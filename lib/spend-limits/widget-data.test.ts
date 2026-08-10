@@ -33,12 +33,14 @@ function config(overrides: Partial<SpendLimitConfig> = {}): SpendLimitConfig {
     name: 'Tankstations',
     purpose: null,
     ruleType: 'counterparty',
-    budgetId: null,
-    budgetName: null,
-    budgetArchived: false,
-    includeChildBudgets: false,
-    counterpartyKey: 'shell',
-    counterpartyLabel: 'Shell',
+    rules: [
+      {
+        id: 'R-1',
+        budgets: [],
+        includeChildBudgets: false,
+        counterparties: [{ key: 'SHELL', label: 'Shell' }],
+      },
+    ],
     limitAmount: 100,
     period: 'month',
     isActive: true,
@@ -54,7 +56,8 @@ function config(overrides: Partial<SpendLimitConfig> = {}): SpendLimitConfig {
  */
 function row(month: string, spent: number): SpendLimitAggregateRow {
   return {
-    month,
+    // Bucketdatum, niet maandsleutel: een maand-bucket is de eerste van de maand.
+    bucketStart: `${month}-01`,
     transactionType: null,
     sumPositief: 0,
     sumNegatief: -spent,
@@ -73,7 +76,7 @@ function build(
     now: NOW,
     windowPeriods: SPEND_LIMIT_WINDOW_BY_PERIOD[cfg.period],
   })
-  return { config: cfg, report, budgetSplit: [] }
+  return { config: cfg, report, budgetSplit: [], ruleSplit: [] }
 }
 
 describe('toSpendLimitWidgetData — projectie pint de motoruitvoer', () => {

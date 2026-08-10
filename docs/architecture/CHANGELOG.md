@@ -748,3 +748,12 @@
 ## 2026-08-09
 
 - Geen wijzigingen.
+
+## 2026-08-10
+
+- **Tabellen** toegevoegd: spend_limit_rules
+- **Componenten (aantal)** toegevoegd: +5
+
+## 2026-08-10
+
+- Geen wijzigingen.

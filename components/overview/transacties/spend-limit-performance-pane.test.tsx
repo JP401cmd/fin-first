@@ -32,7 +32,32 @@ import { SpendLimitPerformancePane } from './spend-limit-performance-pane'
 const NOW = new Date(2026, 7, 15) // 15 augustus 2026
 
 function row(month: string, spend: number): SpendLimitAggregateRow {
-  return { month, transactionType: 'expense', sumPositief: 0, sumNegatief: -spend, count: 2 }
+  // Bucketdatum, niet maandsleutel — een maand-bucket is de eerste van de maand.
+  return {
+    bucketStart: `${month}-01`,
+    transactionType: 'expense',
+    sumPositief: 0,
+    sumNegatief: -spend,
+    count: 2,
+  }
+}
+
+/** Eén budget-regel, met de stand van zaken die het oppervlak moet uitleggen. */
+function budgetRule(
+  over: { name?: string | null; archived?: boolean } = {},
+): SpendLimitConfig['rules'][number] {
+  return {
+    id: 'r-1',
+    budgets: [
+      {
+        id: 'b1',
+        name: over.name === undefined ? 'Boodschappen' : over.name,
+        archived: over.archived ?? false,
+      },
+    ],
+    includeChildBudgets: true,
+    counterparties: [],
+  }
 }
 
 function budgetPot(over: Partial<SpendLimitConfig>): SpendLimitWithReport {
@@ -41,12 +66,7 @@ function budgetPot(over: Partial<SpendLimitConfig>): SpendLimitWithReport {
     name: 'Boodschappengrens',
     purpose: null,
     ruleType: 'budget',
-    budgetId: 'b1',
-    budgetName: 'Boodschappen',
-    budgetArchived: false,
-    includeChildBudgets: true,
-    counterpartyKey: null,
-    counterpartyLabel: null,
+    rules: [budgetRule()],
     limitAmount: 200,
     period: 'month',
     isActive: true,
@@ -62,6 +82,7 @@ function budgetPot(over: Partial<SpendLimitConfig>): SpendLimitWithReport {
       windowPeriods: SPEND_LIMIT_WINDOW_BY_PERIOD.month,
     }),
     budgetSplit: [],
+    ruleSplit: [],
   }
 }
 
@@ -87,7 +108,7 @@ describe('SpendLimitPerformancePane — staat van het gekoppelde budget', () => 
   })
 
   it('meldt een GEARCHIVEERD budget als verwachting, niet als dataverlies', () => {
-    renderPane(budgetPot({ budgetArchived: true }))
+    renderPane(budgetPot({ rules: [budgetRule({ archived: true })] }))
 
     const melding = screen.getByText(/gearchiveerd/i)
     expect(melding.textContent).toContain('Boodschappen')
@@ -100,19 +121,22 @@ describe('SpendLimitPerformancePane — staat van het gekoppelde budget', () => 
     expect(screen.getByText(/juli 2026/i)).toBeTruthy()
   })
 
-  // `ruleSentence` noemt een verdwenen budget óók "niet meer beschikbaar"; de
+  // `describeRule` noemt een verdwenen budget óók "niet meer beschikbaar"; de
   // MELDING herken je aan haar eigen slotzin, niet aan die gedeelde woorden.
-  const verdwenenMelding = () => screen.queryByText(/kunnen niet meer worden toegerekend/i)
+  const verdwenenMelding = () => screen.queryByText(/niet meer worden toegerekend/i)
 
   it('meldt een VERDWENEN budget als de kapotte toestand die het is', () => {
-    renderPane(budgetPot({ budgetName: null, budgetArchived: false }))
+    renderPane(budgetPot({ rules: [budgetRule({ name: null })] }))
 
     expect(verdwenenMelding()).not.toBeNull()
     expect(screen.queryByText(/gearchiveerd/i)).toBeNull()
   })
 
   it('laat "verdwenen" winnen van "gearchiveerd" — anders zegt gearchiveerd niets meer', () => {
-    renderPane(budgetPot({ budgetName: null, budgetArchived: true }))
+    // Per budget sluiten de twee elkaar uit: zonder naam valt er niets te
+    // archiveren, dus `budgetAttention` telt 'm als VERDWENEN en niet als
+    // gearchiveerd. Deze fixture forceert beide vlaggen om dat vast te pinnen.
+    renderPane(budgetPot({ rules: [budgetRule({ name: null, archived: true })] }))
 
     expect(verdwenenMelding()).not.toBeNull()
     expect(screen.queryByText(/gearchiveerd/i)).toBeNull()
@@ -122,11 +146,14 @@ describe('SpendLimitPerformancePane — staat van het gekoppelde budget', () => 
     renderPane(
       budgetPot({
         ruleType: 'counterparty',
-        budgetId: null,
-        budgetName: null,
-        budgetArchived: false,
-        counterpartyKey: 'SHELL',
-        counterpartyLabel: 'Shell',
+        rules: [
+          {
+            id: 'r-1',
+            budgets: [],
+            includeChildBudgets: false,
+            counterparties: [{ key: 'SHELL', label: 'Shell' }],
+          },
+        ],
       }),
     )
 
@@ -147,12 +174,14 @@ function counterpartyPot(): SpendLimitWithReport {
     name: 'Tankgrens',
     purpose: null,
     ruleType: 'counterparty',
-    budgetId: null,
-    budgetName: null,
-    budgetArchived: false,
-    includeChildBudgets: false,
-    counterpartyKey: 'SHELL',
-    counterpartyLabel: 'Shell',
+    rules: [
+      {
+        id: 'r-1',
+        budgets: [],
+        includeChildBudgets: false,
+        counterparties: [{ key: 'SHELL', label: 'Shell' }],
+      },
+    ],
     limitAmount: 200,
     period: 'month',
     isActive: true,
@@ -167,6 +196,7 @@ function counterpartyPot(): SpendLimitWithReport {
       windowPeriods: SPEND_LIMIT_WINDOW_BY_PERIOD.month,
     }),
     budgetSplit: [],
+    ruleSplit: [],
   }
 }
 

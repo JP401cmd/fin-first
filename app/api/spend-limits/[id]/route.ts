@@ -3,7 +3,12 @@ import { badRequest, notFound, serverError, unauthorized } from '@/lib/api/respo
 import { parseBody } from '@/lib/api/parse-body'
 import { createClient } from '@/lib/supabase/server'
 import { SpendLimitInputSchema } from '@/lib/spend-limits/schema'
-import { budgetIsOwn, toSpendLimitRow } from '@/lib/spend-limits/write-helpers'
+import {
+  budgetsAreOwn,
+  collectInputBudgetIds,
+  replaceSpendLimitRules,
+  toSpendLimitRow,
+} from '@/lib/spend-limits/write-helpers'
 
 /**
  * Grenzenpot — wijzigen (incl. pauzeren) en archiveren.
@@ -35,19 +40,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const parsed = await parseBody(SpendLimitInputSchema, req)
   if (!parsed.ok) return parsed.response
 
-  const update = toSpendLimitRow(parsed.data)
-
-  if (parsed.data.ruleType === 'budget') {
-    if (!(await budgetIsOwn(supabase, parsed.data.budgetId))) {
-      return badRequest('Kies een geldig budget')
-    }
-  } else if (!update.counterparty_key) {
-    return badRequest('Deze tegenpartij levert geen bruikbare zoekterm op. Gebruik letters of cijfers.')
+  if (!(await budgetsAreOwn(supabase, collectInputBudgetIds(parsed.data)))) {
+    return badRequest('Kies een geldig budget')
   }
 
   const { data, error } = await supabase
     .from('spend_limits')
-    .update(update)
+    .update(toSpendLimitRow(parsed.data))
     .eq('id', id)
     .eq('user_id', user.id)
     .eq('is_archived', false)
@@ -59,6 +58,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // schaamtepot) en die opvragen voor de tekst van een 404 is een extra query
   // niet waard. `notFound()` gebruikt de app-brede standaardtekst.
   if (!data) return notFound()
+
+  // De regels worden in één transactie vervangen (de plpgsql-functie doet delete
+  // + insert). Faalt dat, dan is de POT al bijgewerkt maar staan de OUDE regels
+  // er nog — een pot met een nieuwe naam of grens en zijn vorige regels. Dat is
+  // de minst schadelijke uitkomst (er is niets kwijt en niets telt stil nul), en
+  // de gebruiker krijgt een expliciete fout in plaats van een stille halve
+  // opslag.
+  const rulesResult = await replaceSpendLimitRules(supabase, id, parsed.data)
+  if (rulesResult.error) {
+    return badRequest(
+      'De regels konden niet worden opgeslagen. Kies een budget of gebruik letters of cijfers in de tegenpartij.',
+    )
+  }
 
   return NextResponse.json({ id: data.id })
 }

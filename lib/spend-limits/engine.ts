@@ -49,34 +49,83 @@ import { isRealAggRow } from '@/lib/server-data/tx-aggregates'
 // ── Types ────────────────────────────────────────────────────────────────────
 
 /**
- * De periodesoorten die de MOTOR uitrekent. Sinds fase 5 alle drie: de
- * check-constraint van de tabel liet `quarter`/`year` al toe, de motor rekent ze
- * nu ook door (er was dus géén migratie nodig).
+ * De periodesoorten die de MOTOR uitrekent. Sinds 10-08-2026 vijf: dag en week
+ * kwamen erbij bovenop de drie kalenderperiodes van fase 5.
  *
  * ── PERIODESLEUTEL- EN LABEL-FORMATEN ZIJN EEN CONTRACT ─────────────────────
  * Ze staan in deeplinks (`?periode=`), in notificatie-id's en in de
  * breakdown-route. Wijzig ze nooit zonder die drie mee te nemen:
  *
- *   | soort     | periodKey   | label           |
- *   |-----------|-------------|-----------------|
- *   | `month`   | `'2026-08'` | `'augustus 2026'` |
- *   | `quarter` | `'2026-Q3'` | `'Q3 2026'`     |
- *   | `year`    | `'2026'`    | `'2026'`        |
+ *   | soort     | periodKey       | label              |
+ *   |-----------|-----------------|--------------------|
+ *   | `day`     | `'2026-08-10'`  | `'10 augustus 2026'` |
+ *   | `week`    | `'2026-W33'`    | `'week 33, 2026'`  |
+ *   | `month`   | `'2026-08'`     | `'augustus 2026'`  |
+ *   | `quarter` | `'2026-Q3'`     | `'Q3 2026'`        |
+ *   | `year`    | `'2026'`        | `'2026'`           |
+ *
+ * De dag-sleutel is met opzet een volledige ISO-datum en niet iets korters: hij
+ * is daarmee identiek aan `slice.since`/`slice.until` van diezelfde periode, en
+ * aan de `bucket_start` die de SQL teruggeeft. Eén formaat, geen omrekening.
  */
-export type SpendLimitPeriodKind = 'month' | 'quarter' | 'year'
-
-export type SpendLimitRuleType = 'budget' | 'counterparty'
+export type SpendLimitPeriodKind = 'day' | 'week' | 'month' | 'quarter' | 'year'
 
 /**
- * Vensterlengte per periodesoort, INCLUSIEF de lopende periode. 13 maanden = 12
- * afgesloten maanden om een reeks op te baseren plus de voorlopige huidige; 9
- * kwartalen = 8 + 1; 4 jaren = 3 + 1. Maximaal 48 onderliggende kalendermaanden.
+ * Waar een pot over gaat, AFGELEID uit zijn regels (nooit opgeslagen — de kolom
+ * `spend_limits.rule_type` is legacy sinds 10-08-2026):
+ *
+ *  - `budget`       — elke regel kiest alleen budgetten
+ *  - `counterparty` — elke regel kiest alleen tegenpartijen
+ *  - `mixed`        — er is minstens één regel die beide dimensies combineert,
+ *                     óf de pot heeft regels van beide soorten naast elkaar
+ *
+ * `mixed` is bewust een EIGEN waarde en niet "budget met een uitzondering": een
+ * oppervlak dat een budget-icoon of een budget-uitsplitsing toont, hoort bij een
+ * gemengde pot iets anders te zeggen dan bij een zuivere budget-pot.
+ */
+export type SpendLimitRuleType = 'budget' | 'counterparty' | 'mixed'
+
+/**
+ * De SQL-korrel waarop de sommen voor een periodesoort worden opgehaald
+ * (`p_grain` van `public.spend_limit_rule_aggregate`).
+ *
+ * Maand, kwartaal en jaar delen de maand-korrel omdat ze alle drie op
+ * kalendermaandgrenzen vallen; dag en week hebben hun eigen korrel omdat een
+ * dag- of weekbedrag per definitie niet uit een maandsom af te leiden is.
+ *
+ * DE HARDE EIS onder `sliceContainsBucket`: een bucket mag NOOIT over een
+ * periodegrens heen liggen. Deze map is de plek waar dat gegarandeerd wordt —
+ * wie hier een korrel grover maakt dan de periode, breekt de optelling stil.
+ */
+export type SpendLimitGrain = 'day' | 'week' | 'month'
+
+export const SPEND_LIMIT_GRAIN_BY_PERIOD: Record<SpendLimitPeriodKind, SpendLimitGrain> = {
+  day: 'day',
+  week: 'week',
+  month: 'month',
+  quarter: 'month',
+  year: 'month',
+}
+
+/**
+ * Vensterlengte per periodesoort, INCLUSIEF de lopende periode. 31 dagen = 30
+ * afgesloten dagen plus de voorlopige vandaag; 14 weken = 13 + 1; 13 maanden =
+ * 12 + 1; 9 kwartalen = 8 + 1; 4 jaren = 3 + 1. Maximaal 48 onderliggende
+ * kalendermaanden.
+ *
+ * Waarom dag en week een KORTER venster in periodes hebben dan een maand: de
+ * reeks moet over een tijdspanne gaan waarin gedrag betekenis heeft. 30 dagen en
+ * 13 weken beslaan ruwweg een maand en een kwartaal aan werkelijke tijd —
+ * vergelijkbaar met wat de andere soorten aan geschiedenis tonen — terwijl 365
+ * dagbolletjes op een verlooplijn onleesbaar zouden zijn.
  *
  * Eén home: de loader importeert deze map, herhaalt de getallen niet. Zie ook de
  * chunking in lib/spend-limits/loader.ts — 48 maanden aan aggregaat-rijen zou
  * zonder chunking tegen de PostgREST `max_rows`-cap kunnen lopen.
  */
 export const SPEND_LIMIT_WINDOW_BY_PERIOD: Record<SpendLimitPeriodKind, number> = {
+  day: 31,
+  week: 14,
   month: 13,
   quarter: 9,
   year: 4,
@@ -127,20 +176,30 @@ export interface SpendLimitRule {
 
 /**
  * Eén aggregaat-rij, al toegesneden op één grenzenpot. De loader kiest welke
- * rijen bij welke pot horen (budget-id's incl. kinderen, of de
- * tegenpartij-sleutel); de motor telt alleen nog op.
+ * rijen bij welke pot horen (welke regel-indexen) en ontdubbelt; de motor telt
+ * alleen nog op.
  *
- * Vorm spiegelt `tx_month_aggregate` / `tx_counterparty_month_aggregate`:
- * `sumPositief` ≥ 0 (o.a. refunds/chargebacks), `sumNegatief` ≤ 0 (uitgaven).
+ * Vorm spiegelt `public.spend_limit_rule_aggregate`: `sumPositief` ≥ 0 (o.a.
+ * refunds/chargebacks), `sumNegatief` ≤ 0 (uitgaven).
  */
 export interface SpendLimitAggregateRow {
-  /** Kalendermaand 'YYYY-MM'. */
-  month: string
+  /**
+   * De EERSTE DAG van de bucket, als ISO-datum 'YYYY-MM-DD' — de dag zelf bij
+   * dag-korrel, de maandag bij week-korrel, de eerste van de maand bij
+   * maand-korrel.
+   *
+   * Bewust een datum en geen periodesleutel: de bereik-match
+   * (`sliceContainsBucket`) is daarmee één kale ISO-datumvergelijking die voor
+   * álle vijf periodesoorten hetzelfde werkt. Vóór 10-08-2026 stond hier een
+   * `month: 'YYYY-MM'` met een eigen lexicografische maandvergelijking; die kon
+   * per definitie geen dag- of weekgrens uitdrukken.
+   */
+  bucketStart: string
   transactionType: string | null
   sumPositief: number
   sumNegatief: number
   count: number
-  /** Alleen bij tegenpartij-regels: welke namen matchten (uitleg in de UI). */
+  /** Alleen bij regels mét tegenpartij-dimensie: welke namen matchten. */
   matchedNames?: string[]
 }
 
@@ -266,6 +325,40 @@ function iso(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
+/**
+ * De MAANDAG van de ISO-week waarin `d` valt (maandag = eerste dag, de
+ * Nederlandse en ISO-8601-conventie).
+ *
+ * `(getDay() + 6) % 7` maakt van zondag=0…zaterdag=6 een maandag=0…zondag=6.
+ * Rekenen gebeurt op lokale kalendercomponenten, nooit op tijdstempels: de
+ * SQL-kant doet hetzelfde met `extract(isodow …)` op een `date`-kolom zonder
+ * tijdzone, en een UTC-omweg zou daar rond middernacht een dag van afwijken.
+ */
+function mondayOf(d: Date): Date {
+  const t = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  t.setDate(t.getDate() - ((t.getDay() + 6) % 7))
+  return t
+}
+
+/**
+ * ISO-weeknummer en ISO-JAAR van de week die op `monday` begint.
+ *
+ * Het ISO-jaar is niet altijd het kalenderjaar van de maandag: de week van 29
+ * december 2025 t/m 4 januari 2026 is ISO-week 1 van 2026. De donderdag van de
+ * week beslist (ISO-8601), en week 1 is de week met 4 januari erin.
+ *
+ * De dagafstand wordt afgerond en niet gedeeld-en-afgekapt: over een
+ * zomertijdovergang scheelt een etmaal 23 of 25 uur, en `Math.round` vangt dat
+ * op waar een kale deling een week zou kunnen verspringen.
+ */
+function isoWeekParts(monday: Date): { year: number; week: number } {
+  const thursday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 3)
+  const year = thursday.getFullYear()
+  const week1Monday = mondayOf(new Date(year, 0, 4))
+  const days = Math.round((thursday.getTime() - week1Monday.getTime()) / 86_400_000)
+  return { year, week: Math.floor(days / 7) + 1 }
+}
+
 // ── Periodevensters ──────────────────────────────────────────────────────────
 
 /**
@@ -275,14 +368,15 @@ function iso(d: Date): string {
  * `isOpen` volgt uit de datum, niet uit de positie in de reeks: een periode is
  * open zolang haar einddatum vandaag of later is. Op de laatste dag van de maand
  * is die maand dus nog steeds voorlopig — de dag is immers niet voorbij. Dat is
- * exact de regel die de reeks eerlijk houdt, en ze geldt onveranderd voor
- * kwartaal en jaar.
+ * exact de regel die de reeks eerlijk houdt, en ze geldt onveranderd voor alle
+ * vijf de soorten (bij `day` betekent ze: vandaag is altijd de open periode).
  *
- * ALLE DRIE de periodesoorten vallen samen met KALENDERGRENZEN (kwartaal =
- * jan-mrt/apr-jun/jul-sep/okt-dec, jaar = 1 jan t/m 31 dec) en dus per definitie
- * op kalendermaandgrenzen. Daarop leunt de containment-match in
- * `computePeriodOutcome`: `since`/`until` zijn altijd exact op een maandgrens te
- * knippen. Een verschoven ("gebroken") boekjaar bestaat hier bewust niet.
+ * KALENDERGRENZEN: kwartaal = jan-mrt/apr-jun/jul-sep/okt-dec, jaar = 1 jan t/m
+ * 31 dec, week = maandag t/m zondag (ISO-8601). Een verschoven ("gebroken")
+ * boekjaar of een week die op zondag begint bestaat hier bewust niet. Daarop
+ * leunt `sliceContainsBucket`: de SQL-korrel die bij een soort hoort
+ * (`SPEND_LIMIT_GRAIN_BY_PERIOD`) is altijd fijn genoeg om binnen deze grenzen
+ * te vallen, dus een bucket ligt nooit over twee periodes tegelijk.
  *
  * De periodeKey/label-formaten zijn een CONTRACT — zie `SpendLimitPeriodKind`.
  */
@@ -303,7 +397,25 @@ export function resolveSpendLimitPeriods(
     let periodKey: string
     let label: string
 
-    if (period === 'quarter') {
+    if (period === 'day') {
+      start = new Date(y, m, now.getDate() + offset)
+      end = start
+      periodKey = iso(start)
+      label = `${start.getDate()} ${MONTH_NAMES[start.getMonth()]} ${start.getFullYear()}`
+    } else if (period === 'week') {
+      // Vanaf de maandag van de HUIDIGE week terugtellen in stappen van 7 dagen;
+      // maand- en jaaroverloop rolt vanzelf om.
+      const thisMonday = mondayOf(now)
+      start = new Date(
+        thisMonday.getFullYear(),
+        thisMonday.getMonth(),
+        thisMonday.getDate() + offset * 7,
+      )
+      end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6)
+      const { year, week } = isoWeekParts(start)
+      periodKey = `${year}-W${String(week).padStart(2, '0')}`
+      label = `week ${week}, ${year}`
+    } else if (period === 'quarter') {
       // Eerste maand van het kwartaal waarin `now` valt, dan 3 maanden per stap.
       // `new Date(y, maand + 3, 0)` = dag 0 van de maand ná het kwartaal = de
       // laatste dag ervan; maand-overloop (< 0 of > 11) rolt vanzelf het jaar om.
@@ -337,21 +449,37 @@ export function resolveSpendLimitPeriods(
 }
 
 /**
- * Hoort deze aggregaat-maand ('YYYY-MM') bij deze periode?
+ * Hoort deze aggregaat-bucket bij deze periode?
  *
  * ÉÉN HOME voor de bereik-match. `computePeriodOutcome` telt hiermee op en de
- * loader splitst er zijn per-budget-uitsplitsing mee uit; twee eigen varianten
- * zouden bij de eerste wijziging uiteenlopen.
+ * loader splitst er zijn uitsplitsingen mee uit; twee eigen varianten zouden bij
+ * de eerste wijziging uiteenlopen.
  *
- * Waarom containment en niet `row.month === slice.periodKey` (de fase-1-regel):
- * die gelijkheid werkt uitsluitend voor maandpotten. Voor een kwartaalpot is
- * `'2026-08' !== '2026-Q3'` altijd waar, waardoor élke periode op nul zou
- * uitkomen en "binnen de grens" zou heten — zonder één foutmelding.
- * Lexicografische 'YYYY-MM'-vergelijking is hier exact omdat `since`/`until`
- * altijd op kalendermaandgrenzen liggen (zie `resolveSpendLimitPeriods`).
+ * Waarom containment en niet `row.bucketStart === slice.periodKey`: die
+ * gelijkheid werkt uitsluitend als korrel en periode toevallig samenvallen. Voor
+ * een kwartaalpot is `'2026-08-01' !== '2026-Q3'` altijd waar, waardoor élke
+ * periode op nul zou uitkomen en "binnen de grens" zou heten — zonder één
+ * foutmelding.
+ *
+ * De vergelijking is een kale lexicografische ISO-datumvergelijking, en die is
+ * hier EXACT omdat een bucket per constructie nooit over een periodegrens heen
+ * ligt: `SPEND_LIMIT_GRAIN_BY_PERIOD` kiest per soort een korrel die binnen die
+ * grenzen valt (zie `resolveSpendLimitPeriods`).
+ */
+export function sliceContainsBucket(slice: SpendLimitPeriodSlice, bucketStart: string): boolean {
+  return bucketStart >= slice.since && bucketStart <= slice.until
+}
+
+/**
+ * Dezelfde vraag voor een KALENDERMAAND-sleutel ('YYYY-MM').
+ *
+ * Blijft bestaan voor de oppervlakken die met `tx_month_aggregate` werken (dat
+ * aggregaat draagt geen bucketdatum maar een maandsleutel). Bewust een dunne
+ * omzetting naar `sliceContainsBucket` en geen tweede vergelijking: de eerste
+ * van de maand ís de bucketdatum van die maand.
  */
 export function sliceContainsMonth(slice: SpendLimitPeriodSlice, month: string): boolean {
-  return month >= slice.since.slice(0, 7) && month <= slice.until.slice(0, 7)
+  return sliceContainsBucket(slice, `${month}-01`)
 }
 
 // ── Optelling per periode ────────────────────────────────────────────────────
@@ -416,7 +544,7 @@ export function computePeriodOutcome(
   const names = new Set<string>()
 
   for (const row of rows) {
-    if (!sliceContainsMonth(slice, row.month)) continue
+    if (!sliceContainsBucket(slice, row.bucketStart)) continue
     if (!isCountable(row)) continue
     sumPositief += row.sumPositief
     sumNegatief += row.sumNegatief

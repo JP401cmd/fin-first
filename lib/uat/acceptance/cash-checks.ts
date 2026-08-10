@@ -944,8 +944,12 @@ NEWFILEUID:NONE
     run: () => {
       criterion('WF-CASH-53')
 
+      // De motor rekent sinds 10-08-2026 op een BUCKETDATUM in plaats van een
+      // maandsleutel (dag/week-grenzen zijn niet uit een maandsom af te leiden).
+      // Een maand-bucket is de eerste van die maand — dezelfde omzetting die
+      // `sliceContainsMonth` doet.
       const agg = (month: string, sumNegatief: number, sumPositief = 0): SpendLimitAggregateRow => ({
-        month,
+        bucketStart: `${month}-01`,
         transactionType: null,
         sumPositief,
         sumNegatief,
@@ -1030,6 +1034,26 @@ NEWFILEUID:NONE
         100,
       )
 
+      // (g) DAG- EN WEEKGRENZEN (ADR 0097). De motor rekent op een BUCKETDATUM,
+      // en `SPEND_LIMIT_GRAIN_BY_PERIOD` garandeert dat een bucket nooit over een
+      // periodegrens ligt. Twee dingen worden hier vastgepind:
+      //   * een dagperiode telt uitsluitend díé dag — de dag ervoor niet;
+      //   * een weekperiode loopt van maandag t/m zondag, en de ISO-weeksleutel
+      //     draagt het ISO-JAAR (de week van 29 dec 2025 heet 2026-W01, want de
+      //     donderdag valt in 2026). Een kale getFullYear() op de maandag zou
+      //     daar '2025-W01' van maken.
+      const dagNu = new Date(2026, 7, 10) // maandag 10 augustus 2026
+      const [dagGisteren, dagVandaag] = resolveSpendLimitPeriods('day', dagNu, 2)
+      const dagRijen = [
+        { bucketStart: '2026-08-09', transactionType: null, sumPositief: 0, sumNegatief: -30, count: 1 },
+        { bucketStart: '2026-08-10', transactionType: null, sumPositief: 0, sumNegatief: -12, count: 1 },
+      ]
+      const dagOutcomeGisteren = computePeriodOutcome(dagGisteren, dagRijen, 20)
+      const dagOutcomeVandaag = computePeriodOutcome(dagVandaag, dagRijen, 20)
+
+      const [weekHuidig] = resolveSpendLimitPeriods('week', new Date(2026, 7, 13), 1)
+      const [weekJaargrens] = resolveSpendLimitPeriods('week', new Date(2025, 11, 31), 1)
+
       // (f) Tegenpartij-parity-helpers (spiegel van public.spend_limit_counterparty_key).
       const key = spendLimitCounterpartyKey('Shell Amsterdam #57')
       const matchesShell = counterpartyMatchesKey('Shell Amsterdam #57', 'SHELL')
@@ -1049,6 +1073,8 @@ NEWFILEUID:NONE
           'stableSmallChangeDirection=stable; ' +
           'improvingDirection=improving; ' +
           'refundFlip: exceeded→within; ' +
+          'dagGisteren=30/exceeded; dagVandaag=12/within; ' +
+          'week=2026-08-10..2026-08-16; weekJaargrensKey=2026-W01; ' +
           'key=SHELLAMSTERDAM57; matchesShell=true; matchesBol=false; emptyKeyNeverMatches=false',
         actual:
           `quarterMatched=${quarterOutcome.periodMatchedAmount}; quarterNear=${quarterOutcome.isNearLimit}; quarterHeadroom=${quarterOutcome.periodHeadroom}; quarterTxCount=${quarterOutcome.matchedTransactionCount}; ` +
@@ -1062,6 +1088,9 @@ NEWFILEUID:NONE
           `stableSmallChangeDirection=${trendStableSmallChange.direction}; ` +
           `improvingDirection=${trendImproving.direction}; ` +
           `refundFlip: ${beforeRefund.status}→${afterRefund.status}; ` +
+          `dagGisteren=${dagOutcomeGisteren.periodMatchedAmount}/${dagOutcomeGisteren.status}; ` +
+          `dagVandaag=${dagOutcomeVandaag.periodMatchedAmount}/${dagOutcomeVandaag.status}; ` +
+          `week=${weekHuidig.since}..${weekHuidig.until}; weekJaargrensKey=${weekJaargrens.periodKey}; ` +
           `key=${key}; matchesShell=${matchesShell}; matchesBol=${matchesBol}; emptyKeyNeverMatches=${emptyKeyNeverMatches}`,
       }
     },

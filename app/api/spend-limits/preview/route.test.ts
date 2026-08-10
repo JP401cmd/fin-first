@@ -6,10 +6,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
  * Wat hier bewaakt wordt:
  *  1. de POORT: 401 zonder sessie, 400 bij een body die het zod-schema niet kent
  *     (AC-B3-05) — en in beide gevallen wordt de database niet aangeraakt;
- *  2. het TE-KORT-pad: een label dat na normalisatie te weinig overhoudt levert
+ *  2. het TE-KORT-pad: labels die na normalisatie te weinig overhouden leveren
  *     een expliciete uitkomst en géén misleidende lege trefferlijst (AC-B3-03);
- *  3. het VENSTER: de datumgrenzen komen uit de motor (resolveSpendLimitPeriods),
- *     niet uit een eigen datumrekening in de route (D-P3);
+ *  3. het VENSTER en de KORREL: allebei uit de motor
+ *     (`resolveSpendLimitPeriods` / `SPEND_LIMIT_GRAIN_BY_PERIOD`), niet uit een
+ *     eigen datumrekening in de route (D-P3);
  *  4. de SOM: refunds verrekend, transfers eruit, namen compleet — inclusief een
  *     naam die buiten elke suggestielijst zou vallen (AC-B3-01);
  *  5. de OVERLAP-observatie: namen van andere potten, zonder bedrag (AC-B3-02);
@@ -18,6 +19,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
  * De motor draait hier ECHT mee (niet gemockt): dat is precies de eigenschap die
  * getoetst moet worden — de preview telt op met dezelfde functie die de pot
  * straks voedt.
+ *
+ * Sinds 10-08-2026 kent de route ÉÉN pad in plaats van twee takken: een regel mag
+ * budgetten en tegenpartijen tegelijk dragen (EN), dus er valt niets meer te
+ * discrimineren. De suites hieronder zijn navenant per DIMENSIE geordend en niet
+ * meer per tak.
  */
 
 const { mockCreateClient, mockGetAuthClaims, mockRpc, mockFrom } = vi.hoisted(() => ({
@@ -37,9 +43,11 @@ import type { SpendLimitPreviewResponse } from './route'
 
 // ── Testgereedschap ─────────────────────────────────────────────────────────
 
+/** Eén rij zoals `spend_limit_rule_aggregate` 'm teruggeeft. */
 interface AggRow {
-  counterparty_key: string
-  month: string
+  rule_index: number
+  bucket_start: string
+  budget_id: string | null
   transaction_type: string | null
   sum_positief: number
   sum_negatief: number
@@ -47,14 +55,15 @@ interface AggRow {
   matched_names: string[] | null
 }
 
-interface ConfigRow {
+interface LimitRow {
   id: string
   name: string
-  rule_type: string
-  counterparty_key?: string | null
-  budget_id?: string | null
-  include_child_budgets?: boolean | null
   is_active: boolean
+  spend_limit_rules: {
+    budget_ids: string[] | null
+    include_child_budgets?: boolean | null
+    counterparty_keys: string[] | null
+  }[]
 }
 
 interface BudgetRow {
@@ -64,11 +73,11 @@ interface BudgetRow {
 }
 
 interface QueryResult {
-  data: ConfigRow[] | BudgetRow[] | null
+  data: unknown
   error: unknown
 }
 
-/** Thenable `.select().eq().eq()`-keten, met de aanroepen zichtbaar. */
+/** Thenable `.select().eq()`-keten, met de aanroepen zichtbaar. */
 interface QueryChain {
   select: (columns: string) => QueryChain
   eq: (column: string, value: unknown) => QueryChain
@@ -93,19 +102,16 @@ function chainFor(result: QueryResult, trace: boolean): QueryChain {
   return chain
 }
 
-function stubLimitsQuery(result: QueryResult) {
-  mockFrom.mockReturnValue(chainFor(result, true))
-}
-
 /**
- * De budget-tak raakt twee tabellen. Alleen de `spend_limits`-keten wordt
- * getraceerd — dat is de query waarvan de kolom-/filtervorm ertoe doet.
+ * De route raakt altijd twee tabellen: `budgets` (voor de subboom én voor de
+ * overlap-vergelijking) en `spend_limits`. Alleen die laatste wordt getraceerd —
+ * dat is de query waarvan de kolom-/filtervorm ertoe doet.
  */
-function stubBudgetBranch(budgets: BudgetRow[], limits: ConfigRow[]) {
+function stubTables(opts: { budgets?: BudgetRow[]; limits?: LimitRow[]; limitsError?: unknown } = {}) {
   mockFrom.mockImplementation((table: string) =>
     table === 'budgets'
-      ? chainFor({ data: budgets, error: null }, false)
-      : chainFor({ data: limits, error: null }, true),
+      ? chainFor({ data: opts.budgets ?? [], error: null }, false)
+      : chainFor({ data: opts.limits ?? [], error: opts.limitsError ?? null }, true),
   )
 }
 
@@ -117,18 +123,21 @@ function previewRequest(body: unknown) {
   })
 }
 
-/** De tegenpartij-tak; `ruleType` is de discriminator van het preview-schema. */
-function counterpartyRequest(body: Record<string, unknown>) {
-  return previewRequest({ ruleType: 'counterparty', ...body })
+/** Een regel met alleen tegenpartijen. */
+function cpRequest(body: Record<string, unknown> = {}) {
+  return previewRequest({ counterpartyLabels: ['SHELL'], ...body })
 }
 
-/** De budget-tak. */
-function budgetRequest(body: Record<string, unknown>) {
-  return previewRequest({ ruleType: 'budget', ...body })
+/** Een regel met alleen budgetten. */
+function budgetRequest(body: Record<string, unknown> = {}) {
+  return previewRequest({ budgetIds: [HOOFD], ...body })
 }
 
 /** Het id van de pot die "in bewerking" is; moet zichzelf nooit als overlap zien. */
 const EDIT_SUBJECT_ID = '11111111-2222-4333-8444-555555555555'
+const HOOFD = 'aaaaaaaa-0000-4000-8000-000000000001'
+const SUB = 'aaaaaaaa-0000-4000-8000-000000000002'
+const ANDERS = 'aaaaaaaa-0000-4000-8000-000000000003'
 
 function malformedRequest() {
   return new Request('http://localhost/api/spend-limits/preview', {
@@ -140,6 +149,24 @@ function malformedRequest() {
 
 async function readPreview(res: Response): Promise<SpendLimitPreviewResponse> {
   return (await res.json()) as SpendLimitPreviewResponse
+}
+
+/** Eén aggregaat-rij; `spend` is een positief uitgavebedrag. */
+function aggRow(over: Partial<AggRow> & { bucket_start: string }): AggRow {
+  return {
+    rule_index: 0,
+    budget_id: null,
+    transaction_type: 'expense',
+    sum_positief: 0,
+    sum_negatief: 0,
+    count: 1,
+    matched_names: null,
+    ...over,
+  }
+}
+
+function ruleAggCalls() {
+  return mockRpc.mock.calls.filter((c) => c[0] === 'spend_limit_rule_aggregate')
 }
 
 beforeEach(() => {
@@ -157,7 +184,7 @@ beforeEach(() => {
   mockGetAuthClaims.mockResolvedValue({ sub: 'user-1' })
   mockCreateClient.mockResolvedValue({ rpc: mockRpc, from: mockFrom })
   mockRpc.mockResolvedValue({ data: [], error: null })
-  stubLimitsQuery({ data: [], error: null })
+  stubTables()
 })
 
 afterEach(() => {
@@ -170,459 +197,363 @@ describe('POST /api/spend-limits/preview — poort', () => {
   it('401 zonder sessie, zonder de database aan te raken', async () => {
     mockGetAuthClaims.mockResolvedValue(null)
 
-    const res = await POST(counterpartyRequest({ counterpartyLabel: 'SHELL' }))
+    const res = await POST(cpRequest())
 
     expect(res.status).toBe(401)
-    expect(await res.json()).toMatchObject({ error: 'Niet ingelogd' })
     expect(mockRpc).not.toHaveBeenCalled()
     expect(mockFrom).not.toHaveBeenCalled()
   })
 
-  it('400 bij een ontbrekend label (AC-B3-05)', async () => {
-    const res = await POST(counterpartyRequest({}))
-
+  it('400 bij een body die geen json is', async () => {
+    const res = await POST(malformedRequest())
     expect(res.status).toBe(400)
-    expect(await res.json()).toMatchObject({ code: 'validation_error' })
     expect(mockRpc).not.toHaveBeenCalled()
   })
 
-  it('400 bij een verkeerd getypeerd label', async () => {
-    const res = await POST(counterpartyRequest({ counterpartyLabel: 42 }))
-
+  it('400 bij een label van het verkeerde type', async () => {
+    const res = await POST(cpRequest({ counterpartyLabels: [42] }))
     expect(res.status).toBe(400)
     expect(mockRpc).not.toHaveBeenCalled()
   })
 
   it('400 bij een onbekende periodesoort', async () => {
-    const res = await POST(counterpartyRequest({ counterpartyLabel: 'SHELL', period: 'week' }))
-
+    const res = await POST(cpRequest({ period: 'decennium' }))
     expect(res.status).toBe(400)
-    expect(mockRpc).not.toHaveBeenCalled()
   })
 
-  it('400 zonder regelsoort: de body kiest de tak, de route raadt niet', async () => {
-    const res = await POST(previewRequest({ counterpartyLabel: 'SHELL' }))
-
-    expect(res.status).toBe(400)
-    expect(mockRpc).not.toHaveBeenCalled()
+  it('aanvaardt de vijf periodesoorten die de motor kent', async () => {
+    for (const period of ['day', 'week', 'month', 'quarter', 'year']) {
+      const res = await POST(cpRequest({ period }))
+      expect(res.status).toBe(200)
+    }
   })
 
-  it('400 bij een budget-tak zonder geldig budget-id', async () => {
-    const res = await POST(budgetRequest({ budgetId: 'geen-uuid' }))
-
+  it('400 bij een budget-id dat geen uuid is', async () => {
+    const res = await POST(budgetRequest({ budgetIds: ['geen-uuid'] }))
     expect(res.status).toBe(400)
     expect(mockRpc).not.toHaveBeenCalled()
   })
 
   it('400 bij een excludeLimitId dat geen uuid is', async () => {
-    const res = await POST(counterpartyRequest({ counterpartyLabel: 'SHELL', excludeLimitId: 'x' }))
-
+    const res = await POST(cpRequest({ excludeLimitId: 'x' }))
     expect(res.status).toBe(400)
-    expect(mockRpc).not.toHaveBeenCalled()
   })
 
-  it('400 bij malformed JSON in plaats van een 500', async () => {
-    const res = await POST(malformedRequest())
+  it('geeft bij een LEGE regel een lege preview in plaats van een 400', async () => {
+    // Een half ingevuld formulier hoort niets te zeggen, niet te schreeuwen — en
+    // een regel zonder dimensies zou bovendien op álles matchen, dus die vraag
+    // stellen we de database niet eens.
+    const res = await POST(previewRequest({ budgetIds: [], counterpartyLabels: [] }))
+    const body = await readPreview(res)
 
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(200)
+    expect(body.status).toBe('ok')
+    expect(body.matchedTransactionCount).toBe(0)
     expect(mockRpc).not.toHaveBeenCalled()
   })
 })
 
 // ── Te kort om te matchen ───────────────────────────────────────────────────
 
-describe('POST /api/spend-limits/preview — te kort om te matchen (AC-B3-03)', () => {
-  it.each([
-    ['een label van één teken', 'S', 'S'],
-    ['een label dat leeg normaliseert', '!!!', ''],
-  ])('%s levert een expliciete uitkomst, geen lege trefferlijst', async (_naam, label, key) => {
-    const res = await POST(counterpartyRequest({ counterpartyLabel: label }))
-    const body = await readPreview(res)
+describe('te-kort-uitkomst', () => {
+  it('geeft `too_short` zodra geen enkel label genoeg overhoudt (AC-B3-03)', async () => {
+    for (const label of ['s', '!', '#!', 'é']) {
+      mockRpc.mockClear()
+      const body = await readPreview(await POST(cpRequest({ counterpartyLabels: [label] })))
 
-    expect(res.status).toBe(200)
-    expect(body.status).toBe('too_short')
-    expect(body.key).toBe(key)
-    expect(body.matchedAmountByPeriod).toEqual([])
-    expect(body.matchedNames).toEqual([])
-    // Geen enkele query: te kort is een uitkomst, geen zoekopdracht.
-    expect(mockRpc).not.toHaveBeenCalled()
-    expect(mockFrom).not.toHaveBeenCalled()
+      expect(body.status).toBe('too_short')
+      expect(body.matchedAmountByPeriod).toEqual([])
+      expect(mockRpc).not.toHaveBeenCalled()
+    }
+  })
+
+  it('telt gewoon door zodra ÉÉN label wél bruikbaar is', async () => {
+    const body = await readPreview(await POST(cpRequest({ counterpartyLabels: ['s', 'SHELL'] })))
+
+    expect(body.status).toBe('ok')
+    // Het te korte label valt eruit; er wordt niet op gematcht.
+    expect(body.keys).toEqual(['SHELL'])
   })
 })
 
-// ── Venster en som ──────────────────────────────────────────────────────────
+// ── Sleutels, venster en korrel ─────────────────────────────────────────────
 
-describe('POST /api/spend-limits/preview — venster en som', () => {
-  it('vraagt het maandvenster op met de sleutel die de server zelf afleidde', async () => {
-    const res = await POST(counterpartyRequest({ counterpartyLabel: 'Shell (NL)' }))
-    const body = await readPreview(res)
+describe('sleutel-afleiding, venster en korrel', () => {
+  it('leidt de sleutels serverzijdig af uit de labels', async () => {
+    const body = await readPreview(
+      await POST(cpRequest({ counterpartyLabels: ['Shell (NL)', 'Café Zürich'] })),
+    )
 
-    expect(res.status).toBe(200)
-    expect(mockRpc).toHaveBeenCalledTimes(1)
-    expect(mockRpc).toHaveBeenCalledWith('tx_counterparty_month_aggregate', {
-      p_from: '2025-08-01',
-      p_to: '2026-09-01', // half-open bovengrens, exact als de RPC zelf rekent
-      p_keys: ['SHELLNL'],
-      p_own_only: false,
-    })
-    expect(body.key).toBe('SHELLNL')
-    expect(body.period).toBe('month')
-    expect(body.matchedAmountByPeriod).toHaveLength(13)
-    expect(body.matchedAmountByPeriod.at(-1)).toMatchObject({
-      periodKey: '2026-08',
-      isOpen: true,
+    expect(body.keys).toEqual(['SHELLNL', 'CAFZRICH'])
+    expect(ruleAggCalls()[0][1]).toMatchObject({
+      p_rules: [{ p: 0, i: 0, b: [], k: ['SHELLNL', 'CAFZRICH'] }],
+      p_grain: 'month',
     })
   })
 
-  it('leidt het kwartaalvenster uit de motor af, niet uit een eigen datumrekening', async () => {
-    const res = await POST(counterpartyRequest({ counterpartyLabel: 'SHELL', period: 'quarter' }))
-    const body = await readPreview(res)
+  it('haalt het venster uit de motor — maand', async () => {
+    await POST(cpRequest())
+    const calls = ruleAggCalls()
 
-    expect(mockRpc.mock.calls[0][1]).toMatchObject({ p_from: '2024-07-01' })
-    expect(body.matchedAmountByPeriod).toHaveLength(9)
-    expect(body.matchedAmountByPeriod.map((p) => p.periodKey).at(-1)).toBe('2026-Q3')
-    expect(body.matchedAmountByPeriod.map((p) => p.label).at(-1)).toBe('Q3 2026')
+    expect(calls[0][1].p_from).toBe('2025-08-01')
+    expect(calls[calls.length - 1][1].p_to).toBe('2026-09-01')
   })
 
-  it('telt netto op via de motor: refund verrekend, transfer eruit', async () => {
-    const rows: AggRow[] = [
-      {
-        counterparty_key: 'SHELL',
-        month: '2026-07',
-        transaction_type: 'expense',
-        sum_positief: 0,
-        sum_negatief: -120,
-        count: 3,
-        matched_names: ['SHELL NL', 'Shell #57'],
-      },
-      {
-        counterparty_key: 'SHELL',
-        month: '2026-07',
-        transaction_type: 'income',
-        sum_positief: 20, // refund op dezelfde tegenpartij
-        sum_negatief: 0,
-        count: 1,
-        matched_names: ['SHELL NL'],
-      },
-      {
-        counterparty_key: 'SHELL',
-        month: '2026-07',
-        transaction_type: 'transfer', // eigen overboeking: telt nooit mee
-        sum_positief: 0,
-        sum_negatief: -500,
-        count: 1,
-        matched_names: ['SHELL SPAARPOT'],
-      },
-      {
-        counterparty_key: 'ANDERS', // andere sleutel in hetzelfde antwoord
-        month: '2026-07',
-        transaction_type: 'expense',
-        sum_positief: 0,
-        sum_negatief: -999,
-        count: 9,
-        matched_names: ['IETS ANDERS'],
-      },
+  it('rekt het venster mee met de periodesoort — kwartaal', async () => {
+    await POST(cpRequest({ period: 'quarter' }))
+    expect(ruleAggCalls()[0][1].p_from).toBe('2024-07-01')
+  })
+
+  it('knipt een jaarvenster in stukken, zoals de loader (dezelfde knipregel)', async () => {
+    await POST(cpRequest({ period: 'year' }))
+    const calls = ruleAggCalls()
+
+    // 2023-01 t/m 2026-09 = 44 maanden ⇒ 4 stukken van hoogstens 12.
+    expect(calls).toHaveLength(4)
+    expect(calls[0][1].p_from).toBe('2023-01-01')
+    expect(calls[calls.length - 1][1].p_to).toBe('2026-09-01')
+    // Sluitend en zonder overlap.
+    for (let i = 1; i < calls.length; i++) {
+      expect(calls[i][1].p_from).toBe(calls[i - 1][1].p_to)
+    }
+  })
+
+  it('vraagt de korrel op die bij de periodesoort hoort', async () => {
+    for (const [period, grain] of [
+      ['day', 'day'],
+      ['week', 'week'],
+      ['month', 'month'],
+      ['quarter', 'month'],
+      ['year', 'month'],
+    ]) {
+      mockRpc.mockClear()
+      await POST(cpRequest({ period }))
+      expect(ruleAggCalls()[0][1].p_grain).toBe(grain)
+    }
+  })
+})
+
+// ── De som ──────────────────────────────────────────────────────────────────
+
+describe('de som', () => {
+  beforeEach(() => {
+    const ROWS = [
+      // Juli: €150 uitgegeven, €50 teruggekregen ⇒ netto €100.
+      aggRow({ bucket_start: '2026-07-01', sum_negatief: -150, count: 3, matched_names: ['Shell Express 1032'] }),
+      aggRow({ bucket_start: '2026-07-01', sum_positief: 50, count: 1, matched_names: ['Shell Express 1032'] }),
+      // Een eigen overboeking telt nergens mee.
+      aggRow({ bucket_start: '2026-07-01', sum_negatief: -9000, transaction_type: 'transfer', count: 1, matched_names: ['Shell intern'] }),
+      // Juni: een naam die in geen enkele top-40 zou staan.
+      aggRow({ bucket_start: '2026-06-01', sum_negatief: -40, count: 1, matched_names: ['SHELL #57 ergens ver weg'] }),
     ]
-    mockRpc.mockResolvedValue({ data: rows, error: null })
 
-    const body = await readPreview(await POST(counterpartyRequest({ counterpartyLabel: 'shell' })))
-
-    const juli = body.matchedAmountByPeriod.find((p) => p.periodKey === '2026-07')
-    expect(juli).toMatchObject({ matchedAmount: 100, matchedTransactionCount: 4, isOpen: false })
-    expect(body.matchedTransactionCount).toBe(4)
-    // Alle daadwerkelijk gematchte schrijfwijzen — óók de naam die buiten een
-    // top-40-suggestielijst zou vallen (AC-B3-01).
-    expect(body.matchedNames).toEqual(['SHELL NL', 'Shell #57'])
-    expect(body.aggregateTruncationSuspected).toBe(false)
+    // Het chunk-venster wordt ECHT toegepast. Zonder die filter zou dezelfde rij
+    // in elk stuk terugkomen en dubbel tellen — een mock-artefact dat de echte
+    // RPC (`t.date >= p_from AND t.date < p_to`) per definitie niet heeft, en dat
+    // een testfout zou verbergen achter een tweemaal zo hoog bedrag.
+    mockRpc.mockImplementation((fn: string, args: Record<string, unknown>) => {
+      if (fn !== 'spend_limit_rule_aggregate') return Promise.resolve({ data: [], error: null })
+      const from = String(args.p_from)
+      const to = String(args.p_to)
+      return Promise.resolve({
+        data: ROWS.filter((r) => r.bucket_start >= from && r.bucket_start < to),
+        error: null,
+      })
+    })
   })
 
-  it('meldt mogelijke afkapping in plaats van stil een te laag getal te tonen', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const rows: AggRow[] = Array.from({ length: 1000 }, () => ({
-      counterparty_key: 'SHELL',
-      month: '2026-07',
-      transaction_type: 'expense',
-      sum_positief: 0,
-      sum_negatief: -1,
-      count: 1,
-      matched_names: ['SHELL NL'],
-    }))
-    mockRpc.mockResolvedValue({ data: rows, error: null })
+  it('verrekent refunds en sluit transfers uit — dezelfde regels als de motor', async () => {
+    const body = await readPreview(await POST(cpRequest()))
+    const juli = body.matchedAmountByPeriod.find((p) => p.periodKey === '2026-07')
 
-    const body = await readPreview(await POST(counterpartyRequest({ counterpartyLabel: 'SHELL' })))
+    expect(juli?.matchedAmount).toBe(100)
+    expect(juli?.matchedTransactionCount).toBe(4)
+    // €9.000 aan overboekingen raakt het bedrag niet.
+    expect(body.matchedAmountByPeriod.every((p) => p.matchedAmount < 1000)).toBe(true)
+  })
 
-    expect(body.aggregateTruncationSuspected).toBe(true)
-    expect(warn).toHaveBeenCalled()
-    warn.mockRestore()
+  it('somt de namen op die daadwerkelijk meetelden, óók buiten elke suggestielijst', async () => {
+    const body = await readPreview(await POST(cpRequest()))
+    expect(body.matchedNames).toContain('SHELL #57 ergens ver weg')
+  })
+
+  it('markeert de lopende periode als voorlopig', async () => {
+    const body = await readPreview(await POST(cpRequest()))
+    const open = body.matchedAmountByPeriod.filter((p) => p.isOpen)
+
+    expect(open).toHaveLength(1)
+    expect(open[0].periodKey).toBe('2026-08')
+  })
+})
+
+// ── Budget-dimensie ─────────────────────────────────────────────────────────
+
+describe('budget-dimensie', () => {
+  beforeEach(() => {
+    stubTables({
+      budgets: [
+        { id: HOOFD, name: 'Boodschappen', parent_id: null },
+        { id: SUB, name: 'Supermarkt', parent_id: HOOFD },
+        { id: ANDERS, name: 'Vervoer', parent_id: null },
+      ],
+    })
+  })
+
+  it('rolt de subboom op en stuurt álle ids mee', async () => {
+    await POST(budgetRequest())
+    const rules = ruleAggCalls()[0][1].p_rules as { b: string[] }[]
+
+    expect([...rules[0].b].sort()).toEqual([HOOFD, SUB].sort())
+  })
+
+  it('laat de subboom weg zodra includeChildBudgets uit staat', async () => {
+    await POST(budgetRequest({ includeChildBudgets: false }))
+    const rules = ruleAggCalls()[0][1].p_rules as { b: string[] }[]
+
+    expect(rules[0].b).toEqual([HOOFD])
+  })
+
+  it('noemt de (sub)budgetten die daadwerkelijk boekingen dragen', async () => {
+    mockRpc.mockResolvedValue({
+      data: [
+        aggRow({ bucket_start: '2026-07-01', budget_id: SUB, sum_negatief: -30 }),
+        // Transfer: telt niet mee en hoort dus ook niet in de opsomming.
+        aggRow({ bucket_start: '2026-07-01', budget_id: ANDERS, sum_negatief: -99, transaction_type: 'transfer' }),
+      ],
+      error: null,
+    })
+
+    const body = await readPreview(await POST(budgetRequest()))
+    expect(body.matchedNames).toEqual(['Supermarkt'])
+    expect(body.keys).toEqual([])
+    expect(body.ruleType).toBe('budget')
+  })
+
+  it('herkent een regel met beide dimensies als gemengd', async () => {
+    const body = await readPreview(
+      await POST(previewRequest({ budgetIds: [HOOFD], counterpartyLabels: ['SHELL'] })),
+    )
+    expect(body.ruleType).toBe('mixed')
+
+    const rules = ruleAggCalls()[0][1].p_rules as { b: string[]; k: string[] }[]
+    expect(rules[0].k).toEqual(['SHELL'])
+    expect(rules[0].b.length).toBeGreaterThan(0)
   })
 })
 
 // ── Overlap-observatie ──────────────────────────────────────────────────────
 
-describe('POST /api/spend-limits/preview — overlap-observatie (AC-B3-02)', () => {
-  it('noemt de bestaande pot die dezelfde uitgaven kan zien, zonder bedrag', async () => {
-    stubLimitsQuery({
-      data: [
-        { id: 'p-1', name: 'Tanken', rule_type: 'counterparty', counterparty_key: 'SHELL', is_active: true },
-        { id: 'p-2', name: 'Boodschappen', rule_type: 'counterparty', counterparty_key: 'AH', is_active: true },
+describe('overlap-observatie', () => {
+  it('noemt de bestaande pot met een rakende sleutel, zonder bedrag (AC-B3-02/D38)', async () => {
+    stubTables({
+      limits: [
+        {
+          id: 'pot-1',
+          name: 'Tanken',
+          is_active: true,
+          spend_limit_rules: [{ budget_ids: [], counterparty_keys: ['SHELL'] }],
+        },
       ],
-      error: null,
     })
 
-    const body = await readPreview(await POST(counterpartyRequest({ counterpartyLabel: 'SHELLNL' })))
+    const body = await readPreview(await POST(cpRequest({ counterpartyLabels: ['SHELLNL'] })))
 
     expect(body.overlappingLimits).toEqual([
       {
-        id: 'p-1',
+        id: 'pot-1',
         name: 'Tanken',
         ruleType: 'counterparty',
         isActive: true,
         reason: 'counterparty_key_substring',
       },
     ])
-    // Alleen niet-gearchiveerde tegenpartij-regels worden opgehaald.
-    expect(mockFrom).toHaveBeenCalledWith('spend_limits')
-    expect(eqCalls).toEqual([
-      ['is_archived', false],
-      ['rule_type', 'counterparty'],
-    ])
-    expect(selectColumns).not.toContain('*')
   })
 
-  it('laat de pot die je BEWERKT niet zichzelf als overlap terugmelden', async () => {
-    stubLimitsQuery({
-      data: [
-        { id: 'p-1', name: 'Tanken', rule_type: 'counterparty', counterparty_key: 'SHELL', is_active: true },
+  it('ziet ook een regel die niet de eerste van de pot is', async () => {
+    stubTables({
+      budgets: [{ id: HOOFD, name: 'Boodschappen', parent_id: null }],
+      limits: [
+        {
+          id: 'pot-2',
+          name: 'Uit eten',
+          is_active: true,
+          spend_limit_rules: [
+            { budget_ids: [HOOFD], include_child_budgets: false, counterparty_keys: [] },
+            { budget_ids: [], counterparty_keys: ['SHELL'] },
+          ],
+        },
       ],
-      error: null,
     })
 
-    const body = await readPreview(
-      await POST(
-        counterpartyRequest({ counterpartyLabel: 'SHELL', excludeLimitId: EDIT_SUBJECT_ID }),
-      ),
-    )
+    const body = await readPreview(await POST(cpRequest()))
+    expect(body.overlappingLimits.map((o) => o.id)).toEqual(['pot-2'])
+    expect(body.overlappingLimits[0].ruleType).toBe('mixed')
+  })
 
-    // Zonder de uitsluiting zou p-1 zichzelf terugmelden zodra hij hetzelfde id
-    // draagt: dat leest als een waarschuwing terwijl het de regel zelf is.
-    expect(body.overlappingLimits.map((o) => o.id)).toEqual(['p-1'])
-
-    stubLimitsQuery({
-      data: [
-        { id: EDIT_SUBJECT_ID, name: 'Tanken', rule_type: 'counterparty', counterparty_key: 'SHELL', is_active: true },
+  it('sluit de pot die je bewerkt uit — die overlapt niet met zichzelf', async () => {
+    stubTables({
+      limits: [
+        {
+          id: EDIT_SUBJECT_ID,
+          name: 'Zichzelf',
+          is_active: true,
+          spend_limit_rules: [{ budget_ids: [], counterparty_keys: ['SHELL'] }],
+        },
       ],
-      error: null,
-    })
-    const zelf = await readPreview(
-      await POST(
-        counterpartyRequest({ counterpartyLabel: 'SHELL', excludeLimitId: EDIT_SUBJECT_ID }),
-      ),
-    )
-    expect(zelf.overlappingLimits).toEqual([])
-  })
-
-  it('geeft een lege observatie als geen enkele regel elkaar raakt', async () => {
-    stubLimitsQuery({
-      data: [
-        { id: 'p-3', name: 'Boodschappen', rule_type: 'counterparty', counterparty_key: 'AH', is_active: true },
-      ],
-      error: null,
     })
 
-    const body = await readPreview(await POST(counterpartyRequest({ counterpartyLabel: 'SHELL' })))
-
-    expect(body.overlappingLimits).toEqual([])
-  })
-})
-
-// ── Budget-tak ──────────────────────────────────────────────────────────────
-
-describe('POST /api/spend-limits/preview — budget-tak (AC-B3-04)', () => {
-  const HOOFD = 'aaaaaaaa-0000-4000-8000-000000000001'
-  const KIND = 'aaaaaaaa-0000-4000-8000-000000000002'
-  const BUURMAN = 'aaaaaaaa-0000-4000-8000-000000000003'
-
-  const BUDGETS: BudgetRow[] = [
-    { id: HOOFD, name: 'Boodschappen', parent_id: null },
-    { id: KIND, name: 'Supermarkt', parent_id: HOOFD },
-    { id: BUURMAN, name: 'Vakantie', parent_id: null },
-  ]
-
-  /** Eén `tx_month_aggregate`-rij; `spend` is een positief uitgavebedrag. */
-  function aggRow(month: string, budgetId: string, spend: number, type = 'expense') {
-    return {
-      month,
-      budget_id: budgetId,
-      transaction_type: type,
-      sum_positief: 0,
-      sum_negatief: -spend,
-      count: 1,
-    }
-  }
-
-  /**
-   * De nep-RPC past het CHUNK-VENSTER écht toe. Dat is geen nettigheid: zonder
-   * die filter zou elke chunk dezelfde rijen teruggeven en zou een dubbeltelling
-   * (het bewijs dat de chunk-grenzen niet sluiten) onzichtbaar blijven.
-   */
-  function stubMonthAggregate(rows: ReturnType<typeof aggRow>[], error: unknown = null) {
-    mockRpc.mockImplementation((fn: string, args: Record<string, unknown>) => {
-      if (fn !== 'tx_month_aggregate') return Promise.resolve({ data: [], error: null })
-      if (error) return Promise.resolve({ data: null, error })
-      const from = String(args.p_from).slice(0, 7)
-      const to = String(args.p_to).slice(0, 7)
-      return Promise.resolve({
-        data: rows.filter((r) => r.month >= from && r.month < to),
-        error: null,
-      })
-    })
-  }
-
-  it('telt de subboom op met dezelfde motorfuncties als de loader', async () => {
-    stubBudgetBranch(BUDGETS, [])
-    stubMonthAggregate([
-      aggRow('2026-07', HOOFD, 30),
-      aggRow('2026-07', KIND, 20), // kind telt mee dankzij includeChildBudgets
-      aggRow('2026-07', KIND, 500, 'transfer'), // eigen overboeking: nooit
-      aggRow('2026-07', BUURMAN, 999), // ander budget: nooit
-      aggRow('2026-06', KIND, 15),
-    ])
-
-    const body = await readPreview(await POST(budgetRequest({ budgetId: HOOFD })))
-
-    expect(body.ruleType).toBe('budget')
-    expect(body.status).toBe('ok')
-    // Een budget matcht op id, niet op tekst — dus geen zoeksleutel.
-    expect(body.key).toBeNull()
-    expect(body.matchedAmountByPeriod).toHaveLength(13)
-    expect(body.matchedAmountByPeriod.find((p) => p.periodKey === '2026-07')).toMatchObject({
-      matchedAmount: 50,
-      matchedTransactionCount: 2,
-      isOpen: false,
-    })
-    expect(body.matchedAmountByPeriod.find((p) => p.periodKey === '2026-06')?.matchedAmount).toBe(15)
-    expect(body.matchedTransactionCount).toBe(3)
-    // De opsomming beschrijft dezelfde verzameling als het bedrag: geen transfer,
-    // geen vreemd budget.
-    expect(body.matchedNames).toEqual(['Boodschappen', 'Supermarkt'])
-  })
-
-  it('laat het kind buiten beschouwing zodra includeChildBudgets uit staat', async () => {
-    stubBudgetBranch(BUDGETS, [])
-    stubMonthAggregate([aggRow('2026-07', HOOFD, 30), aggRow('2026-07', KIND, 20)])
-
-    const body = await readPreview(
-      await POST(budgetRequest({ budgetId: HOOFD, includeChildBudgets: false })),
-    )
-
-    expect(body.matchedAmountByPeriod.find((p) => p.periodKey === '2026-07')?.matchedAmount).toBe(30)
-    expect(body.matchedNames).toEqual(['Boodschappen'])
-  })
-
-  it('knipt het jaarvenster in chunks van ten hoogste 12 maanden (max_rows)', async () => {
-    // Een jaarpot kijkt 4 kalenderjaren terug. `tx_month_aggregate` groepeert per
-    // budget × maand × type en kent geen sleutelfilter, dus zonder knippen kan één
-    // antwoord op de PostgREST-cap landen — precies zoals de loader het doet.
-    stubBudgetBranch(BUDGETS, [])
-    stubMonthAggregate([])
-
-    const body = await readPreview(await POST(budgetRequest({ budgetId: HOOFD, period: 'year' })))
-
-    const calls = mockRpc.mock.calls.filter((c) => c[0] === 'tx_month_aggregate')
-    // Venster 2023-01-01 t/m 2026-09-01 = 44 maanden ⇒ ceil(44/12) = 4 stukken.
-    expect(calls).toHaveLength(4)
-    expect(calls[0][1]).toMatchObject({ p_from: '2023-01-01', p_own_only: false })
-    expect(calls.at(-1)?.[1]).toMatchObject({ p_to: '2026-09-01' })
-    // Sluitend en zonder overlap: elk stuk begint waar het vorige eindigde.
-    for (let i = 1; i < calls.length; i++) {
-      expect(calls[i][1].p_from).toBe(calls[i - 1][1].p_to)
-    }
-    expect(body.matchedAmountByPeriod).toHaveLength(4)
-  })
-
-  it('meldt een overlappende budget-pot als regel-observatie, zonder bedrag', async () => {
-    stubBudgetBranch(BUDGETS, [
-      // Bestaande pot op het KIND: de kandidaat (hoofdbudget incl. kinderen)
-      // trekt dat kind mee, dus dit is een afstammeling-overlap.
-      { id: 'p-kind', name: 'Supermarkt-grens', rule_type: 'budget', budget_id: KIND, include_child_budgets: true, is_active: true },
-      // Op een losstaand budget: raakt niets.
-      { id: 'p-los', name: 'Vakantiegrens', rule_type: 'budget', budget_id: BUURMAN, include_child_budgets: true, is_active: true },
-    ])
-    stubMonthAggregate([])
-
-    const body = await readPreview(await POST(budgetRequest({ budgetId: HOOFD })))
-
-    expect(body.overlappingLimits).toEqual([
-      {
-        id: 'p-kind',
-        name: 'Supermarkt-grens',
-        ruleType: 'budget',
-        isActive: true,
-        reason: 'budget_descendant',
-      },
-    ])
-    // Geen bedrag en geen prioriteit in de observatie.
-    expect(JSON.stringify(body.overlappingLimits)).not.toMatch(/amount|priority/i)
-    expect(eqCalls).toEqual([
-      ['is_archived', false],
-      ['rule_type', 'budget'],
-    ])
-    expect(selectColumns).not.toContain('*')
-  })
-
-  it('meldt de pot die je bewerkt niet als overlap met zichzelf', async () => {
-    stubBudgetBranch(BUDGETS, [
-      { id: EDIT_SUBJECT_ID, name: 'Boodschappengrens', rule_type: 'budget', budget_id: HOOFD, include_child_budgets: true, is_active: true },
-    ])
-    stubMonthAggregate([])
-
-    const body = await readPreview(
-      await POST(budgetRequest({ budgetId: HOOFD, excludeLimitId: EDIT_SUBJECT_ID })),
-    )
-
+    const body = await readPreview(await POST(cpRequest({ excludeLimitId: EDIT_SUBJECT_ID })))
     expect(body.overlappingLimits).toEqual([])
   })
 
-  it('500 bij een fout in een aggregaat-chunk, zonder de rauwe fouttekst te lekken', async () => {
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
-    stubBudgetBranch(BUDGETS, [])
-    stubMonthAggregate([], { message: 'permission denied', code: '42501' })
+  it('vraagt uitsluitend de kolommen op die de observatie nodig heeft', async () => {
+    await POST(cpRequest())
 
-    const res = await POST(budgetRequest({ budgetId: HOOFD }))
-
-    expect(res.status).toBe(500)
-    expect(JSON.stringify(await res.json())).not.toContain('permission denied')
-    error.mockRestore()
+    expect(selectColumns).not.toContain('*')
+    expect(selectColumns).toContain('spend_limit_rules(')
+    expect(eqCalls).toContainEqual(['is_archived', false])
   })
 })
 
-// ── Foutpaden ───────────────────────────────────────────────────────────────
+// ── Betrouwbaarheid ─────────────────────────────────────────────────────────
 
-describe('POST /api/spend-limits/preview — foutpaden', () => {
-  it('500 bij een RPC-fout, zonder de rauwe fouttekst te lekken', async () => {
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+describe('betrouwbaarheid', () => {
+  it('meldt een mogelijk afgekapt antwoord in plaats van stil een te laag getal', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     mockRpc.mockResolvedValue({
-      data: null,
-      error: { message: 'function does not exist', code: '42883' },
+      data: Array.from({ length: 1000 }, () => aggRow({ bucket_start: '2026-07-01', sum_negatief: -1 })),
+      error: null,
     })
 
-    const res = await POST(counterpartyRequest({ counterpartyLabel: 'SHELL' }))
-    const raw = JSON.stringify(await res.json())
+    const body = await readPreview(await POST(cpRequest()))
 
-    expect(res.status).toBe(500)
-    expect(raw).not.toContain('42883')
-    expect(raw).not.toContain('function does not exist')
-    error.mockRestore()
+    expect(body.aggregateTruncationSuspected).toBe(true)
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
   })
 
-  it('500 bij een fout op de configuratie-query (geen stille lege observatie)', async () => {
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
-    stubLimitsQuery({ data: null, error: { message: 'permission denied', code: '42501' } })
+  it('lekt geen rauwe DB-fouttekst in een 500', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockRpc.mockResolvedValue({ data: null, error: { message: 'relation "geheim" does not exist' } })
 
-    const res = await POST(counterpartyRequest({ counterpartyLabel: 'SHELL' }))
+    const res = await POST(cpRequest())
+    const body = (await res.json()) as { error?: string }
 
     expect(res.status).toBe(500)
-    expect(JSON.stringify(await res.json())).not.toContain('permission denied')
-    error.mockRestore()
+    expect(body.error).not.toContain('geheim')
+    expect(err).toHaveBeenCalled()
+    err.mockRestore()
+  })
+
+  it('lekt ook geen fouttekst wanneer de potten-query faalt', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    stubTables({ limitsError: { message: 'relation "spend_limits" does not exist' } })
+
+    const res = await POST(cpRequest())
+    const body = (await res.json()) as { error?: string }
+
+    expect(res.status).toBe(500)
+    expect(body.error).not.toContain('spend_limits')
+    err.mockRestore()
   })
 })

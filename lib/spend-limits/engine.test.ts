@@ -10,6 +10,7 @@
 
 import { describe, it, expect } from 'vitest'
 import {
+  SPEND_LIMIT_GRAIN_BY_PERIOD,
   SPEND_LIMIT_NEAR_LIMIT_PCT,
   SPEND_LIMIT_TREND_WINDOW,
   SPEND_LIMIT_WINDOW_BY_PERIOD,
@@ -30,14 +31,20 @@ import { counterpartyMatchesKey, spendLimitCounterpartyKey } from './counterpart
 
 // ── Hulpjes ─────────────────────────────────────────────────────────────────
 
-/** Aggregaat-rij: `spend` is een positief uitgavebedrag, `refund` een ontvangst. */
+/**
+ * Aggregaat-rij: `spend` is een positief uitgavebedrag, `refund` een ontvangst.
+ *
+ * `bucket` mag een maandsleutel ('2026-08') of een volledige datum
+ * ('2026-08-10') zijn — een maandsleutel wordt aangevuld tot de eerste van die
+ * maand, precies zoals `sliceContainsMonth` doet.
+ */
 function row(
-  month: string,
+  bucket: string,
   spend: number,
   opts: { refund?: number; count?: number; type?: string | null; names?: string[] } = {},
 ): SpendLimitAggregateRow {
   return {
-    month,
+    bucketStart: bucket.length === 7 ? `${bucket}-01` : bucket,
     transactionType: opts.type === undefined ? 'expense' : opts.type,
     sumPositief: opts.refund ?? 0,
     sumNegatief: -spend,
@@ -727,12 +734,112 @@ describe('buildSpendLimitReport — de ondergrens raakt ALLEEN de trend', () => 
 
 describe('SPEND_LIMIT_WINDOW_BY_PERIOD', () => {
   it('dekt maximaal 48 kalendermaanden en houdt altijd ≥3 afgesloten periodes over', () => {
-    expect(SPEND_LIMIT_WINDOW_BY_PERIOD).toEqual({ month: 13, quarter: 9, year: 4 })
-    const maanden: Record<SpendLimitPeriodKind, number> = { month: 1, quarter: 3, year: 12 }
-    for (const kind of ['month', 'quarter', 'year'] as SpendLimitPeriodKind[]) {
+    expect(SPEND_LIMIT_WINDOW_BY_PERIOD).toEqual({ day: 31, week: 14, month: 13, quarter: 9, year: 4 })
+    // Ruwe lengte van één periode in maanden — dag en week ruim naar boven
+    // afgerond op 1, want de 48-maands bovengrens is een plafond en geen doel.
+    const maanden: Record<SpendLimitPeriodKind, number> = {
+      day: 1,
+      week: 1,
+      month: 1,
+      quarter: 3,
+      year: 12,
+    }
+    for (const kind of Object.keys(SPEND_LIMIT_WINDOW_BY_PERIOD) as SpendLimitPeriodKind[]) {
       expect(SPEND_LIMIT_WINDOW_BY_PERIOD[kind] * maanden[kind]).toBeLessThanOrEqual(48)
       expect(SPEND_LIMIT_WINDOW_BY_PERIOD[kind] - 1).toBeGreaterThanOrEqual(SPEND_LIMIT_TREND_WINDOW)
     }
+  })
+
+  it('koppelt elke periodesoort aan een korrel die niet grover is dan de periode zelf', () => {
+    // DE HARDE EIS onder `sliceContainsBucket`: een bucket mag nooit over een
+    // periodegrens heen liggen. Zou een dagpot op maand-korrel rekenen, dan viel
+    // een hele maand in één bucket en telde elke dag van die maand hetzelfde
+    // bedrag — stil, zonder foutmelding.
+    expect(SPEND_LIMIT_GRAIN_BY_PERIOD).toEqual({
+      day: 'day',
+      week: 'week',
+      month: 'month',
+      quarter: 'month',
+      year: 'month',
+    })
+  })
+})
+
+// ── Dag- en weekperiodes ────────────────────────────────────────────────────
+
+describe('resolveSpendLimitPeriods — dag', () => {
+  it('geeft opeenvolgende dagen met vandaag als enige open periode', () => {
+    const now = new Date(2026, 7, 10) // maandag 10 augustus 2026
+    const slices = resolveSpendLimitPeriods('day', now, 3)
+
+    expect(slices.map((s) => s.periodKey)).toEqual(['2026-08-08', '2026-08-09', '2026-08-10'])
+    // Een dagperiode begint en eindigt op dezelfde dag.
+    expect(slices[0].since).toBe('2026-08-08')
+    expect(slices[0].until).toBe('2026-08-08')
+    expect(slices.map((s) => s.isOpen)).toEqual([false, false, true])
+    expect(slices[2].label).toBe('10 augustus 2026')
+  })
+
+  it('rolt over een maandgrens heen', () => {
+    const slices = resolveSpendLimitPeriods('day', new Date(2026, 8, 1), 2) // 1 sep 2026
+    expect(slices.map((s) => s.periodKey)).toEqual(['2026-08-31', '2026-09-01'])
+  })
+
+  it('telt alleen de transacties van díé dag', () => {
+    const now = new Date(2026, 7, 10)
+    const [gisteren, vandaag] = resolveSpendLimitPeriods('day', now, 2)
+    const rows = [row('2026-08-09', 30), row('2026-08-10', 12)]
+
+    expect(computePeriodOutcome(gisteren, rows, 20).periodMatchedAmount).toBe(30)
+    expect(computePeriodOutcome(gisteren, rows, 20).status).toBe('exceeded')
+    expect(computePeriodOutcome(vandaag, rows, 20).periodMatchedAmount).toBe(12)
+    expect(computePeriodOutcome(vandaag, rows, 20).status).toBe('within')
+  })
+})
+
+describe('resolveSpendLimitPeriods — week', () => {
+  it('loopt van maandag tot en met zondag (ISO-8601)', () => {
+    // Donderdag 13 augustus 2026 zit in de week van maandag 10 t/m zondag 16.
+    const [week] = resolveSpendLimitPeriods('week', new Date(2026, 7, 13), 1)
+    expect(week.since).toBe('2026-08-10')
+    expect(week.until).toBe('2026-08-16')
+    expect(week.isOpen).toBe(true)
+  })
+
+  it('gebruikt het ISO-JAAR in de sleutel, niet het kalenderjaar van de maandag', () => {
+    // De week van maandag 29 december 2025 t/m zondag 4 januari 2026 is ISO-week
+    // 1 van 2026: de donderdag (1 januari) valt in 2026. Een kale
+    // `getFullYear()` op de maandag zou hier '2025-W01' zeggen.
+    const [week] = resolveSpendLimitPeriods('week', new Date(2025, 11, 31), 1)
+    expect(week.since).toBe('2025-12-29')
+    expect(week.until).toBe('2026-01-04')
+    expect(week.periodKey).toBe('2026-W01')
+  })
+
+  it('telt een dag-bucket in de week waar hij in valt, en niet in de buurweek', () => {
+    const now = new Date(2026, 7, 13) // donderdag
+    const [vorige, huidige] = resolveSpendLimitPeriods('week', now, 2)
+    expect(vorige.since).toBe('2026-08-03')
+
+    // De SQL levert bij week-korrel de MAANDAG als bucketdatum; beide weken
+    // krijgen dus precies hun eigen bucket.
+    const rows = [row('2026-08-03', 100), row('2026-08-10', 40)]
+    expect(computePeriodOutcome(vorige, rows, 50).periodMatchedAmount).toBe(100)
+    expect(computePeriodOutcome(huidige, rows, 50).periodMatchedAmount).toBe(40)
+  })
+
+  it('houdt de reeks eerlijk: de lopende week telt niet mee', () => {
+    const now = new Date(2026, 7, 13)
+    const report = buildSpendLimitReport({
+      rule: { ruleType: 'budget', limitAmount: 50, period: 'week' },
+      rows: [row('2026-08-03', 100), row('2026-08-10', 999)],
+      now,
+      windowPeriods: 2,
+    })
+    // De lopende week zit ver over de grens, maar breekt de reeks niet.
+    expect(report.currentPeriod.status).toBe('exceeded')
+    expect(report.closedPeriods).toHaveLength(1)
+    expect(report.streaks.exceededPeriodCount).toBe(1)
   })
 })
 

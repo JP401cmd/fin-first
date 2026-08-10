@@ -62,12 +62,19 @@ async function callGet(id: string, query: string) {
   return mod.GET(req, { params: Promise.resolve({ id }) })
 }
 
+/**
+ * Een ZUIVERE tegenpartij-pot: elke regel kiest alleen tegenpartijen. Alleen die
+ * vorm krijgt de per-naam-uitsplitsing — bij een budget- of gemengde regel zou
+ * `tx_counterparty_name_breakdown` het budget-deel negeren en dus een
+ * uitsplitsing tonen die groter is dan het geheel waar ze bij hoort.
+ */
 const COUNTERPARTY_ROW = {
   id: VALID_UUID,
-  rule_type: 'counterparty',
-  counterparty_key: 'SHELL',
   limit_amount: 50,
   period: 'month',
+  spend_limit_rules: [
+    { id: 'r-1', sort_order: 0, budget_ids: [], counterparty_keys: ['SHELL'] },
+  ],
 }
 
 describe('GET /api/spend-limits/[id]/breakdown', () => {
@@ -108,7 +115,30 @@ describe('GET /api/spend-limits/[id]/breakdown', () => {
     mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
     mockFrom.mockReturnValue(
       makeRowChain({
-        data: { ...COUNTERPARTY_ROW, rule_type: 'budget', counterparty_key: null },
+        data: {
+          ...COUNTERPARTY_ROW,
+          spend_limit_rules: [
+            { id: 'r-1', sort_order: 0, budget_ids: ['b1'], counterparty_keys: [] },
+          ],
+        },
+        error: null,
+      }),
+    )
+    const res = await callGet(VALID_UUID, `?periode=${target.periodKey}`)
+    expect(res.status).toBe(400)
+    expect(mockRpc).not.toHaveBeenCalled()
+  })
+
+  it('400 bij een GEMENGDE regel — de naam-uitsplitsing zou het budget-deel negeren', async () => {
+    mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
+    mockFrom.mockReturnValue(
+      makeRowChain({
+        data: {
+          ...COUNTERPARTY_ROW,
+          spend_limit_rules: [
+            { id: 'r-1', sort_order: 0, budget_ids: ['b1'], counterparty_keys: ['SHELL'] },
+          ],
+        },
         error: null,
       }),
     )
@@ -131,11 +161,11 @@ describe('GET /api/spend-limits/[id]/breakdown', () => {
     mockFrom.mockReturnValue(makeRowChain({ data: COUNTERPARTY_ROW, error: null }))
 
     mockRpc.mockImplementation((fn: string) => {
-      if (fn === 'tx_counterparty_month_aggregate') {
+      if (fn === 'spend_limit_rule_aggregate') {
         return Promise.resolve({
           data: [
             {
-              month: target.periodKey,
+              bucket_start: `${target.periodKey}-01`,
               transaction_type: null,
               sum_positief: 10,
               sum_negatief: -100,
@@ -168,7 +198,7 @@ describe('GET /api/spend-limits/[id]/breakdown', () => {
     expect(body.restCount).toBe(1)
 
     const aggArgs = mockRpc.mock.calls.find(
-      (c) => c[0] === 'tx_counterparty_month_aggregate',
+      (c) => c[0] === 'spend_limit_rule_aggregate',
     )?.[1] as Record<string, unknown>
     const nameArgs = mockRpc.mock.calls.find(
       (c) => c[0] === 'tx_counterparty_name_breakdown',
@@ -193,18 +223,18 @@ describe('GET /api/spend-limits/[id]/breakdown', () => {
     mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
     mockFrom.mockReturnValue(makeRowChain({ data: COUNTERPARTY_ROW, error: null }))
     mockRpc.mockImplementation((fn: string) =>
-      fn === 'tx_counterparty_month_aggregate'
+      fn === 'spend_limit_rule_aggregate'
         ? Promise.resolve({
             data: [
               {
-                month: target.periodKey,
+                bucket_start: `${target.periodKey}-01`,
                 transaction_type: 'expense',
                 sum_positief: 0,
                 sum_negatief: -60,
                 count: 2,
               },
               {
-                month: target.periodKey,
+                bucket_start: `${target.periodKey}-01`,
                 transaction_type: 'transfer', // eigen overboeking: telt nooit mee
                 sum_positief: 0,
                 sum_negatief: -500,
@@ -235,11 +265,11 @@ describe('GET /api/spend-limits/[id]/breakdown', () => {
     mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
     mockFrom.mockReturnValue(makeRowChain({ data: COUNTERPARTY_ROW, error: null }))
     mockRpc.mockImplementation((fn: string) =>
-      fn === 'tx_counterparty_month_aggregate'
+      fn === 'spend_limit_rule_aggregate'
         ? Promise.resolve({
             data: [
               {
-                month: target.periodKey,
+                bucket_start: `${target.periodKey}-01`,
                 transaction_type: 'expense',
                 sum_positief: 30, // refund op een naam buiten de top-N
                 sum_negatief: -80,

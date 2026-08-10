@@ -10,33 +10,75 @@ import type { SpendLimitPeriodKind, SpendLimitReport, SpendLimitRuleType } from 
 
 export type { SpendLimitPeriodKind, SpendLimitRuleType }
 
+/**
+ * Eén gekozen budget binnen een regel, mét de stand van zaken die het oppervlak
+ * moet kunnen uitleggen.
+ *
+ * `name === null` en `archived === true` zijn bewust TWEE VELDEN en niet één
+ * "niet meer beschikbaar", want het zijn twee verschillende gebeurtenissen met
+ * twee verschillende boodschappen (AC-B1-02):
+ *
+ *  - `name === null` ⇒ het budget bestaat niet meer (of is niet zichtbaar). Deze
+ *    verwijzing telt vanaf nu structureel niets meer.
+ *  - `archived === true` ⇒ het budget bestaat nog, maar je gebruikt het niet meer
+ *    actief. De historie klopt, nieuwe boekingen zijn onwaarschijnlijk.
+ *
+ * Ze samenvatten zou de tweede situatie als dataverlies laten klinken terwijl er
+ * niets kwijt is.
+ */
+export interface SpendLimitRuleBudgetRef {
+  id: string
+  name: string | null
+  archived: boolean
+}
+
+/** Eén gekozen tegenpartij binnen een regel: de sleutel plus wat de gebruiker koos. */
+export interface SpendLimitRuleCounterpartyRef {
+  /** Genormaliseerde zoeksleutel (server-afgeleid, parity met de SQL-functie). */
+  key: string
+  /** De schrijfwijze die de gebruiker koos of typte — puur uitleg. */
+  label: string
+}
+
+/**
+ * Eén regel van een grenzenpot.
+ *
+ * COMBINATIE-SEMANTIEK (vastgelegd met de eigenaar, 10-08-2026 — en afgedwongen
+ * in `public.spend_limit_rule_aggregate`, niet hier):
+ *  - binnen `budgets`      → OF ("één van deze budgetten")
+ *  - binnen `counterparties` → OF
+ *  - tussen beide lijsten  → EN (staan er allebei waarden, dan moeten ze allebei
+ *    kloppen: budget X én tegenpartij Y)
+ *  - tussen regels van dezelfde pot → UNIE tegen één grensbedrag, waarbij een
+ *    transactie hoogstens één keer telt.
+ *
+ * Een lege lijst legt géén beperking op; beide lijsten leeg kan niet (de
+ * CHECK `spend_limit_rules_not_empty` en het zod-schema sluiten het uit) — zo'n
+ * regel zou stil op álle transacties matchen.
+ */
+export interface SpendLimitRuleConfig {
+  id: string
+  budgets: SpendLimitRuleBudgetRef[]
+  /** Telt de hele subboom onder elk gekozen budget mee? Geldt voor alle budgetten van deze regel. */
+  includeChildBudgets: boolean
+  counterparties: SpendLimitRuleCounterpartyRef[]
+}
+
 /** De configuratie van één grenzenpot, zoals de UI 'm toont en bewerkt. */
 export interface SpendLimitConfig {
   id: string
   name: string
   purpose: string | null
-  ruleType: SpendLimitRuleType
-  budgetId: string | null
-  /** Naam van het gekozen budget — opgelost door de loader, niet in de DB-rij. */
-  budgetName: string | null
   /**
-   * Is het gekoppelde budget GEARCHIVEERD? Bewust een eigen veld naast
-   * `budgetName`, want het zijn twee verschillende gebeurtenissen met twee
-   * verschillende boodschappen:
-   *
-   *  - `budgetName === null` ⇒ het budget bestaat niet meer (of is niet
-   *    zichtbaar). De pot telt vanaf nu structureel niets meer.
-   *  - `budgetArchived === true` ⇒ het budget bestaat nog, maar je gebruikt het
-   *    niet meer actief. De historie klopt, nieuwe boekingen zijn onwaarschijnlijk.
-   *
-   * Ze samenvatten tot één "budget niet meer beschikbaar" zou de tweede situatie
-   * als dataverlies laten klinken terwijl er niets kwijt is (AC-B1-02).
-   * `false` bij tegenpartij-potten — daar bestaat geen budget om te archiveren.
+   * AFGELEID uit `rules`, nooit opgeslagen — de kolom `spend_limits.rule_type` is
+   * legacy sinds 10-08-2026. Zie `deriveSpendLimitRuleType` in de loader.
    */
-  budgetArchived: boolean
-  includeChildBudgets: boolean
-  counterpartyKey: string | null
-  counterpartyLabel: string | null
+  ruleType: SpendLimitRuleType
+  /**
+   * De regels, in de volgorde waarin de gebruiker ze heeft gezet. Minstens één;
+   * een pot zonder regels telt niets en kan via de API niet ontstaan.
+   */
+  rules: SpendLimitRuleConfig[]
   limitAmount: number
   period: SpendLimitPeriodKind
   isActive: boolean
@@ -56,12 +98,18 @@ export interface SpendLimitConfig {
 
 /**
  * Eén (kind)budget binnen één periode van een budget-pot. De uitsplitsing die de
- * prestatieweergave toont zónder extra fetch: `tx_month_aggregate` levert de
- * rijen tóch al per `budget_id` × maand, de loader gooide ze alleen weg.
+ * prestatieweergave toont zónder extra fetch: `spend_limit_rule_aggregate` levert
+ * de rijen tóch al per `budget_id`, de loader hoeft ze alleen te groeperen.
  *
  * Bewust PLAT en SCHAARS (alleen bedragen ≠ 0) — geen tweede rapport naast
  * `SpendLimitReport`, en dus ook geen tweede plek waar een status of een
  * overschrijding wordt uitgerekend.
+ *
+ * LET OP — BESTAAT ALLEEN OP MAAND-KORREL EN ZONDER TEGENPARTIJ-DIMENSIE. De
+ * SQL vult `budget_id` uitsluitend daar (zie de migratie): bij dag-korrel zou
+ * (31 dagen × budgetten × types) tegen de PostgREST-rijcap kunnen lopen, en bij
+ * een gemengde regel zegt "welk budget" niets over waaróm de transactie meetelt.
+ * De pane valt dan terug op `ruleSplit`.
  */
 export interface SpendLimitBudgetSplitRow {
   periodKey: string
@@ -72,16 +120,43 @@ export interface SpendLimitBudgetSplitRow {
   matchedTransactionCount: number
 }
 
+/**
+ * Eén REGEL binnen één periode: "wat droeg deze regel bij aan de pot-som".
+ *
+ * Bestaat pas sinds een pot meerdere regels kan hebben, en is de enige
+ * uitsplitsing die bij élke regelvorm en élke periodesoort klopt.
+ *
+ * TOEREKENING, geen dubbeltelling: raakt één transactie twee regels van dezelfde
+ * pot, dan telt ze bij de regel met de laagste volgorde — dat is de ontdubbeling
+ * die `spend_limit_rule_aggregate` met `DISTINCT ON` legt. De som over de regels
+ * van een periode is daarom exact `periodMatchedAmount` uit het rapport, en
+ * nooit meer.
+ */
+export interface SpendLimitRuleSplitRow {
+  periodKey: string
+  ruleId: string
+  matchedAmount: number
+  matchedTransactionCount: number
+}
+
 /** Configuratie + doorgerekende uitkomst. Dit is wat elk oppervlak consumeert. */
 export interface SpendLimitWithReport {
   config: SpendLimitConfig
   report: SpendLimitReport
   /**
-   * Per-(kind)budget-uitsplitsing per periode; leeg bij tegenpartij-potten (die
-   * halen hun per-naam-uitsplitsing on-demand via de breakdown-route, omdat de
-   * namen niet in het maandaggregaat zitten).
+   * Per-(kind)budget-uitsplitsing per periode; leeg zodra de pot een
+   * tegenpartij-dimensie draagt of op dag-/weekkorrel rekent (zie
+   * `SpendLimitBudgetSplitRow`). Tegenpartij-potten halen hun per-naam-uitsplitsing
+   * on-demand via de breakdown-route, omdat de namen niet per periode in het
+   * aggregaat zitten.
    */
   budgetSplit: SpendLimitBudgetSplitRow[]
+  /**
+   * Per-regel-uitsplitsing per periode. Altijd gevuld zodra er iets gematcht is,
+   * ongeacht regelvorm of periodesoort — de uitsplitsing waar de pane op kan
+   * terugvallen als `budgetSplit` leeg is.
+   */
+  ruleSplit: SpendLimitRuleSplitRow[]
 }
 
 /** Eén keuze in de budget-kiezer van het formulier. */

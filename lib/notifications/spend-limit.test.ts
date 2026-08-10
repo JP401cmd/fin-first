@@ -85,12 +85,14 @@ function pot(o: {
       name: o.name ?? 'Tankstations',
       purpose: null,
       ruleType: 'counterparty',
-      budgetId: null,
-      budgetName: null,
-      budgetArchived: false,
-      includeChildBudgets: false,
-      counterpartyKey: 'shell',
-      counterpartyLabel: 'Shell',
+      rules: [
+        {
+          id: 'r-1',
+          budgets: [],
+          includeChildBudgets: false,
+          counterparties: [{ key: 'SHELL', label: 'Shell' }],
+        },
+      ],
       limitAmount: o.current.limitAmount,
       period: o.periodKind ?? 'month',
       isActive: o.isActive ?? true,
@@ -104,6 +106,7 @@ function pot(o: {
       trend: computeSpendLimitTrend(closed),
     },
     budgetSplit: [],
+    ruleSplit: [],
   }
 }
 
@@ -210,7 +213,7 @@ describe('decideSpendLimitEvents — lopende periode', () => {
         rule: { ruleType: 'counterparty', limitAmount: 100, period: 'month' },
         rows: [
           {
-            month: '2026-08',
+            bucketStart: '2026-08-01',
             transactionType: 'expense',
             sumPositief: 0,
             sumNegatief: -spent,

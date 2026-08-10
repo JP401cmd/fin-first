@@ -6,11 +6,20 @@
  * onvermijdelijk uit elkaar lopen. "Pauzeren" is dus geen apart endpoint maar
  * dezelfde body met `isActive: false`.
  *
+ * ── WAAROM DIT SINDS 10-08-2026 GÉÉN DISCRIMINATED UNION MEER IS ────────────
+ * Tot fase 5 was een pot óf een budget-regel óf een tegenpartij-regel, en dat
+ * liet zich netjes als `z.discriminatedUnion('ruleType', …)` schrijven. Een pot
+ * draagt nu een LIJST regels, en elke regel kan beide dimensies tegelijk
+ * gebruiken (budget X én tegenpartij Y). Er is dus niets meer om op te
+ * discrimineren: de vorm is één object met een `rules`-array, en de betekenis
+ * van een regel volgt uit wélke lijsten gevuld zijn.
+ *
  * De tegenpartij-SLEUTEL komt hier bewust NIET uit de body: de client stuurt
- * alleen het label (wat de gebruiker koos of typte), en de server leidt de
- * genormaliseerde sleutel af met dezelfde functie die de uitleg in de UI voedt.
- * Zo kan een client geen sleutel meesturen die afwijkt van zijn eigen label —
- * en blijft de sleutel per definitie in het formaat dat de SQL-functie verwacht.
+ * alleen de labels (wat de gebruiker koos of typte), en de server leidt de
+ * genormaliseerde sleutels af — sinds deze wijziging zelfs in SQL, in
+ * `public.spend_limit_replace_rules`. Zo kan een client geen sleutel meesturen
+ * die afwijkt van zijn eigen label, en zit de sleutel per definitie in het
+ * formaat dat de aggregaat-functie en de CHECK verwachten.
  */
 
 import { z } from 'zod'
@@ -26,62 +35,98 @@ const LIMIT = z
   .min(0, 'Grensbedrag kan niet negatief zijn')
   .max(10_000_000, 'Grensbedrag is onrealistisch hoog')
 
-// Alle drie de kalenderperiodes die de motor uitrekent (zie
-// SpendLimitPeriodKind in lib/spend-limits/engine.ts). De check-constraint van de
-// tabel liet ze al toe; sinds fase 5 kan de motor ze ook. `.default('month')`
-// houdt bestaande clients die geen `period` meesturen ongewijzigd werkend.
-const PERIOD = z.enum(['month', 'quarter', 'year']).default('month')
+/**
+ * Alle vijf de periodesoorten die de motor uitrekent (zie `SpendLimitPeriodKind`
+ * in lib/spend-limits/engine.ts). `.default('month')` houdt bestaande clients die
+ * geen `period` meesturen ongewijzigd werkend.
+ */
+const PERIOD = z.enum(['day', 'week', 'month', 'quarter', 'year']).default('month')
 
-export const SpendLimitInputSchema = z.discriminatedUnion('ruleType', [
-  z.object({
-    ruleType: z.literal('budget'),
-    name: NAME,
-    purpose: PURPOSE,
-    limitAmount: LIMIT,
-    period: PERIOD,
-    isActive: z.boolean().default(true),
-    budgetId: z.string().uuid('Kies een geldig budget'),
-    includeChildBudgets: z.boolean().default(true),
-  }),
-  z.object({
-    ruleType: z.literal('counterparty'),
-    name: NAME,
-    purpose: PURPOSE,
-    limitAmount: LIMIT,
-    period: PERIOD,
-    isActive: z.boolean().default(true),
-    counterpartyLabel: z
+/**
+ * Bovengrenzen per regel — dezelfde getallen als de CHECK
+ * `spend_limit_rules_size` in de migratie. Ze staan hier zodat een gebruiker een
+ * begrijpelijke 400 krijgt in plaats van een rauwe constraint-fout, en dáár
+ * omdat de tabel onder own-row RLS ook rechtstreeks beschrijfbaar is.
+ */
+const MAX_BUDGETS_PER_RULE = 200
+const MAX_COUNTERPARTIES_PER_RULE = 50
+/** Bovengrens op het aantal regels per pot; ruim boven elk realistisch gebruik. */
+const MAX_RULES = 20
+
+const BUDGET_IDS = z
+  .array(z.string().uuid('Kies een geldig budget'))
+  .max(MAX_BUDGETS_PER_RULE, 'Te veel budgetten in één regel')
+  .default([])
+
+const COUNTERPARTY_LABELS = z
+  .array(
+    z
       .string()
       .trim()
       .min(2, 'Geef minstens twee tekens om op te matchen')
       .max(120, 'Tegenpartij is te lang'),
-  }),
-])
+  )
+  .max(MAX_COUNTERPARTIES_PER_RULE, 'Te veel tegenpartijen in één regel')
+  .default([])
+
+/**
+ * Eén regel. De `refine` is de TS-kant van de CHECK `spend_limit_rules_not_empty`:
+ * een regel zonder enige dimensie zou op álle zichtbare transacties matchen, en
+ * dat is nooit wat iemand bedoelt.
+ */
+const RULE = z
+  .object({
+    budgetIds: BUDGET_IDS,
+    includeChildBudgets: z.boolean().default(true),
+    counterpartyLabels: COUNTERPARTY_LABELS,
+  })
+  .refine((r) => r.budgetIds.length > 0 || r.counterpartyLabels.length > 0, {
+    message: 'Kies minstens één budget of tegenpartij in elke regel',
+  })
+
+export const SpendLimitInputSchema = z.object({
+  name: NAME,
+  purpose: PURPOSE,
+  limitAmount: LIMIT,
+  period: PERIOD,
+  isActive: z.boolean().default(true),
+  rules: z
+    .array(RULE)
+    .min(1, 'Een grens heeft minstens één regel nodig')
+    .max(MAX_RULES, 'Te veel regels in één pot'),
+})
 
 export type SpendLimitInput = z.infer<typeof SpendLimitInputSchema>
+export type SpendLimitRuleInput = SpendLimitInput['rules'][number]
 
 /**
  * Body van de match-preview (POST /api/spend-limits/preview).
  *
- * ── WAAROM DEZELFDE DISCRIMINATOR ALS HET HOOFDSCHEMA ───────────────────────
- * De preview beantwoordt "wat raakt deze regel eigenlijk?" — en er zijn twee
- * regelsoorten. Een preview die alleen tegenpartij-regels kent, laat de gebruiker
- * bij een budget-pot blind opslaan, precies wat B3 wilde wegnemen. De vorm van de
- * body volgt daarom `SpendLimitInputSchema`: `ruleType` als discriminator, met per
- * tak exact de velden die de match bepalen. Één invoervorm voor "wat ga ik
- * opslaan" en "wat raakt dat", zodat het formulier niet hoeft te vertalen.
+ * ── WAAROM DEZELFDE REGELVORM ALS HET HOOFDSCHEMA ──────────────────────────
+ * De preview beantwoordt "wat raakt deze regel eigenlijk?" — en dat moet exact
+ * dezelfde vraag zijn als "wat gaat deze regel straks tellen". De body draagt
+ * daarom één regel in precies de vorm van `RULE`, zodat het formulier niets hoeft
+ * te vertalen en de preview per definitie dezelfde match toont als de pot.
  *
- * De tegenpartij-tak draagt alleen het LABEL: de server leidt de genormaliseerde
- * sleutel af met `spendLimitCounterpartyKey`, zodat de preview per definitie
- * dezelfde match toont als de pot straks telt. De minimumlengte staat daar bewust
- * op 1 en niet op 2 — een te kort label mag geen validatiefout opleveren maar een
- * expliciete "te kort om te matchen"-uitkomst, anders leest een gebruiker
- * halverwege het typen een misleidend "0 matches".
+ * TWEE BEWUSTE AFWIJKINGEN t.o.v. `RULE`:
+ *  - de minimumlengte op een label staat hier op 1 en niet op 2. Een te kort
+ *    label mag geen validatiefout opleveren maar een expliciete "te kort om te
+ *    matchen"-uitkomst, anders leest een gebruiker halverwege het typen een
+ *    misleidend "0 matches" — of erger, een rode melding terwijl hij nog bezig is.
+ *  - er is GEEN `refine` op "minstens één dimensie". Een leeg formulier hoort
+ *    een lege preview te geven, geen 400.
  *
  * `period` bepaalt uitsluitend hoe ver het preview-venster terugkijkt (via
- * SPEND_LIMIT_WINDOW_BY_PERIOD), niet wélke transacties matchen.
+ * SPEND_LIMIT_WINDOW_BY_PERIOD) en op welke korrel de sommen komen, niet wélke
+ * transacties matchen.
  */
-const PREVIEW_SHARED = {
+export const spendLimitPreviewSchema = z.object({
+  budgetIds: BUDGET_IDS,
+  includeChildBudgets: z.boolean().default(true),
+  counterpartyLabels: z
+    .array(z.string().trim().min(1, 'Geef een tegenpartij op').max(120, 'Tegenpartij is te lang'))
+    .max(MAX_COUNTERPARTIES_PER_RULE, 'Te veel tegenpartijen in één regel')
+    .default([]),
   period: PERIOD,
   /**
    * De pot die je aan het BEWERKEN bent. Die mag zichzelf niet als overlappende
@@ -89,26 +134,6 @@ const PREVIEW_SHARED = {
    * leest als een waarschuwing terwijl het de regel zelf is.
    */
   excludeLimitId: z.string().uuid('Ongeldig ID').nullish(),
-}
-
-export const spendLimitPreviewSchema = z.discriminatedUnion('ruleType', [
-  z.object({
-    ruleType: z.literal('counterparty'),
-    counterpartyLabel: z
-      .string()
-      .trim()
-      .min(1, 'Geef een tegenpartij op')
-      .max(120, 'Tegenpartij is te lang'),
-    ...PREVIEW_SHARED,
-  }),
-  z.object({
-    ruleType: z.literal('budget'),
-    budgetId: z.string().uuid('Kies een geldig budget'),
-    // Zelfde default als het hoofdschema: de preview moet dezelfde subboom
-    // optellen als de pot die eruit ontstaat.
-    includeChildBudgets: z.boolean().default(true),
-    ...PREVIEW_SHARED,
-  }),
-])
+})
 
 export type SpendLimitPreviewInput = z.infer<typeof spendLimitPreviewSchema>

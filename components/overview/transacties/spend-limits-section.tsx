@@ -23,7 +23,9 @@
  *
  * OVERLAYS: uitsluitend via <ShellOverlay> (ADR 0039) — `sheet` voor het
  * formulier, `confirm` voor archiveren, `pane` voor het lezen van het verloop.
- * Primaire acties staan in de sticky footer, óók op klein scherm.
+ * Primaire acties staan in de sticky footer, óók op klein scherm. Ook een
+ * suggestielijst is een overlay: het tegenpartij-veld gebruikt daarom bewust
+ * GEEN native <datalist> maar <CounterpartyField> — zie de toelichting daar.
  *
  * DEEPLINK (D7): de server-page leest `?limit=<uuid>[&periode=<periodKey>]` en
  * geeft dat door als `openLimitId`/`openPeriodKey`. Deze sectie bezit de
@@ -63,8 +65,13 @@ import { MaskedAmount } from '@/components/app/masked-amount'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useSpendLimitCopy } from '@/lib/hooks/use-spend-limit-alias'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import {
+  counterpartyMatchesKey,
+  spendLimitCounterpartyKey,
+} from '@/lib/spend-limits/counterparty-key'
 import { SPEND_LIMIT_WINDOW_BY_PERIOD } from '@/lib/spend-limits/engine'
 import type { SpendLimitTrendDirection } from '@/lib/spend-limits/engine'
+import { budgetAttention, describeLimitShort, describeRule } from '@/lib/spend-limits/describe'
 import type { SpendLimitOverlap } from '@/lib/spend-limits/overlap'
 import type { SpendLimitPreviewResponse } from '@/app/api/spend-limits/preview/route'
 import type {
@@ -79,13 +86,26 @@ import { SpendLimitPerformancePane } from './spend-limit-performance-pane'
 
 // ── Periodesoorten ──────────────────────────────────────────────────────────
 
-const PERIODS: readonly SpendLimitPeriodKind[] = ['month', 'quarter', 'year']
+const PERIODS: readonly SpendLimitPeriodKind[] = ['day', 'week', 'month', 'quarter', 'year']
+
+/**
+ * De periodesoorten die ook in de EENVOUDIGE weergave kiesbaar zijn.
+ *
+ * Dag, week en maand zijn de ritmes waarin mensen hun uitgaven beleven ("niet
+ * meer dan €10 per dag aan koffie"); kwartaal en jaar zijn boekhoudkundige
+ * eenheden en blijven diepte voor Volledig. Vóór 10-08-2026 stond hier alleen
+ * `month`, waardoor de periodekiezer in Eenvoudig één enkele, onveranderlijke tab
+ * toonde — een keuze die geen keuze was.
+ */
+const SIMPLE_PERIODS: readonly SpendLimitPeriodKind[] = ['day', 'week', 'month']
 
 /** Hoe de gebruiker de periodesoort noemt. Enkelvoud, meervoud, en de tab-tekst. */
 const PERIOD_WORDS: Record<
   SpendLimitPeriodKind,
   { tab: string; singular: string; plural: string }
 > = {
+  day: { tab: 'Per dag', singular: 'dag', plural: 'dagen' },
+  week: { tab: 'Per week', singular: 'week', plural: 'weken' },
   month: { tab: 'Per maand', singular: 'maand', plural: 'maanden' },
   quarter: { tab: 'Per kwartaal', singular: 'kwartaal', plural: 'kwartalen' },
   year: { tab: 'Per jaar', singular: 'jaar', plural: 'jaren' },
@@ -102,14 +122,49 @@ function closedPeriodContext(period: SpendLimitPeriodKind): number {
 
 // ── Formulierstaat ──────────────────────────────────────────────────────────
 
+/**
+ * Eén regel in het formulier.
+ *
+ * `key` is GEEN database-id maar een stabiele React-sleutel. Bij een bestaande
+ * regel is dat het rij-id, bij een nieuwe een oplopende teller: een index als
+ * sleutel zou bij het verwijderen van een regel de staat van de regels eronder
+ * laten opschuiven (een aangevinkt budget dat naar de verkeerde regel verhuist),
+ * en `Math.random()` zou elke render een nieuwe sleutel geven.
+ *
+ * De volgorde in deze lijst is BETEKENISDRAGEND: de server schrijft 'm als
+ * `sort_order`, en de ontdubbeling in SQL rekent een transactie die twee regels
+ * raakt toe aan de eerste. Slepen/sorteren zit er (nog) niet in — verwijderen en
+ * opnieuw toevoegen is de weg om te herordenen.
+ */
+interface FormRule {
+  key: string
+  budgetIds: string[]
+  includeChildBudgets: boolean
+  counterpartyLabels: string[]
+}
+
+let ruleKeySeq = 0
+function nextRuleKey(): string {
+  ruleKeySeq += 1
+  return `new-${ruleKeySeq}`
+}
+
+/**
+ * Minimale lengte van een tegenpartij-zoekterm vóór hij zinnig is.
+ *
+ * Spiegelt `SPEND_LIMIT_MIN_MATCH_KEY_LENGTH` (lib/spend-limits/overlap.ts) en de
+ * `min(2)` in het zod-schema — één teken matcht als normalised-contains zo
+ * ongeveer alles. Hier staat het als LOKALE constante omdat het formulier de
+ * RUWE tekst toetst (vóór normalisatie) en de server de sleutel; de server heeft
+ * en houdt het laatste woord.
+ */
+const MIN_COUNTERPARTY_LENGTH = 2
+
 interface FormState {
   id: string | null
   name: string
   purpose: string
-  ruleType: 'budget' | 'counterparty'
-  budgetId: string
-  includeChildBudgets: boolean
-  counterpartyLabel: string
+  rules: FormRule[]
   limitAmount: string
   period: SpendLimitPeriodKind
   /**
@@ -121,15 +176,26 @@ interface FormState {
   isActive: boolean
 }
 
+/**
+ * Een verse regel. Het eerste budget staat voorgeselecteerd, precies zoals vóór
+ * de regel-uitbreiding: zo toont het formulier meteen een preview in plaats van
+ * een leeg vlak, en is "wat gaat dit tellen" vanaf de eerste seconde zichtbaar.
+ */
+function emptyRule(budgetOptions: SpendLimitBudgetOption[]): FormRule {
+  return {
+    key: nextRuleKey(),
+    budgetIds: budgetOptions[0] ? [budgetOptions[0].id] : [],
+    includeChildBudgets: true,
+    counterpartyLabels: [],
+  }
+}
+
 function emptyForm(budgetOptions: SpendLimitBudgetOption[]): FormState {
   return {
     id: null,
     name: '',
     purpose: '',
-    ruleType: 'budget',
-    budgetId: budgetOptions[0]?.id ?? '',
-    includeChildBudgets: true,
-    counterpartyLabel: '',
+    rules: [emptyRule(budgetOptions)],
     limitAmount: '',
     period: 'month',
     originalPeriod: null,
@@ -137,15 +203,22 @@ function emptyForm(budgetOptions: SpendLimitBudgetOption[]): FormState {
   }
 }
 
-function formFromConfig(config: SpendLimitConfig): FormState {
+function formFromConfig(config: SpendLimitConfig, budgetOptions: SpendLimitBudgetOption[]): FormState {
   return {
     id: config.id,
     name: config.name,
     purpose: config.purpose ?? '',
-    ruleType: config.ruleType,
-    budgetId: config.budgetId ?? '',
-    includeChildBudgets: config.includeChildBudgets,
-    counterpartyLabel: config.counterpartyLabel ?? '',
+    // Een pot zonder regels kan via de API niet ontstaan; komt hij toch voor, dan
+    // is een lege startregel de enige bewerkbare uitkomst.
+    rules:
+      config.rules.length > 0
+        ? config.rules.map((rule) => ({
+            key: rule.id,
+            budgetIds: rule.budgets.map((b) => b.id),
+            includeChildBudgets: rule.includeChildBudgets,
+            counterpartyLabels: rule.counterparties.map((c) => c.label || c.key),
+          }))
+        : [emptyRule(budgetOptions)],
     limitAmount: String(config.limitAmount),
     period: config.period,
     originalPeriod: config.period,
@@ -153,15 +226,15 @@ function formFromConfig(config: SpendLimitConfig): FormState {
   }
 }
 
-/** Vertaalt de regel naar één leesbare zin. */
-function ruleSentence(config: SpendLimitConfig): string {
-  if (config.ruleType === 'budget') {
-    const naam = config.budgetName ?? 'een budget dat niet meer beschikbaar is'
-    return config.includeChildBudgets
-      ? `Uitgaven in ${naam} (inclusief subbudgetten)`
-      : `Uitgaven in ${naam}`
-  }
-  return `Uitgaven bij ${config.counterpartyLabel ?? 'een tegenpartij'}`
+/** De regels van de FORMULIERSTAAT in gewone taal — dezelfde formulering als `describeRule`. */
+function formRuleSentence(rule: FormRule, budgetOptions: SpendLimitBudgetOption[]): string {
+  const byId = new Map(budgetOptions.map((b) => [b.id, b.name]))
+  return describeRule({
+    id: rule.key,
+    budgets: rule.budgetIds.map((id) => ({ id, name: byId.get(id) ?? null, archived: false })),
+    includeChildBudgets: rule.includeChildBudgets,
+    counterparties: rule.counterpartyLabels.map((label) => ({ key: label, label })),
+  })
 }
 
 /**
@@ -242,10 +315,15 @@ export function SpendLimitsSection({
     else cardEls.current.delete(id)
   }, [])
 
-  // Tegenpartij-keuzelijst: pas ophalen als het formulier open is én de
-  // tegenpartij-tak gekozen is. Eén keer per paginabezoek.
+  // Tegenpartij-keuzelijst: pas ophalen als het formulier openstaat. Eén keer per
+  // paginabezoek.
+  //
+  // Vóór de regel-uitbreiding hing dit aan "de tegenpartij-tak is gekozen". Die
+  // tak bestaat niet meer: ELKE regel kan op elk moment een tegenpartij krijgen,
+  // dus wachten tot er één getikt is zou de suggestielijst pas laten arriveren
+  // wanneer hij niets meer te suggereren heeft.
   useEffect(() => {
-    if (!formOpen || form.ruleType !== 'counterparty' || counterparties !== null) return
+    if (!formOpen || counterparties !== null) return
     let cancelled = false
     fetch('/api/spend-limits/counterparties')
       .then((r) => (r.ok ? r.json() : { options: [] }))
@@ -258,7 +336,7 @@ export function SpendLimitsSection({
     return () => {
       cancelled = true
     }
-  }, [formOpen, form.ruleType, counterparties])
+  }, [formOpen, counterparties])
 
   // ── Deeplink → pane ──────────────────────────────────────────────────────
   // Eén keer per id afhandelen: sluit de gebruiker de pane, dan strippen we de
@@ -317,34 +395,38 @@ export function SpendLimitsSection({
     setFormOpen(true)
   }, [data.budgetOptions])
 
-  const openEdit = useCallback((config: SpendLimitConfig) => {
-    setForm(formFromConfig(config))
-    setError(null)
-    setFormOpen(true)
-  }, [])
+  const openEdit = useCallback(
+    (config: SpendLimitConfig) => {
+      setForm(formFromConfig(config, data.budgetOptions))
+      setError(null)
+      setFormOpen(true)
+    },
+    [data.budgetOptions],
+  )
 
-  /** Bouwt de request-body die het zod-schema van de route verwacht. */
+  /**
+   * Bouwt de request-body die het zod-schema van de route verwacht.
+   *
+   * Regels zonder enige dimensie vallen eruit: het schema wijst ze af (en de
+   * CHECK in de database ook), en een halfingevulde regel die de gebruiker heeft
+   * laten staan mag het opslaan van de rest niet blokkeren. Blijft er niets over,
+   * dan stuurt de route een begrijpelijke 400 terug — die is er al.
+   */
   const buildBody = useCallback((state: FormState) => {
-    const limitAmount = Number(state.limitAmount.replace(',', '.'))
-    const shared = {
+    return {
       name: state.name.trim(),
       purpose: state.purpose.trim() || null,
-      limitAmount,
+      limitAmount: Number(state.limitAmount.replace(',', '.')),
       period: state.period,
       isActive: state.isActive,
+      rules: state.rules
+        .map((rule) => ({
+          budgetIds: rule.budgetIds,
+          includeChildBudgets: rule.includeChildBudgets,
+          counterpartyLabels: rule.counterpartyLabels.map((l) => l.trim()).filter(Boolean),
+        }))
+        .filter((rule) => rule.budgetIds.length > 0 || rule.counterpartyLabels.length > 0),
     }
-    return state.ruleType === 'budget'
-      ? {
-          ...shared,
-          ruleType: 'budget' as const,
-          budgetId: state.budgetId,
-          includeChildBudgets: state.includeChildBudgets,
-        }
-      : {
-          ...shared,
-          ruleType: 'counterparty' as const,
-          counterpartyLabel: state.counterpartyLabel.trim(),
-        }
   }, [])
 
   const submit = useCallback(
@@ -378,10 +460,10 @@ export function SpendLimitsSection({
 
   const togglePause = useCallback(
     (limit: SpendLimitWithReport) => {
-      const state = formFromConfig(limit.config)
+      const state = formFromConfig(limit.config, data.budgetOptions)
       void submit({ ...state, isActive: !limit.config.isActive }, false)
     },
-    [submit],
+    [submit, data.budgetOptions],
   )
 
   const archive = useCallback(async () => {
@@ -398,11 +480,19 @@ export function SpendLimitsSection({
     }
   }, [confirmArchive, router])
 
+  // Minstens één regel moet daadwerkelijk iets kiezen. Halfingevulde regels
+  // eronder blokkeren het opslaan niet — die worden in `buildBody` weggelaten.
+  const hasUsableRule = form.rules.some(
+    (r) =>
+      r.budgetIds.length > 0 ||
+      r.counterpartyLabels.some((l) => l.trim().length >= MIN_COUNTERPARTY_LENGTH),
+  )
+
   const canSubmit =
     form.name.trim().length > 0 &&
     form.limitAmount.trim().length > 0 &&
     Number.isFinite(Number(form.limitAmount.replace(',', '.'))) &&
-    (form.ruleType === 'budget' ? form.budgetId.length > 0 : form.counterpartyLabel.trim().length >= 2)
+    hasUsableRule
 
   return (
     <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
@@ -579,15 +669,21 @@ function SpendLimitCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="truncate font-medium text-[var(--ink)]">{config.name}</h3>
-          <p className="mt-0.5 text-xs text-[var(--ink-3)]">{ruleSentence(config)}</p>
+          <p className="mt-0.5 text-xs text-[var(--ink-3)]">{describeLimitShort(config)}</p>
           {config.purpose && (
             <p className="mt-1 text-xs italic text-[var(--ink-3)]">{config.purpose}</p>
           )}
           {/* Gearchiveerd budget: geen waarschuwing, wel een verwachting —
-              de historie klopt, er komt alleen niets nieuws bij (AC-B1-02). */}
-          {config.ruleType === 'budget' && config.budgetName !== null && config.budgetArchived && (
+              de historie klopt, er komt alleen niets nieuws bij (AC-B1-02).
+              Een WEG budget krijgt hier bewust geen regel: dat is de zwaardere
+              boodschap en die staat voluit in de prestatieweergave, waar ook de
+              uitleg past over wat er wél nog klopt. */}
+          {budgetAttention(config).archivedNames.length > 0 && (
             <p className="mt-1 text-xs text-[var(--ink-3)]">
-              Dit budget is gearchiveerd. Je historie en reeks blijven kloppen.
+              {budgetAttention(config).archivedNames.length === 1
+                ? 'Eén gekoppeld budget is gearchiveerd.'
+                : 'Meerdere gekoppelde budgetten zijn gearchiveerd.'}{' '}
+              Je historie en reeks blijven kloppen.
             </p>
           )}
           {!config.isActive && (
@@ -791,15 +887,13 @@ function SpendLimitForm({
   error: string | null
 }) {
   const { mode } = useDisplayMode()
-  const selectedBudget = budgetOptions.find((b) => b.id === form.budgetId)
   const rows = useMemo(() => budgetOptionRows(budgetOptions), [budgetOptions])
   const periodWords = PERIOD_WORDS[form.period]
   const periodChanged = form.originalPeriod !== null && form.originalPeriod !== form.period
 
   /**
-   * TXN-3 — in EENVOUDIG is de maand de enige periodesoort die je kúnt kiezen;
-   * kwartaal en jaar zijn diepte en blijven aan Volledig. In VOLLEDIG staan alle
-   * drie ongewijzigd.
+   * TXN-3 — in EENVOUDIG zijn dag, week en maand kiesbaar; kwartaal en jaar zijn
+   * diepte en blijven aan Volledig. In VOLLEDIG staan alle vijf.
    *
    * Eén uitzondering, bewust: bewerk je een pot die in Volledig op kwartaal of
    * jaar is gezet, dan blijft díé tab zichtbaar en actief. De keuze stilzwijgend
@@ -808,8 +902,42 @@ function SpendLimitForm({
    * er ook nooit een tab-rij zonder actieve tab.
    */
   const visiblePeriods = useMemo(
-    () => (mode === 'simple' ? PERIODS.filter((p) => p === 'month' || p === form.period) : PERIODS),
+    () =>
+      mode === 'simple'
+        ? PERIODS.filter((p) => SIMPLE_PERIODS.includes(p) || p === form.period)
+        : PERIODS,
     [mode, form.period],
+  )
+
+  /** Muteer één regel op zijn plek; de overige regels blijven ongemoeid. */
+  const updateRule = useCallback(
+    (key: string, patch: Partial<Omit<FormRule, 'key'>>) => {
+      setForm((f) => ({
+        ...f,
+        rules: f.rules.map((r) => (r.key === key ? { ...r, ...patch } : r)),
+      }))
+    },
+    [setForm],
+  )
+
+  const addRule = useCallback(() => {
+    // Een NIEUWE regel start leeg, niet met het eerste budget voorgeselecteerd:
+    // wie een tweede regel toevoegt, weet wat hij wil toevoegen, en een
+    // stilzwijgend meegekozen budget zou zomaar extra uitgaven meetellen.
+    setForm((f) => ({
+      ...f,
+      rules: [
+        ...f.rules,
+        { key: nextRuleKey(), budgetIds: [], includeChildBudgets: true, counterpartyLabels: [] },
+      ],
+    }))
+  }, [setForm])
+
+  const removeRule = useCallback(
+    (key: string) => {
+      setForm((f) => (f.rules.length <= 1 ? f : { ...f, rules: f.rules.filter((r) => r.key !== key) }))
+    },
+    [setForm],
   )
 
   return (
@@ -844,81 +972,44 @@ function SpendLimitForm({
         />
       </label>
 
-      {/* Regelbasis: budget of tegenpartij. */}
-      <fieldset>
-        <legend className="mb-1 text-xs font-semibold text-[var(--ink-2)]">Waar geldt de grens voor?</legend>
-        <div className="flex gap-2">
-          <SegmentTab
-            active={form.ruleType === 'budget'}
-            onClick={() => setForm((f) => ({ ...f, ruleType: 'budget' }))}
-            icon={<Target className="h-4 w-4" />}
-            label="Een budget"
-          />
-          <SegmentTab
-            active={form.ruleType === 'counterparty'}
-            onClick={() => setForm((f) => ({ ...f, ruleType: 'counterparty' }))}
-            icon={<Flame className="h-4 w-4" />}
-            label="Een tegenpartij"
-          />
-        </div>
-      </fieldset>
-
-      {form.ruleType === 'budget' ? (
-        <div className="space-y-2">
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold text-[var(--ink-2)]">Budget</span>
-            <select
-              value={form.budgetId}
-              onChange={(e) => setForm((f) => ({ ...f, budgetId: e.target.value }))}
-              className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm focus:border-[var(--ink-3)] focus:outline-none"
-            >
-              {rows.length === 0 && <option value="">Nog geen uitgavenbudgetten</option>}
-              {rows.map(({ option, depth }) => (
-                <option key={option.id} value={option.id}>
-                  {depth > 0 ? `${' '.repeat(depth * 3)}└ ` : ''}
-                  {option.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          {selectedBudget?.hasChildren && (
-            <label className="flex items-center gap-2 text-xs text-[var(--ink-2)]">
-              <input
-                type="checkbox"
-                checked={form.includeChildBudgets}
-                onChange={(e) => setForm((f) => ({ ...f, includeChildBudgets: e.target.checked }))}
-              />
-              Subbudgetten meetellen
-            </label>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-2">
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold text-[var(--ink-2)]">Tegenpartij</span>
-            <input
-              value={form.counterpartyLabel}
-              onChange={(e) => setForm((f) => ({ ...f, counterpartyLabel: e.target.value }))}
-              placeholder="Shell"
-              list="spend-limit-counterparties"
-              maxLength={120}
-              className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm focus:border-[var(--ink-3)] focus:outline-none"
-            />
-            <datalist id="spend-limit-counterparties">
-              {(counterparties ?? []).map((c) => (
-                <option key={c.key} value={c.label} />
-              ))}
-            </datalist>
-          </label>
-          {/* Eerlijk over de beperking: dit is vrije tekst uit je bank. */}
-          <p className="text-[11px] text-[var(--ink-3)]">
-            We vergelijken je zoekterm met de tegenpartij zoals je bank die doorgeeft — hoofdletters,
-            spaties en leestekens doen niet mee. Een transactie telt mee zodra de naam je zoekterm
-            bevat, dus “Shell” vangt ook “Shell Express 1032”. Hieronder zie je meteen wat deze
-            regel raakt.
+      {/* ── De regels ────────────────────────────────────────────────────── */}
+      <section className="space-y-3">
+        <div>
+          <h3 className="text-xs font-semibold text-[var(--ink-2)]">Waar geldt de grens voor?</h3>
+          <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">
+            Kies budgetten, tegenpartijen, of allebei. Meerdere budgetten betekent{' '}
+            <em>één van deze</em>; zet je er ook een tegenpartij bij, dan moet die er óók op kloppen.
+            Meerdere regels tellen samen op tegen hetzelfde grensbedrag — een uitgave telt daarbij
+            hoogstens één keer mee.
           </p>
         </div>
-      )}
+
+        {form.rules.map((rule, index) => (
+          <SpendLimitRuleEditor
+            key={rule.key}
+            rule={rule}
+            index={index}
+            total={form.rules.length}
+            budgetRows={rows}
+            budgetOptions={budgetOptions}
+            counterparties={counterparties}
+            dailyExpenseRate={dailyExpenseRate}
+            period={form.period}
+            excludeLimitId={form.id}
+            onChange={updateRule}
+            onRemove={removeRule}
+          />
+        ))}
+
+        <button
+          type="button"
+          onClick={addRule}
+          className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-lg border border-dashed border-[var(--border-ed)] px-3 py-2 text-sm text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]"
+        >
+          <Plus className="h-4 w-4" aria-hidden />
+          Regel toevoegen
+        </button>
+      </section>
 
       {/* Periodesoort — de motor rekent alle drie de kalenderperiodes uit. */}
       <fieldset>
@@ -961,8 +1052,9 @@ function SpendLimitForm({
         </span>
       </label>
 
-      {/* ── Match-preview: wat raakt deze regel nú? ─────────────────────── */}
-      <SpendLimitPreview form={form} dailyExpenseRate={dailyExpenseRate} />
+      {/* De match-preview staat PER REGEL, bij de regel waar hij over gaat —
+          één preview onderaan zou bij meerdere regels niet meer te plaatsen zijn
+          ("wat raakt dit?" — welke van de drie?). Zie <SpendLimitRuleEditor>. */}
 
       {/* O5-A: regels worden niet geversioneerd, dus wijzigen is retroactief. */}
       {form.id && (
@@ -983,6 +1075,184 @@ function SpendLimitForm({
         </div>
       )}
     </div>
+  )
+}
+
+// ── Regel-editor ────────────────────────────────────────────────────────────
+
+/**
+ * Eén regel: welke budgetten, welke tegenpartijen, en wat dat nú zou raken.
+ *
+ * ── WAAROM HET GEEN KEUZE TUSSEN TWEE TAKKEN MEER IS ───────────────────────
+ * Tot 09-08-2026 stond hier een segmented control "Een budget / Een tegenpartij"
+ * en zag je maar één van beide velden. Dat kán niet meer: een regel mag beide
+ * dimensies tegelijk dragen, en een tab-keuze zou de EN-combinatie onbereikbaar
+ * maken. Beide velden staan er nu altijd, met de zin eronder die vertelt wat de
+ * combinatie betekent — die zin is de enige plek waar de gebruiker de logica
+ * hoeft te lezen, en hij komt uit dezelfde `describeRule` die de kaart en de
+ * prestatieweergave gebruiken.
+ *
+ * ── BUDGETTEN ALS AANVINKLIJST, NIET ALS <select multiple> ─────────────────
+ * Een native multi-select vraagt ctrl/cmd-klikken en is op mobiel vrijwel
+ * onbedienbaar. Een aanvinklijst in een scrollvak werkt met de vinger, houdt de
+ * boomstructuur zichtbaar via inspringing, en laat de gekozen budgetten
+ * bovendien als tekst samenvatten.
+ */
+function SpendLimitRuleEditor({
+  rule,
+  index,
+  total,
+  budgetRows,
+  budgetOptions,
+  counterparties,
+  dailyExpenseRate,
+  period,
+  excludeLimitId,
+  onChange,
+  onRemove,
+}: {
+  rule: FormRule
+  index: number
+  total: number
+  budgetRows: { option: SpendLimitBudgetOption; depth: number }[]
+  budgetOptions: SpendLimitBudgetOption[]
+  counterparties: SpendLimitCounterpartyOption[] | null
+  dailyExpenseRate: number | null
+  period: SpendLimitPeriodKind
+  excludeLimitId: string | null
+  onChange: (key: string, patch: Partial<Omit<FormRule, 'key'>>) => void
+  onRemove: (key: string) => void
+}) {
+  const chosen = new Set(rule.budgetIds)
+  // "Subbudgetten meetellen" heeft alleen betekenis als er een gekozen budget
+  // daadwerkelijk kinderen heeft — anders is het een schakelaar zonder effect.
+  const anyChosenHasChildren = budgetOptions.some((b) => chosen.has(b.id) && b.hasChildren)
+
+  const toggleBudget = (id: string) => {
+    onChange(rule.key, {
+      budgetIds: chosen.has(id) ? rule.budgetIds.filter((b) => b !== id) : [...rule.budgetIds, id],
+    })
+  }
+
+  const addCounterparty = (label: string) => {
+    const trimmed = label.trim()
+    if (trimmed.length < MIN_COUNTERPARTY_LENGTH) return
+    // Ontdubbelen op de GENORMALISEERDE sleutel en niet op de letterlijke tekst:
+    // "Shell" en "shell " zouden anders twee keer in de lijst staan terwijl ze
+    // exact dezelfde transacties matchen.
+    const key = spendLimitCounterpartyKey(trimmed)
+    if (rule.counterpartyLabels.some((l) => spendLimitCounterpartyKey(l) === key)) return
+    onChange(rule.key, { counterpartyLabels: [...rule.counterpartyLabels, trimmed] })
+  }
+
+  const removeCounterparty = (label: string) => {
+    onChange(rule.key, { counterpartyLabels: rule.counterpartyLabels.filter((l) => l !== label) })
+  }
+
+  return (
+    <fieldset className="space-y-3 rounded-xl border border-[var(--border-ed)] bg-[var(--subtle)] p-3">
+      <legend className="sr-only">Regel {index + 1}</legend>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ink-3)]">
+          Regel {index + 1}
+        </span>
+        {/* De laatste regel is niet te verwijderen: een pot zonder regels telt
+            niets, en het formulier hoort die staat niet te kunnen maken. */}
+        {total > 1 && (
+          <button
+            type="button"
+            onClick={() => onRemove(rule.key)}
+            aria-label={`Regel ${index + 1} verwijderen`}
+            className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-[var(--ink-3)] transition-colors hover:bg-[var(--paper)] hover:text-negative"
+          >
+            <Trash2 className="h-4 w-4" aria-hidden />
+          </button>
+        )}
+      </div>
+
+      {/* Budgetten — meerdere mogelijk (OF). */}
+      <div className="space-y-1.5">
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-[var(--ink-2)]">
+          <Target className="h-3.5 w-3.5" aria-hidden />
+          Budgetten <span className="font-normal text-[var(--ink-3)]">(meerdere mogelijk)</span>
+        </span>
+        {budgetRows.length === 0 ? (
+          <p className="text-[11px] text-[var(--ink-3)]">Nog geen uitgavenbudgetten.</p>
+        ) : (
+          <div className="max-h-44 overflow-y-auto rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] p-1.5">
+            {budgetRows.map(({ option, depth }) => (
+              <label
+                key={option.id}
+                style={{ paddingLeft: `${depth * 14}px` }}
+                className="flex min-h-[36px] cursor-pointer items-center gap-2 rounded px-1.5 text-sm text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]"
+              >
+                <input
+                  type="checkbox"
+                  checked={chosen.has(option.id)}
+                  onChange={() => toggleBudget(option.id)}
+                />
+                <span className="min-w-0 truncate">{option.name}</span>
+              </label>
+            ))}
+          </div>
+        )}
+        {anyChosenHasChildren && (
+          <label className="flex items-center gap-2 text-xs text-[var(--ink-2)]">
+            <input
+              type="checkbox"
+              checked={rule.includeChildBudgets}
+              onChange={(e) => onChange(rule.key, { includeChildBudgets: e.target.checked })}
+            />
+            Subbudgetten meetellen
+          </label>
+        )}
+      </div>
+
+      {/* Tegenpartijen — meerdere mogelijk (OF), samen met de budgetten een EN. */}
+      <div className="space-y-1.5">
+        <CounterpartyField
+          idPrefix={`spend-limit-cp-${rule.key}`}
+          options={counterparties}
+          onAdd={addCounterparty}
+        />
+        {rule.counterpartyLabels.length > 0 && (
+          <ul className="flex flex-wrap gap-1.5">
+            {rule.counterpartyLabels.map((label) => (
+              <li key={label}>
+                <button
+                  type="button"
+                  onClick={() => removeCounterparty(label)}
+                  aria-label={`${label} verwijderen`}
+                  className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-[var(--border-ed)] bg-[var(--paper)] px-2 py-1 text-xs text-[var(--ink-2)] transition-colors hover:border-negative/40 hover:text-negative"
+                >
+                  <Flame className="h-3 w-3" aria-hidden />
+                  {label}
+                  <span aria-hidden>×</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {/* Eerlijk over de beperking: dit is vrije tekst uit je bank. */}
+        <p className="text-[11px] text-[var(--ink-3)]">
+          We vergelijken je zoekterm met de tegenpartij zoals je bank die doorgeeft — hoofdletters,
+          spaties en leestekens doen niet mee. Een transactie telt mee zodra de naam je zoekterm
+          bevat, dus &ldquo;Shell&rdquo; vangt ook &ldquo;Shell Express 1032&rdquo;.
+        </p>
+      </div>
+
+      {/* De regel in één zin — dezelfde formulering als op de kaart. */}
+      <p className="rounded-lg bg-[var(--paper)] px-2.5 py-1.5 text-xs text-[var(--ink-2)]">
+        {formRuleSentence(rule, budgetOptions)}
+      </p>
+
+      <SpendLimitPreview
+        rule={rule}
+        period={period}
+        excludeLimitId={excludeLimitId}
+        dailyExpenseRate={dailyExpenseRate}
+      />
+    </fieldset>
   )
 }
 
@@ -1011,39 +1281,34 @@ const OVERLAP_REASON: Record<SpendLimitOverlap['reason'], string> = {
  * doortypen vertrekt er hooguit één request (AC-B3-06).
  */
 function SpendLimitPreview({
-  form,
+  rule,
+  period,
+  excludeLimitId,
   dailyExpenseRate,
 }: {
-  form: FormState
+  rule: FormRule
+  period: SpendLimitPeriodKind
+  excludeLimitId: string | null
   dailyExpenseRate: number | null
 }) {
   const [state, setState] = useState<PreviewState>({ status: 'idle' })
 
-  const label = form.counterpartyLabel.trim()
-  const enabled = form.ruleType === 'counterparty' ? label.length > 0 : form.budgetId.length > 0
+  const enabled = rule.budgetIds.length > 0 || rule.counterpartyLabels.length > 0
 
   // De request-body als STRING: dat is meteen de effect-dependency. Een object
-  // zou bij elke toetsaanslag een nieuwe identiteit krijgen en de debounce
-  // zinloos maken; een string vergelijkt op inhoud.
+  // zou bij elke render een nieuwe identiteit krijgen en de debounce zinloos
+  // maken; een string vergelijkt op inhoud. Twee regels met dezelfde inhoud
+  // sturen dus ook dezelfde body — en krijgen hetzelfde antwoord.
   const payload = useMemo(
     () =>
-      JSON.stringify(
-        form.ruleType === 'counterparty'
-          ? {
-              ruleType: 'counterparty',
-              counterpartyLabel: label,
-              period: form.period,
-              excludeLimitId: form.id,
-            }
-          : {
-              ruleType: 'budget',
-              budgetId: form.budgetId,
-              includeChildBudgets: form.includeChildBudgets,
-              period: form.period,
-              excludeLimitId: form.id,
-            },
-      ),
-    [form.ruleType, form.budgetId, form.includeChildBudgets, form.period, form.id, label],
+      JSON.stringify({
+        budgetIds: rule.budgetIds,
+        includeChildBudgets: rule.includeChildBudgets,
+        counterpartyLabels: rule.counterpartyLabels.map((l) => l.trim()).filter(Boolean),
+        period,
+        excludeLimitId,
+      }),
+    [rule.budgetIds, rule.includeChildBudgets, rule.counterpartyLabels, period, excludeLimitId],
   )
 
   useEffect(() => {
@@ -1092,11 +1357,11 @@ function SpendLimitPreview({
   return (
     <section
       aria-label="Wat deze regel raakt"
-      className="space-y-1.5 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2.5"
+      className="space-y-1.5 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2.5"
     >
       <h3 className="text-xs font-semibold text-[var(--ink-2)]">Wat deze regel nu zou raken</h3>
       <div aria-live="polite" className="space-y-1.5">
-        <PreviewBody state={state} form={form} dailyExpenseRate={dailyExpenseRate} />
+        <PreviewBody state={state} period={period} dailyExpenseRate={dailyExpenseRate} />
       </div>
     </section>
   )
@@ -1104,11 +1369,11 @@ function SpendLimitPreview({
 
 function PreviewBody({
   state,
-  form,
+  period,
   dailyExpenseRate,
 }: {
   state: PreviewState
-  form: FormState
+  period: SpendLimitPeriodKind
   dailyExpenseRate: number | null
 }) {
   if (state.status === 'idle' || state.status === 'loading') {
@@ -1142,19 +1407,19 @@ function PreviewBody({
     <>
       {preview.matchedTransactionCount === 0 ? (
         <p className="text-[11px] text-[var(--ink-3)]">
-          In je laatste {periods.length} {PERIOD_WORDS[form.period].plural} raakt deze regel nog
-          niets.
+          In je laatste {periods.length} {PERIOD_WORDS[period].plural} raakt deze regel nog niets.
         </p>
       ) : (
         <>
           <p className="text-[11px] text-[var(--ink-2)]">
             {preview.matchedTransactionCount} transactie
             {preview.matchedTransactionCount === 1 ? '' : 's'} in je laatste {periods.length}{' '}
-            {PERIOD_WORDS[form.period].plural}
-            {preview.key && (
+            {PERIOD_WORDS[period].plural}
+            {preview.keys.length > 0 && (
               <>
                 {' '}
-                op zoeksleutel <span className="font-mono text-[var(--ink)]">{preview.key}</span>
+                op zoeksleutel{preview.keys.length === 1 ? '' : 's'}{' '}
+                <span className="font-mono text-[var(--ink)]">{preview.keys.join(' · ')}</span>
               </>
             )}
             .
@@ -1216,6 +1481,231 @@ function PreviewBody({
         </p>
       )}
     </>
+  )
+}
+
+/** Hoeveel suggesties we hoogstens tonen — daarboven is scrollen zinloos werk. */
+const MAX_COUNTERPARTY_SUGGESTIONS = 40
+
+/**
+ * Tegenpartij-veld met een eigen suggestielijst.
+ *
+ * BEWUST GEEN native `<input list>` + `<datalist>`: die dropdown tekent de
+ * browser zelf, buiten React en buiten het ShellOverlay-z-index-systeem om. Op
+ * Android Chrome viel dat native paneel zichtbaar over het onderliggende blok
+ * "Over welke periode telt de grens?" van deze sheet heen (testmelding 8a28dc,
+ * 9 aug 2026). De lijst hieronder leeft binnen de sheet, is gestyled als de rest
+ * van het formulier en sluit bij keuze, buiten-klik, Tab-weg en Escape — conform
+ * de overlay-conventie bovenaan dit bestand (ADR 0039).
+ *
+ * FILTEREN loopt door `spendLimitCounterpartyKey`/`counterpartyMatchesKey`:
+ * exact dezelfde genormaliseerde contains-match als de motor en de SQL gebruiken
+ * om te bepalen wélke transacties meetellen. De suggestielijst toont daardoor
+ * nooit een naam die de grens daarna niet zou vangen — een native datalist deed
+ * hier een eigen, ruwere tekstvergelijking.
+ */
+function CounterpartyField({
+  idPrefix,
+  options,
+  onAdd,
+}: {
+  /**
+   * Uniek per regel. De ids waren tot 09-08-2026 vaste strings; met meerdere
+   * regels op één scherm zouden `<label for>` en `aria-controls` dan allemaal
+   * naar het EERSTE veld wijzen — de screenreader leest dan de verkeerde
+   * combobox voor en een klik op het label springt naar de verkeerde regel.
+   */
+  idPrefix: string
+  options: SpendLimitCounterpartyOption[] | null
+  onAdd: (label: string) => void
+}) {
+  // De tekst in het veld is nu PUUR invoer: hij hoort niet bij de regel, want de
+  // regel bewaart een LIJST. Zodra de gebruiker kiest of bevestigt, verhuist de
+  // tekst naar die lijst en is het veld weer leeg voor de volgende.
+  const [value, setValue] = useState('')
+  const [open, setOpen] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(-1)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+
+  const listId = `${idPrefix}-list`
+  const inputId = `${idPrefix}-input`
+
+  const suggestions = useMemo(() => {
+    const all = options ?? []
+    const key = spendLimitCounterpartyKey(value)
+    // Een lege zoekterm levert een lege sleutel op — dan tonen we de hele lijst.
+    const matched = key ? all.filter((c) => counterpartyMatchesKey(c.label, key)) : all
+    return matched.slice(0, MAX_COUNTERPARTY_SUGGESTIONS)
+  }, [options, value])
+
+  const listOpen = open && suggestions.length > 0
+
+  const select = useCallback(
+    (label: string) => {
+      onAdd(label)
+      setValue('')
+      setOpen(false)
+      setActiveIndex(-1)
+    },
+    [onAdd],
+  )
+
+  // Buiten-klik sluit de lijst — zelfde patroon als components/overview/filter-dropdown.tsx.
+  useEffect(() => {
+    if (!listOpen) return
+    function onPointerDown(e: PointerEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false)
+        setActiveIndex(-1)
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [listOpen])
+
+  // Toetsenbordnavigatie houdt de actieve optie in beeld.
+  useEffect(() => {
+    if (!listOpen || activeIndex < 0) return
+    listRef.current
+      ?.querySelector<HTMLElement>(`[data-index="${activeIndex}"]`)
+      ?.scrollIntoView({ block: 'nearest' })
+  }, [listOpen, activeIndex])
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      if (!open) {
+        setOpen(true)
+        setActiveIndex(0)
+        return
+      }
+      if (suggestions.length === 0) return
+      setActiveIndex((i) => (i + 1) % suggestions.length)
+      return
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      if (!listOpen) return
+      setActiveIndex((i) => (i <= 0 ? suggestions.length - 1 : i - 1))
+      return
+    }
+    if (e.key === 'Enter') {
+      // Enter bevestigt: de gemarkeerde suggestie als er één actief is, anders de
+      // getikte tekst zelf. Vrije tekst MOET blijven werken — de suggestielijst
+      // is een top-40 en een tegenpartij daarbuiten is een geldige zoekterm.
+      if (listOpen && activeIndex >= 0 && suggestions[activeIndex]) {
+        e.preventDefault()
+        select(suggestions[activeIndex].label)
+        return
+      }
+      if (value.trim().length >= MIN_COUNTERPARTY_LENGTH) {
+        // Anders zou Enter in een sheet-formulier de sheet kunnen submitten
+        // terwijl de gebruiker alleen een tegenpartij wilde toevoegen.
+        e.preventDefault()
+        select(value)
+        return
+      }
+    }
+    if (e.key === 'Escape' && listOpen) {
+      // Alleen de suggestielijst sluiten, niet de hele sheet: BottomSheet luistert
+      // op document-niveau op Escape, dus die listener moet hier stoppen.
+      e.preventDefault()
+      e.stopPropagation()
+      e.nativeEvent.stopImmediatePropagation()
+      setOpen(false)
+      setActiveIndex(-1)
+    }
+  }
+
+  return (
+    <div
+      ref={wrapperRef}
+      className="relative"
+      onBlur={(e) => {
+        // Tab-weg sluit de lijst; een klik op een optie niet (die blijft binnen de wrapper,
+        // en houdt de focus vast via preventDefault op mousedown).
+        if (!wrapperRef.current?.contains(e.relatedTarget as Node | null)) {
+          setOpen(false)
+          setActiveIndex(-1)
+        }
+      }}
+    >
+      <label
+        htmlFor={inputId}
+        className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-[var(--ink-2)]"
+      >
+        <Flame className="h-3.5 w-3.5" aria-hidden />
+        Tegenpartijen <span className="font-normal text-[var(--ink-3)]">(meerdere mogelijk)</span>
+      </label>
+      <div className="flex gap-1.5">
+        <input
+          id={inputId}
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value)
+            setActiveIndex(-1)
+            setOpen(true)
+          }}
+          onFocus={() => setOpen(true)}
+          onClick={() => setOpen(true)}
+          onKeyDown={handleKeyDown}
+          placeholder="Shell"
+          maxLength={120}
+          autoComplete="off"
+          role="combobox"
+          aria-expanded={listOpen}
+          aria-controls={listId}
+          aria-autocomplete="list"
+          aria-activedescendant={
+            listOpen && activeIndex >= 0 ? `${listId}-${activeIndex}` : undefined
+          }
+          className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm focus:border-[var(--ink-3)] focus:outline-none"
+        />
+        {/* Een zichtbare knop naast Enter: op mobiel is er geen toetsenbord-Enter
+            die vanzelf voor de hand ligt, en zonder knop is niet te zien dat de
+            getikte tekst nog TOEGEVOEGD moet worden. */}
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => select(value)}
+          disabled={value.trim().length < MIN_COUNTERPARTY_LENGTH}
+          aria-label="Tegenpartij toevoegen"
+          className="inline-flex h-[38px] w-[38px] shrink-0 cursor-pointer items-center justify-center rounded-lg border border-[var(--border-ed)] text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Plus className="h-4 w-4" aria-hidden />
+        </button>
+      </div>
+      {listOpen && (
+        <div
+          ref={listRef}
+          id={listId}
+          role="listbox"
+          aria-label="Tegenpartij-suggesties"
+          className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-y-auto rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] shadow-lg"
+        >
+          {suggestions.map((c, i) => (
+            <button
+              key={c.key}
+              type="button"
+              role="option"
+              id={`${listId}-${i}`}
+              data-index={i}
+              aria-selected={i === activeIndex}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => select(c.label)}
+              className={`block min-h-[44px] w-full px-3 py-2 text-left text-sm transition-colors ${
+                i === activeIndex
+                  ? 'bg-kern-50 font-medium text-kern-700'
+                  : 'text-[var(--ink-2)] hover:bg-[var(--subtle)]'
+              }`}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 

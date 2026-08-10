@@ -4,7 +4,12 @@ import { parseBody } from '@/lib/api/parse-body'
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { loadSpendLimitsSection } from '@/lib/spend-limits/loader'
 import { SpendLimitInputSchema } from '@/lib/spend-limits/schema'
-import { budgetIsOwn, toSpendLimitRow } from '@/lib/spend-limits/write-helpers'
+import {
+  budgetsAreOwn,
+  collectInputBudgetIds,
+  replaceSpendLimitRules,
+  toSpendLimitRow,
+} from '@/lib/spend-limits/write-helpers'
 
 /**
  * Grenzenpotten — lijst + aanmaken.
@@ -48,26 +53,30 @@ export async function POST(req: Request) {
   const parsed = await parseBody(SpendLimitInputSchema, req)
   if (!parsed.ok) return parsed.response
 
-  const row = toSpendLimitRow(parsed.data)
-
-  if (parsed.data.ruleType === 'budget') {
-    if (!(await budgetIsOwn(supabase, parsed.data.budgetId))) {
-      return badRequest('Kies een geldig budget')
-    }
-  } else if (!row.counterparty_key) {
-    // Een label dat na normalisatie niets overhoudt ("!!!") zou een lege sleutel
-    // opleveren, en een lege sleutel matcht per definitie niets. Vang dat hier
-    // af met een begrijpelijke melding i.p.v. een pot die stil nul telt.
-    return badRequest('Deze tegenpartij levert geen bruikbare zoekterm op. Gebruik letters of cijfers.')
+  if (!(await budgetsAreOwn(supabase, collectInputBudgetIds(parsed.data)))) {
+    return badRequest('Kies een geldig budget')
   }
 
   const { data, error } = await supabase
     .from('spend_limits')
-    .insert({ ...row, user_id: user.id })
+    .insert({ ...toSpendLimitRow(parsed.data), user_id: user.id })
     .select('id')
     .single()
 
   if (error) return serverError(error, 'spend-limits:POST')
+
+  // De pot bestaat nu, de regels nog niet. Faalt die tweede stap — bijvoorbeeld
+  // omdat elk tegenpartij-label na normalisatie leeg blijft ("!!!") en de CHECK
+  // `spend_limit_rules_not_empty` toeslaat — dan zou er een REGELLOZE pot
+  // achterblijven die stil nul telt. Die ruimen we op: liever geen pot dan een
+  // pot die er goed uitziet en niets meet.
+  const rulesResult = await replaceSpendLimitRules(supabase, data.id, parsed.data)
+  if (rulesResult.error) {
+    await supabase.from('spend_limits').delete().eq('id', data.id).eq('user_id', user.id)
+    return badRequest(
+      'Deze regels leveren geen bruikbare zoekterm op. Kies een budget of gebruik letters of cijfers in de tegenpartij.',
+    )
+  }
 
   return NextResponse.json({ id: data.id }, { status: 201 })
 }

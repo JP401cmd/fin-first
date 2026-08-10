@@ -14,16 +14,22 @@
  *    overlap zwaarder weegt dan de andere. Potten sluiten elkaar niet uit — een
  *    transactie mag in twee potten meetellen, dat is geen fout maar een keuze.
  *  - Geen TRANSACTIEDATA. De detectie kijkt uitsluitend naar de regels
- *    (sleutel/budget), nooit naar rijen. Daarom is ze goedkoop, deterministisch
- *    en volledig te unit-testen.
+ *    (sleutels/budgetten), nooit naar rijen. Daarom is ze goedkoop,
+ *    deterministisch en volledig te unit-testen.
  *
- * ── WAAROM PER REGELSOORT EN NIET KRUISELINGS ───────────────────────────────
- * Een tegenpartij-regel en een budget-regel kunnen in de praktijk dezelfde
+ * ── WAAROM PER DIMENSIE EN NIET KRUISELINGS ─────────────────────────────────
+ * Een tegenpartij-dimensie en een budget-dimensie kunnen in de praktijk dezelfde
  * transactie zien, maar dát is alleen vast te stellen uit transactiedata (welke
- * boeking hangt aan welk budget). Een uitspraak daarover zou een gok zijn, en
- * een gokkende waarschuwing is erger dan geen waarschuwing. Overlap wordt
- * daarom uitsluitend binnen dezelfde regelsoort vastgesteld, waar ze exact
- * afleidbaar is.
+ * boeking hangt aan welk budget). Een uitspraak daarover zou een gok zijn, en een
+ * gokkende waarschuwing is erger dan geen waarschuwing. Overlap wordt daarom
+ * uitsluitend binnen dezelfde dimensie vastgesteld, waar ze exact afleidbaar is.
+ *
+ * ── DE EN-DIMENSIE MAAKT DE OBSERVATIE RUIMER, NIET SCHERPER ────────────────
+ * Sinds een regel "budget X ÉN tegenpartij Y" kan zijn, is een gedeelde dimensie
+ * niet meer hetzelfde als een gedeelde transactie: een pot op budget X ziet
+ * strikt méér dan een pot op X-én-Y. De observatie blijft daarom bewust op
+ * "KAN dezelfde uitgaven zien" staan en wordt niet verfijnd tot "ziet ze zeker".
+ * Een preciezere claim zou transactiedata vergen — precies wat hier niet hoort.
  */
 
 import { spendLimitCounterpartyKey } from './counterparty-key'
@@ -38,26 +44,28 @@ import type { SpendLimitRuleType } from './engine'
  * als guard. De reden is dezelfde in beide gevallen: één teken matcht als
  * normalised-CONTAINS zo ongeveer alles, dus zowel de trefferlijst als de
  * overlap-observatie zou ruis zijn in plaats van informatie. Het spiegelt de
- * `min(2)` op het label in `SpendLimitInputSchema` — de pot die de gebruiker
+ * `min(2)` op elk label in `SpendLimitInputSchema` — de pot die de gebruiker
  * straks opslaat kent dezelfde ondergrens.
  */
 export const SPEND_LIMIT_MIN_MATCH_KEY_LENGTH = 2
 
 /** De regel die de gebruiker aan het samenstellen is (nog niet opgeslagen). */
-export type SpendLimitOverlapCandidate =
-  | {
-      ruleType: 'counterparty'
-      /** Rauw label óf genormaliseerde sleutel — er wordt hier altijd genormaliseerd. */
-      counterpartyKey: string | null | undefined
-      /** Id bij het BEWERKEN van een bestaande pot; die pot overlapt nooit met zichzelf. */
-      id?: string | null
-    }
-  | {
-      ruleType: 'budget'
-      budgetId: string
-      includeChildBudgets: boolean
-      id?: string | null
-    }
+export interface SpendLimitOverlapCandidate {
+  /** Wortels; de subboom wordt hier opgerold als `includeChildBudgets` aan staat. */
+  budgetIds: readonly string[]
+  includeChildBudgets: boolean
+  /** Rauwe labels óf genormaliseerde sleutels — er wordt hier altijd genormaliseerd. */
+  counterpartyKeys: readonly (string | null | undefined)[]
+  /** Id bij het BEWERKEN van een bestaande pot; die pot overlapt nooit met zichzelf. */
+  id?: string | null
+}
+
+/** Eén regel van een bestaande pot, teruggebracht tot wat de vergelijking nodig heeft. */
+export interface SpendLimitOverlapRule {
+  budgetIds?: readonly string[] | null
+  includeChildBudgets?: boolean | null
+  counterpartyKeys?: readonly (string | null | undefined)[] | null
+}
 
 /** Een bestaande pot, teruggebracht tot wat voor de vergelijking nodig is. */
 export interface SpendLimitOverlapSubject {
@@ -66,9 +74,7 @@ export interface SpendLimitOverlapSubject {
   ruleType: SpendLimitRuleType
   /** Gepauzeerde potten tellen nu niets, maar bestaan nog — de aanroeper mag het zeggen. */
   isActive: boolean
-  counterpartyKey?: string | null
-  budgetId?: string | null
-  includeChildBudgets?: boolean | null
+  rules: readonly SpendLimitOverlapRule[]
 }
 
 /**
@@ -95,22 +101,23 @@ export interface SpendLimitOverlap {
 }
 
 /**
- * Het budget zelf plus — als de regel kinderen meetelt — al zijn afstammelingen.
+ * De gekozen budgetten plus — als de regel kinderen meetelt — al hun
+ * afstammelingen.
  *
  * Transitief (kleinkinderen tellen mee) en met een bezocht-set tegen een
  * cyclische `parent_id`-keten. Dit is de pure tweelingbroer van `collectBudgetIds`
- * in lib/spend-limits/loader.ts; die is module-privé en de loader is server-only,
- * dus hier staat dezelfde boomwandeling zonder Supabase-afhankelijkheid. Wijzig
- * je de ene, kijk dan naar de andere — het is dezelfde regel.
+ * in lib/spend-limits/loader.ts; die is server-only (Supabase-afhankelijk), dus
+ * hier staat dezelfde boomwandeling zonder die afhankelijkheid. Wijzig je de ene,
+ * kijk dan naar de andere — het is dezelfde regel.
  */
 function collectBudgetSubtree(
-  rootId: string,
+  roots: readonly string[],
   includeChildren: boolean,
   childrenByParent: ReadonlyMap<string, string[]>,
 ): Set<string> {
-  const ids = new Set<string>([rootId])
+  const ids = new Set<string>(roots)
   if (!includeChildren) return ids
-  const queue: string[] = [rootId]
+  const queue: string[] = [...roots]
   while (queue.length > 0) {
     const parent = queue.shift() as string
     for (const child of childrenByParent.get(parent) ?? []) {
@@ -120,6 +127,16 @@ function collectBudgetSubtree(
     }
   }
   return ids
+}
+
+/** De sleutels van een regel, genormaliseerd en ontdaan van te korte ruis. */
+function usableKeys(raw: readonly (string | null | undefined)[] | null | undefined): string[] {
+  const out: string[] = []
+  for (const k of raw ?? []) {
+    const key = spendLimitCounterpartyKey(k)
+    if (key.length >= SPEND_LIMIT_MIN_MATCH_KEY_LENGTH) out.push(key)
+  }
+  return out
 }
 
 function firstIntersection(a: Set<string>, b: Set<string>): boolean {
@@ -135,14 +152,20 @@ function firstIntersection(a: Set<string>, b: Set<string>): boolean {
  * lib/spend-limits/counterparty-key.ts). Bevat sleutel A sleutel B als deeltekst,
  * dan matcht élke naam die B matcht per definitie ook A — de overlap is dus
  * wederzijdse deeltekst, in beide richtingen, en exact afleidbaar zonder één
- * transactie te lezen.
+ * transactie te lezen. Met meerdere sleutels per regel is het een OF-lijst: één
+ * paar dat elkaar bevat volstaat.
  *
- * BUDGET: elke regel dekt een verzameling budget-ids (het gekozen budget plus,
- * bij `includeChildBudgets`, zijn hele subboom). Overlap = die twee verzamelingen
+ * BUDGET: elke regel dekt een verzameling budget-ids (de gekozen budgetten plus,
+ * bij `includeChildBudgets`, hun hele subboom). Overlap = die twee verzamelingen
  * snijden. Dat is preciezer dan "voorouder of afstammeling" op zichzelf: een
  * bestaande pot op een hoofdbudget ZONDER kinderen ziet de boekingen van een
  * subbudget niet, en zou anders een overlap melden die er niet is — precies de
  * valse waarschuwing die het vertrouwen in de preview zou ondermijnen.
+ *
+ * PER POT HOOGSTENS ÉÉN TREFFER. Een pot met vier regels die de kandidaat alle
+ * vier raken, is nog steeds één pot om over te vertellen; vier keer dezelfde naam
+ * in de zin zou als een fout lezen. De EERSTE reden wint, en de takken hieronder
+ * staan in de volgorde die het meest specifiek uitlegt.
  *
  * @param childrenByParent budget-id → directe kind-ids. Leeg meegeven is
  *        toegestaan (dan blijft alleen exact-hetzelfde-budget over).
@@ -152,56 +175,25 @@ export function findOverlappingLimits(
   existingLimits: readonly SpendLimitOverlapSubject[],
   childrenByParent: ReadonlyMap<string, string[]> = new Map(),
 ): SpendLimitOverlap[] {
-  const hits: SpendLimitOverlap[] = []
-
-  if (candidate.ruleType === 'counterparty') {
-    const key = spendLimitCounterpartyKey(candidate.counterpartyKey)
-    if (key.length < SPEND_LIMIT_MIN_MATCH_KEY_LENGTH) return hits
-
-    for (const other of existingLimits) {
-      if (other.id === candidate.id) continue
-      if (other.ruleType !== 'counterparty') continue
-      const otherKey = spendLimitCounterpartyKey(other.counterpartyKey)
-      if (otherKey.length === 0) continue
-      if (!key.includes(otherKey) && !otherKey.includes(key)) continue
-      hits.push({
-        id: other.id,
-        name: other.name,
-        ruleType: other.ruleType,
-        isActive: other.isActive,
-        reason: 'counterparty_key_substring',
-      })
-    }
-    return hits
-  }
-
-  const candidateIds = collectBudgetSubtree(
-    candidate.budgetId,
+  const candidateKeys = usableKeys(candidate.counterpartyKeys)
+  const candidateBudgetRoots = [...new Set(candidate.budgetIds)]
+  const candidateBudgetIds = collectBudgetSubtree(
+    candidateBudgetRoots,
     candidate.includeChildBudgets,
     childrenByParent,
   )
 
+  const hits: SpendLimitOverlap[] = []
+
   for (const other of existingLimits) {
     if (other.id === candidate.id) continue
-    if (other.ruleType !== 'budget') continue
-    if (!other.budgetId) continue
 
-    const otherIds = collectBudgetSubtree(
-      other.budgetId,
-      other.includeChildBudgets === true,
+    const reason = firstOverlapReason(
+      { keys: candidateKeys, budgetIds: candidateBudgetIds, budgetRoots: candidateBudgetRoots },
+      other.rules,
       childrenByParent,
     )
-    if (!firstIntersection(candidateIds, otherIds)) continue
-
-    // Volgorde van de takken is betekenisvol: "hetzelfde budget" wint van een
-    // boomrelatie, anders zou een pot op hetzelfde budget met kinderen aan als
-    // 'afstammeling' worden uitgelegd.
-    const reason: SpendLimitOverlapReason =
-      other.budgetId === candidate.budgetId
-        ? 'same_budget'
-        : otherIds.has(candidate.budgetId)
-          ? 'budget_ancestor'
-          : 'budget_descendant'
+    if (!reason) continue
 
     hits.push({
       id: other.id,
@@ -213,4 +205,43 @@ export function findOverlappingLimits(
   }
 
   return hits
+}
+
+/** De eerste reden waarom een van de regels van deze pot de kandidaat raakt. */
+function firstOverlapReason(
+  candidate: { keys: string[]; budgetIds: Set<string>; budgetRoots: string[] },
+  rules: readonly SpendLimitOverlapRule[],
+  childrenByParent: ReadonlyMap<string, string[]>,
+): SpendLimitOverlapReason | null {
+  for (const rule of rules) {
+    if (candidate.keys.length > 0) {
+      for (const otherKey of usableKeys(rule.counterpartyKeys)) {
+        for (const key of candidate.keys) {
+          if (key.includes(otherKey) || otherKey.includes(key)) {
+            return 'counterparty_key_substring'
+          }
+        }
+      }
+    }
+
+    if (candidate.budgetIds.size === 0) continue
+    const otherRoots = [...new Set(rule.budgetIds ?? [])]
+    if (otherRoots.length === 0) continue
+
+    const otherIds = collectBudgetSubtree(
+      otherRoots,
+      rule.includeChildBudgets === true,
+      childrenByParent,
+    )
+    if (!firstIntersection(candidate.budgetIds, otherIds)) continue
+
+    // Volgorde van de takken is betekenisvol: "hetzelfde budget" wint van een
+    // boomrelatie, anders zou een pot op hetzelfde budget met kinderen aan als
+    // 'afstammeling' worden uitgelegd.
+    if (otherRoots.some((id) => candidate.budgetRoots.includes(id))) return 'same_budget'
+    if (candidate.budgetRoots.some((id) => otherIds.has(id))) return 'budget_ancestor'
+    return 'budget_descendant'
+  }
+
+  return null
 }

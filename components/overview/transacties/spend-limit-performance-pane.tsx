@@ -43,8 +43,14 @@ import { Kicker } from '@/components/editorial'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useSpendLimitCopy } from '@/lib/hooks/use-spend-limit-alias'
 import { calculateFreedomTime, formatFreedomTimeString, formatMaskedCurrency } from '@/lib/format'
+import { SPEND_LIMIT_GRAIN_BY_PERIOD } from '@/lib/spend-limits/engine'
 import type { SpendLimitPeriodOutcome, SpendLimitTrend } from '@/lib/spend-limits/engine'
-import type { SpendLimitBudgetSplitRow, SpendLimitWithReport } from '@/lib/spend-limits/types'
+import { budgetAttention, describeRule, describeRules } from '@/lib/spend-limits/describe'
+import type {
+  SpendLimitBudgetSplitRow,
+  SpendLimitRuleSplitRow,
+  SpendLimitWithReport,
+} from '@/lib/spend-limits/types'
 import { SpendLimitPeriodChart } from './spend-limit-period-chart'
 import { SpendLimitHeatmap } from './spend-limit-heatmap'
 
@@ -144,54 +150,71 @@ function FreedomLine({
   )
 }
 
-function ruleSentence(limit: SpendLimitWithReport): string {
-  const { config } = limit
-  if (config.ruleType === 'budget') {
-    const naam = config.budgetName ?? 'een budget dat niet meer beschikbaar is'
-    return config.includeChildBudgets
-      ? `Uitgaven in ${naam} (inclusief subbudgetten)`
-      : `Uitgaven in ${naam}`
+/**
+ * De regels van deze pot, elk op een eigen regel.
+ *
+ * Bewust een LIJST en geen samengeperste zin: bij meerdere regels is "wat telt
+ * hier eigenlijk mee" precies de vraag die de prestatieweergave beantwoordt, en
+ * drie regels achter elkaar in één zin is geen zin meer. De formulering zelf
+ * heeft één eigenaar (`describeRule`) — zie lib/spend-limits/describe.ts.
+ */
+function RuleSentences({ limit }: { limit: SpendLimitWithReport }) {
+  const sentences = describeRules(limit.config)
+  if (sentences.length === 0) return null
+  if (sentences.length === 1) {
+    return <p className="text-xs text-[var(--ink-2)]">{sentences[0]}</p>
   }
-  return `Uitgaven bij ${config.counterpartyLabel ?? 'een tegenpartij'}`
+  return (
+    <ul className="space-y-0.5">
+      {sentences.map((s, i) => (
+        <li key={limit.config.rules[i]?.id ?? i} className="text-xs text-[var(--ink-2)]">
+          · {s}
+        </li>
+      ))}
+    </ul>
+  )
 }
 
 /**
- * De staat van het gekoppelde budget — TWEE gebeurtenissen, twee boodschappen
+ * De staat van de gekoppelde budgetten — TWEE gebeurtenissen, twee boodschappen
  * (AC-B1-02). Ze samenvatten tot één "niet meer beschikbaar" zou het archiveren
  * van een budget als dataverlies laten klinken terwijl er niets kwijt is:
  *
- *  - budget WEG (`budgetName === null`): de pot kan structureel niets meer
- *    tellen. Dit is een defect-achtige toestand waar de gebruiker iets aan moet
- *    doen.
+ *  - budget WEG: die verwijzing kan structureel niets meer tellen. Dit is een
+ *    defect-achtige toestand waar de gebruiker iets aan moet doen.
  *  - budget GEARCHIVEERD: alles klopt nog, alleen komt er waarschijnlijk niets
  *    nieuws meer bij. Dit is een verwachtingsregel, geen waarschuwing.
  *
- * De volgorde is betekenisvol: een weg budget wint, want dan zegt "gearchiveerd"
- * niets meer.
+ * Beide kunnen tegelijk waar zijn zodra een pot meerdere budgetten kiest, dus ze
+ * worden nu naast elkaar getoond in plaats van als exclusieve takken. De
+ * volgorde blijft betekenisvol: het weg-budget staat eerst, want dat is het
+ * enige dat om actie vraagt.
  */
 function BudgetStateNotice({ limit }: { limit: SpendLimitWithReport }) {
-  const { config } = limit
-  if (config.ruleType !== 'budget') return null
+  const { missingCount, archivedNames } = budgetAttention(limit.config)
 
-  if (config.budgetName === null) {
-    return (
-      <p className="text-xs text-[var(--ink-3)]">
-        Het gekoppelde budget is niet meer beschikbaar. De historie hieronder klopt nog wel, maar
-        nieuwe uitgaven kunnen niet meer worden toegerekend.
-      </p>
-    )
-  }
-
-  if (config.budgetArchived) {
-    return (
-      <p className="text-xs text-[var(--ink-3)]">
-        Het budget {config.budgetName} is gearchiveerd. Je historie en je reeks blijven kloppen; er
-        komen alleen waarschijnlijk geen nieuwe uitgaven meer bij.
-      </p>
-    )
-  }
-
-  return null
+  return (
+    <>
+      {missingCount > 0 && (
+        <p className="text-xs text-[var(--ink-3)]">
+          {missingCount === 1
+            ? 'Eén gekoppeld budget is niet meer beschikbaar.'
+            : `${missingCount} gekoppelde budgetten zijn niet meer beschikbaar.`}{' '}
+          De historie hieronder klopt nog wel, maar nieuwe uitgaven kunnen daar niet meer worden
+          toegerekend.
+        </p>
+      )}
+      {archivedNames.length > 0 && (
+        <p className="text-xs text-[var(--ink-3)]">
+          {archivedNames.length === 1
+            ? `Het budget ${archivedNames[0]} is gearchiveerd.`
+            : `Deze budgetten zijn gearchiveerd: ${archivedNames.join(', ')}.`}{' '}
+          Je historie en je reeks blijven kloppen; er komen alleen waarschijnlijk geen nieuwe
+          uitgaven meer bij.
+        </p>
+      )}
+    </>
+  )
 }
 
 // ── Pane ────────────────────────────────────────────────────────────────────
@@ -265,6 +288,28 @@ function PaneBody({
     setSelectedPeriodKey((prev) => (prev === periodKey ? null : periodKey))
   }, [])
 
+  /**
+   * Welke uitsplitsing kán deze pot laten zien? Drie bronnen, met een harde
+   * volgorde — en elk van de drie bestaat alleen onder eigen voorwaarden:
+   *
+   *  - `names`   — de on-demand per-schrijfwijze-uitsplitsing. De route serveert
+   *                die uitsluitend voor een ZUIVERE tegenpartij-pot; bij een
+   *                gemengde regel zou ze het budget-deel negeren en dus groter
+   *                kunnen zijn dan het geheel.
+   *  - `budgets` — de per-(kind)budget-uitsplitsing uit de bundel. Het aggregaat
+   *                vult de budget-kolom alleen op MAAND-korrel voor regels zonder
+   *                tegenpartij-dimensie (rijcap, zie de migratie).
+   *  - `rules`   — de per-regel-uitsplitsing. Werkt altijd, want ze leunt alleen
+   *                op de regelindex; de terugval voor gemengde potten en voor
+   *                dag-/weekgrenzen.
+   */
+  const splitMode: 'names' | 'budgets' | 'rules' =
+    config.ruleType === 'counterparty'
+      ? 'names'
+      : config.ruleType === 'budget' && SPEND_LIMIT_GRAIN_BY_PERIOD[config.period] === 'month'
+        ? 'budgets'
+        : 'rules'
+
   // Welke periodes al zijn opgevraagd. Bewust een ref en geen afgeleide van
   // `breakdowns`: dat laatste zou de effect-dependency laten wisselen zodra de
   // laadstaat gezet is, waarna de cleanup de eigen, nog lopende fetch afbreekt en
@@ -330,7 +375,7 @@ function PaneBody({
     <div className="space-y-6 p-5 sm:p-6 lg:p-0">
       {/* ── Wat deze grens is ─────────────────────────────────────────────── */}
       <header className="space-y-1">
-        <p className="text-sm text-[var(--ink-2)]">{ruleSentence(limit)}</p>
+        <RuleSentences limit={limit} />
         {config.purpose && (
           <p className="font-serif text-sm italic text-[var(--ink-3)]">{config.purpose}</p>
         )}
@@ -477,17 +522,23 @@ function PaneBody({
           <p className="text-sm text-[var(--ink-3)]">
             Kies een periode in de grafiek of het rooster om te zien waar het bedrag vandaan komt.
           </p>
-        ) : config.ruleType === 'budget' ? (
+        ) : splitMode === 'budgets' ? (
           <BudgetSplitList
             rows={limit.budgetSplit.filter((r) => r.periodKey === selected.periodKey)}
             label={selected.label}
           />
-        ) : (
+        ) : splitMode === 'names' ? (
           <NameBreakdownList
             state={breakdowns[selected.periodKey]}
             label={selected.label}
             periodMatchedAmount={selected.periodMatchedAmount}
             dailyExpenseRate={dailyExpenseRate}
+          />
+        ) : (
+          <RuleSplitList
+            rows={limit.ruleSplit.filter((r) => r.periodKey === selected.periodKey)}
+            limit={limit}
+            label={selected.label}
           />
         )}
       </section>
@@ -572,6 +623,63 @@ function TrendSummary({
 }
 
 // ── Uitsplitsingen ──────────────────────────────────────────────────────────
+
+/**
+ * Per REGEL: wat droeg elke regel bij aan het bedrag van deze periode?
+ *
+ * De terugval voor gemengde potten en voor dag-/weekgrenzen, waar de
+ * per-budget-uitsplitsing niet bestaat (zie `splitMode`). Ook hier geldt:
+ * TOEREKENING, geen dubbeltelling — raakt een transactie twee regels van deze
+ * pot, dan telt ze bij de eerste. De som van deze rijen is daarom exact het
+ * periodebedrag, en de lijst kan geen tweede waarheid worden.
+ *
+ * De regels behouden hun FORMULIERVOLGORDE en worden niet op bedrag gesorteerd:
+ * bij de budget-lijst is "grootste bovenaan" de nuttigste ordening, maar hier is
+ * de volgorde betekenisdragend — hij bepaalt wélke regel een gedeelde transactie
+ * vangt. Ze omgooien zou de uitleg tegenspreken.
+ */
+function RuleSplitList({
+  rows,
+  limit,
+  label,
+}: {
+  rows: SpendLimitRuleSplitRow[]
+  limit: SpendLimitWithReport
+  label: string
+}) {
+  const { masked } = useMaskedAmounts()
+  if (rows.length === 0) {
+    return (
+      <p className="text-sm text-[var(--ink-3)]">
+        Geen uitgaven in <span className="capitalize">{label}</span>.
+      </p>
+    )
+  }
+  const amountByRule = new Map(rows.map((r) => [r.ruleId, r]))
+  const ordered = limit.config.rules
+    .map((rule) => ({ rule, row: amountByRule.get(rule.id) }))
+    .filter((entry): entry is { rule: (typeof limit.config.rules)[number]; row: SpendLimitRuleSplitRow } =>
+      Boolean(entry.row),
+    )
+
+  return (
+    <ul className="divide-y divide-[var(--border-ed)] border-y border-[var(--border-ed)]">
+      {ordered.map(({ rule, row }) => (
+        <li key={rule.id} className="flex items-baseline justify-between gap-3 py-1.5 text-sm">
+          <span className="min-w-0 text-[var(--ink)]">
+            {describeRule(rule)}
+            <span className="ml-1.5 text-[11px] text-[var(--ink-3)]">
+              {row.matchedTransactionCount}×
+            </span>
+          </span>
+          <span className="shrink-0 font-mono tabular-nums text-[var(--ink)]">
+            {formatMaskedCurrency(row.matchedAmount, masked)}
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
+}
 
 function BudgetSplitList({ rows, label }: { rows: SpendLimitBudgetSplitRow[]; label: string }) {
   const { masked } = useMaskedAmounts()

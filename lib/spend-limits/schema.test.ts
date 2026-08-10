@@ -6,9 +6,15 @@
  * een client-body wordt afgekeurd, en hun validatiemeldingen reizen letterlijk
  * naar het scherm (ADR 0044: `parseBody` geeft de zod-melding als 400-tekst
  * terug). Een gewijzigde literal is dus een gewijzigde UI-tekst — AC-B5-02 pint
- * er één expliciet vast. En de preview is een DISCRIMINATED UNION: valt die stil
- * terug op één tak, dan kan een budget-regel als tegenpartij-regel worden
- * gelezen (of andersom) en toont de preview iets anders dan de pot straks telt.
+ * er één expliciet vast.
+ *
+ * ── DE UNION IS WEG, DE GRENZEN NIET (10-08-2026) ──────────────────────────
+ * Tot fase 5 was dit een `discriminatedUnion('ruleType', …)`: een pot was óf een
+ * budget-regel óf een tegenpartij-regel. Een regel mag nu beide dimensies dragen
+ * (budget X ÉN tegenpartij Y), dus er valt niets meer te discrimineren. Wat
+ * daarvoor in de plaats moet worden bewaakt is de REGEL-INVARIANT: minstens één
+ * regel, en elke regel kiest minstens één ding — anders zou een lege regel op
+ * álle zichtbare transacties matchen.
  *
  * LET OP bij het uitbreiden van dit bestand: `copy.test.ts` scant heel
  * `lib/spend-limits/**` op naam-dragende literals in CODE. De weergavenaam van
@@ -26,22 +32,23 @@ function messagesFor(issues: { path: PropertyKey[]; message: string }[], path: s
   return issues.filter((i) => i.path.join('.') === path).map((i) => i.message)
 }
 
+/** Een geldige minimale body met één budget-regel. */
+const budgetBody = (name: unknown) => ({
+  name,
+  limitAmount: 100,
+  rules: [{ budgetIds: [UUID] }],
+})
+
+/** Een geldige minimale body met één tegenpartij-regel. */
+const counterpartyBody = (name: unknown) => ({
+  name,
+  limitAmount: 100,
+  rules: [{ counterpartyLabels: ['Shell'] }],
+})
+
 // ── AC-B5-02: de naam-melding is een letterlijke UI-tekst ───────────────────
 
 describe('SpendLimitInputSchema — naam (AC-B5-02)', () => {
-  const budgetBody = (name: unknown) => ({
-    ruleType: 'budget',
-    name,
-    limitAmount: 100,
-    budgetId: UUID,
-  })
-  const counterpartyBody = (name: unknown) => ({
-    ruleType: 'counterparty',
-    name,
-    limitAmount: 100,
-    counterpartyLabel: 'Shell',
-  })
-
   it('een lege naam geeft exact de melding "Geef een naam op"', () => {
     const res = SpendLimitInputSchema.safeParse(budgetBody(''))
     expect(res.success).toBe(false)
@@ -56,9 +63,7 @@ describe('SpendLimitInputSchema — naam (AC-B5-02)', () => {
     expect(messagesFor(res.error!.issues, 'name')).toEqual(['Geef een naam op'])
   })
 
-  it('dezelfde melding in BEIDE takken van de union', () => {
-    // De twee takken herhalen `NAME` uit één constante; zou iemand er één
-    // inlinen met een andere tekst, dan verschilt de UI per regelsoort.
+  it('dezelfde melding ongeacht welke dimensie de regel gebruikt', () => {
     const res = SpendLimitInputSchema.safeParse(counterpartyBody(''))
     expect(res.success).toBe(false)
     expect(messagesFor(res.error!.issues, 'name')).toEqual(['Geef een naam op'])
@@ -70,113 +75,156 @@ describe('SpendLimitInputSchema — naam (AC-B5-02)', () => {
     expect(messagesFor(res.error!.issues, 'name')).toEqual(['Naam is te lang'])
   })
 
-  it('een geldige naam wordt getrimd doorgegeven', () => {
+  it('een geldige naam wordt getrimd doorgegeven, met de defaults erbij', () => {
     const res = SpendLimitInputSchema.safeParse(budgetBody('  Boodschappen  '))
     expect(res.success).toBe(true)
     expect(res.data).toMatchObject({ name: 'Boodschappen', period: 'month', isActive: true })
+    // De subboom telt standaard mee — dezelfde default als vóór de regel-lijst.
+    expect(res.data!.rules[0]).toMatchObject({
+      budgetIds: [UUID],
+      includeChildBudgets: true,
+      counterpartyLabels: [],
+    })
   })
 })
 
-// ── De vorm van de preview-union ────────────────────────────────────────────
+// ── De regel-invariant ──────────────────────────────────────────────────────
 
-describe('spendLimitPreviewSchema — discriminated-union-vormen', () => {
-  it('tegenpartij-tak: minimale body parst, met de defaults van het hoofdschema', () => {
-    const res = spendLimitPreviewSchema.safeParse({
-      ruleType: 'counterparty',
-      counterpartyLabel: '  Shell  ',
+describe('SpendLimitInputSchema — regels', () => {
+  it('eist minstens één regel', () => {
+    const res = SpendLimitInputSchema.safeParse({ name: 'Tanken', limitAmount: 100, rules: [] })
+    expect(res.success).toBe(false)
+    expect(messagesFor(res.error!.issues, 'rules')).toEqual(['Een grens heeft minstens één regel nodig'])
+  })
+
+  it('wijst een regel zonder enige dimensie af — die zou op álles matchen', () => {
+    const res = SpendLimitInputSchema.safeParse({
+      name: 'Tanken',
+      limitAmount: 100,
+      rules: [{ budgetIds: [], counterpartyLabels: [] }],
+    })
+    expect(res.success).toBe(false)
+    expect(messagesFor(res.error!.issues, 'rules.0')).toEqual([
+      'Kies minstens één budget of tegenpartij in elke regel',
+    ])
+  })
+
+  it('aanvaardt meerdere waarden per dimensie én beide dimensies tegelijk', () => {
+    const res = SpendLimitInputSchema.safeParse({
+      name: 'Uit eten',
+      limitAmount: 200,
+      rules: [
+        { budgetIds: [UUID, UUID_2] },
+        { budgetIds: [UUID], counterpartyLabels: ['Gorillas', 'Getir'] },
+      ],
     })
     expect(res.success).toBe(true)
-    expect(res.data).toMatchObject({
-      ruleType: 'counterparty',
-      counterpartyLabel: 'Shell',
-      period: 'month',
-    })
-    // De tegenpartij-SLEUTEL komt bewust NIET uit de body (de server leidt 'm af).
-    expect(res.data).not.toHaveProperty('counterpartyKey')
+    expect(res.data!.rules).toHaveLength(2)
+    expect(res.data!.rules[1].counterpartyLabels).toEqual(['Gorillas', 'Getir'])
   })
 
-  it('budget-tak: minimale body parst, includeChildBudgets staat standaard AAN', () => {
-    const res = spendLimitPreviewSchema.safeParse({ ruleType: 'budget', budgetId: UUID })
-    expect(res.success).toBe(true)
-    expect(res.data).toMatchObject({
-      ruleType: 'budget',
-      budgetId: UUID,
-      includeChildBudgets: true,
-      period: 'month',
+  it('valideert elk budget-id afzonderlijk, met zijn eigen melding', () => {
+    const res = SpendLimitInputSchema.safeParse({
+      name: 'Tanken',
+      limitAmount: 100,
+      rules: [{ budgetIds: [UUID, 'b1'] }],
     })
-  })
-
-  it('elke tak houdt UITSLUITEND zijn eigen velden over', () => {
-    // Een budget-body met een tegenpartij-label erin mag dat label niet
-    // meedragen: anders kan een client een tweede matchregel smokkelen die de
-    // preview wél ziet en de pot straks niet.
-    const res = spendLimitPreviewSchema.safeParse({
-      ruleType: 'budget',
-      budgetId: UUID,
-      counterpartyLabel: 'Shell',
-    })
-    expect(res.success).toBe(true)
-    expect(res.data).not.toHaveProperty('counterpartyLabel')
-  })
-
-  it('de discriminator kiest de tak — een body met de velden van de ándere tak faalt', () => {
-    const res = spendLimitPreviewSchema.safeParse({ ruleType: 'counterparty', budgetId: UUID })
     expect(res.success).toBe(false)
-    expect(messagesFor(res.error!.issues, 'counterpartyLabel')).toHaveLength(1)
+    expect(messagesFor(res.error!.issues, 'rules.0.budgetIds.1')).toEqual(['Kies een geldig budget'])
   })
 
-  it('een onbekende of ontbrekende ruleType wordt op de discriminator afgekeurd', () => {
-    for (const body of [{ ruleType: 'iets_anders' }, {}]) {
-      const res = spendLimitPreviewSchema.safeParse(body)
-      expect(res.success).toBe(false)
-      expect(messagesFor(res.error!.issues, 'ruleType')).toHaveLength(1)
-    }
-  })
-
-  it('een leeg tegenpartij-label geeft zijn eigen melding', () => {
-    const res = spendLimitPreviewSchema.safeParse({ ruleType: 'counterparty', counterpartyLabel: '  ' })
-    expect(res.success).toBe(false)
-    expect(messagesFor(res.error!.issues, 'counterpartyLabel')).toEqual(['Geef een tegenpartij op'])
-  })
-
-  it('een budgetId dat geen uuid is geeft zijn eigen melding', () => {
-    const res = spendLimitPreviewSchema.safeParse({ ruleType: 'budget', budgetId: 'b1' })
-    expect(res.success).toBe(false)
-    expect(messagesFor(res.error!.issues, 'budgetId')).toEqual(['Kies een geldig budget'])
-  })
-
-  it('excludeLimitId is optioneel én nullable, maar moet een uuid zijn als hij er is', () => {
-    const metId = spendLimitPreviewSchema.safeParse({
-      ruleType: 'budget',
-      budgetId: UUID,
-      excludeLimitId: UUID_2,
+  it('houdt het opslag-minimum van twee tekens per tegenpartij-label vast', () => {
+    const res = SpendLimitInputSchema.safeParse({
+      name: 'Brandstof',
+      limitAmount: 100,
+      rules: [{ counterpartyLabels: ['S'] }],
     })
-    expect(metId.success).toBe(true)
-    expect(metId.data).toMatchObject({ excludeLimitId: UUID_2 })
-
-    expect(
-      spendLimitPreviewSchema.safeParse({ ruleType: 'budget', budgetId: UUID, excludeLimitId: null })
-        .success,
-    ).toBe(true)
-
-    const fout = spendLimitPreviewSchema.safeParse({
-      ruleType: 'budget',
-      budgetId: UUID,
-      excludeLimitId: 'nope',
-    })
-    expect(fout.success).toBe(false)
-    expect(messagesFor(fout.error!.issues, 'excludeLimitId')).toEqual(['Ongeldig ID'])
+    expect(res.success).toBe(false)
+    expect(messagesFor(res.error!.issues, 'rules.0.counterpartyLabels.0')).toEqual([
+      'Geef minstens twee tekens om op te matchen',
+    ])
   })
 
-  it('period accepteert exact de drie kalenderperiodes van de motor', () => {
-    for (const period of ['month', 'quarter', 'year'] as const) {
-      const res = spendLimitPreviewSchema.safeParse({ ruleType: 'budget', budgetId: UUID, period })
+  it('period accepteert exact de vijf periodesoorten van de motor', () => {
+    for (const period of ['day', 'week', 'month', 'quarter', 'year'] as const) {
+      const res = SpendLimitInputSchema.safeParse({ ...budgetBody('Tanken'), period })
       expect(res.success).toBe(true)
       expect(res.data).toMatchObject({ period })
     }
     expect(
-      spendLimitPreviewSchema.safeParse({ ruleType: 'budget', budgetId: UUID, period: 'week' })
-        .success,
+      SpendLimitInputSchema.safeParse({ ...budgetBody('Tanken'), period: 'decennium' }).success,
+    ).toBe(false)
+  })
+})
+
+// ── De vorm van de preview-body ─────────────────────────────────────────────
+
+describe('spendLimitPreviewSchema', () => {
+  it('minimale tegenpartij-body parst, met de defaults van het hoofdschema', () => {
+    const res = spendLimitPreviewSchema.safeParse({ counterpartyLabels: ['  Shell  '] })
+    expect(res.success).toBe(true)
+    expect(res.data).toMatchObject({
+      counterpartyLabels: ['Shell'],
+      budgetIds: [],
+      period: 'month',
+    })
+    // De tegenpartij-SLEUTEL komt bewust NIET uit de body (de server leidt 'm af).
+    expect(res.data).not.toHaveProperty('counterpartyKeys')
+  })
+
+  it('minimale budget-body parst, includeChildBudgets staat standaard AAN', () => {
+    const res = spendLimitPreviewSchema.safeParse({ budgetIds: [UUID] })
+    expect(res.success).toBe(true)
+    expect(res.data).toMatchObject({
+      budgetIds: [UUID],
+      includeChildBudgets: true,
+      counterpartyLabels: [],
+      period: 'month',
+    })
+  })
+
+  it('aanvaardt een LEGE body — een half ingevuld formulier mag niet schreeuwen', () => {
+    const res = spendLimitPreviewSchema.safeParse({})
+    expect(res.success).toBe(true)
+    expect(res.data).toMatchObject({ budgetIds: [], counterpartyLabels: [] })
+  })
+
+  it('een leeg tegenpartij-label geeft zijn eigen melding', () => {
+    const res = spendLimitPreviewSchema.safeParse({ counterpartyLabels: ['  '] })
+    expect(res.success).toBe(false)
+    expect(messagesFor(res.error!.issues, 'counterpartyLabels.0')).toEqual([
+      'Geef een tegenpartij op',
+    ])
+  })
+
+  it('een budgetId dat geen uuid is geeft zijn eigen melding', () => {
+    const res = spendLimitPreviewSchema.safeParse({ budgetIds: ['b1'] })
+    expect(res.success).toBe(false)
+    expect(messagesFor(res.error!.issues, 'budgetIds.0')).toEqual(['Kies een geldig budget'])
+  })
+
+  it('excludeLimitId is optioneel én nullable, maar moet een uuid zijn als hij er is', () => {
+    const metId = spendLimitPreviewSchema.safeParse({ budgetIds: [UUID], excludeLimitId: UUID_2 })
+    expect(metId.success).toBe(true)
+    expect(metId.data).toMatchObject({ excludeLimitId: UUID_2 })
+
+    expect(
+      spendLimitPreviewSchema.safeParse({ budgetIds: [UUID], excludeLimitId: null }).success,
+    ).toBe(true)
+
+    const fout = spendLimitPreviewSchema.safeParse({ budgetIds: [UUID], excludeLimitId: 'nope' })
+    expect(fout.success).toBe(false)
+    expect(messagesFor(fout.error!.issues, 'excludeLimitId')).toEqual(['Ongeldig ID'])
+  })
+
+  it('period accepteert exact de vijf periodesoorten van de motor', () => {
+    for (const period of ['day', 'week', 'month', 'quarter', 'year'] as const) {
+      const res = spendLimitPreviewSchema.safeParse({ budgetIds: [UUID], period })
+      expect(res.success).toBe(true)
+      expect(res.data).toMatchObject({ period })
+    }
+    expect(
+      spendLimitPreviewSchema.safeParse({ budgetIds: [UUID], period: 'decennium' }).success,
     ).toBe(false)
   })
 })
@@ -189,19 +237,15 @@ describe('preview-minimum vs. opslag-minimum (bewuste asymmetrie)', () => {
     // een expliciete "te kort om te matchen"-uitkomst; bij opslaan is twee
     // tekens het minimum. Deze twee grenzen horen bij elkaar en drijven anders
     // uit elkaar.
-    expect(
-      spendLimitPreviewSchema.safeParse({ ruleType: 'counterparty', counterpartyLabel: 'S' })
-        .success,
-    ).toBe(true)
+    expect(spendLimitPreviewSchema.safeParse({ counterpartyLabels: ['S'] }).success).toBe(true)
 
     const opslaan = SpendLimitInputSchema.safeParse({
-      ruleType: 'counterparty',
       name: 'Brandstof',
       limitAmount: 100,
-      counterpartyLabel: 'S',
+      rules: [{ counterpartyLabels: ['S'] }],
     })
     expect(opslaan.success).toBe(false)
-    expect(messagesFor(opslaan.error!.issues, 'counterpartyLabel')).toEqual([
+    expect(messagesFor(opslaan.error!.issues, 'rules.0.counterpartyLabels.0')).toEqual([
       'Geef minstens twee tekens om op te matchen',
     ])
   })

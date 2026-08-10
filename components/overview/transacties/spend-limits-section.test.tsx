@@ -35,7 +35,16 @@ import {
   SPEND_LIMIT_WINDOW_BY_PERIOD,
   type SpendLimitAggregateRow,
 } from '@/lib/spend-limits/engine'
-import type { SpendLimitConfig, SpendLimitsSectionData, SpendLimitWithReport } from '@/lib/spend-limits/types'
+import {
+  counterpartyMatchesKey,
+  spendLimitCounterpartyKey,
+} from '@/lib/spend-limits/counterparty-key'
+import type {
+  SpendLimitConfig,
+  SpendLimitCounterpartyOption,
+  SpendLimitsSectionData,
+  SpendLimitWithReport,
+} from '@/lib/spend-limits/types'
 import { SpendLimitsSection } from './spend-limits-section'
 
 // ── Router-/URL-mock ────────────────────────────────────────────────────────
@@ -55,7 +64,14 @@ vi.mock('next/navigation', () => ({
 const NOW = new Date(2026, 7, 15) // 15 augustus 2026
 
 function row(month: string, spend: number): SpendLimitAggregateRow {
-  return { month, transactionType: 'expense', sumPositief: 0, sumNegatief: -spend, count: 2 }
+  // Bucketdatum, niet maandsleutel — een maand-bucket is de eerste van de maand.
+  return {
+    bucketStart: `${month}-01`,
+    transactionType: 'expense',
+    sumPositief: 0,
+    sumNegatief: -spend,
+    count: 2,
+  }
 }
 
 function pot(over: Partial<SpendLimitConfig> = {}): SpendLimitWithReport {
@@ -64,12 +80,14 @@ function pot(over: Partial<SpendLimitConfig> = {}): SpendLimitWithReport {
     name: 'Boodschappengrens',
     purpose: null,
     ruleType: 'budget',
-    budgetId: 'b1',
-    budgetName: 'Boodschappen',
-    budgetArchived: false,
-    includeChildBudgets: true,
-    counterpartyKey: null,
-    counterpartyLabel: null,
+    rules: [
+      {
+        id: 'r-1',
+        budgets: [{ id: 'b1', name: 'Boodschappen', archived: false }],
+        includeChildBudgets: true,
+        counterparties: [],
+      },
+    ],
     limitAmount: 200,
     period: 'month',
     isActive: true,
@@ -85,6 +103,7 @@ function pot(over: Partial<SpendLimitConfig> = {}): SpendLimitWithReport {
       windowPeriods: SPEND_LIMIT_WINDOW_BY_PERIOD[config.period],
     }),
     budgetSplit: [],
+    ruleSplit: [],
   }
 }
 
@@ -142,7 +161,7 @@ let fetchCalls: FetchCall[] = []
 let previewResponse: unknown = {
   status: 'ok',
   ruleType: 'budget',
-  key: null,
+  keys: [],
   period: 'month',
   matchedNames: ['Boodschappen'],
   matchedTransactionCount: 6,
@@ -154,11 +173,15 @@ let previewResponse: unknown = {
   aggregateTruncationSuspected: false,
 }
 
+/** Wat /api/spend-limits/counterparties teruggeeft; per test in te stellen. */
+let counterpartyOptions: SpendLimitCounterpartyOption[] = []
+
 beforeEach(() => {
   routerReplace.mockClear()
   routerRefresh.mockClear()
   currentSearch = new URLSearchParams()
   fetchCalls = []
+  counterpartyOptions = []
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string, init?: RequestInit) => {
@@ -166,7 +189,7 @@ beforeEach(() => {
       if (String(url).includes('/api/spend-limits/preview')) {
         return { ok: true, json: async () => previewResponse } as unknown as Response
       }
-      return { ok: true, json: async () => ({ options: [] }) } as unknown as Response
+      return { ok: true, json: async () => ({ options: counterpartyOptions }) } as unknown as Response
     }),
   )
 })
@@ -348,7 +371,15 @@ describe('SpendLimitsSection — match-preview', () => {
     renderSection()
 
     fireEvent.click(screen.getByRole('button', { name: /nieuwe grenzenpot/i }))
-    fireEvent.click(screen.getByRole('button', { name: 'Een tegenpartij' }))
+
+    // Een nieuwe pot start met het eerste budget voorgeselecteerd, dus er vertrekt
+    // meteen één preview. Die laten we uitlopen zodat de telling hieronder alleen
+    // over het TYPEN gaat.
+    act(() => {
+      vi.advanceTimersByTime(500)
+    })
+    const naOpenen = previewCalls().length
+    expect(naOpenen).toBe(1)
 
     const veld = screen.getByPlaceholderText('Shell')
     for (const waarde of ['S', 'SH', 'SHE', 'SHEL', 'SHELL']) {
@@ -357,17 +388,25 @@ describe('SpendLimitsSection — match-preview', () => {
         vi.advanceTimersByTime(120)
       })
     }
-    // Nog binnen de debounce van de laatste toetsaanslag: niets verstuurd.
-    expect(previewCalls()).toHaveLength(0)
 
+    // TYPEN alleen verandert de regel niet meer: het veld is invoer, de regel
+    // draagt een LIJST. Er vertrekt dus geen enkele extra vlucht — ook niet na de
+    // debounce.
     act(() => {
       vi.advanceTimersByTime(400)
     })
+    expect(previewCalls()).toHaveLength(naOpenen)
 
-    expect(previewCalls()).toHaveLength(1)
-    expect(previewCalls()[0].body).toMatchObject({
-      ruleType: 'counterparty',
-      counterpartyLabel: 'SHELL',
+    // Pas bij bevestigen verhuist de zoekterm naar de regel, en dán telt hij mee.
+    fireEvent.keyDown(veld, { key: 'Enter' })
+    act(() => {
+      vi.advanceTimersByTime(500)
+    })
+
+    expect(previewCalls()).toHaveLength(naOpenen + 1)
+    expect(previewCalls()[naOpenen].body).toMatchObject({
+      budgetIds: ['b1'],
+      counterpartyLabels: ['SHELL'],
       period: 'month',
       excludeLimitId: null,
     })
@@ -384,8 +423,8 @@ describe('SpendLimitsSection — match-preview', () => {
 
     expect(previewCalls()).toHaveLength(1)
     expect(previewCalls()[0].body).toMatchObject({
-      ruleType: 'budget',
-      budgetId: 'b1',
+      budgetIds: ['b1'],
+      counterpartyLabels: [],
       includeChildBudgets: true,
       excludeLimitId: 'pot-1',
     })
@@ -395,7 +434,7 @@ describe('SpendLimitsSection — match-preview', () => {
     previewResponse = {
       status: 'too_short',
       ruleType: 'counterparty',
-      key: 's',
+      keys: [],
       period: 'month',
       matchedNames: [],
       matchedTransactionCount: 0,
@@ -406,8 +445,8 @@ describe('SpendLimitsSection — match-preview', () => {
     renderSection()
 
     fireEvent.click(screen.getByRole('button', { name: /nieuwe grenzenpot/i }))
-    fireEvent.click(screen.getByRole('button', { name: 'Een tegenpartij' }))
-    fireEvent.change(screen.getByPlaceholderText('Shell'), { target: { value: 's' } })
+    fireEvent.change(screen.getByPlaceholderText('Shell'), { target: { value: 'sh' } })
+    fireEvent.keyDown(screen.getByPlaceholderText('Shell'), { key: 'Enter' })
 
     expect(await screen.findByText(/te kort om op te matchen/i)).toBeTruthy()
     expect(screen.queryByText(/raakt deze regel nog niets/i)).toBeNull()
@@ -417,7 +456,7 @@ describe('SpendLimitsSection — match-preview', () => {
     previewResponse = {
       status: 'ok',
       ruleType: 'budget',
-      key: null,
+      keys: [],
       period: 'month',
       matchedNames: ['Boodschappen'],
       matchedTransactionCount: 6,
@@ -441,6 +480,106 @@ describe('SpendLimitsSection — match-preview', () => {
     expect(observatie.textContent).toContain('een subbudget hiervan')
     // Geen euro in de observatie: één waarheid per uitgave.
     expect(observatie.textContent).not.toMatch(/€/)
+  })
+})
+
+// ── 4b. Tegenpartij-suggesties ──────────────────────────────────────────────
+
+/**
+ * De suggestielijst is een OVERLAY, en overlays horen binnen het eigen
+ * z-index-systeem te leven (ADR 0039). Een native <datalist> tekent de browser
+ * zelf: op Android Chrome viel die lijst over het periode-blok van deze sheet
+ * heen (testmelding 8a28dc). Deze suite pint dat er (a) geen datalist meer is,
+ * (b) er een echte listbox in de DOM staat, en (c) dat gefilterd wordt met
+ * exact dezelfde genormaliseerde match als de motor — niet met een tweede,
+ * ruwere tekstvergelijking van de browser.
+ */
+describe('SpendLimitsSection — tegenpartij-suggesties', () => {
+  const OPTIES: SpendLimitCounterpartyOption[] = [
+    { key: 'SHELLEXPRESS1032', label: 'Shell Express 1032', totalSpentInWindow: 240, transactionCount: 6 },
+    { key: 'SHELL', label: 'S.H.E.L.L. tankstation', totalSpentInWindow: 80, transactionCount: 2 },
+    { key: 'JPSHODLHOLDINGBV', label: 'JPS hodl Holding B.V.', totalSpentInWindow: 500, transactionCount: 3 },
+    {
+      key: 'DEISOLATIESHOPBV',
+      label: 'De Isolatieshop B.V. via Stichting Mollie Payments',
+      totalSpentInWindow: 1200,
+      transactionCount: 1,
+    },
+  ]
+
+  async function openTegenpartijVeld() {
+    counterpartyOptions = OPTIES
+    renderSection()
+    fireEvent.click(screen.getByRole('button', { name: /nieuwe grenzenpot/i }))
+    const veld = screen.getByPlaceholderText('Shell')
+    fireEvent.focus(veld)
+    return { veld, lijst: await screen.findByRole('listbox', { name: 'Tegenpartij-suggesties' }) }
+  }
+
+  it('rendert een eigen listbox in plaats van een native datalist', async () => {
+    const { veld, lijst } = await openTegenpartijVeld()
+
+    // De native dropdown is weg — die viel buiten het ShellOverlay-z-index-systeem.
+    expect(document.querySelector('datalist')).toBeNull()
+    expect(veld.getAttribute('list')).toBeNull()
+    expect(veld.getAttribute('role')).toBe('combobox')
+    expect(veld.getAttribute('aria-expanded')).toBe('true')
+
+    // Leeg veld = de volledige lijst, precies het geval uit de melding.
+    expect(within(lijst).getAllByRole('option').map((o) => o.textContent)).toEqual(
+      OPTIES.map((o) => o.label),
+    )
+  })
+
+  it('filtert met dezelfde genormaliseerde match als de motor', async () => {
+    const { veld } = await openTegenpartijVeld()
+
+    fireEvent.change(veld, { target: { value: 'shell' } })
+
+    // Verwachting uit de canonieke helper, niet uit een handgeschreven lijstje:
+    // wat de motor straks meetelt, is wat de suggestielijst nu toont.
+    const key = spendLimitCounterpartyKey('shell')
+    const verwacht = OPTIES.filter((o) => counterpartyMatchesKey(o.label, key)).map((o) => o.label)
+    expect(verwacht).toEqual(['Shell Express 1032', 'S.H.E.L.L. tankstation'])
+
+    const lijst = await screen.findByRole('listbox', { name: 'Tegenpartij-suggesties' })
+    expect(within(lijst).getAllByRole('option').map((o) => o.textContent)).toEqual(verwacht)
+  })
+
+  it('voegt een keuze TOE aan de regel, maakt het veld leeg en sluit de lijst', async () => {
+    const { veld } = await openTegenpartijVeld()
+
+    fireEvent.click(screen.getByRole('option', { name: 'JPS hodl Holding B.V.' }))
+
+    // Het veld is invoer, geen waarde: de keuze verhuist naar de regel en het
+    // veld staat klaar voor de volgende tegenpartij.
+    expect((veld as HTMLInputElement).value).toBe('')
+    expect(screen.getByRole('button', { name: 'JPS hodl Holding B.V. verwijderen' })).toBeTruthy()
+    expect(screen.queryByRole('listbox', { name: 'Tegenpartij-suggesties' })).toBeNull()
+    expect(veld.getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it('ontdubbelt op de genormaliseerde sleutel, niet op de letterlijke tekst', async () => {
+    const { veld } = await openTegenpartijVeld()
+
+    fireEvent.change(veld, { target: { value: 'Shell' } })
+    fireEvent.keyDown(veld, { key: 'Enter' })
+    fireEvent.change(veld, { target: { value: 's.h.e.l.l.' } })
+    fireEvent.keyDown(veld, { key: 'Enter' })
+
+    // Beide teksten normaliseren naar SHELL en matchen dus exact dezelfde
+    // transacties; twee chips zouden suggereren dat er iets extra's meetelt.
+    expect(screen.getAllByRole('button', { name: /verwijderen$/ })).toHaveLength(1)
+  })
+
+  it('sluit met Escape zonder de sheet te sluiten', async () => {
+    const { veld } = await openTegenpartijVeld()
+
+    fireEvent.keyDown(veld, { key: 'Escape' })
+
+    expect(screen.queryByRole('listbox', { name: 'Tegenpartij-suggesties' })).toBeNull()
+    // De sheet zelf staat nog open: het formulier is er nog.
+    expect(screen.getByText(/Over welke periode telt de grens\?/i)).toBeTruthy()
   })
 })
 

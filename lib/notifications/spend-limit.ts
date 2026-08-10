@@ -258,6 +258,8 @@ export function parseSpendLimitEventGate(raw: string | null | undefined): SpendL
  * zegt.
  */
 const PERIOD_WORDS: Record<SpendLimitPeriodKind, { lopend: string; meervoud: string }> = {
+  day: { lopend: 'vandaag', meervoud: 'dagen' },
+  week: { lopend: 'deze week', meervoud: 'weken' },
   month: { lopend: 'deze maand', meervoud: 'maanden' },
   quarter: { lopend: 'dit kwartaal', meervoud: 'kwartalen' },
   year: { lopend: 'dit jaar', meervoud: 'jaren' },

@@ -8,10 +8,19 @@
  * dezelfde bron staat als het bundelveld dat de widget consumeert.
  *
  * De nep-client is BEWUST lokaal en niet `test/helpers/fake-supabase.ts`: die mock
- * kent `spend_limits` en de tegenpartij-RPC niet, telt geen RPC-ARGUMENTEN (en
+ * kent `spend_limits` en de aggregaat-RPC niet, telt geen RPC-ARGUMENTEN (en
  * juist de chunk-grenzen zijn hier het onderwerp) en wordt door twee parallelle
  * pariteitstests gedeeld — hem uitbreiden zou die tests raken voor iets dat ze
  * niet meten.
+ *
+ * ── DE NEP-RPC IS EEN PARITY-SPIEGEL, GEEN STUB (10-08-2026) ────────────────
+ * `spend_limit_rule_aggregate` bevat de combinatie-semantiek zélf: OF binnen een
+ * dimensie, EN tussen de dimensies, en de ontdubbeling per pot. Die logica moet
+ * hier meebewegen, want anders zouden deze tests groen blijven terwijl de SQL
+ * iets anders doet. Het is dus een HAND-GEBORGD paar met de migratie
+ * 20260810120000 — wie de ene aanraakt, raakt de andere aan. De prijs daarvan is
+ * bewust betaald: een stub die alleen vaste rijen teruggeeft, zou de ontdubbeling
+ * (de kern van "meerdere regels") helemaal niet kunnen bewaken.
  */
 
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
@@ -22,6 +31,7 @@ import {
   SPEND_LIMIT_WINDOW_BY_PERIOD,
   computeSpendLimitTrend,
 } from './engine'
+import { spendLimitCounterpartyKey } from './counterparty-key'
 import { resolveEffectiveIncomeExpenses } from '@/lib/effective-financials'
 import { dailyExpenseRate } from '@/lib/format'
 import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
@@ -30,7 +40,19 @@ import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
 
 type Row = Record<string, unknown>
 
-const NOW = new Date(2026, 7, 8) // 8 augustus 2026 — Q3, midden in de maand
+const NOW = new Date(2026, 7, 8) // zaterdag 8 augustus 2026 — Q3, midden in de maand
+
+/** Eén synthetische transactie waar de nep-RPC op matcht. */
+interface FakeTx {
+  date: string
+  /** Positief uitgavebedrag; wordt intern als negatief bedrag geboekt. */
+  spend?: number
+  /** Ontvangst (refund/chargeback), positief bedrag. */
+  refund?: number
+  budgetId?: string | null
+  counterpartyName?: string | null
+  type?: string | null
+}
 
 // ── Nep-client ──────────────────────────────────────────────────────────────
 
@@ -40,13 +62,29 @@ interface FakeOpts {
   profile?: Row | null
   /** Rijen zoals `getCurrentMonthTx` ze levert (venster is diens eigen zorg). */
   monthTx?: Row[]
-  /** Maandaggregaat-rijen; het venster van elke chunk wordt écht toegepast. */
+  /** Transacties waar `spend_limit_rule_aggregate` op matcht. */
+  tx?: FakeTx[]
+  /** Maandaggregaat-rijen voor `tx_month_aggregate` (voedt alléén het dagtarief). */
   monthAgg?: Row[]
-  /** Tegenpartij-aggregaat-rijen; venster + sleutel worden écht toegepast. */
-  counterpartyAgg?: Row[]
   /** Forceer een afgekapt antwoord: zoveel dummy-rijen per chunk. */
-  monthAggRowCount?: number
+  ruleAggRowCount?: number
   configError?: unknown
+}
+
+/** De maandag van de ISO-week waarin `iso` valt — spiegelt de SQL en de motor. */
+function mondayOf(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const dt = new Date(y, m - 1, d)
+  dt.setDate(dt.getDate() - ((dt.getDay() + 6) % 7))
+  const mm = String(dt.getMonth() + 1).padStart(2, '0')
+  const dd = String(dt.getDate()).padStart(2, '0')
+  return `${dt.getFullYear()}-${mm}-${dd}`
+}
+
+function bucketFor(grain: string, date: string): string {
+  if (grain === 'day') return date
+  if (grain === 'week') return mondayOf(date)
+  return `${date.slice(0, 7)}-01`
 }
 
 function makeFake(opts: FakeOpts) {
@@ -91,6 +129,79 @@ function makeFake(opts: FakeOpts) {
     return q
   }
 
+  /**
+   * De spiegel van `public.spend_limit_rule_aggregate`. Zie de kop van dit
+   * bestand: dit is bewust geen stub.
+   */
+  function ruleAggregate(args: Record<string, unknown>) {
+    const from = String(args.p_from ?? '')
+    const to = String(args.p_to ?? '')
+    const grain = String(args.p_grain ?? 'month')
+    const rules = (args.p_rules ?? []) as { p: number; i: number; b: string[]; k: string[] }[]
+
+    if (opts.ruleAggRowCount !== undefined) {
+      return {
+        data: Array.from({ length: opts.ruleAggRowCount }, () => ({
+          rule_index: rules[0]?.i ?? 0,
+          bucket_start: from,
+          budget_id: null,
+          transaction_type: 'expense',
+          sum_positief: 0,
+          sum_negatief: -1,
+          count: 1,
+        })),
+        error: null,
+      }
+    }
+
+    const txs = (opts.tx ?? []).filter((t) => t.date >= from && t.date < to)
+
+    // DISTINCT ON (pot, transactie) ORDER BY regelindex — de ontdubbeling.
+    const winnerByPotAndTx = new Map<string, { rule: (typeof rules)[number]; tx: FakeTx }>()
+    for (const rule of [...rules].sort((a, b) => a.i - b.i)) {
+      for (const [idx, t] of txs.entries()) {
+        const budgetOk = rule.b.length === 0 || (t.budgetId != null && rule.b.includes(t.budgetId))
+        const key = spendLimitCounterpartyKey(t.counterpartyName ?? '')
+        const cpOk = rule.k.length === 0 || rule.k.some((k) => k !== '' && key.includes(k))
+        if (!budgetOk || !cpOk) continue
+        const mapKey = `${rule.p}|${idx}`
+        if (winnerByPotAndTx.has(mapKey)) continue
+        winnerByPotAndTx.set(mapKey, { rule, tx: t })
+      }
+    }
+
+    const grouped = new Map<string, Row>()
+    for (const { rule, tx: t } of winnerByPotAndTx.values()) {
+      const bucket = bucketFor(grain, t.date)
+      const budgetId = grain === 'month' && rule.k.length === 0 ? (t.budgetId ?? null) : null
+      const type = t.type === undefined ? 'expense' : t.type
+      const gk = `${rule.i}|${bucket}|${budgetId}|${type}`
+      let row = grouped.get(gk)
+      if (!row) {
+        row = {
+          rule_index: rule.i,
+          bucket_start: bucket,
+          budget_id: budgetId,
+          transaction_type: type,
+          sum_positief: 0,
+          sum_negatief: 0,
+          count: 0,
+          matched_names: rule.k.length > 0 ? [] : null,
+        }
+        grouped.set(gk, row)
+      }
+      row.sum_positief = Number(row.sum_positief) + (t.refund ?? 0)
+      row.sum_negatief = Number(row.sum_negatief) - (t.spend ?? 0)
+      row.count = Number(row.count) + 1
+      if (rule.k.length > 0 && t.counterpartyName) {
+        const names = row.matched_names as string[]
+        if (!names.includes(t.counterpartyName)) names.push(t.counterpartyName)
+      }
+    }
+
+    return { data: [...grouped.values()], error: null }
+  }
+
   const client = {
     from: (table: string) => {
       tableCalls.push(table)
@@ -98,36 +209,15 @@ function makeFake(opts: FakeOpts) {
     },
     rpc: async (fn: string, args: Record<string, unknown> = {}) => {
       rpcCalls.push({ fn, args })
-      const from = String(args.p_from ?? '')
-      const to = String(args.p_to ?? '')
-      const inWindow = (rows: Row[]) =>
-        rows.filter((r) => {
-          const m = String(r.month)
-          return m >= from.slice(0, 7) && m < to.slice(0, 7)
-        })
-
+      if (fn === 'spend_limit_rule_aggregate') return ruleAggregate(args)
       if (fn === 'tx_month_aggregate') {
-        if (opts.monthAggRowCount !== undefined) {
-          return {
-            data: Array.from({ length: opts.monthAggRowCount }, () => ({
-              month: from.slice(0, 7),
-              budget_id: 'b1',
-              transaction_type: 'expense',
-              sum_positief: 0,
-              sum_negatief: -1,
-              count: 1,
-            })),
-            error: null,
-          }
-        }
-        return { data: inWindow(opts.monthAgg ?? []), error: null }
-      }
-      if (fn === 'tx_counterparty_month_aggregate') {
-        const keys = (args.p_keys ?? []) as string[]
+        const from = String(args.p_from ?? '')
+        const to = String(args.p_to ?? '')
         return {
-          data: inWindow(opts.counterpartyAgg ?? []).filter((r) =>
-            keys.includes(String(r.counterparty_key)),
-          ),
+          data: (opts.monthAgg ?? []).filter((r) => {
+            const m = String(r.month)
+            return m >= from.slice(0, 7) && m < to.slice(0, 7)
+          }),
           error: null,
         }
       }
@@ -146,6 +236,21 @@ function makeFake(opts: FakeOpts) {
 
 // ── Fixture-hulpjes ─────────────────────────────────────────────────────────
 
+let ruleIdSeq = 0
+function ruleRow(over: Partial<Row> = {}): Row {
+  ruleIdSeq += 1
+  return {
+    id: `r-${ruleIdSeq}`,
+    sort_order: 0,
+    budget_ids: [],
+    include_child_budgets: true,
+    counterparty_keys: [],
+    counterparty_labels: [],
+    ...over,
+  }
+}
+
+/** Een pot met, tenzij anders gezegd, één tegenpartij-regel op SHELL. */
 function limitRow(over: Partial<Row> & { id: string }): Row {
   return {
     name: `Pot ${over.id}`,
@@ -154,19 +259,40 @@ function limitRow(over: Partial<Row> & { id: string }): Row {
     // een fixture zonder deze kolom zou stil als "gearchiveerd" wegvallen.
     is_archived: false,
     created_at: '2026-01-01T00:00:00Z',
-    rule_type: 'counterparty',
-    budget_id: null,
-    include_child_budgets: true,
-    counterparty_key: 'SHELL',
-    counterparty_label: 'Shell',
     limit_amount: 100,
     period: 'month',
     is_active: true,
+    spend_limit_rules: [
+      ruleRow({ counterparty_keys: ['SHELL'], counterparty_labels: ['Shell'] }),
+    ],
     ...over,
   }
 }
 
-/** Eén aggregaat-rij: `spend` is een positief uitgavebedrag. */
+/** Kortere schrijfwijze voor een budget-regel. */
+function budgetRule(budgetIds: string[], includeChildren = true): Row {
+  return ruleRow({ budget_ids: budgetIds, include_child_budgets: includeChildren })
+}
+
+/** Kortere schrijfwijze voor een tegenpartij-regel. */
+function cpRule(labels: string[]): Row {
+  return ruleRow({
+    counterparty_keys: labels.map((l) => spendLimitCounterpartyKey(l)),
+    counterparty_labels: labels,
+  })
+}
+
+/** Eén tegenpartij-transactie op de vijftiende van de maand. */
+function shellTx(month: string, spend: number, day = '15'): FakeTx {
+  return { date: `${month}-${day}`, spend, counterpartyName: 'Shell Express' }
+}
+
+/** Eén budget-transactie op de vijftiende van de maand. */
+function budgetTx(month: string, budgetId: string, spend: number, type: string | null = 'expense'): FakeTx {
+  return { date: `${month}-15`, spend, budgetId, type }
+}
+
+/** Aggregaat-rij voor `tx_month_aggregate` (dagtarief-pad). */
 function aggRow(month: string, budgetId: string, spend: number, type: string | null = 'expense'): Row {
   return {
     month,
@@ -175,18 +301,6 @@ function aggRow(month: string, budgetId: string, spend: number, type: string | n
     sum_positief: 0,
     sum_negatief: -spend,
     count: 1,
-  }
-}
-
-function cpRow(month: string, key: string, spend: number): Row {
-  return {
-    counterparty_key: key,
-    month,
-    transaction_type: 'expense',
-    sum_positief: 0,
-    sum_negatief: -spend,
-    count: 1,
-    matched_names: ['Shell Express'],
   }
 }
 
@@ -225,27 +339,26 @@ describe('compute-gate', () => {
     expect(fake.tableCallsFor('profiles')).toBe(0)
   })
 
-  it('slaat de budgets-query over bij uitsluitend tegenpartij-potten zonder keuzelijst', async () => {
+  it('slaat de budgets-query over bij uitsluitend tegenpartij-regels zonder keuzelijst', async () => {
     const fake = makeFake({
       limits: [limitRow({ id: 'p1' })],
-      counterpartyAgg: [cpRow('2026-07', 'SHELL', 40)],
+      tx: [shellTx('2026-07', 40)],
     })
     await loadSpendLimitsSection(fake.client, NOW, {
       withBudgetOptions: false,
       withDailyExpenseRate: false,
     })
     expect(fake.tableCallsFor('budgets')).toBe(0)
-    expect(fake.rpcCallsFor('tx_month_aggregate')).toHaveLength(0)
   })
 
-  it('houdt de budgets-query bij een budget-pot, óók zonder keuzelijst (kind-oprol + naam)', async () => {
+  it('houdt de budgets-query bij een budget-regel, óók zonder keuzelijst (kind-oprol + naam)', async () => {
     const fake = makeFake({
-      limits: [limitRow({ id: 'p1', rule_type: 'budget', budget_id: 'b1', counterparty_key: null })],
+      limits: [limitRow({ id: 'p1', spend_limit_rules: [budgetRule(['b1'])] })],
       budgets: [
         { id: 'b1', name: 'Boodschappen', parent_id: null, budget_type: 'expense', is_archived: false },
         { id: 'b2', name: 'Supermarkt', parent_id: 'b1', budget_type: 'expense', is_archived: false },
       ],
-      monthAgg: [aggRow('2026-07', 'b2', 40)],
+      tx: [budgetTx('2026-07', 'b2', 40)],
     })
     const data = await loadSpendLimitsSection(fake.client, NOW, {
       withBudgetOptions: false,
@@ -254,7 +367,7 @@ describe('compute-gate', () => {
 
     expect(fake.tableCallsFor('budgets')).toBe(1)
     expect(data.budgetOptions).toEqual([]) // keuzelijst blijft leeg
-    expect(data.limits[0].config.budgetName).toBe('Boodschappen')
+    expect(data.limits[0].config.rules[0].budgets[0].name).toBe('Boodschappen')
     // Kind-oprol werkt: de €40 stond op het KIND-budget.
     expect(data.limits[0].report.lastClosedPeriod?.periodMatchedAmount).toBe(40)
   })
@@ -263,59 +376,89 @@ describe('compute-gate', () => {
 // ── Chunking ────────────────────────────────────────────────────────────────
 
 describe('chunking van het unie-venster', () => {
-  it('doet ceil(venstermaanden / 12) calls per RPC-soort — niet per pot (AC-B4-06)', async () => {
+  it('doet één call per CHUNK — niet per pot en niet per regel (AC-B4-06)', async () => {
     // 5 potten, maar het venster wordt bepaald door de LANGSTE terugblik: een
     // kwartaalpot kijkt 9 kwartalen terug (Q3-2024 t/m Q3-2026 = 26 maanden).
+    // Alle vijf rekenen op maand-korrel, dus ze delen één venster en één reeks
+    // calls; de regels reizen samen in één `p_rules`.
     const fake = makeFake({
       limits: [
         limitRow({ id: 'p1', period: 'month' }),
-        limitRow({ id: 'p2', period: 'month', counterparty_key: 'AH' }),
+        limitRow({ id: 'p2', period: 'month', spend_limit_rules: [cpRule(['AH'])] }),
         limitRow({ id: 'p3', period: 'quarter' }),
-        limitRow({ id: 'p4', rule_type: 'budget', budget_id: 'b1', counterparty_key: null, period: 'month' }),
-        limitRow({ id: 'p5', rule_type: 'budget', budget_id: 'b1', counterparty_key: null, period: 'quarter' }),
+        limitRow({ id: 'p4', period: 'month', spend_limit_rules: [budgetRule(['b1'])] }),
+        limitRow({ id: 'p5', period: 'quarter', spend_limit_rules: [budgetRule(['b1'])] }),
       ],
       budgets: [{ id: 'b1', name: 'Boodschappen', parent_id: null, budget_type: 'expense', is_archived: false }],
     })
     await loadSpendLimitsSection(fake.client, NOW, { withDailyExpenseRate: false })
 
-    const maand = fake.rpcCallsFor('tx_month_aggregate')
-    const tegenpartij = fake.rpcCallsFor('tx_counterparty_month_aggregate')
-    expect(maand).toHaveLength(3)
-    expect(tegenpartij).toHaveLength(3)
+    const calls = fake.rpcCallsFor('spend_limit_rule_aggregate')
 
-    // Half-open en sluitend: elk stuk begint waar het vorige eindigt, hoogstens
-    // 12 maanden lang, en het laatste eindigt op de exclusieve bovengrens.
-    expect(maand.map((c) => [c.args.p_from, c.args.p_to])).toEqual([
-      ['2024-07-01', '2025-07-01'],
-      ['2025-07-01', '2026-07-01'],
-      ['2026-07-01', '2026-09-01'],
-    ])
-    expect(tegenpartij.map((c) => [c.args.p_from, c.args.p_to])).toEqual(
-      maand.map((c) => [c.args.p_from, c.args.p_to]),
-    )
-    // Alle tegenpartij-sleutels in één call — niet één call per pot.
-    expect(tegenpartij[0].args.p_keys).toEqual(['SHELL', 'AH'])
+    // Er zit een budget-only regel bij, dus het antwoord draagt de
+    // per-budget-uitsplitsing en wordt in stukken van 4 maanden geknipt:
+    // 2024-07 t/m 2026-09 = 26 maanden ⇒ 7 stukken.
+    expect(calls).toHaveLength(7)
+    // Half-open en sluitend: elk stuk begint waar het vorige eindigt.
+    expect(calls[0].args.p_from).toBe('2024-07-01')
+    expect(calls[0].args.p_to).toBe('2024-11-01')
+    expect(calls[calls.length - 1].args.p_to).toBe('2026-09-01')
+    for (let i = 1; i < calls.length; i++) {
+      expect(calls[i].args.p_from).toBe(calls[i - 1].args.p_to)
+    }
+
+    // ALLE regels van ALLE potten in elke call — niet één call per pot.
+    const rules = calls[0].args.p_rules as { p: number; i: number }[]
+    expect(rules).toHaveLength(5)
+    expect(new Set(rules.map((r) => r.p)).size).toBe(5)
+    // De regelindexen zijn uniek: ze zijn de sleutel waarmee de rijen terugvinden.
+    expect(new Set(rules.map((r) => r.i)).size).toBe(5)
+    expect(calls[0].args.p_grain).toBe('month')
   })
 
   it('rekt het venster naar 4 kalenderjaren zodra er een jaarpot bij zit', async () => {
     const fake = makeFake({ limits: [limitRow({ id: 'p1', period: 'year' })] })
     await loadSpendLimitsSection(fake.client, NOW, { withDailyExpenseRate: false })
 
-    const calls = fake.rpcCallsFor('tx_counterparty_month_aggregate')
-    // 2023-01 t/m 2026-08 = 44 maanden ⇒ ceil(44/12) = 4.
+    const calls = fake.rpcCallsFor('spend_limit_rule_aggregate')
+    // Zuivere tegenpartij-regel ⇒ geen budget-uitsplitsing ⇒ stukken van 12
+    // maanden: 2023-01 t/m 2026-09 = 44 maanden ⇒ 4 stukken.
     expect(calls).toHaveLength(4)
     expect(calls[0].args.p_from).toBe('2023-01-01')
     expect(calls[calls.length - 1].args.p_to).toBe('2026-09-01')
   })
 
-  it('houdt een maandpot op precies één call over 13 maanden', async () => {
+  it('houdt een maandpot op twee stukken over 13 maanden', async () => {
     const fake = makeFake({ limits: [limitRow({ id: 'p1' })] })
     await loadSpendLimitsSection(fake.client, NOW, { withDailyExpenseRate: false })
-    const calls = fake.rpcCallsFor('tx_counterparty_month_aggregate')
+    const calls = fake.rpcCallsFor('spend_limit_rule_aggregate')
     expect(SPEND_LIMIT_WINDOW_PERIODS).toBe(SPEND_LIMIT_WINDOW_BY_PERIOD.month)
     expect(calls).toHaveLength(2) // 13 maanden past niet in één stuk van 12
     expect(calls[0].args.p_from).toBe('2025-08-01')
     expect(calls[calls.length - 1].args.p_to).toBe('2026-09-01')
+  })
+
+  it('vraagt per KORREL een eigen venster op — een dagpot trekt de maandpot niet mee', async () => {
+    const fake = makeFake({
+      limits: [
+        limitRow({ id: 'p-dag', period: 'day' }),
+        limitRow({ id: 'p-jaar', period: 'year' }),
+      ],
+    })
+    await loadSpendLimitsSection(fake.client, NOW, { withDailyExpenseRate: false })
+
+    const calls = fake.rpcCallsFor('spend_limit_rule_aggregate')
+    const perGrain = new Map<string, typeof calls>()
+    for (const c of calls) {
+      const g = String(c.args.p_grain)
+      perGrain.set(g, [...(perGrain.get(g) ?? []), c])
+    }
+
+    // De dagpot kijkt 31 dagen terug (één stuk), de jaarpot 4 kalenderjaren.
+    expect(perGrain.get('day')).toHaveLength(1)
+    expect(perGrain.get('day')?.[0].args.p_from).toBe('2026-07-09')
+    expect(perGrain.get('month')).toHaveLength(4)
+    expect(perGrain.get('month')?.[0].args.p_from).toBe('2023-01-01')
   })
 })
 
@@ -325,9 +468,9 @@ describe('truncatie-kanarie', () => {
   it('meldt een chunk op de max_rows-cap in plaats van stil een te laag getal te tonen (AC-B4-07)', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const fake = makeFake({
-      limits: [limitRow({ id: 'p1', rule_type: 'budget', budget_id: 'b1', counterparty_key: null })],
+      limits: [limitRow({ id: 'p1', spend_limit_rules: [budgetRule(['b1'])] })],
       budgets: [{ id: 'b1', name: 'Boodschappen', parent_id: null, budget_type: 'expense', is_archived: false }],
-      monthAggRowCount: 1000,
+      ruleAggRowCount: 1000,
     })
     const data = await loadSpendLimitsSection(fake.client, NOW, { withDailyExpenseRate: false })
 
@@ -339,9 +482,9 @@ describe('truncatie-kanarie', () => {
   it('zwijgt bij een normaal antwoord', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const fake = makeFake({
-      limits: [limitRow({ id: 'p1', rule_type: 'budget', budget_id: 'b1', counterparty_key: null })],
+      limits: [limitRow({ id: 'p1', spend_limit_rules: [budgetRule(['b1'])] })],
       budgets: [{ id: 'b1', name: 'Boodschappen', parent_id: null, budget_type: 'expense', is_archived: false }],
-      monthAggRowCount: 999,
+      ruleAggRowCount: 999,
     })
     const data = await loadSpendLimitsSection(fake.client, NOW, { withDailyExpenseRate: false })
     expect(data.aggregateTruncationSuspected).toBe(false)
@@ -355,13 +498,13 @@ describe('kwartaal- en jaarpotten', () => {
   it('rekent een kwartaalpot dóór in plaats van hem over te slaan (FR-B4-02)', async () => {
     const fake = makeFake({
       limits: [limitRow({ id: 'p1', period: 'quarter', limit_amount: 100 })],
-      counterpartyAgg: [
+      tx: [
         // Q1 2026: alleen januari.
-        cpRow('2026-01', 'SHELL', 30),
+        shellTx('2026-01', 30),
         // Q2 2026: drie maanden samen 120 ⇒ boven de grens van 100.
-        cpRow('2026-04', 'SHELL', 40),
-        cpRow('2026-05', 'SHELL', 40),
-        cpRow('2026-06', 'SHELL', 40),
+        shellTx('2026-04', 40),
+        shellTx('2026-05', 40),
+        shellTx('2026-06', 40),
       ],
     })
     const data = await loadSpendLimitsSection(fake.client, NOW, { withDailyExpenseRate: false })
@@ -379,12 +522,9 @@ describe('kwartaal- en jaarpotten', () => {
   })
 
   it('levert uitsluitend echte kalenderkwartalen — geen verzonnen periodesleutels (AC-B4-08)', async () => {
-    // Een pot met historie in maar twee kwartalen: de overige periodes zijn echte
-    // kalenderkwartalen met een echte som van 0 (= niets uitgegeven = binnen), NIET
-    // een placeholder-null of een verzonnen sleutel.
     const fake = makeFake({
       limits: [limitRow({ id: 'p1', period: 'quarter', limit_amount: 100 })],
-      counterpartyAgg: [cpRow('2026-04', 'SHELL', 40), cpRow('2026-07', 'SHELL', 10)],
+      tx: [shellTx('2026-04', 40), shellTx('2026-07', 10)],
     })
     const data = await loadSpendLimitsSection(fake.client, NOW, { withDailyExpenseRate: false })
     const report = data.limits[0].report
@@ -394,18 +534,16 @@ describe('kwartaal- en jaarpotten', () => {
       expect(Number.isFinite(p.periodMatchedAmount)).toBe(true)
     }
     expect(report.closedPeriods.filter((p) => p.matchedTransactionCount > 0)).toHaveLength(1)
-    // Trend blijft 'unknown' tot er 6 afgesloten periodes met betekenis zijn —
-    // maar levert nooit een NaN.
     expect(report.trend.recentAvgMatchedAmount).not.toBeNaN()
   })
 
   it('rekent een jaarpot over twaalf kalendermaanden (AC-B4-04)', async () => {
     const maanden = Array.from({ length: 12 }, (_, i) =>
-      cpRow(`2025-${String(i + 1).padStart(2, '0')}`, 'SHELL', 10),
+      shellTx(`2025-${String(i + 1).padStart(2, '0')}`, 10),
     )
     const fake = makeFake({
       limits: [limitRow({ id: 'p1', period: 'year', limit_amount: 1000 })],
-      counterpartyAgg: [cpRow('2024-12', 'SHELL', 999), ...maanden],
+      tx: [shellTx('2024-12', 999), ...maanden],
     })
     const data = await loadSpendLimitsSection(fake.client, NOW, { withDailyExpenseRate: false })
     const byKey = new Map(data.limits[0].report.closedPeriods.map((p) => [p.periodKey, p]))
@@ -414,28 +552,200 @@ describe('kwartaal- en jaarpotten', () => {
   })
 })
 
+describe('dag- en weekpotten', () => {
+  it('rekent een dagpot per kalenderdag door', async () => {
+    const fake = makeFake({
+      limits: [limitRow({ id: 'p1', period: 'day', limit_amount: 10 })],
+      tx: [shellTx('2026-08', 25, '06'), shellTx('2026-08', 4, '07')],
+    })
+    const data = await loadSpendLimitsSection(fake.client, NOW, { withDailyExpenseRate: false })
+    const report = data.limits[0].report
+
+    expect(data.limits[0].config.period).toBe('day')
+    expect(report.currentPeriod.periodKey).toBe('2026-08-08')
+    const byKey = new Map(report.closedPeriods.map((p) => [p.periodKey, p]))
+    expect(byKey.get('2026-08-06')?.periodMatchedAmount).toBe(25)
+    expect(byKey.get('2026-08-06')?.status).toBe('exceeded')
+    expect(byKey.get('2026-08-07')?.periodMatchedAmount).toBe(4)
+    expect(byKey.get('2026-08-07')?.status).toBe('within')
+    // 31 periodes in het venster, waarvan 30 afgesloten.
+    expect(report.streaks.closedPeriodCount).toBe(SPEND_LIMIT_WINDOW_BY_PERIOD.day - 1)
+  })
+
+  it('rekent een weekpot per ISO-week (maandag t/m zondag) door', async () => {
+    const fake = makeFake({
+      limits: [limitRow({ id: 'p1', period: 'week', limit_amount: 50 })],
+      // Zondag 2 augustus valt nog in de wéék van maandag 27 juli;
+      // maandag 3 augustus begint de volgende.
+      tx: [shellTx('2026-08', 60, '02'), shellTx('2026-08', 20, '03')],
+    })
+    const data = await loadSpendLimitsSection(fake.client, NOW, { withDailyExpenseRate: false })
+    const report = data.limits[0].report
+
+    const byKey = new Map(report.closedPeriods.map((p) => [p.periodKey, p]))
+    // Week van maandag 27 juli t/m zondag 2 augustus = ISO-week 31 van 2026.
+    expect(byKey.get('2026-W31')?.periodMatchedAmount).toBe(60)
+    expect(byKey.get('2026-W31')?.status).toBe('exceeded')
+
+    // 8 augustus is een zaterdag, dus de week van maandag 3 augustus (W32) LOOPT
+    // nog. Die hoort dus NIET in de afgesloten periodes — de boeking van 3
+    // augustus zit in de lopende, voorlopige week.
+    expect(report.currentPeriod.periodKey).toBe('2026-W32')
+    expect(report.currentPeriod.periodMatchedAmount).toBe(20)
+    expect(report.currentPeriod.since).toBe('2026-08-03')
+    expect(report.currentPeriod.until).toBe('2026-08-09')
+    expect(byKey.has('2026-W32')).toBe(false)
+  })
+
+  it('vraagt de dag-korrel op bij een dagpot, niet de maand-korrel', async () => {
+    const fake = makeFake({ limits: [limitRow({ id: 'p1', period: 'day' })] })
+    await loadSpendLimitsSection(fake.client, NOW, { withDailyExpenseRate: false })
+    for (const c of fake.rpcCallsFor('spend_limit_rule_aggregate')) {
+      expect(c.args.p_grain).toBe('day')
+    }
+  })
+})
+
+// ── Meerdere regels ─────────────────────────────────────────────────────────
+
+describe('meerdere regels per pot', () => {
+  it('telt de regels bij elkaar op tegen één grensbedrag', async () => {
+    const fake = makeFake({
+      limits: [
+        limitRow({
+          id: 'p1',
+          limit_amount: 100,
+          spend_limit_rules: [budgetRule(['b1']), cpRule(['Shell'])],
+        }),
+      ],
+      budgets: [{ id: 'b1', name: 'Boodschappen', parent_id: null, budget_type: 'expense', is_archived: false }],
+      tx: [
+        budgetTx('2026-07', 'b1', 60),
+        { date: '2026-07-20', spend: 30, counterpartyName: 'Shell Express', budgetId: 'b9' },
+      ],
+    })
+    const data = await loadSpendLimitsSection(fake.client, NOW, { withDailyExpenseRate: false })
+    const juli = data.limits[0].report.closedPeriods.find((p) => p.periodKey === '2026-07')
+
+    expect(juli?.periodMatchedAmount).toBe(90)
+    expect(juli?.status).toBe('within')
+    expect(data.limits[0].config.ruleType).toBe('mixed')
+  })
+
+  it('telt een transactie die TWEE regels raakt maar één keer (geen dubbeltelling)', async () => {
+    const fake = makeFake({
+      limits: [
+        limitRow({
+          id: 'p1',
+          limit_amount: 100,
+          spend_limit_rules: [budgetRule(['b1']), cpRule(['Shell'])],
+        }),
+      ],
+      budgets: [{ id: 'b1', name: 'Boodschappen', parent_id: null, budget_type: 'expense', is_archived: false }],
+      // Deze ENE transactie hangt aan b1 én heet Shell: hij matcht beide regels.
+      tx: [{ date: '2026-07-15', spend: 40, budgetId: 'b1', counterpartyName: 'Shell Express' }],
+    })
+    const data = await loadSpendLimitsSection(fake.client, NOW, { withDailyExpenseRate: false })
+    const juli = data.limits[0].report.closedPeriods.find((p) => p.periodKey === '2026-07')
+
+    // 40, niet 80 — de ontdubbeling rekent hem toe aan de EERSTE regel.
+    expect(juli?.periodMatchedAmount).toBe(40)
+    expect(juli?.matchedTransactionCount).toBe(1)
+  })
+
+  it('splitst per REGEL uit, en die som is exact het periodebedrag', async () => {
+    const budgetR = budgetRule(['b1'])
+    const cpR = cpRule(['Shell'])
+    const fake = makeFake({
+      limits: [limitRow({ id: 'p1', limit_amount: 500, spend_limit_rules: [budgetR, cpR] })],
+      budgets: [{ id: 'b1', name: 'Boodschappen', parent_id: null, budget_type: 'expense', is_archived: false }],
+      tx: [
+        budgetTx('2026-07', 'b1', 60),
+        { date: '2026-07-20', spend: 30, counterpartyName: 'Shell Express', budgetId: 'b9' },
+      ],
+    })
+    const data = await loadSpendLimitsSection(fake.client, NOW, { withDailyExpenseRate: false })
+    const juli = data.limits[0].ruleSplit.filter((r) => r.periodKey === '2026-07')
+
+    expect(juli).toHaveLength(2)
+    expect(juli.find((r) => r.ruleId === budgetR.id)?.matchedAmount).toBe(60)
+    expect(juli.find((r) => r.ruleId === cpR.id)?.matchedAmount).toBe(30)
+
+    const periode = data.limits[0].report.closedPeriods.find((p) => p.periodKey === '2026-07')
+    expect(juli.reduce((s, r) => s + r.matchedAmount, 0)).toBe(periode?.periodMatchedAmount)
+  })
+
+  it('behandelt een regel met budget ÉN tegenpartij als een EN-voorwaarde', async () => {
+    const fake = makeFake({
+      limits: [
+        limitRow({
+          id: 'p1',
+          limit_amount: 500,
+          spend_limit_rules: [
+            ruleRow({
+              budget_ids: ['b1'],
+              counterparty_keys: ['SHELL'],
+              counterparty_labels: ['Shell'],
+            }),
+          ],
+        }),
+      ],
+      budgets: [{ id: 'b1', name: 'Boodschappen', parent_id: null, budget_type: 'expense', is_archived: false }],
+      tx: [
+        // Alleen deze telt: goed budget én goede tegenpartij.
+        { date: '2026-07-15', spend: 25, budgetId: 'b1', counterpartyName: 'Shell Express' },
+        // Goed budget, verkeerde tegenpartij.
+        { date: '2026-07-16', spend: 99, budgetId: 'b1', counterpartyName: 'Albert Heijn' },
+        // Goede tegenpartij, verkeerd budget.
+        { date: '2026-07-17', spend: 99, budgetId: 'b9', counterpartyName: 'Shell Express' },
+      ],
+    })
+    const data = await loadSpendLimitsSection(fake.client, NOW, { withDailyExpenseRate: false })
+    const juli = data.limits[0].report.closedPeriods.find((p) => p.periodKey === '2026-07')
+
+    expect(juli?.periodMatchedAmount).toBe(25)
+    expect(data.limits[0].config.ruleType).toBe('mixed')
+  })
+
+  it('matcht ÉÉN van meerdere budgetten binnen dezelfde regel (OF)', async () => {
+    const fake = makeFake({
+      limits: [limitRow({ id: 'p1', limit_amount: 500, spend_limit_rules: [budgetRule(['b1', 'b2'])] })],
+      budgets: [
+        { id: 'b1', name: 'Boodschappen', parent_id: null, budget_type: 'expense', is_archived: false },
+        { id: 'b2', name: 'Horeca', parent_id: null, budget_type: 'expense', is_archived: false },
+      ],
+      tx: [budgetTx('2026-07', 'b1', 20), budgetTx('2026-07', 'b2', 30)],
+    })
+    const data = await loadSpendLimitsSection(fake.client, NOW, { withDailyExpenseRate: false })
+
+    expect(
+      data.limits[0].report.closedPeriods.find((p) => p.periodKey === '2026-07')?.periodMatchedAmount,
+    ).toBe(50)
+    expect(data.limits[0].config.ruleType).toBe('budget')
+  })
+})
+
 // ── Per-budget-uitsplitsing ─────────────────────────────────────────────────
 
 describe('per-budget-uitsplitsing', () => {
   it('splitst per (kind)budget per periode uit dezelfde rijen, zonder tweede fetch', async () => {
     const fake = makeFake({
-      limits: [limitRow({ id: 'p1', rule_type: 'budget', budget_id: 'b1', counterparty_key: null })],
+      limits: [limitRow({ id: 'p1', spend_limit_rules: [budgetRule(['b1'])] })],
       budgets: [
         { id: 'b1', name: 'Boodschappen', parent_id: null, budget_type: 'expense', is_archived: false },
         { id: 'b2', name: 'Supermarkt', parent_id: 'b1', budget_type: 'expense', is_archived: false },
       ],
-      monthAgg: [
-        aggRow('2026-07', 'b1', 30),
-        aggRow('2026-07', 'b2', 20),
-        aggRow('2026-06', 'b2', 15),
+      tx: [
+        budgetTx('2026-07', 'b1', 30),
+        budgetTx('2026-07', 'b2', 20),
+        budgetTx('2026-06', 'b2', 15),
         // Een eigen overboeking telt nergens mee — net als in de motor.
-        aggRow('2026-07', 'b2', 500, 'transfer'),
+        budgetTx('2026-07', 'b2', 500, 'transfer'),
       ],
     })
     const data = await loadSpendLimitsSection(fake.client, NOW, { withDailyExpenseRate: false })
     const split = data.limits[0].budgetSplit
 
-    expect(fake.rpcCallsFor('tx_month_aggregate')).toHaveLength(2) // alleen de chunks
     const juli = split.filter((s) => s.periodKey === '2026-07')
     expect(juli).toHaveLength(2)
     expect(juli.find((s) => s.budgetId === 'b1')).toMatchObject({ budgetName: 'Boodschappen', matchedAmount: 30 })
@@ -450,18 +760,33 @@ describe('per-budget-uitsplitsing', () => {
   it('blijft leeg bij een tegenpartij-pot (die haalt zijn namen on-demand op)', async () => {
     const fake = makeFake({
       limits: [limitRow({ id: 'p1' })],
-      counterpartyAgg: [cpRow('2026-07', 'SHELL', 40)],
+      tx: [shellTx('2026-07', 40)],
     })
     const data = await loadSpendLimitsSection(fake.client, NOW, { withDailyExpenseRate: false })
     expect(data.limits[0].budgetSplit).toEqual([])
+    // …maar de per-regel-uitsplitsing bestaat er wél, zodat de pane altijd iets
+    // te tonen heeft.
+    expect(data.limits[0].ruleSplit.find((r) => r.periodKey === '2026-07')?.matchedAmount).toBe(40)
+  })
+
+  it('blijft leeg op dag-korrel — de SQL draagt daar bewust geen budget-kolom', async () => {
+    const fake = makeFake({
+      limits: [limitRow({ id: 'p1', period: 'day', spend_limit_rules: [budgetRule(['b1'])] })],
+      budgets: [{ id: 'b1', name: 'Boodschappen', parent_id: null, budget_type: 'expense', is_archived: false }],
+      tx: [{ date: '2026-08-06', spend: 12, budgetId: 'b1', type: 'expense' }],
+    })
+    const data = await loadSpendLimitsSection(fake.client, NOW, { withDailyExpenseRate: false })
+
+    expect(data.limits[0].budgetSplit).toEqual([])
+    expect(data.limits[0].ruleSplit.find((r) => r.periodKey === '2026-08-06')?.matchedAmount).toBe(12)
   })
 })
 
-// ── Staat van het gekoppelde budget + aanmaakdatum ──────────────────────────
+// ── Staat van de gekoppelde budgetten + aanmaakdatum ────────────────────────
 
 describe('configuratie-velden die niet uit de spend_limits-rij alleen volgen', () => {
   const budgetPot = (over: Partial<Row> = {}) =>
-    limitRow({ id: 'p1', rule_type: 'budget', budget_id: 'b1', counterparty_key: null, ...over })
+    limitRow({ id: 'p1', spend_limit_rules: [budgetRule(['b1'])], ...over })
 
   it('markeert een GEARCHIVEERD budget als zodanig, met naam en historie intact (AC-B1-02)', async () => {
     const fake = makeFake({
@@ -469,15 +794,15 @@ describe('configuratie-velden die niet uit de spend_limits-rij alleen volgen', (
       budgets: [
         { id: 'b1', name: 'Vakantie', parent_id: null, budget_type: 'expense', is_archived: true },
       ],
-      monthAgg: [aggRow('2026-07', 'b1', 40)],
+      tx: [budgetTx('2026-07', 'b1', 40)],
     })
     const { config, report } = (
       await loadSpendLimitsSection(fake.client, NOW, { withDailyExpenseRate: false })
     ).limits[0]
 
-    expect(config.budgetArchived).toBe(true)
+    expect(config.rules[0].budgets[0].archived).toBe(true)
     // Gearchiveerd ≠ verdwenen: naam én doorgerekende historie blijven staan.
-    expect(config.budgetName).toBe('Vakantie')
+    expect(config.rules[0].budgets[0].name).toBe('Vakantie')
     expect(report.closedPeriods.find((p) => p.periodKey === '2026-07')?.periodMatchedAmount).toBe(40)
     // En hij hoort niet in de keuzelijst van het formulier.
     expect((await loadSpendLimitsSection(fake.client, NOW)).budgetOptions).toEqual([])
@@ -491,16 +816,17 @@ describe('configuratie-velden die niet uit de spend_limits-rij alleen volgen', (
       await loadSpendLimitsSection(fake.client, NOW, { withDailyExpenseRate: false })
     ).limits[0]
 
-    expect(config.budgetName).toBeNull()
-    expect(config.budgetArchived).toBe(false)
+    expect(config.rules[0].budgets[0].name).toBeNull()
+    expect(config.rules[0].budgets[0].archived).toBe(false)
   })
 
-  it('laat een tegenpartij-pot nooit als gearchiveerd gelden', async () => {
+  it('leidt het soort pot af uit de regels in plaats van uit een kolom', async () => {
     const fake = makeFake({ limits: [limitRow({ id: 'p1' })] })
     const { config } = (
       await loadSpendLimitsSection(fake.client, NOW, { withDailyExpenseRate: false })
     ).limits[0]
-    expect(config.budgetArchived).toBe(false)
+    expect(config.ruleType).toBe('counterparty')
+    expect(config.rules[0].counterparties).toEqual([{ key: 'SHELL', label: 'Shell' }])
   })
 
   it('draagt de aanmaakdatum door — de ondergrens van betekenis voor reeks-meldingen', async () => {
@@ -511,6 +837,23 @@ describe('configuratie-velden die niet uit de spend_limits-rij alleen volgen', (
       await loadSpendLimitsSection(fake.client, NOW, { withDailyExpenseRate: false })
     ).limits[0]
     expect(config.createdAt).toBe('2026-07-14T08:30:00Z')
+  })
+
+  it('houdt de regels op formuliervolgorde, ongeacht de volgorde uit de database', async () => {
+    const eerste = ruleRow({ sort_order: 0, budget_ids: ['b1'] })
+    const tweede = ruleRow({ sort_order: 1, counterparty_keys: ['SHELL'], counterparty_labels: ['Shell'] })
+    const fake = makeFake({
+      // Bewust omgekeerd aangeleverd: PostgREST garandeert geen volgorde op een
+      // ingebedde bron, en de volgorde bepaalt wélke regel een gedeelde
+      // transactie vangt.
+      limits: [limitRow({ id: 'p1', spend_limit_rules: [tweede, eerste] })],
+      budgets: [{ id: 'b1', name: 'Boodschappen', parent_id: null, budget_type: 'expense', is_archived: false }],
+    })
+    const { config } = (
+      await loadSpendLimitsSection(fake.client, NOW, { withDailyExpenseRate: false })
+    ).limits[0]
+
+    expect(config.rules.map((r) => r.id)).toEqual([eerste.id, tweede.id])
   })
 
   it('geeft elke budget-optie zijn ouder mee, zodat de kiezer een boom kan tonen', async () => {
@@ -544,12 +887,12 @@ describe('aanmaak-ondergrens voor de trend (loader → motor)', () => {
    * ZONDER ondergrens: recent = [0, 100, 100] tegen prior = [0, 0, 0] ⇒ prior 0,
    * verandering ≠ 0 ⇒ richting 'worsening' over maanden waarin de pot niet bestond.
    */
-  const AGG_LAATSTE_TWEE = [cpRow('2026-06', 'SHELL', 100), cpRow('2026-07', 'SHELL', 100)]
+  const TX_LAATSTE_TWEE = [shellTx('2026-06', 100), shellTx('2026-07', 100)]
 
   it('draagt createdAt door, zodat een jonge pot in het RAPPORT trend "unknown" krijgt', async () => {
     const fake = makeFake({
       limits: [limitRow({ id: 'p1', limit_amount: 1000, created_at: '2026-06-01T09:00:00Z' })],
-      counterpartyAgg: AGG_LAATSTE_TWEE,
+      tx: TX_LAATSTE_TWEE,
     })
     const { report } = (
       await loadSpendLimitsSection(fake.client, NOW, { withDailyExpenseRate: false })
@@ -579,7 +922,7 @@ describe('aanmaak-ondergrens voor de trend (loader → motor)', () => {
   it('laat een pot die ouder is dan zijn venster ongemoeid (ondergrens inert)', async () => {
     const fake = makeFake({
       limits: [limitRow({ id: 'p1', limit_amount: 1000, created_at: '2020-01-01T00:00:00Z' })],
-      counterpartyAgg: AGG_LAATSTE_TWEE,
+      tx: TX_LAATSTE_TWEE,
     })
     const { report } = (
       await loadSpendLimitsSection(fake.client, NOW, { withDailyExpenseRate: false })
@@ -664,7 +1007,7 @@ describe('dailyExpenseRate — pariteit met DashboardData.dailyExpenseRate', () 
       profile: PROFILE_AUTO,
       monthTx,
       monthAgg: AGG_12M,
-      counterpartyAgg: [cpRow('2026-07', 'SHELL', 40)],
+      tx: [shellTx('2026-07', 40)],
     })
     const data = await loadSpendLimitsSection(fake.client, NOW, { withBudgetOptions: false })
 
@@ -688,12 +1031,13 @@ describe('dailyExpenseRate — pariteit met DashboardData.dailyExpenseRate', () 
       limits: [limitRow({ id: 'p1' })],
       profile: PROFILE_AUTO,
       monthAgg: AGG_12M,
-      counterpartyAgg: [cpRow('2026-07', 'SHELL', 40)],
+      tx: [shellTx('2026-07', 40)],
     })
     await loadSpendLimitsSection(fake.client, NOW, { withBudgetOptions: false })
 
-    // Een tegenpartij-pot doet geen chunk-calls op tx_month_aggregate, dus dit is
-    // precies de dagtarief-fetch — en zijn venster is dat van `getTxAgg12m`.
+    // De potberekening draait op `spend_limit_rule_aggregate`, dus élke
+    // tx_month_aggregate-call is per definitie de dagtarief-fetch — en zijn
+    // venster is dat van `getTxAgg12m`.
     const calls = fake.rpcCallsFor('tx_month_aggregate')
     expect(calls).toHaveLength(1)
     expect(calls[0].args).toEqual({
@@ -712,7 +1056,7 @@ describe('dailyExpenseRate — pariteit met DashboardData.dailyExpenseRate', () 
       limits: [limitRow({ id: 'p1' })],
       profile: manual,
       monthTx: [],
-      counterpartyAgg: [cpRow('2026-07', 'SHELL', 40)],
+      tx: [shellTx('2026-07', 40)],
     })
     const a = await loadSpendLimitsSection(zonderRijen.client, NOW, { withBudgetOptions: false })
     expect(a.dailyExpenseRate).toBe(bundelDagtarief([], 500))
@@ -725,7 +1069,7 @@ describe('dailyExpenseRate — pariteit met DashboardData.dailyExpenseRate', () 
       profile: manual,
       monthTx: [],
       monthAgg: AGG_12M,
-      counterpartyAgg: [cpRow('2026-07', 'SHELL', 40)],
+      tx: [shellTx('2026-07', 40)],
     })
     const b = await loadSpendLimitsSection(metRijen.client, NOW, { withBudgetOptions: false })
     expect(b.dailyExpenseRate).toBe(bundelDagtarief(AGG_12M, 500))
@@ -738,7 +1082,7 @@ describe('dailyExpenseRate — pariteit met DashboardData.dailyExpenseRate', () 
       profile: { ...PROFILE_AUTO, estimated_monthly_expenses: 0 },
       monthTx: [],
       monthAgg: [],
-      counterpartyAgg: [],
+      tx: [],
     })
     const data = await loadSpendLimitsSection(fake.client, NOW, { withBudgetOptions: false })
     expect(data.dailyExpenseRate).toBeNull()
@@ -758,8 +1102,8 @@ describe('dailyExpenseRate — pariteit met DashboardData.dailyExpenseRate', () 
     expect(data.dailyExpenseRate).toBeNull()
     expect(fake.tableCallsFor('profiles')).toBe(0)
     expect(fake.tableCallsFor('transactions')).toBe(0)
-    // Een tegenpartij-pot heeft géén maandaggregaat nodig; staat de dagtarief-
-    // afleiding uit, dan hoort er dus geen enkele tx_month_aggregate-call te zijn.
+    // Staat de dagtarief-afleiding uit, dan hoort er geen enkele
+    // tx_month_aggregate-call te zijn — de pot rekent op een eigen aggregaat.
     expect(fake.rpcCallsFor('tx_month_aggregate')).toHaveLength(0)
   })
 })

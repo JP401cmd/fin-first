@@ -37,7 +37,14 @@ const LIMIT = 50
 
 /** Netto uitgave `amount` in kalendermaand `month`, in de vorm van de RPC. */
 function row(month: string, amount: number): SpendLimitAggregateRow {
-  return { month, transactionType: null, sumPositief: 0, sumNegatief: -amount, count: 2 }
+  // De motor rekent op een BUCKETDATUM; een maand-bucket is de eerste van die maand.
+  return {
+    bucketStart: `${month}-01`,
+    transactionType: null,
+    sumPositief: 0,
+    sumNegatief: -amount,
+    count: 2,
+  }
 }
 
 function buildReport(rows: SpendLimitAggregateRow[], windowPeriods = 13): SpendLimitReport {

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-09T17:37:37.726Z",
-  "generatedDate": "2026-08-09",
+  "generatedAt": "2026-08-10T16:32:57.221Z",
+  "generatedDate": "2026-08-10",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -190,10 +190,10 @@
     "routes": 141,
     "routesProduction": 99,
     "api": 289,
-    "tables": 88,
-    "migrations": 197,
+    "tables": 89,
+    "migrations": 199,
     "integrations": 25,
-    "components": 909,
+    "components": 914,
     "providers": 14,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -7872,6 +7872,10 @@
         "migration": "supabase/migrations/20260717140000_signup_email_allowlist.sql"
       },
       {
+        "name": "spend_limit_rules",
+        "migration": "supabase/migrations/20260810120000_spend_limit_rules_and_grain.sql"
+      },
+      {
         "name": "spend_limits",
         "migration": "supabase/migrations/20260808110000_create_spend_limits.sql"
       },
@@ -7932,7 +7936,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 197
+    "migrationCount": 199
   },
   "tablesByDomain": [
     {
@@ -8053,6 +8057,10 @@
         {
           "name": "signup_email_allowlist",
           "migration": "supabase/migrations/20260717140000_signup_email_allowlist.sql"
+        },
+        {
+          "name": "spend_limit_rules",
+          "migration": "supabase/migrations/20260810120000_spend_limit_rules_and_grain.sql"
         },
         {
           "name": "spend_limits",
@@ -8402,11 +8410,11 @@
     }
   ],
   "components": {
-    "total": 909,
+    "total": 914,
     "groups": [
       {
         "group": "app",
-        "count": 359,
+        "count": 361,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8440,6 +8448,7 @@
           "beheer-container",
           "beheer-nav",
           "benchmark-comparison-chart",
+          "benchmark-comparison-chart.test",
           "bespreek-met-fin-button",
           "bill-calendar",
           "bottom-nav-tabs",
@@ -8569,6 +8578,7 @@
           "holding-transaction-log",
           "holding-transaction-log.test",
           "holdings-heatmap",
+          "holdings-heatmap.test",
           "horizon-cashflow-sankey",
           "horizon-client",
           "horizon-helpers",
@@ -9028,7 +9038,7 @@
       },
       {
         "group": "core",
-        "count": 68,
+        "count": 69,
         "items": [
           "account-source-icon",
           "account-source-icon.test",
@@ -9076,6 +9086,7 @@
           "fire-progress-strip",
           "holding-row",
           "holdings-client",
+          "holdings-client.heatmap.test",
           "holdings-toolbar",
           "hypotheekplanner-tab",
           "investment-holding-pane",
@@ -9380,10 +9391,12 @@
       },
       {
         "group": "sync",
-        "count": 4,
+        "count": 6,
         "items": [
           "global-sync-button",
+          "global-sync-button.test",
           "global-sync-provider",
+          "global-sync-provider.test",
           "sync-progress-strip",
           "sync-report-modal"
         ]
@@ -14298,6 +14311,11 @@
         "column": "related_transaction_id"
       },
       {
+        "from": "spend_limit_rules",
+        "to": "spend_limits",
+        "column": "spend_limit_id"
+      },
+      {
         "from": "spend_limits",
         "to": "budgets",
         "column": "budget_id"
@@ -14785,6 +14803,11 @@
         "rls": true
       },
       "spend_limits": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "spend_limit_rules": {
         "user": true,
         "household": false,
         "rls": true
@@ -15979,6 +16002,18 @@
       ],
       "summary": "TriFinity heeft twee volledig gescheiden feedback-systemen: het oude formulier op `/mijn/feedback` (tabel `feedback`, eigen admin-inbox) en de meldmodus in de chat (tabel `user_reports`, doorstroom naar de Notion-werkqueue). Het oude pad is al uit de navigatie verdwenen en staat ",
       "file": "docs/adr/0096-een-feedback-ingang.md"
+    },
+    {
+      "id": "0097-grenzenpot-meerdere-regels-en-fijnere-periodes",
+      "title": "Grenzenpot: meerdere regels per pot, EN tussen de dimensies, en dag/week-periodes op één regel-aggregaat",
+      "status": "aanvaard",
+      "date": "2026-08-10",
+      "elements": [
+        "as-budget",
+        "fn-budgetteren"
+      ],
+      "summary": "Een grenzenpot was tot 09-08-2026 precies één regel, plat opgeslagen in de pot-rij: óf één `budget_id`, óf één `counterparty_key`, afgedwongen door de CHECK `spend_limits_rule_shape` (ADR 0089, uitgebreid in ADR 0092). De eigenaar vroeg om drie dingen tegelijk:",
+      "file": "docs/adr/0097-grenzenpot-meerdere-regels-en-fijnere-periodes.md"
     }
   ],
   "churn": {
@@ -16028,7 +16063,7 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 9105,
+        "loc": 9107,
         "commits": 92
       },
       {
@@ -16039,7 +16074,7 @@
       {
         "file": "components/core/assets-client.tsx",
         "loc": 4498,
-        "commits": 42
+        "commits": 41
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -17157,7 +17192,7 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-08-09",
+    "previousDate": "2026-08-10",
     "hasChanges": false,
     "sections": []
   },
@@ -17433,6 +17468,13 @@
       "api": 289,
       "components": 909,
       "tables": 88,
+      "routesProduction": 99
+    },
+    {
+      "date": "2026-08-10",
+      "api": 289,
+      "components": 914,
+      "tables": 89,
       "routesProduction": 99
     }
   ]
