@@ -143,7 +143,17 @@ function formatDayTitle(iso: string): string {
   return `${NL_WEEKDAY_ABBR[new Date(y, m - 1, d).getDay()]} ${d} ${NL_MONTH_ABBR[m - 1]} ${y}`
 }
 
-export function TransactiesAnalyse() {
+export function TransactiesAnalyse({
+  naGeldstroom,
+}: {
+  /**
+   * Server-gerenderde sectie die direct ónder de geldstroom-/spaarquote-kaart
+   * hoort (de grenzenpotten). Als slot doorgegeven omdat die sectie server-side
+   * geladen wordt (ADR 0058) terwijl deze analyse een client-component is; de
+   * plek in de leesvolgorde hoort bij de analyse, niet bij de page-wrapper.
+   */
+  naGeldstroom?: React.ReactNode
+} = {}) {
   const { perspective } = usePerspective()
   const searchParams = useSearchParams()
   const { mode } = useDisplayMode()
@@ -165,11 +175,13 @@ export function TransactiesAnalyse() {
     return (y - now.getFullYear()) * 12 + (m - 1 - now.getMonth())
   })
 
-  // TXN-2: Eenvoudig kent alleen '30d' en 'year'. Een bewaarde keuze die daar
-  // geen tab heeft (bv. 'month' uit Volledig of uit de `?maand=`-deeplink) valt
-  // terug op '30d' — met offset 0, want de kalenderpositie van een maand zegt
-  // niets over een rollend 30-dagen-venster. De KEUZE zelf blijft in state
-  // staan, dus terugschakelen naar Volledig levert weer exact dat maandvenster.
+  // TXN-2: Eenvoudig kent '30d', 'month' en 'year' — alleen 'quarter' is daar
+  // diepte. Een bewaarde keuze die geen tab heeft (dus 'quarter' uit Volledig)
+  // valt terug op '30d' — met offset 0, want de kalenderpositie van een
+  // kwartaal zegt niets over een rollend 30-dagen-venster. De KEUZE zelf blijft
+  // in state staan, dus terugschakelen naar Volledig levert weer exact dat
+  // kwartaalvenster. De `?maand=`-deeplink werkt sinds Maand terugkeerde in
+  // beide modi.
   const period = resolvePeriodForMode(selectedPeriod, mode)
   const offset = period === selectedPeriod ? selectedOffset : 0
 
@@ -590,16 +602,25 @@ export function TransactiesAnalyse() {
         />
       </Card>
 
+      {/* De grenzenpotten hangen niet aan de transactie-fetch (server-props), dus
+          ze blijven ook in de fout- en laadstand staan — op dezelfde plek in de
+          leesvolgorde als in de geladen stand: direct onder de geldstroom. */}
       {error ? (
-        <Card>
-          <p className="text-sm text-red-700">{error}</p>
-        </Card>
+        <>
+          <Card>
+            <p className="text-sm text-red-700">{error}</p>
+          </Card>
+          {naGeldstroom}
+        </>
       ) : initialLoading ? (
-        <Card>
-          <div className="flex items-center justify-center py-16">
-            <div className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--ink-3)] border-t-transparent" />
-          </div>
-        </Card>
+        <>
+          <Card>
+            <div className="flex items-center justify-center py-16">
+              <div className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--ink-3)] border-t-transparent" />
+            </div>
+          </Card>
+          {naGeldstroom}
+        </>
       ) : (
         <>
           <div className="grid gap-5 lg:grid-cols-3">
@@ -626,6 +647,8 @@ export function TransactiesAnalyse() {
               </Card>
             </HideInSimple>
           </div>
+
+          {naGeldstroom}
 
           <div className="grid gap-5 sm:grid-cols-2">
             <HideInSimple>

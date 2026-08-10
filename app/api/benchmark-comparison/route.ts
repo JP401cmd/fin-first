@@ -1,9 +1,11 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { serverError, unauthorized } from '@/lib/api/respond'
 import {
   buildPortfolioHistory,
   compareToBenchmarks,
   fetchAllRealBenchmarkData,
+  resolvePeriodStart,
   TIME_PERIODS,
 } from '@/lib/benchmark-comparison'
 
@@ -18,9 +20,7 @@ export async function GET(request: NextRequest) {
   const supabase = await createClient()
 
   const claims = await getAuthClaims(supabase)
-  if (!claims) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
-  }
+  if (!claims) return unauthorized()
 
   const { searchParams } = new URL(request.url)
   const periodId = searchParams.get('period') || '1y'
@@ -34,12 +34,10 @@ export async function GET(request: NextRequest) {
       .eq('user_id', claims.sub)
       .eq('is_active', true)
 
+    // Een echte DB-/RLS-fout is géén "geen holdings": die stil als lege staat
+    // presenteren verbergt een storing achter een plausibel scherm.
     if (holdingsError) {
-      // Holdings table may not exist
-      return NextResponse.json({
-        comparison: null,
-        message: 'Geen holdings gevonden',
-      })
+      return serverError(holdingsError, 'benchmark-comparison:GET holdings')
     }
 
     if (!holdings || holdings.length === 0) {
@@ -79,15 +77,17 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Determine benchmark date range from portfolio history
-    const benchStartDate = new Date(portfolioHistory[0].date)
-    const benchEndDate = new Date()
+    // Het benchmarkvenster volgt de PERIODEKEUZE, niet de volledige historie.
+    // Dezelfde `resolvePeriodStart` gebruikt `compareToBenchmarks` om te
+    // knippen — één bron, dus fetch en vergelijking kunnen niet uiteenlopen.
+    const now = new Date()
+    const benchStartDate = resolvePeriodStart(period, portfolioHistory[0].date, now)
 
     // Fetch real benchmark data from Yahoo Finance (with automatic fallback)
-    const realBenchmarkData = await fetchAllRealBenchmarkData(benchStartDate, benchEndDate)
+    const realBenchmarkData = await fetchAllRealBenchmarkData(benchStartDate, now)
 
     // Compare to benchmarks (uses real data when available, synthetic as fallback)
-    const comparison = compareToBenchmarks(portfolioHistory, period, realBenchmarkData)
+    const comparison = compareToBenchmarks(portfolioHistory, period, realBenchmarkData, now)
 
     // Count how many benchmarks use real vs synthetic data
     const realCount = comparison?.benchmarks.filter(b => b.dataSource === 'yahoo_finance').length ?? 0
@@ -106,10 +106,6 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Benchmark comparison error:', error)
-    return NextResponse.json(
-      { error: 'Kon benchmarkvergelijking niet berekenen' },
-      { status: 500 },
-    )
+    return serverError(error, 'benchmark-comparison:GET')
   }
 }

@@ -55,6 +55,7 @@ export const BEZIT_FLOW: UatFlow = {
     { id: 'csv', scenarioId: 'UAT-BEZIT-18', label: 'WF-BEZIT-18 · CSV-import (broker-export)', kind: 'action', stage: 3, lane: 'verdieping', subOf: 'holdings' },
     { id: 'broker', label: 'WF-BEZIT-19 · Broker-koppeling (Trading 212)', kind: 'cross', stage: 3, lane: 'verdieping', subOf: 'holdings', crossZone: 'MIJN' },
     { id: 'typed-inv', scenarioId: 'UAT-BEZIT-22', label: 'WF-BEZIT-22 · Typed investment-positie', kind: 'screen', stage: 3, lane: 'verdieping', subOf: 'holdings' },
+    { id: 'benchmark', scenarioId: 'UAT-BEZIT-26', label: 'WF-BEZIT-26 · Benchmarkvergelijking (AEX/MSCI/S&P)', kind: 'screen', stage: 3, lane: 'verdieping', subOf: 'holdings' },
 
     // ── 3 · verdieping · crypto ───────────────────────────────────────────
     { id: 'crypto', scenarioId: 'UAT-BEZIT-21', label: 'WF-BEZIT-21 · Crypto-holdings-app', kind: 'screen', stage: 3, lane: 'verdieping' },
@@ -112,6 +113,7 @@ export const BEZIT_FLOW: UatFlow = {
     { from: 'holdings', to: 'csv' },
     { from: 'holdings', to: 'broker', kind: 'cross' },
     { from: 'holdings', to: 'typed-inv' },
+    { from: 'holdings', to: 'benchmark' },
 
     // crypto sub-hub → kinderen (rail)
     { from: 'crypto', to: 'crypto-koppel' },

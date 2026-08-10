@@ -5004,13 +5004,15 @@ export default function HorizonPage({
                     </>
                   )}
                   {/* ── Besteedbaar-lijn toggle ("Zonder je huis") ──
-                      Zusje van de Doel-pill hierboven, en om dezelfde reden buiten
-                      HideInSimple: de lijn rendert in béíde weergavemodi. Alleen
-                      zichtbaar zodra er écht een tweede lijn te tonen is
+                      Alleen zichtbaar zodra er écht een tweede lijn te tonen is
                       (`liquidLineAvailable`) — bij "Meerekenen" valt J exact samen
                       met I, dus daar verdwijnt de pill in plaats van een lijn aan te
-                      bieden die al zichtbaar is. */}
+                      bieden die al zichtbaar is. In Eenvoudig verdwijnt de pill
+                      helemaal: het onderscheid mét/zonder huis is secundaire
+                      diepte. De lijn zelf blijft door de opgeslagen voorkeur
+                      gestuurd en rendert in béíde weergavemodi. */}
                   {liquidLineAvailable && (
+                    <HideInSimple>
                     <button
                       type="button"
                       onClick={() => persistLiquidLine(!showLiquidLine)}
@@ -5031,6 +5033,7 @@ export default function HorizonPage({
                       </svg>
                       <span data-pill-label className="hidden sm:inline">Zonder je huis</span>
                     </button>
+                    </HideInSimple>
                   )}
                   </>
                 )}
@@ -5133,11 +5136,10 @@ export default function HorizonPage({
                         </span>
                       </button>
                     )
-                    // Opbouw-variant is secundaire diepte → verborgen in
-                    // Eenvoudig-modus (hard-hide). Pad-knop blijft altijd.
-                    return mode === 'vermogensopbouw'
-                      ? <HideInSimple key={mode}>{btn}</HideInSimple>
-                      : btn
+                    // Beide varianten blijven in béíde weergavemodi staan: de
+                    // opbouw-staafgrafiek is een andere blik op dezelfde cijfers,
+                    // geen extra diepte — en juist in Eenvoudig de begrijpelijkste.
+                    return btn
                   })}
                 </div>
 

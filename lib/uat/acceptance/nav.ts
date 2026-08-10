@@ -256,14 +256,14 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-NAV-17',
     scenarioId: 'UAT-NAV-17',
-    titel: 'Globale sync starten en het sync-rapport bekijken',
+    titel: 'Globale sync starten en het sync-rapport bekijken (nu incl. bankkoppelingen, uur-/dagrem)',
     kriticiteit: 'KERN',
-    given: 'Koppelingen-lijst (exchanges/wallets) via GlobalSyncProvider.',
-    when: 'De gebruiker start een sync met/zonder koppelingen, of terwijl een sync al loopt.',
-    then: 'Met koppelingen: teller "X/Y"; zonder: alleen een prijzen-only-sync. Sync-status leeft alleen in het React-geheugen van de sessie (GlobalSyncProvider) — een herlaad reset "laatste sync" naar "Nog niet gesynchroniseerd" (verwacht gedrag, geen DB-persistentie).',
+    given: 'Koppelingen-lijst (exchanges/wallets/bankkoppelingen) via GlobalSyncProvider. Sinds deze release liften actieve bankkoppelingen mee op de globale knop, geremd door een client-side uur-rem per koppeling (`BANK_AUTO_SYNC_INTERVAL_MS`, met `BANK_AUTO_SYNC_HEADROOM=3` verzoeken die alleen de handmatige knop mag opmaken) bovenop de server-harde 10/dag-rem (`BANK_DAILY_REQUEST_LIMIT`, `lib/bank-connection-status.ts`).',
+    when: 'De gebruiker start een sync met/zonder koppelingen, of terwijl een sync al loopt; opent het sync-rapport (account-dropdown "Sync-rapport", of een klik op de globale knop bij fouten).',
+    then: 'De voortgangsteller "X/Y" telt ALLE bronnen die daadwerkelijk een verzoek doen (exchanges + wallets + bankkoppelingen die meegaan + prijzenverversing) — dit is de enige telling in de app sinds 10 aug 2026 (voorheen sprak de teller de eindmelding tegen). Een bankkoppeling die wordt overgeslagen (recent gesynchroniseerd binnen het uur, dagrem bijna op, of `link-broken`) is GEEN bron en telt niet mee, maar krijgt wél meteen een `outcome:\'skipped\'`-resultaat in `state.perConnection` met reden en (bij `recent`) het tijdstip waarop de koppeling weer vanzelf meegaat. Zonder koppelingen: alleen een prijzen-only-sync. Het sync-rapport (`SyncReportModal`) toont per bron de uitkomst — groen/rood/blauw — met bij bankrekeningen ook de dagteller "N/10 verzoeken vandaag" (`effectiveDailyRequests`) en een "Synchroniseer nu"-knop die ONGEREMD is (de uur-rem geldt alleen voor het automatische meeliften). Sync-status leeft alleen in het React-geheugen van de sessie (GlobalSyncProvider) — een herlaad reset "laatste sync" naar "Nog niet gesynchroniseerd" (verwacht gedrag, geen DB-persistentie van de rondegeschiedenis; de dagrem zelf is wel server-side persistent).',
     assertion: {
       kind: 'ui-only',
-      source: 'components/sync/global-sync-provider.tsx — sessie-lokale React-state, geen cijfermatige uitkomst hier getoetst',
+      source: 'components/sync/global-sync-provider.tsx + lib/sync/global-sync.ts#planBankSyncs/buildSyncJobs + components/sync/sync-report-modal.tsx + lib/bank-connection-status.ts#BANK_DAILY_REQUEST_LIMIT/effectiveDailyRequests — sessie-lokale React-state + server-harde dagrem, geen cijfermatige uitkomst hier getoetst',
     },
   },
   {

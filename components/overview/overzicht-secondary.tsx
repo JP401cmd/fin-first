@@ -71,6 +71,11 @@ export type OverzichtSecondaryProps = {
   briefingHeadline?: string | null
   /** Afgesloten weken uit de snapshot-historie (terugblik-disclosure). */
   briefingWeekHistory?: BriefingWeekHistoryItem[]
+  /**
+   * Startpositie van het rouleer-venster in de Eenvoudige weergave (server-prop
+   * uit de rotatiecookie). Zie lib/briefing/rotation.ts.
+   */
+  briefingRotation?: number
   /** Liquide cash op spaarrekeningen — voor compound-insight reveal. */
   liquidCash?: number
   /**
@@ -100,6 +105,7 @@ export function OverzichtSecondary({
   freedomHero,
   briefingHeadline,
   briefingWeekHistory,
+  briefingRotation = 0,
   dashboardData,
   activeWidgets,
   allWidgetPrefs,
@@ -226,6 +232,7 @@ export function OverzichtSecondary({
         headline={briefingHeadline ?? null}
         weekHistory={briefingWeekHistory}
         simpleMode={simple}
+        rotationOffset={briefingRotation}
       />
 
       {/* Drie "alles bekijken"-ingangen onder de briefing. In Eenvoudig weg

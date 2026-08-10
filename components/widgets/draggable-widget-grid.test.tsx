@@ -616,6 +616,168 @@ describe('DraggableWidgetGrid — grenzenpot-widgets', () => {
   })
 })
 
+// ── Save-merge: een ongerelateerde save mag niets stilzwijgend uitzetten ─────
+//
+// Notion 2026-08-09-testbug-03b440 ("Grenzenpot"): de grenzenpot-widget van een
+// testgebruiker stond opgeslagen als `enabled:false` met een `order` die exact
+// de ADR-0092-injectieformule volgt — de pref is dus server-side geïnjecteerd
+// (enabled:true) en daarna alsnog op false weggeschreven, zonder dat de
+// gebruiker de tegel ooit heeft weggeklikt. Omdat de picker `spend_limit:*`
+// bewust niet toont (ADR 0092 besluit 1), is dat onherstelbaar.
+//
+// Oorzaak: `performSave` behandelde ELKE save als een volledige vervanging —
+// alles in `allPrefs` dat niet in de LOKALE `activeWidgets`-state zat, werd op
+// `enabled:false` gezet. Maar die lokale state is een GEFILTERDE momentopname
+// (lazy `useState`, geseed bij mount, nooit hergesynchroniseerd), geen
+// weergave van gebruikersintentie. Twee reproduceerbare gaten:
+//   1. een pref die ná mount door de server wordt geïnjecteerd (nieuwe pot /
+//      nieuwe favoriet, props groeien zonder remount) zit niet in de lokale
+//      state → de eerstvolgende resize/hide van een ANDER widget wist 'm;
+//   2. een pref die `isWidgetVisible` tijdelijk wegfiltert (budgetteren uit,
+//      feature uitgezet) zit óók niet in de lokale state → zelfde stille wis,
+//      en na het weer aanzetten van budgetteren komt de widget niet terug.
+// De invariant die dit blok pint: alleen wat de gebruiker in DEZE sessie zelf
+// deactiveerde (kruisje, leegmaken, vul-dashboard, preset) mag op false.
+describe('DraggableWidgetGrid — save-merge zet niets stil uit', () => {
+  beforeEach(() => {
+    mockIsMobile = false
+    mockFetch.mockResolvedValue({ ok: true })
+  })
+
+  /** Klikt en laat de 800ms-debounce van scheduleSave aflopen. */
+  async function clickAndFlushDebounce(btn: HTMLElement) {
+    vi.useFakeTimers()
+    try {
+      await act(async () => { btn.click() })
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
+    } finally {
+      vi.useRealTimers()
+    }
+  }
+
+  function widgetsFromLastSave(): { id: string; enabled: boolean }[] {
+    const calls = mockFetch.mock.calls.filter(([url]) => url === '/api/widgets')
+    expect(calls.length).toBeGreaterThan(0)
+    const last = calls[calls.length - 1]
+    return (JSON.parse((last[1] as RequestInit).body as string) as {
+      widgets: { id: string; enabled: boolean }[]
+    }).widgets
+  }
+
+  const potData: DashboardData = {
+    ...mockData,
+    spendLimitWidgets: [
+      {
+        id: 'POT-1',
+        name: 'Kopen',
+        ruleType: 'budget',
+        period: 'month',
+        isActive: true,
+        limitAmount: 50,
+        currentPeriodKey: '2026-08',
+        currentPeriodLabel: 'augustus 2026',
+        currentMatchedAmount: 20,
+        currentHeadroom: 30,
+        currentOverAmount: 0,
+        status: 'within',
+        isNearLimit: false,
+        currentStreak: 1,
+        longestStreak: 1,
+        closedPeriodCount: 0,
+        exceededPeriodCount: 0,
+        withinPeriodCount: 0,
+        sparkClosedMatchedAmounts: [],
+        trendDirection: 'stable',
+        aggregateTruncationSuspected: false,
+      },
+    ],
+  }
+
+  it('behoudt een ná mount geïnjecteerde grenzenpot bij het verbergen van een ander widget', async () => {
+    const base = makePrefs(['netto_vermogen', 'acties'])
+    const { rerender } = render(
+      <DraggableWidgetGrid
+        initialPrefs={base}
+        allPrefs={base}
+        data={potData}
+        editMode={true}
+        onEditModeChange={() => {}}
+      />
+    )
+
+    // De gebruiker maakt elders een grenzenpot aan; de loader injecteert de
+    // pref (enabled:true, order = lowestOrder-300) en `router.refresh()` levert
+    // nieuwe props — zónder remount, dus de lokale state kent 'm niet.
+    const potPref: WidgetPref = {
+      id: 'spend_limit:POT-1', enabled: true, size: 'quarter', order: -400,
+    }
+    const grown = [...base, potPref]
+    rerender(
+      <DraggableWidgetGrid
+        initialPrefs={grown}
+        allPrefs={grown}
+        data={potData}
+        editMode={true}
+        onEditModeChange={() => {}}
+      />
+    )
+
+    const hideBtn = await screen.findByRole('button', { name: 'Verberg acties widget' })
+    mockFetch.mockClear()
+    await clickAndFlushDebounce(hideBtn)
+
+    const widgets = widgetsFromLastSave()
+    // Wat de gebruiker wél deed: 'acties' verbergen.
+    expect(widgets.find(w => w.id === 'acties')?.enabled).toBe(false)
+    // Wat hij NIET deed: de pot uitzetten.
+    expect(widgets.find(w => w.id === 'spend_limit:POT-1')?.enabled).toBe(true)
+  })
+
+  it('behoudt een budget-widget die alleen door budgetteren-uit is weggefilterd', async () => {
+    // `cash_flow` zit in BUDGET_WIDGETS: met budgetingActive:false filtert
+    // isWidgetVisible 'm uit de lokale state, maar de opgeslagen pref staat
+    // gewoon op enabled:true. Budgetteren weer aanzetten moet 'm terugbrengen.
+    const prefs = makePrefs(['netto_vermogen', 'cash_flow'])
+    render(
+      <DraggableWidgetGrid
+        initialPrefs={prefs}
+        allPrefs={prefs}
+        data={{ ...mockData, budgetingActive: false }}
+        editMode={true}
+        onEditModeChange={() => {}}
+      />
+    )
+
+    const hideBtn = await screen.findByRole('button', { name: 'Verberg netto_vermogen widget' })
+    mockFetch.mockClear()
+    await clickAndFlushDebounce(hideBtn)
+
+    const widgets = widgetsFromLastSave()
+    expect(widgets.find(w => w.id === 'netto_vermogen')?.enabled).toBe(false)
+    expect(widgets.find(w => w.id === 'cash_flow')?.enabled).toBe(true)
+  })
+
+  it('zet bij "dashboard leegmaken" wél alles uit (bewuste vervanging)', async () => {
+    const prefs = makePrefs(['netto_vermogen', 'acties'])
+    render(
+      <DraggableWidgetGrid
+        initialPrefs={prefs}
+        allPrefs={prefs}
+        data={mockData}
+        editMode={true}
+        onEditModeChange={() => {}}
+      />
+    )
+    const clearBtn = await screen.findByTestId('clear-all-btn')
+    await act(async () => { clearBtn.click() })
+    mockFetch.mockClear()
+    await act(async () => { screen.getByTestId('bulk-action-confirm').click() })
+
+    const widgets = widgetsFromLastSave()
+    expect(widgets.every(w => !w.enabled)).toBe(true)
+  })
+})
+
 // ── Regressietest — content rendert altijd onvoorwaardelijk ────────────────
 //
 // Historie: ooit zat alle grid-content achter een collapse-gate

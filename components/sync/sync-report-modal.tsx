@@ -6,6 +6,9 @@
 //   • Header-strip met "Alles synchroniseren"-knop + samenvatting
 //   • Sectie "Exchanges" — Bitvavo/Kraken/Coinbase met test/sync per rij
 //   • Sectie "Wallets"   — BTC/ETH/Polygon/Arbitrum/Base/Solana
+//   • Sectie "Bankrekeningen" — de TrueLayer-koppelingen; hier is de UITKOMST van
+//     de laatste ronde terugleesbaar (groen/rood/blauw), inclusief de reden
+//     waarom een koppeling deze keer niet meeging
 //   • Sectie "Marktdata" — ISIN-resolver status (read-only)
 //
 // Hergebruikt `ConnectionCard`, `ConnectionSection`, `IsinResolverStatus` en
@@ -24,10 +27,14 @@ import { IsinResolverStatus } from '@/components/connections/isin-resolver-statu
 import { MarketDataSourcesCard } from '@/components/connections/market-data-sources-card'
 import { BlockchainSourcesCard } from '@/components/connections/blockchain-sources-card'
 import { SyncProgressStrip } from './sync-progress-strip'
-import { useGlobalSync } from './global-sync-provider'
+import { useGlobalSync, type ConnectionResult } from './global-sync-provider'
 import { useToast } from '@/components/app/toast-provider'
 import { computeFreshness, type ConnectionsData, type ExchangeConnectionRow, type ExchangeId, type WalletAddressRow, type WalletChain } from '@/lib/connections-data'
 import { formatCurrency } from '@/lib/format'
+import { bankManualHref, type BankSyncTarget } from '@/lib/sync/global-sync'
+import { bankSyncLabel, toBankSyncTargets } from '@/lib/sync/bank-sync-targets'
+import { BANK_DAILY_REQUEST_LIMIT, effectiveDailyRequests } from '@/lib/bank-connection-status'
+import type { LinkedAccountView } from '@/lib/truelayer/linked-account'
 
 interface SyncReportModalProps {
   open: boolean
@@ -68,11 +75,79 @@ function maskApiKey(last4: string | null): string {
   return `•••• ${last4}`
 }
 
+/** "vanaf 17:37" — dezelfde tijd die de melding noemt, in dezelfde notatie. */
+function fromTime(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (!Number.isFinite(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return ` Gaat vanzelf weer mee vanaf ${pad(d.getHours())}:${pad(d.getMinutes())}.`
+}
+
+/**
+ * De uitkomst van de laatste ronde als één regel onder de bankkaart.
+ *
+ * Dezelfde drie uitkomsten als de meldingen — dit is de terugleesbare vorm
+ * ervan, niet een tweede systeem. Wél in de krant-tinten van deze pagina:
+ * stoplicht voor gelukt/mislukt (`text-positive`/`text-negative`, dus géén
+ * module-accent — dit gaat over of iets lukte, niet over waar het hoort) en
+ * rustige inkt voor "overgeslagen". Overgeslagen is geen status maar een
+ * mededeling; een derde kleurvlak op een kaart die al een versheidsbadge draagt
+ * maakt het scherm luider zonder iets toe te voegen.
+ */
+function BankRunOutcome({ result }: { result: ConnectionResult }) {
+  if (result.outcome === 'skipped') {
+    const text =
+      result.skipReason === 'link-broken'
+        ? 'Niet bijgewerkt — de verbinding met je bank is kwijt.'
+        : result.skipReason === 'rate-limited'
+          ? 'Niet gesynchroniseerd — de laatste verzoeken van vandaag houden we vrij voor als je ze zelf nodig hebt.'
+          : `Niet gesynchroniseerd — bankgegevens gaan hooguit één keer per uur automatisch mee.${fromTime(
+              result.nextEligibleAt,
+            )}`
+    const broken = result.skipReason === 'link-broken'
+    return (
+      <p
+        className={`text-xs ${broken ? 'text-negative' : 'text-[var(--ink-2)]'}`}
+        data-testid="bank-run-outcome"
+      >
+        {text} Gebruik &laquo;Synchroniseer nu&raquo; om het zelf te doen.
+      </p>
+    )
+  }
+
+  if (result.outcome === 'error') {
+    return (
+      <p className="text-xs text-negative" data-testid="bank-run-outcome">
+        Niet gelukt — {result.error ?? 'probeer het later opnieuw.'}
+      </p>
+    )
+  }
+
+  const nieuw = result.itemsSynced ?? 0
+  return (
+    <p className="text-xs text-positive" data-testid="bank-run-outcome">
+      {nieuw === 0
+        ? 'Bijgewerkt — geen nieuwe transacties.'
+        : `Bijgewerkt — ${nieuw} nieuwe ${nieuw === 1 ? 'transactie' : 'transacties'}.`}
+    </p>
+  )
+}
+
 export function SyncReportModal({ open, onClose }: SyncReportModalProps) {
-  const { state, triggerGlobalSync, acknowledgePartial } = useGlobalSync()
+  const { state, triggerGlobalSync, acknowledgePartial, getBankAttempts, noteBankAttempt } =
+    useGlobalSync()
   const { addToast } = useToast()
 
   const [data, setData] = useState<ConnectionsData | null>(null)
+  const [banks, setBanks] = useState<LinkedAccountView[]>([])
+  /**
+   * Kon de bankronde niet geladen worden? Op de header-knop is stil terugvallen
+   * juist (daar is prijzen verversen het doel), maar dít is het diagnose-scherm:
+   * hier is een ontbrekende sectie het antwoord op de vraag die de gebruiker
+   * kwam stellen. Dus een expliciete regel in plaats van stilte.
+   */
+  const [bankLoadFailed, setBankLoadFailed] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [syncingId, setSyncingId] = useState<string | null>(null)
@@ -95,7 +170,23 @@ export function SyncReportModal({ open, onClose }: SyncReportModalProps) {
     setLoading(true)
     setLoadError(null)
     try {
-      const res = await fetch('/api/integrations/connections', { cache: 'no-store' })
+      // De bank-leesronde loopt parallel en is niet-fataal (zie
+      // `fetchBankSyncTargets`): geen bankkoppelingen betekent geen sectie, geen
+      // foutmelding over een functie die de gebruiker misschien niet gebruikt.
+      const [res, bankRes] = await Promise.all([
+        fetch('/api/integrations/connections', { cache: 'no-store' }),
+        fetch('/api/bank-connect/linked-accounts', { cache: 'no-store' }).catch(() => null),
+      ])
+      if (bankRes?.ok) {
+        const bankJson = (await bankRes.json().catch(() => null)) as {
+          accounts?: LinkedAccountView[]
+        } | null
+        setBanks(Array.isArray(bankJson?.accounts) ? bankJson.accounts : [])
+        setBankLoadFailed(false)
+      } else {
+        setBanks([])
+        setBankLoadFailed(true)
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const json = (await res.json()) as ConnectionsData
       setData(json)
@@ -256,30 +347,92 @@ export function SyncReportModal({ open, onClose }: SyncReportModalProps) {
     }
   }
 
+  // ── Handmatige sync van één bankrekening ─────────────────────────────
+  //
+  // Bewust ONGEREMD door de uur-rem: die geldt alleen voor het automatische
+  // meeliften op de globale knop. Dit is een expliciete opdracht van de
+  // gebruiker — precies de uitweg die de blauwe melding aanbiedt. De harde grens
+  // blijft de 10/dag-rem in de database.
+  async function handleBankSync(id: string) {
+    if (syncingId || testingId) return
+    setSyncingId(id)
+    // Ook een handmatige sync kost een tik van de dagrem. Zonder deze stempel is
+    // de eerstvolgende "Alles synchroniseren" meteen weer een tik.
+    noteBankAttempt(id)
+    try {
+      const res = await fetch('/api/bank-connect/sync', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ connection_account_id: id }),
+      })
+      const json = await res.json().catch(() => null)
+      if (!res.ok) {
+        const message = typeof json?.error === 'string'
+          ? json.error
+          : 'Synchroniseren is niet gelukt — probeer het later opnieuw.'
+        addToast({ type: 'error', title: 'Sync-fout', message })
+      } else {
+        const nieuw = Number(json?.new ?? 0)
+        addToast({
+          type: 'success',
+          title: 'Bankrekening bijgewerkt',
+          message: nieuw === 0
+            ? 'Geen nieuwe transacties — je stond al bij.'
+            : `${nieuw} nieuwe ${nieuw === 1 ? 'transactie' : 'transacties'} opgehaald.`,
+        })
+      }
+      // Verse `last_synced_at` en dagteller ophalen — die sturen zowel de
+      // versheidsbadge als de vraag of deze rekening straks weer meelift.
+      await loadConnections()
+    } catch {
+      addToast({ type: 'error', title: 'Netwerkfout', message: 'Sync kon niet worden uitgevoerd.' })
+    } finally {
+      setSyncingId(null)
+    }
+  }
+
   // ── Globale "Alles synchroniseren"-knop ─────────────────────────────
 
   const handleSyncAll = useCallback(async () => {
     if (!data) return
     if (state.phase === 'syncing') return
+    // De poging-stempels op het moment van klikken uitlezen, niet in een memo:
+    // ze wonen in een ref en veranderen zonder render (zie `getBankAttempts`).
+    const bankTargets: BankSyncTarget[] = toBankSyncTargets(banks, {
+      attempts: getBankAttempts(),
+    })
     await triggerGlobalSync({
       exchanges: data.exchanges,
       wallets: data.wallets,
-      pricesOnly: data.exchanges.length + data.wallets.length === 0,
+      banks: bankTargets,
+      pricesOnly: data.exchanges.length + data.wallets.length + bankTargets.length === 0,
     })
-  }, [data, state.phase, triggerGlobalSync])
+  }, [data, state.phase, triggerGlobalSync, banks, getBankAttempts])
 
   // ── Render ─────────────────────────────────────────────────────────
 
-  const totalConnections = (data?.exchanges.length ?? 0) + (data?.wallets.length ?? 0)
+  const totalConnections =
+    (data?.exchanges.length ?? 0) + (data?.wallets.length ?? 0) + banks.length
 
   const summary = useMemo(() => {
     if (!data) return null
-    const all = [...data.exchanges, ...data.wallets]
-    const errored = all.filter((c) => c.lastSyncError).length
-    const synced = all.filter((c) => c.lastSyncedAt && !c.lastSyncError).length
-    const never = all.filter((c) => !c.lastSyncedAt && !c.lastSyncError).length
+    // Bankkoppelingen tellen mee als koppeling. Hun "fout" is niet een
+    // `lastSyncError`-kolom maar het server-afgeleide oordeel `linked-broken`
+    // (zie `LinkedAccountView.health`) — dat is de enige plek waar over een
+    // bankverbinding geoordeeld wordt.
+    const all = [
+      ...data.exchanges.map((c) => ({ error: Boolean(c.lastSyncError), synced: Boolean(c.lastSyncedAt) })),
+      ...data.wallets.map((c) => ({ error: Boolean(c.lastSyncError), synced: Boolean(c.lastSyncedAt) })),
+      ...banks.map((b) => ({
+        error: b.health.state === 'linked-broken',
+        synced: Boolean(b.last_synced_at),
+      })),
+    ]
+    const errored = all.filter((c) => c.error).length
+    const synced = all.filter((c) => c.synced && !c.error).length
+    const never = all.filter((c) => !c.synced && !c.error).length
     return { errored, synced, never, total: all.length }
-  }, [data])
+  }, [data, banks])
 
   return (
     <BottomSheet open={open} onClose={onClose} title="Sync-rapport" size="full" initialMobileHeight="80vh">
@@ -411,6 +564,65 @@ export function SyncReportModal({ open, onClose }: SyncReportModalProps) {
                   linkedAssetHref={`/core/assets/${row.linkedAssetType}`}
                   linkedAssetName={row.linkedAssetName}
                 />
+              )
+            })}
+          </ConnectionSection>
+        )}
+
+        {/* Bankrekeningen ──────────────────────────────────────────── */}
+        {data && bankLoadFailed && (
+          <ConnectionSection title="Bankrekeningen" description="">
+            <div
+              role="alert"
+              className="border border-[var(--border-ed)] bg-[var(--subtle)] px-4 py-3 text-xs text-[var(--ink-2)]"
+            >
+              <span>Bankkoppelingen konden niet worden geladen.</span>{' '}
+              <button
+                type="button"
+                onClick={() => void loadConnections()}
+                className="font-medium underline underline-offset-2 hover:no-underline"
+              >
+                Opnieuw proberen
+              </button>
+            </div>
+          </ConnectionSection>
+        )}
+        {banks.length > 0 && (
+          <ConnectionSection
+            title="Bankrekeningen"
+            description="Liften mee op elke sync, maar hooguit één keer per uur per rekening. Handmatig synchroniseren kan altijd."
+          >
+            {banks.map((row) => {
+              const result = state.perConnection[row.id]
+              const linkLost = row.health.state === 'linked-broken'
+              const status = computeFreshness(
+                row.last_synced_at,
+                linkLost ? 'Verbinding kwijt — verbind opnieuw met je bank.' : null,
+              )
+              return (
+                <ConnectionCard
+                  key={row.id}
+                  status={status}
+                  label={bankSyncLabel(row)}
+                  sublabel={row.carrier_name ?? undefined}
+                  lastSyncedAt={row.last_synced_at}
+                  errorMessage={linkLost ? 'Verbinding kwijt — verbind opnieuw met je bank.' : null}
+                  syncing={syncingId === row.id || state.phase === 'syncing'}
+                  onSync={() => void handleBankSync(row.id)}
+                  // Alleen een link als er ook écht een dragende rekening is;
+                  // zonder `bank_account_id` zou "Gekoppeld aan …" een koppeling
+                  // suggereren die niet bestaat. De naam staat dan al in het
+                  // sublabel, dus er gaat niets verloren.
+                  linkedAssetHref={row.bank_account_id ? bankManualHref(row.bank_account_id) : undefined}
+                  linkedAssetName={row.bank_account_id ? row.carrier_name ?? undefined : undefined}
+                >
+                  <div className="space-y-1">
+                    {result?.kind === 'bank' && <BankRunOutcome result={result} />}
+                    <p className="font-mono text-[11px] tabular-nums text-[var(--ink-3)]">
+                      {effectiveDailyRequests(row)}/{BANK_DAILY_REQUEST_LIMIT} verzoeken vandaag
+                    </p>
+                  </div>
+                </ConnectionCard>
               )
             })}
           </ConnectionSection>

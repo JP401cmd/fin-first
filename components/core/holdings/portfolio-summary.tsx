@@ -10,10 +10,11 @@
  *      uitgaven heeft ingericht.
  *
  * Period-selector is gekoppeld aan dezelfde state als de BenchmarkComparison-
- * grafiek beneden — `benchmarkComparison.portfolio.returnPct` bevat al een
- * time-weighted return per periode (`lib/benchmark-comparison.ts:514`).
- * Wanneer comparison nog niet geladen is valt de cell terug op de naïef-
- * return over alle holdings (totalValue vs totalCost).
+ * grafiek beneden — `benchmarkComparison.portfolio.returnPct` is de tijdgewogen
+ * return over die periode uit `lib/benchmark-comparison.ts` (single source; deze
+ * cell rekent niets zelf uit). Dat veld is `null` zodra de koershistorie
+ * ontbreekt; de cell toont dan een streepje. Alleen bij periode 'Alles' staat
+ * hier het eigen sinds-aankoop-rendement (totalValue vs totalCost).
  */
 
 import { useCallback, useState, type ReactNode } from 'react'
@@ -93,25 +94,39 @@ export function PortfolioSummary({
 
   const [box3Open, setBox3Open] = useState(false)
 
-  // Rendement over de gekozen periode. Op 'all' valt de strip terug op de
-  // naïef return (value − cost / cost) zodat er altijd iets staat, ook als
-  // benchmark-comparison nog laadt.
+  // Rendement over de gekozen periode.
+  //   • 'Alles' = het rendement sinds aankoop op de inleg (value − cost / cost).
+  //     Dat is een correct, eigen getal en hangt niet van koershistorie af.
+  //   • Elke andere periode komt uitsluitend uit de benchmark-motor. Levert die
+  //     `null` (geen maandelijkse koersobservaties), dan tonen we een streepje
+  //     i.p.v. het sinds-aankoop-getal met een periodelabel eronder — dat las
+  //     als een periode-rendement dat het niet is (bugkaart testbug-ffa902).
+  const sincePurchasePct = totalCost > 0 ? ((totalValue - totalCost) / totalCost) * 100 : 0
   const periodReturnPct =
-    activePeriod.id === 'all' || !comparison
-      ? totalCost > 0
-        ? ((totalValue - totalCost) / totalCost) * 100
-        : 0
-      : comparison.portfolio.returnPct
+    activePeriod.id === 'all'
+      ? sincePurchasePct
+      : comparison?.portfolio.returnPct ?? null
+
   const periodReturnEur =
     activePeriod.id === 'all'
       ? totalValue - totalCost
-      : (totalValue * periodReturnPct) / 100
+      : periodReturnPct !== null
+        ? (totalValue * periodReturnPct) / 100
+        : null
   const periodReturnEurLabel =
-    periodReturnEur >= 0 ? `+${fc(periodReturnEur)}` : `${fc(periodReturnEur)}`
+    periodReturnEur === null
+      ? null
+      : periodReturnEur >= 0
+        ? `+${fc(periodReturnEur)}`
+        : `${fc(periodReturnEur)}`
   const periodReturnSub =
     activePeriod.id === 'all'
       ? `${periodReturnEurLabel} sinds aankoop`
-      : `${periodReturnEurLabel} over ${activePeriod.label.toLowerCase()}`
+      : periodReturnEurLabel !== null
+        ? `${periodReturnEurLabel} ${activePeriod.windowLabel}`
+        : comparison
+          ? 'koershistorie ontbreekt'
+          : 'wordt berekend…'
 
   const todayLabel =
     todayChangePct !== null && todayChangeEur !== null
@@ -140,9 +155,17 @@ export function PortfolioSummary({
     },
     {
       kicker: 'Rendement',
-      amount: `${periodReturnPct >= 0 ? '+' : ''}${periodReturnPct.toFixed(1)}%`,
+      amount:
+        periodReturnPct === null
+          ? '—'
+          : `${periodReturnPct >= 0 ? '+' : ''}${periodReturnPct.toFixed(1)}%`,
       sub: periodReturnSub,
-      variant: periodReturnPct >= 0 ? 'positive' : 'negative',
+      variant:
+        periodReturnPct === null
+          ? 'neutral'
+          : periodReturnPct >= 0
+            ? 'positive'
+            : 'negative',
     },
     {
       kicker: 'Vandaag',

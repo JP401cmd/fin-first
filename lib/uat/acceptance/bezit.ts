@@ -378,6 +378,20 @@ const criteria: AcceptanceCriterion[] = [
       source: 'components/app/app-setup/app-link-gate.tsx (generiek koppelscherm) + components/core/deepenings/crypto-holdings-tab.tsx / investment-holdings-tab.tsx (filter has_holdings_tracking===false op alle assets van het type → candidates; endpoint /api/assets/toggle-holdings)',
     },
   },
+  {
+    workflow: 'WF-BEZIT-26',
+    scenarioId: 'UAT-BEZIT-26',
+    titel: 'Portfoliorendement vergelijken met AEX/MSCI World/S&P 500 (tijdgewogen, periode-gebonden)',
+    kriticiteit: 'BELANGRIJK',
+    persona: 'willem',
+    given: 'Persona Willem Jansen met minstens twee aandelen-holdings (drempel voor een zinvolle vergelijking). `GET /api/benchmark-comparison?period=<id>` levert `compareToBenchmarks` op basis van de portefeuillehistorie (`buildPortfolioHistory`) en live Yahoo Finance-koersreeksen per index (`^AEX`, `IWDA.AS`, `^GSPC`), met een synthetische fallback per benchmark wanneer die koersreeks ontbreekt.',
+    when: 'De gebruiker opent de Aandelen-holdings-app (`components/core/holdings-client.tsx` / `portfolio-summary.tsx`) en bekijkt de benchmark-grafiek (`BenchmarkComparisonChart`), wisselt van periode (1m/3m/6m/1j/all — `TIME_PERIODS`).',
+    then: 'Het benchmarkvenster volgt de gekozen periode (`resolvePeriodStart`) — dezelfde functie knipt zowel de Yahoo-fetch als de vergelijking, dus venster en cijfers kunnen niet uiteenlopen (vóór deze release werd altijd de VOLLEDIGE historie opgehaald, los van de periodekeuze). Het portfoliorendement is tijdgewogen (TWR: r_t = V_t/(V_{t-1}+F_t)-1, samengesteld over de periode) — nooit inleg-vervuild doordat stortingen als koerswinst meetellen. Ontbreekt er koershistorie voor het portfoliorendement (`gap: \'no_price_history\'`), dan toont de UI GEEN percentage en GEEN alpha voor dat venster — nooit een misleidend cijfer of stille 0%. Bij minder dan twee holdings is de vergelijking niet beschikbaar (zie de drempel-randgeval in UAT-BEZIT-12). Elke `GET`-respons draagt `code: \'GEEN_HOLDINGS\'` bij lege portefeuille en gebruikt de gedeelde error-envelope (`unauthorized()`/`serverError()`) i.p.v. een losse foutvorm — een echte DB-/RLS-fout op de holdings-query wordt niet meer stil als "geen holdings" gepresenteerd.',
+    assertion: {
+      kind: 'consistency',
+      source: 'app/api/benchmark-comparison/route.ts + lib/benchmark-comparison.ts#resolvePeriodStart/compareToBenchmarks/buildPortfolioHistory/fetchAllRealBenchmarkData + components/app/benchmark-comparison-chart.tsx + components/core/holdings/portfolio-summary.tsx — live Yahoo Finance-afhankelijk, geen hand-narekenbaar exact-cijfer; consistentie-eis is venster-identiek tussen fetch en vergelijking, zie lib/architecture/calculations.ts#portfolio-benchmarkvergelijking',
+    },
+  },
 ]
 
 export const BEZIT_ACCEPTANCE: AcceptanceSet = {

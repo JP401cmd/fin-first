@@ -28,16 +28,16 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Bezit — acceptatiecriteria dekking', () => {
-  it('heeft precies één criterium per WF-BEZIT-01..25', () => {
+  it('heeft precies één criterium per WF-BEZIT-01..26', () => {
     const numbers = BEZIT_ACCEPTANCE.criteria.map((c) => {
       const m = /^WF-BEZIT-(\d+)$/.exec(c.workflow)
       if (!m) throw new Error(`Onverwacht workflow-id: ${c.workflow}`)
       return Number(m[1])
     })
-    const expectedRange = Array.from({ length: 25 }, (_, i) => i + 1)
+    const expectedRange = Array.from({ length: 26 }, (_, i) => i + 1)
     expect(numbers.slice().sort((a, b) => a - b)).toEqual(expectedRange)
     // Geen duplicaten
-    expect(new Set(numbers).size).toBe(25)
+    expect(new Set(numbers).size).toBe(26)
   })
 
   it('vermeldt voor elk exact-criterium een expected + source', () => {

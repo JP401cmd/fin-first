@@ -25,15 +25,19 @@
  *    server-seed in cashflow-cards-loader.tsx projecteert nog steeds ALLE vier
  *    de kaarten, dus dit is puur een landings-reductie.
  *
- * De MODUS-AFHANKELIJKE reducties raken Volledig niet: `simple` is false, dus
- * `compact`/de CF-2-filter/het afwijkende raster doen daar niets.
+ *  · CF-3 — het venster-label ("in augustus tot nu toe") staat ALLEEN in
+ *    Volledig, onder de KPI van de Transacties-kaart. HERZIEN 10 aug 2026 na een
+ *    melding van een testgebruiker; eerder gaf deze call-site `subAmount`
+ *    onvoorwaardelijk door ("optie A"). De reden van CF-3 hangt aan het CIJFER:
+ *    het label bestaat om te voorkomen dat het maandcijfer verward wordt met de
+ *    30-dagen-cijfers op /overzicht/cashflow/transacties. In Eenvoudig toont de
+ *    compacte kaart sinds CF-1 helemaal geen KPI meer — er is dan niets om een
+ *    venster bij te zetten, en het label werd losse tekst onder een label. Valt
+ *    het cijfer weg, dan valt de reden voor het label weg.
  *
- * Volledig is echter NIET onveranderd, en die nuance hoort hier te staan i.p.v.
- * een te ruime "byte-identiek"-claim: CF-3 geeft `subAmount={card.kpiWindow}`
- * ONVOORWAARDELIJK door, dus de Transacties-kaart krijgt in Volledig een extra
- * regel onder de KPI ("in augustus tot nu toe"). Sterker nog, dat venster-label
- * is op dit moment ALLEEN in Volledig zichtbaar: de compacte kaart (CF-1) rendert
- * `subAmount` niet. Zie het besluitpunt op de Fase 2-kaart.
+ * De MODUS-AFHANKELIJKE reducties raken Volledig niet: `simple` is false, dus
+ * `compact`/de CF-2-filter/het afwijkende raster/de CF-3-gating doen daar niets.
+ * Volledig blijft dus wat het was, inclusief de venster-regel onder de KPI.
  */
 
 import { useState } from 'react'
@@ -98,11 +102,12 @@ export function CashflowLandingCards({ cards }: { cards: CashflowCard[] }) {
             kpi={card.kpi}
             status={card.status}
             subText={card.subText}
-            /* CF-3 — venster-label ("in augustus tot nu toe"), in Volledig onder
-               de KPI en in Eenvoudig onder het label. Bewust in BEIDE modi: de
-               verwarring die CF-3 moet wegnemen (maandcijfer vs. de 30-dagen-
-               cijfers op de transactiepagina) speelt juist in Eenvoudig. */
-            subAmount={card.kpiWindow}
+            /* CF-3 — venster-label ("in augustus tot nu toe") onder de KPI,
+               ALLEEN in Volledig. In Eenvoudig draagt de compacte kaart geen
+               cijfer (CF-1), dus is er ook geen venster te duiden; de gating
+               zit hier op de call-site en niet in `LeverageCard`, zodat de
+               gedeelde shell generiek blijft. */
+            subAmount={simple ? null : card.kpiWindow}
             href={card.href}
             tooltip={card.tooltip}
             compact={simple}
@@ -161,14 +166,12 @@ export function CashflowLandingCardsSkeleton() {
           >
             <div className="flex items-center gap-2.5">
               <div className="h-8 w-8 shrink-0 rounded-lg bg-[var(--subtle)]" />
-              {/* Label + de venster-regel die de compacte kaart sinds CF-3 kan
-                  dragen. Zelfde afweging als in de volledige tak: het raster
-                  rekt de drie tegels toch al gelijk, dus reserveren kost niets
-                  en voorkomt de krimp zodra de Transacties-kaart zijn label
-                  meebrengt. */}
+              {/* Alleen het label — de compacte kaart draagt sinds de CF-3-
+                  herziening (10 aug 2026) geen venster-regel meer, dus een
+                  gereserveerde tweede regel zou hier gegarandeerd inklappen
+                  zodra de echte kaarten binnenkomen. */}
               <div className="min-w-0 flex-1">
                 <div className="h-5 w-24 bg-[var(--subtle)] sm:h-6" />
-                <div className="mt-0.5 h-3 w-32 bg-[var(--subtle)]" />
               </div>
             </div>
           </div>

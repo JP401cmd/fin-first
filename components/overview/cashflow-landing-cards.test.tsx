@@ -3,8 +3,10 @@
  *
  * In **Volledig** blijft de landing wat hij was: vier kaarten met KPI,
  * venster-regel, status-dot en chevron-uitklap. In **Eenvoudig** vervalt de
- * Forecast-kaart (CF-2) en renderen de resterende drie compact (CF-1): één
- * regel met icoon + label, zonder cijfers, status-dot of drilldown.
+ * Forecast-kaart (CF-2), renderen de resterende drie compact (CF-1): één
+ * regel met icoon + label, zonder cijfers, status-dot of drilldown, en blijft
+ * ook het venster-label weg (CF-3, herzien 10 aug 2026 — zonder cijfer is er
+ * geen venster te duiden).
  *
  * Elk van die drie is los te breken zonder dat de ander het merkt — de
  * `compact`-prop kan verdwijnen terwijl de filter blijft, of andersom — dus ze
@@ -153,24 +155,29 @@ describe('CashflowLandingCards — CF-1: compacte kaarten in Eenvoudig', () => {
     expect(screen.getByText('Transacties')).toBeTruthy()
   })
 
-  // CF-3 in Eenvoudig (besluit optie A op de Fase 2-kaart). Eerder slikte de
-  // compacte tak van `LeverageCard` de `subAmount` op, waardoor het venster-label
-  // uitsluitend in Volledig verscheen — een item uit de eenvoudige-weergave-audit
-  // dat alleen de volledige weergave verbeterde. De verwarring die CF-3 moet
-  // wegnemen (maandcijfer vs. de 30-dagen-cijfers op de transactiepagina) speelt
-  // juist hier, dus dit is het oppervlak waar het label het hardst nodig is.
-  it('CF-3 — het venster-label staat óók op de compacte kaart', () => {
+  // CF-3, HERZIEN 10 aug 2026 na een melding van een testgebruiker. Het
+  // venster-label bestaat om het maandcijfer te onderscheiden van de
+  // 30-dagen-cijfers op de transactiepagina — het hangt dus aan het CIJFER. In
+  // Eenvoudig toont de compacte kaart sinds CF-1 geen KPI meer, dus staat het
+  // label daar onder een kaal label zonder iets te duiden. Deze twee asserties
+  // pinnen de herziening vast: weg in Eenvoudig, ongewijzigd in Volledig (zie
+  // de suite hierboven).
+  it('CF-3 — het venster-label staat NIET op de compacte kaart', () => {
     const { container } = renderCards('simple')
-    expect(screen.getByText('in augustus tot nu toe')).toBeTruthy()
-    // En wel op de Transacties-kaart, niet ergens los in de DOM.
+    expect(screen.queryByText('in augustus tot nu toe')).toBeNull()
     const card = cardByHref(container, '/overzicht/cashflow/transacties')
-    expect(card.textContent).toContain('in augustus tot nu toe')
+    expect(card.textContent).not.toContain('tot nu toe')
   })
 
-  it('CF-3 — een compacte kaart zonder venster krijgt geen lege regel', () => {
+  it('CF-3 — geen enkele compacte kaart draagt nog een venster-regel', () => {
     const { container } = renderCards('simple')
-    const budget = cardByHref(container, '/overzicht/cashflow/budget')
-    expect(budget.textContent).not.toContain('augustus')
+    for (const href of [
+      '/overzicht/cashflow/budget',
+      '/overzicht/cashflow/transacties',
+      '/overzicht/cashflow/vaste-lasten',
+    ]) {
+      expect(cardByHref(container, href).textContent).not.toContain('augustus')
+    }
   })
 
   it('toont geen status-dot meer (de compacte kaart draagt geen status)', () => {
@@ -203,5 +210,18 @@ describe('CashflowLandingCardsSkeleton — volgt de weergavemodus', () => {
 
   it('reserveert drie tegels in Eenvoudig — evenveel als er daadwerkelijk komen', () => {
     expect(skeletonTiles('simple').length).toBe(3)
+  })
+
+  // Vormpin, niet alleen een telling: sinds de CF-3-herziening draagt de
+  // compacte kaart één tekstregel (het label). Reserveert de skeleton er twee,
+  // dan klapt elke tegel in zodra de echte kaarten binnenkomen — precies de CLS
+  // die deze fallback moest voorkomen.
+  it('reserveert in Eenvoudig één tekstregel per tegel (geen venster-regel meer)', () => {
+    const tiles = skeletonTiles('simple')
+    for (const tile of Array.from(tiles)) {
+      const textColumn = tile.querySelector('.min-w-0')
+      expect(textColumn).toBeTruthy()
+      expect(textColumn!.children.length).toBe(1)
+    }
   })
 })

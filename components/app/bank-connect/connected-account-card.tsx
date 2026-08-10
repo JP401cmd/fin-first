@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { RefreshCw, Unlink, Building2, AlertTriangle, Clock } from 'lucide-react'
 import { SyncStatusBadge } from './sync-status-badge'
 import type { LinkedAccountView } from '@/lib/truelayer/linked-account'
+import { BANK_DAILY_REQUEST_LIMIT, effectiveDailyRequests } from '@/lib/bank-connection-status'
 import { startBankRelink } from '@/lib/truelayer/start-relink'
 
 /**
@@ -200,20 +201,15 @@ export function ConnectedAccountCard({ account, onSync, onDisconnect, onReauthor
    */
   const relinkOfferedAbove = linkLost || health.expiringSoon
 
-  // Teller weergeven, maar alleen als hij over vandáág gaat.
-  //
-  // `Europe/Amsterdam` en niet `toISOString()`: de dagsleutel in
-  // `rate_limit_reset_date` wordt sinds de atomaire reservering
-  // (public.reserve_bank_sync_slot) in Nederlandse tijd bepaald. Met een
-  // UTC-vergelijking hier zou de kaart tussen middernacht en 02:00 "0/10" tonen
-  // en de knop vrijgeven terwijl de server nog op de volle teller staat — de
-  // gebruiker klikt dan tegen een 429 aan. `en-CA` levert YYYY-MM-DD.
+  // Teller weergeven, maar alleen als hij over vandáág gaat — de regel (inclusief
+  // de Europe/Amsterdam-dagsleutel en het waarom daarvan) woont in
+  // `effectiveDailyRequests`, naast de limiet zelf. Stond hier eerst met de hand;
+  // de derde lezer had de controle vergeten en toonde de stand van gisteren.
   //
   // Vriendelijkheid, geen grens: de echte rem is de RPC. Deze kaart mag hooguit
   // te vroeg blokkeren, nooit iets doorlaten dat de server zou weigeren.
-  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Amsterdam' }).format(new Date())
-  const dailyRequests = account.rate_limit_reset_date === today ? account.daily_requests : 0
-  const canSync = dailyRequests < 10 && !linkLost
+  const dailyRequests = effectiveDailyRequests(account)
+  const canSync = dailyRequests < BANK_DAILY_REQUEST_LIMIT && !linkLost
 
   async function handleSync() {
     setSyncing(true)

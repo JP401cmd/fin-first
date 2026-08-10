@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
   TrendingUp,
@@ -16,6 +16,12 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { HEFBOOM_CONFIG } from '@/lib/hefboom-config'
+import {
+  BRIEFING_ROTATION_COOKIE,
+  BRIEFING_ROTATION_MAX_AGE,
+  nextRotationOffset,
+  rotateEntries,
+} from '@/lib/briefing/rotation'
 import { formatTimestamp } from '@/lib/format'
 import { ShareDialog, type ShareContent } from '@/components/app/share-dialog'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
@@ -74,6 +80,9 @@ const CATEGORY_CONFIG: Record<
 
 /** Maximum aantal kaartjes — 3-koloms × 2 rijen = 6. */
 const MAX_BRIEFING_ENTRIES = 6
+
+/** Eenvoudige weergave: 3 briefjes naast elkaar op sm+, 1 op mobiel. */
+const SIMPLE_BRIEFING_ENTRIES = 3
 
 /** Lees het gedeelde privacy-niveau (zelfde key als de vrijheidskaart-generator). */
 function readPrivacyLevel(): 'anonymous' | 'named' | 'full' {
@@ -148,6 +157,7 @@ export function BriefingPanel({
   headline,
   weekHistory,
   simpleMode = false,
+  rotationOffset = 0,
 }: {
   entries: BriefingEntry[]
   /** ISO-tijdstip waarop de briefing voor vandaag is vastgezet ("Bijgewerkt …"). */
@@ -165,12 +175,20 @@ export function BriefingPanel({
   weekHistory?: BriefingWeekHistoryItem[]
   /**
    * Eenvoudige weergave (display_mode === 'simple'): verberg de
-   * "Jouw vrijheid deze week"-hero en toon de drie belangrijkste briefjes
-   * (de eerste entries, door de engine al op prioriteit geordend) in hetzelfde
-   * 3-koloms grid als de volledige weergave — alleen begrensd op 3. Default
-   * false → volledige briefing (max 6).
+   * "Jouw vrijheid deze week"-hero en toon een ROULEREND venster over de zes
+   * briefjes in hetzelfde 3-koloms grid als de volledige weergave — 3 naast
+   * elkaar op sm+, 1 op mobiel. Ook de "Vorige weken"-terugblik onderaan valt
+   * weg: Eenvoudig gaat over nú, de historie hoort bij de volledige weergave.
+   * Default false → volledige briefing (max 6, geen rotatie).
    */
   simpleMode?: boolean
+  /**
+   * Startpositie van het rouleer-venster in Eenvoudig (server-prop uit de
+   * rotatiecookie). Bij élke vernieuwing van /overzicht schuift hij één plek op
+   * — zie lib/briefing/rotation.ts voor het waarom van de cookie. Genegeerd in
+   * de volledige weergave: die toont alle zes al.
+   */
+  rotationOffset?: number
 }) {
   // Override-state: alleen gezet ná een succesvolle handmatige ververs. Zonder
   // override blijven de server-props de bron van waarheid — remount-veilig.
@@ -213,10 +231,26 @@ export function BriefingPanel({
     ((d: FreedomCardData) => HTMLCanvasElement | Promise<HTMLCanvasElement>) | null
   >(null)
 
-  // In Eenvoudig tonen we de drie belangrijkste briefjes (zelfde 3-koloms grid,
-  // begrensd op 3); anders het volledige grid (max 6).
-  const entryLimit = simpleMode ? 3 : MAX_BRIEFING_ENTRIES
-  const shownEntries = (override?.entries ?? entries).slice(0, entryLimit)
+  // In Eenvoudig rouleert een venster van 3 over dezelfde zes briefjes die de
+  // volledige weergave toont; anders het volledige grid (max 6, ongeroteerd).
+  const pool = (override?.entries ?? entries).slice(0, MAX_BRIEFING_ENTRIES)
+  const shownEntries = simpleMode
+    ? rotateEntries(pool, rotationOffset, SIMPLE_BRIEFING_ENTRIES)
+    : pool
+  const canRotate = simpleMode && pool.length > 1
+
+  // Schuif de cursor één plek op voor de VOLGENDE vernieuwing van /overzicht.
+  // Bewust ná het renderen (effect) en in een cookie: de server leest 'm bij de
+  // volgende load en rendert meteen het juiste venster — geen naspringende
+  // kaartjes. Zonder rotatiemateriaal (0 of 1 briefje) blijft de cursor staan.
+  useEffect(() => {
+    if (!canRotate || typeof document === 'undefined') return
+    const secure = typeof location !== 'undefined' && location.protocol === 'https:'
+    document.cookie =
+      `${BRIEFING_ROTATION_COOKIE}=${nextRotationOffset(rotationOffset)}; path=/; ` +
+      `max-age=${BRIEFING_ROTATION_MAX_AGE}; samesite=lax${secure ? '; secure' : ''}`
+  }, [canRotate, rotationOffset])
+
   const shownRefreshedAt = override?.refreshedAt ?? refreshedAt ?? null
   const shownHeadline = override?.headline ?? headline ?? null
   const refreshable = canRefresh && !usedToday && !refreshing && execReady
@@ -419,14 +453,23 @@ export function BriefingPanel({
       ) : (
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-3 sm:gap-x-0 sm:gap-y-10">
           {shownEntries.map((entry, i) => (
-            <BriefingCard key={entry.id} entry={entry} index={i} />
+            <BriefingCard
+              key={entry.id}
+              entry={entry}
+              index={i}
+              // Eenvoudig op mobiel: één briefje. De andere twee blijven in de
+              // DOM maar zijn display:none — op sm+ vormen ze weer de drie
+              // kolommen. Rouleren doet het venster als geheel, dus mobiel ziet
+              // achtereenvolgens briefje 1, 2, 3, …
+              hiddenOnMobile={simpleMode && i > 0}
+            />
           ))}
         </div>
       )}
 
       {!simpleMode && shownEntries.length > 0 && <BriefingColophon />}
 
-      {weekHistory && weekHistory.length > 0 && (
+      {!simpleMode && weekHistory && weekHistory.length > 0 && (
         <BriefingWeekHistory items={weekHistory} />
       )}
 
@@ -644,7 +687,16 @@ function BriefingImpactBadge({ impact }: { impact?: BriefingEntry['impact'] }) {
   )
 }
 
-function BriefingCard({ entry, index = 0 }: { entry: BriefingEntry; index?: number }) {
+function BriefingCard({
+  entry,
+  index = 0,
+  hiddenOnMobile = false,
+}: {
+  entry: BriefingEntry
+  index?: number
+  /** Onder sm verbergen (Eenvoudig toont op mobiel één briefje). */
+  hiddenOnMobile?: boolean
+}) {
   const config = CATEGORY_CONFIG[entry.category]
   // Defensief: een bevroren snapshot kan na schema-evolutie een onbekende
   // categorie bevatten. Liever het kaartje overslaan dan /overzicht laten
@@ -694,8 +746,10 @@ function BriefingCard({ entry, index = 0 }: { entry: BriefingEntry; index?: numb
   // Krant-kolom i.p.v. kaart: geen doos/afronding, wél verticale scheidslijn
   // tussen kolommen (border-l, gereset op de eerste van elke rij) — spiegelt
   // de reference-plaat. Op mobiel stapelen ze zonder rail (grid-gap scheidt).
+  // `hidden sm:flex` i.p.v. een los `flex` — beide zijn display-utilities, dus
+  // ze naast elkaar zetten zou op stylesheet-volgorde leunen i.p.v. op intentie.
   const base =
-    'group relative flex min-w-0 flex-col animate-fade-up ' +
+    `group relative ${hiddenOnMobile ? 'hidden sm:flex' : 'flex'} min-w-0 flex-col animate-fade-up ` +
     'sm:px-6 sm:border-l sm:border-[var(--border-ed)] ' +
     'sm:[&:nth-child(3n+1)]:border-l-0 sm:[&:nth-child(3n+1)]:pl-0 ' +
     'sm:[&:nth-child(3n)]:pr-0'
@@ -732,4 +786,4 @@ function BriefingColophon() {
   )
 }
 
-export { MAX_BRIEFING_ENTRIES }
+export { MAX_BRIEFING_ENTRIES, SIMPLE_BRIEFING_ENTRIES }

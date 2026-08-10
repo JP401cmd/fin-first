@@ -10,7 +10,9 @@
       "Bash(echo \"EXIT: $?\")",
       "Bash(node -e \"console.log\\(require.resolve\\('vitest'\\)\\)\")",
       "Bash(git check-ignore *)",
-      "Bash(echo \"exit=$?\")"
+      "Bash(echo \"exit=$?\")",
+      "mcp__notion__notion-create-pages",
+      "Bash(git rev-list *)"
     ]
   }
 }

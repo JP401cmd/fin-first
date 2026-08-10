@@ -1,10 +1,13 @@
 /**
  * PeriodeSelector — de periode-keuze op /overzicht/cashflow/transacties.
  *
- * Wat hier bewaakt wordt is TXN-2 (faseplan "Eenvoudige weergave" §8, fase 2):
- * in **Eenvoudig** zijn er twee periodes (30 dagen / jaar), in **Volledig**
- * blijven het er vier. Plus het randgeval dat een reductie altijd oplevert: een
- * keuze die in Volledig gemaakt is en in Eenvoudig niet bestaat, mag niet in een
+ * Wat hier bewaakt wordt is TXN-2 (faseplan "Eenvoudige weergave" §8, fase 2,
+ * herzien 10 aug 2026): in **Eenvoudig** zijn er drie periodes (30 dagen /
+ * maand / jaar), in **Volledig** blijven het er vier. Maand hoorde eerst bij de
+ * diepte, maar is de natuurlijke eenheid waarin mensen hun uitgaven lezen — en
+ * Eenvoudig is de standaard voor nieuwe profielen. Alleen kwartaal blijft
+ * Volledig-only. Plus het randgeval dat een reductie altijd oplevert: een keuze
+ * die in Volledig gemaakt is en in Eenvoudig niet bestaat, mag niet in een
  * tab-strip zonder actieve tab eindigen.
  *
  * De reductie raakt UITSLUITEND de keuze — `resolvePeriodWindow` (de
@@ -38,11 +41,23 @@ describe('PeriodeSelector — periodetabs per weergavemodus', () => {
     expect(tabs.map((t) => t.textContent)).toEqual(['30 dagen', 'Maand', 'Kwartaal', 'Jaar'])
   })
 
-  it('toont in Eenvoudig alleen "30 dagen" en "Jaar"', () => {
+  it('toont in Eenvoudig "30 dagen", "Maand" en "Jaar" — alleen kwartaal ontbreekt', () => {
     renderSelector('simple')
     const tabs = screen.getAllByRole('tab')
-    expect(tabs).toHaveLength(2)
-    expect(tabs.map((t) => t.textContent)).toEqual(['30 dagen', 'Jaar'])
+    expect(tabs).toHaveLength(3)
+    expect(tabs.map((t) => t.textContent)).toEqual(['30 dagen', 'Maand', 'Jaar'])
+  })
+
+  it('houdt de maand-tab in Eenvoudig selecteerbaar en actief', () => {
+    // De kern van deze kaart: de melder verwachtte een kalendermaand-selectie
+    // op de standaardweergave. 'month' moet daar dus niet alleen bestaan, maar
+    // ook als actieve tab kunnen staan (geen stille terugval naar 30 dagen).
+    renderSelector('simple', 'month')
+    const active = screen
+      .getAllByRole('tab')
+      .filter((t) => t.getAttribute('aria-selected') === 'true')
+    expect(active).toHaveLength(1)
+    expect(active[0].textContent).toBe('Maand')
   })
 })
 
@@ -59,15 +74,15 @@ describe('resolvePeriodForMode — terugval zonder lege staat', () => {
     }
   })
 
-  it('valt in Eenvoudig terug op 30 dagen voor maand en kwartaal', () => {
-    expect(resolvePeriodForMode('month', 'simple')).toBe('30d')
+  it('laat maand in Eenvoudig staan en valt alleen voor kwartaal terug op 30 dagen', () => {
+    expect(resolvePeriodForMode('month', 'simple')).toBe('month')
     expect(resolvePeriodForMode('quarter', 'simple')).toBe('30d')
   })
 
   it('geeft altijd een periode die in Eenvoudig ook echt een tab heeft', () => {
     // De strip mag nooit zonder actieve tab staan: elke terugval landt op een
     // key die de gefilterde tab-lijst daadwerkelijk rendert.
-    renderSelector('simple', resolvePeriodForMode('month', 'simple'))
+    renderSelector('simple', resolvePeriodForMode('quarter', 'simple'))
     const active = screen.getAllByRole('tab').filter((t) => t.getAttribute('aria-selected') === 'true')
     expect(active).toHaveLength(1)
     expect(active[0].textContent).toBe('30 dagen')

@@ -12,6 +12,7 @@ import { ChatSettingsPopover } from './chat-settings-popover'
 import type { LocalChatOverview } from '@/lib/ai/local/local-chat-context'
 import type { LocalKnowledgeItem } from '@/lib/ai/local/knowledge-context'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
+import { acquireOverlay } from '@/lib/overlay-signal'
 import { hasSubscription } from '@/lib/feature-registry'
 import { AiSubscriptionUpsell } from '@/components/app/ai-subscription-upsell'
 import { FinDots } from '@/components/app/fin-dots'
@@ -698,6 +699,22 @@ export function ChatPanel() {
     }
   }, [isOpen])
 
+  // Verberg de zwevende nav-pill zolang het paneel als overlay openstaat
+  // (ADR 0039, fase 2 voor de gedocumenteerde 'chat'-uitzondering). Zonder dit
+  // signaal bleef de pill (`z-[60]`) op <1024px bovenop het full-screen paneel
+  // staan en dekte hij de sticky footerknoppen af ("Terug"/"Verstuur melding"
+  // in de meldflow, het invoerveld in het gesprek).
+  //
+  // Bewust NIET bij `isPinned`: gepind is het paneel een gedokte zijbalk die de
+  // pagina-inhoud opzij duwt (`--chat-sidebar-width`) i.p.v. afdekt — de pagina
+  // blijft bruikbaar, dus de navigatie-affordance hoort te blijven staan. De
+  // release hangt aan `isOpen`/`isPinned` (niet aan unmount), zodat de pill
+  // direct bij sluiten terugkomt.
+  useEffect(() => {
+    if (!isOpen || isPinned) return
+    return acquireOverlay()
+  }, [isOpen, isPinned])
+
   // Bij sluiten terug naar de chat: het venster hoort de volgende keer weer als
   // gesprek te openen, niet halverwege een meldformulier.
   //
@@ -1109,16 +1126,21 @@ export function ChatPanel() {
   // Wanneer de chat gesloten is, rendert ChatPanel niets.
   if (!isOpen) return null
 
-  // Panel classes differ between floating (default) and pinned (sidebar) mode
+  // Panel classes differ between floating (default) and pinned (sidebar) mode.
+  // Niet-gepind = modale overlay → `z-[70]`, de standaardlaag BOVEN de zwevende
+  // nav-pill (`z-[60]`); zie CLAUDE.md §Modal-conventie en ADR 0039. Gepind
+  // blijft `z-50`: dat is een gedokte zijbalk die de pagina opzij duwt, geen
+  // modaal venster (en op `lg`+ bestaat de pill sowieso niet).
   const panelClasses = isPinned
     ? 'fixed top-0 right-0 z-50 flex h-screen w-[420px] flex-col bg-[var(--paper)] shadow-2xl border-l border-[var(--border-ed)]'
-    : 'fixed bottom-0 right-0 z-50 flex h-[100dvh] w-full flex-col bg-[var(--paper)] shadow-2xl md:bottom-6 md:right-6 md:h-[700px] md:w-[480px] md:rounded-[var(--r-lg)] md:border md:border-[var(--border-ed)] md:origin-bottom-right motion-safe:md:animate-[wh-melding-in_560ms_cubic-bezier(.2,.8,.2,1)]'
+    : 'fixed bottom-0 right-0 z-[70] flex h-[100dvh] w-full flex-col bg-[var(--paper)] shadow-2xl md:bottom-6 md:right-6 md:h-[700px] md:w-[480px] md:rounded-[var(--r-lg)] md:border md:border-[var(--border-ed)] md:origin-bottom-right motion-safe:md:animate-[wh-melding-in_560ms_cubic-bezier(.2,.8,.2,1)]'
 
   return (
     <>
-      {/* Mobile backdrop (not shown when pinned) */}
+      {/* Mobile backdrop (not shown when pinned) — zelfde laag als het paneel;
+          het paneel staat er ná in de DOM en schildert dus bovenop. */}
       {!isPinned && (
-        <div className="fixed inset-0 z-40 bg-black/20 md:hidden" onClick={veiligSluiten} />
+        <div className="fixed inset-0 z-[70] bg-black/20 md:hidden" onClick={veiligSluiten} />
       )}
 
       {/* Panel */}

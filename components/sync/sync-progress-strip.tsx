@@ -1,9 +1,14 @@
 'use client'
 
 // Compacte progress-strip die zowel onder de header-knop als bovenin het sync-
-// rapport gebruikt wordt. Toont een determinate progress bar over álle jobs
-// (koppelingen + prijsrefresh) maar in de tekst tellen we alleen koppelingen
-// — de prijsrefresh is een impliciete vervolgstap, geen aparte "koppeling".
+// rapport gebruikt wordt. Balk én tekst tellen BRONNEN: elke job die een verzoek
+// doet, de prijzenverversing daarbij inbegrepen.
+//
+// De tekst telde tot 10 aug 2026 alleen "koppelingen" en liet de prijsrefresh
+// bewust weg. Dat was een tweede noemer naast die van de eindmelding, en dan
+// spreekt één ronde zichzelf tegen ("2 van 2 bronnen" naast een teller die er 1
+// ziet). Eén definitie — zie de noot bij `State.totalJobs`. Welke bron nú aan de
+// beurt is, staat er in de `full`-variant naast (`currentJob.label`).
 
 import { useGlobalSync } from './global-sync-provider'
 
@@ -21,32 +26,11 @@ export function SyncProgressStrip({ variant = 'compact' }: SyncProgressStripProp
     ? Math.round((state.completedJobs / state.totalJobs) * 100)
     : 0
 
-  const completedConnections = Object.values(state.perConnection).filter(
-    (r) => r.kind !== 'prices',
-  ).length
-  const totalConnections = state.totalConnections
-  const pricesDone = Boolean(state.perConnection.prices)
-  const onPricesStep = state.currentJob?.kind === 'prices'
-
   const errors = Object.values(state.perConnection).filter((r) => r.outcome === 'error').length
 
-  // Bouw de count-tekst contextueel op:
-  //   • Tijdens koppelingen-fase: "1/2 koppelingen"
-  //   • Tijdens prijzen-fase:     "2 koppelingen · prijzen verversen…"
-  //   • Geen koppelingen, alleen prijzen: "Prijzen verversen…"
-  let countLabel: string
-  if (totalConnections === 0 && state.pricesIncluded) {
-    countLabel = onPricesStep || !pricesDone ? 'Prijzen verversen…' : 'Prijzen ververst'
-  } else if (onPricesStep) {
-    const word = totalConnections === 1 ? 'koppeling' : 'koppelingen'
-    countLabel = `${completedConnections} ${word} · prijzen verversen…`
-  } else {
-    const word = totalConnections === 1 ? 'koppeling' : 'koppelingen'
-    countLabel = `${completedConnections}/${totalConnections} ${word}`
-    if (state.pricesIncluded && !pricesDone) {
-      countLabel += ' · + prijzen'
-    }
-  }
+  const countLabel = `${state.completedJobs}/${state.totalJobs} ${
+    state.totalJobs === 1 ? 'bron' : 'bronnen'
+  }`
 
   if (variant === 'compact') {
     return (

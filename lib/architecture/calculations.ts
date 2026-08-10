@@ -1097,6 +1097,51 @@ export const CALCULATIONS: Calculation[] = [
     note: 'Bewust geen cross-user-aggregatie (privacy): de peer is volledig synthetisch, opgebouwd uit publieke NL-statistieken. Vermogen/inkomen zijn tier:"measured" (CBS-leeftijdsbasis) maar de huishoudtype-verdeling is GERAAMD — inkomen via CBS-equivalentiefactoren (ruw = gestandaardiseerd × factor), vermogen via een gemodelleerde CBS-gegronde factor; UI-badge "Geraamde referentie (CBS-basis)". Gemodelleerde uitkomsten (gezondheidsscore, vrijheidsleeftijd) zijn tier:"modelled". Zie ADR 0018.',
   },
   {
+    id: 'portfolio-benchmarkvergelijking',
+    title: 'Portfoliorendement vs. index (tijdgewogen)',
+    domain: 'Vermogen',
+    summary:
+      'Zet het rendement van de beleggingsportefeuille op /core/assets/holdings af tegen AEX, MSCI World en S&P 500 over één gekozen venster. Twee harde regels dragen de motor: portfolio én benchmarks worden op hetzelfde venster geknipt, en "rendement" is uitsluitend koersbeweging — nooit inleg.',
+    inputs: [
+      'investment_holdings (units, avg_purchase_price, current_price, purchase_date)',
+      'investment_transactions (buy/sell/dividend, units, price_per_unit, date)',
+      'valuations (entity_type=holding, maandelijkse koerswaardering per positie)',
+      'Yahoo Finance chart-API per index-ticker (^AEX, IWDA.AS, ^GSPC), venster-gebonden',
+    ],
+    outputs: [
+      'portfoliorendement % over het venster (of null = niet meetbaar)',
+      'rendementsindex (basis 100) per maand, zonder kasstroomeffect',
+      'indexrendement % per benchmark over hetzelfde venster',
+      'alpha per benchmark (of null zonder meetbaar portfoliorendement)',
+    ],
+    formula:
+      'venster: resolvePeriodStart(periode) → windowStart (één bron voor de API-fetch én de knip). TWR: r_t = V_t / (V_{t−1} + F_t) − 1 met F_t = netto externe kasstroom van maand t; rendement = Π(1 + r_t) − 1. Benchmark: reeks knippen op windowStart, hernormaliseren naar 100, rendement = laatste/eerste − 1. alpha = portfoliorendement − indexrendement, beide uit hetzelfde venster.',
+    files: [
+      'lib/benchmark-comparison.ts',
+      'app/api/benchmark-comparison/route.ts',
+      'components/app/benchmark-comparison-chart.tsx',
+      'components/core/holdings/portfolio-summary.tsx',
+    ],
+    functions: [
+      'resolvePeriodStart',
+      'clipBenchmarkSeries',
+      'buildPortfolioHistory',
+      'computeTwrSeries',
+      'calculateTimeWeightedReturn',
+      'compareToBenchmarks',
+      'benchmarkInterval',
+    ],
+    constants: [
+      { label: 'Vensters', value: 'TIME_PERIODS: 1M/3M/6M/1J/YTD/Alles — elk met een windowLabel dat de UI bij het percentage toont' },
+      { label: 'Kasstroomweging', value: 'Vól aan het begin van de maand (géén Modified Dietz-halvering): dat maakt "maand zonder koersbeweging = exact 0%" hard' },
+      { label: 'Benchmark-interval', value: '≤95 dagen 1d · ≤400 dagen 1wk · daarboven 1mo — dichtheid volgt het venster' },
+      { label: 'Cache', value: 'module-level Map, TTL 1 uur, sleutel = benchmark:interval:venster, hard afgekapt op 50 entries' },
+    ],
+    elementIds: ['as-vermogen', 'sp-vermogen'],
+    note:
+      'Bugkaart testbug-ffa902. Twee defecten die dit getal onbetrouwbaar maakten. (1) VENSTER: de route zette de benchmark-startdatum op het begin van de VOLLEDIGE portfoliohistorie en compareToBenchmarks knipte alleen de portfolio-snapshots — een "1J"-selectie toonde daardoor een ~3-jaars indexrendement (S&P +85,0%), een X-as van sep \'23 t/m aug \'26 en een alpha die een 3-jaars getal van een 1-jaars getal aftrok. De synthetische fallback was juist wél periode-correct, dus het defect trad alleen op mét echte Yahoo-data. Nu leveren route en motor hun venster uit dezelfde resolvePeriodStart, en clipBenchmarkSeries knipt bovendien defensief (een ruimere cache-reeks valt alsnog goed). (2) INLEG ≠ RENDEMENT: buildPortfolioHistory waardeerde élke historische maand tegen de koers van VANDAAG (het commentaar beloofde een interpolatie die er niet was) en calculateTimeWeightedReturn was simpelweg V_eind/V_start − 1 — geen TWR, geen kasstroomcorrectie, ondanks naam en docblock. Drie keer bijkopen tegen een vaste koers las als "+200% rendement"; op productie werd dat +352,2%. De snapshot draagt nu netFlow (externe kasstroom per maand) en pricedFromHistory (had élke bijdragende positie een échte koersobservatie: een valuations-rij voor die maand, of in de lopende maand de actuele koers). computeTwrSeries ketent de maandrendementen en haalt de kasstroom uit de noemer. EERLIJKHEIDSREGEL: ontbreekt één koersobservatie in het venster, dan is het rendement niet meetbaar en geeft de motor null terug — de UI toont dan géén percentage, géén alpha en géén portfoliolijn, met een uitleg wat er ontbreekt. Dat is bewust: het alternatief (de waardelijn tonen) plot stortingen als koerswinst. Ook meegenomen: de sell-fractie boekt de kostprijs nu via de gemiddelde-kostprijsmethode af, en maanden vóór de eerste transactie worden niet meer met de stukken van vandaag gevuld. Copy: "de beste benchmark" → "de sterkste index in deze periode", en elk percentage draagt zijn venster (windowLabel), want een rendement zonder periode is niet te lezen; valt de motor terug op de volledige historie (te weinig snapshots in de periode), dan meldt windowFallback dat en zegt de UI "over de beschikbare historie" i.p.v. het periodelabel. PortfolioSummary consumeert dit getal (consume, don\'t recompute) en toont een streepje bij null; alleen op "Alles" staat daar het eigen sinds-aankoop-rendement, dat niet van koershistorie afhangt. Dekking: lib/benchmark-comparison.test.ts (venster per periode, inleg-geeft-0%, alpha-symmetrie, koersdekking) + components/app/benchmark-comparison-chart.test.tsx (as binnen het venster, venster-label, verbergen zonder koershistorie); de module had daarvóór NUL tests.',
+  },
+  {
     id: 'huis-strategie-trigger',
     title: 'Eigen-huis-strategie — verkoop-/opeethypotheek-trigger (kernel-native)',
     domain: 'Toekomst (FIRE)',

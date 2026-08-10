@@ -6,10 +6,10 @@ import {
   type TimePeriod,
   type BenchmarkId,
   TIME_PERIODS,
-  BENCHMARKS,
   getAlphaDescription,
 } from '@/lib/benchmark-comparison'
 import { TrendingUp, TrendingDown, Minus, BarChart3, Info } from 'lucide-react'
+import { useModuleHex } from '@/components/app/module-color-provider'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { ChartTips } from '@/components/editorial/chart-tips'
 import { getBenchmarkComparisonTips } from '@/lib/chart-tips'
@@ -41,7 +41,22 @@ export const BenchmarkComparisonChart = memo(function BenchmarkComparisonChart({
   } | null>(null)
   const periods = availablePeriods || TIME_PERIODS
 
-  const PORTFOLIO_COLOR = '#f59e0b' // amber
+  // Module-identiteit: de holdings-pagina hoort bij Overzicht/De Kern, dus de
+  // portfoliolijn volgt het gekozen kern-accent (kleurconventie CLAUDE.md) —
+  // geen hardcoded hex.
+  const PORTFOLIO_COLOR = useModuleHex('kern', 500)
+
+  // Rendement is `null` zodra de koershistorie ontbreekt: dan tonen we géén
+  // portfoliolijn, géén percentage en géén alpha. Het alternatief — de
+  // waardelijn tonen — zou stortingen als koerswinst plotten.
+  const portfolioReturnPct = comparison?.portfolio.returnPct ?? null
+  const hasPortfolioReturn = portfolioReturnPct !== null
+
+  // Het venster dat daadwerkelijk gebruikt is; bij een terugval op de volledige
+  // historie is het periodelabel niet waar.
+  const windowLabel = comparison?.windowFallback
+    ? 'over de beschikbare historie'
+    : activePeriod.windowLabel
 
   // Build chart data from comparison result
   const chartData = useMemo(() => {
@@ -258,11 +273,13 @@ export const BenchmarkComparisonChart = memo(function BenchmarkComparisonChart({
   }
 
   const bestBenchmark = sortedByReturn[0] ?? null
-  const alphaVsBest = bestBenchmark ? getAlphaDescription(bestBenchmark.alpha) : null
+  const alphaVsBest =
+    bestBenchmark && bestBenchmark.alpha !== null
+      ? getAlphaDescription(bestBenchmark.alpha)
+      : null
 
   // Animation timings (800ms for complex multi-line chart)
   const lineAnim = hasEntered ? 'drawPath 800ms cubic-bezier(.22,1,.36,1) both' : 'none'
-  const fillAnim = hasEntered ? 'fadeInFill 250ms ease-out 520ms both' : 'none'
 
   return (
     <div ref={ref} className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6" data-testid="benchmark-comparison-section">
@@ -297,8 +314,8 @@ export const BenchmarkComparisonChart = memo(function BenchmarkComparisonChart({
               activePeriod: activePeriod.label,
               benchmarkCount: comparison.benchmarks.length,
               hasOutperformance:
-                comparison.benchmarks.length > 0
-                  ? comparison.portfolio.returnPct >
+                hasPortfolioReturn && comparison.benchmarks.length > 0
+                  ? portfolioReturnPct! >
                     Math.max(...comparison.benchmarks.map((b) => b.returnPct))
                   : null,
             })}
@@ -369,6 +386,7 @@ export const BenchmarkComparisonChart = memo(function BenchmarkComparisonChart({
                 textAnchor="middle"
                 fontSize="9"
                 fill="#a1a1aa"
+                data-testid="benchmark-x-label"
               >
                 {d.toLocaleDateString('nl-NL', { month: 'short', year: '2-digit' })}
               </text>
@@ -458,15 +476,24 @@ export const BenchmarkComparisonChart = memo(function BenchmarkComparisonChart({
         )}
       </div>
 
-      {/* Legend */}
+      {/* Legend — het venster staat erbij; een percentage zonder periode is
+          niet te lezen (precies de verwarring uit de melding). */}
       <div className="mt-3 flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-1.5">
-          <span className="inline-block h-0.5 w-4 rounded-full" style={{ backgroundColor: PORTFOLIO_COLOR }} />
-          <span className="text-[11px] font-medium text-[var(--ink-2)]">Jouw portfolio</span>
-          <span className={`text-[11px] font-semibold ${comparison.portfolio.returnPct >= 0 ? 'text-positive' : 'text-negative'}`}>
-            {comparison.portfolio.returnPct >= 0 ? '+' : ''}{comparison.portfolio.returnPct.toFixed(1)}%
-          </span>
-        </div>
+        <span
+          className="text-[10px] font-medium uppercase tracking-wide text-[var(--ink-4)]"
+          data-testid="benchmark-window-label"
+        >
+          Rendement {windowLabel}
+        </span>
+        {hasPortfolioReturn && (
+          <div className="flex items-center gap-1.5" data-testid="benchmark-portfolio-legend">
+            <span className="inline-block h-0.5 w-4 rounded-full" style={{ backgroundColor: PORTFOLIO_COLOR }} />
+            <span className="text-[11px] font-medium text-[var(--ink-2)]">Jouw portfolio</span>
+            <span className={`text-[11px] font-semibold ${portfolioReturnPct! >= 0 ? 'text-positive' : 'text-negative'}`}>
+              {portfolioReturnPct! >= 0 ? '+' : ''}{portfolioReturnPct!.toFixed(1)}%
+            </span>
+          </div>
+        )}
         {comparison.benchmarks.map((b) => (
           <div
             key={b.id}
@@ -489,43 +516,70 @@ export const BenchmarkComparisonChart = memo(function BenchmarkComparisonChart({
         ))}
       </div>
 
-      {/* Alpha summary */}
-      <div className="mt-4 space-y-2" data-testid="alpha-summary">
-        {comparison.benchmarks.map((b) => {
-          const desc = getAlphaDescription(b.alpha)
-          const AlphaIcon = b.alpha > 0 ? TrendingUp : b.alpha < 0 ? TrendingDown : Minus
-          return (
-            <div
-              key={b.id}
-              className="flex items-center gap-2 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2"
-              data-testid={`alpha-${b.id}`}
-            >
-              <AlphaIcon className={`h-3.5 w-3.5 ${desc.color}`} />
-              <span className="text-xs text-[var(--ink-2)] flex-1">
-                vs {b.name}
-              </span>
-              <span className={`text-xs font-semibold ${desc.color}`} data-testid={`alpha-value-${b.id}`}>
-                {b.alpha >= 0 ? '+' : ''}{b.alpha.toFixed(1)}% alpha
-              </span>
-            </div>
-          )
-        })}
-      </div>
+      {/* Alpha summary — alleen zinvol met een meetbaar portfoliorendement.
+          Alpha t.o.v. een getal dat er niet is, is geen getal. */}
+      {hasPortfolioReturn && (
+        <div className="mt-4 space-y-2" data-testid="alpha-summary">
+          {comparison.benchmarks.map((b) => {
+            if (b.alpha === null) return null
+            const desc = getAlphaDescription(b.alpha)
+            const AlphaIcon = b.alpha > 0 ? TrendingUp : b.alpha < 0 ? TrendingDown : Minus
+            return (
+              <div
+                key={b.id}
+                className="flex items-center gap-2 rounded-lg border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2"
+                data-testid={`alpha-${b.id}`}
+              >
+                <AlphaIcon className={`h-3.5 w-3.5 ${desc.color}`} />
+                <span className="text-xs text-[var(--ink-2)] flex-1">
+                  vs {b.name}
+                </span>
+                <span className={`text-xs font-semibold ${desc.color}`} data-testid={`alpha-value-${b.id}`}>
+                  {b.alpha >= 0 ? '+' : ''}{b.alpha.toFixed(1)}% alpha
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Contextual message */}
-      {alphaVsBest && (
+      {hasPortfolioReturn && alphaVsBest && (
         <div className="mt-3 flex items-start gap-2 rounded-lg border border-kern-100 bg-kern-50/50 p-3" data-testid="benchmark-context-message">
           <Info className="h-3.5 w-3.5 shrink-0 text-kern-500 mt-0.5" />
           <p className="text-xs text-[var(--ink-2)] leading-relaxed">
             <span className="font-medium">Benchmarkvergelijking:</span>{' '}
-            Je portfolio rendement van{' '}
-            <span className={`font-semibold ${comparison.portfolio.returnPct >= 0 ? 'text-positive' : 'text-negative'}`}>
-              {comparison.portfolio.returnPct >= 0 ? '+' : ''}{comparison.portfolio.returnPct.toFixed(1)}%
+            Je portfolio deed{' '}
+            <span className={`font-semibold ${portfolioReturnPct! >= 0 ? 'text-positive' : 'text-negative'}`}>
+              {portfolioReturnPct! >= 0 ? '+' : ''}{portfolioReturnPct!.toFixed(1)}%
             </span>
-            {' '}over deze periode.{' '}
+            {' '}{windowLabel}.{' '}
             {bestBenchmark && (
               <span>
-                De beste benchmark ({bestBenchmark.name}) behaalde{' '}
+                De sterkste index in deze periode was {bestBenchmark.name} met{' '}
+                <span className="font-medium">
+                  {bestBenchmark.returnPct >= 0 ? '+' : ''}
+                  {bestBenchmark.returnPct.toFixed(1)}%
+                </span>.
+              </span>
+            )}
+          </p>
+        </div>
+      )}
+
+      {/* Geen meetbaar portfoliorendement — zeg wát er ontbreekt en waarom we
+          liever niets tonen dan iets dat de inleg meet. */}
+      {!hasPortfolioReturn && (
+        <div className="mt-3 flex items-start gap-2 rounded-lg border border-kern-100 bg-kern-50/50 p-3" data-testid="benchmark-portfolio-unavailable">
+          <Info className="h-3.5 w-3.5 shrink-0 text-kern-500 mt-0.5" />
+          <p className="text-xs text-[var(--ink-2)] leading-relaxed">
+            <span className="font-medium">Je eigen lijn ontbreekt nog.</span>{' '}
+            Voor je rendement {windowLabel} zijn maandelijkse koerswaarderingen
+            van je posities nodig. Zonder die historie zouden we je inleg meten
+            in plaats van je rendement — dat laten we liever weg.{' '}
+            {bestBenchmark && (
+              <span>
+                De sterkste index in deze periode was {bestBenchmark.name} met{' '}
                 <span className="font-medium">
                   {bestBenchmark.returnPct >= 0 ? '+' : ''}
                   {bestBenchmark.returnPct.toFixed(1)}%

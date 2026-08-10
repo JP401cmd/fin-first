@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { loadDashboardData } from '@/lib/dashboard-data-loader'
 import { withCanonicalHealthScore } from '@/lib/overview/canonical-health'
@@ -13,6 +14,7 @@ import {
   type FreedomHeroProps,
 } from '@/lib/briefing/overview-briefing'
 import { getOrCreateWeeklySnapshot, canRefreshToday } from '@/lib/briefing/snapshot'
+import { BRIEFING_ROTATION_COOKIE, parseRotationOffset } from '@/lib/briefing/rotation'
 import { loadTopMarketBriefing } from '@/lib/briefing/news-market'
 import { collectAandachtspunten } from '@/lib/aandachtspunten-loader'
 import type { Aandachtspunt } from '@/lib/aandachtspunten'
@@ -77,6 +79,7 @@ export async function OverzichtSecondaryLoader({
     checkinForBriefing,
     pageStatusInfo,
     pageStatusMinimized,
+    cookieStore,
   ] = await Promise.all([
     loadDashboardData(supabase),
     loadFinData(supabase),
@@ -89,9 +92,16 @@ export async function OverzichtSecondaryLoader({
     // cache() → gratis binnen deze batch) en hangt verder van de route/user-id af.
     computePageStatusInfo(supabase, '/overzicht'),
     userId ? readMinimizedLevel(supabase, userId, '/overzicht') : Promise.resolve(null),
+    // Rotatiecursor van de briefing in Eenvoudig — een cookie, zodat de server
+    // meteen het juiste venster rendert (zie lib/briefing/rotation.ts).
+    cookies(),
   ])
 
   const { dashboardData: rawDashboardData, activeWidgets, allWidgetPrefs } = dashboardResult
+
+  const briefingRotation = parseRotationOffset(
+    cookieStore.get(BRIEFING_ROTATION_COOKIE)?.value,
+  )
 
   // Gezondheidsscore — consume, don't recompute (zie lib/overview/canonical-
   // health.ts). De widget-bundel berekent de score onafhankelijk én altijd
@@ -230,6 +240,7 @@ export async function OverzichtSecondaryLoader({
         briefingRefreshedAt={briefingRefreshedAt}
         briefingDataChanged={briefingDataChanged}
         briefingWeekHistory={briefingWeekHistory}
+        briefingRotation={briefingRotation}
         briefingCanRefresh={briefingCanRefresh}
         freedomHero={freedomHero}
         briefingHeadline={briefingHeadline}

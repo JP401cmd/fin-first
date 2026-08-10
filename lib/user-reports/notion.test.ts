@@ -101,6 +101,36 @@ describe('buildReportPagePayload — CC-actie en Severity', () => {
   })
 })
 
+describe('buildReportPagePayload — Prioriteit', () => {
+  it.each([
+    ['bug', 'P1'],
+    ['vraag', 'P3'],
+    ['aanbeveling', 'P3'],
+  ] as const)('%s → Prioriteit %s', (type, expected) => {
+    const payload = buildReportPagePayload(
+      mkRow({ report_type: type, screen_label: type === 'aanbeveling' ? null : 'Budgetoverzicht' }),
+      null,
+    )
+    expect(props(payload).Prioriteit).toEqual({ select: { name: expected } })
+  })
+
+  it('staat op ELK kaartje — een prio-loze rij zakt weg onderin de queue-sortering', () => {
+    for (const type of ['bug', 'vraag', 'aanbeveling'] as const) {
+      const payload = buildReportPagePayload(mkRow({ report_type: type }), null)
+      expect(props(payload).Prioriteit).toBeDefined()
+    }
+  })
+
+  it('prio en ernst lopen bewust uiteen bij een bug: P1 naast Severity S2 - medium', () => {
+    // Severity = hoe erg het defect zelf is (onbekend bij binnenkomst → midden).
+    // Prioriteit = hoe snel we kijken (hoog, want iemand liep er echt tegenaan).
+    // Deze test staat er zodat niemand ze later "gelijktrekt voor de consistentie".
+    const bug = props(buildReportPagePayload(mkRow({ report_type: 'bug' }), null))
+    expect(bug.Prioriteit).toEqual({ select: { name: 'P1' } })
+    expect(bug.Severity).toEqual({ select: { name: 'S2 - medium' } })
+  })
+})
+
 describe('buildReportPagePayload — titel (incl. Europe/Amsterdam-datumgrens)', () => {
   // 23:30 UTC op 15 jan 2026 = 00:30 CET (winter, UTC+1) op 16 jan — een naive
   // UTC-substring zou '2026-01-15' geven; Amsterdam hoort '2026-01-16' te zijn.

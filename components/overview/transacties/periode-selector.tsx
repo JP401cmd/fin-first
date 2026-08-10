@@ -15,10 +15,14 @@ import type { PeriodKind } from '@/lib/transaction-insights'
  * waarde). Alle overige state (period/offset/label/canGoForward) komt van de
  * orchestrator; wijzigingen gaan terug via `onPeriodChange` / `onOffsetChange`.
  *
- * WEERGAVEMODUS (TXN-2): in **Eenvoudig** zijn er twee periodes — "30 dagen" en
- * "Jaar". Maand en kwartaal zijn diepte: wie zijn geldstroom per kwartaal wil
- * lezen, staat in Volledig. In **Volledig** staan alle vier de tabs
- * ongewijzigd. Dit is puur een keuze-reductie: hoe een periode wordt berekend
+ * WEERGAVEMODUS (TXN-2, herzien 10 aug 2026): in **Eenvoudig** zijn er drie
+ * periodes — "30 dagen", "Maand" en "Jaar". De oorspronkelijke reductie liet
+ * alleen 30 dagen en jaar staan, maar een kalendermaand is voor de meeste
+ * mensen juist de natuurlijke eenheid ("wat gaf ik in juli uit") — en omdat
+ * Eenvoudig de standaard is voor nieuwe profielen, was dat de eerste ervaring.
+ * Maand hoort dus bij de rust, niet bij de diepte. Alleen **Kwartaal** blijft
+ * diepte en staat uitsluitend in Volledig, waar alle vier de tabs ongewijzigd
+ * blijven. Dit is puur een keuze-reductie: hoe een periode wordt berekend
  * (`resolvePeriodWindow`) blijft in beide modi identiek.
  *
  * Design (Editorial Finance):
@@ -38,16 +42,16 @@ const PERIOD_TABS: { key: PeriodKind; label: string }[] = [
 ]
 
 /** De periodes die in Eenvoudig bestaan (TXN-2). Volgorde = tab-volgorde. */
-export const SIMPLE_PERIOD_KEYS: readonly PeriodKind[] = ['30d', 'year']
+export const SIMPLE_PERIOD_KEYS: readonly PeriodKind[] = ['30d', 'month', 'year']
 
 /**
  * De periode die in deze modus daadwerkelijk getoond kan worden.
  *
- * Nodig omdat de keuze bewaard blijft: wie in Volledig "Maand" koos (of via de
- * `?maand=`-deeplink binnenkomt) en daarna naar Eenvoudig schakelt, heeft een
- * periode geselecteerd die daar geen tab meer heeft. Zonder terugval zou de
- * tab-strip niets actiefs tonen. We vallen terug op '30d' — het dichtstbijzijnde
- * venster én de standaard van de pagina.
+ * Nodig omdat de keuze bewaard blijft: wie in Volledig "Kwartaal" koos en
+ * daarna naar Eenvoudig schakelt, heeft een periode geselecteerd die daar geen
+ * tab meer heeft. Zonder terugval zou de tab-strip niets actiefs tonen. We
+ * vallen terug op '30d' — het dichtstbijzijnde venster én de standaard van de
+ * pagina.
  *
  * Bewust een PURE functie op de bewaarde keuze in plaats van een effect dat de
  * state overschrijft: terugschakelen naar Volledig levert zo weer exact de
@@ -81,7 +85,7 @@ export function PeriodeSelector({
 
   const { mode } = useDisplayMode()
 
-  // Eenvoudig: twee periodes. Volledig: alle vier — ongewijzigd.
+  // Eenvoudig: drie periodes (kwartaal is diepte). Volledig: alle vier — ongewijzigd.
   const tabs = useMemo(
     () =>
       mode === 'simple'

@@ -16,8 +16,9 @@ Staat het token er wél, dan is dit commando een **vangnet**: het pakt alleen op
 1. **Nooit een dubbel kaartje.** Het script levert uitsluitend meldingen zónder `notion_page_id`. Schrijf na élk aangemaakt kaartje de `notion_page_id` terug vóór je aan de volgende begint — breekt de run halverwege af, dan pakt de volgende run alleen de rest.
 2. **`Status` is een status-property, geen select.** `{ status: { name: 'Nieuw' } }`. Dit is de bekendste valkuil van deze database; `{ select: … }` geeft een 400.
 3. **Alleen bestaande `Tags`-opties**, plus de vaste herkomst-tag `Testgebruiker`. Verzin geen zone-tags.
-4. **De schermafbeelding-link is kortlevend en gevoelig.** 48 uur geldig, en het is een bearer-credential: wie 'm kopieert haalt het beeld op zonder in te loggen. Plak 'm alleen in het kaartje, nergens anders — niet in de hoofdchat, niet in een samenvatting.
-5. **Geen persoonsgegevens in de terminaluitvoer.** Vat samen op aantallen en titels; citeer geen omschrijvingen of e-mailadressen in de hoofdchat.
+4. **`Prioriteit` en `Severity` lopen bij een bug bewust uiteen** — `P1` naast `S2 - medium`. Severity zegt hoe erg het defect zelf is (onbekend bij binnenkomst, dus een neutrale middenwaarde), Prioriteit zegt hoe snel we kijken (hoog, want een testgebruiker liep er in echt gebruik tegenaan). Trek ze niet gelijk "voor de consistentie"; stel bij triage liever de Severity bij.
+5. **De schermafbeelding-link is kortlevend en gevoelig.** 48 uur geldig, en het is een bearer-credential: wie 'm kopieert haalt het beeld op zonder in te loggen. Plak 'm alleen in het kaartje, nergens anders — niet in de hoofdchat, niet in een samenvatting.
+6. **Geen persoonsgegevens in de terminaluitvoer.** Vat samen op aantallen en titels; citeer geen omschrijvingen of e-mailadressen in de hoofdchat.
 
 ## Stappen
 
@@ -41,6 +42,7 @@ Gebruik `mcp__notion__notion-create-pages` op data source `d87e54c5-fb52-4607-a7
 | `Type` (select) | bug → `Bug` · vraag → `Vraag` · aanbeveling → `Feature` |
 | `Status` (status) | `Nieuw` |
 | `CC-actie` (select) | `Backlog` |
+| `Prioriteit` (select) | op élk kaartje — bug → `P1` · vraag → `P3` · aanbeveling → `P3` |
 | `Severity` (select) | alleen bij bug: `S2 - medium` |
 | `Tags` (multi_select) | `Testgebruiker` + één zone-tag uit `route`, alleen als die bestaat: `/beheer`→`BEHEER`, budget→`BUDGET`, belasting→`BELAST`, schuld→`SCHULD`, cash→`CASH`, `/toekomst`→`TOEK`, `/mijn`→`MIJN`, `/nieuws` of `/berichten`→`WILL`, `/onboarding`→`START`, `/overzicht`→`OVZ`. Geen match → alleen `Testgebruiker`. |
 | `Actual result` | `description` (max ~1900 tekens) |
@@ -52,7 +54,7 @@ Gebruik `mcp__notion__notion-create-pages` op data source `d87e54c5-fb52-4607-a7
 - kop "Wat ging er mis?" / "De vraag" / "De wens" + de volledige `description`
 - bij bug met `expected`: kop "Wat had de melder verwacht?" + de volledige tekst
 - callout 🔎: `Toestemming inzage: JA/NEE · Melder: <email>. Informatief — dit geeft geen technische toegang tot het account; neem contact op met de melder als je meer nodig hebt.`
-- kop "Technische context" + codeblok met `route`, `page_title`, `user_agent`, `viewport`, `app_version`, `id`, `created_at`
+- kop "Technische context" + codeblok met `route`, `page_title`, `user_agent`, `viewport`, `app_version`, `id`, `created_at` — open de fence als ` ```text `, anders raadt Notion een taal (het werd `javascript`) waar de automatische route `plain text` zet
 - is er een `screenshot_url`: een image-block met die URL, gevolgd door één regel "Signed link, geldig 48 uur — bron blijft Supabase (`<screenshot_path>`)."
 
 ### 3. Schrijf de koppeling terug

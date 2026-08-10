@@ -108,7 +108,7 @@ Nu (Eenvoudig): 4 landing-cards met KPI + rekening-pills + maandbanner; geldstro
 |---|---|---|
 | CF-1 ★ | De 4 kaarten in Eenvoudig compact (one-liner, zoals /toekomst) — nu is alleen de chevron weg | B |
 | CF-2 ★ | **Forecast-kaart in Eenvoudig verbergen** (4→3); route blijft bereikbaar. Forecast is geen landingsbelofte — de toekomst leeft op /toekomst | A |
-| CF-3 | Maandcijfers venster-labelen: "€ 0 ontvangen **in augustus tot nu toe**" — voorkomt verwarring naast de 30-dagen-cijfers op transacties (zelfde les als ADR 0073) | E |
+| CF-3 | Maandcijfers venster-labelen: "€ 0 ontvangen **in augustus tot nu toe**" — voorkomt verwarring naast de 30-dagen-cijfers op transacties (zelfde les als ADR 0073). **Alleen in Volledig** — herzien 10 aug 2026 na melding testgebruiker: de eerste uitvoering toonde het label in beide modi ("optie A"), maar in Eenvoudig draagt de compacte kaart sinds CF-1 géén cijfer meer, dus valt met het cijfer ook de reden voor het venster weg. Gating zit op de call-site (`cashflow-landing-cards.tsx`), niet in de gedeelde `LeverageCard`. | E |
 | CF-4 | Instellingenblok als disclosure, standaard dicht | C |
 
 ### /overzicht/cashflow/budget
@@ -128,7 +128,7 @@ Al goed: 6 analyseblokken verborgen. Maar vóór de inhoud staan nog: koppel-ban
 | # | Voorstel | Cat |
 |---|---|---|
 | TXN-1 ★ | Actie-rij in Eenvoudig: 1 primaire knop ("Nieuwe transactie") + "…"-menu (importeer, bank koppelen); koppel-banner alleen tonen zolang er 0 rekeningen gekoppeld zijn | B |
-| TXN-2 | Periode-tabs in Eenvoudig 4→2 (30 dagen / jaar) | B |
+| TXN-2 | Periode-tabs in Eenvoudig 4→3 (30 dagen / maand / jaar) — herzien 10 aug 2026 na melding testgebruiker: de reductie stond eerst op 2 (30 dagen / jaar), maar de kalendermaand is de eenheid waarin mensen hun uitgaven lezen én Eenvoudig is de standaard voor nieuwe profielen. Alleen kwartaal blijft Volledig-only. | B |
 | TXN-3 | Grenzenpotten-periodetabs (maand/kwartaal/jaar) in Eenvoudig alleen maand | B |
 | TXN-4 | Rekening-tabs: lange namen afkappen op korte labels | E |
 

@@ -96,6 +96,55 @@ function isWidgetAccessible(widgetId: string, features: FeatureAccessMap): boole
 /** Catalogus-id's voor een snelle geldigheidscheck (stale/verwijderde prefs). */
 const KNOWN_WIDGET_IDS = new Set(WIDGET_CATALOG.map(w => w.id))
 
+/** Dynamische (niet-catalogus) widget-id's: favorieten en grenzenpotten. */
+function isDynamicWidgetId(id: string): boolean {
+  return (
+    id.startsWith('budget_fav:') ||
+    id.startsWith('holding_fav:') ||
+    id.startsWith('spend_limit:')
+  )
+}
+
+/**
+ * Hoe een save-actie omgaat met prefs die NIET in de meegestuurde lijst zitten.
+ *
+ * - `'partial'` — resize/reorder/hide/add: de lijst is een bewerking van de
+ *   huidige indeling, geen nieuwe indeling. Alleen wat de gebruiker zelf
+ *   deactiveerde gaat op `enabled:false`; al het andere blijft ongemoeid.
+ * - `'replace'` — leegmaken / vul-dashboard / preset / auto-samenstellen: de
+ *   gebruiker vervangt (na bevestiging of wizard) de héle indeling, dus alles
+ *   wat er niet in zit gaat bewust uit.
+ */
+type SaveMode = 'partial' | 'replace'
+
+/**
+ * Bouwt de volledige `widget_prefs`-set die naar `/api/widgets` gaat. De route
+ * VERVANGT de hele kolom, dus deze merge is de enige bescherming van prefs die
+ * niet in de lokale grid-state zitten.
+ *
+ * Kern-invariant (Notion 2026-08-09-testbug-03b440 "Grenzenpot"): afwezig in
+ * `widgets` betekent NIET "uitgezet". De lokale `activeWidgets`-state is een
+ * gefilterde momentopname — `isWidgetVisible` haalt er tijdelijk onzichtbare
+ * prefs uit (budgetteren uit, feature uitgezet) en de lazy `useState`-seed mist
+ * prefs die de server ná mount injecteert (net aangemaakte grenzenpot of
+ * favoriet). Zulke prefs gaan hier ONGEWIJZIGD mee terug; alleen id's in
+ * `deactivatedIds` — wat de gebruiker in deze sessie daadwerkelijk uitzette —
+ * worden op `enabled:false` gezet. Zonder dat onderscheid wiste elke losse
+ * resize stilzwijgend een pot-widget die niet meer terug te halen is (de picker
+ * toont `spend_limit:*` bewust niet, ADR 0092 besluit 1).
+ */
+function mergeWidgetPrefsForSave(
+  widgets: WidgetPref[],
+  allPrefs: WidgetPref[],
+  deactivatedIds: ReadonlySet<string>,
+): WidgetPref[] {
+  const activeIds = new Set(widgets.map(w => w.id))
+  const untouched = allPrefs
+    .filter(p => !activeIds.has(p.id))
+    .map(p => (deactivatedIds.has(p.id) ? { ...p, enabled: false } : p))
+  return [...widgets.map(w => ({ ...w, enabled: true })), ...untouched]
+}
+
 /** Check if a widget should be visible: accessible + budget/holding data present */
 function isWidgetVisible(pref: WidgetPref, features: FeatureAccessMap, data: DashboardData): boolean {
   // Onbekende/verwijderde widget-id in opgeslagen prefs (bv. na het schrappen
@@ -205,16 +254,25 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Track pending debounced save for flush on unload/unmount
   const pendingWidgets = useRef<WidgetPref[] | null>(null)
+  // Id's die de gebruiker in DEZE sessie zelf uitzette (kruisje of een bewuste
+  // vervang-actie). Alleen deze mogen als `enabled:false` worden weggeschreven —
+  // zie mergeWidgetPrefsForSave. Blijft bewust een ref: het is geen render-input,
+  // en hij moet ook gelden voor saves die vóór de eerstvolgende router.refresh()
+  // vertrekken (`allPrefs` draagt de false dan nog niet).
+  const deactivatedIds = useRef<Set<string>>(new Set())
 
-  const performSave = useCallback(async (widgets: WidgetPref[]) => {
+  const performSave = useCallback(async (widgets: WidgetPref[], mode: SaveMode) => {
     setSaveError(null)
 
-    // Merge updated active widgets with disabled widgets from allPrefs
-    const activeIds = new Set(widgets.map(w => w.id))
-    const disabledPrefs = allPrefs
-      .filter(p => !activeIds.has(p.id))
-      .map(p => ({ ...p, enabled: false }))
-    const merged = [...widgets.map(w => ({ ...w, enabled: true })), ...disabledPrefs]
+    if (mode === 'replace') {
+      // Bewuste vervanging van de hele indeling: alles wat er niet in zit is
+      // vanaf nu uitgezet.
+      const activeIds = new Set(widgets.map(w => w.id))
+      for (const p of allPrefs) {
+        if (!activeIds.has(p.id)) deactivatedIds.current.add(p.id)
+      }
+    }
+    const merged = mergeWidgetPrefsForSave(widgets, allPrefs, deactivatedIds.current)
 
     try {
       const res = await fetch('/api/widgets', {
@@ -238,7 +296,9 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
       pendingWidgets.current = null
-      performSave(widgets)
+      // Debounced saves komen altijd uit resize/reorder/hide/add — bewerkingen
+      // van de huidige indeling, nooit een vervanging.
+      performSave(widgets, 'partial')
     }, 800)
   }, [performSave])
 
@@ -249,11 +309,10 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
         clearTimeout(saveTimer.current)
         const widgets = pendingWidgets.current
         pendingWidgets.current = null
-        const activeIds = new Set(widgets.map(w => w.id))
-        const disabledPrefs = allPrefs
-          .filter(p => !activeIds.has(p.id))
-          .map(p => ({ ...p, enabled: false }))
-        const merged = [...widgets.map(w => ({ ...w, enabled: true })), ...disabledPrefs]
+        // Zelfde merge-regels als performSave (gedeelde helper — de twee paden
+        // mogen niet uit elkaar lopen). Een geflushte debounce is per definitie
+        // 'partial'.
+        const merged = mergeWidgetPrefsForSave(widgets, allPrefs, deactivatedIds.current)
         navigator.sendBeacon('/api/widgets', new Blob(
           [JSON.stringify({ widgets: merged })],
           { type: 'application/json' }
@@ -317,6 +376,9 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
     if (widgetId.startsWith('holding_fav:') || widgetId.startsWith('budget_fav:')) {
       syncFavoriteRemoval(widgetId)
     }
+    // Dit is de ENIGE plek waar een losse widget bewust uit gaat. Zonder deze
+    // registratie zou de save 'm ongemoeid laten (afwezig ≠ uitgezet).
+    deactivatedIds.current.add(widgetId)
     setActiveWidgets(prev => {
       const updated = prev.filter(w => w.id !== widgetId)
       scheduleSave(updated)
@@ -325,6 +387,8 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
   }, [scheduleSave, syncFavoriteRemoval])
 
   const handleAdd = useCallback((widgetId: string) => {
+    // Weer toevoegen heft een eerdere hide in deze sessie op.
+    deactivatedIds.current.delete(widgetId)
     setActiveWidgets(prev => {
       const maxOrder = prev.reduce((max, w) => Math.max(max, w.order), 0)
       const def = getWidgetDef(widgetId)
@@ -344,7 +408,7 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
   const handleAutoApply = useCallback(async (newPrefs: WidgetPref[]) => {
     const reordered = reassignOrders(newPrefs.filter(p => isWidgetVisible(p, features, data)))
     setActiveWidgets(reordered)
-    await performSave(reordered)
+    await performSave(reordered, 'replace')
     setIsEditMode(false)
     setShowAddPicker(false)
     // Refresh server data so newly-favorited budgets appear in data.favoriteBudgets
@@ -361,7 +425,7 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
     // Immediate save (not debounced) — same pattern as handleAutoApply
     if (saveTimer.current) clearTimeout(saveTimer.current)
     pendingWidgets.current = null
-    await performSave(reordered)
+    await performSave(reordered, 'replace')
     setIsEditMode(false)
     setShowAddPicker(false)
     router.refresh()
@@ -384,29 +448,38 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
       size: w.sizes.includes(size) ? size : w.defaultSize,
       order: i,
     }))
+    // Grenzenpotten en favorieten horen hier net zo goed bij als de catalogus-
+    // widgets: zonder deze tak wist "vul dashboard" ze stil (ze staan niet in
+    // WIDGET_CATALOG, dus de fill-lijst hierboven bevat ze niet).
+    //
+    // Bron is `allPrefs` (de server-lijst), NIET alleen de lokale state: een pot
+    // die de server net injecteerde zit nog niet in `activeWidgets` en zou
+    // anders alsnog gewist worden — dezelfde stille-verlies-route als in
+    // mergeWidgetPrefsForSave. De lokale variant wint wel als hij er is, want
+    // die kan nog niet-opgeslagen bewerkingen dragen.
+    const dynamicPrefs = new Map<string, WidgetPref>()
+    for (const p of allPrefs) {
+      if (!p.enabled || !isDynamicWidgetId(p.id)) continue
+      if (!isWidgetVisible(p, features, data)) continue
+      dynamicPrefs.set(p.id, p)
+    }
     for (const w of activeWidgets) {
-      // Grenzenpotten horen hier net zo goed bij als de favorieten: zonder deze
-      // tak wist "vul dashboard" de pot-widget stil (hij staat niet in
-      // WIDGET_CATALOG, dus de fill-lijst hierboven bevat hem niet).
-      if (
-        w.id.startsWith('budget_fav:') ||
-        w.id.startsWith('holding_fav:') ||
-        w.id.startsWith('spend_limit:')
-      ) {
-        // Clamp naar de toegestane maten van deze favoriet — voorkomt dat een
-        // niet-ondersteunde fill-size (bv. mini) in de fallback-render valt.
-        const favSizes = getWidgetSizes(w.id)
-        const clamped = favSizes.includes(size) ? size : 'quarter'
-        newPrefs.push({ ...w, size: clamped, order: newPrefs.length })
-      }
+      if (isDynamicWidgetId(w.id)) dynamicPrefs.set(w.id, w)
+    }
+    for (const w of dynamicPrefs.values()) {
+      // Clamp naar de toegestane maten van deze tegel — voorkomt dat een
+      // niet-ondersteunde fill-size (bv. mini) in de fallback-render valt.
+      const favSizes = getWidgetSizes(w.id)
+      const clamped = favSizes.includes(size) ? size : 'quarter'
+      newPrefs.push({ ...w, size: clamped, order: newPrefs.length })
     }
     setActiveWidgets(newPrefs)
     setBulkAction(null)
     if (saveTimer.current) clearTimeout(saveTimer.current)
     pendingWidgets.current = null
-    await performSave(newPrefs)
+    await performSave(newPrefs, 'replace')
     router.refresh()
-  }, [features, data.budgetingActive, activeWidgets, performSave, router])
+  }, [features, data, allPrefs, activeWidgets, performSave, router])
 
   // Bulk: verberg alle widgets — dashboard wordt leeg, gebruiker kan opnieuw
   // beginnen via "Widget toevoegen", "Automatisch samenstellen" of presets.
@@ -415,7 +488,7 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
     setBulkAction(null)
     if (saveTimer.current) clearTimeout(saveTimer.current)
     pendingWidgets.current = null
-    await performSave([])
+    await performSave([], 'replace')
     router.refresh()
   }, [performSave, router])
 

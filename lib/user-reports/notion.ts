@@ -156,6 +156,29 @@ const TITLE_SLUG_BY_REPORT: Record<UserReportType, string> = {
 }
 
 /**
+ * `Prioriteit`-select per meldingssoort. Zonder deze property landt elk kaartje
+ * uit de app leeg in de queue-sortering, en zakt het weg onder alles wat wél een
+ * prio draagt — precies het tegenovergestelde van wat een signaal uit echt
+ * gebruik verdient.
+ *
+ * LET OP — prio en ernst lopen hier BEWUST uiteen: een bug krijgt `P1` terwijl
+ * de Severity op `S2 - medium` blijft staan. Dat is geen inconsistentie maar de
+ * kern van de keuze: `Severity` beschrijft hoe erg het defect op zichzelf is (dat
+ * weten we bij binnenkomst niet, dus een neutrale middenwaarde), `Prioriteit`
+ * beschrijft hoe snel we ernaar kijken — en dát is hoog juist omdát een
+ * testgebruiker het in de praktijk tegenkwam. Verlaag hier niets "voor de
+ * consistentie" met Severity; verhoog de Severity dan liever bij triage.
+ *
+ * Vragen en wensen zijn geen productieverstoring en gaan onder de lopende
+ * backlog door (`P3`); triage mag altijd bijstellen.
+ */
+const NOTION_PRIORITY_BY_REPORT: Record<UserReportType, string> = {
+  bug: 'P1',
+  vraag: 'P3',
+  aanbeveling: 'P3',
+}
+
+/**
  * Zone-tag uit de pathname. UITSLUITEND bestaande `Tags`-opties — een nieuwe
  * optie zou de queue-filters vervuilen. Volgorde = specifiek vóór generiek
  * (budget vóór cashflow, deelpagina's vóór `/overzicht`).
@@ -314,6 +337,9 @@ export function buildReportPagePayload(
     // `{ select: … }` levert hier een 400 — de bekendste valkuil van deze koppeling.
     Status: { status: { name: 'Nieuw' } },
     'CC-actie': { select: { name: 'Backlog' } },
+    // Op ÉLK kaartje, ook bij vraag/wens — anders sorteert een prio-loze rij
+    // onderaan de queue in plaats van op zijn eigen niveau.
+    Prioriteit: { select: { name: NOTION_PRIORITY_BY_REPORT[row.report_type] } },
     Tags: { multi_select: notionTagsForReport(row.route).map((name) => ({ name })) },
     'Actual result': richTextProp(row.description),
     Environment: richTextProp(

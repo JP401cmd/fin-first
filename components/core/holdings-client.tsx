@@ -665,13 +665,24 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
     loadHoldings()
   }, [loadHoldings])
 
-  // Heatmap-projectie: map de holdings één keer per holdings-wijziging naar de
-  // HeatmapHolding-vorm. Een verse array + objecten per render versloeg de
-  // memo() op <HoldingsHeatmap> (elke ouder-render leverde een nieuwe
-  // prop-referentie). Nu stabiel zolang `holdings` niet wijzigt.
+  // Heatmap-projectie: map de zichtbare holdings naar de HeatmapHolding-vorm.
+  //
+  // BRON = `sortedHoldings`, NIET de ruwe `holdings`-state. De toolbar met de
+  // chips (ALLES / AANDELEN·ETF / GESLOTEN) staat als één gedeelde balk BOVEN
+  // de Lijst/Heatmap-toggle en telt "x/y actief" — die keuze stuurt dus beide
+  // weergaven. Voorheen las de heatmap de ongefilterde state en toonde ze ook
+  // alle gesloten posities (bij chip 'all' filtert `filterHoldingsByChip` die
+  // er juist uit), waardoor de heatmap vol stond met €0-tegels terwijl de
+  // lijst er een fractie toonde. Gevolg van deze koppeling: kiest de gebruiker
+  // "AANDELEN/ETF", dan verdwijnen crypto-rijen ook uit de heatmap — bewust,
+  // want de chip is één filter voor beide weergaven.
+  //
+  // Een verse array + objecten per render versloeg de memo() op
+  // <HoldingsHeatmap> (elke ouder-render leverde een nieuwe prop-referentie).
+  // Nu stabiel zolang de gefilterde+gesorteerde set niet wijzigt.
   const heatmapHoldings = useMemo(
     () =>
-      holdings.map((h) => ({
+      sortedHoldings.map((h) => ({
         id: h.id,
         name: h.name,
         ticker: h.ticker,
@@ -686,7 +697,7 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
         sector: h.sector,
         geography: h.geography,
       })),
-    [holdings],
+    [sortedHoldings],
   )
 
   // Stabiele klik-handler voor de heatmap-cellen — in useCallback zodat de
@@ -694,10 +705,10 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
   const handleHeatmapClick = useCallback(
     (id: string) => {
       // Heatmap-cel openen schakelt naar de detail-pane via URL-state —
-      // symmetrisch met de lijst-rij. Crypto-rijen ontstaan in de heatmap niet
-      // (heatmap krijgt alle rows en filtert op `asset_class`/`sector`/
-      // `geography`); voor de zekerheid valt het pane-open terug op de full-page
-      // route wanneer de holding niet in de lokale array zit.
+      // symmetrisch met de lijst-rij. Crypto-rijen kunnen wél in de heatmap
+      // staan (bij chip ALLES zitten ze in `sortedHoldings`); die hebben een
+      // eigen pane-flow op `?crypto=<id>`, dus vallen ze hier — net als een
+      // holding die niet in de lokale array zit — terug op de full-page route.
       const target = holdings.find((h) => h.id === id)
       const bucket = target && (target as Holding & { bucket?: string }).bucket
       if (target && bucket !== 'crypto') {
@@ -959,8 +970,10 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
         </div>
       )}
 
-      {/* Heatmap weergave */}
-      {viewMode === 'heatmap' && holdings.length > 0 && (
+      {/* Heatmap weergave — alleen als de actieve chip iets overlaat; levert de
+          chip niets op, dan toont de lijst-sectie hieronder de gefilterde
+          EmptyState (anders zouden er twee lege toestanden onder elkaar staan). */}
+      {viewMode === 'heatmap' && heatmapHoldings.length > 0 && (
         <section
           className="mt-3 border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6"
           data-testid="holdings-heatmap-section"

@@ -576,6 +576,15 @@ describe('BriefingPanel — Eenvoudige weergave (simpleMode)', () => {
     makeEntry('market', 'Zesde briefje', { id: 'six' }),
   ]
 
+  const weekHistory = [
+    {
+      week: '2026-W31',
+      headline: 'Vorige week',
+      entries: [makeEntry('observation', 'Briefje uit week 31', { id: 'w31' })],
+      freedomDays: 980,
+    },
+  ]
+
   it('toont in Eenvoudig de drie belangrijkste briefjes (1–3), niet de rest', () => {
     const { container } = render(<BriefingPanel entries={sixEntries} simpleMode />)
     expect(container.textContent).toContain('Belangrijkste eerst')
@@ -594,6 +603,70 @@ describe('BriefingPanel — Eenvoudige weergave (simpleMode)', () => {
   it('verbergt "Jouw vrijheid deze week" in Eenvoudig, ook als freedomHero gegeven is', () => {
     render(<BriefingPanel entries={sixEntries} freedomHero={hero} simpleMode />)
     expect(screen.queryByText(/Jouw vrijheid deze week/i)).toBeNull()
+  })
+
+  it('verbergt de "Vorige weken"-terugblik in Eenvoudig', () => {
+    render(<BriefingPanel entries={sixEntries} weekHistory={weekHistory} simpleMode />)
+    expect(screen.queryByText(/Vorige weken/i)).toBeNull()
+  })
+
+  it('toont de "Vorige weken"-terugblik wél in Volledig (geen regressie)', () => {
+    render(<BriefingPanel entries={sixEntries} weekHistory={weekHistory} />)
+    expect(screen.getByText(/Vorige weken/i)).toBeTruthy()
+  })
+
+  it('rouleert het venster één plek op per rotationOffset (2-3-4, dan 3-4-5)', () => {
+    const tweede = render(
+      <BriefingPanel entries={sixEntries} simpleMode rotationOffset={1} />,
+    )
+    expect(tweede.container.textContent).not.toContain('Belangrijkste eerst')
+    expect(tweede.container.textContent).toContain('Tweede briefje')
+    expect(tweede.container.textContent).toContain('Vierde briefje')
+    tweede.unmount()
+
+    const derde = render(
+      <BriefingPanel entries={sixEntries} simpleMode rotationOffset={2} />,
+    )
+    expect(derde.container.textContent).toContain('Derde briefje')
+    expect(derde.container.textContent).toContain('Vijfde briefje')
+    expect(derde.container.textContent).not.toContain('Tweede briefje')
+  })
+
+  it('loopt cyclisch door: bij 5 toont hij 6-1-2', () => {
+    const { container } = render(
+      <BriefingPanel entries={sixEntries} simpleMode rotationOffset={5} />,
+    )
+    expect(container.textContent).toContain('Zesde briefje')
+    expect(container.textContent).toContain('Belangrijkste eerst')
+    expect(container.textContent).toContain('Tweede briefje')
+    expect(container.textContent).not.toContain('Derde briefje')
+  })
+
+  it('toont op mobiel maar één briefje: kaart 2 en 3 zijn hidden sm:flex', () => {
+    const { container } = render(<BriefingPanel entries={sixEntries} simpleMode />)
+    const cards = Array.from(container.querySelectorAll('article'))
+    expect(cards).toHaveLength(3)
+    expect(cards[0].className).not.toContain('hidden')
+    expect(cards[1].className).toContain('hidden sm:flex')
+    expect(cards[2].className).toContain('hidden sm:flex')
+  })
+
+  it('verbergt in Volledig niets op mobiel (geen regressie)', () => {
+    const { container } = render(<BriefingPanel entries={sixEntries} />)
+    const cards = Array.from(container.querySelectorAll('article'))
+    expect(cards).toHaveLength(6)
+    expect(cards.every((c) => !c.className.includes('hidden'))).toBe(true)
+  })
+
+  it('schuift de cursor in de cookie op voor de volgende vernieuwing', () => {
+    render(<BriefingPanel entries={sixEntries} simpleMode rotationOffset={2} />)
+    expect(document.cookie).toContain('tf_briefing_rot=3')
+  })
+
+  it('schrijft geen cursor in Volledig (daar rouleert niets)', () => {
+    document.cookie = 'tf_briefing_rot=; path=/; max-age=0'
+    render(<BriefingPanel entries={sixEntries} rotationOffset={2} />)
+    expect(document.cookie).not.toContain('tf_briefing_rot=3')
   })
 
   it('toont in Volledig (default) wél alle 6 briefjes + de vrijheid-hero (geen regressie)', () => {

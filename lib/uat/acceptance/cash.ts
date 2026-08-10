@@ -149,7 +149,7 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-CASH-08',
     titel: 'Analyse-periode kiezen en door de historie bladeren',
     kriticiteit: 'BELANGRIJK',
-    given: '"Nu" vastgezet op 15 juli 2026; periode-modus "maand", offset 0 en offset −1. WEERGAVEMODUS (TXN-2): de "maand"-tab (net als "kwartaal") bestaat alleen in **Volledig** — `PeriodeSelector` toont daar alle vier de periodetabs (30 dagen/maand/kwartaal/jaar). In **Eenvoudig** zijn er nog maar twee tabs ("30 dagen"/"Jaar"); een bewaarde "maand"-keuze (of de `?maand=`-deeplink) valt daar via `resolvePeriodForMode` terug op "30 dagen" met offset 0. `resolvePeriodWindow` zelf — de berekening die dit criterium toetst — is in beide modi identiek; alleen de tab-toegankelijkheid verschilt.',
+    given: '"Nu" vastgezet op 15 juli 2026; periode-modus "maand", offset 0 en offset −1. WEERGAVEMODUS (TXN-2, herzien 10 aug 2026): de "maand"-tab bestaat in **beide** modi — `PeriodeSelector` toont in **Volledig** alle vier de periodetabs (30 dagen/maand/kwartaal/jaar) en in **Eenvoudig** drie ("30 dagen"/"Maand"/"Jaar"). Alleen "kwartaal" is Volledig-only; een bewaarde kwartaal-keuze valt in Eenvoudig via `resolvePeriodForMode` terug op "30 dagen" met offset 0. De `?maand=`-deeplink werkt in beide modi. `resolvePeriodWindow` zelf — de berekening die dit criterium toetst — is in beide modi identiek; alleen de tab-toegankelijkheid verschilt.',
     when: 'De gebruiker kiest de maand-tab en bladert één maand terug.',
     then: 'Offset 0 (juli): since=2026-07-01, until=2026-07-31, label="juli 2026", vorige periode 2026-06-01..2026-06-30. Offset −1 (juni): since=2026-06-01, until=2026-06-30, label="juni 2026" — even lang als het huidige venster.',
     assertion: {

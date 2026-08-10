@@ -115,3 +115,18 @@ focus-trap (toegankelijkheidsregressie) en zou de uitzonderingslijst laten
 groeien met lagen die geen eigen uitzondering zijn. Precedent: `ConfirmCard`
 en `TransactieDetailsKaart` in de sleepmodus. Sub-oppervlakken horen als fase
 in de state-machine van de overlay, niet als losse open/dicht-vlag ernaast.
+
+**Addendum (2026-08-10) — het chat-paneel ("Fin") is pill-conform gemaakt.**
+De uitzondering *chat* bleef als enige full-screen uitzondering achter op de
+regel hierboven: `components/app/chat/chat-panel.tsx` rendeerde mobiel op
+`z-50` en riep nooit `acquireOverlay()` aan, waardoor de pill (`z-[60]`) op
+<1024px de sticky footerknoppen afdekte (o.a. "Terug"/"Verstuur melding" in de
+meldflow) — in álle Fin-modi. Nu: het niet-gepinde paneel (én zijn mobiele
+backdrop) rendert op `z-[70]` en claimt een overlay zolang het open staat
+(effect met cleanup, release bij close-start). De **gepinde** zijbalkmodus
+blijft bewust op `z-50` en claimt géén overlay: die duwt de pagina-inhoud opzij
+(`--chat-sidebar-width`) i.p.v. 'm af te dekken, dus de navigatie-affordance
+hoort te blijven staan. De chat blijft verder een gedocumenteerde uitzondering
+(geen `<ShellOverlay>`-migratie: eigen masthead, pin-modus en meldflow-state).
+Vastgepind door `components/app/chat/chat-panel.test.tsx` → *"ChatPanel — meldt
+zich als overlay (pill verdwijnt)"*.

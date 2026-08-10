@@ -130,6 +130,46 @@ export type BankLinkHealth = {
 /** Statuswaarden van `bank_connections.status` die "kan niet meer ophalen" betekenen. */
 const BROKEN_CONNECTION_STATUSES = new Set(['expired', 'revoked'])
 
+/**
+ * Hoeveel sync-verzoeken één bankkoppeling per dag mag doen — de app-rem die
+ * `public.reserve_bank_sync_slot` atomair afdwingt (`slot_limit`, default 10).
+ *
+ * Staat hier omdat de waarde inmiddels op drie plekken in de UI leeft: de
+ * "N/10"-teller op de status-pil, de knop-gate op de rekeningkaart, en sinds de
+ * bankstap op de globale sync-knop ook de vraag of een koppeling nog mee mág
+ * liften. Drie losse `10`-literalen lopen bij een limietwijziging uiteen, en dan
+ * belooft een scherm iets dat de database weigert. De DATABASE blijft de rem —
+ * dit is de weergave-/vriendelijkheidskant ervan.
+ */
+export const BANK_DAILY_REQUEST_LIMIT = 10
+
+/**
+ * De dagteller van één koppeling, maar alleen als hij over VANDAAG gaat.
+ *
+ * `bank_connection_accounts.daily_requests` is een rauwe teller met een aparte
+ * dagsleutel (`rate_limit_reset_date`); zonder die controle toont een scherm de
+ * stand van gisteren. Dat is niet theoretisch: een gebruiker die dinsdag tien
+ * keer syncte las woensdagochtend "10/10 verzoeken vandaag" naast een knop die
+ * gewoon werkte.
+ *
+ * `Europe/Amsterdam` en niet `toISOString()`: de dagsleutel wordt in Nederlandse
+ * tijd bepaald (`public.reserve_bank_sync_slot`). Met een UTC-vergelijking staat
+ * een scherm tussen middernacht en 02:00 op 0 terwijl de server nog de volle
+ * teller heeft — en dan klikt de gebruiker tegen een 429 aan. `en-CA` levert
+ * `YYYY-MM-DD`.
+ *
+ * Eén implementatie, drie lezers (de status-pil, de rekeningkaart, het
+ * sync-rapport): de regel stond drie keer los en was in het sync-rapport
+ * vergeten.
+ */
+export function effectiveDailyRequests(
+  account: { daily_requests: number; rate_limit_reset_date: string | null },
+  now: Date = new Date(),
+): number {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Amsterdam' }).format(now)
+  return account.rate_limit_reset_date === today ? account.daily_requests : 0
+}
+
 const MS_PER_DAY = 1000 * 60 * 60 * 24
 
 /**

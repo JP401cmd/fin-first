@@ -75,11 +75,18 @@ export default async function OverzichtCashflowTransactiesPage({
           deck="Elke transactie is gekochte of verkochte tijd — bekijk waar je uren heen gaan."
         />
         <KoppelRekeningBanner accountCount={accountCount} />
-        <TransactiesAnalyse />
-        <SpendLimitsSection
-          data={spendLimits}
-          openLimitId={openLimitId}
-          openPeriodKey={openPeriodKey}
+        {/* De grenzenpotten staan direct onder de geldstroom-/spaarquote-kaart:
+            eerst wat er binnenkomt en overblijft, dan de grenzen die je daarop
+            zet. Server-geladen (ADR 0058) en als slot doorgegeven, omdat de
+            analyse zelf een client-component is. */}
+        <TransactiesAnalyse
+          naGeldstroom={
+            <SpendLimitsSection
+              data={spendLimits}
+              openLimitId={openLimitId}
+              openPeriodKey={openPeriodKey}
+            />
+          }
         />
       </div>
     </>

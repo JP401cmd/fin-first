@@ -152,6 +152,24 @@ function holdingValue(h: HeatmapHolding): number {
   return h.units * h.current_price
 }
 
+/**
+ * Oppervlakte-gewicht van een holding in de treemap.
+ *
+ * Bewust NIET `holdingValue`: die geeft 0 zodra er geen koers is, terwijl zo'n
+ * positie wél bezit is — die zou dan uit de heatmap verdwijnen. Valt daarom
+ * terug op de gemiddelde inkoopprijs, exact dezelfde grondslag als `valueOf`
+ * in `components/core/holdings/holdings-list-view.ts`, zodat het oppervlak in
+ * de heatmap overeenkomt met de gewicht-sortering van de lijst.
+ *
+ * Geen vloer op 1 (meer): een positie zonder waarde — een gesloten/afgelopen
+ * positie van €0 — kreeg daardoor alsnog een zichtbaar vlak, terwijl de
+ * treemap juist op waarde hoort te schalen. Zulke rijen worden in `buildGroups`
+ * uitgesloten i.p.v. gevloerd.
+ */
+function holdingWeight(h: HeatmapHolding): number {
+  return (h.current_price ?? h.avg_purchase_price) * Math.max(0, h.units)
+}
+
 /** Compute unrealized P&L percentage */
 function unrealizedPctPL(h: HeatmapHolding): number | null {
   if (h.current_price == null || h.avg_purchase_price <= 0) return null
@@ -328,6 +346,10 @@ function buildGroups(
   const map = new Map<string, HeatmapHolding[]>()
 
   for (const h of holdings) {
+    // Posities zonder waarde krijgen geen oppervlak: een treemap schaalt op
+    // waarde, dus een €0-positie hoort er niet in thuis (vroeger gevloerd op 1,
+    // wat gesloten posities een misleidend vlak gaf).
+    if (holdingWeight(h) <= 0) continue
     const key = classifyHolding(h, mode)
     const list = map.get(key)
     if (list) {
@@ -343,7 +365,7 @@ function buildGroups(
     .map(([key, group]) => ({
       key,
       label: labels[key] || key,
-      totalValue: group.reduce((s, h) => s + Math.max(holdingValue(h), 1), 0),
+      totalValue: group.reduce((s, h) => s + holdingWeight(h), 0),
       holdings: group,
     }))
     .sort((a, b) => b.totalValue - a.totalValue)
@@ -397,7 +419,7 @@ function computeTwoLevelLayout(
       id: h.id,
       label: h.ticker || h.name,
       ticker: h.ticker,
-      weight: Math.max(holdingValue(h), 1),
+      weight: holdingWeight(h),
     }))
 
     const subRects = squarify(holdingItems, gRect.x, innerY, gRect.w, innerH, globalIndex)
@@ -509,6 +531,8 @@ function TreemapCell({
   return (
     <g
       className="cursor-pointer"
+      data-testid="heatmap-cell"
+      data-holding-id={rect.holdingId}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       onClick={onClick}
@@ -975,6 +999,18 @@ const HoldingsHeatmap = memo(function HoldingsHeatmap({
     return (
       <div className="text-center py-8 text-sm text-[var(--ink-3)]" data-testid="heatmap-empty">
         Voeg holdings toe om de heatmap te zien.
+      </div>
+    )
+  }
+
+  // Edge case: wél holdings, maar geen enkele met waarde (bv. de selectie
+  // bestaat volledig uit gesloten posities). De treemap schaalt op waarde, dus
+  // valt er niets te tekenen — leg dat uit i.p.v. een leeg vlak te tonen.
+  if (groups.length === 0) {
+    return (
+      <div className="text-center py-8 text-sm text-[var(--ink-3)]" data-testid="heatmap-no-value">
+        Deze selectie heeft geen actuele waarde — de heatmap schaalt op
+        marktwaarde. Bekijk gesloten posities in de lijstweergave.
       </div>
     )
   }

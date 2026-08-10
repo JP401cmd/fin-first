@@ -62,18 +62,18 @@ export function LeverageCard({
    * hefboom, of het venster-label "in augustus tot nu toe" op de cashflow-
    * landingskaart (CF-3).
    *
-   * Wordt in BEIDE varianten getoond, ook in `compact`. Dat is bewust: CF-3
-   * bestaat om te voorkomen dat een maandcijfer verward wordt met de
-   * 30-dagen-cijfers op de transactiepagina, en die verwarring is er juist in
-   * Eenvoudig — waar de kaarten compact staan. Zou `compact` het label
-   * wegslikken, dan zou een item uit de eenvoudige-weergave-audit uitsluitend
-   * de VOLLEDIGE weergave verbeteren. (Besluit op de Fase 2-kaart, optie A.)
+   * De shell RENDERT hem in beide varianten (ook in `compact`) en beslist er
+   * bewust niet over: of een regel past hangt af van wat de kaart verder toont,
+   * en dat weet alleen de call-site. Geen gating-prop dus.
    *
-   * Reikwijdte zonder extra prop: van de twee compacte gebruikers geeft alleen
-   * `cashflow-landing-cards` een `subAmount` mee; `toekomst-nav-cards` laat 'm
-   * leeg en rendert dus onveranderd. `hefbomen-nav` vult 'm wél maar zet nooit
-   * `compact`, dus die loopt langs de volledige tak. Een gating-prop zou hier
-   * dus alleen ruis toevoegen.
+   * Reikwijdte in de praktijk: `hefbomen-nav` vult 'm wél maar zet nooit
+   * `compact` (volledige tak); `toekomst-nav-cards` laat 'm leeg; en
+   * `cashflow-landing-cards` geeft het CF-3-venster sinds de herziening van
+   * 10 aug 2026 alleen door in Volledig — in Eenvoudig toont die kaart geen KPI
+   * meer (CF-1), dus is er geen cijfer waarvan het venster geduid moet worden.
+   * De compacte tak hieronder is daarmee op dit moment ongebruikt maar blijft
+   * staan: een compacte kaart die wél een cijfer draagt, mag zijn grondslag
+   * kwijt kunnen.
    */
   subAmount?: React.ReactNode
   href: string

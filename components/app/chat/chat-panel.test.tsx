@@ -5,6 +5,7 @@ import { DefaultChatTransport } from 'ai'
 import { LocalChatTransport } from '@/lib/ai/local/local-chat-transport'
 import { LOCAL_READINESS_FLAP_HINT } from '@/lib/ai/local/local-readiness'
 import { resolveAllExecutionModes } from '@/lib/ai/execution-groups'
+import { getOverlayCount, __resetOverlayCount } from '@/lib/overlay-signal'
 
 /**
  * Regressietest voor de Wft-akkoord-gate in de Fin-chat.
@@ -593,5 +594,65 @@ describe('ChatPanel — per-groep-override wint van de hoofdschakelaar (ADR 0078
     const textarea = await screen.findByPlaceholderText('Even geduld…')
     expect(textarea).toBeDisabled()
     expect(mockSendMessage).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * Regressietest voor de zwevende nav-pill boven het Fin-paneel
+ * (Notion 2026-08-09-testbug-53fc3d, ADR 0039 fase 2).
+ *
+ * Bug: het paneel rendeerde mobiel full-screen op `z-50` en meldde zich nooit
+ * aan bij `lib/overlay-signal`. De `FloatingNavButton` (`z-[60]`) bleef daardoor
+ * op <1024px zichtbaar bovenop het paneel en dekte de sticky footerknoppen af
+ * ("Terug"/"Verstuur melding" in de meldflow) — in álle Fin-modi.
+ *
+ * Deze test pint drie dingen vast: (1) het open, niet-gepinde paneel claimt een
+ * overlay zodat de pill zich verbergt, (2) het geeft die claim weer vrij bij
+ * sluiten/unmount, en (3) de modale laag is `z-[70]` — bóven de pill.
+ */
+describe('ChatPanel — meldt zich als overlay (pill verdwijnt)', () => {
+  beforeEach(() => {
+    __resetOverlayCount()
+    localStorage.setItem(WFT_KEY, 'true')
+    stubExecutionFetch({ privacyMode: false })
+  })
+
+  afterEach(() => {
+    __resetOverlayCount()
+  })
+
+  it('claimt een overlay zolang het paneel open staat en geeft die vrij bij sluiten', async () => {
+    const { rerender, unmount } = render(<ChatPanel />)
+    await waitFor(() => expect(getOverlayCount()).toBe(1))
+
+    // Sluiten (isOpen=false) geeft het signaal direct vrij — de pill komt terug.
+    ctx = makeCtx({ isOpen: false })
+    rerender(<ChatPanel />)
+    await waitFor(() => expect(getOverlayCount()).toBe(0))
+
+    unmount()
+    expect(getOverlayCount()).toBe(0)
+  })
+
+  it('claimt GEEN overlay in gepinde (zijbalk-)modus — de pagina blijft bruikbaar', async () => {
+    ctx = makeCtx({ isPinned: true })
+    render(<ChatPanel />)
+    await waitFor(() => expect(screen.getByText('Fin')).toBeInTheDocument())
+    expect(getOverlayCount()).toBe(0)
+  })
+
+  it('rendert het modale paneel én de backdrop op z-[70], boven de nav-pill (z-[60])', async () => {
+    const { container } = render(<ChatPanel />)
+    await waitFor(() => expect(getOverlayCount()).toBe(1))
+
+    const divs = Array.from(container.querySelectorAll('div'))
+    const panel = divs.find((el) => el.className.includes('h-[100dvh]'))
+    expect(panel).toBeDefined()
+    expect(panel!.className).toContain('z-[70]')
+    expect(panel!.className).not.toContain('z-50')
+
+    const backdrop = divs.find((el) => el.className.includes('bg-black/20'))
+    expect(backdrop).toBeDefined()
+    expect(backdrop!.className).toContain('z-[70]')
   })
 })

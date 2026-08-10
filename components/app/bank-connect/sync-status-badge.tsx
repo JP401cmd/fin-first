@@ -2,7 +2,7 @@
 
 import { Clock, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { formatTimestamp } from '@/lib/format'
-import type { BankLinkHealth } from '@/lib/bank-connection-status'
+import { BANK_DAILY_REQUEST_LIMIT, type BankLinkHealth } from '@/lib/bank-connection-status'
 
 /**
  * DE STATUS-PIL van één bankkoppeling, op de bankverbindingen-sectie van de
@@ -113,7 +113,9 @@ export function SyncStatusBadge({ health, dailyRequests }: SyncStatusBadgeProps)
         <CheckCircle2 aria-hidden className="h-3 w-3" />
         {formatTimestamp(health.lastSyncedAt)}
       </span>
-      <span className="text-xs text-[var(--ink-3)]">{dailyRequests}/10</span>
+      <span className="text-xs text-[var(--ink-3)]">
+        {dailyRequests}/{BANK_DAILY_REQUEST_LIMIT}
+      </span>
     </div>
   )
 }
