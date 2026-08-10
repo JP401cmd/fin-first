@@ -31,7 +31,6 @@ import { normalizeHeadersForFingerprint } from '@/lib/parsers/format-contracts'
 import { Kicker, EditorialHeadline, EditorialDeck } from '@/components/editorial'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { computePositionFromTransactions } from '@/lib/holdings-aggregation'
-import { buildTradeKeys } from '@/lib/holdings-import-key'
 import type { HoldingsImportTarget } from '@/lib/holdings-import-targets'
 
 // ---------------------------------------------------------------------------
@@ -567,51 +566,37 @@ export default function HoldingsImportClient({ targets }: HoldingsImportClientPr
       const keyToIndex = new Map<string, number>()
       holdingKeys.forEach((k, i) => keyToIndex.set(k, i))
 
-      // Build transactions array.
+      // Build transactions array — in BESTANDSVOLGORDE.
       //
-      // Elke rij draagt een dedup-sleutel mee. Die is wat een OVERLAPPENDE
-      // upload mogelijk maakt: exporteer bij je broker gerust een ruimere
-      // periode dan strikt nodig — rijen die we al hebben, herkent de server aan
-      // deze sleutel en slaat hij over. Zonder sleutel zou elke overlappende rij
-      // een tweede keer worden ingevoegd.
+      // Die volgorde is een contract, geen toeval. De server leidt hieruit de
+      // dedup-sleutels af (lib/holdings-import-key.ts) en het volgnummer voor
+      // identieke rijen — een order die de broker in deelexecuties uitvoerde —
+      // telt over het hele bestand. Zou de client hier per holding groeperen,
+      // dan zou dat volgnummer verschuiven en zou een overlappende upload
+      // dubbele rijen opleveren.
       //
-      // De sleutels worden over ALLE transactierijen tegelijk berekend (in
-      // bestandsvolgorde), want het volgnummer voor identieke rijen — een order
-      // die in deelexecuties is uitgevoerd — telt over het hele bestand.
-      const txRowsInFileOrder = selected.filter((r) => r.type !== 'position')
-      const tradeKeys = buildTradeKeys(txRowsInFileOrder)
-      const keyByRow = new Map<PreviewRow, string>()
-      txRowsInFileOrder.forEach((row, i) => keyByRow.set(row, tradeKeys[i]))
-
-      const transactions: {
-        holding_index: number
-        type: 'buy' | 'sell' | 'dividend'
-        units: number
-        price_per_unit: number
-        total_amount: number
-        date: string | null
-        fees: number
-        notes: string | null
-        external_trade_id: string | null
-      }[] = []
-
-      for (const entry of holdingMap.values()) {
-        const holdingIndex = keyToIndex.get(entry.key)!
-        for (const tx of entry.transactions) {
-          if (tx.type === 'position') continue
-          transactions.push({
-            holding_index: holdingIndex,
-            type: tx.type,
-            units: tx.units,
-            price_per_unit: tx.price_per_unit,
-            total_amount: tx.total_amount,
-            date: tx.date,
-            fees: tx.fees,
-            notes: null,
-            external_trade_id: keyByRow.get(tx) ?? null,
-          })
-        }
-      }
+      // We sturen het RÚWE broker-id mee, niet de afgeleide sleutel: de sleutel
+      // hoort server-side te ontstaan, zoals /api/transactions/import dat al doet
+      // met import_hash. Anders kan een client een sleutel sturen die met een
+      // bestaande rij botst en die stil als duplicaat laat overslaan.
+      const transactions = selected
+        .filter(
+          (row): row is PreviewRow & { type: 'buy' | 'sell' | 'dividend' } =>
+            row.type !== 'position',
+        )
+        .map((row) => ({
+          holding_index: keyToIndex.get(
+            (row.isin ?? row.ticker ?? row.name).toUpperCase(),
+          )!,
+          type: row.type,
+          units: row.units,
+          price_per_unit: row.price_per_unit,
+          total_amount: row.total_amount,
+          date: row.date,
+          fees: row.fees,
+          notes: null,
+          external_id: row.externalId,
+        }))
 
       const res = await fetch('/api/holdings/import', {
         method: 'POST',

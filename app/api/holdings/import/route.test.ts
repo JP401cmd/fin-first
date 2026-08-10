@@ -77,6 +77,9 @@ function makeTx(overrides: Partial<{
   date: string | null
   fees: number
   notes: string | null
+  /** Het rúwe broker-id; de server leidt de dedup-sleutel hieruit af. */
+  external_id?: string | null
+  /** Bewust genegeerd door de route — de sleutel is server-bepaald. */
   external_trade_id?: string | null
 }> = {}) {
   return {
@@ -131,21 +134,6 @@ function makeChain(resolveWith: unknown) {
   ;(chain as { then: unknown }).then = (resolve: (v: unknown) => unknown) =>
     Promise.resolve(resolveWith).then(resolve)
 
-  return chain
-}
-
-/**
- * De terug-leesketen die de route na het wegschrijven gebruikt om de positie
- * opnieuw af te leiden uit de persistente transactieset. Levert een lege set,
- * zodat een test die daar niets over te zeggen heeft er ook niet op hoeft te
- * mikken — de route slaat het herberekenen dan gewoon over.
- */
-function emptyTxReadChain(): Record<string, unknown> {
-  const chain: Record<string, unknown> = {}
-  chain.select = vi.fn(() => chain)
-  chain.eq = vi.fn(() => chain)
-  chain.order = vi.fn(() => chain)
-  chain.limit = vi.fn(() => Promise.resolve({ data: [], error: null }))
   return chain
 }
 
@@ -513,158 +501,150 @@ describe('POST /api/holdings/import', () => {
   })
 
   // ---------------------------------------------------------------------------
-  // 6. SNAPSHOT skips plain-insert transactions (no external_trade_id)
+  // 6. De dedup-sleutel is SERVER-bepaald
   // ---------------------------------------------------------------------------
+  //
+  // Het bankpad (/api/transactions/import) herberekent `import_hash` zelf en
+  // negeert wat de client stuurt. Deze route hoort hetzelfde te doen: een
+  // client-geleverde sleutel is een vertrouwensgrens die je niet weggeeft — een
+  // sleutel die met een bestaande rij botst zou die rij stil als duplicaat laten
+  // overslaan.
 
-  it('SNAPSHOT: transaction without external_trade_id is NOT plain-inserted', async () => {
-    mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
+  /** Mock-opstelling voor een append-import zonder doel-bezitting, die de
+   *  weggeschreven transactierijen vastlegt. */
+  function captureUpsertedRows() {
+    const captured: { rows: Array<Record<string, unknown>> } = { rows: [] }
 
-    // Track whether investment_transactions.insert() was called
-    let txPlainInsertCalled = false
-    let txUpsertCalled = false
+    const defaultAssetChain = makeChain({ data: { id: 'asset-1' }, error: null })
+    const holdingsExistingChain = makeChain({ data: [], error: null })
+    const holdingInsertChain = makeChain({ data: { id: 'h-1', asset_id: 'asset-1' }, error: null })
 
-    const ownershipChain = makeChain({ data: { id: VALID_UUID, has_holdings_tracking: true }, error: null })
-    const defaultAssetChain = makeChain({ data: { id: VALID_UUID }, error: null })
-
-    const existingHoldingId = 'h-id-1'
-    const holdingsExistingChain = makeChain({
-      data: [
-        {
-          id: existingHoldingId,
-          ticker: 'VWCE',
-          isin: 'IE00B3RBWM25',
-          units: 5,
-          avg_purchase_price: 100,
-          asset_id: VALID_UUID,
-        },
-      ],
-      error: null,
+    const txChain: Record<string, unknown> = {}
+    txChain.upsert = vi.fn((rows: Array<Record<string, unknown>>) => {
+      captured.rows = rows
+      return txChain
     })
-
-    const matchUpdateChain = { update: vi.fn(), eq: vi.fn().mockReturnThis() }
-    matchUpdateChain.update = vi.fn(() => matchUpdateChain)
-    let mEqCount = 0
-    matchUpdateChain.eq = vi.fn().mockImplementation(() => {
-      mEqCount++
-      if (mEqCount >= 2) return Promise.resolve({ error: null })
-      return matchUpdateChain
-    })
-
-    // De upsert wordt gevolgd door `.select('id')`: alleen de RETURNING-rijen
-    // zijn écht nieuw, de rest was al bekend (ontdubbeld).
-    const txInsertChain = {
-      insert: vi.fn(() => {
-        txPlainInsertCalled = true
-        return Promise.resolve({ error: null })
-      }),
-      upsert: vi.fn(() => {
-        txUpsertCalled = true
-        return { select: vi.fn(() => Promise.resolve({ data: [{ id: 'tx-1' }], error: null })) }
-      }),
-      // Na het wegschrijven leest de route de persistente set terug om de
-      // positie opnieuw af te leiden; leeg = niets te herberekenen.
-      ...emptyTxReadChain(),
-    }
-
-    let fromCallIndex = 0
-    mockFrom.mockImplementation((table: string) => {
-      fromCallIndex++
-      if (table === 'assets' && fromCallIndex === 1) return ownershipChain
-      if (table === 'assets' && fromCallIndex === 2) return defaultAssetChain
-      if (table === 'investment_holdings' && fromCallIndex === 3) return holdingsExistingChain
-      if (table === 'investment_holdings' && fromCallIndex === 4) return matchUpdateChain
-      if (table === 'investment_transactions') return txInsertChain
-      return makeChain({ data: null, error: null })
-    })
-
-    const res = await callRoute(makeRequest({
-      holdings: [makeHolding({ units: 10 })],
-      // A transaction WITHOUT external_trade_id — should be skipped in snapshot mode
-      transactions: [makeTx({ external_trade_id: null })],
-      broker: 'degiro',
-      mode: 'snapshot',
-      targetAssetId: VALID_UUID,
-    }))
-
-    expect(res.status).toBe(201)
-
-    // Plain insert MUST NOT have been called
-    expect(txPlainInsertCalled).toBe(false)
-    // Upsert also not called (no rows with external_trade_id)
-    expect(txUpsertCalled).toBe(false)
-  })
-
-  // ---------------------------------------------------------------------------
-  // 7. APPEND: transaction without external_trade_id IS plain-inserted
-  // ---------------------------------------------------------------------------
-
-  it('APPEND: transaction without external_trade_id IS plain-inserted', async () => {
-    mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
-
-    let txPlainInsertCalled = false
-    let capturedInsertRows: unknown = null
-
-    const existingHoldingId = 'h-id-append'
-    const defaultAssetChain = makeChain({ data: { id: 'asset-id-append' }, error: null })
-
-    const holdingsExistingChain = makeChain({
-      data: [
-        {
-          id: existingHoldingId,
-          ticker: 'VWCE',
-          isin: 'IE00B3RBWM25',
-          units: 5,
-          avg_purchase_price: 100,
-          asset_id: 'asset-id-append',
-        },
-      ],
-      error: null,
-    })
-
-    const matchUpdateChain = { update: vi.fn(), eq: vi.fn().mockReturnThis() }
-    matchUpdateChain.update = vi.fn(() => matchUpdateChain)
-    let mEqCount = 0
-    matchUpdateChain.eq = vi.fn().mockImplementation(() => {
-      mEqCount++
-      if (mEqCount >= 2) return Promise.resolve({ error: null })
-      return matchUpdateChain
-    })
-
-    const txInsertChain = {
-      insert: vi.fn((rows: unknown) => {
-        txPlainInsertCalled = true
-        capturedInsertRows = rows
-        return Promise.resolve({ error: null })
-      }),
-      upsert: vi.fn(() => ({
-        select: vi.fn(() => Promise.resolve({ data: [], error: null })),
-      })),
-      ...emptyTxReadChain(),
-    }
+    txChain.select = vi.fn(() => Promise.resolve({ data: rows2ids(captured.rows), error: null }))
 
     let fromCallIndex = 0
     mockFrom.mockImplementation((table: string) => {
       fromCallIndex++
       if (table === 'assets' && fromCallIndex === 1) return defaultAssetChain
       if (table === 'investment_holdings' && fromCallIndex === 2) return holdingsExistingChain
-      if (table === 'investment_holdings' && fromCallIndex === 3) return matchUpdateChain
-      if (table === 'investment_transactions') return txInsertChain
+      // Elke volgende holdings-aanroep is een insert — het aantal hangt af van
+      // hoeveel holdings de test meestuurt.
+      if (table === 'investment_holdings') return holdingInsertChain
+      if (table === 'investment_transactions') return txChain
+      return makeChain({ data: null, error: null })
+    })
+
+    return captured
+  }
+
+  function rows2ids(rows: Array<Record<string, unknown>>) {
+    return rows.map((_, i) => ({ id: `tx-${i}` }))
+  }
+
+  it('negeert een client-geleverde external_trade_id en leidt de sleutel zelf af', async () => {
+    mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
+    const captured = captureUpsertedRows()
+
+    const res = await callRoute(makeRequest({
+      holdings: [makeHolding({ units: 10 })],
+      transactions: [makeTx({ external_trade_id: 'VERZONNEN-DOOR-DE-CLIENT' })],
+      broker: 'degiro',
+    }))
+
+    expect(res.status).toBe(201)
+    expect(captured.rows[0].external_trade_id).not.toBe('VERZONNEN-DOOR-DE-CLIENT')
+    // Zonder broker-id valt de sleutel terug op de inhoud van de rij: datum,
+    // instrument, soort, aantal, prijs en bedrag — met vaste decimalen, zodat
+    // drijvendekomma-ruis dezelfde transactie niet twee sleutels geeft.
+    expect(captured.rows[0].external_trade_id).toBe(
+      'row|2024-01-15|IE00B3RBWM25|buy|10.000000|100.0000|1000.00',
+    )
+  })
+
+  it('gebruikt het broker-id wanneer de export er een levert', async () => {
+    mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
+    const captured = captureUpsertedRows()
+
+    const res = await callRoute(makeRequest({
+      holdings: [makeHolding({ units: 10 })],
+      transactions: [makeTx({ external_id: 'order-a' })],
+      broker: 'degiro',
+    }))
+
+    expect(res.status).toBe(201)
+    // Soort en datum horen erbij: eToro geeft de open- en sluitregel van dezelfde
+    // positie hetzelfde id, dus het id alleen zou de sluitregel als duplicaat
+    // van de openregel laten sneuvelen.
+    expect(captured.rows[0].external_trade_id).toBe('id:order-a|buy|2024-01-15')
+  })
+
+  it('de sleutel volgt de BESTANDSVOLGORDE, niet de holding-groepering', async () => {
+    mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
+    const captured = captureUpsertedRows()
+
+    // Twee identieke rijen van hetzelfde fonds met daartussen een rij van een
+    // ander fonds — precies het geval waarin groeperen-per-holding het volgnummer
+    // zou laten verschuiven en een overlappende upload dubbele rijen zou geven.
+    const res = await callRoute(makeRequest({
+      holdings: [makeHolding({ units: 10 }), makeHolding({ isin: 'NL0011794037', ticker: 'NT', units: 1 })],
+      transactions: [
+        makeTx({ holding_index: 0 }),
+        makeTx({ holding_index: 1, units: 1, price_per_unit: 50, total_amount: 50 }),
+        makeTx({ holding_index: 0 }),
+      ],
+      broker: 'degiro',
+    }))
+
+    expect(res.status).toBe(201)
+    const keys = captured.rows.map((r) => r.external_trade_id)
+    // Rij 1 en 3 zijn identiek → de tweede krijgt een volgnummer, zodat een
+    // deelexecutie niet als duplicaat van de eerste sneuvelt.
+    expect(keys[0]).not.toBe(keys[2])
+    expect(String(keys[2])).toContain('#2')
+    expect(new Set(keys).size).toBe(3)
+  })
+
+  it('schrijft alles via upsert weg — er is geen rij meer zonder dedup-sleutel', async () => {
+    mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
+
+    let plainInsertCalled = false
+    const defaultAssetChain = makeChain({ data: { id: 'asset-1' }, error: null })
+    const holdingsExistingChain = makeChain({ data: [], error: null })
+    const holdingInsertChain = makeChain({ data: { id: 'h-1', asset_id: 'asset-1' }, error: null })
+
+    const txChain: Record<string, unknown> = {}
+    txChain.upsert = vi.fn(() => txChain)
+    txChain.select = vi.fn(() => Promise.resolve({ data: [{ id: 'tx-0' }], error: null }))
+    txChain.insert = vi.fn(() => {
+      plainInsertCalled = true
+      return Promise.resolve({ error: null })
+    })
+
+    let fromCallIndex = 0
+    mockFrom.mockImplementation((table: string) => {
+      fromCallIndex++
+      if (table === 'assets' && fromCallIndex === 1) return defaultAssetChain
+      if (table === 'investment_holdings' && fromCallIndex === 2) return holdingsExistingChain
+      if (table === 'investment_holdings' && fromCallIndex === 3) return holdingInsertChain
+      if (table === 'investment_transactions') return txChain
       return makeChain({ data: null, error: null })
     })
 
     const res = await callRoute(makeRequest({
       holdings: [makeHolding({ units: 10 })],
-      // transaction WITHOUT external_trade_id — append mode should plain-insert it
-      transactions: [makeTx({ external_trade_id: null })],
+      transactions: [makeTx()],
       broker: 'degiro',
-      // no mode → 'append'
+      // append (default): vroeger ging een rij zonder sleutel hier plain-insert
+      // in, en dat was precies het pad waarlangs overlap dubbele rijen gaf.
     }))
 
     expect(res.status).toBe(201)
-    expect(txPlainInsertCalled).toBe(true)
-    // The insert rows should be an array with 1 entry
-    expect(Array.isArray(capturedInsertRows)).toBe(true)
-    expect((capturedInsertRows as unknown[]).length).toBe(1)
+    expect(plainInsertCalled).toBe(false)
+    expect(txChain.upsert).toHaveBeenCalled()
   })
 
   // ---------------------------------------------------------------------------
@@ -1027,7 +1007,7 @@ describe('POST /api/holdings/import', () => {
     const res = await callRoute(makeRequest({
       // Het opnieuw geüploade bestand bevat dezelfde koop van 10.
       holdings: [makeHolding({ units: 10 })],
-      transactions: [makeTx({ units: 10, external_trade_id: 'id:order-a|buy|2026-01-10' })],
+      transactions: [makeTx({ units: 10, external_id: 'order-a' })],
       broker: 'degiro',
       mode: 'append',
       targetAssetId: VALID_UUID,
@@ -1036,7 +1016,8 @@ describe('POST /api/holdings/import', () => {
     expect(res.status).toBe(201)
 
     // De sleutel bereikt de database — zonder deze regel is ontdubbelen onmogelijk.
-    expect(upsertedRows[0].external_trade_id).toBe('id:order-a|buy|2026-01-10')
+    // Hij is SERVER-afgeleid uit het meegestuurde broker-id, soort en datum.
+    expect(upsertedRows[0].external_trade_id).toBe('id:order-a|buy|2024-01-15')
     // onConflict MOET de kolommen van de unieke index noemen, inclusief user_id:
     // broker-trade-ids zijn niet globaal uniek (Trading 212 'T-001', eToro).
     expect(onConflictOpts?.onConflict).toBe('user_id,external_source,external_trade_id')

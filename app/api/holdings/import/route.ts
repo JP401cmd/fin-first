@@ -8,6 +8,7 @@ import { fingerprintHeaders, diffHeaders, type FormatId } from '@/lib/parsers/fo
 import { recordContractEvent } from '@/lib/contract-events'
 import { getServiceClient } from '@/lib/supabase/service'
 import { unauthorized, badRequest, serverError } from '@/lib/api/respond'
+import { buildTradeKeys } from '@/lib/holdings-import-key'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -35,6 +36,19 @@ interface ImportTransaction {
   date: string | null
   fees: number
   notes: string | null
+  /**
+   * Het RÚWE id dat de broker aan deze transactie hangt (DEGIRO's Order ID,
+   * Trading 212's `ID`, eToro's `Position ID`) — niet de dedup-sleutel zelf.
+   * Die leidt de server af; zie `external_trade_id` hieronder.
+   */
+  external_id?: string | null
+  /**
+   * BEWUST GENEGEERD. Stuurde een oudere client hier een kant-en-klare sleutel,
+   * dan is dat een vertrouwensgrens die we niet weggeven: een sleutel die met een
+   * bestaande rij botst zou die rij stil als duplicaat laten overslaan. De server
+   * berekent 'm zelf, net zoals /api/transactions/import `import_hash`
+   * herberekent en de meegestuurde waarde negeert.
+   */
   external_trade_id?: string | null
 }
 
@@ -595,20 +609,41 @@ export async function POST(request: NextRequest) {
     // --- Process transactions ---
 
     if (body.transactions.length > 0) {
+      // --- Dedup-sleutels: server-bepaald, over de VOLLEDIGE lijst ---
+      //
+      // Over alle transacties in de aangeleverde volgorde (= bestandsvolgorde),
+      // niet alleen over de rijen die straks overleven: het volgnummer voor
+      // identieke rijen telt over het hele bestand, dus een tussentijdse filter
+      // zou het laten verschuiven. De instrument-identiteit komt uit de holding
+      // waar de transactie aan hangt — die koppeling ligt al vast in
+      // `holding_index`.
+      const tradeKeys = buildTradeKeys(
+        body.transactions.map((tx) => {
+          const holding = body.holdings[tx.holding_index]
+          return {
+            externalId: tx.external_id ?? null,
+            isin: holding?.isin ?? null,
+            ticker: holding?.ticker ?? null,
+            date: tx.date,
+            type: tx.type,
+            units: tx.units,
+            price_per_unit: tx.price_per_unit,
+            total_amount: tx.total_amount,
+          }
+        }),
+      )
+
       const txRows = body.transactions
-        .filter((tx) => {
+        .map((tx, index) => ({ tx, externalTradeId: tradeKeys[index] }))
+        .filter(({ tx }) => {
           // date is NOT NULL in the schema — skip transactions without a date.
           return tx.date && tx.date.trim().length > 0
         })
-        .map((tx) => {
+        .map(({ tx, externalTradeId }) => {
           const holdingId = holdingIdMap.get(tx.holding_index)
           if (!holdingId) {
             throw new Error(`Geen holding gevonden voor holding_index ${tx.holding_index}`)
           }
-          // External_trade_id is optional; when absent we leave it NULL so the
-          // partial-unique index still allows multiple rows from the same broker
-          // for the same security.
-          const externalTradeId = tx.external_trade_id || null
           return {
             user_id: user.id,
             holding_id: holdingId,
@@ -624,26 +659,18 @@ export async function POST(request: NextRequest) {
           }
         })
 
-      // Split rows: those with an external_trade_id go through upsert (idempotent
-      // re-imports), the rest through plain insert (no dedup possible).
-      const upsertRows = txRows.filter((r) => r.external_trade_id != null)
-      // Zonder dedup-sleutel is idempotentie onmogelijk: elke herhaalde upload zou
-      // de rij nóg eens invoegen. De wizard levert sinds
-      // `lib/holdings-import-key.ts` ALTIJD een sleutel, dus dit pad is de
-      // terugval voor oudere/externe aanroepers — en blijft in snapshot dicht.
-      const insertRows = mode === 'snapshot'
-        ? []
-        : txRows.filter((r) => r.external_trade_id == null)
-
-      let transactionsSkipped = 0
-
-      if (upsertRows.length > 0) {
+      // Eén pad: alles via upsert. `buildTradeKeys` levert per rij ALTIJD een
+      // sleutel — met een broker-id als de export er een geeft, anders uit de
+      // inhoud van de rij — dus er is geen rij meer die niet te ontdubbelen
+      // valt. Het oude plain-insert-pad daarvoor is daarmee vervallen; het was
+      // precies het pad waarlangs een overlappende upload dubbele rijen kreeg.
+      if (txRows.length > 0) {
         // `ignoreDuplicates` + RETURNING geeft alleen de rijen die ECHT nieuw
         // zijn. Precies het getal dat de gebruiker wil zien bij een bewust
         // overlappende upload: hoeveel was nieuw, hoeveel hadden we al.
         const { data: inserted, error: upsertErr } = await supabase
           .from('investment_transactions')
-          .upsert(upsertRows, {
+          .upsert(txRows, {
             onConflict: 'user_id,external_source,external_trade_id',
             ignoreDuplicates: true,
           })
@@ -651,21 +678,10 @@ export async function POST(request: NextRequest) {
         if (upsertErr) {
           return serverError(upsertErr, 'holdings-import:POST')
         }
-        const insertedCount = inserted?.length ?? upsertRows.length
+        const insertedCount = inserted?.length ?? txRows.length
         transactionsCreated += insertedCount
-        transactionsSkipped += upsertRows.length - insertedCount
+        transactionsDeduped += txRows.length - insertedCount
       }
-      if (insertRows.length > 0) {
-        const { error: insertErr } = await supabase
-          .from('investment_transactions')
-          .insert(insertRows)
-        if (insertErr) {
-          return serverError(insertErr, 'holdings-import:POST')
-        }
-        transactionsCreated += insertRows.length
-      }
-
-      transactionsDeduped = transactionsSkipped
 
       // --- Positie herleiden uit de PERSISTENTE transactieset ---
       //
