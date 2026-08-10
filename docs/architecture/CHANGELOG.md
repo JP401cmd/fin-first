@@ -761,3 +761,12 @@
 ## 2026-08-10
 
 - Geen wijzigingen.
+
+## 2026-08-10
+
+- **API-routes** toegevoegd: /api/holdings/backfill-history, /api/holdings/value-history
+- **Componenten (aantal)** toegevoegd: +3
+
+## 2026-08-10
+
+- Geen wijzigingen.

@@ -1146,4 +1146,162 @@ describe('POST /api/holdings/import', () => {
     expect(mockSyncHoldingAggregates).toHaveBeenCalledTimes(1)
     expect(mockSyncHoldingAggregates.mock.calls[0][2]).toBe(EXISTING_HOLDING)
   })
+
+  // -------------------------------------------------------------------------
+  // Negatieve netto-positie bij een transactie-export
+  // -------------------------------------------------------------------------
+  //
+  // Given een transactie-export waarvan het venster de oorspronkelijke aankoop
+  // NIET bevat (de gebruiker exporteert alleen de laatste maanden), zodat een
+  // instrument in dat bestand alleen een verkoop heeft;
+  // When de wizard die netto positie (negatief) meestuurt in mode 'append';
+  // Then moet de import slagen — bij 'append' is `units` geen gezaghebbend veld:
+  // de positie wordt na afloop toch volledig herleid uit de transactiehistorie
+  // in de database (syncHoldingAggregatesFromTransactions).
+
+  it("APPEND: een negatieve netto-positie blokkeert de import niet — 'units' is daar niet gezaghebbend", async () => {
+    mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
+
+    const ownershipChain = makeChain({ data: { id: VALID_UUID, has_holdings_tracking: true }, error: null })
+    const defaultAssetChain = makeChain({ data: { id: VALID_UUID }, error: null })
+    const holdingsExistingChain = makeChain({ data: [], error: null })
+
+    const insertChain: Record<string, unknown> = {}
+    insertChain.insert = vi.fn(() => insertChain)
+    insertChain.select = vi.fn(() => insertChain)
+    insertChain.single = vi.fn(() => Promise.resolve({
+      data: { id: 'h-nieuw', asset_id: VALID_UUID },
+      error: null,
+    }))
+
+    const txUpsertChain: Record<string, unknown> = {}
+    txUpsertChain.upsert = vi.fn(() => txUpsertChain)
+    txUpsertChain.select = vi.fn(() => Promise.resolve({ data: [{ id: 'tx-1' }], error: null }))
+
+    let fromCallIndex = 0
+    mockFrom.mockImplementation((table: string) => {
+      fromCallIndex++
+      if (table === 'assets' && fromCallIndex === 1) return ownershipChain
+      if (table === 'assets' && fromCallIndex === 2) return defaultAssetChain
+      if (table === 'investment_holdings' && fromCallIndex === 3) return holdingsExistingChain
+      if (table === 'investment_holdings' && fromCallIndex === 4) return insertChain
+      if (table === 'investment_transactions' && fromCallIndex === 5) return txUpsertChain
+      return makeChain({ data: null, error: null })
+    })
+
+    const res = await callRoute(makeRequest({
+      holdings: [makeHolding({
+        name: 'AEX 485.9SPSOPENG',
+        ticker: null,
+        isin: 'NL0014440877',
+        units: -5,
+        avg_purchase_price: 0,
+        current_price: 0,
+      })],
+      transactions: [makeTx({ type: 'sell', units: 5, price_per_unit: 116.66, total_amount: 583.3 })],
+      broker: 'degiro',
+      mode: 'append',
+      targetAssetId: VALID_UUID,
+    }))
+
+    expect(res.status).toBe(201)
+
+    // De weggeschreven holding-rij start op 0, nooit op een negatief aantal.
+    const inserted = (insertChain.insert as ReturnType<typeof vi.fn>).mock.calls[0][0] as { units: number }
+    expect(inserted.units).toBe(0)
+  })
+
+  // De klem op 0 is verdedigbaar, maar mag niet stil zijn: zonder terugkoppeling
+  // ziet de gebruiker een geslaagde import en een positie van 0 stuks, zonder te
+  // weten dát en waaróm er gecorrigeerd is (importtoets 5).
+  it('meldt in de samenvatting hoeveel posities een onvolledige historie hadden', async () => {
+    mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
+    mockSyncHoldingAggregates.mockResolvedValue({
+      synced: true,
+      units: 0,
+      avgPurchasePrice: 0,
+      historyIncomplete: true,
+    })
+
+    const ownershipChain = makeChain({ data: { id: VALID_UUID, has_holdings_tracking: true }, error: null })
+    const defaultAssetChain = makeChain({ data: { id: VALID_UUID }, error: null })
+    const holdingsExistingChain = makeChain({ data: [], error: null })
+
+    const insertChain: Record<string, unknown> = {}
+    insertChain.insert = vi.fn(() => insertChain)
+    insertChain.select = vi.fn(() => insertChain)
+    insertChain.single = vi.fn(() => Promise.resolve({
+      data: { id: 'h-nieuw', asset_id: VALID_UUID },
+      error: null,
+    }))
+
+    const txUpsertChain: Record<string, unknown> = {}
+    txUpsertChain.upsert = vi.fn(() => txUpsertChain)
+    txUpsertChain.select = vi.fn(() => Promise.resolve({ data: [{ id: 'tx-1' }], error: null }))
+
+    let fromCallIndex = 0
+    mockFrom.mockImplementation((table: string) => {
+      fromCallIndex++
+      if (table === 'assets' && fromCallIndex === 1) return ownershipChain
+      if (table === 'assets' && fromCallIndex === 2) return defaultAssetChain
+      if (table === 'investment_holdings' && fromCallIndex === 3) return holdingsExistingChain
+      if (table === 'investment_holdings' && fromCallIndex === 4) return insertChain
+      if (table === 'investment_transactions' && fromCallIndex === 5) return txUpsertChain
+      return makeChain({ data: null, error: null })
+    })
+
+    const res = await callRoute(makeRequest({
+      holdings: [makeHolding({ name: 'AEX 485.9SPSOPENG', units: 0, avg_purchase_price: 0 })],
+      transactions: [makeTx({ type: 'sell', units: 5, price_per_unit: 116.66, total_amount: 583.3 })],
+      broker: 'degiro',
+      mode: 'append',
+      targetAssetId: VALID_UUID,
+    }))
+
+    expect(res.status).toBe(201)
+    const body = await res.json()
+    expect(body.summary.holdings_incomplete_history).toBe(1)
+  })
+
+  it('SNAPSHOT: een negatieve positie blijft een fout — daar is de export wél het volledige beeld', async () => {
+    mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
+    mockFrom.mockImplementation(() => makeChain({ data: { id: VALID_UUID, has_holdings_tracking: true }, error: null }))
+
+    const res = await callRoute(makeRequest({
+      holdings: [makeHolding({ name: 'AEX 485.9SPSOPENG', units: -5 })],
+      transactions: [],
+      broker: 'degiro',
+      mode: 'snapshot',
+      targetAssetId: VALID_UUID,
+    }))
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    // De melding noemt het instrument, niet een indexnummer in een array die de
+    // UI nooit toont.
+    expect(body.error).toContain('AEX 485.9SPSOPENG')
+    expect(body.error).not.toMatch(/^Holding \d+:/)
+  })
+
+  it('meldt ALLE ongeldige holdings in één keer, niet alleen de eerste', async () => {
+    mockAuthGetUser.mockResolvedValue({ data: { user: { id: VALID_UUID } } })
+    mockFrom.mockImplementation(() => makeChain({ data: { id: VALID_UUID, has_holdings_tracking: true }, error: null }))
+
+    const res = await callRoute(makeRequest({
+      holdings: [
+        makeHolding({ name: 'GOED' }),
+        makeHolding({ name: 'FOUT EEN', units: -5 }),
+        makeHolding({ name: 'FOUT TWEE', avg_purchase_price: -1 }),
+      ],
+      transactions: [],
+      broker: 'degiro',
+      mode: 'snapshot',
+      targetAssetId: VALID_UUID,
+    }))
+
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toContain('FOUT EEN')
+    expect(body.error).toContain('FOUT TWEE')
+  })
 })

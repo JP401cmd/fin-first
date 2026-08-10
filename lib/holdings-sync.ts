@@ -12,11 +12,18 @@ type SupabaseLike = Awaited<ReturnType<typeof createClient>>
 export interface HoldingAggregatesSync {
   /** False als de holding-update faalde (best-effort). */
   synced: boolean
-  /** Herberekend aantal eenheden (= engine netUnits). */
+  /** Het WEGGESCHREVEN aantal eenheden — geklemd op 0 (zie `historyIncomplete`). */
   units: number
   /** Herberekende gemiddelde kostprijs (= engine avgCost). */
   avgPurchasePrice: number
-  /** De volledige engine-aggregatie (voor callers die meer velden willen). */
+  /**
+   * True wanneer de engine een negatieve positie afleidde: er is méér verkocht
+   * dan volgens de bekende historie ooit is gekocht. Dat is geen short-positie
+   * maar een gat in de historie — meestal een transactie-export waarvan het
+   * venster niet tot de oorspronkelijke aankoop terugreikt.
+   */
+  historyIncomplete: boolean
+  /** De volledige engine-aggregatie, ONGEklemd (`aggregate.netUnits` kan negatief zijn). */
   aggregate: PositionAggregate
 }
 
@@ -75,10 +82,22 @@ export async function syncHoldingAggregatesFromTransactions(
 
   const agg = computePositionFromTransactions(txs)
 
+  // Een negatieve netto-positie is geen bezit maar een gat in de historie: er
+  // is meer verkocht dan volgens de bekende transacties ooit is gekocht (het
+  // klassieke geval: een transactie-export waarvan het venster niet tot de
+  // oorspronkelijke aankoop terugreikt). `investment_holdings.units` draagt een
+  // gehouden aantal, en alles wat erop rekent — de waarde-rollup naar
+  // `assets.current_value`, portefeuillegewichten, Box 3 — zou zo'n getal als
+  // negatieve waarde meenemen. We klemmen daarom op 0 en melden het apart.
+  // Verliesloos: de transacties blijven staan, dus zodra de ontbrekende aankoop
+  // alsnog geïmporteerd wordt, herleidt dezelfde engine de juiste positie.
+  const historyIncomplete = agg.netUnits < 0
+  const storedUnits = historyIncomplete ? 0 : agg.netUnits
+
   const { error } = await supabase
     .from(tables.holdings)
     .update({
-      units: agg.netUnits,
+      units: storedUnits,
       avg_purchase_price: agg.avgCost,
       updated_at: new Date().toISOString(),
     })
@@ -87,8 +106,9 @@ export async function syncHoldingAggregatesFromTransactions(
 
   return {
     synced: !error,
-    units: agg.netUnits,
+    units: storedUnits,
     avgPurchasePrice: agg.avgCost,
+    historyIncomplete,
     aggregate: agg,
   }
 }

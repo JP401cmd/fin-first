@@ -32,6 +32,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { HoldingsPageData } from '@/lib/holdings-data-loader'
 import { OVERLAY_QUERY_KEYS } from '@/lib/navigation'
 import { PortfolioSummary } from './holdings/portfolio-summary'
+import { PortfolioValueChart } from './holdings/portfolio-value-chart'
 import {
   HoldingsToolbar,
   type SortKey,
@@ -855,6 +856,16 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
         assetClassBreakdown={assetClassBreakdown}
         concentrationTop3Pct={concentrationTop3Pct}
       />
+
+      {/* Waardehistorie — wat de inleg door de tijd waard werd. Staat vóór de
+          verdeling en de benchmark: eerst "hoe liep het", dan "waaruit bestaat
+          het" en "hoe verhoudt het zich". Het component haalt zijn eigen reeks
+          op via /api/holdings/value-history en vangt de lege staat zelf af. */}
+      <section className="mt-6">
+        <PortfolioValueChart
+          yearlyEssentialExpenses={initialData?.yearlyEssentialExpenses ?? 0}
+        />
+      </section>
 
       {/* Allocatie-donut — full breakdown met view-tabs (asset-class/sector/regio).
           Anchor `#portfolio-allocation` zodat de compacte strip in de hero

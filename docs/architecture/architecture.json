@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-10T17:46:23.147Z",
+  "generatedAt": "2026-08-10T21:53:27.510Z",
   "generatedDate": "2026-08-10",
   "repo": {
     "name": "fin",
@@ -189,11 +189,11 @@
   "stats": {
     "routes": 141,
     "routesProduction": 99,
-    "api": 289,
+    "api": 291,
     "tables": 89,
     "migrations": 199,
     "integrations": 25,
-    "components": 914,
+    "components": 917,
     "providers": 14,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -3099,6 +3099,14 @@
       ]
     },
     {
+      "url": "/api/holdings/backfill-history",
+      "file": "app/api/holdings/backfill-history/route.ts",
+      "domain": "holdings",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
       "url": "/api/holdings/import",
       "file": "app/api/holdings/import/route.ts",
       "domain": "holdings",
@@ -3118,6 +3126,14 @@
     {
       "url": "/api/holdings/refresh-prices/cron",
       "file": "app/api/holdings/refresh-prices/cron/route.ts",
+      "domain": "holdings",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "url": "/api/holdings/value-history",
+      "file": "app/api/holdings/value-history/route.ts",
       "domain": "holdings",
       "methods": [
         "GET"
@@ -5221,6 +5237,92 @@
       ]
     },
     {
+      "domain": "holdings",
+      "label": "Beleggingen",
+      "count": 9,
+      "routes": [
+        {
+          "url": "/api/holdings",
+          "file": "app/api/holdings/route.ts",
+          "domain": "holdings",
+          "methods": [
+            "GET",
+            "POST",
+            "PATCH",
+            "DELETE"
+          ]
+        },
+        {
+          "url": "/api/holdings/[id]",
+          "file": "app/api/holdings/[id]/route.ts",
+          "domain": "holdings",
+          "methods": [
+            "GET",
+            "PATCH"
+          ]
+        },
+        {
+          "url": "/api/holdings/[id]/transactions",
+          "file": "app/api/holdings/[id]/transactions/route.ts",
+          "domain": "holdings",
+          "methods": [
+            "GET",
+            "POST",
+            "DELETE"
+          ]
+        },
+        {
+          "url": "/api/holdings/[id]/value-history",
+          "file": "app/api/holdings/[id]/value-history/route.ts",
+          "domain": "holdings",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/holdings/backfill-history",
+          "file": "app/api/holdings/backfill-history/route.ts",
+          "domain": "holdings",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/holdings/import",
+          "file": "app/api/holdings/import/route.ts",
+          "domain": "holdings",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/holdings/refresh-prices",
+          "file": "app/api/holdings/refresh-prices/route.ts",
+          "domain": "holdings",
+          "methods": [
+            "POST",
+            "PATCH"
+          ]
+        },
+        {
+          "url": "/api/holdings/refresh-prices/cron",
+          "file": "app/api/holdings/refresh-prices/cron/route.ts",
+          "domain": "holdings",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/holdings/value-history",
+          "file": "app/api/holdings/value-history/route.ts",
+          "domain": "holdings",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "assets",
       "label": "Bezittingen",
       "count": 7,
@@ -5280,76 +5382,6 @@
           "domain": "assets",
           "methods": [
             "POST"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "holdings",
-      "label": "Beleggingen",
-      "count": 7,
-      "routes": [
-        {
-          "url": "/api/holdings",
-          "file": "app/api/holdings/route.ts",
-          "domain": "holdings",
-          "methods": [
-            "GET",
-            "POST",
-            "PATCH",
-            "DELETE"
-          ]
-        },
-        {
-          "url": "/api/holdings/[id]",
-          "file": "app/api/holdings/[id]/route.ts",
-          "domain": "holdings",
-          "methods": [
-            "GET",
-            "PATCH"
-          ]
-        },
-        {
-          "url": "/api/holdings/[id]/transactions",
-          "file": "app/api/holdings/[id]/transactions/route.ts",
-          "domain": "holdings",
-          "methods": [
-            "GET",
-            "POST",
-            "DELETE"
-          ]
-        },
-        {
-          "url": "/api/holdings/[id]/value-history",
-          "file": "app/api/holdings/[id]/value-history/route.ts",
-          "domain": "holdings",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/holdings/import",
-          "file": "app/api/holdings/import/route.ts",
-          "domain": "holdings",
-          "methods": [
-            "POST"
-          ]
-        },
-        {
-          "url": "/api/holdings/refresh-prices",
-          "file": "app/api/holdings/refresh-prices/route.ts",
-          "domain": "holdings",
-          "methods": [
-            "POST",
-            "PATCH"
-          ]
-        },
-        {
-          "url": "/api/holdings/refresh-prices/cron",
-          "file": "app/api/holdings/refresh-prices/cron/route.ts",
-          "domain": "holdings",
-          "methods": [
-            "GET"
           ]
         }
       ]
@@ -8410,7 +8442,7 @@
     }
   ],
   "components": {
-    "total": 914,
+    "total": 917,
     "groups": [
       {
         "group": "app",
@@ -9038,7 +9070,7 @@
       },
       {
         "group": "core",
-        "count": 69,
+        "count": 71,
         "items": [
           "account-source-icon",
           "account-source-icon.test",
@@ -9097,6 +9129,8 @@
           "opbrengst-uitsplitsing",
           "opbrengst-uitsplitsing.test",
           "portfolio-summary",
+          "portfolio-value-chart",
+          "portfolio-value-chart.test",
           "rebalancing-settings-section",
           "rental-alternative-comparison",
           "rental-roi-card",
@@ -9334,12 +9368,13 @@
       },
       {
         "group": "berichten",
-        "count": 11,
+        "count": 12,
         "items": [
           "archive-edition-card",
           "archive-section",
           "berichten-client",
           "berichten-client.density.test",
+          "berichten-client.unread-count.test",
           "masthead",
           "masthead.test",
           "news-components",
@@ -9986,6 +10021,10 @@
         }
       ],
       "benchmark-comparison": [
+        {
+          "name": "investment_holding_prices",
+          "write": false
+        },
         {
           "name": "investment_holdings",
           "write": false
@@ -13228,9 +13267,11 @@
           "routes": [
             "/api/holdings",
             "/api/holdings/[id]",
+            "/api/holdings/backfill-history",
             "/api/holdings/import",
             "/api/holdings/refresh-prices",
-            "/api/holdings/refresh-prices/cron"
+            "/api/holdings/refresh-prices/cron",
+            "/api/holdings/value-history"
           ]
         },
         {
@@ -13338,7 +13379,8 @@
           "label": "Beleggingen",
           "write": true,
           "routes": [
-            "/api/holdings/import"
+            "/api/holdings/import",
+            "/api/holdings/value-history"
           ]
         },
         {
@@ -13355,6 +13397,26 @@
           "write": false,
           "routes": [
             "/api/investment/holdings/[id]/detail"
+          ]
+        }
+      ],
+      "investment_holding_prices": [
+        {
+          "domain": "holdings",
+          "label": "Beleggingen",
+          "write": true,
+          "routes": [
+            "/api/holdings/refresh-prices",
+            "/api/holdings/refresh-prices/cron",
+            "/api/holdings/value-history"
+          ]
+        },
+        {
+          "domain": "benchmark-comparison",
+          "label": "benchmark-comparison",
+          "write": false,
+          "routes": [
+            "/api/benchmark-comparison"
           ]
         }
       ],
@@ -13712,17 +13774,6 @@
           "write": false,
           "routes": [
             "/api/notifications"
-          ]
-        }
-      ],
-      "investment_holding_prices": [
-        {
-          "domain": "holdings",
-          "label": "Beleggingen",
-          "write": true,
-          "routes": [
-            "/api/holdings/refresh-prices",
-            "/api/holdings/refresh-prices/cron"
           ]
         }
       ],
@@ -16014,6 +16065,18 @@
       ],
       "summary": "Een grenzenpot was tot 09-08-2026 precies één regel, plat opgeslagen in de pot-rij: óf één `budget_id`, óf één `counterparty_key`, afgedwongen door de CHECK `spend_limits_rule_shape` (ADR 0089, uitgebreid in ADR 0092). De eigenaar vroeg om drie dingen tegelijk:",
       "file": "docs/adr/0097-grenzenpot-meerdere-regels-en-fijnere-periodes.md"
+    },
+    {
+      "id": "0098-portefeuille-waardehistorie-prijsladder",
+      "title": "Portefeuille-waardehistorie: een prijsladder in plaats van alleen marktkoersen",
+      "status": "aanvaard",
+      "date": "2026-08-10",
+      "elements": [
+        "as-vermogen",
+        "fn-aandelenregistratie"
+      ],
+      "summary": "De holdings-pagina toonde geen enkel beeld van de waarde door de tijd. De benchmarkgrafiek stond er wél, met AEX, MSCI World en S&P 500, maar meldde eronder: *\"Je eigen lijn ontbreekt nog. Voor je rendement over 1 jaar zijn maandelijkse koerswaarderingen van je posities nodig.\"*",
+      "file": "docs/adr/0098-portefeuille-waardehistorie-prijsladder.md"
     }
   ],
   "churn": {
@@ -16021,7 +16084,7 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 127
+        "commits": 128
       },
       {
         "path": "lib/ai",
@@ -16064,7 +16127,7 @@
       {
         "file": "components/app/horizon/horizon-client.tsx",
         "loc": 9107,
-        "commits": 92
+        "commits": 93
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -17479,8 +17542,8 @@
     },
     {
       "date": "2026-08-10",
-      "api": 289,
-      "components": 914,
+      "api": 291,
+      "components": 917,
       "tables": 89,
       "routesProduction": 99
     }

@@ -16,6 +16,12 @@ import {
  * Query params:
  *   ?period=1m|3m|6m|1y|ytd|all (default: 1y)
  */
+
+/** Paginagrootte voor de koersrijen; gelijk aan PostgREST's `max_rows`. */
+const PRICE_PAGE_SIZE = 1000
+/** Runaway-grens (200k rijen), ruim boven elk realistisch account. */
+const PRICE_MAX_PAGES = 200
+
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
 
@@ -63,11 +69,52 @@ export async function GET(request: NextRequest) {
       .in('holding_id', holdingIds)
       .order('date', { ascending: true })
 
+    // Dagelijkse slotkoersen — de primaire koersbron. Zonder deze bleef de
+    // waardering hangen op `valuations`, dat voor echte accounts leeg is; elke
+    // maand kwam dan op "niet waarneembaar" en de eigen lijn verdween.
+    //
+    // GEPAGINEERD: een kale select kapt stil af op `max_rows` (1000). Na een
+    // backfill (`range=max`) staan er duizenden rijen per ticker; met een
+    // oplopende sortering krijg je dan de OUDSTE 1000 en waardeer je elke maand
+    // op verouderde koersen die zich wél als waarneming presenteren.
+    const priceObservations: Array<{ holding_id: string; date: string; close_price: number | string }> = []
+    for (let page = 0; page < PRICE_MAX_PAGES; page++) {
+      const from = page * PRICE_PAGE_SIZE
+      const { data: pageRows } = await supabase
+        .from('investment_holding_prices')
+        .select('holding_id, date, close_price')
+        .in('holding_id', holdingIds)
+        .order('holding_id', { ascending: true })
+        .order('date', { ascending: true })
+        .range(from, from + PRICE_PAGE_SIZE - 1)
+      const rows = pageRows ?? []
+      priceObservations.push(...rows)
+      if (rows.length < PRICE_PAGE_SIZE) break
+    }
+
+    // De actuele koers als observatie-van-vandaag. Zonder dit wint een oude
+    // slotkoers het van `current_price`: `closeOnOrBefore` kent geen
+    // houdbaarheidsgrens, dus één rij uit 2024 voor een gedelistte positie
+    // waardeert élke latere maand — inclusief de lopende — en meldt dat als
+    // waargenomen. Dezelfde behandeling die de waardecurve al kreeg, zodat de
+    // twee grafieken op één scherm niet uiteenlopen voor "nu".
+    for (const h of holdings) {
+      if (Number(h.current_price) > 0) {
+        priceObservations.push({
+          holding_id: h.id,
+          date: new Date().toISOString().slice(0, 10),
+          close_price: Number(h.current_price),
+        })
+      }
+    }
+
     // Build portfolio history
     const portfolioHistory = buildPortfolioHistory(
       holdings,
       valuations || [],
       transactions || [],
+      new Date(),
+      priceObservations || [],
     )
 
     if (portfolioHistory.length < 2) {

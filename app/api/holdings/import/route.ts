@@ -119,31 +119,68 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 /** Bovengrens voor de naam van een in de wizard aangemaakte bezitting. */
 const MAX_ASSET_NAME_LENGTH = 80
 
+/** Hoeveel validatiefouten we uitschrijven voor we samenvatten. */
+const MAX_REPORTED_ERRORS = 5
+
 // ---------------------------------------------------------------------------
 // Validation helpers
 // ---------------------------------------------------------------------------
 
-function validateHolding(h: unknown, index: number): string | null {
+/**
+ * Valideert één holding uit de payload.
+ *
+ * Twee dingen zijn hier bewust anders dan een rechttoe-rechtaan guard:
+ *
+ * 1. **De melding noemt het instrument, niet een indexnummer.** `Holding 3` is
+ *    een index in de gegroepeerde holdings-array die de wizard nooit toont; de
+ *    gebruiker kon er geen regel bij vinden.
+ * 2. **Een negatief aantal is alleen bij `snapshot` een fout.** Een positie-
+ *    export ís het volledige beeld — een negatieve positie betekent daar een
+ *    parseerfout. Bij een transactie-export (`append`) is `units` géén
+ *    gezaghebbend veld: de wizard leidt 'm af uit de transacties in dít bestand,
+ *    en de server herleidt de echte positie na afloop uit de volledige historie
+ *    in de database (`syncHoldingAggregatesFromTransactions`). Reikt het
+ *    exportvenster niet terug tot de oorspronkelijke aankoop, dan is dat cijfer
+ *    legitiem negatief — dat mag de import niet blokkeren. De aanroeper klemt
+ *    het op 0 vóór het wegschrijven (zie `unitsForImport`).
+ */
+function validateHolding(h: unknown, index: number, mode: ImportMode): string | null {
   if (!h || typeof h !== 'object') {
-    return `Holding ${index}: moet een object zijn`
+    return `Holding ${index + 1}: moet een object zijn`
   }
   const obj = h as Record<string, unknown>
 
   if (!obj.name || typeof obj.name !== 'string' || obj.name.trim().length === 0) {
-    return `Holding ${index}: naam is verplicht`
+    return `Holding ${index + 1}: naam is verplicht`
   }
-  if (typeof obj.units !== 'number' || isNaN(obj.units) || obj.units < 0) {
-    return `Holding ${index}: units moet een positief getal zijn`
+  const label = obj.name.trim()
+
+  if (typeof obj.units !== 'number' || isNaN(obj.units)) {
+    return `${label}: units moet een getal zijn`
+  }
+  if (mode === 'snapshot' && obj.units < 0) {
+    return `${label}: units moet een positief getal zijn`
   }
   if (typeof obj.avg_purchase_price !== 'number' || isNaN(obj.avg_purchase_price) || obj.avg_purchase_price < 0) {
-    return `Holding ${index}: avg_purchase_price moet een positief getal zijn`
+    return `${label}: gemiddelde aankoopprijs moet een positief getal zijn`
   }
   if (obj.current_price !== null && obj.current_price !== undefined) {
     if (typeof obj.current_price !== 'number' || isNaN(obj.current_price) || obj.current_price < 0) {
-      return `Holding ${index}: current_price moet een positief getal of null zijn`
+      return `${label}: huidige prijs moet een positief getal of leeg zijn`
     }
   }
   return null
+}
+
+/**
+ * Het aantal eenheden dat we daadwerkelijk wegschrijven.
+ *
+ * Bij `append` is de meegestuurde waarde niet gezaghebbend (zie
+ * `validateHolding`) en mag hij nooit negatief in de tabel belanden: een nieuwe
+ * rij start op 0 en wordt daarna uit de transactiehistorie herleid.
+ */
+function unitsForImport(units: number, mode: ImportMode): number {
+  return mode === 'append' ? Math.max(0, units) : units
 }
 
 function validateTransaction(tx: unknown, index: number, holdingsLength: number): string | null {
@@ -317,9 +354,20 @@ export async function POST(request: NextRequest) {
 
     // --- Validate individual holdings ---
 
+    // Álle fouten in één antwoord, niet alleen de eerste: een broker-export
+    // levert er zelden precies één, en rij-voor-rij terugkomen kostte de
+    // gebruiker een upload per fout.
+    const holdingErrors: string[] = []
     for (let i = 0; i < body.holdings.length; i++) {
-      const err = validateHolding(body.holdings[i], i)
-      if (err) return NextResponse.json({ error: err }, { status: 400 })
+      const err = validateHolding(body.holdings[i], i, mode)
+      if (err) holdingErrors.push(err)
+    }
+    if (holdingErrors.length > 0) {
+      const shown = holdingErrors.slice(0, MAX_REPORTED_ERRORS)
+      const rest = holdingErrors.length - shown.length
+      return NextResponse.json({
+        error: shown.join(' · ') + (rest > 0 ? ` · en nog ${rest} andere` : ''),
+      }, { status: 400 })
     }
 
     // --- Validate individual transactions ---
@@ -444,6 +492,9 @@ export async function POST(request: NextRequest) {
     let holdingsUpdated = 0
     let holdingsDeactivated = 0
     let transactionsCreated = 0
+    // Posities waarvan de afgeleide historie negatief uitkwam (meer verkocht
+    // dan gekocht in wat we kennen) en dus op 0 is gezet.
+    let holdingsWithIncompleteHistory = 0
     // Rijen die we al hadden en dus zijn overgeslagen — het bewijs dat een
     // bewust overlappende upload geen dubbele historie oplevert.
     let transactionsDeduped = 0
@@ -457,6 +508,9 @@ export async function POST(request: NextRequest) {
 
     for (let i = 0; i < body.holdings.length; i++) {
       const h = body.holdings[i]
+      // Bij 'append' is het meegestuurde aantal niet gezaghebbend en kan het
+      // legitiem negatief zijn; klem het vóór elke schrijfactie op 0.
+      const hUnits = unitsForImport(h.units, mode)
       const isinNorm = h.isin?.toUpperCase() || null
       const tickerNorm = h.ticker?.toUpperCase() || null
 
@@ -474,17 +528,17 @@ export async function POST(request: NextRequest) {
           // Snapshot: the CSV is the source of truth — REPLACE the position
           // (no accumulation) so a re-upload is idempotent. Re-activate in case
           // the holding was previously deactivated by an earlier snapshot.
-          updates.units = h.units
+          updates.units = hUnits
           updates.avg_purchase_price = Math.round(h.avg_purchase_price * 100) / 100
           updates.is_active = true
         } else {
           // Append (legacy): add units, recalculate weighted average price.
           const oldUnits = existing.units
           const oldAvg = existing.avg_purchase_price ?? 0
-          const newUnits = oldUnits + h.units
+          const newUnits = oldUnits + hUnits
           // Weighted average purchase price.
           const newAvg = newUnits > 0
-            ? ((oldAvg * oldUnits) + (h.avg_purchase_price * h.units)) / newUnits
+            ? ((oldAvg * oldUnits) + (h.avg_purchase_price * hUnits)) / newUnits
             : 0
           updates.units = newUnits
           updates.avg_purchase_price = Math.round(newAvg * 100) / 100
@@ -546,7 +600,7 @@ export async function POST(request: NextRequest) {
             ticker: (h.ticker?.trim() || h.name.trim()),
             isin: h.isin || null,
             exchange: h.exchange || null,
-            units: h.units,
+            units: hUnits,
             avg_purchase_price: h.avg_purchase_price,
             current_price: h.current_price ?? null,
             purchase_date: h.purchase_date || null,
@@ -571,7 +625,7 @@ export async function POST(request: NextRequest) {
           id: created.id,
           ticker: h.ticker || null,
           isin: h.isin || null,
-          units: h.units,
+          units: hUnits,
           avg_purchase_price: h.avg_purchase_price,
           asset_id: created.asset_id,
         }
@@ -716,6 +770,11 @@ export async function POST(request: NextRequest) {
             'holdings-import:POST',
           )
         }
+        // Meer verkocht dan volgens de bekende historie ooit gekocht: het
+        // exportvenster reikt niet terug tot de openingskoop. De positie wordt
+        // op 0 gezet — verdedigbaar, maar zonder deze telling wordt die
+        // correctie stil en denkt de gebruiker dat de import compleet was.
+        if (synced.historyIncomplete) holdingsWithIncompleteHistory++
       }
     }
 
@@ -744,6 +803,7 @@ export async function POST(request: NextRequest) {
         asset_id: targetAssetId,
         transactions_created: transactionsCreated,
         transactions_deduped: transactionsDeduped,
+        holdings_incomplete_history: holdingsWithIncompleteHistory,
         total_value: Math.round(totalValue * 100) / 100,
         broker: body.broker,
       },

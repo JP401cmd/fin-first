@@ -31,6 +31,7 @@ import { normalizeHeadersForFingerprint } from '@/lib/parsers/format-contracts'
 import { Kicker, EditorialHeadline, EditorialDeck } from '@/components/editorial'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { computePositionFromTransactions } from '@/lib/holdings-aggregation'
+import { instrumentKey, countDistinctInstruments } from '@/lib/holdings-import-grouping'
 import type { HoldingsImportTarget } from '@/lib/holdings-import-targets'
 
 // ---------------------------------------------------------------------------
@@ -60,6 +61,8 @@ type ImportSummary = {
   transactions_created: number
   /** Rijen die we al hadden en dus zijn overgeslagen (overlappende upload). */
   transactions_deduped?: number
+  /** Posities waarvan de bekende historie meer verkopen dan aankopen bevat. */
+  holdings_incomplete_history?: number
   total_value: number
   broker: string
   /** De bezitting waarin dit landde — ook als de wizard 'm net aanmaakte. */
@@ -505,7 +508,7 @@ export default function HoldingsImportClient({ targets }: HoldingsImportClientPr
       >()
 
       for (const row of selected) {
-        const key = (row.isin ?? row.ticker ?? row.name).toUpperCase()
+        const key = instrumentKey(row)
 
         if (!holdingMap.has(key)) {
           holdingMap.set(key, { key, row, transactions: [] })
@@ -550,7 +553,12 @@ export default function HoldingsImportClient({ targets }: HoldingsImportClientPr
           name: entry.row.name,
           ticker: entry.row.ticker,
           isin: entry.row.isin,
-          units: agg.netUnits,
+          // Geklemd op 0: reikt het exportvenster niet terug tot de
+          // oorspronkelijke aankoop, dan is de netto positie over dít bestand
+          // legitiem negatief. De echte positie wordt server-side herleid uit
+          // de volledige transactiehistorie — dit getal initialiseert hooguit
+          // een nieuwe rij en mag die nooit negatief laten starten.
+          units: Math.max(0, agg.netUnits),
           avg_purchase_price: avgCost,
           // Geen live koers in een transactie-export; gemiddelde kostprijs als
           // neutrale placeholder tot een koers-refresh de actuele prijs ophaalt.
@@ -585,9 +593,7 @@ export default function HoldingsImportClient({ targets }: HoldingsImportClientPr
             row.type !== 'position',
         )
         .map((row) => ({
-          holding_index: keyToIndex.get(
-            (row.isin ?? row.ticker ?? row.name).toUpperCase(),
-          )!,
+          holding_index: keyToIndex.get(instrumentKey(row))!,
           type: row.type,
           units: row.units,
           price_per_unit: row.price_per_unit,
@@ -683,9 +689,10 @@ export default function HoldingsImportClient({ targets }: HoldingsImportClientPr
   // ---------------------------------------------------------------------------
 
   const includedRows = previewRows.filter((r) => r.included)
-  const holdingsCount = includedRows.filter(
-    (r) => r.type === 'position' || r.type === 'buy',
-  ).length
+  // Instrumenten, niet regels: 24 aankopen van hetzelfde fonds zijn één holding.
+  // Zelfde sleutel als de groepering in `performImport`, zodat het getal in de
+  // samenvatting per definitie klopt met wat er verstuurd wordt.
+  const holdingsCount = countDistinctInstruments(includedRows)
   const transactionsCount = includedRows.filter(
     (r) => r.type !== 'position',
   ).length
@@ -1198,6 +1205,51 @@ export default function HoldingsImportClient({ targets }: HoldingsImportClientPr
             )}
           </div>
 
+          {/* Actiebalk — BOVEN de voorbeeldtabel, en sticky.
+              Een transactie-export levert makkelijk honderden regels; stond de
+              importknop eronder, dan moest je er eerst volledig doorheen
+              scrollen vóór je kon importeren. Sticky houdt 'm bereikbaar
+              terwijl je de rijen naloopt.
+              (Dit is een pagina-actiebalk, geen overlay-footer — de
+              ShellOverlay/ADR 0039-norm gaat over sheets en panes en is hier
+              niet van toepassing.) */}
+          <div className="sticky top-0 z-10 -mx-4 flex items-center justify-between gap-3 border-b border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3">
+            <button
+              onClick={() => setStep(1)}
+              disabled={loading}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-2.5 text-sm font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)] disabled:opacity-50"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Terug
+            </button>
+            <button
+              onClick={performImport}
+              disabled={loading || includedRows.length === 0}
+              className={`inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-bold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                willClear
+                  ? 'bg-negative hover:bg-negative/90'
+                  : 'bg-kern-600 hover:bg-kern-700'
+              }`}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Bezig met importeren...
+                </>
+              ) : willClear ? (
+                <>
+                  <Trash2 className="h-4 w-4" />
+                  Verwijderen en importeren ({includedRows.length})
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4" />
+                  Importeren ({includedRows.length})
+                </>
+              )}
+            </button>
+          </div>
+
           {/* Parse warnings */}
           {parseResult && parseResult.errors.length > 0 && (
             <div className="space-y-1 rounded-lg border border-yellow-200 bg-yellow-50 p-3">
@@ -1274,8 +1326,12 @@ export default function HoldingsImportClient({ targets }: HoldingsImportClientPr
                             <span className="font-normal">
                               {' '}
                               &mdash;{' '}
+                              {/* Niet "bijgeteld": de server ontdubbelt op de
+                                  transactiesleutel en herleidt de positie uit
+                                  de volledige historie. Een overlappende upload
+                                  telt dus niets dubbel. */}
                               {effectiveKind === 'transactions'
-                                ? 'wordt bijgeteld'
+                                ? 'wordt samengevoegd'
                                 : 'wordt vervangen'}
                             </span>
                           )}
@@ -1314,44 +1370,6 @@ export default function HoldingsImportClient({ targets }: HoldingsImportClientPr
               Geen rijen gevonden in het bestand.
             </p>
           )}
-
-          {/* Action buttons */}
-          <div className="flex items-center justify-between gap-3">
-            <button
-              onClick={() => setStep(1)}
-              disabled={loading}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-2.5 text-sm font-medium text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)] disabled:opacity-50"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Terug
-            </button>
-            <button
-              onClick={performImport}
-              disabled={loading || includedRows.length === 0}
-              className={`inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-bold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                willClear
-                  ? 'bg-negative hover:bg-negative/90'
-                  : 'bg-kern-600 hover:bg-kern-700'
-              }`}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Bezig met importeren...
-                </>
-              ) : willClear ? (
-                <>
-                  <Trash2 className="h-4 w-4" />
-                  Verwijderen en importeren ({includedRows.length})
-                </>
-              ) : (
-                <>
-                  <Upload className="h-4 w-4" />
-                  Importeren ({includedRows.length})
-                </>
-              )}
-            </button>
-          </div>
         </div>
       )}
 
@@ -1418,6 +1436,22 @@ export default function HoldingsImportClient({ targets }: HoldingsImportClientPr
               {importSummary.transactions_deduped === 1
                 ? 'transactie stond er al en is overgeslagen.'
                 : 'transacties stonden er al en zijn overgeslagen.'}
+            </p>
+          )}
+
+          {/* Onvolledige historie is geen importfout maar wél iets dat de
+              gebruiker moet weten: die posities staan nu op 0 omdat het
+              exportvenster de oorspronkelijke aankoop mist. Zonder deze regel
+              corrigeren we stil en lijkt de import compleet. */}
+          {(importSummary.holdings_incomplete_history ?? 0) > 0 && (
+            <p className="text-center text-sm text-[var(--ink-3)]">
+              Bij{' '}
+              <span className="font-mono font-bold tabular-nums text-[var(--ink)]">
+                {importSummary.holdings_incomplete_history}
+              </span>{' '}
+              {importSummary.holdings_incomplete_history === 1 ? 'positie' : 'posities'} zijn er
+              méér verkopen dan aankopen bekend; die staan nu op 0 stuks. Upload een export die
+              verder terugloopt om het aantal te laten kloppen.
             </p>
           )}
 

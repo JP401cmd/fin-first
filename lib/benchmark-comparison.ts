@@ -438,6 +438,22 @@ export function buildPortfolioHistory(
     date: string
   }>,
   now: Date = new Date(),
+  /**
+   * Dagelijkse slotkoersen uit `investment_holding_prices` — de PRIMAIRE
+   * koersbron sinds de eigen lijn structureel ontbrak.
+   *
+   * Waarom dit erbij kwam: deze functie waardeerde uitsluitend op `valuations`,
+   * een tabel die voor echte accounts leeg is (0 rijen bij 109 posities). Elke
+   * maand kwam daardoor op `pricedFromHistory: false`, `computeTwrSeries` gaf
+   * `null`, en de grafiek meldde "Je eigen lijn ontbreekt nog" — terwijl de
+   * koersen wél bestonden, alleen in een andere tabel. `valuations` blijft als
+   * terugval staan zodat bestaande data blijft werken.
+   */
+  priceObservations: Array<{
+    holding_id: string
+    date: string
+    close_price: number | string
+  }> = [],
 ): HoldingSnapshot[] {
   if (holdings.length === 0) return []
 
@@ -457,6 +473,45 @@ export function buildPortfolioHistory(
     if (!valMap[v.entity_id]) valMap[v.entity_id] = {}
     const monthKey = v.valuation_date.substring(0, 7) // YYYY-MM
     valMap[v.entity_id][monthKey] = v.value
+  }
+
+  // Index koersobservaties per positie, chronologisch. Per maand pakken we de
+  // laatste observatie op of vóór het maandeinde — een echte slotkoers, ook als
+  // die van een paar dagen eerder is (feestdagen, weekend, illiquide fonds).
+  const pricesByHolding: Record<string, Array<{ date: string; close: number }>> = {}
+  for (const p of priceObservations) {
+    const close = Number(p.close_price)
+    if (!Number.isFinite(close) || close <= 0) continue
+    if (!pricesByHolding[p.holding_id]) pricesByHolding[p.holding_id] = []
+    pricesByHolding[p.holding_id].push({ date: p.date, close })
+  }
+  for (const key of Object.keys(pricesByHolding)) {
+    pricesByHolding[key].sort((a, b) => a.date.localeCompare(b.date))
+  }
+
+  // Cursor per positie. De maandlus loopt chronologisch, dus elke reeks hoeft
+  // maar één keer doorlopen te worden in plaats van per maand opnieuw vanaf het
+  // begin — met duizenden koersrijen per positie (na een backfill) scheelt dat
+  // maanden × posities × duizenden vergelijkingen per request.
+  const priceCursor: Record<string, number> = {}
+  const lastClose: Record<string, number> = {}
+
+  /**
+   * Laatste slotkoers op of vóór `onOrBefore`, of null.
+   *
+   * LET OP: mag alleen met een niet-dalende `onOrBefore` worden aangeroepen —
+   * de cursor loopt één kant op. Dat geldt binnen de maandlus hieronder.
+   */
+  function closeOnOrBefore(holdingId: string, onOrBefore: string): number | null {
+    const list = pricesByHolding[holdingId]
+    if (!list || list.length === 0) return null
+    let i = priceCursor[holdingId] ?? 0
+    while (i < list.length && list[i].date <= onOrBefore) {
+      lastClose[holdingId] = list[i].close
+      i++
+    }
+    priceCursor[holdingId] = i
+    return lastClose[holdingId] ?? null
   }
 
   // Index transactions by holding_id → sorted by date
@@ -537,8 +592,13 @@ export function buildPortfolioHistory(
       let price: number
       let priceObserved = false
 
+      const close = closeOnOrBefore(holding.id, monthEnd)
       const valuation = valMap[holding.id]?.[monthKey]
-      if (valuation != null && valuation > 0) {
+      if (close != null) {
+        // Primaire bron: een echte slotkoers uit `investment_holding_prices`.
+        price = close
+        priceObserved = true
+      } else if (valuation != null && valuation > 0) {
         price = valuation / units // valuation is total value
         priceObserved = true
       } else if (monthKey === nowMonthKey && holding.current_price) {

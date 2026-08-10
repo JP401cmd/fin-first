@@ -270,6 +270,48 @@ describe('buildPortfolioHistory — kasstroom en koersdekking', () => {
     expect(computeTwrSeries(history)!.returnPct).toBe(0)
   })
 
+  // Given een portefeuille waarvan de dagkoersen in `investment_holding_prices`
+  // staan en `valuations` (zoals bij elk echt account) leeg is;
+  // When de historie wordt opgebouwd;
+  // Then is élke maand waarneembaar en levert het rendement een lijn op — de
+  // situatie waarin de grafiek "Je eigen lijn ontbreekt nog" meldde.
+  it('waardeert op de dagelijkse slotkoersen, ook zonder één enkele valuation-rij', () => {
+    const dagkoersen = [
+      { holding_id: 'h1', date: '2026-06-30', close_price: 110 },
+      { holding_id: 'h1', date: '2026-07-31', close_price: 120 },
+      { holding_id: 'h1', date: '2026-08-31', close_price: 130 },
+    ]
+    const history = buildPortfolioHistory([holding], [], buys, NOW, dagkoersen)
+
+    expect(history.every(s => s.pricedFromHistory)).toBe(true)
+    expect(history.map(s => s.totalValue)).toEqual([1100, 2400, 3900])
+    expect(computeTwrSeries(history)).not.toBeNull()
+  })
+
+  it('pakt de laatste slotkoers vóór het maandeinde, niet een latere', () => {
+    const dagkoersen = [
+      { holding_id: 'h1', date: '2026-06-26', close_price: 110 }, // vrijdag vóór maandeinde
+      { holding_id: 'h1', date: '2026-07-31', close_price: 120 },
+      { holding_id: 'h1', date: '2026-09-15', close_price: 999 }, // ná NOW — mag nooit meetellen
+    ]
+    const history = buildPortfolioHistory([holding], [], buys, NOW, dagkoersen)
+
+    expect(history[0].totalValue).toBe(1100)
+    // Augustus heeft geen eigen koers meer; de laatste bekende (juli) geldt.
+    expect(history[2].totalValue).toBe(3600)
+  })
+
+  it('negeert onbruikbare koersrijen (nul, negatief, niet-numeriek)', () => {
+    const rommel = [
+      { holding_id: 'h1', date: '2026-06-30', close_price: 0 },
+      { holding_id: 'h1', date: '2026-07-31', close_price: -5 },
+      { holding_id: 'h1', date: '2026-08-31', close_price: 'n/a' },
+    ]
+    const history = buildPortfolioHistory([holding], [], buys, NOW, rommel)
+    // Terugval op het oude gedrag: alleen de lopende maand is waarneembaar.
+    expect(history.map(s => s.pricedFromHistory)).toEqual([false, false, true])
+  })
+
   it('vult maanden vóór de eerste transactie niet met de stukken van vandaag', () => {
     const laat = {
       ...holding,

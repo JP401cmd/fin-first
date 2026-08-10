@@ -188,6 +188,46 @@ describe('syncHoldingAggregatesFromTransactions', () => {
     expect(result.units).toBe(20)
     expect(result.avgPurchasePrice).toBeCloseTo(15, 6)
   })
+
+  // Given een holding waarvan de bekende historie alleen een verkoop bevat —
+  // het klassieke geval van een transactie-export waarvan het venster niet tot
+  // de oorspronkelijke aankoop terugreikt;
+  // When de aggregaten uit die historie worden herleid;
+  // Then mag er geen negatieve positie in `investment_holdings.units` belanden:
+  // je kunt geen −5 stuks bezitten, en downstream (waarde-rollup, portefeuille-
+  // gewichten, Box 3) telt zo'n getal als negatieve waarde mee. De historie
+  // blijft ongemoeid; komt de ontbrekende aankoop later alsnog binnen, dan
+  // herleidt dezelfde engine de positie vanzelf naar het juiste aantal.
+  it('schrijft nooit een negatieve positie weg bij een onvolledige historie', async () => {
+    const txRows: Tx[] = [
+      { type: 'sell', units: 5, price_per_unit: 116.66, total_amount: 583.3, date: '2026-03-15' },
+    ]
+    const capture: { payload?: Record<string, unknown> } = {}
+    const supabase = makeHoldingSupabase(txRows, capture)
+
+    const result = await syncHoldingAggregatesFromTransactions(supabase, TABLES, 'h-3', USER)
+
+    expect(capture.payload?.units).toBe(0)
+    expect(result.units).toBe(0)
+    // De aanroeper kan zien dát de historie onvolledig is — geklemd is niet
+    // hetzelfde als kloppend.
+    expect(result.historyIncomplete).toBe(true)
+    expect(result.aggregate.netUnits).toBe(-5)
+  })
+
+  it('markeert een volledige historie niet als onvolledig', async () => {
+    const txRows: Tx[] = [
+      { type: 'buy', units: 10, price_per_unit: 100, total_amount: 1000, date: '2024-01-01' },
+      { type: 'sell', units: 4, price_per_unit: 120, total_amount: 480, date: '2024-06-01' },
+    ]
+    const capture: { payload?: Record<string, unknown> } = {}
+    const supabase = makeHoldingSupabase(txRows, capture)
+
+    const result = await syncHoldingAggregatesFromTransactions(supabase, TABLES, 'h-4', USER)
+
+    expect(capture.payload?.units).toBe(6)
+    expect(result.historyIncomplete).toBe(false)
+  })
 })
 
 /**
