@@ -6,9 +6,13 @@ import {
   parseEtoro,
   parseBrokerCSV,
   detectBroker,
+  deriveContentKind,
+  supportedExportKinds,
+  BROKER_PRESETS,
   parseENNumber,
   parseISODatePrefix,
   parseEtoroDate,
+  type ParsedHoldingRow,
 } from './broker-csv'
 
 const fixture = (name: string): string =>
@@ -318,5 +322,148 @@ describe('DEGIRO — Transaction export (echt formaat)', () => {
     // als het laatste niet-lege, UUID-achtige veld van de rij en slaan op in
     // raw["Order ID"] zodat de import-stap hem kan persisteren.
     expect(result.rows[0].raw['Order ID']).toBe('00000000-0000-0000-0000-000000000001')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// contentKind — positie-momentopname vs. transactiehistorie
+// ---------------------------------------------------------------------------
+//
+// Dit onderscheid stuurt de importmodus: een positie-export mag de bezitting
+// afstemmen (vervangen + ontbrekende als verkocht), een transactie-export mag
+// alleen aanvullen. Verwisseling beschadigt de cijfers stil, dus het moet hard
+// vastliggen per formaat.
+
+describe('BrokerParseResult.contentKind', () => {
+  it('DEGIRO Portfolio-export → positions', () => {
+    const result = parseBrokerCSV(fixture('degiro-portfolio-sample.csv'), 'degiro')
+    expect(result.rows.length).toBeGreaterThan(0)
+    expect(result.contentKind).toBe('positions')
+  })
+
+  it('DEGIRO Transactie-export → transactions', () => {
+    const result = parseBrokerCSV(fixture('degiro-transaction-real.csv'), 'degiro')
+    expect(result.rows.length).toBeGreaterThan(0)
+    expect(result.contentKind).toBe('transactions')
+  })
+
+  it('Saxo-export → positions', () => {
+    const result = parseBrokerCSV(fixture('saxo-sample.csv'), 'saxo')
+    expect(result.contentKind).toBe('positions')
+  })
+
+  it('ING Beleggen-export → positions', () => {
+    const result = parseBrokerCSV(fixture('ing-beleggen-sample.csv'), 'ing_beleggen')
+    expect(result.contentKind).toBe('positions')
+  })
+
+  it('Trading 212 Account Statement → transactions', () => {
+    const result = parseTrading212(fixture('trading212-sample.csv'))
+    expect(result.contentKind).toBe('transactions')
+  })
+
+  it('eToro Account Statement → transactions', () => {
+    const result = parseEtoro(fixture('etoro-sample.csv'))
+    expect(result.contentKind).toBe('transactions')
+  })
+
+  it('een geweigerd bestand blijft unknown (geen rijen om uit af te leiden)', () => {
+    const result = parseBrokerCSV(fixture('degiro-account-sample.csv'), 'degiro')
+    expect(result.rows).toHaveLength(0)
+    expect(result.contentKind).toBe('unknown')
+  })
+})
+
+describe('deriveContentKind', () => {
+  const row = (type: 'position' | 'buy'): ParsedHoldingRow => ({
+    name: 'X',
+    ticker: null,
+    isin: null,
+    units: 1,
+    price_per_unit: 1,
+    total_amount: 1,
+    date: null,
+    type,
+    fees: 0,
+    currency: 'EUR',
+    exchange: null,
+    externalId: null,
+    raw: {},
+  })
+
+  it('lege lijst → unknown', () => {
+    expect(deriveContentKind([])).toBe('unknown')
+  })
+
+  it('een mengsel van posities en transacties → mixed', () => {
+    // Mag nooit stil doorgaan: welke modus je ook kiest, de helft rekent verkeerd.
+    expect(deriveContentKind([row('position'), row('buy')])).toBe('mixed')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// supportedExportKinds — wanneer moet de wizard de vraag stellen?
+// ---------------------------------------------------------------------------
+
+describe('supportedExportKinds', () => {
+  it('DEGIRO levert beide soorten, dus de gebruiker moet kiezen', () => {
+    const degiro = BROKER_PRESETS.find((b) => b.id === 'degiro')!
+    expect(supportedExportKinds(degiro).sort()).toEqual(['positions', 'transactions'])
+  })
+
+  it('telt het niet-ondersteunde Rekeningoverzicht niet mee', () => {
+    const degiro = BROKER_PRESETS.find((b) => b.id === 'degiro')!
+    expect(degiro.exports.some((e) => !e.supported)).toBe(true)
+    expect(supportedExportKinds(degiro)).not.toContain('unknown')
+  })
+
+  it('de overige brokers leveren er precies één, dus geen vraag', () => {
+    for (const id of ['saxo', 'ing_beleggen', 'trading212', 'etoro'] as const) {
+      const preset = BROKER_PRESETS.find((b) => b.id === id)!
+      expect(supportedExportKinds(preset)).toHaveLength(1)
+    }
+  })
+
+  it('elke preset benoemt minstens één ondersteunde export', () => {
+    for (const preset of BROKER_PRESETS) {
+      expect(preset.exports.filter((e) => e.supported).length).toBeGreaterThan(0)
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// externalId — het broker-id dat de dedup-sleutel voedt
+// ---------------------------------------------------------------------------
+//
+// Zonder dit id valt de sleutel terug op de inhoud van de rij. Dat werkt, maar
+// het id is stabieler (ongevoelig voor een broker die een bedrag herformatteert),
+// dus elke export die er één levert moet 'm ook daadwerkelijk doorgeven.
+
+describe('ParsedHoldingRow.externalId', () => {
+  it('DEGIRO transactie-export geeft het Order ID door', () => {
+    const result = parseBrokerCSV(fixture('degiro-transaction-real.csv'), 'degiro')
+    expect(result.rows[0].externalId).toBe('00000000-0000-0000-0000-000000000001')
+  })
+
+  it('Trading 212 geeft de ID-kolom door', () => {
+    const result = parseTrading212(fixture('trading212-sample.csv'))
+    expect(result.rows[0].externalId).toBe('T-001')
+    // Elke transactierij draagt er één — anders zou juist die rij dubbel binnenkomen.
+    expect(result.rows.every((r) => r.externalId !== null)).toBe(true)
+  })
+
+  it('eToro geeft de Position ID door', () => {
+    const result = parseEtoro(fixture('etoro-sample.csv'))
+    expect(result.rows.length).toBeGreaterThan(0)
+    expect(result.rows.every((r) => r.externalId !== null)).toBe(true)
+  })
+
+  it('positie-rijen dragen geen id — die worden nooit ontdubbeld', () => {
+    const degiro = parseBrokerCSV(fixture('degiro-portfolio-sample.csv'), 'degiro')
+    const saxo = parseBrokerCSV(fixture('saxo-sample.csv'), 'saxo')
+    const ing = parseBrokerCSV(fixture('ing-beleggen-sample.csv'), 'ing_beleggen')
+    for (const result of [degiro, saxo, ing]) {
+      expect(result.rows.every((r) => r.externalId === null)).toBe(true)
+    }
   })
 })

@@ -27,9 +27,29 @@ export interface ParsedHoldingRow {
   fees: number
   currency: string
   exchange: string | null
+  /**
+   * Het id dat de broker zelf aan deze transactie hangt — DEGIRO's Order ID,
+   * Trading 212's `ID`, eToro's `Position ID`. Voedt de dedup-sleutel
+   * (`lib/holdings-import-key.ts`) waarmee een overlappende upload zijn dubbele
+   * rijen kwijtraakt. Null voor positie-rijen en voor exports zonder id; de
+   * sleutel valt dan terug op de inhoud van de rij.
+   */
+  externalId: string | null
   /** Original CSV row preserved as key-value pairs for debugging / auditing. */
   raw: Record<string, string>
 }
+
+/**
+ * Wat een uploadbestand inhoudelijk IS.
+ *
+ * Het onderscheid is geen detail maar bepaalt hoe de import mag rekenen:
+ * - `positions`    — een momentopname van de hele portefeuille. Wat er niet in
+ *                    staat, bezit je niet meer; vervangen mag.
+ * - `transactions` — een handelshistorie over een gekozen periode. Die is per
+ *                    definitie ONVOLLEDIG, dus ontbrekende posities als verkocht
+ *                    markeren zou bezit wegpoetsen dat er gewoon nog is.
+ */
+export type BrokerContentKind = 'positions' | 'transactions' | 'mixed' | 'unknown'
 
 export interface BrokerParseResult {
   broker: BrokerType
@@ -38,17 +58,63 @@ export interface BrokerParseResult {
   errors: string[]
   /** Number of rows that were skipped entirely. */
   skipped: number
+  /** Positie-momentopname of transactiehistorie — afgeleid uit de gelezen rijen. */
+  contentKind: BrokerContentKind
+}
+
+/**
+ * Leid af wat het bestand inhoudelijk is uit de daadwerkelijk gelezen rijen.
+ *
+ * Bewust op de rijen en niet op de header: dit werkt voor élke broker, ook waar
+ * geen sub-formaat-detectie op kolomnamen bestaat. Een positie-export levert
+ * uitsluitend `position`-rijen; een transactie-export uitsluitend koop/verkoop/
+ * dividend.
+ */
+export function deriveContentKind(rows: ParsedHoldingRow[]): BrokerContentKind {
+  if (rows.length === 0) return 'unknown'
+  const positions = rows.filter((r) => r.type === 'position').length
+  if (positions === rows.length) return 'positions'
+  if (positions === 0) return 'transactions'
+  return 'mixed'
 }
 
 // ---------------------------------------------------------------------------
 // Broker presets (UI-facing metadata)
 // ---------------------------------------------------------------------------
 
+/**
+ * Eén concreet exportbestand dat een broker kan opleveren.
+ *
+ * `supported: false` is bewust onderdeel van de lijst: een broker levert vaak
+ * méér exports dan wij kunnen lezen (DEGIRO's Rekeningoverzicht is het
+ * klassieke misgrijp), en de gebruiker vooraf vertellen wélk bestand níet werkt
+ * scheelt een mislukte upload. De parser weigert Account.csv al met een
+ * specifieke melding — dit is dezelfde waarheid, maar dan vooraf zichtbaar.
+ */
+export type BrokerExport = {
+  /** Bestands-/exportnaam zoals de gebruiker die bij de broker ziet. */
+  label: string
+  /** Waar je hem exporteert en wat erin zit. */
+  detail: string
+  /** false = wij herkennen dit bestand maar kunnen het niet als holdings importeren. */
+  supported: boolean
+  /**
+   * Wat dit bestand inhoudelijk is. Bepaalt de importmodus: een
+   * positie-momentopname mag de bezitting vervangen, een transactiehistorie
+   * vult alleen aan. `unknown` voor exports die we sowieso weigeren.
+   */
+  kind: BrokerContentKind
+}
+
 export type BrokerPreset = {
   id: BrokerType
   label: string
   description: string
   exampleHeader: string
+  /** Alle exports die deze broker oplevert — inclusief de niet-ondersteunde. */
+  exports: BrokerExport[]
+  /** Optionele voetnoot onder de exportlijst (formaatvarianten, valuta, alternatief). */
+  note?: string
 }
 
 export const BROKER_PRESETS: BrokerPreset[] = [
@@ -62,32 +128,112 @@ export const BROKER_PRESETS: BrokerPreset[] = [
     description:
       'Portfolio- of Transactie-export uit DEGIRO — niet het Rekeningoverzicht (Account.csv)',
     exampleHeader: 'Product,ISIN,Beurs,... (of Product;ISIN;Beurs;...)',
+    exports: [
+      {
+        label: 'Portfolio.csv — Posities',
+        detail:
+          'Portefeuille → Export. Je posities van vandaag, met aantal, slotkoers en waarde in euro.',
+        supported: true,
+        kind: 'positions',
+      },
+      {
+        label: 'Transactions.csv — Transacties',
+        detail:
+          'Transacties → Export. Je handelshistorie over een gekozen periode; wij rekenen koop min verkoop terug naar je positie.',
+        supported: true,
+        kind: 'transactions',
+      },
+      {
+        label: 'Account.csv — Rekeningoverzicht',
+        detail:
+          'Bevat geldmutaties, geen posities. Exporteer in plaats daarvan Portfolio of Transacties.',
+        supported: false,
+        kind: 'unknown',
+      },
+    ],
+    note: 'Beide DEGIRO-varianten werken: de web-export (komma’s) en de oudere export (puntkomma’s).',
   },
   {
     id: 'saxo',
     label: 'Saxo Bank',
     description: 'Export uit Saxo Bank/BinckBank',
     exampleHeader: 'Instrument,ISIN,...',
+    exports: [
+      {
+        label: 'Posities-export (CSV)',
+        detail:
+          'Rekening → Posities → Exporteren. Met de kolommen Instrument, Symbool, ISIN, Aantal, Huidige prijs en Waarde.',
+        supported: true,
+        kind: 'positions',
+      },
+    ],
   },
   {
     id: 'ing_beleggen',
     label: 'ING Beleggen',
     description: 'Export uit Mijn ING Beleggen',
     exampleHeader: 'Datum,ISIN,Fonds,...',
+    exports: [
+      {
+        label: 'Effectenoverzicht (CSV)',
+        detail:
+          'Mijn ING Beleggen → Overzicht → Downloaden. Met de kolommen Datum, ISIN-code, Naam effect, Aantal, Koers en Waarde.',
+        supported: true,
+        kind: 'positions',
+      },
+    ],
   },
   {
     id: 'trading212',
     label: 'Trading 212',
     description: 'Account Statement-export uit Trading 212',
     exampleHeader: 'Action,Time,ISIN,Ticker,Name,...',
+    exports: [
+      {
+        label: 'Account Statement (CSV)',
+        detail:
+          'History → Export → CSV. Koop, verkoop en dividend nemen we mee; stortingen, opnames en valutawissels slaan we over.',
+        supported: true,
+        kind: 'transactions',
+      },
+    ],
+    note: 'Trading 212 kan ook automatisch: koppel je read-only API-key op de bezitting, dan hoef je nooit meer te uploaden.',
   },
   {
     id: 'etoro',
     label: 'eToro',
     description: 'Account Statement-export uit eToro',
     exampleHeader: 'Date,Type,Details,Amount,Units,...',
+    exports: [
+      {
+        label: 'Account Statement (CSV)',
+        detail:
+          'Portfolio → Rekeningoverzicht → Exporteren. Het tabblad met Date, Type, Details, Amount, Units en Realized Equity Change.',
+        supported: true,
+        kind: 'transactions',
+      },
+    ],
+    note: 'eToro-rekeningen staan in dollars; bedragen komen binnen zoals ze in het bestand staan.',
   },
 ]
+
+/**
+ * De soorten export die deze broker daadwerkelijk oplevert én wij aankunnen.
+ *
+ * Levert er één (Saxo, ING, Trading 212, eToro), dan hoeft de wizard niets te
+ * vragen. Levert er twee (DEGIRO: portefeuille óf transacties), dan moet de
+ * gebruiker kiezen — die keuze bepaalt of de import mag vervangen of alleen
+ * aanvullen.
+ */
+export function supportedExportKinds(preset: BrokerPreset): Array<'positions' | 'transactions'> {
+  const kinds: Array<'positions' | 'transactions'> = []
+  for (const exp of preset.exports) {
+    if (!exp.supported) continue
+    if (exp.kind !== 'positions' && exp.kind !== 'transactions') continue
+    if (!kinds.includes(exp.kind)) kinds.push(exp.kind)
+  }
+  return kinds
+}
 
 // ---------------------------------------------------------------------------
 // Helpers – Dutch number & date parsing
@@ -516,6 +662,7 @@ function parseDegiroRow(
       fees,
       currency: 'EUR',
       exchange,
+      externalId: orderId || null,
       raw: rawWithOrderId,
     }
   }
@@ -537,6 +684,8 @@ function parseDegiroRow(
     fees: 0,
     currency: 'EUR',
     exchange,
+    // Positie-rijen zijn geen transacties en worden nooit ontdubbeld.
+    externalId: null,
     raw,
   }
 }
@@ -565,6 +714,8 @@ function parseSaxoRow(headers: string[], fields: string[]): ParsedHoldingRow | n
     fees: 0,
     currency,
     exchange: null,
+    // Positie-rijen zijn geen transacties en worden nooit ontdubbeld.
+    externalId: null,
     raw,
   }
 }
@@ -592,6 +743,8 @@ function parseINGBeleggenRow(headers: string[], fields: string[]): ParsedHolding
     fees: 0,
     currency: 'EUR',
     exchange: null,
+    // Positie-rijen zijn geen transacties en worden nooit ontdubbeld.
+    externalId: null,
     raw,
   }
 }
@@ -635,6 +788,8 @@ function parseTrading212Row(headers: string[], fields: string[]): ParsedHoldingR
   const total = requireNumber(col(headers, fields, 'Total'), 'Total', parseENNumberOrNull)
   const currency = col(headers, fields, 'Currency (Total)') || col(headers, fields, 'Currency (Price / share)') || 'EUR'
   const notes = col(headers, fields, 'Notes')
+  // Trading 212 zet een eigen transactie-id in de laatste kolom ("ID").
+  const externalId = col(headers, fields, 'ID').trim() || null
   const raw = buildRawRecord(headers, fields)
 
   return {
@@ -649,6 +804,7 @@ function parseTrading212Row(headers: string[], fields: string[]): ParsedHoldingR
     fees: 0,
     currency,
     exchange: null,
+    externalId,
     raw: notes ? { ...raw, _notes: notes } : raw,
   }
 }
@@ -692,6 +848,11 @@ function parseEtoroRow(headers: string[], fields: string[]): ParsedHoldingRow | 
   const amount = requireNumber(col(headers, fields, 'Amount'), 'Amount', parseENNumberOrNull)
   const units = parseENNumber(col(headers, fields, 'Units') || col(headers, fields, 'Units / Contracts'))
   const equityChange = parseENNumber(col(headers, fields, 'Realized Equity Change'))
+  // eToro's Position ID hoort bij de POSITIE, niet bij de regel: openen en
+  // sluiten delen hetzelfde nummer. De dedup-sleutel voegt daarom soort + datum
+  // toe (zie lib/holdings-import-key.ts) — het id alleen zou de sluitregel als
+  // duplicaat van de openregel laten sneuvelen.
+  const externalId = col(headers, fields, 'Position ID').trim() || null
   const raw = buildRawRecord(headers, fields)
 
   // For dividends eToro reports the cash amount in "Amount" but no units —
@@ -713,6 +874,7 @@ function parseEtoroRow(headers: string[], fields: string[]): ParsedHoldingRow | 
     // eToro accounts are USD-based; expose explicitly for downstream FX work.
     currency: 'USD',
     exchange: null,
+    externalId,
     raw,
   }
 }
@@ -736,6 +898,9 @@ export function parseBrokerCSV(content: string, broker: BrokerType): BrokerParse
     rows: [],
     errors: [],
     skipped: 0,
+    // Wordt aan het eind afgeleid uit de gelezen rijen; blijft 'unknown' op elk
+    // vroeg return-pad (leeg bestand, geweigerd formaat).
+    contentKind: 'unknown',
   }
 
   // Strip BOM and split into lines
@@ -829,6 +994,8 @@ export function parseBrokerCSV(content: string, broker: BrokerType): BrokerParse
       result.skipped++
     }
   }
+
+  result.contentKind = deriveContentKind(result.rows)
 
   if (result.rows.length === 0 && result.skipped > 0) {
     // Make the generic fallback format-aware: if this is a DEGIRO upload whose

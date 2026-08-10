@@ -102,6 +102,13 @@ const tests: TestCase[] = [
         assertDefined(preset.label, `${preset.id} has label`)
         assertDefined(preset.description, `${preset.id} has description`)
         assertDefined(preset.exampleHeader, `${preset.id} has exampleHeader`)
+        // De wizard toont per broker welke exports werken én welke niet, en
+        // leidt uit `kind` af of de import mag vervangen of alleen aanvullen.
+        // Een preset zonder (ondersteunde) exports maakt die vraag onbeantwoordbaar.
+        assertDefined(preset.exports, `${preset.id} has exports`)
+        if (mod.supportedExportKinds(preset).length === 0) {
+          throw new Error(`${preset.id} heeft geen enkele ondersteunde export-soort`)
+        }
       }
     },
   },

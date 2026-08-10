@@ -565,9 +565,13 @@ async function importBitvavoTradesForHolding(params: {
     }
   })
 
+  // user_id hoort in de conflict-sleutel: exchange-trade-ids zijn niet globaal
+  // uniek, dus zonder die kolom zou de sync van de ene gebruiker de rij van de
+  // andere raken. Moet exact de kolommen van `crypto_tx_dedup_uidx` noemen
+  // (migratie 20260810140000).
   const { error, count } = await supabase
     .from('crypto_transactions')
-    .upsert(rows, { onConflict: 'external_source,external_trade_id', count: 'exact' })
+    .upsert(rows, { onConflict: 'user_id,external_source,external_trade_id', count: 'exact' })
 
   if (error) {
     return { inserted: 0, error: `${market} upsert: ${error.message}` }

@@ -185,13 +185,14 @@ export function AssetEditBrokerSection({
             <div className="border border-[var(--border-md)] bg-[var(--paper)] p-4">
               <p className="text-sm font-semibold text-[var(--ink)]">CSV-import</p>
               <p className="mt-1 text-[12px] leading-relaxed text-[var(--ink-3)]">
-                Voor andere brokers. Eén afschrift overschrijft de volledige inhoud van deze
-                belegging — upload zelf opnieuw bij wijzigingen.
+                Voor andere brokers. Een portefeuille-export stemt deze belegging volledig
+                af; een transactie-export vult alleen aan — upload zelf opnieuw bij
+                wijzigingen.
               </p>
               <ol className="mt-2 list-decimal space-y-0.5 pl-4 text-[11px] leading-relaxed text-[var(--ink-3)]">
                 <li>Exporteer een afschrift bij je broker</li>
                 <li>Ondersteund: DEGIRO, Saxo, ING</li>
-                <li>Upload — wij parsen en matchen</li>
+                <li>Upload — de wizard toont welk bestand werkt</li>
               </ol>
               <button
                 type="button"

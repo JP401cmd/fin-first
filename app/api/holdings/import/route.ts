@@ -1,10 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { syncAssetValueFromInvestmentHoldings } from '@/lib/holdings-sync'
+import {
+  syncAssetValueFromInvestmentHoldings,
+  syncHoldingAggregatesFromTransactions,
+} from '@/lib/holdings-sync'
 import { fingerprintHeaders, diffHeaders, type FormatId } from '@/lib/parsers/format-contracts'
 import { recordContractEvent } from '@/lib/contract-events'
 import { getServiceClient } from '@/lib/supabase/service'
-import { unauthorized, serverError } from '@/lib/api/respond'
+import { unauthorized, badRequest, serverError } from '@/lib/api/respond'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -35,22 +38,42 @@ interface ImportTransaction {
   external_trade_id?: string | null
 }
 
-// Import mode:
-// - 'append'   (default): legacy behaviour — match across ALL of the user's
-//   active holdings and ADD units to any match. Backward-compatible.
-// - 'snapshot': the CSV is treated as the COMPLETE portfolio of a single asset.
-//   Matches REPLACE units/prices (no accumulation), unmatched holdings of that
-//   asset are soft-deactivated (sold), so re-uploading the same file is idempotent.
+// Import mode — welke van de twee hangt af van WAT er geüpload wordt:
+// - 'snapshot': het bestand is de VOLLEDIGE portefeuille van één bezitting (een
+//   positie-export). Matches VERVANGEN aantal/prijs (geen optelling) en
+//   posities van die bezitting die er niet in staan worden zacht gedeactiveerd
+//   (verkocht) — hetzelfde bestand nogmaals uploaden verandert dus niets.
+// - 'append': het bestand is ONVOLLEDIG — een transactiehistorie over een
+//   gekozen periode. Aantallen worden opgeteld en er wordt NOOIT gedeactiveerd,
+//   want wat niet in de periode viel bezit je gewoon nog. Mét `targetAssetId`
+//   blijft dat binnen één bezitting; zonder is het het legacy-pad over de hele
+//   portefeuille (backward-compatible, niet meer gebruikt door de wizard).
 type ImportMode = 'snapshot' | 'append'
 
 interface ImportRequestBody {
   holdings: ImportHolding[]
   transactions: ImportTransaction[]
   broker: string
-  // Optional; defaults to 'append'. Snapshot mode requires targetAssetId.
+  // Optional; defaults to 'append'. Snapshot mode requires a target asset.
   mode?: ImportMode
-  // The asset a snapshot import reconciles against. Required for 'snapshot'.
+  // The asset a snapshot import reconciles against. Required for 'snapshot',
+  // unless `newAssetName` is given — then the asset is created here first.
   targetAssetId?: string
+  /**
+   * Naam voor een NIEUW aan te maken beleggings-bezitting (snapshot-modus).
+   * Alternatief voor `targetAssetId`: de wizard laat de gebruiker een doel
+   * kiezen, en "+ Nieuwe belegging" landt op dit veld. Precies één van beide.
+   */
+  newAssetName?: string
+  /**
+   * Wis eerst ALLE bestaande posities van de doel-bezitting (harde delete).
+   * Alleen geldig in snapshot-modus. De FK's op `investment_transactions`,
+   * `investment_holding_prices` en `holding_alerts` staan op ON DELETE CASCADE,
+   * dus transactie-, koers- en alerthistorie van die posities verdwijnt mee.
+   * Zonder deze vlag blijft het bestaande snapshot-gedrag: matches vervangen,
+   * ontbrekende posities zacht deactiveren (als verkocht).
+   */
+  clearExisting?: boolean
   /**
    * Kolomnamen uit de header-rij van het geüploade CSV-bestand (Laag A-runtime).
    * Alleen NAMEN — nooit rij-data of financiële waarden.
@@ -78,6 +101,9 @@ const VALID_MODES: ImportMode[] = ['snapshot', 'append']
 
 // Simple RFC 4122 UUID shape check — targetAssetId must be a uuid.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** Bovengrens voor de naam van een in de wizard aangemaakte bezitting. */
+const MAX_ASSET_NAME_LENGTH = 80
 
 // ---------------------------------------------------------------------------
 // Validation helpers
@@ -226,24 +252,38 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Snapshot mode reconciles a single asset's complete portfolio, so it MUST
-    // be told which asset. Validate the shape and the ownership up front.
-    let snapshotAssetId: string | null = null
-    if (mode === 'snapshot') {
-      if (!body.targetAssetId || typeof body.targetAssetId !== 'string') {
-        return NextResponse.json({
-          error: 'Snapshot-import vereist een doel-asset (targetAssetId)',
-        }, { status: 400 })
-      }
+    // De doel-bezitting bakent de hele import af: matchen, aanmaken, wissen en
+    // (alleen in snapshot) deactiveren gebeuren uitsluitend binnen dít asset.
+    // Snapshot EIST een doel; append mag er één hebben (dat is het pad van de
+    // wizard voor een transactie-export) en valt zonder terug op legacy-gedrag
+    // over de hele portefeuille.
+    let targetAssetId: string | null = null
+    // Doel-bezitting toont pas posities als has_holdings_tracking aanstaat.
+    let needsHoldingsTracking = false
+    const newAssetName = typeof body.newAssetName === 'string' ? body.newAssetName.trim() : ''
+
+    if (body.targetAssetId && newAssetName) {
+      return badRequest('Kies één doel: een bestaande bezitting of een nieuwe naam, niet allebei')
+    }
+    if (mode === 'snapshot' && !body.targetAssetId && !newAssetName) {
+      return badRequest('Snapshot-import vereist een doel-bezitting (targetAssetId of newAssetName)')
+    }
+    if (newAssetName && newAssetName.length > MAX_ASSET_NAME_LENGTH) {
+      return badRequest(`Naam van de bezitting mag maximaal ${MAX_ASSET_NAME_LENGTH} tekens zijn`)
+    }
+    if (body.targetAssetId) {
       if (!UUID_RE.test(body.targetAssetId)) {
         return NextResponse.json({
           error: 'targetAssetId moet een geldige uuid zijn',
         }, { status: 400 })
       }
       // Ownership check: the target asset must belong to the current user.
+      // `has_holdings_tracking` komt in dezelfde query mee — die vlag staat
+      // standaard op false, en zonder aan filtert `loadHoldingsData` de
+      // zojuist geïmporteerde posities weg (import "gelukt", overzicht leeg).
       const { data: targetAsset } = await supabase
         .from('assets')
-        .select('id')
+        .select('id, has_holdings_tracking')
         .eq('id', body.targetAssetId)
         .eq('user_id', user.id)
         .maybeSingle()
@@ -252,7 +292,13 @@ export async function POST(request: NextRequest) {
           error: 'Doel-asset niet gevonden',
         }, { status: 404 })
       }
-      snapshotAssetId = targetAsset.id
+      targetAssetId = targetAsset.id
+      needsHoldingsTracking = targetAsset.has_holdings_tracking !== true
+    }
+    if (body.clearExisting && !body.targetAssetId && !newAssetName) {
+      // Wissen bestaat alleen binnen één bezitting; zonder afgebakend doel zou
+      // het de hele portefeuille raken.
+      return badRequest('Wissen van bestaande posities kan alleen bij een import op één bezitting')
     }
 
     // --- Validate individual holdings ---
@@ -269,6 +315,68 @@ export async function POST(request: NextRequest) {
       if (err) return NextResponse.json({ error: err }, { status: 400 })
     }
 
+    // --- Maak de doel-bezitting aan wanneer de wizard om een nieuwe vroeg ---
+    //
+    // Deliberately AFTER all validation, so a rejected payload never leaves an
+    // empty bezitting behind. has_holdings_tracking staat meteen aan: zonder die
+    // vlag filtert `loadHoldingsData` de zojuist geïmporteerde posities weg.
+
+    if (!targetAssetId && newAssetName) {
+      const { data: createdAsset, error: createAssetError } = await supabase
+        .from('assets')
+        .insert({
+          user_id: user.id,
+          name: newAssetName,
+          asset_type: 'investment',
+          current_value: 0,
+          purchase_value: 0,
+          expected_return: 7,
+          monthly_contribution: 0,
+          institution: body.broker,
+          has_holdings_tracking: true,
+        })
+        .select('id')
+        .single()
+      if (createAssetError || !createdAsset) {
+        return serverError(createAssetError, 'holdings-import:POST')
+      }
+      targetAssetId = createdAsset.id
+    }
+
+    // --- clearExisting: wis eerst alle posities van deze bezitting ---
+    //
+    // Harde delete op verzoek van de gebruiker: de FK's op transacties, koersen
+    // en alerts cascaden mee, dus dit is onomkeerbaar. Gebeurt vóór het ophalen
+    // van de bestaande posities, zodat de import daarna op een schone bezitting
+    // landt en alles als 'aangemaakt' telt.
+
+    let holdingsDeleted = 0
+    if (targetAssetId && body.clearExisting === true) {
+      const { data: deletedRows, error: deleteError } = await supabase
+        .from('investment_holdings')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('asset_id', targetAssetId)
+        .select('id')
+      if (deleteError) {
+        return serverError(deleteError, 'holdings-import:POST')
+      }
+      holdingsDeleted = deletedRows?.length ?? 0
+    }
+
+    // --- Zet posities-weergave aan als die nog uitstond ---
+    //
+    // Alleen wanneer de vlag daadwerkelijk uitstond (nieuw aangemaakte
+    // bezittingen krijgen 'm meteen mee) — anders een overbodige schrijfactie.
+
+    if (targetAssetId && needsHoldingsTracking) {
+      await supabase
+        .from('assets')
+        .update({ has_holdings_tracking: true })
+        .eq('id', targetAssetId)
+        .eq('user_id', user.id)
+    }
+
     // --- Resolve a default asset_id for linking holdings ---
 
     let defaultAssetId: string | null = null
@@ -283,17 +391,17 @@ export async function POST(request: NextRequest) {
 
     // --- Fetch existing active investment_holdings for duplicate detection ---
     //
-    // Append mode: match across ALL of the user's active holdings (legacy).
-    // Snapshot mode: scope strictly to the target asset, so reconciliation only
-    // ever touches that asset's holdings.
+    // Met een doel-bezitting: strikt binnen dat asset, zodat matchen (en in
+    // snapshot ook het deactiveren) nooit buiten de gekozen bezitting reikt.
+    // Zonder doel: legacy append over ALLE actieve posities van de gebruiker.
 
     let existingQuery = supabase
       .from('investment_holdings')
       .select('id, ticker, isin, units, avg_purchase_price, asset_id')
       .eq('user_id', user.id)
       .eq('is_active', true)
-    if (mode === 'snapshot' && snapshotAssetId) {
-      existingQuery = existingQuery.eq('asset_id', snapshotAssetId)
+    if (targetAssetId) {
+      existingQuery = existingQuery.eq('asset_id', targetAssetId)
     }
     const { data: existingHoldings } = await existingQuery
 
@@ -322,6 +430,9 @@ export async function POST(request: NextRequest) {
     let holdingsUpdated = 0
     let holdingsDeactivated = 0
     let transactionsCreated = 0
+    // Rijen die we al hadden en dus zijn overgeslagen — het bewijs dat een
+    // bewust overlappende upload geen dubbele historie oplevert.
+    let transactionsDeduped = 0
     // Maps import index → created/updated holding ID
     const holdingIdMap = new Map<number, string>()
     // Track which asset_ids need syncing afterwards
@@ -388,11 +499,9 @@ export async function POST(request: NextRequest) {
         if (existing.asset_id) assetIdsToSync.add(existing.asset_id)
       } else {
         // Create new holding. asset_id is NOT NULL.
-        // Snapshot: always pin to the target asset (never the default/bucket).
-        // Append: keep legacy precedence with broker-named bucket fallback.
-        let resolvedAssetId = mode === 'snapshot'
-          ? snapshotAssetId
-          : (h.asset_id || defaultAssetId)
+        // Met doel-bezitting: altijd daaraan vastpinnen (nooit de default/bucket).
+        // Zonder: legacy-volgorde met broker-genoemde bak als terugval.
+        let resolvedAssetId = targetAssetId ?? (h.asset_id || defaultAssetId)
         if (!resolvedAssetId) {
           const { data: newAsset } = await supabase
             .from('assets')
@@ -461,8 +570,9 @@ export async function POST(request: NextRequest) {
     //
     // Any holding that lived in the target asset but did NOT appear in the CSV
     // has been sold. Zero it out and deactivate (kept for history, excluded from
-    // the value rollup). Append mode never deactivates anything.
-    if (mode === 'snapshot' && snapshotAssetId && existingHoldings) {
+    // the value rollup). Append mode never deactivates anything — dat is precies
+    // waarom een transactie-export (die maar een periode beslaat) append gebruikt.
+    if (mode === 'snapshot' && targetAssetId && existingHoldings) {
       const soldIds = (existingHoldings as ExistingRow[])
         .filter((row) => !matchedExistingIds.has(row.id))
         .map((row) => row.id)
@@ -478,7 +588,7 @@ export async function POST(request: NextRequest) {
           return serverError(deactivateError, 'holdings-import:POST')
         }
         holdingsDeactivated = soldIds.length
-        assetIdsToSync.add(snapshotAssetId)
+        assetIdsToSync.add(targetAssetId)
       }
     }
 
@@ -517,21 +627,33 @@ export async function POST(request: NextRequest) {
       // Split rows: those with an external_trade_id go through upsert (idempotent
       // re-imports), the rest through plain insert (no dedup possible).
       const upsertRows = txRows.filter((r) => r.external_trade_id != null)
-      // Snapshot mode must stay idempotent: a plain insert (no external_trade_id)
-      // would duplicate the same mutation on every re-upload. So in snapshot we
-      // only persist rows that CAN be deduped (have an external_trade_id) and
-      // skip the plain-insert path entirely. Append keeps the legacy behaviour.
+      // Zonder dedup-sleutel is idempotentie onmogelijk: elke herhaalde upload zou
+      // de rij nóg eens invoegen. De wizard levert sinds
+      // `lib/holdings-import-key.ts` ALTIJD een sleutel, dus dit pad is de
+      // terugval voor oudere/externe aanroepers — en blijft in snapshot dicht.
       const insertRows = mode === 'snapshot'
         ? []
         : txRows.filter((r) => r.external_trade_id == null)
 
+      let transactionsSkipped = 0
+
       if (upsertRows.length > 0) {
-        const { error: upsertErr } = await supabase
+        // `ignoreDuplicates` + RETURNING geeft alleen de rijen die ECHT nieuw
+        // zijn. Precies het getal dat de gebruiker wil zien bij een bewust
+        // overlappende upload: hoeveel was nieuw, hoeveel hadden we al.
+        const { data: inserted, error: upsertErr } = await supabase
           .from('investment_transactions')
-          .upsert(upsertRows, { onConflict: 'external_source,external_trade_id', ignoreDuplicates: true })
+          .upsert(upsertRows, {
+            onConflict: 'user_id,external_source,external_trade_id',
+            ignoreDuplicates: true,
+          })
+          .select('id')
         if (upsertErr) {
           return serverError(upsertErr, 'holdings-import:POST')
         }
+        const insertedCount = inserted?.length ?? upsertRows.length
+        transactionsCreated += insertedCount
+        transactionsSkipped += upsertRows.length - insertedCount
       }
       if (insertRows.length > 0) {
         const { error: insertErr } = await supabase
@@ -540,10 +662,45 @@ export async function POST(request: NextRequest) {
         if (insertErr) {
           return serverError(insertErr, 'holdings-import:POST')
         }
+        transactionsCreated += insertRows.length
       }
 
-      // Count only rows we actually persisted (upserts + any plain inserts).
-      transactionsCreated = upsertRows.length + insertRows.length
+      transactionsDeduped = transactionsSkipped
+
+      // --- Positie herleiden uit de PERSISTENTE transactieset ---
+      //
+      // Dit is de kern van een overlappende upload. De client stuurt een netto
+      // positie mee die is afgeleid uit het BESTAND; die optellen bij wat er al
+      // stond telt elke overlappende transactie een tweede keer mee in het
+      // aantal — ook al is de transactierij zelf keurig ontdubbeld.
+      //
+      // Dus: na het wegschrijven de positie opnieuw afleiden uit álle transacties
+      // die nu in de database staan. Dat doet `syncHoldingAggregatesFromTransactions`
+      // al voor de transactie-mutatieroutes; de import gebruikt dezelfde helper
+      // (consume, don't recompute) zodat er geen tweede afleiding ontstaat die
+      // kan wegdrijven. Het opgeslagen aantal is daarmee een cache van de
+      // engine-uitvoer, nooit een eigen waarheid — en de import wordt idempotent,
+      // ongeacht hoeveel overlap de gebruiker aanlevert.
+      const touchedHoldingIds = Array.from(
+        new Set(txRows.map((r) => r.holding_id)),
+      )
+      for (const holdingId of touchedHoldingIds) {
+        const synced = await syncHoldingAggregatesFromTransactions(
+          supabase,
+          { holdings: 'investment_holdings', transactions: 'investment_transactions' },
+          holdingId,
+          user.id,
+        )
+        // Bewust hard falen. De append-tak hierboven heeft het aantal al
+        // incrementeel opgehoogd; blijft de herberekening dan uit, dan staat er
+        // een te hoog aantal en zou een geslaagde import dat verzwijgen.
+        if (!synced.synced) {
+          return serverError(
+            new Error(`herberekening van positie ${holdingId} mislukt`),
+            'holdings-import:POST',
+          )
+        }
+      }
     }
 
     // --- Sync asset values for all affected assets ---
@@ -565,7 +722,12 @@ export async function POST(request: NextRequest) {
         holdings_created: holdingsCreated,
         holdings_updated: holdingsUpdated,
         holdings_deactivated: holdingsDeactivated,
+        holdings_deleted: holdingsDeleted,
+        // De bezitting waarin dit terechtkwam — de wizard kan er een nieuwe
+        // hebben laten aanmaken, dan kent de client het id nog niet.
+        asset_id: targetAssetId,
         transactions_created: transactionsCreated,
+        transactions_deduped: transactionsDeduped,
         total_value: Math.round(totalValue * 100) / 100,
         broker: body.broker,
       },

@@ -271,8 +271,8 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Holdings importeren via CSV (broker-export)',
     kriticiteit: 'KERN',
     persona: 'daan',
-    given: 'Persona Daan Bakker geladen. Trading212-CSV met IWDA (buy 10@75, buy 10@80, sell 5@90, dividend 15@0,20) en EUNL (buy 5@85). LET OP — Deel 2 claimt "geen bestaande holdings"; PERSONAS.daan.holdings bevat in werkelijkheid al 2 posities (Meesman Wereldwijd Totaal + Brand New Day Pensioen), dus dit scenario draait in de praktijk in append/merge-modus bovenop een niet-lege lijst, niet op een lege lijst zoals Deel 2 veronderstelt.',
-    when: 'De gebruiker importeert het bestand en bevestigt alle 5 rijen.',
+    given: 'Persona Daan Bakker geladen. Trading212-CSV met IWDA (buy 10@75, buy 10@80, sell 5@90, dividend 15@0,20) en EUNL (buy 5@85). LET OP — Deel 2 claimt "geen bestaande holdings"; PERSONAS.daan.holdings bevat in werkelijkheid al 2 posities (Meesman Wereldwijd Totaal + Brand New Day Pensioen), dus dit scenario draait in de praktijk in append/merge-modus bovenop een niet-lege lijst, niet op een lege lijst zoals Deel 2 veronderstelt. De wizard eist sindsdien een expliciete doel-bezitting: de merge blijft binnen die ene bezitting in plaats van over de hele portefeuille.',
+    when: 'De gebruiker kiest een doel-bezitting (of laat er een aanmaken), importeert het bestand en bevestigt alle 5 rijen. Een Trading 212-export is een transactiehistorie, dus de wizard kiest de aanvul-modus — er wordt niets als verkocht gemarkeerd.',
     then: 'IWDA: na 2 koop-transacties gem. €77,50 (750+800=1.550/20 eenheden); na verkoop van 5 @ €90: gerealiseerd €62,50 (5×(90−77,50)), 15 eenheden over; + dividend €3,00 ⇒ totaal gerealiseerd €65,50. EUNL: 5 eenheden, gem. €85,00. Totale import-waarde in de samenvattingsbalk €2.428,00 (750+800+450+3+425).',
     assertion: {
       kind: 'exact',
