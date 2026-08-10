@@ -263,6 +263,11 @@ export const AGENT_CURATION: Record<string, AgentCuration> = {
     rol: 'De rekenmotoren — spaarquote, netto vermogen, belastingdruk, FIRE en vrijheidstijd, single-sourced.',
     inzet: 'Wanneer een berekening, constante of aanname verandert, of een getal geverifieerd moet worden.',
   },
+  'import-specialist': {
+    groupId: 'bouw',
+    rol: 'Elk pad waar data van buiten binnenkomt — uploads, koppelingen en feeds; bewaakt doel, dedup-sleutel, afleiding en scoping.',
+    inzet: 'Bij een nieuw of gewijzigd importformaat, een sync-pad, of wanneer een import dubbele rijen of verkeerde totalen oplevert.',
+  },
   // ── ai ──
   'ai-specialist-general': {
     groupId: 'ai',

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-10T16:32:57.221Z",
+  "generatedAt": "2026-08-10T17:46:23.147Z",
   "generatedDate": "2026-08-10",
   "repo": {
     "name": "fin",
@@ -16069,7 +16069,7 @@
       {
         "file": "components/app/budgets-client.tsx",
         "loc": 5130,
-        "commits": 34
+        "commits": 33
       },
       {
         "file": "components/core/assets-client.tsx",
@@ -16181,6 +16181,13 @@
         "description": "Use this agent to BUILD new TriFinity UI: pages and React components in the established Next.js 16 / React 19 / Tailwind v4 style — module heroes, KPI stat cards, BottomSheet deep-dives, charts — always with the 'Geld is opgeslagen tijd' framing and correct feature/module gating. It writes components; the separate `ux-review-expert` agent reviews them. Use it when a new screen, widget, modal or component is needed, or when restyling existing UI to match the design system.",
         "model": "opus",
         "color": "purple"
+      },
+      {
+        "id": "import-specialist",
+        "name": "import-specialist",
+        "description": "Use this agent for ANY path where data from outside enters TriFinity: the file-upload imports (bank CSV/MT940/OFX via `app/(app)/core/cash/import/**` + `app/api/transactions/import/route.ts`, broker CSV via `app/(app)/core/assets/holdings/import/**` + `app/api/holdings/import/route.ts`, the aangifte import in `app/api/onboarding/aangifte-import/route.ts`), the connections that fetch on their own (`app/api/bank-connect/sync/route.ts` + `lib/truelayer/**`, `lib/integrations/broker-sync.ts`, `exchange-sync.ts`, `wallet-sync.ts`), the parsers and format contracts in `lib/parsers/**`, the dedup keys in `lib/holdings-import-key.ts` and `lib/parsers/cross-source-dedup.ts`, the import targets in `lib/holdings-import-targets.ts`, news ingestion in `lib/news-ingest.ts` and format-drift logging in `lib/contract-events.ts`. It owns the import contract — target, dedup key, derivation, scoping and feedback — across the UI, route and DB layers. Schema/RLS mechanics belong to `supabase-db-specialist`, derived figures to `calc-engine-specialist`, screens to `frontend-ui-builder`.",
+        "model": "opus",
+        "color": "green"
       },
       {
         "id": "polar-payments-expert",
