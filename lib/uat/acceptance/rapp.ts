@@ -1,10 +1,11 @@
 /**
- * Acceptatiecriteria — domein Rapportages (WF-RAPP-01..13 / UAT-RAPP-01..13).
+ * Acceptatiecriteria — domein Rapportages (WF-RAPP-01..14 / UAT-RAPP-01..14).
  *
  * Spiegelt exact de aanpak van `budget.ts`/`start.ts`/`will.ts`/`cash.ts`/`ovz.ts`/`nav.ts`.
  * Bron: `docs/uat/uat-plan.md` Deel 1 (workflow-definities WF-RAPP-01..13) +
- * Deel 2 §2.8 (UAT-RAPP-01..13). RAPP is aaneengesloten 01..13 (13 catalogus-
- * scenario's, geen verwijsregel-gaten) — WF-RAPP-07 en WF-RAPP-13 dragen een
+ * Deel 2 §2.8 (UAT-RAPP-01..13), plus WF-RAPP-14 (nieuw, 11 aug 2026 — zie
+ * onder). RAPP is aaneengesloten 01..14 (14 catalogus-scenario's, geen
+ * verwijsregel-gaten) — WF-RAPP-07 en WF-RAPP-13 dragen een
  * annotatie in hun `wf`-veld ("...LEIDEND voor BUDGET" / "...; app-brede
  * maskinggedrag zelf = UAT-NAV-11"), genormaliseerd naar het kale WF-nummer
  * in de coverage-test (spiegelt WILL-13/OVZ-12/19/20/21).
@@ -31,6 +32,15 @@
  * woning/voertuig) — dat is een andere grootheid dan de FIRE-eligible
  * grondslag in het periodieke rapport (WF-RAPP-02) en de spiegel (WF-RAPP-10);
  * nooit met elkaar verwarren.
+ *
+ * WF-RAPP-14 (11 aug 2026, vervolg KRUIS-20): het benchmark-rapport
+ * (`app/api/report/benchmark/route.ts`) en het totaalplan
+ * (`app/api/report/totaalplan/route.ts`) consumeerden hun vrijheidstijd-
+ * dagtarief tot dan toe zelf uit de EFFECTIVE grondslag (`monthlyExpenses`),
+ * het totaalplan bovendien met een verzonnen €100/dag-terugval. Beide lezen nu
+ * het canonieke 12-mnd rolling bundelveld (`dashboardData`/`horizonData`
+ * `.dailyExpenseRate`, lib/expense-rate.ts) — dezelfde bron als de widgets en
+ * de balans-/budgetrapporten (WF-RAPP-06/07).
  */
 
 import type { AcceptanceCriterion, AcceptanceSet } from './types'
@@ -209,6 +219,19 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'ui-only',
       source: 'app/(app)/rapportages/[id]/page.tsx (plain formatCurrency in de hero, bekende inconsistentie) + balans/budget/vermogen/persoonlijk-plan/benchmark (useFc/formatMaskedCurrency) — geen eigen berekening hier getoetst',
+    },
+  },
+  {
+    workflow: 'WF-RAPP-14',
+    scenarioId: 'UAT-RAPP-14',
+    titel: 'Vrijheidstijd op het benchmark-rapport en het totaalplan: canoniek dagtarief',
+    kriticiteit: 'BELANGRIJK',
+    given: 'Een gegenereerd benchmark-rapport (WF-RAPP-10) en een gegenereerd totaalplan/persoonlijk-plan-PDF (WF-RAPP-09).',
+    when: 'De gebruiker leest een €→vrijheidstijd-omrekening op één van beide rapporten en vergelijkt die met dezelfde omrekening op /overzicht of /toekomst.',
+    then: 'Beide routes gaven tot 11 aug 2026 hun eigen dagtarief door: het benchmark-rapport op `dailyExpenseRate(dashboardData.monthlyExpenses)` (de EFFECTIVE grondslag — losse kalendermaand/profielschatting), het totaalplan op diezelfde grondslag mét een verzonnen €100/dag-terugval wanneer die 0 was. Beide zijn nu vervangen door het canonieke 12-mnd rolling bundelveld (`dashboardData.dailyExpenseRate` resp. `horizonData.dailyExpenseRate`, lib/expense-rate.ts) — dezelfde bron als de widgets en de balans-/budgetrapporten (WF-RAPP-06/07). Geen eerlijke dagbasis (0) → geen bedacht getal meer; de assembler laat de tijdregel dan weg.',
+    assertion: {
+      kind: 'consistency',
+      source: 'app/api/report/benchmark/route.ts + app/api/report/totaalplan/route.ts consumeren beide `dailyExpenseRate` uit de dashboard-/horizon-bundel (lib/expense-rate.ts#getRecentDailyExpenseRate, via lib/dashboard-data-loader.ts / lib/horizon-data-loader.ts) i.p.v. een eigen herberekening — consume-don\'t-recompute, geen los hand-narekenbaar cijfer op routeniveau (DB-afhankelijk).',
     },
   },
 ]

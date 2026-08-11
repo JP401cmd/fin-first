@@ -7,6 +7,8 @@ import type { Debt, DebtType } from '../debt-data'
 import { buildKernelInputFromApp, type KernelAdapterPartner, type KernelAdapterProfile } from '../horizon-kernel/adapter'
 import { solveFire } from '../horizon-kernel'
 import { buildKernelSlotMeta, kernelToUnifiedResult, type KernelBridgeContext } from '../horizon-kernel/bridge'
+import { ASSET_TYPE_TO_CATEGORIE } from '../horizon-kernel/adapter/potten'
+import { PENSIOEN_CATEGORIE, pensioenPortfolio } from './pensioen-pot'
 
 /** Minimale synthetische rij — alleen de velden die buildCoverageStrip leest. */
 function mkRow(p: Partial<UnifiedProjectionRow> & { age: number; phase: UnifiedProjectionRow['phase'] }): UnifiedProjectionRow {
@@ -423,4 +425,92 @@ describe('coveragePctForRow — partnerinkomen mag maar ÉÉN keer tellen', () =
     expect(metSamenstelling, 'een echte run hoort rijen met een verdeelbare behoefte op te leveren').toBeGreaterThan(0)
   })
 
+})
+
+// ── De grondslag van `spendablePortfolio` (belegbaar vermogen) ────────────────
+
+/**
+ * `spendablePortfolio` is de gedeelde "belegbaar/duurzaam-opneembaar per rij"-
+ * grondslag: de levensinkomenstrook, de dekkingsradar (brug-tot-AOW), de laagste
+ * buffer + het buffer-veto van katern IV en `eindvermogenBelegbaarNominaal` lezen
+ * allemaal deze ene functie. Wat hier in of uit gaat, beweegt dus in vier
+ * oppervlakken tegelijk — daarom staat de uitsluitingslijst hier per type gepind
+ * in plaats van alleen impliciet in een dekkingspercentage.
+ *
+ * Tolerantie-keuze: EXACT (`toBe`). Het is een optelling van dezelfde floats, geen
+ * meting; een tolerantie zou precies de foutklasse verbergen die deze suite moet
+ * vangen (een term die er ten onrechte wel of niet in zit).
+ */
+describe('spendablePortfolio — welk bezit telt als belegbaar', () => {
+  /** Rij met precies één bucket, om per app-type te kunnen meten. */
+  const enkel = (type: string, endValue: number): UnifiedProjectionRow =>
+    mkRow({
+      age: 70,
+      phase: 'withdrawal',
+      assetBuckets: { [type]: { endValue } } as unknown as UnifiedProjectionRow['assetBuckets'],
+    })
+
+  const NIET_BELEGBAAR = ['eigen_huis', 'real_estate', 'vehicle', 'physical', 'retirement', 'levensverzekering']
+  const WEL_BELEGBAAR = ['cash', 'savings', 'investment', 'crypto', 'deelneming', 'vordering', 'other']
+
+  it.each(NIET_BELEGBAAR)('%s telt NIET mee als belegbaar vermogen', (type) => {
+    expect(spendablePortfolio(enkel(type, 100_000))).toBe(0)
+  })
+
+  it.each(WEL_BELEGBAAR)('%s telt WEL mee als belegbaar vermogen', (type) => {
+    expect(spendablePortfolio(enkel(type, 100_000))).toBe(100_000)
+  })
+
+  /**
+   * Het gemelde defect (kaart "Levensverzekering telt als pensioenpot én als
+   * belegbaar vermogen"). De polis mapt op kern-categorie 'Pensioen' — de kern
+   * trekt hem als pensioenpot leeg en boekt zijn onttrekking als Box 1-
+   * pensioeninkomen — maar hij stond niet in `NON_SPENDABLE_ASSET_TYPES`. Hij
+   * telde daardoor twee keer: als pensioeninkomen dat de behoefte dekt, én als
+   * belegbaar vermogen waarover nóg eens een veilige onttrekking werd gerekend.
+   */
+  it('BUG-ANKER — een levensverzekering verhoogt het belegbaar vermogen niet meer', () => {
+    const row = mkRow({
+      age: 70,
+      phase: 'withdrawal',
+      assetBuckets: {
+        investment: { endValue: 100_000 },
+        levensverzekering: { endValue: 59_436 },
+      } as unknown as UnifiedProjectionRow['assetBuckets'],
+    })
+    expect(spendablePortfolio(row)).toBe(100_000)
+  })
+
+  /**
+   * DRIFT-REM. De pensioen-helft van `NON_SPENDABLE_ASSET_TYPES` is een spiegel van
+   * de canonieke `ASSET_TYPE_TO_CATEGORIE` (adapter/potten.ts). De set staat in de
+   * bron bewust letterlijk uitgeschreven — coverage-strip.ts blijft een importvrije
+   * weergave-leaf — maar dat mag geen afspraak op eer zijn: mapt iemand een derde
+   * app-type op 'Pensioen' zonder het hier uit te sluiten, dan overlappen
+   * `spendablePortfolio` en `pensioenPortfolio` opnieuw. Deze test valt dan om.
+   */
+  it('SPIEGEL — élk app-type van kern-categorie Pensioen is uitgesloten van belegbaar', () => {
+    const pensioenTypen = (Object.keys(ASSET_TYPE_TO_CATEGORIE) as AssetType[]).filter(
+      (t) => ASSET_TYPE_TO_CATEGORIE[t] === PENSIOEN_CATEGORIE,
+    )
+    // Zonder minstens twee typen bewijst de test niets (dan zou 'retirement'-only
+    // er net zo goed doorheen komen).
+    expect(pensioenTypen.length).toBeGreaterThanOrEqual(2)
+    for (const type of pensioenTypen) {
+      expect(spendablePortfolio(enkel(type, 10_000)), `${type} hoort niet belegbaar te zijn`).toBe(0)
+    }
+  })
+
+  /**
+   * De keerzijde: belegbaar en pensioenpot delen geen enkel app-type meer. Dit is
+   * de eigenschap waar katern IV op leunt (twee aparte regels onder "Wat er
+   * overblijft") en die vóór deze kaart juist NIET gold.
+   */
+  it('DISJUNCT — geen enkel app-type telt in zowel belegbaar als pensioenpot', () => {
+    for (const type of Object.keys(ASSET_TYPE_TO_CATEGORIE) as AssetType[]) {
+      const row = enkel(type, 1_000)
+      const beide = spendablePortfolio(row) > 0 && pensioenPortfolio(row) > 0
+      expect(beide, `${type} telt in beide grondslagen`).toBe(false)
+    }
+  })
 })

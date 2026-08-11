@@ -1,6 +1,7 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { localMonthStartMonthsAgo } from '@/lib/month-range'
 import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
+import { EXPENSE_RATE_ROLLING_MONTHS } from '@/lib/constants'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -149,8 +150,10 @@ export async function GET(request: Request) {
         .from('transactions')
         .select('amount, date')
         .lt('amount', 0)
-        // 12-maands rolling window, tijdzone-veilige ondergrens (lib/month-range).
-        .gte('date', localMonthStartMonthsAgo(new Date(date), 11))
+        // Rolling venster uit de CONSTANTE (niet hardgecodeerd "11"): zo blijft dit
+        // venster gelijk aan /api/daily-expense-rate en lib/expense-rate.ts zodra
+        // EXPENSE_RATE_ROLLING_MONTHS ooit wijzigt. Tijdzone-veilige ondergrens.
+        .gte('date', localMonthStartMonthsAgo(new Date(date), EXPENSE_RATE_ROLLING_MONTHS - 1))
         .lte('date', date),
     ])
 

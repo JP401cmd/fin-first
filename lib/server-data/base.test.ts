@@ -32,6 +32,14 @@ vi.mock('react', () => ({
   },
 }))
 
+// `getEarliestIncomeDate` leest de ingelogde gebruiker om zijn eigen-tak
+// expliciet op `user_id` te kunnen filteren (zie de perf-doc in base.ts).
+// `getCachedUser` is zelf cache()-gewrapt; hier stubben we 'm.
+const mockCachedUser = vi.hoisted(() => ({ current: { id: 'u1' } as { id: string } | null }))
+vi.mock('@/lib/supabase/cached-user', () => ({
+  getCachedUser: async () => mockCachedUser.current,
+}))
+
 import {
   getActiveAssets,
   getActiveDebts,
@@ -40,6 +48,7 @@ import {
   getUnlinkedBankAccounts,
   getCurrentMonthTx,
   getTx12m,
+  getEarliestIncomeDate,
 } from './base'
 import { ASSET_CLIENT_COLUMNS } from '@/lib/asset-data'
 import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
@@ -55,7 +64,14 @@ interface QuerySpec {
   filters: FilterCall[]
 }
 
-function makeCountingSupabase(rowsByTable: Record<string, unknown[]> = {}) {
+function makeCountingSupabase(
+  rowsByTable: Record<string, unknown[]> = {},
+  // Optioneel: rijen per AFZONDERLIJKE query bepalen i.p.v. per tabel. Nodig
+  // zodra één fetcher meerdere queries op dezelfde tabel doet met verschillende
+  // filters (zie `getEarliestIncomeDate`: een eigen-tak en een gedeelde-tak).
+  // Krijgt de tot dan toe opgebouwde spec en valt terug op `rowsByTable`.
+  resolveRows?: (spec: QuerySpec) => unknown[] | undefined,
+) {
   const queries: QuerySpec[] = []
   const fromCounts: Record<string, number> = {}
 
@@ -63,7 +79,9 @@ function makeCountingSupabase(rowsByTable: Record<string, unknown[]> = {}) {
     fromCounts[table] = (fromCounts[table] ?? 0) + 1
     const spec: QuerySpec = { table, filters: [] }
     queries.push(spec)
-    const rows = rowsByTable[table] ?? []
+    // Lazy: pas uitlezen op het moment dat de query wordt geawait, zodat
+    // `resolveRows` de complete filterlijst ziet.
+    const rowsNow = () => resolveRows?.(spec) ?? rowsByTable[table] ?? []
 
     const record = (method: string) => (...args: unknown[]) => {
       spec.filters.push([method, ...args])
@@ -76,12 +94,15 @@ function makeCountingSupabase(rowsByTable: Record<string, unknown[]> = {}) {
       },
       eq: record('eq'),
       is: record('is'),
+      gt: record('gt'),
       gte: record('gte'),
       lt: record('lt'),
       order: record('order'),
-      single: () => Promise.resolve({ data: rows[0] ?? null, error: null }),
+      limit: record('limit'),
+      single: () => Promise.resolve({ data: rowsNow()[0] ?? null, error: null }),
+      maybeSingle: () => Promise.resolve({ data: rowsNow()[0] ?? null, error: null }),
       then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
-        Promise.resolve({ data: rows, error: null }).then(resolve, reject),
+        Promise.resolve({ data: rowsNow(), error: null }).then(resolve, reject),
     }
     return q
   }
@@ -188,6 +209,105 @@ describe('base fetchers — transactievensters', () => {
     expect(q.filters).toContainEqual(['lt', 'date', localMonthBounds(now).end])
     // BEWUST geen .limit(...) — de gemigreerde consumers hadden hier geen limiet.
     expect(q.filters.some((f) => f[0] === 'limit')).toBe(false)
+  })
+})
+
+// ── 2b. getEarliestIncomeDate — twee indexeerbare takken, één minimum ────────
+//
+// Deze fetcher is de uitzondering op de T2.1-conventie: hij filtert WÉL
+// expliciet op kolommen, omdat de planner de RLS-OR anders niet in een
+// index-conditie kan duwen en op de globale datum-index terugvalt (kosten
+// schalen dan met de rijen van ándere gebruikers — gemeten 12.202 buffers).
+// De prijs daarvan mag NOOIT een scope-wijziging zijn: tak A dekt policy-tak 1
+// (eigen rijen), tak B dekt policy-tak 2 (huishoud-gedeelde rijen), samen exact
+// de RLS-verzameling. Onderstaande tests bewaken beide helften van die claim.
+
+// Herkent welke van de twee takken een query is aan zijn filters.
+const isOwnBranch = (q: QuerySpec) => q.filters.some((f) => f[0] === 'eq' && f[1] === 'user_id')
+const isSharedBranch = (q: QuerySpec) =>
+  q.filters.some((f) => f[0] === 'eq' && f[1] === 'ownership' && f[2] === 'shared')
+
+describe('getEarliestIncomeDate — vroegste inkomstendatum over eigen + gedeelde rijen', () => {
+  // Beide takken krijgen hun eigen datum mee, zodat we kunnen zien wélke wint.
+  const twoBranches = (ownDate: string | null, sharedDate: string | null) =>
+    makeCountingSupabase({}, (spec) => {
+      if (spec.table !== 'transactions') return undefined
+      if (isSharedBranch(spec)) return sharedDate ? [{ date: sharedDate }] : []
+      if (isOwnBranch(spec)) return ownDate ? [{ date: ownDate }] : []
+      return undefined
+    })
+
+  it('stelt beide takken indexeerbaar op: eigen op user_id, gedeeld op ownership', async () => {
+    const { supabase, queries, fromCounts } = twoBranches('2020-03-01', null)
+    await getEarliestIncomeDate(supabase)
+
+    expect(fromCounts.transactions).toBe(2)
+    const own = queries.find(isOwnBranch)!
+    const shared = queries.find(isSharedBranch)!
+
+    for (const q of [own, shared]) {
+      expect(q.select).toBe('date')
+      expect(q.filters).toContainEqual(['gt', 'amount', 0])
+      expect(q.filters).toContainEqual(['order', 'date', { ascending: true }])
+      expect(q.filters).toContainEqual(['limit', 1])
+    }
+    expect(own.filters).toContainEqual(['eq', 'user_id', 'u1'])
+  })
+
+  // DE SCOPE-VANGRAIL. Collapst iemand dit later terug naar één query met
+  // `.eq('user_id', …)` — de voor de hand liggende "vereenvoudiging" — dan
+  // verdwijnt policy-tak 2 en tellen de gedeelde inkomsten van de partner niet
+  // meer mee in het extrapolatievenster. Deze test wordt dan rood.
+  it('versmalt de scope niet: de gedeelde tak filtert niet op user_id', async () => {
+    const { supabase, queries } = twoBranches(null, null)
+    await getEarliestIncomeDate(supabase)
+
+    const shared = queries.find(isSharedBranch)!
+    expect(shared.filters.some((f) => f[0] === 'eq' && f[1] === 'user_id')).toBe(false)
+    // …en verruimt 'm ook niet: het household_id-predicaat blijft van RLS komen,
+    // wij zetten er zelf géén (fout) huishouden-filter overheen.
+    expect(shared.filters.some((f) => f[1] === 'household_id')).toBe(false)
+  })
+
+  it('neemt het minimum: een eerdere gedeelde inkomstenrij wint van de eigen rij', async () => {
+    const { supabase } = twoBranches('2021-07-01', '2019-02-15')
+    const res = await getEarliestIncomeDate(supabase)
+    expect(res.data).toEqual({ date: '2019-02-15' })
+  })
+
+  it('neemt het minimum: een eerdere eigen rij wint van de gedeelde rij', async () => {
+    const { supabase } = twoBranches('2019-02-15', '2021-07-01')
+    const res = await getEarliestIncomeDate(supabase)
+    expect(res.data).toEqual({ date: '2019-02-15' })
+  })
+
+  it('één lege tak is geen probleem — de andere levert de datum', async () => {
+    const alleenEigen = twoBranches('2022-01-01', null)
+    expect((await getEarliestIncomeDate(alleenEigen.supabase)).data).toEqual({ date: '2022-01-01' })
+
+    const alleenGedeeld = twoBranches(null, '2022-05-09')
+    expect((await getEarliestIncomeDate(alleenGedeeld.supabase)).data).toEqual({
+      date: '2022-05-09',
+    })
+  })
+
+  it('geen enkele inkomstenrij → data null (consumers vallen terug op hun default)', async () => {
+    const { supabase } = twoBranches(null, null)
+    const res = await getEarliestIncomeDate(supabase)
+    expect(res.data).toBeNull()
+    expect(res.error).toBeNull()
+  })
+
+  it('zonder sessie: geen query, en dezelfde lege vorm als PostgREST', async () => {
+    mockCachedUser.current = null
+    try {
+      const { supabase, fromCounts } = twoBranches('2020-01-01', '2020-01-01')
+      const res = await getEarliestIncomeDate(supabase)
+      expect(res.data).toBeNull()
+      expect(fromCounts.transactions).toBeUndefined()
+    } finally {
+      mockCachedUser.current = { id: 'u1' }
+    }
   })
 })
 

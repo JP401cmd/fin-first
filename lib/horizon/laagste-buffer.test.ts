@@ -71,4 +71,22 @@ describe('computeLaagsteBuffer', () => {
   it('één rij → die rij is het dieptepunt', () => {
     expect(computeLaagsteBuffer([makeRow(55, { cash: bucket(42_000) })])).toEqual({ bedrag: 42_000, age: 55 })
   })
+
+  /**
+   * Het buffer-veto van katern IV (`diskwalificatie: 'buffer-uitgeput'`) leest deze
+   * grondslag. Vóór de kaart "Levensverzekering telt als pensioenpot én als
+   * belegbaar vermogen" hield een levensverzekering de buffer kunstmatig omhoog:
+   * een variant die haar vrije portefeuille volledig leegtrok oogde nog steeds
+   * gedekt, terwijl het overgebleven geld in de pensioenpot zat en pas via
+   * pensioeninkomen (Box 1) beschikbaar komt. Sinds die polis in
+   * `NON_SPENDABLE_ASSET_TYPES` staat, zakt de buffer mee — bewust een STRENGER
+   * veto, geen bijvangst.
+   */
+  it('een levensverzekering houdt de buffer niet meer omhoog (buffer-veto wordt strenger)', () => {
+    const rows = [
+      makeRow(60, { investment: bucket(120_000), levensverzekering: bucket(60_000) }),
+      makeRow(80, { investment: bucket(0), levensverzekering: bucket(90_000), retirement: bucket(400_000) }),
+    ]
+    expect(computeLaagsteBuffer(rows)).toEqual({ bedrag: 0, age: 80 })
+  })
 })

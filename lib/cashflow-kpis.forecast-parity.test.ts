@@ -314,13 +314,23 @@ describe('loadForecastSectionData ↔ loadDashboardData — parity op alle vijf 
   it('de slanke laag doet aantoonbaar minder tabel-queries', async () => {
     const { oudQueries, nieuwQueries } = await runBothPaths(buildFixtures()[0].db)
     expect(nieuwQueries).toBeLessThan(oudQueries)
-    // Zeven tabel-fetches (profiel, budgetten, huidige-maand-tx, schulden,
-    // bezittingen, vroegste-inkomsten-datum, snapshots) + het maandaggregaat via
-    // RPC. Dit getal is een BUDGET, geen momentopname: komt er een fetch bij,
+    // Acht tabel-fetches (profiel, budgetten, huidige-maand-tx, schulden,
+    // bezittingen, vroegste-inkomsten-datum × 2, snapshots) + het maandaggregaat
+    // via RPC. Dit getal is een BUDGET, geen momentopname: komt er een fetch bij,
     // verhoog 'm bewust en verantwoord waarom. Nooit versoepelen naar een
     // ongelijkheid — dan verdwijnt precies de bewaking waarvoor deze assertie
     // bestaat.
-    expect(nieuwQueries).toBe(7)
+    //
+    // 7 → 8 op 11 aug 2026, BEWUST: `getEarliestIncomeDate` is gesplitst in twee
+    // takken (eigen rijen op `user_id`, gedeelde rijen op `ownership='shared'`),
+    // omdat de vorige één-query-vorm de planner op de globale datum-index zette
+    // en daar 12.202 buffers / ~100 ms mean kostte — op élke route, want de
+    // fetcher hangt via de layout in het kritieke pad. Twee index-lookups
+    // (0,2 ms + 1,3 ms) die parallel in één `Promise.all` lopen zijn per saldo
+    // ordes sneller dan de ene die ze vervingen; de extra fetch is hier dus een
+    // verbetering, niet een regressie. Zie de doc bij `getEarliestIncomeDate`
+    // in lib/server-data/base.ts voor het scope-bewijs (A ∪ B = de RLS-set).
+    expect(nieuwQueries).toBe(8)
   })
 })
 

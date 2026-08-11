@@ -100,10 +100,13 @@ const ACTIONS: ActionDef[] = [
     id: 'action:toggle-display-mode',
     getLabel: (ctx) =>
       ctx.displayMode === 'simple' ? 'Volledige weergave tonen' : 'Eenvoudige weergave tonen',
-    // Beschrijft wat de modus ECHT doet: HideInSimple haalt diepte-secties weg
-    // in Eenvoudig en zet ze terug in Volledig. De oude tekst ("Diepte-secties
-    // standaard tonen of inklappen") beloofde inklapbaar-maar-bereikbaar — dat
-    // gedrag bestaat niet (DepthSection is ongebruikt).
+    // Beschrijft wat de modus ECHT doet, en dat is niet één mechanisme: het
+    // leeuwendeel van de reductie is `HideInSimple` (hard weg in Eenvoudig,
+    // terug in Volledig), en op drie plekken `DepthSection` (ingeklapt mét
+    // behoud — cashflow-instellingen, "Alle meldingstypen", de AI-uitvoerings-
+    // groepen). De oude tekst ("Diepte-secties standaard tonen of inklappen")
+    // beloofde dát laatste voor de héle app en klopte dus voor vrijwel geen
+    // enkel oppervlak; deze sublabel dekt beide mechanismen.
     getSublabel: () => 'Meer/minder detail op elke pagina',
     getIcon: (ctx) => (ctx.displayMode === 'simple' ? Layers : PanelTopClose),
     module: 'globaal',

@@ -5,7 +5,7 @@ import {
   buildPortfolioHistory,
   compareToBenchmarks,
   fetchAllRealBenchmarkData,
-  resolvePeriodStart,
+  resolveComparisonWindow,
   TIME_PERIODS,
 } from '@/lib/benchmark-comparison'
 
@@ -124,11 +124,15 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Het benchmarkvenster volgt de PERIODEKEUZE, niet de volledige historie.
-    // Dezelfde `resolvePeriodStart` gebruikt `compareToBenchmarks` om te
-    // knippen — één bron, dus fetch en vergelijking kunnen niet uiteenlopen.
+    // Het benchmarkvenster volgt de PERIODEKEUZE — inclusief de terugval op de
+    // volledige historie wanneer er te weinig snapshots in die periode zitten.
+    // Dezelfde functie gebruikt `compareToBenchmarks` om te knippen; hem hier
+    // niet gebruiken was precies de bug: dan haalt de route drie maanden index
+    // op terwijl de motor dertig maanden portfolio meet, en knipt het knippen
+    // niets meer weg.
     const now = new Date()
-    const benchStartDate = resolvePeriodStart(period, portfolioHistory[0].date, now)
+    const { windowStart } = resolveComparisonWindow(portfolioHistory, period, now)
+    const benchStartDate = new Date(windowStart)
 
     // Fetch real benchmark data from Yahoo Finance (with automatic fallback)
     const realBenchmarkData = await fetchAllRealBenchmarkData(benchStartDate, now)

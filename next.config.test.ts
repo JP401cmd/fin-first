@@ -24,6 +24,13 @@ import nextConfig from './next.config'
  *
  * Deze suite bewaakt daarom twee dingen: dat de routing-laag-redirects er zijn
  * én dat er geen `page.tsx` terugkomt die de runtime-redirect herintroduceert.
+ *
+ * TWEEDE LICHTING (11 aug 2026). Vier routes droegen ná die fix nog exact
+ * hetzelfde patroon — latent: nul #310-events op hun naam, maar dezelfde
+ * trigger bij het eerste bezoek. /horizon/strategie,
+ * /horizon/uitgaven-na-pensioen, /toekomst/strategie en
+ * /toekomst/uitgaven-na-pensioen zijn met hetzelfde middel behandeld en staan
+ * hieronder onder dezelfde bewaking.
  */
 
 type RedirectRule = Awaited<ReturnType<NonNullable<typeof nextConfig.redirects>>>[number]
@@ -58,10 +65,46 @@ describe('next.config redirects — legacy routes redirecten op de routing-laag 
     expect(fallback.destination).toBe('/toekomst?whatif=open')
   })
 
-  it('geen page.tsx meer op de twee routes — anders is de runtime-redirect terug', () => {
+  it('/horizon/strategie en /horizon/uitgaven-na-pensioen landen op de /toekomst-panes', async () => {
+    for (const [source, destination] of [
+      ['/horizon/strategie', '/toekomst?strategie=open'],
+      ['/horizon/uitgaven-na-pensioen', '/toekomst?uitgaven=open'],
+      ['/toekomst/uitgaven-na-pensioen', '/toekomst?uitgaven=open'],
+    ]) {
+      const rules = await rulesFor(source)
+      expect(rules, `${source} mist een routing-laag-redirect`).toHaveLength(1)
+      expect(rules[0].destination).toBe(destination)
+      expect(rules[0].permanent).toBe(false)
+    }
+  })
+
+  it('/toekomst/strategie houdt de focus-vertakking van de oude server-component', async () => {
+    const rules = await rulesFor('/toekomst/strategie')
+    expect(rules).toHaveLength(2)
+
+    // Zelfde volgorde-eis als bij /horizon/whatif: de gerichte variant eerst,
+    // anders vangt de catch-all elke ?focus= af en landt alles op `aow`.
+    const [gericht, fallback] = rules
+    expect(gericht.has).toEqual([
+      { type: 'query', key: 'focus', value: '(?<focus>aow|pensioen|huis)' },
+    ])
+    expect(gericht.destination).toBe('/toekomst/gebeurtenissen?strategie=:focus')
+
+    expect(fallback.has).toBeUndefined()
+    expect(fallback.destination).toBe('/toekomst/gebeurtenissen?strategie=aow')
+  })
+
+  it('geen page.tsx meer op de zes routes — anders is de runtime-redirect terug', () => {
     // Een `page.tsx` hier zou opnieuw een React-boom bouwen die zichzelf
     // meteen wegredirect: precies de trigger die deze fix wegnam.
-    for (const route of ['app/(app)/core/cash/page.tsx', 'app/(app)/horizon/whatif/page.tsx']) {
+    for (const route of [
+      'app/(app)/core/cash/page.tsx',
+      'app/(app)/horizon/whatif/page.tsx',
+      'app/(app)/horizon/strategie/page.tsx',
+      'app/(app)/horizon/uitgaven-na-pensioen/page.tsx',
+      'app/(app)/toekomst/strategie/page.tsx',
+      'app/(app)/toekomst/uitgaven-na-pensioen/page.tsx',
+    ]) {
       expect(existsSync(path.join(process.cwd(), route)), `${route} hoort niet te bestaan`).toBe(
         false,
       )
@@ -71,7 +114,11 @@ describe('next.config redirects — legacy routes redirecten op de routing-laag 
   it('de redirect-doelen zijn zelf geen redirect-only route (geen keten)', () => {
     // /toekomst/whatif en /toekomst renderen echte pagina's; zou een doel zelf
     // een runtime-redirect zijn, dan was de trigger alleen verplaatst.
-    for (const target of ['app/(app)/toekomst/whatif/page.tsx', 'app/(app)/toekomst/page.tsx']) {
+    for (const target of [
+      'app/(app)/toekomst/whatif/page.tsx',
+      'app/(app)/toekomst/page.tsx',
+      'app/(app)/toekomst/gebeurtenissen/page.tsx',
+    ]) {
       expect(existsSync(path.join(process.cwd(), target))).toBe(true)
     }
   })

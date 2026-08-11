@@ -33,7 +33,6 @@ import { loadPerspectiveBox3 } from '@/lib/household-tax'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { resolveBox1GrossIncome } from '@/lib/box1-income'
 import { computeBox1Tax } from '@/lib/box1-tax'
-import { dailyExpenseRate } from '@/lib/format'
 import { computeJaarruimte, jaarruimteBesparing, type JaarruimteResult } from '@/lib/jaarruimte'
 import { DEFAULT_RETURN } from '@/lib/constants'
 import type { TaxYear } from '@/lib/box3-data'
@@ -185,17 +184,25 @@ async function loadFiscaleKansenInner(
       : undefined
 
   // ── Dagtarief voor de €→vrijheidstijd-vertaling ───────────────────────
-  // CANONIEK = `dailyExpenseRate` (maanduitgaven × 12 / 365, lib/format.ts),
-  // dezelfde bron waarop de belastingdruk op de hub en de overige
-  // aandachtspunt-producenten (schuld, bezit) rekenen. Bewust NIET
-  // `box3.dailyExpenses`: dat is de som van budget-LIMIETEN gedeeld door 30 —
-  // een andere teller én een andere noemer. Zouden de kansen daarop rekenen,
-  // dan stond onder dezelfde totale-druk-sectie een regel met een tot ~48%
-  // afwijkend aantal vrijheidsdagen, en zouden fiscale aandachtspunten in de
-  // briefing anders rekenen dan de schuld- en bezit-rijen ernaast.
-  // Fallback op de Box 3-waarde zolang er geen effectieve uitgaven bekend zijn.
-  const canonicalDaily =
-    dailyExpenseRate(horizonData.effectiveInput?.monthlyExpenses ?? 0) || box3.dailyExpenses
+  // CANONIEK = `horizonData.dailyExpenseRate`: het 12-mnd ROLLING dagtarief uit
+  // `lib/expense-rate.ts`, dezelfde bron/keten als `DashboardData.dailyExpenseRate`
+  // en dus als de belastingdruk op de hub, de widgets en de aandachtspunt-
+  // producenten (schuld, bezit).
+  //
+  // Was `dailyExpenseRate(horizonData.effectiveInput?.monthlyExpenses ?? 0)` —
+  // de EFFECTIVE grondslag (losse huidige kalendermaand, of de profielschatting
+  // bij `income_source='manual'`). Die conversie is met KRUIS-17/20 juist
+  // afgeschaft: vroeg in de maand kan hij een factor 20+ te laag uitvallen,
+  // waardoor élke vrijheidsregel in de optimizer-katernen een ander aantal jaren
+  // toonde dan de widget met hetzelfde bedrag. Dit tarief stroomt door naar
+  // `optimizer-client` → `optimizer-levenslang` (alle `vrijheid()`-regels,
+  // inclusief de verschilrijen) en naar `generateBox3Strategies`.
+  //
+  // Bewust NIET `box3.dailyExpenses`: dat is de som van budget-LIMIETEN gedeeld
+  // door 30 — een andere teller én een andere noemer (tot ~48% afwijking). Dat
+  // blijft alleen de laatste terugval zolang er géén rolling tarief is (geen
+  // transacties én geen schatting).
+  const canonicalDaily = horizonData.dailyExpenseRate || box3.dailyExpenses
 
   // ── Verwacht beleggingsrendement (aanname achter het netto effect) ────
   // CONSUMEER `fireParams`, leid niet opnieuw af: `loadHorizonData` heeft

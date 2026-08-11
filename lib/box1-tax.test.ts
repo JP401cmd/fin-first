@@ -119,6 +119,200 @@ describe('computeBox1Tax — heffingskortingen', () => {
   })
 })
 
+/**
+ * ARBEIDSINKOMEN als eigen grondslag (11 aug 2026).
+ *
+ * De arbeidskorting en de IACK lopen over het ARBEIDSINKOMEN (loon, winst uit
+ * onderneming, resultaat uit overige werkzaamheden — art. 8.1 Wet IB 2001), niet
+ * over het totale bruto inkomen. Pensioen, AOW, lijfrente en uitkeringen geven
+ * geen recht op arbeidskorting.
+ *
+ * De regressie-rem is het gemengde geval: twee profielen met HETZELFDE totale
+ * bruto inkomen maar een andere samenstelling horen aantoonbaar een andere
+ * arbeidskorting te krijgen. Zonder die eis kan de grondslag stil terugglijden
+ * naar het totaalinkomen zonder dat één assertie omvalt.
+ *
+ * Dat de terugval géén stille gedragswijziging is, wordt hier bewezen door
+ * "weglaten ≡ expliciet het volledige bruto meegeven"; de externe ijkwaarden in
+ * box1-tax.golden.test.ts (die `arbeidsinkomen` nergens zetten) blijven de
+ * onafhankelijke controle daarop.
+ */
+describe('computeBox1Tax — arbeidsinkomen als grondslag voor arbeidskorting/IACK', () => {
+  it('weglaten: de heffing is die van het volledige bruto als arbeidsinkomen', () => {
+    for (const gross of [0, 5_000, 25_845, 45_592, 60_000, 133_000, 250_000]) {
+      for (const aow of [false, true]) {
+        for (const kind of [false, true]) {
+          const zonder = computeBox1Tax({
+            grossYearlyIncome: gross,
+            year: 2026,
+            aow,
+            heeftKinderenOnder12: kind,
+          })
+          const met = computeBox1Tax({
+            grossYearlyIncome: gross,
+            year: 2026,
+            aow,
+            heeftKinderenOnder12: kind,
+            arbeidsinkomen: gross,
+          })
+          // Alles behalve marginalRate is identiek: de terugval zet de grondslag
+          // op precies dit bruto. marginalRate verschilt BEWUST — zie de test
+          // hieronder over wat "de volgende euro" is.
+          const { marginalRate: _weg, ...zonderRest } = zonder
+          const { marginalRate: _met, ...metRest } = met
+          expect(metRest).toEqual(zonderRest)
+          // …en de afgeleide volgt de oude, grondslagloze signatuur exact.
+          expect(zonder.marginalRate).toBe(marginalRateAt(gross, 2026, aow))
+        }
+      }
+    }
+  })
+
+  it('BEWUST verschil: een expliciete grondslag zet de volgende euro op NIET-arbeid', () => {
+    // Weglaten = "mijn hele inkomen is arbeidsinkomen", dus de extra euro is dat
+    // óók en de arbeidskorting-opbouw/-afbouw telt mee in het marginale tarief.
+    // Expliciet meegeven = de grondslag staat vast, dus de extra euro is pensioen
+    // of uitkering. In de OPBOUWtak (€ 25.845) drukt dat het marginale tarief
+    // juist omhoog, in de afbouwtak (€ 60.000) omlaag — de richting verschilt,
+    // en dat is precies waarom dit geen "gelijk aan weglaten" mag heten.
+    const opbouw = 25_845
+    expect(marginalRateAt(opbouw, 2026, false, { arbeidsinkomen: opbouw })).toBeGreaterThan(
+      marginalRateAt(opbouw, 2026),
+    )
+    const afbouw = 60_000
+    expect(marginalRateAt(afbouw, 2026, false, { arbeidsinkomen: afbouw })).toBeLessThan(
+      marginalRateAt(afbouw, 2026),
+    )
+  })
+
+  it('het resultaat draagt de gebruikte grondslag (default = bruto)', () => {
+    expect(computeBox1Tax({ grossYearlyIncome: 60_000, year: 2026 }).arbeidsinkomen).toBe(60_000)
+    expect(
+      computeBox1Tax({ grossYearlyIncome: 60_000, year: 2026, arbeidsinkomen: 20_000 })
+        .arbeidsinkomen,
+    ).toBe(20_000)
+  })
+
+  it('gepensioneerde met € 40.000 pensioen en geen loon: arbeidskorting € 0, heffing hoger', () => {
+    const pensioen = computeBox1Tax({
+      grossYearlyIncome: 40_000,
+      year: 2026,
+      aow: true,
+      arbeidsinkomen: 0,
+    })
+    const alsofArbeid = computeBox1Tax({ grossYearlyIncome: 40_000, year: 2026, aow: true })
+
+    expect(pensioen.arbeidskorting).toBe(0)
+    expect(alsofArbeid.arbeidskorting).toBeGreaterThan(0)
+    // De heffing valt navenant hoger uit — precies het bedrag van de korting die
+    // ten onrechte werd toegekend (beide zitten ruim onder de kortingsplafonds).
+    expect(pensioen.tax - alsofArbeid.tax).toBeCloseTo(alsofArbeid.arbeidskorting, 6)
+  })
+
+  it('werkende met € 50.000 loon + € 20.000 pensioenopname: korting over € 50.000', () => {
+    const gemengd = computeBox1Tax({
+      grossYearlyIncome: 70_000,
+      year: 2026,
+      arbeidsinkomen: 50_000,
+    })
+    const zuiverLoon50 = computeBox1Tax({ grossYearlyIncome: 50_000, year: 2026 })
+    const overHetTotaal = computeBox1Tax({ grossYearlyIncome: 70_000, year: 2026 })
+
+    expect(gemengd.arbeidskorting).toBeCloseTo(zuiverLoon50.arbeidskorting, 6)
+    // € 70.000 ligt in de AFBOUWtak (vanaf € 45.592), dus rekenen over het totaal
+    // gaf hier een TE LAGE korting: de fout draait hier van teken.
+    expect(gemengd.arbeidskorting).toBeGreaterThan(overHetTotaal.arbeidskorting)
+    expect(gemengd.tax).toBeLessThan(overHetTotaal.tax)
+  })
+
+  it('REGRESSIE-REM: gelijk totaal, andere samenstelling ⇒ andere arbeidskorting', () => {
+    const TOTAAL = 40_000
+    const alleenArbeid = computeBox1Tax({ grossYearlyIncome: TOTAAL, year: 2026 })
+    const gemengd = computeBox1Tax({
+      grossYearlyIncome: TOTAAL,
+      year: 2026,
+      arbeidsinkomen: 15_000, // € 15.000 loon + € 25.000 uitkering/pensioen
+    })
+    const geenArbeid = computeBox1Tax({
+      grossYearlyIncome: TOTAAL,
+      year: 2026,
+      arbeidsinkomen: 0,
+    })
+
+    expect(alleenArbeid.belastbaarInkomen).toBe(gemengd.belastbaarInkomen)
+    expect(alleenArbeid.belastbaarInkomen).toBe(geenArbeid.belastbaarInkomen)
+    expect(alleenArbeid.heffingVoorKortingen).toBe(gemengd.heffingVoorKortingen)
+
+    // Zelfde grondslag vóór kortingen, drie verschillende arbeidskortingen…
+    expect(alleenArbeid.arbeidskorting).toBeGreaterThan(gemengd.arbeidskorting)
+    expect(gemengd.arbeidskorting).toBeGreaterThan(geenArbeid.arbeidskorting)
+    expect(geenArbeid.arbeidskorting).toBe(0)
+    // …en dus drie verschillende heffingen.
+    expect(geenArbeid.tax).toBeGreaterThan(gemengd.tax)
+    expect(gemengd.tax).toBeGreaterThan(alleenArbeid.tax)
+  })
+
+  it('IACK deelt exact dezelfde grondslag als de arbeidskorting', () => {
+    const base = { grossYearlyIncome: 40_000, year: 2026 as const, heeftKinderenOnder12: true }
+    expect(computeBox1Tax({ ...base, arbeidsinkomen: 0 }).iack).toBe(0)
+    expect(computeBox1Tax({ ...base, arbeidsinkomen: 15_000 }).iack).toBeCloseTo(
+      computeBox1Tax({ grossYearlyIncome: 15_000, year: 2026, heeftKinderenOnder12: true }).iack,
+      6,
+    )
+  })
+
+  it('marginalRateAt: een extra euro NIET-arbeidsinkomen kent geen kortingsafbouw', () => {
+    // € 60.000 ligt in de afbouwzone van AHK én arbeidskorting.
+    const alsArbeid = marginalRateAt(60_000, 2026)
+    const alsPensioen = marginalRateAt(60_000, 2026, false, { arbeidsinkomen: 0 })
+    expect(alsArbeid).toBeGreaterThan(alsPensioen)
+    // De arbeidskorting-afbouw (6,51 pp) valt weg; de AHK-afbouw blijft staan,
+    // dus het marginale tarief blijft bóven het pure schijftarief.
+    expect(alsArbeid - alsPensioen).toBeCloseTo(BOX1_PARAMS[2026].arbeidskorting.afbouwRate, 4)
+    expect(alsPensioen).toBeGreaterThan(schijftariefOp(60_000, 2026))
+  })
+
+  it('grossFromNet met arbeidsinkomen 0 vraagt méér bruto voor hetzelfde netto', () => {
+    const netto = 16_000
+    const metKorting = grossFromNet(netto, 2026, { aow: true })
+    const zonderKorting = grossFromNet(netto, 2026, { aow: true, arbeidsinkomen: 0 })
+    expect(zonderKorting).toBeGreaterThan(metKorting)
+    // Round-trip op de eigen grondslag blijft kloppen (± €1 door afronding).
+    const terug = computeBox1Tax({
+      grossYearlyIncome: zonderKorting,
+      year: 2026,
+      aow: true,
+      arbeidsinkomen: 0,
+    }).nettoBesteedbaar
+    expect(Math.abs(terug - netto)).toBeLessThanOrEqual(1)
+  })
+
+  it('clamps: negatief → 0; boven het bruto blijft toegestaan (aftrekpost-geval)', () => {
+    expect(
+      computeBox1Tax({ grossYearlyIncome: 40_000, year: 2026, arbeidsinkomen: -5_000 })
+        .arbeidskorting,
+    ).toBe(0)
+    // Een lijfrentepremie verlaagt het belastbare inkomen maar NIET het
+    // arbeidsinkomen — die combinatie moet uitdrukbaar blijven.
+    const metAftrek = computeBox1Tax({
+      grossYearlyIncome: 70_000,
+      year: 2026,
+      arbeidsinkomen: 80_000,
+    })
+    expect(metAftrek.arbeidsinkomen).toBe(80_000)
+    expect(metAftrek.arbeidskorting).toBeCloseTo(
+      computeBox1Tax({ grossYearlyIncome: 80_000, year: 2026 }).arbeidskorting,
+      6,
+    )
+  })
+
+  it('NaN/onzin valt terug op het bruto (geen stille nul-korting)', () => {
+    const r = computeBox1Tax({ grossYearlyIncome: 40_000, year: 2026, arbeidsinkomen: Number.NaN })
+    expect(r.arbeidsinkomen).toBe(40_000)
+    expect(r).toEqual(computeBox1Tax({ grossYearlyIncome: 40_000, year: 2026 }))
+  })
+})
+
 describe('computeBox1Tax — marginalRate', () => {
   it('marginalRate in een korting-afbouwzone ligt boven het pure schijftarief', () => {
     // 60.000 ligt in schijf 2 (37,56%) én in de afbouwzone van algemene

@@ -88,13 +88,22 @@ describe('vaste-lasten-loader — draait op de slanke KPI-laag (ADR 0083)', () =
     expect(src).not.toContain('dashboardData')
   })
 
-  it('houdt de EFFECTIVE grondslag aan, niet de gerealiseerde maand (ADR 0073)', () => {
+  it('houdt de EFFECTIVE grondslag aan voor het AANDEEL, niet de gerealiseerde maand (ADR 0073)', () => {
     // `CashflowCardScalars` draagt beide paren. `currentMonth*` grijpen zou hier
     // stil een andere grootheid opleveren — een half-afgelopen maand als noemer
     // onder "aandeel van je inkomen" — en dat is precies de bug van ADR 0073.
     expect(src).toMatch(/monthlyIncome:\s*kpis\.monthlyIncome/)
-    expect(src).toMatch(/monthlyExpenses:\s*kpis\.monthlyExpenses/)
     expect(src).not.toContain('currentMonth')
+  })
+
+  it('geeft het CANONIEKE dagtarief door, niet de effective maanduitgaven (vervolg KRUIS-20)', () => {
+    // Twee grondslagen naast elkaar, allebei bewust: het AANDEEL meet tegen het
+    // effective maandinkomen (hierboven), de VRIJHEIDSTIJD tegen het 12-mnd
+    // rolling dagtarief. Hier stond `monthlyExpenses: kpis.monthlyExpenses`,
+    // waarna `buildVasteLastenInsights` er zélf `dailyExpenseRate(...)` op deed —
+    // de losse-kalendermaand-conversie die KRUIS-17/20 heeft afgeschaft.
+    expect(src).toMatch(/dailyExpenseRate:\s*kpis\.dailyExpenseRate/)
+    expect(src).not.toMatch(/monthlyExpenses:\s*kpis\.monthlyExpenses/)
   })
 
   it('houdt de kalender in dezelfde grens — één wachtpunt op één load', () => {

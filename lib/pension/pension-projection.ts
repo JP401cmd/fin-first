@@ -22,7 +22,12 @@
  * BELANGRIJK — single source of truth:
  *  - Inflatie komt van de aanroeper (resolveFireParams → inflationRate). Geen
  *    hardcoded inflatiepercentage hier.
- *  - Belasting via `computeBox1Tax` (lib/box1-tax.ts) — geen eigen tarieven.
+ *  - Belasting via `computeBox1Tax` (lib/box1-tax.ts) — geen eigen tarieven,
+ *    met `arbeidsinkomen: 0`: een pensioenuitkering is geen loon/winst/resultaat
+ *    uit werkzaamheden en geeft dus geen recht op arbeidskorting of IACK. Tot
+ *    11 aug 2026 ontbrak die grondslag en kende de motor hier wél een
+ *    arbeidskorting toe — `nettoGeindexeerd` viel daardoor te hoog uit
+ *    (bij € 60.000 bruto AOW-tarief 2026 ruim € 2.300/jaar).
  *
  * BEKENDE SIMPLIFICATIES (bewust, restpunt):
  *  - Box 1-tarieven zijn die van het kalenderjaar `year`; bracket-creep (het
@@ -112,9 +117,18 @@ export function buildPensionProjection({
 
     // Belasting op het geïndexeerde bruto (AOW-gerechtigd tarief: pensioen
     // loopt per definitie vanaf de pensioendatum).
+    // `arbeidsinkomen: 0` — een pensioenuitkering is geen loon/winst/resultaat
+    // uit werkzaamheden, dus er is geen recht op arbeidskorting of IACK. Zonder
+    // die expliciete grondslag kende de motor hier een arbeidskorting toe over
+    // het pensioen en viel de heffing te laag (het nettobedrag te hoog) uit.
     const tax =
       brutoGeindexeerd > 0
-        ? computeBox1Tax({ grossYearlyIncome: brutoGeindexeerd, year, aow: true }).tax
+        ? computeBox1Tax({
+            grossYearlyIncome: brutoGeindexeerd,
+            year,
+            aow: true,
+            arbeidsinkomen: 0,
+          }).tax
         : 0
     const nettoGeindexeerd = Math.max(0, brutoGeindexeerd - tax)
 

@@ -33,11 +33,11 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Rapp — acceptatiecriteria dekking', () => {
-  it('heeft precies één criterium per catalogus-RAPP-scenario (13 stuks, aaneengesloten 01..13)', () => {
+  it('heeft precies één criterium per catalogus-RAPP-scenario (14 stuks, aaneengesloten 01..14)', () => {
     const workflows = RAPP_ACCEPTANCE.criteria.map((c) => c.workflow).sort()
     expect(workflows).toEqual(catalogRappWorkflows)
     expect(new Set(workflows).size).toBe(catalogRappWorkflows.length)
-    expect(workflows.length).toBe(13)
+    expect(workflows.length).toBe(14)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {

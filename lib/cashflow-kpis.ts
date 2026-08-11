@@ -45,9 +45,11 @@ import {
   aggExpenseByMonthAbs,
   aggSumPositief,
   aggSumNegatiefAbs,
+  aggToExpenseRows,
   isRealAggRow,
   type TxMonthAggregateRow,
 } from '@/lib/server-data/tx-aggregates'
+import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 import { resolveEffectiveIncomeExpenses, type IncomeExpenseSources } from '@/lib/effective-financials'
 import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
 import { computeSavingsRate6m, computeDebtAflossingMonthly } from '@/lib/savings-source'
@@ -118,6 +120,25 @@ export interface CashflowCardScalars {
   monthlyIncome: number
   /** EFFECTIVE maanduitgaven (`expenses_source='manual'` wint) — ADR 0073. */
   monthlyExpenses: number
+  /**
+   * CANONIEK dagtarief (€/dag) voor €→vrijheidstijd — 12-mnd ROLLING grondslag
+   * via `lib/expense-rate.ts`, exact dezelfde keten als
+   * `DashboardData.dailyExpenseRate`. Nul extra queries: `txAgg12` is er al.
+   *
+   * Staat er bewust NAAST `monthlyExpenses` en vervangt hem niet: die blijft de
+   * EFFECTIVE grondslag voor structurele aandeel-vragen ("hoeveel van mijn
+   * inkomen ligt vast?"). Maar een dagtarief mag NOOIT uit de effective waarde
+   * komen — dat is de losse kalendermaand, die vroeg in de maand naar ~0
+   * uitschiet en dan hetzelfde bedrag een veelvoud aan "jaren vrijheid" geeft
+   * t.o.v. de widget ernaast (vervolg KRUIS-20). 0 = geen eerlijke dagbasis.
+   *
+   * Optioneel/additief om exact dezelfde reden als `DashboardData.dailyExpenseRate`:
+   * die bundel is structureel toewijsbaar aan dit type (page-status, cashflow-cards,
+   * UAT-checks geven 'm door) en draagt het veld óók als optioneel voor
+   * mock-/empty-bundels. Consumenten kiezen expliciet hun terugval — nooit stil
+   * een eigen maand-conversie.
+   */
+  dailyExpenseRate?: number
 }
 
 // ── Pure afleidingen (verplaatst uit lib/dashboard-data-loader.ts) ───────────
@@ -528,6 +549,17 @@ export const loadCashflowKpis = cache(async (supabase: SupabaseClient): Promise<
   const { income: monthlyIncome, expenses: monthlyExpenses } =
     resolveEffectiveIncomeExpenses(profile ?? {}, realMonth.income, realMonth.expenses)
 
+  // Canoniek dagtarief — GEEN eigen som: dezelfde helper-keten als de
+  // dashboardbundel, op het al opgehaalde 12-mnd aggregaat. `realOnly: false`
+  // houdt de basis (alle ruwe negatieve transacties) byte-identiek aan
+  // `DashboardData.dailyExpenseRate`; de effective maandwaarde dient alleen nog
+  // als terugval voor gebruikers zónder transacties in het venster.
+  const { dailyRate: canonicalDailyExpenseRate } = recentDailyExpenseRateFromRows(
+    aggToExpenseRows(txAgg12, { realOnly: false }),
+    now,
+    monthlyExpenses,
+  )
+
   return {
     budgetTotals: { expense: budgetTotals.expense },
     monthSummary: { budgetScore: deriveBudgetScore(budgetTotals) },
@@ -536,6 +568,7 @@ export const loadCashflowKpis = cache(async (supabase: SupabaseClient): Promise<
     currentMonthExpenses,
     monthlyIncome,
     monthlyExpenses,
+    dailyExpenseRate: canonicalDailyExpenseRate,
   }
 })
 

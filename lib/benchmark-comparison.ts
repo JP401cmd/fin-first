@@ -16,9 +16,19 @@
  * 2. **Rendement is koersbeweging, nooit inleg.** `computeTwrSeries()` ketent
  *    maand-op-maand-rendementen en rekent de kasstroom van die maand uit de
  *    noemer. Storten verandert het rendement daardoor per definitie niet.
- *    Ontbreekt de koersobservatie voor een maand (geen valuation-rij), dan is
- *    het rendement niet meetbaar en geeft de motor `null` terug — de UI toont
- *    dan géén getal, in plaats van de groei van de inleg als "rendement".
+ *
+ * 3. **Gemeten wordt alleen wat noteert.** Een echte portefeuille noteert maar
+ *    deels: van 116 posities op productie hebben er 15 een koersbron, de rest
+ *    draagt de brokeromschrijving van een turbo of een gedelistte naam (zie
+ *    ADR 0098). De eerste versie van deze module eiste een koersobservatie voor
+ *    élke positie en gaf anders `null`. Dat is precies één positie te streng:
+ *    op het referentie-account blankte één onnoteerbare positie van €289 (1%
+ *    van de waarde) het hele rendement. Sinds die bevinding meet de motor het
+ *    **waarneembare deel** van de portefeuille — een echt, afgebakend mandje —
+ *    en draagt hij de dekking (`observedShare`) mee in het contract, zodat de
+ *    UI kan zeggen hóé hard het getal is. Een positie die het mandje in- of
+ *    uitstapt telt als kasstroom, niet als rendement; daarmee blijft regel 2
+ *    overeind. Waardeert de motor niets waarneembaars, dan blijft het `null`.
  */
 
 import { localMonthEnd, localMonthStart } from './month-range'
@@ -61,8 +71,16 @@ export interface PortfolioDataPoint {
   value: number // normalized to 100 at start
 }
 
-/** Waarom het portfoliorendement niet getoond kan worden. */
-export type PortfolioReturnGap = 'no_price_history'
+/**
+ * Waarom het portfoliorendement niet getoond kan worden.
+ *
+ * - `no_price_history` — geen enkele positie had een koersbron in dit venster,
+ *   of er is er maar één maand waarneembaar (één punt is geen rendement).
+ * - `unmeasurable_window` — een opname overtrof de startwaarde van een maand
+ *   (`base < 0`). Er is dan geen basis om tegen af te zetten; dat is een
+ *   bewuste weigering, geen afronding naar 0%.
+ */
+export type PortfolioReturnGap = 'no_price_history' | 'unmeasurable_window'
 
 export interface ComparisonResult {
   period: TimePeriod
@@ -78,6 +96,14 @@ export interface ComparisonResult {
    * periodelabel alleen zou een venster suggereren dat niet is gebruikt.
    */
   windowFallback: boolean
+  /**
+   * True wanneer het venster IS INGEKORT omdat de koershistorie pas later
+   * begint dan de gekozen periode. Portfolio én benchmarks meten dan het
+   * kortere, meetbare venster — anders zou een "1J"-label boven een rendement
+   * van drie maanden staan, met een index van twaalf ernaast (dezelfde fout als
+   * de vensterbug die deze module oorspronkelijk repareerde).
+   */
+  windowClipped: boolean
   portfolio: {
     /** `null` = niet meetbaar (zie `gap`); toon dan géén getal. */
     returnPct: number | null
@@ -85,6 +111,15 @@ export interface ComparisonResult {
     gap?: PortfolioReturnGap
     /** Rendementsindex (basis 100), zonder kasstroomeffect. Leeg bij `gap`. */
     dataPoints: PortfolioDataPoint[]
+    /**
+     * Het laagste aandeel (0–1) van de portefeuillewaarde dat in enige gemeten
+     * maand op een échte koers rustte. `1` = alles noteerde, elke maand.
+     *
+     * Dit is contract, geen presentatiedetail (ADR 0098): zonder dit veld is
+     * het rendement een getal met onbekende hardheid. `null` als er geen
+     * meetbaar rendement is.
+     */
+    observedShare: number | null
   }
   benchmarks: {
     id: BenchmarkId
@@ -388,6 +423,39 @@ export function generateBenchmarkData(
   return points
 }
 
+/**
+ * Het venster waarover vergeleken wordt, uit de periodekeuze én de beschikbare
+ * snapshots. **De API-route moet hier de Yahoo-reeks mee ophalen** en
+ * `compareToBenchmarks` knipt er dezelfde reeks mee.
+ *
+ * Waarom dit een eigen functie is: de route haalde de indexreeks op vanaf de
+ * PERIODE-start, terwijl de motor bij te weinig snapshots terugviel op de
+ * volledige historie. Die terugval verruimt het venster, dus `clipBenchmarkSeries`
+ * knipte daarna niets meer weg en de opgehaalde reeks bleef het korte venster
+ * dragen: portfolio +77,6% over 30 maanden naast AEX +6,0% over 3 maanden, met
+ * het verschil als "alpha". Zolang route en motor deze functie delen kan dat
+ * niet meer uiteenlopen.
+ */
+export function resolveComparisonWindow(
+  snapshots: HoldingSnapshot[],
+  period: TimePeriod,
+  now: Date = new Date(),
+): { windowStart: string; windowFallback: boolean } {
+  if (snapshots.length === 0) {
+    return { windowStart: toDateStr(resolvePeriodStart(period, null, now)), windowFallback: false }
+  }
+
+  const windowStart = toDateStr(resolvePeriodStart(period, snapshots[0].date, now))
+  if (snapshots.filter(s => s.date >= windowStart).length >= 2) {
+    return { windowStart, windowFallback: false }
+  }
+
+  // Te weinig snapshots in het gekozen venster: val terug op de volledige
+  // beschikbare historie — maar meld dat, zodat de UI niet het periodelabel
+  // toont bij een venster dat niet is gebruikt.
+  return { windowStart: snapshots[0].date, windowFallback: true }
+}
+
 // ── Portfolio valuation history ──────────────────────────────
 
 export interface HoldingSnapshot {
@@ -402,11 +470,28 @@ export interface HoldingSnapshot {
   netFlow: number
   /**
    * True wanneer élke bijdragende positie voor deze maand een echte
-   * koersobservatie had — een `valuations`-rij voor die maand, of (in de
-   * lopende maand) de actuele koers. False = gewaardeerd tegen een stand-in
-   * koers; het rendement over een venster met zo'n maand is niet meetbaar.
+   * koersobservatie had. Afgeleid (`observedValue === totalValue`) en bewaard
+   * omdat "volledig waargenomen" een leesbaar begrip is; de rekenkant gebruikt
+   * `observedValue`, niet deze vlag.
    */
   pricedFromHistory: boolean
+  /**
+   * De waarde van uitsluitend de posities die deze maand een échte
+   * koersobservatie hadden — het waarneembare mandje. Dit is de teller van de
+   * tijdgewogen return; posities zonder koersbron blijven er structureel
+   * buiten in plaats van het hele venster te blokkeren.
+   */
+  observedValue: number
+  /**
+   * Netto externe kasstroom van dát mandje. Naast de gewone aan-/verkopen
+   * tellen hier de posities mee die het mandje IN- of UITSTAPPEN: wordt een
+   * positie deze maand voor het eerst waarneembaar, dan komt haar volledige
+   * waarde erbij als instroom; verdwijnt de koersbron, dan gaat haar waarde
+   * van de vórige maand eraf. Zonder die twee zou het aanzwellen van de
+   * koersdekking zich voordoen als koerswinst — precies de fout die regel 2
+   * van deze module verbiedt.
+   */
+  observedNetFlow: number
 }
 
 /**
@@ -526,6 +611,10 @@ export function buildPortfolioHistory(
 
   const nowMonthKey = localMonthStart(now).substring(0, 7)
 
+  // Waarde per waarneembare positie aan het eind van de vórige maand. Nodig om
+  // in- en uitstappers als kasstroom te boeken i.p.v. als rendement.
+  let prevObserved: Record<string, number> = {}
+
   while (current <= now) {
     const monthStart = localMonthStart(current) // YYYY-MM-01 (tijdzone-veilig)
     const monthKey = monthStart.substring(0, 7) // YYYY-MM
@@ -535,8 +624,12 @@ export function buildPortfolioHistory(
     let totalCost = 0
     let netFlow = 0
     // Optimistisch: één positie zonder koersobservatie zet de hele maand op
-    // "niet waarneembaar" — de portfoliowaarde is immers de som.
+    // "niet volledig waargenomen". Dat blokkeert het rendement niet meer (zie
+    // regel 3 in de modulekop) — het drukt de dekking.
     let pricedFromHistory = true
+    let observedValue = 0
+    let observedNetFlow = 0
+    const currObserved: Record<string, number> = {}
 
     for (const holding of holdings) {
       const holdingStart = holding.purchase_date || holding.created_at
@@ -612,20 +705,44 @@ export function buildPortfolioHistory(
         price = holding.current_price ?? holding.avg_purchase_price
       }
 
-      if (!priceObserved) pricedFromHistory = false
-
-      totalValue += units * price
+      const value = units * price
+      totalValue += value
       totalCost += costBasis
+
+      if (priceObserved) {
+        observedValue += value
+        currObserved[holding.id] = value
+        // Instapper: de positie was vorige maand niet waarneembaar, dus haar
+        // hele waarde komt nu het mandje in. Haar eigen maandkasstroom zit
+        // daar al in — die apart optellen zou dubbel boeken.
+        observedNetFlow += holding.id in prevObserved ? monthFlow : value
+      } else {
+        pricedFromHistory = false
+      }
     }
 
-    if (totalValue > 0 || totalCost > 0) {
+    // Uitstappers: waarneembaar in de vorige maand, nu niet meer (verkocht, of
+    // de koersbron viel weg). Ze verlaten het mandje tegen hun laatst bekende
+    // waarde, zodat hun verdwijnen geen −100% wordt.
+    for (const [holdingId, prevValue] of Object.entries(prevObserved)) {
+      if (!(holdingId in currObserved)) observedNetFlow -= prevValue
+    }
+
+    // Eenmaal begonnen blijft de reeks doorlopen, óók als de portefeuille een
+    // maand volledig leeg staat. Vóór deze regel viel zo'n maand weg en knoopte
+    // de keten de maand vóór de verkoop rechtstreeks aan de herkoop vast — met
+    // de verkoop-kasstroom buiten de noemer, wat een vlakke koers als −50% las.
+    if (totalValue > 0 || totalCost > 0 || snapshots.length > 0) {
       snapshots.push({
         date: monthEnd,
         totalValue: roundCents(totalValue),
         totalCost: roundCents(totalCost),
         netFlow: roundCents(netFlow),
         pricedFromHistory,
+        observedValue: roundCents(observedValue),
+        observedNetFlow: roundCents(observedNetFlow),
       })
+      prevObserved = currObserved
     }
 
     current.setMonth(current.getMonth() + 1)
@@ -644,7 +761,29 @@ export interface TwrSeries {
   indexPoints: PortfolioDataPoint[]
   /** Rendement over het hele venster in % (= laatste index − 100). */
   returnPct: number
+  /**
+   * De datum waarop de meting daadwerkelijk begint: de eerste snapshot met een
+   * waarneembare waarde. Kan later liggen dan de vensterstart wanneer de
+   * koershistorie pas later begint. `compareToBenchmarks` knipt de benchmarks
+   * hierop, zodat portfolio en index hetzelfde interval meten.
+   */
+  measuredFrom: string
+  /**
+   * Laagste aandeel (0–1) van de portefeuillewaarde dat in enige gemeten maand
+   * op een echte koers rustte — de hardheid van de zwakste schakel in de keten.
+   */
+  observedShare: number
 }
+
+/**
+ * Uitkomst van de TWR-berekening. Bewust een unie i.p.v. `TwrSeries | null`:
+ * "niet meetbaar" heeft twee verschillende oorzaken en de UI hoort ze uit
+ * elkaar te houden — geen koershistorie is iets anders dan een venster dat door
+ * een opname onmeetbaar werd.
+ */
+export type TwrOutcome =
+  | { ok: true; series: TwrSeries }
+  | { ok: false; gap: PortfolioReturnGap }
 
 /**
  * Echte tijdgewogen return: ketent de maandrendementen en haalt de kasstroom
@@ -659,27 +798,77 @@ export interface TwrSeries {
  * deze kaart aanwijst. De prijs is dat de inleg-maand haar rendement iets
  * onderschat; met maandelijkse snapshots is dat de kleinste van de twee fouten.
  *
- * Geeft `null` wanneer het rendement niet meetbaar is: te weinig snapshots, een
- * maand zonder koersobservatie (`pricedFromHistory === false`), of een
- * deelperiode zonder positieve startbasis.
+ * Gemeten wordt het WAARNEEMBARE mandje (`observedValue`/`observedNetFlow`),
+ * niet de hele portefeuille: posities zonder koersbron zouden anders tegen een
+ * stand-in koers vlak blijven liggen en het rendement richting nul verdunnen —
+ * een fout getal, waar de vorige versie liever géén getal gaf. De meting begint
+ * bij de eerste maand met een waarneming; alles daarvóór is geen nul-rendement
+ * maar een blinde vlek, en telt dus niet mee.
  */
-export function computeTwrSeries(snapshots: HoldingSnapshot[]): TwrSeries | null {
-  if (snapshots.length < 2) return null
-  if (!snapshots.every(s => s.pricedFromHistory)) return null
+export function computeTwrOutcome(snapshots: HoldingSnapshot[]): TwrOutcome {
+  // Alles vóór de eerste waarneming is blind; daar begint de meting.
+  const start = snapshots.findIndex(s => s.observedValue > 0)
+  if (start < 0 || snapshots.length - start < 2) {
+    return { ok: false, gap: 'no_price_history' }
+  }
 
   let index = 100
-  const indexPoints: PortfolioDataPoint[] = [{ date: snapshots[0].date, value: 100 }]
+  const measured = snapshots.slice(start)
+  const indexPoints: PortfolioDataPoint[] = [{ date: measured[0].date, value: 100 }]
 
-  for (let i = 1; i < snapshots.length; i++) {
-    const prev = snapshots[i - 1]
-    const cur = snapshots[i]
-    const base = prev.totalValue + cur.netFlow
-    if (base <= 0) return null
-    index *= cur.totalValue / base
+  for (let i = 1; i < measured.length; i++) {
+    const prev = measured[i - 1]
+    const cur = measured[i]
+    const base = prev.observedValue + cur.observedNetFlow
+
+    if (base < 0) {
+      // Er is meer opgenomen dan er stond: geen basis om tegen af te zetten.
+      return { ok: false, gap: 'unmeasurable_window' }
+    }
+    if (base === 0) {
+      // Geen kapitaal onder risico deze maand (volledig verkocht, of nog niets
+      // waarneembaars). Dan is het rendement per definitie 0% — niet `null`, en
+      // zeker geen −100% omdat de teller toevallig leeg is. Stond er wél waarde
+      // aan het eind zónder basis aan het begin, dan klopt de boekhouding niet.
+      if (cur.observedValue !== 0) return { ok: false, gap: 'unmeasurable_window' }
+      indexPoints.push({ date: cur.date, value: Math.round(index * 100) / 100 })
+      continue
+    }
+
+    index *= cur.observedValue / base
     indexPoints.push({ date: cur.date, value: Math.round(index * 100) / 100 })
   }
 
-  return { indexPoints, returnPct: Math.round((index - 100) * 100) / 100 }
+  // De zwakste schakel, niet de laatste maand. Een TWR is het product van zijn
+  // segmenten: één maand waarin 13% van de waarde waarneembaar was maakt de héle
+  // keten zo hard als díé maand. De laatste maand meten zou bovendien altijd
+  // ~100% opleveren — in de lopende maand geldt `current_price` als observatie,
+  // dus daar noteert per definitie alles.
+  let observedShare = 1
+  for (const s of measured) {
+    if (s.totalValue <= 0) continue // lege maand zegt niets over de dekking
+    observedShare = Math.min(observedShare, s.observedValue / s.totalValue)
+  }
+  observedShare = Math.min(1, Math.max(0, Math.round(observedShare * 10000) / 10000))
+
+  return {
+    ok: true,
+    series: {
+      indexPoints,
+      returnPct: Math.round((index - 100) * 100) / 100,
+      measuredFrom: measured[0].date,
+      observedShare,
+    },
+  }
+}
+
+/**
+ * Dunne wrapper om `computeTwrOutcome` voor callers die de reden niet nodig
+ * hebben. `null` = niet meetbaar.
+ */
+export function computeTwrSeries(snapshots: HoldingSnapshot[]): TwrSeries | null {
+  const outcome = computeTwrOutcome(snapshots)
+  return outcome.ok ? outcome.series : null
 }
 
 /**
@@ -711,21 +900,29 @@ export function compareToBenchmarks(
 ): ComparisonResult | null {
   if (portfolioSnapshots.length < 2) return null
 
-  let windowStart = toDateStr(resolvePeriodStart(period, portfolioSnapshots[0].date, now))
-  let filtered = portfolioSnapshots.filter(s => s.date >= windowStart)
-  let windowFallback = false
+  const { windowStart: requestedStart, windowFallback } = resolveComparisonWindow(
+    portfolioSnapshots,
+    period,
+    now,
+  )
+  const filtered = portfolioSnapshots.filter(s => s.date >= requestedStart)
+  const outcome = computeTwrOutcome(filtered)
+  const twr = outcome.ok ? outcome.series : null
 
-  if (filtered.length < 2) {
-    // Te weinig snapshots in het gekozen venster: val terug op de volledige
-    // beschikbare historie — maar meld dat, zodat de UI niet het periodelabel
-    // toont bij een venster dat niet is gebruikt.
-    filtered = [...portfolioSnapshots]
-    windowStart = filtered[0].date
-    windowFallback = true
-  }
-
+  // Het venster dat we écht meten. De TWR begint bij de eerste waarneming; ligt
+  // die later dan de vensterstart, dan moeten de indices op datzelfde punt
+  // beginnen. Anders zet je een index van twaalf maanden naast een portfolio
+  // van drie en heet het verschil "alpha".
+  const windowStart = twr ? twr.measuredFrom : requestedStart
+  // Clipping vergelijken we tegen de eerste snapshot BINNEN het venster
+  // (filtered[0]), niet tegen de rauwe requestedStart: snapshots landen op
+  // maandeinden, requestedStart is "nu min N maanden" (een dag midden in de
+  // maand). Tegen requestedStart zou windowClipped bij vrijwel elke vaste
+  // periode ten onrechte true zijn — puur door het snapshot-rooster, niet
+  // omdat de koershistorie later begint. filtered[0] bestaat altijd wanneer
+  // twr niet null is (computeTwrOutcome eist measured.length >= 2 uit filtered).
+  const windowClipped = twr ? windowStart > filtered[0].date : false
   const windowStartDate = new Date(windowStart)
-  const twr = computeTwrSeries(filtered)
 
   const benchmarks = BENCHMARKS.map((bench, idx) => {
     // Echte data heeft de voorkeur, maar alleen geknipt op hetzelfde venster.
@@ -756,9 +953,19 @@ export function compareToBenchmarks(
     period,
     windowStart,
     windowFallback,
+    windowClipped,
     portfolio: twr
-      ? { returnPct: twr.returnPct, dataPoints: twr.indexPoints }
-      : { returnPct: null, gap: 'no_price_history' as const, dataPoints: [] },
+      ? {
+          returnPct: twr.returnPct,
+          dataPoints: twr.indexPoints,
+          observedShare: twr.observedShare,
+        }
+      : {
+          returnPct: null,
+          gap: outcome.ok ? 'no_price_history' : outcome.gap,
+          dataPoints: [],
+          observedShare: null,
+        },
     benchmarks,
   }
 }

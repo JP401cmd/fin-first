@@ -6,6 +6,7 @@ import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { formatFireAge } from '@/lib/horizon/fire-format'
 import {
   variantenSweepInputHash,
+  EINDVERMOGEN_GRONDSLAGEN,
   type VariantDiskwalificatie,
   type VariantUitkomst,
   type VariantenSweepResultaat,
@@ -27,6 +28,17 @@ const SNAPSHOT_ENDPOINT = '/api/belasting/varianten-sweep'
  * diskwalificaties komen kant-en-klaar uit die laag. Het enige wat hier gebeurt
  * is een weergave-VERSCHIL tussen twee geleverde totalen (variant − referentie)
  * en de canonieke €→vrijheidstijd-conversie uit `lib/format.ts`.
+ *
+ * ## Het verschilblok noemt zijn as (aug 2026)
+ * "Verschil met je huidige volgorde" staat ná beide inhoudelijke groepen en las
+ * daardoor als de slotsom van de hele tabel — terwijl het uitsluitend de
+ * BELASTING betrof. De regel "≈ 11 jaar en 8 maanden meer vrijheid" werd twee
+ * rijen hoger, in dezelfde kolom, tegengesproken door een belegbaar vermogen dat
+ * van ≈ 56 naar ≈ 29 jaar vrijheid zakte. Sindsdien draagt elk verschil-label
+ * zijn eigen as, staan de twee vermogens-assen ernaast (`VERSCHIL_VERMOGEN_ASSEN`,
+ * getypt op de grondslag-registratie van de sweep) en is de vrijheidstijd per as
+ * een celnotitie in plaats van een eigen slotregel. Nooit optellen: het zijn drie
+ * assen, geen drie delen van één getal.
  *
  * ## Achter een expliciete actie
  * Drie kernel-solves kosten ~466-688 ms. Ze draaien daarom pas na een klik, via
@@ -55,10 +67,12 @@ const SNAPSHOT_ENDPOINT = '/api/belasting/varianten-sweep'
  * mogelijk" zichtbaar het armst — precies de variant die het meeste overhoudt —
  * en kon het scherm zijn eigen vraag niet beantwoorden.
  *
- * De twee worden nooit bij elkaar opgeteld en nooit op één as gezet (CLAUDE.md);
- * ze overlappen bovendien met de levensverzekering-pot (zie
- * `lib/horizon/pensioen-pot.ts`). Het netto eindvermogen incl. niet-liquide bezit
- * (bv. een huis) is een dérde grootheid en staat hier bewust niet.
+ * De twee worden nooit bij elkaar opgeteld en nooit op één as gezet (CLAUDE.md).
+ * Ze zijn sinds 10 aug 2026 DISJUNCT — `levensverzekering` telde daarvoor in
+ * beide — maar disjunct is niet optelbaar: de som mist woning/auto/fysiek bezit en
+ * staat vóór schulden. Het netto eindvermogen incl. niet-liquide bezit (bv. een
+ * huis) is die dérde grootheid en staat hier bewust niet. De grondslagen zelf staan
+ * beschreven in `EINDVERMOGEN_GRONDSLAGEN` (lib/tax-lifetime/varianten-sweep.ts).
  *
  * Wft: geen "je bespaart € X" (het is een verschil tussen twee indicaties), geen
  * gebiedende wijs, geen aanbevolen volgorde. De enige callout op de pagina blijft
@@ -318,6 +332,36 @@ function vrijheid(amount: number | null, dailyExpenses: number): string | null {
 
 const WINNAAR_TINT = 'color-mix(in srgb, var(--positive) 6%, transparent)'
 
+/**
+ * De VERMOGENS-assen die in het verschilblok naast het belastingverschil staan.
+ *
+ * Bewust getypt op de sleutels van `EINDVERMOGEN_GRONDSLAGEN` — de niet-optellen-rem
+ * in `lib/tax-lifetime/varianten-sweep.ts`. Een as die daar geen geregistreerde
+ * grondslag heeft, kan hier dus niet getoond worden, en een hernoemd veld breekt
+ * bij `tsc` in plaats van stil een lege kolom te tekenen.
+ *
+ * `eindvermogenNettoNominaal` staat er bewust NIET bij, ook al is het een geldige
+ * sleutel: dat is de derde grondslag (incl. woning, ná schulden) en zou hier als
+ * "het echte totaal" gaan lezen naast twee deelgrootheden. Het blijft, net als in
+ * de groep "Wat er overblijft", buiten de tabel.
+ */
+const VERSCHIL_VERMOGEN_ASSEN: readonly {
+  veld: keyof typeof EINDVERMOGEN_GRONDSLAGEN
+  label: string
+  grondslag: string
+}[] = [
+  {
+    veld: 'eindvermogenBelegbaarNominaal',
+    label: 'Verschil in belegbaar vermogen',
+    grondslag: 'zonder je huis en ander niet-liquide bezit',
+  },
+  {
+    veld: 'eindvermogenPensioenNominaal',
+    label: 'Verschil in de pensioenpot',
+    grondslag: 'bruto — hier komt nog Box 1 overheen',
+  },
+]
+
 function VariantenTabel({
   resultaat,
   fc,
@@ -343,12 +387,16 @@ function VariantenTabel({
   /**
    * Weergave-verschil tussen twee GELEVERDE totalen (geen herberekening van een
    * kerngetal). `null` zodra een van beide ontbreekt of de variant zelf het
-   * ijkpunt is.
+   * ijkpunt is. Eén aftrekking, voor elke as dezelfde — welke as het is, en
+   * welke kant daar gunstig is, bepaalt de rij die 'm aanroept.
    */
-  const verschil = (v: VariantUitkomst): number | null => {
+  const deltaOp = (
+    v: VariantUitkomst,
+    veld: 'levenslangeTotaleDrukNominaal' | keyof typeof EINDVERMOGEN_GRONDSLAGEN,
+  ): number | null => {
     if (v.isReferentie) return null
-    const eigen = v.levenslangeTotaleDrukNominaal
-    const ijk = referentie?.levenslangeTotaleDrukNominaal ?? null
+    const eigen = v[veld]
+    const ijk = referentie?.[veld] ?? null
     if (eigen === null || ijk === null) return null
     return eigen - ijk
   }
@@ -370,8 +418,9 @@ function VariantenTabel({
       >
         <table className="w-full min-w-[640px] border-collapse text-[12.5px]">
           <caption className="sr-only">
-            Drie onttrekkingsvolgordes vergeleken op hun belastingdruk over je hele looptijd, met je
-            huidige volgorde als ijkpunt.
+            Drie onttrekkingsvolgordes vergeleken op hun belastingdruk over je hele looptijd én op
+            wat er aan het eind overblijft, met je huidige volgorde als ijkpunt. Belasting en
+            vermogen zijn aparte grondslagen en worden nergens bij elkaar opgeteld.
           </caption>
           <thead>
             <tr>
@@ -508,11 +557,12 @@ function VariantenTabel({
                 het belegbaar vermogen slaat de pensioenpot over, dus zonder deze
                 regel oogt "pensioen zo laat mogelijk" armer dan hij is.
 
-                Het onderschrift hierboven belóóft geen disjunctheid ("je pensioen
-                staat hieronder" o.i.d.) en mag dat ook niet: een `levensverzekering`
-                mapt op kern-categorie 'Pensioen' maar staat NIET in
-                NON_SPENDABLE_ASSET_TYPES, dus die polis zit in béíde regels. Zie
-                lib/horizon/pensioen-pot.ts. */}
+                De twee regels zijn sinds 10 aug 2026 disjunct (levensverzekering
+                zat daarvóór in béíde). Het onderschrift hierboven belooft dat
+                bewust nog steeds niet met "je pensioen staat hieronder" o.i.d.: dat
+                leest als een uitsplitsing van één totaal, terwijl de som woning,
+                auto/fysiek bezit én de schulden mist. De note op de groepskop zegt
+                het expliciet. */}
             <tr>
               <Th>
                 Resterende pensioenpot
@@ -544,55 +594,134 @@ function VariantenTabel({
               ))}
             </tr>
 
-            <GroupRow label="Verschil met je huidige volgorde" span={cols} />
-            <tr>
-              <Th>In euro’s, over je hele looptijd</Th>
-              {varianten.map((v) => {
-                const d = verschil(v)
-                return (
-                  <Td key={v.id} muted={d === null} style={winnaarCel(v)}>
-                    {v.isReferentie ? (
-                      <>
-                        —<CellNote>dit is het ijkpunt</CellNote>
-                      </>
-                    ) : d === null || d === 0 ? (
-                      '—'
-                    ) : (
-                      <span style={{ color: d < 0 ? 'var(--positive)' : 'var(--negative)' }}>
-                        {fc(Math.abs(d))} {d < 0 ? 'minder' : 'meer'}
-                      </span>
-                    )}
-                  </Td>
-                )
-              })}
-            </tr>
-            <tr>
-              <Th>
-                In vrijheidstijd
-                <span className="mt-0.5 block font-mono text-[9.5px] uppercase tracking-[0.12em] text-[var(--ink-4)]">
-                  tegen je dagtarief van vandaag; de bedragen zijn nominaal
-                </span>
-              </Th>
-              {varianten.map((v) => {
-                const d = verschil(v)
-                const tijd = vrijheid(d, dailyExpenses)
-                return (
-                  <Td key={v.id} muted={tijd === null} style={winnaarCel(v)}>
-                    {tijd === null || d === null ? (
-                      '—'
-                    ) : (
-                      <span style={{ color: d < 0 ? 'var(--positive)' : 'var(--negative)' }}>
-                        ≈ {tijd} {d < 0 ? 'meer' : 'minder'} vrijheid
-                      </span>
-                    )}
-                  </Td>
-                )
-              })}
-            </tr>
+            {/* Elke as krijgt zijn EIGEN verschilrij, met de as in het label.
+                Vóór aug 2026 stonden hier twee rijen — "In euro's" en "In
+                vrijheidstijd" — die alleen de BELASTING betroffen maar, ná beide
+                inhoudelijke groepen, als slotsom van de hele tabel lazen. De
+                vrijheidstijd-rij claimde "≈ 11 jaar meer vrijheid" terwijl het
+                belegbaar vermogen twee rijen hoger in dezelfde kolom de andere
+                kant op bewoog. Nu draagt elk label zijn as, staan de
+                vermogens-assen ernaast, en is de vrijheidstijd per as een
+                celnotitie in plaats van een eigen slotregel. */}
+            <GroupRow
+              label="Verschil met je huidige volgorde"
+              span={cols}
+              note="per as apart — belasting en vermogen zijn verschillende grondslagen, niet bij elkaar optellen"
+            />
+            <VerschilRij
+              label="Belastingverschil, over je hele looptijd"
+              grondslag="nominaal; vrijheidstijd tegen je dagtarief van vandaag"
+              varianten={varianten}
+              delta={(v) => deltaOp(v, 'levenslangeTotaleDrukNominaal')}
+              lagerIsGunstig
+              ijkpuntNote
+              fc={fc}
+              dailyExpenses={dailyExpenses}
+              winnaarCel={winnaarCel}
+            />
+            {VERSCHIL_VERMOGEN_ASSEN.map((as) => (
+              <VerschilRij
+                key={as.veld}
+                label={as.label}
+                grondslag={as.grondslag}
+                varianten={varianten}
+                delta={(v) => deltaOp(v, as.veld)}
+                fc={fc}
+                dailyExpenses={dailyExpenses}
+                winnaarCel={winnaarCel}
+              />
+            ))}
           </tbody>
         </table>
       </div>
     </div>
+  )
+}
+
+/**
+ * Eén verschilrij in het blok "Verschil met je huidige volgorde": het verschil
+ * tussen een GELEVERD totaal van deze variant en datzelfde totaal van de
+ * referentie, in euro's met de vrijheidstijd als celnotitie eronder.
+ *
+ * ## Waarom één component voor drie assen
+ * De rekenkant is voor elke as dezelfde aftrekking (`deltaOp`); alleen de RICHTING
+ * verschilt. Bij de belasting is mínder gunstig, bij vermogen juist méér. Dat
+ * onderscheid zit uitsluitend in `lagerIsGunstig` en raakt alleen de KLEUR en het
+ * woord "meer/minder vrijheid" — nooit het getal. Zo kan er geen tweede
+ * verschil-formule ontstaan die op één as omgekeerd rekent.
+ *
+ * Het euro-bedrag noemt altijd de feitelijke richting van de grootheid ("€ 1,35 mln
+ * minder"), de kleur zegt of dat gunstig is. Een variant die minder belasting
+ * betaalt én minder overhoudt toont dus een gróéne belastingregel bóven een róde
+ * vermogensregel — precies het beeld dat het scherm eerst verzweeg.
+ *
+ * Vrijheidstijd via de canonieke `vrijheid()`-helper (lib/format.ts) op het
+ * dagtarief dat de optimizer al consumeert — geen eigen dag-conversie.
+ */
+function VerschilRij({
+  label,
+  grondslag,
+  varianten,
+  delta,
+  lagerIsGunstig = false,
+  ijkpuntNote = false,
+  fc,
+  dailyExpenses,
+  winnaarCel,
+}: {
+  label: string
+  /** Mono-onderschrift: waarvan dit het verschil is (eenheid/grondslag). */
+  grondslag: string
+  varianten: readonly VariantUitkomst[]
+  delta: (v: VariantUitkomst) => number | null
+  /** Belasting: lager is gunstig. Vermogen: hoger is gunstig (default). */
+  lagerIsGunstig?: boolean
+  /** Alleen de bovenste rij legt uit waarom de referentiekolom leeg is. */
+  ijkpuntNote?: boolean
+  fc: (v: number) => string
+  dailyExpenses: number
+  winnaarCel: (v: VariantUitkomst) => React.CSSProperties | undefined
+}) {
+  return (
+    <tr>
+      <Th>
+        {label}
+        <span className="mt-0.5 block font-mono text-[9.5px] uppercase leading-snug tracking-[0.12em] text-[var(--ink-4)]">
+          {grondslag}
+        </span>
+      </Th>
+      {varianten.map((v) => {
+        if (v.isReferentie) {
+          return (
+            <Td key={v.id} muted style={winnaarCel(v)}>
+              —{ijkpuntNote && <CellNote>dit is het ijkpunt</CellNote>}
+            </Td>
+          )
+        }
+        const d = delta(v)
+        if (d === null || d === 0) {
+          return (
+            <Td key={v.id} muted style={winnaarCel(v)}>
+              —
+            </Td>
+          )
+        }
+        const gunstig = lagerIsGunstig ? d < 0 : d > 0
+        const tijd = vrijheid(d, dailyExpenses)
+        return (
+          <Td key={v.id} style={winnaarCel(v)}>
+            <span style={{ color: gunstig ? 'var(--positive)' : 'var(--negative)' }}>
+              {fc(Math.abs(d))} {d < 0 ? 'minder' : 'meer'}
+            </span>
+            {tijd && (
+              <CellNote>
+                ≈ {tijd} {gunstig ? 'meer' : 'minder'} vrijheid
+              </CellNote>
+            )}
+          </Td>
+        )
+      })}
+    </tr>
   )
 }
 
@@ -621,24 +750,33 @@ function Bedrag({
  * benoem welke kant hij op valt, en noem het een indicatie. Geen advies, geen
  * gebiedende wijs.
  *
- * De zesde gaat over de arbeidskorting-afwijking in `lib/box1-tax.ts` (zie de
- * module-doc van `lib/tax-lifetime/lifetime-tax.ts`). Die staat er omdat de
- * afwijking niet neutraal is tussen de vergeleken varianten: hij is het grootst in
- * de jaren vóór de AOW, en dat is precies waar "pensioen vroeg" zijn onttrekkingen
- * concentreert. Bewust ZONDER euro-bedragen: de afwijking hangt af van het
- * inkomensniveau en draait bij hoge pensioeninkomens zelfs van teken, dus één
- * getal zou hier een precisie suggereren die er niet is (de gemeten reeks staat
- * gepind in `lib/tax-lifetime/lifetime-tax.test.ts`).
+ * De ZESDE (aug 2026) benoemt wat de tabel structureel niet kan verbergen: de
+ * rangschikking loopt over de belasting, en die as beloont "eerder door je geld
+ * heen zijn" — precies de waarschuwing die `lib/tax-lifetime/varianten-sweep.ts`
+ * in zijn eigen docstring geeft, maar die tot nu toe alleen de ontwikkelaar zag.
+ * Hij hoort bij het verschilblok, dat sinds dezelfde ronde per as is uitgesplitst.
+ *
+ * DRIE INGETROKKEN PUNTEN — niet opnieuw toevoegen, elk was waar tot zijn oorzaak
+ * verdween. Een kanttekening die zijn oorzaak overleeft is een onwaarheid op het
+ * scherm, niet een extra slag om de arm:
+ *  - de LEVENSVERZEKERING-overlap (6→10 aug 2026): bestaat niet meer sinds
+ *    `levensverzekering` in `NON_SPENDABLE_ASSET_TYPES` staat (eigenaarsbesluit
+ *    optie A). De norm "aparte grondslagen, niet optellen" woont onafhankelijk in
+ *    `EINDVERMOGEN_GRONDSLAGEN` (varianten-sweep.ts) en in de groepskop-notes;
+ *  - de ARBEIDSKORTING-afwijking (tot 11 aug 2026): het model kende de
+ *    arbeidskorting ook toe over pensioeninkomen. `lib/box1-tax.ts` kent nu
+ *    `Box1Input.arbeidsinkomen` en `lifetime-tax.ts` geeft daar 0 mee, dus de
+ *    heffing lóópt niet meer scheef en het punt zou de lezer om de tuin leiden.
+ *    De correctie is gepind in `lifetime-tax.test.ts` ("GRONDSLAG").
  */
 function Kanttekeningen({ box1Jaar }: { box1Jaar: number }) {
   const punten = [
     'De heffing is berekend náást de projectie, niet erin: het model rekent niet mee dat je extra bruto moet opnemen om die belasting te betalen. Je werkelijke opname ligt dus hoger, en het verschil tussen de varianten is een indicatie — geen uitkomst.',
     'Een “volgorde” is in het model geen strikte rij maar een gewogen gelijktijdige opname: een pot met een hogere prioriteit levert per euro ongeveer twee keer zoveel als de pot erna. Alleen “als laatste” is echt achtergesteld.',
     'Lijfrente is niet apart te sturen — die valt in het model samen met je bedrijfspensioen in één pot.',
-    'Heb je een levensverzekering? Die telt in het model zowel bij je belegbaar vermogen als bij je pensioenpot. De twee regels onder “wat er overblijft” overlappen daardoor en zijn niet bij elkaar op te tellen.',
     'Box 1 is per persoon; de belasting van je partner zit hier niet in.',
     `De schijven en heffingskortingen zijn die van ${box1Jaar}; in het model groeien ze mee met de inflatie.`,
-    'De box 1-heffing is een indicatie: het model kent de arbeidskorting nu ook toe over pensioeninkomen, terwijl dat fiscaal geen arbeidsinkomen is. In het gangbare bereik valt de heffing daardoor te laag uit — het sterkst in de jaren vóór je AOW, en dus bij vroeg onttrekken; bij een hoog pensioeninkomen valt ze juist iets te hoog uit.',
+    'Minder belasting betekent niet vanzelf dat er méér overblijft. De rangschikking loopt over de belasting, en wie zijn vermogen sneller opmaakt betaalt daar minder over — een variant kan dus bovenaan staan terwijl er aan het eind minder van je vermogen over is. Daarom staat het verschil per as apart onderaan de tabel: de belasting én wat er overblijft.',
   ]
 
   return (

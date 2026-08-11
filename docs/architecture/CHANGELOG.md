@@ -770,3 +770,11 @@
 ## 2026-08-10
 
 - Geen wijzigingen.
+
+## 2026-08-10
+
+- **Schermen** verwijderd: /horizon/strategie, /horizon/uitgaven-na-pensioen, /toekomst/strategie, /toekomst/uitgaven-na-pensioen
+
+## 2026-08-11
+
+- **API-routes** verwijderd: /api/roadmap

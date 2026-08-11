@@ -23,7 +23,8 @@ import type { LinkedAccountView } from '@/lib/truelayer/linked-account'
 import { type Budget } from '@/lib/budget-data'
 import { TransactionForm } from '@/components/app/transaction-form'
 import { BudgetIcon, formatCurrency as formatCurrencyShort, formatCurrencyDecimals as formatCurrency } from '@/components/app/budget-shared'
-import { calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { useDailyExpenseRate } from '@/components/app/freedom-time-label'
 import { capDateGroups } from '@/lib/transaction-list-cap'
 import { localMonthBounds } from '@/lib/month-range'
 import { SankeyDiagram, type SankeyNode, type SankeyLink } from '@/components/app/sankey-diagram'
@@ -801,7 +802,19 @@ export function CashAccountView({
   const netAmount = totalIncome - totalExpenses
   const transferTotal = transferTx.reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
 
-  const dailyExpenses = dailyExpenseRate(totalExpenses)
+  // Canoniek dagtarief uit de gedeelde client-bron (`DailyExpenseProvider` →
+  // GET /api/daily-expense-rate → lib/expense-rate.ts, 12-mnd rolling) —
+  // exact hetzelfde €/dag als de sidebar-badges, de widgets en de rapporten.
+  //
+  // Was `dailyExpenseRate(totalExpenses)`: `totalExpenses` is de som van de
+  // uitgaven van ÉÉN geselecteerde kalendermaand, op ÉÉN rekening, in ÉÉN
+  // perspectief. Dat als jaartarief annualiseren (×12/365) is de single-month-
+  // herberekening die KRUIS-17/20 heeft afgeschaft, en de rekening-scope maakt
+  // een app-brede grondslag per definitie onmogelijk: wie de maand of de
+  // rekening wisselde, zag hetzelfde bedrag een ander aantal dagen vrijheid
+  // waard. De maand-/rekeningtotalen zelf blijven ongewijzigd — alleen de
+  // NOEMER van de €→tijd-vertaling komt nu uit de canonieke bron.
+  const { dailyExpenseRate: dailyExpenses } = useDailyExpenseRate()
 
   const incomeFreedomDays = dailyExpenses > 0
     ? calculateFreedomTime(totalIncome, dailyExpenses)

@@ -67,4 +67,13 @@ describe('OnboardingVraag', () => {
     expect(footerButton('Ja, nog een')).toBeTruthy()
     expect(footerButton('Nee, klaar')).toBeTruthy()
   })
+
+  it('plaatst Ja links en Nee rechts in de knoppen-grid (DOM-volgorde)', () => {
+    renderVraag()
+    const jaBtn = footerButton('Ja')
+    const grid = jaBtn.parentElement
+    const gridButtons = grid ? Array.from(grid.querySelectorAll('button')) : []
+    expect(gridButtons[0]).toBe(jaBtn)
+    expect(gridButtons[1]).toHaveTextContent('Nee')
+  })
 })

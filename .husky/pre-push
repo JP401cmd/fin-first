@@ -40,4 +40,11 @@ echo "✓ TypeScript check passed (production code clean)."
 echo "→ Running datapad-conventie check (ADR 0058)…"
 node scripts/check-client-data-reads.mjs
 
+# Vrijheidstijd-grondslag (KRUIS-20 + vervolg): het €→tijd-dagtarief komt uit
+# ÉÉN bron (12-mnd rolling, lib/expense-rate.ts). Deze gate flagt een nieuw
+# zelfgerekend dagtarief buiten de canonieke bron/allowlist. Twee keer op rij is
+# precies deze drift ontstaan; de compiler ziet 'm niet (alles is `number`).
+echo "→ Running vrijheidstijd-grondslag check (KRUIS-20)…"
+node scripts/check-freedom-time-basis.mjs
+
 exit 0

@@ -30,6 +30,14 @@
 //     lib/supabase/server.ts) worden aangeroepen — NOOIT met
 //     getServiceClient(): die passeert RLS en zou rijen van álle gebruikers
 //     teruggeven.
+//     UITZONDERING (perf, gemeten — zie de doc bij `getEarliestIncomeDate`):
+//     voor een query ZONDER datumvenster met `ORDER BY date … LIMIT 1` kan de
+//     planner de RLS-OR niet in een index-conditie duwen en valt hij terug op
+//     de globale datum-index → kosten O(rijen van ándere gebruikers). Daar
+//     staan expliciete kolom-predicaten wél, in twee takken (eigen + gedeeld)
+//     die samen exact de RLS-verzameling dekken. Gevensterde varianten
+//     (`getCurrentMonthTx`, `getTx12m`) hebben dit probleem NIET — die pakken
+//     de bitmap op `idx_transactions_user_date` gewoon.
 //   • Rauwe PostgREST-resultaatvorm. Elke fetcher `return`t het awaited
 //     `{ data, error }`-object, zodat consumers hun bestaande `.data ?? []` /
 //     `.error`-afleidingen ONGEWIJZIGD houden.
@@ -53,6 +61,7 @@
 import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { ASSET_CLIENT_COLUMNS } from '@/lib/asset-data'
+import { getCachedUser } from '@/lib/supabase/cached-user'
 import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
 import { selectUnlinkedBankAccounts } from '@/lib/unlinked-cash'
 
@@ -211,16 +220,88 @@ export const getTx12m = cache(async (supabase: SupabaseClient) => {
  * rij (nooit afkap-gevoelig) en is door geen van beide begrenzingen geraakt.
  *
  * BEWUST géén transfer-filter: spiegelt de vroegere scan over ÁLLE positieve
- * rijen (`income12Rows` had géén isRealTx-filter). RLS van `transactions` geldt.
+ * rijen (`income12Rows` had géén isRealTx-filter).
+ *
+ * ── TWEE TAKKEN I.P.V. ÉÉN RLS-ONLY QUERY (perf, 11 aug 2026) ──────────────
+ * Dit is de ENIGE fetcher hier die géén datumvenster heeft én `ORDER BY date
+ * LIMIT 1` doet, en precies daar breekt de T2.1-conventie ("RLS scopet al,
+ * dus geen expliciete `.eq('user_id')`"). Zónder kolom-predicaat op `user_id`
+ * is de RLS-policy voor de planner een FILTER met een OR
+ * (`uid = user_id OR (ownership='shared' AND household_id = user_household_id())`),
+ * niet iets wat hij in een index-conditie kan duwen. Hij pakt dan de GLOBALE
+ * `idx_transactions_date` en loopt vanaf de oudste rij ín de tabel vooruit tot
+ * hij een rij van jóu tegenkomt. Gemeten onder gesimuleerde RLS op een laat
+ * ingestroomde gebruiker: 23.134 rows removed / 12.202 buffers / 47 ms — kosten
+ * die schalen met de rijen van ÁNDERE gebruikers, op élke paginalading van élke
+ * route (deze fetcher hangt in `app/(app)/layout.tsx` via `loadLeverScores`).
+ * In pg_stat_statements was dit met 101 ms mean / 623 s totaal de duurste
+ * gemiddelde query van de app.
+ *
+ * De naïeve fix (`.eq('user_id', …)`) is snel maar VERSMALT de scope: de
+ * SELECT-policy is `own OR household-shared`, dus partner-rijen met
+ * `ownership='shared'` zouden wegvallen. Daarom splitsen we in twee takken die
+ * elk hun eigen index krijgen, en nemen we het minimum:
+ *
+ *   tak A — eigen rijen   → `idx_transactions_user_date`            (34 buffers, 0,2 ms)
+ *   tak B — gedeelde rijen→ `idx_transactions_household_shared_date` (4 buffers, 1,3 ms)
+ *
+ * SCOPE-BEWIJS (waarom dit géén datatoegang-wijziging is): beide takken draaien
+ * onder dezelfde RLS-client, dus elke tak levert een DEELVERZAMELING van de
+ * RLS-zichtbare rijen. Tak A = {zichtbaar} ∩ {user_id = ik} = al mijn eigen
+ * rijen (die zijn per policy-tak 1 altijd zichtbaar). Tak B = {zichtbaar} ∩
+ * {ownership='shared'} = de gedeelde rijen van mijn huishouden (policy-tak 2;
+ * gedeelde rijen van een ánder huishouden blijven door RLS geblokkeerd — het
+ * `household_id`-predicaat blijft van de policy komen, niet van ons). A ∪ B is
+ * dus exact de RLS-zichtbare verzameling, en min(datum) over een unie is het
+ * minimum van de twee deelminima. Niet verruimd, niet versmald.
+ *
+ * `.or('user_id.eq.…,ownership.eq.shared')` in één query is bewust NIET gekozen:
+ * gemeten valt de planner dan terug op exact hetzelfde globale-datum-indexplan.
+ *
+ * De gebruiker komt uit `getCachedUser` (zelf `cache()`-gewrapt op dezelfde
+ * client), dus dit kost géén extra auth-round-trip: de layout haalde 'm al op.
  */
 export const getEarliestIncomeDate = cache(async (supabase: SupabaseClient) => {
-  return supabase
-    .from('transactions')
-    .select('date')
-    .gt('amount', 0)
-    .order('date', { ascending: true })
-    .limit(1)
-    .maybeSingle()
+  const user = await getCachedUser(supabase)
+  if (!user) {
+    // Geen sessie → RLS zou hoe dan ook niets teruggeven. Zelfde resultaatvorm
+    // als PostgREST's `maybeSingle()` op nul rijen, zodat consumers hun
+    // `(res.data as { date?: string | null } | null)?.date`-afleiding houden.
+    return { data: null as { date: string } | null, error: null }
+  }
+
+  const [ownRes, sharedRes] = await Promise.all([
+    supabase
+      .from('transactions')
+      .select('date')
+      .eq('user_id', user.id)
+      .gt('amount', 0)
+      .order('date', { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('transactions')
+      .select('date')
+      .eq('ownership', 'shared')
+      .gt('amount', 0)
+      .order('date', { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+  ])
+
+  // ISO-datums (`YYYY-MM-DD`) zijn lexicografisch = chronologisch vergelijkbaar.
+  const candidates = [ownRes.data?.date, sharedRes.data?.date].filter(
+    (d): d is string => typeof d === 'string' && d.length > 0,
+  )
+  const earliest = candidates.length > 0 ? candidates.reduce((a, b) => (a <= b ? a : b)) : null
+
+  return {
+    data: earliest === null ? null : { date: earliest },
+    // Eén falende tak maakt de andere niet ongeldig (de unie is dan onvolledig,
+    // net als vroeger bij een falende enkele query). Eerste fout wint, zodat een
+    // consumer die `.error` leest hetzelfde signaal krijgt als voorheen.
+    error: ownRes.error ?? sharedRes.error,
+  }
 })
 
 // ── 8. Netto-vermogen-snapshots (12-maands venster) ────────────────────────

@@ -290,13 +290,10 @@ describe('OptimizerLevenslang — na de klik', () => {
     const belegbaarRij = screen.getByText(/Belegbaar vermogen aan het eind/i).closest('tr')
     expect(belegbaarRij).toBeTruthy()
     expect(belegbaarRij!.textContent).toMatch(/zonder je huis en ander niet-liquide bezit/i)
-    // Het onderschrift mag GEEN disjunctheid beloven ("je pensioen staat
-    // hieronder" o.i.d.). Een `levensverzekering` mapt op kern-categorie
-    // 'Pensioen' maar staat niet in NON_SPENDABLE_ASSET_TYPES, dus die polis zit
-    // in béíde regels — op de persona-fixture is dat 87% van de winnaar-cel.
-    // Zo'n zin zou de lezer uitnodigen de twee regels op te tellen en het
-    // vermogen te overschatten: dezelfde leesfout als het defect dat deze rij
-    // repareert, alleen omgekeerd van teken.
+    // Het onderschrift mag GEEN uitsplitsing suggereren ("je pensioen staat
+    // hieronder" o.i.d.). De twee regels zijn sinds 10 aug 2026 wél disjunct,
+    // maar hun som mist woning, auto/fysiek bezit én de schulden — zo'n zin zou
+    // de lezer uitnodigen op te tellen en zijn vermogen te overschatten.
     expect(belegbaarRij!.textContent).not.toMatch(/pensioen staat hieronder/i)
     for (const v of resultaat.varianten) {
       expect(belegbaarRij!.textContent).toMatch(euroPattern(v.eindvermogenBelegbaarNominaal!))
@@ -309,9 +306,11 @@ describe('OptimizerLevenslang — na de klik', () => {
       expect(pensioenRij!.textContent).toMatch(euroPattern(v.eindvermogenPensioenNominaal!))
     }
 
-    // De twee grondslagen worden NOOIT opgeteld tot één getal (ze overlappen met
-    // de levensverzekering-pot) en de derde grondslag — netto vermogen incl.
-    // niet-liquide bezit — staat nergens in deze tabel.
+    // De twee grondslagen worden NOOIT opgeteld tot één getal (de som mist woning,
+    // auto/fysiek bezit én de schulden) en de derde grondslag — netto vermogen
+    // incl. niet-liquide bezit — staat nergens in deze tabel. De laag-brede norm
+    // staat in EINDVERMOGEN_GRONDSLAGEN (lib/tax-lifetime/varianten-sweep.ts);
+    // deze assertie bewaakt alleen nog dít scherm.
     for (const v of resultaat.varianten) {
       const som = v.eindvermogenBelegbaarNominaal! + v.eindvermogenPensioenNominaal!
       expect(screen.queryAllByText(euroPattern(som)).length).toBe(0)
@@ -366,7 +365,7 @@ describe('OptimizerLevenslang — na de klik', () => {
     expect(pensioenRij!.textContent).toMatch(euroPattern(1_664_321))
   })
 
-  it('vertaalt het verschil met de referentie naar vrijheidstijd', async () => {
+  it('vertaalt het BELASTINGverschil naar vrijheidstijd, met de as in het label', async () => {
     const resultaat = fixture()
     mockSweep.mockResolvedValue(resultaat)
     renderSectie()
@@ -375,14 +374,102 @@ describe('OptimizerLevenslang — na de klik', () => {
     await waitFor(() => expect(screen.getByRole('table')).toBeTruthy())
 
     // 154.000 − 160.000 = 6.000 minder; bij € 100/dag = 60 dagen = 2 maanden.
-    const euroRij = screen.getByText(/In euro’s, over je hele looptijd/).closest('tr')
-    expect(euroRij!.textContent).toMatch(euroPattern(6_000))
-    expect(euroRij!.textContent).toMatch(/minder/)
-    const tijdRij = screen.getByText(/tegen je dagtarief van vandaag/i).closest('tr')
-    expect(tijdRij!.textContent).toMatch(/In vrijheidstijd/i)
-    expect(tijdRij!.textContent).toMatch(/2 maanden meer vrijheid/i)
+    // Het label noemt de as zelf ("Belastingverschil"), zodat de regel niet meer
+    // als slotsom van de hele tabel leest — dat was het gemelde defect.
+    const belastingRij = screen.getByText(/Belastingverschil, over je hele looptijd/i).closest('tr')
+    expect(belastingRij).toBeTruthy()
+    expect(belastingRij!.textContent).toMatch(euroPattern(6_000))
+    expect(belastingRij!.textContent).toMatch(/minder/)
+    // De vrijheidstijd hangt als celnotitie ONDER het bedrag van diezelfde as —
+    // geen eigen slotregel meer die het laatste woord van de tabel heeft.
+    expect(belastingRij!.textContent).toMatch(/2 maanden meer vrijheid/i)
+    expect(belastingRij!.textContent).toMatch(/tegen je dagtarief van vandaag/i)
+    // De oude, as-loze labels mogen niet terugkomen.
+    expect(screen.queryByText(/^In euro’s, over je hele looptijd$/)).toBeNull()
     // Wft: het is een verschil tussen indicaties, geen belofte van besparing.
     expect(screen.queryByText(/je bespaart/i)).toBeNull()
+  })
+
+  /**
+   * Het gemelde defect zelf. De cijfers zijn de gemeten standen uit de bugmelding
+   * (persona `compleet`): de winnaar betaalt € 575.123 minder belasting — bij
+   * € 100/dag ruim elf jaar vrijheid — terwijl zijn belegbaar vermogen met
+   * € 1.350.847 daalt. Vóór deze fix toonde het blok alleen de eerste helft, als
+   * laatste regel van de tabel, en las dat als het totaaloordeel.
+   */
+  it('BUG-ANKER — minder belasting én minder vermogen staan allebei in het verschilblok', async () => {
+    const resultaat = finaliseerVarianten(
+      [
+        ruw('huidige-volgorde', 'Jouw huidige volgorde', {
+          box3: 500_000,
+          box1: 400_000,
+          fire: 58,
+          belegbaar: 2_766_065,
+          netto: 4_847_281,
+          pensioen: 1_664_321,
+          buffer: 20_000,
+        }),
+        ruw('pensioen-laatst', 'Pensioen zo laat mogelijk', {
+          box3: 200_000,
+          box1: 124_877,
+          fire: 58,
+          belegbaar: 1_415_218,
+          netto: 5_799_903,
+          pensioen: 3_672_936,
+          buffer: 15_000,
+        }),
+      ],
+      2026,
+    )
+    expect(resultaat.winnaarId).toBe('pensioen-laatst')
+
+    mockSweep.mockResolvedValue(resultaat)
+    renderSectie()
+    fireEvent.click(startKnop())
+    await waitFor(() => expect(screen.getByRole('table')).toBeTruthy())
+
+    // De gunstige helft: 900.000 − 324.877 = 575.123 minder belasting.
+    const belastingRij = screen.getByText(/Belastingverschil, over je hele looptijd/i).closest('tr')
+    expect(belastingRij!.textContent).toMatch(euroPattern(575_123))
+    expect(belastingRij!.textContent).toMatch(/meer vrijheid/i)
+
+    // …en de ongunstige helft staat er nu naast, in dezelfde eenheid.
+    const belegbaarVerschil = screen.getByText(/Verschil in belegbaar vermogen/i).closest('tr')
+    expect(belegbaarVerschil).toBeTruthy()
+    expect(belegbaarVerschil!.textContent).toMatch(euroPattern(1_350_847))
+    expect(belegbaarVerschil!.textContent).toMatch(/minder/)
+    expect(belegbaarVerschil!.textContent).toMatch(/minder vrijheid/i)
+
+    // De derde as (de pensioenpot) hoort er ook bij: die verklaart wáár het geld
+    // heen ging, en is een eigen grondslag — geen uitsplitsing van de tweede.
+    const pensioenVerschil = screen.getByText(/Verschil in de pensioenpot/i).closest('tr')
+    expect(pensioenVerschil).toBeTruthy()
+    expect(pensioenVerschil!.textContent).toMatch(euroPattern(2_008_615))
+    expect(pensioenVerschil!.textContent).toMatch(/meer/)
+
+    // Nooit tot één getal opgeteld — niet de twee vermogens-assen, en niet het
+    // belastingverschil bij een vermogensverschil (drie grondslagen).
+    for (const som of [
+      1_350_847 + 2_008_615,
+      575_123 + 1_350_847,
+      575_123 + 2_008_615,
+    ]) {
+      expect(screen.queryAllByText(euroPattern(som)).length).toBe(0)
+    }
+  })
+
+  it('de groepskop van het verschilblok waarschuwt tegen optellen', async () => {
+    const resultaat = fixture()
+    mockSweep.mockResolvedValue(resultaat)
+    renderSectie()
+
+    fireEvent.click(startKnop())
+    await waitFor(() => expect(screen.getByRole('table')).toBeTruthy())
+
+    const kop = screen.getByText(/Verschil met je huidige volgorde/i).closest('td')
+    expect(kop).toBeTruthy()
+    expect(kop!.textContent).toMatch(/verschillende grondslagen/i)
+    expect(kop!.textContent).toMatch(/niet bij elkaar optellen/i)
   })
 
   it('laat de vrijheidstijd-vertaling weg zonder bekend dagtarief', async () => {
@@ -398,7 +485,7 @@ describe('OptimizerLevenslang — na de klik', () => {
     expect(screen.queryByText(/∞/)).toBeNull()
   })
 
-  it('toont de zeven kanttekeningen, met het gebruikte Box 1-jaar', async () => {
+  it('toont de zes kanttekeningen, met het gebruikte Box 1-jaar', async () => {
     const resultaat = fixture()
     mockSweep.mockResolvedValue(resultaat)
     renderSectie()
@@ -408,26 +495,29 @@ describe('OptimizerLevenslang — na de klik', () => {
 
     const lijst = screen.getByText('Kanttekeningen').parentElement!.querySelector('ul')
     expect(lijst).toBeTruthy()
-    expect(lijst!.querySelectorAll('li').length).toBe(7)
+    expect(lijst!.querySelectorAll('li').length).toBe(6)
     const tekst = lijst!.textContent ?? ''
     expect(tekst).toMatch(/náást de projectie, niet erin/i)
     expect(tekst).toMatch(/gewogen gelijktijdige opname/i)
     expect(tekst).toMatch(/Lijfrente is niet apart te sturen/i)
     expect(tekst).toMatch(/Box 1 is per persoon/i)
     expect(tekst).toMatch(new RegExp(`schijven en heffingskortingen zijn die van ${resultaat.box1Jaar}`, 'i'))
-    // De zesde: de arbeidskorting-afwijking stuurt de rangschikking (het effect is
-    // het grootst vóór de AOW), dus die hoort de lezer te zien — mét beide kanten,
-    // want de afwijking is niet systematisch één kant op.
-    expect(tekst).toMatch(/arbeidskorting nu ook toe over pensioeninkomen/i)
-    expect(tekst).toMatch(/vóór je AOW/i)
-    expect(tekst).toMatch(/te hoog/i)
-    // De zevende: de levensverzekering zit in BEIDE regels onder "wat er
-    // overblijft" (mapt op kern-categorie 'Pensioen', maar staat niet in
-    // NON_SPENDABLE_ASSET_TYPES). Zolang die asymmetrie openstaat is dit de enige
-    // plek waar de gebruiker de overlap te horen krijgt — het scherm toont anders
-    // twee regels die optelbaar lijken en het niet zijn.
-    expect(tekst).toMatch(/levensverzekering/i)
-    expect(tekst).toMatch(/niet bij elkaar op te tellen/i)
+    // De ZESDE (11 aug 2026): de rangschikking loopt over de belasting, en die
+    // as beloont "eerder door je geld heen zijn". Zonder dit punt kan de tabel
+    // een variant bovenaan zetten die minder overhoudt zonder dat de lezer het
+    // verband ziet — het defect waar die kaart over ging.
+    expect(tekst).toMatch(/Minder belasting betekent niet vanzelf/i)
+    expect(tekst).toMatch(/sneller opmaakt/i)
+    expect(tekst).toMatch(/per as apart/i)
+    // TWEE INGETROKKEN PUNTEN, hier gepind zodat ze niet uit gewoonte terugkeren.
+    // (1) De levensverzekering-overlap (6→10 aug 2026): bestaat niet meer sinds
+    //     `levensverzekering` in NON_SPENDABLE_ASSET_TYPES staat.
+    expect(tekst).not.toMatch(/levensverzekering/i)
+    // (2) De arbeidskorting-afwijking (tot 11 aug 2026): lib/box1-tax.ts kent nu
+    //     `arbeidsinkomen` als eigen grondslag en lifetime-tax.ts geeft daar 0
+    //     mee, dus het model kent géén arbeidskorting meer toe over pensioen.
+    //     Dit punt op het scherm laten staan zou nu een onwaarheid zijn.
+    expect(tekst).not.toMatch(/arbeidskorting/i)
   })
 
   it('memoïseert op de invoer-hash: een tweede klik rekent niet opnieuw', async () => {

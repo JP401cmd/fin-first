@@ -138,3 +138,54 @@ alle drie tabellen; partner ziet uitsluitend de gedeelde rijen en **0** privéri
 geen rijen uit een ander huishouden; `anon` 0 rijen **zonder fout** op alle drie tabellen.
 `db-model`- + household-vitest groen (op de 2 pre-existente `partner-items-projection`-
 failures na, die van een ander traject zijn).
+
+## Addendum 2 (2026-08-10) — de rest van de database, plus een eigen gate
+
+Migratie `20260810220000_rls_initplan_wrap_helpers_buiten_transactions.sql`
+(**geschreven, nog niet toegepast** — toepassen loopt via de release-stap).
+
+**Wat er nog openstond.** Addendum 1 wikkelde `user_household_id()` op de
+transactions-familie. Daarbuiten bleven de drie helpers kaal. Gemeten tegen `pg_policies`
+op de live database (10-08-2026): **34 policies** verwijzen naar `user_household_id()`,
+`user_owned_household_id()` of `is_superadmin()`; **5** waren al gewikkeld (de drie uit
+addendum 1 plus `user_reports` ×2); **29 policies met 36 kale aanroepen** resteerden.
+Daarvan zitten er 25 in `public` — het getal uit de aanleiding — en **4 op
+`storage.objects`** (`guide_help_admin_*`, kale `is_superadmin()`), die buiten de
+public-scope van de oorspronkelijke telling vielen maar dezelfde kwaal hebben.
+
+Gemeten tegen `pg_proc` (10-08-2026) zijn alle drie `STABLE SECURITY DEFINER` met
+`search_path=public` en ACL `{postgres=X,authenticated=X,service_role=X}` — `anon` heeft
+géén EXECUTE. Alle 29 policies staan op `to authenticated`.
+
+**Twee plekken waar het scherper bijt dan bij transactions.** `budget_amounts` heeft een
+`FOR ALL`-policy, dus de kale aanroep zit óók in `with_check` — per te *schrijven* rij.
+En `assets` draagt de `*_encrypted`-kolommen en wordt op vrijwel elke pagina gelezen.
+
+**De gate.** De Supabase-advisor `auth_rls_initplan` herkent alleen
+`auth.*`/`current_setting` en stond vóór én ná op 0; hij kán dit patroon niet vinden.
+Daarom introduceert deze migratie `public.rls_helper_policy_hygiene()` — `STABLE SECURITY
+INVOKER`, `search_path = ''`, EXECUTE alleen voor `service_role`. Twee lenzen:
+`kale_helper_aanroep` (performance) en `anon_zonder_execute` (veiligheid: helper in een
+policy waarvan de rolset `anon`/`public` bevat terwijl anon geen EXECUTE heeft — dat geeft
+anon een harde fout in plaats van stil 0 rijen, precies de valkuil uit dit ADR).
+
+**Hoe bewezen is dat niets verruimd is.** De migratie sluit af met een `DO`-block dat per
+policy de *genormaliseerde* expressie hasht — normalisatie = schema-kwalificatie én de
+`(select … as …)`-wrapper wegstrepen — en vergelijkt met 34 md5's die read-only vóór de
+migratie zijn gemeten. Wijkt er één af, dan faalt de migratie. Daarnaast bewaakt het block
+dat het aantal helper-dragende policies exact 34 blijft en dat elke rolset
+`{authenticated}` blijft. Dat de normalisatie klopt is *empirisch* aangetoond en niet
+alleen beredeneerd: de vijf al-gewikkelde policies uit addendum 1 hashen vandaag identiek
+aan hun nog-kale zusters (`recurring_transactions` == `assets` == `e0907df4…`). Zij staan
+als controlegroep in dezelfde lijst.
+
+**Blast radius vandaag.** 0 huishoudens, 0 huishoudleden, 0 gedeelde assets/budgets
+(gemeten 10-08-2026): de huishouden-takken matchen nu nul rijen, dus de opbrengst is
+latent — dit voorkomt een klif zodra huishoudens in gebruik komen. De
+`is_superadmin()`-takken evalueren wél al (3 superadmins).
+
+**Niet doen — waarschuwing voor later.** De advisor meldt de drie helpers als
+`authenticated_security_definer_function_executable` (WARN). Die WARN is hier bewust niet
+opgevolgd: een policy-expressie wordt geëvalueerd met de rechten van de *aanroeper*, dus
+`authenticated` moet EXECUTE op deze helpers houden. Dat recht intrekken breekt élke
+huishoud- en beheerpolicy in dit ADR.

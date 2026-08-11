@@ -32,7 +32,7 @@ describe('resolveRouteTitle', () => {
   it('resolveert EXTRA_ROUTE_TITLES (buiten de nav-structuur)', () => {
     expect(resolveRouteTitle('/mijn/checkins')).toBe('Check-ins')
     expect(resolveRouteTitle('/mijn/feedback')).toBe('Melden')
-    expect(resolveRouteTitle('/toekomst/strategie')).toBe('Strategie')
+    expect(resolveRouteTitle('/toekomst/bibliotheek')).toBe('Rekenhulp-bibliotheek')
     expect(resolveRouteTitle('/toekomst/inflatie-koopkracht')).toBe('Inflatie & koopkracht')
   })
 

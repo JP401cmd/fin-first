@@ -4,6 +4,7 @@ import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { VasteLastenInsights } from './vaste-lasten-insights'
 import { buildVasteLastenInsights } from '@/lib/vaste-lasten-insights'
+import { dailyExpenseRate } from '@/lib/format'
 import type { VasteLastenItem, VasteLastenSummary } from '@/lib/vaste-lasten-summary'
 import { CATEGORY_LABELS } from '@/lib/recurring-detection'
 
@@ -30,7 +31,7 @@ function mkSummary(): VasteLastenSummary {
 }
 
 const insights = buildVasteLastenInsights({
-  summary: mkSummary(), monthlyIncome: 4000, monthlyExpenses: 2500,
+  summary: mkSummary(), monthlyIncome: 4000, dailyExpenseRate: dailyExpenseRate(2500),
 })
 
 function renderInMode(mode: 'simple' | 'full') {

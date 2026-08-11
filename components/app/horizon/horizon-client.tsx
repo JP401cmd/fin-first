@@ -459,6 +459,24 @@ export default function HorizonPage({
     initialData?.withdrawalStrategy ?? WITHDRAWAL_DEFAULTS,
   )
   const fireSwr = fireParams.effectiveSwr
+  /**
+   * Canoniek dagtarief (€/dag) voor ÉLKE €→vrijheidstijd-vertaling op deze
+   * pagina — geconsumeerd uit de bundel (`HorizonPageData.dailyExpenseRate`,
+   * 12-mnd rolling via lib/expense-rate.ts), NOOIT zelf gerekend.
+   *
+   * Was op elk van deze call-sites `dailyExpenseRate(effectiveInput?.monthlyExpenses)`.
+   * `effectiveInput.monthlyExpenses` is FIRE-PROJECTIE-INVOER op de EFFECTIVE
+   * grondslag (losse huidige kalendermaand, of de profielschatting bij
+   * `income_source='manual'`) — en in what-if bovendien scenario-aangepast. Als
+   * weergave-dagtarief gaf dat hetzelfde bedrag hier een ander aantal "jaren
+   * vrijheid" dan de widgets, de balans en de belasting-hub (vervolg KRUIS-20),
+   * en liet het de vrijheidstijd meebewegen met een scenario dat de werkelijke
+   * levenskosten van vandaag niet verandert.
+   *
+   * 0 = geen eerlijke dagbasis → de oppervlakken hieronder tonen dan geen
+   * tijdregel (ze guarden allemaal al op `> 0`).
+   */
+  const canonicalDailyRate = initialData.dailyExpenseRate
   const [input, setInput] = useState<FinancialInput | null>(initialData.effectiveInput)
   // Strategy-aware fallback: thread fireStrategy into computeFireProjection/computeFireRange
   // so fire.fireTarget matches the user's chosen end strategy (deplete/legacy/perpetual)
@@ -2313,7 +2331,7 @@ export default function HorizonPage({
       const d = Math.abs(r.age - target)
       if (d < bestDiff) { bestDiff = d; row = r }
     }
-    const dRate = dailyExpenseRate(effectiveInput?.monthlyExpenses ?? 0)
+    const dRate = canonicalDailyRate
     const freedomTime = formatFreedomTimeString(calculateFreedomTime(Math.max(0, row.netWorth), dRate), 'short')
     const isAcc = row.phase === 'accumulation'
     // Fase uit dezelfde bron als de fasebalk (buildSegments): kernel-rijen
@@ -4068,7 +4086,7 @@ export default function HorizonPage({
       netWorth,
       monthlyAmount: deflate(readoutData.monthlyAmount, factor, euroView),
       freedomTime: formatFreedomTimeString(
-        calculateFreedomTime(Math.max(0, netWorth), dailyExpenseRate(effectiveInput?.monthlyExpenses ?? 0)),
+        calculateFreedomTime(Math.max(0, netWorth), canonicalDailyRate),
         'short',
       ),
     }
@@ -4791,7 +4809,7 @@ export default function HorizonPage({
                   View-gating spiegelt de marker: in partner-weergave (met partner-pad)
                   plot de grafiek de pártnerlijn — dan geen eigen tekort-verhaal tonen. */}
               {deficitLoanNotice && !(isPartnerView && partnerLine !== null) && (() => {
-                const dRate = dailyExpenseRate(effectiveInput?.monthlyExpenses ?? 0)
+                const dRate = canonicalDailyRate
                 const freedom = dRate > 0 && !masked
                   ? formatWithFreedom(deficitLoanNotice.peak, dRate, { includeCurrency: false, format: 'long', includeDays: false })
                   : null
@@ -4813,7 +4831,7 @@ export default function HorizonPage({
               {/* "Huis wordt nooit verkocht" — beschrijvende info (geen advies, Wft-veilig).
                   Neutrale horizon-toon, niet de rode "fout"-stijl. */}
               {housingHeldNotice && !isPensioenMode && (() => {
-                const dRate = dailyExpenseRate((effectiveInput?.monthlyExpenses ?? 0))
+                const dRate = canonicalDailyRate
                 const freedom = dRate > 0
                   ? formatWithFreedom(housingHeldNotice.houseValue, dRate, { includeCurrency: false, format: 'long', includeDays: false })
                   : null
@@ -5261,7 +5279,7 @@ export default function HorizonPage({
               <ToekomstWelcome
                 visible={!welcomeDismissed}
                 netWorth={effectiveNetWorth}
-                dailyExpenseRate={(effectiveInput?.monthlyExpenses ?? 0) > 0 ? dailyExpenseRate(effectiveInput!.monthlyExpenses) : 0}
+                dailyExpenseRate={canonicalDailyRate}
                 freedomAge={hasPerspectiveHero ? perspectiveHero!.fireAge : isPensioenMode ? userAowAge.fractional : simResult?.fireAgeFractional ?? fire.fireAge}
                 isPensioen={isPensioenMode}
                 masked={masked}
@@ -6129,7 +6147,7 @@ export default function HorizonPage({
           : isPeriod && dur > 0
             ? amt * dur * sign
             : amt * 12 * 10 * sign // continuous: show 10-year estimate
-        const dailyExp = effectiveInput ? dailyExpenseRate(effectiveInput.monthlyExpenses) : 0
+        const dailyExp = canonicalDailyRate
         const freedomBreakdown = dailyExp > 0 ? calculateFreedomTime(Math.abs(totalImpact), dailyExp) : null
         const freedomStr = freedomBreakdown ? formatFreedomTimeString(freedomBreakdown, 'short') : null
         const hasCatalogFields = LIFE_EVENT_CATALOG[formType]?.fields && LIFE_EVENT_CATALOG[formType].fields!.length > 0
@@ -7659,7 +7677,12 @@ export default function HorizonPage({
                         const studieDuurJaren = (studieDuur / 12).toFixed(1)
                         const terugverdientijd = salarisstijging > 0 ? Math.ceil(collegegeld / salarisstijging) : 0
                         const terugverdientijdJaren = (terugverdientijd / 12).toFixed(1)
-                        const dagKosten = (effectiveInput?.monthlyExpenses ?? 3000) / 30
+                        // Canoniek dagtarief uit de bundel. Was
+                        // `(effectiveInput?.monthlyExpenses ?? 3000) / 30`: de door
+                        // lib/format.ts expliciet als FOUT gedocumenteerde /30-conversie
+                        // (impliciet jaar van 360 dagen, ~1,4% te laag) bovenop de
+                        // effective grondslag én een verzonnen €3.000/mnd-terugval.
+                        const dagKosten = canonicalDailyRate
                         const freedomDaysInvestment = dagKosten > 0 ? Math.round(collegegeld / dagKosten) : 0
                         const freedomDaysPerYear = salarisstijging > 0 && dagKosten > 0 ? Math.round((salarisstijging * 12) / dagKosten) : 0
                         return (
@@ -8212,7 +8235,7 @@ export default function HorizonPage({
                 const netOneTime = formCashflows
                   .filter(cf => cf.type === 'one_time')
                   .reduce((s, cf) => s + (cf.direction === 'income' ? cf.amount : -cf.amount), 0)
-                const dailyExpCf = effectiveInput ? dailyExpenseRate(effectiveInput.monthlyExpenses) : 0
+                const dailyExpCf = canonicalDailyRate
                 const totalNetImpact = Math.abs(netRecurring * 12 * 10 + netOneTime) // 10yr estimate
                 const freedomBdCf = dailyExpCf > 0 && totalNetImpact >= 100
                   ? calculateFreedomTime(totalNetImpact, dailyExpCf)

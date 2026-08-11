@@ -1030,15 +1030,17 @@ Scope: de publieke marketing-site (landing + subpagina's), de publieke Vrijheids
 - **Trigger/startpunt:** De knop "Ga naar je toekomst" op het succes-scherm; of het handmatig openen van /onboarding resp. app-routes in verschillende staten.
 - **Eindresultaat:** Na afronden land je op /toekomst (harde navigatie om een verouderde redirect-lus te voorkomen). Een niet-geonboarde gebruiker die een app-route opent wordt naar /onboarding gestuurd; een geonboarde gebruiker die /onboarding opent wordt naar /overzicht gestuurd.
 - **Stappen:**
-  1. Klik na afloop op "Ga naar je toekomst" en controleer dat /toekomst met jouw net ingevoerde gegevens laadt (bezittingen, doel, projectie).
-  2. Open daarna handmatig /onboarding → automatische redirect naar /overzicht.
-  3. Controleer (met een verse, niet-geonboarde account) dat /overzicht direct doorstuurt naar /onboarding.
-- **Schermen/componenten:** `components/onboarding/onboarding-success.tsx` (CTA), `window.location.assign('/toekomst')` in `app/(onboarding)/onboarding/page.tsx`, onboarding-poort in `app/(app)/layout.tsx` (redirect bij `onboarding_completed` false), al-geonboard-check in het check-effect van de onboarding-pagina.
+  1. Lees op het succes-scherm de regel onder de afsluiting van Fin: *"Rustig beginnen of meteen alle detail? Je weergave kies je later bij Mijn → Uiterlijk."* (APP-2). → *verwacht:* de regel staat er in élke situatie — hij is bewust NIET modus-afhankelijk — en "Mijn → Uiterlijk" is **geen link**: klikken doet niets. Dat is opzet, zie de randgevallen.
+  2. Klik na afloop op "Ga naar je toekomst" en controleer dat /toekomst met jouw net ingevoerde gegevens laadt (bezittingen, doel, projectie).
+  3. Open daarna handmatig /onboarding → automatische redirect naar /overzicht.
+  4. Controleer (met een verse, niet-geonboarde account) dat /overzicht direct doorstuurt naar /onboarding.
+- **Schermen/componenten:** `components/onboarding/onboarding-success.tsx` (CTA + de APP-2-regel), `window.location.assign('/toekomst')` in `app/(onboarding)/onboarding/page.tsx`, onboarding-poort in `app/(app)/layout.tsx` (redirect bij `onboarding_completed` false), al-geonboard-check in het check-effect van de onboarding-pagina.
 - **Kriticiteit:** BELANGRIJK
 - **Rekenend:** nee (de getallen zelf zijn gedekt door WF-START-18/19; hier telt de landing).
 - **Varianten & randgevallen:**
   - Gebruikers die via de Vrijheidscheck converteerden (WF-START-10) hebben `onboarding_completed` al op true en landen op /overzicht — zij zien de onboarding nooit.
   - Direct na afronden mag de app niet terug-flitsen naar /onboarding (daarom de harde navigatie; regressiegevoelig punt).
+  - De APP-2-regel is bewust tekst en geen link: een soft-navigation naar /mijn/uiterlijk zou zowel de `clearLocalStorage()` van de CTA overslaan (concept blijft staan) als kans lopen door de onboarding-poort teruggekaatst te worden vlak na het schrijven van `onboarding_completed`. Een klikbare "Mijn → Uiterlijk" hier is dus een defect, geen verbetering.
 - **Cross-module effecten:** bepaalt de eerste indruk van de Toekomst- en Overzicht-modules.
 
 ---
@@ -2068,7 +2070,7 @@ Scope: `/overzicht` (hoofdpagina/hub), `/dashboard` (redirect), `/overzicht/tips
 
 #### Ongedekte UI
 - **/dashboard** — geen live UI: `app/(app)/dashboard/page.tsx` is een pure `redirect('/overzicht')`; daarnaast vangt `next.config.ts` (regel 43) `/dashboard → /overzicht` al op routing-niveau af. Alleen als redirect-doel testen (WF-OVZ-01 startpunt), er is niets anders te bedienen.
-- **`HefbomenLegenda`** (`components/overview/overzicht-hero/hefbomen-nav.tsx` regel 258-275) — geëxporteerd component (uitleg groen/oranje/rood-stippen) dat nergens in productie-UI wordt gerenderd; alleen in de unit-test gebruikt. Dode UI-export.
+- **`HefbomenLegenda` — bestaat niet meer** (bijgewerkt 11 aug 2026). Het component (uitleg groen/oranje/rood-stippen) is bij OVZ-1 van de eenvoudige-weergave-audit verwijderd; het werd alleen in zijn eigen unit-test gerenderd. De uitleg van de stoplichtkleuren staat nu éénmalig in de pagina-'i' van /overzicht (`PAGE_INFO['/overzicht']` in `lib/page-info-content.ts`) — tóets die, niet het component. De status-dot zelf houdt zijn `title` uit `LEVERAGE_STATUS_LABEL`.
 - **Herstel-knop voor het geminimaliseerde samengestelde-rente-inzicht ontbreekt op /overzicht zelf** — na de X-klik (WF-OVZ-15) is er op de hub geen `InsightToggleButton`; herstellen kan alleen via /overzicht/bezittingen of /overzicht/cashflow (waar de toggle wél naast de 'i' staat) of door localStorage te wissen.
 - **/core/checkin als banner-doel** — de CheckinBanner linkt naar de legacy backing-route `/core/checkin` (bestaat nog als live pagina); de check-in-flow zelf valt buiten deze scope maar de link is functioneel.
 - **Losse hero-onderdelen zonder eigen flow** — de filosofie-footer "Geld is opgeslagen tijd" en de datum/begroeting zijn puur statisch en zijn meegenomen als leesstappen in WF-OVZ-01.
@@ -4560,7 +4562,7 @@ Alle live belasting-UI leeft onder `/overzicht/belasting` (hub + drie box-subpag
 - **Internals van `lib/household-tax.ts#loadPerspectiveBox3` en de API-routes `/api/household/box3` en `/api/household/box2`:** de beschrijving (privacy-gating, combined-berekening via ongewijzigde `calculateBox3`, per-persoon Box 2) is afgeleid uit code-commentaar en consumenten; de bestanden zelf zijn niet regel-voor-regel gelezen.
 - **Gedrag van POST `/api/ai/actions`** (dedupe op metadata, waar de actie zichtbaar wordt): afgeleid uit commentaar in `aandachtspunt-actie-button.tsx` en lib/aandachtspunten.ts; de route is niet gelezen.
 - **"Bespreek met Will"-knop:** aanwezig op stelselradar en 2028-kaart; dat en hoe het chatpaneel met belasting-context opent is niet geverifieerd.
-- **Locatie van de weergavemodus-toggle ("Eenvoudig"):** de HideInSimple-gates zijn in alle pagina's geverifieerd; dat de toggle zelf op /mijn/uiterlijk leeft komt uit projectconventie, niet uit deze scope.
+- ~~**Locatie van de weergavemodus-toggle ("Eenvoudig")**~~ — **bevestigd 11 aug 2026, niet langer onbevestigd.** De modus is op twee plekken te zetten: het blok "Weergave" bovenaan `/mijn/uiterlijk` (`components/mijn/display-mode-picker.tsx`, APP-1) en de ⌘K-actie `action:toggle-display-mode`. Beide schrijven via hetzelfde `PUT /api/display-mode`. Zie WF-MIJN-22 en UAT-NAV-10.
 - **Box 1-waterfall exacte regelvolgorde:** `box1-waterfall.tsx` is niet volledig gelezen; de inhoud (bruto → heffing → netto besteedbaar op basis van Box1Result) is afgeleid uit de props en het gebruik op de pagina.
 
 ---
@@ -6087,22 +6089,25 @@ Alle workflows zijn gebaseerd op de daadwerkelijke code onder `app/(app)/mijn/**
 
 ---
 
-#### WF-MIJN-22 — Uiterlijk aanpassen: palet, typografie en geavanceerde kleuren
-- **Doel:** De gebruiker stemt het uiterlijk van de hele app af: kleurpalet, lettertype en (onder "Geavanceerd") accentkleuren, budget-tints en categoriekaart-tinten.
+#### WF-MIJN-22 — Uiterlijk aanpassen: weergavekeuze, palet, typografie en geavanceerde kleuren
+- **Doel:** De gebruiker stemt het uiterlijk van de hele app af: weergavemodus (Eenvoudig/Volledig), kleurpalet, lettertype en (onder "Geavanceerd") accentkleuren, budget-tints en categoriekaart-tinten.
 - **Trigger/startpunt:** `/mijn/uiterlijk`.
 - **Eindresultaat:** Wijzigingen zijn direct zichtbaar in de hele app (CSS-vars, geen reload) en blijven bewaard; elke sectie heeft een eigen standaard-/resetknop.
 - **Stappen:**
-  1. Kies onder "Palet" een van de drie cream-paletten (Cream / Licht / FD-bruin) — de swatch-strip toont de echte kleuren; de app kleurt direct om.
-  2. Kies onder "Typografie" een van drie font-thema's (Editorial: Playfair + Source Serif / Andada / Digital: Inter) met live preview "Geld is opgeslagen tijd".
-  3. Klap "Geavanceerd" open (Openen +).
-  4. Accentkleuren: kies per module (Overzicht=kern, Will & acties=wil, Toekomst=horizon) een preset of een volledig eigen kleur via de ronde swatch (native color-input, 11-shade preview, hex-weergave, reset per kaart).
-  5. Budget-tints: kies per budgetcategorie (Inkomen/Uitgaven/Sparen/Schuld/Overig) een tint.
-  6. Categoriekaart-tinten: pas de kleuren + transparantie van de zones boven/onder de breuklijn op de categoriekaarten aan.
-- **Schermen/componenten:** `/mijn/uiterlijk` — `app/(app)/mijn/uiterlijk/page.tsx`, `components/mijn/palette-picker.tsx` (localStorage `tf-palette-theme`), `font-picker.tsx` (API-persist), `module-accent-picker.tsx` (debounced persist naar `profiles.module_colors`), `budget-tint-picker.tsx`, `category-tint-picker.tsx` (localStorage); provider `components/app/module-color-provider.tsx`.
+  1. Lees bovenaan het blok "Weergave" (`DisplayModePicker`, APP-1 — sinds fase 1 van de eenvoudige weergave het EERSTE blok op deze pagina): twee kaarten, "Eenvoudig — de kern" en "Volledig — alle detail", elk met een zin uitleg. De actieve kaart draagt een vinkje en `aria-pressed="true"`.
+  2. Klik de niet-actieve kaart. → *verwacht:* de app schakelt direct om (diepte-secties verschijnen/verdwijnen), het vinkje verspringt, en de keuze wordt via `PUT /api/display-mode` weggeschreven — hetzelfde schrijfpad als de ⌘K-actie, dus géén tweede bron. Herlaad: de keuze staat er nog (profielrij, dus ook op een ander apparaat). Diepere doorwerking op de navigatie wordt in UAT-NAV-10 getoetst; hier gaat het om de ingang zelf.
+  3. Kies onder "Palet" een van de drie cream-paletten (Cream / Licht / FD-bruin) — de swatch-strip toont de echte kleuren; de app kleurt direct om.
+  4. Kies onder "Typografie" een van drie font-thema's (Editorial: Playfair + Source Serif / Andada / Digital: Inter) met live preview "Geld is opgeslagen tijd".
+  5. Klap "Geavanceerd" open (Openen +).
+  6. Accentkleuren: kies per module (Overzicht=kern, Will & acties=wil, Toekomst=horizon) een preset of een volledig eigen kleur via de ronde swatch (native color-input, 11-shade preview, hex-weergave, reset per kaart).
+  7. Budget-tints: kies per budgetcategorie (Inkomen/Uitgaven/Sparen/Schuld/Overig) een tint.
+  8. Categoriekaart-tinten: pas de kleuren + transparantie van de zones boven/onder de breuklijn op de categoriekaarten aan.
+- **Schermen/componenten:** `/mijn/uiterlijk` — `app/(app)/mijn/uiterlijk/page.tsx`, `components/mijn/display-mode-picker.tsx` (`setMode` uit `useDisplayMode()` → `PUT /api/display-mode`, optimistisch met rollback), `palette-picker.tsx` (localStorage `tf-palette-theme`), `font-picker.tsx` (API-persist), `module-accent-picker.tsx` (debounced persist naar `profiles.module_colors`), `budget-tint-picker.tsx`, `category-tint-picker.tsx` (localStorage); provider `components/app/module-color-provider.tsx`.
 - **Kriticiteit:** BELANGRIJK
 - **Rekenend:** nee
 - **Varianten & randgevallen:**
-  - Palet is per apparaat (localStorage); accentkleuren en font zijn account-gebonden (DB) — cross-device verschil is dus mogelijk.
+  - Palet is per apparaat (localStorage); weergavemodus, accentkleuren en font zijn account-gebonden (DB) — cross-device verschil is dus mogelijk.
+  - De weergavekeuze is op TWEE plekken te zetten (dit blok en ⌘K); beide schrijven via `PUT /api/display-mode`. Mislukt die PUT, dan rolt de keuze zichtbaar terug.
   - Accentkleur-picker toont een contrast-hint (WCAG) bij eigen kleuren.
   - Reset per kaart zet alleen die kleur terug naar de TriFinity-default.
   - Er is géén licht/donker-thematoggle op deze pagina (zie Onbevestigd).
@@ -6112,13 +6117,14 @@ Alle workflows zijn gebaseerd op de daadwerkelijke code onder `app/(app)/mijn/**
 
 #### WF-MIJN-23 — Weergavemodus wisselen: Eenvoudig ⇄ Volledig
 - **Doel:** De gebruiker schakelt tussen een rustige beginnersweergave (diepte-secties ingeklapt, sommige menu-ingangen verborgen) en de volledige expertweergave.
-- **Trigger/startpunt:** Command-palette (⌘K / Ctrl+K) → actie "Volledige weergave tonen" resp. "Eenvoudige weergave tonen". (Er is géén toggle op /mijn/uiterlijk.)
-- **Eindresultaat:** Profiel-brede modus omgeschakeld en server-side opgeslagen (cross-device); DepthSections klappen standaard open/dicht; in Eenvoudig verdwijnen aangewezen menu-ingangen (o.a. Rekenhulp/Wat-Als) uit sidebar en menusheet.
+- **Trigger/startpunt:** TWEE gelijkwaardige ingangen sinds fase 1 van de eenvoudige weergave (APP-1): het blok "Weergave" bovenaan `/mijn/uiterlijk` (`DisplayModePicker`) én de command-palette (⌘K / Ctrl+K) → actie "Volledige weergave tonen" resp. "Eenvoudige weergave tonen". Beide schrijven via hetzelfde `PUT /api/display-mode`.
+- **Eindresultaat:** Profiel-brede modus omgeschakeld en server-side opgeslagen (cross-device). In Eenvoudig verdwijnt diepte hard (`HideInSimple`: analyses, katernen, extra grafieken), klappen drie bedieningsblokken in mét behoud (`DepthSection`: cashflow-instellingen, "Alle meldingstypen", AI-uitvoeringsgroepen) en verdwijnen aangewezen menu-ingangen (Rekenhulp/Wat-Als) uit sidebar en menusheet.
 - **Stappen:**
   1. Open de command-palette met ⌘K.
-  2. Zoek/kies de actie "Volledige weergave tonen" (of andersom).
-  3. Controleer dat diepte-secties op bv. Overzicht-pagina's nu standaard open (Volledig) of dicht (Eenvoudig) staan.
+  2. Zoek/kies de actie "Volledige weergave tonen" (of andersom). De omschrijving luidt "Meer/minder detail op elke pagina" — niet meer "Diepte-secties standaard tonen of inklappen" (APP-3: die tekst beschreef gedrag dat toen op geen enkel oppervlak bestond).
+  3. Controleer dat de diepte op bv. Overzicht-pagina's nu zichtbaar (Volledig) of weg (Eenvoudig) is, en dat de drie `DepthSection`-blokken in Eenvoudig ingeklapt-maar-openklikbaar staan.
   4. Controleer in Eenvoudig dat de verborgen nav-ingangen weg zijn maar de pagina's via deeplink bereikbaar blijven.
+  5. Zet de modus nu andersom, via `/mijn/uiterlijk` → blok "Weergave" → de niet-actieve kaart. → *verwacht:* zelfde effect als via ⌘K, vinkje + `aria-pressed` verspringen, geen reload. Open daarna ⌘K: het actie-label toont de tegenovergestelde stand — de twee ingangen lezen dus dezelfde bron.
 - **Schermen/componenten:** `components/command-palette/command-palette.tsx` + `lib/command-palette/actions.ts` (`action:toggle-display-mode`), `lib/hooks/use-display-mode.tsx` (optimistisch + `PUT /api/display-mode`, rollback bij fout), consumenten `components/app/depth-section.tsx`, `hide-in-simple.tsx`, `components/app/shell/sidebar.tsx`, `nav-menu-sheet.tsx` (filter op `SIMPLE_HIDDEN_NAV_HREFS`).
 - **Kriticiteit:** BELANGRIJK
 - **Rekenend:** nee
@@ -8258,7 +8264,7 @@ Deze onderdelen bestaan in de code maar worden door geen enkele gebruikersworkfl
 
 **Overzicht-hub & dashboard:**
 - /dashboard — geen live UI: pure redirect naar /overzicht (page-redirect + next.config-redirect); alleen als redirect-doel testbaar
-- HefbomenLegenda (components/overview/overzicht-hero/hefbomen-nav.tsx) — geëxporteerd maar nergens in productie-UI gerenderd (alleen in test); dode UI-export
+- ~~HefbomenLegenda — dode UI-export~~ **opgelost 9 aug 2026 (OVZ-1): component verwijderd**; de stoplicht-uitleg staat nu in de pagina-'i' van /overzicht (`PAGE_INFO['/overzicht']`)
 - Geen herstel-knop op /overzicht voor het geminimaliseerde samengestelde-rente-inzicht — terughalen kan alleen via de InsightToggleButton op /overzicht/bezittingen of /overzicht/cashflow
 - CheckinBanner linkt naar legacy backing-route /core/checkin — route bestaat nog als live pagina (check-in-flow zelf buiten deze scope)
 
@@ -9124,12 +9130,13 @@ WF-NAV-13 (Uitloggen) → **géén eigen scenario** in dit document; gedekt door
 - **a. Happy path:**
   1. Open ⌘K, voer "Eenvoudige weergave tonen" uit. → *verwacht:* label wisselt, palette sluit.
   2. Bekijk de desktop-sidebar met De Toekomst actief. → *verwacht:* Rekenhulp en Wat-Als zijn verdwenen uit de subroutes.
-  3. Open op mobiel het nav-menu. → *verwacht:* dezelfde twee items ontbreken onder Toekomst.
+  3. Open op mobiel het nav-menu. → *verwacht:* dezelfde twee items ontbreken onder Toekomst; bovendien staan alleen de sub-items van de ACTIEVE hoofdpagina uitgeklapt, de rest is één regel (NAV-2). Kijk ook naast "Het Overzicht" in de desktop-sidebar: de netto-vermogen-badge is weg (NAV-5).
   4. Zoek in ⌘K op "rekenhulp". → *verwacht:* geen pagina-resultaat in de sectie Pagina's.
   5. Navigeer via de adresbalk rechtstreeks naar /toekomst/rekenhulp. → *verwacht:* pagina laadt gewoon (alleen de menu-ingang is gefilterd); de mobiele TopBar toont de juiste titel.
-  6. Schakel via ⌘K terug naar "Volledige weergave tonen". → *verwacht:* Rekenhulp/Wat-Als staan overal terug.
-  7. Herlaad de pagina. → *verwacht:* de laatst gekozen modus staat direct bij eerste render (geen flits van de andere modus — server-geseed).
-  **Eindresultaat:** Eenvoudig/Volledig filtert consistent de menu-ingangen op alle drie oppervlakken (sidebar, nav-sheet, ⌘K) en de keuze is server-side (profielrij) bewaard, dus cross-device.
+  6. **Tweede ingang (APP-1):** ga naar `/mijn/uiterlijk`. → *verwacht:* bovenaan, vóór palet en typografie, staat het blok "Weergave" met twee kaarten ("Eenvoudig — de kern" / "Volledig — alle detail"); de kaart die overeenkomt met de zojuist via ⌘K gezette stand draagt het vinkje en `aria-pressed="true"` — de picker leest dus dezelfde bron als het palet.
+  7. Klik in dat blok "Volledige weergave tonen"-kaart ("Volledig — alle detail"). → *verwacht:* Rekenhulp/Wat-Als staan overal terug, zonder page-reload; het ⌘K-actielabel is bij de volgende opening omgedraaid. Er is geen tweede schrijfpad: ook deze klik gaat via `setMode` → `PUT /api/display-mode`.
+  8. Herlaad de pagina. → *verwacht:* de laatst gekozen modus staat direct bij eerste render (geen flits van de andere modus — server-geseed).
+  **Eindresultaat:** Eenvoudig/Volledig is via BEIDE ingangen te zetten (`/mijn/uiterlijk` en ⌘K), filtert consistent de menu-ingangen op alle drie oppervlakken (sidebar, nav-sheet, ⌘K) en de keuze is server-side (profielrij) bewaard, dus cross-device.
 - **c. Foutpad (compact):** Zet devtools op offline vlak vóór het wisselen van modus (PUT /api/display-mode faalt). → *verwacht:* de toggle rolt zichtbaar terug naar de vorige stand — geen blijvend inconsistente UI-staat.
 
 ---
@@ -10275,11 +10282,12 @@ Let op: `recurring_transactions` wordt door de testdata-seed **niet** gevuld —
 
 #### UAT-CASH-22 — Zes maanden vooruitkijken met de cashflow-forecast (dekt WF-CASH-22)
 - **Kriticiteit:** KERN · **Platform:** webapp+mobiel · **Rooktest:** nee · **Duur:** ~7 min
-- **Preconditie:** Persona Daan Bakker, /overzicht/cashflow/forecast.
-- **a. Happy path:** 1) Open de pagina. → *verwacht:* 3 samenvattingskaarten (spaarquote 6m, maandelijks netto, uitgaventrend) + tabel met 6 maandregels (Verwacht in/Verwacht uit/Netto/Saldo). 2) Loop de 6 regels na. → *verwacht:* Netto = Verwacht in − Verwacht uit voor elke regel; Saldo loopt cumulatief door vanaf het huidige liquide saldo (Betaalrekening + Spaarrekening = €850+€2.000 = €2.850, tenzij handmatige transacties dit inmiddels wijzigden). **Berekening verwachting:** `buildForecast` (lib/cashflow-forecast-math.ts) herhaalt dezelfde 6-maands-baseline (`Math.round(6-maands-som/6)`) in elke van de 6 maanden en telt de per-maand omgerekende recurrings (weekly×52/12, quarterly÷3, yearly÷12, monthly ongewijzigd) erbovenop; alle 6 maanden hebben dus identiek "Verwacht in"/"Verwacht uit" tenzij het aantal actieve recurrings verandert. Startsaldo = €2.850 (som bank-rekeningen).
+- **Preconditie:** Persona Daan Bakker, /overzicht/cashflow/forecast, **weergavemodus Volledig** — sinds FC-1 (eenvoudige-weergave-audit) toont Eenvoudig hier geen tabel meer; zie stap e.
+- **a. Happy path (Volledig):** 1) Open de pagina. → *verwacht:* 3 samenvattingskaarten (spaarquote 6m, maandelijks netto, uitgaventrend) + tabel met 6 maandregels (Verwacht in/Verwacht uit/Netto/Saldo). 2) Loop de 6 regels na. → *verwacht:* Netto = Verwacht in − Verwacht uit voor elke regel; Saldo loopt cumulatief door vanaf het huidige liquide saldo (Betaalrekening + Spaarrekening = €850+€2.000 = €2.850, tenzij handmatige transacties dit inmiddels wijzigden). **Berekening verwachting:** `buildForecast` (lib/cashflow-forecast-math.ts) herhaalt dezelfde 6-maands-baseline (`Math.round(6-maands-som/6)`) in elke van de 6 maanden en telt de per-maand omgerekende recurrings (weekly×52/12, quarterly÷3, yearly÷12, monthly ongewijzigd) erbovenop; alle 6 maanden hebben dus identiek "Verwacht in"/"Verwacht uit" tenzij het aantal actieve recurrings verandert. Startsaldo = €2.850 (som bank-rekeningen).
 - **b. Saldo na 6m = landing-KPI:** Vergelijk het laatste "Saldo"-cijfer met de Forecast-KPI op de cashflow-landing (WF-CASH-01). → *verwacht:* exact gelijk (dezelfde bron).
 - **c. Negatieve maand:** Verlaag Daans handmatig ingesteld inkomen (WF-CASH-05) tijdelijk naar €0 en verhoog uitgaven, en herlaad de forecast. → *verwacht:* maanden met negatief netto tonen het saldo/netto-cijfer in rood.
 - **d. Dubbeltelling-aandachtspunt:** Bevestig een vaste last (bv. Huur studio, WF-CASH-31a) als recurring terwijl dezelfde huur-transacties ook al in de 6-maands-baseline-transacties zitten. → *verwacht (bekende MVP-aanname, geen bug maar te documenteren):* de huur telt zowel in de baseline mee als nogmaals als recurring bovenop — het "Verwacht uit"-cijfer ligt daardoor hoger dan een tester intuïtief zou verwachten. Dit staat letterlijk zo in de code-commentaar en is géén verrassing bij het testen, maar wel iets om te herkennen.
+- **e. Eenvoudige weergave (FC-1):** Schakel naar Eenvoudig (`/mijn/uiterlijk` of ⌘K) en herlaad de forecast. → *verwacht:* de vier kopstatistieken en de zes tabelregels zijn weg; in plaats daarvan één eindregel "Over 6 maanden · € X" met daaronder "€ Y erbij/eraf in die zes maanden", een sparkline over hetzelfde cumulatieve saldo, en een voetnoot die naar /toekomst verwijst. **Toets de bron, niet alleen de vorm:** het eindregel-bedrag moet EXACT gelijk zijn aan het laatste "Saldo"-cijfer uit stap a — beide modi lezen dezelfde `buildForecast`-rijen (presentatie-reductie, geen tweede rekenpad). Terug naar Volledig → de tabel staat ongewijzigd terug.
 
 #### UAT-CASH-23 — Bankbestand importeren (MT940/OFX): van upload tot geslaagde import (dekt WF-CASH-23)
 - **Kriticiteit:** KERN · **Platform:** webapp · **Rooktest:** ja (kernpad van bankimport) · **Duur:** ~12 min

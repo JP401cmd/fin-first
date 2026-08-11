@@ -67,8 +67,10 @@ import {
   getTxAgg12m,
   aggSumPositief,
   aggSumNegatiefAbs,
+  aggToExpenseRows,
   type TxMonthAggregateRow,
 } from './server-data/tx-aggregates'
+import { recentDailyExpenseRateFromRows } from './expense-rate'
 import {
   buildHealthScoreInput,
   type HealthScoreAsset,
@@ -94,6 +96,33 @@ export type SnapshotForTrend = {
 
 export interface HorizonPageData {
   effectiveInput: FinancialInput
+  /**
+   * Canoniek dagtarief (€/dag) voor élke €→vrijheidstijd-vertaling die op deze
+   * bundel leunt — 12-mnd rolling grondslag via `lib/expense-rate.ts`, exact
+   * dezelfde keten als `DashboardData.dailyExpenseRate`
+   * (`getTxAgg12m` → `aggToExpenseRows(…, { realOnly: false })` →
+   * `recentDailyExpenseRateFromRows` → `dailyExpenseRate` ×12/365).
+   *
+   * ── WAAROM DIT VELD BESTAAT ────────────────────────────────────────────────
+   * Consumers rekenden `dailyExpenseRate(effectiveInput.monthlyExpenses)`. Dát
+   * veld is de EFFECTIVE grondslag (`resolveEffectiveIncomeExpenses`: de losse
+   * huidige kalendermaand, of de profielschatting bij `income_source='manual'`)
+   * — precies de single-month-conversie die KRUIS-17/20 heeft afgeschaft. Op de
+   * 3e van de maand met €120 geboekt geeft die ~€3,95/dag waar het rolling
+   * tarief ~€100/dag zegt: hetzelfde bedrag, een factor 25 andere "jaren
+   * vrijheid" dan de widget ernaast. Eén metriek, één grondslag.
+   *
+   * `effectiveInput.monthlyExpenses` blijft bestaan en blijft effective — het is
+   * FIRE-projectie-invoer (spaarcapaciteit), geen weergave-dagtarief. Het voedt
+   * hier nog uitsluitend de fallback: `recentDailyExpenseRateFromRows` gebruikt
+   * de meegegeven maandschatting ALLEEN wanneer er geen uitgaven-rijen in het
+   * venster zijn (onboarding zonder transacties).
+   *
+   * 0 = geen eerlijke dagbasis (geen transacties én geen schatting) → het
+   * oppervlak toont het bedrag zónder tijdregel, nooit een eigen benadering.
+   * Kosten: nul extra queries — `txAgg12` is al opgehaald.
+   */
+  dailyExpenseRate: number
   events: LifeEvent[]
   impacts: LifeEventImpact[]
   actions: Action[]
@@ -1037,8 +1066,22 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     yearly_essential_expenses: yearlyMustExpenses,
   }
 
+  // Canoniek dagtarief voor de €→vrijheidstijd-vertalingen die op deze bundel
+  // leunen (belasting-hub, box 1, fiscale kansen, totaalplan, aandachtspunten,
+  // /toekomst). GEEN eigen som: exact dezelfde helper-keten als
+  // `DashboardData.dailyExpenseRate`, op het al-opgehaalde 12-mnd aggregaat —
+  // `realOnly: false` zodat de basis (alle ruwe negatieve transacties, incl.
+  // overboekingen) byte-identiek is aan de dashboardbundel en de rapport-routes.
+  // Zie het veldcommentaar op `HorizonPageData.dailyExpenseRate` voor het waarom.
+  const { dailyRate: canonicalDailyExpenseRate } = recentDailyExpenseRateFromRows(
+    aggToExpenseRows(txAgg12, { realOnly: false }),
+    now,
+    effectiveMonthlyExpenses,
+  )
+
   return {
     effectiveInput,
+    dailyExpenseRate: canonicalDailyExpenseRate,
     events: loadedEvents,
     impacts,
     actions,

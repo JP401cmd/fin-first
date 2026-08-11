@@ -55,7 +55,9 @@ import {
   aggIncomeByMonth,
   aggExpenseByMonthAbs,
   aggAbsByBudgetMonth,
+  aggToExpenseRows,
 } from '@/lib/server-data/tx-aggregates'
+import { recentDailyExpenseRateFromRows } from './expense-rate'
 
 // ── Result type ────────────────────────────────────────────────
 
@@ -142,6 +144,22 @@ export interface CorePageData {
     yearlyMustExpenses: number
     yearlyRetirementExpenses?: number
   }
+  /**
+   * CANONIEK dagtarief (€/dag) — 12-mnd ROLLING grondslag via `lib/expense-rate.ts`,
+   * exact dezelfde keten als `DashboardData.dailyExpenseRate` en
+   * `HorizonPageData.dailyExpenseRate`. Nul extra queries: `txAgg12` is er al.
+   *
+   * Bestaat omdat de AI-feiten (`buildWillFinancialFacts` → `dagtarief`) het
+   * dagtarief uit `rawFinancials.monthlyExpenses` rekenden — de EFFECTIVE
+   * grondslag. Will citeerde daardoor een ander €/dag dan de widget waar de
+   * gebruiker naar keek (vervolg KRUIS-20), terwijl de AI juist verplicht is de
+   * canonieke motoren als bron te noemen. `rawFinancials.monthlyExpenses` blijft
+   * bewust effective: dat is projectie-invoer, geen weergave-dagtarief.
+   *
+   * Optioneel/additief (spiegelt `DashboardData.dailyExpenseRate`) zodat
+   * bestaande mock-bundels blijven compileren; 0 = geen eerlijke dagbasis.
+   */
+  dailyExpenseRate?: number
   fullAssets: Asset[]
   fullDebts: Debt[]
 
@@ -715,6 +733,15 @@ export const loadCoreData = cache(async function loadCoreData(
     yearlyRetirementExpenses,
   }
 
+  // Canoniek dagtarief — GEEN eigen som: dezelfde helper-keten als de dashboard-
+  // en horizon-bundel, op het al opgehaalde 12-mnd aggregaat. De effective
+  // maandwaarde dient alleen nog als terugval voor wie geen transacties heeft.
+  const { dailyRate: canonicalDailyExpenseRate } = recentDailyExpenseRateFromRows(
+    aggToExpenseRows(txAgg12, { realOnly: false }),
+    now,
+    effectiveMonthlyExpenses,
+  )
+
   const netWorth = effectiveTotalAssets - effectiveTotalDebts
   const monthlySavings = effectiveMonthlyIncome - effectiveMonthlyExpenses
 
@@ -1259,6 +1286,7 @@ export const loadCoreData = cache(async function loadCoreData(
     totalNonCashAssets,
 
     rawFinancials,
+    dailyExpenseRate: canonicalDailyExpenseRate,
     fullAssets: assetsResult.data as unknown as Asset[],
     fullDebts: debtsResult.data as unknown as Debt[],
     healthScoreInput,

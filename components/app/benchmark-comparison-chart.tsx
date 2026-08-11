@@ -14,6 +14,12 @@ import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { ChartTips } from '@/components/editorial/chart-tips'
 import { getBenchmarkComparisonTips } from '@/lib/chart-tips'
 
+/** "2026-05-31" → "mei 2026". Voor het venster-label bij een ingekorte meting. */
+function formatMonth(isoDate: string): string {
+  const [year, month] = isoDate.split('-')
+  return `${new Date(Number(year), Number(month) - 1, 1).toLocaleDateString('nl-NL', { month: 'long' })} ${year}`
+}
+
 // ── Chart component ──────────────────────────────────────────
 
 interface BenchmarkComparisonChartProps {
@@ -53,10 +59,22 @@ export const BenchmarkComparisonChart = memo(function BenchmarkComparisonChart({
   const hasPortfolioReturn = portfolioReturnPct !== null
 
   // Het venster dat daadwerkelijk gebruikt is; bij een terugval op de volledige
-  // historie is het periodelabel niet waar.
+  // historie óf een inkorting tot waar de koershistorie begint is het
+  // periodelabel niet waar.
   const windowLabel = comparison?.windowFallback
     ? 'over de beschikbare historie'
-    : activePeriod.windowLabel
+    : comparison?.windowClipped
+      ? `sinds ${formatMonth(comparison.windowStart)}`
+      : activePeriod.windowLabel
+
+  // Hoe hard het getal is: het aandeel van de waarde dat op een échte koers
+  // rust. Contract, geen sierletter (ADR 0098) — een turbo of een gedelistte
+  // naam heeft geen marktkoers en hoort niet stilzwijgend mee te tellen.
+  // Afgerond op hele procenten: pas als er écht iets van af gaat is de
+  // mededeling zinvol — "99,8% van de waarde" leest als ruis.
+  const observedShare = comparison?.portfolio.observedShare ?? null
+  const observedPct = observedShare === null ? null : Math.round(observedShare * 100)
+  const partiallyObserved = observedPct !== null && observedPct < 100
 
   // Build chart data from comparison result
   const chartData = useMemo(() => {
@@ -563,6 +581,14 @@ export const BenchmarkComparisonChart = memo(function BenchmarkComparisonChart({
                 </span>.
               </span>
             )}
+            {partiallyObserved && (
+              <span data-testid="benchmark-coverage-note">
+                {' '}Gemeten over het deel van je portefeuille met een marktkoers —{' '}
+                <span className="font-medium">{observedPct}% van de waarde</span>.
+                Turbo&apos;s, sprinters en gedelistte namen hebben er geen, en tellen
+                dus niet mee in dit rendement.
+              </span>
+            )}
           </p>
         </div>
       )}
@@ -573,10 +599,22 @@ export const BenchmarkComparisonChart = memo(function BenchmarkComparisonChart({
         <div className="mt-3 flex items-start gap-2 rounded-lg border border-kern-100 bg-kern-50/50 p-3" data-testid="benchmark-portfolio-unavailable">
           <Info className="h-3.5 w-3.5 shrink-0 text-kern-500 mt-0.5" />
           <p className="text-xs text-[var(--ink-2)] leading-relaxed">
-            <span className="font-medium">Je eigen lijn ontbreekt nog.</span>{' '}
-            Voor je rendement {windowLabel} zijn maandelijkse koerswaarderingen
-            van je posities nodig. Zonder die historie zouden we je inleg meten
-            in plaats van je rendement — dat laten we liever weg.{' '}
+            {comparison.portfolio.gap === 'unmeasurable_window' ? (
+              <>
+                <span className="font-medium">Dit venster is niet te meten.</span>{' '}
+                Er is een maand waarin je meer hebt opgenomen dan er aan het begin
+                stond. Er is dan geen basis om het rendement tegen af te zetten;
+                een getal zou hier meer verzinnen dan meten. Kies een ander
+                venster.{' '}
+              </>
+            ) : (
+              <>
+                <span className="font-medium">Je eigen lijn ontbreekt nog.</span>{' '}
+                Voor je rendement {windowLabel} is van minstens twee maanden een
+                marktkoers van je posities nodig. Zonder die historie zouden we je
+                inleg meten in plaats van je rendement — dat laten we liever weg.{' '}
+              </>
+            )}
             {bestBenchmark && (
               <span>
                 De sterkste index in deze periode was {bestBenchmark.name} met{' '}

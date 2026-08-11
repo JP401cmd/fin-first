@@ -132,7 +132,7 @@ export const annotations = {
     'AI & calculators': ['ai_calculator_usage', 'custom_calculators', 'calculator_likes', 'calculator_reports', 'calculators'],
     'Nieuws & briefing': ['news_articles', 'news', 'briefing_history', 'briefing'],
     'Vragenlijsten': ['questionnaires', 'questionnaire_questions', 'questionnaire_sessions', 'questionnaire_responses', 'questionnaire'],
-    'Engagement & features': ['user_feature_visits', 'next_step_completions', 'roadmap_features', 'user_badges', 'user_streaks', 'app_settings'],
+    'Engagement & features': ['user_feature_visits', 'next_step_completions', 'user_badges', 'user_streaks', 'app_settings'],
   },
 
   // Leesbare labels voor de API-domeinen (eerste pad-segment na /api).

@@ -205,7 +205,13 @@ export function buildWillFinancialFacts(coreData: CorePageData, profile: FinFact
     fireDoelUitKernel,
     spaarquotePct: coreData.savingsRate6m,
     swr: effectiveSwr,
-    dagtarief: dailyExpenseRate(rawFinancials.monthlyExpenses),
+    // CONSUMEER het canonieke 12-mnd rolling dagtarief uit de bundel. Was
+    // `dailyExpenseRate(rawFinancials.monthlyExpenses)`: de EFFECTIVE grondslag
+    // (losse kalendermaand / profielschatting), waardoor Will een ander €/dag
+    // citeerde dan de widget waar de gebruiker naar keek — terwijl de AI juist
+    // verplicht is de canonieke motoren als bron te noemen (vervolg KRUIS-20).
+    // `?? …` alleen voor mock-bundels zonder het additieve veld.
+    dagtarief: coreData.dailyExpenseRate ?? dailyExpenseRate(rawFinancials.monthlyExpenses),
     maandinkomen: rawFinancials.monthlyIncome,
     maanduitgaven: rawFinancials.monthlyExpenses,
   }

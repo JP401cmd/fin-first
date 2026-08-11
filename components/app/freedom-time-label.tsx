@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
 import { Clock } from 'lucide-react'
-import { formatWithFreedom } from '@/lib/format'
+import { formatWithFreedom, calculateFreedomTime } from '@/lib/format'
 import { MaskedAmount } from '@/components/app/masked-amount'
 
 /**
@@ -87,6 +87,20 @@ export function useDailyExpenseRate() {
 
 /**
  * Convert a EUR amount to freedom time using real daily expenses.
+ *
+ * De dag/maand/jaar-DECOMPOSITIE komt uit de canonieke engine
+ * `lib/format.ts#calculateFreedomTime` — hier stond een tweede, handgerolde
+ * implementatie (`Math.floor(totalDays / 365)` / `% 365 / 30` / `% 30`) naast
+ * die van format.ts. Twee keer dezelfde som is per definitie toekomstige drift;
+ * deze functie voegt nu alleen nog de twee EIGEN, hier-specifieke
+ * WEERGAVEVORMEN toe (`formatted` in "1j 3mnd"-stijl, `formattedDagen` in
+ * nl-NL-decimalen) die `formatFreedomTimeString` niet kent.
+ *
+ * Uitkomst-identiek aan de oude implementatie voor alles wat gerenderd wordt:
+ * bij `years === 0` geldt `totalDays % 30 === totalDays − months × 30` exact, en
+ * bij `years > 0` gebruikt `formatted` de dagen niet. `days` blijft bewust het
+ * AFGERONDE TOTAAL aantal dagen (andere betekenis dan `breakdown.days`, dat de
+ * rest ná jaren/maanden is) — call-sites lezen dat veld zo.
  */
 export function eurToFreedomTime(amount: number, dailyExpenseRate: number): {
   days: number
@@ -99,9 +113,10 @@ export function eurToFreedomTime(amount: number, dailyExpenseRate: number): {
     return { days: 0, months: 0, years: 0, formatted: '-', formattedDagen: '0 dagen' }
   }
 
-  const totalDays = amount / dailyExpenseRate
-  const years = Math.floor(totalDays / 365)
-  const months = Math.floor((totalDays % 365) / 30)
+  const breakdown = calculateFreedomTime(amount, dailyExpenseRate)
+  const totalDays = breakdown.totalDays
+  const years = breakdown.years
+  const months = breakdown.months
   const days = Math.round(totalDays % 30)
 
   let formatted: string

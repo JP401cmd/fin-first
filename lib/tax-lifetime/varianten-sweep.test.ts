@@ -49,10 +49,16 @@ import {
   finaliseerVarianten,
   runVariantenSweep,
   variantenSweepInputHash,
+  EINDVERMOGEN_GRONDSLAGEN,
   type VariantId,
   type VariantUitkomst,
   type VariantenSweepSnapshot,
 } from './varianten-sweep'
+import { spendablePortfolio } from '@/lib/horizon/coverage-strip'
+import { pensioenPortfolio } from '@/lib/horizon/pensioen-pot'
+import { ASSET_TYPE_TO_CATEGORIE } from '@/lib/horizon-kernel/adapter/potten'
+import type { AssetType } from '@/lib/asset-data'
+import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import {
   buildCompleetHorizonFixture,
   buildCompleetKernelProfileBase,
@@ -534,9 +540,11 @@ describe('resterende pensioenpot per variant', () => {
    * omdat z'n vermogen in de pensioenpot zit die die rij overslaat.
    *
    * De optelling hieronder is uitsluitend een RICHTINGSTOETS, geen getoonde
-   * grondslag: `levensverzekering` zit vandaag in béide termen (zie de bevinding bij
-   * `NON_SPENDABLE_ASSET_TYPES`), dus de som telt dat deel dubbel. De twee rijen op
-   * het scherm blijven daarom apart en worden nooit opgeteld.
+   * grondslag. De twee termen zijn sinds 10 aug 2026 wél disjunct
+   * (`levensverzekering` is uit `NON_SPENDABLE_ASSET_TYPES` gehaald), maar hun som
+   * mist nog altijd woning/auto/fysiek bezit en staat vóór schulden — het is dus
+   * geen bestaande grootheid. De twee rijen op het scherm blijven apart; zie
+   * `EINDVERMOGEN_GRONDSLAGEN` en de rem-suite hieronder.
    */
   it('BUG-ANKER — de winnaar oogt armer op de belegbare rij, maar houdt het meeste over', () => {
     expect(laatst.eindvermogenBelegbaarNominaal as number).toBeLessThan(
@@ -562,6 +570,110 @@ describe('resterende pensioenpot per variant', () => {
       expect(v.kernelFout).not.toBeNull()
       expect(v.eindvermogenPensioenNominaal).toBeNull()
     }
+  })
+})
+
+// ── 5c. De NIET-OPTELLEN-REM, op de laag waar de velden wonen ────────────────
+
+/**
+ * VANGRAIL bij de kaart "Levensverzekering telt als pensioenpot én als belegbaar
+ * vermogen — kies één van beide" (eigenaarsbesluit optie A).
+ *
+ * De rem hing tot 10 aug 2026 uitsluitend op het scherm
+ * (`optimizer-levenslang.test.tsx`) en was daar waarde-gekoppeld: hij ving exact de
+ * geformatteerde som vóór één fixture, dus een afgeronde of afgekorte som glipte
+ * erdoor en een tweede consument — widget, export, briefing — had geen enkele rem.
+ * Deze suite zet 'm in de laag waar de velden wonen, waarde-onafhankelijk.
+ *
+ * Toleranties zijn hier bewust gekozen, niet geërfd:
+ *  - de disjunctheids- en registratieproeven zijn EXACT/boolean — geen meting;
+ *  - de "som ≠ netto"-proef gebruikt een ABSOLUTE band van €1 op bedragen in de
+ *    miljoenen. Dat is bewust ruim genoeg om float-ruis te negeren en bewust
+ *    absoluut: de claim is "deze twee grootheden vallen niet samen", niet "ze
+ *    verschillen relatief zoveel procent". Een relatieve band zou bij een fixture
+ *    zonder woning én zonder schulden juist de foutklasse verbergen.
+ */
+describe('grondslag-rem — de eindvermogens zijn drie grondslagen, geen optelbare termen', () => {
+  const resultaat = runVariantenSweep(snapshot)
+  const referentie = resultaat.varianten.find((v) => v.isReferentie)!
+
+  it('elk eindvermogen-veld staat geregistreerd met zijn grondslag', () => {
+    const velden = Object.keys(referentie).filter((k) => k.startsWith('eindvermogen'))
+    expect(velden.length).toBeGreaterThan(0)
+    for (const veld of velden) {
+      expect(
+        Object.prototype.hasOwnProperty.call(EINDVERMOGEN_GRONDSLAGEN, veld),
+        `${veld} heeft geen grondslag-omschrijving in EINDVERMOGEN_GRONDSLAGEN`,
+      ).toBe(true)
+    }
+    // …en andersom: geen registratie voor een veld dat niet (meer) bestaat.
+    expect(Object.keys(EINDVERMOGEN_GRONDSLAGEN).sort()).toEqual(velden.sort())
+  })
+
+  /**
+   * De eigenschap waar het defect over ging. Vóór optie A telde
+   * `levensverzekering` in béide grondslagen; op de gemeten fixture was dat 87% van
+   * de belegbare cel van de winnaar. Per app-type geprobeerd, dus
+   * fixture-onafhankelijk.
+   */
+  it('DISJUNCT — geen enkel app-type telt in zowel belegbaar als pensioenpot', () => {
+    const enkel = (type: string): UnifiedProjectionRow =>
+      ({ assetBuckets: { [type]: { endValue: 1_000 } } }) as unknown as UnifiedProjectionRow
+
+    let pensioenTypen = 0
+    for (const type of Object.keys(ASSET_TYPE_TO_CATEGORIE) as AssetType[]) {
+      const row = enkel(type)
+      const belegbaar = spendablePortfolio(row) > 0
+      const pensioen = pensioenPortfolio(row) > 0
+      if (pensioen) pensioenTypen++
+      expect(belegbaar && pensioen, `${type} telt in beide grondslagen`).toBe(false)
+    }
+    // Zonder minstens twee pensioen-typen bewijst de proef niets: het defect zát
+    // juist in het tweede type.
+    expect(pensioenTypen).toBeGreaterThanOrEqual(2)
+  })
+
+  /**
+   * Disjunct is niet optelbaar. De som van belegbaar + pensioen is aantoonbaar NIET
+   * het netto vermogen — hij mist het niet-liquide bezit en staat vóór schulden —
+   * dus een consument die de twee optelt produceert een vierde getal dat nergens is
+   * gedefinieerd. Deze fixture (persona `compleet`) heeft zowel een woning als
+   * schulden, dus het verschil is echt en niet toevallig nul.
+   */
+  it('de som van belegbaar + pensioen is GEEN netto vermogen', () => {
+    for (const v of resultaat.varianten) {
+      const som = (v.eindvermogenBelegbaarNominaal as number) + (v.eindvermogenPensioenNominaal as number)
+      const netto = v.eindvermogenNettoNominaal as number
+      expect(Math.abs(netto - som)).toBeGreaterThan(1)
+    }
+  })
+
+  /**
+   * BIJT-PROEF op de kaart zelf: de fixture heeft een levensverzekering-restant, en
+   * dat restant zit in de pensioenpot en NIET in het belegbaar vermogen.
+   */
+  it('BUG-ANKER — het levensverzekering-restant zit alleen nog in de pensioenpot', () => {
+    const direct = computeConvergentieProjection({ rawContext: snapshot.rawContext })
+    expect(direct.ok).toBe(true)
+    if (!direct.ok) return
+    const laatste = direct.result.rows[direct.result.rows.length - 1]
+
+    const polis = laatste.assetBuckets.levensverzekering?.endValue ?? 0
+    expect(polis, 'zonder polis-restant bewijst deze proef niets').toBeGreaterThan(0)
+
+    const alleBuckets = Object.values(laatste.assetBuckets).reduce(
+      (s, d) => s + (d?.endValue ?? 0),
+      0,
+    )
+    // De polis zit in de pensioenpot…
+    expect(pensioenPortfolio(laatste)).toBeGreaterThanOrEqual(polis)
+    // …en niet in het belegbaar vermogen: hem weglaten verandert daar niets.
+    const zonderPolis = {
+      ...laatste,
+      assetBuckets: { ...laatste.assetBuckets, levensverzekering: undefined },
+    } as unknown as UnifiedProjectionRow
+    expect(spendablePortfolio(zonderPolis)).toBe(referentie.eindvermogenBelegbaarNominaal)
+    expect(alleBuckets).toBeGreaterThan(referentie.eindvermogenBelegbaarNominaal as number)
   })
 })
 

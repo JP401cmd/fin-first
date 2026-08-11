@@ -30,7 +30,6 @@ import {
   JAARRUIMTE_AANDACHTSPUNT_ID,
 } from './aandachtspunten'
 import { loadActionedAandachtspuntIds } from './aandachtspunten-actions'
-import { dailyExpenseRate } from './format'
 import { loadFiscaleKansen } from './tax-opportunities-loader'
 import { CURRENT_TAX_YEAR } from './box3-data'
 import { loadHorizonData } from './horizon-data-loader'
@@ -178,8 +177,13 @@ async function collectBudgetAandachtspunten(supabase: SupabaseClient): Promise<A
 /** Laad actieve schulden + dag-uitgaven en zet ze om naar aandachtspunten. */
 async function collectDebtAandachtspunten(supabase: SupabaseClient): Promise<Aandachtspunt[]> {
   const horizonData = await loadHorizonData(supabase)
-  const monthlyExpenses = horizonData.effectiveInput?.monthlyExpenses ?? 0
-  const dailyExpenses = monthlyExpenses > 0 ? dailyExpenseRate(monthlyExpenses) : 100
+  // CONSUMEER het canonieke 12-mnd rolling dagtarief. Was
+  // `dailyExpenseRate(effectiveInput.monthlyExpenses) : 100`: de EFFECTIVE
+  // grondslag + een verzonnen €100/dag. De fiscale aandachtspunt-producent
+  // (`lib/tax-opportunities-loader.ts`) leest dezelfde bundelwaarde, dus schuld-,
+  // bezit- én fiscale rijen in dezelfde briefinglijst rekenen nu met één
+  // dagtarief (vervolg KRUIS-20).
+  const dailyExpenses = horizonData.dailyExpenseRate
 
   // Gedeelde actieve-schulden-fetch (adapter gebruikt alleen id/name/
   // current_balance/interest_rate/is_active — een subset van select('*')).
@@ -198,8 +202,9 @@ async function collectDebtAandachtspunten(supabase: SupabaseClient): Promise<Aan
  */
 async function collectAssetAandachtspunten(supabase: SupabaseClient): Promise<Aandachtspunt[]> {
   const horizonData = await loadHorizonData(supabase)
-  const monthlyExpenses = horizonData.effectiveInput?.monthlyExpenses ?? 0
-  const dailyExpenses = dailyExpenseRate(monthlyExpenses)
+  // Zelfde canonieke bundelwaarde als de schuld-producent hierboven — één
+  // dagtarief over alle aandachtspunt-rijen (vervolg KRUIS-20).
+  const dailyExpenses = horizonData.dailyExpenseRate
   const inflationRate = horizonData.fireParams?.inflationRate ?? 0
 
   // Gedeelde actieve-assets-fetch (adapter gebruikt alleen asset_type/

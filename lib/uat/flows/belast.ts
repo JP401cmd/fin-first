@@ -84,6 +84,7 @@ export const BELAST_FLOW: UatFlow = {
     { id: 'leengrens', scenarioId: 'UAT-BELAST-14', label: 'WF-BELAST-14 · DGA-leengrens (Wet excessief lenen)', kind: 'screen', stage: 3, lane: 'box2', subOf: 'box2' },
     { id: 'dividendsim', scenarioId: 'UAT-BELAST-15', label: 'WF-BELAST-15 · Dividend-schijfsimulator', kind: 'action', stage: 3, lane: 'box2', subOf: 'box2' },
     { id: 'vpbbox2', scenarioId: 'UAT-BELAST-16', label: 'WF-BELAST-16 · Gecombineerde druk Vpb + Box 2', kind: 'screen', stage: 3, lane: 'box2', subOf: 'box2' },
+    { id: 'huishoud-vrijheidsdagen', scenarioId: 'UAT-BELAST-26', label: 'WF-BELAST-26 · Vrijheidsdagen op de huishoud-Box 2/3-routes (canoniek dagtarief)', kind: 'screen', stage: 3, lane: 'box2', subOf: 'box2' },
 
     // ── 3 · Box 3-spoor (sparen + beleggen) ───────────────────────────────
     { id: 'box3', scenarioId: 'UAT-BELAST-17', label: 'WF-BELAST-17 · Box 3-aanslag (rekenstappen, classificatie, opbouw, mix)', kind: 'screen', stage: 3, lane: 'box3' },
@@ -143,6 +144,8 @@ export const BELAST_FLOW: UatFlow = {
     { from: 'box2', to: 'leengrens' },
     { from: 'box2', to: 'dividendsim' },
     { from: 'box2', to: 'vpbbox2' },
+    { from: 'box2', to: 'huishoud-vrijheidsdagen' },
+    { from: 'box3', to: 'huishoud-vrijheidsdagen' },
     { from: 'leengrens', to: 'actie' },
 
     // Box 3-spoor (beslispunt: tegenbewijs?)

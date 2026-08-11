@@ -117,14 +117,27 @@ describe('buildPensionProjection', () => {
       year: 2026,
     })
     const at67 = rows.find((r) => r.age === 67)!
+    // `arbeidsinkomen: 0` — een pensioenuitkering geeft géén recht op
+    // arbeidskorting. VERWACHTING BIJGESTELD (11 aug 2026): deze assertie
+    // spiegelde tot dan de motor-aanroep zónder grondslag en pinde daarmee een
+    // te lage heffing; de oude waarde was fout, niet de test.
     const expectedTax = computeBox1Tax({
       grossYearlyIncome: at67.brutoGeindexeerd,
       year: 2026,
       aow: true,
+      arbeidsinkomen: 0,
     }).tax
     expect(at67.nettoGeindexeerd).toBeCloseTo(at67.brutoGeindexeerd - expectedTax, 2)
     expect(at67.nettoGeindexeerd).toBeLessThan(at67.brutoGeindexeerd)
     expect(expectedTax).toBeGreaterThan(0)
+    // De projectie kent aantoonbaar géén arbeidskorting meer toe over pensioen:
+    // met de oude grondslag viel de heffing zichtbaar lager uit.
+    const zonderGrondslag = computeBox1Tax({
+      grossYearlyIncome: at67.brutoGeindexeerd,
+      year: 2026,
+      aow: true,
+    }).tax
+    expect(expectedTax).toBeGreaterThan(zonderGrondslag)
   })
 
   it('is deterministic for identical input', () => {

@@ -266,7 +266,9 @@ function Composition({ insights }: { insights: Insights }) {
 function WhatIfCancel({ insights }: { insights: Insights }) {
   const start = insights.largestSubscription?.monthlyAmount ?? insights.largestItem?.monthlyAmount ?? 10
   const [monthly, setMonthly] = useState<number>(Math.round(start))
-  const { yearlyEuro, freedom } = cancelEffect(monthly, insights.monthlyExpenses)
+  // Canoniek dagtarief uit de insights-bundel (12-mnd rolling), niet de
+  // effective maanduitgaven — zelfde noemer als de vrijheidsregels erboven.
+  const { yearlyEuro, freedom } = cancelEffect(monthly, insights.dailyExpenseRate)
   const freedomStr = formatFreedomTimeString(freedom, 'long')
   return (
     <div className="space-y-3">

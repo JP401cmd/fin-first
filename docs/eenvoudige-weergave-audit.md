@@ -203,7 +203,7 @@ Per fase één kaart in de Notion-werkqueue (🧩 Trifinity), status **Backlog**
 | Fase | Inhoud | Prio | Notion |
 |---|---|---|---|
 | **1 · Keuze vindbaar + eerste scherm** ✅ *opgeleverd 9 aug 2026* | APP-1, APP-2 *(in bestáánd welkomstscherm)*, APP-3 ⚠, APP-6, OVZ-1, OVZ-2, OVZ-3, OVZ-4 | P1 | [kaart](https://app.notion.com/p/3b7f9e8d568a819c8c39f9a8acf8d350) |
-| **2 · Cashflow-gezin + cijfernormen** | APP-7 (incl. BEZ-3 + BEL-4), APP-5, CF-1…4, BUD-1, BUD-2/3, TXN-1, TXN-2/3, TXN-4, FC-1 | P1 | [kaart](https://app.notion.com/p/3b7f9e8d568a817eb1a8f34bc77d272a) |
+| **2 · Cashflow-gezin + cijfernormen** ✅ *opgeleverd 9 aug 2026* | APP-7 (incl. BEZ-3 + BEL-4), APP-5 *(zie §10)*, CF-1…4, BUD-1, BUD-2/3, TXN-1, TXN-2/3, TXN-4, FC-1 | P1 | [kaart](https://app.notion.com/p/3b7f9e8d568a817eb1a8f34bc77d272a) |
 | **3 · Bezittingen, belasting & toekomst** ✅ *opgeleverd 9 aug 2026* | BEZ-2, BEZ-4, BEL-1 *(alle modi)*, BEL-2, BEL-3, TOE-2, TOE-3 | P2 | [kaart](https://app.notion.com/p/3b7f9e8d568a8129984bc17a469cb687) |
 | **4 · Mijn, berichten & navigatie** ✅ *opgeleverd 9 aug 2026* | MIJN-1, MIJN-3, MIJN-4, NAV-2 ⚠, NAV-5 ⚠, NAV-6, BER-1, NWS-1 | P2 | [kaart](https://app.notion.com/p/3b7f9e8d568a81aaab9cf58222fa97b7) |
 | **5 · Verkenningen + uitvoering besluit** ✅ *verkenning én implementatie opgeleverd 9 aug 2026* | NAV-4 ("Voor jou"-ingang) + BER-2 (één feedback-ingang) → voorstel + ADR → besluit → gebouwd | P3 | [kaart](https://app.notion.com/p/3b7f9e8d568a81ada57cd7194875b721) |
@@ -215,7 +215,7 @@ Per fase één kaart in de Notion-werkqueue (🧩 Trifinity), status **Backlog**
 - **NAV-4** → `docs/verkenning-voor-jou-ingang.md` + `docs/adr/0095-voor-jou-ingang-tips-en-berichten.md`. Besluit: **niet samenvoegen**. De dubbeling bestaat alleen op de desktop-sidebar, er waren nooit twee badges (één getal + twee stipjes), en één "Voor jou · N" zou een afgeleide meldingstroom moeten optellen bij DB-rijen met een eigen levenscyclus. In plaats daarvan is het échte gat gerepareerd: **"Tips & acties" staat nu in `globalNav`** en is dus vindbaar in de mobiele nav-sheet. Tips & acties en Berichten blijven gescheiden ingangen; geen gedeelde badge. `/overzicht/tips` is uit `EXTRA_ROUTE_TITLES` gehaald (die map is voor routes búiten de nav-structuur) — de titel komt nu uit `globalNav`.
 - **BER-2** → `docs/verkenning-een-feedback-ingang.md` + `docs/adr/0096-een-feedback-ingang.md`. Besluit: **doen**. `/mijn/feedback` is nu een **verwijspagina** met één primaire actie die de chat rechtstreeks in meldmodus opent (nieuwe `openMelding()` op de chat-context); `POST /api/feedback` antwoordt met **410 Gone** via de nieuwe `gone()`-helper in `lib/api/respond.ts` — bewust geen 404, dat leest als defect. Tabel `feedback` en `/beheer/feedback` blijven staan als **archief** (de tabel zit in de AVG-export en heeft geen eigen-rij DELETE-policy), inclusief een kop/omschrijving die dat zegt. Categorie-afbeelding `bug` → bug, `vraag` → vraag, `idee` → aanbeveling; **`overig` krijgt bewust geen opvolger**. Geen migratie.
 
-**Restpunt fase 5:** `npm run arch:diagram` is niet gedraaid — `docs/architecture/architecture.json` draagt ongecommitte wijzigingen van de parallelle sessie. Draaien op een schone tree bij de release-stap; de ADR-frontmatter van 0095/0096 wordt dan als architectuurfeit opgepikt.
+~~**Restpunt fase 5:** `npm run arch:diagram` is niet gedraaid~~ — **gedaan** (9 aug 2026, commit `8a12ad0d3` "feiten opnieuw gescand na fase 2-5 en de twee nieuwe ADR's"). De ADR-frontmatter van 0095/0096 zit sindsdien als architectuurfeit in `docs/architecture/architecture.json`.
 
 ⚠ = raakt bestanden met ongecommit werk van de parallelle sessie (command-palette, sidebar) — eerst afstemmen.
 
@@ -223,13 +223,47 @@ Per fase één kaart in de Notion-werkqueue (🧩 Trifinity), status **Backlog**
 
 ## 9 · Technische kanttekeningen
 
-1. **DepthSection**: ongebruikt. Kies — inzetten voor alle C-voorstellen (inklappen-met-behoud, zoals ADR 0026 bedoelde) óf verwijderen. Niet laten liggen.
+1. ~~**DepthSection**: ongebruikt. Kies — inzetten voor alle C-voorstellen (inklappen-met-behoud, zoals ADR 0026 bedoelde) óf verwijderen. Niet laten liggen.~~ — **beslist: inzetten** (zie §9.7 hieronder en de derde aanvulling in ADR 0026). Drie oppervlakken draaien er sinds fase 2/4 op; het punt is hiermee gesloten.
 2. ~~**ADR 0026 bijwerken** zodra APP-1/APP-4 landen~~ — **gedaan** (9 aug 2026): ADR 0026 heeft een aanvulling die de `/mijn/uiterlijk`-ingang vastlegt, het geen-hints-beleid bevestigt (APP-4 afgewezen) en het "mechanisme-only"-punt als achterhaald markeert.
 3. **Geen nieuwe rekenpaden**: alle B-voorstellen zijn presentatie-reductie — consumeren uit dezelfde bundel/engine (consume, don't recompute); nergens een cijfer "vereenvoudigd herberekenen".
 4. **Werkboom**: `command-palette`, `sidebar.tsx` en horizon-bestanden hebben ongecommitte wijzigingen van een parallelle sessie — voorstellen die die bestanden raken (CMD-2, NAV-*) pas na afstemming oppakken. *(9 aug 2026, fase 4: NAV-5 is als geïsoleerde diff van 4 regels bovenop het ongecommitte euro-weergave-werk in `sidebar.tsx` geland — geen overlap met dat blok.)*
 5. **UAT**: fase 1-wijzigingen raken geteste zones (overzicht, cashflow, budget) → uat-docs-keeper meenemen in dezelfde PR's. *(Fase 4 heeft WF-MIJN-01/20/30 en WF-NAV-06/10 in dezelfde stap bijgewerkt.)*
 6. **NAV-2 zat niet waar de audit 'm zocht** (9 aug 2026): de desktop-`Sidebar` klapte structureel al alleen de actieve module uit (`isActive && isEnabled`-gate op `SubTagStrip`; de `dimmed`-prop stond nergens op `true`). Waar élke tak wél altijd openstond is de **`NavMenuSheet`** — daar is de reductie geland. De sidebar-regel is vastgelegd met een regressietest i.p.v. met code die niets zou doen.
 7. **DepthSection is niet meer ongebruikt** (punt 1 hierboven): fase 2 zette 'm in voor CF-4, fase 4 voor MIJN-3 (Alle meldingstypen) en MIJN-4 (AI-uitvoeringsgroepen). Het patroon staat: in Eenvoudig gemónt met titel + samenvatting, in Volledig rendert de bestaande boom onveranderd.
+
+## 10 · Nazorg (11 aug 2026) — de drie halve items
+
+De controle van 9-10 aug 2026 (artifact 9520032e, tegen commit `8a12ad0d3`) stelde vast dat alle 33 gekozen voorstellen zijn doorgevoerd en alle 9 afgevallen correct niet zijn aangeraakt. Drie voorstellen waren daarbij wél *geland* maar niet *afgerond*. Hun eindstand:
+
+### APP-2 — afgemaakt
+
+De weergavekeuze werd alleen genoemd in de welkomstgids op /overzicht (`components/overview/welcome-guide-banner.tsx`), niet op het onboarding-successcherm. Dat is nu wél zo: `components/onboarding/onboarding-success.tsx` draagt één regel onder de afsluiting van Fin — *"Rustig beginnen of meteen alle detail? Je weergave kies je later bij Mijn → Uiterlijk."*
+
+Twee bewuste beperkingen op dat scherm, allebei technisch afgedwongen en niet cosmetisch:
+
+- **Geen modus-afhankelijke tekst.** De `DisplayModeProvider` hangt uitsluitend in `app/(app)/layout.tsx`; het successcherm leeft in de `(onboarding)`-routegroep en zou daarbuiten stilzwijgend op de `'simple'`-fallback landen (de valkuil die ADR 0026 als waarschuwing vastlegt). De zin klopt daarom in beide standen.
+- **Geen `<Link>`.** De CTA ernaast draait bewust `clearLocalStorage()` + een *harde* navigatie, omdat een soft-navigation vlak na het schrijven van `onboarding_completed` door de onboarding-poort teruggekaatst kan worden. Een klikbare route hiernaast zou die twee dingen omzeilen; een pad in tekst niet.
+
+### APP-5 — bewust afgesloten, geen app-brede jargonregel
+
+Fase 2 leverde twee call-site-fixes ("Onzekerheid (P40–P60)" → bandbreedte, "YTD" → dit jaar) maar géén vangrail zoals APP-7 die wél kreeg. Dat blijft zo, om twee redenen.
+
+**De vangrail kan niet bestaan in de vorm die APP-7 wél had.** `SIMPLE_MAX_FIGURES` kon in de primitive omdat een `FiguresStrip` een geteld aantal cellen heeft. Jargon is vrije prose, verspreid over honderden componenten; de enige mechanische variant is een woordenlijst-grep, en die kan niet weten of een treffer in Eenvoudig *zichtbaar* is — dat hangt af van runtime-`HideInSimple`-nesting. Een gate die dat niet kan bepalen levert vals alarm op precies de plekken waar het jargon is toegestaan.
+
+**En de twee resterende treffers staan buiten Eenvoudig.** Beide zijn nagelopen:
+
+- De "Onzekerheid"-pil + `p25–p75`-tooltip staat op `/toekomst/whatif`. Die route zit in `SIMPLE_HIDDEN_NAV_HREFS` (`lib/nav-config.ts`) en is in Eenvoudig uit sidebar, nav-sheet én ⌘K gefilterd — een Volledig-oppervlak dus.
+- `"(10e percentiel)"` in `components/app/horizon/phase-analysis/opbouw/monte-carlo-opbouw.tsx` zit in de fase-modal. De enige ingang daarheen is de `PhaseBar` in `horizon-client.tsx`, en die staat binnen `<HideInSimple>`. In Eenvoudig is het scherm dus onbereikbaar.
+
+Het audit-voorstel zei zelf al "SWR/opnamerate blijft Volledig". Deze twee vallen in diezelfde categorie, en "Volledig blijft exact zoals het was" is een acceptatiecriterium. Ze worden dus **niet** herschreven. Komt er ooit percentiel-taal op een oppervlak dat in Eenvoudig wél zichtbaar is, dan is dat een gewone bevinding op dat oppervlak — niet het bewijs dat er een app-brede regel had moeten zijn.
+
+### APP-6 — claim rechtgezet, bewust geen constraint
+
+De docblock van `welcome-guide-banner.tsx` beloofde "mobiel max ~⅓ viewport" alsof het een regel was; er stond geen `max-h`/`vh` omheen. De schermronde mat 282px op 390×844 = **33,4%**, dus de claim klopte feitelijk — hij was alleen verkeerd geformuleerd. De docblock zegt nu dat dit een *gemeten uitkomst* is en waarom er geen harde kap komt: die zou de afvinkregels of de sluit-/navigatieknoppen afsnijden zodra een scherm één stap meer draagt, en dan verliest de gebruiker functionaliteit in plaats van drukte. Groeit het aantal stappen, dan hermeten — niet afknippen.
+
+### Documentatie-drift, dichtgezet
+
+Vijf plekken beweerden iets dat het werk zelf onwaar had gemaakt: ADR 0026 (`DepthSection` "nooit ingehangen"), de comment bij `action:toggle-display-mode`, en `docs/uat/uat-plan.md` op zes plekken (HefbomenLegenda 2×, "géén toggle op /mijn/uiterlijk", UAT-NAV-10, WF-MIJN-22, UAT-CASH-22, plus een Onbevestigd-regel die inmiddels bevestigd feit was). Alle bijgewerkt; `lib/uat/acceptance/*` was al correct en bleef leidend. De zesde — de tegenstrijdige `subAmount`-comments in `cashflow-landing-cards.tsx` en `leverage-card.tsx` — was al opgelost in `153314dc9`.
 
 ---
 

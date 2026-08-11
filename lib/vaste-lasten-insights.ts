@@ -21,7 +21,6 @@ import {
 } from '@/lib/cashflow-cards'
 import type { LeverageStatus } from '@/lib/leverage-status'
 import {
-  dailyExpenseRate,
   calculateFreedomTime,
   roundCents,
   type FreedomTimeBreakdown,
@@ -54,8 +53,14 @@ export interface VasteLastenInsights {
   vasteKostenYearly: number
 
   monthlyIncome: number
-  /** Maanduitgaven — grondslag voor het dagtarief in de "wat als ik opzeg"-interactie. */
-  monthlyExpenses: number
+  /**
+   * CANONIEK dagtarief (€/dag, 12-mnd rolling) — doorgegeven aan `cancelEffect`
+   * voor de "wat als ik opzeg"-interactie, zodat die exact dezelfde noemer
+   * gebruikt als de vrijheidstijd-regels op deze pagina. Verving het vroegere
+   * `monthlyExpenses`-veld (effective grondslag), dat de client dwong zelf een
+   * dagtarief te maken.
+   */
+  dailyExpenseRate: number
   /** Aandeel van vaste lasten in het maandinkomen (0-1), of null zonder inkomen. */
   ratioOfIncome: number | null
   /** Afgerond aandeel-percentage (0-100), of null zonder inkomen. */
@@ -130,22 +135,39 @@ function largestOf(
  * Effect van het opzeggen van een maandelijkse post: jaarbedrag +
  * vrijheidstijd. Pure helper zodat de "wat als ik opzeg"-interactie in de UI
  * exact dezelfde grondslag deelt als de rest van het scherm.
+ *
+ * `dailyRate` is het AL-BEREKENDE canonieke dagtarief (€/dag), niet een
+ * maandbedrag: deze functie mag de grondslag niet meer kiezen. Was
+ * `cancelEffect(monthlyAmount, monthlyExpenses)` met een interne
+ * `dailyExpenseRate(monthlyExpenses)` — waardoor de aanroeper er ongemerkt de
+ * EFFECTIVE maanduitgaven in kon schuiven (vervolg KRUIS-20). Geef
+ * `insights.dailyExpenseRate` door.
  */
 export function cancelEffect(
   monthlyAmount: number,
-  monthlyExpenses: number,
+  dailyRate: number,
 ): { yearlyEuro: number; freedom: FreedomTimeBreakdown } {
   const yearlyEuro = roundCents(Math.max(0, monthlyAmount) * 12)
-  const freedom = calculateFreedomTime(yearlyEuro, dailyExpenseRate(monthlyExpenses))
+  const freedom = calculateFreedomTime(yearlyEuro, dailyRate)
   return { yearlyEuro, freedom }
 }
 
+/**
+ * @param monthlyIncome - EFFECTIVE maandinkomen: de noemer van het structurele
+ *   aandeel ("hoeveel van mijn inkomen ligt vast?"). Bewust effective (ADR 0073).
+ * @param dailyExpenseRate - CANONIEK dagtarief (€/dag) uit de 12-mnd rolling
+ *   bron (`CashflowCardScalars.dailyExpenseRate` / `DashboardData.dailyExpenseRate`).
+ *   Bewust een KANT-EN-KLAAR tarief i.p.v. `monthlyExpenses`: deze motor koos
+ *   voorheen zelf `dailyExpenseRate(monthlyExpenses)` op de effective grondslag,
+ *   waardoor dezelfde vaste last hier een ander aantal vrijheidsdagen kostte dan
+ *   in de widgets (vervolg KRUIS-20). 0 → geen vrijheidstijd, geen benadering.
+ */
 export function buildVasteLastenInsights(params: {
   summary: VasteLastenSummary
   monthlyIncome: number
-  monthlyExpenses: number
+  dailyExpenseRate: number
 }): VasteLastenInsights {
-  const { summary, monthlyIncome, monthlyExpenses } = params
+  const { summary, monthlyIncome, dailyExpenseRate: dailyRate } = params
 
   const subscriptionsMonthly = roundCents(summary.totalMonthlySubscriptions)
   const vasteKostenMonthly = roundCents(summary.totalMonthlyVasteKosten)
@@ -159,8 +181,7 @@ export function buildVasteLastenInsights(params: {
   const ratioOfIncome = hasData && monthlyIncome > 0 ? totalMonthly / monthlyIncome : null
   const status = vasteLastenCardStatus({ totalMonthly, count, monthlyIncome })
 
-  // Vrijheidstijd via het canonieke dagtarief.
-  const dailyRate = dailyExpenseRate(monthlyExpenses)
+  // Vrijheidstijd via het canonieke dagtarief — aangeleverd, niet zelf gerekend.
   const freedomPerMonth =
     hasData && dailyRate > 0 ? calculateFreedomTime(totalMonthly, dailyRate) : EMPTY_FREEDOM
   const freedomPerYear =
@@ -191,7 +212,7 @@ export function buildVasteLastenInsights(params: {
     vasteKostenYearly: roundCents(vasteKostenMonthly * 12),
 
     monthlyIncome,
-    monthlyExpenses,
+    dailyExpenseRate: dailyRate,
     ratioOfIncome,
     ratioPct: ratioOfIncome != null ? Math.round(ratioOfIncome * 100) : null,
     status,

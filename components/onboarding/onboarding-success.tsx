@@ -77,6 +77,26 @@ export function OnboardingSuccess({
         </p>
       </div>
 
+      {/* APP-2 (eenvoudige-weergave-audit) — de tweede plek waar de app zelf
+          vertelt dát er een weergavekeuze is; de eerste is de welkomstgids op
+          /overzicht. Juist hier, want een vers account start op 'simple' en
+          weet anders niet dat er meer ís.
+
+          Twee bewuste beperkingen:
+          · GEEN modus-afhankelijke tekst. De `DisplayModeProvider` hangt alleen
+            in `app/(app)/layout.tsx`; dit scherm leeft in de (onboarding)-groep
+            en zou dus stilzwijgend op de 'simple'-fallback landen (ADR 0026).
+            Deze zin klopt daarom in beide standen.
+          · GEEN <Link>. De CTA hiernaast draait bewust `clearLocalStorage()` +
+            een HARDE navigatie: een soft-navigation vlak na het schrijven van
+            `onboarding_completed` kan door de onboarding-poort teruggekaatst
+            worden, en zou de concept-staat laten staan. Een pad in tekst is
+            hier veiliger dan een klikbare route. */}
+      <p className="mx-auto mt-4 max-w-md font-sans text-xs leading-relaxed text-[var(--ink-3)]">
+        Rustig beginnen of meteen alle detail? Je weergave kies je later bij{' '}
+        <span className="font-semibold text-[var(--ink-2)]">Mijn &rarr; Uiterlijk</span>.
+      </p>
+
       {/* Decorative color bar — twee modules (Overzicht + Toekomst) */}
       <div className="mt-8 flex w-full max-w-xs items-center gap-0">
         <div className="h-0.5 flex-1 bg-kern-300" />

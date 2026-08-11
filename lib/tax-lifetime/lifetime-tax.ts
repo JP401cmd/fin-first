@@ -65,43 +65,39 @@
  *    factor. Dat is equivalent aan een tabel die exact met de inflatie
  *    meebeweegt — de gangbare NL-indexatiepraktijk.
  *
- * ## Bekende afwijking in de tariefmotor (gemeld, niet omzeild)
- * `computeBox1Tax` berekent de **arbeidskorting** over het volledige
- * `grossYearlyIncome`, dus óók over AOW/pensioen. Fiscaal is dat geen
- * arbeidsinkomen: de korting valt te hoog uit en `box1Totaal` daarmee te laag.
+ * ## Arbeidskorting-grondslag: OPGELOST (11 aug 2026)
+ * Tot aug 2026 rekende `computeBox1Tax` de **arbeidskorting** over het volledige
+ * `grossYearlyIncome`, dus óók over AOW/pensioen — fiscaal geen arbeidsinkomen.
+ * De korting viel te hoog uit en `box1Totaal` daarmee te laag; en omdat deze
+ * reeks een VERSCHIL van twee motoraanroepen rapporteert (`box1Totaal −
+ * box1AlVerrekend`) draaide het teken bij hoge pensioeninkomens zelfs om.
  *
- * **De afwijking is NIET systematisch één kant op** — deze reeks rapporteert een
- * VERSCHIL van twee motoraanroepen (`box1Totaal − box1AlVerrekend`), en beide
- * benen dragen hun eigen te hoge korting. Gemeten tegen `BOX1_PARAMS[2026]`, met
- * "juist" = dezelfde motor zónder arbeidskorting:
+ * De motor kent nu `Box1Input.arbeidsinkomen` als eigen grondslag. Deze module
+ * geeft er **0** mee — voor de tariefstap (`box1TaxOnReal`) én voor de
+ * netto→bruto-inversie van de AOW (`grossFromNet`), want een te lage
+ * arbeidskorting-grondslag daar zou de fout via het bruto weer binnenlaten.
+ * Er is nog steeds precies één tariefmotor; dit is de invoer, geen variant.
  *
- * | AOW netto | pensioen | vóór AOW | ná AOW |
- * |-----------|----------|----------|--------|
- * | € 0       | € 30.000 | −€ 5.381 | −€ 2.687 |
- * | € 0       | € 150.000| € 0      | € 0      |
- * | € 16.000  | € 30.000 | −€ 3.270 | −€ 1.669 |
- * | € 16.000  | € 150.000| +€ 2.364 | +€ 1.150 |
+ * Gemeten effect op `box1NietVerrekend` tegen `BOX1_PARAMS[2026]` (nieuw − oud):
  *
- * Zodra de arbeidskorting op het TOTAALinkomen is uitgefaseerd (afbouw vanaf
- * €45.592, nul vanaf ≈ €133k) terwijl hij op het AOW-only-been nog volop meetelt,
- * keert het teken om: het verschil valt dan te HOOG uit.
+ * | AOW netto | pensioen  | vóór AOW | ná AOW   |
+ * |-----------|-----------|----------|----------|
+ * | € 0       | € 30.000  | +€ 5.381 | +€ 2.687 |
+ * | € 0       | € 150.000 | € 0      | € 0      |
+ * | € 16.000  | € 30.000  | +€ 3.572 | +€ 1.990 |
+ * | € 16.000  | € 150.000 | −€ 1.858 | −€ 707   |
  *
- * **"Conservatief" is hier het verkeerde woord.** In het gangbare bereik
- * onderschat de reeks de last, en een onderschatte last laat een plan er BETER
- * uitzien dan het is — dat valt in het voordeel van de gebruiker uit, wat het
- * tegenovergestelde van conservatief is.
+ * Oftewel: de heffing gaat in het gangbare bereik OMHOOG (de reeks onderschatte
+ * de last), en bij een hoog pensioeninkomen bovenop AOW iets omlaag. Het effect
+ * was het grootst in de jaren vóór de AOW — precies waar "pensioen vroeg" zijn
+ * onttrekkingen concentreert — dus de correctie raakt de RANGSCHIKKING van de
+ * sweep en niet alleen het niveau. De zesde kanttekening op het scherm
+ * (`optimizer-levenslang.tsx`) die dit meldde is daarmee ingetrokken.
  *
- * **De bias is gekoppeld aan de as die de sweep vergelijkt.** Hij is verreweg het
- * grootst in de jaren vóór de AOW (bovenste rij: −€5.381 tegen −€2.687), en dat is
- * precies waar de variant "pensioen vroeg" zijn onttrekkingen concentreert. De
- * afwijking laat de VERGELIJKING dus niet ongemoeid: over tien tot vijftien
- * vroeg-onttrekkingsjaren telt ze op tot een orde die de tabel zelf als uitkomst
- * toont. Vandaar de zesde kanttekening op het scherm (`optimizer-levenslang.tsx`).
- *
- * De correctie hoort in `lib/box1-tax.ts` (arbeidsinkomen als eigen invoer), niet
- * hier: een eigen tarief-variant zou een tweede tariefimplementatie zijn. De
- * huidige uitkomst is aan BEIDE kanten gepind in `lifetime-tax.test.ts` ("BEKENDE
- * AFWIJKING"), zodat een latere correctie een zichtbare, bewuste wijziging is.
+ * Bij een AOW-been schuift óók de grondslag: `grossFromNet(€16.000 netto, AOW)`
+ * gaat van € 16.182 naar € 17.582 bruto — zonder arbeidskorting is er méér
+ * bruto nodig voor hetzelfde netto. Beide benen bewegen dus mee, wat verklaart
+ * waarom de correctie op de AOW-rijen kleiner is dan de weggevallen korting.
  *
  * ## Partner: volledig uitgesloten (ADR 0036)
  * Box 1 is per persoon en het partner-inkomen wordt niet als BRUTO grootheid
@@ -241,10 +237,14 @@ export interface LifetimeTaxSeries {
  * zonder eigen-woning-velden: het eigenwoningforfait/de hypotheekrenteaftrek
  * lopen in het model via de woonlasten in de kernel-cashflow, niet via deze
  * rapportagelaag (ze twee keer aanzetten zou dubbeltellen).
+ *
+ * `arbeidsinkomen: 0` — ELKE stroom in deze reeks (AOW, pensioenuitkering,
+ * pensioenonttrekking) is naar zijn aard géén arbeidsinkomen. Zie de module-doc:
+ * dit is de grondslag, geen tariefvariant. De motor blijft de enige.
  */
 function box1TaxOnReal(grossReal: number, year: Box1TaxYear, aow: boolean): number {
   if (!(grossReal > 0)) return 0
-  return computeBox1Tax({ grossYearlyIncome: grossReal, year, aow }).tax
+  return computeBox1Tax({ grossYearlyIncome: grossReal, year, aow, arbeidsinkomen: 0 }).tax
 }
 
 // ── Publieke motor ───────────────────────────────────────────────────────────
@@ -285,8 +285,14 @@ export function computeLifetimeTax(
 
     // ── Reëel rekenen (schijven groeien mee met de inflatie) ─────────────────
     const aowNettoReal = aowNetto / factor
+    // Ook de netto→bruto-inversie draait op `arbeidsinkomen: 0`: zonder dat zou
+    // ze het bruto zoeken waarbij een arbeidskorting meetelt die een AOW'er niet
+    // krijgt, en daarmee een te LAAG aowBruto opleveren — de fout zou dan via de
+    // grondslag alsnog binnenkomen nadat hij uit de tariefstap is gehaald.
     const aowBrutoReal =
-      aowNettoReal > 0 ? grossFromNet(aowNettoReal, year, { aow: aowGerechtigd }) : 0
+      aowNettoReal > 0
+        ? grossFromNet(aowNettoReal, year, { aow: aowGerechtigd, arbeidsinkomen: 0 })
+        : 0
     const pensioenReal = (pensioenUitkeringBruto + pensioenOnttrekkingBruto) / factor
 
     const alVerrekendReal = box1TaxOnReal(aowBrutoReal, year, aowGerechtigd)

@@ -93,15 +93,11 @@ export const PAGE_INFO: Record<string, string> = {
     'Verander je sparen, rendement of pensioenleeftijd en zie direct hoeveel jaar of maanden vrijheid je dat oplevert. ' +
     'Geen toezegging — alleen verkennen.',
 
-  '/toekomst/strategie':
-    'Drie levensstrategieën die je vrijheidsmoment het sterkst sturen: ' +
-    'AOW (wanneer en hoeveel), pensioen (opbouw en uitkering) en huis (kopen, behouden, afbetalen). ' +
-    'Klein draaien aan deze knoppen verschuift jaren.',
-
-  '/toekomst/uitgaven-na-pensioen':
-    'Wat ga je werkelijk uitgeven als je niet meer hoeft te werken. ' +
-    'Eenzelfde uitgavenpatroon of bewust minder — dit getal bepaalt de hoogte van je vrijheidsdoel. ' +
-    'Geen aanname; je eigen keuze.',
+  // NB: /toekomst/strategie en /toekomst/uitgaven-na-pensioen hadden hier een
+  // tekst, maar renderen sinds de React #310-opruiming (11 aug 2026) geen
+  // pagina meer — ze redirecten op de routing-laag (next.config.ts) naar de
+  // Gebeurtenissen-tab resp. de uitgaven-pane op /toekomst. De `i` van die
+  // oppervlakken hoort bij hun eigen route, niet bij een dood adres.
 
   '/toekomst/inflatie-koopkracht':
     'Inflatie eet je vermogen op in stille jaren. ' +
@@ -191,11 +187,6 @@ export const PAGE_INFO: Record<string, string> = {
     'Wat-als scenario\'s: verken hoe veranderingen je vrijheidsdatum beïnvloeden. ' +
     'Verschuif sliders voor spaarquote, rendement of extra inleg en zie direct het effect. ' +
     'Vergelijk scenario\'s naast je huidige pad.',
-
-  '/horizon/strategie':
-    'Je onttrekkingsstrategie na financiële vrijheid. ' +
-    'Kies hoe je vermogen opneemt (vast percentage, variabel, of bucket-strategie) en zie de impact op levensduur. ' +
-    'Pas parameters aan voor jouw situatie.',
 
   // ── Overige hoofdpaginas ─────────────────────────────────────────
   '/identity':

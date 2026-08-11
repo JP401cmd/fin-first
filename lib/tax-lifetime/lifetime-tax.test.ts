@@ -133,13 +133,21 @@ describe('computeLifetimeTax — pensioen wordt marginaal belast (bovenóp AOW)'
     expect(r.box1NietVerrekend).toBe(r.box1Totaal - r.box1AlVerrekend)
     // en de grondslag telt de drie bruto-stromen op.
     expect(r.box1GrondslagBruto).toBe(r.aowBruto + 12_000 + 8_000)
-    // handmatige controle tegen de enige tariefmotor:
-    const brutoAow = grossFromNet(AOW_NETTO, YEAR, { aow: true })
-    const alVerrekend = computeBox1Tax({ grossYearlyIncome: brutoAow, year: YEAR, aow: true }).tax
+    // handmatige controle tegen de enige tariefmotor — met dezelfde grondslag
+    // die de module gebruikt: AOW en pensioen zijn geen arbeidsinkomen, dus ook
+    // de netto→bruto-inversie draait op arbeidsinkomen 0.
+    const brutoAow = grossFromNet(AOW_NETTO, YEAR, { aow: true, arbeidsinkomen: 0 })
+    const alVerrekend = computeBox1Tax({
+      grossYearlyIncome: brutoAow,
+      year: YEAR,
+      aow: true,
+      arbeidsinkomen: 0,
+    }).tax
     const totaal = computeBox1Tax({
       grossYearlyIncome: brutoAow + 20_000,
       year: YEAR,
       aow: true,
+      arbeidsinkomen: 0,
     }).tax
     expect(r.box1NietVerrekend).toBeCloseTo(totaal - alVerrekend, 6)
   })
@@ -201,72 +209,79 @@ describe('computeLifetimeTax — aow-vlag per rij', () => {
   })
 
   /**
-   * BEKENDE AFWIJKING (bewust zichtbaar gepind, niet stil geaccepteerd):
-   * `computeBox1Tax` past de **arbeidskorting** toe op het volledige
-   * `grossYearlyIncome`, ook als dat pensioen/AOW is. Fiscaal is pensioen géén
-   * arbeidsinkomen, dus de motor OVERSCHAT de korting en daarmee ONDERSCHAT hij
-   * `box1Totaal`. Dit is een eigenschap van de enige tariefmotor van de app
-   * (`lib/box1-tax.ts`), niet van deze rapportagelaag — hem hier omzeilen zou een
-   * tweede tariefimplementatie zijn (verboden). Deze tests leggen de huidige
-   * uitkomst vast zodat een latere correctie in box1-tax.ts een BEWUSTE,
-   * zichtbare wijziging is in plaats van een stille verschuiving.
+   * ARBEIDSKORTING-GRONDSLAG (was: "BEKENDE AFWIJKING", opgelost 11 aug 2026).
    *
-   * DRIE gevallen, want de afwijking is NIET uniform:
-   *  (a) `aow: true` zonder AOW-inkomen — de milde kant, was al gepind;
-   *  (b) `aow: false` — de kant die de RANGSCHIKKING stuurt: "pensioen vroeg"
-   *      concentreert onttrekkingen in pre-AOW-jaren, en dáár is de afwijking
-   *      verreweg het grootst (volle niet-AOW-arbeidskorting, max €5.685, tegen
-   *      de veel kleinere AOW-variant, max €2.840);
-   *  (c) AOW + een HOOG pensioen — daar draait het teken om, doordat de korting
-   *      op het totaalinkomen is uitgefaseerd terwijl hij op het AOW-only-been
-   *      nog meetelt. Zonder dit geval zou "de reeks onderschat altijd" als
-   *      waarheid vastliggen.
+   * Tot aug 2026 paste `computeBox1Tax` de arbeidskorting toe op het volledige
+   * `grossYearlyIncome`, ook als dat pensioen/AOW was. De motor kent nu
+   * `Box1Input.arbeidsinkomen`; deze module geeft er 0 mee, voor zowel de
+   * tariefstap als de netto→bruto-inversie van de AOW.
+   *
+   * DE VERWACHTING IS BIJGESTELD OMDAT DE OUDE WAARDE FOUT WAS, niet omdat de
+   * test lastig was: waar deze tests eerst de afwijking t.o.v. "heffing zonder
+   * arbeidskorting" pinden (−€5.381 / −€2.687 / ±), pinnen ze nu dat er GEEN
+   * afwijking meer is (exact 0) plus de gemeten sprong t.o.v. het oude gedrag.
+   * De drie gevallen blijven staan, want ze dekken drie verschillende zones:
+   *  (a) ná AOW zonder AOW-inkomen — de milde kant;
+   *  (b) vóór de AOW — waar de volle niet-AOW-korting gold (max €5.685) en
+   *      "pensioen vroeg" zijn onttrekkingen concentreert;
+   *  (c) AOW + hoog pensioen — waar de oude fout van teken draaide.
    */
-  /** Heffing zoals die zónder de (fiscaal onterechte) arbeidskorting zou zijn. */
+  /** Heffing zoals die zónder arbeidskorting hoort te zijn (de fiscale norm). */
   const juisteHeffing = (gross: number, aow: boolean): number => {
     if (!(gross > 0)) return 0
     const r = computeBox1Tax({ grossYearlyIncome: gross, year: YEAR, aow })
     const terecht = Math.min(r.algemeneHeffingskorting + r.iack, r.heffingVoorKortingen)
     return Math.max(0, r.heffingVoorKortingen - terecht)
   }
+  /** Het gedrag van vóór de fix: arbeidskorting over het volledige bruto. */
+  const oudeHeffing = (gross: number, aow: boolean): number =>
+    gross > 0 ? computeBox1Tax({ grossYearlyIncome: gross, year: YEAR, aow }).tax : 0
 
-  it('BEKENDE AFWIJKING (a) ná AOW zonder AOW-inkomen: arbeidskorting óók over pensioen', () => {
+  it('GRONDSLAG (a) ná AOW zonder AOW-inkomen: pensioen krijgt GEEN arbeidskorting', () => {
     const r = computeLifetimeTax([row({ age: 70, pensioenOnttrekkingBruto: 30_000 })], {
       aowLeeftijd: AOW_LEEFTIJD,
       year: YEAR,
     }).rows[0]
-    const zonderKortingen = computeBox1Tax({
-      grossYearlyIncome: 30_000,
-      year: YEAR,
-      aow: true,
-    })
-    expect(zonderKortingen.arbeidskorting).toBeGreaterThan(0) // ← de afwijking zelf
-    expect(r.box1NietVerrekend).toBe(zonderKortingen.tax)
-    // …en hoe groot hij is: ± €2.687 te laag op dit niveau.
-    expect(r.box1NietVerrekend - juisteHeffing(30_000, true)).toBeCloseTo(-2_687, -1)
+
+    // Exact de fiscale norm — geen tolerantie: dit is een IDENTITEIT, niet een orde.
+    expect(r.box1NietVerrekend).toBe(juisteHeffing(30_000, true))
+    // De motor kent hier zelf geen korting meer toe.
+    expect(
+      computeBox1Tax({ grossYearlyIncome: 30_000, year: YEAR, aow: true, arbeidsinkomen: 0 })
+        .arbeidskorting,
+    ).toBe(0)
+    // Gemeten sprong t.o.v. het oude gedrag: de heffing gaat ± €2.687 OMHOOG.
+    expect(r.box1NietVerrekend - oudeHeffing(30_000, true)).toBeCloseTo(2_687, -1)
   })
 
-  it('BEKENDE AFWIJKING (b) vóór de AOW is de afwijking ruim twee keer zo groot', () => {
+  it('GRONDSLAG (b) vóór de AOW was de fout ruim twee keer zo groot — nu óók 0', () => {
     const opts = { aowLeeftijd: AOW_LEEFTIJD, year: YEAR }
     const voor = computeLifetimeTax([row({ age: 60, pensioenOnttrekkingBruto: 30_000 })], opts)
       .rows[0]
     const na = computeLifetimeTax([row({ age: 70, pensioenOnttrekkingBruto: 30_000 })], opts).rows[0]
     expect(voor.aowGerechtigd).toBe(false)
 
-    const afwijkingVoor = voor.box1NietVerrekend - juisteHeffing(30_000, false)
-    const afwijkingNa = na.box1NietVerrekend - juisteHeffing(30_000, true)
+    expect(voor.box1NietVerrekend).toBe(juisteHeffing(30_000, false))
+    expect(na.box1NietVerrekend).toBe(juisteHeffing(30_000, true))
 
-    // Beide onderschatten, maar de pre-AOW-kant fors zwaarder — en dát is de kant
-    // waar "pensioen vroeg" zijn onttrekkingen concentreert.
-    expect(afwijkingVoor).toBeCloseTo(-5_381, -1)
-    expect(afwijkingNa).toBeCloseTo(-2_687, -1)
-    expect(Math.abs(afwijkingVoor)).toBeGreaterThan(Math.abs(afwijkingNa) * 1.9)
+    // De correctie zelf is asymmetrisch: pre-AOW ruim twee keer zo groot, en dát
+    // is de kant waar "pensioen vroeg" zijn onttrekkingen concentreert — dus de
+    // fix raakt de RANGSCHIKKING van de sweep, niet alleen het niveau.
+    const sprongVoor = voor.box1NietVerrekend - oudeHeffing(30_000, false)
+    const sprongNa = na.box1NietVerrekend - oudeHeffing(30_000, true)
+    expect(sprongVoor).toBeCloseTo(5_381, -1)
+    expect(sprongNa).toBeCloseTo(2_687, -1)
+    expect(sprongVoor).toBeGreaterThan(sprongNa * 1.9)
   })
 
-  it('BEKENDE AFWIJKING (c) bij AOW + hoog pensioen KEERT het teken om (niet systematisch)', () => {
+  it('GRONDSLAG (c) AOW + hoog pensioen: óók het AOW-been draait op arbeidsinkomen 0', () => {
     const opts = { aowLeeftijd: AOW_LEEFTIJD, year: YEAR }
     const AOW_NETTO = 16_000
-    const brutoAow = grossFromNet(AOW_NETTO, YEAR, { aow: true })
+    // De inversie zelf verschuift mee: zonder arbeidskorting is er MEER bruto
+    // nodig voor hetzelfde netto AOW-bedrag.
+    const brutoAowOud = grossFromNet(AOW_NETTO, YEAR, { aow: true })
+    const brutoAow = grossFromNet(AOW_NETTO, YEAR, { aow: true, arbeidsinkomen: 0 })
+    expect(brutoAow).toBeGreaterThan(brutoAowOud)
 
     const bescheiden = computeLifetimeTax(
       [row({ age: 70, aowNetto: AOW_NETTO, pensioenOnttrekkingBruto: 30_000 })],
@@ -277,15 +292,19 @@ describe('computeLifetimeTax — aow-vlag per rij', () => {
       opts,
     ).rows[0]
 
-    // De reeks rapporteert een VERSCHIL van twee motoraanroepen; beide benen
-    // dragen hun eigen te hoge korting, dus het saldo hoeft niet negatief te zijn.
     const juistVerschil = (pensioen: number) =>
       juisteHeffing(brutoAow + pensioen, true) - juisteHeffing(brutoAow, true)
 
-    expect(bescheiden.box1NietVerrekend - juistVerschil(30_000)).toBeLessThan(0) // te laag
-    expect(hoog.box1NietVerrekend - juistVerschil(150_000)).toBeGreaterThan(0) // te HOOG
-    expect(bescheiden.box1NietVerrekend - juistVerschil(30_000)).toBeCloseTo(-1_669, -1)
-    expect(hoog.box1NietVerrekend - juistVerschil(150_000)).toBeCloseTo(1_150, -1)
+    // Beide benen zijn nu grondslag-correct ⇒ het verschil is exact juist.
+    expect(bescheiden.box1NietVerrekend).toBeCloseTo(juistVerschil(30_000), 6)
+    expect(hoog.box1NietVerrekend).toBeCloseTo(juistVerschil(150_000), 6)
+
+    // Richting van de correctie: omhoog bij een bescheiden pensioen, omlaag bij
+    // een hoog pensioen (waar de oude korting op het totaal al was uitgefaseerd).
+    const oudVerschil = (pensioen: number) =>
+      oudeHeffing(brutoAowOud + pensioen, true) - oudeHeffing(brutoAowOud, true)
+    expect(bescheiden.box1NietVerrekend - oudVerschil(30_000)).toBeCloseTo(1_990, -1)
+    expect(hoog.box1NietVerrekend - oudVerschil(150_000)).toBeCloseTo(-707, -1)
   })
 
   it('de vlag kantelt exact op age === aowLeeftijd', () => {
@@ -332,7 +351,7 @@ describe('computeLifetimeTax — aow-vlag per rij', () => {
     expect(nietAow.aowGerechtigd).toBe(false)
     expect(scharnier.box1NietVerrekend).toBeLessThan(nietAow.box1NietVerrekend)
     expect(scharnier.box1NietVerrekend).toBe(
-      computeBox1Tax({ grossYearlyIncome: 30_000, year: YEAR, aow: true }).tax,
+      computeBox1Tax({ grossYearlyIncome: 30_000, year: YEAR, aow: true, arbeidsinkomen: 0 }).tax,
     )
   })
 

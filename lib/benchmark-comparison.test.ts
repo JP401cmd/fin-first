@@ -4,7 +4,9 @@ import {
   clipBenchmarkSeries,
   compareToBenchmarks,
   computeTwrSeries,
+  computeTwrOutcome,
   benchmarkInterval,
+  resolveComparisonWindow,
   resolvePeriodStart,
   TIME_PERIODS,
   type BenchmarkDataPoint,
@@ -65,14 +67,30 @@ function realData(points: BenchmarkDataPoint[]): Map<BenchmarkId, BenchmarkDataP
   ])
 }
 
-/** Snapshot-fabriek: standaard mét koersobservatie en zonder kasstroom. */
+/**
+ * Snapshot-fabriek: standaard een volledig waarneembare maand zonder kasstroom.
+ *
+ * `observedValue`/`observedNetFlow` volgen standaard de totalen — dat is de
+ * situatie "élke positie noteert". Een test die een blinde vlek wil, zet ze
+ * expliciet; dat is precies het onderscheid dat de motor maakt.
+ */
 function snap(overrides: Partial<HoldingSnapshot> & { date: string; totalValue: number }): HoldingSnapshot {
+  const netFlow = overrides.netFlow ?? 0
   return {
     totalCost: overrides.totalValue,
-    netFlow: 0,
+    netFlow,
     pricedFromHistory: true,
+    observedValue: overrides.totalValue,
+    observedNetFlow: netFlow,
     ...overrides,
   }
+}
+
+/** Maand zonder énige koersobservatie: het mandje is leeg. */
+function blindSnap(
+  overrides: Partial<HoldingSnapshot> & { date: string; totalValue: number },
+): HoldingSnapshot {
+  return snap({ ...overrides, pricedFromHistory: false, observedValue: 0, observedNetFlow: 0 })
 }
 
 describe('resolvePeriodStart — één venster voor route en motor', () => {
@@ -159,6 +177,58 @@ describe('compareToBenchmarks — het venster volgt de periodekeuze', () => {
     expect(result.windowFallback).toBe(true)
     expect(result.windowStart).toBe('2024-01-31')
   })
+
+  // Given een terugval op de volledige historie (te weinig snapshots in de
+  // periode); When de route bepaalt vanaf welke datum hij de indexreeks ophaalt;
+  // Then is dat exact het venster dat de motor gebruikt. Zonder deze binding
+  // haalde de route drie maanden index op naast dertig maanden portfolio en
+  // heette het verschil "alpha" (F2).
+  it('geeft de route hetzelfde teruggevallen venster als de motor gebruikt', () => {
+    const short = [snap({ date: '2024-01-31', totalValue: 1000 }), snap({ date: '2024-02-29', totalValue: 1100 })]
+    const window = resolveComparisonWindow(short, PERIOD('3m'), NOW)
+    const result = compareToBenchmarks(short, PERIOD('3m'), realData(benchSeries()), NOW)!
+
+    expect(window.windowFallback).toBe(true)
+    expect(window.windowStart).toBe(result.windowStart)
+    // En de periode-start (die de route vóór de fix gebruikte) ligt er ruim ná.
+    const periodeStart = dateStr(resolvePeriodStart(PERIOD('3m'), short[0].date, NOW))
+    expect(periodeStart > window.windowStart).toBe(true)
+  })
+
+  // Given een portefeuille waarvan de koershistorie pas halverwege het venster
+  // begint; When er vergeleken wordt; Then meten portfolio én index vanaf dat
+  // punt, en meldt het resultaat dat het venster is ingekort.
+  it('knipt het venster tot waar de koershistorie begint, ook voor de indices', () => {
+    const snapshots: HoldingSnapshot[] = [
+      ...Array.from({ length: 9 }, (_, i) => blindSnap({ date: monthEndAgo(12 - i), totalValue: 1000 })),
+      snap({ date: monthEndAgo(3), totalValue: 1000, observedNetFlow: 1000 }),
+      snap({ date: monthEndAgo(2), totalValue: 1050 }),
+      snap({ date: monthEndAgo(1), totalValue: 1100 }),
+    ]
+    const result = compareToBenchmarks(snapshots, PERIOD('1y'), realData(benchSeries()), NOW)!
+
+    expect(result.windowClipped).toBe(true)
+    expect(result.windowStart).toBe(monthEndAgo(3))
+    expect(result.portfolio.returnPct).toBeCloseTo(10, 6)
+    for (const b of result.benchmarks) {
+      expect(b.dataPoints.every(p => p.date >= result.windowStart)).toBe(true)
+    }
+  })
+
+  // Regressie (F12): snapshots landen op maandeinden, requestedStart is "nu min
+  // N maanden" — een dag midden in de maand. Zonder koershistorie-gat mag dat
+  // roosterverschil windowClipped niet naar true duwen: anders meldt elke vaste
+  // periode ten onrechte "koershistorie begint later" terwijl de dekking
+  // volledig is.
+  it('meldt geen clipping puur door het snapshot-rooster t.o.v. een periode-start midden in de maand', () => {
+    const volledig: HoldingSnapshot[] = Array.from({ length: 24 }, (_, i) =>
+      snap({ date: monthEndAgo(23 - i), totalValue: 1000 * 1.01 ** i }),
+    )
+    for (const id of ['1m', '3m', '6m', '1y', 'ytd'] as const) {
+      const result = compareToBenchmarks(volledig, PERIOD(id), realData(benchSeries()), NOW)!
+      expect(result.windowClipped).toBe(false)
+    }
+  })
 })
 
 describe('compareToBenchmarks — alpha', () => {
@@ -175,7 +245,9 @@ describe('compareToBenchmarks — alpha', () => {
   })
 
   it('laat de alpha weg zodra het portfoliorendement niet meetbaar is', () => {
-    const zonderKoers = snapshots.map(s => ({ ...s, pricedFromHistory: false }))
+    const zonderKoers = snapshots.map(s =>
+      ({ ...s, pricedFromHistory: false, observedValue: 0, observedNetFlow: 0 }),
+    )
     const result = compareToBenchmarks(zonderKoers, PERIOD('1y'), realData(benchSeries()), NOW)!
     expect(result.portfolio.returnPct).toBeNull()
     expect(result.portfolio.gap).toBe('no_price_history')
@@ -217,16 +289,101 @@ describe('computeTwrSeries — inleg is geen rendement', () => {
     expect(computeTwrSeries(snapshots)!.returnPct).toBeCloseTo(21, 6)
   })
 
-  it('geeft null zodra één maand geen koersobservatie heeft', () => {
+  it('geeft null zodra geen enkele maand een koersobservatie heeft', () => {
     const snapshots: HoldingSnapshot[] = [
-      snap({ date: '2026-01-31', totalValue: 1000 }),
-      snap({ date: '2026-02-28', totalValue: 1100, pricedFromHistory: false }),
+      blindSnap({ date: '2026-01-31', totalValue: 1000 }),
+      blindSnap({ date: '2026-02-28', totalValue: 1100 }),
     ]
     expect(computeTwrSeries(snapshots)).toBeNull()
+    expect(computeTwrOutcome(snapshots)).toEqual({ ok: false, gap: 'no_price_history' })
   })
 
   it('geeft null bij minder dan twee snapshots', () => {
     expect(computeTwrSeries([snap({ date: '2026-01-31', totalValue: 1000 })])).toBeNull()
+  })
+
+  // Given één onnoteerbare positie (turbo, delisting) naast noterende posities;
+  // When het rendement wordt berekend;
+  // Then meet de motor het noterende deel i.p.v. het hele venster te blokkeren.
+  // Dit is F1 na de release: op productie blankte één positie van €289 — 1% van
+  // de waarde — het rendement van een portefeuille van €27.925.
+  it('meet het waarneembare deel door, ook als één positie niet noteert', () => {
+    const snapshots: HoldingSnapshot[] = [
+      snap({ date: '2026-01-31', totalValue: 1289, observedValue: 1000, observedNetFlow: 1000 }),
+      snap({
+        date: '2026-02-28',
+        totalValue: 1389,
+        pricedFromHistory: false,
+        observedValue: 1100,
+        observedNetFlow: 0,
+      }),
+    ]
+    const outcome = computeTwrOutcome(snapshots)
+    expect(outcome.ok).toBe(true)
+    if (!outcome.ok) return
+    expect(outcome.series.returnPct).toBeCloseTo(10, 6)
+    // En het contract zegt hóé hard dat getal is: de dunste maand telt
+    // (1000/1289 in januari, tegen 1100/1389 in februari).
+    expect(outcome.series.observedShare).toBeCloseTo(1000 / 1289, 4)
+  })
+
+  // Given een positie die pas halverwege het venster een koersbron krijgt
+  // (de dagelijkse cron begon in mei);
+  // When de meting loopt;
+  // Then telt haar intrede als kasstroom, niet als koerswinst.
+  it('boekt een positie die het mandje instapt als inleg, niet als rendement', () => {
+    const snapshots: HoldingSnapshot[] = [
+      snap({ date: '2026-01-31', totalValue: 2000, observedValue: 1000, observedNetFlow: 1000 }),
+      // Tweede positie (€900) wordt nu ook waarneembaar; de eerste staat stil.
+      snap({ date: '2026-02-28', totalValue: 2000, observedValue: 1900, observedNetFlow: 900 }),
+    ]
+    // Zonder de instroomboeking zou dit 1900/1000 − 1 = +90% zijn geweest.
+    expect(computeTwrSeries(snapshots)!.returnPct).toBe(0)
+  })
+
+  // Given een venster waarvan de eerste maanden geen enkele koersbron hebben;
+  // When de meting loopt;
+  // Then begint hij bij de eerste waarneming en meldt hij dat via `measuredFrom`
+  // — de blinde maanden zijn geen 0%-rendement.
+  it('begint de meting bij de eerste waarneming, niet bij de eerste maand', () => {
+    const snapshots: HoldingSnapshot[] = [
+      blindSnap({ date: '2026-01-31', totalValue: 1000 }),
+      blindSnap({ date: '2026-02-28', totalValue: 1000 }),
+      snap({ date: '2026-03-31', totalValue: 1000, observedNetFlow: 1000 }),
+      snap({ date: '2026-04-30', totalValue: 1200 }),
+    ]
+    const series = computeTwrSeries(snapshots)!
+    expect(series.measuredFrom).toBe('2026-03-31')
+    expect(series.indexPoints.map(p => p.date)).toEqual(['2026-03-31', '2026-04-30'])
+    expect(series.returnPct).toBeCloseTo(20, 6)
+  })
+
+  // Given een portefeuille die volledig verkocht wordt en later terugkeert;
+  // When het rendement wordt berekend;
+  // Then is een maand zonder kapitaal 0%, geen −50%. (F3/F6)
+  it('leest een volledige verkoop als 0%, niet als een halvering', () => {
+    const snapshots: HoldingSnapshot[] = [
+      snap({ date: '2026-01-31', totalValue: 1000, observedNetFlow: 1000 }),
+      // Alles verkocht: waarde 0, uitstroom −1000.
+      snap({ date: '2026-02-28', totalValue: 0, observedValue: 0, observedNetFlow: -1000 }),
+      snap({ date: '2026-03-31', totalValue: 0, observedValue: 0, observedNetFlow: 0 }),
+      // Herkoop tegen dezelfde koers.
+      snap({ date: '2026-04-30', totalValue: 1000, observedNetFlow: 1000 }),
+    ]
+    // Het defect maakte hier −50% van: de verkoopmaand viel weg en de keten
+    // knoopte januari rechtstreeks aan april, met de kasstromen buiten beeld.
+    expect(computeTwrSeries(snapshots)!.returnPct).toBe(0)
+  })
+
+  // Given een opname die groter is dan de stand aan het begin van de maand;
+  // When het rendement wordt berekend;
+  // Then weigert de motor het venster met een eigen reden. (F6, was ongetest)
+  it('weigert een venster waarin meer is opgenomen dan er stond', () => {
+    const snapshots: HoldingSnapshot[] = [
+      snap({ date: '2026-01-31', totalValue: 1000, observedNetFlow: 1000 }),
+      snap({ date: '2026-02-28', totalValue: 100, observedValue: 100, observedNetFlow: -1500 }),
+    ]
+    expect(computeTwrOutcome(snapshots)).toEqual({ ok: false, gap: 'unmeasurable_window' })
   })
 })
 
@@ -323,6 +480,86 @@ describe('buildPortfolioHistory — kasstroom en koersdekking', () => {
     // Juni en juli bestonden nog niet in het transactieboek → geen snapshot.
     expect(history).toHaveLength(1)
     expect(history[0].totalValue).toBe(1000)
+  })
+
+  // Given een echte portefeuille: één noterende positie naast één turbo die
+  // Yahoo niet kan oplossen (op productie 13 van de 14 open posities noteert);
+  // When de historie wordt opgebouwd;
+  // Then blijft de turbo buiten het gemeten mandje maar blokkeert hij het
+  // rendement niet meer, en meldt de dekking hoeveel waarde eronder ligt.
+  it('meet door bij een gemengde portefeuille en meldt de dekking', () => {
+    const turbo = {
+      id: 'h2',
+      units: 10,
+      avg_purchase_price: 30,
+      current_price: 30,
+      purchase_date: '2026-06-10',
+      created_at: '2026-06-01T00:00:00.000Z',
+    }
+    const turboBuys = [
+      { holding_id: 'h2', type: 'buy' as const, units: 10, price_per_unit: 30, date: '2026-06-10' },
+    ]
+    const dagkoersen = [
+      { holding_id: 'h1', date: '2026-06-30', close_price: 100 },
+      { holding_id: 'h1', date: '2026-07-31', close_price: 110 },
+      { holding_id: 'h1', date: '2026-08-14', close_price: 121 },
+    ]
+    const history = buildPortfolioHistory(
+      [holding, turbo],
+      [],
+      [...buys, ...turboBuys],
+      NOW,
+      dagkoersen,
+    )
+
+    // De turbo drukt de dekking, maar zet de maand niet meer op onmeetbaar.
+    expect(history.every(s => s.pricedFromHistory)).toBe(false)
+    expect(history.every(s => s.observedValue > 0)).toBe(true)
+
+    const outcome = computeTwrOutcome(history)
+    expect(outcome.ok).toBe(true)
+    if (!outcome.ok) return
+
+    // Juli: 2200 / (1000 + 1000 inleg) = +10%.
+    // Augustus: de turbo stapt het mandje in via `current_price` en telt als
+    // instroom (300), dus 3930 / (2200 + 1000 + 300) = +12,29%.
+    expect(outcome.series.returnPct).toBeCloseTo(23.51, 2)
+
+    // De dekking is de ZWAKSTE maand, niet de laatste: in juni/juli stond de
+    // turbo (10 × €30) buiten beeld. Juni is het dunst: 1000 / 1300.
+    expect(outcome.series.observedShare).toBeCloseTo(1000 / 1300, 4)
+  })
+
+  // Given een portefeuille die in maart volledig verkocht wordt en in mei
+  // terugkeert tegen dezelfde koers;
+  // When de historie wordt opgebouwd;
+  // Then verdwijnt de verkoopmaand niet uit de keten (F3).
+  it('houdt de maand van een volledige verkoop in de reeks', () => {
+    const positie = {
+      id: 'h1',
+      units: 0,
+      avg_purchase_price: 100,
+      current_price: 100,
+      purchase_date: '2026-06-10',
+      created_at: '2026-06-01T00:00:00.000Z',
+    }
+    const txs = [
+      { holding_id: 'h1', type: 'buy' as const, units: 10, price_per_unit: 100, date: '2026-06-10' },
+      { holding_id: 'h1', type: 'sell' as const, units: 10, price_per_unit: 100, date: '2026-07-10' },
+    ]
+    const dagkoersen = [
+      { holding_id: 'h1', date: '2026-06-30', close_price: 100 },
+      { holding_id: 'h1', date: '2026-07-31', close_price: 100 },
+      { holding_id: 'h1', date: '2026-08-14', close_price: 100 },
+    ]
+    const history = buildPortfolioHistory([positie], [], txs, NOW, dagkoersen)
+
+    // Juni (gekocht), juli (leeg na verkoop), augustus (nog steeds leeg).
+    expect(history.map(s => s.date.substring(0, 7))).toEqual(['2026-06', '2026-07', '2026-08'])
+    expect(history[1].totalValue).toBe(0)
+    // De verkoop verlaat het mandje als kasstroom, niet als koersverlies.
+    expect(history[1].observedNetFlow).toBe(-1000)
+    expect(computeTwrSeries(history)!.returnPct).toBe(0)
   })
 })
 

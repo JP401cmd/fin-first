@@ -9,7 +9,7 @@ import {
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import { normalisePrivacySettings } from '@/lib/household-data'
-import { dailyExpenseRate } from '@/lib/format'
+import { getRecentDailyExpenseRate } from '@/lib/expense-rate'
 
 /**
  * GET /api/household/box3?year=2025|2026
@@ -64,23 +64,19 @@ export async function GET(request: NextRequest) {
   const allDebts = (debtsRes.data ?? []) as Debt[]
   const currentUserName = profileRes.data?.[0]?.full_name ?? 'Jij'
 
-  // Get monthly expenses for freedom days calculation
-  const monthStart = new Date()
-  monthStart.setDate(1)
-  monthStart.setHours(0, 0, 0, 0)
-  const monthEnd = new Date(monthStart)
-  monthEnd.setMonth(monthEnd.getMonth() + 1)
-
-  const { data: budgets } = await supabase
-    .from('budgets')
-    .select('default_limit, budget_type')
-    .eq('budget_type', 'expense')
-
-  const monthlyExpenses = (budgets ?? []).reduce(
-    (sum, b) => sum + (Number(b.default_limit) || 0),
-    0,
-  )
-  const dailyExpenses = monthlyExpenses > 0 ? dailyExpenseRate(monthlyExpenses) : 100
+  // Dagtarief voor de vrijheidsdagen — CANONIEKE 12-mnd rolling bron
+  // (lib/expense-rate.ts), identiek aan `DashboardData.dailyExpenseRate` en de
+  // widgets/rapporten.
+  //
+  // Was: de som van budget-LIMIETEN (`budgets.default_limit`) als "maanduitgaven",
+  // met een verzonnen €100/dag-terugval. Dat is een DERDE grondslag naast
+  // effective en rolling — een plan, geen realiteit — en precies de bron waar
+  // lib/tax-opportunities-loader.ts al expliciet voor waarschuwt (tot ~48%
+  // afwijking). Daardoor toonde dezelfde Box 3-heffing hier een ander aantal
+  // vrijheidsdagen dan op /overzicht/belasting/box3 (vervolg KRUIS-20).
+  // 0 = geen eerlijke dagbasis → calculateBox3 guardt daar al op en geeft
+  // freedomDays 0 i.p.v. een op een bedacht tarief gebaseerd getal.
+  const { dailyRate: dailyExpenses } = await getRecentDailyExpenseRate(supabase)
 
   // Separate assets/debts by user
   const myAssets = allAssets.filter(a => a.user_id === claims.sub || a.ownership === 'shared')

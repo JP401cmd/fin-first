@@ -21,7 +21,6 @@
  * een vervolgkaart — deze route is pure read + client-side PDF.
  */
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
-import { dailyExpenseRate } from '@/lib/format'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { NL_AOW_AGE } from '@/lib/constants'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
@@ -120,8 +119,14 @@ export async function GET() {
     }
 
     // ── Vrijheidstijd-framing: canonieke daguitgaven ──
-    const monthlyExpenses = horizonData.effectiveInput.monthlyExpenses ?? 0
-    const dayRate = monthlyExpenses > 0 ? dailyExpenseRate(monthlyExpenses) : 100
+    // CONSUMEER het 12-mnd rolling dagtarief uit de bundel (lib/expense-rate.ts),
+    // dezelfde bron als de widgets en de balans/budget/vermogen-rapporten. Was
+    // `dailyExpenseRate(effectiveInput.monthlyExpenses) : 100` — de EFFECTIVE
+    // grondslag plus een verzonnen €100/dag-terugval, waardoor het totaalplan
+    // andere jaren vrijheid rapporteerde dan het scherm waaruit het komt
+    // (vervolg KRUIS-20). 0 = geen eerlijke dagbasis; de assembler laat de
+    // tijdregel dan weg i.p.v. een bedacht getal te tonen.
+    const dayRate = horizonData.dailyExpenseRate
 
     // ── Assembleer (pure) ──
     const payload: TotaalplanData = assembleTotaalplan({

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-10T21:53:27.510Z",
-  "generatedDate": "2026-08-10",
+  "generatedAt": "2026-08-11T01:49:15.378Z",
+  "generatedDate": "2026-08-11",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -158,7 +158,6 @@
       "Engagement & features": [
         "user_feature_visits",
         "next_step_completions",
-        "roadmap_features",
         "user_badges",
         "user_streaks",
         "app_settings"
@@ -187,11 +186,11 @@
     }
   },
   "stats": {
-    "routes": 141,
-    "routesProduction": 99,
-    "api": 291,
+    "routes": 137,
+    "routesProduction": 95,
+    "api": 290,
     "tables": 89,
-    "migrations": 199,
+    "migrations": 203,
     "integrations": 25,
     "components": 917,
     "providers": 14,
@@ -671,18 +670,6 @@
       "isTest": false
     },
     {
-      "url": "/horizon/strategie",
-      "file": "app/(app)/horizon/strategie/page.tsx",
-      "group": "horizon",
-      "isTest": false
-    },
-    {
-      "url": "/horizon/uitgaven-na-pensioen",
-      "file": "app/(app)/horizon/uitgaven-na-pensioen/page.tsx",
-      "group": "horizon",
-      "isTest": false
-    },
-    {
       "url": "/household-invite",
       "file": "app/household-invite/page.tsx",
       "group": "persoonlijk",
@@ -1003,18 +990,6 @@
     {
       "url": "/toekomst/samengestelde-interest",
       "file": "app/(app)/toekomst/samengestelde-interest/page.tsx",
-      "group": "horizon",
-      "isTest": false
-    },
-    {
-      "url": "/toekomst/strategie",
-      "file": "app/(app)/toekomst/strategie/page.tsx",
-      "group": "horizon",
-      "isTest": false
-    },
-    {
-      "url": "/toekomst/uitgaven-na-pensioen",
-      "file": "app/(app)/toekomst/uitgaven-na-pensioen/page.tsx",
       "group": "horizon",
       "isTest": false
     },
@@ -1722,18 +1697,6 @@
         "isTest": false
       },
       {
-        "url": "/horizon/strategie",
-        "file": "app/(app)/horizon/strategie/page.tsx",
-        "group": "horizon",
-        "isTest": false
-      },
-      {
-        "url": "/horizon/uitgaven-na-pensioen",
-        "file": "app/(app)/horizon/uitgaven-na-pensioen/page.tsx",
-        "group": "horizon",
-        "isTest": false
-      },
-      {
         "url": "/toekomst",
         "file": "app/(app)/toekomst/page.tsx",
         "group": "horizon",
@@ -1778,18 +1741,6 @@
       {
         "url": "/toekomst/samengestelde-interest",
         "file": "app/(app)/toekomst/samengestelde-interest/page.tsx",
-        "group": "horizon",
-        "isTest": false
-      },
-      {
-        "url": "/toekomst/strategie",
-        "file": "app/(app)/toekomst/strategie/page.tsx",
-        "group": "horizon",
-        "isTest": false
-      },
-      {
-        "url": "/toekomst/uitgaven-na-pensioen",
-        "file": "app/(app)/toekomst/uitgaven-na-pensioen/page.tsx",
         "group": "horizon",
         "isTest": false
       },
@@ -3989,15 +3940,6 @@
       "url": "/api/retirement-aspirations",
       "file": "app/api/retirement-aspirations/route.ts",
       "domain": "retirement-aspirations",
-      "methods": [
-        "GET",
-        "PUT"
-      ]
-    },
-    {
-      "url": "/api/roadmap",
-      "file": "app/api/roadmap/route.ts",
-      "domain": "roadmap",
       "methods": [
         "GET",
         "PUT"
@@ -7255,22 +7197,6 @@
       ]
     },
     {
-      "domain": "roadmap",
-      "label": "roadmap",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/roadmap",
-          "file": "app/api/roadmap/route.ts",
-          "domain": "roadmap",
-          "methods": [
-            "GET",
-            "PUT"
-          ]
-        }
-      ]
-    },
-    {
       "domain": "scenarios",
       "label": "Scenario’s",
       "count": 1,
@@ -7968,7 +7894,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 199
+    "migrationCount": 203
   },
   "tablesByDomain": [
     {
@@ -8081,6 +8007,10 @@
         {
           "name": "report_configs",
           "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+        },
+        {
+          "name": "roadmap_features",
+          "migration": "supabase/migrations/20260319000004_create_roadmap_features.sql"
         },
         {
           "name": "settlement_entries",
@@ -8232,10 +8162,6 @@
         {
           "name": "next_step_completions",
           "migration": "supabase/migrations/20260215000001_create_new_tables.sql"
-        },
-        {
-          "name": "roadmap_features",
-          "migration": "supabase/migrations/20260319000004_create_roadmap_features.sql"
         },
         {
           "name": "user_badges",
@@ -10966,16 +10892,6 @@
           "write": true
         }
       ],
-      "roadmap": [
-        {
-          "name": "app_settings",
-          "write": true
-        },
-        {
-          "name": "roadmap_features",
-          "write": true
-        }
-      ],
       "scenarios": [
         {
           "name": "app_settings",
@@ -12432,14 +12348,6 @@
           ]
         },
         {
-          "domain": "roadmap",
-          "label": "roadmap",
-          "write": true,
-          "routes": [
-            "/api/roadmap"
-          ]
-        },
-        {
           "domain": "scenarios",
           "label": "Scenario’s",
           "write": true,
@@ -12934,8 +12842,6 @@
           "label": "Huishouden",
           "write": false,
           "routes": [
-            "/api/household/box2",
-            "/api/household/box3",
             "/api/household/budget-model",
             "/api/household/data",
             "/api/household/fire-projections"
@@ -14035,16 +13941,6 @@
           "write": true,
           "routes": [
             "/api/report"
-          ]
-        }
-      ],
-      "roadmap_features": [
-        {
-          "domain": "roadmap",
-          "label": "roadmap",
-          "write": true,
-          "routes": [
-            "/api/roadmap"
           ]
         }
       ],
@@ -16126,7 +16022,7 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 9107,
+        "loc": 9130,
         "commits": 93
       },
       {
@@ -16141,7 +16037,7 @@
       },
       {
         "file": "components/app/cash-account-view.tsx",
-        "loc": 3444,
+        "loc": 3457,
         "commits": 20
       },
       {
@@ -17263,8 +17159,16 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-08-10",
-    "hasChanges": false,
-    "sections": []
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "API-routes",
+        "added": [],
+        "removed": [
+          "/api/roadmap"
+        ]
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -17545,7 +17449,14 @@
       "api": 291,
       "components": 917,
       "tables": 89,
-      "routesProduction": 99
+      "routesProduction": 95
+    },
+    {
+      "date": "2026-08-11",
+      "api": 290,
+      "components": 917,
+      "tables": 89,
+      "routesProduction": 95
     }
   ]
 }

@@ -41,14 +41,22 @@ export async function VasteLastenLoader({ perspective }: { perspective: Perspect
     loadVasteLastenSummary(supabase),
   ])
 
-  // EFFECTIVE grondslag (ADR 0073) — `income_source = 'manual'` wint. Een
-  // structureel aandeel ("hoeveel van mijn inkomen ligt vast?") meet je tegen een
-  // stabiel maandinkomen, niet tegen een half-afgelopen maand; `currentMonth*`
-  // hoort hier dus NIET.
+  // TWEE VERSCHILLENDE GRONDSLAGEN, allebei bewust:
+  //  · `monthlyIncome` — EFFECTIVE (ADR 0073, `income_source='manual'` wint). Een
+  //    structureel aandeel ("hoeveel van mijn inkomen ligt vast?") meet je tegen
+  //    een stabiel maandinkomen, niet tegen een half-afgelopen maand;
+  //    `currentMonth*` hoort hier dus NIET.
+  //  · `dailyExpenseRate` — CANONIEK 12-mnd ROLLING (lib/expense-rate.ts). Hier
+  //    stond `monthlyExpenses: kpis.monthlyExpenses`, waarna de motor er zélf
+  //    `dailyExpenseRate(...)` op deed: de effective/single-month-conversie die
+  //    KRUIS-17/20 heeft afgeschaft. Dezelfde vaste last kostte daardoor op dit
+  //    scherm een ander aantal vrijheidsdagen dan in de vaste-lasten-widget.
   const insights = buildVasteLastenInsights({
     summary,
     monthlyIncome: kpis.monthlyIncome,
-    monthlyExpenses: kpis.monthlyExpenses,
+    // `?? 0` = "geen eerlijke dagbasis" (het veld is additief/optioneel op het
+    // gedeelde scalars-type); de motor laat de tijdregels dan weg.
+    dailyExpenseRate: kpis.dailyExpenseRate ?? 0,
   })
 
   return (

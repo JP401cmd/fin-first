@@ -7,7 +7,7 @@ import {
 } from '@/lib/box2-data'
 import type { Asset } from '@/lib/asset-data'
 import { normalisePrivacySettings } from '@/lib/household-data'
-import { dailyExpenseRate } from '@/lib/format'
+import { getRecentDailyExpenseRate } from '@/lib/expense-rate'
 import {
   dgaLeningTotalForUser,
   dgaLeningTotalCombined,
@@ -104,17 +104,14 @@ export async function GET(request: NextRequest) {
   // vorderingen/schulden when they hide their vermogen (shared stays).
   const combinedDgaTotal = dgaLeningTotalCombined(dgaSources, claims.sub, partnerHidesVermogen)
 
-  // Get monthly expenses for freedom days calculation
-  const { data: budgets } = await supabase
-    .from('budgets')
-    .select('default_limit, budget_type')
-    .eq('budget_type', 'expense')
-
-  const monthlyExpenses = (budgets ?? []).reduce(
-    (sum, b) => sum + (Number(b.default_limit) || 0),
-    0,
-  )
-  const dailyExpenses = monthlyExpenses > 0 ? dailyExpenseRate(monthlyExpenses) : 100
+  // Dagtarief voor de vrijheidsdagen — CANONIEKE 12-mnd rolling bron
+  // (lib/expense-rate.ts), identiek aan de box3-huishoudroute, de widgets en de
+  // rapporten. Was de som van budget-LIMIETEN (`budgets.default_limit`) met een
+  // verzonnen €100/dag-terugval: een derde grondslag (plan i.p.v. realiteit),
+  // waardoor dezelfde Box 2-heffing hier een ander aantal vrijheidsdagen gaf dan
+  // elders (vervolg KRUIS-20). 0 = geen eerlijke dagbasis → calculateBox2 guardt
+  // daar al op en geeft freedomDays 0.
+  const { dailyRate: dailyExpenses } = await getRecentDailyExpenseRate(supabase)
 
   // Helper: convert Asset to Box2Deelneming
   function assetToDeelneming(a: Asset): Box2Deelneming {

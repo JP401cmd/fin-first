@@ -186,13 +186,15 @@ export const globalNav: GlobalNavItem[] = [
  * Elke route hieronder is geverifieerd tegen `app/(app)/<route>/page.tsx`.
  * Dynamische routes (bv. /toekomst/bibliotheek/[id]) horen hier bewust NIET:
  * die hebben een runtime-afhankelijke titel en leveren die via <NavStackMeta>.
+ * Redirect-only routes evenmin: /toekomst/strategie en
+ * /toekomst/uitgaven-na-pensioen redirecten sinds de React #310-opruiming op
+ * de routing-laag (next.config.ts) en renderen geen TopBar meer — een titel
+ * hier zou naar een pagina wijzen die niet bestaat.
  */
 export const EXTRA_ROUTE_TITLES: Record<string, string> = {
-  '/toekomst/strategie': 'Strategie',
   '/toekomst/bibliotheek': 'Rekenhulp-bibliotheek',
   '/toekomst/inflatie-koopkracht': 'Inflatie & koopkracht',
   '/toekomst/samengestelde-interest': 'Samengestelde interest',
-  '/toekomst/uitgaven-na-pensioen': 'Uitgaven na pensioen',
   '/mijn/checkins': 'Check-ins',
   '/mijn/lokale-chat': 'Lokale chat',
   // ADR 0096: geen inzendformulier meer maar een verwijspagina naar de

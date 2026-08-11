@@ -67,7 +67,7 @@ describe('buildVasteLastenInsights — aandeel & status pariteit', () => {
       const insights = buildVasteLastenInsights({
         summary,
         monthlyIncome: income,
-        monthlyExpenses: 2500,
+        dailyExpenseRate: dailyExpenseRate(2500),
       })
       const expected = vasteLastenCardStatus({
         totalMonthly: total,
@@ -83,7 +83,7 @@ describe('buildVasteLastenInsights — aandeel & status pariteit', () => {
     const insights = buildVasteLastenInsights({
       summary: mkSummary([mkItem('a', 'X', 1000, 'subscription')], []),
       monthlyIncome: 4000,
-      monthlyExpenses: 2500,
+      dailyExpenseRate: dailyExpenseRate(2500),
     })
     expect(insights.meterGoodMax).toBe(VASTE_LASTEN_GOOD_MAX)
     expect(insights.meterWarnMax).toBe(VASTE_LASTEN_WARN_MAX)
@@ -93,12 +93,12 @@ describe('buildVasteLastenInsights — aandeel & status pariteit', () => {
     const good = buildVasteLastenInsights({
       summary: mkSummary([mkItem('a', 'X', 1999, 'subscription')], []),
       monthlyIncome: 4000,
-      monthlyExpenses: 2500,
+      dailyExpenseRate: dailyExpenseRate(2500),
     })
     const boundary = buildVasteLastenInsights({
       summary: mkSummary([mkItem('a', 'X', 2000, 'subscription')], []),
       monthlyIncome: 4000,
-      monthlyExpenses: 2500,
+      dailyExpenseRate: dailyExpenseRate(2500),
     })
     expect(good.status).toBe('good')
     expect(boundary.status).toBe('warn')
@@ -112,7 +112,7 @@ describe('buildVasteLastenInsights — vrijheidstijd', () => {
     const insights = buildVasteLastenInsights({
       summary: mkSummary([mkItem('a', 'Huur', total, 'rent')], []),
       monthlyIncome: 4000,
-      monthlyExpenses,
+      dailyExpenseRate: dailyExpenseRate(monthlyExpenses),
     })
     const expected = calculateFreedomTime(total, dailyExpenseRate(monthlyExpenses))
     expect(insights.freedomDaysPerMonth).toBe(Math.round(expected.totalDays))
@@ -126,7 +126,7 @@ describe('buildVasteLastenInsights — vrijheidstijd', () => {
     const insights = buildVasteLastenInsights({
       summary: mkSummary([mkItem('a', 'Huur', 1000, 'rent')], []),
       monthlyIncome: 4000,
-      monthlyExpenses: 0,
+      dailyExpenseRate: 0,
     })
     expect(insights.freedomDaysPerMonth).toBe(0)
     expect(insights.freedomPerMonth.isInfinite).toBe(false)
@@ -139,7 +139,7 @@ describe('buildVasteLastenInsights — benchmark-delta', () => {
     const insights = buildVasteLastenInsights({
       summary: mkSummary([mkItem('a', 'Bundel', subsMonthly, 'subscription')], []),
       monthlyIncome: 4000,
-      monthlyExpenses: 2500,
+      dailyExpenseRate: dailyExpenseRate(2500),
     })
     expect(insights.subscriptionBenchmarkMonthly).toBe(SUBSCRIPTION_BENCHMARK.avgMonthlyPerPerson)
     expect(insights.subscriptionDeltaMonthly).toBeCloseTo(51, 2)
@@ -150,7 +150,7 @@ describe('buildVasteLastenInsights — benchmark-delta', () => {
     const insights = buildVasteLastenInsights({
       summary: mkSummary([mkItem('a', 'Spotify', 20, 'subscription')], []),
       monthlyIncome: 4000,
-      monthlyExpenses: 2500,
+      dailyExpenseRate: dailyExpenseRate(2500),
     })
     expect(insights.aboveSubscriptionBenchmark).toBe(false)
     expect(insights.subscriptionDeltaMonthly).toBeLessThan(0)
@@ -166,7 +166,7 @@ describe('buildVasteLastenInsights — samenstelling & grootste post', () => {
     const insights = buildVasteLastenInsights({
       summary,
       monthlyIncome: 4000,
-      monthlyExpenses: 2500,
+      dailyExpenseRate: dailyExpenseRate(2500),
     })
     const sum = insights.composition.reduce((s, c) => s + c.monthlyAmount, 0)
     expect(sum).toBeCloseTo(insights.totalMonthly, 2)
@@ -190,7 +190,7 @@ describe('buildVasteLastenInsights — edge cases', () => {
     const insights = buildVasteLastenInsights({
       summary: EMPTY,
       monthlyIncome: 4000,
-      monthlyExpenses: 2500,
+      dailyExpenseRate: dailyExpenseRate(2500),
     })
     expect(insights.hasData).toBe(false)
     expect(insights.status).toBe('neutral')
@@ -205,7 +205,7 @@ describe('buildVasteLastenInsights — edge cases', () => {
     const insights = buildVasteLastenInsights({
       summary: mkSummary([mkItem('a', 'Huur', 1000, 'rent')], []),
       monthlyIncome: 0,
-      monthlyExpenses: 2500,
+      dailyExpenseRate: dailyExpenseRate(2500),
     })
     expect(insights.ratioOfIncome).toBeNull()
     expect(insights.status).toBe('neutral')
@@ -217,7 +217,7 @@ describe('buildVasteLastenInsights — edge cases', () => {
     const insights = buildVasteLastenInsights({
       summary: mkSummary([mkItem('a', 'Netflix', 16, 'subscription')], []),
       monthlyIncome: 4000,
-      monthlyExpenses: 2500,
+      dailyExpenseRate: dailyExpenseRate(2500),
     })
     expect(insights.vasteKostenMonthly).toBe(0)
     expect(insights.vasteKostenCount).toBe(0)
@@ -227,14 +227,43 @@ describe('buildVasteLastenInsights — edge cases', () => {
 
 describe('cancelEffect', () => {
   it('jaarbedrag = maand × 12 en vrijheid via canonieke helpers', () => {
-    const { yearlyEuro, freedom } = cancelEffect(50, 2500)
+    const { yearlyEuro, freedom } = cancelEffect(50, dailyExpenseRate(2500))
     expect(yearlyEuro).toBe(600)
     const expected = calculateFreedomTime(600, dailyExpenseRate(2500))
     expect(freedom.totalDays).toBeCloseTo(expected.totalDays, 5)
   })
 
   it('negatief bedrag wordt geklemd op 0', () => {
-    const { yearlyEuro } = cancelEffect(-30, 2500)
+    const { yearlyEuro } = cancelEffect(-30, dailyExpenseRate(2500))
     expect(yearlyEuro).toBe(0)
+  })
+
+  it('tweede argument is een DAGTARIEF, geen maandbedrag (grondslag-pin)', () => {
+    // Regressie op de vervolg-KRUIS-20-fix: wie hier per ongeluk het
+    // MAANDbedrag doorgeeft (de oude signatuur) krijgt een ~30× te lage
+    // vrijheidstijd. Deze assertie pint dat de noemer een €/dag-tarief is.
+    // NB: `calculateFreedomTime` rondt totalDays af op 1 decimaal — vandaar
+    // toBeCloseTo(..., 1) i.p.v. een exacte quotiënt-vergelijking.
+    const dagtarief = dailyExpenseRate(2500) // ≈ €82,19/dag
+    const perDag = cancelEffect(50, dagtarief).freedom.totalDays
+    const perMaandVerkeerd = cancelEffect(50, 2500).freedom.totalDays
+    expect(perDag).toBeCloseTo(600 / dagtarief, 1)
+    expect(perMaandVerkeerd).toBeCloseTo(600 / 2500, 1)
+    expect(perDag).toBeGreaterThan(perMaandVerkeerd * 25)
+  })
+})
+
+describe('buildVasteLastenInsights — grondslag-pin (vervolg KRUIS-20)', () => {
+  it('vrijheidstijd volgt het AANGELEVERDE dagtarief, niet een eigen maand-conversie', () => {
+    // Twee identieke bundels, alleen een ander dagtarief: de vrijheidstijd moet
+    // exact omgekeerd evenredig meebewegen. Zou de motor ooit weer zelf een
+    // maandbedrag omrekenen, dan breekt deze verhouding.
+    const summary = mkSummary([mkItem('a', 'Huur', 1200, 'rent')], [])
+    const laag = buildVasteLastenInsights({ summary, monthlyIncome: 4000, dailyExpenseRate: 50 })
+    const hoog = buildVasteLastenInsights({ summary, monthlyIncome: 4000, dailyExpenseRate: 100 })
+    expect(laag.freedomPerMonth.totalDays).toBeCloseTo(1200 / 50, 1)
+    expect(hoog.freedomPerMonth.totalDays).toBeCloseTo(1200 / 100, 1)
+    // Het tarief reist mee naar de client zodat cancelEffect dezelfde noemer krijgt.
+    expect(hoog.dailyExpenseRate).toBe(100)
   })
 })

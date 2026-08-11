@@ -110,8 +110,11 @@ const nextConfig: NextConfig = {
    *
    * Sub-routes (bv. /core/assets/holdings/[id]) blijven werken op hun
    * huidige paden totdat ze individueel gemigreerd zijn — alleen
-   * exact-matches voor de hoofdpagina's redirecten nu. /horizon/whatif en
-   * /core/cash zijn inmiddels wél gemigreerd (zie het #310-blok hieronder).
+   * exact-matches voor de hoofdpagina's redirecten nu. De redirect-only
+   * sub-routes (/core/cash, /horizon/whatif, /horizon/strategie,
+   * /horizon/uitgaven-na-pensioen, /toekomst/strategie,
+   * /toekomst/uitgaven-na-pensioen) zijn inmiddels wél gemigreerd — zie het
+   * #310-blok hieronder.
    *
    * `permanent: false` tijdens migratie (307 Temporary Redirect, met
    * method-preservation) zodat we later naar `permanent: true` (308) kunnen
@@ -183,6 +186,42 @@ const nextConfig: NextConfig = {
         permanent: false,
       },
       { source: '/horizon/whatif', destination: '/toekomst?whatif=open', permanent: false },
+
+      // Tweede lichting (11 aug 2026) — dezelfde behandeling voor de vier
+      // resterende redirect-only server-componenten. Ze waren latent: geen
+      // enkel #310-event stond op hun naam, maar ze droegen exact dezelfde
+      // trigger als /core/cash en /horizon/whatif en zouden hem bij het eerste
+      // bezoek opnieuw kunnen afvuren.
+      { source: '/horizon/strategie', destination: '/toekomst?strategie=open', permanent: false },
+      {
+        source: '/horizon/uitgaven-na-pensioen',
+        destination: '/toekomst?uitgaven=open',
+        permanent: false,
+      },
+      {
+        source: '/toekomst/uitgaven-na-pensioen',
+        destination: '/toekomst?uitgaven=open',
+        permanent: false,
+      },
+
+      // /toekomst/strategie?focus=aow|pensioen|huis opende de bijbehorende
+      // levensstrategie op de Gebeurtenissen-tab. Die vertakking gaat mee naar
+      // de routing-laag via een named capture group in `has` — dezelfde
+      // volgorde-eis als bij /horizon/whatif: de gerichte variant MOET vóór de
+      // catch-all staan, anders landt elke deeplink op `aow`. Een onbekende
+      // (of ontbrekende) focus valt bewust terug op `aow`, precies zoals de
+      // oude server-component deed.
+      {
+        source: '/toekomst/strategie',
+        has: [{ type: 'query', key: 'focus', value: '(?<focus>aow|pensioen|huis)' }],
+        destination: '/toekomst/gebeurtenissen?strategie=:focus',
+        permanent: false,
+      },
+      {
+        source: '/toekomst/strategie',
+        destination: '/toekomst/gebeurtenissen?strategie=aow',
+        permanent: false,
+      },
 
       // Parameters-migratie (beslissing 5): eindstrategie/onttrekking/
       // inflatie/rendement leven inline onder de Voorkeuren-tab op

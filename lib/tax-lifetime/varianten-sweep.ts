@@ -230,9 +230,7 @@ export interface VariantUitkomst {
    * kan katern IV zijn eigen vraag niet beantwoorden.
    *
    * GRONDSLAG-WAARSCHUWING: dit is een DERDE grondslag naast netto en belegbaar, geen
-   * uitsplitsing daarvan. Nooit optellen bij `eindvermogenBelegbaarNominaal` — die
-   * telt `levensverzekering` vandaag óók mee (zie `lib/horizon/pensioen-pot.ts`), dus
-   * de som zou dat deel dubbel tellen. Apart tonen, apart labelen.
+   * uitsplitsing daarvan en geen optelbare term. Zie `EINDVERMOGEN_GRONDSLAGEN`.
    */
   readonly eindvermogenPensioenNominaal: number | null
   /** Dieptepunt van het belegbaar vermogen (`computeLaagsteBuffer`). */
@@ -243,6 +241,56 @@ export interface VariantUitkomst {
   /** Nette kern-fout-reden; `null` = de run slaagde. */
   readonly kernelFout: string | null
 }
+
+/** Elk `eindvermogen*`-veld op `VariantUitkomst` — de sleutels van de registratie hieronder. */
+type EindvermogenVeld = Extract<keyof VariantUitkomst, `eindvermogen${string}`>
+
+/**
+ * DE NIET-OPTELLEN-REM, op de laag waar de velden wonen.
+ *
+ * Elk `eindvermogen*`-veld van deze sweep is een EIGEN grondslag: een andere
+ * verzameling bezittingen, een ander moment in de belastingketen, een andere
+ * verhouding tot schulden. Ze mogen nooit bij elkaar worden opgeteld, nooit op één
+ * as of marker worden gemengd (CLAUDE.md), en nooit als "uitsplitsing" van elkaar
+ * worden gepresenteerd. Deze map zegt per veld wat het telt, zodat een tweede
+ * consument (widget, export, briefing) het antwoord in de laag vindt in plaats van
+ * het op het scherm te moeten reconstrueren.
+ *
+ * **Waarom hier en niet op het scherm.** De rem hing tot 10 aug 2026 uitsluitend als
+ * assertie in `optimizer-levenslang.test.tsx`: waarde-gekoppeld aan één fixture (hij
+ * ving exact de geformatteerde som), dus een afgeronde of afgekorte som glipte
+ * erdoor, en een tweede consument had geen enkele rem. Katern IV blijft die
+ * scherm-assertie houden, maar de norm woont nu hier.
+ *
+ * **De rem is machinaal.** `_eindvermogenGrondslagenCompleet` hieronder is een
+ * compile-time volledigheidscheck: komt er een vierde `eindvermogen*`-veld bij zonder
+ * dat iemand zijn grondslag opschrijft, dan faalt `tsc`. `varianten-sweep.test.ts`
+ * pint daarnaast de eigenschap waar het echt om gaat: geen enkel app-type telt in
+ * twee grondslagen (disjunct), en de som van belegbaar + pensioen is aantoonbaar
+ * NIET het netto vermogen.
+ *
+ * NB disjunct ≠ optelbaar. Sinds `levensverzekering` uit `NON_SPENDABLE_ASSET_TYPES`
+ * is gehaald (eigenaarsbesluit optie A, kaart "Levensverzekering telt als pensioenpot
+ * én als belegbaar vermogen") overlappen belegbaar en pensioen niet meer, maar hun
+ * som mist nog steeds woning/auto/fysiek bezit én staat vóór schulden — het is dus
+ * geen bestaande grootheid, en zeker niet het netto vermogen.
+ */
+export const EINDVERMOGEN_GRONDSLAGEN: Readonly<Record<EindvermogenVeld, string>> = {
+  eindvermogenNettoNominaal:
+    'netto vermogen op de laatste rij: ALLE bezit incl. niet-liquide (woning, auto, fysiek), NÁ schulden. De enige grondslag die "wat is het waard" beantwoordt.',
+  eindvermogenBelegbaarNominaal:
+    'belegbaar vermogen op de laatste rij (spendablePortfolio): bezit buiten NON_SPENDABLE_ASSET_TYPES — dus zónder woning/tweede pand/auto/fysiek bezit én zónder de pensioenpot — en VÓÓR schulden. Zelfde grondslag als laagsteBuffer en het buffer-veto.',
+  eindvermogenPensioenNominaal:
+    'resterende pensioenpot op de laatste rij (pensioenPortfolio): kern-categorie \'Pensioen\', dus retirement ÉN levensverzekering. BRUTO — hier komt nog Box 1 overheen, terwijl de Box 3-heffing op de belegbare regel al in de kernel-cashflow zit.',
+}
+
+/**
+ * Compile-time rem: elk `eindvermogen*`-veld MOET een grondslag-omschrijving hebben.
+ * Een vierde veld toevoegen zonder registratie is een `tsc`-fout, geen review-detail.
+ */
+const _eindvermogenGrondslagenCompleet: Record<EindvermogenVeld, string> =
+  EINDVERMOGEN_GRONDSLAGEN
+void _eindvermogenGrondslagenCompleet
 
 /** Volledige sweep-uitkomst — de drie varianten plus de gekozen winnaar. */
 export interface VariantenSweepResultaat {

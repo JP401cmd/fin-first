@@ -436,7 +436,11 @@ export const CASH_ENGINE_CHECKS: CashEngineCheck[] = [
     label: '"Wat als ik opzeg" (cancelEffect): €44,90/mnd → €538,80/jr + vrijheidsdagen',
     run: () => {
       criterion('WF-CASH-20')
-      const r = cancelEffect(44.9, 2200)
+      // `cancelEffect` neemt sinds de vervolg-KRUIS-20-fix het KANT-EN-KLARE
+      // dagtarief (€/dag) i.p.v. maanduitgaven, zodat de aanroeper de grondslag
+      // niet meer kan kiezen. De verwachting blijft identiek: hetzelfde
+      // €2.200/mnd, alleen expliciet door de canonieke conversie geleid.
+      const r = cancelEffect(44.9, dailyExpenseRate(2200))
       return {
         expected: 'jaarbedrag=538.8; vrijheidsdagen=7.4',
         actual: `jaarbedrag=${r.yearlyEuro}; vrijheidsdagen=${r.freedom.totalDays}`,

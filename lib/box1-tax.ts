@@ -68,6 +68,25 @@ export interface Box1Input {
   grossYearlyIncome: number
   year: Box1TaxYear
   aow?: boolean
+  /**
+   * **Arbeidsinkomen** — de grondslag voor de arbeidskorting én de IACK
+   * (art. 8.1 lid 1 onderdeel e Wet IB 2001): loon, winst uit onderneming en
+   * resultaat uit overige werkzaamheden. AOW, pensioen, lijfrente-uitkeringen,
+   * uitkeringen en het eigenwoning-saldo zijn dat NIET en geven dus geen recht
+   * op arbeidskorting.
+   *
+   * **Weglaten = terugval op `grossYearlyIncome`** — precies het gedrag van
+   * vóór aug 2026, zodat een niet-omgezette aanroeper byte-identieke uitkomsten
+   * houdt. Geef 'm expliciet mee zodra de grondslag géén (volledig)
+   * arbeidsinkomen is; voor een zuiver pensioen-/AOW-inkomen is dat
+   * `arbeidsinkomen: 0`.
+   *
+   * Alleen op 0 geclampt, **bewust niet afgetopt op `grossYearlyIncome`**: een
+   * aftrekpost (lijfrentepremie, hypotheekrente) verlaagt wél het belastbare
+   * inkomen maar níét het arbeidsinkomen, dus `arbeidsinkomen > gross` is een
+   * legitieme, fiscaal juiste combinatie.
+   */
+  arbeidsinkomen?: number
   wozValue?: number
   hypotheekRente?: number // jaarlijkse aftrekbare rente eigen woning
   heeftKinderenOnder12?: boolean // voor IACK (optioneel)
@@ -77,6 +96,8 @@ export interface Box1Input {
 export interface Box1Result {
   year: Box1TaxYear
   grossYearlyIncome: number
+  /** De arbeidskorting-/IACK-grondslag die deze som gebruikte (na fallback). */
+  arbeidsinkomen: number
   belastbaarInkomen: number // na eigenwoning-saldo
   eigenwoningforfait: number
   hypotheekrenteaftrek: number
@@ -299,6 +320,20 @@ function computeArbeidskorting(
   return korting
 }
 
+/**
+ * De arbeidskorting-/IACK-grondslag van een invoer: `arbeidsinkomen` wanneer
+ * meegegeven, anders het volledige bruto inkomen (terugval — zie `Box1Input`).
+ *
+ * ENIGE plek waar die terugval woont: zowel `computeBox1Core` als
+ * `marginalRateAt` leiden 'm hierlangs af, zodat de marginale afgeleide niet op
+ * een andere grondslag kan gaan rekenen dan de heffing zelf.
+ */
+function resolveArbeidsinkomen(input: Box1Input, gross: number): number {
+  const raw = input.arbeidsinkomen
+  if (raw == null || !Number.isFinite(raw)) return gross
+  return Math.max(0, raw)
+}
+
 /** Inkomensafhankelijke combinatiekorting (IACK). Alleen bij kind < 12. */
 function computeIack(
   income: number,
@@ -359,18 +394,23 @@ function computeBox1Core(input: Box1Input): Omit<Box1Result, 'marginalRate'> {
   const heffingVoorKortingen = taxOverSchijven(belastbaarInkomen, schijven)
 
   // Stap 4: Heffingskortingen
-  // Arbeidskorting wordt over arbeidsinkomen berekend (hier: bruto inkomen).
+  // Arbeidskorting én IACK lopen over het ARBEIDSINKOMEN (loon/winst/resultaat),
+  // niet over het totale bruto inkomen en niet over het belastbare inkomen:
+  // pensioen, AOW en uitkeringen geven geen recht op arbeidskorting, en een
+  // aftrekpost (eigen woning) verlaagt de grondslag er niet mee.
+  // Zonder expliciet `arbeidsinkomen` valt de motor terug op het bruto inkomen.
   // AOW-gerechtigden krijgen alleen het belastingdeel van AHK + arbeidskorting
   // (geen AOW-premiedeel) → aparte, lagere AOW-variant-params.
+  const arbeidsinkomen = resolveArbeidsinkomen(input, gross)
   const algemeneHeffingskorting = computeAlgemeneHeffingskorting(
     belastbaarInkomen,
     aow ? params.algemeneHeffingskortingAow : params.algemeneHeffingskorting,
   )
   const arbeidskorting = computeArbeidskorting(
-    gross,
+    arbeidsinkomen,
     aow ? params.arbeidskortingAow : params.arbeidskorting,
   )
-  const iack = computeIack(gross, input.heeftKinderenOnder12 ?? false, params.iack)
+  const iack = computeIack(arbeidsinkomen, input.heeftKinderenOnder12 ?? false, params.iack)
 
   // Heffingskortingen kunnen de heffing niet onder nul brengen.
   const totaleHeffingskortingenRaw = algemeneHeffingskorting + arbeidskorting + iack
@@ -390,6 +430,7 @@ function computeBox1Core(input: Box1Input): Omit<Box1Result, 'marginalRate'> {
   return {
     year: input.year,
     grossYearlyIncome: gross,
+    arbeidsinkomen,
     belastbaarInkomen,
     eigenwoningforfait: ew.eigenwoningforfait,
     hypotheekrenteaftrek: ew.hypotheekrenteaftrek,
@@ -409,7 +450,12 @@ function computeBox1Core(input: Box1Input): Omit<Box1Result, 'marginalRate'> {
 
 export function computeBox1Tax(input: Box1Input): Box1Result {
   const core = computeBox1Core(input)
-  const marginalRate = marginalRateAt(core.grossYearlyIncome, input.year, input.aow)
+  // Dezelfde arbeidskorting-grondslag als de heffing zelf. `undefined` (geen
+  // expliciet arbeidsinkomen) valt in marginalRateAt op precies dezelfde
+  // terugval terug — daarom is de uitkomst dan bit-identiek aan vóór aug 2026.
+  const marginalRate = marginalRateAt(core.grossYearlyIncome, input.year, input.aow, {
+    arbeidsinkomen: input.arbeidsinkomen,
+  })
   return { ...core, marginalRate }
 }
 
@@ -426,11 +472,24 @@ export function computeBox1Tax(input: Box1Input): Box1Result {
  * voedt de marginale-druk-curve, dus de afbouw-zones moeten de curve omhoog
  * duwen. Berekend als numerieke afgeleide (tax(income+1) − tax(income)) zodat
  * álle effecten (schijfgrenzen, beide kortingen) consistent worden meegenomen.
+ *
+ * `opts.arbeidsinkomen` bepaalt WAT die volgende euro is. Meegegeven → de
+ * grondslag staat VAST over beide probes, dus de extra euro is géén
+ * arbeidsinkomen (pensioen, AOW, uitkering) en er komt geen arbeidskorting-
+ * afbouw bovenop het schijftarief. Weggelaten → beide probes vallen elk op hun
+ * eigen bruto terug en de euro is wél arbeidsinkomen: exact het gedrag van vóór
+ * aug 2026.
  */
-export function marginalRateAt(income: number, year: Box1TaxYear, aow?: boolean): number {
+export function marginalRateAt(
+  income: number,
+  year: Box1TaxYear,
+  aow?: boolean,
+  opts?: { arbeidsinkomen?: number },
+): number {
   if (income < 0) return 0
-  const lo = computeBox1Core({ grossYearlyIncome: income, year, aow })
-  const hi = computeBox1Core({ grossYearlyIncome: income + 1, year, aow })
+  const arbeidsinkomen = opts?.arbeidsinkomen
+  const lo = computeBox1Core({ grossYearlyIncome: income, year, aow, arbeidsinkomen })
+  const hi = computeBox1Core({ grossYearlyIncome: income + 1, year, aow, arbeidsinkomen })
   return hi.tax - lo.tax
 }
 
@@ -509,11 +568,21 @@ export function deriveMarginaalTarief(opts: {
 export function grossFromNet(
   targetNetYearly: number,
   year: Box1TaxYear,
-  opts?: { aow?: boolean },
+  opts?: { aow?: boolean; arbeidsinkomen?: number },
 ): number {
   if (!(targetNetYearly > 0)) return 0
+  // `arbeidsinkomen` staat VAST over de hele bisectie: het is een eigenschap van
+  // de inkomstenbron, niet van het bruto dat we zoeken. Voor een netto AOW- of
+  // pensioenbedrag hoort hier 0 — anders zoekt de inversie het bruto waarbij een
+  // arbeidskorting meetelt die de ontvanger niet krijgt, en valt het bruto (en
+  // daarmee elke heffing die erop volgt) te laag uit.
   const netAt = (gross: number): number =>
-    computeBox1Core({ grossYearlyIncome: gross, year, aow: opts?.aow }).nettoBesteedbaar
+    computeBox1Core({
+      grossYearlyIncome: gross,
+      year,
+      aow: opts?.aow,
+      arbeidsinkomen: opts?.arbeidsinkomen,
+    }).nettoBesteedbaar
 
   // Bruto ≥ netto (belasting ≥ 0). Onder de bovengrens van een ruime gok
   // verdubbelen tot netAt(hi) het doel haalt (defensief; tax < 100%).

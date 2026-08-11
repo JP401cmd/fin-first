@@ -114,9 +114,29 @@ function nearestRow(rows: UnifiedProjectionRow[], age: number): UnifiedProjectio
  * Asset-types die NIET duurzaam opneembaar zijn om besteding te dekken en dus
  * buiten het "belegbaar vermogen" vallen: de eigen woning + tweede pand (niet te
  * verzilveren zonder verkoop → dát maakt de brugjaren krap), auto's/fysiek bezit,
- * en de pensioenpot (die voedt ál het pensioeninkomen dat als vaste inkomsten
+ * en de PENSIOENPOT (die voedt ál het pensioeninkomen dat als vaste inkomsten
  * meetelt — anders dubbeltelling). Verzilvert de kernel de woning (downsize),
  * dan verschuift die waarde vanzelf naar de liquide buckets in latere rijen.
+ *
+ * ## De pensioenpot = BEIDE app-typen van kern-categorie 'Pensioen'
+ * `retirement` én `levensverzekering` mappen op dezelfde kern-categorie
+ * (`ASSET_TYPE_TO_CATEGORIE`, adapter/potten.ts). Die categorie stuurt de
+ * onttrekkings-waterval, de pensioen-lever van de fiscale optimizer én de
+ * Box 1-boeking van de onttrekking (`box1Streams.pensioenOnttrekkingBruto`).
+ * Tot 10 aug 2026 stond hier alléén `retirement`, waardoor een levensverzekering
+ * TEGELIJK als vrij opneembaar vermogen én als pensioenpot telde: de polis voedde
+ * pensioeninkomen dat als vaste inkomsten meetelde én verhoogde de veilige
+ * onttrekking over datzelfde geld. Eigenaarsbesluit (9 aug 2026, optie A): het ís
+ * een pensioenpot, dus hij hoort hier. Gevolg — bewust geaccepteerd — het getoonde
+ * belegbaar vermogen daalt voor iedereen met zo'n polis.
+ *
+ * De pensioen-helft van deze lijst is een SPIEGEL van `ASSET_TYPE_TO_CATEGORIE`,
+ * bewust letterlijk uitgeschreven (deze module blijft een importvrije weergave-leaf,
+ * geen kernel-adapter-consument). Die spiegel is een testverplichting, geen
+ * afspraak op eer: `coverage-strip.test.ts` pint dat de pensioen-typen hier exact
+ * de typen zijn die op `PENSIOEN_CATEGORIE` mappen, zodat `spendablePortfolio` en
+ * `pensioenPortfolio` (lib/horizon/pensioen-pot.ts) niet stil kunnen gaan
+ * overlappen zodra iemand de mapping uitbreidt.
  */
 const NON_SPENDABLE_ASSET_TYPES = new Set<string>([
   'eigen_huis',
@@ -124,6 +144,7 @@ const NON_SPENDABLE_ASSET_TYPES = new Set<string>([
   'vehicle',
   'physical',
   'retirement',
+  'levensverzekering',
 ])
 
 /**
@@ -133,7 +154,13 @@ const NON_SPENDABLE_ASSET_TYPES = new Set<string>([
  * laagste-buffer-afleiding (`lib/horizon/laagste-buffer.ts`) CONSUMEREN deze functie —
  * zodat de "belegbaar per rij"-grondslag single-sourced blijft (één home). Gedrag
  * byte-identiek t.o.v. de module-private versie; `buildCoverageStrip` blijft de andere
- * consument.
+ * consument, en `lib/tax-lifetime/varianten-sweep.ts` levert 'm als
+ * `eindvermogenBelegbaarNominaal` aan katern IV.
+ *
+ * DISJUNCT MET `pensioenPortfolio` (sinds 10 aug 2026): geen enkel app-type telt in
+ * beide grondslagen. Ze blijven wél verschillende grootheden — belegbaar staat vóór
+ * schulden en mist woning/auto/fysiek bezit — en worden nooit opgeteld tot één
+ * "totaal vermogen"; dáárvoor bestaat het netto vermogen als eigen grondslag.
  */
 export function spendablePortfolio(row: UnifiedProjectionRow): number {
   const buckets = row.assetBuckets ?? {}

@@ -195,8 +195,27 @@ export default async function AppLayout({
     // constante `activeModules` (hierboven), niet aan batch-uitkomsten, dus deze
     // queries kunnen parallel mee i.p.v. één waterfall-stap later. Inactieve
     // module → Promise.resolve(null) (geen query), identiek aan het oude gedrag.
+    // hasTransactions is een JA/NEE-vraag ("heeft deze gebruiker al ooit een
+    // transactie?"), maar stond hier als `count: 'exact'` — die telt élke rij
+    // van de gebruiker om er één boolean uit af te leiden. Op totale DB-tijd was
+    // dit de #1 query van de hele app (25.215 calls · 39,1 ms mean · 6.064 ms
+    // max · 986 s cumulatief) en hij draait in de layout, dus op élke route.
+    // Vervangen door een BESTAANSVRAAG: één rij ophalen is genoeg voor `> 0`.
+    // Gemeten onder gesimuleerde RLS op de zwaarste gebruiker (9.556 rijen):
+    // 825 buffers / 25,5 ms → 3 buffers / 0,1 ms.
+    // De `.order('date', desc)` is er BEWUST, puur als planner-anker: zonder
+    // sortering koos de planner soms een Seq Scan die stopt bij de eerste hit —
+    // snel als je rijen vooraan de heap staan, een tijdbom als ze achteraan
+    // staan (dat is precies de vorm van die 6-seconden-max). Mét de sortering
+    // is het altijd een Index Scan op `idx_transactions_user_date`.
+    // Semantiek ongewijzigd, óók voor 0 transacties: lege array → false.
     coachHasTransactionsModule
-      ? supabase.from('transactions').select('id', { count: 'exact', head: true }).eq('user_id', user.id)
+      ? supabase
+          .from('transactions')
+          .select('id')
+          .eq('user_id', user.id)
+          .order('date', { ascending: false })
+          .limit(1)
       : Promise.resolve(null),
     coachHasHoldingsModule
       ? supabase.from('investment_holdings').select('id, isin').eq('user_id', user.id).eq('is_active', true)
@@ -397,7 +416,10 @@ export default async function AppLayout({
     // Schulden: hergebruik reeds-geladen debtRows (is_active=true).
     hasDebts: debtRows.length > 0,
     // Per-module signalen: default `true` wanneer de module uit staat → gap vuurt niet.
-    hasTransactions: coachHasTransactionsModule ? (coachTxRes?.count ?? 0) > 0 : true,
+    // Bestaansvraag i.p.v. exact-count (zie de query in de main-batch): de
+    // uitkomst blijft een boolean met identieke semantiek — ≥1 rij ⇒ true,
+    // 0 rijen ⇒ false.
+    hasTransactions: coachHasTransactionsModule ? (coachTxRes?.data?.length ?? 0) > 0 : true,
     hasHoldings: coachHasHoldingsModule ? coachHoldings.length > 0 : true,
     hasHoldingsWithIsin: coachHasHoldingsModule
       ? coachHoldings.some(h => h.isin !== null && h.isin !== '')

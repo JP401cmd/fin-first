@@ -21,6 +21,7 @@ import {
   CATEGORY_LABELS,
 } from '@/lib/recurring-detection'
 import { buildVasteLastenInsights } from '@/lib/vaste-lasten-insights'
+import { dailyExpenseRate } from '@/lib/format'
 import { vasteLastenCardStatus } from '@/lib/cashflow-cards'
 import type { VasteLastenItem, VasteLastenSummary } from '@/lib/vaste-lasten-summary'
 
@@ -287,7 +288,7 @@ const tests: TestCase[] = [
         count: 4,
       }
       const insights = buildVasteLastenInsights({
-        summary, monthlyIncome: 4000, monthlyExpenses: 2500,
+        summary, monthlyIncome: 4000, dailyExpenseRate: dailyExpenseRate(2500),
       })
       assertEqual(insights.totalMonthly, 1106, 'Totaal ongewijzigd t.o.v. summary')
       assertEqual(insights.subscriptionsMonthly, 26, 'Abonnementen-subtotaal ongewijzigd')
@@ -319,7 +320,7 @@ const tests: TestCase[] = [
           totalMonthly: total, count: 1,
         }
         const insights = buildVasteLastenInsights({
-          summary, monthlyIncome: 4000, monthlyExpenses: 2500,
+          summary, monthlyIncome: 4000, dailyExpenseRate: dailyExpenseRate(2500),
         })
         const expected = vasteLastenCardStatus({ totalMonthly: total, count: 1, monthlyIncome: 4000 })
         assertEqual(insights.status, expected, `Status pariteit bij totaal ${total}`)

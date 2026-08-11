@@ -59,6 +59,8 @@ import {
 import { buildTsParams } from '@/lib/horizon-kernel/adapter/prio-overgang'
 import { ASSET_TYPE_TO_CATEGORIE } from '@/lib/horizon-kernel/adapter/potten'
 import { PENSIOEN_CATEGORIE, pensioenPortfolio } from '@/lib/horizon/pensioen-pot'
+import { spendablePortfolio } from '@/lib/horizon/coverage-strip'
+import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import type { AssetPot, DebtPot, TsBezitCategorie } from '@/lib/horizon-kernel/types'
 import type { ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
@@ -683,10 +685,78 @@ export const BELAST_ENGINE_CHECKS: BelastEngineCheck[] = [
         ASSET_TYPE_TO_CATEGORIE.retirement === PENSIOEN_CATEGORIE &&
         ASSET_TYPE_TO_CATEGORIE.levensverzekering === PENSIOEN_CATEGORIE
 
+      // (e) De twee GETOONDE vermogensgrondslagen delen geen enkel app-type meer.
+      // Tot 10 aug 2026 telde `levensverzekering` in béide (belegbaar én
+      // pensioenpot); sinds het eigenaarsbesluit (optie A) staat die polis in
+      // NON_SPENDABLE_ASSET_TYPES. Per app-type geprobeerd op een rij met precies
+      // één bucket — waarde-onafhankelijk, dus een fixture zonder polis kan dit
+      // criterium niet stil groen houden.
+      const grondslagenDisjunct = (Object.keys(ASSET_TYPE_TO_CATEGORIE) as AssetType[]).every((t) => {
+        const enkelRij = { assetBuckets: { [t]: { endValue: 1_000 } } } as unknown as UnifiedProjectionRow
+        return !(spendablePortfolio(enkelRij) > 0 && pensioenPortfolio(enkelRij) > 0)
+      })
+
       return {
         expected:
-          'prioReferentie=4; prioLaatst=5; prioEerst=1; variantOverlaysDiffer=true; presetsCollide=true; vetoOrder=buffer-uitgeput; kernelFoutNoDisq=true; eindvermogenCompleet=true; nettoGteBelegbaar=true; pensioenpotCompleet=true; pensioenpotVolgtLever=true; pensioenpotVolgtCategorie=true',
-        actual: `prioReferentie=${vectoren[0].Pensioen}; prioLaatst=${vectoren[1].Pensioen}; prioEerst=${vectoren[2].Pensioen}; variantOverlaysDiffer=${variantOverlaysDiffer}; presetsCollide=${presetsCollide}; vetoOrder=${vetoOrder}; kernelFoutNoDisq=${kernelFoutNoDisq}; eindvermogenCompleet=${eindvermogenCompleet}; nettoGteBelegbaar=${nettoGteBelegbaar}; pensioenpotCompleet=${pensioenpotCompleet}; pensioenpotVolgtLever=${pensioenpotVolgtLever}; pensioenpotVolgtCategorie=${pensioenpotVolgtCategorie}`,
+          'prioReferentie=4; prioLaatst=5; prioEerst=1; variantOverlaysDiffer=true; presetsCollide=true; vetoOrder=buffer-uitgeput; kernelFoutNoDisq=true; eindvermogenCompleet=true; nettoGteBelegbaar=true; pensioenpotCompleet=true; pensioenpotVolgtLever=true; pensioenpotVolgtCategorie=true; grondslagenDisjunct=true',
+        actual: `prioReferentie=${vectoren[0].Pensioen}; prioLaatst=${vectoren[1].Pensioen}; prioEerst=${vectoren[2].Pensioen}; variantOverlaysDiffer=${variantOverlaysDiffer}; presetsCollide=${presetsCollide}; vetoOrder=${vetoOrder}; kernelFoutNoDisq=${kernelFoutNoDisq}; eindvermogenCompleet=${eindvermogenCompleet}; nettoGteBelegbaar=${nettoGteBelegbaar}; pensioenpotCompleet=${pensioenpotCompleet}; pensioenpotVolgtLever=${pensioenpotVolgtLever}; pensioenpotVolgtCategorie=${pensioenpotVolgtCategorie}; grondslagenDisjunct=${grondslagenDisjunct}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-BELAST-26',
+    scenarioId: 'UAT-BELAST-26',
+    label: 'Vrijheidsdagen op /api/household/box2 + box3: canoniek rolling dagtarief, geen budget-limiet-fictie',
+    run: () => {
+      criterion('WF-BELAST-26')
+      // Vóór 11 aug 2026 bouwden beide routes 'monthlyExpenses' zelf op als de
+      // som van budget-LIMIETEN (`budgets.default_limit`), met een verzonnen
+      // €100/dag-terugval zodra er geen budgetten waren. Sinds de fix lezen
+      // beide routes `getRecentDailyExpenseRate(supabase)`, dat op exact deze
+      // pure functie (`recentDailyExpenseRateFromRows`) uitkomt — dezelfde bron
+      // als `DashboardData.dailyExpenseRate` en de rapport-routes.
+      const referenceDate = new Date('2026-08-11T12:00:00Z')
+
+      // (a) Géén transactierijen én géén schatting-fallback → dailyRate 0. De
+      // OUDE code gaf hier stiekem €100/dag; de heffingsmotoren zelf guarden al
+      // op `dailyExpenses > 0` en geven dan freedomDays 0 — geen verzonnen getal.
+      const leeg = recentDailyExpenseRateFromRows([], referenceDate)
+      const box2Leeg = calculateBox2({
+        deelnemingen: [{ name: 'Belang', annual_dividend: 100_000, disposal_gain: 0 }],
+        year: 2026,
+        hasPartner: false,
+        dailyExpenses: leeg.dailyRate,
+      })
+      const box3Leeg = calculateBox3({
+        assets: box3AssetsFromPersona(willem),
+        debts: [],
+        hasPartner: false,
+        dailyExpenses: leeg.dailyRate,
+        year: 2026,
+      })
+
+      // (b) Realistische 3 maanden transactierijen (€2.000/mnd) → hetzelfde
+      // rolling dagtarief als elk ander KRUIS-20-oppervlak, en freedomDays volgt
+      // rechtstreeks uit round(heffing / dagtarief) — geen tweede formule.
+      const rows = [
+        { amount: -2000, date: '2026-06-15' },
+        { amount: -2000, date: '2026-07-15' },
+        { amount: -2000, date: '2026-08-05' },
+      ]
+      const gevuld = recentDailyExpenseRateFromRows(rows, referenceDate)
+      const box2Gevuld = calculateBox2({
+        deelnemingen: [{ name: 'Belang', annual_dividend: 100_000, disposal_gain: 0 }],
+        year: 2026,
+        hasPartner: false,
+        dailyExpenses: gevuld.dailyRate,
+      })
+
+      return {
+        expected:
+          'dailyRateLeeg=0; box2FreedomDaysLeeg=0; box3FreedomDaysLeeg=0; dailyRateGevuld=65.7534; box2TotaleHeffing=26525.21; box2FreedomDaysGevuld=403',
+        actual:
+          `dailyRateLeeg=${leeg.dailyRate}; box2FreedomDaysLeeg=${box2Leeg.freedomDays}; box3FreedomDaysLeeg=${box3Leeg.freedomDays}; ` +
+          `dailyRateGevuld=${fx(gevuld.dailyRate, 4)}; box2TotaleHeffing=${fx(box2Gevuld.totalTaxInclDga, 2)}; box2FreedomDaysGevuld=${box2Gevuld.freedomDays}`,
       }
     },
   },

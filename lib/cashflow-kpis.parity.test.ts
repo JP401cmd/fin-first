@@ -168,7 +168,15 @@ function buildFixtures(): Fixture[] {
 
 // ── De zeven velden uit het OUDE pad ────────────────────────────────────────
 
-/** Selecteert precies de zeven scalars die `buildCashflowCards` uit de bundel leest. */
+/**
+ * Selecteert precies de scalars die de slanke laag moet spiegelen.
+ *
+ * ACHT, niet zeven: `dailyExpenseRate` is erbij gekomen omdat de Vaste-lasten-
+ * pagina hem uit deze laag consumeert i.p.v. zelf `dailyExpenseRate(monthlyExpenses)`
+ * te rekenen (vervolg KRUIS-20). Pariteit-bewaking op dít veld is precies de rem
+ * die een derde grondslag-familie moet voorkomen: wijkt het rolling tarief van de
+ * slanke laag ooit af van de dashboardbundel, dan valt deze suite om.
+ */
 function sevenFromBundle(d: DashboardData): CashflowCardScalars {
   return {
     budgetTotals: { expense: { limit: d.budgetTotals.expense.limit, spent: d.budgetTotals.expense.spent } },
@@ -178,6 +186,7 @@ function sevenFromBundle(d: DashboardData): CashflowCardScalars {
     currentMonthExpenses: d.currentMonthExpenses,
     monthlyIncome: d.monthlyIncome,
     monthlyExpenses: d.monthlyExpenses,
+    dailyExpenseRate: d.dailyExpenseRate,
   }
 }
 
@@ -197,7 +206,7 @@ async function runBothPaths(db: FakeDb) {
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
-describe('loadCashflowKpis ↔ loadDashboardData — parity op alle zeven velden', () => {
+describe('loadCashflowKpis ↔ loadDashboardData — parity op alle acht velden', () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(NOW)
@@ -206,7 +215,7 @@ describe('loadCashflowKpis ↔ loadDashboardData — parity op alle zeven velden
     vi.useRealTimers()
   })
 
-  it.each(buildFixtures())('$label — zeven velden identiek', async ({ db }) => {
+  it.each(buildFixtures())('$label — acht velden identiek', async ({ db }) => {
     const { oud, nieuw } = await runBothPaths(db)
     expect(nieuw).toEqual(oud)
     // Expliciet per veld, zodat een falende run meteen benoemt wélk veld dreef.
@@ -218,6 +227,10 @@ describe('loadCashflowKpis ↔ loadDashboardData — parity op alle zeven velden
     expect(nieuw.currentMonthExpenses).toBe(oud.currentMonthExpenses)
     expect(nieuw.monthlyIncome).toBe(oud.monthlyIncome)
     expect(nieuw.monthlyExpenses).toBe(oud.monthlyExpenses)
+    // Het canonieke 12-mnd rolling dagtarief MOET identiek zijn: beide paden
+    // draaien dezelfde keten (aggToExpenseRows → recentDailyExpenseRateFromRows)
+    // op hetzelfde aggregaat. Drift hier = twee dagtarieven in de app.
+    expect(nieuw.dailyExpenseRate).toBe(oud.dailyExpenseRate)
   })
 
   it('de slanke laag doet aantoonbaar minder tabel-queries', async () => {

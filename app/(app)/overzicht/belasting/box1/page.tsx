@@ -13,7 +13,7 @@ import {
   JAARRUIMTE_MAX_2026,
 } from '@/lib/jaarruimte'
 import { BelastingBoxPageHeader } from '@/components/overview/belasting-box-page-header'
-import { formatCurrency, calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
+import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { computeBox1Tax, grossFromNet, deriveMarginaalTarief, type Box1Result } from '@/lib/box1-tax'
 import { resolveBox1GrossIncome, type Box1IncomeResolution } from '@/lib/box1-income'
 import { Box1GrossIncomeEditor } from '@/components/overview/belasting/box1-gross-income-editor'
@@ -89,10 +89,14 @@ export default async function BelastingBox1Page() {
   // out-of-scope, dus de partner-kaart blijft op de bovengrens (0).
   const pensionFactorA: number = horizonData.pensioenFactorA
 
-  // Vrijheidstijd-equivalent ("Geld is opgeslagen tijd"). Dagelijkse uitgaven
-  // uit dezelfde bron als de rest van de app; 0 → geen vertaling.
-  const monthlyExpenses = horizonData.effectiveInput?.monthlyExpenses ?? 0
-  const dailyExpenses = dailyExpenseRate(monthlyExpenses)
+  // Vrijheidstijd-equivalent ("Geld is opgeslagen tijd"). CONSUMEER het
+  // canonieke 12-mnd rolling dagtarief uit de bundel — dezelfde bron als de
+  // belasting-hub, de widgets en de rapporten. Was
+  // `dailyExpenseRate(effectiveInput.monthlyExpenses)`: de EFFECTIVE grondslag
+  // (losse kalendermaand / profielschatting), die hetzelfde bedrag een ander
+  // aantal jaren vrijheid gaf dan het scherm ernaast (vervolg KRUIS-20).
+  // 0 → geen vertaling.
+  const dailyExpenses = horizonData.dailyExpenseRate
 
   // ── Eigen woning + gekoppelde hypotheek (1.6) ──────────────────────────
   // RLS scoopt de queries al naar de ingelogde gebruiker. We pakken de eerste

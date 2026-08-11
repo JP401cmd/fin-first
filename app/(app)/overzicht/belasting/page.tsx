@@ -10,7 +10,6 @@ import {
   type BelastingBoxCard,
 } from '@/components/overview/belasting-box-cards'
 import { buildBelastingBoxCards } from './box-cards'
-import { dailyExpenseRate } from '@/lib/format'
 import { hasBox2Relevance } from '@/lib/box2-relevance'
 import { computeBox3TaxableInput, box3TaxStatus } from '@/lib/box3-taxable-input'
 import { CURRENT_TAX_YEAR } from '@/lib/box3-data'
@@ -146,11 +145,15 @@ export default async function OverzichtBelastingPage() {
   const householdType =
     (householdTypeRes?.data?.household_type as string | undefined) ?? undefined
 
-  // Dag-uitgaven voor de vrijheidstijd-omrekening (canonieke jaar/365-dagbasis
-  // via dailyExpenseRate). Fallback op €100/dag zodat de vrijheidstijd nooit
-  // door nul deelt.
-  const monthlyExpenses = horizonData.effectiveInput?.monthlyExpenses ?? 0
-  const dailyExpenses = monthlyExpenses > 0 ? dailyExpenseRate(monthlyExpenses) : 100
+  // Dag-uitgaven voor de vrijheidstijd-omrekening — CONSUMEER het canonieke
+  // 12-mnd rolling dagtarief uit de bundel; reken hier niets zelf uit. Was:
+  // `dailyExpenseRate(effectiveInput.monthlyExpenses)` — de EFFECTIVE grondslag
+  // (losse kalendermaand / profielschatting), waardoor dezelfde heffing hier een
+  // ander aantal vrijheidsdagen gaf dan de widgets ernaast (vervolg KRUIS-20).
+  // De verzonnen `: 100`/dag-terugval is weg: `recentDailyExpenseRateFromRows`
+  // draagt de profielschatting al als terugval, en 0 betekent "geen eerlijke
+  // dagbasis" — dan toont het oppervlak het bedrag zónder tijdregel.
+  const dailyExpenses = horizonData.dailyExpenseRate
 
   // Marginaal tarief voor de effectieve-druk-annotatie (C1/C2).
   const marg = horizonData.fireParams?.marginaalTarief ?? deriveMarginaalTarief()

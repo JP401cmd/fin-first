@@ -66,7 +66,14 @@ export async function GET() {
       savingsRate6m: dashboardData.savingsRate6m ?? null,
       netWorth: dashboardData.netWorth ?? null,
       yearlyIncome,
-      dailyExpenseRate: dailyExpenseRate(dashboardData.monthlyExpenses),
+      // CONSUMEER het canonieke bundelveld (12-mnd rolling, lib/expense-rate.ts).
+      // Was `dailyExpenseRate(dashboardData.monthlyExpenses)` — precies wat het
+      // veldcommentaar op `DashboardData.dailyExpenseRate` (lib/types/dashboard.ts)
+      // letterlijk verbiedt: `monthlyExpenses` is de EFFECTIVE grondslag (losse
+      // kalendermaand / profielschatting), dus het benchmark-rapport duidde
+      // hetzelfde bedrag in andere jaren vrijheid dan de widgets ernaast.
+      // `?? …` alleen voor mock-/empty-bundels zonder het additieve veld.
+      dailyExpenseRate: dashboardData.dailyExpenseRate ?? dailyExpenseRate(dashboardData.monthlyExpenses),
     }
 
     const report = buildBenchmarkReport({

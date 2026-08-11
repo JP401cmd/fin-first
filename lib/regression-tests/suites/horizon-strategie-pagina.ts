@@ -1,7 +1,7 @@
 import { registerCategory, registerTests } from '../test-registry'
 import {
   assert, assertEqual, assertNotNull, assertGreaterThan,
-  assertGreaterThanOrEqual, assertLessThan, assertLessThanOrEqual, assertType, assertFinite,
+  assertGreaterThanOrEqual, assertLessThan, assertLessThanOrEqual, assertFinite,
 } from '../assert'
 import type { TestCase } from '../test-types'
 import { unauthenticatedFetch, authenticatedFetch } from '../server-runner'
@@ -76,34 +76,45 @@ function makeCtx(o?: Partial<WithdrawalContext>): WithdrawalContext {
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 const tests: TestCase[] = [
-  // ── Step 1: Page loads correctly ──────────────────────────────────────────
+  // ── Step 1: Legacy-route redirect op de routing-laag ──────────────────────
   {
     id: 'strategie-page-route',
-    name: 'Strategie pagina route bestaat',
+    name: 'Strategie-route redirect op de routing-laag',
     category: CAT,
-    description: '/horizon/strategie page module exporteert default component',
+    description: '/horizon/strategie heeft geen page.tsx meer maar een next.config-redirect',
     priority: 'critical',
-    estimatedDurationMs: 50,
+    estimatedDurationMs: 500,
     async fn() {
-      const mod = await import('@/app/(app)/horizon/strategie/page')
-      assertNotNull(mod.default, 'default export')
-      assertType(mod.default, 'function', 'component is function')
+      // Was: `import('@/app/(app)/horizon/strategie/page')`. Die pagina is
+      // verwijderd bij de React #310-opruiming — een server-component die bij
+      // render meteen `redirect()` aanriep duwde de client-router het
+      // harde-navigatiepad in. De redirect zit nu in next.config.ts, dus we
+      // toetsen het gedrag over de draad in plaats van de module.
+      const res = await authenticatedFetch('/horizon/strategie', { redirect: 'manual' })
+      assertEqual(res.status, 307, 'routing-laag-redirect (307)')
+      const location = res.headers.get('location') ?? ''
+      assert(
+        location.includes('/toekomst'),
+        `verwacht een doel onder /toekomst, kreeg "${location}"`,
+      )
     },
   },
   {
     id: 'strategie-page-accessible',
-    name: 'Strategie pagina bereikbaar',
+    name: 'Strategie-deeplink landt op de strategie-pane',
     category: CAT,
-    description: '/horizon/strategie retourneert 200 of auth redirect',
+    description: '/horizon/strategie stuurt door naar /toekomst met de strategie-pane open',
     priority: 'critical',
     estimatedDurationMs: 500,
     async fn() {
       const res = await authenticatedFetch('/horizon/strategie', { redirect: 'manual' })
-      // Should be 200 (if logged in) or 307 (auth redirect)
-      assert(
-        res.status === 200 || res.status === 307,
-        `verwacht 200 of 307, kreeg ${res.status}`,
-      )
+      assertEqual(res.status, 307, 'routing-laag-redirect (307)')
+      // Next levert de Location relatief ('/toekomst?strategie=open'); een
+      // proxy mag hem absoluut maken, dus toetsen we op de betekenisdragende
+      // delen in plaats van op de exacte string.
+      const location = res.headers.get('location') ?? ''
+      assert(location.includes('/toekomst'), `doel onder /toekomst, kreeg "${location}"`)
+      assert(location.includes('strategie=open'), `pane-param aanwezig, kreeg "${location}"`)
     },
   },
 
@@ -347,20 +358,18 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 5: Back link to horizon page ─────────────────────────────────────
+  // ── Step 5: De legacy-horizon-route zelf ──────────────────────────────────
   {
     id: 'strategie-horizon-link',
-    name: 'Terug-link naar horizon pagina',
+    name: 'Legacy /horizon blijft bereikbaar',
     category: CAT,
-    description: 'Pagina bevat ArrowLeft icon en link naar /horizon',
+    description: '/horizon redirect naar /toekomst — de terugweg loopt niet dood',
     priority: 'medium',
-    estimatedDurationMs: 50,
+    estimatedDurationMs: 300,
     async fn() {
-      // Verify the strategie page imports ArrowLeft and Link
-      const mod = await import('@/app/(app)/horizon/strategie/page')
-      assertNotNull(mod.default, 'page exports component')
-      // The page uses <Link href="/horizon"> with ArrowLeft — verified by code review
-      // We can also check the horizon page is accessible
+      // Was: een module-import van de strategie-pagina om te bewijzen dat de
+      // terug-link bestond. Die pagina is er niet meer (React #310-opruiming);
+      // wat overblijft is de eis dat de legacy-hoofdroute blijft doorsturen.
       const res = await authenticatedFetch('/horizon', { redirect: 'manual' })
       assert(res.status === 200 || res.status === 307, 'horizon route bestaat')
     },

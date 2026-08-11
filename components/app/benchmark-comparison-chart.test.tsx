@@ -47,9 +47,11 @@ function comparison(overrides: Partial<ComparisonResult> = {}): ComparisonResult
     period: PERIOD_1Y,
     windowStart: WINDOW_START,
     windowFallback: false,
+    windowClipped: false,
     portfolio: {
       returnPct: 8.4,
       dataPoints: series(2025, 9, 12, 108.4).map(p => ({ date: p.date, value: p.value })),
+      observedShare: 1,
     },
     benchmarks: [
       { id: 'aex', name: 'AEX', color: '#3b82f6', returnPct: 5.2, dataPoints: series(2025, 9, 12, 105.2), alpha: 3.2, dataSource: 'yahoo_finance' },
@@ -127,7 +129,7 @@ describe('BenchmarkComparisonChart — copy', () => {
 
 describe('BenchmarkComparisonChart — geen koershistorie', () => {
   const zonderRendement = comparison({
-    portfolio: { returnPct: null, gap: 'no_price_history', dataPoints: [] },
+    portfolio: { returnPct: null, gap: 'no_price_history', dataPoints: [], observedShare: null },
     benchmarks: comparison().benchmarks.map(b => ({ ...b, alpha: null })),
   })
 
@@ -142,10 +144,53 @@ describe('BenchmarkComparisonChart — geen koershistorie', () => {
     renderChart(zonderRendement)
     const note = screen.getByTestId('benchmark-portfolio-unavailable')
     expect(note).toHaveTextContent('Je eigen lijn ontbreekt nog')
-    expect(note).toHaveTextContent('maandelijkse koerswaarderingen')
+    expect(note).toHaveTextContent('marktkoers van je posities')
     expect(note).toHaveTextContent('S&P 500')
     // De benchmarks staan er nog gewoon, over het juiste venster.
     expect(screen.getByTestId('benchmark-window-label')).toHaveTextContent('over 1 jaar')
+  })
+
+  // Given een venster waarin meer is opgenomen dan er stond;
+  // When de motor daarom weigert te meten;
+  // Then zegt het scherm wélke van de twee oorzaken speelt — "je koershistorie
+  // ontbreekt" zou hier de gebruiker een verkeerde actie in sturen.
+  it('onderscheidt een onmeetbaar venster van ontbrekende koershistorie', () => {
+    renderChart(comparison({
+      portfolio: { returnPct: null, gap: 'unmeasurable_window', dataPoints: [], observedShare: null },
+      benchmarks: comparison().benchmarks.map(b => ({ ...b, alpha: null })),
+    }))
+    const note = screen.getByTestId('benchmark-portfolio-unavailable')
+    expect(note).toHaveTextContent('Dit venster is niet te meten')
+    expect(note).not.toHaveTextContent('Je eigen lijn ontbreekt nog')
+  })
+})
+
+describe('BenchmarkComparisonChart — dekking van het rendement', () => {
+  // Given een portefeuille waarvan een deel geen marktkoers heeft (turbo's,
+  // delistings); When er wél een rendement is; Then zegt het scherm hoe hard
+  // dat getal is — de dekking is contract, geen voetnoot (ADR 0098).
+  it('noemt het aandeel van de waarde waarover gemeten is', () => {
+    renderChart(comparison({
+      portfolio: {
+        returnPct: 8.4,
+        dataPoints: series(2025, 9, 12, 108.4).map(p => ({ date: p.date, value: p.value })),
+        observedShare: 0.72,
+      },
+    }))
+    expect(screen.getByTestId('benchmark-coverage-note')).toHaveTextContent('72% van de waarde')
+  })
+
+  it('zwijgt erover zodra de hele portefeuille noteert', () => {
+    renderChart(comparison())
+    expect(screen.queryByTestId('benchmark-coverage-note')).toBeNull()
+  })
+
+  // Given een koershistorie die pas later dan de gekozen periode begint;
+  // When het venster daarop is ingekort;
+  // Then draagt het label die kortere periode, niet "over 1 jaar".
+  it('benoemt een ingekort venster met de maand waarin de meting begint', () => {
+    renderChart(comparison({ windowClipped: true, windowStart: '2026-05-31' }))
+    expect(screen.getByTestId('benchmark-context-message')).toHaveTextContent('sinds mei 2026')
   })
 })
 

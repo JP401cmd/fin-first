@@ -180,20 +180,48 @@ export interface FakeSupabase {
   rpcCalls: () => string[]
 }
 
+/**
+ * De gebruiker die `auth.getUser()` van deze mock teruggeeft. Ook de `id` van de
+ * profielrij in de fixtures, zodat "de ingelogde gebruiker" overal hetzelfde is.
+ */
+export const FAKE_USER_ID = 'user-parity'
+
+/**
+ * Stempelt `user_id` op fixture-rijen die 'm weglaten.
+ *
+ * In de echte database is `user_id` op deze tabellen NOT NULL — een rij zónder
+ * bestaat niet. Een fixture die 'm wegliet was tot nu toe onschuldig omdat élke
+ * gescande query RLS-gescoped was (geen kolom-predicaat), maar zodra één loader
+ * een expliciete `.eq('user_id', …)` doet — zoals `getEarliestIncomeDate` sinds
+ * de perf-fix moet — filtert dit ECHT toegepaste predicaat zulke rijen weg en
+ * meet de test stil iets anders dan productie. Dat is precies het "de mock mag
+ * een test hooguit minder scherp maken, nooit stil van rijen beroven"-principe
+ * uit de kop van dit bestand.
+ *
+ * Blijft scherp: er wordt één vaste id gestempeld (dezelfde als `auth.getUser()`),
+ * dus een query die op een ÁNDERE user_id filtert levert nog steeds niets — en een
+ * fixture die bewust een vreemde `user_id` zet, houdt die.
+ *
+ * `profiles` doet hier NIET aan mee: die tabel heeft geen `user_id`-kolom (de
+ * eigen rij is `id`), dus een stempel zou daar een fantoomkolom introduceren.
+ */
+const withUserId = (rows: Row[]): Row[] =>
+  rows.map((r) => (r.user_id === undefined ? { ...r, user_id: FAKE_USER_ID } : r))
+
 export function makeSupabase(db: FakeDb): FakeSupabase {
   let tableQueries = 0
   const perTable = new Map<string, number>()
   const rpcCalls: string[] = []
-  const transactions = db.transactions ?? []
+  const transactions = withUserId(db.transactions ?? [])
 
   const tables: Record<string, Row[]> = {
     profiles: [db.profile],
-    budgets: db.budgets ?? [],
+    budgets: withUserId(db.budgets ?? []),
     transactions,
-    debts: db.debts ?? [],
-    assets: db.assets ?? [],
-    net_worth_snapshots: db.netWorthSnapshots ?? [],
-    recurring_transactions: db.recurringTransactions ?? [],
+    debts: withUserId(db.debts ?? []),
+    assets: withUserId(db.assets ?? []),
+    net_worth_snapshots: withUserId(db.netWorthSnapshots ?? []),
+    recurring_transactions: withUserId(db.recurringTransactions ?? []),
   }
 
   function builder(table: string) {
@@ -250,7 +278,7 @@ export function makeSupabase(db: FakeDb): FakeSupabase {
   }
 
   const client = {
-    auth: { getUser: async () => ({ data: { user: { id: 'user-parity' } }, error: null }) },
+    auth: { getUser: async () => ({ data: { user: { id: FAKE_USER_ID } }, error: null }) },
     from: (table: string) => {
       tableQueries++
       perTable.set(table, (perTable.get(table) ?? 0) + 1)

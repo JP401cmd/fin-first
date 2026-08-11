@@ -20,15 +20,20 @@
  * verandert. Daarom wordt de canonieke map geÏMPORTEERD, nooit nagetypt (zelfde
  * patroon als `lib/horizon/toekomst-scenario.ts` en `toekomst-doel.ts`).
  *
- * ## Bekende asymmetrie (buiten scope, bewust NIET hier gerepareerd)
- * `NON_SPENDABLE_ASSET_TYPES` in `coverage-strip.ts` sluit alléén `retirement` uit,
- * niet `levensverzekering`. Die polis telt dus vandaag mee in BEIDE grondslagen:
- * in `spendablePortfolio` (belegbaar vermogen, laagste buffer, dekkingsgraad) én
- * hier. De twee grootheden overlappen daardoor met de waarde van de
- * levensverzekering-pot; ze mogen om die reden nooit bij elkaar worden opgeteld en
- * worden altijd als aparte, apart gelabelde regels getoond. Het uitsluiten van
- * `levensverzekering` raakt de coverage-strip, het buffer-veto en de FIRE-grondslag
- * app-breed en is daarom een eigen besluit, geen zijdelingse aanpassing hier.
+ * ## Disjunct met het belegbaar vermogen (sinds 10 aug 2026)
+ * `NON_SPENDABLE_ASSET_TYPES` in `coverage-strip.ts` sloot tot dan alléén
+ * `retirement` uit, niet `levensverzekering` — die polis telde daardoor in BEIDE
+ * grondslagen: als vrij opneembaar vermogen én als pensioenpot, terwijl de
+ * kern-waterval hem als pensioenpot leegtrekt en zijn onttrekking als Box 1-
+ * pensioeninkomen boekt. Eigenaarsbesluit (optie A, 9 aug 2026): het ís een
+ * pensioenpot. Beide typen staan nu in `NON_SPENDABLE_ASSET_TYPES`, dus
+ * `spendablePortfolio` en `pensioenPortfolio` delen geen enkel app-type meer.
+ *
+ * Disjunct is NIET hetzelfde als optelbaar: belegbaar staat vóór schulden en mist
+ * woning/auto/fysiek bezit, de pensioenpot is bruto (Box 1 komt er nog overheen).
+ * De som is dus geen bestaande grootheid — het netto vermogen is dat wél, en heeft
+ * zijn eigen veld. Zie `EINDVERMOGEN_GRONDSLAGEN` in
+ * `lib/tax-lifetime/varianten-sweep.ts` voor de drie grondslagen naast elkaar.
  */
 
 import type { AssetType } from '@/lib/asset-data'

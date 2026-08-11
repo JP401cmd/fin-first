@@ -119,7 +119,7 @@ afgaat op een echte kernel-run.
   gaat om het vierde KATERN op de optimizer-pagina, maar om het vijfde item in
   de belasting-groep van `hld-model.ts` — twee verschillende tellingen.)
 
-## Vier resterende beperkingen (bewust buiten deze fase)
+## Drie resterende beperkingen (bewust buiten deze fase)
 
 1. **Gewogen trekking, geen strikte volgorde.** Een "volgorde" is in het model
    geen harde rij maar een gewogen gelijktijdige opname: een pot met een hogere
@@ -132,31 +132,33 @@ afgaat op een echte kernel-run.
    partner-inkomen wordt nergens als bruto grootheid vastgehouden, dus een
    partner-Box 1 zou verzonnen zijn. `Box1Streams.partnerBatenNetto` bestaat
    uitsluitend om die uitsluiting aantoonbaar en testbaar te maken.
-4. **Arbeidskorting-afwijking in de tariefmotor.** `computeBox1Tax` berekent de
-   arbeidskorting over het volledige `grossYearlyIncome`, dus ook over
-   AOW/pensioen — fiscaal geen arbeidsinkomen.
+## Ingetrokken beperking: de arbeidskorting-afwijking (11 aug 2026)
 
-   De afwijking is **niet systematisch één kant op**, en **"conservatief" is er
-   het verkeerde woord voor**. De reeks rapporteert een VERSCHIL van twee
-   motoraanroepen (`box1Totaal − box1AlVerrekend`) en beide benen dragen hun
-   eigen te hoge korting. In het gangbare bereik onderschat de reeks de last —
-   wat het plan er BETER laat uitzien dan het is, dus in het voordeel van de
-   gebruiker, het tegenovergestelde van conservatief. Bij een hoog
-   pensioeninkomen keert het teken om en valt de heffing juist te hoog uit,
-   doordat de korting op het totaalinkomen is uitgefaseerd terwijl hij op het
-   AOW-only-been nog meetelt.
+Dit ADR noemde als vierde beperking dat `computeBox1Tax` de arbeidskorting over
+het volledige `grossYearlyIncome` berekende, dus ook over AOW/pensioen — fiscaal
+geen arbeidsinkomen. Die beperking is **opgeheven**, niet verzacht.
 
-   **De bias laat de VERGELIJKING niet ongemoeid.** Hij is verreweg het grootst
-   in de jaren vóór de AOW (waar de volle niet-AOW-arbeidskorting van max
-   €5.685 geldt in plaats van de AOW-variant van max €2.840), en dat is precies
-   waar de variant "pensioen vroeg" zijn onttrekkingen concentreert. Die variant
-   wordt dus structureel te gunstig voorgesteld ten opzichte van de andere twee —
-   een richtingseffect op de rangschikking, niet alleen op het niveau. De
-   gemeten reeks staat in de module-doc van `lib/tax-lifetime/lifetime-tax.ts`;
-   de uitkomst is aan BEIDE kanten gepind in `lifetime-tax.test.ts` ("BEKENDE
-   AFWIJKING"); de gebruiker leest het als zesde kanttekening onder katern IV.
-   De correctie hoort in `lib/box1-tax.ts` (arbeidsinkomen als eigen invoer),
-   niet in de rapportagelaag.
+`lib/box1-tax.ts` kent nu `Box1Input.arbeidsinkomen` als eigen grondslag voor de
+arbeidskorting én de IACK, met terugval op `grossYearlyIncome` zodat een
+niet-omgezette aanroeper niets merkt. `lib/tax-lifetime/lifetime-tax.ts` geeft
+`arbeidsinkomen: 0` mee — voor de tariefstap én voor de netto→bruto-inversie van
+de AOW (`grossFromNet`), want een korting in de inversie zou de fout via een te
+laag `aowBruto` alsnog binnenlaten. Er is nog steeds precies één tariefmotor; dit
+is invoer, geen tariefvariant.
+
+Gevolg voor deze sectie, gemeten op `BOX1_PARAMS[2026]` (nieuw − oud per jaarrij
+`box1NietVerrekend`): AOW € 0 + pensioen € 30.000 → **+€ 5.381** vóór de AOW en
+**+€ 2.687** erna; AOW € 16.000 netto + pensioen € 30.000 → **+€ 1.990** ná de
+AOW; met een pensioen van € 150.000 draait het naar **−€ 707**. De heffing gaat
+in het gangbare bereik dus omhoog, en het sterkst in de pre-AOW-jaren — precies
+waar "pensioen vroeg" zijn onttrekkingen concentreert. **De rangschikking van de
+sweep kan hierdoor verschuiven**; de variant "pensioen vroeg" werd voorheen te
+gunstig voorgesteld.
+
+De zesde kanttekening onder katern IV die dit meldde is daarmee **ingetrokken**
+(zeven → zes punten): hem laten staan zou een onwaarheid op het scherm zijn. De
+tests in `lifetime-tax.test.ts` heten nu "GRONDSLAG" in plaats van "BEKENDE
+AFWIJKING" en pinnen de nieuwe uitkomst exact plus de gemeten sprong.
 
 ## Alternatieven
 

@@ -68,11 +68,12 @@ of -toggle** te tonen op de pagina's zelf blijft staan. Het voorstel voor een "o
 zwaar gereduceerde pagina's (APP-4) is expliciet afgewezen — dat zou precies de rust ondermijnen die
 Eenvoudig moet leveren.
 
-Ook achterhaald: het "mechanisme-only"-punt hierboven. `DepthSection` is nooit ingehangen; de
-pagina-reductie loopt in de praktijk volledig via `HideInSimple` (hard verbergen). De ⌘K-omschrijving
-is daarop bijgesteld — "Meer/minder detail op elke pagina" in plaats van de belofte
-"Diepte-secties standaard tonen of inklappen", die gedrag beschreef dat niet bestaat. Of
-`DepthSection` alsnog wordt ingezet of verwijderd, is een open punt (audit §9.1).
+Ook achterhaald: het "mechanisme-only"-punt hierboven. Op het moment van fase 1 was `DepthSection`
+nog nergens ingehangen en liep de pagina-reductie volledig via `HideInSimple` (hard verbergen). De
+⌘K-omschrijving is daarop bijgesteld — "Meer/minder detail op elke pagina" in plaats van de belofte
+"Diepte-secties standaard tonen of inklappen", die gedrag beschreef dat op geen enkel oppervlak
+bestond. Of `DepthSection` alsnog wordt ingezet of verwijderd stond op dat moment nog open (audit
+§9.1); fase 2 en 4 hebben die vraag beantwoord — zie de aanvulling hieronder.
 
 ## Aanvulling — 9 augustus 2026 (cijfernorm, fase 2 eenvoudige weergave)
 
@@ -114,3 +115,36 @@ gebeurde het in meerdere bestaande suites tegelijk, en het is de reden dat `alwa
 Wat NIET verandert: de norm is **presentatie-reductie**, geen tweede rekenweg. Beide modi consumeren
 dezelfde reeds berekende `FigureProps`; er wordt nergens een cijfer "vereenvoudigd herberekend"
 (CLAUDE.md, consume-don't-recompute). En Volledig blijft in alle gevallen exact zoals het was.
+
+## Aanvulling — 9 augustus 2026 (twee mechanismen, fase 3 t/m 5 eenvoudige weergave)
+
+Fase 3 (bezittingen, belasting, toekomst), fase 4 (mijn, berichten, navigatie) en fase 5
+(verkenningen) zijn opgeleverd. Eén besluit daaruit hoort in deze ADR, de rest is uitvoering.
+
+**De open vraag uit fase 1 is beantwoord: `DepthSection` blijft, náást `HideInSimple`.** De modus
+kent daarmee bewust **twee** mechanismen, en de keuze ertussen is een inhoudelijke:
+
+- **`HideInSimple`** — hard weg in Eenvoudig. Voor *diepte*: analyses, katernen, extra grafieken.
+  Wat hier verdwijnt is uitleg of verrijking; de gebruiker verliest geen ingang.
+- **`DepthSection`** — ingeklapt mét behoud, één klik ertussen. Voor *bedieningsvlakken*: dingen die
+  de gebruiker moet kúnnen bijstellen. Hard verbergen zou daar de enige ingang dichtzetten.
+
+Drie oppervlakken staan sinds fase 2/4 op het tweede mechanisme: het cashflow-instellingenblok
+(CF-4), "Alle meldingstypen" op `/mijn/notificaties` (MIJN-3) en de AI-uitvoeringsgroepen op
+`/mijn/privacy` (MIJN-4). Ze delen één implementatieregel die hier hoort omdat hij uit het
+acceptatiecriterium volgt en niet uit smaak: **`DepthSection` wordt alléén in Eenvoudig gemónt.** In
+Volledig zou hij weliswaar open staan, maar mét kop-knop en kaartrand — en "Volledig blijft
+ongewijzigd" betekent dat daar exact de bestaande boom rendert.
+
+De ⌘K-sublabel "Meer/minder detail op elke pagina" dekt beide mechanismen; dat is precies waarom die
+formulering het van de oude, mechanisme-specifieke tekst won.
+
+Twee besluiten uit fase 5 zijn bewust **niet** hier vastgelegd maar als eigen ADR, omdat ze over de
+informatie-architectuur gaan en niet over de weergavemodus: **ADR 0095** (tips & acties en berichten
+blijven gescheiden ingangen) en **ADR 0096** (één feedback-ingang via de chat; `POST /api/feedback`
+antwoordt 410). Beide zijn aanvaard en geïmplementeerd.
+
+Tot slot een grens die tijdens fase 3 scherp werd: niet elke audit-bevinding is een modus-bevinding.
+Waar iets gewoon fout of dubbel was — een permanent lege Box 2-kaart, een tabbalk die het kaartengrid
+eronder exact herhaalt — is het in **beide** modi gerepareerd. De modus is een rustknop, geen
+opbergplek voor UI die er sowieso niet hoorde te staan.

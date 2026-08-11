@@ -30,12 +30,21 @@ import {
  * client-fetch naar /api/welcome-guide over. Interacties (afvinken/navigeren/
  * sluiten) blijven via de bestaande PUT-route lopen.
  *
- * EENVOUDIGE WEERGAVE (APP-6): in 'simple' comprimeert de gids tot ~⅓ van een
- * mobiel scherm — de stappen worden afvinkregels i.p.v. grote proceskaarten, de
- * "Scherm N van M"-teller verdwijnt (de stippen dragen die informatie al) en de
- * schermintro + stapomschrijvingen blijven weg. In 'full' is de gids
- * ongewijzigd. De uitlegzin over de weergavekeuze zelf (APP-2) staat er in
- * BEIDE modi onder: dat is precies de vindbaarheid die ontbrak.
+ * EENVOUDIGE WEERGAVE (APP-6): in 'simple' comprimeert de gids — de stappen
+ * worden afvinkregels i.p.v. grote proceskaarten, de "Scherm N van M"-teller
+ * verdwijnt (de stippen dragen die informatie al) en de schermintro +
+ * stapomschrijvingen blijven weg. In 'full' is de gids ongewijzigd. De
+ * uitlegzin over de weergavekeuze zelf (APP-2) staat er in BEIDE modi onder:
+ * dat is precies de vindbaarheid die ontbrak.
+ *
+ * De audit vroeg om "mobiel max ~⅓ viewport". Dat is hier een GEMETEN UITKOMST,
+ * geen afgedwongen grens: op 390×844 (iPhone 12/13/14-klasse) meet de
+ * gecomprimeerde gids 282px = 33,4% (schermronde 9 aug 2026). Er staat bewust
+ * GEEN `max-h`/`vh`-regel omheen — een harde kap zou de afvinkregels of de
+ * sluit-/navigatieknoppen afsnijden zodra een scherm één stap meer draagt, en
+ * dan verliest de gebruiker functionaliteit i.p.v. drukte. De compressie komt
+ * dus van mínder inhoud, niet van een schaar. Groeit het aantal stappen per
+ * scherm, hermeet dan hier in plaats van een grens toe te voegen.
  */
 
 const SESSION_CLOSED_KEY = 'welcome_guide_closed'

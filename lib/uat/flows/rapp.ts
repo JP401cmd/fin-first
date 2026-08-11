@@ -48,6 +48,7 @@ export const RAPP_FLOW: UatFlow = {
     // ── 4 · benchmark ─────────────────────────────────────────────────────
     { id: 'benchmark', scenarioId: 'UAT-RAPP-10', label: 'WF-RAPP-10 · Benchmark-spiegel openen', kind: 'screen', stage: 4, lane: 'benchmark' },
     { id: 'benchmarkdetail', scenarioId: 'UAT-RAPP-11', label: 'WF-RAPP-11 · Benchmark-cijfer aanklikken (detail-sheet)', kind: 'action', stage: 4, lane: 'benchmark', subOf: 'benchmark' },
+    { id: 'vrijheidstijdrapport', scenarioId: 'UAT-RAPP-14', label: 'WF-RAPP-14 · Vrijheidstijd op benchmark + totaalplan (canoniek dagtarief)', kind: 'screen', stage: 4, lane: 'benchmark', subOf: 'benchmark' },
 
     // ── 5 · randvoorwaarden ───────────────────────────────────────────────
     { id: 'print', scenarioId: 'UAT-RAPP-12', label: 'WF-RAPP-12 · Rapport afdrukken als PDF', kind: 'action', stage: 5, lane: 'randvoorwaarden' },
@@ -81,6 +82,8 @@ export const RAPP_FLOW: UatFlow = {
     // instap → benchmark
     { from: 'hub', to: 'benchmark' },
     { from: 'benchmark', to: 'benchmarkdetail' },
+    { from: 'benchmark', to: 'vrijheidstijdrapport' },
+    { from: 'persoonlijkplan', to: 'vrijheidstijdrapport' },
 
     // instap → randvoorwaarden
     { from: 'balans', to: 'print' },
