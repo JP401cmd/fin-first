@@ -120,6 +120,223 @@ describe('fetchPriceData — pence/GBp-normalisatie', () => {
     expect(data!.price).toBe(187.25)
     expect(data!.currency).toBe('USD')
   })
+
+  /**
+   * HET MEEST WAARSCHIJNLIJKE STILLE DEFECT.
+   *
+   * `fiftyTwoWeekHigh`/`Low` komen uit exact dezelfde `meta` — en dus dezelfde
+   * pence-notatie — als `regularMarketPrice`. Wordt de deling daar vergeten,
+   * dan staat een Londens aandeel met een koers van £29,48 naast een jaarbereik
+   * van 2500–3200. Dat leest niet als "fout" maar als "extreem ver onder zijn
+   * top", en niemand meldt het als bug.
+   */
+  it('KERN-EIS: het 52-weeks bereik ondergaat DEZELFDE pence-deling als de koers', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockChartFetch({
+        currency: 'GBp',
+        regularMarketPrice: 2947.5,
+        chartPreviousClose: 2961.4,
+        fiftyTwoWeekHigh: 3250.0,
+        fiftyTwoWeekLow: 2100.0,
+        shortName: 'AIAG',
+      }),
+    )
+
+    const data = await fetchPriceData('AIAG52.L')
+    expect(data).not.toBeNull()
+    expect(data!.fiftyTwoWeekHigh).toBeCloseTo(32.5, 6)
+    expect(data!.fiftyTwoWeekLow).toBeCloseTo(21.0, 6)
+
+    // De koers moet binnen het bereik vallen — precies de eigenschap die
+    // sneuvelt als één van de twee kanten niet genormaliseerd is.
+    expect(data!.price).toBeGreaterThanOrEqual(data!.fiftyTwoWeekLow!)
+    expect(data!.price).toBeLessThanOrEqual(data!.fiftyTwoWeekHigh!)
+  })
+
+  it('GBX: zelfde deling op het 52-weeks bereik', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockChartFetch({
+        currency: 'GBX',
+        regularMarketPrice: 2947.5,
+        chartPreviousClose: 2961.4,
+        fiftyTwoWeekHigh: 3250.0,
+        fiftyTwoWeekLow: 2100.0,
+        shortName: 'SOME.LSE',
+      }),
+    )
+
+    const data = await fetchPriceData('SOME52.L')
+    expect(data!.fiftyTwoWeekHigh).toBeCloseTo(32.5, 6)
+    expect(data!.fiftyTwoWeekLow).toBeCloseTo(21.0, 6)
+  })
+
+  it('een echt pond-instrument (GBP) houdt zijn 52-weeks bereik ongedeeld', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockChartFetch({
+        currency: 'GBP',
+        regularMarketPrice: 42.5,
+        chartPreviousClose: 42.0,
+        fiftyTwoWeekHigh: 51.0,
+        fiftyTwoWeekLow: 33.0,
+        shortName: 'REAL.GBP',
+      }),
+    )
+
+    const data = await fetchPriceData('REALGBP52.L')
+    expect(data!.fiftyTwoWeekHigh).toBe(51.0)
+    expect(data!.fiftyTwoWeekLow).toBe(33.0)
+  })
+})
+
+/**
+ * Het 52-weeks bereik en het noteringsmoment uit dezelfde chart-respons.
+ *
+ * Beide velden dragen `meta` al mee (empirisch geverifieerd op MRVL /
+ * VWRL.AS / ASML.AS) — dit kost dus geen extra HTTP-verzoek, alleen meer
+ * uitlezen. De valkuil zit in de EENHEID (`regularMarketTime` is seconden, niet
+ * milliseconden) en in de ONTBREKENDE waarde (Yahoo levert `0`/`null` voor
+ * instrumenten zonder historie; die als koers wegschrijven trekt een as naar nul).
+ */
+describe('fetchPriceData — 52-weeks bereik', () => {
+  it('leest high/low uit de meta', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockChartFetch({
+        currency: 'USD',
+        regularMarketPrice: 92.4,
+        chartPreviousClose: 91.0,
+        fiftyTwoWeekHigh: 127.48,
+        fiftyTwoWeekLow: 46.21,
+        shortName: 'Marvell Technology',
+      }),
+    )
+
+    const data = await fetchPriceData('MRVL52')
+    expect(data!.fiftyTwoWeekHigh).toBe(127.48)
+    expect(data!.fiftyTwoWeekLow).toBe(46.21)
+  })
+
+  it('ontbrekend, nul of onzinnig → null (geen verzonnen bereik)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockChartFetch({
+        currency: 'EUR',
+        regularMarketPrice: 10,
+        chartPreviousClose: 10,
+        fiftyTwoWeekHigh: 0,
+        fiftyTwoWeekLow: null,
+        shortName: 'Vers genoteerd',
+      }),
+    )
+
+    const data = await fetchPriceData('FRESH52.AS')
+    // 0 is geen koers maar een ontbrekende waarde.
+    expect(data!.fiftyTwoWeekHigh).toBeNull()
+    expect(data!.fiftyTwoWeekLow).toBeNull()
+  })
+
+  it('negatieve of niet-numerieke waarden worden geweigerd', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockChartFetch({
+        currency: 'EUR',
+        regularMarketPrice: 10,
+        fiftyTwoWeekHigh: '127,48',
+        fiftyTwoWeekLow: -3,
+        shortName: 'Rommel',
+      }),
+    )
+
+    const data = await fetchPriceData('JUNK52.AS')
+    expect(data!.fiftyTwoWeekHigh).toBeNull()
+    expect(data!.fiftyTwoWeekLow).toBeNull()
+  })
+
+  it('velden geheel afwezig → beide null, de rest werkt gewoon', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockChartFetch({
+        currency: 'EUR',
+        regularMarketPrice: 10,
+        chartPreviousClose: 9,
+        shortName: 'Zonder bereik',
+      }),
+    )
+
+    const data = await fetchPriceData('NORANGE.AS')
+    expect(data!.fiftyTwoWeekHigh).toBeNull()
+    expect(data!.fiftyTwoWeekLow).toBeNull()
+    expect(data!.price).toBe(10)
+  })
+})
+
+describe('fetchPriceData — marketTime (seconden → ISO)', () => {
+  it('rekent seconden sinds epoch om naar een ISO-string', async () => {
+    // 2026-08-11T15:30:00Z
+    const seconds = Math.floor(Date.UTC(2026, 7, 11, 15, 30, 0) / 1000)
+    vi.stubGlobal(
+      'fetch',
+      mockChartFetch({
+        currency: 'EUR',
+        regularMarketPrice: 10,
+        regularMarketTime: seconds,
+        shortName: 'Met tijd',
+      }),
+    )
+
+    const data = await fetchPriceData('TIME1.AS')
+    expect(data!.marketTime).toBe('2026-08-11T15:30:00.000Z')
+  })
+
+  it('behandelt het NIET als milliseconden (de klassieke ×1000-fout)', async () => {
+    const seconds = Math.floor(Date.UTC(2026, 7, 11, 15, 30, 0) / 1000)
+    vi.stubGlobal(
+      'fetch',
+      mockChartFetch({ currency: 'EUR', regularMarketPrice: 10, regularMarketTime: seconds }),
+    )
+
+    const data = await fetchPriceData('TIME2.AS')
+    // Zonder de ×1000 zou dit januari 1970 zijn — een stil verkeerde datum.
+    expect(new Date(data!.marketTime!).getUTCFullYear()).toBe(2026)
+  })
+
+  it('0, NaN, negatief of ontbrekend → null', async () => {
+    for (const [i, value] of [0, Number.NaN, -1, null, undefined, 'gisteren'].entries()) {
+      vi.stubGlobal(
+        'fetch',
+        mockChartFetch({ currency: 'EUR', regularMarketPrice: 10, regularMarketTime: value }),
+      )
+      const data = await fetchPriceData(`TIMEBAD${i}.AS`)
+      expect(data!.marketTime).toBeNull()
+    }
+  })
+
+  it('een waarde die al in MILLISECONDEN staat wordt geweigerd (onzinnig ver weg)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockChartFetch({
+        currency: 'EUR',
+        regularMarketPrice: 10,
+        regularMarketTime: Date.now(), // ms i.p.v. seconden → jaar ~57.000
+      }),
+    )
+
+    const data = await fetchPriceData('TIMEMS.AS')
+    expect(data!.marketTime).toBeNull()
+  })
+
+  it('een waarde vóór 2000 wordt geweigerd (epoch-restant, geen beursmoment)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockChartFetch({ currency: 'EUR', regularMarketPrice: 10, regularMarketTime: 12_345 }),
+    )
+
+    const data = await fetchPriceData('TIMEOLD.AS')
+    expect(data!.marketTime).toBeNull()
+  })
 })
 
 /**

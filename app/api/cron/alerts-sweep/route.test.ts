@@ -173,6 +173,22 @@ describe('alerts-sweep verwerking', () => {
     )
   })
 
+  it('volle batch -> meerdere leesrondes en achterstand gemeld', async () => {
+    // Sinds de sweep dagelijks draait, moet één ronde meer dan één batch kunnen
+    // legen; wat dan nog overblijft hoort als `backlog` zichtbaar te zijn op
+    // /beheer/jobs i.p.v. stil achter te lopen op de instroom.
+    cfg.errorRows = Array.from({ length: 500 }, (_, i) => ({
+      context: 'onRequestError:route',
+      message: `Budget ${i} niet gevonden`,
+      created_at: new Date().toISOString(),
+    }))
+    const res = await GET(req('cron-secret'))
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { backlog: boolean; errors_scanned: number }
+    expect(body.backlog).toBe(true)
+    expect(body.errors_scanned).toBeGreaterThan(500)
+  })
+
   it('kanaalfout -> state niet doorgeschoven, job_runs error', async () => {
     cfg.errorRows = [
       {

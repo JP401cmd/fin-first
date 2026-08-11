@@ -229,6 +229,36 @@ describe('sweep — S2a gefaalde taken', () => {
   })
 })
 
+describe('sweep — stiltevenster bij een dagelijkse cadans', () => {
+  const alertAgo = (hours: number) =>
+    new Date(NOW.getTime() - hours * 60 * 60 * 1000).toISOString()
+
+  function withJobAlert(hoursAgo: number) {
+    return runSweep(
+      input({
+        state: {
+          ...emptySweepState(),
+          errorWatermark: '2026-08-11T11:00:00.000Z',
+          jobAlerts: { retention: alertAgo(hoursAgo) },
+        },
+        failedRuns: [{ job: 'retention', created_at: alertAgo(hoursAgo) }],
+      }),
+    )
+  }
+
+  it('een alarm van 17 uur geleden houdt stand: mail (02:00) en sweep (19:00) samen één alarm', () => {
+    // Grootste afstand binnen één etmaal tussen een taak en de sweep:
+    // maandsnapshots draaien om 02:00, de sweep om 19:00.
+    expect(withJobAlert(17).notifications).toHaveLength(0)
+  })
+
+  it('een alarm van 21 uur geleden blokkeert niet meer — de sweep valt niet op zijn eigen rand', () => {
+    // Met een venster van 24u zou de dagelijkse ronde van morgen precies op de
+    // grens vallen en bij een paar seconden cron-jitter stilletjes overslaan.
+    expect(withJobAlert(21).notifications).toHaveLength(1)
+  })
+})
+
 describe('sweep — S2b uitgebleven taken', () => {
   it('meldt een taak die zijn maxAgeHours overschrijdt', () => {
     const res = runSweep(

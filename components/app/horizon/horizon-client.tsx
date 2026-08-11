@@ -47,8 +47,9 @@ import { resolveFireParams, type FireParams } from '@/lib/fire-params'
 import { deriveMarginaalTarief } from '@/lib/box1-tax'
 import { type WithdrawalStrategyType, type WithdrawalStrategyConfig, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
-import { computeYearlyMustExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
+import { computeRetirementExpenses, computeYearlyMustExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { deriveRetirementExpenseBasis } from '@/lib/retirement-expense-basis'
+import type { CashflowSettingsData } from '@/lib/cashflow-settings-data'
 import { resolveEffectiveIncomeExpenses, type IncomeExpenseSources } from '@/lib/effective-financials'
 import type { Debt } from '@/lib/debt-data'
 import { deriveNaturalMilestones, naturalMilestoneToLifeEvent, type NaturalMilestone } from '@/lib/natural-milestones'
@@ -250,6 +251,7 @@ import { TOEKOMST_OVERLAY_BALLOONS } from '@/components/app/horizon/toekomst-ove
 import { ToekomstWelcome } from '@/components/app/horizon/toekomst-welcome'
 import { ToekomstExitNotice } from '@/components/app/horizon/toekomst-exit-notice'
 import { WidgetEmpty } from '@/components/widgets/widget-empty'
+import { resolveUnlinkedCashShare, unlinkedCashTotal } from '@/lib/unlinked-cash'
 
 type ActiveModal = null | 'scenarios' | 'simulations' | 'withdrawal' | 'backtesting' | 'strategie'
 
@@ -1108,7 +1110,12 @@ export default function HorizonPage({
         const supabase = createClient()
         const { data: profileData } = await supabase
           .from('profiles')
-          .select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, box3_method, marginaal_tarief, feature_preferences, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, withdrawal_profile_config, deficit_loan_rate, housing_strategy_config, pot_rules')
+          // `income_source`/`expenses_source` erbij (ADR 0103): de kernel-context
+          // droeg wél `net_monthly_income`/`estimated_monthly_expenses` maar niet
+          // de bijbehorende bronsignalen, terwijl de `loadData`-select ze al
+          // meenam. Zonder die twee kan de rekenlaag hier niet zien welke
+          // grondslag geldt en leest ze een profielbedrag alsof het de waarheid is.
+          .select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, box3_method, marginaal_tarief, feature_preferences, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, withdrawal_profile_config, deficit_loan_rate, housing_strategy_config, pot_rules')
           .single()
         if (cancelled || !profileData) return
         // Jaarlijkse essentiële uitgaven — zelfde grondslag (echte essentiële
@@ -1156,7 +1163,7 @@ export default function HorizonPage({
       const twelveMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 11, 1)).toISOString().split('T')[0]
       const sixMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 5, 1)).toISOString().split('T')[0]
 
-      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, actionsResult, childBudgetsResult, fullDebtsResult, snapshotsResult, income12Result, earliestIncomeResult, tx6mResult, bankAccountsResult] = await Promise.all([
+      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, actionsResult, childBudgetsResult, fullDebtsResult, snapshotsResult, income12Result, earliestIncomeResult, tx6mResult, bankAccountsResult, cashflowSettings] = await Promise.all([
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct').eq('is_active', true),
         supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
@@ -1186,7 +1193,16 @@ export default function HorizonPage({
         supabase.from('transactions').select('date').gt('amount', 0).order('date', { ascending: true }).limit(1),
         // 6-month transactions for stable resilience calculation
         supabase.from('transactions').select('amount').gte('date', sixMonthsAgo).lt('date', monthEnd),
-        supabase.from('bank_accounts').select('id, name, balance').eq('is_active', true).is('linked_asset_id', null),
+        // `ownership` erbij: de SELECT-policy is huishoud-verbreed, dus een
+        // gedeelde rekening komt hier ook binnen en telt op het eigen aandeel.
+        supabase.from('bank_accounts').select('id, name, balance, ownership').eq('is_active', true).is('linked_asset_id', null),
+        // GEDEELDE GRONDSLAG (ADR 0103) — het jaarinkomen dat `current_income`
+        // als pensioenuitgave (en dus als FIRE-doel) gebruikt, komt uit dezelfde
+        // bundel als de inkomenskaart op /overzicht/cashflow. Zonder dit rekende
+        // deze refresh nog puur op de transactie-extrapolatie.
+        fetch('/api/overzicht/cashflow-settings')
+          .then((r) => (r.ok ? (r.json() as Promise<CashflowSettingsData>) : null))
+          .catch(() => null),
       ])
 
       // Check for profile query errors
@@ -1218,6 +1234,13 @@ export default function HorizonPage({
           (profileResult.data ?? {}) as IncomeExpenseSources,
           monthlyIncome,
           monthlyExpenses,
+          // Budgetgrondslag erbij (ADR 0103) zodra de gedeelde bundel binnen is.
+          cashflowSettings
+            ? {
+                income: cashflowSettings.budgetIncome.monthlyTotal,
+                expenses: cashflowSettings.budgetExpenses.monthlyTotal,
+              }
+            : undefined,
         )
 
       // 6-month average income/expenses for stable resilience calculation
@@ -1235,7 +1258,12 @@ export default function HorizonPage({
 
       const totalAssetsOnly = (assetsResult.data ?? []).reduce((s, a) =>
         s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
-      const unlinkedCash = (bankAccountsResult.data ?? []).reduce((s, a) => s + Number(a.balance), 0)
+      // DE canonieke, huishoud-gewogen optelling (lib/unlinked-cash.ts) — geen
+      // eigen reduce, anders drift deze client-herlading met de server-bundel.
+      const unlinkedCash = unlinkedCashTotal(
+        bankAccountsResult.data,
+        await resolveUnlinkedCashShare(supabase, bankAccountsResult.data),
+      )
       const totalAssets = totalAssetsOnly + unlinkedCash
       const totalDebts = (debtsResult.data ?? []).reduce((s, d) =>
         s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
@@ -1250,10 +1278,19 @@ export default function HorizonPage({
         allChildren,
       )
 
-      // Extrapolatie (inkomen → jaarbasis) + pensioenuitgave-methode: ÉÉN gedeelde
-      // bron (lib/retirement-expense-basis.ts), identiek aan de SSR-loader en
-      // /api/uitgaven-na-pensioen/context (consume, don't recompute).
-      const { extrapolatedIncome, yearlyRetirementExpenses } = deriveRetirementExpenseBasis({
+      // Jaarinkomen + pensioenuitgave-methode.
+      //
+      // Het jaarinkomen komt op de GEDEELDE grondslag (ADR 0103): budgetten,
+      // transacties, eigen bedrag of profielschatting — hetzelfde getal dat de
+      // inkomenskaart op /overzicht/cashflow toont. Dat is hier de zwaarste
+      // consequentie van het besluit: bij `retirement_expense_method =
+      // 'current_income'` ÍS dit jaarinkomen de pensioenuitgave, en dus het
+      // FIRE-doel.
+      //
+      // Terugval wanneer de bundel niet beschikbaar is: de gedeelde
+      // extrapolatie-helper (lib/retirement-expense-basis.ts) op de rauwe
+      // 12-maands transactiesom — nooit een eigen, vierde afleiding.
+      const fallbackBasis = deriveRetirementExpenseBasis({
         method: profileResult.data?.retirement_expense_method as RetirementExpenseMethod,
         yearlyMustExpenses,
         last12Income,
@@ -1262,6 +1299,18 @@ export default function HorizonPage({
         estimatedYearlyExpenses: profileMonthlyExpenses * 12,
         now,
       })
+      const extrapolatedIncome = cashflowSettings
+        ? cashflowSettings.effectiveAnnualIncome
+        : fallbackBasis.extrapolatedIncome
+      const yearlyRetirementExpenses = cashflowSettings
+        ? computeRetirementExpenses(
+            profileResult.data?.retirement_expense_method as RetirementExpenseMethod,
+            yearlyMustExpenses,
+            extrapolatedIncome,
+            profileResult.data?.retirement_expense_custom_amount,
+            profileMonthlyExpenses * 12,
+          )
+        : fallbackBasis.yearlyRetirementExpenses
 
       setRetirementMethod((profileResult.data?.retirement_expense_method ?? 'essential_budgets') as RetirementExpenseMethod)
 

@@ -38,6 +38,11 @@ import {
   computeRetirementExpenses,
   type RetirementExpenseMethod,
 } from '@/lib/budget-utils'
+import {
+  resolveEffectiveIncomeExpenses,
+  type IncomeExpenseSources,
+} from '@/lib/effective-financials'
+import type { CashflowSettingsData } from '@/lib/cashflow-settings-data'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { HousingStrategySection } from '@/components/identity/instellingen/housing-strategy-section'
 import {
@@ -176,18 +181,24 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
       const now = new Date()
       const monthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString().split('T')[0]
       const monthEnd = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 1)).toISOString().split('T')[0]
-      const twelveMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 11, 1)).toISOString().split('T')[0]
 
-      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, childBudgetsResult, income12Result, earliestIncomeResult] = await Promise.all([
+      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, childBudgetsResult, cashflowSettings] = await Promise.all([
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct').eq('is_active', true),
         supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-        supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate').single(),
+        supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source').single(),
         supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
         supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
         supabase.from('budgets').select('id, name, parent_id, default_limit, is_essential, interval, budget_type').not('parent_id', 'is', null).not('budget_type', 'in', '("archive","income","savings")'),
-        supabase.from('transactions').select('amount, date').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
-        supabase.from('transactions').select('date').gt('amount', 0).gte('date', twelveMonthsAgo).order('date', { ascending: true }).limit(1),
+        // GEDEELDE GRONDSLAG (ADR 0103). Deze modal rekende zijn eigen
+        // 12-maands jaarinkomen uit een rauwe transactielus — daarmee negeerde
+        // hij zowel de handmatige override als (nu) de budget-grondslag, en
+        // toonde hij een ander FIRE-doel dan /overzicht/cashflow. Het
+        // jaarinkomen komt voortaan uit dezelfde bundel als de kaart die de
+        // gebruiker ziet; de twee eigen inkomens-queries zijn daarmee weg.
+        fetch('/api/overzicht/cashflow-settings')
+          .then((r) => (r.ok ? (r.json() as Promise<CashflowSettingsData>) : null))
+          .catch(() => null),
       ])
 
       // Fetch withdrawal strategy columns separately — these may not exist yet
@@ -218,13 +229,33 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
         setStrategyWarning('Strategie-instellingen konden niet geladen worden. Standaardwaarden worden gebruikt.')
       }
 
-      let monthlyIncome = 0
-      let monthlyExpenses = 0
+      // Rauwe transactiesom over de lopende kalendermaand — mag onvolledig zijn;
+      // de resolver hieronder bepaalt wat er werkelijk geldt.
+      let txMonthIncome = 0
+      let txMonthExpenses = 0
       for (const tx of txResult.data ?? []) {
         const amt = Number(tx.amount)
-        if (amt > 0) monthlyIncome += amt
-        else monthlyExpenses += Math.abs(amt)
+        if (amt > 0) txMonthIncome += amt
+        else txMonthExpenses += Math.abs(amt)
       }
+      // Canonieke effectieve maandbedragen via de ENE resolver — een handmatige
+      // bron wint altijd van de (mogelijk partiële) maandsom, en de
+      // budgetgrondslag doet mee zodra de gedeelde bundel binnen is. Voorheen
+      // ontbrak deze stap hier volledig: de modal telde de kalendermaand rauw op
+      // en negeerde daarmee stilzwijgend de handmatige override van de gebruiker
+      // (ADR 0103 — de vijfde kopie van de grondslagbeslissing).
+      const effective = resolveEffectiveIncomeExpenses(
+        (profileResult.data ?? {}) as IncomeExpenseSources,
+        txMonthIncome,
+        txMonthExpenses,
+        cashflowSettings
+          ? {
+              income: cashflowSettings.budgetIncome.monthlyTotal,
+              expenses: cashflowSettings.budgetExpenses.monthlyTotal,
+            }
+          : undefined,
+      )
+      const monthlyExpenses = effective.expenses
 
       const totalAssets = (assetsResult.data ?? []).reduce((s, a) =>
         s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
@@ -232,19 +263,14 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
         s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
       const monthlyContributions = (assetsResult.data ?? []).reduce((s, a) => s + Number(a.monthly_contribution), 0)
 
-      const last12Income = income12Result.data?.reduce((s, t) => s + Number(t.amount), 0) ?? 0
-      let extrapolatedIncome = last12Income
-      const earliestIncomeDate = earliestIncomeResult.data?.[0]?.date
-      if (earliestIncomeDate && last12Income > 0) {
-        const earliest = new Date(earliestIncomeDate)
-        const incomeMonths = Math.max(1, Math.min(12,
-          (now.getFullYear() - earliest.getFullYear()) * 12 +
-          (now.getMonth() - earliest.getMonth())
-        ))
-        if (incomeMonths < 12) {
-          extrapolatedIncome = (last12Income / incomeMonths) * 12
-        }
-      }
+      // Jaarinkomen op de GEDEELDE grondslag: `effectiveAnnualIncome` is precies
+      // het getal op de inkomenskaart van /overzicht/cashflow en dezelfde waarde
+      // die de FIRE-keten voedt. Valt de bundel weg (offline/401), dan het
+      // effectieve maandinkomen × 12 — nooit een tweede, eigen extrapolatie.
+      const extrapolatedIncome = cashflowSettings
+        ? cashflowSettings.effectiveAnnualIncome
+        : effective.income * 12
+      const monthlyIncome = extrapolatedIncome / 12
 
       const allChildren = childBudgetsResult.data ?? []
       const { yearlyMustExpenses } = computeYearlyMustExpenses(

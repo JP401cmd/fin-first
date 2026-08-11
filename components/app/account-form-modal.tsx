@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
-import { X, Plus, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { Trash2 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { createClient } from '@/lib/supabase/client'
 import { OwnershipToggle, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
@@ -50,92 +50,6 @@ export function AccountFormModal({
   const [backfillChecked, setBackfillChecked] = useState(false)
   const [backfilling, setBackfilling] = useState(false)
   const [backfillResult, setBackfillResult] = useState<string | null>(null)
-  const [showOwnIbans, setShowOwnIbans] = useState(false)
-  const [ownIbanRows, setOwnIbanRows] = useState<{ id: string; match_type: string; match_value: string; iban: string | null; label: string | null }[]>([])
-  const [newOwnIban, setNewOwnIban] = useState('')
-  const [newOwnIbanLabel, setNewOwnIbanLabel] = useState('')
-  const [newOwnName, setNewOwnName] = useState('')
-  const [reclassifying, setReclassifying] = useState(false)
-  const [reclassifyResult, setReclassifyResult] = useState<string | null>(null)
-
-  const loadOwnIbans = useCallback(async () => {
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data } = await supabase
-      .from('user_own_ibans')
-      .select('id, match_type, match_value, iban, label')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: true })
-    if (data) setOwnIbanRows(data)
-  }, [])
-
-  useEffect(() => {
-    if (showOwnIbans) { void loadOwnIbans() }
-  }, [showOwnIbans, loadOwnIbans])  
-
-  async function addOwnIban() {
-    const normalized = newOwnIban.replace(/\s/g, '').toUpperCase()
-    if (!normalized) return
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    await supabase.from('user_own_ibans').insert({
-      user_id: user.id,
-      iban: normalized,
-      match_type: 'iban',
-      match_value: normalized,
-      label: newOwnIbanLabel.trim() || null,
-    })
-    setNewOwnIban('')
-    setNewOwnIbanLabel('')
-    loadOwnIbans()
-  }
-
-  async function addOwnName() {
-    const value = newOwnName.trim()
-    if (!value) return
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    await supabase.from('user_own_ibans').insert({
-      user_id: user.id,
-      iban: null,
-      match_type: 'name',
-      match_value: value.toLowerCase(),
-      label: value,
-    })
-    setNewOwnName('')
-    loadOwnIbans()
-  }
-
-  async function removeOwnIban(id: string) {
-    const supabase = createClient()
-    await supabase.from('user_own_ibans').delete().eq('id', id)
-    loadOwnIbans()
-  }
-
-  async function reclassifyTransactions() {
-    setReclassifying(true)
-    setReclassifyResult(null)
-    try {
-      const res = await fetch('/api/own-accounts/reclassify', { method: 'POST' })
-      const json = await res.json()
-      if (res.ok) {
-        const n = json.reclassified ?? 0
-        setReclassifyResult(
-          n > 0
-            ? `${n} transactie${n === 1 ? '' : 's'} omgezet naar eigen rekening.`
-            : (json.message ?? 'Geen transacties om om te zetten.'),
-        )
-      } else {
-        setReclassifyResult(json.error ?? 'Herclassificeren mislukt.')
-      }
-    } catch {
-      setReclassifyResult('Herclassificeren mislukt.')
-    }
-    setReclassifying(false)
-  }
 
   function persist() {
     onSave({
@@ -274,99 +188,17 @@ export function AccountFormModal({
             </div>
           )}
 
-          {/* Own IBAN registry (hidden for contant geld) */}
-          {accountType !== 'contant_geld' && <div className="border-t border-[var(--border-ed)] pt-3">
-            <button
-              type="button"
-              onClick={() => setShowOwnIbans((v) => !v)}
-              className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-[var(--ink-3)] hover:text-[var(--ink-2)]"
-            >
-              <span>{showOwnIbans ? '\u25BE' : '\u25B8'}</span>
-              Mijn andere eigen rekeningen
-            </button>
-            {showOwnIbans && (
-              <div className="mt-2 space-y-2">
-                <p className="text-[11px] leading-relaxed text-[var(--ink-4)]">
-                  Markeer rekeningen die van jou zijn (bv. een tweede bank, PayPal of een broker).
-                  Overboekingen naar/van deze rekeningen worden bij import herkend als eigen-rekening-verschuiving
-                  en tellen nergens mee. Geen IBAN? Voeg een naam toe (bv. &ldquo;PayPal&rdquo;).
-                </p>
-                {ownIbanRows.map((row) => (
-                  <div key={row.id} className="flex items-center gap-2">
-                    <span className="flex-1 font-mono text-xs text-[var(--ink-2)]">
-                      {row.match_type === 'name'
-                        ? <>naam: <span className="not-italic">{row.match_value}</span></>
-                        : (row.iban ?? row.match_value)}
-                    </span>
-                    {row.label && row.match_type !== 'name' && (
-                      <span className="text-xs italic text-[var(--ink-3)]">{row.label}</span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => removeOwnIban(row.id)}
-                      className="rounded p-0.5 text-[var(--ink-4)] hover:bg-negative/10 hover:text-negative"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))}
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newOwnIban}
-                    onChange={(e) => setNewOwnIban(e.target.value.toUpperCase())}
-                    placeholder="NL91ABNA..."
-                    className="flex-1 rounded-[var(--r)] border border-[var(--border-ed)] px-2 py-1 font-mono text-xs text-[var(--ink)] outline-none focus:border-kern-500"
-                  />
-                  <input
-                    type="text"
-                    value={newOwnIbanLabel}
-                    onChange={(e) => setNewOwnIbanLabel(e.target.value)}
-                    placeholder="Label (optioneel)"
-                    className="w-32 rounded-[var(--r)] border border-[var(--border-ed)] px-2 py-1 text-xs text-[var(--ink)] outline-none focus:border-kern-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={addOwnIban}
-                    className="rounded-[var(--r)] bg-kern-100 px-2 py-1 text-xs font-medium text-kern-700 hover:bg-kern-200"
-                    aria-label="IBAN toevoegen"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newOwnName}
-                    onChange={(e) => setNewOwnName(e.target.value)}
-                    placeholder="Naam, bijv. PayPal"
-                    className="flex-1 rounded-[var(--r)] border border-[var(--border-ed)] px-2 py-1 text-xs text-[var(--ink)] outline-none focus:border-kern-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={addOwnName}
-                    className="rounded-[var(--r)] bg-kern-100 px-2 py-1 text-xs font-medium text-kern-700 hover:bg-kern-200"
-                    aria-label="Naam toevoegen"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-                <div className="flex items-center justify-between gap-2 border-t border-[var(--border-ed)] pt-2">
-                  <span className="text-[11px] text-[var(--ink-4)]">
-                    {reclassifyResult ?? 'Bestaande transacties opnieuw indelen op deze regels?'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={reclassifyTransactions}
-                    disabled={reclassifying}
-                    className="shrink-0 rounded-[var(--r)] border border-[var(--border-md)] px-2.5 py-1 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] disabled:opacity-50"
-                  >
-                    {reclassifying ? 'Bezig\u2026' : 'Herclassificeer'}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>}
+          {/* Eigen rekeningen \u2014 het beheer zat hier als inklapblok en muteerde
+              `user_own_ibans` rechtstreeks vanuit de browser (ADR 0058: muteren
+              hoort via een API-route). Het woont nu op \u00E9\u00E9n plek, m\u00E9t de lijst van
+              werkelijk voorkomende tegenpartijen: Budgetten \u2192 Eigen rekening. */}
+          {accountType !== 'contant_geld' && (
+            <p className="border-t border-[var(--border-ed)] pt-3 text-[11px] leading-relaxed text-[var(--ink-4)]">
+              Heb je meer eigen rekeningen \u2014 een tweede bank, PayPal, een broker? Beheer die bij
+              Budgetten \u2192 Eigen rekening. Overboekingen ertussen tellen dan niet mee als uitgave of
+              inkomst.
+            </p>
+          )}
 
           {/* Backfill-bevestiging bij eigendomsflip met bestaande transacties. */}
           {pendingBackfill && (

@@ -84,10 +84,12 @@ export const loadAssetsData = cache(async (
     // bezittingen die alleen in bank_accounts staan (geen companion cash-asset).
     // Zelfde bron/telling als horizon-data-loader's `unlinkedCash`, zodat het
     // bezittingen-totaal aansluit op de canonieke `totalAssets` / hero-kaart.
-    // RLS scoopt dit tot de eigen rekeningen van de gebruiker.
+    // RLS scoopt dit tot de eigen rekeningen van de gebruiker PLUS de gedeelde
+    // rekeningen van het huishouden — vandaar `ownership`: die laatste tellen
+    // op het eigen aandeel, niet volledig (ADR 0101).
     supabase
       .from('bank_accounts')
-      .select('id, name, balance')
+      .select('id, name, balance, ownership')
       .is('linked_asset_id', null)
       .eq('is_active', true),
     supabase
@@ -111,10 +113,17 @@ export const loadAssetsData = cache(async (
   // eigen-inclusieve perspectieven (personal/household). In 'partner'-perspectief
   // toont de lijst bewust de bezittingen van de partner; de eigen rekeningen
   // horen daar niet bij. RLS levert sowieso alleen de eigen rekeningen.
+  // De perspectief-context is hier al geladen — het aandeel komt daaruit, zodat
+  // een gedeelde rekening niet bij beide partners voor 100% in het totaal landt.
   const unlinkedCashAssets =
     perspective === 'partner'
       ? []
-      : (buildUnlinkedCashAssets(unlinkedBankRes.data ?? []) as unknown as Array<Record<string, unknown>>)
+      : (buildUnlinkedCashAssets(unlinkedBankRes.data ?? [], {
+          perspective,
+          mySharePct: perspectiveData.context.hasHousehold
+            ? perspectiveData.context.mySharePct
+            : 100,
+        }) as unknown as Array<Record<string, unknown>>)
   const assets = [...sortedAssets, ...unlinkedCashAssets]
   const mortgages = (mortgageRes.data ?? []) as AssetsPageData['mortgages']
   const budgetingActive = profileRes.data?.budgeting_active !== false

@@ -9,6 +9,7 @@
 //   - not configured              → "Niet geconfigureerd" + setup hint
 
 import { useEffect, useState } from 'react'
+import { formatAmsterdamDayMonth, formatAmsterdamTime } from '@/lib/tz'
 
 interface FmpStatus {
   callsToday: number
@@ -22,13 +23,12 @@ type LoadState =
   | { kind: 'ready'; status: FmpStatus }
   | { kind: 'error' }
 
+// Amsterdamse tijd via `lib/tz.ts` — `toLocaleString` zonder `timeZone` leest de
+// runtime-tijdzone (server = UTC, browser = Amsterdam): de #418-klasse.
 function formatResetTime(iso: string): string {
-  try {
-    const d = new Date(iso)
-    return d.toLocaleString('nl-NL', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })
-  } catch {
-    return iso
-  }
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  return `${formatAmsterdamDayMonth(d)} ${formatAmsterdamTime(d)}`
 }
 
 export function IsinResolverStatus() {

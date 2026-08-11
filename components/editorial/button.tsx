@@ -12,6 +12,14 @@
  * - `primary`  (default): inkt-zwart — het canonieke recept, module-neutraal.
  *     `bg-[var(--ink)] text-[var(--paper)] hover:bg-[var(--ink-2)]`.
  * - `secondary`: outline — zelfde maatvoering, `border-2 border-[var(--ink)]`.
+ * - `destructive`: semantisch rood — UITSLUITEND voor de bevestigende knop van
+ *     een onomkeerbare actie (verwijderen, loslaten, definitief wissen):
+ *     `bg-negative text-white hover:bg-negative/90`. Dit is het recept dat de
+ *     app al met de hand herhaalde (`asset-pane.tsx`, `doel-loslaten-confirm.tsx`)
+ *     — nu één bron, zodat "Verwijder 43 transacties" er nooit meer uitziet als
+ *     "Opslaan". Semantisch rood volgt bewust NIET de accentkleur van de module.
+ *     Kleur is hier nooit het enige signaal: de knoptekst benoemt de uitkomst en
+ *     de bevestiging draagt icoon + kop (GOV.UK-regel).
  * - `moment`   : module-kleur, UITSLUITEND voor grote momenten
  *     (onboarding-afronding, module-activatie, doel vastleggen):
  *     `bg-[var(--module-active-600)] text-white hover:bg-[var(--module-active-700)]`.
@@ -36,11 +44,11 @@ import type {
   ReactNode,
 } from 'react'
 
-export type ButtonVariant = 'primary' | 'secondary' | 'moment'
+export type ButtonVariant = 'primary' | 'secondary' | 'destructive' | 'moment'
 export type ButtonSize = 'sm' | 'md'
 
 type CommonProps = {
-  /** `primary` (ink, default) · `secondary` (outline) · `moment` (module-kleur, grote momenten). */
+  /** `primary` (ink, default) · `secondary` (outline) · `destructive` (rood, onomkeerbaar) · `moment` (module-kleur, grote momenten). */
   variant?: ButtonVariant
   /** `md` = min-h-11 (default) · `sm` = min-h-9 (krappe contexten). */
   size?: ButtonSize
@@ -81,6 +89,7 @@ const VARIANT: Record<ButtonVariant, string> = {
   primary: 'bg-[var(--ink)] text-[var(--paper)] hover:bg-[var(--ink-2)]',
   secondary:
     'border-2 border-[var(--ink)] bg-[var(--paper)] text-[var(--ink)] hover:bg-[var(--subtle)]',
+  destructive: 'border border-negative bg-negative text-white hover:bg-negative/90',
   moment:
     'bg-[var(--module-active-600)] text-white hover:bg-[var(--module-active-700)]',
 }

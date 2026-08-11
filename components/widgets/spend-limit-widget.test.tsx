@@ -48,6 +48,10 @@ function makeLimit(overrides: Partial<SpendLimitWidgetData> = {}): SpendLimitWid
     withinPeriodCount: 9,
     sparkClosedMatchedAmounts: [100, 130, 90, 150, 110, 120],
     trendDirection: 'improving',
+    score: 82,
+    scoreLabel: 'strak',
+    scoreHitRatePct: 75,
+    scoreBasisPeriodCount: 12,
     aggregateTruncationSuspected: false,
     ...overrides,
   }

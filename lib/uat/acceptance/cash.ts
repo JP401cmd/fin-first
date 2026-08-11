@@ -206,10 +206,10 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     given: 'Persona Daan Bakker, meerdere "Uber Eats"-transacties over meerdere maanden.',
     when: 'De gebruiker wijzigt het budget en kiest reikwijdte "Alle transacties van deze tegenpartij".',
-    then: 'Alle transacties van die tegenpartij (over alle maanden) krijgen het nieuwe budget + `category_source=\'rule\'`; een correctieregel wordt opgeslagen in `category_corrections`. Het exacte aantal bijgewerkte transacties hangt af van de seedhistorie (niet hand-narekenbaar), het GEDRAG (bulk-match op tegenpartijnaam) is wel deterministisch.',
+    then: 'Alle transacties van die tegenpartij (over alle maanden) krijgen het nieuwe budget + `category_source=\'rule\'`; een correctieregel wordt opgeslagen in `category_corrections`. Het exacte aantal bijgewerkte transacties hangt af van de seedhistorie (niet hand-narekenbaar), het GEDRAG (bulk-match op tegenpartijnaam) is wel deterministisch. TWEE EIGENSCHAPPEN ERBIJ sinds de bulkbewerk-oplevering (ADR 0104): (1) boekt de gebruiker op "Eigen rekening", dan schrijft het formulier het CANONIEKE TRIO — `budget_id` + `category_source` + `transaction_type=\'transfer\'` — via dezelfde gedeelde `transferMarkingFor` (lib/transactions/transfer-marking.ts) die `PATCH /api/transactions/bulk-budget` gebruikt; alléén `budget_id` schrijven zou de transactie zichtbaar op "Eigen rekening" zetten terwijl hij nog gewoon meetelt in inkomsten, uitgaven, spaarquote en grenzenpotten (`isRealAggRow` kijkt uitsluitend naar `transaction_type`). Krijgt een voorheen-verschuivende rij een gewoon budget, dan wordt de markering `null`; had de rij geen markering, dan blijft de sleutel weg — importherkomst als \'DEBIT\' sneuvelt nooit op een budgetwijziging. (2) De reikwijdte-match escapet `%`/`_` in de vrije gebruikerstekst (`escapeLikePattern`): een omschrijving met een `%` erin liet de update anders over ÉLKE transactie van de gebruiker lopen. Beide eigenschappen zijn hier gedragsmatig; hun exacte toets woont in WF-CASH-56 (paritytest transfer-marking.test.ts).',
     assertion: {
       kind: 'ui-only',
-      source: 'components/app/transaction-form.tsx (handleSaveWithScope) — bulk-DB-update, geen pure functie zonder Supabase',
+      source: 'components/app/transaction-form.tsx (handleSaveWithScope → bulkUpdate met lib/transactions/transfer-marking.ts#transferMarkingFor + lib/transactions/search-query.ts#escapeLikePattern) — bulk-DB-update, geen pure functie zonder Supabase; de gedeelde markeringsregel zelf is exact gedekt door WF-CASH-56',
     },
   },
   {
@@ -783,6 +783,117 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'ui-only',
       source: 'app/(app)/overzicht/cashflow/transacties/page.tsx + components/overview/transacties/spend-limits-section.tsx + spend-limit-performance-pane.tsx + spend-limit-period-chart.tsx + spend-limit-heatmap.tsx + components/widgets/spend-limit-widget.tsx + lib/widget-catalog.ts + lib/dashboard-data-loader.ts + app/api/spend-limits/route.ts (GET/POST — lijst + aanmaken) + app/api/spend-limits/[id]/route.ts (PUT/PATCH/DELETE — bewerken/pauzeren/archiveren) + app/api/spend-limits/counterparties/route.ts (top-40-suggestielijst) + app/api/spend-limits/preview/route.ts + app/api/spend-limits/[id]/breakdown/route.ts + app/(app)/mijn/uiterlijk/page.tsx + components/mijn/spend-limit-alias-picker.tsx + lib/hooks/use-spend-limit-alias.tsx + app/api/spend-limit-alias/route.ts + lib/notifications/spend-limit.ts + app/api/notifications/route.ts#decideSpendLimitEvents — UI-/route-gedrag op persona-seeddata met Math.random()-jitter, geen hard cijfer',
+    },
+  },
+  {
+    workflow: 'WF-CASH-55',
+    scenarioId: 'UAT-CASH-55',
+    titel: 'Transactie-bulkbewerken: zoeken over de volledige historie, pagina/alle-N selecteren, impact tonen (ADR 0104, AC1–AC5)',
+    kriticiteit: 'KERN',
+    persona: 'daan',
+    given: 'De bulkbewerk-overlay (docs/requirements-transactie-bulkbewerken.md) is open op een zoekopdracht met 340 treffers en een paginagrootte van 50.',
+    when: 'De gebruiker zoekt zonder datumvenster (AC1), leest het treffertotaal op de eerste pagina (AC2), vinkt de kopcheckbox aan (AC3), verandert daarna de zoekterm (AC4) en leest de impactregel van een selectie van 12 transacties met som −€1.240 (AC5).',
+    then: 'AC1: `applyTransactionSearchCriteria` zet op een leeg criterium geen enkel datumfilter (geen `gte`/`lte` op `date`) — anders dan het oude venster van ~12–13 maanden (resolveFetchWindow) reikt de zoekopdracht dus over de hele historie. AC2/AC3: de kopcheckbox pakt exact de 50 zichtbare rijen (headerState=full, niet 340) en de "Selecteer alle 340 gevonden transacties"-affordance verschijnt alleen dan. AC4: het criterium krijgt een andere identiteitssleutel zodra de zoekterm wijzigt — de stabiele haak waarop de overlay de selectie leegt en dat meldt. AC5: de impactregel toont 12 transacties en het netto bedrag −€1.240 (som van sumPositief + sumNegatief).',
+    assertion: {
+      kind: 'exact',
+      expected: 'geenDatumfilterOpLeegCriterium=true; headerStateVolledigePagina=full; selectAllAffordance=true; selectionCountExpliciet=50; selectionCountAlleN=340; criteriaKeyVerandertBijZoekterm=true; impactNetBedrag=-1240',
+      source: 'lib/transactions/search-query.ts#applyTransactionSearchCriteria (echte functie, fake filterbuilder) + components/overview/transacties/bulk/selection-model.ts#headerState/shouldOfferSelectAll/selectionCount + criteria.ts#criteriaKey (echte functies) + bulk-impact.tsx (net = sumPositief + sumNegatief, mirror — inline in BulkImpact, geen eigen export) — zie cash-checks.ts',
+    },
+  },
+  {
+    workflow: 'WF-CASH-56',
+    scenarioId: 'UAT-CASH-56',
+    titel: 'Transactie-bulkbewerken: hercategoriseren — canoniek trio en split-uitsluiting (ADR 0104, AC6–AC8)',
+    kriticiteit: 'KERN',
+    persona: 'daan',
+    given: '1.500 geselecteerde transacties, waarvan 3 nu `transaction_type=\'transfer\'` dragen en 7 gewone import-herkomst (bv. \'DEBIT\'); geen enkele is gesplitst in dit scenario.',
+    when: 'De gebruiker koppelt de selectie aan "Eigen rekening" (AC7), koppelt in een tweede ronde alle 10 aan "Boodschappen" (AC8), en `planBulkBudgetUpdate` verdeelt de 1.500 kandidaten in schrijfgroepen (AC6).',
+    then: 'AC7: naar "Eigen rekening" schrijft elke rij het canonieke trio `budget_id` + `category_source=\'transfer\'` + `transaction_type=\'transfer\'`. AC8: naar "Boodschappen" verliezen de 3 voorheen-verschuivende rijen hun `transaction_type` (wordt `null`); bij de overige 7 ontbreekt de sleutel `transaction_type` in de patch volledig — hun importherkomst blijft ongemoeid, geen blanket-null. AC6: alle 1.500 niet-gesplitste kandidaten belanden in een schrijfgroep (0 skips) — het uiteindelijk gerapporteerde "1.500 van 1.500" komt in productie nog steeds uit `.select(\'id\')` op de mutatie (R-NF4), maar de groepering zelf raakt aantoonbaar alle 1.500. Een split in de selectie wordt uitgesloten met reden `is_split`, nooit stil meegenomen.',
+    assertion: {
+      kind: 'exact',
+      expected: 'eigenRekeningTrio=budget_id+transfer+transfer; wasVerschuivingNaarGewoon=manual+transactionTypeNull; wasGeenVerschuivingNaarGewoon=manual+geenTransactionTypeSleutel; planTotaalCandidates1500=1500; planSkipped1500=0; splitWordtGeskiptMetReden=is_split',
+      source: 'lib/transactions/transfer-marking.ts#transferMarkingFor + lib/transactions/bulk-mutate.ts#planBulkBudgetUpdate — echte productiefuncties, geen mirror (gedeeld met components/app/transaction-form.tsx, paritytest transfer-marking.test.ts) — zie cash-checks.ts',
+    },
+  },
+  {
+    workflow: 'WF-CASH-57',
+    scenarioId: 'UAT-CASH-57',
+    titel: 'Transactie-bulkbewerken: verwijderen — zware bevestiging, type-to-confirm en herimport-waarschuwing (ADR 0104, AC9–AC10)',
+    kriticiteit: 'KERN',
+    persona: 'daan',
+    given: 'Een selectie van 43 transacties, waarvan 5 afkomstig van een gekoppelde bankrekening.',
+    when: 'De gebruiker klikt op Verwijderen; de bevestiging toont het aantal/totaalbedrag/actieve filters, staat erop dat het definitief is, en vraagt — boven de drempel van 25 (`TYPE_TO_CONFIRM_THRESHOLD`) — het aantal over te typen.',
+    then: 'AC9: bij 43 (>25) is `needsTyping=true`, de knoptekst luidt "Verwijder 43 transacties" (niet "OK"), en de knop blijft geblokkeerd tot het overgetypte aantal exact 43 is (`typedOk`). Rood is niet het enige signaal: de bevestiging draagt ook een icoon en een expliciete kop ("Dit is definitief"). AC10: met 5 bankgekoppelde rijen (bankLinkedCount>0) toont de bevestiging de herimport-waarschuwing; bij 0 verschijnt ze niet — de app waarschuwt, voorkomt niets (R-NF7).',
+    assertion: {
+      kind: 'exact',
+      expected: 'needsTypingBij43=true; labelBij43=Verwijder 43 transacties; typedOkLeeg=false; typedOkJuisteGetal=true; typedOkVerkeerdGetal=false; waarschuwingBij5BankLinked=true; geenWaarschuwingBij0=false',
+      source: 'components/overview/transacties/bulk/bulk-bevestigingen.tsx (BulkDeleteConfirm: totaal/needsTyping/typedOk/label-berekening, inline — mirror, geen eigen export) + lib/transactions/bulk-contract.ts#TYPE_TO_CONFIRM_THRESHOLD (echte constante) — zie cash-checks.ts',
+    },
+  },
+  {
+    workflow: 'WF-CASH-58',
+    scenarioId: 'UAT-CASH-58',
+    titel: 'Transactie-bulkbewerken: huishoud-scoping en de 5.000-grens (ADR 0104, AC11–AC12) — HANDMATIGE CONTROLE',
+    kriticiteit: 'KERN',
+    persona: 'lisa',
+    given: 'Een huishouden waarin de partner transacties heeft op een gedeelde rekening (Lisa de Groot, "gezin"); een gebruiker met 4.000 transacties die aan een filter voldoen.',
+    when: 'De gebruiker selecteert "alle N" en voert een bulkactie uit.',
+    then: 'AC11/AC12 zijn structureel geborgd in de code (`lib/transactions/bulk-mutate.ts` zet `.eq(\'user_id\', userId)` op zowel de leesronde als de schrijfronde — RLS op UPDATE/DELETE is toch al strikt eigen-rij, dit is de tweede, expliciete slot; `SELECTION_MAX=5000` in `bulk-contract.ts` laat de manifest-route boven de grens weigeren met 400 `selection_too_large` in plaats van stil af te kappen), maar een live UAT-run kan dit NIET automatisch aantonen: de standaard testpersona\'s dragen geen gedeelde rekening met partnertransacties in de juiste vorm, en geen enkele persona heeft 4.000 transacties die aan één filter voldoen. Dit scenario is daarom een HANDMATIGE controle — een tester zet zelf een huishouden met een gedeelde rekening en ≥4.000 filtermatchende transacties op (of leest de code/tests) en bevestigt met de hand dat (a) geen enkele partnerrij wijzigt/verdwijnt en (b) alle 4.000 geraakt worden, niet 1.000. Groen kleuren zonder deze stap bewijst niets.',
+    assertion: {
+      kind: 'ui-only',
+      source: 'lib/transactions/bulk-mutate.ts (readBulkCandidates/bulkUpdateTransactions/bulkDeleteTransactions — .eq(\'user_id\') op leesronde én schrijfronde) + lib/transactions/bulk-contract.ts#SELECTION_MAX + de manifest-route (app/api/transactions/search/manifest/route.ts, 400 selection_too_large) — DB-mutatie/RLS-gedrag over een datatoestand die geen persona seedt; niet los toetsbaar in een pure vitest, en in een live UAT-run alleen bewijsbaar met een handmatig opgezet huishouden + 4.000-rijen-account.',
+    },
+  },
+  {
+    workflow: 'WF-CASH-59',
+    scenarioId: 'UAT-CASH-59',
+    titel: 'Transactie-bulkbewerken: regelaanbod op bevestiging en eerlijke terugkoppeling bij gedeeltelijke mislukking (ADR 0104, AC13–AC14)',
+    kriticiteit: 'BELANGRIJK',
+    persona: 'daan',
+    given: 'Een geslaagde hercategorisatie; een bulkactie waarbij één batch van ≤200 id\'s faalt terwijl de overige batches doorgaan (R-NF5).',
+    when: 'De app biedt na de hercategorisatie aan er een regel van te maken en de gebruiker klikt weg (AC13); de bulkmutatie rondt af met één mislukte batch (AC14).',
+    then: 'AC13: wegklikken van het regelaanbod roept `createBulkRule` niet aan — er ontstaat geen `category_corrections`-rij; alleen een expliciete bevestiging doet dat. AC14: het eindresultaat volgt het vaste contract `{ requested, updated/deleted, skipped[{id,reason}], failedIds[] }` — de gefaalde batch levert `failedIds` op terwijl `updated`/`deleted` (uit `.select(\'id\')` op de geslaagde batches) het werkelijke aantal blijft; de app meldt dus expliciet hoeveel wél en hoeveel niet gelukt zijn, nooit stilzwijgend "klaar".',
+    assertion: {
+      kind: 'consistency',
+      source: 'components/overview/transacties/bulk/bulk-api.ts#createBulkRule (alleen op expliciete aanroep) + lib/transactions/bulk-mutate.ts#bulkUpdateTransactions/bulkDeleteTransactions (BulkWriteResult { touched, failedIds } — per-batch falen isoleert de rest, getest in bulk-mutate.test.ts) + lib/transactions/bulk-contract.ts#BulkBudgetResponse/BulkDeleteResponse-vorm — DB-mutatie over meerdere Supabase-rondes, geen pure functie zonder Supabase; de contractvorm zelf is wel het toetsbare deel.',
+    },
+  },
+  {
+    workflow: 'WF-CASH-60',
+    scenarioId: 'UAT-CASH-60',
+    titel: 'Grondslag van inkomen en uitgaven kiezen: budgetten, transacties of een eigen bedrag (ADR 0103)',
+    kriticiteit: 'KERN',
+    given:
+      'Het cashflow-instellingenblok op /overzicht/cashflow (`components/overview/cashflow-instellingen-blok.tsx`, lazy ingeladen via `cashflow-below-fold.tsx` — óók in Eenvoudig, daar achter een disclosure). Eén synthetische situatie waarin de drie bronnen bewust UITEENLOPEN: profielschatting €2.000/mnd, gemeten transacties €3.000/mnd, budgetsom €3.600/mnd. De keuze staat per kant op `profiles.income_source` / `profiles.expenses_source`; de uitsluitlijst op de eigen, exclusieve kolom `profiles.cashflow_basis_prefs` (NADRUKKELIJK niet `feature_preferences`, die kolom wordt als volledige overwrite geschreven).',
+    when:
+      'De gebruiker zet de grondslag achtereenvolgens op "kies voor mij" (`auto`), "uit je transacties" (`transaction`), "eigen bedrag" (`manual`) en op `auto` zonder bruikbare budget- of transactiesom; `resolveAmountWithBasis` neemt telkens de precedentiebeslissing en `resolveSavingsSource` leidt de spaarquote van diezelfde grondslag af.',
+    then:
+      'Precedentie (één functie, schaalvrij — de caller kiest maand- of jaarbedragen): `manual` wint altijd en levert basis `manual` (€2.000); `auto` met een bruikbare budgetsom levert die som en basis `budget` (€3.600); `transaction` slaat de budgetsom BEWUST over en levert de gemeten €3.000 met basis `transaction` (wie expliciet op de werkelijkheid stuurt, mag daar niet stil door zijn budgetten van worden afgeduwd); zonder bruikbare budget- én transactiesom valt `auto` terug op de profielschatting met basis `profile`. DE SPAARQUOTE VOLGT DE GRONDSLAG en is geen aparte instelbare bron: staan inkomen én uitgaven op `transaction`, dan blijft `savingsRate6m` ongewijzigd de uitkomst (mét de spaarbudget-/aflossingscorrectie die in `computeSavingsRate6m` zit); staat één van beide daar NIET op, dan geldt één uniforme (I − E) / I op de effectieve bedragen ZONDER die correctie — de correctie bestaat alleen omdat een RÚWE transactiesom spaarstortingen en aflossing ten onrechte meetelt, en een budget-uitgavensom bevat die per constructie niet (`BASIS_BUDGET_TYPE` telt uitsluitend `budget_type=\'expense\'`). Bewuste, aanvaarde gedragswijziging: ook de GEMENGDE combinatie (handmatig/budget-inkomen × transactie-uitgaven) valt nu onder de uniforme formule — voor gebruikers met `income_source=\'manual\'` en `expenses_source=\'auto\'` verschuift de spaarquote (en daarmee de FIRE-datum en de pijler Rondkomen) eenmalig. Elke kaart in het blok BENOEMT zijn eigen grondslag; dat is de harde voorwaarde waaronder een schuivend getal is toegestaan. Bronwaarde én uitsluitlijst landen in ÉÉN `PUT /api/parameters` — twee aanroepen zouden een waarneembare tussentoestand geven.',
+    assertion: {
+      kind: 'exact',
+      expected:
+        'autoBudget=3600/budget; transactieSlaatBudgetOver=3000/transaction; manualWint=2000/manual; terugvalProfiel=2000/profile; quoteBudgetgrondslag=25; quoteBeideTransactie=31',
+      source:
+        'lib/effective-financials.ts#resolveAmountWithBasis + lib/savings-source.ts#resolveSavingsSource (grondslag-tak) — echte productiefuncties, geen mirror; de opslag-invarianten (één PUT, eigen kolom) zijn vergrendeld in app/api/parameters/route.test.ts en app/api/feature-preferences/route.test.ts — zie cash-checks.ts',
+    },
+  },
+  {
+    workflow: 'WF-CASH-61',
+    scenarioId: 'UAT-CASH-61',
+    titel: 'Grenzenpot: reeksscore en prestatiebadge over afgesloten periodes (ADR 0089/0092)',
+    kriticiteit: 'BELANGRIJK',
+    given:
+      'De pure motor `computeSpendLimitScore` (lib/spend-limits/engine.ts) op synthetische afgesloten periodes — géén persona-jitter, dus wél volledig narekenbaar. Drie situaties: (a) zes afgesloten maandperiodes met grens €500 en uitgaven 400/400/400/300/300/300 (alle binnen, dalend), (b) zes afgesloten periodes van €900 tegen diezelfde grens (alle overschreden, vlak), (c) slechts twee afgesloten periodes.',
+    when:
+      '`computeSpendLimitTrend` levert de richting en `computeSpendLimitScore(closedPeriods, trend, createdAt)` het cijfer; de badge leest `label` uit `SPEND_LIMIT_SCORE_THRESHOLDS` en de opbouwgrafiek de drie `components`.',
+    then:
+      'Het cijfer is 70% trefpercentage + 30% huidige reeks (geklemd op `SPEND_LIMIT_SCORE_MIN_PERIODS` = 3 periodes) ± 10 trendbonus, geklemd op [0, 100]. (a) alles binnen + dalende trend → 100, label "strak", trefpercentage 100%, basis 6 periodes. (b) alles boven de grens, reeks 0, vlakke trend → 0, label "los". (c) ONDER de ondergrens van 3 meetellende afgesloten periodes geeft de motor `score: null` en `label: null` met `basisPeriodCount: 2` — de badge toont dan géén cijfer in plaats van een verzonnen laag getal. De `components` zijn precies de drie waarden waarop het cijfer rust, zodat de opbouwgrafiek niet van het cijfer kan wegdrijven.',
+    assertion: {
+      kind: 'exact',
+      expected:
+        'scoreGoed=100; labelGoed=strak; hitRateGoed=100; basisGoed=6; scoreSlecht=0; labelSlecht=los; scoreTeWeinig=null; labelTeWeinig=null; basisTeWeinig=2',
+      source:
+        'lib/spend-limits/engine.ts#computeSpendLimitScore + computeSpendLimitTrend + SPEND_LIMIT_SCORE_THRESHOLDS/SPEND_LIMIT_SCORE_MIN_PERIODS — echte productiefuncties, geen mirror — zie cash-checks.ts',
     },
   },
 ]

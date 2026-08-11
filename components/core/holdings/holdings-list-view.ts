@@ -12,9 +12,9 @@
 
 import type { SortKey, AssetClassFilter } from './holdings-toolbar'
 
-/** Zelfde EPSILON als de aggregatie-engine (lib/holdings-aggregation.ts): een
- *  positie geldt als gesloten bij ~0 stuks. */
-export const CLOSED_UNITS_EPSILON = 1e-9
+import { isClosedPosition, CLOSED_UNITS_EPSILON } from '@/lib/holdings-staleness'
+
+export { CLOSED_UNITS_EPSILON }
 
 /** Minimale velden die de filter/sort lezen. Superset-veilig: de page-`Holding`
  *  voldoet hieraan. `bucket` is optioneel (investment/crypto-onderscheid). */
@@ -24,6 +24,9 @@ export interface HoldingListItem {
   current_price: number | null
   daily_change_percent?: number | null
   name: string
+  ticker?: string | null
+  isin?: string | null
+  last_price_update?: string | null
   pnl_total?: number | null
   pnl_is_closed?: boolean | null
   bucket?: string
@@ -36,8 +39,10 @@ export interface HoldingListItem {
  * `units`-kolom met dezelfde EPSILON als de engine.
  */
 export function isClosedHolding(h: HoldingListItem): boolean {
-  if (typeof h.pnl_is_closed === 'boolean') return h.pnl_is_closed
-  return Math.abs(h.units) <= CLOSED_UNITS_EPSILON
+  // Delegeert bewust: één implementatie van "is deze positie gesloten", gedeeld
+  // met de verouderd-regel. Twee kopieën die vandaag hetzelfde doen, doen dat
+  // morgen niet meer.
+  return isClosedPosition(h)
 }
 
 /**

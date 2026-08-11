@@ -3,7 +3,11 @@ import { NextResponse } from 'next/server'
 import { computeFireAge } from '@/lib/checkin/fire-age'
 import { resolveFireParams } from '@/lib/fire-params'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
-import { selectUnlinkedBankAccounts, unlinkedCashTotal } from '@/lib/unlinked-cash'
+import {
+  resolveUnlinkedCashShare,
+  selectUnlinkedBankAccounts,
+  unlinkedCashTotal,
+} from '@/lib/unlinked-cash'
 
 const MONTH_NAMES = [
   'januari', 'februari', 'maart', 'april', 'mei', 'juni',
@@ -111,7 +115,12 @@ export async function GET() {
 
   // Zelfde inclusieregels als dashboard-data-loader: gewogen met
   // net_worth_inclusion_pct, plus losse bankrekeningen als cash.
-  const unlinkedCash = unlinkedCashTotal(bankRes.data)
+  // Huishoud-gewogen (lib/unlinked-cash.ts): een gedeelde rekening telt op het
+  // eigen aandeel, niet bij beide partners volledig.
+  const unlinkedCash = unlinkedCashTotal(
+    bankRes.data,
+    await resolveUnlinkedCashShare(supabase, bankRes.data),
+  )
   const totalAssets = (assetsRes.data || []).reduce(
     (s, a) => s + (a.current_value || 0) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0,
   ) + unlinkedCash

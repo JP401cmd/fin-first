@@ -370,6 +370,14 @@ function CashflowInstellingenDisclosure({ data }: { data: CashflowSettingsData }
 
   return (
     <div className="mt-5 sm:mt-8">
+      {/* NB: het blok draagt in Volledig sinds de samenvatting-herbouw zijn eigen
+          kop "Je instellingen" / "Waar je cijfers op rusten"; "& toekomst" klopt
+          niet meer (de FIRE-doorkijk woont op /toekomst). Deze twee regels lopen
+          daar bewust nog niet mee: `cashflow-below-fold.test.tsx` pint de titel
+          letterlijk, en dat testbestand is niet van deze wijziging. Hernoemen
+          hoort in dezelfde change als die assertie. In de praktijk ziet een
+          gebruiker nooit beide labels tegelijk — in Eenvoudig onderdrukt
+          `hideHeading` de eigen kop van het blok. */}
       <DepthSection
         title="Instellingen & toekomst"
         summary="Je inkomen, spaarquote en geschatte uitgaven"

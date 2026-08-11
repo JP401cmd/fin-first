@@ -71,7 +71,6 @@ export const CALC_COVERAGE_IGNORE: CalcCoverageIgnoreEntry[] = [
   { file: 'lib/crypto-holdings-data.ts', reason: 'Portefeuille-presentatiehelpers (concentratie/spread); de Box 3-impact-tak leunt op de al-gecatalogiseerde box3-forfaitair-motor, de rest is weergave.' },
   { file: 'lib/debt-kpi.ts', reason: 'KPI-aggregatie voor schuldenkaarten — presentatielaag op de schuld-aflossingsmotor (zie calc "Schuld-aflossingsmotor").' },
   { file: 'lib/freedom-milestones.ts', reason: 'Presentatie-mijlpalen afgeleid uit reeds-gecatalogiseerde vrijheidscijfers, geen eigen rekenkern.' },
-  { file: 'lib/goal-current-value.ts', reason: 'Dunne parameter-afleiding voor doelen-voortgang op reeds-gecatalogiseerde bronnen (spaarquote/salaris/rendement).' },
   { file: 'lib/household-data.ts', reason: 'Perspectiefverdeling (persoonlijk/huishouden/partner) — presentatielaag over reeds-gecatalogiseerde totalen, geen nieuwe rekenkern.' },
   { file: 'lib/jaarruimte-facts.ts', reason: 'Orkestreert uitsluitend de al-gecatalogiseerde jaarruimte-motor (lib/jaarruimte.ts, zie calc "box1") tot een feiten-object voor AI-context — eigen docstring: "orkestreert alleen".' },
   { file: 'lib/onboarding-presets.ts', reason: 'Eenmalige onboarding-defaultberekening (noodfondsdoel-suggestie), geen doorlopende rekenmotor.' },

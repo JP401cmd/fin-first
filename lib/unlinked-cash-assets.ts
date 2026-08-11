@@ -15,12 +15,15 @@
 // meegenomen, gelijk aan hoe `horizon-data-loader`'s `unlinkedCash` ze optelt.
 
 import type { Asset } from './asset-data'
+import { unlinkedCashFractionFor, type UnlinkedCashShare } from './unlinked-cash'
 
 /** Smalle vorm van een `bank_accounts`-rij die als cash-bezit meetelt. */
 export interface UnlinkedBankAccountRow {
   id: string
   name: string | null
   balance: number | string | null
+  /** Nodig voor de huishoud-weging — zie `lib/unlinked-cash.ts`. */
+  ownership?: string | null
 }
 
 /**
@@ -52,13 +55,21 @@ export type SyntheticCashAsset = Partial<Asset> & {
  *              `linked_asset_id IS NULL` en `is_active = true`. Gekoppelde
  *              rekeningen hebben al een companion cash-asset in de `assets`-tabel
  *              en mogen hier NIET meekomen (anders dubbeltelling).
+ * @param share Huishoud-aandeel voor GEDEELDE rekeningen — dezelfde canonieke
+ *              weging als `unlinkedCashTotal`. Verplicht: ongewogen zou een
+ *              gedeelde rekening bij béíde partners voor het volle saldo in het
+ *              bezittingen-totaal landen, precies de dubbeltelling die
+ *              ADR 0101 wegneemt. Zonder huishouden: `SOLO_UNLINKED_CASH_SHARE`.
  */
 export function buildUnlinkedCashAssets(
   rows: readonly UnlinkedBankAccountRow[] | null | undefined,
+  share: UnlinkedCashShare,
 ): SyntheticCashAsset[] {
   if (!rows || rows.length === 0) return []
   return rows.map((r) => {
-    const balance = Number(r.balance) || 0
+    const balance =
+      (Number(r.balance) || 0) *
+      unlinkedCashFractionFor(share.perspective, r.ownership, share.mySharePct)
     return {
       id: r.id,
       user_id: '',

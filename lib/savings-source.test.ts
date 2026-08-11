@@ -171,3 +171,78 @@ describe('resolveSavingsSource — handmatig pad = wat de cashflow-kaart toont',
     )
   })
 })
+
+describe('resolveSavingsSource — de spaarquote VOLGT de grondslag (ADR 0103)', () => {
+  const base = {
+    incomeSource: 'auto', expensesSource: 'auto',
+    netMonthlyIncome: 4000, estimatedAnnualIncome: 60_000,
+    estimatedMonthlyExpenses: 3000, savingsRate6m: 18,
+  }
+
+  it('beide grondslagen transactie → ONGEWIJZIGD savingsRate6m (incl. de correcties)', () => {
+    const r = resolveSavingsSource({
+      ...base,
+      basis: { income: 'transaction', expenses: 'transaction', annualIncome: 60_000, monthlyExpenses: 4200 },
+    })
+    expect(r.effectiveAnnualIncome).toBe(60_000)
+    expect(r.effectiveSavingsRatePct).toBe(18)
+    expect(r.baseAnnualSavings).toBeCloseTo(60_000 * 0.18, 6)
+  })
+
+  it('budget-grondslag → uniforme (I − E)/I, ZONDER spaarbudget-/aflossingscorrectie', () => {
+    // Die correctie hoort bij de rúwe transactiesom. Een budget-uitgavensom bevat
+    // per constructie geen spaarstortingen of aflossing (alleen budget_type
+    // 'expense'), dus de correctie er bovenop leggen zou hetzelfde spaargeld twee
+    // keer tellen — de fout die ooit 30 % → 37,2 % maakte.
+    const r = resolveSavingsSource({
+      ...base,
+      basis: { income: 'budget', expenses: 'budget', annualIncome: 60_000, monthlyExpenses: 3500 },
+    })
+    expect(r.effectiveSavingsRatePct).toBeCloseTo(((5000 - 3500) / 5000) * 100, 10) // 30%
+    expect(r.effectiveSavingsRatePct).not.toBe(18)
+  })
+
+  it('BEWUSTE GEDRAGSWIJZIGING: handmatig inkomen × transactie-uitgaven valt nu ook onder de uniforme formule', () => {
+    // Vóór ADR 0103 leverde deze combinatie `savingsRate6m` (hier 18 %) op: een
+    // VERHOUDING gemeten over het transactie-inkomen, losgelaten op een inkomen
+    // uit een ándere grondslag. Dat getal is door niemand na te vertellen. Nu:
+    // (4000 − 3400) / 4000 = 15 %. Gebruikers met income_source='manual' en
+    // expenses_source='auto' zien hierdoor eenmalig een andere spaarquote — en
+    // dus een andere FIRE-datum en Rondkomen-pijler.
+    const legacy = resolveSavingsSource({ ...base, incomeSource: 'manual' })
+    expect(legacy.effectiveSavingsRatePct).toBe(18)
+
+    const nu = resolveSavingsSource({
+      ...base,
+      incomeSource: 'manual',
+      basis: { income: 'manual', expenses: 'transaction', annualIncome: 48_000, monthlyExpenses: 3400 },
+    })
+    expect(nu.effectiveAnnualIncome).toBe(48_000)
+    expect(nu.effectiveSavingsRatePct).toBeCloseTo(15, 10)
+  })
+
+  it('grondslag zonder bruikbaar jaarinkomen valt terug op de transactie-extrapolatie', () => {
+    const r = resolveSavingsSource({
+      ...base,
+      incomeSource: 'manual',
+      basis: { income: 'manual', expenses: 'manual', annualIncome: 0, monthlyExpenses: 3000 },
+    })
+    expect(r.effectiveAnnualIncome).toBe(60_000)
+  })
+
+  it('ZONDER basis-blok blijft élke bestaande call-site byte-identiek', () => {
+    const zonder = resolveSavingsSource({ ...base, incomeSource: 'manual', expensesSource: 'manual' })
+    // Legacy: handmatig inkomen × 12, quote uit (inkomen − uitgaven)/inkomen.
+    expect(zonder.effectiveAnnualIncome).toBe(48_000)
+    expect(zonder.effectiveSavingsRatePct).toBeCloseTo(25, 10)
+  })
+
+  it('tekort op de budgetgrondslag geeft een negatieve quote (geen clamp)', () => {
+    const r = resolveSavingsSource({
+      ...base,
+      basis: { income: 'budget', expenses: 'budget', annualIncome: 24_000, monthlyExpenses: 2500 },
+    })
+    expect(r.effectiveSavingsRatePct).toBeCloseTo(((2000 - 2500) / 2000) * 100, 10) // −25%
+    expect(r.baseAnnualSavings).toBeLessThan(0)
+  })
+})

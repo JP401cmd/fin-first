@@ -1,37 +1,38 @@
 'use client'
 
 /**
- * Portfolio summary — vervangt de oude KPI-strip + losse Box 3-tegel op
- * /core/assets/holdings. Drie onderdelen:
- *   1. Figures-strip (Playfair, scherpe hoeken, highlight-marker op winnaar)
- *      met periode-keuze. Marktwaarde · Rendement · Vandaag · Forward dividend.
- *   2. Box 3-rij als klikbare kassabon-trigger (skill: "elk getal is klikbaar").
+ * Portfolio summary — de KPI-strip bovenaan /core/assets/holdings. Drie
+ * onderdelen:
+ *   1. Figures-strip (Playfair, scherpe hoeken, highlight-marker op winnaar):
+ *      Marktwaarde · Rendement · Vandaag · Forward dividend.
+ *   2. Compacte allocatie-strip met concentratie-indicator.
  *   3. Editorial deck-regel met FIRE-koppeling als de gebruiker essentiële
  *      uitgaven heeft ingericht.
  *
- * Period-selector is gekoppeld aan dezelfde state als de BenchmarkComparison-
- * grafiek beneden — `benchmarkComparison.portfolio.returnPct` is de tijdgewogen
- * return over die periode uit `lib/benchmark-comparison.ts` (single source; deze
- * cell rekent niets zelf uit). Dat veld is `null` zodra de koershistorie
- * ontbreekt; de cell toont dan een streepje. Alleen bij periode 'Alles' staat
- * hier het eigen sinds-aankoop-rendement (totalValue vs totalCost).
+ * De periode-rail staat bewust NIET meer in dit component maar op de pagina
+ * zelf: hij stuurt inmiddels drie consumenten aan (deze rendement-cel, de
+ * waardegrafiek en de benchmark-vergelijking), en hoorde daarmee niet langer
+ * bij de hero. `activePeriod` komt hier alleen nog binnen als label-context.
+ *
+ * Het rendement is de tijdgewogen return over de gekozen periode uit
+ * `lib/benchmark-comparison.ts` (single source; deze cell rekent niets zelf
+ * uit). Dat veld is `null` zodra de koershistorie ontbreekt; de cell toont dan
+ * een streepje. Bij periode 'Alles' komt het getal uit de canonieke
+ * aggregatie-engine (`totalPnL`/`totalInvested`) — zie de prop-toelichting.
+ *
+ * Box 3 staat hier niet meer: die hoort op /overzicht/belasting/box3, waar de
+ * heffing over het héle vermogen wordt berekend in plaats van over alleen deze
+ * portefeuille.
  */
 
-import { useCallback, useState, type ReactNode } from 'react'
-import { ShellOverlay } from '@/components/app/shell/shell-overlay'
-import { Kicker, FiguresStrip, type FigureProps } from '@/components/editorial'
+import { useCallback } from 'react'
+import { FiguresStrip, type FigureProps } from '@/components/editorial'
 import {
-  TIME_PERIODS,
   type TimePeriod,
   type ComparisonResult,
 } from '@/lib/benchmark-comparison'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { formatMaskedCurrency } from '@/lib/format'
-import { type calculatePortfolioBox3 } from '@/lib/box3-holdings'
-import { BOX3_PARAMS, CURRENT_TAX_YEAR } from '@/lib/box3-data'
-import { NL_SWR } from '@/lib/constants'
-
-type Box3Summary = ReturnType<typeof calculatePortfolioBox3>
 
 export type AssetClassSlice = {
   label: string
@@ -41,7 +42,23 @@ export type AssetClassSlice = {
 
 export type PortfolioSummaryProps = {
   totalValue: number
-  totalCost: number
+  /**
+   * Totale opbrengst over de HELE historie uit de canonieke aggregatie-engine:
+   * gerealiseerd + ongerealiseerd + dividend − kosten, over álle posities.
+   *
+   * Hier stond eerder `totalCost` (= `units × avg_purchase_price`), waaruit het
+   * rendement als `(totalValue − totalCost) / totalCost` volgde. Dat getal telt
+   * alleen de posities die je NU nog hebt: een verkochte positie heeft
+   * `units = 0` en verdwijnt mét het resultaat dat je erop maakte. Op een
+   * portefeuille met 14 open en 95 gesloten posities negeerde de KPI daarmee
+   * 95 van de 109 posities — en stond er een "ingelegd"-bedrag onder dat niet
+   * bij de marktwaarde ernaast hoorde.
+   */
+  totalPnL: number
+  /** Bruto Σ aankoopbedragen over dezelfde historie — de noemer bij `totalPnL`. */
+  totalInvested: number
+  /** Aantal posities met een open positie (units > 0) — subregel bij marktwaarde. */
+  openPositionsCount: number
   /** Som van per-holding `daily_change_percent * value` (gewogen) — null als
    *  geen prijsfeed-data beschikbaar. */
   todayChangeEur: number | null
@@ -49,12 +66,19 @@ export type PortfolioSummaryProps = {
   /** Verwacht netto-NL forward dividend (12 maanden, na 15% bronbelasting).
    *  null als nog geen dividend-data geladen of geen dividend-aandelen. */
   forwardDividendNetNl: number | null
-  /** Box 3-summary uit `calculatePortfolioBox3`. */
-  box3: Box3Summary
   /** Yearly essentiële uitgaven uit must-budgets (loader). 0 verbergt deck. */
   yearlyEssentialExpenses: number
+  /**
+   * Gepersonaliseerde veilige onttrekkingsvoet uit de loader
+   * (`HoldingsPageData.effectiveSwr` ← `resolveFireParamsWithAssumptions`).
+   * De ENIGE onttrekkingsvoet die dit oppervlak mag tonen — consume, don't
+   * recompute. `null` = geen grondslag geleverd (server-load mislukt); de
+   * deck-regel valt dan terug op de SWR-vrije bruto-framing in plaats van een
+   * percentage te tonen dat niet van deze gebruiker is.
+   */
+  effectiveSwr: number | null
+  /** Alleen label-context voor de rendement-cel; de rail zelf staat op de pagina. */
   activePeriod: TimePeriod
-  onPeriodChange: (p: TimePeriod) => void
   /** Geleverde portfolio-rendement uit benchmark-comparison API.
    *  null tijdens initial load of bij <2 datapunten in de gekozen periode. */
   comparison: ComparisonResult | null
@@ -66,22 +90,27 @@ export type PortfolioSummaryProps = {
 }
 
 const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
-// SWR voor de FIRE-deck-regel. Canoniek: de Nederlandse SWR (≈2,88%, na Box 3
-// + inflatie) uit lib/constants. Eerder stond hier een lokale `const NL_SWR =
-// 0.04` die de échte constante schaduwde → te lage dekking-jaren. De per-
-// gebruiker effectiveSwr is hier (nog) niet beschikbaar; de loader levert geen
-// FIRE-params aan deze hero. NL_SWR is de juiste no-profiel-fallback.
+// SWR voor de FIRE-deck-regel komt binnen als prop (`effectiveSwr`), niet uit
+// een import. Twee eerdere stadia zaten hier fout: eerst een lokale
+// `const NL_SWR = 0.04` die de échte constante schaduwde, daarna de echte
+// `NL_SWR`-import — canoniek, maar het is de app-brede no-profiel-fallback en
+// dus niet de onttrekkingsvoet van DEZE gebruiker. Op dit oppervlak was NL_SWR
+// bovendien de ENIGE bron (geen fallback naast een primaire prop, zoals bij de
+// horizon-componenten), waardoor de hero structureel een ander SWR-percentage
+// toonde dan de SWR-monitor-widget en elk ander FIRE-oppervlak. De loader
+// levert de grondslag nu wél: HoldingsPageData.effectiveSwr.
 
 export function PortfolioSummary({
   totalValue,
-  totalCost,
+  totalPnL,
+  totalInvested,
+  openPositionsCount,
   todayChangeEur,
   todayChangePct,
   forwardDividendNetNl,
-  box3,
   yearlyEssentialExpenses,
+  effectiveSwr,
   activePeriod,
-  onPeriodChange,
   comparison,
   assetClassBreakdown,
   concentrationTop3Pct,
@@ -92,24 +121,29 @@ export function PortfolioSummary({
     [masked],
   )
 
-  const [box3Open, setBox3Open] = useState(false)
-
   // Rendement over de gekozen periode.
-  //   • 'Alles' = het rendement sinds aankoop op de inleg (value − cost / cost).
-  //     Dat is een correct, eigen getal en hangt niet van koershistorie af.
+  //   • 'Alles' = het totale resultaat over de hele historie, uit de canonieke
+  //     aggregatie-engine: gerealiseerd + ongerealiseerd + dividend − kosten,
+  //     gedeeld door wat je in totaal hebt ingelegd. Dat telt óók de posities
+  //     die je inmiddels verkocht hebt — precies wat de oude
+  //     `(totalValue − totalCost)`-som liet vallen. Hangt niet van koershistorie
+  //     af. Consume, don't recompute: de som staat in de loader/route.
   //   • Elke andere periode komt uitsluitend uit de benchmark-motor. Levert die
   //     `null` (geen maandelijkse koersobservaties), dan tonen we een streepje
   //     i.p.v. het sinds-aankoop-getal met een periodelabel eronder — dat las
   //     als een periode-rendement dat het niet is (bugkaart testbug-ffa902).
-  const sincePurchasePct = totalCost > 0 ? ((totalValue - totalCost) / totalCost) * 100 : 0
+  const lifetimeReturnPct =
+    totalInvested > 0 ? (totalPnL / totalInvested) * 100 : null
   const periodReturnPct =
     activePeriod.id === 'all'
-      ? sincePurchasePct
+      ? lifetimeReturnPct
       : comparison?.portfolio.returnPct ?? null
 
   const periodReturnEur =
     activePeriod.id === 'all'
-      ? totalValue - totalCost
+      ? lifetimeReturnPct !== null
+        ? totalPnL
+        : null
       : periodReturnPct !== null
         ? (totalValue * periodReturnPct) / 100
         : null
@@ -121,7 +155,13 @@ export function PortfolioSummary({
         : `${fc(periodReturnEur)}`
   const periodReturnSub =
     activePeriod.id === 'all'
-      ? `${periodReturnEurLabel} sinds aankoop`
+      ? periodReturnEurLabel !== null
+        // Zonder deze guard rendert de cel letterlijk "null sinds aankoop":
+        // `periodReturnEurLabel` is null zodra er geen inleg bekend is, en dit
+        // was de enige tak zonder controle. Vóór de overstap op de P&L-motor
+        // kón dat niet — het bedrag was toen altijd een getal.
+        ? `${periodReturnEurLabel} sinds aankoop`
+        : 'nog geen inleg bekend'
       : periodReturnEurLabel !== null
         ? `${periodReturnEurLabel} ${activePeriod.windowLabel}`
         : comparison
@@ -150,7 +190,11 @@ export function PortfolioSummary({
     {
       kicker: 'Marktwaarde',
       amount: fc(totalValue),
-      sub: `ingelegd ${fc(totalCost)}`,
+      // Bewust GEEN "ingelegd €x" meer: dat bedrag was `units ×
+      // avg_purchase_price` over de open posities, dus het hoorde niet bij de
+      // marktwaarde ernaast zodra er ook maar één positie verkocht was. Het
+      // aantal open posities is wél een eerlijke duiding van hetzelfde getal.
+      sub: openPositionsCount === 1 ? '1 positie' : `${openPositionsCount} posities`,
       variant: 'winner', // hoofdresultaat → highlight-marker
     },
     {
@@ -191,9 +235,10 @@ export function PortfolioSummary({
   const yearsCovered = showFireDeck
     ? totalValue / yearlyEssentialExpenses
     : 0
-  const swrYears = showFireDeck
-    ? totalValue / (yearlyEssentialExpenses / NL_SWR)
-    : 0
+  const swrYears =
+    showFireDeck && effectiveSwr !== null
+      ? totalValue / (yearlyEssentialExpenses / effectiveSwr)
+      : 0
 
   return (
     <section className="mt-2">
@@ -210,89 +255,66 @@ export function PortfolioSummary({
         />
       )}
 
-      {/* Periode-selector — toggle-pill-stijl, scherpe hoeken voor pill-rail */}
-      <div className="-mt-3 mb-4 flex items-center justify-between gap-3">
-        <span className="text-[10px] uppercase tracking-[0.2em] font-mono text-[var(--ink-3)]">
-          Periode
-        </span>
-        <div
-          className="flex flex-wrap gap-1"
-          role="tablist"
-          aria-label="Rendement-periode"
-        >
-          {TIME_PERIODS.map((p) => {
-            const active = p.id === activePeriod.id
-            return (
-              <button
-                key={p.id}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => onPeriodChange(p)}
-                className={`min-h-[32px] px-2.5 py-1 text-[11px] font-mono font-semibold uppercase tracking-[0.12em] border transition-colors ${
-                  active
-                    ? 'bg-[var(--ink)] text-[var(--paper)] border-[var(--ink)]'
-                    : 'bg-transparent text-[var(--ink-3)] border-[var(--rule-soft)] hover:text-[var(--ink-2)] hover:border-[var(--ink-3)]'
-                }`}
-                style={{ WebkitTapHighlightColor: 'transparent' }}
-              >
-                {p.label}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Box 3 als kassabon-trigger — klikbare rij, geen aparte kaart */}
-      {box3.totalValue > 0 && (
-        <button
-          type="button"
-          onClick={() => setBox3Open(true)}
-          className="mt-1 mb-4 w-full text-left flex items-center justify-between gap-4 border-t border-b border-[var(--rule-soft)] py-3 hover:bg-[var(--subtle)]/40 transition-colors"
-          aria-label="Bekijk Box 3-kassabon"
-        >
-          <div className="flex items-center gap-2.5">
-            <span
-              aria-hidden
-              className="inline-block h-px w-7 shrink-0"
-              style={{ background: 'var(--module-active-500)' }}
-            />
-            <span className="text-[10px] uppercase tracking-[0.2em] font-mono text-[var(--module-active-700)]">
-              Box 3-belasting
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span
-              className="font-mono tabular-nums text-sm text-[var(--ink)]"
-              style={{ fontWeight: 600 }}
-            >
-              {fc(box3.totalTax)}/jaar
-            </span>
-            <span className="text-[10px] font-mono text-[var(--ink-3)]">
-              {(box3.effectiveRate * 100).toFixed(2)}%
-            </span>
-            <ChevronRight />
-          </div>
-        </button>
-      )}
-
       {/* FIRE-deck-regel — Horizon-koppeling via editorial italic */}
       {showFireDeck && (
         <FireDeckLine
           yearsCovered={yearsCovered}
           swrYears={swrYears}
-          swr={NL_SWR}
+          swr={effectiveSwr}
           fontFamily={SOURCE_SERIF}
         />
       )}
-
-      <Box3Sheet
-        open={box3Open}
-        onClose={() => setBox3Open(false)}
-        box3={box3}
-        fc={fc}
-      />
     </section>
+  )
+}
+
+/**
+ * Periode-rail — toggle-pill-stijl, scherpe hoeken.
+ *
+ * Woont sinds aug 2026 als eigen sectie op de pagina in plaats van in de hero:
+ * hij stuurt drie oppervlakken tegelijk aan (de rendement-cel hierboven, de
+ * waardegrafiek en de benchmark-vergelijking), en hoorde daarmee niet langer
+ * bij één ervan. De vormgeving blijft hier zodat er één rail-recept is.
+ */
+export function PeriodRail({
+  periods,
+  activePeriod,
+  onPeriodChange,
+  className = '',
+}: {
+  periods: readonly TimePeriod[]
+  activePeriod: TimePeriod
+  onPeriodChange: (p: TimePeriod) => void
+  className?: string
+}) {
+  return (
+    <div className={`flex items-center justify-between gap-3 ${className}`}>
+      <span className="text-[10px] uppercase tracking-[0.2em] font-mono text-[var(--ink-3)]">
+        Periode
+      </span>
+      <div className="flex flex-wrap gap-1" role="tablist" aria-label="Periode">
+        {periods.map((p) => {
+          const active = p.id === activePeriod.id
+          return (
+            <button
+              key={p.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => onPeriodChange(p)}
+              className={`min-h-[32px] px-2.5 py-1 text-[11px] font-mono font-semibold uppercase tracking-[0.12em] border transition-colors ${
+                active
+                  ? 'bg-[var(--ink)] text-[var(--paper)] border-[var(--ink)]'
+                  : 'bg-transparent text-[var(--ink-3)] border-[var(--rule-soft)] hover:text-[var(--ink-2)] hover:border-[var(--ink-3)]'
+              }`}
+              style={{ WebkitTapHighlightColor: 'transparent' }}
+            >
+              {p.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
@@ -386,25 +408,6 @@ function AllocationStrip({
   )
 }
 
-function ChevronRight() {
-  return (
-    <svg
-      aria-hidden
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="text-[var(--ink-3)]"
-    >
-      <polyline points="9 18 15 12 9 6" />
-    </svg>
-  )
-}
-
 function FireDeckLine({
   yearsCovered,
   swrYears,
@@ -413,21 +416,25 @@ function FireDeckLine({
 }: {
   yearsCovered: number
   swrYears: number
-  /** Onttrekkingsvoet die de SWR-framing aanstuurt (canoniek NL_SWR). */
-  swr: number
+  /**
+   * Gepersonaliseerde onttrekkingsvoet die de SWR-framing aanstuurt
+   * (`effectiveSwr`, doorgegeven vanaf de loader). `null` = geen grondslag →
+   * uitsluitend de bruto-framing, nooit een generiek percentage.
+   */
+  swr: number | null
   fontFamily: string
 }) {
   // Twee framings: brutto (jaren waar je portfolio op kunt teren tot €0) en
   // SWR (jaren bij duurzame onttrekking). Toon SWR primair als die ≥1, anders
   // brutto met label "uitgaven". Het percentage komt uit de doorgegeven `swr`
   // zodat de tekst nooit een ander tarief noemt dan waarmee gerekend is.
-  const useSwr = swrYears >= 1
+  const useSwr = swr !== null && swrYears >= 1
   const display = useSwr ? swrYears : yearsCovered
   const yearsLabel = display.toFixed(1).replace('.', ',')
-  const swrLabel = `${(swr * 100).toFixed(1).replace('.', ',')}%`
-  const framing = useSwr
-    ? `Bij ${swrLabel} onttrekking financiert deze portefeuille ${yearsLabel} jaar van je essentiële uitgaven.`
-    : `Deze portefeuille dekt ${yearsLabel} jaar essentiële uitgaven (zonder rendement-aanname).`
+  const framing =
+    useSwr && swr !== null
+      ? `Bij ${(swr * 100).toFixed(1).replace('.', ',')}% onttrekking financiert deze portefeuille ${yearsLabel} jaar van je essentiële uitgaven.`
+      : `Deze portefeuille dekt ${yearsLabel} jaar essentiële uitgaven (zonder rendement-aanname).`
   return (
     <p
       className="italic text-[13px] leading-snug text-[var(--ink-2)] pl-3 max-w-[60ch] mb-4"
@@ -438,91 +445,5 @@ function FireDeckLine({
     >
       {framing}
     </p>
-  )
-}
-
-function Box3Sheet({
-  open,
-  onClose,
-  box3,
-  fc,
-}: {
-  open: boolean
-  onClose: () => void
-  box3: Box3Summary
-  fc: (v: number) => string
-}) {
-  // Aggregate per-holding velden naar portfolio-niveau voor de kassabon-rijen.
-  const taxableValue = box3.holdings.reduce((s, h) => s + h.taxableValue, 0)
-  const forfaitRendement = box3.holdings.reduce(
-    (s, h) => s + h.forfaitRendement,
-    0,
-  )
-  const tarief = box3.holdings[0]?.tarief ?? BOX3_PARAMS[CURRENT_TAX_YEAR].tarief
-  const forfaitRate = box3.holdings[0]?.forfaitRate ?? 0
-  return (
-    <ShellOverlay open={open} onClose={onClose} kind="sheet" size="md" title="Box 3-kassabon">
-      <div className="space-y-4">
-        <Kicker>Berekening</Kicker>
-        <dl className="text-sm">
-          <Row label="Bruto vermogen" value={fc(box3.totalValue)} />
-          <Row label="Heffingsvrij vermogen" value={fc(box3.totalExemption)} />
-          <Row label="Belastbaar deel" value={fc(taxableValue)} />
-          <Row
-            label={`Fictief rendement (${(forfaitRate * 100).toFixed(2)}%)`}
-            value={fc(forfaitRendement)}
-          />
-          <Row
-            label={`Tarief ${(tarief * 100).toFixed(0)}%`}
-            value={fc(box3.totalTax)}
-            emphasis
-          />
-        </dl>
-        <p
-          className="italic text-[13px] leading-snug text-[var(--ink-3)]"
-          style={{ fontFamily: SOURCE_SERIF }}
-        >
-          Effectief tarief over je totale beleggingsvermogen:{' '}
-          <strong className="not-italic font-bold text-[var(--ink)]">
-            {(box3.effectiveRate * 100).toFixed(2)}%
-          </strong>
-          . Berekend via fictief rendement; netto kunnen dividend en koerswinst
-          deze heffing meer dan compenseren.
-        </p>
-      </div>
-    </ShellOverlay>
-  )
-}
-
-function Row({
-  label,
-  value,
-  emphasis = false,
-}: {
-  label: string
-  value: ReactNode
-  emphasis?: boolean
-}) {
-  return (
-    <div
-      className={`flex items-baseline justify-between gap-3 py-2 ${
-        emphasis
-          ? 'border-t-4 border-double border-[var(--ink)] mt-2 pt-3'
-          : 'border-b border-dotted border-[var(--rule-soft)]'
-      }`}
-    >
-      <dt
-        className={`text-[var(--ink-2)] ${emphasis ? 'font-bold text-[var(--ink)]' : ''}`}
-      >
-        {label}
-      </dt>
-      <dd
-        className={`font-mono tabular-nums ${
-          emphasis ? 'font-bold text-[var(--ink)]' : 'text-[var(--ink-2)]'
-        }`}
-      >
-        {value}
-      </dd>
-    </div>
   )
 }

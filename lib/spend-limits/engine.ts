@@ -39,9 +39,10 @@
  *
  * De REEKS-GETALLEN (`computeStreaks`) en de PERIODE-UITKOMSTEN
  * (`computePeriodOutcome`) blijven daarbij ONGEWIJZIGD: die zijn kale datafeiten
- * over afgesloten periodes, en hun enige gebruik als *prestatie* (de mijlpaal)
- * heeft zijn eigen poort al. De trend is de enige afgeleide die zonder poort een
- * uitspraak over gedrag deed.
+ * over afgesloten periodes. Elk gebruik ervan als *prestatie* draagt zijn eigen
+ * poort: de mijlpaal-melding via `streakStartsAfterCreation`, de trend en de
+ * score (`computeSpendLimitScore`) via `closedPeriodsSinceCreation`. Wie hier een
+ * afgeleide bij bouwt die iets over gedrag zegt, hoort diezelfde poort te zetten.
  */
 
 import { isRealAggRow } from '@/lib/server-data/tx-aggregates'
@@ -299,6 +300,91 @@ export interface SpendLimitTrend {
   direction: SpendLimitTrendDirection
 }
 
+/**
+ * De vier standen van de reeks-score. Bewust OBSERVEREND en niet belonend
+ * ('goud'/'brons') of veroordelend ('slecht'): een grenzenpot is een norm die de
+ * gebruiker zichzelf stelt (ADR 0089), en het cijfer beschrijft hoe het patroon
+ * eruitziet — het deelt geen rapportcijfer over de persoon uit.
+ *
+ * ── TWEE VOCABULAIRES OM NIET MEE TE BOTSEN ─────────────────────────────────
+ * De woorden zijn met opzet NIET die van `getLabel` in lib/financial-health.ts
+ * (Uitstekend / Sterk / Redelijk / Kwetsbaar / Kritiek). Twee scores in één app
+ * waarin hetzelfde woord een andere band betekent, lopen bij de eerste
+ * schermafbeelding naast elkaar al uit de pas. Deze schaal gaat over één
+ * zelfgekozen grens; het gezondheidsgetal over de hele huishouding. Ze zijn niet
+ * vergelijkbaar en mogen nooit naast elkaar als "twee scores" worden gezet.
+ *
+ * Even hard, en makkelijker te missen: ook niet de STOPLICHT-woorden. "Op koers"
+ * is app-breed de béste, groene stand (nav-menu, doelen-view, budgetrapportage);
+ * als tweede band in `--score-ok`-blauw zou het op één scherm twee dingen
+ * betekenen. Wie hier een label wijzigt, grept het losse woord eerst app-breed —
+ * en let daarbij ook op de RICHTING: hetzelfde woord dat elders de top is en hier
+ * de tweede plek, is drift ook als de kleur verschilt.
+ */
+export type SpendLimitScoreLabel = 'strak' | 'netjes' | 'wisselend' | 'los'
+
+/**
+ * Hoe goed je je aan je eigen grens houdt, in één getal van 0 tot 100.
+ *
+ * ── WAAROM DIT IN DE MOTOR HOORT ────────────────────────────────────────────
+ * De score verdicht drie dingen die de motor al kent (raakpercentage, lopende
+ * reeks t.o.v. de langste, en de richting). Zou een oppervlak 'm zelf afleiden,
+ * dan ontstaat precies de drift die dit bestand overal vermijdt: de tegel en de
+ * pane zouden bij dezelfde pot een ander cijfer tonen.
+ *
+ * ── DE AANMAAK-ONDERGRENS GELDT HIER WÉL ────────────────────────────────────
+ * Anders dan de kale reeks-getallen (`computeStreaks`, bewust ongefilterd) is
+ * dit een uitspraak over GEDRAG — dezelfde categorie als de trend en de
+ * mijlpaal-melding, en dus met dezelfde poort: alleen afgesloten periodes die
+ * volledig ná het aanmaken van de pot beginnen tellen mee. Zonder die poort
+ * scoort een splinternieuwe pot meteen 100, want de motor telt een periode
+ * zonder transacties als "binnen de grens" — een cijfer over een tijd waarin de
+ * grens niet bestond.
+ *
+ * ── PAS VANAF DRIE MEETELLENDE PERIODES ─────────────────────────────────────
+ * Onder `SPEND_LIMIT_SCORE_MIN_PERIODS` blijft alles `null`. Eén periode binnen
+ * de grens levert rekenkundig een 100 op — waar, maar het zegt niets, en een
+ * cijfer dat niets zegt is erger dan geen cijfer. `basisPeriodCount` telt in dat
+ * geval al wél mee, zodat een oppervlak kan zeggen hoever het nog is.
+ *
+ * `basisPeriodCount` reist ook daarna mee zodat een oppervlak kan zeggen waaróp
+ * het cijfer rust: een 100 over drie periodes betekent iets anders dan een 100
+ * over twaalf, en het getal alleen tonen zou dat verschil verbergen.
+ */
+/**
+ * De drie termen waaruit het cijfer is opgebouwd, elk genormaliseerd naar 0–1:
+ * "hoeveel van deze term heb je verdiend". Bestaat zodat een oppervlak de
+ * OPBOUW kan tonen (het spinnenweb in de prestatieweergave) zonder de formule
+ * na te bouwen — anders zou de grafiek stil kunnen wegdrijven van het cijfer
+ * ernaast.
+ *
+ * `trend` is bewust een DRIESTAND en geen continue schaal: de richting levert
+ * een vaste correctie van ±`SPEND_LIMIT_SCORE_TREND_BONUS`, geen gewogen term.
+ * 0 = je geeft meer uit dan daarvoor, 0,5 = gelijk of nog onbekend, 1 = minder.
+ * Een halve waarde bij 'unknown' is geen oordeel maar de neutrale stand — precies
+ * wat de formule zelf doet (bonus 0).
+ */
+export interface SpendLimitScoreComponents {
+  /** Aandeel meetellende periodes binnen de grens (0–1). Weegt het zwaarst. */
+  hitRate: number
+  /** Lopende reeks t.o.v. `SPEND_LIMIT_SCORE_MIN_PERIODS`, geklemd op 1. */
+  streak: number
+  /** Richting als driestand: 0 / 0,5 / 1. */
+  trend: number
+}
+
+export interface SpendLimitScore {
+  /** 0–100; `null` zolang er geen meetellende afgesloten periode is. */
+  score: number | null
+  label: SpendLimitScoreLabel | null
+  /** Aandeel meetellende afgesloten periodes binnen de grens, in procenten. */
+  hitRatePct: number | null
+  /** Aantal afgesloten periodes waarop het cijfer rust (ná de aanmaak-ondergrens). */
+  basisPeriodCount: number
+  /** De opbouw achter het cijfer; `null` zodra er geen cijfer is. */
+  components: SpendLimitScoreComponents | null
+}
+
 export interface SpendLimitReport {
   /** De lopende, nog niet afgesloten periode — altijd VOORLOPIG. */
   currentPeriod: SpendLimitPeriodOutcome
@@ -309,6 +395,8 @@ export interface SpendLimitReport {
   streaks: SpendLimitStreaks
   /** Trend over de afgesloten periodes; de lopende telt bewust niet mee. */
   trend: SpendLimitTrend
+  /** Hoe goed je je aan je grens houdt, verdicht tot één cijfer. */
+  score: SpendLimitScore
 }
 
 // ── Datum-helpers (lokaal geparsed, geen UTC-drift) ─────────────────────────
@@ -762,6 +850,124 @@ export function computeSpendLimitTrend(
   }
 }
 
+// ── Score ────────────────────────────────────────────────────────────────────
+
+/**
+ * De gewichten van de score, expliciet benoemd zodat er geen losse getallen in
+ * de formule staan. Het RAAKPERCENTAGE weegt het zwaarst: hoe vaak je binnen je
+ * grens bleef is de kern van de belofte. De REEKS weegt lichter en beloont
+ * herstel — wie na een misser weer opbouwt, ziet dat terug zonder dat één
+ * slechte periode de hele historie wist. De RICHTING is een kleine correctie in
+ * beide richtingen, geen hoofdmoot: hij zegt iets over de laatste blokken, niet
+ * over de norm.
+ *
+ * HARDE EIS bij elke wijziging hier: de score moet MONOTOON blijven in gedrag —
+ * één periode die van `exceeded` naar `within` kantelt mag het cijfer nooit
+ * verlagen. `engine.test.ts` pint dat vast; zie ook de noemer-uitleg bij
+ * `computeSpendLimitScore`.
+ */
+export const SPEND_LIMIT_SCORE_HIT_RATE_WEIGHT = 70
+export const SPEND_LIMIT_SCORE_STREAK_WEIGHT = 30
+export const SPEND_LIMIT_SCORE_TREND_BONUS = 10
+
+/**
+ * Hoeveel meetellende afgesloten periodes er minstens moeten zijn vóór er een
+ * cijfer verschijnt. Gelijk aan het trend-venster, en om dezelfde reden: onder
+ * die grens is elk patroon toeval. Zonder deze drempel zou één afgesloten
+ * periode binnen de grens al een 100 opleveren — waar en misleidend tegelijk.
+ */
+export const SPEND_LIMIT_SCORE_MIN_PERIODS = SPEND_LIMIT_TREND_WINDOW
+
+/** Drempels van de vier standen — dezelfde banden als de score-kleurschaal. */
+export const SPEND_LIMIT_SCORE_THRESHOLDS: { min: number; label: SpendLimitScoreLabel }[] = [
+  { min: 80, label: 'strak' },
+  { min: 60, label: 'netjes' },
+  { min: 40, label: 'wisselend' },
+  { min: 0, label: 'los' },
+]
+
+function resolveScoreLabel(score: number): SpendLimitScoreLabel {
+  for (const band of SPEND_LIMIT_SCORE_THRESHOLDS) {
+    if (score >= band.min) return band.label
+  }
+  // Onbereikbaar: de laatste band begint op 0 en de score is geklemd op [0,100].
+  return 'los'
+}
+
+/**
+ * Bereken de reeks-score over AFGESLOTEN periodes, oud → nieuw aangeleverd.
+ *
+ * De `trend` gaat er als geheel in en wordt NIET opnieuw afgeleid: hij draagt de
+ * aanmaak-ondergrens al, dus richting en score kijken per definitie naar
+ * dezelfde periodes. Bij een onbekende richting ('unknown', te weinig historie)
+ * is de bonus 0 — nooit een half oordeel.
+ *
+ * De reeks-verhouding komt uit `computeStreaks` over de MEETELLENDE periodes, en
+ * niet uit het kale `report.streaks`: dat laatste telt bewust ook periodes van
+ * vóór de aanmaak mee (zie `SpendLimitScore`).
+ *
+ * ── DE NOEMER IS VAST, NIET JE EIGEN RECORD (MONOTONIE) ─────────────────────
+ * De reeks-term meet de huidige reeks tegen `SPEND_LIMIT_SCORE_MIN_PERIODS`, niet
+ * tegen de langste reeks in het venster. Dat laatste stond hier eerst en maakte
+ * de score NIET-MONOTOON: de langste reeks is een eigen record dat meegroeit met
+ * je historie, dus een periode die van "boven" naar "binnen" kantelt kon de
+ * noemer harder laten stijgen dan de teller. Concreet: `W W E W W E W W` scoorde
+ * 83, terwijl `W W W W W E W W` — dezelfde reeks met één overschrijding MINDER —
+ * op 73 uitkwam. Wie het beter deed, zag zijn cijfer dalen.
+ *
+ * Met een vaste noemer zijn beide termen niet-dalend in gedrag: een periode van
+ * `exceeded` naar `within` verhoogt het raakpercentage en kan de lopende reeks
+ * alleen verlengen. "Drie schone periodes op rij" levert de volle reeks-punten;
+ * daarboven klemt de term, want een reeks van twintig zegt niet tweemaal zoveel
+ * als een reeks van tien.
+ */
+export function computeSpendLimitScore(
+  closedPeriods: SpendLimitPeriodOutcome[],
+  trend: SpendLimitTrend,
+  createdAt?: string | null,
+): SpendLimitScore {
+  const eligible = closedPeriodsSinceCreation(closedPeriods, createdAt)
+  if (eligible.length < SPEND_LIMIT_SCORE_MIN_PERIODS) {
+    return {
+      score: null,
+      label: null,
+      hitRatePct: null,
+      basisPeriodCount: eligible.length,
+      components: null,
+    }
+  }
+
+  const streaks = computeStreaks(eligible)
+  const hitRate = (streaks.closedPeriodCount - streaks.exceededPeriodCount) / streaks.closedPeriodCount
+  const streakRatio = Math.min(1, streaks.currentStreak / SPEND_LIMIT_SCORE_MIN_PERIODS)
+  const trendBonus =
+    trend.direction === 'improving'
+      ? SPEND_LIMIT_SCORE_TREND_BONUS
+      : trend.direction === 'worsening'
+        ? -SPEND_LIMIT_SCORE_TREND_BONUS
+        : 0
+
+  const raw =
+    hitRate * SPEND_LIMIT_SCORE_HIT_RATE_WEIGHT +
+    streakRatio * SPEND_LIMIT_SCORE_STREAK_WEIGHT +
+    trendBonus
+  const score = Math.max(0, Math.min(100, Math.round(raw)))
+
+  return {
+    score,
+    label: resolveScoreLabel(score),
+    hitRatePct: Math.round(hitRate * 100),
+    basisPeriodCount: streaks.closedPeriodCount,
+    // Dezelfde drie waarden waar `raw` hierboven op rust — geen tweede afleiding,
+    // zodat de opbouw-grafiek niet van het cijfer kan wegdrijven.
+    components: {
+      hitRate,
+      streak: streakRatio,
+      trend: trendBonus === 0 ? 0.5 : trendBonus > 0 ? 1 : 0,
+    },
+  }
+}
+
 // ── Volledig rapport ─────────────────────────────────────────────────────────
 
 /**
@@ -771,9 +977,10 @@ export function computeSpendLimitTrend(
  * de loader haalt het per periodesoort uit `SPEND_LIMIT_WINDOW_BY_PERIOD` (13
  * maanden = 12 afgesloten + de huidige; 9 kwartalen; 4 jaren).
  *
- * `rule.createdAt` gaat UITSLUITEND naar de trend (aanmaak-ondergrens). De
- * periode-uitkomsten, `closedPeriods` en de reeks-getallen worden er bewust niet
- * door aangeraakt — zie de kop van dit bestand.
+ * `rule.createdAt` gaat naar de trend én de score (aanmaak-ondergrens): dat zijn
+ * de twee afgeleiden die een uitspraak over GEDRAG doen. De periode-uitkomsten,
+ * `closedPeriods` en de kale reeks-getallen worden er bewust niet door
+ * aangeraakt — zie de kop van dit bestand.
  */
 export function buildSpendLimitReport(args: {
   rule: SpendLimitRule
@@ -788,12 +995,14 @@ export function buildSpendLimitReport(args: {
   const closedPeriods = outcomes.filter((o) => !o.isOpen)
   // De laatste slice is per constructie de lopende periode.
   const currentPeriod = outcomes[outcomes.length - 1]
+  const trend = computeSpendLimitTrend(closedPeriods, SPEND_LIMIT_TREND_WINDOW, rule.createdAt)
 
   return {
     currentPeriod,
     lastClosedPeriod: closedPeriods.length > 0 ? closedPeriods[closedPeriods.length - 1] : null,
     closedPeriods,
     streaks: computeStreaks(closedPeriods),
-    trend: computeSpendLimitTrend(closedPeriods, SPEND_LIMIT_TREND_WINDOW, rule.createdAt),
+    trend,
+    score: computeSpendLimitScore(closedPeriods, trend, rule.createdAt),
   }
 }

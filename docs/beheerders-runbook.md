@@ -140,8 +140,8 @@ nauwelijks invoer; een dagritueel is dan verkeerd gedimensioneerd. Wat het doel 
 
 Dit moment is **pull**: je haalt op. Daarnaast duwt de app zelf — zie *Meldingen naar je telefoon*
 verderop. Kort: `lib/cron-alert.ts` mailt én pusht bij `job_runs.status='error'`, en de
-meldingen-sweep (`/api/cron/alerts-sweep`) pusht elk kwartier bij een nieuwe soort fout of een
-taak die stil bleef. Beide zwijgen zolang hun kanaal niet is geconfigureerd.
+meldingen-sweep (`/api/cron/alerts-sweep`) pusht bij een nieuwe soort fout of een taak die stil
+bleef — dagelijks vanuit Vercel, en zo vaak als de externe pinger hem aanroept. Beide zwijgen zolang hun kanaal niet is geconfigureerd.
 
 ### De zes inbakken — wat je langsloopt, en wat "afgehandeld" hier betekent
 
@@ -185,9 +185,22 @@ ondermijnt precies datgene waarvoor iemand de app gebruikt. De twee klokken (AVG
 nooit op het volgende kijkmoment.
 
 ### Draaien de geplande taken nog?
-- **Technisch beheer → Achtergrondtaken** (`/beheer/jobs`): laatste run, status, duur en
-  samenvatting per cron. De lijst met taken staat in `app/(app)/beheer/jobs/page.tsx`, het
-  schema in `vercel.json`.
+- **Technisch beheer → Achtergrondtaken** (`/beheer/jobs`): per taak het ingeplande schema
+  (gelezen uit `vercel.json`), de laatste run, status, duur en samenvatting — plus een
+  **actualiteitsoordeel**: *actueel* · *achterstallig* (geen geslaagde run binnen het venster
+  `maxAgeHours`) · *nog niet uitgevoerd* · *niet bewaakt*. Bovenaan staat de telling: één blik
+  volstaat. De lijst met taken staat in `lib/job-catalog.ts` (de single source), het schema in
+  `vercel.json`; wijken die twee uiteen, dan meldt de pagina dat als **schema-drift** en wordt
+  `lib/job-health.test.ts` rood in CI.
+- **Alle crons draaien hoogstens 1×/dag** — dat is een planlimiet van Vercel, geen ontwerpkeuze.
+  De meldingen-sweep stond op elk kwartier en is daarom terug naar dagelijks 19:00 UTC (ná de
+  laatste dagelijkse taak). Wie sub-dagelijkse detectie wil, heeft de externe pinger hieronder
+  nodig; die zit niet aan die limiet vast.
+- **Lees de tijden goed: cron-expressies zijn UTC, tijdstempels zijn Amsterdams.** Een taak van
+  05:00 UTC toont in de zomer een laatste run rond 07:00 — dat is correct, geen drift. Vercel
+  start een cron bovendien tot ongeveer een uur ná het hele uur (gemeten: 6 tot 55 minuten), dus
+  het actualiteitsoordeel op de pagina rekent met een ruimere marge dan de sweep. Kleurt een
+  kaart rood, dan is dat écht een gemiste ronde en niet de speling van de planner.
 
 **`CRON_SECRET` is een harde randvoorwaarde voor élke cron.** Staat de env-var niet in de
 Vercel-omgeving, dan weigert iedere cron-handler zichzelf *fail-closed* met een 500
@@ -219,18 +232,29 @@ weigert de briefing-mail (een mail zonder werkende afmeldlink mag niet uit).
 
 Sinds ADR 0102 duwt de app zelf. Twee wachters, en je hebt ze **allebei** nodig.
 
-**Binnenwacht — `/api/cron/alerts-sweep`.** Draait elk kwartier en meldt drie dingen:
-een **nieuwe soort fout** in `error_logs` (niet elk voorval — alleen nieuwe soorten, plus één
-her-alarm als een bekende fout 10× zo vaak gaat voorkomen), een **gefaalde** achtergrondtaak, en
-een taak die **stil** bleef (geen geslaagde run binnen zijn `maxAgeHours` uit
-`lib/job-catalog.ts`). Per signaalsoort hoogstens één gebundelde melding per kwartier; per
-fouttype en per taak hoogstens één per 24 uur.
+**Binnenwacht — `/api/cron/alerts-sweep`.** Meldt drie dingen: een **nieuwe soort fout** in
+`error_logs` (niet elk voorval — alleen nieuwe soorten, plus één her-alarm als een bekende fout
+10× zo vaak gaat voorkomen), een **gefaalde** achtergrondtaak, en een taak die **stil** bleef
+(geen geslaagde run binnen zijn `maxAgeHours` uit `lib/job-catalog.ts`). Per signaalsoort
+hoogstens één gebundelde melding per ronde; per fouttype en per taak hoogstens één per **20 uur**.
+
+> Dat is bewust géén "één per etmaal" meer. Roept de pinger elk kwartier aan, dan meldt een
+> blijvend falende taak zich op t=0, 20u, 40u — twee keer binnen sommige etmalen. Liever dat dan
+> een dag die door een randgeval stilletjes wegvalt.
+
+De **Vercel-cron draait dagelijks om 19:00 UTC** (= 21:00 Amsterdamse tijd in de zomer) — dat is
+de planlimiet, één uitvoering per dag, niet de gewenste cadans. Vaker kan alleen de pinger
+hieronder: de route is idempotent en getthrottled, dus elk kwartier aanroepen is veilig.
 
 **Buitenwacht — de dead man's switch.** De binnenwacht kan zijn eigen stilte niet zien: valt de
 Vercel-cronplanner uit, dan draait ook de sweep niet. Daarom hoort er een **externe** pinger
 omheen (healthchecks.io of cron-job.org, gratis) die elk kwartier dezelfde URL aanroept **en
 zelf alarm slaat als die aanroep uitblijft of faalt**. Zonder dat onderdeel is de hele opzet
 schijnzekerheid — precies het scenario van 29 juli t/m 11 augustus 2026.
+
+> **Sinds de dagelijkse cron is die pinger niet alleen de wachter, maar ook de motor.** Zonder
+> hem is de detectietijd van een nieuwe soort fout tot 24 uur in plaats van een kwartier — en er
+> is niets aan te zien: `/beheer/jobs` blijft groen. Staat hij nog niet, zet hem dan.
 
 Inrichten (alles hieronder is een **wijziging aan de draaiende omgeving** → via de
 `change-request`-skill, met een regel in de tabel daar):

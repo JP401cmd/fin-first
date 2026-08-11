@@ -22,6 +22,38 @@ export type PriceData = {
   currency: string | null
   /** Full name of the security */
   displayName: string | null
+  /**
+   * Yahoo's instrumenttype uit `chart.result[0].meta.instrumentType`
+   * ("EQUITY", "ETF", "MUTUALFUND", "CRYPTOCURRENCY", …). Beschrijft de
+   * VERPAKKING van het instrument, niet de inhoud — zie
+   * `lib/holdings-classification.ts` voor de afleiding naar een assetklasse.
+   */
+  instrumentType: string | null
+  /**
+   * Beurscode waarop het instrument noteert (`meta.exchangeName`, bv. "AMS",
+   * "NMS"; valt terug op `meta.fullExchangeName` als de korte code ontbreekt).
+   */
+  exchangeName: string | null
+  /**
+   * Hoogste koers in de afgelopen 52 weken (`meta.fiftyTwoWeekHigh`), in
+   * DEZELFDE notatie als `price` — dus óók door 100 gedeeld bij een
+   * pence-genoteerd (GBp/GBX) instrument. `null` als de feed niets bruikbaars
+   * levert.
+   */
+  fiftyTwoWeekHigh: number | null
+  /** Laagste koers in de afgelopen 52 weken (`meta.fiftyTwoWeekLow`), zelfde notatie als `price`. */
+  fiftyTwoWeekLow: number | null
+  /**
+   * Moment waarop de beurs deze koers noteerde (`meta.regularMarketTime`), als
+   * ISO-string. LET OP: Yahoo levert dit veld in SECONDEN sinds epoch, niet in
+   * milliseconden — het wordt hier omgerekend en op plausibiliteit gecontroleerd.
+   * `null` bij 0, NaN of een tijdstip dat onmogelijk ver weg ligt.
+   *
+   * Onderscheidt zich van `timestamp` hieronder: dat is het moment waarop WIJ
+   * de feed bevroegen, dit is het moment waarop de MARKT noteerde. Een beurs die
+   * dicht is levert een verse `timestamp` met een oude `marketTime`.
+   */
+  marketTime: string | null
   /** Timestamp of the price data */
   timestamp: string
   /** Source of the data */
@@ -95,6 +127,44 @@ async function acquireRateLimitTokenBlocking(maxWaitMs: number): Promise<boolean
   }
 }
 
+// ── Meta-veld-parsers ───────────────────────────────────────────
+
+/**
+ * Accepteer alleen een eindig, positief getal — anders `null`.
+ *
+ * Yahoo laat velden weg, of vult ze met `0`/`null` voor instrumenten zonder
+ * historie (net genoteerd, illiquide). Een `0` als 52-weeks-laag is geen koers
+ * maar een ontbrekende waarde; hem toch wegschrijven zou een grafiek-as naar
+ * nul trekken en een positie er structureel "op zijn hoogtepunt" laten uitzien.
+ */
+function finitePositiveNumber(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return null
+  return value
+}
+
+/** Ondergrens plausibiliteit: 2000-01-01T00:00:00Z in seconden. */
+const MARKET_TIME_MIN_SECONDS = 946_684_800
+/** Bovengrens: iets in de toekomst mag (klokverschil beurs↔ons), ver weg niet. */
+const MARKET_TIME_MAX_SKEW_MS = 2 * 24 * 60 * 60 * 1000
+
+/**
+ * `meta.regularMarketTime` (SECONDEN sinds epoch) → ISO-string.
+ *
+ * De eenheid is de valkuil: `new Date(1760000000)` zonder ×1000 levert januari
+ * 1970 op, en dat is geen zichtbare fout maar een stil verkeerde datum. De
+ * plausibiliteitsgrenzen vangen bovendien het omgekeerde af — een waarde die al
+ * in milliseconden staat, wordt ×1000 een jaartal in de vijftigduizend en valt
+ * hier weg in plaats van een onzinnige "laatst genoteerd"-datum te tonen.
+ */
+function parseMarketTime(value: unknown): string | null {
+  const seconds = finitePositiveNumber(value)
+  if (seconds === null) return null
+  if (seconds < MARKET_TIME_MIN_SECONDS) return null
+  const ms = seconds * 1000
+  if (ms > Date.now() + MARKET_TIME_MAX_SKEW_MS) return null
+  return new Date(ms).toISOString()
+}
+
 // ── Yahoo Finance API ───────────────────────────────────────────
 
 /**
@@ -156,6 +226,12 @@ export async function fetchPriceData(ticker: string): Promise<PriceData | null> 
     let previousClose: number | null = meta.chartPreviousClose ?? meta.previousClose ?? null
     let currency: string | null = meta.currency || null
 
+    // Het 52-weeks bereik komt uit DEZELFDE `meta` en dus uit dezelfde notatie
+    // als `regularMarketPrice`. Daarom hier uitlezen — vóór de pence-tak — zodat
+    // die normalisatie hieronder ze meeneemt.
+    let fiftyTwoWeekHigh = finitePositiveNumber(meta.fiftyTwoWeekHigh)
+    let fiftyTwoWeekLow = finitePositiveNumber(meta.fiftyTwoWeekLow)
+
     // ── Pence-notatie normaliseren (Londen/LSE-instrumenten) ────────
     // Yahoo levert in pence genoteerde aandelen met currency "GBp" (kleine
     // p; Yahoo's pence-conventie is exact zo gespeld) of de variant "GBX",
@@ -165,9 +241,16 @@ export async function fetchPriceData(ticker: string): Promise<PriceData | null> 
     // canonieke GBP-waarden krijgt zonder eigen fix. LET OP: "GBP" met
     // hoofdletter P is een écht pond en mag NIET gedeeld worden; het
     // percentage is schaal-invariant en blijft ongemoeid.
+    // Het 52-weeks bereik hoort in DEZELFDE tak, niet in een eigen `if`: het
+    // komt uit dezelfde pence-notatie. Een aparte tak (of vergeten deling) zet
+    // een Londens aandeel met een koers in ponden naast een jaarbereik in
+    // penny's — een factor 100 ernaast, en juist bij een bereik valt dat niet
+    // op als "fout" maar als "extreem ver van zijn top".
     if (currency === 'GBp' || currency?.toUpperCase() === 'GBX') {
       currentPrice = currentPrice / 100
       if (previousClose !== null) previousClose = previousClose / 100
+      if (fiftyTwoWeekHigh !== null) fiftyTwoWeekHigh = fiftyTwoWeekHigh / 100
+      if (fiftyTwoWeekLow !== null) fiftyTwoWeekLow = fiftyTwoWeekLow / 100
       currency = 'GBP'
     }
 
@@ -186,6 +269,18 @@ export async function fetchPriceData(ticker: string): Promise<PriceData | null> 
       dailyChangePercent,
       currency,
       displayName: meta.shortName || meta.longName || null,
+      // Classificatie-velden die dezelfde response al draagt — géén extra HTTP-
+      // verzoek, puur méér uitlezen. Ze belanden ook in de cache-entry hieronder,
+      // zodat een gecachete `PriceData` dezelfde velden draagt als een verse.
+      instrumentType: typeof meta.instrumentType === 'string' ? meta.instrumentType : null,
+      exchangeName:
+        (typeof meta.exchangeName === 'string' ? meta.exchangeName : null) ??
+        (typeof meta.fullExchangeName === 'string' ? meta.fullExchangeName : null),
+      // Koersgegevens uit dezelfde respons: het 52-weeks bereik (al
+      // pence-genormaliseerd hierboven) en het noteringsmoment van de markt.
+      fiftyTwoWeekHigh,
+      fiftyTwoWeekLow,
+      marketTime: parseMarketTime(meta.regularMarketTime),
       timestamp: new Date().toISOString(),
       source: 'yahoo_finance',
     }

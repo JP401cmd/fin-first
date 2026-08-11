@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, memo } from 'react'
-import { Target, ArrowRightLeft, BarChart3, Globe, Briefcase, Edit3, Check, Info } from 'lucide-react'
+import { Target, ArrowRightLeft, Globe, Briefcase, Edit3, Check, Info } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 
@@ -15,7 +15,6 @@ import {
   VIEW_MODE_LABELS,
   CATEGORY_LABELS,
   ASSET_CLASS_LABELS,
-  SECTOR_LABELS,
   GEOGRAPHY_LABELS,
   DEFAULT_TARGETS,
   ALLOCATION_COLORS,
@@ -26,13 +25,12 @@ import { formatMaskedCurrency } from '@/lib/format'
 
 // Re-export types and utilities for consumers
 export type { AllocationViewMode, HoldingForAllocation, TargetAllocation, AllocationSlice }
-export { computeAllocationSlices, computeRebalancingSuggestions, ASSET_CLASS_LABELS, SECTOR_LABELS, GEOGRAPHY_LABELS, DEFAULT_TARGETS, ALLOCATION_COLORS }
+export { computeAllocationSlices, computeRebalancingSuggestions, ASSET_CLASS_LABELS, GEOGRAPHY_LABELS, DEFAULT_TARGETS, ALLOCATION_COLORS }
 
 // ── View mode icons ─────────────────────────────────────────
 
 const VIEW_MODE_ICONS: Record<AllocationViewMode, typeof Briefcase> = {
   asset_class: Briefcase,
-  sector: BarChart3,
   geography: Globe,
 }
 
@@ -423,7 +421,7 @@ const PortfolioAllocationVisualization = memo(function PortfolioAllocationVisual
             <div className="space-y-3">
               {targets.map((t) => {
                 const slice = slices.find((s) => s.key === t.category)
-                const allLabels = { ...ASSET_CLASS_LABELS, ...SECTOR_LABELS, ...GEOGRAPHY_LABELS }
+                const allLabels = { ...ASSET_CLASS_LABELS, ...GEOGRAPHY_LABELS }
                 return (
                   <ComparisonBar
                     key={t.category}

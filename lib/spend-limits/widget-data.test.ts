@@ -71,7 +71,15 @@ function build(
   cfg: SpendLimitConfig = config(),
 ): SpendLimitWithReport {
   const report = buildSpendLimitReport({
-    rule: { ruleType: cfg.ruleType, limitAmount: cfg.limitAmount, period: cfg.period },
+    // `createdAt` gaat mee zoals de loader hem meegeeft (loader.ts, buildSpendLimitReport-
+    // aanroep): zonder dat veld past de motor de aanmaak-ondergrens niet toe, en zou
+    // deze helper een pot doorrekenen die in productie niet kan bestaan.
+    rule: {
+      ruleType: cfg.ruleType,
+      limitAmount: cfg.limitAmount,
+      period: cfg.period,
+      createdAt: cfg.createdAt,
+    },
     rows,
     now: NOW,
     windowPeriods: SPEND_LIMIT_WINDOW_BY_PERIOD[cfg.period],
@@ -137,6 +145,37 @@ describe('toSpendLimitWidgetData — projectie pint de motoruitvoer', () => {
     expect(w.longestStreak).toBe(s.longestStreak)
     expect(w.closedPeriodCount).toBe(s.closedPeriodCount)
     expect(w.exceededPeriodCount).toBe(s.exceededPeriodCount)
+  })
+
+  it('score-velden komen 1-op-1 uit report.score — óók het LABEL', () => {
+    const limit = build([
+      row('2026-08', 10),
+      row('2026-07', 20),
+      row('2026-06', 150), // eroverheen
+      row('2026-05', 30),
+      row('2026-04', 40),
+    ])
+    const w = toSpendLimitWidgetData(limit)
+    const s = limit.report.score
+
+    expect(w.score).toBe(s.score)
+    expect(w.scoreHitRatePct).toBe(s.hitRatePct)
+    expect(w.scoreBasisPeriodCount).toBe(s.basisPeriodCount)
+    // Het label reist MEE en wordt niet uit het cijfer afgeleid. Zou de tegel een
+    // eigen drempeltabel krijgen, dan drijft hij af van de pane zonder dat iets
+    // faalt — precies waar de kop van widget-data.ts voor waarschuwt.
+    expect(w.scoreLabel).toBe(s.label)
+    expect(w.scoreLabel).not.toBeNull()
+  })
+
+  it('zonder meetellende historie blijven score én label null (geen verzonnen 0)', () => {
+    // Pot van deze maand: geen enkele AFGESLOTEN periode telt mee.
+    const limit = build([row('2026-08', 10)], config({ createdAt: '2026-08-01T00:00:00.000Z' }))
+    const w = toSpendLimitWidgetData(limit)
+
+    expect(w.score).toBeNull()
+    expect(w.scoreLabel).toBeNull()
+    expect(w.scoreHitRatePct).toBeNull()
   })
 
   it('withinPeriodCount = closedPeriodCount − exceededPeriodCount (complement, geen hertelling)', () => {

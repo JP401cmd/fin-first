@@ -69,11 +69,30 @@ import {
   computePeriodOutcome,
   computeStreaks,
   computeSpendLimitTrend,
+  computeSpendLimitScore,
   resolveSpendLimitPeriods,
   type SpendLimitAggregateRow,
   type SpendLimitPeriodOutcome,
 } from '@/lib/spend-limits/engine'
+import { resolveAmountWithBasis } from '@/lib/effective-financials'
+import { resolveSavingsSource } from '@/lib/savings-source'
 import { spendLimitCounterpartyKey, counterpartyMatchesKey } from '@/lib/spend-limits/counterparty-key'
+import {
+  applyTransactionSearchCriteria,
+  type TransactionFilterBuilder,
+} from '@/lib/transactions/search-query'
+import { TYPE_TO_CONFIRM_THRESHOLD } from '@/lib/transactions/bulk-contract'
+import { transferMarkingFor } from '@/lib/transactions/transfer-marking'
+import { planBulkBudgetUpdate, type BulkCandidateRow } from '@/lib/transactions/bulk-mutate'
+import {
+  EMPTY_SELECTION,
+  togglePage,
+  headerState,
+  shouldOfferSelectAll,
+  selectionCount,
+  selectAllMatching,
+} from '@/components/overview/transacties/bulk/selection-model'
+import { criteriaKey } from '@/components/overview/transacties/bulk/criteria'
 import { CASH_ACCEPTANCE } from './cash'
 import type { AcceptanceCriterion } from './types'
 
@@ -244,6 +263,59 @@ function nextMonthlyOccurrence(dayOfMonth: number, now: Date): string {
   const m = String(next.getMonth() + 1).padStart(2, '0')
   const d = String(next.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
+}
+
+/** Fake PostgREST-filterbuilder die alleen registreert welke methoden zijn
+ *  aangeroepen — precies de structurele vorm die search-query.ts vraagt
+ *  (zie het docblock daar: bewust géén echte PostgrestFilterBuilder, anders
+ *  klapt TS om in TS2589 door diens recursieve `this`-vorm). */
+function makeFakeFilterBuilder(): { calls: string[]; builder: TransactionFilterBuilder } {
+  const calls: string[] = []
+  const builder: TransactionFilterBuilder = {
+    eq: (c) => { calls.push(`eq:${c}`); return builder },
+    in: (c) => { calls.push(`in:${c}`); return builder },
+    is: (c) => { calls.push(`is:${c}`); return builder },
+    or: (f) => { calls.push(`or:${f}`); return builder },
+    gt: (c) => { calls.push(`gt:${c}`); return builder },
+    lt: (c) => { calls.push(`lt:${c}`); return builder },
+    gte: (c) => { calls.push(`gte:${c}`); return builder },
+    lte: (c) => { calls.push(`lte:${c}`); return builder },
+  }
+  return { calls, builder }
+}
+
+/** Mirror van de netto-berekening in BulkImpact (components/overview/transacties/bulk/bulk-impact.tsx:64):
+ *  net = sumPositief + sumNegatief — inline in het component, geen eigen export. */
+function bulkImpactNet(sumPositief: number, sumNegatief: number): number {
+  return sumPositief + sumNegatief
+}
+
+/** Mirror van de bevestigingsstaat in BulkDeleteConfirm
+ *  (components/overview/transacties/bulk/bulk-bevestigingen.tsx:254-259): het
+ *  genoemde aantal, de type-to-confirm-poort en de knoptekst — inline
+ *  React-state, geen eigen export. */
+function deleteConfirmState(
+  count: number,
+  linkedCounterpartCount: number | null,
+  includeLinked: boolean,
+  typed: string,
+): { totaal: number; needsTyping: boolean; typedOk: boolean; label: string } {
+  const meegaand = includeLinked && linkedCounterpartCount != null ? linkedCounterpartCount : 0
+  const totaal = count + meegaand
+  const needsTyping = totaal > TYPE_TO_CONFIRM_THRESHOLD
+  const typedOk = !needsTyping || Number(typed.trim()) === totaal
+  const label = `Verwijder ${totaal} ${totaal === 1 ? 'transactie' : 'transacties'}`
+  return { totaal, needsTyping, typedOk, label }
+}
+
+/** Minimale BulkCandidateRow met sensible defaults (WF-CASH-56). */
+function makeBulkCandidate(overrides: Partial<BulkCandidateRow> & { id: string }): BulkCandidateRow {
+  return {
+    is_split: false,
+    transaction_type: null,
+    linked_transfer_id: null,
+    ...overrides,
+  }
 }
 
 // ── Checks — één per 'exact'-workflow in CASH_ACCEPTANCE ───────────────────
@@ -1096,6 +1168,233 @@ NEWFILEUID:NONE
           `dagVandaag=${dagOutcomeVandaag.periodMatchedAmount}/${dagOutcomeVandaag.status}; ` +
           `week=${weekHuidig.since}..${weekHuidig.until}; weekJaargrensKey=${weekJaargrens.periodKey}; ` +
           `key=${key}; matchesShell=${matchesShell}; matchesBol=${matchesBol}; emptyKeyNeverMatches=${emptyKeyNeverMatches}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-CASH-55',
+    scenarioId: 'UAT-CASH-55',
+    label: 'Bulkbewerken — geen datumvenster op een leeg criterium, kopcheckbox = pagina, "alle N"-affordance, criteriaKey-wissel, impact-net (AC1–AC5)',
+    run: () => {
+      criterion('WF-CASH-55')
+
+      // AC1: een leeg criterium zet géén enkel datumfilter — de zoekopdracht
+      // reikt zonder venster over de hele historie (ADR: geen resolveFetchWindow).
+      const fake = makeFakeFilterBuilder()
+      applyTransactionSearchCriteria(fake.builder, {}, 'user-1')
+      const geenDatumfilterOpLeegCriterium =
+        !fake.calls.some((c) => c.startsWith('gte:date') || c.startsWith('lte:date')) &&
+        fake.calls.includes('eq:user_id')
+
+      // AC2/AC3: 50 zichtbare rijen van 340 treffers.
+      const pageIds = Array.from({ length: 50 }, (_, i) => `tx-${i}`)
+      const volleSelectie = togglePage(EMPTY_SELECTION, pageIds)
+      const headerStateVolledigePagina = headerState(volleSelectie, pageIds)
+      const selectAllAffordance = shouldOfferSelectAll(volleSelectie, pageIds, 340)
+      const selectionCountExpliciet = selectionCount(volleSelectie, 340)
+      const alleNSelectie = selectAllMatching()
+      const selectionCountAlleN = selectionCount(alleNSelectie, 340)
+
+      // AC4: de identiteitssleutel verandert zodra de zoekterm wijzigt.
+      const sleutelLeeg = criteriaKey({})
+      const sleutelMetZoekterm = criteriaKey({ q: 'Notaris' })
+      const criteriaKeyVerandertBijZoekterm = sleutelLeeg !== sleutelMetZoekterm
+
+      // AC5: 12 transacties, netto −€1.240 (uitgaven-overschot).
+      const impactNetBedrag = bulkImpactNet(0, -1240)
+
+      return {
+        expected:
+          'geenDatumfilterOpLeegCriterium=true; headerStateVolledigePagina=full; selectAllAffordance=true; selectionCountExpliciet=50; selectionCountAlleN=340; criteriaKeyVerandertBijZoekterm=true; impactNetBedrag=-1240',
+        actual:
+          `geenDatumfilterOpLeegCriterium=${geenDatumfilterOpLeegCriterium}; headerStateVolledigePagina=${headerStateVolledigePagina}; selectAllAffordance=${selectAllAffordance}; selectionCountExpliciet=${selectionCountExpliciet}; selectionCountAlleN=${selectionCountAlleN}; criteriaKeyVerandertBijZoekterm=${criteriaKeyVerandertBijZoekterm}; impactNetBedrag=${impactNetBedrag}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-CASH-56',
+    scenarioId: 'UAT-CASH-56',
+    label: 'Bulkbewerken — canoniek trio (transferMarkingFor) en split-uitsluiting (planBulkBudgetUpdate) (AC6–AC8)',
+    run: () => {
+      criterion('WF-CASH-56')
+
+      // AC7: naar "Eigen rekening" schrijft altijd het volledige trio.
+      const eigenRekeningTrioObj = transferMarkingFor({ targetsEigenRekening: true, currentType: null })
+      const eigenRekeningTrio = `${eigenRekeningTrioObj.category_source}+${eigenRekeningTrioObj.transaction_type}`
+
+      // AC8: was een verschuiving, gaat naar een gewoon budget → markering wist.
+      const wasVerschuivingObj = transferMarkingFor({ targetsEigenRekening: false, currentType: 'transfer' })
+      const wasVerschuivingNaarGewoon = `${wasVerschuivingObj.category_source}+transactionTypeNull=${wasVerschuivingObj.transaction_type === null}`
+
+      // AC8: was GEEN verschuiving → de sleutel transaction_type ontbreekt helemaal
+      // (geen blanket-null die importherkomst als 'DEBIT' zou overschrijven).
+      const wasGeenVerschuivingObj = transferMarkingFor({ targetsEigenRekening: false, currentType: 'DEBIT' })
+      const wasGeenVerschuivingNaarGewoon = `${wasGeenVerschuivingObj.category_source}+geenTransactionTypeSleutel=${!('transaction_type' in wasGeenVerschuivingObj)}`
+
+      // AC6: 1.500 niet-gesplitste kandidaten belanden allemaal in een schrijfgroep.
+      const candidates1500: BulkCandidateRow[] = Array.from({ length: 1500 }, (_, i) =>
+        makeBulkCandidate({ id: `tx-${i}`, transaction_type: i < 3 ? 'transfer' : null }))
+      const plan1500 = planBulkBudgetUpdate({
+        requestedIds: candidates1500.map((c) => c.id),
+        candidates: candidates1500,
+        budgetId: 'budget-boodschappen',
+        targetsEigenRekening: false,
+      })
+      const planTotaalCandidates1500 = plan1500.groups.reduce((s, g) => s + g.ids.length, 0)
+      const planSkipped1500 = plan1500.skipped.length
+
+      // Randgeval: een split in de selectie wordt geskipt, nooit stil meegenomen.
+      const metSplit: BulkCandidateRow[] = [
+        makeBulkCandidate({ id: 'split-1', is_split: true }),
+        makeBulkCandidate({ id: 'gewoon-1' }),
+      ]
+      const planMetSplit = planBulkBudgetUpdate({
+        requestedIds: metSplit.map((c) => c.id),
+        candidates: metSplit,
+        budgetId: 'budget-boodschappen',
+        targetsEigenRekening: false,
+      })
+      const splitWordtGeskiptMetReden = planMetSplit.skipped[0]?.reason ?? 'GEEN_SKIP'
+
+      return {
+        expected:
+          'eigenRekeningTrio=transfer+transfer; wasVerschuivingNaarGewoon=manual+transactionTypeNull=true; wasGeenVerschuivingNaarGewoon=manual+geenTransactionTypeSleutel=true; planTotaalCandidates1500=1500; planSkipped1500=0; splitWordtGeskiptMetReden=is_split',
+        actual:
+          `eigenRekeningTrio=${eigenRekeningTrio}; wasVerschuivingNaarGewoon=${wasVerschuivingNaarGewoon}; wasGeenVerschuivingNaarGewoon=${wasGeenVerschuivingNaarGewoon}; planTotaalCandidates1500=${planTotaalCandidates1500}; planSkipped1500=${planSkipped1500}; splitWordtGeskiptMetReden=${splitWordtGeskiptMetReden}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-CASH-57',
+    scenarioId: 'UAT-CASH-57',
+    label: 'Bulkbewerken — verwijder-bevestiging: type-to-confirm-poort en herimport-waarschuwing (mirror) (AC9–AC10)',
+    run: () => {
+      criterion('WF-CASH-57')
+
+      // AC9: 43 (>25) transacties, geen tegenboekingen.
+      const bij43Leeg = deleteConfirmState(43, 0, true, '')
+      const bij43JuisteGetal = deleteConfirmState(43, 0, true, '43')
+      const bij43VerkeerdGetal = deleteConfirmState(43, 0, true, '42')
+
+      // AC10: bankLinkedCount > 0 triggert de waarschuwing, 0 niet (zelfde
+      // conditionele render als bulk-bevestigingen.tsx:310 `bankLinkedCount > 0`).
+      const waarschuwingBij5BankLinked = 5 > 0
+      const geenWaarschuwingBij0 = 0 > 0
+
+      return {
+        expected:
+          'needsTypingBij43=true; labelBij43=Verwijder 43 transacties; typedOkLeeg=false; typedOkJuisteGetal=true; typedOkVerkeerdGetal=false; waarschuwingBij5BankLinked=true; geenWaarschuwingBij0=false',
+        actual:
+          `needsTypingBij43=${bij43Leeg.needsTyping}; labelBij43=${bij43Leeg.label}; typedOkLeeg=${bij43Leeg.typedOk}; typedOkJuisteGetal=${bij43JuisteGetal.typedOk}; typedOkVerkeerdGetal=${bij43VerkeerdGetal.typedOk}; waarschuwingBij5BankLinked=${waarschuwingBij5BankLinked}; geenWaarschuwingBij0=${geenWaarschuwingBij0}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-CASH-60',
+    scenarioId: 'UAT-CASH-60',
+    label:
+      'Grondslagkeuze (ADR 0103): resolveAmountWithBasis-precedentie (manual > budget > transactie > profiel, met de bewuste budget-overslag op \'transaction\') + de spaarquote die de grondslag volgt',
+    run: () => {
+      criterion('WF-CASH-60')
+
+      // Drie bronnen die BEWUST uiteenlopen, zodat elke tak een eigen cijfer geeft.
+      const PROFIEL = 2000
+      const TRANSACTIE = 3000
+      const BUDGET = 3600
+
+      const auto = resolveAmountWithBasis('auto', PROFIEL, TRANSACTIE, BUDGET)
+      const transactie = resolveAmountWithBasis('transaction', PROFIEL, TRANSACTIE, BUDGET)
+      const manual = resolveAmountWithBasis('manual', PROFIEL, TRANSACTIE, BUDGET)
+      const terugval = resolveAmountWithBasis('auto', PROFIEL, 0, 0)
+
+      // De spaarquote VOLGT de grondslag. Budgetgrondslag: uniforme (I − E) / I
+      // op de effectieve bedragen, zónder spaarbudget-/aflossingscorrectie.
+      const opBudget = resolveSavingsSource({
+        incomeSource: 'auto',
+        expensesSource: 'auto',
+        netMonthlyIncome: PROFIEL,
+        estimatedMonthlyExpenses: 2700,
+        estimatedAnnualIncome: PROFIEL * 12,
+        savingsRate6m: 31,
+        basis: {
+          income: 'budget',
+          expenses: 'budget',
+          annualIncome: BUDGET * 12,
+          monthlyExpenses: 2700,
+        },
+      })
+      // Beide op 'transaction' → savingsRate6m blijft ongewijzigd de uitkomst.
+      const opTransactie = resolveSavingsSource({
+        incomeSource: 'auto',
+        expensesSource: 'auto',
+        netMonthlyIncome: PROFIEL,
+        estimatedMonthlyExpenses: 2700,
+        estimatedAnnualIncome: PROFIEL * 12,
+        savingsRate6m: 31,
+        basis: {
+          income: 'transaction',
+          expenses: 'transaction',
+          annualIncome: TRANSACTIE * 12,
+          monthlyExpenses: 2700,
+        },
+      })
+
+      return {
+        expected:
+          'autoBudget=3600/budget; transactieSlaatBudgetOver=3000/transaction; manualWint=2000/manual; terugvalProfiel=2000/profile; quoteBudgetgrondslag=25; quoteBeideTransactie=31',
+        actual:
+          `autoBudget=${auto.amount}/${auto.basis}; transactieSlaatBudgetOver=${transactie.amount}/${transactie.basis}; manualWint=${manual.amount}/${manual.basis}; terugvalProfiel=${terugval.amount}/${terugval.basis}; quoteBudgetgrondslag=${opBudget.effectiveSavingsRatePct}; quoteBeideTransactie=${opTransactie.effectiveSavingsRatePct}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-CASH-61',
+    scenarioId: 'UAT-CASH-61',
+    label:
+      'Grenzenpot-reeksscore (computeSpendLimitScore): 70% trefpercentage + 30% reeks ± 10 trendbonus, geklemd op [0,100]; onder 3 meetellende periodes geen cijfer',
+    run: () => {
+      criterion('WF-CASH-61')
+
+      const LIMIET = 500
+      /** Eén afgesloten maandperiode met een vast bedrag — geen jitter. */
+      const periode = (maand: number, bedrag: number): SpendLimitPeriodOutcome => {
+        const mm = String(maand).padStart(2, '0')
+        const laatsteDag = new Date(Date.UTC(2026, maand, 0)).getUTCDate()
+        const over = Math.max(0, bedrag - LIMIET)
+        return {
+          periodKey: `2026-${mm}`,
+          label: `2026-${mm}`,
+          since: `2026-${mm}-01`,
+          until: `2026-${mm}-${String(laatsteDag).padStart(2, '0')}`,
+          isOpen: false,
+          periodMatchedAmount: bedrag,
+          limitAmount: LIMIET,
+          periodOverAmount: over,
+          periodHeadroom: Math.max(0, LIMIET - bedrag),
+          status: over > 0 ? 'exceeded' : 'within',
+          isNearLimit: false,
+          matchedTransactionCount: 1,
+          matchedCounterpartyNames: [],
+        }
+      }
+
+      // (a) alles binnen de grens én dalend → volle score, geklemd op 100.
+      const goed = [400, 400, 400, 300, 300, 300].map((b, i) => periode(i + 1, b))
+      const scoreGoed = computeSpendLimitScore(goed, computeSpendLimitTrend(goed), null)
+
+      // (b) alles boven de grens, vlak → reeks 0, geen bonus.
+      const slecht = [900, 900, 900, 900, 900, 900].map((b, i) => periode(i + 1, b))
+      const scoreSlecht = computeSpendLimitScore(slecht, computeSpendLimitTrend(slecht), null)
+
+      // (c) onder de ondergrens van SPEND_LIMIT_SCORE_MIN_PERIODS (3).
+      const teWeinig = goed.slice(0, 2)
+      const scoreTeWeinig = computeSpendLimitScore(teWeinig, computeSpendLimitTrend(teWeinig), null)
+
+      return {
+        expected:
+          'scoreGoed=100; labelGoed=strak; hitRateGoed=100; basisGoed=6; scoreSlecht=0; labelSlecht=los; scoreTeWeinig=null; labelTeWeinig=null; basisTeWeinig=2',
+        actual:
+          `scoreGoed=${scoreGoed.score}; labelGoed=${scoreGoed.label}; hitRateGoed=${scoreGoed.hitRatePct}; basisGoed=${scoreGoed.basisPeriodCount}; scoreSlecht=${scoreSlecht.score}; labelSlecht=${scoreSlecht.label}; scoreTeWeinig=${scoreTeWeinig.score}; labelTeWeinig=${scoreTeWeinig.label}; basisTeWeinig=${scoreTeWeinig.basisPeriodCount}`,
       }
     },
   },

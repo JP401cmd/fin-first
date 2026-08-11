@@ -54,7 +54,7 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'compleet',
     given: 'Vaste 6-maands-aggregaten (inkomen/uitgaven/aflossing) — géén persona-seed; de bron is een formule-identiteit.',
     when: 'De gebruiker leest de spaarquote op elk consument-oppervlak (cashflow-tegel, instellingenblok, gezondheidspijler, forecast, check-in, deel-kaart, snapshots, Fin).',
-    then: 'Overal exact hetzelfde percentage uit `savingsRateFromAggregates`. EXACT: (36.000 / 27.000 / 1.800) → 30,0%; inkomen ≤ 0 → 0 (guard). Geen consument doet een eigen spaarquote-som.',
+    then: 'Overal exact hetzelfde percentage uit `savingsRateFromAggregates`. EXACT: (36.000 / 27.000 / 1.800) → 30,0%; inkomen ≤ 0 → 0 (guard). Geen consument doet een eigen spaarquote-som. SINDS ADR 0103 (11 aug 2026) is de formule nog steeds de enige bron, maar WÉLKE aggregaten erin gaan volgt de gekozen grondslag: `resolveSavingsSource` heeft een grondslag-tak die alleen bij inkomen én uitgaven op `transaction` de 6-maands-meting mét spaarbudget-/aflossingscorrectie doorgeeft; op elke andere grondslag geldt dezelfde functie met de effectieve maandbedragen en aflossing 0 — de correctie mag daar niet, want een budget-uitgavensom bevat spaarstortingen en aflossing per constructie niet. Dat is één formule met een expliciete grondslag, geen tweede bron; welke grondslag geldt staat op elke kaart. De keuze-precedentie zelf is gedekt door WF-CASH-60, de budgetsom door WF-BUDGET-26.',
     assertion: {
       kind: 'exact',
       expected: 'spaarquote=30; nulInkomen=0',
@@ -99,11 +99,11 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'compleet',
     given: 'Vaste rendement/inflatie-paren — géén persona-seed; de bron is de SWR-formule + vloer.',
     when: 'De gebruiker leest de effectieve SWR (badge "Afgeleid") en volgt hem door naar FIRE-doel en beide projecties.',
-    then: 'Eén SWR-getal uit `computeEffectiveSwr` (= rendement − Box 3-drag − inflatie, vloer 0,1%) voedt SWR-widget, FIRE-doel en projecties. EXACT: (7% ; 2%) → 2,840% (BOX3_DRAG 0,0216); (1% ; 5%) → vloer 0,100%.',
+    then: 'Eén SWR-getal uit `computeEffectiveSwr` (= rendement − Box 3-drag − inflatie, vloer 0,1%) voedt SWR-widget, FIRE-doel en projecties. EXACT: (7% ; 2%) → 2,840% (BOX3_DRAG 0,0216); (1% ; 5%) → vloer 0,100%. DE INVOER heeft sinds 11 aug 2026 een expliciete precedentieketen die élk FIRE-tonend oppervlak hoort te gebruiken: (1) de gebruikerskeuze `profiles.expected_return`/`inflation_rate` wint altijd, (2) de jaargelaagde markt-default uit `fire_assumptions` (beheer op /beheer/fiscale-kerngetallen) vult alléén waar de gebruiker niets zette, (3) de TS-constanten `DEFAULT_RETURN`/`INFLATION` zijn de terugval. Die keten woont in `resolveFireParamsWithAssumptions`, dat de rij shadowt op een KOPIE (de profielrij blijft `null` waar de gebruiker niets koos — elders leest dat als "niet ingesteld"). Laat een oppervlak stap 2 weg, dan rekent het met een ándere onttrekkingsvoet zodra beheer een jaarlaag zet; de formule hieronder verandert daar niet door.',
     assertion: {
       kind: 'exact',
       expected: 'swrDefault=0.02840; swrVloer=0.00100',
-      source: 'lib/fire-params.ts#computeEffectiveSwr(0.07,0.02) = 0.02840; (0.01,0.05) = 0.001 (vloer). Register-getal 5.',
+      source: 'lib/fire-params.ts#computeEffectiveSwr(0.07,0.02) = 0.02840; (0.01,0.05) = 0.001 (vloer). Register-getal 5. De invoer-precedentie eromheen: lib/fire-params.ts#resolveFireParamsWithAssumptions + lib/fire-assumptions.ts#resolveFireAssumptions (gebruikerskeuze > jaarlaag `fire_assumptions` > lib/constants.ts) — geen tweede SWR-som, alleen een expliciete grondslag voor rendement en inflatie.',
     },
   },
   {
@@ -201,10 +201,10 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'compleet',
     given: 'Persona Tessa geladen; sidebar open, hefboomkaarten zichtbaar.',
     when: 'De gebruiker vergelijkt per domein de stoplichtstatus op sidebar-dot, hefboomkaart, status-banner en box1/2/3-kaart.',
-    then: 'Per domein exact dezelfde categorische status uit één scoringsbron (`loadLeverScores`/`computeLeverScores`/`pillarStatus`, `lib/leverage-status.ts`). Stoplichtkleuren volgen NIET het module-accent (semantiek blijft semantisch). Register-getal 12.',
+    then: 'Per domein exact dezelfde categorische status uit één scoringsbron (`loadLeverScores`/`computeLeverScores`/`pillarStatus`, `lib/leverage-status.ts`). Stoplichtkleuren volgen NIET het module-accent (semantiek blijft semantisch). Register-getal 12. TWEE GRONDSLAG-GATEN GESLOTEN (11 aug 2026), allebei in de loader die op ÉLKE route in het shell-pad hangt: (1) het Box 1-inkomen achter de belasting-dot leest sinds ADR 0103 dezelfde budgetgrondslag als /overzicht/cashflow (`loadBudgetBasis` → `resolveEffectiveIncomeExpenses` mét budget-argument) in plaats van stil op de transactiegrondslag te blijven; (2) de losse-rekening-optelling voor de sidebar-netWorth-metric gebruikt de canonieke, huishoud-gewogen `unlinkedCashTotal`/`resolveUnlinkedCashShare` in plaats van een eigen `reduce` over de saldi. Beide waren drift-bronnen tussen de dot en de pagina, niet tussen de vier oppervlakken onderling — de gelijkheidseis hierboven verandert er niet door, ze wordt er waar door.',
     assertion: {
       kind: 'consistency',
-      source: 'consistentie-eis: register-getal 12 (hefboom-status) uit lib/leverage-status.ts + lib/lever-scores-loader.ts; categorisch identiek op vier oppervlakken.',
+      source: 'consistentie-eis: register-getal 12 (hefboom-status) uit lib/leverage-status.ts + lib/lever-scores-loader.ts (dat sindsdien `loadBudgetBasis` en `unlinkedCashTotal` consumeert i.p.v. een eigen inkomens-/saldo-som); categorisch identiek op vier oppervlakken.',
     },
   },
   {

@@ -167,7 +167,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     given: 'Sanne\'s geactiveerde account: netMonthlyIncome €3.200 (bron: manual), estimatedMonthlyExpenses €2.200 (bron: manual), geen schulden.',
     when: 'De gebruiker opent /overzicht/cashflow na activatie.',
-    then: 'Effectief jaarinkomen = €38.400; effectieve spaarquote = 31,25%; jaarlijks spaarbedrag = €12.000 — moet exact overeenkomen met wat de gebruiker later zelf narekent (SSoT-eis, zelfde motor als WF-START-18).',
+    then: 'Effectief jaarinkomen = €38.400; effectieve spaarquote = 31,25%; jaarlijks spaarbedrag = €12.000 — moet exact overeenkomen met wat de gebruiker later zelf narekent (SSoT-eis, zelfde motor als WF-START-18). DEZE DRIE GETALLEN ZIJN INVARIANT over de grondslag-tak die `resolveSavingsSource` sinds ADR 0103 draagt: Sanne staat op manual/manual, dus met én zonder het optionele `basis`-blok komt de uniforme (I − E) / I = (3.200 − 2.200) / 3.200 op 31,25% uit. De check-funnel zelf (`lib/check/build-report.ts`) blijft bewust op de legacy-tak — daar vult de gebruiker de bedragen zelf in.',
     assertion: {
       kind: 'exact',
       expected: 'effectiveAnnualIncome=38400; effectiveSavingsRatePct=31.25; baseAnnualSavings=12000',

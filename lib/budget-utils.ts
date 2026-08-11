@@ -173,6 +173,35 @@ export function yearlyMustExpensesFromBudgets(allBudgets: FlatBudgetRow[]): numb
   return computeYearlyMustExpenses(essentialParents, children).yearlyMustExpenses
 }
 
+/** Minimale rijvorm voor de type-erfregel: id, ouder en eigen type. */
+export interface BudgetTypeRow {
+  id: string
+  parent_id: string | null
+  budget_type: string
+}
+
+/**
+ * Map budget_id → budget_type, voor ZOWEL parent- als child-budgetten. Een child
+ * ERFT het type van zijn parent (en valt weg als die parent ontbreekt).
+ *
+ * Woonde tot ADR 0103 in lib/cashflow-kpis.ts. Verhuisd hierheen omdat die module
+ * Supabase-fetchers importeert en `lib/budget-basis.ts` (de grondslag-motor) een
+ * PURE module moet blijven; twee kopieën van deze erfregel zou precies de drift
+ * opleveren die de regel bestrijdt. `lib/cashflow-kpis.ts` re-exporteert 'm zodat
+ * bestaande call-sites (dashboard-data-loader) ongewijzigd blijven.
+ */
+export function buildBudgetTypeMap(budgets: BudgetTypeRow[]): Map<string, string> {
+  const parents = budgets.filter(b => b.parent_id === null)
+  const children = budgets.filter(b => b.parent_id !== null)
+  const budgetTypeMap = new Map<string, string>()
+  for (const b of parents) budgetTypeMap.set(b.id, b.budget_type)
+  for (const c of children) {
+    const parentType = budgetTypeMap.get(c.parent_id ?? '')
+    if (parentType) budgetTypeMap.set(c.id, parentType)
+  }
+  return budgetTypeMap
+}
+
 export type RetirementExpenseMethod =
   | 'essential_budgets'
   | 'custom_amount'

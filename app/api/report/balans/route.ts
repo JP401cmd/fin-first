@@ -2,6 +2,7 @@ import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { localMonthStartMonthsAgo } from '@/lib/month-range'
 import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 import { EXPENSE_RATE_ROLLING_MONTHS } from '@/lib/constants'
+import { resolveUnlinkedCashShare, unlinkedCashFractionFor } from '@/lib/unlinked-cash'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -135,7 +136,9 @@ export async function GET(request: Request) {
         .eq('is_active', true),
       supabase
         .from('bank_accounts')
-        .select('id, name, account_type, balance, is_active')
+        // `ownership` hoort erbij: een GEDEELDE rekening is voor beide partners
+        // zichtbaar en telt hieronder op het eigen aandeel (lib/unlinked-cash.ts).
+        .select('id, name, account_type, balance, is_active, ownership')
         .eq('is_active', true)
         // Sluit companion-rekeningen uit die al als cash-asset (asset_type
         // 'cash', via linked_asset_id) in de activa-telling zitten — anders
@@ -159,7 +162,7 @@ export async function GET(request: Request) {
 
     type AssetRow = { id: string; name: string; asset_type: string; current_value: number; is_active: boolean; net_worth_inclusion_pct: number }
     type DebtRow = { id: string; name: string; debt_type: string; current_balance: number; interest_rate: number; is_active: boolean; net_worth_inclusion_pct: number }
-    type BankRow = { id: string; name: string; account_type: string; balance: number; is_active: boolean }
+    type BankRow = { id: string; name: string; account_type: string; balance: number; is_active: boolean; ownership?: string | null }
     type TxRow = { amount: number; date: string }
 
     const assetsRaw = (assetsResult.status === 'fulfilled' ? assetsResult.value.data ?? [] : []) as AssetRow[]
@@ -207,14 +210,28 @@ export async function GET(request: Request) {
 
     // ── Bank accounts as liquide middelen ────────────────────────────────────
 
-    const liquideItems: BalansItem[] = banksRaw.map(b => ({
-      id: b.id,
-      name: b.name,
-      type: b.account_type,
-      rawValue: Math.round(Number(b.balance)),
-      value: Math.round(Number(b.balance)),
-      inclusionPct: 100,
-    }))
+    // Huishoud-aandeel voor gedeelde rekeningen — dezelfde canonieke weging als
+    // de loaders, zodat de balans niet drift met het dashboard. Zonder gedeelde
+    // rekening kost dit geen extra leesronde.
+    const bankShare = await resolveUnlinkedCashShare(supabase, banksRaw)
+
+    const liquideItems: BalansItem[] = banksRaw.map(b => {
+      const fraction = unlinkedCashFractionFor(
+        bankShare.perspective,
+        b.ownership,
+        bankShare.mySharePct,
+      )
+      return {
+        id: b.id,
+        name: b.name,
+        type: b.account_type,
+        rawValue: Math.round(Number(b.balance)),
+        value: Math.round(Number(b.balance) * fraction),
+        // Het aandeel is de inclusie op deze regel: de kassabon toont zo
+        // waaróm een gedeelde rekening voor de helft meetelt.
+        inclusionPct: Math.round(fraction * 100),
+      }
+    })
 
     const liquideMiddelen: BalansCategory = {
       label: 'Liquide middelen',

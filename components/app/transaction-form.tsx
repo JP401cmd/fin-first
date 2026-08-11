@@ -1,12 +1,19 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { X, Save, Trash2, Repeat, GitFork, Plus, History, ArrowRight, FileText, BarChart3, Sparkles, Users } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { X, Save, Trash2, Repeat, GitFork, Plus, History, ArrowRight, FileText, BarChart3, Sparkles, Users, ArrowLeftRight } from 'lucide-react'
 import { CounterpartyAnalysisPanel } from '@/components/app/counterparty-analysis-panel'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { OwnershipToggle, useHouseholdStatus } from '@/components/app/ownership-toggle'
 import { createClient } from '@/lib/supabase/client'
 import { buildBudgetSelectEntries, budgetOptionLabel, type Budget } from '@/lib/budget-data'
+import {
+  TRANSFER_TYPES,
+  collectEigenRekeningBudgetIds,
+  transferMarkingFor,
+} from '@/lib/transactions/transfer-marking'
+import { isRejected, planRuleTarget } from '@/lib/transactions/rule-target'
+import { escapeLikePattern } from '@/lib/transactions/search-query'
 import { FREQUENCY_LABELS } from '@/lib/recurring-data'
 
 type Transaction = {
@@ -23,6 +30,12 @@ type Transaction = {
   category_source: string
   is_split?: boolean
   ownership?: 'personal' | 'shared'
+  /**
+   * Huidige verschuivings-markering. Optioneel omdat niet elke aanroeper hem
+   * meelaadt; ontbreekt hij, dan geldt "geen verschuiving" en wordt er nooit
+   * stil een bestaande markering gewist.
+   */
+  transaction_type?: string | null
 }
 
 type BudgetGroup = {
@@ -45,6 +58,14 @@ type PendingRow = {
   category_source: string
   notes: string | null
   ownership: 'personal' | 'shared'
+  /**
+   * Alleen aanwezig wanneer de markering daadwerkelijk moet veranderen: naar
+   * `'transfer'` bij een boeking op Eigen rekening, naar `null` wanneer een
+   * bestaande verschuiving een gewoon budget krijgt. Blijft hij weg, dan laat de
+   * UPDATE het veld ongemoeid — importherkomst als `'DEBIT'`/`'payment'` mag
+   * niet sneuvelen op een budgetwijziging.
+   */
+  transaction_type?: string | null
 }
 
 function formatDateNL(dateStr: string): string {
@@ -135,6 +156,37 @@ export function TransactionForm({
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
+  /**
+   * De "Eigen rekening"-posten (archive-emmer): hoofdpost én subpost, want welke
+   * van de twee selecteerbaar is hangt af van het budgetplan — `buildBudgetSelectEntries`
+   * toont de subpost als die bestaat en valt anders terug op de hoofdpost.
+   *
+   * Waarom dit méér is dan een budget-keuze: `isRealAggRow` bepaalt of iets een
+   * echte inkomst/uitgave is UITSLUITEND op `transaction_type` — niet op het
+   * budget. Zou dit formulier alleen `budget_id` schrijven, dan staat de
+   * transactie zichtbaar op "Eigen rekening" terwijl hij nog gewoon meetelt in
+   * inkomsten, uitgaven, spaarquote en grenzenpotten. Vandaar het canonieke trio
+   * (`transaction_type` + `category_source` + budget), gelijk aan wat de import,
+   * de banksync, `own-accounts-reclassify` en de sleepmodus (`lib/category-rules.ts`)
+   * al schrijven.
+   *
+   * De regel zelf woont sinds de bulkbewerk-oplevering in
+   * `lib/transactions/transfer-marking.ts` — gedeeld met
+   * `PATCH /api/transactions/bulk-budget`, met een paritytest erop. Twee kopieën
+   * zouden betekenen dat het van het gebruikte scherm afhangt of een overboeking
+   * als verschuiving of als uitgave telt (AC7/AC8).
+   */
+  const eigenRekeningBudgetIds = useMemo(
+    () => collectEigenRekeningBudgetIds(budgetGroups.flatMap((g) => [g.parent, ...g.children])),
+    [budgetGroups],
+  )
+
+  /** Boekt deze transactie op Eigen rekening? Een split kán dat niet (budget is dan null). */
+  const isTransferBudget = !isSplit && eigenRekeningBudgetIds.has(form.budget_id)
+  // "Stond hij al als verschuiving geboekt?" is geen losse afleiding meer: die
+  // vraag zit in `transferMarkingFor` (zie de PendingRow-opbouw hieronder), zodat
+  // het formulier en de bulkroute hem niet elk apart kunnen beantwoorden.
+
   // Eenmaal weggeklikte share-suggestie blijft weg tot de gekozen budget(ten) wijzigen.
   const [shareSuggestionDismissed, setShareSuggestionDismissed] = useState(false)
 
@@ -194,40 +246,72 @@ export function TransactionForm({
 
     // 2. Bulk update existing transactions (als scope niet 'single')
     if (scope !== 'single' && matchName) {
-      let query = supabase
-        .from('transactions')
-        .update({ budget_id: form.budget_id || null, category_source: 'rule' })
-        .eq('user_id', user.id)
-        .neq('id', transaction.id)
-
-      if (matchField === 'counterparty_name') {
-        query = query.ilike('counterparty_name', matchName)
-      } else {
-        query = query.ilike('description', matchName)
+      // Dezelfde selectie voor beide schrijfrondes hieronder — één plek, zodat
+      // ze onmogelijk uiteen kunnen lopen.
+      const bulkUpdate = (patch: Record<string, unknown>) => {
+        let q = supabase
+          .from('transactions')
+          .update(patch)
+          .eq('user_id', user.id)
+          .neq('id', transaction.id)
+        // Geëscapet: `matchName` is vrije gebruikerstekst, en `%`/`_` zijn
+        // LIKE-jokers. Een omschrijving met een `%` erin zou deze update over
+        // élke transactie van de gebruiker laten lopen.
+        const safeMatch = escapeLikePattern(matchName)
+        q = matchField === 'counterparty_name'
+          ? q.ilike('counterparty_name', safeMatch)
+          : q.ilike('description', safeMatch)
+        return scope === 'future' ? q.gte('date', transaction.date) : q
       }
 
-      if (scope === 'future') {
-        query = query.gte('date', transaction.date)
-      }
+      // Boekt de gebruiker op Eigen rekening, dan gaat de verschuivings-markering
+      // mee — spiegelt `retroSet` in lib/category-rules.ts. Zonder dit krijgen de
+      // oudere rijen wél het archive-budget maar tellen ze gewoon door in de
+      // spaarquote.
+      await bulkUpdate({
+        budget_id: form.budget_id || null,
+        category_source: 'rule',
+        ...(isTransferBudget ? { transaction_type: 'transfer' } : {}),
+      })
 
-      await query
+      // Andersom: gaat een verschuiving naar een gewoon budget, dan moet de
+      // markering weg — anders blijft een échte uitgave buiten de spaarquote.
+      // Bewust géén blanket `null`: alleen rijen die nú een verschuiving zijn,
+      // zodat importherkomst ('DEBIT', 'payment', …) op de rest intact blijft.
+      if (!isTransferBudget) {
+        await bulkUpdate({ transaction_type: null }).in('transaction_type', [...TRANSFER_TYPES])
+      }
     }
 
-    // 3. Always save correction rule — system learns from every budget
-    // correction, regardless of scope. Future imports from the same source
-    // will automatically get the corrected category.
-    if (matchName) {
+    // 3. Save correction rule — system learns from every budget correction,
+    // regardless of scope. Future imports from the same source will
+    // automatically get the corrected category.
+    //
+    // Wáár de regel landt beslist dit formulier niet zelf: `planRuleTarget` is de
+    // gedeelde bron (ook gebruikt door lib/category-rules.ts en de bulkroute).
+    // Een boeking op Eigen rekening levert hier dus géén correctieregel — die
+    // zet alleen `budget_id`, niet `transaction_type`, waardoor toekomstige
+    // imports op de archive-post zouden landen én tóch zouden meetellen. En een
+    // te korte matchwaarde levert helemaal geen regel: die matcht als substring
+    // en zou élke volgende import sturen.
+    const rulePlan = planRuleTarget({
+      targetsEigenRekening: isTransferBudget,
+      matchField,
+      matchValue: matchName,
+    })
+    if (!isRejected(rulePlan) && rulePlan.target.table === 'category_corrections') {
+      const target = rulePlan.target
       await supabase
         .from('category_corrections')
         .delete()
         .eq('user_id', user.id)
-        .eq('match_field', matchField)
-        .ilike('match_value', matchName)
+        .eq('match_field', target.matchField)
+        .ilike('match_value', escapeLikePattern(target.matchValue))
 
       await supabase.from('category_corrections').insert({
         user_id: user.id,
-        match_field: matchField,
-        match_value: matchName,
+        match_field: target.matchField,
+        match_value: target.matchValue,
         budget_id: form.budget_id || null,
       })
     }
@@ -277,6 +361,14 @@ export function TransactionForm({
       ? splitRows.filter(r => r.amount !== '' && parseFloat(r.amount) > 0)
       : []
 
+    // Het canonieke trio komt uit de gedeelde helper: `category_source` altijd,
+    // `transaction_type` ALLEEN wanneer de markering echt moet veranderen (zie
+    // PendingRow). Dezelfde functie voedt `PATCH /api/transactions/bulk-budget`.
+    const marking = transferMarkingFor({
+      targetsEigenRekening: isTransferBudget,
+      currentType: transaction?.transaction_type,
+    })
+
     const row: PendingRow = {
       user_id: user.id,
       account_id: accountId,
@@ -288,10 +380,10 @@ export function TransactionForm({
       budget_id: isSplit ? null : (form.budget_id || null),
       is_income: form.is_income,
       is_split: isSplit && validSplitRows.length >= 2,
-      category_source: 'manual' as const,
       notes: form.notes.trim() || null,
       // household_id wordt server-side afgeleid door de stamp_household_id-trigger.
       ownership: form.ownership,
+      ...marking,
     }
 
     if (isEdit && transaction) {
@@ -612,6 +704,15 @@ export function TransactionForm({
                     )
                   )}
                 </select>
+                {isTransferBudget && (
+                  <p
+                    className="mt-1.5 flex items-center gap-1.5 text-xs text-[var(--ink-3)]"
+                    data-testid="tx-transfer-notice"
+                  >
+                    <ArrowLeftRight className="h-3 w-3 shrink-0 text-kern-600" />
+                    <span>Verschuiving tussen eigen rekeningen — telt niet mee als inkomst of uitgave.</span>
+                  </p>
+                )}
                 {showShareSuggestion && selectedBudgetIsShared && (
                   <ShareSuggestionChip
                     onAccept={() => { update('ownership', 'shared'); setShareSuggestionDismissed(true) }}

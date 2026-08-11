@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { buildReport } from '../build-report'
 import { computeAowMonthly } from '@/lib/horizon-data'
 import type { CheckIntake } from '../types'
@@ -6,10 +6,15 @@ import type { CheckIntake } from '../types'
 // FASE 6 stap 5A: `buildReport` draait nu op de horizon-kernel (echte monthly-resolution
 // bisectie per call, ~1200 iteraties). Sommige tests roepen `buildReport` 2-3x aan
 // (baseline vs. varianten) en zaten daardoor tegen/over het vitest-default (5000ms) aan —
-// tot 10s gemeten in volledige isolatie, geen contention. Ruimere default zodat de suite
-// niet flakey wordt onder CI-parallelisatie (zelfde aanpak als matrix.test.ts's
-// per-test-timeout, hier file-breed omdat de meerderheid van de tests dit raakt).
-vi.setConfig({ testTimeout: 20000 })
+// tot 10s gemeten in volledige isolatie, geen contention.
+//
+// Geen lokale testTimeout-override meer (Notion-kaart "Testisolatie:
+// cash-account-view.test.tsx faalt intermitterend", 11 aug 2026): dit bestand
+// zette 'm eerder lokaal op 20000ms, wat de globale 30000ms uit
+// vitest.config.ts (bewust ruim gezet vóór dit bestand, juist voor
+// rekenzware FIRE-/Monte-Carlo-tests onder load) weer verlaagde. Onder volle-
+// suite-contentie liep dat de globale marge in — laat het bestand nu de
+// globale 30000ms erven.
 
 // Deterministische "vandaag" zodat leeftijd/jaartallen reproduceerbaar zijn.
 const NOW = new Date('2026-06-17T12:00:00.000Z')

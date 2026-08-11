@@ -27,6 +27,38 @@ export function normalizeIban(value: string): string {
 }
 
 /**
+ * Ondergrens voor een NAAM-patroon.
+ *
+ * Een naam-regel is een lowercase SUBSTRING-match (`name.includes(pattern)`), en
+ * de match zet transacties op `transaction_type='transfer'` — ze verdwijnen dus
+ * uit je uitgaven, en dat is niet terug te draaien. Een te kort patroon is
+ * daarmee een stille massa-mutatie: `"ing"` vangt Booking.com, Parking,
+ * Verzekeringen en Financiering, waarna de spaarquote en de FIRE-datum op valse
+ * grond verbeteren.
+ *
+ * Deze grens is bewust GEDEELD: hij geldt zowel op `POST /api/own-accounts/rules`
+ * als op het tweede schrijfpad in `lib/category-rules.ts` (scope `'rule'` vanuit
+ * de sleepmodus). Stond hij maar op één plek, dan was de andere de achterdeur —
+ * precies wat de securityreview van 11 aug aantrof.
+ *
+ * Drie is een ondergrens, geen garantie. De echte bescherming is dat de gebruiker
+ * vóór opslaan ziet hoeveel tegenpartijen een regel raakt.
+ */
+export const MIN_OWN_ACCOUNT_NAME_LENGTH = 3
+
+/**
+ * Heeft deze gebruiker überhaupt identifiers? Zo niet, dan is elke matchronde een
+ * no-op en kan de aanroeper het werk overslaan.
+ *
+ * Staat in deze module en niet in `own-accounts-server.ts`, omdat die laatste
+ * `decryptField` meetrekt en dus server-only is; deze check is puur en wordt ook
+ * client-side gebruikt.
+ */
+export function hasOwnAccountIdentifiers(ids: OwnAccountIdentifiers): boolean {
+  return ids.ibans.size > 0 || ids.namePatterns.length > 0
+}
+
+/**
  * Bouw de gecombineerde identifier-set uit de regels (user_own_ibans) en de
  * IBANs van de eigen bankrekeningen.
  */

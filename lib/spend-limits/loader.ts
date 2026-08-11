@@ -52,7 +52,9 @@ import {
   isRealAggRow,
   type TxMonthAggregateRow,
 } from '@/lib/server-data/tx-aggregates'
-import { getCurrentMonthTx, getOwnProfile } from '@/lib/server-data/base'
+import { getCurrentMonthTx, getOwnProfile, getBudgets } from '@/lib/server-data/base'
+import { loadBudgetBasis } from '@/lib/household/budget-share'
+import type { BudgetBasisRow } from '@/lib/budget-basis'
 import { deriveRealMonthTotals, type MonthTxRow } from '@/lib/cashflow-kpis'
 import { resolveEffectiveIncomeExpenses, type IncomeExpenseSources } from '@/lib/effective-financials'
 import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
@@ -346,16 +348,28 @@ async function resolveDailyExpenseRate(
   now: Date,
 ): Promise<number | null> {
   try {
-    const [profileResult, monthTxResult, aggResult] = await Promise.all([
+    const [profileResult, monthTxResult, aggResult, budgetsResult] = await Promise.all([
       getOwnProfile(supabase),
       getCurrentMonthTx(supabase),
       getTxAgg12m(supabase),
+      // Budgetgrondslag (ADR 0103) — gedeelde, cache()'de fetch; binnen een
+      // render kost hij niets extra en zonder hem zou de terugval-grondslag van
+      // het dagtarief afwijken van de bundel.
+      getBudgets(supabase),
     ])
     const profile = (profileResult.data ?? {}) as IncomeExpenseSources
     const monthTx = (monthTxResult.data ?? []) as unknown as MonthTxRow[]
     const realMonth = deriveRealMonthTotals(monthTx)
+    const spendBudgetBasis = await loadBudgetBasis(
+      supabase,
+      profileResult.data as Record<string, unknown> | null,
+      (budgetsResult.data ?? []) as unknown as BudgetBasisRow[],
+    )
     // Alleen de FALLBACK-grondslag (zie boven) — nooit meer het tarief zelf.
-    const { expenses } = resolveEffectiveIncomeExpenses(profile, realMonth.income, realMonth.expenses)
+    const { expenses } = resolveEffectiveIncomeExpenses(profile, realMonth.income, realMonth.expenses, {
+      income: spendBudgetBasis.income.monthlyTotal,
+      expenses: spendBudgetBasis.expenses.monthlyTotal,
+    })
     // Faalt het aggregaat, dan valt de helper terug op de schatting — een STILLE
     // wissel van grondslag. De uitkomst blijft identiek aan de dashboardbundel
     // (die dezelfde `?? []` doet), maar de wissel hoort zichtbaar te zijn.

@@ -46,7 +46,12 @@ vi.mock('@/lib/crypto/field-encryption', () => ({
   decryptField: (v: string | null) => (v ? v.replace(/^enc:/, '') : null),
   encryptField: (v: string) => `enc:${v}`,
 }))
-vi.mock('@/lib/parsers/categorize', () => ({
+// Alleen de twee dure/onvoorspelbare functies worden vervangen. De rest van de
+// module blijft ECHT — `isOwnAccountTransfer` is pure matchlogica en die willen
+// we in deze test juist onvervalst laten draaien; een stub eromheen zou bewijzen
+// dat de route een mock aanroept, niet dat de match klopt.
+vi.mock('@/lib/parsers/categorize', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/parsers/categorize')>()),
   categorizeTransaction: mockCategorize,
   buildFrequencyMap: mockBuildFrequencyMap,
 }))
@@ -111,6 +116,16 @@ type SupabaseOpts = {
   reserve?: () => Promise<Slot> | Slot
   /** Laat `reserve_bank_sync_slot` falen (PostgREST-foutvorm). */
   reserveError?: { message: string }
+  /**
+   * Wat de huishoud-verbrede SELECT-policy op `bank_accounts` doorlaat — dus
+   * inclusief een gedeelde partnerrekening. `enc:`-prefix = de ciphertext-vorm
+   * die de crypto-mock hierboven begrijpt.
+   */
+  bankAccounts?: { iban_encrypted: string | null }[]
+  /** Handmatige eigen-rekening-regels (`user_own_ibans`). */
+  ownIbanRules?: { match_type: string; match_value: string }[]
+  /** Wat `.from('budgets').select('*')` oplevert (own or shared). */
+  budgets?: { id: string; slug: string | null; user_id: string }[]
 }
 
 function makeSupabase(existing: TxRow[], opts: SupabaseOpts = {}) {
@@ -123,6 +138,8 @@ function makeSupabase(existing: TxRow[], opts: SupabaseOpts = {}) {
   /** Elke niet-insert-mutatie op `transactions`. Moet altijd leeg blijven:
    *  dedup verhindert INSERTs en doet nooit een update, merge of delete. */
   const transactionMutations: string[] = []
+  /** Onthoudt of er ooit zelf op `user_id` versmald is bij `bank_accounts`. */
+  let bankAccountsUserIdFilter = false
 
   function builder(table: string) {
     let op: 'select' | 'insert' | 'update' = 'select'
@@ -173,6 +190,19 @@ function makeSupabase(existing: TxRow[], opts: SupabaseOpts = {}) {
 
     function resolve(): { data: unknown; error: null } {
       if (op !== 'select') return { data: payload, error: null }
+      if (table === 'bank_accounts') {
+        // De route/helper mag hier GEEN eigen `user_id`-filter zetten: de
+        // SELECT-policy is huishoud-verbreed en een eigenaarsfilter zou de
+        // gezamenlijke rekening uit de identifier-set laten vallen.
+        if (eqs['user_id'] !== undefined) bankAccountsUserIdFilter = true
+        return { data: opts.bankAccounts ?? [], error: null }
+      }
+      if (table === 'user_own_ibans') {
+        return { data: opts.ownIbanRules ?? [], error: null }
+      }
+      if (table === 'budgets') {
+        return { data: opts.budgets ?? [], error: null }
+      }
       if (table === 'bank_connection_accounts') {
         return {
           data: {
@@ -270,6 +300,7 @@ function makeSupabase(existing: TxRow[], opts: SupabaseOpts = {}) {
     transactionMutations,
     /** Momentopname van de bestaande rijen — bewijst dat er niets aan is geraakt. */
     existing,
+    ownAccountsProbe: () => bankAccountsUserIdFilter,
   }
 }
 
@@ -763,6 +794,215 @@ describe('POST /api/bank-connect/sync — cross-bron dedup (laag 2)', () => {
 
     expect(body).toMatchObject({ new: 0, duplicates: 1, duplicates_cross_source: 0 })
     expect(syncLogs[0]).toMatchObject({ transactions_dup: 1, transactions_dup_cross_source_iban: 0 })
+  })
+})
+
+/**
+ * Eigen-rekening-detectie op het SYNCPAD.
+ *
+ * ## Wat er stuk was
+ *
+ * De sync nam de `transaction_type` van de provider over (altijd `null`, zie
+ * mapper.ts) en liet de categorisatie het budget kiezen. Een overboeking naar je
+ * eigen spaar- of huishoudrekening kwam daardoor als échte UITGAVE binnen — de
+ * dubbeltelling die de spaarquote vertekent en die `/api/own-accounts/reclassify`
+ * achteraf moest repareren. De bestandsimport deed dit al wél goed; twee wegen
+ * naar dezelfde tabel met verschillende uitkomsten.
+ *
+ * ## Wat deze tests vastpinnen
+ *
+ *  1. een nieuw binnengekomen transactie met een eigen-rekening-IBAN landt als
+ *     het canonieke trio (`transfer` / `transfer` / de Eigen rekening-post);
+ *  2. de identifier-set wordt ÉÉN keer per run gebouwd, niet per rij;
+ *  3. de gedeelde huishoudrekening telt mee (geen eigenaarsfilter op
+ *     `bank_accounts` — zelfde invariant als in de reclassify-route);
+ *  4. onze detectie wint van de categorisatie, maar ontkent de provider nooit;
+ *  5. de teller in de respons is HERLEID uit de weggeschreven rijen.
+ */
+describe('POST /api/bank-connect/sync — eigen-rekening-verschuiving', () => {
+  const EIGEN_IBAN = 'NL01BANK0000000001'
+  /** Rekening van de partner, `ownership='shared'` — de policy laat 'm door. */
+  const GEDEELDE_IBAN = 'NL02BANK0000000002'
+  const EIGEN_REKENING_BUDGET = { id: 'budget-eigen', slug: 'eigen-rekening', user_id: USER_ID }
+
+  /** Bankrij met een tegenpartij-IBAN, zoals TrueLayer 'm levert. */
+  function bankTx(iban: string | null, over: Record<string, unknown> = {}) {
+    return {
+      transaction_id: 'tl-spaar',
+      timestamp: '2026-07-05T10:00:00Z',
+      description: 'Overboeking spaarrekening',
+      amount: -500,
+      transaction_type: 'DEBIT',
+      transaction_category: 'TRANSFER',
+      meta: iban ? { counter_party_iban: iban } : {},
+      ...over,
+    }
+  }
+
+  function opts(over: Partial<SupabaseOpts> = {}): SupabaseOpts {
+    return {
+      bankAccounts: [{ iban_encrypted: `enc:${EIGEN_IBAN}` }],
+      budgets: [EIGEN_REKENING_BUDGET],
+      ...over,
+    }
+  }
+
+  it('boekt een overboeking naar de eigen rekening als verschuiving, niet als uitgave', async () => {
+    const { client, inserted } = makeSupabase([], opts())
+    mockCreateClient.mockResolvedValue(client)
+    mockGetAccountTransactions.mockResolvedValue([bankTx(EIGEN_IBAN)])
+
+    const res = await POST(request())
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(inserted.flat()).toHaveLength(1)
+    // Het canonieke trio — alle drie tegelijk, want elk voor zich is te weinig:
+    // zonder budget telt de rij nergens, zonder `transfer` telt ze als uitgave.
+    expect(inserted.flat()[0]).toMatchObject({
+      transaction_type: 'transfer',
+      category_source: 'transfer',
+      budget_id: 'budget-eigen',
+    })
+    expect(body).toMatchObject({ new: 1, own_account_transfers: 1 })
+  })
+
+  it('telt de GEDEELDE huishoudrekening als eigen rekening', async () => {
+    // Zelfde invariant als in /api/own-accounts/reclassify: met een
+    // eigenaarsfilter op `bank_accounts` viel de gezamenlijke rekening uit de
+    // set en bleef de overboeking dáárheen een uitgave.
+    const { client, inserted, ownAccountsProbe } = makeSupabase(
+      [],
+      opts({
+        bankAccounts: [
+          { iban_encrypted: `enc:${EIGEN_IBAN}` },
+          { iban_encrypted: `enc:${GEDEELDE_IBAN}` },
+        ],
+      }),
+    )
+    mockCreateClient.mockResolvedValue(client)
+    mockGetAccountTransactions.mockResolvedValue([bankTx(GEDEELDE_IBAN)])
+
+    await POST(request())
+
+    expect(ownAccountsProbe()).toBe(false)
+    expect(inserted.flat()[0]).toMatchObject({ transaction_type: 'transfer', budget_id: 'budget-eigen' })
+  })
+
+  it('herkent ook een naam-regel op een rekening zonder bruikbare IBAN', async () => {
+    const { client, inserted } = makeSupabase(
+      [],
+      opts({
+        bankAccounts: [],
+        ownIbanRules: [{ match_type: 'name', match_value: 'PayPal' }],
+      }),
+    )
+    mockCreateClient.mockResolvedValue(client)
+    mockGetAccountTransactions.mockResolvedValue([
+      bankTx(null, { meta: { counter_party_preferred_name: 'PAYPAL *SPOTIFY' } }),
+    ])
+
+    await POST(request())
+
+    expect(inserted.flat()[0]).toMatchObject({ transaction_type: 'transfer', category_source: 'transfer' })
+  })
+
+  it('overrulet een budget dat de categorisatie al had gekozen', async () => {
+    // Een verschuiving is per definitie geen uitgave, dus élk gewoon budget is
+    // hier de verkeerde bak. Laat je 'm staan, dan telt de overboeking mee in
+    // dat budget én verdwijnt ze uit de spaarquote.
+    mockCategorize.mockReturnValue({
+      budget_id: 'budget-boodschappen',
+      confidence: 0.9,
+      budgetName: 'Boodschappen',
+      category_source: 'rule',
+    })
+    const { client, inserted } = makeSupabase([], opts())
+    mockCreateClient.mockResolvedValue(client)
+    mockGetAccountTransactions.mockResolvedValue([bankTx(EIGEN_IBAN)])
+
+    await POST(request())
+
+    expect(inserted.flat()[0]).toMatchObject({
+      budget_id: 'budget-eigen',
+      category_source: 'transfer',
+      transaction_type: 'transfer',
+    })
+  })
+
+  it('laat een gewone uitgave ongemoeid bij de categorisatie', async () => {
+    mockCategorize.mockReturnValue({
+      budget_id: 'budget-boodschappen',
+      confidence: 0.9,
+      budgetName: 'Boodschappen',
+      category_source: 'rule',
+    })
+    const { client, inserted } = makeSupabase([], opts())
+    mockCreateClient.mockResolvedValue(client)
+    mockGetAccountTransactions.mockResolvedValue([bankTx('NL99SHOP0000000009')])
+
+    const res = await POST(request())
+    const body = await res.json()
+
+    expect(inserted.flat()[0]).toMatchObject({
+      budget_id: 'budget-boodschappen',
+      category_source: 'rule',
+      transaction_type: null,
+    })
+    expect(body.own_account_transfers).toBe(0)
+  })
+
+  it('kiest nooit de Eigen rekening-post van de PARTNER als doel', async () => {
+    // De SELECT-policy op `budgets` is huishoud-verbreed ("own or shared"). Het
+    // doel van een eigen rij hoort van de schrijvende gebruiker te zijn.
+    const { client, inserted } = makeSupabase(
+      [],
+      opts({ budgets: [{ id: 'budget-partner', slug: 'eigen-rekening', user_id: 'user-2' }] }),
+    )
+    mockCreateClient.mockResolvedValue(client)
+    mockGetAccountTransactions.mockResolvedValue([bankTx(EIGEN_IBAN)])
+
+    await POST(request())
+
+    // Wél als verschuiving geboekt (dat is het belangrijkste), maar zonder doel
+    // in plaats van in andermans bak — dezelfde terugval als de bestandsimport.
+    expect(inserted.flat()[0]).toMatchObject({
+      transaction_type: 'transfer',
+      category_source: 'transfer',
+      budget_id: null,
+    })
+  })
+
+  it('bouwt de identifier-set één keer per sync-run, niet per transactie', async () => {
+    const { client } = makeSupabase([], opts())
+    mockCreateClient.mockResolvedValue(client)
+    mockGetAccountTransactions.mockResolvedValue([
+      bankTx(EIGEN_IBAN, { transaction_id: 'tl-1', description: 'Naar spaar 1' }),
+      bankTx(EIGEN_IBAN, { transaction_id: 'tl-2', description: 'Naar spaar 2', amount: -300 }),
+      bankTx('NL99SHOP0000000009', { transaction_id: 'tl-3', description: 'Winkel' }),
+    ])
+
+    const res = await POST(request())
+    const body = await res.json()
+
+    const tables = client.from.mock.calls.map((c) => String(c[0]))
+    expect(tables.filter((t) => t === 'bank_accounts')).toHaveLength(1)
+    expect(tables.filter((t) => t === 'user_own_ibans')).toHaveLength(1)
+    // En de teller is herleid uit de weggeschreven rijen, niet opgehoogd naast
+    // de insert: drie nieuw, waarvan twee verschuiving.
+    expect(body).toMatchObject({ new: 3, own_account_transfers: 2 })
+  })
+
+  it('doet niets bijzonders als de gebruiker geen enkele identifier heeft', async () => {
+    const { client, inserted } = makeSupabase([], opts({ bankAccounts: [], budgets: [] }))
+    mockCreateClient.mockResolvedValue(client)
+    mockGetAccountTransactions.mockResolvedValue([bankTx(EIGEN_IBAN)])
+
+    const res = await POST(request())
+    const body = await res.json()
+
+    expect(inserted.flat()[0]).toMatchObject({ transaction_type: null, category_source: 'import' })
+    expect(body.own_account_transfers).toBe(0)
   })
 })
 

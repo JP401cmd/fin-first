@@ -6,6 +6,7 @@ import {
   type PortfolioTransaction,
   type PriceObservation,
 } from '@/lib/portfolio-value-history'
+import { roundCents } from '@/lib/format'
 
 /**
  * GET /api/holdings/value-history — waardecurve van de HELE effectenportefeuille.
@@ -15,7 +16,10 @@ import {
  * maandpunten (de 1e van elke maand) plus een slotpunt op vandaag.
  *
  * Rekenwerk staat in `lib/portfolio-value-history.ts` — deze route laadt alleen
- * de twee bronnen en geeft het resultaat door. Geen eigen som hier.
+ * de twee bronnen en geeft het resultaat door. Geen eigen som hier: de
+ * per-positie-uitsplitsing (`byHolding`) komt cent-exact uit de motor; deze
+ * route hangt er alleen naam/ticker aan en kapt de staart af (zie
+ * `POINT_HOLDING_CAP`).
  *
  * Query params:
  *   ?months=<n> — beperk tot de laatste n maanden (standaard: hele historie).
@@ -37,7 +41,7 @@ export async function GET(request: NextRequest) {
     // in de curve. Expliciete kolomlijst (kolomregel CLAUDE.md), geen select('*').
     const { data: holdings, error: holdingsError } = await supabase
       .from('investment_holdings')
-      .select('id, current_price, last_price_update')
+      .select('id, name, ticker, current_price, last_price_update')
       .eq('user_id', claims.sub)
 
     if (holdingsError) return serverError(holdingsError, 'holdings-value-history:GET')
@@ -107,12 +111,54 @@ export async function GET(request: NextRequest) {
 
     const history = buildPortfolioValueHistory({ transactions, prices, today, from })
 
+    // Naam/ticker per positie, zodat het maanddetail leesbare regels toont in
+    // plaats van id's. De motor kent alleen id's — die blijft over posities
+    // rekenen, niet over labels.
+    const labels = new Map<string, { name: string; ticker: string | null }>()
+    for (const h of holdings ?? []) {
+      const name = typeof h.name === 'string' ? h.name.trim() : ''
+      const ticker = typeof h.ticker === 'string' ? h.ticker.trim() : ''
+      labels.set(h.id as string, {
+        name: name || ticker || 'Onbekende positie',
+        ticker: ticker || null,
+      })
+    }
+
+    const points = history.points.map((p) => {
+      const enriched = p.byHolding.map((s) => ({
+        id: s.id,
+        name: labels.get(s.id)?.name ?? 'Onbekende positie',
+        ticker: labels.get(s.id)?.ticker ?? null,
+        value: s.value,
+        tier: s.tier,
+      }))
+      // CAP: zonder afkappen groeit de payload met historie × posities. Het
+      // referentie-account heeft 109 posities × ~13 ankers = ~1.400 regels voor
+      // een grafiek die er per maand een handvol toont. De staart gaat als één
+      // regel mee, zodat het maanddetail nog steeds op de balkhoogte uitkomt:
+      // Σ byHolding + rest.value === marketValue (de motor levert de delen
+      // cent-exact aan; optellen van hele centen houdt dat zo).
+      const tail = enriched.slice(POINT_HOLDING_CAP)
+      return {
+        ...p,
+        byHolding: enriched.slice(0, POINT_HOLDING_CAP),
+        rest: tail.length > 0
+          ? { count: tail.length, value: roundCents(tail.reduce((sum, h) => sum + h.value, 0)) }
+          : null,
+      }
+    })
+
     return NextResponse.json({
-      points: history.points,
+      points,
       averagePricedFromMarket: history.averagePricedFromMarket,
-      // Alleen het AANTAL, niet de id's: de UI heeft genoeg aan "hoeveel
-      // posities missen een koers", en holding-id's horen niet nodeloos in een
-      // respons die alleen een grafiek voedt.
+      // Alleen het AANTAL, niet de id's — maar dat is hier een keuze over NUT,
+      // niet over vertrouwelijkheid: aan "hoeveel posities missen een koers"
+      // hangt geen doorklik, dus id's zouden er niets toevoegen.
+      // `points[].byHolding` draagt sinds de maandbalken wél holding-id's: de
+      // grafiek opent per maand een detailscherm dat naar de positie doorlinkt,
+      // dus daar zijn ze functioneel nodig. Dat mag — het is eigen data van de
+      // ingelogde gebruiker: elke query hierboven filtert op
+      // `.eq('user_id', claims.sub)` bovenop RLS.
       holdingsWithoutMarketPriceCount: history.holdingsWithoutMarketPrice.length,
       // De noemer is het aantal posities dat aan de curve MEEDOET, niet het
       // totaal van de gebruiker: alleen posities met transacties zitten in de
@@ -123,6 +169,13 @@ export async function GET(request: NextRequest) {
     return serverError(err, 'holdings-value-history:GET')
   }
 }
+
+/**
+ * Hoeveel posities per maandpunt met naam worden meegestuurd. De rest gaat als
+ * één `rest`-regel mee (aantal + waarde), zodat het maanddetail leesbaar blijft
+ * én de payload niet met de historie meegroeit.
+ */
+const POINT_HOLDING_CAP = 12
 
 /** Paginagrootte; gelijk aan PostgREST's `max_rows` (supabase/config.toml). */
 const PAGE_SIZE = 1000

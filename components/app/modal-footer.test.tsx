@@ -9,11 +9,13 @@
  *  5. `layout="stacked"` voegt `flex-1` toe (mobiele full-width-stapeling);
  *     `layout="inline"` doet dat niet.
  *  6. De canonieke ink/paper-knop-classes zijn aanwezig (visuele identiteit).
+ *  7. `tone="destructive"` kleurt ALLEEN de primary rood — expliciet én
+ *     overgeërfd uit een `ModalFooterToneProvider`.
  */
 
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { ModalFooter } from './modal-footer'
+import { ModalFooter, ModalFooterToneProvider } from './modal-footer'
 
 describe('ModalFooter', () => {
   it('rendert primary en secondary met labels', () => {
@@ -123,5 +125,64 @@ describe('ModalFooter', () => {
       <ModalFooter primary={{ label: 'Opslaan', onClick: vi.fn(), type: 'submit' }} />,
     )
     expect(screen.getByRole('button', { name: 'Opslaan' })).toHaveAttribute('type', 'submit')
+  })
+})
+
+/**
+ * De onomkeerbare knop moet er onomkeerbaar uitzien. Zonder deze tone draagt
+ * "Verwijder 43 transacties" exact dezelfde inkt-knop als "Opslaan".
+ */
+describe('ModalFooter — tone="destructive"', () => {
+  it('kleurt de primary semantisch rood, niet ink', () => {
+    render(
+      <ModalFooter
+        tone="destructive"
+        primary={{ label: 'Verwijder 43 transacties', onClick: vi.fn() }}
+        secondary={{ label: 'Annuleer', onClick: vi.fn() }}
+      />,
+    )
+    const primary = screen.getByRole('button', { name: 'Verwijder 43 transacties' })
+    expect(primary.className).toContain('bg-negative')
+    expect(primary.className).not.toContain('bg-[var(--ink)]')
+  })
+
+  it('laat de secondary met rust — annuleren is nooit het gevaar', () => {
+    render(
+      <ModalFooter
+        tone="destructive"
+        primary={{ label: 'Verwijderen', onClick: vi.fn() }}
+        secondary={{ label: 'Annuleer', onClick: vi.fn() }}
+      />,
+    )
+    const secondary = screen.getByRole('button', { name: 'Annuleer' })
+    expect(secondary.className).toContain('border-[var(--ink)]')
+    expect(secondary.className).not.toContain('bg-negative')
+  })
+
+  it('erft de tone uit een omliggende ModalFooterToneProvider', () => {
+    render(
+      <ModalFooterToneProvider tone="destructive">
+        <ModalFooter primary={{ label: 'Verwijderen', onClick: vi.fn() }} />
+      </ModalFooterToneProvider>,
+    )
+    expect(screen.getByRole('button', { name: 'Verwijderen' }).className).toContain('bg-negative')
+  })
+
+  it('een expliciete tone wint van de context', () => {
+    render(
+      <ModalFooterToneProvider tone="destructive">
+        <ModalFooter tone="default" primary={{ label: 'Opslaan', onClick: vi.fn() }} />
+      </ModalFooterToneProvider>,
+    )
+    const primary = screen.getByRole('button', { name: 'Opslaan' })
+    expect(primary.className).toContain('bg-[var(--ink)]')
+    expect(primary.className).not.toContain('bg-negative')
+  })
+
+  it('zonder tone blijft de primary ink (geen stille kleurwissel app-breed)', () => {
+    render(<ModalFooter primary={{ label: 'Opslaan', onClick: vi.fn() }} />)
+    const primary = screen.getByRole('button', { name: 'Opslaan' })
+    expect(primary.className).toContain('bg-[var(--ink)]')
+    expect(primary.className).not.toContain('bg-negative')
   })
 })

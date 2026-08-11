@@ -18,6 +18,7 @@ import { InfoTooltip } from '@/components/editorial/info-icon-tooltip'
 import { categorizeTransaction, isOwnAccountTransfer, isWalletTransferType, buildFrequencyMap, type CategoryCorrection, type FrequencyMatch } from '@/lib/parsers/categorize'
 import { type Budget, resolveEigenRekeningBudgetId } from '@/lib/budget-data'
 import { buildOwnAccountIdentifiers } from '@/lib/own-accounts'
+import { formatAmsterdamDayMonth, formatAmsterdamTime } from '@/lib/tz'
 import { fetchOwnAccountIbansStrict, ibanById } from '@/lib/own-accounts-ibans'
 import { linkUnmatchedTransfers } from '@/lib/transfer-matching'
 import { MaskedAmount } from '@/components/app/masked-amount'
@@ -30,24 +31,14 @@ import {
   shiftIsoDate,
   type CrossSourceCandidate,
 } from '@/lib/parsers/cross-source-dedup'
-
-/**
- * Minimale transactievorm voor het post-import categoriseer-scherm
- * (AICategorizeSheet). Structureel compatibel met de interne Transaction van de
- * sheet; wordt gevuld uit de zojuist weggeschreven, nog ongecategoriseerde rijen.
- */
-type PostImportTx = {
-  id: string
-  date: string
-  description: string
-  counterparty_name: string | null
-  counterparty_iban: string | null
-  amount: number
-  import_hash: string | null
-  budget_id: string | null
-  reference?: string | null
-  account_id?: string | null
-}
+import {
+  POST_IMPORT_SELECT,
+  pickUncategorized,
+  mergeUncategorized,
+  retainStillOpen,
+  type InsertedTxRow,
+  type PostImportTx,
+} from '@/lib/post-import-categorize'
 
 type Account = {
   id: string
@@ -242,6 +233,12 @@ export default function ImportPage() {
   // ÁL in de DB staan, zodat een onderbroken categorisatie geen import verliest.
   const [postImportRows, setPostImportRows] = useState<PostImportTx[]>([])
   const [showCategorizeSheet, setShowCategorizeSheet] = useState(false)
+  /** Waar zolang we de categoriseerset opnieuw uit de database herleiden — de CTA
+   *  mag in dat venster niet klikbaar zijn met een verouderd aantal. */
+  const [refreshingPostImport, setRefreshingPostImport] = useState(false)
+  /** Is er in deze sessie minstens één categoriseerronde afgerond? Bepaalt of een
+   *  lege set "niets te doen" of "alles ingedeeld" betekent. */
+  const [categorizeRoundDone, setCategorizeRoundDone] = useState(false)
   const PAGE_SIZE = 50
   const [currentPage, setCurrentPage] = useState(0)
 
@@ -972,7 +969,7 @@ export default function ImportPage() {
      * waarheid over wie ze mag wegschrijven.
      */
     async function importBatchViaRoute(batch: typeof insertRows): Promise<{
-      rows: PostImportTx[]
+      rows: InsertedTxRow[]
       skipped: { import_hash: string; bank_seq: string | null; layer?: string }[]
       failed: number
       error: string | null
@@ -992,7 +989,7 @@ export default function ImportPage() {
       const data = await res.json().catch(() => ({})) as {
         error?: string
         failed?: number
-        rows?: PostImportTx[]
+        rows?: InsertedTxRow[]
         skipped?: { import_hash: string; bank_seq: string | null; layer?: string }[]
       }
 
@@ -1056,18 +1053,7 @@ export default function ImportPage() {
       /** Aantal rijen dat écht niet is weggeschreven. Op het clientpad is dat de
        *  hele batch (alles-of-niets); de server-route rapporteert het exact. */
       let batchFailedRows = 0
-      let insertedRows: {
-        id: string
-        date: string
-        description: string
-        counterparty_name: string | null
-        counterparty_iban: string | null
-        amount: number | string
-        import_hash: string | null
-        budget_id: string | null
-        reference: string | null
-        transaction_type: string | null
-      }[] = []
+      let insertedRows: InsertedTxRow[] = []
 
       try {
         if (useServerPath) {
@@ -1090,7 +1076,7 @@ export default function ImportPage() {
           const { data: inserted, error: insertError } = await supabase
             .from("transactions")
             .insert(batches[batchIdx])
-            .select('id, date, description, counterparty_name, counterparty_iban, amount, import_hash, budget_id, reference, transaction_type')
+            .select(POST_IMPORT_SELECT)
           if (insertError) {
             batchFailed = true
             batchError = insertError.message
@@ -1119,22 +1105,7 @@ export default function ImportPage() {
       // voor het post-import categoriseer-scherm. Bewust búiten de if/else: een
       // batch die deels sneuvelde heeft wél rijen weggeschreven, en die horen
       // niet stil uit het categoriseerscherm te verdwijnen.
-      for (const r of insertedRows) {
-        if (r.budget_id === null && r.transaction_type !== 'transfer') {
-          importedUncategorized.push({
-            id: r.id,
-            date: r.date,
-            description: r.description,
-            counterparty_name: r.counterparty_name,
-            counterparty_iban: r.counterparty_iban,
-            amount: Number(r.amount),
-            import_hash: r.import_hash,
-            budget_id: null,
-            reference: r.reference,
-            account_id: selectedAccountId,
-          })
-        }
-      }
+      importedUncategorized.push(...pickUncategorized(insertedRows, selectedAccountId))
 
       const progressCount = Math.min((batchIdx + 1) * BATCH_SIZE, insertRows.length)
       setImportProgress({ current: progressCount, total: insertRows.length, failed: failedCount })
@@ -1195,6 +1166,11 @@ export default function ImportPage() {
     const supabase = createClient()
     const { data: { user: retryUser } } = await supabase.auth.getUser()
     const remaining: typeof failedBatches = []
+    /** Rijen die pas bij deze poging zijn weggeschreven. Ze horen net zo goed in het
+     *  categoriseer-scherm als de rijen uit de eerste ronde; zonder deze verzameling
+     *  bleef de belofte "categoriseren direct na het importeren" voor een herstelde
+     *  batch onvervuld. */
+    const recoveredUncategorized: PostImportTx[] = []
 
     for (const fb of failedBatches) {
       if (fb.retries >= 2) {
@@ -1214,9 +1190,18 @@ export default function ImportPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ account_id: selectedAccountId, rows: fb.rows }),
           })
-          const data = await res.json().catch(() => ({})) as { error?: string; failed?: number }
+          const data = await res.json().catch(() => ({})) as {
+            error?: string
+            failed?: number
+            rows?: InsertedTxRow[]
+          }
           if (!res.ok) { ok = false; errMsg = data.error || 'Importeren mislukt' }
           else if ((data.failed ?? 0) > 0) { ok = false; errMsg = `${data.failed} rijen niet weggeschreven` }
+          // De route geeft de zojuist weggeschreven rijen terug (mét id's); rijen die
+          // de eerste poging al haalde komen als duplicaat terug en zitten hier dus
+          // niet in. Ook bij een deels geslaagde retry meenemen: wat wél landde hoort
+          // in het categoriseer-scherm.
+          recoveredUncategorized.push(...pickUncategorized(data.rows ?? [], selectedAccountId))
         } else {
           // Sla rijen over die al bestaan (dé reden dat de batch faalde) en importeer alleen
           // de resterende — anders faalt de retry identiek (plain insert van dezelfde batch
@@ -1238,8 +1223,19 @@ export default function ImportPage() {
           }
           const survivors = fb.rows.filter((row) => !existing.has(rowDedupKey(row as { import_hash: string; bank_seq: string | null })))
           if (survivors.length > 0) {
-            const { error: insertError } = await supabase.from("transactions").insert(survivors)
+            // `.select()` is hier niet cosmetisch: zonder de gegenereerde id's kan het
+            // categoriseer-scherm de herstelde rijen niet bijwerken en verdwijnen ze
+            // stil uit stap 4.
+            const { data: recovered, error: insertError } = await supabase
+              .from("transactions")
+              .insert(survivors)
+              .select(POST_IMPORT_SELECT)
             if (insertError) { ok = false; errMsg = insertError.message }
+            else if (recovered) {
+              recoveredUncategorized.push(
+                ...pickUncategorized(recovered as InsertedTxRow[], batchAccountId ?? selectedAccountId),
+              )
+            }
           }
         }
       } catch (err) {
@@ -1255,6 +1251,12 @@ export default function ImportPage() {
     setFailedBatches(remaining)
     setImportProgress((prev) => ({ ...prev, failed: stillFailed }))
 
+    // Aanvullen, niet vervangen — de rijen uit de eerste ronde staan er al. Dedup op
+    // id zodat een tweede "opnieuw proberen" dezelfde rij niet dubbel aanbiedt.
+    if (recoveredUncategorized.length > 0) {
+      setPostImportRows((prev) => mergeUncategorized(prev, recoveredUncategorized))
+    }
+
     if (remaining.length === 0) {
       const { data } = await supabase.auth.getUser()
       if (data.user) linkUnmatchedTransfers(supabase, data.user.id).catch(console.error)
@@ -1262,6 +1264,51 @@ export default function ImportPage() {
       setError(`${stillFailed} transacties konden niet worden geïmporteerd na meerdere pogingen.`)
     }
     setRetrying(false)
+  }
+
+  /**
+   * Herleidt de post-import categoriseerset opnieuw uit de database.
+   *
+   * Waarom herleiden en niet lokaal aftrekken: het categoriseer-scherm schrijft niet
+   * alleen de aangeboden rijen weg. Slaat de gebruiker een regel op, dan werkt de
+   * sheet retroactief álle nog ongecategoriseerde treffers bij — ook rijen uit deze
+   * import die hij nooit expliciet toonde. De database is dus de enige betrouwbare
+   * bron van "wat staat er nog open"; een lokale telling zou meteen scheef staan.
+   *
+   * Bij een leesfout laten we de set ongemoeid: liever een te hoge teller dan rijen
+   * die stil uit het scherm verdwijnen zonder dat ze zijn ingedeeld.
+   */
+  async function refreshPostImportRows(current: PostImportTx[]) {
+    if (current.length === 0) return
+    setRefreshingPostImport(true)
+    try {
+      const supabase = createClient()
+      const ids = current.map((r) => r.id)
+      const stillOpen = new Set<string>()
+      // Bewuste, gedocumenteerde cap: `.in()` gaat per 200 id's de deur uit zodat een
+      // grote import niet op een URL-lengtegrens stukloopt. Alle chunks worden
+      // gelezen — er wordt niets afgekapt.
+      const CHUNK = 200
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        const { data, error } = await supabase
+          .from('transactions')
+          .select('id')
+          .in('id', ids.slice(i, i + CHUNK))
+          .is('budget_id', null)
+        if (error) return
+        for (const r of (data ?? []) as { id: string }[]) stillOpen.add(r.id)
+      }
+      setPostImportRows((prev) => retainStillOpen(prev, stillOpen))
+    } finally {
+      setRefreshingPostImport(false)
+    }
+  }
+
+  /** Sluit het categoriseer-scherm en herleid daarna wat er nog openstaat. */
+  function closeCategorizeSheet(afterSave: boolean) {
+    setShowCategorizeSheet(false)
+    if (afterSave) setCategorizeRoundDone(true)
+    void refreshPostImportRows(postImportRows)
   }
 
   const crossSourceCount = rows.filter((r) => r.crossSourceDuplicate).length
@@ -1447,7 +1494,8 @@ export default function ImportPage() {
                 Bestand: <strong>{pendingSession.fileName}</strong> — {pendingSession.importedHashes.length} van {pendingSession.totalRows} transacties geïmporteerd.
               </p>
               <p className="mt-0.5 text-xs text-[var(--ink-4)]">
-                Gestart op {new Date(pendingSession.startedAt).toLocaleString('nl-NL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                {/* Amsterdamse tijd via lib/tz.ts — niet de runtime-tijdzone (#418-klasse). */}
+                Gestart op {formatAmsterdamDayMonth(new Date(pendingSession.startedAt))} {formatAmsterdamTime(new Date(pendingSession.startedAt))}
               </p>
             </div>
             <div className="flex shrink-0 gap-2">
@@ -2095,10 +2143,23 @@ export default function ImportPage() {
         <div className="space-y-4">
           <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6 text-center">
             <p className="text-sm text-[var(--ink-2)]">
-              Je transacties zijn <strong>opgeslagen</strong>. Categoriseren is <strong>optioneel</strong> — deel de nog ongecategoriseerde rijen nu in, of doe dat rustig later.
+              {postImportRows.length === 0 && categorizeRoundDone ? (
+                <>Alle geïmporteerde transacties zijn <strong>ingedeeld</strong>. Je bent klaar.</>
+              ) : (
+                <>Je transacties zijn <strong>opgeslagen</strong>. Categoriseren is <strong>optioneel</strong> — deel de nog ongecategoriseerde rijen nu in, of doe dat rustig later.</>
+              )}
             </p>
             <div className="mt-4 flex flex-col items-center gap-3">
-              {postImportRows.length > 0 && !showCategorizeSheet && (
+              {/* Zolang de set opnieuw wordt herleid tonen we geen klikbaar aantal: dat
+                  aantal is dan verouderd en een tweede ronde op stale rijen kan de
+                  zojuist gemaakte keuzes overschrijven. */}
+              {refreshingPostImport && !showCategorizeSheet && (
+                <span className="inline-flex items-center gap-2 text-sm text-[var(--ink-3)]">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Bijwerken…
+                </span>
+              )}
+              {postImportRows.length > 0 && !showCategorizeSheet && !refreshingPostImport && (
                 <button
                   type="button"
                   onClick={() => setShowCategorizeSheet(true)}
@@ -2127,8 +2188,8 @@ export default function ImportPage() {
           transactions={postImportRows}
           budgets={budgets}
           budgetGroups={budgetGroups}
-          onClose={() => setShowCategorizeSheet(false)}
-          onSaved={() => setShowCategorizeSheet(false)}
+          onClose={() => closeCategorizeSheet(false)}
+          onSaved={() => closeCategorizeSheet(true)}
         />
       )}
 

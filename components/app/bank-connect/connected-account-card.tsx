@@ -163,7 +163,12 @@ export function ConnectedAccountCard({ account, onSync, onDisconnect, onReauthor
    * techniek. Zonder laag 2 telde deze kaart lager dan de success-pagina over
    * dezelfde sync.
    */
-  const [syncResult, setSyncResult] = useState<{ new: number; alreadyKnown: number } | null>(null)
+  const [syncResult, setSyncResult] = useState<{
+    new: number
+    alreadyKnown: number
+    /** Nieuwe rijen die als eigen-rekening-verschuiving zijn geboekt (geen uitgave). */
+    ownTransfers: number
+  } | null>(null)
   const [disconnecting, setDisconnecting] = useState(false)
   const [confirmDisconnect, setConfirmDisconnect] = useState(false)
   const [relinking, setRelinking] = useState(false)
@@ -227,6 +232,7 @@ export function ConnectedAccountCard({ account, onSync, onDisconnect, onReauthor
         setSyncResult({
           new: data?.new ?? 0,
           alreadyKnown: (data?.duplicates ?? 0) + (data?.duplicates_cross_source ?? 0),
+          ownTransfers: data?.own_account_transfers ?? 0,
         })
         onSync()
       } else {
@@ -429,6 +435,16 @@ export function ConnectedAccountCard({ account, onSync, onDisconnect, onReauthor
       {syncResult && (
         <div className="mt-3 bg-positive-bg px-3 py-2 text-xs text-positive" aria-live="polite">
           {syncResult.new} nieuwe transacties, {syncResult.alreadyKnown} al bekend
+          {/* Verschuivingen tussen je eigen rekeningen tellen niet als uitgave.
+              Alleen tonen als het gebeurd is — een "0" zou ruis zijn. */}
+          {syncResult.ownTransfers > 0 && (
+            <>
+              {', '}
+              {syncResult.ownTransfers === 1
+                ? 'waarvan 1 overboeking tussen eigen rekeningen'
+                : `waarvan ${syncResult.ownTransfers} overboekingen tussen eigen rekeningen`}
+            </>
+          )}
         </div>
       )}
 

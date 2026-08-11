@@ -7,6 +7,7 @@ import { KoppelRekeningBanner } from '@/components/overview/koppel-rekening-bann
 import { TransactiesAnalyse } from '@/components/overview/transacties/transacties-analyse'
 import { SpendLimitsSection } from '@/components/overview/transacties/spend-limits-section'
 import { loadSpendLimitsSection } from '@/lib/spend-limits/loader'
+import type { WidgetPrefs } from '@/lib/widget-catalog'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
 import { PageOpening } from '@/components/editorial'
@@ -55,6 +56,24 @@ export default async function OverzichtCashflowTransactiesPage({
   // één geïndexeerde query op spend_limits, en pas daarna de aggregaat-RPC's.
   const spendLimits = await loadSpendLimitsSection(supabase)
 
+  // Widget-prefs voor de schakelaar "Widget op dashboard" in het bewerkformulier.
+  // Server-side gelezen en als prop doorgegeven (ADR 0058) — de sectie leidt de
+  // effectieve staat af met `isSpendLimitWidgetEnabled`, dezelfde helper die de
+  // loader-injectie en PATCH /api/spend-limits/[id]/widget gebruiken. Eigen rij,
+  // anon-RLS-client; `null` betekent "nog nooit iets aangepast" en de helper valt
+  // dan terug op de injectie-regel (actief = zichtbaar).
+  //
+  // Alleen de potten-schakelaar heeft dit nodig, dus het blijft één smalle
+  // kolomselectie op één rij — geen tweede dashboardbundel op deze pagina.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  const { data: profile } = user
+    ? await supabase.from('profiles').select('widget_prefs').eq('id', user.id).maybeSingle()
+    : { data: null }
+  const savedWidgets = (profile?.widget_prefs as WidgetPrefs | null)?.widgets
+  const widgetPrefs = Array.isArray(savedWidgets) ? savedWidgets : null
+
   return (
     <>
       <NavStackMeta title="Transacties" bottomBar={{ kind: 'tabs' }} />
@@ -85,6 +104,7 @@ export default async function OverzichtCashflowTransactiesPage({
               data={spendLimits}
               openLimitId={openLimitId}
               openPeriodKey={openPeriodKey}
+              widgetPrefs={widgetPrefs}
             />
           }
         />

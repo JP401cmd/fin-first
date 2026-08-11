@@ -15,10 +15,9 @@ function useFc() {
   const { masked } = useMaskedAmounts()
   return useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
 }
-import { calculatePortfolioBox3 } from '@/lib/box3-holdings'
 import PortfolioAllocationVisualization, { type HoldingForAllocation } from '@/components/app/portfolio-allocation-chart'
 import { BenchmarkComparisonChart } from '@/components/app/benchmark-comparison-chart'
-import { TIME_PERIODS, type TimePeriod, type ComparisonResult } from '@/lib/benchmark-comparison'
+import { TIME_PERIODS, monthsForPeriod, type TimePeriod, type ComparisonResult } from '@/lib/benchmark-comparison'
 import DividendTracker from '@/components/app/dividend-tracker'
 import { RebalancingSettingsSection } from './rebalancing-settings-section'
 import dynamic from 'next/dynamic'
@@ -31,7 +30,7 @@ import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { HoldingsPageData } from '@/lib/holdings-data-loader'
 import { OVERLAY_QUERY_KEYS } from '@/lib/navigation'
-import { PortfolioSummary } from './holdings/portfolio-summary'
+import { PortfolioSummary, PeriodRail } from './holdings/portfolio-summary'
 import { PortfolioValueChart } from './holdings/portfolio-value-chart'
 import {
   HoldingsToolbar,
@@ -48,6 +47,7 @@ import {
   filterHoldingsByChip,
   sortHoldings,
 } from './holdings/holdings-list-view'
+import { isPriceStale, countStalePrices } from '@/lib/holdings-staleness'
 
 type Holding = {
   id: string
@@ -69,6 +69,9 @@ type Holding = {
   currency?: string
   // Price feed data
   previous_close?: number | null
+  /** 52-weeks koersbereik uit de feed; NULL tot de eerste koersvernieuwing. */
+  fifty_two_week_high?: number | null
+  fifty_two_week_low?: number | null
   daily_change_percent?: number | null
   // Classification fields for portfolio allocation
   asset_class?: string | null
@@ -108,6 +111,20 @@ type HoldingPriceUpdate = {
 // isClosedHolding + de filter/sort-helpers leven in
 // `./holdings/holdings-list-view` (pure, getest); de page consumeert ze.
 
+/**
+ * Faalde `/api/holdings` met een HTTP-status, dan draagt de fout die status mee.
+ * Nodig omdat de melding anders elke uitkomst op één hoop gooit: een verlopen
+ * sessie (401) vraagt om opnieuw inloggen, een 500 om opnieuw proberen, en een
+ * netwerkfout (geen status) om je verbinding. Eén verzamelzin gaf de gebruiker
+ * geen enkele handelingsrichting.
+ */
+class HoldingsLoadError extends Error {
+  constructor(readonly status: number) {
+    super(`HTTP ${status}`)
+    this.name = 'HoldingsLoadError'
+  }
+}
+
 export default function HoldingsPage({ initialData }: { initialData?: HoldingsPageData } = {}) {
   const router = useRouter()
   const pathname = usePathname()
@@ -117,7 +134,11 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
   const assetFilter = searchParams.get('asset')
   const [holdings, setHoldings] = useState<Holding[]>(initialData ? initialData.holdings as Holding[] : [])
   const [totalValue, setTotalValue] = useState(initialData?.totalValue ?? 0)
-  const [totalCost, setTotalCost] = useState(initialData?.totalCost ?? 0)
+  // Opbrengst over de HELE historie uit de canonieke aggregatie-engine — telt
+  // ook de inmiddels verkochte posities, die uit `totalCost` wegvallen. Voedt
+  // de rendement-KPI bij periode 'Alles'.
+  const [totalPnL, setTotalPnL] = useState(initialData?.totalPnL ?? 0)
+  const [totalInvested, setTotalInvested] = useState(initialData?.totalInvested ?? 0)
   const [loading, setLoading] = useState(!initialData)
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -131,7 +152,10 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
   const [refreshing, setRefreshing] = useState(false)
   const [refreshResult, setRefreshResult] = useState<{ message: string; type: 'success' | 'warning' | 'error' } | null>(null)
   const [benchmarkComparison, setBenchmarkComparison] = useState<ComparisonResult | null>(null)
-  const [benchmarkPeriod, setBenchmarkPeriod] = useState<TimePeriod>(TIME_PERIODS.find(p => p.id === '1y')!)
+  // Eén periode-keuze voor drie oppervlakken: de rendement-cel in de hero, de
+  // waardegrafiek en de benchmark-vergelijking. Heette `benchmarkPeriod` toen
+  // hij alleen de benchmark stuurde.
+  const [chartPeriod, setChartPeriod] = useState<TimePeriod>(TIME_PERIODS.find(p => p.id === '1y')!)
   const [benchmarkLoading, setBenchmarkLoading] = useState(false)
   const [overrideHolding, setOverrideHolding] = useState<Holding | null>(null)
   // Holdings view mode: list or heatmap (persisted in localStorage)
@@ -158,22 +182,44 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
   // requests af (geen verspilde egress, geen setState-na-unmount).
   const { abortableFetch, isMounted } = useAbortableFetch()
 
+  /**
+   * Herlaadt de holdings vanaf `/api/holdings`. Alleen ná een sync of mutatie —
+   * de eerste render komt van de server-loader (zie de mount-effect hieronder).
+   *
+   * De route levert sinds aug 2026 dezelfde set als die loader (investment én
+   * crypto, zie het docblock van `app/api/holdings/route.ts`). Dáárvoor liet een
+   * refresh de crypto-posities stil vallen.
+   */
   const loadHoldings = useCallback(async () => {
     try {
       setError(null)
       const res = await abortableFetch('/api/holdings')
       if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`)
+        // De status meedragen: één verzamelmelding voor élke uitkomst maakte
+        // een verlopen sessie (401) niet te onderscheiden van een storing
+        // (500) of een netwerkhapering — en dus onoplosbaar voor de gebruiker.
+        throw new HoldingsLoadError(res.status)
       }
       const data = await res.json()
       if (!isMounted()) return
       setHoldings(data.holdings || [])
       setTotalValue(data.total_value || 0)
-      setTotalCost(data.total_cost || 0)
+      setTotalPnL(data.total_pnl || 0)
+      setTotalInvested(data.total_invested || 0)
     } catch (e) {
       // Afgebroken fetch (unmount) → stil negeren, geen foutmelding.
       if (isAbortError(e) || !isMounted()) return
-      setError('Kon holdings niet laden. Probeer het opnieuw.')
+      // Matchen op de STATUSCODE, nooit op de 401-tekst: die is app-breed
+      // 'Niet ingelogd' (lib/api/respond.ts) en mag niet in een frontend-match
+      // vastgepind worden.
+      const status = e instanceof HoldingsLoadError ? e.status : null
+      setError(
+        status === 401
+          ? 'Je sessie is verlopen. Log opnieuw in om je holdings te laden.'
+          : status !== null
+            ? 'Kon holdings niet laden — de server gaf een fout. Probeer het opnieuw.'
+            : 'Kon holdings niet laden — controleer je verbinding en probeer het opnieuw.',
+      )
     } finally {
       if (isMounted()) setLoading(false)
     }
@@ -196,20 +242,43 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
     }
   }, [abortableFetch, isMounted])
 
+  // Start-fetch ALLEEN wanneer de server niets meegaf.
+  //
+  // Met `initialData` heeft de server de holdings al geleverd; deze fetch haalde
+  // dezelfde rijen direct nóg een keer op. Dat was niet alleen dubbel werk — het
+  // was ook de enige bron van de melding "Kon holdings niet laden": die
+  // verscheen bóven een pagina die gewoon gevuld was, en na "opnieuw proberen"
+  // verdween hij zonder zichtbaar verschil, omdat er niets te verversen viel.
+  // `loadHoldings()` blijft wél de herlaad-route na een sync of mutatie.
+  //
+  // Bewust GEEN "heb ik al geladen?"-ref om dat af te dwingen: een ref overleeft
+  // de gesimuleerde remount van React StrictMode, terwijl de fetch die tijdens
+  // de eerste mount startte wél wordt afgebroken. De tweede mount zou dan
+  // overslaan omdat de ref al gezet is, en de afgebroken fetch wordt stil
+  // genegeerd — resultaat: een lege pagina zonder foutmelding en zonder
+  // retry-knop. De `initialData`-check hieronder is genoeg: `loadHoldings` is
+  // een stabiele useCallback, dus dit effect draait sowieso maar één keer per
+  // echte mount, en tweemaal fetchen onder StrictMode is precies wat het
+  // abort-mechanisme in `useAbortableFetch` afvangt.
   useEffect(() => {
+    if (initialData) {
+      setLoading(false)
+      return
+    }
     loadHoldings()
-  }, [loadHoldings])
+  }, [loadHoldings, initialData])
 
   // Load benchmark data after holdings are loaded
   useEffect(() => {
     if (!loading && holdings.length > 0) {
-      loadBenchmarkComparison(benchmarkPeriod.id)
+      loadBenchmarkComparison(chartPeriod.id)
     }
-  }, [loading, holdings.length, benchmarkPeriod.id, loadBenchmarkComparison])
+  }, [loading, holdings.length, chartPeriod.id, loadBenchmarkComparison])
 
-  function handleBenchmarkPeriodChange(period: TimePeriod) {
-    setBenchmarkPeriod(period)
-    // Data will reload via the useEffect above
+  function handlePeriodChange(period: TimePeriod) {
+    setChartPeriod(period)
+    // Benchmark herlaadt via de useEffect hierboven; de waardegrafiek reageert
+    // op de afgeleide `chartMonths`-prop.
   }
 
   // Persist view mode to localStorage
@@ -305,36 +374,19 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
     try {
       const res = await fetch(`/api/holdings?id=${id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Verwijderen mislukt')
-      setHoldings((prev) => {
-        const updated = prev.filter((h) => h.id !== id)
-        // Recalculate totals so allocation chart percentages update correctly
-        const newTotalValue = updated.reduce((sum, h) => {
-          const price = h.current_price ?? h.avg_purchase_price
-          return sum + price * h.units
-        }, 0)
-        const newTotalCost = updated.reduce((sum, h) => {
-          return sum + h.avg_purchase_price * h.units
-        }, 0)
-        setTotalValue(newTotalValue)
-        setTotalCost(newTotalCost)
-        return updated
-      })
+      // Rij optimistisch uit de lijst halen zodat de UI direct reageert; de
+      // TOTALEN komen van de server. Ze hier zelf herrekenen zou een derde
+      // rekenwijze introduceren naast de loader en de route — zonder toegang tot
+      // de wisselkoersen die die twee wél toepassen, dus met een ander bedrag
+      // voor niet-EUR posities.
+      setHoldings((prev) => prev.filter((h) => h.id !== id))
+      loadHoldings()
     } catch {
       setError('Kon holding niet verwijderen')
     } finally {
       setDeleting(null)
     }
   }
-
-  // Determine if a holding's price is stale (last update > 24 hours ago, or no ticker with no recent update)
-  const isPriceStale = useCallback((holding: Holding): boolean => {
-    if (!holding.ticker && !holding.isin) return false // No ticker = manual management, not stale
-    if (!holding.last_price_update) return true // Never updated = stale
-    const lastUpdate = new Date(holding.last_price_update)
-    const now = new Date()
-    const hoursSinceUpdate = (now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60)
-    return hoursSinceUpdate > 24
-  }, [])
 
   // Format timestamp for stale indicator (newspaper style)
   const formatLastUpdate = useCallback((dateStr: string | null): string => {
@@ -439,19 +491,18 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
     }
   }
 
-  // Count stale holdings
-  const staleCount = useMemo(() => {
-    return holdings.filter(h => isPriceStale(h)).length
-  }, [holdings, isPriceStale])
+  // Verouderde prijzen — ALLEEN over de nog open posities; zie de toelichting
+  // bij `countStalePrices` in @/lib/holdings-staleness (pure, getest).
+  const staleCount = useMemo(() => countStalePrices(holdings), [holdings])
 
-  // Box 3 tax summary for the entire portfolio
-  const box3Summary = useMemo(() => {
-    const holdingValues = holdings.map(h => ({
-      id: h.id,
-      value: (h.current_price ?? h.avg_purchase_price) * Math.max(0, h.units),
-    }))
-    return calculatePortfolioBox3(holdingValues)
-  }, [holdings])
+  /** Aantal posities dat je nu daadwerkelijk bezit — subregel bij marktwaarde. */
+  const openPositionsCount = useMemo(
+    () => holdings.filter(h => !isClosedHolding(h)).length,
+    [holdings],
+  )
+
+  /** Het gekozen venster als maandenaantal voor de waardegrafiek; null = alles. */
+  const chartMonths = useMemo(() => monthsForPeriod(chartPeriod), [chartPeriod])
 
   // Compute holdings data for portfolio allocation visualization (with classification)
   const holdingsForAllocation: HoldingForAllocation[] = useMemo(() => {
@@ -841,35 +892,32 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
         )
       })()}
 
-      {/* Hero summary — figures-strip + allocatie-strip + period selector + Box 3 + FIRE deck */}
+      {/* Hero summary — figures-strip + allocatie-strip + FIRE deck.
+          De periode-rail staat bewust NIET meer hierin: die stuurt inmiddels
+          drie oppervlakken aan en heeft daarom een eigen plek hieronder. */}
       <PortfolioSummary
         totalValue={totalValue}
-        totalCost={totalCost}
+        totalPnL={totalPnL}
+        totalInvested={totalInvested}
+        openPositionsCount={openPositionsCount}
         todayChangeEur={todayChange.eur}
         todayChangePct={todayChange.pct}
         forwardDividendNetNl={forwardDividendNetNl}
-        box3={box3Summary}
         yearlyEssentialExpenses={initialData?.yearlyEssentialExpenses ?? 0}
-        activePeriod={benchmarkPeriod}
-        onPeriodChange={handleBenchmarkPeriodChange}
+        // Grondslag uit de loader; géén lokale constante. Zonder server-load is
+        // er ook geen `yearlyEssentialExpenses` en rendert de deck-regel niet,
+        // dus `null` betekent hier "geen deck" en nooit "toon een generiek %".
+        effectiveSwr={initialData?.effectiveSwr ?? null}
+        activePeriod={chartPeriod}
         comparison={benchmarkComparison}
         assetClassBreakdown={assetClassBreakdown}
         concentrationTop3Pct={concentrationTop3Pct}
       />
 
-      {/* Waardehistorie — wat de inleg door de tijd waard werd. Staat vóór de
-          verdeling en de benchmark: eerst "hoe liep het", dan "waaruit bestaat
-          het" en "hoe verhoudt het zich". Het component haalt zijn eigen reeks
-          op via /api/holdings/value-history en vangt de lege staat zelf af. */}
-      <section className="mt-6">
-        <PortfolioValueChart
-          yearlyEssentialExpenses={initialData?.yearlyEssentialExpenses ?? 0}
-        />
-      </section>
-
       {/* Allocatie-donut — full breakdown met view-tabs (asset-class/sector/regio).
-          Anchor `#portfolio-allocation` zodat de compacte strip in de hero
-          hierheen kan deeplinken via in-page jump. */}
+          Staat direct onder de KPI-regel: eerst "waaruit bestaat het", dan pas
+          de tijdas. Anchor `#portfolio-allocation` zodat de compacte strip in de
+          hero hierheen kan deeplinken via in-page jump. */}
       {showAllocation && (
         <section
           id="portfolio-allocation"
@@ -889,22 +937,48 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
         </section>
       )}
 
-      {/* Rebalancing drempel-instellingen — horen bij de portfolio-verdeling
-          hierboven. Alleen zichtbaar wanneer er target-allocaties zijn
-          (de component gate zichzelf). */}
-      {showAllocation && <RebalancingSettingsSection />}
+      {/* Periode-rail — één keuze die drie oppervlakken tegelijk stuurt: de
+          rendement-cel in de hero, de waardegrafiek en de benchmark hieronder.
+          Staat dáárom hier, tussen de verdeling en de twee tijdgebonden
+          grafieken, en niet meer verstopt in de hero. */}
+      {holdings.length > 0 && (
+        <section className="mt-6 border-t border-b border-[var(--rule-soft)] py-3">
+          <PeriodRail
+            periods={TIME_PERIODS}
+            activePeriod={chartPeriod}
+            onPeriodChange={handlePeriodChange}
+          />
+        </section>
+      )}
 
-      {/* Benchmark — alleen vanaf 3 holdings */}
+      {/* Waardehistorie — wat de portefeuille door de tijd waard was, over
+          hetzelfde venster als de rail hierboven. Het component haalt zijn eigen
+          reeks op via /api/holdings/value-history en vangt de lege staat zelf af. */}
+      <section className="mt-6">
+        <PortfolioValueChart
+          months={chartMonths}
+          yearlyEssentialExpenses={initialData?.yearlyEssentialExpenses ?? 0}
+        />
+      </section>
+
+      {/* Benchmark — alleen vanaf 2 holdings */}
       {showBenchmark && (
         <section className="mt-6">
           <BenchmarkComparisonChart
             comparison={benchmarkComparison}
-            onPeriodChange={handleBenchmarkPeriodChange}
-            activePeriod={benchmarkPeriod}
+            onPeriodChange={handlePeriodChange}
+            activePeriod={chartPeriod}
             loading={benchmarkLoading}
+            // De gedeelde PeriodRail hierboven stuurt deze grafiek al aan.
+            hidePeriodRail
           />
         </section>
       )}
+
+      {/* Rebalancing drempel-instellingen — horen bij de portfolio-verdeling.
+          Alleen zichtbaar wanneer er target-allocaties zijn (de component gate
+          zichzelf). */}
+      {showAllocation && <RebalancingSettingsSection />}
 
       {/* Dividend-tracker — alleen wanneer er ook dividend is */}
       {showDividendTracker && (
@@ -917,8 +991,12 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
       {error && (
         <div className="mt-4 border border-[var(--negative)] bg-[var(--negative)]/5 p-4">
           <p className="text-sm text-[var(--negative)]">{error}</p>
+          {/* Bewust GÉÉN setLoading(true) hier: dat wisselde de hele pagina om
+              naar de laadskeleton terwijl er correcte, server-geleverde data
+              stond — de gebruiker zag zijn portefeuille verdwijnen om vervolgens
+              onveranderd terug te komen. `loadHoldings` zet de foutregel zelf. */}
           <button
-            onClick={() => { setError(null); setLoading(true); loadHoldings() }}
+            onClick={() => { setError(null); loadHoldings() }}
             className="mt-2 inline-flex min-h-[32px] items-center px-3 py-1.5 text-[11px] font-mono font-semibold uppercase tracking-[0.12em] bg-[var(--negative)] text-[var(--paper)] border border-[var(--negative)] hover:opacity-90"
           >
             Opnieuw proberen
@@ -1093,6 +1171,10 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
                 isStale: stale,
                 isWinner: winnerIds.has(holding.id),
                 closedPnl,
+                // 52-weeks bereik uit de koersfeed. Blijft NULL tot de
+                // eerstvolgende koersvernieuwing; de strook verbergt zich dan.
+                fiftyTwoWeekHigh: holding.fifty_two_week_high ?? null,
+                fiftyTwoWeekLow: holding.fifty_two_week_low ?? null,
               }}
               weightPct={weightPct}
               formattedValue={formattedValue}

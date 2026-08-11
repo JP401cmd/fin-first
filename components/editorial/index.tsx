@@ -204,6 +204,11 @@ export interface FigureProps {
   /** Either a pre-formatted string ("€ 12.345") or a node (e.g. <MaskedAmount>) — the latter lets privacy-aware widgets swap in masked bullets without losing the cell's typography. */
   amount: string | ReactNode
   sub?: string
+  /** Optionele TWEEDE subregel onder `sub`, zelfde typografie. Voor cellen waar
+   *  de herkomst van het getal en de eenheid/periode allebei mee moeten — bv.
+   *  de grondslag-vermelding (ADR 0103: elk getal benoemt waar het vandaan komt)
+   *  naast "per maand". Weglaten = exact het gedrag van vóór deze prop. */
+  sub2?: string
   variant?: 'neutral' | 'positive' | 'negative' | 'winner'
   /** Maakt de cell een klikbare deeplink. Wordt gerenderd als Next.js `<Link>`. */
   href?: string
@@ -324,6 +329,14 @@ function FiguresStripCell({
           style={{ fontFamily: SOURCE_SERIF }}
         >
           {figure.sub}
+        </div>
+      )}
+      {figure.sub2 && (
+        <div
+          className="italic text-[11px] text-[var(--ink-3)] leading-snug"
+          style={{ fontFamily: SOURCE_SERIF }}
+        >
+          {figure.sub2}
         </div>
       )}
     </>

@@ -30,6 +30,8 @@ import {
 } from '@/lib/box3-taxable-input'
 import { box1JaarruimteStatus, resolvePensionFactorA } from '@/lib/jaarruimte'
 import { resolveEffectiveIncomeExpenses } from '@/lib/effective-financials'
+import { loadBudgetBasis } from '@/lib/household/budget-share'
+import type { BudgetBasisRow } from '@/lib/budget-basis'
 import { resolveFireParams } from '@/lib/fire-params'
 import { computeSavingsRate6m, computeDebtAflossingMonthly } from '@/lib/savings-source'
 import { localMonthStartMonthsAgo, localMonthBounds } from '@/lib/month-range'
@@ -42,6 +44,7 @@ import {
   getCurrentMonthTx,
   getEarliestIncomeDate,
 } from '@/lib/server-data/base'
+import { resolveUnlinkedCashShare, unlinkedCashTotal } from '@/lib/unlinked-cash'
 import {
   fetchTxMonthAggregate,
   aggSumPositief,
@@ -249,10 +252,10 @@ export const loadLeverScores = cache(async function loadLeverScores(
   // byte-gelijk aan de eigen aggregaten hierboven. Bij household/partner via de
   // gedeelde, privacy-veilige `loadPerspectiveDataServer` (zelfde share()-regel).
   // Dit voedt UITSLUITEND de sidebar-netWorth-metric — niet de lever-scores.
-  const unlinkedCash = ((bankAccountsRes.data ?? []) as Array<{ balance: number | string }>).reduce(
-    (s, a) => s + Number(a.balance),
-    0,
-  )
+  // Losse rekeningen via DE canonieke, huishoud-gewogen optelling
+  // (lib/unlinked-cash.ts) — geen eigen reduce, anders drift met dashboard/horizon.
+  const unlinkedCashShare = await resolveUnlinkedCashShare(supabase, bankAccountsRes.data)
+  const unlinkedCash = unlinkedCashTotal(bankAccountsRes.data, unlinkedCashShare)
   let perspectiveTotalAssets = totalAssets + unlinkedCash
   let perspectiveTotalDebts = totalDebts
   if (perspective !== 'personal') {
@@ -266,7 +269,11 @@ export const loadLeverScores = cache(async function loadLeverScores(
         pd.assets.reduce((s, a) => {
           const raw = Number(a.current_value) * ((Number(a.net_worth_inclusion_pct) || 100) / 100)
           return s + share(a, raw)
-        }, 0) + unlinkedCash
+        }, 0) +
+        unlinkedCashTotal(bankAccountsRes.data, {
+          perspective,
+          mySharePct: unlinkedCashShare.mySharePct,
+        })
       perspectiveTotalDebts = pd.debts.reduce((s, d) => {
         const raw = Number(d.current_balance) * ((Number(d.net_worth_inclusion_pct) || 100) / 100)
         return s + share(d, raw)
@@ -400,10 +407,24 @@ export const loadLeverScores = cache(async function loadLeverScores(
     if (amt > 0) monthTxIncome += amt
     else monthTxExpenses += Math.abs(amt)
   }
+  // Budgetgrondslag (ADR 0103) uit dezelfde gedeelde samenstelling als de
+  // loaders. Zonder dit zou de sidebar-statusdot — die op ÉLKE route in het
+  // shell-pad hangt — het Box 1-inkomen op de transactiegrondslag blijven
+  // rekenen terwijl /overzicht/cashflow het budgetgetal toont. Geen extra query:
+  // `getBudgets`/`getOwnProfile` staan al in de golf hierboven.
+  const leverBudgetBasis = await loadBudgetBasis(
+    supabase,
+    profile as unknown as Record<string, unknown>,
+    (budgetsRes.data ?? []) as unknown as BudgetBasisRow[],
+  )
   const { income: box1MonthlyIncome } = resolveEffectiveIncomeExpenses(
     profile,
     monthTxIncome,
     monthTxExpenses,
+    {
+      income: leverBudgetBasis.income.monthlyTotal,
+      expenses: leverBudgetBasis.expenses.monthlyTotal,
+    },
   )
   const box1MarginaalTarief = resolveFireParams(profile).marginaalTarief
   // Factor A meegeven: zonder werkgeverspensioen-aftrek meldde de dot een

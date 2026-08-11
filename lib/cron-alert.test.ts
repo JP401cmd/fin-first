@@ -19,6 +19,9 @@ function makeService(throttleValue: string | null) {
 
 const okSend = vi.fn().mockResolvedValue({ ok: true })
 
+/** Push standaard uit, zodat de tests niet van ambient env afhangen. */
+const noPush = { pushConfigured: () => false }
+
 describe('alertCronFailure', () => {
   it('stuurt 1 mail + zet throttle-stempel bij een fout met recipient', async () => {
     const { service, upsert } = makeService(null)
@@ -27,9 +30,9 @@ describe('alertCronFailure', () => {
     const res = await alertCronFailure(
       service,
       { job: 'snapshots', error: 'profiel-query faalde' },
-      { send, now, recipient: () => 'ops@trifinity.app' },
+      { send, now, recipient: () => 'ops@trifinity.app', ...noPush },
     )
-    expect(res).toEqual({ sent: true })
+    expect(res).toEqual({ sent: true, channels: { mail: true, push: false } })
     expect(send).toHaveBeenCalledTimes(1)
     const mail = send.mock.calls[0][0]
     expect(mail.to).toBe('ops@trifinity.app')
@@ -42,13 +45,13 @@ describe('alertCronFailure', () => {
     })
   })
 
-  it('geen recipient -> geen mail (stille no-op)', async () => {
+  it('geen enkel kanaal -> stille no-op', async () => {
     const { service, upsert } = makeService(null)
     const send = vi.fn()
     const res = await alertCronFailure(
       service,
       { job: 'retention', error: 'x' },
-      { send, recipient: () => null },
+      { send, recipient: () => null, ...noPush },
     )
     expect(res).toEqual({ sent: false, skipped: 'no-recipient' })
     expect(send).not.toHaveBeenCalled()
@@ -60,13 +63,16 @@ describe('alertCronFailure', () => {
     // 2 uur geleden gealarmeerd -> binnen 24u venster.
     const { service, upsert } = makeService('2026-07-21T10:00:00.000Z')
     const send = vi.fn()
+    const push = vi.fn()
     const res = await alertCronFailure(
       service,
       { job: 'news-ingest', error: 'x' },
-      { send, now, recipient: () => 'ops@trifinity.app' },
+      { send, now, recipient: () => 'ops@trifinity.app', push, pushConfigured: () => true },
     )
     expect(res).toEqual({ sent: false, skipped: 'throttled' })
     expect(send).not.toHaveBeenCalled()
+    // Eén throttle voor beide kanalen: de push gaat ook niet uit.
+    expect(push).not.toHaveBeenCalled()
     expect(upsert).not.toHaveBeenCalled()
   })
 
@@ -77,9 +83,9 @@ describe('alertCronFailure', () => {
     const res = await alertCronFailure(
       service,
       { job: 'holdings-prices', error: 'x' },
-      { send: okSend, now, recipient: () => 'ops@trifinity.app' },
+      { send: okSend, now, recipient: () => 'ops@trifinity.app', ...noPush },
     )
-    expect(res).toEqual({ sent: true })
+    expect(res).toEqual({ sent: true, channels: { mail: true, push: false } })
   })
 
   it('mail-fout -> geen stempel, geen throw', async () => {
@@ -88,9 +94,58 @@ describe('alertCronFailure', () => {
     const res = await alertCronFailure(
       service,
       { job: 'briefing-email', error: 'x' },
-      { send, recipient: () => 'ops@trifinity.app' },
+      { send, recipient: () => 'ops@trifinity.app', ...noPush },
     )
     expect(res).toEqual({ sent: false, skipped: 'send-failed' })
     expect(upsert).not.toHaveBeenCalled()
+  })
+
+  // ── Duw-kanaal naast de mail (ADR 0102) ──────────────────────────────────
+  it('pusht ook zonder mail-recipient, en zet dan wél de stempel', async () => {
+    const { service, upsert } = makeService(null)
+    const send = vi.fn()
+    const push = vi.fn().mockResolvedValue({ sent: true })
+    const res = await alertCronFailure(
+      service,
+      { job: 'retention', error: 'x' },
+      {
+        send,
+        now: () => new Date('2026-07-21T12:00:00Z'),
+        recipient: () => null,
+        push,
+        pushConfigured: () => true,
+      },
+    )
+    expect(res).toEqual({ sent: true, channels: { mail: false, push: true } })
+    expect(send).not.toHaveBeenCalled()
+    expect(push).toHaveBeenCalledTimes(1)
+    expect(upsert).toHaveBeenCalledTimes(1)
+  })
+
+  it('de push draagt nooit de fouttekst (payloadregel)', async () => {
+    const { service } = makeService(null)
+    const push = vi.fn().mockResolvedValue({ sent: true })
+    await alertCronFailure(
+      service,
+      { job: 'snapshots', error: 'profiel jan@example.com faalde op /overzicht?id=42' },
+      { send: okSend, recipient: () => 'ops@trifinity.app', push, pushConfigured: () => true },
+    )
+    const payload = JSON.stringify(push.mock.calls[0][0])
+    expect(payload).not.toContain('jan@example.com')
+    expect(payload).not.toContain('profiel')
+    expect(payload).toContain('Maandsnapshots')
+  })
+
+  it('mail faalt maar push lukt -> alsnog gealarmeerd + stempel', async () => {
+    const { service, upsert } = makeService(null)
+    const send = vi.fn().mockResolvedValue({ ok: false })
+    const push = vi.fn().mockResolvedValue({ sent: true })
+    const res = await alertCronFailure(
+      service,
+      { job: 'news-ingest', error: 'x' },
+      { send, recipient: () => 'ops@trifinity.app', push, pushConfigured: () => true },
+    )
+    expect(res).toEqual({ sent: true, channels: { mail: false, push: true } })
+    expect(upsert).toHaveBeenCalledTimes(1)
   })
 })

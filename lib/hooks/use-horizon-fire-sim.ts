@@ -42,6 +42,7 @@ import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import type { Box3Method } from '@/lib/bucket-projection'
 import { type HousingStrategyConfig } from '@/lib/housing-strategy'
+import { withResolvedKernelBedragen } from '@/lib/horizon/kernel-profile-basis'
 
 /**
  * Wat-als-scenario-overrides (2e projectielijn op /toekomst, plan §A/§B). Additief en
@@ -410,6 +411,32 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
 
   const deferredKernelInput = useDeferredValue(kernelInput)
 
+  /**
+   * De kernel-profielrij MET de geresolveerde grondslag-bedragen (ADR 0103).
+   *
+   * De SSR-loader injecteert deze al in `rawProfile`, maar `kernelRawProfile` kan
+   * hier ook uit de client-mount-fetch (`loadKernelContext` in horizon-client)
+   * komen, en díé leest de rauwe profielkolommen. Zonder deze correctie zou de
+   * FIRE-datum ná hydratie kunnen verspringen t.o.v. de server-render — een half
+   * gedicht gat is erger dan een open gat. Door het HIER te doen, op de plek waar
+   * élke kernel-run zijn context samenstelt, is de bron van de rij niet meer
+   * relevant.
+   *
+   * `horizonInput` is de EFFECTIEVE `FinancialInput` (bundel `effectiveInput`, of
+   * de client-refresh die dezelfde resolver draait), dus dit is een doorgifte —
+   * geen tweede grondslagbeslissing. Idempotent t.o.v. de SSR-injectie.
+   */
+  const kernelProfileWithBasis = useMemo(() => {
+    const raw = deferredKernelInput.kernelRawProfile
+    if (!raw) return null
+    const fi = deferredKernelInput.horizonInput
+    if (!fi) return raw
+    return withResolvedKernelBedragen(raw, {
+      monthlyIncome: fi.monthlyIncome,
+      monthlyExpenses: fi.monthlyExpenses,
+    })
+  }, [deferredKernelInput])
+
   // Zelfde defer-patroon als de hoofd-input (:hierboven), nu op de scenario-overrides:
   // tijdens slider-drag coalesced de (2e) scenario-run in een onderbreekbare
   // achtergrond-render. Op de initiële render is de deferred waarde gelijk aan de huidige
@@ -432,13 +459,13 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     const built = buildInputFromBundle(p)
     if (!built) return null
     // Zonder rauwe profiel-rij kan de kernel-invoer niet worden samengesteld.
-    if (!p.kernelRawProfile) return null
+    if (!kernelProfileWithBasis) return null
     const { input: unifiedInput, cashflows } = built
 
     // ── Kernel-only: route via de convergentie-router ─────────────────
     const outcome = computeConvergentieProjection({
       rawContext: {
-        profile: p.kernelRawProfile,
+        profile: kernelProfileWithBasis,
         assets: p.assets ?? [],
         debts: p.debts ?? [],
         lifeEvents: p.lifeEvents ?? [],
@@ -476,7 +503,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     // BASELINE-inputs, want yearlyExpenses hangt niet van assets/events af.
     const built = buildInputFromBundle(p)
     if (!built) return null
-    if (!p.kernelRawProfile) return null
+    if (!kernelProfileWithBasis) return null
     const { input: unifiedInput } = built
 
     // (a) assets pre-muteren met de categorie-rendement-delta's + (b) scenario-events
@@ -486,7 +513,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
 
     const outcome = computeConvergentieProjection({
       rawContext: {
-        profile: p.kernelRawProfile,
+        profile: kernelProfileWithBasis,
         assets: scenarioAssets,
         debts: p.debts ?? [],
         lifeEvents: scenarioLifeEvents,
@@ -519,14 +546,14 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     if (stopAge == null || !Number.isFinite(stopAge)) return null
 
     const p = deferredKernelInput
-    if (!p.horizonInput || !p.kernelRawProfile) return null
+    if (!p.horizonInput || !kernelProfileWithBasis) return null
 
     const built = buildInputFromBundle(p)
     if (!built) return null
 
     // Actieve context: scenario-overrides indien aanwezig (gedeelde assemblage, één home).
     return runForcedStopPath(
-      buildStopPadInput(p, p.kernelRawProfile, deferredScenarioOverrides, stopAge, built.input.yearlyExpenses),
+      buildStopPadInput(p, kernelProfileWithBasis, deferredScenarioOverrides, stopAge, built.input.yearlyExpenses),
     )
   }, [runSyncKernel, deferredKernelInput, deferredScenarioOverrides, deferredStopPadAge])
 
@@ -549,10 +576,10 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     const reqId = (mainReqIdRef.current += 1)
     const p = deferredKernelInput
     const built = buildInputFromBundle(p)
-    if (!built || !p.kernelRawProfile) { setAsyncSimMain(null); return }
+    if (!built || !kernelProfileWithBasis) { setAsyncSimMain(null); return }
     const { input: unifiedInput, cashflows } = built
     const rawContext: ConvergentieRawContext = {
-      profile: p.kernelRawProfile,
+      profile: kernelProfileWithBasis,
       assets: p.assets ?? [],
       debts: p.debts ?? [],
       lifeEvents: p.lifeEvents ?? [],
@@ -579,11 +606,11 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
 
     const p = deferredKernelInput
     const built = buildInputFromBundle(p)
-    if (!built || !p.kernelRawProfile) { setAsyncScenario(null); return }
+    if (!built || !kernelProfileWithBasis) { setAsyncScenario(null); return }
     const { assets: scenarioAssets, lifeEvents: scenarioLifeEvents } =
       resolveScenarioAssetsAndEvents(p.assets, p.lifeEvents, ov)
     const rawContext: ConvergentieRawContext = {
-      profile: p.kernelRawProfile,
+      profile: kernelProfileWithBasis,
       assets: scenarioAssets,
       debts: p.debts ?? [],
       lifeEvents: scenarioLifeEvents,
@@ -613,10 +640,10 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     const stopAge = deferredStopPadAge
     if (stopAge == null || !Number.isFinite(stopAge)) { setAsyncStopPad(null); return }
     const p = deferredKernelInput
-    if (!p.horizonInput || !p.kernelRawProfile) { setAsyncStopPad(null); return }
+    if (!p.horizonInput || !kernelProfileWithBasis) { setAsyncStopPad(null); return }
     const built = buildInputFromBundle(p)
     if (!built) { setAsyncStopPad(null); return }
-    const stopInput = buildStopPadInput(p, p.kernelRawProfile, deferredScenarioOverrides, stopAge, built.input.yearlyExpenses)
+    const stopInput = buildStopPadInput(p, kernelProfileWithBasis, deferredScenarioOverrides, stopAge, built.input.yearlyExpenses)
     let cancelled = false
     runForcedStopPathAsync(stopInput).then((res) => {
       if (cancelled || reqId !== stopPadReqIdRef.current) return

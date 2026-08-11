@@ -28,6 +28,16 @@ interface BenchmarkComparisonChartProps {
   activePeriod: TimePeriod
   availablePeriods?: TimePeriod[]
   loading?: boolean
+  /**
+   * Verberg de eigen periode-knoppen omdat de pagina er al één rail voor heeft.
+   *
+   * Op de holdings-pagina stuurt sinds aug 2026 één gedeelde `PeriodRail` zowel
+   * de rendement-KPI, de waardegrafiek als deze vergelijking aan. Twee rails met
+   * dezelfde functie — en met andere vormtaal, want deze draagt nog afgeronde
+   * hoeken tegen de editorial design-taal in — leest als twee onafhankelijke
+   * keuzes terwijl het er één is. `activePeriod` blijft nodig voor de labels.
+   */
+  hidePeriodRail?: boolean
 }
 
 export const BenchmarkComparisonChart = memo(function BenchmarkComparisonChart({
@@ -36,6 +46,7 @@ export const BenchmarkComparisonChart = memo(function BenchmarkComparisonChart({
   activePeriod,
   availablePeriods,
   loading,
+  hidePeriodRail = false,
 }: BenchmarkComparisonChartProps) {
   const [hoveredBenchmark, setHoveredBenchmark] = useState<BenchmarkId | null>(null)
   const { ref, hasEntered, animationComplete } = useInViewAnimation({ duration: 800 })
@@ -308,23 +319,26 @@ export const BenchmarkComparisonChart = memo(function BenchmarkComparisonChart({
           <h2 className="text-sm font-semibold text-[var(--ink-2)]">Benchmark vergelijking</h2>
         </div>
         <div className="flex items-center gap-2">
-          {/* Period buttons */}
-          <div className="flex items-center gap-1" data-testid="benchmark-period-buttons">
-            {periods.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => onPeriodChange(p)}
-                data-testid={`benchmark-period-${p.id}`}
-                className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-                  activePeriod.id === p.id
-                    ? 'bg-kern-100 text-kern-700'
-                    : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
+          {/* Period buttons — verborgen wanneer de pagina al een gedeelde rail
+              heeft (holdings); zie de prop-toelichting. */}
+          {!hidePeriodRail && (
+            <div className="flex items-center gap-1" data-testid="benchmark-period-buttons">
+              {periods.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => onPeriodChange(p)}
+                  data-testid={`benchmark-period-${p.id}`}
+                  className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+                    activePeriod.id === p.id
+                      ? 'bg-kern-100 text-kern-700'
+                      : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          )}
           {/* ChartTips */}
           <ChartTips
             storageKey="benchmark_comparison_chart"

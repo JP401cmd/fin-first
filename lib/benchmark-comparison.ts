@@ -176,6 +176,29 @@ export const TIME_PERIODS: TimePeriod[] = [
   { id: 'all', label: 'Alles', months: 0, windowLabel: 'over de volledige historie' },
 ]
 
+/**
+ * De periode als een aantal maanden, voor consumenten die met een
+ * `?months=`-venster werken (`/api/holdings/value-history`) in plaats van met
+ * een periode-id (`/api/benchmark-comparison`).
+ *
+ * Eén vertaling, op de plek waar `TIME_PERIODS` zelf staat — zodat de
+ * periode-rail op de holdings-pagina de waardegrafiek én de benchmark over
+ * hetzelfde venster aanstuurt zonder dat een component z'n eigen mapping bouwt.
+ *
+ *   • vaste vensters (`1m`/`3m`/`6m`/`1y`) → `period.months`
+ *   • `ytd` → het aantal maanden sinds 1 januari, INCLUSIEF de lopende maand:
+ *     in januari is dat 1, niet 0. Nul zou de route op z'n minimum (1) klemmen
+ *     en dus toevallig goed uitpakken — maar in februari zou 1 een maand te
+ *     weinig zijn. Daarom expliciet `getMonth() + 1`.
+ *   • `all` → `null`: geen venster, de hele historie (de motor begint sowieso
+ *     nooit vóór de eerste transactie).
+ */
+export function monthsForPeriod(period: TimePeriod, today: Date = new Date()): number | null {
+  if (period.id === 'all') return null
+  if (period.isYtd) return today.getMonth() + 1
+  return period.months > 0 ? period.months : null
+}
+
 // ── Venster (één bron voor route én motor) ───────────────────
 
 /**

@@ -84,6 +84,9 @@ type InvHoldingRow = {
   last_price_update: string | null
   units: number
   avg_purchase_price: number
+  asset_class: string | null
+  geography: string | null
+  exchange: string | null
 }
 
 function makeHoldingRow(overrides: Partial<InvHoldingRow> & { id: string }): InvHoldingRow {
@@ -97,6 +100,9 @@ function makeHoldingRow(overrides: Partial<InvHoldingRow> & { id: string }): Inv
     last_price_update: null,
     units: 1,
     avg_purchase_price: 10,
+    asset_class: null,
+    geography: null,
+    exchange: null,
     ...overrides,
   }
 }
@@ -109,6 +115,11 @@ function makePriceData(overrides: Partial<PriceData> = {}): PriceData {
     dailyChangePercent: 1.0101,
     currency: 'EUR',
     displayName: 'Test Instrument',
+    instrumentType: null,
+    exchangeName: null,
+    fiftyTwoWeekHigh: null,
+    fiftyTwoWeekLow: null,
+    marketTime: null,
     timestamp: new Date().toISOString(),
     source: 'yahoo_finance',
     ...overrides,
@@ -152,14 +163,16 @@ function makeInvestmentHoldingsChainFactory(
   listRows: InvHoldingRow[],
   onUpdate: (id: string, fields: Record<string, unknown>) => { error: unknown },
   updateLog: Array<{ id: string; fields: Record<string, unknown> }>,
+  selectLog?: string[],
 ) {
   return () => {
     let mode: 'list' | 'update' | null = null
     let updateId: string | undefined
     let updateFields: Record<string, unknown> | undefined
     const chain: Record<string, unknown> = {}
-    chain.select = vi.fn(() => {
+    chain.select = vi.fn((cols?: string) => {
       mode = 'list'
+      if (selectLog && typeof cols === 'string') selectLog.push(cols)
       return chain
     })
     chain.update = vi.fn((fields: Record<string, unknown>) => {
@@ -365,5 +378,346 @@ describe('POST /api/holdings/refresh-prices', () => {
     // No write to investment_holdings.update() for the skipped holding either.
     expect(updateLog.some((u) => u.id === 'h-closed')).toBe(false)
     expect(updateLog.some((u) => u.id === 'h-open')).toBe(true)
+  })
+
+  // -------------------------------------------------------------------------
+  // 4. Classificatie uit de feed-metadata (asset_class / geography)
+  // -------------------------------------------------------------------------
+
+  /**
+   * De classificatie komt UITSLUITEND uit `instrumentType`/`exchangeName` van de
+   * verse Yahoo-response — nooit uit de request-body — en vult alleen lege
+   * kolommen. De harde eisen die hier vastliggen:
+   *   a. EQUITY + AMS → aandelen/nederland.
+   *   b. ETF → assetklasse 'etf', maar NOOIT een geografie uit de
+   *      noteringsbeurs (VWRL noteert in Amsterdam, belegt wereldwijd).
+   *   c. Een bestaande (handmatige) waarde wordt niet overschreven → een
+   *      tweede refresh op al geclassificeerde posities verandert niets.
+   *   d. Legacy 'equity'/'bonds' worden wél genormaliseerd (afgebakende
+   *      uitzondering).
+   */
+  function runWithHoldings(holdings: InvHoldingRow[]) {
+    const updateLog: Array<{ id: string; fields: Record<string, unknown> }> = []
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'investment_holdings') {
+        return makeInvestmentHoldingsChainFactory(holdings, () => ({ error: null }), updateLog)()
+      }
+      if (table === 'investment_holding_prices') {
+        return makeGenericChain({ error: null })
+      }
+      return makeGenericChain({ data: null, error: null })
+    })
+    return updateLog
+  }
+
+  it('EQUITY op AMS vult lege kolommen met aandelen/nederland en telt mee als geclassificeerd', async () => {
+    const holdings = [makeHoldingRow({ id: 'h-asml', ticker: 'ASML.AS' })]
+    mockFetchPriceData.mockResolvedValue(
+      makePriceData({ instrumentType: 'EQUITY', exchangeName: 'AMS' }),
+    )
+    const updateLog = runWithHoldings(holdings)
+
+    const res = await callRoute(makeRequest({ bucket: 'investment' }))
+    const body = await res.json()
+
+    const write = updateLog.find((u) => u.id === 'h-asml')!
+    expect(write.fields.asset_class).toBe('aandelen')
+    expect(write.fields.geography).toBe('nederland')
+    expect(write.fields.exchange).toBe('AMS')
+    expect(body.summary.classified).toBe(1)
+    expect(body.message).toMatch(/1 positie geclassificeerd/)
+  })
+
+  it('ETF op AMS krijgt assetklasse etf maar GEEN geografie uit de noteringsbeurs', async () => {
+    const holdings = [makeHoldingRow({ id: 'h-vwrl', ticker: 'VWRL.AS' })]
+    mockFetchPriceData.mockResolvedValue(
+      makePriceData({ instrumentType: 'ETF', exchangeName: 'AMS' }),
+    )
+    const updateLog = runWithHoldings(holdings)
+
+    const res = await callRoute(makeRequest({ bucket: 'investment' }))
+    const body = await res.json()
+
+    const write = updateLog.find((u) => u.id === 'h-vwrl')!
+    expect(write.fields.asset_class).toBe('etf')
+    // Kern-eis: de kolom wordt niet meegeschreven — geen 'nederland' voor een
+    // wereldwijd beleggend fonds. De beurscode zelf is wél een feit en mag.
+    expect('geography' in write.fields).toBe(false)
+    expect(write.fields.exchange).toBe('AMS')
+    expect(body.summary.classified).toBe(1)
+  })
+
+  it('onbekend instrumentType laat assetklasse/geografie ongemoeid (onbekend is geen categorie)', async () => {
+    const holdings = [makeHoldingRow({ id: 'h-raar', ticker: 'RAAR' })]
+    mockFetchPriceData.mockResolvedValue(
+      makePriceData({ instrumentType: 'FUTURE', exchangeName: 'ZZZ' }),
+    )
+    const updateLog = runWithHoldings(holdings)
+
+    const res = await callRoute(makeRequest({ bucket: 'investment' }))
+    const body = await res.json()
+
+    const write = updateLog.find((u) => u.id === 'h-raar')!
+    expect('asset_class' in write.fields).toBe(false)
+    expect('geography' in write.fields).toBe(false)
+    // De beurscode hangt niet af van of wij het instrumenttype herkennen.
+    expect(write.fields.exchange).toBe('ZZZ')
+    expect(body.summary.classified).toBe(1)
+    // De prijs wordt uiteraard wél gewoon bijgewerkt.
+    expect(write.fields.current_price).toBe(100)
+  })
+
+  it('feed zonder type én zonder beurs schrijft geen enkel classificatieveld', async () => {
+    const holdings = [makeHoldingRow({ id: 'h-kaal', ticker: 'KAAL' })]
+    mockFetchPriceData.mockResolvedValue(
+      makePriceData({ instrumentType: null, exchangeName: null }),
+    )
+    const updateLog = runWithHoldings(holdings)
+
+    const res = await callRoute(makeRequest({ bucket: 'investment' }))
+    const body = await res.json()
+
+    const write = updateLog.find((u) => u.id === 'h-kaal')!
+    for (const col of ['asset_class', 'geography', 'exchange']) {
+      expect(col in write.fields).toBe(false)
+    }
+    expect(body.summary.classified).toBe(0)
+    expect(body.message).not.toMatch(/geclassificeerd/)
+  })
+
+  it('TWEEDE RONDE: al geclassificeerde posities blijven ongewijzigd (handmatige keuze wint)', async () => {
+    // Exact de staat die de eerste ronde achterlaat, plus een handmatige keuze
+    // die afwijkt van wat de feed zou afleiden.
+    const holdings = [
+      makeHoldingRow({
+        id: 'h-al-gezet',
+        ticker: 'ASML.AS',
+        asset_class: 'aandelen',
+        geography: 'nederland',
+        exchange: 'AMS',
+      }),
+      makeHoldingRow({
+        id: 'h-handmatig',
+        ticker: 'VWRL.AS',
+        asset_class: 'obligaties', // gebruiker weet dat dit een obligatie-ETF is
+        geography: 'wereld',
+        exchange: 'EURONEXT', // eigen schrijfwijze — mag niet overschreven worden
+      }),
+    ]
+    mockFetchPriceData.mockImplementation(async (ticker: string) =>
+      makePriceData({
+        instrumentType: ticker === 'ASML.AS' ? 'EQUITY' : 'ETF',
+        exchangeName: 'AMS',
+      }),
+    )
+    const updateLog = runWithHoldings(holdings)
+
+    const res = await callRoute(makeRequest({ bucket: 'investment' }))
+    const body = await res.json()
+
+    for (const id of ['h-al-gezet', 'h-handmatig']) {
+      const write = updateLog.find((u) => u.id === id)!
+      expect('asset_class' in write.fields).toBe(false)
+      expect('geography' in write.fields).toBe(false)
+      expect('exchange' in write.fields).toBe(false)
+    }
+    // Niets nieuws geclassificeerd → de teller is eerlijk 0 bij een herhaling.
+    expect(body.summary.classified).toBe(0)
+  })
+
+  it('legacy-sleutels equity/bonds worden genormaliseerd, geografie blijft ongemoeid', async () => {
+    const holdings = [
+      makeHoldingRow({ id: 'h-legacy-eq', ticker: 'MRVL', asset_class: 'equity', geography: 'noord_amerika' }),
+      makeHoldingRow({ id: 'h-legacy-bd', ticker: 'BOND', asset_class: 'bonds', geography: 'europa' }),
+    ]
+    mockFetchPriceData.mockResolvedValue(
+      makePriceData({ instrumentType: 'EQUITY', exchangeName: 'NMS' }),
+    )
+    const updateLog = runWithHoldings(holdings)
+
+    const res = await callRoute(makeRequest({ bucket: 'investment' }))
+    const body = await res.json()
+
+    expect(updateLog.find((u) => u.id === 'h-legacy-eq')!.fields.asset_class).toBe('aandelen')
+    // 'bonds' → 'obligaties', ook al zegt de feed EQUITY: normalisatie van de
+    // bestaande waarde, geen herclassificatie uit de feed.
+    expect(updateLog.find((u) => u.id === 'h-legacy-bd')!.fields.asset_class).toBe('obligaties')
+    for (const id of ['h-legacy-eq', 'h-legacy-bd']) {
+      expect('geography' in updateLog.find((u) => u.id === id)!.fields).toBe(false)
+    }
+    expect(body.summary.classified).toBe(2)
+  })
+
+  it('classificatie komt niet uit de request-body — meegestuurde velden worden genegeerd', async () => {
+    const holdings = [makeHoldingRow({ id: 'h-body', ticker: 'MRVL' })]
+    mockFetchPriceData.mockResolvedValue(
+      makePriceData({ instrumentType: 'EQUITY', exchangeName: 'NMS' }),
+    )
+    const updateLog = runWithHoldings(holdings)
+
+    await callRoute(
+      makeRequest({ bucket: 'investment', asset_class: 'crypto', geography: 'opkomend' }),
+    )
+
+    const write = updateLog.find((u) => u.id === 'h-body')!
+    expect(write.fields.asset_class).toBe('aandelen') // feed wint, body genegeerd
+    expect(write.fields.geography).toBe('noord_amerika')
+  })
+
+  it('leest de exchange-kolom mee — anders is "leeg" niet van "handmatig gezet" te onderscheiden', async () => {
+    const selectLog: string[] = []
+    const updateLog: Array<{ id: string; fields: Record<string, unknown> }> = []
+    mockFetchPriceData.mockResolvedValue(makePriceData())
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'investment_holdings') {
+        return makeInvestmentHoldingsChainFactory(
+          [makeHoldingRow({ id: 'h-sel', ticker: 'SEL' })],
+          () => ({ error: null }),
+          updateLog,
+          selectLog,
+        )()
+      }
+      return makeGenericChain({ error: null })
+    })
+
+    await callRoute(makeRequest({ bucket: 'investment' }))
+
+    expect(selectLog.length).toBeGreaterThan(0)
+    for (const cols of ['asset_class', 'geography', 'exchange']) {
+      expect(selectLog[0]).toContain(cols)
+    }
+  })
+
+  // -------------------------------------------------------------------------
+  // 5. 52-weeks bereik — KOERSveld, geen classificatie
+  // -------------------------------------------------------------------------
+
+  /**
+   * Het verschil met de classificatie hierboven is het hele punt: assetklasse,
+   * geografie en beurs worden ÉÉN keer ingevuld en daarna met rust gelaten; het
+   * 52-weeks bereik schuift dagelijks op en moet dus ELKE ronde opnieuw uit de
+   * verse feed komen. Landt het per ongeluk onder de "alleen als leeg"-regel,
+   * dan bevriest de eerste refresh het bereik voorgoed — en dat is aan de
+   * buitenkant onzichtbaar, want er staat gewoon een getal.
+   */
+  it('schrijft het 52-weeks bereik weg bij de koersvelden', async () => {
+    const holdings = [makeHoldingRow({ id: 'h-52w', ticker: 'MRVL' })]
+    mockFetchPriceData.mockResolvedValue(
+      makePriceData({ fiftyTwoWeekHigh: 127.48, fiftyTwoWeekLow: 46.21 }),
+    )
+    const updateLog = runWithHoldings(holdings)
+
+    await callRoute(makeRequest({ bucket: 'investment' }))
+
+    const write = updateLog.find((u) => u.id === 'h-52w')!
+    expect(write.fields.fifty_two_week_high).toBe(127.48)
+    expect(write.fields.fifty_two_week_low).toBe(46.21)
+  })
+
+  it('ververst het bereik ÉLKE ronde — ook als de classificatie niets meer doet', async () => {
+    // Exact de staat ná een eerdere refresh: alles al geclassificeerd.
+    const holdings = [
+      makeHoldingRow({
+        id: 'h-tweede',
+        ticker: 'MRVL',
+        asset_class: 'aandelen',
+        geography: 'noord_amerika',
+        exchange: 'NMS',
+      }),
+    ]
+    mockFetchPriceData.mockResolvedValue(
+      makePriceData({
+        instrumentType: 'EQUITY',
+        exchangeName: 'NMS',
+        fiftyTwoWeekHigh: 131.0, // bereik is opgeschoven sinds de vorige ronde
+        fiftyTwoWeekLow: 47.5,
+      }),
+    )
+    const updateLog = runWithHoldings(holdings)
+
+    const res = await callRoute(makeRequest({ bucket: 'investment' }))
+    const body = await res.json()
+
+    const write = updateLog.find((u) => u.id === 'h-tweede')!
+    // Classificatie doet niets meer…
+    expect(body.summary.classified).toBe(0)
+    expect('asset_class' in write.fields).toBe(false)
+    expect('exchange' in write.fields).toBe(false)
+    // …maar het bereik wordt wél opnieuw geschreven.
+    expect(write.fields.fifty_two_week_high).toBe(131.0)
+    expect(write.fields.fifty_two_week_low).toBe(47.5)
+  })
+
+  it('overschrijft een bestaande waarde NIET met null wanneer de feed niets levert', async () => {
+    const holdings = [makeHoldingRow({ id: 'h-geen-52w', ticker: 'THIN' })]
+    mockFetchPriceData.mockResolvedValue(
+      makePriceData({ fiftyTwoWeekHigh: null, fiftyTwoWeekLow: null }),
+    )
+    const updateLog = runWithHoldings(holdings)
+
+    await callRoute(makeRequest({ bucket: 'investment' }))
+
+    const write = updateLog.find((u) => u.id === 'h-geen-52w')!
+    // De kolommen worden niet meegeschreven — de laatst bekende waarde blijft
+    // staan i.p.v. leeggemaakt te worden door een tijdelijk magere feed.
+    expect('fifty_two_week_high' in write.fields).toBe(false)
+    expect('fifty_two_week_low' in write.fields).toBe(false)
+    expect(write.fields.current_price).toBe(100) // de prijs gaat gewoon door
+  })
+
+  it('telt NIET mee in de classified-teller (anders is die teller betekenisloos)', async () => {
+    const holdings = [
+      makeHoldingRow({
+        id: 'h-alles-gezet',
+        ticker: 'MRVL',
+        asset_class: 'aandelen',
+        geography: 'noord_amerika',
+        exchange: 'NMS',
+      }),
+    ]
+    mockFetchPriceData.mockResolvedValue(
+      makePriceData({
+        instrumentType: 'EQUITY',
+        exchangeName: 'NMS',
+        fiftyTwoWeekHigh: 131.0,
+        fiftyTwoWeekLow: 47.5,
+      }),
+    )
+    runWithHoldings(holdings)
+
+    const res = await callRoute(makeRequest({ bucket: 'investment' }))
+    const body = await res.json()
+
+    expect(body.summary.updated).toBe(1)
+    // Zou het bereik meetellen, dan was classified altijd gelijk aan updated.
+    expect(body.summary.classified).toBe(0)
+    expect(body.message).not.toMatch(/geclassificeerd/)
+  })
+
+  it('rekent het bereik mee om naar EUR — zelfde wisselkoers als de prijs', async () => {
+    // EUR-gedenomineerde holding met een USD-koers: de route rekent prijs en
+    // vorige slotkoers om. Blijft het bereik in USD staan, dan lijkt een
+    // Amerikaans aandeel structureel op/onder zijn 52-weeks laag.
+    const holdings = [makeHoldingRow({ id: 'h-usd', ticker: 'MRVL', currency: 'EUR' })]
+    mockFetchPriceData.mockResolvedValue(
+      makePriceData({
+        currency: 'USD',
+        price: 100,
+        previousClose: 98,
+        fiftyTwoWeekHigh: 130,
+        fiftyTwoWeekLow: 50,
+      }),
+    )
+    mockGetEURRateSync.mockReturnValue(0.9)
+    const updateLog = runWithHoldings(holdings)
+
+    await callRoute(makeRequest({ bucket: 'investment' }))
+
+    const write = updateLog.find((u) => u.id === 'h-usd')!
+    expect(write.fields.current_price).toBeCloseTo(90, 6)
+    expect(write.fields.previous_close).toBeCloseTo(88.2, 6)
+    expect(write.fields.currency).toBe('EUR')
+    expect(write.fields.fifty_two_week_high).toBeCloseTo(117, 6)
+    expect(write.fields.fifty_two_week_low).toBeCloseTo(45, 6)
   })
 })

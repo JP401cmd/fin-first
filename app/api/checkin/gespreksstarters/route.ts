@@ -60,7 +60,13 @@ export async function GET() {
   // Zelfde inclusieregels als dashboard-data-loader: actieve posten, gewogen
   // met net_worth_inclusion_pct, plus losse bankrekeningen als cash.
   const assets = assetsRes.data || []
-  const unlinkedCash = unlinkedCashTotal(bankRes.data)
+  // Huishoud-gewogen: een gedeelde rekening is voor béíde partners zichtbaar en
+  // zou ongewogen twee keer volledig meetellen. De perspectief-context is hier
+  // al geladen — geen extra leesronde.
+  const unlinkedCash = unlinkedCashTotal(bankRes.data, {
+    perspective: 'personal',
+    mySharePct: perspective.hasHousehold ? perspective.mySharePct : 100,
+  })
   // Gewogen waarde per post — dezelfde weging als het totaal, zodat een
   // aandeel-vraag ("hoeveel % zit in X?") teller en noemer op één grondslag
   // vergelijkt.

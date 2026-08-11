@@ -135,6 +135,33 @@ describe('PUT /api/parameters — marginaal_tarief range-validatie (Arch F1)', (
   })
 })
 
+describe('PUT /api/parameters — AC7: bronwaarde + selectie landen in ÉÉN upsert-call (ADR 0103)', () => {
+  // Het uitgesloten id moet uuid-vormig zijn: `parseCashflowBasisPrefs` weigert
+  // sinds de security-review elke andere vorm (budgets.id is een uuid, dus een
+  // niet-uuid is een betekenisloze uitsluiting). Assertions ongewijzigd.
+  const BUDGET_ID = '11111111-1111-4111-8111-111111111111'
+
+  it('income_source en cashflow_basis_prefs landen in DEZELFDE upsert-payload, en er is precies één upsert-call', async () => {
+    const res = await PUT(
+      putRequest({
+        income_source: 'budget',
+        cashflow_basis_prefs: { v: 1, excludedIncomeBudgetIds: [BUDGET_ID], excludedExpenseBudgetIds: [] },
+      }),
+    )
+    expect(res.status).toBe(200)
+
+    const profileUpserts = upserted.filter((u) => u.table === 'profiles')
+    // Nooit twee calls: bron los van selectie zou een waarneembare tussentoestand
+    // geven (grondslag al gewijzigd, uitsluitlijst nog niet — of andersom bij een
+    // gefaalde tweede call).
+    expect(profileUpserts).toHaveLength(1)
+    expect(profileUpserts[0].payload.income_source).toBe('budget')
+    expect(profileUpserts[0].payload.cashflow_basis_prefs).toEqual({
+      v: 1, excludedIncomeBudgetIds: [BUDGET_ID], excludedExpenseBudgetIds: [],
+    })
+  })
+})
+
 describe('PUT /api/parameters — schrijfpad dicht', () => {
   it('target_savings_rate in de body muteert de kolom NIET meer', async () => {
     const res = await PUT(putRequest({ net_monthly_income: 3500, target_savings_rate: 30 }))

@@ -159,6 +159,60 @@ export interface SpendLimitWithReport {
   ruleSplit: SpendLimitRuleSplitRow[]
 }
 
+/**
+ * Eén losse TRANSACTIE achter één periode — de rij-uitsplitsing onder de
+ * aggregaat-uitsplitsingen hierboven.
+ *
+ * ── HET BEDRAG IS EEN BIJDRAGE, GEEN BOEKINGSSALDO ──────────────────────────
+ * `matchedAmount` draagt dezelfde conventie als élk ander bedrag in de pot:
+ * POSITIEF = uitgave, negatief = geld dat terugkwam (refund/chargeback). De
+ * rauwe `transactions.amount` heeft het omgekeerde teken; de omzetting gebeurt
+ * in de API-route met `netSpendFromSums` uit de motor — de enige eigenaar van
+ * die tekenregel — en nooit met een losse `-x` in een component. Zou de lijst
+ * het bankteken tonen, dan stond op één scherm dezelfde uitgave één keer
+ * positief (per budget / per naam) en één keer negatief.
+ *
+ * `budgetId` is een verwijzing, geen naam: het oppervlak lost 'm op uit data die
+ * al op de pagina staat (`SpendLimitWithReport`), zodat de lijst geen tweede
+ * fetch kost.
+ */
+export interface SpendLimitTransactionRow {
+  id: string
+  /** Boekdatum, ISO 'yyyy-mm-dd'. */
+  date: string
+  counterpartyName: string | null
+  description: string
+  /** Netto bijdrage aan de pot; positief = uitgave. */
+  matchedAmount: number
+  budgetId: string | null
+}
+
+/**
+ * Het antwoord van GET /api/spend-limits/[id]/transactions.
+ *
+ * ── DE TOTALEN KOMEN NIET UIT DE RIJEN (consume, don't recompute) ───────────
+ * `totalCount` en `totalMatchedAmount` zijn `matchedTransactionCount` en
+ * `periodMatchedAmount` uit `computePeriodOutcome` — dezelfde motorfunctie en
+ * dezelfde aggregaat-bron als de kaart en de grafiek. Ze zijn dus per definitie
+ * gelijk aan wat er boven de lijst staat.
+ *
+ * "Er zijn er meer dan we tonen" is daarom `totalCount > rows.length`, en NIET
+ * "raakte de SQL zijn eigen LIMIT". Dat is bewust: het verschil is meteen ook een
+ * parity-controle tussen de rij-RPC en het aggregaat. Er komt hier dus géén
+ * tweede truncatie-vlag bij; `aggregateTruncationSuspected` blijft wat het is
+ * (een kanarie over de AGGREGAAT-chunks, zie SpendLimitsSectionData).
+ */
+export interface SpendLimitTransactionsResponse {
+  periodKey: string
+  label: string
+  /** Nieuwste eerst; hooguit 200 (hard geklemd in SQL). */
+  rows: SpendLimitTransactionRow[]
+  /** Canoniek aantal meetellende boekingen in deze periode. */
+  totalCount: number
+  /** Canoniek periodebedrag (netto, positief = uitgave). */
+  totalMatchedAmount: number
+}
+
 /** Eén keuze in de budget-kiezer van het formulier. */
 export interface SpendLimitBudgetOption {
   id: string

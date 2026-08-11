@@ -21,6 +21,7 @@ import {
   type ExchangeId,
   type WalletChain,
 } from '@/lib/connections-data'
+import { formatAmsterdamShortDate } from '@/lib/tz'
 
 // ── Display-mappings ─────────────────────────────────────────
 
@@ -67,22 +68,8 @@ const STATUS_HINT: Record<FreshnessStatus, string> = {
 
 // ── Helpers ─────────────────────────────────────────────────
 
-function formatLastSync(date: Date): string {
-  const now = new Date()
-  const sameDay =
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate()
-  if (sameDay) {
-    return new Intl.DateTimeFormat('nl-NL', { hour: '2-digit', minute: '2-digit' }).format(date)
-  }
-  const sameYear = date.getFullYear() === now.getFullYear()
-  return new Intl.DateTimeFormat('nl-NL', {
-    day: 'numeric',
-    month: 'short',
-    ...(sameYear ? {} : { year: 'numeric' }),
-  }).format(date)
-}
+// Krant-stijl (HH:mm vandaag, d MMM dit jaar, d MMM yyyy ouder) staat in
+// `lib/tz.ts` — altijd Amsterdamse tijd, nooit de lokale getters (#418-klasse).
 
 // ── Props ───────────────────────────────────────────────────
 
@@ -135,7 +122,7 @@ export function ConnectionIndicator({
   // tijden ("2 uur geleden"). Bij error voegen we een korte hersteltip toe
   // zodat de gebruiker meteen weet wat te doen.
   const tooltip = dateValid && status !== 'never'
-    ? `Automatisch gesynchroniseerd via ${sourceLabel} — ${STATUS_LABEL[status]} · bijgewerkt ${formatLastSync(date)}${STATUS_HINT[status]}`
+    ? `Automatisch gesynchroniseerd via ${sourceLabel} — ${STATUS_LABEL[status]} · bijgewerkt ${formatAmsterdamShortDate(date)}${STATUS_HINT[status]}`
     : `Automatisch gesynchroniseerd via ${sourceLabel} — ${STATUS_LABEL[status]}${STATUS_HINT[status]}`
 
   // 12px voor compacte rijen, 14px voor standaard kaarten — beide passen op

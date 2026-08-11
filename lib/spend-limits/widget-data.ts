@@ -16,7 +16,13 @@
  * drempel. Zo blijft er één eigenaar per getal (consume, don't recompute).
  */
 
-import type { SpendLimitPeriodKind, SpendLimitRuleType, SpendLimitStatus, SpendLimitTrendDirection } from './engine'
+import type {
+  SpendLimitPeriodKind,
+  SpendLimitRuleType,
+  SpendLimitScoreLabel,
+  SpendLimitStatus,
+  SpendLimitTrendDirection,
+} from './engine'
 import type { SpendLimitWithReport } from './types'
 
 export interface SpendLimitWidgetData {
@@ -52,6 +58,20 @@ export interface SpendLimitWidgetData {
   sparkClosedMatchedAmounts: number[]
   /** Richting uit `report.trend` — 'unknown' bij < 6 afgesloten periodes. */
   trendDirection: SpendLimitTrendDirection
+
+  // ── Score ─────────────────────────────────────────────────────────────────
+  /** 0–100 uit `report.score`; `null` zonder meetellende historie. Nooit hier afleiden. */
+  score: number | null
+  /**
+   * Het woord bij het cijfer, kant-en-klaar uit de motor. Reist bewust MEE in
+   * plaats van dat de tegel 'm uit `score` afleidt: dat zou een tweede
+   * banden-indeling opleveren die stil kan wegdrijven van die van de motor.
+   */
+  scoreLabel: SpendLimitScoreLabel | null
+  /** Aandeel meetellende periodes binnen de grens — de zwaarste term van het cijfer. */
+  scoreHitRatePct: number | null
+  /** Waarop het cijfer rust — zonder dit getal leest een 100 over drie periodes als een 100 over twaalf. */
+  scoreBasisPeriodCount: number
 
   /**
    * Een aggregaat-chunk kwam op de PostgREST-cap terug, dus de sommen kunnen
@@ -100,6 +120,11 @@ export function toSpendLimitWidgetData(
 
     sparkClosedMatchedAmounts: report.closedPeriods.map((p) => p.periodMatchedAmount),
     trendDirection: report.trend.direction,
+
+    score: report.score.score,
+    scoreLabel: report.score.label,
+    scoreHitRatePct: report.score.hitRatePct,
+    scoreBasisPeriodCount: report.score.basisPeriodCount,
 
     aggregateTruncationSuspected: opts.aggregateTruncationSuspected === true,
   }

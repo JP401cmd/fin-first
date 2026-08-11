@@ -8,6 +8,7 @@ import {
   benchmarkInterval,
   resolveComparisonWindow,
   resolvePeriodStart,
+  monthsForPeriod,
   TIME_PERIODS,
   type BenchmarkDataPoint,
   type BenchmarkId,
@@ -570,5 +571,34 @@ describe('benchmarkInterval — dichtheid volgt het venster', () => {
     expect(benchmarkInterval(daysAgo(30), end)).toBe('1d')
     expect(benchmarkInterval(daysAgo(200), end)).toBe('1wk')
     expect(benchmarkInterval(daysAgo(1200), end)).toBe('1mo')
+  })
+})
+
+describe('monthsForPeriod — de rail vertaald naar een ?months=-venster', () => {
+  // De holdings-pagina stuurt met één periode-rail zowel de benchmark (op
+  // periode-id) als de waardegrafiek (op maandenaantal) aan. Deze vertaling is
+  // de enige plek waar die twee vensters aan elkaar geknoopt worden.
+  const periodById = (id: string) => TIME_PERIODS.find((p) => p.id === id)!
+
+  it('geeft de vaste vensters ongewijzigd door', () => {
+    const juni = new Date('2026-06-15T12:00:00Z')
+    expect(monthsForPeriod(periodById('1m'), juni)).toBe(1)
+    expect(monthsForPeriod(periodById('3m'), juni)).toBe(3)
+    expect(monthsForPeriod(periodById('6m'), juni)).toBe(6)
+    expect(monthsForPeriod(periodById('1y'), juni)).toBe(12)
+  })
+
+  it('geeft null voor "Alles" — geen venster, de hele historie', () => {
+    expect(monthsForPeriod(periodById('all'), new Date('2026-06-15T12:00:00Z'))).toBeNull()
+  })
+
+  it('telt YTD inclusief de lopende maand, ook in januari', () => {
+    // Januari moet 1 zijn, niet 0: met 0 zou de route op haar minimum klemmen en
+    // toevallig goed uitpakken, maar in februari zou dezelfde fout één maand
+    // historie wegsnijden.
+    expect(monthsForPeriod(periodById('ytd'), new Date('2026-01-09T12:00:00Z'))).toBe(1)
+    expect(monthsForPeriod(periodById('ytd'), new Date('2026-02-01T12:00:00Z'))).toBe(2)
+    expect(monthsForPeriod(periodById('ytd'), new Date('2026-08-11T12:00:00Z'))).toBe(8)
+    expect(monthsForPeriod(periodById('ytd'), new Date('2026-12-31T12:00:00Z'))).toBe(12)
   })
 })

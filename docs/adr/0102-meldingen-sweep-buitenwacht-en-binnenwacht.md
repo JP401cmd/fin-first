@@ -78,7 +78,9 @@ Twee gaten maakten dat onvoldoende:
   stond er alleen als comment en werd bij deze kaart prompt gebroken; ze is nu
   een test (`lib/supabase/proxy.cron-paths.test.ts`).
 - **Ontdubbeling.** Venster 15 min · per fingerprint max 1×/24u · per taak max
-  1×/24u via **dezelfde** `cron_alert_last_<job>`-sleutel als de bestaande mail,
+  1×/24u *(herijkt naar de dagelijkse cadans — zie de aantekening onderaan:
+  stiltevenster 20u, en dus niet langer gegarandeerd één per rollend etmaal)* via
+  **dezelfde** `cron_alert_last_<job>`-sleutel als de bestaande mail,
   zodat mail, directe push en sweep samen hoogstens één alarm per taak per
   etmaal geven. Nachtstilte bewust niet in v1.
 - **Geen configuratie → stille no-op.** Zonder `NTFY_TOPIC` slaat de route álle
@@ -100,7 +102,9 @@ Twee gaten maakten dat onvoldoende:
 ## Gevolgen
 
 - Een nieuwe soort fout of een stille cron bereikt de beheerder binnen een
-  kwartier, zonder meldingsstorm.
+  kwartier, zonder meldingsstorm. *(Zie de aantekening onderaan: de
+  Vercel-cron draait sinds 11 aug 2026 dagelijks; een kwartier-cadans komt
+  sindsdien uitsluitend van de externe pinger.)*
 - **Prod-config (change-request-werk, niet in de PR-diff):** `NTFY_TOPIC` (+
   `NTFY_TOKEN`) in Vercel, de externe pinger op `/api/cron/alerts-sweep`, en —
   blijvende randvoorwaarde — `CRON_SECRET`. Zonder die drie is de feature een
@@ -126,3 +130,84 @@ Twee gaten maakten dat onvoldoende:
      (`backlog: true`), maar de limiet zelf hoort op de log-route.
 - De sweep bewaakt zijn eigen stilte niet (`maxAgeHours: null`) — dat kán hij
   niet; daar is de buitenwacht voor.
+
+## Aantekening — 11 augustus 2026: de binnenwacht wordt een dagelijkse ronde
+
+**Wat verandert.** `/api/cron/alerts-sweep` stond op `*/15 * * * *`. Het
+Vercel-plan waarop dit project draait staat **één cron-uitvoering per dag** toe,
+en dit was de enige cron die daarboven zat. Het schema is `0 19 * * *`. 19:00
+valt ná de laatste dagelijkse taak (prijsverversing 18:00), zodat één ronde de
+uitkomst van álle dagelijkse taken meeneemt.
+
+**Alle tijden hier zijn UTC** — Vercel evalueert cron-expressies in UTC, niet in
+de zone van de gebruiker. De sweep draait dus feitelijk 21:00 Amsterdamse tijd in
+de zomer. De onderlinge ordening klopt hoe dan ook (álle crons lopen op dezelfde
+klok), maar de *labels* schoven: de catalogus-teksten dragen sindsdien expliciet
+"UTC", omdat "Dagelijks 05:00" naast een laatste run van 07:55 anders als drift
+leest terwijl beide kloppen. Vensters zelf zijn zomer-/wintertijd-ongevoelig: ze
+vergelijken absolute milliseconden.
+
+**Wat dat betekent voor het besluit.** De opzet blijft buitenwacht + binnenwacht,
+maar de rolverdeling verschuift wezenlijk: de Vercel-cron is nu een *vangnet met
+een dagelijkse hartslag*, niet meer de motor van de detectie.
+
+- **De externe dead man's switch wordt hiermee bélangrijker, niet minder.** Hij
+  was al het enige dat "de crons draaien helemaal niet" kan zien. Hij is nu
+  bovendien het enige dat sub-dagelijkse detectie levert: de pinger roept
+  dezelfde route aan en is niet aan de planlimiet gebonden. Blijft de pinger weg,
+  dan zakt de detectietijd van een nieuwe soort fout van een kwartier naar tot 24
+  uur — zonder dat er iets zichtbaar stuk is. De inrichting uit het
+  beheerders-runbook is daarmee geen "nice to have" meer maar de feitelijke
+  cadans.
+- **Cron-jitter is gemeten, niet aangenomen.** 13 opeenvolgende `news-ingest`-runs
+  (`0 5 * * *`) startten 6,6 tot 55,1 minuten ná het hele uur. Vercel plant op
+  **uur-granulariteit**; elk venster hieronder rekent daarom met een vol uur
+  speling aan beide kanten, niet met seconden.
+- **Drempels die op een kwartier-cadans waren geijkt, zijn herijkt.** Vier
+  plekken waar het venster stilzwijgend aan de cadans hing:
+  1. *Stiltevenster* (`THROTTLE_MS`, sweep.ts) 24u → **20u**. Een throttle gelijk
+     aan de cadans laat de ronde van morgen op zijn eigen rand vallen, en met tot
+     55 minuten jitter wordt die rand echt geraakt — dan valt er een dag uit. 20
+     uur ligt onder de cadans en boven de grootste afstand binnen één etmaal
+     tussen een taak en de sweep (snapshots 02:00 → sweep 19:00 = 17u), dus mail
+     en push ontdubbelen op dezelfde dag nog steeds.
+     **De belofte is daarmee bijgesteld:** "hoogstens één alarm per taak per 20
+     uur", niet meer "per etmaal". Roept de externe pinger elk kwartier aan (wat
+     het runbook voorschrijft), dan vuurt een blijvend falende taak op t=0, 20u,
+     40u en bevat een rollend etmaal er twee. Bewuste ruil: af en toe één alarm
+     te veel is goedkoper dan een dag die stilletjes wegvalt.
+  2. *`maxAgeHours`* (job-catalog.ts): de regel is niet meer "schema + ruime
+     marge" maar "tussen (gat + jitter) en (gat + 24u − jitter − looptijd)", met
+     `gat` = sweeptijd − looptijdstip. De taken van 18:00 gaan daarom van 26 →
+     **23**: met 26 blijft een gemiste dag onopgemerkt tot de dag daarna, en 24
+     laat maar 11 minuten marge — te weinig, want `created_at` wordt pas bij het
+     AFRONDEN geschreven en de prijsverversing doet een exchange- en wallet-sync.
+     Afgedwongen in `lib/job-health.test.ts`, mét de jitter in de som.
+  3. *Twee consumenten, twee banden.* `maxAgeHours` beantwoordt de vraag van de
+     sweep (eenmalig, op één vast moment). `/beheer/jobs` stelt een andere vraag
+     — "is deze taak bij?", op een willekeurig moment — en daar is diezelfde
+     drempel te krap: twee gezonde runs kunnen 24u + jitter uit elkaar liggen, dus
+     de kaart zou op ruwweg de helft van de dagen tot een uur lang ten onrechte
+     rood staan. De pagina telt er een expliciete toeslag bij op
+     (`PAGE_JITTER_MARGIN_HOURS`, lib/job-health.ts). Dat vals alarm dáár duurder
+     is dan een oordeel dat later komt, volgt uit de rolverdeling: het alarm is de
+     sweep, de pagina is het overzicht.
+  4. *Leesvenster* (route.ts): de 500-rijencap was per kwartier (≈48.000/dag) en
+     zou als daglimiet het watermerk structureel laten achterlopen; de ronde
+     leest nu meerdere batches. Het terugkijkvenster voor gefaalde runs is 24u →
+     26u, want een venster dat exact even lang is als de tussenpoos heeft geen
+     overlap meer.
+- **Onveranderd:** `lib/cron-alert.ts` houdt zijn eigen `THROTTLE_HOURS = 24`.
+  Die meldt op het moment dat een taak faalt (niet op de sweep-cadans) en schrijft
+  **dezelfde** `cron_alert_last_<job>`-sleutel als de sweep. Omdat het venster van
+  de sweep korter is, bepaalt in de praktijk het kortste van de twee wanneer er
+  weer een alarm mag: de sweep kan 20 uur na een mail opnieuw melden. De
+  docblock-zin in dat bestand spreekt nog van "één alarm per etmaal" en hoort
+  bijgewerkt te worden zodra het bestand vrij is (het staat nu onder handen in een
+  parallelle sessie). Verder onveranderd: de payloadregel, de fingerprint-TTL (7
+  dagen) en `maxAgeHours: null` voor de sweep zelf.
+- **Open vraag (buiten deze wijziging):** of de planlimiet naast de frequentie
+  óók het *aantal* crons begrenst. `vercel.json` bevat er acht; als het plan er
+  minder toestaat, draait een deel niet — en dat is met "geen regel in
+  `job_runs`" niet van "nog niet aan de beurt" te onderscheiden. Te verifiëren op
+  het Vercel-dashboard.

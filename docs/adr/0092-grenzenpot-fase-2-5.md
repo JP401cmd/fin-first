@@ -212,6 +212,73 @@ staart-verdediging: ze voorkomen dat de PostgREST `max_rows`-cap de
 uitsplitsing stil afkapt en dat een tweede optelling naast de motor
 ontstaat. Dit is geen open gat maar het vastgelegde ontwerp van Besluit 5.
 
+## Besluit 12 — Eén gerichte weg terug voor een uitgezette pot-widget, in het formulier van de pot
+
+*Toegevoegd 11-08-2026.*
+
+Besluit 1 hield de widget-picker bewust dicht voor dynamische id's
+(`spend_limit:*`), maar liet daarmee een pref-staat bestaan waar geen enkel pad
+meer uit leidde: een via het kruisje op `enabled:false` gezette pot-widget was
+alleen terug te halen door de pot te archiveren en opnieuw aan te maken — het
+weggooien van een gedragsnorm mét historie om een tegel terug te krijgen.
+
+`PATCH /api/spend-limits/[id]/widget` zet uitsluitend het `enabled`-veld van de
+pref `spend_limit:<id>`, via een eigen-rij read-modify-write op
+`profiles.widget_prefs` (anon-RLS-client, spiegel van `app/api/appearance`;
+nooit de PUT op `/api/widgets`, die de hele kolom vervangt). De schakelaar staat
+in het bewerkformulier van de pot en **niet** in de picker: het contract van de
+picker is de statische `WIDGET_CATALOG`, en drie prefix-specifieke takken erin
+zouden de dynamische-id-scheiding die Besluit 1 vastlegt weer opheffen. Er komt
+geen zichtbaarheidskolom bij — de pref blijft de enige waarheid, en de regel
+"is de widget aan?" (`pref?.enabled ?? isActive`) heeft één home in
+`lib/spend-limits/widget-pref.ts`, die zowel de loader-injectie als het
+formulier voedt.
+
+Aanzetten schríjft altijd een pref in plaats van op de injectie te leunen: een
+gepauzeerde pot wordt namelijk nooit geïnjecteerd.
+
+**Aanvaarde keerzijde:** `/api/widgets` vervangt de hele `widget_prefs`-kolom, en
+`mergeWidgetPrefsForSave` stuurt niet-aangeraakte prefs ongewijzigd terug uit een
+mogelijk verouderde `allPrefs`. Een tweede geopend tabblad op `/overzicht` dat ná
+de toggle nog een resize opslaat, zet de pot-widget stil weer uit. Zichtbaar en
+met dezelfde schakelaar te herstellen; het alternatief (de grid-save partieel
+maken) is een grotere ingreep dan het risico rechtvaardigt.
+
+## Besluit 13 — Rijen mogen, maar mogen nooit een getal voeden
+
+*Toegevoegd 11-08-2026.*
+
+Besluit 5 en het migratie-commentaar van de aggregaat-RPC verbieden geen
+rij-teruggave; ze verbieden een TOTAAL uit een rij-lus af te leiden, omdat de
+PostgREST `max_rows`-cap zo'n som stil te laag maakt. Voor bewijsmateriaal —
+"welke boekingen zaten in dit bedrag" — geldt dat bezwaar niet.
+
+`public.spend_limit_rule_transactions` geeft daarom begrensd (harde klem op 200)
+transactierijen terug voor één periode, met dezelfde JOIN-conditie, hetzelfde
+`transaction_type`-filter (`(joint_)transfer` uitgesloten, letterlijk gespiegeld
+aan `isRealAggRow`) en dezelfde `DISTINCT ON`-ontdubbeling als het aggregaat —
+de ontdubbeling in een subquery vóór `ORDER BY`/`LIMIT`, anders kapt de limiet af
+vóórdat er ontdubbeld is. `SECURITY INVOKER` is hier niet alleen juist maar de
+enige juiste keuze: `SECURITY DEFINER` zou de SELECT-policy van `transactions`
+omzeilen en een persoonlijke lijst in een cross-user-lezing veranderen. De grants
+zijn strikter dan die van de aggregaat-functie (`REVOKE` van `public` én `anon`,
+`EXECUTE` alleen voor `authenticated`), omdat deze functie namen én
+omschrijvingen teruggeeft.
+
+De harde grens: **de lijst voedt nooit een getal.** `totalCount` en
+`totalMatchedAmount` komen uit `computePeriodOutcome` over het regel-aggregaat,
+en "er zijn er meer dan we tonen" is `totalCount > rows.length` — een
+vergelijking met de canonieke telling, niet een vlag die de SQL over zijn eigen
+LIMIT zou moeten meesturen. Dat levert bovendien gratis een parity-controle op.
+`aggregateTruncationSuspected` blijft wat het is: een eigenschap van de
+bundel-fetch, niet gedupliceerd naar de lijst.
+
+De lijst is perspectief-agnostisch: de grenzenpot telt gedeelde
+huishoudboekingen ongeschaald (ADR 0089), dus de route haalt de
+perspectief-cookie bewust niet binnen en de lijst zegt die grondslag er letterlijk
+bij. Zou hij wél schalen, dan zag de gebruiker €50 in de pot en €25 in de lijst
+eronder.
+
 ## Gevolgen
 
 - `lib/spend-limits/engine.ts` blijft de enige rekenbron; `calculations.ts`

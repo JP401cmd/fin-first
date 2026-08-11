@@ -12,6 +12,9 @@
  *    zodat `budget_id IS NULL` de zojuist toegewezen rijen vanzelf uitsluit.
  */
 
+import { isRejected, planRuleTarget } from './transactions/rule-target'
+import { escapeLikePattern } from './transactions/search-query'
+
 export type AssignScope = 'rule' | 'these' | 'one'
 
 export type AssignmentInput = {
@@ -90,22 +93,41 @@ export function buildAssignmentPlan(input: AssignmentInput): AssignmentPlan {
   const matchValue = tx.counterparty_name || tx.description
   const iban = tx.counterparty_iban ? tx.counterparty_iban.replace(/\s/g, '').toUpperCase() : null
 
-  // Transfer-drop: de "regel" is een eigen-rekening-herkenning, geen budget-regel.
+  // Wáár de blijvende regel landt is niet lokaal beslist: `planRuleTarget` is de
+  // gedeelde bron (ook gebruikt door `transaction-form.tsx` en de bulkroute).
+  // Transfer-drop → eigen-rekening-herkenning, geen budget-regel; en élke
+  // matchwaarde draagt dezelfde ondergrens, want een te korte substring bestuurt
+  // anders élke volgende import én elke herclassificatieronde.
+  //
+  // Bij een afwijzing valt alleen de PERSISTENTE regel weg; deze transactie en
+  // haar siblings worden gewoon geboekt (`txUpdate`/`retro`). De gebruiker
+  // verliest dus zijn actie niet, alleen het te grove automatisme.
   let rules: CategoryRule[] = []
   let ownAccountRule: AssignmentPlan['ownAccountRule'] = null
-  if (isTransfer) {
-    const nameKey = (tx.counterparty_name ?? '').trim().toLowerCase()
-    if (iban || nameKey) {
+  const planned = planRuleTarget({
+    targetsEigenRekening: isTransfer,
+    matchField,
+    matchValue,
+    counterpartyIban: isTransfer ? tx.counterparty_iban : null,
+    label: tx.counterparty_name,
+  })
+  if (!isRejected(planned)) {
+    const target = planned.target
+    if (target.table === 'user_own_ibans') {
       ownAccountRule = {
-        matchType: iban ? 'iban' : 'name',
-        matchValue: iban || nameKey,
-        label: tx.counterparty_name,
+        matchType: target.matchType,
+        matchValue: target.matchValue,
+        label: target.label,
         userId,
       }
+    } else {
+      rules = [{ match_field: target.matchField, match_value: target.matchValue, budget_id: budgetId }]
     }
-  } else {
-    rules = [{ match_field: matchField, match_value: matchValue, budget_id: budgetId }]
-    if (iban) rules.push({ match_field: 'counterparty_iban', match_value: iban, budget_id: budgetId })
+  }
+  // Een IBAN-correctie matcht EXACT en kan dus niets te breeds vangen; die mag
+  // ook blijven staan wanneer de naam-/omschrijvingsregel is afgewezen.
+  if (!isTransfer && iban) {
+    rules.push({ match_field: 'counterparty_iban', match_value: iban, budget_id: budgetId })
   }
 
   const retroSet: NonNullable<AssignmentPlan['retro']>['set'] = {
@@ -175,13 +197,17 @@ export async function applyAssignmentPlan(
   //    (.ilike) op een eigen (match_field, match_value)-paar; een bulk-delete
   //    met .in() zou cross-matchen (over-deletie) en ilike-semantiek verliezen.
   //    De inserts zijn wél gebundeld tot één bulk-insert.
+  //
+  //    `escapeLikePattern`: de matchwaarde is vrije gebruikerstekst en `%`/`_`
+  //    zijn LIKE-jokers. Ongeëscapet wist een regelwaarde met een `%` erin ÁLLE
+  //    correcties van die gebruiker — en de UI meldt gewoon "opgeslagen".
   for (const rule of plan.rules) {
     const { error: delError } = await supabase
       .from('category_corrections')
       .delete()
       .eq('user_id', plan.retro!.userId)
       .eq('match_field', rule.match_field)
-      .ilike('match_value', rule.match_value)
+      .ilike('match_value', escapeLikePattern(rule.match_value))
     if (delError) throw new Error(delError.message)
   }
   if (plan.rules.length > 0) {
@@ -228,9 +254,12 @@ export async function applyAssignmentPlan(
       .update(set)
       .eq('user_id', userId)
       .is('budget_id', null)
+    // Ook hier geëscapet: een tegenpartij of omschrijving met een `%` erin zou
+    // de retro-update over élke transactie zonder budget laten lopen.
+    const safeName = escapeLikePattern(nameFilter.value)
     nameQuery = nameFilter.field === 'counterparty_name'
-      ? nameQuery.ilike('counterparty_name', nameFilter.value)
-      : nameQuery.ilike('description', `%${nameFilter.value}%`)
+      ? nameQuery.ilike('counterparty_name', safeName)
+      : nameQuery.ilike('description', `%${safeName}%`)
     const { data: nameRows, error: nameError } = await nameQuery.select('id')
     if (nameError) throw new Error(nameError.message)
     bulkUpdated += nameRows?.length ?? 0

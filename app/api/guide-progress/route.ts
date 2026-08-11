@@ -4,6 +4,9 @@ import { calculateFreedomTime } from '@/lib/format'
 import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
 import { resolveFireParams } from '@/lib/fire-params'
 import { resolveSavingsSource, savingsRateFromAggregates } from '@/lib/savings-source'
+import { resolveAmountWithBasis } from '@/lib/effective-financials'
+import { loadBudgetBasis } from '@/lib/household/budget-share'
+import type { BudgetBasisRow } from '@/lib/budget-basis'
 
 /**
  * GET /api/guide-progress
@@ -31,6 +34,8 @@ export async function GET() {
       debtsResult,
       profileResult,
       budgetsResult,
+      budgetRowsResult,
+      basisPrefsResult,
       recommendationsResult,
     ] = await Promise.all([
       supabase
@@ -71,6 +76,21 @@ export async function GET() {
         .from('budgets')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', claims.sub),
+      // Budgetrijen + grondslag-selectie (ADR 0103) — de FIRE-schatting op deze
+      // route moet dezelfde spaarbron gebruiken als /overzicht. De count-query
+      // hierboven blijft head-only (die telt alleen of er budgetten ZIJN).
+      supabase
+        .from('budgets')
+        .select('id, parent_id, budget_type, name, default_limit, interval, ownership, is_archived, merged_into, created_at')
+        .eq('user_id', claims.sub),
+      // Apart en tolerant: `cashflow_basis_prefs` bestaat pas na migratie
+      // 20260811160000 en zou als extra kolom de profielselect laten falen.
+      supabase
+        .from('profiles')
+        .select('cashflow_basis_prefs')
+        .eq('id', claims.sub)
+        .maybeSingle()
+        .then((r) => r, () => ({ data: null })),
       supabase
         .from('recommendations')
         .select('id, status', { count: 'exact', head: false })
@@ -166,6 +186,24 @@ export async function GET() {
     // Lichte spaarquote uit het 12-maands transactie-inkomen/-uitgaven; het
     // handmatige inkomen/uitgaven-pad wint via resolveSavingsSource.
     const txSavingsRate = savingsRateFromAggregates(monthlyIncome, monthlyExpenses, 0)
+    // Budgetgrondslag (ADR 0103) — dezelfde spaarbron als /overzicht.
+    const guideBudgetBasis = await loadBudgetBasis(
+      supabase,
+      (basisPrefsResult.data ?? null) as Record<string, unknown> | null,
+      (budgetRowsResult.data ?? []) as unknown as BudgetBasisRow[],
+    )
+    const guideAnnualIncome = resolveAmountWithBasis(
+      profile?.income_source,
+      (Number(profile?.net_monthly_income) || 0) * 12,
+      monthlyIncome * 12,
+      guideBudgetBasis.income.annualTotal,
+    )
+    const guideExpenses = resolveAmountWithBasis(
+      profile?.expenses_source,
+      Number(profile?.estimated_monthly_expenses) || 0,
+      monthlyExpenses,
+      guideBudgetBasis.expenses.monthlyTotal,
+    )
     const { baseAnnualSavings } = resolveSavingsSource({
       incomeSource: profile?.income_source,
       expensesSource: profile?.expenses_source,
@@ -173,6 +211,12 @@ export async function GET() {
       estimatedAnnualIncome: monthlyIncome * 12,
       estimatedMonthlyExpenses: Number(profile?.estimated_monthly_expenses) || 0,
       savingsRate6m: txSavingsRate,
+      basis: {
+        income: guideAnnualIncome.basis,
+        expenses: guideExpenses.basis,
+        annualIncome: guideAnnualIncome.amount,
+        monthlyExpenses: guideExpenses.amount,
+      },
     })
 
     let fireAge: number | null = null

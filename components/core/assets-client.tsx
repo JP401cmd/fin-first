@@ -355,7 +355,9 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
           // zelfde bron/telling als de server-loader (assets-data-loader.ts).
           supabase
             .from('bank_accounts')
-            .select('id, name, balance')
+            // `ownership` erbij: de policy is huishoud-verbreed, dus een
+            // gedeelde rekening komt hier ook binnen en moet gewogen worden.
+            .select('id, name, balance, ownership')
             .is('linked_asset_id', null)
             .eq('is_active', true),
           supabase
@@ -372,7 +374,15 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
         // (perspectiefwissel) terug op de onvolledige assets-only som.
         const unlinkedCashAssets = (perspective === 'partner'
           ? []
-          : buildUnlinkedCashAssets(unlinkedBankResult.data ?? [])) as unknown as PerspectiveAsset[]
+          : buildUnlinkedCashAssets(unlinkedBankResult.data ?? [], {
+              perspective,
+              // Aandeel uit de al geladen perspectief-context: een GEDEELDE
+              // rekening telt op het eigen deel, niet bij beide partners vol
+              // (ADR 0101).
+              mySharePct: perspectiveData.context.hasHousehold
+                ? perspectiveData.context.mySharePct
+                : 100,
+            })) as unknown as PerspectiveAsset[]
         setAssets([...sortedLoaded, ...unlinkedCashAssets])
 
         if (mortgageResult.data) setMortgages(mortgageResult.data as Mortgage[])

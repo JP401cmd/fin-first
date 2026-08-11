@@ -49,7 +49,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   AlertTriangle,
+  ChevronDown,
   ChevronRight,
+  Eye,
+  EyeOff,
   Flame,
   Pause,
   Pencil,
@@ -72,6 +75,15 @@ import {
 import { SPEND_LIMIT_WINDOW_BY_PERIOD } from '@/lib/spend-limits/engine'
 import type { SpendLimitTrendDirection } from '@/lib/spend-limits/engine'
 import { budgetAttention, describeLimitShort, describeRule } from '@/lib/spend-limits/describe'
+import {
+  resolveSpendLimitDisplayStatus,
+  SPEND_LIMIT_STATUS_BAND_CLASS,
+  SPEND_LIMIT_STATUS_LABEL,
+  SPEND_LIMIT_STATUS_TEXT_CLASS,
+} from '@/lib/spend-limits/status-display'
+import { SpendLimitScoreBadge } from './spend-limit-score-badge'
+import { isSpendLimitWidgetEnabled } from '@/lib/spend-limits/widget-pref'
+import type { WidgetPref } from '@/lib/widget-catalog'
 import type { SpendLimitOverlap } from '@/lib/spend-limits/overlap'
 import type { SpendLimitPreviewResponse } from '@/app/api/spend-limits/preview/route'
 import type {
@@ -174,6 +186,14 @@ interface FormState {
    */
   originalPeriod: SpendLimitPeriodKind | null
   isActive: boolean
+  /**
+   * Staat de dashboard-tegel van deze pot aan? Effectieve staat, niet de rauwe
+   * pref — `isSpendLimitWidgetEnabled` bepaalt 'm (opgeslagen keuze wint, anders
+   * beslist de loader-injectie: actief = zichtbaar).
+   */
+  widgetEnabled: boolean
+  /** Dezelfde waarde zoals de sheet 'm binnenkwam — alleen een WIJZIGING schrijft. */
+  originalWidgetEnabled: boolean
 }
 
 /**
@@ -200,10 +220,18 @@ function emptyForm(budgetOptions: SpendLimitBudgetOption[]): FormState {
     period: 'month',
     originalPeriod: null,
     isActive: true,
+    // Een nieuwe pot heeft nog geen id en dus geen pref; de schakelaar wordt bij
+    // aanmaken niet getoond en de loader injecteert de tegel na het opslaan.
+    widgetEnabled: true,
+    originalWidgetEnabled: true,
   }
 }
 
-function formFromConfig(config: SpendLimitConfig, budgetOptions: SpendLimitBudgetOption[]): FormState {
+function formFromConfig(
+  config: SpendLimitConfig,
+  budgetOptions: SpendLimitBudgetOption[],
+  widgetEnabled: boolean,
+): FormState {
   return {
     id: config.id,
     name: config.name,
@@ -223,6 +251,8 @@ function formFromConfig(config: SpendLimitConfig, budgetOptions: SpendLimitBudge
     period: config.period,
     originalPeriod: config.period,
     isActive: config.isActive,
+    widgetEnabled,
+    originalWidgetEnabled: widgetEnabled,
   }
 }
 
@@ -276,16 +306,24 @@ export function SpendLimitsSection({
   data,
   openLimitId = null,
   openPeriodKey = null,
+  widgetPrefs = null,
 }: {
   data: SpendLimitsSectionData
   /** `?limit=` uit de URL — opent de prestatieweergave voor die pot (AC-B1-09). */
   openLimitId?: string | null
   /** `?periode=` uit de URL — voorselectie binnen die weergave. */
   openPeriodKey?: string | null
+  /**
+   * `profiles.widget_prefs.widgets`, server-side gelezen (ADR 0058). Voedt alléén
+   * de begintoestand van de schakelaar "Widget op dashboard"; `null` = nog nooit
+   * iets aangepast, en dan beslist de loader-injectie (actief = zichtbaar).
+   */
+  widgetPrefs?: WidgetPref[] | null
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const copy = useSpendLimitCopy()
+  const { mode: sectionMode } = useDisplayMode()
   const [formOpen, setFormOpen] = useState(false)
   const [form, setForm] = useState<FormState>(() => emptyForm(data.budgetOptions))
   const [saving, setSaving] = useState(false)
@@ -294,6 +332,17 @@ export function SpendLimitsSection({
   const [counterparties, setCounterparties] = useState<SpendLimitCounterpartyOption[] | null>(null)
   const [paneLimitId, setPaneLimitId] = useState<string | null>(null)
   const [panePeriodKey, setPanePeriodKey] = useState<string | null>(null)
+  /**
+   * Open/dicht van de pottenlijst. De standaard volgt de profiel-brede
+   * weergavemodus, gelijk aan `DepthSection`: Eenvoudig begint ingeklapt (rustig
+   * scherm), Volledig begint open. Een klik overschrijft dat voor deze sessie —
+   * bewust ephemeral, geen persist, zodat een modus-wissel alle secties weer
+   * gelijk zet.
+   */
+  const [listOpen, setListOpen] = useState(sectionMode === 'full')
+  useEffect(() => {
+    setListOpen(sectionMode === 'full')
+  }, [sectionMode])
   /**
    * Wat de screenreader hoort bij openen én sluiten van de prestatieweergave.
    * Bewust een eigen staat en niet afgeleid van `paneLimit`: een leeggemaakte
@@ -397,11 +446,20 @@ export function SpendLimitsSection({
 
   const openEdit = useCallback(
     (config: SpendLimitConfig) => {
-      setForm(formFromConfig(config, data.budgetOptions))
+      setForm(
+        formFromConfig(
+          config,
+          data.budgetOptions,
+          // Eén bron voor "staat de tegel aan?" — dezelfde helper die de
+          // loader-injectie en de PATCH-route gebruiken. Hier wordt de regel dus
+          // geconsumeerd, niet herafgeleid.
+          isSpendLimitWidgetEnabled(widgetPrefs, config.id, config.isActive),
+        ),
+      )
       setError(null)
       setFormOpen(true)
     },
-    [data.budgetOptions],
+    [data.budgetOptions, widgetPrefs],
   )
 
   /**
@@ -447,6 +505,28 @@ export function SpendLimitsSection({
           setError(json?.error || 'Opslaan is niet gelukt.')
           return
         }
+
+        // De widget-schakelaar is een APARTE route: hij schrijft een
+        // eigen-rij-pref op `profiles.widget_prefs`, terwijl de pot zelf in
+        // `spend_limits` leeft. Alleen bij een echte wijziging, en alleen voor een
+        // bestaande pot — een nieuwe pot heeft nog geen id en krijgt zijn tegel
+        // vanzelf van de loader-injectie.
+        if (state.id && state.widgetEnabled !== state.originalWidgetEnabled) {
+          const widgetRes = await fetch(`/api/spend-limits/${state.id}/widget`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: state.widgetEnabled }),
+          })
+          if (!widgetRes.ok) {
+            // De pot zélf is wél opgeslagen. Dat eerlijk zeggen en de sheet open
+            // laten is beter dan sluiten alsof alles lukte.
+            const json = await widgetRes.json().catch(() => null)
+            setError(json?.error || 'De pot is opgeslagen, maar de widget-instelling niet.')
+            router.refresh()
+            return
+          }
+        }
+
         if (closeAfter) setFormOpen(false)
         router.refresh()
       } catch {
@@ -460,10 +540,18 @@ export function SpendLimitsSection({
 
   const togglePause = useCallback(
     (limit: SpendLimitWithReport) => {
-      const state = formFromConfig(limit.config, data.budgetOptions)
+      // Pauzeren raakt de widget-pref BEWUST niet: `widgetEnabled` gaat er
+      // ongewijzigd in, dus `submit` slaat de widget-PATCH over. Zonder pref laat
+      // de injectie de tegel vanzelf komen en gaan; mét pref blijft de bewuste
+      // keuze van de gebruiker staan (AC-B2-02).
+      const state = formFromConfig(
+        limit.config,
+        data.budgetOptions,
+        isSpendLimitWidgetEnabled(widgetPrefs, limit.config.id, limit.config.isActive),
+      )
       void submit({ ...state, isActive: !limit.config.isActive }, false)
     },
-    [submit, data.budgetOptions],
+    [submit, data.budgetOptions, widgetPrefs],
   )
 
   const archive = useCallback(async () => {
@@ -479,6 +567,27 @@ export function SpendLimitsSection({
       setSaving(false)
     }
   }, [confirmArchive, router])
+
+  /**
+   * De samenvatting op de ingeklapte regel.
+   *
+   * Telt alleen de CANONIEKE statussen uit de motor (`report.currentPeriod`) —
+   * geen eigen bedragen, geen eigen drempel. Bewust in deze volgorde: wat
+   * aandacht vraagt eerst, want dát is de reden om weer uit te klappen.
+   */
+  const collapsedSummary = useMemo(() => {
+    const n = data.limits.length
+    if (n === 0) return `Nog geen ${copy.pluralLower}`
+    const over = data.limits.filter((l) => l.report.currentPeriod.status === 'exceeded').length
+    const near = data.limits.filter(
+      (l) => l.report.currentPeriod.status !== 'exceeded' && l.report.currentPeriod.isNearLimit,
+    ).length
+    const parts = [`${n} ${n === 1 ? copy.singularLower : copy.pluralLower}`]
+    if (over > 0) parts.push(`${over} boven je grens`)
+    if (near > 0) parts.push(`${near} dicht bij je grens`)
+    if (over === 0 && near === 0) parts.push('allemaal binnen je grens')
+    return parts.join(' · ')
+  }, [data.limits, copy])
 
   // Minstens één regel moet daadwerkelijk iets kiezen. Halfingevulde regels
   // eronder blokkeren het opslaan niet — die worden in `buildBody` weggelaten.
@@ -497,9 +606,32 @@ export function SpendLimitsSection({
   return (
     <section className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="max-w-xl">
-          <h2 className="font-serif text-lg text-[var(--ink)]">{copy.plural}</h2>
-          <p className="mt-1 text-sm text-[var(--ink-2)]">{copy.intro}</p>
+        <div className="min-w-0 max-w-xl">
+          {/* De kop ÍS de schakelaar (het standaard disclosure-patroon: heading
+              omvat de knop). De <h2> blijft dus een echte heading — een <span>
+              in een knop zou de sectie uit de heading-navigatie van een
+              schermlezer laten verdwijnen. De samenvattingsregel staat bewust
+              búiten de knop: een heading hoort geen alinea te bevatten. */}
+          <h2 className="font-serif text-lg text-[var(--ink)]">
+            <button
+              type="button"
+              onClick={() => setListOpen((v) => !v)}
+              aria-expanded={listOpen}
+              aria-controls={LIST_PANEL_ID}
+              className="-m-1 flex min-w-0 cursor-pointer items-center gap-2 p-1 text-left"
+            >
+              <ChevronDown
+                aria-hidden
+                className={`h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform duration-200 motion-reduce:transition-none ${
+                  listOpen ? 'rotate-180' : ''
+                }`}
+              />
+              {copy.plural}
+            </button>
+          </h2>
+          <p className="mt-1 pl-6 text-sm text-[var(--ink-2)]">
+            {listOpen ? copy.intro : collapsedSummary}
+          </p>
         </div>
         <button
           onClick={openNew}
@@ -510,6 +642,17 @@ export function SpendLimitsSection({
         </button>
       </div>
 
+      {/* Ingeklapt blijft de inhoud in de DOM (de max-height-transitie heeft 'm
+          nodig), maar `inert` haalt 'm uit de tab-volgorde én de a11y-boom —
+          zonder dat tabt een toetsenbordgebruiker door knoppen die niemand ziet
+          en leest een schermlezer alle potten voor. Gelijk aan DepthSection. */}
+      <div
+        id={LIST_PANEL_ID}
+        inert={!listOpen}
+        className={`transition-all duration-300 ease-in-out motion-reduce:transition-none ${
+          listOpen ? 'max-h-[8000px] opacity-100' : 'max-h-0 overflow-hidden opacity-0'
+        }`}
+      >
       {/* Truncatie-kanarie: liever "dit kan te laag zijn" dan stil een te laag
           getal (AC-B1-15 / AC-B4-07). */}
       {data.aggregateTruncationSuspected && (
@@ -547,6 +690,7 @@ export function SpendLimitsSection({
           ))}
         </ul>
       )}
+      </div>
 
       {/* Screenreader-aankondiging bij openen/sluiten van de prestatieweergave.
           Altijd gemount, zodat de regio bestaat vóór de tekst erin verschijnt. */}
@@ -593,12 +737,15 @@ export function SpendLimitsSection({
         />
       </ShellOverlay>
 
-      {/* ── Archiveren ──────────────────────────────────────────────────── */}
+      {/* ── Archiveren ────────────────────────────────────────────────────
+          Bewust ZONDER `destructive`: die prop zet sinds de footer-tone de
+          bevestigknop semantisch rood, en archiveren verwijdert niets — de
+          tekst hieronder zegt dat met zoveel woorden. Rood zou hier een
+          onomkeerbaarheid beloven die er niet is. */}
       <ShellOverlay
         open={confirmArchive !== null}
         onClose={() => setConfirmArchive(null)}
         kind="confirm"
-        destructive
         title={`${copy.singular} archiveren`}
         footer={
           <ModalFooter
@@ -660,6 +807,7 @@ function SpendLimitCard({
   const streaks = report.streaks
   const trend = report.trend
   const over = current.status === 'exceeded'
+  const displayStatus = resolveSpendLimitDisplayStatus(current)
 
   return (
     <li
@@ -703,21 +851,15 @@ function SpendLimitCard({
         </div>
       </div>
 
-      {/* Lopende periode — expliciet als voorlopig gemarkeerd. */}
-      <div className="mt-3 rounded-lg bg-[var(--subtle)] px-3 py-2">
+      {/* Lopende periode — expliciet als voorlopig gemarkeerd, en gekleurd naar
+          de stand zodat binnen/boven niet alleen uit de regel rechts blijkt. */}
+      <div className={`mt-3 rounded-lg border px-3 py-2 ${SPEND_LIMIT_STATUS_BAND_CLASS[displayStatus]}`}>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <span className="text-xs text-[var(--ink-3)]">
             {current.label} · nog niet afgesloten, telt niet mee voor je reeks
           </span>
-          {/* Stoplicht in DRIE standen, gelijk aan spend-limit-widget.tsx. Een
-              binaire ternary kleurde "Dicht bij je grens" groen — geruststellend
-              terwijl de tegel amber waarschuwde voor dezelfde toestand. */}
-          <span
-            className={`text-xs font-medium ${
-              over ? 'text-negative' : current.isNearLimit ? 'text-warning' : 'text-positive'
-            }`}
-          >
-            {over ? 'Boven je grens' : current.isNearLimit ? 'Dicht bij je grens' : 'Binnen je grens'}
+          <span className={`text-xs font-medium ${SPEND_LIMIT_STATUS_TEXT_CLASS[displayStatus]}`}>
+            {SPEND_LIMIT_STATUS_LABEL[displayStatus]}
           </span>
         </div>
         <div className="mt-1 flex flex-wrap items-baseline gap-x-4 gap-y-1">
@@ -752,6 +894,11 @@ function SpendLimitCard({
             Meegeteld: {current.matchedCounterpartyNames.join(' · ')}
           </p>
         )}
+        {/* De score over je historie, apart van de lopende periode erboven.
+            Altijd tonen — de badge zegt zelf wel dat er nog geen cijfer is. */}
+        <div className="mt-2 border-t border-[var(--border-ed)]/40 pt-2">
+          <SpendLimitScoreBadge score={report.score} />
+        </div>
       </div>
 
       {/* Laatste afgesloten periode + de vier reeks-getallen. */}
@@ -1051,6 +1198,51 @@ function SpendLimitForm({
           binnen.
         </span>
       </label>
+
+      {/* ── Widget op het startscherm ─────────────────────────────────────
+          ALLEEN bij bewerken: een nieuwe pot heeft nog geen id en dus geen pref,
+          en zijn tegel komt er sowieso (de loader injecteert er één voor elke
+          actieve pot). Dit is de ENIGE weg terug nadat de tegel op /overzicht is
+          weggeklikt — de widget-picker toont `spend_limit:*` bewust niet (ADR
+          0092 besluit 1), dus zonder deze schakelaar was archiveren + opnieuw
+          aanmaken het enige alternatief. */}
+      {form.id && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2.5">
+          <span className="flex items-start gap-2">
+            {form.widgetEnabled ? (
+              <Eye className="mt-0.5 h-4 w-4 shrink-0 text-kern-600" aria-hidden />
+            ) : (
+              <EyeOff className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ink-3)]" aria-hidden />
+            )}
+            <span>
+              <span className="block text-xs font-semibold text-[var(--ink-2)]">
+                Widget op dashboard
+              </span>
+              <span className="block text-[11px] text-[var(--ink-3)]">
+                {form.widgetEnabled
+                  ? 'Deze pot staat als tegel op je startscherm.'
+                  : 'Zet aan om de tegel terug te zetten op je startscherm.'}
+              </span>
+            </span>
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={form.widgetEnabled}
+            aria-label="Widget op dashboard"
+            onClick={() => setForm((f) => ({ ...f, widgetEnabled: !f.widgetEnabled }))}
+            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors ${
+              form.widgetEnabled ? 'bg-kern-600' : 'bg-[var(--border-md)]'
+            }`}
+          >
+            <span
+              className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform ${
+                form.widgetEnabled ? 'translate-x-4' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+      )}
 
       {/* De match-preview staat PER REGEL, bij de regel waar hij over gaat —
           één preview onderaan zou bij meerdere regels niet meer te plaatsen zijn
@@ -1483,6 +1675,9 @@ function PreviewBody({
     </>
   )
 }
+
+/** Koppelt de inklap-knop aan het paneel dat hij opent (`aria-controls`). */
+const LIST_PANEL_ID = 'spend-limits-list'
 
 /** Hoeveel suggesties we hoogstens tonen — daarboven is scrollen zinloos werk. */
 const MAX_COUNTERPARTY_SUGGESTIONS = 40

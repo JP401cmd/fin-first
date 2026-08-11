@@ -5,17 +5,20 @@ import { syncAssetValueFromHoldings } from '@/lib/holdings-sync'
 import { getEURRateSync } from '@/lib/forex'
 import { resolveHolding } from '@/lib/holdings-table-resolver'
 import { loadHoldingsPnL, attachPnLToHoldings } from '@/lib/holdings-pnl-enrichment'
+import { sumHoldingTotals, type HoldingTotalsRow } from '@/lib/holdings-totals'
 
 /**
  * GET /api/holdings — List user's investment holdings.
  *
  * Na de tabel-split (migratie 20260502000003): leest uit `investment_holdings`.
- * De Holdings-pagina is bedoeld voor effectenposities; crypto-posities lopen
- * via de exchange-sync en de crypto-detail-routes — niet door deze
- * overzichts-endpoint.
+ * Effecten dus, en uitsluitend effecten — crypto heeft een eigen app met eigen
+ * transacties en koershistorie (`lib/crypto-holdings-data.ts`). Deze route en
+ * `lib/holdings-data-loader.ts` leveren daarom dezelfde set: die loader vult de
+ * eerste render van de holdings-pagina, deze route elke herlading dáárna, en
+ * twee bronnen voor één lijst horen niet uiteen te lopen.
  *
  * Query params:
- *   ?asset_id=<uuid> — filter holdings for a specific asset
+ *   ?asset_id=<uuid> — beperk tot de holdings van één bezitting
  */
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
@@ -70,28 +73,27 @@ export async function GET(request: NextRequest) {
       })),
       claims.sub,
     )
-    const holdings = attachPnLToHoldings(
+    const enrichedInvestment = attachPnLToHoldings(
       baseHoldings as unknown as Array<Record<string, unknown> & { id: string }>,
       pnlMap,
+    ).map((h) => ({ ...h, bucket: 'investment' as const }))
+
+    const holdings = enrichedInvestment
+
+    // Totalen via de gedeelde helper — dezelfde die de server-loader gebruikt.
+    // Losse reduces hier en dáár lieten de twee bronnen uiteenlopen, waardoor
+    // een bedrag kon veranderen door alleen op "Prijzen vernieuwen" te klikken.
+    const { totalValue, totalCost, totalPnL, totalInvested } = sumHoldingTotals(
+      holdings as unknown as HoldingTotalsRow[],
+      getEURRateSync,
     )
-
-    const totalValue = holdings.reduce((sum: number, h: Record<string, unknown>) => {
-      const price = (h.current_price as number | null) ?? (h.avg_purchase_price as number)
-      const currency = (h.currency as string) || 'EUR'
-      const eurRate = getEURRateSync(currency)
-      return sum + (price * (h.units as number) * eurRate)
-    }, 0)
-
-    const totalCost = holdings.reduce((sum: number, h: Record<string, unknown>) => {
-      const currency = (h.currency as string) || 'EUR'
-      const eurRate = getEURRateSync(currency)
-      return sum + ((h.avg_purchase_price as number) * (h.units as number) * eurRate)
-    }, 0)
 
     return NextResponse.json({
       holdings,
       total_value: totalValue,
       total_cost: totalCost,
+      total_pnl: totalPnL,
+      total_invested: totalInvested,
       source: 'investment_holdings_table',
     })
   } catch (err) {

@@ -6,6 +6,8 @@ import {
   AlertTriangle, ToggleLeft, ToggleRight, X,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+// Amsterdamse tijd i.p.v. de runtime-tijdzone (#418-klasse, sweep fase 1).
+import { formatAmsterdamLongDateTime } from '@/lib/tz'
 
 type QuestionType = 'open' | 'scale' | 'multiple_choice'
 
@@ -474,7 +476,7 @@ function ResponsesSheet({ questionnaireId, onClose }: {
                   <button type="button" onClick={() => setSelectedSessionId(s.id)} className="flex min-w-0 flex-1 items-center justify-between px-4 py-3 text-left">
                     <div>
                       <p className="text-sm font-medium text-[var(--ink)]">{s.user_email}</p>
-                      <p className="mt-0.5 text-xs text-[var(--ink-4)]">{new Date(s.started_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                      <p className="mt-0.5 text-xs text-[var(--ink-4)]">{formatAmsterdamLongDateTime(new Date(s.started_at))}</p>
                     </div>
                     <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${s.completed_at ? 'bg-kern-500/10 text-kern-700' : 'bg-amber-100 text-amber-700'}`}>{s.completed_at ? 'Voltooid' : 'Onvolledig'}</span>
                   </button>
@@ -500,7 +502,7 @@ function ResponsesSheet({ questionnaireId, onClose }: {
             <div>
               <button type="button" onClick={() => setSelectedSessionId(null)} className="mb-4 text-xs text-[var(--ink-3)] hover:text-[var(--ink-2)]">&larr; Terug naar overzicht</button>
               <p className="text-sm font-medium text-[var(--ink)]">{selectedSession.user_email}</p>
-              <p className="mb-4 text-xs text-[var(--ink-4)]">{new Date(selectedSession.started_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+              <p className="mb-4 text-xs text-[var(--ink-4)]">{formatAmsterdamLongDateTime(new Date(selectedSession.started_at))}</p>
               <div className="space-y-3">
                 {selectedSession.questionnaire_responses
                   .sort((a, b) => {

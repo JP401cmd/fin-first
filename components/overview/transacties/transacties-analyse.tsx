@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { ArrowRight, Plus, Upload, Link2, ChevronRight, MoreHorizontal } from 'lucide-react'
+import { ArrowRight, Plus, Upload, Link2, ChevronRight, MoreHorizontal, Search } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { usePerspective } from '@/components/app/perspective-provider'
 import {
@@ -41,6 +41,7 @@ import { WeekdagPatroon } from './weekdag-patroon'
 import { PeriodeTrend } from './periode-trend'
 import { UitgavenHeatmap } from './uitgaven-heatmap'
 import { TransactieDetailSheet } from './transactie-detail-sheet'
+import { BulkBewerkenOverlay } from './bulk/bulk-bewerken-overlay'
 
 /**
  * TransactiesAnalyse — periode-gestuurde transactie-analyse op
@@ -75,6 +76,8 @@ type FullTransaction = {
   category_source: string
   is_split?: boolean
   ownership?: 'personal' | 'shared'
+  /** Verschuivings-markering; het bewerkformulier moet weten of hij al gezet is. */
+  transaction_type: string | null
 }
 
 type BudgetGroup = { parent: Budget; children: Budget[] }
@@ -223,6 +226,12 @@ export function TransactiesAnalyse({
   const [pickerOpen, setPickerOpen] = useState(false)
   // "…"-menu met de beheer-acties; bestaat alleen in Eenvoudig (TXN-1).
   const [moreOpen, setMoreOpen] = useState(false)
+  // Bulkbewerk-overlay: zoeken over de VOLLEDIGE historie + meervoudige acties.
+  // Bewust conditioneel gemount (net als het bewerkformulier hierboven), zodat
+  // criterium, selectie en resultaat bij heropenen vers beginnen — een
+  // achtergebleven selectie op een gesloten scherm is precies de situatie waarin
+  // je straks een actie uitvoert op rijen die je niet meer voor je hebt.
+  const [bulkOpen, setBulkOpen] = useState(false)
   const [drillCp, setDrillCp] = useState<{ name: string; iban: string | null } | null>(null)
   const [listDetail, setListDetail] = useState<
     { kind: 'day'; date: string } | { kind: 'weekday'; index: number } | null
@@ -399,10 +408,24 @@ export function TransactiesAnalyse({
   const budgetGroups = useMemo<BudgetGroup[]>(() => {
     const parents = budgets.filter((b) => !b.parent_id && b.budget_type !== 'archive')
     const children = budgets.filter((b) => b.parent_id && b.budget_type !== 'archive')
-    return parents.map((parent) => ({
+    const groups = parents.map((parent) => ({
       parent,
       children: children.filter((c) => c.parent_id === parent.id),
     }))
+
+    // De archive-emmer "Eigen rekening" hoort er WÉL bij: zonder deze groep is
+    // een onderlinge overboeking niet als zodanig te boeken in het
+    // bewerkformulier, en blijft een verschuiving als echte uitgave meetellen.
+    // `buildBudgetSelectEntries` toont hem als platte, direct kiesbare optie.
+    // Spiegelt cash-account-view.tsx.
+    const archiveParents = budgets.filter((b) => !b.parent_id && b.budget_type === 'archive')
+    const archiveChildren = budgets.filter((b) => b.parent_id && b.budget_type === 'archive')
+    const archiveGroups = archiveParents.map((parent) => ({
+      parent,
+      children: archiveChildren.filter((c) => c.parent_id === parent.id),
+    }))
+
+    return [...groups, ...archiveGroups]
   }, [budgets])
 
   const allMapped = useMemo(
@@ -500,17 +523,43 @@ export function TransactiesAnalyse({
     setSelectedOffset((o) => Math.min(0, o + delta))
   }, [])
 
-  const openEdit = useCallback(async (tx: AnalysisTransaction) => {
+  /**
+   * Eén transactie in het bewerkformulier openen op id. Bestond eerder alleen
+   * als `openEdit(tx)`; de bulkbewerk-overlay kent alleen het id van een rij,
+   * dus de query staat nu hier en `openEdit` is de dunne schil eromheen. Zelfde
+   * query, zelfde bestand — geen tweede client-lezer erbij.
+   */
+  const openEditById = useCallback(async (id: string) => {
     const supabase = createClient()
     const { data } = await supabase
       .from('transactions')
       .select(
-        'id, account_id, budget_id, date, amount, description, counterparty_name, counterparty_iban, is_income, notes, category_source, is_split, ownership',
+        'id, account_id, budget_id, date, amount, description, counterparty_name, counterparty_iban, is_income, notes, category_source, is_split, ownership, transaction_type',
       )
-      .eq('id', tx.id)
+      .eq('id', id)
       .single()
     if (data) setEditTx(data as FullTransaction)
   }, [])
+
+  const openEdit = useCallback(
+    (tx: AnalysisTransaction) => {
+      void openEditById(tx.id)
+    },
+    [openEditById],
+  )
+
+  /**
+   * Rij openen vanuit de bulkoverlay: eerst de overlay sluiten. Twee overlays
+   * met een eigen focus-trap tegelijk open is geen navigatie maar een val — en
+   * "één rij bewerken" is bovendien een stap wég van de bulkbedoeling.
+   */
+  const openRowFromBulk = useCallback(
+    (id: string) => {
+      setBulkOpen(false)
+      void openEditById(id)
+    },
+    [openEditById],
+  )
 
   const refetch = useCallback(() => {
     setEditTx(null)
@@ -562,6 +611,18 @@ export function TransactiesAnalyse({
           </button>
         )}
         <HideInSimple>
+          {/* Expliciete ingang naar het zoeken over de VOLLEDIGE historie (F1).
+              Het inline-zoekveld in de tijdlijn hieronder blijft ongewijzigd op
+              het zichtbare venster werken — dit is een ingang erbij, geen
+              vervanging. In Eenvoudig staat dezelfde ingang in het "…"-menu. */}
+          <button
+            type="button"
+            onClick={() => setBulkOpen(true)}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] transition-colors duration-150 hover:bg-[var(--subtle)]"
+          >
+            <Search className="h-4 w-4" aria-hidden />
+            Zoeken en bulkbewerken
+          </button>
           <Link
             href="/core/cash/import"
             className="inline-flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
@@ -770,6 +831,17 @@ export function TransactiesAnalyse({
         title="Meer acties"
       >
         <div className="space-y-2 p-5">
+          <button
+            type="button"
+            onClick={() => {
+              setMoreOpen(false)
+              setBulkOpen(true)
+            }}
+            className="flex w-full cursor-pointer items-center gap-3 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-left text-sm font-medium text-[var(--ink)] transition-colors duration-150 hover:bg-[var(--subtle)]"
+          >
+            <Search className="h-4 w-4 shrink-0 text-[var(--ink-3)]" aria-hidden />
+            Zoeken en bulkbewerken
+          </button>
           <Link
             href="/core/cash/import"
             onClick={() => setMoreOpen(false)}
@@ -788,6 +860,22 @@ export function TransactiesAnalyse({
           </Link>
         </div>
       </ShellOverlay>
+
+      {/* Bulkbewerken: zoeken over de volledige historie + meervoudige acties.
+          De overlay leest en muteert uitsluitend via /api/transactions/**
+          (ADR 0058) en toont bewust alléén eigen transacties — schrijven op
+          `transactions` is strikt eigen rijen, ook op een gedeelde rekening. */}
+      {bulkOpen && (
+        <BulkBewerkenOverlay
+          open
+          onClose={() => setBulkOpen(false)}
+          budgetGroups={budgetGroups}
+          budgetNameById={budgetMap}
+          accounts={accounts}
+          onOpenRow={openRowFromBulk}
+          onMutated={refetch}
+        />
+      )}
 
       {/* Tegenpartij-analyse */}
       {drillCp && (

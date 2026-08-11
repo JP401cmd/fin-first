@@ -148,7 +148,9 @@ export const getBudgets = cache(async (supabase: SupabaseClient) =>
  * assets-tabel bij het netto vermogen wordt geteld (RLS-gescoped).
  *
  * Ruimste kolomset = horizon (`id, name, balance`); dashboard (`id, balance`)
- * en lever-scores (`balance`) zijn subsets.
+ * en lever-scores (`balance`) zijn subsets. `ownership` komt daar sinds de
+ * huishoud-weging bij: zonder die kolom is een gedeelde rekening niet van een
+ * eigen rekening te onderscheiden en telt hij bij beide partners voor 100%.
  *
  * Het `is_active`/`linked_asset_id IS NULL`-predicaat is de GRONDSLAG (welk geld
  * telt náást de assets mee) en woont daarom in `lib/unlinked-cash.ts`, samen met

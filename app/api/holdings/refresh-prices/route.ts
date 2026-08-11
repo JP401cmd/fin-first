@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { fetchPriceData, resolveYahooSymbol } from '@/lib/price-feed'
+import { buildClassificationUpdate } from '@/lib/holdings-classification'
 import { fetchBatchForexRates, getEURRateSync } from '@/lib/forex'
 import {
   syncAssetValueFromInvestmentHoldings,
@@ -68,6 +69,16 @@ type RefreshResult = {
   displayName?: string | null
   current_price?: number | null
   last_price_update?: string | null
+  /**
+   * Kreeg deze positie bij dit verzoek een assetklasse, geografie en/of beurs
+   * toegewezen? Voedt de `classified`-teller in de samenvatting, zodat de
+   * gebruiker kan zien dát de portefeuille-verdeling is aangevuld.
+   *
+   * Het 52-weeks bereik telt hier NIET in mee: dat is een koersveld dat elke
+   * ronde ververst wordt, dus meetellen zou de teller gelijkmaken aan het aantal
+   * geslaagde posities en daarmee betekenisloos maken.
+   */
+  classified?: boolean
 }
 
 /**
@@ -109,7 +120,15 @@ export async function POST(request: NextRequest) {
     if (!bucketFilter || bucketFilter === 'investment') {
       let invQuery = supabase
         .from('investment_holdings')
-        .select('id, asset_id, ticker, isin, name, currency, current_price, last_price_update, units, avg_purchase_price')
+        // asset_class/geography/exchange worden meegelezen omdat de
+        // classificatie-aanvulling hieronder een BESTAANDE waarde nooit mag
+        // overschrijven — zonder deze drie kolommen kunnen we "leeg" niet van
+        // "handmatig ingevuld" onderscheiden. Het 52-weeks bereik staat er
+        // bewust NIET bij: dat is een koersveld dat elke ronde vervangen wordt,
+        // dus de huidige waarde is niet relevant om te lezen. Geen
+        // `limit`/`range`: de volledige actieve set moet zichtbaar zijn, anders
+        // classificeren we blind.
+        .select('id, asset_id, ticker, isin, name, currency, current_price, last_price_update, units, avg_purchase_price, asset_class, geography, exchange')
         .eq('user_id', user.id)
         .eq('is_active', true)
       if (holdingId && bucketFilter === 'investment') invQuery = invQuery.eq('id', holdingId)
@@ -263,6 +282,10 @@ export async function POST(request: NextRequest) {
     const stale = results.filter(r => r.status === 'stale').length
     const skipped = results.filter(r => r.status === 'skipped').length
     const errors = results.filter(r => r.status === 'error').length
+    // Zichtbare terugkoppeling: hoeveel posities kregen bij dit verzoek een
+    // assetklasse en/of geografie toegewezen. Zonder deze teller is "prijzen
+    // bijgewerkt" niet te onderscheiden van "de verdeling is óók aangevuld".
+    const classified = results.filter(r => r.classified === true).length
 
     return NextResponse.json({
       results,
@@ -272,9 +295,13 @@ export async function POST(request: NextRequest) {
         stale,
         skipped,
         errors,
+        classified,
       },
       message: updated > 0
-        ? `${updated} prij${updated === 1 ? 's' : 'zen'} bijgewerkt, ${stale} niet beschikbaar`
+        ? `${updated} prij${updated === 1 ? 's' : 'zen'} bijgewerkt, ${stale} niet beschikbaar` +
+          (classified > 0
+            ? ` — ${classified} positie${classified === 1 ? '' : 's'} geclassificeerd`
+            : '')
         : stale > 0
           ? `Prijsfeed niet beschikbaar voor ${stale} holding${stale !== 1 ? 's' : ''} — laatste bekende prijzen worden getoond`
           : 'Geen holdings met ticker gevonden',
@@ -296,6 +323,9 @@ async function refreshInvestmentHolding(
     currency: string | null
     current_price: number | null
     last_price_update: string | null
+    asset_class?: string | null
+    geography?: string | null
+    exchange?: string | null
   },
 ): Promise<RefreshResult> {
   if (!holding.ticker && !holding.isin && !holding.name) {
@@ -364,6 +394,13 @@ async function refreshInvestmentHolding(
   // ongemoeid — de loader rekent die zelf om via forex.
   let price = priceData.price
   let previousClose = priceData.previousClose
+  // Het 52-weeks bereik komt in dezelfde valuta als de koers en moet dus DEZELFDE
+  // omrekening ondergaan. Anders staat er een EUR-koers naast een USD-jaarbereik
+  // en lijkt een Amerikaans aandeel structureel dicht bij (of onder) zijn
+  // 52-weeks laag — precies dezelfde klasse fout als de pence-valkuil in
+  // `lib/price-feed.ts`, maar dan met een wisselkoers als factor.
+  let fiftyTwoWeekHigh = priceData.fiftyTwoWeekHigh
+  let fiftyTwoWeekLow = priceData.fiftyTwoWeekLow
   let storeCurrency = priceData.currency
   const holdingCur = (holding.currency ?? 'EUR').toUpperCase()
   const priceCur = (priceData.currency ?? holdingCur).toUpperCase()
@@ -373,6 +410,8 @@ async function refreshInvestmentHolding(
     if (rate > 0) {
       price = priceData.price * rate
       previousClose = priceData.previousClose != null ? priceData.previousClose * rate : null
+      fiftyTwoWeekHigh = priceData.fiftyTwoWeekHigh != null ? priceData.fiftyTwoWeekHigh * rate : null
+      fiftyTwoWeekLow = priceData.fiftyTwoWeekLow != null ? priceData.fiftyTwoWeekLow * rate : null
       storeCurrency = 'EUR'
     }
   }
@@ -387,6 +426,28 @@ async function refreshInvestmentHolding(
   if (previousClose !== null) updateFields.previous_close = previousClose
   if (priceData.dailyChangePercent !== null) updateFields.daily_change_percent = priceData.dailyChangePercent
   if (storeCurrency) updateFields.currency = storeCurrency
+  // 52-weeks bereik: KOERSveld, geen classificatie. Wordt daarom élke ronde
+  // opnieuw uit de verse feed geschreven (het bereik schuift dagelijks op), maar
+  // met dezelfde terughoudendheid als de andere koersvelden hierboven — levert
+  // de feed niets, dan blijft de laatst bekende waarde staan i.p.v. `null`.
+  if (fiftyTwoWeekHigh !== null) updateFields.fifty_two_week_high = fiftyTwoWeekHigh
+  if (fiftyTwoWeekLow !== null) updateFields.fifty_two_week_low = fiftyTwoWeekLow
+
+  // ── Classificatie aanvullen (assetklasse + geografie + beurs) ───
+  // Dezelfde Yahoo-response draagt `instrumentType` en `exchangeName` al mee;
+  // we leiden ze hier UITSLUITEND uit die verse feed-respons af (nooit uit de
+  // request-body) en schrijven ze alleen weg wanneer de kolom nu leeg is, zodat
+  // een handmatige classificatie van de gebruiker blijft staan. Elke refresh
+  // leidt opnieuw af — er wordt niets geaccumuleerd of opgehoogd.
+  //
+  // `sector` blijft bewust ongemoeid: die vraagt Yahoo's `quoteSummary`, dat
+  // zonder crumb-token 401 geeft.
+  // De beslissing zelf staat in `buildClassificationUpdate` — gedeeld met de
+  // nachtelijke cron, zodat het niet van de route afhangt óf een positie
+  // geclassificeerd wordt.
+  const classification = buildClassificationUpdate(priceData, holding)
+  Object.assign(updateFields, classification)
+  const classified = Object.keys(classification).length > 0
 
   const { error: updateError } = await supabase
     .from('investment_holdings')
@@ -433,6 +494,7 @@ async function refreshInvestmentHolding(
     currency: storeCurrency,
     displayName: priceData.displayName,
     last_price_update: new Date().toISOString(),
+    classified,
   }
 }
 

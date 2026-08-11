@@ -29,6 +29,12 @@
 // eerlijk kan tonen hoe hard de lijn is. Dat cijfer is onderdeel van het
 // contract, geen extraatje.
 //
+// PER-POSITIE-UITSPLITSING: de motor berekent de waarde per positie toch al om
+// tot `marketValue` te komen. Die uitkomsten worden niet meer weggegooid maar
+// geëxporteerd als `PortfolioValuePoint.byHolding` — één regel per open positie,
+// met de trap die de waardering droeg. Zo kan een maandbalk uit zijn eigen delen
+// worden opgebouwd zonder ergens een tweede som te schrijven.
+//
 // CONSUME, DON'T RECOMPUTE: de units/kostprijs per positie komen uit
 // `computePositionFromTransactions` (lib/holdings-aggregation.ts) — dezelfde
 // engine die de holdings-lijst, de detail-pane en de import gebruiken. Deze
@@ -73,6 +79,16 @@ export interface PriceObservation {
 /** Welke trap van de prijsladder een positie op een peildatum waardeerde. */
 export type PriceTier = 'market' | 'transaction' | 'cost'
 
+/** Het aandeel van één positie in de portefeuillewaarde op één peildatum. */
+export interface PortfolioValueHoldingSlice {
+  /** investment_holdings.id */
+  id: string
+  /** Marktwaarde van DEZE positie op de peildatum, EUR. */
+  value: number
+  /** Welke trap van de prijsladder deze waardering droeg. */
+  tier: PriceTier
+}
+
 export interface PortfolioValuePoint {
   /** Peildatum, `YYYY-MM-DD` — de 1e van de maand, of vandaag voor het slotpunt. */
   date: string
@@ -88,6 +104,19 @@ export interface PortfolioValuePoint {
    * laatst bekende transactieprijs of kostprijs.
    */
   pricedFromMarket: number
+  /**
+   * Per-positie-uitsplitsing van `marketValue` op deze peildatum, aflopend op
+   * waarde. Eén regel per OPEN positie — dus altijd exact `openPositions`
+   * regels, en daarmee de bouwstenen van precies dezelfde balkhoogte.
+   *
+   * In de praktijk zijn dat de posities met `value > 0`. De enige uitzondering
+   * is de degeneratie waarin een open positie nóch een koers nóch een kostprijs
+   * heeft (prijs 0): die staat er met `value: 0` in, zodat `byHolding.length`
+   * en `openPositions` niet uit elkaar kunnen lopen.
+   *
+   * De som is cent-exact gelijk aan `marketValue` — zie `splitCentExact`.
+   */
+  byHolding: PortfolioValueHoldingSlice[]
 }
 
 export interface PortfolioValueHistory {
@@ -142,6 +171,46 @@ function monthAnchors(from: string, today: string): string[] {
     cursor = nextMonthAnchor(cursor)
   }
   return anchors
+}
+
+// ── Cent-exacte uitsplitsing ───────────────────────────────────
+
+/**
+ * Aflopend op waarde; bij een gelijke waarde op id, zodat de volgorde niet van
+ * de toevallige invoervolgorde van de transacties afhangt.
+ */
+function byValueDesc(a: PortfolioValueHoldingSlice, b: PortfolioValueHoldingSlice): number {
+  return b.value - a.value || a.id.localeCompare(b.id)
+}
+
+/**
+ * Rondt de per-positie-waarden zó af dat hun som EXACT de al afgeronde
+ * `marketValue` van hetzelfde punt is.
+ *
+ * Nodig omdat `marketValue` de SOM afrondt terwijl de delen elk apart afronden —
+ * en die twee vallen niet vanzelf samen. Zonder deze stap kan de UI-som van de
+ * balkdelen enkele centen van de balkhoogte afwijken, precies het soort verschil
+ * waar een gebruiker terecht over valt.
+ *
+ * Aanpak: reken in hele centen (optellen van euro-floats introduceert juist het
+ * sub-cent-residu dat we uitbannen), en laat het residu — hooguit een halve cent
+ * per positie — op de grootste positie landen: daar is het relatief het kleinst.
+ * Het residu kan de kop theoretisch een paar centen verschuiven, dus daarna
+ * wordt opnieuw gesorteerd; `byHolding` is dus onder alle omstandigheden
+ * aflopend.
+ */
+function splitCentExact(
+  slices: PortfolioValueHoldingSlice[],
+  marketValue: number,
+): PortfolioValueHoldingSlice[] {
+  if (slices.length === 0) return []
+  slices.sort(byValueDesc)
+  const cents = slices.map((s) => Math.round(s.value * 100))
+  const residual = Math.round(marketValue * 100) - cents.reduce((sum, c) => sum + c, 0)
+  cents[0] += residual
+  const out = slices.map((s, i) => ({ ...s, value: cents[i] / 100 }))
+  out.sort(byValueDesc)
+  return out
 }
 
 // ── Motor ──────────────────────────────────────────────────────
@@ -222,6 +291,8 @@ export function buildPortfolioValueHistory(
     let costBasis = 0
     let valueFromMarket = 0
     let openPositions = 0
+    /** Ruwe (nog niet afgeronde) waarde per open positie op deze peildatum. */
+    const slices: PortfolioValueHoldingSlice[] = []
 
     for (const holdingId of holdingIds) {
       // 1. Transacties tot en met de peildatum bijwerken.
@@ -294,14 +365,17 @@ export function buildPortfolioValueHistory(
       costBasis += agg.netUnits * agg.avgCost
       if (tier === 'market') valueFromMarket += value
       openPositions++
+      slices.push({ id: holdingId, value, tier })
     }
 
+    const roundedMarketValue = roundCents(marketValue)
     points.push({
       date: anchor,
-      marketValue: roundCents(marketValue),
+      marketValue: roundedMarketValue,
       costBasis: roundCents(costBasis),
       openPositions,
       pricedFromMarket: marketValue > 0 ? valueFromMarket / marketValue : 0,
+      byHolding: splitCentExact(slices, roundedMarketValue),
     })
   }
 

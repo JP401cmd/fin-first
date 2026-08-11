@@ -110,3 +110,32 @@ De units en de kostprijs komen in beide gevallen uit
   ver van de werkelijkheid liggen. Dat is zichtbaar (het drukt
   `pricedFromMarket`), maar niet corrigeerbaar zonder een koersbron die voor die
   instrumenten niet bestaat.
+
+## Aanvulling (aug 2026) — de uitsplitsing die er al was
+
+De motor rekende de waarde per positie per peildatum al uit; alleen de som
+verliet de functie. Sinds de maandbalken-weergave op `/core/assets/holdings`
+draagt elk punt óók `byHolding: { id, value, tier }[]` — dezelfde `value` en
+dezelfde `tier` die de som voedden, niet opnieuw berekend.
+
+Drie dingen zijn hier expliciet vastgelegd, omdat ze alle drie stil kunnen
+breken:
+
+- **De prijsladder verandert niet.** Trap 1/2/3 en `pricedFromMarket` zijn
+  ongewijzigd. `tier` per positie is precies de trap waarop díé positie stond;
+  daarmee kan het maanddetail per regel tonen wat de waardering droeg, in plaats
+  van alleen het gewogen gemiddelde over de hele portefeuille.
+- **De delen tellen cent-exact op tot het geheel.** `Σ round(value×100)` per punt
+  is gelijk aan `round(marketValue×100)`; het afrondingsresidu landt op de
+  grootste positie. Een balk en zijn segmenten mogen niet uit twee verschillende
+  optellingen komen — anders wijkt de kassabon een cent van de balkhoogte af en
+  is er geen manier om te zien welke van de twee de waarheid is.
+- **De cap zit in de route, niet in de motor.** `GET /api/holdings/value-history`
+  levert de top-12 per punt plus een `rest`-bucket `{ count, value }`. Dat is een
+  weergavegrens tegen een payload die met historie × posities groeit — geen
+  rekenkeuze. De motor blijft volledig.
+
+De id's staan daarmee wél in de respons, waar de oorspronkelijke route ze
+bewust weglaat. Dat is geen versoepeling: het maanddetail linkt door naar de
+positie, dus het id is functioneel nodig, en de query is en blijft
+`.eq('user_id', claims.sub)` bovenop RLS.

@@ -51,6 +51,7 @@ import {
 } from '@/components/app/shell/shell-overlay'
 import { useToast } from '@/components/app/toast-provider'
 import { formatCurrency } from '@/lib/format'
+import { formatAmsterdamShortDate } from '@/lib/tz'
 import type {
   CryptoHoldingPricePoint,
   CryptoHoldingRow,
@@ -73,28 +74,18 @@ function formatUnits(units: number): string {
   return units.toFixed(decimals).replace(/\.?0+$/, '')
 }
 
-/** Krant-stijl korte datum, identiek aan de full-page detail. */
+/**
+ * Krant-stijl korte datum, identiek aan de full-page detail.
+ *
+ * De notatie zelf staat in `lib/tz.ts` en rekent in Amsterdamse tijd — niet in
+ * de tijdzone van de runtime (#418-klasse; dit was een letterlijke kopie van de
+ * variant in components/core/holdings/investment-holding-pane.tsx).
+ */
 function formatNewspaperDate(iso: string | null): string | null {
   if (!iso) return null
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return null
-  const now = new Date()
-  const sameDay =
-    date.getFullYear() === now.getFullYear() &&
-    date.getMonth() === now.getMonth() &&
-    date.getDate() === now.getDate()
-  if (sameDay) {
-    return new Intl.DateTimeFormat('nl-NL', {
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date)
-  }
-  const sameYear = date.getFullYear() === now.getFullYear()
-  return new Intl.DateTimeFormat('nl-NL', {
-    day: 'numeric',
-    month: 'short',
-    ...(sameYear ? {} : { year: 'numeric' }),
-  }).format(date)
+  return formatAmsterdamShortDate(date)
 }
 
 /** Capitalize first letter — gebruikt voor wallet-chain-labels. */

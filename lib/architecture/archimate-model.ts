@@ -161,7 +161,7 @@ export const ARCHI_CADENCE_NL: Record<ArchiCadence, string> = {
 // als hier (en dus op de plaat) een koppeling bestaat.
 
 const FUNCTION_SERVICE_MAP: Record<ModuleId, string[]> = {
-  budgetteren: ['as-budget'],
+  budgetteren: ['as-budget', 'as-transacties'],
   vermogensregistratie: ['as-vermogen', 'as-belasting'],
   aandelenregistratie: ['as-vermogen'],
   inzicht_acties: ['as-coach'],
@@ -179,6 +179,12 @@ const FN_X = 830
 const FN_W = 370
 const FN_H = 60
 const fnRow = (i: number) => 316 + i * 72
+
+// row(9) (as-transacties, ADR 0104) zou zonder deze verschuiving in de
+// databandkop knallen (data-cont begon op y=1064, row(9) eindigt op 1144).
+// De hele data-laag (groep + informatieobjecten) schuift daarom 100px naar
+// beneden; het model wordt evenredig hoger.
+const DATA_Y_SHIFT = 100
 
 // ── Model-opbouw ─────────────────────────────────────────────────────────────
 
@@ -342,6 +348,12 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
       items: ['/api/household/*', 'perspectief-loaders', 'RLS + RPC'],
     },
     {
+      id: 'as-transacties', x: 560, y: row(9), w: 220, h: 66, kind: 'appsvc',
+      title: 'Transactiedienst',
+      lead: 'Server-side zoeken en bulkmuteren van transacties over de volledige historie: hercategoriseren naar één budget of definitief verwijderen, uitgevoerd op een bevroren, server-side gematerialiseerde id-lijst — nooit op een opnieuw uitgevoerd filter (ADR 0104). De eerste server-side dienst voor transactie-CRUD; lezen/muteren liep hiervoor client-direct (grandfathered). Géén importdienst (dat blijft as-import) en géén budgetteringsdienst (as-budget blijft budgetten/varianties/trends).',
+      items: ['/api/transactions/search', '/api/transactions/search/manifest', '/api/transactions/bulk-budget', '/api/transactions/bulk-delete', '/api/transactions/bulk-budget/regel', 'lib/transactions/bulk-mutate.ts', 'lib/transactions/transfer-marking.ts'],
+    },
+    {
       id: 'as-vrijheidscheck', x: 934, y: 110, w: 215, h: 56, kind: 'appsvc',
       title: 'Vrijheidscheck-dienst',
       lead: 'Bedient de publieke Vrijheidscheck-funnel: anonieme intake (incl. levensgebeurtenissen, per-asset rendement en pensioen-uitgaven) valide + versleuteld wegschrijven, het Vrijheidsrapport server-side bouwen (consumeert de bestaande rekenmotoren + nieuws-artikelen van dezelfde bron als /api/news; herberekent niets) en de conversie naar een echt account. Fundament-dienst, géén functionele module — het is een instroomproces, geen gebruiker-activeerbare capability.',
@@ -418,68 +430,68 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
 
     // ── Data ──
     {
-      id: 'data-cont', x: 700, y: 1064, w: 600, h: 280, kind: 'group',
+      id: 'data-cont', x: 700, y: 1064 + DATA_Y_SHIFT, w: 600, h: 280, kind: 'group',
       title: 'TriFinity-gegevens (informatieobjecten)',
       lead: 'De data-objecten waarmee de applicatie werkt — beheerd in Supabase Postgres met Row Level Security.',
       items: [],
       note: `${stats.tables} tabellen · ${stats.migrations} migraties · RLS`,
     },
     {
-      id: 'do-transactie', x: 716, y: 1120, w: 138, h: 56, kind: 'data',
+      id: 'do-transactie', x: 716, y: 1120 + DATA_Y_SHIFT, w: 138, h: 56, kind: 'data',
       title: 'Transactie',
-      lead: 'Inkomsten/uitgaven, terugkerende lasten en bankrekeningen.',
+      lead: 'Inkomsten/uitgaven, terugkerende lasten en bankrekeningen. Sinds de transactiedienst (as-transacties, ADR 0104) ook bulk-muteerbaar (hercategoriseren over de volledige historie) en door de gebruiker definitief verwijderbaar — géén prullenbak.',
       items: ['transactions', 'recurring_transactions', 'bank_accounts'],
     },
     {
-      id: 'do-bezitting', x: 862, y: 1120, w: 138, h: 56, kind: 'data',
+      id: 'do-bezitting', x: 862, y: 1120 + DATA_Y_SHIFT, w: 138, h: 56, kind: 'data',
       title: 'Bezitting & schuld',
       lead: 'Bezittingen, schulden en waarderingen.',
       items: ['assets', 'debts', 'valuations'],
     },
     {
-      id: 'do-holding', x: 1008, y: 1120, w: 138, h: 56, kind: 'data',
+      id: 'do-holding', x: 1008, y: 1120 + DATA_Y_SHIFT, w: 138, h: 56, kind: 'data',
       title: 'Holding',
       lead: 'Aandelen-, fonds- en cryptoposities met koersen.',
       items: ['holdings', 'crypto_holdings', 'holding_prices'],
     },
     {
-      id: 'do-budget', x: 1154, y: 1120, w: 138, h: 56, kind: 'data',
+      id: 'do-budget', x: 1154, y: 1120 + DATA_Y_SHIFT, w: 138, h: 56, kind: 'data',
       title: 'Budget',
       lead: 'Budgetten en categorieën.',
       items: ['budgets'],
     },
     {
-      id: 'do-doel', x: 789, y: 1186, w: 138, h: 56, kind: 'data',
+      id: 'do-doel', x: 789, y: 1186 + DATA_Y_SHIFT, w: 138, h: 56, kind: 'data',
       title: 'Doel & gebeurtenis',
       lead: 'Doelen, levensgebeurtenissen en FIRE-parameters.',
       items: ['goals', 'life_events'],
     },
     {
-      id: 'do-huishouden', x: 935, y: 1186, w: 138, h: 56, kind: 'data',
+      id: 'do-huishouden', x: 935, y: 1186 + DATA_Y_SHIFT, w: 138, h: 56, kind: 'data',
       title: 'Huishouden',
       lead: 'Huishoudens, leden, uitnodigingen en budgetmodel-voorstellen (wederzijdse instemming).',
       items: ['households', 'household_members', 'household_invitations', 'household_budget_model_proposals'],
     },
     {
-      id: 'do-meta', x: 1081, y: 1186, w: 138, h: 56, kind: 'data',
+      id: 'do-meta', x: 1081, y: 1186 + DATA_Y_SHIFT, w: 138, h: 56, kind: 'data',
       title: 'Profiel & snapshots',
       lead: 'Profielen, vermogens-snapshots (dag-cadans) en de tijdstempel-vermogenshistorie per sync.',
       items: ['profiles', 'net_worth_snapshots', 'net_worth_history', 'app_settings'],
     },
     {
-      id: 'do-lead', x: 716, y: 1252, w: 180, h: 56, kind: 'data',
+      id: 'do-lead', x: 716, y: 1252 + DATA_Y_SHIFT, w: 180, h: 56, kind: 'data',
       title: 'Lead-intake',
       lead: 'Anonieme pre-account Vrijheidscheck-intake (versleuteld) plus het server-berekende rapport-snapshot en de IP-rate-limit-tellers. Uitsluitend service-role-bereikbaar: RLS aan, géén policies (ADR 0022).',
       items: ['lead_intakes', 'intake_rate_limit'],
     },
     {
-      id: 'do-contract-events', x: 904, y: 1252, w: 180, h: 56, kind: 'data',
+      id: 'do-contract-events', x: 904, y: 1252 + DATA_Y_SHIFT, w: 180, h: 56, kind: 'data',
       title: 'Contract-events',
       lead: 'Operator-telemetrie voor contractdrift van externe koppelingen en bestandsimports. Bevat uitsluitend structurele metadata (kolom-/header-namen + fingerprint-hash) — nooit financiële waarden. Superadmin-only SELECT; INSERT via RPC `increment_contract_event` (service-role, anti-spam dedup op `(kind, surface, fingerprint)`). Zichtbaar op /beheer/integraties — tab "Contracten" (ADR 0024).',
       items: ['contract_events'],
     },
     {
-      id: 'do-melding', x: 1096, y: 1252, w: 138, h: 56, kind: 'data',
+      id: 'do-melding', x: 1096, y: 1252 + DATA_Y_SHIFT, w: 138, h: 56, kind: 'data',
       title: 'Gebruikersmelding',
       lead: 'Bug/vraag/aanbeveling van een testgebruiker, met optioneel een screenshot (privé-bucket, signed URL) en de Notion-syncstatus. Een RPC (`reserve_user_report_slot`) begrenst het aantal meldingen per gebruiker.',
       items: ['user_reports'],
@@ -558,6 +570,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     't-notion->app-comp': { payload: 'Leest onverstuurde user_reports-rijen en zet notion_sync_status na een gepushte of mislukte poging', mechanism: 'rest', cadence: 'daily', contractDomains: ['user-reports'], note: 'Dagelijkse cron 06:00 (vercel.json); Supabase blijft de bron, de push is best-effort en herstelbaar. app_settings.notion_api_token/notion_reports_data_source_id staan op de SELECT-denylist (concern app-settings-select-denylist).' },
     // Applicatieservice → bedrijfsproces
     'as-import->sp-registreren': { payload: 'Transacties, saldi en terugkerende lasten', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['bank-connect', 'recurring', 'detect-recurring', 'own-accounts', 'bank-accounts'], note: 'De IBAN van een rekening leeft versleuteld (`iban_encrypted` + blind index `iban_hash`); de sleutels zijn server-only. Daarom lezen en schrijven de clientschermen hem via `own-accounts/ibans` en `bank-accounts/[id]` in plaats van rechtstreeks op de tabel — die IBAN is niet alleen een label maar de identifier waarmee overboekingen tussen eigen rekeningen worden herkend.' },
+    'as-transacties->sp-registreren': { payload: 'Zoekresultaten over de volledige historie + bulkmutatie-uitkomsten', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['transactions'] },
     'as-budget->sp-budget': { payload: 'Budgetten, varianties, trends en dagtempo', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['budgets', 'budget-trends', 'budget-variance', 'daily-expense-rate', 'cashflow-forecast'] },
     'as-vermogen->sp-vermogen': { payload: 'Bezittingen, schulden, posities en koersen', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['assets', 'debts', 'holdings', 'crypto', 'prices', 'rebalancing', 'valuations'] },
     'as-belasting->sp-belasting': { payload: 'Box 1/2/3-druk, jaarruimte en tegenbewijs', mechanism: 'compute', cadence: 'on-demand', contractDomains: ['belasting'], note: 'Voornamelijk pure rekenmotoren in lib/; één API-route exposeert box1-inkomen.' },
@@ -631,6 +644,10 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
   // Huishouden-dienst bedient het deelproces 'Delen & rapporteren' (en dwarsdoorsnijdend de rest)
   addEdge({ from: 'as-huishouden', to: 'sp-delen', type: 'serving', fromSide: 'L', toSide: 'R', midX: 545 })
 
+  // Transactiedienst bedient (naast as-import) het deelproces 'Registreren &
+  // importeren' — zoeken/bulkmuteren over de volledige historie (ADR 0104).
+  addEdge({ from: 'as-transacties', to: 'sp-registreren', type: 'serving', fromSide: 'L', toSide: 'R', midX: 500 })
+
   // Planningsdienst levert projectierijen aan de belastingdienst (Fase 3, ADR
   // 0088): de fiscale rapportagelaag rekent NAAST de kernel-rijen, niet erin
   // (geen terugkoppeling — vandaar 'serving', geen access-relatie).
@@ -685,19 +702,19 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
   })
 
   // De applicatie leest en schrijft de gegevens
-  addEdge({ from: 'app-comp', to: 'data-cont', type: 'access', fromSide: 'B', toSide: 'T', fromOffset: 1140, toOffset: 1140, label: 'Leest en schrijft', readWrite: true })
+  addEdge({ from: 'app-comp', to: 'data-cont', type: 'access', fromSide: 'B', toSide: 'T', fromOffset: 1140 + DATA_Y_SHIFT, toOffset: 1140 + DATA_Y_SHIFT, label: 'Leest en schrijft', readWrite: true })
 
   // De Vrijheidscheck-dienst leest en schrijft het lead-intake-object (service-role)
-  addEdge({ from: 'as-vrijheidscheck', to: 'do-lead', type: 'access', fromSide: 'B', toSide: 'L', readWrite: true, via: [[806, 1280]] })
+  addEdge({ from: 'as-vrijheidscheck', to: 'do-lead', type: 'access', fromSide: 'B', toSide: 'L', readWrite: true, via: [[806, 1280 + DATA_Y_SHIFT]] })
 
   // Contractbewaking: import-dienst schrijft formaat-drift; vermogens-dienst schrijft API-response-drift
-  addEdge({ from: 'as-import', to: 'do-contract-events', type: 'access', fromSide: 'B', toSide: 'T', via: [[670, 1252]] })
-  addEdge({ from: 'as-vermogen', to: 'do-contract-events', type: 'access', fromSide: 'B', toSide: 'T', via: [[670, 1252]] })
+  addEdge({ from: 'as-import', to: 'do-contract-events', type: 'access', fromSide: 'B', toSide: 'T', via: [[670, 1252 + DATA_Y_SHIFT]] })
+  addEdge({ from: 'as-vermogen', to: 'do-contract-events', type: 'access', fromSide: 'B', toSide: 'T', via: [[670, 1252 + DATA_Y_SHIFT]] })
 
   // Inzicht- & coachingsdienst legt de gebruikersmelding vast (own-row)
-  addEdge({ from: 'as-coach', to: 'do-melding', type: 'access', fromSide: 'B', toSide: 'T', readWrite: true, via: [[700, 1220]] })
+  addEdge({ from: 'as-coach', to: 'do-melding', type: 'access', fromSide: 'B', toSide: 'T', readWrite: true, via: [[700, 1220 + DATA_Y_SHIFT]] })
 
-  return { width: 1660, height: 1370, nodes, edges }
+  return { width: 1660, height: 1370 + DATA_Y_SHIFT, nodes, edges }
 }
 
 // ── Afgeleide helpers ────────────────────────────────────────────────────────

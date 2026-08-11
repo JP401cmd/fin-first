@@ -3,11 +3,35 @@ import { loadCoreData } from '@/lib/core-data-loader'
 import { getCachedUser } from '@/lib/supabase/cached-user'
 import type { FinancialInput, SavingsRateMethod } from '@/lib/core-metrics'
 import type { RetirementExpenseMethod } from '@/lib/budget-utils'
+import type { BasisSource, BudgetBasisResult, ResolvedBasis } from '@/lib/budget-basis'
 
 export interface CashflowSettingsData {
+  /** TRANSACTIE-grondslag: het 12-maands geëxtrapoleerde inkomen ("berekend"). */
   estimatedAnnualIncome: number
+  /**
+   * Het EFFECTIEVE jaarinkomen op de gekozen grondslag (ADR 0103) — dít is het
+   * getal op de "Geschat jaarinkomen"-kaart, en dezelfde waarde die de FIRE-keten
+   * en het bruto Box 1-inkomen voeden. Consumenten beslissen de grondslag NIET
+   * opnieuw; `incomeBasis` zegt waar het vandaan komt.
+   */
+  effectiveAnnualIncome: number
   netMonthlyIncome: number
+  /**
+   * De RAUWE 6-maands TRANSACTIEquote. Hoort bij de transactie-kassabon: hij
+   * verklaart de 6-maands bedragen die daar staan.
+   */
   savingsRate6m: number
+  /**
+   * De EFFECTIEVE spaarquote (%) op de gekozen grondslag (ADR 0103) — hetzelfde
+   * percentage waarop de gezondheidsscore en de FIRE-prognose draaien.
+   *
+   * DIT is het getal dat het instellingenblok toont, ook (en juist) onder het
+   * afgeleide kassabon-blok: dáár staan effectieve, grondslag-geresolveerde
+   * bedragen, en `savingsRate6m` eronder zetten zou een transactiepercentage bij
+   * budgetbedragen plaatsen. Gelijk aan `savingsRate6m` zolang beide grondslagen
+   * 'transaction' zijn.
+   */
+  effectiveSavingsRatePct: number
   targetSavingsRate: number | null
   estimatedMonthlyExpenses: number
   retirementExpenseMethod: RetirementExpenseMethod
@@ -18,10 +42,40 @@ export interface CashflowSettingsData {
   effectiveSwr: number
   inflationRate: number
   fireStrategy: { strategy: 'perpetual' | 'legacy' | 'deplete' | 'pensioen'; endAge: number }
-  /** Whether income comes from DB field ('manual') or transaction-computed average ('auto'). */
-  incomeSource: 'auto' | 'manual'
-  /** Whether expenses come from DB field ('manual') or transaction-computed average ('auto'). */
-  expensesSource: 'auto' | 'manual'
+  /**
+   * De KEUZE van de gebruiker (ADR 0103): 'budget' | 'transaction' | 'manual', of
+   * 'auto' zolang hij nooit koos. 'auto' is geen optie in de interface.
+   */
+  incomeSource: BasisSource
+  expensesSource: BasisSource
+  /**
+   * De UITKOMST van de grondslagbeslissing — nooit 'auto'. Hierop benoemt de kaart
+   * zichtbaar waar zijn getal vandaan komt ("uit je budgetten" / "uit je
+   * transacties" / "eigen bedrag"); zonder die vermelding zou een grondslag die
+   * kan schuiven een tweede waarheid met vertraging zijn.
+   *
+   * ELK VELD HOORT BIJ HET BEDRAG IN DÍT type, niet bij een gelijknamig bedrag
+   * elders in de app:
+   *  • `incomeBasis`   ↔ `effectiveAnnualIncome` (12-maands grootheid);
+   *  • `expensesBasis` ↔ `computedMonthlyExpenses` / de grondslag waarop
+   *    `savingsRate6m` staat (6-maands gemiddelde).
+   *
+   * Ze komen dus BEWUST NIET uit de huidige-maand-resolutie van de core-bundel
+   * (`monthlyIncomeBasis`/`monthlyExpensesBasis`). Dat was de bug: het label kwam
+   * uit de kalendermaand terwijl het bedrag ernaast de 12-maands-extrapolatie
+   * was, en die twee lopen uiteen zodra er in de lopende maand nog geen inkomen
+   * geboekt is (label 'profile' naast een transactie-bedrag).
+   */
+  incomeBasis: ResolvedBasis
+  expensesBasis: ResolvedBasis
+  /**
+   * De budgetgrondslag per kant, met ALLE selecteerbare posten (ook de
+   * uitgesloten) zodat het detailvenster de aanvinklijst kan tonen.
+   * `hasBudgets: false` → er valt niets te kiezen; `allExcluded: true` → alles
+   * uitgesloten, de grondslag valt terug op transacties (zichtbare melding).
+   */
+  budgetIncome: BudgetBasisResult
+  budgetExpenses: BudgetBasisResult
   /**
    * Hoe de getoonde spaarquote tot stand kwam: 'transaction' (echte 6-mnd
    * transacties), 'estimate' (uit profiel-schattingen) of 'net_worth_delta'
@@ -136,8 +190,10 @@ export async function loadCashflowSettingsData(
 
   return {
     estimatedAnnualIncome: rf.extrapolatedIncome,
+    effectiveAnnualIncome: rf.effectiveAnnualIncome,
     netMonthlyIncome: Number(profile?.net_monthly_income ?? 0),
     savingsRate6m: core.savingsRate6m,
+    effectiveSavingsRatePct: core.effectiveSavingsRatePct,
     targetSavingsRate: goalTargetSavingsRate ?? profile?.target_savings_rate ?? null,
     estimatedMonthlyExpenses: Number(profile?.estimated_monthly_expenses ?? 0),
     retirementExpenseMethod:
@@ -153,8 +209,17 @@ export async function loadCashflowSettingsData(
       strategy: core.fireStrategy.strategy,
       endAge: core.fireStrategy.endAge,
     },
-    incomeSource: (profile?.income_source as 'auto' | 'manual') ?? 'auto',
-    expensesSource: (profile?.expenses_source as 'auto' | 'manual') ?? 'auto',
+    // Grondslag: CONSUME uit de core-bundel — daar ontstaat de beslissing één
+    // keer (ADR 0103), hier wordt ze niet opnieuw genomen. De PAARVORMING is de
+    // enige keuze die hier valt: dit type levert een JAARinkomen en een
+    // 6-MAANDS uitgavencijfer, dus het neemt de basis van precies die twee
+    // resoluties over — niet die van de huidige kalendermaand.
+    incomeSource: core.incomeSource,
+    expensesSource: core.expensesSource,
+    incomeBasis: core.annualIncomeBasis,
+    expensesBasis: core.savingsExpensesBasis,
+    budgetIncome: core.budgetIncome,
+    budgetExpenses: core.budgetExpenses,
     savingsRateMethod: core.savingsRateMethod,
     // Transactie-berekend (6-mnd gemiddelde), bewust NIET rf.monthlyExpenses —
     // dat is de effectieve (post-resolver) waarde die bij een handmatige

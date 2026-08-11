@@ -51,6 +51,9 @@ import {
 } from '@/lib/server-data/tx-aggregates'
 import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 import { resolveEffectiveIncomeExpenses, type IncomeExpenseSources } from '@/lib/effective-financials'
+import { buildBudgetTypeMap } from '@/lib/budget-utils'
+import { loadBudgetBasis } from '@/lib/household/budget-share'
+import type { BudgetBasisRow } from '@/lib/budget-basis'
 import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
 import { computeSavingsRate6m, computeDebtAflossingMonthly } from '@/lib/savings-source'
 import { computeSavingsRateFromNetWorthDelta } from '@/lib/core-metrics'
@@ -155,21 +158,16 @@ export type BudgetType = typeof BUDGET_TYPES[number]
  * erft het type van zijn parent (en valt weg als die parent ontbreekt).
  *
  * Verplaatst uit `loadDashboardData` (was ~r552-557), waar de map behalve de
- * budget-oprol ook de spaar- en schuld-budget-ID-sets voedt. Die loader
- * consumeert deze functie nu, zodat er één definitie van "welk type is dit
- * budget" bestaat.
+ * budget-oprol ook de spaar- en schuld-budget-ID-sets voedt.
+ *
+ * VERHUISD naar lib/budget-utils.ts (ADR 0103): de pure grondslag-motor
+ * `lib/budget-basis.ts` heeft precies deze erfregel nodig en mag géén
+ * Supabase-import binnentrekken (deze module doet dat wel, via
+ * lib/server-data/base.ts). Hier blijft een re-export staan zodat de bestaande
+ * call-sites (lib/dashboard-data-loader.ts) ongewijzigd blijven — één definitie,
+ * twee ingangen.
  */
-export function buildBudgetTypeMap(budgets: BudgetRowForTotals[]): Map<string, string> {
-  const parents = budgets.filter(b => b.parent_id === null)
-  const children = budgets.filter(b => b.parent_id !== null)
-  const budgetTypeMap = new Map<string, string>()
-  for (const b of parents) budgetTypeMap.set(b.id, b.budget_type)
-  for (const c of children) {
-    const parentType = budgetTypeMap.get(c.parent_id ?? '')
-    if (parentType) budgetTypeMap.set(c.id, parentType)
-  }
-  return budgetTypeMap
-}
+export { buildBudgetTypeMap }
 
 /**
  * Budgetlimiet + besteding per type over de HUIDIGE kalendermaand.
@@ -545,9 +543,17 @@ export const loadCashflowKpis = cache(async (supabase: SupabaseClient): Promise<
   const currentMonthExpenses = aggExpenseByMonthAbs(txAgg12, { realOnly: true }).get(monthKey) ?? 0
 
   // Effective grondslag uit de rauwe maand-rijen (zie de asymmetrie hierboven).
+  // De budgetgrondslag (ADR 0103) loopt via dezelfde gedeelde samenstelling als
+  // `loadDashboardData` — anders zou deze KPI-laag een ander effectief inkomen
+  // tonen dan /overzicht zodra iemand op budgetten staat (de parity-suite
+  // hieronder vangt dat).
+  const kpiBudgetBasis = await loadBudgetBasis(supabase, profile, budgets as unknown as BudgetBasisRow[])
   const realMonth = deriveRealMonthTotals(monthTx)
   const { income: monthlyIncome, expenses: monthlyExpenses } =
-    resolveEffectiveIncomeExpenses(profile ?? {}, realMonth.income, realMonth.expenses)
+    resolveEffectiveIncomeExpenses(profile ?? {}, realMonth.income, realMonth.expenses, {
+      income: kpiBudgetBasis.income.monthlyTotal,
+      expenses: kpiBudgetBasis.expenses.monthlyTotal,
+    })
 
   // Canoniek dagtarief — GEEN eigen som: dezelfde helper-keten als de
   // dashboardbundel, op het al opgehaalde 12-mnd aggregaat. `realOnly: false`
@@ -659,10 +665,15 @@ export const loadForecastSectionData = cache(async (supabase: SupabaseClient): P
   const assets = (assetsResult.data ?? []) as unknown as Asset[]
   const snapshots = (snapshotsResult.data ?? []) as unknown as NetWorthSnapshotRow[]
 
-  // EFFECTIVE grondslag uit de rauwe maand-rijen (ADR 0073).
+  // EFFECTIVE grondslag uit de rauwe maand-rijen (ADR 0073), met de
+  // budgetgrondslag (ADR 0103) uit dezelfde gedeelde samenstelling.
+  const forecastBudgetBasis = await loadBudgetBasis(supabase, profile, budgets as unknown as BudgetBasisRow[])
   const realMonth = deriveRealMonthTotals(monthTx)
   const { income: monthlyIncome, expenses: monthlyExpenses } =
-    resolveEffectiveIncomeExpenses(profile ?? {}, realMonth.income, realMonth.expenses)
+    resolveEffectiveIncomeExpenses(profile ?? {}, realMonth.income, realMonth.expenses, {
+      income: forecastBudgetBasis.income.monthlyTotal,
+      expenses: forecastBudgetBasis.expenses.monthlyTotal,
+    })
 
   // 6-maands sub-venster op het aggregaat, met de spaarbudget-correctie.
   const savingsBudgetIds = budgetIdsOfType(buildBudgetTypeMap(budgets), 'savings')

@@ -332,11 +332,11 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     persona: 'lisa',
     given: 'Persona Lisa geladen; interne overboekingen tussen eigen rekeningen geboekt op het Eigen-rekening-archief.',
-    when: 'De gebruiker opent de verborgen-categorieën-sectie.',
-    then: 'Het getoonde "verschoven bedrag" == de som van de Eigen-rekening-archiefpost deze maand — een A=B-toets (het bedrag zelf hangt af van welke transacties als eigen-rekening-transfer zijn herkend, niet hand-narekenbaar door de IBAN+naam-detectie).',
+    when: 'De gebruiker opent de verborgen-categorieën-sectie, en beheert via het tandwiel op de Eigen rekening-sectie welke tegenrekeningen eigen rekeningen zijn (rekening kiezen → tegenpartijen aanvinken → opslaan zet de historie om).',
+    then: 'Het getoonde "verschoven bedrag" == de som van de Eigen-rekening-archiefpost deze maand — een A=B-toets (het bedrag zelf hangt af van welke transacties als eigen-rekening-transfer zijn herkend, niet hand-narekenbaar door de IBAN+naam-detectie). Na het aanvinken van een tegenpartij verschuift dat bedrag mee met het aantal omgezette transacties dat de sheet terugmeldt.',
     assertion: {
       kind: 'consistency',
-      source: 'lib/eigen-rekening-transfers.ts (IBAN+naam-detectie) voedt zowel de figures-strip-uitsluiting als de Eigen-rekening-archiefpost; consistentie tussen die twee, geen vast cijfer',
+      source: 'lib/own-accounts.ts#buildOwnAccountIdentifiers + lib/parsers/categorize.ts#isOwnAccountTransfer (IBAN+naam-detectie) voedt zowel de figures-strip-uitsluiting als de Eigen-rekening-archiefpost; dezelfde twee functies bepalen de aangevinkt-stand in components/app/own-accounts-sheet.tsx en de omzetting in lib/own-accounts-reclassify.ts. Consistentie tussen die paden, geen vast cijfer',
     },
   },
   {
@@ -394,6 +394,25 @@ const criteria: AcceptanceCriterion[] = [
       kind: 'exact',
       expected: 'leegNaamGooit=true; nulBedragGooit=true; archiveTypeGooit=true; validInsertBudgetType=expense; validIsEssential=false',
       source: 'lib/budget-plan-diff.ts#buildCreateBudgetDiff — echte productiefunctie, geen mirror (aangeroepen door components/app/sleepmodus/sleepmodus-overlay.tsx#handleCreateBudget); de client-validatie in components/app/sleepmodus/nieuw-budget-kaart.tsx#handleSubmit spiegelt dezelfde drie regels vóór de fetch',
+    },
+  },
+  {
+    workflow: 'WF-BUDGET-26',
+    scenarioId: 'UAT-BUDGET-26',
+    titel: 'Je budgetten als grondslag voor inkomen en uitgaven: welke posten meetellen, realisatie vóór plan (ADR 0103)',
+    kriticiteit: 'KERN',
+    given:
+      'De pure motor `computeBudgetBasis` (lib/budget-basis.ts) op een synthetische budgetboom — géén persona-transacties, dus volledig narekenbaar. Uitgavenkant: "Wonen" (hoofdbudget ZONDER kinderen, €1.000/mnd), "Boodschappen" (hoofdbudget MÉT kinderen, eigen limiet €9.999/mnd) met de kinderen "Supermarkt" (€400/mnd) en "Markt" (€1.200/jaar), plus een gearchiveerd budget (€500/mnd) en een `budget_type=\'savings\'`-pot (€300/mnd). Inkomstenkant: "Salaris" (€3.000/mnd). De aanvinklijst en de uitsluitingen leven op `profiles.cashflow_basis_prefs`.',
+    when:
+      '`computeBudgetBasis(budgets, \'expense\' | \'income\', excludedIds, { realized })` bepaalt de selecteerbare posten en hun jaarbedrag — eerst zonder realisatie-venster (alles op plan), daarna met een venster dat eindigt op 2026-08 waarin "Supermarkt" €2.400 uitgaven over 12 maanden draagt en een in maart 2026 aangemaakt budget €600 over 6 maanden.',
+    then:
+      'SELECTIENIVEAU — de lijst staat op het niveau waar het BEDRAG ONTSTAAT: hoofdbudgetten zonder kinderen plus de kinderen van hoofdbudgetten die kinderen hebben. "Boodschappen" is dus zelf géén post (zijn €9.999 is een kop boven zijn kinderen en zou dubbel tellen), "Wonen"/"Supermarkt"/"Markt" wél → 3 posten. DRAGENDE INVARIANT: de uitgavengrondslag bestaat uitsluitend uit `budget_type=\'expense\'` — de savings-pot valt er per constructie buiten, en precies dáárop steunt de spaarquote-regel in WF-CASH-60 (op de budgetgrondslag mag de spaarbudget-/aflossingscorrectie NIET worden toegepast, want het geld is er nooit afgehaald). Gearchiveerde/weggemergde rijen tellen nergens mee. KIND-OPROL met het EIGEN interval van het kind (terugval: dat van de ouder) — dus 1.000×12 + 400×12 + 1.200×1 = €18.000/jaar, €1.500/mnd; dit spiegelt `computeYearlyMustExpenses` en NADRUKKELIJK niet `deriveBudgetTotals`, dat kinderlimieten rauw optelt en met het parent-interval normaliseert (een maandkind onder een jaarouder telt daar 12× te laag). Sluit de gebruiker "Markt" uit, dan zakt het totaal met exact €1.200 naar €16.800 terwijl de post ZICHTBAAR blijft staan (`excluded: true`) — uitsluiten is geen verbergen. Inkomstenkant: €36.000/jaar. REALISATIE VÓÓR PLAN (correctie 11 aug 2026): heeft een post boekingen in het rollende 12-maandsvenster, dan telt de GEMETEN som en draagt de post `source: \'realized\'`; heeft hij er geen, dan valt hij terug op zijn geplande limiet (`source: \'planned\'`), zodat een net aangemaakt budget bruikbaar blijft. Plan en meting worden nooit gemengd binnen één post, en welke van de twee geldt is zichtbaar. DE DELER IS DE LEEFTIJD VAN HET BUDGET, niet de spanwijdte van zijn boekingen: clamp(max(maanden sinds `created_at`, spanwijdte), 1, 12) — een 6 maanden oud budget met €600 realisatie extrapoleert naar €1.200/jaar, een budget ouder dan het venster deelt door 12 en dus telt €2.400 gewoon als €2.400. Ankeren op de spanwijdte zou een jaarlijkse gemeentebelasting die deze maand is afgeschreven als €9.600 doortellen, maandelijks golvend.',
+    assertion: {
+      kind: 'exact',
+      expected:
+        'postenExpense=3; jaartotaalPlan=18000; maandtotaalPlan=1500; jaartotaalNaUitsluiting=16800; postenBlijvenZichtbaar=3; jaartotaalIncome=36000; oudBudgetRealisatie=2400/realized; jongBudgetGeextrapoleerd=1200/realized; zonderBoekingenPlan=12000/planned',
+      source:
+        'lib/budget-basis.ts#computeBudgetBasis (+ de gedeelde `annualAmount`/`buildBudgetTypeMap` uit lib/budget-utils.ts en `BASIS_BUDGET_TYPE`/`resolveDenominatorMonths`) — echte productiefuncties, geen mirror; de huishoud-deelfractie komt via `opts.shareFractionById` binnen en woont bewust buiten deze pure module (lib/household/budget-share.ts) — zie budget-checks.ts',
     },
   },
 ]

@@ -69,6 +69,8 @@ import { WhatIfDevelopmentNotice } from '@/components/app/horizon/whatif-develop
 import { applyWhatIfOverrides, buildBaselineOverrides } from '@/lib/whatif-overrides'
 import { computeDebtAflossingMonthly, computeSavingsRate6m, resolveSavingsSource } from '@/lib/savings-source'
 import { resolveEffectiveIncomeExpenses } from '@/lib/effective-financials'
+import { withResolvedKernelBedragen } from '@/lib/horizon/kernel-profile-basis'
+import type { CashflowSettingsData } from '@/lib/cashflow-settings-data'
 import { parseHousingStrategy, type HousingStrategyConfig } from '@/lib/housing-strategy'
 import { hasPartner as deriveHasPartner } from '@/lib/household-type'
 import {
@@ -95,6 +97,7 @@ import { IncomeExpenseChart } from '@/components/app/horizon/income-expense-char
 import { WealthCompositionChart } from '@/components/app/horizon/wealth-composition-chart'
 import { type StackedRow } from '@/lib/wealth-composition'
 import { buildBreakdownFromSimRows } from '@/lib/income-expense-breakdown'
+import { resolveUnlinkedCashShare, unlinkedCashTotal } from '@/lib/unlinked-cash'
 
 // WhatIfChat trekt de zware `ai` + `@ai-sdk/react` bundels (~30–40kB gz) mee. Die horen niet
 // in de First-Load JS van deze route: de chat staat onderaan een lange pagina en wordt lang
@@ -215,7 +218,7 @@ export default function WhatIfPage() {
       const twelveMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 11, 1)).toISOString().split('T')[0]
       const sixMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 5, 1)).toISOString().split('T')[0]
 
-      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, childBudgetsResult, income12Result, earliestIncomeResult, fullAssetsResult, fullDebtsResult, bankAccountsResult, income6mResult, expense6mResult, allBudgetsTypeResult] = await Promise.all([
+      const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, childBudgetsResult, earliestIncomeResult, fullAssetsResult, fullDebtsResult, bankAccountsResult, income6mResult, expense6mResult, allBudgetsTypeResult, cashflowSettings] = await Promise.all([
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct').eq('is_active', true),
         supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
@@ -223,7 +226,6 @@ export default function WhatIfPage() {
         supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
         supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
         supabase.from('budgets').select('id, name, parent_id, default_limit, is_essential, interval, budget_type').not('parent_id', 'is', null).not('budget_type', 'in', '("archive","income","savings")'),
-        supabase.from('transactions').select('amount, date').gt('amount', 0).gte('date', twelveMonthsAgo).lt('date', monthEnd),
         supabase.from('transactions').select('date').gt('amount', 0).gte('date', twelveMonthsAgo).order('date', { ascending: true }).limit(1),
         // Expliciete kolomlijst i.p.v. `select('*')`: `assets` heeft een
         // huishoud-gedeelde SELECT-policy, dus `*` levert bij een gedeelde
@@ -231,12 +233,22 @@ export default function WhatIfPage() {
         // PARTNER in deze bundel. Zie ASSET_CLIENT_COLUMNS.
         supabase.from('assets').select(ASSET_CLIENT_COLUMNS).eq('is_active', true).limit(500),
         supabase.from('debts').select('*').eq('is_active', true).limit(200),
-        supabase.from('bank_accounts').select('id, balance').eq('is_active', true).is('linked_asset_id', null),
+        // `ownership` erbij: de policy is huishoud-verbreed, dus een gedeelde
+        // rekening komt hier ook binnen en telt op het eigen aandeel.
+        supabase.from('bank_accounts').select('id, balance, ownership').eq('is_active', true).is('linked_asset_id', null),
         supabase.from('transactions').select('amount, transaction_type').eq('is_income', true).gte('date', sixMonthsAgo).lt('date', monthEnd),
         supabase.from('transactions').select('amount, transaction_type, budget_id').eq('is_income', false).gte('date', sixMonthsAgo).lt('date', monthEnd),
         // Budget-type-map-bron (parent + kind) → spaarbudget-IDs voor de
         // spaarbudget-correctie in computeSavingsRate6m (WF-REKEN-13).
         supabase.from('budgets').select('id, budget_type, parent_id'),
+        // GEDEELDE GRONDSLAG (ADR 0103). De maandbedragen liepen hier al door de
+        // resolver, maar het JAARinkomen werd nog lokaal uit transacties
+        // geëxtrapoleerd — waardoor what-if een ander FIRE-doel kon tonen dan de
+        // inkomenskaart op /overzicht/cashflow. Dat getal komt nu uit dezelfde
+        // bundel; de eigen 12-maands inkomsten-query is daarmee weg.
+        fetch('/api/overzicht/cashflow-settings')
+          .then((r) => (r.ok ? (r.json() as Promise<CashflowSettingsData>) : null))
+          .catch(() => null),
       ])
 
       // Rauwe transactie-som over de huidige kalendermaand-tot-nu-toe (zoals de
@@ -256,7 +268,18 @@ export default function WhatIfPage() {
       // dashboard/horizon/core/fin-data-loader al consumeren — geen eigen
       // kalendermaand-optelsom-zonder-fallback meer.
       const { income: monthlyIncome, expenses: monthlyExpenses } =
-        resolveEffectiveIncomeExpenses(profileResult.data ?? {}, txMonthIncome, txMonthExpenses)
+        resolveEffectiveIncomeExpenses(
+          profileResult.data ?? {},
+          txMonthIncome,
+          txMonthExpenses,
+          // Budgetgrondslag erbij (ADR 0103) zodra de gedeelde bundel binnen is.
+          cashflowSettings
+            ? {
+                income: cashflowSettings.budgetIncome.monthlyTotal,
+                expenses: cashflowSettings.budgetExpenses.monthlyTotal,
+              }
+            : undefined,
+        )
 
       const totalAssets = (assetsResult.data ?? []).reduce((s, a) =>
         s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
@@ -264,19 +287,14 @@ export default function WhatIfPage() {
         s + Number(d.current_balance) * ((d.net_worth_inclusion_pct ?? 100) / 100), 0)
       const monthlyContributions = (assetsResult.data ?? []).reduce((s, a) => s + Number(a.monthly_contribution), 0)
 
-      const last12Income = income12Result.data?.reduce((s, t) => s + Number(t.amount), 0) ?? 0
-      let extrapolatedIncome = last12Income
       const earliestIncomeDate = earliestIncomeResult.data?.[0]?.date
-      if (earliestIncomeDate && last12Income > 0) {
-        const earliest = new Date(earliestIncomeDate)
-        const incomeMonths = Math.max(1, Math.min(12,
-          (now.getFullYear() - earliest.getFullYear()) * 12 +
-          (now.getMonth() - earliest.getMonth())
-        ))
-        if (incomeMonths < 12) {
-          extrapolatedIncome = (last12Income / incomeMonths) * 12
-        }
-      }
+      // Jaarinkomen op de GEDEELDE grondslag (ADR 0103): `effectiveAnnualIncome`
+      // is hetzelfde getal als op de inkomenskaart van /overzicht/cashflow.
+      // Terugval bij een mislukte bundel-fetch: het effectieve maandinkomen × 12
+      // — nooit een tweede, afwijkende extrapolatie.
+      const extrapolatedIncome = cashflowSettings
+        ? cashflowSettings.effectiveAnnualIncome
+        : monthlyIncome * 12
 
       const allChildren = childBudgetsResult.data ?? []
       const { yearlyMustExpenses } = computeYearlyMustExpenses(
@@ -334,7 +352,11 @@ export default function WhatIfPage() {
       // Store full assets/debts for unified projection engine
       setFullAssets((fullAssetsResult.data ?? []) as Asset[])
       setFullDebts((fullDebtsResult.data ?? []) as Debt[])
-      const unlinkedCash = (bankAccountsResult.data ?? []).reduce((s: number, a: { balance: number | string }) => s + Number(a.balance), 0)
+      // DE canonieke, huishoud-gewogen optelling (lib/unlinked-cash.ts).
+      const unlinkedCash = unlinkedCashTotal(
+        bankAccountsResult.data,
+        await resolveUnlinkedCashShare(supabase, bankAccountsResult.data),
+      )
       setBankAccountCash(unlinkedCash)
 
       // Canonieke 6m-spaarquote voor de slider-baseline (WF-REKEN-13) — nu via
@@ -442,10 +464,29 @@ export default function WhatIfPage() {
 
       // Rauwe profiel-rij (incl. pot_rules) — kern-invoerbron voor de router
       // (FASE 5, stap 2a). Alleen geconsumeerd wanneer de kernel-vlag aan is.
-      setRawProfile({
-        ...(profileResult.data as WhatifRawProfileRow),
-        pot_rules: rawPotRules,
-      })
+      //
+      // MÉT grondslag-injectie (ADR 0103), net als de SSR-loader en
+      // use-horizon-fire-sim. Deze pagina stond eerder als "bewuste uitzondering"
+      // genoteerd omdat de profielrij hier de door de gebruiker gesimuleerde
+      // baseline zou zijn; dat klopt niet. `setRawProfile` heeft precies deze ene
+      // aanroep en `rawProfile` wordt daarna nooit meer geschreven — de
+      // scenario-variatie loopt volledig via `assets`, `lifeEvents`,
+      // `returnDeltaByAssetType` en `yearlyExpenses`, niet via de profielrij. Er
+      // is dus geen schuifregelaar die injectie kan overschrijven.
+      //
+      // Zonder injectie leest de kernel `p.net_monthly_income ?? null`: bij
+      // `income_source = 'auto'` met een lege kolom — de staat van élke bestaande
+      // rij — wordt `nettoJaarinkomen` 0, en dan wijken de baseline-lijn én de
+      // FIRE-KPI in dit lab materieel af van diezelfde baseline op /toekomst.
+      setRawProfile(
+        withResolvedKernelBedragen(
+          {
+            ...(profileResult.data as WhatifRawProfileRow),
+            pot_rules: rawPotRules,
+          },
+          { monthlyIncome, monthlyExpenses },
+        ),
+      )
 
       const horizonInput: FinancialInput = {
         totalAssets, totalDebts, monthlyIncome, monthlyExpenses,

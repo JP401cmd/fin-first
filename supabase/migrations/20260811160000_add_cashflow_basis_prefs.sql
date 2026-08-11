@@ -1,0 +1,63 @@
+-- Grondslag-selectie voor inkomen en uitgaven — server-side, cross-device bewaard.
+--
+-- WAAROM: ADR 0103 maakt de grondslag van "geschat inkomen" en "geschatte uitgaven"
+--   een expliciete keuze (budgetten / transacties / eigen bedrag, per kant los te
+--   zetten via `profiles.income_source` en `profiles.expenses_source`). Binnen de
+--   budget-grondslag kiest de gebruiker per budget of het meetelt — geen
+--   belastingteruggaaf in het maandinkomen, wél de vakantietoeslag, enzovoort.
+--   Die selectie is een UITSLUITLIJST, geen insluitlijst: "alles aangevinkt" is dan
+--   de lege lijst (de blijvende, kosteloze default, ook voor wie de selectie nooit
+--   opent) en een later aangemaakt budget telt vanzelf mee in plaats van stil
+--   buiten de grondslag te vallen — die laatste fout verlaagt het inkomen zonder
+--   enig signaal. De vorm is een kleine, versioned JSONB-blob
+--   (`CashflowBasisPrefs`, `v: 1`):
+--     { "v": 1, "excludedIncomeBudgetIds": [...], "excludedExpenseBudgetIds": [...] }
+--   Een id van een verwijderd budget in de lijst is betekenisloos en wordt bij het
+--   rekenen genegeerd (`computeBudgetBasis`, lib/budget-basis.ts) — nooit een fout.
+--
+-- BEWUST NIET in `feature_preferences`: `PUT /api/feature-preferences` bouwt die
+--   jsonb bij elke aanroep opnieuw op uit uitsluitend bekende UNIFIED_FEATURES-id's
+--   en schrijft die als VOLLEDIGE overwrite. Elke sleutel die geen feature-id is
+--   verdwijnt bij de eerstvolgende voorkeurenwijziging — het inkomen van een
+--   gebruiker zou dan veranderen doordat hij ergens anders een functie aan- of
+--   uitzette. Een eigen, exclusieve kolom heeft geen concurrente schrijvers en
+--   maakt een volledige overwrite veilig. Zelfde precedent als
+--   20260710120000_add_toekomst_scenario_prefs.sql.
+--
+-- EIGEN RIJ, NIET HUISHOUD-GEDEELD: de lijst verwijst naar budget-id's van deze
+--   gebruiker; een partner-id heeft er geen betekenis in. Het aandeel waarmee een
+--   GEDEELD budget meetelt is een ANDERE as en wordt NIET door deze lijst geregeld,
+--   maar door de huishoud-deelfractie (`mySharePct` uit `households.split_mode`).
+--   Dat is geen belofte maar een afgedwongen pad: de SELECT-policy op `budgets` is
+--   huishoud-verbreed (`auth.uid() = user_id OR (ownership='shared' AND
+--   household_id = user_household_id())`), dus `getBudgets` levert óók de gedeelde
+--   budgetten van de partner. Alle zeven server-aanroepers halen de grondslag
+--   daarom via `loadBudgetBasis` (lib/household/budget-share.ts), die het aandeel
+--   resolvet en als `shareFractionById` aan `computeBudgetBasis` doorgeeft — met
+--   `shareFractionFor` (lib/budget-perspective.ts) als enige weegregel, dezelfde
+--   die de perspectief-loader en de losse-cash-optelling gebruiken. Zonder die
+--   weging zou een gedeeld INKOMSTENbudget bij beide partners voor 100% meetellen
+--   (op huishoudniveau 200%) en dat rechtstreeks in FIRE, spaarquote,
+--   hefboomscores en het bruto Box 1-inkomen landen.
+--
+-- TOEGANGSMODEL (geen nieuwe policy nodig):
+--   `profiles` heeft al eigen-rij toegang: RLS-policy
+--   "Users can manage own profile" ON profiles FOR ALL USING (auth.uid() = id).
+--   FOR ALL dekt SELECT/INSERT/UPDATE/DELETE; zonder aparte WITH CHECK hergebruikt
+--   Postgres de USING-expressie ook als schrijf-check, dus een own-row UPDATE van
+--   deze nieuwe kolom is volledig afgedekt. RLS is ROW-level (niet kolom-level) en
+--   er is geen kolom-scoped GRANT, dus de nieuwe kolom ERFT deze policy
+--   automatisch. Schrijfpad: PUT /api/parameters → `sanitizeCashSettingsInput` →
+--   `parseCashflowBasisPrefs` (lib/cashflow-settings.ts) als enige schrijf-poort,
+--   via de anon RLS-client, nooit service-role. Lezen gebeurt server-side in de
+--   loaders (opnieuw defensief geparsed — DB-inhoud nooit vertrouwen).
+--
+-- NULLABLE, GEEN DEFAULT: NULL = nooit gezet, en dat is te onderscheiden van een
+--   leeg gezette selectie ({"v":1,"excludedIncomeBudgetIds":[],...}). Puur
+--   additief; raakt verder niets aan; veilig her-uitvoerbaar via IF NOT EXISTS.
+
+alter table public.profiles
+  add column if not exists cashflow_basis_prefs jsonb;
+
+comment on column public.profiles.cashflow_basis_prefs is
+  'Selectie binnen de budget-grondslag van inkomen/uitgaven (versioned JSONB, shape CashflowBasisPrefs v:1): { v, excludedIncomeBudgetIds[], excludedExpenseBudgetIds[] } — de UITGESLOTEN budget-id''s, niet de ingesloten, zodat "alles aangevinkt" de lege lijst is en een nieuw budget vanzelf meetelt. NULL = nooit gezet (≠ leeg gezet). Eigen rij, niet huishoud-gedeeld; het aandeel van een gedeeld budget volgt de huishoud-deelfractie. Cross-device. Enige schrijf-poort: parseCashflowBasisPrefs via PUT /api/parameters (own-row, anon RLS-client). Bewust NIET in feature_preferences (dat wordt door PUT /api/feature-preferences volledig overschreven). Zie ADR 0103.';

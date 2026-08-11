@@ -514,25 +514,30 @@ const tests: TestCase[] = [
   // View mode: sector
   // ════════════════════════════════════════════════════════════════════
   {
-    id: 'rebalancing-drift-sector-viewmode',
-    name: 'computeDrift: werkt met sector view mode',
+    id: 'rebalancing-drift-geography-viewmode',
+    name: 'computeDrift: werkt met geografie view mode',
     category: CAT,
-    description: 'Drift berekening werkt correct met sector als classificatie',
+    // Was 'sector'. Die view is aug 2026 vervallen — er was geen bron voor
+    // (de koersfeed levert 'm niet en Yahoo's quoteSummary is achter
+    // cookie-authenticatie afgeschermd), waardoor 1 van de 116 posities een
+    // sector had. De dekking die deze case bood is "computeDrift werkt óók op
+    // een andere dimensie dan de standaard"; geografie is nu die dimensie.
+    description: 'Drift berekening werkt correct met geografie als classificatie',
     priority: 'medium',
     estimatedDurationMs: 200,
     fn() {
-      const sectorTargets: TargetAllocation[] = [
-        { category: 'breed', target_pct: 60 },
-        { category: 'obligaties', target_pct: 30 },
-        { category: 'crypto', target_pct: 10 },
+      const geographyTargets: TargetAllocation[] = [
+        { category: 'wereld', target_pct: 60 },
+        { category: 'europa', target_pct: 30 },
+        { category: 'noord_amerika', target_pct: 10 },
       ]
 
-      const drifts = computeDrift(HOLDINGS, sectorTargets, 'sector')
-      assertEqual(drifts.length, 3, '3 sector drift results')
+      const drifts = computeDrift(HOLDINGS, geographyTargets, 'geography')
+      assertEqual(drifts.length, 3, '3 geografie drift results')
 
-      const breed = drifts.find(d => d.category === 'breed')!
-      assertNotNull(breed, 'breed sector drift bestaat')
-      assertFinite(breed.drift_pct, 'breed drift is finite')
+      const wereld = drifts.find(d => d.category === 'wereld')!
+      assertNotNull(wereld, 'wereld geografie drift bestaat')
+      assertFinite(wereld.drift_pct, 'wereld drift is finite')
     },
   },
 

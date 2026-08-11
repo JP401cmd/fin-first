@@ -263,4 +263,153 @@ describe('buildPortfolioValueHistory', () => {
       '2026-02-15',
     ])
   })
+
+  // ── Per-positie-uitsplitsing (byHolding) ─────────────────────────────────
+  //
+  // De maandbalken op de holdings-pagina bouwen elke balk uit deze delen op en
+  // openen er een detailscherm per maand mee. Twee dingen moeten daarom hard
+  // zijn: de delen tellen op tot exact de balkhoogte, en ze staan aflopend.
+  //
+  // TOLERANTIE — bewuste keuze: de somtoets is EXACT en wordt in hele centen
+  // gedaan (`Math.round(x * 100)`), niet met een relatieve marge. Grondslag: de
+  // foutklasse die we hier uitsluiten is precies "de balkdelen tellen één cent
+  // anders op dan de balk", en een relatieve tolerantie zou die op een
+  // portefeuille van tonnen ruimschoots wegpoetsen. Optellen ín centen (i.p.v.
+  // euro-floats vergelijken) houdt de assertie vrij van het sub-cent-residu van
+  // drijvende-komma-optelling, dat geen echte afwijking is.
+  describe('byHolding', () => {
+    /** Som in hele centen — vermijdt het float-residu van euro-optellingen. */
+    function sumCents(slices: readonly { value: number }[]): number {
+      return slices.reduce((s, h) => s + Math.round(h.value * 100), 0)
+    }
+
+    it('telt op elk anker exact op tot de marketValue van datzelfde punt', () => {
+      const r = buildPortfolioValueHistory({
+        transactions: [
+          tx('aandeel', 'buy', 10, 100, '2026-01-10'),
+          tx('turbo', 'buy', 3, 33.33, '2026-01-12'),
+          tx('fonds', 'buy', 7, 12.5, '2026-02-03'),
+          tx('aandeel', 'buy', 5, 111.11, '2026-03-04'),
+        ],
+        prices: [
+          price('aandeel', '2026-01-31', 111.11),
+          price('aandeel', '2026-02-28', 123.45),
+          price('fonds', '2026-03-31', 13.37),
+        ],
+        today: '2026-05-05',
+      })
+
+      // Meerdere ankers, met een wisselend aantal open posities per anker.
+      expect(r.points.length).toBeGreaterThan(3)
+      for (const p of r.points) {
+        expect(sumCents(p.byHolding)).toBe(Math.round(p.marketValue * 100))
+        expect(p.byHolding).toHaveLength(p.openPositions)
+      }
+      // De uitsplitsing groeit mee met de portefeuille (2 posities → 3).
+      expect(r.points[0].byHolding).toHaveLength(2)
+      expect(r.points[r.points.length - 1].byHolding).toHaveLength(3)
+    })
+
+    it('laat het afrondingsresidu niet naar de balkhoogte lekken', () => {
+      // Drie posities van €10,005: naïef per stuk afronden geeft 3 × €10,01 =
+      // €30,03, terwijl de som afgerond €30,02 is. Precies de cent waar de
+      // gebruiker over valt als de balkdelen niet op de balk uitkomen.
+      const r = buildPortfolioValueHistory({
+        transactions: [
+          tx('a', 'buy', 1, 10.005, '2026-01-10'),
+          tx('b', 'buy', 1, 10.005, '2026-01-10'),
+          tx('c', 'buy', 1, 10.005, '2026-01-10'),
+        ],
+        prices: [],
+        today: '2026-03-05',
+      })
+
+      for (const p of r.points) {
+        expect(p.marketValue).toBe(30.02)
+        expect(sumCents(p.byHolding)).toBe(3002)
+        // Niet de naïeve 3 × 1001 centen.
+        expect(sumCents(p.byHolding)).not.toBe(3 * Math.round(10.005 * 100))
+        // Elke regel blijft wél een heel aantal centen.
+        for (const h of p.byHolding) {
+          expect(Math.abs(h.value * 100 - Math.round(h.value * 100))).toBeLessThan(1e-6)
+        }
+        // En de volgorde blijft aflopend, ook nu het residu de kop verschoof.
+        expect(p.byHolding.map((h) => h.value)).toEqual([10.01, 10.01, 10])
+      }
+    })
+
+    it('laat een gesloten positie uit byHolding vallen en houdt de open erin', () => {
+      const r = buildPortfolioValueHistory({
+        transactions: [
+          tx('open', 'buy', 10, 120, '2026-01-10'),
+          tx('dicht', 'buy', 5, 200, '2026-01-10'),
+          tx('dicht', 'sell', 5, 250, '2026-02-10'),
+        ],
+        prices: [],
+        today: '2026-04-01',
+      })
+
+      // 1 feb: beide posities open, aflopend op waarde (1200 vóór 1000).
+      expect(r.points[0].date).toBe('2026-02-01')
+      expect(r.points[0].byHolding).toEqual([
+        { id: 'open', value: 1200, tier: 'transaction' },
+        { id: 'dicht', value: 1000, tier: 'transaction' },
+      ])
+
+      // 1 mrt: 'dicht' is verkocht (netUnits 0) en verdwijnt uit de uitsplitsing,
+      // ook al beweegt de curve van 'open' gewoon door.
+      expect(r.points[1].date).toBe('2026-03-01')
+      expect(r.points[1].byHolding.map((h) => h.id)).toEqual(['open'])
+      expect(r.points[1].openPositions).toBe(1)
+      for (const p of r.points) {
+        expect(sumCents(p.byHolding)).toBe(Math.round(p.marketValue * 100))
+      }
+    })
+
+    it('draagt per positie de trap die de waardering droeg', () => {
+      const r = buildPortfolioValueHistory({
+        transactions: [
+          tx('markt', 'buy', 10, 100, '2026-01-10'),
+          tx('turbo', 'buy', 10, 90, '2026-01-10'),
+          // Een aankoop zónder prijs: trap 2 blijft leeg, dus trap 3 (kostprijs).
+          { holding_id: 'kaal', type: 'buy', units: 10, price_per_unit: 0, total_amount: 0, date: '2026-01-10' },
+        ],
+        prices: [price('markt', '2026-01-31', 120)],
+        today: '2026-02-20',
+      })
+
+      const feb = r.points[0]
+      expect(feb.date).toBe('2026-02-01')
+      expect(feb.byHolding).toEqual([
+        { id: 'markt', value: 1200, tier: 'market' },
+        { id: 'turbo', value: 900, tier: 'transaction' },
+        { id: 'kaal', value: 0, tier: 'cost' },
+      ])
+      // De kostprijs-positie heeft netUnits > 0 en telt dus mee in openPositions;
+      // byHolding en openPositions kunnen niet uit elkaar lopen.
+      expect(feb.openPositions).toBe(3)
+      expect(feb.byHolding).toHaveLength(3)
+      // Alleen trap 1 telt mee in het marktaandeel — ongewijzigd contract.
+      expect(feb.pricedFromMarket).toBeCloseTo(1200 / 2100, 6)
+    })
+
+    it('sorteert aflopend op waarde, onafhankelijk van de invoervolgorde', () => {
+      const r = buildPortfolioValueHistory({
+        transactions: [
+          tx('klein', 'buy', 1, 50, '2026-01-10'),
+          tx('groot', 'buy', 100, 80, '2026-01-11'),
+          tx('midden', 'buy', 10, 75, '2026-01-12'),
+          tx('kleinst', 'buy', 2, 5, '2026-01-13'),
+        ],
+        prices: [],
+        today: '2026-03-05',
+      })
+
+      for (const p of r.points) {
+        expect(p.byHolding.map((h) => h.id)).toEqual(['groot', 'midden', 'klein', 'kleinst'])
+        const values = p.byHolding.map((h) => h.value)
+        expect([...values].sort((a, b) => b - a)).toEqual(values)
+      }
+    })
+  })
 })

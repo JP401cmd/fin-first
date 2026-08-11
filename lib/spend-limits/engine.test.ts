@@ -12,11 +12,15 @@ import { describe, it, expect } from 'vitest'
 import {
   SPEND_LIMIT_GRAIN_BY_PERIOD,
   SPEND_LIMIT_NEAR_LIMIT_PCT,
+  SPEND_LIMIT_SCORE_MIN_PERIODS,
+  SPEND_LIMIT_SCORE_THRESHOLDS,
+  SPEND_LIMIT_SCORE_TREND_BONUS,
   SPEND_LIMIT_TREND_WINDOW,
   SPEND_LIMIT_WINDOW_BY_PERIOD,
   buildSpendLimitReport,
   closedPeriodsSinceCreation,
   computePeriodOutcome,
+  computeSpendLimitScore,
   computeSpendLimitTrend,
   computeStreaks,
   netSpendFromSums,
@@ -26,6 +30,7 @@ import {
   type SpendLimitPeriodKind,
   type SpendLimitPeriodOutcome,
   type SpendLimitRule,
+  type SpendLimitTrend,
 } from './engine'
 import { counterpartyMatchesKey, spendLimitCounterpartyKey } from './counterparty-key'
 
@@ -678,7 +683,152 @@ describe('computeSpendLimitTrend — aanmaak-ondergrens', () => {
   })
 })
 
-describe('buildSpendLimitReport — de ondergrens raakt ALLEEN de trend', () => {
+describe('computeSpendLimitScore', () => {
+  const stable = computeSpendLimitTrend(maanden([100, 100, 100, 100, 100, 100]))
+  const geen: SpendLimitTrend = { ...stable, direction: 'unknown' }
+
+  it('zwijgt onder de drempel van drie meetellende periodes', () => {
+    // Eén periode binnen de grens levert rekenkundig een 100 op. Waar, maar het
+    // zegt niets — en een cijfer dat niets zegt is erger dan geen cijfer.
+    for (const n of [0, 1, 2]) {
+      const score = computeSpendLimitScore(maanden(Array(n).fill(10)), geen)
+      expect(score.score).toBeNull()
+      expect(score.label).toBeNull()
+      expect(score.hitRatePct).toBeNull()
+      expect(score.basisPeriodCount).toBe(n)
+    }
+  })
+
+  it('geeft 100 bij een vlekkeloze historie en 0 bij een historie die altijd misging', () => {
+    const perfect = computeSpendLimitScore(maanden([10, 10, 10, 10, 10, 10]), geen)
+    expect(perfect.score).toBe(100)
+    expect(perfect.label).toBe('strak')
+    expect(perfect.hitRatePct).toBe(100)
+    expect(perfect.basisPeriodCount).toBe(6)
+
+    // Grens = 1000 (zie `maanden`), dus elke periode zit eroverheen.
+    const altijdMis = computeSpendLimitScore(maanden([5000, 5000, 5000, 5000]), geen)
+    expect(altijdMis.score).toBe(0)
+    expect(altijdMis.label).toBe('los')
+    expect(altijdMis.hitRatePct).toBe(0)
+  })
+
+  it('beloont herstel: dezelfde misser weegt lichter naarmate de nieuwe reeks groeit', () => {
+    const netNaEenMisser = computeSpendLimitScore(maanden([10, 10, 10, 5000, 10]), geen)
+    const langerHersteld = computeSpendLimitScore(maanden([10, 10, 10, 5000, 10, 10, 10]), geen)
+    expect(langerHersteld.score!).toBeGreaterThan(netNaEenMisser.score!)
+  })
+
+  it('is MONOTOON: één periode van boven naar binnen verlaagt het cijfer nooit', () => {
+    // De regressietest voor de niet-monotone reeks-noemer. Met de langste reeks
+    // als noemer scoorde het slechtere patroon hieronder (83) HOGER dan het
+    // betere (73), omdat een eigen record meegroeit met je historie.
+    const BINNEN = 10
+    const BOVEN = 5000 // grens = 1000, zie `maanden`
+    const slechter = computeSpendLimitScore(
+      maanden([BINNEN, BINNEN, BOVEN, BINNEN, BINNEN, BOVEN, BINNEN, BINNEN]),
+      geen,
+    )
+    const beter = computeSpendLimitScore(
+      maanden([BINNEN, BINNEN, BINNEN, BINNEN, BINNEN, BOVEN, BINNEN, BINNEN]),
+      geen,
+    )
+    expect(beter.score!).toBeGreaterThan(slechter.score!)
+
+    // En breder: kantel elke overschrijding één voor één om — het cijfer mag bij
+    // geen enkele stap dalen. Dit vangt ook toekomstige gewichtswijzigingen.
+    const start = [BOVEN, BOVEN, BINNEN, BOVEN, BINNEN, BINNEN, BOVEN, BINNEN, BOVEN, BINNEN]
+    let vorige = computeSpendLimitScore(maanden(start), geen).score!
+    for (let i = 0; i < start.length; i++) {
+      if (start[i] !== BOVEN) continue
+      const verbeterd = [...start]
+      verbeterd[i] = BINNEN
+      const nu = computeSpendLimitScore(maanden(verbeterd), geen).score!
+      expect(nu).toBeGreaterThanOrEqual(vorige)
+      start[i] = BINNEN
+      vorige = nu
+    }
+  })
+
+  it('verrekent de richting als correctie in beide kanten, en negeert een onbekende richting', () => {
+    const periods = maanden([10, 10, 10, 5000, 10, 10])
+    const neutraal = computeSpendLimitScore(periods, geen)
+    const beter = computeSpendLimitScore(periods, { ...stable, direction: 'improving' })
+    const slechter = computeSpendLimitScore(periods, { ...stable, direction: 'worsening' })
+
+    expect(beter.score! - neutraal.score!).toBe(SPEND_LIMIT_SCORE_TREND_BONUS)
+    expect(neutraal.score! - slechter.score!).toBe(SPEND_LIMIT_SCORE_TREND_BONUS)
+    // 'stable' en 'unknown' geven allebei geen correctie — nooit een half oordeel.
+    expect(computeSpendLimitScore(periods, stable).score).toBe(neutraal.score)
+  })
+
+  it('klemt op [0,100], ook als de richting-correctie eroverheen zou duwen', () => {
+    const top = computeSpendLimitScore(maanden([10, 10, 10, 10]), { ...stable, direction: 'improving' })
+    expect(top.score).toBe(100)
+    const bodem = computeSpendLimitScore(maanden([5000, 5000, 5000]), { ...stable, direction: 'worsening' })
+    expect(bodem.score).toBe(0)
+  })
+
+  it('telt alleen periodes ná de aanmaak — een splinternieuwe pot krijgt géén 100', () => {
+    // Precies de valkuil waarvoor de ondergrens bestaat: de motor telt een
+    // periode zonder transacties als "binnen de grens", dus zonder poort erft
+    // een pot van vandaag een vlekkeloze historie die hij nooit heeft geleefd.
+    const leegDanEcht = maanden([0, 0, 0, 0, 0, 0, 0, 0, 0, 5000, 5000, 10])
+
+    const zonderPoort = computeSpendLimitScore(leegDanEcht, geen)
+    // 10 van 12 binnen (×70 = 58,3) + lopende reeks 1 van de 3 (×30 = 10) = 68.
+    expect(zonderPoort.score).toBe(68)
+    expect(zonderPoort.hitRatePct).toBe(83)
+    expect(zonderPoort.basisPeriodCount).toBe(12)
+
+    // Pot gemaakt op 1 oktober ⇒ alleen okt/nov/dec tellen mee: 1 van 3 binnen.
+    const metPoort = computeSpendLimitScore(leegDanEcht, geen, '2026-10-01')
+    expect(metPoort.basisPeriodCount).toBe(3)
+    expect(metPoort.hitRatePct).toBe(33)
+    expect(metPoort.score).toBeLessThan(zonderPoort.score!)
+  })
+
+  it('geeft de opbouw prijs, en die reproduceert het cijfer exact', () => {
+    // Het spinnenweb in de prestatieweergave tekent `components`. Zou dat niet
+    // dezelfde termen zijn waarop `score` rust, dan kan de grafiek stil gaan
+    // afwijken van het getal ernaast — deze test is die koppeling.
+    const periods = maanden([10, 10, 10, 5000, 10, 10])
+    for (const richting of ['improving', 'stable', 'worsening', 'unknown'] as const) {
+      const s = computeSpendLimitScore(periods, { ...stable, direction: richting })
+      const c = s.components!
+      const bonus = (c.trend - 0.5) * 2 * SPEND_LIMIT_SCORE_TREND_BONUS
+      const herbouwd = Math.round(c.hitRate * 70 + c.streak * 30 + bonus)
+      expect(herbouwd).toBe(s.score)
+    }
+  })
+
+  it('laat de opbouw weg zolang er geen cijfer is', () => {
+    const s = computeSpendLimitScore(maanden([10]), geen)
+    expect(s.score).toBeNull()
+    expect(s.components).toBeNull()
+  })
+
+  it('houdt zich aan de drempelbanden van SPEND_LIMIT_SCORE_THRESHOLDS', () => {
+    // De banden staan als data in de motor zodat de UI ze nooit hoeft na te bouwen.
+    expect(SPEND_LIMIT_SCORE_THRESHOLDS.map((b) => b.min)).toEqual([80, 60, 40, 0])
+    expect(SPEND_LIMIT_SCORE_MIN_PERIODS).toBe(SPEND_LIMIT_TREND_WINDOW)
+    // De labels mogen NOOIT samenvallen met die van het gezondheidsgetal
+    // (lib/financial-health.ts) — dezelfde woorden op andere banden is drift.
+    expect(SPEND_LIMIT_SCORE_THRESHOLDS.map((b) => b.label)).toEqual([
+      'strak', 'netjes', 'wisselend', 'los',
+    ])
+    // ...en ook niet met de stoplicht-woorden: 'Op koers' is app-breed de béste,
+    // groene stand (nav-menu, doelen-view, budgetrapportage) en kan hier dus geen
+    // tweede band zijn — hetzelfde woord op een andere plek in de rangorde leest
+    // op twee schermen als twee verschillende dingen.
+    const stoplicht = ['op koers', 'aandacht nodig', 'actie vereist']
+    for (const band of SPEND_LIMIT_SCORE_THRESHOLDS) {
+      expect(stoplicht).not.toContain(band.label)
+    }
+  })
+})
+
+describe('buildSpendLimitReport — de ondergrens raakt de trend én de score, niet de reeks', () => {
   const now = new Date(2026, 7, 8) // 8 augustus 2026
   const rule: SpendLimitRule = { ruleType: 'budget', limitAmount: 1000, period: 'month' }
   const windowPeriods = SPEND_LIMIT_WINDOW_BY_PERIOD.month // 13 = 12 afgesloten + de lopende
@@ -707,6 +857,12 @@ describe('buildSpendLimitReport — de ondergrens raakt ALLEEN de trend', () => 
     expect(met.trend.direction).toBe('unknown')
     expect(met.trend.recentAvgMatchedAmount).toBeNull()
     expect(met.trend.movingAvgMatchedAmountByPeriod).toEqual([])
+
+    // Idem voor de score: zonder poort zou een pot van drie dagen oud met een
+    // vlekkeloze 100 pronken over twaalf maanden die hij nooit heeft geleefd.
+    expect(zonder.score.score).toBe(100)
+    expect(met.score.score).toBeNull()
+    expect(met.score.basisPeriodCount).toBe(0)
   })
 
   it('pot ouder dan zijn venster: het hele rapport is identiek met en zonder aanmaakdatum', () => {

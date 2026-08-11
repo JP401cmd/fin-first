@@ -21,6 +21,7 @@
  */
 import { DEFAULT_RETURN, INFLATION, BOX3_DRAG } from '@/lib/constants'
 import { deriveMarginaalTarief, schijfGrensVoor } from './box1-tax'
+import { resolveFireAssumptions, type FireAssumptionRow } from './fire-assumptions'
 import type { Box3Method } from './bucket-projection'
 
 /**
@@ -61,17 +62,54 @@ export function computeEffectiveSwr(grossReturn: number, inflationRate: number):
  * projectie op de horizon-pagina; rendement is profiel-instelling, geen
  * leeftijd-formule.
  */
-export function resolveFireParams(profile: {
-  expected_return?: number | null
-  inflation_rate?: number | null
-  box3_method?: string | null
-  marginaal_tarief?: number | null
-  net_monthly_income?: number | null
-}): FireParams {
+export function resolveFireParams(profile: FireProfileInput): FireParams {
   const grossReturn = profile.expected_return ?? DEFAULT_RETURN
   const inflationRate = profile.inflation_rate ?? INFLATION
   const effectiveSwr = computeEffectiveSwr(grossReturn, inflationRate)
   const box3Method: Box3Method = (profile.box3_method === 'werkelijk') ? 'werkelijk' : 'forfaitair'
   const marginaalTarief = profile.marginaal_tarief ?? deriveMarginaalTarief({ netMonthlyIncome: profile.net_monthly_income })
   return { grossReturn, inflationRate, effectiveSwr, box3Method, marginaalTarief }
+}
+
+/** De profielvelden die de FIRE-parameters bepalen. */
+export interface FireProfileInput {
+  expected_return?: number | null
+  inflation_rate?: number | null
+  box3_method?: string | null
+  marginaal_tarief?: number | null
+  net_monthly_income?: number | null
+}
+
+/**
+ * Profielrij + jaargelaagde markt-aannames → FireParams, in één aanroep.
+ *
+ * Dit is de VOLLEDIGE grondslag-keten die elk FIRE-tonend oppervlak moet
+ * gebruiken, in deze precedentievolgorde:
+ *
+ *   1. de expliciete gebruikerskeuze (`profiles.expected_return` /
+ *      `profiles.inflation_rate`) — die wint altijd;
+ *   2. de jaargelaagde markt-default uit `fire_assumptions` (beheer op
+ *      /beheer/fiscale-kerngetallen) — alleen waar de gebruiker NIETS zette;
+ *   3. de TS-constanten `DEFAULT_RETURN`/`INFLATION` (lib/constants.ts) —
+ *      terugval van `resolveFireAssumptions` bij een ontbrekende jaarrij.
+ *
+ * De shadow gebeurt op een KOPIE: de profielrij zelf blijft ongemoeid, want
+ * elders wordt `null` gelezen als "niet ingesteld" (coach-datagap).
+ *
+ * Waarom hier en niet per loader: laat een oppervlak stap 2 weg, dan rekent het
+ * met een ándere onttrekkingsvoet dan de rest van de app zodra beheer een
+ * jaarlaag zet — precies de grondslagdrift die dit veld moet uitsluiten. De
+ * aanroeper queryt (`fire_assumptions`), deze resolver consumeert — hetzelfde
+ * scheidingsprincipe als `lookupAowAge`/`resolveFireAssumptions`.
+ */
+export function resolveFireParamsWithAssumptions(
+  profile: FireProfileInput | null | undefined,
+  assumptionRows: readonly FireAssumptionRow[] | null | undefined,
+  year?: number,
+): FireParams {
+  const assumptions = resolveFireAssumptions(assumptionRows, year)
+  const shadowed: FireProfileInput = { ...(profile ?? {}) }
+  if (shadowed.expected_return == null) shadowed.expected_return = assumptions.expectedReturn
+  if (shadowed.inflation_rate == null) shadowed.inflation_rate = assumptions.inflation
+  return resolveFireParams(shadowed)
 }

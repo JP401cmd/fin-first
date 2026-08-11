@@ -48,6 +48,8 @@ let bankAccountsUserIdFilter = false
 let bankAccountsColumns = ''
 /** Alle updates die de route deed. */
 let updates: { ids: string[]; patch: Record<string, unknown> }[] = []
+/** Kreeg de UPDATE een expliciet `user_id`-filter mee (eigenaarscontrole op de schrijf)? */
+let updateUserIdFilter = false
 
 function buildClient(opts: {
   bankAccounts: BankRow[]
@@ -111,7 +113,19 @@ function buildClient(opts: {
           update: (patch: Record<string, unknown>) => ({
             in: (_col: string, ids: string[]) => {
               updates.push({ ids, patch })
-              return Promise.resolve({ error: null })
+              // De UPDATE eindigt op `.eq('user_id', …).select('id')`: de teller
+              // telt sinds 11 aug de TERUGGEGEVEN rijen, niet de kandidaten (een
+              // UPDATE die door RLS 0 rijen raakt geeft geen error, dus optellen
+              // van `batchIds.length` kon "N omgezet" melden terwijl er niets
+              // gebeurde). De stub geeft daarom de id's terug die hij "schreef".
+              const updateChain = {
+                eq: (col: string) => {
+                  if (col === 'user_id') updateUserIdFilter = true
+                  return updateChain
+                },
+                select: () => Promise.resolve({ data: ids.map((id) => ({ id })), error: null }),
+              }
+              return updateChain
             },
           }),
         }
@@ -127,6 +141,7 @@ beforeEach(() => {
   bankAccountsUserIdFilter = false
   bankAccountsColumns = ''
   updates = []
+  updateUserIdFilter = false
   mockDecryptField.mockImplementation((c: string | null) => {
     if (c === null) return null
     if (typeof c === 'string' && c.startsWith('enc:')) return c.slice(4)
@@ -161,6 +176,13 @@ describe('POST /api/own-accounts/reclassify', () => {
     expect(updates).toHaveLength(1)
     expect(updates[0].ids).toEqual(['tx-naar-gedeeld'])
     expect(updates[0].patch).toMatchObject({ transaction_type: 'transfer', category_source: 'transfer' })
+    // De SCHRIJF draagt een eigen `user_id`-filter, óók al filtert de
+    // kandidaat-lees er al op. Het is de eigenaarscontrole die de docblock van
+    // `reclassifyOwnAccountTransfers` belooft, en die er tot 11 aug niet stond:
+    // zonder dit filter zou een verbreding van de kandidaat-query stil
+    // partnerrijen binnenhalen die de UPDATE dan nul keer raakt — waarna de
+    // gebruiker wél te horen krijgt dat ze zijn omgezet.
+    expect(updateUserIdFilter).toBe(true)
   })
 
   it('gooit zelf geen user_id-filter over de RLS-poort heen', async () => {

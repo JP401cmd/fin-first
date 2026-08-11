@@ -23,7 +23,7 @@
 
 import type { ReactNode } from 'react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
-import { ModalFooter } from '@/components/app/modal-footer'
+import { ModalFooter, ModalFooterToneProvider } from '@/components/app/modal-footer'
 import { useIsLgUp } from '@/lib/hooks/use-media-query'
 import { SlideInPane, type PaneAction } from './slide-in-pane'
 
@@ -37,7 +37,14 @@ type ShellOverlayProps = {
   title?: string
   /** Alleen voor kind="sheet". Default `md`. */
   size?: SheetSize
-  /** Alleen voor kind="confirm". Kleurt primaire CTA rood. */
+  /**
+   * Voor kind="confirm" en kind="sheet": dit is een onomkeerbare bevestiging.
+   * Zet de tone van elke `ModalFooter` in de overlay op `destructive` (rode
+   * primary) en forwardt `data-destructive` op de content-wrapper voor
+   * eventuele eigen styling-hooks. Bij kind="pane" heeft de prop geen effect:
+   * die footer wordt op desktop door `SlideInPane` gerenderd en zou dan per
+   * breakpoint verschillen.
+   */
   destructive?: boolean
   /** Alleen voor kind="pane". ←-knop wijst standaard naar `onClose`; geef
    *  `onBack` mee als je een eigen back-handler nodig hebt (bv. naar een
@@ -193,9 +200,11 @@ export function ShellOverlay({
     // `actions` worden in de sticky title-bar gerendered — handig voor
     // bv. pijl-navigatie of share-icons binnen een sheet.
     return (
-      <BottomSheet open={open} onClose={onClose} title={title} size={size} actions={actions} footerSlot={footer}>
-        {children}
-      </BottomSheet>
+      <ModalFooterToneProvider tone={destructive ? 'destructive' : 'default'}>
+        <BottomSheet open={open} onClose={onClose} title={title} size={size} actions={actions} footerSlot={footer}>
+          {children}
+        </BottomSheet>
+      </ModalFooterToneProvider>
     )
   }
 
@@ -205,14 +214,20 @@ export function ShellOverlay({
   // safe-area-padding consistent zijn met de rest van het overlay-systeem.
   // BottomSheet centreert al op `md:items-center` — geen extra desktop-logica.
   //
-  // De `destructive` variant wordt door de consumer gebruikt om de primaire
-  // CTA in `children` rood te stylen. We exposeren het hier zodat de wrapper
-  // weet of dit een bevestigings-context is (en in de toekomst extra a11y
-  // attributen kan zetten zoals `aria-describedby` op een waarschuwingsblok).
-  // Voor nu: we forwarden `data-destructive` voor styling-hooks in children.
+  // `destructive` is hier geen losse vlag maar de bron van de rode CTA: de
+  // `ModalFooterToneProvider` zet de tone van elke `ModalFooter` in deze
+  // overlay (footer én children) op `destructive`, zodat de bevestigende knop
+  // semantisch rood is in plaats van dezelfde inkt-knop als "Opslaan". Eerder
+  // forwardde deze tak alleen `data-destructive` — een attribuut dat niets in
+  // de app las, waardoor de gevaarlijkste knop er onopvallend uitzag.
+  //
+  // `data-destructive` blijft staan als styling-/testhaak voor children die
+  // hun eigen knop renderen (bv. `event-pane`).
   return (
-    <BottomSheet open={open} onClose={onClose} title={title} size="sm" footerSlot={footer}>
-      <div data-destructive={destructive ? 'true' : undefined}>{children}</div>
-    </BottomSheet>
+    <ModalFooterToneProvider tone={destructive ? 'destructive' : 'default'}>
+      <BottomSheet open={open} onClose={onClose} title={title} size="sm" footerSlot={footer}>
+        <div data-destructive={destructive ? 'true' : undefined}>{children}</div>
+      </BottomSheet>
+    </ModalFooterToneProvider>
   )
 }

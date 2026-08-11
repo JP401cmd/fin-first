@@ -25,6 +25,7 @@ import { createLocalAiResolver, LOCAL_REP_BATCH_SIZE } from '@/lib/ai/local/loca
 import { useExecutionMode } from '@/lib/ai/local/use-execution-mode'
 import { createPrefetchGate, LOCAL_PREFETCH_WINDOW, type PrefetchGate } from '@/lib/categorize/wizard-gate'
 import { CategorizeWizard } from '@/components/app/categorize-wizard'
+import { escapeLikePattern } from '@/lib/transactions/search-query'
 import {
   TransactionRow,
   type Transaction,
@@ -921,7 +922,7 @@ export function AICategorizeSheet({
             .delete()
             .eq('user_id', user.id)
             .eq('match_field', matchField)
-            .ilike('match_value', matchValue)
+            .ilike('match_value', escapeLikePattern(matchValue))
           await supabase.from('category_corrections')
             .insert({ user_id: user.id, match_field: matchField, match_value: matchValue, budget_id: row.acceptedBudgetId })
           rules++
@@ -933,7 +934,7 @@ export function AICategorizeSheet({
               .delete()
               .eq('user_id', user.id)
               .eq('match_field', 'counterparty_iban')
-              .ilike('match_value', normalizedIban)
+              .ilike('match_value', escapeLikePattern(normalizedIban))
             await supabase.from('category_corrections')
               .insert({ user_id: user.id, match_field: 'counterparty_iban', match_value: normalizedIban, budget_id: row.acceptedBudgetId })
           }
@@ -947,9 +948,9 @@ export function AICategorizeSheet({
             .neq('id', row.tx.id)
 
           if (matchField === 'counterparty_name') {
-            bulkQuery = bulkQuery.ilike('counterparty_name', matchValue)
+            bulkQuery = bulkQuery.ilike('counterparty_name', escapeLikePattern(matchValue))
           } else {
-            bulkQuery = bulkQuery.ilike('description', `%${matchValue}%`)
+            bulkQuery = bulkQuery.ilike('description', `%${escapeLikePattern(matchValue)}%`)
           }
 
           // Also match by IBAN for retroactive application

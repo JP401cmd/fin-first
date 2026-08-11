@@ -15,7 +15,9 @@ import type { Recommendation, Action } from '@/lib/recommendation-data'
 import { computeGoalProgress, type Goal } from '@/lib/goal-data'
 import { resolveEffectiveIncomeExpenses, type IncomeExpenseSources } from '@/lib/effective-financials'
 import { localMonthBounds } from '@/lib/month-range'
-import { getActiveAssets, getActiveDebts, getOwnProfile } from '@/lib/server-data/base'
+import { getActiveAssets, getActiveDebts, getOwnProfile, getBudgets } from '@/lib/server-data/base'
+import { loadBudgetBasis } from '@/lib/household/budget-share'
+import type { BudgetBasisRow } from '@/lib/budget-basis'
 import { syncActiveGoalValues } from '@/lib/goal-current-value'
 // Doel-`current_value`-sync + cap-splitsing wonen nu in de gedeelde
 // `lib/goal-current-value.ts` (ÉNE bron voor scherm + dashboard-widget). Deze
@@ -338,20 +340,25 @@ export async function loadEffectiveMonthlyFigures(
 ): Promise<{ monthlyIncome: number; monthlyExpenses: number }> {
   const user = await getCachedUser(supabase)
   const { start: monthStart, end: monthEnd } = localMonthBounds(new Date())
-  const profileQuery: PromiseLike<{ data: IncomeExpenseSources | null }> = user
-    ? supabase
-        .from('profiles')
-        .select('net_monthly_income, estimated_monthly_expenses, income_source, expenses_source')
-        .eq('id', user.id)
-        .single()
+  // BEWUST `getOwnProfile` (select('*')) i.p.v. de vroegere expliciete
+  // kolomlijst: de grondslag-selectie leeft op `cashflow_basis_prefs` (ADR 0103)
+  // en die kolom bestaat pas na migratie 20260811160000 — één onbekende kolom in
+  // een expliciete lijst zou de hele profielquery laten falen. Bovendien is deze
+  // fetcher cache()-gedeeld, dus binnen een render kost hij niets extra.
+  const profileQuery: PromiseLike<{ data: Record<string, unknown> | null }> = user
+    ? (getOwnProfile(supabase) as unknown as PromiseLike<{ data: Record<string, unknown> | null }>)
     : Promise.resolve({ data: null })
-  const [txRes, profileRes] = await Promise.all([
+  const [txRes, profileRes, budgetsRes] = await Promise.all([
     supabase
       .from('transactions')
       .select('amount, transaction_type')
       .gte('date', monthStart)
       .lt('date', monthEnd),
     profileQuery,
+    // Budgetgrondslag (ADR 0103) — gedeelde, cache()'de fetch; zonder deze zou de
+    // Doelen-tab een ander effectief maandinkomen tonen dan de bundel, terwijl
+    // deze helper juist bestaat om diezelfde grondslag te garanderen.
+    user ? getBudgets(supabase) : Promise.resolve({ data: null }),
   ])
 
   let txIncome = 0
@@ -364,10 +371,16 @@ export async function loadEffectiveMonthlyFigures(
     else txExpenses += Math.abs(amt)
   }
 
+  const goalsBudgetBasis = await loadBudgetBasis(
+    supabase,
+    profileRes.data,
+    (budgetsRes.data ?? []) as unknown as BudgetBasisRow[],
+  )
   const { income, expenses } = resolveEffectiveIncomeExpenses(
     (profileRes.data ?? {}) as IncomeExpenseSources,
     txIncome,
     txExpenses,
+    { income: goalsBudgetBasis.income.monthlyTotal, expenses: goalsBudgetBasis.expenses.monthlyTotal },
   )
   return {
     monthlyIncome: income > 0 ? Math.round(income) : 0,

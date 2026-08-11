@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { buildUnlinkedCashAssets } from './unlinked-cash-assets'
+import { SOLO_UNLINKED_CASH_SHARE } from './unlinked-cash'
+
+/** Solo-context: geen huishouden, dus alles telt voor 100%. */
+const SOLO = SOLO_UNLINKED_CASH_SHARE
 
 describe('buildUnlinkedCashAssets', () => {
   it('maps each unlinked bank_account to a synthetic cash asset', () => {
@@ -7,7 +11,7 @@ describe('buildUnlinkedCashAssets', () => {
       { id: 'ba-1', name: 'Betaalrekening', balance: 3200 },
       { id: 'ba-2', name: ' Spaarrekening ', balance: '15000' },
     ]
-    const result = buildUnlinkedCashAssets(rows)
+    const result = buildUnlinkedCashAssets(rows, SOLO)
 
     expect(result).toHaveLength(2)
     expect(result[0]).toMatchObject({
@@ -28,16 +32,40 @@ describe('buildUnlinkedCashAssets', () => {
   })
 
   it('falls back to a neutral name and 0 balance on missing/invalid data', () => {
-    const result = buildUnlinkedCashAssets([{ id: 'ba-x', name: null, balance: null }])
+    const result = buildUnlinkedCashAssets([{ id: 'ba-x', name: null, balance: null }], SOLO)
     expect(result[0].name).toBe('Bankrekening')
     expect(result[0].current_value).toBe(0)
     expect(result[0].purchase_value).toBe(0)
   })
 
   it('returns [] for empty/nullish input', () => {
-    expect(buildUnlinkedCashAssets([])).toEqual([])
-    expect(buildUnlinkedCashAssets(null)).toEqual([])
-    expect(buildUnlinkedCashAssets(undefined)).toEqual([])
+    expect(buildUnlinkedCashAssets([], SOLO)).toEqual([])
+    expect(buildUnlinkedCashAssets(null, SOLO)).toEqual([])
+    expect(buildUnlinkedCashAssets(undefined, SOLO)).toEqual([])
+  })
+
+  // ADR 0101: een GEDEELDE rekening is voor beide partners zichtbaar en mag dus
+  // niet bij allebei voor het volle saldo in het bezittingen-totaal landen.
+  it('weegt een gedeelde rekening op het huishoud-aandeel', () => {
+    const rows = [
+      { id: 'ba-shared', name: 'Gezamenlijk', balance: 4000, ownership: 'shared' },
+      { id: 'ba-own', name: 'Eigen', balance: 1000, ownership: 'personal' },
+    ]
+    const mine = buildUnlinkedCashAssets(rows, { perspective: 'personal', mySharePct: 50 })
+
+    expect(mine[0].current_value).toBe(2000)
+    expect(mine[0].purchase_value).toBe(2000)
+    expect(mine[1].current_value).toBe(1000)
+  })
+
+  it('toont een gedeelde rekening vol in de huishoud-blik', () => {
+    const rows = [{ id: 'ba-shared', name: 'Gezamenlijk', balance: 4000, ownership: 'shared' }]
+    const household = buildUnlinkedCashAssets(rows, {
+      perspective: 'household',
+      mySharePct: 50,
+    })
+
+    expect(household[0].current_value).toBe(4000)
   })
 
   // Regressie op het bug-kaartje "bezitting niet gelijk" (P0): het bezittingen-
@@ -67,7 +95,7 @@ describe('buildUnlinkedCashAssets', () => {
       { id: 'b5', name: 'E', balance: 35000 },
       { id: 'b6', name: 'F', balance: 15000 },
     ]
-    const synthetic = buildUnlinkedCashAssets(unlinkedBankRows)
+    const synthetic = buildUnlinkedCashAssets(unlinkedBankRows, SOLO)
 
     // Synthetische cash is per definitie asset_type 'cash' → nooit eigen_huis,
     // telt dus volledig mee in het excl-home-totaal.

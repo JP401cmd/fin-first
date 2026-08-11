@@ -2,6 +2,8 @@
  * Shared formatting utilities (server-safe, no 'use client').
  */
 
+import { amsterdamParts, NL_DAY_ABBR, NL_MONTH_ABBR } from './tz'
+
 /**
  * Guard against NaN/undefined/Infinity — returns 0 for any non-finite input.
  */
@@ -403,12 +405,9 @@ export function formatWithFreedom(
 }
 
 // ── Newspaper-style timestamp formatting ──────────────────────────────
-
-const NL_DAY_ABBR = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za']
-const NL_MONTH_ABBR = [
-  'jan', 'feb', 'mrt', 'apr', 'mei', 'jun',
-  'jul', 'aug', 'sep', 'okt', 'nov', 'dec',
-]
+//
+// De NL-woordenlijsten en de tijdzone-vaste kalenderdelen komen uit `lib/tz.ts`
+// — één bron, zodat de #418-klasse niet opnieuw per bestand gekopieerd wordt.
 
 /**
  * Kale datum in krantstijl: `d MMM yyyy` (bv. `29 jul 2026`).
@@ -423,61 +422,6 @@ export function formatDateShort(iso: string): string {
   const d = new Date(`${iso.slice(0, 10)}T00:00:00Z`)
   if (isNaN(d.getTime())) return ''
   return `${d.getUTCDate()} ${NL_MONTH_ABBR[d.getUTCMonth()]} ${d.getUTCFullYear()}`
-}
-
-const AMSTERDAM_TZ = 'Europe/Amsterdam'
-
-/**
- * Kalenderdelen van een moment in Europe/Amsterdam — losgekoppeld van de
- * tijdzone waarin de runtime toevallig draait.
- *
- * Waarom niet de gewone `getHours()/getDate()`-getters: die lezen de LOKALE
- * tijdzone. De server draait op Vercel in UTC en de browser in
- * Europe/Amsterdam, dus dezelfde `Date` gaf server-side een ander uur (en soms
- * een andere kalenderdag) dan client-side. Voor tekst die zowel in de SSR-HTML
- * als in de eerste client-render staat is dat een React #418
- * hydration-mismatch — precies de bug die `lib/overview/greeting.ts` eerder
- * voor de begroeting oploste. Zelfde TZ-projectregel: uur- en daggrenzen via
- * `Intl.DateTimeFormat` met expliciete `timeZone`, nooit uit een UTC-afknip.
- */
-const AMSTERDAM_PARTS_FMT = new Intl.DateTimeFormat('en-US', {
-  timeZone: AMSTERDAM_TZ,
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: false,
-})
-
-interface AmsterdamParts {
-  year: number
-  /** 1-12 */
-  month: number
-  day: number
-  hour: number
-  minute: number
-  /** 0 = zondag, conform NL_DAY_ABBR. */
-  weekday: number
-}
-
-function amsterdamParts(d: Date): AmsterdamParts {
-  const parts = AMSTERDAM_PARTS_FMT.formatToParts(d)
-  const value = (type: Intl.DateTimeFormatPartTypes) =>
-    Number.parseInt(parts.find((p) => p.type === type)?.value ?? '0', 10)
-
-  const year = value('year')
-  const month = value('month')
-  const day = value('day')
-  // Sommige runtimes geven met `hour12: false` '24' terug om middernacht.
-  const hour = value('hour') % 24
-  const minute = value('minute')
-
-  // Weekdag uit de Amsterdamse kalenderdatum zelf (via een UTC-anker), zodat de
-  // uitkomst niet van de locale-weekdagnaam of van de runtime-tijdzone afhangt.
-  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay()
-
-  return { year, month, day, hour, minute, weekday }
 }
 
 /**

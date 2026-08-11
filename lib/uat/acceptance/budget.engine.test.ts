@@ -31,11 +31,13 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Budget — acceptatiecriteria dekking', () => {
-  it('heeft precies één criterium per catalogus-BUDGET-scenario (01..25, geen gaten)', () => {
+  it('heeft precies één criterium per catalogus-BUDGET-scenario (01..26, geen gaten)', () => {
     const workflows = BUDGET_ACCEPTANCE.criteria.map((c) => c.workflow).sort()
     expect(workflows).toEqual(catalogBudgetWorkflows)
     expect(new Set(workflows).size).toBe(catalogBudgetWorkflows.length)
-    expect(workflows.length).toBe(25)
+    // 25 → 26: WF-BUDGET-26 (de budgetgrondslag uit ADR 0103 — welke posten
+    // meetellen, de expense-only-invariant en realisatie vóór plan; 'exact').
+    expect(workflows.length).toBe(26)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {
@@ -61,7 +63,8 @@ describe('UAT Budget — acceptatiecriteria dekking', () => {
       .sort()
     const checkWorkflows = BUDGET_ENGINE_CHECKS.map((c) => c.workflow).sort()
     expect(checkWorkflows).toEqual(exactWorkflows)
-    expect(exactWorkflows.length).toBe(13)
+    // 13 → 14: WF-BUDGET-26 is 'exact' en krijgt een BUDGET_ENGINE_CHECKS-rij.
+    expect(exactWorkflows.length).toBe(14)
   })
 
   it('markeert de niet-narekenbare/niet-exacte scenario\'s met de juiste kind', () => {

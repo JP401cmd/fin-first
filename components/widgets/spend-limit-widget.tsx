@@ -35,30 +35,27 @@ import { useSpendLimitCopy } from '@/lib/hooks/use-spend-limit-alias'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import type { SpendLimitWidgetData } from '@/lib/spend-limits/widget-data'
 import type { SpendLimitTrendDirection } from '@/lib/spend-limits/engine'
+import {
+  resolveSpendLimitDisplayStatus,
+  SPEND_LIMIT_SCORE_TEXT_CLASS,
+  SPEND_LIMIT_STATUS_COLOR_VAR,
+  SPEND_LIMIT_STATUS_LABEL_INLINE,
+  SPEND_LIMIT_STATUS_TEXT_CLASS,
+  type SpendLimitDisplayStatus,
+} from '@/lib/spend-limits/status-display'
 import type { WidgetSize } from '@/lib/widget-catalog'
 
-/** De drie toestanden die de tegel toont — alle drie uit de motor gelezen. */
-type DisplayStatus = 'within' | 'near' | 'exceeded'
+/**
+ * De drie toestanden die de tegel toont. Stand, kleuren en labels komen uit
+ * lib/spend-limits/status-display.ts — dezelfde bron als de pane en de kaart,
+ * zodat de tegel niet opnieuw amber kan waarschuwen waar een ander oppervlak
+ * groen geruststelt.
+ */
+type DisplayStatus = SpendLimitDisplayStatus
 
-/** Stoplicht-semantiek: volgt de gekozen accentkleur NIET (CLAUDE.md kleurregel). */
-const STATUS_COLOR: Record<DisplayStatus, string> = {
-  within: 'var(--positive)',
-  near: 'var(--warning)',
-  exceeded: 'var(--negative)',
-}
-
-const STATUS_TEXT_CLASS: Record<DisplayStatus, string> = {
-  within: 'text-positive',
-  near: 'text-warning',
-  exceeded: 'text-negative',
-}
-
-/** Observationeel, niet prescriptief: wat er is, niet wat je moet doen. */
-const STATUS_LABEL: Record<DisplayStatus, string> = {
-  within: 'binnen je grens',
-  near: 'dicht bij je grens',
-  exceeded: 'boven je grens',
-}
+const STATUS_COLOR = SPEND_LIMIT_STATUS_COLOR_VAR
+const STATUS_TEXT_CLASS = SPEND_LIMIT_STATUS_TEXT_CLASS
+const STATUS_LABEL = SPEND_LIMIT_STATUS_LABEL_INLINE
 
 /**
  * Richting uit `report.trend`. Let op de omgekeerde semantiek: MINDER uitgeven
@@ -72,8 +69,7 @@ const TREND_LABEL: Record<SpendLimitTrendDirection, string> = {
 }
 
 function resolveStatus(limit: SpendLimitWidgetData): DisplayStatus {
-  if (limit.status === 'exceeded') return 'exceeded'
-  return limit.isNearLimit ? 'near' : 'within'
+  return resolveSpendLimitDisplayStatus(limit)
 }
 
 function StatusDot({ status }: { status: DisplayStatus }) {
@@ -83,6 +79,32 @@ function StatusDot({ status }: { status: DisplayStatus }) {
       className="inline-block h-2 w-2 shrink-0 rounded-full"
       style={{ background: STATUS_COLOR[status] }}
     />
+  )
+}
+
+/**
+ * De reeks-score, compact. Rendert NIETS zonder meetellende historie: een 0 of
+ * een streepje zou een oordeel suggereren over een pot die nog niets heeft
+ * kunnen bewijzen. Het cijfer komt kant-en-klaar uit de motor (`report.score`),
+ * inclusief het label — hier wordt geen drempel toegepast.
+ */
+function ScoreLine({
+  limit,
+  className = '',
+}: {
+  limit: SpendLimitWidgetData
+  className?: string
+}) {
+  if (limit.score === null || limit.scoreLabel === null) return null
+  return (
+    <span className={`inline-flex items-baseline gap-1 ${className}`}>
+      <span className="text-[var(--ink-3)]">score</span>
+      <span
+        className={`font-mono font-semibold tabular-nums ${SPEND_LIMIT_SCORE_TEXT_CLASS[limit.scoreLabel]}`}
+      >
+        {limit.score}
+      </span>
+    </span>
   )
 }
 
@@ -322,6 +344,7 @@ export const SpendLimitWidget = memo(function SpendLimitWidget({
                 limitAmount={limit.limitAmount}
                 hasEntered={hasEntered}
               />
+              {/* Geen ScoreLine hier: xl toont de score al als eigen cel rechts. */}
               <p className="mt-1 text-[11px] text-[var(--ink-3)]">{TREND_LABEL[limit.trendDirection]}</p>
             </div>
           </div>
@@ -332,6 +355,14 @@ export const SpendLimitWidget = memo(function SpendLimitWidget({
               <StreakCell label="Langste reeks" value={limit.longestStreak} />
               <StreakCell label="Afgesloten" value={limit.closedPeriodCount} />
               <StreakCell label="Eroverheen" value={limit.exceededPeriodCount} />
+              {limit.score !== null && limit.scoreLabel !== null && (
+                <StreakCell
+                  label="Score"
+                  value={
+                    <span className={SPEND_LIMIT_SCORE_TEXT_CLASS[limit.scoreLabel]}>{limit.score}</span>
+                  }
+                />
+              )}
             </div>
             <p className="text-[11px] text-[var(--ink-3)]">
               Binnen je grens{' '}
@@ -378,7 +409,10 @@ export const SpendLimitWidget = memo(function SpendLimitWidget({
               limitAmount={limit.limitAmount}
               hasEntered={hasEntered}
             />
-            <p className="mt-1 text-[11px] text-[var(--ink-3)]">{TREND_LABEL[limit.trendDirection]}</p>
+            <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-[11px] text-[var(--ink-3)]">
+              <span>{TREND_LABEL[limit.trendDirection]}</span>
+              <ScoreLine limit={limit} />
+            </p>
           </div>
           {streakRow}
         </div>
@@ -409,6 +443,15 @@ export const SpendLimitWidget = memo(function SpendLimitWidget({
             {/* Reeks = een AANTAL periodes, geen bedrag → maskeert niet. */}
             <span className="font-mono tabular-nums text-[var(--ink)]">{limit.currentStreak}</span>
             <span className="text-[var(--ink-3)]"> op rij</span>
+            {/* Beide velden guarden, gelijk aan de xl-tak: guardt hier alleen
+                `score`, dan rendert een verweesde scheider zodra die twee ooit
+                uiteenlopen. */}
+            {limit.score !== null && limit.scoreLabel !== null && (
+              <>
+                <span className="text-[var(--ink-4)]"> · </span>
+                <ScoreLine limit={limit} />
+              </>
+            )}
           </p>
           {freedomLabel && (
             <p className="truncate font-serif italic text-[10px] leading-none text-[var(--ink-3)]">

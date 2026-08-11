@@ -16,28 +16,13 @@
  * de server-tijdzone.
  */
 
-const AMSTERDAM_TZ = 'Europe/Amsterdam'
+import { AMSTERDAM_TZ, amsterdamHour } from '@/lib/tz'
 
 export interface OverviewGreeting {
   /** "Goedemorgen" / "Goedemiddag" / "Goedenavond" / "Goedenacht". */
   greeting: string
   /** Bv. "Donderdag 16 juli 2026" (eerste letter gekapitaliseerd). */
   dateLabel: string
-}
-
-/** Uur (0-23) in Europe/Amsterdam voor het gegeven moment. */
-function amsterdamHour(now: Date): number {
-  const hourPart = new Intl.DateTimeFormat('nl-NL', {
-    hour: '2-digit',
-    hour12: false,
-    timeZone: AMSTERDAM_TZ,
-  })
-    .formatToParts(now)
-    .find((p) => p.type === 'hour')?.value
-
-  const h = Number.parseInt(hourPart ?? '0', 10)
-  // Sommige runtimes geven met `hour12: false` '24' terug om middernacht.
-  return Number.isNaN(h) || h === 24 ? 0 : h
 }
 
 /** Tijd-van-de-dag-groet op basis van het uur (0-23). */

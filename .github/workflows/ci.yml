@@ -60,6 +60,18 @@ jobs:
       - name: Lint-vangrails (eslint)
         run: npm run lint
 
+      # Runtime-ondergrens (ADR 0100). De SSR-crash op /overzicht
+      # ("controller[kState].transformAlgorithm is not a function") was
+      # nodejs/node#62036 — een race in Node's eigen webstreams die toeslaat
+      # wanneer een bezoeker wegklikt terwijl de RSC-stream nog loopt.
+      # Gerepareerd in Node 24.15.0. Deze stap draait de upstream-reproductie
+      # en is deterministisch rood op elke Node < 24.15.0 (300/300 lokaal
+      # geverifieerd op 24.13.0 en 24.14.0, 300/300 groen op 24.15.0), zodat
+      # een teruggerolde runtime hier struikelt in plaats van in productie.
+      # Bewust vóór de zware suites: faalt in ~1s.
+      - name: Runtime-ondergrens (webstreams-race)
+        run: npx vitest run test/node-webstreams-race.test.ts
+
       # Eén gerichte vitest-run over de rekenkern (FIRE/Horizon-kernel), de
       # Excel-oracle-pariteit (draait tegen de in-git fixtures onder
       # test/fixtures/horizon-oracle), de fiscale motoren (box1/box3/

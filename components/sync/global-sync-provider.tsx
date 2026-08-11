@@ -24,6 +24,7 @@ import {
 } from '@/lib/sync/global-sync'
 import { useToast } from '@/components/app/toast-provider'
 import { formatCurrency } from '@/lib/format'
+import { formatAmsterdamTime } from '@/lib/tz'
 import type { ExchangeConnectionRow, WalletAddressRow } from '@/lib/connections-data'
 
 export type SyncPhase = 'idle' | 'syncing' | 'partial'
@@ -208,13 +209,18 @@ interface GlobalSyncContextValue {
 
 const GlobalSyncContext = createContext<GlobalSyncContextValue | null>(null)
 
-/** Tekst onder een blauwe melding: wanneer deze koppeling weer vanzelf meegaat. */
+/**
+ * Tekst onder een blauwe melding: wanneer deze koppeling weer vanzelf meegaat.
+ *
+ * Klok in Amsterdamse tijd via `lib/tz.ts` — met `getHours()` leest de server
+ * (UTC) een ander uur dan de browser, en dat is de #418-klasse. Dezelfde tekst
+ * staat in `components/sync/sync-report-modal.tsx#fromTime`.
+ */
 function nextEligibleLabel(nextEligibleAt: string | null): string {
   if (!nextEligibleAt) return ''
   const d = new Date(nextEligibleAt)
   if (!Number.isFinite(d.getTime())) return ''
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return ` Gaat vanzelf weer mee vanaf ${pad(d.getHours())}:${pad(d.getMinutes())}.`
+  return ` Gaat vanzelf weer mee vanaf ${formatAmsterdamTime(d)}.`
 }
 
 export function GlobalSyncProvider({ children }: { children: ReactNode }) {

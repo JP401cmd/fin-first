@@ -1035,12 +1035,23 @@ describe('dailyExpenseRate — pariteit met DashboardData.dailyExpenseRate', () 
     })
     await loadSpendLimitsSection(fake.client, NOW, { withBudgetOptions: false })
 
-    // De potberekening draait op `spend_limit_rule_aggregate`, dus élke
-    // tx_month_aggregate-call is per definitie de dagtarief-fetch — en zijn
-    // venster is dat van `getTxAgg12m`.
+    // De potberekening draait op `spend_limit_rule_aggregate`, dus de
+    // tx_month_aggregate-calls komen uit twee bronnen: de dagtarief-fetch
+    // (`getTxAgg12m`, het volle 12-maands venster) en — sinds de budgetgrondslag
+    // op REALISATIE draait (ADR 0103, correctie 11 aug 2026) — drie
+    // gechunkte calls van 4 maanden uit `getRealizedBudgetAmounts`.
+    //
+    // De assertie blijft wat ze was: de dagtarief-fetch gebruikt het CANONIEKE
+    // venster en rekent er geen eigen variant op na. Alleen het aantal calls is
+    // niet langer 1.
     const calls = fake.rpcCallsFor('tx_month_aggregate')
-    expect(calls).toHaveLength(1)
-    expect(calls[0].args).toEqual({
+    const canoniek = calls.filter(
+      c =>
+        c.args.p_from === localMonthStartMonthsAgo(NOW, 11) &&
+        c.args.p_to === localMonthBounds(NOW).end,
+    )
+    expect(canoniek).toHaveLength(1)
+    expect(canoniek[0].args).toEqual({
       p_from: localMonthStartMonthsAgo(NOW, 11),
       p_to: localMonthBounds(NOW).end,
       p_own_only: false,

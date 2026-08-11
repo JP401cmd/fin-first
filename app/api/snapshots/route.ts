@@ -10,15 +10,21 @@ import {
   type HealthScoreTransaction,
 } from '@/lib/health-score-input'
 import { resolveFireParams } from '@/lib/fire-params'
-import { annualAmount } from '@/lib/budget-utils'
+import { yearlyMustExpensesFromBudgets } from '@/lib/budget-utils'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
 import { logError } from '@/lib/log-error'
 import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
 import { resolveSavingsSource, savingsRateFromAggregates } from '@/lib/savings-source'
-import { resolveEffectiveIncomeExpenses } from '@/lib/effective-financials'
+import { resolveEffectiveIncomeExpenses, resolveAmountWithBasis } from '@/lib/effective-financials'
+import { loadBudgetBasis, selectBudgetsForBasis } from '@/lib/household/budget-share'
+import type { BudgetBasisRow } from '@/lib/budget-basis'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
-import { selectUnlinkedBankAccounts, unlinkedCashTotal } from '@/lib/unlinked-cash'
+import {
+  resolveUnlinkedCashShare,
+  selectUnlinkedBankAccounts,
+  unlinkedCashTotal,
+} from '@/lib/unlinked-cash'
 import {
   weightedAssetTotal,
   weightedDebtTotal,
@@ -57,13 +63,14 @@ export async function GET() {
   // snapshot. SWR komt uit resolveFireParams (gepersonaliseerd) — identiek aan
   // het POST-schrijfpad, zodat GET-enrichment en POST hetzelfde fire_target geven.
   const [budgetsRes, profileRes] = await Promise.all([
+    // Alle budgetrijen (parents + children): de canonieke must-grondslag rolt
+    // essentiële children op en telt orphan-children apart, dus de rij-selectie
+    // hoort in de motor te gebeuren, niet in de query. Zelfde select als het
+    // POST-schrijfpad hieronder, zodat GET-enrichment en POST niet kunnen driften.
     supabase
       .from('budgets')
-      .select('default_limit, interval')
-      .eq('user_id', claims.sub)
-      .eq('is_essential', true)
-      .in('budget_type', ['expense'])
-      .is('parent_id', null),
+      .select('id, parent_id, budget_type, default_limit, interval, is_essential')
+      .eq('user_id', claims.sub),
     supabase
       .from('profiles')
       .select('expected_return, inflation_rate')
@@ -71,10 +78,7 @@ export async function GET() {
       .single(),
   ])
 
-  const yearlyMustExpenses = (budgetsRes.data ?? []).reduce(
-    (s, b) => s + annualAmount(Number(b.default_limit) || 0, b.interval),
-    0,
-  )
+  const yearlyMustExpenses = yearlyMustExpensesFromBudgets(budgetsRes.data ?? [])
   const fireSwr = resolveFireParams(profileRes.data ?? {}).effectiveSwr
   const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / fireSwr : 0
 
@@ -140,6 +144,8 @@ export async function POST() {
     incomeResult,
     profileResult,
     budgetsResult,
+    basisBudgetsResult,
+    basisPrefsResult,
     monthTxResult,
     bankAccountsResult,
   ] = await Promise.all([
@@ -176,10 +182,29 @@ export async function POST() {
       .eq('id', user.id)
       .single(),
     // Alle budgetten (alle types, parents + children) — must-expenses + health.
+    // Scope BEWUST ongewijzigd own-row: verbreden zou `yearlyMustExpenses` en de
+    // health-score-budgetten meeverschuiven (zie het aandachtspunt
+    // checkin-snapshot-assets-own-row). De GRONDSLAG heeft zijn eigen query.
     supabase
       .from('budgets')
       .select('id, parent_id, budget_type, default_limit, interval, is_essential')
       .eq('user_id', user.id),
+    // Budgetrijen voor de GRONDSLAG (ADR 0103) — huishoud-verbreed via RLS,
+    // exact zoals `getBudgets` in de live loaders. Zonder deze aparte query zou
+    // een gedeeld inkomstenbudget van de partner wél op /overzicht/cashflow
+    // meetellen en NIET in de snapshot van die nacht.
+    selectBudgetsForBasis(supabase),
+    // Grondslag-selectie (ADR 0103). BEWUST een aparte, tolerante query en geen
+    // extra kolom op de profielselect hierboven: `cashflow_basis_prefs` bestaat
+    // pas na migratie 20260811160000, en één onbekende kolom zou daar de HELE
+    // profielquery laten falen — waarna deze route een snapshot zou wegschrijven
+    // zónder inkomens-/uitgavenbron. Faalt deze query, dan telt alles mee.
+    supabase
+      .from('profiles')
+      .select('cashflow_basis_prefs')
+      .eq('id', user.id)
+      .maybeSingle()
+      .then((r) => r, () => ({ data: null })),
     // Huidige-maand-transacties met budget_id voor budget-discipline.
     supabase
       .from('transactions')
@@ -208,7 +233,13 @@ export async function POST() {
 
   // Canoniek opgeslagen net_worth: inclusion-gewogen assets + losse cash
   // − inclusion-gewogen debts (spiegelt dashboard-loader; gedeeld met auto/cron).
-  const unlinkedCash = unlinkedCashTotal(bankAccountsResult.data)
+  // Huishoud-gewogen (lib/unlinked-cash.ts). Kritiek juist hier: een ongewogen
+  // gedeelde rekening zou de dubbeltelling PERMANENT in de snapshotreeks van
+  // beide partners vastleggen.
+  const unlinkedCash = unlinkedCashTotal(
+    bankAccountsResult.data,
+    await resolveUnlinkedCashShare(supabase, bankAccountsResult.data),
+  )
   const weightedAssets = weightedAssetTotal(assets as SnapshotAsset[])
   const totalDebts = weightedDebtTotal(debts as SnapshotDebt[])
   const totalAssets = weightedAssets + unlinkedCash
@@ -219,11 +250,11 @@ export async function POST() {
   const monthlyIncome = income.reduce((s, t) => s + Number(t.amount), 0) / 6
   const monthlyContributions = assets.reduce((s, a) => s + Number(a.monthly_contribution || 0), 0)
 
-  // Essential budgets for yearly "must" expenses (parents-only, expense, essentieel).
+  // Essentiële jaarlasten op de CANONIEKE grondslag (parent/child-oprol +
+  // orphan-tak), niet de smallere parents-only-som die hier eerder stond. Deze
+  // waarde schrijft door naar freedom_percentage/fire_age/sovereignty_level.
   const allBudgets = budgetsResult.data ?? []
-  const yearlyMustExpenses = allBudgets
-    .filter(b => b.is_essential && b.budget_type === 'expense' && b.parent_id === null)
-    .reduce((s, b) => s + annualAmount(Number(b.default_limit) || 0, b.interval), 0)
+  const yearlyMustExpenses = yearlyMustExpensesFromBudgets(allBudgets)
 
   const fireParams = resolveFireParams(profileResult.data ?? {})
   const fireSwr = fireParams.effectiveSwr
@@ -284,10 +315,31 @@ export async function POST() {
   // transactiemeting, exact zoals de live loader en het instellingenblok
   // onderaan /overzicht/cashflow. Zonder dit dreef de opgeslagen historie weg
   // van het getal dat de gebruiker ziet.
+  // Budgetgrondslag (ADR 0103) — de snapshot legt HISTORIE vast, dus hij moet op
+  // dezelfde grondslag staan als het dashboard; een tijdreeks corrigeert zich
+  // nooit vanzelf. Weging via het huishoud-aandeel, exact zoals de loaders.
+  const snapshotBudgetBasis = await loadBudgetBasis(
+    supabase,
+    (basisPrefsResult.data ?? null) as Record<string, unknown> | null,
+    (basisBudgetsResult.data ?? []) as unknown as BudgetBasisRow[],
+  )
+  const snapshotAnnualIncome = resolveAmountWithBasis(
+    profileResult.data?.income_source,
+    Number(profileResult.data?.net_monthly_income ?? 0) * 12,
+    monthlyIncome * 12,
+    snapshotBudgetBasis.income.annualTotal,
+  )
+  const snapshotExpenses = resolveAmountWithBasis(
+    profileResult.data?.expenses_source,
+    Number(profileResult.data?.estimated_monthly_expenses ?? 0),
+    monthlyExpenses,
+    snapshotBudgetBasis.expenses.monthlyTotal,
+  )
   const { income: effectiveMonthlyIncome } = resolveEffectiveIncomeExpenses(
     profileResult.data ?? {},
     monthlyIncome,
     monthlyExpenses,
+    { income: snapshotBudgetBasis.income.monthlyTotal, expenses: snapshotBudgetBasis.expenses.monthlyTotal },
   )
   const { effectiveSavingsRatePct: savingsRate6m } = resolveSavingsSource({
     incomeSource: profileResult.data?.income_source,
@@ -296,6 +348,12 @@ export async function POST() {
     estimatedAnnualIncome: monthlyIncome * 12,
     estimatedMonthlyExpenses: Number(profileResult.data?.estimated_monthly_expenses ?? 0),
     savingsRate6m: savingsRateFromTx,
+    basis: {
+      income: snapshotAnnualIncome.basis,
+      expenses: snapshotExpenses.basis,
+      annualIncome: snapshotAnnualIncome.amount,
+      monthlyExpenses: snapshotExpenses.amount,
+    },
   })
   // DSTI-teller: Σ maandlasten over de actieve schulden (select bevat monthly_payment).
   const debtMonthlyPayments = debts.reduce((s, d) => s + Number(d.monthly_payment ?? 0), 0)

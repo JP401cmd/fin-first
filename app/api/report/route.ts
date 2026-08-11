@@ -14,6 +14,9 @@ import { resolveFireParams } from '@/lib/fire-params'
 import { yearlyMustExpensesFromBudgets } from '@/lib/budget-utils'
 import { computeFreedomProgressWithBasis, inclHomeTargetFromScalar } from '@/lib/core-metrics'
 import { resolveSavingsSource, savingsRateFromAggregates, computeDebtAflossingMonthly } from '@/lib/savings-source'
+import { resolveAmountWithBasis } from '@/lib/effective-financials'
+import { loadBudgetBasis } from '@/lib/household/budget-share'
+import type { BudgetBasisRow } from '@/lib/budget-basis'
 import { getRecentDailyExpenseRate } from '@/lib/expense-rate'
 import {
   deriveHousingContext,
@@ -178,6 +181,7 @@ export async function GET(request: Request) {
       actionsResult,
       goalsResult,
       profileResult,
+      basisPrefsResult,
     ] = await Promise.allSettled([
       supabase
         .from('net_worth_snapshots')
@@ -193,7 +197,9 @@ export async function GET(request: Request) {
         .order('date', { ascending: true }),
       supabase
         .from('budgets')
-        .select('id, name, slug, icon, budget_type, default_limit, interval, is_essential, parent_id'),
+        // ownership/is_archived/merged_into komen erbij voor de budgetgrondslag
+        // (ADR 0103) — zie `reportBudgetBasis` verderop.
+        .select('id, name, slug, icon, budget_type, default_limit, interval, is_essential, parent_id, ownership, is_archived, merged_into'),
       supabase
         .from('assets')
         .select('id, name, asset_type, current_value, woz_value, monthly_contribution, expected_return, is_active, net_worth_inclusion_pct')
@@ -215,6 +221,13 @@ export async function GET(request: Request) {
         .from('profiles')
         .select('full_name, date_of_birth, expected_return, inflation_rate, box3_method, marginaal_tarief, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, housing_strategy_config')
         .single(),
+      // Grondslag-selectie (ADR 0103), apart gehouden: `cashflow_basis_prefs`
+      // bestaat pas na migratie 20260811160000 en zou als extra kolom hierboven
+      // de hele profielselect laten falen.
+      // Eigen-rij expliciet, net als de vijf andere prefs-reads: de own-row
+      // policy dekt dit vandaag, maar een `.single()` zonder filter breekt stil
+      // zodra `profiles` ooit huishoud-verbreed wordt.
+      supabase.from('profiles').select('cashflow_basis_prefs').eq('id', user.id).single(),
     ])
 
     // Safe extraction
@@ -234,6 +247,7 @@ export async function GET(request: Request) {
     const actions = (actionsResult.status === 'fulfilled' ? actionsResult.value.data ?? [] : []) as ActionRow[]
     const goals = (goalsResult.status === 'fulfilled' ? goalsResult.value.data ?? [] : []) as GoalRow[]
     const profile = profileResult.status === 'fulfilled' ? profileResult.value.data : null
+    const basisPrefsRow = (basisPrefsResult.status === 'fulfilled' ? basisPrefsResult.value.data : null) as Record<string, unknown> | null
 
     // ── KERN SECTION ──
 
@@ -586,6 +600,26 @@ export async function GET(request: Request) {
       avgMonthlyExpenses - reportMonthlySavingsBudget,
       reportDebtAflossingMonthly,
     ))
+    // Budgetgrondslag (ADR 0103) — het rapport hoort hetzelfde spaarbedrag te
+    // noemen als /overzicht en /toekomst; een pdf met een ander getal is een
+    // tweede waarheid die de gebruiker meeneemt.
+    const reportBudgetBasis = await loadBudgetBasis(
+      supabase,
+      basisPrefsRow,
+      allBudgets as unknown as BudgetBasisRow[],
+    )
+    const reportAnnualIncome = resolveAmountWithBasis(
+      profile?.income_source,
+      Number(profile?.net_monthly_income ?? 0) * 12,
+      avgMonthlyIncome * 12,
+      reportBudgetBasis.income.annualTotal,
+    )
+    const reportExpenses = resolveAmountWithBasis(
+      profile?.expenses_source,
+      Number(profile?.estimated_monthly_expenses ?? 0),
+      avgMonthlyExpenses,
+      reportBudgetBasis.expenses.monthlyTotal,
+    )
     const { baseAnnualSavings } = resolveSavingsSource({
       incomeSource: profile?.income_source,
       expensesSource: profile?.expenses_source,
@@ -595,6 +629,12 @@ export async function GET(request: Request) {
       savingsRate6m: reportSavingsRatePct,
       monthlyDebtAflossing: reportDebtAflossingMonthly,
       monthlySavingsContribution: reportMonthlySavingsBudget,
+      basis: {
+        income: reportAnnualIncome.basis,
+        expenses: reportExpenses.basis,
+        annualIncome: reportAnnualIncome.amount,
+        monthlyExpenses: reportExpenses.amount,
+      },
     })
     const monthlySavingsForFire = baseAnnualSavings / 12
 

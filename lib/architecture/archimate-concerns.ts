@@ -25,6 +25,42 @@ export interface ArchiConcern {
 
 export const ARCHI_CONCERNS: ArchiConcern[] = [
   {
+    id: 'huishoud-inkomensverhouding-zonder-intervalconversie',
+    title: 'De huishoud-inkomensverhouding telt budgetlimieten op zonder interval-conversie',
+    detail:
+      'lib/household/perspective-loader.ts (r172-182) leidt bij `split_mode = \'income_ratio\'` de verdeelsleutel `mySharePct` af uit de income-budgetten van beide partners: `.from(\'budgets\').select(\'user_id, default_limit\').eq(\'budget_type\', \'income\')` en dan `Number(b.default_limit) || 0` optellen. Er zit GEEN interval-conversie in — een jaarbudget van €60.000 en een maandbudget van €5.000 zijn economisch gelijk maar tellen hier als 60.000 tegen 5.000, een factor 12. Evenmin een parent/kind-oprol (een parent met kinderen telt zowel zijn eigen kop als zijn kinderen mee) en geen is_archived/merged_into-filter. De canonieke conversie bestaat al: `annualAmount` in lib/budget-utils.ts, en sinds ADR 0103 doet `computeBudgetBasis` (lib/budget-basis.ts) precies deze som wél goed. Gevolg: bij twee partners met verschillend ingestelde budget-intervallen krijgt de verkeerde partner het grootste aandeel, en dat aandeel weegt de losse-cash-optelling (lib/unlinked-cash.ts, ADR 0101) en de gedeelde-item-weging. Vandaag inert — nul huishoudens op productie (gemeten 11-8-2026) — maar dat venster sluit bij het eerste tweede huishoudlid. NIET opgelost in de ADR 0103-snede: het raakt de huishoudsplitsing, niet de cashflow-grondslag, en verdient een eigen besluit over of de verhouding überhaupt op budgetten hoort te staan (de code zelf noemt "de cashflow-fase standaardiseert dit later op transactie-inkomen"). Verwijder dit punt zodra die som via annualAmount/computeBudgetBasis loopt of op transactie-inkomen staat.',
+    severity: 'risk',
+    elementIds: ['as-budget', 'fn-budgetteren', 't-supabase'],
+    reviewedAt: '2026-08-11',
+  },
+  {
+    id: 'budget-kind-oprol-interval-mismatch',
+    title: 'De budget-KPI rolt kinderen op met het interval van de PARENT',
+    detail:
+      'lib/cashflow-kpis.ts#deriveBudgetTotals (r196-212) bepaalt de maandlimiet per budget-type door de kinder-limieten RAUW op te tellen en die som daarna te normaliseren met het interval van de PARENT (`monthly` ×1, `quarterly` ÷3, alles anders ÷12). Elk kind met een ander interval dan zijn ouder komt daardoor verkeerd binnen: een MAANDkind van €300 onder een JAARouder telt als €25/mnd — 12× te laag; andersom telt een jaarkind onder een maandouder 12× te hoog. `budgets.interval` staat monthly/quarterly/yearly expliciet toe (CHECK-constraint), dus dit is bereikbaar gebruikersgedrag. Dezelfde fout-klasse als de gedupliceerde jaarconversie die `annualAmount` (lib/budget-utils.ts) ooit opruimde, één laag hoger. De correcte vorm staat in `computeYearlyMustExpenses` (elk kind met zijn eigen interval, terugval het parent-interval) en sinds ADR 0103 ook in `computeBudgetBasis` (lib/budget-basis.ts) — die laatste kopieert deriveBudgetTotals expliciet NIET, met een test die het verschil vastlegt. BEWUST NIET samengevoegd: deriveBudgetTotals beantwoordt een ándere vraag (budgetdekking déze maand, met een bewust transfer-ONgefilterde spent-pass) en voedt de Budget-KPI + budgetScore op /overzicht en /overzicht/cashflow; hem "repareren" verschuift die twee zichtbare getallen en hoort een eigen besluit te zijn. Gevolg zolang het blijft staan: de budget-limiet-KPI en de budget-grondslag van de cashflow-kaarten kunnen voor dezelfde budgetten een ander bedrag noemen. Verwijder dit punt zodra deriveBudgetTotals de kind-oprol via annualAmount doet (met een eigen besluit over de verschoven KPI).',
+    severity: 'debt',
+    elementIds: ['as-budget', 'fn-budgetteren'],
+    reviewedAt: '2026-08-11',
+  },
+  {
+    id: 'essentiele-uitgaven-zonder-huishoud-deelfractie',
+    title: 'De essentiële jaaruitgaven wegen een GEDEELD budget op 100%',
+    detail:
+      'lib/budget-utils.ts#computeYearlyMustExpenses (r83-102) sommeert de essentiële budgetrijen zoals `getBudgets` ze aanlevert, zonder huishoud-deelfractie. De SELECT-policy op `budgets` is `auth.uid() = user_id OR (ownership = \'shared\' AND household_id = user_household_id())`, dus die lijst bevat ook de als `shared` gemarkeerde budgetten van de partner — en die tellen hier voor 100% mee bij BEIDE partners. Bij een gedeeld essentieel budget van €1.000/mnd rekenen twee partners samen dus €24.000/jaar aan must-expenses waar het er €12.000 zijn. Dat voedt `yearlyMustExpenses` en daarmee het FIRE-doel: het doelvermogen komt te hoog uit en de FIRE-datum te laat. Sinds ADR 0103 doet de zusterberekening het wél goed: `lib/household/budget-share.ts` past `shareFractionFor` (lib/budget-perspective.ts) toe op kindniveau voor de inkomsten-/uitgavengrondslag, met fail-closed 50% en een fast path zonder extra query. BEWUST NIET meegenomen in de ADR 0103-snede: dit is een andere metriek (essentiële jaaruitgaven voor het FIRE-doel, niet de cashflow-grondslag), en meeveranderen zou de FIRE-datum van huishoudens verschuiven om een reden die los staat van de grondslagkeuze — dat hoort een eigen, aantoonbaar besluit te zijn. Vandaag inert zolang er geen huishoudens met gedeelde essentiële budgetten zijn (nul huishoudens op productie, gemeten 11-8-2026); dat venster sluit bij het eerste tweede huishoudlid. Verwijder dit punt zodra computeYearlyMustExpenses de deelfractie via shareFractionFor toepast.',
+    severity: 'risk',
+    elementIds: ['as-budget', 'as-planning', 'fn-budgetteren'],
+    reviewedAt: '2026-08-11',
+  },
+  {
+    id: 'feature-preferences-volledige-overwrite',
+    title: 'PUT /api/feature-preferences overschrijft de hele jsonb-kolom',
+    detail:
+      'app/api/feature-preferences/route.ts bouwt `profiles.feature_preferences` bij elke aanroep OPNIEUW op uit uitsluitend bekende `UNIFIED_FEATURES`-id\'s en schrijft die als VOLLEDIGE overwrite — geen read-modify-write. Elke sleutel in die kolom die geen feature-id is, verdwijnt dus bij de eerstvolgende voorkeurenwijziging van de gebruiker. Er wonen daar aantoonbaar niet-feature-sleutels: `_welcome_seen`, `deferred_onboarding_fields` en de intake-sleutels. Concreet: iemand zet ergens een functie aan of uit en verliest daarmee stil zijn onboarding-status of uitgestelde intake-velden — een gegevensverlies zonder foutmelding en zonder spoor. Dit is ook de reden dat ADR 0103 de grondslag-selectie een EIGEN kolom gaf (`profiles.cashflow_basis_prefs`) in plaats van deze: daar zou het betekend hebben dat het inkomen van een gebruiker verandert doordat hij ergens anders een functie uitzette. De structurele fix is een own-row read-modify-write (spiegel `app/api/appearance`) of het uitfaseren van de niet-feature-sleutels naar eigen kolommen; die keuze is NIET in de ADR 0103-snede genomen. Verwijder dit punt zodra de route mergt in plaats van overschrijft, of zodra er geen niet-feature-sleutels meer in de kolom wonen.',
+    severity: 'risk',
+    elementIds: ['t-supabase', 'as-planning'],
+    reviewedAt: '2026-08-11',
+  },
+  {
     id: 'volledige-profielrij-naar-de-client',
     title: 'De hele profiles-rij serialiseert naar de browser in kernel-snapshots',
     detail:
@@ -52,13 +88,13 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     reviewedAt: '2026-08-05',
   },
   {
-    id: 'gedeelde-bankrekening-ongewogen',
-    title: 'Gedeelde bankrekening telt bij béíde partners voor 100%',
+    id: 'gedeelde-bezitting-ongewogen',
+    title: 'Gedeelde bezitting telt bij béíde partners voor 100%',
     detail:
-      'bank_accounts heeft géén net_worth_inclusion_pct-kolom, terwijl assets en debts die wél hebben. Een GEDEELDE losse rekening (ownership=shared, linked_asset_id IS NULL) telt daardoor in het netto vermogen van beide partners voor het volle saldo, waar een gedeelde bezitting via inclusion-% over hen verdeeld wordt — op huishoudniveau dus 200% versus 100%. Dit is pre-existent en app-breed consistent (het dashboard deed het altijd al zo; sinds 2026-07-31 doen de check-in- en snapshot-routes het ook, wat de drift tússen de schermen juist wegnam). Oplossen vraagt een schemabesluit — de kolom toevoegen en een migratiepad voor bestaande gedeelde rekeningen — niet een lokale correctie in een route. Verwijder dit punt zodra dat besluit gevallen en uitgevoerd is.',
+      'Opvolger van "gedeelde bankrekening telt dubbel" (11-8-2026 opgelost: de losse-cash-optelling weegt sinds ADR 0101 op households.split_mode, lib/unlinked-cash.ts). De ANDERE helft staat nog open: net_worth_inclusion_pct op assets/debts is géén huishoudsplitsing maar een handmatige 0-100-schuif met default 100, volledig los van ownership. Een bezitting op "gedeeld" zetten zet die schuif niet op 50, dus een gedeelde bezitting telt in het netto vermogen van béíde partners voor het volle bedrag — op huishoudniveau 200%. De wortelfix is expliciet huishoud-eigenaarschap (één rij, één eigenaar, verdeling afgeleid uit split_mode) en is vandaag gratis: nul huishoudens, nul gedeelde bezittingen op productie (gemeten 11-8-2026). Dat venster sluit bij het eerste tweede huishoudlid — een gebruikersactie, geen release. Zie ADR 0101.',
     severity: 'debt',
     elementIds: ['as-vermogen', 'fn-vermogensregistratie', 't-supabase'],
-    reviewedAt: '2026-07-31',
+    reviewedAt: '2026-08-11',
   },
   {
     id: 'checkin-snapshot-assets-own-row',
@@ -244,10 +280,28 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     id: 'grenzenpot-sql-ts-parity-zonder-test',
     title: 'Grenzenpot: SQL↔TS-parity-contract is alleen door discipline geborgd',
     detail:
-      'De tegenpartij-normalisatie bestaat twee keer — `public.spend_limit_counterparty_key` (SQL, COLLATE "C") en `spendLimitCounterpartyKey` (TS). De som komt uit SQL, de uitleg uit TS. Er is geen geautomatiseerde test die beide naast elkaar uitvoert; de borging is een comment, een CHECK-constraint (`counterparty_key ~ \'^[0-9A-Z]+$\'`) en review-discipline (ADR 0089 besluit 3). Fase 2–4 (uitsplitsing via `tx_counterparty_name_breakdown`, match-preview via `findOverlappingLimits`) leunt zwaarder op dat contract dan fase 1: er hangt nu een derde consument aan dezelfde sleutel. GEDICHT (was hier gemeld): migratie `20260808170000_tx_counterparty_name_breakdown_transfer_parity.sql` voegt aan `tx_counterparty_name_breakdown` hetzelfde `transaction_type`-filter toe als `computePeriodOutcome` (`isRealAggRow`) — de uitsplitsing beschrijft nu dezelfde verzameling als het canonieke periodebedrag; de rest-bucket-klem op 0 blijft staan als vangnet tegen de top-50-afkap, niet meer tegen deze asymmetrie. Wat blijft staan: het SQL↔TS-parity-PAAR (`spend_limit_counterparty_key` ↔ `spendLimitCounterpartyKey`, en nu ook het transaction_type-predikaat zelf) is nog altijd alleen met de hand geborgd — er is geen geautomatiseerde test die beide talen naast elkaar uitvoert. Verwijder dit punt zodra er een geautomatiseerde parity-test bestaat.',
+      'De tegenpartij-normalisatie bestaat twee keer — `public.spend_limit_counterparty_key` (SQL, COLLATE "C") en `spendLimitCounterpartyKey` (TS). De som komt uit SQL, de uitleg uit TS. Er is geen geautomatiseerde test die beide naast elkaar uitvoert; de borging is een comment, een CHECK-constraint (`counterparty_key ~ \'^[0-9A-Z]+$\'`) en review-discipline (ADR 0089 besluit 3). Fase 2–4 (uitsplitsing via `tx_counterparty_name_breakdown`, match-preview via `findOverlappingLimits`) leunt zwaarder op dat contract dan fase 1: er hangt nu een derde consument aan dezelfde sleutel. GEDICHT (was hier gemeld): migratie `20260808170000_tx_counterparty_name_breakdown_transfer_parity.sql` voegt aan `tx_counterparty_name_breakdown` hetzelfde `transaction_type`-filter toe als `computePeriodOutcome` (`isRealAggRow`) — de uitsplitsing beschrijft nu dezelfde verzameling als het canonieke periodebedrag; de rest-bucket-klem op 0 blijft staan als vangnet tegen de top-50-afkap, niet meer tegen deze asymmetrie. Wat blijft staan: het SQL↔TS-parity-PAAR (`spend_limit_counterparty_key` ↔ `spendLimitCounterpartyKey`, en nu ook het transaction_type-predikaat zelf) is nog altijd alleen met de hand geborgd — er is geen geautomatiseerde test die beide talen naast elkaar uitvoert. GEGROEID (11-08-2026): migratie `20260811120000_spend_limit_rule_transactions.sql` voegt een VIERDE consument toe. De rij-RPC `spend_limit_rule_transactions` dupliceert nu niet alleen de normalisatiesleutel maar óók het `transaction_type`-predikaat én de `DISTINCT ON`-ontdubbelvolgorde in een tweede SQL-functie — en die twee bepalen samen of de getoonde boekingenlijst dezelfde verzameling beschrijft als het canonieke periodebedrag erboven. Wijkt één van de drie af, dan telt de lijst zichtbaar niet op tot het bedrag, zonder dat iets faalt. Het risico is daarmee gegroeid van "één sleutel, drie lezers" naar "drie predikaten, vier lezers". Verwijder dit punt zodra er een geautomatiseerde parity-test bestaat.',
     severity: 'debt',
     elementIds: ['as-budget'],
-    reviewedAt: '2026-08-08',
+    reviewedAt: '2026-08-11',
+  },
+  {
+    id: 'hard-verwijderde-banktransacties-keren-terug',
+    title: 'Hard verwijderde banktransacties kunnen bij de volgende sync terugkomen',
+    detail:
+      'De transactiedienst (as-transacties, ADR 0104) laat een gebruiker transacties bulk hard verwijderen — bewuste eigenaarskeuze, geen prullenbak (B1). De unieke dedup-index transactions_import_hash_per_account_idx blokkeert een herimport alleen zolang de rij nog bestaat; is ze weg, dan importeert de eerstvolgende bank-sync of -import diezelfde boeking probleemloos opnieuw, alsof er nooit iets verwijderd was. De app waarschuwt daarvoor in de verwijder-bevestiging (F18) maar voorkomt het niet. Uitweg zou een tombstone op de dedup-sleutel zijn (bewust buiten scope, R-NF7). Verwijder dit punt zodra zo\'n tombstone bestaat of het risico anderszins is afgedekt.',
+    severity: 'debt',
+    elementIds: ['as-transacties', 't-bankconnect', 'do-transactie'],
+    reviewedAt: '2026-08-11',
+  },
+  {
+    id: 'vijf-paden-wijzen-transacties-toe',
+    title: 'Vijf implementaties van "wijs N transacties toe aan een budget"',
+    detail:
+      'Met de transactiedienst (as-transacties, ADR 0104) erbij zijn er nu vijf plekken die hetzelfde doen — een selectie transacties in één keer aan een budget koppelen — elk net anders in paginatie, telling en scoping: sleepmodus (lib/category-rules.ts, auto-siblings, niet gepagineerd), ai-categorize-sheet.tsx (auto-groepen, wel gepagineerd op lezen niet op schrijven), het scope-prompt in transaction-form.tsx (auto-match op naam, telt geraakte rijen niet), own-accounts-reclassify.ts (IBAN/naam-regels, wél gepagineerd en telt correct — het enige eerder-correcte referentiepatroon) en nu lib/transactions/bulk-mutate.ts (vrije selectie, bevroren id-lijst, batching ≤200, telt uit .select(\'id\')). ADR 0104 besluit 10 kiest bewust géén convergentie nu: de vier bestaande paden zijn family (b) (criterium-gebaseerd) en die semantiek in de nieuwe bevroren-id-lijst-primitive trekken zou precies weghalen wat ADR 0104 besluit 1 koopt. Te verwijderen zodra alle vijf op bulk-mutate.ts (of een gedeelde opvolger) draaien — een aparte convergentiekaart.',
+    severity: 'debt',
+    elementIds: ['as-transacties', 'as-budget'],
+    reviewedAt: '2026-08-11',
   },
 ]
 

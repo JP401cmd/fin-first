@@ -47,15 +47,15 @@ describe('BUDGET_FLOW — curatie-integriteit', () => {
     }
   })
 
-  it('dekt alle 25 WF-BUDGET-scenario\'s (01..25, aaneengesloten — geen verwijsregel-gaten)', () => {
+  it('dekt alle 26 WF-BUDGET-scenario\'s (01..26, aaneengesloten — geen verwijsregel-gaten)', () => {
     const covered = new Set(
       BUDGET_FLOW.nodes.map((n) => n.scenarioId).filter((id): id is string => Boolean(id)),
     )
-    const expected = Array.from({ length: 25 }, (_, i) => `UAT-BUDGET-${String(i + 1).padStart(2, '0')}`)
+    const expected = Array.from({ length: 26 }, (_, i) => `UAT-BUDGET-${String(i + 1).padStart(2, '0')}`)
     for (const id of expected) {
       expect(covered.has(id), `${id} moet als flow-knoop voorkomen`).toBe(true)
     }
-    expect(covered.size).toBe(25)
+    expect(covered.size).toBe(26)
   })
 
   it('de domeinoverschrijdende cross-knopen dekken Cash/MIJN/TOEK/OVZ/RAPP', () => {

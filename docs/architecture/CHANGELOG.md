@@ -796,3 +796,12 @@
 ## 2026-08-11
 
 - **API-routes** verwijderd: /api/module-guide/steps, /api/standard-guide/steps
+
+## 2026-08-11
+
+- **API-routes** toegevoegd: /api/transactions/bulk-budget, /api/transactions/bulk-budget/regel, /api/transactions/bulk-delete, /api/transactions/search, /api/transactions/search/manifest
+- **Componenten (aantal)** toegevoegd: +11
+
+## 2026-08-11
+
+- Geen wijzigingen.

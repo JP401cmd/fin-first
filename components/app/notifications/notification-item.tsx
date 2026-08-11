@@ -7,6 +7,7 @@ import { useChatContext } from '@/components/app/chat/chat-provider'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import type { ListDensity } from '@/components/app/density-toggle'
 import type { Notification, NotificationType } from '@/app/api/notifications/route'
+import { formatAmsterdamTime } from '@/lib/tz'
 
 // ── Module mapping ──────────────────────────────────────────────────
 
@@ -50,9 +51,13 @@ const FALLBACK_MODULE_INFO: ModuleInfo = {
   mediumVar: 'var(--will-m)',
 }
 
+// Amsterdamse wandkloktijd via `lib/tz.ts` — `toLocaleTimeString` zonder
+// `timeZone` leest de runtime-tijdzone, dus de server (UTC) zou hier een ander
+// uur renderen dan de browser (#418-klasse).
 function formatTime(dateStr: string): string {
   const d = new Date(dateStr)
-  return d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
+  if (Number.isNaN(d.getTime())) return ''
+  return formatAmsterdamTime(d)
 }
 
 // ── Notification Item ───────────────────────────────────────────────

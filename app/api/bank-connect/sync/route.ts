@@ -24,9 +24,15 @@ import {
 } from '@/lib/truelayer/errors'
 import type { TLTransaction } from '@/lib/truelayer/types'
 import { syncAccountBalance } from '@/lib/truelayer/balance-sync'
-import { categorizeTransaction, buildFrequencyMap, type CategoryCorrection } from '@/lib/parsers/categorize'
+import {
+  categorizeTransaction,
+  buildFrequencyMap,
+  isOwnAccountTransfer,
+  type CategoryCorrection,
+} from '@/lib/parsers/categorize'
+import { loadOwnAccountIdentifiers } from '@/lib/own-accounts-server'
 import { decryptField, encryptField } from '@/lib/crypto/field-encryption'
-import type { Budget } from '@/lib/budget-data'
+import { resolveEigenRekeningBudgetId, type Budget } from '@/lib/budget-data'
 
 /**
  * De eerste ophaal doet tot vier provider-verzoeken (B8: 24 maanden in blokken
@@ -337,6 +343,7 @@ export async function POST(req: Request) {
       existingHashSet,
       crossSourceCandidates,
       freqMap,
+      ownAccounts,
     ] = await Promise.all([
       supabase
         .from('budgets')
@@ -365,6 +372,9 @@ export async function POST(req: Request) {
             maxDate: dates[dates.length - 1],
           }),
       buildFrequencyMap(user.id, supabase),
+      // Eigen-rekening-identifiers: ÉÉN keer per sync-run, vóór de rijlus. Twee
+      // queries voor de hele run in plaats van twee per transactie.
+      loadOwnAccountIdentifiers(supabase, user.id),
     ])
 
     // Vergelijking op `import_hash` alléén — niet op de volledige indexsleutel
@@ -416,12 +426,31 @@ export async function POST(req: Request) {
       .filter((d) => d.reason === null)
       .map((d) => d.candidate)
 
+    // ── Eigen-rekening-verschuivingen (het doel van de rij) ───────────────────
+    // De post waar een herkende verschuiving op landt is een `archive`-budget en
+    // telt dus niet mee als uitgave. Bewust gefilterd op de EIGEN budgetten: de
+    // SELECT-policy op `budgets` is huishoud-verbreed ("own or shared"), en het
+    // doel van een eigen rij hoort van de schrijvende gebruiker te zijn — niet
+    // per ongeluk de gedeelde emmer van de partner. Spiegelt
+    // `/api/own-accounts/reclassify`, dat de budgetten met `.eq('user_id', …)`
+    // leest. `null` als de post niet bestaat: dan blijft de rij zonder budget
+    // maar wél als `transfer` staan, precies zoals de bestandsimport doet.
+    const eigenRekeningBudgetId = resolveEigenRekeningBudgetId(
+      ((budgets ?? []) as Budget[]).filter((b) => b.user_id === user.id),
+    )
+
     // Categorize and batch insert.
     // 200 in plaats van 50: sinds B8 kan één eerste ophaal ~3.000 rijen leveren,
     // en 60 sequentiële round-trips passen niet comfortabel binnen de
     // functie-timeout.
     const BATCH_SIZE = 200
-    let insertedCount = 0
+    /**
+     * De rijen die daadwerkelijk zijn weggeschreven. De tellers hieronder worden
+     * hiéruit HERLEID — nooit naast de insert opgehoogd. Anders telt een batch
+     * die sneuvelde stil mee in "zoveel nieuw", en dat is exact de fout die
+     * dedup nutteloos maakt: de rij wordt geweigerd, het getal niet.
+     */
+    const insertedRows: { category_source: string }[] = []
     let failedCount = 0
 
     for (let i = 0; i < newTransactions.length; i += BATCH_SIZE) {
@@ -439,6 +468,15 @@ export async function POST(req: Request) {
           freqMap,
         )
 
+        // Eigen-rekening-detectie op de server, uit een set die deze route zelf
+        // heeft gebouwd — nooit uit iets dat de provider of een client aanlevert.
+        const isOwnTransfer = isOwnAccountTransfer(
+          tx.counterparty_iban,
+          ownAccounts.ids.ibans,
+          tx.counterparty_name,
+          ownAccounts.ids.namePatterns,
+        )
+
         return {
           user_id: user.id,
           account_id: connAccount.bank_account_id,
@@ -448,12 +486,30 @@ export async function POST(req: Request) {
           counterparty_name: tx.counterparty_name,
           counterparty_iban: tx.counterparty_iban,
           reference: tx.reference,
-          transaction_type: tx.transaction_type,
+          // Onze detectie kan een verschuiving alleen BEVESTIGEN, niet ontkennen:
+          // een tegenpartij die wij niet kennen bewijst niet dat het géén eigen
+          // rekening is. Vandaar de eenzijdige upgrade — matcht onze set, dan
+          // zetten wij het trio, óók als de categorisatie al een budget had
+          // gekozen. Reden: een verschuiving is per definitie geen uitgave, dus
+          // élk gewoon budget is hier de verkeerde bak; hem laten staan is precies
+          // de dubbeltelling die de spaarquote vertekent en die `reclassify`
+          // achteraf moet repareren.
+          //
+          // Wat hier NIET staat, en waarom niet: er is geen "de provider wint als
+          // die al transfer zegt"-tak. `lib/truelayer/mapper.ts:47` zet
+          // `transaction_type` altijd op `null` (rauwe categorieën gaan naar
+          // `bank_code`), dus zo'n tak zou dood zijn. Levert een toekomstige
+          // provider hier wél een waarde — met name `'joint_transfer'` — dan
+          // overschrijft deze regel die. Dat is dan een bewuste heroverweging
+          // waard, geen stilzwijgende aanname.
+          transaction_type: isOwnTransfer ? 'transfer' : tx.transaction_type,
           bank_code: tx.bank_code,
           import_hash: tx.import_hash,
           is_income: tx.amount > 0,
-          budget_id: cat.budget_id,
-          category_source: cat.category_source ?? (cat.budget_id ? 'rule' : 'import'),
+          budget_id: isOwnTransfer ? eigenRekeningBudgetId : cat.budget_id,
+          category_source: isOwnTransfer
+            ? 'transfer'
+            : cat.category_source ?? (cat.budget_id ? 'rule' : 'import'),
           // Herkomst (B5): deze rijen komen uit de bankkoppeling. `category_source`
           // beschrijft hóé het budget is bepaald — `source` beschrijft wáár de
           // transactie vandaan komt. Bestaande rijen blijven bewust NULL
@@ -474,9 +530,20 @@ export async function POST(req: Request) {
         console.error('Batch insert error:', insertError)
         failedCount += rows.length
       } else {
-        insertedCount += rows.length
+        insertedRows.push(...rows)
       }
     }
+
+    // Beide getallen HERLEID uit de weggeschreven verzameling, niet opgehoogd.
+    // Deze route raakt uitsluitend NIEUWE rijen: bestaande transacties worden
+    // door dedup-laag 1 en 2 overgeslagen en nooit bijgewerkt, dus een handmatig
+    // gecategoriseerde boeking kan hier niet worden overschreven.
+    const insertedCount = insertedRows.length
+    // `category_source === 'transfer'` is hier een exacte maat voor "door onze
+    // detectie herkend": deze route geeft `categorizeTransaction` bewust géén
+    // identifier-set mee (die prioriteit-0-tak kan dus niet vuren), dus de enige
+    // schrijver van die waarde is de tak hierboven.
+    const ownTransferCount = insertedRows.filter((r) => r.category_source === 'transfer').length
 
     // ── Saldo meeliften op de sync ────────────────────────────────────────────
     // Een sync zonder saldo laat `bank_accounts.balance` op 0 staan (en daarmee
@@ -584,6 +651,14 @@ export async function POST(req: Request) {
       // plaats van erin — anders verandert stil wat "al bekend" betekent.
       duplicates: duplicateCount,
       duplicates_cross_source: crossSourceCounts.total,
+      // Additief: hoeveel van de nieuwe rijen zijn als eigen-rekening-verschuiving
+      // geboekt in plaats van als uitgave/inkomst. Zonder deze teller is "het is
+      // gelukt" niet te onderscheiden van "er is niets herkend", terwijl juist
+      // deze rijen de spaarquote beïnvloeden. Bewust NIET in `bank_sync_log`:
+      // daar zou een kolom (en dus een migratie) voor nodig zijn, en de
+      // terugkoppeling hoort in eerste instantie bij de gebruiker die net op
+      // "Synchroniseer" drukte.
+      own_account_transfers: ownTransferCount,
       // Stand ná deze sync, zoals de database hem atomair heeft vastgesteld —
       // geen `gelezen waarde + 1` meer, die kon onder gelijktijdigheid liegen.
       daily_requests: dailyRequests,

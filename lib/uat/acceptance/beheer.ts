@@ -553,11 +553,11 @@ const criteria: AcceptanceCriterion[] = [
     when:
       'De beheerder doorloopt de audit-trail, de client-fouten, de e-mailpogingen en de cron-uitvoeringen; controleert of een gebruikersbeheer-actie (WF-BEHEER-07/08) in de audit-trail verschijnt.',
     then:
-      'Elke log toont de juiste rijen (wie/wat/detail/wanneer, status, duur); lege logboeken zijn mogelijk; de audit-trail is de verificatiebron voor de KERN-gebruikersbeheer-flows. Alleen-lezen weergave, geen eigen berekening.',
+      'Elke log toont de juiste rijen (wie/wat/detail/wanneer, status, duur); lege logboeken zijn mogelijk; de audit-trail is de verificatiebron voor de KERN-gebruikersbeheer-flows. Alleen-lezen weergave, geen eigen berekening. OP /beheer/jobs (11 aug 2026) draagt elk schema-label sindsdien expliciet "UTC" — Vercel evalueert cron-expressies in UTC, en zonder dat achtervoegsel las "Dagelijks 05:00" naast een laatste run van 07:55 (Amsterdam) als drift terwijl er niets aan de hand was. De "stil"-drempels (`maxAgeHours`) zijn geen ronde "schema + ruime marge" meer maar een uitgerekende band per taak (bv. de prijsverversing van 26 → 23 uur), afgeleid uit de GEMETEN cron-jitter en het feit dat `job_runs.created_at` pas bij het AFRONDEN wordt geschreven; de pagina telt daar via `deriveJobHealth` nog een eigen toeslag bij op, omdat zij een andere vraag stelt dan de meldingen-sweep. Wat een tester hier controleert blijft dus alleen-lezen, maar een taak die op "stil" staat terwijl hij vanmorgen liep is nú een echte bevinding en geen tijdzone-illusie.',
     assertion: {
       kind: 'ui-only',
       source:
-        'app/(app)/beheer/audit/page.tsx + app/(app)/beheer/errors/page.tsx + app/(app)/beheer/email/page.tsx + app/(app)/beheer/jobs/page.tsx (JOB_CATALOG, incl. cron "Meldingen → Notion-sync") — alleen-lezen logboeken, geen cijfermatige uitkomst',
+        'app/(app)/beheer/audit/page.tsx + app/(app)/beheer/errors/page.tsx + app/(app)/beheer/email/page.tsx + app/(app)/beheer/jobs/page.tsx (taken uit lib/job-catalog.ts, incl. "Meldingen → Notion-sync" en "Meldingen-sweep") — alleen-lezen logboeken, geen cijfermatige uitkomst',
     },
   },
   {

@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedUser } from '@/lib/supabase/cached-user'
+import { countStalePrices, type StalenessRow } from '@/lib/holdings-staleness'
 import { getActiveAssets, getActiveDebts, getOwnProfile } from '@/lib/server-data/base'
 import { ChatProvider } from '@/components/app/chat/chat-provider'
 import { ChatPanelLazy } from '@/components/app/chat/chat-panel-lazy'
@@ -55,8 +56,6 @@ import type { ModuleColorConfig, BudgetColorConfig, PhaseColorConfig } from '@/l
 import type { FontTheme } from '@/components/app/module-color-provider'
 
 // ── Sidebar status-dot drempels ─────────────────────────────────────
-// Holdings-koers ouder dan dit = "ververs nodig" (sidebar staleness-dot).
-const HOLDINGS_STALE_DAYS = 7
 // Hypotheek-rentevaste periode loopt binnen dit venster af = "actie" (sidebar dot).
 const RATE_RESET_MONTHS = 6
 
@@ -91,15 +90,7 @@ export default async function AppLayout({
   threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
   const dateStr = threeMonthsAgo.toISOString().split('T')[0]
 
-  // Cutoff voor de holdings-staleness-dots — vooraf berekend zodat de twee
-  // staleness-tellingen in de hoofdbatch hieronder mee kunnen (i.p.v. een
-  // tweede seriële round-trip ná de batch). De app-gate (`sidebarActiveAppKeys`)
-  // verschuift naar de boolean-afleiding — het gedrag blijft identiek.
-  const staleCutoffIso = new Date(
-    Date.now() - HOLDINGS_STALE_DAYS * 24 * 60 * 60 * 1000,
-  ).toISOString()
-
-  // ── Active modules ────────────────────────────────────
+    // ── Active modules ────────────────────────────────────
   // Module-toggle is verwijderd uit Trifinity (zie /mijn/geavanceerd).
   // App-zichtbaarheid wordt voortaan per individuele app afgeleid van
   // tracking-flags op assets/debts (zie `sidebarActiveAppKeys` hieronder).
@@ -223,25 +214,31 @@ export default async function AppLayout({
     coachHasFireModule
       ? supabase.from('life_events').select('id, event_type').eq('user_id', user.id).eq('is_active', true)
       : Promise.resolve(null),
-    // Holdings-staleness-tellingen (sidebar-dot). Voorheen een aparte seriële
-    // Promise.all ná de batch, gate-d op `sidebarActiveAppKeys`. Hier
-    // ONGEGATE meegenomen (head-only count, minimale payload); de app-gate
-    // verschuift naar de boolean-afleiding hieronder zodat de uitkomst
-    // (`sidebarAandelenStale`/`sidebarCryptoStale`) byte-identiek blijft — één
-    // waterfall-stap minder. De koers is "verouderd" als de jongste
-    // last_price_update ouder is dan HOLDINGS_STALE_DAYS.
+    // Holdings-staleness (sidebar-dot). ONGEGATE meegenomen in de hoofdbatch;
+    // de app-gate verschuift naar de boolean-afleiding hieronder.
+    //
+    // GEEN head-only count meer, en dat is de hele wijziging: de telling stelde
+    // hier zijn EIGEN vraag (`last_price_update < 7 dagen`) terwijl de banner op
+    // de holdings-pagina een andere stelde (24 uur, alleen open posities, nooit-
+    // bijgewerkt telt mee). Op hetzelfde account zei de zijbalk daardoor
+    // "Koersen actueel" terwijl de pagina "Prijzen verouderd" meldde — allebei
+    // volgens hun eigen definitie correct, en samen onbruikbaar.
+    //
+    // Nu halen we de vier velden op waarop het oordeel rust en laten we
+    // `lib/holdings-staleness.ts` beslissen — dezelfde functie die de banner
+    // gebruikt. Twee vragen die hetzelfde antwoord moeten geven, stellen we niet
+    // langer op twee manieren. De payload blijft klein (vier smalle kolommen,
+    // alleen actieve rijen) en er is nog steeds één ronde naar de database.
     supabase
       .from('investment_holdings')
-      .select('id', { count: 'exact', head: true })
+      .select('units, ticker, isin, last_price_update')
       .eq('user_id', user.id)
-      .eq('is_active', true)
-      .lt('last_price_update', staleCutoffIso),
+      .eq('is_active', true),
     supabase
       .from('crypto_holdings')
-      .select('id', { count: 'exact', head: true })
+      .select('units, symbol, last_price_update, is_fiat_balance')
       .eq('user_id', user.id)
-      .eq('is_active', true)
-      .lt('last_price_update', staleCutoffIso),
+      .eq('is_active', true),
   ])
 
   const platformStatus = parsePlatformStatus(platformStatusRes.data?.value as string | undefined)
@@ -289,17 +286,30 @@ export default async function AppLayout({
   )
 
   // ── Sidebar status-dots: holdings-staleness (app-gated afleiding) ──────
-  // De tellingen (`aandelenStaleRes`/`cryptoStaleRes`) draaiden mee in de
-  // hoofdbatch hierboven. De app-gate staat hier: een dot vuurt alleen wanneer
-  // de bijbehorende holdings-app daadwerkelijk in de sidebar staat — identiek
-  // aan het oude `sidebarActiveAppKeys.includes(...)`-gedrag, alleen verplaatst
-  // van de query naar de afleiding (de query zelf is nu ongegate maar head-only).
+  // De rijen draaiden mee in de hoofdbatch hierboven; het OORDEEL valt hier, via
+  // dezelfde `countStalePrices` die de banner op de holdings-pagina gebruikt.
+  // Eén definitie, twee oppervlakken — zie lib/holdings-staleness.ts voor waarom
+  // dat nodig was. De app-gate blijft ongewijzigd: een dot vuurt alleen wanneer
+  // de bijbehorende holdings-app daadwerkelijk in de sidebar staat.
+  //
+  // Crypto draagt geen `ticker`/`isin` maar een `symbol`; dat wordt hier op
+  // `ticker` gemapt zodat de gedeelde regel ("zonder koersbron kan een prijs
+  // niet verouderen") ook daar het juiste antwoord geeft.
   const sidebarAandelenStale =
     sidebarActiveAppKeys.includes('aandelen-holdings') &&
-    (aandelenStaleRes.count ?? 0) > 0
+    countStalePrices(
+      (aandelenStaleRes.data ?? []) as unknown as StalenessRow[],
+    ) > 0
   const sidebarCryptoStale =
     sidebarActiveAppKeys.includes('crypto-holdings') &&
-    (cryptoStaleRes.count ?? 0) > 0
+    countStalePrices(
+      ((cryptoStaleRes.data ?? []) as Array<Record<string, unknown>>).map((r) => ({
+        units: r.units as number | string | null,
+        ticker: (r.symbol as string | null) ?? null,
+        last_price_update: r.last_price_update as string | null,
+        is_fiat_balance: r.is_fiat_balance as boolean | null,
+      })),
+    ) > 0
 
   // ── Sidebar status-dot: hypotheek-renteherziening (gratis, app-gated) ───
   // Rentevaste periode van een hypotheek loopt af binnen RATE_RESET_MONTHS

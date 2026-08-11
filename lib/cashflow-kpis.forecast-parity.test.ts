@@ -100,7 +100,16 @@ const ASSETS: Row[] = [
   },
 ]
 
-/** Profiel-basis: géén dob ⇒ de dure horizon-tak (dob && netWorth>0) blijft uit. */
+/**
+ * Profiel-basis: géén dob ⇒ de dure horizon-tak (dob && netWorth>0) blijft uit.
+ *
+ * De grondslag staat BEWUST expliciet op 'transaction' (ADR 0103) en niet meer
+ * op 'auto'. Deze suite bewaakt de spaarquote-keten (aggregaat-pad, net-vermogen-
+ * delta-fallback, maandgrenzen, gaten in de reeks); met 'auto' én een
+ * income-budget van €60.000/jr in de set zou de budgetgrondslag winnen en zouden
+ * die assertions een ánder onderwerp meten. Fixture 6 pint het 'auto'-gedrag
+ * apart, op beide paden.
+ */
 const PROFILE_BASE: Row = {
   id: 'user-parity',
   full_name: 'Parity',
@@ -108,8 +117,8 @@ const PROFILE_BASE: Row = {
   budgeting_active: true,
   net_monthly_income: 5000,
   estimated_monthly_expenses: 3000,
-  income_source: 'auto',
-  expenses_source: 'auto',
+  income_source: 'transaction',
+  expenses_source: 'transaction',
 }
 
 /**
@@ -249,6 +258,22 @@ function buildFixtures(): Fixture[] {
           tx(4000, '2026-06-05', B_INCOME),
           tx(-1200, '2026-05-12', B_EXPENSE_KID),
           tx(4000, '2026-03-05', B_INCOME),
+        ],
+        debts: DEBTS,
+        assets: ASSETS,
+        netWorthSnapshots: SNAPSHOTS_NIET_GEBRUIKT,
+      },
+    },
+    {
+      // ADR 0103: 'auto' = "kies voor mij", en de app kiest budgetten zodra die
+      // er zijn. Zelfde transacties als fixture 1, alleen de grondslag verschilt.
+      label: "6. auto met budgetten ⇒ budgetgrondslag (ADR 0103)",
+      db: {
+        profile: { ...PROFILE_BASE, income_source: 'auto', expenses_source: 'auto' },
+        budgets: BUDGETS,
+        transactions: [
+          tx(4000, '2026-07-05', B_INCOME),
+          tx(-1200, '2026-07-12', B_EXPENSE_KID),
         ],
         debts: DEBTS,
         assets: ASSETS,
@@ -396,6 +421,23 @@ describe('de vijf velden, met harde waarden op beide paden', () => {
     ])
     expect(oud.savingsHistory).toEqual(nieuw.savingsHistory)
     expect(oud.expenseHistory).toEqual(nieuw.expenseHistory)
+  })
+
+  it("fixture 6: 'auto' met budgetten ⇒ de BUDGETgrondslag wint, op beide paden gelijk (ADR 0103)", async () => {
+    const { nieuw, oud } = await runBothPaths(buildFixtures()[5].db)
+    // De budgetgrondslag is sinds de correctie van 11 aug 2026 de REALISATIE op
+    // de budgetten. De fixture-budgetten dragen geen `created_at`, dus de deler is
+    // het VOLLE venster (12). €4.000 op het inkomstenbudget over het jaar ⇒
+    // €4.000/jr ≈ €333,33/mnd. Vóór de correctie stond hier €5.000 (de geplande
+    // €60.000/jr).
+    expect(nieuw.monthlyIncome).toBeCloseTo(4000 / 12, 6)
+    expect(oud.monthlyIncome).toBe(nieuw.monthlyIncome)
+    // DRAGENDE INVARIANT: het SPAARbudget telt NIET mee in de uitgavengrondslag
+    // — ook niet op realisatie. Alleen de €1.200 op het expense-KIND telt
+    // (⇒ €1.200/jr = €100/mnd); anders zou de spaarbudget-correctie in
+    // resolveSavingsSource weer nodig zijn.
+    expect(nieuw.monthlyExpenses).toBe(100)
+    expect(oud.monthlyExpenses).toBe(100)
   })
 
   it("fixture 3: bij income_source='manual' wint het profiel in monthlyIncome, NIET in savingsRate6m", async () => {

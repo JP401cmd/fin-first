@@ -24,6 +24,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Debt } from '@/lib/debt-data'
 import { savingsRateFromAggregates, computeDebtAflossingMonthly } from '@/lib/savings-source'
 import { resolveEffectiveIncomeExpenses, type IncomeExpenseSources } from '@/lib/effective-financials'
+import { loadBudgetBasis } from '@/lib/household/budget-share'
+import type { BudgetBasisRow } from '@/lib/budget-basis'
 import { localMonthStart, localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
 import type { GoalType } from '@/lib/goal-data'
 
@@ -100,7 +102,24 @@ export function autolinkGoalCurrentValues<
 
 // ── Rij-types voor de lazy injectie-queries (kolom-scoped, licht) ──
 type ParamTxRow = { amount: number | string; budget_id: string | null; date: string }
-type ParamBudgetRow = { id: string; budget_type: string | null; parent_id: string | null }
+/**
+ * De velden ná `parent_id` worden alleen door de budgetGRONDSLAG gebruikt
+ * (ADR 0103, `computeBudgetBasis`); `computeParameterSavingsRatePct` heeft
+ * genoeg aan de eerste drie. Ze staan hier zodat de rij-vorm eerlijk is en de
+ * cast naar `BudgetBasisRow` geen velden verzint.
+ */
+type ParamBudgetRow = {
+  id: string
+  budget_type: string | null
+  parent_id: string | null
+  name?: string | null
+  default_limit?: number | string | null
+  interval?: string | null
+  ownership?: string | null
+  is_archived?: boolean | null
+  merged_into?: string | null
+  created_at?: string | null
+}
 type ParamAssetRow = {
   current_value: number | string | null
   expected_return: number | string | null
@@ -166,6 +185,11 @@ export function computeParameterEffectiveSalary(
   profile: IncomeExpenseSources | null,
   tx: readonly ParamTxRow[],
   monthStart: string,
+  /**
+   * Budgetgrondslag (ADR 0103). Weglaten → transactie/handmatig zoals voorheen;
+   * dat houdt de bestaande unit-tests en elke andere aanroeper inert.
+   */
+  budgetBasis?: { income: { monthlyTotal: number }; expenses: { monthlyTotal: number } },
 ): number | undefined {
   let monthIncome = 0
   let monthExpenses = 0
@@ -176,7 +200,14 @@ export function computeParameterEffectiveSalary(
     if (amt > 0) monthIncome += amt
     else monthExpenses += Math.abs(amt)
   }
-  const { income } = resolveEffectiveIncomeExpenses(profile ?? {}, monthIncome, monthExpenses)
+  const { income } = resolveEffectiveIncomeExpenses(
+    profile ?? {},
+    monthIncome,
+    monthExpenses,
+    budgetBasis
+      ? { income: budgetBasis.income.monthlyTotal, expenses: budgetBasis.expenses.monthlyTotal }
+      : undefined,
+  )
   return income > 0 ? Math.round(income) : undefined
 }
 
@@ -247,7 +278,7 @@ export async function injectParameterGoalCurrentValues(
   const monthEnd = localMonthBounds(now).end
   const sixMonthsAgo = localMonthStartMonthsAgo(now, 5)
 
-  const [txRows, budgetRows, debtRows, profileRow, assetRows, snapshotRows] = await Promise.all([
+  const [txRows, budgetRows, debtRows, profileRow, basisPrefsRow, assetRows, snapshotRows] = await Promise.all([
     needsTx
       ? supabase
           .from('transactions')
@@ -256,10 +287,12 @@ export async function injectParameterGoalCurrentValues(
           .lt('date', monthEnd)
           .then(r => ((r.data ?? []) as ParamTxRow[]))
       : Promise.resolve([] as ParamTxRow[]),
-    needsSavingsRate
+    // Ook nodig voor `needsSalary`: het salaris-doel draait sinds ADR 0103 op de
+    // grondslag (budget/transactie/handmatig), niet meer alleen op transacties.
+    needsSavingsRate || needsSalary
       ? supabase
           .from('budgets')
-          .select('id, budget_type, parent_id')
+          .select('id, budget_type, parent_id, name, default_limit, interval, ownership, is_archived, merged_into, created_at')
           .then(r => ((r.data ?? []) as ParamBudgetRow[]))
       : Promise.resolve([] as ParamBudgetRow[]),
     needsSavingsRate
@@ -282,6 +315,17 @@ export async function injectParameterGoalCurrentValues(
           .maybeSingle()
           .then(r => (r.data as IncomeExpenseSources | null))
       : Promise.resolve(null as IncomeExpenseSources | null),
+    // Grondslag-selectie (ADR 0103), apart en tolerant: `cashflow_basis_prefs`
+    // bestaat pas na migratie 20260811160000 en zou als extra kolom de
+    // profielselect hierboven laten falen.
+    needsSalary && userId
+      ? supabase
+          .from('profiles')
+          .select('cashflow_basis_prefs')
+          .eq('id', userId)
+          .maybeSingle()
+          .then(r => (r.data as Record<string, unknown> | null), () => null)
+      : Promise.resolve(null as Record<string, unknown> | null),
     needsReturn
       ? supabase
           .from('assets')
@@ -304,7 +348,15 @@ export async function injectParameterGoalCurrentValues(
     ? computeParameterSavingsRatePct(txRows, budgetRows, debtRows)
     : undefined
   const salaryMonthly = needsSalary
-    ? computeParameterEffectiveSalary(profileRow, txRows, monthStart)
+    ? computeParameterEffectiveSalary(
+        profileRow,
+        txRows,
+        monthStart,
+        // Budgetgrondslag (ADR 0103) — het salaris-doel meet zich aan hetzelfde
+        // effectieve maandinkomen als /overzicht, niet aan een transactie-only
+        // variant daarvan.
+        await loadBudgetBasis(supabase, basisPrefsRow, budgetRows as unknown as BudgetBasisRow[]),
+      )
     : undefined
   const weightedReturnPct = needsReturn ? computeParameterWeightedReturnPct(assetRows) : undefined
   const fireAge = needsFireAge ? pickLatestSnapshotFireAge(snapshotRows) : undefined

@@ -26,6 +26,13 @@
 // aangeroepen — nooit met getServiceClient(). `ownOnly` beperkt tot de eigen
 // rijen (excl. gedeeld huishouden), voor loaders die vroeger `.eq('user_id')`
 // deden (lever-scores).
+//
+// ÉÉN UITZONDERING (migratie 20260811180000, ADR 0103): een service-role-aanroeper
+// mag de RPC gebruiken MITS hij een expliciete `scope` meegeeft (zie
+// TxAggregateScope). Die scope is in SQL een puur restrictief AND-filter dat de
+// SELECT-policy naspeelt — hij verruimt niets en is dus geen RLS-bypass, maar hij
+// is op het service-role-pad wél de ENIGE afbakening. Ontbreekt hij daar, dan
+// aggregeert de functie over álle gebruikers.
 
 import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -170,23 +177,58 @@ export function aggToExpenseRows(
 }
 
 /**
+ * Expliciete afbakening voor een aanroeper die NIET op RLS kan leunen.
+ *
+ * Bestaat uitsluitend voor het SERVICE-ROLE-pad (de snapshot-cron). Die rol heeft
+ * `rolbypassrls = true`, dus `auth.uid()` is er NULL en de RLS-scope van
+ * `transactions` vervalt volledig — zonder afbakening zou de RPC daar over álle
+ * gebruikers aggregeren.
+ *
+ * De twee velden spiegelen samen de SELECT-policy `View own or shared
+ * transactions` (eigen rijen OF de als 'shared' gemarkeerde rijen van hetzelfde
+ * huishouden), zodat dit pad exact dezelfde verzameling ziet als een sessie-client
+ * van die gebruiker. Alleen `userId` afbakenen zou de gedeelde boekingen van de
+ * partner wegsnijden en de grondslag laten driften met /overzicht.
+ *
+ * In SQL is dit een puur RESTRICTIEF extra AND-filter (migratie
+ * 20260811180000): voor een authenticated aanroeper geldt de RLS onverkort
+ * bovenop, dus een vreemd id levert daar 0 rijen op — nooit een bypass.
+ */
+export interface TxAggregateScope {
+  /** De gebruiker wiens transacties (incl. zijn gedeelde huishoud-rijen) tellen. */
+  userId: string
+  /** Zijn huishouden, of null wanneer hij er geen heeft → alleen eigen rijen. */
+  householdId?: string | null
+}
+
+/**
  * Haal het maandaggregaat op via de RLS-veilige RPC. `from`/`to` als lokale
  * datum-strings ('YYYY-MM-DD', `to` exclusief). Retourneert de rauwe
  * PostgREST-vorm zodat consumers `.data ?? []` / `.error` ongewijzigd houden.
  *
  * MOET met de authenticated/anon RLS-client worden aangeroepen (nooit
- * getServiceClient): de functie is SECURITY INVOKER en leunt op de RLS van
- * `transactions`.
+ * getServiceClient) — TENZIJ `scope` wordt meegegeven: de functie is SECURITY
+ * INVOKER en leunt anders op de RLS van `transactions`. Zie {@link TxAggregateScope}.
+ *
+ * De scope-sleutels worden ALLEEN in de payload gezet wanneer er een scope is.
+ * Dat is bewust: een ongescoopte aanroep houdt daarmee exact dezelfde
+ * argumentenset als vóór migratie 20260811180000, zodat er niets verandert aan
+ * hoe PostgREST de functie resolvet of hoe de bestaande callsites eruitzien.
  */
 export async function fetchTxMonthAggregate(
   supabase: SupabaseClient,
-  args: { from: string; to: string; ownOnly?: boolean },
+  args: { from: string; to: string; ownOnly?: boolean; scope?: TxAggregateScope | null },
 ): Promise<{ data: TxMonthAggregateRow[] | null; error: unknown }> {
-  const { data, error } = await supabase.rpc('tx_month_aggregate', {
+  const params: Record<string, unknown> = {
     p_from: args.from,
     p_to: args.to,
     p_own_only: args.ownOnly ?? false,
-  })
+  }
+  if (args.scope) {
+    params.p_user_id = args.scope.userId
+    params.p_household_id = args.scope.householdId ?? null
+  }
+  const { data, error } = await supabase.rpc('tx_month_aggregate', params)
   return { data: (data as TxMonthAggregateRow[] | null) ?? null, error }
 }
 

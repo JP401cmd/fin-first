@@ -171,14 +171,16 @@ describe('base fetchers — query-vorm', () => {
     expect(q.filters).toContainEqual(['order', 'sort_order', { ascending: true }])
   })
 
-  it('getUnlinkedBankAccounts: bank_accounts.select(id,name,balance).eq(is_active).is(linked_asset_id,null)', async () => {
+  it('getUnlinkedBankAccounts: bank_accounts.select(id,name,balance,ownership).eq(is_active).is(linked_asset_id,null)', async () => {
     const { supabase, queries } = makeCountingSupabase({
-      bank_accounts: [{ id: 'ba1', name: 'Spaar', balance: 1000 }],
+      bank_accounts: [{ id: 'ba1', name: 'Spaar', balance: 1000, ownership: 'personal' }],
     })
     const res = await getUnlinkedBankAccounts(supabase)
-    expect(res.data).toEqual([{ id: 'ba1', name: 'Spaar', balance: 1000 }])
+    expect(res.data).toEqual([{ id: 'ba1', name: 'Spaar', balance: 1000, ownership: 'personal' }])
     const q = findQuery(queries, 'bank_accounts')
-    expect(q.select).toBe('id, name, balance')
+    // `ownership` is niet optioneel: zonder die kolom is een gedeelde rekening
+    // niet te wegen en telt hij bij beide partners voor 100%.
+    expect(q.select).toBe('id, name, balance, ownership')
     expect(q.filters).toContainEqual(['eq', 'is_active', true])
     expect(q.filters).toContainEqual(['is', 'linked_asset_id', null])
   })

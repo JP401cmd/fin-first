@@ -27,7 +27,7 @@ import {
   ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, Pencil, Save, Trash2,
   GitFork, CircleDot, AlertTriangle, CheckCircle2, Check, Heart, LayoutGrid, Link2,
   TrendingUp, AlertCircle, BarChart3, EyeOff, MessageCircle, FileText, MoveRight, ArrowLeftRight,
-  Pill,
+  Pill, Settings2,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { BUDGET_SLUGS, type Budget, type BudgetWithChildren } from '@/lib/budget-data'
@@ -88,6 +88,13 @@ const GoalForm = dynamic(() =>
 // observeerbaar — die wordt bij elke open opnieuw geseed.
 const BudgetPlanEditorSheet = dynamic(() =>
   import('@/components/app/budget-plan-editor-sheet').then(m => ({ default: m.BudgetPlanEditorSheet })),
+  { ssr: false }
+)
+// Instellingen-sheet "welke tegenrekeningen zijn van mij" — zelfde mount-latch
+// als de planeditor (zie `ownAccountsEverOpened`), zodat de sluit-animatie van
+// de BottomSheet intact blijft en de chunk pas bij de eerste open geladen wordt.
+const OwnAccountsSheet = dynamic(() =>
+  import('@/components/app/own-accounts-sheet').then(m => ({ default: m.OwnAccountsSheet })),
   { ssr: false }
 )
 // Eenmalige koppel-nudge ná setup — lazy zoals de zuster-modals; render-conditie
@@ -1161,6 +1168,10 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
   // dynamic-import-comment). Verandert niets observeerbaars vóór de eerste open:
   // de sheet rendert dan toch niets (open=false ⇒ BottomSheet rendert null).
   const [planEditorEverOpened, setPlanEditorEverOpened] = useState(false)
+  // Eigen-rekening-instellingen (tandwiel bij de "Eigen rekening"-sectie) —
+  // zelfde open-state + mount-latch-paar als de planeditor hierboven.
+  const [showOwnAccounts, setShowOwnAccounts] = useState(false)
+  const [ownAccountsEverOpened, setOwnAccountsEverOpened] = useState(false)
   const [goals, setGoals] = useState<Goal[]>(initialData?.goals ?? [])
   const [budgetRolloverHistory, setBudgetRolloverHistory] = useState<BudgetRollover[]>([])
   const [loadingRolloverHistory, setLoadingRolloverHistory] = useState(false)
@@ -1716,6 +1727,10 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
     if (showPlanEditor) setPlanEditorEverOpened(true)
   }, [showPlanEditor])
 
+  useEffect(() => {
+    if (showOwnAccounts) setOwnAccountsEverOpened(true)
+  }, [showOwnAccounts])
+
   // "Nieuw budget" pane — getriggerd door `?newBudget=true`. Bron-of-truth:
   // - "+ Nieuw budget"-CTA in de planeditor-toolbar
   // - Redirect vanaf de oude /core/budgets/new route
@@ -1935,6 +1950,31 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
   const verborgenBudgets = showEigenRekeningProminent
     ? archiveBudgets.filter((b) => b.slug !== BUDGET_SLUGS.EIGEN_REKENING)
     : archiveBudgets
+  // Ingang naar de instellingen-sheet: een tandwiel ZONDER label, direct op de
+  // "Eigen rekening"-kop — daar waar de post staat die je ermee bestuurt.
+  //
+  // Eerder stond hij als vierde knop met tekst in de control-strip bovenaan. Dat
+  // dekte elke weergave af, maar zette een instelling die bij één specifieke post
+  // hoort op gelijke voet met "Plan bewerken" — en dat leest als een pagina-brede
+  // actie. Eigenaarskeuze (11 aug): terug naar de sectiekop.
+  //
+  // De reachability-zorg die de verplaatsing destijds motiveerde is opgelost door
+  // 'm op BEIDE plekken te renderen waar de post kan staan: prominent (≥2
+  // rekeningen) én in de "Verborgen"-tak. Dat is dezelfde knop die de sectie
+  // volgt, geen tweede concurrerende ingang. Blijft over: zonder
+  // `eigenRekeningParent` bestaat de post niet en is er dus ook niets in te
+  // stellen — dan hoort er geen knop te zijn.
+  const eigenRekeningSettingsButton = (
+    <button
+      type="button"
+      onClick={() => setShowOwnAccounts(true)}
+      aria-label="Eigen rekeningen instellen"
+      title="Eigen rekeningen instellen"
+      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] transition-colors hover:text-[var(--ink)]"
+    >
+      <Settings2 className="h-3.5 w-3.5" />
+    </button>
+  )
   const eigenRekeningExplainer = (
     <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/40 px-3.5 py-3">
       <ArrowLeftRight className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ink-4)]" />
@@ -2525,10 +2565,13 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
           )}
           {showEigenRekeningProminent && (
             <div className="mt-4 sm:mt-8">
-              <h3 className="mb-4 label-editorial text-[var(--ink-2)]">
-                Eigen rekening
-                <span className="ml-1 font-normal normal-case tracking-normal text-[var(--ink-4)]">— verschuivingen, tellen niet mee</span>
-              </h3>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <h3 className="label-editorial text-[var(--ink-2)]">
+                  Eigen rekening
+                  <span className="ml-1 font-normal normal-case tracking-normal text-[var(--ink-4)]">— verschuivingen, tellen niet mee</span>
+                </h3>
+                {eigenRekeningSettingsButton}
+              </div>
               {eigenRekeningExplainer}
               <TreeComp
                 groups={eigenRekeningParent ? [eigenRekeningParent] : []}
@@ -2559,6 +2602,15 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
               </button>
               {showArchive && (
                 <>
+                  {/* Dezelfde tandwiel-ingang als bij de prominente sectie: staat de
+                      Eigen rekening-post hiér, dan hoort de instelling hier ook. Zonder
+                      deze tak is de sheet bij < 2 rekeningen nergens te bereiken. */}
+                  {!showEigenRekeningProminent && eigenRekeningParent && (
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <span className="label-editorial text-[var(--ink-3)]">Eigen rekening</span>
+                      {eigenRekeningSettingsButton}
+                    </div>
+                  )}
                   {!showEigenRekeningProminent && eigenRekeningParent && eigenRekeningExplainer}
                   <TreeComp
                     groups={verborgenBudgets}
@@ -2734,6 +2786,22 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
             goToDetailStep()
             loadBudgets()
             loadSpending()
+          }}
+        />
+      )}
+
+      {/* Eigen-rekening-instellingen — lazy via mount-latch (zie
+          ownAccountsEverOpened), zelfde constructie als de planeditor. Na opslaan
+          herladen we de bestedingen: de herclassificatie verplaatst bestaande
+          transacties naar "Eigen rekening", dus de bedragen én de teller van nog
+          te koppelen transacties veranderen. */}
+      {ownAccountsEverOpened && (
+        <OwnAccountsSheet
+          open={showOwnAccounts}
+          onClose={() => setShowOwnAccounts(false)}
+          onSaved={() => {
+            loadSpending()
+            void refreshAllTimeUncatCount()
           }}
         />
       )}

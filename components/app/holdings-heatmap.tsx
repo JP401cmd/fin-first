@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useCallback, useRef, memo } from 'react'
+import { isPriceStale, type StalenessRow } from '@/lib/holdings-staleness'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { formatCurrency } from '@/components/app/budget-shared'
 import {
@@ -90,7 +91,6 @@ const COLOR_MODE_LABELS: Record<ColorMode, string> = {
 /** Dutch labels for the grouping toggle */
 const GROUPING_LABELS: Record<AllocationViewMode, string> = {
   asset_class: 'Bezittingscategorie',
-  sector: 'Sector',
   geography: 'Geografie',
 }
 
@@ -190,12 +190,17 @@ function getColorValue(
   return dividendData?.get(h.id) ?? 0
 }
 
-/** Check whether a holding's price data is stale (> 24 hours old) */
+/**
+ * Of de koers van deze holding verouderd is.
+ *
+ * Delegeert naar de gedeelde regel in `lib/holdings-staleness.ts`. Hier stond
+ * een eigen 24-uursgrens — de VIERDE definitie van "verouderd" in de app, en de
+ * gemeenste: de heatmap is de tweede weergave van dezelfde holdings-pagina, dus
+ * je kon met één klik op de weergave-toggle van "koersen actueel" naar streepjes
+ * op élke positie springen zonder dat er iets veranderd was.
+ */
 function isStalePrice(h: HeatmapHolding): boolean {
-  if (!h.last_price_update) return true
-  const lastUpdate = new Date(h.last_price_update)
-  const now = new Date()
-  return now.getTime() - lastUpdate.getTime() > 24 * 60 * 60 * 1000
+  return isPriceStale(h as StalenessRow)
 }
 
 /** Format a date string to a short Dutch locale format */
@@ -1021,7 +1026,7 @@ const HoldingsHeatmap = memo(function HoldingsHeatmap({
       <div className="mb-4 flex flex-wrap items-center gap-4" data-testid="heatmap-toggles">
         <ToggleGroup
           label="Groepering"
-          options={['asset_class', 'sector', 'geography'] as AllocationViewMode[]}
+          options={['asset_class', 'geography'] as AllocationViewMode[]}
           value={groupMode}
           onChange={setGroupMode}
           labels={GROUPING_LABELS}

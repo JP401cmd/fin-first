@@ -52,6 +52,7 @@ export const CASH_FLOW: UatFlow = {
     { id: 'kassabon', scenarioId: 'UAT-CASH-03', label: 'WF-CASH-03 · Kassabon inkomsten/uitgaven', kind: 'screen', stage: 1, lane: 'verkennen', subOf: 'geldstroom' },
     { id: 'rekeningen', scenarioId: 'UAT-CASH-04', label: 'WF-CASH-04 · Rekeningen & rekeningdetail', kind: 'screen', stage: 1, lane: 'verkennen' },
     { id: 'instellingen', scenarioId: 'UAT-CASH-05', label: 'WF-CASH-05 · Cashflow-instellingen (inkomen/spaarquote/uitgaven)', kind: 'screen', stage: 1, lane: 'verkennen' },
+    { id: 'grondslagkeuze', scenarioId: 'UAT-CASH-60', label: 'WF-CASH-60 · Grondslag inkomen/uitgaven kiezen: budgetten, transacties of eigen bedrag (ADR 0103)', kind: 'action', stage: 1, lane: 'verkennen', subOf: 'instellingen' },
     { id: 'inflatie', scenarioId: 'UAT-CASH-06', label: 'WF-CASH-06 · Inflatie-impact verkennen', kind: 'screen', stage: 1, lane: 'verkennen' },
     { id: 'statusmelding', scenarioId: 'UAT-CASH-07', label: 'WF-CASH-07 · Status-melding minimaliseren/heropenen', kind: 'screen', stage: 1, lane: 'verkennen' },
 
@@ -69,6 +70,12 @@ export const CASH_FLOW: UatFlow = {
     { id: 'rekeningverwijderen', scenarioId: 'UAT-CASH-52', label: 'WF-CASH-52 · Betaalrekening verwijderen (bewaren/verwijderen, ADR 0082)', kind: 'action', stage: 3, lane: 'transacties', subOf: 'rekeningen' },
     { id: 'grenzenpotberekenen', scenarioId: 'UAT-CASH-53', label: 'WF-CASH-53 · Grenzenpot berekenen en reeks (kwartaal/jaar-periodes, trend, isNearLimit)', kind: 'action', stage: 3, lane: 'transacties' },
     { id: 'grenzenpotbeheren', scenarioId: 'UAT-CASH-54', label: 'WF-CASH-54 · Grenzenpot beheren, prestatieweergave, widget, match-preview & alias (budget-regel: zie de BUDGET-kruisverwijzing)', kind: 'action', stage: 3, lane: 'transacties', subOf: 'grenzenpotberekenen' },
+    { id: 'grenzenpotscore', scenarioId: 'UAT-CASH-61', label: 'WF-CASH-61 · Grenzenpot: reeksscore en prestatiebadge over afgesloten periodes', kind: 'action', stage: 3, lane: 'transacties', subOf: 'grenzenpotberekenen' },
+    { id: 'bulkzoeken', scenarioId: 'UAT-CASH-55', label: 'WF-CASH-55 · Bulkbewerken: zoeken zonder datumvenster, pagina/alle-N selecteren, impact (ADR 0104)', kind: 'action', stage: 3, lane: 'transacties', subOf: 'zoeken' },
+    { id: 'bulkhercategoriseren', scenarioId: 'UAT-CASH-56', label: 'WF-CASH-56 · Bulkbewerken: hercategoriseren — canoniek trio, split-uitsluiting', kind: 'action', stage: 3, lane: 'transacties', subOf: 'bulkzoeken' },
+    { id: 'bulkverwijderen', scenarioId: 'UAT-CASH-57', label: 'WF-CASH-57 · Bulkbewerken: verwijderen — zware bevestiging, herimport-waarschuwing', kind: 'action', stage: 3, lane: 'transacties', subOf: 'bulkzoeken' },
+    { id: 'bulkscoping', scenarioId: 'UAT-CASH-58', label: 'WF-CASH-58 · Bulkbewerken: huishoud-scoping en de 5.000-grens (handmatige controle)', kind: 'action', stage: 3, lane: 'transacties', subOf: 'bulkzoeken' },
+    { id: 'bulkregelfeedback', scenarioId: 'UAT-CASH-59', label: 'WF-CASH-59 · Bulkbewerken: regelaanbod op bevestiging, eerlijke terugkoppeling bij gedeeltelijke mislukking', kind: 'action', stage: 3, lane: 'transacties', subOf: 'bulkhercategoriseren' },
 
     // ── 4 · vaste lasten ──────────────────────────────────────────────────
     { id: 'vastelasten', scenarioId: 'UAT-CASH-16', label: 'WF-CASH-16 · Vaste lasten: totaal/aandeel/vrijheidstijd', kind: 'screen', stage: 4, lane: 'vastelasten' },
@@ -129,6 +136,8 @@ export const CASH_FLOW: UatFlow = {
     { from: 'geldstroom', to: 'kassabon' },
     { from: 'hefboom', to: 'rekeningen' },
     { from: 'hefboom', to: 'instellingen' },
+    { from: 'instellingen', to: 'grondslagkeuze' },
+    { from: 'grondslagkeuze', to: 'x-budget', kind: 'cross', label: 'budgetgrondslag' },
     { from: 'hefboom', to: 'inflatie' },
     { from: 'hefboom', to: 'statusmelding' },
 
@@ -146,7 +155,14 @@ export const CASH_FLOW: UatFlow = {
     { from: 'rekeningen', to: 'rekeningverwijderen' },
     { from: 'hefboom', to: 'grenzenpotberekenen' },
     { from: 'grenzenpotberekenen', to: 'grenzenpotbeheren' },
+    { from: 'grenzenpotberekenen', to: 'grenzenpotscore' },
     { from: 'grenzenpotbeheren', to: 'x-will', kind: 'cross', label: 'melding' },
+    { from: 'zoeken', to: 'bulkzoeken' },
+    { from: 'bulkzoeken', to: 'bulkhercategoriseren' },
+    { from: 'bulkzoeken', to: 'bulkverwijderen' },
+    { from: 'bulkzoeken', to: 'bulkscoping' },
+    { from: 'bulkhercategoriseren', to: 'bulkregelfeedback' },
+    { from: 'bulkverwijderen', to: 'bulkregelfeedback' },
 
     // vaste lasten
     { from: 'hefboom', to: 'vastelasten' },
@@ -197,6 +213,13 @@ export const CASH_FLOW: UatFlow = {
     { from: 'rekeningverwijderen', to: 'uitkomst' },
     { from: 'grenzenpotberekenen', to: 'uitkomst' },
     { from: 'grenzenpotbeheren', to: 'uitkomst' },
+    { from: 'grenzenpotscore', to: 'uitkomst' },
+    { from: 'grondslagkeuze', to: 'uitkomst' },
+    { from: 'bulkzoeken', to: 'uitkomst' },
+    { from: 'bulkhercategoriseren', to: 'uitkomst' },
+    { from: 'bulkverwijderen', to: 'uitkomst' },
+    { from: 'bulkscoping', to: 'uitkomst' },
+    { from: 'bulkregelfeedback', to: 'uitkomst' },
     { from: 'opzeggen', to: 'uitkomst' },
     { from: 'aianalyse', to: 'uitkomst' },
     { from: 'watals', to: 'uitkomst' },

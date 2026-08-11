@@ -51,6 +51,8 @@ import { buildSpendingSums, combineSpending, shareFractionFor } from '@/lib/budg
 import { buildTemplateSeed } from '@/lib/budget-templates/onboarding-presets'
 import { getNibudHouseholdType, calculateBenchmarks } from '@/lib/nibud/reference-data'
 import { dailyExpenseRate, calculateFreedomTime } from '@/lib/format'
+import { computeBudgetBasis, type BudgetBasisRow } from '@/lib/budget-basis'
+import type { BudgetRealizedWindow } from '@/lib/budget-realized'
 import { BUDGET_ACCEPTANCE } from './budget'
 import type { AcceptanceCriterion } from './types'
 
@@ -433,6 +435,74 @@ export const BUDGET_ENGINE_CHECKS: BudgetEngineCheck[] = [
       return {
         expected: 'leegNaamGooit=true; nulBedragGooit=true; archiveTypeGooit=true; validInsertBudgetType=expense; validIsEssential=false',
         actual: `leegNaamGooit=${leegNaamGooit}; nulBedragGooit=${nulBedragGooit}; archiveTypeGooit=${archiveTypeGooit}; validInsertBudgetType=${insert.budget_type}; validIsEssential=${insert.is_essential}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-BUDGET-26',
+    scenarioId: 'UAT-BUDGET-26',
+    label:
+      'Budgetgrondslag (computeBudgetBasis, ADR 0103): selectieniveau + expense-only-invariant + kind-oprol op eigen interval, uitsluiten verlaagt maar verbergt niet, en realisatie vóór plan met de budgetleeftijd als deler',
+    run: () => {
+      criterion('WF-BUDGET-26')
+
+      const row = (r: Partial<BudgetBasisRow> & { id: string }): BudgetBasisRow => ({
+        parent_id: null,
+        budget_type: 'expense',
+        name: r.id,
+        default_limit: 0,
+        interval: 'monthly',
+        created_at: '2020-01-01T00:00:00Z',
+        ...r,
+      })
+
+      const budgets: BudgetBasisRow[] = [
+        row({ id: 'wonen', name: 'Wonen', default_limit: 1000 }),
+        // Hoofdbudget MÉT kinderen — zelf géén post (zijn limiet is een kop).
+        row({ id: 'boodschappen', name: 'Boodschappen', default_limit: 9999 }),
+        row({ id: 'supermarkt', name: 'Supermarkt', parent_id: 'boodschappen', default_limit: 400 }),
+        // Kind met een EIGEN interval (jaar) onder een maand-ouder.
+        row({ id: 'markt', name: 'Markt', parent_id: 'boodschappen', default_limit: 1200, interval: 'yearly' }),
+        // Valt buiten de uitgavengrondslag: gearchiveerd resp. een spaarpot.
+        row({ id: 'oud', name: 'Oud', default_limit: 500, is_archived: true }),
+        row({ id: 'sparen', name: 'Sparen', budget_type: 'savings', default_limit: 300 }),
+        // Inkomstenkant.
+        row({ id: 'salaris', name: 'Salaris', budget_type: 'income', default_limit: 3000 }),
+      ]
+
+      const plan = computeBudgetBasis(budgets, 'expense', [])
+      const naUitsluiting = computeBudgetBasis(budgets, 'expense', ['markt'])
+      const income = computeBudgetBasis(budgets, 'income', [])
+
+      // Realisatie-venster dat eindigt op 2026-08 (12 maanden breed).
+      const realized: BudgetRealizedWindow = {
+        windowMonths: 12,
+        windowEndMonth: '2026-08',
+        truncationSuspected: false,
+        byBudgetId: {
+          // Budget ouder dan het venster → deler 12 → de som telt onverkort.
+          supermarkt: { incoming: 0, outgoing: 2400, coveredMonths: 12 },
+          // Budget aangemaakt in maart 2026 → leeftijd 6 → ×2 geëxtrapoleerd.
+          jong: { incoming: 0, outgoing: 600, coveredMonths: 6 },
+        },
+      }
+      const metRealisatie = computeBudgetBasis(
+        [...budgets, row({ id: 'jong', name: 'Jong', default_limit: 50, created_at: '2026-03-01T00:00:00Z' })],
+        'expense',
+        [],
+        { realized },
+      )
+      const entryOf = (id: string) => metRealisatie.entries.find((e) => e.id === id)
+      const oud = entryOf('supermarkt')
+      const jong = entryOf('jong')
+      // Geen enkele boeking in het venster → terugval op de geplande limiet.
+      const zonderBoekingen = entryOf('wonen')
+
+      return {
+        expected:
+          'postenExpense=3; jaartotaalPlan=18000; maandtotaalPlan=1500; jaartotaalNaUitsluiting=16800; postenBlijvenZichtbaar=3; jaartotaalIncome=36000; oudBudgetRealisatie=2400/realized; jongBudgetGeextrapoleerd=1200/realized; zonderBoekingenPlan=12000/planned',
+        actual:
+          `postenExpense=${plan.entries.length}; jaartotaalPlan=${plan.annualTotal}; maandtotaalPlan=${plan.monthlyTotal}; jaartotaalNaUitsluiting=${naUitsluiting.annualTotal}; postenBlijvenZichtbaar=${naUitsluiting.entries.length}; jaartotaalIncome=${income.annualTotal}; oudBudgetRealisatie=${oud?.annualAmount}/${oud?.source}; jongBudgetGeextrapoleerd=${jong?.annualAmount}/${jong?.source}; zonderBoekingenPlan=${zonderBoekingen?.annualAmount}/${zonderBoekingen?.source}`,
       }
     },
   },

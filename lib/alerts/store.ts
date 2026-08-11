@@ -87,7 +87,8 @@ export async function loadSweepState(service: SupabaseClient): Promise<SweepStat
 
 /**
  * Schrijft alleen de daadwerkelijk gewijzigde sleutels terug. Dat houdt het
- * aantal writes per kwartier laag (meestal nul) en maakt de sweep goedkoop.
+ * aantal writes per ronde laag (meestal nul) en maakt de sweep goedkoop — ook
+ * wanneer de externe pinger de route vaker aanroept dan de dagelijkse cron.
  */
 export async function saveSweepState(
   service: SupabaseClient,

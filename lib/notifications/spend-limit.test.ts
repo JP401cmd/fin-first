@@ -8,6 +8,7 @@ import {
 } from './spend-limit'
 import {
   buildSpendLimitReport,
+  computeSpendLimitScore,
   computeSpendLimitTrend,
   computeStreaks,
   type SpendLimitPeriodKind,
@@ -79,6 +80,9 @@ function pot(o: {
   createdAt?: string
 }): SpendLimitWithReport {
   const closed = o.closed ?? []
+  // Zonder `createdAt` blijven trend en score inert t.o.v. de aanmaak-ondergrens
+  // (bewuste motor-regel) — de meldingenlaag heeft zijn eigen poort.
+  const trend = computeSpendLimitTrend(closed)
   return {
     config: {
       id: o.id ?? 'pot-1',
@@ -103,7 +107,8 @@ function pot(o: {
       lastClosedPeriod: closed.length > 0 ? closed[closed.length - 1] : null,
       closedPeriods: closed,
       streaks: computeStreaks(closed),
-      trend: computeSpendLimitTrend(closed),
+      trend,
+      score: computeSpendLimitScore(closed, trend),
     },
     budgetSplit: [],
     ruleSplit: [],

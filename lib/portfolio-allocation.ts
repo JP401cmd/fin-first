@@ -7,7 +7,20 @@
 
 // ── Types ────────────────────────────────────────────────────
 
-export type AllocationViewMode = 'asset_class' | 'sector' | 'geography'
+/**
+ * De dimensies waarlangs de portefeuille verdeeld getoond kan worden.
+ *
+ * 'sector' stond hier ook, maar is aug 2026 vervallen. Reden: er was geen bron.
+ * De classificatie komt uit de koersfeed (Yahoo's chart-meta levert
+ * `instrumentType` en de beurs mee in de call die de prijsvernieuwing tóch
+ * doet), en sector zit daar níét bij — dat vraagt Yahoo's `quoteSummary`, dat
+ * met cookie-authenticatie is afgeschermd (401 "Invalid Crumb"). In productie
+ * had 1 van de 116 posities een sector. Een tab die structureel "Overig 100%"
+ * toont, suggereert een verdeling die niet gemeten is; dan is hem weglaten
+ * eerlijker dan hem vullen. Voor een breed gespreide ETF is "sector" bovendien
+ * betekenisloos.
+ */
+export type AllocationViewMode = 'asset_class' | 'geography'
 
 export type HoldingForAllocation = {
   id: string
@@ -48,6 +61,11 @@ export type RebalancingSuggestion = {
 
 export const ASSET_CLASS_LABELS: Record<string, string> = {
   aandelen: 'Aandelen',
+  // Bewust een eigen categorie naast 'aandelen'/'obligaties': de koersfeed
+  // levert `instrumentType`, en dat beschrijft de VERPAKKING, niet de inhoud.
+  // Een obligatie-ETF is óók instrumentType ETF; die onder "Aandelen" scharen
+  // zou een fout getal opleveren, geen ruwe benadering.
+  etf: 'ETF/fondsen',
   obligaties: 'Obligaties',
   vastgoed: 'Vastgoed',
   grondstoffen: 'Grondstoffen',
@@ -56,19 +74,29 @@ export const ASSET_CLASS_LABELS: Record<string, string> = {
   anders: 'Overig',
 }
 
-export const SECTOR_LABELS: Record<string, string> = {
-  technologie: 'Technologie',
-  financials: 'Financiële sector',
-  gezondheidszorg: 'Gezondheidszorg',
-  consument: 'Consumentengoederen',
-  industrie: 'Industrie',
-  energie: 'Energie',
-  vastgoed: 'Vastgoed',
-  telecom: 'Telecom',
-  materialen: 'Materialen',
-  nutsbedrijven: 'Nutsbedrijven',
-  breed: 'Breed gespreid',
-  anders: 'Overig',
+/**
+ * Waarden uit een ouder vocabulaire, vertaald bij het LEZEN.
+ *
+ * De database draagt nog rijen met `equity`/`bonds` (uit een eerdere
+ * classificatie-ronde) terwijl de labels hierboven Nederlands zijn. Zonder deze
+ * vertaling viel zo'n rij door de label-lookup heen en verscheen de rauwe
+ * sleutel in de grafiek — precies wat er stond: een taartpunt met het label
+ * "equity". Vertalen bij het lezen houdt oude rijen correct zonder migratie;
+ * de koersvernieuwing normaliseert ze daarnaast bij het schrijven.
+ */
+const LEGACY_CATEGORY_ALIASES: Record<string, string> = {
+  equity: 'aandelen',
+  equities: 'aandelen',
+  stock: 'aandelen',
+  stocks: 'aandelen',
+  bond: 'obligaties',
+  bonds: 'obligaties',
+  fund: 'etf',
+  fonds: 'etf',
+  fondsen: 'etf',
+  realestate: 'vastgoed',
+  real_estate: 'vastgoed',
+  commodities: 'grondstoffen',
 }
 
 export const GEOGRAPHY_LABELS: Record<string, string> = {
@@ -83,13 +111,11 @@ export const GEOGRAPHY_LABELS: Record<string, string> = {
 
 export const VIEW_MODE_LABELS: Record<AllocationViewMode, string> = {
   asset_class: 'Assetklasse',
-  sector: 'Sector',
   geography: 'Geografie',
 }
 
 export const CATEGORY_LABELS: Record<AllocationViewMode, Record<string, string>> = {
   asset_class: ASSET_CLASS_LABELS,
-  sector: SECTOR_LABELS,
   geography: GEOGRAPHY_LABELS,
 }
 
@@ -116,7 +142,6 @@ export const DEFAULT_TARGETS: Record<AllocationViewMode, TargetAllocation[]> = {
     { category: 'cash', target_pct: 5 },
     { category: 'crypto', target_pct: 5 },
   ],
-  sector: [],
   geography: [
     { category: 'wereld', target_pct: 50 },
     { category: 'europa', target_pct: 20 },
@@ -128,12 +153,22 @@ export const DEFAULT_TARGETS: Record<AllocationViewMode, TargetAllocation[]> = {
 
 // ── Utility: classify a holding based on its metadata ────────
 
+/**
+ * Normaliseert een opgeslagen categorie naar het canonieke vocabulaire.
+ * Onbekende waarden blijven ongemoeid — ze verschijnen dan als eigen groep met
+ * hun rauwe sleutel, wat zichtbaar maakt dát er iets niet gemapt is.
+ */
+export function normalizeCategory(value: string): string {
+  const key = value.trim().toLowerCase()
+  return LEGACY_CATEGORY_ALIASES[key] ?? key
+}
+
 function classifyHolding(
   holding: HoldingForAllocation,
   mode: AllocationViewMode,
 ): string {
   const field = holding[mode]
-  if (field && field !== '') return field
+  if (field && field !== '') return normalizeCategory(field)
   return 'anders'
 }
 
@@ -180,13 +215,20 @@ export function computeRebalancingSuggestions(
 
   return targets
     .map((t) => {
-      const slice = slices.find((s) => s.key === t.category)
+      // De doelrij draagt het vocabulaire waarin hij ooit is opgeslagen
+      // ('equity', 'bonds'), de slice-sleutel is genormaliseerd ('aandelen',
+      // 'obligaties'). Zonder deze normalisatie vindt `find` niets, valt
+      // `current_pct` terug op 0 en adviseert een volbelegde portefeuille om
+      // 80% bij te kopen. Normaliseren op de ONTMOETING, niet in de DB: de
+      // opgeslagen rij blijft zoals hij is.
+      const key = normalizeCategory(t.category)
+      const slice = slices.find((s) => s.key === key)
       const currentPct = slice?.pct ?? 0
       const drift = currentPct - t.target_pct
       const absDrift = Math.abs(drift)
       const amount = (absDrift / 100) * totalValue
-      const labels = { ...ASSET_CLASS_LABELS, ...SECTOR_LABELS, ...GEOGRAPHY_LABELS }
-      const label = labels[t.category] || t.category
+      const labels = { ...ASSET_CLASS_LABELS, ...GEOGRAPHY_LABELS }
+      const label = labels[key] || labels[t.category] || t.category
 
       let action: 'buy' | 'sell' | 'hold' = 'hold'
       if (drift < -DRIFT_THRESHOLD) action = 'buy'

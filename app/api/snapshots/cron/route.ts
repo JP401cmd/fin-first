@@ -10,18 +10,22 @@ import {
   type HealthScoreTransaction,
 } from '@/lib/health-score-input'
 import { resolveFireParams } from '@/lib/fire-params'
-import { annualAmount } from '@/lib/budget-utils'
+import { yearlyMustExpensesFromBudgets } from '@/lib/budget-utils'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
 import { logError } from '@/lib/log-error'
 import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
 import { resolveSavingsSource, savingsRateFromAggregates } from '@/lib/savings-source'
-import { resolveEffectiveIncomeExpenses } from '@/lib/effective-financials'
+import { resolveEffectiveIncomeExpenses, resolveAmountWithBasis } from '@/lib/effective-financials'
+import { resolveBudgetBasisFromProfile } from '@/lib/cashflow-settings'
+import { budgetShareFractionById, selectBudgetsForBasisForUser } from '@/lib/household/budget-share'
+import { fetchRealizedBudgetAmounts } from '@/lib/budget-realized'
+import type { BudgetBasisRow } from '@/lib/budget-basis'
 import { recordJobRun } from '@/lib/job-runs'
 import { mapWithConcurrency } from '@/lib/concurrency'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 import {
-  loadHouseholdIdsByUser,
+  loadHouseholdSharesByUser,
   selectUnlinkedBankAccountsForUser,
   unlinkedCashTotal,
 } from '@/lib/unlinked-cash'
@@ -137,15 +141,38 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: profilesError.message }, { status: 500 })
   }
 
-  // Huishouden per gebruiker, in ÉÉN leesronde vooraf (niet per gebruiker in de
-  // pool). Nodig omdat de service-role-client RLS passeert: de huishoud-verbrede
-  // scope van `bank_accounts` moet hier met de hand mee. Faalt de leesronde, dan
+  // Huishouden + aandeel per gebruiker, vooraf (niet per gebruiker in de pool).
+  // Nodig omdat de service-role-client RLS passeert: de huishoud-verbrede scope
+  // van `bank_accounts` moet hier met de hand mee, én er is geen sessie waaruit
+  // `resolveUnlinkedCashShare` het aandeel kan afleiden. Faalt de leesronde, dan
   // is de map leeg en valt iedereen terug op alleen-eigen-rijen — hooguit een
   // gedeeld saldo te weinig, nooit dat van een vreemde.
-  const householdIdByUser = await loadHouseholdIdsByUser(
+  const householdShareByUser = await loadHouseholdSharesByUser(
     supabase,
     (profiles ?? []).map(p => p.id),
   )
+
+  // Grondslag-selectie per gebruiker (ADR 0103), vooraf en gebatcht — zelfde
+  // patroon als het huishoud-aandeel hierboven, dus géén extra query per
+  // gebruiker in de pool. BEWUST een aparte, tolerante query en geen extra kolom
+  // op de profielselect: `cashflow_basis_prefs` bestaat pas na migratie
+  // 20260811160000, en één onbekende kolom zou daar de HELE profielquery laten
+  // falen — en dus de complete cron. Faalt deze query, dan is de map leeg en
+  // telt voor iedereen elk budget mee (de kosteloze default).
+  const basisPrefsByUser = new Map<string, Record<string, unknown>>()
+  {
+    const { data: prefsRows } = await supabase
+      .from('profiles')
+      .select('id, cashflow_basis_prefs')
+      .in('id', (profiles ?? []).map(p => p.id))
+      .then((r) => r, (error) => {
+        console.error('[snapshots-cron] grondslag-selectie laden mislukt:', error)
+        return { data: null }
+      })
+    for (const row of (prefsRows ?? []) as Array<{ id: string; cashflow_basis_prefs?: unknown }>) {
+      basisPrefsByUser.set(row.id, { cashflow_basis_prefs: row.cashflow_basis_prefs })
+    }
+  }
 
   type SnapshotEntry = { userId: string; created: boolean; error?: string }
 
@@ -178,8 +205,10 @@ export async function GET(request: Request) {
         expensesResult,
         incomeResult,
         budgetsResult,
+        basisBudgetsResult,
         monthTxResult,
         bankAccountsResult,
+        realizedWindow,
       ] = await Promise.all([
         supabase
           .from('assets')
@@ -210,6 +239,16 @@ export async function GET(request: Request) {
           .from('budgets')
           .select('id, parent_id, budget_type, default_limit, interval, is_essential')
           .eq('user_id', userId),
+        // Budgetrijen voor de GRONDSLAG (ADR 0103). De query hierboven blijft
+        // BEWUST own-row (verbreden zou `yearlyMustExpenses` en de
+        // health-score-budgetten meeverschuiven); deze draagt de huishoud-scope
+        // met de hand mee omdat een service-role-client de policy passeert —
+        // zelfde patroon als `selectUnlinkedBankAccountsForUser` hierboven.
+        selectBudgetsForBasisForUser(
+          supabase,
+          userId,
+          householdShareByUser.get(userId)?.householdId ?? null,
+        ),
         // Huidige-maand-transacties met budget_id voor budget-discipline.
         supabase
           .from('transactions')
@@ -226,8 +265,15 @@ export async function GET(request: Request) {
         selectUnlinkedBankAccountsForUser(
           supabase,
           userId,
-          householdIdByUser.get(userId) ?? null,
+          householdShareByUser.get(userId)?.householdId ?? null,
         ),
+        // GEREALISEERDE budgetbedragen (ADR 0103) — dezelfde grondslag als de
+        // twee sessie-paden. Zie de toelichting bij `cronBudgetBasis` hieronder
+        // voor waarom dit de ONGECACHETE variant mét expliciete scope is.
+        fetchRealizedBudgetAmounts(supabase, {
+          userId,
+          householdId: householdShareByUser.get(userId)?.householdId ?? null,
+        }),
       ])
 
       if (assetsResult.error || debtsResult.error) {
@@ -242,7 +288,14 @@ export async function GET(request: Request) {
       const expenses = expensesResult.data ?? []
       const income = incomeResult.data ?? []
 
-      const unlinkedCash = unlinkedCashTotal(bankAccountsResult.data)
+      // Gewogen op het huishoud-aandeel uit de vooraf geladen map: een gedeelde
+      // rekening telt in de snapshot van elke partner voor zijn eigen deel, zodat
+      // de reeks niet permanent 200% van het saldo vastlegt. Zonder huishouden
+      // (of bij een gefaalde map) is het aandeel 100 resp. fail-closed 50.
+      const unlinkedCash = unlinkedCashTotal(bankAccountsResult.data, {
+        perspective: 'personal',
+        mySharePct: householdShareByUser.get(userId)?.mySharePct ?? 100,
+      })
 
       // Canoniek opgeslagen net_worth: inclusion-gewogen assets + losse cash
       // − inclusion-gewogen debts (spiegelt dashboard-loader; gedeeld met POST/auto).
@@ -256,10 +309,12 @@ export async function GET(request: Request) {
       const monthlyIncome = income.reduce((s, t) => s + Number(t.amount), 0) / 6
       const monthlyContributions = assets.reduce((s, a) => s + Number(a.monthly_contribution || 0), 0)
 
+      // Canonieke grondslag (parent/child-oprol + orphan-tak) i.p.v. de
+      // parents-only-som die hier stond. De budgets-query hierboven haalde de
+      // children al op — deze migratie kost dus GEEN extra query, ook niet op
+      // dit cron-pad dat voor alle gebruikers draait.
       const allBudgets = budgetsResult.data ?? []
-      const yearlyMustExpenses = allBudgets
-        .filter(b => b.is_essential && b.budget_type === 'expense' && b.parent_id === null)
-        .reduce((s, b) => s + annualAmount(Number(b.default_limit) || 0, b.interval), 0)
+      const yearlyMustExpenses = yearlyMustExpensesFromBudgets(allBudgets)
 
       const fireParams = resolveFireParams(profile)
       const fireSwr = fireParams.effectiveSwr
@@ -306,10 +361,79 @@ export async function GET(request: Request) {
       const savingsRateFromTx = savingsRateFromAggregates(monthlyIncome, monthlyExpenses, debtAflossing6m)
       // EFFECTIEVE inkomsten en spaarquote — handmatige invoer wint, exact zoals
       // de live loader en het instellingenblok onderaan /overzicht/cashflow.
+      // Budgetgrondslag (ADR 0103) — de snapshot legt HISTORIE vast en moet dus
+      // op dezelfde grondslag staan als het dashboard. BEWUST NIET via
+      // `loadBudgetBasis`: die resolvet het huishoud-aandeel uit de SESSIE
+      // (`auth.getUser()`), en deze cron draait service-role — daar zou hij op de
+      // fail-closed 50 % uitkomen. Het aandeel komt hier uit de vooraf gebatchte
+      // `householdShareByUser`, dezelfde bron die de losse-cash-weging gebruikt.
+      const cronBudgetShare = {
+        perspective: 'personal' as const,
+        mySharePct: householdShareByUser.get(userId)?.mySharePct ?? 100,
+      }
+      const cronBudgetRows = (basisBudgetsResult.data ?? []) as unknown as BudgetBasisRow[]
+      // GRONDSLAG-PARITEIT MET DE SESSIE-PADEN (gat gesloten, migratie
+      // 20260811180000). Er zijn DRIE schrijvers naar dezelfde datum-gekeyde rij
+      // in `net_worth_snapshots`: POST /api/snapshots, GET /api/snapshots/auto
+      // (beide sessie) en deze cron. Tot deze migratie schreven de eerste twee de
+      // REALISATIE en deze cron de PLANNING, omdat `tx_month_aggregate` SECURITY
+      // INVOKER is en op de RLS van `transactions` leunt — een RLS die onder
+      // service-role (`auth.uid()` is NULL) volledig vervalt. De reeks droeg
+      // daardoor twee grondslagen door elkaar, en `savings_rate`,
+      // `freedom_percentage` en `fire_age` konden verspringen zonder financiële
+      // gebeurtenis. Een tijdreeks corrigeert zoiets nooit zelf.
+      //
+      // De RPC draagt nu `p_user_id`/`p_household_id`: een puur RESTRICTIEF extra
+      // AND-filter dat de SELECT-policy `View own or shared transactions` naspeelt.
+      // Voor een authenticated aanroeper geldt RLS er onverkort bovenop (een vreemd
+      // id levert daar 0 rijen); hier, op service-role, is het de enige afbakening.
+      //
+      // DRIE DINGEN OM NIET STIL TE VERANDEREN:
+      //   1. Dit is `fetchRealizedBudgetAmounts` (ongecachet), NOOIT
+      //      `getRealizedBudgetAmounts`. Die tweede is `cache()`-gewrapt op de
+      //      supabase-client, en deze cron deelt ÉÉN service-client over alle
+      //      gebruikers — gebruiker 2 zou de realisatie van gebruiker 1 krijgen.
+      //   2. De scope draagt óók de `householdId`, niet alleen de `userId`. Het
+      //      sessie-pad haalt het aggregaat RLS-breed op (dus inclusief de
+      //      gedeelde boekingen van de partner); alleen op `user_id` afbakenen zou
+      //      een gedeeld budget waarop de partner het meeste boekt hier structureel
+      //      te laag laten meetellen. Zelfde bron als de budget- en cash-scope
+      //      hierboven: `householdShareByUser`.
+      //   3. Drie RPC-chunks per gebruiker — identiek aan het sessie-pad, en niet
+      //      te bundelen. De chunking bestaat omdat de per-budget-dimensie voor
+      //      ÉÉN gebruiker al tegen de 1000-rijen-cap loopt; over gebruikers heen
+      //      batchen zou die cap juist gegarandeerd overschrijden en stil te lage
+      //      sommen opleveren. Binnen de pool van 5 zijn dat ≤15 gelijktijdige
+      //      RPC's, naast de ~7 reads per gebruiker die er al waren.
+      //
+      // Faalt de ophaal (of één chunk), dan levert hij het lege venster en valt
+      // elke post zichtbaar terug op zijn geplande limiet — het gedrag van vóór
+      // deze wijziging, nooit een halve waarheid onder de naam "gemeten".
+      const cronBudgetBasis = resolveBudgetBasisFromProfile(
+        basisPrefsByUser.get(userId) ?? null,
+        cronBudgetRows,
+        {
+          shareFractionById: budgetShareFractionById(cronBudgetRows, cronBudgetShare),
+          realized: realizedWindow,
+        },
+      )
+      const cronAnnualIncome = resolveAmountWithBasis(
+        profile.income_source,
+        Number(profile.net_monthly_income ?? 0) * 12,
+        monthlyIncome * 12,
+        cronBudgetBasis.income.annualTotal,
+      )
+      const cronExpenses = resolveAmountWithBasis(
+        profile.expenses_source,
+        Number(profile.estimated_monthly_expenses ?? 0),
+        monthlyExpenses,
+        cronBudgetBasis.expenses.monthlyTotal,
+      )
       const { income: effectiveMonthlyIncome } = resolveEffectiveIncomeExpenses(
         profile,
         monthlyIncome,
         monthlyExpenses,
+        { income: cronBudgetBasis.income.monthlyTotal, expenses: cronBudgetBasis.expenses.monthlyTotal },
       )
       const { effectiveSavingsRatePct: savingsRate6m } = resolveSavingsSource({
         incomeSource: profile.income_source,
@@ -318,6 +442,12 @@ export async function GET(request: Request) {
         estimatedAnnualIncome: monthlyIncome * 12,
         estimatedMonthlyExpenses: Number(profile.estimated_monthly_expenses ?? 0),
         savingsRate6m: savingsRateFromTx,
+        basis: {
+          income: cronAnnualIncome.basis,
+          expenses: cronExpenses.basis,
+          annualIncome: cronAnnualIncome.amount,
+          monthlyExpenses: cronExpenses.amount,
+        },
       })
       // DSTI-teller: Σ maandlasten over de actieve schulden (select bevat monthly_payment).
       const debtMonthlyPayments = debts.reduce((s, d) => s + Number(d.monthly_payment ?? 0), 0)

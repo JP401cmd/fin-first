@@ -11,9 +11,9 @@ import {
   type TargetAllocation,
   type AllocationSlice,
   computeAllocationSlices,
+  normalizeCategory,
   CATEGORY_LABELS,
   ASSET_CLASS_LABELS,
-  SECTOR_LABELS,
   GEOGRAPHY_LABELS,
 } from './portfolio-allocation'
 
@@ -147,14 +147,19 @@ export function computeDrift(
   const labels = CATEGORY_LABELS[viewMode]
 
   return targets.map((t) => {
-    const slice = slices.find((s) => s.key === t.category)
+    // Zie computeRebalancingSuggestions: doelrijen staan in het opgeslagen
+    // vocabulaire, slice-sleutels zijn genormaliseerd. De genormaliseerde
+    // sleutel gaat óók mee naar buiten, zodat suggestTrades hieronder tegen
+    // dezelfde vocabulaire filtert als waarin de slices zijn gegroepeerd.
+    const key = normalizeCategory(t.category)
+    const slice = slices.find((s) => s.key === key)
     const currentPct = slice?.pct ?? 0
     const driftPct = currentPct - t.target_pct
     const driftAmount = (Math.abs(driftPct) / 100) * totalValue
 
     return {
-      category: t.category,
-      label: labels[t.category] || t.category,
+      category: key,
+      label: labels[key] || labels[t.category] || t.category,
       current_pct: Math.round(currentPct * 10) / 10,
       target_pct: t.target_pct,
       drift_pct: Math.round(driftPct * 10) / 10,
@@ -225,7 +230,10 @@ function buildHoldingSuggestions(
   // Get holdings in this category
   const categoryHoldings = holdings.filter((h) => {
     const field = h[viewMode]
-    const key = field && field !== '' ? field : 'anders'
+    // Zelfde normalisatie als classifyHolding in portfolio-allocation.ts —
+    // anders valt een holding met het legacy-veld 'equity' buiten de categorie
+    // 'aandelen' waarvoor de trade juist is voorgesteld.
+    const key = field && field !== '' ? normalizeCategory(field) : 'anders'
     return key === category && h.value > 0
   })
 

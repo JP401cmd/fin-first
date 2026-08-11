@@ -46,13 +46,26 @@ import { calculateFreedomTime, formatFreedomTimeString, formatMaskedCurrency } f
 import { SPEND_LIMIT_GRAIN_BY_PERIOD } from '@/lib/spend-limits/engine'
 import type { SpendLimitPeriodOutcome, SpendLimitTrend } from '@/lib/spend-limits/engine'
 import { budgetAttention, describeRule, describeRules } from '@/lib/spend-limits/describe'
+import {
+  resolveSpendLimitDisplayStatus,
+  SPEND_LIMIT_STATUS_BAND_CLASS,
+  SPEND_LIMIT_STATUS_LABEL,
+  SPEND_LIMIT_STATUS_TEXT_CLASS,
+} from '@/lib/spend-limits/status-display'
+import { SpendLimitScoreBadge, SpendLimitScoreExplainer } from './spend-limit-score-badge'
+import { SpendLimitScoreRadar } from './spend-limit-score-radar'
 import type {
   SpendLimitBudgetSplitRow,
   SpendLimitRuleSplitRow,
+  SpendLimitTransactionsResponse,
   SpendLimitWithReport,
 } from '@/lib/spend-limits/types'
 import { SpendLimitPeriodChart } from './spend-limit-period-chart'
 import { SpendLimitHeatmap } from './spend-limit-heatmap'
+import {
+  SpendLimitTransactionList,
+  type SpendLimitTransactionsState,
+} from './spend-limit-transaction-list'
 
 // ── Props-contract (W3-SECTION consumeert dit) ──────────────────────────────
 
@@ -278,6 +291,25 @@ function PaneBody({
       : null,
   )
   const [breakdowns, setBreakdowns] = useState<Record<string, BreakdownState>>({})
+  const [transactions, setTransactions] = useState<Record<string, SpendLimitTransactionsState>>({})
+
+  /**
+   * Budget-id → naam, uit data die AL op de pagina staat (D6: de losse-boekingen-
+   * lijst mag geen tweede fetch kosten). Twee bronnen, want ze dekken elkaar niet:
+   *  - `config.rules[].budgets` kent de GEKOZEN budgetten (de wortels van de regel);
+   *  - `limit.budgetSplit` kent ook de (klein)KINDEREN waarop daadwerkelijk geboekt
+   *    is — maar bestaat alleen op maand-korrel zonder tegenpartij-dimensie.
+   * Samen dekken ze het gewone geval; een id dat in geen van beide zit toont geen
+   * naam, en dat is eerlijker dan een uuid of een verzonnen label.
+   */
+  const budgetNameById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const rule of limit.config.rules) {
+      for (const b of rule.budgets) if (b.name) map.set(b.id, b.name)
+    }
+    for (const r of limit.budgetSplit) if (r.budgetName) map.set(r.budgetId, r.budgetName)
+    return map
+  }, [limit])
 
   const selected = useMemo(
     () => outcomes.find((o) => o.periodKey === selectedPeriodKey) ?? null,
@@ -315,6 +347,13 @@ function PaneBody({
   // laadstaat gezet is, waarna de cleanup de eigen, nog lopende fetch afbreekt en
   // de uitsplitsing eeuwig op "laden" blijft staan.
   const requested = useRef<Set<string>>(new Set())
+  /**
+   * Dezelfde bookkeeping voor de losse-boekingen-lijst, bewust een TWEEDE set:
+   * de naam-uitsplitsing bestaat alleen voor tegenpartij-potten en de boekingen
+   * voor élke pot. Eén gedeelde set zou een periode die al voor de ene route is
+   * opgehaald voor de andere overslaan.
+   */
+  const requestedTx = useRef<Set<string>>(new Set())
   const alive = useRef(true)
   useEffect(() => {
     alive.current = true
@@ -361,10 +400,49 @@ function PaneBody({
       })
   }, [selectedPeriodKey, config.ruleType, config.id])
 
+  // De losse boekingen achter de gekozen periode — voor ÉLKE potvorm (de rij-RPC
+  // evalueert dezelfde regelvorm als het aggregaat, dus de lijst kan niet groter
+  // zijn dan het geheel), en per periode maar één keer.
+  useEffect(() => {
+    const key = selectedPeriodKey
+    if (!key) return
+    if (requestedTx.current.has(key)) return
+    requestedTx.current.add(key)
+
+    setTransactions((prev) => ({ ...prev, [key]: { status: 'loading' } }))
+
+    const write = (state: SpendLimitTransactionsState) => {
+      if (!alive.current) return
+      setTransactions((prev) => ({ ...prev, [key]: state }))
+    }
+
+    fetch(`/api/spend-limits/${config.id}/transactions?periode=${encodeURIComponent(key)}`)
+      .then(async (res) => {
+        const json = await res.json().catch(() => null)
+        if (!res.ok) {
+          requestedTx.current.delete(key)
+          write({
+            status: 'error',
+            message: json?.error || 'De boekingen konden niet worden geladen.',
+          })
+          return
+        }
+        write({ status: 'ready', data: json as SpendLimitTransactionsResponse })
+      })
+      .catch(() => {
+        requestedTx.current.delete(key)
+        write({
+          status: 'error',
+          message: 'De boekingen konden niet worden geladen. Controleer je verbinding.',
+        })
+      })
+  }, [selectedPeriodKey, config.id])
+
   const current = report.currentPeriod
   const last = report.lastClosedPeriod
   const streaks = report.streaks
   const over = current.status === 'exceeded'
+  const displayStatus = resolveSpendLimitDisplayStatus(current)
 
   /* Padding alleen ónder lg. ShellOverlay kind="pane" rendert vanaf lg de
      SlideInPane, en die wrapt children zélf al in `px-7 py-6 lg:px-8 lg:py-7`;
@@ -404,18 +482,15 @@ function PaneBody({
       {/* ── De lopende periode ────────────────────────────────────────────── */}
       <section className="space-y-2">
         <Kicker>Nu</Kicker>
-        <div className="border border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2.5">
+        {/* Kleur uit de gedeelde standen-map: de band zegt in één oogopslag waar
+            je staat, in plaats van dat alleen de regel rechts het verklapt. */}
+        <div className={`border px-3 py-2.5 ${SPEND_LIMIT_STATUS_BAND_CLASS[displayStatus]}`}>
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <span className="text-xs text-[var(--ink-3)]">
               {current.label} · voorlopig, telt niet mee voor je reeks
             </span>
-            {/* Drie standen — zie spend-limits-section.tsx en spend-limit-widget.tsx. */}
-            <span
-              className={`text-xs font-medium ${
-                over ? 'text-negative' : current.isNearLimit ? 'text-warning' : 'text-positive'
-              }`}
-            >
-              {over ? 'Boven je grens' : current.isNearLimit ? 'Dicht bij je grens' : 'Binnen je grens'}
+            <span className={`text-xs font-medium ${SPEND_LIMIT_STATUS_TEXT_CLASS[displayStatus]}`}>
+              {SPEND_LIMIT_STATUS_LABEL[displayStatus]}
             </span>
           </div>
           <p className="mt-1 text-sm text-[var(--ink)]">
@@ -443,6 +518,13 @@ function PaneBody({
             dailyExpenseRate={dailyExpenseRate}
             prefix={over ? 'Die overschrijding is' : 'Die ruimte is'}
           />
+          {/* De score gaat over je historie, niet over deze periode — hij staat
+              er bewust ONDER de scheidingslijn en draagt het woord "score". */}
+          {report.score.score !== null && (
+            <div className="mt-2 border-t border-[var(--border-ed)]/40 pt-2">
+              <SpendLimitScoreBadge score={report.score} />
+            </div>
+          )}
         </div>
       </section>
 
@@ -513,6 +595,10 @@ function PaneBody({
             · {last.status === 'exceeded' ? 'boven je grens' : 'binnen je grens'}
           </p>
         )}
+        <SpendLimitScoreExplainer score={report.score} />
+        {/* De opbouw achter het cijfer. Rendert zichzelf weg zolang er geen score
+            is; de explainer hierboven zegt dan al waaróm. */}
+        <SpendLimitScoreRadar score={report.score} />
       </section>
 
       {/* ── Uitsplitsing van de gekozen periode ───────────────────────────── */}
@@ -540,6 +626,20 @@ function PaneBody({
             limit={limit}
             label={selected.label}
           />
+        )}
+
+        {/* De losse boekingen ONDER de uitsplitsing: eerst het patroon (per budget,
+            per regel of per naam), dan het bewijs regel voor regel. Omgekeerd zou
+            een lijst van 200 regels de samenvatting van het scherm duwen. */}
+        {selected && (
+          <div className="space-y-2 pt-2">
+            <Kicker size="small">Losse boekingen</Kicker>
+            <SpendLimitTransactionList
+              state={transactions[selected.periodKey]}
+              label={selected.label}
+              budgetNameById={budgetNameById}
+            />
+          </div>
         )}
       </section>
 
@@ -584,8 +684,9 @@ function TrendSummary({
     return (
       <p className="text-sm text-[var(--ink-2)]">
         Gemiddeld <MaskedAmount value={trend.recentAvgMatchedAmount} tone="kern" /> per periode over
-        je laatste {trend.windowPeriods} afgesloten periodes. Voor een vergelijking met de periodes
-        daarvóór heb je er {trend.windowPeriods * 2} nodig.
+        je laatste {trend.windowPeriods} afgesloten periodes. Zodra je er {trend.windowPeriods * 2}{' '}
+        hebt, leggen we die {trend.windowPeriods} naast de {trend.windowPeriods} daarvóór en zie je
+        een richting.
       </p>
     )
   }

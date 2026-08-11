@@ -71,7 +71,7 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Cash — acceptatiecriteria dekking', () => {
-  it('heeft precies één criterium per catalogus-CASH-scenario (01..54, geen gaten)', () => {
+  it('heeft precies één criterium per catalogus-CASH-scenario (01..61, geen gaten)', () => {
     const workflows = CASH_ACCEPTANCE.criteria.map((c) => c.workflow).sort()
     expect(workflows).toEqual(catalogCashWorkflows)
     expect(new Set(workflows).size).toBe(catalogCashWorkflows.length)
@@ -110,7 +110,20 @@ describe('UAT Cash — acceptatiecriteria dekking', () => {
     // 52 → 54: grenzenpotten fase 2-5 (ADR 0089/0092, requirement-delta 8 aug
     // 2026) — WF-CASH-53 (motor, 'exact') en WF-CASH-54 (beheren/pane/widget/
     // preview/alias/meldingen, 'ui-only' — persona-jitter sluit 'exact' uit).
-    expect(workflows.length).toBe(54)
+    // 54 → 59: transactie-bulkbewerken (docs/requirements-transactie-
+    // bulkbewerken.md, ADR 0104) — WF-CASH-55 (zoeken zonder datumvenster +
+    // pagina/alle-N-selectie + impact, 'exact'), WF-CASH-56 (canoniek trio +
+    // split-uitsluiting, 'exact'), WF-CASH-57 (verwijder-bevestiging:
+    // type-to-confirm + herimport-waarschuwing, 'exact'), WF-CASH-58
+    // (huishoud-scoping + de 5.000-grens — 'ui-only', HANDMATIGE controle:
+    // geen persona draagt de benodigde datatoestand) en WF-CASH-59
+    // (regelaanbod-op-bevestiging + gedeeltelijke-mislukking-contract,
+    // 'consistency').
+    // 59 → 61: WF-CASH-60 (grondslagkeuze inkomen/uitgaven, ADR 0103 — de
+    // precedentie in `resolveAmountWithBasis` + de spaarquote die die grondslag
+    // volgt, 'exact') en WF-CASH-61 (grenzenpot-reeksscore/prestatiebadge,
+    // `computeSpendLimitScore` — pure motor op synthetische periodes, 'exact').
+    expect(workflows.length).toBe(61)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {
@@ -177,7 +190,13 @@ describe('UAT Cash — acceptatiecriteria dekking', () => {
     // op synthetische invoer) is 'exact' en krijgt een CASH_ENGINE_CHECKS-rij;
     // WF-CASH-54 (beheren/pane/widget/preview/alias/meldingen) blijft
     // 'ui-only' — persona-jitter sluit 'exact' uit voor dat criterium.
-    expect(exactWorkflows.length).toBe(32)
+    // 32 → 35: transactie-bulkbewerken (ADR 0104) — WF-CASH-55/56/57 zijn
+    // 'exact' en krijgen elk een CASH_ENGINE_CHECKS-rij; WF-CASH-58 blijft
+    // 'ui-only' (handmatige controle) en WF-CASH-59 is 'consistency' — geen
+    // van beide krijgt een rij.
+    // 35 → 37: WF-CASH-60 en WF-CASH-61 zijn beide 'exact' en krijgen elk een
+    // CASH_ENGINE_CHECKS-rij.
+    expect(exactWorkflows.length).toBe(37)
   })
 
   it('markeert de jitter-gebonden/AI/gebonden randgevallen met de juiste kind', () => {

@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { fetchPriceData } from '@/lib/price-feed'
+import { buildClassificationUpdate } from '@/lib/holdings-classification'
 import { fetchCoinPricesEurBatch } from '@/lib/integrations/coingecko-client'
 import { syncAllExchangeConnections } from '@/lib/integrations/exchange-cron'
 import { syncAllWalletAddresses } from '@/lib/integrations/wallet-cron'
@@ -181,14 +182,26 @@ interface BucketSummary {
   skipped: number
   errors: number
   assets_synced: number
+  /**
+   * Aantal posities dat in deze ronde een assetklasse, geografie of beurs kreeg.
+   * Het 52-weeks bereik telt bewust NIET mee — dat is een koersveld dat élke
+   * ronde ververst wordt, dus meetellen zou deze teller gelijkmaken aan
+   * `updated` en daarmee betekenisloos maken.
+   */
+  classified: number
 }
 
 async function refreshInvestmentHoldings(supabase: SupabaseClient): Promise<BucketSummary> {
-  const summary: BucketSummary = { total: 0, unique_tickers: 0, updated: 0, stale: 0, skipped: 0, errors: 0, assets_synced: 0 }
+  const summary: BucketSummary = { total: 0, unique_tickers: 0, updated: 0, stale: 0, skipped: 0, errors: 0, assets_synced: 0, classified: 0 }
 
   const { data: rows, error } = await supabase
     .from('investment_holdings')
-    .select('id, user_id, asset_id, ticker, isin, current_price')
+    // `asset_class, geography, exchange` meelezen is noodzakelijk, niet extra:
+    // zonder de huidige waarde kun je "nog leeg" niet onderscheiden van "de
+    // gebruiker heeft dit zelf ingevuld", en zou de feed een handmatige keuze
+    // overschrijven. Het 52-weeks bereik hoeft NIET meegelezen: dat is een
+    // koersveld dat elke ronde onvoorwaardelijk vervangen wordt.
+    .select('id, user_id, asset_id, ticker, isin, current_price, asset_class, geography, exchange')
     .eq('is_active', true)
     .or('ticker.neq.null,isin.neq.null')
 
@@ -237,6 +250,23 @@ async function refreshInvestmentHoldings(supabase: SupabaseClient): Promise<Buck
       if (priceData.previousClose !== null) updateFields.previous_close = priceData.previousClose
       if (priceData.dailyChangePercent !== null) updateFields.daily_change_percent = priceData.dailyChangePercent
       if (priceData.currency) updateFields.currency = priceData.currency
+      // 52-weeks bereik: koersveld, geen classificatie — elke ronde opnieuw uit
+      // de verse feed (het bereik schuift dagelijks op), maar nooit een bestaande
+      // waarde met `null` overschrijven als de feed niets levert. Deze route
+      // rekent — anders dan de handmatige refresh — niets naar EUR om; het
+      // bereik blijft dus in dezelfde valuta als de `current_price` die hier
+      // wordt weggeschreven, en dat is precies de bedoeling.
+      if (priceData.fiftyTwoWeekHigh !== null) updateFields.fifty_two_week_high = priceData.fiftyTwoWeekHigh
+      if (priceData.fiftyTwoWeekLow !== null) updateFields.fifty_two_week_low = priceData.fiftyTwoWeekLow
+
+      // Classificatie langs exact dezelfde regel als de handmatige refresh.
+      // Zonder dit vulde de portefeuille-verdeling alleen voor wie zélf op
+      // "Prijzen vernieuwen" drukte — de nachtelijke ronde raakt dezelfde
+      // posities maar liet ze ongeclassificeerd, en dat verschil is aan de
+      // buitenkant niet te zien.
+      const classification = buildClassificationUpdate(priceData, h)
+      Object.assign(updateFields, classification)
+      if (Object.keys(classification).length > 0) summary.classified++
 
       const { error: upErr } = await supabase
         .from('investment_holdings')
@@ -298,7 +328,7 @@ async function refreshInvestmentHoldings(supabase: SupabaseClient): Promise<Buck
 }
 
 async function refreshCryptoHoldings(supabase: SupabaseClient): Promise<BucketSummary> {
-  const summary: BucketSummary = { total: 0, unique_tickers: 0, updated: 0, stale: 0, skipped: 0, errors: 0, assets_synced: 0 }
+  const summary: BucketSummary = { total: 0, unique_tickers: 0, updated: 0, stale: 0, skipped: 0, errors: 0, assets_synced: 0, classified: 0 }
 
   const { data: rows, error } = await supabase
     .from('crypto_holdings')

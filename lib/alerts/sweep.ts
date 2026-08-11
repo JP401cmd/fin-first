@@ -12,9 +12,10 @@ import type { PushMessage } from '@/lib/alerts/push'
  * Drie signalen:
  *  - **S1 nieuwe fouten** — `error_logs` sinds het watermerk, gegroepeerd op
  *    fingerprint. Meldt alleen NIEUWE soorten (+ één escalatie bij 10× volume).
- *  - **S2a gefaalde taak** — `job_runs.status='error'`, per taak max 1×/24u via
- *    dezelfde `cron_alert_last_<job>`-sleutel als de bestaande mail, zodat mail
- *    en push samen hoogstens één alarm per taak per etmaal geven.
+ *  - **S2a gefaalde taak** — `job_runs.status='error'`, per taak hoogstens één
+ *    alarm per 20 uur via dezelfde `cron_alert_last_<job>`-sleutel als de
+ *    bestaande mail, zodat mail en push samen niet twee keer alarm slaan
+ *    (zie `THROTTLE_MS` — inclusief wat dat venster niet belooft).
  *  - **S2b uitgebleven taak** — geen geslaagde run binnen `maxAgeHours`. Dit
  *    sluit fase 2 van ADR 0060 en is het enige signaal dat "de cron draaide
  *    helemaal niet" van binnenuit ziet (mits de sweep zélf nog draait — dáárom
@@ -26,7 +27,27 @@ import type { PushMessage } from '@/lib/alerts/push'
  * kunnen gebruikersinvoer en id's bevatten. Vastgelegd in sweep.test.ts.
  */
 
-const THROTTLE_MS = 24 * 60 * 60 * 1000
+/**
+ * Stiltevenster per fouttype en per taak: **hoogstens één alarm per 20 uur**.
+ *
+ * Niet 24 uur, sinds de sweep dagelijks draait (19:00 UTC, planlimiet). Een
+ * throttle die gelijk is aan de cadans is een val: de ronde van morgen valt dan
+ * op de rand van zijn eigen venster, en Vercel start een cron tot ~55 minuten ná
+ * het hele uur (gemeten) — dus die rand wordt daadwerkelijk geraakt en er valt
+ * een dag stilletjes uit. 20 uur ligt onder de cadans en boven de grootste
+ * afstand binnen één etmaal tussen een taak en de sweep (snapshots 02:00 → sweep
+ * 19:00 = 17 uur), zodat de mail van `lib/cron-alert.ts` en de push van de sweep
+ * elkaar op dezelfde dag nog steeds ontdubbelen.
+ *
+ * WAT DIT NIET MEER BELOOFT: "hoogstens één alarm per taak per etmaal". Roept de
+ * externe pinger de route vaker aan (het runbook schrijft elk kwartier voor), dan
+ * vuurt een blijvend falende taak op t=0, 20u, 40u — en dan bevat een rollend
+ * etmaal er twee. Dat is de bewuste ruil: liever af en toe een alarm te veel dan
+ * een dag die stilletjes wegvalt. `cron-alert.ts` houdt zijn eigen venster op 24
+ * uur maar schrijft dezelfde `cron_alert_last_<job>`-sleutel, dus in de praktijk
+ * bepaalt het kortste venster van de twee wanneer er weer een alarm mag.
+ */
+const THROTTLE_MS = 20 * 60 * 60 * 1000
 /** Her-alarm zodra een al gemeld fouttype 10× zo vaak voorkomt als bij de melding. */
 const ESCALATION_FACTOR = 10
 /** Fingerprints zonder nieuw voorval verlopen; houdt de state-blob klein. */
@@ -185,7 +206,7 @@ export function runSweep(input: SweepInput): SweepResult {
       const stillThrottled = prev && throttled(prev.alertedAt, nowMs)
 
       if (!prev || !stillThrottled) {
-        // Nieuw fouttype, of eentje die na 24 uur stilte terugkomt.
+        // Nieuw fouttype, of eentje die na het stiltevenster terugkomt.
         next.fingerprints[fp] = {
           total: g.count,
           alertedAt: nowIso,

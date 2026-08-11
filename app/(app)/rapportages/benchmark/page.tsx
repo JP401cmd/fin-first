@@ -20,6 +20,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { Printer, Globe } from 'lucide-react'
 import { formatMaskedCurrency, formatTimestamp } from '@/lib/format'
+import { formatAmsterdamTime } from '@/lib/tz'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { formatFireAge } from '@/lib/horizon-data'
 import { ScenarioCallout, SectionLabel, OrnamentColophon, PageInfoButton } from '@/components/editorial'
@@ -170,10 +171,9 @@ export default function BenchmarkPage() {
   }
 
   const generatedDate = formatTimestamp(data.generatedAt)
-  const generatedTime = new Date(data.generatedAt).toLocaleTimeString('nl-NL', {
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  // Amsterdamse wandkloktijd via `lib/tz.ts` — niet de runtime-tijdzone
+  // (server = UTC, browser = Amsterdam): dat is de #418-klasse.
+  const generatedTime = formatAmsterdamTime(new Date(data.generatedAt))
   const cohortIncomplete = data.cohort.complete === false || data.metrics.length === 0
   const hasWorld = Boolean(data.global.income || data.global.wealth)
   const musk = data.musk

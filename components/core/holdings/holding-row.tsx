@@ -9,6 +9,9 @@
  *   - Hoofdbedrag: marktwaarde in DM Mono 18-22px tabular-nums, met
  *     highlight-marker bij positieve outlier-prestatie (top 3 winnaars).
  *   - KPI-strip: dag-Δ% + totaal-rendement%.
+ *   - 52-weeks bereikstrook: waar de huidige koers staat in zijn eigen
+ *     jaarbereik (verschijnt alleen wanneer de koersfeed dat bereik geleverd
+ *     heeft — zie `holding-range-bar.tsx`).
  *   - Meta-regel: italic Source Serif 4 met units · valuta-badge.
  *
  * Acties (transactie / edit / delete) zitten achter een ⋯-menu rechts;
@@ -27,6 +30,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { HighlightMark } from '@/components/editorial'
+import { HoldingRangeBar } from './holding-range-bar'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
@@ -51,6 +55,15 @@ export type HoldingRowData = {
    * tonen (geen transactiehistorie). `formatted` is masking-aware uit de parent.
    */
   closedPnl?: { amount: number; formatted: string } | null
+  /**
+   * 52-weeks bereik uit de koersfeed (`investment_holdings.fifty_two_week_high`
+   * / `_low`), in dezelfde valuta als `currentPrice` — de refresh-route rekent
+   * beide met dezelfde wisselkoers om. `null`/ontbrekend zolang er nog geen
+   * koersvernieuwing is gedraaid of de positie niet noteert; dan verdwijnt de
+   * strook volledig in plaats van een leeg bereik te suggereren.
+   */
+  fiftyTwoWeekHigh?: number | null
+  fiftyTwoWeekLow?: number | null
 }
 
 export type HoldingRowProps = {
@@ -257,6 +270,20 @@ export function HoldingRow({
                 )}
               </div>
             </div>
+          )}
+
+          {/* 52-weeks bereik — alleen voor een lopende positie: bij een
+              uitverkochte rij is er geen koers meer om te duiden, daar telt de
+              opbrengst hierboven. De strook verbergt zichzelf wanneer de feed
+              het bereik (nog) niet geleverd heeft. */}
+          {!soldOut && (
+            <HoldingRangeBar
+              low={holding.fiftyTwoWeekLow}
+              high={holding.fiftyTwoWeekHigh}
+              current={holding.currentPrice}
+              currency={holding.currency}
+              testId={`holding-52w-${holding.id}`}
+            />
           )}
 
           {/* Meta-regel — italic Source Serif */}

@@ -1,6 +1,7 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { sanitizeCashSettingsInput } from '@/lib/cashflow-settings'
+import { sanitizeCashSettingsInput, parseCashflowBasisPrefs } from '@/lib/cashflow-settings'
+import { unauthorized, badRequest, serverError } from '@/lib/api/respond'
 import { loadParameterSavingsRateTarget } from '@/lib/cashflow-settings-data'
 import { bandError, isWithinBand } from '@/lib/parameters-band'
 
@@ -12,16 +13,27 @@ export async function GET() {
   const claims = await getAuthClaims(supabase)
 
   if (!claims) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
-  // Try with marginaal_tarief column; fall back to base columns if column doesn't exist yet
+  // Drie tiers, elk met één kolom minder. Tier 0 vraagt `cashflow_basis_prefs`
+  // (ADR 0103) erbij; die kolom kan op een DB zonder de migratie nog ontbreken en
+  // zou dan de HELE select laten falen — met tier 1 als vangnet levert de route
+  // dan nog steeds alle bestaande velden, in plaats van stil terug te vallen op
+  // de kale tier 2 (waar income_source/expenses_source verdwijnen).
+  const BASE_COLUMNS =
+    'expected_return, inflation_rate, box3_method, marginaal_tarief, pension_factor_a, pension_factor_a_source, net_monthly_income, estimated_monthly_expenses, retirement_expense_method, retirement_expense_custom_amount, target_savings_rate, income_source, expenses_source'
+
   let data: Record<string, unknown> | null = null
-  const { data: d1, error: e1 } = await supabase
+  const { data: d0, error: e0 } = await supabase
     .from('profiles')
-    .select('expected_return, inflation_rate, box3_method, marginaal_tarief, pension_factor_a, pension_factor_a_source, net_monthly_income, estimated_monthly_expenses, retirement_expense_method, retirement_expense_custom_amount, target_savings_rate, income_source, expenses_source')
+    .select(`${BASE_COLUMNS}, cashflow_basis_prefs`)
     .eq('id', claims.sub)
     .single()
+
+  const { data: d1, error: e1 } = e0
+    ? await supabase.from('profiles').select(BASE_COLUMNS).eq('id', claims.sub).single()
+    : { data: d0, error: null }
 
   if (!e1) {
     data = d1 as Record<string, unknown>
@@ -33,7 +45,7 @@ export async function GET() {
       .eq('id', claims.sub)
       .single()
     if (e2) {
-      return NextResponse.json({ error: 'Fout bij laden parameters' }, { status: 500 })
+      return serverError(e2, 'parameters:GET')
     }
     data = d2 as Record<string, unknown>
   }
@@ -57,6 +69,10 @@ export async function GET() {
     target_savings_rate: goalTargetSavingsRate ?? data?.target_savings_rate ?? null,
     income_source: data?.income_source ?? 'auto',
     expenses_source: data?.expenses_source ?? 'auto',
+    // Bronwaarde én selectie in ÉÉN uitgifte, spiegelbeeld van de PUT (ADR 0103).
+    // Opnieuw defensief geparsed: DB-inhoud wordt nooit vertrouwd. NULL of een
+    // onbekende vorm → null = "nooit gezet" → alles telt mee.
+    cashflow_basis_prefs: parseCashflowBasisPrefs(data?.cashflow_basis_prefs),
   })
 }
 
@@ -67,14 +83,14 @@ export async function PUT(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+    return unauthorized()
   }
 
   let body: Record<string, unknown>
   try {
     body = await request.json()
   } catch {
-    return NextResponse.json({ error: 'Ongeldig verzoek' }, { status: 400 })
+    return badRequest('Ongeldig verzoek')
   }
 
   // Valideer return/inflatie alleen wanneer ze in de body zitten — zo kan de
@@ -182,23 +198,39 @@ export async function PUT(request: NextRequest) {
     .from('profiles')
     .upsert(updateData)
 
+  // Wat de retry-tak WEL heeft weggeschreven — de response mag NOOIT iets
+  // bevestigen dat niet is opgeslagen (zie hieronder).
+  const persistedCashSettings: typeof cashSettings = { ...cashSettings }
+
   // If upsert fails (e.g. a newer column doesn't exist yet on a legacy DB),
-  // retry once without the optional columns (marginaal_tarief + the factor-A pair).
+  // retry once without the optional columns (marginaal_tarief, the factor-A pair
+  // and cashflow_basis_prefs). Zonder die laatste zou een DB waarop migratie
+  // 20260811160000 nog niet draaide de HELE parameters-PUT laten falen — dus ook
+  // het opslaan van de bronwaarde zelf.
   if (
     error &&
     (marginaalTarief !== undefined ||
       pensionFactorA !== undefined ||
-      pensionFactorASource !== undefined)
+      pensionFactorASource !== undefined ||
+      cashSettings.cashflow_basis_prefs !== undefined)
   ) {
     delete updateData.marginaal_tarief
     delete updateData.pension_factor_a
     delete updateData.pension_factor_a_source
+    delete updateData.cashflow_basis_prefs
+    // De selectie is NIET weggeschreven, dus hij mag ook niet in de response
+    // staan. Zonder deze regel kreeg de client zijn uitsluitingen terug alsof ze
+    // bewaard waren, terwijl de grondslag bij de volgende render weer op "alles
+    // telt mee" staat — een stille tweede waarheid, precies waar ADR 0103 tegen
+    // beschermt. De bronwaarde (income_source/expenses_source) IS wel bewaard en
+    // blijft daarom in de response staan.
+    delete persistedCashSettings.cashflow_basis_prefs
     const retry = await supabase.from('profiles').upsert(updateData)
     error = retry.error
   }
 
   if (error) {
-    return NextResponse.json({ error: 'Fout bij opslaan parameters' }, { status: 500 })
+    return serverError(error, 'parameters:PUT')
   }
 
   return NextResponse.json({
@@ -209,6 +241,6 @@ export async function PUT(request: NextRequest) {
     marginaal_tarief: marginaalTarief !== undefined ? marginaalTarief : null,
     pension_factor_a: pensionFactorA !== undefined ? pensionFactorA : null,
     pension_factor_a_source: pensionFactorASource !== undefined ? pensionFactorASource : null,
-    ...cashSettings,
+    ...persistedCashSettings,
   })
 }

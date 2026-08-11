@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { resolveFireParams, computeEffectiveSwr } from '@/lib/fire-params'
+import {
+  resolveFireParams,
+  computeEffectiveSwr,
+  resolveFireParamsWithAssumptions,
+} from '@/lib/fire-params'
+import type { FireAssumptionRow } from '@/lib/fire-assumptions'
+import { CURRENT_TAX_YEAR } from '@/lib/box3-data'
 import { DEFAULT_RETURN, INFLATION, BOX3_DRAG, NL_SWR } from '@/lib/horizon-data'
 
 /**
@@ -103,5 +109,64 @@ describe('computeEffectiveSwr — gedeelde pure helper', () => {
     const inf = 0.025
     expect(resolveFireParams({ expected_return: gr, inflation_rate: inf }).effectiveSwr)
       .toBe(computeEffectiveSwr(gr, inf))
+  })
+})
+
+/**
+ * resolveFireParamsWithAssumptions — de VOLLEDIGE grondslag-keten
+ * (profielkeuze > jaarlaag fire_assumptions > TS-constanten) in één home.
+ *
+ * Bestond eerder alleen als losse, drie keer gekopieerde shadow-blokken in de
+ * loaders. Een oppervlak dat de jaarlaag oversloeg rekende met een andere
+ * onttrekkingsvoet dan de rest van de app zodra beheer een jaar zette.
+ */
+describe('resolveFireParamsWithAssumptions — grondslag-keten', () => {
+  const jaarlaag: FireAssumptionRow[] = [
+    { year: CURRENT_TAX_YEAR, expected_return: 0.085, inflation: 0.03, volatility: 0.15 },
+  ]
+
+  it('leeg profiel + lege jaarlaag → exact NL_SWR (oud gedrag blijft intact)', () => {
+    const params = resolveFireParamsWithAssumptions({}, [])
+    expect(params.effectiveSwr).toBeCloseTo(NL_SWR, 12)
+    expect(params.grossReturn).toBe(DEFAULT_RETURN)
+    expect(params.inflationRate).toBe(INFLATION)
+  })
+
+  it('null profiel gedraagt zich als leeg profiel', () => {
+    expect(resolveFireParamsWithAssumptions(null, null).effectiveSwr)
+      .toBeCloseTo(NL_SWR, 12)
+  })
+
+  it('jaarlaag vult ALLEEN de velden die de gebruiker leeg liet', () => {
+    const params = resolveFireParamsWithAssumptions(
+      { expected_return: null, inflation_rate: null },
+      jaarlaag,
+    )
+    expect(params.grossReturn).toBe(0.085)
+    expect(params.inflationRate).toBe(0.03)
+    expect(params.effectiveSwr).toBe(computeEffectiveSwr(0.085, 0.03))
+  })
+
+  it('een expliciete gebruikerskeuze wint van de jaarlaag', () => {
+    const params = resolveFireParamsWithAssumptions(
+      { expected_return: 0.05, inflation_rate: 0.02 },
+      jaarlaag,
+    )
+    expect(params.grossReturn).toBe(0.05)
+    expect(params.inflationRate).toBe(0.02)
+    expect(params.effectiveSwr).toBe(computeEffectiveSwr(0.05, 0.02))
+  })
+
+  it('mengt per veld: eigen rendement, jaarlaag-inflatie', () => {
+    const params = resolveFireParamsWithAssumptions({ expected_return: 0.05 }, jaarlaag)
+    expect(params.grossReturn).toBe(0.05)
+    expect(params.inflationRate).toBe(0.03)
+  })
+
+  it('muteert de doorgegeven profielrij niet (null blijft "niet ingesteld")', () => {
+    const profile = { expected_return: null, inflation_rate: null }
+    resolveFireParamsWithAssumptions(profile, jaarlaag)
+    expect(profile.expected_return).toBeNull()
+    expect(profile.inflation_rate).toBeNull()
   })
 })

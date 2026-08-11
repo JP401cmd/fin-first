@@ -31,6 +31,7 @@ import { useGlobalSync, type ConnectionResult } from './global-sync-provider'
 import { useToast } from '@/components/app/toast-provider'
 import { computeFreshness, type ConnectionsData, type ExchangeConnectionRow, type ExchangeId, type WalletAddressRow, type WalletChain } from '@/lib/connections-data'
 import { formatCurrency } from '@/lib/format'
+import { formatAmsterdamTime } from '@/lib/tz'
 import { bankManualHref, type BankSyncTarget } from '@/lib/sync/global-sync'
 import { bankSyncLabel, toBankSyncTargets } from '@/lib/sync/bank-sync-targets'
 import { BANK_DAILY_REQUEST_LIMIT, effectiveDailyRequests } from '@/lib/bank-connection-status'
@@ -75,13 +76,17 @@ function maskApiKey(last4: string | null): string {
   return `•••• ${last4}`
 }
 
-/** "vanaf 17:37" — dezelfde tijd die de melding noemt, in dezelfde notatie. */
+/**
+ * "vanaf 17:37" — dezelfde tijd die de melding noemt, in dezelfde notatie.
+ *
+ * Klok in Amsterdamse tijd via `lib/tz.ts`, gelijk aan
+ * `components/sync/global-sync-provider.tsx#nextEligibleLabel` (#418-klasse).
+ */
 function fromTime(iso: string | null | undefined): string {
   if (!iso) return ''
   const d = new Date(iso)
   if (!Number.isFinite(d.getTime())) return ''
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return ` Gaat vanzelf weer mee vanaf ${pad(d.getHours())}:${pad(d.getMinutes())}.`
+  return ` Gaat vanzelf weer mee vanaf ${formatAmsterdamTime(d)}.`
 }
 
 /**

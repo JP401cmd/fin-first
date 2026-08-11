@@ -6,6 +6,7 @@ import { BottomSheet } from '@/components/app/bottom-sheet'
 import { BudgetIcon } from '@/components/app/budget-shared'
 import { createClient } from '@/lib/supabase/client'
 import { type Budget } from '@/lib/budget-data'
+import { escapeLikePattern } from '@/lib/transactions/search-query'
 
 type TransferTransaction = {
   id: string
@@ -145,7 +146,7 @@ export function TransferConfirmSheet({
       .delete()
       .eq('user_id', user.id)
       .eq('match_field', matchField)
-      .ilike('match_value', matchValue)
+      .ilike('match_value', escapeLikePattern(matchValue))
 
     await supabase.from('category_corrections').insert({
       user_id: user.id,
@@ -161,7 +162,7 @@ export function TransferConfirmSheet({
         .delete()
         .eq('user_id', user.id)
         .eq('match_field', 'counterparty_iban')
-        .ilike('match_value', normalizedIban)
+        .ilike('match_value', escapeLikePattern(normalizedIban))
       await supabase.from('category_corrections').insert({
         user_id: user.id,
         match_field: 'counterparty_iban',

@@ -45,8 +45,22 @@ import { getAowLeeftijden } from '@/lib/reference-cache'
 import { resolveFireAssumptions, type FireAssumptionRow } from '@/lib/fire-assumptions'
 import { loadPerspectiveDataServer } from '@/lib/household/perspective-loader-server'
 import type { Perspective } from '@/lib/household-data'
-import { resolveEffectiveIncomeExpenses } from './effective-financials'
+import {
+  resolveUnlinkedCashShare,
+  selectUnlinkedBankAccounts,
+  unlinkedCashFractionFor,
+  unlinkedCashTotal,
+} from '@/lib/unlinked-cash'
+import { resolveEffectiveIncomeExpenses, resolveAmountWithBasis } from './effective-financials'
 import { resolveSavingsSource, savingsRateFromAggregates } from './savings-source'
+import {
+  type BasisSource,
+  type BudgetBasisResult,
+  type BudgetBasisRow,
+  type ResolvedBasis,
+} from './budget-basis'
+import { loadBudgetBasis } from '@/lib/household/budget-share'
+import { getOwnProfile, getBudgets } from '@/lib/server-data/base'
 import { fetchLatestSnapshotsByMonth } from '@/lib/server-data/snapshot-aggregates'
 import {
   getTxAgg12m,
@@ -86,7 +100,27 @@ export interface CorePageData {
   monthlyIncomeExpenseSeries: { label: string; income: number; expenses: number }[]
 
   // Savings rate
+  /**
+   * De RAUWE 6-maands TRANSACTIEquote (incl. spaarbudget-/aflossingscorrectie).
+   * Dit is de MEETWAARDE, niet per se het getal waar de app op oordeelt — de
+   * transactie-kassabon hoort deze te tonen omdat hij de bedragen erboven
+   * verklaart.
+   */
   savingsRate6m: number
+  /**
+   * De EFFECTIEVE spaarquote (%) — `resolveSavingsSource(...).effectiveSavingsRatePct`,
+   * dus op de grondslag die de gebruiker koos (ADR 0103). Gelijk aan
+   * `savingsRate6m` zolang inkomen én uitgaven op de transactiegrondslag staan;
+   * anders de uniforme (I − E) / I over de effectieve bedragen.
+   *
+   * DIT is het percentage waar de gezondheidsscore en de FIRE-prognose op
+   * draaien, en dus het percentage dat het instellingenblok onderaan
+   * /overzicht/cashflow hoort te tonen. Vóór dit veld toonde dat blok
+   * `savingsRate6m` onder een kassabon met effectieve bedragen: inkomen €5.000,
+   * uitgaven €3.000, gespaard +€2.000 — met daaronder 5 % in plaats van 40 %,
+   * terwijl de score en de FIRE-datum wél op 40 % rekenden.
+   */
+  effectiveSavingsRatePct: number
   savingsRateMonths: number
   savingsRateMethod: SavingsRateMethod
   savingsReceiptData: {
@@ -140,10 +174,48 @@ export interface CorePageData {
     monthlyExpenses: number
     totalAssets: number
     totalDebts: number
+    /** TRANSACTIE-extrapolatie (12-mnd geannualiseerd) — de gemeten waarde, los van de gekozen grondslag. */
     extrapolatedIncome: number
+    /**
+     * Het EFFECTIEVE jaarinkomen op de gekozen grondslag (ADR 0103):
+     * budgetsom, transactie-extrapolatie of handmatig × 12. Dít getal voedt de
+     * FIRE-keten (`current_income`), de spaarbron en het bruto Box 1-inkomen —
+     * consumenten beslissen de grondslag NIET opnieuw.
+     */
+    effectiveAnnualIncome: number
     yearlyMustExpenses: number
     yearlyRetirementExpenses?: number
   }
+
+  // ── Grondslag van inkomen & uitgaven (ADR 0103) ─────────────────────────────
+  /** De KEUZE op de profielrij ('auto' = nooit gekozen). */
+  incomeSource: BasisSource
+  expensesSource: BasisSource
+
+  // EEN GRONDSLAG HOORT BIJ ÉÉN BEDRAG. De loader neemt de precedentie-beslissing
+  // op DRIE verschillende grootheden (huidige kalendermaand, 12-maands
+  // extrapolatie, 6-maands gemiddelde), en die kunnen uiteenlopen: wie vroeg in
+  // de maand nog geen salaris geboekt heeft krijgt op de maand-grootheid
+  // 'profile' en op de jaar-grootheid 'transaction'. Eén gedeeld `incomeBasis`
+  // zou dus naast sommige bedragen een onwaarheid zetten. Vandaar vier expliciete
+  // velden — elk gekoppeld aan precies het getal dat het beschrijft.
+
+  /** Grondslag van `rawFinancials.monthlyIncome` (gerealiseerde huidige kalendermaand). */
+  monthlyIncomeBasis: ResolvedBasis
+  /** Grondslag van `rawFinancials.monthlyExpenses` (gerealiseerde huidige kalendermaand). */
+  monthlyExpensesBasis: ResolvedBasis
+  /** Grondslag van `rawFinancials.effectiveAnnualIncome` (12-maands extrapolatie). */
+  annualIncomeBasis: ResolvedBasis
+  /**
+   * Grondslag van de maanduitgaven die de SPAARQUOTE voedt (6-maands gemiddelde,
+   * `savingsReceiptData.extHalfYearExpenses / 6`) — dezelfde meting waarop
+   * `savingsRate6m` staat, en dus de grondslag die bij het getoonde
+   * spaarpercentage hoort.
+   */
+  savingsExpensesBasis: ResolvedBasis
+  /** De budgetgrondslag per kant, incl. ALLE selecteerbare posten voor de UI. */
+  budgetIncome: BudgetBasisResult
+  budgetExpenses: BudgetBasisResult
   /**
    * CANONIEK dagtarief (€/dag) — 12-mnd ROLLING grondslag via `lib/expense-rate.ts`,
    * exact dezelfde keten als `DashboardData.dailyExpenseRate` en
@@ -392,6 +464,7 @@ export const loadCoreData = cache(async function loadCoreData(
     earliestTxResult, profileResult, bankAccountsResult,
     aowResult,
     fireAssumptionsResult,
+    allBudgetsBasisResult, ownProfileResult,
   ] = await Promise.all([
     supabase
       .from('transactions')
@@ -454,11 +527,11 @@ export const loadCoreData = cache(async function loadCoreData(
       .from('profiles')
       .select('full_name, retirement_expense_method, retirement_expense_custom_amount, expected_return, inflation_rate, box3_method, net_monthly_income, estimated_monthly_expenses, budgeting_active, active_modules, fire_end_strategy, fire_end_age, fire_legacy_amount, date_of_birth, income_source, expenses_source, household_type, housing_strategy_config')
       .single(),
-    supabase
-      .from('bank_accounts')
-      .select('id, name, balance')
-      .eq('is_active', true)
-      .is('linked_asset_id', null),
+    // Losse bankrekeningen via de gedeelde query-definitie: het
+    // `is_active`/`linked_asset_id IS NULL`-predicaat is de GRONDSLAG (welk geld
+    // náást de assets meetelt) en hoorde nooit als handgerolde kopie hier te
+    // staan — dat was precies de plek waar dit getal kon driften.
+    selectUnlinkedBankAccounts(supabase),
     // AOW-referentietabel via de gedeelde module-TTL-cache (lib/reference-cache.ts).
     // De .then(ok, err)-adapter behoudt de { data, error }-vorm van een rauwe
     // supabase-query, zodat de bestaande error-logging + `.data ?? []`-fallback
@@ -476,6 +549,21 @@ export const loadCoreData = cache(async function loadCoreData(
       .select('year, expected_return, inflation, volatility, source, is_definitive')
       .order('year', { ascending: true })
       .then((r) => r, () => ({ data: null })),
+    // ── Grondslag-invoer (ADR 0103) ──────────────────────────────────────────
+    // ALLE budgetten (parents + children, alle types, incl. is_archived/
+    // merged_into) via de gedeelde, cache()-gewrapte `getBudgets` — dezelfde rijen
+    // die dashboard-/horizon-/lever-scores-loader al ophalen, dus op /overzicht en
+    // /overzicht/cashflow is dit letterlijk dezelfde roundtrip. De bestaande
+    // essential/child-queries hierboven zijn VOORGEFILTERD (alleen essentiële
+    // uitgave-parents, children zonder archive/income/savings) en dus ongeschikt
+    // als grondslag-bron: de inkomstenkant zit er per definitie niet in.
+    getBudgets(supabase),
+    // De grondslag-selectie staat op `profiles.cashflow_basis_prefs`. BEWUST via
+    // `getOwnProfile` (select('*')) en niet als extra kolom op de expliciete
+    // profielselect hierboven: die kolom bestaat pas na migratie 20260811160000,
+    // en één onbekende kolom zou daar de HELE profielquery laten falen —
+    // waarna elke profielinstelling stil wegvalt. Een `*`-select kan dat niet.
+    getOwnProfile(supabase),
   ])
 
   if (txResult.error) throw txResult.error
@@ -506,8 +594,29 @@ export const loadCoreData = cache(async function loadCoreData(
   // Fallback to profile estimates for users without transactions
   const profileMonthlyIncome = Number(profileResult.data?.net_monthly_income ?? 0)
   const profileMonthlyExpenses = Number(profileResult.data?.estimated_monthly_expenses ?? 0)
-  const { income: effectiveMonthlyIncome, expenses: effectiveMonthlyExpenses } =
-    resolveEffectiveIncomeExpenses(profileResult.data ?? {}, monthlyIncome, monthlyExpenses)
+
+  // ── De budgetgrondslag (ADR 0103) ────────────────────────────────────────
+  // Ontstaat HIER, één keer, en reist als bundelveld mee zodat geen enkele
+  // consument de grondslagbeslissing herhaalt. Een leeg gezette selectie
+  // (allExcluded) levert annualTotal 0 op en valt daarmee vanzelf terug op de
+  // transactiegrondslag — precies wat het besluit voorschrijft.
+  const { income: budgetIncome, expenses: budgetExpenses } = await loadBudgetBasis(
+    supabase,
+    ownProfileResult.data as Record<string, unknown> | null,
+    (allBudgetsBasisResult.data ?? []) as unknown as BudgetBasisRow[],
+  )
+  const incomeSource = ((profileResult.data?.income_source as BasisSource | null) ?? 'auto') as BasisSource
+  const expensesSource = ((profileResult.data?.expenses_source as BasisSource | null) ?? 'auto') as BasisSource
+
+  const {
+    income: effectiveMonthlyIncome,
+    expenses: effectiveMonthlyExpenses,
+    incomeBasis: monthlyIncomeBasis,
+    expensesBasis: monthlyExpensesBasis,
+  } = resolveEffectiveIncomeExpenses(profileResult.data ?? {}, monthlyIncome, monthlyExpenses, {
+    income: budgetIncome.monthlyTotal,
+    expenses: budgetExpenses.monthlyTotal,
+  })
   const budgetingActive = profileResult.data?.budgeting_active !== false
   // Module-toggle is verwijderd uit Trifinity; alle modules zijn altijd actief
   // op data-niveau. App-zichtbaarheid in de sidebar wordt afgeleid van
@@ -598,6 +707,30 @@ export const loadCoreData = cache(async function loadCoreData(
     : last6MonthsExpenses
   const halfYearSavings = extHalfYearIncome - extHalfYearExpenses
 
+  // ── De JAAR-grondslag (ADR 0103) ─────────────────────────────────────────
+  // Dezelfde precedentie als de maand-resolutie hierboven, maar op jaarbedragen:
+  // budgetsom → transactie-extrapolatie → profielschatting × 12, met 'manual' die
+  // altijd wint. Loopt DOOR de gedeelde resolver en niet ernáást, zodat het
+  // jaarinkomen dat de FIRE-keten, de spaarbron en Box 1 voeden per definitie
+  // dezelfde grondslag draagt als de inkomenskaart op /overzicht/cashflow.
+  const annualIncomeResolution = resolveAmountWithBasis(
+    profileResult.data?.income_source,
+    profileMonthlyIncome * 12,
+    extrapolatedIncome,
+    budgetIncome.annualTotal,
+  )
+  const effectiveAnnualIncome = annualIncomeResolution.amount
+  // Uitgaven-grondslag voor de SPAARQUOTE. Bewust op het 6-maands GEMIDDELDE en
+  // niet op de lopende maand: dat is de meting waar `savingsRate6m` op staat, dus
+  // de uniforme (I − E)/I-formule blijft op dezelfde meetbasis staan als de
+  // transactiequote waarmee hij vergeleken wordt.
+  const savingsExpenseResolution = resolveAmountWithBasis(
+    profileResult.data?.expenses_source,
+    profileMonthlyExpenses,
+    extHalfYearExpenses / 6,
+    budgetExpenses.monthlyTotal,
+  )
+
   // ── Yearly must expenses from essential budgets ──
   const allChildren = childBudgetsResult.data ?? []
   const { yearlyMustExpenses, expenseItems } = computeYearlyMustExpenses(
@@ -612,7 +745,11 @@ export const loadCoreData = cache(async function loadCoreData(
   const yearlyRetirementExpenses = computeRetirementExpenses(
     budgetingActive ? activeRetirementMethod : activeRetirementMethod,
     effectiveMustExpenses,
-    extrapolatedIncome,
+    // ADR 0103: methode 'current_income' volgt de GEKOZEN inkomensgrondslag, niet
+    // langer alleen de transactie-extrapolatie. Bij die methode ÍS het jaarinkomen
+    // de pensioenuitgave en dus het FIRE-doel — de grootste getalsverschuiving van
+    // dat besluit, vooraf geaccepteerd.
+    effectiveAnnualIncome,
     profileResult.data?.retirement_expense_custom_amount,
     profileMonthlyExpenses * 12,
   )
@@ -650,7 +787,11 @@ export const loadCoreData = cache(async function loadCoreData(
   // ── Total assets (weighted by net_worth_inclusion_pct) ──
   const totalAssetsOnly = assetsResult.data.reduce((s, a) =>
     s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
-  const unlinkedCash = (bankAccountsResult.data ?? []).reduce((s, a) => s + Number(a.balance), 0)
+  // Canonieke, huishoud-gewogen optelling (lib/unlinked-cash.ts): een gedeelde
+  // rekening telt op het eigen aandeel, niet twee keer volledig. Aandeel één
+  // keer resolven; de perspectief-tak verderop hergebruikt het.
+  const unlinkedCashShare = await resolveUnlinkedCashShare(supabase, bankAccountsResult.data)
+  const unlinkedCash = unlinkedCashTotal(bankAccountsResult.data, unlinkedCashShare)
   const totalAssets = totalAssetsOnly + unlinkedCash
 
   // ── Total debts (weighted by net_worth_inclusion_pct) ──
@@ -675,8 +816,23 @@ export const loadCoreData = cache(async function loadCoreData(
   const allCashAssets = assetsResult.data
     .filter(a => a.asset_type === 'cash')
     .map(a => ({ id: a.id, name: a.name, balance: Number(a.current_value), source: 'asset' as const }))
+  // Per-rekening óók op het aandeel: `core-landing` telt deze bank-entries op tot
+  // de cash-bucket van de vermogenssamenstelling, en die moet gelijk zijn aan de
+  // `unlinkedCash` in het headline-totaal. Ongewogen laten zou de dubbeltelling
+  // via de achterdeur van de grafiek terugbrengen.
   const unlinkedBanks = (bankAccountsResult.data ?? [])
-    .map(a => ({ id: a.id, name: a.name, balance: Number(a.balance), source: 'bank' as const }))
+    .map(a => ({
+      id: a.id,
+      name: a.name,
+      balance:
+        Number(a.balance) *
+        unlinkedCashFractionFor(
+          unlinkedCashShare.perspective,
+          (a as { ownership?: string | null }).ownership,
+          unlinkedCashShare.mySharePct,
+        ),
+      source: 'bank' as const,
+    }))
   const cashAccounts = [...allCashAssets, ...unlinkedBanks]
 
   const nonCashAssets = assetsResult.data
@@ -713,7 +869,11 @@ export const loadCoreData = cache(async function loadCoreData(
         pd.assets.reduce((s, a) => {
           const raw = Number(a.current_value) * ((Number(a.net_worth_inclusion_pct) || 100) / 100)
           return s + share(a, raw)
-        }, 0) + unlinkedCash
+        }, 0) +
+        unlinkedCashTotal(bankAccountsResult.data, {
+          perspective,
+          mySharePct: unlinkedCashShare.mySharePct,
+        })
       effectiveTotalDebts = pd.debts.reduce((s, d) => {
         const raw = Number(d.current_balance) * ((Number(d.net_worth_inclusion_pct) || 100) / 100)
         return s + share(d, raw)
@@ -729,6 +889,7 @@ export const loadCoreData = cache(async function loadCoreData(
     totalAssets: effectiveTotalAssets,
     totalDebts: effectiveTotalDebts,
     extrapolatedIncome,
+    effectiveAnnualIncome,
     yearlyMustExpenses: effectiveMustExpenses,
     yearlyRetirementExpenses,
   }
@@ -777,7 +938,7 @@ export const loadCoreData = cache(async function loadCoreData(
   const prevMonthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 1, 1)).toISOString().split('T')[0]
   const [
     budgetResult, spendingResult, snapshotResult,
-    assetValuationResult, goalsResult, spending6mResult,
+    goalsResult, spending6mResult,
     holdingsResult, prevSpendingResult,
   ] = await Promise.all([
     supabase.from('budgets').select('id, name, icon, default_limit, budget_type, parent_id, is_essential, interval, is_favorite, alert_threshold').limit(500),
@@ -785,7 +946,19 @@ export const loadCoreData = cache(async function loadCoreData(
     supabase.from('net_worth_snapshots').select('snapshot_date, total_assets, total_debts, net_worth, freedom_percentage, fire_age, sovereignty_level, savings_rate, resilience_score, fire_portfolio_required').order('snapshot_date', { ascending: true }).limit(24),
     // debt-progress (original_amount/current_balance, is_active) hergebruikt nu
     // `debtsResult` uit batch-1 — aparte query verwijderd (−1 query, byte-identiek).
-    supabase.from('valuations').select('value, valuation_date').eq('entity_type', 'asset').order('valuation_date', { ascending: false }).limit(50),
+    //
+    // De `valuations`-query (top-50 DESC, zónder user_id) is hier verwijderd: hij
+    // voedde uitsluitend `assetGrowthDirection` en dat pad was op twee manieren
+    // fout. (1) Groeischuld: de tabel groeit dagelijks, de RLS-disjunctie
+    // (auth.uid() = user_id OR shared/household) dwingt een Seq Scan + top-N
+    // heapsort af — gemeten op 292k rijen: 4172 buffers / 174 ms, en een
+    // expliciete `.eq('user_id')` haalt de Sort er bij limit 50 níet uit.
+    // (2) Correctheid: `sorted[0]`/`sorted[1]` heetten "totalen" maar waren de
+    // waarde van twee LOSSE bezittingen; zonder tiebreaker op dezelfde
+    // valuation_date vergeleek het pijltje twee verschillende assets.
+    // `net_worth_snapshots.total_assets` (hierboven al opgehaald) ís de grondslag
+    // die het label claimt, en dekt meer gebruikers. Zie Notion-kaart
+    // "Groeischuld valuations", optie A.
     // Doelen: bestaan (hasGoals) + noodfonds-target voor de score. Selecteert de
     // velden voor de emergency-resolver; hasGoals blijft "heeft ≥1 doel" (incl.
     // voltooid), de emergency-target filtert client-side op niet-voltooid.
@@ -995,16 +1168,14 @@ export const loadCoreData = cache(async function loadCoreData(
     debtProgress = { totalOriginal, totalCurrent, progressPct: Math.max(0, Math.min(100, progressPct)) }
   }
 
-  // ── Compute asset growth direction from recent valuations ──
+  // ── Asset growth direction — ÉÉN grondslag: net_worth_snapshots.total_assets ──
+  // Was een tweetraps-pad met `valuations` als primaire bron; die tak is
+  // verwijderd (zie de toelichting bij batch-2). `total_assets` is een echt
+  // totaal en dus de grondslag die het pijltje claimt; `snapshotResult` is
+  // ASC gesorteerd, dus de laatste twee rijen zijn de meest recente.
+  // Minder dan 2 snapshots ⇒ 'flat' (geen richting te bepalen).
   let assetGrowthDirection: 'up' | 'down' | 'flat' = 'flat'
-  if (assetValuationResult.data && assetValuationResult.data.length >= 2) {
-    const sorted = [...assetValuationResult.data].sort((a, b) => b.valuation_date.localeCompare(a.valuation_date))
-    const latestTotal = Number(sorted[0].value)
-    const previousTotal = Number(sorted[1].value)
-    if (latestTotal > previousTotal * 1.001) assetGrowthDirection = 'up'
-    else if (latestTotal < previousTotal * 0.999) assetGrowthDirection = 'down'
-    else assetGrowthDirection = 'flat'
-  } else if (snapshotResult.data && snapshotResult.data.length >= 2) {
+  if (snapshotResult.data && snapshotResult.data.length >= 2) {
     const snaps = snapshotResult.data as NetWorthSnapshot[]
     const latestAssets = Number(snaps[snaps.length - 1].total_assets)
     const prevAssets = Number(snaps[snaps.length - 2].total_assets)
@@ -1077,6 +1248,13 @@ export const loadCoreData = cache(async function loadCoreData(
     estimatedAnnualIncome: extrapolatedIncome,
     estimatedMonthlyExpenses: profileMonthlyExpenses,
     savingsRate6m: Math.round(computedSavingsRate6m * 10) / 10,
+    // De spaarquote VOLGT de grondslag (ADR 0103) — geen aparte instelbare bron.
+    basis: {
+      income: annualIncomeResolution.basis,
+      expenses: savingsExpenseResolution.basis,
+      annualIncome: effectiveAnnualIncome,
+      monthlyExpenses: savingsExpenseResolution.amount,
+    },
   })
   const healthScoreInput: HealthScoreInput = buildHealthScoreInput(
     {
@@ -1252,11 +1430,26 @@ export const loadCoreData = cache(async function loadCoreData(
     profileIncome: profileMonthlyIncome,
     profileExpenses: profileMonthlyExpenses,
 
+    // Grondslag (ADR 0103) — de keuze én de uitkomst reizen mee. Elk
+    // basis-veld hoort bij precies één bedrag; zie het type hierboven.
+    incomeSource,
+    expensesSource,
+    monthlyIncomeBasis,
+    monthlyExpensesBasis,
+    annualIncomeBasis: annualIncomeResolution.basis,
+    savingsExpensesBasis: savingsExpenseResolution.basis,
+    budgetIncome,
+    budgetExpenses,
+
     incomeMonths: actualIncomeMonths,
     incomeByMonth: sortedIncomeMonths,
     monthlyIncomeExpenseSeries,
 
     savingsRate6m: Math.round(computedSavingsRate6m * 10) / 10,
+    // De grondslag-geresolveerde quote (ADR 0103) — dezelfde waarde die
+    // hierboven de gezondheidsscore voedt, nu ook op de bundel zodat de
+    // cashflow-kaart hem kan tonen i.p.v. de rauwe transactiemeting.
+    effectiveSavingsRatePct: coreEffectiveSavingsRate,
     savingsRateMonths: savingsRateDataMonths,
     savingsRateMethod,
     savingsReceiptData: {

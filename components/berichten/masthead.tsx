@@ -1,3 +1,9 @@
+import {
+  formatAmsterdamDayMonth,
+  formatAmsterdamTime,
+  isSameAmsterdamDay,
+} from '@/lib/tz'
+
 interface MastheadProps {
   editionNr?: number
   jaargang?: number
@@ -29,15 +35,18 @@ function capitalize(str: string): string {
   return str.length > 0 ? str.charAt(0).toUpperCase() + str.slice(1) : str
 }
 
-// "Bijgewerkt 08:14" als de editie van vandaag is, anders "Bijgewerkt 29 mei"
+// "Bijgewerkt 08:14" als de editie van vandaag is, anders "Bijgewerkt 29 mei".
+//
+// Klok en kalenderdag in Amsterdamse tijd via `lib/tz.ts`: `toDateString()` en
+// `toLocaleTimeString()` zonder `timeZone` lezen de runtime-tijdzone, dus de
+// server (UTC) rendert dan een andere tekst dan de browser — #418-klasse.
 function formatUpdated(iso: string): string | null {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return null
   const now = new Date()
-  const sameDay = d.toDateString() === now.toDateString()
-  const when = sameDay
-    ? d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
-    : d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })
+  const when = isSameAmsterdamDay(d, now)
+    ? formatAmsterdamTime(d)
+    : formatAmsterdamDayMonth(d)
   return `Bijgewerkt ${when}`
 }
 

@@ -25,6 +25,13 @@ type SyncResult = {
    */
   duplicates_cross_source: number
   new: number
+  /**
+   * Hoeveel van de nieuwe rijen als eigen-rekening-verschuiving zijn geboekt
+   * (`transfer`, op de Eigen rekening-post) in plaats van als uitgave/inkomst.
+   * Zonder deze regel ziet de gebruiker alleen "X nieuw" en blijft onzichtbaar
+   * dat zijn overboeking naar de spaarrekening géén uitgave is geworden.
+   */
+  own_account_transfers: number
   fetched_from: string | null
   truncated: boolean
   /** Het saldo dat deze sync heeft overgenomen, of `null` als dat niet lukte. */
@@ -129,6 +136,7 @@ export default function ConnectSuccessPage() {
             new: data.new,
             duplicates: data.duplicates,
             duplicates_cross_source: data.duplicates_cross_source ?? 0,
+            own_account_transfers: data.own_account_transfers ?? 0,
             fetched_from: data.fetched_from ?? null,
             truncated: Boolean(data.truncated),
             balance: typeof data.balance === 'number' ? data.balance : null,
@@ -398,6 +406,18 @@ export default function ConnectSuccessPage() {
                         {result.duplicates_cross_source === 1
                           ? 'Eén transactie stond hier al vanuit een eerdere import en is niet nog eens toegevoegd.'
                           : `${result.duplicates_cross_source} transacties stonden hier al vanuit een eerdere import en zijn niet nog eens toegevoegd.`}
+                      </p>
+                    )}
+
+                    {/* Eigen-rekening-verschuivingen. Deze rijen tellen bewust
+                        NIET als uitgave — dat is precies waarom het hier hoort te
+                        staan: anders lijkt het totaal aan nieuwe transacties
+                        onverklaarbaar hoger dan wat er in de budgetten landt. */}
+                    {result.own_account_transfers > 0 && (
+                      <p className="text-xs text-[var(--ink-2)]">
+                        {result.own_account_transfers === 1
+                          ? 'Eén transactie is herkend als overboeking tussen je eigen rekeningen en telt niet als uitgave.'
+                          : `${result.own_account_transfers} transacties zijn herkend als overboeking tussen je eigen rekeningen en tellen niet als uitgave.`}
                       </p>
                     )}
 

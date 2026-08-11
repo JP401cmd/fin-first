@@ -1,6 +1,22 @@
 import '@testing-library/jest-dom'
 import { vi, afterEach } from 'vitest'
+import { configure } from '@testing-library/react'
 import { __resetPrivacyModeCache } from '@/components/app/use-privacy-mode'
+
+// Globale `asyncUtilTimeout`-verhoging (testing-library default: 1000ms).
+// Notion-kaart "Testisolatie: cash-account-view.test.tsx faalt intermitterend
+// in de volle suite" (11 aug 2026): onder volle-suite-parallelliteit (~921
+// bestanden) lopen React/DOM-tests met `waitFor`/`findBy*` op de 1000ms-default
+// vast op CPU-contentie — niet alleen in het ene bestand dat destijds al een
+// eigen (lokale) verhoging kreeg (components/app/cash-account-view.test.tsx),
+// maar ook in andere bestanden (bv. app/(app)/core/cash/connect/page.test.tsx),
+// steeds bij de EERSTE test in het bestand (module-cold-start bovenop de
+// fetch-keten). Klasse-probleem, geen dader-bestand — vandaar hier globaal in
+// plaats van bestand-voor-bestand. Bescheiden gehouden (5000ms, niet hoger)
+// zodat een echte component-traagheid niet gemaskeerd wordt; de per-test
+// `testTimeout` (30000ms, vitest.config.ts) blijft de harde bovengrens voor
+// echte hangs.
+configure({ asyncUtilTimeout: 5000 })
 
 // De privacy-mode-hook (usePrivacyMode) deelt een module-singleton-cache zodat
 // meerdere indicatoren op één pagina niet elk apart /api/privacy-mode fetchen.

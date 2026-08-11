@@ -19,7 +19,7 @@ import {
 } from '@/lib/horizon-data'
 import type { Action } from '@/lib/recommendation-data'
 import { computeYearlyMustExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
-import { deriveRetirementExpenseBasis } from '@/lib/retirement-expense-basis'
+import { deriveRetirementExpenseBasis, extrapolateAnnualIncome } from '@/lib/retirement-expense-basis'
 import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import type { Asset } from '@/lib/asset-data'
 import { type Debt } from '@/lib/debt-data'
@@ -52,7 +52,10 @@ import { resolvePotRules, type PotRulesConfig } from '@/lib/pot-rules'
 import { parseToekomstScenarioPrefs, type ToekomstScenarioPrefs } from '@/lib/horizon/toekomst-scenario'
 import { loadPerspectiveDataServer } from '@/lib/household/perspective-loader-server'
 import type { Perspective } from '@/lib/household-data'
-import { resolveEffectiveIncomeExpenses } from './effective-financials'
+import { resolveEffectiveIncomeExpenses, resolveAmountWithBasis } from './effective-financials'
+import type { BudgetBasisRow } from './budget-basis'
+import { loadBudgetBasis } from '@/lib/household/budget-share'
+import { withResolvedKernelBedragen } from '@/lib/horizon/kernel-profile-basis'
 import { resolveSavingsSource, computeSavingsRate6m, computeDebtAflossingMonthly } from './savings-source'
 import {
   getActiveAssets,
@@ -63,6 +66,7 @@ import {
   getCurrentMonthTx,
   getEarliestIncomeDate,
 } from './server-data/base'
+import { resolveUnlinkedCashShare, unlinkedCashTotal } from './unlinked-cash'
 import {
   getTxAgg12m,
   aggSumPositief,
@@ -564,8 +568,22 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
 
   // Fallback to profile estimates for users without transactions
   const profileMonthlyExpenses = Number(profile.estimated_monthly_expenses ?? 0)
+
+  // ── De budgetgrondslag (ADR 0103) ────────────────────────────────────────
+  // Zelfde motor en dezelfde rijen als de core-/dashboard-loader (`getBudgets`
+  // is cache()-gedeeld binnen het request), zodat /toekomst per definitie op
+  // dezelfde grondslag staat als /overzicht/cashflow. Geen extra query.
+  const { income: horizonBudgetIncome, expenses: horizonBudgetExpenses } = await loadBudgetBasis(
+    supabase,
+    profile as Record<string, unknown>,
+    (allBudgetsResult.data ?? []) as unknown as BudgetBasisRow[],
+  )
+
   const { income: effectiveMonthlyIncome, expenses: effectiveMonthlyExpenses } =
-    resolveEffectiveIncomeExpenses(profile ?? {}, monthlyIncome, monthlyExpenses)
+    resolveEffectiveIncomeExpenses(profile ?? {}, monthlyIncome, monthlyExpenses, {
+      income: horizonBudgetIncome.monthlyTotal,
+      expenses: horizonBudgetExpenses.monthlyTotal,
+    })
 
   // 6-month average income/expenses for stable resilience calculation — uit het
   // maandaggregaat, TRANSFER-EXCLUSIEF (realOnly:true). avgIncome6m/avgExpenses6m voeden
@@ -583,7 +601,11 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   // Asset totals with inclusion percentages
   const totalAssetsOnly = (assetsResult.data ?? []).reduce((s, a) =>
     s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100), 0)
-  const unlinkedCash = (bankAccountsResult.data ?? []).reduce((s, a) => s + Number(a.balance), 0)
+  // Losse bankrekeningen via DE canonieke optelling (lib/unlinked-cash.ts),
+  // gewogen op het huishoud-aandeel. Het aandeel wordt hier ÉÉN keer geresolved
+  // en hieronder in de perspectief-tak hergebruikt (geen tweede leesronde).
+  const unlinkedCashShare = await resolveUnlinkedCashShare(supabase, bankAccountsResult.data)
+  const unlinkedCash = unlinkedCashTotal(bankAccountsResult.data, unlinkedCashShare)
   const totalAssets = totalAssetsOnly + unlinkedCash
   // totalDebts uit de gedeelde getActiveDebts (select('*')) — dezelfde rijen die
   // computeDebtAflossingMonthly + de health-score consumeren, één fetch per request.
@@ -629,6 +651,19 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   // Extrapolatie (inkomen → jaarbasis) + pensioenuitgave-methode: ÉÉN gedeelde
   // bron (lib/retirement-expense-basis.ts), identiek gedeeld met horizon-client
   // loadData() en /api/uitgaven-na-pensioen/context (consume, don't recompute).
+  // JAAR-grondslag (ADR 0103): dezelfde precedentie als de maand-resolutie, op
+  // jaarbedragen. De TRANSACTIE-invoer blijft de bestaande, bewust
+  // transfer-INCLUSIEVE extrapolatie (realOnly:false, zie de motivatie bij
+  // `last12Income` hierboven) — die semantiek is hier niet aangeraakt; alleen de
+  // KEUZE welke van de drie grondslagen wint loopt nu door de gedeelde resolver.
+  const horizonTxAnnualIncome = extrapolateAnnualIncome(last12Income, earliestIncomeDate, now)
+  const horizonAnnualIncome = resolveAmountWithBasis(
+    (profile as { income_source?: string | null }).income_source,
+    Number(profile.net_monthly_income ?? 0) * 12,
+    horizonTxAnnualIncome,
+    horizonBudgetIncome.annualTotal,
+  )
+
   const { extrapolatedIncome, yearlyRetirementExpenses } = deriveRetirementExpenseBasis({
     method: profile.retirement_expense_method as RetirementExpenseMethod,
     yearlyMustExpenses,
@@ -637,6 +672,7 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     customAmount: profile.retirement_expense_custom_amount,
     estimatedYearlyExpenses: profileMonthlyExpenses * 12,
     now,
+    effectiveAnnualIncome: horizonAnnualIncome.amount,
   })
 
   const dob = profile.date_of_birth ?? null
@@ -666,10 +702,16 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
         item.ownership === 'shared' && perspective !== 'household'
           ? raw * (item._myShareFraction ?? 1)
           : raw
+      // Losse rekeningen volgen hetzelfde perspectief als de bezittingen: vol in
+      // de huishoud-blik, aandeel-gewogen in de partner-blik (waar eigen-
+      // persoonlijke rekeningen wegvallen). Zelfde geresolvede aandeel-%.
       fireTotalAssets = pd.assets.reduce((s, a) => {
         const raw = Number(a.current_value) * ((Number(a.net_worth_inclusion_pct) || 100) / 100)
         return s + share(a, raw)
-      }, 0) + unlinkedCash
+      }, 0) + unlinkedCashTotal(bankAccountsResult.data, {
+        perspective,
+        mySharePct: unlinkedCashShare.mySharePct,
+      })
       fireTotalDebts = pd.debts.reduce((s, d) => {
         const raw = Number(d.current_balance) * ((Number(d.net_worth_inclusion_pct) || 100) / 100)
         return s + share(d, raw)
@@ -763,6 +805,13 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   // overschreven). `effectiveSavingsRate` is datzelfde percentage en voedt
   // hieronder ook de gezondheidsscore — één getal, één oordeel.
   const sources = profile as { income_source?: string | null; expenses_source?: string | null }
+  // Uitgaven-grondslag voor de spaarquote, op de 6-maands meetbasis.
+  const horizonSavingsExpenses = resolveAmountWithBasis(
+    sources.expenses_source,
+    profileMonthlyExpenses,
+    expenses6m / 6,
+    horizonBudgetExpenses.monthlyTotal,
+  )
   const {
     baseAnnualSavings: baseAnnualSavingsFromCashflow,
     effectiveSavingsRatePct: effectiveSavingsRate,
@@ -773,6 +822,15 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     estimatedAnnualIncome: extrapolatedIncome,
     estimatedMonthlyExpenses: profileMonthlyExpenses,
     savingsRate6m,
+    // De spaarquote volgt de grondslag (ADR 0103). De uitgaven-invoer is het
+    // 6-maands GEMIDDELDE (`expenses6m / 6`) — dezelfde meting als savingsRate6m,
+    // niet de lopende maand.
+    basis: {
+      income: horizonAnnualIncome.basis,
+      expenses: horizonSavingsExpenses.basis,
+      annualIncome: extrapolatedIncome,
+      monthlyExpenses: horizonSavingsExpenses.amount,
+    },
   })
 
 
@@ -1061,10 +1119,25 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   // hierboven gemerged) + de al-berekende essentiële-jaaruitgaven (geen DB-kolom)
   // zodat de kernel dezelfde pensioen-uitgave-grondslag ('essential_budgets')
   // gebruikt als v2. Geen nieuwe som — hergebruikt `yearlyMustExpenses`.
-  const rawProfile: ConvergentieRawProfileRow = {
-    ...(profile as ConvergentieRawProfileRow),
-    yearly_essential_expenses: yearlyMustExpenses,
-  }
+  // De inkomens-/uitgavenbedragen worden BEWUST vervangen door de geresolveerde
+  // effectieve waarden (ADR 0103) — zelfde injectie-patroon als
+  // `yearly_essential_expenses` hierboven: een berekende waarde in plaats van een
+  // rauwe DB-kolom, zonder dat het kernel-contract verandert.
+  //
+  // Nodig omdat de kern KASSTROOM modelleert: `buildInkomenUitgaven` leest
+  // `net_monthly_income` × 12 als `nettoJaarinkomen` → `cf.basissalaris` → CF!D.
+  // Hij heeft dus bedragen nodig, geen verhouding (de spaarquote consumeert hij
+  // niet), en hij kan de grondslag ook niet zelf bepalen — `ConvergentieRawProfileRow`
+  // draagt geen budgetsom en geen transactiereeks. Zonder deze injectie rekende de
+  // projectie voor een `budget`- of `transaction`-gebruiker met €0 basissalaris,
+  // want `profiles.net_monthly_income` bestaat alleen voor de `manual`-grondslag.
+  const rawProfile: ConvergentieRawProfileRow = withResolvedKernelBedragen(
+    {
+      ...(profile as ConvergentieRawProfileRow),
+      yearly_essential_expenses: yearlyMustExpenses,
+    },
+    effectiveInput,
+  )
 
   // Canoniek dagtarief voor de €→vrijheidstijd-vertalingen die op deze bundel
   // leunen (belasting-hub, box 1, fiscale kansen, totaalplan, aandachtspunten,

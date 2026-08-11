@@ -88,6 +88,7 @@ export const BUDGET_FLOW: UatFlow = {
     { id: 'categorisatie', scenarioId: 'UAT-BUDGET-13', label: 'WF-BUDGET-13 · Doorwerking: categorisering → budgetrealisatie', kind: 'action', stage: 4, lane: 'doorwerking' },
     { id: 'x-cash', label: 'Transacties & categorisatie (Cash-import)', kind: 'cross', stage: 4, lane: 'doorwerking', crossZone: 'CASH' },
     { id: 'rapport', scenarioId: 'UAT-BUDGET-24', label: 'WF-BUDGET-24 · Maandelijks budgetrapport openen', kind: 'screen', stage: 4, lane: 'doorwerking' },
+    { id: 'grondslag', scenarioId: 'UAT-BUDGET-26', label: 'WF-BUDGET-26 · Doorwerking: budgetten als grondslag voor inkomen/uitgaven (ADR 0103)', kind: 'action', stage: 4, lane: 'doorwerking' },
 
     // ── 5 · uitkomst ──────────────────────────────────────────────────────
     { id: 'uitkomst', label: 'Budget-dekking, resterend & vrijheidstijd bijgewerkt', kind: 'outcome', stage: 5 },
@@ -147,6 +148,9 @@ export const BUDGET_FLOW: UatFlow = {
     { from: 'categorisatie', to: 'x-cash', kind: 'cross', label: 'transactie → budget' },
     { from: 'hub', to: 'rapport' },
     { from: 'rapport', to: 'x-rapp', kind: 'cross' },
+    { from: 'hub', to: 'grondslag' },
+    { from: 'grondslag', to: 'x-cash', kind: 'cross', label: 'grondslagkeuze op /overzicht/cashflow' },
+    { from: 'grondslag', to: 'uitkomst' },
 
     // samenvloeien → uitkomst
     { from: 'nieuw', to: 'uitkomst' },

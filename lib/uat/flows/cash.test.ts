@@ -47,7 +47,7 @@ describe('CASH_FLOW — curatie-integriteit', () => {
     }
   })
 
-  it('dekt alle 54 WF-CASH-scenario\'s (01..54, aaneengesloten — geen verwijsregel-gaten)', () => {
+  it('dekt alle 61 WF-CASH-scenario\'s (01..61, aaneengesloten — geen verwijsregel-gaten)', () => {
     const covered = new Set(
       CASH_FLOW.nodes.map((n) => n.scenarioId).filter((id): id is string => Boolean(id)),
     )
@@ -79,11 +79,17 @@ describe('CASH_FLOW — curatie-integriteit', () => {
     // 2026) — WF-CASH-53 (motor: kwartaal/jaar-periodes, isNearLimit, streaks,
     // trend) en WF-CASH-54 (beheren, prestatieweergave, widget, match-preview,
     // alias, meldingen).
-    const expected = Array.from({ length: 54 }, (_, i) => `UAT-CASH-${String(i + 1).padStart(2, '0')}`)
+    // 54 → 59: transactie-bulkbewerken (docs/requirements-transactie-
+    // bulkbewerken.md, ADR 0104) — WF-CASH-55..59 (zoeken/selecteren/impact,
+    // hercategoriseren, verwijderen, huishoud-scoping/5.000-grens,
+    // regelaanbod/gedeeltelijke mislukking).
+    const expected = Array.from({ length: 61 }, (_, i) => `UAT-CASH-${String(i + 1).padStart(2, '0')}`)
     for (const id of expected) {
       expect(covered.has(id), `${id} moet als flow-knoop voorkomen`).toBe(true)
     }
-    expect(covered.size).toBe(54)
+    // 59 → 61: WF-CASH-60 (grondslagkeuze inkomen/uitgaven, ADR 0103) en
+    // WF-CASH-61 (grenzenpot-reeksscore/prestatiebadge).
+    expect(covered.size).toBe(61)
   })
 
   it('de domeinoverschrijdende cross-knopen dekken BUDGET/OVZ/TOEK/WILL/BEZIT/MIJN', () => {

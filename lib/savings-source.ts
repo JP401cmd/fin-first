@@ -18,8 +18,39 @@
  *
  * Door precies dezelfde keuzeregel te gebruiken kan de prognose nooit
  * divergeren van wat de gebruiker op de cashflow-pagina ziet.
+ *
+ * SINDS ADR 0103 heeft `resolveSavingsSource` twee takken. Krijgt hij het
+ * optionele `basis`-blok (de geresolveerde grondslag uit
+ * `resolveAmountWithBasis`), dan VOLGT de spaarquote de grondslag: beide op
+ * 'transaction' → ongewijzigd `savingsRate6m`; anders één uniforme
+ * (I − E) / I zonder spaarbudget-/aflossingscorrectie. Zonder dat blok blijft de
+ * legacy-keuzeregel hieronder gelden — byte-identiek voor elke call-site die de
+ * grondslag (nog) niet kent.
  */
 import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
+import type { ResolvedBasis } from '@/lib/effective-financials'
+
+/**
+ * De geresolveerde grondslag + de effectieve bedragen daarop (ADR 0103).
+ *
+ * De spaarquote VOLGT de grondslag; ze is geen aparte instelbare bron. Levert de
+ * caller dit blok, dan is de spaarbron volledig door de grondslag bepaald.
+ */
+export interface SavingsBasisInput {
+  /** Grondslag van het inkomen (uit `resolveAmountWithBasis`). */
+  income: ResolvedBasis
+  /** Grondslag van de uitgaven (uit `resolveAmountWithBasis`). */
+  expenses: ResolvedBasis
+  /** Effectief JAARinkomen op die grondslag. */
+  annualIncome: number
+  /**
+   * Effectieve MAANDuitgaven op die grondslag. Op de transactiegrondslag hoort
+   * hier het 6-maands GEMIDDELDE (dezelfde meting waar `savingsRate6m` op staat),
+   * niet de lopende maand — anders zou een half geboekte maand de quote laten
+   * springen.
+   */
+  monthlyExpenses: number
+}
 
 export interface SavingsSourceInput {
   /** profiles.income_source — 'manual' wint over de berekende waarde. */
@@ -47,6 +78,19 @@ export interface SavingsSourceInput {
    * `monthlyDebtAflossing`, zie daar.
    */
   monthlySavingsContribution?: number
+  /**
+   * NIEUW (ADR 0103) — de geresolveerde grondslag. WEGLATEN = byte-identiek aan
+   * het gedrag van vóór dat besluit (de legacy-tak hieronder, die alleen
+   * `manual` versus "berekend" kent).
+   *
+   * De server-oppervlakken geven 'm inmiddels allemaal mee: de drie loaders, de
+   * twee cashflow-KPI-loaders, de drie snapshot-routes, `/api/report` en
+   * `/api/guide-progress`. Wat bewust ZONDER blijft: `lib/check/build-report.ts`
+   * (zet expliciet manual/manual — in de check-funnel vult de gebruiker zelf in)
+   * en de what-if-pagina, die op een eigen, door de gebruiker gestuurde baseline
+   * rekent. De optionaliteit blijft daarom bestaan; ze is geen restschuld.
+   */
+  basis?: SavingsBasisInput
 }
 
 export interface SavingsSource {
@@ -186,6 +230,54 @@ export function computeSavingsRate6m(agg: SavingsRate6mAggregates): SavingsRate6
 }
 
 export function resolveSavingsSource(input: SavingsSourceInput): SavingsSource {
+  // ── GRONDSLAG-PAD (ADR 0103) ───────────────────────────────────────────────
+  // De spaarquote volgt de grondslag van inkomen en uitgaven; ze is geen aparte
+  // instelbare bron.
+  //
+  //  • Staan BEIDE op 'transaction', dan blijft de uitkomst exact die van
+  //    vandaag: `savingsRate6m`, mét de spaarbudget-/aflossingscorrectie die in
+  //    `computeSavingsRate6m` zit.
+  //  • Staat ÉÉN van beide NIET op 'transaction', dan geldt één uniforme formule
+  //    (I − E) / I op de effectieve bedragen, ZONDER die correctie.
+  //
+  // Waarom zonder: de correctie bestaat omdat `expenses6m` een RÚWE
+  // transactiesom is waar spaarstortingen en aflossing ten onrechte in zitten
+  // (zie de toelichting bij het handmatige pad hieronder). Een
+  // budget-uitgavensom bevat die per constructie niet — alleen
+  // `budget_type='expense'` telt mee, 'savings' en 'debt' vallen erbuiten
+  // (BASIS_BUDGET_TYPE in lib/budget-basis.ts, een DRAGENDE invariant). Het geld
+  // dat de correctie zou terugtellen is er nooit afgehaald; hem er alsnog
+  // bovenop leggen geeft exact de dubbeltelling die ooit een ingevoerde 30 % tot
+  // 37,2 % opblies.
+  //
+  // BEWUSTE GEDRAGSWIJZIGING (eigenaar-besluit, wijkt af van de "erkende
+  // uitzondering" in ADR 0103 §"De spaarquote volgt de uitgavengrondslag"): ook
+  // de GEMENGDE combinatie — handmatig of budget-inkomen × transactie-uitgaven —
+  // valt nu onder de uniforme formule. Voorheen leverde die combinatie
+  // `savingsRate6m` op: een VERHOUDING gemeten over het transactie-inkomen,
+  // vermenigvuldigd met een inkomen uit een ándere grondslag. Dat getal is door
+  // niemand na te vertellen. Gevolg: voor gebruikers met income_source='manual'
+  // en expenses_source='auto'/'transaction' verschuift de spaarquote (en daarmee
+  // de FIRE-datum en de gezondheidsscore-pijler Rondkomen) eenmalig.
+  if (input.basis) {
+    // Val terug op de transactie-extrapolatie wanneer de grondslag geen bruikbaar
+    // jaarinkomen oplevert (bv. income_source='manual' met een leeggemaakt bedrag).
+    // Zelfde `> 0`-guard als de legacy-tak hieronder — die is hier bewust
+    // behouden zodat een randgeval geen inkomen van €0 de FIRE-prognose in duwt.
+    const effectiveAnnualIncome =
+      input.basis.annualIncome > 0 ? input.basis.annualIncome : input.estimatedAnnualIncome
+    const bothTransaction = input.basis.income === 'transaction' && input.basis.expenses === 'transaction'
+    const effectiveSavingsRatePct = bothTransaction
+      ? input.savingsRate6m
+      : savingsRateFromAggregates(effectiveAnnualIncome / 12, input.basis.monthlyExpenses, 0)
+    return {
+      effectiveAnnualIncome,
+      effectiveSavingsRatePct,
+      baseAnnualSavings: effectiveAnnualIncome * (effectiveSavingsRatePct / 100),
+    }
+  }
+
+  // ── LEGACY-PAD (geen grondslag meegegeven) ─────────────────────────────────
   const incomeManual = input.incomeSource === 'manual' && input.netMonthlyIncome > 0
   const effectiveAnnualIncome = incomeManual
     ? input.netMonthlyIncome * 12

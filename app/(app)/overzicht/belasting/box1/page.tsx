@@ -76,7 +76,7 @@ export default async function BelastingBox1Page() {
   // jaarschatting omgerekend naar bruto via de Box 1-motor (grossFromNet).
   const income: Box1IncomeResolution = user
     ? await resolveBox1GrossIncome(supabase, user.id, 2026)
-    : { grossYearly: 0, estimateGross: 0, estimateNetYearly: 0, isManual: false }
+    : { grossYearly: 0, estimateGross: 0, estimateNetYearly: 0, estimateNetBasis: 'profile', isManual: false }
   const grossYearly = income.grossYearly
   const marg = horizonData.fireParams?.marginaalTarief ?? deriveMarginaalTarief()
 

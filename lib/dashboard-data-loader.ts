@@ -39,6 +39,7 @@ import {
   getEarliestIncomeDate,
   getNetWorthSnapshots12m,
 } from '@/lib/server-data/base'
+import { resolveUnlinkedCashShare, unlinkedCashTotal } from '@/lib/unlinked-cash'
 import { localDateStr } from '@/lib/budget-period'
 import {
   runBacktest,
@@ -106,6 +107,7 @@ import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import { mergeWidgetPrefs, type WidgetSize } from '@/lib/widget-catalog'
 import { loadSpendLimitsSection } from '@/lib/spend-limits/loader'
 import { toSpendLimitWidgetData } from '@/lib/spend-limits/widget-data'
+import { lowestWidgetOrder, newSpendLimitWidgetPrefs } from '@/lib/spend-limits/widget-pref'
 import { computePortfolioFees, computeFeeImpactOnFire } from '@/lib/fee-analysis'
 import {
   computeDrift,
@@ -120,7 +122,9 @@ import {
   buildCategoryAppLinks,
   type CategoryAppLink,
 } from '@/lib/category-app-nav'
-import { resolveEffectiveIncomeExpenses } from './effective-financials'
+import { resolveEffectiveIncomeExpenses, resolveAmountWithBasis } from './effective-financials'
+import type { BudgetBasisRow } from './budget-basis'
+import { loadBudgetBasis } from '@/lib/household/budget-share'
 import {
   buildBudgetTypeMap,
   budgetIdsOfType,
@@ -526,8 +530,24 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
 
   // Fallback to profile estimates for users without transactions
   const profileMonthlyExpenses = Number(profileResult.data?.estimated_monthly_expenses ?? 0)
+
+  // ── De budgetgrondslag (ADR 0103) ────────────────────────────────────────
+  // Zelfde motor en dezelfde `getBudgets`-rijen als de core-/horizon-loader
+  // (cache()-gedeeld binnen het request) — geen extra query, geen tweede
+  // beslissing. Alle budgetten, ook de inkomstenkant: `allBudgetsRaw` hierboven
+  // is dezelfde bron, maar dit blok leest 'm ongefilterd.
+  const { income: dashboardBudgetIncome, expenses: dashboardBudgetExpenses } =
+    await loadBudgetBasis(
+      supabase,
+      profileResult.data as Record<string, unknown> | null,
+      (allBudgetsRawResult.data ?? []) as unknown as BudgetBasisRow[],
+    )
+
   const { income: effectiveMonthlyIncome, expenses: effectiveMonthlyExpenses } =
-    resolveEffectiveIncomeExpenses(profileResult.data ?? {}, monthlyIncome, monthlyExpenses)
+    resolveEffectiveIncomeExpenses(profileResult.data ?? {}, monthlyIncome, monthlyExpenses, {
+      income: dashboardBudgetIncome.monthlyTotal,
+      expenses: dashboardBudgetExpenses.monthlyTotal,
+    })
 
   // Previous month income/expenses for cashflow comparison widget
   let prevMonthIncome = 0
@@ -542,7 +562,14 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // Cash assets already included via assets table — only add unlinked bank_accounts (legacy/transition)
   const totalAssetsOnly = (assetsResult.data ?? []).reduce((s, a) =>
     s + Number(a.current_value) * (((a as { net_worth_inclusion_pct?: number | null }).net_worth_inclusion_pct ?? 100) / 100), 0)
-  const unlinkedCash = (bankAccountsResult.data ?? []).reduce((s, a) => s + Number(a.balance), 0)
+  // Losse bankrekeningen via DE canonieke optelling (lib/unlinked-cash.ts),
+  // gewogen op het huishoud-aandeel: een GEDEELDE rekening is voor beide
+  // partners zichtbaar en zou ongewogen twee keer volledig meetellen. Geen
+  // eigen reduce meer hier — consume, don't recompute.
+  const unlinkedCash = unlinkedCashTotal(
+    bankAccountsResult.data,
+    await resolveUnlinkedCashShare(supabase, bankAccountsResult.data),
+  )
   const totalAssetsRaw = totalAssetsOnly + unlinkedCash
   const totalDebtsRaw = (debtsResult.data ?? []).reduce((s, d) =>
     s + Number(d.current_balance) * (((d as { net_worth_inclusion_pct?: number | null }).net_worth_inclusion_pct ?? 100) / 100), 0)
@@ -778,7 +805,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const savedFavIds = new Set(widgetPrefs.widgets.filter(w => w.id.startsWith('budget_fav:')).map(w => w.id))
   const currentFavIds = new Set(favoriteBudgets.map(b => `budget_fav:${b.id}`))
   // Add new favorites that aren't in saved prefs yet (insert at top)
-  const lowestOrder = Math.min(0, ...widgetPrefs.widgets.map(w => w.order))
+  const lowestOrder = lowestWidgetOrder(widgetPrefs.widgets)
   const newFavPrefs: WidgetPref[] = favoriteBudgets
     .filter(b => !savedFavIds.has(`budget_fav:${b.id}`))
     .map((b, i) => ({
@@ -805,18 +832,21 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // (actief én gepauzeerd), zodat pauzeren de opgeslagen pref niet wist en een
   // bewuste "widget uit"-keuze (enabled:false) een pauze/hervat-cyclus overleeft
   // (FR-B2-03/04, AC-B2-02). Alleen archiveren ruimt de pref op (AC-B2-03).
+  //
+  // De gate + de pref-vorm (maat, order-offset −300) wonen in
+  // lib/spend-limits/widget-pref.ts, omdat de schakelaar in het bewerkformulier
+  // (PATCH /api/spend-limits/[id]/widget) een teruggezette tegel met EXACT
+  // dezelfde defaults moet kunnen schrijven — anders landt "weer aan" op een
+  // andere plek dan een verse injectie.
   const savedSpendLimitIds = new Set(
     widgetPrefs.widgets.filter(w => w.id.startsWith('spend_limit:')).map(w => w.id),
   )
   const currentSpendLimitIds = new Set(spendLimitWidgets.map(s => `spend_limit:${s.id}`))
-  const newSpendLimitPrefs: WidgetPref[] = spendLimitWidgets
-    .filter(s => s.isActive && !savedSpendLimitIds.has(`spend_limit:${s.id}`))
-    .map((s, i) => ({
-      id: `spend_limit:${s.id}`,
-      enabled: true,
-      size: 'quarter' as WidgetSize,
-      order: lowestOrder - 300 + i,
-    }))
+  const newSpendLimitPrefs: WidgetPref[] = newSpendLimitWidgetPrefs(
+    spendLimitWidgets,
+    savedSpendLimitIds,
+    lowestOrder,
+  )
 
   // Combine: catalog widgets + saved fav prefs (only if still favorited) + new fav prefs
   const allWidgetPrefs = [
@@ -848,6 +878,18 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       extrapolatedIncome = (last12Income / incomeMonths) * 12
     }
   }
+
+  // JAAR-grondslag (ADR 0103): dezelfde precedentie, op jaarbedragen. Voedt
+  // `computeRetirementExpenses` (methode current_income → FIRE-doel) en de
+  // spaarbron, zodat /overzicht per definitie op dezelfde grondslag staat als
+  // /overzicht/cashflow en /toekomst.
+  const dashboardAnnualIncome = resolveAmountWithBasis(
+    (profileResult.data as { income_source?: string | null } | null)?.income_source,
+    Number(profileResult.data?.net_monthly_income ?? 0) * 12,
+    extrapolatedIncome,
+    dashboardBudgetIncome.annualTotal,
+  )
+  const dashboardEffectiveAnnualIncome = dashboardAnnualIncome.amount
 
   // ── 6-month rolling average savings rate ─────────────────────
   // Het 6-maands sub-venster op het maandaggregaat (transfer-gefilterd, mét de
@@ -931,7 +973,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const yearlyRetirementExpenses = computeRetirementExpenses(
     profileResult.data?.retirement_expense_method as RetirementExpenseMethod,
     yearlyMustExpenses,
-    extrapolatedIncome,
+    // ADR 0103: methode 'current_income' volgt de GEKOZEN inkomensgrondslag.
+    dashboardEffectiveAnnualIncome,
     profileResult.data?.retirement_expense_custom_amount,
     profileMonthlyExpenses * 12,
   )
@@ -941,6 +984,13 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // Spaarbron voor de FIRE-prognose — gelijk aan /toekomst en /overzicht/cashflow.
   // Prioriteit: handmatige override → inkomen × spaarquote → asset-aggregaat.
   // De unified engine indexeert dit jaarbedrag zelf met inflatie.
+  // Uitgaven-grondslag voor de spaarquote, op de 6-maands meetbasis.
+  const dashboardSavingsExpenses = resolveAmountWithBasis(
+    (profileResult.data as { expenses_source?: string | null } | null)?.expenses_source,
+    profileMonthlyExpenses,
+    expenses6m / 6,
+    dashboardBudgetExpenses.monthlyTotal,
+  )
   const dashboardSavingsOverrideRaw = (profileResult.data as { monthly_savings_override?: number | string | null } | null)?.monthly_savings_override
   const dashboardSavingsOverride = dashboardSavingsOverrideRaw == null ? null : Number(dashboardSavingsOverrideRaw)
   const {
@@ -957,6 +1007,14 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     estimatedAnnualIncome: extrapolatedIncome,
     estimatedMonthlyExpenses: profileMonthlyExpenses,
     savingsRate6m,
+    // De spaarquote volgt de grondslag (ADR 0103). Uitgaven op de 6-maands
+    // meetbasis (`expenses6m / 6`), dezelfde meting als savingsRate6m.
+    basis: {
+      income: dashboardAnnualIncome.basis,
+      expenses: dashboardSavingsExpenses.basis,
+      annualIncome: dashboardEffectiveAnnualIncome,
+      monthlyExpenses: dashboardSavingsExpenses.amount,
+    },
   })
   // dashboardSavingsOverride + dashboardBaseAnnualSavings worden als parameters aan
   // buildHorizonInput doorgegeven (dezelfde annualSavings-prioriteit als de

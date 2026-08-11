@@ -88,6 +88,52 @@ describe('deriveRetirementExpenseBasis — methode-afleiding bovenop de extrapol
   })
 })
 
+describe('deriveRetirementExpenseBasis — de gekozen inkomensgrondslag (ADR 0103)', () => {
+  const base: RetirementExpenseBasisParams = {
+    method: 'current_income',
+    yearlyMustExpenses: 24000,
+    last12Income: 47427.5,
+    earliestIncomeDate: '2026-01-05',
+    customAmount: null,
+    estimatedYearlyExpenses: 30000,
+    now: NOW,
+  }
+
+  it('INERT zonder effectiveAnnualIncome: byte-identiek aan voorheen', () => {
+    const r = deriveRetirementExpenseBasis(base)
+    expect(r.extrapolatedIncome).toBeCloseTo(94855, 5)
+    expect(r.transactionAnnualIncome).toBeCloseTo(94855, 5)
+    expect(r.yearlyRetirementExpenses).toBeCloseTo(94855, 5)
+  })
+
+  it('een budget-/handmatige grondslag wint en verschuift daarmee het FIRE-doel', () => {
+    const r = deriveRetirementExpenseBasis({ ...base, effectiveAnnualIncome: 62_400 })
+    expect(r.extrapolatedIncome).toBe(62_400)
+    expect(r.yearlyRetirementExpenses).toBe(62_400)
+    // De rúwe transactiemeting blijft apart beschikbaar.
+    expect(r.transactionAnnualIncome).toBeCloseTo(94855, 5)
+  })
+
+  it('een leeg/ongeldig grondslagbedrag valt terug op de transactie-extrapolatie', () => {
+    for (const v of [0, -1, null, undefined, Number.NaN]) {
+      const r = deriveRetirementExpenseBasis({ ...base, effectiveAnnualIncome: v })
+      expect(r.extrapolatedIncome).toBeCloseTo(94855, 5)
+    }
+  })
+
+  it('raakt de andere twee methodes niet', () => {
+    expect(
+      deriveRetirementExpenseBasis({ ...base, method: 'essential_budgets', effectiveAnnualIncome: 62_400 })
+        .yearlyRetirementExpenses,
+    ).toBe(24000)
+    expect(
+      deriveRetirementExpenseBasis({
+        ...base, method: 'custom_amount', customAmount: 36000, effectiveAnnualIncome: 62_400,
+      }).yearlyRetirementExpenses,
+    ).toBe(36000)
+  })
+})
+
 describe('consistentie: drie call-sites → identieke afleiding bij identieke input', () => {
   // Simuleert dat SSR-loader, horizon-client load()-refresh en de sheet-context-
   // route na de consolidatie exact dezelfde helper met exact dezelfde grondslag

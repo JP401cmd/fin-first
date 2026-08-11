@@ -10,7 +10,7 @@
  *     gezin-huishouden (hasPartner=true), geen activa, gevoeligheids-guard.
  */
 
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { buildReport } from '../build-report'
 import { intakeToPersona } from '../intake-to-persona'
@@ -19,8 +19,13 @@ import type { CheckIntake } from '../types'
 // FASE 6 stap 5A: `buildReport` draait nu op de horizon-kernel (echte monthly-resolution
 // bisectie per call). Meerdere tests hier roepen `buildReport`/`intakeToPersona` 2-3x aan
 // en zaten daardoor tegen/over het vitest-default (5000ms) aan — tot 10s gemeten in
-// volledige isolatie, geen contention. Zie build-report.test.ts voor dezelfde aanpak.
-vi.setConfig({ testTimeout: 20000 })
+// volledige isolatie, geen contention.
+//
+// Geen lokale testTimeout-override meer (Notion-kaart "Testisolatie:
+// cash-account-view.test.tsx faalt intermitterend", 11 aug 2026) — zie
+// build-report.test.ts voor de onderbouwing: de lokale 20000ms verlaagde de
+// globale 30000ms-marge uit vitest.config.ts weer, wat dit bestand onder
+// volle-suite-contentie liet timeouten. Laat het nu de globale 30000ms erven.
 
 const NOW = new Date('2026-06-17T12:00:00.000Z')
 

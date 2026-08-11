@@ -214,6 +214,12 @@ function selectJuli() {
 
 let fetchMock: ReturnType<typeof vi.fn>
 let breakdownBody: unknown
+let transactionsBody: unknown
+
+/** Alleen de breakdown-vluchten — de pane haalt sinds de boekingenlijst twee bronnen op. */
+function breakdownCalls() {
+  return fetchMock.mock.calls.filter((c) => String(c[0]).includes('/breakdown?'))
+}
 
 describe('SpendLimitPerformancePane — uitsplitsing per naam', () => {
   beforeEach(() => {
@@ -226,9 +232,30 @@ describe('SpendLimitPerformancePane — uitsplitsing per naam', () => {
       restMatchedAmount: 0,
       restCount: 0,
     }
-    fetchMock = vi.fn(
-      async () => ({ ok: true, json: async () => breakdownBody }) as unknown as Response,
-    )
+    transactionsBody = {
+      periodKey: '2026-07',
+      label: 'juli 2026',
+      rows: [
+        {
+          id: 'tx-1',
+          date: '2026-07-14',
+          counterpartyName: 'SHELL 1234',
+          description: 'Tanken',
+          matchedAmount: 150,
+          budgetId: null,
+        },
+      ],
+      totalCount: 1,
+      totalMatchedAmount: 150,
+    }
+    // Per ENDPOINT antwoorden, niet één vorm voor alles: de twee bronnen hebben
+    // verschillende contracten, en één vorm voor beide liet de boekingenlijst op
+    // een ontbrekende `rows` crashen — een testartefact dat een echte kwetsbaarheid
+    // verborg (de lijst nam toen de hele pane mee in zijn val).
+    fetchMock = vi.fn(async (url: unknown) => {
+      const body = String(url).includes('/transactions?') ? transactionsBody : breakdownBody
+      return { ok: true, json: async () => body } as unknown as Response
+    })
     vi.stubGlobal('fetch', fetchMock)
   })
 
@@ -247,14 +274,20 @@ describe('SpendLimitPerformancePane — uitsplitsing per naam', () => {
 
     selectJuli()
 
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(String(fetchMock.mock.calls[0][0])).toBe(
+    // Eén vlucht PER BRON: de uitsplitsing en de losse boekingen zijn twee
+    // onafhankelijke on-demand bronnen. Het aantal endpoints is hier bijzaak — de
+    // eis is dat elk er precies één keer op uit gaat, en pas ná de selectie.
+    expect(breakdownCalls()).toHaveLength(1)
+    expect(String(breakdownCalls()[0][0])).toBe(
       '/api/spend-limits/pot-1/breakdown?periode=2026-07',
     )
 
     // En na het antwoord blijft het bij die ene vlucht — géén her-fetch per render.
-    expect(await screen.findByText('SHELL 1234')).toBeTruthy()
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    // findAll, niet find: dezelfde tegenpartij staat nu zowel in de
+    // naam-uitsplitsing als in de boekingenlijst eronder. Dat is precies wat een
+    // gebruiker ziet — één naam op twee detailniveaus.
+    expect(await screen.findAllByText('SHELL 1234')).not.toHaveLength(0)
+    expect(breakdownCalls()).toHaveLength(1)
   })
 
   it('drukt de vrijheidstijd uit in het CANONIEKE periodebedrag, niet in de som van de regels', async () => {
@@ -263,7 +296,7 @@ describe('SpendLimitPerformancePane — uitsplitsing per naam', () => {
 
     renderPane(limit)
     selectJuli()
-    await screen.findByText('SHELL 1234')
+    await screen.findAllByText('SHELL 1234')
 
     // De motor zegt 150; de geklemde uitsplitsing telt op tot 200. Dat verschil is
     // precies het geval waarin een eigen optelling de gebruiker te véél

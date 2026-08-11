@@ -69,7 +69,16 @@ const BUDGETS: Row[] = [
   { id: B_INCOME, parent_id: null, budget_type: 'income', default_limit: 36000, interval: 'yearly', name: 'Inkomen', icon: '', is_favorite: false, is_essential: false, alert_threshold: 80, sort_order: 4 },
 ]
 
-/** Profiel-basis: géén dob/vermogen ⇒ de dure horizon-tak blijft uit. */
+/**
+ * Profiel-basis: géén dob/vermogen ⇒ de dure horizon-tak blijft uit.
+ *
+ * De grondslag staat BEWUST expliciet op 'transaction' (ADR 0103) en niet meer
+ * op 'auto': deze fixtures bewaken de ADR-0073-asymmetrie (currentMonth* =
+ * gerealiseerd, monthlyIncome/-Expenses = effective), en die vraag staat los van
+ * "welke van de drie grondslagen wint". Met 'auto' én budgetten in de set zou de
+ * budgetgrondslag winnen en zouden deze assertions een ánder onderwerp testen.
+ * Fixture 6 hieronder pint dat 'auto'-gedrag apart, op beide paden.
+ */
 const PROFILE_BASE: Row = {
   id: 'user-parity',
   full_name: 'Parity',
@@ -77,8 +86,8 @@ const PROFILE_BASE: Row = {
   budgeting_active: true,
   net_monthly_income: 5000,
   estimated_monthly_expenses: 3000,
-  income_source: 'auto',
-  expenses_source: 'auto',
+  income_source: 'transaction',
+  expenses_source: 'transaction',
 }
 
 interface Fixture {
@@ -142,7 +151,7 @@ function buildFixtures(): Fixture[] {
       },
     },
     {
-      label: '2. transactioneel (income_source = auto)',
+      label: '2. transactioneel (income_source = transaction)',
       db: { profile: { ...PROFILE_BASE }, budgets: BUDGETS, transactions: transactioneel },
     },
     {
@@ -161,6 +170,16 @@ function buildFixtures(): Fixture[] {
           { id: B_EXPENSE, parent_id: null, budget_type: 'expense', default_limit: 0, interval: 'monthly', name: 'Uitgaven', icon: '', is_favorite: false, is_essential: true, alert_threshold: 80, sort_order: 1 },
         ],
         transactions: [tx(1800, `${THIS_MONTH}-04`), tx(-900, `${THIS_MONTH}-05`, B_EXPENSE)],
+      },
+    },
+    {
+      // ADR 0103: 'auto' = "kies voor mij", en de app kiest budgetten zodra die
+      // er zijn. Zelfde transacties als fixture 2, alleen de grondslag verschilt.
+      label: "6. auto met budgetten ⇒ budgetgrondslag (ADR 0103)",
+      db: {
+        profile: { ...PROFILE_BASE, income_source: 'auto', expenses_source: 'auto' },
+        budgets: BUDGETS,
+        transactions: transactioneel,
       },
     },
   ]
@@ -276,11 +295,14 @@ describe('de twee grondslagen blijven uit elkaar (ADR 0073)', () => {
     expect(nieuw.monthlyIncome).not.toBe(nieuw.currentMonthIncome)
   })
 
-  it('fixture 2: zonder manual-override volgt monthlyIncome de transactiesom', async () => {
+  it('fixture 2: op de transactiegrondslag volgt monthlyIncome de transactiesom', async () => {
     const { nieuw, oud } = await runBothPaths(buildFixtures()[1].db)
     expect(nieuw.currentMonthIncome).toBe(4200)
     expect(nieuw.currentMonthExpenses).toBe(1300 + 250 + 600 + 77)
-    // 'auto' + transacties aanwezig ⇒ effective == de transactiesom van deze maand.
+    // grondslag 'transaction' + transacties aanwezig ⇒ effective == de
+    // transactiesom van deze maand. De income-budgetten (€36.000/jr) worden hier
+    // BEWUST niet gebruikt: wie expliciet op de gemeten werkelijkheid stuurt,
+    // mag daar niet stil door zijn budgetten van worden afgeduwd (ADR 0103).
     expect(nieuw.monthlyIncome).toBe(4200)
     expect(nieuw.monthlyExpenses).toBe(1300 + 250 + 600 + 77)
     // ── Kind-oprol, end-to-end ──────────────────────────────────────────────
@@ -309,6 +331,39 @@ describe('de twee grondslagen blijven uit elkaar (ADR 0073)', () => {
     // Het oude pad kapt precies even hard af ⇒ geen enkel veld drijft.
     expect(oud.monthlyExpenses).toBe(nieuw.monthlyExpenses)
     expect(oud.currentMonthExpenses).toBe(nieuw.currentMonthExpenses)
+  })
+
+  it("fixture 6: 'auto' met budgetten ⇒ de BUDGETgrondslag wint, op beide paden gelijk (ADR 0103)", async () => {
+    const { oud, nieuw } = await runBothPaths(buildFixtures()[5].db)
+    // De budgetgrondslag is sinds de correctie van 11 aug 2026 de REALISATIE op
+    // de budgetten, niet hun geplande limiet. Deze fixture-budgetten dragen geen
+    // `created_at`, dus de deler is het VOLLE venster (12) — de conservatieve
+    // terugval. €4.200 op het inkomstenbudget over het jaar ⇒ €4.200/jr = €350/mnd.
+    //
+    // NB dit is niet de spanwijdte-deler: die zou €4.200 / 1 × 12 = €50.400/jr
+    // ⇒ €4.200/mnd geven. Zie de jaarpost-test in lib/budget-basis.test.ts voor
+    // waarom die deler is verworpen. Vóór de hele correctie stond hier €3.000
+    // (de geplande €36.000/jr).
+    expect(nieuw.currentMonthIncome).toBe(4200)
+    expect(nieuw.monthlyIncome).toBe(350)
+    expect(oud.monthlyIncome).toBe(350)
+    // Uitgaven, per post geannualiseerd op de deler (hier: het volle venster,
+    // want de fixture-rijen dragen geen created_at):
+    //  • B_EXPENSE_KID: 1.300 (deze maand) + 1.500 (vorige maand) = 2.800/jr
+    //    ⇒ 2.800 / 12 × 12 = 2.800/jr ≈ 233,33/mnd.
+    //  • B_EXPENSE (de PARENT, die kinderen heeft): 250 rechtstreeks op hem
+    //    geboekt ⇒ 250/jr ≈ 20,83/mnd. Hij telt mee als extra post juist omdat er
+    //    écht op hem geboekt is; zijn geplande limiet (9.999) telt als 0 zodat
+    //    hij niet dubbelt met zijn kind.
+    // DRAGENDE INVARIANT, end-to-end: het SPAARbudget telt NIET mee — ook niet
+    // nu de grondslag op realisatie draait. De €600 op B_SAVINGS blijft er dus
+    // buiten. Zou dat ooit veranderen, dan moet de spaarbudget-correctie in
+    // resolveSavingsSource terugkomen (zie ADR 0103).
+    expect(nieuw.monthlyExpenses).toBeCloseTo((2800 + 250) / 12, 6)
+    expect(oud.monthlyExpenses).toBe(nieuw.monthlyExpenses)
+    // De gerealiseerde maand blijft onaangeraakt: één keuze, twee grondslagen.
+    // (Die telt de €600 spaarboeking en de €77 zonder budget WEL mee.)
+    expect(nieuw.currentMonthExpenses).toBe(1300 + 250 + 600 + 77)
   })
 
   it('fixture 4: de maandgrens telt alleen deze maand mee', async () => {

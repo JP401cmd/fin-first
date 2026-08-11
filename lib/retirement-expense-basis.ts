@@ -76,11 +76,30 @@ export interface RetirementExpenseBasisParams {
   estimatedYearlyExpenses?: number
   /** Referentiemoment voor de maand-diff (default: nu). */
   now?: Date
+  /**
+   * Het EFFECTIEVE jaarinkomen op de gekozen grondslag (ADR 0103), uit
+   * `resolveAmountWithBasis`. Is dit meegegeven én > 0, dan is DÍT de
+   * inkomensgrondslag voor methode `current_income` — bij die methode ís het
+   * jaarinkomen de pensioenuitgave en dus het FIRE-doel, dus een budget- of
+   * handmatige grondslag hoort hier door te werken.
+   *
+   * WEGLATEN (of ≤ 0) → de transactie-extrapolatie blijft de grondslag,
+   * byte-identiek aan het gedrag van vóór dat besluit. Bewust optioneel: één van
+   * de drie call-sites (components/app/horizon/horizon-client.tsx) kent de
+   * grondslag nog niet en mag daar niet stil van verschuiven.
+   */
+  effectiveAnnualIncome?: number | null
 }
 
 export interface RetirementExpenseBasis {
-  /** Geannualiseerd inkomen (huidige levensstijl) — voedt methode current_income. */
+  /**
+   * Het inkomen dat methode `current_income` voedt: het effectieve jaarinkomen op
+   * de gekozen grondslag wanneer de caller die meegeeft, anders de
+   * transactie-extrapolatie.
+   */
   extrapolatedIncome: number
+  /** De RÚWE transactie-extrapolatie, altijd — los van de gekozen grondslag. */
+  transactionAnnualIncome: number
   /** Jaarlijkse pensioenuitgave volgens de gekozen methode. */
   yearlyRetirementExpenses: number
 }
@@ -93,11 +112,17 @@ export interface RetirementExpenseBasis {
 export function deriveRetirementExpenseBasis(
   params: RetirementExpenseBasisParams,
 ): RetirementExpenseBasis {
-  const extrapolatedIncome = extrapolateAnnualIncome(
+  const transactionAnnualIncome = extrapolateAnnualIncome(
     params.last12Income,
     params.earliestIncomeDate,
     params.now ?? new Date(),
   )
+  // ADR 0103: de gekozen inkomensgrondslag wint wanneer de caller 'm aanlevert.
+  // De `> 0`-guard voorkomt dat een leeggemaakt handmatig bedrag de FIRE-keten op
+  // een jaarinkomen van €0 zet.
+  const resolved = params.effectiveAnnualIncome
+  const extrapolatedIncome =
+    resolved != null && Number.isFinite(resolved) && resolved > 0 ? resolved : transactionAnnualIncome
   const yearlyRetirementExpenses = computeRetirementExpenses(
     params.method,
     params.yearlyMustExpenses,
@@ -105,5 +130,5 @@ export function deriveRetirementExpenseBasis(
     params.customAmount,
     params.estimatedYearlyExpenses,
   )
-  return { extrapolatedIncome, yearlyRetirementExpenses }
+  return { extrapolatedIncome, transactionAnnualIncome, yearlyRetirementExpenses }
 }

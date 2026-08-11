@@ -21,34 +21,33 @@ import { useGlobalSync } from './global-sync-provider'
 import { useToast } from '@/components/app/toast-provider'
 import { fetchBankSyncTargets } from './load-bank-sync-targets'
 import type { ConnectionsData } from '@/lib/connections-data'
+import {
+  formatAmsterdamDayMonth,
+  formatAmsterdamDayMonthYear,
+  formatAmsterdamTime,
+  isSameAmsterdamDay,
+  isSameAmsterdamYear,
+} from '@/lib/tz'
 
 interface GlobalSyncButtonProps {
   onOpenReport: () => void
 }
 
-const NL_MONTH_ABBR = [
-  'jan', 'feb', 'mrt', 'apr', 'mei', 'jun',
-  'jul', 'aug', 'sep', 'okt', 'nov', 'dec',
-]
-
 // Krant-stijl tijdnotatie (zie FreshnessLabel): HH:mm vandaag, d MMM dit
 // jaar, d MMM yyyy ouder — geen relatieve tijden ("2 uur geleden").
+//
+// Uur en kalenderdag komen uit `lib/tz.ts` (Europe/Amsterdam), niet uit de
+// lokale getters: de server draait in UTC en zou dan een ander uur renderen dan
+// de browser — de #418-klasse.
 function formatRelative(iso: string | null): string {
   if (!iso) return 'Nog niet gesynchroniseerd'
   const d = new Date(iso)
   if (!Number.isFinite(d.getTime())) return 'Onbekend'
   const now = new Date()
   if (now.getTime() - d.getTime() < 60_000) return 'zojuist gesynchroniseerd'
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const isSameDay =
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate()
-  if (isSameDay) return `laatste sync ${pad(d.getHours())}:${pad(d.getMinutes())}`
-  if (d.getFullYear() === now.getFullYear()) {
-    return `laatste sync ${d.getDate()} ${NL_MONTH_ABBR[d.getMonth()]}`
-  }
-  return `laatste sync ${d.getDate()} ${NL_MONTH_ABBR[d.getMonth()]} ${d.getFullYear()}`
+  if (isSameAmsterdamDay(d, now)) return `laatste sync ${formatAmsterdamTime(d)}`
+  if (isSameAmsterdamYear(d, now)) return `laatste sync ${formatAmsterdamDayMonth(d)}`
+  return `laatste sync ${formatAmsterdamDayMonthYear(d)}`
 }
 
 export function GlobalSyncButton({ onOpenReport }: GlobalSyncButtonProps) {

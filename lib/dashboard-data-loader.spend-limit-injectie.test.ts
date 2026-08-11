@@ -13,20 +13,24 @@
  *  3. **stale-drop** — pas bij ARCHIVEREN verdwijnt de opgeslagen pref, omdat de
  *     pot dan niet meer uit de loader komt (AC-B2-03).
  *
- * ── WAAROM EEN GESPIEGELDE REGEL + EEN BRON-ANKER ───────────────────────────
+ * ── ECHTE REGEL + EEN BRON-ANKER ────────────────────────────────────────────
  * De injectie staat inline in `loadDashboardData`, een functie met tientallen
- * queries die in een unit-test niet te draaien is, en die in deze taak niet
- * gewijzigd mag worden. Deze suite doet daarom twee dingen tegelijk:
+ * queries die in een unit-test niet te draaien is. Deze suite doet daarom twee
+ * dingen tegelijk:
  *
  *  · de INVOER is echt — `loadSpendLimitsSection` (nep-client, hetzelfde patroon
  *    als lib/spend-limits/loader.test.ts) plus `toSpendLimitWidgetData`, precies
  *    de twee functies die de loader hier ook gebruikt. `isActive` en de
  *    archief-filter komen dus uit de echte code, niet uit een fixture;
- *  · de REGEL is gespiegeld, en dat spiegelbeeld is verankerd: `bronanker`
- *    hieronder leest lib/dashboard-data-loader.ts van schijf en eist dat de
- *    beslissende fragmenten er letterlijk in staan. Wordt de injectie daar
- *    veranderd, dan valt dit bestand om in plaats van stilzwijgend een regel te
- *    bewaken die niet meer bestaat.
+ *  · de REGEL is óók echt: de gate en de pref-vorm wonen sinds de
+ *    widget-schakelaar (PATCH /api/spend-limits/[id]/widget) in
+ *    lib/spend-limits/widget-pref.ts, en `injecteer()` hieronder roept diezelfde
+ *    functies aan als de loader. Wat hier nog gespiegeld is, is enkel het
+ *    SAMENSTELLEN van de lijst (welke prefs blijven staan), en dat spiegelbeeld
+ *    is verankerd: `bronanker` leest lib/dashboard-data-loader.ts van schijf en
+ *    eist dat de beslissende fragmenten er letterlijk in staan. Wordt de injectie
+ *    daar veranderd, dan valt dit bestand om in plaats van stilzwijgend een regel
+ *    te bewaken die niet meer bestaat.
  */
 
 import { describe, it, expect } from 'vitest'
@@ -36,7 +40,13 @@ import { fileURLToPath } from 'node:url'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { loadSpendLimitsSection } from '@/lib/spend-limits/loader'
 import { toSpendLimitWidgetData, type SpendLimitWidgetData } from '@/lib/spend-limits/widget-data'
-import { mergeWidgetPrefs, type WidgetPref, type WidgetPrefs, type WidgetSize } from '@/lib/widget-catalog'
+import { mergeWidgetPrefs, type WidgetPref, type WidgetPrefs } from '@/lib/widget-catalog'
+import {
+  lowestWidgetOrder,
+  newSpendLimitWidgetPrefs,
+  SPEND_LIMIT_WIDGET_ORDER_OFFSET,
+  SPEND_LIMIT_WIDGET_SIZE,
+} from '@/lib/spend-limits/widget-pref'
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const LOADER_PATH = join(REPO_ROOT, 'lib', 'dashboard-data-loader.ts')
@@ -62,12 +72,10 @@ describe('bronanker — de gespiegelde regel bestaat nog in loadDashboardData', 
   })
 
   it.each([
-    // De gate: alleen actieve potten krijgen een NIEUWE pref.
-    ['isActive-gate', 's.isActive && !savedSpendLimitIds.has('],
-    // De offset. Bewust als letterlijk fragment: −300 is een magisch getal dat
-    // nergens als constante woont, dus dit is de enige plek die het vastpint.
-    ['order-offset −300', 'order: lowestOrder - 300 + i,'],
-    ['lowestOrder-basis', 'const lowestOrder = Math.min(0, ...widgetPrefs.widgets.map(w => w.order))'],
+    // De gate + de pref-vorm komen uit de gedeelde helper; dit anker bewaakt dat
+    // de loader hem ook echt consumeert en niet stilletjes een eigen kopie terugkrijgt.
+    ['gedeelde injectie-helper', 'newSpendLimitWidgetPrefs( spendLimitWidgets, savedSpendLimitIds, lowestOrder, )'],
+    ['lowestOrder-basis', 'const lowestOrder = lowestWidgetOrder(widgetPrefs.widgets)'],
     // De stale-drop: een opgeslagen pref overleeft alleen als de pot nog uit de
     // loader komt (dus niet gearchiveerd is).
     ['stale-drop', "!w.id.startsWith('spend_limit:') || currentSpendLimitIds.has(w.id)"],
@@ -155,19 +163,18 @@ async function widgetsFor(limits: Row[]): Promise<SpendLimitWidgetData[]> {
 
 function injecteer(saved: WidgetPrefs | null, spendLimitWidgets: SpendLimitWidgetData[]) {
   const widgetPrefs = mergeWidgetPrefs(saved)
-  const lowestOrder = Math.min(0, ...widgetPrefs.widgets.map((w) => w.order))
+  const lowestOrder = lowestWidgetOrder(widgetPrefs.widgets)
   const savedSpendLimitIds = new Set(
     widgetPrefs.widgets.filter((w) => w.id.startsWith('spend_limit:')).map((w) => w.id),
   )
   const currentSpendLimitIds = new Set(spendLimitWidgets.map((s) => `spend_limit:${s.id}`))
-  const newSpendLimitPrefs: WidgetPref[] = spendLimitWidgets
-    .filter((s) => s.isActive && !savedSpendLimitIds.has(`spend_limit:${s.id}`))
-    .map((s, i) => ({
-      id: `spend_limit:${s.id}`,
-      enabled: true,
-      size: 'quarter' as WidgetSize,
-      order: lowestOrder - 300 + i,
-    }))
+  // Exact de aanroep uit de loader — de gate en de pref-vorm worden hier dus
+  // getest zoals ze draaien, niet nagebouwd.
+  const newSpendLimitPrefs: WidgetPref[] = newSpendLimitWidgetPrefs(
+    spendLimitWidgets,
+    savedSpendLimitIds,
+    lowestOrder,
+  )
 
   const allWidgetPrefs = [
     ...widgetPrefs.widgets.filter(
@@ -241,6 +248,14 @@ describe('injectie — isActive-gate', () => {
 // ── 2. order-offset −300 ────────────────────────────────────────────────────
 
 describe('injectie — order-offset −300', () => {
+  // De defaults staan als constante vastgepind omdat de widget-schakelaar
+  // (PATCH /api/spend-limits/[id]/widget) er een teruggezette tegel mee schrijft:
+  // schuift de injectie op, dan moet de schakelaar meeschuiven — niet driften.
+  it('pint de gedeelde defaults vast (maat + offset)', () => {
+    expect(SPEND_LIMIT_WIDGET_ORDER_OFFSET).toBe(-300)
+    expect(SPEND_LIMIT_WIDGET_SIZE).toBe('quarter')
+  })
+
   it('geeft elke nieuwe pot lowestOrder − 300 + volgorde-index', async () => {
     const widgets = await widgetsFor([
       limitRow({ id: 'aaa' }),

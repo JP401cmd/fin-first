@@ -121,6 +121,15 @@ const ALLOWED_FILES = new Map([
     'Produceert HorizonPageData.dailyExpenseRate; de resterende aanroep voedt alleen ' +
       'calculateBox3 waarvan enkel .tax gelezen wordt (freedomDays ongebruikt).',
   ],
+  [
+    'components/overview/cashflow-instellingen-blok.tsx',
+    'GEKOZEN-grondslag (ADR 0103): dit paneel is het oppervlak waar de gebruiker de ' +
+      'grondslag voor inkomen/uitgaven zelf kiest, en het toont het €→tijd-tarief van ' +
+      'het bedrag dat er op dát moment staat — inclusief de nog niet opgeslagen ' +
+      'budgetselectie (resolveAmountWithBasis, optimistisch). Het canonieke 12-mnd ' +
+      'rolling tarief zou hier de kassabon tegenspreken: het bedrag boven de regel zou ' +
+      'meebewegen met een vinkje terwijl de tijd eronder stil blijft staan.',
+  ],
 
   // ── Eigen invoer / eigen flow (geen app-brede weergave-grondslag) ─────────
   [

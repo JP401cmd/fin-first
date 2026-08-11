@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-11T14:14:36.752Z",
+  "generatedAt": "2026-08-11T22:32:23.427Z",
   "generatedDate": "2026-08-11",
   "repo": {
     "name": "fin",
@@ -188,11 +188,11 @@
   "stats": {
     "routes": 137,
     "routesProduction": 95,
-    "api": 294,
+    "api": 299,
     "tables": 89,
-    "migrations": 205,
+    "migrations": 207,
     "integrations": 25,
-    "components": 928,
+    "components": 939,
     "providers": 14,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -4208,11 +4208,51 @@
       ]
     },
     {
+      "url": "/api/transactions/bulk-budget",
+      "file": "app/api/transactions/bulk-budget/route.ts",
+      "domain": "transactions",
+      "methods": [
+        "PATCH"
+      ]
+    },
+    {
+      "url": "/api/transactions/bulk-budget/regel",
+      "file": "app/api/transactions/bulk-budget/regel/route.ts",
+      "domain": "transactions",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/transactions/bulk-delete",
+      "file": "app/api/transactions/bulk-delete/route.ts",
+      "domain": "transactions",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
       "url": "/api/transactions/import",
       "file": "app/api/transactions/import/route.ts",
       "domain": "transactions",
       "methods": [
         "GET",
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/transactions/search",
+      "file": "app/api/transactions/search/route.ts",
+      "domain": "transactions",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/transactions/search/manifest",
+      "file": "app/api/transactions/search/manifest/route.ts",
+      "domain": "transactions",
+      "methods": [
         "POST"
       ]
     },
@@ -5723,6 +5763,62 @@
           "domain": "checkin",
           "methods": [
             "GET"
+          ]
+        }
+      ]
+    },
+    {
+      "domain": "transactions",
+      "label": "transactions",
+      "count": 6,
+      "routes": [
+        {
+          "url": "/api/transactions/bulk-budget",
+          "file": "app/api/transactions/bulk-budget/route.ts",
+          "domain": "transactions",
+          "methods": [
+            "PATCH"
+          ]
+        },
+        {
+          "url": "/api/transactions/bulk-budget/regel",
+          "file": "app/api/transactions/bulk-budget/regel/route.ts",
+          "domain": "transactions",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/transactions/bulk-delete",
+          "file": "app/api/transactions/bulk-delete/route.ts",
+          "domain": "transactions",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/transactions/import",
+          "file": "app/api/transactions/import/route.ts",
+          "domain": "transactions",
+          "methods": [
+            "GET",
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/transactions/search",
+          "file": "app/api/transactions/search/route.ts",
+          "domain": "transactions",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/transactions/search/manifest",
+          "file": "app/api/transactions/search/manifest/route.ts",
+          "domain": "transactions",
+          "methods": [
+            "POST"
           ]
         }
       ]
@@ -7385,22 +7481,6 @@
       ]
     },
     {
-      "domain": "transactions",
-      "label": "transactions",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/transactions/import",
-          "file": "app/api/transactions/import/route.ts",
-          "domain": "transactions",
-          "methods": [
-            "GET",
-            "POST"
-          ]
-        }
-      ]
-    },
-    {
       "domain": "uitgaven-na-pensioen",
       "label": "uitgaven-na-pensioen",
       "count": 1,
@@ -7943,7 +8023,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 205
+    "migrationCount": 207
   },
   "tablesByDomain": [
     {
@@ -8417,11 +8497,11 @@
     }
   ],
   "components": {
-    "total": 928,
+    "total": 939,
     "groups": [
       {
         "group": "app",
-        "count": 364,
+        "count": 365,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8713,6 +8793,7 @@
           "share-dialog",
           "shell-contexts",
           "shell-overlay",
+          "shell-overlay.destructive.test",
           "sidebar",
           "sidebar.eenvoudig.test",
           "sim-chart",
@@ -8791,7 +8872,7 @@
       },
       {
         "group": "overview",
-        "count": 157,
+        "count": 167,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -8825,6 +8906,16 @@
           "box3-tegenbewijs-card",
           "briefing-panel",
           "briefing-panel.test",
+          "bulk-bevestigingen",
+          "bulk-bevestigingen.test",
+          "bulk-bewerken-overlay",
+          "bulk-bewerken-overlay.test",
+          "bulk-filters",
+          "bulk-filters.test",
+          "bulk-impact",
+          "bulk-resultaten",
+          "bulk-resultaten.test",
+          "bulk-uitkomst",
           "cashflow-cards-loader",
           "cashflow-forecast",
           "cashflow-forecast-sparkline",
@@ -11088,7 +11179,15 @@
           "write": false
         },
         {
+          "name": "category_corrections",
+          "write": true
+        },
+        {
           "name": "transactions",
+          "write": true
+        },
+        {
+          "name": "user_own_ibans",
           "write": true
         }
       ],
@@ -12121,7 +12220,9 @@
           "label": "transactions",
           "write": true,
           "routes": [
-            "/api/transactions/import"
+            "/api/transactions/import",
+            "/api/transactions/search",
+            "/api/transactions/search/manifest"
           ]
         },
         {
@@ -13006,6 +13107,8 @@
           "label": "transactions",
           "write": false,
           "routes": [
+            "/api/transactions/bulk-budget",
+            "/api/transactions/bulk-budget/regel",
             "/api/transactions/import"
           ]
         },
@@ -13231,6 +13334,14 @@
         }
       ],
       "category_corrections": [
+        {
+          "domain": "transactions",
+          "label": "transactions",
+          "write": true,
+          "routes": [
+            "/api/transactions/bulk-budget/regel"
+          ]
+        },
         {
           "domain": "bank-connect",
           "label": "Bank-connect",
@@ -13998,6 +14109,14 @@
             "/api/own-accounts/rules",
             "/api/own-accounts/settings"
           ]
+        },
+        {
+          "domain": "transactions",
+          "label": "transactions",
+          "write": true,
+          "routes": [
+            "/api/transactions/bulk-budget/regel"
+          ]
         }
       ],
       "questionnaire_responses": [
@@ -14058,6 +14177,7 @@
       "recommendations",
       "transactions",
       "user_feature_visits",
+      "user_own_ibans",
       "valuations"
     ]
   },
@@ -16108,6 +16228,37 @@
       ],
       "summary": "Detectie van storingen was **pull**-gebaseerd: `/beheer/errors` en `/beheer/jobs` tonen fouten pas als iemand ze opent. Eén duw-kanaal bestond al — de cron-mail uit ADR 0060 — maar die is stil zolang `ALERT_EMAIL`/`OPS_EMAIL` niet gezet is, en dekt alleen een cron die faalde met ",
       "file": "docs/adr/0102-meldingen-sweep-buitenwacht-en-binnenwacht.md"
+    },
+    {
+      "id": "0103-grondslag-van-inkomen-en-uitgaven-is-een-expliciete-keuze",
+      "title": "De grondslag van inkomen en uitgaven is een expliciete keuze, met budgetten als standaard",
+      "status": "aanvaard",
+      "date": "2026-08-11",
+      "elements": [
+        "as-budget",
+        "as-planning",
+        "as-belasting",
+        "fn-budgetteren",
+        "t-supabase"
+      ],
+      "summary": "\"Geschat jaarinkomen\" en \"Geschatte uitgaven\" op `/overzicht/cashflow` kenden tot nu toe twee grondslagen: de transactiesom, of een handmatig bedrag dat de gebruiker zelf invulde (`profiles.income_source` / `expenses_source` = `'auto' | 'manual'`). Wie zijn inkomen niet in transa",
+      "file": "docs/adr/0103-grondslag-van-inkomen-en-uitgaven-is-een-expliciete-keuze.md"
+    },
+    {
+      "id": "0104-bulkselectie-is-een-bevroren-idlijst",
+      "title": "Een bulkselectie op transacties is een bevroren id-lijst, geen criterium",
+      "status": "aanvaard",
+      "date": "2026-08-11",
+      "elements": [
+        "as-transacties",
+        "as-budget",
+        "sp-registreren",
+        "do-transactie",
+        "fn-budgetteren",
+        "t-supabase"
+      ],
+      "summary": "Het transactie-bulkbewerkscherm (requirements 11 aug 2026, B1–B3) laat een gebruiker over de **volledige** historie zoeken, tot duizenden transacties selecteren, ze in één keer hercategoriseren of **hard verwijderen**. De kernbeslissing is wat \"selecteer alle 4.000\" technisch bet",
+      "file": "docs/adr/0104-bulkselectie-is-een-bevroren-idlijst.md"
     }
   ],
   "churn": {
@@ -16131,7 +16282,7 @@
       },
       {
         "path": "app/api/household",
-        "commits": 16
+        "commits": 17
       },
       {
         "path": "app/api/assets",
@@ -16157,7 +16308,7 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 9138,
+        "loc": 9179,
         "commits": 93
       },
       {
@@ -16182,12 +16333,12 @@
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 2702,
+        "loc": 2748,
         "commits": 52
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
-        "loc": 2300,
+        "loc": 2359,
         "commits": 20
       },
       {
@@ -17294,17 +17445,8 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-08-11",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "API-routes",
-        "added": [],
-        "removed": [
-          "/api/module-guide/steps",
-          "/api/standard-guide/steps"
-        ]
-      }
-    ]
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {
@@ -17589,8 +17731,8 @@
     },
     {
       "date": "2026-08-11",
-      "api": 294,
-      "components": 928,
+      "api": 299,
+      "components": 939,
       "tables": 89,
       "routesProduction": 95
     }

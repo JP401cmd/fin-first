@@ -102,6 +102,34 @@ describe('buildAssignmentPlan', () => {
     })
   })
 
+  it('te korte matchwaarde: géén blijvende budgetregel, de exacte IBAN-regel blijft wél', () => {
+    // Dezelfde ondergrens als op `user_own_ibans` en op de bulkroute — één norm
+    // (`planRuleTarget`), drie schrijfpaden. Een correctie op `"AH"` matcht als
+    // substring op de omschrijving en zou élke volgende import sturen; een
+    // IBAN-correctie matcht exact en kan niets te breeds vangen.
+    const plan = buildAssignmentPlan(input({
+      scope: 'rule',
+      tx: { id: 'tx-1', counterparty_name: 'AH', counterparty_iban: 'nl91 abna 0417 1643 00', description: 'x' },
+    }))
+    expect(plan.rules).toEqual([
+      { match_field: 'counterparty_iban', match_value: 'NL91ABNA0417164300', budget_id: 'b-boodschappen' },
+    ])
+    // De transactie zelf (en haar siblings) worden gewoon geboekt: alleen het te
+    // grove automatisme valt weg.
+    expect(plan.txUpdate.ids).toEqual(['tx-1'])
+  })
+
+  it('transfer + te korte tegenpartijnaam zonder IBAN: géén eigen-rekeningregel', () => {
+    const plan = buildAssignmentPlan(input({
+      scope: 'rule',
+      isTransfer: true,
+      budgetId: 'b-eigen',
+      tx: { id: 'tx-1', counterparty_name: 'AH', counterparty_iban: null, description: 'x' },
+    }))
+    expect(plan.ownAccountRule).toBeNull()
+    expect(plan.rules).toEqual([])
+  })
+
   it('budget-drop (geen transfer) heeft géén ownAccountRule', () => {
     expect(buildAssignmentPlan(input({ scope: 'rule' })).ownAccountRule).toBeNull()
   })
