@@ -18,7 +18,7 @@ function VrijheidsPadKaart() {
         <p className="font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-3)]">
           Jouw pad naar vrijheid
         </p>
-        <span className="font-mono text-[10px] text-[var(--ink-4)]">illustratief</span>
+        <span className="font-mono text-[10px] text-[var(--ink-meta)]">illustratief</span>
       </div>
 
       {/* Projectie-grafiek */}
@@ -31,7 +31,7 @@ function VrijheidsPadKaart() {
         >
           {/* Doelvermogen-lijn: hier ben je vrij */}
           <line x1="16" y1="48" x2="304" y2="48" stroke="var(--border-md)" strokeDasharray="2 4" />
-          <text x="16" y="38" fontSize="9" fill="var(--ink-4)" className="font-sans uppercase" letterSpacing="0.08em">
+          <text x="16" y="38" fontSize="9" fill="var(--ink-meta)" className="font-sans uppercase" letterSpacing="0.08em">
             Doelvermogen — genoeg om vrij te zijn
           </text>
 
@@ -87,7 +87,7 @@ function VrijheidsPadKaart() {
 
       {/* Card footer */}
       <div className="bg-[var(--subtle)] px-5 py-3">
-        <p className="text-center font-sans text-[10px] italic text-[var(--ink-4)]">
+        <p className="text-center font-sans text-[10px] italic text-[var(--ink-meta)]">
           Voorbeeldprojectie — jouw eigen pad staat er in ±5 minuten
         </p>
       </div>
@@ -104,7 +104,7 @@ export function Hero() {
         <p className="font-sans text-[10px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-3)]">
           Persoonlijk Financieel Dagblad
         </p>
-        <p className="font-mono text-[10px] text-[var(--ink-4)]">
+        <p className="font-mono text-[10px] text-[var(--ink-meta)]">
           Editie 2026 · Nederland
         </p>
       </div>
@@ -141,7 +141,7 @@ export function Hero() {
               className="inline-flex items-center justify-center gap-2 rounded-[var(--r)] border border-[var(--border-md)] px-6 py-3.5 font-sans text-sm font-medium text-[var(--ink-2)] transition-all hover:border-[var(--ink-3)] hover:shadow-[var(--s0)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
             >
               Ontdek hoe het werkt
-              <span className="text-[var(--ink-4)]">→</span>
+              <span className="text-[var(--ink-meta)]">→</span>
             </Link>
             <Link
               href="/check"
@@ -182,7 +182,7 @@ export function Hero() {
 
       {/* Scroll-indicator */}
       <div className="absolute bottom-9 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
-        <span className="font-sans text-[10px] uppercase tracking-[0.11em] text-[var(--ink-4)]">
+        <span className="font-sans text-[10px] uppercase tracking-[0.11em] text-[var(--ink-meta)]">
           Scroll
         </span>
         <div className="h-9 w-px bg-gradient-to-b from-[var(--border-md)] to-transparent" />

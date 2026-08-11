@@ -138,9 +138,10 @@ nauwelijks invoer; een dagritueel is dan verkeerd gedimensioneerd. Wat het doel 
 > `avg-verzoek` en `datalek-72u`. Bij 2× 15 min per week kun je anders tot 3,5 dag van een
 > 72-uursklok verliezen.
 
-Dit moment is **pull**: je haalt op. Het duwen (melding bij nieuwe fouten of een gefaalde cron)
-is apart belegd; vandaag is `lib/cron-alert.ts` het enige duw-kanaal — dat mailt bij
-`job_runs.status='error'` naar `ALERT_EMAIL`/`OPS_EMAIL`, met 24-uurs throttle per job.
+Dit moment is **pull**: je haalt op. Daarnaast duwt de app zelf — zie *Meldingen naar je telefoon*
+verderop. Kort: `lib/cron-alert.ts` mailt én pusht bij `job_runs.status='error'`, en de
+meldingen-sweep (`/api/cron/alerts-sweep`) pusht elk kwartier bij een nieuwe soort fout of een
+taak die stil bleef. Beide zwijgen zolang hun kanaal niet is geconfigureerd.
 
 ### De zes inbakken — wat je langsloopt, en wat "afgehandeld" hier betekent
 
@@ -185,11 +186,89 @@ nooit op het volgende kijkmoment.
 
 ### Draaien de geplande taken nog?
 - **Technisch beheer → Achtergrondtaken** (`/beheer/jobs`): laatste run, status, duur en
-  samenvatting per cron (prijsverversing, maandsnapshots, nieuws-ingest).
+  samenvatting per cron. De lijst met taken staat in `app/(app)/beheer/jobs/page.tsx`, het
+  schema in `vercel.json`.
+
+**`CRON_SECRET` is een harde randvoorwaarde voor élke cron.** Staat de env-var niet in de
+Vercel-omgeving, dan weigert iedere cron-handler zichzelf *fail-closed* met een 500
+(`{"error":"CRON_SECRET not configured"}`) — vóór er ook maar iets gebeurt. Dat is bewust: een
+cron-endpoint draait op de service-role-sleutel en mag zonder secret niet open staan. De prijs
+is dat de storing zich verstopt.
+
+> **Lees `/beheer/jobs` daarom zo: "geen regel" betekent níét "nog niet aan de beurt".** Op zes
+> van de zeven crons zit die weigering vóór `recordJobRun()`, dus zonder secret ontstaat er
+> helemaal geen regel — precies hetzelfde beeld als een taak die nooit is ingepland. Alleen
+> `news-ingest` logt de weigering wél. Zo bleef het uitvallen van alle zeven crons van 29 juli
+> t/m 11 augustus 2026 onopgemerkt, op één dagelijkse `news-ingest`-error na.
+
+Controleren en herstellen:
+1. `npx vercel env ls production` — `CRON_SECRET` hoort in de lijst te staan.
+2. Ontbreekt hij: zetten is een **wijziging aan de draaiende omgeving** (zie het kopje verderop) —
+   dus via de `change-request`-skill, mét een regel in de tabel daar. Waarde: 32 willekeurige bytes,
+   `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`; environment
+   **Production** (en Preview als je daar wilt kunnen testen). Een env-var wordt pas actief bij de
+   eerstvolgende deploy — dus daarna opnieuw deployen.
+3. Volg `/beheer/jobs` de 24 uur erna: elke dagelijkse cron hoort een `success`- of een verklaarde
+   `error`-regel te krijgen, en `news-ingest` hoort te stoppen met de dagelijkse
+   "CRON_SECRET ontbreekt"-fout. `snapshots` draait maandelijks (de 1e) en volgt later.
+
+Hetzelfde geldt voor `EMAIL_UNSUB_SECRET`: die valt terug op `CRON_SECRET`, dus zonder allebei
+weigert de briefing-mail (een mail zonder werkende afmeldlink mag niet uit).
+
+### Meldingen naar je telefoon (push)
+
+Sinds ADR 0102 duwt de app zelf. Twee wachters, en je hebt ze **allebei** nodig.
+
+**Binnenwacht — `/api/cron/alerts-sweep`.** Draait elk kwartier en meldt drie dingen:
+een **nieuwe soort fout** in `error_logs` (niet elk voorval — alleen nieuwe soorten, plus één
+her-alarm als een bekende fout 10× zo vaak gaat voorkomen), een **gefaalde** achtergrondtaak, en
+een taak die **stil** bleef (geen geslaagde run binnen zijn `maxAgeHours` uit
+`lib/job-catalog.ts`). Per signaalsoort hoogstens één gebundelde melding per kwartier; per
+fouttype en per taak hoogstens één per 24 uur.
+
+**Buitenwacht — de dead man's switch.** De binnenwacht kan zijn eigen stilte niet zien: valt de
+Vercel-cronplanner uit, dan draait ook de sweep niet. Daarom hoort er een **externe** pinger
+omheen (healthchecks.io of cron-job.org, gratis) die elk kwartier dezelfde URL aanroept **en
+zelf alarm slaat als die aanroep uitblijft of faalt**. Zonder dat onderdeel is de hele opzet
+schijnzekerheid — precies het scenario van 29 juli t/m 11 augustus 2026.
+
+Inrichten (alles hieronder is een **wijziging aan de draaiende omgeving** → via de
+`change-request`-skill, met een regel in de tabel daar):
+
+1. **Kanaal.** Maak een ntfy-topic met een onraadbare naam en een access token (ntfy.sh of
+   self-hosted). Een topic zónder token is **publiek leesbaar** — token dus verplicht.
+2. **Env in Vercel** (Production): `NTFY_TOPIC`, `NTFY_TOKEN`, optioneel `NTFY_SERVER`. Daarna
+   opnieuw deployen; env-vars worden pas actief bij de volgende deploy.
+3. **Externe pinger.** Laat hem elk kwartier `GET https://<domein>/api/cron/alerts-sweep`
+   aanroepen met header `Authorization: Bearer <CRON_SECRET>`. Zet zijn eigen grace period op
+   ~30 minuten.
+   > **Gebruik de header, niet `?secret=…`.** Een querystring landt in de Vercel-toegangslogs,
+   > in de logs van de pinger en in elke proxy ertussen. En `CRON_SECRET` is één sleutel voor
+   > **alle** cron-routes — ook `/api/cron/retention`, die rijen *verwijdert*. Wie het secret uit
+   > een log plukt, kan dus meer dan alleen de sweep triggeren. healthchecks.io, cron-job.org en
+   > UptimeRobot ondersteunen custom headers. Kan je pinger dat écht niet, geef hem dan een eigen
+   > secret in plaats van `CRON_SECRET` te delen.
+4. **Proef.** Zet het topic tijdelijk op je telefoon, forceer een `job_runs`-errorrij en een
+   `error_logs`-rij, en controleer dat er **één** melding komt — en bij herhaling binnen 24 uur
+   géén tweede. Zet daarna de pinger een uur uit en controleer dat de buitenwacht alarm slaat.
+
+**Zonder `NTFY_TOPIC` is de sweep een stille no-op**: geen fouten, `/beheer/jobs` blijft groen.
+Dat is bewust, maar het betekent ook: een groene `/beheer/jobs` bewijst niet dat je gealarmeerd
+zou worden. Controleer bij het kwartaalritme of de env-vars nog staan.
+
+**Wat een melding wél en niet zegt.** Meldingen dragen uitsluitend **tellingen**, taak-labels,
+een geknepen context-tag en een link naar `/beheer/errors` of `/beheer/jobs` — nooit de
+fouttekst, stacktrace of URL. Dat is een harde regel (AVG): het kanaal loopt buiten onze stack
+en `error_logs.context` wordt ongefilterd door de browser aangeleverd. Voor de inhoud klik je
+door naar de beheerpagina. De cron-**mail** bevat wél de fouttekst; die gaat naar onze eigen
+mailbox.
 
 ### Fouten die gebruikers raken
 - **Technisch beheer → Foutmeldingen** (`/beheer/errors`): ongevangen client-fouten met
   stacktrace, automatisch verzameld.
+- **Let op de dekking:** `error_logs` bevat client-fouten en ónafgevangen serverfouten. Een
+  afgevangen API-500 via `serverError()` gaat alleen naar de Vercel-logs en verschijnt hier
+  (en dus in de meldingen) **niet**. Aparte kaart.
 
 ### AI-verbruik en -kosten
 - **Technisch beheer → AI Features** (`/beheer/ai-features`): maandbudgetten (AI-abonnees /

@@ -21,7 +21,19 @@
      4.64:1 op --subtle (4.83 op --bg, 5.18 op --paper). Houd de print-fallback
      `.text-[var(--ink-3)]` onderin dit bestand gelijk aan deze waarde. */
   --ink-3: #6e685a;
+  /* --ink-4 is GEEN teksttoken. 1.65:1 op --subtle, 1.72 op --bg, 1.85 op
+     --paper — ver onder de WCAG-AA-eis van 4.5:1. Het bestaat voor hairlines,
+     uitgeschakelde vlakken en achtergrond-tints (het voedt --module-active-50
+     en -100 hieronder). Gebruik voor kleine metadata-tekst --ink-meta. */
   --ink-4: #bbb8b0;
+  /* Metadata-tekst (10px kickers, "illustratief", stap-tellers, valuta-prefixes)
+     met een AA-garantie. De AA-envelop op de donkerste achtergrond (--subtle)
+     laat geen lichtere toon toe dan de --ink-3-familie: alles boven L≈0.145
+     zakt onder 4.5:1. Deze waarde is daarom een fractie donkerder dan --ink-3
+     zodat de kleinste tekst wat marge houdt — 4.85:1 op --subtle, 5.03 op --bg,
+     5.41 op --paper. Houd de print-fallback `.text-[var(--ink-meta)]` onderin
+     dit bestand gelijk aan deze waarde. */
+  --ink-meta: #6b6557;
   --rule-soft: rgba(26, 25, 22, 0.18);  /* halftransparante divider voor dotted/dashed */
   --r: 0px;
   --r-lg: 0px;
@@ -1116,6 +1128,9 @@ body.sleepmodus-dragging * {
   }
   .text-\[var\(--ink-4\)\] {
     color: #bbb8b0 !important;
+  }
+  .text-\[var\(--ink-meta\)\] {
+    color: #6b6557 !important;
   }
   .border-\[var\(--ink\)\] {
     border-color: #1a1916 !important;

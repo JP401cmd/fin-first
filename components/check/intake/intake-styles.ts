@@ -57,7 +57,7 @@ export const fieldLabel = 'mb-1.5 block font-serif text-sm font-medium text-[var
 
 /** Eyebrow / sectiekop in label-editorial (uppercase, mono-achtig). */
 export const eyebrow =
-  'label-editorial font-mono text-[var(--ink-4)]'
+  'label-editorial font-mono text-[var(--ink-meta)]'
 
 /** Basis-invoerveld — hairline-rand, accent-focusring. */
 export function inputBase(accent: Accent = 'kern'): string {

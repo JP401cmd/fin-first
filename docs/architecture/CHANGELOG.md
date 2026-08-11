@@ -778,3 +778,21 @@
 ## 2026-08-11
 
 - **API-routes** verwijderd: /api/roadmap
+
+## 2026-08-11
+
+- **API-routes** toegevoegd: /api/own-accounts/counterparties, /api/own-accounts/rules, /api/own-accounts/settings, /api/spend-limits/[id]/transactions, /api/spend-limits/[id]/widget
+- **Componenten (aantal)** toegevoegd: +6
+
+## 2026-08-11
+
+- Geen wijzigingen.
+
+## 2026-08-11
+
+- **API-routes** toegevoegd: /api/cron/alerts-sweep
+- **Componenten (aantal)** toegevoegd: +5
+
+## 2026-08-11
+
+- **API-routes** verwijderd: /api/module-guide/steps, /api/standard-guide/steps

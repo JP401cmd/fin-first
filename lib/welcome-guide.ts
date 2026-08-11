@@ -7,11 +7,12 @@
 // Twee opslaglagen (geen schema-wijziging nodig):
 //  - CONFIG (welke schermen/stappen): app_settings key `welcome_guide_config`,
 //    leesbaar door élke ingelogde user, alleen schrijfbaar door superadmin.
-//    Spiegelt `standard_guide_steps`/`coach_config`.
+//    Spiegelt `coach_config`.
 //  - PER-USER STAAT (afvinken/voortgang/sluiten): genest onder de bestaande
 //    `profiles.module_guide_state` jsonb-kolom, top-level key `welcome:guide`.
-//    De bestaande module-guide-hook itereert alleen over bekende module-ids en
-//    raakt deze key niet aan.
+//    Sinds 11 aug 2026 is dit de ENIGE levende lezer/schrijver van die kolom
+//    (naast /api/module-guide/progress): de standard-/module-guide-hooks en de
+//    `goal:`-completion-detector zijn verwijderd als dode gids-code.
 //
 // Dit bestand is PUUR: geen React, geen Supabase, geen lucide-imports — zo
 // bruikbaar in zowel server- als client-context en triviaal te testen.

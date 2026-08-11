@@ -386,6 +386,19 @@ const criteria: AcceptanceCriterion[] = [
       source: 'window.location.assign + onboarding-poort in app/(app)/layout.tsx + components/onboarding/onboarding-success.tsx (statische copy), geen eigen berekening',
     },
   },
+  {
+    workflow: 'WF-START-27',
+    scenarioId: 'UAT-START-27',
+    titel: 'De rapportuitkomst delen zonder bedragen (ADR 0067)',
+    kriticiteit: 'BELANGRIJK',
+    given: 'Sanne\'s rapport is open (zie WF-START-08); netWorthFreedom is geen tekort en niet oneindig, dus de knop "Delen" staat naast "Download als PDF".',
+    when: 'De bezoeker klikt "Delen"; de dialoog toont de op canvas getekende deelkaart (1200×630) en de acties "Delen" (native share, met de kaart als bestand waar de browser dat ondersteunt), "Tekst kopiëren" en "Afbeelding opslaan".',
+    then: 'De deelkaart, de gekopieerde tekst én de meegegeven link bevatten UITSLUITEND de vrijheidstijd van het rapport ("X jaar en Y maanden") — geen €, geen %, geen ander ingevoerd of afgeleid gegeven (inkomen, vermogen, geboortejaar). De link is `<origin>/check`, parameterloos (geen token, geen querystring) — de ontvanger doet de check zelf; er wordt niets opgeslagen (momentopname, `lead_intakes` blijft ongemoeid). Staat netWorthFreedom op tekort of op nul jaar-en-nul-maanden, dan retourneert `selectShareFreedom` `null` en verschijnt de knop "Delen" niet.',
+    assertion: {
+      kind: 'consistency',
+      source: 'lib/check/share-freedom.ts#selectShareFreedom is de enige functie die het volledige rapport ziet en reduceert het tot {years, months}; buildFreedomShareText/buildFreedomCardCopy/ShareButton.tsx werken uitsluitend op dat object. A=B-toets (gedeelde payload bevat geen ander cijfer dan years/months, en bij deficit/infinite/nul geen deel-knop) i.p.v. een hard cijfer — bewaakt door lib/check/__tests__/share-freedom.test.ts',
+    },
+  },
 ]
 
 export const START_ACCEPTANCE: AcceptanceSet = {

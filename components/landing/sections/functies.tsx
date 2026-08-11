@@ -287,7 +287,7 @@ export function FunctiesSecties() {
                 </li>
               </ul>
 
-              <p className="mt-5 border-t border-dashed border-[var(--border-ed)] pt-4 font-serif text-xs italic text-[var(--ink-4)]">
+              <p className="mt-5 border-t border-dashed border-[var(--border-ed)] pt-4 font-serif text-xs italic text-[var(--ink-meta)]">
                 Eerlijk zijn over wat we niet zijn, bespaart frustratie aan beide kanten.
               </p>
             </div>

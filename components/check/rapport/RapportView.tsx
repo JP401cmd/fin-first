@@ -1,6 +1,8 @@
 import type { CheckReportData } from '@/lib/check/types'
+import { selectShareFreedom } from '@/lib/check/share-freedom'
 import { ReadingProgress } from './ReadingProgress'
 import { DownloadButton } from './DownloadButton'
+import { ShareButton } from './ShareButton'
 import { Masthead } from './Masthead'
 import { LifeGrid } from './LifeGrid'
 import { NavIndex } from './NavIndex'
@@ -21,12 +23,22 @@ import { RapportFooter } from './RapportFooter'
  * Sectievolgorde: 1 Foto van nu · 2 Gezondheidsgetal · 3 Twee toekomsten ·
  * 4 De toekomst (kruising + levenspad samengevoegd) · 5 Uit het nieuws ·
  * 6 Fin's zetten.
+ *
+ * ADR 0067 — de deel-actie: `selectShareFreedom` reduceert het rapport hier
+ * éénmalig tot twee gehele getallen (jaren + maanden vrijheid). Dát is het
+ * enige dat `ShareButton` te zien krijgt; bedragen en invoer komen het deelpad
+ * structureel niet in. Geen deelbare uitkomst (tekort/nul) → geen knop.
  */
 export function RapportView({ report }: { report: CheckReportData }) {
+  const shareFreedom = selectShareFreedom(report)
+
   return (
     <>
       <ReadingProgress />
-      <DownloadButton />
+      <div className="report-actions">
+        {shareFreedom && <ShareButton freedom={shareFreedom} />}
+        <DownloadButton />
+      </div>
       <Masthead masthead={report.masthead} />
       <LifeGrid data={report.lifeGrid} />
       <NavIndex report={report} />

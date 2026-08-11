@@ -78,7 +78,7 @@ export function StepPensioen({ intake, onChange, onNext, onBack }: Props) {
           <span className="text-xs font-normal italic text-[var(--ink-3)]">(optioneel)</span>
         </label>
         <div className="relative">
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm text-[var(--ink-4)]">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm text-[var(--ink-meta)]">
             &euro;
           </span>
           <input
@@ -155,7 +155,7 @@ export function StepPensioen({ intake, onChange, onNext, onBack }: Props) {
             placeholder="7,0"
             className={`${inputBase('horizon')} px-3 py-2.5 pr-8 font-mono text-sm tabular-nums`}
           />
-          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-[var(--ink-4)]">
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-[var(--ink-meta)]">
             %
           </span>
         </div>
@@ -205,7 +205,7 @@ export function StepPensioen({ intake, onChange, onNext, onBack }: Props) {
           <span className="text-xs font-normal italic text-[var(--ink-3)]">(optioneel — per maand)</span>
         </label>
         <div className="relative">
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm text-[var(--ink-4)]">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm text-[var(--ink-meta)]">
             &euro;
           </span>
           <input

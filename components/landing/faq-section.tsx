@@ -32,7 +32,7 @@ function FaqItem({ q, a, index }: Vraag & { index: number }) {
           {q}
         </p>
         <ChevronDown
-          className={`mt-0.5 h-4 w-4 shrink-0 text-[var(--ink-4)] transition-transform duration-300 ${
+          className={`mt-0.5 h-4 w-4 shrink-0 text-[var(--ink-meta)] transition-transform duration-300 ${
             open ? 'rotate-180' : ''
           }`}
           aria-hidden="true"

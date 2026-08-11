@@ -132,7 +132,10 @@ function LoginForm() {
 
       <div className="my-5 flex items-center gap-3">
         <span className="h-px flex-1 bg-zinc-200" />
-        <span className="text-xs uppercase tracking-[0.08em] text-zinc-400">of</span>
+        {/* zinc-500, niet zinc-400: #a1a1aa haalde 2,55:1 op wit en zakte
+            daarmee onder de AA-eis van 4,5:1 (Lighthouse `color-contrast`).
+            zinc-500 = 4,83:1 en sluit aan op de rest van deze zinc-pagina. */}
+        <span className="text-xs uppercase tracking-[0.08em] text-zinc-500">of</span>
         <span className="h-px flex-1 bg-zinc-200" />
       </div>
 
@@ -198,7 +201,10 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4">
+    // <main> i.p.v. <div>: /login heeft geen app-shell en had daardoor geen
+    // enkele landmark (Lighthouse `landmark-one-main`). Screenreader-gebruikers
+    // konden niet naar de hoofdinhoud springen.
+    <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-4">
       <Suspense fallback={
         <div className="w-full max-w-sm">
           <Link href="/" className="mb-6 flex items-center justify-center">
@@ -220,6 +226,6 @@ export default function LoginPage() {
       }>
         <LoginForm />
       </Suspense>
-    </div>
+    </main>
   )
 }

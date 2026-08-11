@@ -47,15 +47,15 @@ describe('START_FLOW — curatie-integriteit', () => {
     }
   })
 
-  it('dekt alle 26 WF-START-scenario\'s (01..26, aaneengesloten — geen verwijsregel-gaten)', () => {
+  it('dekt alle 27 WF-START-scenario\'s (01..27, aaneengesloten — geen verwijsregel-gaten)', () => {
     const covered = new Set(
       START_FLOW.nodes.map((n) => n.scenarioId).filter((id): id is string => Boolean(id)),
     )
-    const expected = Array.from({ length: 26 }, (_, i) => `UAT-START-${String(i + 1).padStart(2, '0')}`)
+    const expected = Array.from({ length: 27 }, (_, i) => `UAT-START-${String(i + 1).padStart(2, '0')}`)
     for (const id of expected) {
       expect(covered.has(id), `${id} moet als flow-knoop voorkomen`).toBe(true)
     }
-    expect(covered.size).toBe(26)
+    expect(covered.size).toBe(27)
   })
 
   it('de domeinoverschrijdende cross-knopen dekken OVZ/TOEK/WILL/NAV', () => {

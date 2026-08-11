@@ -109,7 +109,7 @@ function EventRowForm({ preset, currentAge, dailyRate, onAdd }: EventRowFormProp
         onClick={() => setOpen(true)}
         className="flex w-full items-center gap-3 border border-dashed border-[var(--border-ed)] px-4 py-3 text-left text-sm text-[var(--ink-2)] transition-colors hover:border-horizon-400 hover:bg-horizon-50/50"
       >
-        <Plus className="h-4 w-4 shrink-0 text-[var(--ink-4)]" aria-hidden="true" />
+        <Plus className="h-4 w-4 shrink-0 text-[var(--ink-meta)]" aria-hidden="true" />
         <Icon className="h-4 w-4 shrink-0 text-horizon-600" aria-hidden="true" />
         <span className="font-display font-medium">{preset.label}</span>
         <span className="font-serif text-xs italic text-[var(--ink-3)]">{preset.hint}</span>
@@ -143,7 +143,7 @@ function EventRowForm({ preset, currentAge, dailyRate, onAdd }: EventRowFormProp
               }}
               className={`${inputBase('horizon')} px-3 py-2 pr-8 font-mono text-sm tabular-nums`}
             />
-            <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 font-mono text-xs text-[var(--ink-4)]">
+            <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 font-mono text-xs text-[var(--ink-meta)]">
               jr
             </span>
           </div>
@@ -154,7 +154,7 @@ function EventRowForm({ preset, currentAge, dailyRate, onAdd }: EventRowFormProp
             {preset.sign === 'cost' ? 'Kosten' : 'Bedrag'}
           </label>
           <div className="relative">
-            <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-xs text-[var(--ink-4)]">
+            <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-xs text-[var(--ink-meta)]">
               &euro;
             </span>
             <input
@@ -253,7 +253,7 @@ export function StepGebeurtenissen({ intake, onChange, onNext, onBack }: Props) 
                     type="button"
                     onClick={() => handleRemove(idx)}
                     aria-label={`Verwijder ${ev.label}`}
-                    className="text-[var(--ink-4)] transition-colors hover:text-negative"
+                    className="text-[var(--ink-meta)] transition-colors hover:text-negative"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>

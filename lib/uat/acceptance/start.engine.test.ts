@@ -7,10 +7,11 @@
  * er alleen overheen en toetst `expect(actual).toBe(expected)` — één bron van
  * waarheid voor de rekenlogica, twee draaimomenten (CI + /beheer/regressietest).
  *
- * De niet-exacte criteria (18 ui-only workflows) hebben geen vast cijfer en
- * worden hier als bespoke kind-controle geborgd, samen met de dekkingscontrole
- * op `start.ts` zelf (elk START-scenario uit de catalogus heeft precies één
- * criterium — 01..26, aaneengesloten, geen verwijsregel-gaten).
+ * De niet-exacte criteria (18 ui-only workflows + 1 consistency-workflow)
+ * hebben geen vast cijfer en worden hier als bespoke kind-controle geborgd,
+ * samen met de dekkingscontrole op `start.ts` zelf (elk START-scenario uit de
+ * catalogus heeft precies één criterium — 01..27, aaneengesloten, geen
+ * verwijsregel-gaten).
  */
 
 import { describe, it, expect } from 'vitest'
@@ -30,11 +31,11 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Start — acceptatiecriteria dekking', () => {
-  it('heeft precies één criterium per catalogus-START-scenario (01..26, geen gaten)', () => {
+  it('heeft precies één criterium per catalogus-START-scenario (01..27, geen gaten)', () => {
     const workflows = START_ACCEPTANCE.criteria.map((c) => c.workflow).sort()
     expect(workflows).toEqual(catalogStartWorkflows)
     expect(new Set(workflows).size).toBe(catalogStartWorkflows.length)
-    expect(workflows.length).toBe(26)
+    expect(workflows.length).toBe(27)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {

@@ -123,3 +123,69 @@ describe('next.config redirects — legacy routes redirecten op de routing-laag 
     }
   })
 })
+
+/**
+ * Content-Security-Policy — de report-only/enforce-koppeling.
+ *
+ * Aanleiding: de Lighthouse-nulmeting (11 aug 2026) hield Best practices op 96
+ * op ÉLKE pagina door één console-error: "The Content Security Policy directive
+ * `upgrade-insecure-requests` is ignored when delivered in a report-only
+ * policy." De directive is daar per spec inert — hij deed dus geen werk en
+ * kostte wel een punt. In enforce-modus hoort hij er juist wél in te staan.
+ *
+ * Die koppeling is het enige dat hier bewaakt wordt: niet "de directive is weg"
+ * (dat zou een latere enforce-switch blokkeren) maar "hij hoort bij enforce".
+ */
+describe('next.config security-headers — CSP', () => {
+  async function cspHeader() {
+    const groups = await nextConfig.headers!()
+    const found = groups
+      .flatMap((g) => g.headers)
+      .filter((h) => h.key.startsWith('Content-Security-Policy'))
+
+    // Twee CSP-headers tegelijk zou betekenen dat de enforce-switch de
+    // report-only-variant niet vervangt maar ernaast zet.
+    expect(found).toHaveLength(1)
+    return found[0]
+  }
+
+  it('stuurt upgrade-insecure-requests alleen mee in enforce-modus', async () => {
+    const csp = await cspHeader()
+    const isReportOnly = csp.key === 'Content-Security-Policy-Report-Only'
+
+    expect(csp.value.includes('upgrade-insecure-requests')).toBe(!isReportOnly)
+  })
+
+  it('houdt de directives die los van de modus altijd gelden', async () => {
+    const csp = await cspHeader()
+
+    for (const directive of [
+      "default-src 'self'",
+      "object-src 'none'",
+      "base-uri 'none'",
+      "form-action 'self'",
+      "frame-ancestors 'self'",
+    ]) {
+      expect(csp.value, `${directive} mag niet stilletjes verdwijnen`).toContain(directive)
+    }
+  })
+
+  it('levert de niet-CSP-beveiligingsheaders op elke route', async () => {
+    // Deze vier hangen aan geen enkele schakelaar en kunnen dus stil sneuvelen
+    // bij een refactor van SECURITY_HEADERS. HSTS met een korte max-age zou
+    // net zo stil de bescherming uithollen — vandaar de waarde erbij.
+    const groups = await nextConfig.headers!()
+    const root = groups.find((g) => g.source === '/:path*')
+    expect(root, 'security-headers horen op álle routes te staan').toBeDefined()
+
+    const byKey = new Map(root!.headers.map((h) => [h.key, h.value]))
+    expect(byKey.get('Strict-Transport-Security')).toBe(
+      'max-age=63072000; includeSubDomains',
+    )
+    expect(byKey.get('X-Content-Type-Options')).toBe('nosniff')
+    expect(byKey.get('Referrer-Policy')).toBe('strict-origin-when-cross-origin')
+    // SAMEORIGIN, niet DENY: de beheer-mobielpreview rendert een same-origin
+    // iframe (components/app/beheer/mobile-preview-frame.tsx).
+    expect(byKey.get('X-Frame-Options')).toBe('SAMEORIGIN')
+  })
+})

@@ -621,16 +621,6 @@ async function runImportWritePhase({
       }
     }
 
-    // 5. Goal-guide completion-detector — bonus: if this import results
-    //    in ≥1 aangifte-imported assets and the user has at least 3
-    //    assets total (across all sources), mark the relevant goal
-    //    steps as completed. We do this best-effort: failures here do
-    //    NOT roll back the import, since the data is the primary value
-    //    and step-completion is cosmetic.
-    await maybeCompleteVermogenOverzichtSteps(supabase, user.id).catch((err) => {
-      logSafeError('goal_guide_completion', err)
-    })
-
     // Success — cache (met size-cap eviction) en return.
     const successBody: AangifteImportResponse = {
       ok: true,
@@ -828,101 +818,5 @@ export async function DELETE(req: Request): Promise<Response> {
       { ok: false, error: 'Verwijderen mislukt. Probeer het opnieuw.' },
       { status: 500 },
     )
-  }
-}
-
-// ── Goal-guide completion-detector ──────────────────────────────────
-//
-// Bonus from the plan: when an aangifte-import lands ≥1 asset rows and
-// the user has ≥3 total assets, mark the `vermogen-overzicht` steps
-// `vo_first_asset` and `vo_assets_3` as completed. We touch
-// `profiles.module_guide_state` directly using the same JSONB shape as
-// `app/api/module-guide/progress/route.ts` to stay compatible.
-//
-// Best-effort: any failure here is logged but does not block the import.
-//
-// NOTE (8 aug 2026): the `goal:<slug>` key convention originally came from
-// `lib/briefing/goal-guide-steps.ts`, which was removed together with
-// /beheer/doelen (dead branch, zero UI consumers since ADR 0007). The key
-// below is therefore a plain literal now. No live surface reads
-// `goal:vermogen-overzicht` — the Welcome guide uses `welcome:guide`
-// (lib/welcome-guide.ts). This write is kept because removing it touches a
-// live onboarding route beyond the confirmed cleanup scope; it is tracked
-// on the follow-up card for the remaining guide-state dead code.
-
-interface ModuleGuideProgressEntry {
-  completedSteps: string[]
-  dismissedAt: string | null
-}
-
-type ModuleGuideStateMap = Record<string, ModuleGuideProgressEntry>
-
-async function maybeCompleteVermogenOverzichtSteps(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
-): Promise<void> {
-  // Count user's total assets — both manual + imported. When we cross
-  // the thresholds (1 / 3) we toggle the corresponding goal-step.
-  const { count, error: countErr } = await supabase
-    .from('assets')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .eq('is_active', true)
-  if (countErr) {
-    throw countErr
-  }
-  const totalAssets = count ?? 0
-  if (totalAssets < 1) return // nothing to mark; defensive
-
-  // Read the current module_guide_state. The column may not exist on
-  // older DBs — we degrade gracefully (no completion happens, the user
-  // toggles steps manually as before).
-  const { data: profile, error: readErr } = await supabase
-    .from('profiles')
-    .select('module_guide_state')
-    .eq('id', userId)
-    .single()
-  if (readErr) {
-    if ((readErr as PostgresLikeError).code === '42703') return
-    throw readErr
-  }
-
-  const goalKey = 'goal:vermogen-overzicht'
-  const currentState = (profile?.module_guide_state as ModuleGuideStateMap | null) ?? {}
-  const currentEntry: ModuleGuideProgressEntry = currentState[goalKey] ?? {
-    completedSteps: [],
-    dismissedAt: null,
-  }
-
-  const wantSteps = new Set<string>(currentEntry.completedSteps)
-  let mutated = false
-  // vo_first_asset: any asset suffices.
-  if (totalAssets >= 1 && !wantSteps.has('vo_first_asset')) {
-    wantSteps.add('vo_first_asset')
-    mutated = true
-  }
-  // vo_assets_3: at least 3 total assets.
-  if (totalAssets >= 3 && !wantSteps.has('vo_assets_3')) {
-    wantSteps.add('vo_assets_3')
-    mutated = true
-  }
-
-  if (!mutated) return
-
-  const updatedState: ModuleGuideStateMap = {
-    ...currentState,
-    [goalKey]: {
-      ...currentEntry,
-      completedSteps: Array.from(wantSteps),
-    },
-  }
-
-  const { error: writeErr } = await supabase
-    .from('profiles')
-    .update({ module_guide_state: updatedState })
-    .eq('id', userId)
-  if (writeErr) {
-    if ((writeErr as PostgresLikeError).code === '42703') return
-    throw writeErr
   }
 }

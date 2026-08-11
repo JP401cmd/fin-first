@@ -51,7 +51,7 @@ export function StepDoel({ intake, onChange, onNext, onBack }: Props) {
 
       {/* Suggesties */}
       <div>
-        <p className="label-editorial mb-2 font-mono text-[var(--ink-4)]">
+        <p className="label-editorial mb-2 font-mono text-[var(--ink-meta)]">
           Of kies een richting
         </p>
         <div className="flex flex-wrap gap-2">

@@ -131,7 +131,7 @@ export function StepUitgaven({ intake, onChange, onNext, onBack }: Props) {
             <span className="text-xs font-normal italic text-[var(--ink-3)]">(optioneel)</span>
           </label>
           <div className="relative">
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm text-[var(--ink-4)]">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm text-[var(--ink-meta)]">
               &euro;
             </span>
             <input
@@ -162,13 +162,13 @@ export function StepUitgaven({ intake, onChange, onNext, onBack }: Props) {
         <label htmlFor={`${id}-totaal`} className={fieldLabel}>
           Totale maanduitgaven
           {autoSum > 0 && (
-            <span className="ml-2 font-mono text-xs font-normal tabular-nums text-[var(--ink-4)]">
+            <span className="ml-2 font-mono text-xs font-normal tabular-nums text-[var(--ink-meta)]">
               (of laat berekend: {formatCurrency(autoSum)})
             </span>
           )}
         </label>
         <div className="relative">
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm text-[var(--ink-4)]">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm text-[var(--ink-meta)]">
             &euro;
           </span>
           <input

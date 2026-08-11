@@ -36,3 +36,28 @@ opgeslagen tijd*.
   `compliance-check` vóór livegang.
 - Bouw is nog niet gepland; dit ADR is de grens waarbinnen de latere
   `new-feature`-pijplijn moet blijven. De werkqueue-kaart verwijst hiernaar.
+
+## Stand van de bouw (11 augustus 2026)
+
+**Fase 1 gebouwd** — delen vanaf `/check/rapport`, als momentopname zonder opslag:
+
+- `lib/check/share-freedom.ts` — `selectShareFreedom(report)` is de **enige**
+  functie in het deelpad die het volledige rapport ziet en geeft twee gehele
+  getallen terug (`{ years, months }`). Alles erna (tekst, beeld, knop, dialoog)
+  werkt op dát object; een bedrag komt er niet in omdat het niet wordt
+  meegegeven, niet omdat het wordt weggelaten.
+- Gedeeld worden: een client-side op canvas getekende kaart (1200×630), een
+  tekst met alleen de vrijheidstijd, en de link `<origin>/check` — parameterloos.
+  De ontvanger doet de check zelf; er wordt niets opgeslagen en niets
+  herbezoekbaar gemaakt (dataminimalisatie). `lead_intakes` blijft ongemoeid.
+- De link-preview is die van de generieke `/check`-pagina en draagt dus per
+  constructie geen persoonlijk gegeven; `/check/rapport` blijft `noindex`.
+- Bewaakt door `lib/check/__tests__/share-freedom.test.ts`: die voert het
+  volledige rapport in en eist dat in de complete deel-payload (tekst, klembord,
+  link én elke string die op de afbeelding wordt getekend) geen `€`, geen `%` en
+  geen andere cijferreeks staat dan de gedeelde jaren en maanden.
+
+**Bewust niet gebouwd (zou buiten deze grens vallen en vraagt een eigen ADR):**
+een server-gerenderde OG-afbeelding met de persoonlijke uitkomst, en een
+persistente, herbezoekbare uitkomst-URL — beide vragen opslag of een
+enumereerbare identifier.

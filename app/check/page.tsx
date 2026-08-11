@@ -61,7 +61,7 @@ export default function CheckPage() {
             Beantwoord acht vragen. Ontvang je persoonlijk Vrijheidsrapport — met je
             vrijheidstijd, gezondheidsgetal en de drie stappen die het meest opleveren.
           </p>
-          <p className="mt-3 font-mono text-xs text-[var(--ink-4)]">
+          <p className="mt-3 font-mono text-xs text-[var(--ink-meta)]">
             Geen registratie nodig · Gegevens verlaten je browser pas bij verzending ·{' '}
             <span className="text-kern-600">AVG-conform</span>
           </p>

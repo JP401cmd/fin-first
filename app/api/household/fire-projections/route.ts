@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { computeFireProjection, computeFireRange, type FinancialInput, type FireProjection, type FireRange } from '@/lib/horizon-data'
 import { computeSharePct, type SplitMode } from '@/lib/household-data'
+import { annualAmount } from '@/lib/budget-utils'
 import { localMonthBounds } from '@/lib/month-range'
 
 /**
@@ -263,17 +264,13 @@ export async function GET() {
       const limit = children.length > 0
         ? children.reduce((sum, c) => sum + Number(c.default_limit), 0)
         : Number(b.default_limit)
-      if (b.ownership === 'shared') {
-        // Split shared budget expenses according to split_mode
-        const share = limit * shareFraction
-        yearlyMustExpenses += (b as { interval?: string }).interval === 'monthly' ? share * 12
-          : (b as { interval?: string }).interval === 'quarterly' ? share * 4
-          : share
-      } else {
-        yearlyMustExpenses += (b as { interval?: string }).interval === 'monthly' ? limit * 12
-          : (b as { interval?: string }).interval === 'quarterly' ? limit * 4
-          : limit
-      }
+      // Jaarconversie via de canonieke `annualAmount` (lib/budget-utils.ts) —
+      // niet met de hand. Bij een gedeeld budget telt alleen het eigen aandeel
+      // mee; de conversie is lineair, dus delen-vóór of delen-ná converteren
+      // geeft hetzelfde bedrag.
+      const interval = (b as { interval?: string }).interval
+      const share = b.ownership === 'shared' ? limit * shareFraction : limit
+      yearlyMustExpenses += annualAmount(share, interval)
     }
 
     return {
@@ -340,9 +337,7 @@ export async function GET() {
       const limit = children.length > 0
         ? children.reduce((sum, c) => sum + Number(c.default_limit), 0)
         : Number(b.default_limit)
-      total += (b as { interval?: string }).interval === 'monthly' ? limit * 12
-        : (b as { interval?: string }).interval === 'quarterly' ? limit * 4
-        : limit
+      total += annualAmount(limit, (b as { interval?: string }).interval)
     }
     return total
   })()

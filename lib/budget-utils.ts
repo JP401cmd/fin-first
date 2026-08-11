@@ -122,6 +122,57 @@ export function computeYearlyMustExpenses(
   return { yearlyMustExpenses: total, expenseItems }
 }
 
+/**
+ * Platte budgetrij zoals de meeste routes 'm uit één `.from('budgets')` halen.
+ * `default_limit` mag hier expliciet null/ontbrekend zijn: verschillende
+ * call-sites typen de kolom defensief als nullable.
+ */
+export interface FlatBudgetRow extends Omit<BudgetRow, 'default_limit'> {
+  default_limit: number | string | null | undefined
+  parent_id?: string | null
+}
+
+/**
+ * `yearlyMustExpenses` uit ÉÉN platte budgetlijst (parents + children door
+ * elkaar) — de vorm die de snapshot-, rapport- en holdings-paden uit hun
+ * bestaande budgets-query krijgen.
+ *
+ * Waarom deze wrapper bestaat: niet alleen de FORMULE moet één huis hebben,
+ * ook de RIJ-SELECTIE. Zes call-sites telden jarenlang alleen de PARENT-limieten
+ * (`is_essential ∧ budget_type='expense' ∧ parent_id IS NULL`) en misten
+ * daarmee de parent/child-oprol én de orphan-tak van
+ * `computeYearlyMustExpenses`. Dat is precies dezelfde fout-klasse als de
+ * gedupliceerde jaarconversie, één laag hoger: identieke formule, andere
+ * grondslag. Deze functie herhaalt de rekenlogica NIET — ze delegeert naar
+ * `computeYearlyMustExpenses` en legt alleen de twee filters vast.
+ *
+ * De children worden vóórgefilterd op EXCLUDED_BUDGET_TYPES, identiek aan
+ * lib/dashboard-data-loader.ts en lib/horizon-data-loader.ts. Dat is bewust:
+ * tak A van `computeYearlyMustExpenses` past die blocklist NIET op children toe
+ * (alleen tak B doet dat), dus een archive/income/savings-kind onder een
+ * essentiële uitgave-parent zou zónder vóórfilter wél meetellen. Op de huidige
+ * data bestaat die combinatie niet, maar de twee vormen zijn niet identiek —
+ * daarom volgen we de vorm van de dominante oppervlakken (dashboard/toekomst).
+ *
+ * `default_limit` wordt genormaliseerd met `Number(x) || 0`. Dat is GEEN
+ * cosmetica: alle zes gemigreerde call-sites hadden die guard in hun eigen som
+ * staan. `computeYearlyMustExpenses` doet kaal `Number(...)`, en dat is voor
+ * null gelijk (0) maar NIET voor undefined (NaN) — één ontbrekende kolom in een
+ * select zou de hele jaarsom naar NaN trekken. De guard blijft dus staan.
+ */
+export function yearlyMustExpensesFromBudgets(allBudgets: FlatBudgetRow[]): number {
+  const normalize = (b: FlatBudgetRow) => ({ ...b, default_limit: Number(b.default_limit) || 0 })
+  const essentialParents: BudgetRow[] = allBudgets
+    .filter(b => b.is_essential && b.budget_type === 'expense' && (b.parent_id ?? null) === null)
+    .map(normalize)
+  const children: ChildBudgetRow[] = allBudgets
+    .filter(
+      b => (b.parent_id ?? null) !== null && !EXCLUDED_BUDGET_TYPES.includes(b.budget_type ?? ''),
+    )
+    .map(b => ({ ...normalize(b), parent_id: b.parent_id ?? null }))
+  return computeYearlyMustExpenses(essentialParents, children).yearlyMustExpenses
+}
+
 export type RetirementExpenseMethod =
   | 'essential_budgets'
   | 'custom_amount'

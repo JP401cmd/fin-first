@@ -1,6 +1,29 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+/**
+ * Cron-routes: headless aangeroepen, dus GEEN sessiecookie. Het echte auth-slot
+ * is `CRON_SECRET` in de handler zelf (fail-closed in productie). Zónder een
+ * entry hier 401't de `/api/`-protected-prefix de cron VÓÓR die check draait —
+ * en dan draait de taak nooit, zonder spoor in `job_runs`.
+ *
+ * Deze lijst MOET gelijk zijn aan de `crons`-lijst in `vercel.json`. Dat stond
+ * er eerder alleen als comment; sinds ADR 0102 bewaakt `proxy.cron-paths.test.ts`
+ * het, omdat een vergeten entry een taak stil onbereikbaar maakt.
+ */
+export const CRON_PUBLIC_PATHS: readonly string[] = [
+  '/api/snapshots/cron',
+  '/api/holdings/refresh-prices/cron',
+  '/api/cron/retention', // AVG-retentie (Arch F3, ADR 0059)
+  '/api/cron/user-reports-notion-sync', // retry van gemiste Notion-pushes (meldingen)
+  '/api/web-vitals/retention/cron', // web_vitals-retentie (feature 885)
+  '/api/news-ingest/cron', // dagelijkse nieuws-ingest
+  '/api/briefing/email/cron', // wekelijkse briefing-mail
+  // Meldingen-sweep (ADR 0102). Wordt ÓÓK van buiten aangeroepen door de
+  // externe dead man's switch — juist die aanroep heeft nooit een sessie.
+  '/api/cron/alerts-sweep',
+]
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -70,19 +93,9 @@ export async function updateSession(request: NextRequest) {
     // 401't de /api/-protected-prefix de logged-out beacons VÓÓR de handler, waardoor
     // anonieme/pre-auth RUM stil verloren gaat (de fire-and-forget beacon negeert de 401).
     '/api/web-vitals',
-    // --- Cron-routes (Arch F4-besluit AC#2): headless aangeroepen, GEEN
-    // sessiecookie. Het echte auth-slot is CRON_SECRET in de handler zelf
-    // (fail-closed in productie: ontbrekend/onjuist secret -> 401/500). Zónder
-    // deze entries zou de /api/-protected-prefix de cron 401'en VÓÓR de
-    // CRON_SECRET-check draait -> cron kapot. Moet in sync blijven met de
-    // "crons"-lijst in vercel.json. Daarom bewust in de allowlist. ---
-    '/api/snapshots/cron',
-    '/api/holdings/refresh-prices/cron',
-    '/api/cron/retention', // AVG-retentie (Arch F3, ADR 0059)
-    '/api/cron/user-reports-notion-sync', // retry van gemiste Notion-pushes (meldingen)
-    '/api/web-vitals/retention/cron', // web_vitals-retentie (feature 885)
-    '/api/news-ingest/cron', // dagelijkse nieuws-ingest
-    '/api/briefing/email/cron', // wekelijkse briefing-mail
+    // --- Cron-routes (Arch F4-besluit AC#2): zie CRON_PUBLIC_PATHS hierboven,
+    // dat is de single source en wordt tegen vercel.json bewaakt. ---
+    ...CRON_PUBLIC_PATHS,
   ]
 
   // Protected route prefixes that require authentication

@@ -28,7 +28,7 @@ export function DemoMock({
             <span className="h-2.5 w-2.5 rounded-full bg-[var(--ink-4)]/30" aria-hidden="true" />
             <span className="h-2.5 w-2.5 rounded-full bg-[var(--ink-4)]/30" aria-hidden="true" />
           </div>
-          <p className="font-mono text-[10px] text-[var(--ink-4)]">
+          <p className="font-mono text-[10px] text-[var(--ink-meta)]">
             trifinity.app
           </p>
         </div>
@@ -126,15 +126,15 @@ export function CashflowInzichtDemo() {
       <div className="space-y-2.5">
         <div className="grid grid-cols-3 gap-2 rounded border border-[var(--border-ed)] bg-[var(--paper)] p-2.5">
           <div>
-            <p className="font-sans text-[9px] uppercase tracking-[0.08em] text-[var(--ink-4)]">In</p>
+            <p className="font-sans text-[9px] uppercase tracking-[0.08em] text-[var(--ink-meta)]">In</p>
             <p className="font-mono text-[11px] font-semibold text-[var(--ink)] tabular-nums">€4.870</p>
           </div>
           <div>
-            <p className="font-sans text-[9px] uppercase tracking-[0.08em] text-[var(--ink-4)]">Uit</p>
+            <p className="font-sans text-[9px] uppercase tracking-[0.08em] text-[var(--ink-meta)]">Uit</p>
             <p className="font-mono text-[11px] font-semibold text-[var(--ink)] tabular-nums">€3.640</p>
           </div>
           <div>
-            <p className="font-sans text-[9px] uppercase tracking-[0.08em] text-[var(--ink-4)]">Vrij</p>
+            <p className="font-sans text-[9px] uppercase tracking-[0.08em] text-[var(--ink-meta)]">Vrij</p>
             <p className="font-mono text-[11px] font-semibold text-kern-700 tabular-nums">+€1.230</p>
           </div>
         </div>
@@ -187,7 +187,7 @@ export function BalansDemo() {
         </div>
 
         <div className="rounded border border-[var(--border-ed)] bg-[var(--paper)] p-2.5">
-          <p className="font-sans text-[9px] uppercase tracking-[0.08em] text-[var(--ink-4)]">Vaste lasten</p>
+          <p className="font-sans text-[9px] uppercase tracking-[0.08em] text-[var(--ink-meta)]">Vaste lasten</p>
           <div className="mt-1 flex items-baseline justify-between">
             <span className="font-mono text-[11px] font-semibold text-[var(--ink)] tabular-nums">€2.140 p/m</span>
             <span className="font-sans text-[10px] text-[var(--ink-3)]">waarvan 4 abonnementen</span>

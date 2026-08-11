@@ -282,8 +282,8 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     {
       id: 'sp-vrijheidscheck', x: 722, y: 110, w: 200, h: 56, kind: 'bizproc',
       title: 'Vrijheidscheck doen',
-      lead: 'Publiek instroomproces (geen functionele module): een bezoeker doet anoniem een korte intake, krijgt server-berekend een Vrijheidsrapport en converteert daarna naar een account. Dit is de voordeur naar het hoofdproces, niet zelf een deel ervan.',
-      items: ['/check', 'anonieme intake', 'rapport', 'conversie naar account'],
+      lead: 'Publiek instroomproces (geen functionele module): een bezoeker doet anoniem een korte intake, krijgt server-berekend een Vrijheidsrapport, kan zijn uitkomst delen en converteert daarna naar een account. Delen gaat uitsluitend in vrijheidstijd — nooit bedragen, percentages of invoer, en de gedeelde link is parameterloos (ADR 0067); er wordt niets extra opgeslagen. Dit is de voordeur naar het hoofdproces, niet zelf een deel ervan.',
+      items: ['/check', 'anonieme intake', 'rapport', 'uitkomst delen (alleen vrijheidstijd)', 'conversie naar account'],
     },
 
     // ── Applicatieservices ──

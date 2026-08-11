@@ -11,7 +11,8 @@ import {
 // GET    → huidige config (default als er geen override is) + isDefault-vlag.
 // PUT    → valideer + sla de samengestelde config op in app_settings.
 // DELETE → verwijder de override → terug naar de ingebouwde default.
-// Spiegelt /api/admin/coach + /api/standard-guide/steps.
+// Spiegelt /api/admin/coach (het oorspronkelijke tweede voorbeeld,
+// /api/standard-guide/steps, is verwijderd — dode gids-tak, 11 aug 2026).
 
 // ── Validatie ────────────────────────────────────────────────────────────────
 

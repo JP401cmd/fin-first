@@ -2,7 +2,11 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type JobStatus = 'success' | 'error'
 
-/** Canonieke job-keys — gespiegeld door JOB_CATALOG op /beheer/jobs. */
+/**
+ * Canonieke job-keys. `JOB_CATALOG` (lib/job-catalog.ts) is een
+ * `Record<JobKey, …>`, dus een key erbij compileert rood tot de catalogus —
+ * en daarmee /beheer/jobs, de meldingslabels en de stilte-drempel — meebeweegt.
+ */
 export type JobKey =
   | 'holdings-prices'
   | 'snapshots'
@@ -12,6 +16,7 @@ export type JobKey =
   | 'web-vitals-retention'
   | 'retention'
   | 'user-reports-notion-sync'
+  | 'alerts-sweep'
 
 /**
  * Schrijf één uitvoering van een achtergrondtaak weg in `job_runs`.

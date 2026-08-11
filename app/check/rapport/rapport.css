@@ -126,7 +126,10 @@
 /* ===== MASTHEAD ===== */
 .rapport-root header.masthead {
   border-bottom: 3px double var(--ink);
-  padding-top: 30px;
+  /* Ruim genoeg dat de zwevende `.report-actions`-balk (top 14px, ~31px hoog)
+     zijn eigen band heeft en niet over de masthead-toprand valt. Sinds de
+     deel-actie ernaast staat, reikt die balk verder naar links dan voorheen. */
+  padding-top: 56px;
   padding-bottom: 14px;
 }
 .rapport-root .masthead-top {
@@ -1548,8 +1551,13 @@
   top: 14px;
   right: 28px;
   z-index: 40;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
-.rapport-root .download-btn {
+.rapport-root .download-btn,
+.rapport-root .share-btn {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -1569,19 +1577,175 @@
     border-color 0.15s,
     color 0.15s;
 }
-.rapport-root .download-btn:hover {
+.rapport-root .download-btn:hover,
+.rapport-root .share-btn:hover {
   background: var(--paper-2);
   border-color: var(--ink-soft);
   color: var(--ink);
 }
-.rapport-root .download-btn:focus-visible {
+.rapport-root .download-btn:focus-visible,
+.rapport-root .share-btn:focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
-.rapport-root .download-btn svg {
+.rapport-root .download-btn svg,
+.rapport-root .share-btn svg {
   width: 14px;
   height: 14px;
   flex: none;
+}
+
+/* De deel-actie is de primaire van de twee: goud-omrand i.p.v. grijs. */
+.rapport-root .share-btn {
+  border-color: color-mix(in srgb, var(--vrijgekocht) 45%, transparent);
+  color: var(--ink);
+}
+.rapport-root .share-btn:hover {
+  border-color: var(--vrijgekocht);
+}
+.rapport-root .share-btn svg {
+  color: var(--vrijgekocht);
+}
+
+/* ── Deel-dialoog (ADR 0067) ───────────────────────────────────────────────
+   Eigen, gescopete overlay: /check valt buiten de (app)-groep, dus geen
+   ShellOverlay/BottomSheet. Wel dezelfde laag als de share-dialog van de app
+   (z-index 90), dus boven de meelopende CTA-balk (70). */
+.rapport-root .share-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: color-mix(in srgb, var(--ink) 46%, transparent);
+  overflow-y: auto;
+}
+.rapport-root .share-dialog {
+  width: min(620px, 100%);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  border-radius: 6px;
+  box-shadow: 0 24px 60px color-mix(in srgb, var(--ink) 28%, transparent);
+  padding: 24px 24px 20px;
+}
+.rapport-root .share-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 14px;
+}
+.rapport-root .share-dialog-kicker {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 6px;
+}
+.rapport-root .share-dialog h2 {
+  font-family: var(--display);
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.rapport-root .share-dialog-close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.rapport-root .share-dialog-close:hover {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+.rapport-root .share-dialog-close:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.rapport-root .share-dialog-close svg {
+  width: 15px;
+  height: 15px;
+}
+.rapport-root .share-dialog-lede {
+  margin-top: 14px;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+.rapport-root .share-card {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 16px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+}
+.rapport-root .share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.rapport-root .share-action {
+  flex: 1 1 auto;
+  min-width: 140px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 11px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+.rapport-root .share-action:hover {
+  background: var(--paper-2);
+  border-color: var(--ink-soft);
+  color: var(--ink);
+}
+.rapport-root .share-action:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+.rapport-root .share-action.primary {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+.rapport-root .share-action.primary:hover {
+  background: var(--ink-soft);
+  border-color: var(--ink-soft);
+  color: var(--paper);
+}
+.rapport-root .share-status {
+  min-height: 18px;
+  margin-top: 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-faint);
 }
 
 /* Meelopende CTA-balk onderaan — boven safe-area, hoog z, geen nav-pill hier
@@ -1713,6 +1877,7 @@
 
   /* Verberg interactieve chrome die niet in een statisch dossier hoort. */
   .rapport-root .report-actions,
+  .rapport-root .share-overlay,
   .rapport-root .sticky-cta,
   .rapport-root .progress-bar,
   .rapport-root .index,

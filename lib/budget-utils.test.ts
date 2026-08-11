@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { annualAmount, computeYearlyMustExpenses, computeRetirementExpenses, type BudgetRow, type ChildBudgetRow } from './budget-utils'
+import { annualAmount, computeYearlyMustExpenses, computeRetirementExpenses, yearlyMustExpensesFromBudgets, type BudgetRow, type ChildBudgetRow, type FlatBudgetRow } from './budget-utils'
 import { PERSONAS } from './test-personas'
 
 /**
@@ -330,14 +330,149 @@ describe('annualAmount — de canonieke jaarconversie van een budget-limiet', ()
 })
 
 /**
+ * `yearlyMustExpensesFromBudgets` — de canonieke rij-selectie voor call-sites
+ * die één platte budgetlijst hebben. Delegeert naar computeYearlyMustExpenses;
+ * deze tests pinnen het VERSCHIL met de parents-only-som die de zes call-sites
+ * tot 11 aug 2026 hanteerden.
+ */
+describe('yearlyMustExpensesFromBudgets — canonieke rij-selectie uit één platte lijst', () => {
+  const parentsOnly = (rows: FlatBudgetRow[]) =>
+    rows
+      .filter(b => b.is_essential && b.budget_type === 'expense' && (b.parent_id ?? null) === null)
+      .reduce((s, b) => s + annualAmount(Number(b.default_limit) || 0, b.interval), 0)
+
+  it('rolt essentiële children op i.p.v. de parent-limiet te tellen', () => {
+    const rows: FlatBudgetRow[] = [
+      { id: 'p', parent_id: null, name: 'Wonen', default_limit: 1000, interval: 'monthly', budget_type: 'expense', is_essential: true },
+      { id: 'c1', parent_id: 'p', name: 'Huur', default_limit: 700, interval: 'monthly', budget_type: 'expense', is_essential: true },
+      { id: 'c2', parent_id: 'p', name: 'Deco', default_limit: 100, interval: 'monthly', budget_type: 'expense', is_essential: false },
+    ]
+    // Parents-only zou €12.000 tellen; de canonieke motor telt alleen het
+    // essentiële kind: €8.400. Dít is de grondslagwijziging van de migratie.
+    expect(parentsOnly(rows)).toBe(12000)
+    expect(yearlyMustExpensesFromBudgets(rows)).toBe(8400)
+  })
+
+  it('valt terug op de parent-limiet wanneer die geen children heeft', () => {
+    const rows: FlatBudgetRow[] = [
+      { id: 'p', parent_id: null, default_limit: 250, interval: 'monthly', budget_type: 'expense', is_essential: true },
+    ]
+    expect(yearlyMustExpensesFromBudgets(rows)).toBe(3000)
+    expect(yearlyMustExpensesFromBudgets(rows)).toBe(parentsOnly(rows))
+  })
+
+  it('telt een orphan (essentieel kind van een niet-essentiële parent) apart mee', () => {
+    const rows: FlatBudgetRow[] = [
+      { id: 'p', parent_id: null, default_limit: 100, interval: 'monthly', budget_type: 'expense', is_essential: false },
+      { id: 'c', parent_id: 'p', default_limit: 300, interval: 'monthly', budget_type: 'expense', is_essential: true },
+    ]
+    // Parents-only ziet hier NIETS (parent is niet essentieel); canoniek €3.600.
+    expect(parentsOnly(rows)).toBe(0)
+    expect(yearlyMustExpensesFromBudgets(rows)).toBe(3600)
+  })
+
+  it('weert archive/income/savings-children uit beide takken', () => {
+    const rows: FlatBudgetRow[] = [
+      { id: 'p', parent_id: null, default_limit: 500, interval: 'monthly', budget_type: 'expense', is_essential: true },
+      { id: 'c-arch', parent_id: 'p', default_limit: 999, interval: 'monthly', budget_type: 'archive', is_essential: true },
+      { id: 'p2', parent_id: null, default_limit: 0, interval: 'monthly', budget_type: 'savings', is_essential: true },
+      { id: 'c-spaar', parent_id: 'p2', default_limit: 999, interval: 'monthly', budget_type: 'savings', is_essential: true },
+    ]
+    // Het archive-kind wordt vóórgefilterd, dus de parent valt terug op z'n
+    // eigen limiet (€6.000); het savings-kind telt in geen enkele tak mee.
+    expect(yearlyMustExpensesFromBudgets(rows)).toBe(6000)
+  })
+
+  /**
+   * GEPIND, NIET GEREPAREERD — asymmetrie in de canonieke motor.
+   *
+   * Tak A weert schuld-budgetten doordat de call-site op budget_type='expense'
+   * filtert. Tak B (orphans) gebruikt alleen de blocklist
+   * ['archive','income','savings'] — 'debt' zit daar NIET in. Een essentieel
+   * schuld-KIND van een essentiële schuld-parent telt daardoor wél mee als
+   * essentiële jaaruitgave, terwijl de parent zelf is uitgesloten.
+   *
+   * Dit is GEEN gedrag dat deze migratie introduceert: dashboard, /toekomst en
+   * year-in-review consumeren computeYearlyMustExpenses al en tellen deze rijen
+   * dus vandaag al mee. Op de live data gaat het om 16 rijen / €16.536 per jaar
+   * verdeeld over 8 gebruikers. Repareren betekent de canonieke motor wijzigen
+   * en daarmee het FIRE-doel op de hoofdoppervlakken — een eigenaar-besluit,
+   * buiten de scope van deze migratiekaart. Deze test legt het gedrag vast
+   * zodat een toekomstige wijziging bewust gebeurt en niet stil.
+   */
+  it('PINT: een essentieel schuld-kind telt via de orphan-tak wél mee (asymmetrie)', () => {
+    const rows: FlatBudgetRow[] = [
+      { id: 'p-debt', parent_id: null, default_limit: 400, interval: 'monthly', budget_type: 'debt', is_essential: true },
+      { id: 'c-debt', parent_id: 'p-debt', default_limit: 250, interval: 'monthly', budget_type: 'debt', is_essential: true },
+    ]
+    // De schuld-PARENT telt niet (allowlist expense); het schuld-KIND wel.
+    expect(parentsOnly(rows)).toBe(0)
+    expect(yearlyMustExpensesFromBudgets(rows)).toBe(3000)
+  })
+
+  it('delegeert aantoonbaar naar computeYearlyMustExpenses (geen tweede implementatie)', () => {
+    const rows: FlatBudgetRow[] = [
+      { id: 'p', parent_id: null, default_limit: 1000, interval: 'monthly', budget_type: 'expense', is_essential: true },
+      { id: 'c1', parent_id: 'p', default_limit: 700, interval: 'quarterly', budget_type: 'expense', is_essential: true },
+      { id: 'orphan', parent_id: 'x', default_limit: 120, interval: 'yearly', budget_type: 'expense', is_essential: true },
+    ]
+    const direct = computeYearlyMustExpenses(
+      rows.filter(b => b.is_essential && b.budget_type === 'expense' && b.parent_id === null) as BudgetRow[],
+      rows.filter(b => b.parent_id !== null) as ChildBudgetRow[],
+    ).yearlyMustExpenses
+    expect(yearlyMustExpensesFromBudgets(rows)).toBe(direct)
+    expect(yearlyMustExpensesFromBudgets(rows)).toBe(2800 + 120)
+  })
+
+  it('is leeg-veilig en negeert een lege lijst', () => {
+    expect(yearlyMustExpensesFromBudgets([])).toBe(0)
+  })
+
+  /**
+   * BIJT-PROEF op de `Number(x) || 0`-guard. Alle zes gemigreerde call-sites
+   * hadden die guard in hun eigen som; `computeYearlyMustExpenses` doet kaal
+   * `Number(...)`. Zonder de guard in de wrapper zou één ontbrekend/onleesbaar
+   * `default_limit` de hele jaarsom naar NaN trekken — precies het soort stille
+   * gedragsverandering dat een "pure de-duplicatie" hoort te vermijden.
+   */
+  it('houdt null/undefined/onleesbare limieten op 0 in plaats van NaN', () => {
+    const rows: FlatBudgetRow[] = [
+      { id: 'ok', parent_id: null, default_limit: 100, interval: 'monthly', budget_type: 'expense', is_essential: true },
+      { id: 'nul', parent_id: null, default_limit: null, interval: 'monthly', budget_type: 'expense', is_essential: true },
+      { id: 'undef', parent_id: null, default_limit: undefined, interval: 'monthly', budget_type: 'expense', is_essential: true },
+      { id: 'rommel', parent_id: null, default_limit: 'n.v.t.', interval: 'monthly', budget_type: 'expense', is_essential: true },
+    ]
+    const totaal = yearlyMustExpensesFromBudgets(rows)
+    expect(Number.isNaN(totaal)).toBe(false)
+    expect(totaal).toBe(1200)
+  })
+})
+
+/**
  * Anti-drift-grendel — géén tweede jaarconversie buiten `annualAmount`.
  *
- * Deze vijf bestanden bouwen `yearlyMustExpenses` op uit essentiële budgetten en
+ * Deze zes bestanden bouwen `yearlyMustExpenses` op uit essentiële budgetten en
  * delen dat door de effectieve SWR tot een `fireTarget`; drie ervan SCHRIJVEN de
  * uitkomst als `freedom_percentage` naar de database. Ze consumeren daarom de
  * canonieke conversie in plaats van 'm te herhalen (CLAUDE.md "consume, don't
- * recompute"). Het patroon hieronder is exact de foutvorm die de bug was — een
- * copy-paste-terugkeer ervan maakt deze test rood.
+ * recompute"). Een copy-paste-terugkeer van de foutvorm maakt deze test rood.
+ *
+ * WAAROM TWEE PATRONEN (2026-08-11). De oorspronkelijke grendel matchte alleen
+ * de letterlijke one-liner `interval === 'yearly' ? limit : limit * 12`. Daar
+ * glipte de zustersom `yearlyMustExpensesHorizon` in app/api/report/route.ts
+ * dwars doorheen: díe schreef dezelfde conversie als meerregelige if-keten, en
+ * omdat het bestand elders (voor de eerste som) al `annualAmount` importeerde,
+ * gaf de import-assertie bovendien een vals-groen dekkingssignaal. Het tweede,
+ * vormvrije patroon vangt de klasse i.p.v. de exacte formulering: een tak op
+ * `interval === '<waarde>'` die binnen dezelfde expressie met de
+ * annualisatie-factor 12 of 4 vermenigvuldigt.
+ *
+ * Bewust NIET gematcht: de periode-schaling in app/api/report/route.ts
+ * (`b.interval === 'yearly' ? limit * monthsInPeriod / 12 : …`). Die zet een
+ * limiet om naar de RAPPORTPERIODE, niet naar een jaar, en voedt alleen de
+ * budget-breakdown-weergave — geen yearlyMustExpenses, geen fireTarget. Ze
+ * DEELT door 12/3 in plaats van te vermenigvuldigen, dus het patroon hieronder
+ * laat haar met opzet ongemoeid.
  */
 describe('anti-drift-grendel — call-sites consumeren annualAmount', () => {
   const CALL_SITE_FILES = [
@@ -345,16 +480,80 @@ describe('anti-drift-grendel — call-sites consumeren annualAmount', () => {
     ['app', 'api', 'snapshots', 'route.ts'],
     ['app', 'api', 'snapshots', 'cron', 'route.ts'],
     ['app', 'api', 'snapshots', 'auto', 'route.ts'],
+    ['app', 'api', 'household', 'fire-projections', 'route.ts'],
     ['lib', 'holdings-data-loader.ts'],
   ]
 
   it.each(CALL_SITE_FILES.map(parts => [parts.join('/'), parts] as const))(
-    '%s bevat geen eigen jaarconversie meer en importeert annualAmount',
+    '%s bevat geen eigen jaarconversie meer',
     (_label, parts) => {
       const src = readFileSync(join(process.cwd(), ...parts), 'utf8')
-      // De foutvorm: alles wat niet 'yearly' is ×12 → quarterly 3× te hoog.
+      // 1. De letterlijke foutvorm: alles wat niet 'yearly' is ×12 → quarterly 3× te hoog.
       expect(src).not.toMatch(/interval === 'yearly'\s*\?\s*limit\s*:\s*limit \* 12/)
-      expect(src).toMatch(/\bannualAmount\b/)
+      // 2. Vormvrij: elke tak op een interval-waarde die ×12 of ×4 rekent.
+      expect(src).not.toMatch(
+        /interval\s*===\s*'(?:monthly|quarterly|yearly)'[\s\S]{0,200}?\*\s*(?:12|4)\b/,
+      )
+      // 3. Consumeert een canonieke bron uit lib/budget-utils.ts.
+      expect(src).toMatch(/\b(?:annualAmount|yearlyMustExpensesFromBudgets)\b/)
+    },
+  )
+})
+
+/**
+ * Anti-drift-grendel, laag 2 — de RIJ-SELECTIE, niet alleen de formule.
+ *
+ * Zes call-sites telden `yearlyMustExpenses` jarenlang als een som over ALLEEN
+ * de parent-budgetten. Dezelfde formule als de canonieke motor, maar een andere
+ * grondslag: geen parent/child-oprol en geen orphan-tak. Daardoor toonden het
+ * PDF-rapport, de drie snapshot-schrijfpaden en het holdings-FIRE-deck een
+ * ander FIRE-doel dan /toekomst, het dashboard en year-in-review — die
+ * `computeYearlyMustExpenses` al consumeerden.
+ *
+ * De foutvorm hieronder is de parents-only-som: een filter op `parent_id`
+ * gevolgd door een eigen `.reduce(`. Ze mag in deze bestanden niet terugkeren;
+ * de rij-selectie hoort in `yearlyMustExpensesFromBudgets` te leven.
+ */
+describe('anti-drift-grendel — rij-selectie leeft in de motor, niet in de call-site', () => {
+  const MUST_EXPENSE_CONSUMERS = [
+    ['app', 'api', 'report', 'route.ts'],
+    ['app', 'api', 'snapshots', 'route.ts'],
+    ['app', 'api', 'snapshots', 'cron', 'route.ts'],
+    ['app', 'api', 'snapshots', 'auto', 'route.ts'],
+    ['lib', 'holdings-data-loader.ts'],
+  ]
+
+  it.each(MUST_EXPENSE_CONSUMERS.map(parts => [parts.join('/'), parts] as const))(
+    '%s bouwt geen eigen parents-only must-som meer',
+    (_label, parts) => {
+      const src = readFileSync(join(process.cwd(), ...parts), 'utf8')
+      // De foutvorm: is_essential-filter met een parent_id-clausule, gevolgd
+      // door een eigen reduce — vormvrij, dus ook als meerregelige keten.
+      expect(src).not.toMatch(/is_essential[\s\S]{0,160}?parent_id[\s\S]{0,160}?\.reduce\(/)
+      expect(src).toMatch(/\byearlyMustExpensesFromBudgets\b/)
+    },
+  )
+})
+
+/**
+ * Bijt-proef voor de gedeelde-budget-split in
+ * app/api/household/fire-projections/route.ts. Die route deelt een `shared`
+ * budget eerst op het eigen aandeel (`limit × shareFraction`) en converteert
+ * daarna pas naar een jaarbedrag. Dat mag alleen omdat `annualAmount` LINEAIR
+ * is: delen-vóór en delen-ná converteren geven hetzelfde bedrag. Zou er ooit
+ * een clamp, floor of afronding in `annualAmount` komen, dan verschuift het
+ * huishoud-aandeel stilletjes — deze test wordt dan rood.
+ */
+describe('annualAmount is lineair (grondslag onder de huishoud-split)', () => {
+  it.each(['monthly', 'quarterly', 'yearly'] as const)(
+    'delen vóór converteren == converteren vóór delen (%s)',
+    interval => {
+      for (const fraction of [0.5, 0.35, 0.65, 1]) {
+        expect(annualAmount(1234.56 * fraction, interval)).toBeCloseTo(
+          annualAmount(1234.56, interval) * fraction,
+          10,
+        )
+      }
     },
   )
 })

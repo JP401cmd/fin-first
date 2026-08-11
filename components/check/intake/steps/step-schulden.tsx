@@ -69,7 +69,7 @@ function DebtRowForm({ preset, onAdd }: DebtRowFormProps) {
         onClick={() => setOpen(true)}
         className="flex w-full items-center gap-3 border border-dashed border-[var(--border-ed)] px-4 py-3 text-left text-sm text-[var(--ink-2)] transition-colors hover:border-wil-400 hover:bg-wil-50/50"
       >
-        <Plus className="h-4 w-4 shrink-0 text-[var(--ink-4)]" aria-hidden="true" />
+        <Plus className="h-4 w-4 shrink-0 text-[var(--ink-meta)]" aria-hidden="true" />
         <span className="font-display font-medium">{preset.label}</span>
         <span className="font-serif text-xs italic text-[var(--ink-3)]">{preset.hint}</span>
       </button>
@@ -95,7 +95,7 @@ function DebtRowForm({ preset, onAdd }: DebtRowFormProps) {
             Openstaand saldo
           </label>
           <div className="relative">
-            <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-xs text-[var(--ink-4)]">
+            <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-xs text-[var(--ink-meta)]">
               &euro;
             </span>
             <input
@@ -114,7 +114,7 @@ function DebtRowForm({ preset, onAdd }: DebtRowFormProps) {
         <div>
           <label htmlFor={`${id}-rate`} className="mb-1 block text-xs font-medium text-[var(--ink-3)]">
             Rente %{' '}
-            <span className="font-normal italic text-[var(--ink-4)]">(opt.)</span>
+            <span className="font-normal italic text-[var(--ink-meta)]">(opt.)</span>
           </label>
           <div className="relative">
             <input
@@ -126,7 +126,7 @@ function DebtRowForm({ preset, onAdd }: DebtRowFormProps) {
               placeholder="3,5"
               className={`${inputBase('wil')} px-3 py-2 font-mono text-sm tabular-nums`}
             />
-            <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 font-mono text-xs text-[var(--ink-4)]">
+            <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 font-mono text-xs text-[var(--ink-meta)]">
               %
             </span>
           </div>
@@ -135,10 +135,10 @@ function DebtRowForm({ preset, onAdd }: DebtRowFormProps) {
         <div>
           <label htmlFor={`${id}-pay`} className="mb-1 block text-xs font-medium text-[var(--ink-3)]">
             Maandlast{' '}
-            <span className="font-normal italic text-[var(--ink-4)]">(opt.)</span>
+            <span className="font-normal italic text-[var(--ink-meta)]">(opt.)</span>
           </label>
           <div className="relative">
-            <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-xs text-[var(--ink-4)]">
+            <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-xs text-[var(--ink-meta)]">
               &euro;
             </span>
             <input
@@ -221,7 +221,7 @@ export function StepSchulden({ intake, onChange, onNext, onBack }: Props) {
                   type="button"
                   onClick={() => handleRemove(idx)}
                   aria-label={`Verwijder ${d.name}`}
-                  className="text-[var(--ink-4)] transition-colors hover:text-negative"
+                  className="text-[var(--ink-meta)] transition-colors hover:text-negative"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>

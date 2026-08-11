@@ -1,13 +1,14 @@
 // Gecureerde Start-procesflow (verdiepingslaag laag 2 voor de UAT-plaat).
 //
 // Bron: docs/uat/uat-plan.md Deel 1 — "Publiek, registratie & onboarding
-// (WF-START)" (WF-START-01..26) en de acceptatie in lib/uat/acceptance/start.ts.
+// (WF-START)" (WF-START-01..26, plus WF-START-27 als latere aanvulling — het
+// deelpad van ADR 0067) en de acceptatie in lib/uat/acceptance/start.ts.
 // De knopen met `scenarioId` verwijzen naar de UAT-scenario-ID's uit
 // lib/uat/catalog.ts (UAT-START-NN) en erven daarmee de rondestatus. Het label
 // toont bewust het WF-nummer, spiegelt lib/uat/flows/budget.ts + schuld.ts + toek.ts.
 //
 // START is — net als BUDGET — een AANEENGESLOTEN catalogus: alle
-// WF-START-01..26 hebben een eigen UAT-scenario en dus een eigen knoop
+// WF-START-01..27 hebben een eigen UAT-scenario en dus een eigen knoop
 // hieronder. Geen verwijsregel-gaten (UAT-START-15 wordt WÉL door het
 // NAV-deelgebied naar hier terugverwezen als "leidend scenario" — dat is een
 // verwijzing VAN NAV NAAR START, niet andersom, dus hier gewoon een normale knoop).
@@ -47,6 +48,7 @@ export const START_FLOW: UatFlow = {
     { id: 'checkresume', scenarioId: 'UAT-START-07', label: 'WF-START-07 · Check onderbreken/hervatten', kind: 'action', stage: 1, lane: 'check', subOf: 'check' },
     { id: 'rapport', scenarioId: 'UAT-START-08', label: 'WF-START-08 · Vrijheidsrapport lezen', kind: 'screen', stage: 1, lane: 'check' },
     { id: 'rapportpdf', scenarioId: 'UAT-START-09', label: 'WF-START-09 · Rapport downloaden als PDF', kind: 'action', stage: 1, lane: 'check', subOf: 'rapport' },
+    { id: 'rapportdelen', scenarioId: 'UAT-START-27', label: 'WF-START-27 · Rapport delen zonder bedragen', kind: 'action', stage: 1, lane: 'check', subOf: 'rapport' },
 
     // ── 2 · conversie / registratie ──────────────────────────────────────────
     { id: 'activeren', scenarioId: 'UAT-START-10', label: 'WF-START-10 · Account maken + check activeren (conversie)', kind: 'action', stage: 2, lane: 'account' },
@@ -98,6 +100,7 @@ export const START_FLOW: UatFlow = {
     { from: 'check', to: 'checkresume' },
     { from: 'check', to: 'rapport' },
     { from: 'rapport', to: 'rapportpdf' },
+    { from: 'rapport', to: 'rapportdelen' },
     { from: 'rapport', to: 'activeren' },
 
     // conversie/registratie → login

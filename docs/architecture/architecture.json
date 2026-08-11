@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-11T01:49:15.378Z",
+  "generatedAt": "2026-08-11T14:14:36.752Z",
   "generatedDate": "2026-08-11",
   "repo": {
     "name": "fin",
@@ -188,11 +188,11 @@
   "stats": {
     "routes": 137,
     "routesProduction": 95,
-    "api": 290,
+    "api": 294,
     "tables": 89,
-    "migrations": 203,
+    "migrations": 205,
     "integrations": 25,
-    "components": 917,
+    "components": 928,
     "providers": 14,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -2791,6 +2791,14 @@
       ]
     },
     {
+      "url": "/api/cron/alerts-sweep",
+      "file": "app/api/cron/alerts-sweep/route.ts",
+      "domain": "cron",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "url": "/api/cron/retention",
       "file": "app/api/cron/retention/route.ts",
       "domain": "cron",
@@ -3521,16 +3529,6 @@
       ]
     },
     {
-      "url": "/api/module-guide/steps",
-      "file": "app/api/module-guide/steps/route.ts",
-      "domain": "module-guide",
-      "methods": [
-        "GET",
-        "PUT",
-        "DELETE"
-      ]
-    },
-    {
       "url": "/api/monthly-checkin",
       "file": "app/api/monthly-checkin/route.ts",
       "domain": "monthly-checkin",
@@ -3716,6 +3714,14 @@
       ]
     },
     {
+      "url": "/api/own-accounts/counterparties",
+      "file": "app/api/own-accounts/counterparties/route.ts",
+      "domain": "own-accounts",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "url": "/api/own-accounts/ibans",
       "file": "app/api/own-accounts/ibans/route.ts",
       "domain": "own-accounts",
@@ -3729,6 +3735,22 @@
       "domain": "own-accounts",
       "methods": [
         "POST"
+      ]
+    },
+    {
+      "url": "/api/own-accounts/rules",
+      "file": "app/api/own-accounts/rules/route.ts",
+      "domain": "own-accounts",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "url": "/api/own-accounts/settings",
+      "file": "app/api/own-accounts/settings/route.ts",
+      "domain": "own-accounts",
+      "methods": [
+        "GET"
       ]
     },
     {
@@ -4082,6 +4104,22 @@
       ]
     },
     {
+      "url": "/api/spend-limits/[id]/transactions",
+      "file": "app/api/spend-limits/[id]/transactions/route.ts",
+      "domain": "spend-limits",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "url": "/api/spend-limits/[id]/widget",
+      "file": "app/api/spend-limits/[id]/widget/route.ts",
+      "domain": "spend-limits",
+      "methods": [
+        "PATCH"
+      ]
+    },
+    {
       "url": "/api/spend-limits/counterparties",
       "file": "app/api/spend-limits/counterparties/route.ts",
       "domain": "spend-limits",
@@ -4103,16 +4141,6 @@
       "domain": "spending-patterns",
       "methods": [
         "GET"
-      ]
-    },
-    {
-      "url": "/api/standard-guide/steps",
-      "file": "app/api/standard-guide/steps/route.ts",
-      "domain": "standard-guide",
-      "methods": [
-        "GET",
-        "PUT",
-        "DELETE"
       ]
     },
     {
@@ -5524,6 +5552,71 @@
       ]
     },
     {
+      "domain": "spend-limits",
+      "label": "spend-limits",
+      "count": 7,
+      "routes": [
+        {
+          "url": "/api/spend-limits",
+          "file": "app/api/spend-limits/route.ts",
+          "domain": "spend-limits",
+          "methods": [
+            "GET",
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/spend-limits/[id]",
+          "file": "app/api/spend-limits/[id]/route.ts",
+          "domain": "spend-limits",
+          "methods": [
+            "PATCH",
+            "DELETE"
+          ]
+        },
+        {
+          "url": "/api/spend-limits/[id]/breakdown",
+          "file": "app/api/spend-limits/[id]/breakdown/route.ts",
+          "domain": "spend-limits",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/spend-limits/[id]/transactions",
+          "file": "app/api/spend-limits/[id]/transactions/route.ts",
+          "domain": "spend-limits",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/spend-limits/[id]/widget",
+          "file": "app/api/spend-limits/[id]/widget/route.ts",
+          "domain": "spend-limits",
+          "methods": [
+            "PATCH"
+          ]
+        },
+        {
+          "url": "/api/spend-limits/counterparties",
+          "file": "app/api/spend-limits/counterparties/route.ts",
+          "domain": "spend-limits",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/spend-limits/preview",
+          "file": "app/api/spend-limits/preview/route.ts",
+          "domain": "spend-limits",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "calculators",
       "label": "Calculators",
       "count": 6,
@@ -5635,50 +5728,48 @@
       ]
     },
     {
-      "domain": "spend-limits",
-      "label": "spend-limits",
+      "domain": "own-accounts",
+      "label": "own-accounts",
       "count": 5,
       "routes": [
         {
-          "url": "/api/spend-limits",
-          "file": "app/api/spend-limits/route.ts",
-          "domain": "spend-limits",
-          "methods": [
-            "GET",
-            "POST"
-          ]
-        },
-        {
-          "url": "/api/spend-limits/[id]",
-          "file": "app/api/spend-limits/[id]/route.ts",
-          "domain": "spend-limits",
-          "methods": [
-            "PATCH",
-            "DELETE"
-          ]
-        },
-        {
-          "url": "/api/spend-limits/[id]/breakdown",
-          "file": "app/api/spend-limits/[id]/breakdown/route.ts",
-          "domain": "spend-limits",
+          "url": "/api/own-accounts/counterparties",
+          "file": "app/api/own-accounts/counterparties/route.ts",
+          "domain": "own-accounts",
           "methods": [
             "GET"
           ]
         },
         {
-          "url": "/api/spend-limits/counterparties",
-          "file": "app/api/spend-limits/counterparties/route.ts",
-          "domain": "spend-limits",
+          "url": "/api/own-accounts/ibans",
+          "file": "app/api/own-accounts/ibans/route.ts",
+          "domain": "own-accounts",
           "methods": [
             "GET"
           ]
         },
         {
-          "url": "/api/spend-limits/preview",
-          "file": "app/api/spend-limits/preview/route.ts",
-          "domain": "spend-limits",
+          "url": "/api/own-accounts/reclassify",
+          "file": "app/api/own-accounts/reclassify/route.ts",
+          "domain": "own-accounts",
           "methods": [
             "POST"
+          ]
+        },
+        {
+          "url": "/api/own-accounts/rules",
+          "file": "app/api/own-accounts/rules/route.ts",
+          "domain": "own-accounts",
+          "methods": [
+            "POST"
+          ]
+        },
+        {
+          "url": "/api/own-accounts/settings",
+          "file": "app/api/own-accounts/settings/route.ts",
+          "domain": "own-accounts",
+          "methods": [
+            "GET"
           ]
         }
       ]
@@ -5886,6 +5977,37 @@
       ]
     },
     {
+      "domain": "cron",
+      "label": "cron",
+      "count": 3,
+      "routes": [
+        {
+          "url": "/api/cron/alerts-sweep",
+          "file": "app/api/cron/alerts-sweep/route.ts",
+          "domain": "cron",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/cron/retention",
+          "file": "app/api/cron/retention/route.ts",
+          "domain": "cron",
+          "methods": [
+            "GET"
+          ]
+        },
+        {
+          "url": "/api/cron/user-reports-notion-sync",
+          "file": "app/api/cron/user-reports-notion-sync/route.ts",
+          "domain": "cron",
+          "methods": [
+            "GET"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "horizon-kernel",
       "label": "horizon-kernel",
       "count": 3,
@@ -5912,41 +6034,6 @@
           "domain": "horizon-kernel",
           "methods": [
             "GET"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "module-guide",
-      "label": "module-guide",
-      "count": 3,
-      "routes": [
-        {
-          "url": "/api/module-guide/progress",
-          "file": "app/api/module-guide/progress/route.ts",
-          "domain": "module-guide",
-          "methods": [
-            "GET",
-            "PUT"
-          ]
-        },
-        {
-          "url": "/api/module-guide/settings",
-          "file": "app/api/module-guide/settings/route.ts",
-          "domain": "module-guide",
-          "methods": [
-            "GET",
-            "PUT"
-          ]
-        },
-        {
-          "url": "/api/module-guide/steps",
-          "file": "app/api/module-guide/steps/route.ts",
-          "domain": "module-guide",
-          "methods": [
-            "GET",
-            "PUT",
-            "DELETE"
           ]
         }
       ]
@@ -6117,29 +6204,6 @@
       ]
     },
     {
-      "domain": "cron",
-      "label": "cron",
-      "count": 2,
-      "routes": [
-        {
-          "url": "/api/cron/retention",
-          "file": "app/api/cron/retention/route.ts",
-          "domain": "cron",
-          "methods": [
-            "GET"
-          ]
-        },
-        {
-          "url": "/api/cron/user-reports-notion-sync",
-          "file": "app/api/cron/user-reports-notion-sync/route.ts",
-          "domain": "cron",
-          "methods": [
-            "GET"
-          ]
-        }
-      ]
-    },
-    {
       "domain": "debts",
       "label": "Schulden",
       "count": 2,
@@ -6190,24 +6254,26 @@
       ]
     },
     {
-      "domain": "own-accounts",
-      "label": "own-accounts",
+      "domain": "module-guide",
+      "label": "module-guide",
       "count": 2,
       "routes": [
         {
-          "url": "/api/own-accounts/ibans",
-          "file": "app/api/own-accounts/ibans/route.ts",
-          "domain": "own-accounts",
+          "url": "/api/module-guide/progress",
+          "file": "app/api/module-guide/progress/route.ts",
+          "domain": "module-guide",
           "methods": [
-            "GET"
+            "GET",
+            "PUT"
           ]
         },
         {
-          "url": "/api/own-accounts/reclassify",
-          "file": "app/api/own-accounts/reclassify/route.ts",
-          "domain": "own-accounts",
+          "url": "/api/module-guide/settings",
+          "file": "app/api/module-guide/settings/route.ts",
+          "domain": "module-guide",
           "methods": [
-            "POST"
+            "GET",
+            "PUT"
           ]
         }
       ]
@@ -7274,23 +7340,6 @@
       ]
     },
     {
-      "domain": "standard-guide",
-      "label": "standard-guide",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/standard-guide/steps",
-          "file": "app/api/standard-guide/steps/route.ts",
-          "domain": "standard-guide",
-          "methods": [
-            "GET",
-            "PUT",
-            "DELETE"
-          ]
-        }
-      ]
-    },
-    {
       "domain": "sync",
       "label": "sync",
       "count": 1,
@@ -7894,7 +7943,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 203
+    "migrationCount": 205
   },
   "tablesByDomain": [
     {
@@ -8368,11 +8417,11 @@
     }
   ],
   "components": {
-    "total": 917,
+    "total": 928,
     "groups": [
       {
         "group": "app",
-        "count": 361,
+        "count": 364,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8605,6 +8654,8 @@
           "notification-panel",
           "notification-provider",
           "opzeg-modal",
+          "own-accounts-sheet",
+          "own-accounts-sheet.test",
           "ownership-toggle",
           "page-skeleton",
           "page-status-banner",
@@ -8706,6 +8757,7 @@
           "transacties-feed",
           "transacties-feed.test",
           "transaction-form",
+          "transaction-form.test",
           "transfer-confirm-sheet",
           "trend-chart",
           "uitgaven-pane",
@@ -8739,7 +8791,7 @@
       },
       {
         "group": "overview",
-        "count": 154,
+        "count": 157,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -8863,6 +8915,9 @@
           "spend-limit-performance-pane.test",
           "spend-limit-period-chart",
           "spend-limit-period-chart.test",
+          "spend-limit-score-badge",
+          "spend-limit-score-radar",
+          "spend-limit-transaction-list",
           "spend-limits-section",
           "spend-limits-section.test",
           "tax-gauge",
@@ -8996,7 +9051,7 @@
       },
       {
         "group": "core",
-        "count": 71,
+        "count": 75,
         "items": [
           "account-source-icon",
           "account-source-icon.test",
@@ -9042,7 +9097,9 @@
           "debt-payoff-strategy",
           "equity-buildup-bar",
           "fire-progress-strip",
+          "holding-range-bar",
           "holding-row",
+          "holding-row.test",
           "holdings-client",
           "holdings-client.heatmap.test",
           "holdings-toolbar",
@@ -9054,7 +9111,9 @@
           "net-worth-projection-chart",
           "opbrengst-uitsplitsing",
           "opbrengst-uitsplitsing.test",
+          "portfolio-month-details-sheet",
           "portfolio-summary",
+          "portfolio-summary.test",
           "portfolio-value-chart",
           "portfolio-value-chart.test",
           "rebalancing-settings-section",
@@ -9183,7 +9242,7 @@
       },
       {
         "group": "check",
-        "count": 29,
+        "count": 30,
         "items": [
           "BlikOpToekomst",
           "CtaSection",
@@ -9200,6 +9259,7 @@
           "RapportView",
           "ReadingProgress",
           "SectionTrigger",
+          "ShareButton",
           "Toekomst",
           "TweeToekomsten",
           "check-wizard",
@@ -10156,6 +10216,14 @@
       ],
       "cron": [
         {
+          "name": "error_logs",
+          "write": false
+        },
+        {
+          "name": "job_runs",
+          "write": false
+        },
+        {
           "name": "user_reports",
           "write": false
         }
@@ -10721,11 +10789,11 @@
         },
         {
           "name": "transactions",
-          "write": true
+          "write": false
         },
         {
           "name": "user_own_ibans",
-          "write": false
+          "write": true
         }
       ],
       "parameters": [
@@ -10944,6 +11012,10 @@
           "write": false
         },
         {
+          "name": "profiles",
+          "write": true
+        },
+        {
           "name": "spend_limits",
           "write": true
         }
@@ -10956,12 +11028,6 @@
         {
           "name": "transactions",
           "write": false
-        }
-      ],
-      "standard-guide": [
-        {
-          "name": "app_settings",
-          "write": true
         }
       ],
       "subscriptions": [
@@ -11383,6 +11449,14 @@
           "write": true,
           "routes": [
             "/api/spend-limit-alias"
+          ]
+        },
+        {
+          "domain": "spend-limits",
+          "label": "spend-limits",
+          "write": true,
+          "routes": [
+            "/api/spend-limits/[id]/widget"
           ]
         },
         {
@@ -12043,14 +12117,6 @@
           ]
         },
         {
-          "domain": "own-accounts",
-          "label": "own-accounts",
-          "write": true,
-          "routes": [
-            "/api/own-accounts/reclassify"
-          ]
-        },
-        {
           "domain": "transactions",
           "label": "transactions",
           "write": true,
@@ -12172,6 +12238,14 @@
           "write": false,
           "routes": [
             "/api/notifications"
+          ]
+        },
+        {
+          "domain": "own-accounts",
+          "label": "own-accounts",
+          "write": false,
+          "routes": [
+            "/api/own-accounts/counterparties"
           ]
         },
         {
@@ -12310,8 +12384,7 @@
           "label": "module-guide",
           "write": true,
           "routes": [
-            "/api/module-guide/settings",
-            "/api/module-guide/steps"
+            "/api/module-guide/settings"
           ]
         },
         {
@@ -12353,14 +12426,6 @@
           "write": true,
           "routes": [
             "/api/scenarios"
-          ]
-        },
-        {
-          "domain": "standard-guide",
-          "label": "standard-guide",
-          "write": true,
-          "routes": [
-            "/api/standard-guide/steps"
           ]
         },
         {
@@ -12562,6 +12627,14 @@
           "write": false,
           "routes": [
             "/api/admin/news-ingest"
+          ]
+        },
+        {
+          "domain": "cron",
+          "label": "cron",
+          "write": false,
+          "routes": [
+            "/api/cron/alerts-sweep"
           ]
         }
       ],
@@ -12876,7 +12949,8 @@
           "label": "own-accounts",
           "write": false,
           "routes": [
-            "/api/own-accounts/reclassify"
+            "/api/own-accounts/reclassify",
+            "/api/own-accounts/rules"
           ]
         },
         {
@@ -12906,6 +12980,7 @@
           "label": "spend-limits",
           "write": false,
           "routes": [
+            "/api/spend-limits/[id]/transactions",
             "/api/spend-limits/preview"
           ]
         },
@@ -13012,7 +13087,7 @@
           "write": false,
           "routes": [
             "/api/own-accounts/ibans",
-            "/api/own-accounts/reclassify"
+            "/api/own-accounts/settings"
           ]
         },
         {
@@ -13607,6 +13682,24 @@
           ]
         }
       ],
+      "error_logs": [
+        {
+          "domain": "log-error",
+          "label": "log-error",
+          "write": true,
+          "routes": [
+            "/api/log-error"
+          ]
+        },
+        {
+          "domain": "cron",
+          "label": "cron",
+          "write": false,
+          "routes": [
+            "/api/cron/alerts-sweep"
+          ]
+        }
+      ],
       "user_reports": [
         {
           "domain": "cron",
@@ -13796,16 +13889,6 @@
           ]
         }
       ],
-      "error_logs": [
-        {
-          "domain": "log-error",
-          "label": "log-error",
-          "write": true,
-          "routes": [
-            "/api/log-error"
-          ]
-        }
-      ],
       "news_editions": [
         {
           "domain": "news",
@@ -13866,6 +13949,8 @@
             "/api/spend-limits",
             "/api/spend-limits/[id]",
             "/api/spend-limits/[id]/breakdown",
+            "/api/spend-limits/[id]/transactions",
+            "/api/spend-limits/[id]/widget",
             "/api/spend-limits/preview"
           ]
         },
@@ -13908,9 +13993,10 @@
         {
           "domain": "own-accounts",
           "label": "own-accounts",
-          "write": false,
+          "write": true,
           "routes": [
-            "/api/own-accounts/reclassify"
+            "/api/own-accounts/rules",
+            "/api/own-accounts/settings"
           ]
         }
       ],
@@ -15973,6 +16059,55 @@
       ],
       "summary": "De holdings-pagina toonde geen enkel beeld van de waarde door de tijd. De benchmarkgrafiek stond er wél, met AEX, MSCI World en S&P 500, maar meldde eronder: *\"Je eigen lijn ontbreekt nog. Voor je rendement over 1 jaar zijn maandelijkse koerswaarderingen van je posities nodig.\"*",
       "file": "docs/adr/0098-portefeuille-waardehistorie-prijsladder.md"
+    },
+    {
+      "id": "0099-benchmark-meet-het-waarneembare-mandje",
+      "title": "Benchmarkrendement: meet het waarneembare mandje, niet alles of niets",
+      "status": "aanvaard",
+      "date": "2026-08-11",
+      "elements": [
+        "as-vermogen",
+        "sp-vermogen"
+      ],
+      "summary": "ADR 0098 maakte `investment_holding_prices` de primaire koersbron van `buildPortfolioHistory`. Daarmee was de oorzaak weg die de benchmarkgrafiek leeg hield — dacht iedereen. De feature bleef leeg.",
+      "file": "docs/adr/0099-benchmark-meet-het-waarneembare-mandje.md"
+    },
+    {
+      "id": "0100-node-runtime-ondergrens-webstreams-race",
+      "title": "Node-runtime kent een expliciete ondergrens (24.15.0) vanwege de webstreams-race",
+      "status": "aanvaard",
+      "date": "2026-08-11",
+      "elements": [
+        "t-platform"
+      ],
+      "summary": "De SSR-crash op `/overzicht` was geen fout in onze code maar nodejs/node#62036, een race in Node's eigen webstreams-implementatie. Hij is upstream gerepareerd in Node 24.15.0. We leggen daarom een expliciete patch-ondergrens vast in `engines.node` en bewaken die met een determini",
+      "file": "docs/adr/0100-node-runtime-ondergrens-webstreams-race.md"
+    },
+    {
+      "id": "0101-gedeelde-cash-weegt-in-de-leeslaag",
+      "title": "Gedeeld geld weegt in de leeslaag, niet in een extra kolom",
+      "status": "aanvaard",
+      "date": "2026-08-11",
+      "elements": [
+        "as-vermogen",
+        "fn-vermogensregistratie",
+        "t-supabase"
+      ],
+      "summary": "Een gedeelde losse bankrekening telde bij béíde partners voor het volle saldo. De SELECT-policy op `bank_accounts` is huishoud-verbreed (`auth.uid() = user_id OR (ownership = 'shared' AND household_id = user_household_id())`), maar de optelling erbovenop was ongewogen. Op huishou",
+      "file": "docs/adr/0101-gedeelde-cash-weegt-in-de-leeslaag.md"
+    },
+    {
+      "id": "0102-meldingen-sweep-buitenwacht-en-binnenwacht",
+      "title": "meldingen sweep buitenwacht en binnenwacht",
+      "status": "accepted",
+      "date": "2026-08-11",
+      "elements": [
+        "t-platform",
+        "t-supabase",
+        "app-comp"
+      ],
+      "summary": "Detectie van storingen was **pull**-gebaseerd: `/beheer/errors` en `/beheer/jobs` tonen fouten pas als iemand ze opent. Eén duw-kanaal bestond al — de cron-mail uit ADR 0060 — maar die is stil zolang `ALERT_EMAIL`/`OPS_EMAIL` niet gezet is, en dekt alleen een cron die faalde met ",
+      "file": "docs/adr/0102-meldingen-sweep-buitenwacht-en-binnenwacht.md"
     }
   ],
   "churn": {
@@ -15980,15 +16115,15 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 128
+        "commits": 129
       },
       {
         "path": "lib/ai",
-        "commits": 60
+        "commits": 61
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 40
+        "commits": 41
       },
       {
         "path": "app/api/ai",
@@ -15996,7 +16131,7 @@
       },
       {
         "path": "app/api/household",
-        "commits": 15
+        "commits": 16
       },
       {
         "path": "app/api/assets",
@@ -16016,29 +16151,29 @@
       },
       {
         "path": "components/horizon",
-        "commits": 3
+        "commits": 2
       }
     ],
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 9130,
+        "loc": 9138,
         "commits": 93
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 5130,
+        "loc": 5198,
         "commits": 33
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4498,
+        "loc": 4508,
         "commits": 41
       },
       {
         "file": "components/app/cash-account-view.tsx",
         "loc": 3457,
-        "commits": 20
+        "commits": 21
       },
       {
         "file": "lib/release-notes.ts",
@@ -16047,12 +16182,12 @@
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 2690,
+        "loc": 2702,
         "commits": 52
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
-        "loc": 2298,
+        "loc": 2300,
         "commits": 20
       },
       {
@@ -17158,14 +17293,15 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-08-10",
+    "previousDate": "2026-08-11",
     "hasChanges": true,
     "sections": [
       {
         "label": "API-routes",
         "added": [],
         "removed": [
-          "/api/roadmap"
+          "/api/module-guide/steps",
+          "/api/standard-guide/steps"
         ]
       }
     ]
@@ -17453,8 +17589,8 @@
     },
     {
       "date": "2026-08-11",
-      "api": 290,
-      "components": 917,
+      "api": 294,
+      "components": 928,
       "tables": 89,
       "routesProduction": 95
     }

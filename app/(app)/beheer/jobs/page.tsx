@@ -1,5 +1,6 @@
 import { Activity, Check, AlertCircle, Clock } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { JOB_CATALOG, JOB_LIST } from '@/lib/job-catalog'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,64 +16,8 @@ interface JobRun {
   created_at: string
 }
 
-const JOB_CATALOG = [
-  {
-    key: 'holdings-prices',
-    label: 'Prijsverversing',
-    schedule: 'Dagelijks 18:00',
-    path: '/api/holdings/refresh-prices/cron',
-    description: 'Beurskoersen + crypto-prijzen bijwerken, inclusief exchange- en wallet-sync.',
-  },
-  {
-    key: 'snapshots',
-    label: 'Maandsnapshots',
-    schedule: '1e van de maand, 02:00',
-    path: '/api/snapshots/cron',
-    description: 'Maandelijkse netto-vermogen-snapshot per gebruiker.',
-  },
-  {
-    key: 'news-ingest',
-    label: 'Nieuws-ingest',
-    schedule: 'Dagelijks 05:00',
-    path: '/api/news-ingest/cron',
-    description: 'RSS- en webbronnen ophalen, AI-categoriseren en opslaan.',
-  },
-  {
-    key: 'integraties-health',
-    label: 'Integraties liveness',
-    schedule: 'Dagelijks 18:00 (meelift op prijs-refresh)',
-    path: '/api/holdings/refresh-prices/cron',
-    description: 'Publieke health-probes van externe koppelingen (Bitvavo, Kraken, Coinbase, CoinGecko, Blockchair, TrueLayer).',
-  },
-  {
-    key: 'briefing-email',
-    label: 'Briefing-e-mail',
-    schedule: 'Maandag 07:00',
-    path: '/api/briefing/email/cron',
-    description: 'Wekelijkse briefing-e-mail (opt-in) van de bevroren weeksnapshot — vrijheidstijd-first, euro-vrij, met brug terug naar Fin.',
-  },
-  {
-    key: 'web-vitals-retention',
-    label: 'Webprestaties-retentie',
-    schedule: 'Dagelijks 03:30',
-    path: '/api/web-vitals/retention/cron',
-    description: 'Verwijdert web_vitals-metingen ouder dan de retentietermijn (180 dagen) zodat de RUM-tabel niet ongebreideld groeit.',
-  },
-  {
-    key: 'retention',
-    label: 'AVG-bewaartermijnen',
-    schedule: 'Dagelijks 03:45',
-    path: '/api/cron/retention',
-    description: 'Purget log-/usage-rijen ouder dan de vastgelegde bewaartermijn (error_logs/mail_log 12m, job_runs 6m, contract_events/ai_token_usage/ai_usage 24m) en verlopen lead_intakes (90d). Zie ADR 0059.',
-  },
-  {
-    key: 'user-reports-notion-sync',
-    label: 'Meldingen → Notion-sync',
-    schedule: 'Dagelijks 06:00',
-    path: '/api/cron/user-reports-notion-sync',
-    description: 'Herstelt meldingen van testgebruikers (bug/vraag/aanbeveling) die live niet naar de Notion-queue gepusht konden worden; stopt na 5 pogingen per melding.',
-  },
-] as const
+// Catalogus = single source in lib/job-catalog.ts (gedeeld met de cron-melding
+// en de stilte-drempel van de meldingen-sweep). Hier alleen de weergave.
 
 const dateTimeFmt = new Intl.DateTimeFormat('nl-NL', {
   day: 'numeric',
@@ -161,7 +106,7 @@ export default async function BeheerJobsPage() {
 
       {/* Per-job kaarten */}
       <div className="space-y-3">
-        {JOB_CATALOG.map((job) => {
+        {JOB_LIST.map((job) => {
           const last = lastByJob.get(job.key)
           const entries = last ? primitiveEntries(last.summary) : []
           return (
@@ -246,7 +191,7 @@ export default async function BeheerJobsPage() {
             </thead>
             <tbody>
               {recent.map((run) => {
-                const meta = JOB_CATALOG.find((j) => j.key === run.job)
+                const meta = JOB_CATALOG[run.job as keyof typeof JOB_CATALOG]
                 return (
                   <tr key={run.id} className="border-b border-dotted border-[var(--border-ed)] hover:bg-[var(--subtle)]">
                     <td className="py-2 pr-4 font-mono text-xs tabular-nums text-[var(--ink-3)]">

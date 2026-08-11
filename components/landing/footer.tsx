@@ -72,7 +72,7 @@ export function Footer() {
               <div className="mb-3 flex items-center">
                 <span className="font-display text-[22px] font-bold leading-none text-[var(--ink)]">t</span>
                 <span className="font-display text-[22px] font-bold leading-none text-kern-600">f.</span>
-                <span className="ml-2 font-sans text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-4)]">
+                <span className="ml-2 font-sans text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--ink-meta)]">
                   TriFinity
                 </span>
               </div>

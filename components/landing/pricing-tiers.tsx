@@ -92,9 +92,12 @@ export function PricingTiers() {
                   >
                     {tier.kicker}
                   </p>
-                  <h3 className="font-display text-2xl font-bold leading-none text-[var(--ink)]">
+                  {/* h2, niet h3: op /prijzen is de hero-titel de enige h1 en
+                      staat er geen tussenkop boven dit grid — een h3 sloeg een
+                      niveau over (Lighthouse `heading-order`). */}
+                  <h2 className="font-display text-2xl font-bold leading-none text-[var(--ink)]">
                     {tier.name}
-                  </h3>
+                  </h2>
                 </div>
                 {tier.highlighted && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-[var(--ink)] px-2.5 py-1 font-sans text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--bg)]">

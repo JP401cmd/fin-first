@@ -23,9 +23,12 @@ import type { NextConfig } from "next";
  * mobielpreview-iframe (components/app/beheer/mobile-preview-frame.tsx) heel.
  *
  * Wordt eerst als Content-Security-Policy-Report-Only uitgeleverd (rustige
- * meekijk-periode). VERVOLGSTAP: na de meekijk-periode omzetten naar de
- * enforce-header `Content-Security-Policy`.
+ * meekijk-periode). VERVOLGSTAP: na de meekijk-periode `CSP_REPORT_ONLY` op
+ * false zetten — dat schakelt in één zet de enforce-header ín én
+ * `upgrade-insecure-requests` terug aan (zie hieronder).
  */
+const CSP_REPORT_ONLY = true;
+
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
@@ -40,7 +43,12 @@ const CONTENT_SECURITY_POLICY = [
   "object-src 'none'",
   "base-uri 'none'",
   "form-action 'self'",
-  "upgrade-insecure-requests",
+  // `upgrade-insecure-requests` is per spec INERT in een report-only policy: de
+  // browser negeert 'm daar en logt dat als console-error op élke pagina (kostte
+  // ons structureel Lighthouse Best practices 96 i.p.v. 100). Daarom hangt de
+  // directive aan de enforce-schakelaar i.p.v. dat we 'm hard meesturen; hij
+  // komt vanzelf terug zodra CSP_REPORT_ONLY op false gaat.
+  ...(CSP_REPORT_ONLY ? [] : ['upgrade-insecure-requests']),
 ].join('; ');
 
 /**
@@ -55,7 +63,10 @@ const SECURITY_HEADERS = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()' },
-  { key: 'Content-Security-Policy-Report-Only', value: CONTENT_SECURITY_POLICY },
+  {
+    key: CSP_REPORT_ONLY ? 'Content-Security-Policy-Report-Only' : 'Content-Security-Policy',
+    value: CONTENT_SECURITY_POLICY,
+  },
 ];
 
 // Serwist (the PWA service-worker layer) is wired in via `serwist.config.js`

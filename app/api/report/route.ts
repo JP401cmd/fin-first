@@ -11,7 +11,7 @@ import { getModel } from '@/lib/ai/config'
 import type { ReportData, ReportConfig, HistoricalPeriodSummary } from '@/lib/report-data'
 import { checkTierGate } from '@/lib/require-tier'
 import { resolveFireParams } from '@/lib/fire-params'
-import { annualAmount } from '@/lib/budget-utils'
+import { yearlyMustExpensesFromBudgets } from '@/lib/budget-utils'
 import { computeFreedomProgressWithBasis, inclHomeTargetFromScalar } from '@/lib/core-metrics'
 import { resolveSavingsSource, savingsRateFromAggregates, computeDebtAflossingMonthly } from '@/lib/savings-source'
 import { getRecentDailyExpenseRate } from '@/lib/expense-rate'
@@ -343,9 +343,11 @@ export async function GET(request: Request) {
 
     // FIRE target — based on essential (must) expenses from budget settings,
     // gedeeld door de gebruikers-effectiveSwr (was: vaste NL_SWR).
-    const yearlyMustExpenses = allBudgets
-      .filter(b => b.is_essential && b.budget_type === 'expense' && !b.parent_id)
-      .reduce((s, b) => s + annualAmount(Number(b.default_limit) || 0, b.interval), 0)
+    // Canonieke grondslag (lib/budget-utils.ts): parent/child-oprol + orphan-tak,
+    // niet alleen de parent-limieten. Zelfde motor als /toekomst, het dashboard,
+    // year-in-review en het persoonlijk plan — dit rapport telde vóór deze
+    // migratie een eigen, smallere rijselectie.
+    const yearlyMustExpenses = yearlyMustExpensesFromBudgets(allBudgets)
     const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / fireParams.effectiveSwr : 0
 
     // Total assets & debts (weighted by net_worth_inclusion_pct)
@@ -563,14 +565,12 @@ export async function GET(request: Request) {
     let fireAge: number | null = null
     let monthlyPassiveIncome: number | null = null
 
-    const yearlyMustExpensesHorizon = allBudgets
-      .filter(b => b.is_essential && b.budget_type === 'expense' && !b.parent_id)
-      .reduce((sum, b) => {
-        const limit = Number(b.default_limit) || 0
-        if (b.interval === 'yearly') return sum + limit
-        if (b.interval === 'quarterly') return sum + limit * 4
-        return sum + limit * 12
-      }, 0)
+    // De zustersom `yearlyMustExpensesHorizon` is weg: hij filterde exact
+    // dezelfde rijen als `yearlyMustExpenses` hierboven en herhaalde daarna de
+    // interval→jaar-conversie met de hand. `allBudgets` wordt tussen beide
+    // punten niet gemuteerd, dus de twee sommen waren per definitie gelijk.
+    // Eén grondslag, één som: de FIRE-leeftijd draait nu aantoonbaar op exact
+    // hetzelfde must-bedrag als het `fireTarget`/vrijheids-% in dit rapport.
     const avgMonthlyIncome = monthsWithData.length > 0 ? totalIncome / monthsWithData.length : 0
     const avgMonthlyExpenses = monthsWithData.length > 0 ? totalExpenses / monthsWithData.length : 0
 
@@ -605,17 +605,17 @@ export async function GET(request: Request) {
       // monthlyExpenses), dus we mogen income/expenses uitdrukken als het
       // resolveSavingsSource-surplus zonder het FIRE-doel te verstoren. Zo
       // draait de FIRE-leeftijd op exact dezelfde spaarbron als /toekomst.
-      // Bij ontbrekende must-budgetten (yearlyMustExpensesHorizon === 0) valt
+      // Bij ontbrekende must-budgetten (yearlyMustExpenses === 0) valt
       // de motor terug op het periode-gemiddelde — daar is geen canonieke
       // must-grondslag beschikbaar.
-      const useSavingsSource = yearlyMustExpensesHorizon > 0
+      const useSavingsSource = yearlyMustExpenses > 0
       const horizonInput: FinancialInput = {
         totalAssets,
         totalDebts,
         monthlyIncome: useSavingsSource ? monthlySavingsForFire : avgMonthlyIncome,
         monthlyExpenses: useSavingsSource ? 0 : avgMonthlyExpenses,
         monthlyContributions: 0,
-        yearlyMustExpenses: yearlyMustExpensesHorizon,
+        yearlyMustExpenses,
         dateOfBirth: profile?.date_of_birth || null,
       }
       // CONSUME, DON'T RECOMPUTE (CLAUDE.md): de FIRE-LEEFTIJD/-datum komt uit de

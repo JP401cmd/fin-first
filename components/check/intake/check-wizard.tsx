@@ -97,7 +97,14 @@ function ProgressBar({ current }: { current: CheckStep }) {
   const progress = current === 'email' ? total : currentIdx + 1
 
   return (
-    <div role="progressbar" aria-valuenow={progress} aria-valuemin={1} aria-valuemax={total}>
+    <div
+      role="progressbar"
+      aria-label="Voortgang vragenlijst"
+      aria-valuenow={progress}
+      aria-valuemin={1}
+      aria-valuemax={total}
+      aria-valuetext={`Stap ${progress} van ${total}`}
+    >
       <div className="flex gap-1">
         {Array.from({ length: total }).map((_, i) => (
           <div
@@ -108,7 +115,7 @@ function ProgressBar({ current }: { current: CheckStep }) {
           />
         ))}
       </div>
-      <p className="label-editorial mt-2 font-mono text-[var(--ink-4)]">
+      <p className="label-editorial mt-2 font-mono text-[var(--ink-meta)]">
         Stap {progress} van {total}
       </p>
     </div>
@@ -231,7 +238,7 @@ export function CheckWizard() {
           aria-live="polite"
           aria-atomic="true"
         >
-          <span className="label-editorial font-mono text-[var(--ink-4)]">
+          <span className="label-editorial font-mono text-[var(--ink-meta)]">
             Al vrijgekocht
           </span>
           <span className="font-mono tabular-nums text-base font-medium text-horizon-700">
@@ -253,7 +260,7 @@ export function CheckWizard() {
         {/* Stap-kop */}
         {meta && (
           <header className="mb-8 border-b border-[var(--border-ed)] pb-6">
-            <p className="label-editorial mb-2 font-mono text-[var(--ink-4)]">
+            <p className="label-editorial mb-2 font-mono text-[var(--ink-meta)]">
               {meta.num} · {meta.sub}
             </p>
             <h2
