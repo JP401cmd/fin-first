@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
-import { FinHome } from './fin-home'
+import { FinHome, type FinHomeProps } from './fin-home'
+import { FinSlotProvider } from '@/lib/shell/fin-slot'
 import type { CoachDataGaps } from '@/lib/coach-suggestions'
 import { __resetInflight } from '@/lib/inflight'
 
@@ -18,6 +19,12 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
+// FinHome leest het nav-pill-slot via context; zonder provider gooit de hook.
+// Er is hier geen FloatingNavButton, dus het slot blijft leeg → alleen de
+// zwevende instantie rendert (precies wat deze tests asserten).
+const renderFin = (props: FinHomeProps) =>
+  render(<FinSlotProvider><FinHome {...props} /></FinSlotProvider>)
+
 const gaps = (over: Partial<CoachDataGaps> = {}): CoachDataGaps => ({
   hasBank: true, hasAssets: true, hasBudgets: true, hasGoals: true, hasDebts: true,
   hasTransactions: true, hasHoldings: true, hasHoldingsWithIsin: true, hasFireParams: true,
@@ -33,7 +40,7 @@ afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); __resetInflight() })
 
 describe('FinHome', () => {
   it('toont de bubbel-launcher en opent de chat bij klik', () => {
-    render(<FinHome dataGaps={gaps()} delayMs={1000} />)
+    renderFin({ dataGaps: gaps(), delayMs: 1000 })
     const launcher = screen.getByRole('button', { name: /Open chat met Fin/i })
     fireEvent.click(launcher)
     expect(toggle).toHaveBeenCalled()
@@ -41,14 +48,14 @@ describe('FinHome', () => {
 
   it('toont de melding na delayMs met reduced-motion-tekst', () => {
     vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as unknown as MediaQueryList)
-    render(<FinHome dataGaps={gaps({ hasBank: false })} delayMs={1000} autoDismissMs={999999} />)
+    renderFin({ dataGaps: gaps({ hasBank: false }), delayMs: 1000, autoDismissMs: 999999 })
     act(() => { vi.advanceTimersByTime(1000 + 400) })
     expect(screen.getByText(/Koppel je bank/i)).toBeInTheDocument()
   })
 
   it('× sluit de melding zonder de chat te openen', async () => {
     vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as unknown as MediaQueryList)
-    render(<FinHome dataGaps={gaps({ hasBank: false })} delayMs={0} autoDismissMs={999999} />)
+    renderFin({ dataGaps: gaps({ hasBank: false }), delayMs: 0, autoDismissMs: 999999 })
     await act(async () => {})
     act(() => { vi.advanceTimersByTime(400) })
     fireEvent.click(screen.getByRole('button', { name: /Sluiten/i }))
@@ -58,7 +65,7 @@ describe('FinHome', () => {
 
   it('rendert niets wanneer de chat open is (één Fin)', () => {
     isOpenValue = true
-    const { container } = render(<FinHome dataGaps={gaps()} delayMs={0} />)
+    const { container } = renderFin({ dataGaps: gaps(), delayMs: 0 })
     expect(container).toBeEmptyDOMElement()
   })
 })

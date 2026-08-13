@@ -37,6 +37,8 @@ import { calculateHoldingBox3 } from '@/lib/box3-holdings'
 import { parseSaleConfig } from '@/lib/sale-config'
 import { computeSharePct } from '@/lib/household-data'
 import { calculateRental } from '@/lib/verhuurrendement-calc'
+import { buildAssetReturnBreakdown, type AssetHoldingsCost } from '@/lib/asset-return'
+import { sumHoldingTotals } from '@/lib/holdings-totals'
 import { BEZIT_ACCEPTANCE } from './bezit'
 import type { AcceptanceCriterion } from './types'
 
@@ -133,24 +135,50 @@ export const BEZIT_ENGINE_CHECKS: BezitEngineCheck[] = [
   {
     workflow: 'WF-BEZIT-01',
     scenarioId: 'UAT-BEZIT-01',
-    label: 'Totale waarde, maandelijkse inleg, rendement, groepen en kaarten (persona compleet)',
+    label: 'Totale waarde, maandelijkse inleg, rendement portefeuille, groepen en kaarten (persona compleet)',
     run: () => {
       criterion('WF-BEZIT-01')
       const waarde = totaleWaarde(compleet)
       const inleg = compleet.assets.reduce((s, a) => s + a.monthly_contribution, 0)
-      const totalPurchase =
-        compleet.assets.reduce((s, a) => s + a.purchase_value, 0) +
-        compleet.bank_accounts.reduce((s, b) => s + b.balance, 0)
-      const rendement = waarde - totalPurchase
       const rows = [
         ...compleet.assets.map((a) => a.asset_type),
         ...compleet.bank_accounts.map(() => 'cash' as const),
       ]
       const groepen = new Set(rows).size
       const kaarten = rows.length
+
+      // Rendement portefeuille: échte motor (lib/asset-return.ts), niet
+      // herimplementeerd. Kostprijs van Meesman komt — net als de server-
+      // loader (lib/assets-data-loader.ts#loadHoldingsCostByAssetId) — uit
+      // `sumHoldingTotals` op de RAUWE holding-kolommen (avg_purchase_price),
+      // niet uit de transactiehistorie (dat is WF-BEZIT-16, een net-iets
+      // ander getal door de 4-decimalen-afronding van het seed-veld).
+      const meesman = compleet.assets.find((a) => a.name === 'Meesman Wereldwijd Totaal')!
+      const meesmanHolding = compleet.holdings!.find((h) => h.assetName === 'Meesman Wereldwijd Totaal')!
+      const holdingsCostByAssetId: Record<string, AssetHoldingsCost> = {
+        [meesman.name]: (() => {
+          const totals = sumHoldingTotals([
+            { units: meesmanHolding.units, avg_purchase_price: meesmanHolding.avg_purchase_price, current_price: meesmanHolding.current_price },
+          ])
+          return { cost: totals.totalCost, value: totals.totalValue }
+        })(),
+      }
+      const breakdown = buildAssetReturnBreakdown(
+        compleet.assets.map((a) => ({
+          id: a.name,
+          name: a.name,
+          assetType: a.asset_type,
+          value: a.current_value,
+          purchaseValue: a.purchase_value,
+          shareFraction: 1,
+        })),
+        holdingsCostByAssetId,
+      )
+      const p = breakdown.portfolio
+
       return {
-        expected: 'totaleWaarde=1585000; maandelijkseInleg=1700; rendementTotaal=559000; groepen=13; kaarten=16',
-        actual: `totaleWaarde=${waarde}; maandelijkseInleg=${inleg}; rendementTotaal=${rendement}; groepen=${groepen}; kaarten=${kaarten}`,
+        expected: `totaleWaarde=1585000; maandelijkseInleg=1700; rendementPortefeuille=${fx(84860.02, 2)}; rendementPortefeuilleCost=${fx(235139.98, 2)}; rendementPortefeuillePct=${fx(36.09, 2)}; groepen=13; kaarten=16`,
+        actual: `totaleWaarde=${waarde}; maandelijkseInleg=${inleg}; rendementPortefeuille=${fx(p.gain, 2)}; rendementPortefeuilleCost=${fx(p.cost, 2)}; rendementPortefeuillePct=${fx(p.pct ?? NaN, 2)}; groepen=${groepen}; kaarten=${kaarten}`,
       }
     },
   },

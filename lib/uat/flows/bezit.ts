@@ -24,6 +24,7 @@ export const BEZIT_FLOW: UatFlow = {
 
     // ── 1 · hub ───────────────────────────────────────────────────────────
     { id: 'ovz', scenarioId: 'UAT-BEZIT-01', label: 'WF-BEZIT-01 · Bezittingenoverzicht', kind: 'screen', stage: 1 },
+    { id: 'rendement-modal', scenarioId: 'UAT-BEZIT-27', label: 'WF-BEZIT-27 · Rekenmodal rendement', kind: 'screen', stage: 1, subOf: 'ovz' },
 
     // ── 2 · verkennen ─────────────────────────────────────────────────────
     { id: 'filter', scenarioId: 'UAT-BEZIT-02', label: 'WF-BEZIT-02 · Filteren op categorie', kind: 'screen', stage: 2, lane: 'verkennen' },
@@ -78,6 +79,9 @@ export const BEZIT_FLOW: UatFlow = {
     // instap → hub
     { from: 'nav', to: 'leeg' },
     { from: 'leeg', to: 'ovz' },
+
+    // hub → rekenmodal
+    { from: 'ovz', to: 'rendement-modal' },
 
     // hub → verkennen
     { from: 'ovz', to: 'filter' },

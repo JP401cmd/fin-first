@@ -1,12 +1,19 @@
 .willhome {
   position: fixed;
   z-index: 50;
-  /* eerste right = fallback; tweede = sidebar-bewust (calc + custom prop) */
+  /* eerste right/bottom = fallback; tweede = sidebar-/safe-area-bewust */
   right: 1rem;
-  bottom: calc(var(--bottom-nav-height) + 1.5rem);
+  bottom: 1rem;
+  /* Op mobiel rendert ALLEEN de melding-kaart nog via `.willhome` — de idle
+     bubbel portalt sinds de pill-samenvoeging in het nav-pill-slot (zie
+     .wh-slot hieronder) en is op <1024px hier `hidden`. Deze regel moet dus
+     ruimte voor de pill vrijhouden: de meldingkaart is w-80 (320px) en
+     overlapt de gecentreerde pill wél, in tegenstelling tot de kleine 56px
+     bubbel van vroeger (waarvoor "flush in de hoek" ooit terecht was). */
+  bottom: var(--mobile-nav-clearance);
   right: calc(1rem + var(--chat-sidebar-width, 0px));
 }
-@media (min-width: 768px) {
+@media (min-width: 1024px) {
   .willhome { bottom: 1.5rem; right: calc(1.5rem + var(--chat-sidebar-width, 0px)); }
 }
 
@@ -24,6 +31,38 @@
 }
 .wh-bubble:hover { transform: scale(1.05); border-color: var(--color-wil-400); }
 .wh-bubble:active { transform: scale(0.95); }
+
+/* Fin ín de mobiele nav-pill — derde segment van dezelfde donkere capsule,
+   niet een eigen glazen bolletje ernaast. Geen eigen vulling/rand/schaduw
+   meer: transparant zoals de zoek-/menuknop, zodat alleen de kleurstippen nog
+   verschillen. De wrapper is de positioneringscontext voor badge/indicator;
+   buiten .willhome hangen die anders aan de viewport. */
+.wh-slot { position: relative; display: flex; }
+.wh-bubble--slot {
+  /* Zelfde padding-opbouw als de zoek-/menuknop (px-5 py-2.5) i.p.v. een vast
+     vierkant — anders oogt dit segment smaller/kleiner dan de andere twee. */
+  height: auto; width: auto;
+  padding: 0.625rem 1.25rem;
+  background: transparent;
+  backdrop-filter: none;
+  border: none;
+  box-shadow: none;
+  transition: background-color 160ms ease;
+}
+.wh-slot .wh-bubble--slot:hover { transform: none; background: rgb(255 255 255 / 0.1); border-color: transparent; }
+.wh-slot .wh-bubble--slot:active { transform: none; background: rgb(255 255 255 / 0.15); }
+/* De avatar is GEEN kind van de knop (los, absoluut gepositioneerd overlay-
+   element — zie .wh-avatar hieronder), dus de knop zelf krijgt een
+   onzichtbare 18px-spacer (exact het icoonformaat van zoeken/menu) zodat
+   padding + content precies dezelfde knopmaat oplevert. Deze offsets
+   centreren de 28px-avatar dáárover heen. */
+.wh-slot .wh-avatar--bubble { right: 0.9375rem; bottom: 0.3125rem; }
+.wh-slot .wh-privacy, .wh-slot .wh-warning { top: -0.1875rem; right: -0.1875rem; }
+.wh-bubble--slot .wh-badge {
+  top: -0.3125rem; left: -0.3125rem;
+  min-width: 1.125rem; height: 1.125rem; padding: 0 0.25rem;
+  font-size: 10px;
+}
 
 .wh-badge {
   position: absolute; top: -0.375rem; left: -0.375rem;

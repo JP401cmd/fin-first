@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { useScrollLock } from '@/lib/hooks/use-scroll-lock'
 import { useFocusTrap } from '@/lib/hooks/use-focus-trap'
+import { useSwipeToDismiss, SPRING_CURVE } from '@/lib/hooks/use-swipe-to-dismiss'
 import { acquireOverlay } from '@/lib/overlay-signal'
 
 type BottomSheetProps = {
@@ -73,11 +74,6 @@ const sizeClasses = {
   full: 'md:max-w-5xl',
 } as const
 
-const DISMISS_VELOCITY = 800   // px/s — fast flick always dismisses
-const DISMISS_PERCENT = 0.3    // 30% of sheet height
-const SPRING_CURVE = 'cubic-bezier(0.32, 0.72, 0, 1)'
-const VELOCITY_SAMPLES = 5
-
 export function BottomSheet({ open, onClose, title, children, size = 'md', initialMobileHeight, footerSlot, actions, belowFloatingNav = false, closeOnBackdropClick = false }: BottomSheetProps) {
   const [visible, setVisible] = useState(false)
   const [expandedToFull, setExpandedToFull] = useState(false)
@@ -85,16 +81,9 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
   const backdropRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
 
-  // Touch / drag state
-  const dragStartY = useRef(0)
-  const dragCurrentY = useRef(0)
-  const isDragging = useRef(false)
-  const velocityTracker = useRef<{ y: number; t: number }[]>([])
+  // Scroll-container — voedt zowel de scroll-vs-drag beslissing van het
+  // swipe-gebaar als de expand-on-scroll van `initialMobileHeight`.
   const contentRef = useRef<HTMLDivElement>(null)
-  // 'handle' = drag handle touch, 'content' = content area touch
-  const touchSource = useRef<'handle' | 'content'>('handle')
-  // Once we decide scroll vs drag for a content touch, lock it in
-  const gestureDecision = useRef<'undecided' | 'scroll' | 'drag'>('undecided')
 
   // Animation state machine
   const phaseRef = useRef<'idle' | 'entering' | 'open' | 'closing'>('idle')
@@ -113,8 +102,6 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
   }, [])
 
   // ── Animation helpers ──────────────────────────────────────
-
-  const getSheetHeight = useCallback(() => sheetRef.current?.offsetHeight ?? 400, [])
 
   /** Exit animation for programmatic close (X / Escape / backdrop) */
   const animateExit = useCallback(() => {
@@ -154,80 +141,56 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
     setTimeout(cleanup, 300)
   }, [])
 
-  /** Dismiss animation for swipe gesture — velocity-based duration */
-  const animateDismiss = useCallback((velocity: number) => {
-    if (exitAnimationInProgress.current) return
+  // ── Swipe-to-dismiss (gedeeld gebaar) ──────────────────────
+  //
+  // Het gebaar zelf (velocity, scroll-vs-drag, rubber-band, drempels, exit- en
+  // terugveer-animatie) leeft in `useSwipeToDismiss`. Hier blijft alleen wat
+  // BottomSheet-eigen is: de sluit-bookkeeping van de state machine en het
+  // uitklappen naar volle hoogte bij een opwaartse drag.
+
+  const handleSwipeDismissStart = useCallback(() => {
+    if (exitAnimationInProgress.current) return false
     exitAnimationInProgress.current = true
     phaseRef.current = 'closing'
-
-    const sheet = sheetRef.current
-    const backdrop = backdropRef.current
-    const sheetHeight = getSheetHeight()
-    const remaining = sheetHeight - Math.max(0, dragCurrentY.current)
-
-    if (prefersReducedMotion.current || !sheet) {
-      setVisible(false)
-      exitAnimationInProgress.current = false
-      phaseRef.current = 'idle'
-      onCloseRef.current()
-      return
-    }
-
-    const duration = Math.min(350, Math.max(150, (remaining / Math.max(velocity, 500)) * 1000))
-
-    sheet.style.animation = 'none'
-    sheet.style.transition = `transform ${duration}ms ${SPRING_CURVE}`
-    sheet.style.transform = `translateY(${sheetHeight}px)`
-
-    if (backdrop) {
-      backdrop.style.transition = `background-color ${duration * 0.8}ms ease-out`
-      backdrop.style.backgroundColor = 'rgba(0,0,0,0)'
-    }
-
-    const cleanup = () => {
-      if (!exitAnimationInProgress.current) return
-      setVisible(false)
-      exitAnimationInProgress.current = false
-      phaseRef.current = 'idle'
-      onCloseRef.current()
-    }
-    sheet.addEventListener('transitionend', cleanup, { once: true })
-    setTimeout(cleanup, duration + 50)
-  }, [getSheetHeight])
-
-  /** Spring snap-back when drag doesn't meet dismiss threshold */
-  const animateSnapBack = useCallback(() => {
-    const sheet = sheetRef.current
-    const backdrop = backdropRef.current
-    if (!sheet) return
-
-    if (prefersReducedMotion.current) {
-      sheet.style.transform = ''
-      sheet.style.transition = ''
-      sheet.style.willChange = ''
-      if (backdrop) {
-        backdrop.style.backgroundColor = 'rgba(0,0,0,0.5)'
-        backdrop.style.transition = ''
-      }
-      return
-    }
-
-    sheet.style.transition = `transform 350ms ${SPRING_CURVE}`
-    sheet.style.transform = ''
-
-    if (backdrop) {
-      backdrop.style.transition = `background-color 350ms ${SPRING_CURVE}`
-      backdrop.style.backgroundColor = 'rgba(0,0,0,0.5)'
-    }
-
-    const onEnd = () => {
-      sheet.style.transition = ''
-      sheet.style.willChange = ''
-      if (backdrop) backdrop.style.transition = ''
-    }
-    sheet.addEventListener('transitionend', onEnd, { once: true })
-    setTimeout(onEnd, 400)
+    return true
   }, [])
+
+  const handleSwipeDismissed = useCallback(() => {
+    // Guard op de vlag: een heropening midden in de exit zet 'm op false,
+    // waarna deze (al ingeplande) afronding niets meer mag doen.
+    if (!exitAnimationInProgress.current) return
+    setVisible(false)
+    exitAnimationInProgress.current = false
+    phaseRef.current = 'idle'
+    onCloseRef.current()
+  }, [])
+
+  /**
+   * Expand-to-full: sheets met `initialMobileHeight` starten op een deelhoogte;
+   * een opwaartse drag klapt ze uit i.p.v. te rubber-banden. Bewust
+   * BottomSheet-only — een paneel dat al volledige hoogte heeft (chat) kent dit
+   * niet.
+   */
+  const handleDragUpExpand = useCallback((rawDelta: number) => {
+    if (rawDelta >= -30 || !initialMobileHeight || expandedToFull) return false
+    setExpandedToFull(true)
+    if (sheetRef.current) {
+      sheetRef.current.style.transition = `max-height 350ms ${SPRING_CURVE}`
+      sheetRef.current.style.transform = ''
+      sheetRef.current.style.willChange = ''
+    }
+    return true
+  }, [initialMobileHeight, expandedToFull])
+
+  const { handleTouchStart, handleContentTouchStart, handleTouchMove, handleTouchEnd } =
+    useSwipeToDismiss({
+      sheetRef,
+      backdropRef,
+      contentRef,
+      onDismiss: handleSwipeDismissed,
+      onDismissStart: handleSwipeDismissStart,
+      onDragMove: handleDragUpExpand,
+    })
 
   // ── Programmatic close (X / Escape / backdrop click) ───────
 
@@ -301,147 +264,6 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [visible, handleProgrammaticClose])
-
-  // ── Touch handlers ─────────────────────────────────────────
-
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    dragStartY.current = e.touches[0].clientY
-    dragCurrentY.current = 0
-    isDragging.current = true
-    velocityTracker.current = [{ y: e.touches[0].clientY, t: Date.now() }]
-    // Touch from drag handle: always drag immediately
-    touchSource.current = 'handle'
-    gestureDecision.current = 'drag'
-    if (sheetRef.current) {
-      sheetRef.current.style.animation = 'none'
-      sheetRef.current.style.transition = 'none'
-      sheetRef.current.style.willChange = 'transform'
-    }
-  }, [])
-
-  const handleContentTouchStart = useCallback((e: React.TouchEvent) => {
-    dragStartY.current = e.touches[0].clientY
-    dragCurrentY.current = 0
-    isDragging.current = false // don't drag yet — wait for decision
-    velocityTracker.current = [{ y: e.touches[0].clientY, t: Date.now() }]
-    touchSource.current = 'content'
-    gestureDecision.current = 'undecided'
-  }, [])
-
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!sheetRef.current) return
-
-    const rawDelta = e.touches[0].clientY - dragStartY.current
-
-    // Content-area touch: decide between scroll and drag
-    if (touchSource.current === 'content') {
-      if (gestureDecision.current === 'scroll') return // let native scroll handle it
-
-      if (gestureDecision.current === 'undecided') {
-        // Need enough movement to decide (5px threshold)
-        if (Math.abs(rawDelta) < 5) return
-
-        const scrollEl = contentRef.current
-        const atTop = !scrollEl || scrollEl.scrollTop <= 0
-        const swipingDown = rawDelta > 0
-
-        if (atTop && swipingDown) {
-          // Activate drag-dismiss
-          gestureDecision.current = 'drag'
-          isDragging.current = true
-          // Reset start to current position for smooth drag start
-          dragStartY.current = e.touches[0].clientY
-          if (sheetRef.current) {
-            sheetRef.current.style.animation = 'none'
-            sheetRef.current.style.transition = 'none'
-            sheetRef.current.style.willChange = 'transform'
-          }
-          velocityTracker.current = [{ y: e.touches[0].clientY, t: Date.now() }]
-          return
-        } else {
-          // Let native scroll take over
-          gestureDecision.current = 'scroll'
-          return
-        }
-      }
-    }
-
-    // From here: active drag (handle or content-decided drag)
-    if (!isDragging.current) return
-
-    // Expand-to-full: if initialMobileHeight is set and not yet expanded,
-    // upward drag (negative delta) expands the sheet instead of rubber-banding
-    const currentRawDelta = e.touches[0].clientY - dragStartY.current
-    if (currentRawDelta < -30 && initialMobileHeight && !expandedToFull) {
-      setExpandedToFull(true)
-      // Reset drag state so sheet snaps cleanly
-      isDragging.current = false
-      if (sheetRef.current) {
-        sheetRef.current.style.transition = `max-height 350ms ${SPRING_CURVE}`
-        sheetRef.current.style.transform = ''
-        sheetRef.current.style.willChange = ''
-      }
-      return
-    }
-
-    // Rubber-banding for upward drag (15% resistance)
-    const deltaY = currentRawDelta < 0 ? currentRawDelta * 0.15 : currentRawDelta
-
-    sheetRef.current.style.transform = `translateY(${deltaY}px)`
-    dragCurrentY.current = deltaY
-
-    // Velocity tracking (last N samples)
-    const now = Date.now()
-    velocityTracker.current.push({ y: e.touches[0].clientY, t: now })
-    if (velocityTracker.current.length > VELOCITY_SAMPLES) {
-      velocityTracker.current.shift()
-    }
-
-    // Backdrop opacity follows finger
-    if (backdropRef.current && currentRawDelta > 0) {
-      const sheetHeight = getSheetHeight()
-      const dragPercent = Math.min(1, currentRawDelta / sheetHeight)
-      backdropRef.current.style.backgroundColor = `rgba(0,0,0,${0.5 * (1 - dragPercent)})`
-      backdropRef.current.style.transition = 'none'
-    }
-
-    if (currentRawDelta > 0) e.preventDefault()
-  }, [getSheetHeight, initialMobileHeight, expandedToFull])
-
-  const handleTouchEnd = useCallback(() => {
-    // Content touch that stayed as scroll — just clean up
-    if (touchSource.current === 'content' && gestureDecision.current !== 'drag') {
-      gestureDecision.current = 'undecided'
-      touchSource.current = 'handle'
-      return
-    }
-    if (!isDragging.current || !sheetRef.current) return
-    isDragging.current = false
-
-    // Calculate velocity from tracked samples
-    const samples = velocityTracker.current
-    let velocity = 0
-    if (samples.length >= 2) {
-      const last = samples[samples.length - 1]
-      const prev = samples[0]
-      const dt = last.t - prev.t
-      if (dt > 0) velocity = ((last.y - prev.y) / dt) * 1000
-    }
-
-    const sheetHeight = getSheetHeight()
-    const dragPercent = dragCurrentY.current / sheetHeight
-
-    if (velocity > DISMISS_VELOCITY || dragPercent > DISMISS_PERCENT) {
-      animateDismiss(Math.max(velocity, 500))
-    } else {
-      animateSnapBack()
-    }
-
-    dragCurrentY.current = 0
-    velocityTracker.current = []
-    gestureDecision.current = 'undecided'
-    touchSource.current = 'handle'
-  }, [getSheetHeight, animateDismiss, animateSnapBack])
 
   const handleBackdrop = useCallback((e: React.MouseEvent) => {
     if (closeOnBackdropClick && e.target === e.currentTarget) handleProgrammaticClose()

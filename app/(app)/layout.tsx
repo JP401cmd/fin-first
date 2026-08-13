@@ -46,6 +46,7 @@ import { getServerPerspective } from '@/lib/household/server-perspective'
 import { FinHome } from '@/components/app/fin/fin-home'
 import { parseCoachConfig, type CoachDataGaps } from '@/lib/coach-suggestions'
 import { ModuleColorProvider } from '@/components/app/module-color-provider'
+import { FinSlotProvider } from '@/lib/shell/fin-slot'
 import {
   generateAllColorVars,
   DEFAULT_MODULE_COLORS,
@@ -514,6 +515,10 @@ export default async function AppLayout({
               <NotificationProvider>
               <GlobalSyncProvider>
                 <ModuleColorProvider initialConfig={moduleColors} initialBudgetConfig={budgetColors} initialPhaseConfig={phaseColors} initialFontTheme={(profile?.typography_theme as FontTheme) ?? 'editorial'}>
+                  {/* Deelt de slot-plek in de mobiele nav-pill met FinHome: de
+                      pill zit in de ResponsiveShell, FinHome hangt er als
+                      sibling naast. Zie lib/shell/fin-slot.tsx. */}
+                  <FinSlotProvider>
                     <div className="min-h-screen bg-[var(--bg)]" data-app-root style={allVars as React.CSSProperties}>
                       {/* Skip-link — eerste tab-stop voor keyboard- en
                           screen-reader-gebruikers (WCAG 2.1 Bypass Blocks).
@@ -573,6 +578,7 @@ export default async function AppLayout({
                         />
                       </Suspense>
                     </div>
+                  </FinSlotProvider>
                 </ModuleColorProvider>
                 <NotificationModal />
               </GlobalSyncProvider>

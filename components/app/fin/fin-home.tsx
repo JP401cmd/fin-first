@@ -2,6 +2,7 @@
 
 import './fin-home.css'
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { FinDots } from '@/components/app/fin-dots'
 import { AlertTriangle } from 'lucide-react'
@@ -11,6 +12,7 @@ import { AiPrivacyIndicator } from '@/components/app/ai-privacy-indicator'
 import { useChatContext } from '@/components/app/chat/chat-provider'
 import { useOverlayOpen } from '@/lib/hooks/use-scroll-lock'
 import { isImmersiveRoute } from '@/lib/shell/immersive-routes'
+import { useFinSlot } from '@/lib/shell/fin-slot'
 import { useCoachSuggestion } from '@/lib/hooks/use-coach-suggestion'
 import { useTypewriter } from '@/lib/hooks/use-typewriter'
 import { CoachMelding } from './coach-melding'
@@ -47,6 +49,25 @@ export function FinHome({
   // backdrop door en lijkt de FAB bovenop de primaire actieknop onderin de
   // sheet te staan — net zoals de nav-pill door zo'n overlay wordt afgedekt.
   const overlayOpen = useOverlayOpen()
+  // Mobiel woont de idle-bubbel ín de nav-pill: FloatingNavButton rendert daar
+  // een slot, wij portalen onze bubbel erin. Zie lib/shell/fin-slot.tsx.
+  //
+  // `mounted` is GEEN overbodige voorzichtigheid: FinHome hangt in zijn eigen
+  // <Suspense>-grens, los van waar FloatingNavButton hydrateert. React
+  // garandeert alleen "effects ná de volledige commit" BINNEN één
+  // hydration-boundary — over twee onafhankelijke Suspense-grenzen heen kan
+  // FloatingNavButton's slot-registratie-effect al gevuurd zijn vóórdat
+  // FinHome's eigen hydration-pass start. Zonder deze vlag zou FinHome dan
+  // met een niet-lege `slotEl` hydrateren terwijl de server 'm nooit kende
+  // (server rendert altijd met slotEl=null) → hydration-mismatch. Door de
+  // portal-tak te gaten op FinHome's EIGEN mount-effect (dat pas ná FinHome's
+  // eigen hydratie vuurt, onafhankelijk van andere boundaries) is de eerste
+  // render overal gegarandeerd gelijk aan de server; de portal-swap volgt
+  // daarna als gewone client-only update.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+  const { slotEl: rawSlotEl } = useFinSlot()
+  const slotEl = mounted ? rawSlotEl : null
   const pathname = usePathname()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -135,13 +156,15 @@ export function FinHome({
   const localBlocked = exec.status === 'blocked'
 
   if (isOpen) return null
-  // Verberg zodra een overlay/modal open is — de FAB mag niet door de
-  // halftransparante backdrop heen over de sheet-CTA verschijnen.
-  if (overlayOpen) return null
-  // Idem op een immersieve taakflow (bv. de check-in-wizard): die zet zijn
-  // eigen primaire actie sticky onderaan, waar de bubbel er pal bovenop stond.
-  // Zie lib/shell/immersive-routes.ts.
-  if (isImmersiveRoute(pathname)) return null
+
+  // Alleen de zwevende hoek-instantie verbergt zich hier. De geslotte bubbel
+  // erft dit gratis: het slot leeft in FloatingNavButton, die bij een open
+  // overlay of immersieve route al `visibility: hidden` + `aria-hidden` krijgt.
+  //  - overlay: de FAB mag niet door de halftransparante backdrop heen over de
+  //    sheet-CTA verschijnen.
+  //  - immersieve taakflow (bv. de check-in-wizard): die zet zijn eigen primaire
+  //    actie sticky onderaan, waar de bubbel er pal bovenop stond.
+  const hideFloating = overlayOpen || isImmersiveRoute(pathname)
 
   const fabAria = localBlocked
     ? 'Open chat met Fin — let op: lokale AI werkt niet op dit toestel'
@@ -149,44 +172,88 @@ export function FinHome({
       ? `Open chat met Fin — ${postponedReady} uitgestelde tip${postponedReady === 1 ? '' : 's'} klaar`
       : 'Open chat met Fin'
 
-  return (
-    <div className={`willhome willhome--${mode}`}>
-      {mode === 'melding' && suggestion ? (
-        <div className="wh-melding-face">
-          <CoachMelding
-            headerLabel={headerLabel}
-            shown={shown}
-            showCursor={!done}
-            done={done}
-            cta={suggestion.cta}
-            ctaHref={suggestion.ctaHref}
-            onClose={dismiss}
-            onCtaActivate={handleCta}
-            onOpenChat={handleOpenChatFromMelding}
-          />
-        </div>
-      ) : (
-        <button type="button" onClick={handleBubbleClick} className="wh-bubble" aria-label={fabAria}>
-          {postponedReady > 0 && (
-            <span className="wh-badge" aria-hidden>{postponedReady > 9 ? '9+' : postponedReady}</span>
-          )}
-        </button>
-      )}
+  // De bubbel is drie lagen die absoluut aan hun eigen context hangen: knop
+  // (met badge), avatar erover, en het privacy-/waarschuwingsteken. Eén bron,
+  // twee plekken — in het nav-pill-slot (mobiel) en zwevend in de hoek (desktop).
+  const renderBubble = (variant: 'floating' | 'slot') => (
+    <>
+      <button
+        type="button"
+        onClick={handleBubbleClick}
+        className={variant === 'slot' ? 'wh-bubble wh-bubble--slot' : 'wh-bubble'}
+        aria-label={fabAria}
+      >
+        {/* Onzichtbare spacer, exact het icoonformaat van de zoek-/menuknop
+            (size=18) — de echte avatar is een los overlay-element (zie
+            hieronder) en telt dus niet vanzelf mee voor de knopmaat; zonder
+            dit zou het slot-segment smaller ogen dan de andere twee. */}
+        {variant === 'slot' && <span aria-hidden className="block h-[18px] w-[18px]" />}
+        {postponedReady > 0 && (
+          <span className="wh-badge" aria-hidden>{postponedReady > 9 ? '9+' : postponedReady}</span>
+        )}
+      </button>
 
-      <div className={`wh-avatar wh-avatar--${mode}`} aria-hidden>
-        <FinDots size={36} state={finState} />
+      <div className="wh-avatar wh-avatar--bubble" aria-hidden>
+        <FinDots size={variant === 'slot' ? 28 : 36} state={finState} />
       </div>
 
       {/* Eén plek rechtsboven: normaal het privacy-schildje, maar zodra lokaal
           hier niet kán, wint de waarschuwing — dat is het dringender bericht. */}
-      {mode === 'bubble' &&
-        (localBlocked ? (
-          <span className="wh-warning" title={exec.message ?? 'Lokale AI werkt niet op dit toestel'}>
-            <AlertTriangle size={10} aria-hidden />
-          </span>
-        ) : (
-          <AiPrivacyIndicator size={12} className="wh-privacy" />
-        ))}
-    </div>
+      {localBlocked ? (
+        <span className="wh-warning" title={exec.message ?? 'Lokale AI werkt niet op dit toestel'}>
+          <AlertTriangle size={10} aria-hidden />
+        </span>
+      ) : (
+        <AiPrivacyIndicator size={12} className="wh-privacy" />
+      )}
+    </>
+  )
+
+  return (
+    <>
+      {/* Mobiel/tablet: de bubbel staat in de nav-pill-rij en blijft dáár staan,
+          óók terwijl een melding in de hoek openstaat — de melding is het grote
+          signaal, dit de vaste ingang (net als de badge, die ook niet meebeweegt
+          met de modus). Boven lg verbergt de pill zichzelf en valt alles terug
+          op de zwevende instantie hieronder.
+
+          `!hideFloating` is hier VERPLICHT, niet optioneel: de pill verbergt
+          zichzelf alleen op lib/overlay-signal.ts (BottomSheet/SlideInPane).
+          `hideFloating` leest lib/hooks/use-scroll-lock.ts, de bredere teller
+          die ook command-palette, share-dialog, notification-panel en
+          sleepmodus meetelt. Zonder deze check bleef de bubbel in die gevallen
+          zichtbaar én tikbaar terwijl hij vóór de samenvoeging altijd verdween. */}
+      {!hideFloating && slotEl && createPortal(<div className="wh-slot">{renderBubble('slot')}</div>, slotEl)}
+
+      {!hideFloating && (
+        <div
+          className={`willhome willhome--${mode}${mode === 'bubble' ? ' hidden lg:block' : ''}`}
+        >
+          {mode === 'melding' && suggestion ? (
+            <>
+              <div className="wh-melding-face">
+                <CoachMelding
+                  headerLabel={headerLabel}
+                  shown={shown}
+                  showCursor={!done}
+                  done={done}
+                  cta={suggestion.cta}
+                  ctaHref={suggestion.ctaHref}
+                  onClose={dismiss}
+                  onCtaActivate={handleCta}
+                  onOpenChat={handleOpenChatFromMelding}
+                />
+              </div>
+
+              <div className="wh-avatar wh-avatar--melding" aria-hidden>
+                <FinDots size={36} state={finState} />
+              </div>
+            </>
+          ) : (
+            renderBubble('floating')
+          )}
+        </div>
+      )}
+    </>
   )
 }

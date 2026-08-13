@@ -70,4 +70,21 @@ describe('LeverCompassMobile — NAV-6 statuspunt-reductie', () => {
       expect(within(panel).getByText(label)).toBeInTheDocument()
     }
   })
+
+  // Bug: de trigger staat als tweede icoon in de TopBar-rij (na
+  // PerspectiveSwitcher, vóór PrivacyToggle — zie top-bar.tsx), dus niet aan
+  // de rechterrand. Een `right-0`-geankerd 256px-paneel groeide dan naar
+  // links tot voorbij de viewport-rand (zichtbaar afgesneden op 390px breed).
+  // Given het paneel open is, when het rendert, then hangt het gecentreerd
+  // onder de trigger (net als de tooltip in LeverCompassDots hierboven in
+  // dit bestand) met een viewport-clamp, niet hard tegen de rechterrand.
+  it('hangt het paneel gecentreerd onder de trigger, niet hard right-anchored (voorkomt off-screen op smalle mobiele schermen)', () => {
+    renderCompass('simple', scoresWith({}))
+    fireEvent.click(screen.getByRole('button', { name: /Kompas:/ }))
+    const panel = screen.getByRole('dialog', { name: 'Financieel kompas' })
+    expect(panel.className).not.toMatch(/(?:^|\s)right-0(?:\s|$)/)
+    expect(panel.className).toMatch(/left-1\/2/)
+    expect(panel.className).toMatch(/-translate-x-1\/2/)
+    expect(panel.className).toMatch(/max-w-\[calc\(100vw-2rem\)\]/)
+  })
 })

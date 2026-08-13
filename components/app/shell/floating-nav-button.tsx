@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { Search, LayoutGrid, X } from 'lucide-react'
 import { useCommandPalette } from '@/components/command-palette/command-palette-provider'
 import { useOverlayOpen } from '@/lib/overlay-signal'
 import { isImmersiveRoute } from '@/lib/shell/immersive-routes'
+import { useFinSlot } from '@/lib/shell/fin-slot'
 import { NavMenuSheet } from './nav-menu-sheet'
 
 /**
@@ -41,6 +42,22 @@ export function FloatingNavButton() {
   // sticky primaire actie onderaan zet. Zie lib/shell/immersive-routes.ts.
   const pathname = usePathname()
   const hidden = overlayOpen || isImmersiveRoute(pathname)
+
+  // Fin portalt zijn idle-bubbel in het slot hiernaast (zie lib/shell/fin-slot.tsx).
+  // Registratie loopt via een effect, NIET rechtstreeks vanuit de ref-callback:
+  // een ref-callback vuurt tijdens de commit-fase, óók tijdens hydration — een
+  // synchrone `registerSlot()` daar liet FinHome (elders in de boom, later
+  // gehydrateerd) al met een niet-lege `slotEl` hydrateren terwijl de server 'm
+  // nooit kende, wat React als hydration-mismatch markeerde. Een effect draait
+  // pas ná de volledige commit, dus de eerste hydration-pass blijft overal
+  // consistent met de server (slotEl start null); de portal-swap volgt daarna
+  // als gewone client-render.
+  const { registerSlot } = useFinSlot()
+  const slotRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    registerSlot(slotRef.current)
+    return () => registerSlot(null)
+  }, [registerSlot])
 
   const handleAction = (action: 'open-chat' | 'open-account' | 'open-search') => {
     if (action === 'open-search') {
@@ -103,6 +120,13 @@ export function FloatingNavButton() {
               <LayoutGrid size={18} strokeWidth={2.25} />
             )}
           </button>
+
+          {/* Fin — derde segment van dezelfde capsule, geen apart element meer.
+              De scheidingslijn verbergt zichzelf (`has-[+div:empty]`) zolang
+              Fin niets portalt (chat open / overlay), anders bleef er een kier
+              met een kaal streepje over. */}
+          <div className="w-px self-stretch bg-white/15 has-[+div:empty]:hidden" aria-hidden="true" />
+          <div ref={slotRef} className="flex items-center justify-center empty:hidden" />
         </div>
       </div>
 

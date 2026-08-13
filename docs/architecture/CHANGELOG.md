@@ -805,3 +805,11 @@
 ## 2026-08-11
 
 - Geen wijzigingen.
+
+## 2026-08-13
+
+- **Componenten (aantal)** toegevoegd: +1
+
+## 2026-08-13
+
+- Geen wijzigingen.

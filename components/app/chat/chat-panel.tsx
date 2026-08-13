@@ -12,6 +12,7 @@ import { ChatSettingsPopover } from './chat-settings-popover'
 import type { LocalChatOverview } from '@/lib/ai/local/local-chat-context'
 import type { LocalKnowledgeItem } from '@/lib/ai/local/knowledge-context'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
+import { useSwipeToDismiss } from '@/lib/hooks/use-swipe-to-dismiss'
 import { acquireOverlay } from '@/lib/overlay-signal'
 import { hasSubscription } from '@/lib/feature-registry'
 import { AiSubscriptionUpsell } from '@/components/app/ai-subscription-upsell'
@@ -461,6 +462,12 @@ export function ChatPanel() {
   const router = useRouter()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  // Swipe-down-to-dismiss (alleen de modale, niet-gepinde weergave): het paneel
+  // zelf schuift mee, de mobiele backdrop dooft mee, de berichtenlijst beslist
+  // scroll-vs-drag.
+  const panelRef = useRef<HTMLDivElement>(null)
+  const backdropRef = useRef<HTMLDivElement>(null)
+  const messagesScrollRef = useRef<HTMLDivElement>(null)
   const [input, setInput] = useState('')
 
   // Wft disclaimer state — one-time acceptance persisted in localStorage
@@ -1114,6 +1121,24 @@ export function ChatPanel() {
     close()
   }, [meldingBezig, close])
 
+  // Hetzelfde gebaar als elke andere modal (BottomSheet). Uit bij `isPinned`
+  // (een gedokte zijbalk swipe je niet weg) en tijdens een lopende verzending —
+  // anders zou het paneel wegschuiven terwijl `veiligSluiten` het sluiten
+  // tegenhoudt. De achtergrond staat op `bg-black/20`, dus die dekking geven we
+  // mee zodat een terugveer niet ineens donkerder uitkomt.
+  const { handleTouchStart, handleContentTouchStart, handleTouchMove, handleTouchEnd } =
+    useSwipeToDismiss({
+      sheetRef: panelRef,
+      backdropRef,
+      contentRef: messagesScrollRef,
+      onDismiss: veiligSluiten,
+      backdropOpacity: 0.2,
+      enabled: !isPinned && !meldingBezig,
+    })
+  const swipeProps = isPinned
+    ? {}
+    : { onTouchMove: handleTouchMove, onTouchEnd: handleTouchEnd }
+
   // Eén label voor de megafoon: hij schakelt heen én terug, dus "Melding maken"
   // liegt zodra je in meldmodus staat.
   const meldingKnopLabel = meldingBezig
@@ -1133,21 +1158,28 @@ export function ChatPanel() {
   // modaal venster (en op `lg`+ bestaat de pill sowieso niet).
   const panelClasses = isPinned
     ? 'fixed top-0 right-0 z-50 flex h-screen w-[420px] flex-col bg-[var(--paper)] shadow-2xl border-l border-[var(--border-ed)]'
-    : 'fixed bottom-0 right-0 z-[70] flex h-[100dvh] w-full flex-col bg-[var(--paper)] shadow-2xl md:bottom-6 md:right-6 md:h-[700px] md:w-[480px] md:rounded-[var(--r-lg)] md:border md:border-[var(--border-ed)] md:origin-bottom-right motion-safe:md:animate-[wh-melding-in_560ms_cubic-bezier(.2,.8,.2,1)]'
+    // Mobiel bewust géén volle 100dvh: `bottom-0` + volle hoogte liet het
+    // paneel tot de fysieke bovenrand doorlopen. De hoogte laat nu safe-area
+    // + een kleine marge vrij, zodat er altijd wat pagina zichtbaar blijft.
+    : 'fixed bottom-0 right-0 z-[70] flex h-[calc(100dvh-var(--safe-area-top,0px)-1rem)] w-full flex-col bg-[var(--paper)] shadow-2xl md:bottom-6 md:right-6 md:h-[700px] md:w-[480px] md:rounded-[var(--r-lg)] md:border md:border-[var(--border-ed)] md:origin-bottom-right motion-safe:md:animate-[wh-melding-in_560ms_cubic-bezier(.2,.8,.2,1)]'
 
   return (
     <>
       {/* Mobile backdrop (not shown when pinned) — zelfde laag als het paneel;
           het paneel staat er ná in de DOM en schildert dus bovenop. */}
       {!isPinned && (
-        <div className="fixed inset-0 z-[70] bg-black/20 md:hidden" onClick={veiligSluiten} />
+        <div ref={backdropRef} className="fixed inset-0 z-[70] bg-black/20 md:hidden" onClick={veiligSluiten} />
       )}
 
       {/* Panel */}
-      <div className={panelClasses}>
+      <div ref={panelRef} className={panelClasses} {...swipeProps}>
 
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-4 py-3">
+        {/* Header — dient tegelijk als greep voor het swipe-down-gebaar. */}
+        <div
+          className="flex items-center justify-between border-b border-[var(--border-ed)] px-4 py-3"
+          style={isPinned ? undefined : { touchAction: 'none' }}
+          onTouchStart={isPinned ? undefined : handleTouchStart}
+        >
           <div className="flex items-center gap-2">
             {config.fabAvatar(32)}
             <div>
@@ -1191,10 +1223,15 @@ export function ChatPanel() {
                 bestemming van dit gesprek, het lokale model en de overige
                 functies; de volledige uitleg blijft op /mijn/privacy. */}
             {mode === 'chat' && <ChatSettingsPopover onChanged={exec.refresh} />}
-            {/* Pin toggle — desktop only */}
+            {/* Pin toggle — desktop only. Pinnen dokt het paneel als zijbalk;
+                op mobiel is daar geen ruimte voor. `!hidden`/`md:!flex`
+                (i.p.v. kale `hidden`/`md:flex`): `.touch-target` zet zelf al
+                een ongeclausuleerde `display: inline-flex` en won zonder
+                `!belangrijk` de cascade van `hidden`, waardoor de knop tóch
+                op mobiel zichtbaar bleef. */}
             <button
               onClick={togglePin}
-              className="hidden touch-target rounded-lg text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)] md:flex md:items-center md:justify-center"
+              className="!hidden touch-target rounded-lg text-[var(--ink-3)] hover:bg-zinc-100 hover:text-[var(--ink-2)] md:!flex md:items-center md:justify-center"
               aria-label={isPinned ? 'Losmaken' : 'Vastzetten'}
               title={isPinned ? 'Losmaken' : 'Vastzetten'}
             >
@@ -1241,7 +1278,11 @@ export function ChatPanel() {
         <>
         {/* Permanente lokaal-strip gedurende de hele privé-sessie. */}
         {isLocalMode && <LocalModeBanner />}
-        <div className="flex-1 overflow-y-auto px-4 py-3">
+        <div
+          ref={messagesScrollRef}
+          className="flex-1 overflow-y-auto px-4 py-3"
+          onTouchStart={isPinned ? undefined : handleContentTouchStart}
+        >
           {/* Polite live-regio alléén om de berichten — de assertive foutbanner
               staat er bewust buiten (geen geneste live-regio's). */}
           <div aria-live="polite" aria-relevant="additions">

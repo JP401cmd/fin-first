@@ -38,6 +38,11 @@
  *    canonieke /overzicht/*-routes (was: /core/assets, /core/debts,
  *    /will#cashflow met ankerverlies); regressie geborgd in
  *    components/app/shell/lever-compass.deeplinks.test.tsx.
+ *  - UAT-NAV-06/d: OPGELOST — het uitgeklapte kompas-paneel hing rechts
+ *    uitgelijnd (`right-0`) terwijl de trigger niet aan de rechterrand van de
+ *    TopBar staat, waardoor het paneel op smalle mobiele schermen links
+ *    voorbij de viewport-rand afsneed; nu gecentreerd onder de trigger met een
+ *    viewport-clamp. Regressie: lever-compass.simple-view.test.tsx.
  *  - UAT-NAV-24: `MobileBottomBar`/`MobileAppStrip` zijn dode code (renderen
  *    altijd niets), ondanks dat pagina's er nog naar verwijzen.
  *  - UAT-NAV-26: de ingelogde 404-pagina toont twee IDENTIEKE knoppen "Naar
@@ -92,12 +97,12 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-NAV-04',
     titel: 'Mobiel navigeren via de zwevende nav-pill + NavMenuSheet',
     kriticiteit: 'BELANGRIJK',
-    given: 'Mobiel viewport (<1024px), NavMenuSheet (z-50, bewust ónder de FloatingNavButton z-[60]).',
-    when: 'De gebruiker tikt het raster-icoon, navigeert of sluit zonder keuze.',
-    then: 'De pill blijft altijd zichtbaar bóven de sheet (sluit-functie); "Vraag Fin" onder "Overal beschikbaar" is een bevestigde no-op (de Fin-bubbel is de werkende mobiele ingang).',
+    given: 'Mobiel viewport (<1024px), NavMenuSheet (z-50, bewust ónder de FloatingNavButton z-[60]). Sinds deze release woont Fins idle-bubbel als DERDE segment ín dezelfde donkere capsule (raster-icoon | scheidingslijn | Fin-slot) — gedeeld via `FinSlotProvider`/`useFinSlot` (lib/shell/fin-slot.tsx): de pill rendert een leeg slot-element, `FinHome` portalt zijn bubbel erin. Boven lg valt dit terug op de losse, zwevende Fin-instantie (het slot bestaat niet meer, de pill zelf ook niet).',
+    when: 'De gebruiker tikt het raster-icoon, navigeert of sluit zonder keuze; en tikt afzonderlijk het Fin-segment in de pill.',
+    then: 'De pill blijft altijd zichtbaar bóven de sheet (sluit-functie); "Vraag Fin" onder "Overal beschikbaar" in de NavMenuSheet is een bevestigde no-op (het Fin-segment ín de pill is de werkende mobiele ingang). Het Fin-segment opent hetzelfde chatpaneel als de vroegere zwevende bubbel (zie WF-NAV-20) en erft de verberg-logica van de pill (overlay/immersieve route verbergt de hele capsule incl. Fin-segment); de scheidingslijn verbergt zichzelf zolang het slot leeg is (chat open).',
     assertion: {
       kind: 'ui-only',
-      source: 'components/app/shell/floating-nav-button.tsx + nav-menu-sheet.tsx — interactie/laag-conventie, geen cijfermatige uitkomst',
+      source: 'components/app/shell/floating-nav-button.tsx + nav-menu-sheet.tsx + lib/shell/fin-slot.tsx + components/app/fin/fin-home.tsx (renderBubble(\'slot\')-portal) — interactie/laag-conventie, geen cijfermatige uitkomst',
     },
   },
   {
@@ -121,10 +126,10 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     given: 'Mobiele TopBar-utility-cluster op een tab-root; kompas-deeplinks in `lever-compass.tsx`. Sinds fase 4 van de eenvoudige weergave hangt de TRIGGER aan de weergavemodus (NAV-6): in Volledig de vier gekleurde stippen naast elkaar, in Eenvoudig één samengevat statuspunt met de zwaarste status van de vier (rood > oranje > groen > geen data).',
     when: 'De gebruiker tikt de kompas-trigger aan en gaat door het paneel naar "Bezittingen"/"Schulden"/"Cashflow".',
-    then: 'De kompas-deeplinks wijzen naar de canonieke /overzicht/*-routes: Bezittingen → /overzicht/bezittingen, Schulden → /overzicht/schulden, Cashflow → /overzicht/cashflow (geen legacy /core/* of /will#cashflow-ankerverlies meer). Het PANEEL is in beide modi identiek: alle vier de hefbomen mét naam, status en detail — de reductie zit uitsluitend in de trigger, dus er gaat geen informatie verloren. In Eenvoudig draagt het ene punt de status ook in zijn aria-label ("Kompas: aandacht — open het kompas"); "geen data" overstemt nooit een echte waarschuwing. Geborgd in lever-compass.deeplinks.test.tsx + lever-compass.simple-view.test.tsx.',
+    then: 'De kompas-deeplinks wijzen naar de canonieke /overzicht/*-routes: Bezittingen → /overzicht/bezittingen, Schulden → /overzicht/schulden, Cashflow → /overzicht/cashflow (geen legacy /core/* of /will#cashflow-ankerverlies meer). Het PANEEL is in beide modi identiek: alle vier de hefbomen mét naam, status en detail — de reductie zit uitsluitend in de trigger, dus er gaat geen informatie verloren. In Eenvoudig draagt het ene punt de status ook in zijn aria-label ("Kompas: aandacht — open het kompas"); "geen data" overstemt nooit een echte waarschuwing. OPGELOST (deze release): het uitgeklapte paneel hangt nu gecentreerd onder de trigger (`left-1/2 -translate-x-1/2`, met `max-w-[calc(100vw-2rem)]` als viewport-clamp) i.p.v. rechts uitgelijnd (`right-0`) — de trigger staat als tweede icoon in de TopBar-rij, niet aan de rechterrand, dus een `right-0`-geankerd 256px-paneel liep op smalle schermen (390px) voorbij de linkerrand af. Geborgd in lever-compass.deeplinks.test.tsx + lever-compass.simple-view.test.tsx.',
     assertion: {
       kind: 'ui-only',
-      source: 'components/app/shell/lever-compass.tsx (LEVERS-config + worstLeverStatus) — canonieke routes; regressietests lever-compass.deeplinks.test.tsx en lever-compass.simple-view.test.tsx',
+      source: 'components/app/shell/lever-compass.tsx (LEVERS-config + worstLeverStatus + gecentreerde paneel-positionering) — canonieke routes; regressietests lever-compass.deeplinks.test.tsx en lever-compass.simple-view.test.tsx',
     },
   },
   {
@@ -314,12 +319,12 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-NAV-21',
     titel: 'BottomSheet-bediening op mobiel (app-brede modal-conventie)',
     kriticiteit: 'BELANGRIJK',
-    given: 'De gedeelde `BottomSheet` (z-[70] default) en de NavMenuSheet (bewuste uitzondering, `belowFloatingNav`, z-50).',
-    when: 'De gebruiker sleept/sluit een sheet via greep, backdrop, X of Escape.',
-    then: 'Elke sheet gedraagt zich identiek (slide-omhoog, uitklappen naar ~92vh, sluiten via drie routes) en dekt de nav-pill af — behalve de NavMenuSheet, die als enige de pill zichtbaar laat (bevestigd als de enige uitzondering).',
+    given: 'De gedeelde `BottomSheet` (z-[70] default) en de NavMenuSheet (bewuste uitzondering, `belowFloatingNav`, z-50). Het sleepgebaar zelf (velocity-drempel, 30%-drempel, rubber-band, scroll-vs-drag-beslissing) is sinds deze release geëxtraheerd naar `lib/hooks/use-swipe-to-dismiss.ts`, zodat óók het niet-gepinde ChatPanel (mobiel) hetzelfde swipe-down-gebaar deelt — géén tweede eigen implementatie.',
+    when: 'De gebruiker sleept/sluit een sheet via greep, backdrop, X of Escape; en sleept het niet-gepinde ChatPanel omlaag via de header (die als greep dient) of vanaf de top van de berichtenlijst.',
+    then: 'Elke sheet (en het ChatPanel) gedraagt zich identiek qua sleepgebaar (slide-omhoog/omlaag, dezelfde velocity/percentage-drempels) — BottomSheet-varianten klappen bovendien uit naar ~92vh (`initialMobileHeight`, ChatPanel kent dit niet); alle sluiten via drie routes en dekken de nav-pill af — behalve de NavMenuSheet, die als enige de pill zichtbaar laat (bevestigd als de enige uitzondering). Het ChatPanel-gebaar is uitgeschakeld zolang de chat gepind is (desktop-zijbalk) of een melding wordt verstuurd (`meldingBezig`) — zie WF-WILL-24.',
     assertion: {
       kind: 'ui-only',
-      source: 'components/app/bottom-sheet.tsx — gedeelde modal-conventie, geen cijfermatige uitkomst',
+      source: 'components/app/bottom-sheet.tsx + lib/hooks/use-swipe-to-dismiss.ts + components/app/chat/chat-panel.tsx (useSwipeToDismiss-gebruik) — gedeelde modal-conventie, geen cijfermatige uitkomst',
     },
   },
   {

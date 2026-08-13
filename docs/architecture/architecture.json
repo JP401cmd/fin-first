@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-11T22:32:23.427Z",
-  "generatedDate": "2026-08-11",
+  "generatedAt": "2026-08-13T19:24:04.231Z",
+  "generatedDate": "2026-08-13",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -192,8 +192,8 @@
     "tables": 89,
     "migrations": 207,
     "integrations": 25,
-    "components": 939,
-    "providers": 14,
+    "components": 940,
+    "providers": 15,
     "contextBuilders": 9,
     "briefingTools": 0,
     "coachLayers": 4,
@@ -8464,6 +8464,10 @@
       "source": "@/components/app/feature-access-provider"
     },
     {
+      "name": "FinSlotProvider",
+      "source": "@/lib/shell/fin-slot"
+    },
+    {
       "name": "GlobalSyncProvider",
       "source": "@/components/sync/global-sync-provider"
     },
@@ -8497,7 +8501,7 @@
     }
   ],
   "components": {
-    "total": 939,
+    "total": 940,
     "groups": [
       {
         "group": "app",
@@ -9142,7 +9146,7 @@
       },
       {
         "group": "core",
-        "count": 75,
+        "count": 76,
         "items": [
           "account-source-icon",
           "account-source-icon.test",
@@ -9154,6 +9158,7 @@
           "asset-edit-broker-section",
           "asset-edit-connection-section",
           "asset-form-iban.test",
+          "asset-return-modal",
           "assets-client",
           "box3-comparison",
           "card-kpi-strip",
@@ -16266,7 +16271,7 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 129
+        "commits": 130
       },
       {
         "path": "lib/ai",
@@ -16314,12 +16319,12 @@
       {
         "file": "components/app/budgets-client.tsx",
         "loc": 5198,
-        "commits": 33
+        "commits": 34
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4508,
-        "commits": 41
+        "loc": 4599,
+        "commits": 42
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -16339,7 +16344,7 @@
       {
         "file": "app/(app)/core/cash/import/page.tsx",
         "loc": 2359,
-        "commits": 20
+        "commits": 21
       },
       {
         "file": "app/(app)/core/checkin/page.tsx",
@@ -17444,7 +17449,7 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-08-11",
+    "previousDate": "2026-08-13",
     "hasChanges": false,
     "sections": []
   },
@@ -17733,6 +17738,13 @@
       "date": "2026-08-11",
       "api": 299,
       "components": 939,
+      "tables": 89,
+      "routesProduction": 95
+    },
+    {
+      "date": "2026-08-13",
+      "api": 299,
+      "components": 940,
       "tables": 89,
       "routesProduction": 95
     }

@@ -646,7 +646,9 @@ describe('ChatPanel — meldt zich als overlay (pill verdwijnt)', () => {
     await waitFor(() => expect(getOverlayCount()).toBe(1))
 
     const divs = Array.from(container.querySelectorAll('div'))
-    const panel = divs.find((el) => el.className.includes('h-[100dvh]'))
+    // Sinds de mobiele top-marge (bewust géén volle 100dvh meer, zie
+    // panelClasses) is dit de stabiele marker voor het modale paneel.
+    const panel = divs.find((el) => el.className.includes('fixed bottom-0 right-0'))
     expect(panel).toBeDefined()
     expect(panel!.className).toContain('z-[70]')
     expect(panel!.className).not.toContain('z-50')
@@ -654,5 +656,126 @@ describe('ChatPanel — meldt zich als overlay (pill verdwijnt)', () => {
     const backdrop = divs.find((el) => el.className.includes('bg-black/20'))
     expect(backdrop).toBeDefined()
     expect(backdrop!.className).toContain('z-[70]')
+  })
+})
+
+/**
+ * Swipe-down-to-dismiss (gedeeld gebaar uit lib/hooks/use-swipe-to-dismiss.ts,
+ * dezelfde hook die BottomSheet gebruikt). Deze tests pinnen de bedrading, niet
+ * de drempelwaarden zelf: (1) een voldoende grote sleep aan de header sluit via
+ * `veiligSluiten`, (2) een korte sleep veert terug, (3) de berichtenlijst
+ * beslist scroll-vs-drag, en (4) de gepinde zijbalk krijgt het gebaar niet.
+ */
+describe('ChatPanel — swipe-down-to-dismiss', () => {
+  const originalOffsetHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')
+
+  function vindDiv(container: HTMLElement, deelKlasse: string) {
+    return Array.from(container.querySelectorAll('div')).find((el) =>
+      el.className.includes(deelKlasse),
+    )
+  }
+
+  beforeEach(() => {
+    localStorage.setItem(WFT_KEY, 'true')
+    stubExecutionFetch({ privacyMode: false })
+    // jsdom geeft elk element hoogte 0, terwijl de dismiss-drempel 30% van de
+    // paneelhoogte is — die hoogte pinnen we dus expliciet.
+    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+      configurable: true,
+      value: 800,
+    })
+  })
+
+  afterEach(() => {
+    if (originalOffsetHeight) {
+      Object.defineProperty(HTMLElement.prototype, 'offsetHeight', originalOffsetHeight)
+    } else {
+      delete (HTMLElement.prototype as unknown as Record<string, unknown>).offsetHeight
+    }
+  })
+
+  it('sluit het paneel na een neerwaartse sleep aan de header', async () => {
+    const close = vi.fn()
+    ctx = makeCtx({ close })
+    const { container } = render(<ChatPanel />)
+    await waitFor(() => expect(screen.getByText('Fin')).toBeInTheDocument())
+
+    const header = vindDiv(container, 'justify-between border-b')!
+    fireEvent.touchStart(header, { touches: [{ clientY: 100 }] })
+    fireEvent.touchMove(header, { touches: [{ clientY: 500 }] })
+    fireEvent.touchEnd(header)
+
+    await waitFor(() => expect(close).toHaveBeenCalledTimes(1))
+  })
+
+  it('sluit NIET bij een korte sleep (onder de drempel) — het paneel veert terug', async () => {
+    const close = vi.fn()
+    ctx = makeCtx({ close })
+    const { container } = render(<ChatPanel />)
+    await waitFor(() => expect(screen.getByText('Fin')).toBeInTheDocument())
+
+    const header = vindDiv(container, 'justify-between border-b')!
+    // Zonder gecontroleerde tijd meet de snelheids-tracker de afstand tussen
+    // twee synchrone fireEvent-aanroepen — dat is al 0ms of "instant" en dus
+    // een willekeurig hoge px/s, ongeacht de bedoelde sleepafstand. 80px in
+    // 200ms (400px/s) is een realistische trage sleep, ruim onder zowel de
+    // snelheids- (800px/s) als de percentage-drempel (30% van de 800px
+    // gemockte paneelhoogte hierboven).
+    const dateNowSpy = vi.spyOn(Date, 'now')
+    dateNowSpy.mockReturnValueOnce(1_000).mockReturnValueOnce(1_200)
+    fireEvent.touchStart(header, { touches: [{ clientY: 100 }] })
+    fireEvent.touchMove(header, { touches: [{ clientY: 180 }] })
+    dateNowSpy.mockRestore()
+    fireEvent.touchEnd(header)
+
+    // Ruim langer dan de langste dismiss-animatie (350ms + marge).
+    await new Promise((r) => setTimeout(r, 450))
+    expect(close).not.toHaveBeenCalled()
+  })
+
+  it('sluit vanuit de berichtenlijst wanneer die bovenaan staat', async () => {
+    const close = vi.fn()
+    ctx = makeCtx({ close })
+    const { container } = render(<ChatPanel />)
+    const lijst = await waitFor(() => vindDiv(container, 'overflow-y-auto px-4 py-3')!)
+
+    fireEvent.touchStart(lijst, { touches: [{ clientY: 100 }] })
+    // Eerste beweging beslist scroll-vs-drag (bovenaan + omlaag = drag).
+    fireEvent.touchMove(lijst, { touches: [{ clientY: 150 }] })
+    fireEvent.touchMove(lijst, { touches: [{ clientY: 550 }] })
+    fireEvent.touchEnd(lijst)
+
+    await waitFor(() => expect(close).toHaveBeenCalledTimes(1))
+  })
+
+  it('sluit NIET wanneer de berichtenlijst gescrold is — dat blijft native scroll', async () => {
+    const close = vi.fn()
+    ctx = makeCtx({ close })
+    const { container } = render(<ChatPanel />)
+    const lijst = await waitFor(() => vindDiv(container, 'overflow-y-auto px-4 py-3')!)
+    Object.defineProperty(lijst, 'scrollTop', { configurable: true, value: 120 })
+
+    fireEvent.touchStart(lijst, { touches: [{ clientY: 100 }] })
+    fireEvent.touchMove(lijst, { touches: [{ clientY: 150 }] })
+    fireEvent.touchMove(lijst, { touches: [{ clientY: 550 }] })
+    fireEvent.touchEnd(lijst)
+
+    await new Promise((r) => setTimeout(r, 450))
+    expect(close).not.toHaveBeenCalled()
+  })
+
+  it('krijgt het gebaar NIET in gepinde (zijbalk-)modus', async () => {
+    const close = vi.fn()
+    ctx = makeCtx({ close, isPinned: true })
+    const { container } = render(<ChatPanel />)
+    await waitFor(() => expect(screen.getByText('Fin')).toBeInTheDocument())
+
+    const header = vindDiv(container, 'justify-between border-b')!
+    fireEvent.touchStart(header, { touches: [{ clientY: 100 }] })
+    fireEvent.touchMove(header, { touches: [{ clientY: 500 }] })
+    fireEvent.touchEnd(header)
+
+    await new Promise((r) => setTimeout(r, 450))
+    expect(close).not.toHaveBeenCalled()
   })
 })

@@ -457,7 +457,7 @@ export function LeverCompassMobile({ scores }: { scores: LeverScores }) {
       {/* Expanded panel */}
       {expanded && (
         <div
-          className="absolute right-0 top-full mt-1.5 z-50 w-64 border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s2)] py-2"
+          className="absolute left-1/2 -translate-x-1/2 top-full mt-1.5 z-50 w-64 max-w-[calc(100vw-2rem)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s2)] py-2"
           role="dialog"
           aria-label="Financieel kompas"
         >

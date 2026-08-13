@@ -12,6 +12,8 @@ import { BottomSheet } from '@/components/app/bottom-sheet'
 // variant degradeert daar stil in plaats van te gooien.
 import { useOptionalToast } from '@/components/app/toast-provider'
 import { Kicker, FiguresStrip, PageInfoButton, GlossaryTerm, PageOpening, SubtotalLine } from '@/components/editorial'
+import { buildAssetReturnBreakdown, formatGainPct } from '@/lib/asset-return'
+import { AssetReturnModal } from './asset-return-modal'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { AssetPane } from '@/components/app/core/assets/asset-pane'
@@ -279,6 +281,7 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
   // en met deeplink-conventie uit `OVERLAY_QUERY_KEYS`.
   const requestedAssetId = searchParams.get('asset')
   const [projectionYears, setProjectionYears] = useState(10)
+  const [returnModalOpen, setReturnModalOpen] = useState(false)
   const [insightOpen, setInsightOpen] = useState(false)
   useEffect(() => {
     try {
@@ -296,6 +299,19 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
   // deze pagina een ander €/dag (en dus andere "jaren vrijheid") dan de
   // balans/vermogen-rapporten en de dashboard-widgets voor hetzelfde bedrag.
   const dailyExpenses = initialData?.dailyExpenses ?? 0
+  // Kostprijs per bezit uit de holdings-motor (`sumHoldingTotals`), via de
+  // server-loader — client-direct lezen van holdings voor weergavedata mag niet
+  // (ADR 0058). De map is NIET perspectief-afhankelijk: RLS op beide
+  // holdings-tabellen is own-row, dus dit zijn per definitie alleen de eigen
+  // kostprijzen en opnieuw ophalen bij een perspectiefwissel levert identieke
+  // data. Een PARTNER-bezit krijgt hier dus nooit een rij — een permanente
+  // RLS-grens, geen verversingsprobleem — en valt in `buildAssetReturnBreakdown`
+  // zichtbaar terug op `purchase_value`; de KPI meldt dat via `sub2`, de modal
+  // per rij.
+  const holdingsCostByAssetId = useMemo(
+    () => initialData?.holdingsCostByAssetId ?? {},
+    [initialData?.holdingsCostByAssetId],
+  )
   const [budgetingActive, setBudgetingActive] = useState(initialData?.budgetingActive ?? true)
   // Cards-decoraties (sparklines + connections) — client-side fetch zodra
   // assets geladen zijn. Failure is non-fataal: lege maps → cards renderen
@@ -446,8 +462,42 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
     [perspective],
   )
   const totalValue = activeAssets.reduce((s, a) => s + perspectiveAssetValue(a, perspective), 0)
-  const totalPurchase = activeAssets.reduce((s, a) => s + Number(a.purchase_value) * shareFractionFor(a), 0)
   const totalMonthlyContrib = activeAssets.reduce((s, a) => s + Number(a.monthly_contribution) * shareFractionFor(a), 0)
+
+  // ── Rendement: grondslagen gescheiden (lib/asset-return.ts) ──
+  // Verving `totalValue − Σ purchase_value`. Die ene aftrekking legde de
+  // kostprijs uit de holdings naast zich neer ten gunste van een met de hand
+  // ingetypt `purchase_value`, telde een banksaldo zonder aankoopwaarde als
+  // volledige winst, en liet een woning van een miljoen het getal overstemmen.
+  // De helper doet het rekenwerk; hier alleen de perspectief-weging, exact
+  // zoals `totalValue` en `shareFractionFor` die elders toepassen.
+  const returnBreakdown = useMemo(
+    () =>
+      buildAssetReturnBreakdown(
+        activeAssets.map((a) => ({
+          id: String(a.id),
+          name: String(a.name ?? ''),
+          // Partner-aggregaatrijen (privacy 'totalen') dragen géén `asset_type`;
+          // `String(undefined)` zette hier letterlijk "undefined" op het scherm.
+          assetType: typeof a.asset_type === 'string' ? a.asset_type : '',
+          value: perspectiveAssetValue(a, perspective),
+          purchaseValue: a.purchase_value != null ? Number(a.purchase_value) : null,
+          shareFraction: shareFractionFor(a),
+          aggregated: a._aggregated === true,
+        })),
+        holdingsCostByAssetId,
+      ),
+    [activeAssets, perspective, shareFractionFor, holdingsCostByAssetId],
+  )
+  const portfolioReturn = returnBreakdown.portfolio
+  // Rust een deel van het rendement op een zelf ingevulde aankoopwaarde in
+  // plaats van op de posities? Dan hoort dat op de KPI zelf te staan, niet
+  // alleen in de modal. Gebeurt structureel bij een PARTNER-bezit: RLS op de
+  // holdings-tabellen is own-row, dus de partner-kant krijgt nooit een
+  // holdings-kostprijs — twee grondslagen in één getal, permanent.
+  const portfolioMixedBasis =
+    portfolioReturn.rows.length > 0 &&
+    portfolioReturn.rows.some((r) => r.costSource === 'purchase_value')
 
   // ── Dubbele grondslag: subtotaal "excl. eigen woning" ────────
   // Gewogen-consistent met het bruto totaal: dezelfde per-item waarde-functie
@@ -766,7 +816,13 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
         deck={
           <>
             Elke bezitting is opgeslagen tijd — geld dat voor je werkt in plaats van andersom.
-            {activeAssets.length > 0 && ` ${activeAssets.length} bezitting${activeAssets.length === 1 ? '' : 'en'} bij elkaar — gewogen naar inclusiepercentage.`}
+            {/* De strip hieronder telt élke bezitting voor zijn VOLLE waarde op:
+                `perspectiveAssetValue` weegt alleen het huishoud-aandeel, niet
+                `net_worth_inclusion_pct`. De deck beloofde het omgekeerde
+                ("gewogen naar inclusiepercentage") en was daarmee onwaar — een
+                woning op 50% inclusie telde hier gewoon vol mee. Netto vermogen
+                weegt wél (lib/asset-data.ts), vandaar de verwijzing. */}
+            {activeAssets.length > 0 && ` ${activeAssets.length} bezitting${activeAssets.length === 1 ? '' : 'en'} bij elkaar, elk voor zijn volle waarde — je netto vermogen weegt ze naar inclusiepercentage en valt daardoor anders uit.`}
           </>
         }
       >
@@ -816,15 +872,24 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
               sub: 'totale inleg per maand',
             },
             {
-              kicker: 'Rendement totaal',
-              amount: totalPurchase > 0
-                ? `${totalValue >= totalPurchase ? '+' : ''}${fc(totalValue - totalPurchase)}`
+              // Grondslag in de naam: dit is het rendement op de MARKTPORTEFEUILLE
+              // (beleggingen + crypto), niet op alles wat je bezit. De rekenmodal
+              // hieronder toont de andere twee stapels — woning/deelneming en de
+              // bezittingen zonder kostprijs — zodat het totaal blijft kloppen.
+              kicker: 'Rendement portefeuille',
+              amount: portfolioReturn.cost > 0
+                ? `${portfolioReturn.gain >= 0 ? '+' : ''}${fc(portfolioReturn.gain)}`
                 : '—',
-              sub: totalPurchase > 0
-                ? totalValue >= totalPurchase ? 'sinds aankoop' : 'verlies sinds aankoop'
-                : 'geen aankoopwaarde bekend',
-              variant: totalPurchase > 0
-                ? totalValue >= totalPurchase ? 'positive' : 'negative'
+              sub: portfolioReturn.pct != null
+                ? `${formatGainPct(portfolioReturn.pct)} sinds aankoop`
+                : 'geen kostprijs bekend',
+              sub2: portfolioReturn.cost > 0
+                ? portfolioMixedBasis
+                  ? 'beleggingen en crypto · deels op ingevulde aankoopwaarde'
+                  : 'beleggingen en crypto'
+                : undefined,
+              variant: portfolioReturn.cost > 0
+                ? portfolioReturn.gain >= 0 ? 'positive' : 'negative'
                 : 'neutral',
             },
             {
@@ -838,6 +903,32 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
           ]}
         />
       )}
+
+      {/* Rekenmodal-trigger. Alleen in "Volledig": in Eenvoudig valt de
+          rendement-cel zelf weg, dus zou dit naar een uitleg zonder onderwerp
+          wijzen. Bewust een aparte knop en geen klikbare figures-cel — `FigureProps`
+          kent alleen `href` (een `<a>`), en een overlay openen via een nep-link
+          breekt toetsenbord- en screenreader-gedrag. */}
+      {!simple && (
+        <div className="-mt-2 mb-5 flex justify-end">
+          <button
+            type="button"
+            onClick={() => setReturnModalOpen(true)}
+            aria-haspopup="dialog"
+            aria-expanded={returnModalOpen}
+            className="inline-flex min-h-[44px] items-center gap-1.5 font-sans text-xs text-[var(--ink-3)] underline decoration-dotted underline-offset-4 transition-colors hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+          >
+            Zo is het rendement berekend
+          </button>
+        </div>
+      )}
+
+      <AssetReturnModal
+        open={returnModalOpen}
+        onClose={() => setReturnModalOpen(false)}
+        breakdown={returnBreakdown}
+        dailyExpenses={dailyExpenses}
+      />
 
       {/* Dubbele grondslag — subtieler subtotaal "excl. eigen woning" onder het
           bruto totaal. Zelfde typografie-familie (mono/tabular-nums), kern-accent,

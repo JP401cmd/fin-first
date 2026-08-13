@@ -20,11 +20,11 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'compleet',
     given: 'Persona Tessa Compleet geladen (13 bezittingen + 3 bankrekeningen-als-cash = 16 rijen, 13 categoriegroepen).',
     when: 'De gebruiker opent /overzicht/bezittingen (of legacy /core/assets) en leest de figures-strip.',
-    then: 'Totale waarde = €1.585.000, Maandelijkse inleg = €1.700, Rendement totaal = €559.000; 13 categoriegroepen, 16 kaarten (Cash-groep bevat 4: 3 rekeningen + de "Spaargeld direct opneembaar"-asset die zelf asset_type "cash" is).',
+    then: 'Totale waarde = €1.585.000, Maandelijkse inleg = €1.700; 13 categoriegroepen, 16 kaarten (Cash-groep bevat 4: 3 rekeningen + de "Spaargeld direct opneembaar"-asset die zelf asset_type "cash" is). SINDS de omzetting naar `buildAssetReturnBreakdown` (lib/asset-return.ts) heet de vierde cel "Rendement portefeuille" (niet meer "Rendement totaal") en dekt uitsluitend de marktportefeuille (investment + crypto): Meesman Wereldwijd Totaal draagt €73.860,02 (waarde €300.000 − holdings-kostprijs €226.139,98 = 2.215 eenheden × avg_purchase_price €102,0948, NIET het ronde purchase_value-veld €210.000) en Crypto portefeuille draagt €11.000 (waarde €20.000 − purchase_value €9.000, geen holdings-tracking op deze asset). Rendement portefeuille = +€84.860,02 op kostprijs €235.139,98 ⇒ +36,1% sinds aankoop. De overige 11 bezittingen (eigen woning, verhuurd appartement, auto, kunst, deelneming, kapitaalverzekering, vordering, aanhangwagen + 3× cash/savings/retirement) landen niet meer in deze KPI — ze zijn zichtbaar in de rekenmodal (WF-BEZIT-27), niet in de kop-KPI.',
     assertion: {
       kind: 'exact',
-      expected: 'totaleWaarde=1585000; maandelijkseInleg=1700; rendementTotaal=559000; groepen=13; kaarten=16',
-      source: 'som current_value over PERSONAS.compleet.assets + PERSONAS.compleet.bank_accounts (spiegelt perspectiveAssetValue/totalValue in components/core/assets-client.tsx — in het solo-perspectief van een persona zonder huishouden is ownership altijd "personal", dus perspectiveAssetValue(asset) reduceert triviaal tot current_value; geen aparte weeglogica te herimplementeren). SINDS ADR 0101 (gedeelde cash in de leeslaag) krijgt `buildUnlinkedCashAssets` óók een `{ perspective, mySharePct }`-optie mee, zodat een GEDEELDE bankrekening op het eigen aandeel telt in plaats van bij beide partners vol — voor deze solo-persona is die factor 1 en blijft het cijfer dus ongewijzigd; op een huishoud-persona zou het wél verschillen.',
+      expected: 'totaleWaarde=1585000; maandelijkseInleg=1700; rendementPortefeuille=84860.02; rendementPortefeuilleCost=235139.98; rendementPortefeuillePct=36.09; groepen=13; kaarten=16',
+      source: 'som current_value over PERSONAS.compleet.assets + PERSONAS.compleet.bank_accounts (spiegelt perspectiveAssetValue/totalValue in components/core/assets-client.tsx — in het solo-perspectief van een persona zonder huishouden is ownership altijd "personal", dus perspectiveAssetValue(asset) reduceert triviaal tot current_value; geen aparte weeglogica te herimplementeren). SINDS ADR 0101 (gedeelde cash in de leeslaag) krijgt `buildUnlinkedCashAssets` óók een `{ perspective, mySharePct }`-optie mee, zodat een GEDEELDE bankrekening op het eigen aandeel telt in plaats van bij beide partners vol — voor deze solo-persona is die factor 1 en blijft het cijfer dus ongewijzigd; op een huishoud-persona zou het wél verschillen. Rendement portefeuille komt sinds 13-08-2026 uit `lib/asset-return.ts#buildAssetReturnBreakdown(assets, holdingsCostByAssetId).portfolio` — de kostprijs van Meesman komt uit `lib/holdings-totals.ts#sumHoldingTotals` (units × avg_purchase_price, de kolom op de holding-rij, NIET de transactiehistorie uit WF-BEZIT-16 — die twee liggen hier €0,02 uit elkaar door de 4-decimalen-afronding van het seed-veld avg_purchase_price=102,0948 t.o.v. de exacte 226.140/2.215).',
     },
   },
   {
@@ -390,6 +390,20 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'consistency',
       source: 'app/api/benchmark-comparison/route.ts + lib/benchmark-comparison.ts#resolveComparisonWindow/compareToBenchmarks/buildPortfolioHistory/computeTwrOutcome/fetchAllRealBenchmarkData + components/app/benchmark-comparison-chart.tsx + components/core/holdings/portfolio-summary.tsx — live Yahoo Finance-afhankelijk, geen hand-narekenbaar exact-cijfer; consistentie-eis is venster-identiek tussen fetch en vergelijking, zie lib/architecture/calculations.ts#portfolio-benchmarkvergelijking',
+    },
+  },
+  {
+    workflow: 'WF-BEZIT-27',
+    scenarioId: 'UAT-BEZIT-27',
+    titel: 'Rekenmodal "Zo is het rendement berekend" raadplegen',
+    kriticiteit: 'BELANGRIJK',
+    persona: 'compleet',
+    given: 'Persona Tessa Compleet geladen; figures-strip in weergavemodus "Volledig" (de knop bestaat niet in "Eenvoudig").',
+    when: 'De gebruiker klikt "Zo is het rendement berekend" onder de figures-strip.',
+    then: 'Een `ShellOverlay kind="sheet"` "Rendement — zo is het opgebouwd" opent met drie secties: MEEGETELD · MARKTPORTEFEUILLE (Meesman + Crypto, elk met "kostprijs uit je posities" resp. "aankoopwaarde die je zelf invulde" als bronlabel, totaalregel "Rendement portefeuille" = +€84.860,02); APART · WAARDEVERANDERING (eigen woning, verhuurd appartement, auto, kunst + sieraden, deelneming, kapitaalverzekering, vordering, aanhangwagen — 8 rijen, totaalregel "Waardeverandering"); GEEN GRONDSLAG (3 bankrekeningen + Spaargeld direct opneembaar + Spaardeposito 3-jaar + Pensioenfonds ABP — 6 rijen, geen totaalregel). De sluitpost-kassabon telt Marktportefeuille (€320.000) + Waardeverandering-bezit + Zonder grondslag exact op tot "Totale waarde" (€1.585.000) — dezelfde optelling als de figures-strip toont, dus geen bedrag verdwijnt tussen de emmers.',
+    assertion: {
+      kind: 'consistency',
+      source: 'components/core/asset-return-modal.tsx (drie Section-blokken + sluitpost-KassabonShell) consumeert `AssetReturnBreakdown` uit lib/asset-return.ts#buildAssetReturnBreakdown zonder eigen berekening ("consume, don\'t recompute"); consistentie-eis: portfolio.value + valuation.value + withoutBasis.value === totalValue === de "Totale waarde" uit de figures-strip (WF-BEZIT-01). Geen los engine-check nodig — dat is precies de optelling die buildAssetReturnBreakdown per constructie garandeert (totalValue = Σ over alle rijen, ongeacht emmer).',
     },
   },
 ]

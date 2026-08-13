@@ -32,8 +32,14 @@ test.describe('UAT-BEZIT-01 — Bezittingenoverzicht: totalen en categorieën', 
     expect(parseEuroAmount(figures.totaleWaarde)).toBe(1_585_000)
     // Σ monthly_contribution: Spaardeposito €200 + Meesman €1.500.
     expect(parseEuroAmount(figures.maandelijkseInleg)).toBe(1_700)
-    // totalValue (1.585.000) − totalPurchase (1.026.000).
-    expect(parseEuroAmount(figures.rendementTotaal)).toBe(559_000)
+    // Rendement portefeuille (lib/asset-return.ts#buildAssetReturnBreakdown):
+    // uitsluitend de marktportefeuille (investment + crypto), niet Σ alle
+    // bezittingen. Meesman: waarde €300.000 − holdings-kostprijs €226.139,98
+    // (2.215 × avg_purchase_price €102,0948) = €73.860,02. Crypto: waarde
+    // €20.000 − purchase_value €9.000 = €11.000 (geen holdings-tracking op
+    // deze asset). Totaal €84.860,02, rondt af naar €84.860 (fc() toont 0
+    // decimalen).
+    expect(parseEuroAmount(figures.rendementPortefeuille)).toBe(84_860)
 
     // Kanttekening 1 (uat2-bezit.md regel 8): het vrijheidstijd-onderschrift
     // hangt af van seed-jitter op de lopende-maand-uitgaven — we toetsen

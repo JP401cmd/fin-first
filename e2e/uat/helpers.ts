@@ -104,7 +104,7 @@ export async function seedPersona(page: Page, key: PersonaKey): Promise<void> {
 export interface FiguresStripValues {
   totaleWaarde: string
   maandelijkseInleg: string
-  rendementTotaal: string
+  rendementPortefeuille: string
 }
 
 /**
@@ -134,12 +134,12 @@ export async function readFiguresStrip(page: Page): Promise<FiguresStripValues> 
   return {
     totaleWaarde: await readByKicker('Totale waarde'),
     maandelijkseInleg: await readByKicker('Maandelijkse inleg'),
-    rendementTotaal: await readByKicker('Rendement totaal'),
+    rendementPortefeuille: await readByKicker('Rendement portefeuille'),
   }
 }
 
 /**
- * Parseert een NL-geformatteerd euro-bedrag ("€ 1.585.000", "+€ 559.000",
+ * Parseert een NL-geformatteerd euro-bedrag ("€ 1.585.000", "+€ 84.860",
  * "€ 1.585.000") naar een geheel getal. Decimalen komen op de
  * figures-strip niet voor (`fc()` rondt af), dus we hoeven geen komma's
  * te ontleden. Geeft `NaN` terug bij een placeholder als "—".
