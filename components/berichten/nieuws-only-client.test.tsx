@@ -140,13 +140,66 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+// ── 0. cache-scoping — de editie van account A mag nooit bij account B ─────
+
+describe('NieuwsOnlyClient — browsercache is accountgebonden', () => {
+  const cloud = () =>
+    executionState({ status: 'cloud', intended: 'cloud', canUseCloud: true })
+
+  function seedCache(key: string, headline: string) {
+    localStorage.setItem(
+      key,
+      JSON.stringify({ items: [newsItem('a-1', headline)], fetchedAt: Date.now() }),
+    )
+  }
+
+  it('leest de cache van een ander account niet en haalt een eigen editie op', async () => {
+    // Given account A heeft op dit toestel een editie in de browsercache staan
+    seedCache('trifinity_news_cache:user-a', 'Editie van account A')
+    mocks.useExecutionMode.mockReturnValue(cloud())
+
+    // When account B op hetzelfde toestel /nieuws opent
+    render(<NieuwsOnlyClient userId="user-b" />)
+
+    // Then ziet B zijn eigen editie, niet die van A
+    expect(await screen.findByText('Cloudbericht')).toBeInTheDocument()
+    expect(screen.queryByText('Editie van account A')).not.toBeInTheDocument()
+    expect(urls()).toContain('/api/news')
+  })
+
+  it('negeert en verwijdert de oude accountloze cachesleutel', async () => {
+    // Given een cache uit de tijd dat de sleutel niet op user_id was gescoped —
+    // die kan van elk account op dit toestel zijn en is dus onbruikbaar.
+    seedCache('trifinity_news_cache', 'Editie van onbekend account')
+    mocks.useExecutionMode.mockReturnValue(cloud())
+
+    render(<NieuwsOnlyClient userId="user-b" />)
+
+    expect(await screen.findByText('Cloudbericht')).toBeInTheDocument()
+    expect(screen.queryByText('Editie van onbekend account')).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(localStorage.getItem('trifinity_news_cache')).toBeNull(),
+    )
+  })
+
+  it('leest de eigen cache wél en slaat de fetch dan over', async () => {
+    seedCache('trifinity_news_cache:user-b', 'Eigen bewaarde editie')
+    mocks.useExecutionMode.mockReturnValue(cloud())
+
+    render(<NieuwsOnlyClient userId="user-b" />)
+
+    expect(await screen.findByText('Eigen bewaarde editie')).toBeInTheDocument()
+    expect(urls()).not.toContain('/api/news')
+  })
+})
+
 // ── 1. resolving — er mag NIETS vertrekken ─────────────────────────────────
 
 describe('NieuwsOnlyClient — uitvoertoestanden', () => {
   it("'resolving' start geen cloud-fetch en geen lokale generatie", async () => {
     mocks.useExecutionMode.mockReturnValue(executionState({ status: 'resolving' }))
 
-    render(<NieuwsOnlyClient />)
+    render(<NieuwsOnlyClient userId="user-b" />)
 
     await waitFor(() => expect(screen.getByTestId('skeleton')).toBeInTheDocument())
     expect(urls().some((u) => u.startsWith('/api/news?') || u === '/api/news')).toBe(false)
@@ -164,7 +217,7 @@ describe('NieuwsOnlyClient — uitvoertoestanden', () => {
       }),
     )
 
-    render(<NieuwsOnlyClient />)
+    render(<NieuwsOnlyClient userId="user-b" />)
 
     expect(
       await screen.findByText('Het lokale model staat niet (meer) op dit toestel.'),
@@ -187,7 +240,7 @@ describe('NieuwsOnlyClient — uitvoertoestanden', () => {
       executionState({ status: 'cloud', intended: 'cloud', canUseCloud: true }),
     )
 
-    render(<NieuwsOnlyClient />)
+    render(<NieuwsOnlyClient userId="user-b" />)
 
     expect(await screen.findByText('Cloudbericht')).toBeInTheDocument()
     expect(urls()).toContain('/api/news')
@@ -202,7 +255,7 @@ describe('NieuwsOnlyClient — uitvoertoestanden', () => {
     )
     storedEdition = { items: [newsItem('news-local-a1', 'Bewaard bericht')], cached: true, sourceCount: 12 }
 
-    render(<NieuwsOnlyClient />)
+    render(<NieuwsOnlyClient userId="user-b" />)
 
     expect(await screen.findByText('Bewaard bericht')).toBeInTheDocument()
     expect(mocks.generateLocalNewsEdition).not.toHaveBeenCalled()
@@ -217,7 +270,7 @@ describe('NieuwsOnlyClient — uitvoertoestanden', () => {
     )
     storedEdition = { items: [], cached: true, sourceCount: 12 }
 
-    render(<NieuwsOnlyClient />)
+    render(<NieuwsOnlyClient userId="user-b" />)
 
     expect(await screen.findByText('Geen nieuws met impact op jouw situatie')).toBeInTheDocument()
     expect(mocks.generateLocalNewsEdition).not.toHaveBeenCalled()
@@ -251,7 +304,7 @@ describe('NieuwsOnlyClient — uitvoertoestanden', () => {
         }),
     )
 
-    render(<NieuwsOnlyClient />)
+    render(<NieuwsOnlyClient userId="user-b" />)
 
     await waitFor(() => expect(mocks.generateLocalNewsEdition).toHaveBeenCalled())
 
@@ -304,7 +357,7 @@ describe('NieuwsOnlyClient — uitvoertoestanden', () => {
         }),
     )
 
-    render(<NieuwsOnlyClient />)
+    render(<NieuwsOnlyClient userId="user-b" />)
     await waitFor(() => expect(mocks.generateLocalNewsEdition).toHaveBeenCalled())
 
     const bar = () => screen.getByRole('progressbar')
@@ -327,7 +380,7 @@ describe('NieuwsOnlyClient — uitvoertoestanden', () => {
     storedEdition = { items: [newsItem('news-local-a1', 'Bewaard bericht')], cached: true, sourceCount: 12 }
     mocks.generateLocalNewsEdition.mockRejectedValue(new Error('Het model reageerde niet.'))
 
-    render(<NieuwsOnlyClient />)
+    render(<NieuwsOnlyClient userId="user-b" />)
     expect(await screen.findByText('Bewaard bericht')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /ververs/i }))
@@ -346,7 +399,7 @@ describe('NieuwsOnlyClient — uitvoertoestanden', () => {
     storedEdition = { items: [], cached: false }
     mocks.generateLocalNewsEdition.mockResolvedValue([])
 
-    render(<NieuwsOnlyClient />)
+    render(<NieuwsOnlyClient userId="user-b" />)
 
     await waitFor(() => expect(postCalls).toHaveLength(1))
     // Zonder deze POST blijft `cached` false en start het volgende bezoek

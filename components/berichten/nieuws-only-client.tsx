@@ -17,18 +17,34 @@ import { LOCAL_NEWS_MAX_ITEMS } from '@/lib/ai/local/local-news-select'
 import { useLocalNewsEdition } from './use-local-news-edition'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import type { NewsItem } from '@/lib/news-item'
+import { NEWS_CACHE_KEY_PREFIX } from '@/lib/browser-account-storage'
 
 // ── News cache (client-side) ────────────────────────────────────────
-// Duplicated from berichten-client.tsx intentionally — the two pages
-// may evolve independently and share the same localStorage key so a
-// user switching between them still benefits from cached data.
-//
 // LET OP: deze cache hoort bij het CLOUDPAD. De on-device editie wordt
 // server-side bewaard (/api/local-news-edition) en raakt deze sleutel niet aan —
 // anders zou een lokaal samengestelde editie in de cloud-cache belanden.
+//
+// PER ACCOUNT GESCOPED — de reden staat canoniek in `lib/browser-account-storage.ts`.
+// Specifiek hier: `fetchNews` serveert deze cache vóór er ook maar één keer naar
+// /api/news wordt gekeken, dus een ongescopede sleutel betekent dat het andere
+// account de editie krijgt zónder dat de server ooit om een mening is gevraagd.
+// De server was nooit het probleem: /api/news en `news_cache:<uid>` in app_settings
+// zijn overal op user.id gescoped.
+//
+// De user_id komt als prop uit de server-page (`app/(app)/nieuws/page.tsx`), niet
+// uit een client-side auth-call: dan bestaat er geen venster waarin de cache al
+// gelezen is maar de identiteit nog niet bekend.
 
-const NEWS_LOCAL_CACHE_KEY = 'trifinity_news_cache'
+/**
+ * Sleutel van vóór de scoping — bevroren literal, bewust GEEN alias van de prefix
+ * hierboven: die kan nog wijzigen (`…_v2`), deze is geschiedenis.
+ */
+const LEGACY_NEWS_CACHE_KEY = 'trifinity_news_cache'
 const NEWS_CACHE_TTL_MS = 6 * 60 * 60 * 1000 // 6 hours
+
+function newsCacheKey(userId: string): string {
+  return `${NEWS_CACHE_KEY_PREFIX}:${userId}`
+}
 
 interface LocalNewsCache {
   items: NewsItem[]
@@ -39,7 +55,7 @@ interface LocalNewsCache {
   jaargang?: number
 }
 
-function getLocalNewsCache(): {
+function getLocalNewsCache(userId: string): {
   items: NewsItem[]
   generatedAt?: string
   sourceCount?: number
@@ -47,7 +63,11 @@ function getLocalNewsCache(): {
   jaargang?: number
 } | null {
   try {
-    const raw = localStorage.getItem(NEWS_LOCAL_CACHE_KEY)
+    // De accountloze sleutel is per definitie van onbekende herkomst: weggooien,
+    // niet migreren naar de huidige gebruiker.
+    localStorage.removeItem(LEGACY_NEWS_CACHE_KEY)
+
+    const raw = localStorage.getItem(newsCacheKey(userId))
     if (!raw) return null
     const cache: LocalNewsCache = JSON.parse(raw)
     if (Date.now() - cache.fetchedAt > NEWS_CACHE_TTL_MS) return null
@@ -64,6 +84,7 @@ function getLocalNewsCache(): {
 }
 
 function setLocalNewsCache(
+  userId: string,
   items: NewsItem[],
   generatedAt?: string,
   sourceCount?: number,
@@ -72,7 +93,7 @@ function setLocalNewsCache(
 ): void {
   try {
     const cache: LocalNewsCache = { items, fetchedAt: Date.now(), generatedAt, sourceCount, editionNr, jaargang }
-    localStorage.setItem(NEWS_LOCAL_CACHE_KEY, JSON.stringify(cache))
+    localStorage.setItem(newsCacheKey(userId), JSON.stringify(cache))
   } catch {
     // Silent fail — localStorage might be full
   }
@@ -229,7 +250,7 @@ function LocalUnavailableNotice({ message, onRetry }: { message: string; onRetry
 // De gate loopt via `canUseCloud`/`canUseLocal`, niet via een eigen
 // `status === 'lokaal'`-vergelijking — dat is de fail-closed-garantie.
 
-export function NieuwsOnlyClient() {
+export function NieuwsOnlyClient({ userId }: { userId: string }) {
   // Weergavemodus — stuurt alleen de masthead-reductie (NWS-1) aan.
   const simple = useDisplayMode().mode === 'simple'
   // ── News state ──
@@ -283,7 +304,7 @@ export function NieuwsOnlyClient() {
   // ── Fetch news (initial load) ──
   const fetchNews = useCallback(async () => {
     if (newsFetched) return
-    const cached = getLocalNewsCache()
+    const cached = getLocalNewsCache(userId)
     if (cached) {
       setNewsItems(cached.items)
       if (cached.generatedAt) setGeneratedAt(cached.generatedAt)
@@ -313,7 +334,7 @@ export function NieuwsOnlyClient() {
 
       const items: NewsItem[] = data.items ?? data
       setNewsItems(items)
-      setLocalNewsCache(items, data.generatedAt, data.sourceCount, data.editionNr, data.jaargang)
+      setLocalNewsCache(userId, items, data.generatedAt, data.sourceCount, data.editionNr, data.jaargang)
       setNewsFetched(true)
       if (data.editionNr) setEditionNr(data.editionNr)
       if (data.jaargang) setJaargang(data.jaargang)
@@ -325,14 +346,14 @@ export function NieuwsOnlyClient() {
     } finally {
       setNewsLoading(false)
     }
-  }, [newsFetched])
+  }, [newsFetched, userId])
 
   // ── Refresh news (manual) ──
   const refreshNews = useCallback(async () => {
     // Fail-closed: een verversing is een cloud-generatie. Alleen bij een
     // expliciet cloud-groen licht.
     if (!execution.canUseCloud) return
-    try { localStorage.removeItem(NEWS_LOCAL_CACHE_KEY) } catch { /* noop */ }
+    try { localStorage.removeItem(newsCacheKey(userId)) } catch { /* noop */ }
     // Keep current items visible — use overlay instead of clearing
     setRefreshing(true)
     setNewsError(null)
@@ -360,7 +381,7 @@ export function NieuwsOnlyClient() {
 
       const items: NewsItem[] = data.items ?? data
       setNewsItems(items)
-      setLocalNewsCache(items, data.generatedAt, data.sourceCount, data.editionNr, data.jaargang)
+      setLocalNewsCache(userId, items, data.generatedAt, data.sourceCount, data.editionNr, data.jaargang)
       setNewsFetched(true)
       setRefreshing(false)
       if (data.editionNr) setEditionNr(data.editionNr)
@@ -372,7 +393,7 @@ export function NieuwsOnlyClient() {
       setNewsError(err instanceof Error ? err.message : 'Nieuws kon niet worden geladen')
       setRefreshing(false)
     }
-  }, [execution.canUseCloud])
+  }, [execution.canUseCloud, userId])
 
   // News-only users have AI enabled by definition — fetch zodra vaststaat dat
   // deze editie via de cloud hoort te komen. In 'resolving'/'blocked'/'lokaal'
@@ -409,7 +430,7 @@ export function NieuwsOnlyClient() {
         // Generation complete — final items arrived
         const items: NewsItem[] = data.items ?? data
         setNewsItems(items)
-        setLocalNewsCache(items, data.generatedAt, data.sourceCount, data.editionNr, data.jaargang)
+        setLocalNewsCache(userId, items, data.generatedAt, data.sourceCount, data.editionNr, data.jaargang)
         setNewsFetched(true)
         setGenerating(false)
         setRefreshing(false)
@@ -432,7 +453,7 @@ export function NieuwsOnlyClient() {
       poll()
     }, 4000)
     return () => clearInterval(interval)
-  }, [generating, newsFetched, execution.canUseCloud])
+  }, [generating, newsFetched, execution.canUseCloud, userId])
 
   // ── Eén weergavemodel voor beide paden ──
   // De JSX hieronder leest uitsluitend deze afgeleiden, zodat cloud- en

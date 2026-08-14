@@ -47,6 +47,7 @@ import { FinHome } from '@/components/app/fin/fin-home'
 import { parseCoachConfig, type CoachDataGaps } from '@/lib/coach-suggestions'
 import { ModuleColorProvider } from '@/components/app/module-color-provider'
 import { FinSlotProvider } from '@/lib/shell/fin-slot'
+import { AccountStorageGuard } from '@/components/app/account-storage-guard'
 import {
   generateAllColorVars,
   DEFAULT_MODULE_COLORS,
@@ -532,7 +533,8 @@ export default async function AppLayout({
                         Naar hoofdinhoud
                       </a>
                       <FeatureAccessProvider data={featureAccess} activeModules={activeModules}>
-                        <CommandPaletteProvider role={profile?.role ?? 'user'}>
+                        <AccountStorageGuard userId={user.id} />
+                        <CommandPaletteProvider role={profile?.role ?? 'user'} userId={user.id}>
                           {/* Deelt de vier cashflow-kaartstatussen tussen de
                               sidebar-dots (in de Sidebar) en de server-seed van
                               de cashflow-hub (in de pagina) — twee zustertakken

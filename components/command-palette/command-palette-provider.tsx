@@ -63,10 +63,13 @@ export function useCommandPalette(): CommandPaletteContextValue {
 
 export function CommandPaletteProvider({
   role,
+  userId,
   children,
 }: {
   /** Rol uit profiles.role — bepaalt of beheer-pages getoond worden. */
   role?: string
+  /** Scope van de recents-opslag; zie lib/command-palette/recents.ts. */
+  userId: string
   children: ReactNode
 }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -112,7 +115,7 @@ export function CommandPaletteProvider({
   return (
     <CommandPaletteContext.Provider value={value}>
       {children}
-      {mounted && <CommandPalette open={isOpen} onClose={close} role={role} />}
+      {mounted && <CommandPalette open={isOpen} onClose={close} role={role} userId={userId} />}
     </CommandPaletteContext.Provider>
   )
 }

@@ -80,11 +80,13 @@ type CommandPaletteProps = {
   onClose: () => void
   /** profile.role uit (app)/layout.tsx — bepaalt zichtbaarheid van beheer-pages. */
   role?: string
+  /** Scope van de recents-opslag; zie lib/command-palette/recents.ts. */
+  userId: string
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function CommandPalette({ open, onClose, role }: CommandPaletteProps) {
+export function CommandPalette({ open, onClose, role, userId }: CommandPaletteProps) {
   const router = useRouter()
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -186,8 +188,8 @@ export function CommandPalette({ open, onClose, role }: CommandPaletteProps) {
   const [recents, setRecents] = useState<CommandItem[]>([])
   useEffect(() => {
     if (!open) return
-    setRecents(recentsToCommandItems(readRecents()))
-  }, [open])
+    setRecents(recentsToCommandItems(readRecents(userId)))
+  }, [open, userId])
 
   // ── Entity-search (debounced) ──────────────────────────────────────────────
   useEffect(() => {
@@ -308,7 +310,7 @@ export function CommandPalette({ open, onClose, role }: CommandPaletteProps) {
   // ── Activeer item ──────────────────────────────────────────────────────────
   const activate = useCallback(
     (item: CommandItem) => {
-      pushRecent(item)
+      pushRecent(userId, item)
       if (item.run) {
         void item.run()
         return
@@ -318,7 +320,7 @@ export function CommandPalette({ open, onClose, role }: CommandPaletteProps) {
         router.push(item.href)
       }
     },
-    [router, onClose],
+    [router, onClose, userId],
   )
 
   // ── Keyboard-nav ───────────────────────────────────────────────────────────

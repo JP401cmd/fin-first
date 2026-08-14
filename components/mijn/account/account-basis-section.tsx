@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Mail, KeyRound, LogOut } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { purgeAccountScopedStorage } from '@/lib/browser-account-storage'
 import { checkLeakedPassword } from '@/lib/leaked-password'
 import { LEAKED_PASSWORD_MESSAGE, MIN_PASSWORD_LENGTH } from '@/lib/password-policy'
 
@@ -223,6 +224,10 @@ function SignOutEverywhere() {
 
   async function handleSignOut() {
     setLoading(true)
+    // Ook hier opruimen: dit is de sterkste uitlogactie van de app en hij gaat
+    // niet langs /logout. Zonder deze regel laat juist "log me overal uit" op dít
+    // toestel alles staan.
+    purgeAccountScopedStorage()
     const supabase = createClient()
     await supabase.auth.signOut({ scope: 'global' })
     router.replace('/')

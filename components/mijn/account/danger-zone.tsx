@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Trash2, AlertTriangle } from 'lucide-react'
+import { purgeAccountScopedStorage } from '@/lib/browser-account-storage'
 
 /**
  * DangerZone — onomkeerbare account-verwijdering. Vereist dat de gebruiker
@@ -33,6 +34,10 @@ export function DangerZone({ currentEmail }: { currentEmail: string }) {
         const body = (await res.json().catch(() => null)) as { error?: string } | null
         throw new Error(body?.error ?? 'Verwijderen mislukt')
       }
+      // De server is leeg, maar de browser hield kopieën: onboarding-antwoorden
+      // (inkomen/vermogen), concepten en de krantcache. Wie "verwijder alles"
+      // vraagt, hoort niet met zijn gegevens op het toestel achter te blijven.
+      purgeAccountScopedStorage()
       router.replace('/')
     } catch (err) {
       setDeleting(false)
