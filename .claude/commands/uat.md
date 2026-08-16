@@ -20,6 +20,7 @@ Je draait een **UAT live-run** over de TriFinity-app: je test de gekozen UAT-zon
 4. **NOOIT uitloggen / de sessie beëindigen.** Het `jochen`-wachtwoord is onbekend en de sessie is cookie-based; uitloggen = lockout. Logout-scenario's → alleen de affordance verifiëren, niet klikken.
 5. **Niet-destructief tenzij veilig-omkeerbaar op dit wegwerpaccount.** Draai destructieve admin-tools (account verwijderen, persona-seed die wist, onboarding-reset, check-in wissen, AI-kill-switch op prod-config) **niet** echt — verifieer rendering/bereikbaarheid. Maak eigen test-CRUD (transacties/budgetten/rapporten/calculators) achteraf ongedaan zodat het account eindigt zoals het begon.
 6. **Efficiënt.** Gebruik `evaluate_script` met tekst-presence-checks (`document.body.innerText.includes(...)`, `querySelector`, `location.pathname`) i.p.v. dure full-page screenshots; screenshot alleen waar visuele/mobiele bevestiging nodig is. Mobiel-scenario's: emuleer ~390×844.
+7. **Bugnummer terugschrijven naar de registratie.** Maak (of hergebruik) je voor een `gefaald`/`geblokkeerd`-instantie een Notion-kaartje, zet dan de kaart-URL letterlijk in de `opmerking` van diezelfde `POST /api/admin/uat/results`-registratie (bv. "... Zie <notion-url>."). `uat_results` heeft geen aparte kolom hiervoor — `opmerking` is de drager, net zoals `meldingen-doorzetten` `notion_page_id` terugschrijft naar `user_reports`. Zoek **vóór** je een nieuw kaartje maakt eerst via `mcp__notion__notion-query-data-sources` (SQL-mode, data source `d87e54c5-fb52-4607-a72a-52e4b58ee806`, bv. `Feature LIKE '%<ZONE>-<NN>%'`) of er al één bestaat — geen duplicaten. Bij herhaalde structurele blokkades met dezelfde onderliggende reden (bv. 6 subs die allemaal "vereist 2e huishoudaccount" zijn): één gecombineerd kaartje, geen kaartje per instantie.
 
 ## Stappen
 
@@ -37,8 +38,9 @@ Je draait een **UAT live-run** over de TriFinity-app: je test de gekozen UAT-zon
 Stel via **AskUserQuestion** de vraag *"Welke diepte wil je testen?"*:
 - **Happy-path (aanbevolen voor een snelle veeg)** — het standaardgedrag hieronder: alleen sub `a`, webapp.
 - **Volledige dekking (a+b+c+d + mobiel waar van toepassing)** — grondiger en trager; richt zich op de go/no-go-dekkingsdrempel (≥95%) op `/beheer/uat`. Ga bij deze keuze door naar stap 1c vóórdat je sub-agents dispatcht.
+- **Alleen nog niet geslaagde tests (retest rood/oranje)** — negeer welke zones/diepte hierboven gekozen zijn qua sub-selectie en test uitsluitend instanties waarvan de **laatst bekende status** (over alle rondes heen) `gefaald` of `geblokkeerd` is. Ga bij deze keuze door naar stap 1d.
 
-Bij happy-path: sla stap 1c over, ga direct naar stap 2 — **0% gedragswijziging** t.o.v. het bestaande commandogedrag.
+Bij happy-path: sla stap 1c/1d over, ga direct naar stap 2 — **0% gedragswijziging** t.o.v. het bestaande commandogedrag.
 
 ### 1c. Bij volledige dekking — prioriteitswachtrij (alleen als stap 1b = volledige dekking)
 Bereken in de hoofdthread, via `evaluate_script` in de ingelogde browsersessie (geen nieuwe API-route nodig):
@@ -56,6 +58,23 @@ Toon anders een compacte tabel (grijze KERN-/BELANGRIJK-/OVERIG-instanties per z
 4. **Other (vrije tekst)** — zone-namen, "alleen KERN", aantallen, scenario-ID's; interpreteer dit tegen de berekende wachtrij en bevestig kort ("ik ga dan X draaien, klopt dat?") vóórdat je sub-agents dispatcht — geen mini-syntax, gewoon natuurlijke taal.
 
 Het resultaat is een concrete lijst `[{scenarioId, zone, subs:['b','c','d',...], platforms:[...]}, ...]` — dit is wat de zone-agent(s) in stap 2 meekrijgen.
+
+### 1d. Bij retest rood/oranje (alleen als stap 1b = "alleen nog niet geslaagde tests")
+Bereken in de hoofdthread, via `evaluate_script` in de ingelogde browsersessie:
+1. `GET /api/admin/uat/latest` — geeft al de "laatst bekend per (scenario_id, sub, platform)"-reductie over álle rondes samen (dezelfde bron als de "Laatst bekend"-toggle op `/beheer/uat`); geen eigen reductielogica nodig.
+2. Filter op `status IN ('gefaald', 'geblokkeerd')`.
+3. Koppel elke instantie via `lib/uat/catalog.ts` aan zijn zone (grep op `id: 'UAT-<ZONE>-`); een instantie zonder catalogusmatch is een hernummerd/verwijderd scenario-id — meld dit als observatie, koppel 'm op de zone-prefix van het id.
+4. Groepeer per zone; sorteer zones oplopend op aantal instanties (kleinste zone eerst) zodat een onderbreking na zoveel mogelijk voltooide zones nog een bruikbaar tussenresultaat geeft.
+
+Is de lijst leeg (niets staat op rood/oranje) → meld dat direct en sla de sub-agent-dispatch over. Toon anders een compacte tabel (aantal rood/oranje per zone) en bevestig kort de volgorde vóór je begint (geen aparte AskUserQuestion nodig — de keuze "retest rood/oranje" in stap 1b is zelf al de opdracht).
+
+**Pas de briefing uit stap 2 als volgt aan voor een retest:**
+- **Instantielijst, geen scenario-doorloop:** exact dezelfde vorm als bij volledige dekking (stap 1c) — de zone-agent krijgt de concrete `[{scenarioId, sub, platform, vorigeStatus, vorigeOpmerking}, ...]`-lijst mee, inclusief de vorige `opmerking`/`faalstap`/`severity` als context (zodat de agent weet wat er precies moet worden geverifieerd i.p.v. blind te herbeginnen).
+- **Proportioneel diep:** een bevestigd ernstig defect (S0/S1) grondig herverifiëren (live reproduceren of overtuigend codeonderzoek); een reeds vaak bevestigde structurele blokkade (2e account, externe sandbox) mag een korte herbevestiging zijn — niet elke keer opnieuw diep graven.
+- **Heroverweeg voorzichtige blokkades.** Een eerdere `geblokkeerd`-registratie kan zelf te voorzichtig zijn geweest (bv. een klik die de automation-classifier blokkeerde terwijl de actie eigenlijk veilig-omkeerbaar is, of een testaccount dat al bestaat voor precies dit doel). Vraag de agent zulke gevallen expliciet te heroverwegen i.p.v. de eerdere blokkade klakkeloos te herhalen — met behoud van regel 5 (niet-destructief tenzij veilig-omkeerbaar).
+- **CC-actie-onderscheid bij het Notion-kaartje:** een bevestigd defect in de code krijgt een gewoon kaartje met **CC-actie** `Backlog`. Een instantie die structureel geblokkeerd blijft om een reden die geen codewijziging oplost (2e testaccount nodig, externe sandbox, destructieve actie op gedeelde data) krijgt in plaats daarvan **CC-actie** `"7. Actie gebruiker"` — dit is geen bug maar een keuze die de eigenaar (JP) zelf moet maken/faciliteren. Bundel herhaalde identieke blokkade-redenen in één kaartje (zie harde regel 7).
+- **Al vandaag elders bevestigd?** Isoleerde een eerdere zone-agent in dezelfde sessie al hetzelfde onderliggende defect (bv. dezelfde root cause in twee scenario's, of een reset+re-seed-cyclus die al succesvol elders draaide), hoeft de volgende zone-agent dat niet blind te herhalen — verwijs naar de eerdere bevinding/kaart in plaats van te dupliceren.
+- **Rondelabel:** `{label:'<ZONE> retest — <datum> (chromedev, rood+oranje)', notes:'Retest van laatst-bekend rood/oranje. Instanties: [...]'}`.
 
 ### 2. Test per zone — serieel, één sub-agent per zone
 Er is **één gedeelde browser**; draai de zones **na elkaar** (nooit twee browser-agents tegelijk). Per zone een **sub-agent** (Agent-tool, `general-purpose`) om het hoofd-contextvenster licht te houden. Geef de sub-agent deze self-contained briefing (vul `<ZONE>` + datum in):
