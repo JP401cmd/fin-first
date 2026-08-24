@@ -191,3 +191,48 @@ vult ze aan. Kort:
 3. Scores 1–10 op de 22 gevraagde dimensies plus de hoofdscore op de kernbelofte.
 4. Vier lijsten: top 5 problemen, top 5 quick wins, top 5 structureel, top 5 sterk.
 5. Geprioriteerde roadmap: Nu → Vervolgens → Later.
+
+---
+
+## Tweede testronde (24 aug 2026, middag)
+
+**Deliverable:** `TriFinity-bevindingen.pdf` — 36 pagina's, 55 defecten, elk met severity,
+prioriteit (P1 Nu / P2 Vervolgens / P3 Later), reproductiestappen, verwachte tegenover
+werkelijke uitkomst, aanbeveling en bewijsbeeld waar beschikbaar. Sterke punten staan
+bewust niet in dit register; die horen in de audit (artifact) en in een regressietest.
+
+**Bouwpijplijn van de PDF** (in de scratchpad, niet in de repo):
+`bev-head.html` + `bev-tail.html` → `bevindingen.html` → screenshots inlinen als data-URI
+→ `bevindingen-img.html` → `pdf.mjs` (Playwright `page.pdf`, A4, printBackground).
+
+**Openstaande opdracht:** na afronding van de lopende rondes moet de PDF worden bijgewerkt
+met de nieuwe bevindingen.
+
+### Rondes die op dit moment lopen
+| Tester | Account | Gebied |
+|---|---|---|
+| Toegankelijkheid + Fin-oppervlak | `jochen@` (AI actief) | Toetsenbordnavigatie, focus, koppenstructuur, aria, contrast; gedrag als het AI-model onbereikbaar is |
+| Invoer, import, rapportages | `leo@` | Transacties beheren, de drie testbestanden importeren (incl. dubbele upload), budget aanmaken, doelen, rapportages |
+| Belastingmodule | `ronald@` (persona compleet) | Box 1/2/3 narekenen, herleidbaarheid, de Wft-grens tussen inzicht en advies |
+
+### Accountstatus
+`jochen@` en `ronald@` hebben `commercial_tier = 'ai'` en alle modules. De guard-trigger op
+`profiles` weigert die wijziging door `authenticated`/`anon` maar laat `postgres` door —
+zoals bedoeld.
+
+**Er is geen AI-sleutel in de omgeving** (`ANTHROPIC_API_KEY` noch `OPENAI_API_KEY`). De
+kwaliteit van Fin's antwoorden is daarom niet te beoordelen; het gedrag van de app wanneer
+het model onbereikbaar is, wél.
+
+### Capaciteit — herhaalde waarneming
+De Next dev-server groeit onder aanhoudend testen structureel naar circa **11 GB** van de
+15 GB, inmiddels drie keer waargenomen. Er is geen swap; de machine loopt dan vast en
+navigaties duren minuten. Herstarten van de dev-server geeft het geheugen direct terug.
+Voor langere rondes is een productiebuild (`npm run build && npm start`) verstandiger —
+die hercompileert niet per bezoeker.
+
+### Nog niet getest na deze ronde
+Huishouden en partnerdeling (grootste resterende gat, en het gevoeligste: wat ziet je
+partner wél en niet), onboarding in de varianten alleenstaand en gezin, sessie- en
+foutgedrag (verlopen sessie midden in een formulier, netwerkverlies bij opslaan, twee
+tabbladen naast elkaar), en de kwaliteit van de AI-antwoorden.
