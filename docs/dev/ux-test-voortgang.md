@@ -333,3 +333,13 @@ Toegevoegd: C8, C9, C10 als volledige cases; H22 t/m H28 als volledige cases; vi
 - Stap 5 nieuw: **één storageState-bestand per tester**, en bij aanvang het ingelogde account van het scherm aflezen.
 
 **Slotsectie herschreven** — wat nu wél gedekt is (belastingmodule, Fin-oppervlak, toegankelijkheid, import, doelen, twee rapportvormen), wat open blijft (schermlezer met echte hulpsoftware, virtueel toetsenbord, de rapporten spiegel/totaalplan, budget aanmaken, bankkoppeling), en wat bewust buiten het register valt.
+
+## Schermoordeel — alle schermen in beide weergaven (25 aug)
+
+Op verzoek: alle hoofd-, deel- en detailschermen bekeken in Volledig én Eenvoudig, met per pagina een oordeel en verbeteringen, plus een taal- en jargonhoofdstuk. PDF: `docs/dev/rapporten/TriFinity-schermoordeel.pdf` (16 pagina's, bron ernaast).
+
+Methode: 33 routes × 2 weergaven op `jochen@` (desktop 1440), per route screenshot + paginameting + volledige paginatekst (`scratchpad/txt/`), jargonscan over alle teksten, beeldreview per paar. Driver: `scratchpad/cap.mjs` (4 batches per modus).
+
+Kerncijfers: 13 schermen echt gereduceerd (40–59% op het Overzicht-cluster), 14 identiek (o.a. /mijn-familie, /rapportages, /berichten, /nieuws, beide apps), 2 overreducties (cashflow-hub en forecast tonen in Eenvoudig geen antwoord meer), 2 kapotte verwijsketens (factor A → verborgen pensioen-strategie; voorkeuren verbergt instellingen waar de motor mee rekent).
+
+Nieuwe losse waarnemingen uit deze ronde (nog niet in het bevindingenregister): "10 jaar en 12 maanden vrijheid" (afrondingsfout formatter, bezittingen), tips-tour op /toekomst keert terug zolang je "Sluiten" kiest (alleen "Niet meer weergeven" onthoudt), welkomstgids sluiten vergt twee beslissingen, leeg widget-rail-gebied van ±één schermhoogte op /overzicht in Volledig, supermarkten/kleding/restaurant als "vaste kosten" geclassificeerd (wortel van H14), Importeer/Bank koppelen verborgen achter "…" in Eenvoudig op transacties, NAV-1 (apps uit Eenvoudig-zijbalk) besloten op 9 aug maar niet doorgevoerd.

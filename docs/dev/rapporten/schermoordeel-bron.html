@@ -1,0 +1,395 @@
+<title>TriFinity Schermoordeel</title>
+<style>
+@page{size:A4;margin:16mm 14mm 18mm}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Georgia,'Times New Roman',serif;font-size:10pt;line-height:1.5;color:#1C2226;background:#fff}
+.mono,.chip,.lbl{font-family:"Courier New",monospace}
+h1{font-size:26pt;line-height:1.1;margin:4mm 0 3mm}
+h2.sec{font-size:16pt;margin:0 0 1.5mm;padding-top:2mm}
+h3.grp{font-size:12.5pt;margin:6mm 0 2mm;padding-bottom:1mm;border-bottom:1.5pt solid #1C2226}
+.cover{padding:24mm 6mm 10mm;page-break-after:always}
+.eyebrow{font-family:"Courier New",monospace;font-size:8pt;letter-spacing:.16em;text-transform:uppercase;color:#5A656B;margin-bottom:3mm}
+.sub{font-style:italic;color:#5A656B;font-size:11.5pt;max-width:150mm;margin:2mm 0 6mm}
+.facts{display:flex;gap:4mm;margin:6mm 0}
+.fact{border:1px solid #D2DADD;border-radius:1.5mm;padding:3mm 5mm;flex:1}
+.fact .n{font-size:16pt;font-weight:700}
+.fact .l{font-family:"Courier New",monospace;font-size:7pt;letter-spacing:.12em;text-transform:uppercase;color:#5A656B}
+.note{font-size:9pt;color:#5A656B;max-width:160mm;margin-top:3mm}
+.seclede{font-style:italic;color:#5A656B;margin-bottom:3mm}
+.chip{display:inline-block;font-size:6.8pt;font-weight:700;letter-spacing:.09em;text-transform:uppercase;padding:.7mm 1.8mm;border-radius:1mm;margin-right:1.2mm}
+.c-goed{background:#E1EFE7;color:#25704A}.c-deels{background:#F6F1DC;color:#8E7100}
+.c-mis{background:#F7E6E4;color:#A8251C}.c-niets{background:#E4EDF5;color:#33628F}
+.pb{page-break-before:always}
+.pg{page-break-inside:avoid;margin:0 0 6mm;border-top:2pt solid #1C2226;padding-top:2mm}
+.pg .kop{display:flex;align-items:baseline;gap:3mm;flex-wrap:wrap;margin-bottom:1mm}
+.pg .route{font-family:"Courier New",monospace;font-size:10pt;font-weight:700;color:#0F6E6E}
+.pg h4{font-size:12pt;margin:0}
+.pg .met{font-family:"Courier New",monospace;font-size:7.5pt;color:#5A656B;margin:.5mm 0 2mm}
+.shots{display:grid;grid-template-columns:1fr 1fr;gap:2.5mm;margin:2mm 0}
+.shots figure{margin:0}
+.shots img{width:100%;border:1px solid #D2DADD;border-radius:1mm;display:block}
+.shots figcaption{font-family:"Courier New",monospace;font-size:6.8pt;color:#5A656B;margin-top:.8mm}
+.solo .shots{grid-template-columns:1fr 1fr}
+.oordeel{margin:1.5mm 0}
+.oordeel b.t{font-family:"Courier New",monospace;font-size:7pt;letter-spacing:.1em;text-transform:uppercase;color:#66757C;display:block;margin-bottom:.6mm}
+ul.verb{margin:1mm 0 0;padding-left:4.5mm}
+ul.verb li{margin-bottom:.8mm}
+table.d{width:100%;border-collapse:collapse;font-size:8.6pt;margin:2mm 0}
+table.d th{font-family:"Courier New",monospace;font-size:6.8pt;letter-spacing:.09em;text-transform:uppercase;color:#5A656B;text-align:left;padding:1.4mm 1.8mm;background:#EEF1F2}
+table.d td{padding:1.2mm 1.8mm;border-bottom:1px solid #E4E9EA;vertical-align:top}
+td.r{text-align:right;font-family:"Courier New",monospace}
+.taal td:first-child{font-style:italic}
+</style>
+
+<div class="cover">
+  <div class="eyebrow">Schermronde Eenvoudig &harr; Volledig &middot; 24&ndash;25 augustus 2026</div>
+  <h1>TriFinity Schermoordeel</h1>
+  <div class="sub">Alle hoofd-, deel- en detailschermen bekeken in beide weergaven, met per pagina een oordeel en concrete verbeteringen &mdash; plus de taal- en jargonverbeteringen die daarbij horen. Aanleiding: terugkerende testerfeedback &ldquo;de app is te moeilijk&rdquo;; de eenvoudige weergave moet dat verhelpen.</div>
+  <div class="facts">
+    <div class="fact"><div class="n">33</div><div class="l">Schermen bekeken</div></div>
+    <div class="fact"><div class="n">66</div><div class="l">Vastleggingen (2 weergaven)</div></div>
+    <div class="fact"><div class="n">13</div><div class="l">Schermen echt gereduceerd</div></div>
+    <div class="fact"><div class="n">14</div><div class="l">Identiek in beide weergaven</div></div>
+  </div>
+  <p class="note">Methode: account <span class="mono">jochen@test.trifinity.nl</span> (persona Lisa &mdash; solo, koopwoning, &euro;130k netto vermogen), desktop 1440px, lokale teststack. Per scherm: schermafbeelding en paginameting in Volledig en Eenvoudig, plus de volledige paginatekst voor de jargonanalyse. Paginalengtes in pixels; het verschilpercentage is de reductie in Eenvoudig. Vier oordeelscriteria: <i>antwoord eerst</i> (beantwoordt het eerste scherm de vraag van de pagina), <i>duiding boven data</i> (houdt Eenvoudig de uitleg of alleen de getallen), <i>taal</i> (gewone woorden op beslismomenten) en <i>escalatiepad</i> (kan de gebruiker ter plekke naar meer detail).</p>
+  <p class="note"><b>Oordeelchips:</b> <span class="chip c-goed">Sterk</span> reductie raak gekozen &middot; <span class="chip c-deels">Deels</span> goede richting, verkeerde selectie &middot; <span class="chip c-mis">Mis</span> reductie schaadt het doel &middot; <span class="chip c-niets">Onaangeraakt</span> weergavemodus doet hier niets.</p>
+</div>
+
+<h2 class="sec">De meting in één tabel</h2>
+<p class="seclede">Paginalengte per weergave. Een streep in de laatste kolom betekent: de pagina negeert de weergavemodus volledig.</p>
+<table class="d">
+<tr><th>Scherm</th><th class="r">Volledig</th><th class="r">Eenvoudig</th><th class="r">Reductie</th><th>Oordeel in één zin</th></tr>
+<tr><td class="mono">/overzicht</td><td class="r">3.416</td><td class="r">1.703</td><td class="r">50%</td><td>Meetbaar rustiger, maar de duiding op de tegels verdwijnt mee</td></tr>
+<tr><td class="mono">/overzicht/bezittingen</td><td class="r">4.479</td><td class="r">2.334</td><td class="r">48%</td><td>Pill-lijst is raak; twee promo-simulators blijven onterecht staan</td></tr>
+<tr><td class="mono">/overzicht/schulden</td><td class="r">3.378</td><td class="r">1.381</td><td class="r">59%</td><td>Beste reductie van de app; banner houdt jargon</td></tr>
+<tr><td class="mono">/overzicht/cashflow</td><td class="r">1.858</td><td class="r">1.000</td><td class="r">46%</td><td>Overreductie: de kop stelt een vraag, de pagina toont nul cijfers</td></tr>
+<tr><td class="mono">/overzicht/belasting</td><td class="r">3.209</td><td class="r">1.595</td><td class="r">50%</td><td>Boven de vouw identiek &mdash; inclusief het foute marginale tarief</td></tr>
+<tr><td class="mono">&hellip;/cashflow/transacties</td><td class="r">3.744</td><td class="r">2.976</td><td class="r">21%</td><td>Analyses weg, maar het valse &minus;265%-alarm blijft vooraan</td></tr>
+<tr><td class="mono">&hellip;/cashflow/vaste-lasten</td><td class="r">3.300</td><td class="r">1.952</td><td class="r">41%</td><td>Houdt de langste lijst, schrapt de korte uitleg</td></tr>
+<tr><td class="mono">&hellip;/cashflow/forecast</td><td class="r">1.000</td><td class="r">1.000</td><td class="r">&mdash;*</td><td>Eenvoudig verbergt de complete inhoud &mdash; lege pagina</td></tr>
+<tr><td class="mono">&hellip;/cashflow/budget</td><td class="r">1.000</td><td class="r">1.000</td><td class="r">&mdash;</td><td>Laadt niet (bekend defect C7); in beide weergaven een foutscherm</td></tr>
+<tr><td class="mono">&hellip;/belasting/box1</td><td class="r">3.631</td><td class="r">1.853</td><td class="r">49%</td><td>Goede selectie; jaarruimte-som met factor A blijft te technisch</td></tr>
+<tr><td class="mono">&hellip;/belasting/box2</td><td class="r">2.444</td><td class="r">1.000</td><td class="r">59%</td><td>Sterk gereduceerd; de &euro;0-kop naast simulatorbedrag blijft</td></tr>
+<tr><td class="mono">&hellip;/belasting/box3</td><td class="r">2.656</td><td class="r">1.250</td><td class="r">53%</td><td>Wft-gevoelige peildatum-passage verdwijnt terecht in Eenvoudig</td></tr>
+<tr><td class="mono">&hellip;/belasting/optimizer</td><td class="r">3.003</td><td class="r">1.683</td><td class="r">44%</td><td>Kern blijft overeind; goede reductie van katernen</td></tr>
+<tr><td class="mono">&hellip;/bezittingen/investment</td><td class="r">3.167</td><td class="r">3.167</td><td class="r">&mdash;</td><td>App-oppervlak negeert de modus; YTD-jargon voor iedereen</td></tr>
+<tr><td class="mono">&hellip;/schulden/mortgage</td><td class="r">1.000</td><td class="r">1.000</td><td class="r">&mdash;</td><td>Idem &mdash; app-oppervlak zonder weergavelogica</td></tr>
+<tr><td class="mono">/toekomst</td><td class="r">2.391</td><td class="r">1.880</td><td class="r">21%</td><td>KPI&rsquo;s 4&rarr;3, nav 6&rarr;4; tips-tour keert elk bezoek terug</td></tr>
+<tr><td class="mono">/toekomst/doelen</td><td class="r">1.000</td><td class="r">1.000</td><td class="r">&mdash;</td><td>Identiek; statuslogica is het echte probleem (M31/M32)</td></tr>
+<tr><td class="mono">/toekomst/gebeurtenissen</td><td class="r">1.108</td><td class="r">1.000</td><td class="r">10%</td><td>Verbergt levensstrategie&euml;n &mdash; en daarmee de plek waar factor A woont</td></tr>
+<tr><td class="mono">/toekomst/voorkeuren</td><td class="r">1.382</td><td class="r">1.000</td><td class="r">28%</td><td>Verbergt instellingen waar het rekenmodel w&eacute;l mee rekent</td></tr>
+<tr><td class="mono">/toekomst/rekenhulp</td><td class="r">1.000</td><td class="r">1.000</td><td class="r">&mdash;</td><td>Uit nav verborgen in Eenvoudig; pagina zelf ongewijzigd</td></tr>
+<tr><td class="mono">/toekomst/whatif</td><td class="r">1.729</td><td class="r">1.000</td><td class="r">42%</td><td>Contextblok verdwijnt; via deeplink bereikbaar en dan kaal</td></tr>
+<tr><td class="mono">/mijn (+6 subpagina&rsquo;s)</td><td class="r">div.</td><td class="r">div.</td><td class="r">&mdash;</td><td>Vrijwel volledig onaangeraakt; notificaties verbergt 2 typen</td></tr>
+<tr><td class="mono">/berichten &middot; /nieuws &middot; /tips</td><td class="r">div.</td><td class="r">div.</td><td class="r">&mdash;</td><td>Identiek in beide weergaven</td></tr>
+<tr><td class="mono">/rapportages</td><td class="r">2.267</td><td class="r">2.267</td><td class="r">&mdash;</td><td>Identiek; peildatum-jargon voor iedereen</td></tr>
+</table>
+<p class="note">* Forecast is in beide weergaven 1.000px, maar in Eenvoudig is de complete inhoud (totalen, maandtabel) verwijderd &mdash; de pagina bestaat nog, het antwoord niet meer.</p>
+
+
+<h2 class="sec pb">Oordeel per pagina</h2>
+<p class="seclede">Per scherm: beide weergaven, de meting, het oordeel en de verbeteringen. Links Volledig, rechts Eenvoudig.</p>
+
+<h3 class="grp">Hoofdschermen</h3>
+
+<div class="pg">
+  <div class="kop"><span class="route">/overzicht</span><h4>Het dashboard</h4><span class="chip c-deels">Deels</span></div>
+  <div class="met">3.416 &rarr; 1.703 px (&minus;50%) &middot; mobiel 5,8 &rarr; 2,4 schermen &middot; tekst 2.643 &rarr; 1.808 tekens</div>
+  <div class="shots">
+    <figure>{{IMG:V-full-ov.png}}<figcaption>Volledig</figcaption></figure>
+    <figure>{{IMG:V-simple-ov.png}}<figcaption>Eenvoudig</figcaption></figure>
+  </div>
+  <div class="oordeel"><b class="t">Oordeel</b>
+  De reductie is echt en meetbaar: de welkomstgids krimpt van vier grote kaarten naar vier afvinkregels, de widget-rail en de week-strip verdwijnen, en op mobiel staan nu begroeting plus vier kerngetallen op het eerste scherm waar eerst geen enkel getal stond. Maar de selectie snijdt verkeerd op drie punten. De hefboomtegels verliezen juist hun duiding in gewone taal (&ldquo;Goed gespreid&rdquo;, &ldquo;Hoge schuldenlast&rdquo;) en houden de kale euro&rsquo;s &mdash; beginners hebben m&eacute;&eacute;r aan die woorden dan aan de getallen. De welkomstgids staat ook in Eenvoudig b&oacute;ven de begroeting en toont 0/4 afgevinkt op een account met 16 bezittingen. En wie de gids sluit krijgt eerst een tussenvraag (&ldquo;Welkomstgids sluiten?&rdquo;) met twee tekstblokken &mdash; sluiten kost twee beslissingen. In Volledig staat daarnaast een fors leeg widget-rail-gebied van ruim een schermhoogte met alleen lege cirkels.</div>
+  <ul class="verb">
+    <li><b>Eenvoudig:</b> geef de tegels hun oordeel in gewone taal terug en maak juist het euro-detail secundair; toon de gids &oacute;nder de begroeting, vink data-bewust af, en laat &eacute;&eacute;n klik volstaan om te sluiten.</li>
+    <li><b>Volledig:</b> vul of verberg het lege widget-rail-gebied; een leeg raster van plaatshouders is dode ruimte op het duurste scherm.</li>
+    <li><b>Beide:</b> de Fin-toast dekt de grafiek af; begrens hem tot &eacute;&eacute;n regel met uitklap.</li>
+  </ul>
+</div>
+
+<div class="pg">
+  <div class="kop"><span class="route">/toekomst</span><h4>De tijdas</h4><span class="chip c-deels">Deels</span></div>
+  <div class="met">2.391 &rarr; 1.880 px (&minus;21%) &middot; KPI-cellen 4 &rarr; 3 &middot; nav-subitems 6 &rarr; 4</div>
+  <div class="shots">
+    <figure>{{IMG:P-full-tk.png}}<figcaption>Volledig &mdash; met de tips-tour die elk bezoek terugkeert</figcaption></figure>
+    <figure>{{IMG:P-simple-tk.png}}<figcaption>Eenvoudig &mdash; zelfde tour, drie KPI&rsquo;s</figcaption></figure>
+  </div>
+  <div class="oordeel"><b class="t">Oordeel</b>
+  Dit was in de audit van 8 augustus het voorbeeldscherm, en de opzet klopt nog steeds: compacte kaarten, KPI&rsquo;s van vier naar drie, Rekenhulp en Wat-Als uit de navigatie. De spotlight-uitleg bij de grafiek (OPBOUW, OVERGANG, ONTTREKKING, in gewone taal) is pedagogisch het beste stuk tekst van de app. Twee dingen zitten de pagina in de weg. De tips-tour keert bij &eacute;lk bezoek terug zolang je op &ldquo;Sluiten&rdquo; klikt &mdash; alleen &ldquo;Niet meer weergeven&rdquo; onthoudt de keuze, en het verschil tussen die twee knoppen is voor een gebruiker onzichtbaar; wie de verkeerde kiest doorloopt de tour elke keer opnieuw, en het sluiten spawnt bovendien een tweede modal (&ldquo;Je tips zijn nu verborgen&rdquo;). En de kernbevinding van het testpanel blijft: het antwoord van deze pagina (FIRE 52,9) verschilt per laadbeurt en spreekt het dashboard tegen &mdash; geen weergavemodus die dat oplost.</div>
+  <ul class="verb">
+    <li><b>Beide:</b> laat &ldquo;Sluiten&rdquo; de tour gewoon onthouden (of maak het verschil tussen de twee knoppen expliciet), en schrap de tweede modal &mdash; een toast volstaat.</li>
+    <li><b>Eenvoudig:</b> de drie overgebleven KPI&rsquo;s zijn goed gekozen; voeg als enige toevoeging &eacute;&eacute;n zin duiding onder het FIRE-getal toe (&ldquo;dit betekent: rond je 53e wordt werken een keuze&rdquo;).</li>
+  </ul>
+</div>
+
+<div class="pg">
+  <div class="kop"><span class="route">/mijn &nbsp;+ /berichten &middot; /nieuws &middot; /overzicht/tips &middot; /rapportages</span><h4>De onaangeraakte hoofdschermen</h4><span class="chip c-niets">Onaangeraakt</span></div>
+  <div class="met">alle vijf identiek in beide weergaven (woordverschil 3&ndash;5 = alleen tijdstempels)</div>
+  <div class="oordeel"><b class="t">Oordeel</b>
+  Vijf van de zeven hoofdingangen negeren de weergavemodus volledig. Voor /berichten en /nieuws is dat verdedigbaar (een lijst is een lijst), al blijft de vierdeling tips/berichten/nieuws/briefing zelf de grotere vraag. Voor /mijn (negen kaarten plus een tabbalk die hetzelfde doet) en /rapportages (zeven rapportvormen, waarvan twee betaald en twee die niet laden) is het een gemiste kans: juist hier zou Eenvoudig de vier relevante ingangen kunnen tonen. De audit van 8 augustus benoemde dit al (&ldquo;de dekking is ongelijk&rdquo;); aan de dekking is sindsdien op deze schermen niets veranderd.</div>
+  <ul class="verb">
+    <li><b>Eenvoudig /mijn:</b> toon de vier kaarten die een beginner nodig heeft (Profiel, Uiterlijk, Account, Privacy); de rest achter &ldquo;Alle instellingen&rdquo;.</li>
+    <li><b>Eenvoudig /rapportages:</b> toon de twee rapporten die werken en gratis zijn (balans, persoonlijk plan) en markeer betaalde vormen v&oacute;&oacute;raf als vergrendeld &mdash; niet pas na het genereren (H28).</li>
+    <li><b>Beide /overzicht/tips:</b> de acties-lijst bevat productadvies (&ldquo;hypotheek oversluiten&rdquo;, &ldquo;beleg het studiefonds&rdquo;) &mdash; herformuleer beschrijvend, zie het taalhoofdstuk.</li>
+  </ul>
+</div>
+
+
+<h3 class="grp">Overzicht — deelschermen</h3>
+
+<div class="pg">
+  <div class="kop"><span class="route">/overzicht/bezittingen</span><h4>Wat je bezit</h4><span class="chip c-deels">Deels</span></div>
+  <div class="met">4.479 &rarr; 2.334 px (&minus;48%) &middot; KPI-strip 4 &rarr; 1 &middot; kaartraster &rarr; pill-lijst</div>
+  <div class="shots">
+    <figure>{{IMG:P-full-bez.png}}<figcaption>Volledig</figcaption></figure>
+    <figure>{{IMG:P-simple-bez.png}}<figcaption>Eenvoudig</figcaption></figure>
+  </div>
+  <div class="oordeel"><b class="t">Oordeel</b>
+  De pill-lijst in Eenvoudig is het beste reductiepatroon van de app: zestien bezittingen als rustige regels met sparkline en bedrag, in plaats van twaalf categorieblokken met elk een eigen &ldquo;Voeg toe&rdquo;-spookkaart. Maar de prioriteit in wat bl&iacute;jft is verkeerd om: b&eacute;ide promo-simulators (samengestelde rente &eacute;n beheerkosten) overleven de reductie integraal, terwijl drie van de vier KPI&rsquo;s sneuvelen. Een beginner krijgt dus w&eacute;l &ldquo;0,5% extra fee kost je &euro;51.091 over 30 jaar&rdquo; en niet zijn eigen rendement. Daarnaast twee taalpunten: de intro gebruikt &ldquo;inclusiepercentage&rdquo; in beide weergaven, en de vrijheidsregel toont &ldquo;10 jaar en 12 maanden vrijheid&rdquo; &mdash; twaalf maanden die een jaar hadden moeten zijn.</div>
+  <ul class="verb">
+    <li><b>Eenvoudig:</b> maximaal &eacute;&eacute;n teaser tegelijk, en pas nadat het eigen antwoord er staat; de fee-simulator hoort in Volledig.</li>
+    <li><b>Beide:</b> repareer de maand-afronding (&ldquo;X jaar en 12 maanden&rdquo; &rarr; &ldquo;X+1 jaar&rdquo;) &mdash; die formatter wordt app-breed gebruikt.</li>
+    <li><b>Beide:</b> vervang &ldquo;inclusiepercentage&rdquo; door &ldquo;hoeveel hiervan meetelt voor je vrijheid&rdquo;.</li>
+  </ul>
+</div>
+
+<div class="pg">
+  <div class="kop"><span class="route">/overzicht/schulden</span><h4>Wat je terugkoopt</h4><span class="chip c-goed">Sterk</span></div>
+  <div class="met">3.378 &rarr; 1.381 px (&minus;59%) &middot; KPI-strip 4 &rarr; 2 &middot; kaartraster &rarr; pill-lijst</div>
+  <div class="shots">
+    <figure>{{IMG:P-full-sch.png}}<figcaption>Volledig</figcaption></figure>
+    <figure>{{IMG:P-simple-sch.png}}<figcaption>Eenvoudig</figcaption></figure>
+  </div>
+  <div class="oordeel"><b class="t">Oordeel</b>
+  De grootste en best gekozen reductie van de app. De twee overgebleven KPI&rsquo;s (totale schuld, maandlasten) zijn precies de juiste; de vervallen twee (gewogen rente, &ldquo;11 types schuld&rdquo;) waren vulling &mdash; die laatste is ook in Volledig een KPI zonder informatiewaarde. De pill-lijst werkt hier nog beter dan bij bezittingen omdat elf spookkaarten (&ldquo;Voeg hypotheek toe&rdquo;, &ldquo;Voeg DGA-schuld toe&rdquo;&hellip;) verdwijnen. Wat blijft staan is de statusbanner met &ldquo;avalanche-methode&rdquo; als onvertaald jargon in een rood alarm, in beide weergaven, en op de kaart in Volledig nog altijd &ldquo;600 mnd resterend&rdquo; op een schuld van &euro;320 (H2).</div>
+  <ul class="verb">
+    <li><b>Beide:</b> &ldquo;avalanche-methode&rdquo; &rarr; &ldquo;duurste schuld eerst&rdquo; (het staat er al half; de merknaam kan weg).</li>
+    <li><b>Volledig:</b> schrap de categorie&euml;n-KPI of vervang hem door iets beslisbaars (bv. duurste rente).</li>
+  </ul>
+</div>
+
+<div class="pg">
+  <div class="kop"><span class="route">/overzicht/cashflow</span><h4>De geldstroom-hub</h4><span class="chip c-mis">Mis</span></div>
+  <div class="met">1.858 &rarr; 1.000 px (&minus;46%) &middot; tekst 1.701 &rarr; 1.000 tekens &middot; cijfers op de pagina in Eenvoudig: alleen rekeningsaldi</div>
+  <div class="shots">
+    <figure>{{IMG:P-full-cf.png}}<figcaption>Volledig</figcaption></figure>
+    <figure>{{IMG:P-simple-cf.png}}<figcaption>Eenvoudig</figcaption></figure>
+  </div>
+  <div class="oordeel"><b class="t">Oordeel</b>
+  Hier slaat de reductie door naar de verkeerde kant. De kop vraagt &ldquo;Hoeveel vrijheid zet je elke maand opzij?&rdquo; en Eenvoudig antwoordt met&hellip; drie lege navigatiekaarten zonder &eacute;&eacute;n cijfer, drie rekeningsaldi en een dichtgeklapte instellingensectie. Geen saldo, geen spaarquote, geen maandbeeld &mdash; de pagina stelt een vraag en toont alleen deuren. Dit is het spiegelbeeld van het tegelprobleem op /overzicht: daar getallen zonder woorden, hier geen van beide. In Volledig staat het antwoord er w&eacute;l, maar samen met het valse alarm (&ldquo;tekort deze maand&rdquo;, spaarquote &minus;265% op een meter tot &minus;100) dat het eigen model verderop weerspreekt (C6). De vierde kaart (Forecast) is in Eenvoudig bovendien geheel verdwenen in plaats van leeg.</div>
+  <ul class="verb">
+    <li><b>Eenvoudig:</b> geef elke navigatiekaart zijn ene kerngetal terug (budget-stand, saldo deze maand, vaste-lastenquote) &mdash; d&aacute;t is de eenvoudige weergave van deze pagina, niet kale knoppen.</li>
+    <li><b>Beide:</b> markeer maandcijfers v&oacute;&oacute;r de salarisdatum als &ldquo;tot nu toe&rdquo; en begrens de spaarquote-meter op zijn eigen schaal (C6).</li>
+  </ul>
+</div>
+
+<div class="pg">
+  <div class="kop"><span class="route">/overzicht/belasting</span><h4>De belasting-hub</h4><span class="chip c-deels">Deels</span></div>
+  <div class="met">3.209 &rarr; 1.595 px (&minus;50%) &middot; boven de vouw pixel-identiek</div>
+  <div class="shots">
+    <figure>{{IMG:P-full-bel.png}}<figcaption>Volledig</figcaption></figure>
+    <figure>{{IMG:P-simple-bel.png}}<figcaption>Eenvoudig &mdash; boven de vouw gelijk</figcaption></figure>
+  </div>
+  <div class="oordeel"><b class="t">Oordeel</b>
+  De onderste helft (kalender, stelselradar, stroomdiagram) verdwijnt netjes in Eenvoudig; het eerste scherm is in beide weergaven identiek. Dat betekent dat de twee zwaarste bevindingen van het testpanel ook in de eenvoudigste stand vol in beeld staan: een heffing die niet aansluit op de detailpagina (C8) en 36,6% effectief naast 35,8% marginaal &mdash; een combinatie die niet kan bestaan (C9). Eenvoudig maakt dit gevaarlijker in plaats van veiliger: wie &eacute;&eacute;n getal ziet heeft minder context om een fout getal te wantrouwen. De weergavemodus is hier niet het probleem, en ook niet de oplossing: dit vraagt om single-sourcing van de motor, niet om verbergen.</div>
+  <ul class="verb">
+    <li><b>Beide:</b> eerst C8/C9 repareren (&eacute;&eacute;n box 1-motor, geen fallback-marginaal bij bekend inkomen); daarna pas de weergave verfijnen.</li>
+    <li><b>Eenvoudig:</b> vervang de effectief/marginaal-cellen door &eacute;&eacute;n zin (&ldquo;van elke euro extra houd je nu &plusmn;44 cent over&rdquo;) &mdash; het marginale tarief is expert-taal.</li>
+  </ul>
+</div>
+
+
+<h3 class="grp">Detailschermen — cashflow</h3>
+
+<div class="pg">
+  <div class="kop"><span class="route">/overzicht/cashflow/transacties</span><h4>Transacties</h4><span class="chip c-deels">Deels</span></div>
+  <div class="met">3.744 &rarr; 2.976 px (&minus;21%) &middot; analyses (heatmap, trend, weekdag, tegenpartijen) verdwijnen; lijst identiek</div>
+  <div class="shots">
+    <figure>{{IMG:P-full-trx.png}}<figcaption>Volledig</figcaption></figure>
+    <figure>{{IMG:P-simple-trx.png}}<figcaption>Eenvoudig</figcaption></figure>
+  </div>
+  <div class="oordeel"><b class="t">Oordeel</b>
+  De richting klopt: acht analyseblokken terug naar meter plus lijst, en de transactielijst zelf &mdash; met per dag de vrijheidsdag-omrekening &mdash; is in beide weergaven het sterkste stuk. Maar wat vooraan blijft staan is precies het verkeerde: de &minus;265%-spaarquotemeter (het valse alarm van C6) is in Eenvoudig het &eacute;&eacute;rste en vrijwel enige duidingselement. En de reductie verbergt twee knoppen die een beginner juist nodig heeft: &ldquo;Importeer transacties&rdquo; en &ldquo;Bank koppelen&rdquo; verdwijnen achter een &ldquo;&hellip;&rdquo;-menu &mdash; terwijl dat d&eacute; route is waarmee een leeg account gevuld raakt (verlengt H18).</div>
+  <ul class="verb">
+    <li><b>Eenvoudig:</b> houd Importeer en Bank koppelen zichtbaar; verberg liever &ldquo;Zoeken en bulkbewerken&rdquo;.</li>
+    <li><b>Beide:</b> de meter pas laten oordelen als de maand compleet is; tot die tijd &ldquo;tot nu toe&rdquo;-framing.</li>
+  </ul>
+</div>
+
+<div class="pg">
+  <div class="kop"><span class="route">/overzicht/cashflow/vaste-lasten</span><h4>Vaste lasten</h4><span class="chip c-deels">Deels</span></div>
+  <div class="met">3.300 &rarr; 1.952 px (&minus;41%) &middot; 21-regels-analyse blijft; quote, vrijheidstijd, sluipverbruik, samenstelling en wat-als verdwijnen</div>
+  <div class="shots">
+    <figure>{{IMG:P-full-vl.png}}<figcaption>Volledig</figcaption></figure>
+    <figure>{{IMG:P-simple-vl.png}}<figcaption>Eenvoudig</figcaption></figure>
+  </div>
+  <div class="oordeel"><b class="t">Oordeel</b>
+  Opnieuw het patroon &ldquo;data blijft, duiding verdwijnt&rdquo;, en hier het duidelijkst. Eenvoudig behoudt het langste element van de pagina &mdash; de volledige 21-regels-kostenlijst &mdash; en schrapt juist de vier korte blokken die betekenis gaven: de vaste-lastenquote met Nibud-context, de vrijheidstijd-vertaling, het abonnementen-sluipverbruik (met de opzegknop!) en de samenstelling. Een beginner houdt een boodschappenlijst over zonder oordeel. Daarbij een datavraag die in beide weergaven zichtbaar is: Albert Heijn, Lidl, Jumbo, Shell, H&amp;M en een restaurant staan als &ldquo;vaste kosten&rdquo; geclassificeerd (de wortel van H14; boodschappen zijn geen vaste lasten), en de kop rekent &ldquo;&plusmn;23 dagen vrijheid/mnd&rdquo; op het uitgaven-dagtarief &mdash; de C5-metafoorfout.</div>
+  <ul class="verb">
+    <li><b>Eenvoudig:</b> draai het om &mdash; toon quote-oordeel + sluipverbruik + top-5 grootste posten; de volledige lijst achter &ldquo;alle 21 posten&rdquo;.</li>
+    <li><b>Beide:</b> herclassificeer variabele uitgaven uit de vaste-lastenlijst; dat repareert ook de 58%-quote.</li>
+  </ul>
+</div>
+
+<div class="pg">
+  <div class="kop"><span class="route">/overzicht/cashflow/forecast &nbsp;+ /budget</span><h4>Forecast en Budget</h4><span class="chip c-mis">Mis</span></div>
+  <div class="met">forecast: inhoud volledig verborgen in Eenvoudig &middot; budget: laadt in geen van beide weergaven (C7)</div>
+  <div class="oordeel"><b class="t">Oordeel</b>
+  Forecast is de tweede overreductie: in Eenvoudig verdwijnen de totalen &eacute;n de maandtabel &mdash; de complete inhoud &mdash; en blijft een vrijwel lege pagina over die wel in de navigatie staat (via de cashflow-hub is zelfs de kaart weg, maar de route bestaat). Een pagina die in een weergave niets toont hoort in die weergave geen bestemming te zijn. Budget laadt niet door het bekende defect (C7-patroon: &eacute;&eacute;n falende bijzaak trekt de hele pagina om) &mdash; in beide weergaven een foutscherm met een Fin-tip die &ldquo;voeg je eerste budget toe&rdquo; zegt tegen een account met 33 budgetten.</div>
+  <ul class="verb">
+    <li><b>Eenvoudig forecast:</b> toon &eacute;&eacute;n samenvattend blok (&ldquo;over 6 maanden &plusmn;&euro;X&rdquo;) &oacute;f verwijder de route uit Eenvoudig net als Rekenhulp.</li>
+    <li><b>Beide budget:</b> degraded rendering &mdash; eigen budgetten tonen ook als de benchmark faalt.</li>
+  </ul>
+</div>
+
+<h3 class="grp">Detailschermen — belasting</h3>
+
+<div class="pg">
+  <div class="kop"><span class="route">/overzicht/belasting/box1</span><h4>Box 1 &mdash; werk + woning</h4><span class="chip c-goed">Sterk</span></div>
+  <div class="met">3.631 &rarr; 1.853 px (&minus;49%) &middot; eigenwoning-katern en tariefcurve verdwijnen; jaarruimte-kaart blijft</div>
+  <div class="shots">
+    <figure>{{IMG:P-full-box1.png}}<figcaption>Volledig</figcaption></figure>
+    <figure>{{IMG:P-simple-box1.png}}<figcaption>Eenvoudig</figcaption></figure>
+  </div>
+  <div class="oordeel"><b class="t">Oordeel</b>
+  De best gekozen belasting-reductie: Eenvoudig houdt precies de twee dingen die er voor deze gebruiker toe doen &mdash; wat kost box 1 me (in euro&rsquo;s &eacute;n maanden vrijheid) en wat is mijn grootste kans (jaarruimte, met simulator en actieknop). Het marginale tarief, de curve en het eigenwoning-katern zijn terecht Volledig-materiaal. Twee smetten: de uitleg zet de rekensom &ldquo;30% &times; (inkomen &minus; &euro;19.172) &minus; 6.27 &times; factor A&rdquo; integraal in Eenvoudig (formules zijn expert-taal), en de simulator start onverminderd op 100% van een jaarruimte die met factor A = 0 is berekend (H23) &mdash; het scherpste getal op de zwakste aanname, in beide weergaven. Bovendien verwijst de kaart naar &ldquo;pensioen-strategie&rdquo; om factor A in te vullen &mdash; en die woont op een pagina die Eenvoudig verbergt (zie gebeurtenissen).</div>
+  <ul class="verb">
+    <li><b>Eenvoudig:</b> vervang de formule door &eacute;&eacute;n zin + &ldquo;hoe we dit berekenen&rdquo;-uitklap; badge &ldquo;berekend z&oacute;nder je werkgeverspensioen&rdquo; zolang factor A leeg is.</li>
+    <li><b>Beide:</b> factor A invulbaar op de kaart zelf (H23).</li>
+  </ul>
+</div>
+
+<div class="pg">
+  <div class="kop"><span class="route">/overzicht/belasting/box2 &nbsp;&middot; box3 &nbsp;&middot; optimizer</span><h4>Box 2, Box 3 en de optimizer</h4><span class="chip c-goed">Sterk</span></div>
+  <div class="met">box2 &minus;59% &middot; box3 &minus;53% (peildatum-passage weg in Eenvoudig) &middot; optimizer &minus;44%</div>
+  <div class="shots">
+    <figure>{{IMG:P-simple-box3.png}}<figcaption>Box 3 in Eenvoudig &mdash; berekening + tegenbewijs, peildatum-passage weg</figcaption></figure>
+    <figure>{{IMG:P-simple-opt.png}}<figcaption>Optimizer in Eenvoudig</figcaption></figure>
+  </div>
+  <div class="oordeel"><b class="t">Oordeel</b>
+  Drie goede reducties. Opvallend en terecht: de Wft-gevoeligste passage van de app (het peildatum-&ldquo;arbitragevenster&rdquo; met de spaargeld-instructie, H24) staat all&eacute;&eacute;n in Volledig &mdash; Eenvoudig-gebruikers krijgen haar niet te zien. De box 3-berekeningsstappen met de forfait-balk blijven, en dat hoort zo: dat is d&eacute; herleidbaarheids-kracht van de module. Wat in beide weergaven blijft staan: de box 2-simulator die onder een kop &ldquo;&euro;0 per jaar&rdquo; ongevraagd &euro;16.867 heffing toont met de slider op de schijfgrens (H26), en de tegenbewijs-slider die op een vaste 2,0% start terwijl de app het echte rendement kent (M24). Jargondichtheid blijft hier het hoogst van de app: forfaitair, tegenbewijs, heffingsvrij, vervreemdingswinst, excessief lenen &mdash; deels onvermijdelijk (het z&iacute;jn de wettelijke termen), maar elk verdient zijn ene-zin-uitleg ter plekke, ook in Eenvoudig.</div>
+  <ul class="verb">
+    <li><b>Beide:</b> box 2-slider start op &euro;0; tegenbewijs-slider start op het bekende rendement.</li>
+    <li><b>Eenvoudig:</b> geef elk wetsjargon een tooltip-zin (&ldquo;forfait = het rendement dat de Belastingdienst a&aacute;nneemt&rdquo;) in plaats van de term te vermijden &mdash; vermijden kan hier niet.</li>
+  </ul>
+</div>
+
+<div class="pg">
+  <div class="kop"><span class="route">/overzicht/bezittingen/investment &nbsp;&middot; /overzicht/schulden/mortgage</span><h4>De verdiepings-apps</h4><span class="chip c-niets">Onaangeraakt</span></div>
+  <div class="met">beide identiek in beide weergaven; YTD-jargon in de holdings-app</div>
+  <div class="oordeel"><b class="t">Oordeel</b>
+  De app-oppervlakken (aandelen-holdings, hypotheekplanner) hebben geen enkele weergavelogica. Verdedigbaar &mdash; wie een holdings-app opent, wil diepte &mdash; maar de audit van 8 augustus besloot dat deze apps in Eenvoudig &uacute;it de navigatie zouden gaan (NAV-1), en dat is niet gebeurd: &ldquo;Aandelen holdings&rdquo; staat in Eenvoudig gewoon in de zijbalk. Daardoor is de facto een expert-oppervlak &eacute;&eacute;n klik verwijderd van de eenvoudigste stand, compleet met &ldquo;YTD&rdquo; en benchmark-vergelijking.</div>
+  <ul class="verb">
+    <li><b>Eenvoudig:</b> voer NAV-1 alsnog door (APPS-blok uit de zijbalk), of accepteer de zichtbaarheid en vertaal dan minimaal &ldquo;YTD&rdquo; &rarr; &ldquo;dit jaar&rdquo;.</li>
+  </ul>
+</div>
+
+
+<h3 class="grp">Toekomst — deelschermen</h3>
+
+<div class="pg">
+  <div class="kop"><span class="route">/toekomst/doelen</span><h4>Doelen</h4><span class="chip c-niets">Onaangeraakt</span></div>
+  <div class="met">identiek in beide weergaven</div>
+  <div class="oordeel"><b class="t">Oordeel</b>
+  Geen weergaveverschil, en dat is hier acceptabel: drie doelkaarten zijn niet overweldigend. De echte problemen zijn modus-onafhankelijk en staan in het bevindingenregister: een nieuw doel start direct op &ldquo;achter op planning&rdquo; (M31), de status reageert niet op doelbedrag en deadline (M32), &ldquo;Volledig bewerken&rdquo; stapelt een tweede venster op het eerste (M35), en het doel ontbreekt op de tijdas terwijl het dashboard het wel toont (M36). E&eacute;n weergavepunt: de FIRE-voortgang hier (58%, aug 2039) spreekt het dashboard (99,4%, &ldquo;0j 1m&rdquo;) tegen &mdash; C10 &mdash; en juist een Eenvoudig-gebruiker heeft geen derde scherm om te bepalen wie er gelijk heeft.</div>
+  <ul class="verb">
+    <li><b>Beide:</b> C10 eerst (&eacute;&eacute;n grondslag voor FIRE-voortgang); daarna M31/M32 (startstatus, statuslogica).</li>
+  </ul>
+</div>
+
+<div class="pg">
+  <div class="kop"><span class="route">/toekomst/gebeurtenissen</span><h4>Gebeurtenissen &amp; levensstrategie&euml;n</h4><span class="chip c-mis">Mis</span></div>
+  <div class="met">1.108 &rarr; 1.000 px &middot; Eenvoudig verbergt het complete blok &ldquo;Levensstrategie&euml;n&rdquo; (AOW-, pensioen-, huis-strategie)</div>
+  <div class="oordeel"><b class="t">Oordeel</b>
+  De gebeurtenissenlijst zelf is in beide weergaven gelijk &mdash; inclusief het omgekeerde vrijheids-label (C2: een sabbatical die geld kost krijgt &ldquo;+2,4 jaar vrijheid&rdquo;). Het weergaveverschil zit in wat Eenvoudig verbergt: de vier levensstrategie&euml;n, waaronder de <b>pensioen-strategie</b>. Daarmee breekt Eenvoudig zijn eigen verwijsketen: de jaarruimte-kaart op box 1 &mdash; die in Eenvoudig gewoon zichtbaar is &mdash; zegt &ldquo;vul je factor A in bij je pensioen-strategie&rdquo;, en die plek bestaat in Eenvoudig niet. De gebruiker krijgt een opdracht zonder bestemming. Instellingen verbergen is geen complexiteitsreductie wanneer zichtbare schermen ernaar verwijzen &eacute;n het rekenmodel ermee rekent.</div>
+  <ul class="verb">
+    <li><b>Eenvoudig:</b> houd de strategie&euml;n bereikbaar (eventueel ingeklapt), &oacute;f laat de box 1-verwijzing in Eenvoudig direct een invulveld openen in plaats van te verwijzen.</li>
+    <li><b>Beide:</b> C2-label herformuleren als richting (&ldquo;&rarr; 2,4 jaar later vrij&rdquo;).</li>
+  </ul>
+</div>
+
+<div class="pg">
+  <div class="kop"><span class="route">/toekomst/voorkeuren &nbsp;&middot; /rekenhulp &nbsp;&middot; /whatif</span><h4>Voorkeuren, Rekenhulp en Wat-Als</h4><span class="chip c-deels">Deels</span></div>
+  <div class="met">voorkeuren &minus;28% (onttrekkingsvolgorde en potten-verdeling verborgen) &middot; rekenhulp/whatif: uit nav in Eenvoudig, via deeplink bereikbaar</div>
+  <div class="oordeel"><b class="t">Oordeel</b>
+  Rekenhulp en Wat-Als uit de Eenvoudig-navigatie halen is de juiste keuze &mdash; expertgereedschap. Maar op voorkeuren verbergt Eenvoudig instellingen waar de projectiemotor gewoon mee d&oacute;&oacute;rrekent: de onttrekkingsvolgorde (welke pot eerst leeg bij afbouw) en de verdeling bij toename. Een Eenvoudig-gebruiker kan dus niet zien of corrigeren waarmee zijn eigen toekomstlijn wordt berekend &mdash; het model wordt er niet eenvoudiger van, alleen onzichtbaarder. En &eacute;&eacute;n jargonlek: elders op de pagina blijft &ldquo;SWR/opnamerate&rdquo; ook in Eenvoudig staan.</div>
+  <ul class="verb">
+    <li><b>Eenvoudig voorkeuren:</b> toon rekenm&eacute;&eacute;draaiende instellingen als leesregel met huidige waarde (&ldquo;bij afbouw eerst spaargeld &mdash; wijzig&rdquo;) in plaats van ze te verbergen.</li>
+    <li><b>Beide:</b> &ldquo;opnamerate/SWR&rdquo; buiten Volledig niet gebruiken; in Eenvoudig &ldquo;wat je jaarlijks opneemt&rdquo;.</li>
+  </ul>
+</div>
+
+<h3 class="grp">Mijn — detailpagina&rsquo;s</h3>
+
+<div class="pg">
+  <div class="kop"><span class="route">/mijn/profiel &middot; account &middot; uiterlijk &middot; privacy &middot; koppelingen &middot; geavanceerd &middot; notificaties</span><h4>De instellingenfamilie</h4><span class="chip c-niets">Onaangeraakt</span></div>
+  <div class="met">zes van zeven identiek; notificaties verbergt 2 van 8 typen in Eenvoudig; privacy &minus;13% (alleen sidebar-badge)</div>
+  <div class="shots">
+    <figure>{{IMG:V-picker.png}}<figcaption>/mijn/uiterlijk &mdash; de weergavekeuze, correct als eerste blok</figcaption></figure>
+    <figure>{{IMG:P-full-not.png}}<figcaption>/mijn/notificaties &mdash; 8 typen + 4 partner-modi</figcaption></figure>
+  </div>
+  <div class="oordeel"><b class="t">Oordeel</b>
+  De weergavekeuze zelf staat goed: eerste blok op Uiterlijk, heldere labels (&ldquo;Eenvoudig &mdash; de kern&rdquo; / &ldquo;Volledig &mdash; alle detail&rdquo;), server-side opgeslagen. Voor de rest negeert de familie de modus, en op &eacute;&eacute;n pagina is dat schadelijk: notificaties toont ook in Eenvoudig acht meldingstypen met vier partner-modi &mdash; terwijl het account geen partner heeft. Dat is de M-klasse-drukte die de audit al noemde. Curieus detail: de twee typen die Eenvoudig w&eacute;l verbergt (maandelijkse check-in, briefing per e-mail) zijn juist de twee die een beginner zou willen aanzetten.</div>
+  <ul class="verb">
+    <li><b>Eenvoudig notificaties:</b> drie schakelaars (briefing, belangrijke wijzigingen, herinnering) en de partner-sectie alleen m&eacute;t partner; de omgekeerde verbergkeuze terugdraaien.</li>
+    <li><b>Eenvoudig /mijn:</b> zie hoofdschermen &mdash; vier kaarten, rest achter &ldquo;alle instellingen&rdquo;.</li>
+  </ul>
+</div>
+
+
+<h2 class="sec pb">Taal &amp; jargon &mdash; de concrete verbeteringen</h2>
+<p class="seclede">Gebaseerd op de volledige paginatekst van alle 33 schermen in beide weergaven. Eerste tabel: termen die een beginner in Eenvoudig te zien krijgt. De regel is niet &ldquo;vermijd elk vakwoord&rdquo; &mdash; wettelijke termen m&oacute;gen &mdash; maar: elk vakwoord draagt ter plekke zijn ene-zin-uitleg, en afkortingen bestaan in Eenvoudig niet.</p>
+
+<table class="d taal">
+<tr><th>Staat er (in Eenvoudig)</th><th>Waar</th><th>Voorstel</th></tr>
+<tr><td>&ldquo;inclusiepercentage&rdquo;</td><td>bezittingen-intro</td><td>&ldquo;hoeveel hiervan meetelt voor je vrijheid&rdquo;</td></tr>
+<tr><td>&ldquo;avalanche-methode&rdquo;</td><td>schulden-banner (rood alarm)</td><td>&ldquo;duurste schuld eerst&rdquo; &mdash; de uitleg staat er al, de merknaam kan weg</td></tr>
+<tr><td>&ldquo;YTD&rdquo;</td><td>aandelen-holdings</td><td>&ldquo;dit jaar&rdquo;</td></tr>
+<tr><td>&ldquo;SWR&rdquo; / &ldquo;opnamerate&rdquo;</td><td>voorkeuren (ook Eenvoudig)</td><td>&ldquo;wat je jaarlijks opneemt&rdquo;; het percentage mag erachter tussen haakjes</td></tr>
+<tr><td>&ldquo;30% &times; (inkomen &minus; &euro;19.172) &minus; 6.27 &times; factor A&rdquo;</td><td>box 1-uitleg</td><td>In Eenvoudig &eacute;&eacute;n zin (&ldquo;ongeveer 30% van je inkomen boven &euro;19.000, minus wat je werkgever al opbouwt&rdquo;) met de formule in een uitklap</td></tr>
+<tr><td>&ldquo;forfaitair (fictief) rendement&rdquo;</td><td>box 3</td><td>Term houden, uitleg vooraan: &ldquo;de Belastingdienst rekent met een a&aacute;ngenomen rendement (&lsquo;forfait&rsquo;), niet met wat je echt verdiende&rdquo;</td></tr>
+<tr><td>&ldquo;tegenbewijs&rdquo;</td><td>box 3</td><td>Term houden + &ldquo;laat zien wat je &eacute;cht verdiende en betaal daarover&rdquo;</td></tr>
+<tr><td>&ldquo;heffingsvrij vermogen&rdquo;</td><td>box 3</td><td>Term houden + &ldquo;het deel waarover je niets betaalt&rdquo;</td></tr>
+<tr><td>&ldquo;vervreemdingswinst&rdquo;, &ldquo;excessief lenen&rdquo;</td><td>box 2</td><td>&ldquo;winst bij verkoop van je aandeel&rdquo;; &ldquo;meer dan &euro;500.000 lenen van je eigen BV&rdquo;</td></tr>
+<tr><td>&ldquo;aanmerkelijk belang&rdquo;</td><td>belasting-hub + box 2 (5 pagina&rsquo;s)</td><td>Term houden (wettelijk) + &eacute;&eacute;nmalig &ldquo;5% of meer van een BV&rdquo; op de hub</td></tr>
+<tr><td>&ldquo;jaarruimte&rdquo; / &ldquo;factor A&rdquo; / &ldquo;lijfrente&rdquo;</td><td>box 1, hub, tips</td><td>Termen houden; factor A altijd met bijschrift &ldquo;wat je werkgever al opbouwt (staat op mijnpensioenoverzicht.nl)&rdquo;</td></tr>
+<tr><td>&ldquo;schuldgraad&rdquo;</td><td>schulden-intro</td><td>&ldquo;schuld ten opzichte van wat je bezit&rdquo;</td></tr>
+<tr><td>&ldquo;FIRE&rdquo;</td><td>toekomst, notificaties</td><td>In Eenvoudig consequent &ldquo;volledige vrijheid&rdquo;; FIRE alleen in Volledig</td></tr>
+</table>
+
+<p class="note"><b>Wat al goed gaat:</b> de grafieklegenda op /overzicht zegt in Eenvoudig &ldquo;Bandbreedte&rdquo; waar Volledig &ldquo;Onzekerheid (P40&ndash;P60)&rdquo; toont &mdash; d&aacute;t is de jargonregel zoals bedoeld, en het bewijs dat hij per element kan. &ldquo;Volatiliteit&rdquo;, &ldquo;P40&ndash;P60&rdquo;, &ldquo;eigenwoningforfait&rdquo; en &ldquo;dagtarief&rdquo; komen alleen in Volledig voor. De spotlight-uitleg op de tijdas (opbouw/overgang/onttrekking) en de box 3-berekeningsstappen zijn voorbeeldig geschreven.</p>
+
+<table class="d taal">
+<tr><th>Toon-/formuleringspunt</th><th>Waar</th><th>Voorstel</th></tr>
+<tr><td>&ldquo;Controleer de API-sleutel in Admin instellingen&rdquo;</td><td>Fin-chat, foutpad</td><td>&ldquo;Fin is nu even niet bereikbaar &mdash; probeer het straks opnieuw&rdquo;; beheerderstekst naar het log (H27)</td></tr>
+<tr><td>&ldquo;benut hem v&oacute;&oacute;r 31 december&rdquo; &middot; &ldquo;optimalisatie aanbevolen&rdquo; &middot; &ldquo;dus rond de jaarwisseling spaargeld aanhouden&hellip;&rdquo;</td><td>belastingmodule</td><td>Beschrijvend herformuleren (Wft, H24): &ldquo;wie zijn jaarruimte dit jaar gebruikt, trekt hem af in 2026&rdquo;</td></tr>
+<tr><td>&ldquo;Overweeg hypotheek oversluiten &mdash; de markt biedt lagere tarieven&rdquo; &middot; &ldquo;beleg het studiefonds in een breed gespreid indexfonds&rdquo;</td><td>tips/acties</td><td>Productadvies verwijderen of neutraal maken; marktclaims niet hardcoden</td></tr>
+<tr><td>&minus;11 mnd = groen bij &ldquo;vrijheid&rdquo;-delta&rsquo;s</td><td>gebeurtenissen</td><td>Richting in woorden: &ldquo;&rarr; 11 maanden eerder vrij&rdquo; (C2)</td></tr>
+<tr><td>&ldquo;9 maanden per jaar&rdquo; naast &ldquo;36,6%&rdquo;</td><td>belasting-hub, vaste-lasten</td><td>Werk-tijd-framing op inkomensbasis, of weglaten; de twee claims samen overschrijden twaalf maanden (C5)</td></tr>
+<tr><td>&ldquo;10 jaar en 12 maanden vrijheid&rdquo;</td><td>bezittingen (formatter, app-breed)</td><td>Afronden: &ldquo;11 jaar vrijheid&rdquo;</td></tr>
+<tr><td>Sluiten vergt tweemaal kiezen (gids-confirm; tour-modal &ldquo;Je tips zijn nu verborgen&rdquo;)</td><td>overzicht, toekomst</td><td>E&eacute;n klik sluit; onthouden is de default (&ldquo;Sluiten&rdquo; hoort te onthouden); bevestiging hooguit als toast</td></tr>
+<tr><td>&ldquo;Rapport niet beschikbaar&rdquo; als kop boven een abonnementsgrens</td><td>rapportages</td><td>&ldquo;Hiervoor is een abonnement nodig&rdquo; + route; leest nu als storing (H28)</td></tr>
+</table>
+
+<h2 class="sec pb">De patronen &mdash; en wat als eerste moet</h2>
+<p class="seclede">Vijf patronen verklaren vrijwel alle oordelen hierboven.</p>
+<div class="oordeel">
+<p><b>1 &middot; Duiding verdwijnt, data blijft.</b> Op de tegels, bij vaste lasten en op transacties schrapt Eenvoudig de interpretatielaag en houdt de ruwe cijfers of de langste lijst. Voor de doelgroep van Eenvoudig is dat precies verkeerd om. De ontwerpregel hoort te zijn: <i>het oordeel in woorden blijft, het detail verhuist</i>.</p>
+<p><b>2 &middot; Twee overreducties maken pagina&rsquo;s antwoordloos.</b> Cashflow (vraag in de kop, nul cijfers eronder) en forecast (inhoud volledig weg, route blijft). Een pagina die in Eenvoudig niets zegt, hoort daar een kerngetal te tonen of geen bestemming te zijn.</p>
+<p><b>3 &middot; De dekking is nog steeds ongelijk.</b> Veertien schermen negeren de modus, waaronder /mijn, /rapportages en notificaties &mdash; de audit van 8 augustus constateerde dit; op deze schermen is niets veranderd. En NAV-1 (apps uit de Eenvoudig-zijbalk) is besloten maar niet doorgevoerd.</p>
+<p><b>4 &middot; Eenvoudig breekt twee eigen verwijzingen.</b> Box 1 verwijst naar de pensioen-strategie (verborgen in Eenvoudig); voorkeuren verbergt instellingen waar de motor mee rekent. Verbergen zonder de verwijsketen na te lopen levert doodlopende opdrachten op.</p>
+<p><b>5 &middot; Foute getallen overleven elke weergave.</b> Het onmogelijke tarief op de belasting-hub, de &minus;265%-meter, het 13-jaar-uiteenlopende FIRE-antwoord: Eenvoudig toont ze net zo hard, met m&iacute;nder context om ze te wantrouwen. Correctheid gaat v&oacute;&oacute;r reductie.</p>
+</div>
+
+<table class="d">
+<tr><th>#</th><th>Eerst doen</th><th>Waarom eerst</th></tr>
+<tr><td class="r">1</td><td>C8/C9/C10 + de meterschaal (&minus;265%) repareren</td><td>Eenvoudig versterkt het vertrouwen in het ene getoonde getal; dat getal moet dus kloppen</td></tr>
+<tr><td class="r">2</td><td>Cashflow- en forecast-overreductie terugdraaien (kerngetal per kaart)</td><td>Twee hoofdroutes zijn in Eenvoudig antwoordloos</td></tr>
+<tr><td class="r">3</td><td>Duiding terug op de tegels; vaste-lasten omgedraaid (oordeel boven lijst)</td><td>Het kernpatroon &mdash; kleine wijzigingen, groot effect voor beginners</td></tr>
+<tr><td class="r">4</td><td>Verwijsketen herstellen (factor A, voorkeuren-leesregels)</td><td>Doodlopende opdrachten ondermijnen het vertrouwen in Eenvoudig zelf</td></tr>
+<tr><td class="r">5</td><td>Taaltabellen hierboven doorvoeren + jargonregel als test borgen</td><td>Grotendeels tekstwerk; de test voorkomt terugval</td></tr>
+<tr><td class="r">6</td><td>Dekking: /mijn, notificaties, rapportages, NAV-1</td><td>De belofte &ldquo;Eenvoudig = de kern&rdquo; geldt nu maar voor de helft van de app</td></tr>
+</table>
+
+<p class="note">Verhouding tot eerdere stukken: de 84 genummerde bevindingen staan in het Bevindingenregister (PDF, <span class="mono">docs/dev/rapporten/</span>); het overkoepelende oordeel over de weergavemodus in <span class="mono">docs/dev/ux-oordeel-weergavemodus.md</span>. Dit schermoordeel is de pagina-voor-pagina-uitwerking daarvan; verwijzingen als C8 en H23 wijzen naar het register.</p>
