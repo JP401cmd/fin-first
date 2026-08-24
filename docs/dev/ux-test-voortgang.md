@@ -100,6 +100,26 @@ samengevoegd**. Als die weg is, is dit de samenvatting van wat vaststaat:
   prioriteitsscore; de fee-calculator laat zien dat 0,5% beheerkosten €51.091
   over 30 jaar kost — 13% van de eindwaarde.
 
+### Zwaarste bevindingen — twee keer onafhankelijk gereproduceerd
+
+- 🔴 **Het kernantwoord van de app is niet-deterministisch.** Drie keer dezelfde
+  pagina `/toekomst` laden, dezelfde gegevens, dezelfde sessie, seconden na elkaar:
+
+  | Laadbeurt | Vrijheidsleeftijd | Doelbedrag |
+  |---|---|---|
+  | 1 | 52,9 jaar | € 537.598 |
+  | 2 | **67 jaar** | **€ 1.180.986** |
+  | 3 | 52,9 jaar | € 537.598 |
+
+  Tester B2 zag hetzelfde op een ander account (61,6 jaar / € 2.101.015 versus
+  "Je bent vrij" / € 705.173). **Aanwijzing:** op datzelfde scherm staat
+  "AOW-integratie: inbegrepen vanaf 67j", en de afwijkende laadbeurt gaf exact 67 —
+  dat wijst op een terugval op de AOW-leeftijd wanneer de FIRE-berekening niet
+  compleet is. Gemeten ná alle omgevingsreparaties, dus geen artefact.
+
+- 🟠 **"Verwacht rendement (portefeuille) 665,5%"** in de FIRE-widget op
+  `/overzicht` (tester B2 zag 650,0% op zijn account). Factor-100-fout.
+
 ### Van tester C (navigatie, taal, cognitive load — account leo)
 - 🔴 **Vrijheids-delta's lezen omgekeerd.** Op `/toekomst/gebeurtenissen` krijgt
   "Verbouwing eigen woning — € 45.000" de badge **"+2.2 jaar vrijheid"**, en
