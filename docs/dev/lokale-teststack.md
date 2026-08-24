@@ -66,7 +66,24 @@ afhankelijkheid nog niet bestaat, wordt in een volgende pass opnieuw geprobeerd.
 Dat is ongevoelig voor élke verkeerde datering, niet alleen deze. Wat na vijf
 passes niet lukt, wordt luid gemeld — nooit stil overgeslagen.
 
-> **Dit blijft een tijdelijke pleister.** De echte oplossing is de migratie
+**4. Sommige objecten bestaan alleen op productie.** Dit is de ernstigste van de
+vier, en ook een echte fout in de repo. Een aantal database-objecten wordt door
+**geen enkele migratie** aangemaakt — ze zijn ooit rechtstreeks op de remote
+database gezet. Op een verse database ontbreken ze dus, met gevolgen die niet
+naar hun oorzaak wijzen:
+
+| Ontbrekend object | Wat er kapot gaat |
+|---|---|
+| Tabelrechten voor `anon` / `authenticated` | Élke query geeft `permission denied for table …`; elke pagina rendert leeg alsof de gebruiker geen gegevens heeft |
+| `profiles.commercial_tier`, `profiles.active_subscriptions` | Migratie `20260720081332` installeert een guard-trigger die `new.commercial_tier` leest bij **iedere** insert/update op `profiles`. Zonder de kolom faalt élke profielwijziging met `record "new" has no field "commercial_tier"` — de onboarding kan niet opslaan, `onboarding_completed` wordt nooit gezet, en de gebruiker wordt door élke route teruggestuurd naar `/onboarding` |
+| `assets.has_woonbalans_tracking` | Gebruikt door migratie `20260802190000` en door de persona-seed; zonder de kolom faalt seeden halverwege |
+| `profiles.role`, `is_superadmin()`, `handle_new_user()` + trigger | Blokkeerden tientallen migraties bij het opbouwen van deze stack |
+
+`patch_remote_only()` in het script vult deze aan. Dat is nadrukkelijk een
+pleister: zolang die functie nodig is, is de repo niet zelfvoorzienend en kan
+niemand een omgeving opbouwen zonder een kopie van productie.
+
+> **De pleisters blijven pleisters.** De echte oplossing is de migratie
 > hernummeren, en dat is geen losse hernoeming: `schema_migrations` op productie
 > kent de oude versie al, dus een nieuwe timestamp maakt er een "nog niet
 > toegepaste" migratie van die opnieuw zou draaien. Dat hoort via de

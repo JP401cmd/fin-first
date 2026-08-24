@@ -82,9 +82,15 @@ start_supabase() {
   fi
   log "supabase starten"
   cp supabase/config.toml /tmp/config.toml.bak
+  # Twee runtime-patches, allebei alleen tijdens het starten:
+  #  - db.migrations uit (zie apply_migrations hieronder)
+  #  - edge_runtime uit: die container start niet in deze sandbox
+  #    ("runc create failed: error setting rlimit type 7") en blokkeert dan de
+  #    hele start. Het project gebruikt geen edge functions.
   node -e '
     const fs=require("fs");const p="supabase/config.toml";let t=fs.readFileSync(p,"utf8");
     t=t.replace(/(\[db\.migrations\][\s\S]*?)\nenabled = true/,"$1\nenabled = false");
+    t=t.replace(/(\[edge_runtime\][\s\S]*?)\nenabled = true/,"$1\nenabled = false");
     fs.writeFileSync(p,t);'
   set +e
   supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor
@@ -137,6 +143,39 @@ apply_migrations() {
   fi
 }
 
+# --- 4b. Objecten die alleen op productie bestaan --------------------------
+# Een aantal objecten wordt door GEEN enkele migratie in deze repo aangemaakt;
+# ze bestaan alleen op de remote database. Zonder deze patch is de app op een
+# verse database onbruikbaar. Elk item hieronder is een geconstateerd gemis,
+# geen voorkeur — laat ze staan tot de migraties zelfvoorzienend zijn.
+#
+#  * tabelrechten voor anon/authenticated/service_role — zonder deze geeft élke
+#    query "permission denied for table ..." en rendert elke pagina leeg.
+#  * profiles.commercial_tier / active_subscriptions — migratie 20260720081332
+#    installeert een guard-trigger die new.commercial_tier leest bij iedere
+#    insert/update. Ontbreekt de kolom, dan faalt élke profielwijziging met
+#    'record "new" has no field "commercial_tier"' → onboarding kan niet
+#    opslaan en de gebruiker blijft eeuwig in /onboarding hangen.
+#  * assets.has_woonbalans_tracking — gebruikt door migratie 20260802190000
+#    en door de persona-seed, maar nergens aangemaakt.
+patch_remote_only() {
+  log "objecten aanvullen die geen migratie aanmaakt"
+  docker exec -i "$DB_CONTAINER" psql -q -v ON_ERROR_STOP=1 -U postgres -d postgres >/dev/null <<'SQL'
+grant usage on schema public to anon, authenticated, service_role;
+grant all on all tables in schema public to anon, authenticated, service_role;
+grant all on all sequences in schema public to anon, authenticated, service_role;
+grant all on all functions in schema public to anon, authenticated, service_role;
+alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+
+alter table public.profiles add column if not exists commercial_tier text not null default 'gratis';
+alter table public.profiles add column if not exists active_subscriptions text[] not null default '{}';
+alter table public.assets   add column if not exists has_woonbalans_tracking boolean not null default false;
+
+notify pgrst, 'reload schema';
+SQL
+}
+
 # --- 5. Env ---------------------------------------------------------------
 write_env() {
   log ".env.local schrijven"
@@ -186,7 +225,7 @@ case "${1:-}" in
     docker exec -i "$DB_CONTAINER" psql -qtA -U postgres -d postgres \
       -c 'drop schema if exists public cascade; create schema public;
           truncate supabase_migrations.schema_migrations;' >/dev/null
-    apply_migrations; ensure_test_user
+    apply_migrations; patch_remote_only; ensure_test_user
     log "database gereset"; exit 0 ;;
 esac
 
@@ -194,6 +233,7 @@ ensure_docker
 ensure_images
 start_supabase
 apply_migrations
+patch_remote_only
 write_env
 ensure_test_user
 
