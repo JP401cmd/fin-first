@@ -236,3 +236,48 @@ Huishouden en partnerdeling (grootste resterende gat, en het gevoeligste: wat zi
 partner wél en niet), onboarding in de varianten alleenstaand en gezin, sessie- en
 foutgedrag (verlopen sessie midden in een formulier, netwerkverlies bij opslaan, twee
 tabbladen naast elkaar), en de kwaliteit van de AI-antwoorden.
+
+## Ronde 3 — toegankelijkheid, Fin-oppervlak en belastingmodule (24 aug, 17:00)
+
+Twee testrondes afgerond, één loopt nog.
+
+| Ronde | Account | Status |
+|---|---|---|
+| Toegankelijkheid + Fin-oppervlak | `jochen@` (AI-tier) | afgerond |
+| Belastingmodule | `ronald@` (persona `compleet`, AI-tier) | afgerond |
+| Invoer / import / rapportages | `leo@` | loopt nog |
+
+### Nieuwe bevindingen in de PDF verwerkt
+
+- **C8** — hub en `/belasting/box1` noemen twee verschillende box 1-heffingen (verschil €4.357 = eigenwoning-saldo × 49,5%).
+- **C9** — effectief tarief (36,6%) boven marginaal (35,8%) op de hub; box 1-pagina noemt 56,0% voor hetzelfde inkomen.
+- **H22** — "Drie boxen, één som" telt box 2 niet mee in het totaal.
+- **H23** — jaarruimte gerekend met factor A = 0; scherm spreekt zichzelf tegen over de aanname.
+- **H24** — Wft: vier passages in aanbevelende/gebiedende vorm; `/wft` nergens gelinkt en zelf nog concept.
+- **H25** — hypotheekrenteaftrek tegen toptarief; tariefsaanpassing eigen woning ontbreekt.
+- **H26** — box 2-scherm met kop €0 toont tegelijk €16.867; slider-default staat op de schijfgrens.
+- **H27** — chatfout in beheerderstaal ("controleer de API-sleutel in Admin instellingen").
+- **M22–M29** — vrijheidsdag-koers verschilt per scherm (3 vs 5 dagen op hetzelfde bedrag); box 3-indeling; tegenbewijs-default 2,0%; "Vraag Fin" markeert gelezen bij een mislukt antwoord; chat laat typen terwijl `aiEnabled:false`; chat sluit niet met Escape; twee `h1` per pagina; focus-outline 0px.
+- **L7–L9** — getypte vraag gewist na fout; box 2-alarm bij €0; "Ververs"-knop verdwijnt na gebruik.
+
+### Verworpen: het gemelde "datalek"
+
+De belastingtester meldde als Critical dat de module minutenlang het dossier van een andere gebruiker toonde, inclusief e-mailadres. **Geverifieerd en verworpen — het is de testmethode, niet het product.**
+
+Oorzaak: twee gelijktijdige testers deelden één `storageState`-bestand (`scratchpad/state.json`). Beide schreven ernaar; de laatste schrijver overschreef de cookies van de ander midden in een run. In de database staat het "vreemde" dossier gewoon op het eigen account (`ronald@` heeft de `compleet`-persona met "Belang Volkert Compleet Holding BV"), en het "eigen" dossier op het andere account (`jochen@` heeft "Woning Utrecht" €385.000 en "Pensioenfonds ABP Lisa"). Servercode gecontroleerd: `getCachedUser` gebruikt React `cache()` (request-scoped), en `lib/reference-cache.ts` bevat alleen niet-gebruikersgebonden referentiedata.
+
+**Les voor volgende rondes: geef elke tester een eigen storageState-pad** (`state-<account>.json`) en laat elke tester bij aanvang het ingelogde e-mailadres van het scherm verifiëren. Dit is nu in de PDF opgenomen als sectie "Verworpen waarnemingen", zodat het register laat zien wat er is afgevallen.
+
+De overige belastingbevindingen blijven overeind: het zijn vergelijkingen *binnen* één consistente dataset (hub vs. detail, kop vs. simulator, formule vs. uitkomst).
+
+### PDF-stand
+
+74 bevindingen (9 Critical, 27 High, 29 Medium, 9 Low), 59 pagina's, 19 ingesloten schermafbeeldingen. Bouwen:
+
+```
+cd <scratchpad>
+node inline.mjs   # bev-head + bev-tail -> bevindingen.html -> bevindingen-img.html
+node pdf.mjs      # -> TriFinity-bevindingen.pdf
+```
+
+`inline.mjs` sluit de `{{IMG:bestand.png}}`-plaatshouders in als base64 data-URI en verwijdert lege figures; het bestand zelf komt nooit in de modelcontext.
