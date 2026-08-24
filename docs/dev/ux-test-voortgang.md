@@ -309,3 +309,27 @@ De PDF staat als `docs/dev/rapporten/TriFinity-bevindingen.pdf` in de repo, met 
 ### Capaciteitsgrens, definitief
 
 Drie gelijktijdige testers passen niet. Gemeten bij de laatste ronde: `next-server` op 11,1 GB van 16 GB, load average 44–70, en pagina's die na 240s nog niets teruggaven. **Maximaal twee browsersessies tegelijk**, en herstart de dev-server tussen rondes.
+
+## Reproductiegids bijgewerkt (24 aug, 19:50)
+
+Artefact: https://claude.ai/code/artifact/91f41706-4509-4d71-9ed3-4b4529494140 — bron staat als `docs/dev/rapporten/reproductiegids-bron.html` in de repo.
+
+Toegevoegd: C8, C9, C10 als volledige cases; H22 t/m H28 als volledige cases; vijftien regels in de Medium-tabel en vier in de Low-tabel.
+
+**Accounttabel gecorrigeerd.** De oude tabel klopte niet meer — hij beschreef de personadefinities, niet wat er in de database staat. Gelezen stand per 24 aug:
+
+| Account | Persona | Inhoud | Tier |
+|---|---|---|---|
+| `uxtest@` | handmatig gevuld | 6 bezittingen, 0 transacties, één bezitting van €1 biljoen (bewijs van H8) | gratis |
+| `jochen@` | Lisa — solo, woning Utrecht | 16 bezittingen (€498.550), 11 schulden, 405 transacties | **ai** |
+| `ronald@` | Volkert Compleet — DGA | 16 bezittingen (€1.585.000), 12 schulden, 287 transacties | **ai** |
+| `leo@` | Volkert Compleet — DGA | 16 bezittingen (€1.585.000), 12 schulden, 295 transacties | gratis |
+| `bas@` | Willem — FIRE nabij | 8 bezittingen (€1.619.700), 0 schulden, 301 transacties | gratis |
+
+`ronald@` was géén Lisa-account; die persona zit op `jochen@`. Daar kwam het vermeende datalek uit voort. `ronald@` en `leo@` dragen dezelfde persona met verschillende tier — bruikbaar om betaalmuren te vergelijken.
+
+**Twee nieuwe stappen in de opzetsectie:**
+- Stap 4 (capaciteit) aangescherpt met de tweede meting: 11,1 GB, load 44–70, pagina's die na 240s niets teruggaven. `kill -9` op de PID, want `pkill` laat het proces soms staan.
+- Stap 5 nieuw: **één storageState-bestand per tester**, en bij aanvang het ingelogde account van het scherm aflezen.
+
+**Slotsectie herschreven** — wat nu wél gedekt is (belastingmodule, Fin-oppervlak, toegankelijkheid, import, doelen, twee rapportvormen), wat open blijft (schermlezer met echte hulpsoftware, virtueel toetsenbord, de rapporten spiegel/totaalplan, budget aanmaken, bankkoppeling), en wat bewust buiten het register valt.

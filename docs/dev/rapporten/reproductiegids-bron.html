@@ -1,0 +1,775 @@
+<title>TriFinity Reproductiegids</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+:root{
+  --ground:#EFF2F3; --surface:#FFFFFF; --surface-2:#E7ECEE;
+  --ink:#151A1D; --ink-2:#3D484E; --muted:#66757C; --line:#D2DADD;
+  --accent:#0F6E6E; --accent-soft:#DCEDEC;
+  --crit:#A8251C; --high:#B45C09; --med:#8E7100; --low:#33628F; --good:#25704A;
+  --crit-bg:#F7E6E4; --high-bg:#FAEDDE; --med-bg:#F6F1DC; --low-bg:#E4EDF5; --good-bg:#E1EFE7;
+  --shadow:0 1px 2px rgba(21,26,29,.06),0 8px 24px -12px rgba(21,26,29,.18);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#0E1315; --surface:#161D20; --surface-2:#1D262A;
+    --ink:#E7ECED; --ink-2:#BCC7CB; --muted:#8797A0; --line:#2A3539;
+    --accent:#54CFC2; --accent-soft:#12312F;
+    --crit:#F2837A; --high:#E8A765; --med:#D6BE5E; --low:#8FB6D8; --good:#7DC79E;
+    --crit-bg:#2B1614; --high-bg:#2B1F12; --med-bg:#282312; --low-bg:#141F29; --good-bg:#12241A;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px -14px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0E1315; --surface:#161D20; --surface-2:#1D262A;
+  --ink:#E7ECED; --ink-2:#BCC7CB; --muted:#8797A0; --line:#2A3539;
+  --accent:#54CFC2; --accent-soft:#12312F;
+  --crit:#F2837A; --high:#E8A765; --med:#D6BE5E; --low:#8FB6D8; --good:#7DC79E;
+  --crit-bg:#2B1614; --high-bg:#2B1F12; --med-bg:#282312; --low-bg:#141F29; --good-bg:#12241A;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px -14px rgba(0,0,0,.7);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);
+  font-family:"Source Serif 4",Georgia,serif;font-size:16.5px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px 96px}
+h1,h2,h3,h4{font-family:Archivo,"Helvetica Neue",Arial,sans-serif;text-wrap:balance;margin:0}
+.eyebrow{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;font-weight:500;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+code{font-family:"IBM Plex Mono",monospace;font-size:.88em;background:var(--surface-2);
+  padding:1px 5px;border-radius:3px}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+
+header{border-bottom:1px solid var(--line);padding:56px 0 34px;margin-bottom:40px}
+h1{font-size:clamp(32px,5vw,50px);font-weight:700;letter-spacing:-.022em;line-height:1.06}
+header p{max-width:62ch;color:var(--ink-2);margin:18px 0 0}
+
+section{margin-bottom:56px}
+h2{font-size:26px;font-weight:600;letter-spacing:-.015em;margin:0 0 6px;padding-top:8px}
+.lede{color:var(--muted);max-width:64ch;margin:0 0 24px}
+
+/* setup */
+.setup{background:var(--surface);border:1px solid var(--line);border-radius:6px;
+  padding:26px 28px;box-shadow:var(--shadow)}
+.setup h3{font-size:16px;font-weight:600;margin:22px 0 8px}
+.setup h3:first-child{margin-top:0}
+pre{background:var(--surface-2);border:1px solid var(--line);border-radius:5px;
+  padding:13px 15px;overflow-x:auto;margin:8px 0;
+  font-family:"IBM Plex Mono",monospace;font-size:13px;line-height:1.55}
+pre code{background:none;padding:0;font-size:inherit}
+.setup p{margin:0 0 10px;color:var(--ink-2)}
+.acc{width:100%;border-collapse:collapse;font-size:14.5px;margin:8px 0}
+.acc th,.acc td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line)}
+.acc th{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted)}
+.acc td:first-child{font-family:"IBM Plex Mono",monospace;font-size:13px}
+
+/* cases */
+.grp-head{display:flex;align-items:baseline;gap:12px;margin:34px 0 14px;
+  padding-bottom:8px;border-bottom:1px solid var(--line)}
+.grp-head h3{font-size:15px;font-weight:600;letter-spacing:.02em}
+.grp-head span{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--muted)}
+
+.case{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--line);
+  border-radius:5px;padding:20px 22px;margin-bottom:14px;box-shadow:var(--shadow)}
+.case.crit{border-left-color:var(--crit)}
+.case.high{border-left-color:var(--high)}
+.case.med{border-left-color:var(--med)}
+.case.low{border-left-color:var(--low)}
+.case.good{border-left-color:var(--good)}
+.ctop{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-bottom:8px}
+.id{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;color:var(--muted)}
+.tag{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;letter-spacing:.1em;
+  text-transform:uppercase;padding:3px 8px;border-radius:3px}
+.t-crit{background:var(--crit-bg);color:var(--crit)}
+.t-high{background:var(--high-bg);color:var(--high)}
+.t-med{background:var(--med-bg);color:var(--med)}
+.t-low{background:var(--low-bg);color:var(--low)}
+.t-good{background:var(--good-bg);color:var(--good)}
+.route{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--accent)}
+.case h4{font-size:18.5px;font-weight:600;letter-spacing:-.01em;line-height:1.3;margin-bottom:12px}
+
+.steps{margin:0 0 14px;padding-left:1.3em}
+.steps li{margin-bottom:4px;color:var(--ink-2);font-size:15.5px}
+.ea{display:grid;grid-template-columns:1fr 1fr;gap:2px;margin:12px 0;
+  border:1px solid var(--line);border-radius:4px;overflow:hidden;background:var(--line)}
+.ea > div{background:var(--surface-2);padding:12px 14px}
+.ea .lab{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.11em;
+  text-transform:uppercase;margin-bottom:5px}
+.ea .verwacht .lab{color:var(--good)}
+.ea .werkelijk .lab{color:var(--crit)}
+.ea p{margin:0;font-size:15px;color:var(--ink-2)}
+.ea p b{color:var(--ink);font-weight:600}
+@media (max-width:640px){.ea{grid-template-columns:1fr}}
+
+figure{margin:14px 0 0}
+figure img{width:100%;height:auto;display:block;border:1px solid var(--line);border-radius:4px}
+figcaption{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted);margin-top:6px}
+.noshot{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--muted);
+  margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:5px;background:var(--surface)}
+table.d{border-collapse:collapse;width:100%;font-size:14.5px}
+table.d th,table.d td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line)}
+table.d tr:last-child td{border-bottom:none}
+table.d th{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.11em;
+  text-transform:uppercase;color:var(--muted);background:var(--surface-2)}
+.note{font-size:14.5px;color:var(--muted);max-width:66ch}
+</style>
+
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Bij de UX-audit &middot; tien testrondes &middot; augustus 2026</div>
+  <h1>TriFinity Reproductiegids</h1>
+  <p>Elke bevinding uit de audit, omgezet naar iets wat je zelf kunt narekenen: de route, de stappen ernaartoe, wat je zou verwachten, wat er werkelijk gebeurt, en het bewijsbeeld waar dat er is. Bovenaan staat hoe je de testomgeving opnieuw opzet, zodat de hele exercitie herhaalbaar is. Bijgewerkt na de rondes over de belastingmodule, de Fin-chat, toegankelijkheid en de import: tien Critical, achtentwintig High.</p>
+</header>
+
+<section>
+  <div class="eyebrow">Vooraf</div>
+  <h2>De omgeving opnieuw opzetten</h2>
+  <p class="lede">De testcontainer is vluchtig. Dit is de hele route van niets naar een ingelogde app met gevulde accounts.</p>
+  <div class="setup">
+    <h3>1 &middot; Stack starten</h3>
+    <pre><code>bash scripts/dev/test-stack.sh --dev</code></pre>
+    <p>Dit start de Docker-daemon, zet Google&rsquo;s Docker Hub-mirror als registry-mirror, haalt de Supabase-images op en hertagt ze naar de namen die de CLI verwacht, past de migraties toe in een werkende volgorde, vult de objecten aan die geen enkele migratie aanmaakt, schrijft <code>.env.local</code> en start de dev-server op <code>:3000</code>. Reken op een kwartier tot een half uur bij een verse container; daarna is het een minuut.</p>
+    <p>Achtergrond en de zes bekende blokkades staan in <code>docs/dev/lokale-teststack.md</code>. Andere schakelaars: <code>--reset</code> (database leeg, migraties opnieuw), <code>--down</code> (alles afbreken).</p>
+
+    <h3>2 &middot; Inloggen</h3>
+    <p>Ga naar <code>http://localhost:3000/login</code>. Alle testaccounts hebben wachtwoord <code>Test2026!</code>.</p>
+    <table class="acc">
+      <tr><th>Account</th><th>Persona</th><th>Inhoud</th><th>Tier</th><th>Waarvoor</th></tr>
+      <tr><td>uxtest@</td><td>handmatig gevuld</td><td>6 bezittingen, 0 transacties</td><td>gratis</td><td>Onboarding, invoer, foutafhandeling. Draagt een bezitting van &euro;1&nbsp;biljoen &mdash; het bewijs van H8</td></tr>
+      <tr><td>jochen@</td><td>Lisa &mdash; solo, koopwoning Utrecht</td><td>16 bezittingen (&euro;498.550), 11 schulden, 405 transacties</td><td><b>ai</b></td><td>Belastingmodule, Fin-chat, toegankelijkheid</td></tr>
+      <tr><td>ronald@</td><td>Volkert Compleet &mdash; DGA</td><td>16 bezittingen (&euro;1.585.000), 12 schulden, 287 transacties</td><td><b>ai</b></td><td>Box 2, DGA-paden, betaalde functies</td></tr>
+      <tr><td>leo@</td><td>Volkert Compleet &mdash; DGA</td><td>16 bezittingen (&euro;1.585.000), 12 schulden, 295 transacties</td><td>gratis</td><td>Import, doelen, rapportages, betaalmuren</td></tr>
+      <tr><td>bas@</td><td>Willem &mdash; FIRE nabij</td><td>8 bezittingen (&euro;1.619.700), geen schulden, 301 transacties</td><td>gratis</td><td>Power user: toekomst, verdieping</td></tr>
+    </table>
+    <p class="noshot">Stand per 24 augustus 2026, gelezen uit de database &mdash; niet uit de personadefinities. Controleer hem opnieuw voor je begint: eerdere testrondes hebben deze accounts gewijzigd. Let op dat <code>ronald@</code> en <code>leo@</code> dezelfde persona dragen; de tier verschilt.</p>
+    <p>Een leeg account vullen met een persona: na inloggen &eacute;&eacute;nmalig <code>fetch('/api/activate',{method:'POST'})</code> vanuit de browserconsole. Krijg je <code>400 Already activated</code>, zet dan eerst <code>last_known_phase</code> op <code>null</code> in <code>profiles</code>.</p>
+
+    <h3>3 &middot; Als gebruiker doorklikken</h3>
+    <p>Chromium staat klaar op <code>/opt/pw-browsers/chromium-1194/chrome-linux/chrome</code>. Starten met <code>--no-sandbox --disable-dev-shm-usage</code>. Mobiel testen doe je met viewport 390&times;844, <code>isMobile</code> en <code>hasTouch</code>.</p>
+
+    <h3>4 &middot; Capaciteitsgrens &mdash; belangrijk</h3>
+    <p><b>Maximaal twee browsersessies tegelijk, en herstart de dev-server tussen rondes.</b> Twee keer gemeten en twee keer bevestigd: bij drie gelijktijdige testers groeide <code>next-server</code> naar 11,1 GB van de 16 GB, liep de load average op tot 44&ndash;70, en gaven pagina&rsquo;s na 240 seconden nog niets terug. Er is geen swap. Herstart de dev-server zodra hij boven ~4 GB komt (<code>kill -9</code> op de specifieke PID &mdash; een <code>pkill</code> laat het proces soms staan), of draai een productiebuild (<code>npm run build &amp;&amp; npm start</code>): de dev-server hercompileert elke route per bezoeker en dát is de geheugenvreter.</p>
+
+    <h3>5 &middot; Eén sessiebestand per tester &mdash; niet delen</h3>
+    <p>Draaien er meerdere testers tegelijk, geef elk een <b>eigen</b> <code>storageState</code>-pad (<code>state-&lt;account&gt;.json</code>). Twee testers die hetzelfde bestand schrijven overschrijven elkaars cookies midden in een run: de een keek daardoor minutenlang naar het account van de ander en rapporteerde dat bijna als datalek. Laat elke tester bovendien bij aanvang <b>het ingelogde account van het scherm aflezen</b> (initialen in de zijbalk of het e-mailadres in de header) en dat bij elke bevinding noteren. Kost tien seconden en scheelt een dag verificatie.</p>
+
+    <h3>6 &middot; Wat géén productbevinding is</h3>
+    <p>Traagheid en laadtijden (dev-server), de zwarte &ldquo;N&nbsp;Issues&rdquo;-badge linksonder (Next.js dev-overlay), e-mail en bankkoppelingen (werken lokaal niet), en alles rond beleggingsposities of rechten dat raar oogt (acht migraties zijn niet toepasbaar). Bij twijfel: markeer als &ldquo;mogelijk omgeving&rdquo; en ga verder.</p>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow">Testgevallen</div>
+  <h2>Bevindingen om na te rekenen</h2>
+  <p class="lede">Per geval: waar het zit, hoe je er komt, wat je zou verwachten, en wat er werkelijk gebeurt.</p>
+
+  <div class="grp-head"><h3>Critical</h3><span>blokkeert taak, begrip of kernwaarde</span></div>
+
+  <div class="case crit">
+    <div class="ctop"><span class="id">C1</span><span class="tag t-crit">Critical</span><span class="route">/toekomst</span></div>
+    <h4>Het kernantwoord verschilt per laadbeurt</h4>
+    <ol class="steps">
+      <li>Log in op een gevuld account (bv. <code>ronald@</code>).</li>
+      <li>Open <code>/toekomst</code> en noteer &ldquo;Vrijheidsleeftijd&rdquo; en &ldquo;Doelbedrag&rdquo;.</li>
+      <li>Herlaad de pagina. Herhaal drie tot vijf keer, met een paar seconden ertussen.</li>
+      <li>Verander niets aan de gegevens.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>Bij ongewijzigde gegevens elke keer <b>hetzelfde</b> antwoord.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p>52,9 jaar / &euro; 537.598 &rarr; <b>67 jaar / &euro; 1.180.986</b> &rarr; 52,9 jaar / &euro; 537.598.</p></div>
+    </div>
+    <p class="note"><b>Spoor:</b> op hetzelfde scherm staat &ldquo;AOW-integratie: inbegrepen vanaf 67j&rdquo; en de afwijkende laadbeurt gaf exact 67. Vermoedelijk een terugval op de AOW-leeftijd wanneer de FIRE-berekening niet compleet is. Op een tweede account: &ldquo;61,6 jaar / &euro; 2.101.015&rdquo; versus &ldquo;Je bent vrij / &euro; 705.173&rdquo;.</p>
+    <figure>{{IMG:verif-toekomst-1.png}}<figcaption>/toekomst &mdash; laadbeurt 1</figcaption></figure>
+  </div>
+
+  <div class="case crit">
+    <div class="ctop"><span class="id">C2</span><span class="tag t-crit">Critical</span><span class="route">/toekomst/gebeurtenissen</span></div>
+    <h4>Het label van de vrijheids-delta zegt het omgekeerde</h4>
+    <ol class="steps">
+      <li>Open <code>/toekomst/gebeurtenissen</code> op een account met levensgebeurtenissen.</li>
+      <li>Lees per gebeurtenis het financiële effect én de badge ernaast.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>Een gebeurtenis die geld kost, verkleint je vrijheid. Extra inkomen vergroot haar.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p>Sabbatical (kost geld) &rarr; <b>&ldquo;+2,4 jaar vrijheid&rdquo;</b>. AOW (levert geld op) &rarr; <b>&ldquo;&minus;4,1 jaar vrijheid&rdquo;</b>.</p></div>
+    </div>
+    <p class="note">De rekenkunde klopt: het getal is de verschuiving van je vrijheidsdatum, plus = later. Alleen het woord &ldquo;vrijheid&rdquo; maakt er een saldo van in plaats van een richting.</p>
+    <figure>{{IMG:verify-gebeurtenissen.png}}<figcaption>Drie gebeurtenissen met hun badges</figcaption></figure>
+  </div>
+
+  <div class="case crit">
+    <div class="ctop"><span class="id">C3</span><span class="tag t-crit">Critical</span><span class="route">/onboarding</span></div>
+    <h4>Invoer overleeft geen apparaatwissel; mislukte opslag wist alles</h4>
+    <ol class="steps">
+      <li>Log in op een leeg account en vul de eerste schermen van de onboarding in.</li>
+      <li>Voeg in sectie 3 twee of drie bezittingen toe.</li>
+      <li>Open dezelfde app in een andere browser of een privévenster, met hetzelfde account.</li>
+      <li>Los daarvan: forceer een serverfout bij de eindopslag en lees de melding, kijk daarna naar het scherm eronder.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>Je bent ingelogd, dus je concept hangt aan je account en je gaat verder waar je was. Een mislukte opslag laat je invoer staan.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p>Andere browser begint bij vraag 1. De banner &ldquo;gegevens hersteld&rdquo; herstelt alleen de stáppositie: drie bezittingen werden er één. Bij een mislukte opslag staat de wizard al leeg áchter de melding &ldquo;Je antwoorden staan nog hier&rdquo;.</p></div>
+    </div>
+    <p class="note">Voortgang zit in <code>localStorage</code> onder <code>trifinity_onboarding_draft</code>. Na twintig doorlopen schermen bevat de database nog niets.</p>
+    <figure>{{IMG:onb-01.png}}<figcaption>Start van de onboarding</figcaption></figure>
+  </div>
+
+  <div class="case crit">
+    <div class="ctop"><span class="id">C4</span><span class="tag t-crit">Critical</span><span class="route">/check stap 5</span></div>
+    <h4>De prominente knop vernietigt je invoer</h4>
+    <ol class="steps">
+      <li>Open <code>/check</code> (geen login nodig) en doorloop de stappen tot &ldquo;Bezittingen&rdquo;.</li>
+      <li>Klik &ldquo;Spaargeld&rdquo;, vul een naam en <code>25000</code> in.</li>
+      <li>Zoek de knop om verder te gaan.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>Een zichtbare &ldquo;Verder&rdquo;-knop die je invoer meeneemt.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p>Geen &ldquo;Verder&rdquo;. De enige brede donkere knop zegt <b>&ldquo;Overslaan (geen bezittingen)&rdquo;</b> en gooit je &euro;25.000 weg zonder waarschuwing; de teller zakt van <b>1j 4m naar 8m</b>.</p></div>
+    </div>
+    <figure>{{IMG:05a-voor-toevoegen.png}}<figcaption>&euro;25.000 ingevuld &mdash; de grote knop zegt &ldquo;Overslaan&rdquo;</figcaption></figure>
+    <figure>{{IMG:05c-na-overslaan.png}}<figcaption>Na de klik: invoer weg, doorgestuurd naar stap 6</figcaption></figure>
+  </div>
+
+  <div class="case crit">
+    <div class="ctop"><span class="id">C5</span><span class="tag t-crit">Critical</span><span class="route">/overzicht/belasting + /cashflow/vaste-lasten</span></div>
+    <h4>De tijd-metafoor rekent fout: samen 18 van de 12 maanden</h4>
+    <ol class="steps">
+      <li>Open <code>/overzicht/belasting</code> en noteer de zin met &ldquo;maanden per jaar&rdquo;.</li>
+      <li>Open <code>/overzicht/cashflow/vaste-lasten</code> en noteer dezelfde soort zin.</li>
+      <li>Tel de twee bij elkaar op.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>Twee delen van hetzelfde jaar. Samen hooguit twaalf maanden.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p>Belasting: &ldquo;&euro;34.144 &mdash; <b>9 maanden per jaar</b>&rdquo; naast &ldquo;EFFECTIEF 36,6%&rdquo;. Vaste lasten: &ldquo;&euro;34.628 &mdash; <b>9 maanden</b>&rdquo;. Samen <b>18</b>.</p></div>
+    </div>
+    <p class="note"><b>Oorzaak:</b> de omrekening gebruikt het <em>uitgaven</em>-dagtarief (circa &euro;110/dag) als maat voor werktijd in plaats van het inkomen. Met het inkomen als noemer wordt belasting circa 4,4 maanden en vaste lasten circa 7 &mdash; samen onder de twaalf. Naast &ldquo;36,6%&rdquo; leest &ldquo;9 van 12&rdquo; nu als 75% druk.</p>
+  </div>
+
+  <div class="case crit">
+    <div class="ctop"><span class="id">C6</span><span class="tag t-crit">Critical</span><span class="route">/overzicht/cashflow</span></div>
+    <h4>Vals alarm over een tekort dat het eigen model weerlegt</h4>
+    <ol class="steps">
+      <li>Open <code>/overzicht/cashflow</code> op een dag vóór de salarisdatum (bijvoorbeeld de 24e).</li>
+      <li>Lees de banner bovenaan en de spaarquote.</li>
+      <li>Kijk daarna naar de stippellijn in de geldstroomgrafiek op dezelfde pagina.</li>
+      <li>Open de forecast-tab.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>&ldquo;Tot nu toe deze maand&rdquo;, met de opmerking dat het salaris nog moet komen.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p>Rode banner <b>&ldquo;ACTIE NODIG &mdash; je hebt deze maand een tekort&rdquo;</b>, spaarquote <b>&minus;265%</b>. Terwijl de eigen stippellijn op dag 25 naar +&euro;2.000 springt en de forecast <b>+&euro;1.820 overschot</b> voorspelt.</p></div>
+    </div>
+    <p class="note">De spaarquote van &minus;265% staat bovendien op een meter met schaal &minus;100 tot +100.</p>
+  </div>
+
+  <div class="case crit">
+    <div class="ctop"><span class="id">C7</span><span class="tag t-crit">Critical</span><span class="route">/overzicht/cashflow/budget</span></div>
+    <h4>De budgetpagina laadt niet, en drie signalen spreken elkaar tegen</h4>
+    <ol class="steps">
+      <li>Open <code>/overzicht/cashflow/budget</code> op een account met budgetten.</li>
+      <li>Klik &ldquo;Probeer het opnieuw&rdquo;.</li>
+      <li>Lees de tip eronder.</li>
+      <li>Ga terug naar het dashboard en kijk of budgetdata daar wél rendert.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>Je 33 budgetten, en hooguit een melding dat de Nibud-vergelijking niet lukte.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p>&ldquo;Kon budgetten niet laden&rdquo;; retry verandert niets (2&times; gereproduceerd); Fin zegt eronder &ldquo;Voeg je <b>eerste</b> budget toe&rdquo;. Elders rendert dezelfde data gewoon. Netwerklog: 404 op <code>/api/nibud/benchmark</code>.</p></div>
+    </div>
+    <p class="note"><em>De 404 kan omgeving zijn. Dat één falende benchmark-aanroep de hele pagina neerhaalt, is productgedrag.</em></p>
+  </div>
+
+
+  <div class="case crit">
+    <div class="ctop"><span class="id">C8</span><span class="tag t-crit">Critical</span><span class="route">/overzicht/belasting &harr; /belasting/box1</span></div>
+    <h4>Twee verschillende Box 1-heffingen, verschil &euro;4.357</h4>
+    <ol class="steps">
+      <li>Log in op <code>ronald@</code> of <code>jochen@</code> (beide hebben een eigen woning met hypotheek).</li>
+      <li>Open <code>/overzicht/belasting</code>, katern IV, en lees <code>BRUTO &minus; HEFFING = NETTO</code>.</li>
+      <li>Open <code>/overzicht/belasting/box1</code> en lees &ldquo;BOX 1-DRUK&rdquo; en &ldquo;NETTO BESTEEDBAAR&rdquo;.</li>
+      <li>Deel het verschil tussen beide heffingen door de &ldquo;netto aftrekpost&rdquo; op de Box 1-pagina.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>&Eacute;&eacute;n box 1-heffing. Het overzicht is de optelsom van het detail.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p>Hub: <code>&euro;93.369 &minus; <b>&euro;33.575</b> = &euro;59.794</code>. Box 1: <code>&minus;&euro;31.793 + &euro;2.575 = <b>&euro;29.218</b></code>, netto <b>&euro;64.151</b>.</p></div>
+    </div>
+    <p class="note"><b>Wat je narekent:</b> &euro;4.357 &divide; &euro;8.803 = <b>49,5%</b> &mdash; het verschil is exact de eigenwoning-post tegen het toptarief. De hub negeert de eigen woning; de detailpagina rekent haar twee keer mee (in de gross-up én als aftrek). Klik het bruto-bedrag aan: de dialoog toont letterlijk &ldquo;Netto &euro;59.794 + belasting &euro;33.575 = bruto &euro;93.369&rdquo;, waarna de pagina een netto van &euro;64.151 toont.</p>
+    <figure>{{IMG:G-20-hub2.png}}<figcaption>Hub &mdash; heffing &euro;33.575</figcaption></figure>
+    <figure>{{IMG:G-23-box1b.png}}<figcaption>Box 1 &mdash; dezelfde heffing als &euro;29.218</figcaption></figure>
+  </div>
+
+  <div class="case crit">
+    <div class="ctop"><span class="id">C9</span><span class="tag t-crit">Critical</span><span class="route">/overzicht/belasting &harr; /belasting/box1</span></div>
+    <h4>Effectief tarief boven marginaal; marginaal 20 punten uiteen</h4>
+    <ol class="steps">
+      <li>Lees op <code>/overzicht/belasting</code>, katern I, de twee percentages naast elkaar.</li>
+      <li>Lees dezelfde twee op <code>/overzicht/belasting/box1</code>.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>Effectief ligt altijd ónder marginaal. Beide schermen noemen hetzelfde marginale tarief.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p>Hub: <b>36,6% effectief naast 35,8% marginaal</b> &mdash; onmogelijk. Box 1: 31,3% effectief, <b>56,0%</b> marginaal.</p></div>
+    </div>
+    <p class="note"><b>Welke klopt:</b> de Box 1-pagina. Bij &euro;93.369 is 56,0% juist (49,5% toptarief + circa 6,5% arbeidskorting-afbouw). De hub toont het bodemschijftarief &mdash; hetzelfde getal dat elders naast &ldquo;Inkomen onbekend&rdquo; verschijnt, dus vermoedelijk een fallback die ook vuurt wanneer het inkomen wél bekend is. Dit is de beslisvariabele voor élke fiscale keuze.</p>
+  </div>
+
+  <div class="case crit">
+    <div class="ctop"><span class="id">C10</span><span class="tag t-crit">Critical</span><span class="route">/overzicht &harr; /toekomst/doelen</span></div>
+    <h4>Het FIRE-antwoord ligt dertien jaar uiteen</h4>
+    <ol class="steps">
+      <li>Log in op <code>leo@</code> of <code>ronald@</code> (16 bezittingen, &euro;1.585.000).</li>
+      <li>Lees op <code>/overzicht</code> het blok FIRE-prognose: countdown, vrijheidsleeftijd en voortgang.</li>
+      <li>Open <code>/toekomst/doelen</code> en lees het doel &ldquo;Volledige vrijheid (FIRE)&rdquo;.</li>
+    </ol>
+    <div class="tw">
+      <table class="d">
+        <tr><th></th><th>/overzicht</th><th>/toekomst/doelen</th></tr>
+        <tr><td>Nu bereikt</td><td><b>&euro;1.585.000</b></td><td><b>&euro;960.000</b></td></tr>
+        <tr><td>Voortgang</td><td>99,4%</td><td>58%</td></tr>
+        <tr><td>Wanneer vrij</td><td><b>0j 1m</b></td><td><b>aug 2039</b></td></tr>
+      </table>
+    </div>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>&Eacute;&eacute;n antwoord op de kernvraag van de app.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p>De ene zegt: volgende maand. De andere: over dertien jaar. Doelbedrag is op beide &euro;1.650.000.</p></div>
+    </div>
+    <p class="note"><b>Oorzaak:</b> twee grondslagen voor hetzelfde doel. Het dashboard rekent met het netto vermogen inclusief niet-liquide bezittingen (woning, auto, kunst, deelneming); de doelenpagina met de FIRE-eligible portefeuille. Beide grootheden zijn verdedigbaar, maar mogen niet als voortgang op hetzelfde doel staan &mdash; precies de vermenging die <code>CLAUDE.md</code> verbiedt. Vierde manier waarop het kernantwoord niet vaststaat, naast C1, C5 en H21.</p>
+    <figure>{{IMG:F-54-tijdas.png}}<figcaption>Dashboard en doelen in dezelfde sessie</figcaption></figure>
+  </div>
+
+  <div class="grp-head"><h3>High</h3><span>duidelijke frictie of aanzienlijk waardeverlies</span></div>
+
+  <div class="case high">
+    <div class="ctop"><span class="id">H0</span><span class="tag t-high">High</span><span class="route">app-breed mobiel</span></div>
+    <h4>De &ldquo;Tip van Fin&rdquo;-toast blokkeert een derde van het scherm</h4>
+    <ol class="steps">
+      <li>Open de app op 390&times;844 en wacht na het laden.</li>
+      <li>Meet hoe lang de toast blijft staan.</li>
+      <li>Klik hem weg en navigeer naar een volgende pagina.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>Een hint die vanzelf verdwijnt, en wegblijft als je hem sluit.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p>Circa <b>320&times;256 px</b> (30% van het scherm), na 30 seconden nog aanwezig, en terug op elke volgende pagina. Sluitkruis: <b>22&times;22</b>. Dekt onder meer &ldquo;Voeg object toe&rdquo;, de rente-slider en de saldo-KPI af.</p></div>
+    </div>
+  </div>
+
+  <div class="case high">
+    <div class="ctop"><span class="id">H0b</span><span class="tag t-high">High</span><span class="route">/overzicht &harr; /overzicht/cashflow</span></div>
+    <h4>Twee schermen, één begrip, tegengesteld teken</h4>
+    <ol class="steps">
+      <li>Lees op <code>/overzicht</code> het widget &ldquo;Cashflow maand&rdquo;.</li>
+      <li>Klik door naar <code>/overzicht/cashflow</code> en lees het saldo voor dezelfde maand.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>Hetzelfde getal, of een zichtbaar verschil in venster.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p>&ldquo;<b>+&euro; 3.606</b> &middot; +22d vrijheid opgebouwd&rdquo; tegenover &ldquo;Saldo <b>&minus;&euro; 3.617,88</b>&rdquo;. Beide zeggen &ldquo;deze maand&rdquo;; geen van beide zegt welk venster.</p></div>
+    </div>
+  </div>
+
+  <div class="case high">
+    <div class="ctop"><span class="id">H0c</span><span class="tag t-high">High</span><span class="route">/overzicht</span></div>
+    <h4>Het dashboard spreekt zichzelf op drie punten tegen</h4>
+    <ol class="steps">
+      <li>Open <code>/overzicht</code>, klik &ldquo;Toon onderverdeling&rdquo; bij de gezondheidsscore.</li>
+      <li>Vergelijk noodfonds, FIRE-voortgang en budgetdiscipline met wat de briefing, de FIRE-widget en de heatmap op hetzelfde scherm zeggen.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>Eén waarde per grootheid.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p>Noodfonds &ldquo;Uitstekend 100&rdquo; versus briefing &ldquo;vraagt aandacht&rdquo;. FIRE <b>11%</b> versus <b>24,2%</b>. &ldquo;Budgetdiscipline 3/3 &mdash; alle budgetten binnen de limiet&rdquo; versus heatmap &ldquo;Gas, water, licht 107%&rdquo; &mdash; op een account met 33 budgetten.</p></div>
+    </div>
+  </div>
+
+  <div class="case high">
+    <div class="ctop"><span class="id">H0d</span><span class="tag t-high">High</span><span class="route">/overzicht/schulden &middot; /cashflow/vaste-lasten</span></div>
+    <h4>Afgeleide getallen zonder plausibiliteitsgrens</h4>
+    <ol class="steps">
+      <li>Zoek op <code>/overzicht/schulden</code> een kleine schuld met een maandbedrag.</li>
+      <li>Lees het label &ldquo;resterend&rdquo;.</li>
+      <li>Bekijk op <code>/cashflow/vaste-lasten</code> welke posten als vaste last meetellen.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>&euro;320 restant bij &euro;80/mnd is vier maanden. Supermarkten zijn geen vaste lasten.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p>&ldquo;<b>600 mnd resterend</b>&rdquo; (vijftig jaar). En Albert Heijn, Lidl, Jumbo, Aldi, Shell, H&amp;M tellen mee als vaste last &rarr; quote <b>58%</b>, met advies om abonnementen (&euro;51) langs te lopen &mdash; terwijl dezelfde pagina zegt dat die &ldquo;netjes&rdquo; zijn.</p></div>
+    </div>
+  </div>
+
+  <div class="case high">
+    <div class="ctop"><span class="id">H1</span><span class="tag t-high">High</span><span class="route">/overzicht</span></div>
+    <h4>Verwacht rendement staat honderd keer te hoog</h4>
+    <ol class="steps">
+      <li>Open <code>/overzicht</code> op een gevuld account.</li>
+      <li>Zoek de FIRE-prognosewidget en lees &ldquo;Verwacht rendement (portefeuille)&rdquo;.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>Een percentage in de orde van <b>5&ndash;8%</b> per jaar.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p><b>665,5%</b> (op een ander account 650,0%).</p></div>
+    </div>
+    <figure>{{IMG:verif-overzicht.png}}<figcaption>/overzicht met de FIRE-prognosewidget</figcaption></figure>
+  </div>
+
+  <div class="case high">
+    <div class="ctop"><span class="id">H2</span><span class="tag t-high">High</span><span class="route">/overzicht</span></div>
+    <h4>De briefing spreekt de rest van het dashboard tegen</h4>
+    <ol class="steps">
+      <li>Open <code>/overzicht</code> en lees de briefing-items.</li>
+      <li>Klik op de gezondheidsscore &rarr; &ldquo;Toon onderverdeling&rdquo; en lees dezelfde onderwerpen daar.</li>
+      <li>Let ook op de tijdstempel &ldquo;BIJGEWERKT&rdquo; en of die meebeweegt na een datawijziging.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>Eén waarheid per scherm.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p>Briefing: &ldquo;noodfonds dekt <b>0,0</b> van 6 maanden&rdquo;. Pilaren: &ldquo;Noodfonds <b>Uitstekend 100</b> &mdash; 6,7&times; salaris&rdquo;. Tijdstempel bleef uren staan, ook na opnieuw inloggen.</p></div>
+    </div>
+    <figure>{{IMG:dash-vol.png}}<figcaption>/overzicht &mdash; briefing en gezondheidsscore op één scherm</figcaption></figure>
+  </div>
+
+  <div class="case high">
+    <div class="ctop"><span class="id">H3</span><span class="tag t-high">High</span><span class="route">bezitting toevoegen</span></div>
+    <h4>Onmogelijke bedragen worden zonder vraag geaccepteerd</h4>
+    <ol class="steps">
+      <li>Voeg een bezitting toe, categorie Auto.</li>
+      <li>Vul als waarde <code>999999999999</code> in en bevestig.</li>
+      <li>Bekijk daarna het dashboard en de detailpagina.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>Een vraag of dit klopt, of op zijn minst een waarschuwing.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p>Toast &ldquo;toegevoegd&rdquo;. Daarna: &ldquo;TOTALE WAARDE &euro; 1.000.000.507.699&rdquo;, &ldquo;<b>9999 jaar vrijheid</b>&rdquo;, &ldquo;Afschrijving &minus;&euro; 150.000.000.000/jr&rdquo;.</p></div>
+    </div>
+    <p class="note">Zelfde patroon bij het onboarding-eindscherm, dat &ldquo;NETTO VERMOGEN &euro; -2.479.300&rdquo; zonder commentaar toont.</p>
+  </div>
+
+  <div class="case high">
+    <div class="ctop"><span class="id">H4</span><span class="tag t-high">High</span><span class="route">/overzicht &middot; terugkeer</span></div>
+    <h4>Er is geen reden om morgen terug te komen</h4>
+    <ol class="steps">
+      <li>Bekijk het dashboard, log uit.</li>
+      <li>Log opnieuw in, bij voorkeur in een verse browser.</li>
+      <li>Zoek naar wat er is veranderd sinds je vorige bezoek.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>Een spoor van verandering: nieuwe inzichten, delta&rsquo;s, iets dat aandacht vraagt.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p>Identiek scherm, dezelfde briefing-tijdstempel, checklist blijft <b>0/4</b> ondanks vijf geregistreerde bezittingen, en de badge &ldquo;Berichten &middot; 1&rdquo; leidt naar &ldquo;GEEN BERICHTEN&rdquo;.</p></div>
+    </div>
+  </div>
+
+  <div class="case high">
+    <div class="ctop"><span class="id">H5</span><span class="tag t-high">High</span><span class="route">/onboarding</span></div>
+    <h4>Twintig schermen zonder één vrijheidsgetal</h4>
+    <ol class="steps">
+      <li>Doorloop de onboarding op een leeg account en tel de schermen.</li>
+      <li>Let op de teller linksboven: wanneer springt die?</li>
+      <li>Zoek in de hele flow naar een berekend getal over vrijheid in tijd.</li>
+      <li>Vergelijk met <code>/check</code>, de publieke funnel.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>Zodra inkomen en uitgaven bekend zijn (scherm 4), kan de app tonen wat je opbouwt.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p>Nergens. Teller telt secties: &ldquo;2/8&rdquo; op drie schermen, &ldquo;4/8&rdquo; op acht. <b>Twintig schermen</b> tot sectie 6. Sectie 4 is acht losse ja/nee-vragen over schuldsoorten.</p></div>
+    </div>
+    <p class="note">De publieke funnel doet het wél: daar loopt vanaf stap 2 een teller &ldquo;AL VRIJGEKOCHT 1j 4m&rdquo; mee.</p>
+    <figure>{{IMG:onb-05.png}}<figcaption>Onboardingscherm &mdash; vakkundig gemaakt, maar zonder uitkomst</figcaption></figure>
+  </div>
+
+  <div class="case high">
+    <div class="ctop"><span class="id">H6</span><span class="tag t-high">High</span><span class="route">formulieren</span></div>
+    <h4>Bedragvelden muteren invoer stilzwijgend</h4>
+    <ol class="steps">
+      <li>Tik <code>abc</code> in een bedragveld en klik Verder.</li>
+      <li>Tik <code>-500</code> in hetzelfde veld en kijk wat er blijft staan.</li>
+      <li>Klik daarna TERUG en controleer of je eerdere waarden nog zichtbaar zijn.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>Een melding wat er niet mag; bij terugnavigatie zie je wat je eerder invulde.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p><code>abc</code> verdwijnt zonder melding; <code>-500</code> wordt stil <code>500</code>; Verder werkt gewoon door. Na TERUG zijn de velden <b>leeg</b>.</p></div>
+    </div>
+  </div>
+
+  <div class="case high">
+    <div class="ctop"><span class="id">H7</span><span class="tag t-high">High</span><span class="route">/berichten &middot; navigatie</span></div>
+    <h4>Ruis, onvindbaarheid en jargon</h4>
+    <ol class="steps">
+      <li>Open <code>/berichten</code> en tel de meldingen; lees de tekst bij een budget dat op 100% staat.</li>
+      <li>Zoek in het hoofdmenu naar &ldquo;importeren&rdquo; of &ldquo;bank koppelen&rdquo;.</li>
+      <li>Bekijk op <code>/toekomst</code> de keuzekaarten en noteer de termen.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>Gebundelde meldingen; de belangrijkste activatietaak in het menu; Nederlandse begrippen op beslismomenten.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p>Zeven bijna identieke &ldquo;DRINGEND&rdquo;-meldingen; &ldquo;&euro;1280 van &euro;1280 &mdash; budget <b>overschreden</b>&rdquo; (dat is vól). Import alleen via een knop op de transactiepagina, op <code>/core/cash/import</code>. Termen: &ldquo;SWR 2.8%&rdquo;, &ldquo;Interen&rdquo;, &ldquo;inclusiepercentage&rdquo;, &ldquo;PSD2, UPO, brokerage-sync&rdquo;.</p></div>
+    </div>
+  </div>
+
+  <div class="case high">
+    <div class="ctop"><span class="id">H8</span><span class="tag t-high">High</span><span class="route">/overzicht/bezittingen</span></div>
+    <h4>Vrijheidstijd telt twaalf maanden niet door</h4>
+    <ol class="steps">
+      <li>Open <code>/overzicht/bezittingen</code> en lees het tijd-equivalent bij &ldquo;Totale waarde&rdquo;.</li>
+      <li>Het randgeval treedt op wanneer de maanden op 12 uitkomen.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>&ldquo;11 jaar vrijheid&rdquo;.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p>&ldquo;<b>10 jaar en 12 maanden</b> vrijheid&rdquo;.</p></div>
+    </div>
+    <figure>{{IMG:bezittingen.png}}<figcaption>/overzicht/bezittingen &mdash; ook het scherm met de beste uitleg van de app</figcaption></figure>
+  </div>
+
+
+  <div class="case high">
+    <div class="ctop"><span class="id">H22</span><span class="tag t-high">High</span><span class="route">/overzicht/belasting</span></div>
+    <h4>&ldquo;Drie boxen, één som&rdquo; telt er twee op</h4>
+    <ol class="steps">
+      <li>Lees de kop van <code>/overzicht/belasting</code> en tel de balken onder &ldquo;VERDELING OVER DE BOXEN&rdquo;.</li>
+      <li>Lees de voetnoot; open daarna <code>/belasting/box2</code> en vergelijk het bedrag met het hubtotaal.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>Een getal dat &ldquo;TOTALE DRUK&rdquo; heet, bevat de drie beloofde boxen.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p>Twee balken, tegel &ldquo;Aanmerkelijk belang&rdquo; toont <code>&mdash;</code>, voetnoot: <i>&ldquo;Box 2 staat buiten dit totaal&rdquo;</i>. Op een DGA-profiel valt zo &euro;23.425 &mdash; 23% van de jaarrekening &mdash; buiten het hoofdgetal.</p></div>
+    </div>
+  </div>
+
+  <div class="case high">
+    <div class="ctop"><span class="id">H23</span><span class="tag t-high">High</span><span class="route">/overzicht/belasting/box1</span></div>
+    <h4>Jaarruimte gerekend met factor A = 0, op een account mét werkgeverspensioen</h4>
+    <ol class="steps">
+      <li>Open <code>/belasting/box1</code>, katern IV, en noteer het jaarruimtebedrag.</li>
+      <li>Reken na: <code>bedrag &divide; 0,30 + 19.172</code> &mdash; komt dat op het bruto-inkomen uit?</li>
+      <li>Lees op hetzelfde katern de waarschuwing &ldquo;DE ADDER: FACTOR A&rdquo;, en de twee zinnen over de aanname.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>Werkgeversopbouw verrekend, of zichtbaar gemarkeerd dat hij ontbreekt.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p><b>&euro;22.259</b> = exact 30% &times; (93.369 &minus; 19.172) &rArr; factor A = 0, terwijl het account &ldquo;Pensioenfonds ABP &euro;8.000&rdquo; bezit. Geen markering, geen invoerveld.</p></div>
+    </div>
+    <p class="note"><b>Het scherm spreekt zichzelf tegen.</b> Boven: <i>&ldquo;een bovengrens vóór aftrek van je werkgeverspensioen&rdquo;</i>. Onder, over hetzelfde bedrag: <i>&ldquo;Berekend met je opgeslagen factor A&rdquo;</i>. Bij een gemiddelde ABP-factor A van circa &euro;1.500 blijft er ruwweg &euro;12.850 over &mdash; bijna een halvering.</p>
+  </div>
+
+  <div class="case high">
+    <div class="ctop"><span class="id">H24</span><span class="tag t-high">High</span><span class="route">/belasting/box3, /box1, /overzicht/tips</span></div>
+    <h4>Wft: vier passages glijden van &ldquo;opties&rdquo; naar &ldquo;doe dit&rdquo;</h4>
+    <ol class="steps">
+      <li>Lees op <code>/belasting/box3</code> het katern &ldquo;PEILDATUM &amp; ARBITRAGEVENSTER&rdquo;.</li>
+      <li>Lees de zwevende tip op <code>/belasting/box1</code>.</li>
+      <li>Klik op de jaarruimte-kaart &ldquo;TOEVOEGEN ALS ACTIE&rdquo;; open daarna <code>/overzicht/tips</code> &rarr; Open acties.</li>
+      <li>Zoek op alle drie de schermen naar een link naar <code>/wft</code>, <code>/voorwaarden</code> of <code>/disclaimer</code>.</li>
+    </ol>
+    <div class="tw">
+      <table class="d">
+        <tr><th>Waar</th><th>Letterlijk citaat</th></tr>
+        <tr><td>Box 3</td><td>&ldquo;&hellip; <b>dus rond de jaarwisseling spaargeld aanhouden in plaats van beleggen</b> verlaagt tijdelijk je heffing.&rdquo;</td></tr>
+        <tr><td>Box 1-tip</td><td>&ldquo;Je grootste Box 1-kans is je jaarruimte &mdash; <b>benut hem</b> vóór 31 december.&rdquo;</td></tr>
+        <tr><td>Hub-banner</td><td>&ldquo;&hellip; <b>optimalisatie aanbevolen</b>.&rdquo;</td></tr>
+        <tr><td>Open acties</td><td>&ldquo;Overweeg hypotheek oversluiten &mdash; <b>de markt biedt momenteel lagere tarieven</b>&rdquo; · &ldquo;<b>beleg het studiefonds in een breed gespreid indexfonds</b>&rdquo;</td></tr>
+      </table>
+    </div>
+    <p class="note"><b>De grensovergang is de knop.</b> Zodra iets via &ldquo;Toevoegen als actie&rdquo; op een persoonlijke lijst mét deadline landt, is het een aanbeveling met opvolging &mdash; geverifieerd dat het bedrag daadwerkelijk als open actie landt. Geen enkele hyperlink naar <code>/wft</code>, en die pagina draagt zelf de kop <i>&ldquo;Concepttekst &mdash; nog niet juridisch gevalideerd&rdquo;</i>.</p>
+  </div>
+
+  <div class="case high">
+    <div class="ctop"><span class="id">H25</span><span class="tag t-high">High</span><span class="route">/overzicht/belasting/box1</span></div>
+    <h4>Renteaftrek tegen het toptarief; de tariefsaanpassing ontbreekt</h4>
+    <ol class="steps">
+      <li>Open <code>/belasting/box1</code>, katern III, op een account in de hoogste schijf met hypotheek.</li>
+      <li>Controleer de bestanddelen: forfait = WOZ &times; 0,35%, rente = schuld &times; rentepercentage.</li>
+      <li>Deel het hub&ndash;detailverschil door de netto aftrekpost.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>Rente tegen <code>min(marginaal, tariefsaanpassing)</code> &mdash; circa 37,5% in 2026 &mdash; forfait tegen marginaal.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p>Bestanddelen kloppen exact (&euro;1.348 en &euro;10.150), maar de verrekening loopt op <b>49,5%</b>. Overschatting circa &euro;1.000&ndash;&euro;1.200 per jaar.</p></div>
+    </div>
+    <p class="noshot">Voorbehoud: het tarief is afgeleid uit het verschil tussen twee schermen, niet uit een getoond percentage. Richting zeker, omvang niet.</p>
+  </div>
+
+  <div class="case high">
+    <div class="ctop"><span class="id">H26</span><span class="tag t-high">High</span><span class="route">/overzicht/belasting/box2</span></div>
+    <h4>Kop &ldquo;&euro;0&rdquo; met daaronder een heffing van &euro;16.867</h4>
+    <ol class="steps">
+      <li>Open <code>/belasting/box2</code> op een account met een klein belang en geen uitkering.</li>
+      <li>Lees de kop en de berekeningsstappen; scrol naar de simulator en raak de slider <b>niet</b> aan.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>De simulator start op de werkelijke situatie; het maximum houdt verband met de deelneming.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p>Kop <code>&euro;0 PER JAAR</code>; eronder zonder één klik <code>BOX 2-HEFFING <b>&euro;16.867</b></code>. Slider staat op <b>exact de schijfgrens &euro;68.843</b>, bereik tot &euro;179.000, bij een belang van &euro;2.000.</p></div>
+    </div>
+    <p class="note">Een default op precies de grens waar het lage tarief eindigt is een impliciete aanbeveling om dát bedrag uit te keren.</p>
+    <figure>{{IMG:G-21-box2b.png}}<figcaption>Kop &euro;0, simulator &euro;16.867</figcaption></figure>
+  </div>
+
+  <div class="case high">
+    <div class="ctop"><span class="id">H27</span><span class="tag t-high">High</span><span class="route">Fin-chat, app-breed</span></div>
+    <h4>Storingsmelding in beheerderstaal</h4>
+    <ol class="steps">
+      <li>Log in op een account met AI-abonnement (<code>jochen@</code> of <code>ronald@</code>, tier <code>ai</code>).</li>
+      <li>Open de Fin-chat en stel een willekeurige vraag.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>Een melding in de taal van de gebruiker, met iets dat hij zelf kan doen.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p><i>&ldquo;De AI is niet geconfigureerd. <b>Controleer de API-sleutel in Admin instellingen.</b>&rdquo;</i> (422 op <code>/api/ai/chat</code>). De gebruiker heeft geen beheerpaneel.</p></div>
+    </div>
+    <p class="noshot">Dat de sleutel lokaal ontbreekt is omgeving; de tekst die daarop volgt is productgedrag en verschijnt bij élke provider-storing.</p>
+  </div>
+
+  <div class="case high">
+    <div class="ctop"><span class="id">H28</span><span class="tag t-high">High</span><span class="route">/rapportages</span></div>
+    <h4>Rapport eist een AI-abonnement, ook als je de variant z&oacute;nder AI kiest</h4>
+    <ol class="steps">
+      <li>Open <code>/rapportages</code> op een account zonder AI-abonnement (<code>leo@</code> of <code>bas@</code>, tier <code>gratis</code>).</li>
+      <li>Kies een periode en zet de AI-optie <b>uit</b>; laat het rapport genereren.</li>
+      <li>Controleer de URL: die draagt <code>&amp;ai=false</code>.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>Het rapport zonder AI-tekst &mdash; of vooraf horen dat het hoe dan ook betaald is.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p><i>&ldquo;Rapport niet beschikbaar &mdash; <b>Deze functie vereist een AI abonnement</b>&rdquo;</i>, onder een generieke kop die het als storing laat lezen.</p></div>
+    </div>
+    <p class="noshot">De betaalmuur zelf is correct gedrag; de bevinding gaat over de genegeerde keuze en de plaatsing van de melding.</p>
+  </div>
+
+  <div class="grp-head"><h3>Mobiel</h3><span>viewport 390&times;844, isMobile, hasTouch</span></div>
+
+  <div class="case high">
+    <div class="ctop"><span class="id">M1</span><span class="tag t-high">High</span><span class="route">/overzicht mobiel</span></div>
+    <h4>Het hele eerste scherm is de welkomstchecklist</h4>
+    <ol class="steps">
+      <li>Open <code>/overzicht</code> op 390&times;844 met een gevuld account.</li>
+      <li>Kijk wat er zichtbaar is zonder te scrollen.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>Op het kleinste scherm eerst je cijfers: vermogen, cashflow, vrijheidstijd.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p>Alleen &ldquo;WELKOM BIJ TRIFINITY &mdash; SCHERM 1 VAN 5 &middot; 0/4 AFGEVINKT&rdquo; met vier kaarten. Geen begroeting, geen enkel bedrag. De &ldquo;TIP VAN FIN&rdquo;-toast dekt content af en zijn tekst is <b>afgekapt</b>: &ldquo;&hellip;bezittingen en schulden, h&rdquo;.</p></div>
+    </div>
+    <figure>{{IMG:mob-overzicht.png}}<figcaption>/overzicht op 390&times;844 &mdash; het volledige eerste scherm</figcaption></figure>
+  </div>
+
+  <div class="case med">
+    <div class="ctop"><span class="id">M2</span><span class="tag t-med">Medium</span><span class="route">app-breed mobiel</span></div>
+    <h4>Bedieningselementen onder de raakdrempel</h4>
+    <ol class="steps">
+      <li>Meet op elke route de afmetingen van knoppen en links.</li>
+      <li>Richtlijn: minimaal 44&times;44 px voor een duim.</li>
+    </ol>
+    <div class="ea">
+      <div class="verwacht"><div class="lab">Verwacht</div><p>Alles wat klikbaar is, is ook raakbaar.</p></div>
+      <div class="werkelijk"><div class="lab">Werkelijk</div><p>&ldquo;Toon detail&rdquo;-knoppen <b>24&times;24</b>; &ldquo;Bedragen maskeren&rdquo; en &ldquo;Wat zie ik hier?&rdquo; <b>28&times;28</b>; weergaveschakelaar en sluitknop <b>32&times;32</b>; nieuws, meldingen en avatar <b>36&times;36</b>; &ldquo;Kompas openen&rdquo; <b>45&times;14</b>.</p></div>
+    </div>
+  </div>
+
+  <div class="case good">
+    <div class="ctop"><span class="id">M3</span><span class="tag t-good">Strong</span><span class="route">app-breed mobiel</span></div>
+    <h4>Geen enkele route scrollt horizontaal</h4>
+    <div class="tw" style="margin:10px 0">
+      <table class="d">
+        <tr><th>Route</th><th>Horizontaal scrollen</th></tr>
+        <tr><td><code>/overzicht</code></td><td>nee</td></tr>
+        <tr><td><code>/overzicht/bezittingen</code></td><td>nee</td></tr>
+        <tr><td><code>/overzicht/cashflow</code></td><td>nee</td></tr>
+        <tr><td><code>/toekomst</code></td><td>nee</td></tr>
+        <tr><td><code>/berichten</code></td><td>nee</td></tr>
+      </table>
+    </div>
+    <p class="note">Gemeten met <code>document.documentElement.scrollWidth &gt; clientWidth</code>. Op een informatiedichte financiële app is dit bepaald niet vanzelfsprekend.</p>
+  </div>
+
+  <div class="grp-head"><h3>Medium en Low</h3><span>samengevat &mdash; volledige uitwerking in de audit</span></div>
+
+  <div class="case med">
+    <div class="ctop"><span class="id">&mdash;</span><span class="tag t-med">Medium</span><span class="route">diverse</span></div>
+    <h4>Negenentwintig punten die met eigen ogen te zien zijn</h4>
+    <div class="tw">
+      <table class="d">
+        <tr><th>Waar</th><th>Verwacht</th><th>Werkelijk</th></tr>
+        <tr><td><code>/toekomst</code></td><td>Antwoord op &ldquo;wat moet ik veranderen?&rdquo;</td><td>Alleen wanneer en wat als &mdash; nooit hoeveel extra per maand</td></tr>
+        <tr><td><code>/overzicht</code></td><td>Checklist weet wat je al hebt</td><td>0/4 bij 16 bezittingen en 405 transacties</td></tr>
+        <tr><td>Hypotheekwizard</td><td>Looptijd wordt gevraagd of getoond</td><td>&ldquo;&euro;1.514 maandlasten, 23 jr resterend&rdquo; &mdash; 30 jaar stilzwijgend aangenomen</td></tr>
+        <tr><td><code>/overzicht/belasting</code></td><td>Geen percentage zonder inkomen</td><td>&ldquo;Inkomen onbekend&rdquo; naast &ldquo;MARGINAAL 35.8%&rdquo;</td></tr>
+        <tr><td>Prognoses</td><td>Onzekerheid bij het getal</td><td>&ldquo;&euro; 887.689&rdquo; &mdash; vijftien jaar vooruit, op de euro</td></tr>
+        <tr><td>Lege data</td><td>&ldquo;We missen gegevens&rdquo;</td><td>&ldquo;VRIJHEIDSLEEFTIJD 100.0 jaar&rdquo;, &ldquo;DOELBEDRAG &euro; -11.328.971&rdquo;</td></tr>
+        <tr><td>Bezittingformulier</td><td>Melding bij negatieve waarde</td><td>Geen enkele reactie &mdash; niet te onderscheiden van een kapotte knop</td></tr>
+        <tr><td>Verwijderen</td><td>Terug naar de lijst, met &ldquo;ongedaan maken&rdquo;</td><td>Je blijft op de pagina van het verwijderde item</td></tr>
+        <tr><td><code>/toekomst</code></td><td>Uitleg is te sluiten</td><td>Tips-overlay onderschept elke klik, geen zichtbare sluitknop</td></tr>
+        <tr><td><code>/toekomst</code> Details</td><td>Jaar-op-jaar tabel opent</td><td>Opende niet <em>(voorbehoud: mogelijk interactie-artefact)</em></td></tr>
+        <tr><td>Zijbalk</td><td>Vaste plattegrond</td><td>&ldquo;APPS&rdquo; verspringt per pagina; Crypto en Verhuurrendement nergens zichtbaar</td></tr>
+        <tr><td>Onboarding 8/8</td><td>Voortgang = profiel compleet</td><td>&ldquo;100% &mdash; je bent klaar&rdquo; naast lege kernvelden</td></tr>
+        <tr><td>Onboarding</td><td>Eén voortgangsindicator</td><td>Wizard 3/8 &rarr; modal &ldquo;STAP 1 VAN 2&rdquo; &rarr; nog een vraag</td></tr>
+        <tr><td>Zijbalk bovenin</td><td>Je ziet in welke euro&rsquo;s je kijkt</td><td>&ldquo;Persoonlijk&rdquo; en &ldquo;Toekomstige euro&rsquo;s&rdquo; zonder uitleg of afleesbare stand</td></tr>
+        <tr><td><code>/belasting/box3</code> vs optimizer</td><td>Eén dagtarief voor de hele app</td><td>Dezelfde &euro;569 is <b>3</b> vrijheidsdagen op box 3 en <b>5</b> in de optimizer; cashflow rekent &euro;106/dag, de balans &euro;165/dag</td></tr>
+        <tr><td><code>/belasting/box3</code> stappen</td><td>Pensioen buiten box 3, sieraden vrijgesteld, belastingschuld niet aftrekbaar</td><td>Alle drie verkeerd ingedeeld; geen corrigeerpunt per bezitting</td></tr>
+        <tr><td><code>/belasting/box3</code> 3.2</td><td>Tegenbewijs-slider start op het bekende rendement</td><td>Vast op 2,0%, terwijl de portefeuille +23,3% doet &mdash; de default bepaalt de conclusie volledig</td></tr>
+        <tr><td><code>/berichten</code> &rarr; Vraag Fin</td><td>Mislukte vraag laat het bericht ongelezen</td><td>Ongelezen-teller loopt 11 &rarr; 10 &rarr; 9 zonder dat er ooit een antwoord verscheen</td></tr>
+        <tr><td>Fin-chat</td><td>Veld uitgeschakeld als de AI uit staat</td><td>Volledig bruikbaar, afwijzing pas ná het versturen &mdash; terwijl <code>aiEnabled:false</code> al bekend was</td></tr>
+        <tr><td>Fin-chat</td><td><kbd>Esc</kbd> sluit elk overlay</td><td>Chatpaneel blijft open; de bezitting-modal sluit wél correct</td></tr>
+        <tr><td><code>/overzicht</code>, <code>/bezittingen</code></td><td>Eén <code>h1</code>, aaneengesloten koppenreeks</td><td>Twee <code>h1</code>&rsquo;s per pagina en sprongen van <code>h1</code> naar <code>h3</code></td></tr>
+        <tr><td>Gezondheidsscore-kaart</td><td>Zichtbare focusrand</td><td><code>outline-width: 0px</code> op een knop die wél focus krijgt</td></tr>
+        <tr><td><code>/rapportages/balans</code></td><td>Bijschrift verklaart het bedrag erboven</td><td>&ldquo;Passiva &euro;1.585.000 &middot; <b>12 schulden</b>&rdquo; &mdash; getal boekhoudkundig juist, bijschrift telt alleen de schulden (&euro;454.020)</td></tr>
+        <tr><td><code>/toekomst/doelen</code></td><td>Nieuw doel krijgt een neutrale startstand</td><td>Seconden na aanmaken al &ldquo;ACHTER OP PLANNING&rdquo; bij 0%</td></tr>
+        <tr><td><code>/toekomst/doelen</code></td><td>Hoger doel + eerdere deadline = slechtere status</td><td>30% &ldquo;op koers&rdquo; &rarr; 17% &ldquo;op koers&rdquo; na verhoging naar &euro;9.000 en zeven maanden vervroegen</td></tr>
+        <tr><td>Import, stap Dubbelingen</td><td>Tellers tellen op</td><td>&ldquo;<b>0 nieuw</b> &middot; 7 duplicaten &middot; <b>1 transacties importeren</b>&rdquo; na één vinkje</td></tr>
+        <tr><td>Import, stap Dubbelingen</td><td>Elk vakje benoemt zijn regel</td><td>7 van de 8 vakjes met <code>aria-label = null</code> &mdash; naamloze keuzes over geld</td></tr>
+        <tr><td><code>/toekomst/doelen</code></td><td>Eén venster tegelijk</td><td>&ldquo;Volledig bewerken&rdquo; stapelt een tweede venster op het eerste</td></tr>
+        <tr><td><code>/toekomst</code> vs <code>/overzicht</code></td><td>Nieuw doel staat op de tijdas</td><td>Wel op het dashboard, niet op de tijdas &mdash; het scherm dat over de toekomst gáát</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="case low">
+    <div class="ctop"><span class="id">&mdash;</span><span class="tag t-low">Low</span><span class="route">taal</span></div>
+    <h4>Negen punten van taal, afwerking en toestandsbeheer</h4>
+    <div class="tw">
+      <table class="d">
+        <tr><th>Waar</th><th>Staat er</th><th>Hoort te zijn</th></tr>
+        <tr><td>FEITEN-paneel</td><td>&ldquo;2 bezitten&rdquo;</td><td>&ldquo;2 bezittingen&rdquo;</td></tr>
+        <tr><td>Onboarding</td><td>&ldquo;Nog een beleggingen?&rdquo;</td><td>&ldquo;Nog een belegging?&rdquo;</td></tr>
+        <tr><td>Breadcrumb</td><td>&ldquo;Schulden &rsaquo; Mortgage&rdquo;</td><td>&ldquo;Schulden &rsaquo; Hypotheek&rdquo;</td></tr>
+        <tr><td>Onboarding 1/8</td><td>Banner &eacute;n inline-melding voor één veld</td><td>Alleen de inline-melding</td></tr>
+        <tr><td>Onboarding 1/8</td><td>&ldquo;verder niets verplichts&rdquo; boven een verplicht veld</td><td>&ldquo;Alleen je naam is verplicht&rdquo;</td></tr>
+        <tr><td>Fin-chat</td><td>Getypte vraag verdwijnt na een fout</td><td>Blijft staan, met &ldquo;opnieuw versturen&rdquo;</td></tr>
+        <tr><td><code>/belasting/box2</code></td><td>&ldquo;AANDACHT&rdquo;-banner + DGA-kalender bij &euro;0 heffing</td><td>Onderdrukken tot de positie materieel is</td></tr>
+        <tr><td>Briefing-kop</td><td>&ldquo;Ververs&rdquo; verdwijnt na één klik</td><td>Blijft staan, uitgeschakeld, met de reden erbij</td></tr>
+        <tr><td><code>/rapportages/balans</code></td><td>Vierde dagtarief: &euro;165/dag</td><td>Eén tarief uit &eacute;&eacute;n bron &mdash; wel als enige scherm dat het tarief tóónt</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="grp-head"><h3>Sterk</h3><span>hier hoort niets te veranderen &mdash; controleer dit bij elke wijziging</span></div>
+
+  <div class="case good">
+    <div class="ctop"><span class="id">S1</span><span class="tag t-good">Strong</span><span class="route">/check stap 7</span></div>
+    <h4>De rekenketen is volledig zichtbaar</h4>
+    <ol class="steps">
+      <li>Doorloop <code>/check</code> tot &ldquo;Pensioen &amp; rendement&rdquo;.</li>
+      <li>Klik &ldquo;TOON DE REKENKETEN&rdquo;.</li>
+    </ol>
+    <p class="note">Toont: <em>7,0% bruto nominaal rendement &minus; ~2,0% inflatie = ~5,0% reëel &minus; ~2,1% Box 3-heffing = ~2,9% netto reëel.</em> Meer rekenschap dan gebruikelijk in deze categorie.</p>
+    <figure>{{IMG:07-rekenketen.png}}<figcaption>De rekenketen uitgeklapt</figcaption></figure>
+  </div>
+
+  <div class="case good">
+    <div class="ctop"><span class="id">S2</span><span class="tag t-good">Strong</span><span class="route">/overzicht</span></div>
+    <h4>De gezondheidsscore legt zichzelf uit</h4>
+    <ol class="steps">
+      <li>Open <code>/overzicht</code> en klik &ldquo;Toon onderverdeling&rdquo; bij de gezondheidsscore.</li>
+    </ol>
+    <p class="note">Radar met zes pilaren, expliciete formule, per pilaar de waarde én de drempel, plus een actie. Dit is het niveau van herleidbaarheid dat elders in de app ontbreekt &mdash; maak het de standaard.</p>
+  </div>
+
+  <div class="case good">
+    <div class="ctop"><span class="id">S3</span><span class="tag t-good">Strong</span><span class="route">/onboarding</span></div>
+    <h4>Defaults worden voorgerekend uit je eigen gegevens</h4>
+    <ol class="steps">
+      <li>Vul bij &ldquo;Wat geef je uit?&rdquo; bijvoorbeeld <code>2600</code> in.</li>
+      <li>Ga naar het volgende scherm en kijk naar het voorstel.</li>
+    </ol>
+    <p class="note">&ldquo;&asymp; 80% van nu&rdquo; staat voorgeselecteerd met <b>&euro;24.960</b> al ingevuld &mdash; exact 80% van 2600&times;12 &mdash; mét de redenering erbij. Even verderop: &ldquo;Noodfonds &euro;15.600&rdquo; = zes keer je maandlasten.</p>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow">Nog open</div>
+  <h2>Wat nog niet is nagerekend</h2>
+  <p class="lede">Eerlijk begrensd, zodat niemand denkt dat het gedekt is.</p>
+  <div class="setup">
+    <p><b>Wél gedekt inmiddels:</b> de belastingmodule (hub, box 1/2/3, optimizer &mdash; dertig getallen nagerekend, waarvan vierentwintig exact kloppen), de Fin-chat en het briefing-oppervlak, toegankelijkheid op structuur, contrast en focus, en de import (CSV, MT940-herkenning, corrupte en ongeldige bestanden, ontdubbeling) plus doelen en twee rapportvormen.</p>
+    <p><b>Mobiel is deels gedaan.</b> Horizontaal scrollen en raakdoelen zijn gemeten op vijf routes. Nog open: modals en overlays op klein scherm, toetsenbordgedrag in formulieren, tabellen en grafieken op de resterende routes, en terug-navigatie vanuit detailpagina&rsquo;s.</p>
+    <p><b>Niet aangeraakt:</b> schermlezerbeleving met echte hulpsoftware (NVDA, VoiceOver), virtueel toetsenbord en swipe-gebaren, de rapporten <i>spiegel</i> en <i>totaalplan</i> (laadden niet binnen twee minuten terwijl de dev-server vastliep &mdash; onder die belasting is een meting waardeloos), budget aanmaken en bewerken (de budgetpagina laadde niet, zie C7), en de bankkoppeling en broker-synchronisatie (vereisen extern verkeer).</p>
+    <p><b>De kwaliteit van de AI-antwoorden staat hier los van.</b> Er is geen AI-sleutel in de omgeving, dus het model kan niets genereren. Alles rond Fin dat hier staat gaat over het oppervlak &mdash; de melding, de toestand, de toegankelijkheid &mdash; niet over wat Fin zegt.</p>
+    <p><b>Niet als productbevinding opgevoerd:</b> alles wat door de zes ontbrekende database-objecten werd veroorzaakt, de traagheid van de dev-server, en het gemelde &ldquo;datalek&rdquo; op de belastingmodule &mdash; dat laatste bleek een gedeeld sessiebestand tussen twee testers, geverifieerd tegen database én broncode. Waar het herstelgedrag rond zo&rsquo;n fout wél productgedrag is &mdash; zoals bij C3 &mdash; staat dat er expliciet bij.</p>
+  </div>
+</section>
+
+</div>
