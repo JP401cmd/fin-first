@@ -281,3 +281,31 @@ node pdf.mjs      # -> TriFinity-bevindingen.pdf
 ```
 
 `inline.mjs` sluit de `{{IMG:bestand.png}}`-plaatshouders in als base64 data-URI en verwijdert lege figures; het bestand zelf komt nooit in de modelcontext.
+
+## Ronde 3 afgerond — importronde voortijdig afgebroken (24 aug, 18:45)
+
+De derde tester (invoer/import/rapportages op `leo@`) is om 18:12 gestopt doordat de sessie opnieuw werd opgestart; hij heeft zijn rapport nooit geschreven. Zijn waarnemingen zijn teruggehaald uit de vastgelegde handelingen en stuk voor stuk nageslagen vóór opname in het register:
+
+| Bevinding | Verificatie |
+|---|---|
+| **C10** — FIRE-antwoord 13 jaar uiteen: `/overzicht` "0j 1m / 99,4%" tegenover `/toekomst/doelen` "aug 2039 / 58%" | Database: 16 bezittingen = €1.585.000; doelenpagina rekent met €960.000. Grondslagverschil nettoVermogen vs. FIRE-eligible portefeuille — precies de vermenging die CLAUDE.md verbiedt |
+| **H28** — rapport eist AI-abonnement terwijl `ai=false` is gekozen | `rapportages/page.tsx` r.184 duwt de gebruikerskeuze door als `ai=${useAi}`; `leo@` staat op tier `gratis` |
+| **M30** — balans: "Passiva €1.585.000 · 12 schulden" | `balans/page.tsx` r.285-289: bedrag is `totalPassiva` (boekhoudkundig correct: €454.020 schuld + €1.130.980 eigen vermogen), sublabel telt alleen `totalDebtItems`. Getal klopt, bijschrift niet |
+| **M31/M32** — nieuw doel direct "achter op planning"; doel zwaarder maken verbetert de status | Uit de handelingen: €0/€5.000 jul 2027 → ACHTER; €1.500/€9.000 dec 2026 → OP KOERS bij 17% |
+| **M33/M34** — dedup-teller "0 nieuw · 1 importeren"; 7 van 8 checkboxes zonder `aria-label` | Uit de handelingen |
+| **M35/M36** — gestapelde modals; nieuw doel niet op de tijdas | Uit de handelingen |
+| **L10** — vierde dagtarief (€165/dag op de balans) | Uit de handelingen |
+
+**Wat de ronde niet meer heeft gehaald** (opgenomen in "Nog niet getest"): de rapporten *spiegel* en *totaalplan* (laadden niet binnen 120s terwijl de dev-server 11 GB gebruikte en de load boven 40 lag), budget aanmaken/bewerken (de budgetpagina laadde niet; op deze run met Postgres-fout 42703 `undefined_column`, vermoedelijk omgeving), en de bankkoppeling/broker-sync (vereisen extern verkeer).
+
+**De ontdubbeling werkt aantoonbaar goed**: een tweede import van hetzelfde bestand gaf "0 nieuw · 7 duplicaten · 0 importeren" met uitleg. Ongeldige bestanden (.txt, corrupte CSV) geven begrijpelijke, specifieke foutmeldingen.
+
+### Eindstand register
+
+84 bevindingen — **10 Critical, 28 High, 36 Medium, 10 Low** — 70 pagina's, 25 schermafbeeldingen.
+
+De PDF staat als `docs/dev/rapporten/TriFinity-bevindingen.pdf` in de repo, met de HTML-bron ernaast (`bevindingen-bron.html`). Reden: de upload naar de gebruiker liep drie keer op een netwerktimeout, en de container is vluchtig. `inline.mjs` schaalt de schermafbeeldingen nu naar 1100px JPEG q72 (3,0 MB → 1,5 MB) voordat het de PDF rendert.
+
+### Capaciteitsgrens, definitief
+
+Drie gelijktijdige testers passen niet. Gemeten bij de laatste ronde: `next-server` op 11,1 GB van 16 GB, load average 44–70, en pagina's die na 240s nog niets teruggaven. **Maximaal twee browsersessies tegelijk**, en herstart de dev-server tussen rondes.
