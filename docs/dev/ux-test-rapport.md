@@ -2,15 +2,15 @@
 
 **Getoetste belofte:** "De vrijheid om met inzicht en grip keuzes te maken voor nu en later."
 
-**Opzet.** Zes testrondes op vijf accounts, uitgevoerd in een echte browser op een
+**Opzet.** Zeven testrondes op vijf accounts, uitgevoerd in een echte browser op een
 lokaal draaiende instantie met volledige database. Drie persona's: beginner
 (leeg account, zelf invoeren), groeiende gebruiker (persona Lisa, €130k netto
 vermogen) en power user (persona Willem, €1,62M / persona Tessa, alle assettypen).
 Beoordeeld is wat er op het scherm gebeurde, niet wat de code bedoelt.
 
-**Wat níét is getest, en waarom.** Mobiel (Fase 16) is volledig blijven liggen:
-de testomgeving raakte verzadigd en responsiviteit zou de waarneming vervuild
-hebben. Een cijfer geven zou een gok zijn. Verder ontbreken: cashflow/transacties
+**Wat níét is getest, en waarom.** Het virtuele toetsenbord en swipe-gebaren op
+mobiel zijn in een headless browser niet te simuleren; de Fin-chat zit achter een
+betaalmuur op het testaccount. Verder ontbreken: cashflow/transacties
 en CSV-import, budget aanmaken, spaardoelenbeheer, rapportages, Fin-chat,
 toegankelijkheid, en delen van de personalisatie-persistentie.
 
@@ -330,9 +330,9 @@ doortellen naar een jaar.
 | Gebruiksgemak beginner | **7** | Rustige wizard, één vraag per scherm, overal een uitweg |
 | Informatiearchitectuur | **7** | Heldere driedeling, maar legacy-routes en dubbele ingangen |
 | Navigatie | **6** | Import en koppelen onvindbaar; menu-inhoud verspringt per pagina |
-| Begrijpelijkheid | **6** | Sterk frame, ondermijnd door jargon en een omgekeerd lezend label |
+| Begrijpelijkheid | **5** | Sterk frame, ondermijnd door jargon en een omgekeerd lezend label |
 | Visualisatie | **7** | Goede grafieken met bandbreedte; heatmap zonder duiding |
-| Inzicht | **7** | Fee-simulator en gezondheidsonderverdeling zijn echt inzicht |
+| Inzicht | **6** | Fee-simulator en gezondheidsonderverdeling zijn echt inzicht |
 | Grip | **5** | Acties dragen hun effect, maar "wat moet ik veranderen" ontbreekt |
 | Ondersteuning bij keuzes | **5** | Wel de prijs van een keuze, niet de weg naar een doel |
 | Toekomstwaarde | **5** | Rijk instrumentarium, maar het kernantwoord wisselt per laadbeurt |
@@ -343,14 +343,14 @@ doortellen naar een jaar.
 | Customization | **6** | Instrumenten aanwezig; weergavekeuze bleek cross-device bewaard |
 | Vertrouwen | **5** | Uitstekende uitleglagen, ondermijnd door tegenstrijdige getallen |
 | Foutafhandeling | **5** | Voorbeeldig op profielvelden, afwezig op bedragvelden |
-| Mobiele UX | **n.v.t.** | Niet getest — een cijfer zou een gok zijn |
+| Mobiele UX | **7** | Foutloze overlays en nul layout-lekken; te kleine targets en een opdringerige toast |
 | **Totale gebruikerservaring** | **6** | |
 
 ### Hoofdscore op de kernbelofte
 
 > "De vrijheid om met inzicht en grip keuzes te maken voor nu en later."
 
-## **5,5 / 10**
+## **5,0 / 10**
 
 Onderbouwing per deel. **Inzicht: ruim voldoende.** De app laat zien wat er gebeurt en
 legt uit waarom — de gezondheidsonderverdeling, de rekenketen en de fee-simulator zijn
@@ -430,3 +430,40 @@ is goed, de onboarding is mooi maar te lang en levert niets op, het dashboard is
 overvol — en dan worden de verdiepingspagina's opeens uitstekend. Dat is precies andersom
 dan gebruikelijk, en het is een kans: het moeilijke werk is al gedaan. De eerste twintig
 minuten van een nieuwe gebruiker doen het product op dit moment tekort.
+
+
+---
+
+## Naschrift — de laatste testronde
+
+De afsluitende rondes (mobiel en de inzicht/grip/nu-fases) brachten drie
+bevindingen die het beeld veranderen, en één die de hoofdscore van 5,5 naar 5,0
+brengt.
+
+**De tijd-metafoor rekent aantoonbaar fout.** `/overzicht/belasting` zegt
+"€34.144 per jaar — 9 maanden per jaar opgeofferd aan belasting", naast "EFFECTIEF
+36,6%". `/cashflow/vaste-lasten` zegt "€34.628 per jaar — 9 maanden die je werkt
+om je vaste lasten te betalen". Samen achttien van de twaalf maanden. De
+omrekening gebruikt het uitgaven-dagtarief als maat voor werktijd in plaats van
+het inkomen; met de juiste noemer wordt het circa 4,4 en circa 7 maanden.
+
+Dit is de derde manier waarop het vrijheidsgetal onbetrouwbaar is, na het
+wisselende kernantwoord en het omgekeerd lezende label. Daarmee is het een patroon
+en geen incident — en dat drukt de score. Geen van de drie vraagt om een nieuw
+rekenmodel: het zijn een race, een woord en een noemer.
+
+**De budgetpagina laadt niet.** "Kon budgetten niet laden", retry doet niets, en
+Fin zegt eronder "Voeg je eerste budget toe" op een account met 33 budgetten. Eén
+falende benchmark-aanroep (404 op `/api/nibud/benchmark`) haalt de hele pagina
+neer in plaats van alleen de vergelijking.
+
+**Vals alarm over een tekort.** Op de 24e: "ACTIE NODIG — je hebt deze maand een
+tekort", spaarquote −265%, terwijl de eigen prognoselijn op dag 25 naar +€2.000
+springt en de forecast +€1.820 overschot voorspelt.
+
+**Mobiel scoort 7 en is beter dan verwacht.** Nul horizontale scroll-lekken op
+dertien routes, foutloze overlay-discipline (sheets boven de navigatieknop, die
+zichzelf verbergt en soepel terugkomt), en formulieren met numeriek toetsenbord en
+een bereikbare opslaanknop. De punten gaan eraf op de "Tip van Fin"-toast die 30%
+van het scherm blokkeert en niet wegblijft, en op bedieningselementen van 20 tot
+28 px waar 44 de richtlijn is.
