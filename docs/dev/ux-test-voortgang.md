@@ -100,6 +100,41 @@ samengevoegd**. Als die weg is, is dit de samenvatting van wat vaststaat:
   prioriteitsscore; de fee-calculator laat zien dat 0,5% beheerkosten €51.091
   over 30 jaar kost — 13% van de eindwaarde.
 
+### Van tester C (navigatie, taal, cognitive load — account leo)
+- 🔴 **Vrijheids-delta's lezen omgekeerd.** Op `/toekomst/gebeurtenissen` krijgt
+  "Verbouwing eigen woning — € 45.000" de badge **"+2.2 jaar vrijheid"**, en
+  "Aanvullend pensioen +€ 1.100/mnd" krijgt **"−3.2 jaar vrijheid"**. Bedoeld is
+  "2,2 jaar later vrij" resp. "3,2 jaar eerder vrij", maar "+ vrijheid" leest als
+  winst. Teken en woord spreken elkaar tegen op de kernmetric.
+- 🟠 **Zeven bijna identieke "DRINGEND"-budgetmeldingen** op `/berichten`, en
+  "€1280 van €1280 — budget overschreden" klopt niet: dat is vól benutten.
+- 🟠 **Import en bankkoppeling zijn niet vindbaar vanuit het menu.** Import alleen
+  via een knop op de transactiepagina, op de legacy-route `/core/cash/import`.
+- 🟠 **Kernjargon zonder uitleg op beslismomenten**: "SWR 2.8%", "Interen",
+  "inclusiepercentage", "PSD2-banken, UPO, brokerage-sync".
+- 🟡 De "TIP VAN FIN"-toast overlapt content op elke pagina (stond over het
+  KPI-blok "BELEGD € 829.736" heen) en herhaalt zich per pagina.
+- 🟡 Zijbalk-"APPS" verspringt per pagina; Crypto holdings en Verhuurrendement
+  waren nergens zichtbaar.
+- 🟡 Onboarding-eindscherm accepteert "NETTO VERMOGEN € -2.479.300" zonder enige
+  "klopt dit?"-controle.
+- 🟡 "Nieuws" (menu) vs "Krant" (paginatitel); Rapportages en Account staan dubbel.
+- 🟡 De weergave-switches "Persoonlijk" en "Toekomstige euro's" zijn onverklaard
+  en hun actuele stand is niet afleesbaar.
+- 🔵 "Nog een beleggingen?", "4 bezitten". **Nuance**: tester C zag "26 jaar en
+  6 maanden" (correct) — "10 jaar en 12 maanden" is dus een randgeval dat optreedt
+  wanneer de maanden op 12 uitkomen.
+- 🟢 Sterk: de her-inlogmodal bewaart context ("Je gegevens zijn veilig").
+- 🟢 Sterk: verdiepingspagina's hebben een consistent redactioneel stramien —
+  statement-kop, vier KPI's mét tijd-equivalent, genummerde secties, breadcrumb,
+  uitklapbare uitleg. Dít is de maat waarnaar `/overzicht` toe moet.
+
+**Vindbaarheidsgat** (bestaat wél, niet gevonden als gebruiker): bestandsimport,
+Crypto holdings, Verhuurrendement, `/toekomst/bibliotheek`,
+`/toekomst/samengestelde-interest`, `/mijn/feedback`, `/mijn/lokale-chat`,
+`/rapportages/benchmark`, `/persoonlijk-plan`, `/totaalplan`. Legacy-routes
+`/core/**`, `/dashboard`, `/horizon/**` bestaan nog en duiken op in echte flows.
+
 ### Publieke funnel `/check` (ondergeschikt)
 - 🔴 De enige prominente knop op de bezittingen-stap is "Overslaan (geen
   bezittingen)"; die gooit de zojuist ingetypte €25.000 weg zonder waarschuwing
