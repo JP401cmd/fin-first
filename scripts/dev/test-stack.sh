@@ -170,8 +170,27 @@ alter default privileges in schema public grant all on sequences to anon, authen
 
 alter table public.profiles add column if not exists commercial_tier text not null default 'gratis';
 alter table public.profiles add column if not exists active_subscriptions text[] not null default '{}';
-alter table public.assets   add column if not exists has_woonbalans_tracking boolean not null default false;
 
+alter table public.assets add column if not exists has_woonbalans_tracking  boolean not null default false;
+alter table public.assets add column if not exists has_rental_tracking      boolean not null default false;
+alter table public.assets add column if not exists monthly_maintenance_cost numeric;
+alter table public.assets add column if not exists vva_fee                  numeric;
+alter table public.assets add column if not exists vacancy_log              jsonb not null default '[]'::jsonb;
+
+-- app/api/snapshots/auto doet upsert(..., onConflict: 'user_id,snapshot_date')
+-- op net_worth_snapshots, maar geen migratie maakt daar een unieke constraint
+-- voor — 20260504000001 legt alleen een gewone index. Zonder deze index geeft
+-- de route 500 "no unique or exclusion constraint matching the ON CONFLICT
+-- specification". Of productie hem out-of-band heeft, valt uit de repo niet af
+-- te leiden; zie de documentatie.
+delete from public.net_worth_snapshots a
+ using public.net_worth_snapshots b
+ where a.id > b.id and a.user_id = b.user_id and a.snapshot_date = b.snapshot_date;
+create unique index if not exists net_worth_snapshots_user_date_key
+  on public.net_worth_snapshots (user_id, snapshot_date);
+
+-- Kolommen die hierboven zijn toegevoegd vallen buiten de eerdere grant-ronde.
+grant all on all tables in schema public to anon, authenticated, service_role;
 notify pgrst, 'reload schema';
 SQL
 }
