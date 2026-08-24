@@ -343,3 +343,9 @@ Methode: 33 routes × 2 weergaven op `jochen@` (desktop 1440), per route screens
 Kerncijfers: 13 schermen echt gereduceerd (40–59% op het Overzicht-cluster), 14 identiek (o.a. /mijn-familie, /rapportages, /berichten, /nieuws, beide apps), 2 overreducties (cashflow-hub en forecast tonen in Eenvoudig geen antwoord meer), 2 kapotte verwijsketens (factor A → verborgen pensioen-strategie; voorkeuren verbergt instellingen waar de motor mee rekent).
 
 Nieuwe losse waarnemingen uit deze ronde (nog niet in het bevindingenregister): "10 jaar en 12 maanden vrijheid" (afrondingsfout formatter, bezittingen), tips-tour op /toekomst keert terug zolang je "Sluiten" kiest (alleen "Niet meer weergeven" onthoudt), welkomstgids sluiten vergt twee beslissingen, leeg widget-rail-gebied van ±één schermhoogte op /overzicht in Volledig, supermarkten/kleding/restaurant als "vaste kosten" geclassificeerd (wortel van H14), Importeer/Bank koppelen verborgen achter "…" in Eenvoudig op transacties, NAV-1 (apps uit Eenvoudig-zijbalk) besloten op 9 aug maar niet doorgevoerd.
+
+## Register v3 — schermronde-vondsten toegevoegd (25 aug)
+
+De zeven waarnemingen uit het schermoordeel zijn in het bevindingenregister opgenomen: **M37** (formatter "10 jaar en 12 maanden"), **M38** (tips-tour keert elk bezoek terug; "Sluiten" onthoudt niet; tweede modal), **M39** (leeg widget-rail-gebied op /overzicht Volledig), **M40** (Importeer/Bank koppelen verborgen in Eenvoudig), **M41** (NAV-1 besloten maar niet doorgevoerd), **L11** (welkomstgids sluiten vergt twee beslissingen). De boodschappen-in-vaste-lasten-waarneming is géén nieuw nummer geworden maar als bewijs-aanvulling (met screenshot) bij het bestaande **H14** gezet — het was er de wortel van, en dubbel nummeren vervuilt het register.
+
+Stand: **90 bevindingen** — 10 Critical, 28 High, 41 Medium, 11 Low — 76 pagina's, 31 schermafbeeldingen.
