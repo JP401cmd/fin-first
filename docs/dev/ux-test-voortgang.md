@@ -349,3 +349,9 @@ Nieuwe losse waarnemingen uit deze ronde (nog niet in het bevindingenregister): 
 De zeven waarnemingen uit het schermoordeel zijn in het bevindingenregister opgenomen: **M37** (formatter "10 jaar en 12 maanden"), **M38** (tips-tour keert elk bezoek terug; "Sluiten" onthoudt niet; tweede modal), **M39** (leeg widget-rail-gebied op /overzicht Volledig), **M40** (Importeer/Bank koppelen verborgen in Eenvoudig), **M41** (NAV-1 besloten maar niet doorgevoerd), **L11** (welkomstgids sluiten vergt twee beslissingen). De boodschappen-in-vaste-lasten-waarneming is géén nieuw nummer geworden maar als bewijs-aanvulling (met screenshot) bij het bestaande **H14** gezet — het was er de wortel van, en dubbel nummeren vervuilt het register.
 
 Stand: **90 bevindingen** — 10 Critical, 28 High, 41 Medium, 11 Low — 76 pagina's, 31 schermafbeeldingen.
+
+## Verbeterpunten-PDF (25 aug)
+
+Vierde document: `TriFinity-verbeterpunten-weergave.pdf` — de schermoordeel-punten die géén genummerde bevinding zijn, als werklijst S1–S16 (duiding-boven-data, de twee overreducties, kapotte verwijsketens, dekking, selectiekeuzes, en S16: van binaire schakelaar naar diepte ter plekke). Bevat óók de volledige taal- en jargontabel (14 voorstellen) en achterin een kruisverwijzing van 19 schermronde-waarnemingen naar hun registernummer, zodat niets dubbel wordt geteld of opgepakt.
+
+Documentindeling nu: **register v3** = genummerde defecten (C/H/M/L) · **aanvulling 25 aug** = alleen de nieuwe registernummers · **schermoordeel** = onderbouwing per pagina met screenshots · **verbeterpunten** = de ontwerp-/tekstwerklijst (S-nummers).
