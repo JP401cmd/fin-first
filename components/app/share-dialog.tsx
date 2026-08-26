@@ -355,7 +355,7 @@ export function ShareDialog({
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-[var(--scrim)] backdrop-blur-[var(--scrim-blur)]"
         onClick={onClose}
         data-testid="share-dialog-backdrop"
       />

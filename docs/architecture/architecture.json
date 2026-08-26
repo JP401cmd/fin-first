@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-13T19:24:04.231Z",
-  "generatedDate": "2026-08-13",
+  "generatedAt": "2026-08-26T22:24:14.063Z",
+  "generatedDate": "2026-08-26",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -192,7 +192,7 @@
     "tables": 89,
     "migrations": 207,
     "integrations": 25,
-    "components": 940,
+    "components": 946,
     "providers": 15,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -8501,14 +8501,15 @@
     }
   ],
   "components": {
-    "total": 940,
+    "total": 946,
     "groups": [
       {
         "group": "app",
-        "count": 365,
+        "count": 368,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
+          "account-storage-guard",
           "action-board",
           "action-board.test",
           "action-card",
@@ -8563,6 +8564,7 @@
           "budget-sparkline",
           "budget-tree",
           "budgets-client",
+          "budgets-client-degraded.test",
           "budgets-client-empty-state.test",
           "budgets-client.test",
           "budgetteren.config",
@@ -8753,6 +8755,7 @@
           "perspective-context-label",
           "perspective-context-label.test",
           "perspective-provider",
+          "perspective-provider.test",
           "perspective-switcher",
           "perspective-switcher.test",
           "phase-bar",
@@ -8876,7 +8879,7 @@
       },
       {
         "group": "overview",
-        "count": 167,
+        "count": 169,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -8895,6 +8898,7 @@
           "box2-detail",
           "box2-detail.test",
           "box2-dividend-simulator",
+          "box2-dividend-simulator.test",
           "box2-gecombineerde-druk",
           "box2-gecombineerde-druk.test",
           "box2-leengrens",
@@ -8960,6 +8964,7 @@
           "hub-stelselradar",
           "hub-stroom",
           "hub-totale-druk",
+          "hub-totale-druk.test",
           "hub-verdeling",
           "inflation-impact-card",
           "inflation-impact-card.test",
@@ -9338,7 +9343,7 @@
       },
       {
         "group": "check",
-        "count": 30,
+        "count": 31,
         "items": [
           "BlikOpToekomst",
           "CtaSection",
@@ -9360,6 +9365,7 @@
           "TweeToekomsten",
           "check-wizard",
           "check-wizard-section",
+          "open-rij-commit.test",
           "step-bezittingen",
           "step-buffer",
           "step-doel",
@@ -16264,6 +16270,29 @@
       ],
       "summary": "Het transactie-bulkbewerkscherm (requirements 11 aug 2026, B1–B3) laat een gebruiker over de **volledige** historie zoeken, tot duizenden transacties selecteren, ze in één keer hercategoriseren of **hard verwijderen**. De kernbeslissing is wat \"selecteer alle 4.000\" technisch bet",
       "file": "docs/adr/0104-bulkselectie-is-een-bevroren-idlijst.md"
+    },
+    {
+      "id": "0105-werktijd-deelt-op-het-inkomen",
+      "title": "Werktijd deelt op het inkomen, vrijheidstijd op de uitgaven",
+      "status": "aanvaard",
+      "date": "2026-08-26",
+      "elements": [
+        "as-belasting",
+        "as-budget"
+      ],
+      "summary": "De app kende één tijd-metafoor: **vrijheidstijd** — een bedrag gedeeld door het uitgaven-dagtarief (\"hoeveel dagen van mijn levensstijl koopt dit\"). Twee oppervlakken presenteerden dat getal echter met **werktijd-taal** (\"die je werkt om te betalen\", \"per jaar opgeofferd aan bela",
+      "file": "docs/adr/0105-werktijd-deelt-op-het-inkomen.md"
+    },
+    {
+      "id": "0106-hypotheekrenteaftrek-loopt-over-het-netto-eigenwoningsaldo",
+      "title": "De tariefsaanpassing eigen woning loopt over het netto eigenwoningsaldo",
+      "status": "aanvaard",
+      "date": "2026-08-26",
+      "elements": [
+        "as-belasting"
+      ],
+      "summary": "De Box 1-motor verlaagde met de hypotheekrenteaftrek uitsluitend de **grondslag**. Daardoor werkte de aftrek automatisch door tegen het schijftarief waarin hij landt — 49,50% in de topschijf — terwijl de wet dat effect sinds 2014 maximeert op het **aftrektarief** (37,56% in 2026)",
+      "file": "docs/adr/0106-hypotheekrenteaftrek-loopt-over-het-netto-eigenwoningsaldo.md"
     }
   ],
   "churn": {
@@ -16271,19 +16300,19 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 130
+        "commits": 72
       },
       {
         "path": "lib/ai",
-        "commits": 61
+        "commits": 55
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 41
+        "commits": 29
       },
       {
         "path": "app/api/ai",
-        "commits": 22
+        "commits": 20
       },
       {
         "path": "app/api/household",
@@ -16298,11 +16327,11 @@
         "commits": 9
       },
       {
-        "path": "lib/fire-simulation.ts",
-        "commits": 7
+        "path": "app/api/budgets",
+        "commits": 6
       },
       {
-        "path": "app/api/budgets",
+        "path": "lib/fire-simulation.ts",
         "commits": 6
       },
       {
@@ -16313,23 +16342,23 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 9179,
-        "commits": 93
+        "loc": 9230,
+        "commits": 77
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 5198,
-        "commits": 34
+        "loc": 5260,
+        "commits": 30
       },
       {
         "file": "components/core/assets-client.tsx",
         "loc": 4599,
-        "commits": 42
+        "commits": 39
       },
       {
         "file": "components/app/cash-account-view.tsx",
         "loc": 3457,
-        "commits": 21
+        "commits": 19
       },
       {
         "file": "lib/release-notes.ts",
@@ -16338,8 +16367,8 @@
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 2748,
-        "commits": 52
+        "loc": 2757,
+        "commits": 50
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
@@ -16347,9 +16376,9 @@
         "commits": 21
       },
       {
-        "file": "app/(app)/core/checkin/page.tsx",
-        "loc": 2225,
-        "commits": 9
+        "file": "lib/test-personas.ts",
+        "loc": 2236,
+        "commits": 8
       }
     ]
   },
@@ -17450,8 +17479,16 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-08-13",
-    "hasChanges": false,
-    "sections": []
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+6"
+        ],
+        "removed": []
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -17745,6 +17782,13 @@
       "date": "2026-08-13",
       "api": 299,
       "components": 940,
+      "tables": 89,
+      "routesProduction": 95
+    },
+    {
+      "date": "2026-08-26",
+      "api": 299,
+      "components": 946,
       "tables": 89,
       "routesProduction": 95
     }

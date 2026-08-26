@@ -24,8 +24,16 @@ function makeGoal(id: string, name: string): GoalWithBudget {
   } as unknown as GoalWithBudget
 }
 
-function makeProgress(pct: number, onTrack: boolean): GoalProgress {
-  return { current: pct * 1000, target: 100_000, pct, onTrack, eta: null }
+function makeProgress(pct: number, onTrack: boolean, measured = true): GoalProgress {
+  return {
+    current: pct * 1000,
+    target: 100_000,
+    pct,
+    onTrack,
+    measured,
+    requiredMonthly: null,
+    eta: null,
+  }
 }
 
 describe('VoortgangDoelenCard', () => {
@@ -89,6 +97,18 @@ describe('VoortgangDoelenCard', () => {
     const { container } = render(<VoortgangDoelenCard items={items} />)
     expect(container.querySelector('.bg-emerald-500')).toBeTruthy()
     expect(container.querySelector('.bg-amber-500')).toBeNull()
+  })
+
+  // Bevinding M31: dezelfde grondslag als de "Net begonnen"-pil op
+  // /toekomst/doelen — een vers doel krijgt hier geen groen vinkje.
+  it('measured=false krijgt een neutrale bar, geen groen vinkje en geen alarm', () => {
+    const items = [
+      { goal: makeGoal('1', 'Vakantiepot'), progress: makeProgress(0, true, false) },
+    ]
+    const { container } = render(<VoortgangDoelenCard items={items} />)
+    expect(container.querySelector('.bg-emerald-500')).toBeNull()
+    expect(container.querySelector('.bg-amber-500')).toBeNull()
+    expect(container.querySelector('.bg-\\[var\\(--ink-4\\)\\]')).toBeTruthy()
   })
 
   it('onTrack=false gebruikt amber-bar', () => {

@@ -11,10 +11,14 @@ function mockResult(overrides: Partial<Box2Result> = {}): Box2Result {
     year: 2026,
     hasPartner: false,
     params: { tariefLaag: 0.245, tariefHoog: 0.31, grens: 68843, grensPartner: 137686 } as Box2Result['params'],
-    perDeelneming: [{ name: 'Holding BV', dividend: 20000, disposalGain: 0, totalIncome: 20000, shareOfTotal: 1 }],
+    perDeelneming: [{ name: 'Holding BV', dividend: 20000, disposalGain: 0, totalIncome: 20000, shareOfTotal: 1, dividendOnbekend: false }],
     totalDividend: 20000,
     totalDisposalGain: 0,
     totalIncome: 20000,
+    dividendOnbekend: false,
+    dividendOnbekendCount: 0,
+    incomeLow: 20000,
+    incomeHigh: 0,
     taxLow: 4900,
     taxHigh: 0,
     totalTax: 4900,
@@ -44,8 +48,69 @@ describe('Box2Detail', () => {
     mockFetch({ personal: mockResult() })
     render(<DisplayModeProvider initialMode="full"><Box2Detail year={2026} /></DisplayModeProvider>)
     await waitFor(() => expect(screen.getByText(/aanmerkelijk belang 2026 · privé/i)).toBeTruthy())
-    expect(screen.getByText(/4\.900/)).toBeTruthy()
-    expect(screen.getByText(/49 vrijheidsdagen/)).toBeTruthy()
+    // Sinds H26 start de simulator op het WERKELIJKE inkomen, dus het bedrag
+    // staat bewust twee keer op de pagina: in de kop én in de simulator eronder.
+    // Dat is de fix, niet een fout — vroeger stond er onder een kop van €0 een
+    // hypothetische €16.867.
+    expect(screen.getAllByText(/4\.900/).length).toBeGreaterThanOrEqual(2)
+    expect(screen.getAllByText(/49 vrijheidsdagen/).length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('H26 — kop en simulator tonen bij eerste render hetzelfde bedrag', async () => {
+    // De bevinding was dat de kop €0 zei en de simulator eronder €16.867. De
+    // simulator draait nu op result.totalIncome, dus die twee kunnen per
+    // constructie niet meer uiteenlopen zonder interactie.
+    mockFetch({ personal: mockResult() })
+    render(<DisplayModeProvider initialMode="full"><Box2Detail year={2026} /></DisplayModeProvider>)
+    await waitFor(() => screen.getByText(/aanmerkelijk belang 2026 · privé/i))
+    const slider = screen.getByLabelText('Dividend dit jaar') as HTMLInputElement
+    expect(slider.value).toBe('20000')
+    // Niet de oude default (de schijfgrens) en geen bedrag dat daarbij hoort.
+    expect(slider.value).not.toBe('68843')
+    expect(screen.queryByText(/16\.867/)).toBeNull()
+  })
+
+  it('H26 — NULL ≠ 0: onbekend dividend toont "Nog niet ingevuld", geen €0', async () => {
+    mockFetch({
+      personal: mockResult({
+        perDeelneming: [{ name: 'Holding BV', dividend: 0, disposalGain: 0, totalIncome: 0, shareOfTotal: 0, dividendOnbekend: true }],
+        totalDividend: 0,
+        totalIncome: 0,
+        dividendOnbekend: true,
+        dividendOnbekendCount: 1,
+        incomeLow: 0,
+        taxLow: 0,
+        totalTax: 0,
+        effectiveRate: 0,
+        totalTaxInclDga: 0,
+        freedomDays: 0,
+      }),
+    })
+    render(<DisplayModeProvider initialMode="full"><Box2Detail year={2026} /></DisplayModeProvider>)
+    await waitFor(() => expect(screen.getByText('Nog niet ingevuld')).toBeTruthy())
+    expect(screen.getByText(/We weten je jaarlijks dividend nog niet/i)).toBeTruthy()
+    // Wél een weg vooruit, geen doodlopende nul.
+    expect(screen.getByText(/Vul het dividend aan bij je deelneming/i)).toBeTruthy()
+    // En zeker geen hypothetische heffing eronder.
+    expect(screen.queryByText(/16\.867/)).toBeNull()
+  })
+
+  it('H26 — bij een deels gevulde set blijft het bedrag staan, als expliciete ondergrens', async () => {
+    mockFetch({
+      personal: mockResult({
+        perDeelneming: [
+          { name: 'Gevuld BV', dividend: 20000, disposalGain: 0, totalIncome: 20000, shareOfTotal: 1, dividendOnbekend: false },
+          { name: 'Leeg BV', dividend: 0, disposalGain: 0, totalIncome: 0, shareOfTotal: 0, dividendOnbekend: true },
+        ],
+        dividendOnbekend: true,
+        dividendOnbekendCount: 1,
+      }),
+    })
+    render(<DisplayModeProvider initialMode="full"><Box2Detail year={2026} /></DisplayModeProvider>)
+    await waitFor(() => screen.getByText(/aanmerkelijk belang 2026 · privé/i))
+    expect(screen.queryByText('Nog niet ingevuld')).toBeNull()
+    expect(screen.getByText(/Dit bedrag is een ondergrens/i)).toBeTruthy()
+    expect(screen.getAllByText(/4\.900/).length).toBeGreaterThanOrEqual(1)
   })
 
   it('pakt eigen partner-resultaat in household-modus (geen personal-key)', async () => {

@@ -3,6 +3,7 @@ import {
   BOX2_PARAMS,
   DGA_LENING_DREMPEL,
   calculateBox2,
+  splitBox2Brackets,
   type Box2Deelneming,
   type Box2Input,
 } from './box2-data'
@@ -140,6 +141,142 @@ describe('WF-BELAST-13 — DGA-persona krijgt een niet-nul Box 2-aanslag (datapa
     // Dividend ligt boven de schijfgrens → beide schijven gevuld.
     expect(r.taxLow).toBeGreaterThan(0)
     expect(r.taxHigh).toBeGreaterThan(0)
+  })
+})
+
+describe('H26 — NULL ≠ 0: een niet-ingevuld dividend is geen nul-aanslag', () => {
+  // De kop toonde "€0 per jaar" voor élke DGA die het dividendveld nooit heeft
+  // kunnen invullen. Het bedrag klopte (we weten niets beters), maar het
+  // ONDERSCHEID ontbrak — en "je betaalt geen Box 2" is een andere mededeling dan
+  // "we hebben het nog niet gevraagd".
+
+  it('onbekend dividend (null) → dividendOnbekend, heffing blijft 0', () => {
+    const r = calculateBox2(
+      makeInput({
+        deelnemingen: [{ name: 'Holding BV', annual_dividend: null, disposal_gain: 0 }],
+      }),
+    )
+    expect(r.dividendOnbekend).toBe(true)
+    expect(r.dividendOnbekendCount).toBe(1)
+    expect(r.totalIncome).toBe(0)
+    expect(r.totalTaxInclDga).toBe(0)
+    expect(r.perDeelneming[0].dividendOnbekend).toBe(true)
+  })
+
+  it('expliciete 0 is WÉL bekend — onderscheidbaar van null', () => {
+    const expliciet = calculateBox2(
+      makeInput({ deelnemingen: [{ name: 'BV', annual_dividend: 0, disposal_gain: 0 }] }),
+    )
+    const onbekend = calculateBox2(
+      makeInput({ deelnemingen: [{ name: 'BV', annual_dividend: null, disposal_gain: 0 }] }),
+    )
+    // Zelfde cijfers…
+    expect(expliciet.totalTaxInclDga).toBe(onbekend.totalTaxInclDga)
+    expect(expliciet.totalIncome).toBe(onbekend.totalIncome)
+    // …maar een ander verhaal. Dit is de hele bevinding.
+    expect(expliciet.dividendOnbekend).toBe(false)
+    expect(onbekend.dividendOnbekend).toBe(true)
+  })
+
+  it('zonder deelnemingen is er niets onbekend (geen vals alarm)', () => {
+    const r = calculateBox2(makeInput({ deelnemingen: [], dgaLeningenTotal: 600_000 }))
+    expect(r.dividendOnbekend).toBe(false)
+    expect(r.dividendOnbekendCount).toBe(0)
+  })
+
+  it('gemengde set: telt alleen het bekende dividend en markeert onvolledig', () => {
+    const r = calculateBox2(
+      makeInput({
+        deelnemingen: [
+          { name: 'Gevuld BV', annual_dividend: 50_000, disposal_gain: 0 },
+          { name: 'Leeg BV', annual_dividend: null, disposal_gain: 0 },
+        ],
+      }),
+    )
+    expect(r.totalIncome).toBe(50_000)
+    expect(r.totalTaxInclDga).toBeGreaterThan(0)
+    // Het bedrag is een ONDERGRENS — het oppervlak moet dat kunnen zeggen.
+    expect(r.dividendOnbekend).toBe(true)
+    expect(r.dividendOnbekendCount).toBe(1)
+    expect(r.perDeelneming.map((d) => d.dividendOnbekend)).toEqual([false, true])
+  })
+
+  it('negatief dividend wordt op 0 geclampt en geldt als bekend', () => {
+    const r = calculateBox2(
+      makeInput({ deelnemingen: [{ name: 'BV', annual_dividend: -5_000, disposal_gain: 0 }] }),
+    )
+    expect(r.totalDividend).toBe(0)
+    expect(r.totalIncome).toBe(0)
+    expect(r.dividendOnbekend).toBe(false)
+  })
+})
+
+describe('H26 — schijfverdeling woont in de motor (splitBox2Brackets)', () => {
+  const grens = BOX2_PARAMS[2026].grens
+
+  it('exact op de grens → alles laag, niets hoog', () => {
+    const r = calculateBox2(
+      makeInput({ deelnemingen: [{ name: 'BV', annual_dividend: grens, disposal_gain: 0 }] }),
+    )
+    expect(r.incomeLow).toBe(grens)
+    expect(r.incomeHigh).toBe(0)
+    expect(r.taxHigh).toBe(0)
+  })
+
+  it('één euro boven de grens → hoge schijf begint', () => {
+    const r = calculateBox2(
+      makeInput({ deelnemingen: [{ name: 'BV', annual_dividend: grens + 1, disposal_gain: 0 }] }),
+    )
+    expect(r.incomeLow).toBe(grens)
+    expect(r.incomeHigh).toBe(1)
+    expect(r.taxHigh).toBeCloseTo(0.31, 2)
+  })
+
+  it('incomeLow + incomeHigh is altijd het totale inkomen', () => {
+    for (const income of [0, 1, 50_000, grens, grens + 1, 300_000]) {
+      const r = calculateBox2(
+        makeInput({ deelnemingen: [{ name: 'BV', annual_dividend: income, disposal_gain: 0 }] }),
+      )
+      expect(r.incomeLow + r.incomeHigh).toBe(r.totalIncome)
+    }
+  })
+
+  it('partner-grens verschuift de splitsing mee', () => {
+    const income = 100_000
+    const single = calculateBox2(
+      makeInput({ deelnemingen: [{ name: 'BV', annual_dividend: income, disposal_gain: 0 }] }),
+    )
+    const metPartner = calculateBox2(
+      makeInput({
+        hasPartner: true,
+        deelnemingen: [{ name: 'BV', annual_dividend: income, disposal_gain: 0 }],
+      }),
+    )
+    expect(single.incomeHigh).toBe(income - grens)
+    expect(metPartner.incomeHigh).toBe(0)
+  })
+
+  it('de pure helper is dezelfde als wat het resultaat publiceert', () => {
+    const income = 220_000
+    const r = calculateBox2(
+      makeInput({ deelnemingen: [{ name: 'BV', annual_dividend: income, disposal_gain: 0 }] }),
+    )
+    expect(splitBox2Brackets(income, grens)).toEqual({
+      incomeLow: r.incomeLow,
+      incomeHigh: r.incomeHigh,
+    })
+  })
+
+  it('afronding: de motor rondt op centen af — de tolerantie is ABSOLUUT (€0,01)', () => {
+    // De verwijderde simulator-kopie rekende ongerond en gaf 16.866,535 waar de
+    // motor 16.866,54 geeft. Beide formatteren naar "€ 16.867", dus het verschil
+    // was onzichtbaar tot je twee oppervlakken naast elkaar legde. Absoluut, niet
+    // relatief: dit is een afrondingsvraag op centen, geen schaalvraag.
+    const r = calculateBox2(
+      makeInput({ deelnemingen: [{ name: 'BV', annual_dividend: grens, disposal_gain: 0 }] }),
+    )
+    expect(r.totalTax).toBe(16_866.54)
+    expect(Math.abs(r.totalTax - grens * 0.245)).toBeLessThanOrEqual(0.01)
   })
 })
 

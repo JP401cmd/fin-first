@@ -61,7 +61,10 @@ export function Box1Waterfall({
   const stappen: WaterfallStap[] = [
     { label: 'Bruto inkomen', delta: bruto, cumulatief: bruto, kind: 'basis' },
     {
-      label: 'Heffing (schijven)',
+      // Niet meer 'Heffing (schijven)': heffingVoorKortingen draagt sinds de
+      // tariefsaanpassing eigen woning (art. 2.10 lid 2 Wet IB 2001) ook een
+      // niet-schijven-component. Het label moet in beide gevallen waar zijn.
+      label: 'Heffing vóór kortingen',
       delta: -heffing,
       cumulatief: bruto - heffing,
       kind: 'aftrek',

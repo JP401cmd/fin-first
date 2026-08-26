@@ -80,7 +80,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     given: 'Dezelfde periode/cijfers als WF-RAPP-02, nu met de inleiding-toggle op "met ai-inleiding".',
     when: 'De gebruiker genereert het rapport met AI-inleiding.',
-    then: 'Cijfers zijn byte-identiek aan WF-RAPP-02 (AI voegt alleen een redactionele callout toe); een AI-fout/timeout laat het rapport gewoon verschijnen zonder inleiding (stil geslikt, "report should never fail because of it"); AI-verbruik wordt gelogd via `recordAiUsage`.',
+    then: 'Cijfers zijn byte-identiek aan WF-RAPP-02 (AI voegt alleen een redactionele callout toe); een AI-fout/timeout laat het rapport gewoon verschijnen zonder inleiding (stil geslikt, "report should never fail because of it"); AI-verbruik wordt gelogd via `recordAiUsage`. Abonnementsgrens: uitsluitend DEZE variant (`use_ai=true`) vraagt de AI-add-on — zonder abonnement is dat een 403, terwijl de variant "standaard" uit WF-RAPP-02 gewoon een volledig rapport levert (H28). Ook het lokale/on-device schrijven van de inleiding blijft achter dezelfde betaalmuur (`useExecutionMode` → `blocked` zonder `hasAiSubscription`).',
     assertion: {
       kind: 'ui-only',
       source: 'app/api/report/route.ts (AI-generatie, generateText via getModel) — redactionele tekst, niet deterministisch toetsbaar',
@@ -93,10 +93,10 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     given: 'Een gegenereerd periodiek rapport (WF-RAPP-02.a) met gecachte data in `report_configs.cached_data`.',
     when: 'De gebruiker heropent het rapport uit het archief, ná wijzigingen aan de brondata.',
-    then: 'De getoonde cijfers zijn byte-gelijk aan de oorspronkelijke generatie (bv. Vermogensgroei blijft +€9.800) — een A=B-consistentietoets tussen "eerste generatie" en "heropend uit cache", ongeacht latere brondata-wijzigingen.',
+    then: 'De getoonde cijfers zijn byte-gelijk aan de oorspronkelijke generatie (bv. Vermogensgroei blijft +€9.800) — een A=B-consistentietoets tussen "eerste generatie" en "heropend uit cache", ongeacht latere brondata-wijzigingen. Uitzondering op de bevriezing, en alleen op de NIET-cijfers: heropent iemand met `use_ai=false` (eigen keuze, privé-modus of een verlopen AI-abonnement), dan wordt een eerder gegenereerde AI-inleiding uit de cache weggelaten — de cijfers blijven ongemoeid.',
     assertion: {
       kind: 'consistency',
-      source: 'app/api/report/route.ts r127-138/760-768 (cached_data-teruggave) — bevroren cache vs. eerste generatie, geen nieuw cijfer',
+      source: 'app/api/report/route.ts (cached_data-teruggave) — bevroren cache vs. eerste generatie, geen nieuw cijfer',
     },
   },
   {
@@ -106,10 +106,10 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     given: 'Minstens 2 opgeslagen rapporten in het archief.',
     when: 'De gebruiker klikt het prullenbak-icoon.',
-    then: 'Het item verdwijnt onmiddellijk zonder bevestigingsdialoog (bewust, geen undo); een netwerkfout faalt stil (item kan na herladen nog bestaan); zonder AI-add-on faalt DELETE met 403 (zelfde tier-gate als GET/POST).',
+    then: 'Het item verdwijnt zonder bevestigingsdialoog (bewust, geen undo), maar pas NA een bevestigd antwoord van de server; weigert of faalt het verzoek, dan blijft de rij staan en verschijnt de foutmelding in een aria-live-regio boven het archief (geen "spookverwijdering" meer). DELETE vraagt GEEN AI-add-on: de handler verwijdert een eigen rij en raakt AI niet — de tier-gate die hier stond is verwijderd (H28).',
     assertion: {
       kind: 'ui-only',
-      source: 'app/(app)/rapportages/page.tsx#handleDelete + DELETE /api/report — workflow zonder eigen berekening',
+      source: 'app/(app)/rapportages/page.tsx#handleDelete (res.ok-check) + DELETE /api/report — workflow zonder eigen berekening',
     },
   },
   {

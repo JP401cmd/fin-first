@@ -64,6 +64,16 @@ interface ReduceOpts {
   realOnly?: boolean
   /** Ondergrens 'YYYY-MM' (inclusief) voor een sub-venster (bv. 6-maands). */
   sinceMonth?: string
+  /**
+   * Bovengrens 'YYYY-MM' (EXCLUSIEF) — de eerste maand die NIET meer meetelt.
+   *
+   * Bestaat voor vensters die de LOPENDE, nog onvolledige kalendermaand buiten
+   * de meting moeten houden (de canonieke spaarquote, zie `savingsRateWindow` in
+   * lib/savings-source.ts). Zonder deze grens telt een halfvolle maand — vaste
+   * lasten al afgeschreven, salaris nog niet binnen — als volwaardige maand mee.
+   * Weglaten = ongewijzigd gedrag: geen bovengrens.
+   */
+  beforeMonth?: string
   /** Beperk tot deze budget-ids (bv. spaarbudget-correctie). */
   budgetIds?: Set<string>
 }
@@ -71,6 +81,7 @@ interface ReduceOpts {
 function passes(row: TxMonthAggregateRow, opts: ReduceOpts): boolean {
   if (opts.realOnly && !isRealAggRow(row)) return false
   if (opts.sinceMonth && row.month < opts.sinceMonth) return false
+  if (opts.beforeMonth && row.month >= opts.beforeMonth) return false
   if (opts.budgetIds && !(row.budget_id && opts.budgetIds.has(row.budget_id))) return false
   return true
 }

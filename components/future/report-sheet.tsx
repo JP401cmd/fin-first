@@ -97,7 +97,7 @@ export function ReportSheet({
       role="dialog"
       aria-modal="true"
       aria-label={`Meld ${calculatorName}`}
-      className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/30 backdrop-blur-sm p-4 pb-[calc(1rem+var(--safe-area-bottom,0px))]"
+      className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-[var(--scrim)] backdrop-blur-[var(--scrim-blur)] p-4 pb-[calc(1rem+var(--safe-area-bottom,0px))]"
       onClick={onClose}
     >
       <div

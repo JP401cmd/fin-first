@@ -16,13 +16,26 @@ import { Kicker } from '@/components/editorial'
  * De legenda toont het euro-bedrag per box (VerdelingStaaf rekent zelf de
  * percentages uit naar rato van de bedragen), zodat de lezer ineens ziet welke
  * box het zwaarst weegt.
+ *
+ * H22 (26-08-2026) — de kicker belooft "verdeling over de boxen" terwijl er bij
+ * aanmerkelijk belang maar twee balken staan: de hub rekent Box 2 bewust niet
+ * door (BEL-1). `exclBox2` zet daarom een voetregel onder de staaf die dat
+ * benoemt. De percentages blijven ongemoeid — ze zijn naar rato van wat er
+ * wél in het totaal zit, en die grondslag staat er nu bij.
  */
 
 const BOX1_COLOR = 'var(--color-box1-700)' // amber
 const BOX2_COLOR = 'var(--color-box2-700)' // violet
 const BOX3_COLOR = 'var(--color-box3-700)' // teal
 
-export function HubVerdeling({ overview }: { overview: TaxOverviewResult }) {
+export function HubVerdeling({
+  overview,
+  exclBox2 = false,
+}: {
+  overview: TaxOverviewResult
+  /** Aanmerkelijk belang aanwezig, maar Box 2 zit niet in dit totaal (H22). */
+  exclBox2?: boolean
+}) {
   const { box1Tax, box2Tax, box3Tax, total } = overview
 
   // Geen druk → niets te verdelen.
@@ -43,6 +56,12 @@ export function HubVerdeling({ overview }: { overview: TaxOverviewResult }) {
       <div className="mt-4">
         <VerdelingStaaf segments={segments} />
       </div>
+      {exclBox2 && box2Tax <= 0 && (
+        <p className="mt-4 border-t border-[var(--rule-soft)] pt-3 text-xs leading-snug text-[var(--ink-3)]">
+          Box 2 ontbreekt in deze verdeling — de hub rekent aanmerkelijk belang niet door. De
+          percentages gaan over Box 1 en Box 3 samen.
+        </p>
+      )}
     </article>
   )
 }

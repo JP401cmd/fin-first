@@ -7,6 +7,8 @@ import { useScrollLock } from '@/lib/hooks/use-scroll-lock'
 import { useFocusTrap } from '@/lib/hooks/use-focus-trap'
 import { useSwipeToDismiss, SPRING_CURVE } from '@/lib/hooks/use-swipe-to-dismiss'
 import { acquireOverlay } from '@/lib/overlay-signal'
+import { pushOverlayHistory } from '@/lib/overlay-history'
+import { scrimColor } from '@/lib/overlay-scrim'
 
 type BottomSheetProps = {
   open: boolean
@@ -64,6 +66,19 @@ type BottomSheetProps = {
    * onschadelijke dismiss gewenst is en er niets verloren kan gaan.
    */
   closeOnBackdropClick?: boolean
+  /**
+   * STANDAARD (`true`) duwt een open sheet één entry op de browser-history, zodat
+   * de mobiele terug-knop de MODAL sluit i.p.v. de onderliggende pagina weg te
+   * navigeren — en bij gestapelde modals in omgekeerde volgorde terugloopt. Zie
+   * `lib/overlay-history.ts`.
+   *
+   * Zet 'm op `false` voor een overlay waarvan de OPEN-STAAT UIT DE URL komt
+   * (`?holding=<id>`, `?planEditor=true`). Die schrijft bij sluiten zelf de URL
+   * met `router.replace`; twee partijen die dezelfde history-entry claimen levert
+   * een modal op die na terug opnieuw opent. `<ShellOverlay kind="pane">` zet
+   * dit daarom voor de hele pane-familie uit.
+   */
+  manageHistory?: boolean
 }
 
 const sizeClasses = {
@@ -74,7 +89,7 @@ const sizeClasses = {
   full: 'md:max-w-5xl',
 } as const
 
-export function BottomSheet({ open, onClose, title, children, size = 'md', initialMobileHeight, footerSlot, actions, belowFloatingNav = false, closeOnBackdropClick = false }: BottomSheetProps) {
+export function BottomSheet({ open, onClose, title, children, size = 'md', initialMobileHeight, footerSlot, actions, belowFloatingNav = false, closeOnBackdropClick = false, manageHistory = true }: BottomSheetProps) {
   const [visible, setVisible] = useState(false)
   const [expandedToFull, setExpandedToFull] = useState(false)
   const sheetRef = useRef<HTMLDivElement>(null)
@@ -127,7 +142,7 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
 
     if (backdrop) {
       backdrop.style.transition = 'background-color 200ms ease-out'
-      backdrop.style.backgroundColor = 'rgba(0,0,0,0)'
+      backdrop.style.backgroundColor = scrimColor(0)
     }
 
     const cleanup = () => {
@@ -182,15 +197,14 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
     return true
   }, [initialMobileHeight, expandedToFull])
 
-  const { handleTouchStart, handleContentTouchStart, handleTouchMove, handleTouchEnd } =
-    useSwipeToDismiss({
-      sheetRef,
-      backdropRef,
-      contentRef,
-      onDismiss: handleSwipeDismissed,
-      onDismissStart: handleSwipeDismissStart,
-      onDragMove: handleDragUpExpand,
-    })
+  const { handleSheetTouchStart } = useSwipeToDismiss({
+    sheetRef,
+    backdropRef,
+    contentRef,
+    onDismiss: handleSwipeDismissed,
+    onDismissStart: handleSwipeDismissStart,
+    onDragMove: handleDragUpExpand,
+  })
 
   // ── Programmatic close (X / Escape / backdrop click) ───────
 
@@ -199,6 +213,11 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
     animateExit()
     onCloseRef.current()
   }, [animateExit])
+
+  // Via een ref, zodat het history-effect alleen op `open` hangt: zou het op de
+  // callback-identiteit hangen, dan pushte elke re-render een nieuwe entry.
+  const handleProgrammaticCloseRef = useRef(handleProgrammaticClose)
+  handleProgrammaticCloseRef.current = handleProgrammaticClose
 
   // ── State machine: open prop → visible state ───────────────
 
@@ -219,7 +238,7 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
         sheetRef.current.style.animation = ''
       }
       if (backdropRef.current) {
-        backdropRef.current.style.backgroundColor = 'rgba(0,0,0,0.5)'
+        backdropRef.current.style.backgroundColor = scrimColor()
         backdropRef.current.style.transition = ''
       }
 
@@ -250,6 +269,15 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
     return acquireOverlay()
   }, [open, belowFloatingNav])
 
+  // ── Terug-knop sluit de modal, niet de pagina ──────────────
+  // Eén history-entry per open sheet; `popstate` sluit langs dezelfde weg als
+  // de X-knop (exit-animatie + onClose), en de cleanup consumeert de eigen
+  // entry weer zodat er geen weesentry achterblijft. Zie lib/overlay-history.ts.
+  useEffect(() => {
+    if (!manageHistory || !open) return
+    return pushOverlayHistory(() => handleProgrammaticCloseRef.current())
+  }, [open, manageHistory])
+
   // ── Focus management + trap ────────────────────────────────
 
   useFocusTrap({ active: visible, containerRef: sheetRef })
@@ -275,7 +303,7 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
     <div
       ref={backdropRef}
       className={`fixed inset-0 ${belowFloatingNav ? 'z-50' : 'z-[70]'} flex items-end justify-center md:items-center`}
-      style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+      style={{ backgroundColor: scrimColor() }}
       onClick={handleBackdrop}
     >
       <div
@@ -283,8 +311,13 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+        // Eén touchstart voor het HELE paneel — de hook routeert zelf naar
+        // "slepen" (greepje/header/footer/tussenruimte) of "eerst scroll-vs-drag
+        // beslissen" (binnen de scroll-content). Vóórheen droeg alleen het
+        // greepje een handler, waardoor de strook eronder niet sleepte én de
+        // browser het gebaar als pull-to-refresh oppakte. `touchmove`/`touchend`
+        // hangen niet-passief aan `document` (zie use-swipe-to-dismiss.ts).
+        onTouchStart={handleSheetTouchStart}
         className={`flex w-full flex-col bg-[var(--paper)] rounded-t-[var(--r-lg)] shadow-[var(--s2)] md:mx-4 ${sizeClasses[size]} md:rounded-[var(--r-lg)] safe-bottom animate-sheet-enter`}
         style={{
           maxHeight: initialMobileHeight && !expandedToFull
@@ -293,11 +326,13 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
           transition: expandedToFull ? `max-height 350ms ${SPRING_CURVE}` : undefined,
         }}
       >
-        {/* Drag handle — mobile only (44px touch target) */}
+        {/* Drag handle — mobile only (44px touch target). `touch-action: none`
+            blijft staan: op precies deze strook mag de browser het gebaar nooit
+            claimen, ook niet vóór onze eerste touchmove. De handler zelf komt
+            van de paneel-brede `onTouchStart` hierboven. */}
         <div
           className="flex shrink-0 justify-center py-5 cursor-grab md:hidden"
           style={{ touchAction: 'none' }}
-          onTouchStart={handleTouchStart}
         >
           <div className="h-1 w-10 rounded-full bg-[var(--border-md)]" />
         </div>
@@ -345,7 +380,6 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
           ref={contentRef}
           className="min-h-0 flex-1 overflow-y-auto"
           style={{ overscrollBehaviorY: 'contain' }}
-          onTouchStart={handleContentTouchStart}
           onScroll={initialMobileHeight && !expandedToFull ? (e) => {
             const el = e.currentTarget
             // Expand when user scrolls near bottom of initial height

@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useCallback, useId } from 'react'
+import { useState, useCallback, useEffect, useId } from 'react'
 import { Plus, Trash2, CreditCard } from 'lucide-react'
 import type { CheckDraft } from '@/lib/check/use-check-draft'
 import type { CheckIntakeDebt } from '@/lib/check/types'
 import { formatCurrency } from '@/lib/format'
 import { parseBedrag } from '@/lib/check/use-check-draft'
-import { primaryBtn, backBtn, inlineAddBtn, inputBase } from '../intake-styles'
+import { primaryBtn, backBtn, ghostBtn, inlineAddBtn, inputBase } from '../intake-styles'
+import { usePendingRows } from '../use-pending-rows'
 
 interface Props {
   intake: CheckDraft['intake']
@@ -33,9 +34,11 @@ const DEBT_PRESETS: DebtPreset[] = [
 interface DebtRowFormProps {
   preset: DebtPreset
   onAdd: (debt: CheckIntakeDebt) => void
+  /** Meldt de openstaande, geldige invoer aan de stap zodat "Verder" hem meeneemt (C4). */
+  onPendingChange: (key: string, pending: CheckIntakeDebt | null) => void
 }
 
-function DebtRowForm({ preset, onAdd }: DebtRowFormProps) {
+function DebtRowForm({ preset, onAdd, onPendingChange }: DebtRowFormProps) {
   const [open, setOpen] = useState(false)
   const [rawLabel, setRawLabel] = useState('')
   const [rawBalance, setRawBalance] = useState('')
@@ -43,18 +46,34 @@ function DebtRowForm({ preset, onAdd }: DebtRowFormProps) {
   const [rawPayment, setRawPayment] = useState('')
   const id = useId()
 
-  function handleAdd() {
+  /** Zet de huidige invoer om naar een schuld — `null` zolang er geen geldig saldo staat. */
+  const buildDebt = useCallback((): CheckIntakeDebt | null => {
     const balance = parseBedrag(rawBalance)
-    if (balance <= 0) return
-    const rate = parseBedrag(rawRate)
-    const payment = parseBedrag(rawPayment)
-    onAdd({
+    if (balance <= 0) return null
+    return {
       debtType: preset.debtType,
       name: rawLabel.trim() || preset.label,
       balance,
-      interestRatePct: rate,
-      monthlyPayment: payment,
-    })
+      interestRatePct: parseBedrag(rawRate),
+      monthlyPayment: parseBedrag(rawPayment),
+    }
+  }, [rawBalance, rawLabel, rawRate, rawPayment, preset.debtType, preset.label])
+
+  // Houd de stap op de hoogte van openstaande invoer (C4 — niets gaat meer verloren).
+  useEffect(() => {
+    onPendingChange(preset.debtType, open ? buildDebt() : null)
+  }, [open, buildDebt, onPendingChange, preset.debtType])
+
+  // Verdwijnt de rij zelf, dan verdwijnt ook zijn melding.
+  useEffect(
+    () => () => onPendingChange(preset.debtType, null),
+    [onPendingChange, preset.debtType],
+  )
+
+  function handleAdd() {
+    const debt = buildDebt()
+    if (!debt) return
+    onAdd(debt)
     setRawLabel('')
     setRawBalance('')
     setRawRate('')
@@ -172,12 +191,23 @@ function DebtRowForm({ preset, onAdd }: DebtRowFormProps) {
 export function StepSchulden({ intake, onChange, onNext, onBack }: Props) {
   const debts = intake.debts ?? []
   const totalDebt = debts.reduce((s, d) => s + d.balance, 0)
+  const pending = usePendingRows<CheckIntakeDebt>()
 
   const handleAdd = useCallback(
     (debt: CheckIntakeDebt) => {
       onChange({ debts: [...debts, debt] })
     },
     [debts, onChange],
+  )
+
+  /** Commit eerst elke openstaande, ingevulde rij en navigeer dan pas (C4). */
+  const commitThen = useCallback(
+    (navigate: () => void) => {
+      const rows = pending.flush()
+      if (rows.length > 0) onChange({ debts: [...debts, ...rows] })
+      navigate()
+    },
+    [debts, onChange, pending.flush],
   )
 
   const handleRemove = useCallback(
@@ -240,15 +270,28 @@ export function StepSchulden({ intake, onChange, onNext, onBack }: Props) {
       {/* Voeg-toe rijen — elk type mag meerdere keren (onderscheid via naam) */}
       <div className="space-y-2">
         {DEBT_PRESETS.map((preset) => (
-          <DebtRowForm key={preset.debtType} preset={preset} onAdd={handleAdd} />
+          <DebtRowForm
+            key={preset.debtType}
+            preset={preset}
+            onAdd={handleAdd}
+            onPendingChange={pending.report}
+          />
         ))}
       </div>
 
       <div className="flex flex-col gap-2 pt-2">
-        <button type="button" onClick={onNext} className={primaryBtn('wil')}>
-          {debts.length === 0 ? 'Overslaan (geen schulden)' : 'Verder'}
+        <p className="min-h-4 font-serif text-xs italic text-[var(--ink-3)]" aria-live="polite">
+          {pending.hasPending ? 'Je openstaande invoer nemen we mee als je verdergaat.' : ''}
+        </p>
+        <button type="button" onClick={() => commitThen(onNext)} className={primaryBtn('wil')}>
+          Verder
         </button>
-        <button type="button" onClick={onBack} className={backBtn}>
+        {debts.length === 0 && !pending.hasPending && (
+          <button type="button" onClick={onNext} className={ghostBtn}>
+            Overslaan (geen schulden)
+          </button>
+        )}
+        <button type="button" onClick={() => commitThen(onBack)} className={backBtn}>
           Terug
         </button>
       </div>

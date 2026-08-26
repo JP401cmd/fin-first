@@ -103,6 +103,27 @@ export interface Box1Result {
   hypotheekrenteaftrek: number
   hillenAftrek: number
   eigenwoningSaldo: number // forfait - aftrek - hillen (kan negatief = aftrekpost)
+  /**
+   * Tariefsaanpassing aftrekbare kosten eigen woning (art. 2.10 lid 2 Wet IB
+   * 2001) — de bijtelling op de heffing die de renteaftrek terugbrengt van het
+   * topschijftarief naar het maximale aftrektarief. 0 zonder eigen woning en 0
+   * zolang het inkomen onder de topschijfgrens blijft. Zit AL verwerkt in
+   * `heffingVoorKortingen` (en dus in `tax`); apart gepubliceerd voor
+   * transparantie op het scherm.
+   */
+  tariefsaanpassing: number
+  /**
+   * Het WERKELIJKE belastingeffect van de eigen woning: heffing zónder eigen
+   * woning − heffing mét. Positief = voordeel (netto aftrekpost), negatief =
+   * kost (netto bijtelling). Inclusief tariefsaanpassing én het herleven van
+   * heffingskortingen — dus de enige eerlijke "wat levert mijn woning fiscaal
+   * op". 0 wanneer er geen eigen woning is.
+   *
+   * BESTAAT omdat oppervlakken dit anders zelf uitrekenen met een tarief dat de
+   * motor níét toepast (`|saldo| × marginalRate` overschatte het met ±36%).
+   */
+  eigenwoningBelastingEffect: number
+  /** Heffing over het belastbare inkomen vóór heffingskortingen: schijven + tariefsaanpassing. */
   heffingVoorKortingen: number
   algemeneHeffingskorting: number
   arbeidskorting: number
@@ -348,6 +369,31 @@ function computeIack(
 
 // ── Eigen woning ─────────────────────────────────────────────
 
+/**
+ * Geschatte aftrekbare hypotheekrente per jaar uit een hypotheeksaldo + rente%.
+ *
+ * De INVOER-kant van `Box1Input.hypotheekRente`: de app slaat per hypotheek een
+ * saldo en een nominale rentevoet op, niet de betaalde rente. Dit is bewust een
+ * SCHATTING op het openstaande saldo (geen annuïtaire opbouw over het jaar) —
+ * dezelfde schatting die de Box 1-subpagina toont, dus geen tweede waarheid.
+ *
+ * WOONT HIER, niet in een oppervlak: hij stond in `box1/page.tsx` als lokale
+ * functie én een tweede keer als "bewuste spiegeling" in
+ * `lib/uat/acceptance/belast-checks.ts` (die geen server-only module mag
+ * importeren — `lib/box1-tax.ts` is puur, dus die spiegeling is nu overbodig).
+ * Coercie via `Number(...)`: `current_balance`/`interest_rate` komen als
+ * NUMERIC uit Postgres en arriveren dan als string.
+ */
+export function estimateMortgageRenteJaar(
+  balance: number | string | null | undefined,
+  ratePct: number | string | null | undefined,
+): number {
+  const b = Number(balance) || 0
+  const r = Number(ratePct) || 0
+  if (b <= 0 || r <= 0) return 0
+  return Math.round(b * (r / 100))
+}
+
 interface EigenWoningResult {
   eigenwoningforfait: number
   hypotheekrenteaftrek: number
@@ -371,6 +417,75 @@ function computeEigenWoning(input: Box1Input, params: Box1Params): EigenWoningRe
   return { eigenwoningforfait, hypotheekrenteaftrek, hillenAftrek, eigenwoningSaldo }
 }
 
+// ── Tariefsaanpassing aftrekbare kosten eigen woning ─────────
+
+/**
+ * Het tariefsaanpassingspercentage (art. 2.10 lid 2 Wet IB 2001) — het verschil
+ * tussen het topschijftarief en het maximale aftrektarief eigen woning.
+ *
+ * **Bewust AFGELEID, geen eigen constante.** 2026: 49,50% − 37,56% = 11,94% ✓
+ * (gepubliceerd percentage). 2025: 49,50% − 37,48% = 12,02% ✓. Een losse
+ * `TARIEFSAANPASSING_2026`-constante zou een vierde plek zijn waar hetzelfde
+ * feit staat en zou stil uit de pas lopen bij een nieuw belastingjaar.
+ */
+export function tariefsaanpassingPct(
+  year: Box1TaxYear = CURRENT_TAX_YEAR,
+  aow = false,
+): number {
+  const params = BOX1_PARAMS[year]
+  const schijven = aow ? params.schijvenAow : params.schijven
+  const topTarief = schijven[schijven.length - 1]?.tarief ?? 0
+  return Math.max(0, topTarief - params.hypotheekAftrekMaxTarief)
+}
+
+/**
+ * Tariefsaanpassing aftrekbare kosten eigen woning — de bijtelling op de
+ * heffing (art. 2.10 lid 2 Wet IB 2001).
+ *
+ * De renteaftrek verlaagt in de motor alleen de GRONDSLAG en werkt daardoor
+ * door tegen het schijftarief waarin hij landt (49,50% in de topschijf). De wet
+ * maximeert dat effect op `hypotheekAftrekMaxTarief` (37,56% in 2026) door de
+ * belasting te VERHOGEN met het verschil — maar alleen "voor zover" de aftrek
+ * anders in de topschijf zou zijn vergolden.
+ *
+ * GRONDSLAG A (eigenaarsbesluit 26-08-2026, ADR 0106): de basis is het NETTO
+ * eigenwoningsaldo (rente − forfait − Hillen), niet de bruto rente. Dat sluit
+ * aan op "aftrekbare kosten … verminderd met de voordelen uit eigen woning" en
+ * dekt Wet Hillen gratis: forfait > rente → saldo positief → basis 0 → geen
+ * correctie.
+ *
+ * De "voor zover"-begrenzing: alleen het deel van de aftrek dat het inkomen
+ * ónder de topschijfgrens duwt is tegen 49,50% vergolden. Bij een bruto van
+ * € 85.000 en een aftrek van € 8.803 zit slechts € 6.574 boven € 78.426; de
+ * rest landde al in schijf 2 en heeft dus geen correctie nodig.
+ *
+ * Bewust NIET afgeleid uit een heffingsdelta ("verschil ÷ aftrekpost"): die
+ * bevat ook het terecht herlevende deel van de algemene heffingskorting. De
+ * statutaire correctie is een aparte, additieve post.
+ */
+function computeTariefsaanpassing(
+  gross: number,
+  eigenwoningSaldo: number,
+  schijven: Box1Schijf[],
+  params: Box1Params,
+): number {
+  // Alleen een AFTREKPOST (negatief saldo) valt onder de tariefsaanpassing.
+  const aftrekpost = Math.max(0, -eigenwoningSaldo)
+  if (aftrekpost <= 0) return 0
+
+  const topTarief = schijven[schijven.length - 1]?.tarief ?? 0
+  const pct = topTarief - params.hypotheekAftrekMaxTarief
+  if (pct <= 0) return 0
+
+  // Drempel = bovengrens van de één-na-laatste schijf (de topschijfgrens),
+  // gemeten op het inkomen VÓÓR de eigenwoning-aftrek.
+  const drempel = schijven[schijven.length - 2]?.tot
+  if (drempel == null) return 0
+
+  const deelInTopschijf = Math.min(aftrekpost, Math.max(0, gross - drempel))
+  return deelInTopschijf * pct
+}
+
 // ── Core Calculation ─────────────────────────────────────────
 
 /**
@@ -378,7 +493,9 @@ function computeEigenWoning(input: Box1Input, params: Box1Params): EigenWoningRe
  * marginalRateAt deze core twee keer kan aanroepen (income en income+1)
  * zonder oneindige recursie via computeBox1Tax → marginalRateAt → ...
  */
-function computeBox1Core(input: Box1Input): Omit<Box1Result, 'marginalRate'> {
+function computeBox1Core(
+  input: Box1Input,
+): Omit<Box1Result, 'marginalRate' | 'eigenwoningBelastingEffect'> {
   const params = BOX1_PARAMS[input.year]
   const aow = input.aow ?? false
   const schijven = aow ? params.schijvenAow : params.schijven
@@ -390,8 +507,19 @@ function computeBox1Core(input: Box1Input): Omit<Box1Result, 'marginalRate'> {
   // Stap 2: Belastbaar inkomen = bruto + eigenwoning-saldo (saldo is meestal negatief)
   const belastbaarInkomen = Math.max(0, gross + ew.eigenwoningSaldo)
 
-  // Stap 3: Heffing vóór kortingen
-  const heffingVoorKortingen = taxOverSchijven(belastbaarInkomen, schijven)
+  // Stap 3: Heffing vóór kortingen = schijventarief + tariefsaanpassing.
+  // Art. 2.10 lid 2 Wet IB 2001 VERHOOGT de belasting op het belastbare
+  // inkomen; de heffingskortingen (hoofdstuk 8) komen daar pas ná. Bewust
+  // opgeteld bij heffingVoorKortingen en niet als losse post na de kortingen:
+  // anders zou de kortingen-cap (stap 4) op een te lage heffing worden gelegd.
+  const schijvenHeffing = taxOverSchijven(belastbaarInkomen, schijven)
+  const tariefsaanpassing = computeTariefsaanpassing(
+    gross,
+    ew.eigenwoningSaldo,
+    schijven,
+    params,
+  )
+  const heffingVoorKortingen = schijvenHeffing + tariefsaanpassing
 
   // Stap 4: Heffingskortingen
   // Arbeidskorting én IACK lopen over het ARBEIDSINKOMEN (loon/winst/resultaat),
@@ -436,6 +564,7 @@ function computeBox1Core(input: Box1Input): Omit<Box1Result, 'marginalRate'> {
     hypotheekrenteaftrek: ew.hypotheekrenteaftrek,
     hillenAftrek: ew.hillenAftrek,
     eigenwoningSaldo: ew.eigenwoningSaldo,
+    tariefsaanpassing,
     heffingVoorKortingen,
     algemeneHeffingskorting,
     arbeidskorting,
@@ -456,7 +585,18 @@ export function computeBox1Tax(input: Box1Input): Box1Result {
   const marginalRate = marginalRateAt(core.grossYearlyIncome, input.year, input.aow, {
     arbeidsinkomen: input.arbeidsinkomen,
   })
-  return { ...core, marginalRate }
+
+  // Het werkelijke belastingeffect van de eigen woning = de heffingsdelta t.o.v.
+  // dezelfde invoer zónder eigen woning. Hier (niet in de core) berekend zodat
+  // de ±1-probes van marginalRateAt hem niet twee keer hoeven te draaien en er
+  // geen recursiepad kan ontstaan.
+  const heeftEigenWoning = (input.wozValue ?? 0) > 0 || (input.hypotheekRente ?? 0) > 0
+  const eigenwoningBelastingEffect = heeftEigenWoning
+    ? computeBox1Core({ ...input, wozValue: undefined, hypotheekRente: undefined }).tax -
+      core.tax
+    : 0
+
+  return { ...core, marginalRate, eigenwoningBelastingEffect }
 }
 
 // ── Marginal & effective rate helpers ────────────────────────
@@ -548,6 +688,29 @@ export function deriveMarginaalTarief(opts: {
     return hoog
   }
   return laag
+}
+
+/**
+ * Het tarief waartegen hypotheekrente daadwerkelijk aftrekbaar is: het
+ * marginale tarief, AFGETOPT op `hypotheekAftrekMaxTarief` (37,56% in 2026).
+ *
+ * Enige bron voor "wat levert een euro hypotheekrenteaftrek op". Bestaat omdat
+ * beslisondersteunende motoren (aflossen-vs-beleggen) de aftrek anders tegen
+ * het volle marginale tarief waarderen — precies de asymmetrie die art. 2.10
+ * lid 2 Wet IB 2001 sinds 2014 wegneemt. Onder de topschijf verandert de
+ * min() niets (35,75% blijft 35,75%); erboven kapt hij 49,50% → 37,56%.
+ *
+ * Dit is de VUISTREGEL-variant voor oppervlakken die alleen een marginaal
+ * tarief kennen. Wie het echte bedrag wil, leest `tariefsaanpassing` /
+ * `eigenwoningBelastingEffect` op `Box1Result` — die kennen ook de
+ * "voor zover"-begrenzing en het herleven van heffingskortingen.
+ */
+export function hraAftrekTarief(
+  marginaalTarief: number,
+  year: Box1TaxYear = CURRENT_TAX_YEAR,
+): number {
+  if (!Number.isFinite(marginaalTarief) || marginaalTarief <= 0) return 0
+  return Math.min(marginaalTarief, BOX1_PARAMS[year].hypotheekAftrekMaxTarief)
 }
 
 // ── Netto → bruto inversie ───────────────────────────────────

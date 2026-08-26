@@ -10,6 +10,7 @@ import {
   type BelastingBoxCard,
 } from '@/components/overview/belasting-box-cards'
 import { buildBelastingBoxCards } from './box-cards'
+import { buildBelastingHubOpening } from './hub-opening-copy'
 import { hasBox2Relevance } from '@/lib/box2-relevance'
 import { computeBox3TaxableInput, box3TaxStatus } from '@/lib/box3-taxable-input'
 import { CURRENT_TAX_YEAR } from '@/lib/box3-data'
@@ -18,8 +19,8 @@ import { PageStatusDot } from '@/components/app/page-status-dot'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
-import { deriveMarginaalTarief } from '@/lib/box1-tax'
 import { buildTaxOverview } from '@/lib/tax-overview'
+import { dailyIncomeRateFromGrossYearly } from '@/lib/income-rate'
 import { loadFiscaleKansen, type FiscaleKansen } from '@/lib/tax-opportunities-loader'
 import type { LeverageStatus } from '@/lib/leverage-status'
 import { getTaxDeadlines } from '@/lib/tax-calendar'
@@ -155,9 +156,6 @@ export default async function OverzichtBelastingPage() {
   // dagbasis" — dan toont het oppervlak het bedrag zónder tijdregel.
   const dailyExpenses = horizonData.dailyExpenseRate
 
-  // Marginaal tarief voor de effectieve-druk-annotatie (C1/C2).
-  const marg = horizonData.fireParams?.marginaalTarief ?? deriveMarginaalTarief()
-
   // ── Box 1: bruto, heffing, jaarruimte en KAART-STATUS uit ÉÉN bron ────
   // Alles komt uit `loadFiscaleKansen` → `resolveBox1GrossIncome` +
   // `computeJaarruimte` + `computeBox1Tax`. Dat is de CANONIEKE Box 1-grondslag,
@@ -176,6 +174,23 @@ export default async function OverzichtBelastingPage() {
   const grossYearly = kansen?.grossYearly ?? 0
   const box1Tax = kansen?.box1Tax ?? null
   const jaarruimte = kansen?.jaarruimte ?? null
+
+  // De twee TARIEVEN komen uit dezelfde motoraanroep als `box1Tax` — géén
+  // tweede afleiding hier (bevinding C9). `incomeKnown` is de ENIGE poort:
+  // zonder bruto-inkomen levert de loader beide tarieven als null en toont de
+  // druk-kaart "Inkomen onbekend" i.p.v. een vuistregel-percentage naast een
+  // kaart die tegelijk zegt dat het inkomen onbekend is (bevinding M4).
+  const incomeKnown = grossYearly > 0
+  const box1EffectiveRate = kansen?.box1EffectiveRate ?? null
+  const box1MarginalRate = kansen?.box1MarginalRate ?? null
+
+  // Bruto DAGELIJKS INKOMEN — de canonieke werkjaar-noemer (ADR 0105,
+  // lib/income-rate.ts). CONSUME, don't recompute: `kansen.grossYearly` IS al de
+  // canonieke bruto Box 1-grondslag (resolveBox1GrossIncome, ADR 0086), dus hier
+  // de PURE variant i.p.v. `getCanonicalDailyIncomeRate` — dezelfde grondslag,
+  // nul extra queries. 0 → geen eerlijke werkjaar-basis; de hero valt dan terug
+  // op de vrijheidstijd-formulering i.p.v. een verzonnen werktijd-claim.
+  const dailyIncome = dailyIncomeRateFromGrossYearly(grossYearly).dailyRate
   // Status EN statustekst uit één afleiding: de dot en het bijschrift op
   // dezelfde kaart mogen elkaar nooit tegenspreken (precies de fout die deze
   // wijziging opheft).
@@ -212,12 +227,18 @@ export default async function OverzichtBelastingPage() {
   // Box 2 bewust BUITEN het totaal: we laden de echte Box 2-heffing niet op de
   // hub (per-persoon, vereist eigen berekening). Bij aanmerkelijk belang
   // annoteren we het totaal met "excl. Box 2".
+  //
+  // TARIEVEN: doorgeven, niet afleiden (bevinding C9). Het `total` hieronder
+  // mengt bewust twee grondslagen (inkomens- én vermogensheffing) omdat het één
+  // rekening is die de gebruiker betaalt; een TARIEF mag die menging niet erven
+  // — vandaar dat `effectiveRate` de Box 1-heffing over het Box 1-inkomen is,
+  // exact het percentage van /overzicht/belasting/box1.
   const overview = buildTaxOverview({
     box1Tax,
     box2Tax: null,
     box3Tax,
-    grossYearlyIncome: grossYearly > 0 ? grossYearly : null,
-    marginalRate: marg,
+    effectiveRate: box1EffectiveRate,
+    marginalRate: box1MarginalRate,
     dailyExpenses,
   })
 
@@ -238,6 +259,14 @@ export default async function OverzichtBelastingPage() {
     hasAanmerkelijkBelang,
   })
 
+  // Kop + deck uit dezelfde boolean als de kaarten (bevinding H22): de opening
+  // telt wat er werkelijk op het scherm staat — twee boxen in één som, of drie
+  // boxen in twee rekeningen wanneer Box 2 meespeelt. Zie hub-opening-copy.ts.
+  const opening = buildBelastingHubOpening({
+    hasAanmerkelijkBelang,
+    year: new Date().getFullYear(),
+  })
+
   return (
     <>
       <NavStackMeta title="Belasting" bottomBar={{ kind: 'tabs' }} />
@@ -254,11 +283,11 @@ export default async function OverzichtBelastingPage() {
         />
         <PageOpening
           className="pr-20 sm:pr-24"
-          kicker={`De vierde hefboom · Belasting ${new Date().getFullYear()}`}
-          titleBefore="Drie boxen, één rekening — betaald in "
-          emphasis="vrijheid"
-          titleAfter=""
-          deck="Wat de fiscus jaarlijks afroomt is óók vrijheidstijd. Drie boxen, één som — hieronder zie je waar de hefboom het zwaarst weegt en waar ruimte ligt om vrijheid terug te kopen."
+          kicker={opening.kicker}
+          titleBefore={opening.titleBefore}
+          emphasis={opening.emphasis}
+          titleAfter={opening.titleAfter}
+          deck={opening.deck}
         />
       </div>
 
@@ -307,10 +336,12 @@ export default async function OverzichtBelastingPage() {
             <HubTotaleDruk
               overview={overview}
               dailyExpenses={dailyExpenses}
+              dailyIncome={dailyIncome}
+              incomeKnown={incomeKnown}
               exclBox2={hasAanmerkelijkBelang}
               box3PerspectiveAware={box3PerspectiveAware}
             />
-            <HubVerdeling overview={overview} />
+            <HubVerdeling overview={overview} exclBox2={hasAanmerkelijkBelang} />
           </div>
           {/* Perspectief-/eerlijkheidsannotatie als ScenarioCallout — vervangt
               de losse chip-strip + verzamelt de "indicatie, geen advies"-voetregel.
@@ -375,7 +406,7 @@ export default async function OverzichtBelastingPage() {
 
         {/* Krant-stijl colophon als hub-afsluiter. */}
         <div className="pt-10 sm:pt-14">
-          <OrnamentColophon text="Drie boxen, één rekening" module="Belasting" />
+          <OrnamentColophon text={opening.colophon} module="Belasting" />
         </div>
       </div>
     </>

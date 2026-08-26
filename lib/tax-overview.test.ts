@@ -36,37 +36,48 @@ describe('buildTaxOverview — distribution', () => {
   })
 })
 
-describe('buildTaxOverview — effectiveRate & marginalRate', () => {
-  it('effectiveRate = total / grossYearlyIncome', () => {
+// Sinds bevinding C9 (26-08-2026) leidt de aggregator GEEN tarief meer af: hij
+// geeft de twee percentages van `computeBox1Tax` door. De oude assertie
+// (`effectiveRate = total / grossYearlyIncome`) legde precies de bug vast die
+// C9 opheft — de Box 3-vermogensheffing in de teller van een inkomens-quotiënt —
+// en is daarom vervangen, niet verplaatst. De grondslag-bewijzen staan in
+// lib/tax-overview.hub-tarieven.test.ts.
+describe('buildTaxOverview — effectiveRate & marginalRate (pass-through)', () => {
+  it('geeft beide tarieven ongewijzigd door', () => {
     const r = buildTaxOverview({
       box1Tax: 20_000,
       box2Tax: null,
-      box3Tax: null,
-      grossYearlyIncome: 80_000,
-    })
-    expect(r.effectiveRate).toBeCloseTo(0.25, 6)
-  })
-
-  it('effectiveRate = null bij ontbrekend of nul inkomen', () => {
-    const zonder = buildTaxOverview({ box1Tax: 20_000, box2Tax: null, box3Tax: null })
-    expect(zonder.effectiveRate).toBeNull()
-    const nul = buildTaxOverview({
-      box1Tax: 20_000,
-      box2Tax: null,
-      box3Tax: null,
-      grossYearlyIncome: 0,
-    })
-    expect(nul.effectiveRate).toBeNull()
-  })
-
-  it('marginalRate wordt doorgegeven', () => {
-    const r = buildTaxOverview({
-      box1Tax: 10_000,
-      box2Tax: null,
-      box3Tax: null,
+      box3Tax: 2_000,
+      effectiveRate: 0.25,
       marginalRate: 0.4956,
     })
-    expect(r.marginalRate).toBeCloseTo(0.4956, 6)
+    expect(r.effectiveRate).toBeCloseTo(0.25, 10)
+    expect(r.marginalRate).toBeCloseTo(0.4956, 10)
+  })
+
+  it('leidt GEEN tarief af uit total: box3 verandert het effectieve tarief niet', () => {
+    const zonderBox3 = buildTaxOverview({
+      box1Tax: 20_000,
+      box2Tax: null,
+      box3Tax: null,
+      effectiveRate: 0.25,
+    })
+    const metBox3 = buildTaxOverview({
+      box1Tax: 20_000,
+      box2Tax: null,
+      box3Tax: 9_999,
+      effectiveRate: 0.25,
+    })
+    expect(metBox3.effectiveRate).toBe(zonderBox3.effectiveRate)
+    // ... terwijl het TOTAAL wél meebeweegt: één rekening, twee grondslagen.
+    expect(metBox3.total).toBe(29_999)
+  })
+
+  it('beide tarieven null zonder invoer — geen vuistregel-terugval (M4)', () => {
+    const r = buildTaxOverview({ box1Tax: null, box2Tax: null, box3Tax: 600 })
+    expect(r.effectiveRate).toBeNull()
+    expect(r.marginalRate).toBeNull()
+    expect(r.total).toBe(600)
   })
 })
 

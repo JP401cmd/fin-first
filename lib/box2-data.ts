@@ -27,7 +27,17 @@ export interface Box2Params {
 
 export interface Box2Deelneming {
   name: string
-  annual_dividend: number
+  /**
+   * Jaarlijks dividend. `null` = NIET INGEVULD, en dat is iets anders dan 0.
+   *
+   * Bevinding H26: de route mapte `Number(a.annual_dividend) || 0`, waardoor een
+   * lege kolom stil €0 werd. De Box 2-kop toonde dan "€0 per jaar" — wat een
+   * DGA leest als "ik betaal geen Box 2", terwijl de app het simpelweg nooit
+   * gevraagd heeft. In een fiscale context is een verzonnen nul een
+   * vertrouwensbreuk; het onderscheid moet dus door de motor heen blijven
+   * bestaan (zie `Box2Result.dividendOnbekend`).
+   */
+  annual_dividend: number | null
   disposal_gain: number  // vervreemdingswinst
 }
 
@@ -45,6 +55,8 @@ export interface Box2PerDeelneming {
   disposalGain: number
   totalIncome: number
   shareOfTotal: number  // percentage of total Box 2 income
+  /** true = deze deelneming heeft géén ingevuld dividend (NULL, niet 0). */
+  dividendOnbekend: boolean
 }
 
 export interface Box2Result {
@@ -59,6 +71,24 @@ export interface Box2Result {
   totalDividend: number
   totalDisposalGain: number
   totalIncome: number
+
+  /**
+   * true zodra MINSTENS ÉÉN deelneming geen ingevuld dividend heeft. Het
+   * getoonde bedrag is dan een ONDERGRENS, geen aanslag — een oppervlak hoort
+   * hier "nog niet ingevuld" van te maken i.p.v. een zelfverzekerde €0
+   * (bevinding H26). Zonder deelnemingen is er niets onbekend → false.
+   */
+  dividendOnbekend: boolean
+  /** Aantal deelnemingen zonder ingevuld dividend (voor "1 van de 2"-teksten). */
+  dividendOnbekendCount: number
+
+  // Schijfverdeling van het Box 2-inkomen (de grondslag ónder taxLow/taxHigh).
+  // Bewust ONDERDEEL VAN DE MOTOR: de dividend-schijfsimulator tekende deze
+  // splitsing tot 26-08-2026 met een eigen `splitDividend()` na — een tweede
+  // staffel-implementatie die ongerond rekende en `dgaExcessTax` niet kende
+  // (bevinding H26, "one formula, one home").
+  incomeLow: number    // deel van het inkomen in de eerste schijf
+  incomeHigh: number   // deel van het inkomen boven de eerste-schijfgrens
 
   // Tax calculation
   taxLow: number       // belasting tegen laag tarief
@@ -125,6 +155,7 @@ export const BOX2_TOOLTIPS: Record<string, string> = {
   aanmerkelijkBelang: 'Je hebt een aanmerkelijk belang als je (direct of indirect) 5% of meer van de aandelen bezit.',
   tariefStaffel: 'In de eerste schijf betaal je 24,5% (2026 tot €68.843; 2025 tot €67.804). Daarboven geldt 31% — het toptarief is per 2025 verlaagd van 33% naar 31%. Met fiscaal partner verdubbelt de eerste-schijfgrens (2026 €137.686).',
   dividend: 'Winstuitkering die je ontvangt van een BV of deelneming waarin je aanmerkelijk belang hebt.',
+  dividendOnbekend: 'Je jaarlijks dividend is nog niet ingevuld bij je deelneming. We tonen daarom geen bedrag: €0 zou hier suggereren dat je niets betaalt, terwijl we het simpelweg nog niet weten.',
   vervreemdingswinst: 'Winst bij verkoop van je aandelen: verkoopprijs minus verkrijgingsprijs.',
   fiscaalPartner: 'Met een fiscaal partner verdubbelt de eerste-schijfgrens voor het lage tarief (2026 naar €137.686, 2025 €135.608).',
   wetExcessiefLenen: 'De Wet excessief lenen bij eigen vennootschap belast leningen boven €500.000 van je BV als fictief regulier voordeel in Box 2. Het bovenmatige deel wordt belast tegen Box 2 tarieven.',
@@ -132,15 +163,36 @@ export const BOX2_TOOLTIPS: Record<string, string> = {
 
 // ── Core Calculation ─────────────────────────────────────────
 
+/**
+ * Splits een Box 2-inkomen over de twee schijven. ÉÉN home voor de staffel-
+ * geometrie: zowel de gewone heffing als de fictief-regulier-voordeel-tak van de
+ * Wet excessief lenen gebruiken hem, en sinds bevinding H26 ook de dividend-
+ * schijfsimulator (via `Box2Result.incomeLow/incomeHigh`).
+ */
+export function splitBox2Brackets(
+  income: number,
+  grens: number,
+): { incomeLow: number; incomeHigh: number } {
+  return {
+    incomeLow: Math.min(income, grens),
+    incomeHigh: Math.max(0, income - grens),
+  }
+}
+
 export function calculateBox2(input: Box2Input): Box2Result {
   const params = BOX2_PARAMS[input.year]
 
   // Per-deelneming breakdown
   let totalDividend = 0
   let totalDisposalGain = 0
+  let dividendOnbekendCount = 0
 
   const perDeelneming: Box2PerDeelneming[] = input.deelnemingen.map(d => {
-    const dividend = Math.max(0, d.annual_dividend)
+    // NULL ≠ 0: een niet-ingevuld dividend telt als 0 in de SOM (we kunnen niets
+    // beters weten), maar het feit dát het ontbreekt reist mee naar buiten.
+    const dividendOnbekend = d.annual_dividend == null
+    if (dividendOnbekend) dividendOnbekendCount += 1
+    const dividend = Math.max(0, d.annual_dividend ?? 0)
     const disposalGain = d.disposal_gain // can be negative (loss)
     const totalIncome = dividend + disposalGain
 
@@ -153,6 +205,7 @@ export function calculateBox2(input: Box2Input): Box2Result {
       disposalGain,
       totalIncome,
       shareOfTotal: 0, // calculated after totals
+      dividendOnbekend,
     }
   })
 
@@ -166,16 +219,9 @@ export function calculateBox2(input: Box2Input): Box2Result {
   // Apply bracket tax (staffeltarief)
   const grens = input.hasPartner ? params.grensPartner : params.grens
 
-  let taxLow: number
-  let taxHigh: number
-
-  if (totalIncome <= grens) {
-    taxLow = totalIncome * params.tariefLaag
-    taxHigh = 0
-  } else {
-    taxLow = grens * params.tariefLaag
-    taxHigh = (totalIncome - grens) * params.tariefHoog
-  }
+  const { incomeLow, incomeHigh } = splitBox2Brackets(totalIncome, grens)
+  const taxLow = incomeLow * params.tariefLaag
+  const taxHigh = incomeHigh * params.tariefHoog
 
   const baseTax = Math.round((taxLow + taxHigh) * 100) / 100
 
@@ -188,18 +234,11 @@ export function calculateBox2(input: Box2Input): Box2Result {
   if (dgaLeningenExcess > 0) {
     // Fictief regulier voordeel adds to Box 2 income — apply bracket tax on excess
     const totalIncomeWithDga = totalIncome + dgaLeningenExcess
-    const grensForDga = input.hasPartner ? params.grensPartner : params.grens
-
-    let fullTaxLow: number
-    let fullTaxHigh: number
-    if (totalIncomeWithDga <= grensForDga) {
-      fullTaxLow = totalIncomeWithDga * params.tariefLaag
-      fullTaxHigh = 0
-    } else {
-      fullTaxLow = grensForDga * params.tariefLaag
-      fullTaxHigh = (totalIncomeWithDga - grensForDga) * params.tariefHoog
-    }
-    const fullTax = Math.round((fullTaxLow + fullTaxHigh) * 100) / 100
+    const full = splitBox2Brackets(totalIncomeWithDga, grens)
+    const fullTax =
+      Math.round(
+        (full.incomeLow * params.tariefLaag + full.incomeHigh * params.tariefHoog) * 100,
+      ) / 100
     dgaExcessTax = Math.round((fullTax - baseTax) * 100) / 100
   }
 
@@ -220,6 +259,10 @@ export function calculateBox2(input: Box2Input): Box2Result {
     totalDividend,
     totalDisposalGain,
     totalIncome,
+    dividendOnbekend: dividendOnbekendCount > 0,
+    dividendOnbekendCount,
+    incomeLow,
+    incomeHigh,
     taxLow: Math.round(taxLow * 100) / 100,
     taxHigh: Math.round(taxHigh * 100) / 100,
     totalTax,

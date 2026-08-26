@@ -48,8 +48,18 @@ function arcPath(startDeg: number, endDeg: number, radius: number): string {
   return `M ${s.x.toFixed(2)} ${s.y.toFixed(2)} A ${radius} ${radius} 0 0 1 ${e.x.toFixed(2)} ${e.y.toFixed(2)}`
 }
 
+/**
+ * Duiding onder de leeswaarde. Valt de quote BUITEN de schaal van de meter
+ * (−100…+100), dan zegt het label dat er ook bij: de naald staat dan tegen de
+ * aanslag en zou anders een precisie suggereren die de meter niet heeft.
+ * Aanleiding: een halve maand (vaste lasten al afgeschreven, salaris nog niet
+ * binnen) leverde −265 % op een −100…+100-meter (bevinding C6). Het cijfer zelf
+ * wordt NIET afgekapt — alleen de aflezing benoemt haar eigen grens.
+ */
 function savingsRateLabel(rate: number): string {
+  if (rate < -100) return 'negatief · buiten schaal'
   if (rate < 0) return 'negatief'
+  if (rate > 100) return 'sterk · buiten schaal'
   if (rate >= 30) return 'sterk'
   if (rate >= 15) return 'gezond'
   return 'laag'

@@ -12,6 +12,7 @@ import type { VasteLastenSummary } from '@/lib/vaste-lasten-summary'
 import { buildForecast } from '@/lib/cashflow-forecast-math'
 import { pillarStatus, type LeverageStatus } from '@/lib/leverage-status'
 import { formatCurrency } from '@/lib/format'
+import { CURRENT_MONTH_INCOME_COMPLETE_RATIO } from '@/lib/constants'
 
 export type CashflowCardKey = 'budget' | 'transacties' | 'vaste-lasten' | 'forecast'
 
@@ -126,23 +127,80 @@ export function budgetCardStatus(input: {
 }
 
 /**
- * Transacties: maand-spaarquote (netto/inkomen). ≥20% good, ≥0% warn, <0 bad.
+ * Is het inkomen van de LOPENDE kalendermaand nog niet compleet?
+ *
+ * Meet de gerealiseerde maandinkomsten tegen het EFFECTIEVE maandinkomen (ADR
+ * 0073 — de stabiele grondslag, waar `income_source = 'manual'` de
+ * profielinschatting laat winnen). Staat er minder dan
+ * `CURRENT_MONTH_INCOME_COMPLETE_RATIO` van een normale maand op de rekening,
+ * dan kijkt de gebruiker naar een halve maand: vaste lasten zijn rond de 1e
+ * afgeschreven, het salaris komt pas rond de 25e.
+ *
+ * Zonder bekend maandinkomen (0) is er niets om tegen te meten → `false`
+ * (geen aannames, gewoon het normale oordeel).
+ */
+export function isCurrentMonthIncomeIncomplete(input: {
+  currentMonthIncome: number
+  expectedMonthlyIncome: number
+}): boolean {
+  if (input.expectedMonthlyIncome <= 0) return false
+  return input.currentMonthIncome < input.expectedMonthlyIncome * CURRENT_MONTH_INCOME_COMPLETE_RATIO
+}
+
+/**
+ * Transacties: maand-spaarquote (netto/inkomen). ≥20% good, ≥0% warn, <0 bad —
+ * MET één uitzondering, zie hieronder.
  *
  * De parameternamen benoemen de grondslag met opzet: dit draait op de
  * GEREALISEERDE huidige kalendermaand (`DashboardData.currentMonthIncome/
  * currentMonthExpenses`), niet op het effective `monthlyIncome/monthlyExpenses`
  * — dat laatste is bij `income_source = 'manual'` een profielinschatting.
+ *
+ * ── DE HALVE-MAAND-UITZONDERING (bevinding C6, 26 aug 2026) ─────────────────
+ * Een gerealiseerde maand is pas een oordeel als hij af is. Wie op de 24e kijkt
+ * heeft zijn vaste lasten al betaald en zijn salaris nog niet ontvangen; het
+ * netto saldo staat dan diep in de min terwijl er niets aan de hand is. De kaart
+ * meldde daar "Tekort deze maand" (rood), terwijl de forecast-kaart ernaast een
+ * overschot voorspelde — de app sprak zichzelf tegen, en een alarm dat regelmatig
+ * onterecht afgaat leert mensen rode meldingen negeren.
+ *
+ * Er wordt daarom pas gealarmeerd als BEIDE waar zijn:
+ *   1. het inkomen van deze maand is compleet genoeg om te beoordelen
+ *      (`isCurrentMonthIncomeIncomplete` is false), OF er is geen prognose om
+ *      op terug te vallen; én
+ *   2. de eigen prognose voor een VOLLE maand (`buildForecast`, rij 1) is zelf
+ *      negatief.
+ * Anders blijft het cijfer staan als wat het is — "tot nu toe" — met status
+ * 'neutral': zichtbaar, maar geen alarm. Zodra het salaris binnen is (of de
+ * prognose wél negatief wordt) geldt het gewone oordeel onverkort, dus een écht
+ * tekort blijft rood.
+ *
+ * `expectedMonthlyIncome` en `forecastNetPerMonth` zijn optioneel: zonder die
+ * twee is de uitkomst identiek aan het gedrag van vóór deze bevinding.
  */
 export function transactiesCardStatus(input: {
   currentMonthIncome: number
   currentMonthExpenses: number
+  /** EFFECTIVE maandinkomen (ADR 0073) — meetlat voor "is de maand af?". */
+  expectedMonthlyIncome?: number
+  /** Netto per maand uit `buildForecast` (rij 1), of null zonder prognose. */
+  forecastNetPerMonth?: number | null
 }): LeverageStatus {
   const { currentMonthIncome, currentMonthExpenses } = input
   const monthlyNet = currentMonthIncome - currentMonthExpenses
   const hasTx = currentMonthIncome > 0 || currentMonthExpenses > 0
   const rate = currentMonthIncome > 0 ? (monthlyNet / currentMonthIncome) * 100 : null
   if (!hasTx || rate == null) return 'neutral'
-  return rate >= 20 ? 'good' : rate >= 0 ? 'warn' : 'bad'
+  if (rate >= 20) return 'good'
+  if (rate >= 0) return 'warn'
+
+  const forecastNet = input.forecastNetPerMonth
+  const incomeIncomplete = isCurrentMonthIncomeIncomplete({
+    currentMonthIncome,
+    expectedMonthlyIncome: input.expectedMonthlyIncome ?? 0,
+  })
+  if (incomeIncomplete && forecastNet != null && forecastNet >= 0) return 'neutral'
+  return 'bad'
 }
 
 /**
@@ -253,6 +311,23 @@ export function buildCashflowCards(
     },
   }
 
+  // ── Forecast-rekenkern (vóór de Transacties-kaart) ──────────
+  // De prognose wordt hier al gebouwd omdat de Transacties-kaart hem nodig heeft
+  // om te beslissen of een negatief maandsaldo een tekort is of een halve maand
+  // (zie `transactiesCardStatus`). De Forecast-kaart verderop consumeert exact
+  // deze rijen — één `buildForecast`-aanroep, geen tweede prognose ernaast.
+  const rows = buildForecast(
+    cashflow.recurrings,
+    cashflow.baselineIncome,
+    cashflow.baselineExpenses,
+    cashflow.startingBalance,
+    now,
+  )
+  const netPerMonth = rows[0]?.net ?? 0
+  const endBalance = rows[rows.length - 1]?.cumulative ?? cashflow.startingBalance
+  const hasForecast =
+    cashflow.baselineIncome > 0 || cashflow.baselineExpenses > 0 || cashflow.recurrings.length > 0
+
   // ── Transacties ─────────────────────────────────────────────
   // GRONDSLAG: de GEREALISEERDE huidige kalendermaand uit transacties. LET OP —
   // `kpis.monthlyIncome/monthlyExpenses` zijn de EFFECTIVE waarden
@@ -266,9 +341,19 @@ export function buildCashflowCards(
   const monthlyNet = currentMonthIncome - currentMonthExpenses
   const hasTx = currentMonthIncome > 0 || currentMonthExpenses > 0
   const rate = currentMonthIncome > 0 ? (monthlyNet / currentMonthIncome) * 100 : null
+  // Meetlat voor "is deze maand al te beoordelen?" — BEWUST het EFFECTIVE
+  // maandinkomen (ADR 0073), dezelfde stabiele grondslag die de vaste-lasten-kaart
+  // hieronder als noemer gebruikt. Alleen als meetlat: KPI, spaarquote en tip
+  // blijven onverkort op de gerealiseerde maand staan.
+  const txIncomeIncomplete = isCurrentMonthIncomeIncomplete({
+    currentMonthIncome,
+    expectedMonthlyIncome: kpis.monthlyIncome,
+  })
   const txStatus: LeverageStatus = transactiesCardStatus({
     currentMonthIncome,
     currentMonthExpenses,
+    expectedMonthlyIncome: kpis.monthlyIncome,
+    forecastNetPerMonth: hasForecast ? netPerMonth : null,
   })
   const transacties: CashflowCard = {
     key: 'transacties',
@@ -276,13 +361,18 @@ export function buildCashflowCards(
     href: `${BASE}/transacties`,
     tooltip: 'Inkomsten en uitgaven van deze maand.',
     kpi: hasTx ? signed(monthlyNet) : null,
+    // Bij een negatief saldo dat door de halve-maand-uitzondering op 'neutral'
+    // blijft (zie `transactiesCardStatus`) zegt de regel wát er ontbreekt, i.p.v.
+    // een tekort te melden dat de prognose ernaast weerlegt.
     subText: !hasTx
       ? 'Nog geen transacties'
       : txStatus === 'good'
         ? 'Goed gespaard deze maand'
         : txStatus === 'warn'
           ? 'Krap deze maand'
-          : 'Tekort deze maand',
+          : txStatus === 'neutral'
+            ? 'Inkomen nog niet compleet'
+            : 'Tekort deze maand',
     status: txStatus,
     // DE KAART WAAR CF-3 OM BEGONNEN IS. Dit netto-cijfer staat één klik
     // verwijderd van de 30-dagen-cijfers op /overzicht/cashflow/transacties en
@@ -294,7 +384,13 @@ export function buildCashflowCards(
       // `currentMonthWindowLabel` valt weg: "AUGUSTUS TOT NU TOE".
       label: monthWindow,
       value: rate != null ? `${rate.toFixed(0)}% spaarquote` : '—',
-      tip: `Inkomen ${formatCurrency(currentMonthIncome)} · uitgaven ${formatCurrency(currentMonthExpenses)}.`,
+      // Loopt de maand nog (inkomen niet compleet) en staat er een prognose
+      // tegenover? Zet die er letterlijk bij — dat is de toets die de kaart zelf
+      // ook doet, en zonder die regel leest een negatief saldo als een tekort.
+      tip:
+        txIncomeIncomplete && hasForecast
+          ? `Inkomen ${formatCurrency(currentMonthIncome)} · uitgaven ${formatCurrency(currentMonthExpenses)}. Deze maand loopt nog; prognose voor een volle maand ${signed(netPerMonth)}.`
+          : `Inkomen ${formatCurrency(currentMonthIncome)} · uitgaven ${formatCurrency(currentMonthExpenses)}.`,
       actionLabel: 'Bekijk transacties',
     },
   }
@@ -343,17 +439,8 @@ export function buildCashflowCards(
   }
 
   // ── Forecast ────────────────────────────────────────────────
-  const rows = buildForecast(
-    cashflow.recurrings,
-    cashflow.baselineIncome,
-    cashflow.baselineExpenses,
-    cashflow.startingBalance,
-    now,
-  )
-  const netPerMonth = rows[0]?.net ?? 0
-  const endBalance = rows[rows.length - 1]?.cumulative ?? cashflow.startingBalance
-  const hasForecast =
-    cashflow.baselineIncome > 0 || cashflow.baselineExpenses > 0 || cashflow.recurrings.length > 0
+  // `rows`/`netPerMonth`/`endBalance`/`hasForecast` zijn hierboven al berekend
+  // (de Transacties-kaart leest de prognose).
   const fcStatus: LeverageStatus = forecastCardStatus({ netPerMonth, hasForecast })
   const forecast: CashflowCard = {
     key: 'forecast',

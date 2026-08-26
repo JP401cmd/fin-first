@@ -68,7 +68,7 @@ describe('DoelenView — basis-render', () => {
       <DoelenView
         goals={[mockGoal()]}
         goalProgresses={[
-          { current: 20000, target: 50000, pct: 40, onTrack: false, eta: 'over 2 jaar' },
+          { current: 20000, target: 50000, pct: 40, onTrack: false, measured: true, requiredMonthly: null, eta: 'over 2 jaar' },
         ]}
       />,
     )
@@ -82,7 +82,7 @@ describe('DoelenView — basis-render', () => {
       <DoelenView
         goals={[mockGoal()]}
         goalProgresses={[
-          { current: 30000, target: 50000, pct: 60, onTrack: true, eta: null },
+          { current: 30000, target: 50000, pct: 60, onTrack: true, measured: true, requiredMonthly: null, eta: null },
         ]}
       />,
     )
@@ -94,7 +94,7 @@ describe('DoelenView — basis-render', () => {
       <DoelenView
         goals={[mockGoal()]}
         goalProgresses={[
-          { current: 50000, target: 50000, pct: 100, onTrack: true, eta: null },
+          { current: 50000, target: 50000, pct: 100, onTrack: true, measured: true, requiredMonthly: null, eta: null },
         ]}
       />,
     )
@@ -106,7 +106,7 @@ describe('DoelenView — basis-render', () => {
       <DoelenView
         goals={[mockGoal()]}
         goalProgresses={[
-          { current: 30000, target: 50000, pct: 60, onTrack: false, eta: null },
+          { current: 30000, target: 50000, pct: 60, onTrack: false, measured: true, requiredMonthly: null, eta: null },
         ]}
       />,
     )
@@ -118,11 +118,65 @@ describe('DoelenView — basis-render', () => {
       <DoelenView
         goals={[mockGoal()]}
         goalProgresses={[
-          { current: 5000, target: 50000, pct: 10, onTrack: false, eta: null },
+          { current: 5000, target: 50000, pct: 10, onTrack: false, measured: true, requiredMonthly: null, eta: null },
         ]}
       />,
     )
     expect(screen.getByText('Achter op planning')).toBeTruthy()
+  })
+
+  // ── Bevinding M31: een vers doel krijgt geen oordeel ──────────────────
+  it('toont "Net begonnen" i.p.v. een stoplicht zolang er niets te meten valt', () => {
+    render(
+      <DoelenView
+        goals={[mockGoal({ current_value: 0 })]}
+        goalProgresses={[
+          { current: 0, target: 50000, pct: 0, onTrack: true, measured: false, requiredMonthly: 1000, eta: 'jul 2027' },
+        ]}
+      />,
+    )
+    expect(screen.getByText('Net begonnen')).toBeTruthy()
+    expect(screen.queryByText('Achter op planning')).toBeNull()
+    expect(screen.queryByText('Op koers')).toBeNull()
+  })
+
+  // ── Bevinding M32: het oordeel moet navolgbaar zijn ───────────────────
+  it('toont de benodigde maandinleg bij een EUR-doel, zodat de status navolgbaar is', () => {
+    render(
+      <DoelenView
+        goals={[mockGoal()]}
+        goalProgresses={[
+          { current: 1500, target: 9000, pct: 17, onTrack: false, measured: true, requiredMonthly: 1875, eta: 'dec 2026' },
+        ]}
+      />,
+    )
+    // formatCurrency zet een non-breaking space tussen € en het bedrag.
+    const regel = screen.getByText(/per maand nodig/)
+    expect(regel.textContent?.replace(/ /g, ' ')).toBe('€ 1.875 per maand nodig')
+  })
+
+  it('toont GEEN maandinleg bij een behaald doel', () => {
+    render(
+      <DoelenView
+        goals={[mockGoal()]}
+        goalProgresses={[
+          { current: 50000, target: 50000, pct: 100, onTrack: true, measured: true, requiredMonthly: 0, eta: null },
+        ]}
+      />,
+    )
+    expect(screen.queryByText(/per maand nodig/)).toBeNull()
+  })
+
+  it('toont GEEN maandinleg bij een niet-euro doel (geen tempo van een tempo)', () => {
+    render(
+      <DoelenView
+        goals={[mockGoal({ goal_type: 'savings_rate', target_value: 40, current_value: 20 })]}
+        goalProgresses={[
+          { current: 20, target: 40, pct: 50, onTrack: false, measured: true, requiredMonthly: 3.5, eta: 'dec 2026' },
+        ]}
+      />,
+    )
+    expect(screen.queryByText(/per maand nodig/)).toBeNull()
   })
 
   it('sorteert off-track doelen bovenaan', () => {
@@ -131,8 +185,8 @@ describe('DoelenView — basis-render', () => {
       mockGoal({ id: 'g2', name: 'Off-track doel' }),
     ]
     const progresses = [
-      { current: 30000, target: 50000, pct: 60, onTrack: true, eta: null },
-      { current: 5000, target: 50000, pct: 10, onTrack: false, eta: null },
+      { current: 30000, target: 50000, pct: 60, onTrack: true, measured: true, requiredMonthly: null, eta: null },
+      { current: 5000, target: 50000, pct: 10, onTrack: false, measured: true, requiredMonthly: null, eta: null },
     ]
     render(<DoelenView goals={goals} goalProgresses={progresses} />)
     const headings = screen.getAllByRole('heading', { level: 3 })
@@ -146,7 +200,7 @@ describe('DoelenView — basis-render', () => {
       <DoelenView
         goals={[mockGoal()]}
         goalProgresses={[
-          { current: 20000, target: 50000, pct: 40, onTrack: false, eta: null },
+          { current: 20000, target: 50000, pct: 40, onTrack: false, measured: true, requiredMonthly: null, eta: null },
         ]}
       />,
     )
@@ -159,7 +213,7 @@ describe('DoelenView — basis-render', () => {
       <DoelenView
         goals={[mockGoal()]}
         goalProgresses={[
-          { current: 20000, target: 50000, pct: 40, onTrack: false, eta: null },
+          { current: 20000, target: 50000, pct: 40, onTrack: false, measured: true, requiredMonthly: null, eta: null },
         ]}
       />,
     )
@@ -180,8 +234,8 @@ describe('DoelenView — basis-render', () => {
       <DoelenView
         goals={[mockGoal({ id: 'a' }), mockGoal({ id: 'b' })]}
         goalProgresses={[
-          { current: 10, target: 100, pct: 10, onTrack: false, eta: null },
-          { current: 20, target: 100, pct: 20, onTrack: false, eta: null },
+          { current: 10, target: 100, pct: 10, onTrack: false, measured: true, requiredMonthly: null, eta: null },
+          { current: 20, target: 100, pct: 20, onTrack: false, measured: true, requiredMonthly: null, eta: null },
         ]}
       />,
     )
@@ -208,7 +262,7 @@ describe('DoelenView — doelsituatie-groep', () => {
       <DoelenView
         goals={[mockGoal()]}
         goalProgresses={[
-          { current: 20000, target: 50000, pct: 40, onTrack: false, eta: null },
+          { current: 20000, target: 50000, pct: 40, onTrack: false, measured: true, requiredMonthly: null, eta: null },
         ]}
       />,
     )
@@ -222,7 +276,7 @@ describe('DoelenView — doelsituatie-groep', () => {
           paramGoal({ id: 'p1', name: 'Spaarquote-doel', goal_type: 'savings_rate' }),
         ]}
         goalProgresses={[
-          { current: 38, target: 45, pct: 84, onTrack: true, eta: null },
+          { current: 38, target: 45, pct: 84, onTrack: true, measured: true, requiredMonthly: null, eta: null },
         ]}
       />,
     )
@@ -241,7 +295,7 @@ describe('DoelenView — doelsituatie-groep', () => {
           }),
         ]}
         goalProgresses={[
-          { current: 54.5, target: 52, pct: 95, onTrack: true, eta: null },
+          { current: 54.5, target: 52, pct: 95, onTrack: true, measured: true, requiredMonthly: null, eta: null },
         ]}
       />,
     )
@@ -258,7 +312,7 @@ describe('DoelenView — doelsituatie-groep', () => {
           paramGoal({ id: 'ps', name: 'Spaarquote-doel', goal_type: 'savings_rate' }),
         ]}
         goalProgresses={[
-          { current: 0, target: 45, pct: 0, onTrack: false, eta: null },
+          { current: 0, target: 45, pct: 0, onTrack: false, measured: true, requiredMonthly: null, eta: null },
         ]}
       />,
     )
@@ -276,7 +330,7 @@ describe('DoelenView — doelsituatie-groep', () => {
           paramGoal({ id: 'ps', name: 'Spaarquote-doel', goal_type: 'savings_rate' }),
         ]}
         goalProgresses={[
-          { current: 38, target: 45, pct: 84, onTrack: true, eta: null },
+          { current: 38, target: 45, pct: 84, onTrack: true, measured: true, requiredMonthly: null, eta: null },
         ]}
       />,
     )
@@ -294,7 +348,7 @@ describe('DoelenView — doelsituatie-groep', () => {
           paramGoal({ id: 'ps', name: 'Spaarquote-doel', goal_type: 'savings_rate' }),
         ]}
         goalProgresses={[
-          { current: 38, target: 45, pct: 84, onTrack: true, eta: null },
+          { current: 38, target: 45, pct: 84, onTrack: true, measured: true, requiredMonthly: null, eta: null },
         ]}
       />,
     )
@@ -323,8 +377,8 @@ describe('DoelenView — doelsituatie-groep', () => {
           mockGoal({ id: 'm1', name: 'Noodfonds' }),
         ]}
         goalProgresses={[
-          { current: 38, target: 45, pct: 84, onTrack: true, eta: null },
-          { current: 20000, target: 50000, pct: 40, onTrack: false, eta: null },
+          { current: 38, target: 45, pct: 84, onTrack: true, measured: true, requiredMonthly: null, eta: null },
+          { current: 20000, target: 50000, pct: 40, onTrack: false, measured: true, requiredMonthly: null, eta: null },
         ]}
       />,
     )
@@ -348,8 +402,8 @@ describe('DoelenView — weergavemodus (TOE-2)', () => {
       mockGoal({ id: 'm1', name: 'Noodfonds' }),
     ],
     goalProgresses: [
-      { current: 54.5, target: 52, pct: 95, onTrack: true, eta: null },
-      { current: 20000, target: 50000, pct: 40, onTrack: false, eta: null },
+      { current: 54.5, target: 52, pct: 95, onTrack: true, measured: true, requiredMonthly: null, eta: null },
+      { current: 20000, target: 50000, pct: 40, onTrack: false, measured: true, requiredMonthly: null, eta: null },
     ],
   }
 

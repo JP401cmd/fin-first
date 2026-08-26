@@ -156,7 +156,7 @@ export function ToekomstWelcome({
       <div
         aria-hidden
         onClick={onDismiss}
-        className="absolute inset-0 cursor-default bg-[var(--ink)]/30 backdrop-blur-md"
+        className="absolute inset-0 cursor-default bg-[var(--scrim)] backdrop-blur-md"
       />
 
       {/* Welkomstkaart — editorial, met horizon-accent. */}

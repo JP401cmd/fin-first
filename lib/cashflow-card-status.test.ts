@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   budgetCardStatus,
   transactiesCardStatus,
+  isCurrentMonthIncomeIncomplete,
   vasteLastenCardStatus,
   forecastCardStatus,
 } from './cashflow-cards'
@@ -163,5 +164,109 @@ describe('forecastCardStatus — status by netPerMonth', () => {
 
   it('netPerMonth exactly 0 → warn', () => {
     expect(forecastCardStatus({ netPerMonth: 0, hasForecast: true })).toBe('warn')
+  })
+})
+
+// ── C6: de halve-maand-uitzondering op transactiesCardStatus ────────────────
+//
+// Bevinding C6 ("Vals alarm over een tekort", 26 aug 2026): wie op de 24e keek —
+// vaste lasten afgeschreven, salaris nog niet binnen — kreeg "Tekort deze maand"
+// (rood) terwijl de forecast-kaart ernaast een overschot voorspelde. De kaart
+// alarmeert daarom pas als het maandinkomen compleet genoeg is óf de prognose
+// zelf negatief is.
+
+describe('isCurrentMonthIncomeIncomplete — meet de gerealiseerde maand tegen het effective inkomen', () => {
+  it('salaris nog niet binnen (0 van 3000) → incompleet', () => {
+    expect(isCurrentMonthIncomeIncomplete({ currentMonthIncome: 0, expectedMonthlyIncome: 3000 })).toBe(true)
+  })
+
+  it('net onder de drempel (2399 van 3000 = 79,97 %) → incompleet', () => {
+    expect(isCurrentMonthIncomeIncomplete({ currentMonthIncome: 2399, expectedMonthlyIncome: 3000 })).toBe(true)
+  })
+
+  it('exact op de drempel (2400 van 3000 = 80 %) → compleet genoeg', () => {
+    expect(isCurrentMonthIncomeIncomplete({ currentMonthIncome: 2400, expectedMonthlyIncome: 3000 })).toBe(false)
+  })
+
+  it('geen bekend maandinkomen → niets om tegen te meten → compleet (geen aanname)', () => {
+    expect(isCurrentMonthIncomeIncomplete({ currentMonthIncome: 0, expectedMonthlyIncome: 0 })).toBe(false)
+  })
+})
+
+describe('transactiesCardStatus — C6: geen alarm op een halve maand met positieve prognose', () => {
+  /** De repro uit de bevinding: 24e van de maand, vaste lasten eruit, salaris nog niet binnen. */
+  const HALVE_MAAND = { currentMonthIncome: 0, currentMonthExpenses: 1800, expectedMonthlyIncome: 3000 }
+
+  it('zonder inkomen deze maand is er geen quote → neutral (ongewijzigd)', () => {
+    expect(transactiesCardStatus(HALVE_MAAND)).toBe('neutral')
+  })
+
+  it('deelsalaris binnen + prognose positief → neutral ("tot nu toe"), geen rood', () => {
+    expect(
+      transactiesCardStatus({
+        currentMonthIncome: 400,
+        currentMonthExpenses: 1800,
+        expectedMonthlyIncome: 3000,
+        forecastNetPerMonth: 1820,
+      }),
+    ).toBe('neutral')
+  })
+
+  it('deelsalaris binnen maar prognose NEGATIEF → bad (een echt structureel tekort blijft rood)', () => {
+    expect(
+      transactiesCardStatus({
+        currentMonthIncome: 400,
+        currentMonthExpenses: 1800,
+        expectedMonthlyIncome: 3000,
+        forecastNetPerMonth: -250,
+      }),
+    ).toBe('bad')
+  })
+
+  it('prognose exact 0 telt als niet-negatief → neutral', () => {
+    expect(
+      transactiesCardStatus({
+        currentMonthIncome: 400,
+        currentMonthExpenses: 1800,
+        expectedMonthlyIncome: 3000,
+        forecastNetPerMonth: 0,
+      }),
+    ).toBe('neutral')
+  })
+
+  it('salaris IS binnen (volle maand) en toch een tekort → bad, ook met positieve prognose', () => {
+    expect(
+      transactiesCardStatus({
+        currentMonthIncome: 3000,
+        currentMonthExpenses: 3400,
+        expectedMonthlyIncome: 3000,
+        forecastNetPerMonth: 500,
+      }),
+    ).toBe('bad')
+  })
+
+  it('géén prognose beschikbaar → het oude oordeel blijft gelden (bad)', () => {
+    expect(
+      transactiesCardStatus({
+        currentMonthIncome: 400,
+        currentMonthExpenses: 1800,
+        expectedMonthlyIncome: 3000,
+        forecastNetPerMonth: null,
+      }),
+    ).toBe('bad')
+  })
+
+  it('zonder de twee nieuwe velden is de uitkomst identiek aan vóór de fix', () => {
+    expect(transactiesCardStatus({ currentMonthIncome: 400, currentMonthExpenses: 1800 })).toBe('bad')
+  })
+
+  it('de uitzondering raakt ALLEEN de bad-tak: good/warn blijven ongewijzigd', () => {
+    const halveMaandContext = { expectedMonthlyIncome: 3000, forecastNetPerMonth: 1820 }
+    expect(
+      transactiesCardStatus({ currentMonthIncome: 1000, currentMonthExpenses: 700, ...halveMaandContext }),
+    ).toBe('good')
+    expect(
+      transactiesCardStatus({ currentMonthIncome: 1000, currentMonthExpenses: 950, ...halveMaandContext }),
+    ).toBe('warn')
   })
 })

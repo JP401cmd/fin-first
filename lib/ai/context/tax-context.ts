@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { section, formatCurrency, formatFreedomTime, formatPercentage } from './formatter'
-import { calculateFreedomTime } from '@/lib/format'
+import { calculateFreedomTime, carryFreedomUnits } from '@/lib/format'
 import { computeBox1Tax } from '@/lib/box1-tax'
 import { loadPerspectiveBox3 } from '@/lib/household-tax'
 import { computeJaarruimte, resolvePensionFactorA, jaarruimteBesparing } from '@/lib/jaarruimte'
@@ -25,9 +25,13 @@ function amountAsFreedomTime(amount: number, dailyExpenses: number): { years: nu
   if (dailyExpenses <= 0 || amount <= 0) return null
   const bd = calculateFreedomTime(amount, dailyExpenses)
   // Restdagen (< 1 maand) ronden we naar de dichtstbijzijnde maand zodat een
-  // klein bedrag niet als "0 maanden vrijheid" verdwijnt.
-  const months = bd.months + (bd.days >= 15 ? 1 : 0)
-  return { years: bd.years, months }
+  // klein bedrag niet als "0 maanden vrijheid" verdwijnt. Die afronding kan de
+  // maandteller ZELF op 12 zetten (11 maanden + ≥15 restdagen) — ook al levert
+  // calculateFreedomTime sinds H3/M37 nooit meer een 12. Daarom loopt ook deze
+  // optelling door dezelfde canonieke carry: anders noemt Fin "10 jaar en 12
+  // maanden" terwijl het scherm ernaast "11 jaar" toont.
+  const rolled = carryFreedomUnits(bd.years, bd.months + (bd.days >= 15 ? 1 : 0), 0)
+  return { years: rolled.years, months: rolled.months }
 }
 
 /** Formatteer een bedrag inclusief vrijheidstijd-equivalent (indien berekenbaar). */

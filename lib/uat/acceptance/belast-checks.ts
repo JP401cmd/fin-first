@@ -13,10 +13,13 @@
  * Twee bewuste inline-spiegelingen (analoog aan schuld-checks.ts):
  *  - de subpagina-bruto-afleiding = `grossFromNet(netto-jaar)` (spiegelt
  *    resolveBox1GrossIncome.estimateGross, box1-income.ts);
- *  - de eigenwoning-rente = round(hypotheeksaldo × rente%) (spiegelt
- *    estimateMortgageRente in box1/page.tsx);
  *  - de gecombineerde Vpb+Box2-druk = Vpb + (1−Vpb)×Box2 op de canonieke
  *    VPB_PARAMS/BOX2_PARAMS (spiegelt box2-gecombineerde-druk.tsx).
+ *
+ * De DERDE spiegeling — de eigenwoning-rente `round(saldo × rente%)` — is
+ * 26-08-2026 opgeheven (bevinding C8): die formule woont nu als
+ * `estimateMortgageRenteJaar` in `lib/box1-tax.ts` (pure module, dus gewoon
+ * importeerbaar) en wordt hier geconsumeerd i.p.v. nagebouwd.
  *
  * Alle gebruikte engine-functies zijn client-veilig (geen `server-only` /
  * `@/lib/supabase/*` / `next/headers` in hun import-graaf): `lib/box1-tax.ts`,
@@ -29,7 +32,7 @@
  */
 
 import { PERSONAS, type PersonaData } from '@/lib/test-personas'
-import { computeBox1Tax, grossFromNet } from '@/lib/box1-tax'
+import { computeBox1Tax, estimateMortgageRenteJaar, grossFromNet } from '@/lib/box1-tax'
 import { calculateBox2, VPB_PARAMS, BOX2_PARAMS, DGA_LENING_DREMPEL } from '@/lib/box2-data'
 import { dgaLeningTotalForUser } from '@/lib/box2-dga-lening'
 import {
@@ -39,7 +42,11 @@ import {
 } from '@/lib/box3-data'
 import type { Asset, AssetType } from '@/lib/asset-data'
 import { compareForfaitairVsWerkelijk } from '@/lib/box3-tegenbewijs'
-import { computeJaarruimte, jaarruimteBesparing } from '@/lib/jaarruimte'
+import {
+  computeJaarruimte,
+  jaarruimteBesparing,
+  estimateFactorAFromSalary,
+} from '@/lib/jaarruimte'
 import {
   generateBox3Strategies,
   rankStrategies,
@@ -109,13 +116,6 @@ function criterion(workflow: string): AcceptanceCriterion {
 
 function fx(n: number, decimals: number): string {
   return n.toFixed(decimals)
-}
-
-/** Geschatte aftrekbare hypotheekrente per jaar (spiegelt estimateMortgageRente
- *  in box1/page.tsx: round(saldo × rente%)). */
-function estimateMortgageRente(balance: number, ratePct: number): number {
-  if (balance <= 0 || ratePct <= 0) return 0
-  return Math.round(balance * (ratePct / 100))
 }
 
 /** Volledig getypeerd Asset met alleen de velden die de Box 3-motor leest;
@@ -191,7 +191,7 @@ const eigenHuisHypotheek = compleet.debts.find(
   (d) => d.debt_type === 'mortgage' && d.linked_asset_name === eigenHuis.name,
 )!
 const hypSaldo = Number(eigenHuisHypotheek.current_balance)
-const hypRente = estimateMortgageRente(hypSaldo, Number(eigenHuisHypotheek.interest_rate))
+const hypRente = estimateMortgageRenteJaar(hypSaldo, Number(eigenHuisHypotheek.interest_rate))
 
 // ── Variantensweep-fixture (Fase 3-optimizer, WF-BELAST-25) ────────────────
 
@@ -267,8 +267,8 @@ export const BELAST_ENGINE_CHECKS: BelastEngineCheck[] = [
       criterion('WF-BELAST-07')
       const r = computeBox1Tax({ grossYearlyIncome: tessaGross, year: 2026, wozValue: woz, hypotheekRente: hypRente })
       return {
-        expected: 'belastbaar=153248; tax=65790; effectief=41.0; marginaal=49.5; ahk=0; arbeidskorting=0; netto=94868',
-        actual: `belastbaar=${Math.round(r.belastbaarInkomen)}; tax=${Math.round(r.tax)}; effectief=${fx(r.effectiveRate * 100, 1)}; marginaal=${fx(r.marginalRate * 100, 1)}; ahk=${Math.round(r.algemeneHeffingskorting)}; arbeidskorting=${Math.round(r.arbeidskorting)}; netto=${Math.round(r.nettoBesteedbaar)}`,
+        expected: 'belastbaar=153248; tax=66675; effectief=41.5; marginaal=49.5; ahk=0; arbeidskorting=0; netto=93983; tariefsaanpassing=885',
+        actual: `belastbaar=${Math.round(r.belastbaarInkomen)}; tax=${Math.round(r.tax)}; effectief=${fx(r.effectiveRate * 100, 1)}; marginaal=${fx(r.marginalRate * 100, 1)}; ahk=${Math.round(r.algemeneHeffingskorting)}; arbeidskorting=${Math.round(r.arbeidskorting)}; netto=${Math.round(r.nettoBesteedbaar)}; tariefsaanpassing=${Math.round(r.tariefsaanpassing)}`,
       }
     },
   },
@@ -295,11 +295,11 @@ export const BELAST_ENGINE_CHECKS: BelastEngineCheck[] = [
       criterion('WF-BELAST-09')
       const base = { grossYearlyIncome: 100000, year: 2026 as const, wozValue: woz }
       const a = computeBox1Tax({ ...base, hypotheekRente: hypRente }) // rente 9300
-      const b = computeBox1Tax({ ...base, hypotheekRente: estimateMortgageRente(hypSaldo, 6) }) // 18000
+      const b = computeBox1Tax({ ...base, hypotheekRente: estimateMortgageRenteJaar(hypSaldo, 6) }) // 18000
       const c = computeBox1Tax({ ...base, hypotheekRente: 0 })
       return {
-        expected: 'forfait=1890; renteaftrek=9300; saldo=-7410; saldo6pct=-16110; hillenOntkoppeld=1357.02; saldoOntkoppeld=532.98',
-        actual: `forfait=${Math.round(a.eigenwoningforfait)}; renteaftrek=${Math.round(a.hypotheekrenteaftrek)}; saldo=${Math.round(a.eigenwoningSaldo)}; saldo6pct=${Math.round(b.eigenwoningSaldo)}; hillenOntkoppeld=${fx(c.hillenAftrek, 2)}; saldoOntkoppeld=${fx(c.eigenwoningSaldo, 2)}`,
+        expected: 'forfait=1890; renteaftrek=9300; saldo=-7410; saldo6pct=-16110; hillenOntkoppeld=1357.02; saldoOntkoppeld=532.98; effect=2783.20; effect6pct=6050.92; effectOntkoppeld=-263.83',
+        actual: `forfait=${Math.round(a.eigenwoningforfait)}; renteaftrek=${Math.round(a.hypotheekrenteaftrek)}; saldo=${Math.round(a.eigenwoningSaldo)}; saldo6pct=${Math.round(b.eigenwoningSaldo)}; hillenOntkoppeld=${fx(c.hillenAftrek, 2)}; saldoOntkoppeld=${fx(c.eigenwoningSaldo, 2)}; effect=${fx(a.eigenwoningBelastingEffect, 2)}; effect6pct=${fx(b.eigenwoningBelastingEffect, 2)}; effectOntkoppeld=${fx(c.eigenwoningBelastingEffect, 2)}`,
       }
     },
   },
@@ -315,9 +315,20 @@ export const BELAST_ENGINE_CHECKS: BelastEngineCheck[] = [
       // ook JaarruimteCard/belasting-hub/aandachtspunten-loader/AI-tax-context
       // gebruiken (single source, lib/jaarruimte.ts).
       const besparing = jaarruimteBesparing(tessaGross, jr.jaarruimte, 2026)
+      // H23: factor A is bij deze persona ONBEKEND (geen pension_factor_a), dus
+      // `jr.jaarruimte` is een BOVENgrens. De kaart toont er sinds 26-08-2026 een
+      // bereik bij; de ondergrens komt uit DEZELFDE motor met een geschatte
+      // factor A (estimateFactorAFromSalary, 1,875% middelloon-maximum) — geen
+      // tweede rekenpad, dus pinbaar in dezelfde oracle.
+      const ondergrens = computeJaarruimte(
+        tessaGross,
+        estimateFactorAFromSalary(tessaGross, { year: 2026 }),
+        2026,
+      ).jaarruimte
       return {
-        expected: 'jaarruimte=35588; franchise=19172; max=35589; besparing=18127',
-        actual: `jaarruimte=${jr.jaarruimte}; franchise=${jr.franchise}; max=${jr.max}; besparing=${besparing}`,
+        expected:
+          'jaarruimte=35588; franchise=19172; max=35589; besparing=18127; bereikOndergrens=18955',
+        actual: `jaarruimte=${jr.jaarruimte}; franchise=${jr.franchise}; max=${jr.max}; besparing=${besparing}; bereikOndergrens=${ondergrens}`,
       }
     },
   },
@@ -347,9 +358,29 @@ export const BELAST_ENGINE_CHECKS: BelastEngineCheck[] = [
         hasPartner: false,
         dailyExpenses: 0,
       })
+      // H26 — NULL ≠ 0. Een niet-ingevuld dividend geeft dezelfde cijfers als
+      // een expliciete nul, maar mag daar niet mee samenvallen: "je betaalt geen
+      // Box 2" is een andere mededeling dan "we hebben het nooit gevraagd".
+      const base = { year: 2026, hasPartner: false, dailyExpenses: 0 } as const
+      const nulOnbekend = calculateBox2({
+        ...base,
+        deelnemingen: [{ name: 'Leeg BV', annual_dividend: null, disposal_gain: 0 }],
+      })
+      const nulExpliciet = calculateBox2({
+        ...base,
+        deelnemingen: [{ name: 'Nul BV', annual_dividend: 0, disposal_gain: 0 }],
+      })
+      const gemengd = calculateBox2({
+        ...base,
+        deelnemingen: [
+          { name: 'Gevuld BV', annual_dividend: 50000, disposal_gain: 0 },
+          { name: 'Leeg BV', annual_dividend: null, disposal_gain: 0 },
+        ],
+      })
       return {
-        expected: 'totalIncome=100000; taxLaag=16866.54; taxHoog=9658.67; totaleHeffing=26525.21; effectief=26.53',
-        actual: `totalIncome=${r.totalIncome}; taxLaag=${fx(r.taxLow, 2)}; taxHoog=${fx(r.taxHigh, 2)}; totaleHeffing=${fx(r.totalTax, 2)}; effectief=${fx(r.effectiveRate * 100, 2)}`,
+        expected:
+          'totalIncome=100000; taxLaag=16866.54; taxHoog=9658.67; totaleHeffing=26525.21; effectief=26.53; nullOnbekend=true; nullHeffing=0; explicieteNulOnbekend=false; gemengdOnbekendCount=1',
+        actual: `totalIncome=${r.totalIncome}; taxLaag=${fx(r.taxLow, 2)}; taxHoog=${fx(r.taxHigh, 2)}; totaleHeffing=${fx(r.totalTax, 2)}; effectief=${fx(r.effectiveRate * 100, 2)}; nullOnbekend=${nulOnbekend.dividendOnbekend}; nullHeffing=${nulOnbekend.totalTaxInclDga}; explicieteNulOnbekend=${nulExpliciet.dividendOnbekend}; gemengdOnbekendCount=${gemengd.dividendOnbekendCount}`,
       }
     },
   },
@@ -517,6 +548,10 @@ export const BELAST_ENGINE_CHECKS: BelastEngineCheck[] = [
           goal: GOAL_BY_ID['jaarruimte-maximaal'],
           grossYearlyIncome: tessaGross,
           pensionFactorA: 0,
+          // De persona heeft geen pension_factor_a → factor A is ONBEKEND, niet
+          // "expliciet 0" (H23). Raakt de ranking niet (dezelfde `besparing`),
+          // maar de kaart toont er de bovengrens-markering bij.
+          pensionFactorAKnown: false,
           dailyExpenses: 100,
           hasData: true,
           besparing: jrBesparing,

@@ -31,13 +31,15 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Budget — acceptatiecriteria dekking', () => {
-  it('heeft precies één criterium per catalogus-BUDGET-scenario (01..26, geen gaten)', () => {
+  it('heeft precies één criterium per catalogus-BUDGET-scenario (01..27, geen gaten)', () => {
     const workflows = BUDGET_ACCEPTANCE.criteria.map((c) => c.workflow).sort()
     expect(workflows).toEqual(catalogBudgetWorkflows)
     expect(new Set(workflows).size).toBe(catalogBudgetWorkflows.length)
     // 25 → 26: WF-BUDGET-26 (de budgetgrondslag uit ADR 0103 — welke posten
     // meetellen, de expense-only-invariant en realisatie vóór plan; 'exact').
-    expect(workflows.length).toBe(26)
+    // 26 → 27: WF-BUDGET-27 (degraded rendering bij een mislukte her-fetch,
+    // bevinding C7, 26-08-2026; 'ui-only').
+    expect(workflows.length).toBe(27)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
 import { GebeurtenissenView, type EventPaneData, type KernelSimData } from './gebeurtenissen-view'
+import { computeEventImpact } from '@/lib/event-impact'
 import type { LifeEvent, FinancialInput } from '@/lib/horizon-data'
 import type { FireParams } from '@/lib/fire-params'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
@@ -208,13 +209,26 @@ describe('GebeurtenissenView — event-impact-badge (plan F-5)', () => {
 
   it('toont impact-badge per event wanneer annualSavings > 0', () => {
     renderView({ events: [flatEvent({ one_time_cost: 12000 })], annualSavings: 12000 })
-    // 12000 / 12000 = 1.0 jaar → "+1.0 jaar vrijheid"
-    expect(screen.getByText(/\+1\.0 jaar/)).toBeTruthy()
+    // 12000 / 12000 = 1.0 jaar kost → "→ 1.0 jaar later vrij"
+    expect(
+      screen.getByText(
+        computeEventImpact({ ...flatEvent({ one_time_cost: 12000 }) }, 12000).displayLabel,
+      ),
+    ).toBeTruthy()
+    expect(screen.getByText(/1\.0 jaar later vrij/)).toBeTruthy()
+  })
+
+  it('tekst de badge als richting, niet als saldo (bug C2)', () => {
+    // Een event dat geld oplevert mag geen "−" vóór "vrijheid" krijgen:
+    // het schuift de vrijheidsdatum naar voren.
+    renderView({ events: [flatEvent({ one_time_cost: -50000 })], annualSavings: 12000 })
+    expect(screen.getByText(/4\.2 jaar eerder vrij/)).toBeTruthy()
+    expect(screen.queryByText(/jaar vrijheid|mnd vrijheid/i)).toBeNull()
   })
 
   it('verbergt impact-badge wanneer annualSavings ontbreekt', () => {
     renderView({ events: [flatEvent({ one_time_cost: 12000 })] })
-    expect(screen.queryByText(/jaar vrijheid|mnd vrijheid/i)).toBeNull()
+    expect(screen.queryByText(/later vrij|eerder vrij/i)).toBeNull()
   })
 
   it('toont gain-tone (positief) bij erfenis (negatieve one_time_cost)', () => {

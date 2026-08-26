@@ -52,8 +52,12 @@ export const TAX_DEADLINES: DeadlineTemplate[] = [
   {
     id: 'box3-peildatum',
     label: 'Peildatum Box 3',
+    // H24 (Wft): "Plan grote aankopen of stortingen rondom deze datum" was een
+    // aansporing om geldhandelingen op de peildatum te timen — dezelfde
+    // grensovergang als in het peildatum-katern. Wat blijft: het feit dat die
+    // ene dag telt, en dat tijdelijk schuiven niet werkt.
     description:
-      'De waarde van je Box 3 vermogen op 1 januari bepaalt je belasting voor het hele jaar. Plan grote aankopen of stortingen rondom deze datum.',
+      'De waarde van je Box 3-vermogen op 1 januari bepaalt je belasting voor het hele jaar. Een verschuiving die binnen drie maanden wordt teruggedraaid, telt niet mee (antimisbruikregel).',
     box: 3,
     month: 1,
     day: 1,

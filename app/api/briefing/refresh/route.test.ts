@@ -17,6 +17,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const mockCheckTierGate = vi.fn()
 const mockAssertCloudAllowed = vi.fn()
+const mockAssertAiEnabled = vi.fn()
 const mockIsCloudAllowed = vi.fn()
 const mockLoadAndCompose = vi.fn()
 const mockReadSnapshot = vi.fn()
@@ -33,6 +34,7 @@ vi.mock('@/lib/require-tier', () => ({
 }))
 vi.mock('@/lib/ai/privacy-gate', () => ({
   assertCloudAllowed: (...args: unknown[]) => mockAssertCloudAllowed(...args),
+  assertAiEnabled: (...args: unknown[]) => mockAssertAiEnabled(...args),
   isCloudAllowed: (...args: unknown[]) => mockIsCloudAllowed(...args),
 }))
 vi.mock('@/lib/briefing/overview-briefing', async (importOriginal) => {
@@ -107,6 +109,8 @@ beforeEach(() => {
   mockCreateClient.mockResolvedValue(buildSupabase())
   mockCheckTierGate.mockResolvedValue(null)
   mockAssertCloudAllowed.mockResolvedValue(null)
+  // Kill-switch aan (AI mag draaien) — M26 gate't beide paden hierop.
+  mockAssertAiEnabled.mockResolvedValue(null)
   mockIsCloudAllowed.mockResolvedValue(false) // groep staat op lokaal
   mockReadSnapshot.mockResolvedValue(null)
   mockLoadDirectives.mockResolvedValue({ temporal: [], functional: [] })

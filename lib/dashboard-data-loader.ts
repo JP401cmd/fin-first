@@ -77,6 +77,8 @@ import { getUpcomingTransactions, type RecurringTransaction } from '@/lib/recurr
 import { getTaxDeadlines } from '@/lib/tax-calendar'
 import { recurringToUpcomingEvents, taxDeadlinesToUpcomingEvents } from '@/lib/upcoming-events'
 import { syncActiveGoalValues } from '@/lib/goal-current-value'
+import { isVrijheidsgetalGoal } from '@/lib/goals/vrijheidsgetal-goal'
+import { loadVrijheidsgetalSnapshot } from '@/lib/goals/vrijheidsgetal-source'
 import type { GoalType } from '@/lib/goal-data'
 import { type Debt } from '@/lib/debt-data'
 import {
@@ -2505,13 +2507,19 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     current_value: Number((g as { current_value: unknown }).current_value ?? 0),
     target_value: Number((g as { target_value: unknown }).target_value ?? 0),
   }))
-  const { goals: syncedWidgetGoals } = await syncActiveGoalValues(
+  // Derde live bron (bevinding C10): het vrijheidsgetal-doel volgt de canonieke
+  // FIRE-motor. `loadVrijheidsgetalSnapshot` deelt via React-`cache()` letterlijk
+  // dezelfde uitkomst met /toekomst/doelen, en leunt op de `computeHorizonFireSim`-
+  // run die deze loader hierboven al deed — geen tweede kernel-solve.
+  const { goals: syncedWidgetGoals, fireSnapshot, vrijheidsgetalSynced } = await syncActiveGoalValues(
     supabase,
     goalsForWidget,
     (assetsResult.data ?? []) as { id: string; current_value: number | string | null }[],
     (debtsResult.data ?? []) as { id: string; current_balance: number | string | null }[],
     currentUserId,
+    () => loadVrijheidsgetalSnapshot(supabase),
   )
+  const widgetFireEta = vrijheidsgetalSynced > 0 ? (fireSnapshot?.eta ?? null) : null
   const topGoals: TopGoal[] = syncedWidgetGoals.slice(0, 3).map(g => ({
     id: g.id,
     name: g.name,
@@ -2522,6 +2530,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     color: g.color ?? 'teal',
     icon: g.icon ?? 'Target',
     custom_unit: g.custom_unit ?? null,
+    eta: isVrijheidsgetalGoal(g) ? widgetFireEta : null,
   }))
 
   // ── Pensioen / AOW-widget bron (HIGH-1 correctness + optie B: aanvullend pensioen) ──

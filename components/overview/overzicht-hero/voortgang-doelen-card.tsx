@@ -15,16 +15,11 @@
  */
 
 import Link from 'next/link'
-import { Target, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Target, CheckCircle2, AlertCircle, CircleDashed } from 'lucide-react'
 import type { GoalWithBudget } from '@/lib/fin-data-loader'
+import type { GoalProgress } from '@/lib/goal-data'
 
-export type GoalProgress = {
-  current: number
-  target: number
-  pct: number
-  onTrack: boolean
-  eta: string | null
-}
+export type { GoalProgress }
 
 export function VoortgangDoelenCard({
   items,
@@ -58,12 +53,29 @@ export function VoortgangDoelenCard({
         {items.map(({ goal, progress }) => {
           if (!progress) return null
           const pct = Math.max(0, Math.min(100, progress.pct))
-          const status = progress.onTrack ? 'ontrack' : 'achter'
-          const StatusIcon = status === 'ontrack' ? CheckCircle2 : AlertCircle
+          // Bevinding M31: een vers doel zonder bijdrage heeft nog geen
+          // meetbaar tempo. Dezelfde grondslag als de statuspil op
+          // /toekomst/doelen ("Net begonnen") — hier als neutraal icoon, zodat
+          // deze kaart geen groen vinkje zet op iets dat niet gemeten is.
+          const status = !progress.measured
+            ? 'nieuw'
+            : progress.onTrack
+              ? 'ontrack'
+              : 'achter'
+          const StatusIcon =
+            status === 'nieuw' ? CircleDashed : status === 'ontrack' ? CheckCircle2 : AlertCircle
           const statusColor =
-            status === 'ontrack' ? 'text-emerald-700' : 'text-amber-700'
+            status === 'nieuw'
+              ? 'text-[var(--ink-3)]'
+              : status === 'ontrack'
+                ? 'text-emerald-700'
+                : 'text-amber-700'
           const barColor =
-            status === 'ontrack' ? 'bg-emerald-500' : 'bg-amber-500'
+            status === 'nieuw'
+              ? 'bg-[var(--ink-4)]'
+              : status === 'ontrack'
+                ? 'bg-emerald-500'
+                : 'bg-amber-500'
 
           return (
             <li key={goal.id} className="flex items-center gap-2.5">

@@ -47,4 +47,11 @@ node scripts/check-client-data-reads.mjs
 echo "→ Running vrijheidstijd-grondslag check (KRUIS-20)…"
 node scripts/check-freedom-time-basis.mjs
 
+# ShellOverlay-driewegregel (ADR 0039): flag een NIEUWE directe <BottomSheet>,
+# een handgerolde `fixed inset-0`-overlay, of een scrim met een rauwe kleur
+# i.p.v. var(--scrim). De regel stond al in CLAUDE.md maar had geen gate — met
+# als resultaat 64 directe consumers en zeven verschillende scrims.
+echo "→ Running ShellOverlay-driewegregel check (ADR 0039)…"
+node scripts/check-overlay-standard.mjs
+
 exit 0

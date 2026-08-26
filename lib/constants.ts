@@ -115,6 +115,40 @@ export const CENT_EPSILON = 0.005
  */
 export const EXPENSE_RATE_ROLLING_MONTHS = 12
 
+// ── Spaarquote-meetvenster ──────────────────────────────────────
+
+/**
+ * Aantal VOLTOOIDE kalendermaanden in het meetvenster van de canonieke
+ * spaarquote (`computeSavingsRate6m`, lib/savings-source.ts).
+ *
+ * "Voltooid" is hier het hele punt. Tot 26 aug 2026 liep het venster over zes
+ * kalendermaanden INCLUSIEF de lopende — terwijl het aantal datamaanden waarmee
+ * geëxtrapoleerd wordt (`savingsRateDataMonths`) alleen de VERSTREKEN maanden
+ * telt. Die scheefheid maakte de quote structureel te laag, en bij weinig
+ * historie dramatisch: wie vóór zijn salarisdatum keek, had de vaste lasten van
+ * de lopende maand al wél in de teller staan en zijn salaris nog niet — met een
+ * spaarquote van −265 % en een rode "je hebt deze maand een tekort"-melding tot
+ * gevolg, terwijl de eigen prognose een overschot voorspelde (bevinding C6).
+ *
+ * Het venster loopt dus van `SAVINGS_RATE_WINDOW_MONTHS` maanden terug tot en
+ * met de vorige maand; de lopende maand valt er per definitie buiten en wordt
+ * apart getoond als "tot nu toe" (`currentMonthWindowLabel`).
+ */
+export const SAVINGS_RATE_WINDOW_MONTHS = 6
+
+/**
+ * Welk aandeel van een normaal maandinkomen binnen moet zijn voordat de
+ * GEREALISEERDE lopende maand als "inkomen compleet" telt.
+ *
+ * Gebruikt door `transactiesCardStatus` (lib/cashflow-cards.ts): zolang er
+ * minder dan dit aandeel van het effectieve maandinkomen op de rekening staat,
+ * is een negatief maandsaldo geen tekort maar een halve maand — dan alarmeert de
+ * kaart niet, mits de eigen prognose voor een vólle maand niet negatief is.
+ * 80 % laat ruimte voor een salaris dat in delen binnenkomt of licht varieert,
+ * en slaat toch aan zodra de hoofdinkomstenpost ontbreekt.
+ */
+export const CURRENT_MONTH_INCOME_COMPLETE_RATIO = 0.8
+
 // ── Noodfonds (emergency fund) ──────────────────────────────────
 
 /**
@@ -341,3 +375,115 @@ export const VOLGENDE_STAP_SPAARQUOTE_MIN_PCT = 15
 
 /** Aandeel vaste lasten (% van inkomen) waarboven de motor "vaste lasten verlagen" voorstelt. */
 export const VOLGENDE_STAP_VASTE_LASTEN_MAX_PCT = 60
+
+// ── Werktijd (werkjaar-noemer) ──────────────────────────────────
+//
+// De WERKTIJD-metafoor ("hoeveel van je werkjaar gaat hier naartoe") is een
+// ANDERE grootheid dan de VRIJHEIDSTIJD-metafoor ("hoeveel dagen leven koopt dit
+// bedrag"). Vrijheidstijd deelt door het UITGAVEN-dagtarief
+// (EXPENSE_RATE_ROLLING_MONTHS hierboven → lib/expense-rate.ts); werktijd deelt
+// door het INKOMEN-dagtarief (lib/income-rate.ts). Meng ze nooit: twee
+// vrijheidstijd-getallen zijn niet optelbaar tot een werkjaar — dat was precies
+// de bug waarbij twee pagina's samen "18 van de 12 maanden" claimden (ADR 0105).
+
+/**
+ * Dagen per kalenderjaar — de noemer van élke jaarbedrag→dagtarief-conversie.
+ * Bewust 365, niet 12×30=360: dat scheelt ~1,4% en laat elke afgeleide tijd
+ * dezelfde fractie té lang ogen (zie `dailyExpenseRate` in lib/format.ts, dat
+ * dezelfde 365 hanteert).
+ */
+export const DAYS_PER_YEAR = 365
+
+/**
+ * Maanden in één werkjaar — de vaste noemer van elke "X van de 12 maanden"-claim.
+ * Omdat álle werktijd-claims op hetzelfde bruto jaarinkomen delen, zijn ze delen
+ * van DEZELFDE taart en kan hun som per constructie niet boven dit getal
+ * uitkomen zolang de bedragen samen het bruto jaarinkomen niet overschrijden.
+ */
+export const WORK_YEAR_MONTHS = 12
+
+/**
+ * DISPLAY-cap (maanden) op een getoonde werktijd-claim. Beschermt tegen een
+ * absurde weergave bij een degenereerde noemer (bv. een bijna nul bruto
+ * jaarinkomen naast reële vaste lasten): "4.812 van de 12 maanden" is geen
+ * signaal maar ruis. Dit is een WEERGAVE-grens op de canonieke uitkomst, geen
+ * grens op de meting — `WorkTimeBreakdown.shareOfWorkYear` en `.workDays`
+ * blijven ongeknipt, en `exceedsWorkYear` blijft het eerlijke alarm.
+ */
+export const WORK_TIME_DISPLAY_MAX_MONTHS = 99
+
+// ── Doelvoortgang: pace-toets ("haal je het tempo?") ─────────────
+//
+// Bevindingen M31 + M32. De oude on-track-toets voor doelen mat een LINEAIRE
+// TIJD-FRACTIE sinds `created_at` ("hoeveel % van de looptijd is verstreken?").
+// Het doelBEDRAG kwam daar niet in voor, dus een doel zwaarder maken (hoger
+// bedrag, eerdere deadline) kon de status ongewijzigd op "op koers" laten (M32),
+// terwijl een zojuist aangemaakt doel per constructie meteen "achter op
+// planning" was (M31: `now` ligt altijd nét ná `created_at`, dus de verwachte
+// fractie is altijd een piepklein positief getal en het afgeronde pct 0).
+// Vervangen door een PACE-toets: benodigde inleg per maand tot de streefdatum
+// versus de feitelijk gerealiseerde inleg per maand.
+
+/**
+ * Dagen per maand — de noemer die "dagen tot streefdatum" omzet naar MAANDEN in
+ * de doel-pace-toets. Bewust AFGELEID van `DAYS_PER_YEAR` en niet als los getal
+ * neergezet: de app hanteert één jaarlengte, en een tweede (bv. 30 of 30,44)
+ * zou dezelfde looptijd op twee schermen anders lang maken.
+ */
+export const GOAL_PACE_DAYS_PER_MONTH = DAYS_PER_YEAR / 12
+
+/**
+ * RELATIEVE marge op de benodigde maandinleg waarbinnen een doel nog "op koers"
+ * heet (10%). Bewust relatief en niet absoluut: de benodigde inleg schaalt mee
+ * met de omvang van het doel, dus een vaste marge in euro's zou een klein doel
+ * onbereikbaar streng en een groot doel betekenisloos ruim maken. Spiegelt de
+ * 10%-tolerantie van de oude tijd-fractie-toets, zodat de strengheid van het
+ * stoplicht niet stilzwijgend verschuift bij deze wissel van grondslag.
+ */
+export const GOAL_PACE_TOLERANCE = 0.1
+
+/**
+ * Genadeperiode (dagen) ná aanmaak waarin een doel ZONDER enige bijdrage nog
+ * geen oordeel krijgt (M31). Binnen dit venster is er letterlijk niets te meten:
+ * de app zou een gebruiker vertellen dat hij achterloopt op een plan dat hij
+ * seconden geleden maakte. Daarna is het uitblijven van bijdragen wél een
+ * signaal. Twee weken = kort genoeg om niet te maskeren, lang genoeg om één
+ * salaris-/spaarmoment af te wachten.
+ */
+export const GOAL_PACE_GRACE_DAYS = 14
+
+/**
+ * VLOER (maanden) op de gemeten periode sinds `created_at`. Zonder vloer deelt
+ * een verse inleg door een periode van bijna nul en levert een oneindig hoog
+ * "feitelijk tempo" op — waarmee élk doel triviaal op koers zou staan (precies
+ * de klasse fout die M32 blootlegde). Eén maand betekent: een bijdrage telt
+ * hooguit als het tempo van één maand, niet als het tempo van één dag.
+ */
+export const GOAL_PACE_MIN_MEASURE_MONTHS = 1
+
+// ── Box 2: schaal van de dividend-schijfsimulator ────────────────
+//
+// Bevinding H26. De bovengrens van de dividend-schuif stond als kale `1.3` in
+// components/overview/belasting/box2-dividend-simulator.tsx — een los financieel
+// ogend getal in een component, precies wat CLAUDE.md verbiedt. Het is bewust
+// GEEN fiscale constante (die horen in lib/box2-data.ts bij BOX2_PARAMS): er
+// bestaat geen wettelijke bovengrens aan een dividenduitkering.
+
+/**
+ * WEERGAVE-schaalfactor op de partner-schijfgrens die de bovengrens van de
+ * dividend-schuif bepaalt: `grensPartner × factor`, afgerond op duizendtallen
+ * (2026: €137.686 × 1,3 ≈ €179.000).
+ *
+ * WAARVOOR: de schuif moet de omslag van 24,5% naar 31% kúnnen tonen — óók voor
+ * iemand mét fiscaal partner, wiens lage schijf tot €137.686 loopt. Een factor
+ * ruim boven 1 zet die omslag zichtbaar links van het einde van de schaal.
+ *
+ * WAARVOOR NIET (eigenaarsbesluit 26-08-2026, optie B): dit is GEEN
+ * uitkeercapaciteit en géén functie van de waarde van de deelneming. Koppelen
+ * aan `current_value` (optie A) is bewust afgewezen — aandelenwaarde ≠ vrije
+ * reserves, en bij een klein belang zou de hoge schijf onbereikbaar worden
+ * waardoor de simulator zijn enige educatieve functie verliest. Het component
+ * zet er daarom een expliciet bijschrift bij; de schuif start daarnaast op het
+ * WERKELIJKE Box 2-inkomen, zodat de schaal geen impliciete aanbeveling meer is.
+ */
+export const BOX2_SIMULATOR_SCHAAL_FACTOR = 1.3

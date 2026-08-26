@@ -240,10 +240,14 @@ export function computeLeverScores(input: {
     taxDetail = 'Onder vrijstelling'
   } else if (hasPartner && input.box3TaxableAboveThreshold <= 100_000) {
     taxDetail = `${fmtShort(input.box3TaxableAboveThreshold)} boven vrijstelling`
-  } else if (!hasPartner && input.box3TaxableAboveThreshold > 0) {
-    taxDetail = `${fmtShort(input.box3TaxableAboveThreshold)} boven vrijstelling — bekijk tips`
   } else {
-    taxDetail = `${fmtShort(input.box3TaxableAboveThreshold)} boven vrijstelling — optimalisatie aanbevolen`
+    // H24 (Wft): de staart was "— optimalisatie aanbevolen". Deze detailtekst
+    // wordt via {figure} in de status-banner van /overzicht/belasting
+    // geïnterpoleerd, dus die aanbeveling landde letterlijk in de banner.
+    // Beschrijvend gehouden; de verwijzing naar tips is navigatie, geen advies.
+    // De twee resterende takken (geen partner; partner boven €100k) leverden
+    // hetzelfde inzicht op en zijn daarom samengevoegd.
+    taxDetail = `${fmtShort(input.box3TaxableAboveThreshold)} boven vrijstelling — bekijk tips`
   }
 
   // Schulden payoff voortgang: 0–100 (null als schuldenvrij of geen data)

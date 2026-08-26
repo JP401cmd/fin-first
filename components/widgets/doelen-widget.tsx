@@ -21,7 +21,12 @@ interface Props {
  * som. Cruciaal voor `direction:'down'`-types (bv. `fire_age`), waar hoger NIET
  * beter is; een naïeve `current/target` zou daar structureel op 100% klemmen en
  * afwijken van het doel-scherm (`/toekomst`). `TopGoal` draagt alle velden die
- * de canonieke functie leest.
+ * de canonieke functie voor `pct` leest.
+ *
+ * LET OP: `TopGoal` draagt géén `created_at`, dus de pace-toets (`onTrack`,
+ * bevindingen M31/M32) kan hier niet meten en valt terug op "geen oordeel".
+ * Deze widget toont dan ook alléén `pct` — wil je hier ooit een status tonen,
+ * neem `created_at` mee in `TopGoal` i.p.v. een eigen oordeel te bouwen.
  */
 function goalPct(goal: TopGoal): number {
   return computeGoalProgress({
@@ -33,11 +38,18 @@ function goalPct(goal: TopGoal): number {
 }
 
 function isOverdue(goal: TopGoal): boolean {
+  // Een live-gesynchroniseerd doel (canonieke `eta`) toont de GEPROJECTEERDE
+  // datum; "Verlopen" hoort bij een streefdatum, niet bij een projectie.
+  if (goal.eta) return false
   if (!goal.target_date) return false
   return new Date(goal.target_date) < new Date() && goalPct(goal) < 100
 }
 
 function etaLabel(goal: TopGoal): string | null {
+  // Canonieke projectie wint van de opgeslagen streefdatum (bevinding C10) —
+  // spiegelt `computeGoalProgress`'s `etaOverride` op het doelen-scherm, zodat
+  // widget en scherm dezelfde datum tonen.
+  if (goal.eta) return goal.eta
   if (!goal.target_date) return null
   return new Date(goal.target_date).toLocaleDateString('nl-NL', { month: 'short', year: 'numeric' })
 }

@@ -49,6 +49,11 @@ export interface AssetTypeGroup {
  * weging. `expectedReturn = weightedReturn / value` blijft een correcte
  * (inclusion-)waarde-gewogen ratio: de inclusion-factor zit in teller én
  * noemer en valt tegen elkaar weg, dus het rendement-% wordt niet vertekend.
+ *
+ * Eenheid: `expectedReturn` (en `weightedReturn`) is een 0..1-FRACTIE — de
+ * percent-schaal van `assets.expected_return` wordt hier genormaliseerd (`/100`),
+ * gelijk aan het horizon-kernel-pad. Consumenten vermenigvuldigen zelf met 100
+ * voor weergave.
  */
 export function computeAssetsByType(assets: readonly WeightableAssetRow[]): AssetTypeGroup[] {
   type Acc = Omit<AssetTypeGroup, 'expectedReturn'>
@@ -59,9 +64,17 @@ export function computeAssetsByType(assets: readonly WeightableAssetRow[]): Asse
     const weightedValue = Number(a.current_value) * incl
     acc[type].value += weightedValue
     acc[type].purchaseValue += Number(a.purchase_value ?? 0) * incl
+    // SCHAAL: `assets.expected_return` staat in de DB als HEEL PERCENTAGE (7 = 7%),
+    // terwijl `profiles.expected_return` een 0..1-fractie is. Het canonieke
+    // rekenpad normaliseert dat overal expliciet (horizon-kernel/adapter/potten.ts,
+    // toekomst-scenario.ts, toekomst-doel.ts: `/ 100`); deze helper doet dat nu
+    // óók, zodat `expectedReturn` op deze groep een fractie is — zoals het
+    // doc-comment op `weightedExpectedReturn` belooft en zoals de widgets (die er
+    // ×100 overheen doen voor weergave) aannemen. Vóór deze normalisatie liet het
+    // percent-schaal getal doorlekken naar de weergave → "665,5%".
     const assetReturn = resolveDepreciation(a as unknown as Asset)
       ? 0
-      : Number(a.expected_return ?? 0)
+      : Number(a.expected_return ?? 0) / 100
     acc[type].weightedReturn += weightedValue * assetReturn
     return acc
   }, {})

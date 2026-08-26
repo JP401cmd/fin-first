@@ -36,6 +36,19 @@ export interface Aandachtspunt {
   id: string
   domain: AandachtspuntDomain
   title: string
+  /**
+   * Vrije toelichting. Gelezen door `local-tips-context` (→ `toelichting` in de
+   * on-device tips-prompt) en `totaalplan-data#buildInzichten` (→ `detail` in
+   * het rapport). De loader-bus (`aandachtspunten-loader.ts`) vult 'm vandaag
+   * nooit, dus beide lezers krijgen in de praktijk `null`.
+   *
+   * H24 (Wft): `aandachtspuntToActionPayload` leest dit veld NIET — die stelt
+   * de actie-beschrijving zelf samen uit savings/freedomDays/deadline/href.
+   * De belasting-kaarten vulden het daarom met tekst die nergens landde, en
+   * die tekst bestond uit imperatieve productinstructies ("Stort €X in een
+   * lijfrente"). Die schrijfkant is verwijderd. Vul dit veld alleen met
+   * beschrijvende tekst: wat het geval is, niet wat de gebruiker moet doen.
+   */
   description?: string
   /** Geschatte besparing in EUR/jaar. 0 = onbekend (toch tonen). */
   savings: number

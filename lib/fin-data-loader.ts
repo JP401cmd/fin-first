@@ -12,13 +12,15 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getCachedUser } from '@/lib/supabase/cached-user'
 import type { Recommendation, Action } from '@/lib/recommendation-data'
-import { computeGoalProgress, type Goal } from '@/lib/goal-data'
+import { computeGoalProgress, type Goal, type GoalProgress } from '@/lib/goal-data'
 import { resolveEffectiveIncomeExpenses, type IncomeExpenseSources } from '@/lib/effective-financials'
 import { localMonthBounds } from '@/lib/month-range'
 import { getActiveAssets, getActiveDebts, getOwnProfile, getBudgets } from '@/lib/server-data/base'
 import { loadBudgetBasis } from '@/lib/household/budget-share'
 import type { BudgetBasisRow } from '@/lib/budget-basis'
 import { syncActiveGoalValues } from '@/lib/goal-current-value'
+import { isVrijheidsgetalGoal } from '@/lib/goals/vrijheidsgetal-goal'
+import { loadVrijheidsgetalSnapshot } from '@/lib/goals/vrijheidsgetal-source'
 // Doel-`current_value`-sync + cap-splitsing wonen nu in de gedeelde
 // `lib/goal-current-value.ts` (ÉNE bron voor scherm + dashboard-widget). Deze
 // re-export houdt de bestaande import-paden (o.a. lib/fin-data-loader.test.ts)
@@ -77,7 +79,7 @@ export interface FinKpiData {
   goals: GoalWithBudget[]
   completedGoalCount: number
   totalGoalCount: number
-  goalProgresses: { current: number; target: number; pct: number; onTrack: boolean; eta: string | null }[]
+  goalProgresses: GoalProgress[]
 }
 
 export interface FinPageData {
@@ -85,12 +87,19 @@ export interface FinPageData {
   actions: Action[]
   kpiData: FinKpiData
   goals: GoalWithBudget[]
-  goalProgresses: { current: number; target: number; pct: number; onTrack: boolean; eta: string | null }[]
+  goalProgresses: GoalProgress[]
   partnerInfo: { partnerId: string; partnerName: string } | null
   currentUserId: string | null
   userProfile: { full_name: string | null }
   completedGoalCount: number
   totalGoalCount: number
+  /**
+   * Draait het vrijheidsgetal-doel op de canonieke FIRE-motor (bevinding C10)?
+   * `false` wanneer er geen zo'n doel is óf de motor geen doelbedrag kon leveren
+   * — dan staan de opgeslagen waarden op de kaart en mag de UI géén
+   * "volgt automatisch"-belofte doen.
+   */
+  vrijheidsgetalLive: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -260,16 +269,25 @@ export async function loadFinData(
   // dashboard-Doelen-widget consumeert, zodat scherm en widget nooit uiteenlopen.
   // LAZY: parameter-queries draaien alleen als er parameter-doelen zijn.
   // `goalProgresses` blijft index-gekoppeld aan deze `goals`-volgorde.
-  const { goals } = await syncActiveGoalValues(
+  // Het vrijheidsgetal-doel is de derde live bron (bevinding C10): huidige
+  // waarde, doelbedrag én verwachte datum komen uit dezelfde canonieke FIRE-motor
+  // die /overzicht toont. Thunk = lazy: zonder zo'n doel geen kernel-run.
+  const { goals, fireSnapshot, vrijheidsgetalSynced } = await syncActiveGoalValues(
     supabase,
     allGoals,
     loadedAssets,
     loadedDebts,
     currentUserId,
+    () => loadVrijheidsgetalSnapshot(supabase),
   )
 
   // 7. Compute goal progresses
-  const goalProgresses = goals.map(g => computeGoalProgress(g))
+  // De geprojecteerde FIRE-datum vervangt de opgeslagen streefdatum als `eta`;
+  // alleen bij het vrijheidsgetal-doel, en alleen als de sync daadwerkelijk sloeg.
+  const fireEta = vrijheidsgetalSynced > 0 ? (fireSnapshot?.eta ?? null) : null
+  const goalProgresses = goals.map(g =>
+    computeGoalProgress(g, isVrijheidsgetalGoal(g) ? { etaOverride: fireEta } : undefined),
+  )
 
   // 8. Enrich actions with assigner display names
   let enrichedActions = enrichedActionsRaw
@@ -321,6 +339,7 @@ export async function loadFinData(
     userProfile,
     completedGoalCount,
     totalGoalCount,
+    vrijheidsgetalLive: vrijheidsgetalSynced > 0,
   }
 }
 

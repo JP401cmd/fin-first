@@ -77,3 +77,56 @@ describe('compareMortgageVsInvest — reactief op extraBedrag', () => {
     expect(Math.abs(large)).toBeGreaterThan(Math.abs(small))
   })
 })
+
+/**
+ * H25: het verlies aan hypotheekrenteaftrek bij extra aflossen werd tegen het
+ * volle marginale tarief gewaardeerd (49,50%), terwijl de rente sinds de
+ * tariefsaanpassing eigen woning (art. 2.10 lid 2 Wet IB 2001) maximaal tegen
+ * 37,56% aftrekbaar is. Dat OVERschatte het HRA-verlies en maakte aflossen
+ * structureel minder aantrekkelijk dan het is.
+ *
+ * Tolerantie: relatief (verhoudingen tussen scenario's), bewust niet absoluut —
+ * de bedragen hangen aan een volledig aflosschema over 10 jaar, dus een
+ * cent-tolerantie zou hier alleen het schema pinnen, niet de tariefkeuze.
+ */
+describe('compareMortgageVsInvest — HRA tegen het aftrektarief, niet het marginale', () => {
+  const topschijf = (extra: number): HvBParams => ({
+    ...BASE_PARAMS,
+    extraBedrag: extra,
+    marginaalTarief: 0.495,
+  })
+
+  it('topschijf-tarief wordt afgekapt: aflossen levert méér op dan bij 49,50% waardering', () => {
+    const netto = compareMortgageVsInvest(topschijf(500)).aflossing.nettoVoordeel
+    // Referentie: dezelfde run met een tarief dat al ónder het maximum ligt.
+    const onderMax = compareMortgageVsInvest({
+      ...BASE_PARAMS,
+      extraBedrag: 500,
+      marginaalTarief: 0.3756,
+    }).aflossing.nettoVoordeel
+    // Beide worden nu tegen 37,56% gewaardeerd → identiek.
+    expect(netto).toBeCloseTo(onderMax, 6)
+  })
+
+  it('een tarief ónder het maximum blijft ongemoeid (geen stille gedragswijziging)', () => {
+    // 36,97% < 37,56% → de min() mag hier niets doen; dit is het fixture-tarief
+    // van alle bestaande tests, die daarom byte-identiek groen blijven.
+    const a = compareMortgageVsInvest(withExtra(500)).aflossing.nettoVoordeel
+    const b = compareMortgageVsInvest({
+      ...BASE_PARAMS,
+      extraBedrag: 500,
+      marginaalTarief: 0.3697,
+    }).aflossing.nettoVoordeel
+    expect(a).toBe(b)
+  })
+
+  it('zonder aftrekbaarheid verandert er niets aan de aftopping', () => {
+    const zonderAftrek = compareMortgageVsInvest({
+      ...topschijf(500),
+      isTaxDeductible: false,
+    }).aflossing.nettoVoordeel
+    const metAftrek = compareMortgageVsInvest(topschijf(500)).aflossing.nettoVoordeel
+    // Geen aftrek → geen HRA-verlies → hoger netto voordeel van aflossen.
+    expect(zonderAftrek).toBeGreaterThan(metAftrek)
+  })
+})

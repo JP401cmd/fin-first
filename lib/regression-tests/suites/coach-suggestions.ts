@@ -112,12 +112,14 @@ const tests: TestCase[] = [
     estimatedDurationMs: 50,
     fn() {
       // Data-gap aanwezig → gap_bank (eerste in volgorde)
-      const gap = getFirstUndismissedSuggestion(emptyGaps(), '/core/budgets', NO_DISMISS, [])
+      const gap = getFirstUndismissedSuggestion(emptyGaps(), '/overzicht/cashflow/budget', NO_DISMISS, [])
       assertEqual(gap?.key, 'gap_bank', 'gap_bank (eerste data-gap) wint')
 
-      // Geen gaps → pad-suggestie
-      const path = getFirstUndismissedSuggestion(fullGaps(), '/core/budgets', NO_DISMISS, [])
-      assertEqual(path?.key, 'path_budgets', 'path_budgets bij volledige data op /core/budgets')
+      // Geen gaps → pad-suggestie. Sinds bevinding C7 bestaat er geen
+      // onvoorwaardelijke `path_budgets` meer; /overzicht/cashflow valt door
+      // naar de brede /overzicht-regel.
+      const path = getFirstUndismissedSuggestion(fullGaps(), '/overzicht/cashflow/budget', NO_DISMISS, [])
+      assertEqual(path?.key, 'path_core', 'path_core bij volledige data op /overzicht/cashflow/budget')
 
       // Geen gaps, onbekend pad → default
       const def = getFirstUndismissedSuggestion(fullGaps(), '/random-pagina', NO_DISMISS, [])
@@ -130,14 +132,35 @@ const tests: TestCase[] = [
     id: 'coach-path-specificity',
     name: 'Specifiek pad wint van breder pad',
     category: CAT,
-    description: '/core/budgets matcht path_budgets, niet path_core',
+    description: '/overzicht/schulden matcht path_debts, niet path_core',
     priority: 'high',
     estimatedDurationMs: 50,
     fn() {
-      const s = getFirstUndismissedSuggestion(fullGaps(), '/core/budgets/123', NO_DISMISS, [])
-      assertEqual(s?.key, 'path_budgets', 'Specifieke /core/budgets-regel wint van /core')
-      const core = getFirstUndismissedSuggestion(fullGaps(), '/core/assets', NO_DISMISS, [])
-      assertEqual(core?.key, 'path_core', '/core/assets valt terug op path_core')
+      const s = getFirstUndismissedSuggestion(fullGaps(), '/overzicht/schulden/123', NO_DISMISS, [])
+      assertEqual(s?.key, 'path_debts', 'Specifieke /overzicht/schulden-regel wint van /overzicht')
+      const core = getFirstUndismissedSuggestion(fullGaps(), '/overzicht/bezittingen', NO_DISMISS, [])
+      assertEqual(core?.key, 'path_core', '/overzicht/bezittingen valt terug op path_core')
+    },
+  },
+
+  // ── 4b. Budget-tip is voorwaardelijk (bevinding C7) ────────────────────
+  {
+    id: 'coach-budget-tip-conditional',
+    name: 'Budget-tip vuurt alleen zonder budgetten',
+    category: CAT,
+    description: 'Geen "voeg je eerste budget toe" meer voor wie al budgetten heeft',
+    priority: 'high',
+    estimatedDurationMs: 50,
+    fn() {
+      const onlyBudgetsMissing = { ...fullGaps(), hasBudgets: false }
+      const missing = getFirstUndismissedSuggestion(onlyBudgetsMissing, '/overzicht/cashflow/budget', NO_DISMISS, [])
+      assertEqual(missing?.key, 'gap_budgets', 'gap_budgets vuurt zonder budgetten')
+
+      const withBudgets = getFirstUndismissedSuggestion(fullGaps(), '/overzicht/cashflow/budget', NO_DISMISS, [])
+      assert(
+        withBudgets?.key !== 'gap_budgets' && withBudgets?.key !== 'path_budgets',
+        `geen budget-tip voor een gebruiker mét budgetten (kreeg: ${withBudgets?.key})`,
+      )
     },
   },
 

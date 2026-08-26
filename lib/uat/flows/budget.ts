@@ -46,6 +46,7 @@ export const BUDGET_FLOW: UatFlow = {
 
     // ── 1 · hub ───────────────────────────────────────────────────────────
     { id: 'hub', scenarioId: 'UAT-BUDGET-02', label: 'WF-BUDGET-02 · Budget-vs-realisatie van de maand', kind: 'screen', stage: 1 },
+    { id: 'degraded', scenarioId: 'UAT-BUDGET-27', label: 'WF-BUDGET-27 · Mislukte her-fetch verbergt de pagina niet meer', kind: 'action', stage: 1, subOf: 'hub' },
 
     // ── 2 · verkennen ─────────────────────────────────────────────────────
     { id: 'analysehub', scenarioId: 'UAT-BUDGET-05', label: 'WF-BUDGET-05 · Budgetanalyse-hub', kind: 'screen', stage: 2, lane: 'verkennen' },

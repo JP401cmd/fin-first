@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react'
 import { formatCurrency } from '@/lib/format'
+import { savingsRateFromAggregates } from '@/lib/savings-source'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import type { TransactionRow } from '@/components/app/transacties-feed'
 
@@ -53,7 +54,9 @@ export function TransactiesGeldstroom({
       }
     }
     const net = income - expenses
-    const savingsRate = income > 0 ? Math.round((net / income) * 100) : 0
+    // Consume, don't recompute: dezelfde canonieke deling als `summarizeFlow` en
+    // de 6-maands quote (lib/savings-source.ts) — geen vierde eigen formule.
+    const savingsRate = Math.round(savingsRateFromAggregates(income, expenses, 0))
     return {
       aggregates: { income, expenses, net, savingsRate },
       dailyFlow: { dailyIncome, dailyExpenses, daysInMonth },

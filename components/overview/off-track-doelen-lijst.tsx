@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Target, AlertCircle, ArrowRight } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import type { GoalWithBudget } from '@/lib/fin-data-loader'
+import type { GoalProgress as CanonicalGoalProgress } from '@/lib/goal-data'
 
 /**
  * OffTrackDoelenLijst — sub-component op /overzicht/tips dat doelen
@@ -14,14 +15,18 @@ import type { GoalWithBudget } from '@/lib/fin-data-loader'
  *
  * Filter-criterium: !onTrack && pct < 100. Behaalde doelen en doelen
  * op koers tonen we niet — alleen wat actie vraagt.
+ *
+ * Bevinding M31: een zojuist aangemaakt doel hoort hier NIET in de actielijst.
+ * Dat wordt bij de bron opgelost — `computeGoalProgress` houdt `onTrack` op
+ * `true` zolang er niets te meten valt — niet met een tweede guard hier.
+ * Vandaar dat deze lijst bewust een SUBSET van het canonieke contract vraagt
+ * (`measured`/`requiredMonthly` heeft hij niet nodig), afgeleid van dat contract
+ * i.p.v. de vorm lokaal over te tikken.
  */
-type GoalProgress = {
-  current: number
-  target: number
-  pct: number
-  onTrack: boolean
-  eta: string | null
-}
+type GoalProgress = Pick<
+  CanonicalGoalProgress,
+  'current' | 'target' | 'pct' | 'onTrack' | 'eta'
+>
 
 function statusBadge(pct: number, onTrack: boolean): {
   label: string

@@ -104,6 +104,24 @@ describe('JaarruimteCard — factor A via prop (geen lokale invoer meer)', () =>
     )
   })
 
+  it('toont géén bovengrens-badge op de partnerkaart, ook al is factor A onbekend', () => {
+    // De partner HEEFT geen eigen factor-A-bron, dus `factorAKnown={false}` is
+    // daar de waarheid — maar een "vul je factor A in"-oproep zou naar de
+    // verkeerde persoon wijzen. De partner-footer benoemt het al (H23).
+    render(
+      <JaarruimteCard
+        grossYearlyIncome={50_000}
+        pensioenAangroei={0}
+        factorAKnown={false}
+        factorAEditable={false}
+      />,
+    )
+    expect(screen.queryByText(/niet ingevuld/i)).toBeNull()
+    expect(screen.getByText(/zonder factor A \(werkgeverspensioen\)/i)).toBeTruthy()
+    // Geen bereik in de kop: de partnerkaart houdt één getal.
+    expect(screen.getAllByText(/€\s*9\.248/).length).toBeGreaterThan(0)
+  })
+
   it('toont géén eigen-pensioen-strategie-link op de partnerkaart (factorAEditable=false)', () => {
     // Partnerkaart in de huishoud-view: pensioenAangroei bewust 0, geen eigen
     // factor-A-bron → de footer mag NIET naar de eigen pensioen-strategie
@@ -113,5 +131,96 @@ describe('JaarruimteCard — factor A via prop (geen lokale invoer meer)', () =>
     )
     expect(screen.queryByRole('link', { name: /pensioen-strategie/i })).toBeNull()
     expect(screen.getByText(/zonder factor A/i)).toBeTruthy()
+  })
+})
+
+/**
+ * Bevinding H23 — "Jaarruimte rust op factor A = 0".
+ *
+ * `factorA = 0` heeft twee betekenissen: "expliciet geen werkgeverspensioen"
+ * (zzp, isKnown=true) en "niet ingevuld" (NULL, isKnown=false). De kaart kon ze
+ * niet onderscheiden en zei onvoorwaardelijk "berekend met je opgeslagen factor
+ * A" onder een bedrag dat de uitleg erboven een bovengrens noemt.
+ *
+ * IJKGETALLEN (bruto €50.000, 2026, franchise €19.172):
+ *  - bovengrens  = 30% × 30.828                             = €9.248
+ *  - geschatte factor A = 1,875% × 30.828                   = €578,03
+ *  - ondergrens  = 9.248,4 − 6,27 × 578,03                  = €5.624
+ * Beide grenzen komen uit `computeJaarruimte` — geen tweede rekenpad.
+ */
+describe('JaarruimteCard — onbekende factor A = bovengrens (H23)', () => {
+  it('toont de badge + het bereik wanneer factor A niet is ingevuld', () => {
+    const { container } = render(
+      <JaarruimteCard grossYearlyIncome={50_000} pensioenAangroei={0} factorAKnown={false} />,
+    )
+    expect(screen.getByText(/Factor A niet ingevuld — bovengrens/i)).toBeTruthy()
+    expect(container.textContent).toMatch(/€\s*5\.624\s*–\s*€\s*9\.248/)
+    // De ondergrens is de fiscale middelloon-maximum-aanname, benoemd in de tekst.
+    expect(container.textContent).toMatch(/1,875%/)
+  })
+
+  it('vervangt de tegenstrijdige footer bij onbekende factor A', () => {
+    render(<JaarruimteCard grossYearlyIncome={50_000} pensioenAangroei={0} factorAKnown={false} />)
+    // De letterlijke tegenspraak uit de bevinding mag NIET meer verschijnen.
+    expect(screen.queryByText(/opgeslagen factor A/i)).toBeNull()
+    expect(screen.getByText(/Berekend zónder factor A/i)).toBeTruthy()
+    // De bewerkplek blijft bereikbaar (eigen kaart).
+    expect(screen.getByRole('link', { name: /pensioen-strategie/i })).toBeTruthy()
+  })
+
+  it('houdt de bestaande, zekere formulering bij een EXPLICIETE 0 (zzp)', () => {
+    render(<JaarruimteCard grossYearlyIncome={50_000} pensioenAangroei={0} factorAKnown={true} />)
+    expect(screen.queryByText(/niet ingevuld/i)).toBeNull()
+    expect(screen.getByText(/opgeslagen factor A/i)).toBeTruthy()
+    // Eén getal, geen bereik.
+    expect(screen.queryByText(/€\s*5\.624\s*–/)).toBeNull()
+  })
+
+  it('gedraagt zich zonder de prop als "bekend" (achterwaartse compatibiliteit)', () => {
+    render(<JaarruimteCard grossYearlyIncome={50_000} pensioenAangroei={0} />)
+    expect(screen.queryByText(/Factor A niet ingevuld/i)).toBeNull()
+    expect(screen.getByText(/opgeslagen factor A/i)).toBeTruthy()
+  })
+
+  it('start de inleg-slider op de ONDERGRENS zolang factor A onbekend is', () => {
+    // Het scherpste getal van de module voedt een storting met deadline; de
+    // bovengrens als default-suggestie riskeert een niet-aftrekbare inleg.
+    render(<JaarruimteCard grossYearlyIncome={50_000} pensioenAangroei={0} factorAKnown={false} />)
+    const slider = screen.getByLabelText(/Lijfrente-inleg dit jaar/i) as HTMLInputElement
+    expect(slider.value).toBe('5624')
+    // De bovengrens blijft bereikbaar — hij is alleen niet meer de suggestie.
+    expect(slider.max).toBe('9248')
+  })
+
+  it('start op de VOLLE ruimte wanneer factor A wél bekend is', () => {
+    render(<JaarruimteCard grossYearlyIncome={50_000} pensioenAangroei={0} factorAKnown />)
+    const slider = screen.getByLabelText(/Lijfrente-inleg dit jaar/i) as HTMLInputElement
+    expect(slider.value).toBe('9248')
+  })
+
+  it('waarschuwt zodra de inleg bóven de ondergrens komt (en niet eronder)', () => {
+    render(<JaarruimteCard grossYearlyIncome={50_000} pensioenAangroei={0} factorAKnown={false} />)
+    const slider = screen.getByLabelText(/Lijfrente-inleg dit jaar/i)
+    // Default = ondergrens → geen waarschuwing.
+    expect(screen.queryByText(/niet-aftrekbare inleg/i)).toBeNull()
+    fireEvent.change(slider, { target: { value: '9000' } })
+    expect(screen.getByText(/niet-aftrekbare inleg/i)).toBeTruthy()
+    fireEvent.change(slider, { target: { value: '3000' } })
+    expect(screen.queryByText(/niet-aftrekbare inleg/i)).toBeNull()
+  })
+})
+
+describe('JaarruimteCard — ruimte 0 benoemt de JUISTE oorzaak', () => {
+  it('zegt "franchise" wanneer het inkomen onder de drempel ligt (factor A 0)', () => {
+    // Was: "Je werkgever vult je pensioenaangroei volledig" — aantoonbaar onwaar
+    // zonder factor A; de ruimte is 0 omdat 15.000 < franchise 19.172.
+    render(<JaarruimteCard grossYearlyIncome={15_000} pensioenAangroei={0} />)
+    expect(screen.getByText(/onder de franchise/i)).toBeTruthy()
+    expect(screen.queryByText(/werkgever vult je pensioenaangroei volledig/i)).toBeNull()
+  })
+
+  it('houdt de werkgevers-verklaring wanneer factor A de ruimte wél opeet', () => {
+    render(<JaarruimteCard grossYearlyIncome={50_000} pensioenAangroei={10_000} />)
+    expect(screen.getByText(/werkgever vult je pensioenaangroei volledig/i)).toBeTruthy()
   })
 })

@@ -653,7 +653,7 @@ describe('ChatPanel — meldt zich als overlay (pill verdwijnt)', () => {
     expect(panel!.className).toContain('z-[70]')
     expect(panel!.className).not.toContain('z-50')
 
-    const backdrop = divs.find((el) => el.className.includes('bg-black/20'))
+    const backdrop = divs.find((el) => el.className.includes('bg-[var(--scrim)]'))
     expect(backdrop).toBeDefined()
     expect(backdrop!.className).toContain('z-[70]')
   })

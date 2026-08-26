@@ -82,7 +82,7 @@ export function WelcomePopup({ onDismiss }: WelcomePopupProps) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-[var(--ink)]/40 p-4 backdrop-blur-sm motion-safe:animate-[welcome-fade-in_180ms_ease-out_both]"
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-[var(--scrim)] p-4 backdrop-blur-[var(--scrim-blur)] motion-safe:animate-[welcome-fade-in_180ms_ease-out_both]"
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}

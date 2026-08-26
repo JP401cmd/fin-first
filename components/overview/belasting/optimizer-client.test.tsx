@@ -143,6 +143,9 @@ function jaarruimteSection(besparing: number, freedomDays: number): GoalSection 
     goal: GOAL_BY_ID['jaarruimte-maximaal'],
     grossYearlyIncome: 60_000,
     pensionFactorA: 0,
+    // Expliciete 0 (zzp, geen werkgeverspensioen) → bekend; deze suite test de
+    // ranking/rendering, niet de bovengrens-markering (H23).
+    pensionFactorAKnown: true,
     dailyExpenses: DAILY_EXPENSES,
     hasData: true,
     besparing,

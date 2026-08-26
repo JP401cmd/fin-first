@@ -1,13 +1,14 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Plus, Trash2, Landmark } from 'lucide-react'
 import type { CheckDraft } from '@/lib/check/use-check-draft'
 import type { CheckIntakeAsset } from '@/lib/check/types'
 import { formatCurrency } from '@/lib/format'
 import { parseBedrag } from '@/lib/check/use-check-draft'
 import { useId } from 'react'
-import { primaryBtn, backBtn, inlineAddBtn, inputBase } from '../intake-styles'
+import { primaryBtn, backBtn, ghostBtn, inlineAddBtn, inputBase } from '../intake-styles'
+import { usePendingRows } from '../use-pending-rows'
 
 interface Props {
   intake: CheckDraft['intake']
@@ -39,9 +40,11 @@ const GROWTH_ASSET_TYPES = new Set(['investment', 'crypto', 'retirement', 'real_
 interface AssetRowFormProps {
   preset: AssetPreset
   onAdd: (asset: CheckIntakeAsset) => void
+  /** Meldt de openstaande, geldige invoer aan de stap zodat "Verder" hem meeneemt (C4). */
+  onPendingChange: (key: string, pending: CheckIntakeAsset | null) => void
 }
 
-function AssetRowForm({ preset, onAdd }: AssetRowFormProps) {
+function AssetRowForm({ preset, onAdd, onPendingChange }: AssetRowFormProps) {
   const [raw, setRaw] = useState('')
   const [rawLabel, setRawLabel] = useState('')
   const [rawReturn, setRawReturn] = useState('')
@@ -49,17 +52,35 @@ function AssetRowForm({ preset, onAdd }: AssetRowFormProps) {
   const id = useId()
   const isGrowth = GROWTH_ASSET_TYPES.has(preset.assetType)
 
-  function handleAdd() {
+  /** Zet de huidige invoer om naar een bezitting — `null` zolang er geen geldig bedrag staat. */
+  const buildAsset = useCallback((): CheckIntakeAsset | null => {
     const val = parseBedrag(raw)
-    if (val <= 0) return
+    if (val <= 0) return null
     const ret = isGrowth ? parseBedrag(rawReturn) : 0
-    onAdd({
+    return {
       assetType: preset.assetType,
       name: rawLabel.trim() || preset.label,
       value: val,
       extra: rawLabel.trim() || null,
       expectedReturnPct: isGrowth && ret > 0 ? ret : null,
-    })
+    }
+  }, [raw, rawLabel, rawReturn, isGrowth, preset.assetType, preset.label])
+
+  // Houd de stap op de hoogte van openstaande invoer (C4 — niets gaat meer verloren).
+  useEffect(() => {
+    onPendingChange(preset.assetType, open ? buildAsset() : null)
+  }, [open, buildAsset, onPendingChange, preset.assetType])
+
+  // Verdwijnt de rij zelf, dan verdwijnt ook zijn melding.
+  useEffect(
+    () => () => onPendingChange(preset.assetType, null),
+    [onPendingChange, preset.assetType],
+  )
+
+  function handleAdd() {
+    const asset = buildAsset()
+    if (!asset) return
+    onAdd(asset)
     setRaw('')
     setRawLabel('')
     setRawReturn('')
@@ -162,12 +183,23 @@ function AssetRowForm({ preset, onAdd }: AssetRowFormProps) {
 export function StepBezittingen({ intake, onChange, onNext, onBack }: Props) {
   const assets = intake.assets ?? []
   const total = assets.reduce((s, a) => s + a.value, 0)
+  const pending = usePendingRows<CheckIntakeAsset>()
 
   const handleAdd = useCallback(
     (asset: CheckIntakeAsset) => {
       onChange({ assets: [...assets, asset] })
     },
     [assets, onChange],
+  )
+
+  /** Commit eerst elke openstaande, ingevulde rij en navigeer dan pas (C4). */
+  const commitThen = useCallback(
+    (navigate: () => void) => {
+      const rows = pending.flush()
+      if (rows.length > 0) onChange({ assets: [...assets, ...rows] })
+      navigate()
+    },
+    [assets, onChange, pending.flush],
   )
 
   const handleRemove = useCallback(
@@ -228,15 +260,28 @@ export function StepBezittingen({ intake, onChange, onNext, onBack }: Props) {
       {/* Voeg-toe rijen — elk type mag meerdere keren (onderscheid via naam) */}
       <div className="space-y-2">
         {ASSET_PRESETS.map((preset) => (
-          <AssetRowForm key={preset.assetType} preset={preset} onAdd={handleAdd} />
+          <AssetRowForm
+            key={preset.assetType}
+            preset={preset}
+            onAdd={handleAdd}
+            onPendingChange={pending.report}
+          />
         ))}
       </div>
 
       <div className="flex flex-col gap-2 pt-2">
-        <button type="button" onClick={onNext} className={primaryBtn('kern')}>
-          {assets.length === 0 ? 'Overslaan (geen bezittingen)' : 'Verder'}
+        <p className="min-h-4 font-serif text-xs italic text-[var(--ink-3)]" aria-live="polite">
+          {pending.hasPending ? 'Je openstaande invoer nemen we mee als je verdergaat.' : ''}
+        </p>
+        <button type="button" onClick={() => commitThen(onNext)} className={primaryBtn('kern')}>
+          Verder
         </button>
-        <button type="button" onClick={onBack} className={backBtn}>
+        {assets.length === 0 && !pending.hasPending && (
+          <button type="button" onClick={onNext} className={ghostBtn}>
+            Overslaan (geen bezittingen)
+          </button>
+        )}
+        <button type="button" onClick={() => commitThen(onBack)} className={backBtn}>
           Terug
         </button>
       </div>

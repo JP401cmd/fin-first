@@ -340,3 +340,97 @@ describe('buildCashflowCards — Transacties-kaart: gedrag dat de fix NIET mag v
     expect(transactiesCardStatus({ currentMonthIncome: 0, currentMonthExpenses: 0 })).toBe('neutral')
   })
 })
+
+// ── C6 — de halve maand is geen tekort ─────────────────────────────────────
+// Bevinding C6 ("Vals alarm over een tekort", 26 aug 2026): op de 24e — vaste
+// lasten afgeschreven, salaris nog niet binnen — meldde de Transacties-kaart
+// "Tekort deze maand" (rood) terwijl de Forecast-kaart ernaast een overschot
+// voorspelde. Twee kaarten uit dezelfde `buildCashflowCards`-aanroep die elkaar
+// tegenspreken; deze suite pint vast dat ze dat niet meer doen.
+
+describe('buildCashflowCards — C6: geen tekort-alarm op een onvolledige maand', () => {
+  /** Prognose met een structureel overschot: +€1.000 netto per maand. */
+  const CASHFLOW_MET_OVERSCHOT: CashflowData = {
+    ...EMPTY_CASHFLOW,
+    baselineIncome: 3000,
+    baselineExpenses: 2000,
+  }
+  /** Prognose die zelf negatief is: −€500 netto per maand. */
+  const CASHFLOW_MET_TEKORT: CashflowData = {
+    ...EMPTY_CASHFLOW,
+    baselineIncome: 2000,
+    baselineExpenses: 2500,
+  }
+
+  /** 24 augustus 2026 — de dag uit de reproductiestappen, vóór de salarisdatum. */
+  const VOOR_SALARIS = new Date(2026, 7, 24)
+
+  /** Salaris nog niet binnen (€400 van €3.000), vaste lasten wél (−€1.800). */
+  const HALVE_MAAND: Partial<DashboardData> = {
+    monthlyIncome: 3000,
+    monthlyExpenses: 2000,
+    currentMonthIncome: 400,
+    currentMonthExpenses: 1800,
+  }
+
+  function txCard(cashflow: CashflowData, overrides: Partial<DashboardData>) {
+    const cards = buildCashflowCards(baseDashboard(overrides), cashflow, EMPTY_VASTE_LASTEN, VOOR_SALARIS)
+    const card = cards.find((c) => c.key === 'transacties')
+    if (!card) throw new Error('transacties-kaart ontbreekt')
+    return card
+  }
+
+  it('halve maand + positieve prognose: geen rood, en de kaart zegt WAT er ontbreekt', () => {
+    const card = txCard(CASHFLOW_MET_OVERSCHOT, HALVE_MAAND)
+    expect(card.status).toBe('neutral')
+    expect(card.subText).toBe('Inkomen nog niet compleet')
+    // Het cijfer zelf wordt NIET verzacht: het saldo blijft negatief en het
+    // venster blijft "tot nu toe" — alleen het OORDEEL wacht op een volle maand.
+    expect(card.kpi).toBe('€\u00A0-1.400')
+    expect(card.kpiWindow).toBe('in augustus tot nu toe')
+  })
+
+  it('de tip zet de eigen prognose ernaast (dát is de toets die de kaart doet)', () => {
+    const card = txCard(CASHFLOW_MET_OVERSCHOT, HALVE_MAAND)
+    expect(card.detail.tip).toContain('Deze maand loopt nog')
+    expect(card.detail.tip).toContain('+€\u00A01.000')
+  })
+
+  it('Transacties en Forecast spreken elkaar niet meer tegen', () => {
+    const cards = buildCashflowCards(
+      baseDashboard(HALVE_MAAND),
+      CASHFLOW_MET_OVERSCHOT,
+      EMPTY_VASTE_LASTEN,
+      VOOR_SALARIS,
+    )
+    const tx = cards.find((c) => c.key === 'transacties')!
+    const forecast = cards.find((c) => c.key === 'forecast')!
+    expect(forecast.status).toBe('good')
+    expect(tx.status).not.toBe('bad') // vóór C6 stond hier 'bad' náást een groene forecast
+  })
+
+  it('halve maand + NEGATIEVE prognose: wél rood — de melding blijft betekenisvol', () => {
+    const card = txCard(CASHFLOW_MET_TEKORT, HALVE_MAAND)
+    expect(card.status).toBe('bad')
+    expect(card.subText).toBe('Tekort deze maand')
+  })
+
+  it('salaris binnen én toch een tekort: rood, ook al is de prognose positief', () => {
+    const card = txCard(CASHFLOW_MET_OVERSCHOT, {
+      monthlyIncome: 3000,
+      monthlyExpenses: 2000,
+      currentMonthIncome: 3000,
+      currentMonthExpenses: 3400,
+    })
+    expect(card.status).toBe('bad')
+    expect(card.subText).toBe('Tekort deze maand')
+    // Volle maand ⇒ geen "loopt nog"-zin in de tip.
+    expect(card.detail.tip).not.toContain('Deze maand loopt nog')
+  })
+
+  it('zonder prognose (lege cashflow) blijft het oordeel wat het was: rood', () => {
+    const card = txCard(EMPTY_CASHFLOW, HALVE_MAAND)
+    expect(card.status).toBe('bad')
+    expect(card.subText).toBe('Tekort deze maand')
+  })
+})

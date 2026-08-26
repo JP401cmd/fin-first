@@ -11,7 +11,6 @@ import type { Budget, BudgetWithChildren } from '@/lib/budget-data'
 import { ASSET_CLIENT_COLUMNS, computeExpectedAnnualAppreciation, type Asset } from '@/lib/asset-data'
 import { type Debt, computeRenteAflossingsSplit, DEBT_TYPE_ICONS } from '@/lib/debt-data'
 import type { RetirementExpenseMethod } from '@/lib/budget-utils'
-import { localMonthStartMonthsAgo } from '@/lib/month-range'
 import type { FireParams } from '@/lib/fire-params'
 import {
   type SavingsRateMethod,
@@ -35,7 +34,7 @@ import {
 import { computeHorizonFireTarget, EMPTY_HORIZON_FIRE_TARGETS } from '@/lib/fire-target-shared'
 import { computeYearlyMustExpenses, computeRetirementExpenses } from '@/lib/budget-utils'
 import { resolveFireParams } from '@/lib/fire-params'
-import { DEFAULT_RETURN, INFLATION } from '@/lib/constants'
+import { DEFAULT_RETURN, INFLATION, SAVINGS_RATE_WINDOW_MONTHS } from '@/lib/constants'
 import { ALL_MODULES } from '@/lib/module-registry'
 import { parseFireStrategy, type FireStrategyConfig } from '@/lib/fire-strategy'
 import { ageAtDate } from '@/lib/horizon-data'
@@ -52,7 +51,12 @@ import {
   unlinkedCashTotal,
 } from '@/lib/unlinked-cash'
 import { resolveEffectiveIncomeExpenses, resolveAmountWithBasis } from './effective-financials'
-import { resolveSavingsSource, savingsRateFromAggregates } from './savings-source'
+import {
+  resolveSavingsSource,
+  savingsRateFromAggregates,
+  savingsRateWindow,
+  savingsRateDataMonths,
+} from './savings-source'
 import {
   type BasisSource,
   type BudgetBasisResult,
@@ -681,29 +685,32 @@ export const loadCoreData = cache(async function loadCoreData(
   }))
 
   // ── Last 6 months expenses & savings rate (rolling average) ──
-  // 6 kalendermaanden incl. de huidige = 5 maanden terug (getMonth()-6 telde 7 maanden — off-by-one)
-  const sixMonthsAgo = localMonthStartMonthsAgo(now, 5)
-  // `sixMonthsAgo` is per definitie een maandbegin ('YYYY-MM-01'), dus de vroegere
-  // rij-filter `t.date >= sixMonthsAgo` is exact gelijk aan de maand-ondergrens
-  // `month >= 'YYYY-MM'` op het aggregaat — geen randgeval, geen benadering.
-  const sinceMonth6m = sixMonthsAgo.slice(0, 7)
-  const last6MonthsIncome = aggSumPositief(txAgg12, { realOnly: true, sinceMonth: sinceMonth6m })
-  const last6MonthsExpenses = aggSumNegatiefAbs(txAgg12, { realOnly: true, sinceMonth: sinceMonth6m })
+  // Venster + datamaanden uit de gedeelde bron (lib/savings-source.ts): zes
+  // VOLTOOIDE kalendermaanden, de lopende maand EXCLUSIEF (bevinding C6). Beide
+  // grenzen zijn een maandbegin ('YYYY-MM-01'), dus de vroegere rij-filter
+  // `t.date >= sixMonthsAgo` is exact gelijk aan de maandsleutel-vergelijking op
+  // het aggregaat — geen randgeval, geen benadering.
+  const { sinceMonth: sinceMonth6m, beforeMonth: beforeMonth6m } = savingsRateWindow(now)
+  const last6MonthsIncome = aggSumPositief(txAgg12, {
+    realOnly: true,
+    sinceMonth: sinceMonth6m,
+    beforeMonth: beforeMonth6m,
+  })
+  const last6MonthsExpenses = aggSumNegatiefAbs(txAgg12, {
+    realOnly: true,
+    sinceMonth: sinceMonth6m,
+    beforeMonth: beforeMonth6m,
+  })
   // Use earliest income date (matching dashboard-data-loader) for month extrapolation
-  let savingsRateDataMonths = 6
-  if (earliestIncomeDate && (last6MonthsIncome > 0 || last6MonthsExpenses > 0)) {
-    const earliest = new Date(earliestIncomeDate)
-    savingsRateDataMonths = Math.max(1,
-      (now.getFullYear() - earliest.getFullYear()) * 12 +
-      (now.getMonth() - earliest.getMonth()),
-    )
-    savingsRateDataMonths = Math.min(savingsRateDataMonths, 6)
-  }
-  const extHalfYearIncome = savingsRateDataMonths < 6
-    ? (last6MonthsIncome / savingsRateDataMonths) * 6
+  const dataMonths6 =
+    last6MonthsIncome > 0 || last6MonthsExpenses > 0
+      ? savingsRateDataMonths(now, earliestIncomeDate)
+      : SAVINGS_RATE_WINDOW_MONTHS
+  const extHalfYearIncome = dataMonths6 < SAVINGS_RATE_WINDOW_MONTHS
+    ? (last6MonthsIncome / dataMonths6) * SAVINGS_RATE_WINDOW_MONTHS
     : last6MonthsIncome
-  const extHalfYearExpenses = savingsRateDataMonths < 6
-    ? (last6MonthsExpenses / savingsRateDataMonths) * 6
+  const extHalfYearExpenses = dataMonths6 < SAVINGS_RATE_WINDOW_MONTHS
+    ? (last6MonthsExpenses / dataMonths6) * SAVINGS_RATE_WINDOW_MONTHS
     : last6MonthsExpenses
   const halfYearSavings = extHalfYearIncome - extHalfYearExpenses
 
@@ -933,8 +940,13 @@ export const loadCoreData = cache(async function loadCoreData(
   }
 
   // ── Batch 2: Budget alerts + debt progress + asset valuations + goals + 6m spending ──
-  // 6 kalendermaanden incl. de huidige = 5 maanden terug (getMonth()-6 telde 7 maanden — off-by-one)
-  const sixMonthsAgoForBudgets = localMonthStartMonthsAgo(now, 5)
+  // Zelfde venster als de spaarquote (`savingsRateWindow`): zes VOLTOOIDE
+  // kalendermaanden, de lopende maand exclusief. MOET gelijk lopen met
+  // `extHalfYearIncome/Expenses` hierboven — de spaarbudget-correctie
+  // (`sbTotal6m`) wordt van diezelfde uitgavensom afgetrokken, dus een breder
+  // venster hier zou de quote kunstmatig verhogen. De kassabon-breakdown
+  // (`savingsBreakdown`) leest hetzelfde venster en toont dus ook zes volle maanden.
+  const { fromDate: sixMonthsAgoForBudgets, toDate: budgetWindowEnd } = savingsRateWindow(now)
   const prevMonthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 1, 1)).toISOString().split('T')[0]
   const [
     budgetResult, spendingResult, snapshotResult,
@@ -970,7 +982,7 @@ export const loadCoreData = cache(async function loadCoreData(
     // tx-rijke gebruiker kapt dit 6-maands venster dus stil af; de structurele route
     // is het maandaggregaat (ADR 0050 — kan per definitie niet afkappen, en draait
     // hierboven al als `txAgg12` op een ruimer venster) of keyset-paginatie.
-    supabase.from('transactions').select('budget_id, amount').gte('date', sixMonthsAgoForBudgets).lt('date', monthEnd).limit(1000),
+    supabase.from('transactions').select('budget_id, amount').gte('date', sixMonthsAgoForBudgets).lt('date', budgetWindowEnd).limit(1000),
     // Holdings from tracked assets for portfolio card. Na de tabel-split
     // (migratie 20260502000003) zit deze data alleen in `investment_holdings`
     // — crypto-holdings hebben (nog) geen `daily_change_percent` en worden
@@ -1118,8 +1130,8 @@ export const loadCoreData = cache(async function loadCoreData(
       }
 
       // Compute corrected savings rate (savings budgets + debt aflossing count as saving, not expense)
-      const extSb6m = savingsRateDataMonths < 6
-        ? (sbTotal6m / savingsRateDataMonths) * 6
+      const extSb6m = dataMonths6 < SAVINGS_RATE_WINDOW_MONTHS
+        ? (sbTotal6m / dataMonths6) * SAVINGS_RATE_WINDOW_MONTHS
         : sbTotal6m
       const extAfl6m = debtAflossingTotal6m
       // Gedeelde formule (income − expenses + aflossing); spaarbudgetten tellen als
@@ -1450,7 +1462,7 @@ export const loadCoreData = cache(async function loadCoreData(
     // hierboven de gezondheidsscore voedt, nu ook op de bundel zodat de
     // cashflow-kaart hem kan tonen i.p.v. de rauwe transactiemeting.
     effectiveSavingsRatePct: coreEffectiveSavingsRate,
-    savingsRateMonths: savingsRateDataMonths,
+    savingsRateMonths: dataMonths6,
     savingsRateMethod,
     savingsReceiptData: {
       extHalfYearIncome,

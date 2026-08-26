@@ -37,7 +37,14 @@ export interface AandachtspuntActieButtonProps {
   id?: string
   domain?: AandachtspuntDomain
   title?: string
-  description?: string
+  // GEEN `description` (H24). Deze knop doet precies één ding met het
+  // Aandachtspunt dat hij bouwt: het via `aandachtspuntToActionPayload` naar
+  // POST /api/ai/actions sturen. Die functie leest `description` niet — ze
+  // stelt de beschrijving zelf samen uit savings/freedomDays/deadline/href.
+  // De teksten die de belasting-kaarten hier meegaven landden dus nergens,
+  // terwijl het stuk voor stuk imperatieve productinstructies waren ("Stort €X
+  // in een lijfrente"). Doorkoppelen zou de Wft-grens juist overschrijden;
+  // daarom is de prop weg in plaats van aangesloten.
   /** Geschatte jaarbesparing in EUR. */
   savings?: number
   freedomDays?: number
@@ -65,7 +72,6 @@ function resolveAandachtspunt(props: AandachtspuntActieButtonProps): Aandachtspu
     id,
     domain,
     title,
-    description: props.description,
     savings: savings ?? 0,
     freedomDays: freedomDays ?? 0,
     euroImpactMonthly: props.euroImpactMonthly,

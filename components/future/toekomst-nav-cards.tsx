@@ -40,20 +40,24 @@ import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import { STRATEGY_LABELS } from '@/lib/fire-strategy'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import type { FireParams } from '@/lib/fire-params'
+import type { GoalProgress as CanonicalGoalProgress } from '@/lib/goal-data'
 
 // ── Types ────────────────────────────────────────────────────────────
 
 /**
  * Voortgang per doel — parallel array met `goals` (zelfde index), exact zoals
  * `loadFinData` (`FinPageData.goalProgresses`) hem teruggeeft.
+ *
+ * Bewust een SUBSET van het canonieke `computeGoalProgress`-contract, afgeleid
+ * i.p.v. lokaal overgetikt: de kaart telt alleen aandacht-vragende doelen en
+ * leunt daarvoor op `onTrack`. Een vers doel (bevinding M31) is bij de bron al
+ * `onTrack: true` zolang er niets te meten valt, dus hier is geen tweede guard
+ * nodig — en dus ook `measured` niet.
  */
-export type GoalProgress = {
-  current: number
-  target: number
-  pct: number
-  onTrack: boolean
-  eta: string | null
-}
+export type GoalProgress = Pick<
+  CanonicalGoalProgress,
+  'current' | 'target' | 'pct' | 'onTrack' | 'eta'
+>
 
 /**
  * Drilldown-detail per kaart — getoond in het uitklap-paneel (chevron).

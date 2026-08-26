@@ -21,6 +21,7 @@ import {
   type Goal,
   type GoalType,
 } from './goal-data'
+import { GOAL_PACE_DAYS_PER_MONTH, GOAL_PACE_GRACE_DAYS } from './constants'
 
 /** Minimale, volledig getypeerde Goal-fixture — alleen de velden die
  *  computeGoalProgress leest hoeven per test te worden overschreven. */
@@ -41,7 +42,7 @@ function makeGoal(overrides: Partial<Goal>): Goal {
 describe('computeGoalProgress — bestaande up-types (regressie)', () => {
   it('savings: 3000/5000 = 60%, zonder datum onTrack=true, eta=null', () => {
     const p = computeGoalProgress(makeGoal({ goal_type: 'savings', current_value: 3000, target_value: 5000 }))
-    expect(p).toEqual({ current: 3000, target: 5000, pct: 60, onTrack: true, eta: null })
+    expect(p).toEqual({ current: 3000, target: 5000, pct: 60, onTrack: true, measured: true, requiredMonthly: null, eta: null })
   })
 
   it('savings: current > target → pct geclampt op 100', () => {
@@ -51,7 +52,7 @@ describe('computeGoalProgress — bestaande up-types (regressie)', () => {
 
   it('target <= 0 → pct 0, onTrack false, eta null', () => {
     const p = computeGoalProgress(makeGoal({ current_value: 100, target_value: 0 }))
-    expect(p).toEqual({ current: 100, target: 0, pct: 0, onTrack: false, eta: null })
+    expect(p).toEqual({ current: 100, target: 0, pct: 0, onTrack: false, measured: false, requiredMonthly: null, eta: null })
   })
 
   it('debt_payoff: 4000 afgelost van 10000 = 40%', () => {
@@ -67,7 +68,10 @@ describe('computeGoalProgress — bestaande up-types (regressie)', () => {
   })
 
   it('met target_date: ruim vóór op schema → onTrack true + eta gezet', () => {
-    // created_at 100 dagen terug, target_date 100 dagen vooruit → expectedPct ~50%.
+    // Regressie-anker uit de tijd-fractie-heuristiek; blijft geldig onder de
+    // pace-toets. created_at 100 dagen terug (≈3,29 mnd gemeten), target_date
+    // 100 dagen vooruit (≈3,29 mnd te gaan): benodigd €2.000/3,29 ≈ €609/mnd,
+    // feitelijk €3.000/3,29 ≈ €913/mnd → ruim boven de 10%-marge.
     const now = Date.now()
     const created = new Date(now - 100 * 86400_000).toISOString()
     const target = new Date(now + 100 * 86400_000).toISOString()
@@ -76,11 +80,12 @@ describe('computeGoalProgress — bestaande up-types (regressie)', () => {
       created_at: created, target_date: target,
     }))
     expect(p.pct).toBe(60)
-    expect(p.onTrack).toBe(true) // 60 >= 50*0.9 = 45
+    expect(p.onTrack).toBe(true)
     expect(p.eta).not.toBeNull()
   })
 
   it('met target_date: achter op schema → onTrack false', () => {
+    // Benodigd €4.500/3,29 ≈ €1.370/mnd, feitelijk €500/3,29 ≈ €152/mnd.
     const now = Date.now()
     const created = new Date(now - 100 * 86400_000).toISOString()
     const target = new Date(now + 100 * 86400_000).toISOString()
@@ -89,8 +94,166 @@ describe('computeGoalProgress — bestaande up-types (regressie)', () => {
       created_at: created, target_date: target,
     }))
     expect(p.pct).toBe(10)
-    expect(p.onTrack).toBe(false) // 10 < 45
+    expect(p.onTrack).toBe(false)
     expect(p.eta).not.toBeNull()
+  })
+})
+
+// ── 1b. Pace-toets: bevindingen M31 + M32 ─────────────────────────────────
+//
+// De on-track-toets voor 'up'-doelen met streefdatum mat een lineaire
+// TIJD-FRACTIE sinds `created_at`; `target_value` kwam er niet in voor. Gevolg:
+//  · M32 — een doel zwaarder maken (hoger bedrag, eerdere deadline) liet de
+//    status ongewijzigd op "op koers" staan;
+//  · M31 — een zojuist aangemaakt doel stond per constructie meteen "achter op
+//    planning", omdat `now` altijd nét ná `created_at` ligt.
+// Vervangen door: benodigde inleg/maand tot de streefdatum vs. feitelijke
+// inleg/maand sinds aanmaak (eigenaarsbesluit 26-08-2026, optie A).
+
+const DAY_MS = 86400_000
+
+describe('computeGoalProgress — pace-toets (M32: doelbedrag telt mee)', () => {
+  it('M32-repro: doel verzwaren + deadline vervroegen maakt de status SLECHTER, niet gelijk', () => {
+    const now = Date.now()
+    // Doel bestaat net; er staat al €1.500 op (dus meetbaar — zie M31-blok).
+    const created = new Date(now - 2 * DAY_MS).toISOString()
+
+    const voor = computeGoalProgress(makeGoal({
+      current_value: 1500, target_value: 5000, // 30%
+      created_at: created,
+      target_date: new Date(now + 340 * DAY_MS).toISOString(), // ± jul 2027
+    }))
+    const na = computeGoalProgress(makeGoal({
+      current_value: 1500, target_value: 9000, // 17%
+      created_at: created, // een PATCH raakt created_at niet
+      target_date: new Date(now + 129 * DAY_MS).toISOString(), // ± dec 2026
+    }))
+
+    expect(voor.pct).toBe(30)
+    expect(voor.onTrack).toBe(true)
+    expect(na.pct).toBe(17)
+    expect(na.onTrack).toBe(false) // de kern van M32: het oordeel verslechtert
+    // En de lat is zichtbaar omhoog gegaan.
+    expect(na.requiredMonthly).toBeGreaterThan(voor.requiredMonthly as number)
+  })
+
+  it('target_value beïnvloedt de uitkomst bij IDENTIEKE created_at/target_date', () => {
+    // Precies wat de oude tijd-fractie-heuristiek structureel niet kon: twee
+    // doelen met dezelfde looptijd en dezelfde inleg, maar een ander doelbedrag.
+    const now = Date.now()
+    const created = new Date(now - 60 * DAY_MS).toISOString()
+    const target_date = new Date(now + 60 * DAY_MS).toISOString()
+
+    const haalbaar = computeGoalProgress(makeGoal({
+      current_value: 2000, target_value: 4000, created_at: created, target_date,
+    }))
+    const onhaalbaar = computeGoalProgress(makeGoal({
+      current_value: 2000, target_value: 1_000_000, created_at: created, target_date,
+    }))
+
+    expect(haalbaar.onTrack).toBe(true)
+    expect(onhaalbaar.onTrack).toBe(false)
+  })
+
+  it('requiredMonthly = resterend bedrag gedeeld door de maanden tot de streefdatum', () => {
+    const now = Date.now()
+    const p = computeGoalProgress(makeGoal({
+      current_value: 1000, target_value: 5000,
+      created_at: new Date(now - 30 * DAY_MS).toISOString(),
+      target_date: new Date(now + 120 * DAY_MS).toISOString(),
+    }))
+    const maandenTeGaan = 120 / GOAL_PACE_DAYS_PER_MONTH
+    expect(p.requiredMonthly).toBeCloseTo(4000 / maandenTeGaan, 2)
+  })
+
+  it('vloer op de meetperiode: een verse inleg deelt niet door bijna-nul tijd', () => {
+    // Zonder GOAL_PACE_MIN_MEASURE_MONTHS zou €10 die één minuut geleden
+    // binnenkwam een tempo van duizenden euro's per maand suggereren en élk
+    // doel triviaal "op koers" maken.
+    const now = Date.now()
+    const p = computeGoalProgress(makeGoal({
+      current_value: 10, target_value: 50_000,
+      created_at: new Date(now - 60_000).toISOString(),
+      target_date: new Date(now + 365 * DAY_MS).toISOString(),
+    }))
+    expect(p.measured).toBe(true) // current > 0 → er is iets te meten
+    expect(p.onTrack).toBe(false)
+  })
+
+  it('verstreken streefdatum met een onbereikt doel is niet "op koers"', () => {
+    const now = Date.now()
+    const p = computeGoalProgress(makeGoal({
+      current_value: 2000, target_value: 5000,
+      created_at: new Date(now - 400 * DAY_MS).toISOString(),
+      target_date: new Date(now - 10 * DAY_MS).toISOString(),
+    }))
+    expect(p.onTrack).toBe(false)
+    expect(p.requiredMonthly).toBeNull() // geen maand meer om iets in te halen
+  })
+
+  it('verstreken streefdatum met een BEHAALD doel blijft op koers', () => {
+    const now = Date.now()
+    const p = computeGoalProgress(makeGoal({
+      current_value: 5000, target_value: 5000,
+      created_at: new Date(now - 400 * DAY_MS).toISOString(),
+      target_date: new Date(now - 10 * DAY_MS).toISOString(),
+    }))
+    expect(p.pct).toBe(100)
+    expect(p.onTrack).toBe(true)
+  })
+
+  it('zonder created_at (lichte projectie zoals TopGoal): geen pace-oordeel, wél requiredMonthly', () => {
+    const now = Date.now()
+    const p = computeGoalProgress({
+      goal_type: 'savings', current_value: 100, target_value: 5000,
+      target_date: new Date(now + 90 * DAY_MS).toISOString(),
+    })
+    expect(p.onTrack).toBe(true) // geen meetperiode → geen vals alarm
+    expect(p.measured).toBe(true)
+    expect(p.requiredMonthly).not.toBeNull()
+  })
+})
+
+describe('computeGoalProgress — genadeperiode voor een vers doel (M31)', () => {
+  it('M31-repro: zojuist aangemaakt doel op €0 is NIET "achter op planning"', () => {
+    const now = Date.now()
+    const p = computeGoalProgress(makeGoal({
+      current_value: 0, target_value: 5000,
+      created_at: new Date(now - 5_000).toISOString(), // 5 seconden geleden
+      target_date: new Date(now + 330 * DAY_MS).toISOString(), // elf maanden
+    }))
+    expect(p.pct).toBe(0)
+    expect(p.measured).toBe(false) // niets te meten → scherm toont "Net begonnen"
+    expect(p.onTrack).toBe(true) // geen vals alarm op ENIG oppervlak
+    expect(p.requiredMonthly).not.toBeNull() // de lat is wél al bekend
+  })
+
+  it('binnen de genadeperiode maar mét bijdrage: wél meten (M32 hoeft niet te wachten)', () => {
+    const now = Date.now()
+    const p = computeGoalProgress(makeGoal({
+      current_value: 1500, target_value: 9000,
+      created_at: new Date(now - 1 * DAY_MS).toISOString(),
+      target_date: new Date(now + 129 * DAY_MS).toISOString(),
+    }))
+    expect(p.measured).toBe(true)
+  })
+
+  it('ná de genadeperiode is uitblijvende inleg wél een signaal', () => {
+    const now = Date.now()
+    const p = computeGoalProgress(makeGoal({
+      current_value: 0, target_value: 5000,
+      created_at: new Date(now - (GOAL_PACE_GRACE_DAYS + 1) * DAY_MS).toISOString(),
+      target_date: new Date(now + 330 * DAY_MS).toISOString(),
+    }))
+    expect(p.measured).toBe(true)
+    expect(p.onTrack).toBe(false)
+  })
+
+  it('doel ZONDER streefdatum blijft ongemoeid: gemeten, op koers, geen maandlat', () => {
+    const p = computeGoalProgress(makeGoal({ current_value: 0, target_value: 5000 }))
+    expect(p.measured).toBe(true)
+    expect(p.onTrack).toBe(true)
+    expect(p.requiredMonthly).toBeNull()
   })
 })
 
@@ -113,7 +276,7 @@ describe('computeGoalProgress — down-richting (fire_age)', () => {
 
   it('current 0 (of null → 0): 0% en niet onTrack', () => {
     const p = computeGoalProgress(makeGoal({ goal_type: 'fire_age', current_value: 0, target_value: 58 }))
-    expect(p).toEqual({ current: 0, target: 58, pct: 0, onTrack: false, eta: null })
+    expect(p).toEqual({ current: 0, target: 58, pct: 0, onTrack: false, measured: false, requiredMonthly: null, eta: null })
   })
 
   it('doel bereikt met overshoot (current < target) → pct geclampt op 100 + onTrack', () => {
@@ -135,7 +298,7 @@ describe('computeGoalProgress — down-richting (fire_age)', () => {
 
   it('target <= 0 (ongeldig) → 0% en niet onTrack', () => {
     const p = computeGoalProgress(makeGoal({ goal_type: 'fire_age', current_value: 60, target_value: 0 }))
-    expect(p).toEqual({ current: 60, target: 0, pct: 0, onTrack: false, eta: null })
+    expect(p).toEqual({ current: 60, target: 0, pct: 0, onTrack: false, measured: false, requiredMonthly: null, eta: null })
   })
 
   it('down-tak negeert target_date (geen eta, geen tijdlijn-onTrack)', () => {

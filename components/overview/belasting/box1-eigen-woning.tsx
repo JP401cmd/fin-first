@@ -38,9 +38,14 @@ export function Box1EigenWoning({
   const hillen = result.hillenAftrek
   const saldo = result.eigenwoningSaldo // < 0 = aftrekpost, > 0 = bijtelling
 
-  // Het netto-effect op je belastbaar inkomen: een negatief saldo verlaagt je
-  // belasting (≈ saldo × marginaal tarief).
-  const belastingEffect = Math.round(Math.abs(saldo) * result.marginalRate)
+  // Het werkelijke belastingeffect komt UIT DE MOTOR (consume, don't recompute).
+  // Was: |saldo| × result.marginalRate — een tarief (56,01%) dat de motor
+  // aantoonbaar níét toepast, want de arbeidskorting loopt over het
+  // arbeidsinkomen dat een aftrekpost terecht niet verlaagt. Sinds de
+  // tariefsaanpassing eigen woning (art. 2.10 lid 2 Wet IB 2001) is het echte
+  // effect bovendien gemaximeerd op het aftrektarief; die eigen som toonde
+  // €4.930 waar de motor €3.306 rekent.
+  const belastingEffect = Math.round(Math.abs(result.eigenwoningBelastingEffect))
   const isAftrekpost = saldo < 0
 
   const freedom =

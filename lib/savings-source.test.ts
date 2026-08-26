@@ -3,8 +3,12 @@ import {
   savingsRateFromAggregates,
   monthlySavingsFromRate,
   computeDebtAflossingMonthly,
+  computeSavingsRate6m,
   resolveSavingsSource,
+  savingsRateWindow,
+  savingsRateDataMonths,
 } from './savings-source'
+import { SAVINGS_RATE_WINDOW_MONTHS } from './constants'
 import type { Debt } from './debt-data'
 
 /**
@@ -244,5 +248,120 @@ describe('resolveSavingsSource — de spaarquote VOLGT de grondslag (ADR 0103)',
     })
     expect(r.effectiveSavingsRatePct).toBeCloseTo(((2000 - 2500) / 2000) * 100, 10) // −25%
     expect(r.baseAnnualSavings).toBeLessThan(0)
+  })
+})
+
+// ── C6: het meetvenster van de spaarquote ───────────────────────────────────
+//
+// Bevinding C6 ("Vals alarm over een tekort", 26 aug 2026): het 6-maands venster
+// liep t/m de LOPENDE maand terwijl `dataMonths` alleen de verstreken maanden
+// telde. Vroeg in de maand staan de vaste lasten er al wél in en het salaris nog
+// niet — met bij weinig historie een spaarquote van −265 % tot gevolg. Deze
+// getuigen pinnen het venster (voltooide maanden), de datamaand-telling die er
+// exact bij hoort, en het defect zelf.
+
+describe('savingsRateWindow — zes VOLTOOIDE maanden, de lopende erbuiten', () => {
+  it('juli 2026 ⇒ [2026-01, 2026-07): januari t/m juni', () => {
+    expect(savingsRateWindow(new Date(2026, 6, 15))).toEqual({
+      sinceMonth: '2026-01',
+      beforeMonth: '2026-07',
+      fromDate: '2026-01-01',
+      toDate: '2026-07-01',
+    })
+  })
+
+  it('de bovengrens is de 1e van de LOPENDE maand — ook op dag 1 en op de laatste dag', () => {
+    for (const dag of [1, 15, 31]) {
+      const w = savingsRateWindow(new Date(2026, 0, dag))
+      expect(w.beforeMonth).toBe('2026-01')
+      expect(w.toDate).toBe('2026-01-01')
+      // Zes voltooide maanden terug = juli 2025.
+      expect(w.sinceMonth).toBe('2025-07')
+    }
+  })
+
+  it('loopt correct over de jaargrens', () => {
+    const w = savingsRateWindow(new Date(2026, 1, 3)) // februari 2026
+    expect(w.sinceMonth).toBe('2025-08')
+    expect(w.beforeMonth).toBe('2026-02')
+  })
+
+  it('venster is exact SAVINGS_RATE_WINDOW_MONTHS maanden breed', () => {
+    const w = savingsRateWindow(new Date(2026, 6, 15))
+    const [ys, ms] = w.sinceMonth.split('-').map(Number)
+    const [yb, mb] = w.beforeMonth.split('-').map(Number)
+    expect((yb - ys) * 12 + (mb - ms)).toBe(SAVINGS_RATE_WINDOW_MONTHS)
+  })
+})
+
+describe('savingsRateDataMonths — telt VOLTOOIDE maanden sinds het vroegste inkomen', () => {
+  const nu = new Date(2026, 6, 15) // 15 juli 2026
+
+  it('geen inkomsten-datum ⇒ het volle venster (geen extrapolatie)', () => {
+    expect(savingsRateDataMonths(nu, null)).toBe(SAVINGS_RATE_WINDOW_MONTHS)
+    expect(savingsRateDataMonths(nu, undefined)).toBe(SAVINGS_RATE_WINDOW_MONTHS)
+    expect(savingsRateDataMonths(nu, '')).toBe(SAVINGS_RATE_WINDOW_MONTHS)
+  })
+
+  it('inkomen begon in de LOPENDE maand ⇒ 0 voltooide maanden, geklemd op 1', () => {
+    // Dit is het C6-scenario: er is nog geen enkele volledige maand gemeten. De
+    // klem op 1 voorkomt een deling door nul; het venster is dan leeg, dus
+    // income6m = 0 en `computeSavingsRate6m` valt via `isEstimate` terug.
+    expect(savingsRateDataMonths(nu, '2026-07-02')).toBe(1)
+  })
+
+  it('telt de lopende maand NIET mee (juni ⇒ 1, niet 2)', () => {
+    expect(savingsRateDataMonths(nu, '2026-06-25')).toBe(1)
+    expect(savingsRateDataMonths(nu, '2026-05-25')).toBe(2)
+  })
+
+  it('klemt op het venster en op een datum in de toekomst', () => {
+    expect(savingsRateDataMonths(nu, '2023-01-01')).toBe(SAVINGS_RATE_WINDOW_MONTHS)
+    expect(savingsRateDataMonths(nu, '2026-12-01')).toBe(1)
+  })
+})
+
+describe('C6-repro: een halve maand mag de canonieke quote niet vervuilen', () => {
+  // Twee volle maanden (salaris 3000, uitgaven 2000 ⇒ +33 %) plus een LOPENDE
+  // maand waarin alleen de vaste lasten (−1800) al zijn afgeschreven.
+  const VOLLEDIGE_MAANDEN = { income: 6000, expenses: 4000 }
+  const HALVE_MAAND = { income: 0, expenses: 1800 }
+
+  it('mét de lopende maand erin zakt de quote diep de min in (het oude gedrag)', () => {
+    const vervuild = computeSavingsRate6m({
+      income6m: VOLLEDIGE_MAANDEN.income + HALVE_MAAND.income,
+      expenses6m: VOLLEDIGE_MAANDEN.expenses + HALVE_MAAND.expenses,
+      savingsBudgetSpent6m: 0,
+      debtAflossing6m: 0,
+      dataMonths: 2,
+    })
+    // (6000 − 5800) / 6000 = 3,3 % — en met minder historie wordt dit fors negatief.
+    expect(vervuild.savingsRate6m).toBeCloseTo(3.333, 3)
+  })
+
+  it('zonder de lopende maand blijft de gemeten quote staan waar hij hoort', () => {
+    const schoon = computeSavingsRate6m({
+      income6m: VOLLEDIGE_MAANDEN.income,
+      expenses6m: VOLLEDIGE_MAANDEN.expenses,
+      savingsBudgetSpent6m: 0,
+      debtAflossing6m: 0,
+      dataMonths: 2,
+    })
+    expect(schoon.savingsRate6m).toBeCloseTo(33.333, 3)
+  })
+
+  it('alléén een lopende maand ⇒ leeg venster ⇒ isEstimate, geen negatief cijfer', () => {
+    // De extreme variant uit de bevinding: één maand historie, gekeken vóór de
+    // salarisdatum. Het venster bevat dan NIETS, dus de aggregaat-formule geeft 0
+    // en markeert zichzelf als schatting — i.p.v. −265 % door te zetten.
+    const leeg = computeSavingsRate6m({
+      income6m: 0,
+      expenses6m: 0,
+      savingsBudgetSpent6m: 0,
+      debtAflossing6m: 0,
+      dataMonths: 1,
+    })
+    expect(leeg.savingsRate6m).toBe(0)
+    expect(leeg.isEstimate).toBe(true)
   })
 })

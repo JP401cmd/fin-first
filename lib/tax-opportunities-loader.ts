@@ -14,6 +14,7 @@
 //   · Box 3-grondslag + dag-uitgaven → `loadPerspectiveBox3` (ADR 0036)
 //   · Box 3-scenario's              → `generateBox3Strategies` (→ calculateBox3)
 //   · bruto Box 1-inkomen           → `resolveBox1GrossIncome` (override-bewust)
+//   · eigen woning (WOZ + rente)    → `resolveEigenWoningBox1Input` (C8)
 //   · onbenutte ruimte              → `computeJaarruimte`
 //   · besparing van de inleg        → `jaarruimteBesparing` (ADR 0040/0041)
 //   · Box 1-heffing                 → `computeBox1Tax`
@@ -31,7 +32,11 @@ import { getCachedUser } from '@/lib/supabase/cached-user'
 import type { Perspective } from '@/lib/household-data'
 import { loadPerspectiveBox3 } from '@/lib/household-tax'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
-import { resolveBox1GrossIncome } from '@/lib/box1-income'
+import {
+  resolveBox1GrossIncome,
+  resolveEigenWoningBox1Input,
+  GEEN_EIGEN_WONING,
+} from '@/lib/box1-income'
 import { computeBox1Tax } from '@/lib/box1-tax'
 import { computeJaarruimte, jaarruimteBesparing, type JaarruimteResult } from '@/lib/jaarruimte'
 import { DEFAULT_RETURN } from '@/lib/constants'
@@ -146,6 +151,30 @@ export interface FiscaleKansen {
   jaarruimteSavings: number
   /** Box 1-heffing over `grossYearly` (€/jr), null zonder inkomen. */
   box1Tax: number | null
+  /**
+   * Effectief tarief over `grossYearly` (fractie) — `computeBox1Tax(...)
+   * .effectiveRate`, uit DEZELFDE motoraanroep als `box1Tax`. Null zonder
+   * inkomen.
+   *
+   * BESTAAT sinds bevinding C9: de hub rekende zijn eigen "effectief tarief"
+   * als (Box 1 + Box 3) / Box 1-inkomen — een vermogensheffing in de teller van
+   * een inkomens-quotiënt. Nu leest de hub hetzelfde percentage als
+   * /overzicht/belasting/box1.
+   */
+  box1EffectiveRate: number | null
+  /**
+   * Marginaal tarief over de volgende euro (fractie) — `computeBox1Tax(...)
+   * .marginalRate`, uit DEZELFDE motoraanroep. Null zonder inkomen.
+   *
+   * BESTAAT sinds bevinding C9/M4: de hub toonde `fireParams.marginaalTarief`
+   * → `deriveMarginaalTarief()`, de FIRE-vuistregel die per constructie altijd
+   * een van twee vaste schijftarieven teruggeeft (35,75%/49,5% in 2026) en dus
+   * nooit de afbouw-gecorrigeerde 56,0% van de motor kón tonen — 20,2
+   * procentpunt verschil met de Box 1-subpagina over hetzelfde inkomen. Die
+   * vuistregel blijft correct voor haar EIGEN doel (netto→bruto-schattingen in
+   * de FIRE-laag), maar is geen user-facing tarief-KPI.
+   */
+  box1MarginalRate: number | null
 }
 
 async function loadFiscaleKansenInner(
@@ -236,29 +265,55 @@ async function loadFiscaleKansenInner(
   // cashflow-schatting. Dit is bewust NIET `box1JaarruimteStatus` — die is een
   // sync status-heuristiek voor de sidebar-dot (netto/(1−marginaal), geen
   // DB-read) en kent de override niet.
-  const grossYearly = user
-    ? (await resolveBox1GrossIncome(supabase, user.id, year)).grossYearly
-    : 0
+  //
+  // De eigen woning is de TWEEDE helft van diezelfde Box 1-invoer en komt uit
+  // dezelfde resolutielaag (`resolveEigenWoningBox1Input`, naast de bruto-bron).
+  // Bevinding C8: die stond hier NIET, terwijl de Box 1-subpagina 'm wél
+  // meegaf — zelfde motor, zelfde bruto, twee heffingen. Parallel opgehaald:
+  // twee onafhankelijke bronnen, geen extra serieel wachtblok.
+  const [grossResolution, eigenWoning] = await Promise.all([
+    user ? resolveBox1GrossIncome(supabase, user.id, year) : Promise.resolve(null),
+    user ? resolveEigenWoningBox1Input(supabase) : Promise.resolve(GEEN_EIGEN_WONING),
+  ])
+  const grossYearly = grossResolution?.grossYearly ?? 0
   const pensionFactorA = horizonData.pensioenFactorA
+  // NULL ≠ 0 (bevinding H23): dezelfde `JaarruimteCard` hangt óók in de fiscale
+  // optimizer, dus de "factor A onbekend → bovengrens"-markering moet dáár uit
+  // dezelfde bundelbron komen als op de Box 1-subpagina. Anders toont het ene
+  // oppervlak de onzekerheid en het andere niet.
+  const pensionFactorAKnown = horizonData.pensioenFactorAKnown
 
   const jaarruimte = computeJaarruimte(grossYearly, pensionFactorA, year)
   const jaarruimteSavings = jaarruimteBesparing(grossYearly, jaarruimte.jaarruimte, year)
   const jaarruimteFreedomDays =
     canonicalDaily > 0 ? Math.round(jaarruimteSavings / canonicalDaily) : 0
 
-  // Box 1-heffing over dezelfde bruto-grondslag. `dailyExpenses` voedt alleen
-  // de (hier ongebruikte) vrijheidsdagen-velden van de motor — `tax` is er
-  // onafhankelijk van, dus de heffing hangt niet aan de grondslagkeuze.
-  const box1Tax =
+  // Box 1-heffing over dezelfde bruto-grondslag ÉN dezelfde eigen-woning-invoer
+  // als /overzicht/belasting/box1 — daarmee is `box1Tax` hier A=B met de
+  // subpagina (bevinding C8). Vóór deze fix ontbrak de eigenwoning-invoer,
+  // waardoor de aftrekpost wegviel en de hub-heffing structureel te HOOG stond
+  // (en bij een (bijna) afgeloste hypotheek — forfait > rente, Wet Hillen —
+  // juist te laag). `dailyExpenses` voedt alleen de (hier ongebruikte)
+  // vrijheidsdagen-velden van de motor; `tax` is er onafhankelijk van.
+  //
+  // ÉÉN motoraanroep, DRIE uitkomsten (bevinding C9): heffing, effectief tarief
+  // en marginaal tarief komen alle drie uit dit ene resultaat. Zo kan de hub
+  // geen tarief tonen dat bij een andere heffing hoort, en is de gate
+  // "inkomen bekend" (grossYearly > 0) er precies één — valt die dicht, dan
+  // vallen heffing én beide tarieven samen weg (bevinding M4).
+  const box1Result =
     grossYearly > 0
-      ? Math.round(
-          computeBox1Tax({
-            grossYearlyIncome: grossYearly,
-            year,
-            dailyExpenses: canonicalDaily,
-          }).tax,
-        )
+      ? computeBox1Tax({
+          grossYearlyIncome: grossYearly,
+          year,
+          wozValue: eigenWoning.wozValue,
+          hypotheekRente: eigenWoning.hypotheekRente,
+          dailyExpenses: canonicalDaily,
+        })
       : null
+  const box1Tax = box1Result != null ? Math.round(box1Result.tax) : null
+  const box1EffectiveRate = box1Result?.effectiveRate ?? null
+  const box1MarginalRate = box1Result?.marginalRate ?? null
 
   // ── Bouw ALLE doel-secties, in de volgorde van de catalogus ───────────
   const sections: GoalSection[] = TAX_OPTIMIZER_GOALS.map((goal): GoalSection => {
@@ -285,6 +340,7 @@ async function loadFiscaleKansenInner(
           goal,
           grossYearlyIncome: grossYearly,
           pensionFactorA,
+          pensionFactorAKnown,
           dailyExpenses: canonicalDaily,
           hasData: grossYearly > 0,
           besparing: jaarruimteSavings,
@@ -333,6 +389,8 @@ async function loadFiscaleKansenInner(
     jaarruimte,
     jaarruimteSavings,
     box1Tax,
+    box1EffectiveRate,
+    box1MarginalRate,
   }
 }
 

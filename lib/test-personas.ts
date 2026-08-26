@@ -214,6 +214,13 @@ export interface PersonaGoal {
   icon: string
   color: string
   is_completed: boolean
+  /**
+   * Vrije JSONB-metadata (`goals.metadata`). Gebruikt voor de standaard-doel-marker
+   * `{ standaardDoel: 'vrijheidsgetal' }` — die maakt van het FIRE-doel een LIVE
+   * tracker op de canonieke FIRE-motor i.p.v. een statisch bedrag (bevinding C10,
+   * lib/goals/vrijheidsgetal-goal.ts). Weglaten = gewoon handmatig doel.
+   */
+  metadata?: Record<string, unknown>
 }
 
 export interface PersonaLifeEvent {
@@ -1071,8 +1078,8 @@ const lisaData: PersonaData = {
   ],
   recommendations: [
     {
-      title: 'Verhoog beleggingsinleg na kinderopvangtoeslag',
-      description: 'Wanneer de kinderen naar school gaan, valt 350/mnd kinderopvangkosten weg. Plan nu al om dit bedrag naar beleggingen te sturen.',
+      title: 'Er komt €350 per maand vrij als de opvang stopt',
+      description: 'Zodra de kinderen naar school gaan, valt €350 per maand aan kinderopvangkosten weg. Dat bedrag is straks vrij te besteden — waar het heen gaat, bepaalt hoeveel vrijheidstijd het oplevert.',
       recommendation_type: 'savings_boost',
       euro_impact_monthly: 350,
       euro_impact_yearly: 4200,
@@ -1081,15 +1088,23 @@ const lisaData: PersonaData = {
       priority_score: 4,
       status: 'pending',
       suggested_actions: [
-        { title: 'Stel automatische verhoging Meesman in', freedom_days_impact: 45, euro_impact_monthly: 350 },
+        { title: 'Zet vast wanneer de opvangkosten precies wegvallen', freedom_days_impact: 45, euro_impact_monthly: 350 },
       ],
       actions: [
-        { source: 'ai', title: 'Plan Meesman verhoging', description: 'Zet een reminder om de Meesman inleg te verhogen zodra de kinderopvangkosten wegvallen', freedom_days_impact: 45, euro_impact_monthly: 350, status: 'open', priority_score: 4, scheduled_week: getNextWeek() },
+        { source: 'ai', title: 'Markeer het moment dat de opvang stopt', description: 'Noteer vanaf welke maand de €350 vrijvalt, zodat je die maand bewust een bestemming kiest', freedom_days_impact: 45, euro_impact_monthly: 350, status: 'open', priority_score: 4, scheduled_week: getNextWeek() },
       ],
     },
+    // H24 (Wft): deze twee fixtures worden op /overzicht/tips verbatim
+    // gerenderd zodra persona Lisa geladen is via /beheer/testdata — het is
+    // dus zichtbare copy, geen inerte seed. De oude teksten noemden een
+    // productcategorie (breed gespreid indexfonds), twee vergelijkers
+    // (Independer, Hypotheker), een aanbieder (Meesman) en een
+    // rendementsbelofte ("levert significant meer op"). Herschreven naar
+    // inzicht: benoem het gegeven en de afweging, laat de keuze bij de
+    // gebruiker. De cijfers blijven ongewijzigd — die voeden de demo-KPI's.
     {
-      title: 'Overweeg hypotheek oversluiten',
-      description: 'Je huidige hypotheekrente is 2.9%. De markt biedt momenteel lagere tarieven. Bij oversluiting kun je mogelijk 80-120/mnd besparen.',
+      title: 'Je hypotheekrente staat op 2,9%',
+      description: 'Je hypotheek loopt tegen 2,9% rente. Op deze hoofdsom komt elke 0,5% renteverschil neer op ongeveer €80-120 per maand — dat is wat een rentewijziging in jouw geval waard is.',
       recommendation_type: 'budget_optimization',
       euro_impact_monthly: 100,
       euro_impact_yearly: 1200,
@@ -1098,15 +1113,15 @@ const lisaData: PersonaData = {
       priority_score: 3,
       status: 'pending',
       suggested_actions: [
-        { title: 'Vraag offertes op bij 3 hypotheekverstrekkers', freedom_days_impact: 13 },
+        { title: 'Zet je rente, rentevaste periode en boetevrije ruimte op een rij', freedom_days_impact: 13 },
       ],
       actions: [
-        { source: 'ai', title: 'Vergelijk hypotheekrentes', description: 'Gebruik Independer of Hypotheker om actuele rentes te vergelijken met je huidige tarief', freedom_days_impact: 13, euro_impact_monthly: 100, status: 'open', priority_score: 3 },
+        { source: 'ai', title: 'Breng je hypotheekvoorwaarden in kaart', description: 'Noteer je huidige rente, resterende rentevaste periode en boetevrije ruimte, zodat je weet waar je aan toe bent', freedom_days_impact: 13, euro_impact_monthly: 100, status: 'open', priority_score: 3 },
       ],
     },
     {
-      title: 'Start een studiefonds via beleggingen',
-      description: 'In plaats van sparen op een spaarrekening, beleg het studiefonds in een breed gespreid indexfonds. Over 10+ jaar levert dit significant meer op.',
+      title: 'Studiefonds: sparen of beleggen',
+      description: 'Het studiefonds staat nu volledig op een spaarrekening. Sparen en beleggen verschillen in verwacht rendement én in risico; bij een horizon van 10+ jaar weegt dat verschil zwaarder mee. Welke verdeling past, hangt af van hoeveel koersschommeling je voor dit doel wilt dragen.',
       recommendation_type: 'asset_reallocation',
       euro_impact_monthly: 0,
       euro_impact_yearly: 0,
@@ -1115,10 +1130,10 @@ const lisaData: PersonaData = {
       priority_score: 3,
       status: 'pending',
       suggested_actions: [
-        { title: 'Open apart beleggingsaccount voor studiefonds', freedom_days_impact: 8 },
+        { title: 'Bepaal de horizon en het risico dat bij dit doel hoort', freedom_days_impact: 8 },
       ],
       actions: [
-        { source: 'ai', title: 'Open Meesman kindrekening', description: 'Open een aparte Meesman rekening op naam van de kinderen', freedom_days_impact: 8, euro_impact_monthly: 0, status: 'open', priority_score: 3 },
+        { source: 'ai', title: 'Leg de horizon van het studiefonds vast', description: 'Noteer wanneer het geld nodig is en hoeveel schommeling daar tot die tijd bij past', freedom_days_impact: 8, euro_impact_monthly: 0, status: 'open', priority_score: 3 },
       ],
     },
   ],
@@ -2044,7 +2059,12 @@ const tessaData: PersonaData = {
   }),
   transactions: tessaTransactions,
   goals: [
-    { name: 'Volledige vrijheid (FIRE)', description: 'Belegbaar vermogen naar het FIRE-doel — volledige vrijheid vóór 55', goal_type: 'net_worth', target_value: 1650000, current_value: 960000, target_date: monthsAgo(-156), icon: 'Target', color: 'amber', is_completed: false },
+    // Standaard-doel-marker: dit is hét vrijheidsgetal-doel, dus een LIVE tracker
+    // op de canonieke FIRE-motor. De opgeslagen target/current blijven als
+    // "ooit ingevuld"-waarde staan; de kaart toont de gesynchroniseerde stand
+    // (bevinding C10 — zonder de marker liepen /overzicht en /toekomst/doelen
+    // dertien jaar uiteen).
+    { name: 'Volledige vrijheid (FIRE)', description: 'Belegbaar vermogen naar het FIRE-doel — volledige vrijheid vóór 55', goal_type: 'net_worth', target_value: 1650000, current_value: 960000, target_date: monthsAgo(-156), icon: 'Target', color: 'amber', is_completed: false, metadata: { standaardDoel: 'vrijheidsgetal' } },
     { name: 'Hypotheek appartement aflossen', description: 'Aflossingsvrije beleggingshypotheek terugbrengen naar nul', goal_type: 'debt_payoff', target_value: 110000, current_value: 20000, target_date: monthsAgo(-120), icon: 'Home', color: 'purple', is_completed: false },
   ],
   life_events: [

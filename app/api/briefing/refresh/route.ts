@@ -24,7 +24,7 @@ import {
 import { maskPIIInOutput } from '@/lib/ai/pii-output-filter'
 import { recordAiUsage } from '@/lib/ai-credits'
 import { checkTierGate } from '@/lib/require-tier'
-import { assertCloudAllowed, isCloudAllowed } from '@/lib/ai/privacy-gate'
+import { assertAiEnabled, assertCloudAllowed, isCloudAllowed } from '@/lib/ai/privacy-gate'
 import { unauthorized, forbidden, badRequest, serverError } from '@/lib/api/respond'
 import { parseBody } from '@/lib/api/parse-body'
 
@@ -86,6 +86,16 @@ export async function POST(req: Request) {
   //    (lib/briefing/redactie.ts); de gate hoort dus vóór die aanroep — en
   //    daarmee ook vóór loadAndComposeOverviewBriefing, dat de volledige
   //    financiële situatie ophaalt om te redigeren. Nooit een stille uitwijk.
+  //
+  // KILL-SWITCH VÓÓR BEIDE (M26). "AI uit" (`profiles.ai_enabled`) betekent dat
+  // er niets gegenereerd wordt — cloud noch on-device. `assertCloudAllowed` doet
+  // dat sinds M26 zelf, maar de lokale stappen komen daar niet langs: die lezen
+  // `isCloudAllowed`, en dié geeft bij een uitgezette kill-switch `false` — wat
+  // zonder deze regel als "lokaal mag dus" zou lezen. Vandaar de expliciete,
+  // groepsloze poort hier.
+  const aiGate = await assertAiEnabled(supabase, user.id)
+  if (aiGate) return aiGate
+
   if (stapParam !== null) {
     if (await isCloudAllowed(supabase, user.id, 'briefing')) {
       return forbidden('Je briefing draait in de cloud — gebruik de gewone ververs.')

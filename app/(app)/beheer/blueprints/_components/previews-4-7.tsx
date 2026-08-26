@@ -186,7 +186,7 @@ export function ModalPreview() {
       {open && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
-          style={{ background: 'rgba(0,0,0,0.4)' }}
+          style={{ background: 'var(--scrim)' }}
           onClick={() => setOpen(false)}
         >
           <div

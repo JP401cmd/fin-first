@@ -1,10 +1,11 @@
 /**
  * Gedeelde bron-van-waarheid voor de ACTUELE `current_value` van actieve doelen.
  *
- * Voor asset/debt-gekoppelde doelen én lab-gegenereerde parameter-doelen
+ * Voor asset/debt-gekoppelde doelen, lab-gegenereerde parameter-doelen
  * (`metadata.bron === 'parameter'`: spaarquote/salaris/rendement/vrijheidsleeftijd)
- * ligt de huidige waarde NIET in de DB-kolom, maar wordt die live afgeleid uit
- * consume-only bronnen. Voorheen leefde deze logica alleen in `lib/fin-data-loader.ts`
+ * én het vrijheidsgetal-doel (`metadata.standaardDoel === 'vrijheidsgetal'`,
+ * bevinding C10 — zie lib/goals/vrijheidsgetal-goal.ts) ligt de huidige waarde
+ * NIET in de DB-kolom, maar wordt die live afgeleid uit consume-only bronnen. Voorheen leefde deze logica alleen in `lib/fin-data-loader.ts`
  * (doelen-scherm), waardoor de dashboard-Doelen-widget de RAUWE opgeslagen waarde
  * (vaak 0) toonde en afweek van het scherm. Deze module is de ÉNE plek zodat
  * beide oppervlakken (scherm + widget) identiek synchroniseren — geen drift.
@@ -22,12 +23,21 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Debt } from '@/lib/debt-data'
-import { savingsRateFromAggregates, computeDebtAflossingMonthly } from '@/lib/savings-source'
+import {
+  savingsRateFromAggregates,
+  computeDebtAflossingMonthly,
+  savingsRateWindow,
+} from '@/lib/savings-source'
 import { resolveEffectiveIncomeExpenses, type IncomeExpenseSources } from '@/lib/effective-financials'
 import { loadBudgetBasis } from '@/lib/household/budget-share'
 import type { BudgetBasisRow } from '@/lib/budget-basis'
-import { localMonthStart, localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
+import { localMonthStart, localMonthBounds } from '@/lib/month-range'
 import type { GoalType } from '@/lib/goal-data'
+import {
+  applyVrijheidsgetalSync,
+  isVrijheidsgetalGoal,
+  type VrijheidsgetalSnapshot,
+} from '@/lib/goals/vrijheidsgetal-goal'
 
 /**
  * Minimale velden die de doel-`current_value`-sync leest/muteert. Zowel het
@@ -148,6 +158,13 @@ export function computeParameterSavingsRatePct(
   tx: readonly ParamTxRow[],
   budgets: readonly ParamBudgetRow[],
   debts: readonly Debt[],
+  /**
+   * Exclusieve bovengrens ('YYYY-MM-DD', = de 1e van de LOPENDE maand) uit
+   * `savingsRateWindow`. De query hierboven haalt bewust ook de lopende maand op
+   * — het salaris-doel heeft die nodig — dus de vensterknip gebeurt hier.
+   * Weglaten = het oude gedrag (alles wat binnenkomt telt mee).
+   */
+  windowEnd?: string,
 ): number | undefined {
   // Savings-budget-ids: eigen type 'savings' OF (kind met savings-parent) — zelfde
   // parent-eerst-erving als de dashboard/horizon-loader.
@@ -162,6 +179,9 @@ export function computeParameterSavingsRatePct(
   let expenses6m = 0
   let savingsBudgetSpent6m = 0
   for (const t of tx) {
+    // De LOPENDE maand valt buiten het meetvenster (bevinding C6): vaste lasten
+    // zijn er al af, het salaris nog niet binnen — dat trekt de quote scheef.
+    if (windowEnd && t.date >= windowEnd) continue
     const amt = Number(t.amount)
     if (!Number.isFinite(amt)) continue
     if (amt > 0) { income6m += amt; continue }
@@ -276,7 +296,11 @@ export async function injectParameterGoalCurrentValues(
   const now = new Date()
   const monthStart = localMonthStart(now)
   const monthEnd = localMonthBounds(now).end
-  const sixMonthsAgo = localMonthStartMonthsAgo(now, 5)
+  // Meetvenster van de spaarquote — gedeelde bron (lib/savings-source.ts): zes
+  // VOLTOOIDE kalendermaanden. De QUERY loopt bewust dóór tot het einde van de
+  // lopende maand omdat het salaris-doel diezelfde rijen leest; de vensterknip
+  // voor de spaarquote gebeurt in `computeParameterSavingsRatePct` (`savingsWindowEnd`).
+  const { fromDate: sixMonthsAgo, toDate: savingsWindowEnd } = savingsRateWindow(now)
 
   const [txRows, budgetRows, debtRows, profileRow, basisPrefsRow, assetRows, snapshotRows] = await Promise.all([
     needsTx
@@ -345,7 +369,7 @@ export async function injectParameterGoalCurrentValues(
   ])
 
   const savingsRatePct = needsSavingsRate
-    ? computeParameterSavingsRatePct(txRows, budgetRows, debtRows)
+    ? computeParameterSavingsRatePct(txRows, budgetRows, debtRows, savingsWindowEnd)
     : undefined
   const salaryMonthly = needsSalary
     ? computeParameterEffectiveSalary(
@@ -385,6 +409,13 @@ export async function injectParameterGoalCurrentValues(
  * handmatige), synchroniseer daarna de `current_value` van asset/debt-gekoppelde
  * en parameter-doelen live. Muteert de doelen in-place en geeft de gesorteerde
  * `goals` (+ de `parameterGoals`-subset) terug.
+ *
+ * `loadFireSnapshot` is de DERDE synchronisatiebron (bevinding C10): het
+ * vrijheidsgetal-doel volgt de canonieke FIRE-motor i.p.v. een statisch
+ * opgeslagen bedrag. Bewust een THUNK en geen waarde: hij wordt alleen
+ * aangeroepen wanneer er daadwerkelijk zo'n doel actief is, zodat gebruikers
+ * zonder FIRE-doel geen kernel-run betalen — hetzelfde lazy-patroon als de
+ * parameter-injectie hierboven.
  */
 export async function syncActiveGoalValues<T extends SyncableGoal>(
   supabase: SupabaseClient,
@@ -392,9 +423,17 @@ export async function syncActiveGoalValues<T extends SyncableGoal>(
   assets: readonly { id: string; current_value: number | string | null }[],
   debts: readonly { id: string; current_balance: number | string | null }[],
   userId: string | null,
-): Promise<{ goals: T[]; parameterGoals: T[] }> {
+  loadFireSnapshot?: () => Promise<VrijheidsgetalSnapshot | null>,
+): Promise<{ goals: T[]; parameterGoals: T[]; fireSnapshot: VrijheidsgetalSnapshot | null; vrijheidsgetalSynced: number }> {
   const { goals, parameterGoals } = splitActiveGoals(allGoals)
   autolinkGoalCurrentValues(goals, assets, debts)
-  await injectParameterGoalCurrentValues(supabase, parameterGoals, userId)
-  return { goals, parameterGoals }
+
+  const wantsFire = Boolean(loadFireSnapshot) && goals.some(isVrijheidsgetalGoal)
+  const [, fireSnapshot] = await Promise.all([
+    injectParameterGoalCurrentValues(supabase, parameterGoals, userId),
+    wantsFire ? loadFireSnapshot!() : Promise.resolve(null),
+  ])
+  const vrijheidsgetalSynced = applyVrijheidsgetalSync(goals, fireSnapshot)
+
+  return { goals, parameterGoals, fireSnapshot, vrijheidsgetalSynced }
 }

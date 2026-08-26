@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { section, formatCurrency, formatFreedomTime } from './formatter'
-import { calculateFreedomTime } from '@/lib/format'
+import { calculateFreedomTime, carryFreedomUnits } from '@/lib/format'
 import { collectAandachtspunten } from '@/lib/aandachtspunten-loader'
 import type { AandachtspuntDomain } from '@/lib/aandachtspunten'
 
@@ -22,9 +22,12 @@ const DOMAIN_LABEL: Record<AandachtspuntDomain, string> = {
 function freedomDaysToString(freedomDays: number): string | null {
   if (!Number.isFinite(freedomDays) || freedomDays <= 0) return null
   const bd = calculateFreedomTime(freedomDays, 1)
-  const months = bd.months + (bd.days >= 15 ? 1 : 0)
-  if (bd.years === 0 && months === 0) return null
-  return formatFreedomTime(bd.years, months)
+  // Zelfde carry als in tax-context.ts: de ≥15-dagen-afronding kan de maandteller
+  // zelf op 12 zetten, ook al levert calculateFreedomTime er sinds H3/M37 nooit
+  // meer een. Eén huis voor de regel (lib/format.ts#carryFreedomUnits).
+  const rolled = carryFreedomUnits(bd.years, bd.months + (bd.days >= 15 ? 1 : 0), 0)
+  if (rolled.years === 0 && rolled.months === 0) return null
+  return formatFreedomTime(rolled.years, rolled.months)
 }
 
 /**

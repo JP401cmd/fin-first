@@ -5,7 +5,8 @@ import { Clock, AlertTriangle } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { Kicker, ScenarioCallout, FiguresStrip } from '@/components/editorial'
-import { BOX2_PARAMS, type Box2Params, type TaxYear } from '@/lib/box2-data'
+import { BOX2_PARAMS, calculateBox2, type TaxYear } from '@/lib/box2-data'
+import { BOX2_SIMULATOR_SCHAAL_FACTOR } from '@/lib/constants'
 
 /**
  * Box2DividendSimulator — interactieve "hoeveel dividend in welke schijf"-tool.
@@ -15,13 +16,26 @@ import { BOX2_PARAMS, type Box2Params, type TaxYear } from '@/lib/box2-data'
  * resulterende Box 2-heffing, het netto restant en — in de geest van "geld is
  * opgeslagen tijd" — de vrijheidsdagen die de heffing kost.
  *
- * Schijfgrens: BOX2_PARAMS[year].grens (single) of grensPartner (fiscaal
- * partner; de eerste-schijfruimte verdubbelt). De slider loopt door tot iets
- * voorbij de partner-grens zodat zowel single als partner de overgang zien.
+ * ÉÉN MOTOR (bevinding H26). Tot 26-08-2026 rekende dit component met een eigen
+ * `splitDividend()`: een tweede staffel-implementatie náást `calculateBox2`, die
+ * ongerond rekende (€16.866,535 vs. €16.866,54) en `dgaExcessTax` niet kende —
+ * bij een DGA boven de leendrempel gaf de kop dus een ánder vrijheidsdagen-getal
+ * dan de simulator eronder. Nu roept de simulator dezelfde motor aan als de kop,
+ * met hetzelfde DGA-leentotaal en hetzelfde dagtarief.
  *
- * Client-component: lokale slider-state + één afgeleide berekening. Geen
- * Supabase, geen netwerk — puur op de wettelijke parameters. Indicatie, geen
- * fiscaal advies.
+ * NEUTRALE DEFAULT (bevinding H26). De slider startte op exact de schijfgrens,
+ * waardoor een DGA zónder dividend zonder één klik "€16.867 heffing" las onder
+ * een kop van €0 — en een default op de grens is bovendien een impliciete
+ * aanbeveling ("keer precies dít bedrag uit"). De schuif start nu op het
+ * WERKELIJKE Box 2-inkomen, zodat kop en simulator bij eerste render per
+ * constructie hetzelfde bedrag tonen.
+ *
+ * Schijfgrens: BOX2_PARAMS[year].grens (single) of grensPartner (fiscaal
+ * partner; de eerste-schijfruimte verdubbelt). De schaal van de schuif is
+ * FISCAAL, geen uitkeercapaciteit — zie BOX2_SIMULATOR_SCHAAL_FACTOR.
+ *
+ * Client-component: lokale slider-state + één aanroep van de pure motor. Geen
+ * Supabase, geen netwerk. Indicatie, geen fiscaal advies.
  */
 
 const PLAYFAIR = 'var(--font-display, var(--font-playfair, Georgia, serif))'
@@ -30,34 +44,8 @@ const PLAYFAIR = 'var(--font-display, var(--font-playfair, Georgia, serif))'
 const BOX2_COLOR = 'var(--module-active-600)'
 const BOX2_HOOG_COLOR = 'var(--module-active-400)'
 
-interface SplitResult {
-  inLow: number
-  inHigh: number
-  taxLow: number
-  taxHigh: number
-  totalTax: number
-  netto: number
-  effectiveRate: number
-  inHighBracket: boolean
-}
-
-function splitDividend(amount: number, grens: number, params: Box2Params): SplitResult {
-  const inLow = Math.min(amount, grens)
-  const inHigh = Math.max(0, amount - grens)
-  const taxLow = inLow * params.tariefLaag
-  const taxHigh = inHigh * params.tariefHoog
-  const totalTax = taxLow + taxHigh
-  return {
-    inLow,
-    inHigh,
-    taxLow,
-    taxHigh,
-    totalTax,
-    netto: amount - totalTax,
-    effectiveRate: amount > 0 ? totalTax / amount : 0,
-    inHighBracket: inHigh > 0,
-  }
-}
+/** Slider-stap in euro's — puur een bedieningsdetail, geen fiscaal getal. */
+const SLIDER_STEP = 1000
 
 function pct(value: number): string {
   return (value * 100).toLocaleString('nl-NL', {
@@ -70,25 +58,59 @@ export function Box2DividendSimulator({
   year = 2026,
   hasPartner = false,
   dailyExpenses = 0,
+  defaultDividend = 0,
+  dgaLeningenTotal = 0,
+  dividendOnbekend = false,
 }: {
   year?: TaxYear
   hasPartner?: boolean
   dailyExpenses?: number
+  /** Het WERKELIJKE Box 2-inkomen (kop). Startstand van de schuif. */
+  defaultDividend?: number
+  /** DGA-leentotaal uit hetzelfde resultaat, zodat de motor identiek rekent. */
+  dgaLeningenTotal?: number
+  /** true = het dividend is niet ingevuld; de kop toont dan geen bedrag. */
+  dividendOnbekend?: boolean
 }) {
   const params = BOX2_PARAMS[year]
   const grens = hasPartner ? params.grensPartner : params.grens
-  // Slider tot ~30% voorbij de partner-grens zodat de hoge schijf altijd
-  // bereikbaar is, ook in single-modus.
-  const sliderMax = Math.round((params.grensPartner * 1.3) / 1000) * 1000
-  const [dividend, setDividend] = useState(grens)
+  // Fiscale schaal: tot ruim voorbij de PARTNER-grens zodat de omslag naar 31%
+  // altijd bereikbaar is, ook in single-modus. Nooit korter dan het werkelijke
+  // inkomen — anders zou de schuif zijn eigen startstand niet kunnen weergeven.
+  const fiscaleSchaalMax =
+    Math.round((params.grensPartner * BOX2_SIMULATOR_SCHAAL_FACTOR) / SLIDER_STEP) * SLIDER_STEP
+  const sliderMax = Math.max(
+    fiscaleSchaalMax,
+    Math.ceil(Math.max(0, defaultDividend) / SLIDER_STEP) * SLIDER_STEP,
+  )
+  const [dividend, setDividend] = useState(Math.max(0, defaultDividend))
   // Entree-reveal — de gestapelde schijf-balk tekent in via width-transition.
   const { ref: revealRef, hasEntered } = useInViewAnimation({ duration: 600 })
 
-  const r = splitDividend(dividend, grens, params)
-  const lowWidthPct = dividend > 0 ? (r.inLow / dividend) * 100 : 0
-  const highWidthPct = dividend > 0 ? (r.inHigh / dividend) * 100 : 0
-  const freedomDays =
-    dailyExpenses > 0 ? Math.round(r.totalTax / dailyExpenses) : 0
+  // ÉÉN motor — dezelfde die de kop voedt, met hetzelfde DGA-leentotaal en
+  // hetzelfde dagtarief. Schijfverdeling, afronding, effectief tarief én
+  // vrijheidsdagen komen dus uit lib/box2-data.ts, niet uit dit bestand.
+  const sim = calculateBox2({
+    deelnemingen: [{ name: 'simulatie', annual_dividend: dividend, disposal_gain: 0 }],
+    year,
+    hasPartner,
+    dailyExpenses,
+    dgaLeningenTotal,
+  })
+  // Netto = wat er van het DIVIDEND overblijft. De excessief-lenen-heffing zit
+  // bewust niet in dit getal: die is verschuldigd over een fictief voordeel, niet
+  // over de uitkering. Ze staat als eigen regel in de uitsplitsing.
+  const netto = dividend - sim.totalTax
+  const lowWidthPct = dividend > 0 ? (sim.incomeLow / dividend) * 100 : 0
+  const highWidthPct = dividend > 0 ? (sim.incomeHigh / dividend) * 100 : 0
+  const inHighBracket = sim.incomeHigh > 0
+  const isDefault = dividend === Math.max(0, defaultDividend)
+
+  const watAlsZin = isDefault
+    ? dividendOnbekend
+      ? 'Je jaarlijks dividend is nog niet ingevuld, dus de schuif start op € 0 — gelijk aan de kop hierboven. Schuif om te zien wat een uitkering zou kosten.'
+      : `De schuif staat op je werkelijke Box 2-inkomen (${formatCurrency(defaultDividend)}), dus deze uitkomst is gelijk aan de kop hierboven. Schuif om een ander uitkeerbedrag door te rekenen.`
+    : `Deze uitkomst hoort bij een uitkering van ${formatCurrency(dividend)} — niet bij je huidige situatie (${dividendOnbekend ? 'nog niet ingevuld' : formatCurrency(defaultDividend)}).`
 
   return (
     <div ref={revealRef} className="border-t border-[var(--ink)] px-5 py-5 sm:px-6">
@@ -96,7 +118,7 @@ export function Box2DividendSimulator({
 
       <p className="mb-4 max-w-[62ch] text-sm leading-snug text-[var(--ink-2)]">
         Schuif het dividend dat je dit jaar uitkeert en zie hoeveel in de lage
-        schijf (24,5%) blijft en wat in de hoge schijf (31%) valt
+        schijf ({pct(params.tariefLaag)}) blijft en wat in de hoge schijf ({pct(params.tariefHoog)}) valt
         {hasPartner ? ' — met fiscaal partner verdubbelt de lage-schijfruimte.' : '.'}
       </p>
 
@@ -118,7 +140,7 @@ export function Box2DividendSimulator({
           type="range"
           min={0}
           max={sliderMax}
-          step={1000}
+          step={SLIDER_STEP}
           value={dividend}
           onChange={(e) => setDividend(Number(e.target.value))}
           className="h-11 w-full cursor-pointer accent-[var(--module-active-500)]"
@@ -129,26 +151,36 @@ export function Box2DividendSimulator({
           <span>grens {formatCurrency(grens)}</span>
           <span>{formatCurrency(sliderMax)}</span>
         </div>
+        {/* Expliciet bijschrift bij de schaal — de bovengrens is fiscaal gekozen
+            (zodat de omslag naar 31% zichtbaar is) en zegt niets over wat je BV
+            daadwerkelijk kán uitkeren. */}
+        <p className="mt-1.5 max-w-[62ch] text-[11px] leading-snug text-[var(--ink-3)]">
+          De schaal loopt tot {formatCurrency(sliderMax)} — ruim voorbij de
+          partner-grens van {formatCurrency(params.grensPartner)}, zodat je de
+          omslag naar {pct(params.tariefHoog)} ziet. Dat is een rekenschaal, geen
+          uitkeercapaciteit van je BV: wat je werkelijk kunt uitkeren volgt uit
+          je vrije reserves.
+        </p>
       </div>
 
       {/* Gestapelde schijf-balk — scherp kader, breedte-draw-in op entree */}
       <div
         className="mb-2 flex h-4 w-full overflow-hidden border border-[var(--ink)] bg-[var(--subtle)]"
         role="img"
-        aria-label={`Verdeling dividend: ${formatCurrency(r.inLow)} in de lage schijf, ${formatCurrency(r.inHigh)} in de hoge schijf`}
+        aria-label={`Verdeling dividend: ${formatCurrency(sim.incomeLow)} in de lage schijf, ${formatCurrency(sim.incomeHigh)} in de hoge schijf`}
       >
-        {r.inLow > 0 && (
+        {sim.incomeLow > 0 && (
           <div
             className="h-full transition-[width] duration-300 ease-out"
             style={{ width: `${hasEntered ? lowWidthPct : 0}%`, backgroundColor: BOX2_COLOR }}
-            title={`Lage schijf (24,5%): ${formatCurrency(r.inLow)}`}
+            title={`Lage schijf (${pct(params.tariefLaag)}): ${formatCurrency(sim.incomeLow)}`}
           />
         )}
-        {r.inHigh > 0 && (
+        {sim.incomeHigh > 0 && (
           <div
             className="h-full transition-[width] duration-300 ease-out"
             style={{ width: `${hasEntered ? highWidthPct : 0}%`, backgroundColor: BOX2_HOOG_COLOR }}
-            title={`Hoge schijf (31%): ${formatCurrency(r.inHigh)}`}
+            title={`Hoge schijf (${pct(params.tariefHoog)}): ${formatCurrency(sim.incomeHigh)}`}
           />
         )}
       </div>
@@ -158,37 +190,56 @@ export function Box2DividendSimulator({
         <div className="flex items-center justify-between gap-3 text-xs">
           <span className="flex items-center gap-1.5 text-[var(--ink-2)]">
             <span className="block h-2.5 w-2.5" style={{ backgroundColor: BOX2_COLOR }} aria-hidden="true" />
-            Lage schijf (24,5%) · {formatCurrency(r.inLow)}
+            Lage schijf ({pct(params.tariefLaag)}) · {formatCurrency(sim.incomeLow)}
           </span>
-          <span className="font-mono tabular-nums text-[var(--ink-2)]">{formatCurrency(r.taxLow)}</span>
+          <span className="font-mono tabular-nums text-[var(--ink-2)]">{formatCurrency(sim.taxLow)}</span>
         </div>
         <div className="flex items-center justify-between gap-3 text-xs">
           <span className="flex items-center gap-1.5 text-[var(--ink-2)]">
             <span className="block h-2.5 w-2.5" style={{ backgroundColor: BOX2_HOOG_COLOR }} aria-hidden="true" />
-            Hoge schijf (31%) · {formatCurrency(r.inHigh)}
+            Hoge schijf ({pct(params.tariefHoog)}) · {formatCurrency(sim.incomeHigh)}
           </span>
-          <span className="font-mono tabular-nums text-[var(--ink-2)]">{formatCurrency(r.taxHigh)}</span>
+          <span className="font-mono tabular-nums text-[var(--ink-2)]">{formatCurrency(sim.taxHigh)}</span>
         </div>
+        {/* Excessief lenen — zichtbaar zodra de motor er iets van maakt, zodat de
+            simulator-uitkomst optelbaar blijft met de kop. */}
+        {sim.dgaExcessTax > 0 && (
+          <div className="flex items-center justify-between gap-3 text-xs">
+            <span className="flex items-center gap-1.5 text-[var(--ink-2)]">
+              <AlertTriangle className="h-3 w-3 shrink-0 text-[var(--negative)]" aria-hidden="true" />
+              Extra heffing excessief lenen
+            </span>
+            <span className="font-mono tabular-nums text-[var(--ink-2)]">{formatCurrency(sim.dgaExcessTax)}</span>
+          </div>
+        )}
       </div>
 
-      {/* Verdict-regel — uniform ScenarioCallout; hoge schijf = negatief (icoon + tekst) */}
+      {/* Verdict-regel — uniform ScenarioCallout; hoge schijf = negatief (icoon + tekst).
+          Bij een uitkering van nul is "je blijft in de lage schijf" een uitspraak
+          over niets: dan nodigt de regel uit tot schuiven i.p.v. te oordelen. */}
       <ScenarioCallout className="mt-1 text-xs">
         <span className="inline-flex items-start gap-2 not-italic">
-          {r.inHighBracket && (
+          {inHighBracket && (
             <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-[var(--negative)]" aria-hidden="true" />
           )}
           <span>
-            {r.inHighBracket ? (
+            {dividend === 0 ? (
+              <>
+                Nog geen uitkering ingevuld. Schuif om te zien hoe een dividend
+                zich over de schijven verdeelt — je lage-schijfruimte is{' '}
+                <span className="font-mono tabular-nums font-semibold text-[var(--ink)]">{formatCurrency(grens)}</span>.
+              </>
+            ) : inHighBracket ? (
               <>
                 Je dividend valt voor{' '}
-                <span className="font-mono tabular-nums font-semibold text-[var(--ink)]">{formatCurrency(r.inHigh)}</span>{' '}
-                in de hoge schijf (31%). Onder {formatCurrency(grens)} blijf je
+                <span className="font-mono tabular-nums font-semibold text-[var(--ink)]">{formatCurrency(sim.incomeHigh)}</span>{' '}
+                in de hoge schijf ({pct(params.tariefHoog)}). Onder {formatCurrency(grens)} blijf je
                 volledig in de lage schijf — uitsmeren over meerdere jaren of de
                 partner-ruimte benutten kan schelen.
               </>
             ) : (
               <>
-                Je blijft volledig in de lage schijf (24,5%). Er is nog{' '}
+                Je blijft volledig in de lage schijf ({pct(params.tariefLaag)}). Er is nog{' '}
                 <span className="font-mono tabular-nums font-semibold text-[var(--ink)]">{formatCurrency(grens - dividend)}</span>{' '}
                 ruimte tot de grens van {formatCurrency(grens)}.
               </>
@@ -197,25 +248,32 @@ export function Box2DividendSimulator({
         </span>
       </ScenarioCallout>
 
+      {/* Wat-als-markering — BOVEN de bedragen, zodat een vluchtige lezer de
+          uitkomst niet als "wat ik betaal" meeneemt (bevinding H26). */}
+      <div className="mt-4 border-t border-[var(--rule-soft)] pt-3">
+        <Kicker size="small" className="mb-1">Wat-als · niet je huidige aangifte</Kicker>
+        <p className="max-w-[62ch] text-[11px] leading-snug text-[var(--ink-2)]">{watAlsZin}</p>
+      </div>
+
       {/* Totalen — via FiguresStrip (top/bottom-rule), Box 2-heffing als hoofduitkomst */}
       <FiguresStrip
         cols={3}
         figures={[
-          { kicker: 'Box 2-heffing', amount: formatCurrency(r.totalTax), variant: 'winner' },
-          { kicker: 'Netto', amount: formatCurrency(r.netto) },
-          { kicker: 'Effectief', amount: pct(r.effectiveRate) },
+          { kicker: 'Box 2-heffing bij dit scenario', amount: formatCurrency(sim.totalTaxInclDga), variant: 'winner' },
+          { kicker: 'Netto dividend', amount: formatCurrency(netto) },
+          { kicker: 'Effectief tarief', amount: pct(sim.effectiveRate) },
         ]}
       />
 
-      {freedomDays > 0 && (
+      {sim.freedomDays > 0 && (
         <div className="-mt-1 flex items-center gap-1.5 text-[11px] text-[var(--ink-3)]">
           <Clock className="h-3 w-3" aria-hidden="true" />
-          De heffing kost {freedomDays} vrijheidsdagen
+          Bij dit scenario kost de heffing {sim.freedomDays} vrijheidsdagen
         </div>
       )}
 
       <ScenarioCallout className="mt-4" title="Indicatie, geen advies.">
-        Op basis van de Box 2-staffel {year}. De slider verandert je werkelijke
+        Op basis van de Box 2-staffel {year}. De schuif verandert je werkelijke
         aangifte niet.
       </ScenarioCallout>
     </div>

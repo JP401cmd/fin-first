@@ -44,6 +44,22 @@ describe('OffTrackDoelenLijst', () => {
     expect(container.firstChild).toBeNull()
   })
 
+  // Bevinding M31 — tweede oppervlak. Een zojuist aangemaakt doel hoort niet in
+  // de actielijst. De guard zit bij de bron (computeGoalProgress houdt `onTrack`
+  // op true zolang er niets te meten valt), niet in dit component; deze test
+  // pint vast dat die keuze hier daadwerkelijk doorwerkt.
+  it('toont een vers doel niet: onTrack blijft true zolang er niets gemeten is', () => {
+    const { container } = render(
+      <OffTrackDoelenLijst
+        goals={[mockGoal({ current_value: 0 })]}
+        goalProgresses={[
+          { current: 0, target: 50000, pct: 0, onTrack: true, eta: 'jul 2027' },
+        ]}
+      />,
+    )
+    expect(container.firstChild).toBeNull()
+  })
+
   it('toont alleen off-track doelen (niet onTrack, pct < 100)', () => {
     render(
       <OffTrackDoelenLijst

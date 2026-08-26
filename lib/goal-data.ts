@@ -2,6 +2,13 @@
  * Goal types, labels, and progress helpers for the Fin module.
  */
 
+import {
+  GOAL_PACE_DAYS_PER_MONTH,
+  GOAL_PACE_GRACE_DAYS,
+  GOAL_PACE_MIN_MEASURE_MONTHS,
+  GOAL_PACE_TOLERANCE,
+} from '@/lib/constants'
+
 export type GoalType =
   | 'savings'
   | 'debt_payoff'
@@ -207,6 +214,61 @@ export type GoalProgressInput = Pick<
   'goal_type' | 'current_value' | 'target_value' | 'target_date'
 > & { created_at?: string }
 
+export type GoalProgressOptions = {
+  /**
+   * Vervangt de uit `target_date` afgeleide `eta` door een door een canonieke
+   * motor GEPROJECTEERDE datum (bevinding C10). Alleen gezet voor doelen die een
+   * live tracker zijn — vandaag uitsluitend het vrijheidsgetal-doel, waar de
+   * datum uit de FIRE-countdown komt (`lib/goals/vrijheidsgetal-goal.ts`).
+   *
+   * Bewust een OPTIE en geen veld op het doel-object: `GoalProgressInput`
+   * spiegelt DB-kolommen, en dit is een afgeleide weergavewaarde. `onTrack`
+   * blijft ongemoeid op `target_date` staan — dat is de ambitie die de gebruiker
+   * zelf invoerde, en die blijft de meetlat voor "op koers".
+   */
+  etaOverride?: string | null
+}
+
+/**
+ * Canonieke uitkomst van `computeGoalProgress` — de ENE vorm waarin elk
+ * oppervlak (doelenpagina, dashboard-widget, /overzicht-hero, acties-lijst,
+ * nav-kaarten, briefing) doelvoortgang consumeert. Importeer dit type i.p.v.
+ * de vorm lokaal over te tikken: een oppervlak dat een veld mist, mist een
+ * oordeel.
+ */
+export type GoalProgress = {
+  current: number
+  target: number
+  /** 0–100, richting-bewust afgerond. */
+  pct: number
+  /**
+   * "Haal je het tempo?" — bij een 'up'-doel MET streefdatum de pace-toets
+   * (benodigde inleg/maand vs. feitelijke inleg/maand), anders het bestaande
+   * richting-/tolerantie-oordeel. `true` betekent altijd "geen probleem
+   * gesignaleerd": ook wanneer er (nog) niets te meten valt (`measured: false`),
+   * zodat geen enkel oppervlak vals alarm slaat op een vers doel.
+   */
+  onTrack: boolean
+  /**
+   * Valt er iets te oordelen? `false` uitsluitend bij een VERS doel met
+   * streefdatum waarop nog geen bijdrage staat (bevinding M31): binnen
+   * `GOAL_PACE_GRACE_DAYS` na aanmaak én `current === 0`. Een oppervlak hoort
+   * dan "net begonnen" te tonen i.p.v. een stoplicht — niet zelf iets afleiden
+   * uit `pct === 0`.
+   */
+  measured: boolean
+  /**
+   * Wat er vanaf NU per maand bij moet om de streefdatum te halen, in de
+   * EENHEID VAN HET DOEL (euro's voor de EUR-types, procenten voor
+   * `savings_rate`, …). `null` zonder streefdatum, bij een verstreken
+   * streefdatum en bij een 'down'-doel (een leeftijdsdoel heeft geen maandinleg).
+   * Bevinding M32 vraagt dit expliciet op het scherm, zodat het stoplicht
+   * navolgbaar wordt.
+   */
+  requiredMonthly: number | null
+  eta: string | null
+}
+
 /**
  * Compute goal progress.
  * For debt_payoff, progress = how much has been paid off.
@@ -215,55 +277,94 @@ export type GoalProgressInput = Pick<
  * Richting-bewust: bij `direction: 'down'` (lager-is-beter, bv. `fire_age`) is
  * het doel een LAGERE waarde dan de huidige; voortgang = target / current. Alle
  * bestaande types zijn 'up' (default) en behouden exact hun gedrag.
+ *
+ * ON-TRACK = PACE-TOETS (bevindingen M31 + M32, 26 aug 2026). Voorheen mat de
+ * 'up'-tak een lineaire TIJD-FRACTIE sinds `created_at`; `target_value` kwam in
+ * die verwachting niet voor (alleen in `pct`), waardoor een doel zwaarder maken
+ * de status ongewijzigd kon laten en een vers doel per constructie meteen rood
+ * stond. Nu: benodigde inleg per maand tot de streefdatum versus de feitelijk
+ * gerealiseerde inleg per maand.
  */
-export function computeGoalProgress(goal: GoalProgressInput): {
-  current: number
-  target: number
-  pct: number
-  onTrack: boolean
-  eta: string | null
-} {
+export function computeGoalProgress(goal: GoalProgressInput, options?: GoalProgressOptions): GoalProgress {
   const current = Number(goal.current_value)
   const target = Number(goal.target_value)
 
   const direction = GOAL_TYPE_META[goal.goal_type]?.direction ?? 'up'
+  const etaOverride = options?.etaOverride ?? null
 
   if (direction === 'down') {
     // Lager-is-beter. Ongeldig doel of nog geen (positieve) huidige waarde →
-    // 0% en niet op koers (geen stale/misleidende voortgang).
+    // 0% en niet op koers (geen stale/misleidende voortgang). `measured: false`
+    // markeert die tweede tak als "nog geen meting" — exact de lezing die
+    // ParameterGoalCard al hanteerde; `onTrack` blijft bewust ongewijzigd.
     if (target <= 0 || !Number.isFinite(current) || current <= 0) {
-      return { current, target, pct: 0, onTrack: false, eta: null }
+      return { current, target, pct: 0, onTrack: false, measured: false, requiredMonthly: null, eta: null }
     }
     const pct = Math.max(0, Math.min(Math.round((target / current) * 100), 100))
     const onTrack = current <= target + DOWN_GOAL_ONTRACK_TOLERANCE
-    // target_date-tijdlijnlogica is alleen zinvol voor 'up'-doelen.
-    return { current, target, pct, onTrack, eta: null }
+    // target_date-tijdlijnlogica (en dus ook `etaOverride`) is alleen zinvol voor
+    // 'up'-doelen; een `down`-doel is zelf al een leeftijd, geen datum — en dus
+    // ook geen benodigde maandinleg.
+    return { current, target, pct, onTrack, measured: true, requiredMonthly: null, eta: null }
   }
 
-  if (target <= 0) return { current, target, pct: 0, onTrack: false, eta: null }
+  if (target <= 0) {
+    return { current, target, pct: 0, onTrack: false, measured: false, requiredMonthly: null, eta: etaOverride }
+  }
 
   const pct = Math.min(Math.round((current / target) * 100), 100)
 
-  // Estimate ETA based on target_date
+  // Zonder streefdatum is er geen planning om tegen af te zetten: het doel is
+  // per definitie "op koers" (bestaand gedrag) en er is geen maandinleg te
+  // berekenen. Dat is een geldig oordeel, dus `measured` blijft true.
   let onTrack = true
-  let eta: string | null = null
+  let measured = true
+  let requiredMonthly: number | null = null
+  // Een canonieke projectie wint van de opgeslagen streefdatum: dát is het
+  // antwoord op "wanneer haal ik dit", terwijl `target_date` de ambitie is.
+  let eta: string | null = etaOverride
 
   if (goal.target_date) {
     const targetDate = new Date(goal.target_date)
     const now = new Date()
     const daysLeft = Math.max(0, (targetDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+    const monthsLeft = daysLeft / GOAL_PACE_DAYS_PER_MONTH
     const createdMs = goal.created_at ? new Date(goal.created_at).getTime() : NaN
-    const totalDays = (targetDate.getTime() - createdMs) / (1000 * 60 * 60 * 24)
+    const elapsedDays = (now.getTime() - createdMs) / (1000 * 60 * 60 * 24)
 
-    if (totalDays > 0 && daysLeft > 0) {
-      const expectedPct = ((totalDays - daysLeft) / totalDays) * 100
-      onTrack = pct >= expectedPct * 0.9 // 10% tolerance
+    if (monthsLeft > 0) {
+      // Benodigd tempo vanaf nu — hier komt `target_value` de toets binnen, en
+      // precies dát ontbrak in de oude tijd-fractie-heuristiek (M32).
+      requiredMonthly = Math.max(0, target - current) / monthsLeft
+
+      // Feitelijk tempo sinds aanmaak (eigenaarsbesluit 26-08-2026, optie A:
+      // bestaande data, geen nieuw veld/historie). Dat mag omdat `current_value`
+      // bij aanmaken op 0 staat — alles wat er nu in zit, is er sindsdien in
+      // gekomen. Zonder `created_at` (lichte projecties zoals TopGoal) is er
+      // geen meetperiode: dan geen pace-oordeel, en `onTrack` blijft true.
+      if (Number.isFinite(elapsedDays)) {
+        measured = current > 0 || elapsedDays >= GOAL_PACE_GRACE_DAYS
+        if (measured) {
+          const monthsElapsed = Math.max(
+            elapsedDays / GOAL_PACE_DAYS_PER_MONTH,
+            GOAL_PACE_MIN_MEASURE_MONTHS,
+          )
+          const actualMonthly = current / monthsElapsed
+          onTrack = actualMonthly >= requiredMonthly * (1 - GOAL_PACE_TOLERANCE)
+        }
+      }
+    } else if (current < target) {
+      // Streefdatum verstreken en het doel niet gehaald. Er is geen maandinleg
+      // meer die dit nog redt; "op koers" zou hier onwaar zijn.
+      onTrack = false
     }
 
-    eta = targetDate.toLocaleDateString('nl-NL', { month: 'short', year: 'numeric' })
+    if (etaOverride == null) {
+      eta = targetDate.toLocaleDateString('nl-NL', { month: 'short', year: 'numeric' })
+    }
   }
 
-  return { current, target, pct, onTrack, eta }
+  return { current, target, pct, onTrack, measured, requiredMonthly, eta }
 }
 
 /**

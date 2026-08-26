@@ -51,10 +51,17 @@ export function Box3Peildatum({ year }: { year: TaxYear }) {
         className="mt-4 text-sm italic leading-snug text-[var(--ink-2)]"
         style={{ fontFamily: SOURCE_SERIF }}
       >
+        {/* H24 (Wft): beschrijvend, niet sturend. De oude zin ("rond de
+            jaarwisseling spaargeld aanhouden in plaats van beleggen verlaagt
+            tijdelijk je heffing") was een instructie over wánneer tussen
+            spaargeld en beleggingen te schuiven — dat raakt
+            beleggingsdienstverlening. Wat blijft: uitleggen hoe de meting
+            werkt, en waarom de antimisbruikregel bestaat. */}
         Je Box 3-vermogen wordt gemeten op{' '}
         <span className="not-italic font-semibold text-[var(--ink)]">1 januari {year}</span>.
-        Beleggingen tellen zwaarder mee dan spaargeld, dus rond de jaarwisseling
-        spaargeld aanhouden in plaats van beleggen verlaagt tijdelijk je heffing.
+        Beleggingen tellen mee met een hoger forfaitair rendement dan spaargeld,
+        dus de verhouding op die ene dag bepaalt je grondslag voor het hele
+        jaar. Precies daarom bestaat er een antimisbruikregel.
       </p>
 
       <ScenarioCallout title="Antimisbruikregel." className="mt-4 text-xs">

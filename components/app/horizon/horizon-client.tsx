@@ -112,6 +112,12 @@ import { type ScenarioPresetResult } from '@/lib/horizon/scenario-presets'
 import { computeStopMarge } from '@/lib/horizon/stop-marge'
 import { selectDoelLijnBron } from '@/lib/horizon/doel-lijn-bron'
 import {
+  resolveHeroFireAge,
+  formatHeroFireAge,
+  heroFireAgeCaption,
+  isHeroAnswerPending,
+} from '@/lib/horizon/hero-fire-age'
+import {
   scenarioMonthlySpendDelta,
   buildCategorieReturnGroups,
   isDoelConceptGewijzigd,
@@ -508,7 +514,20 @@ export default function HorizonPage({
   const [profileRaw, setProfileRaw] = useState<Record<string, unknown> | null>(null)
   const [estimatedYearlyIncome, setEstimatedYearlyIncome] = useState(0)
   const [fireStrategy, setFireStrategy] = useState<FireStrategyConfig | undefined>(initialData?.fireStrategy ?? undefined)
-  const [userAowAge, setUserAowAge] = useState<AowAge>({ years: 67, months: 0, fractional: 67, isDefinitive: false })
+  /**
+   * AOW-leeftijd. SYNCHROON geseed uit de server-voorgeladen wettelijke tabel
+   * (`initialData.aowRows`) i.p.v. de hardcoded 67-terugval; de mount-fetch
+   * (regel ±1358) ververst 'm daarna alleen nog bij een legacy-DB zonder tabel.
+   *
+   * WAAROM (bevinding C1): in pensioen-modus TOONT de hero deze leeftijd als
+   * kernantwoord. Startte hij op de terugval, dan las de gebruiker eerst "67
+   * jaar" en daarna zijn echte AOW-leeftijd — de "exact 67" uit de bevinding.
+   * `lookupAowAge` geeft zelf de 67-terugval als de tabel leeg is, dus dit is
+   * gedragsidentiek waar er niets te seeden valt.
+   */
+  const [userAowAge, setUserAowAge] = useState<AowAge>(() =>
+    lookupAowAge(initialData.aowRows ?? [], initialData.effectiveInput?.dateOfBirth ?? null),
+  )
   // ── Kernel-context (horizon-kernel = de enige motor) ──
   /** Rauwe profiel-rij (incl. kernel-instellingen-kolommen + geïnjecteerde
    *  yearly_essential_expenses) — kern-invoerbron voor de convergentie-router. Server-
@@ -960,7 +979,7 @@ export default function HorizonPage({
   // Fase 2b (#495): gemigreerd naar runUnifiedProjection() met per-asset-type rendement
   // Task 4.2: de kernel-runs draaien in een web worker (met synchrone jsdom/SSR-fallback);
   // `firstPaint*` levert de server-scalars zolang de worker-run nog niet geland is.
-  const { result: simResult, cashflows: simCashflows, error: simError, unifiedRows, effectiveLifeEvents, kernelStatus, kernelMaandHint, kernelHousingSale, scenario, stopPad, scenarioPending, stopPadPending, firstPaintFireAge, firstPaintFreedomPct, firstPaintRequiredPortfolio } = useHorizonFireSim(
+  const { result: simResult, cashflows: simCashflows, error: simError, unifiedRows, effectiveLifeEvents, kernelStatus, kernelMaandHint, kernelHousingSale, scenario, stopPad, scenarioPending, stopPadPending, isRefining: kernelIsRefining, firstPaintFireAge, firstPaintFreedomPct, firstPaintRequiredPortfolio } = useHorizonFireSim(
     input
       ? {
           horizonInput: input,
@@ -2125,7 +2144,10 @@ export default function HorizonPage({
   // Task 4.2 (progressieve first paint): zolang de worker-run nog niet geland is, wint de
   // server-scalar (`firstPaintRequiredPortfolio`) boven de client-side `fire`-fallback, zodat
   // de hero meteen het canonieke doelbedrag toont (consume, don't recompute) i.p.v. te flitsen.
-  const effectiveFireTarget = simResult?.requiredFirePortfolio ?? firstPaintRequiredPortfolio ?? fire?.fireTarget ?? 0
+  // C1: `fire?.fireTarget` (computeFireProjection) is hier VERWIJDERD als laatste
+  // terugval — dat is een tweede motor op hetzelfde doelbedrag. Blijft over: de
+  // kernel, en anders de server-scalar die zélf uit de kernel komt.
+  const effectiveFireTarget = simResult?.requiredFirePortfolio ?? firstPaintRequiredPortfolio ?? 0
   const effectiveNetWorth = (effectiveInput?.totalAssets ?? 0) - (effectiveInput?.totalDebts ?? 0)
   // Canonieke grondslag (ADR 0009): FIRE-eligible vermogen (huis gefilterd via
   // de housing-strategie) ÷ benodigde portfolio via computeFreedomProgress —
@@ -2194,9 +2216,10 @@ export default function HorizonPage({
   // (fireTargetInclHome = requiredFireNetWorth) tenzij de woning is uitgesloten
   // (exclude_from_fire) → dan het liquide excl.-doel. Consistent met de noemer
   // van effectiveFreedomPct, zodat de balk-fill en het balk-label niet botsen.
+  // Zelfde C1-regel als bij `effectiveFireTarget`: alleen kernel-afgeleide bronnen.
   const balkVrijheidDoel = homeExcludedFromProgress
-    ? (simResult?.requiredFirePortfolio ?? fire?.fireTarget ?? 0)
-    : (fireTargetInclHome ?? simResult?.requiredFirePortfolio ?? fire?.fireTarget ?? 0)
+    ? (simResult?.requiredFirePortfolio ?? firstPaintRequiredPortfolio ?? 0)
+    : (fireTargetInclHome ?? simResult?.requiredFirePortfolio ?? firstPaintRequiredPortfolio ?? 0)
 
   // ── AOW-stop shortfall detectie ────────────────────────────────────────
   const isShortfallScenario = !isPensioenMode
@@ -2214,6 +2237,39 @@ export default function HorizonPage({
   const aowAgeFormatted = userAowAge.months > 0
     ? `${userAowAge.years}j + ${userAowAge.months}m`
     : `${userAowAge.years} jaar`
+
+  // ── KERNANTWOORD: één bron voor de vrijheids-/pensioenleeftijd (bevinding C1) ─
+  // De hero-KPI, de kassabon eronder en de welkomst-/exit-overlay tonen dezelfde
+  // vraag. Voorheen mocht elk oppervlak zelf een terugval kiezen zodra de kernel
+  // nog niet klaar was — waaronder `fire.fireAge` uit computeFireProjection, een
+  // TWEEDE motor met eigen aannames. Daardoor gaf dezelfde ongewijzigde invoer
+  // per laadbeurt een ander antwoord. Nu beslist één pure resolver welk getal
+  // wint én hoe hard het is; is er geen kernel-antwoord, dan zeggen we dat
+  // ("voorlopig" / "wordt berekend") in plaats van een tweede getal te tonen.
+  const heroFireAge = resolveHeroFireAge({
+    hasKernelResult: simResult != null,
+    kernelFireAgeFractional: simResult?.fireAgeFractional ?? null,
+    kernelFireAge: simResult?.fireAge ?? null,
+    isPensioenMode,
+    aowAgeFractional: userAowAge.fractional,
+    // De wettelijke tabel is server-voorgeladen; is hij leeg, dan staat
+    // `userAowAge` nog op de 67-terugval en is het getal dus voorlopig.
+    aowTableLoaded: aowRows.length > 0,
+    snapshotFireAge: firstPaintFireAge,
+    isRefining: kernelIsRefining,
+  })
+  const heroFireAgePending = isHeroAnswerPending(heroFireAge)
+  const heroFireAgeText = formatHeroFireAge(heroFireAge, { aowText: aowAgeFormatted, dash: '–', pendingText: '···' })
+  const heroFireAgeTextMobile = formatHeroFireAge(heroFireAge, { aowText: aowAgeFormatted, dash: '-', pendingText: '···' })
+  /** Kassabon-vorm: mét eenheid, en "Niet bereikbaar" i.p.v. een streepje. */
+  const heroFireAgeReceiptText =
+    heroFireAge.bron === 'aow-tabel'
+      ? aowAgeFormatted
+      : heroFireAge.age != null
+        ? `${heroFireAge.age.toFixed(1)} jaar`
+        : heroFireAge.status === 'berekenen'
+          ? 'Wordt berekend…'
+          : 'Niet bereikbaar'
   const aowAgeInt = Math.floor(userAowAge.fractional)
   // Use startPortfolio of the first retirement row at AOW age = actual portfolio AT AOW
   // (not endPortfolio which is after a year of withdrawals). Fallback to firePortfolioAtFire
@@ -4227,7 +4283,9 @@ export default function HorizonPage({
   const heroFreedomFraming = resolveFreedomFraming({
     freedomPct: effectiveFreedomPct,
     currentAge,
-    fireAge: simResult?.fireAgeFractional ?? simResult?.fireAge ?? firstPaintFireAge ?? fire?.fireAge ?? null,
+    // Consume-only: exact hetzelfde kernantwoord als de KPI eronder — nooit
+    // een eigen precedentieketen (dat was juist de drift-bron van C1).
+    fireAge: heroFireAge.age,
     strategy: fireStrategy?.strategy,
     aowAge: userAowAge.fractional,
   })
@@ -4368,16 +4426,19 @@ export default function HorizonPage({
                 <span className="font-serif text-[28px] font-bold tracking-tight text-[var(--ink)]">{freeHeroPhrase}.</span>
               ) : (
                 <>
-                  <span className="font-display text-[36px] font-bold tracking-tight text-[var(--ink)]">
+                  <span
+                    className="font-display text-[36px] font-bold tracking-tight text-[var(--ink)]"
+                    aria-busy={!hasPerspectiveHero && heroFireAgePending}
+                  >
                     {hasPerspectiveHero
                       ? (perspectiveHero!.fireAge !== null ? Math.round(perspectiveHero!.fireAge) : '-')
-                      : isPensioenMode
-                        ? aowAgeFormatted
-                        : simResult?.fireAgeFractional != null
-                          ? simResult.fireAgeFractional.toFixed(1)
-                          : fire.fireAge !== null ? Math.round(fire.fireAge) : '-'}
+                      : heroFireAgeTextMobile}
                   </span>
-                  <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">{isPensioenMode ? 'pensioenleeftijd' : 'vrijheidsleeftijd'}</span>
+                  <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">
+                    {hasPerspectiveHero
+                      ? (isPensioenMode ? 'pensioenleeftijd' : 'vrijheidsleeftijd')
+                      : heroFireAgeCaption(heroFireAge, isPensioenMode ? 'pensioenleeftijd' : 'vrijheidsleeftijd')}
+                  </span>
                 </>
               )}
             </button>
@@ -4391,6 +4452,10 @@ export default function HorizonPage({
               onClick={() => setShowFireAgeReceipt(true)}
               className="p-4 border-r border-[var(--rule-soft)] last:border-r-0 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
               data-testid="hero-stat-fire-age"
+              // Hardheid van het kernantwoord machineleesbaar (C1) — voedt de
+              // UAT-controle "3-5x herladen geeft hetzelfde antwoord".
+              data-fire-age-status={hasPerspectiveHero ? 'perspectief' : heroFireAge.status}
+              aria-busy={!hasPerspectiveHero && heroFireAgePending}
               title={hasPerspectiveHero ? (isPartnerView ? `FIRE-leeftijd van ${perspectiveHero!.householdName}` : 'Gezamenlijke FIRE-leeftijd op basis van gecombineerd vermogen en gedeelde uitgaven') : isPensioenMode ? 'AOW-leeftijd op basis van je geboortedatum' : undefined}
             >
               <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1.5">
@@ -4412,18 +4477,18 @@ export default function HorizonPage({
                     ? freeHeroPhrase
                     : hasPerspectiveHero
                       ? (perspectiveHero!.fireAge !== null ? Math.round(perspectiveHero!.fireAge) : '–')
-                      : isPensioenMode
-                        ? aowAgeFormatted
-                        : simResult?.fireAgeFractional != null
-                          ? simResult.fireAgeFractional.toFixed(1)
-                          : fire.fireAge !== null ? Math.round(fire.fireAge) : '–'}
+                      : heroFireAgeText}
                 </span>
               </div>
               <div
                 className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
                 style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
               >
-                {showFreeHero ? '' : hasPerspectiveHero ? (isPartnerView ? `jaar (${perspectiveHero!.householdName})` : 'jaar (huishouden)') : isPensioenMode ? 'AOW-leeftijd' : 'jaar'}
+                {showFreeHero
+                  ? ''
+                  : hasPerspectiveHero
+                    ? (isPartnerView ? `jaar (${perspectiveHero!.householdName})` : 'jaar (huishouden)')
+                    : heroFireAgeCaption(heroFireAge, isPensioenMode ? 'AOW-leeftijd' : 'jaar')}
               </div>
             </button>
 
@@ -4626,18 +4691,14 @@ export default function HorizonPage({
                     ? freeHeroPhrase
                     : hasPerspectiveHero
                       ? (perspectiveHero!.fireAge !== null ? Math.round(perspectiveHero!.fireAge) : '–')
-                      : isPensioenMode
-                        ? aowAgeFormatted
-                        : simResult?.fireAgeFractional != null
-                          ? simResult.fireAgeFractional.toFixed(1)
-                          : fire.fireAge !== null ? Math.round(fire.fireAge) : '–'}
+                      : heroFireAgeText}
                 </span>
               </div>
               <div
                 className="italic text-[10px] text-[var(--ink-3)] mt-1"
                 style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
               >
-                {showFreeHero ? '' : 'jaar'}
+                {showFreeHero ? '' : hasPerspectiveHero ? 'jaar' : heroFireAgeCaption(heroFireAge, 'jaar')}
               </div>
             </button>
 
@@ -5329,7 +5390,7 @@ export default function HorizonPage({
                 visible={!welcomeDismissed}
                 netWorth={effectiveNetWorth}
                 dailyExpenseRate={canonicalDailyRate}
-                freedomAge={hasPerspectiveHero ? perspectiveHero!.fireAge : isPensioenMode ? userAowAge.fractional : simResult?.fireAgeFractional ?? fire.fireAge}
+                freedomAge={hasPerspectiveHero ? perspectiveHero!.fireAge : heroFireAge.age}
                 isPensioen={isPensioenMode}
                 masked={masked}
                 // Stil sluiten (✕/Escape/achtergrond): alleen wegklikken, de
@@ -5403,11 +5464,7 @@ export default function HorizonPage({
                           netWorth: effectiveNetWorth,
                           // Vrijheidsleeftijd: EXACT dezelfde bron + precedentie als de
                           // hero-KPI "vrijheidsleeftijd" (single-source, niet herberekend).
-                          freedomAge: hasPerspectiveHero
-                            ? perspectiveHero!.fireAge
-                            : isPensioenMode
-                              ? userAowAge.fractional
-                              : simResult?.fireAgeFractional ?? fire.fireAge,
+                          freedomAge: hasPerspectiveHero ? perspectiveHero!.fireAge : heroFireAge.age,
                           masked,
                           isPensioen: isPensioenMode,
                         }}
@@ -8046,6 +8103,10 @@ export default function HorizonPage({
                     </div>
                     {/* Per-partner FIRE age estimate */}
                     {fire && (() => {
+                      // tweede-motor: exempt — GEEN kernantwoord. Dit is de losse
+                      // scheidings-schatting in de what-if: hij vergelijkt een
+                      // ruwe vóór/ná op één en dezelfde scalar-basis. Het getal
+                      // wordt nergens naast het hero-antwoord getoond. Zie C1.
                       const currentFireAge = fire.fireAge
                       // Rough estimate: after scheiding, net worth drops by (1-behoudPct/100), monthly costs change
                       const alimentatiePartner = Number(formMetadata.partneralimentatieBedrag) || 0
@@ -8432,6 +8493,8 @@ export default function HorizonPage({
           allRows={unifiedRows ?? []}
           monthlyIncome={effectiveInput?.monthlyIncome}
           savingsRate6m={healthScoreInput.savingsRate6m}
+          // tweede-motor: exempt — fase-modal-invoer, geen hero-KPI; de modal
+          // rekent zijn eigen strategie-bewuste doel door. Zie C1.
           fireTarget={fire?.fireTarget}
           hasPartner={initialData.hasPartner}
           marginaalTarief={fireParams.marginaalTarief}
@@ -8577,13 +8640,7 @@ export default function HorizonPage({
 
             <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
               <span className="text-[var(--ink)]">{isPensioenMode ? 'Pensioenleeftijd' : 'Vrijheidsleeftijd'}</span>
-              <span className="tabular-nums text-[var(--ink)]">
-                {isPensioenMode
-                  ? aowAgeFormatted
-                  : simResult?.fireAgeFractional != null
-                    ? `${simResult.fireAgeFractional.toFixed(1)} jaar`
-                    : fire?.fireAge !== null ? `${Math.round(fire!.fireAge!)} jaar` : 'Niet bereikbaar'}
-              </span>
+              <span className="tabular-nums text-[var(--ink)]">{heroFireAgeReceiptText}</span>
             </div>
 
             {!isPensioenMode && range && range.optimistic.fireAge !== null && range.pessimistic.fireAge !== null && (
@@ -8634,13 +8691,7 @@ export default function HorizonPage({
               )}
               <div className="flex justify-between py-0.5">
                 <span className="font-sans text-sm text-[var(--ink-2)]">{isPensioenMode ? 'Pensioenleeftijd' : 'Vrijheidsleeftijd'}</span>
-                <span className="tabular-nums text-[var(--ink)]">
-                  {isPensioenMode
-                    ? aowAgeFormatted
-                    : simResult?.fireAgeFractional != null
-                      ? `${simResult.fireAgeFractional.toFixed(1)} jaar`
-                      : fire?.fireAge !== null ? `${Math.round(fire!.fireAge!)} jaar` : '-'}
-                </span>
+                <span className="tabular-nums text-[var(--ink)]">{heroFireAgeReceiptText}</span>
               </div>
               <div className="flex justify-between py-0.5">
                 <span className="font-sans text-sm text-[var(--ink-2)]">{isPensioenMode ? 'Jaren tot pensioen' : 'Jaren tot vrijheid'}</span>

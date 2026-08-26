@@ -118,6 +118,8 @@ function jaarruimteSection(besparing: number, opts?: { hasData?: boolean }): Goa
     goal: GOAL_BY_ID['jaarruimte-maximaal'],
     grossYearlyIncome: 70_000,
     pensionFactorA: 1_500,
+    // Ingevulde factor A → bekend (H23-veld; raakt de kansen-som niet).
+    pensionFactorAKnown: true,
     dailyExpenses,
     hasData: opts?.hasData ?? true,
     besparing,

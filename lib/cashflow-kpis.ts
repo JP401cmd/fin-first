@@ -54,8 +54,13 @@ import { resolveEffectiveIncomeExpenses, type IncomeExpenseSources } from '@/lib
 import { buildBudgetTypeMap } from '@/lib/budget-utils'
 import { loadBudgetBasis } from '@/lib/household/budget-share'
 import type { BudgetBasisRow } from '@/lib/budget-basis'
-import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
-import { computeSavingsRate6m, computeDebtAflossingMonthly } from '@/lib/savings-source'
+import { localMonthBounds } from '@/lib/month-range'
+import {
+  computeSavingsRate6m,
+  computeDebtAflossingMonthly,
+  savingsRateWindow,
+  savingsRateDataMonths,
+} from '@/lib/savings-source'
 import { computeSavingsRateFromNetWorthDelta } from '@/lib/core-metrics'
 import { computeExpectedAnnualAppreciation, type Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
@@ -344,19 +349,16 @@ export function deriveSavingsHistory(snapshots: NetWorthSnapshotRow[]): MonthVal
 
 /**
  * Aantal maanden werkelijke data (1-6) voor de extrapolatie in de 6-maands
- * spaarquote: het aantal kalendermaanden tussen de vroegste inkomsten-transactie
- * en nu, geklemd op [1, 6]. Geen inkomsten-datum → 6 (geen extrapolatie).
+ * spaarquote.
  *
- * Verplaatst uit `loadDashboardData` (was ~r807-814); `lib/lever-scores-loader.ts`
- * en `lib/horizon-data-loader.ts` dragen dezelfde afleiding inline.
+ * DELEGEERT sinds bevinding C6 naar `savingsRateDataMonths` (lib/savings-source.ts),
+ * waar de telling naast het venster woont dat ze moet beschrijven. De vier
+ * loaders die deze afleiding elk inline droegen (dashboard/core/horizon/lever)
+ * lezen nu allemaal diezelfde bron. Blijft hier als naam bestaan omdat
+ * `loadDashboardData` en `loadCashflowKpis` hem onder deze naam consumeren.
  */
 export function deriveDataMonths6(now: Date, earliestIncomeDate: string | null | undefined): number {
-  if (!earliestIncomeDate) return 6
-  const earliest = new Date(earliestIncomeDate)
-  return Math.max(1, Math.min(6,
-    (now.getFullYear() - earliest.getFullYear()) * 12 +
-    (now.getMonth() - earliest.getMonth())
-  ))
+  return savingsRateDataMonths(now, earliestIncomeDate)
 }
 
 /** De budget-ID's (parent + child) van één type, uit de gedeelde type-map. */
@@ -377,25 +379,27 @@ export interface SavingsRate6mWindow {
  * Het 6-maands sub-venster op het 12-maands maandaggregaat: inkomsten, uitgaven
  * en spaarbudget-stortingen, alle drie transfer-gefilterd.
  *
- * Verplaatst uit `loadDashboardData` (was ~r792-805). Zes KALENDERmaanden
- * inclusief de huidige = vijf maanden terug (`getMonth() - 6` telde er zeven —
- * die off-by-one is hier bewust meeverhuisd, niet "hersteld"). De ondergrens komt
- * uit `localMonthStartMonthsAgo` (TZ-veilig) en wordt op maandsleutel-niveau
- * toegepast: die grens is altijd de 1e van de maand, dus `date >= grens` is exact
- * `maand >= grens.slice(0,7)`.
+ * Verplaatst uit `loadDashboardData` (was ~r792-805). De grenzen komen sinds
+ * bevinding C6 uit `savingsRateWindow` (lib/savings-source.ts): zes VOLTOOIDE
+ * kalendermaanden, de lopende maand EXCLUSIEF. Voorheen liep het venster t/m de
+ * lopende maand terwijl `deriveDataMonths6` er alleen de verstreken maanden in
+ * telde — die scheefheid maakte de quote structureel te laag en bij weinig
+ * historie extreem negatief. Beide grenzen zijn de 1e van een maand, dus
+ * `date >= grens` is exact `maand >= grens.slice(0,7)`.
  */
 export function deriveSavingsRate6mWindow(
   now: Date,
   txAgg12: TxMonthAggregateRow[],
   savingsBudgetIds: Set<string>,
 ): SavingsRate6mWindow {
-  const sinceMonth = localMonthStartMonthsAgo(now, 5).slice(0, 7)
+  const { sinceMonth, beforeMonth } = savingsRateWindow(now)
   return {
-    income6m: aggSumPositief(txAgg12, { realOnly: true, sinceMonth }),
-    expenses6m: aggSumNegatiefAbs(txAgg12, { realOnly: true, sinceMonth }),
+    income6m: aggSumPositief(txAgg12, { realOnly: true, sinceMonth, beforeMonth }),
+    expenses6m: aggSumNegatiefAbs(txAgg12, { realOnly: true, sinceMonth, beforeMonth }),
     savingsBudgetSpent6m: aggSumNegatiefAbs(txAgg12, {
       realOnly: true,
       sinceMonth,
+      beforeMonth,
       budgetIds: savingsBudgetIds,
     }),
   }

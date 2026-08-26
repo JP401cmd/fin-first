@@ -501,6 +501,9 @@ function jaarruimteSection(
     goal: GOAL_BY_ID['jaarruimte-maximaal'],
     grossYearlyIncome: 70_000,
     pensionFactorA: 1_500,
+    // Ingevulde factor A (1.500) → bekend; de bovengrens-markering (H23) is
+    // een UI-conditie en raakt de ranking-som in deze suite niet.
+    pensionFactorAKnown: true,
     dailyExpenses,
     hasData: opts?.hasData ?? true,
     besparing,

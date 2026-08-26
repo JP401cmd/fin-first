@@ -489,6 +489,24 @@ const criteria: AcceptanceCriterion[] = [
       source: 'components/app/horizon/sim-chart.tsx + chart-static-layers.tsx (ADR 0091-maskeringslaag; euro-weergave via lib/euro-display.ts — géén cijfer hier, zie UAT-TOEK-33 voor de deflatie-math)',
     },
   },
+  {
+    workflow: 'WF-TOEK-35',
+    scenarioId: 'UAT-TOEK-35',
+    titel: 'Doelenpagina: pace-toets ("op koers") en het vrijheidsgetal-doel dat live meesynct (bevindingen M31/M32/C10, dekt /toekomst/doelen)',
+    kriticiteit: 'KERN',
+    persona: 'willem',
+    given:
+      '/toekomst/doelen (eigen subroute, 26-08-2026 uit de tijdas-tab getrokken — zelfde `DoelenView`/`computeGoalProgress`, geen nieuw rekenpad). VOORHEEN mat het "op koers"-oordeel een lineaire TIJD-FRACTIE sinds `created_at` waarin `target_value` niet voorkwam: een doel zwaarder maken kon de status ongewijzigd laten, en een zojuist aangemaakt doel op €0 stond per constructie meteen op "achter". Sinds de fix is het oordeel een PACE-TOETS: benodigde inleg/maand tot de streefdatum (`requiredMonthly = (target−current)/maandenTeGaan`, GOAL_PACE_DAYS_PER_MONTH=365,25/12) tegen de feitelijke inleg/maand sinds `created_at` (10%-marge, GOAL_PACE_TOLERANCE), met een vloer van GOAL_PACE_MIN_MEASURE_MONTHS=1 maand zodat een minuten-oude bijdrage geen tempo van duizenden euro\'s per maand suggereert.',
+    when:
+      'De gebruiker leest twee doelen met dezelfde looptijd en dezelfde inleg maar een ander doelbedrag (toont dat `target_value` nu meetelt); een doel dat binnen GOAL_PACE_GRACE_DAYS=14 dagen na aanmaak nog op €0 staat (toont de "Net begonnen"-genadeperiode i.p.v. een vals alarm); en — als het vrijheidsgetal-standaarddoel bestaat en `vrijheidsgetalLive` waar is — de kaart die "Volgt automatisch je vrijheidsgetal" toont.',
+    then:
+      '(a) Bij identieke `created_at`/`target_date` en identieke inleg maakt een hoger `target_value` het oordeel `onTrack: false` waar het lagere doel `true` blijft — de kern van M32, vergrendeld in lib/goal-data.test.ts ("target_value beïnvloedt de uitkomst bij IDENTIEKE created_at/target_date"). (b) Een doel `current_value: 0` binnen de genadeperiode krijgt `measured: false` (kaart toont "Net begonnen", neutrale kleur, GEEN stoplichtoordeel) terwijl `requiredMonthly` al wél bekend is; ná de genadeperiode ZONDER inleg wordt uitblijven een signaal (`measured: true; onTrack: false`) — vergrendeld in hetzelfde bestand ("genadeperiode voor een vers doel (M31)"). (c) Op de kaart verschijnt bij een EUR-doel onder de 100% het bedrag "€X per maand nodig" (`requiredMonthly`, alleen bij `unit === \'EUR\'` — een spaarquote-doel toont geen "tempo van een tempo"). (d) Het vrijheidsgetal-standaarddoel (`isVrijheidsgetalGoal`) toont bij `vrijheidsgetalLive` de regel "Volgt automatisch je vrijheidsgetal" i.p.v. een handmatig bij te werken cijfer — de kaart negeert dan bewust een eigen `current_value`-invoer ten faveure van de canonieke FIRE-eta (`etaOverride` via `lib/goals/vrijheidsgetal-goal.ts`).',
+    assertion: {
+      kind: 'consistency',
+      source:
+        'lib/goal-data.ts#computeGoalProgress — de pace-toets (a/b) is volledig `exact` vergrendeld in lib/goal-data.test.ts (niet hier herhaald: `computeGoalProgress` heeft geen injecteerbare klok, dus een UAT-cijfer op basis van relatieve dagen zou ofwel de testklok namaken ofwel drijven met de daadwerkelijke kalenderdatum — de vitest-suite is al de canonieke, deterministische toets). (c) components/future/doelen-view.tsx#ManualGoalCard (requiredMonthly-regel, EUR-only gate). (d) components/future/doelen-view.tsx#isVrijheidsgetalGoal + live-prop vanuit app/(app)/toekomst/doelen/page.tsx#vrijheidsgetalLive (FinPageData, lib/goals/vrijheidsgetal-goal.ts).',
+    },
+  },
 ]
 
 export const TOEK_ACCEPTANCE: AcceptanceSet = {
@@ -503,5 +521,5 @@ export const TOEK_ACCEPTANCE: AcceptanceSet = {
  */
 export const TOEK_EXPECTED_WORKFLOW_NUMBERS: number[] = [
   ...Array.from({ length: 26 }, (_, i) => i + 1), // 1..26
-  28, 29, 30, 32, 33, 34,
+  28, 29, 30, 32, 33, 34, 35,
 ]

@@ -101,7 +101,7 @@ export function Box2Leengrens({
                     id="tax:box2-leengrens"
                     domain="tax"
                     title="Los DGA-lening af vóór 31 december"
-                    description={`Breng je BV-lening onder de drempel van ${fc(dgaLeningenDrempel)} om de extra Box 2-heffing te voorkomen.`}
+                    // H24: dode `description` verwijderd — nooit uitgelezen.
                     savings={Math.round(dgaExcessTax)}
                     freedomDays={freedomDays}
                     deadline="31 december"

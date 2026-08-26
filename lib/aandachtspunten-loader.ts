@@ -86,6 +86,18 @@ async function collectTaxAandachtspunten(supabase: SupabaseClient): Promise<Aand
   // bedrijfspensioen blijft de tip ongewijzigd. De box1-hub toont de kans wél
   // (daar beheert de gebruiker 'm); deze demping zit bewust alléén hier.
   //
+  // AANNAME BIJGESTELD 26-08-2026 (bevinding H23): "daar beheert de gebruiker
+  // 'm" klopte niet — de jaarruimtekaart toonde het bovengrens-bedrag zónder
+  // enige onzekerheids-markering en zei zelfs "berekend met je opgeslagen factor
+  // A". Dat is nu opgelost aan de KAART-kant (badge + bereik + eerlijke footer,
+  // via de prop `factorAKnown`), niet hier: deze demping blijft een filter op de
+  // TIPS-lijst, waar geen ruimte is voor een bereik of een badge.
+  //
+  // BEKENDE GRENS van dit signaal (aparte kaart): een `assets`-rij met
+  // asset_type='retirement' telt NIET mee — alleen de pensioen-strategie-wizard
+  // zet het life_event. Wie zijn pensioenbezit invoerde maar de wizard nooit
+  // doorliep, krijgt de tip dus ongedempt.
+  //
   // Het is met opzet een FILTER en geen herberekening: we onderdrukken de
   // geleverde kans, we bouwen 'm niet met andere aannames opnieuw op.
   const hasBedrijfspensioen = horizonData.events.some(

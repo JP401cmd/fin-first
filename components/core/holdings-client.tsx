@@ -321,36 +321,13 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
     return () => { cancelled = true }
   }, [holdings.length])
 
-  // Push a history entry when a modal opens so the back button closes the modal
-  // instead of navigating away. After form submission, replace the entry to
-  // prevent the back button from re-opening the (now stale) form.
-  // De pane (`?holding=<id>`) regelt z'n eigen close via URL-state — die zit
-  // dus niet in deze tracking, anders zou de back-knop dubbel-poppen.
-  useEffect(() => {
-    const modalOpen = showForm || txHolding !== null
-    if (modalOpen) {
-      // Push a new history entry for the open modal
-      window.history.pushState({ holdingsModal: true }, '')
-    }
-
-    function onPopState() {
-      // When user presses back while a modal is open, close the modal
-      // instead of navigating away. This prevents re-submission.
-      if (showForm) {
-        setShowForm(false)
-        return
-      }
-      if (txHolding) {
-        setTxHolding(null)
-        return
-      }
-    }
-
-    window.addEventListener('popstate', onPopState)
-    return () => {
-      window.removeEventListener('popstate', onPopState)
-    }
-  }, [showForm, txHolding])
+  // NB: de "back-knop sluit de modal"-logica die hier stond (een eigen
+  // `pushState` + `popstate` voor `showForm`/`txHolding`) is verwijderd. Dat
+  // was de enige one-off in de app; sinds `BottomSheet` dit centraal doet
+  // (`lib/overlay-history.ts`) zouden beide dezelfde entry claimen en samen
+  // dubbel-poppen. De pane (`?holding=<id>`) blijft bewust buiten die centrale
+  // integratie — die regelt z'n close via URL-state (zie `manageHistory` op
+  // `<ShellOverlay kind="pane">`).
 
   // On mount, check if we arrived here via back-button after a form submission
   // and prevent re-opening the form

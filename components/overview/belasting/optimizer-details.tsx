@@ -163,6 +163,10 @@ export function OptimizerDetails({
                         <JaarruimteCard
                           grossYearlyIncome={jaarruimteSection.grossYearlyIncome}
                           pensioenAangroei={jaarruimteSection.pensionFactorA}
+                          // H23: zelfde kaart als op /overzicht/belasting/box1,
+                          // dus ook hier de bovengrens-markering bij een
+                          // onbekende factor A — uit dezelfde bundelbron.
+                          factorAKnown={jaarruimteSection.pensionFactorAKnown}
                           year={year}
                           dailyExpenses={jaarruimteSection.dailyExpenses}
                         />

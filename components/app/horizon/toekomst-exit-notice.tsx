@@ -92,7 +92,7 @@ export function ToekomstExitNotice({ visible, onClose, onDismissForever }: Toeko
       <div
         aria-hidden
         onClick={onClose}
-        className="absolute inset-0 cursor-default bg-[var(--ink)]/30 backdrop-blur-md"
+        className="absolute inset-0 cursor-default bg-[var(--scrim)] backdrop-blur-md"
       />
 
       {/* Melding-kaart — editorial, met horizon-accent. */}

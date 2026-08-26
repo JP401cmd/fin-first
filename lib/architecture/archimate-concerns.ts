@@ -88,13 +88,22 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     reviewedAt: '2026-08-05',
   },
   {
+    id: 'box1-eigenwoning-invoer-fin',
+    title: 'Fin rekent de Box 1-heffing nog zónder eigen woning',
+    detail:
+      'Restant van bevinding C8. `computeBox1Tax` is één motor, maar hij werd op drie plekken met VERSCHILLENDE invoer gevoed: de Box 1-subpagina gaf wozValue/hypotheekRente mee, de kansen-loader (hub + optimizer + aandachtspunten) niet, en lib/ai/context/tax-context.ts ook niet. De eerste twee delen sinds 26-08-2026 `resolveEigenWoningBox1Input` (lib/box1-income.ts) en zijn A=B; de AI-context staat er nog náást, dus wie Fin naar zijn Box 1-heffing vraagt kan een ander bedrag horen dan het scherm toont (richting hangt aan de hypotheek: te hoog bij rente > forfait, te laag bij een afgeloste hypotheek onder Wet Hillen). Bewust apart getrokken omdat datzelfde bestand óók nog op de derde bruto-afleiding zit (`estimateGrossYearly`, zie het punt hierboven) — één ingreep die beide invoerhelften gelijktrekt is goedkoper dan twee. Bron-grendel op de twee gefixte oppervlakken: lib/box1-income.eigen-woning.test.ts. Verwijder dit punt zodra tax-context.ts dezelfde resolutie consumeert.',
+    severity: 'debt',
+    elementIds: ['as-belasting'],
+    reviewedAt: '2026-08-26',
+  },
+  {
     id: 'gedeelde-bezitting-ongewogen',
     title: 'Gedeelde bezitting telt bij béíde partners voor 100%',
     detail:
-      'Opvolger van "gedeelde bankrekening telt dubbel" (11-8-2026 opgelost: de losse-cash-optelling weegt sinds ADR 0101 op households.split_mode, lib/unlinked-cash.ts). De ANDERE helft staat nog open: net_worth_inclusion_pct op assets/debts is géén huishoudsplitsing maar een handmatige 0-100-schuif met default 100, volledig los van ownership. Een bezitting op "gedeeld" zetten zet die schuif niet op 50, dus een gedeelde bezitting telt in het netto vermogen van béíde partners voor het volle bedrag — op huishoudniveau 200%. De wortelfix is expliciet huishoud-eigenaarschap (één rij, één eigenaar, verdeling afgeleid uit split_mode) en is vandaag gratis: nul huishoudens, nul gedeelde bezittingen op productie (gemeten 11-8-2026). Dat venster sluit bij het eerste tweede huishoudlid — een gebruikersactie, geen release. Zie ADR 0101.',
+      'Opvolger van "gedeelde bankrekening telt dubbel" (11-8-2026 opgelost: de losse-cash-optelling weegt sinds ADR 0101 op households.split_mode, lib/unlinked-cash.ts). De ANDERE helft staat nog open: net_worth_inclusion_pct op assets/debts is géén huishoudsplitsing maar een handmatige 0-100-schuif met default 100, volledig los van ownership. Een bezitting op "gedeeld" zetten zet die schuif niet op 50, dus een gedeelde bezitting telt in het netto vermogen van béíde partners voor het volle bedrag — op huishoudniveau 200%. De wortelfix is expliciet huishoud-eigenaarschap (één rij, één eigenaar, verdeling afgeleid uit split_mode) en is vandaag gratis: nul huishoudens, nul gedeelde bezittingen op productie (gemeten 11-8-2026). Dat venster sluit bij het eerste tweede huishoudlid — een gebruikersactie, geen release. Zie ADR 0101. Reikwijdte-update 26-8-2026: hetzelfde ongewogen pad (volle WOZ bij beide partners) landt sinds de gedeelde eigenwoning-lookup resolveEigenWoningBox1Input (lib/box1-income.ts, kaart C8) ook op de belasting-hub, de optimizer en de aandachtspunten — voorheen alleen de Box 1-subpagina.',
     severity: 'debt',
     elementIds: ['as-vermogen', 'fn-vermogensregistratie', 't-supabase'],
-    reviewedAt: '2026-08-11',
+    reviewedAt: '2026-08-26',
   },
   {
     id: 'checkin-snapshot-assets-own-row',
@@ -185,6 +194,24 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     severity: 'risk',
     elementIds: ['as-planning', 'fn-toekomstplannen', 'as-vermogen'],
     reviewedAt: '2026-08-05',
+  },
+  {
+    id: 'first-paint-fire-age-uit-verouderde-snapshot',
+    title: 'De "voorlopige" vrijheidsleeftijd kan uit een snapshot van gisteren komen',
+    detail:
+      'De hero van /toekomst toont, zolang de kernel-worker nog rekent, het LAATST WEGGESCHREVEN kernel-antwoord uit net_worth_snapshots.fire_age (horizon-client.tsx#serverFireAge → useHorizonFireSim#initialFireAge → firstPaintFireAge). Die rij wordt geschreven door een debounced pad in lib/hooks/use-horizon-fire-sim.ts dat bewust alléén UPDATE draait en nooit INSERT ("een upsert zou bij een ontbrekende dagrij de NOT NULL-constraint op total_assets schenden"). Ontbreekt de dagrij van vandaag, dan blijft een OUDERE snapshot staan — berekend onder mogelijk andere bezittingen, gebeurtenissen of strategie. Sinds 26-08-2026 (bevinding C1) is dit niet langer stil: lib/horizon/hero-fire-age.ts markeert zo\'n getal expliciet als "voorlopig" en het wordt overschreven zodra de kernel antwoordt, dus de gebruiker ziet nooit meer twee ononderscheidbare eindantwoorden. Wat OPEN blijft: het voorlopige getal kán inhoudelijk ver naast het uiteindelijke liggen, en er is geen bovengrens op de ouderdom van de gebruikte snapshot. Uitweg (bewust niet in de C1-snede genomen, want het raakt de snapshot-schrijfweg en niet de weergave): de dagrij aanmaken via het reguliere snapshot-pad dat total_assets wél kent, zodat de UPDATE altijd een verse rij raakt — of firstPaintFireAge negeren wanneer de snapshot ouder is dan N dagen. Verwijder dit punt zodra de dagrij gegarandeerd bestaat of de leeftijdsgrens er is.',
+    severity: 'debt',
+    elementIds: ['as-planning', 'fn-toekomstplannen'],
+    reviewedAt: '2026-08-26',
+  },
+  {
+    id: 'fire-doel-zonder-preset-marker-blijft-statisch',
+    title: 'Een zelfgemaakt FIRE-doel volgt de motor niet',
+    detail:
+      'Sinds bevinding C10 (26-08-2026) is het vrijheidsgetal-doel een LIVE tracker: `syncActiveGoalValues` vult huidige waarde, doelbedrag en verwachte datum uit de canonieke FIRE-motor (lib/goals/vrijheidsgetal-goal.ts + -source.ts), zodat /overzicht en /toekomst/doelen niet langer dertien jaar uiteen kunnen lopen. De discriminant is de preset-marker `metadata.standaardDoel === \'vrijheidsgetal\'`, die alléén de quick-add-kiezer wegschrijft — bewust, want gewone `net_worth`-doelen ("Eerste 10K belegd", "Erfenis structureren") mogen niet aan de FIRE-motor hangen. Wat OPEN blijft: een gebruiker die zijn FIRE-doel met de hand aanmaakt (Geavanceerd → GoalForm, of een doel van vóór de preset) krijgt géén marker en dus géén sync — die kaart toont nog steeds de ooit ingevoerde stand en streefdatum, precies het gedrag dat C10 aanwees. Zichtbaar is dat wel: de "Volgt automatisch je vrijheidsgetal"-regel ontbreekt dan. Uitwegen (geen van beide in de C10-snede genomen, want ze raken respectievelijk de invoer en een datamigratie): (a) GoalForm laat de gebruiker een doel expliciet als "mijn vrijheidsgetal" markeren, of (b) een eenmalige backfill die bestaande FIRE-achtige net_worth-doelen aanbiedt om te koppelen. Verwijder dit punt zodra een van beide bestaat.',
+    severity: 'debt',
+    elementIds: ['as-planning', 'fn-toekomstplannen'],
+    reviewedAt: '2026-08-26',
   },
   {
     id: 'vermogenshistorie-persoonlijk-only',

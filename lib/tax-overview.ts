@@ -15,6 +15,20 @@
  * `lib/tax-opportunities-loader.ts` — daar wonen ook het type `TaxOpportunity`
  * en de €→vrijheidsdagen-vertaling van een kans.
  *
+ * TARIEVEN KOMEN BINNEN, WORDEN HIER NIET AFGELEID (bevinding C9, 26-08-2026).
+ * Deze aggregator rekende het "effectieve tarief" zelf uit als
+ * `total / grossYearlyIncome` — een TELLER/NOEMER-MISMATCH: de teller telde de
+ * Box 3-VERMOGENSheffing mee, de noemer was uitsluitend het Box 1-INKOMEN. Op
+ * de hub gaf dat 36,6% "effectief" náást 35,8% "marginaal": een combinatie die
+ * in een progressief stelsel niet kan bestaan. Beide tarieven horen bij dezelfde
+ * grondslag (inkomen) en hebben één home: `computeBox1Tax` (lib/box1-tax.ts) —
+ * `effectiveRate` = tax/bruto, `marginalRate` = de numerieke afgeleide incl.
+ * heffingskorting-afbouw. Ze worden hier alleen nog DOORGEGEVEN, zodat de hub
+ * exact dezelfde twee percentages toont als /overzicht/belasting/box1.
+ *
+ * Gevolg voor de invoer: `grossYearlyIncome` is uit `TaxOverviewInput`
+ * verdwenen. Wie 'm terugzet, zet de tweede grondslag terug.
+ *
  * Geen Supabase/React-imports. Volgt het pure-engine-patroon van box3-data.ts.
  * Geld-formattering hoort hier NIET — alle bedragen komen als getallen terug.
  */
@@ -32,7 +46,19 @@ export interface TaxOverviewInput {
   box1Tax: number | null
   box2Tax: number | null
   box3Tax: number | null
-  grossYearlyIncome?: number | null
+  /**
+   * Effectief tarief over het INKOMEN (fractie) — CONSUMEER
+   * `computeBox1Tax(...).effectiveRate`, reken hem hier niet na. `null` =
+   * inkomen onbekend; dan toont het oppervlak géén tarief (bevinding M4).
+   */
+  effectiveRate?: number | null
+  /**
+   * Marginaal tarief over de volgende euro INKOMEN (fractie) — CONSUMEER
+   * `computeBox1Tax(...).marginalRate`. Bewust NIET `deriveMarginaalTarief()`:
+   * dat is de FIRE-vuistregel (altijd één van twee vaste schijftarieven, nooit
+   * afbouw-gecorrigeerd) en die kán het echte tarief niet weergeven. `null` =
+   * inkomen onbekend.
+   */
   marginalRate?: number | null
   dailyExpenses?: number
 }
@@ -43,8 +69,13 @@ export interface TaxOverviewResult {
   box3Tax: number
   total: number
   distribution: TaxDistribution
-  /** total / grossYearlyIncome (indien bekend), anders null. */
+  /**
+   * Effectief tarief over het inkomen (Box 1-heffing / bruto Box 1-inkomen),
+   * doorgegeven uit `computeBox1Tax`. NIET `total / inkomen` — `total` bevat
+   * ook de Box 3-vermogensheffing, die geen inkomens-noemer heeft.
+   */
   effectiveRate: number | null
+  /** Marginaal tarief over de volgende euro inkomen, uit `computeBox1Tax`. */
   marginalRate: number | null
   /** total / dailyExpenses, afgerond (0 als dailyExpenses ontbreekt). */
   freedomDays: number
@@ -67,12 +98,11 @@ export function buildTaxOverview(input: TaxOverviewInput): TaxOverviewResult {
       }
     : { box1: 0, box2: 0, box3: 0 }
 
-  const grossYearlyIncome = input.grossYearlyIncome ?? null
-  const effectiveRate =
-    grossYearlyIncome != null && grossYearlyIncome > 0
-      ? total / grossYearlyIncome
-      : null
-
+  // Beide tarieven: PASS-THROUGH van de Box 1-motor. Ze delen daardoor per
+  // constructie dezelfde grondslag (bruto Box 1-inkomen) en verdwijnen samen
+  // zodra dat inkomen onbekend is — de asymmetrie van bevinding M4 (een
+  // marginaal tarief naast "Inkomen onbekend") kan hier niet meer ontstaan.
+  const effectiveRate = input.effectiveRate ?? null
   const marginalRate = input.marginalRate ?? null
 
   const dailyExpenses = input.dailyExpenses ?? 0

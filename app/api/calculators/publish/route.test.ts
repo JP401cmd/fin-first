@@ -18,6 +18,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  */
 
 const mockIsCloudAllowed = vi.fn()
+const mockAssertAiEnabled = vi.fn()
 const mockCheckTierGate = vi.fn()
 const mockCheckCreditBudget = vi.fn()
 const mockRecordAiUsage = vi.fn()
@@ -25,6 +26,7 @@ const mockScreenPublishMetadata = vi.fn()
 
 vi.mock('@/lib/ai/privacy-gate', () => ({
   isCloudAllowed: (...args: unknown[]) => mockIsCloudAllowed(...args),
+  assertAiEnabled: (...args: unknown[]) => mockAssertAiEnabled(...args),
   PRIVACY_GATE_CODE: 'privacy_mode_active',
 }))
 vi.mock('@/lib/require-tier', () => ({
@@ -71,6 +73,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   mockCreateClient.mockResolvedValue(supabase())
   mockIsCloudAllowed.mockResolvedValue(true)
+  // Kill-switch aan — M26 gate't hier vóór de privé-poort.
+  mockAssertAiEnabled.mockResolvedValue(null)
   mockCheckTierGate.mockResolvedValue(null)
   mockCheckCreditBudget.mockResolvedValue({ allowed: true, retryAfterSeconds: 3600 })
 })

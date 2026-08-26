@@ -695,6 +695,9 @@ export async function seedPersonaData(
     color: g.color,
     is_completed: g.is_completed,
     sort_order: i,
+    // `{}` = de DB-default; behoudt de standaard-doel-marker waar de persona 'm zet
+    // (bv. `standaardDoel: 'vrijheidsgetal'` → live FIRE-tracker, bevinding C10).
+    metadata: g.metadata ?? {},
   }))
 
   const eventRows = persona.life_events.map((e) => ({

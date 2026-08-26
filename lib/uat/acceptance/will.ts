@@ -170,7 +170,7 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-WILL-09',
     titel: 'Foutherstel in de chat',
     kriticiteit: 'BELANGRIJK',
-    given: 'AI-kill-switch uit via /beheer/platform (deterministisch forceerbaar); breed tier-gate-effect over alle AI-oppervlakken hoort bij UAT-KRUIS-25, hier alleen het chat-oppervlak.',
+    given: 'Het GLOBALE platform-kill-switch uit via /beheer/platform (`killSwitches.ai`, admin-breed, deterministisch forceerbaar) — te onderscheiden van de EIGEN "AI uit"-knop van de gebruiker op /mijn/privacy (`profiles.ai_enabled`), die sinds bevinding M26 chat al vóór het versturen blokkeert (zie WF-WILL-25). Breed tier-gate-effect over alle AI-oppervlakken hoort bij UAT-KRUIS-25, hier alleen het chat-oppervlak.',
     when: 'De gebruiker stelt een vraag terwijl de AI is uitgeschakeld, en klikt daarna "Opnieuw proberen" (na AI weer aan) of "Sluiten".',
     then: 'Rode foutbanner met begrijpelijke uitleg + "Technische details" (max 240 tekens) + knoppen "Opnieuw proberen"/"Sluiten"; bubbel en paneel blijven bruikbaar; "Opnieuw proberen" na herstel genereert alsnog een antwoord; "Sluiten" verwijdert de banner.',
     assertion: {
@@ -362,6 +362,23 @@ const criteria: AcceptanceCriterion[] = [
       kind: 'ui-only',
       source:
         'components/app/chat/chat-panel.tsx (megafoon-toggle, veiligSluiten/meldingBezig-blokkade, useSwipeToDismiss({enabled: !isPinned && !meldingBezig})) + lib/hooks/use-swipe-to-dismiss.ts + components/app/chat/melding/melding-view.tsx + melding-form.tsx + melding-type-kiezer.tsx + app/api/user-reports/route.ts (ReportSchema/zod-validatie, dutchValidationMessage, RPC reserve_user_report_slot voor de 5/uur-rem, best-effort pushReportToNotion) + app/api/cron/user-reports-notion-sync/route.ts (retry-cron) — procestoets/randvoorwaarden, geen AI-inhoud',
+    },
+  },
+  {
+    workflow: 'WF-WILL-25',
+    scenarioId: 'UAT-WILL-25',
+    titel: 'Chat blokkeert vóóraf (beide bestemmingen) als de gebruiker AI zelf heeft uitgezet',
+    kriticiteit: 'KERN',
+    given:
+      'Bevinding M26 (26-08-2026). `profiles.ai_enabled` (de knop "AI uit" op /mijn/privacy — de EIGEN keuze van de gebruiker, geen abonnements- of toestelbeperking) staat uit; de AI-groep van deze gebruiker staat op `cloud` (de default voor vrijwel elk account). Dit is een ANDER mechanisme dan het globale platform-kill-switch uit WF-WILL-09 (`/beheer/platform` → `killSwitches.ai`, admin-breed) — beide kunnen onafhankelijk van elkaar aan/uit staan.',
+    when:
+      'De gebruiker opent de chat. VOORHEEN gaf `useExecutionMode` bij `prefs.mode === "cloud"` meteen `canUseCloud: true` terug, ongeacht `ai_enabled` — de kill-switch-check stond code-technisch ná de cloud-tak. Chat was dan volledig bruikbaar, een bericht kon verstuurd worden en de server wees het pas ná verzending af (`assertCloudAllowed` → 403 `ai_disabled`) — inclusief een echt AI-antwoord vóór de fix bestond.',
+    then:
+      'De kill-switch-check is gehoist vóór de cloud-tak in `useExecutionMode`: `status` wordt `blocked` met `reason: "ai_uit"` en `intended` op de bestemming die de gebruiker anders had gekregen (`prefs.mode`, hier `cloud`) — vóór het typen, niet ná het versturen. `LocalBlockedNotice` toont bij `reason === "ai_uit"` de kop "AI staat uit" (niet "Lokale chat nog niet klaar", want het gaat niet over het lokale pad) met de tekst `AI_DISABLED_MESSAGE`, die sinds deze fix BEIDE bestemmingen noemt ("niet in de cloud en niet op je eigen toestel") in plaats van alleen "ook niet op je eigen toestel". Precies dezelfde blokkade gold al vóór de fix voor een gebruiker op `mode: "lokaal"` (`intended: "lokaal"`) — dat pad regresseert niet. De server-kant (`assertCloudAllowed`) blijft de laatste linie en verandert niet; deze hoisting is de client-spiegel zodat de blokkade vóór het gesprek zichtbaar is in plaats van als foutbanner erna (dat laatste blijft WF-WILL-09, voor het GLOBALE kill-switch-pad). DEZELFDE SERVER-SPIEGEL landt tegelijk op twee andere routes die zelf geen kill-switch-check hadden (de nieuwe, generieke `assertAiEnabled(supabase, user.id)`-poort, vóór elke andere AI-gate): `app/api/briefing/refresh/route.ts` (de lokale stappen lazen alleen `isCloudAllowed`, wat bij AI-uit ook `false` gaf maar zonder de juiste reden) en `app/api/calculators/publish/route.ts` (zonder de gate adviseerde de foutmelding "zet je rapporten-groep op cloud-AI" — een uitweg die bij AI-uit niet bestaat, want die blokkeert cloud én lokaal). Beide waren gemarkeerd als "nieuw/ongedekt oppervlak" door de staleness-detector, maar zijn geen apart scenario: het is dezelfde M26-poort, drie keer toegepast.',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'lib/ai/local/use-execution-mode.ts (kill-switch-check gehoist vóór de cloud-tak, `reason: "ai_uit"`, `AI_DISABLED_MESSAGE`) + components/app/chat/chat-panel.tsx#LocalBlockedNotice (kop "AI staat uit" bij `reason === "ai_uit"`) + app/api/ai/chat/route.ts (assertCloudAllowed, server-laatste-linie, ongewijzigd) + lib/ai/privacy-gate.ts#assertAiEnabled (nieuwe, groepsloze poort) + app/api/briefing/refresh/route.ts + app/api/calculators/publish/route.ts (dezelfde poort, twee andere routes) — gedekt door lib/ai/local/use-execution-mode.test.ts + lib/ai/privacy-gate.test.ts; procestoets/randvoorwaarden, geen AI-inhoud',
     },
   },
 ]

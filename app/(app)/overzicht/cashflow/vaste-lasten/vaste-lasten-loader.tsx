@@ -1,4 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
+import { getCachedUser } from '@/lib/supabase/cached-user'
+import {
+  getCanonicalDailyIncomeRate,
+  EMPTY_DAILY_INCOME_RATE,
+  type DailyIncomeRate,
+} from '@/lib/income-rate'
 import { loadCashflowKpis } from '@/lib/cashflow-kpis'
 import { loadCashflowData } from '@/lib/cashflow-data-loader'
 import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
@@ -35,10 +41,29 @@ export async function VasteLastenLoader({ perspective }: { perspective: Perspect
   // boven zijn return (zie de kop van page.tsx).
   const supabase = await createClient()
 
-  const [kpis, cashflow, summary] = await Promise.all([
+  // De WERKTIJD-noemer hangt aan de ingelogde gebruiker (handmatige Box 1-
+  // override staat op zijn profielrij). `getCachedUser` is `cache()`-gewrapt en
+  // deelt de auth-roundtrip die de loaders hieronder toch al doen.
+  const user = await getCachedUser(supabase)
+
+  const [kpis, cashflow, summary, incomeRate] = await Promise.all([
     loadCashflowKpis(supabase),
     loadCashflowData(supabase, perspective),
     loadVasteLastenSummary(supabase),
+    // WERKTIJD-basis (ADR 0105) — bruto dagtarief uit de CANONIEKE bruto Box 1-
+    // grondslag (`resolveBox1GrossIncome`, ADR 0086/0103), dezelfde bron als de
+    // belasting-hub. Bewust géén tweede afleiding uit `kpis.monthlyIncome`: dat
+    // is netto én een andere grondslag, en zou dit scherm een ander werkjaar
+    // geven dan /overzicht/belasting — precies de fout die C5 blootlegde.
+    // KOSTEN: deze bron trekt de `loadCoreData`-bundel binnen (aandachtspunt
+    // `bruto-box1-grondslag-meervoudig`); hij draait daarom PARALLEL met de drie
+    // loaders hierboven, en faalt zacht → geen werktijd-regel i.p.v. geen pagina.
+    user
+      ? getCanonicalDailyIncomeRate(supabase, user.id).catch((err): DailyIncomeRate => {
+          console.error('vaste-lasten:income-rate', err)
+          return EMPTY_DAILY_INCOME_RATE
+        })
+      : Promise.resolve(EMPTY_DAILY_INCOME_RATE),
   ])
 
   // TWEE VERSCHILLENDE GRONDSLAGEN, allebei bewust:
@@ -57,6 +82,11 @@ export async function VasteLastenLoader({ perspective }: { perspective: Perspect
     // `?? 0` = "geen eerlijke dagbasis" (het veld is additief/optioneel op het
     // gedeelde scalars-type); de motor laat de tijdregels dan weg.
     dailyExpenseRate: kpis.dailyExpenseRate ?? 0,
+    //  · `dailyIncomeRate` — CANONIEK bruto dagtarief (ADR 0105). Een DERDE
+    //    grondslag naast de twee hierboven, en bewust: werktijd ("hoeveel van je
+    //    werkjaar gaat hiernaartoe") deelt op het inkomen, vrijheidstijd op de
+    //    uitgaven. 0 = geen werkjaar-basis → het scherm laat de werktijd-zin weg.
+    dailyIncomeRate: incomeRate.dailyRate,
   })
 
   return (

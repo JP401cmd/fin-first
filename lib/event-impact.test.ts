@@ -27,22 +27,22 @@ describe('computeEventImpact — basis', () => {
 })
 
 describe('computeEventImpact — kosten (positieve impact)', () => {
-  it('eenmalige €12.000 op €12k/jaar = +1.0 jaar vrijheid', () => {
+  it('eenmalige €12.000 op €12k/jaar = 1.0 jaar later vrij', () => {
     const result = computeEventImpact(
       { ...baseEvent, one_time_cost: 12000 },
       12000,
     )
     expect(result.yearsImpact).toBeCloseTo(1.0)
     expect(result.tone).toBe('cost')
-    expect(result.displayLabel).toMatch(/\+1\.0 jaar/)
+    expect(result.displayLabel).toBe('→ 1.0 jaar later vrij')
   })
 
-  it('€6.000 eenmalig op €12k/jaar = +6 mnd', () => {
+  it('€6.000 eenmalig op €12k/jaar = 6 mnd later vrij', () => {
     const result = computeEventImpact(
       { ...baseEvent, one_time_cost: 6000 },
       12000,
     )
-    expect(result.displayLabel).toBe('+6 mnd vrijheid')
+    expect(result.displayLabel).toBe('→ 6 mnd later vrij')
     expect(result.tone).toBe('cost')
   })
 
@@ -58,14 +58,14 @@ describe('computeEventImpact — kosten (positieve impact)', () => {
 })
 
 describe('computeEventImpact — opbrengsten (negatieve impact)', () => {
-  it('erfenis €50.000 op €12k/jaar = −4.2 jaar vrijheid', () => {
+  it('erfenis €50.000 op €12k/jaar = 4.2 jaar eerder vrij', () => {
     const result = computeEventImpact(
       { ...baseEvent, one_time_cost: -50000 },
       12000,
     )
     expect(result.yearsImpact).toBeCloseTo(-4.2, 1)
     expect(result.tone).toBe('gain')
-    expect(result.displayLabel).toMatch(/−4\.2 jaar/)
+    expect(result.displayLabel).toBe('→ 4.2 jaar eerder vrij')
   })
 
   it('positieve monthly_income_change verlaagt netCost', () => {
@@ -76,7 +76,44 @@ describe('computeEventImpact — opbrengsten (negatieve impact)', () => {
     )
     expect(result.yearsImpact).toBeCloseTo(-0.5)
     expect(result.tone).toBe('gain')
+    expect(result.displayLabel).toBe('→ 6 mnd eerder vrij')
   })
+})
+
+describe('computeEventImpact — label leest richtingsgewijs (bug C2)', () => {
+  // Regressie: het label plakte het rekenteken vóór "vrijheid"
+  // ("+2,4 jaar vrijheid"), wat als winst leest terwijl een positieve
+  // yearsImpact juist vertraging is. Label en teken moeten nu één
+  // richting vertellen — gepind tegen de engine-uitvoer zelf.
+  const cases = [
+    { label: 'sabbatical (kost)', event: { ...baseEvent, one_time_cost: 28800 } },
+    { label: 'AOW (opbrengst)', event: { ...baseEvent, one_time_cost: -49200 } },
+    {
+      label: 'middelbare school (kost, < 1 jaar)',
+      event: { ...baseEvent, monthly_cost_change: 200, duration_months: 55 },
+    },
+    {
+      label: 'extra inkomen (opbrengst, < 1 jaar)',
+      event: { ...baseEvent, monthly_income_change: 200, duration_months: 55 },
+    },
+  ]
+
+  for (const { label, event } of cases) {
+    it(`${label}: richting volgt het teken van yearsImpact`, () => {
+      const result = computeEventImpact(event, 12000)
+      expect(result.displayLabel.startsWith('→ ')).toBe(true)
+      if (result.yearsImpact > 0) {
+        expect(result.tone).toBe('cost')
+        expect(result.displayLabel).toContain('later vrij')
+      } else {
+        expect(result.tone).toBe('gain')
+        expect(result.displayLabel).toContain('eerder vrij')
+      }
+      // Geen rekenteken meer vóór de eenheid, en geen saldo-formulering.
+      expect(result.displayLabel).not.toMatch(/[+−-]\s*\d/)
+      expect(result.displayLabel).not.toContain('vrijheid')
+    })
+  }
 })
 
 describe('computeEventImpact — permanent (duration=0)', () => {

@@ -157,7 +157,7 @@ export function Box3TegenbewijsCard({ result }: { result: Box3Result }) {
               id="tax:box3-tegenbewijs"
               domain="tax"
               title="Lever tegenbewijs voor Box 3"
-              description={`Bij een werkelijk rendement van ${formatPct1(rendementPct)} loont tegenbewijs t.o.v. de forfaitaire heffing.`}
+              // H24: dode `description` verwijderd — nooit uitgelezen.
               savings={Math.round(cmp.besparing)}
               freedomDays={Math.round(cmp.freedomDays)}
               href="/overzicht/belasting/box3"

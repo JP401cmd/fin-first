@@ -362,11 +362,16 @@ describe('loadForecastSectionData ↔ loadDashboardData — parity op alle vijf 
 describe('de vijf velden, met harde waarden op beide paden', () => {
   bevriesDeKlok()
 
-  it('fixture 1: aggregaat-quote 44,0 % — de snapshots blijven ONGEBRUIKT', async () => {
+  it('fixture 1: aggregaat-quote 54,0 % — de snapshots blijven ONGEBRUIKT', async () => {
     const { nieuw, oud } = await runBothPaths(buildFixtures()[0].db)
-    // (30000 − (21000 − 3000) + 1200) / 30000 × 100 = 44
-    expect(nieuw.savingsRate6m).toBe(44)
-    expect(oud.savingsRate6m).toBe(44)
+    // VENSTER = zes VOLTOOIDE maanden (jan t/m jun); juli — de lopende maand —
+    // valt erbuiten (bevinding C6, `savingsRateWindow`). Januari droeg alleen
+    // €5000 inkomen; feb–jun elk +5000/−3000/−500.
+    // income6m 30000 · expenses6m 17500 · spaarbudget6m 2500 · aflossing6m 1200
+    // ⇒ (30000 − (17500 − 2500) + 1200) / 30000 × 100 = 54
+    // (was 44 toen juli meetelde: +5000/−3500 erbij en januari erbuiten.)
+    expect(nieuw.savingsRate6m).toBe(54)
+    expect(oud.savingsRate6m).toBe(54)
     // De snapshot-sprong 10k → 200k zou via de delta-tak een absurde quote geven;
     // dat de uitkomst 44 blijft, is het bewijs dat de `isEstimate`-poort dicht zit.
     expect(nieuw.savingsHistory).toEqual([
@@ -444,22 +449,26 @@ describe('de vijf velden, met harde waarden op beide paden', () => {
     const { nieuw, oud } = await runBothPaths(buildFixtures()[2].db)
     expect(nieuw.monthlyIncome).toBe(8000)
     expect(nieuw.monthlyExpenses).toBe(2500)
-    // Dezelfde transacties als fixture 1 ⇒ dezelfde TRANSACTIEquote. De handmatige
-    // €8000/€2500 zou (8000 − 2500)/8000 = 68,75 % geven; dát is de EFFECTIEVE
-    // spaarquote (resolveSavingsSource) en een ander getal dan dit veld.
-    expect(nieuw.savingsRate6m).toBe(44)
-    expect(oud.savingsRate6m).toBe(44)
+    // Dezelfde transacties als fixture 1 ⇒ dezelfde TRANSACTIEquote (54 %). De
+    // handmatige €8000/€2500 zou (8000 − 2500)/8000 = 68,75 % geven; dát is de
+    // EFFECTIEVE spaarquote (resolveSavingsSource) en een ander getal dan dit veld.
+    expect(nieuw.savingsRate6m).toBe(54)
+    expect(oud.savingsRate6m).toBe(54)
     expect(nieuw.savingsRate6m).not.toBe(68.8)
     expect(oud.monthlyIncome).toBe(8000)
     expect(oud.monthlyExpenses).toBe(2500)
   })
 
-  it('fixture 4: de maandgrenzen tellen precies de juiste dagen mee (82,3 %)', async () => {
+  it('fixture 4: de maandgrenzen tellen precies de juiste dagen mee (90,5 %)', async () => {
     const { nieuw, oud } = await runBothPaths(buildFixtures()[3].db)
-    // 31 jan (9000) valt buiten het 6-maands-venster ⇒ income6m = 6000+4000+3000.
-    // (13000 − 3500 + 1200) / 13000 × 100 = 82,307… → 82,3
-    expect(nieuw.savingsRate6m).toBe(82.3)
-    expect(oud.savingsRate6m).toBe(82.3)
+    // Venster = jan t/m jun (zes VOLTOOIDE maanden). 31 jan (9000/−0) valt er nu
+    // WEL in; 1 en 31 juli — de lopende maand — vallen erbuiten. In UTC+2 zou een
+    // `toISOString()`-grens 30 juni de julimaand in trekken en dus uit het venster
+    // duwen; dat die €4000/−€1000 meetellen is exact de TZ-getuige.
+    // income6m 9000+6000+4000 = 19000 · expenses6m 2000+1000 = 3000 · aflossing 1200
+    // ⇒ (19000 − 3000 + 1200) / 19000 × 100 = 90,526… → 90,5
+    expect(nieuw.savingsRate6m).toBe(90.5)
+    expect(oud.savingsRate6m).toBe(90.5)
     // Huidige maand = [1 jul, 1 aug): 30 juni valt erbuiten, 31 juli erin.
     expect(nieuw.monthlyIncome).toBe(3000)
     expect(nieuw.monthlyExpenses).toBe(500)
@@ -472,13 +481,15 @@ describe('de vijf velden, met harde waarden op beide paden', () => {
     expect(oud.expenseHistory).toEqual(nieuw.expenseHistory)
   })
 
-  it('fixture 5: de lege maand laat een GAT, de reeks schuift niet op (75,0 %)', async () => {
+  it('fixture 5: de lege maand laat een GAT, de reeks schuift niet op (77,5 %)', async () => {
     const { nieuw, oud } = await runBothPaths(buildFixtures()[4].db)
     // Vroegste inkomen = februari (de fixture-rijen staan door elkaar; de mock
     // voert `order(date asc).limit(1)` echt uit) ⇒ dataMonths6 = 5 ⇒ extrapolatie
-    // naar 6: extIncome6 24000, extExpenses6 7200, aflossing 1200 ⇒ 18000/24000 = 75.
-    expect(nieuw.savingsRate6m).toBe(75)
-    expect(oud.savingsRate6m).toBe(75)
+    // naar 6. Venster = jan t/m jun, dus juli (+4000/−1400) valt eruit:
+    // income6m 16000 · expenses6m 4600 ⇒ ×6/5 ⇒ extIncome6 19200, extExpenses6 5520,
+    // aflossing 1200 ⇒ 14880/19200 = 77,5 %.
+    expect(nieuw.savingsRate6m).toBe(77.5)
+    expect(oud.savingsRate6m).toBe(77.5)
     // April ONTBREEKT (geen enkele transactie ⇒ geen aggregaat-groep), en de
     // maanden eromheen houden hun eigen waarde: zou de reeks opschuiven, dan zou
     // mei hier 1100 tonen in plaats van 1200. De reeks staat bovendien
@@ -604,17 +615,22 @@ describe('deriveDataMonths6 — waarde-getuige (de extrapolatie-teller)', () => 
 })
 
 describe('deriveSavingsRate6mWindow — waarde-getuige (het 6-maands sub-venster)', () => {
-  const nu = new Date(2026, 6, 15) // juli 2026 ⇒ venster vanaf '2026-02'
+  // Juli 2026 ⇒ venster = zes VOLTOOIDE maanden: '2026-01' t/m '2026-06'. Juli
+  // zelf loopt nog en valt er per definitie buiten (bevinding C6).
+  const nu = new Date(2026, 6, 15)
   const spaar = new Set([B_SAVINGS])
 
   const agg = buildMonthAggregatesFromRows([
-    // Januari = de 7e maand terug: valt er NET buiten.
+    // December 2025 = de 7e voltooide maand terug: valt er NET buiten.
+    { amount: 7777, date: '2025-12-31', budget_id: null, transaction_type: null },
+    { amount: -6666, date: '2025-12-31', budget_id: null, transaction_type: null },
+    // Januari = de 6e voltooide maand terug: valt er NET binnen.
     { amount: 9999, date: '2026-01-31', budget_id: null, transaction_type: null },
     { amount: -8888, date: '2026-01-31', budget_id: null, transaction_type: null },
-    // Februari = de 6e maand terug: valt er NET binnen.
     { amount: 4000, date: '2026-02-01', budget_id: null, transaction_type: null },
     { amount: -1000, date: '2026-02-02', budget_id: null, transaction_type: null },
     { amount: -250, date: '2026-02-03', budget_id: B_SAVINGS, transaction_type: null },
+    // Juli = de LOPENDE maand: valt er NET buiten — dit is de C6-getuige.
     { amount: 6000, date: '2026-07-01', budget_id: null, transaction_type: null },
     { amount: -2000, date: '2026-07-02', budget_id: null, transaction_type: null },
     // Transfers tellen nergens mee.
@@ -622,19 +638,29 @@ describe('deriveSavingsRate6mWindow — waarde-getuige (het 6-maands sub-venster
     { amount: -50000, date: '2026-07-04', budget_id: B_SAVINGS, transaction_type: 'joint_transfer' },
   ])
 
-  it('zes kalendermaanden inclusief de huidige — de zevende valt eruit', () => {
+  it('zes VOLTOOIDE kalendermaanden — de lopende maand én de zevende vallen eruit', () => {
     expect(deriveSavingsRate6mWindow(nu, agg, spaar)).toEqual({
-      income6m: 10000, // 4000 + 6000; de 9999 van januari telt niet mee
-      expenses6m: 3250, // 1000 + 250 + 2000; de 8888 van januari telt niet mee
+      income6m: 13999, // 9999 + 4000; december (7777) en juli (6000) tellen niet mee
+      expenses6m: 10138, // 8888 + 1000 + 250; december (6666) en juli (2000) niet
       savingsBudgetSpent6m: 250, // alleen de echte spaarbudget-rij
     })
+  })
+
+  it('de lopende maand is de enige reden dat juli wegvalt (bevinding C6)', () => {
+    // Zonder de bovengrens zou juli meetellen. Dat de julirijen NIET in de sommen
+    // zitten terwijl ze wél in het aggregaat staan, is precies wat de fix bewaakt:
+    // een halve maand (uitgaven al geboekt, salaris nog niet) mag het 6-maands
+    // gemiddelde niet vervuilen.
+    const w = deriveSavingsRate6mWindow(nu, agg, spaar)
+    expect(w.income6m).not.toBe(19999) // 13999 + 6000 = het oude, vervuilde venster
+    expect(w.expenses6m).not.toBe(12138) // 10138 + 2000
   })
 
   it('een lege spaarbudget-set levert 0 spaarcorrectie (en laat de rest ongemoeid)', () => {
     const zonder = deriveSavingsRate6mWindow(nu, agg, new Set())
     expect(zonder.savingsBudgetSpent6m).toBe(0)
-    expect(zonder.income6m).toBe(10000)
-    expect(zonder.expenses6m).toBe(3250)
+    expect(zonder.income6m).toBe(13999)
+    expect(zonder.expenses6m).toBe(10138)
   })
 
   it('budgetIdsOfType levert de spaarbudget-set uit de type-map (parent + child)', () => {

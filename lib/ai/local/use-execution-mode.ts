@@ -14,11 +14,14 @@
 //   'resolving' → we weten het nog niet. Er mag NIETS vertrekken.
 //   'cloud'     → deze groep draait via de cloud-AI; gebruik het normale pad.
 //   'lokaal'    → draait on-device; gebruik het lokale pad.
-//   'blocked'   → moet lokaal, maar het mag of kan niet. Drie redenen: de
-//                 kill-switch (`profiles.ai_enabled`) staat uit, het
-//                 'ai'-abonnement is niet meer actief, óf dit toestel kan het
-//                 niet. Er mag NIETS vertrekken en er mag ook niets on-device
-//                 gegenereerd worden — ook niet "even via de cloud".
+//   'blocked'   → er mag of kan niets draaien. Drie redenen: de kill-switch
+//                 (`profiles.ai_enabled`) staat uit, het 'ai'-abonnement is niet
+//                 meer actief, óf dit toestel kan het lokale model niet aan. Er
+//                 mag NIETS vertrekken en er mag ook niets on-device gegenereerd
+//                 worden — ook niet "even via de cloud".
+//                 De eerste reden (AI uit) blokkeert BEIDE bestemmingen; de
+//                 andere twee gelden alleen wanneer lokaal gekozen is. `reason`
+//                 draagt welke van de drie het is.
 //
 // FAIL-CLOSED IS DE KERN. Zowel 'resolving' als 'blocked' betekenen: niet
 // versturen. Een consument die alleen op `=== 'lokaal'` test en anders de cloud
@@ -41,10 +44,22 @@ import type { AiExecutionGroup, AiExecutionMode } from '@/lib/ai/execution-group
 
 export type ExecutionStatus = 'resolving' | 'cloud' | 'lokaal' | 'blocked'
 
+/**
+ * Wáárom er niets mag draaien. Bewust een aparte, machineleesbare as naast
+ * `message`: een oppervlak dat de blokkade vormgeeft (kop, icoon, knop) mag daar
+ * niet voor op de meldingstekst hoeven matchen.
+ *
+ * Optioneel gehouden zodat bestaande consumenten en hun test-dubbels geldig
+ * blijven; ontbreekt hij, dan valt een oppervlak terug op zijn generieke tekst.
+ */
+export type ExecutionBlockedReason = 'ai_uit' | 'abonnement' | 'toestel'
+
 export interface ExecutionModeState {
   status: ExecutionStatus
   /** Uitleg bij 'blocked' — de concrete reden uit resolveLocalReadiness. */
   message: string | null
+  /** Categorie van de blokkade bij 'blocked'. */
+  reason?: ExecutionBlockedReason
   /** De gekozen bestemming, ongeacht of die haalbaar is. Handig voor UI-tekst. */
   intended: AiExecutionMode | null
   /** Mag er nu een cloud-aanroep vertrekken? */
@@ -67,9 +82,14 @@ const RESOLVING: Omit<ExecutionModeState, 'refresh'> = {
  * Melding wanneer de gebruiker AI zélf heeft uitgezet (`profiles.ai_enabled`).
  * Bewust een andere tekst dan de abonnementsmelding: dit is geen beperking die
  * hem overkomt maar zijn eigen keuze, en de weg terug is een andere knop.
+ *
+ * De tekst noemt sinds M26 BEIDE bestemmingen. Hij gold eerst alleen op het
+ * lokale pad ("ook niet op je eigen toestel"); nu de kill-switch ook het
+ * cloudpad blokkeert zou dat de helft van de gebruikers de indruk geven dat er
+ * alleen on-device iets stopt.
  */
-export const LOCAL_AI_DISABLED_MESSAGE =
-  'AI staat uit in je instellingen, dus er wordt niets gegenereerd — ook niet op je eigen toestel. ' +
+export const AI_DISABLED_MESSAGE =
+  'AI staat uit in je instellingen, dus er wordt niets gegenereerd — niet in de cloud en niet op je eigen toestel. ' +
   'Via Mijn → Privacy kun je AI weer aanzetten.'
 
 /**
@@ -170,42 +190,43 @@ export function useExecutionMode(group: AiExecutionGroup, active = true): Execut
       // Onbekend → in 'resolving' blijven (zie fetchPrefs): niets versturen.
       if (prefs === null) return
 
+      // ── Kill-switch, vóór ALLES ──────────────────────────────────────────
+      // `profiles.ai_enabled` is de knop "AI uit" op /mijn/privacy. Hij staat
+      // bovenaan omdat hij een andere vraag beantwoordt dan de rest van deze
+      // hook: niet "wáár draait het" maar "mag er überhaupt iets draaien". Wie
+      // AI zelf heeft uitgezet hoort geen melding over zijn abonnement of over
+      // privé-modus te krijgen, maar over zijn eigen knop.
+      //
+      // DEZE CHECK STOND EERDER ÓNDER DE CLOUD-TAK (M26), en dat was het gat:
+      // een gebruiker met AI uit wiens groep op cloud stond — de default voor
+      // vrijwel elk account — kreeg meteen `canUseCloud: true` terug. In de chat
+      // betekende dat een volledig bruikbaar invoerveld, een verstuurd bericht
+      // en een echt AI-antwoord, terwijl de app al wist dat AI uit stond. De
+      // server dekt het sinds M26 zelf af (assertCloudAllowed → 403
+      // `ai_disabled`); deze hoisting is de client-spiegel daarvan, zodat het
+      // oppervlak vóór het typen blokkeert in plaats van ná het versturen.
+      //
+      // `intended` draagt de bestemming die de gebruiker gekozen had, niet een
+      // aanname: bij AI-uit is de blokkade even hard op cloud als op lokaal,
+      // maar de UI-tekst mag wel weten waar hij anders naartoe zou zijn gegaan.
+      if (!prefs.aiEnabled) {
+        setState({
+          status: 'blocked',
+          message: AI_DISABLED_MESSAGE,
+          reason: 'ai_uit',
+          intended: prefs.mode,
+          canUseCloud: false,
+          canUseLocal: false,
+        })
+        return
+      }
+
       if (prefs.mode === 'cloud') {
         setState({
           status: 'cloud',
           message: null,
           intended: 'cloud',
           canUseCloud: true,
-          canUseLocal: false,
-        })
-        return
-      }
-
-      // ── Kill-switch, vóór het abonnement ─────────────────────────────────
-      // `profiles.ai_enabled` is de knop "AI uit" op /mijn/privacy. Hij staat
-      // vóór de abonnementscheck omdat dit de eigen, expliciete keuze van de
-      // gebruiker is: wie AI zelf heeft uitgezet moet niet te horen krijgen dat
-      // zijn abonnement verlopen is.
-      //
-      // Deze check zit ná de cloud-tak, en dat is een BEWUSTE AFBAKENING — geen
-      // bewijs dat het cloudpad gedekt is. Dat is het namelijk niet: `ai_enabled`
-      // komt in app/api uitsluitend voor in deze route en de vijf
-      // `local-*`-context-routes; de echte cloudroutes gate'en op `privacy_mode`
-      // (assertCloudAllowed) en tier, niet op de kill-switch — zie
-      // app/api/ai/chat/route.ts r50-53. "AI uit" wordt op het cloudpad dus
-      // evenmin afgedwongen.
-      //
-      // Dat gat is ouder dan deze hook en raakt meer dan alleen de oppervlakken
-      // die hier langskomen, dus het hoort in een eigen ronde thuis en niet als
-      // bijvangst van deze fix. Wat hier wél dicht gaat is het lokale pad: dat
-      // raakt tijdens het genereren geen enkele route meer aan, waardoor deze GET
-      // de laatste server-uitspraak is — en die zweeg erover.
-      if (!prefs.aiEnabled) {
-        setState({
-          status: 'blocked',
-          message: LOCAL_AI_DISABLED_MESSAGE,
-          intended: 'lokaal',
-          canUseCloud: false,
           canUseLocal: false,
         })
         return
@@ -229,6 +250,7 @@ export function useExecutionMode(group: AiExecutionGroup, active = true): Execut
         setState({
           status: 'blocked',
           message: LOCAL_SUBSCRIPTION_REVOKED_MESSAGE,
+          reason: 'abonnement',
           intended: 'lokaal',
           canUseCloud: false,
           canUseLocal: false,
@@ -251,6 +273,7 @@ export function useExecutionMode(group: AiExecutionGroup, active = true): Execut
         setState({
           status: 'blocked',
           message: `${verdict.reasons[0] ?? 'De proef op dit toestel is niet geslaagd.'} Lokale AI blijft daarom uit op dit apparaat; via Mijn → Privacy kun je de proef opnieuw draaien.`,
+          reason: 'toestel',
           intended: 'lokaal',
           canUseCloud: false,
           canUseLocal: false,
@@ -268,6 +291,7 @@ export function useExecutionMode(group: AiExecutionGroup, active = true): Execut
         setState({
           status: 'blocked',
           message: readiness.message ?? 'Lokale AI is nu niet beschikbaar op dit toestel.',
+          reason: 'toestel',
           intended: 'lokaal',
           canUseCloud: false,
           canUseLocal: false,

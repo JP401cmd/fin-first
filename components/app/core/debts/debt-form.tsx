@@ -134,13 +134,23 @@ export function DebtForm({
   const subtypeOptions = DEBT_SUBTYPE_LABELS[debtType]
   const visibleFields = DEBT_TYPE_FIELDS[debtType]
 
+  // Type-specifieke velden blijven bij het bewerken van een bestaande schuld
+  // in state staan als je het debt_type wisselt (`handleTypeChange` reset
+  // alleen bij !isEdit), zodat terugswitchen de ingevulde waarde niet wist.
+  // Wat het huidige type níét toont, mag echter nooit meetellen — niet in de
+  // opslag en niet in de live-preview. Anders houdt bv. een familielening die
+  // je omzet naar "persoonlijke lening" onzichtbaar repayment_type='lineair',
+  // en rekent de looptijd-KPI daarop door. Zelfde gating als
+  // `is_tax_deductible`/`nhg` hieronder.
+  const effectiveRepaymentType = visibleFields.includes('repayment_type') ? repaymentType : ''
+
   // Bereken de verwachte restschuld op basis van origineel bedrag + aflossingsschema
   const calculatedBalance = useMemo(() => {
     const orig = Number(originalAmount)
     const rate = Number(interestRate)
     if (orig <= 0 || !startDate || !endDate) return null
 
-    const rt = repaymentType || 'annuiteit'
+    const rt = effectiveRepaymentType || 'annuiteit'
     const result = computeExpectedBalance({
       original_amount: orig,
       interest_rate: rate,
@@ -149,7 +159,7 @@ export function DebtForm({
       repayment_type: rt,
     } as Debt)
     return result ? result.expectedBalance : null
-  }, [originalAmount, interestRate, startDate, endDate, repaymentType])
+  }, [originalAmount, interestRate, startDate, endDate, effectiveRepaymentType])
 
   // Bereken het verwachte maandbedrag op basis van saldo, rente, looptijd en type
   const calculatedPayment = useMemo(() => {
@@ -167,7 +177,7 @@ export function DebtForm({
       ))
     }
 
-    const rt = repaymentType || 'annuiteit'
+    const rt = effectiveRepaymentType || 'annuiteit'
 
     if (rt === 'aflossingsvrij') {
       return Math.round(bal * monthlyRate * 100) / 100
@@ -185,7 +195,7 @@ export function DebtForm({
     if (rate === 0) return Math.round((bal / months) * 100) / 100
     const factor = Math.pow(1 + monthlyRate, months)
     return Math.round(bal * (monthlyRate * factor) / (factor - 1) * 100) / 100
-  }, [currentBalance, interestRate, endDate, repaymentType, useCalculatedBalance, calculatedBalance, nowMs])
+  }, [currentBalance, interestRate, endDate, effectiveRepaymentType, useCalculatedBalance, calculatedBalance, nowMs])
 
   function handleTypeChange(type: DebtType) {
     setDebtType(type)
@@ -286,7 +296,7 @@ export function DebtForm({
       notes: notes || null,
       // Type-specific fields
       subtype: subtype || null,
-      repayment_type: repaymentType || null,
+      repayment_type: effectiveRepaymentType || null,
       is_tax_deductible: visibleFields.includes('is_tax_deductible') ? isTaxDeductible : null,
       fixed_rate_end_date: fixedRateEndDate || null,
       nhg: visibleFields.includes('nhg') ? nhg : null,

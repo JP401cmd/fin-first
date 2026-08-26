@@ -32,7 +32,11 @@ export type EventImpact = {
   netCostEUR: number
   /** Geschatte impact in jaren — positief = later vrij, negatief = eerder vrij. */
   yearsImpact: number
-  /** Display-string: "+6 mnd" / "−1.2 jaar" / "Geen impact". */
+  /**
+   * Display-string, richtingsgewijs geformuleerd zodat het label niet als
+   * saldo maar als verschuiving van je vrijheidsdatum leest:
+   * "→ 6 mnd later vrij" / "→ 1.2 jaar eerder vrij" / "Geen impact".
+   */
   displayLabel: string
   /** Tone voor styling: 'cost' / 'gain' / 'neutral'. */
   tone: 'cost' | 'gain' | 'neutral'
@@ -68,13 +72,17 @@ export function computeEventImpact(
   if (absYears < 0.02) {
     return { netCostEUR, yearsImpact, displayLabel: 'Geen impact', tone: 'neutral' }
   }
-  const sign = yearsImpact > 0 ? '+' : '−'
+  // Richting i.p.v. rekenteken: "+2,4 jaar vrijheid" leest als winst
+  // terwijl een positieve yearsImpact juist vertraging betekent. We
+  // tekstueren de delta daarom als verschuiving van de vrijheidsdatum,
+  // net als elders in de app (lib/strategy-preview.ts).
+  const direction = yearsImpact > 0 ? 'later vrij' : 'eerder vrij'
   let displayLabel: string
   if (absYears < 1) {
     const monthsLabel = Math.round(absYears * 12)
-    displayLabel = `${sign}${monthsLabel} mnd vrijheid`
+    displayLabel = `→ ${monthsLabel} mnd ${direction}`
   } else {
-    displayLabel = `${sign}${absYears.toFixed(1)} jaar vrijheid`
+    displayLabel = `→ ${absYears.toFixed(1)} jaar ${direction}`
   }
   return {
     netCostEUR,

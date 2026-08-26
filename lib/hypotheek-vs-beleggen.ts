@@ -9,6 +9,7 @@
  */
 
 import { BOX3_DRAG } from '@/lib/horizon-data'
+import { hraAftrekTarief } from '@/lib/box1-tax'
 import {
   amortizationSchedule,
   linearAmortization,
@@ -41,7 +42,12 @@ export interface HvBParams {
   restLooptijd: number
   /** Is de rente fiscaal aftrekbaar? */
   isTaxDeductible: boolean
-  /** Marginaal IB-tarief (0–1; schijf-1- of topschijf-tarief, jaar-afgeleid) */
+  /**
+   * Marginaal IB-tarief (0–1; schijf-1- of topschijf-tarief, jaar-afgeleid).
+   * Wordt intern voor de HRA-waardering afgetopt op het maximale aftrektarief
+   * eigen woning via `hraAftrekTarief()` — aanroepers hoeven dat niet zelf te
+   * doen (en moeten dat ook niet: één plek, geen tweede kopie van de regel).
+   */
   marginaalTarief: number
   /** Verwacht bruto rendement op beleggingen (decimaal, bijv. 0.07) */
   verwachtRendement: number
@@ -170,6 +176,9 @@ function computeAflossingsScenario(params: HvBParams): {
   const { extraBedrag, hypotheekBalance, rente, repaymentType, restLooptijd,
           isTaxDeductible, marginaalTarief, horizonJaren } = params
 
+  // Één bron voor "wat levert een euro hypotheekrenteaftrek op" (lib/box1-tax).
+  const aftrekTarief = hraAftrekTarief(marginaalTarief)
+
   const maanden = Math.min(restLooptijd, horizonJaren * 12)
   const basePayment = computeMonthlyPayment(hypotheekBalance, rente, repaymentType, restLooptijd)
 
@@ -194,8 +203,14 @@ function computeAflossingsScenario(params: HvBParams): {
     // Rentebesparing
     const renteBesparing = renteBase - renteExtra
 
-    // Verloren HRA (minder renteaftrek)
-    const hraVerlies = isTaxDeductible ? renteBesparing * marginaalTarief : 0
+    // Verloren HRA (minder renteaftrek). Gewaardeerd tegen het AFTREKTARIEF,
+    // niet tegen het volle marginale tarief: sinds de tariefsaanpassing
+    // aftrekbare kosten eigen woning (art. 2.10 lid 2 Wet IB 2001) is
+    // hypotheekrente maximaal tegen 37,56% (2026) aftrekbaar. Waarderen tegen
+    // 49,50% overschatte het HRA-verlies met 11,94 procentpunt en maakte extra
+    // aflossen daardoor structureel minder aantrekkelijk dan het is.
+    // Onder de topschijf verandert er niets (min() laat 35,75% ongemoeid).
+    const hraVerlies = isTaxDeductible ? renteBesparing * aftrekTarief : 0
 
     // Netto voordeel dit jaar
     const netto = renteBesparing - hraVerlies

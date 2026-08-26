@@ -15,7 +15,11 @@ import {
 import { BelastingBoxPageHeader } from '@/components/overview/belasting-box-page-header'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { computeBox1Tax, grossFromNet, deriveMarginaalTarief, type Box1Result } from '@/lib/box1-tax'
-import { resolveBox1GrossIncome, type Box1IncomeResolution } from '@/lib/box1-income'
+import {
+  resolveBox1GrossIncome,
+  resolveEigenWoningBox1Input,
+  type Box1IncomeResolution,
+} from '@/lib/box1-income'
 import { Box1GrossIncomeEditor } from '@/components/overview/belasting/box1-gross-income-editor'
 import { Box1Waterfall } from '@/components/overview/belasting/box1-waterfall'
 import { Box1MarginaleCurveCard } from '@/components/overview/belasting/box1-marginale-curve-card'
@@ -34,17 +38,6 @@ const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
 export const metadata: Metadata = {
   title: 'Box 1 · Werk + woning — TriFinity',
   description: 'Belasting over werk en woning — plus je onbenutte jaarruimte (pensioenaftrek).',
-}
-
-/** Geschatte aftrekbare hypotheekrente per jaar uit een mortgage-debt. */
-function estimateMortgageRente(
-  balance: number | null | undefined,
-  ratePct: number | null | undefined,
-): number {
-  const b = Number(balance) || 0
-  const r = Number(ratePct) || 0
-  if (b <= 0 || r <= 0) return 0
-  return Math.round(b * (r / 100))
 }
 
 /**
@@ -88,6 +81,12 @@ export default async function BelastingBox1Page() {
   // (factor A 0); de uitleg framet dat expliciet. Partner-factor-A is privé en
   // out-of-scope, dus de partner-kaart blijft op de bovengrens (0).
   const pensionFactorA: number = horizonData.pensioenFactorA
+  // NULL ≠ 0 (bevinding H23): de bundel weet of er daadwerkelijk een factor A
+  // is (`resolvePensionFactorA().isKnown`), maar deze pagina las dat veld niet
+  // en gaf het niet door — waardoor de kaart onvoorwaardelijk "berekend met je
+  // opgeslagen factor A" zei onder een bedrag dat de uitleg erboven een
+  // "bovengrens" noemt. Eén bundelveld, drie consumenten op deze pagina.
+  const pensionFactorAKnown: boolean = horizonData.pensioenFactorAKnown
 
   // Vrijheidstijd-equivalent ("Geld is opgeslagen tijd"). CONSUMEER het
   // canonieke 12-mnd rolling dagtarief uit de bundel — dezelfde bron als de
@@ -99,36 +98,12 @@ export default async function BelastingBox1Page() {
   const dailyExpenses = horizonData.dailyExpenseRate
 
   // ── Eigen woning + gekoppelde hypotheek (1.6) ──────────────────────────
-  // RLS scoopt de queries al naar de ingelogde gebruiker. We pakken de eerste
-  // eigen_huis-asset met een WOZ-waarde en de daaraan gekoppelde mortgage.
-  const [eigenHuisRes, mortgageRes] = await Promise.all([
-    supabase
-      .from('assets')
-      .select('id, woz_value')
-      .eq('is_active', true)
-      .eq('asset_type', 'eigen_huis')
-      .order('woz_value', { ascending: false, nullsFirst: false })
-      .limit(1),
-    supabase
-      .from('debts')
-      .select('linked_asset_id, current_balance, interest_rate')
-      .eq('is_active', true)
-      .eq('debt_type', 'mortgage'),
-  ])
-
-  const eigenHuis = eigenHuisRes.data?.[0] ?? null
-  const wozValue = eigenHuis ? Number(eigenHuis.woz_value) || 0 : 0
-  // Som de rente over alle aan deze woning gekoppelde hypotheken.
-  const hypotheekRente =
-    eigenHuis != null
-      ? (mortgageRes.data ?? [])
-          .filter((d) => d.linked_asset_id === eigenHuis.id)
-          .reduce(
-            (sum, d) => sum + estimateMortgageRente(d.current_balance, d.interest_rate),
-            0,
-          )
-      : 0
-  const hasEigenWoning = wozValue > 0
+  // De lookup stond hier als lokale code en NERGENS anders — daardoor rekende
+  // de belasting-hub dezelfde motor zónder eigen woning en noemde hij een
+  // andere Box 1-heffing (bevinding C8, Δ €4.357). Nu één resolutie naast de
+  // bruto-bron; hub en subpagina delen 'm, dus ze kunnen niet meer uiteenlopen.
+  const eigenWoning = await resolveEigenWoningBox1Input(supabase)
+  const hasEigenWoning = eigenWoning.hasEigenWoning
 
   // ── Echte Box 1-berekening (1.1) ───────────────────────────────────────
   const box1Result: Box1Result | null =
@@ -136,8 +111,8 @@ export default async function BelastingBox1Page() {
       ? computeBox1Tax({
           grossYearlyIncome: grossYearly,
           year: 2026,
-          wozValue: hasEigenWoning ? wozValue : undefined,
-          hypotheekRente: hasEigenWoning ? hypotheekRente : undefined,
+          wozValue: eigenWoning.wozValue,
+          hypotheekRente: eigenWoning.hypotheekRente,
           dailyExpenses,
         })
       : null
@@ -230,13 +205,14 @@ export default async function BelastingBox1Page() {
                 <PerspectiveContextLabel className="normal-case tracking-normal" />
               </span>
             </SectionLabel>
-            <JaarruimteUitleg />
+            <JaarruimteUitleg factorAKnown={pensionFactorAKnown} />
             <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Kicker className="mb-2">Jij</Kicker>
               <JaarruimteCard
                 grossYearlyIncome={grossYearly}
                 pensioenAangroei={pensionFactorA}
+                factorAKnown={pensionFactorAKnown}
                 marginaalTarief={marg}
                 year={2026}
                 dailyExpenses={dailyExpenses}
@@ -250,9 +226,15 @@ export default async function BelastingBox1Page() {
                 // gebruiker en mag NOOIT als de factor A van de partner worden
                 // hergebruikt (privacylek + rekenfout). De partner heeft geen
                 // eigen factor-A-bron, dus we rekenen zonder factor-A-aftrek.
+                // `factorAKnown={false}` is hier de waarheid (er is geen bron),
+                // maar de kaart houdt de badge bewust achterwege zolang
+                // `factorAEditable={false}`: een "vul je factor A in"-oproep zou
+                // op de partnerkaart naar de verkeerde persoon wijzen. De
+                // partner-footer benoemt de ontbrekende bron al expliciet.
                 <JaarruimteCard
                   grossYearlyIncome={partnerGrossYearly}
                   pensioenAangroei={0}
+                  factorAKnown={false}
                   marginaalTarief={marg}
                   year={2026}
                   dailyExpenses={dailyExpenses}
@@ -276,10 +258,11 @@ export default async function BelastingBox1Page() {
         <Reveal>
           <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-8 pb-10">
             <SectionLabel num="IV">Je jaarruimte benutten</SectionLabel>
-            <JaarruimteUitleg />
+            <JaarruimteUitleg factorAKnown={pensionFactorAKnown} />
             <JaarruimteCard
               grossYearlyIncome={grossYearly}
               pensioenAangroei={pensionFactorA}
+              factorAKnown={pensionFactorAKnown}
               marginaalTarief={marg}
               year={2026}
               dailyExpenses={dailyExpenses}
@@ -405,8 +388,14 @@ function Box1DrukHero({
  * de eerlijke "bovengrens vóór werkgeverspensioen"-framing. Verwijst naar de
  * pensioen-strategie (factor A invullen) en de officiële Belastingdienst-
  * rekenhulp (Wft: indicatie, geen advies).
+ *
+ * `factorAKnown` (bevinding H23): de "bovengrens"-alinea gold ONVOORWAARDELIJK
+ * en was daarmee twee keer fout tegelijk — tegenstrijdig met de kaartfooter
+ * ("berekend met je opgeslagen factor A") bij een ONBEKENDE factor A, én simpelweg
+ * onwaar zodra de gebruiker zijn factor A wél had ingevuld (dan is het geen
+ * bovengrens meer). Eén bundelveld stuurt nu beide teksten.
  */
-function JaarruimteUitleg() {
+function JaarruimteUitleg({ factorAKnown }: { factorAKnown: boolean }) {
   const opbouwPct = Math.round(JAARRUIMTE_OPBOUW_PCT * 100)
   const linkCls =
     'underline decoration-[var(--border-md)] underline-offset-2 hover:text-[var(--ink)]'
@@ -470,14 +459,27 @@ function JaarruimteUitleg() {
         <p className="mt-4 mb-1 font-mono text-[10px] uppercase tracking-[0.18em] not-italic text-[var(--ink-3)]">
           Wat je hieronder ziet
         </p>
-        <p>
-          Een <strong>bovengrens vóór aftrek van je werkgeverspensioen</strong>.
-          Vul je factor A in — hieronder of bij je{' '}
-          <Link href="/toekomst/gebeurtenissen?strategie=pensioen" className={linkCls}>
-            pensioen-strategie
-          </Link>{' '}
-          — voor een scherpere schatting.
-        </p>
+        {factorAKnown ? (
+          <p>
+            Je jaarruimte <strong>met je eigen factor A verrekend</strong> — de
+            pensioenaangroei die je hebt ingevuld is er al vanaf. Klopt hij niet
+            meer? Pas &apos;m aan bij je{' '}
+            <Link href="/toekomst/gebeurtenissen?strategie=pensioen" className={linkCls}>
+              pensioen-strategie
+            </Link>
+            .
+          </p>
+        ) : (
+          <p>
+            Een <strong>bovengrens vóór aftrek van je werkgeverspensioen</strong>
+            : je factor A is nog niet ingevuld, dus er is met 0 gerekend. Vul
+            &apos;m in bij je{' '}
+            <Link href="/toekomst/gebeurtenissen?strategie=pensioen" className={linkCls}>
+              pensioen-strategie
+            </Link>{' '}
+            voor één scherp bedrag in plaats van een bereik.
+          </p>
+        )}
 
         <p className="mt-3 text-[12px] italic text-[var(--ink-3)]">
           Indicatie, geen advies — het bindende bedrag bereken je met de{' '}

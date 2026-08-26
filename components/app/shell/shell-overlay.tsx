@@ -188,6 +188,13 @@ export function ShellOverlay({
           size="full"
           footerSlot={mobileFooterSlot}
           actions={actions}
+          // Panes zijn de URL-gestuurde familie: hun open-staat komt uit een
+          // query-param (`?holding=<id>`, `?budget=<id>`, `?asset=<id>`) en hun
+          // `onClose` schrijft die met `router.replace` weer weg. De centrale
+          // overlay-history zou dan een tweede claim op dezelfde entry leggen,
+          // met een pane die na "terug" opnieuw opent. Back-integratie voor
+          // panes hoort bij de stack-push van Fase 0.5 (NavStackProvider).
+          manageHistory={false}
         >
           {children}
         </BottomSheet>

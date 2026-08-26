@@ -382,7 +382,7 @@ export function CommandPalette({ open, onClose, role, userId }: CommandPalettePr
     <div
       data-cmdk-overlay
       onClick={onBackdrop}
-      className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-[2px] flex items-end md:items-start md:pt-[12vh] justify-center"
+      className="fixed inset-0 z-[60] bg-[var(--scrim)] backdrop-blur-[var(--scrim-blur)] flex items-end md:items-start md:pt-[12vh] justify-center"
       style={{ animation: 'cmdk-fade-in 120ms ease-out' }}
     >
       <div

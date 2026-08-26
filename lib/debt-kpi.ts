@@ -13,9 +13,8 @@ import {
   type Debt,
   type DebtType,
   REPAYMENT_TYPE_LABELS,
-  amortizationSchedule,
-  linearAmortization,
 } from './debt-data'
+import { debtRemainingMonths } from './debt-remaining-term'
 import { formatCurrency } from './format'
 import type { KpiPair, KpiValue } from './asset-kpi'
 
@@ -45,50 +44,12 @@ function formatPercent(value: number, opts: { decimals?: number; signed?: boolea
   return `${formatted}%`
 }
 
-function diffMonths(from: Date, to: Date): number {
-  const months = (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth())
-  return Math.max(0, months)
-}
-
 /**
- * Resterende looptijd in maanden. Twee paden:
- * 1. Als `end_date` is gezet, gebruik kalendervergelijking — dat is wat de
- *    gebruiker zelf heeft ingevuld en moet dus leidend zijn.
- * 2. Anders projectie via amortisatie-schedule (balance + rente + maandlast).
- *    Aflossingsvrije schulden geven null terug — daar is geen einde te zien.
+ * Resterende looptijd in maanden — gedeelde bron met `lib/category-kpi.ts`,
+ * zie `lib/debt-remaining-term.ts`. Lokale alias zodat de per-type
+ * implementaties hieronder onveranderd kunnen blijven lezen.
  */
-function remainingMonths(debt: Debt, now: Date): number | null {
-  if (debt.end_date) {
-    const end = new Date(debt.end_date)
-    const m = diffMonths(now, end)
-    return m > 0 ? m : null
-  }
-
-  const balance = Number(debt.current_balance)
-  const rate = Number(debt.interest_rate)
-  const payment = Number(debt.monthly_payment)
-  if (balance <= 0 || payment <= 0) return null
-
-  const rt = debt.repayment_type ?? 'annuiteit'
-  if (rt === 'aflossingsvrij') return null
-
-  if (rt === 'lineair') {
-    // Voor lineair willen we de resterende termijn — die volgt uit de huidige
-    // balans gedeeld door het maandelijkse aflossingsbedrag (rente niet
-    // meegerekend). We projecteren simpel met `linearAmortization` over
-    // 600 maanden en pakken de eerste rij waar saldo 0 wordt.
-    const sched = linearAmortization(balance, rate, 600, now)
-    if (sched.length === 0) return null
-    const last = sched[sched.length - 1]
-    return last.balance <= 0.01 ? sched.length : null
-  }
-
-  // Annuïteit / default — gebruik amortizationSchedule
-  const sched = amortizationSchedule(balance, rate, payment, now)
-  if (sched.length === 0) return null
-  const last = sched[sched.length - 1]
-  return last.balance <= 0.01 ? sched.length : null
-}
+const remainingMonths = debtRemainingMonths
 
 // ── Per-type implementaties ────────────────────────────────────
 

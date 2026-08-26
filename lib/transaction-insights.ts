@@ -11,6 +11,8 @@
  *  - Datums zijn ISO 'yyyy-mm-dd' en worden lokaal geparsed (geen UTC-drift).
  */
 
+import { savingsRateFromAggregates } from '@/lib/savings-source'
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type PeriodKind = '30d' | 'month' | 'quarter' | 'year'
@@ -204,7 +206,11 @@ export function summarizeFlow(txns: AnalysisTransaction[]): FlowSummary {
     else if (t.amount < 0) expense += Math.abs(t.amount)
   }
   const net = income - expense
-  const savingsRate = income > 0 ? Math.round((net / income) * 100) : 0
+  // Consume, don't recompute: de spaarquote-formule woont in lib/savings-source.ts
+  // (`savingsRateFromAggregates`, (I − E + aflossing) / I × 100). Hier is er geen
+  // aflossings-term — dit is een kaal periode-aggregaat over transacties — maar de
+  // deling zelf hoort niet voor de derde keer in de codebase te staan.
+  const savingsRate = Math.round(savingsRateFromAggregates(income, expense, 0))
   return { income, expense, net, savingsRate, count }
 }
 

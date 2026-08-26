@@ -7,6 +7,8 @@ import {
   grossFromNet,
   deriveMarginaalTarief,
   schijfGrensVoor,
+  tariefsaanpassingPct,
+  hraAftrekTarief,
   MARGINAAL_TARIEF_NETTO_DREMPEL,
   BOX1_PARAMS,
 } from './box1-tax'
@@ -400,6 +402,155 @@ describe('computeBox1Tax — eigen woning (forfait + Hillen)', () => {
       hypotheekRente: 10_000,
     })
     expect(met.tax).toBeLessThan(zonder.tax)
+  })
+})
+
+/**
+ * Tariefsaanpassing aftrekbare kosten eigen woning — art. 2.10 lid 2 Wet IB 2001.
+ *
+ * Bevinding H25: de renteaftrek verlaagde alleen de GRONDSLAG en werkte daardoor
+ * door tegen 49,50% in de topschijf, terwijl het maximale aftrektarief 37,56%
+ * (2026) is. Grondslag A (eigenaarsbesluit 26-08-2026, ADR 0106): de correctie
+ * loopt over het NETTO eigenwoningsaldo.
+ *
+ * TOLERANTIES — bewust gekozen, niet geërfd:
+ *  - Bedragen: ABSOLUUT € 0,01 (`toBeCloseTo(x, 2)`). De correctie is een exacte
+ *    vermenigvuldiging van twee eindige decimalen; een relatieve marge zou een
+ *    tariefverschil van procentpunten kunnen verbergen — precies de foutklasse
+ *    die hier gemist werd.
+ *  - Tarieven: 4 decimalen (`toBeCloseTo(x, 4)`), dus scherper dan 0,01 pp.
+ *    Ook hier bewust géén ruime relatieve marge: 11,94 pp verschil is de bug.
+ */
+describe('computeBox1Tax — tariefsaanpassing eigen woning (art. 2.10 lid 2)', () => {
+  // Referentiegeval uit de bevinding: WOZ € 385.000 → forfait € 1.347,50;
+  // rente € 10.150 → netto aftrekpost € 8.802,50.
+  const REF = { year: 2026 as const, wozValue: 385_000, hypotheekRente: 10_150 }
+  const AFTREKPOST = 10_150 - 385_000 * 0.0035 // 8802.50
+  const PCT_2026 = 0.495 - 0.3756 // 11,94%
+  const DREMPEL_2026 = 78_426
+
+  it('referentiegeval € 95.000: correctie € 1.051 en verrekentarief 37,56% i.p.v. 49,50%', () => {
+    const met = computeBox1Tax({ grossYearlyIncome: 95_000, ...REF })
+    const zonder = computeBox1Tax({ grossYearlyIncome: 95_000, year: 2026 })
+
+    expect(-met.eigenwoningSaldo).toBeCloseTo(AFTREKPOST, 2)
+    // De hele aftrekpost zit boven de drempel → volledige correctie.
+    expect(met.tariefsaanpassing).toBeCloseTo(AFTREKPOST * PCT_2026, 2)
+    expect(met.tariefsaanpassing).toBeCloseTo(1051.02, 2)
+
+    // Het effectieve verrekentarief van de aftrekpost is nu het aftrektarief.
+    const verrekentarief = (zonder.tax - met.tax) / AFTREKPOST
+    expect(verrekentarief).toBeCloseTo(0.3756, 4)
+    expect(verrekentarief).not.toBeCloseTo(0.495, 4) // de bug
+  })
+
+  it('"voor zover"-begrenzing bij € 85.000: alleen het deel BOVEN de drempel telt', () => {
+    const gross = 85_000
+    const met = computeBox1Tax({ grossYearlyIncome: gross, ...REF })
+
+    const deelBovenDrempel = gross - DREMPEL_2026 // 6.574 < aftrekpost 8.802,50
+    expect(deelBovenDrempel).toBeLessThan(AFTREKPOST)
+    expect(met.tariefsaanpassing).toBeCloseTo(deelBovenDrempel * PCT_2026, 2)
+    expect(met.tariefsaanpassing).toBeCloseTo(784.94, 2)
+    // De naïeve implementatie (hele aftrekpost × pct) zou hier € 1.051 geven.
+    expect(met.tariefsaanpassing).not.toBeCloseTo(AFTREKPOST * PCT_2026, 2)
+  })
+
+  it('onder de drempel (€ 60.000): correctie 0 en de uitkomst blijft die van vóór de fix', () => {
+    const r = computeBox1Tax({ grossYearlyIncome: 60_000, ...REF })
+    expect(r.tariefsaanpassing).toBe(0)
+    // Regressie-anker: exact het bedrag van vóór de fix (absolute cent-tolerantie).
+    expect(r.tax).toBeCloseTo(12_037.07, 2)
+    expect(r.eigenwoningBelastingEffect).toBeCloseTo(3_869.4, 2)
+  })
+
+  it('geen eigen woning: correctie 0 en effect 0 (mag nooit vuren zonder woning)', () => {
+    const r = computeBox1Tax({ grossYearlyIncome: 200_000, year: 2026 })
+    expect(r.tariefsaanpassing).toBe(0)
+    expect(r.eigenwoningBelastingEffect).toBe(0)
+  })
+
+  it('Wet Hillen (forfait > rente): positief saldo → geen correctie, ook hoog boven de drempel', () => {
+    const r = computeBox1Tax({
+      grossYearlyIncome: 120_000,
+      year: 2026,
+      wozValue: 400_000,
+      hypotheekRente: 200,
+    })
+    expect(r.eigenwoningSaldo).toBeGreaterThan(0) // bijtelling, geen aftrekpost
+    expect(r.tariefsaanpassing).toBe(0)
+    // Een bijtelling KOST belasting → negatief effect.
+    expect(r.eigenwoningBelastingEffect).toBeLessThan(0)
+  })
+
+  it('jaar-geparametriseerd: 2025 rekent met 12,02% en de 2025-drempel', () => {
+    const gross = 95_000
+    const p25 = BOX1_PARAMS[2025]
+    const pct25 = p25.schijven[2].tarief - p25.hypotheekAftrekMaxTarief
+    expect(pct25).toBeCloseTo(0.1202, 4) // gepubliceerd 2025-percentage
+
+    const r = computeBox1Tax({ grossYearlyIncome: gross, year: 2025, wozValue: 385_000, hypotheekRente: 10_150 })
+    const aftrekpost25 = 10_150 - 385_000 * p25.eigenwoningforfaitRate
+    expect(r.tariefsaanpassing).toBeCloseTo(aftrekpost25 * pct25, 2)
+    // Drempel beweegt mee met de jaartabel (2025: € 76.817).
+    expect(p25.schijven[1].tot).toBe(76_817)
+  })
+
+  it('tariefsaanpassingPct is afgeleid uit de jaartabel — geen losse constante', () => {
+    expect(tariefsaanpassingPct(2026)).toBeCloseTo(0.1194, 4)
+    expect(tariefsaanpassingPct(2025)).toBeCloseTo(0.1202, 4)
+    // AOW-tabel deelt topschijf en aftrekmaximum → zelfde percentage.
+    expect(tariefsaanpassingPct(2026, true)).toBeCloseTo(tariefsaanpassingPct(2026, false), 6)
+  })
+
+  it('de correctie zit IN heffingVoorKortingen (waterfall blijft sluitend)', () => {
+    const r = computeBox1Tax({ grossYearlyIncome: 95_000, ...REF })
+    expect(r.tariefsaanpassing).toBeGreaterThan(0)
+    // De waterfall rekent bruto − heffing + kortingen = netto.
+    expect(r.heffingVoorKortingen - r.totaleHeffingskortingen).toBeCloseTo(r.tax, 2)
+    expect(r.grossYearlyIncome - r.heffingVoorKortingen + r.totaleHeffingskortingen)
+      .toBeCloseTo(r.nettoBesteedbaar, 2)
+  })
+
+  it('eigenwoningBelastingEffect IS de heffingsdelta (bron voor de eigen-woning-kaart)', () => {
+    for (const gross of [60_000, 85_000, 95_000, 160_658]) {
+      const met = computeBox1Tax({ grossYearlyIncome: gross, ...REF })
+      const zonder = computeBox1Tax({ grossYearlyIncome: gross, year: 2026 })
+      expect(met.eigenwoningBelastingEffect).toBeCloseTo(zonder.tax - met.tax, 2)
+      // En nooit meer de oude eigen som |saldo| × marginalRate (€ 4.930 bij 95k).
+      expect(met.eigenwoningBelastingEffect).toBeLessThan(
+        Math.abs(met.eigenwoningSaldo) * met.marginalRate,
+      )
+    }
+  })
+
+  it('bij € 85.000 blijft de herleving van de algemene heffingskorting behouden', () => {
+    // De aftrekpost verlaagt het belastbaar inkomen en dus de AHK-afbouw. Dat
+    // effect is fiscaal juist en mag door de correctie niet worden weggerekend:
+    // de heffingsdelta ligt daarom HOGER dan aftrekpost × aftrektarief.
+    const met = computeBox1Tax({ grossYearlyIncome: 85_000, ...REF })
+    const zonder = computeBox1Tax({ grossYearlyIncome: 85_000, year: 2026 })
+    const delta = zonder.tax - met.tax
+    expect(met.algemeneHeffingskorting).toBeGreaterThan(zonder.algemeneHeffingskorting)
+    expect(delta).toBeGreaterThan(AFTREKPOST * 0.3756)
+  })
+})
+
+describe('hraAftrekTarief — waardering van hypotheekrenteaftrek', () => {
+  it('kapt het topschijftarief af op het maximale aftrektarief', () => {
+    expect(hraAftrekTarief(0.495, 2026)).toBeCloseTo(0.3756, 4)
+    expect(hraAftrekTarief(0.495, 2025)).toBeCloseTo(0.3748, 4)
+  })
+
+  it('laat een tarief ónder het maximum ongemoeid', () => {
+    expect(hraAftrekTarief(0.3575, 2026)).toBeCloseTo(0.3575, 4)
+    expect(hraAftrekTarief(0.3697, 2026)).toBeCloseTo(0.3697, 4)
+  })
+
+  it('degenereert veilig op 0 bij onzin-invoer', () => {
+    expect(hraAftrekTarief(0, 2026)).toBe(0)
+    expect(hraAftrekTarief(-1, 2026)).toBe(0)
+    expect(hraAftrekTarief(Number.NaN, 2026)).toBe(0)
   })
 })
 

@@ -67,13 +67,30 @@ describe('getFirstUndismissedSuggestion priority', () => {
 
   it('falls through data gap -> path -> default', () => {
     expect(getFirstUndismissedSuggestion(empty(), '/overzicht/cashflow', none, [])?.key).toBe('gap_bank')
-    expect(getFirstUndismissedSuggestion(full(), '/overzicht/cashflow', none, [])?.key).toBe('path_budgets')
+    expect(getFirstUndismissedSuggestion(full(), '/overzicht/cashflow', none, [])?.key).toBe('path_core')
     expect(getFirstUndismissedSuggestion(full(), '/random', none, [])?.key).toBe('default')
   })
 
   it('specific path wins over broad path', () => {
-    expect(getFirstUndismissedSuggestion(full(), '/overzicht/cashflow/budget', none, [])?.key).toBe('path_budgets')
+    expect(getFirstUndismissedSuggestion(full(), '/overzicht/schulden/x', none, [])?.key).toBe('path_debts')
     expect(getFirstUndismissedSuggestion(full(), '/overzicht/bezittingen', none, [])?.key).toBe('path_core')
+  })
+
+  // Bevinding C7: de budget-tip mag alleen vuren als er écht nog geen budget
+  // is. De onvoorwaardelijke pad-regel `path_budgets` is verwijderd; wat
+  // overblijft is `gap_budgets`, dat op `!hasBudgets` checkt. Een gebruiker met
+  // bestaande budgetten krijgt dus nooit meer "Voeg je eerste budget toe".
+  it('budget-tip vuurt alleen bij ontbrekende budgetten (geen onvoorwaardelijke pad-regel)', () => {
+    const onlyBudgetsMissing: CoachDataGaps = { ...full(), hasBudgets: false }
+    expect(
+      getFirstUndismissedSuggestion(onlyBudgetsMissing, '/overzicht/cashflow/budget', none, [])?.key,
+    ).toBe('gap_budgets')
+    // Mét budgetten: geen budget-tip meer, maar de brede /overzicht-fallback.
+    for (const path of ['/overzicht/cashflow', '/overzicht/cashflow/budget', '/core/budgets']) {
+      const key = getFirstUndismissedSuggestion(full(), path, none, [])?.key
+      expect(key).not.toBe('path_budgets')
+      expect(key).not.toBe('gap_budgets')
+    }
   })
 
   it('suppresses fire-params/life-events gaps on /toekomst (overlay de-dup)', () => {

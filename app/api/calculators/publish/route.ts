@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { unauthorized, errorResponse } from '@/lib/api/respond'
-import { isCloudAllowed, PRIVACY_GATE_CODE } from '@/lib/ai/privacy-gate'
+import { assertAiEnabled, isCloudAllowed, PRIVACY_GATE_CODE } from '@/lib/ai/privacy-gate'
 import { checkTierGate } from '@/lib/require-tier'
 import { checkCreditBudget, creditLimitMessage } from '@/lib/ai/credit-gate'
 import { recordAiUsage } from '@/lib/ai-credits'
@@ -63,6 +63,13 @@ export async function POST(req: Request) {
   // Daarom: staat 'rapporten' op lokaal, dan kan er niet gepubliceerd worden en
   // zeggen we dat eerlijk, mét de uitweg. De rekenhulp zelf blijft gewoon werken
   // en blijft privé bewaard — alleen het DELEN vraagt de cloud-controle.
+  // KILL-SWITCH EERST (M26). Staat AI uit, dan geeft `isCloudAllowed` ook false —
+  // maar de melding hieronder zou dan een uitweg adviseren die niet werkt ("zet
+  // 'm op cloud-AI"): de kill-switch blokkeert cloud én lokaal. Eerst de echte
+  // oorzaak melden, met de knop die er wél toe doet.
+  const aiGate = await assertAiEnabled(supabase, user.id)
+  if (aiGate) return aiGate
+
   if (!(await isCloudAllowed(supabase, user.id, 'rapporten'))) {
     return errorResponse(
       'Privé-modus actief: publiceren vraagt een inhoudelijke controle op onze server. ' +

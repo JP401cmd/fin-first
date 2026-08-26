@@ -89,10 +89,20 @@ describe('dashboard-wealth-weighting — computeAssetsByType (Punt 1)', () => {
   it('keeps expectedReturn a correct ratio (weging valt weg in teller én noemer)', () => {
     const groups = computeAssetsByType([INVESTMENT, HOUSE])
     const byType = Object.fromEntries(groups.map(g => [g.type, g]))
-    // Eén belegging op 100% → expectedReturn == asset-return (7%).
-    expect(byType.investment.expectedReturn).toBeCloseTo(7, 6)
-    // Eén huis op 50% → expectedReturn == asset-return (2%), factor cancelt weg.
-    expect(byType.real_estate.expectedReturn).toBeCloseTo(2, 6)
+    // Eén belegging op 100% → expectedReturn == asset-return (7% = 0,07).
+    expect(byType.investment.expectedReturn).toBeCloseTo(0.07, 6)
+    // Eén huis op 50% → expectedReturn == asset-return (2% = 0,02), factor cancelt weg.
+    expect(byType.real_estate.expectedReturn).toBeCloseTo(0.02, 6)
+  })
+
+  // Kaart H1 — "Verwacht rendement 665,5%". `assets.expected_return` staat in de
+  // DB als HEEL PERCENTAGE (7 = 7%), `profiles.expected_return` als fractie
+  // (0,07). Deze helper leverde de percent-schaal ONGEDEELD door, waarna de
+  // widgets er nóg eens ×100 overheen deden → 100× te hoog op /overzicht.
+  it('normaliseert de percent-schaal van assets.expected_return naar een 0..1-fractie', () => {
+    const groups = computeAssetsByType([INVESTMENT])
+    expect(groups[0].expectedReturn).toBeLessThan(1)
+    expect(groups[0].expectedReturn).toBeCloseTo(0.07, 10)
   })
 
   it('sorts groups by weighted value descending', () => {
@@ -104,11 +114,16 @@ describe('dashboard-wealth-weighting — computeAssetsByType (Punt 1)', () => {
 
 describe('dashboard-wealth-weighting — weightedExpectedReturn (W3)', () => {
   // Zoals data.assetsByType in de bundel: expectedReturn als 0..1-factor.
-  const GROUPS = [
-    { type: 'investment', value: 60_000, expectedReturn: 0.07 },
-    { type: 'crypto', value: 40_000, expectedReturn: 0 },
-    { type: 'cash', value: 25_000, expectedReturn: 0 },
+  // BEWUST via computeAssetsByType afgeleid uit ruwe rijen op percent-schaal —
+  // precies het pad dat de loader loopt (dashboard-data-loader.ts:587). Een
+  // losstaande, met de hand verzonnen fractie-fixture liet kaart H1 (100×-fout)
+  // ongezien passeren omdat ze de schaalconversie oversloeg.
+  const GROUP_ROWS: WeightableAssetRow[] = [
+    { asset_type: 'investment', current_value: 60_000, purchase_value: 50_000, expected_return: 7 },
+    { asset_type: 'crypto', current_value: 40_000, purchase_value: 40_000, expected_return: 0 },
+    { asset_type: 'cash', current_value: 25_000, purchase_value: 25_000, expected_return: 0 },
   ]
+  const GROUPS = computeAssetsByType(GROUP_ROWS)
 
   it('weegt op waarde binnen de opgegeven scope (beleggingsportefeuille)', () => {
     // (60k*0,07 + 40k*0) / 100k = 4,2%. Cash valt buiten de scope.
@@ -123,6 +138,23 @@ describe('dashboard-wealth-weighting — weightedExpectedReturn (W3)', () => {
   it('levert 0 bij lege of waardeloze scope (aanroeper vangt lege portefeuille af)', () => {
     expect(weightedExpectedReturn([], INVESTMENT_ASSET_TYPES)).toBe(0)
     expect(weightedExpectedReturn([{ type: 'cash', value: 25_000, expectedReturn: 0 }], INVESTMENT_ASSET_TYPES)).toBe(0)
+  })
+
+  // Kaart H1 — regressie op het VOLLEDIGE weergavepad: ruwe rijen (percent-schaal)
+  // → computeAssetsByType → weightedExpectedReturn → de widget-formule
+  // (`portfolioReturn * 100`, fire-prognose-widget.tsx / beleggingsrendement-widget.tsx).
+  // Voorheen: 666,7%. Een jaarrendement boven de 100% is per definitie een
+  // schaalfout, geen getal om te tonen — dat is wat deze assert bewaakt.
+  it('REGRESSIE H1: de widget-weergaveformule blijft in een realistische range', () => {
+    const rows: WeightableAssetRow[] = [
+      { asset_type: 'investment', current_value: 60_000, expected_return: 7 },
+      { asset_type: 'retirement', current_value: 40_000, expected_return: 6 },
+    ]
+    const portfolioReturn = weightedExpectedReturn(computeAssetsByType(rows), INVESTMENT_ASSET_TYPES)
+    const displayed = portfolioReturn * 100 // exact wat de widgets renderen
+    expect(displayed).toBeCloseTo(6.6, 6) // (60k×7% + 40k×6%) / 100k
+    expect(displayed).toBeGreaterThan(0)
+    expect(displayed).toBeLessThan(100)
   })
 })
 

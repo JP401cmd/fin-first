@@ -388,7 +388,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     {
       id: 't-aigateway', x: 1250, y: row(1), w: 185, h: 66, kind: 'tech',
       title: 'AI-gateway (Vercel AI SDK)',
-      lead: 'Provider-agnostische AI-laag; model omschakelbaar tussen Anthropic, OpenAI en Mistral via beheer. Optioneel pad naast — niet vervangen door — de lokale AI-runtime (t-lokale-ai). De gebruiker kiest per uitvoergroep waar de AI draait (ADR 0078); staat een groep op lokaal, dan blokkeert een server-side 403 (privacy_mode_active) vóór de modelaanroep. Die gate dekt nu ALLE aanroepbare AI-routes, niet meer alleen categorisatie en chat — dubbel fail-closed naast de client-side swap.',
+      lead: 'Provider-agnostische AI-laag; model omschakelbaar tussen Anthropic, OpenAI en Mistral via beheer. Optioneel pad naast — niet vervangen door — de lokale AI-runtime (t-lokale-ai). De gebruiker kiest per uitvoergroep waar de AI draait (ADR 0078); staat een groep op lokaal, dan blokkeert een server-side 403 (privacy_mode_active) vóór de modelaanroep. Dezelfde gate handhaaft de kill-switch `profiles.ai_enabled` ("AI uit" op /mijn/privacy) — 403 `ai_disabled`, vóór de plaatsingsvraag, sinds M26 ook op het cloudpad. Die gate dekt ALLE aanroepbare AI-routes, niet alleen categorisatie en chat — dubbel fail-closed naast de client-side swap.',
       items: ['streaming + tools', 'Zod tool-schemas', 'PII-filter'],
     },
     {

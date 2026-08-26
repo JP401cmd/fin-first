@@ -55,7 +55,7 @@ vi.mock('@/lib/ai/privacy-gate', () => ({
 }))
 vi.mock('@/lib/expense-rate', () => ({ getRecentDailyExpenseRate: mockDailyRate }))
 
-import { GET } from './route'
+import { GET, POST, DELETE } from './route'
 
 // ── Fixture ──────────────────────────────────────────────────────────────────
 // Bewust het profiel uit de bug-analyse: vermogen €180k, schuld €20k, geboren
@@ -325,5 +325,198 @@ describe('GET /api/report — nette degradatie (gedocumenteerd gedrag, geen bug)
     expect(outcome.engine).toBe('scalar-fallback')
     expect(outcome.fallbackReason).toMatch(/negatief netto vermogen/)
     expect(data.horizon.fireAge).toBe(outcome.result.fireAge)
+  })
+})
+
+/**
+ * H28 — de AI-abonnementspoort mag alleen het AI-pad bewaken.
+ *
+ * `checkTierGate('ai')` stond in alle drie de handlers bovenaan, vóór het
+ * uitlezen van `use_ai`. Wie op /rapportages expliciet "standaard" (zonder
+ * AI-inleiding) koos, kreeg daardoor alsnog "Deze functie vereist een AI
+ * abonnement" — ná het invullen, voor een rapport dat op één alinea na volledig
+ * deterministisch is. DELETE had helemaal geen AI-vraagstuk en blokkeerde
+ * gratis accounts bij het opruimen van hun eigen archief.
+ *
+ * Deze suite pint beide helften: de poort verschuift, hij verdwijnt niet. Elk
+ * pad dat wél om een AI-inleiding vraagt blijft 403 (eigenaarskader: alle
+ * AI-gebruik zit achter de betaalmuur; het lokale/on-device pad wordt op zijn
+ * eigen laag gegated in `useExecutionMode`, dat op `hasAiSubscription` sluit).
+ *
+ * Het 403-pad was hiervoor 0x getest — de bestaande suite zet `checkTierGate`
+ * altijd op `null`.
+ */
+describe('/api/report — AI-poort geldt alleen voor het AI-pad (H28)', () => {
+  const TIER_GATE = {
+    subscriptions: [] as string[],
+    error: 'Deze functie vereist een AI abonnement',
+  }
+
+  /** Account zónder 'ai'-abonnement; cloud is verder gewoon toegestaan. */
+  function setupWithoutSubscription(cloudAllowed = true) {
+    mockCreateClient.mockResolvedValue(buildClient(DEFAULT_TABLES))
+    mockCheckTierGate.mockResolvedValue(TIER_GATE)
+    mockIsCloudAllowed.mockResolvedValue(cloudAllowed)
+    mockDailyRate.mockResolvedValue({ dailyRate: 100 })
+  }
+
+  function getRequest(query: string) {
+    return new Request(
+      `http://localhost/api/report?period_type=month&date_from=2026-05-01&date_to=2026-06-01${query}`,
+    )
+  }
+
+  it('GET met use_ai=false levert 200 + een volledig rapport zonder abonnement', async () => {
+    setupWithoutSubscription()
+    const res = await GET(getRequest('&use_ai=false'))
+
+    expect(res.status).toBe(200)
+    const data = (await res.json()) as {
+      useAi: boolean
+      aiIntroduction: string | null
+      kern: { totalAssets: number }
+    }
+    expect(data.useAi).toBe(false)
+    expect(data.aiIntroduction).toBeNull()
+    // Niet alleen "geen 403": de cijfers komen er ook echt uit.
+    expect(data.kern.totalAssets).toBe(180000)
+    // De poort wordt niet eens geraadpleegd — er is geen AI-pad om te bewaken.
+    expect(mockCheckTierGate).not.toHaveBeenCalled()
+  })
+
+  it('GET met use_ai=true blijft 403 zonder abonnement — de betaalmuur lekt niet weg', async () => {
+    setupWithoutSubscription()
+    const res = await GET(getRequest('&use_ai=true'))
+
+    expect(res.status).toBe(403)
+    expect(await res.json()).toMatchObject({ error: TIER_GATE.error })
+    expect(mockCheckTierGate).toHaveBeenCalledWith(expect.anything(), 'user-1', 'ai')
+  })
+
+  it('GET zonder use_ai-parameter telt als "met inleiding" en blijft dus 403', async () => {
+    setupWithoutSubscription()
+    const res = await GET(getRequest(''))
+
+    expect(res.status).toBe(403)
+  })
+
+  it('GET met use_ai=false in privé-modus levert 200 zonder AI-inleiding', async () => {
+    // Samenloop met de privé-modus-gate: die zet `useAi` op false, waarna de
+    // abonnementspoort niet meer hoort te vuren.
+    setupWithoutSubscription(false)
+    const res = await GET(getRequest('&use_ai=false'))
+
+    expect(res.status).toBe(200)
+    const data = (await res.json()) as { useAi: boolean; aiIntroduction: string | null }
+    expect(data.useAi).toBe(false)
+    expect(data.aiIntroduction).toBeNull()
+    expect(mockCheckTierGate).not.toHaveBeenCalled()
+  })
+
+  it('GET met use_ai=true in privé-modus geeft de privé-403, niet de abonnements-403', async () => {
+    setupWithoutSubscription(false)
+    const res = await GET(getRequest('&use_ai=true'))
+
+    expect(res.status).toBe(403)
+    expect(await res.json()).toMatchObject({ code: 'privacy_mode_active' })
+  })
+
+  it('POST slaat een configuratie zónder AI-inleiding op zonder abonnement', async () => {
+    setupWithoutSubscription()
+    const res = await POST(
+      new Request('http://localhost/api/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Mei 2026',
+          period_type: 'month',
+          date_from: '2026-05-01',
+          date_to: '2026-06-01',
+          use_ai: false,
+        }),
+      }),
+    )
+
+    expect(res.status).toBe(201)
+    expect(mockCheckTierGate).not.toHaveBeenCalled()
+  })
+
+  it('POST met use_ai:true blijft 403 zonder abonnement', async () => {
+    setupWithoutSubscription()
+    const res = await POST(
+      new Request('http://localhost/api/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Mei 2026',
+          period_type: 'month',
+          date_from: '2026-05-01',
+          date_to: '2026-06-01',
+          use_ai: true,
+        }),
+      }),
+    )
+
+    expect(res.status).toBe(403)
+    expect(await res.json()).toMatchObject({ error: TIER_GATE.error })
+  })
+
+  it('DELETE van een eigen configuratie heeft nooit een AI-abonnement nodig', async () => {
+    // Dit is óók de bron van de "spookverwijdering": de 403 die hier stond werd
+    // door de UI niet gelezen, dus de rij verdween alleen op het scherm.
+    setupWithoutSubscription()
+    const res = await DELETE(new Request('http://localhost/api/report?id=cfg-1', { method: 'DELETE' }))
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ success: true })
+    expect(mockCheckTierGate).not.toHaveBeenCalled()
+  })
+})
+
+describe('GET /api/report — de cache honoreert de keuze "zonder AI-inleiding"', () => {
+  const CACHED = {
+    reportId: 'cached-1',
+    reportName: 'Mei 2026',
+    useAi: true,
+    aiIntroduction: 'Een eerder door het model geschreven inleiding.',
+    kern: { totalAssets: 1 },
+  }
+
+  function setup(hasSubscription: boolean) {
+    mockCreateClient.mockResolvedValue(
+      buildClient({ ...DEFAULT_TABLES, report_configs: [{ cached_data: CACHED }] }),
+    )
+    mockCheckTierGate.mockResolvedValue(
+      hasSubscription ? null : { subscriptions: [], error: 'Deze functie vereist een AI abonnement' },
+    )
+    mockIsCloudAllowed.mockResolvedValue(true)
+    mockDailyRate.mockResolvedValue({ dailyRate: 100 })
+  }
+
+  const cachedRequest = (aiQuery: string) =>
+    new Request(
+      `http://localhost/api/report?period_type=month&date_from=2026-05-01&date_to=2026-06-01&config_id=cfg-1${aiQuery}`,
+    )
+
+  it('strijkt de eerder gegenereerde inleiding weg bij use_ai=false', async () => {
+    // Anders zou de keuze óók hier genegeerd worden — en zou een verlopen
+    // abonnement via de cache alsnog AI-tekst blijven leveren.
+    setup(false)
+    const res = await GET(cachedRequest('&use_ai=false'))
+
+    expect(res.status).toBe(200)
+    const data = (await res.json()) as { useAi: boolean; aiIntroduction: string | null; reportId: string }
+    expect(data.reportId).toBe('cached-1')
+    expect(data.aiIntroduction).toBeNull()
+    expect(data.useAi).toBe(false)
+  })
+
+  it('laat de inleiding staan wanneer de gebruiker er wél om vraagt en er recht op heeft', async () => {
+    setup(true)
+    const res = await GET(cachedRequest('&use_ai=true'))
+
+    expect(res.status).toBe(200)
+    const data = (await res.json()) as { aiIntroduction: string | null }
+    expect(data.aiIntroduction).toBe(CACHED.aiIntroduction)
   })
 })

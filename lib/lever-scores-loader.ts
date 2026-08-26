@@ -33,8 +33,12 @@ import { resolveEffectiveIncomeExpenses } from '@/lib/effective-financials'
 import { loadBudgetBasis } from '@/lib/household/budget-share'
 import type { BudgetBasisRow } from '@/lib/budget-basis'
 import { resolveFireParams } from '@/lib/fire-params'
-import { computeSavingsRate6m, computeDebtAflossingMonthly } from '@/lib/savings-source'
-import { localMonthStartMonthsAgo, localMonthBounds } from '@/lib/month-range'
+import {
+  computeSavingsRate6m,
+  computeDebtAflossingMonthly,
+  savingsRateWindow,
+  savingsRateDataMonths,
+} from '@/lib/savings-source'
 import {
   getActiveAssets,
   getActiveDebts,
@@ -176,12 +180,14 @@ export const loadLeverScores = cache(async function loadLeverScores(
 
   const now = new Date()
 
-  // 6-maands-venster voor de CANONIEKE spaarquote (identiek aan de dashboard-loader:
-  // `localMonthStartMonthsAgo(now, 5)` = de 1e van 5 maanden terug ⇒ 6 kalendermaanden
-  // incl. de huidige). Voorheen rekende deze loader een eigen 3-maands quote met een
-  // tekenfout (uitgaven negatief zonder Math.abs) → 164% i.p.v. de canonieke ~50%
-  // (KRUIS-06).
-  const sixMonthsAgo = localMonthStartMonthsAgo(now, 5)
+  // 6-maands-venster voor de CANONIEKE spaarquote — grenzen uit `savingsRateWindow`
+  // (lib/savings-source.ts), identiek aan de dashboard-, core- en horizon-loader:
+  // zes VOLTOOIDE kalendermaanden, de lopende maand EXCLUSIEF (bevinding C6). Hier
+  // valt die grens samen met de query zelf: het RPC-venster is `[fromDate, toDate)`,
+  // dus er hoeft geen extra maandfilter overheen. Voorheen rekende deze loader een
+  // eigen 3-maands quote met een tekenfout (uitgaven negatief zonder Math.abs) →
+  // 164% i.p.v. de canonieke ~50% (KRUIS-06).
+  const savingsWindow = savingsRateWindow(now)
 
   // Gedeelde basisdata-laag (lib/server-data/base.ts): assets/debts/profiel/
   // budgetten/bank + het huidige-maand-tx-venster draaien als ÉÉN query per tabel
@@ -213,7 +219,7 @@ export const loadLeverScores = cache(async function loadLeverScores(
     // 6-maands rijen-slice: kan niet stil afkappen op max_rows=1000
     // (correctheid). RLS-breed (geen ownOnly) — identiek aan getTx12m's vroegere
     // scope, waar T2.1 de expliciete .eq('user_id') liet vervallen.
-    fetchTxMonthAggregate(supabase, { from: sixMonthsAgo, to: localMonthBounds(now).end }),
+    fetchTxMonthAggregate(supabase, { from: savingsWindow.fromDate, to: savingsWindow.toDate }),
     // Vroegste inkomens-datum (all-time, één rij) — afkap-vrij, i.p.v. de vroegere
     // reduce over een gecapte 12-maands-slice (die kon bij >1000 positieve rijen
     // stil afkappen → savingsDataMonths te klein → over-extrapolatie). Zelfde
@@ -315,23 +321,16 @@ export const loadLeverScores = cache(async function loadLeverScores(
   const savingsBudgetSpent6m = aggSumNegatiefAbs(tx6mAgg, { realOnly: true, budgetIds: savingsBudgetIds })
   const debtAflossing6m = computeDebtAflossingMonthly(debtRows as unknown as Debt[]) * 6
 
-  let savingsDataMonths = 6
   // Vroegste inkomens-datum: all-time via de gedeelde `getEarliestIncomeDate`
   // (order(date asc).limit(1)) i.p.v. een reduce over een gecapte 12-maands-slice —
   // die kon bij >1000 positieve rijen stil afkappen (savingsDataMonths te klein →
   // over-extrapolatie). Spiegelt dashboard-data-loader.ts/horizon-data-loader.ts.
+  // De telling zelf komt uit `savingsRateDataMonths` (lib/savings-source.ts) —
+  // dezelfde bron als het venster hierboven, zodat de twee niet uit elkaar kunnen
+  // lopen zoals vóór bevinding C6.
   const earliestIncomeDate =
     (earliestIncomeRes.data as { date?: string | null } | null)?.date ?? undefined
-  if (earliestIncomeDate) {
-    const earliest = new Date(earliestIncomeDate)
-    savingsDataMonths = Math.max(
-      1,
-      Math.min(
-        6,
-        (now.getFullYear() - earliest.getFullYear()) * 12 + (now.getMonth() - earliest.getMonth()),
-      ),
-    )
-  }
+  const savingsDataMonths = savingsRateDataMonths(now, earliestIncomeDate)
 
   const savingsRate: number | null =
     income6m > 0

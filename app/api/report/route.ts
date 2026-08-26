@@ -104,11 +104,6 @@ export async function GET(request: Request) {
       return unauthorized()
     }
 
-    const tierGate = await checkTierGate(supabase, user.id, 'ai')
-    if (tierGate) {
-      return forbidden(tierGate.error)
-    }
-
     const url = new URL(request.url)
     const periodType = url.searchParams.get('period_type') || 'month'
     const dateFrom = url.searchParams.get('date_from')
@@ -141,6 +136,29 @@ export async function GET(request: Request) {
       useAi = false
     }
 
+    // ABONNEMENTSPOORT — bewust HIER, ná het lezen van `use_ai` en ná de
+    // privé-modus-correctie hierboven, en uitsluitend als er daadwerkelijk een
+    // AI-inleiding gevraagd wordt. Stond deze check bovenaan de handler, dan
+    // kreeg iemand die expliciet "standaard" (zonder AI) koos alsnog een
+    // betaalmuur voor een rapport dat verder volledig deterministisch is — de
+    // keuze werd aangeboden en daarna niet gehonoreerd (H28).
+    //
+    // Dit spiegelt het gevestigde patroon van /api/privacy-mode (gate alleen bij
+    // aanzetten) en /api/ai-execution-prefs POST (gate alleen bij mode 'lokaal'):
+    // parameter eerst lezen, dán conditioneel gaten.
+    //
+    // De poort verschuift, hij verdwijnt niet: élk AI-pad blijft betaald. Vraagt
+    // iemand `use_ai=true` zonder abonnement, dan blijft dit een 403. Het lokale
+    // (on-device) pad wordt op zijn eigen laag gegated — `useExecutionMode` zet
+    // 'blocked' zodra `hasAiSubscription` false is — dus ook daar levert een
+    // gratis account geen inleiding op.
+    if (useAi) {
+      const tierGate = await checkTierGate(supabase, user.id, 'ai')
+      if (tierGate) {
+        return forbidden(tierGate.error)
+      }
+    }
+
     if (!dateFrom || !dateTo) {
       return Response.json({ error: 'date_from en date_to zijn verplicht' }, { status: 400 })
     }
@@ -167,7 +185,17 @@ export async function GET(request: Request) {
         .eq('user_id', user.id)
         .single()
       if (config?.cached_data) {
-        return Response.json(config.cached_data)
+        const cached = config.cached_data as ReportData
+        // De keuze "zonder AI-inleiding" geldt óók voor een editie die uit de
+        // cache komt. Zonder deze correctie zou een rapport dat ooit mét
+        // inleiding is gegenereerd die alinea alsnog tonen aan iemand die nu
+        // expliciet zonder AI vraagt — of aan iemand die inmiddels in
+        // privé-modus zit of geen AI-abonnement meer heeft. Er wordt niets
+        // opnieuw gegenereerd; alleen de alinea gaat eruit.
+        if (!useAi && cached.aiIntroduction) {
+          return Response.json({ ...cached, aiIntroduction: null, useAi: false })
+        }
+        return Response.json(cached)
       }
     }
 
@@ -877,16 +905,26 @@ export async function POST(request: Request) {
       return unauthorized()
     }
 
-    const tierGate = await checkTierGate(supabase, user.id, 'ai')
-    if (tierGate) {
-      return forbidden(tierGate.error)
-    }
-
     const body = await request.json()
     const { name, period_type, date_from, date_to, use_ai } = body
 
     if (!name || !period_type || !date_from || !date_to) {
       return Response.json({ error: 'Alle velden zijn verplicht' }, { status: 400 })
+    }
+
+    // Zelfde volgorde-correctie als in GET: deze handler bewaart alléén een
+    // `report_configs`-rij en roept zelf nooit een model aan. Een configuratie
+    // ZONDER AI-inleiding opslaan hoort dus geen AI-abonnement te vragen — de
+    // gate bovenaan blokkeerde eerder zelfs dat (H28). Bewaart iemand wél een
+    // configuratie die om een AI-inleiding vráágt, dan geldt de betaalmuur nog
+    // steeds: dan zou de GET hem verderop tóch tegenhouden, en de melding hier
+    // komt eerder in de flow.
+    const wantsAi = use_ai !== false
+    if (wantsAi) {
+      const tierGate = await checkTierGate(supabase, user.id, 'ai')
+      if (tierGate) {
+        return forbidden(tierGate.error)
+      }
     }
 
     const { data, error } = await supabase
@@ -897,7 +935,7 @@ export async function POST(request: Request) {
         period_type,
         date_from,
         date_to,
-        use_ai: use_ai !== false,
+        use_ai: wantsAi,
         last_generated_at: new Date().toISOString(),
       })
       .select()
@@ -923,11 +961,13 @@ export async function DELETE(request: Request) {
       return unauthorized()
     }
 
-    const tierGate = await checkTierGate(supabase, user.id, 'ai')
-    if (tierGate) {
-      return forbidden(tierGate.error)
-    }
-
+    // BEWUST GEEN abonnementspoort: deze handler verwijdert een eigen
+    // `report_configs`-rij en raakt AI op geen enkele manier. De gate die hier
+    // stond blokkeerde gratis accounts bij het opruimen van hun eigen archief
+    // (H28) — en omdat de UI de 403 niet las, verdween de rij alleen op het
+    // scherm en niet op de server (de "spookverwijdering" uit S9). De
+    // eigenaarscontrole zit op de query zelf: `.eq('user_id', user.id)` bovenop
+    // RLS.
     const url = new URL(request.url)
     const id = url.searchParams.get('id')
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useId, useCallback } from 'react'
+import { useState, useId, useCallback, useEffect } from 'react'
 import {
   Plus,
   Trash2,
@@ -16,7 +16,8 @@ import type { CheckDraft } from '@/lib/check/use-check-draft'
 import type { CheckIntakeLifeEvent } from '@/lib/check/types'
 import { parseBedrag } from '@/lib/check/use-check-draft'
 import { formatCurrency, dailyExpenseRate, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
-import { primaryBtn, backBtn, inlineAddBtn, inputBase } from '../intake-styles'
+import { primaryBtn, backBtn, ghostBtn, inlineAddBtn, inputBase } from '../intake-styles'
+import { usePendingRows } from '../use-pending-rows'
 
 interface Props {
   intake: CheckDraft['intake']
@@ -70,9 +71,11 @@ interface EventRowFormProps {
   currentAge: number | null
   dailyRate: number
   onAdd: (event: CheckIntakeLifeEvent) => void
+  /** Meldt de openstaande, geldige invoer aan de stap zodat "Verder" hem meeneemt (C4). */
+  onPendingChange: (key: string, pending: CheckIntakeLifeEvent | null) => void
 }
 
-function EventRowForm({ preset, currentAge, dailyRate, onAdd }: EventRowFormProps) {
+function EventRowForm({ preset, currentAge, dailyRate, onAdd, onPendingChange }: EventRowFormProps) {
   const baseAge = (currentAge ?? 35) + preset.defaultAgeOffset
   const [open, setOpen] = useState(false)
   const [rawAge, setRawAge] = useState(String(baseAge))
@@ -90,15 +93,30 @@ function EventRowForm({ preset, currentAge, dailyRate, onAdd }: EventRowFormProp
       ? formatFreedomTimeString(calculateFreedomTime(amountVal, dailyRate), 'short')
       : null
 
-  function handleAdd() {
-    if (amountVal <= 0) return
-    if (!ageVal || ageVal < 16 || ageVal > 100) return
-    onAdd({
+  /** Zet de huidige invoer om naar een gebeurtenis — `null` bij een ongeldig bedrag of leeftijd. */
+  const buildEvent = useCallback((): CheckIntakeLifeEvent | null => {
+    if (amountVal <= 0) return null
+    if (!ageVal || ageVal < 16 || ageVal > 100) return null
+    return {
       key: preset.key,
       label: preset.label,
       age: ageVal,
       amount: preset.sign === 'cost' ? -amountVal : amountVal,
-    })
+    }
+  }, [amountVal, ageVal, preset.key, preset.label, preset.sign])
+
+  // Houd de stap op de hoogte van openstaande invoer (C4 — niets gaat meer verloren).
+  useEffect(() => {
+    onPendingChange(preset.key, open ? buildEvent() : null)
+  }, [open, buildEvent, onPendingChange, preset.key])
+
+  // Verdwijnt de rij zelf (bv. bij het maximum), dan verdwijnt ook zijn melding.
+  useEffect(() => () => onPendingChange(preset.key, null), [onPendingChange, preset.key])
+
+  function handleAdd() {
+    const event = buildEvent()
+    if (!event) return
+    onAdd(event)
     setOpen(false)
   }
 
@@ -200,12 +218,23 @@ export function StepGebeurtenissen({ intake, onChange, onNext, onBack }: Props) 
   const currentAge = calcAge(intake.dateOfBirth)
   const dailyRate = dailyExpenseRate(intake.expenses?.totaalMaand ?? 0)
   const atMax = events.length >= MAX_EVENTS
+  const pending = usePendingRows<CheckIntakeLifeEvent>()
 
   const handleAdd = useCallback(
     (event: CheckIntakeLifeEvent) => {
       onChange({ lifeEvents: [...events, event].slice(0, MAX_EVENTS) })
     },
     [events, onChange],
+  )
+
+  /** Commit eerst elke openstaande, ingevulde rij en navigeer dan pas (C4). */
+  const commitThen = useCallback(
+    (navigate: () => void) => {
+      const rows = pending.flush()
+      if (rows.length > 0) onChange({ lifeEvents: [...events, ...rows].slice(0, MAX_EVENTS) })
+      navigate()
+    },
+    [events, onChange, pending.flush],
   )
 
   const handleRemove = useCallback(
@@ -278,16 +307,25 @@ export function StepGebeurtenissen({ intake, onChange, onNext, onBack }: Props) 
               currentAge={currentAge}
               dailyRate={dailyRate}
               onAdd={handleAdd}
+              onPendingChange={pending.report}
             />
           ))}
         </div>
       )}
 
       <div className="flex flex-col gap-2 pt-2">
-        <button type="button" onClick={onNext} className={primaryBtn('horizon')}>
-          {events.length === 0 ? 'Overslaan (geen gebeurtenissen)' : 'Verder'}
+        <p className="min-h-4 font-serif text-xs italic text-[var(--ink-3)]" aria-live="polite">
+          {pending.hasPending ? 'Je openstaande invoer nemen we mee als je verdergaat.' : ''}
+        </p>
+        <button type="button" onClick={() => commitThen(onNext)} className={primaryBtn('horizon')}>
+          Verder
         </button>
-        <button type="button" onClick={onBack} className={backBtn}>
+        {events.length === 0 && !pending.hasPending && (
+          <button type="button" onClick={onNext} className={ghostBtn}>
+            Overslaan (geen gebeurtenissen)
+          </button>
+        )}
+        <button type="button" onClick={() => commitThen(onBack)} className={backBtn}>
           Terug
         </button>
       </div>

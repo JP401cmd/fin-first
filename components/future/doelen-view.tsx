@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Target, Pencil, ArrowUpRight, MoreHorizontal } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
-import { formatGoalValue, GOAL_TYPE_META } from '@/lib/goal-data'
+import { formatGoalValue, GOAL_TYPE_META, type GoalProgress } from '@/lib/goal-data'
 import type { GoalWithBudget } from '@/lib/fin-data-loader'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { DoelToevoegenSheet } from './doel-toevoegen-sheet'
@@ -41,7 +41,8 @@ import { MilestoneCelebration } from '@/components/app/milestone-celebration'
  */
 type GoalDisplay = {
   goal: GoalWithBudget
-  progress: { current: number; target: number; pct: number; onTrack: boolean; eta: string | null }
+  /** Canoniek doel-voortgangscontract (`computeGoalProgress`) — niet lokaal overtikken. */
+  progress: GoalProgress
 }
 
 /**
@@ -55,6 +56,18 @@ function isParameterGoal(goal: GoalWithBudget): boolean {
   return typeof m === 'object' && m !== null && (m as Record<string, unknown>).bron === 'parameter'
 }
 
+/**
+ * Mirror van lib/goals/vrijheidsgetal-goal#isVrijheidsgetalGoal — om dezelfde
+ * reden lokaal als `isParameterGoal` hierboven (die canonieke module trekt de
+ * horizon-loader mee). Triviale tag-check; houd identiek aan de bron.
+ */
+function isVrijheidsgetalGoal(goal: GoalWithBudget): boolean {
+  const m = goal.metadata
+  return (
+    typeof m === 'object' && m !== null && (m as Record<string, unknown>).standaardDoel === 'vrijheidsgetal'
+  )
+}
+
 function formatMarge(v: number): string {
   return v.toLocaleString('nl-NL', { maximumFractionDigits: 1 })
 }
@@ -66,6 +79,13 @@ function statusFor(progress: GoalDisplay['progress']): {
 } {
   if (progress.pct >= 100) {
     return { label: 'Behaald', color: 'text-positive', bg: 'bg-positive/10' }
+  }
+  // Bevinding M31: een zojuist gesteld doel waarop nog niets binnenkwam heeft
+  // geen meetbaar tempo. Het eerste dat de app erover zegt mag dan geen oordeel
+  // zijn. Neutrale toon (geen stoplichtkleur) — de motor bepaalt WANNEER dit
+  // geldt (`progress.measured`), dit scherm leidt dat niet zelf af uit `pct`.
+  if (!progress.measured) {
+    return { label: 'Net begonnen', color: 'text-[var(--ink-3)]', bg: 'bg-[var(--subtle)]' }
   }
   if (progress.onTrack) {
     return { label: 'Op koers', color: 'text-positive', bg: 'bg-positive/10' }
@@ -200,9 +220,21 @@ function ManualGoalCard({
   goal,
   progress,
   onEdit,
-}: GoalDisplay & { onEdit: () => void }) {
+  live = false,
+}: GoalDisplay & { onEdit: () => void; live?: boolean }) {
   const status = statusFor(progress)
   const pct = Math.min(100, Math.max(0, Math.round(progress.pct)))
+  // Bevinding M32: het stoplicht rust voortaan op het benodigde maandbedrag tot
+  // de streefdatum — toon dat bedrag erbij, anders is het oordeel niet
+  // navolgbaar (en merk je niet dat een zwaarder doel de lat verhoogt).
+  // Alleen bij doelen die in euro's lopen: "0,4% per maand nodig" op een
+  // spaarquote-doel is een tempo van een tempo, geen behulpzaam getal.
+  const requiredMonthly =
+    progress.requiredMonthly != null &&
+    progress.pct < 100 &&
+    GOAL_TYPE_META[goal.goal_type]?.unit === 'EUR'
+      ? progress.requiredMonthly
+      : null
   // Kaart is een button die de edit-sheet opent. Geen genest-Link.
   return (
     <button
@@ -258,6 +290,19 @@ function ManualGoalCard({
           <span className="text-[var(--ink-3)]">{progress.eta}</span>
         )}
       </div>
+      {requiredMonthly != null && (
+        <p className="mt-1 text-[10px] text-[var(--ink-4)] tabular-nums">
+          {formatCurrency(Math.round(requiredMonthly))} per maand nodig
+        </p>
+      )}
+      {live && (
+        // Bevinding C10: dit doel toont niet je ingevoerde bedragen maar de
+        // canonieke FIRE-stand. Zonder dit regeltje lijkt de kaart handmatig
+        // bij te werken terwijl invoer genegeerd wordt.
+        <p className="mt-1 text-[10px] text-[var(--ink-4)]">
+          Volgt automatisch je vrijheidsgetal
+        </p>
+      )}
     </button>
   )
 }
@@ -267,6 +312,7 @@ export function DoelenView({
   goalProgresses,
   monthlyIncome = 0,
   monthlyExpenses = 0,
+  vrijheidsgetalLive = false,
 }: {
   goals: GoalWithBudget[]
   goalProgresses: GoalDisplay['progress'][]
@@ -274,6 +320,8 @@ export function DoelenView({
    *  standaard-doelen-kiezer in DoelToevoegenSheet (consume, don't recompute). */
   monthlyIncome?: number
   monthlyExpenses?: number
+  /** Draait het vrijheidsgetal-doel live op de FIRE-motor? (`FinPageData.vrijheidsgetalLive`) */
+  vrijheidsgetalLive?: boolean
 }) {
   const router = useRouter()
   // Weergavemodus: single source of truth (geen prop-drilling van de modus).
@@ -467,6 +515,7 @@ export function DoelenView({
                 goal={d.goal}
                 progress={d.progress}
                 onEdit={() => setEditingGoal(d.goal)}
+                live={vrijheidsgetalLive && isVrijheidsgetalGoal(d.goal)}
               />
             ),
           )}
@@ -485,6 +534,7 @@ export function DoelenView({
               goal={d.goal}
               progress={d.progress}
               onEdit={() => setEditingGoal(d.goal)}
+              live={vrijheidsgetalLive && isVrijheidsgetalGoal(d.goal)}
             />
           ))}
         </div>

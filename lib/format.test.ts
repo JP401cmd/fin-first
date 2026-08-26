@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   dailyExpenseRate,
   calculateFreedomTime,
+  carryFreedomUnits,
   formatFreedomTimeString,
   formatWithFreedom,
   formatTimestamp,
@@ -347,5 +348,97 @@ describe('Slice 2 characterization — idioom B → A (holdings/dividends-routes
     for (const v of [12.34, 105.9, 1000, 3.8, 14200.42, 9592.59, 250.0, 1234.56]) {
       expect(roundCents(v)).toBe(idiomB(v))
     }
+  })
+})
+
+// ── H3 / M37 — twaalf maanden rollen door naar een jaar ────────────────
+//
+// `remainingAfterYears` loopt tot net onder 365 dagen, terwijl twaalf maanden in
+// deze decompositie maar 12 × 30 = 360 dagen beslaan. In dat venster van bijna
+// vijf dagen (~1,4% van elk jaar, terugkerend bij ELKE jaargrens) kwam de
+// maandteller op 12 uit: "10 jaar en 12 maanden" — een hoeveelheid tijd die niet
+// bestaat, op het merkgetal van de app.
+describe('calculateFreedomTime — jaar/maand-carry (H3/M37)', () => {
+  it('exacte repro H3: 4014 dagen is 11 jaar, niet 10 jaar en 12 maanden', () => {
+    const bd = calculateFreedomTime(4014, 1)
+    expect(bd.years).toBe(11)
+    expect(bd.months).toBe(0)
+    expect(formatFreedomTimeString(bd, 'long')).toBe('11 jaar')
+  })
+
+  it('exacte repro M37: €401.000 bij €100/dag is 11 jaar', () => {
+    const bd = calculateFreedomTime(401000, 100)
+    expect(bd.years).toBe(11)
+    expect(bd.months).toBe(0)
+    expect(formatFreedomTimeString(bd, 'long')).toBe('11 jaar')
+    expect(formatFreedomTimeString(bd, 'short')).toBe('11j')
+  })
+
+  it('eerste-jaar-randgeval: 362 dagen is "1 jaar", niet "12 maanden"', () => {
+    const bd = calculateFreedomTime(362, 1)
+    expect(bd.years).toBe(1)
+    expect(bd.months).toBe(0)
+    expect(formatFreedomTimeString(bd, 'long')).toBe('1 jaar')
+  })
+
+  it('grenssweep 355–370 restdagen: de maandteller haalt nooit 12', () => {
+    for (let rest = 355; rest <= 370; rest++) {
+      const bd = calculateFreedomTime(10 * 365 + rest, 1)
+      expect(bd.months).toBeLessThan(12)
+      expect(formatFreedomTimeString(bd, 'long')).not.toContain('12 maanden')
+    }
+    // De carry pakt precies waar hij hoort: 359 rest → nog 11 maanden, 360 → jaar.
+    expect(calculateFreedomTime(10 * 365 + 359, 1).months).toBe(11)
+    expect(calculateFreedomTime(10 * 365 + 360, 1)).toMatchObject({ years: 11, months: 0 })
+  })
+
+  it('invariant over 20 jaar aan dagtotalen: months blijft 0..11', () => {
+    for (let d = 0; d <= 7300; d++) {
+      const bd = calculateFreedomTime(d, 1)
+      expect(bd.months).toBeGreaterThanOrEqual(0)
+      expect(bd.months).toBeLessThanOrEqual(11)
+    }
+  })
+
+  it('tekort (negatief bedrag) draagt net zo goed over — zelfde decompositie', () => {
+    const bd = calculateFreedomTime(-4014, 1)
+    expect(bd.isDeficit).toBe(true)
+    expect(bd).toMatchObject({ years: 11, months: 0 })
+    expect(formatWithFreedom(-4014, 1, { includeCurrency: false })).toBe('11 jaar achter')
+  })
+
+  it('totalDays blijft de onafgeronde waarheid — alleen de weergave rondt op', () => {
+    const bd = calculateFreedomTime(4014, 1)
+    expect(bd.totalDays).toBe(4014)
+    // De carry verklaart de restdagen tot een vol jaar; ze mogen niet nóg eens
+    // los meetellen (11 × 365 + 4 = 4019 zou het totaal overschrijden).
+    expect(bd.days).toBe(0)
+  })
+
+  it('raakt de gewone gevallen niet: geen carry, geen wijziging', () => {
+    expect(calculateFreedomTime(4000, 1)).toMatchObject({ years: 10, months: 11, days: 20 })
+    expect(formatFreedomTimeString(calculateFreedomTime(9000, 100), 'long')).toBe('3 maanden')
+    expect(formatFreedomTimeString(calculateFreedomTime(2800, 100), 'long')).toBe('28 dagen')
+  })
+})
+
+describe('carryFreedomUnits — gedeelde carry-regel', () => {
+  it('laat een decompositie onder de twaalf maanden ongemoeid', () => {
+    expect(carryFreedomUnits(10, 11, 20)).toEqual({ years: 10, months: 11, days: 20 })
+    expect(carryFreedomUnits(0, 0, 5)).toEqual({ years: 0, months: 0, days: 5 })
+  })
+
+  it('rolt twaalf maanden door naar een jaar en nult de restdagen', () => {
+    expect(carryFreedomUnits(10, 12, 4)).toEqual({ years: 11, months: 0, days: 0 })
+    expect(carryFreedomUnits(0, 12, 0)).toEqual({ years: 1, months: 0, days: 0 })
+  })
+
+  it('dekt de AI-context-optelling: 11 maanden + een afgeronde restmaand', () => {
+    // lib/ai/context/{tax,aandachtspunten}-context.ts tellen zelf een maand op bij
+    // ≥15 restdagen en kunnen zo op 12 uitkomen met een correcte breakdown.
+    const bd = calculateFreedomTime(10 * 365 + 350, 1) // 11 maanden + 20 restdagen
+    expect(bd.months).toBe(11)
+    expect(bd.days).toBeGreaterThanOrEqual(15)
+    expect(carryFreedomUnits(bd.years, bd.months + 1, 0)).toEqual({ years: 11, months: 0, days: 0 })
   })
 })

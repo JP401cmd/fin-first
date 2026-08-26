@@ -48,11 +48,21 @@
  *   verschillende bruto's → een licht ander Box 1-bedrag op hub vs. subpagina.
  *   De exact-criteria toetsen de SUBPAGINA-bron (grossFromNet); de hub-druk (01)
  *   is daarom `consistency` (aggregatie-invariant), geen los cijfer.
- * - WF-BELAST-13/15 — de persona-deelneming ("Belang Volkert Compleet Holding
- *   BV") heeft GEEN `annual_dividend` in de seed (PersonaAsset kent het veld
- *   niet) → de ÉCHTE Box 2-aanslag van Tessa is €0. `/api/household/box2` zet
- *   bovendien `disposal_gain: 0` hard. We toetsen de staffel-motor daarom met
- *   een REPRESENTATIEF dividend; de €0-realiteit staat in het rapport als gap.
+ * - WF-BELAST-13/15 — INGEHAALD (26-08-2026). Deze regel beschreef tot vandaag
+ *   een toestand die niet meer bestond: de persona-deelneming ("Belang Volkert
+ *   Compleet Holding BV") zou GEEN `annual_dividend` in de seed hebben, waardoor
+ *   Tessa's aanslag €0 bleef. Het SEED-pad is al gerepareerd — `PersonaAsset`
+ *   kent het veld, de fixture zet €90.000 en `buildSeedAssetRow` mapt het (zie
+ *   lib/box2-data.test.ts, blok "WF-BELAST-13"). `/api/household/box2` zet nog
+ *   steeds `disposal_gain: 0` hard (bewuste scope-down, optie C). We toetsen de
+ *   staffel-motor met een REPRESENTATIEF dividend van €100.000; dat blijft een
+ *   motortoets, geen persona-cijfer.
+ *   Wat WÉL open bleef en bevinding H26 opleverde: het GEBRUIKERSpad. Een via de
+ *   UI aangemaakte deelneming kan nog altijd geen dividend krijgen
+ *   (`components/core/assets-client.tsx` rendert de drie velden die
+ *   `ASSET_TYPE_FIELDS.deelneming` belooft niet als invoer). Sinds H26 liegt de
+ *   app daar niet meer over: NULL ≠ 0, de kop toont "nog niet ingevuld" i.p.v.
+ *   een verzonnen €0. Het invoerveld zelf loopt met H8/H9 mee.
  * - WF-BELAST-14 — DGA-leentotaal (Wet excessief lenen). GEFIXT (kaart 39bf9e8d,
  *   optie B): de route bouwt `dgaLeningenTotal` nu op als som(dga_schuld) +
  *   som(dga_lening-vorderingen) via `lib/box2-dga-lening.ts` (was: vorderingen −
@@ -79,12 +89,12 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Totale belastingdruk raadplegen op de hub',
     kriticiteit: 'KERN',
     persona: 'compleet',
-    given: 'Persona Tessa Compleet geladen; /overzicht/belasting toont drie box-kaarten + de "De druk"-sectie (Box 1 + Box 3, excl. Box 2).',
-    when: 'De gebruiker leest het hub-totaal (som Box 1 + Box 3) en de verdeling per box.',
-    then: 'Het hub-totaal = `buildTaxOverview(box1Tax, null, box3Tax).total` = box1Tax + box3Tax (Box 2 bewust null → buiten het totaal bij aanmerkelijk belang); de verdeling telt op tot 100%; freedomDays = round(total / daguitgaven). Box3Tax kwam voorheen uit de `healthScoreInput.taxData`-proxy (buildTaxData), die schulden — incl. de eigenwoninghypotheek — negeerde; de hub leest nu `horizonData.box3Tax` (dezelfde canonieke `calculateBox3`-uitkomst als de Box 3-subpagina, personal-perspectief) en overschrijft dat bij household/partner met de perspectief-heffing uit de gedeelde kansen-loader. Box1Tax is sinds ADR 0086 óók A=B met de subpagina: de hub leest de CANONIEKE bruto-bron (`resolveBox1GrossIncome` — schijfinversie + handmatige override) i.p.v. de sync status-heuristiek `box1JaarruimteStatus` (netMonthly×12/(1−marg)). Die heuristiek voedt nog uitsluitend de sidebar-dot; het restverschil rond de grens `jaarruimte = 0` is bewust en gedocumenteerd.',
+    given: 'Persona Tessa Compleet geladen; /overzicht/belasting toont drie box-kaarten + de "De druk"-sectie (Box 1 + Box 3, excl. Box 2). Sinds 26-08-2026 (bevinding H22) telt de pagina-opening wat er werkelijk staat: bij aanmerkelijk belang luidt de kop "Drie boxen, twee rekeningen" (en de colophon idem), zonder aanmerkelijk belang "Twee boxen, één rekening" — de oude vaste kop "Drie boxen, één rekening"/"Drie boxen, één som" beloofde een som van drie boxen die het totaal by design niet maakt.',
+    when: 'De gebruiker leest het hub-totaal (som Box 1 + Box 3), de verdeling per box en de twee tarieven (effectief + marginaal) op de druk-kaart.',
+    then: 'Het hub-totaal = `buildTaxOverview(box1Tax, null, box3Tax).total` = box1Tax + box3Tax (Box 2 bewust null → buiten het totaal bij aanmerkelijk belang); de verdeling telt op tot 100%; freedomDays = round(total / daguitgaven). Box3Tax kwam voorheen uit de `healthScoreInput.taxData`-proxy (buildTaxData), die schulden — incl. de eigenwoninghypotheek — negeerde; de hub leest nu `horizonData.box3Tax` (dezelfde canonieke `calculateBox3`-uitkomst als de Box 3-subpagina, personal-perspectief) en overschrijft dat bij household/partner met de perspectief-heffing uit de gedeelde kansen-loader. Box1Tax leest sinds ADR 0086 de CANONIEKE bruto-bron (`resolveBox1GrossIncome` — schijfinversie + handmatige override) i.p.v. de sync status-heuristiek `box1JaarruimteStatus` (netMonthly×12/(1−marg)). Die heuristiek voedt nog uitsluitend de sidebar-dot; het restverschil rond de grens `jaarruimte = 0` is bewust en gedocumenteerd. VOLLEDIG A=B PAS SINDS 26-08-2026 (bevinding C8): het bruto was al gelijk, maar de kansen-loader gaf de EIGEN-WONING-invoer (wozValue/hypotheekRente) niet mee terwijl de subpagina dat wél deed, dus dezelfde motor gaf twee heffingen (gemeten Δ €4.357). Beide oppervlakken consumeren nu `resolveEigenWoningBox1Input` (lib/box1-income.ts). DE TWEE TARIEVEN, herijkt 26-08-2026 (bevindingen C9 + M4): "Effectief" is de BOX 1-heffing over het bruto BOX 1-inkomen — exact hetzelfde percentage als de druk-hero op /overzicht/belasting/box1 — en NIET langer `total / grossYearlyIncome`; die oude breuk zette de Box 3-vermogensheffing in de teller van een inkomens-quotiënt en gaf 36,6% náást een "marginaal" van 35,8%, effectief bóven marginaal. "Marginaal" is `computeBox1Tax(...).marginalRate` (56,01% bij bruto €93.369, incl. arbeidskorting-afbouw) en niet langer de FIRE-vuistregel `deriveMarginaalTarief()`, die per constructie alleen 35,75% of 49,50% kan teruggeven — 20,2 procentpunt verschil tussen hub en subpagina. Beide komen uit ÉÉN motoraanroep in de kansen-loader (`box1EffectiveRate`/`box1MarginalRate`), dus ze kunnen niet uiteenlopen en verdwijnen samen: bij `grossYearly === 0` toont de druk-kaart "Inkomen onbekend" i.p.v. een percentage — consistent met de Box 1-tegel ernaast en met de subpagina, die de hele druk-hero dan al verbergt. Het hero-BEDRAG en de werktijd-regel blijven bewust de HELE rekening (incl. Box 3): één bedrag, twee grondslagen, en de tarieven dragen daarom hun grondslag als onderregel. WEGLATING ZICHTBAAR BIJ HET GETAL (bevinding H22, eigenaarsbesluit 26-08-2026 = optie B — het bedrag verandert NIET): bij aanmerkelijk belang draagt de druk-kaart een "excl. Box 2"-tag naast het hero-bedrag plus de regel "Box 2 (aanmerkelijk belang) zit hier niet in — die rekening staat apart." met een link naar /overzicht/belasting/box2, en de verdeelstaaf een voetregel dat de percentages over Box 1 en Box 3 samen gaan. De "indicatie, geen advies"-callout onder de sectie herhaalt het als voetnoot; hij was voorheen de ENIGE plek waar de weglating stond.',
     assertion: {
       kind: 'consistency',
-      source: 'lib/tax-overview.ts#buildTaxOverview — aggregatie-invariant total = box1+box2+box3, distribution som = 100, freedomDays = round(total/daily); box1Tax = computeBox1Tax over resolveBox1GrossIncome via lib/tax-opportunities-loader.ts#loadFiscaleKansen (A=B met /overzicht/belasting/box1); box3Tax = horizonData.box3Tax resp. de perspectief-heffing uit dezelfde loader (canonieke calculateBox3, A=B met /overzicht/belasting/box3). tax-overview.test.ts dekt de aggregator exact.',
+      source: 'lib/tax-overview.ts#buildTaxOverview — aggregatie-invariant total = box1+box2+box3, distribution som = 100, freedomDays = round(total/daily); box1Tax = computeBox1Tax over resolveBox1GrossIncome + resolveEigenWoningBox1Input via lib/tax-opportunities-loader.ts#loadFiscaleKansen (A=B met /overzicht/belasting/box1 — beide invoerhelften gedeeld sinds C8; de bron-grendel in lib/box1-income.eigen-woning.test.ts bewaakt dat); box3Tax = horizonData.box3Tax resp. de perspectief-heffing uit dezelfde loader (canonieke calculateBox3, A=B met /overzicht/belasting/box3). tax-overview.test.ts dekt de aggregator exact. TARIEVEN (C9/M4): effectiveRate/marginalRate zijn pass-through uit dezelfde computeBox1Tax-aanroep (loadFiscaleKansen.box1EffectiveRate/box1MarginalRate); `grossYearlyIncome` is uit TaxOverviewInput verwijderd zodat de teller/noemer-mismatch niet kan terugkeren. Bewaakt door lib/tax-overview.hub-tarieven.test.ts (motor-invariant effectief <= marginaal over €1.000-€400.000, absolute ruisband 1e-9 tariefpunten; exacte reconstructie van 36,6%/35,8%/56,01% bij bruto €93.369; bron-grendel op hub-pagina + kansen-loader) en components/overview/belasting/hub-totale-druk.test.tsx (Inkomen onbekend → geen enkel percentage).',
     },
   },
   {
@@ -165,11 +175,11 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'compleet',
     given: 'Persona Tessa geladen; netto €7.600/mnd (net_monthly_income) → subpagina-bruto = grossFromNet(91.200, 2026) = €160.658; eigen woning WOZ €540.000 + gekoppelde hypotheek (rente €9.300). WEERGAVEMODUS (BEL-4/APP-7): de vier onderstaande cijfers (effectief tarief, marginaal tarief, netto besteedbaar, "Geschat bruto") zijn zelf mode-onafhankelijk berekend — `computeBox1Tax` draait ongeacht modus. Wat ZICHTBAAR is op de figures-strip verschilt: in **Volledig** staan alle vier de cellen; in **Eenvoudig** kapt `FiguresStrip` af tot 2 (`simpleFigures`) — Effectief tarief + Netto besteedbaar (de vraag "wat kost het en wat houd ik over"); "Geschat bruto" (bewerkbaar, zie WF-BELAST-08) en het marginale tarief staan dan alleen in Volledig.',
     when: 'De gebruiker opent /overzicht/belasting/box1 en leest de druk-hero (Box 1-belasting, effectief/marginaal tarief, netto besteedbaar) + heffingskortingen (in Eenvoudig: alleen effectief tarief + netto besteedbaar op de strip zelf; de overige waarden gelden ongewijzigd voor de rest van de hero/waterfall).',
-    then: 'Bij bruto €160.658 met eigen woning: belastbaar inkomen €153.248 (160.658 − 7.410 eigenwoning-saldo); Box 1-belasting €65.790; effectief tarief 41,0%; marginaal tarief 49,5%; algemene heffingskorting €0 + arbeidskorting €0 (beide volledig afgebouwd bij dit DGA-inkomen); netto besteedbaar €94.868. (Bruto is de SUBPAGINA-bron; de hub gebruikt een andere bron — zie kop.)',
+    then: 'Bij bruto €160.658 met eigen woning: belastbaar inkomen €153.248 (160.658 − 7.410 eigenwoning-saldo); Box 1-belasting €66.675; effectief tarief 41,5%; marginaal tarief 49,5%; algemene heffingskorting €0 + arbeidskorting €0 (beide volledig afgebouwd bij dit DGA-inkomen); netto besteedbaar €93.983. HERIJKT 26-08-2026 (bevinding H25, ADR 0106): de heffing bevat nu de tariefsaanpassing aftrekbare kosten eigen woning (art. 2.10 lid 2 Wet IB 2001) van €885 = het volledige aftreksaldo €7.410 × (49,50% − 37,56%), want bij dit inkomen ligt de hele aftrek boven de topschijfgrens €78.426. VÓÓR de fix stond hier tax €65.790 / effectief 41,0% / netto €94.868 — die cijfers verrekenden de hypotheekrente tegen 49,50% i.p.v. het maximale aftrektarief 37,56% en waren dus €885/jaar te gunstig. Het MARGINALE tarief (49,5%) verandert bewust NIET: de tariefsaanpassing is een bijtelling op de heffing, geen schijfwijziging, en de ±1-probe draait zonder eigenwoning-invoer. (Bruto is de SUBPAGINA-bron; de hub gebruikt een andere bron — zie kop.)',
     assertion: {
       kind: 'exact',
-      expected: 'belastbaar=153248; tax=65790; effectief=41.0; marginaal=49.5; ahk=0; arbeidskorting=0; netto=94868',
-      source: 'lib/box1-tax.ts#computeBox1Tax (year 2026, grossYearlyIncome=grossFromNet(7600×12,2026)=160658, wozValue=540000, hypotheekRente=9300); heffingskortingen volledig afgebouwd boven de afbouwgrenzen 2026',
+      expected: 'belastbaar=153248; tax=66675; effectief=41.5; marginaal=49.5; ahk=0; arbeidskorting=0; netto=93983; tariefsaanpassing=885',
+      source: 'lib/box1-tax.ts#computeBox1Tax (year 2026, grossYearlyIncome=grossFromNet(7600×12,2026)=160658, wozValue=540000, hypotheekRente=9300); heffingskortingen volledig afgebouwd boven de afbouwgrenzen 2026; tariefsaanpassing = min(aftrekpost, gross − topschijfgrens) × (topschijftarief − hypotheekAftrekMaxTarief), beide afgeleid uit BOX1_PARAMS[2026]',
     },
   },
   {
@@ -195,11 +205,11 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'compleet',
     given: 'Persona Tessa geladen; "Eigen woning Amersfoort" (WOZ €540.000) met gekoppelde hypotheek "Hypotheek eigen woning" (€300.000 @ 3,1%). Alleen de aan het eigen_huis gekoppelde hypotheek telt (de aflossingsvrije beleggingshypotheek hangt aan een real_estate-asset).',
     when: 'De gebruiker bekijkt de eigen-woning-kaart; randgevallen: rente 6% en hypotheek ontkoppeld (rente 0).',
-    then: 'Basis: eigenwoningforfait = 540.000×0,0035 = €1.890; renteaftrek = round(300.000×0,031) = €9.300; saldo vóór Hillen −7.410 (<0 → geen Hillen), eigenwoning-saldo −€7.410 (aftrekpost). Rente 6% → renteaftrek €18.000, saldo −€16.110. Ontkoppeld (rente 0): Hillen = 1.890×0,718 = €1.357,02, eigenwoning-saldo +€532,98 (teken FLIPT naar bijtelling).',
+    then: 'Basis: eigenwoningforfait = 540.000×0,0035 = €1.890; renteaftrek = round(300.000×0,031) = €9.300; saldo vóór Hillen −7.410 (<0 → geen Hillen), eigenwoning-saldo −€7.410 (aftrekpost). Rente 6% → renteaftrek €18.000, saldo −€16.110. Ontkoppeld (rente 0): Hillen = 1.890×0,718 = €1.357,02, eigenwoning-saldo +€532,98 (teken FLIPT naar bijtelling). BELASTINGEFFECT OP DE KAART, herijkt 26-08-2026 (bevinding H25, ADR 0106): de regel "levert je ≈ … aan vrijheid terug" leest sinds deze wijziging het motorveld `eigenwoningBelastingEffect` (heffing zónder eigen woning − heffing mét) in plaats van de eigen som |saldo| × marginalRate. Bij bruto €100.000 is dat €2.783 (rente 9.300) resp. €6.051 (rente 6%); de oude eigen som gaf €4.150 resp. €9.023 — een overschatting van ±49%, want `marginalRate` (56,01%) bevat de arbeidskorting-afbouw die over het ARBEIDSinkomen loopt en door een aftrekpost terecht niet daalt. Het motorveld bevat de tariefsaanpassing (€884,75 resp. €1.923,53) én het herleven van heffingskortingen. Bij ontkoppeld (bijtelling) is het effect negatief: −€263,83, en toont de kaart "kost je".',
     assertion: {
       kind: 'exact',
-      expected: 'forfait=1890; renteaftrek=9300; saldo=-7410; saldo6pct=-16110; hillenOntkoppeld=1357.02; saldoOntkoppeld=532.98',
-      source: 'lib/box1-tax.ts#computeBox1Tax (year 2026, wozValue=540000, hypotheekRente=9300/18000/0) — eigenwoningforfaitRate 0,0035, hillenPct 0,718; Hillen-aftrek alleen wanneer forfait > rente (spiegelt WF-SCHULD-21 op persona compleet)',
+      expected: 'forfait=1890; renteaftrek=9300; saldo=-7410; saldo6pct=-16110; hillenOntkoppeld=1357.02; saldoOntkoppeld=532.98; effect=2783.20; effect6pct=6050.92; effectOntkoppeld=-263.83',
+      source: 'lib/box1-tax.ts#computeBox1Tax (year 2026, grossYearlyIncome=100000, wozValue=540000, hypotheekRente=9300/18000/0) — eigenwoningforfaitRate 0,0035, hillenPct 0,718; Hillen-aftrek alleen wanneer forfait > rente (spiegelt WF-SCHULD-21 op persona compleet); eigenwoningBelastingEffect is de heffingsdelta t.o.v. dezelfde invoer zonder eigen woning en is de canonieke bron voor components/overview/belasting/box1-eigen-woning.tsx',
     },
   },
   {
@@ -210,11 +220,12 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'compleet',
     given: 'Persona Tessa geladen; bruto €160.658 (subpagina-bron), factor A onbekend (geen pension_factor_a in het profiel → resolvePensionFactorA → 0).',
     when: 'De gebruiker leest de jaarruimte-gauge en simuleert een lijfrente-inleg tot de volledige ruimte.',
-    then: 'Jaarruimte 2026 = 30% × min(160.658 − 19.172, 137.800 − 19.172) − 6,27×0 = 30% × 118.628 = €35.588 (gecapt op de grondslag-cap; JAARRUIMTE_MAX_2026 €35.589 is de afgeronde referentie). Franchise €19.172. Geschatte belastingbesparing bij volledige benutting (marginaal-correct = computeBox1Tax(160.658).tax − computeBox1Tax(160.658 − 35.588).tax, ADR 0040/0041 — vangt schijfovergangen én heffingskorting-afbouw, i.t.t. de oude vlakke inleg × marginaal-benadering) = €18.127.',
+    then: 'Jaarruimte 2026 = 30% × min(160.658 − 19.172, 137.800 − 19.172) − 6,27×0 = 30% × 118.628 = €35.588 (gecapt op de grondslag-cap; JAARRUIMTE_MAX_2026 €35.589 is de afgeronde referentie). Franchise €19.172. Geschatte belastingbesparing bij volledige benutting (marginaal-correct = computeBox1Tax(160.658).tax − computeBox1Tax(160.658 − 35.588).tax, ADR 0040/0041 — vangt schijfovergangen én heffingskorting-afbouw, i.t.t. de oude vlakke inleg × marginaal-benadering) = €18.127. ONBEKENDE FACTOR A = BOVENGRENS (bevinding H23, 26-08-2026): omdat deze persona géén pension_factor_a heeft, is `pensioenFactorAKnown` false en toont de kaart (a) de badge "Factor A niet ingevuld — bovengrens", (b) een BEREIK €18.955 – €35.588 i.p.v. één getal, en (c) een footer die "berekend zónder factor A" zegt in plaats van het eerdere, tegenstrijdige "berekend met je opgeslagen factor A". De ondergrens komt uit DEZELFDE motor met een geschatte factor A (estimateFactorAFromSalary = 1,875% × (160.658 − 19.172) = €2.652,86 → 35.588 − 6,27×2.652,86 = €18.955) — geen tweede rekenpad. De inleg-slider start bij onbekende factor A op die ondergrens (te veel storten = niet-aftrekbare inleg); de bovengrens blijft de slider-max. Bij een BEKENDE factor A (ook een expliciete 0 van een zzp\'er) blijven badge en bereik weg en houdt de kaart de oude, zekere formulering.',
     assertion: {
       kind: 'exact',
-      expected: 'jaarruimte=35588; franchise=19172; max=35589; besparing=18127',
-      source: 'lib/jaarruimte.ts#computeJaarruimte(160658, 0, 2026) — grondslag-cap 137.800−19.172, OPBOUW_PCT 0,3, FACTOR_A_IMPUTATIE 6,27; besparing = jaarruimteBesparing(160658, 35588, 2026) = marginaal-correcte som via computeBox1Tax(gross) − computeBox1Tax(gross − inleg), ADR 0041',
+      expected:
+        'jaarruimte=35588; franchise=19172; max=35589; besparing=18127; bereikOndergrens=18955',
+      source: 'lib/jaarruimte.ts#computeJaarruimte(160658, 0, 2026) — grondslag-cap 137.800−19.172, OPBOUW_PCT 0,3, FACTOR_A_IMPUTATIE 6,27; besparing = jaarruimteBesparing(160658, 35588, 2026) = marginaal-correcte som via computeBox1Tax(gross) − computeBox1Tax(gross − inleg), ADR 0041; bereikOndergrens = computeJaarruimte(160658, estimateFactorAFromSalary(160658, {year:2026}), 2026) — zelfde motor, geschatte factor A (H23)',
     },
   },
   {
@@ -252,13 +263,13 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Box 2-aanslag inzien als DGA',
     kriticiteit: 'KERN',
     persona: 'compleet',
-    given: 'Persona Tessa geladen (DGA met deelneming "Belang Volkert Compleet Holding BV"). ⚠ De persona-seed zet GEEN annual_dividend → de ÉCHTE aanslag is €0 (zie kop/rapport). We toetsen de staffel-motor met een representatieve DGA-dividenduitkering van €100.000 (single, geen fiscaal partner → eerste-schijfgrens €68.843).',
-    when: 'De gebruiker bekijkt de Box 2-aanslag over een uitgekeerd dividend van €100.000.',
-    then: 'Staffel 2026 (single): laag tarief 24,5% tot €68.843, hoog 31% daarboven. taxLaag = 68.843×0,245 = €16.866,54; taxHoog = (100.000−68.843)×0,31 = €9.658,67; totale heffing €26.525,21; effectief tarief 26,53%.',
+    given: 'Persona Tessa geladen (DGA met deelneming "Belang Volkert Compleet Holding BV"; de seed zet sinds de dividend-gat-fix €90.000 annual_dividend). We toetsen de staffel-motor met een representatieve DGA-dividenduitkering van €100.000 (single, geen fiscaal partner → eerste-schijfgrens €68.843), plus — sinds bevinding H26 — de tak waarin het dividend NIET is ingevuld.',
+    when: 'De gebruiker bekijkt de Box 2-aanslag over een uitgekeerd dividend van €100.000; daarnaast wordt een deelneming zónder ingevuld dividend (NULL) langs dezelfde motor gehaald.',
+    then: 'Staffel 2026 (single): laag tarief 24,5% tot €68.843, hoog 31% daarboven. taxLaag = 68.843×0,245 = €16.866,54; taxHoog = (100.000−68.843)×0,31 = €9.658,67; totale heffing €26.525,21; effectief tarief 26,53%. NULL ≠ 0 (H26): een deelneming zonder ingevuld dividend levert dezelfde cijfers als een expliciete €0 (heffing 0), maar is daarvan onderscheidbaar via `dividendOnbekend` — het oppervlak toont dan "nog niet ingevuld" i.p.v. een zelfverzekerde €0. Een expliciete 0 is wél bekend.',
     assertion: {
       kind: 'exact',
-      expected: 'totalIncome=100000; taxLaag=16866.54; taxHoog=9658.67; totaleHeffing=26525.21; effectief=26.53',
-      source: 'lib/box2-data.ts#calculateBox2 (year 2026, hasPartner false → grens €68.843, tariefLaag 0,245 / tariefHoog 0,31) op één deelneming met annual_dividend €100.000, disposal_gain 0',
+      expected: 'totalIncome=100000; taxLaag=16866.54; taxHoog=9658.67; totaleHeffing=26525.21; effectief=26.53; nullOnbekend=true; nullHeffing=0; explicieteNulOnbekend=false; gemengdOnbekendCount=1',
+      source: 'lib/box2-data.ts#calculateBox2 (year 2026, hasPartner false → grens €68.843, tariefLaag 0,245 / tariefHoog 0,31) op één deelneming met annual_dividend €100.000, disposal_gain 0; plus de NULL/0-takken via Box2Result.dividendOnbekend/dividendOnbekendCount',
     },
   },
   {
@@ -282,13 +293,13 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Dividend-schijfsimulator gebruiken',
     kriticiteit: 'BELANGRIJK',
     persona: 'compleet',
-    given: 'Persona Tessa geladen (DGA); de dividend-schijfsimulator laat een dividendbedrag variëren rond de eerste-schijfgrens (single €68.843, 2026).',
+    given: 'Persona Tessa geladen (DGA); de dividend-schijfsimulator laat een dividendbedrag variëren rond de eerste-schijfgrens (single €68.843, 2026). Sinds bevinding H26 START de schuif op het WERKELIJKE Box 2-inkomen (niet op de grens) en rekent hij met `calculateBox2` — dezelfde motor als de kop erboven, met hetzelfde DGA-leentotaal en hetzelfde dagtarief.',
     when: 'De gebruiker zet een dividend van €50.000 (onder de grens) en daarna €80.000 (boven de grens).',
-    then: 'Onder de grens (€50.000): alleen laag tarief → taxHoog €0, totale heffing = 50.000×0,245 = €12.250. Boven de grens (€80.000): laag deel 68.843×0,245 = €16.866,54 + hoog deel (80.000−68.843)×0,31 = €3.458,67 → totale heffing €20.325,21. De omslag (taxHoog van 0 → positief) ligt op de grens €68.843.',
+    then: 'Onder de grens (€50.000): alleen laag tarief → taxHoog €0, totale heffing = 50.000×0,245 = €12.250. Boven de grens (€80.000): laag deel 68.843×0,245 = €16.866,54 + hoog deel (80.000−68.843)×0,31 = €3.458,67 → totale heffing €20.325,21. De omslag (taxHoog van 0 → positief) ligt op de grens €68.843. H26-eigenschap: zónder interactie is de simulator-uitkomst per constructie gelijk aan de kop, want de startstand ís het werkelijke inkomen. De verwijderde tweede staffel-implementatie (`splitDividend`) rondde niet af (€16.866,535) en kende `dgaExcessTax` niet; de schaal van de schuif komt uit `BOX2_SIMULATOR_SCHAAL_FACTOR` (weergave, geen uitkeercapaciteit).',
     assertion: {
       kind: 'exact',
       expected: 'onderGrensTaxHoog=0; onderGrensTotaal=12250; bovenGrensTaxLaag=16866.54; bovenGrensTaxHoog=3458.67; bovenGrensTotaal=20325.21',
-      source: 'lib/box2-data.ts#calculateBox2 (year 2026, hasPartner false, grens €68.843) op dividend €50.000 (onder) resp. €80.000 (boven) — de staffel-omslag',
+      source: 'lib/box2-data.ts#calculateBox2 (year 2026, hasPartner false, grens €68.843) op dividend €50.000 (onder) resp. €80.000 (boven) — de staffel-omslag. Sinds H26 is dit óók letterlijk de motor die components/overview/belasting/box2-dividend-simulator.tsx aanroept (bewaakt door de bron-grendel in box2-dividend-simulator.test.tsx).',
     },
   },
   {
@@ -359,10 +370,11 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'compleet',
     given: 'Persona Tessa geladen; de Box 3-subpagina + hub tonen de peildatum-uitleg (1 januari), het arbitragevenster en de vooruitblik op het stelsel-2028.',
     when: 'De gebruiker leest de peildatum-uitleg en de stelsel-vooruitblik.',
-    then: 'Statische, educatieve content: de Box 3-waarde wordt gemeten op 1 januari; grote aankopen vlak vóór die datum verlagen tijdelijk het vermogen (arbitragevenster). Pure weergave, geen berekening.',
+    then: 'Statische, educatieve content: de Box 3-waarde wordt gemeten op 1 januari en die meting bepaalt de grondslag voor het hele jaar; het arbitragevenster (1 okt–31 mrt) wordt uitgelegd samen met de antimisbruikregel die tijdelijke verschuivingen ongedaan maakt. Beschrijvend, niet sturend: nergens een aansporing om aankopen, stortingen of een verschuiving tussen spaargeld en beleggingen rond de peildatum te timen (bevinding H24). Pure weergave, geen berekening.',
     assertion: {
       kind: 'ui-only',
-      source: 'BOX3_TOOLTIPS.peildatum + hub-stelselradar — statische educatieve tekst, geen rekenmotor',
+      source:
+        'BOX3_TOOLTIPS.peildatum + Box3Peildatum-katern + TAX_DEADLINES#box3-peildatum + hub-stelselradar — statische educatieve tekst, geen rekenmotor. Toongrendel: lib/wft-copy-guard.test.ts',
     },
   },
   {

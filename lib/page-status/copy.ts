@@ -124,15 +124,19 @@ export const PAGE_STATUS_COPY: Record<string, RouteCopy> = {
 
   '/overzicht/belasting': {
     title: 'Belasting',
+    // H24 (Wft): beschrijvend, niet oordelend. "Je betaalt waarschijnlijk meer
+    // belasting dan nodig" is een bewering die we niet hard kunnen maken —
+    // we kennen de heffing, niet wat "nodig" was. Zelfde register als de
+    // box3-pagina hieronder: benoem de grondslag, trek geen conclusie.
     warn: {
-      reason: 'Er is ruimte om je belasting slimmer te regelen ({figure}).',
+      reason: 'Een deel van je vermogen valt in de Box 3-heffing ({figure}).',
       remedy:
-        'Bekijk je Box 1- en Box 3-overzicht — er zijn kansen om legaal minder belasting te betalen.',
+        'Bekijk je Box 1- en Box 3-overzicht om te zien hoe die heffing is opgebouwd.',
     },
     bad: {
-      reason: 'Je betaalt waarschijnlijk meer belasting dan nodig ({figure}).',
+      reason: 'Je vermogen ligt ruim boven de heffingsvrije voet ({figure}).',
       remedy:
-        'Bekijk je Box 1- en Box 3-overzicht om de grootste optimalisatiekansen te vinden.',
+        'In je Box 1- en Box 3-overzicht zie je per box waar de heffing vandaan komt.',
     },
     will: {
       onderwerp: 'Mijn belasting optimaliseren',

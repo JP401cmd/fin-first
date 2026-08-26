@@ -15,6 +15,16 @@ import {
 } from '@/lib/box2-dga-lening'
 
 /**
+ * Zet een rauwe `assets.annual_dividend`-kolomwaarde om naar het motorcontract.
+ * NULL/leeg/niet-numeriek → `null` ("nog niet ingevuld"), nooit 0.
+ */
+function toDividend(raw: unknown): number | null {
+  if (raw == null || raw === '') return null
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : null
+}
+
+/**
  * GET /api/household/box2?year=2025|2026
  *
  * Returns Box 2 calculations based on deelneming assets:
@@ -58,7 +68,9 @@ export async function GET(request: NextRequest) {
   const [{ data: assetsRaw }, { data: vorderingenRaw }, { data: dgaSchuldenRaw }] = await Promise.all([
     supabase
       .from('assets')
-      .select('*')
+      // Kolomregel (CLAUDE.md): geen select('*') op assets — de tabel draagt *_encrypted/*_hash
+      // en de SELECT-policy is huishoud-gedeeld; vraag alleen wat deze route echt consumeert.
+      .select('id, name, institution, annual_dividend, current_value, ownership_percentage, ownership, user_id')
       .eq('is_active', true)
       .eq('asset_type', 'deelneming'),
     supabase
@@ -117,7 +129,13 @@ export async function GET(request: NextRequest) {
   function assetToDeelneming(a: Asset): Box2Deelneming {
     return {
       name: a.institution || a.name || 'Deelneming',
-      annual_dividend: Number(a.annual_dividend) || 0,
+      // NULL ≠ 0 (bevinding H26). `Number(x) || 0` maakte een niet-ingevulde
+      // kolom stil €0, waardoor de Box 2-kop "€0 per jaar" toonde voor élke DGA
+      // die het veld nooit heeft kunnen invullen. Zelfde patroon als
+      // app/api/report/vermogen/route.ts. De Number()-cast blijft nodig omdat
+      // PostgREST NUMERIC als string levert; een niet-numerieke waarde is óók
+      // "niet ingevuld" en wordt bewust NIET als 0 doorgegeven.
+      annual_dividend: toDividend(a.annual_dividend),
       // WF-BELAST-13 is bewust dividend-only (scope-down, productbesluit optie C):
       // vervreemdingswinst heeft géén backing kolom/UI/afleiding en valt buiten
       // scope als aparte, latere feature. calculateBox2() verwerkt disposal_gain

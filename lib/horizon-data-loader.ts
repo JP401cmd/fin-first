@@ -56,7 +56,13 @@ import { resolveEffectiveIncomeExpenses, resolveAmountWithBasis } from './effect
 import type { BudgetBasisRow } from './budget-basis'
 import { loadBudgetBasis } from '@/lib/household/budget-share'
 import { withResolvedKernelBedragen } from '@/lib/horizon/kernel-profile-basis'
-import { resolveSavingsSource, computeSavingsRate6m, computeDebtAflossingMonthly } from './savings-source'
+import {
+  resolveSavingsSource,
+  computeSavingsRate6m,
+  computeDebtAflossingMonthly,
+  savingsRateWindow,
+  savingsRateDataMonths,
+} from './savings-source'
 import {
   getActiveAssets,
   getActiveDebts,
@@ -365,9 +371,11 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   const now = new Date()
   const oneYearFromNow = new Date(Date.UTC(now.getFullYear() + 1, now.getMonth(), now.getDate())).toISOString().split('T')[0]
   const today = now.toISOString().split('T')[0]
-  // 6-maands ondergrens voor de 6m-slice uit de gedeelde 12-maands tx-fetch
-  // (byte-identiek aan het vroegere aparte [sixMonthsAgo, monthEnd)-venster).
-  const sixMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 5, 1)).toISOString().split('T')[0]
+  // 6-maands venster voor de 6m-slice uit de gedeelde 12-maands tx-fetch — grenzen
+  // uit `savingsRateWindow` (lib/savings-source.ts), gedeeld met dashboard-, core-
+  // en lever-scores-loader: zes VOLTOOIDE kalendermaanden, de lopende maand
+  // EXCLUSIEF (bevinding C6).
+  const savingsWindow = savingsRateWindow(now)
 
   const [
     txResult,
@@ -492,9 +500,10 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   // een 12-maands-slice maar uit de aparte all-time `getEarliestIncomeDate` (zie
   // hieronder).
   const txAgg12 = (txAgg12Result.data ?? []) as TxMonthAggregateRow[]
-  // 6-maands sub-venster op maand-niveau ('YYYY-MM'); sixMonthsAgo is de 1e van de
-  // maand ⇒ `date >= sixMonthsAgo` == `maand >= sixMonthsAgoMonth` (exact).
-  const sixMonthsAgoMonth = sixMonthsAgo.slice(0, 7)
+  // 6-maands sub-venster op maand-niveau ('YYYY-MM'). Beide grenzen zijn de 1e van
+  // een maand ⇒ `date >= from && date < to` == `maand >= sinceMonth && maand <
+  // beforeMonth` (exact). `beforeMonth` = de lopende maand en valt er dus buiten.
+  const { sinceMonth: sixMonthsAgoMonth, beforeMonth: currentMonthExcl } = savingsWindow
 
   // AOW-rijen voor de client-kernel-context (rawProfile + aowRows). Leeg bij een
   // ontbrekende tabel (legacy DB) → de client valt terug op de mount-fetch.
@@ -593,8 +602,16 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   // income6m hieronder (spiegelt dashboard-data-loader's health-inkomensanker
   // extIncome6/6, óók transfer-exclusief). Transfers tellen NERGENS mee in de
   // spaarquote/health-grondslag; alleen de FIRE-projectie-sommen zien alle kasstromen.
-  const totalIncome6m = aggSumPositief(txAgg12, { realOnly: true, sinceMonth: sixMonthsAgoMonth })
-  const totalExpenses6m = aggSumNegatiefAbs(txAgg12, { realOnly: true, sinceMonth: sixMonthsAgoMonth })
+  const totalIncome6m = aggSumPositief(txAgg12, {
+    realOnly: true,
+    sinceMonth: sixMonthsAgoMonth,
+    beforeMonth: currentMonthExcl,
+  })
+  const totalExpenses6m = aggSumNegatiefAbs(txAgg12, {
+    realOnly: true,
+    sinceMonth: sixMonthsAgoMonth,
+    beforeMonth: currentMonthExcl,
+  })
   const avgIncome6m = totalIncome6m > 0 ? totalIncome6m / 6 : effectiveMonthlyIncome
   const avgExpenses6m = totalExpenses6m > 0 ? totalExpenses6m / 6 : effectiveMonthlyExpenses
 
@@ -763,11 +780,20 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   // gezondheidsscore + het cashflow-hefboompercentage — bij transfer-zware gebruikers
   // afweek van statusdot/briefing/cashflow-pagina. income6m/expenses6m zijn hierdoor
   // (weer) per constructie gelijk aan totalIncome6m/totalExpenses6m hierboven.
-  const income6m = aggSumPositief(txAgg12, { realOnly: true, sinceMonth: sixMonthsAgoMonth })
-  const expenses6m = aggSumNegatiefAbs(txAgg12, { realOnly: true, sinceMonth: sixMonthsAgoMonth })
+  const income6m = aggSumPositief(txAgg12, {
+    realOnly: true,
+    sinceMonth: sixMonthsAgoMonth,
+    beforeMonth: currentMonthExcl,
+  })
+  const expenses6m = aggSumNegatiefAbs(txAgg12, {
+    realOnly: true,
+    sinceMonth: sixMonthsAgoMonth,
+    beforeMonth: currentMonthExcl,
+  })
   const savingsBudgetSpent6m = aggSumNegatiefAbs(txAgg12, {
     realOnly: true,
     sinceMonth: sixMonthsAgoMonth,
+    beforeMonth: currentMonthExcl,
     budgetIds: savingsBudgetIds,
   })
 
@@ -779,17 +805,11 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   // savingsRateFromAggregates + profiel-fallback). Spaarbudgetten tellen als sparen
   // (uit de uitgaven-term), schuldaflossing erbij. Byte-identiek aan de vroegere
   // inline-versie; nu single-sourced met dashboard/core/lever-scores.
-  let dataMonths6 = 6
   // Zelfde vroegste-inkomens-datum als hierboven (uit de gedeelde all-time
-  // getEarliestIncomeDate).
-  const earliestIncomeDateH = earliestIncomeDate
-  if (earliestIncomeDateH) {
-    const earliest = new Date(earliestIncomeDateH)
-    dataMonths6 = Math.max(1, Math.min(6,
-      (now.getFullYear() - earliest.getFullYear()) * 12 +
-      (now.getMonth() - earliest.getMonth())
-    ))
-  }
+  // getEarliestIncomeDate); de telling zelf komt uit `savingsRateDataMonths`
+  // (lib/savings-source.ts) — dezelfde bron als het venster, zodat venster en
+  // datamaanden niet uit elkaar kunnen lopen (bevinding C6).
+  const dataMonths6 = savingsRateDataMonths(now, earliestIncomeDate)
   const { savingsRate6m } = computeSavingsRate6m({
     income6m,
     expenses6m,

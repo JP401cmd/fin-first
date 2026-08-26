@@ -30,3 +30,35 @@ describe('Box 1-pagina — partner-privacy factor A', () => {
     expect(source).toContain('horizonData.pensioenFactorA')
   })
 })
+
+/**
+ * Bevinding H23 — NULL ≠ 0 moet de pagina ook daadwerkelijk DOORGEVEN.
+ *
+ * `pensioenFactorAKnown` stond al op de horizon-bundel, maar deze pagina las het
+ * veld niet: de kaart zei onvoorwaardelijk "berekend met je opgeslagen factor A"
+ * onder een bedrag dat de uitleg erboven een "bovengrens" noemt. Zelfde lichte
+ * statische assertie als hierboven — hij faalt zodra iemand de wiring terugdraait.
+ */
+describe('Box 1-pagina — factor-A-bekendheid doorgegeven (H23)', () => {
+  const source = readFileSync(join(__dirname, 'page.tsx'), 'utf8')
+
+  it('leest pensioenFactorAKnown uit de loader-bundel (geen eigen afleiding)', () => {
+    expect(source).toContain('horizonData.pensioenFactorAKnown')
+  })
+
+  it('geeft factorAKnown door aan de EIGEN jaarruimtekaart(en)', () => {
+    expect(source).toMatch(
+      /pensioenAangroei=\{pensionFactorA\}\s*\n\s*factorAKnown=\{pensionFactorAKnown\}/,
+    )
+  })
+
+  it('geeft de partnerkaart een LITERALE false, nooit de eigen bekendheid', () => {
+    // De partner heeft geen eigen factor-A-bron; `pensionFactorAKnown` is de
+    // bekendheid van de INGELOGDE gebruiker en mag hier niet lekken.
+    expect(source).toMatch(/pensioenAangroei=\{0\}\s*\n\s*factorAKnown=\{false\}/)
+  })
+
+  it('stuurt ook het uitlegblok op dezelfde bron (geen tweede waarheid)', () => {
+    expect(source).toContain('<JaarruimteUitleg factorAKnown={pensionFactorAKnown} />')
+  })
+})

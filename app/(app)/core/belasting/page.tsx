@@ -45,7 +45,8 @@ interface Box3ApiResponse {
 
 interface Box2ApiDeelneming {
   name: string
-  annual_dividend: number
+  /** NULL = nog niet ingevuld (bevinding H26) — spiegelt Box2Deelneming. */
+  annual_dividend: number | null
   disposal_gain: number
   assetId?: string
   currentValue?: number

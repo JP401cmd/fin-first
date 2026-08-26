@@ -288,6 +288,17 @@ export type GoalSection =
       grossYearlyIncome: number
       /** Factor A (jaarlijkse pensioenaangroei, €) uit het profiel. */
       pensionFactorA: number
+      /**
+       * Of `pensionFactorA` een BEKENDE waarde is (`pensioenFactorAKnown` op de
+       * horizon-bundel = `resolvePensionFactorA().isKnown`). NULL ≠ 0: `false`
+       * betekent "niet ingevuld", dus de jaarruimte hierboven is een BOVENGRENS.
+       * VERPLICHT veld (bevinding H23): de optimizer rendert dezelfde
+       * `JaarruimteCard` als /overzicht/belasting/box1, dus als het ene oppervlak
+       * de onzekerheid toont en het andere niet, staat er weer één metric met twee
+       * gezichten. Door hem niet-optioneel te maken kan een nieuwe producent hem
+       * niet stilzwijgend overslaan.
+       */
+      pensionFactorAKnown: boolean
       /** Canonieke dag-uitgaven voor de €→vrijheidstijd-vertaling. */
       dailyExpenses: number
       /** false → JaarruimteCard toont zelf de "vul je inkomen aan"-melding. */

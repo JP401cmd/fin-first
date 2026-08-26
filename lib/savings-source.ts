@@ -29,6 +29,83 @@
  */
 import { type Debt, computeRenteAflossingsSplit } from '@/lib/debt-data'
 import type { ResolvedBasis } from '@/lib/effective-financials'
+import { localMonthStart, localMonthStartMonthsAgo } from '@/lib/month-range'
+import { SAVINGS_RATE_WINDOW_MONTHS } from '@/lib/constants'
+
+/**
+ * Het MEETVENSTER van de canonieke spaarquote: de laatste
+ * `SAVINGS_RATE_WINDOW_MONTHS` VOLTOOIDE kalendermaanden. De lopende maand valt
+ * er buiten.
+ *
+ * ── WAAROM DE LOPENDE MAAND ERBUITEN VALT (bevinding C6, 26 aug 2026) ────────
+ * Het venster liep tot deze datum van `now − 5 maanden` t/m de lopende maand,
+ * terwijl het aantal DATAMAANDEN waarmee `computeSavingsRate6m` extrapoleert
+ * alleen de verstreken maanden telt (`savingsRateDataMonths`). Die twee
+ * definities spraken elkaar tegen. De lopende maand is bovendien per definitie
+ * halfvol én asymmetrisch gevuld: vaste lasten worden rond de 1e afgeschreven,
+ * salaris komt rond de 25e binnen. Vroeg in de maand staat er dus een volle
+ * uitgavenkant tegenover een lege inkomstenkant. Extrapoleren repareert dat
+ * niet — inkomen én uitgaven worden met dezelfde factor geschaald, dus de
+ * VERHOUDING (en daarmee de quote) blijft de scheve.
+ *
+ * Bij weinig historie is die ene maand het hele venster: gemeten −265 %
+ * spaarquote plus een rode "je hebt deze maand een tekort"-melding, terwijl de
+ * eigen forecast een overschot voorspelde.
+ *
+ * De lopende maand verdwijnt hiermee niet uit de app — hij wordt apart getoond
+ * als "tot nu toe" (`currentMonthWindowLabel` in lib/cashflow-cards.ts), waar
+ * het onvolledige karakter bij de lezer staat in plaats van in een gemiddelde.
+ *
+ * SINGLE SOURCE: élke 6-maands-spaarquote-aggregatie (dashboard-, horizon-,
+ * core- en lever-scores-loader) leest zijn grenzen hier — vier plekken die
+ * voorheen elk hun eigen `localMonthStartMonthsAgo(now, 5)` schreven.
+ */
+export interface SavingsRateWindow {
+  /** 'YYYY-MM' — eerste maand IN het venster (inclusief). */
+  sinceMonth: string
+  /** 'YYYY-MM' — de LOPENDE maand: eerste maand BUITEN het venster (exclusief). */
+  beforeMonth: string
+  /** 'YYYY-MM-DD' — eerste dag van `sinceMonth`, voor date-gefilterde queries (inclusief). */
+  fromDate: string
+  /** 'YYYY-MM-DD' — eerste dag van de lopende maand, exclusieve bovengrens. */
+  toDate: string
+}
+
+export function savingsRateWindow(now: Date): SavingsRateWindow {
+  const fromDate = localMonthStartMonthsAgo(now, SAVINGS_RATE_WINDOW_MONTHS)
+  const toDate = localMonthStart(now)
+  return {
+    sinceMonth: fromDate.slice(0, 7),
+    beforeMonth: toDate.slice(0, 7),
+    fromDate,
+    toDate,
+  }
+}
+
+/**
+ * Aantal maanden werkelijke data (1..`SAVINGS_RATE_WINDOW_MONTHS`) waarmee
+ * `computeSavingsRate6m` een korter dan volledig venster extrapoleert.
+ *
+ * Telt VOLTOOIDE maanden sinds de vroegste inkomstenboeking — het kalendermaand-
+ * verschil tussen `now` en die datum, dus de lopende maand telt níét mee. Dat
+ * sluit sinds bevinding C6 exact aan op `savingsRateWindow`, die dezelfde maanden
+ * bevat. Voorheen bestond deze telling in vier loaders in vier bijna-identieke
+ * inline-varianten (waarvan één zonder `Math.min`-klem op de bovengrens).
+ *
+ * Ondergrens 1: `computeSavingsRate6m` deelt hierdoor; is er nog geen voltooide
+ * maand, dan is het venster leeg (income6m = 0) en valt de berekening via
+ * `isEstimate` terug op de profiel- of net-vermogen-schatting.
+ */
+export function savingsRateDataMonths(
+  now: Date,
+  earliestIncomeDate: string | null | undefined,
+): number {
+  if (!earliestIncomeDate) return SAVINGS_RATE_WINDOW_MONTHS
+  const earliest = new Date(earliestIncomeDate)
+  const months =
+    (now.getFullYear() - earliest.getFullYear()) * 12 + (now.getMonth() - earliest.getMonth())
+  return Math.max(1, Math.min(SAVINGS_RATE_WINDOW_MONTHS, months))
+}
 
 /**
  * De geresolveerde grondslag + de effectieve bedragen daarop (ADR 0103).
@@ -163,7 +240,11 @@ export interface SavingsRate6mAggregates {
   savingsBudgetSpent6m: number
   /** 6-maands schuldaflossing (`computeDebtAflossingMonthly` × 6). */
   debtAflossing6m: number
-  /** Aantal maanden werkelijke data (1–6) voor extrapolatie bij <6m historie. */
+  /**
+   * Aantal maanden werkelijke data (1–6) voor extrapolatie bij <6m historie.
+   * VOLTOOIDE maanden — via `savingsRateDataMonths`, die dezelfde maanden telt
+   * als `savingsRateWindow` afbakent (de lopende maand valt in beide buiten).
+   */
   dataMonths: number
   /**
    * Profiel-fallback bij een transactieloze gebruiker (aggregaat-quote = 0):
@@ -204,11 +285,12 @@ export interface SavingsRate6mResult {
  * plaats waar de formule woont ("consume, don't recompute").
  */
 export function computeSavingsRate6m(agg: SavingsRate6mAggregates): SavingsRate6mResult {
-  const dataMonths = Math.max(1, Math.min(6, agg.dataMonths))
-  const extIncome6 = dataMonths < 6 ? (agg.income6m / dataMonths) * 6 : agg.income6m
-  const extExpenses6 = dataMonths < 6 ? (agg.expenses6m / dataMonths) * 6 : agg.expenses6m
+  const W = SAVINGS_RATE_WINDOW_MONTHS
+  const dataMonths = Math.max(1, Math.min(W, agg.dataMonths))
+  const extIncome6 = dataMonths < W ? (agg.income6m / dataMonths) * W : agg.income6m
+  const extExpenses6 = dataMonths < W ? (agg.expenses6m / dataMonths) * W : agg.expenses6m
   const extSavingsBudget6 =
-    dataMonths < 6 ? (agg.savingsBudgetSpent6m / dataMonths) * 6 : agg.savingsBudgetSpent6m
+    dataMonths < W ? (agg.savingsBudgetSpent6m / dataMonths) * W : agg.savingsBudgetSpent6m
 
   const rate = savingsRateFromAggregates(extIncome6, extExpenses6 - extSavingsBudget6, agg.debtAflossing6m)
   const isEstimate = rate === 0

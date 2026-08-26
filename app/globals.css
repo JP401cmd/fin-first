@@ -35,6 +35,17 @@
      dit bestand gelijk aan deze waarde. */
   --ink-meta: #6b6557;
   --rule-soft: rgba(26, 25, 22, 0.18);  /* halftransparante divider voor dotted/dashed */
+
+  /* ── Scrim — de gedimde achtergrond achter een modal ──────────────────
+     Eén dekking app-breed. Er liepen zeven varianten rond (0.2/0.3/0.4/0.5/0.6,
+     `black` vs. `var(--ink)`, blur wel/niet), waardoor "de pagina donker achter
+     de modal" per oppervlak iets anders betekende. Gebruik in overlays:
+     `bg-[var(--scrim)]` (+ `backdrop-blur-[var(--scrim-blur)]` waar een blur
+     hoort). De JS-tak van dezelfde waarde — nodig omdat het swipe-gebaar de
+     dekking met de vinger mee laat lopen — staat in `lib/overlay-scrim.ts`;
+     `lib/overlay-scrim.test.ts` bewaakt dat beide gelijk blijven. */
+  --scrim: rgba(0, 0, 0, 0.5);
+  --scrim-blur: 2px;
   --r: 0px;
   --r-lg: 0px;
   --r-sm: 0px;

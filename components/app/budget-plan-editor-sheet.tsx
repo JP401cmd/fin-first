@@ -550,7 +550,10 @@ export function BudgetPlanEditorSheet({
   // ── Render ────────────────────────────────────────────────────
   return (
     <>
-    <BottomSheet key={editorEpoch} open={open} onClose={handleClose} title="Plan bewerken" size="full">
+    {/* `manageHistory={false}`: deze sheet is URL-gestuurd (`?planEditor=true`)
+        en haalt die param bij sluiten zelf met `router.replace` weg. De centrale
+        overlay-history zou een tweede claim op dezelfde entry leggen. */}
+    <BottomSheet key={editorEpoch} open={open} onClose={handleClose} title="Plan bewerken" size="full" manageHistory={false}>
       {/* Editorial intro — kicker-met-streep + deck (italic Source Serif).
           BottomSheet levert al de Playfair-titel in zijn header-bar; deze
           intro geeft context (welke maand, wat je hier doet) zonder dubbele
@@ -728,7 +731,7 @@ export function BudgetPlanEditorSheet({
       {/* Delete confirmation */}
       {pendingDelete && (
         <div
-          className="absolute inset-0 z-10 flex items-end justify-center bg-black/30 px-4 pb-6 sm:items-center sm:pb-0"
+          className="absolute inset-0 z-10 flex items-end justify-center bg-[var(--scrim)] px-4 pb-6 sm:items-center sm:pb-0"
           role="dialog"
           aria-modal="true"
           onClick={() => setPendingDelete(null)}

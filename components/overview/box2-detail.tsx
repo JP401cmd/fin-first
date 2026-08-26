@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Calculator, ChevronDown, ChevronUp, Clock, Building2, AlertTriangle } from 'lucide-react'
+import Link from 'next/link'
+import { Calculator, ChevronDown, ChevronUp, Clock, Building2, AlertTriangle, HelpCircle } from 'lucide-react'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
@@ -67,6 +68,7 @@ function Row({
   label,
   value,
   pct,
+  text,
   bold,
   highlight,
   tooltip,
@@ -75,6 +77,8 @@ function Row({
   label: string
   value?: number
   pct?: number
+  /** Tekstuele waarde i.p.v. een bedrag — bv. "nog niet ingevuld" (NULL ≠ 0). */
+  text?: string
   bold?: boolean
   highlight?: boolean
   tooltip?: string
@@ -86,7 +90,9 @@ function Row({
         {label}
         {tooltip && <InfoTooltip text={tooltip} />}
       </span>
-      {(value != null || pct != null) && (
+      {text != null ? (
+        <span className="text-xs italic text-[var(--ink-3)]">{text}</span>
+      ) : (value != null || pct != null) && (
         <span className={`font-mono text-xs tabular-nums ${bold ? 'font-semibold text-[var(--ink)]' : 'text-[var(--ink-2)]'}`}>
           {pct != null ? formatPct(pct) : value != null ? fc(value) : ''}
         </span>
@@ -158,6 +164,13 @@ export function Box2Detail({ year = 2026 }: { year?: number }) {
   if (!result) return null
 
   const hasDga = result.dgaLeningenExcess > 0
+  // NULL ≠ 0 (bevinding H26). Is er geen enkel ingevuld dividend en komt de
+  // heffing daarmee op nul uit, dan is "€0 per jaar" een verzonnen zekerheid:
+  // de app heeft het nooit gevraagd. Levert de motor tóch een bedrag (een tweede
+  // deelneming mét dividend, of excessief lenen), dan tonen we dat bedrag wél —
+  // met de aantekening dat het een ondergrens is.
+  const dividendOnbekend = result.dividendOnbekend === true
+  const toonGeenBedrag = dividendOnbekend && result.totalTaxInclDga === 0
 
   return (
     <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-8">
@@ -179,18 +192,64 @@ export function Box2Detail({ year = 2026 }: { year?: number }) {
             <PerspectiveContextLabel />
           </div>
           <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span
-              className="text-[34px] sm:text-[44px] font-black leading-none tracking-[-0.02em] tabular-nums text-[var(--ink)]"
-              style={{ fontFamily: PLAYFAIR }}
-            >
-              <HighlightMark>{fc(result.totalTaxInclDga)}</HighlightMark>
-            </span>
-            <span className="text-xs font-mono uppercase tracking-[0.12em] text-[var(--ink-3)]">per jaar</span>
+            {toonGeenBedrag ? (
+              <span
+                className="text-[26px] sm:text-[32px] font-black leading-none tracking-[-0.02em] text-[var(--ink-3)]"
+                style={{ fontFamily: PLAYFAIR }}
+              >
+                Nog niet ingevuld
+              </span>
+            ) : (
+              <>
+                <span
+                  className="text-[34px] sm:text-[44px] font-black leading-none tracking-[-0.02em] tabular-nums text-[var(--ink)]"
+                  style={{ fontFamily: PLAYFAIR }}
+                >
+                  <HighlightMark>{fc(result.totalTaxInclDga)}</HighlightMark>
+                </span>
+                <span className="text-xs font-mono uppercase tracking-[0.12em] text-[var(--ink-3)]">per jaar</span>
+              </>
+            )}
           </div>
-          {result.freedomDays > 0 && (
+          {!toonGeenBedrag && result.freedomDays > 0 && (
             <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-[var(--ink-3)]">
               <Clock className="h-3 w-3" aria-hidden="true" />
               {result.freedomDays} vrijheidsdagen
+            </div>
+          )}
+          {/* Ontbrekend dividend expliciet benoemen i.p.v. als €0 wegpoetsen.
+              Een fiscale nul die de app zelf verzon is een vertrouwensbreuk. */}
+          {dividendOnbekend && (
+            <div className="mt-3 flex items-start gap-2 border border-[var(--border-ed)] border-l-[3px] border-l-[var(--module-active-500)] bg-[var(--subtle)] px-3 py-2.5 text-xs leading-snug text-[var(--ink-2)]">
+              <HelpCircle className="h-4 w-4 shrink-0 mt-0.5" style={{ color: 'var(--module-active-700)' }} aria-hidden="true" />
+              <span>
+                {toonGeenBedrag ? (
+                  <>
+                    We weten je jaarlijks dividend nog niet
+                    {result.dividendOnbekendCount > 1
+                      ? ` (${result.dividendOnbekendCount} deelnemingen zonder bedrag)`
+                      : ''}
+                    , dus we tonen geen aanslag. Een “€ 0” zou hier suggereren dat
+                    je niets betaalt, terwijl we het simpelweg niet weten.{' '}
+                  </>
+                ) : (
+                  <>
+                    Dit bedrag is een ondergrens:{' '}
+                    {result.dividendOnbekendCount > 1
+                      ? `${result.dividendOnbekendCount} deelnemingen hebben`
+                      : 'één deelneming heeft'}{' '}
+                    nog geen ingevuld dividend.{' '}
+                  </>
+                )}
+                <Link
+                  href="/overzicht/bezittingen"
+                  className="font-semibold underline underline-offset-2"
+                  style={{ color: 'var(--module-active-700)' }}
+                >
+                  Vul het dividend aan bij je deelneming
+                </Link>
+                .
+              </span>
             </div>
           )}
           <p
@@ -237,7 +296,13 @@ export function Box2Detail({ year = 2026 }: { year?: number }) {
           </button>
           {showDetails && (
             <div className="border-t border-[var(--ink)] px-5 py-5 sm:px-6 space-y-2.5">
-              <Row label="Dividend" value={result.totalDividend} tooltip={BOX2_TOOLTIPS.dividend} fc={fc} />
+              <Row
+                label="Dividend"
+                value={toonGeenBedrag ? undefined : result.totalDividend}
+                text={toonGeenBedrag ? 'nog niet ingevuld' : undefined}
+                tooltip={toonGeenBedrag ? BOX2_TOOLTIPS.dividendOnbekend : BOX2_TOOLTIPS.dividend}
+                fc={fc}
+              />
               <Row label="Vervreemdingswinst" value={result.totalDisposalGain} tooltip={BOX2_TOOLTIPS.vervreemdingswinst} fc={fc} />
               <Row label="Totaal Box 2-inkomen" value={result.totalIncome} bold fc={fc} />
               <div className="h-px bg-[var(--rule-soft)]" />
@@ -291,10 +356,17 @@ export function Box2Detail({ year = 2026 }: { year?: number }) {
 
         {/* 2.2 — Dividend-schijf simulator */}
         <HideInSimple>
+          {/* De simulator start op het WERKELIJKE Box 2-inkomen en krijgt
+              hetzelfde DGA-leentotaal mee, zodat hij bij eerste render exact de
+              kop hierboven reproduceert i.p.v. een hypothetisch bedrag
+              (bevinding H26). */}
           <Box2DividendSimulator
             year={result.year}
             hasPartner={result.hasPartner}
             dailyExpenses={result.dailyExpenses}
+            defaultDividend={result.totalIncome}
+            dgaLeningenTotal={result.dgaLeningenTotal}
+            dividendOnbekend={dividendOnbekend}
           />
         </HideInSimple>
 

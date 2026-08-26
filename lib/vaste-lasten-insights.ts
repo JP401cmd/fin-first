@@ -9,7 +9,14 @@
 //   - aandeel% + status  → `vasteLastenCardStatus` (lib/cashflow-cards.ts)
 //   - meter-zones        → `VASTE_LASTEN_GOOD_MAX` / `VASTE_LASTEN_WARN_MAX`
 //   - vrijheidstijd      → `dailyExpenseRate` → `calculateFreedomTime` (lib/format)
+//   - werktijd           → `dailyIncomeRate` → `calculateWorkTime` (lib/work-time, ADR 0105)
 //   - benchmark-getal    → `SUBSCRIPTION_BENCHMARK` (redactioneel, lib/vaste-lasten-benchmarks)
+//
+// TWEE TIJD-GROOTHEDEN, NOOIT DOOR ELKAAR (ADR 0105):
+//   · VRIJHEIDSTIJD  — bedrag / uitgaven-dagtarief = "hoeveel dagen leven koopt dit".
+//   · WERKTIJD       — jaarbedrag / bruto inkomen-dagtarief = "welk deel van mijn
+//     werkjaar gaat hier naartoe". Alleen dít getal mag "die je werkt om te
+//     betalen"-taal dragen, en alleen dít getal is optelbaar tot twaalf maanden.
 // Er wordt hier geen eigen som van een kerngetal gemaakt; alleen samenstellen,
 // groeperen en delta's t.o.v. de geciteerde benchmark.
 
@@ -25,6 +32,7 @@ import {
   roundCents,
   type FreedomTimeBreakdown,
 } from '@/lib/format'
+import { calculateWorkTime, EMPTY_WORK_TIME, type WorkTimeBreakdown } from '@/lib/work-time'
 import {
   CATEGORY_LABELS,
   type RecurringCategory,
@@ -78,6 +86,17 @@ export interface VasteLastenInsights {
   freedomPerYear: FreedomTimeBreakdown
   /** Afgeronde vrijheidsdagen per maand (voor het onderschrift). */
   freedomDaysPerMonth: number
+
+  /**
+   * WERKTIJD (ADR 0105): welk deel van het WERKJAAR de vaste lasten opeisen —
+   * jaarbedrag gedeeld door het bruto dagelijks inkomen. Een ANDERE grootheid dan
+   * `freedomPerYear` hierboven (dat deelt op de uitgaven) en de enige die de
+   * "die je werkt om te betalen"-formulering mag dragen. `hasBasis: false` →
+   * bruto jaarinkomen onbekend, het scherm laat de werktijd-zin dan weg.
+   */
+  workTimePerYear: WorkTimeBreakdown
+  /** Het bruto dagtarief waarop `workTimePerYear` staat (€/dag, 0 = geen basis). */
+  dailyIncomeRate: number
 
   /** Benchmark-duiding voor abonnementen (redactioneel geciteerd getal). */
   subscriptionBenchmarkMonthly: number
@@ -161,13 +180,25 @@ export function cancelEffect(
  *   voorheen zelf `dailyExpenseRate(monthlyExpenses)` op de effective grondslag,
  *   waardoor dezelfde vaste last hier een ander aantal vrijheidsdagen kostte dan
  *   in de widgets (vervolg KRUIS-20). 0 → geen vrijheidstijd, geen benadering.
+ * @param dailyIncomeRate - CANONIEK bruto dagtarief (€/dag) uit `lib/income-rate.ts`
+ *   (`getCanonicalDailyIncomeRate` → `resolveBox1GrossIncome`, ADR 0086/0105) —
+ *   de noemer van de WERKTIJD-claim. Bewust een KANT-EN-KLAAR tarief én bewust
+ *   een ANDER tarief dan `dailyExpenseRate`: werktijd deelt op het inkomen, niet
+ *   op de uitgaven. Optioneel/additief: 0 (of weggelaten) → geen werkjaar-basis,
+ *   de motor laat de werktijd-regel leeg i.p.v. hem te benaderen.
  */
 export function buildVasteLastenInsights(params: {
   summary: VasteLastenSummary
   monthlyIncome: number
   dailyExpenseRate: number
+  dailyIncomeRate?: number
 }): VasteLastenInsights {
-  const { summary, monthlyIncome, dailyExpenseRate: dailyRate } = params
+  const {
+    summary,
+    monthlyIncome,
+    dailyExpenseRate: dailyRate,
+    dailyIncomeRate: dailyIncome = 0,
+  } = params
 
   const subscriptionsMonthly = roundCents(summary.totalMonthlySubscriptions)
   const vasteKostenMonthly = roundCents(summary.totalMonthlyVasteKosten)
@@ -186,6 +217,12 @@ export function buildVasteLastenInsights(params: {
     hasData && dailyRate > 0 ? calculateFreedomTime(totalMonthly, dailyRate) : EMPTY_FREEDOM
   const freedomPerYear =
     hasData && dailyRate > 0 ? calculateFreedomTime(totalMonthly * 12, dailyRate) : EMPTY_FREEDOM
+
+  // Werktijd via het canonieke bruto dagtarief — aangeleverd, niet zelf gerekend.
+  // SCHAAL: `calculateWorkTime` wil een JAARbedrag, vandaar ×12 (spiegelt
+  // `freedomPerYear` hierboven).
+  const workTimePerYear =
+    hasData && dailyIncome > 0 ? calculateWorkTime(totalMonthly * 12, dailyIncome) : EMPTY_WORK_TIME
 
   // Benchmark-delta (geciteerd getal, redactioneel).
   const subscriptionBenchmarkMonthly = SUBSCRIPTION_BENCHMARK.avgMonthlyPerPerson
@@ -224,6 +261,9 @@ export function buildVasteLastenInsights(params: {
     freedomPerMonth,
     freedomPerYear,
     freedomDaysPerMonth: Math.round(freedomPerMonth.totalDays),
+
+    workTimePerYear,
+    dailyIncomeRate: dailyIncome,
 
     subscriptionBenchmarkMonthly,
     subscriptionDeltaMonthly,

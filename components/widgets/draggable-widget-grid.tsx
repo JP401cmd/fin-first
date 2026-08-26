@@ -822,7 +822,7 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
           conform de modal-conventie. */}
       {selectedPreset && createPortal(
         <>
-          <div className="fixed inset-0 z-[70] bg-black/30" onClick={() => setSelectedPreset(null)} />
+          <div className="fixed inset-0 z-[70] bg-[var(--scrim)]" onClick={() => setSelectedPreset(null)} />
           <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
             <div className="w-full max-w-sm rounded-xl border border-[var(--border-md)] bg-[var(--paper)] shadow-[var(--s3)] p-5">
               <h3 className="text-sm font-semibold text-[var(--ink)]">
@@ -857,7 +857,7 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
           Zelfde portal-reden als hierboven. */}
       {bulkAction && createPortal(
         <>
-          <div className="fixed inset-0 z-[70] bg-black/30" onClick={() => setBulkAction(null)} />
+          <div className="fixed inset-0 z-[70] bg-[var(--scrim)]" onClick={() => setBulkAction(null)} />
           <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
             <div className="w-full max-w-sm rounded-xl border border-[var(--border-md)] bg-[var(--paper)] shadow-[var(--s3)] p-5">
               <h3 className="text-sm font-semibold text-[var(--ink)]">
@@ -972,7 +972,7 @@ function WidgetAddPicker({ activeWidgets, features, budgetingActive, showPicker,
       {showPicker && createPortal(
         <>
           {/* Backdrop */}
-          <div className="fixed inset-0 z-[70] bg-black/30" onClick={onClose} />
+          <div className="fixed inset-0 z-[70] bg-[var(--scrim)]" onClick={onClose} />
           {/* Centered modal */}
           <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
             <div className="w-full max-w-md max-h-[80vh] flex flex-col rounded-xl border border-[var(--border-md)] bg-[var(--paper)] shadow-[var(--s3)]">

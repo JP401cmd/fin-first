@@ -15,6 +15,7 @@ import { useState } from 'react'
 import { Gauge, Clock, CreditCard, PieChart, Scissors, Ban } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { formatFreedomTimeString } from '@/lib/format'
+import { formatWorkTimeString } from '@/lib/work-time'
 import {
   cancelEffect,
   type VasteLastenInsights as Insights,
@@ -114,10 +115,23 @@ function QuoteMeter({ insights }: { insights: Insights }) {
   )
 }
 
-// ── 2. Vrijheidstijd-vertaling ────────────────────────────────
+// ── 2. Tijd-vertaling ─────────────────────────────────────────
+//
+// TWEE GROOTHEDEN, ELK MET EIGEN TAAL (ADR 0105):
+//  · vrijheidstijd (`freedom*`, deelt op het UITGAVEN-dagtarief) → "kost je …
+//    vrijheid";
+//  · werktijd (`workTimePerYear`, deelt op het BRUTO INKOMEN-dagtarief) → "je
+//    werkt … van je jaar hiervoor".
+// De tweede zin dróég hier werktijd-taal over een vrijheidstijd-getal ("… die je
+// werkt om je vaste lasten te betalen"). Twee zulke uitgaven-aandelen zijn geen
+// delen van hetzelfde werkjaar, waardoor deze pagina en /overzicht/belasting
+// samen achttien maanden per jaar claimden (bevinding C5). Zonder bekend bruto
+// jaarinkomen tonen we géén werktijd-claim, maar de vrijheidstijd-formulering.
 function FreedomTranslation({ insights }: { insights: Insights }) {
-  const { freedomDaysPerMonth, freedomPerYear } = insights
+  const { freedomDaysPerMonth, freedomPerYear, workTimePerYear } = insights
   const yearStr = formatFreedomTimeString(freedomPerYear, 'long')
+  const workStr = formatWorkTimeString(workTimePerYear)
+  const showWorkTime = workTimePerYear.hasBasis && workTimePerYear.monthsPerYear > 0
   return (
     <div className="space-y-1.5">
       <p className="text-sm leading-relaxed text-[var(--ink-2)]">
@@ -127,10 +141,20 @@ function FreedomTranslation({ insights }: { insights: Insights }) {
         </strong>{' '}
         per maand.
       </p>
-      <p className="text-xs text-[var(--ink-3)]">
-        Over een heel jaar is dat <span className="font-medium text-[var(--ink-2)]">{yearStr}</span>{' '}
-        die je werkt om je vaste lasten te betalen. Elke euro minder is vrijheid die je terugkoopt.
-      </p>
+      {showWorkTime ? (
+        <p className="text-xs text-[var(--ink-3)]">
+          Je werkt <span className="font-medium text-[var(--ink-2)]">{workStr}</span> van je jaar om
+          ze te betalen
+          {workTimePerYear.exceedsWorkYear ? ' — meer dan een heel werkjaar' : ''}. Elke euro minder
+          is vrijheid die je terugkoopt.
+        </p>
+      ) : (
+        <p className="text-xs text-[var(--ink-3)]">
+          Over een heel jaar kost dat je{' '}
+          <span className="font-medium text-[var(--ink-2)]">{yearStr}</span> vrijheid. Elke euro
+          minder is vrijheid die je terugkoopt.
+        </p>
+      )}
     </div>
   )
 }

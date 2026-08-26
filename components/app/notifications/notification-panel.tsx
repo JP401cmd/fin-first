@@ -201,7 +201,7 @@ export function NotificationModal() {
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-start justify-center bg-black/40 pt-16 sm:items-center sm:pt-0 transition-[right] duration-300"
+      className="fixed inset-0 z-[70] flex items-start justify-center bg-[var(--scrim)] pt-16 sm:items-center sm:pt-0 transition-[right] duration-300"
       style={{ right: 'var(--chat-sidebar-width, 0px)' }}
       onClick={handleBackdrop}
     >

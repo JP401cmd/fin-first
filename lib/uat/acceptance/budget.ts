@@ -415,6 +415,24 @@ const criteria: AcceptanceCriterion[] = [
         'lib/budget-basis.ts#computeBudgetBasis (+ de gedeelde `annualAmount`/`buildBudgetTypeMap` uit lib/budget-utils.ts en `BASIS_BUDGET_TYPE`/`resolveDenominatorMonths`) — echte productiefuncties, geen mirror; de huishoud-deelfractie komt via `opts.shareFractionById` binnen en woont bewust buiten deze pure module (lib/household/budget-share.ts) — zie budget-checks.ts',
     },
   },
+  {
+    workflow: 'WF-BUDGET-27',
+    scenarioId: 'UAT-BUDGET-27',
+    titel: 'Een mislukte her-fetch verbergt de al geladen budgetpagina niet meer (degraded rendering, bevinding C7)',
+    kriticiteit: 'BELANGRIJK',
+    persona: 'lisa',
+    given:
+      'Persona Lisa geladen; de budgetpagina hydrateert altijd server-side met `initialData`, maar `loadBudgets()` draait daarna alsnog client-side zodra een dependency wijzigt (bv. `PerspectiveProvider` die ná mount van "personal" naar de opgeslagen huishoud-/partnervoorkeur wisselt). VOORHEEN zette elke falende her-fetch onvoorwaardelijk `error`, en een onvoorwaardelijke `if (error) return <foutscherm/>` verving de complete, al correcte pagina (NIBUD-kaart, doelen, rollovers incluis) door één rode foutbox.',
+    when:
+      'De her-fetch faalt (a) vóórdat er ooit goede data stond (bv. de eerste client-side load zelf mislukt) en (b) nádat de pagina al één keer succesvol content toonde.',
+    then:
+      '(a) Zonder ooit succesvolle data blijft het gedrag ongewijzigd: het blokkerende foutscherm ("Kon budgetten niet laden. Probeer het opnieuw.") vervangt de pagina — er is dan ook niets om te bewaren. (b) Zodra `hasGoodBudgetData` ooit waar werd (elke succesvolle `loadBudgets()`, óók een geldige lege set), overschrijft een latere fout de render NIET meer: hij landt in een niet-blokkerende `refreshError`-balk boven de behouden cijfers ("Kon de budgetten niet verversen — je ziet de laatst geladen cijfers.") met een eigen "Opnieuw proberen"-knop die `loading` bewust niet op true zet (anders verdwijnt de data alsnog achter een skeleton). De render-grens berekent dit met `blockingError = hasGoodBudgetData ? null : error` / `degradedError = hasGoodBudgetData ? (refreshError ?? error) : refreshError` — zodat ook een toekomstig codepad dat per ongeluk nog `error` zet, degradeert i.p.v. blokkeert.',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'components/app/budgets-client.tsx (hasGoodBudgetData-ref, refreshError-state, blockingError/degradedError op de render-grens, loadBudgets-catch-tak) — resilience-gedrag, geen cijfermatige uitkomst',
+    },
+  },
 ]
 
 export const BUDGET_ACCEPTANCE: AcceptanceSet = {

@@ -18,7 +18,7 @@ import type { AssetKpiContext } from './asset-kpi'
 import type { DebtKpiContext } from './debt-kpi'
 import type { KpiPair, KpiValue } from './asset-kpi'
 import { formatCurrency } from './format'
-import { amortizationSchedule, linearAmortization } from './debt-data'
+import { debtRemainingMonths } from './debt-remaining-term'
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -78,35 +78,12 @@ function sumValid(values: number[]): number {
   return total
 }
 
-// ── Resterende looptijd voor schulden — herhaling van debt-kpi om
-//    circulaire imports te voorkomen. Identieke logica.
-function remainingMonths(debt: Debt, now: Date): number | null {
-  if (debt.end_date) {
-    const end = new Date(debt.end_date)
-    const m = diffMonths(now, end)
-    return m > 0 ? m : null
-  }
-
-  const balance = Number(debt.current_balance)
-  const rate = Number(debt.interest_rate)
-  const payment = Number(debt.monthly_payment)
-  if (balance <= 0 || payment <= 0) return null
-
-  const rt = debt.repayment_type ?? 'annuiteit'
-  if (rt === 'aflossingsvrij') return null
-
-  if (rt === 'lineair') {
-    const sched = linearAmortization(balance, rate, 600, now)
-    if (sched.length === 0) return null
-    const last = sched[sched.length - 1]
-    return last.balance <= 0.01 ? sched.length : null
-  }
-
-  const sched = amortizationSchedule(balance, rate, payment, now)
-  if (sched.length === 0) return null
-  const last = sched[sched.length - 1]
-  return last.balance <= 0.01 ? sched.length : null
-}
+// ── Resterende looptijd voor schulden — gedeelde bron met debt-kpi.
+//    Stond hier eerder als letterlijke kopie ("identieke logica"), wat
+//    betekende dat een fix in debt-kpi dit oppervlak stuk liet. De logica
+//    woont nu in lib/debt-remaining-term.ts; dat bestand importeert alleen
+//    debt-data, dus er is geen circulaire import.
+const remainingMonths = debtRemainingMonths
 
 // ── Asset categorie-aggregaten ─────────────────────────────────
 

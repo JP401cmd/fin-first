@@ -189,7 +189,7 @@ export function Box3PartnerSlider({
             id="tax:box3-partner-allocatie"
             domain="tax"
             title="Optimaliseer de Box 3-verdeling met je partner"
-            description={`Verschuif naar de optimale verdeling (≈ ${optimalPctP1}/${100 - optimalPctP1}) om de gecombineerde heffing te verlagen.`}
+            // H24: dode `description` verwijderd — nooit uitgelezen.
             savings={Math.round(extraVsOptimal)}
             freedomDays={
               dailyExpenses > 0 ? Math.round(extraVsOptimal / dailyExpenses) : 0

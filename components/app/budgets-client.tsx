@@ -1093,6 +1093,22 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
   const [partnerBudgets, setPartnerBudgets] = useState<PartnerBudgetRow[]>([])
   const [loading, setLoading] = useState(!initialData)
   const [error, setError] = useState<string | null>(null)
+  // Degraded rendering (bevinding C7). Beide budget-routes hydrateren deze
+  // component ALTIJD met server-data (`initialData`), maar `loadBudgets()`
+  // draait daarna alsnog client-side zodra een dep verandert — o.a. wanneer
+  // `PerspectiveProvider` ná mount van 'personal' naar de opgeslagen
+  // huishoud-/partnervoorkeur wisselt, of wanneer de huishoud-context binnenkomt.
+  // Faalde die her-fetch, dan zette de oude code onvoorwaardelijk `error`, en de
+  // full-page early-return hieronder wiste de complete, al correcte pagina
+  // (inclusief NIBUD-kaart, doelen, rollovers) tot één rood blokje.
+  //
+  // Harde regel sindsdien: een fout mag reeds-correcte server-data NOOIT
+  // overschrijven. Zodra er ooit goede budget-data op het scherm stond, landt
+  // een fout in `refreshError` — een niet-blokkerende melding bóven de
+  // behouden cijfers — en `error` blijft voorbehouden aan de enige situatie
+  // waarin blokkeren klopt: we hebben helemaal niets te tonen.
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+  const hasGoodBudgetData = useRef(!!initialData)
   // Gate voor de first-use lege staat: die mag pas renderen als we weten dát er
   // niets is, niet zolang we nog laden. Server-gehydrateerd (`initialData`) is
   // die zekerheid er al bij mount — en beide routes geven `initialData` áltijd
@@ -1578,6 +1594,11 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
       }))
 
       setBudgets(tree)
+      // Vanaf hier staat er goede budget-data op het scherm (ook een lege set
+      // is een geldige uitkomst — de first-use lege staat vangt die op). Een
+      // latere fout mag dit dus niet meer wegvagen: hij degradeert.
+      hasGoodBudgetData.current = true
+      setRefreshError(null)
 
       // Household-boom-modus (budgetModel='household'): laad de partner-
       // PERSOONLIJKE budgetten read-only via de privacy-gated RPC. Buiten deze
@@ -1593,7 +1614,15 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
       }
     } catch (err) {
       console.error('Error loading budgets:', err)
-      if (!signal?.aborted) setError('Kon budgetten niet laden. Probeer het opnieuw.')
+      if (!signal?.aborted) {
+        if (hasGoodBudgetData.current) {
+          // Degraded: de reeds correcte render blijft staan, de gebruiker
+          // hoort alleen dat de cijfers niet ververst konden worden.
+          setRefreshError('Kon de budgetten niet verversen — je ziet de laatst geladen cijfers.')
+        } else {
+          setError('Kon budgetten niet laden. Probeer het opnieuw.')
+        }
+      }
     } finally {
       if (!signal?.aborted) {
         setLoading(false)
@@ -2265,11 +2294,20 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
     )
   }
 
-  if (error) {
+  // Degraded rendering (C7) — de invariant staat hier, op de render-grens waar
+  // het overschrijven daadwerkelijk gebeurde, en niet alleen bij de setState:
+  // het blokkerende foutscherm mag ALLEEN verschijnen als er niets te tonen is.
+  // Stond er ooit goede data, dan degradeert elke fout (ook een `error` die een
+  // toekomstig codepad per ongeluk zet) naar de niet-blokkerende melding in de
+  // normale render hieronder.
+  const blockingError = hasGoodBudgetData.current ? null : error
+  const degradedError = hasGoodBudgetData.current ? (refreshError ?? error) : refreshError
+
+  if (blockingError) {
     return (
       <div className="py-5 sm:py-12">
         <div className="rounded-[var(--r-lg)] border border-red-200 bg-red-50 p-6 text-center">
-          <FormError id={formErrorId('budgets-load')} message={error} />
+          <FormError id={formErrorId('budgets-load')} message={blockingError} />
           <button onClick={() => { setError(null); setLoading(true); loadBudgets() }} className="mt-3 bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
             Opnieuw proberen
           </button>
@@ -2280,6 +2318,30 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
 
   return (
     <div className="py-3 sm:py-8">
+      {/* Degraded rendering (C7): een gefaalde her-fetch meldt zich hier,
+          niet-blokkerend en met een route om het opnieuw te proberen. De reeds
+          geladen cijfers eronder blijven gewoon staan. Semantische
+          waarschuwingskleur (geen module-accent) — dit is status, geen
+          module-identiteit. `loading` bewust NIET op true zetten bij de retry:
+          dat zou de skeleton tonen en de data alsnog verbergen. */}
+      {degradedError && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[var(--r-lg)] border border-[var(--warning)] bg-[var(--warning-bg)] px-4 py-3 text-sm text-[var(--ink-2)]"
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0 text-[var(--warning)]" aria-hidden="true" />
+          <span className="min-w-0 flex-1">{degradedError}</span>
+          <button
+            type="button"
+            onClick={() => { setRefreshError(null); setError(null); loadBudgets() }}
+            className="shrink-0 font-medium underline underline-offset-2 hover:no-underline"
+          >
+            Opnieuw proberen
+          </button>
+        </div>
+      )}
+
       {/* Privacy notice for hidden budget data (Feature #537) */}
       {perspective === 'household' && hiddenCategories.includes('budgets') && (
         <div className="mb-4">

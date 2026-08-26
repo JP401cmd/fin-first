@@ -3,7 +3,7 @@ import { renderHook, waitFor } from '@testing-library/react'
 import {
   useExecutionMode,
   LOCAL_SUBSCRIPTION_REVOKED_MESSAGE,
-  LOCAL_AI_DISABLED_MESSAGE,
+  AI_DISABLED_MESSAGE,
 } from './use-execution-mode'
 import { checkLocalAiCapability } from './webgpu-capability'
 import { getLocalModelState } from './model-manager'
@@ -135,9 +135,13 @@ describe('useExecutionMode — abonnement op het lokale pad', () => {
 /**
  * De KILL-SWITCH (`profiles.ai_enabled`, de knop "AI uit" op /mijn/privacy).
  *
- * Op het cloudpad handhaaft elke route 'm zelf. Op de zuiver lokale paden is er
- * geen route meer die kan handhaven — daar was de GET de laatste server-uitspraak
- * en die zweeg erover, dus "AI uit" genereerde on-device gewoon door.
+ * Op de zuiver lokale paden is er tijdens het genereren geen route meer die kan
+ * handhaven — daar is de prefs-GET de laatste server-uitspraak, en die zweeg
+ * erover, dus "AI uit" genereerde on-device gewoon door.
+ *
+ * Op het cloudpad handhaaft `assertCloudAllowed` 'm sinds M26 server-side; deze
+ * hook is daar de spiegel van, zodat een oppervlak al vóór het typen blokkeert
+ * in plaats van pas ná het versturen (zie de tweede describe hieronder).
  */
 describe('useExecutionMode — kill-switch op het lokale pad', () => {
   it('AI UIT + groep op lokaal → blocked, er draait niets on-device', async () => {
@@ -151,7 +155,7 @@ describe('useExecutionMode — kill-switch op het lokale pad', () => {
     expect(result.current.canUseLocal).toBe(false)
     // Ook geen stille uitwijk naar de cloud: AI uit is AI uit.
     expect(result.current.canUseCloud).toBe(false)
-    expect(result.current.message).toBe(LOCAL_AI_DISABLED_MESSAGE)
+    expect(result.current.message).toBe(AI_DISABLED_MESSAGE)
   })
 
   it('de kill-switch gaat VÓÓR de GPU-/modelcontrole', async () => {
@@ -175,7 +179,7 @@ describe('useExecutionMode — kill-switch op het lokale pad', () => {
     const { result } = renderHook(() => useExecutionMode('documenten'))
     await waitFor(() => expect(result.current.status).toBe('blocked'))
 
-    expect(result.current.message).toBe(LOCAL_AI_DISABLED_MESSAGE)
+    expect(result.current.message).toBe(AI_DISABLED_MESSAGE)
     expect(result.current.message).not.toBe(LOCAL_SUBSCRIPTION_REVOKED_MESSAGE)
   })
 
@@ -192,5 +196,64 @@ describe('useExecutionMode — kill-switch op het lokale pad', () => {
     expect(result.current.status).toBe('resolving')
     expect(result.current.canUseLocal).toBe(false)
     expect(result.current.canUseCloud).toBe(false)
+  })
+})
+
+/**
+ * M26 — DE KILL-SWITCH OP HET CLOUDPAD.
+ *
+ * Het gemelde symptoom (de Fin-chat liet typen en versturen terwijl de app al
+ * wist dat AI uit stond) was de zichtbare rand van een groter gat: de `mode ===
+ * 'cloud'`-tak gaf meteen `canUseCloud: true` terug, zónder `aiEnabled` te
+ * lezen. Voor de default-modus — vrijwel elk account — werd "AI uit" dus
+ * nergens afgedwongen: het bericht vertrok en werd door de echte cloud-AI
+ * beantwoord.
+ *
+ * Deze suite bewaakt de volgorde in de hook: kill-switch VÓÓR de modus-tak.
+ */
+describe('useExecutionMode — kill-switch op het CLOUDpad (M26)', () => {
+  it('AI UIT + groep op cloud → blocked; er vertrekt niets naar de cloud-AI', async () => {
+    fetchMock.mockResolvedValue(
+      prefsResponse({ modes: { gesprek: 'cloud' }, hasAiSubscription: true, aiEnabled: false }),
+    )
+
+    const { result } = renderHook(() => useExecutionMode('gesprek'))
+
+    await waitFor(() => expect(result.current.status).toBe('blocked'))
+    // De regressie in één regel: dit was `true` en daarmee een bruikbaar
+    // invoerveld plus een echt AI-antwoord ondanks "AI uit".
+    expect(result.current.canUseCloud).toBe(false)
+    expect(result.current.canUseLocal).toBe(false)
+    expect(result.current.message).toBe(AI_DISABLED_MESSAGE)
+    expect(result.current.reason).toBe('ai_uit')
+  })
+
+  it('de melding noemt beide bestemmingen — niet alleen het eigen toestel', async () => {
+    fetchMock.mockResolvedValue(
+      prefsResponse({ modes: { gesprek: 'cloud' }, hasAiSubscription: true, aiEnabled: false }),
+    )
+
+    const { result } = renderHook(() => useExecutionMode('gesprek'))
+    await waitFor(() => expect(result.current.status).toBe('blocked'))
+
+    expect(result.current.message).toMatch(/niet in de cloud/)
+    expect(result.current.message).toMatch(/eigen toestel/)
+    // De bestemming die de gebruiker had staan blijft leesbaar voor UI-tekst.
+    expect(result.current.intended).toBe('cloud')
+  })
+
+  it('AI AAN + groep op cloud → gewoon cloud, ongewijzigd gedrag', async () => {
+    fetchMock.mockResolvedValue(
+      prefsResponse({ modes: { gesprek: 'cloud' }, hasAiSubscription: true, aiEnabled: true }),
+    )
+
+    const { result } = renderHook(() => useExecutionMode('gesprek'))
+
+    await waitFor(() => expect(result.current.status).toBe('cloud'))
+    expect(result.current.canUseCloud).toBe(true)
+    expect(result.current.reason).toBeUndefined()
+    // De cloud-tak doet nog steeds geen GPU-/modelprobe.
+    expect(mockedCapability).not.toHaveBeenCalled()
+    expect(mockedModelState).not.toHaveBeenCalled()
   })
 })

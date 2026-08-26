@@ -41,6 +41,20 @@ vi.mock('./household-tax', () => ({
 }))
 vi.mock('./box1-income', () => ({
   resolveBox1GrossIncome: (...args: unknown[]) => resolveBox1GrossIncomeMock(...args),
+  // De eigen-woning-helft van de Box 1-invoer (C8). Deze suite draait geen
+  // eigen woning, dus de inerte uitkomst volstaat — maar hij MOET bestaan:
+  // `loadFiscaleKansen` roept 'm sinds C8 altijd aan, en een ontbrekende export
+  // liet de hele kansen-keten stil falen (alle belasting-aandachtspunten weg).
+  resolveEigenWoningBox1Input: async () => ({
+    wozValue: undefined,
+    hypotheekRente: undefined,
+    hasEigenWoning: false,
+  }),
+  GEEN_EIGEN_WONING: {
+    wozValue: undefined,
+    hypotheekRente: undefined,
+    hasEigenWoning: false,
+  },
 }))
 
 /**

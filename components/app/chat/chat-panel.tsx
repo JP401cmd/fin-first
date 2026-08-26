@@ -7,7 +7,7 @@ import { DefaultChatTransport, type ChatTransport, type UIMessage } from 'ai'
 import { useRouter, usePathname } from 'next/navigation'
 import { useChatContext } from './chat-provider'
 import { LocalChatTransport } from '@/lib/ai/local/local-chat-transport'
-import { useExecutionMode } from '@/lib/ai/local/use-execution-mode'
+import { useExecutionMode, type ExecutionBlockedReason } from '@/lib/ai/local/use-execution-mode'
 import { ChatSettingsPopover } from './chat-settings-popover'
 import type { LocalChatOverview } from '@/lib/ai/local/local-chat-context'
 import type { LocalKnowledgeItem } from '@/lib/ai/local/knowledge-context'
@@ -109,18 +109,36 @@ function LocalModeBanner() {
 }
 
 /**
- * Fail-closed-scherm: privé-modus staat aan maar het lokale pad is niet gereed
- * op dit toestel. We tonen de concrete readiness-melding en verwijzen naar
- * Mijn → Privacy (download/beheer). NOOIT een stille cloud-fallback.
+ * Fail-closed-scherm: er mag of kan hier niets draaien. Twee families, één vorm:
+ *
+ *  - `reason === 'ai_uit'` — de gebruiker heeft AI zelf uitgezet. Dat geldt sinds
+ *    M26 op BEIDE bestemmingen, dus ook voor een gesprek dat in de cloud zou
+ *    draaien; de kop mag dan niet over "lokale chat" gaan.
+ *  - anders — het gesprek moet lokaal maar het pad is niet gereed op dit toestel
+ *    (of het abonnement is verlopen). We tonen de concrete readiness-melding.
+ *
+ * In beide gevallen verwijzen we naar Mijn → Privacy en is er NOOIT een stille
+ * cloud-fallback.
  */
-function LocalBlockedNotice({ message, onNavigate }: { message: string; onNavigate: () => void }) {
+function LocalBlockedNotice({
+  message,
+  reason,
+  onNavigate,
+}: {
+  message: string
+  reason?: ExecutionBlockedReason
+  onNavigate: () => void
+}) {
+  const aiUit = reason === 'ai_uit'
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-6 py-8">
       <div className="mx-auto max-w-sm text-center">
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-50">
           <Cpu className="h-6 w-6 text-amber-600" aria-hidden="true" />
         </div>
-        <h2 className="text-base font-semibold text-[var(--ink)]">Lokale chat nog niet klaar</h2>
+        <h2 className="text-base font-semibold text-[var(--ink)]">
+          {aiUit ? 'AI staat uit' : 'Lokale chat nog niet klaar'}
+        </h2>
         <p className="mt-3 text-sm leading-relaxed text-[var(--ink-2)]">{message}</p>
         <p className="mt-3 text-xs text-[var(--ink-3)]">
           Je gegevens zijn privé gebleven — er is niets naar onze servers gestuurd.
@@ -1124,20 +1142,16 @@ export function ChatPanel() {
   // Hetzelfde gebaar als elke andere modal (BottomSheet). Uit bij `isPinned`
   // (een gedokte zijbalk swipe je niet weg) en tijdens een lopende verzending —
   // anders zou het paneel wegschuiven terwijl `veiligSluiten` het sluiten
-  // tegenhoudt. De achtergrond staat op `bg-black/20`, dus die dekking geven we
-  // mee zodat een terugveer niet ineens donkerder uitkomt.
-  const { handleTouchStart, handleContentTouchStart, handleTouchMove, handleTouchEnd } =
-    useSwipeToDismiss({
-      sheetRef: panelRef,
-      backdropRef,
-      contentRef: messagesScrollRef,
-      onDismiss: veiligSluiten,
-      backdropOpacity: 0.2,
-      enabled: !isPinned && !meldingBezig,
-    })
-  const swipeProps = isPinned
-    ? {}
-    : { onTouchMove: handleTouchMove, onTouchEnd: handleTouchEnd }
+  // tegenhoudt. De achtergrond draait op het gedeelde `--scrim`-token, dus de
+  // dekking hoeven we niet meer apart mee te geven (de hook gebruikt dezelfde
+  // bron) — een terugveer komt daarmee exact op de ruststand uit.
+  const { handleSheetTouchStart } = useSwipeToDismiss({
+    sheetRef: panelRef,
+    backdropRef,
+    contentRef: messagesScrollRef,
+    onDismiss: veiligSluiten,
+    enabled: !isPinned && !meldingBezig,
+  })
 
   // Eén label voor de megafoon: hij schakelt heen én terug, dus "Melding maken"
   // liegt zodra je in meldmodus staat.
@@ -1168,17 +1182,21 @@ export function ChatPanel() {
       {/* Mobile backdrop (not shown when pinned) — zelfde laag als het paneel;
           het paneel staat er ná in de DOM en schildert dus bovenop. */}
       {!isPinned && (
-        <div ref={backdropRef} className="fixed inset-0 z-[70] bg-black/20 md:hidden" onClick={veiligSluiten} />
+        <div ref={backdropRef} className="fixed inset-0 z-[70] bg-[var(--scrim)] md:hidden" onClick={veiligSluiten} />
       )}
 
-      {/* Panel */}
-      <div ref={panelRef} className={panelClasses} {...swipeProps}>
+      {/* Panel — één paneel-brede touchstart; de hook routeert zelf naar greep
+          of scroll-content (`touchmove`/`touchend` hangen niet-passief aan
+          `document`). Gepind is het een zijbalk, geen modaal venster: dan geen
+          gebaar. */}
+      <div ref={panelRef} className={panelClasses} onTouchStart={isPinned ? undefined : handleSheetTouchStart}>
 
-        {/* Header — dient tegelijk als greep voor het swipe-down-gebaar. */}
+        {/* Header — dient tegelijk als greep voor het swipe-down-gebaar. De
+            handler komt van de paneel-brede `onTouchStart`; `touch-action: none`
+            blijft hier staan zodat de browser dit gebaar nooit zelf claimt. */}
         <div
           className="flex items-center justify-between border-b border-[var(--border-ed)] px-4 py-3"
           style={isPinned ? undefined : { touchAction: 'none' }}
-          onTouchStart={isPinned ? undefined : handleTouchStart}
         >
           <div className="flex items-center gap-2">
             {config.fabAvatar(32)}
@@ -1267,10 +1285,11 @@ export function ChatPanel() {
           <WftDisclaimer onAccept={handleWftAccept} />
         )}
 
-        {/* Gesprek moet lokaal, maar kan niet → fail-closed blokkade (nooit stil
-            terugvallen op de cloud). */}
+        {/* Er mag/kan niets draaien → fail-closed blokkade (nooit stil terugvallen
+            op de cloud). Twee families: AI staat uit (geldt op beide
+            bestemmingen, M26), of het lokale pad is niet gereed. */}
         {hasAi && wftAccepted !== false && blockedMessage !== null && (
-          <LocalBlockedNotice message={blockedMessage} onNavigate={close} />
+          <LocalBlockedNotice message={blockedMessage} reason={exec.reason} onNavigate={close} />
         )}
 
         {/* Messages */}
@@ -1281,7 +1300,6 @@ export function ChatPanel() {
         <div
           ref={messagesScrollRef}
           className="flex-1 overflow-y-auto px-4 py-3"
-          onTouchStart={isPinned ? undefined : handleContentTouchStart}
         >
           {/* Polite live-regio alléén om de berichten — de assertive foutbanner
               staat er bewust buiten (geen geneste live-regio's). */}

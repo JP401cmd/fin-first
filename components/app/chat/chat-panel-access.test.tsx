@@ -119,6 +119,48 @@ describe('ChatPanel — AI-abonnee-toegang via de échte FeatureAccessProvider',
     expect(screen.queryByTestId('ai-upsell-panel')).not.toBeInTheDocument()
   })
 
+  /**
+   * M26 — het gemelde symptoom, als test.
+   *
+   * Met "AI uit" (`profiles.ai_enabled = false`) en het gesprek op cloud (de
+   * default) bleef het invoerveld volledig bruikbaar: typen kon, versturen kon,
+   * en het antwoord kwam gewoon van de echte cloud-AI. De app wist het eerder
+   * dan de gebruiker en liet hem toch de moeite doen.
+   *
+   * Eis: uitgeschakeld VÓÓR het typen, met de reden erbij.
+   */
+  it('AI UIT + gesprek op cloud → geen invoerveld maar een uitleg, vóór het typen', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              modes: { gesprek: 'cloud' },
+              hasAiSubscription: true,
+              aiEnabled: false,
+            }),
+        }),
+      ),
+    )
+
+    render(
+      <FeatureAccessProvider data={aiSubscriberData}>
+        <ChatPanel />
+      </FeatureAccessProvider>,
+    )
+
+    // De uitleg staat er, met een kop die klopt voor het cloudpad — niet
+    // "lokale chat nog niet klaar" bij iemand die nooit lokaal koos.
+    expect(await screen.findByText('AI staat uit')).toBeInTheDocument()
+    expect(screen.getByText(/Via Mijn → Privacy kun je AI weer aanzetten/)).toBeInTheDocument()
+
+    // En geen invoerveld: de blokkade komt vóór het typen, niet erna.
+    expect(screen.queryByPlaceholderText('Vraag Fin iets...')).not.toBeInTheDocument()
+    expect(mockSendMessage).not.toHaveBeenCalled()
+  })
+
   it('toont de upsell (geen invoerveld) voor dezelfde AI-abonnee BUITEN FeatureAccessProvider — karakterisering van de faalmodus', () => {
     // Mimic van de oude (foute) layout-plaatsing: ChatPanel zonder een
     // FeatureAccessProvider-ancestor. useFeatureAccess() valt terug op de

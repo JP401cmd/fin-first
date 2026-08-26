@@ -277,14 +277,24 @@ export function BriefingPanel({
   }
 
   /**
-   * Gedeelde 403-afhandeling. Twee heel verschillende oorzaken delen die code:
-   * geen AI-abonnement (→ upsell) en de privé-modus-poort (→ uitleg). Ze door
-   * elkaar halen zou iemand met privé-modus een abonnement aansmeren dat hij al
-   * heeft.
+   * Gedeelde 403-afhandeling. DRIE heel verschillende oorzaken delen die status:
+   * geen AI-abonnement (→ upsell), de privé-modus-poort (→ uitleg) en de
+   * kill-switch "AI uit" (→ uitleg). Ze door elkaar halen zou iemand een
+   * abonnement aansmeren dat hij al heeft — of erger: iemand die AI zelf heeft
+   * uitgezet een betaalmuur voorschotelen als reden.
+   *
+   * De kill-switch-tak is bereikbaar ondanks de client-gate: die leest de stand
+   * per tab, dus wie AI op een ander toestel uitzet krijgt hier alsnog de
+   * server-403 binnen. De dag-vlag zetten we in dat geval bewust NIET — er is
+   * geen ververs verbruikt.
    */
   function handle403(data: { code?: string; error?: string } | null): void {
     if (data?.code === 'privacy_mode_active') {
       setError(data.error ?? 'Je briefing draait lokaal op je apparaat.')
+      return
+    }
+    if (data?.code === 'ai_disabled') {
+      setError(data.error ?? 'AI staat uit in je instellingen. Via Mijn → Privacy kun je AI weer aanzetten.')
       return
     }
     setShowUpsell(true)

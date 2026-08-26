@@ -267,3 +267,60 @@ describe('buildVasteLastenInsights — grondslag-pin (vervolg KRUIS-20)', () => 
     expect(hoog.dailyExpenseRate).toBe(100)
   })
 })
+
+describe('buildVasteLastenInsights — werktijd (C5 / ADR 0105)', () => {
+  // €4.000/mnd vaste lasten op een bruto jaarinkomen van €96.000: precies de
+  // helft van het werkjaar. Het uitgaven-dagtarief staat er bewust náást om te
+  // pinnen dat werktijd er NIET op meebeweegt.
+  const summary = mkSummary([mkItem('a', 'Huur', 4000, 'rent')], [])
+
+  it('deelt op het INKOMEN-dagtarief, niet op het uitgaven-dagtarief', () => {
+    const insights = buildVasteLastenInsights({
+      summary,
+      monthlyIncome: 5000,
+      dailyExpenseRate: 100,
+      dailyIncomeRate: 96_000 / 365,
+    })
+    expect(insights.workTimePerYear.hasBasis).toBe(true)
+    expect(insights.workTimePerYear.monthsPerYear).toBeCloseTo(6, 1)
+    expect(insights.workTimePerYear.shareOfWorkYear).toBeCloseTo(0.5, 6)
+    // Een ANDER uitgaven-dagtarief mag de werktijd niet verschuiven.
+    const anderTarief = buildVasteLastenInsights({
+      summary,
+      monthlyIncome: 5000,
+      dailyExpenseRate: 250,
+      dailyIncomeRate: 96_000 / 365,
+    })
+    expect(anderTarief.workTimePerYear.monthsPerYear).toBe(
+      insights.workTimePerYear.monthsPerYear,
+    )
+    // ... terwijl de vrijheidstijd dat juist wél doet — twee grootheden.
+    expect(anderTarief.freedomPerYear.totalDays).not.toBeCloseTo(
+      insights.freedomPerYear.totalDays,
+      1,
+    )
+  })
+
+  it('zonder bruto jaarinkomen: geen werktijd-claim (het scherm laat de zin weg)', () => {
+    const insights = buildVasteLastenInsights({
+      summary,
+      monthlyIncome: 5000,
+      dailyExpenseRate: 100,
+    })
+    expect(insights.workTimePerYear.hasBasis).toBe(false)
+    expect(insights.workTimePerYear.monthsPerYear).toBe(0)
+    expect(insights.dailyIncomeRate).toBe(0)
+    // De vrijheidstijd blijft ongemoeid — de terugval-zin heeft 'm nodig.
+    expect(insights.freedomPerYear.totalDays).toBeGreaterThan(0)
+  })
+
+  it('zonder vaste lasten: geen werktijd, ook mét inkomen-basis', () => {
+    const insights = buildVasteLastenInsights({
+      summary: mkSummary([], []),
+      monthlyIncome: 5000,
+      dailyExpenseRate: 100,
+      dailyIncomeRate: 96_000 / 365,
+    })
+    expect(insights.workTimePerYear.monthsPerYear).toBe(0)
+  })
+})

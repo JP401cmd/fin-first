@@ -331,15 +331,15 @@ type PathRule = {
 export const PATH_SUGGESTIONS: PathRule[] = [
   // Volgorde = specifiek → breed: de specifieke /overzicht/*-paden staan
   // vóór de brede /overzicht-fallback (anders zou /overzicht die afvangen).
-  {
-    pathPrefix: '/overzicht/cashflow',
-    key: 'path_budgets',
-    condition: 'Op een pagina onder /overzicht/cashflow.',
-    suggestion: {
-      message: 'Hier bepaal je hoeveel vrijheid je elke maand opzijzet. Voeg je eerste budget toe.',
-      cta: 'Budget toevoegen',
-    },
-  },
+  //
+  // GEEN `path_budgets`-regel meer (bevinding C7, besluit eigenaar 26-08-2026).
+  // Die vuurde onvoorwaardelijk op `/overzicht/cashflow` met de tekst "Voeg je
+  // eerste budget toe" — óók voor iemand met tientallen bestaande budgetten,
+  // wat feitelijk onjuist is en het vertrouwen in Fin ondermijnt. De juiste
+  // regel bestond al één laag hoger: `gap_budgets` (DATA_GAP_SUGGESTIONS)
+  // vuurt hetzelfde advies mét `check: (g) => !g.hasBudgets`. De pad-regel was
+  // dus een ongeconditioneerd duplicaat en is verwijderd; `/overzicht/cashflow`
+  // valt nu terug op `path_core`, dat voor élke datastand klopt.
   {
     pathPrefix: '/overzicht/schulden',
     key: 'path_debts',
@@ -363,8 +363,13 @@ export const PATH_SUGGESTIONS: PathRule[] = [
     key: 'path_belasting_box1',
     condition: 'Op een pagina onder /overzicht/belasting/box1.',
     suggestion: {
+      // H24 (Wft): beschrijvend, niet gebiedend. De oude tekst ("benut hem
+      // vóór 31 december en koop vrijheid terug") was een aansporing tot een
+      // concrete productstorting (lijfrente) mét deadline. De bubble hangt in
+      // de app-shell en staat dus los van de "Indicatie, geen advies"-
+      // voetnoten op de pagina zelf — er is hier geen voorbehoud in beeld.
       message:
-        'Je grootste Box 1-kans is je jaarruimte — benut hem vóór 31 december en koop vrijheid terug.',
+        'Je jaarruimte is de pensioenruimte die je dit jaar mag aftrekken — die telt per kalenderjaar en vervalt na 31 december.',
       cta: 'Bekijk jaarruimte',
       ctaHref: '/overzicht/belasting/box1#jaarruimte-uitleg',
     },
@@ -374,8 +379,15 @@ export const PATH_SUGGESTIONS: PathRule[] = [
     key: 'path_belasting_box2',
     condition: 'Op een pagina onder /overzicht/belasting/box2.',
     suggestion: {
+      // H24-bijvangst: zelfde tabel, zelfde defect. "Hou je rekening-courant
+      // onder €500k en time je dividend slim" was een dubbele instructie over
+      // concrete financiële handelingen (DGA-lening, dividendmoment).
+      // Bewust zónder bedrag: de leengrens is een fiscale constante en hoort
+      // niet als los getal in statische copy (CLAUDE.md — geen hardcoded
+      // financiële constanten buiten lib/constants.ts). De kaart zelf toont
+      // de actuele drempel wél, uit de canonieke bron.
       message:
-        'Hou je rekening-courant onder €500k en time je dividend slim rond de jaarwisseling.',
+        'Boven de leengrens telt je BV-lening mee als Box 2-inkomen, en je dividendmoment bepaalt in welk jaar het valt.',
       cta: 'Bekijk Box 2',
     },
   },

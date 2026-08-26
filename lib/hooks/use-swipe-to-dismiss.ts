@@ -10,9 +10,23 @@
  * volle hoogte, sluit-bookkeeping) blijft bij de consumer via `onDragMove`,
  * `onDismissStart` en `onDismiss` — zo bestaat er geen tweede kopie van het
  * gebaar die uit elkaar kan lopen.
+ *
+ * ── Waarom `touchmove` niet via een React-prop loopt ────────────────────
+ * React 19 registreert `touchstart`/`touchmove`/`wheel` hard als PASSIVE
+ * listener op de (portal-)root. In een passive listener negeert de browser
+ * `preventDefault()`; de sheet volgde dus wel de vinger, maar de browser vatte
+ * hetzelfde gebaar óók op als pull-to-refresh en verversde de pagina. Daarom
+ * hangt dit gebaar `touchmove` (+ `touchend`/`touchcancel`) ZELF aan
+ * `document`, met `{ passive: false }`, en alleen zolang er een gebaar loopt:
+ * bij `touchstart` erbij, bij het einde eraf. Geen luisteraars in ruststand,
+ * precies één tijdens een veeg, en `preventDefault()` doet weer wat het zegt.
+ *
+ * `touchstart` mag wél een React-prop blijven: daar wordt niets voorkomen
+ * (dat zou de sluit-knop onklikbaar maken), alleen de drag opgezet.
  */
 
 import { useCallback, useEffect, useRef, type RefObject } from 'react'
+import { scrimColor, SCRIM_OPACITY } from '@/lib/overlay-scrim'
 
 const DISMISS_VELOCITY = 800   // px/s — fast flick always dismisses
 const DISMISS_PERCENT = 0.3    // 30% of sheet height
@@ -21,7 +35,7 @@ const VELOCITY_SAMPLES = 5
 const DECISION_THRESHOLD = 5
 /** Weerstand op een opwaartse drag — het paneel volgt de vinger maar voor 15%. */
 const RUBBER_BAND = 0.15
-const DEFAULT_BACKDROP_OPACITY = 0.5
+const DEFAULT_BACKDROP_OPACITY = SCRIM_OPACITY
 
 /** Gedeelde spring-curve voor sheet-animaties (ook buiten dit gebaar bruikbaar). */
 export const SPRING_CURVE = 'cubic-bezier(0.32, 0.72, 0, 1)'
@@ -66,8 +80,15 @@ export type SwipeToDismissHandlers = {
   handleTouchStart: (e: React.TouchEvent) => void
   /** Voor de scroll-container: eerst scroll-vs-drag beslissen. */
   handleContentTouchStart: (e: React.TouchEvent) => void
-  handleTouchMove: (e: React.TouchEvent) => void
-  handleTouchEnd: () => void
+  /**
+   * Voor het HELE paneel: één `onTouchStart` op de buitenste div die zelf
+   * routeert — begint de aanraking binnen `contentRef` dan geldt de
+   * scroll-vs-drag-beslissing, daarbuiten (header, footer, alle tussenruimte)
+   * sleept 'ie meteen. Dit is de aanbevolen bevestiging: zonder dit was er
+   * letterlijk een dode strook "net onder het greepje" waar niets sleepte én
+   * de browser het gebaar oppakte.
+   */
+  handleSheetTouchStart: (e: React.TouchEvent) => void
 }
 
 export function useSwipeToDismiss({
@@ -82,6 +103,7 @@ export function useSwipeToDismiss({
 }: UseSwipeToDismissOptions): SwipeToDismissHandlers {
   // Touch / drag state
   const dragStartY = useRef(0)
+  const dragStartX = useRef(0)
   const dragCurrentY = useRef(0)
   const isDragging = useRef(false)
   const velocityTracker = useRef<{ y: number; t: number }[]>([])
@@ -142,7 +164,7 @@ export function useSwipeToDismiss({
 
     if (backdrop) {
       backdrop.style.transition = `background-color ${duration * 0.8}ms ease-out`
-      backdrop.style.backgroundColor = 'rgba(0,0,0,0)'
+      backdrop.style.backgroundColor = scrimColor(0)
     }
 
     let finished = false
@@ -162,7 +184,7 @@ export function useSwipeToDismiss({
     const backdrop = backdropRef?.current ?? null
     if (!sheet) return
 
-    const restingBackdrop = `rgba(0,0,0,${backdropOpacity})`
+    const restingBackdrop = scrimColor(backdropOpacity)
 
     if (prefersReducedMotion.current) {
       sheet.style.transform = ''
@@ -192,6 +214,42 @@ export function useSwipeToDismiss({
     setTimeout(onEnd, 400)
   }, [sheetRef, backdropRef, backdropOpacity])
 
+  // ── Niet-passieve gebaar-listeners ─────────────────────────
+  //
+  // Stabiele dispatchers: ze lezen de verse handler uit een ref, zodat
+  // add/removeEventListener altijd dezelfde functie-identiteit zien — ook als
+  // `enabled` halverwege een gebaar verandert en de useCallbacks vernieuwen.
+  const moveHandlerRef = useRef<(e: TouchEvent) => void>(() => {})
+  const endHandlerRef = useRef<() => void>(() => {})
+  const listenersAttached = useRef(false)
+
+  const dispatchMove = useRef((e: TouchEvent) => moveHandlerRef.current(e)).current
+  const dispatchEnd = useRef(() => endHandlerRef.current()).current
+
+  const attachGestureListeners = useCallback(() => {
+    if (listenersAttached.current || typeof document === 'undefined') return
+    listenersAttached.current = true
+    // `passive: false` is de hele reden dat dit niet via React-props loopt:
+    // alleen zo mag `preventDefault()` de native pull-to-refresh tegenhouden.
+    document.addEventListener('touchmove', dispatchMove, { passive: false })
+    // Op `document` (niet op de sheet) zodat een vinger die buiten het paneel
+    // loslaat het gebaar netjes afsluit i.p.v. de sheet halverwege te laten staan.
+    document.addEventListener('touchend', dispatchEnd)
+    document.addEventListener('touchcancel', dispatchEnd)
+  }, [dispatchMove, dispatchEnd])
+
+  const detachGestureListeners = useCallback(() => {
+    if (!listenersAttached.current || typeof document === 'undefined') return
+    listenersAttached.current = false
+    document.removeEventListener('touchmove', dispatchMove)
+    document.removeEventListener('touchend', dispatchEnd)
+    document.removeEventListener('touchcancel', dispatchEnd)
+  }, [dispatchMove, dispatchEnd])
+
+  // Vangnet: unmount midden in een gebaar (bv. de consumer sluit programmatisch
+  // terwijl de vinger nog op het scherm ligt) laat anders listeners achter.
+  useEffect(() => detachGestureListeners, [detachGestureListeners])
+
   // `enabled` kan tijdens een actieve sleep omlaag gaan (bv. ChatPanel zet
   // 'm uit zodra een melding-verzending start). De handlers zelf bailen dan
   // stil uit (`if (!enabled) return`) — zonder deze reset blijft de sheet met
@@ -199,18 +257,22 @@ export function useSwipeToDismiss({
   // om dat op te ruimen.
   useEffect(() => {
     if (enabled) return
+    detachGestureListeners()
     if (!isDragging.current && gestureDecision.current !== 'drag') return
     isDragging.current = false
     gestureDecision.current = 'undecided'
     touchSource.current = 'handle'
     animateSnapBack()
-  }, [enabled, animateSnapBack])
+  }, [enabled, animateSnapBack, detachGestureListeners])
 
   // ── Touch handlers ─────────────────────────────────────────
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (!enabled) return
     dragStartY.current = e.touches[0].clientY
+    // `?? 0`: sommige synthetische touch-events (tests, enkele webviews) dragen
+    // geen clientX; zonder deze default rekent de horizontaal-guard met NaN.
+    dragStartX.current = e.touches[0].clientX ?? 0
     dragCurrentY.current = 0
     isDragging.current = true
     velocityTracker.current = [{ y: e.touches[0].clientY, t: Date.now() }]
@@ -222,21 +284,40 @@ export function useSwipeToDismiss({
       sheetRef.current.style.transition = 'none'
       sheetRef.current.style.willChange = 'transform'
     }
-  }, [enabled, sheetRef])
+    attachGestureListeners()
+  }, [enabled, sheetRef, attachGestureListeners])
 
   const handleContentTouchStart = useCallback((e: React.TouchEvent) => {
     if (!enabled) return
     dragStartY.current = e.touches[0].clientY
+    // `?? 0`: sommige synthetische touch-events (tests, enkele webviews) dragen
+    // geen clientX; zonder deze default rekent de horizontaal-guard met NaN.
+    dragStartX.current = e.touches[0].clientX ?? 0
     dragCurrentY.current = 0
     isDragging.current = false // don't drag yet — wait for decision
     velocityTracker.current = [{ y: e.touches[0].clientY, t: Date.now() }]
     touchSource.current = 'content'
     gestureDecision.current = 'undecided'
-  }, [enabled])
+    attachGestureListeners()
+  }, [enabled, attachGestureListeners])
 
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+  /**
+   * Eén touchstart voor het hele paneel; routeert op basis van het doelwit.
+   * Alles buiten de scroll-content (greepje, header, footer, tussenruimte) is
+   * greep — dat maakt "de modal in zijn geheel wegslepen" waar.
+   */
+  const handleSheetTouchStart = useCallback((e: React.TouchEvent) => {
+    const scrollEl = contentRef?.current ?? null
+    if (scrollEl && scrollEl.contains(e.target as Node)) handleContentTouchStart(e)
+    else handleTouchStart(e)
+  }, [contentRef, handleContentTouchStart, handleTouchStart])
+
+  const handleTouchMove = useCallback((e: TouchEvent) => {
     if (!enabled) return
     if (!sheetRef.current) return
+    // Zodra de browser het gebaar zelf heeft overgenomen (scroll gestart) is
+    // het event niet meer te annuleren; dan niets forceren.
+    const stopNative = () => { if (e.cancelable) e.preventDefault() }
 
     const rawDelta = e.touches[0].clientY - dragStartY.current
 
@@ -245,12 +326,26 @@ export function useSwipeToDismiss({
       if (gestureDecision.current === 'scroll') return // let native scroll handle it
 
       if (gestureDecision.current === 'undecided') {
-        // Need enough movement to decide (5px threshold)
-        if (Math.abs(rawDelta) < DECISION_THRESHOLD) return
+        const rawDeltaX = (e.touches[0].clientX ?? 0) - dragStartX.current
+        // Overwegend horizontaal (carrousel, horizontale tabel) is nooit een
+        // dismiss — meteen loslaten, anders blokkeren we hun scroll.
+        if (Math.abs(rawDeltaX) > Math.abs(rawDelta) && Math.abs(rawDeltaX) >= DECISION_THRESHOLD) {
+          gestureDecision.current = 'scroll'
+          return
+        }
 
         const scrollEl = contentRef?.current ?? null
         const atTop = !scrollEl || scrollEl.scrollTop <= 0
         const swipingDown = rawDelta > 0
+
+        // Zolang de content bovenaan staat én de vinger omlaag gaat kan dit nog
+        // een dismiss worden. De browser moet dán al stilgehouden worden: wachten
+        // tot de beslissing valt (5px verderop) is te laat — pull-to-refresh is
+        // tegen die tijd al begonnen en negeert elke latere preventDefault.
+        if (atTop && swipingDown) stopNative()
+
+        // Need enough movement to decide (5px threshold)
+        if (Math.abs(rawDelta) < DECISION_THRESHOLD) return
 
         if (atTop && swipingDown) {
           // Activate drag-dismiss
@@ -275,6 +370,10 @@ export function useSwipeToDismiss({
 
     // From here: active drag (handle or content-decided drag)
     if (!isDragging.current) return
+
+    // Een actieve sleep is van ons — in beide richtingen (omhoog = uitklappen).
+    // De browser mag er niets meer mee doen.
+    stopNative()
 
     const currentRawDelta = e.touches[0].clientY - dragStartY.current
 
@@ -303,14 +402,13 @@ export function useSwipeToDismiss({
     if (backdrop && currentRawDelta > 0) {
       const sheetHeight = getSheetHeight()
       const dragPercent = Math.min(1, currentRawDelta / sheetHeight)
-      backdrop.style.backgroundColor = `rgba(0,0,0,${backdropOpacity * (1 - dragPercent)})`
+      backdrop.style.backgroundColor = scrimColor(backdropOpacity * (1 - dragPercent))
       backdrop.style.transition = 'none'
     }
-
-    if (currentRawDelta > 0) e.preventDefault()
   }, [enabled, sheetRef, backdropRef, contentRef, backdropOpacity, getSheetHeight])
 
   const handleTouchEnd = useCallback(() => {
+    detachGestureListeners()
     if (!enabled) return
     // Content touch that stayed as scroll — just clean up
     if (touchSource.current === 'content' && gestureDecision.current !== 'drag') {
@@ -344,7 +442,12 @@ export function useSwipeToDismiss({
     velocityTracker.current = []
     gestureDecision.current = 'undecided'
     touchSource.current = 'handle'
-  }, [enabled, sheetRef, getSheetHeight, animateDismiss, animateSnapBack])
+  }, [enabled, sheetRef, getSheetHeight, animateDismiss, animateSnapBack, detachGestureListeners])
 
-  return { handleTouchStart, handleContentTouchStart, handleTouchMove, handleTouchEnd }
+  // De dispatchers lezen de handlers hier vandaan, zodat een listener die bij
+  // `touchstart` is aangehangen tijdens hetzelfde gebaar de VERSE closure ziet.
+  moveHandlerRef.current = handleTouchMove
+  endHandlerRef.current = handleTouchEnd
+
+  return { handleTouchStart, handleContentTouchStart, handleSheetTouchStart }
 }

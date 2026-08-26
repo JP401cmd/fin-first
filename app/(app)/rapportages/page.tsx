@@ -107,6 +107,7 @@ export default function RapportagesPage() {
   const [savedConfigs, setSavedConfigs] = useState<ReportConfig[]>([])
   const [generating, setGenerating] = useState(false)
   const [configsLoading, setConfigsLoading] = useState(true)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [useAi, setUseAi] = useState(false)
   const [balansDate, setBalansDate] = useState(new Date().toISOString().split('T')[0])
   const [budgetMonth, setBudgetMonth] = useState(() => {
@@ -191,12 +192,25 @@ export default function RapportagesPage() {
     }
   }
 
+  // De rij verdween eerder ALTIJD uit de lijst, ook als de server het verzoek
+  // weigerde: het antwoord werd niet gelezen. Een 403 of 500 zag er dan uit als
+  // een geslaagde verwijdering tot de volgende herlaadbeurt de rij terugbracht
+  // ("spookverwijdering"). We filteren nu pas ná een bevestigd `res.ok`, en
+  // laten anders zien wát er misging.
   const handleDelete = async (id: string) => {
+    setDeleteError(null)
     try {
-      await fetch(`/api/report?id=${id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/report?id=${id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null)
+        setDeleteError(
+          (payload as { error?: string } | null)?.error || 'Verwijderen mislukt. Probeer het opnieuw.',
+        )
+        return
+      }
       setSavedConfigs(prev => prev.filter(c => c.id !== id))
     } catch {
-      // Silent fail
+      setDeleteError('Verwijderen mislukt — geen verbinding met de server.')
     }
   }
 
@@ -650,6 +664,15 @@ export default function RapportagesPage() {
       <div className="mt-8">
         <RekeningTag label="archief">
           <SectionLabel>Eerder verschenen</SectionLabel>
+
+          {/* Altijd gemount, zodat een screenreader de melding hoort zodra ze verschijnt. */}
+          <div role="alert" aria-live="polite">
+            {deleteError && (
+              <p className="mb-3 border-l-2 border-negative bg-negative-bg px-3 py-2 font-inter text-[13px] leading-snug text-negative">
+                {deleteError}
+              </p>
+            )}
+          </div>
 
           {configsLoading ? (
             <div className="flex items-center justify-center py-8">

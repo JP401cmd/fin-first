@@ -157,10 +157,12 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
   },
 
   // Assets
+  // expectedReturn is een 0..1-FRACTIE (contract van computeAssetsByType, kaart H1) —
+  // consumenten doen zelf ×100 voor weergave.
   assetsByType: [
-    { type: 'Beleggingen', value: 120000, purchaseValue: 95000, expectedReturn: 7.2 },
-    { type: 'Spaargeld', value: 45000, purchaseValue: 45000, expectedReturn: 2.5 },
-    { type: 'Vastgoed', value: 80000, purchaseValue: 75000, expectedReturn: 3.0 },
+    { type: 'Beleggingen', value: 120000, purchaseValue: 95000, expectedReturn: 0.072 },
+    { type: 'Spaargeld', value: 45000, purchaseValue: 45000, expectedReturn: 0.025 },
+    { type: 'Vastgoed', value: 80000, purchaseValue: 75000, expectedReturn: 0.03 },
   ],
   totalPurchaseValue: 215000,
 

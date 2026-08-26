@@ -43,6 +43,7 @@ export default async function ToekomstDoelenPage() {
         goalProgresses={finData.goalProgresses}
         monthlyIncome={monthlyFigures.monthlyIncome}
         monthlyExpenses={monthlyFigures.monthlyExpenses}
+        vrijheidsgetalLive={finData.vrijheidsgetalLive}
       />
     </>
   )

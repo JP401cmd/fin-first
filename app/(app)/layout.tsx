@@ -511,7 +511,14 @@ export default async function AppLayout({
           <ErrorReporter />
           <AutoSnapshotTrigger />
           <DailyPriceSyncTrigger />
-          <PerspectiveProvider>
+          {/* `initialPerspective` = de server-gelezen tf_perspective-cookie
+              (dezelfde `sidebarPerspective` die de sidebar-cijfers voedt).
+              Zonder deze seed start de provider op 'personal' en corrigeert hij
+              pas ná /api/perspective — waardoor een huishoud-gebruiker per
+              laadbeurt eerst persoonlijke en dan huishoud-cijfers zag
+              (bevinding C1). Server- en client-seed zijn identiek, dus geen
+              hydration-mismatch. */}
+          <PerspectiveProvider initialPerspective={sidebarPerspective}>
             <ChatProvider>
               <NotificationProvider>
               <GlobalSyncProvider>

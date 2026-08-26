@@ -62,9 +62,16 @@ export function usePerspective() {
 
 /**
  * Get locally stored perspective preference.
+ *
+ * `fallback` is de cookie-seed: is localStorage leeg of geblokkeerd (private
+ * mode, gewiste site-data), dan is de cookie nog steeds een geldige uitdrukking
+ * van dezelfde voorkeur — beide worden in lockstep geschreven door
+ * `setPerspective`. Zonder deze terugval zou de provider in dat geval alsnog
+ * naar 'personal' klappen ná de fetch: precies de flits die C1 beschrijft, maar
+ * dan andersom.
  */
-function getStoredPerspective(): Perspective {
-  if (typeof window === 'undefined') return 'personal'
+function getStoredPerspective(fallback: Perspective = 'personal'): Perspective {
+  if (typeof window === 'undefined') return fallback
   try {
     const stored = localStorage.getItem(PERSPECTIVE_STORAGE_KEY)
     if (stored && ['personal', 'household', 'partner'].includes(stored)) {
@@ -73,7 +80,7 @@ function getStoredPerspective(): Perspective {
   } catch {
     // localStorage not available
   }
-  return 'personal'
+  return fallback
 }
 
 /**
@@ -123,9 +130,34 @@ export function usePerspectiveAbort(perspective: Perspective): AbortSignal {
   return controllerRef.current.signal
 }
 
-export function PerspectiveProvider({ children }: { children: ReactNode }) {
+/**
+ * @param initialPerspective Server-side gelezen `tf_perspective`-cookie
+ *   (`getServerPerspective()` in `app/(app)/layout.tsx`). Dit is de SYNCHRONE
+ *   seed van de provider-state.
+ *
+ *   WAAROM (bevinding C1/C7): de provider startte altijd op `'personal'` en
+ *   corrigeerde pas ná `fetch('/api/perspective')`. Bij een huishoud-gebruiker
+ *   toonde elke laadbeurt daardoor eerst de PERSOONLIJKE cijfers en daarna de
+ *   HUISHOUD-cijfers — twee elk-voor-zich correcte, maar verschillende
+ *   antwoorden op dezelfde vraag. Wie op het verkeerde moment keek, zag per
+ *   herlaadbeurt iets anders.
+ *
+ *   De cookie is de bron die de server toch al leest (dezelfde waarde voedt de
+ *   sidebar en alle perspectief-bewuste server-loaders), dus seeden hiermee
+ *   houdt server-HTML en eerste client-render identiek — geen hydration-mismatch
+ *   en geen flits. De async `/api/perspective`-ronde blijft: die levert
+ *   `availablePerspectives`/`partnerName` én corrigeert de seed wanneer de
+ *   opgeslagen voorkeur inmiddels niet meer geldig is (partner losgekoppeld).
+ */
+export function PerspectiveProvider({
+  children,
+  initialPerspective = 'personal',
+}: {
+  children: ReactNode
+  initialPerspective?: Perspective
+}) {
   const router = useRouter()
-  const [perspective, setLocalPerspective] = useState<Perspective>('personal')
+  const [perspective, setLocalPerspective] = useState<Perspective>(initialPerspective)
   const [isHousehold, setIsHousehold] = useState(false)
   const [availablePerspectives, setAvailablePerspectives] = useState<PerspectiveOption[]>([
     { id: 'personal', label: 'Persoonlijk', description: 'Alleen jouw financiën' },
@@ -147,7 +179,7 @@ export function PerspectiveProvider({ children }: { children: ReactNode }) {
         if (res.ok) {
           const data = await res.json()
           const serverPerspective = data.selectedPerspective as Perspective
-          const localPerspective = getStoredPerspective()
+          const localPerspective = getStoredPerspective(initialPerspective)
 
           // Use server value if available, otherwise use local
           const activePerspective = serverPerspective !== 'personal' ? serverPerspective : localPerspective
@@ -167,19 +199,19 @@ export function PerspectiveProvider({ children }: { children: ReactNode }) {
           // server-componenten meteen correct renderen (ook vóór een switch).
           storePerspectiveCookie(validPerspective)
         } else {
-          // Fall back to localStorage
-          setLocalPerspective(getStoredPerspective())
+          // Fall back to localStorage, dan de cookie-seed
+          setLocalPerspective(getStoredPerspective(initialPerspective))
         }
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') return
-        // Fall back to localStorage
-        setLocalPerspective(getStoredPerspective())
+        // Fall back to localStorage, dan de cookie-seed
+        setLocalPerspective(getStoredPerspective(initialPerspective))
       }
       setLoading(false)
     }
     loadPerspective()
     return () => controller.abort()
-  }, [])
+  }, [initialPerspective])
 
   const setPerspective = useCallback(async (newPerspective: Perspective) => {
     // Optimistic local update — always immediate

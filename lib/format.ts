@@ -165,6 +165,19 @@ export function dailyExpenseRate(monthlyExpenses: number): number {
   return (safe * 12) / 365
 }
 
+// ── Vrijheidstijd: kalenderbasis van de jaar/maand/dag-decompositie ───
+//
+// Bewuste, vaste weergaveconventie (géén gebruikersparameter, dus geen plek in
+// lib/fire-params.ts): een jaar telt 365 dagen, een maand 30. Die twee zijn
+// onderling NIET consistent — 12 × 30 = 360 < 365 — en precies dat gat van bijna
+// vijf dagen maakt een expliciete carry noodzakelijk (zie carryFreedomUnits).
+// Ze staan hier, in het canonieke huis van de vrijheidstijd (lib/ai/dna/base.ts),
+// en niet in lib/constants.ts: dat bestand huisvest financiële AANNAMES
+// (rendement/inflatie/SWR), niet de kalenderbasis van een formatter.
+export const FREEDOM_DAYS_PER_YEAR = 365
+export const FREEDOM_DAYS_PER_MONTH = 30
+export const FREEDOM_MONTHS_PER_YEAR = 12
+
 /**
  * Freedom time breakdown from a EUR amount and daily expenses.
  */
@@ -195,6 +208,44 @@ export interface FormatWithFreedomOptions {
    * only affects nothing today; kept for API stability.
    */
   includeDays?: boolean
+}
+
+/**
+ * Rol een jaar/maand-decompositie op zodat de maandteller nooit zijn eigen
+ * overloop bereikt: "10 jaar en 12 maanden" is geen bestaande hoeveelheid tijd,
+ * "11 jaar" wel.
+ *
+ * Waarom dit een aparte, geëxporteerde helper is en geen regel bínnen
+ * calculateFreedomTime: er is een TWEEDE plek die zelf maanden optelt. De
+ * AI-contextbouwers (lib/ai/context/tax-context.ts en
+ * lib/ai/context/aandachtspunten-context.ts) ronden restdagen ≥ 15 naar boven af
+ * op een hele maand (`bd.months + 1`) en kunnen zo op eigen kracht op 12
+ * uitkomen — óók met een correcte breakdown. Zonder gedeelde carry vertelt Fin
+ * "10 jaar en 12 maanden" terwijl het scherm ernaast "11 jaar" toont. Eén huis
+ * voor de carry-regel, twee consumenten.
+ *
+ * DAGEN NA EEN CARRY = 0 (bewuste keuze). De carry verklaart de resterende
+ * 360–364 dagen tot een VOL jaar; die zijn daarmee al in `years` opgegaan. Ze
+ * laten staan telt ze een tweede keer mee (11 × 365 + 4 = 4019 dagen voor een
+ * totaal van 4014), en ze opnieuw uitrekenen tegen het nieuwe jaartal geeft een
+ * NEGATIEVE rest (4014 − 4015 = −1). Nul is de enige waarde die geen van beide
+ * fouten maakt; de prijs is dat de decompositie in dit venster maximaal vijf
+ * dagen naar boven afrondt. `totalDays` blijft onafgerond de exacte waarheid.
+ */
+export function carryFreedomUnits(
+  years: number,
+  months: number,
+  days: number
+): { years: number; months: number; days: number } {
+  if (months < FREEDOM_MONTHS_PER_YEAR) {
+    return { years, months, days }
+  }
+  const carriedYears = Math.floor(months / FREEDOM_MONTHS_PER_YEAR)
+  return {
+    years: years + carriedYears,
+    months: months - carriedYears * FREEDOM_MONTHS_PER_YEAR,
+    days: 0,
+  }
 }
 
 /**
@@ -237,12 +288,17 @@ export function calculateFreedomTime(
   const totalDays = absoluteAmount / safeExpenses
 
   // Cap at a reasonable maximum (9999 years) to prevent display issues
-  const cappedDays = Math.min(totalDays, 9999 * 365)
+  const cappedDays = Math.min(totalDays, 9999 * FREEDOM_DAYS_PER_YEAR)
 
-  const years = Math.floor(cappedDays / 365)
-  const remainingAfterYears = cappedDays - years * 365
-  const months = Math.floor(remainingAfterYears / 30)
-  const days = Math.round(remainingAfterYears - months * 30)
+  const rawYears = Math.floor(cappedDays / FREEDOM_DAYS_PER_YEAR)
+  const remainingAfterYears = cappedDays - rawYears * FREEDOM_DAYS_PER_YEAR
+  const rawMonths = Math.floor(remainingAfterYears / FREEDOM_DAYS_PER_MONTH)
+  const rawDays = Math.round(remainingAfterYears - rawMonths * FREEDOM_DAYS_PER_MONTH)
+
+  // `remainingAfterYears` loopt tot net onder 365, terwijl twaalf maanden maar
+  // 360 dagen beslaan — in dat venster van bijna vijf dagen wordt `rawMonths`
+  // exact 12. Rol dat door naar een heel jaar (H3/M37).
+  const { years, months, days } = carryFreedomUnits(rawYears, rawMonths, rawDays)
 
   return {
     years,

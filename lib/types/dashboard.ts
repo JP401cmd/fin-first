@@ -43,6 +43,14 @@ export interface TopGoal {
   color: string
   icon: string
   custom_unit?: string | null
+  /**
+   * Door een canonieke motor GEPROJECTEERDE datum ("aug 2039"), die de uit
+   * `target_date` afgeleide datum vervangt (bevinding C10). Vandaag alleen gezet
+   * voor het vrijheidsgetal-doel, waar hij uit dezelfde FIRE-countdown komt als
+   * `simFireCountdown`. `null`/afwezig ⇒ de widget leidt de datum zoals vanouds
+   * uit `target_date` af.
+   */
+  eta?: string | null
 }
 
 export interface TopRecurringTransaction {
@@ -288,7 +296,9 @@ export interface DashboardData {
     savings: { month: string; value: number }[]
     debt:    { month: string; value: number }[]
   }
-  // Asset breakdown per type
+  // Asset breakdown per type. `expectedReturn` is een 0..1-FRACTIE (0,07 = 7%),
+  // genormaliseerd in computeAssetsByType uit de percent-schaal van
+  // assets.expected_return — consumenten doen zelf ×100 voor weergave (kaart H1).
   assetsByType: { type: string; value: number; purchaseValue: number; expectedReturn: number }[]
   totalPurchaseValue: number
   // Horizon: scenario range (optimistic/expected/pessimistic FIRE ages)
