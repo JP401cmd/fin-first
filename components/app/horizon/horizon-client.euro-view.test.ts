@@ -25,7 +25,16 @@
 
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
+import { simRowsToChartPoints } from '@/lib/horizon/sim-chart-geometry'
 import { join } from 'node:path'
+import { deflate, deflatePoints, factorAtAge } from '@/lib/euro-display'
+import {
+  APPROX_PREFIX,
+  formatCurrency,
+  formatMaskedApproxCurrency,
+  roundToSignificant,
+  MASKED_AMOUNT_PLACEHOLDER,
+} from '@/lib/format'
 
 const SOURCE_PATH = join(process.cwd(), 'components', 'app', 'horizon', 'horizon-client.tsx')
 
@@ -141,21 +150,62 @@ describe('horizon-client.tsx — euro-weergave-render-grens (T4)', () => {
     expect(src).toMatch(/factorAtAge\(displayUnifiedRows, userAowAge\.fractional\)/)
   })
 
-  it('houdt het voortgangs-PAAR nominaal: balk-fill en balk-label delen één noemer', () => {
+  it('zet het balk-label in de actieve euro-weergave, gelijk aan de Doelbedrag-KPI', () => {
+    // Given een gebruiker met een nominaal FIRE-doel van € 200.032, When hij de
+    // euro-weergave op "huidige euro's" zet, Then toont het label rechts van de
+    // voortgangsbalk hetzelfde bedrag als de Doelbedrag-KPI erboven
+    // ("ca. € 180.000 — volledige vrijheid") en niet meer het nominale bedrag.
+    // Eigenaar-besluit 27-08-2026: twee bedragen voor hetzelfde doel op één
+    // scherm leest als een fout, ook al was de eerdere nominale keuze (label =
+    // noemer van de balk-fill) intern verdedigbaar.
     const src = readFileSync(SOURCE_PATH, 'utf8')
-    // De balk vult op `effectiveFreedomPct` — canoniek uit
-    // `computeFreedomProgressWithBasis` met een NOMINALE noemer. Het label
-    // rechts van de balk IS die noemer, geen losstaand doelbedrag: zet je daar
-    // het gedeflateerde doel neer, dan leest het paar twee grondslagen tegelijk
-    // (een balk op 40% naast een bedrag waarvan de breuk 59% is).
+    // De VULLING blijft op `effectiveFreedomPct` — een ratio (klasse R)
+    // deflateert nooit; alleen de euro-weergave van het label wisselt mee.
     expect(src).toMatch(/width: `\$\{hasPerspectiveHero \? [^`]*effectiveFreedomPct\}%`/)
-    expect(src).toMatch(/formatMaskedCurrency\(balkVrijheidDoel, masked\)\} — volledige vrijheid/)
-    expect(src).toMatch(/formatMaskedCurrency\(portfolioAtAow \?\? 0, masked\)\} — vermogen op AOW/)
-    // …en de uitzondering draagt de verplichte markering (D12/D13).
-    expect(src).toMatch(/euro-view: exempt — hoort bij de nominale freedomPct-noemer/)
-    // De KPI-tegel "benodigd" is wél een LOSSTAAND doelbedrag en blijft
-    // deflateren; anders zou deze fix stil de hele hero nominaal maken.
+    // Het label leest de view*-waarden — dezelfde variabelen als de KPI, dus
+    // per constructie hetzelfde bedrag.
+    expect(src).toMatch(/formatMaskedApproxCurrency\(viewBalkVrijheidDoel, masked\)\} — volledige vrijheid/)
+    expect(src).toMatch(/formatMaskedApproxCurrency\(viewPortfolioAtAow \?\? 0, masked\)\} — vermogen op AOW/)
+    // …en de nominale variant is wég. Een terugval hierop is onzichtbaar: het
+    // bedrag blijft plausibel, alleen te hoog.
+    expect(src).not.toMatch(/formatMaskedCurrency\(balkVrijheidDoel, masked\)/)
+    expect(src).not.toMatch(/formatMaskedCurrency\(portfolioAtAow \?\? 0, masked\)/)
+    // De euro-view-uitzondering op deze plek is vervallen met het besluit; laat
+    // hem niet stil terugkeren (dat zou de oude conventie heropenen).
+    expect(src).not.toMatch(/euro-view: exempt — hoort bij de nominale freedomPct-noemer/)
+    // De KPI-tegel "benodigd" deflateerde al en blijft ongewijzigd — dit is de
+    // waarde waaraan het label is gelijkgetrokken.
     expect(src).toMatch(/isPensioenMode \? \(viewPortfolioAtAow \?\? 0\) : viewBalkVrijheidDoel/)
+  })
+
+  it('deflateert het balk-doelbedrag via de canonieke route — € 200.032 nominaal wordt ca. € 180.000', () => {
+    // Given de kernelrijen van het eigenaarsprofiel (FIRE-moment zes jaar
+    // vooruit, ~2% inflatie ⇒ deflator 1,126), When de euro-weergave op 'real'
+    // staat, Then deelt de balk het nominale doel exact één keer door de factor
+    // van het FIRE-jaar — via `factorAtAge`/`deflate`, nooit een eigen Math.pow —
+    // en rondt de M5-weergave dat af op "ca. € 180.000".
+    const rows = [
+      { age: 46, inflationFactor: 1 },
+      { age: 52, inflationFactor: 1.02 ** 6 },
+    ]
+    const fireFactor = factorAtAge(rows, 52)
+    const nominaalDoel = 200032
+
+    const nominaleWeergave = deflate(nominaalDoel, fireFactor, 'nominal')
+    expect(nominaleWeergave).toBe(nominaalDoel)
+    expect(roundToSignificant(nominaleWeergave)).toBe(200000)
+
+    const reeleWeergave = deflate(nominaalDoel, fireFactor, 'real')
+    expect(reeleWeergave).toBeCloseTo(nominaalDoel / 1.02 ** 6, 6)
+    expect(roundToSignificant(reeleWeergave)).toBe(180000)
+
+    // Zo komt het op het scherm: "ca." als voorbehoud (M5), en gemaskeerd
+    // verdwijnt óók het voorbehoud — bullets zijn geen bedrag.
+    expect(formatMaskedApproxCurrency(reeleWeergave, false)).toBe(
+      `${APPROX_PREFIX}${formatCurrency(180000)}`,
+    )
+    expect(formatMaskedApproxCurrency(reeleWeergave, false)).toContain('180.000')
+    expect(formatMaskedApproxCurrency(reeleWeergave, true)).toBe(MASKED_AMOUNT_PLACEHOLDER)
   })
 
   it('leidt élke FIRE-moment-factor af uit één genormaliseerde leeftijd (KRUIS-27)', () => {
@@ -180,6 +230,52 @@ describe('horizon-client.tsx — euro-weergave-render-grens (T4)', () => {
     // rijen dragen de leeftijden van een ander.
     expect(src).toMatch(/factorMapByPosition\(partnerLine\.rows, factorByOffset\)/)
     expect(src).toMatch(/factorMapByPosition\(householdMainLine\.rows, factorByOffset\)/)
+    // K2b — de scenario-overlays lopen sinds `simRowsToChartPoints` op dezelfde
+    // as-conventie als de besteedbaar-lijn (eindstand van rij `age` op `age + 1`)
+    // en dragen daarom dezelfde bronjaar-sleutel.
+    expect(src).toMatch(
+      /points: deflatePoints\(o\.points, factorByAge, euroView, x => x - 1\)/,
+    )
+    // K4b — de huishoud-overlays sleutelen op positie; de seed op de
+    // startleeftijd schuift alle offsets één plek op.
+    expect(src).toMatch(/\[1, \.\.\.factorByOffset\]/)
+  })
+
+  /**
+   * Given  een kernelreeks die via `simRowsToChartPoints` op de chart-as staat:
+   *        een seed op de startleeftijd plus de eindstand van rij `age` op
+   *        `age + 1`, met `factorByAge` = f(age) = (1+π)^(age − startleeftijd).
+   * When   de overlay met de bronjaar-sleutel (`x - 1`) wordt gedeflateerd.
+   * Then   elk punt draagt de factor van zijn BRONrij — dezelfde die de hoofdlijn
+   *        op die x tekent — én het staartpunt wordt wél gedeflateerd.
+   */
+  it('deflateert overlay-punten op hun bronjaar, staartpunt incluis (K2b)', () => {
+    const startAge = 40
+    const rows = [
+      { age: 40, startPortfolio: 100_000, endPortfolio: 110_000 },
+      { age: 41, startPortfolio: 110_000, endPortfolio: 121_000 },
+      { age: 42, startPortfolio: 121_000, endPortfolio: 133_100 },
+    ]
+    const pts = simRowsToChartPoints(rows)
+    // Zoals de loader hem bouwt: alleen leeftijden die de kernel levert (40..42).
+    const factorByAge = new Map(rows.map((r) => [r.age, Math.pow(1.02, r.age - startAge)]))
+
+    const out = deflatePoints(pts, factorByAge, 'real', (x) => x - 1)
+
+    // Seed op x=40: sleutel 39 ontbreekt bewust ⇒ ongemoeid. Dat is exact goed,
+    // want jaar 0 draagt factor 1.0.
+    expect(out[0]).toEqual([40, 100_000])
+    // x=41 draagt de eindstand van rij 40 ⇒ factor f(40) = 1.0.
+    expect(out[1][0]).toBe(41)
+    expect(out[1][1]).toBeCloseTo(110_000, 6)
+    // x=42 draagt de eindstand van rij 41 ⇒ factor f(41) = 1.02.
+    expect(out[2][1]).toBeCloseTo(121_000 / 1.02, 6)
+    // STAARTPUNT x=43: bestaat niet in factorByAge (rijen lopen t/m 42), maar de
+    // bronjaar-sleutel 42 wél ⇒ gedeflateerd i.p.v. nominaal blijven staan. Zonder
+    // de sleutel bleef dit punt op 133.100 hangen: een zichtbare haak omhoog.
+    expect(out[3][0]).toBe(43)
+    expect(out[3][1]).toBeCloseTo(133_100 / Math.pow(1.02, 2), 6)
+    expect(out[3][1]).not.toBeCloseTo(133_100, 0)
   })
 
   it('laat het dagtarief (€ → vrijheidstijd) ongemoeid', () => {

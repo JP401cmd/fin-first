@@ -8,6 +8,7 @@ import {
   type LifeEventImpactKind,
 } from '@/lib/calculator/to-life-event'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
+import { noteOverlayNavigation } from '@/lib/overlay-history'
 import { ModalFooter } from '@/components/app/modal-footer'
 
 /**
@@ -84,6 +85,11 @@ export function CalculatorToLifeEventSheet({
       setError(`Opslaan mislukt: ${insertError.message}`)
       return
     }
+    // Deze sluiting hoort bij de navigatie eronder: zonder dit signaal
+    // consumeert de overlay-history haar entry met een `history.back()` die de
+    // nog lopende route-wissel afbreekt (geen link-klik om aan te herkennen —
+    // dit is een knop in de sticky footer). Zie lib/overlay-history.ts.
+    noteOverlayNavigation()
     onClose()
     router.push('/toekomst?tab=gebeurtenissen')
     router.refresh()

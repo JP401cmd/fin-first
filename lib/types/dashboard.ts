@@ -344,7 +344,18 @@ export interface DashboardData {
   // Optioneel/additief: hand-gebouwde mock-/fixture-bundels zonder dit veld blijven
   // geldig; ontbreekt hij, dan geldt de bestaande `factorAtAge`-conventie
   // "geen factor → 1" (= nominaal tonen), nooit een verzonnen getal.
-  simRows: { age: number; endPortfolio: number; phase: string; flowIn: number; flowOut: number; oneTimeNet: number; inflationFactor?: number }[] | null
+  //
+  // TIJDSTIP-CONVENTIE (verplicht voor consumenten): een rij met `age: N` beschrijft
+  // het leeftijdsJAAR N. `startPortfolio` is de stand ÓP N; `endPortfolio` die aan het
+  // EIND van dat jaar — dus op leeftijd N + 1. Een reeks "vermogen op leeftijd X" leest
+  // daarom `startPortfolio`, en een grafiek plot `endPortfolio` op `age + 1` (canoniek:
+  // `lib/horizon/sim-chart-geometry.ts#simRowsToChartPoints`). `inflationFactor` is
+  // (1 + inflatie)^k met k = N − startleeftijd, en hoort bij de RIJ: de app deflateert
+  // `endPortfolio` app-breed met f(N), ook al staat die waarde op de as bij N + 1 —
+  // wijk daar niet van af, anders zakt je reeks ~π onder de hoofdlijn.
+  // `startPortfolio` is optioneel omdat hand-gebouwde mock-/fixture-bundels hem niet
+  // dragen; de loader vult hem altijd.
+  simRows: { age: number; endPortfolio: number; startPortfolio?: number; phase: string; flowIn: number; flowOut: number; oneTimeNet: number; inflationFactor?: number }[] | null
   // Horizon: kernel-eindleeftijd (SimResult.displayEndAge) — de leeftijd die /horizon als
   // aslabel toont (deplete/legacy = fire_end_age, perpetual/pensioen = horizon-cap 100).
   // Widgets tonen dit i.p.v. een hardcoded '90j'. null als de sim niet kon draaien of bij

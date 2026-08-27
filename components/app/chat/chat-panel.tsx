@@ -14,6 +14,7 @@ import type { LocalKnowledgeItem } from '@/lib/ai/local/knowledge-context'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { useSwipeToDismiss } from '@/lib/hooks/use-swipe-to-dismiss'
 import { acquireOverlay } from '@/lib/overlay-signal'
+import { pushOverlayHistory } from '@/lib/overlay-history'
 import { hasSubscription } from '@/lib/feature-registry'
 import { AiSubscriptionUpsell } from '@/components/app/ai-subscription-upsell'
 import { FinDots } from '@/components/app/fin-dots'
@@ -1134,10 +1135,34 @@ export function ChatPanel() {
   // Sluiten mag alles behalve een lopende verzending afkappen. Geldt voor het
   // sluitkruis én de mobiele backdrop — die laatste is juist de knop die je per
   // ongeluk raakt terwijl je op een trage upload wacht.
+  // Geeft `false` bij een weigering — dat is het contract van de sluit-callback
+  // van overlay-history: op een terug-druk krijgt het paneel zijn history-entry
+  // dan terug, in plaats van open te blijven staan zónder entry (waarna de
+  // volgende terug-druk de pagina zou verlaten met de chat nog open).
   const veiligSluiten = useCallback(() => {
-    if (meldingBezig) return
+    if (meldingBezig) return false
     close()
+    return true
   }, [meldingBezig, close])
+
+  // ── Terug-knop sluit de chat, niet de pagina ───────────────
+  // Exact hetzelfde mechanisme als elke andere modal (BottomSheet, regel ~276):
+  // één history-entry per open paneel, `popstate` sluit langs dezelfde weg als
+  // het sluitkruis (`veiligSluiten`), en de cleanup consumeert de eigen entry
+  // weer. Zie lib/overlay-history.ts.
+  //
+  // Bewust NIET bij `isPinned`: gepind is het paneel een gedokte zijbalk die de
+  // pagina niet afdekt — terug hoort daar gewoon te navigeren, net zoals de pill
+  // dan blijft staan. Via een ref zodat het effect alleen op `isOpen`/`isPinned`
+  // hangt: zou het op de callback-identiteit hangen, dan pushte elke re-render
+  // (elke getypte letter) een nieuwe entry.
+  const veiligSluitenRef = useRef(veiligSluiten)
+  veiligSluitenRef.current = veiligSluiten
+
+  useEffect(() => {
+    if (!isOpen || isPinned) return
+    return pushOverlayHistory(() => veiligSluitenRef.current())
+  }, [isOpen, isPinned])
 
   // Hetzelfde gebaar als elke andere modal (BottomSheet). Uit bij `isPinned`
   // (een gedokte zijbalk swipe je niet weg) en tijdens een lopende verzending —

@@ -95,7 +95,16 @@ function factorAt(age: number): number {
   return Math.pow(1 + TEST_INFLATION, age - currentAge)
 }
 
-type FixtureRow = { age: number; endPortfolio: number; inflationFactor: number }
+// De kernel levert per leeftijdsJAAR twee standen: `startPortfolio` (stand ÓP
+// `age`) en `endPortfolio` (stand op `age + 1`). De weergavereeks leest de
+// eerste; de fixtures dragen daarom beide, zodat ze de echte SimRow-vorm
+// spiegelen i.p.v. één veld dat "de waarde van dit jaar" moet voorstellen.
+type FixtureRow = {
+  age: number
+  startPortfolio: number
+  endPortfolio: number
+  inflationFactor: number
+}
 
 /**
  * Bouw een gefilterd `endPortfolio`-pad (zónder huis): het LIQUIDE deel groeit
@@ -106,8 +115,14 @@ function buildEndPortfolioFiltered(): FixtureRow[] {
   const rows: FixtureRow[] = []
   let v = 100_000 // start liquide (beleggingen)
   for (let age = currentAge; age <= fireAge; age++) {
-    rows.push({ age, endPortfolio: Math.round(v), inflationFactor: factorAt(age) })
-    v = v * 1.06 + 15_000
+    const next = v * 1.06 + 15_000
+    rows.push({
+      age,
+      startPortfolio: Math.round(v),
+      endPortfolio: Math.round(next),
+      inflationFactor: factorAt(age),
+    })
+    v = next
   }
   return rows
 }
@@ -120,6 +135,7 @@ function buildEndPortfolioFull(): FixtureRow[] {
   return buildEndPortfolioFiltered().map((r) => ({
     age: r.age,
     // Voeg de overwaarde-van-nu erbij als ruwe benadering van "huis zit erin".
+    startPortfolio: r.startPortfolio + houseEquityNow,
     endPortfolio: r.endPortfolio + houseEquityNow,
     inflationFactor: r.inflationFactor,
   }))
@@ -165,7 +181,7 @@ describe('buildSimNetWorthRows — niet-filterende modi: reeks ≡ endPortfolio'
       // is ~0 en de reeks blijft gelijk aan endPortfolio.
       expect(out.length).toBe(simRows.length)
       for (let i = 0; i < out.length; i++) {
-        expect(Math.abs(out[i].netWorth - simRows[i].endPortfolio)).toBeLessThanOrEqual(EPS)
+        expect(Math.abs(out[i].netWorth - simRows[i].startPortfolio)).toBeLessThanOrEqual(EPS)
       }
     })
 
@@ -199,11 +215,11 @@ describe('buildSimNetWorthRows — exclude_from_fire (zonder houseInLedger): hui
     })
     // Elke rij telt overwaarde bij → reeks ligt boven het gefilterde endPortfolio.
     for (let i = 0; i < out.length; i++) {
-      expect(out[i].netWorth).toBeGreaterThan(simRows[i].endPortfolio)
+      expect(out[i].netWorth).toBeGreaterThan(simRows[i].startPortfolio)
     }
     // De huiswaarde groeit → de bijdrage neemt toe over de jaren.
-    const contribFirst = out[0].netWorth - simRows[0].endPortfolio
-    const contribLast = out[out.length - 1].netWorth - simRows[simRows.length - 1].endPortfolio
+    const contribFirst = out[0].netWorth - simRows[0].startPortfolio
+    const contribLast = out[out.length - 1].netWorth - simRows[simRows.length - 1].startPortfolio
     expect(contribLast).toBeGreaterThan(contribFirst)
   })
 
@@ -257,7 +273,7 @@ describe('buildSimNetWorthRows — kernel-tak (houseInLedger): huis al in het gr
       })
       expect(out.length).toBe(simRows.length)
       for (let i = 0; i < out.length; i++) {
-        expect(Math.abs(out[i].netWorth - simRows[i].endPortfolio)).toBeLessThanOrEqual(EPS)
+        expect(Math.abs(out[i].netWorth - simRows[i].startPortfolio)).toBeLessThanOrEqual(EPS)
       }
     })
   }
@@ -489,7 +505,108 @@ describe('buildSimNetWorthRows — edge cases', () => {
       dateOfBirth: DOB,
     })
     for (let i = 0; i < out.length; i++) {
-      expect(Math.abs(out[i].netWorth - simRows[i].endPortfolio)).toBeLessThanOrEqual(EPS)
+      expect(Math.abs(out[i].netWorth - simRows[i].startPortfolio)).toBeLessThanOrEqual(EPS)
     }
+  })
+})
+
+/**
+ * ADR 0034-addendum — de endpoint-invariant op de /overzicht-mini-grafiek.
+ *
+ * Given  een kernel-jaarreeks in de ECHTE `SimRow`-vorm: `startPortfolio` is de
+ *        stand ÓP leeftijd `age`, `endPortfolio` de stand op leeftijd `age + 1`
+ *        (bridge: `endPortfolio → UnifiedProjectionRow.netWorth`, "netto vermogen
+ *        einde van jaar"). Profiel: fractionele FIRE-leeftijd 50,75, eigen woning
+ *        op `exclude_from_fire`, huis al in het grootboek (`houseInLedger`).
+ * When   `buildSimNetWorthRows` de reeks omzet naar het weergave-vermogen per jaar
+ *        en de /overzicht-grafiek de rij op de afgeronde FIRE-leeftijd (51) leest.
+ * Then   die rij is het geprojecteerde netto vermogen ÓP leeftijd 51 en ligt dus
+ *        binnen één jaargrid-stap van `requiredFireNetWorth` (Prognose!I@FIRE) —
+ *        hetzelfde bedrag dat /toekomst als doel-incl-woning toont.
+ *
+ * Verankerd op de ECHTE eigenaar-cijfers (probe 27-08-2026, jpsmit@jps-holding.nl):
+ * stand vandaag €265.401 op leeftijd 46, kernelreeks 46→51, FIRE 50,75,
+ * requiredFireNetWorth €562.833.
+ */
+describe('buildSimNetWorthRows — ADR 0034 endpoint-invariant (leeftijd-uitlijning)', () => {
+  // Kernelreeks zoals de bridge hem levert: index = leeftijdsjaar, waarde = stand
+  // ÓP die leeftijd. Echte eigenaar-cijfers.
+  const NW_AT_AGE: Record<number, number> = {
+    46: 265_401,
+    47: 329_170,
+    48: 399_066,
+    49: 472_725,
+    50: 550_269,
+    51: 565_847,
+    52: 584_482,
+  }
+  const START_AGE = 46
+  const FIRE_AGE_FRACTIONAL = 50.75
+  const FIRE_AGE_DISPLAY = 51 // fireAgeForDisplay(50,75)
+  const REQUIRED_FIRE_NET_WORTH = 562_833 // Prognose!I@FIRE — /toekomst-doel incl. woning
+  const DOB_46 = '1980-01-01'
+
+  /** De ECHTE SimRow-vorm: start = stand óp `age`, end = stand op `age + 1`. */
+  function kernelRows() {
+    const rows = []
+    for (let age = START_AGE; age <= 51; age++) {
+      rows.push({
+        age,
+        startPortfolio: NW_AT_AGE[age],
+        endPortfolio: NW_AT_AGE[age + 1],
+        inflationFactor: Math.pow(1.02, age - START_AGE),
+      })
+    }
+    return rows
+  }
+
+  it('legt op de afgeronde FIRE-leeftijd het vermogen ÓP die leeftijd neer, niet dat van een jaar later', () => {
+    const out = buildSimNetWorthRows({
+      simRows: kernelRows(),
+      currentNetWorth: NW_AT_AGE[START_AGE],
+      housingStrategy: { mode: 'exclude_from_fire' },
+      houseInLedger: true,
+      assets,
+      debts,
+      dateOfBirth: DOB_46,
+    })
+
+    // De reconcile-offset hoort ~0 te zijn: rij 0 IS de stand van vandaag. Is hij
+    // dat niet, dan schuift een heel groeijaar als "grondslagverschil" de hele
+    // reeks omlaag — precies de fout die deze test vastlegt.
+    expect(Math.abs(out[0].netWorth - NW_AT_AGE[START_AGE])).toBeLessThanOrEqual(EPS)
+
+    const atFire = out.find((r) => r.age === FIRE_AGE_DISPLAY)
+    expect(atFire).toBeDefined()
+    expect(Math.abs(atFire!.netWorth - NW_AT_AGE[FIRE_AGE_DISPLAY])).toBeLessThanOrEqual(EPS)
+
+    // ADR 0034: op de FIRE-maand geldt prognose-nettovermogen == requiredFireNetWorth.
+    // Tolerantie RELATIEF (1%) en niet absoluut: het verschil dat overblijft is de
+    // afronding van een fractionele FIRE-leeftijd (50,75) naar het jaargrid (51) —
+    // die schaalt mee met het bedrag. Een absolute cent-tolerantie zou hier een
+    // fout-klasse verbergen die met de vermogensomvang meegroeit.
+    const afwijking = Math.abs(atFire!.netWorth - REQUIRED_FIRE_NET_WORTH) / REQUIRED_FIRE_NET_WORTH
+    expect(afwijking).toBeLessThan(0.01)
+  })
+
+  it('deflateert de FIRE-rij met de factor van diezelfde leeftijd (waarde en factor horen bij hetzelfde jaar)', () => {
+    const out = buildSimNetWorthRows({
+      simRows: kernelRows(),
+      currentNetWorth: NW_AT_AGE[START_AGE],
+      housingStrategy: { mode: 'exclude_from_fire' },
+      houseInLedger: true,
+      assets,
+      debts,
+      dateOfBirth: DOB_46,
+    })
+    const atFire = out.find((r) => r.age === FIRE_AGE_DISPLAY)!
+    // 5 jaar vooruit vanaf 46 ⇒ factor 1,02^5. Waarde én factor moeten bij
+    // leeftijd 51 horen; een jaar-shift in de waarde zou hier een te hoog
+    // reëel bedrag geven terwijl de factor onveranderd blijft.
+    expect(atFire.inflationFactor).toBeCloseTo(Math.pow(1.02, FIRE_AGE_DISPLAY - START_AGE), 9)
+    const reeel = deflate(atFire.netWorth, atFire.inflationFactor, 'real')
+    expect(reeel).toBeGreaterThan(505_000)
+    expect(reeel).toBeLessThan(520_000)
+    void FIRE_AGE_FRACTIONAL
   })
 })

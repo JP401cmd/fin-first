@@ -404,10 +404,13 @@ export const OVZ_ENGINE_CHECKS: OvzEngineCheck[] = [
       // IEEE-754 altijd exact — geen drijvendekomma-afrondingsruis in de assertie.
       const currentNetWorth = 500000
       const rows = buildSimNetWorthRows({
+        // `startPortfolio` = de stand ÓP die leeftijd (wat de weergavereeks toont);
+        // `endPortfolio` = de stand een jaar later. De reeks leest de eerste, dus
+        // die draagt hier de bedragen die de assertie hieronder verwacht.
         simRows: [
-          { age: 60, endPortfolio: 500000, inflationFactor: 1 },
-          { age: 61, endPortfolio: 1000000, inflationFactor: 2 },
-          { age: 62, endPortfolio: 2000000, inflationFactor: 4 },
+          { age: 60, startPortfolio: 500000, endPortfolio: 1000000, inflationFactor: 1 },
+          { age: 61, startPortfolio: 1000000, endPortfolio: 2000000, inflationFactor: 2 },
+          { age: 62, startPortfolio: 2000000, endPortfolio: 4000000, inflationFactor: 4 },
         ],
         currentNetWorth,
         housingStrategy: DEFAULT_HOUSING_STRATEGY, // include_full → geen huis-overwaarde-optelling

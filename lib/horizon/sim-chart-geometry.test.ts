@@ -9,7 +9,7 @@
  * onvolledige memo-dep of een gewijzigde formule) direct zichtbaar wordt.
  */
 import { describe, it, expect } from 'vitest'
-import { buildSimChartGeometry, type SimChartGeometryInput } from './sim-chart-geometry'
+import { buildSimChartGeometry, simRowsToChartPoints, type SimChartGeometryInput } from './sim-chart-geometry'
 import type { SimRow } from '@/lib/fire-simulation'
 import type { ChartEventOverlay } from '@/lib/chart-event-overlay'
 
@@ -446,5 +446,52 @@ describe('buildSimChartGeometry — eventOverlay', () => {
 
   it('paden schalen mee met de nieuwe innerH', () => {
     expect(g.accPath).toMatchInlineSnapshot(`"M 60.0 223.6 L 81.0 219.6 L 101.9 215.3 L 122.9 210.8 L 143.8 206.1 L 164.8 201.1 L 185.8 195.9 L 206.7 190.5 L 227.7 184.7 L 248.6 178.7 L 269.6 172.4 L 290.6 165.7 L 311.5 158.8 L 332.5 151.5 L 353.4 143.8 L 374.4 135.7 L 395.4 127.2 L 416.3 118.4 L 437.3 109.0 L 443.6 106.2"`)
+  })
+})
+
+/**
+ * Tijdstip-conventie van de chart-punten (bugfix 27-08-2026).
+ *
+ * Given  een kernel-jaarreeks: `SimRow{age: N}` beschrijft leeftijdsJAAR N, met
+ *        `startPortfolio` = stand ÓP N en `endPortfolio` = stand op N + 1.
+ * When   een reeks naar chart-punten wordt omgezet.
+ * Then   het eerste punt ligt op de beginleeftijd met de BEGINstand, en elke
+ *        eindejaarsstand landt op `age + 1` — dezelfde as-positie die de
+ *        hoofdlijn gebruikt, zodat overlays en hoofdlijn samenvallen.
+ */
+describe('simRowsToChartPoints — tijdstip-conventie', () => {
+  const rows = [
+    makeRow(40, 100_000, { endPortfolio: 110_000 }),
+    makeRow(41, 110_000, { endPortfolio: 121_000 }),
+    makeRow(42, 121_000, { endPortfolio: 133_100 }),
+  ]
+
+  it('seedt op de beginleeftijd en plot elke eindstand op age + 1', () => {
+    expect(simRowsToChartPoints(rows)).toEqual([
+      [40, 100_000],
+      [41, 110_000],
+      [42, 121_000],
+      [43, 133_100],
+    ])
+  })
+
+  it('geeft een lege reeks terug voor lege invoer (geen seed uit het niets)', () => {
+    expect(simRowsToChartPoints([])).toEqual([])
+  })
+
+  it('legt een overlay exact op de hoofdlijn wanneer beide dezelfde rijen krijgen', () => {
+    // De regressie die dit vastlegt: de overlays bouwden hun punten als
+    // [age, endPortfolio] en lagen daardoor een heel jaar links van de
+    // hoofdlijn — zichtbaar als een overlay die bij de startleeftijd al op de
+    // stand van een jaar later begint.
+    const overlayPts = simRowsToChartPoints(rows)
+    const hoofdlijnPts: [number, number][] = [[rows[0].age, rows[0].startPortfolio]]
+    for (const r of rows) hoofdlijnPts.push([r.age + 1, r.endPortfolio])
+    expect(overlayPts).toEqual(hoofdlijnPts)
+
+    // En de oude vorm week aantoonbaar af — anders bewijst de test niets.
+    const oudeVorm = rows.map((r) => [r.age, r.endPortfolio] as [number, number])
+    expect(oudeVorm).not.toEqual(overlayPts)
+    expect(oudeVorm[0]).toEqual([40, 110_000]) // stand van leeftijd 41 op x=40
   })
 })

@@ -32,6 +32,8 @@ import { resolvePageStatusMap } from '@/lib/page-status/resolve'
 import { resolveFreedomBanner } from '@/lib/page-status/freedom'
 import type { PageStatusInfo } from '@/lib/page-status/types'
 import type { MinimizedLevel } from '@/lib/page-status/display'
+import { readMinimizedMap } from '@/lib/page-status/minimized-prefs'
+import { DEFICIT_NOTICE_MINIMIZE_KEY } from '@/lib/horizon/deficit-loan-minimize'
 
 /** Welke databron(nen) een in-scope route nodig heeft. */
 export type Family = 'lever' | 'cashflow' | 'box2' | 'freedom'
@@ -71,7 +73,33 @@ export function normalizePageStatusRoute(raw: string | null): string | null {
   if (!raw) return null
   // Trailing slash strippen (behalve de root "/"); leeg → niets.
   const trimmed = raw.length > 1 && raw.endsWith('/') ? raw.slice(0, -1) : raw
-  return trimmed in ROUTE_FAMILY ? trimmed : null
+  // hasOwnProperty i.p.v. `in`: `in` volgt de prototype-keten, dus 'toString',
+  // 'constructor' en 'hasOwnProperty' zouden anders door de allowlist glippen.
+  return Object.prototype.hasOwnProperty.call(ROUTE_FAMILY, trimmed) ? trimmed : null
+}
+
+/**
+ * Extra sleutels die WÉL een "geminimaliseerd"-voorkeur in
+ * `profiles.status_banner_minimized` dragen, maar GEEN /overzicht-status hebben:
+ * hun melding komt uit data die de pagina zelf al geladen heeft, niet uit
+ * `computePageStatusInfo`. Ze zijn daarom bewust géén ROUTE_FAMILY-entry — de
+ * GET blijft er `{ info: null }` voor geven — maar de PUT moet ze wel kunnen
+ * opslaan, zodat er één schrijfpad voor minimaliseren blijft bestaan.
+ */
+export const EXTRA_MINIMIZE_KEYS: readonly string[] = [DEFICIT_NOTICE_MINIMIZE_KEY]
+
+/**
+ * Allowlist voor het SCHRIJFPAD (PUT): de /overzicht-routes uit ROUTE_FAMILY
+ * plus de extra pref-only sleutels hierboven. Bewust een aparte functie naast
+ * `normalizePageStatusRoute` (die de LEES-scope van de status bewaakt), zodat de
+ * GET niet stilzwijgend meegroeit met sleutels die geen status hebben.
+ */
+export function normalizeMinimizeKey(raw: string | null): string | null {
+  if (!raw) return null
+  const trimmed = raw.length > 1 && raw.endsWith('/') ? raw.slice(0, -1) : raw
+  // Zie normalizePageStatusRoute: prototype-sleutels mogen de allowlist niet passeren.
+  if (Object.prototype.hasOwnProperty.call(ROUTE_FAMILY, trimmed)) return trimmed
+  return EXTRA_MINIMIZE_KEYS.includes(trimmed) ? trimmed : null
 }
 
 /** Smalt een onbekende jsonb-waarde tot een geldig minimized-niveau (of null). */
@@ -89,13 +117,9 @@ export async function readMinimizedLevel(
   userId: string,
   route: string,
 ): Promise<MinimizedLevel | null> {
-  const { data } = await supabase
-    .from('profiles')
-    .select('status_banner_minimized')
-    .eq('id', userId)
-    .single()
-
-  const map = (data?.status_banner_minimized ?? {}) as Record<string, unknown>
+  // Delegeert naar de lichte gedeelde lezing (minimized-prefs.ts) zodat er één
+  // select op de map bestaat; gedrag is identiek aan de vorige inline-query.
+  const map = await readMinimizedMap(supabase, userId)
   return asMinimizedLevel(map[route])
 }
 

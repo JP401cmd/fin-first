@@ -1175,7 +1175,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // optioneel is voor hand-gebouwde fixtures): zo dwingt de compiler af dat de
   // join hieronder daadwerkelijk gebeurt en er nooit een factor-loze rij de
   // /overzicht-bundel in glipt.
-  let simRows: { age: number; endPortfolio: number; phase: string; flowIn: number; flowOut: number; oneTimeNet: number; inflationFactor: number }[] | null = null
+  let simRows: { age: number; endPortfolio: number; startPortfolio: number; phase: string; flowIn: number; flowOut: number; oneTimeNet: number; inflationFactor: number }[] | null = null
   // Geprojecteerd VOLLEDIG netto vermogen per jaar (FIRE-pot + meegroeiende
   // niet-liquide assets die uit de FIRE-pot gefilterd zijn). Náást endPortfolio,
   // zodat de /overzicht-grafiek de Vandaag→projectie-lijn continu houdt met het
@@ -1231,6 +1231,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         simRows = clipRowsToPlanEnd(simResult.rows, simResult.displayEndAge).map(r => ({
           age: r.age,
           endPortfolio: r.endPortfolio,
+          // Stand ÓP `age` (begin van het leeftijdsjaar). Nodig voor de
+          // /overzicht-weergavereeks, die "vermogen op leeftijd X" toont en dus
+          // niet de eindejaarsstand mag lezen — zie de leeftijdsconventie op
+          // `BuildSimNetWorthRowsParams.simRows`.
+          startPortfolio: r.startPortfolio,
           phase: r.phase,
           flowIn: r.flowIn,
           flowOut: r.flowOut,

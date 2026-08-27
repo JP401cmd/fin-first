@@ -228,6 +228,34 @@ export type SimChartGeometry = {
  * De formules zijn 1-op-1 overgenomen uit de vorige inline-render-body van
  * `sim-chart.tsx` (bit-identieke SVG-output is een harde eis van deze refactor).
  */
+/**
+ * Zet een kernel-jaarreeks om naar chart-punten `[leeftijd, vermogen]`.
+ *
+ * TIJDSTIP-CONVENTIE (één plek, hier):
+ * een `SimRow{age: N}` beschrijft het leeftijdsJAAR N, niet het tijdstip N.
+ * `startPortfolio` is de stand ÓP N; `endPortfolio` de stand aan het EIND van dat
+ * jaar — dus op leeftijd N + 1 (bridge: `endPortfolio → UnifiedProjectionRow
+ * .netWorth`, "netto vermogen einde van jaar"). Een reeks is daarom een seed op de
+ * beginleeftijd plus één punt per jaargrens.
+ *
+ * WAAROM GEDEELD: de hoofdlijn en de ghost-lijn hieronder deden dit al goed, maar
+ * de overlay-reeksen in `horizon-client.tsx` (huishoud-partnerlijn, wat-als-
+ * scenario's, doel-/wat-als-lijn) plotten `[r.age, r.endPortfolio]` — zonder de
+ * `+ 1` en zonder seed. Die overlays liggen op DEZELFDE leeftijds-as als de
+ * hoofdlijn, dus ze stonden er structureel één jaar links van: bij de
+ * beginleeftijd begon de overlay al op de stand van een jaar later, en de
+ * gestippelde wat-als-lijn kruiste de doellijn een jaar te vroeg. Eén conventie,
+ * één huis — anders drift elke nieuwe overlay opnieuw weg.
+ */
+export function simRowsToChartPoints(
+  rows: readonly Pick<SimRow, 'age' | 'startPortfolio' | 'endPortfolio'>[],
+): [number, number][] {
+  if (rows.length === 0) return []
+  const pts: [number, number][] = [[rows[0].age, rows[0].startPortfolio]]
+  for (const r of rows) pts.push([r.age + 1, r.endPortfolio])
+  return pts
+}
+
 export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeometry {
   const {
     rows,
@@ -288,23 +316,11 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
   const minAge = visibleMinAge ?? currentAge
   const maxAge = visibleMaxAge ?? endAge
 
-  // Build all path points from rows
-  const allPts: [number, number][] = []
-  if (rows.length > 0) {
-    allPts.push([rows[0].age, rows[0].startPortfolio])
-    for (const r of rows) {
-      allPts.push([r.age + 1, r.endPortfolio])
-    }
-  }
+  // Build all path points from rows (tijdstip-conventie: zie simRowsToChartPoints)
+  const allPts: [number, number][] = simRowsToChartPoints(rows)
 
   // Build baseline ghost-line points (what-if mode)
-  const baselinePts: [number, number][] = []
-  if (baselineRows && baselineRows.length > 0) {
-    baselinePts.push([baselineRows[0].age, baselineRows[0].startPortfolio])
-    for (const r of baselineRows) {
-      baselinePts.push([r.age + 1, r.endPortfolio])
-    }
-  }
+  const baselinePts: [number, number][] = simRowsToChartPoints(baselineRows ?? [])
 
   // Filter points to visible range for Y-axis rescaling
   const inRange = ([age]: [number, number]) => age >= minAge - 1 && age <= maxAge + 1

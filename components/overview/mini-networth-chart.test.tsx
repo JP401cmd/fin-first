@@ -7,6 +7,7 @@ import { PrivacyProvider, PRIVACY_MASKED_STORAGE_KEY } from '@/lib/hooks/use-pri
 import { MASKED_AMOUNT_PLACEHOLDER, formatApproxCurrency, formatCurrency } from '@/lib/format'
 import { EuroViewProvider } from '@/lib/hooks/use-euro-view'
 import { deflate, factorAtAge } from '@/lib/euro-display'
+import { buildSimNetWorthRows } from '@/lib/horizon/networth-rows'
 import { VrijheidsvoortgangWidget } from '@/components/widgets/vrijheidsvoortgang-widget'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
 
@@ -901,5 +902,94 @@ describe('KRUIS-consistentie (AC-F4 / UAT-KRUIS-27) — één FIRE-doel, één d
     // rij-keuze en niet alleen de afronding.
     expect(formatApproxCurrency(verwacht)).not.toBe(formatApproxCurrency(nietVerwacht))
     expect(container.textContent).not.toContain(formatApproxCurrency(nietVerwacht))
+  })
+})
+
+/**
+ * ADR 0034-addendum op het scherm — /overzicht en /toekomst tonen hetzelfde
+ * vermogen op het vrijheidsmoment.
+ *
+ * Given  een gebruiker met een FRACTIONELE vrijheidsleeftijd (50,75), eigen
+ *        woning op `exclude_from_fire` en de euro-weergave op "huidige euro's";
+ *        de kernelreeks komt uit `buildSimNetWorthRows` op de ECHTE `SimRow`-
+ *        vorm (`startPortfolio` = stand ÓP die leeftijd, `endPortfolio` = stand
+ *        een jaar later), zoals `dashboard-data-loader` hem aanlevert.
+ * When   de mini-vermogensgrafiek de kop "Vermogen bij vrijheid → …" rendert.
+ * Then   dat bedrag is het geprojecteerde netto vermogen op de afgeronde
+ *        vrijheidsleeftijd (51) en valt — na de "ca."-afronding op twee
+ *        significante cijfers — samen met het doel-incl-woning dat /toekomst
+ *        toont (`requiredFireNetWorth`, gedeflateerd met dezelfde rij-factor).
+ *
+ * Echte eigenaar-cijfers (probe 27-08-2026): stand vandaag €265.401 op leeftijd
+ * 46, requiredFireNetWorth €562.833 nominaal. Vóór de leeftijd-uitlijning las de
+ * grafiek de eindejaarsstand en toonde ze "ca. €470.000" naast "ca. €510.000"
+ * op /toekomst.
+ */
+describe('MiniNetWorthChart — vermogen bij vrijheid == FIRE-doel incl. woning (ADR 0034)', () => {
+  const NW_AT_AGE: Record<number, number> = {
+    46: 265_401, 47: 329_170, 48: 399_066, 49: 472_725,
+    50: 550_269, 51: 565_847, 52: 584_482,
+  }
+  const START_AGE = 46
+  const FIRE_DISPLAY_AGE = 51 // fireAgeForDisplay(50,75)
+  const REQUIRED_FIRE_NET_WORTH = 562_833
+
+  it('toont hetzelfde afgeronde bedrag als het /toekomst-doel incl. woning', () => {
+    const kernelRows = Array.from({ length: 6 }, (_, i) => {
+      const age = START_AGE + i
+      return {
+        age,
+        startPortfolio: NW_AT_AGE[age],
+        endPortfolio: NW_AT_AGE[age + 1],
+        inflationFactor: Math.pow(1.02, i),
+      }
+    })
+    // Exact het loader-pad: de bundelreeks komt uit de canonieke engine, niet
+    // uit een met de hand nagebouwde reeks.
+    const simNetWorthRows = buildSimNetWorthRows({
+      simRows: kernelRows,
+      currentNetWorth: NW_AT_AGE[START_AGE],
+      housingStrategy: { mode: 'exclude_from_fire' },
+      houseInLedger: true,
+      assets: [],
+      debts: [],
+      dateOfBirth: null,
+    })
+
+    const { container } = render(
+      <EuroViewProvider initialView="real">
+        <MiniNetWorthChart
+          netWorthHistory={buildHistory([240_000, 250_000, NW_AT_AGE[START_AGE]])}
+          currentNetWorth={NW_AT_AGE[START_AGE]}
+          currentAge={START_AGE}
+          fireAge={FIRE_DISPLAY_AGE}
+          endAge={93}
+          simNetWorthRows={simNetWorthRows}
+          simRequiredPortfolio={201_813}
+        />
+      </EuroViewProvider>,
+    )
+
+    // /toekomst rekent hetzelfde doel om met de rij-factor op diezelfde
+    // weergave-leeftijd (horizon-client#viewFireTargetInclHome).
+    const factorRows = simNetWorthRows.map((r) => ({ age: r.age, inflationFactor: r.inflationFactor }))
+    const toekomstDoel = deflate(
+      REQUIRED_FIRE_NET_WORTH,
+      factorAtAge(factorRows, FIRE_DISPLAY_AGE),
+      'real',
+    )
+
+    expect(container.textContent).toContain(
+      `Vermogen bij vrijheid → ${formatApproxCurrency(toekomstDoel)}`,
+    )
+    // En het is niet toevallig gelijk doordat álles op dezelfde afronding valt:
+    // de eindejaarsstand (de oude, foute grondslag) rondt aantoonbaar ánders af.
+    const oudeFouteGrondslag = deflate(
+      NW_AT_AGE[FIRE_DISPLAY_AGE + 1] - (NW_AT_AGE[START_AGE + 1] - NW_AT_AGE[START_AGE]),
+      factorAtAge(factorRows, FIRE_DISPLAY_AGE),
+      'real',
+    )
+    expect(formatApproxCurrency(oudeFouteGrondslag)).not.toBe(formatApproxCurrency(toekomstDoel))
+    expect(container.textContent).not.toContain(formatApproxCurrency(oudeFouteGrondslag))
   })
 })

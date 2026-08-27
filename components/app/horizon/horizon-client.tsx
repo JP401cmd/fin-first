@@ -77,6 +77,7 @@ import {
   Play,
   Pause,
   Receipt,
+  Minus,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import {
@@ -91,6 +92,8 @@ import {
 } from '@/lib/horizon/liquid-wealth-line'
 import { applyHousingToComposition } from '@/lib/horizon/wealth-composition-housing'
 import { detectDeficitLoanFromRows } from '@/lib/horizon/deficit-loan-display'
+import { buildDeficitLoanCopy } from '@/lib/horizon/deficit-loan-copy'
+import { useDeficitNotice } from '@/components/app/horizon/deficit-notice-provider'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { HideInSimple } from '@/components/app/hide-in-simple'
@@ -237,6 +240,7 @@ import { buildBreakdown } from '@/lib/income-expense-breakdown'
 import { WealthCompositionChart } from '@/components/app/horizon/wealth-composition-chart'
 import { unifiedRowsToStackedRows, type StackedRow } from '@/lib/wealth-composition'
 import { clipRowsToPlanEnd } from '@/lib/horizon/clip-rows-to-plan-end'
+import { simRowsToChartPoints } from '@/lib/horizon/sim-chart-geometry'
 import {
   buildFactorByAge,
   buildFactorByOffset,
@@ -1595,7 +1599,7 @@ export default function HorizonPage({
             ownOverlays.push({
               name: 'Jouw projectie',
               color: '#b89968', // lichter horizon
-              points: me.rows.map(r => [r.age, r.endPortfolio] as [number, number]),
+              points: simRowsToChartPoints(me.rows),
               fireAge: me.projection.fireAge,
               fireAgeFractional: me.fireAgeFractional,
               isDashed: true,
@@ -2814,6 +2818,41 @@ export default function HorizonPage({
   const usePartnerMainLine = isPartnerView && partnerLine !== null
   // Huishouden-view: de gecombineerde lijn is de hoofdlijn (matcht de hero-FIRE).
   const useHouseholdMainLine = isHouseholdView && householdMainLine !== null
+
+  // ── Tekort-lening-melding: zichtbaarheid + minimaliseer-toestand ─────────
+  // View-gating spiegelt de tijdlijn-marker: in partner-weergave mét partner-pad
+  // plot de grafiek de pártnerlijn — dan hoort het eigen tekort-verhaal er niet.
+  // De piek wordt aan de `DeficitNoticeProvider` gemeld (paginakop op /toekomst),
+  // die bepaalt of de melding uitgeklapt is of ingeklapt tot het statuspunt naast
+  // de pagina-'i'. Buiten die provider (legacy /horizon) blijft 'ie uitgeklapt.
+  const deficitNoticeVisible = deficitLoanNotice != null && !usePartnerMainLine
+  const {
+    display: deficitDisplay,
+    canMinimize: canMinimizeDeficit,
+    minimize: minimizeDeficitNotice,
+  } = useDeficitNotice(deficitNoticeVisible ? deficitLoanNotice!.peak : null)
+
+  // Situatie-specifieke uitleg bij de melding. Alle getallen komen uit DEZELFDE
+  // run (detector + `displayEndAge` + AOW-leeftijd + woonstrategie); de copy
+  // zelf woont in een pure sibling-module met eigen toon-grendel. Bedragen gaan
+  // er RÉÉDS geformatteerd in via de canonieke helpers (`formatMaskedCurrency` /
+  // `formatWithFreedom` op de bundel-dagbasis) — geen tweede som, geen eigen
+  // dag/jaar-conversie.
+  const deficitLoanCopy = useMemo(() => {
+    if (!deficitLoanNotice || !deficitNoticeVisible) return null
+    const freedomText = canonicalDailyRate > 0 && !masked
+      ? formatWithFreedom(deficitLoanNotice.peak, canonicalDailyRate, { includeCurrency: false, format: 'long', includeDays: false })
+      : null
+    return buildDeficitLoanCopy({
+      firstAge: deficitLoanNotice.firstAge,
+      aowAge: userAowAge.fractional,
+      displayEndAge,
+      isPensioenMode,
+      homeExcludedFromFire: homeExcludedFromProgress,
+      peakText: formatMaskedCurrency(deficitLoanNotice.peak, masked),
+      freedomText,
+    })
+  }, [deficitLoanNotice, deficitNoticeVisible, canonicalDailyRate, masked, userAowAge.fractional, displayEndAge, isPensioenMode, homeExcludedFromProgress])
   const aowAgeIntForDepletion = Math.ceil(userAowAge.fractional)
   const depletionAge = isAowStopActive && aowStopSimResult
     ? aowStopSimResult.rows.find(r => r.age >= aowAgeIntForDepletion && r.endPortfolio <= 0)?.age ?? null
@@ -3043,7 +3082,7 @@ export default function HorizonPage({
           name: scenario.name,
           label: scenario.name,
           color: color.hex,
-          points: result.rows.map(r => [r.age, r.endPortfolio] as [number, number]),
+          points: simRowsToChartPoints(result.rows),
         },
         rows: result.rows,
         events: scenarioEvents,
@@ -3092,9 +3131,7 @@ export default function HorizonPage({
       color: 'var(--ink-2)',
       // Clip op dezelfde `displayEndAge` als de hoofdlijn (zie displaySimRows) — anders
       // loopt de gestippelde lijn een jaar verder door dan de basislijn.
-      points: clipRowsToPlanEnd(doelLijnBron.rows, displayEndAge).map(
-        r => [r.age, r.endPortfolio] as [number, number],
-      ),
+      points: simRowsToChartPoints(clipRowsToPlanEnd(doelLijnBron.rows, displayEndAge)),
       variant: 'scenario',
       fireAgeFractional: doelLijnBron.fireAgeFractional,
       // Stop-bron ⇒ legenda toont "(stop 63)" i.p.v. de gesolvede "(57j)".
@@ -4179,14 +4216,26 @@ export default function HorizonPage({
   // De lijn wordt getekend als 'ie kán én de gebruiker 'm aan heeft staan.
   const liquidLineVisible = liquidLineAvailable && showLiquidLine
   // Scenario-overlays lopen op de EIGEN leeftijd-as (wat-als/stop-pad/ghosts van
-  // dezelfde gebruiker) ⇒ leeftijd-sleutel.
+  // dezelfde gebruiker) ⇒ leeftijd-sleutel, met BRONJAAR-sleutel (`x - 1`).
+  // Waarom `x - 1`: `simRowsToChartPoints` plot de eindstand van rij `age` op
+  // `age + 1` (zie lib/horizon/sim-chart-geometry.ts). De HOOFDLIJN deflateert
+  // diezelfde eindstand met de factor van de RIJ (`deflateRowsByAge` op
+  // `SIM_ROW_MONEY_FIELDS`, dus f(age)) en tekent hem daarna op `age + 1`. Een
+  // overlay die op x=age+1 f(age+1) zou pakken, krijgt één jaar extra deflatie
+  // en zakt ~π onder de lijn waar hij tegen afgezet wordt. Zelfde sleutel en
+  // zelfde reden als de besteedbaar-lijn hierboven en de Monte-Carlo-band
+  // hieronder. Het STAARTpunt (x = laatste leeftijd + 1) valt zonder deze
+  // sleutel bovendien buiten `factorByAge` en zou nominaal blijven staan — een
+  // zichtbare haak omhoog in 'real'. Het SEED-punt (x = startleeftijd) mapt naar
+  // startleeftijd − 1, die bewust niet in de map zit: `deflatePoints` laat het
+  // bedrag dan ongemoeid, en dat is exact goed — jaar 0 draagt factor 1.0.
   const viewCombinedScenarioOverlays = useMemo(
     () =>
       euroView === 'nominal'
         ? combinedScenarioOverlays
         : combinedScenarioOverlays.map(o => ({
             ...o,
-            points: deflatePoints(o.points, factorByAge, euroView),
+            points: deflatePoints(o.points, factorByAge, euroView, x => x - 1),
           })),
     [combinedScenarioOverlays, factorByAge, euroView],
   )
@@ -4204,11 +4253,21 @@ export default function HorizonPage({
         ? householdOverlays
         : householdOverlays.map(o => ({
             ...o,
+            // `[1, ...factorByOffset]`: de puntenreeks draagt sinds
+            // `simRowsToChartPoints` een SEED op de startleeftijd, gevolgd door
+            // één punt per rij op `age + 1`. Positie j=0 is dus de stand van nu
+            // (factor 1.0) en positie j=i+1 draagt de eindstand van rij i — die
+            // op de hoofdlijn met de factor van díe rij (offset i) wordt
+            // gedeflateerd. Het vooropgezette 1-element schuift de offsets één
+            // plek op zodat elk punt de factor van zijn BRONrij krijgt; zonder
+            // die shift pakt elk punt er één te ver en zakt de overlay ~π onder
+            // de hoofdlijn. Leeftijd-as is hier vreemd (partner/huishouden), dus
+            // positie draagt de tijd — niet de leeftijd (K4).
             points: deflatePoints(
               o.points,
               factorMapByPosition(
                 o.points.map(([age]) => ({ age })),
-                factorByOffset,
+                [1, ...factorByOffset],
               ),
               euroView,
             ),
@@ -4809,26 +4868,33 @@ export default function HorizonPage({
                 style={{ width: `${hasPerspectiveHero ? Math.max(Math.min(perspectiveHero!.freedomPercentage, 100), 0) : effectiveFreedomPct}%` }}
               />
             </div>
-            {/* euro-view: exempt — hoort bij de nominale freedomPct-noemer.
-                Het balk-label is geen losstaand doelbedrag maar het RECHTER-EIND
-                van de balk hierboven: het is de noemer waartegen de vulling
-                (`effectiveFreedomPct`, canoniek uit computeFreedomProgressWithBasis
-                op de NOMINALE `requiredNetWorthInclHome`) is gemeten. Zetten we
-                hier het gedeflateerde doel neer, dan leest het paar twee
-                grondslagen tegelijk: een balk op 40% naast een bedrag waarvan de
-                breuk 59% is. Percentage + label zijn daarom één eenheid en
-                blijven samen nominaal — identiek aan het voortgangs-paar van de
-                Vrijheidsvoortgang-widget op /overzicht. De KPI-tegel "benodigd"
-                hierboven is wél een losstaand doelbedrag en deflateert gewoon
-                (`viewBalkVrijheidDoel`, gepind in horizon-client.euro-view.test.ts). */}
+            {/* Balk-label = HETZELFDE bedrag als de Doelbedrag-KPI hierboven, in
+                de actieve euro-weergave. Eigenaar-besluit 27-08-2026 (addendum
+                ADR 0034, conventie ADR 0093): het label leest voor een gebruiker
+                als een doelbedrag, niet als de wiskundige noemer van de
+                balk-vulling — twee bedragen voor hetzelfde doel op één scherm
+                ("ca. €180.000" in de KPI naast €200.032 onder de balk) leest als
+                een fout, ook al was de eerdere nominale keuze intern
+                verdedigbaar. Daarmee vervalt de euro-view-uitzondering die hier
+                stond (D12/D13).
+                Wat NIET meebeweegt: de vulling blijft `effectiveFreedomPct`,
+                canoniek uit computeFreedomProgressWithBasis — een ratio (klasse
+                R, ADR 0093) deflateert nooit. Gevolg dat de eigenaar accepteert:
+                in 'real' is de breuk onder de balk niet meer letterlijk
+                teller/label. Ook de grondslag-keuze (excl. woning bij
+                `isHomeExcludedFromFire`) is ongewijzigd — ADR 0034.
+                Deflatie loopt via de canonieke route en exact één keer:
+                `viewBalkVrijheidDoel`/`viewPortfolioAtAow` zijn binnen de
+                render-grens gedeeld door `factorAtAge` op het FIRE- resp.
+                AOW-jaar. Gepind in horizon-client.euro-view.test.ts. */}
             <div className="mt-2 flex justify-between text-xs text-[var(--ink-4)]">
               <span>0%</span>
               <span className="font-mono">
                 {hasPerspectiveHero
-                  ? `${formatMaskedCurrency(perspectiveHero!.fireTarget, masked)} — ${isPartnerView ? `${perspectiveHero!.householdName}'s vrijheid` : 'gezamenlijke vrijheid'}`
+                  ? `${formatMaskedApproxCurrency(perspectiveHero!.fireTarget, masked)} — ${isPartnerView ? `${perspectiveHero!.householdName}'s vrijheid` : 'gezamenlijke vrijheid'}`
                   : isPensioenMode
-                    ? `${formatMaskedCurrency(portfolioAtAow ?? 0, masked)} — vermogen op AOW`
-                    : `${formatMaskedCurrency(balkVrijheidDoel, masked)} — volledige vrijheid`}
+                    ? `${formatMaskedApproxCurrency(viewPortfolioAtAow ?? 0, masked)} — vermogen op AOW`
+                    : `${formatMaskedApproxCurrency(viewBalkVrijheidDoel, masked)} — volledige vrijheid`}
               </span>
               <span>100%</span>
             </div>
@@ -5106,26 +5172,70 @@ export default function HorizonPage({
                   tijdlijn-marker i.p.v. de lijn ontvloeren. Stoplicht-oranje (aandacht),
                   volgt de module-accentkeuze bewust NIET (CLAUDE.md-kleurconventie).
                   View-gating spiegelt de marker: in partner-weergave (met partner-pad)
-                  plot de grafiek de pártnerlijn — dan geen eigen tekort-verhaal tonen. */}
-              {deficitLoanNotice && !(isPartnerView && partnerLine !== null) && (() => {
-                const dRate = canonicalDailyRate
-                const freedom = dRate > 0 && !masked
-                  ? formatWithFreedom(deficitLoanNotice.peak, dRate, { includeCurrency: false, format: 'long', includeDays: false })
-                  : null
-                return (
-                  <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-orange-300 bg-orange-50/60 px-3 py-2.5">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
-                    <p className="font-sans text-[12px] text-orange-700">
-                      Tekort-lening aangesproken vanaf leeftijd{' '}
-                      <strong>{Math.floor(deficitLoanNotice.firstAge)}</strong> — piek{' '}
-                      <strong>{formatMaskedCurrency(deficitLoanNotice.peak, masked)}</strong>
-                      {freedom ? <> ({freedom} vrijheid die je later terugkoopt)</> : null}. In die
-                      periode leen je bij om je uitgaven te dekken; op de vermogenslijn zie je dit
-                      niet, want die toont je nettovermogen (tekort al verrekend).
-                    </p>
+                  plot de grafiek de pártnerlijn — dan geen eigen tekort-verhaal tonen.
+
+                  MINIMALISEERBAAR (CLAUDE.md-meldingen-conventie): uitgeklapt = deze
+                  melding; na "Minimaliseren" blijft alleen het gekleurde statuspunt
+                  links naast de pagina-'i' over (`DeficitNoticeDot` in de /toekomst-kop).
+                  De aria-live-regio blijft ALTIJD gemount, zodat een screenreader zowel
+                  het minimaliseren als het heropenen meekrijgt.
+
+                  KLEUR: amber = de canonieke stoplicht-'warn'-familie (dezelfde die
+                  `LEVERAGE_STATUS_DOT.warn` aan het statuspunt geeft), zodat melding en
+                  punt één familie zijn. Semantische status, dus bewust GEEN module-accent.
+                  De naburige oranje meldingen hierboven zijn pre-existing drift — buiten
+                  scope van deze wijziging. */}
+              <section role="status" aria-live="polite">
+                {deficitLoanCopy && deficitDisplay === 'minimized' && (
+                  <span className="sr-only">
+                    Melding over je tekort-lening geminimaliseerd. Activeer de gekleurde
+                    stip naast de informatie-knop om de melding opnieuw te tonen.
+                  </span>
+                )}
+                {deficitLoanCopy && deficitLoanNotice && deficitDisplay === 'expanded' && (
+                  <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-amber-300 bg-amber-50/60 px-3 py-2.5">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" aria-hidden="true" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="font-sans text-[12px] font-semibold text-amber-900">
+                          Tekort-lening aangesproken vanaf leeftijd {Math.floor(deficitLoanNotice.firstAge)}
+                        </p>
+                        {/* Minimaliseren alleen tonen waar de keuze ook onthouden
+                            wordt (binnen de provider) — geen knop die niets doet. */}
+                        {canMinimizeDeficit && (
+                          <button
+                            type="button"
+                            onClick={minimizeDeficitNotice}
+                            aria-label="Minimaliseren"
+                            title="Minimaliseren"
+                            className="-mr-1 -mt-1 inline-flex shrink-0 items-center gap-1 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--paper)] px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--ink-3)] transition-colors hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+                          >
+                            <Minus className="h-3.5 w-3.5" aria-hidden="true" />
+                            Minimaliseren
+                          </button>
+                        )}
+                      </div>
+                      <p className="mt-1 font-sans text-[12px] leading-relaxed text-amber-800">
+                        {deficitLoanCopy.periode} {deficitLoanCopy.waarom}
+                      </p>
+                      {deficitLoanCopy.woning && (
+                        <p className="mt-1.5 font-sans text-[12px] leading-relaxed text-amber-800">
+                          {deficitLoanCopy.woning}
+                        </p>
+                      )}
+                      <p className="mt-1.5 font-sans text-[12px] leading-relaxed text-amber-800">
+                        {deficitLoanCopy.piek} {deficitLoanCopy.lijn}
+                      </p>
+                      <p className="mt-1.5 font-sans text-[12px] leading-relaxed text-amber-800">
+                        {deficitLoanCopy.knoppen}
+                      </p>
+                      <p className="mt-2 font-sans text-[11px] text-[var(--ink-3)]">
+                        {deficitLoanCopy.disclaimer}
+                      </p>
+                    </div>
                   </div>
-                )
-              })()}
+                )}
+              </section>
 
               {/* "Huis wordt nooit verkocht" — beschrijvende info (geen advies, Wft-veilig).
                   Neutrale horizon-toon, niet de rode "fout"-stijl. */}

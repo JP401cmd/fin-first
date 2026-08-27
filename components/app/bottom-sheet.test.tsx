@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { BottomSheet } from './bottom-sheet'
 import { getOverlayCount, __resetOverlayCount } from '@/lib/overlay-signal'
+import { getOverlayHistoryDepth, __resetOverlayHistory } from '@/lib/overlay-history'
 
 // Modal-standaard: een klik op de gedimde achtergrond (backdrop) sluit een
 // modal NIET meer. Dit voorkomt onbedoeld dataverlies wanneer een gebruiker
@@ -122,5 +123,112 @@ describe('BottomSheet — overlay-signaal (pill verbergen)', () => {
       </BottomSheet>,
     )
     expect(getOverlayCount()).toBe(0)
+  })
+})
+
+/**
+ * Eén history-entry per open sheet — en elke sluitroute ruimt die op de juiste
+ * manier op. X, Escape, backdrop en swipe consumeren de eigen entry met een
+ * `history.back()` (anders blijft er een weesentry staan). Sluiten dóór een
+ * link in de sheet is de uitzondering: daar is Next's navigatie al onderweg en
+ * zou diezelfde back() die navigatie afbreken — de sheet blijft dan dicht maar
+ * de URL springt terug (het defect uit e2e/nav-menu-sheet-navigation.spec.ts).
+ *
+ * De rerender naar `open={false}` staat voor de bovenliggende component die op
+ * `onClose` reageert; daar hangt de effect-cleanup (de release) aan.
+ */
+describe('BottomSheet — history-entry per sluitroute', () => {
+  let pushSpy: ReturnType<typeof vi.spyOn>
+  let backSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    __resetOverlayHistory()
+    window.history.replaceState(null, '')
+    pushSpy = vi.spyOn(window.history, 'pushState')
+    backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    __resetOverlayHistory()
+  })
+
+  function renderSheet(kinderen?: React.ReactNode) {
+    const onClose = vi.fn()
+    const { rerender } = render(
+      <BottomSheet open onClose={onClose} title="Test" closeOnBackdropClick>
+        {kinderen ?? <p>inhoud</p>}
+      </BottomSheet>,
+    )
+    const dialog = screen.getByRole('dialog')
+    return {
+      onClose,
+      dialog,
+      backdrop: dialog.parentElement as HTMLElement,
+      /** De ouder reageert op onClose en zet `open` uit. */
+      ouderSluit: () =>
+        rerender(
+          <BottomSheet open={false} onClose={onClose} title="Test" closeOnBackdropClick>
+            {kinderen ?? <p>inhoud</p>}
+          </BottomSheet>,
+        ),
+    }
+  }
+
+  it('duwt precies één entry bij openen', () => {
+    renderSheet()
+    expect(pushSpy).toHaveBeenCalledTimes(1)
+    expect(getOverlayHistoryDepth()).toBe(1)
+  })
+
+  it('consumeert de entry bij sluiten via de X-knop', () => {
+    const { onClose, ouderSluit } = renderSheet()
+    fireEvent.click(screen.getByLabelText('Sluiten'))
+    expect(onClose).toHaveBeenCalledTimes(1)
+    ouderSluit()
+    expect(backSpy).toHaveBeenCalledTimes(1)
+    expect(getOverlayHistoryDepth()).toBe(0)
+  })
+
+  it('consumeert de entry bij sluiten via Escape', () => {
+    const { ouderSluit } = renderSheet()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    ouderSluit()
+    expect(backSpy).toHaveBeenCalledTimes(1)
+    expect(getOverlayHistoryDepth()).toBe(0)
+  })
+
+  it('consumeert de entry bij sluiten via de backdrop', () => {
+    const { backdrop, ouderSluit } = renderSheet()
+    fireEvent.click(backdrop)
+    ouderSluit()
+    expect(backSpy).toHaveBeenCalledTimes(1)
+    expect(getOverlayHistoryDepth()).toBe(0)
+  })
+
+  it('consumeert de entry bij weg-swipen', async () => {
+    const { dialog, onClose, ouderSluit } = renderSheet()
+    fireEvent.touchStart(dialog, { touches: [{ clientX: 0, clientY: 0 }] })
+    fireEvent.touchMove(document, { touches: [{ clientX: 0, clientY: 160 }] })
+    fireEvent.touchEnd(document)
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    ouderSluit()
+    expect(backSpy).toHaveBeenCalledTimes(1)
+    expect(getOverlayHistoryDepth()).toBe(0)
+  })
+
+  it('laat de history met rust wanneer een link in de sheet de sluiting veroorzaakt', () => {
+    const { ouderSluit } = renderSheet(<a href="/mijn">Mijn</a>)
+    // Next's <Link> voorkomt de default en navigeert zelf; die navigatie is bij
+    // het sluiten nog onderweg.
+    const houdJsdomStil = (e: Event) => e.preventDefault()
+    document.addEventListener('click', houdJsdomStil)
+    fireEvent.click(screen.getByText('Mijn'))
+    document.removeEventListener('click', houdJsdomStil)
+
+    ouderSluit()
+
+    expect(backSpy).not.toHaveBeenCalled()
+    expect(getOverlayHistoryDepth()).toBe(0)
   })
 })

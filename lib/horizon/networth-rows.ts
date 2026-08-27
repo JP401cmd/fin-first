@@ -77,11 +77,32 @@ export interface SimNetWorthRow {
 
 export interface BuildSimNetWorthRowsParams {
   /**
-   * Per-jaar FIRE-portefeuille uit de engine (endPortfolio = LedgerRow nettoVermogen, nominaal),
-   * mét de weergave-deflator van diezelfde kernelrij. De aanroeper joint die factor op
+   * Per-jaar FIRE-portefeuille uit de engine (LedgerRow nettoVermogen, nominaal), mét
+   * de weergave-deflator van diezelfde kernelrij. De aanroeper joint die factor op
    * LEEFTIJD uit `HorizonFireSim.unifiedRows`; hier wordt hij alleen doorgegeven.
+   *
+   * LEEFTIJDSCONVENTIE (hard — hier ging het mis, aug 2026):
+   * een `SimRow` met `age: N` beschrijft het leeftijdsJAAR N, niet het tijdstip N.
+   * `startPortfolio` is de stand ÓP leeftijd N, `endPortfolio` de stand aan het EIND
+   * van dat jaar — dus op leeftijd N + 1 (bridge: `endPortfolio → UnifiedProjectionRow
+   * .netWorth`, "netto vermogen einde van jaar"). Deze reeks is een WEERGAVE-reeks
+   * "vermogen op leeftijd X" en gebruikt daarom `startPortfolio`.
+   *
+   * Beide velden zijn verplicht en geen van beide heeft een fallback: `endPortfolio`
+   * doorgeven waar `startPortfolio` hoort schuift de héle curve een groeijaar omlaag
+   * en dat is onzichtbaar, want de reconcile-offset hieronder trekt jaar 0 tóch weer
+   * naar `currentNetWorth` — de naad blijft knikvrij terwijl elk later jaar te laag
+   * staat. Dat was de /overzicht-bug: "Vermogen bij vrijheid" €471.625 i.p.v.
+   * €512.505 (echte eigenaar-data, FIRE 50,75).
    */
-  simRows: { age: number; endPortfolio: number; inflationFactor: number }[]
+  simRows: {
+    age: number
+    /** Netto vermogen ÓP leeftijd `age` (begin van het leeftijdsjaar) — de weergavewaarde. */
+    startPortfolio: number
+    /** Netto vermogen aan het EIND van leeftijdsjaar `age` (= stand op `age + 1`). */
+    endPortfolio: number
+    inflationFactor: number
+  }[]
   /** Volledig netto vermogen vandaag (incl. huis) — het Vandaag-punt / historie-grondslag. */
   currentNetWorth: number
   /** Housing-strategie van de gebruiker. */
@@ -136,11 +157,16 @@ export function buildSimNetWorthRows(p: BuildSimNetWorthRowsParams): SimNetWorth
     return Math.max(0, currentValue - balance)
   }
 
-  // Ruwe reeks: endPortfolio + huisbijdrage per jaar. `inflationFactor` reist mee
-  // als passagier — hij zit in GEEN ENKELE som hieronder.
+  // Ruwe reeks: vermogen ÓP de leeftijd + huisbijdrage op diezelfde leeftijd.
+  // `startPortfolio`, niet `endPortfolio` — zie de leeftijdsconventie op
+  // `BuildSimNetWorthRowsParams.simRows`. Ook `houseEquityAt` rekent naar het
+  // TIJDSTIP `age`, dus waarde en huisbijdrage horen nu bij hetzelfde moment;
+  // met `endPortfolio` werd een stand van `age + 1` opgeteld bij een overwaarde
+  // van `age`. `inflationFactor` reist mee als passagier — hij zit in GEEN
+  // ENKELE som hieronder, en hoort (jaar 0 = 1.0) bij ditzelfde tijdstip.
   const raw = rows.map((r) => ({
     age: r.age,
-    value: r.endPortfolio + houseEquityAt(r.age),
+    value: r.startPortfolio + houseEquityAt(r.age),
     inflationFactor: r.inflationFactor,
   }))
 

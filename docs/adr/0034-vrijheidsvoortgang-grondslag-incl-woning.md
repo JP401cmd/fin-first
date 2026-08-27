@@ -44,3 +44,7 @@ Eigenaar-besluit: óók de **"nog X jaar vrij"-aftelling / FIRE-leeftijd** moet 
 - **Downsize/opeethypotheek.** De woning is niet-liquide TOTDAT de kernel haar monetariseert (verkoop/opeet); de FIRE-maand wacht daar correct op. De woning "eerder" laten meetellen (aftelling naar 0 vóór de liquide pot toereikend is) zou betekenen dat je een niet-verkochte woning opeet — modelmatig onjuist. Bewust NIET gedaan.
 
 Vergrendeld door `lib/horizon-kernel/fire-basis-invariant.test.ts`. Gevolg: de eerdere afbakening (die de aftelling als "liquide, beweegt niet mee met incl." omschreef) is hierboven gecorrigeerd; het besluit "aftelling op incl." is voor het default-geval een feit, niet een openstaande wijziging.
+
+## Addendum (2026-08-27) — het balk-label volgt de euro-weergave
+
+Eigenaar-besluit: het bedrag-label rechts van de voortgangsbalk op `/toekomst` (zie Gevolgen hierboven) toont voortaan het doelbedrag in de **actieve euro-weergave** (ADR 0093), gelijkgetrokken met de Doelbedrag-KPI ernaast — "ca. €180.000 — volledige vrijheid" in `'real'` waar het nominaal €200.032 was. De grondslag-keuze (incl. woning, excl. bij `exclude_from_fire`) en het percentage zelf zijn niet geraakt: `freedomPct` is een ratio en deflateert nooit. Bewuste keerzijde: in `'real'` is de balkvulling niet meer letterlijk teller ÷ label; twee verschillende bedragen voor hetzelfde doel op één scherm woog voor de eigenaar zwaarder. De euro-view-uitzondering die hier stond (ADR 0093 §12) vervalt; bewaakt door `components/app/horizon/horizon-client.euro-view.test.ts`.

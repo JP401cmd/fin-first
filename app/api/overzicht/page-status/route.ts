@@ -5,10 +5,15 @@ import { getCachedUser } from '@/lib/supabase/cached-user'
 import {
   computePageStatusInfo,
   normalizePageStatusRoute,
+  normalizeMinimizeKey,
   asMinimizedLevel,
   readMinimizedLevel,
   ROUTE_FAMILY,
 } from '@/lib/page-status/compute'
+import {
+  DEFICIT_NOTICE_MINIMIZE_KEY,
+  asDeficitMinimizedPeak,
+} from '@/lib/horizon/deficit-loan-minimize'
 import {
   statusCacheKey,
   readStatusCache,
@@ -96,14 +101,18 @@ export async function GET(request: NextRequest) {
 /**
  * PUT /api/overzicht/page-status
  *
- * Slaat de per-gebruiker "geminimaliseerd"-voorkeur van de status-duiding-banner
- * op voor één /overzicht-route. Body: `{ route: string, level: 'warn'|'bad'|null }`.
- *  - level 'warn'|'bad' → de gebruiker klapte de banner op dat niveau in.
- *  - level null         → voorkeur wissen (banner weer tonen).
+ * Slaat de per-gebruiker "geminimaliseerd"-voorkeur van een melding op.
+ * Body: `{ route: string, level: 'warn'|'bad'|'info'|number|null }`.
+ *  - level 'warn'|'bad'|'info' → stoplicht-niveau waarop een /overzicht-banner
+ *    is ingeklapt; escalatie naar een erger niveau heropent hem.
+ *  - level number → de PIEK waarop de tekort-lening-melding op /toekomst is
+ *    ingeklapt; een materieel hogere piek heropent hem (deficit-loan-minimize).
+ *  - level null → voorkeur wissen (melding weer tonen).
  *
  * Schrijft read-modify-write op de jsonb-map in de EIGEN profielrij
  * (`.eq('id', user.id)`, RLS-scoped, anon-client). Nooit een service-role-client.
- * Valideert `route` via exact dezelfde `normalizePageStatusRoute`-allowlist als de GET.
+ * Valideert `route` via `normalizeMinimizeKey`: de GET-allowlist plus de extra
+ * pref-only sleutels — de GET-scope groeit daar bewust NIET mee.
  */
 export async function PUT(request: NextRequest) {
   try {
@@ -123,19 +132,30 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Ongeldig verzoek' }, { status: 400 })
     }
 
-    // Route via dezelfde in-scope-allowlist als de GET — geen duplicatie.
-    const route = normalizePageStatusRoute(
+    // Schrijf-allowlist = de /overzicht-routes van de GET PLUS de extra
+    // pref-only sleutels (bv. de tekort-lening-melding op /toekomst, waarvan de
+    // melding uit de al geladen horizon-run komt en niet uit een status-fetch).
+    const route = normalizeMinimizeKey(
       typeof body.route === 'string' ? body.route : null,
     )
     if (!route) {
       return NextResponse.json({ error: 'Onbekende route' }, { status: 400 })
     }
 
-    // Level moet exact 'warn' | 'bad' | null zijn.
-    const level: MinimizedLevel | null =
-      body.level === null ? null : asMinimizedLevel(body.level)
-    if (body.level !== null && level === null) {
-      return NextResponse.json({ error: 'Ongeldig niveau' }, { status: 400 })
+    // Het "niveau" is sleutel-afhankelijk:
+    //  - /overzicht-routes  → stoplicht-niveau 'warn' | 'bad' | 'info'.
+    //  - tekort-lening      → de PIEK (afgerond, nominaal) waarop geminimaliseerd
+    //    werd; escalatie = een materieel hogere piek (zie deficit-loan-minimize).
+    // Beide mogen null zijn (voorkeur wissen → melding weer tonen).
+    let level: MinimizedLevel | number | null = null
+    if (body.level !== null) {
+      level =
+        route === DEFICIT_NOTICE_MINIMIZE_KEY
+          ? asDeficitMinimizedPeak(body.level)
+          : asMinimizedLevel(body.level)
+      if (level === null) {
+        return NextResponse.json({ error: 'Ongeldig niveau' }, { status: 400 })
+      }
     }
 
     // Read-modify-write op de eigen jsonb-map: lezen, sleutel zetten/wissen,

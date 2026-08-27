@@ -6,6 +6,7 @@ import { LocalChatTransport } from '@/lib/ai/local/local-chat-transport'
 import { LOCAL_READINESS_FLAP_HINT } from '@/lib/ai/local/local-readiness'
 import { resolveAllExecutionModes } from '@/lib/ai/execution-groups'
 import { getOverlayCount, __resetOverlayCount } from '@/lib/overlay-signal'
+import { getOverlayHistoryDepth, __resetOverlayHistory } from '@/lib/overlay-history'
 
 /**
  * Regressietest voor de Wft-akkoord-gate in de Fin-chat.
@@ -91,6 +92,15 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('./chat-provider', () => ({
   useChatContext: () => ctx,
+}))
+
+// MeldingView draagt de verzend-state; hier meldt hij meteen "bezig", zodat de
+// sluit-blokkade (`meldingBezig`) in ChatPanel actief is.
+vi.mock('./melding/melding-view', () => ({
+  MeldingView: ({ onBezigChange }: { onBezigChange: (bezig: boolean) => void }) => {
+    onBezigChange(true)
+    return <div>melding-formulier</div>
+  },
 }))
 
 vi.mock('@/components/app/feature-access-provider', () => ({
@@ -777,5 +787,99 @@ describe('ChatPanel — swipe-down-to-dismiss', () => {
 
     await new Promise((r) => setTimeout(r, 450))
     expect(close).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * Terug-knop sluit de chat, niet de pagina — hetzelfde mechanisme als elke
+ * andere modal (lib/overlay-history.ts, gedeeld met BottomSheet). Deze tests
+ * pinnen de bedrading: (1) een open paneel meldt precies één history-entry aan,
+ * (2) een echte terug-druk sluit langs `veiligSluiten` en laat de route staan,
+ * (3) sluiten via het kruisje laat geen weesentry achter, (4) heropenen meldt
+ * opnieuw aan, en (5) de gepinde zijbalk doet er niet aan mee.
+ */
+describe('ChatPanel — terug-knop sluit het paneel', () => {
+  let backSpy: ReturnType<typeof vi.spyOn>
+
+  function simuleerBrowserBack() {
+    window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }))
+  }
+
+  beforeEach(() => {
+    __resetOverlayHistory()
+    window.history.replaceState(null, '')
+    // jsdom voert `history.back()` asynchroon uit en vuurt niet altijd popstate;
+    // we simuleren de browser expliciet (zelfde aanpak als overlay-history.test.ts).
+    backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {
+      simuleerBrowserBack()
+    })
+    localStorage.setItem(WFT_KEY, 'true')
+    stubExecutionFetch({ privacyMode: false })
+  })
+
+  afterEach(() => {
+    backSpy.mockRestore()
+    __resetOverlayHistory()
+  })
+
+  it('meldt één history-entry aan zolang het paneel open staat', async () => {
+    render(<ChatPanel />)
+    await waitFor(() => expect(getOverlayHistoryDepth()).toBe(1))
+  })
+
+  it('sluit het paneel bij een terug-druk in plaats van de pagina weg te navigeren', async () => {
+    const close = vi.fn()
+    ctx = makeCtx({ close })
+    render(<ChatPanel />)
+    await waitFor(() => expect(getOverlayHistoryDepth()).toBe(1))
+
+    simuleerBrowserBack()
+
+    expect(close).toHaveBeenCalledTimes(1)
+    expect(getOverlayHistoryDepth()).toBe(0)
+  })
+
+  it('houdt zijn history-entry wanneer een lopende verzending het sluiten blokkeert', async () => {
+    // Terug-druk tijdens een verzending: `veiligSluiten` weigert. Zonder
+    // teruggave van de entry stond het paneel open zónder entry — en verliet de
+    // volgende terug-druk de pagina met de chat nog open.
+    const close = vi.fn()
+    ctx = makeCtx({ close, meldingRequested: true, clearMeldingRequest: vi.fn() })
+    render(<ChatPanel />)
+    await waitFor(() => expect(screen.getByText('melding-formulier')).toBeTruthy())
+    await waitFor(() => expect(getOverlayHistoryDepth()).toBe(1))
+
+    simuleerBrowserBack()
+
+    expect(close).not.toHaveBeenCalled()
+    expect(getOverlayHistoryDepth()).toBe(1)
+  })
+
+  it('laat geen weesentry achter bij sluiten via het kruisje, en meldt opnieuw aan bij heropenen', async () => {
+    const close = vi.fn()
+    ctx = makeCtx({ close })
+    const { rerender } = render(<ChatPanel />)
+    await waitFor(() => expect(getOverlayHistoryDepth()).toBe(1))
+
+    // Sluiten (isOpen=false) consumeert de eigen entry — anders zou de eerste
+    // terug-druk daarna niets doen.
+    ctx = makeCtx({ isOpen: false, close })
+    rerender(<ChatPanel />)
+    await waitFor(() => expect(getOverlayHistoryDepth()).toBe(0))
+    expect(backSpy).toHaveBeenCalledTimes(1)
+    // Onze eigen back mag `close` niet nóg eens aanroepen.
+    expect(close).not.toHaveBeenCalled()
+
+    // Heropenen meldt opnieuw aan.
+    ctx = makeCtx({ close })
+    rerender(<ChatPanel />)
+    await waitFor(() => expect(getOverlayHistoryDepth()).toBe(1))
+  })
+
+  it('meldt GEEN entry aan in gepinde (zijbalk-)modus — terug navigeert daar gewoon', async () => {
+    ctx = makeCtx({ isPinned: true })
+    render(<ChatPanel />)
+    await waitFor(() => expect(screen.getByText('Fin')).toBeInTheDocument())
+    expect(getOverlayHistoryDepth()).toBe(0)
   })
 })

@@ -25,6 +25,7 @@
 
 import { useRouter } from 'next/navigation'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
+import { noteOverlayNavigation } from '@/lib/overlay-history'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type { NaturalMilestone, NaturalMilestoneKind } from '@/lib/natural-milestones'
@@ -321,6 +322,12 @@ export function NaturalMilestoneSheet({
             <button
               type="button"
               onClick={() => {
+                // Deze sluiting hoort bij de navigatie erboven: zonder dit
+                // signaal consumeert de overlay-history haar entry met een
+                // `history.back()` die de nog lopende route-wissel afbreekt
+                // (geen link-klik om aan te herkennen — dit is een knop).
+                // Zie lib/overlay-history.ts.
+                noteOverlayNavigation()
                 router.push(source.href)
                 onClose()
               }}

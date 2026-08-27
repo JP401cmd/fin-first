@@ -159,9 +159,17 @@ function MiniNetWorthChartComponent({
     // dan geen opbouw-verhaal meer, wel een "hoe loopt het verder"-verhaal.
     const fireReached =
       fireAge != null && currentAge != null && fireAge <= currentAge
+    // De projectie stopt op de WEERGAVE-leeftijd, door dezelfde seam als
+    // /toekomst en als de doelbedrag-deflator verderop in dit bestand:
+    // `fireAgeForDisplay` (= Math.round). De kernelrijen staan op hele
+    // leeftijden, dus een fractionele grens kapt af op de rij eronder terwijl
+    // de deflator-lookup naar boven afrondt — twee leeftijd-afkappingen op één
+    // getal, binnen één component. `fireReached` blijft bewust op de rauwe
+    // waarde: dat is een DREMPEL, en die hoort fractioneel (zie fire-strategy.ts).
+    const fireAgeCutoff = fireAgeForDisplay(fireAge)
     const projectionEndAge =
-      fireAge != null && currentAge != null && fireAge > currentAge
-        ? fireAge
+      fireAgeCutoff != null && currentAge != null && fireAgeCutoff > currentAge
+        ? fireAgeCutoff
         : endAge != null && currentAge != null && endAge > currentAge
           ? endAge
           : null

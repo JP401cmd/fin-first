@@ -13,8 +13,9 @@
  * Waarom geen ShellOverlay-wrapper? De driewegregel (pane/sheet/confirm) past
  * niet schoon bij een launcher-modal: de palette wil top-anchored, geen
  * sheet-bottom-detents, geen pane-headers. We hergebruiken wel de primitives
- * (`useFocusTrap`, `useScrollLock`, portal naar document.body) zodat a11y +
- * scroll-gedrag consistent blijft met de rest van het overlay-systeem.
+ * (`useFocusTrap`, `useScrollLock`, `useSwipeToDismiss`, `pushOverlayHistory`,
+ * portal naar document.body) zodat a11y, scroll-, swipe- en terug-gedrag
+ * consistent blijven met de rest van het overlay-systeem.
  */
 
 import {
@@ -30,6 +31,8 @@ import { useRouter } from 'next/navigation'
 import { Search, X, ArrowUp, ArrowDown, CornerDownLeft, type LucideIcon } from 'lucide-react'
 import { useScrollLock } from '@/lib/hooks/use-scroll-lock'
 import { useFocusTrap } from '@/lib/hooks/use-focus-trap'
+import { useSwipeToDismiss } from '@/lib/hooks/use-swipe-to-dismiss'
+import { pushOverlayHistory, noteOverlayNavigation } from '@/lib/overlay-history'
 import { useChatContext } from '@/components/app/chat/chat-provider'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
@@ -90,6 +93,11 @@ export function CommandPalette({ open, onClose, role, userId }: CommandPalettePr
   const router = useRouter()
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  // Backdrop + resultatenlijst voeden het gedeelde swipe-gebaar: de scrim
+  // fade't met de vinger mee, en een touch die in de lijst begint mag pas een
+  // dismiss worden als die lijst bovenaan staat (anders is het scrollen).
+  const overlayRef = useRef<HTMLDivElement>(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
 
   const [query, setQuery] = useState('')
   const [entityResults, setEntityResults] = useState<CommandItem[]>([])
@@ -316,6 +324,12 @@ export function CommandPalette({ open, onClose, role, userId }: CommandPalettePr
         return
       }
       if (item.href) {
+        // Deze sluiting hoort bij de navigatie eronder: zonder dit signaal
+        // consumeert de overlay-history haar entry met een `history.back()`
+        // die de nog lopende route-wissel afbreekt. Hier is de trigger vaak
+        // niet eens een klik (Enter op het geselecteerde item), dus de
+        // link-klik-herkenning ziet 'm niet. Zie lib/overlay-history.ts.
+        noteOverlayNavigation()
         onClose()
         router.push(item.href)
       }
@@ -367,6 +381,34 @@ export function CommandPalette({ open, onClose, role, userId }: CommandPalettePr
     initialFocusRef: isCoarsePointer ? containerRef : inputRef,
   })
 
+  // ── Swipe-down-to-dismiss (gedeeld gebaar) ─────────────────────────────────
+  // Exact dezelfde hook als BottomSheet en het chatpaneel — velocity, de
+  // scroll-vs-drag-beslissing, rubber-banding en de exit-animatie leven dáár,
+  // niet hier. Eén `onTouchStart` op het paneel: de hook routeert zelf naar
+  // "meteen slepen" (invoerbalk, footer, tussenruimte) of "eerst scroll-vs-drag
+  // beslissen" (binnen de resultatenlijst). Alleen touch, dus desktop zonder
+  // aanraakscherm merkt niets.
+  const closeRef = useRef(onClose)
+  closeRef.current = onClose
+
+  const { handleSheetTouchStart } = useSwipeToDismiss({
+    sheetRef: containerRef,
+    backdropRef: overlayRef,
+    contentRef: bodyRef,
+    onDismiss: () => closeRef.current(),
+  })
+
+  // ── Terug-knop sluit de palette, niet de pagina ────────────────────────────
+  // Eén history-entry per open palette; `popstate` sluit langs dezelfde weg als
+  // het kruisje/Escape, en de cleanup consumeert de eigen entry weer. Springt de
+  // gebruiker via een resultaat naar een andere route, dan heeft Next intussen
+  // zijn eigen state gepusht en laat de release de history met rust. Zie
+  // lib/overlay-history.ts.
+  useEffect(() => {
+    if (!open) return
+    return pushOverlayHistory(() => closeRef.current())
+  }, [open])
+
   // ── Backdrop click ─────────────────────────────────────────────────────────
   const onBackdrop = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -380,6 +422,7 @@ export function CommandPalette({ open, onClose, role, userId }: CommandPalettePr
 
   return createPortal(
     <div
+      ref={overlayRef}
       data-cmdk-overlay
       onClick={onBackdrop}
       className="fixed inset-0 z-[60] bg-[var(--scrim)] backdrop-blur-[var(--scrim-blur)] flex items-end md:items-start md:pt-[12vh] justify-center"
@@ -392,6 +435,9 @@ export function CommandPalette({ open, onClose, role, userId }: CommandPalettePr
         aria-label="Zoeken in TriFinity"
         aria-modal="true"
         tabIndex={-1}
+        // Eén paneel-brede touchstart; `touchmove`/`touchend` hangen
+        // niet-passief aan `document` (zie use-swipe-to-dismiss.ts).
+        onTouchStart={handleSheetTouchStart}
         className="w-full md:max-w-2xl bg-[var(--paper)] border border-[var(--border-ed)] shadow-[var(--s2)] flex flex-col max-h-[88vh] md:max-h-[70vh] outline-none"
         style={{
           animation: 'cmdk-pop-in 180ms cubic-bezier(0.32, 0.72, 0, 1)',
@@ -422,7 +468,7 @@ export function CommandPalette({ open, onClose, role, userId }: CommandPalettePr
         </div>
 
         {/* ── Body ── */}
-        <div className="flex-1 overflow-y-auto" data-scroll-container={false}>
+        <div ref={bodyRef} className="flex-1 overflow-y-auto" data-scroll-container={false}>
           {flatItems.length === 0 ? (
             <EmptyState query={query} loading={entityLoading} />
           ) : (

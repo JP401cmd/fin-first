@@ -10,6 +10,15 @@ import { PrintTijdasButton } from '@/components/future/print-tijdas-button'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PageOpening, OrnamentColophon } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
+import {
+  DeficitNoticeProvider,
+  DeficitNoticeDot,
+} from '@/components/app/horizon/deficit-notice-provider'
+import { readMinimizedMap } from '@/lib/page-status/minimized-prefs'
+import {
+  DEFICIT_NOTICE_MINIMIZE_KEY,
+  asDeficitMinimizedPeak,
+} from '@/lib/horizon/deficit-loan-minimize'
 
 export const metadata: Metadata = {
   title: 'Toekomst — TriFinity',
@@ -90,7 +99,7 @@ export default async function ToekomstPage({
     data: { user },
   } = await supabase.auth.getUser()
 
-  const [horizonData, finData, calcCountRes] = await Promise.all([
+  const [horizonData, finData, calcCountRes, minimizedMap] = await Promise.all([
     loadHorizonData(supabase),
     loadFinData(supabase),
     user
@@ -99,8 +108,17 @@ export default async function ToekomstPage({
           .select('*', { count: 'exact', head: true })
           .eq('user_id', user.id)
       : Promise.resolve({ count: 0 }),
+    // Server-seed van de "geminimaliseerd"-voorkeur voor de tekort-lening-melding
+    // (own-row jsonb-pref, cross-device). Lichte single-row select, parallel aan
+    // de zware loaders — zo flikkert de melding/het statuspunt niet na hydration.
+    user
+      ? readMinimizedMap(supabase, user.id)
+      : Promise.resolve({} as Record<string, unknown>),
   ])
   const calculatorCount = calcCountRes.count ?? 0
+  const deficitMinimizedPeak = asDeficitMinimizedPeak(
+    minimizedMap[DEFICIT_NOTICE_MINIMIZE_KEY],
+  )
 
   // Een echte tijdas-projectie vereist een leeftijd (geboortedatum). Zonder die
   // kan er geen FIRE-pad berekend worden — dan tonen we ook geen print/deel-knop.
@@ -112,6 +130,13 @@ export default async function ToekomstPage({
           bovenbalk, gelijk aan /overzicht en /mijn. Zonder expliciete topBar
           valt NavStackMeta terug op 'simple' en verdwijnt de cluster. */}
       <NavStackMeta title="Toekomst" topBar={{ kind: 'rich' }} bottomBar={{ kind: 'tabs' }} />
+      {/* De tekort-lening-melding leeft bij de tijdas-grafiek (in HorizonPage),
+          maar haar geminimaliseerde vorm is een statuspunt náást de pagina-'i'
+          hierboven. Deze provider omspant daarom béíde: hij deelt de piek uit de
+          horizon-run met het punt en onthoudt minimaliseren server-side
+          (jsonb-pref → PUT /api/overzicht/page-status). Zie
+          `components/app/horizon/deficit-notice-provider.tsx`. */}
+      <DeficitNoticeProvider initialMinimizedPeak={deficitMinimizedPeak}>
       <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-4 sm:pt-6 print:hidden">
         <div className="mb-4 flex items-start justify-between gap-3">
           <PageOpening
@@ -123,6 +148,12 @@ export default async function ToekomstPage({
             deck="Geld is opgeslagen tijd — kies wat je later met die tijd doet."
           />
           <div className="flex shrink-0 items-center gap-2">
+            {/* Statuspunt van een geminimaliseerde melding: links naast de 'i',
+                zelfde h-7 w-7-familie, stoplichtkleur (géén module-accent). De
+                conventie noemt absolute offsets voor pagina's waar de 'i'
+                absoluut staat; deze kop is een flex-cluster, dus DOM-volgorde +
+                gap-2 (8px) geeft exact dezelfde plaatsing. */}
+            <DeficitNoticeDot />
             <PageInfoButton description={PAGE_INFO['/toekomst'] ?? ''} />
             {/* Print/Deel toont op basis van een ECHTE projectie (geboortedatum
                 aanwezig → tijdas berekenbaar), niet langer op de verwijderde
@@ -157,6 +188,7 @@ export default async function ToekomstPage({
       <div className="print:hidden">
         <OrnamentColophon text="Geld is opgeslagen tijd" module="De Toekomst" />
       </div>
+      </DeficitNoticeProvider>
     </>
   )
 }
