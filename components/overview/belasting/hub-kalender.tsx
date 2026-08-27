@@ -7,10 +7,13 @@ import { Kicker } from '@/components/editorial'
  * horizontale tijdlijn (peildatum Box 3, aangifte IB, voorlopige aanslag,
  * jaarruimte-inleg, DGA-leengrens).
  *
- * De hub levert de deadlines al gesorteerd op `daysUntil` oplopend
- * (`getTaxDeadlines(now)`); wij tonen de eerstvolgende ~5 en markeren de
- * dichtstbijzijnde als highlight. `box: null` (box-overstijgend, bv. aangifte)
- * wordt naar `undefined` gemapt zodat de tijdlijn de neutrale kleur gebruikt.
+ * De hub levert de deadlines al gesorteerd op `daysUntil` oplopend én al
+ * gefilterd op relevantie (`getTaxDeadlines(now, { hasAanmerkelijkBelang })`);
+ * wij tonen de eerstvolgende ~5 en markeren de dichtstbijzijnde als highlight.
+ * Dit component filtert dus zélf niets — zonder aanmerkelijk belang zit de
+ * DGA-leengrens al niet meer in `deadlines` (bevinding L8). `box: null`
+ * (box-overstijgend, bv. aangifte) wordt naar `undefined` gemapt zodat de
+ * tijdlijn de neutrale kleur gebruikt.
  *
  * Bewust presentationeel/server-compatible.
  */

@@ -12,7 +12,14 @@ import type { LifeEvent } from './horizon-data'
 import type { NaturalMilestone } from './natural-milestones'
 
 export type ChartEventSide = 'above' | 'below'
-export type ChartEventKind = 'life_event' | 'natural'
+/**
+ * Marker-soort op de chart.
+ * - `life_event` — handmatige levensgebeurtenis (`life_events.target_age`), sleepbaar.
+ * - `natural`    — automatisch afgeleide mijlpaal (hypotheek afgelost, eerste miljoen, …).
+ * - `goal`       — financieel doel met kalender-streefdatum (`goals.target_date`),
+ *                  omgerekend naar leeftijd; read-only (bevinding M36).
+ */
+export type ChartEventKind = 'life_event' | 'natural' | 'goal'
 
 /** Eén marker-aanvraag voor de chart-overlay. */
 export interface ChartEventOverlay {
@@ -96,9 +103,21 @@ export interface PositionedChartEvent extends ChartEventOverlay {
 }
 
 /**
+ * Stapel-prioriteit binnen één (leeftijd, side)-bucket: lager = dichter bij de
+ * bar/lijn. Door de gebruiker zélf ingevoerde gebeurtenissen staan vooraan,
+ * daarna zijn doelen, en pas dan de automatisch afgeleide mijlpalen.
+ */
+const KIND_STACK_RANK: Record<ChartEventKind, number> = {
+  life_event: 0,
+  goal: 1,
+  natural: 2,
+}
+
+/**
  * Groepeer events per (geronde leeftijd, side) zodat we ze kunnen stapelen.
- * Sortering binnen een bucket: natural milestones krijgen hogere stackIndex
- * (verder van de bar) zodat user-events visueel prioriteit hebben.
+ * Sortering binnen een bucket volgt `KIND_STACK_RANK`: natural milestones
+ * krijgen de hoogste stackIndex (verder van de bar) zodat user-events visueel
+ * prioriteit hebben, met doelen ertussenin.
  */
 export function positionChartEvents(
   events: ChartEventOverlay[],
@@ -120,9 +139,10 @@ export function positionChartEvents(
 
   const positioned: PositionedChartEvent[] = []
   for (const [, list] of buckets) {
-    // User life events eerst (stackIndex 0+), natural daarna
+    // User life events eerst (stackIndex 0+), dan doelen, dan natural
     const sorted = [...list].sort((a, b) => {
-      if (a.kind !== b.kind) return a.kind === 'life_event' ? -1 : 1
+      const rank = KIND_STACK_RANK[a.kind] - KIND_STACK_RANK[b.kind]
+      if (rank !== 0) return rank
       return a.age - b.age
     })
     sorted.forEach((e, idx) => {

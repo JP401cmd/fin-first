@@ -94,7 +94,6 @@ function makeDashboardData(overrides: Partial<DashboardData> = {}): DashboardDat
     fireAgeFractional: null,
     expenseHistory: [],
     budgetTypeHistory: { income: [], expense: [], savings: [], debt: [] },
-    totalPurchaseValue: 90_000,
     fireRange: null,
     simRows: null,
     simRequiredPortfolio: null,
@@ -860,7 +859,9 @@ const tests: TestCase[] = [
       assertEqual(routeScore.label, loaderScore.label, 'route.label === loader.label')
 
       // Echte (niet-proxy) inputs
-      assertEqual(routeInput.budgetCategories.length, 3, 'drie budgetcategorieën')
+      // H4: één entry per INDIVIDUELE categorie (deze fixture: twee kinderloze
+      // parents), niet meer drie vaste type-sommen.
+      assertEqual(routeInput.budgetCategories.length, 2, 'één categorie per budget')
       assert(routeInput.budgetCategories.some(c => c.limit > 0), 'minstens één echte budgetlimiet')
       assertEqual(routeInput.netMonthlyIncome, 4_000, 'netMonthlyIncome doorgegeven')
       assertEqual(routeInput.debtMonthlyPayments, 600, 'debtMonthlyPayments doorgegeven')

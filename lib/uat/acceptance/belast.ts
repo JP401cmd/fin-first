@@ -147,7 +147,7 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'compleet',
     given: 'Persona Tessa geladen; de hub-sectie "De kalender" toont de eerstvolgende fiscale deadlines.',
     when: 'De gebruiker leest de kalender (aangifte, voorlopige aanslag, betaaltermijnen).',
-    then: 'De deadlines komen uit `getTaxDeadlines(now, 2026)` en tonen label + datum + "over N dagen". De uitkomst is RUNTIME-datum-afhankelijk (de "now"-klok) → geen vast cijfer; tax-calendar.test.ts dekt de deadline-logica.',
+    then: 'De deadlines komen uit `getTaxDeadlines(now, { hasAanmerkelijkBelang, year: 2026 })` en tonen label + datum + "over N dagen". Zonder aanmerkelijk belang filtert de lib de `box: 2`-deadlines (DGA-leengrens) weg, zodat die niet bij een niet-DGA bovenaan staat (bevinding L8). De uitkomst is RUNTIME-datum-afhankelijk (de "now"-klok) → geen vast cijfer; tax-calendar.test.ts dekt de deadline-logica én het relevantiefilter.',
     assertion: {
       kind: 'ui-only',
       source: 'lib/tax-calendar.ts#getTaxDeadlines — datum-/klok-afhankelijke weergave, geen persona-cijfer; gedekt door tax-calendar.test.ts',

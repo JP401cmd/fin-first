@@ -48,8 +48,10 @@ const NU = new Date(2026, 5, 15, 12, 0, 0)
 const SAMENVATTING: VasteLastenSummary = {
   subscriptions: [],
   vasteKosten: [],
+  terugkerendVariabel: [],
   totalMonthlySubscriptions: 0,
   totalMonthlyVasteKosten: 0,
+  totalMonthlyVariabel: 0,
   totalMonthly: 12,
   count: 1,
 }

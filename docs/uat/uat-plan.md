@@ -974,7 +974,7 @@ Scope: de publieke marketing-site (landing + subpagina's), de publieke Vrijheids
 #### WF-START-23 — Onboarding onderbreken en hervatten (concept-herstel)
 - **Doel:** Als nieuwe gebruiker de onboarding kunnen verlaten en later verdergaan op (ongeveer) dezelfde stap, zonder dat gevoelige gegevens in de browser achterblijven.
 - **Trigger/startpunt:** Tijdens de onboarding de tab sluiten of wegnavigeren; later /onboarding opnieuw openen in dezelfde browser.
-- **Eindresultaat:** Een groene melding "✓ Je eerder ingevulde gegevens zijn hersteld" (4 seconden, wegklikbaar); de flow staat op de herstelde stap. Alleen níet-gevoelige keuzes (stap, strategie-keuzes, preset-/skip-vlaggen) zijn hersteld — naam, geboortedatum en alle bedragen zijn bewust leeg.
+- **Eindresultaat:** Een neutrale melding "Verder waar je was — we hebben je plek in de vragenlijst onthouden; je naam, bedragen, bezittingen en schulden bewaren we niet op dit apparaat" (9 seconden, wegklikbaar); de flow staat op de herstelde stap. Alleen níet-gevoelige keuzes (stap, strategie-keuzes, preset-/skip-vlaggen) zijn hersteld — naam, geboortedatum en alle bedragen zijn bewust leeg.
 - **Stappen:**
   1. Vul enkele stappen in en sluit de tab.
   2. Open /onboarding opnieuw: de restore-melding verschijnt en je staat op de opgeslagen stap.
@@ -1804,7 +1804,7 @@ Scope: `/overzicht` (hoofdpagina/hub), `/dashboard` (redirect), `/overzicht/tips
   - Eerste week (geen basis) → alleen het totaal + hint "Vanaf volgende week zie je hier je wekelijkse vrijheidswinst."
   - Implausibele sprong (basis bevroren op nog-settelende data of eenmalige vermogenscorrectie) → delta onderdrukt, hero toont het totaal met de regel "Je cijfers zijn net flink bijgesteld …" en de kop valt terug op de totaal-zin.
   - Geen uitgaven bekend (isInfinite) → "Vul je uitgaven aan om je vrijheidstijd te zien".
-  - Netto vermogen ≤ 0 (isDeficit) → "Bouw je eerste vrijheid op — elke euro telt" (geen viering van schuld-dagen).
+  - Netto vermogen ≤ 0 (isDeficit) → "Je schulden zijn nu groter dan je bezittingen — elke afgeloste euro telt" (geen viering van schuld-dagen).
   - Live cijfers wijken ≥ 2 dagen af van het bevroren weekbeeld → hint "je cijfers zijn sindsdien veranderd" in de briefing-kop.
   - Huishoud-/partnerweergave → geen snapshot-write; hero live berekend uit het perspectief.
   - Eenvoudige weergave → dit blok verborgen.
@@ -8965,7 +8965,7 @@ Alle scenario's, per deelgebied in uitvoervolgorde. Formaat en registratie: zie 
 #### UAT-START-23 — Onboarding onderbreken en hervatten (concept-herstel) (dekt WF-START-23)
 - **Kriticiteit:** BELANGRIJK · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~4 min
 - **Preconditie:** verse reset via "Onboarding starten"
-- **a. Happy path:** vul naam, geboortedatum en inkomen (€ 2.900) in, ga door naar "uitgaven", sluit de tab zonder af te ronden → heropen `/onboarding` → *verwacht:* groene melding "✓ Je eerder ingevulde gegevens zijn hersteld" (4 seconden, wegklikbaar) en je staat weer op stap "uitgaven" — MAAR naam, geboortedatum en het ingevulde inkomen zijn bewust LEEG (alleen de stap-positie/keuzes zijn hersteld, geen gevoelige data).
+- **a. Happy path:** vul naam, geboortedatum en inkomen (€ 2.900) in, ga door naar "uitgaven", sluit de tab zonder af te ronden → heropen `/onboarding` → *verwacht:* neutrale melding "Verder waar je was — … je naam, bedragen, bezittingen en schulden bewaren we niet op dit apparaat" (9 seconden, wegklikbaar) en je staat weer op stap "uitgaven" — MAAR naam, geboortedatum en het ingevulde inkomen zijn bewust LEEG (alleen de stap-positie/keuzes zijn hersteld, geen gevoelige data).
 - **c. Foutpad — finish-guard na onvolledig herstel:** probeer vanaf de herstelde staat direct door te klikken naar de klaar-stap en af te ronden → *verwacht:* de finish-guard blokkeert dit met de melding "Vul eerst je naam en geboortedatum in…" en stuurt je terug naar de eerste onvolledige verplichte stap (naam).
 
 #### UAT-START-24 — Fout bij het afronden van onboarding herstellen (retry) (dekt WF-START-24)
@@ -9495,7 +9495,7 @@ WF-NAV-13 (Uitloggen) → **géén eigen scenario** in dit document; gedekt door
   - **Eindresultaat:** getal is groen/positief en de orde van grootte klopt.
   - **Berekening verwachting (rekenend, `lib/format.ts` + `lib/briefing/overview-briefing.ts:277-284`):** dailyExpenses = maanduitgaven×12/365. Begrote maanduitgaven (excl. sparen) = €455 (wonen) + €410 (dagelijks) + €230 (vervoer) + €400 (leuk) = **€1.495** → dailyExpenses = 1.495×12/365 = **€49,15/dag**. totalDays = 1.619.700/49,15 ≈ **32.957 dagen** → jaren=floor(32.957/365)=**90**, restant=107 dagen → maanden=floor(107/30)=**3**, dagen=round(107−90)=**17** → **"≈90 jaar, 3 maanden en 17 dagen"**. *Let op: dit is een schatting op basis van begrote bedragen; de briefing gebruikt het 6-maands reëel-transactiegemiddelde (met seizoensuitgaven als de Toscane-vakantie en BMW-onderhoud), dus het exacte getal mag afwijken — toets de ORDE VAN GROOTTE (tientallen jaren, niet enkele jaren) en dat het teken positief is, niet het exacte dagaantal.*
 - **b. Delta (richting, niet exact):** week-over-week delta kan door marktbeweging/inleg (~€2.500/mnd ≈ €577/week) een toename van een tiental dagen vrijheid opleveren — verwacht een klein positief getal (enkele tot ~15 dagen), geen dramatische sprong.
-- **c. Variant — deficit-framing (Daan):** open /overzicht met persona Daan (netto vermogen **−€4.200**) → *verwacht:* GEEN gevierde dagen-teller; in plaats daarvan de tekst **"Bouw je eerste vrijheid op — elke euro telt"** (isDeficit-tak, `amount < 0`). Dit toetst expliciet dat een negatief netto vermogen niet als "vrijheidsdagen" wordt gevierd.
+- **c. Variant — deficit-framing (Daan):** open /overzicht met persona Daan (netto vermogen **−€4.200**) → *verwacht:* GEEN gevierde dagen-teller; in plaats daarvan de tekst **"Je schulden zijn nu groter dan je bezittingen — elke afgeloste euro telt"** (isDeficit-tak, `amount < 0`). Dit toetst expliciet dat een negatief netto vermogen niet als "vrijheidsdagen" wordt gevierd.
 - **d. Eerste week (geen basis):** test met een gloednieuwe testaccount (geen vorige week-snapshot) → *verwacht:* alleen het totaal + hint "Vanaf volgende week zie je hier je wekelijkse vrijheidswinst."
 
 ---

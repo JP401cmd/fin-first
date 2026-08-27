@@ -33,7 +33,9 @@ import {
   vasteLastenCardStatus,
   forecastCardStatus,
   buildCashflowCards,
+  currentMonthSavingsRate,
 } from '@/lib/cashflow-cards'
+import { deriveRealMonthTotals } from '@/lib/cashflow-month-totals'
 import type { DashboardData } from '@/lib/types/dashboard'
 import { MOCK_DASHBOARD_DATA } from '@/lib/mock-dashboard-data'
 import type { CashflowData } from '@/lib/cashflow-data-loader'
@@ -999,8 +1001,10 @@ NEWFILEUID:NONE
       const vasteLastenSummary: VasteLastenSummary = {
         subscriptions: [],
         vasteKosten: [],
+        terugkerendVariabel: [],
         totalMonthlySubscriptions: 0,
         totalMonthlyVasteKosten: 0,
+        totalMonthlyVariabel: 0,
         totalMonthly: 0,
         count: 0,
       }
@@ -1395,6 +1399,51 @@ NEWFILEUID:NONE
           'scoreGoed=100; labelGoed=strak; hitRateGoed=100; basisGoed=6; scoreSlecht=0; labelSlecht=los; scoreTeWeinig=null; labelTeWeinig=null; basisTeWeinig=2',
         actual:
           `scoreGoed=${scoreGoed.score}; labelGoed=${scoreGoed.label}; hitRateGoed=${scoreGoed.hitRatePct}; basisGoed=${scoreGoed.basisPeriodCount}; scoreSlecht=${scoreSlecht.score}; labelSlecht=${scoreSlecht.label}; scoreTeWeinig=${scoreTeWeinig.score}; labelTeWeinig=${scoreTeWeinig.label}; basisTeWeinig=${scoreTeWeinig.basisPeriodCount}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-CASH-62',
+    scenarioId: 'UAT-CASH-62',
+    label:
+      'Widget en cashflow-strip delen één grondslag voor "deze maand" (H6: classificatie op teken, beide transfer-types, geen rekening-scoping, één spaarquote-formule)',
+    run: () => {
+      criterion('WF-CASH-62')
+
+      // Één maand rijen die alle vier de assen uit de bevinding raakt.
+      const rijen = [
+        { amount: -2_446.45, transaction_type: null },   // gewone uitgave
+        { amount: -1_000.00, transaction_type: null },   // gewone uitgave
+        { amount: 950.00, transaction_type: null },      // gewoon inkomen
+        { amount: 150.00, transaction_type: null },      // (a) positief, is_income stond op false
+        { amount: -11.88, transaction_type: 'joint_transfer' }, // (b) telt NIET mee
+        { amount: -100.00, transaction_type: null },     // (c) rij zonder account_id
+        { amount: -500.00, transaction_type: 'transfer' }, // telt NIET mee
+      ]
+
+      // STRIP (/overzicht/cashflow): de canonieke maandmotor over dezelfde rijen.
+      const strip = deriveRealMonthTotals(rijen)
+      const stripSaldo = strip.income - strip.expenses
+      const stripQuote = currentMonthSavingsRate(strip.income, strip.expenses)
+
+      // WIDGET (/overzicht): consumeert DashboardData.currentMonth*, dat de loader
+      // uit HETZELFDE maandaggregaat vult — hier gemodelleerd als de canonieke pass.
+      const currentMonthIncome = strip.income
+      const currentMonthExpenses = strip.expenses
+      const widgetSaldo = currentMonthIncome - currentMonthExpenses
+      const widgetQuote = currentMonthSavingsRate(currentMonthIncome, currentMonthExpenses)
+
+      // De EFFECTIVE grondslag is bewust een ander getal — en mag dat blijven,
+      // mits het venster benoemd wordt. Dit is de +€3.606-kant van de bevinding.
+      const effectiefSaldo = 9_999 - 8_888
+
+      return {
+        expected:
+          'stripSaldo=-2446.45; widgetSaldo=-2446.45; gelijk=true; stripQuote=-222.4; widgetQuote=-222.4; effectiefSaldo=1111; effectiefWijktAf=true',
+        actual:
+          `stripSaldo=${fx(stripSaldo, 2)}; widgetSaldo=${fx(widgetSaldo, 2)}; gelijk=${stripSaldo === widgetSaldo}; ` +
+          `stripQuote=${fx(stripQuote ?? 0, 1)}; widgetQuote=${fx(widgetQuote ?? 0, 1)}; ` +
+          `effectiefSaldo=${fx(effectiefSaldo, 0)}; effectiefWijktAf=${effectiefSaldo !== stripSaldo}`,
       }
     },
   },

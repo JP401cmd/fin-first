@@ -201,6 +201,11 @@ export function buildKernelInputFromAppWithNotices(input: KernelAdapterInput): K
     // liquide bezit i.p.v. het eindeloos te laten compounden. Parity-/fixture-pad zet
     // deze vlag NIET (input-from-fixture) → Excel v5-oracle byte-identiek.
     tekortAflossingUitLiquide: true,
+    // M6 (gap-besluit V21): `reached_now` mag op het app-pad nooit een negatief
+    // doelbedrag (B36 < 0) of een horizon-parkeerstand (B38 < 0) maskeren — dat
+    // leverde "Vrijheidsleeftijd 100,0 jaar" als hard feit. Parity-/fixture-pad
+    // zet deze vlag NIET (input-from-fixture) → Excel v5-oracle byte-identiek.
+    reachedNowVereistBereikbaarDoel: true,
   }
 
   return {

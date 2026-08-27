@@ -8,7 +8,13 @@ import {
   getVisibleScreens,
   hasMoreScreens,
   reconcileCompleted,
-  countCompletedOnScreen,
+  countScreenProgress,
+  deriveGuideStates,
+  guideVisitSlugsForRoute,
+  isGuideComplete,
+  isGuideStepDone,
+  GUIDE_VISIT_SLUG_BY_STEP_ID,
+  type GuideAccountFacts,
   type WelcomeGuideConfig,
   type WelcomeGuideState,
 } from './welcome-guide'
@@ -195,7 +201,7 @@ describe('getVisibleScreens & hasMoreScreens', () => {
   })
 })
 
-describe('reconcileCompleted & countCompletedOnScreen', () => {
+describe('reconcileCompleted & countScreenProgress', () => {
   it('dropt ids die niet meer in de config bestaan', () => {
     const ids = ['s1-bezittingen', 'verdwenen-id', 's2-grafiek']
     expect(reconcileCompleted(DEFAULT_WELCOME_GUIDE, ids)).toEqual([
@@ -206,7 +212,221 @@ describe('reconcileCompleted & countCompletedOnScreen', () => {
 
   it('telt afgevinkte stappen per scherm', () => {
     const screen = DEFAULT_WELCOME_GUIDE.screens[0]
-    expect(countCompletedOnScreen(screen, ['s1-bezittingen', 's1-budget'])).toBe(2)
-    expect(countCompletedOnScreen(screen, [])).toBe(0)
+    expect(countScreenProgress(screen, ['s1-bezittingen', 's1-budget'])).toEqual({
+      done: 2,
+      total: 4,
+      notApplicable: 0,
+    })
+    expect(countScreenProgress(screen, [])).toEqual({ done: 0, total: 4, notApplicable: 0 })
+  })
+})
+
+// ── M1: de gids leidt af wat de app al weet ────────────────────────────────
+
+/** Leeg account: elk signaal uit, niets bezocht. */
+const EMPTY_FACTS: GuideAccountFacts = {
+  hasAssets: false,
+  hasDebts: false,
+  hasBudgets: false,
+  hasBankConnection: false,
+  hasTransactions: false,
+  hasFireParams: false,
+  hasHorizonSetup: false,
+  hasLifeEvents: false,
+  hasRetirementExpenseChoice: false,
+  hasGoals: false,
+  hasScenarioPrefs: false,
+  visitedSlugs: [],
+  notApplicableStepIds: [],
+}
+
+/** Volledig gevuld account: alles ingevuld én alles bezocht. */
+const FULL_FACTS: GuideAccountFacts = {
+  hasAssets: true,
+  hasDebts: true,
+  hasBudgets: true,
+  hasBankConnection: true,
+  hasTransactions: true,
+  hasFireParams: true,
+  hasHorizonSetup: true,
+  hasLifeEvents: true,
+  hasRetirementExpenseChoice: true,
+  hasGoals: true,
+  hasScenarioPrefs: true,
+  visitedSlugs: Object.values(GUIDE_VISIT_SLUG_BY_STEP_ID),
+  notApplicableStepIds: [],
+}
+
+describe('deriveGuideStates — de bevinding uit M1', () => {
+  it('gevuld account: scherm 1 staat op 4/4 (was 0/4)', () => {
+    const derived = deriveGuideStates(DEFAULT_WELCOME_GUIDE, FULL_FACTS)
+    const screen = DEFAULT_WELCOME_GUIDE.screens[0]
+    // Zonder afleiding — de situatie vóór M1 — is dit 0/4.
+    expect(countScreenProgress(screen, [])).toEqual({ done: 0, total: 4, notApplicable: 0 })
+    expect(countScreenProgress(screen, [], derived)).toEqual({
+      done: 4,
+      total: 4,
+      notApplicable: 0,
+    })
+  })
+
+  it('leeg account: niets wordt afgeleid afgevinkt', () => {
+    const derived = deriveGuideStates(DEFAULT_WELCOME_GUIDE, EMPTY_FACTS)
+    for (const screen of DEFAULT_WELCOME_GUIDE.screens) {
+      expect(countScreenProgress(screen, [], derived).done).toBe(0)
+    }
+  })
+
+  it('bezoekstappen hangen aan het bezoekregister, niet aan financiële data', () => {
+    const derived = deriveGuideStates(DEFAULT_WELCOME_GUIDE, {
+      ...EMPTY_FACTS,
+      visitedSlugs: ['guide_nieuws'],
+    })
+    expect(derived['s3-nieuws']).toBe('done')
+    expect(derived['s3-rekenhulp']).toBe('open')
+  })
+
+  it('s2-voorkeuren leunt op de horizon-setup, NIET op de FIRE-parameters', () => {
+    // expected_return/inflation_rate hebben een DB-default: "gevuld" bewijst niets.
+    const alleenParams = deriveGuideStates(DEFAULT_WELCOME_GUIDE, {
+      ...EMPTY_FACTS,
+      hasFireParams: true,
+    })
+    expect(alleenParams['s2-voorkeuren']).toBe('open')
+    const metSetup = deriveGuideStates(DEFAULT_WELCOME_GUIDE, {
+      ...EMPTY_FACTS,
+      hasHorizonSetup: true,
+    })
+    expect(metSetup['s2-voorkeuren']).toBe('done')
+  })
+
+  it('s1-rekening telt zowel een bankkoppeling als een CSV-import', () => {
+    expect(
+      deriveGuideStates(DEFAULT_WELCOME_GUIDE, { ...EMPTY_FACTS, hasTransactions: true })[
+        's1-rekening'
+      ],
+    ).toBe('done')
+    expect(
+      deriveGuideStates(DEFAULT_WELCOME_GUIDE, { ...EMPTY_FACTS, hasBankConnection: true })[
+        's1-rekening'
+      ],
+    ).toBe('done')
+  })
+
+  it('onbekende stap-id → geen regel → handmatig, geen crash', () => {
+    const config: WelcomeGuideConfig = {
+      ...DEFAULT_WELCOME_GUIDE,
+      screens: [
+        {
+          id: 'eigen-scherm',
+          title: '',
+          layout: 'list',
+          required: true,
+          enabled: true,
+          steps: [{ id: 'door-beheerder-verzonnen', title: 'Iets eigens', enabled: true }],
+        },
+      ],
+    }
+    const derived = deriveGuideStates(config, FULL_FACTS)
+    expect(derived['door-beheerder-verzonnen']).toBeUndefined()
+    expect(isGuideStepDone('door-beheerder-verzonnen', [], derived)).toBe(false)
+    expect(isGuideStepDone('door-beheerder-verzonnen', ['door-beheerder-verzonnen'], derived)).toBe(
+      true,
+    )
+  })
+
+  it("'n.v.t.' valt uit de noemer en telt nooit als afgevinkt", () => {
+    const derived = deriveGuideStates(DEFAULT_WELCOME_GUIDE, {
+      ...FULL_FACTS,
+      notApplicableStepIds: ['s1-schulden'],
+    })
+    expect(derived['s1-schulden']).toBe('nvt')
+    expect(countScreenProgress(DEFAULT_WELCOME_GUIDE.screens[0], [], derived)).toEqual({
+      done: 3,
+      total: 3,
+      notApplicable: 1,
+    })
+    // Ook een handmatig vinkje maakt een n.v.t.-stap niet "af".
+    expect(isGuideStepDone('s1-schulden', ['s1-schulden'], derived)).toBe(false)
+  })
+
+  it('afgeleid gedaan wint van niets, maar vervuilt completedStepIds niet', () => {
+    const derived = deriveGuideStates(DEFAULT_WELCOME_GUIDE, { ...EMPTY_FACTS, hasAssets: true })
+    // De afleiding leeft naast de handmatige lijst; die lijst blijft leeg.
+    expect(isGuideStepDone('s1-bezittingen', [], derived)).toBe(true)
+    const state: WelcomeGuideState = { ...DEFAULT_WELCOME_GUIDE_STATE }
+    expect(state.completedStepIds).toEqual([])
+  })
+})
+
+describe('isGuideComplete', () => {
+  it('waar zodra elke zichtbare stap done of n.v.t. is', () => {
+    const state: WelcomeGuideState = { ...DEFAULT_WELCOME_GUIDE_STATE }
+    const derived = deriveGuideStates(DEFAULT_WELCOME_GUIDE, FULL_FACTS)
+    // Scherm 3 kent één stap zonder afleiding niet — alle drie zichtbare
+    // schermen zijn volledig afleidbaar, dus dit moet waar zijn.
+    expect(isGuideComplete(DEFAULT_WELCOME_GUIDE, state, derived)).toBe(true)
+  })
+
+  it('onwaar zolang er nog een open stap is', () => {
+    const state: WelcomeGuideState = { ...DEFAULT_WELCOME_GUIDE_STATE }
+    const derived = deriveGuideStates(DEFAULT_WELCOME_GUIDE, {
+      ...FULL_FACTS,
+      hasBudgets: false,
+    })
+    expect(isGuideComplete(DEFAULT_WELCOME_GUIDE, state, derived)).toBe(false)
+  })
+
+  it('kijkt alleen naar ZICHTBARE schermen', () => {
+    // Alles op scherm 1–3 gedaan, de optionele schermen nog niet ontgrendeld.
+    const facts: GuideAccountFacts = {
+      ...EMPTY_FACTS,
+      hasAssets: true,
+      hasDebts: true,
+      hasBudgets: true,
+      hasTransactions: true,
+      hasHorizonSetup: true,
+      hasLifeEvents: true,
+      hasRetirementExpenseChoice: true,
+      visitedSlugs: [
+        'guide_toekomst_grafiek',
+        'guide_vaste_lasten',
+        'guide_tips',
+        'guide_nieuws',
+        'guide_rekenhulp',
+      ],
+    }
+    const derived = deriveGuideStates(DEFAULT_WELCOME_GUIDE, facts)
+    expect(isGuideComplete(DEFAULT_WELCOME_GUIDE, DEFAULT_WELCOME_GUIDE_STATE, derived)).toBe(true)
+    // Met een ontgrendeld vierde scherm is de gids niet meer af.
+    const meer: WelcomeGuideState = { ...DEFAULT_WELCOME_GUIDE_STATE, revealedScreens: 4 }
+    expect(isGuideComplete(DEFAULT_WELCOME_GUIDE, meer, derived)).toBe(false)
+  })
+})
+
+describe('guideVisitSlugsForRoute', () => {
+  it('/toekomst telt alleen exact, niet elke subroute', () => {
+    expect(guideVisitSlugsForRoute('/toekomst')).toEqual(['guide_toekomst_grafiek'])
+    expect(guideVisitSlugsForRoute('/toekomst/doelen')).toEqual([])
+  })
+
+  it('deeplink met query levert beide slugs', () => {
+    const slugs = guideVisitSlugsForRoute('/toekomst', (k) => (k === 'whatif' ? 'open' : null))
+    expect(slugs).toEqual(['guide_toekomst_grafiek', 'guide_whatif'])
+  })
+
+  it('prefix-routes tellen ook diepere paden', () => {
+    expect(guideVisitSlugsForRoute('/nieuws/artikel-123')).toEqual(['guide_nieuws'])
+    expect(guideVisitSlugsForRoute('/nieuwsbrief')).toEqual([])
+    expect(guideVisitSlugsForRoute('/toekomst/rekenhulp/abc')).toEqual(['guide_rekenhulp'])
+  })
+
+  it('elke bezoek-slug verwijst naar een bestaande stap én een bestaande route', () => {
+    const stepIds = new Set(
+      DEFAULT_WELCOME_GUIDE.screens.flatMap((s) => s.steps.map((st) => st.id)),
+    )
+    for (const stepId of Object.keys(GUIDE_VISIT_SLUG_BY_STEP_ID)) {
+      expect(stepIds.has(stepId)).toBe(true)
+    }
   })
 })

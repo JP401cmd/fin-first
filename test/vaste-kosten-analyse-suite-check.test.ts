@@ -23,7 +23,10 @@ describe('vaste-kosten-analyse regressie-suite (wil.vaste-kosten-analyse)', () =
 
     // Vergrendel het aantal: een stille wijziging (test verwijderd/vergeten
     // te registreren) moet hier zichtbaar worden, niet pas op de beheerpagina.
-    expect(tests.length).toBe(10)
+    // 11 sinds H14: `vaste-kosten-terugkerend-variabel` bewaakt dat onherkende
+    // wekelijkse/variabele posten buiten de vaste-lastenquote vallen — en dat de
+    // spiegelfout (onherkende maandpost) er WEL in blijft.
+    expect(tests.length).toBe(11)
 
     for (const t of tests) {
       await expect(

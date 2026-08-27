@@ -114,9 +114,10 @@ export interface AangifteLinkedMortgagePair {
  * Carries everything needed to create the assets, debts, profile-update
  * and balance_snapshots rows in one transaction.
  *
- * `idempotency_key` follows the same convention as
- * `/api/onboarding/save-own-data`: a client-generated UUID that the
- * server uses to dedupe duplicate submits (page-refresh, double-click).
+ * Dedup gebeurt op een SERVER-AFGELEIDE contenthash over deze payload
+ * (`lib/aangifte/import-key.ts`), vastgelegd als claim in
+ * `import_idempotency`. Het meegestuurde `idempotency_key` wordt genegeerd —
+ * zie het veldcommentaar hieronder.
  */
 export interface AangifteImportPayload {
   assets: AangifteAssetReviewItem[]
@@ -129,7 +130,19 @@ export interface AangifteImportPayload {
   peildatum: string
   /** Tax year, e.g. 2024 for a 2024 aangifte. */
   tax_year: number
-  /** Client-generated UUID for idempotent retries. */
+  /**
+   * @deprecated GENEGEERD door de server sinds de duurzame-idempotentie-
+   * wijziging. Het veld blijft verplicht in het schema zodat oude clients
+   * tijdens een rollende deploy niet stuklopen, maar de waarde wordt niet
+   * gelezen.
+   *
+   * Reden: dit was een client-bepaalde sleutel én `review-step.tsx` mintte
+   * er een VERSE UUID voor bij elke submit-poging, waardoor twee submits
+   * nooit dezelfde sleutel droegen en dedup principieel niet kon werken.
+   * De server leidt de sleutel nu af uit de INHOUD van de payload
+   * (`lib/aangifte/import-key.ts`) — net zoals `/api/transactions/import`
+   * de client-`import_hash` negeert en herberekent.
+   */
   idempotency_key: string
   /**
    * Optional: client-computed pairs of (eigen_huis asset, mortgage debt).
@@ -156,6 +169,18 @@ export type AangifteImportResponse =
       ok: true
       asset_ids: string[]
       debt_ids: string[]
+      /**
+       * `true` wanneer deze aangifte al eerder is geïmporteerd en de server
+       * het bewaarde antwoord herhaalt zonder iets opnieuw weg te schrijven.
+       * `asset_ids`/`debt_ids` zijn dan de id's van de EERSTE import.
+       *
+       * Zonder deze vlag is "gelukt" niet te onderscheiden van "er is niets
+       * gebeurd" — de gebruiker die bewust opnieuw uploadt ziet anders exact
+       * hetzelfde scherm als bij een eerste import. Wil de gebruiker het
+       * echt overdoen, dan is de route `DELETE ?peildatum=X` (verwijdert de
+       * rijen én geeft de idempotentie-claim vrij).
+       */
+      already_imported?: boolean
     }
   | {
       ok: false

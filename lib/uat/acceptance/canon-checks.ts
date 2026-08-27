@@ -74,8 +74,12 @@ function makeHousingContext(eigenHuisValue: number, mortgageBalance: number): Ho
   }
 }
 
-/** Minimaal Box 3-asset-fixture: `calculateBox3`/`classifyAsset` lezen alleen
- *  id/is_active/asset_type/current_value. Cast is bewust (pure fixture). */
+/** Minimaal Box 3-asset-fixture: `calculateBox3` leest hier alleen
+ *  id/is_active/asset_type/current_value. Sinds M23 leest `classifyAsset`
+ *  daarnaast `subtype`, `tax_benefit` en de overschrijving `box3_vrijgesteld`;
+ *  die ontbreken bewust in deze fixture (→ `undefined`), zodat de indeling
+ *  puur op het assettype valt — precies wat deze canon-check bedoelt te meten.
+ *  Cast is bewust (pure fixture). */
 function makeBox3Asset(asset_type: Asset['asset_type'], current_value: number): Asset {
   return { id: `${asset_type}-${current_value}`, is_active: true, asset_type, current_value } as unknown as Asset
 }

@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowLeft, BookOpen, Sparkles } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { loadHorizonData } from '@/lib/horizon-data-loader'
+import { loadHorizonRaw } from '@/lib/horizon-data-loader'
 import {
   buildUserDataContext,
   checkRequirements,
@@ -78,7 +78,7 @@ export default async function BibliotheekPage({
   // het hele bundle hier niet nodig; één call is goedkoper dan een
   // losse parallelle profile/assets/debts-fetch én blijft consistent
   // met andere /toekomst-routes.
-  const horizonData = await loadHorizonData(supabase)
+  const horizonData = await loadHorizonRaw(supabase)
   const userCtx = buildUserDataContext({
     effectiveInput: horizonData.effectiveInput,
     unlinkedCash: horizonData.unlinkedCash,

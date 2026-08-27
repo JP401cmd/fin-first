@@ -8,8 +8,22 @@ import type { FireRange } from '@/lib/horizon-data'
 import type { FreedomMilestoneResult } from '@/lib/freedom-milestones'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
 import type { FeeAnalysis } from '@/lib/fee-analysis'
+import { buildAssetReturnBreakdown, summarizePortfolioReturn } from '@/lib/asset-return'
 
 const months = ['2025-09', '2025-10', '2025-11', '2025-12', '2026-01', '2026-02']
+
+/**
+ * Gerealiseerd rendement in de mock — uit de ECHTE motor, niet met de hand
+ * ingevulde emmers. Zo kan de mock niet uit de pas lopen met de grondslag die
+ * de widgets consumeren: het spaargeld belandt hier vanzelf in `withoutBasis`
+ * (een saldo is gestort, niet gekocht) en alleen de beleggingsrij draagt het
+ * portefeuillerendement. Sluit aan op `assetsByType` hieronder.
+ */
+const mockAssetReturn = summarizePortfolioReturn(buildAssetReturnBreakdown([
+  { id: 'mock-investment', name: 'Wereldwijd indexfonds', assetType: 'investment', value: 120000, purchaseValue: 95000 },
+  { id: 'mock-savings', name: 'Spaarrekening', assetType: 'savings', value: 45000, purchaseValue: 45000 },
+  { id: 'mock-real-estate', name: 'Verhuurd appartement', assetType: 'real_estate', value: 80000, purchaseValue: 75000 },
+]))
 
 /** Mock-inflatie — één bron voor zowel `inflationRate` als de factorreeks hieronder. */
 const MOCK_INFLATION_RATE = 0.02
@@ -164,7 +178,7 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
     { type: 'Spaargeld', value: 45000, purchaseValue: 45000, expectedReturn: 0.025 },
     { type: 'Vastgoed', value: 80000, purchaseValue: 75000, expectedReturn: 0.03 },
   ],
-  totalPurchaseValue: 215000,
+  assetReturn: mockAssetReturn,
 
   // Horizon
   fireRange,

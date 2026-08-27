@@ -22,13 +22,13 @@ import { join } from 'node:path'
  *     "consume, don't recompute").
  */
 
-const loadHorizonDataMock = vi.fn()
+const loadHorizonRawMock = vi.fn()
 const buildHorizonInputMock = vi.fn()
 const computeConvergentieProjectionMock = vi.fn()
 const toSimResultMock = vi.fn()
 
-vi.mock('./horizon-data-loader', () => ({
-  loadHorizonData: (...args: unknown[]) => loadHorizonDataMock(...args),
+vi.mock('./horizon/raw-data-loader', () => ({
+  loadHorizonRaw: (...args: unknown[]) => loadHorizonRawMock(...args),
 }))
 vi.mock('./horizon/build-input', () => ({
   buildHorizonInput: (...args: unknown[]) => buildHorizonInputMock(...args),
@@ -50,23 +50,29 @@ const SUPABASE = {} as never
 const FIRE_STRATEGY = { strategy: 'perpetual', endAge: 100, legacyAmount: 0 }
 const WITHDRAWAL_STRATEGY = { strategy: 'static' }
 
+const RAW_HAPPY = {
+  effectiveInput: { dateOfBirth: '1985-04-01' },
+  events: [{ id: 'evt-1' }],
+  assets: [{ id: 'asset-1' }],
+  debts: [{ id: 'debt-1' }],
+  // De FIRE-run leest de PERSPECTIEF-rijen, niet de rauwe eigen arrays.
+  fireAssets: [{ id: 'asset-1' }],
+  fireDebts: [{ id: 'debt-1' }],
+  fireRowsComplete: true,
+  fireStrategy: FIRE_STRATEGY,
+  withdrawalStrategy: WITHDRAWAL_STRATEGY,
+  fireParams: { grossReturn: 0.06, inflationRate: 0.02, box3Method: 'forfaitair' },
+  box3Method: 'forfaitair',
+  hasPartner: false,
+  unlinkedCash: 1000,
+  monthlySavingsOverride: null,
+  baseAnnualSavingsFromCashflow: 12000,
+  housingStrategy: { mode: 'include_full' },
+  rawProfile: { id: 'profile-1', yearly_essential_expenses: 24000 },
+}
+
 function armHappyPath() {
-  loadHorizonDataMock.mockResolvedValue({
-    effectiveInput: { dateOfBirth: '1985-04-01' },
-    events: [{ id: 'evt-1' }],
-    assets: [{ id: 'asset-1' }],
-    debts: [{ id: 'debt-1' }],
-    fireStrategy: FIRE_STRATEGY,
-    withdrawalStrategy: WITHDRAWAL_STRATEGY,
-    fireParams: { grossReturn: 0.06, inflationRate: 0.02, box3Method: 'forfaitair' },
-    box3Method: 'forfaitair',
-    hasPartner: false,
-    unlinkedCash: 1000,
-    monthlySavingsOverride: null,
-    baseAnnualSavingsFromCashflow: 12000,
-    housingStrategy: { mode: 'include_full' },
-    rawProfile: { id: 'profile-1', yearly_essential_expenses: 24000 },
-  })
+  loadHorizonRawMock.mockResolvedValue(RAW_HAPPY)
   buildHorizonInputMock.mockReturnValue({
     input: { yearlyExpenses: 30000 },
     aowAgeInt: 68,
@@ -105,7 +111,7 @@ describe('computeHorizonFireSim — de canonieke FIRE-run', () => {
   })
 
   it('geeft null (geen halve uitkomst) wanneer een essentiële input ontbreekt', async () => {
-    loadHorizonDataMock.mockResolvedValue({
+    loadHorizonRawMock.mockResolvedValue({
       effectiveInput: { dateOfBirth: null },
       fireParams: { grossReturn: 0.06, inflationRate: 0.02 },
     })
@@ -116,6 +122,59 @@ describe('computeHorizonFireSim — de canonieke FIRE-run', () => {
   it('geeft null bij een gefaalde kernel-run', async () => {
     computeConvergentieProjectionMock.mockReturnValue({ ok: false })
     expect(await computeHorizonFireSim(SUPABASE)).toBeNull()
+  })
+
+  // ── H21 / ADR 0107 — perspectief-bewuste run ──────────────────────────────
+  it('leest de RAUWE laag (geen loadHorizonData) — anders is de recursie terug', () => {
+    const src = readFileSync(join(process.cwd(), 'lib', 'fire-target-shared.ts'), 'utf8')
+    expect(src).toMatch(/loadHorizonRaw\s*\(/)
+    // De afgeleide laag consumeert DEZE functie; hem hier aanroepen is oneindige recursie.
+    expect(src).not.toMatch(/\bloadHorizonData\s*\(/)
+  })
+
+  it('geeft het perspectief door aan de rauwe laag; zonder argument is dat expliciet "personal"', async () => {
+    await computeHorizonFireSim(SUPABASE)
+    expect(loadHorizonRawMock).toHaveBeenCalledWith(SUPABASE, 'personal')
+
+    loadHorizonRawMock.mockClear()
+    await computeHorizonFireSim(SUPABASE, 'household')
+    expect(loadHorizonRawMock).toHaveBeenCalledWith(SUPABASE, 'household')
+  })
+
+  it('voedt de kernel met de PERSPECTIEF-rijen (fireAssets/fireDebts), niet met de eigen arrays', async () => {
+    loadHorizonRawMock.mockResolvedValue({
+      effectiveInput: { dateOfBirth: '1985-04-01' },
+      events: [],
+      assets: [{ id: 'eigen' }],
+      debts: [{ id: 'eigen-schuld' }],
+      fireAssets: [{ id: 'huishoud' }],
+      fireDebts: [{ id: 'huishoud-schuld' }],
+      fireRowsComplete: true,
+      fireStrategy: FIRE_STRATEGY,
+      withdrawalStrategy: WITHDRAWAL_STRATEGY,
+      fireParams: { grossReturn: 0.06, inflationRate: 0.02, box3Method: 'forfaitair' },
+      box3Method: 'forfaitair',
+      hasPartner: false,
+      unlinkedCash: 0,
+      monthlySavingsOverride: null,
+      baseAnnualSavingsFromCashflow: 0,
+      housingStrategy: { mode: 'include_full' },
+      rawProfile: { id: 'profile-1' },
+    })
+    const run = await computeHorizonFireSim(SUPABASE, 'household')
+    expect(run!.rawContext.assets).toEqual([{ id: 'huishoud' }])
+    expect(run!.rawContext.debts).toEqual([{ id: 'huishoud-schuld' }])
+    expect(buildHorizonInputMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ assets: [{ id: 'huishoud' }], debts: [{ id: 'huishoud-schuld' }] }),
+    )
+  })
+
+  it('weigert te draaien op privacy-aggregaatrijen i.p.v. een pot met verzonnen aannames te bouwen', async () => {
+    // Privacyniveau "totalen": één synthetische rij zónder asset_type/rendement.
+    // Een SOM is daarop eerlijk, een kernel-POT niet — dus geen kernel-antwoord.
+    loadHorizonRawMock.mockResolvedValue({ ...RAW_HAPPY, fireRowsComplete: false })
+    expect(await computeHorizonFireSim(SUPABASE, 'household')).toBeNull()
+    expect(computeConvergentieProjectionMock).not.toHaveBeenCalled()
   })
 })
 
@@ -140,7 +199,7 @@ describe('computeHorizonFireTarget — dunne afleiding, geen eigen run', () => {
   })
 
   it('lege uitkomst wanneer de gedeelde run niet kon draaien', async () => {
-    loadHorizonDataMock.mockRejectedValue(new Error('db down'))
+    loadHorizonRawMock.mockRejectedValue(new Error('db down'))
     expect(await computeHorizonFireTarget(SUPABASE)).toEqual({
       requiredFirePortfolio: null,
       requiredFireNetWorth: null,

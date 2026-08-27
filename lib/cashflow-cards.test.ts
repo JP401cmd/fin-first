@@ -58,8 +58,10 @@ const EMPTY_CASHFLOW: CashflowData = {
 const EMPTY_VASTE_LASTEN: VasteLastenSummary = {
   subscriptions: [],
   vasteKosten: [],
+  terugkerendVariabel: [],
   totalMonthlySubscriptions: 0,
   totalMonthlyVasteKosten: 0,
+  totalMonthlyVariabel: 0,
   totalMonthly: 0,
   count: 0,
 }

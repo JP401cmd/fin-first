@@ -3,6 +3,7 @@ import { assert, assertEqual, assertNotNull, assertGreaterThan } from '../assert
 import type { TestCase } from '../test-types'
 import type { DashboardData } from '@/lib/types/dashboard'
 import { getWidgetDef, BUDGET_WIDGETS } from '@/lib/widget-catalog'
+import { emptyPortfolioReturnSummary } from '@/lib/asset-return'
 import { authenticatedFetch } from '../server-runner'
 
 const CAT = 'dashboard.empty-loading'
@@ -89,7 +90,7 @@ function makeEmptyDashboardData(): DashboardData {
     },
     // Asset & Tax
     assetsByType: [],
-    totalPurchaseValue: 0,
+    assetReturn: emptyPortfolioReturnSummary(),
     box3Tax: null,
     // Monthly comparison
     prevMonthIncome: 0,
@@ -214,7 +215,8 @@ const tests: TestCase[] = [
       const data = makeEmptyDashboardData()
       assertEqual(data.totalAssets, 0, 'totalAssets should be 0')
       assertEqual(data.assetsByType.length, 0, 'assetsByType should be empty')
-      assertEqual(data.totalPurchaseValue, 0, 'totalPurchaseValue should be 0')
+      assertEqual(data.assetReturn.value, 0, 'assetReturn should be empty')
+      assertEqual(data.assetReturn.pct, null, 'assetReturn.pct should be null (geen kostprijs, geen percentage)')
       assertEqual(data.box3Tax, null, 'box3Tax should be null without assets')
     },
   },

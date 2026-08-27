@@ -5,6 +5,7 @@ import { calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from 
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { ASSET_TYPE_COLORS, ASSET_TYPE_LABELS, type AssetType } from '@/lib/asset-data'
 import type { DashboardData } from './widget-renderer'
+import { RETURN_BASIS_LABELS, formatGainPct } from '@/lib/asset-return'
 
 // investment/retirement/crypto delen kern-500 in het editorial palette — onderscheid
 // gaat via tekst-labels naast kleur-dots (zie lib/asset-data.ts comment).
@@ -40,17 +41,19 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
   // Count of investment-type asset entries (approximated as number of types present)
   const positionCount = investmentAssets.length
 
-  // Werkelijk rendement tot nu toe (vervangt de `expected_return`-aanname):
-  // (huidige waarde − aankoopwaarde) / aankoopwaarde over de belegde subset.
-  // `purchaseValue` komt al inclusion-gewogen uit de canonieke assetsByType
-  // (computeAssetsByType) — consumeren, niet herberekenen. Zelfde formule/veld
-  // als de zuster-widget Vermogen ("Ongerealiseerde winst"), zodat er geen
-  // tweede rendementsdefinitie op het dashboard ontstaat.
-  const totalPurchase = investmentAssets.reduce((s, a) => s + a.purchaseValue, 0)
-  const realizedGain = totalPurchase > 0 ? totalInvestments - totalPurchase : null
-  const realizedPct = realizedGain != null && totalPurchase > 0
-    ? (realizedGain / totalPurchase) * 100
-    : null
+  // Gerealiseerd rendement uit de CANONIEKE motor via de bundel (kaart H7).
+  // Deze widget rekende zijn eigen `Σ value − Σ purchaseValue` over
+  // investment + retirement + crypto — dezelfde fout als de zuster-widgets:
+  // een pensioenpot heeft geen kostprijsbegrip (gestort, niet gekocht) en telde
+  // met `purchase_value = 0` volledig als winst mee. `data.assetReturn.portfolio`
+  // is dezelfde grondslag als de kop-KPI op /overzicht/bezittingen.
+  //
+  // NB: de WAARDE hierboven (`totalInvestments`) houdt bewust pensioen erin —
+  // "wat staat er belegd" is een andere vraag dan "wat is er op belegd geld
+  // verdiend". Het rendement-label draagt daarom expliciet zijn eigen scope.
+  const portfolio = data.assetReturn
+  const realizedPct = portfolio.cost > 0 ? portfolio.pct : null
+  const realizedGain = portfolio.cost > 0 ? portfolio.gain : null
 
   if (size === 'mini') {
     return (
@@ -82,7 +85,7 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
           )}
           {realizedPct != null && (
             <p className="mt-1 font-mono text-[10px] tabular-nums text-[var(--ink-4)]">
-              Rendement {realizedPct >= 0 ? '+' : ''}{realizedPct.toFixed(1)}%
+              {RETURN_BASIS_LABELS.portfolioSincePurchase.label} {formatGainPct(realizedPct)}
             </p>
           )}
         </div>
@@ -128,7 +131,7 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
             })}
             {realizedPct != null && (
               <p className="font-mono text-[11px] tabular-nums text-[var(--ink-3)]">
-                Rendement: {realizedPct >= 0 ? '+' : ''}{realizedPct.toFixed(1)}%
+                {RETURN_BASIS_LABELS.portfolioSincePurchase.label}: {formatGainPct(realizedPct)}
               </p>
             )}
             {investmentContributions > 0 && (
@@ -212,10 +215,10 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
               )
             })}
 
-            {/* Werkelijk rendement tot nu toe (waarde − aankoopwaarde) */}
+            {/* Gerealiseerd rendement uit de canonieke motor — grondslag in het label */}
             {realizedGain != null && (
               <div className="mt-1 flex items-baseline justify-between border-t border-dashed border-[var(--border-ed)] pt-2 text-[11px]">
-                <span className="text-[var(--ink-3)]">Rendement</span>
+                <span className="text-[var(--ink-3)]">{RETURN_BASIS_LABELS.portfolioSincePurchase.label}</span>
                 <span className={realizedGain >= 0 ? 'text-positive' : 'text-negative'}>
                   <MaskedAmount
                     value={realizedGain}
@@ -225,7 +228,7 @@ export const HoldingsWidget = memo(function HoldingsWidget({ size, data, href }:
                   />
                   {realizedPct != null && (
                     <span className="ml-1 font-normal text-[var(--ink-3)]">
-                      ({realizedPct >= 0 ? '+' : ''}{realizedPct.toFixed(1)}%)
+                      ({formatGainPct(realizedPct)})
                     </span>
                   )}
                 </span>

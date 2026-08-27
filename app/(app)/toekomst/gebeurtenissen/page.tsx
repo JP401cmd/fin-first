@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
-import { loadHorizonData } from '@/lib/horizon-data-loader'
+import { loadHorizonRaw } from '@/lib/horizon-data-loader'
 import { GebeurtenissenView, type KernelSimData } from '@/components/future/gebeurtenissen-view'
 import { ToekomstSubpageShell } from '@/components/future/toekomst-subpage-shell'
 import { ageAtDate } from '@/lib/horizon-data'
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
 export default async function ToekomstGebeurtenissenPage() {
   const supabase = await createClient()
   const [horizonData, aowRes] = await Promise.all([
-    loadHorizonData(supabase),
+    loadHorizonRaw(supabase),
     supabase
       .from('aow_leeftijd')
       .select('id, birth_date_from, birth_date_through, aow_years, aow_months, is_definitive, source')

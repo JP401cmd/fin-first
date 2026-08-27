@@ -20,6 +20,7 @@ import {
 } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
+import { passivaSubLabel } from './passiva-sub'
 
 /**
  * Masked-aware currency formatter hook. Returns a stable callback that
@@ -208,6 +209,8 @@ export default function BalansPage() {
 
   const totalAssetItems = data.vasteActiva.items.length + data.vlottendeActiva.items.length + data.liquideMiddelen.items.length
   const totalDebtItems = data.langVreemdVermogen.items.length + data.kortVreemdVermogen.items.length
+  // Passiva = schulden + eigen vermogen; het bijschrift moet beide noemen (bevinding M30).
+  const passivaSub = passivaSubLabel(totalDebtItems)
 
   return (
     <div className="mx-auto max-w-[900px] px-4 py-6 md:px-8">
@@ -285,7 +288,7 @@ export default function BalansPage() {
           {
             kicker: 'Passiva',
             amount: fc(data.totalPassiva),
-            sub: `${totalDebtItems} ${totalDebtItems === 1 ? 'schuld' : 'schulden'}`,
+            sub: passivaSub,
             variant: 'neutral',
           },
           {

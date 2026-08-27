@@ -291,17 +291,26 @@ describe('CashOverview — bank_accounts in één leesronde', () => {
     expect(q.ops).toContainEqual({ name: 'eq', args: ['ownership', 'personal'] })
   })
 
-  it('versmalt het persoonlijke perspectief óók in de brede modus (nu ná het ophalen)', async () => {
+  it('versmalt het persoonlijke perspectief op OWNERSHIP, niet op rekening (H6)', async () => {
     renderOverzicht({ showAllCashAccounts: true })
-    // De transactie-queries draaien op de ZICHTBARE rekeningen; daar lezen we
-    // af welke rijen het perspectief-filter overleefd hebben.
     await settle()
-    expect(tableReads('transactions').some((q) => q.ops.some((o) => o.name === 'in'))).toBe(true)
-    const inOp = tableReads('transactions')
-      .flatMap((q) => q.ops)
-      .find((o) => o.name === 'in')
-    expect(inOp?.args[0]).toBe('account_id')
-    expect(inOp?.args[1]).toEqual(['ba-eigen'])
+
+    const txReads = tableReads('transactions')
+    expect(txReads.length).toBeGreaterThan(0)
+
+    // SINDS H6: geen rekening-witlijst meer. De strip telde daardoor een andere
+    // verzameling dan de canonieke maandmotor (`deriveRealMonthTotals`), die
+    // alle RLS-zichtbare rijen leest — een van de vier assen achter bevinding
+    // H6. Eigenaarsbesluit 26-08-2026: scoping los, historische maandcijfers
+    // mogen zichtbaar verschuiven.
+    expect(txReads.some((q) => q.ops.some((o) => o.name === 'in'))).toBe(false)
+
+    // Wat WÉL blijft: het perspectief. Dat is geen rekening-scoping maar de as
+    // waarop de hele pagina draait; los je die ook op, dan lekken partner-rijen
+    // in het persoonlijke beeld.
+    for (const q of txReads) {
+      expect(q.ops).toContainEqual({ name: 'eq', args: ['ownership', 'personal'] })
+    }
   })
 
   it('een gedeelde rekening opent de rekeningdetail, niet het bezittings-paneel', async () => {
@@ -340,17 +349,23 @@ describe('CashOverview — bank_accounts in één leesronde', () => {
     expect(gefilterdeKolommen).toEqual(['is_archive_bucket'])
   })
 
-  it('voegt de archiefrekening bij de aggregatie-ids, niet bij de kaartenlijst', async () => {
+  it('houdt de archiefrekening buiten de kaartenlijst; de aggregatie ziet hem structureel (H6)', async () => {
     archiveRow.value = { id: 'ba-archief' }
     renderOverzicht()
     await settle()
 
-    // Eén kaartenlijst-ronde blijft één ronde; het archief reist apart mee.
+    // Eén kaartenlijst-ronde blijft één ronde, en het archief hoort daar niet in
+    // — dat deel van de belofte is ongewijzigd.
     expect(bankReads().kaartenlijst).toHaveLength(1)
-    const inOp = tableReads('transactions')
-      .flatMap((q) => q.ops)
-      .find((o) => o.name === 'in')
-    expect(inOp?.args[1]).toEqual(['ba-eigen', 'ba-archief'])
+    expect(screen.queryByText(/archief/i)).toBeNull()
+
+    // VÓÓR H6 werd `ba-archief` handmatig aan een `in('account_id', …)`-witlijst
+    // geplakt zodat de bewaarde historie in de geldstroomcijfers bleef staan.
+    // Die witlijst bestaat niet meer: de query leest alle RLS-zichtbare rijen,
+    // dus archiefboekingen tellen nu vanzelf mee. Sterker dan de witlijst, want
+    // die kon een rekening missen; deze assertie bewaakt dat er geen nieuwe
+    // scoping insluipt die het archief opnieuw zou kunnen uitsluiten.
+    expect(tableReads('transactions').some((q) => q.ops.some((o) => o.name === 'in'))).toBe(false)
   })
 
   it('bouwt de asset→rekening-map uit de ongefilterde set, inclusief gedeeld', () => {

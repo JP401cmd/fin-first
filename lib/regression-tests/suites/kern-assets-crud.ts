@@ -149,11 +149,12 @@ const tests: TestCase[] = [
     estimatedDurationMs: 200,
     fn() {
       // Validation rules for numeric fields:
-      // units: NaN or < 0 → 400 "Units moet een positief getal zijn"
+      // units: NaN or <= 0 → 400 "Aantal stuks moet groter dan 0 zijn" (H8: 0 was
+      // toegestaan en werd client-side stil naar 1 gecoerceerd)
       // avg_purchase_price: NaN or < 0 → 400 "Gemiddelde aankoopprijs moet een positief getal zijn"
       // current_price: NaN or < 0 → 400 "Huidige prijs moet een positief getal zijn"
       const validationMessages = [
-        { field: 'units', message: 'Units moet een positief getal zijn' },
+        { field: 'units', message: 'Aantal stuks moet groter dan 0 zijn' },
         { field: 'avg_purchase_price', message: 'Gemiddelde aankoopprijs moet een positief getal zijn' },
         { field: 'current_price', message: 'Huidige prijs moet een positief getal zijn' },
       ]

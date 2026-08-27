@@ -112,6 +112,7 @@ export function buildHldModel(): HldModel {
           { title: 'Uitrekenen wanneer je niet meer hoeft te werken', desc: 'Je FIRE-datum: het moment dat werken een keuze wordt.' },
           { title: '“Wat als”-scenario\'s doorrekenen', desc: 'Meer sparen, eerder stoppen, anders beleggen — zie het effect direct.' },
           { title: 'Grote gebeurtenissen meenemen', desc: 'Huis kopen, pensioen, kinderen — alles op je tijdlijn.' },
+          { title: 'Je doelen terugzien op je tijdlijn', desc: 'Een doel met een streefdatum krijgt een eigen markering op je tijdas, op de leeftijd die bij die datum hoort — zodat het scherm dat over je toekomst gaat laat zien waar je naartoe spaart. Is de streefdatum al voorbij en het doel nog open, dan blijft de markering staan bij vandaag.' },
           { title: 'Je vermogen jaren vooruit zien groeien', desc: 'Simulaties en een toets tegen echte beurshistorie.' },
           { title: 'Snappen hoe je vrijheidsgrafiek is opgebouwd', desc: 'In vier stappen met je eigen cijfers: opbouw, benodigd vermogen, het vrijheidsmoment en onttrekking.' },
           { title: 'Je loopbaan en inkomen meenemen', desc: 'Salarisgroei, een plafond of minder werken — zie wat het met je vrijheidsdatum doet.' },

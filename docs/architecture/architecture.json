@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-26T22:24:14.063Z",
-  "generatedDate": "2026-08-26",
+  "generatedAt": "2026-08-27T15:58:54.939Z",
+  "generatedDate": "2026-08-27",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -188,11 +188,11 @@
   "stats": {
     "routes": 137,
     "routesProduction": 95,
-    "api": 299,
-    "tables": 89,
-    "migrations": 207,
+    "api": 300,
+    "tables": 90,
+    "migrations": 211,
     "integrations": 25,
-    "components": 946,
+    "components": 956,
     "providers": 15,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -2380,6 +2380,14 @@
       "domain": "appearance",
       "methods": [
         "PUT"
+      ]
+    },
+    {
+      "url": "/api/assets",
+      "file": "app/api/assets/route.ts",
+      "domain": "assets",
+      "methods": [
+        "POST"
       ]
     },
     {
@@ -5335,8 +5343,16 @@
     {
       "domain": "assets",
       "label": "Bezittingen",
-      "count": 7,
+      "count": 8,
       "routes": [
+        {
+          "url": "/api/assets",
+          "file": "app/api/assets/route.ts",
+          "domain": "assets",
+          "methods": [
+            "POST"
+          ]
+        },
         {
           "url": "/api/assets/[id]",
           "file": "app/api/assets/[id]/route.ts",
@@ -7851,6 +7867,10 @@
         "migration": "supabase/migrations/20260218000001_add_household_support.sql"
       },
       {
+        "name": "import_idempotency",
+        "migration": "supabase/migrations/20260827170000_create_import_idempotency.sql"
+      },
+      {
         "name": "intake_rate_limit",
         "migration": "supabase/migrations/20260617000000_lead_intakes.sql"
       },
@@ -8023,7 +8043,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 207
+    "migrationCount": 211
   },
   "tablesByDomain": [
     {
@@ -8100,6 +8120,10 @@
         {
           "name": "household_budget_model_proposals",
           "migration": "supabase/migrations/20260611000002_household_budget_model_consent.sql"
+        },
+        {
+          "name": "import_idempotency",
+          "migration": "supabase/migrations/20260827170000_create_import_idempotency.sql"
         },
         {
           "name": "intake_rate_limit",
@@ -8501,11 +8525,11 @@
     }
   ],
   "components": {
-    "total": 946,
+    "total": 956,
     "groups": [
       {
         "group": "app",
-        "count": 368,
+        "count": 373,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8526,6 +8550,8 @@
           "ai-subscription-upsell.test",
           "ai-vaste-kosten-sheet",
           "ai-vaste-kosten-sheet.test",
+          "amount-input",
+          "amount-input.test",
           "analysis-section",
           "app-link-gate",
           "app-link-gate.test",
@@ -8662,6 +8688,7 @@
           "goal-form",
           "goal-form.test",
           "grafiek-uitleg-walkthrough",
+          "guide-visit-tracker",
           "head-scripts",
           "health-score-receipt",
           "health-score-receipt.test",
@@ -8735,6 +8762,7 @@
           "net-worth-projection-chart",
           "nibud-benchmark",
           "nieuw-budget-kaart",
+          "notification-bundle",
           "notification-item",
           "notification-item.test",
           "notification-panel",
@@ -8819,6 +8847,7 @@
           "step-choice",
           "step-details",
           "step-header",
+          "step-header-count.test",
           "step-link-debt",
           "step-type",
           "step-type.test",
@@ -8879,7 +8908,7 @@
       },
       {
         "group": "overview",
-        "count": 169,
+        "count": 170,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -8912,6 +8941,7 @@
           "box3-section-header",
           "box3-stelsel2028",
           "box3-tegenbewijs-card",
+          "box3-tegenbewijs-card.test",
           "briefing-panel",
           "briefing-panel.test",
           "bulk-bevestigingen",
@@ -9342,6 +9372,44 @@
         ]
       },
       {
+        "group": "onboarding",
+        "count": 32,
+        "items": [
+          "aangifte-import-pane",
+          "budget-amount-editor",
+          "facts-panel",
+          "freedom-ticker",
+          "freedom-ticker.test",
+          "onboarding-bezittingen",
+          "onboarding-bezittingen.test",
+          "onboarding-eindstrategie",
+          "onboarding-horizon",
+          "onboarding-identity",
+          "onboarding-identity.test",
+          "onboarding-inkomen",
+          "onboarding-inkomen.test",
+          "onboarding-klaar",
+          "onboarding-pensioen",
+          "onboarding-pensioen.test",
+          "onboarding-posten",
+          "onboarding-schulden",
+          "onboarding-schulden.test",
+          "onboarding-section-back-navigation.test",
+          "onboarding-shell",
+          "onboarding-spaardoel",
+          "onboarding-success",
+          "onboarding-uitgaven-pensioen",
+          "onboarding-upo-section",
+          "onboarding-vraag",
+          "onboarding-vraag.test",
+          "progress-bar",
+          "section-review",
+          "speech-bubble",
+          "step-progress",
+          "welcome-popup"
+        ]
+      },
+      {
         "group": "check",
         "count": 31,
         "items": [
@@ -9379,44 +9447,10 @@
         ]
       },
       {
-        "group": "onboarding",
-        "count": 29,
-        "items": [
-          "aangifte-import-pane",
-          "budget-amount-editor",
-          "facts-panel",
-          "onboarding-bezittingen",
-          "onboarding-bezittingen.test",
-          "onboarding-eindstrategie",
-          "onboarding-horizon",
-          "onboarding-identity",
-          "onboarding-inkomen",
-          "onboarding-inkomen.test",
-          "onboarding-klaar",
-          "onboarding-pensioen",
-          "onboarding-pensioen.test",
-          "onboarding-posten",
-          "onboarding-schulden",
-          "onboarding-schulden.test",
-          "onboarding-section-back-navigation.test",
-          "onboarding-shell",
-          "onboarding-spaardoel",
-          "onboarding-success",
-          "onboarding-uitgaven-pensioen",
-          "onboarding-upo-section",
-          "onboarding-vraag",
-          "onboarding-vraag.test",
-          "progress-bar",
-          "section-review",
-          "speech-bubble",
-          "step-progress",
-          "welcome-popup"
-        ]
-      },
-      {
         "group": "editorial",
-        "count": 16,
+        "count": 17,
         "items": [
+          "aanname-hint",
           "button",
           "button.test",
           "chart-tips",
@@ -9762,13 +9796,13 @@
         {
           "key": "path",
           "label": "Pad-gebaseerd",
-          "description": "Eén tip per pagina/route, als fallback wanneer er geen data-gap of uitgesteld veld speelt.",
+          "description": "Eén tip per pagina/route, als fallback wanneer er geen data-gap of uitgesteld veld speelt. Deze laag wordt pas bereikt als élke data-gap dicht is — een regel hier moet dus voor een gevuld account kloppen, of een eigen check dragen.",
           "order": 3
         },
         {
           "key": "default",
           "label": "Standaard welkomstbericht",
-          "description": "Laatste terugval als geen enkele andere regel van toepassing is.",
+          "description": "Laatste terugval als geen enkele andere regel van toepassing is. Twee varianten: gevuld account eerst, daarna het onvoorwaardelijke welkomstbericht.",
           "order": 4
         }
       ],
@@ -10040,6 +10074,10 @@
         {
           "name": "assets",
           "write": true
+        },
+        {
+          "name": "household_members",
+          "write": false
         }
       ],
       "bank-accounts": [
@@ -10555,6 +10593,10 @@
         },
         {
           "name": "debts",
+          "write": false
+        },
+        {
+          "name": "fire_assumptions",
           "write": false
         },
         {
@@ -11838,6 +11880,7 @@
           "label": "Bezittingen",
           "write": true,
           "routes": [
+            "/api/assets",
             "/api/assets/[id]",
             "/api/assets/account-number",
             "/api/assets/toggle-holdings",
@@ -12670,6 +12713,14 @@
           ]
         },
         {
+          "domain": "assets",
+          "label": "Bezittingen",
+          "write": false,
+          "routes": [
+            "/api/assets"
+          ]
+        },
+        {
           "domain": "checkin",
           "label": "checkin",
           "write": false,
@@ -12719,6 +12770,14 @@
           "write": true,
           "routes": [
             "/api/admin/fire-assumptions"
+          ]
+        },
+        {
+          "domain": "household",
+          "label": "Huishouden",
+          "write": false,
+          "routes": [
+            "/api/household/fire-projections"
           ]
         }
       ],
@@ -14975,6 +15034,11 @@
         "user": true,
         "household": false,
         "rls": true
+      },
+      "import_idempotency": {
+        "user": true,
+        "household": false,
+        "rls": true
       }
     }
   },
@@ -16293,6 +16357,42 @@
       ],
       "summary": "De Box 1-motor verlaagde met de hypotheekrenteaftrek uitsluitend de **grondslag**. Daardoor werkte de aftrek automatisch door tegen het schijftarief waarin hij landt — 49,50% in de topschijf — terwijl de wet dat effect sinds 2014 maximeert op het **aftrektarief** (37,56% in 2026)",
       "file": "docs/adr/0106-hypotheekrenteaftrek-loopt-over-het-netto-eigenwoningsaldo.md"
+    },
+    {
+      "id": "0107-de-fire-loader-is-geknipt-in-rauw-en-afgeleid",
+      "title": "De FIRE-loader is geknipt in een rauwe en een afgeleide laag, en de FIRE-run kent het perspectief",
+      "status": "aanvaard",
+      "date": "2026-08-27",
+      "elements": [
+        "as-planning",
+        "as-vermogen",
+        "fn-toekomstplannen"
+      ],
+      "summary": "Een testpanel legde `/overzicht` en `/toekomst` naast elkaar en kreeg op dezelfde vraag verschillende antwoorden: een andere vrijheidsleeftijd per scherm, en op `/toekomst` stond \"NETTO VERMOGEN €1.731.640\" vijf regels boven \"€1.619.700 netto vermogen\". Drie losse oorzaken onder ",
+      "file": "docs/adr/0107-de-fire-loader-is-geknipt-in-rauw-en-afgeleid.md"
+    },
+    {
+      "id": "0108-box3-indeling-is-een-afleiding-met-een-overschrijving",
+      "title": "De Box 3-indeling is één afleiding met één overschrijving",
+      "status": "aanvaard",
+      "date": "2026-08-27",
+      "elements": [
+        "as-belasting"
+      ],
+      "summary": "De vraag \"valt deze bezitting in Box 3?\" werd op **drie** plekken onafhankelijk beantwoord, en de antwoorden spraken elkaar tegen. `classifyAsset` (`lib/box3-data.ts`) voedde de Box 3-pagina, de FIRE-projectie en de huishoudbelasting; `BOX3_ASSET_TYPES` (`lib/box3-taxable-input.t",
+      "file": "docs/adr/0108-box3-indeling-is-een-afleiding-met-een-overschrijving.md"
+    },
+    {
+      "id": "0109-een-onmogelijke-uitkomst-is-geen-antwoord",
+      "title": "Een onmogelijke uitkomst is geen antwoord: de FIRE-solver zegt het, en de weergave vangt het op",
+      "status": "aanvaard",
+      "date": "2026-08-27",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen"
+      ],
+      "summary": "Een testpanel opende `/toekomst` met een leeg profiel en las daar, in kopgetallen, zonder enige waarschuwing: **\"VRIJHEIDSLEEFTIJD 100,0 jaar\"** en **\"DOELBEDRAG €−11.328.971 benodigd\"**. Beide getallen waren netjes berekend. Geen van beide kon kloppen.",
+      "file": "docs/adr/0109-een-onmogelijke-uitkomst-is-geen-antwoord.md"
     }
   ],
   "churn": {
@@ -16300,23 +16400,23 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 72
+        "commits": 71
       },
       {
         "path": "lib/ai",
-        "commits": 55
+        "commits": 50
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 29
+        "commits": 30
       },
       {
         "path": "app/api/ai",
-        "commits": 20
+        "commits": 18
       },
       {
         "path": "app/api/household",
-        "commits": 17
+        "commits": 18
       },
       {
         "path": "app/api/assets",
@@ -16332,28 +16432,28 @@
       },
       {
         "path": "lib/fire-simulation.ts",
-        "commits": 6
+        "commits": 5
       },
       {
         "path": "components/horizon",
-        "commits": 2
+        "commits": 1
       }
     ],
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 9230,
+        "loc": 9521,
         "commits": 77
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 5260,
-        "commits": 30
+        "loc": 5278,
+        "commits": 29
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4599,
-        "commits": 39
+        "loc": 4886,
+        "commits": 37
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -16361,24 +16461,24 @@
         "commits": 19
       },
       {
+        "file": "lib/dashboard-data-loader.ts",
+        "loc": 2829,
+        "commits": 51
+      },
+      {
         "file": "lib/release-notes.ts",
         "loc": 2763,
         "commits": 3
       },
       {
-        "file": "lib/dashboard-data-loader.ts",
-        "loc": 2757,
-        "commits": 50
-      },
-      {
         "file": "app/(app)/core/cash/import/page.tsx",
-        "loc": 2359,
+        "loc": 2378,
         "commits": 21
       },
       {
         "file": "lib/test-personas.ts",
         "loc": 2236,
-        "commits": 8
+        "commits": 9
       }
     ]
   },
@@ -17478,13 +17578,27 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-08-13",
+    "previousDate": "2026-08-26",
     "hasChanges": true,
     "sections": [
       {
+        "label": "API-routes",
+        "added": [
+          "/api/assets"
+        ],
+        "removed": []
+      },
+      {
+        "label": "Tabellen",
+        "added": [
+          "import_idempotency"
+        ],
+        "removed": []
+      },
+      {
         "label": "Componenten (aantal)",
         "added": [
-          "+6"
+          "+10"
         ],
         "removed": []
       }
@@ -17790,6 +17904,13 @@
       "api": 299,
       "components": 946,
       "tables": 89,
+      "routesProduction": 95
+    },
+    {
+      "date": "2026-08-27",
+      "api": 300,
+      "components": 956,
+      "tables": 90,
       "routesProduction": 95
     }
   ]

@@ -183,10 +183,11 @@ describe('computeEmergencyFundMonths', () => {
 // ── buildBudgetCategories ─────────────────────────────────────────────────
 
 describe('buildBudgetCategories', () => {
-  it('lege budgetten → 3 categorieën met limit=0 (inactief-pad)', () => {
-    const result = buildBudgetCategories([], [])
-    expect(result).toHaveLength(3)
-    expect(result.every((c) => c.limit === 0)).toBe(true)
+  it('lege budgetten → lege lijst (inactief-pad, gewicht herverdeeld)', () => {
+    // H4 punt 3: voorheen kwamen hier drie lege TYPE-sommen uit. De pijler wordt
+    // op dezelfde manier inactief (geen entry met limit > 0), maar de vorm zegt
+    // nu de waarheid: er zijn nul categorieën.
+    expect(buildBudgetCategories([], [])).toEqual([])
   })
 
   it('parent-budget met expense-type: limit en spent klopt', () => {
@@ -219,6 +220,71 @@ describe('buildBudgetCategories', () => {
     const result = buildBudgetCategories(budgets, [])
     const sav = result.find((c) => c.limit === 1000)
     expect(sav?.limit).toBe(1000) // 12000/12
+  })
+
+  // ── H4 punt 3 — per INDIVIDUELE categorie, niet per type-som ─────────────
+
+  it('kinderen zijn de categorieën; de parent-groep telt niet nog eens mee', () => {
+    const budgets: HealthScoreBudget[] = [
+      { id: 'wonen', parent_id: null, budget_type: 'expense', default_limit: 0, interval: 'monthly' },
+      { id: 'gwl', parent_id: 'wonen', budget_type: null, default_limit: 200, interval: 'monthly' },
+      { id: 'huur', parent_id: 'wonen', budget_type: null, default_limit: 1200, interval: 'monthly' },
+    ]
+    const result = buildBudgetCategories(budgets, [])
+    expect(result).toHaveLength(2)
+    expect(result.map((c) => c.limit).sort((a, b) => a - b)).toEqual([200, 1200])
+  })
+
+  it('DE BEVINDING: een overschreden categorie verdwijnt niet meer in de type-som', () => {
+    // "Gas, water, licht 107%" naast "3/3 alles binnen de limiet" was het defect:
+    // de overschrijding van €14 werd weggemiddeld tegen de ruimte op huur.
+    const budgets: HealthScoreBudget[] = [
+      { id: 'wonen', parent_id: null, budget_type: 'expense', default_limit: 0, interval: 'monthly' },
+      { id: 'gwl', parent_id: 'wonen', budget_type: null, default_limit: 200, interval: 'monthly' },
+      { id: 'huur', parent_id: 'wonen', budget_type: null, default_limit: 1200, interval: 'monthly' },
+    ]
+    const transactions: HealthScoreTransaction[] = [
+      { amount: -214, budget_id: 'gwl' },   // 107% van 200
+      { amount: -1000, budget_id: 'huur' }, // ruim binnen
+    ]
+    const result = buildBudgetCategories(budgets, transactions)
+    const gwl = result.find((c) => c.limit === 200)
+    expect(gwl?.spent).toBe(214)
+    expect(result.filter((c) => c.spent > c.limit)).toHaveLength(1)
+    // De oude type-som (1400 limiet / 1214 besteed) zag géén overschrijding.
+    const typeSum = result.reduce(
+      (acc, c) => ({ limit: acc.limit + c.limit, spent: acc.spent + c.spent }),
+      { limit: 0, spent: 0 },
+    )
+    expect(typeSum.spent).toBeLessThan(typeSum.limit)
+  })
+
+  it('parent zonder kinderen is zelf de categorie; per type apart geteld', () => {
+    const budgets: HealthScoreBudget[] = [
+      { id: 'boodschappen', parent_id: null, budget_type: 'expense', default_limit: 500, interval: 'monthly' },
+      { id: 'sparen', parent_id: null, budget_type: 'savings', default_limit: 400, interval: 'monthly' },
+      { id: 'aflossen', parent_id: null, budget_type: 'debt', default_limit: 300, interval: 'monthly' },
+      { id: 'salaris', parent_id: null, budget_type: 'income', default_limit: 4000, interval: 'monthly' },
+    ]
+    const result = buildBudgetCategories(budgets, [])
+    // income doet niet mee in de discipline-pijler (ongewijzigd gedrag).
+    expect(result.map((c) => c.limit).sort((a, b) => a - b)).toEqual([300, 400, 500])
+  })
+
+  it('het kwartaal-interval van de PARENT normaliseert ook de kinderlimieten', () => {
+    const budgets: HealthScoreBudget[] = [
+      { id: 'verzekering', parent_id: null, budget_type: 'expense', default_limit: 0, interval: 'quarterly' },
+      { id: 'inboedel', parent_id: 'verzekering', budget_type: null, default_limit: 300, interval: 'monthly' },
+    ]
+    const result = buildBudgetCategories(budgets, [])
+    expect(result).toEqual([{ limit: 100, spent: 0 }]) // 300/3
+  })
+
+  it('een budget zonder bekend type levert geen categorie', () => {
+    const budgets: HealthScoreBudget[] = [
+      { id: 'raar', parent_id: null, budget_type: 'onzin', default_limit: 500, interval: 'monthly' },
+    ]
+    expect(buildBudgetCategories(budgets, [])).toEqual([])
   })
 })
 

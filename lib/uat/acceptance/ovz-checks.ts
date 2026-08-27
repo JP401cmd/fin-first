@@ -34,6 +34,12 @@ import { compareCompound } from '@/lib/compound-projection'
 import { buildSimNetWorthRows } from '@/lib/horizon/networth-rows'
 import { DEFAULT_HOUSING_STRATEGY } from '@/lib/housing-strategy'
 import { deflate } from '@/lib/euro-display'
+import {
+  DEFAULT_WELCOME_GUIDE,
+  countScreenProgress,
+  deriveGuideStates,
+  type GuideAccountFacts,
+} from '@/lib/welcome-guide'
 import { OVZ_ACCEPTANCE } from './ovz'
 import type { AcceptanceCriterion } from './types'
 
@@ -263,6 +269,55 @@ export const OVZ_ENGINE_CHECKS: OvzEngineCheck[] = [
       return {
         expected: 'freedomDaysPerYear=45; euroImpactYearly=4080',
         actual: `freedomDaysPerYear=${freedomDaysPerYear}; euroImpactYearly=${euroImpactYearly}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-OVZ-14',
+    scenarioId: 'UAT-OVZ-14',
+    label: 'Welkomstgids: afgeleide voortgang op scherm 1 (gevuld 4/4, leeg 0/4, n.v.t. buiten de noemer)',
+    run: () => {
+      criterion('WF-OVZ-14')
+      const screen = DEFAULT_WELCOME_GUIDE.screens[0]
+      const leeg: GuideAccountFacts = {
+        hasAssets: false,
+        hasDebts: false,
+        hasBudgets: false,
+        hasBankConnection: false,
+        hasTransactions: false,
+        hasFireParams: false,
+        hasHorizonSetup: false,
+        hasLifeEvents: false,
+        hasRetirementExpenseChoice: false,
+        hasGoals: false,
+        hasScenarioPrefs: false,
+        visitedSlugs: [],
+        notApplicableStepIds: [],
+      }
+      // Persona met een gevuld account: bezittingen, schulden, budget en een
+      // gekoppelde rekening — precies de vier stappen van scherm 1.
+      const gevuld: GuideAccountFacts = {
+        ...leeg,
+        hasAssets: true,
+        hasDebts: true,
+        hasBudgets: true,
+        hasBankConnection: true,
+      }
+      // Alleen huishoud-gedeelde bezittingen van de partner: eigen-account is
+      // leeg, dus de gids vinkt niets af (perspectief-lek-regressie).
+      const partner = leeg
+
+      const p = (facts: GuideAccountFacts, done: string[] = []) =>
+        countScreenProgress(screen, done, deriveGuideStates(DEFAULT_WELCOME_GUIDE, facts))
+
+      const g = p(gevuld)
+      const l = p(leeg)
+      const n = p({ ...gevuld, notApplicableStepIds: ['s1-schulden'] })
+      const pa = p(partner)
+
+      return {
+        expected: 'gevuld=4/4; leeg=0/4; nvt=3/3+1; partner=0/4',
+        actual: `gevuld=${g.done}/${g.total}; leeg=${l.done}/${l.total}; nvt=${n.done}/${n.total}+${n.notApplicable}; partner=${pa.done}/${pa.total}`,
       }
     },
   },

@@ -31,7 +31,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { getCachedUser } from '@/lib/supabase/cached-user'
 import type { Perspective } from '@/lib/household-data'
 import { loadPerspectiveBox3 } from '@/lib/household-tax'
-import { loadHorizonData } from '@/lib/horizon-data-loader'
+import { loadHorizonRaw } from '@/lib/horizon-data-loader'
 import {
   resolveBox1GrossIncome,
   resolveEigenWoningBox1Input,
@@ -184,19 +184,31 @@ async function loadFiscaleKansenInner(
 ): Promise<FiscaleKansen> {
   // Twee onafhankelijke takken (Box 3-grondslag vs. Box 1-inkomen) —
   // parallel, zodat de extra bron geen extra serieel wachtblok wordt.
-  const [box3, user, horizonData] = await Promise.all([
-    loadPerspectiveBox3(supabase, perspective, year),
+  //
+  // VOLGORDE (M22): de rauwe horizon-laag levert het canonieke dagtarief, en
+  // `loadPerspectiveBox3` heeft datzelfde tarief nodig. We halen het hier één
+  // keer op en geven het dóór, i.p.v. de Box 3-loader zijn eigen
+  // transactie-query te laten draaien. Dat kost dus een serieel stapje op de
+  // Box 3-tak — bewust: één noemer met één query is beter dan twee queries die
+  // uit elkaar kúnnen lopen zodra iemand aan één van beide sleutelt.
+  const [user, horizonData] = await Promise.all([
     getCachedUser(supabase),
-    loadHorizonData(supabase),
+    loadHorizonRaw(supabase),
   ])
+  const box3 = await loadPerspectiveBox3(
+    supabase,
+    perspective,
+    year,
+    undefined,
+    horizonData.dailyExpenseRateDetail,
+  )
 
   // ÉÉN grondslag voor de hele vergelijking, bepaald door het gekozen
   // perspectief (zelfde regel als box3-detail.tsx): alleen de huishoud-weergave
   // rekent op het gecombineerde resultaat; persoonlijk én partner-weergave
   // gebruiken het perspectief-eigen resultaat (`box3.personal` ís in
   // partner-weergave het resultaat van de partner). Zo staan er nooit
-  // huishoudcijfers zonder huishoud-markering, en klopt het dagtarief
-  // (dailyExpensesByPerspective) bij de heffing die het deelt.
+  // huishoudcijfers zonder huishoud-markering.
   const useHouseholdBasis = perspective === 'household' && !!box3.combined
   const current = useHouseholdBasis ? box3.combined! : box3.personal
 
@@ -227,10 +239,11 @@ async function loadFiscaleKansenInner(
   // `optimizer-client` → `optimizer-levenslang` (alle `vrijheid()`-regels,
   // inclusief de verschilrijen) en naar `generateBox3Strategies`.
   //
-  // Bewust NIET `box3.dailyExpenses`: dat is de som van budget-LIMIETEN gedeeld
-  // door 30 — een andere teller én een andere noemer (tot ~48% afwijking). Dat
-  // blijft alleen de laatste terugval zolang er géén rolling tarief is (geen
-  // transacties én geen schatting).
+  // `box3.dailyExpenses` WAS hier een gevaarlijke terugval: de som van
+  // budget-LIMIETEN gedeeld door 30 — een andere teller én een andere noemer
+  // (op productie gemeten −68% tot +441%). Sinds M22 is dat exact hetzelfde
+  // object als hierboven (we geven het zelfs dóór aan `loadPerspectiveBox3`),
+  // dus de `||`-terugval is nu een identiteit en geen tweede koers meer.
   const canonicalDaily = horizonData.dailyExpenseRate || box3.dailyExpenses
 
   // ── Verwacht beleggingsrendement (aanname achter het netto effect) ────

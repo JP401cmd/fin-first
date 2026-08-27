@@ -102,7 +102,7 @@ export function OnboardingVraag({
             <button
               type="button"
               onClick={onExit}
-              className="min-h-9 text-xs italic text-[var(--ink-3)] underline-offset-4 transition-colors hover:text-[var(--ink-2)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+              className="min-h-11 text-xs italic text-[var(--ink-3)] underline-offset-4 transition-colors hover:text-[var(--ink-2)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
               style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
             >
               {exitLabel}

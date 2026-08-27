@@ -11,7 +11,7 @@ import { type SimRow, type SimResult } from '@/lib/fire-simulation'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/app/toast-provider'
 
-import { calculateFreedomTime, formatFreedomTimeString, formatCurrency, formatMaskedCurrency, formatWithFreedom, dailyExpenseRate } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString, formatCurrency, formatMaskedCurrency, formatMaskedApproxCurrency, formatWithFreedom, dailyExpenseRate } from '@/lib/format'
 import { BOX3_PARAMS, CURRENT_TAX_YEAR } from '@/lib/box3-data'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import {
@@ -56,8 +56,14 @@ import { deriveNaturalMilestones, naturalMilestoneToLifeEvent, type NaturalMiles
 import {
   lifeEventSide,
   naturalMilestoneSide,
+  type ChartEventKind,
   type ChartEventOverlay,
 } from '@/lib/chart-event-overlay'
+import {
+  buildGoalChartMarkers,
+  isGoalMarkerId,
+  type GoalMarkerInput,
+} from '@/lib/horizon/goal-chart-markers'
 import { NaturalMilestoneSheet } from '@/components/app/horizon/natural-milestone-sheet'
 import { ActionCard } from '@/components/app/action-card'
 import dynamic from 'next/dynamic'
@@ -70,6 +76,7 @@ import {
   Home, Lightbulb,
   Play,
   Pause,
+  Receipt,
 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import {
@@ -116,7 +123,13 @@ import {
   formatHeroFireAge,
   heroFireAgeCaption,
   isHeroAnswerPending,
+  isHeroAnswerInvalid,
 } from '@/lib/horizon/hero-fire-age'
+import {
+  guardFireTarget,
+  HORIZON_MISSENDE_GEGEVENS_HINTS,
+  HORIZON_MISSENDE_GEGEVENS_LABEL,
+} from '@/lib/horizon/outcome-guard'
 import {
   scenarioMonthlySpendDelta,
   buildCategorieReturnGroups,
@@ -278,6 +291,27 @@ interface HouseholdHeroData {
 }
 
 /**
+ * Tap-affordance op een KPI-tegel die een kassabon opent (bevinding M5).
+ *
+ * De hero-KPI's waren al `<button>`-elementen met een kassabon eronder, maar dat
+ * was uitsluitend af te lezen aan een hover-tint — op touch dus nergens. Een
+ * prognose-kopgetal zonder zichtbaar spoor naar zijn aannames leest als een
+ * vaststaand feit; dít bonnetje is dat spoor. Klein en in `--ink-4`, zodat het
+ * de cijferregel niet beconcurreert, mét sr-only tekst zodat een schermlezer de
+ * belofte óók hoort.
+ *
+ * Hoort in de kicker-rij van de tegel (`ml-auto` duwt hem naar rechts).
+ */
+function ReceiptCue() {
+  return (
+    <>
+      <Receipt className="ml-auto h-3 w-3 shrink-0 text-[var(--ink-4)]" aria-hidden />
+      <span className="sr-only">— tik voor de aannames achter dit getal</span>
+    </>
+  )
+}
+
+/**
  * Zichtbaarheids-gate (Task 4.2): `true` zodra het gegeven element (bijna) in beeld komt.
  * Gebruikt om de zware duiding-secties (scenario-presets) pas te laten
  * rekenen wanneer de gebruiker er (dreigt te) scrollen — niet meer eager in idle. Blijft
@@ -413,6 +447,7 @@ export function factorMapByPosition(
 export default function HorizonPage({
   initialData,
   embedded = false,
+  goals,
 }: {
   initialData: HorizonPageData
   /**
@@ -423,6 +458,15 @@ export default function HorizonPage({
    * geen paginakop, dus daar blijft `embedded={false}` de volle hero renderen.
    */
   embedded?: boolean
+  /**
+   * M36 — financiële doelen met een streefdatum als markers op de tijdas.
+   * Bewust een PROP en geen extra query in de horizon-bundel: `/toekomst` laadt
+   * deze doelen toch al (`loadFinData`) voor de Doelen-navkaart, dus de grafiek
+   * leest exact DEZELFDE slice als de dashboard-widget — geen tweede bron, geen
+   * extra egress. Ontbreekt de prop (legacy `/horizon`-route), dan gedraagt de
+   * grafiek zich als voorheen.
+   */
+  goals?: readonly GoalMarkerInput[]
 }) {
   const { triggerDream } = useDreamTransition()
   const { masked } = useMaskedAmounts()
@@ -596,6 +640,9 @@ export default function HorizonPage({
   // Levensgebeurtenissen toggle — handmatig aangemaakte life events tonen/verbergen.
   // Default true. Persistent zoals natuurlijke mijlpalen.
   const [showLifeEvents, setShowLifeEvents] = useState(true)
+  // Doelen toggle (M36) — financiële doelen met streefdatum op de as. Default
+  // true; zelfde per-apparaat localStorage-voorkeur als de twee buur-pills.
+  const [showGoals, setShowGoals] = useState(true)
   // Besteedbaar-lijn ("Zonder je huis") toggle — de tweede vermogenslijn in
   // Pad-modus. Standaardstand hangt aan de woonstrategie (zie
   // `defaultLiquidWealthLineVisible`): AAN bij uitsluiten, UIT bij de andere
@@ -617,6 +664,8 @@ export default function HorizonPage({
       if (storedNat !== null) setShowNaturalMilestones(storedNat === 'true')
       const storedLife = localStorage.getItem('horizon_show_life_events')
       if (storedLife !== null) setShowLifeEvents(storedLife === 'true')
+      const storedGoals = localStorage.getItem('horizon_show_goals')
+      if (storedGoals !== null) setShowGoals(storedGoals === 'true')
       // Besteedbaar-lijn: géén key ⇒ de woonstrategie-afhankelijke default uit
       // de useState-initializer blijft staan.
       const storedLiquid = localStorage.getItem('horizon_show_liquid_line')
@@ -693,6 +742,10 @@ export default function HorizonPage({
   const persistLifeEvents = useCallback((val: boolean) => {
     setShowLifeEvents(val)
     try { localStorage.setItem('horizon_show_life_events', String(val)) } catch { /* noop */ }
+  }, [])
+  const persistGoals = useCallback((val: boolean) => {
+    setShowGoals(val)
+    try { localStorage.setItem('horizon_show_goals', String(val)) } catch { /* noop */ }
   }, [])
   const persistLiquidLine = useCallback((val: boolean) => {
     setShowLiquidLine(val)
@@ -962,18 +1015,19 @@ export default function HorizonPage({
     }
   }, [hasScenario, scenarioSliderEvents, scenarioReturnDeltas])
 
-  // Server-scalar FIRE-leeftijd voor de progressieve first paint (Task 4.2): de laatst door de
-  // kernel weggeschreven `fire_age` uit net_worth_snapshots (consume, don't recompute). Voedt —
-  // samen met `initialData.freedomPct`/`requiredPortfolioExclHome` — de hero-eerste-paint zolang
-  // de client-side kernel-worker de exacte projectie nog berekent.
-  const serverFireAge = useMemo<number | null>(() => {
-    const snaps = initialData.resilienceSnapshots
-    for (let i = snaps.length - 1; i >= 0; i--) {
-      const fa = snaps[i].fire_age
-      if (fa != null) return fa
-    }
-    return null
-  }, [initialData.resilienceSnapshots])
+  // Server FIRE-leeftijd voor de progressieve first paint (Task 4.2): de
+  // kernel-leeftijd uit de canonieke server-run (`computeHorizonFireSim` via
+  // `loadHorizonData`), niet meer de laatst weggeschreven
+  // `net_worth_snapshots.fire_age`.
+  //
+  // WAAROM DE SNAPSHOT WEG IS (H21 / ADR 0107): die kolom wordt door de RAUWE
+  // scalar-lus (`lib/horizon/fire-scalar.ts`) geschreven — een ándere motor dan
+  // de kernel-worker die hier landt. De eerste paint toonde dus stelselmatig een
+  // andere vrijheidsleeftijd dan de tweede, en de historie kon dagen oud zijn.
+  // Eén motor, geen sprong. Valt de server-run weg (geen geboortedatum, negatief
+  // vermogen), dan is dit `null` en toont het oppervlak NIETS in plaats van een
+  // getal uit een andere rekenwijze.
+  const serverFireAge = initialData.fireAgeFractional
 
   // Simulatie-engine met echte app-data (fractionele FIRE-leeftijd + kasstromen)
   // Fase 2b (#495): gemigreerd naar runUnifiedProjection() met per-asset-type rendement
@@ -1928,6 +1982,30 @@ export default function HorizonPage({
   // Distinctieve partner-kleur voor read-only partner-event-markers (teal) —
   // verschilt van eigen events (goud/bruin) en natuurlijke mijlpalen.
   const COLOR_PARTNER_EVENT = '#0d9488'
+  // Doel-markers (M36) dragen het Wil-accent: `doelen` hoort in de module
+  // `inzicht_acties` → navModule 'wil' (lib/module-registry.ts). Dat token is
+  // door de gebruiker instelbaar, dus geen losse hex — de fallback benadert
+  // alleen de standaard-wil uit globals.css voor het geval de var ontbreekt.
+  // Een verstreken streefdatum is SEMANTIEK (stoplicht-rood) en volgt de
+  // accentkeuze bewust niet.
+  const COLOR_GOAL = 'var(--color-wil-600, #3a2f52)'
+  const COLOR_GOAL_OVERDUE = 'var(--negative, #b91c1c)'
+
+  // Doelen met een kalender-streefdatum → markers op de leeftijd-as. De
+  // omzetting (en alle uitsluitingen) leeft in lib/horizon/goal-chart-markers.ts;
+  // hier gebeurt geen enkele doel-berekening — `computeGoalProgress` blijft de
+  // enige bron voor voortgang.
+  const goalChartMarkers = useMemo<ChartEventOverlay[]>(
+    () =>
+      buildGoalChartMarkers(goals ?? [], {
+        dateOfBirth: effectiveInput?.dateOfBirth ?? null,
+        currentAge,
+        color: COLOR_GOAL,
+        overdueColor: COLOR_GOAL_OVERDUE,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- COLOR_* zijn module-constante strings
+    [goals, effectiveInput?.dateOfBirth, currentAge],
+  )
 
   const chartEventOverlay = useMemo<ChartEventOverlay[]>(() => {
     const out: ChartEventOverlay[] = []
@@ -1977,6 +2055,12 @@ export default function HorizonPage({
         })
       }
     }
+    // M36 — financiële doelen met streefdatum. Volgen `showOwnEvents`: in een
+    // precies partner-perspectief is de hoofdlijn die van de partner, dus horen
+    // de EIGEN doelen daar net zo min bij als de eigen levensgebeurtenissen.
+    if (showGoals && showOwnEvents) {
+      out.push(...goalChartMarkers)
+    }
     // Partner-levensgebeurtenissen als READ-ONLY markers (huishouden- +
     // partner-view). Distinctieve partner-kleur (teal) zodat ze visueel
     // verschillen van de eigen events (goud/bruin) én van natuurlijke
@@ -2016,7 +2100,7 @@ export default function HorizonPage({
       })
     }
     return out
-  }, [showLifeEvents, showNaturalMilestones, displayEvents, naturalMilestones, isHouseholdView, isPartnerView, partnerLine, partnerLifeEvents, deficitLoanNotice])
+  }, [showLifeEvents, showNaturalMilestones, showGoals, goalChartMarkers, displayEvents, naturalMilestones, isHouseholdView, isPartnerView, partnerLine, partnerLifeEvents, deficitLoanNotice])
 
   // ── Natuurlijke-mijlpaal info-sheet state ─────────────────────────────
   const [selectedNaturalMilestone, setSelectedNaturalMilestone] =
@@ -2030,12 +2114,18 @@ export default function HorizonPage({
 
   // Klik-handler voor markers op de chart. Life-events openen de EventPane
   // (bestaande slide-in/stack-push flow), natuurlijke mijlpalen openen onze
-  // krant-stijl info-sheet.
+  // krant-stijl info-sheet, doelen deeplinken naar de doelenpagina.
   const handleChartEventClick = useCallback(
-    (id: string, kind: 'life_event' | 'natural') => {
+    (id: string, kind: ChartEventKind) => {
       // Read-only partner-marker (id-prefix 'partner-'): geen edit-pane openen —
       // de viewer mag de levensgebeurtenissen van de partner niet bewerken.
       if (id.startsWith('partner-')) return
+      // M36 — een doel bewerk je op /toekomst/doelen (daar wordt ook de
+      // voortgang herrekend); de tijdas toont 'm alleen.
+      if (kind === 'goal' || isGoalMarkerId(id)) {
+        router.push('/toekomst/doelen')
+        return
+      }
       if (kind === 'life_event') {
         setEventPaneEditingId(id)
         setEventPaneMode('view')
@@ -2045,7 +2135,7 @@ export default function HorizonPage({
       const m = naturalMilestones.find(x => x.id === id)
       if (m) setSelectedNaturalMilestone(m)
     },
-    [naturalMilestones],
+    [naturalMilestones, router],
   )
 
   /**
@@ -2067,7 +2157,7 @@ export default function HorizonPage({
       id: string,
       sourceId: string | undefined,
       newAge: number,
-      kind: 'life_event' | 'natural',
+      kind: ChartEventKind,
     ) => {
       if (kind !== 'life_event') return
       const eventId = sourceId ?? id
@@ -2091,7 +2181,7 @@ export default function HorizonPage({
       id: string,
       sourceId: string | undefined,
       newAge: number,
-      kind: 'life_event' | 'natural',
+      kind: ChartEventKind,
     ) => {
       if (kind !== 'life_event') return
       // Voor life_events is sourceId === id (zie chartEventOverlay-build).
@@ -2221,6 +2311,19 @@ export default function HorizonPage({
     ? (simResult?.requiredFirePortfolio ?? firstPaintRequiredPortfolio ?? 0)
     : (fireTargetInclHome ?? simResult?.requiredFirePortfolio ?? firstPaintRequiredPortfolio ?? 0)
 
+  // ── M6-vangrail op het GETOONDE doelbedrag ────────────────────────────────
+  // Tweede verdedigingslinie (de rekenkant is bij de bron gefixt: solver-scoping
+  // op een negatief doelbedrag + de gemarkeerde eind-horizon-terugval in de
+  // bridge). Een doelbedrag ≤ 0, of een bedrag dat uit de eind-horizon-terugval
+  // komt (= geprojecteerde stand op ~100, een ándere grootheid dan "benodigd"),
+  // gaat NOOIT als kaal bedrag op het scherm — daar komt een gegevensmelding.
+  // Geldt alleen voor de FIRE-doelbedrag-tegel: in pensioen-modus toont die tegel
+  // het GEPROJECTEERDE vermogen op AOW, wat een uitkomst is en geen doel.
+  const fireTargetGuard = guardFireTarget(balkVrijheidDoel, {
+    isEndOfHorizonFallback: simResult?.requiredFireIsEndOfHorizonFallback === true,
+  })
+  const showFireTargetNotice = !isPensioenMode && !fireTargetGuard.ok
+
   // ── AOW-stop shortfall detectie ────────────────────────────────────────
   const isShortfallScenario = !isPensioenMode
     && !isHouseholdView && !isPartnerView
@@ -2255,7 +2358,7 @@ export default function HorizonPage({
     // De wettelijke tabel is server-voorgeladen; is hij leeg, dan staat
     // `userAowAge` nog op de 67-terugval en is het getal dus voorlopig.
     aowTableLoaded: aowRows.length > 0,
-    snapshotFireAge: firstPaintFireAge,
+    serverFireAge: firstPaintFireAge,
     isRefining: kernelIsRefining,
   })
   const heroFireAgePending = isHeroAnswerPending(heroFireAge)
@@ -2266,7 +2369,7 @@ export default function HorizonPage({
     heroFireAge.bron === 'aow-tabel'
       ? aowAgeFormatted
       : heroFireAge.age != null
-        ? `${heroFireAge.age.toFixed(1)} jaar`
+        ? `${heroFireAge.age.toFixed(1)} jaar` // kassabon: exact
         : heroFireAge.status === 'berekenen'
           ? 'Wordt berekend…'
           : 'Niet bereikbaar'
@@ -2381,6 +2484,31 @@ export default function HorizonPage({
   // les als doel-lijn-bron.ts: alles uit hetzelfde result-object). Fallback op de
   // slider-stand voor het theoretische geval dat de geforceerde run geen leeftijd meldt.
   const duidingStopAge = stopPad != null ? (stopPad.result.fireAgeFractional ?? scenarioStopAge) : null
+  // ── "Wat hoort daarbij?" — het omgekeerde antwoord op de gekozen stopleeftijd (M2) ──
+  // De pagina beantwoordde drie vragen (kan ik dit · wanneer · wat als) en liet de vierde
+  // liggen: wat hoort er dan bij? Het getal bestónd al — de solver rekent voor élke
+  // doorgerekende stand P!B96 uit — maar het stop-pad gooide het weg, dus het bereikte het
+  // scherm alleen in de zeldzame hoofdrun-status `unreachable_within_horizon`.
+  //
+  // PURE CONSUME-LAAG: leest `stopPad.maandHint` (dezelfde run die de radar, de strook en de
+  // doel-lijn al voeden) en `canonicalDailyRate` uit de bundel. Geen eigen som, geen tweede
+  // bron — precies de drift die CLAUDE.md's "consume, don't recompute" verbiedt.
+  //
+  // GATE = `maandHint > 0`. Dat ÍS per constructie "dekking onder 100% op de gekozen
+  // stopleeftijd": de solver zet de hint op `−gap ÷ maanden`, dus positief ⟺ gap < 0 ⟺ de
+  // modelwaarde blijft onder het doelbedrag. Bewust géén eigen dekkingspercentage afleiden:
+  // dat zou een tweede lezing van dezelfde vraag zijn, naast de radar.
+  const stopPadTekortHint = useMemo(() => {
+    if (stopPad == null || duidingStopAge == null) return null
+    const perMaand = stopPad.maandHint
+    if (!Number.isFinite(perMaand) || perMaand <= 0) return null
+    // €→vrijheidstijd via de canonieke helper op de canonieke dagbasis (bundel-veld).
+    // `totalDays` is de eigen uitvoer van die helper — geen deling met de hand.
+    const dagen = canonicalDailyRate > 0
+      ? Math.round(calculateFreedomTime(perMaand, canonicalDailyRate).totalDays)
+      : 0
+    return { stopAge: duidingStopAge, perMaand, dagen }
+  }, [stopPad, duidingStopAge, canonicalDailyRate])
   // ── Dekkingsradar-assen — pure consume-laag over de duiding-rijen ──────
   // Alle grootheden komen elders vandaan: de duiding-rijen (stop-pad wint), de actieve-pad
   // FIRE/benodigd-vermogen/doel-eindvermogen en de canonieke bestedingsgrondslag
@@ -2437,7 +2565,20 @@ export default function HorizonPage({
       if (d < bestDiff) { bestDiff = d; row = r }
     }
     const dRate = canonicalDailyRate
-    const freedomTime = formatFreedomTimeString(calculateFreedomTime(Math.max(0, row.netWorth), dRate), 'short')
+    // ── PEILMOMENT (H21/F1) ────────────────────────────────────────────────
+    // `row.netWorth` is per contract de EINDstand van het blok (bridge.ts:
+    // Prognose!I op m = 12k+11), `row.startNetWorth` de BEGINstand (m = 12k−1).
+    // De kassabon toonde de eindstand onder het label "leeftijd X · jaar Y",
+    // terwijl de zin eronder het netto vermogen van VANDAAG toont. Op k=0 scheelt
+    // dat precies één jaar rendement + inleg — in productie €1.731.640 boven
+    // €1.619.700, vijf regels uit elkaar, beide gepresenteerd als "nu".
+    // (Deflatie verhult het juist: bij k=0 is de inflatiefactor exact 1,0.)
+    //
+    // Eén peilmoment voor de hele bar: de stand ÓP die leeftijd = het begin van
+    // het blok. Daarmee klopt de kassabon per constructie met het leeftijd- en
+    // jaarlabel ernaast, en is `k=0` letterlijk het bedrag van vandaag.
+    const readoutNetWorth = row.startNetWorth
+    const freedomTime = formatFreedomTimeString(calculateFreedomTime(Math.max(0, readoutNetWorth), dRate), 'short')
     const isAcc = row.phase === 'accumulation'
     // Fase uit dezelfde bron als de fasebalk (buildSegments): kernel-rijen
     // kennen geen 'transition' (bridge.ts), dus row.phase ziet Overgang niet.
@@ -2463,7 +2604,13 @@ export default function HorizonPage({
       year: new Date().getFullYear() + row.year,
       phaseLabel,
       phaseColor,
-      netWorth: row.netWorth,
+      netWorth: readoutNetWorth,
+      // Grondslag in het label: op de huidige leeftijd is de beginstand van het
+      // blok letterlijk "nu"; verderop de tijdas is het het begin van dat jaar.
+      netWorthMoment:
+        currentAge != null && row.age === Math.round(currentAge)
+          ? 'nu'
+          : `begin ${new Date().getFullYear() + row.year}`,
       freedomTime,
       monthlyLabel: isAcc ? 'Inleg / maand' : 'Ruimte / maand',
       monthlyAmount: isAcc
@@ -4439,6 +4586,10 @@ export default function HorizonPage({
                       ? (isPensioenMode ? 'pensioenleeftijd' : 'vrijheidsleeftijd')
                       : heroFireAgeCaption(heroFireAge, isPensioenMode ? 'pensioenleeftijd' : 'vrijheidsleeftijd')}
                   </span>
+                  {/* M5 — hetzelfde bonnetje-spoor als op de figures-strip: dit
+                      grote getal is óók een knop naar zijn eigen aannames. */}
+                  <Receipt className="ml-2 inline h-3.5 w-3.5 shrink-0 align-middle text-[var(--ink-4)]" aria-hidden />
+                  <span className="sr-only">— tik voor de aannames achter dit getal</span>
                 </>
               )}
             </button>
@@ -4461,6 +4612,7 @@ export default function HorizonPage({
               <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1.5">
                 <Hourglass className="h-3 w-3 shrink-0" aria-hidden />
                 <span>{showFreeHero ? freeHeroLabel : isPensioenMode ? 'Pensioenleeftijd' : 'Vrijheidsleeftijd'}</span>
+                <ReceiptCue />
               </div>
               <div
                 className={`${showFreeHero ? 'text-[18px] sm:text-[20px] leading-tight' : 'text-[28px] sm:text-[32px] leading-none'} font-black tracking-[-0.02em] tabular-nums`}
@@ -4503,8 +4655,25 @@ export default function HorizonPage({
               <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1.5">
                 <Target className="h-3 w-3 shrink-0" aria-hidden />
                 <span>{isPensioenMode ? 'Vermogen op AOW' : 'Doelbedrag'}</span>
+                <ReceiptCue />
               </div>
-              {!hasPerspectiveHero && showDualFireTarget ? (
+              {!hasPerspectiveHero && showFireTargetNotice ? (
+                /* M6: onmogelijk/niet-berekenbaar doelbedrag — melding i.p.v. getal. */
+                <>
+                  <div
+                    className="text-[16px] sm:text-[18px] font-black leading-tight tracking-[-0.01em]"
+                    style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+                  >
+                    {fireTargetGuard.label}
+                  </div>
+                  <div
+                    className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
+                    style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+                  >
+                    {fireTargetGuard.hint}
+                  </div>
+                </>
+              ) : !hasPerspectiveHero && showDualFireTarget ? (
                 <>
                   {/* Doel MET je huis — het grote doel; kwalificatie inline zodat de kaart even hoog blijft als de buur-KPI's */}
                   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
@@ -4512,7 +4681,7 @@ export default function HorizonPage({
                       className="text-[24px] sm:text-[28px] font-black leading-none tracking-[-0.02em]"
                       style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
                     >
-                      <MaskedAmount value={viewFireTargetInclHome!} tone="horizon" monoWhenVisible={false} />
+                      <MaskedAmount value={viewFireTargetInclHome!} tone="horizon" monoWhenVisible={false} approx />
                     </div>
                     <span
                       className="italic text-[11px] text-[var(--ink-3)]"
@@ -4527,7 +4696,7 @@ export default function HorizonPage({
                       className="text-[16px] sm:text-[18px] font-black leading-none tracking-[-0.02em] text-[var(--module-active-800)]"
                       style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
                     >
-                      <MaskedAmount value={viewFireTargetExclHome!} tone="horizon" monoWhenVisible={false} />
+                      <MaskedAmount value={viewFireTargetExclHome!} tone="horizon" monoWhenVisible={false} approx />
                     </div>
                     <span
                       className="italic text-[11px] text-[var(--ink-3)]"
@@ -4544,8 +4713,8 @@ export default function HorizonPage({
                     style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
                   >
                     {hasPerspectiveHero
-                      ? <MaskedAmount value={perspectiveHero!.fireTarget} tone="horizon" monoWhenVisible={false} />
-                      : <MaskedAmount value={isPensioenMode ? (viewPortfolioAtAow ?? 0) : viewBalkVrijheidDoel} tone="horizon" monoWhenVisible={false} />}
+                      ? <MaskedAmount value={perspectiveHero!.fireTarget} tone="horizon" monoWhenVisible={false} approx />
+                      : <MaskedAmount value={isPensioenMode ? (viewPortfolioAtAow ?? 0) : viewBalkVrijheidDoel} tone="horizon" monoWhenVisible={false} approx />}
                   </div>
                   <div
                     className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
@@ -4569,6 +4738,7 @@ export default function HorizonPage({
               <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1.5">
                 <Percent className="h-3 w-3 shrink-0" aria-hidden />
                 <span>{isPensioenMode ? 'Mnd. onttrekking' : isKernelDepleteRate ? 'Onttrekking' : 'Opnamerate'}</span>
+                <ReceiptCue />
               </div>
               <div
                 className="text-[24px] sm:text-[28px] font-black leading-none tracking-[-0.02em] tabular-nums"
@@ -4675,6 +4845,7 @@ export default function HorizonPage({
               <div className="flex items-center gap-1.5 text-[9px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1">
                 <Hourglass className="h-3 w-3 shrink-0" aria-hidden />
                 <span>{showFreeHero ? freeHeroLabel : isPensioenMode ? 'Pensioenlft' : 'Vrijheidslft'}</span>
+                <ReceiptCue />
               </div>
               <div
                 className={`${showFreeHero ? 'text-[15px] leading-tight' : 'text-[22px] leading-none'} font-black tracking-[-0.02em] tabular-nums`}
@@ -4711,8 +4882,25 @@ export default function HorizonPage({
               <div className="flex items-center gap-1.5 text-[9px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1">
                 <Target className="h-3 w-3 shrink-0" aria-hidden />
                 <span>{isPensioenMode ? 'Vermogen' : 'Doelbedrag'}</span>
+                <ReceiptCue />
               </div>
-              {!hasPerspectiveHero && showDualFireTarget ? (
+              {!hasPerspectiveHero && showFireTargetNotice ? (
+                /* M6: onmogelijk/niet-berekenbaar doelbedrag — melding i.p.v. getal. */
+                <>
+                  <div
+                    className="text-[13px] font-black leading-tight tracking-[-0.01em]"
+                    style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+                  >
+                    {fireTargetGuard.label}
+                  </div>
+                  <div
+                    className="italic text-[10px] text-[var(--ink-3)] mt-1"
+                    style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+                  >
+                    {fireTargetGuard.hint}
+                  </div>
+                </>
+              ) : !hasPerspectiveHero && showDualFireTarget ? (
                 <>
                   {/* Doel MET je huis — het grote doel; kwalificatie inline zodat de kaart even hoog blijft als de buur-KPI's */}
                   <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
@@ -4720,7 +4908,7 @@ export default function HorizonPage({
                       className="text-[18px] font-black leading-none tracking-[-0.02em]"
                       style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
                     >
-                      <MaskedAmount value={viewFireTargetInclHome!} tone="horizon" monoWhenVisible={false} />
+                      <MaskedAmount value={viewFireTargetInclHome!} tone="horizon" monoWhenVisible={false} approx />
                     </div>
                     <span
                       className="italic text-[10px] text-[var(--ink-3)]"
@@ -4735,7 +4923,7 @@ export default function HorizonPage({
                       className="text-[13px] font-black leading-none tracking-[-0.02em] text-[var(--module-active-800)]"
                       style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
                     >
-                      <MaskedAmount value={viewFireTargetExclHome!} tone="horizon" monoWhenVisible={false} />
+                      <MaskedAmount value={viewFireTargetExclHome!} tone="horizon" monoWhenVisible={false} approx />
                     </div>
                     <span
                       className="italic text-[10px] text-[var(--ink-3)]"
@@ -4752,8 +4940,8 @@ export default function HorizonPage({
                     style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
                   >
                     {hasPerspectiveHero
-                      ? <MaskedAmount value={perspectiveHero!.fireTarget} tone="horizon" monoWhenVisible={false} />
-                      : <MaskedAmount value={isPensioenMode ? (viewPortfolioAtAow ?? 0) : viewBalkVrijheidDoel} tone="horizon" monoWhenVisible={false} />}
+                      ? <MaskedAmount value={perspectiveHero!.fireTarget} tone="horizon" monoWhenVisible={false} approx />
+                      : <MaskedAmount value={isPensioenMode ? (viewPortfolioAtAow ?? 0) : viewBalkVrijheidDoel} tone="horizon" monoWhenVisible={false} approx />}
                   </div>
                   <div
                     className="italic text-[10px] text-[var(--ink-3)] mt-1"
@@ -4775,6 +4963,7 @@ export default function HorizonPage({
               <div className="flex items-center gap-1.5 text-[9px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1">
                 <Percent className="h-3 w-3 shrink-0" aria-hidden />
                 <span>{isPensioenMode ? 'Mnd.' : isKernelDepleteRate ? 'Onttrekking' : 'Opnamerate'}</span>
+                <ReceiptCue />
               </div>
               <div
                 className="text-[18px] font-black leading-none tracking-[-0.02em]"
@@ -5077,7 +5266,17 @@ export default function HorizonPage({
                       aria-busy={mcExpanded && mcPending}
                     >
                       <FlaskConical className="h-3 w-3" />
-                      <span data-pill-label className="hidden sm:inline">Marktcheck</span>
+                      {/* Het label mag NIET wegvallen zolang de datawaarde staat
+                          (H21/F2): op smal scherm bleef anders een kaal getal over,
+                          dat naast een "succeskans" als kans gelezen werd. Zonder
+                          waarde blijft het label op `sm:` verborgen — dan is er ook
+                          niets te misduiden en telt de compacte pillenbalk. */}
+                      <span
+                        data-pill-label
+                        className={mcExpanded && !mcPending && mcMarge ? 'inline' : 'hidden sm:inline'}
+                      >
+                        Marktcheck
+                      </span>
                       {mcExpanded && mcPending && (
                         <span className="font-mono text-[10px] tabular-nums opacity-60">…</span>
                       )}
@@ -5187,6 +5386,32 @@ export default function HorizonPage({
                     </span>
                   )}
                 </button>
+
+                {/* ── Doelen toggle (M36) ──
+                    Alleen zichtbaar zodra er écht doel-markers te tonen zijn:
+                    zonder doelen met streefdatum voegt een lege pill niets toe. */}
+                {goalChartMarkers.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => persistGoals(!showGoals)}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                      showGoals
+                        ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
+                        : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
+                    }`}
+                    aria-pressed={showGoals}
+                    aria-label="Doelen met een streefdatum op de tijdlijn tonen"
+                    title="Toon je doelen op de tijdlijn, op hun streefdatum"
+                  >
+                    <Target className="h-3 w-3" />
+                    <span data-pill-label className="hidden sm:inline">Doelen</span>
+                    {showGoals && (
+                      <span className="ml-0.5 font-mono text-[10px] tabular-nums opacity-75">
+                        {goalChartMarkers.length}
+                      </span>
+                    )}
+                  </button>
+                )}
 
                 {/* ── Natuurlijke mijlpalen toggle ── */}
                 <button
@@ -5415,6 +5640,7 @@ export default function HorizonPage({
                       freedomTime={viewReadoutData.freedomTime}
                       monthlyLabel={viewReadoutData.monthlyLabel}
                       monthlyAmount={viewReadoutData.monthlyAmount}
+                      netWorthMoment={viewReadoutData.netWorthMoment}
                       isResting={lifelineAge === null}
                     />
                   </div>
@@ -6042,6 +6268,33 @@ export default function HorizonPage({
                     </>
                   }
                 />
+                {/* ── Wat hoort daarbij? (bevinding M2) ──────────────────────────────
+                    Permanent tekstblok, direct ónder de stop-slider: dáár kiest de
+                    gebruiker het doel, dus dáár hoort het omgekeerde antwoord. Verschijnt
+                    zodra de gekozen stopleeftijd niet gedekt is (`maandHint > 0`) en
+                    verdwijnt zodra hij dat wél is — geen edge-case-gate op de hoofdrun.
+                    TOON (Wft): feitelijk inzicht, geen aanbeveling. "hoort daar … bij" is
+                    een rekenuitkomst; bewust géén "je moet", geen "verhoog je spaarquote",
+                    geen belofte dat het doel dan gehaald wordt. Sluitregel volgt de
+                    bestaande app-conventie ("Indicatie, geen advies — …"). */}
+                {stopPadTekortHint !== null && (
+                  <div className="mt-4 border border-[var(--ink-2)] border-l-4 border-l-horizon-500 bg-[var(--paper)] px-3 py-2.5">
+                    <p className="mb-1 label-editorial text-[var(--ink-3)]">Wat hoort daarbij?</p>
+                    <p className="font-sans text-[12px] leading-snug text-[var(--ink-2)]">
+                      Om op {formatAge(stopPadTekortHint.stopAge)} jr te stoppen hoort daar{' '}
+                      <span className="font-mono tabular-nums">
+                        {formatMaskedApproxCurrency(stopPadTekortHint.perMaand, masked)}
+                      </span>{' '}
+                      per maand extra sparen bij, bovenop wat je nu opzij zet
+                      {!masked && stopPadTekortHint.dagen >= 1 && (
+                        <> — omgerekend {stopPadTekortHint.dagen} {stopPadTekortHint.dagen === 1 ? 'dag' : 'dagen'} vrijheid per maand</>
+                      )}.
+                    </p>
+                    <p className="mt-1.5 font-sans text-[11px] leading-snug text-[var(--ink-3)]">
+                      Indicatie, geen advies — een rekenuitkomst bij je huidige aannames, uitgesmeerd over de maanden tot je eindleeftijd.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -8562,6 +8815,14 @@ export default function HorizonPage({
       <BottomSheet open={showFireAgeReceipt} onClose={() => setShowFireAgeReceipt(false)} title={isPensioenMode ? 'Pensioenleeftijd' : 'Vrijheidsleeftijd'}>
         <div className="p-5">
           <KassabonShell>
+            {/* M6: de motor gaf een leeftijd op/voorbij het horizonplafond — dat is
+                de parkeerstand, geen antwoord. Melding vóór de onderbouwing. */}
+            {isHeroAnswerInvalid(heroFireAge) && (
+              <div className="mb-3 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)] p-2.5 font-sans text-[11px] leading-relaxed text-[var(--ink-2)]">
+                <strong className="font-semibold text-[var(--ink)]">{HORIZON_MISSENDE_GEGEVENS_LABEL}.</strong>{' '}
+                {HORIZON_MISSENDE_GEGEVENS_HINTS['buiten-horizon']}
+              </div>
+            )}
             <div className="mb-3 text-center">
               <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">{isPensioenMode ? 'PENSIOENLEEFTIJD' : 'VRIJHEIDSLEEFTIJD'}</p>
               <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">
@@ -8604,6 +8865,16 @@ export default function HorizonPage({
               <div className="flex justify-between py-0.5">
                 <span className="font-sans text-sm text-[var(--ink-2)]">Verwacht rendement</span>
                 <span className="tabular-nums text-[var(--ink)]">{(fireParams.grossReturn * 100).toFixed(1)}%</span>
+              </div>
+              {/* M5 — de tweede aanname onder élk prognosegetal. De bevinding
+                  wees erop dat rendement wél in de kassabon stond en inflatie
+                  niet, terwijl juist die twee samen bepalen hoeveel het bedrag
+                  straks wáárd is. Bron is `fireParams.inflationRate` (profiel →
+                  resolveFireParams) — dezelfde waarde waarmee de kernel rekent,
+                  niet een eigen aanname. */}
+              <div className="flex justify-between py-0.5">
+                <span className="font-sans text-sm text-[var(--ink-2)]">Verwachte inflatie</span>
+                <span className="tabular-nums text-[var(--ink)]">{(fireParams.inflationRate * 100).toFixed(1)}%</span>
               </div>
               <div className="flex justify-between py-0.5">
                 <span className="font-sans text-sm text-[var(--ink-2)]">Pensioenuitgaven/jr</span>
@@ -8722,6 +8993,14 @@ export default function HorizonPage({
       <BottomSheet open={showFireTargetReceipt} onClose={() => setShowFireTargetReceipt(false)} title={isPensioenMode ? 'Verwacht vermogen op AOW' : 'FIRE Doelbedrag'}>
         <div className="p-5">
           <KassabonShell>
+            {/* M6: dezelfde vangrail als op de KPI-tegel — de bon mag nooit een
+                bedrag onderbouwen dat de tegel als "we missen gegevens" toont. */}
+            {showFireTargetNotice && (
+              <div className="mb-3 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)] p-2.5 font-sans text-[11px] leading-relaxed text-[var(--ink-2)]">
+                <strong className="font-semibold text-[var(--ink)]">{fireTargetGuard.label}.</strong>{' '}
+                {fireTargetGuard.hint}
+              </div>
+            )}
             <div className="mb-3 text-center">
               <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">{isPensioenMode ? 'VERWACHT VERMOGEN OP AOW' : 'FIRE DOELBEDRAG'}</p>
               <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">
@@ -8751,6 +9030,18 @@ export default function HorizonPage({
               <div className="flex justify-between py-0.5">
                 <span className="font-sans text-sm text-[var(--ink-2)]">Opnamerate (SWR)</span>
                 <span className="tabular-nums text-[var(--ink)]">{(fireSwr * 100).toFixed(2)}%</span>
+              </div>
+              {/* M5 — de twee aannames waaruit die SWR volgt (rendement − Box 3-
+                  druk − inflatie). Zonder deze regels is het doelbedrag een kaal
+                  getal en de opnamerate een onverklaarde constante. Beide uit
+                  `fireParams`, dus dezelfde waarden als de kernel gebruikt. */}
+              <div className="flex justify-between py-0.5">
+                <span className="font-sans text-sm text-[var(--ink-2)]">Verwacht rendement</span>
+                <span className="tabular-nums text-[var(--ink)]">{(fireParams.grossReturn * 100).toFixed(1)}%</span>
+              </div>
+              <div className="flex justify-between py-0.5">
+                <span className="font-sans text-sm text-[var(--ink-2)]">Verwachte inflatie</span>
+                <span className="tabular-nums text-[var(--ink)]">{(fireParams.inflationRate * 100).toFixed(1)}%</span>
               </div>
               {isPensioenMode && viewMonthlyWithdrawalAtAow != null && (
                 <div className="flex justify-between py-0.5">

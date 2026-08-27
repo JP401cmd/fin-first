@@ -4,7 +4,7 @@ import type { ReactElement } from 'react'
 import { MiniNetWorthChart } from './mini-networth-chart'
 import { DisplayModeProvider, type DisplayMode } from '@/lib/hooks/use-display-mode'
 import { PrivacyProvider, PRIVACY_MASKED_STORAGE_KEY } from '@/lib/hooks/use-privacy'
-import { MASKED_AMOUNT_PLACEHOLDER, formatCurrency } from '@/lib/format'
+import { MASKED_AMOUNT_PLACEHOLDER, formatApproxCurrency, formatCurrency } from '@/lib/format'
 import { EuroViewProvider } from '@/lib/hooks/use-euro-view'
 import { deflate, factorAtAge } from '@/lib/euro-display'
 import { VrijheidsvoortgangWidget } from '@/components/widgets/vrijheidsvoortgang-widget'
@@ -269,7 +269,8 @@ describe('MiniNetWorthChart — projectie-render met simRows', () => {
     // Het liquide vrijheidsdoel (€915.600) wordt APART getoond als label, niet
     // als marker-hoogte op de netto-vermogen-as. Het bedrag blijft zichtbaar.
     // Het label maakt expliciet dat het om een LIQUIDE doel gaat (B3).
-    expect(container.textContent).toContain('915')
+    // M5: als prognose staat het afgerond op significante cijfers → "920".
+    expect(container.textContent).toContain('920')
     expect(container.textContent).toMatch(/Vrijheidsdoel/)
     expect(container.textContent).toMatch(/liquide/)
   })
@@ -592,8 +593,10 @@ describe('MiniNetWorthChart — privacy-masking voor saldi', () => {
         simRequiredPortfolio={915_600}
       />,
     )
+    // Het huidige vermogen blijft exact (gerealiseerd); het vrijheidsdoel is een
+    // prognose en staat sinds M5 afgerond op het scherm (915.600 → ca. 920.000).
     expect(container.textContent).toContain('187')
-    expect(container.textContent).toContain('915')
+    expect(container.textContent).toContain('920')
   })
 
   it('maskeert het netto-vermogen-headline en het eindbedrag bij privacy aan', () => {
@@ -610,7 +613,7 @@ describe('MiniNetWorthChart — privacy-masking voor saldi', () => {
     )
     expect(container.textContent).toContain(MASKED_AMOUNT_PLACEHOLDER)
     expect(container.textContent).not.toContain('187')
-    expect(container.textContent).not.toContain('915')
+    expect(container.textContent).not.toContain('920')
   })
 
   it('houdt leeftijd-labels (Vrijheid / Vandaag) zichtbaar bij masking', () => {
@@ -703,8 +706,12 @@ describe("MiniNetWorthChart — euro-weergave (huidige euro's)", () => {
     expect(Math.round(expected)).not.toBe(Math.round(wrongOrder))
 
     const { container } = renderMiniChart(rows, 'real')
-    expect(container.textContent).toContain(formatCurrency(expected))
-    expect(container.textContent).not.toContain(formatCurrency(wrongOrder))
+    // M5 — het eindbedrag is een PROGNOSE-kopgetal en staat afgerond op het
+    // scherm. De D7-volgorde blijft aantoonbaar: de twee volgordes liggen ver
+    // genoeg uiteen om ook ná afronding te verschillen (€470.000 vs €480.000).
+    expect(formatApproxCurrency(expected)).not.toBe(formatApproxCurrency(wrongOrder))
+    expect(container.textContent).toContain(formatApproxCurrency(expected))
+    expect(container.textContent).not.toContain(formatApproxCurrency(wrongOrder))
   })
 
   it("toont in 'nominal' het onbewerkte eindbedrag (byte-identiek aan vandaag)", () => {
@@ -712,7 +719,7 @@ describe("MiniNetWorthChart — euro-weergave (huidige euro's)", () => {
     const last = rows[rows.length - 1]
     const { container } = renderMiniChart(rows, 'nominal')
     expect(container.textContent).toContain(
-      formatCurrency(last.netWorth + EV_ANCHOR_OFFSET),
+      formatApproxCurrency(last.netWorth + EV_ANCHOR_OFFSET),
     )
   })
 
@@ -801,8 +808,13 @@ describe('KRUIS-consistentie (AC-F4 / UAT-KRUIS-27) — één FIRE-doel, één d
     expect(Math.round(expected)).not.toBe(EV_REQUIRED_PORTFOLIO)
 
     const chart = renderMiniChart(rows, 'real')
+    // M5 — het doel is een PROGNOSE-kopgetal en staat dus afgerond op
+    // significante cijfers op het scherm ("ca. €540.000"). De deflatie-eis
+    // blijft onverkort: de assertie loopt door dezelfde weergave-seam als het
+    // oppervlak, dus een verkeerde factor-rij zou nog steeds een ander getal
+    // opleveren (540.000 vs. 550.000 bij één rij verschil).
     expect(chart.container.textContent).toContain(
-      `Vrijheidsdoel ${formatCurrency(expected)} liquide`,
+      `Vrijheidsdoel ${formatApproxCurrency(expected)} liquide`,
     )
     chart.unmount()
   })
@@ -840,7 +852,7 @@ describe('KRUIS-consistentie (AC-F4 / UAT-KRUIS-27) — één FIRE-doel, één d
     const rows = buildFactorRows()
     const chart = renderMiniChart(rows, 'nominal')
     expect(chart.container.textContent).toContain(
-      `Vrijheidsdoel ${formatCurrency(EV_REQUIRED_PORTFOLIO)} liquide`,
+      `Vrijheidsdoel ${formatApproxCurrency(EV_REQUIRED_PORTFOLIO)} liquide`,
     )
     chart.unmount()
 
@@ -883,7 +895,11 @@ describe('KRUIS-consistentie (AC-F4 / UAT-KRUIS-27) — één FIRE-doel, één d
     )
     const verwacht = deflate(EV_REQUIRED_PORTFOLIO, genormaliseerdHoger, 'real')
     const nietVerwacht = deflate(EV_REQUIRED_PORTFOLIO, naiefLager, 'real')
-    expect(container.textContent).toContain(`Vrijheidsdoel ${formatCurrency(verwacht)} liquide`)
-    expect(container.textContent).not.toContain(formatCurrency(nietVerwacht))
+    expect(container.textContent).toContain(`Vrijheidsdoel ${formatApproxCurrency(verwacht)} liquide`)
+    // De twee rijen liggen ver genoeg uit elkaar om ook ná M5-afronding te
+    // verschillen (€540.000 vs. €550.000) — de test bewijst dus nog steeds de
+    // rij-keuze en niet alleen de afronding.
+    expect(formatApproxCurrency(verwacht)).not.toBe(formatApproxCurrency(nietVerwacht))
+    expect(container.textContent).not.toContain(formatApproxCurrency(nietVerwacht))
   })
 })

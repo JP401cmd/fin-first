@@ -29,6 +29,14 @@ export interface OnboardingProgressBarProps {
   total: number
   /** Optionele terug-affordance, links van de balk. */
   backSlot?: ReactNode
+  /**
+   * Optionele tweede regel ONDER de balk, binnen dezelfde sticky wrapper —
+   * gebruikt voor de meelopende vrijheidstijd-teller. Bewust een eigen regel
+   * en geen extra kolom in de balk-rij: op mobiel staan daar al de
+   * terug-link, de balk en de stap-indicator, en een vierde element zou de
+   * balk tot een streepje persen.
+   */
+  tickerSlot?: ReactNode
   /** Optioneel: extra Tailwind classes voor de buitenste wrapper. */
   className?: string
 }
@@ -37,6 +45,7 @@ export function OnboardingProgressBar({
   current,
   total,
   backSlot,
+  tickerSlot,
   className = '',
 }: OnboardingProgressBarProps) {
   // Clamp om out-of-range-waardes (off-by-one bij dynamische step-orders)
@@ -79,6 +88,12 @@ export function OnboardingProgressBar({
           {safeCurrent}/{safeTotal}
         </span>
       </div>
+
+      {/* Tweede regel: meelopende teller. Alleen gerenderd wanneer de caller
+          er één levert — zonder teller blijft de kop exact zoals hij was. */}
+      {tickerSlot && (
+        <div className="mx-auto max-w-[1080px] px-4 sm:px-6">{tickerSlot}</div>
+      )}
     </div>
   )
 }

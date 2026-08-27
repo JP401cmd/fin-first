@@ -73,7 +73,6 @@ function makeData(overrides: Partial<DashboardData> = {}): DashboardData {
     expenseHistory: [],
     budgetTypeHistory: { income: [], expense: [], savings: [], debt: [] },
     assetsByType: [],
-    totalPurchaseValue: 0,
     fireRange: null,
     freedomMilestones: null,
     simRows: null,

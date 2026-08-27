@@ -24,6 +24,9 @@ export type { GlossaryTermProps } from './glossary-term'
 // Re-export InlineInfoDisclosure (i-knop + inline uitleg-paneel; eigen file wegens state)
 export { InlineInfoDisclosure } from './inline-info-disclosure'
 export type { InlineInfoDisclosureProps } from './inline-info-disclosure'
+// Re-export AannameHint ("waarop gebaseerd?"-voetnoot bij een afgeleid getal; eigen file wegens state)
+export { AannameHint } from './aanname-hint'
+export type { AannameHintProps } from './aanname-hint'
 // Re-export InfoIconTooltip (scherpe inline i + zwevende popover; derde info-affordance; eigen file wegens state)
 export { InfoIconTooltip, InfoTooltip } from './info-icon-tooltip'
 // Re-export PageInfoButton (page context popover)

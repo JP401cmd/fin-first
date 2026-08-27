@@ -57,6 +57,12 @@ export type OverzichtSecondaryProps = {
    * (`resolveFreedomFraming`). Stuurt de Vrijheid-strip. Default 'building'.
    */
   freedomFraming?: FreedomFraming
+  /**
+   * M6: de motor gaf een vrijheidsleeftijd die niet kán kloppen (parkeerstand op
+   * het horizonplafond). De strip toont dan een gegevensmelding i.p.v. een
+   * aftelling. Consume-only — afgeleid in `resolveFreedomAgeView`.
+   */
+  freedomDataIssue?: boolean
   /** Briefing-entries onder de hero (max 6, 3-koloms grid). */
   briefingEntries?: BriefingEntry[]
   /** ISO-tijdstip waarop de briefing voor vandaag is vastgezet ("Bijgewerkt …"). */
@@ -79,6 +85,12 @@ export type OverzichtSecondaryProps = {
   /** Liquide cash op spaarrekeningen — voor compound-insight reveal. */
   liquidCash?: number
   /**
+   * Belegt de gebruiker al? Stuurt de CTA-variant van de compound-kaart
+   * ("Start met beleggen" vs. "Bekijk je portefeuille") — niet de rendergate,
+   * die blijft op liquide cash. Zie kaart H15.
+   */
+  hasInvestments?: boolean
+  /**
    * Volledige DashboardData voor de optionele HeroWidgetRail (power-user
    * edit-mode). De widget-gated velden in de bundel zijn leeg voor een
    * minimaal-widget-account → kleinere RSC-flight; de rail toont alleen ACTIEVE
@@ -97,10 +109,10 @@ export function OverzichtSecondary({
   currentAge,
   fireAge,
   freedomFraming = 'building',
+  freedomDataIssue = false,
   briefingEntries,
   briefingRefreshedAt,
-  // briefingDataChanged wordt (net als vóór deze kaart) niet doorgegeven aan
-  // BriefingPanel — bewust ongemoeid gelaten; buiten scope van deze perf-kaart.
+  briefingDataChanged,
   briefingCanRefresh,
   freedomHero,
   briefingHeadline,
@@ -110,6 +122,7 @@ export function OverzichtSecondary({
   activeWidgets,
   allWidgetPrefs,
   liquidCash,
+  hasInvestments = false,
 }: OverzichtSecondaryProps) {
   const rail = useHeroRailState(activeWidgets ?? [])
 
@@ -195,6 +208,7 @@ export function OverzichtSecondary({
                   currentAge={currentAge ?? null}
                   fireAge={fireAge ?? null}
                   framing={freedomFraming}
+                  dataIssue={freedomDataIssue}
                 />
               </>
             }
@@ -211,6 +225,7 @@ export function OverzichtSecondary({
               currentAge={currentAge ?? null}
               fireAge={fireAge ?? null}
               framing={freedomFraming}
+              dataIssue={freedomDataIssue}
             />
           </>
         )}
@@ -220,13 +235,19 @@ export function OverzichtSecondary({
       {/* T-4 Dramatic Compound — alleen voor cash-zware users. */}
       {liquidCash != null && liquidCash >= 10_000 && (
         <div className="mt-6">
-          <CompoundInsightCard liquidCash={liquidCash} />
+          <CompoundInsightCard liquidCash={liquidCash} hasInvestments={hasInvestments} />
         </div>
       )}
 
+      {/* dataChanged is het compenserende versheidssignaal bij het bewust
+          wekelijkse freeze-model (lib/briefing/snapshot.ts): de briefingTEKST
+          blijft staan terwijl de gezondheidspijlers live herberekenen. Zonder
+          deze doorgifte leest die divergentie als een stille tegenspraak
+          tussen twee getallen op hetzelfde scherm. */}
       <BriefingPanel
         entries={briefingEntries ?? []}
         refreshedAt={briefingRefreshedAt ?? null}
+        dataChanged={briefingDataChanged ?? false}
         canRefresh={briefingCanRefresh ?? false}
         freedomHero={freedomHero ?? null}
         headline={briefingHeadline ?? null}

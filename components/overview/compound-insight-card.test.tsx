@@ -35,6 +35,34 @@ describe('CompoundInsightCard — render', () => {
     expect(container.querySelector('a[href="/overzicht/bezittingen"]')).toBeTruthy()
   })
 
+  // H15: de CTA keek alleen naar cash en riep "Start met beleggen" ook naast
+  // een lopende inleg. De rendergate blijft op liquide cash; alleen de CTA
+  // volgt nu de werkelijke staat.
+  describe('CTA-variant (kaart H15)', () => {
+    it('toont "Start met beleggen" wanneer er nog niet belegd wordt', () => {
+      const { container } = render(<CompoundInsightCard liquidCash={50_000} />)
+      expect(container.textContent).toMatch(/Start met beleggen/i)
+      expect(container.querySelector('a[href="/overzicht/bezittingen"]')).toBeTruthy()
+    })
+
+    it('spreekt een belegger niet als beginner aan', () => {
+      const { container } = render(
+        <CompoundInsightCard liquidCash={50_000} hasInvestments />,
+      )
+      expect(container.textContent).not.toMatch(/Start met beleggen/i)
+      expect(container.textContent).toMatch(/Bekijk je portefeuille/i)
+      // ...en verwijst naar de holdings i.p.v. de pagina waar hij zelf op staat.
+      expect(
+        container.querySelector('a[href^="/overzicht/bezittingen/investment"]'),
+      ).toBeTruthy()
+    })
+
+    it('laat de rendergate ongemoeid — hasInvestments stuurt alleen de CTA', () => {
+      const { container } = render(<CompoundInsightCard liquidCash={0} hasInvestments />)
+      expect(container.firstChild).toBeNull()
+    })
+  })
+
   it('toont disclaimer over historische rendementen', () => {
     render(<CompoundInsightCard liquidCash={20_000} />)
     expect(

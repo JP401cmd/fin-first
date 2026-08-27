@@ -24,6 +24,8 @@ import {
   DEFAULT_TERM_YEARS_PER_TYPE,
   computeDefaultMonthlyPayment,
 } from '@/lib/debt-data'
+import { addYearsIso } from '@/lib/debt-term-basis'
+import { MAX_TERM_YEARS } from './validation'
 import type { AssetQuickInput, DebtQuickInput } from './types'
 
 /** Velden die door de DB / Server Action worden gevuld en dus niet in de draft zitten. */
@@ -75,11 +77,16 @@ function isValidDateIso(v: string | null | undefined): v is string {
   )
 }
 
-/** `end_date` als ISO-datum op basis van `start_date` + looptijd in jaren. */
-function addYearsIso(startIso: string, years: number): string {
-  const d = new Date(startIso)
-  d.setFullYear(d.getFullYear() + years)
-  return d.toISOString().split('T')[0]
+/**
+ * Normaliseer de optionele looptijd-invoer naar hele jaren binnen de
+ * schema-grenzen. Buiten bereik of niet-numeriek ⇒ `null`, waarna de
+ * type-default weer leidend is.
+ */
+function normalizeTermYears(v: number | null | undefined): number | null {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return null
+  const rounded = Math.round(v)
+  if (rounded < 1 || rounded > MAX_TERM_YEARS) return null
+  return rounded
 }
 
 /**
@@ -263,14 +270,23 @@ export function buildDebtDraft(input: DebtQuickInput): DebtDraft {
     repayment_type: inputRepayment,
     start_date: inputStartDate,
     monthly_payment: inputMonthlyPayment,
+    term_years: inputTermYears,
   } = input
+
+  const today = todayIso()
 
   // Startdatum: user-invoer (hypotheek) wint van "vandaag". Een ongeldige of
   // ontbrekende waarde valt veilig terug op vandaag zodat de rij nooit zonder
   // start_date de DB in gaat.
-  const start_date = isValidDateIso(inputStartDate) ? inputStartDate : todayIso()
+  const start_date = isValidDateIso(inputStartDate) ? inputStartDate : today
 
-  const years = DEFAULT_TERM_YEARS_PER_TYPE[debt_type]
+  // Looptijd: een expliciet opgegeven RESTERENDE looptijd (het optionele
+  // hypotheek-veld) wint van de stille type-default. Hij telt vanaf vandaag,
+  // niet vanaf de ingangsdatum — dat is wat de gebruiker invult en wat de
+  // kaarten als "X jr resterend" tonen. Zonder invoer blijft het oude gedrag
+  // ongewijzigd: de type-default vanaf de ingangsdatum.
+  const explicitTermYears = normalizeTermYears(inputTermYears)
+  const years = explicitTermYears ?? DEFAULT_TERM_YEARS_PER_TYPE[debt_type]
   // Aflossingsvorm: user-invoer (hypotheek) wint van de type-default. Andere
   // schuldtypes leveren dit nooit aan → default blijft leidend.
   const repayment: RepaymentType | null =
@@ -323,9 +339,16 @@ export function buildDebtDraft(input: DebtQuickInput): DebtDraft {
     )
   }
 
-  // Einddatum leidt af uit de (echte) ingangsdatum + looptijd; voor het
-  // default-pad (start_date=vandaag) is dit identiek aan het oude gedrag.
-  const end_date = years != null && years > 0 ? addYearsIso(start_date, years) : null
+  // Einddatum. Met expliciete resterende looptijd ankeren we op vandaag
+  // (resterend ⇒ vandaag + looptijd); zonder invoer op de (echte)
+  // ingangsdatum + type-default — voor het default-pad (start_date=vandaag)
+  // identiek aan het oude gedrag.
+  const end_date =
+    explicitTermYears != null
+      ? addYearsIso(today, explicitTermYears)
+      : years != null && years > 0
+        ? addYearsIso(start_date, years)
+        : null
 
   // Hypotheek met annuiteit/lineair = fiscaal aftrekbaar (box 1 eigen woning).
   const is_tax_deductible =

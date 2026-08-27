@@ -549,6 +549,15 @@ export interface UnifiedProjectionResult {
    * kernel-pad altijd gevuld en ≥ `requiredFirePortfolio` (overwaarde ≥ 0).
    */
   requiredFireNetWorth?: number
+  /**
+   * `true` ⇒ `requiredFirePortfolio`/`requiredFireNetWorth` komen NIET van een echt
+   * FIRE-moment maar van de geprojecteerde EINDSTAND op de horizon (leeftijd ~100) —
+   * een andere grootheid dan "benodigd vermogen". Bij een structureel tekort is die
+   * stand negatief. Weergave-oppervlakken tonen dan een gegevensmelding i.p.v. een
+   * bedrag (bevinding M6; guard in `lib/horizon/outcome-guard.ts`). Optioneel/additief:
+   * stub-/mock-/preview-resultaten die het veld niet zetten blijven geldig.
+   */
+  requiredFireIsEndOfHorizonFallback?: boolean
   /** Impliciete onttrekkingsratio (jaarlijkse uitgaven / benodigde portfolio) */
   implicitWithdrawalRate: number
   /** Gebruikte eindstrategie */
@@ -660,6 +669,7 @@ export function toSimResult(result: UnifiedProjectionResult): SimResult {
     firePortfolioAtFire: result.firePortfolioAtFire,
     requiredFirePortfolio: result.requiredFirePortfolio,
     requiredFireNetWorth: result.requiredFireNetWorth,
+    requiredFireIsEndOfHorizonFallback: result.requiredFireIsEndOfHorizonFallback,
     fireReachable: result.fireReachable,
     implicitWithdrawalRate: result.implicitWithdrawalRate,
     classic25xTarget,

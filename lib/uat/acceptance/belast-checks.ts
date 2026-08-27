@@ -470,7 +470,12 @@ export const BELAST_ENGINE_CHECKS: BelastEngineCheck[] = [
       const input: Box3Input = { assets: box3AssetsFromPersona(willem), debts: [], hasPartner: false, dailyExpenses: 0, year: 2026 }
       const r = calculateBox3(input)
       return {
-        expected: 'spaargeld=57700; beleggingen=627000; rendementsgrondslag=684700; grondslagSparen=625343; box3Income=35033.24; tax=12612',
+        // M23 (27-08-2026): beleggingen 627.000 → 605.000. Het verschil is exact
+        // de BMW 3-serie (€22.000) van persona Willem: een auto voor eigen
+        // gebruik is een roerende zaak en valt buiten de Box 3-grondslag
+        // (art. 5.3 lid 2 Wet IB 2001). Hij stond er alleen in door de
+        // fall-through "alles overige is een belegging" in classifyAsset.
+        expected: 'spaargeld=57700; beleggingen=605000; rendementsgrondslag=662700; grondslagSparen=603343; box3Income=33721.07; tax=12140',
         actual: `spaargeld=${r.totaalSpaargeld}; beleggingen=${r.totaalBeleggingen}; rendementsgrondslag=${r.rendementsgrondslag}; grondslagSparen=${r.grondslagSparen}; box3Income=${fx(r.box3Income, 2)}; tax=${Math.round(r.tax)}`,
       }
     },
@@ -485,7 +490,10 @@ export const BELAST_ENGINE_CHECKS: BelastEngineCheck[] = [
       const box3Result = calculateBox3(input)
       const tb = compareForfaitairVsWerkelijk({ box3Result, werkelijkRendementPct: 3 })
       return {
-        expected: 'forfaitair=12612; werkelijkEur=20541.00; werkelijkeHeffing=7394.76; gunstigste=werkelijk; besparing=5217.21',
+        // M23: forfaitaire heffing 12.612 -> 12.140 nadat de auto (roerende zaak
+        // eigen gebruik) uit de grondslag verdween; het werkelijk-rendement-been
+        // beweegt mee omdat het over dezelfde grondslag rekent.
+        expected: 'forfaitair=12140; werkelijkEur=19881.00; werkelijkeHeffing=7157.16; gunstigste=werkelijk; besparing=4982.43',
         actual: `forfaitair=${Math.round(tb.forfaitaireHeffing)}; werkelijkEur=${fx(tb.werkelijkRendementEur, 2)}; werkelijkeHeffing=${fx(tb.werkelijkeHeffing, 2)}; gunstigste=${tb.gunstigste}; besparing=${fx(tb.besparing, 2)}`,
       }
     },
@@ -502,7 +510,8 @@ export const BELAST_ENGINE_CHECKS: BelastEngineCheck[] = [
       const totalB = solo.totaalBeleggingen
       const split = calculatePartnerSplit(totalS / 2, totalB / 2, 0, totalS / 2, totalB / 2, 0, 2026)
       return {
-        expected: 'partner1Tax=5707; partner2Tax=5707; totaleTax=11415; soloTax=12612',
+        // M23: zelfde grondslagverschuiving, nu per partner (50/50).
+        expected: 'partner1Tax=5473; partner2Tax=5473; totaleTax=10945; soloTax=12140',
         actual: `partner1Tax=${split.partner1Tax}; partner2Tax=${split.partner2Tax}; totaleTax=${split.totalTax}; soloTax=${Math.round(solo.tax)}`,
       }
     },
@@ -566,7 +575,9 @@ export const BELAST_ENGINE_CHECKS: BelastEngineCheck[] = [
       const standing = buildCurrentStanding(current, 100)
 
       return {
-        expected: `shiftNetNegative=true; topKind=jaarruimte; topTitle=${JAARRUIMTE_TITLE}; standingTax=12612; standingSpaargeld=57700; standingBeleggingen=627000`,
+        // M23: buildCurrentStanding spiegelt Box3Result, dus de standing volgt de
+        // gecorrigeerde indeling (beleggingen 627.000 -> 605.000).
+        expected: `shiftNetNegative=true; topKind=jaarruimte; topTitle=${JAARRUIMTE_TITLE}; standingTax=12140; standingSpaargeld=57700; standingBeleggingen=605000`,
         actual: `shiftNetNegative=${!!shift && shift.netEffect < 0}; topKind=${top?.kind}; topTitle=${top?.title}; standingTax=${Math.round(standing.tax)}; standingSpaargeld=${standing.totaalSpaargeld}; standingBeleggingen=${standing.totaalBeleggingen}`,
       }
     },

@@ -65,6 +65,8 @@ interface DataOverrides {
   /** ADR-uniforme (I−E)/I op de gekozen grondslagen — kaart + afgeleid blok. */
   effectiveSavingsRatePct?: number
   computedMonthlyExpenses?: number
+  /** Canoniek dagtarief uit de bundel (M22) — 0 = geen eerlijke dagbasis. */
+  dailyExpenseRate?: number
   monthlyBreakdown?: CashflowSettingsData['monthlyBreakdown']
   incomeSource?: BasisSource
   expensesSource?: BasisSource
@@ -124,6 +126,9 @@ function makeData(overrides: DataOverrides = {}): CashflowSettingsData {
     effectiveSavingsRatePct: overrides.effectiveSavingsRatePct ?? 25,
     targetSavingsRate: null,
     estimatedMonthlyExpenses: 3000,
+    // Canoniek dagtarief uit de bundel (M22): 3000 × 12 / 365. Bewust NIET
+    // 3000/30 = 100 — dat wás de tweede noemer die deze kaart heeft opgeruimd.
+    dailyExpenseRate: overrides.dailyExpenseRate ?? (3000 * 12) / 365,
     retirementExpenseMethod: 'essential_budgets',
     retirementCustomAmount: 0,
     budgetingActive: false,

@@ -22,9 +22,12 @@ import { formatAmsterdamDayMonth, formatAmsterdamTime } from '@/lib/tz'
 import { fetchOwnAccountIbansStrict, ibanById } from '@/lib/own-accounts-ibans'
 import { linkUnmatchedTransfers } from '@/lib/transfer-matching'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { Kicker, EditorialHeadline, EditorialDeck } from '@/components/editorial'
 import { AICategorizeSheet } from '@/components/app/ai-categorize-sheet'
 import { selectAllState, withAllSkip, type CrossSourceFlag } from './select-all'
+import { countImportRows, selectionCounterLabel } from './import-counters'
+import { rowCheckboxLabel } from './row-checkbox-label'
 import {
   CROSS_SOURCE_DATE_TOLERANCE_DAYS,
   partitionCrossSourceDuplicates,
@@ -164,6 +167,9 @@ function isNetworkFailure(err: unknown): boolean {
 
 export default function ImportPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // Bedragmaskering (per apparaat) — de rij-checkbox-labels moeten 'm volgen,
+  // anders spreekt een schermlezer het bedrag alsnog voluit uit (M34).
+  const { masked } = useMaskedAmounts()
   const [step, setStep] = useState(1)
   const [accounts, setAccounts] = useState<Account[]>([])
   const [selectedAccountId, setSelectedAccountId] = useState('')
@@ -1311,10 +1317,11 @@ export default function ImportPage() {
     void refreshPostImportRows(postImportRows)
   }
 
-  const crossSourceCount = rows.filter((r) => r.crossSourceDuplicate).length
-  const newCount = rows.filter((r) => !r.isDuplicate && !r.crossSourceDuplicate).length
-  const dupCount = rows.filter((r) => r.isDuplicate).length
-  const toImportCount = rows.filter((r) => !r.skipImport).length
+  // Classificatie- én selectie-tellers uit één pass; `selectionCounterLabel`
+  // benoemt de selectie expliciet zodat hij niet als classificatie leest (M33).
+  const counters = countImportRows(rows)
+  const { crossSourceCount, newCount, dupCount, toImportCount } = counters
+  const selectionLabel = selectionCounterLabel(counters)
   const totalBij = rows.filter((r) => !r.skipImport && r.amount > 0).reduce((s, r) => s + r.amount, 0)
   const totalAf = rows.filter((r) => !r.skipImport && r.amount < 0).reduce((s, r) => s + r.amount, 0)
 
@@ -1918,6 +1925,13 @@ export default function ImportPage() {
                   {crossSourceCount > 0 && (
                     <span className="text-warning"><strong>{crossSourceCount}</strong> al via bank</span>
                   )}
+                  {/* Derde teller (M33): meet de SELECTIE, niet de classificatie
+                      hiervoor. De rand markeert die breuk visueel; het label
+                      zegt in woorden wat het getal is, zodat "0 nieuw · 7
+                      duplicaten · 1 geselecteerd" niet als tegenspraak leest. */}
+                  <span className="border-l border-[var(--border-ed)] pl-4 text-[var(--ink-2)]">
+                    {selectionLabel}
+                  </span>
                 </div>
                 <button
                   onClick={() => handleImport()}
@@ -1932,7 +1946,7 @@ export default function ImportPage() {
                   ) : (
                     <>
                       <Upload className="h-4 w-4" />
-                      {toImportCount} transacties importeren
+                      Importeren
                     </>
                   )}
                 </button>
@@ -2008,8 +2022,13 @@ export default function ImportPage() {
                           return (
                             <tr key={realIdx} className={`${row.skipImport ? 'bg-[var(--subtle)] opacity-60' : 'hover:bg-[var(--subtle)]'}`}>
                               <td className="px-4 py-2">
+                                {/* Toegankelijke naam per rij (M34): zonder label zijn
+                                    dit N identieke naamloze checkboxen, terwijl juist
+                                    hier een verkeerd vinkje een dubbele boeking betekent.
+                                    Bedrag volgt de maskering — zie row-checkbox-label.ts. */}
                                 <input
                                   type="checkbox"
+                                  aria-label={rowCheckboxLabel(row, { masked })}
                                   checked={!row.skipImport}
                                   onChange={() => toggleSkip(realIdx)}
                                   className="h-4 w-4 border-[var(--border-md)] text-kern-600 focus:ring-kern-500"

@@ -70,11 +70,14 @@ import { buildPensionProjection } from '@/lib/pension/pension-projection'
 import { resolveFireAssumptions, type FireAssumptionRow } from '@/lib/fire-assumptions'
 import { getAowLeeftijden } from '@/lib/reference-cache'
 import type { Asset } from '@/lib/asset-data'
-import { computeAssetsByType, computeLiquidPot, monthsCoveredFrom } from '@/lib/dashboard-wealth-weighting'
-import { resolveEmergencyFund } from '@/lib/emergency-fund'
+import { computeAssetsByType, computeLiquidPot, monthsCoveredFrom, inclusionFactor, weightedAssetValue } from '@/lib/dashboard-wealth-weighting'
+import { buildAssetReturnBreakdown, summarizePortfolioReturn, type AssetHoldingsCost } from '@/lib/asset-return'
+import { loadHoldingsCostByAssetId } from '@/lib/holdings-cost'
+import { resolveEmergencyFund, toEmergencyFundDisplay } from '@/lib/emergency-fund'
 import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
 import { getUpcomingTransactions, type RecurringTransaction } from '@/lib/recurring-data'
 import { getTaxDeadlines } from '@/lib/tax-calendar'
+import { hasBox2RelevanceFromRows } from '@/lib/box2-relevance'
 import { recurringToUpcomingEvents, taxDeadlinesToUpcomingEvents } from '@/lib/upcoming-events'
 import { syncActiveGoalValues } from '@/lib/goal-current-value'
 import { isVrijheidsgetalGoal } from '@/lib/goals/vrijheidsgetal-goal'
@@ -307,6 +310,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     earliestIncomeResult, actionsKpiResult,
     fireAssumptionsResult,
     debtSnapshotMonthlyResult,
+    holdingsCostByAssetId,
   ] = await Promise.all([
     // Gedeelde basisdata-laag (lib/server-data/base.ts): huidige-maand-tx, actieve
     // assets/schulden, eigen profiel, alle budgetten, het 12-maands transactie-
@@ -423,6 +427,15 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     // balance_snapshots-aggregaat (RLS-veilig, egress-zuinig). Netwerkfout → { data: null }
     // → de widget valt terug op de aflossingen-bron hieronder (graceful degradation).
     fetchLatestSnapshotsByMonth(supabase, twelveMonthsAgo).then((r) => r, () => ({ data: null, error: null })),
+    // Kostprijs per bezit uit de holdings-motor (lib/holdings-cost.ts) — DEZELFDE
+    // bron als /overzicht/bezittingen. Kaart H7: de rendement-widgets rekenden hun
+    // eigen "sinds aankoop" op `assets.purchase_value`, het met de hand ingetypte
+    // getal dat lib/asset-return.ts nu juist vervangt. Twee kleine extra queries
+    // (holdings « 1000 rijen, beide gate-bewust op has_holdings_tracking +
+    // is_active) is de prijs voor één grondslag over beide oppervlakken; ze lopen
+    // in deze batch mee, dus zonder waterval. Netwerkfout → lege map → de motor
+    // valt zichtbaar terug op `purchase_value` (costSource), nooit stil.
+    loadHoldingsCostByAssetId(supabase).then((r) => r, () => ({}) as Record<string, AssetHoldingsCost>),
   ])
 
   // ── Holdings-superset → drie JS-subsets ─────────────────────────────────────
@@ -505,6 +518,22 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // maand blijven op de (kleine, subset-)tx12m-slices hierboven.
   const txAgg12 = (txAgg12Result.data ?? []) as TxMonthAggregateRow[]
 
+  // Inkomen/uitgaven per maand uit HET maandaggregaat, transfer-gefilterd. Deze
+  // twee maps zijn de ENIGE bron van elke "wat is er in maand X werkelijk
+  // gebeurd"-waarde in deze loader: `expenseHistory`, `savingsByMonth`,
+  // `currentMonth*` (verderop) én `prevMonth*` (direct hieronder).
+  //
+  // BEWUST HIER GEHESEN (H6). `prevMonthIncome/-Expenses` liepen tot nu toe over
+  // een eigen rij-lus op `prevMonthTxRows` — een slice van `getTx12m`, een RAUWE
+  // rij-query zonder limiet en dus onderhevig aan de stille PostgREST
+  // `max_rows`-cap. Zolang die twee alleen in een grafiekje stonden was dat een
+  // schoonheidsfout; sinds H6 zet het cashflow-widget ze NAAST `currentMonth*`
+  // in dezelfde balken. Twee vensters van dezelfde grootheid waarvan er één kan
+  // afkappen en de andere niet, is exact de bugklasse die H6 aankaart — nu delen
+  // ze één aggregaat en dus één grondslag.
+  const expenseByMonth = aggExpenseByMonthAbs(txAgg12, { realOnly: true })
+  const incomeByMonth = aggIncomeByMonth(txAgg12, { realOnly: true })
+
   // ── Derive budget subsets from single query (was 4 queries) ──
   const allBudgetsRaw = (allBudgetsRawResult.data ?? []) as { id: string; name: string; icon: string; default_limit: number; interval: string; budget_type: string; alert_threshold: number; parent_id: string | null; is_favorite: boolean; is_essential: boolean }[]
   const essentialBudgetsData = allBudgetsRaw.filter(b => b.is_essential && b.budget_type === 'expense' && b.parent_id === null)
@@ -551,15 +580,15 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       expenses: dashboardBudgetExpenses.monthlyTotal,
     })
 
-  // Previous month income/expenses for cashflow comparison widget
-  let prevMonthIncome = 0
-  let prevMonthExpenses = 0
-  for (const tx of prevMonthTxRows) {
-    if (!isRealTx(tx)) continue
-    const amt = Number(tx.amount)
-    if (amt > 0) prevMonthIncome += amt
-    else prevMonthExpenses += Math.abs(amt)
-  }
+  // Previous month income/expenses for cashflow comparison widget.
+  //
+  // Uit HET maandaggregaat op de vorige-maandsleutel — dezelfde bron en hetzelfde
+  // transfer-filter als `currentMonthIncome/-Expenses` verderop, alleen een maand
+  // eerder. Zie de toelichting bij `incomeByMonth`/`expenseByMonth` hierboven voor
+  // waarom de vroegere rij-lus over `prevMonthTxRows` hier weg moest (max_rows).
+  const prevMonthKey = prevMonthStart.slice(0, 7)
+  const prevMonthIncome = incomeByMonth.get(prevMonthKey) ?? 0
+  const prevMonthExpenses = expenseByMonth.get(prevMonthKey) ?? 0
 
   // Cash assets already included via assets table — only add unlinked bank_accounts (legacy/transition)
   const totalAssetsOnly = (assetsResult.data ?? []).reduce((s, a) =>
@@ -588,7 +617,39 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // zodat som(assetsByType.value) == het headline-totaal (totalAssets/netWorth).
   const assetsByType = computeAssetsByType(assetsResult.data ?? [])
 
-  const totalPurchaseValue = assetsByType.reduce((s, a) => s + a.purchaseValue, 0)
+  // ── Gerealiseerd rendement: DEZELFDE motor als /overzicht/bezittingen ────────
+  // Kaart H7. Hiervóór stond hier `totalPurchaseValue = Σ purchaseValue over ÁLLE
+  // types`, waarmee de Vermogen-widget `totalAssets − totalPurchaseValue` als
+  // "Ongerealiseerde winst" toonde — letterlijk de formule die commit 5857ba0d9
+  // op de bezittingenpagina wegnam (één aftrekking over vier onvergelijkbare
+  // soorten getallen: een banksaldo zonder kostprijs telt volledig als winst).
+  // Dat veld is bewust VERWIJDERD in plaats van blijven staan: een bundelveld dat
+  // een foute grondslag draagt, wordt vroeg of laat opnieuw geconsumeerd.
+  //
+  // WEGING (eigenaarsbesluit kaart H7, 26-08-2026): op het dashboard weegt álles
+  // met `net_worth_inclusion_pct` — waarde én kostprijs, via dezelfde factor, dus
+  // het percentage blijft onvertekend (de factor valt in teller en noemer weg).
+  // Dat is bewust een ANDERE weging dan op /overzicht/bezittingen, waar de motor
+  // op het BRUTO bezittingentotaal sluit en met het huishoud-aandeel weegt
+  // (perspectiveAssetValue/shareFractionFor). De grondslag is identiek — welke
+  // bezittingen, welke kostprijs — alleen de weging volgt het oppervlak waarop
+  // het getal moet sluiten. Zie lib/architecture/calculations.ts.
+  const assetReturn = summarizePortfolioReturn(buildAssetReturnBreakdown(
+    (assetsResult.data ?? []).map((a) => {
+      const row = a as {
+        id?: unknown; name?: unknown; asset_type?: unknown; purchase_value?: number | null
+      }
+      return {
+        id: String(row.id ?? ''),
+        name: String(row.name ?? ''),
+        assetType: typeof row.asset_type === 'string' ? row.asset_type : '',
+        value: weightedAssetValue(a),
+        purchaseValue: row.purchase_value != null ? Number(row.purchase_value) : null,
+        shareFraction: inclusionFactor(a),
+      }
+    }),
+    holdingsCostByAssetId,
+  ))
 
   // Inclusion-gewogen liquide pot (direct besteedbaar geld: spaar/betaal/cash +
   // niet-gekoppelde bankrekeningen). Dé grondslag voor buffer/noodfonds/runway —
@@ -1457,9 +1518,10 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // afgeleide scalars (noodfonds-uitgaven current-month i.p.v. 6-mnd-gemiddelde,
   // freedomPct op de sim-kernel-noemer, geëxtrapoleerd DSTI-inkomen) én ALTIJD
   // persoonlijk (geen perspectief), zodat 'm structureel afwijkt van de
-  // /overzicht-hero (horizon-data-loader). Op /overzicht wordt deze score dan ook
-  // overschreven door de perspectief-correcte horizonData-score
-  // (components/overview/overzicht-secondary-loader.tsx). Blijft bestaan als
+  // /overzicht-hero (horizon-data-loader). Op /overzicht worden deze score, het
+  // vrijheids-% én de noodfonds-bundel dan ook overschreven door de
+  // perspectief-correcte horizonData-waarden (`withCanonicalOverviewFigures` in
+  // components/overview/overzicht-secondary-loader.tsx — H4). Blijft bestaan als
   // fallback voor consumers zonder horizonData (bv. de benchmark-rapportroute,
   // die horizonData.healthScore prefereert). Wijzig je iets aan de score-scalars:
   // doe dat aan de canonieke bron in horizon-data-loader, niet hier.
@@ -1513,14 +1575,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   )
 
   // Expense history: Σ |negatieve bedragen| per maand, transfer-gefilterd — uit het
-  // maandaggregaat (byte-identiek aan de vroegere rij-bucket). De map zelf wordt
-  // hieronder nog hergebruikt (currentMonthExpenses + savingsByMonth), dus alleen
-  // de sortering/vorm loopt via de gedeelde helper.
-  const expenseByMonth = aggExpenseByMonthAbs(txAgg12, { realOnly: true })
+  // maandaggregaat (byte-identiek aan de vroegere rij-bucket). Alleen de
+  // sortering/vorm loopt via de gedeelde helper; `expenseByMonth`/`incomeByMonth`
+  // zelf zijn bovenaan de loader gemaakt (naast `txAgg12`), omdat `prevMonth*`
+  // ze daar al nodig heeft.
   const expenseHistory = toSortedMonthHistory(expenseByMonth)
-
-  // Income history: positieve transacties per maand, transfer-gefilterd.
-  const incomeByMonth = aggIncomeByMonth(txAgg12, { realOnly: true })
 
   // Gerealiseerde HUIDIGE kalendermaand (excl. transfers) — de grondslag voor
   // oppervlakken die "wat gebeurde er déze maand echt" tonen, los van de
@@ -1809,8 +1868,20 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   upcomingEvents.push(
     ...recurringToUpcomingEvents(getUpcomingTransactions(recurringRows, AGENDA_HORIZON_DAYS)),
   )
-  // Fiscale deadlines binnen dezelfde horizon
-  upcomingEvents.push(...taxDeadlinesToUpcomingEvents(getTaxDeadlines(new Date()), AGENDA_HORIZON_DAYS))
+  // Fiscale deadlines binnen dezelfde horizon. Box 2-deadlines (leengrens DGA)
+  // alleen bij een aanmerkelijk belang — bevinding L8. De relevantie komt uit de
+  // AL GELADEN actieve assets/schulden, dus dit kost geen extra query.
+  const hasAanmerkelijkBelang = hasBox2RelevanceFromRows(
+    (assetsResult.data ?? []) as { asset_type?: string | null; subtype?: string | null; user_id?: string | null }[],
+    (debtsResult.data ?? []) as { debt_type?: string | null; user_id?: string | null }[],
+    currentUserId,
+  )
+  upcomingEvents.push(
+    ...taxDeadlinesToUpcomingEvents(
+      getTaxDeadlines(new Date(), { hasAanmerkelijkBelang }),
+      AGENDA_HORIZON_DAYS,
+    ),
+  )
   // Goal deadlines
   for (const g of (goalsResult.data ?? []) as { id: string; name: string; target_date?: string | null; target_value?: number | null }[]) {
     if (g.target_date) {
@@ -1846,17 +1917,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // Consume, don't recompute: currentAmount = inclusion-gewogen liquide pot,
   // norm = 3 × netto maandsalaris, monthsCovered op DIE grondslag. De leesbare
   // runway (maanden vaste lasten) reist apart mee.
-  const emergencyFund = {
-    currentAmount: roundCents(emergencyResolved.currentAmount),
-    targetAmount: roundCents(emergencyResolved.targetAmount),
-    monthsCovered: Math.round(emergencyResolved.monthsCovered * 10) / 10,
-    targetMonths: Math.round(emergencyResolved.targetMonths * 2) / 2,
-    isComplete: emergencyResolved.monthsCovered >= emergencyResolved.targetMonths,
-    runwayMonths: Math.round(emergencyResolved.runwayMonths * 10) / 10,
-    // Provenance uit de resolver — 'salary' (de norm) of 'expenses' (terugval
-    // bij nul inkomen). De widget benoemt de grondslag die hij toont.
-    source: emergencyResolved.source,
-  }
+  // Afronding via de GEDEELDE display-conventie (lib/emergency-fund.ts), zodat
+  // deze bundel en de canonieke /overzicht-bundel niet elk hun eigen
+  // `Math.round(x * 10) / 10` dragen. `source` reist als provenance mee —
+  // 'salary' (de norm) of 'expenses' (terugval bij nul inkomen).
+  const emergencyFund = toEmergencyFundDisplay(emergencyResolved)
 
   // ── Next Steps: canonieke Volgende Stap-motor ───────────────────────────
   // De motor (lib/next-steps/engine.ts) bepaalt welke stap er nú toe doet en in
@@ -1874,6 +1939,13 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     goalCount: (goalsResult.data ?? []).length,
     hasDateOfBirth: !!profileResult.data?.date_of_birth,
     netWorth,
+    // LET OP (H4): dit leest de BUNDEL-eigen noodfondscijfers, niet de canonieke
+    // horizon-versie die /overzicht over `emergencyFund` heen legt — deze stap
+    // wordt hier, in de loader, al vastgelegd. Beide paden delen sinds H4
+    // dezelfde rijen (getActiveAssets) en hetzelfde effectieve salaris, dus ze
+    // vallen samen zolang er salaris bekend is. Ze kunnen alleen nog uiteenlopen
+    // op de terugval-tak (nul inkomen): daar deelt de bundel door de effectieve
+    // maanduitgaven en de canonieke versie door het 6-maands gemiddelde.
     emergencyMonthsCovered: emergencyFund.monthsCovered,
     emergencyTargetMonths: emergencyFund.targetMonths,
     savingsRate6mPct: savingsRate6m,
@@ -2626,7 +2698,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     expenseHistory,
     budgetTypeHistory,
     assetsByType,
-    totalPurchaseValue,
+    assetReturn,
     fireRange,
     // Canonieke mijlpaal-motor-uitkomst (zie berekening hierboven) — de enige
     // bron voor mijlpaal-datums in de widgets.

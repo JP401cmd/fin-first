@@ -14,7 +14,6 @@ import {
   deriveProvenance,
   debtShareFraction,
   formatOwnershipSubline,
-  dailyExpensesByPerspective,
   SPLIT_MODE_LABELS,
   SPLIT_MODE_DESCRIPTIONS,
   DEFAULT_PRIVACY_SETTINGS,
@@ -22,6 +21,7 @@ import {
   type OwnershipType,
   type PrivacyLevel,
 } from '@/lib/household-data'
+import { dailyExpenseRate } from '@/lib/format'
 
 const CAT = 'identiteit.household'
 
@@ -759,16 +759,34 @@ const tests: TestCase[] = [
   },
   {
     id: 'household-daily-expenses-perspective',
-    name: 'dailyExpensesByPerspective: per-perspectief noemer',
+    name: 'Box 3-vrijheidsdagen staan op de canonieke noemer (M22)',
     category: CAT,
-    description: 'Vrijheidstijd-noemer: eigen=mijn, huishouden=gecombineerd, partner=verschil',
+    description:
+      'Het perspectief-Box 3-pad rekent op dailyExpenseRate (×12/365), niet op maand÷30. De oude noemer week ~14% af op hetzelfde maandbedrag — en die 14% is de ONDERGRENS: hij gold alleen bij gelijke teller, terwijl de oude teller budget-LIMIETEN was i.p.v. gerealiseerde uitgaven.',
     priority: 'medium',
     estimatedDurationMs: 50,
     fn() {
-      const m = { personal: 1500, household: 3600 }
-      assert(Math.abs(dailyExpensesByPerspective(m, 'personal') - 50) < 1e-9, 'eigen = 1500/30')
-      assert(Math.abs(dailyExpensesByPerspective(m, 'household') - 120) < 1e-9, 'huishouden = 3600/30')
-      assert(Math.abs(dailyExpensesByPerspective(m, 'partner') - 70) < 1e-9, 'partner = (3600-1500)/30')
+      const monthly = 3000
+      const canoniek = dailyExpenseRate(monthly)
+      assert(Math.abs(canoniek - (monthly * 12) / 365) < 1e-9, 'canoniek = maand × 12 / 365')
+
+      // De verwijderde noemer, hier alleen nog als CONTRAST — geen import meer,
+      // want de functie bestaat niet meer (M22: één noemer, één huis).
+      const oud = monthly / 30
+      assert(oud > canoniek, 'maand÷30 overschat het dagtarief structureel')
+      assert(
+        Math.abs(oud / canoniek - 365 / 360) < 1e-9,
+        'de afwijking is exact 365/360 — 12 × 30 dagen is geen jaar',
+      )
+
+      // Zelfde heffing, twee noemers → twee antwoorden op één scherm. Dít is de
+      // klasse die M22 sloot; de assertie legt vast dat ze niet gelijk zijn en
+      // dus nooit door elkaar gebruikt mogen worden.
+      const heffing = 569
+      assert(
+        Math.round(heffing / oud) !== Math.round(heffing / canoniek),
+        'twee noemers geven op hetzelfde bedrag een ander aantal vrijheidsdagen',
+      )
     },
   },
   {

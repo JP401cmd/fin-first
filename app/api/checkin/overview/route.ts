@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { computeFireAge } from '@/lib/checkin/fire-age'
 import { resolveFireParams } from '@/lib/fire-params'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
+import { savingsRateDataMonths, savingsRateWindow } from '@/lib/savings-source'
 import {
   resolveUnlinkedCashShare,
   selectUnlinkedBankAccounts,
@@ -28,7 +29,13 @@ export async function GET() {
   const { start: monthStart, end: monthEnd } = localMonthBounds(now)
   const prevMonthStart = localMonthStart(new Date(currentYear, currentMonth - 1, 1))
   const prevMonthEnd = monthStart
-  const sixMonthsAgo = localMonthStart(new Date(currentYear, currentMonth - 6, 1))
+  // 6-maands venster uit de CANONIEKE bron (lib/savings-source.ts): zes
+  // VOLTOOIDE kalendermaanden, de lopende maand exclusief. Stond hier als
+  // `new Date(currentYear, currentMonth - 6, 1)` t/m `monthEnd` — dat telde
+  // ZEVEN kalendermaanden terwijl de deler eronder op 6 klemde, dus de
+  // 6-maands gemiddelden liepen structureel ~14-17 % te hoog. Dezelfde
+  // off-by-one die `deriveSavingsRate6mWindow` bij bevinding C6 al ophief.
+  const window6m = savingsRateWindow(now)
 
   const prevMonthIdx = currentMonth === 0 ? 11 : currentMonth - 1
 
@@ -81,15 +88,15 @@ export async function GET() {
       .select('amount, transaction_type, date')
       .eq('user_id', claims.sub)
       .eq('is_income', true)
-      .gte('date', sixMonthsAgo)
-      .lt('date', monthEnd),
+      .gte('date', window6m.fromDate)
+      .lt('date', window6m.toDate),
     supabase
       .from('transactions')
       .select('amount, transaction_type, date')
       .eq('user_id', claims.sub)
       .eq('is_income', false)
-      .gte('date', sixMonthsAgo)
-      .lt('date', monthEnd),
+      .gte('date', window6m.fromDate)
+      .lt('date', window6m.toDate),
     // Net worth snapshots (last 2)
     supabase
       .from('net_worth_snapshots')
@@ -143,13 +150,11 @@ export async function GET() {
   const expenses6m = expense6mRows.reduce((s, t) => s + Math.abs(t.amount || 0), 0)
   const earliest6m = [...income6mRows, ...expense6mRows]
     .reduce<string | null>((min, t) => (t.date && (!min || t.date < min) ? t.date : min), null)
-  let dataMonths6 = 6
-  if (earliest6m) {
-    const ed = new Date(earliest6m)
-    dataMonths6 = Math.max(1, Math.min(6,
-      (currentYear - ed.getFullYear()) * 12 + (currentMonth - ed.getMonth()),
-    ))
-  }
+  // Deler uit dezelfde canonieke bron als het venster hierboven — die telt
+  // VOLTOOIDE maanden en sluit daarmee exact aan op `savingsRateWindow`.
+  // Was een inline kopie die los van het venster kon driften. Bewust de
+  // vroegste van inkomsten ÉN uitgaven: beide sommen delen deze ene deler.
+  const dataMonths6 = savingsRateDataMonths(now, earliest6m)
   const income6mAvg = income6m / dataMonths6
   const expenses6mAvg = expenses6m / dataMonths6
 

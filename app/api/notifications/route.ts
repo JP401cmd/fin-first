@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { shouldAlert } from '@/lib/budget-alerts'
+import { shouldAlert, budgetLimitStatus } from '@/lib/budget-alerts'
 import { shouldSendWozReminder, WOZ_REMINDER_TEMPLATE } from '@/lib/notifications/woz-reminder'
 import { shouldSendPensionReminder, PENSION_REMINDER_TEMPLATE } from '@/lib/notifications/pension-reminder'
 import { amsterdamWeekKey } from '@/lib/briefing/snapshot'
@@ -226,6 +226,26 @@ export async function GET(request: NextRequest) {
           .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
       }
 
+      /**
+       * "€X van €Y" voor de omschrijving.
+       *
+       * Normaal op hele euro's, zoals overal in de meldingen. Maar bij een
+       * échte overschrijding die op hele euro's samenvalt (1280,40 tegen
+       * 1279,80 → "€1280 van €1280") sprak de tekst zichzelf tegen: dezelfde
+       * twee getallen, en er zou iets overschreden zijn. In dat ene geval
+       * tonen we centen, zodat het verschil zichtbaar is dat het woord
+       * "overschreden" beweert.
+       */
+      function formatAmountPair(spent: number, limit: number): string {
+        const collapsesOnWholeEuros = Math.round(spent) === Math.round(limit)
+        const differsInCents = budgetLimitStatus(spent, limit) !== 'bereikt'
+        if (collapsesOnWholeEuros && differsInCents) {
+          const euro = (v: number) => v.toFixed(2).replace('.', ',')
+          return `€${euro(spent)} van €${euro(limit)}`
+        }
+        return `€${Math.round(spent)} van €${Math.round(limit)}`
+      }
+
       function pushBudgetNotification(
         budget: { id: string; name: string; budget_type: string; alert_threshold: number | null; default_limit: number },
         spent: number,
@@ -246,38 +266,62 @@ export async function GET(request: NextRequest) {
         let description: string
         let color: string
         let icon: string
+        // Priority stuurt de "Dringend"-bak van drie oppervlakken tegelijk
+        // (bel-dropdown, /berichten en de meldingen-widget: allemaal
+        // `priority <= 2 && ongelezen`). Alleen een échte overschrijding is
+        // dringend; "limiet bereikt" is een gezonde eindstand en zit met
+        // priority 3 bewust búiten die bak.
+        let priority: number
+
+        // De drie toestanden van de limiet, canoniek uit `budgetLimitStatus`:
+        // exact-op-de-grens is "bereikt", niet "over" (bevinding H16).
+        const limitStatus = budgetLimitStatus(spent, limit)
 
         if (bt === 'savings') {
           title = `${budget.name}: ${pctRounded}% gespaard`
           description = `€${Math.round(spent)} van €${Math.round(limit)} spaardoel — minder dan ${threshold}% bereikt`
           color = 'blue'
           icon = 'TrendingUp'
+          priority = 2
         } else if (bt === 'debt') {
           title = `${budget.name}: ${pctRounded}% afgelost`
           description = `€${Math.round(spent)} van €${Math.round(limit)} aflossingsdoel — minder dan ${threshold}% bereikt`
           color = 'purple'
           icon = 'TrendingUp'
-        } else if (pct >= 120) {
+          priority = 2
+        } else if (limitStatus === 'over' && pct >= 120) {
           title = `${budget.name}: ${pctRounded}% — flink over budget`
-          description = `€${Math.round(spent)} van €${Math.round(limit)} — €${Math.round(spent - limit)} overschrijding`
+          description = `${formatAmountPair(spent, limit)} — €${Math.round(spent - limit)} overschrijding`
           color = 'red'
           icon = 'AlertTriangle'
-        } else if (pct >= 100) {
+          priority = 1
+        } else if (limitStatus === 'over') {
           title = `${budget.name}: ${pctRounded}% — over budget`
-          description = `€${Math.round(spent)} van €${Math.round(limit)} — budget overschreden`
+          description = `${formatAmountPair(spent, limit)} — budget overschreden`
           color = 'red'
           icon = 'AlertTriangle'
+          priority = 1
+        } else if (limitStatus === 'bereikt') {
+          // Vaste lasten raken deze tak elke maand: `lib/budget-plan-diff.ts`
+          // zet hun limiet gelijk aan de maandelijkse afschrijving. Dit is dus
+          // het normale geval, geen randgeval — en zeker geen rood alarm.
+          title = `${budget.name}: limiet bereikt`
+          description = `${formatAmountPair(spent, limit)} — precies op de grens, niets meer over`
+          color = 'amber'
+          icon = 'AlertTriangle'
+          priority = 3
         } else {
           title = `${budget.name}: ${pctRounded}% besteed`
           description = `€${Math.round(spent)} van €${Math.round(limit)} — nog €${Math.round(limit - spent)} over (drempel: ${threshold}%)`
           color = 'amber'
           icon = 'AlertTriangle'
+          priority = 2
         }
 
         notifications.push({
           id,
           type: 'budget',
-          priority: pct >= 100 ? 1 : 2,
+          priority,
           title,
           description,
           icon,
@@ -285,7 +329,9 @@ export async function GET(request: NextRequest) {
           createdAt: now,
           read: readIds.includes(id),
           actionUrl: `/core/budgets?budget=${budget.id}`,
-          aiContext: `Mijn budget voor ${budget.name} staat op ${pctRounded}%. Wat kan ik doen om binnen budget te blijven?`,
+          aiContext: limitStatus === 'bereikt'
+            ? `Mijn budget voor ${budget.name} zit precies op de limiet: €${Math.round(spent)} van €${Math.round(limit)}. Is dat erg, en klopt deze limiet nog?`
+            : `Mijn budget voor ${budget.name} staat op ${pctRounded}%. Wat kan ik doen om binnen budget te blijven?`,
         })
       }
 

@@ -173,7 +173,6 @@ export default async function OverzichtPage() {
               perspective={perspective}
               userId={userId}
               horizonData={horizonData}
-              health={health}
               freedomPct={freedomPct}
               currentAge={currentAge}
               currentNetWorth={currentNetWorth}

@@ -138,3 +138,28 @@ describe('VrijheidStrip — vrij/pensioen-framing', () => {
     expect(screen.queryByText('Nog')).toBeNull()
   })
 })
+
+describe('VrijheidStrip — M6-vangrail (dataIssue)', () => {
+  it('toont de gegevensmelding i.p.v. een percentage', () => {
+    render(<VrijheidStrip freedomPct={12} currentAge={36} fireAge={null} dataIssue />)
+    expect(screen.getByText(/We missen gegevens/i)).toBeInTheDocument()
+    expect(screen.queryByText('12%')).not.toBeInTheDocument()
+  })
+
+  it('vertelt wat er ontbreekt en wijst naar het profiel', () => {
+    render(<VrijheidStrip freedomPct={12} dataIssue />)
+    expect(screen.getByText(/Vul je geboortedatum, inkomen en bestedingen aan/i)).toBeInTheDocument()
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/mijn/profiel')
+  })
+
+  it('rendert geen voortgangsbalk bij een onmogelijke uitkomst', () => {
+    const { container } = render(<VrijheidStrip freedomPct={12} dataIssue />)
+    expect(container.querySelector('[role="progressbar"]')).toBeNull()
+  })
+
+  it('zonder dataIssue verandert er niets aan het bestaande gedrag', () => {
+    render(<VrijheidStrip freedomPct={42} />)
+    expect(screen.getByText('42%')).toBeInTheDocument()
+    expect(screen.queryByText(/We missen gegevens/i)).not.toBeInTheDocument()
+  })
+})

@@ -66,6 +66,27 @@ const BUNDLE_FALLBACK = /\.dailyExpenseRate\s*\?\?[\s\S]*?dailyExpenseRate\s*\(/
 const COMMENT_LINE = /^\s*(\*|\/\/|\/\*)/
 
 /**
+ * REGEL 2 (M22) — een eigen deling die `dailyExpenseRate` omzeilt.
+ *
+ * Blinde vlek (a) in de kop van dit bestand was geen theorie: `loadPerspectiveBox3`
+ * deelde de som van budget-LIMIETEN door 30 en gaf zo dezelfde Box 3-heffing op
+ * de subpagina een ander aantal vrijheidsdagen dan op de hub — op productie
+ * −68% tot +441%. Deze gate zag daar niets van, want er stond nergens
+ * `dailyExpenseRate(`.
+ *
+ * Wat we vangen: een deling door 30 / 30.4 / 30.44 / 30.5 op een identifier die
+ * naar UITGAVEN ruikt. Dat is de vorm die drie keer op rij is teruggekomen
+ * (household-tax ÷30, inflatie-koopkracht ÷30,44, what-if ÷30). Een som via
+ * tussenvariabelen glipt er nog steeds doorheen — dit is een vangrail, geen
+ * dekkingsbewijs.
+ *
+ * De juiste vorm is ALTIJD `dailyExpenseRate(maandbedrag)` (×12/365): twaalf
+ * maanden van 30 dagen is 360, geen jaar, dus ÷30 overschat elk dagtarief met
+ * 365/360 — bovenop de kans dat de TELLER ook al niet klopt.
+ */
+const MONTH_DIVISION = /(?<![A-Za-z0-9_$])([A-Za-z0-9_$.]*(?:xpense|itgave|osten|pend)[A-Za-z0-9_$.]*)\s*\/\s*30(?:\.[45]?\d*)?(?![\d.])/
+
+/**
  * Verwijder string-literals uit een regel vóór de match-test. De naam
  * `dailyExpenseRate(3000)` komt namelijk óók voor in PROZA — UAT-verwachtingen
  * ("vrijheidsdagen = calculateFreedomTime(…, dailyExpenseRate(2200))") en de
@@ -117,25 +138,41 @@ const ALLOWED_FILES = new Map([
       '(yearlyMustExpenses/365) voor de FIRE-tak.',
   ],
   [
-    'lib/horizon-data-loader.ts',
-    'Produceert HorizonPageData.dailyExpenseRate; de resterende aanroep voedt alleen ' +
+    // Was lib/horizon-data-loader.ts; die loader is bij ADR 0107 geknipt en de
+    // queries + rauwe afleidingen (waaronder deze aanroep) wonen nu in de rauwe
+    // laag. Zelfde regel, zelfde reden — alleen een ander pad.
+    'lib/horizon/raw-data-loader.ts',
+    'Produceert HorizonRawData.dailyExpenseRate; de resterende aanroep voedt alleen ' +
       'calculateBox3 waarvan enkel .tax gelezen wordt (freedomDays ongebruikt).',
   ],
-  [
-    'components/overview/cashflow-instellingen-blok.tsx',
-    'GEKOZEN-grondslag (ADR 0103): dit paneel is het oppervlak waar de gebruiker de ' +
-      'grondslag voor inkomen/uitgaven zelf kiest, en het toont het €→tijd-tarief van ' +
-      'het bedrag dat er op dát moment staat — inclusief de nog niet opgeslagen ' +
-      'budgetselectie (resolveAmountWithBasis, optimistisch). Het canonieke 12-mnd ' +
-      'rolling tarief zou hier de kassabon tegenspreken: het bedrag boven de regel zou ' +
-      'meebewegen met een vinkje terwijl de tijd eronder stil blijft staan.',
-  ],
+  // components/overview/cashflow-instellingen-blok.tsx stond hier tot M22 met de
+  // redenering "dit paneel toont het tarief van het bedrag dat er op dát moment
+  // staat". Die uitzondering is INGETROKKEN (eigenaar-besluit 26-08-2026, optie
+  // B1): een dagtarief is geen grondslagkeuze maar een app-brede wisselkoers, en
+  // deze uitzondering maakte het paneel de derde koers binnen één module ("één
+  // dag vrijheid kost je nu €106" naast een app op ~€124/dag). Het blok
+  // consumeert nu `CashflowSettingsData.dailyExpenseRate` en benoemt de herkomst
+  // in de regel eronder — dát is wat de kassabon kloppend houdt, niet een eigen
+  // tarief. Zet het bestand hier NIET terug zonder nieuw eigenaar-besluit.
 
   // ── Eigen invoer / eigen flow (geen app-brede weergave-grondslag) ─────────
   [
+    // De check-wizard rékent sinds bevinding H12 niet meer zelf: hij consumeert
+    // computeFreedomTicker uit lib/freedom-ticker.ts (gedeeld met de
+    // onboarding-teller). De entry blijft staan omdat dit bestand hét precedent
+    // is voor de intake-grondslag; verdwijnt de wizard, dan mag hij weg.
     'components/check/intake/check-wizard.tsx',
     'Check-intake rekent op de bedragen die de gebruiker NET in de wizard typte — ' +
       'er is nog geen transactiehistorie om een rolling tarief uit te halen.',
+  ],
+  [
+    'lib/freedom-ticker.ts',
+    'DE gedeelde intake-grondslag (intakeDailyExpenseRate): de meelopende ' +
+      '"Al vrijgekocht"-teller van /check én /onboarding rekent op de bedragen die ' +
+      'de gebruiker zojuist zelf typte — er is nog geen transactiehistorie voor een ' +
+      'rolling tarief. Bewust ÉÉN module in plaats van de conversie per intake-scherm ' +
+      '(bevinding H12): zo blijft "intake rekent op eigen invoer" één gedocumenteerde ' +
+      'uitzondering. De conversie zelf blijft dailyExpenseRate (×12/365).',
   ],
   ['components/check/intake/steps/step-gebeurtenissen.tsx', 'Idem: intake-eigen invoer.'],
   [
@@ -153,6 +190,12 @@ const ALLOWED_FILES = new Map([
     'AI-tool die een DOOR DE GEBRUIKER OPGEGEVEN maandbedrag omrekent ("wat als ik ' +
       '€X/mnd uitgeef") — een hypothese, geen weergave van zijn eigen dagtarief.',
   ],
+  [
+    'app/(app)/horizon/whatif/whatif-page-client.tsx',
+    'WHAT-IF-grondslag: het scenariobedrag dat de gebruiker in de schuifjes zet is ' +
+      'hier de hele vraag ("wat als ik €X/mnd uitgeef"), net als bij de AI-tool ' +
+      'hierboven. De CONVERSIE is wél canoniek — dit verving een ÷30 (M22).',
+  ],
 
   // ── Vaste testgetallen (geen gebruikersdata) ─────────────────────────────
   ['lib/uat/acceptance/budget-checks.ts', 'UAT-fixture met een vast literal-bedrag.'],
@@ -161,6 +204,7 @@ const ALLOWED_FILES = new Map([
   ['lib/uat/acceptance/kruis-checks.ts', 'UAT-fixture met een vast literal-bedrag.'],
   ['lib/uat/acceptance/start-checks.ts', 'UAT-fixture met een vast literal-bedrag.'],
   ['lib/regression-tests/suites/vaste-kosten-analyse.ts', 'Regressie-fixture met een vast literal-bedrag.'],
+  ['lib/regression-tests/suites/identiteit-household.ts', 'Regressie-fixture met een vast literal-bedrag (M22-noemerregel).'],
 ])
 
 function walk(dir, acc) {
@@ -187,6 +231,27 @@ const allowed = []
 for (const file of files) {
   const rel = relative(ROOT, file).split(sep).join('/')
   const src = readFileSync(file, 'utf8')
+
+  // ── Regel 2: eigen maand÷30-deling (M22) ────────────────────────────────
+  // Niet-allowlistbaar, net als de kolomregel in check-client-data-reads.mjs:
+  // een 360-dagenjaar is nooit een bewuste andere GRONDSLAG, het is een fout in
+  // de CONVERSIE. Wie een andere grondslag wil, voedt `dailyExpenseRate()` een
+  // ander maandbedrag — dat is regel 1, met zijn eigen allowlist.
+  if (MONTH_DIVISION.test(src)) {
+    src.split(/\r?\n/).forEach((rawLine, i) => {
+      const line = stripStrings(rawLine)
+      if (COMMENT_LINE.test(rawLine)) return
+      const m = MONTH_DIVISION.exec(line)
+      if (!m) return
+      violations.push({
+        rel,
+        line: i + 1,
+        text: rawLine.trim(),
+        rule: 'maand÷30 i.p.v. dailyExpenseRate() (×12/365)',
+      })
+    })
+  }
+
   if (!CALL.test(src)) continue
   const lines = src.split(/\r?\n/)
   lines.forEach((rawLine, i) => {
@@ -235,14 +300,20 @@ if (listMode) {
 
 if (violations.length > 0) {
   console.error('\n✗ Eigen €→vrijheidstijd-dagtarief buiten de canonieke bron:\n')
-  for (const v of violations) console.error(`  ${v.rel}:${v.line}\n    ${v.text}`)
+  for (const v of violations) {
+    console.error(`  ${v.rel}:${v.line}${v.rule ? `  [${v.rule}]` : ''}\n    ${v.text}`)
+  }
   console.error(
     '\nHet dagtarief komt uit ÉÉN bron (12-mnd rolling, lib/expense-rate.ts).\n' +
       'Consumeer het bundelveld `dailyExpenseRate` (DashboardData / HorizonPageData /\n' +
       'CorePageData / CashflowCardScalars), of roep `getRecentDailyExpenseRate(supabase)`\n' +
       'aan. Is dit bewust een ANDERE grondslag (onttrekkingsfase, essentiële uitgaven,\n' +
       'eigen intake-invoer)? Zet het bestand dan in ALLOWED_FILES in\n' +
-      'scripts/check-freedom-time-basis.mjs MÉT de reden.\n',
+      'scripts/check-freedom-time-basis.mjs MÉT de reden.\n' +
+      '\nSTAAT ER [maand÷30] bij? Dan is de ALLOWLIST NIET de uitweg: twaalf maanden\n' +
+      'van 30 dagen is 360, geen jaar. Een andere GRONDSLAG kies je door\n' +
+      '`dailyExpenseRate()` een ander maandbedrag te voeren — de CONVERSIE zelf\n' +
+      '(×12/365) is nooit een keuze.\n',
   )
   process.exit(1)
 }

@@ -19,6 +19,11 @@ describe('OVERLAY_TRIGGER_PARAMS', () => {
     }
     expect(OVERLAY_TRIGGER_PARAMS).toContain(OVERLAY_QUERY_KEYS.newBudget)
     expect(OVERLAY_TRIGGER_PARAMS).toContain(OVERLAY_QUERY_KEYS.planEditor)
+    // Kaart H7: de rekenmodal "Zo is het rendement berekend" is sinds 27-08-2026
+    // ook via de URL bereikbaar, zodat elk rendementsgetal op /overzicht naar
+    // dezelfde uitleg kan linken. Staat hij niet in de trigger-lijst, dan blijft
+    // de param na een setup-completion staan en opent de modal ongevraagd.
+    expect(OVERLAY_TRIGGER_PARAMS).toContain(OVERLAY_QUERY_KEYS.rendementUitleg)
   })
 
   it('gebruikt de actuele URL-param-values, niet de key-namen (cryptoHolding → "crypto")', () => {

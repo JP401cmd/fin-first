@@ -58,7 +58,7 @@ describe('parseLocationTime', () => {
   })
 })
 
-import { avgDailyExpense, freedomDays } from './transaction-display'
+import { avgDailyExpense, dayFreedomLabel, freedomDays, groupByDay } from './transaction-display'
 
 describe('avgDailyExpense + freedomDays', () => {
   const txns = [
@@ -73,6 +73,55 @@ describe('avgDailyExpense + freedomDays', () => {
   it('vrijheidsdagen = bedrag / dag-uitgave', () => {
     expect(freedomDays(180, 90)).toBeCloseTo(2)
     expect(freedomDays(100, 0)).toBe(0)
+  })
+})
+
+describe('dayFreedomLabel — dagkop deelt één grondslag met het euro-bedrag (M20)', () => {
+  // Het exacte scenario uit de bevinding: één dag met €507,64 freelance-inkomsten
+  // en €28,61 uitgaven, bij een dagtarief van ~€95/dag.
+  const gemeldeDag = [
+    { date: '2026-08-20', amount: 507.64, transaction_type: null },
+    { date: '2026-08-20', amount: -28.61, transaction_type: null },
+  ]
+  const daily = 95
+
+  it('rekent op het netto dagbedrag, niet op de bruto uitgaven', () => {
+    const [g] = groupByDay(gemeldeDag)
+    const net = g.incomeTotal - g.expenseTotal
+    expect(net).toBeCloseTo(479.03, 2)
+    // Vóór de fix: freedomDays(g.expenseTotal, daily) ≈ 0,3 naast "+ €479,03".
+    expect(freedomDays(g.expenseTotal, daily)).toBeCloseTo(0.3, 1)
+    // Na de fix volgen dagen en euro's dezelfde teller: 479,03 / 95 ≈ 5,0.
+    expect(dayFreedomLabel(net, daily)).toBe('≈ 5,0 vrijheidsdagen erbij')
+  })
+
+  it('labelt een netto-uitgavendag als "kwijt" en laat die ongewijzigd', () => {
+    const [g] = groupByDay([{ date: '2026-06-05', amount: -82.4, transaction_type: null }])
+    const net = g.incomeTotal - g.expenseTotal
+    expect(net).toBeCloseTo(-82.4, 2)
+    // Zuivere uitgavendag: netto == -expenseTotal, dus hetzelfde cijfer als vóór M20.
+    expect(dayFreedomLabel(net, 90)).toBe('≈ 0,9 vrijheidsdag kwijt')
+  })
+
+  it('meervoud volgt het afgeronde getal, niet de ruwe waarde', () => {
+    expect(dayFreedomLabel(-176.4, 90)).toBe('≈ 2,0 vrijheidsdagen kwijt') // 1,96 → 2,0
+    expect(dayFreedomLabel(-90, 90)).toBe('≈ 1,0 vrijheidsdag kwijt')
+  })
+
+  it('verbergt het dagental zodra bedragen gemaskeerd zijn', () => {
+    // dagen × dagtarief == het verborgen bedrag, dus het cijfer moet ook weg.
+    expect(dayFreedomLabel(479.03, daily, true)).toBe('≈ •••••• vrijheidsdagen erbij')
+    expect(dayFreedomLabel(-82.4, 90, true)).toBe('≈ •••••• vrijheidsdagen kwijt')
+    // Ook een bijna-nul-dag toont de regel: anders lekt '' dat het saldo minimaal is.
+    expect(dayFreedomLabel(-4, 90, true)).toBe('≈ •••••• vrijheidsdagen kwijt')
+    // Zonder dagtarief valt er niets te tonen — dat hangt niet van het bedrag af.
+    expect(dayFreedomLabel(-500, 0, true)).toBe('')
+  })
+
+  it('zwijgt bij een verwaarloosbaar of onbekend dagsaldo', () => {
+    expect(dayFreedomLabel(0, 90)).toBe('')
+    expect(dayFreedomLabel(-4, 90)).toBe('') // 0,04 dag → rondt af op 0,0
+    expect(dayFreedomLabel(-500, 0)).toBe('') // geen dagtarief bekend
   })
 })
 
@@ -99,7 +148,9 @@ describe('detectRecurring', () => {
   })
 })
 
-import { groupByDay, parseSmartQuery, monogram } from './transaction-display'
+// groupByDay wordt hierboven al geimporteerd (dayFreedomLabel-sectie) - een tweede
+// import van dezelfde naam is een TS2300-duplicaat.
+import { parseSmartQuery, monogram } from './transaction-display'
 
 describe('groupByDay', () => {
   it('groepeert + subtotalen, nieuw→oud', () => {

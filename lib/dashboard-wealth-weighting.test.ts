@@ -7,6 +7,8 @@ import {
   monthsCoveredFrom,
   weightedExpectedReturn,
   INVESTMENT_ASSET_TYPES,
+  INVESTED_ASSET_TYPES,
+  hasInvestedAssets,
   type WeightableAssetRow,
 } from './dashboard-wealth-weighting'
 import { computeSovereigntyLevel } from './feature-phases'
@@ -228,5 +230,33 @@ describe('computeSovereigntyLevel — runway op liquide pot (huis telt niet)', (
     expect(computeSovereigntyLevel(8_000, 2_000, 5, false)).toBe(
       computeSovereigntyLevel(8_000, 2_000, 5, false, 8_000),
     )
+  })
+})
+
+// ── hasInvestedAssets — "belegt deze gebruiker al?" (kaart H15) ──────────────
+describe('hasInvestedAssets', () => {
+  const rij = (asset_type: string, current_value: number): WeightableAssetRow => ({
+    asset_type,
+    current_value,
+  })
+
+  it('herkent een marktportefeuille', () => {
+    expect(hasInvestedAssets([rij('investment', 12_000)])).toBe(true)
+    expect(hasInvestedAssets([rij('crypto', 800)])).toBe(true)
+  })
+
+  it('leest cash, huis en pensioen niet als beleggen', () => {
+    // Pensioen is gestort, niet gekocht: het bewijst geen eigen beleggingskeuze
+    // (zelfde standpunt als NO_BASIS_TYPES in lib/asset-return.ts). Bewust een
+    // andere set dan INVESTMENT_ASSET_TYPES, die het rendement weegt.
+    expect(hasInvestedAssets([rij('retirement', 120_000)])).toBe(false)
+    expect(hasInvestedAssets([rij('cash', 50_000), rij('real_estate', 400_000)])).toBe(false)
+    expect((INVESTMENT_ASSET_TYPES as readonly string[]).includes('retirement')).toBe(true)
+    expect(INVESTED_ASSET_TYPES.has('retirement')).toBe(false)
+  })
+
+  it('telt een lege of waardeloze positie niet mee', () => {
+    expect(hasInvestedAssets([])).toBe(false)
+    expect(hasInvestedAssets([rij('investment', 0)])).toBe(false)
   })
 })

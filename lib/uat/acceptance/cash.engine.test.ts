@@ -123,7 +123,10 @@ describe('UAT Cash — acceptatiecriteria dekking', () => {
     // precedentie in `resolveAmountWithBasis` + de spaarquote die die grondslag
     // volgt, 'exact') en WF-CASH-61 (grenzenpot-reeksscore/prestatiebadge,
     // `computeSpendLimitScore` — pure motor op synthetische periodes, 'exact').
-    expect(workflows.length).toBe(61)
+    // 61 → 62: WF-CASH-62 (bevinding H6 — het /overzicht-widget en de
+    // figures-strip op /overzicht/cashflow tonen hetzelfde saldo voor hetzelfde
+    // venster, 'exact' via deriveRealMonthTotals + currentMonthSavingsRate).
+    expect(workflows.length).toBe(62)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {
@@ -196,7 +199,8 @@ describe('UAT Cash — acceptatiecriteria dekking', () => {
     // van beide krijgt een rij.
     // 35 → 37: WF-CASH-60 en WF-CASH-61 zijn beide 'exact' en krijgen elk een
     // CASH_ENGINE_CHECKS-rij.
-    expect(exactWorkflows.length).toBe(37)
+    // 37 → 38: WF-CASH-62 is 'exact' en krijgt een CASH_ENGINE_CHECKS-rij.
+    expect(exactWorkflows.length).toBe(38)
   })
 
   it('markeert de jitter-gebonden/AI/gebonden randgevallen met de juiste kind', () => {

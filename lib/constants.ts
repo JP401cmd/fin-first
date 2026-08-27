@@ -20,6 +20,9 @@ import type { AssetType } from '@/lib/asset-data'
 // (alleen type-imports) en importeert constants.ts NIET terug → geen cycle. Hiermee
 // zijn de NL-FIRE-belastingafgeleiden hieronder één-op-één afgeleid van de bron.
 import { BOX3_PARAMS, CURRENT_TAX_YEAR } from '@/lib/box3-data'
+// Het horizonplafond van de rekenkern (Excel-horizon-guard). Pure constanten-/
+// type-module zonder eigen imports → geen cycle. Zie HORIZON_PLAFOND_LEEFTIJD.
+import { MAX_AGE as KERNEL_MAX_AGE } from '@/lib/horizon-kernel/types'
 
 // ── Investment Assumptions ──────────────────────────────────────
 
@@ -362,6 +365,27 @@ export const WEERBAARHEID_SCHILD = 75
  * niet op de meting zelf (runBacktest blijft 0–1). Geen semantische drempel.
  */
 export const WEERBAARHEID_DISPLAY_MAX = 99
+
+// ── Horizon — plausibiliteitsgrenzen voor GETOONDE uitkomsten ──────────────
+//
+// Vangrails voor bevinding M6 ("onmogelijke uitkomsten worden als gewoon
+// resultaat gerenderd"). Dit zijn WEERGAVE-grenzen, geen financiële aannames:
+// de cijfers zelf komen canoniek uit de horizon-kernel. Ze staan hier zodat de
+// guard (`lib/horizon/outcome-guard.ts`) en elk oppervlak dezelfde grens delen.
+
+/**
+ * Het horizonplafond van de rekenkern: de FIRE-bisectie zoekt tussen de huidige
+ * leeftijd en leeftijd `MAX_AGE` (`solver.ts`: `clng((100 − leeftijd) · 12)`) en
+ * PARKEERT op die grens wanneer er geen FIRE-moment gevonden is. Een
+ * vrijheidsleeftijd ÓP of BÓVEN dit plafond is daarom nooit een echt antwoord maar
+ * de parkeerstand — die tonen we niet als getal.
+ *
+ * Bewust een ALIAS van de kernel-constante (`horizon-kernel/types.ts#MAX_AGE`,
+ * de Excel-horizon-guard) en geen eigen 100: twee losse getallen zouden precies
+ * de drift geven die deze vangrail moet vangen. `types.ts` is een pure
+ * type-/constanten-module zonder imports, dus dit legt geen cyclus.
+ */
+export const HORIZON_PLAFOND_LEEFTIJD: number = KERNEL_MAX_AGE
 
 // ── Volgende Stap — signaaldrempels (nudge) ─────────────────────
 //

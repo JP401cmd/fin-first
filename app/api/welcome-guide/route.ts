@@ -8,9 +8,11 @@ import {
   parseWelcomeGuideState,
   getVisibleScreens,
   reconcileCompleted,
+  deriveGuideStates,
   type WelcomeGuideConfig,
   type WelcomeGuideState,
 } from '@/lib/welcome-guide'
+import { loadAccountStatus } from '@/lib/account-status'
 
 // ── Welkomstgids — per-user API ─────────────────────────────────────────────
 // GET  → merged config (app_settings) + per-user staat (module_guide_state).
@@ -73,13 +75,23 @@ export async function GET() {
   const claims = await getAuthClaims(supabase)
   if (!claims) return unauthorized()
 
-  const config = await loadConfig(supabase)
-  const { raw } = await loadRawState(supabase, claims.sub)
-  const state = parseWelcomeGuideState(raw, config)
+  const [config, rawState, accountStatus] = await Promise.all([
+    loadConfig(supabase),
+    loadRawState(supabase, claims.sub),
+    loadAccountStatus(supabase, claims.sub),
+  ])
+  const state = parseWelcomeGuideState(rawState.raw, config)
   // Orphan-cleanup: drop afgevinkte ids van inmiddels verwijderde stappen.
   state.completedStepIds = reconcileCompleted(config, state.completedStepIds)
 
-  return NextResponse.json({ config, state })
+  // `derived` = wat de app al wéét (M1). Bewust naast `state`, nooit erin:
+  // afgeleide ids in de jsonb schrijven maakt uitvinken onmogelijk en laat een
+  // vinkje staan nadat de onderliggende data is verdwenen.
+  return NextResponse.json({
+    config,
+    state,
+    derived: deriveGuideStates(config, accountStatus),
+  })
 }
 
 // ── PUT ───────────────────────────────────────────────────────────────────────

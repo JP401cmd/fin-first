@@ -25,6 +25,7 @@
 import type { DashboardData } from '@/lib/types/dashboard'
 import type { ModuleId } from '@/lib/module-registry'
 import { TARGET_EMERGENCY_SALARY_MONTHS, emergencyScoreTargetMonths } from '@/lib/emergency-fund'
+import { budgetLimitStatus } from '@/lib/budget-alerts'
 
 // ── Lightweight input for server-side / snapshot usage ───────
 // Allows computing the health score without a full DashboardData bundle.
@@ -294,12 +295,37 @@ export function scoreTaxOptimization(
   return Math.round(vrijstellingScore * 0.4 + dragScore * 0.4 + allocScore * 0.2)
 }
 
-/** Budget-discipline: % of budget categories within their limit. */
+/**
+ * Telt de budget-discipline: hoeveel van de ACTIEVE categorieën (limiet > 0)
+ * bleven binnen hun limiet?
+ *
+ * Sinds bevinding H4 (eigenaar-besluit 26 aug 2026) levert
+ * `buildBudgetCategories` één entry per INDIVIDUELE categorie in plaats van
+ * drie type-sommen — de teller is dus letterlijk het getal dat de omschrijving
+ * belooft, en dezelfde populatie die de uitgaven-heatmap kleurt.
+ *
+ * De grensvergelijking loopt via de canonieke `budgetLimitStatus`
+ * (lib/budget-alerts.ts): exact-op-de-limiet is `'bereikt'`, géén
+ * overschrijding. Zonder die cent-tolerantie zou een vaste last waarvan de
+ * limiet per constructie gelijk is aan de afschrijving (lib/budget-plan-diff.ts)
+ * elke maand op float-ruis (1280.0000000000002 > 1280) als overschrijding
+ * tellen — bevinding H16, dezelfde valkuil.
+ */
+function budgetDisciplineTally(
+  budgetCategories: { limit: number; spent: number }[],
+): { active: number; within: number } {
+  const active = budgetCategories.filter(c => c.limit > 0)
+  return {
+    active: active.length,
+    within: active.filter(c => budgetLimitStatus(c.spent, c.limit) !== 'over').length,
+  }
+}
+
+/** Budget-discipline: % of individual budget categories within their limit. */
 function scoreBudgetDiscipline(budgetCategories: { limit: number; spent: number }[]): number {
-  const categories = budgetCategories.filter(c => c.limit > 0)
-  if (categories.length === 0) return 0 // caller treats no-budget as inactive (FR-5)
-  const withinBudget = categories.filter(c => c.spent <= c.limit).length
-  return Math.round((withinBudget / categories.length) * 100)
+  const { active, within } = budgetDisciplineTally(budgetCategories)
+  if (active === 0) return 0 // caller treats no-budget as inactive (FR-5)
+  return Math.round((within / active) * 100)
 }
 
 // ── Label ────────────────────────────────────────────────────
@@ -323,6 +349,16 @@ function getLabel(score: number): string {
 const BASE_WEIGHTS: Record<string, number> = {
   // Rondkomen (0.30)
   savings_rate: 0.20,
+  // GEWICHT OPNIEUW GETOETST bij H4 (26 aug 2026) en BEWUST op 0.10 gelaten.
+  // De pijler ging van drie type-sommen naar één entry per categorie. Dat maakt
+  // 'm fijner (bij ~33 categorieën verschuift één overschrijding de pijler ~3pp
+  // i.p.v. 33pp), niet zwaarder: hij meet nog steeds hetzelfde gedrag, alleen
+  // zonder de weg-middeling. Verhogen zou de score-herweging van ADR 0010
+  // openbreken zonder dat de indicator méér is gaan zeggen; verlagen zou de
+  // enige per-categorie-signalering in de score verder verdunnen.
+  // LET OP (bekende beperking, niet in deze kaart opgelost): een categorie met
+  // een limiet maar zonder besteding telt als "binnen de limiet". Veel ongebruikte
+  // categorieën tillen de pijler dus omhoog. Zie de kaartnotitie H4 punt 3.
   budget_discipline: 0.10,
   // Buffer (0.20)
   emergency_fund: 0.20,
@@ -536,9 +572,9 @@ export function computeHealthScoreFromInputs(
   const savingsRateScore = scoreSavingsRate(input.savingsRate6m)
 
   // Budgetdiscipline — inactief zonder budgetten (FR-5; geen 70-dummy meer).
-  const budgetCats = input.budgetCategories.filter(c => c.limit > 0)
-  const budgetWithin = budgetCats.filter(c => c.spent <= c.limit).length
-  const budgetTotal = budgetCats.length
+  // Teller en score komen uit DEZELFDE tally, zodat de rawValue ("32/33") nooit
+  // een andere lezing kan krijgen dan het percentage ernaast (H4 punt 3).
+  const { active: budgetTotal, within: budgetWithin } = budgetDisciplineTally(input.budgetCategories)
   const budgetScore = scoreBudgetDiscipline(input.budgetCategories)
   if (budgetTotal === 0) inactiveByData.add('budget_discipline')
 
@@ -604,7 +640,7 @@ export function computeHealthScoreFromInputs(
       budgetTotal === 0
         ? 'Stel budgetten in voor je belangrijkste uitgavencategorieën.'
         : budgetWithin < budgetTotal
-        ? 'Er zijn budgetten overschreden — bekijk de kassabon voor details.'
+        ? `${budgetTotal - budgetWithin} van je ${budgetTotal} categorieën zit over de limiet — kijk in de heatmap welke.`
         : 'Alle budgetten binnen de limiet — goed gedisciplineerd!',
       budgetTotal > 0 ? `${budgetWithin}/${budgetTotal}` : 'Geen budget',
     ),

@@ -297,6 +297,29 @@ describe('BriefingPanel — wekelijkse-briefing header + ververs', () => {
     expect(screen.getByText(/Bijgewerkt/i)).toBeTruthy()
   })
 
+  // H5: het freeze-model is by design, maar zonder deze hint leest de divergentie
+  // tussen bevroren briefingtekst en live gezondheidspijler als een tegenspraak.
+  it('toont de versheidshint bij dataChanged, met verversverwijzing als dat mag', () => {
+    render(
+      <BriefingPanel
+        entries={[makeEntry('observation', 'X')]}
+        refreshedAt={new Date().toISOString()}
+        dataChanged
+      />,
+    )
+    expect(screen.getByText(/je cijfers zijn sindsdien veranderd/i)).toBeTruthy()
+  })
+
+  it('zwijgt over versheid wanneer dataChanged false is', () => {
+    render(
+      <BriefingPanel
+        entries={[makeEntry('observation', 'X')]}
+        refreshedAt={new Date().toISOString()}
+      />,
+    )
+    expect(screen.queryByText(/je cijfers zijn sindsdien veranderd/i)).toBeNull()
+  })
+
   it('toont altijd een Deel-knop in de header', () => {
     render(<BriefingPanel entries={[makeEntry('observation', 'X')]} />)
     expect(screen.getByRole('button', { name: /deel je vrijheidsweek/i })).toBeTruthy()

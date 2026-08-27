@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { FirePrognoseWidget } from './fire-prognose-widget'
 import type { DashboardData } from './widget-renderer'
+// Grondslag-labels uit de gedeelde bron (kaart H7): dit is een AANNAME per jaar.
+import { RETURN_BASIS_LABELS } from '@/lib/asset-return'
 
 // Stuurbaar perspectief — default personal (zelfde als buiten de provider).
 const mockPerspective = { perspective: 'personal' as string, partnerName: null as string | null }
@@ -69,7 +71,6 @@ function makeData(overrides: Partial<DashboardData> = {}): DashboardData {
     expenseHistory: [],
     budgetTypeHistory: { income: [], expense: [], savings: [], debt: [] },
     assetsByType: [],
-    totalPurchaseValue: 0,
     fireRange: null,
     freedomMilestones: null,
     simRows: null,
@@ -153,7 +154,7 @@ describe('FirePrognoseWidget — gewogen portefeuille-rendement i.p.v. 7% / NL-F
     const data = makeData({ grossReturn: 0.07, inflationRate: 0.02, assetsByType: PORTFOLIO })
     render(<FirePrognoseWidget size="full" data={data} />)
     // 60k@7% + 40k@0% over 100k = 4,2% — het gewogen getal, niet 7,0%.
-    expect(screen.getByText('Verwacht rendement (portefeuille)')).toBeInTheDocument()
+    expect(screen.getByText(RETURN_BASIS_LABELS.expectedAnnual.label)).toBeInTheDocument()
     expect(screen.getByText('4.2%')).toBeInTheDocument()
     expect(screen.queryByText('7.0%')).not.toBeInTheDocument()
   })

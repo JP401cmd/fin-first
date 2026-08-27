@@ -13,13 +13,19 @@
  */
 
 import { formatCurrency } from '@/lib/format'
+import { HORIZON_MISSENDE_GEGEVENS_LABEL } from '@/lib/horizon/outcome-guard'
 import { formatFireAgeShort } from '@/lib/horizon-data'
 
 export interface ConceptTerugrekeningProps {
   /** Fractionele FIRE-leeftijd; bepaalt waar het ankerpunt op de x-as valt. */
   fireAgeFractional: number | null
-  /** Het echte benodigd vermogen (ankerbedrag) bij de FIRE-leeftijd. */
-  requiredFirePortfolio: number
+  /**
+   * Het echte benodigd vermogen (ankerbedrag) bij de FIRE-leeftijd. `null` wanneer
+   * de aanroeper de M6-vangrail heeft laten vallen (`guardFireTarget`): het diagram
+   * toont dan de gegevensmelding i.p.v. een bedrag. De guard-BESLISSING hoort bij de
+   * aanroeper — dit component beslist niets, het volgt.
+   */
+  requiredFirePortfolio: number | null
   /** Of er een AOW/pensioen-inkomensbodem meespeelt (beïnvloedt de bijschrift). */
   hasIncomeFloor: boolean
 }
@@ -30,7 +36,10 @@ export function ConceptTerugrekening({
   hasIncomeFloor,
 }: ConceptTerugrekeningProps) {
   const ageLabel = fireAgeFractional !== null ? formatFireAgeShort(fireAgeFractional) : 'jouw leeftijd'
-  const bedrag = formatCurrency(requiredFirePortfolio)
+  const bedrag =
+    requiredFirePortfolio === null
+      ? HORIZON_MISSENDE_GEGEVENS_LABEL
+      : formatCurrency(requiredFirePortfolio)
 
   // Ankerpunt op de dalende lijn (illustratief midden-rechts).
   const anchorX = 250
@@ -42,7 +51,11 @@ export function ConceptTerugrekening({
         viewBox="0 0 480 180"
         className="w-full max-w-[480px]"
         role="img"
-        aria-label={`Terugrekening: het benodigd vermogen daalt met de leeftijd; bij ${ageLabel} heb je ongeveer ${bedrag} nodig`}
+        aria-label={
+          requiredFirePortfolio === null
+            ? 'Terugrekening: het benodigd vermogen daalt met de leeftijd; we missen gegevens om jouw bedrag te berekenen'
+            : `Terugrekening: het benodigd vermogen daalt met de leeftijd; bij ${ageLabel} heb je ongeveer ${bedrag} nodig`
+        }
       >
         {/* assen */}
         <line x1="40" y1="20" x2="40" y2="150" stroke="var(--ink-4)" strokeWidth="1" />

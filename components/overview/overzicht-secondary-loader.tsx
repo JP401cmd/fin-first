@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { loadDashboardData } from '@/lib/dashboard-data-loader'
-import { withCanonicalHealthScore } from '@/lib/overview/canonical-health'
+import { withCanonicalOverviewFigures } from '@/lib/overview/canonical-health'
 import { loadFinData } from '@/lib/fin-data-loader'
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
 import type { Perspective } from '@/lib/household-data'
@@ -25,6 +25,7 @@ import type { BriefingWeekHistoryItem } from '@/components/overview/briefing-pan
 import type { HefbomenHousingSplit } from './overzicht-hero/hefbomen-nav'
 import { MiniNetWorthChart } from './mini-networth-chart'
 import { dailyExpenseRate } from '@/lib/format'
+import { hasInvestedAssets } from '@/lib/dashboard-wealth-weighting'
 import { OverzichtSecondary } from './overzicht-secondary'
 
 // Stabiele lege-array-referentie voor de mini-vermogen-grafiek — voorkomt dat
@@ -54,7 +55,6 @@ export async function OverzichtSecondaryLoader({
   perspective,
   userId,
   horizonData,
-  health,
   freedomPct,
   currentAge,
   currentNetWorth,
@@ -63,8 +63,13 @@ export async function OverzichtSecondaryLoader({
   supabase: SupabaseClient
   perspective: Perspective
   userId: string | null
+  /**
+   * De volledige canonieke Horizon-bundel uit blok 1. Levert niet alleen de
+   * briefing-context maar óók de drie kerngetallen die de widget-bundel
+   * overschrijven (`withCanonicalOverviewFigures`): gezondheidsscore,
+   * vrijheids-% en noodfonds. Vandaar dat er geen losse `health`-prop meer is.
+   */
   horizonData: HorizonPageData | null
-  health: HorizonPageData['healthScore'] | null
   freedomPct: number | null
   currentAge: number | null
   /** Netto vermogen (perspectief-correct, blok 1) — basis voor de vrijheidstijd-briefing. */
@@ -103,11 +108,12 @@ export async function OverzichtSecondaryLoader({
     cookieStore.get(BRIEFING_ROTATION_COOKIE)?.value,
   )
 
-  // Gezondheidsscore — consume, don't recompute (zie lib/overview/canonical-
-  // health.ts). De widget-bundel berekent de score onafhankelijk én altijd
-  // persoonlijk → afwijking van de hero. Laat de widgets de canonieke,
-  // perspectief-correcte score uit horizonData (blok 1) tonen.
-  const dashboardData = withCanonicalHealthScore(rawDashboardData, health)
+  // Kerngetallen — consume, don't recompute (zie lib/overview/canonical-
+  // health.ts). De widget-bundel leidt gezondheidsscore, vrijheids-% én
+  // noodfonds onafhankelijk af en altijd persoonlijk → afwijking van de hero en
+  // de kassabon (bevinding H4). Laat de widgets en de briefing de canonieke,
+  // perspectief-correcte waarden uit horizonData (blok 1) tonen.
+  const dashboardData = withCanonicalOverviewFigures(rawDashboardData, horizonData)
 
   // Perspectief-override voor de getallen die uit dashboardData komen (freedom-
   // time-uitgaven + briefing). Vermogen/vrijheid% komen al perspectief-correct
@@ -212,7 +218,11 @@ export async function OverzichtSecondaryLoader({
   // en rondt alleen de weergave af. Rond hier dus niets zelf af en geef
   // `fireAgeDisplay` nooit door aan een drempel — dat was WF-CANON-03, waarbij
   // een afgeronde 45,3 "financieel vrij" tot 6 maanden te vroeg liet omslaan.
-  const { fireAgeDisplay, framing: freedomFraming } = resolveFreedomAgeView({
+  //
+  // M6: `dataIssue` is waar zodra de motor een leeftijd gaf die niet kán kloppen
+  // (op/voorbij het horizonplafond). Dan toont de strip een gegevensmelding i.p.v.
+  // een aftelling — het probleem verdwijnt niet stilletjes uit beeld.
+  const { fireAgeDisplay, framing: freedomFraming, dataIssue: freedomDataIssue } = resolveFreedomAgeView({
     fireAgeFractional: dashboardData.fireAgeFractional ?? null,
     freedomPct,
     currentAge,
@@ -236,6 +246,7 @@ export async function OverzichtSecondaryLoader({
         currentAge={currentAge}
         fireAge={fireAgeDisplay}
         freedomFraming={freedomFraming}
+        freedomDataIssue={freedomDataIssue}
         briefingEntries={briefingEntries}
         briefingRefreshedAt={briefingRefreshedAt}
         briefingDataChanged={briefingDataChanged}
@@ -248,6 +259,10 @@ export async function OverzichtSecondaryLoader({
         activeWidgets={activeWidgets}
         allWidgetPrefs={allWidgetPrefs}
         liquidCash={liquidCash}
+        // H15: de compound-CTA conditioneert op "belegt al", niet alleen op
+        // cash. Hier afgeleid uit de al geladen `horizonData` — geen extra
+        // query en geen tweede lezing (hasInvestedAssets is de ene bron).
+        hasInvestments={hasInvestedAssets(horizonData?.assets ?? [])}
       />
     </>
   )

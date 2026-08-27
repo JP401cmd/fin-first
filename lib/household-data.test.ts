@@ -13,7 +13,6 @@ import {
   computePerspectiveNetWorth,
   debtShareFraction,
   formatOwnershipSubline,
-  dailyExpensesByPerspective,
 } from './household-data'
 
 describe('deriveProvenance', () => {
@@ -114,18 +113,8 @@ describe('formatOwnershipSubline', () => {
   })
 })
 
-describe('dailyExpensesByPerspective', () => {
-  const monthly = { personal: 1500, household: 3600 }
-  it('eigen → mijn dag-uitgaven', () => {
-    expect(dailyExpensesByPerspective(monthly, 'personal')).toBeCloseTo(50, 10) // 1500/30
-  })
-  it('huishouden → gecombineerd', () => {
-    expect(dailyExpensesByPerspective(monthly, 'household')).toBeCloseTo(120, 10) // 3600/30
-  })
-  it('partner → afgeleid als household - personal wanneer geen expliciete waarde', () => {
-    expect(dailyExpensesByPerspective(monthly, 'partner')).toBeCloseTo(70, 10) // (3600-1500)/30
-  })
-  it('partner → expliciete waarde heeft voorrang', () => {
-    expect(dailyExpensesByPerspective({ ...monthly, partner: 900 }, 'partner')).toBeCloseTo(30, 10)
-  })
-})
+// `dailyExpensesByPerspective` is met M22 verwijderd: het was de tweede
+// €→vrijheidstijd-noemer (maanduitgaven ÷ 30 op budget-LIMIETEN) naast de
+// canonieke (`lib/expense-rate.ts`, 12-mnd rolling gerealiseerd ×12/365).
+// De noemer-regel zelf wordt nu getoetst in lib/household-tax.test.ts en in
+// de regressiesuite `identiteit-household`.

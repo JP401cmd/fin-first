@@ -194,3 +194,42 @@ describe('masking-bypass regressies', () => {
     expect(errorNode.textContent).not.toMatch(/500/)
   })
 })
+
+// ── M5: prognose-weergave (approx) ────────────────────────────────────────
+describe('<MaskedAmount approx> — prognose-kopgetal', () => {
+  it('rondt af op significante cijfers en zet "ca." ervoor', () => {
+    const { container } = renderInProvider(<MaskedAmount value={676_698} approx />)
+    // Het kopgetal toont de benadering, niet de euro-exacte uitkomst.
+    expect(container.textContent).toContain(formatCurrency(680_000))
+    expect(container.textContent).not.toContain(formatCurrency(676_698))
+    expect(container.textContent).toContain('ca.')
+  })
+
+  it('zet "ca." in een eigen, lichtere span — niet in de cijferstring', () => {
+    // Waarom dit gepind is: het voorbehoud mag niet meegroeien met een
+    // Playfair-black kopgetal van 28px; dan loopt de KPI-cel over en leest het
+    // voorbehoud even luid als het antwoord.
+    const { container } = renderInProvider(<MaskedAmount value={676_698} approx />)
+    const prefix = Array.from(container.querySelectorAll('span')).find(
+      (el) => el.textContent === 'ca.',
+    )
+    expect(prefix).toBeTruthy()
+    expect(prefix!.className).toContain('text-[var(--ink-3)]')
+  })
+
+  it('toont gemaskeerd alleen bullets — géén "ca."', () => {
+    const { container } = renderInProvider(<MaskedAmount value={676_698} approx />, { masked: true })
+    expect(container.textContent).toBe(MASKED_AMOUNT_PLACEHOLDER)
+  })
+
+  it('wint van decimals — een benadering met centen is een tegenspraak', () => {
+    const { container } = renderInProvider(<MaskedAmount value={676_698.49} approx decimals />)
+    expect(container.textContent).toContain(formatCurrency(680_000))
+    expect(container.textContent).not.toContain(',49')
+  })
+
+  it('laat de standaardweergave ongemoeid (geen approx = exact, geen prefix)', () => {
+    const { container } = renderInProvider(<MaskedAmount value={676_698} />)
+    expect(container.textContent).toBe(formatCurrency(676_698))
+  })
+})

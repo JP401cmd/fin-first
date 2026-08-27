@@ -12,6 +12,14 @@
 
 import { z } from 'zod'
 
+/**
+ * Bovengrens voor de optionele looptijd-invoer (`DebtQuickInput.term_years`),
+ * in jaren. Ruim boven elke realistische hypotheek-resttermijn en daarmee
+ * vooral een typefout-vangnet; geëxporteerd zodat het wizard-veld exact
+ * dezelfde grens hanteert als de server-side validatie.
+ */
+export const MAX_TERM_YEARS = 50
+
 /** Must stay in sync with `AssetType` in `lib/asset-data.ts`. */
 const ASSET_TYPE_VALUES = [
   'cash',
@@ -102,6 +110,17 @@ export const DebtQuickInputSchema = z.object({
     .number()
     .finite()
     .min(0, 'Bedrag mag niet negatief zijn')
+    .nullable()
+    .optional(),
+  // Hypotheek-only: resterende looptijd in jaren vanaf vandaag. Optioneel
+  // zodat andere schuldtypes (en oudere call-sites) ongemoeid blijven;
+  // `buildDebtDraft` valt terug op `DEFAULT_TERM_YEARS_PER_TYPE` wanneer dit
+  // ontbreekt. Bovengrens 50 sluit typefouten uit (bv. maanden i.p.v. jaren).
+  term_years: z
+    .number()
+    .finite()
+    .min(1, 'Looptijd moet minstens 1 jaar zijn')
+    .max(MAX_TERM_YEARS, `Looptijd mag hoogstens ${MAX_TERM_YEARS} jaar zijn`)
     .nullable()
     .optional(),
 })

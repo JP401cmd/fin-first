@@ -7,6 +7,7 @@ import { MaskedAmount } from '@/components/app/masked-amount'
 import { calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
 import { DEFAULT_RETURN } from '@/lib/constants'
 import { weightedExpectedReturn, INVESTMENT_ASSET_TYPES } from '@/lib/dashboard-wealth-weighting'
+import { RETURN_BASIS_LABELS, formatGainPct } from '@/lib/asset-return'
 import { TrendingUp } from 'lucide-react'
 
 interface Props {
@@ -25,17 +26,24 @@ const ASSET_LABELS: Record<string, string> = {
 export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget({ size, data, href }: Props) {
   const investmentAssets = data.assetsByType.filter(a => (INVESTMENT_ASSET_TYPES as readonly string[]).includes(a.type))
   const totalInvestmentValue = investmentAssets.reduce((s, a) => s + a.value, 0)
-  const totalInvestmentCost = investmentAssets.reduce((s, a) => s + a.purchaseValue, 0)
 
-  // Cost basis (aankoopwaarde) is required to express a return. Zonder kostprijs
-  // is "0%" misleidend — dan tonen we "onbekend" i.p.v. een schijnrendement.
-  const hasCostBasis = totalInvestmentCost > 0
+  // GEREALISEERD RENDEMENT — uit de canonieke motor via de bundel (kaart H7).
+  // Hiervóór rekende deze widget zijn eigen `Σ value − Σ purchaseValue` over
+  // investment + retirement + crypto. Twee dingen gingen daar mis: (1) een
+  // PENSIOENPOT heeft geen kostprijsbegrip — wat er staat is gestort, niet
+  // gekocht — dus met `purchase_value = 0` telde de hele pot als winst
+  // (gemeten op een productierij: +100,9% i.p.v. +36,1%); (2) de kostprijs kwam
+  // uit het met de hand ingetypte `purchase_value` in plaats van uit de
+  // transactie-onderbouwde holdings. `lib/asset-return.ts` lost beide op en is
+  // dezelfde motor als de kop-KPI op /overzicht/bezittingen — één getal, één
+  // grondslag, twee schermen.
+  const portfolio = data.assetReturn
 
-  // Since-inception return (value én purchaseValue zijn inclusion-gewogen in de bundel)
-  const sinceInceptionReturn = hasCostBasis
-    ? ((totalInvestmentValue - totalInvestmentCost) / totalInvestmentCost) * 100
-    : 0
-  const sinceInceptionAbsolute = totalInvestmentValue - totalInvestmentCost
+  // Zonder kostprijs is "0%" misleidend — dan tonen we "onbekend" i.p.v. een
+  // schijnrendement.
+  const hasCostBasis = portfolio.cost > 0
+  const sinceInceptionReturn = portfolio.pct ?? 0
+  const sinceInceptionAbsolute = portfolio.gain
 
   // Verwacht rendement: asset-gewogen uit de canonieke bundel (assetsByType[].expectedReturn)
   // via de gedeelde helper — profiel-breed grossReturn alleen als fallback. Zelfde
@@ -59,8 +67,12 @@ export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget
     : sinceInceptionReturn >= 0
       ? 'text-positive'
       : 'text-negative'
-  const signPrefix = sinceInceptionReturn >= 0 ? '+' : ''
-  const returnLabel = hasCostBasis ? `${signPrefix}${sinceInceptionReturn.toFixed(1)}%` : 'onbekend'
+  // Eén formatter voor élk rendementspercentage (lib/asset-return.ts): zelfde
+  // afronding en nl-NL-komma als de KPI en de rekenmodal.
+  const returnLabel = hasCostBasis ? (formatGainPct(portfolio.pct) ?? 'onbekend') : 'onbekend'
+  // Grondslag in het label — gedeelde bron, geen eigen tekst per oppervlak.
+  const basisLabel = RETURN_BASIS_LABELS.portfolioSincePurchase
+  const expectedLabel = RETURN_BASIS_LABELS.expectedAnnual
 
   // Empty state: no investment assets at all
   if (investmentAssets.length === 0) {
@@ -72,9 +84,11 @@ export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget
   }
 
   // ── Mini: since-inception return % ────────────────────────────
+  // Kicker draagt de grondslag: op mini past geen sublabel, en een kaal
+  // "Rendement" is precies de dubbelzinnigheid die kaart H7 wegneemt.
   if (size === 'mini') {
     return (
-      <WidgetShell module="kern" size="mini" kicker="Rendement" href={href}>
+      <WidgetShell module="kern" size="mini" kicker={basisLabel.compact} href={href}>
         <p className={`font-mono ${hasCostBasis ? 'text-[15px]' : 'text-[11px]'} font-semibold tabular-nums leading-none truncate ${returnColor}`}>
           {returnLabel}
         </p>
@@ -90,7 +104,7 @@ export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget
           {returnLabel}
         </p>
         <p className="mt-0.5 text-xs text-[var(--ink-3)]">
-          {hasCostBasis ? 'totaalrendement' : 'aankoopwaarde onbekend'}
+          {hasCostBasis ? basisLabel.label : 'aankoopwaarde onbekend'}
         </p>
         {hasCostBasis && (
           <p className={`mt-1 ${returnColor}`}>
@@ -106,30 +120,36 @@ export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget
     )
   }
 
+  // Per-type uitsplitsing — de rollup uit de MOTOR (summarizePortfolioReturn),
+  // niet opnieuw uit `assetsByType.purchaseValue` gerekend. Gevolg: een
+  // pensioenpot komt hier per definitie niet meer voor (dat type draagt geen
+  // kostprijsbegrip), en een rij die op de holdings-kostprijs rust telt met die
+  // kostprijs mee in plaats van met het handmatig ingevulde bedrag.
+  const typeRows = portfolio.byType
+
   // Per-type breakdown row renderer (shared by half/full)
-  const renderTypeRow = (asset: (typeof investmentAssets)[number]) => {
-    const rowHasCost = asset.purchaseValue > 0
-    const gain = asset.value - asset.purchaseValue
-    const pct = rowHasCost ? (gain / asset.purchaseValue) * 100 : 0
+  const renderTypeRow = (row: (typeof typeRows)[number]) => {
+    const rowHasCost = row.cost > 0
+    const pct = row.pct
     const rowColor = !rowHasCost
       ? 'text-[var(--ink-4)]'
-      : gain >= 0
+      : row.gain >= 0
         ? 'text-positive'
         : 'text-negative'
-    const label = ASSET_LABELS[asset.type] || asset.type
+    const label = ASSET_LABELS[row.type] || row.type
     return (
-      <div key={asset.type} className="flex items-center justify-between text-xs">
+      <div key={row.type} className="flex items-center justify-between text-xs">
         <span className="text-[var(--ink-3)] w-24 truncate">{label}</span>
         <span className="text-[var(--ink)]">
-          <MaskedAmount value={asset.value} tone="kern" />
+          <MaskedAmount value={row.value} tone="kern" />
         </span>
         {rowHasCost ? (
           <>
             <span className={rowColor}>
-              <MaskedAmount value={gain} tone="kern" />
+              <MaskedAmount value={row.gain} tone="kern" />
             </span>
             <span className={`font-mono tabular-nums w-16 shrink-0 text-right ${rowColor}`}>
-              {gain >= 0 ? '+' : ''}{pct.toFixed(1)}%
+              {formatGainPct(pct)}
             </span>
           </>
         ) : (
@@ -141,8 +161,8 @@ export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget
 
   // ── Full: extended overview with per-asset-type breakdown ─────
   if (size === 'full') {
-    const shown = investmentAssets.slice(0, 3)
-    const extra = investmentAssets.length - shown.length
+    const shown = typeRows.slice(0, 3)
+    const extra = typeRows.length - shown.length
 
     return (
       <WidgetShell module="kern" size={size} kicker="Beleggingsrendement" href={href}>
@@ -152,7 +172,7 @@ export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget
         </p>
         <p className="mt-0.5 text-xs text-[var(--ink-3)]">
           {hasCostBasis ? (
-            <>totaalrendement &middot; <MaskedAmount value={sinceInceptionAbsolute} tone="kern" /></>
+            <>{basisLabel.label} &middot; <MaskedAmount value={sinceInceptionAbsolute} tone="kern" /></>
           ) : (
             'aankoopwaarde onbekend'
           )}
@@ -166,7 +186,7 @@ export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget
         {/* Per-asset-type breakdown table */}
         <div className="mt-3">
           <p className="text-[10px] uppercase tracking-wide text-[var(--ink-4)] mb-1.5">
-            Rendement per type
+            {basisLabel.label} &middot; per type
           </p>
           <div className="space-y-1">
             {shown.map(renderTypeRow)}
@@ -178,7 +198,7 @@ export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget
 
         {/* Footer: expected return comparison */}
         <p className="mt-3 pt-2 border-t border-[var(--border-ed)] font-serif italic text-[11px] text-[var(--ink-3)]">
-          Verwacht rendement: {expectedReturnPct.toFixed(1)}%/jaar
+          {expectedLabel.label}: {expectedReturnPct.toFixed(1)}%
         </p>
       </WidgetShell>
     )
@@ -195,7 +215,7 @@ export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget
             {returnLabel}
           </p>
           <p className="mt-0.5 text-[11px] text-[var(--ink-3)]">
-            {hasCostBasis ? 'totaalrendement' : 'aankoopwaarde onbekend'}
+            {hasCostBasis ? basisLabel.label : 'aankoopwaarde onbekend'}
           </p>
           {hasCostBasis && (
             <p className={`mt-0.5 ${returnColor}`}>
@@ -220,7 +240,7 @@ export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget
             )
           })}
           <p className="font-serif italic text-[11px] text-[var(--ink-3)]">
-            Verwacht: {expectedReturnPct.toFixed(1)}%/jr
+            {expectedLabel.label}: {expectedReturnPct.toFixed(1)}%
           </p>
         </div>
       </div>

@@ -6,6 +6,7 @@ import { getEURRateSync } from '@/lib/forex'
 import { resolveHolding } from '@/lib/holdings-table-resolver'
 import { loadHoldingsPnL, attachPnLToHoldings } from '@/lib/holdings-pnl-enrichment'
 import { sumHoldingTotals, type HoldingTotalsRow } from '@/lib/holdings-totals'
+import { PURCHASE_DATE_FUTURE_ERROR, isPurchaseDateInFuture } from '@/lib/asset-parameter-bands'
 
 /**
  * GET /api/holdings — List user's investment holdings.
@@ -161,10 +162,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate numeric fields when provided
+    // `<= 0` en niet `< 0` (bevinding H8). Nul was hier toegestaan, maar de
+    // client stuurde 'm nooit: `Number(formUnits) || 1` maakte van een ingetypte
+    // 0 stilzwijgend één stuk. Wie 0 bedoelde kreeg dus een positie van 1, en
+    // wie de client omzeilde kreeg een positie zonder stukken die elke
+    // waardeberekening op 0 zet. Beide kanten dicht: de client stuurt de 0 nu
+    // door, en hier is het een expliciete 400.
     if (units !== undefined && units !== null) {
       const n = Number(units)
-      if (isNaN(n) || n < 0) {
-        return NextResponse.json({ error: 'Units moet een positief getal zijn' }, { status: 400 })
+      if (isNaN(n) || n <= 0) {
+        return NextResponse.json({ error: 'Aantal stuks moet groter dan 0 zijn' }, { status: 400 })
       }
     }
 
@@ -201,6 +208,13 @@ export async function POST(request: NextRequest) {
       if (isNaN(n) || n < 0 || n > 0.10) {
         return NextResponse.json({ error: 'TER moet een getal zijn tussen 0 en 0.10 (0% - 10%)' }, { status: 400 })
       }
+    }
+
+    // Een aankoopdatum in de toekomst bestaat niet (bevinding H8). Het
+    // `max`-attribuut op het datumveld is een suggestie die een geplakte of
+    // getypte waarde niet tegenhoudt; dit is de grens.
+    if (typeof purchase_date === 'string' && purchase_date !== '' && isPurchaseDateInFuture(purchase_date)) {
+      return NextResponse.json({ error: PURCHASE_DATE_FUTURE_ERROR }, { status: 400 })
     }
 
     // Validate ter_source field when provided
@@ -319,6 +333,10 @@ export async function POST(request: NextRequest) {
       name,
       ticker: ticker || null,
       isin: isin || null,
+      // `|| 1` vangt nu alléén nog `units === undefined` (= veld niet ingevuld):
+      // 0 en negatief zijn hierboven al met een 400 afgewezen. Dat die default
+      // 1 is en niet 0 is een bestaande keuze — een positie zonder stukken is
+      // voor elke waardeberekening nul.
       units: Number(units) || 1,
       avg_purchase_price: Number(avg_purchase_price) || 0,
       current_price: current_price != null ? Number(current_price) : null,
@@ -414,6 +432,10 @@ export async function PATCH(request: NextRequest) {
     if (body.current_price !== undefined && body.current_price !== null && isNaN(Number(body.current_price))) {
       return NextResponse.json({ error: 'Huidige prijs moet een getal zijn' }, { status: 400 })
     }
+    // BEWUST asymmetrisch met POST hierboven, die `units <= 0` weigert: bij
+    // BIJWERKEN is 0 een legitieme eindstand (een uitverkochte positie — 95 van
+    // de 115 geïmporteerde posities op productie staan zo). Trek deze twee niet
+    // naar elkaar toe zonder dat af te wegen.
     if (body.units !== undefined && body.units !== null && isNaN(Number(body.units))) {
       return NextResponse.json({ error: 'Units moet een getal zijn' }, { status: 400 })
     }

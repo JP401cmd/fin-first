@@ -5,6 +5,7 @@ import {
   margeAnkerKort,
   margeAnkerZin,
   margeKort,
+  MARGE_EENHEID,
   margeLegenda,
   margeZin,
 } from '@/lib/horizon/marktcheck-copy'
@@ -30,26 +31,49 @@ function marge(over: Partial<RendementMarge> = {}): RendementMarge {
 }
 
 describe('Marktcheck-copy — de pil-waarde', () => {
-  it('Given speling, When de korte vorm wordt gelezen, Then staat er een positief percentage met nl-NL-komma', () => {
-    expect(margeKort(marge({ marge: 0.018 }))).toBe('1,8%')
-    expect(margeKort(marge({ marge: 0.064 }))).toBe('6,4%')
+  it('Given speling, When de korte vorm wordt gelezen, Then staat er een positief getal met nl-NL-komma én de eenheid', () => {
+    expect(margeKort(marge({ marge: 0.018 }))).toBe(`1,8 ${MARGE_EENHEID}`)
+    expect(margeKort(marge({ marge: 0.064 }))).toBe(`6,4 ${MARGE_EENHEID}`)
   })
 
   it('Given een tekort, When de korte vorm wordt gelezen, Then draagt het getal een minteken', () => {
-    expect(margeKort(marge({ marge: -0.029 }))).toBe('−2,9%')
+    expect(margeKort(marge({ marge: -0.029 }))).toBe(`−2,9 ${MARGE_EENHEID}`)
   })
 
-  it('Given een marge binnen de afronding van nul, When de korte vorm wordt gelezen, Then staat er `0%` en géén `−0%`', () => {
+  it('Given een marge binnen de afronding van nul, When de korte vorm wordt gelezen, Then staat er `0` en géén `−0`', () => {
     // Dit is precies wat je ziet als je stopleeftijd samenvalt met de gesolvede
     // FIRE-leeftijd: het plan gaat per constructie precies op. Zonder deze
     // afronding zou het teken van de zoekruis op het scherm belanden.
-    expect(margeKort(marge({ marge: -0.00004 }))).toBe('0%')
-    expect(margeKort(marge({ marge: 0.00004 }))).toBe('0%')
+    expect(margeKort(marge({ marge: -0.00004 }))).toBe(`0 ${MARGE_EENHEID}`)
+    expect(margeKort(marge({ marge: 0.00004 }))).toBe(`0 ${MARGE_EENHEID}`)
   })
 
   it('Given een begrensde uitkomst, When de korte vorm wordt gelezen, Then staat er een grens en geen schijnprecisie', () => {
-    expect(margeKort(marge({ marge: RENDEMENT_MARGE_GRENS, begrensd: 'boven' }))).toBe('>15%')
-    expect(margeKort(marge({ marge: -RENDEMENT_MARGE_GRENS, begrensd: 'onder' }))).toBe('<−15%')
+    expect(margeKort(marge({ marge: RENDEMENT_MARGE_GRENS, begrensd: 'boven' }))).toBe(`>15 ${MARGE_EENHEID}`)
+    expect(margeKort(marge({ marge: -RENDEMENT_MARGE_GRENS, begrensd: 'onder' }))).toBe(`<−15 ${MARGE_EENHEID}`)
+  })
+
+  // ── H21/F2 ─ de eenheid mag nooit ontbreken ──────────────────────────────
+  // De bevinding: op /toekomst stond `4,1%` naast een `99% succeskans`-widget.
+  // Twee grootheden uit twee motoren onder één teken — de marge las als een
+  // rampzalige slaagkans terwijl het juist een gezonde speling is. De eenheid
+  // hoort daarom IN de waarde te zitten, niet in het label ernaast (dat viel op
+  // smal scherm weg).
+  it('Given élke uitkomst, When de pil-waarde wordt gelezen, Then draagt hij de eenheid en nooit een kaal procentteken', () => {
+    const gevallen = [
+      marge({ marge: 0.041 }),
+      marge({ marge: -0.029 }),
+      marge({ marge: 0.00004 }),
+      marge({ marge: RENDEMENT_MARGE_GRENS, begrensd: 'boven' }),
+      marge({ marge: -RENDEMENT_MARGE_GRENS, begrensd: 'onder' }),
+    ]
+    for (const m of gevallen) {
+      const kort = margeKort(m)
+      expect(kort).toContain(MARGE_EENHEID)
+      // Niets in de vorm `4,1%` — een getal dat direct door een procentteken
+      // wordt gevolgd is precies de vorm die als kans gelezen wordt.
+      expect(kort).not.toMatch(/\d%(?!pt)/)
+    }
   })
 })
 

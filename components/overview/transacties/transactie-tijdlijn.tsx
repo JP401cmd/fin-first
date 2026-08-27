@@ -5,7 +5,7 @@ import { AccountSourceIcon, accountSourceSuffix } from '@/components/core/accoun
 import type { BankLinkState } from '@/lib/bank-connection-status'
 import {
   cleanMerchantName, deriveType, parseLocationTime, avgDailyExpense,
-  freedomDays, detectRecurring, groupByDay, monogram, parseSmartQuery, type TxKind,
+  dayFreedomLabel, detectRecurring, groupByDay, monogram, parseSmartQuery, type TxKind,
 } from '@/lib/transaction-display'
 import { formatCurrencyDecimals, MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
@@ -51,11 +51,6 @@ function dayHeader(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number)
   const dow = (new Date(y, m - 1, d).getDay() + 6) % 7
   return `${WD[dow]} ${d} ${MO[m - 1]}`
-}
-function freedomLabel(days: number): string {
-  if (days <= 0) return ''
-  const v = days.toFixed(1).replace('.', ',')
-  return `≈ ${v} vrijheidsdag${days >= 2 ? 'en' : ''}`
 }
 
 // nl-NL bedrag-formatter voor de FX-subregel (vreemde valuta, geen euro-glyph).
@@ -245,20 +240,27 @@ export function TransactieTijdlijn({ transactions, windowDays, accounts, selecte
         <NoResultsEmpty onClear={clearAll} />
       ) : (
         <div role="list" className="space-y-4">
-          {cappedGroups.map((g) => (
-            <div key={g.date}>
-              <div className="flex items-baseline justify-between border-b border-[var(--ink)] pb-1">
-                <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--ink-3)]" aria-label={dayHeader(g.date)}>{dayHeader(g.date)}</span>
-                <span className="font-mono text-[11px] text-[var(--ink-3)] tabular-nums">
-                  {g.incomeTotal - g.expenseTotal >= 0 ? '+' : '−'} {masked ? MASKED_AMOUNT_PLACEHOLDER : formatCurrencyDecimals(Math.abs(g.incomeTotal - g.expenseTotal))}
-                  {daily > 0 && <span className="text-[var(--color-kern-700)]"> · {freedomLabel(freedomDays(g.expenseTotal, daily))}</span>}
-                </span>
+          {cappedGroups.map((g) => {
+            // Eén grondslag voor béide cijfers in de kop (M20): het euro-bedrag en de
+            // vrijheidsdagen lezen allebei dit netto dagbedrag. Vroeger stond hier het
+            // netto bedrag naast dagen uit `expenseTotal` — twee definities in één regel.
+            const net = g.incomeTotal - g.expenseTotal
+            const freedom = dayFreedomLabel(net, daily, masked)
+            return (
+              <div key={g.date}>
+                <div className="flex items-baseline justify-between border-b border-[var(--ink)] pb-1">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--ink-3)]" aria-label={dayHeader(g.date)}>{dayHeader(g.date)}</span>
+                  <span className="font-mono text-[11px] text-[var(--ink-3)] tabular-nums">
+                    {net >= 0 ? '+' : '−'} {masked ? MASKED_AMOUNT_PLACEHOLDER : formatCurrencyDecimals(Math.abs(net))}
+                    {freedom && <span className="text-[var(--color-kern-700)]"> · {freedom}</span>}
+                  </span>
+                </div>
+                <ul className="divide-y divide-dotted divide-[var(--border-ed)]">
+                  {g.rows.map((t) => <Row key={t.id} t={t} recurring={recurring.has(t.id)} onSelect={onSelect} masked={masked} />)}
+                </ul>
               </div>
-              <ul className="divide-y divide-dotted divide-[var(--border-ed)]">
-                {g.rows.map((t) => <Row key={t.id} t={t} recurring={recurring.has(t.id)} onSelect={onSelect} masked={masked} />)}
-              </ul>
-            </div>
-          ))}
+            )
+          })}
           {filtered.length > visibleCount && (
             <button
               type="button"

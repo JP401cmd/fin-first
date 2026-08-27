@@ -817,3 +817,9 @@
 ## 2026-08-26
 
 - **Componenten (aantal)** toegevoegd: +6
+
+## 2026-08-27
+
+- **API-routes** toegevoegd: /api/assets
+- **Tabellen** toegevoegd: import_idempotency
+- **Componenten (aantal)** toegevoegd: +10

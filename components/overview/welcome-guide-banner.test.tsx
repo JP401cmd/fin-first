@@ -117,6 +117,72 @@ describe('WelcomeGuideBanner', () => {
 })
 
 /**
+ * M1 — de gids weet wat de app al weet. De banner krijgt naast `state` een
+ * `derived`-map met de server-afgeleide stap-toestand; die moet in de teller
+ * meetellen en zichtbaar anders zijn dan een zelf gezet vinkje.
+ */
+describe('WelcomeGuideBanner — afgeleide voortgang', () => {
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+  })
+
+  const S1 = ['s1-bezittingen', 's1-schulden', 's1-budget', 's1-rekening']
+
+  function renderWithDerived(derived: Record<string, 'done' | 'open' | 'nvt'>) {
+    vi.stubGlobal('fetch', vi.fn())
+    return render(
+      <DisplayModeProvider initialMode="full">
+        <WelcomeGuideBanner
+          seed={{ config: DEFAULT_WELCOME_GUIDE, state: DEFAULT_WELCOME_GUIDE_STATE, derived }}
+        />
+      </DisplayModeProvider>,
+    )
+  }
+
+  it('gevuld account: teller staat op 4/4 zonder één handmatig vinkje', async () => {
+    renderWithDerived(Object.fromEntries(S1.map((id) => [id, 'done' as const])))
+    expect(await screen.findByText('Zijn al je bezittingen geregistreerd?')).toBeInTheDocument()
+    expect(screen.getByText(/4\/4 afgevinkt/)).toBeInTheDocument()
+  })
+
+  it('zonder afleiding blijft het 0/4 — het gedrag van vóór M1', async () => {
+    renderWithDerived({})
+    expect(await screen.findByText('Zijn al je bezittingen geregistreerd?')).toBeInTheDocument()
+    expect(screen.getByText(/0\/4 afgevinkt/)).toBeInTheDocument()
+  })
+
+  it('afgeleid vinkje is niet klikbaar en meldt zich als automatisch', async () => {
+    renderWithDerived({ 's1-bezittingen': 'done' })
+    expect(await screen.findByText('Zijn al je bezittingen geregistreerd?')).toBeInTheDocument()
+    // Geen knop meer voor deze stap — een afgeleid vinkje uitzetten kan niet.
+    expect(
+      screen.queryByRole('button', { name: /Markeer "Zijn al je bezittingen geregistreerd\?"/ }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByLabelText(/automatisch afgevinkt op basis van je gegevens/),
+    ).toBeInTheDocument()
+    // Een stap zonder afleiding blijft gewoon handmatig afvinkbaar.
+    expect(
+      screen.getByRole('button', { name: /Markeer "Zijn al je schulden geregistreerd\?"/ }),
+    ).toBeInTheDocument()
+  })
+
+  it("'n.v.t.' valt buiten de teller en is niet groen", async () => {
+    renderWithDerived({
+      's1-bezittingen': 'done',
+      's1-schulden': 'nvt',
+      's1-budget': 'done',
+      's1-rekening': 'done',
+    })
+    expect(await screen.findByText('Zijn al je bezittingen geregistreerd?')).toBeInTheDocument()
+    expect(screen.getByText(/3\/3 afgevinkt/)).toBeInTheDocument()
+    expect(screen.getByText(/1 n\.v\.t\./)).toBeInTheDocument()
+    expect(screen.getByLabelText(/niet van toepassing/)).toBeInTheDocument()
+  })
+})
+
+/**
  * APP-6 (gids comprimeren in Eenvoudig) + APP-2 (de gids noemt de weergave-
  * keuze). De seed-route wordt gebruikt zodat er geen fetch aan te pas komt.
  */

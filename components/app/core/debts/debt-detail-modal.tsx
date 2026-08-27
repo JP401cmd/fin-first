@@ -39,6 +39,11 @@ import { DebtTrajectoryChart } from './debt-trajectory-chart'
 import HypotheekVsBeleggenModal from './hypotheek-vs-beleggen-modal'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { ChartTips } from '@/components/editorial/chart-tips'
+import { AannameHint } from '@/components/editorial/aanname-hint'
+import {
+  describeDebtTermBasis,
+  resolveDebtTermBasis,
+} from '@/lib/debt-term-basis'
 import { getDebtTrajectoryTips } from '@/lib/chart-tips'
 
 export function DebtDetailModal({
@@ -73,6 +78,10 @@ export function DebtDetailModal({
   embedded?: boolean
 }) {
   const [showHvB, setShowHvB] = useState(false)
+  // Grondslag van `end_date`: aflostijd, schuldenvrij-jaar en het geschatte
+  // maandbedrag rusten er alle drie op. `null` ⇒ de gebruiker vulde de
+  // einddatum zelf in en het getal is een gegeven, geen aanname.
+  const termBasisText = describeDebtTermBasis(resolveDebtTermBasis(debt))
   const { perspective } = usePerspective()
   const [partnerSplit, setPartnerSplit] = useState<{
     splitMode: SplitMode; mySharePct: number; myName: string; partnerName: string
@@ -283,6 +292,20 @@ export function DebtDetailModal({
                   : ''}
               </p>
             </div>
+          )}
+
+          {/* Waarop gebaseerd? — aflostijd, schuldenvrij-jaar en het
+              geschatte maandbedrag rusten alle drie op `end_date`. Staat die
+              op de stille type-default (of ontbreekt hij), dan hoort dat bij
+              het getal te staan i.p.v. verborgen te blijven tot iemand
+              toevallig het bewerkformulier opent. */}
+          {termBasisText && (
+            <AannameHint
+              subject="de aflostijd"
+              action={{ label: 'Einddatum aanpassen', onClick: onEdit }}
+            >
+              {termBasisText}
+            </AannameHint>
           )}
 
           <div className="grid grid-cols-2 gap-3">

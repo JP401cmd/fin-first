@@ -85,6 +85,17 @@ export interface DebtQuickInput {
    * (payment_plan via field3, belastingschuld, creditcard) laten dit leeg.
    */
   monthly_payment?: number | null
+  /**
+   * Resterende looptijd in hele jaren, geteld vanaf **vandaag** — optioneel
+   * uitgevraagd voor hypotheken. Vult geen eigen kolom: `buildDebtDraft`
+   * vertaalt hem naar `debts.end_date` (= vandaag + looptijd) én gebruikt hem
+   * als aflossingstermijn voor het geschatte maandbedrag, zodat de getoonde
+   * looptijd en maandlast op dezelfde termijn rusten.
+   * `undefined`/`null` ⇒ terugval op `DEFAULT_TERM_YEARS_PER_TYPE` (hypotheek
+   * = 30 jaar vanaf de ingangsdatum) — precies de stille aanname die dit veld
+   * corrigeerbaar maakt.
+   */
+  term_years?: number | null
 }
 
 export type QuickAddInput =

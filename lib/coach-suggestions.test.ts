@@ -6,6 +6,9 @@ import {
   COACH_RULE_COUNT,
   DEFAULT_COACH_TIMING,
   DEFAULT_COACH_HEADER,
+  PATH_SUGGESTIONS,
+  DATA_GAP_SUGGESTIONS,
+  isEstablishedAccount,
   type CoachDataGaps,
   type CoachOverrides,
 } from './coach-suggestions'
@@ -68,7 +71,8 @@ describe('getFirstUndismissedSuggestion priority', () => {
   it('falls through data gap -> path -> default', () => {
     expect(getFirstUndismissedSuggestion(empty(), '/overzicht/cashflow', none, [])?.key).toBe('gap_bank')
     expect(getFirstUndismissedSuggestion(full(), '/overzicht/cashflow', none, [])?.key).toBe('path_core')
-    expect(getFirstUndismissedSuggestion(full(), '/random', none, [])?.key).toBe('default')
+    // Gevuld account → de gevulde terugval, niet het first-use-welkom (H15).
+    expect(getFirstUndismissedSuggestion(full(), '/random', none, [])?.key).toBe('default_gevuld')
   })
 
   it('specific path wins over broad path', () => {
@@ -132,10 +136,12 @@ describe('module-gated data gaps (absorbed nudges)', () => {
     })
 
     it(`${c.key} is skipped when its module is NOT active`, () => {
-      // activeModules zonder de vereiste module → gap overgeslagen → default.
+      // activeModules zonder de vereiste module → gap overgeslagen → terugval.
+      // De basis is `full()` met één gap open, dus het account is gevuld: sinds
+      // H15 wint dan de gevulde terugval, niet het first-use-welkom.
       const withoutModule = ALL_MODULES.filter((m) => m !== c.module)
       const s = getFirstUndismissedSuggestion(c.open(), '/random', none, [], undefined, withoutModule)
-      expect(s?.key).toBe('default')
+      expect(s?.key).toBe('default_gevuld')
     })
   }
 
@@ -174,8 +180,128 @@ describe('overrides + dismiss', () => {
   })
 
   it('returns null when everything is exhausted', () => {
-    const ov: CoachOverrides = { default: { enabled: false } }
+    // Beide default-varianten uit (H15: de terugval is gesplitst, dus beheer
+    // moet ze allebei kunnen uitzetten — één key volstaat niet meer).
+    const ov: CoachOverrides = { default: { enabled: false }, default_gevuld: { enabled: false } }
     expect(getFirstUndismissedSuggestion(full(), '/random', none, [], ov)).toBeNull()
+  })
+})
+
+// ── H15: een gevuld account wordt niet als beginner aangesproken ───────────
+//
+// REGRESSIE-ANKER. De path- en default-laag worden per constructie pas bereikt
+// als élke data-gap dicht is: ze ZIJN de "dit account is gevuld"-lagen. Stond
+// daar first-use-copy, dan kreeg juist de gevulde gebruiker 'm te zien. Deze
+// blok legt dat gedrag omgekeerd vast — zowel de uitkomst (geen
+// beginnerstaal voor een gevuld account, op geen enkele route) als de
+// catalogus-vorm (first-use-copy in de pad-laag vereist een predicaat).
+describe('H15 — first-use-copy hoort bij first use', () => {
+  /** Woordenschat die alleen bij een LEEG account klopt. */
+  const FIRST_USE_PATRONEN = [
+    /\beerste\b/i,
+    /breng je .* in kaart/i,
+    /^welkom\b/i,
+    /\bstart met\b/i,
+    /\bbegin met\b/i,
+    /\bvoeg je .* toe\b/i,
+    /\bstel je .* in\b/i,
+  ]
+  const isFirstUseCopy = (message: string) => FIRST_USE_PATRONEN.some((p) => p.test(message))
+
+  /** Elke pad-prefix uit de catalogus + de routes zónder pad-regel. */
+  const ALLE_ROUTES = [
+    ...PATH_SUGGESTIONS.map((r) => r.pathPrefix),
+    '/overzicht/cashflow',
+    '/overzicht/cashflow/budget',
+    '/overzicht/bezittingen',
+    '/mijn',
+    '/mijn/profiel',
+    '/berichten',
+    '/onbekende-route',
+  ]
+
+  it('geeft een gevuld account op géén enkele route beginnerstaal', () => {
+    for (const path of ALLE_ROUTES) {
+      const s = getFirstUndismissedSuggestion(full(), path, none, [], undefined, ALL_MODULES)
+      expect(s, `geen suggestie op ${path}`).not.toBeNull()
+      expect(
+        isFirstUseCopy(s!.message),
+        `first-use-copy op ${path} (${s!.key}): "${s!.message}"`,
+      ).toBe(false)
+    }
+  })
+
+  it('houdt de first-use-copy wél voor een leeg account', () => {
+    // Leeg account: de data-gap-laag vuurt en die draagt de first-use-teksten.
+    const s = getFirstUndismissedSuggestion(empty(), '/overzicht/cashflow', none, [], undefined, ALL_MODULES)
+    expect(s?.key).toBe('gap_bank')
+    // En de onvoorwaardelijke terugval blijft "Welkom." zolang het account
+    // niet gevuld is — ook als alle gaps zijn weggeklikt (de val waarin de
+    // laagvolgorde je niets meer vertelt).
+    const alleGapsWeg = new Set(DATA_GAP_SUGGESTIONS.map((r) => r.key))
+    const terugval = getFirstUndismissedSuggestion(empty(), '/onbekend', alleGapsWeg, [], undefined, ALL_MODULES)
+    expect(terugval?.key).toBe('default')
+    expect(isFirstUseCopy(terugval!.message)).toBe(true)
+  })
+
+  it('spreekt een gevuld account op /mijn en /berichten niet met "Welkom." aan', () => {
+    for (const path of ['/mijn', '/berichten']) {
+      const s = getFirstUndismissedSuggestion(full(), path, none, [], undefined, ALL_MODULES)
+      expect(s?.key).toBe('default_gevuld')
+      expect(s?.message).not.toMatch(/^Welkom/)
+    }
+  })
+
+  it('toont de schulden-pad-tip alleen bij geregistreerde schulden', () => {
+    // Mét schulden: de gevulde variant, zonder "breng je schulden in kaart".
+    const metSchulden = getFirstUndismissedSuggestion(full(), '/overzicht/schulden', none, [], undefined, ALL_MODULES)
+    expect(metSchulden?.key).toBe('path_debts')
+    expect(isFirstUseCopy(metSchulden!.message)).toBe(false)
+
+    // Zónder schulden én zonder de module die `gap_debts` draagt: de pad-regel
+    // valt weg en de brede, datastand-onafhankelijke terugval wint.
+    const zonderSchulden: CoachDataGaps = { ...full(), hasDebts: false }
+    const zonderModule = ALL_MODULES.filter((m) => m !== 'vermogensregistratie')
+    const s = getFirstUndismissedSuggestion(zonderSchulden, '/overzicht/schulden', none, [], undefined, zonderModule)
+    expect(s?.key).toBe('path_core')
+  })
+
+  it('valt bij onbekende accountstatus terug op de onvoorwaardelijke regels', () => {
+    // Geen dataGaps (nog niet geladen): een regel mét predicaat mag niet
+    // gokken — de bredere, altijd-kloppende regel wint.
+    expect(getFirstUndismissedSuggestion(undefined, '/overzicht/schulden', none, [])?.key).toBe('path_core')
+    expect(getFirstUndismissedSuggestion(undefined, '/onbekend', none, [])?.key).toBe('default')
+  })
+
+  it('eist een predicaat bij elke pad-regel met first-use-copy', () => {
+    for (const regel of PATH_SUGGESTIONS) {
+      if (!isFirstUseCopy(regel.suggestion.message)) continue
+      expect(
+        typeof regel.check,
+        `pad-regel "${regel.key}" draagt first-use-copy zonder check — die laag ziet alleen gevulde accounts`,
+      ).toBe('function')
+    }
+  })
+
+  it('geeft beheer beide default-varianten als losse regel', () => {
+    const rows = buildCoachCatalogForAdmin()
+    const defaults = rows.filter((r) => r.layer === 'default')
+    expect(defaults.map((r) => r.key)).toEqual(['default_gevuld', 'default'])
+    // Eén override mag nooit stilzwijgend beide teksten overschrijven.
+    const ov: CoachOverrides = { default: { message: 'Alleen de first-use-tekst' } }
+    const metOverride = buildCoachCatalogForAdmin(ov)
+    expect(metOverride.find((r) => r.key === 'default')?.message).toBe('Alleen de first-use-tekst')
+    expect(metOverride.find((r) => r.key === 'default_gevuld')?.hasOverride).toBe(false)
+  })
+
+  it('isEstablishedAccount vraagt bezit én boekhouding', () => {
+    expect(isEstablishedAccount(full())).toBe(true)
+    expect(isEstablishedAccount(empty())).toBe(false)
+    // Alleen een bezitting is nog geen gevuld account.
+    expect(isEstablishedAccount({ ...empty(), hasAssets: true })).toBe(false)
+    // Bezit + transacties (of budgetten) wel.
+    expect(isEstablishedAccount({ ...empty(), hasAssets: true, hasTransactions: true })).toBe(true)
+    expect(isEstablishedAccount({ ...empty(), hasAssets: true, hasBudgets: true })).toBe(true)
   })
 })
 

@@ -484,6 +484,11 @@ export const WIDGET_HREFS: Record<string, string> = {
   cash_flow:                '/overzicht/cashflow',
   budgetten:                '/overzicht/cashflow/budget',
   uitgaven_heatmap:         '/overzicht/cashflow/budget',
+  // BEWUST GEEN `?rendementUitleg=open` hier (kaart H7): deze widget gáát over
+  // het totale vermogen; de rendement-regel is één regel in de uitsplitsing.
+  // De hele tegel is één link, dus een deeplink naar de rekenmodal zou élke klik
+  // op "Vermogen" bij een uitleg over rendement laten uitkomen. Wie de uitleg
+  // wil, vindt 'm één klik verder op de bezittingenpagina zelf.
   assets:                   '/overzicht/bezittingen',
   schulden:                 '/overzicht/schulden',
   holdings:                 '/overzicht/bezittingen/investment?tab=aandelen-holdings',
@@ -506,7 +511,12 @@ export const WIDGET_HREFS: Record<string, string> = {
   surplus_gap:              '/toekomst#vermogensstromen',
   swr_monitor:              '/toekomst/voorkeuren',
   inflatie_impact:          '/toekomst/voorkeuren',
-  beleggingsrendement:      '/overzicht/bezittingen',
+  // Kaart H7 — de rekenmodal "Zo is het rendement berekend" hing aan één knop op
+  // één pagina. Deze widget gaat volledig ÓVER het rendement, dus zijn tegel-link
+  // opent die uitleg rechtstreeks (OVERLAY_QUERY_KEYS.rendementUitleg). Zo komt
+  // het getal en de uitleg erbij op één klik van elkaar, zonder de modal per
+  // oppervlak na te bouwen.
+  beleggingsrendement:      '/overzicht/bezittingen?rendementUitleg=open',
   pensioen_aow:             '/toekomst/gebeurtenissen',
   meldingen:                '/berichten',
   volgende_stap:            '/overzicht/tips',

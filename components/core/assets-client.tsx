@@ -12,7 +12,8 @@ import { BottomSheet } from '@/components/app/bottom-sheet'
 // variant degradeert daar stil in plaats van te gooien.
 import { useOptionalToast } from '@/components/app/toast-provider'
 import { Kicker, FiguresStrip, PageInfoButton, GlossaryTerm, PageOpening, SubtotalLine } from '@/components/editorial'
-import { buildAssetReturnBreakdown, formatGainPct } from '@/lib/asset-return'
+import { buildAssetReturnBreakdown, formatGainPct, RETURN_BASIS_LABELS } from '@/lib/asset-return'
+import { OVERLAY_QUERY_KEYS } from '@/lib/navigation'
 import { AssetReturnModal } from './asset-return-modal'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
@@ -28,6 +29,20 @@ import { DGA_LENING_DREMPEL } from '@/lib/box2-data'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
 import { calculateFreedomTime, formatFreedomTimeString, formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { AmountInput } from '@/components/app/amount-input'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
+import { parseAmountInput } from '@/lib/amount-input'
+import {
+  ASSET_AMOUNT_CONFIRM_THRESHOLD,
+  PURCHASE_DATE_FUTURE_ERROR,
+  assetAmountLimitError,
+  assetReturnBand,
+  assetReturnBandError,
+  isPurchaseDateInFuture,
+  isWithinAssetAmountLimit,
+  isWithinAssetReturnBand,
+  todayIso,
+} from '@/lib/asset-parameter-bands'
 
 /**
  * Masked-aware EUR formatter hook used across this file's many sub-views.
@@ -281,7 +296,15 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
   // en met deeplink-conventie uit `OVERLAY_QUERY_KEYS`.
   const requestedAssetId = searchParams.get('asset')
   const [projectionYears, setProjectionYears] = useState(10)
-  const [returnModalOpen, setReturnModalOpen] = useState(false)
+  // Rekenmodal "Zo is het rendement berekend". Naast de knop onder de
+  // figures-strip is de modal sinds kaart H7 ook via de URL bereikbaar
+  // (`?rendementUitleg=open`, OVERLAY_QUERY_KEYS.rendementUitleg): de
+  // rendement-widgets op /overzicht linken hierheen, zodat élk rendementsgetal
+  // in de app bij DEZELFDE uitleg uitkomt in plaats van dat de modal per
+  // oppervlak wordt nagebouwd. Alleen de begintoestand komt uit de URL — daarna
+  // stuurt de knop 'm, en bij sluiten wordt de param opgeruimd.
+  const returnUitlegParam = searchParams.get(OVERLAY_QUERY_KEYS.rendementUitleg)
+  const [returnModalOpen, setReturnModalOpen] = useState(returnUitlegParam != null)
   const [insightOpen, setInsightOpen] = useState(false)
   useEffect(() => {
     try {
@@ -728,6 +751,19 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
     [router, searchParams],
   )
 
+  // Sluiten van de rekenmodal ruimt de deeplink-param op, zodat een refresh of
+  // een terug-navigatie 'm niet opnieuw opent. Shallow replace op het HUIDIGE
+  // pad (`pathname`), niet op een hardgecodeerde route: deze client draait ook
+  // als embed onder /overzicht/bezittingen.
+  const closeReturnModal = useCallback(() => {
+    setReturnModalOpen(false)
+    if (returnUitlegParam == null) return
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete(OVERLAY_QUERY_KEYS.rendementUitleg)
+    const queryString = params.toString()
+    router.replace(`${pathname}${queryString ? `?${queryString}` : ''}`, { scroll: false })
+  }, [returnUitlegParam, searchParams, router, pathname])
+
   // Geselecteerde asset = lookup uit lijst o.b.v. URL. Memoized zodat
   // pane-prop alleen herrendert bij echte id-wisseling.
   const selectedAsset = useMemo(
@@ -876,17 +912,20 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
               // (beleggingen + crypto), niet op alles wat je bezit. De rekenmodal
               // hieronder toont de andere twee stapels — woning/deelneming en de
               // bezittingen zonder kostprijs — zodat het totaal blijft kloppen.
-              kicker: 'Rendement portefeuille',
+              // Het label komt sinds kaart H7 uit de GEDEELDE bron
+              // (RETURN_BASIS_LABELS): dezelfde tekst voor dezelfde grondslag op
+              // /overzicht en hier, zodat er geen vijfde vocabulaire ontstaat.
+              kicker: RETURN_BASIS_LABELS.portfolioSincePurchase.label,
               amount: portfolioReturn.cost > 0
                 ? `${portfolioReturn.gain >= 0 ? '+' : ''}${fc(portfolioReturn.gain)}`
                 : '—',
               sub: portfolioReturn.pct != null
-                ? `${formatGainPct(portfolioReturn.pct)} sinds aankoop`
+                ? (formatGainPct(portfolioReturn.pct) ?? 'geen kostprijs bekend')
                 : 'geen kostprijs bekend',
               sub2: portfolioReturn.cost > 0
                 ? portfolioMixedBasis
-                  ? 'beleggingen en crypto · deels op ingevulde aankoopwaarde'
-                  : 'beleggingen en crypto'
+                  ? `${RETURN_BASIS_LABELS.portfolioSincePurchase.scope} · deels op ingevulde aankoopwaarde`
+                  : RETURN_BASIS_LABELS.portfolioSincePurchase.scope
                 : undefined,
               variant: portfolioReturn.cost > 0
                 ? portfolioReturn.gain >= 0 ? 'positive' : 'negative'
@@ -925,7 +964,7 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
 
       <AssetReturnModal
         open={returnModalOpen}
-        onClose={() => setReturnModalOpen(false)}
+        onClose={closeReturnModal}
         breakdown={returnBreakdown}
         dailyExpenses={dailyExpenses}
       />
@@ -2427,6 +2466,15 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
     setSaving(true)
     setFormError(null)
 
+    // H8/H9: `Number(formUnits) || 1` maakte van een ingetypte 0 stilzwijgend
+    // één stuk — de 0 bereikte de server dus nooit en de gebruiker kreeg een
+    // positie die hij niet had ingevoerd. De waarde gaat nu ongewijzigd mee.
+    // Leeg blijft "niet ingevuld" (`undefined`, en JSON.stringify laat 'm weg);
+    // een 0 levert bij het AANMAKEN een expliciete 400 uit /api/holdings. Bij
+    // BIJWERKEN blijft 0 toegestaan: een uitverkochte positie staat legitiem op
+    // nul (95 van de 115 geïmporteerde posities in productie staan zo).
+    const unitsValue = formUnits.trim() === '' ? undefined : Number(formUnits)
+
     try {
       if (editHolding) {
         // UPDATE
@@ -2437,7 +2485,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
             id: editHolding.id,
             name: formName.trim(),
             ticker: formTicker.trim() || null,
-            units: Number(formUnits) || 1,
+            units: unitsValue,
             avg_purchase_price: Number(formAvgPrice) || 0,
           }),
         })
@@ -2455,7 +2503,7 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
             name: formName.trim(),
             ticker: formTicker.trim() || null,
             isin: formIsin.trim() || null,
-            units: Number(formUnits) || 1,
+            units: unitsValue,
             avg_purchase_price: Number(formAvgPrice) || 0,
             current_price: Number(formAvgPrice) || 0,
             purchase_date: formPurchaseDate || null,
@@ -2748,10 +2796,12 @@ function HoldingsList({ assetId, assetName }: { assetId: string; assetName: stri
                 {!editHolding && (
                   <div className="col-span-2">
                     <label className="text-[10px] font-medium text-[var(--ink-3)]">Aankoopdatum</label>
+                    {/* Een aankoop in de toekomst bestaat niet (H8). */}
                     <input
                       type="date"
                       value={formPurchaseDate}
                       onChange={(e) => setFormPurchaseDate(e.target.value)}
+                      max={todayIso()}
                       className="mt-0.5 w-full border border-[var(--border-ed)] px-2 py-1.5 text-xs text-[var(--ink)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
                       data-testid="holding-purchase-date-input"
                     />
@@ -3183,6 +3233,85 @@ export function AssetForm({
   const [deelnemingOptions, setDeelnemingOptions] = useState<{ id: string; name: string }[]>([])
   const [dgaTotal, setDgaTotal] = useState(0)
   const [validationError, setValidationError] = useState<string | null>(null)
+  /**
+   * Veld-gebonden validatiefouten (bevindingen H8 + H9).
+   *
+   * `validationError` hierboven rendert onderaan het formulier, ver ónder de
+   * bedragvelden — op een normale schermhoogte "gebeurt er niets waarneembaars"
+   * bij een geweigerde save, precies zoals gerapporteerd. Bovendien konden drie
+   * velden dezelfde generieke tekst tonen zonder dat zichtbaar was wélk veld
+   * fout stond. Deze map hangt de fout aan het veld zelf (rode rand +
+   * `aria-invalid` + melding eronder), en `scrollToFirstError` brengt hem in
+   * beeld. Het formulier-brede blok blijft bestaan voor fouten die geen veld
+   * hebben (bv. een geweigerde save door de server).
+   */
+  type AssetFieldKey = 'currentValue' | 'purchaseValue' | 'monthlyContribution' | 'expectedReturn' | 'purchaseDate'
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<AssetFieldKey, string>>>({})
+  const currentValueRef = useRef<HTMLInputElement | null>(null)
+  const purchaseValueRef = useRef<HTMLInputElement | null>(null)
+  const monthlyContributionRef = useRef<HTMLInputElement | null>(null)
+  const expectedReturnRef = useRef<HTMLInputElement | null>(null)
+  const purchaseDateRef = useRef<HTMLInputElement | null>(null)
+  /**
+   * Volgorde = de leesvolgorde van het formulier, zodat `scrollToFirstError` bij
+   * meerdere fouten de bovenste kiest — dat is de fout waar de gebruiker het
+   * eerst langs komt.
+   */
+  const fieldOrder: AssetFieldKey[] = ['currentValue', 'purchaseValue', 'expectedReturn', 'monthlyContribution', 'purchaseDate']
+  function refForField(key: AssetFieldKey): HTMLInputElement | null {
+    switch (key) {
+      case 'currentValue': return currentValueRef.current
+      case 'purchaseValue': return purchaseValueRef.current
+      case 'monthlyContribution': return monthlyContributionRef.current
+      case 'expectedReturn': return expectedReturnRef.current
+      case 'purchaseDate': return purchaseDateRef.current
+    }
+  }
+  /**
+   * Brengt de eerste fout in beeld en zet de focus erop. Zonder dit blijft een
+   * foutmelding op dit lange formulier even onvindbaar als de melding onderaan
+   * die hij vervangt — het patroon is overgenomen uit `onboarding-inkomen.tsx`,
+   * dat het al goed deed.
+   */
+  function scrollToFirstError(errors: Partial<Record<AssetFieldKey, string>>) {
+    const first = fieldOrder.find((k) => errors[k])
+    if (!first) return
+    const el = refForField(first)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.focus({ preventScroll: true })
+  }
+  /**
+   * Bevestigingsstap bij een groot bedrag (bevinding H8, besluit eigenaar:
+   * optie B). Bewust GEEN harde cap: die zou een legitieme UHNW-gebruiker
+   * blokkeren. In plaats daarvan vraagt de app door — met de
+   * vrijheidstijd-vertaling erbij, zodat de plausibiliteitscheck in de taal van
+   * de app staat ("dat is X vrijheid — klopt dat?") in plaats van in kale euro's
+   * waar een extra nul niet opvalt.
+   */
+  const [bedragBevestiging, setBedragBevestiging] = useState<number | null>(null)
+  const bedragBevestigdRef = useRef<number | null>(null)
+  /**
+   * De huidige waarde als getal, voor de live-afgeleiden in dit formulier
+   * (effectieve waarde bij een deel-inclusie, DGA-drempel, vrijheidstijd).
+   * Via `parseAmountInput` en niet via `Number()`: het veld mag sinds
+   * `<AmountInput>` een NL-genoteerd bedrag dragen ("1.234,56"), en `Number()`
+   * maakte daar stilzwijgend `NaN` van — waarna de afgeleide regel gewoon
+   * verdween in plaats van iets te melden.
+   */
+  const currentValueNum = parseAmountInput(currentValue) ?? 0
+  /**
+   * Wist de fout van één veld zodra de gebruiker het aanpast. Een foutmelding
+   * die blijft staan terwijl de invoer al gecorrigeerd is, leert de gebruiker
+   * de melding te negeren — en dan is een zichtbare fout net zo nutteloos als
+   * de onzichtbare die hij vervangt.
+   */
+  function onFieldChange(key: AssetFieldKey, setter: (v: string) => void) {
+    return (v: string) => {
+      setter(v)
+      setFieldErrors((prev) => (prev[key] ? { ...prev, [key]: undefined } : prev))
+    }
+  }
   const { addToast } = useOptionalToast()
   // Household ownership
   const [ownership, setOwnership] = useState<OwnershipType>(asset?.ownership ?? 'personal')
@@ -3266,21 +3395,65 @@ export function AssetForm({
     if (!name || !currentValue) return
     setValidationError(null)
 
-    // Validate no negative monetary values
-    const numCurrentValue = Number(currentValue)
-    const numPurchaseValue = Number(purchaseValue)
-    const numMonthlyContribution = Number(monthlyContribution)
+    // ── Validatie (H8/H9) ───────────────────────────────────────────────────
+    //
+    // Alle bedragen lopen via `parseAmountInput` — één leesregel voor het hele
+    // formulier, in plaats van `Number()` op een string die "1.234,56" kan zijn
+    // (dat gaf stilzwijgend NaN → `|| 0` → nul). `null` betekent "niet te lezen
+    // als bedrag" en is nadrukkelijk iets anders dan 0.
+    const numCurrentValue = parseAmountInput(currentValue)
+    const numPurchaseValue = purchaseValue ? parseAmountInput(purchaseValue) : 0
+    const numMonthlyContribution = monthlyContribution ? parseAmountInput(monthlyContribution) : 0
+    const numExpectedReturn = expectedReturn ? parseAmountInput(expectedReturn, 'allow-negative') : 0
+    const numDepreciationRate = depreciationRate ? Number(depreciationRate) : 0
 
-    if (numCurrentValue < 0) {
-      setValidationError('Waarde mag niet negatief zijn. Voer een positief bedrag in.')
+    const errors: Partial<Record<AssetFieldKey, string>> = {}
+
+    if (numCurrentValue === null) {
+      errors.currentValue = 'Vul een bedrag van 0 of hoger in.'
+    } else if (!isWithinAssetAmountLimit('current_value', numCurrentValue)) {
+      errors.currentValue = assetAmountLimitError('current_value')
+    }
+    if (numPurchaseValue === null) {
+      errors.purchaseValue = 'Vul een bedrag van 0 of hoger in.'
+    } else if (!isWithinAssetAmountLimit('purchase_value', numPurchaseValue)) {
+      errors.purchaseValue = assetAmountLimitError('purchase_value')
+    }
+    if (numMonthlyContribution === null) {
+      errors.monthlyContribution = 'Vul een bedrag van 0 of hoger in.'
+    } else if (!isWithinAssetAmountLimit('monthly_contribution', numMonthlyContribution)) {
+      errors.monthlyContribution = assetAmountLimitError('monthly_contribution')
+    }
+    // Rendementsband per type. Wordt overgeslagen wanneer een afschrijvingspercentage
+    // is ingevuld: dan is `expected_return` per definitie 0 (zie de payload hieronder)
+    // en is het rendementsveld niet eens zichtbaar.
+    if (!(numDepreciationRate > 0)) {
+      if (numExpectedReturn === null) {
+        errors.expectedReturn = assetReturnBandError(assetType)
+      } else if (!isWithinAssetReturnBand(assetType, numExpectedReturn)) {
+        // Dit is de check die de gemelde 665,5% tegenhoudt (H1/H7).
+        errors.expectedReturn = assetReturnBandError(assetType)
+      }
+    }
+    if (purchaseDate && isPurchaseDateInFuture(purchaseDate)) {
+      errors.purchaseDate = PURCHASE_DATE_FUTURE_ERROR
+    }
+
+    setFieldErrors(errors)
+    if (Object.keys(errors).length > 0) {
+      scrollToFirstError(errors)
       return
     }
-    if (purchaseValue && numPurchaseValue < 0) {
-      setValidationError('Aankoopwaarde mag niet negatief zijn. Voer een positief bedrag in.')
-      return
-    }
-    if (monthlyContribution && numMonthlyContribution < 0) {
-      setValidationError('Maandelijkse inleg mag niet negatief zijn.')
+
+    // ── Plausibiliteitsvraag bij een groot bedrag (H8, optie B) ─────────────
+    //
+    // Geen blokkade maar een vraag, en bewust in vrijheidstijd gesteld: een
+    // extra nul valt in "€100.000.000" niet op, in "10.000 jaar vrijheid" wel.
+    // `bedragBevestigdRef` onthoudt het exact bevestigde bedrag, zodat een
+    // daarna gewijzigde waarde opnieuw doorgevraagd wordt.
+    const teBevestigen = numCurrentValue ?? 0
+    if (teBevestigen >= ASSET_AMOUNT_CONFIRM_THRESHOLD && bedragBevestigdRef.current !== teBevestigen) {
+      setBedragBevestiging(teBevestigen)
       return
     }
 
@@ -3352,11 +3525,14 @@ export function AssetForm({
       user_id: user.id,
       name,
       asset_type: assetType,
-      current_value: Number(currentValue) || 0,
-      purchase_value: isCashType ? Number(currentValue) || 0 : Number(purchaseValue) || 0,
+      // Alle bedragen komen uit `parseAmountInput` hierboven — hier staat bewust
+      // geen tweede lezing van dezelfde string (dat was de plek waar "1.234,56"
+      // via `Number()` NaN werd en `|| 0` er stilzwijgend nul van maakte).
+      current_value: numCurrentValue ?? 0,
+      purchase_value: isCashType ? (numCurrentValue ?? 0) : (numPurchaseValue ?? 0),
       purchase_date: isCashType ? null : purchaseDate || null,
-      expected_return: (depreciationRate && Number(depreciationRate) > 0 ? 0 : Number(expectedReturn) || 0),
-      monthly_contribution: isCashType ? 0 : Number(monthlyContribution) || 0,
+      expected_return: numDepreciationRate > 0 ? 0 : (numExpectedReturn ?? 0),
+      monthly_contribution: isCashType ? 0 : (numMonthlyContribution ?? 0),
       institution: institution || null,
       notes: notes || null,
       // Type-specific fields
@@ -3420,7 +3596,7 @@ export function AssetForm({
       assetId = asset.id
 
       // Auto-track valuation when current_value changes
-      const newValue = Number(currentValue) || 0
+      const newValue = numCurrentValue ?? 0
       const oldValue = Number(asset.current_value)
       if (newValue !== oldValue && newValue > 0) {
         const today = new Date().toISOString().split('T')[0]
@@ -3443,8 +3619,42 @@ export function AssetForm({
         })
       }
     } else {
-      const { data: inserted, error: insertErr } = await supabase.from('assets').insert(row).select('id').single()
-      if (insertErr) { console.error('ASSET INSERT FAILED:', insertErr); setValidationError('Opslaan mislukt: ' + insertErr.message); setSaving(false); return }
+      // AANMAKEN gaat via `POST /api/assets` (ADR 0058 + ADR 0044). Dit was een
+      // client-directe `supabase.from('assets').insert(row)` — de enige
+      // validatie op de waarden was daarmee de `if` hierboven, die iedereen met
+      // een anon-token en een directe PostgREST-call kon overslaan (de
+      // RLS-policy op `assets` is eigen-rij maar kolom-onafhankelijk). De route
+      // valideert dezelfde banden met zod. De DB-laag eronder — migratie
+      // 20260827140000 met de CHECK-constraints — is GESCHREVEN maar op het
+      // moment van deze wijziging nog niet toegepast (geverifieerd tegen
+      // pg_constraint, 27-08-2026); tot die deploy is de route de enige grens
+      // en blijft een directe PostgREST-insert een omweg.
+      //
+      // `user_id` en `household_id` gaan bewust NIET mee: die bepaalt de server
+      // uit de sessie resp. `household_members`. Zou de client ze mogen sturen,
+      // dan kon een bezitting in andermans huishouden belanden — en de
+      // SELECT-policy op `assets` is huishoud-verbreed.
+      const { user_id: _userId, household_id: _householdId, ...payload } = row
+      let inserted: { id?: string } | null = null
+      try {
+        const res = await fetch('/api/assets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        const data = await res.json().catch(() => null)
+        if (!res.ok) {
+          setValidationError(String(data?.error ?? `Opslaan mislukt (HTTP ${res.status})`))
+          setSaving(false)
+          return
+        }
+        inserted = data as { id?: string }
+      } catch (err) {
+        console.error('ASSET INSERT FAILED:', err)
+        setValidationError('Opslaan mislukt. Controleer je verbinding en probeer het opnieuw.')
+        setSaving(false)
+        return
+      }
       assetId = inserted?.id
     }
 
@@ -3607,9 +3817,9 @@ export function AssetForm({
             <p className="mt-1 text-[10px] text-[var(--ink-3)]">
               Stel in welk percentage van deze asset wordt meegeteld in je netto vermogen en vrijheidsberekeningen.
             </p>
-            {netWorthInclusionPct < 100 && Number(currentValue) > 0 && (
+            {netWorthInclusionPct < 100 && currentValueNum > 0 && (
               <p className="mt-1 font-mono text-[11px] tabular-nums text-kern-600">
-                Effectieve waarde: {fc(Number(currentValue) * netWorthInclusionPct / 100)}
+                Effectieve waarde: {fc(currentValueNum * netWorthInclusionPct / 100)}
               </p>
             )}
           </div>
@@ -3675,12 +3885,13 @@ export function AssetForm({
           {/* Value fields */}
           {assetType === 'cash' ? (
             <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Huidig saldo</label>
-              <input
-                type="number"
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]" htmlFor="asset-huidig-saldo">Huidig saldo</label>
+              <AmountInput
+                id="asset-huidig-saldo"
                 value={currentValue}
-                onChange={(e) => setCurrentValue(e.target.value)}
-                className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+                onChange={onFieldChange('currentValue', setCurrentValue)}
+                inputRef={currentValueRef}
+                error={fieldErrors.currentValue ?? null}
                 placeholder="0"
               />
             </div>
@@ -3691,15 +3902,18 @@ export function AssetForm({
                   <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
                     {assetType === 'eigen_huis' ? 'Marktwaarde' : assetType === 'levensverzekering' ? 'Afkoopwaarde' : assetType === 'vordering' ? 'Uitstaand bedrag' : 'Huidige waarde'}
                   </label>
-                  <input
-                    type="number"
+                  <AmountInput
                     value={currentValue}
-                    onChange={(e) => !hasActiveHoldings && setCurrentValue(e.target.value)}
+                    onChange={(v) => { if (!hasActiveHoldings) onFieldChange('currentValue', setCurrentValue)(v) }}
                     readOnly={hasActiveHoldings}
+                    inputRef={currentValueRef}
+                    error={fieldErrors.currentValue ?? null}
                     className={`w-full rounded-[var(--r)] border px-3 py-2 text-sm ${
                       hasActiveHoldings
                         ? 'border-[var(--border-ed)] bg-[var(--subtle)] text-[var(--ink-3)] cursor-not-allowed'
-                        : 'border-[var(--border-ed)]'
+                        : fieldErrors.currentValue
+                          ? 'border-negative bg-negative/5 text-negative'
+                          : 'border-[var(--border-ed)]'
                     }`}
                     title={hasActiveHoldings ? 'Waarde wordt automatisch berekend uit holdings' : undefined}
                   />
@@ -3711,11 +3925,11 @@ export function AssetForm({
                   <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
                     {assetType === 'eigen_huis' ? 'Aankoopprijs' : assetType === 'vordering' ? 'Oorspronkelijke hoofdsom' : 'Aankoopwaarde'}
                   </label>
-                  <input
-                    type="number"
+                  <AmountInput
                     value={purchaseValue}
-                    onChange={(e) => setPurchaseValue(e.target.value)}
-                    className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+                    onChange={onFieldChange('purchaseValue', setPurchaseValue)}
+                    inputRef={purchaseValueRef}
+                    error={fieldErrors.purchaseValue ?? null}
                   />
                 </div>
               </div>
@@ -3739,12 +3953,16 @@ export function AssetForm({
                 {!(visibleFields.includes('depreciation_rate') && depreciationRate && Number(depreciationRate) > 0) && (
                 <div>
                   <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">{assetType === 'vordering' || assetType === 'savings' ? 'Rente (% p.j.)' : 'Rendement (% p.j.)'}</label>
-                  <input
-                    type="number"
-                    step="0.1"
+                  {/* Negatief mag: afschrijvende types ('vehicle', 'physical')
+                      dragen een negatief rendement. De band per type staat in
+                      lib/asset-parameter-bands.ts en wordt bij opslaan getoetst. */}
+                  <AmountInput
                     value={expectedReturn}
-                    onChange={(e) => setExpectedReturn(e.target.value)}
-                    className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+                    onChange={onFieldChange('expectedReturn', setExpectedReturn)}
+                    sign="allow-negative"
+                    inputRef={expectedReturnRef}
+                    error={fieldErrors.expectedReturn ?? null}
+                    aria-label={`Rendement in procenten per jaar, tussen ${assetReturnBand(assetType).min} en ${assetReturnBand(assetType).max}`}
                   />
                 </div>
                 )}
@@ -3753,22 +3971,33 @@ export function AssetForm({
                     <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
                       {assetType === 'levensverzekering' ? 'Premie p/m' : assetType === 'vordering' ? 'Aflossing p/m' : 'Inleg p/m'}
                     </label>
-                    <input
-                      type="number"
+                    <AmountInput
                       value={monthlyContribution}
-                      onChange={(e) => setMonthlyContribution(e.target.value)}
-                      className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+                      onChange={onFieldChange('monthlyContribution', setMonthlyContribution)}
+                      inputRef={monthlyContributionRef}
+                      error={fieldErrors.monthlyContribution ?? null}
                     />
                   </div>
                 )}
                 <div>
                   <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Aankoopdatum</label>
+                  {/* `max` is de zichtbare grens; de echte controle staat in
+                      handleSave + POST /api/assets (een `max`-attribuut is een
+                      suggestie die een geplakte waarde niet tegenhoudt). */}
                   <input
                     type="date"
                     value={purchaseDate}
-                    onChange={(e) => setPurchaseDate(e.target.value)}
-                    className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
+                    onChange={(e) => onFieldChange('purchaseDate', setPurchaseDate)(e.target.value)}
+                    max={todayIso()}
+                    ref={purchaseDateRef}
+                    aria-invalid={fieldErrors.purchaseDate ? true : undefined}
+                    className={`w-full rounded-[var(--r)] border px-3 py-2 text-sm ${
+                      fieldErrors.purchaseDate ? 'border-negative bg-negative/5 text-negative' : 'border-[var(--border-ed)]'
+                    }`}
                   />
+                  {fieldErrors.purchaseDate && (
+                    <p role="alert" className="mt-1 text-[11px] leading-snug text-negative">{fieldErrors.purchaseDate}</p>
+                  )}
                 </div>
               </div>
 
@@ -4151,7 +4380,7 @@ export function AssetForm({
                       )}
                     </div>
                     {(() => {
-                      const totalDga = dgaTotal + (Number(currentValue) || 0)
+                      const totalDga = dgaTotal + (currentValueNum)
                       // DGA-drempel uit de canonieke bron (lib/box2-data.ts) — geen losse literal.
                       if (totalDga > DGA_LENING_DREMPEL) return (
                         <div className="rounded-[var(--r)] border border-negative/40 bg-negative/10 p-3">
@@ -4186,11 +4415,11 @@ export function AssetForm({
               </div>
 
               {/* Vrijheidstijd-context bij de waarde — "geld is opgeslagen tijd". */}
-              {dailyExpenses > 0 && Number(currentValue) > 0 && (
+              {dailyExpenses > 0 && currentValueNum > 0 && (
                 <p className="text-[11px] text-[var(--ink-3)]">
-                  Deze waarde van <span className="font-medium text-[var(--ink-2)]">{fc(Number(currentValue))}</span> staat voor{' '}
+                  Deze waarde van <span className="font-medium text-[var(--ink-2)]">{fc(currentValueNum)}</span> staat voor{' '}
                   <span className="font-medium text-horizon-700">
-                    {formatFreedomTimeString(calculateFreedomTime(Number(currentValue), dailyExpenses), 'long')}
+                    {formatFreedomTimeString(calculateFreedomTime(currentValueNum, dailyExpenses), 'long')}
                   </span>{' '}
                   vrijheid.
                 </p>
@@ -4395,6 +4624,64 @@ export function AssetForm({
             {validationError}
           </div>
         )}
+
+        {/* Plausibiliteitsvraag bij een groot bedrag (H8). Geen blokkade: de
+            gebruiker mag doorzetten. De vraag staat bewust in vrijheidstijd —
+            een extra nul valt in euro's niet op, in jaren vrijheid wel. */}
+        <ShellOverlay
+          open={bedragBevestiging !== null}
+          onClose={() => setBedragBevestiging(null)}
+          kind="confirm"
+          title="Klopt dit bedrag?"
+          footer={
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const bedrag = bedragBevestiging
+                  setBedragBevestiging(null)
+                  bedragBevestigdRef.current = bedrag
+                  void handleSave()
+                }}
+                className="flex-1 rounded-[var(--r)] bg-[var(--ink)] px-4 py-2 text-sm font-medium text-[var(--paper)]"
+                data-testid="asset-bedrag-bevestigen"
+              >
+                Ja, dit klopt
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setBedragBevestiging(null)
+                  currentValueRef.current?.focus()
+                }}
+                className="flex-1 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)]"
+              >
+                Aanpassen
+              </button>
+            </div>
+          }
+        >
+          {bedragBevestiging !== null && (
+            <div className="px-6 py-4 text-sm leading-relaxed text-[var(--ink-2)]">
+              <p>
+                Je vult <span className="font-medium text-[var(--ink)]">{fc(bedragBevestiging)}</span> in
+                {name ? <> bij <span className="font-medium text-[var(--ink)]">{name}</span></> : null}.
+              </p>
+              {dailyExpenses > 0 && (
+                <p className="mt-2">
+                  Dat is{' '}
+                  <span className="font-medium text-[var(--ink)]" data-testid="asset-bedrag-bevestiging-vrijheid">
+                    {formatFreedomTimeString(calculateFreedomTime(bedragBevestiging, dailyExpenses), 'long')}
+                  </span>{' '}
+                  vrijheid bij je huidige uitgaven.
+                </p>
+              )}
+              <p className="mt-2 text-[var(--ink-3)]">
+                Een bedrag van deze omvang is meestal een typefout — één nul te veel. Klopt het wel, dan gaan we gewoon verder.
+              </p>
+            </div>
+          )}
+        </ShellOverlay>
 
         {/* Inline Annuleren/Opslaan — alleen in standalone-mode. In
             embedded-mode levert de pane-wrapper deze knoppen via

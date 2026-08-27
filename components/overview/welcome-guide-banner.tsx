@@ -9,7 +9,8 @@ import { GuideScreenView } from './guide-screen-view'
 import {
   getVisibleScreens,
   hasMoreScreens,
-  countCompletedOnScreen,
+  countScreenProgress,
+  type GuideDerivedStates,
   type WelcomeGuideConfig,
   type WelcomeGuideState,
 } from '@/lib/welcome-guide'
@@ -49,7 +50,16 @@ import {
 
 const SESSION_CLOSED_KEY = 'welcome_guide_closed'
 
-type Payload = { config: WelcomeGuideConfig; state: WelcomeGuideState }
+type Payload = {
+  config: WelcomeGuideConfig
+  state: WelcomeGuideState
+  /**
+   * Wat de app al wéét (M1): stap-id → 'done' | 'open' | 'nvt', server-side
+   * afgeleid uit de accountstatus. Ontbreekt bij een oudere payload → de gids
+   * gedraagt zich exact als voorheen (alles handmatig).
+   */
+  derived?: GuideDerivedStates
+}
 
 export function WelcomeGuideBanner({ seed }: { seed?: Payload | null }) {
   const [data, setData] = useState<Payload | null>(null)
@@ -124,7 +134,7 @@ export function WelcomeGuideBanner({ seed }: { seed?: Payload | null }) {
 
   if (hidden || !data) return null
 
-  const { config, state } = data
+  const { config, state, derived } = data
   const visible = getVisibleScreens(config, state)
   if (visible.length === 0) return null
 
@@ -133,8 +143,9 @@ export function WelcomeGuideBanner({ seed }: { seed?: Payload | null }) {
   const screen = visible[idx]
   const isLast = idx === visible.length - 1
   const canReveal = hasMoreScreens(config, state)
-  const doneOnScreen = countCompletedOnScreen(screen, state.completedStepIds)
-  const totalOnScreen = screen.steps.filter((s) => s.enabled).length
+  // Voortgang telt afgeleid + handmatig; niet-van-toepassing-stappen vallen uit
+  // de noemer (anders wordt de teller onhaalbaar).
+  const progress = countScreenProgress(screen, state.completedStepIds, derived)
 
   // ── Acties ──
   const toggle = (stepId: string) =>
@@ -207,10 +218,16 @@ export function WelcomeGuideBanner({ seed }: { seed?: Payload | null }) {
               ) : (
                 <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--ink-4)]">
                   Scherm {idx + 1} van {totalEnabled}
-                  {totalOnScreen > 0 && (
+                  {progress.total > 0 && (
                     <>
                       {' · '}
-                      {doneOnScreen}/{totalOnScreen} afgevinkt
+                      {progress.done}/{progress.total} afgevinkt
+                    </>
+                  )}
+                  {progress.notApplicable > 0 && (
+                    <>
+                      {' · '}
+                      {progress.notApplicable} n.v.t.
                     </>
                   )}
                 </p>
@@ -252,6 +269,7 @@ export function WelcomeGuideBanner({ seed }: { seed?: Payload | null }) {
               <GuideScreenView
                 screen={screen}
                 completedStepIds={state.completedStepIds}
+                derived={derived}
                 onToggle={toggle}
                 compact={simple}
               />

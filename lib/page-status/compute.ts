@@ -22,10 +22,12 @@ import { getCachedUser } from '@/lib/supabase/cached-user'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { loadLeverScores } from '@/lib/lever-scores-loader'
 import { loadDashboardData } from '@/lib/dashboard-data-loader'
+import { loadHorizonData } from '@/lib/horizon-data-loader'
+import { withCanonicalOverviewFigures } from '@/lib/overview/canonical-health'
 import { loadCashflowData } from '@/lib/cashflow-data-loader'
 import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
 import { buildCashflowCards } from '@/lib/cashflow-cards'
-import { hasBox2Relevance } from '@/lib/box2-relevance'
+import { loadBox2Materiality } from '@/lib/box2-relevance'
 import { resolvePageStatusMap } from '@/lib/page-status/resolve'
 import { resolveFreedomBanner } from '@/lib/page-status/freedom'
 import type { PageStatusInfo } from '@/lib/page-status/types'
@@ -40,7 +42,8 @@ export type Family = 'lever' | 'cashflow' | 'box2' | 'freedom'
  *  - 'freedom' (root /overzicht) → loadDashboardData (informatieve vrijheidsduiding).
  *  - 'lever'  (hefbomen + Box 1/3) → loadLeverScores (lichte, gedeelde SSoT).
  *  - 'cashflow' (budget/transacties/vaste-lasten/forecast) → dashboard + cashflow + vaste lasten.
- *  - 'box2' → hasBox2Relevance (één ja/nee-gate).
+ *  - 'box2' → loadBox2Materiality (lichte Box 2-berekening: banner alleen bij
+ *    een echte heffing, niet bij loutere aanwezigheid van een belang — L8).
  * Niet-cashflow-/niet-freedom-routes raken de zware dashboard-loader dus NOOIT aan.
  */
 export const ROUTE_FAMILY: Record<string, Family> = {
@@ -120,7 +123,21 @@ export async function computePageStatusInfo(
     // reeds-berekende kerngetallen uit de dashboard-loader (geen eigen
     // rekenmotor): freedomPct (canoniek), currentAge, fireAge en de gekozen
     // strategie. resolveFreedomBanner geeft null wanneer nog niet vrij.
-    const { dashboardData } = await loadDashboardData(supabase)
+    //
+    // H4: `freedomPct >= 100` is een ZELFSTANDIGE trigger voor "je bent
+    // financieel vrij" (isFinanciallyFree). Het rauwe bundelveld wordt op
+    // /overzicht overschreven door de canonieke horizon-waarde, dus zonder
+    // dezelfde patch kon deze banner "financieel vrij" melden boven een hero die
+    // een lager percentage toonde. Perspectief-gekeyed zoals de 'lever'-familie
+    // hieronder, zodat blok 1 van /overzicht dezelfde React-`cache()`-entry raakt
+    // (geen tweede kernel-solve). De leeftijden blijven uit de bundel — exact
+    // dezelfde combinatie die de Vrijheid-strip via `resolveFreedomAgeView` leest.
+    const [{ dashboardData: rawBundle }, freedomPerspective] = await Promise.all([
+      loadDashboardData(supabase),
+      getServerPerspective(),
+    ])
+    const horizonData = await loadHorizonData(supabase, freedomPerspective).catch(() => null)
+    const dashboardData = withCanonicalOverviewFigures(rawBundle, horizonData)
     return resolveFreedomBanner({
       freedomPct: dashboardData.freedomPct ?? null,
       currentAge: dashboardData.currentAge ?? null,
@@ -155,9 +172,9 @@ export async function computePageStatusInfo(
     return resolvePageStatusMap({ cashflowCards })[route] ?? null
   }
 
-  // box2 — alleen de ja/nee-gate.
+  // box2 — de materialiteits-gate: banner alleen bij een echte heffing.
   const user = await getCachedUser(supabase)
   if (!user) return null
-  const box2Relevant = await hasBox2Relevance(supabase, user.id)
-  return resolvePageStatusMap({ box2Relevant })[route] ?? null
+  const { material } = await loadBox2Materiality(supabase, user.id)
+  return resolvePageStatusMap({ box2Material: material })[route] ?? null
 }

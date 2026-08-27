@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import {
   Check,
+  Minus,
   ArrowRight,
   Wallet,
   Landmark,
@@ -28,7 +29,7 @@ import {
   Home,
   type LucideIcon,
 } from 'lucide-react'
-import type { GuideIcon, WelcomeGuideScreen, WelcomeGuideStep } from '@/lib/welcome-guide'
+import type { GuideDerivedStates, GuideIcon, WelcomeGuideScreen, WelcomeGuideStep } from '@/lib/welcome-guide'
 
 /**
  * GuideScreenView — pure presentatie van één welkomstgids-scherm. Gedeeld door
@@ -38,14 +39,43 @@ import type { GuideIcon, WelcomeGuideScreen, WelcomeGuideStep } from '@/lib/welc
  *
  * - layout 'process' → genummerde stapkaarten links→rechts (scherm 1).
  * - layout 'list'    → verticale rijen.
- * Afgevinkte stappen worden groen en blijven staan (geen line-through).
  * readOnly = preview: vinkjes niet klikbaar, links niet-navigerend.
  * compact  = eenvoudige weergave (APP-6): áltijd de lijst-layout, zonder
  *            schermintro en zonder stapomschrijvingen — vier afvinkregels in
  *            plaats van vier proceskaarten, zodat de gids op mobiel binnen ~⅓
  *            van het eerste scherm blijft. De stappen zelf, hun vinkjes en hun
  *            links veranderen niet; alleen wat eromheen staat.
+ *
+ * VIER STAP-TOESTANDEN (M1) — de gids weet sinds M1 wat er al in het account
+ * staat, en dat moet zichtbaar anders zijn dan een eigen vinkje:
+ *  · 'auto'   — afgeleid uit je gegevens. Positief getint, NIET klikbaar (een
+ *               afgeleid vinkje uitzetten kan niet: het zou meteen terugkomen).
+ *  · 'manual' — zelf afgevinkt. Positief getint, klikbaar (uitvinken mag).
+ *  · 'nvt'    — niet van toepassing. Gedempt, buiten de teller, niet klikbaar.
+ *  · 'open'   — nog te doen.
+ * De kleuren volgen de semantische tokens (`--positive`), niet de Tailwind-
+ * standaardkleuren die hier eerder stonden.
  */
+
+type StepVisualState = 'auto' | 'manual' | 'nvt' | 'open'
+
+function resolveStepState(
+  stepId: string,
+  done: Set<string>,
+  derived?: GuideDerivedStates,
+): StepVisualState {
+  const state = derived?.[stepId]
+  if (state === 'nvt') return 'nvt'
+  if (state === 'done') return 'auto'
+  return done.has(stepId) ? 'manual' : 'open'
+}
+
+const STEP_STATE_LABEL: Record<StepVisualState, string> = {
+  auto: 'automatisch afgevinkt op basis van je gegevens',
+  manual: 'zelf afgevinkt',
+  nvt: 'niet van toepassing',
+  open: 'nog te doen',
+}
 
 // ── Icoon-map (naam → lucide-component) ─────────────────────────────────────
 const ICON_MAP: Record<GuideIcon, LucideIcon> = {
@@ -76,6 +106,8 @@ const ICON_MAP: Record<GuideIcon, LucideIcon> = {
 interface Props {
   screen: WelcomeGuideScreen
   completedStepIds: string[]
+  /** Server-afgeleide stap-toestand (M1). Weglaten = alles handmatig. */
+  derived?: GuideDerivedStates
   onToggle?: (stepId: string) => void
   readOnly?: boolean
   compact?: boolean
@@ -84,11 +116,13 @@ interface Props {
 export function GuideScreenView({
   screen,
   completedStepIds,
+  derived,
   onToggle,
   readOnly = false,
   compact = false,
 }: Props) {
   const done = new Set(completedStepIds)
+  const stateOf = (stepId: string) => resolveStepState(stepId, done, derived)
   const steps = screen.steps.filter((s) => s.enabled)
   const showIntro = Boolean(screen.intro) && !compact
 
@@ -111,11 +145,11 @@ export function GuideScreenView({
       )}
 
       {screen.layout === 'process' && !compact ? (
-        <ProcessSteps steps={steps} done={done} onToggle={onToggle} readOnly={readOnly} />
+        <ProcessSteps steps={steps} stateOf={stateOf} onToggle={onToggle} readOnly={readOnly} />
       ) : (
         <ListSteps
           steps={steps}
-          done={done}
+          stateOf={stateOf}
           onToggle={onToggle}
           readOnly={readOnly}
           compact={compact}
@@ -129,37 +163,42 @@ export function GuideScreenView({
 
 function ProcessSteps({
   steps,
-  done,
+  stateOf,
   onToggle,
   readOnly,
 }: {
   steps: WelcomeGuideStep[]
-  done: Set<string>
+  stateOf: (stepId: string) => StepVisualState
   onToggle?: (id: string) => void
   readOnly: boolean
 }) {
   return (
     <ol className="flex flex-col gap-3 lg:flex-row lg:items-stretch lg:gap-2">
       {steps.map((step, i) => {
-        const isDone = done.has(step.id)
+        const state = stateOf(step.id)
+        const isDone = state === 'auto' || state === 'manual'
         return (
           <li key={step.id} className="flex items-stretch gap-2 lg:flex-1">
             <div
               className={`flex flex-1 flex-col rounded-xl border p-3.5 transition-colors ${
                 isDone
-                  ? 'border-emerald-300 bg-emerald-50/50'
-                  : 'border-[var(--border-ed)] bg-[var(--paper)]'
+                  ? 'border-[var(--positive)]/40 bg-positive-bg'
+                  : state === 'nvt'
+                    ? 'border-[var(--border-ed)] bg-[var(--subtle)]'
+                    : 'border-[var(--border-ed)] bg-[var(--paper)]'
               }`}
             >
               <div className="mb-2 flex items-center justify-between">
                 <span
                   className={`inline-flex h-6 w-6 items-center justify-center rounded-full font-mono text-xs font-semibold ${
-                    isDone ? 'bg-emerald-500 text-white' : 'bg-[var(--subtle)] text-[var(--ink-3)]'
+                    isDone
+                      ? 'bg-[var(--positive)] text-[var(--paper)]'
+                      : 'bg-[var(--subtle)] text-[var(--ink-3)]'
                   }`}
                 >
                   {i + 1}
                 </span>
-                <StepCheckbox step={step} isDone={isDone} onToggle={onToggle} readOnly={readOnly} />
+                <StepCheckbox step={step} state={state} onToggle={onToggle} readOnly={readOnly} />
               </div>
               <StepIcon step={step} isDone={isDone} />
               <p className="mt-1.5 text-sm font-semibold leading-snug text-[var(--ink)]">
@@ -167,6 +206,15 @@ function ProcessSteps({
               </p>
               {step.description && (
                 <p className="mt-1 text-xs leading-snug text-[var(--ink-3)]">{step.description}</p>
+              )}
+              {(state === 'auto' || state === 'nvt') && (
+                <p
+                  className={`mt-1 text-[11px] font-medium leading-snug ${
+                    state === 'auto' ? 'text-positive' : 'text-[var(--ink-4)]'
+                  }`}
+                >
+                  {state === 'auto' ? 'Al geregeld — uit je gegevens' : 'Niet van toepassing'}
+                </p>
               )}
               <div className="mt-auto pt-2.5">
                 <StepLink step={step} readOnly={readOnly} />
@@ -192,13 +240,13 @@ function ProcessSteps({
 
 function ListSteps({
   steps,
-  done,
+  stateOf,
   onToggle,
   readOnly,
   compact = false,
 }: {
   steps: WelcomeGuideStep[]
-  done: Set<string>
+  stateOf: (stepId: string) => StepVisualState
   onToggle?: (id: string) => void
   readOnly: boolean
   /** Eenvoudige weergave: strakkere rijen, geen stapomschrijving (APP-6). */
@@ -207,15 +255,16 @@ function ListSteps({
   return (
     <ul className="divide-y divide-[var(--border-ed)] rounded-xl border border-[var(--border-ed)] bg-[var(--paper)]">
       {steps.map((step) => {
-        const isDone = done.has(step.id)
+        const state = stateOf(step.id)
+        const isDone = state === 'auto' || state === 'manual'
         return (
           <li
             key={step.id}
             className={`flex gap-3 transition-colors ${compact ? 'items-center px-3 py-1.5' : 'items-start p-3.5'} ${
-              isDone ? 'bg-emerald-50/40' : ''
+              isDone ? 'bg-positive-bg' : state === 'nvt' ? 'bg-[var(--subtle)]' : ''
             }`}
           >
-            <StepCheckbox step={step} isDone={isDone} onToggle={onToggle} readOnly={readOnly} />
+            <StepCheckbox step={step} state={state} onToggle={onToggle} readOnly={readOnly} />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <StepIcon step={step} isDone={isDone} inline />
@@ -243,17 +292,49 @@ function ListSteps({
 
 // ── Bouwstenen ──────────────────────────────────────────────────────────────
 
+/**
+ * Het vinkje. Alleen 'manual' en 'open' zijn KLIKBAAR — een afgeleid vinkje
+ * ('auto') uitzetten kan niet (het komt bij de volgende render terug) en een
+ * niet-van-toepassing-stap heeft niets af te vinken. Beide renderen daarom als
+ * statisch merkteken met een sprekend `aria-label`, i.p.v. als knop die niets
+ * doet.
+ */
 function StepCheckbox({
   step,
-  isDone,
+  state,
   onToggle,
   readOnly,
 }: {
   step: WelcomeGuideStep
-  isDone: boolean
+  state: StepVisualState
   onToggle?: (id: string) => void
   readOnly: boolean
 }) {
+  const base = 'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2'
+
+  if (state === 'auto' || state === 'nvt') {
+    const isAuto = state === 'auto'
+    return (
+      <span
+        role="img"
+        aria-label={`"${step.title}" — ${STEP_STATE_LABEL[state]}`}
+        title={STEP_STATE_LABEL[state]}
+        className={`${base} ${
+          isAuto
+            ? 'border-[var(--positive)] bg-[var(--positive)]'
+            : 'border-[var(--border-md)] bg-[var(--subtle)]'
+        }`}
+      >
+        {isAuto ? (
+          <Check className="h-3 w-3 text-[var(--paper)]" strokeWidth={3} />
+        ) : (
+          <Minus className="h-3 w-3 text-[var(--ink-4)]" strokeWidth={3} />
+        )}
+      </span>
+    )
+  }
+
+  const isDone = state === 'manual'
   return (
     <button
       type="button"
@@ -263,13 +344,13 @@ function StepCheckbox({
       aria-label={
         isDone ? `Markeer "${step.title}" als niet gedaan` : `Markeer "${step.title}" als gedaan`
       }
-      className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
+      className={`${base} transition-all ${
         isDone
-          ? 'border-emerald-500 bg-emerald-500'
+          ? 'border-[var(--positive)] bg-[var(--positive)]'
           : 'border-[var(--border-md)] bg-[var(--paper)]'
-      } ${readOnly ? 'cursor-default' : 'cursor-pointer hover:border-emerald-400 hover:scale-110'}`}
+      } ${readOnly ? 'cursor-default' : 'cursor-pointer hover:border-[var(--positive)] hover:scale-110'}`}
     >
-      {isDone && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
+      {isDone && <Check className="h-3 w-3 text-[var(--paper)]" strokeWidth={3} />}
     </button>
   )
 }
@@ -289,7 +370,7 @@ function StepIcon({
   return (
     <Icon
       className={`${inline ? 'h-4 w-4' : 'h-5 w-5'} shrink-0 ${
-        isDone ? 'text-emerald-600' : 'text-[var(--ink-3)]'
+        isDone ? 'text-positive' : 'text-[var(--ink-3)]'
       }`}
       aria-hidden
     />

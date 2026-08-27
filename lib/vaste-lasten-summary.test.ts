@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { __resetVasteLastenCache } from '@/lib/vaste-lasten-cache'
-import { loadVasteLastenSummary } from './vaste-lasten-summary'
+import { loadVasteLastenSummary, isTerugkerendVariabel } from './vaste-lasten-summary'
 
 /**
  * Borgt de één-bron-van-waarheid die de Vaste-Lasten-widget consumeert.
@@ -107,5 +107,103 @@ describe('loadVasteLastenSummary — bundel/widget-contract', () => {
     const summary = await loadVasteLastenSummary(supabase)
     expect(summary.totalMonthly).toBe(100)
     expect(summary.count).toBe(1)
+  })
+})
+
+/**
+ * H14 — TERUGKEREND, MAAR VARIABEL.
+ *
+ * Het defect: onherkende terugkerende uitgaven (supermarkt, tanken, horeca,
+ * winkelen) vielen door `detectCategory` heen naar `other_expense` en telden
+ * daarna ONVOORWAARDELIJK als vaste last — quote 58% waar 43% klopt, mét een
+ * "Aandacht"-banner die naar de verkeerde post wees.
+ *
+ * De belangrijkste test hieronder is de SPIEGELFOUT-test: een echte vaste last
+ * met onherkende tegenpartij (particuliere verhuurder) moet in de quote BLIJVEN.
+ * Te veel eruit filteren geeft een vals "gezond", en een te lage quote alarmeert
+ * niet — dat faalpad is gevaarlijker dan het defect zelf.
+ */
+describe('isTerugkerendVariabel — de frequentie-snede + variabele tegenpartijen', () => {
+  const item = (over: Partial<Parameters<typeof isTerugkerendVariabel>[0]>) => ({
+    name: 'Onbekend',
+    category: 'other_expense' as const,
+    frequency: 'monthly' as const,
+    categoryOverride: null,
+    ...over,
+  })
+
+  it('wekelijkse onherkende uitgave is variabel (de structurele regel)', () => {
+    expect(isTerugkerendVariabel(item({ name: 'Albert Heijn', frequency: 'weekly' }))).toBe(true)
+    // Ook zonder herkenbare naam: de frequentie alleen is genoeg.
+    expect(isTerugkerendVariabel(item({ name: 'Kassa 4 Utrecht', frequency: 'weekly' }))).toBe(true)
+  })
+
+  it('maandelijkse winkel/tank/horeca is variabel (de aanvulling)', () => {
+    for (const naam of ['Shell Amsterdam', 'H&M', 'Restaurant De Kade', 'Action 1234', 'Jumbo']) {
+      expect(isTerugkerendVariabel(item({ name: naam }))).toBe(true)
+    }
+  })
+
+  it('SPIEGELFOUT: onherkende maandpost blijft een vaste last', () => {
+    // Een particuliere verhuurder, alimentatie of boekhouder wordt door geen
+    // enkel patroon herkend en rekent maandelijks af — die MOET in de quote
+    // blijven staan, anders liegt de app "gezond".
+    expect(isTerugkerendVariabel(item({ name: 'J. Jansen' }))).toBe(false)
+    expect(isTerugkerendVariabel(item({ name: 'Boekhouder Van Dijk' }))).toBe(false)
+    expect(isTerugkerendVariabel(item({ name: 'Alimentatie' }))).toBe(false)
+  })
+
+  it('een herkende categorie wordt nooit alsnog variabel', () => {
+    expect(isTerugkerendVariabel(item({ category: 'rent', frequency: 'weekly' }))).toBe(false)
+    expect(isTerugkerendVariabel(item({ category: 'utility', name: 'Shell Energie' }))).toBe(false)
+  })
+
+  it('de gebruiker wint altijd: een expliciete override overrulet beide signalen', () => {
+    expect(
+      isTerugkerendVariabel(
+        item({ name: 'Albert Heijn', frequency: 'weekly', categoryOverride: 'vaste_kosten' }),
+      ),
+    ).toBe(false)
+    expect(
+      isTerugkerendVariabel(item({ name: 'Picnic', categoryOverride: 'subscription' })),
+    ).toBe(false)
+  })
+})
+
+describe('loadVasteLastenSummary — variabele groep buiten het totaal', () => {
+  beforeEach(() => __resetVasteLastenCache())
+
+  it('houdt een wekelijkse supermarkt buiten de quote maar toont hem wel', async () => {
+    const supabase = makeSupabase([
+      { id: 'r1', counterparty_name: 'Verhuurder BV', amount: -900, name: 'Huur', frequency: 'monthly', category_override: 'vaste_kosten' },
+      // €125/week → €541,67/mnd; hoorde nooit in een vaste-lastenquote.
+      { id: 'r2', counterparty_name: 'Albert Heijn', amount: -125, name: 'Albert Heijn', frequency: 'weekly', category_override: null },
+    ])
+    const summary = await loadVasteLastenSummary(supabase)
+
+    expect(summary.totalMonthly).toBe(900)
+    expect(summary.count).toBe(1)
+    expect(summary.terugkerendVariabel.map((i) => i.name)).toEqual(['Albert Heijn'])
+    expect(summary.totalMonthlyVariabel).toBeCloseTo(541.67, 2)
+    // De variabele groep zit NIET in het totaal — dat is de hele fix.
+    expect(summary.totalMonthly).not.toBeCloseTo(1441.67, 2)
+  })
+
+  it('SPIEGELFOUT: onherkende maandpost blijft in het totaal', async () => {
+    const supabase = makeSupabase([
+      { id: 'r1', counterparty_name: 'J. Jansen', amount: -750, name: 'J. Jansen', frequency: 'monthly', category_override: null },
+    ])
+    const summary = await loadVasteLastenSummary(supabase)
+    expect(summary.totalMonthly).toBe(750)
+    expect(summary.terugkerendVariabel).toHaveLength(0)
+  })
+
+  it('een als vaste kost bevestigde supermarkt telt gewoon mee', async () => {
+    const supabase = makeSupabase([
+      { id: 'r1', counterparty_name: 'Albert Heijn', amount: -100, name: 'Albert Heijn', frequency: 'monthly', category_override: 'vaste_kosten' },
+    ])
+    const summary = await loadVasteLastenSummary(supabase)
+    expect(summary.totalMonthly).toBe(100)
+    expect(summary.terugkerendVariabel).toHaveLength(0)
   })
 })

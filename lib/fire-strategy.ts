@@ -10,6 +10,8 @@
  * Pure types, geen Supabase dependency.
  */
 
+import { guardFreedomAge } from '@/lib/horizon/outcome-guard'
+
 export type FireEndStrategy = 'perpetual' | 'legacy' | 'deplete' | 'pensioen'
 
 export interface FireStrategyConfig {
@@ -167,6 +169,11 @@ export function resolveFreedomFraming(input: FreedomStateInput): FreedomFraming 
  */
 export function fireAgeForDisplay(fireAgeFractional: number | null | undefined): number | null {
   if (fireAgeFractional == null || !Number.isFinite(fireAgeFractional)) return null
+  // M6-vangrail: een leeftijd op/voorbij het horizonplafond is de parkeerstand van
+  // de kernel-bisectie, geen antwoord — nooit als "vrijheidsleeftijd" tonen. Eén
+  // guard (`lib/horizon/outcome-guard.ts`), zodat de /overzicht-strip én de
+  // mini-vermogensgrafiek dezelfde grens hanteren als de /toekomst-hero.
+  if (!guardFreedomAge(fireAgeFractional).ok) return null
   return Math.round(fireAgeFractional)
 }
 
@@ -177,10 +184,17 @@ export interface FreedomAgeViewInput extends Omit<FreedomStateInput, 'fireAge'> 
 }
 
 export interface FreedomAgeView {
-  /** Afgerond — uitsluitend voor weergave. */
+  /** Afgerond — uitsluitend voor weergave. `null` óók bij een M6-vangrail-treffer. */
   fireAgeDisplay: number | null
   /** Framing, bepaald op de fractionele drempel. */
   framing: FreedomFraming
+  /**
+   * `true` ⇒ de motor gaf een leeftijd die niet kán kloppen (op/voorbij het
+   * horizonplafond, bevinding M6). Het oppervlak toont dan een gegevensmelding
+   * i.p.v. een aftelling — niet gewoon "geen aftelling", want dan verdwijnt het
+   * probleem stilletjes uit beeld.
+   */
+  dataIssue: boolean
 }
 
 /**
@@ -193,10 +207,15 @@ export function resolveFreedomAgeView({
   fireAgeFractional,
   ...rest
 }: FreedomAgeViewInput): FreedomAgeView {
-  const state: FreedomStateInput = { ...rest, fireAge: fireAgeFractional }
+  // M6: een onmogelijke leeftijd mag ook de DREMPEL niet voeden — anders bepaalt
+  // de parkeerstand (100) alsnog of iemand "financieel vrij" heet.
+  const guard = guardFreedomAge(fireAgeFractional)
+  const bruikbaar = guard.ok ? fireAgeFractional : null
+  const state: FreedomStateInput = { ...rest, fireAge: bruikbaar }
   return {
-    fireAgeDisplay: fireAgeForDisplay(fireAgeFractional),
+    fireAgeDisplay: fireAgeForDisplay(bruikbaar),
     framing: resolveFreedomFraming(state),
+    dataIssue: !guard.ok,
   }
 }
 

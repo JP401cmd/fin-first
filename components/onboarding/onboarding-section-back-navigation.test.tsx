@@ -51,6 +51,12 @@ vi.mock('@/components/app/quick-add-wizard/quick-add-wizard', () => ({
 
 import { OnboardingBezittingen } from './onboarding-bezittingen'
 import { OnboardingSchulden } from './onboarding-schulden'
+import { OnboardingInkomen } from './onboarding-inkomen'
+import {
+  OnboardingUitgavenPensioen,
+  INITIAL_RETIREMENT_EXPENSE,
+  type RetirementExpenseState,
+} from './onboarding-uitgaven-pensioen'
 
 afterEach(() => vi.clearAllMocks())
 
@@ -186,5 +192,88 @@ describe('Onboarding-terugknop — tussen groepen (gelifte fase-stack)', () => {
     expect(container.textContent).not.toContain('Heb je een betaalrekening?')
     // De eerder toegevoegde post is behouden.
     expect(footerText('Test cash')).toBeTruthy()
+  })
+})
+
+// ── (3) Terug in de inkomen/uitgaven-groep toont de ingevulde bedragen (H10) ─
+
+describe('Onboarding-terugknop — inkomen/uitgaven-groep (Notion H10)', () => {
+  /**
+   * Mini-orchestrator die het inkomen/uitgaven/uitgaven_pensioen-deel van
+   * page.tsx spiegelt: `identity`/`retirementExpense` zijn gelift (net als
+   * `state.identity` in de echte orchestrator), en elke stapwissel remount't
+   * de stap-boom via `key={step}` (net als `<StepTransition key={state.step}>`,
+   * page.tsx r.1341) — dat is precies het mechanisme waarvan de kaart
+   * beweerde dat het de velden zou legen.
+   */
+  function MiniInkomenOrchestrator() {
+    const order = ['inkomen', 'uitgaven', 'uitgaven_pensioen'] as const
+    type Step = (typeof order)[number]
+    const [step, setStep] = useState<Step>('inkomen')
+    const [identity, setIdentity] = useState({
+      net_monthly_income: '',
+      estimated_monthly_expenses: '',
+    })
+    const [retirementExpense, setRetirementExpense] = useState<RetirementExpenseState>(
+      INITIAL_RETIREMENT_EXPENSE,
+    )
+
+    const goToNext = () => setStep((s) => order[Math.min(order.indexOf(s) + 1, order.length - 1)])
+    const goToBack = () => setStep((s) => order[Math.max(order.indexOf(s) - 1, 0)])
+
+    return (
+      <div key={step}>
+        {(step === 'inkomen' || step === 'uitgaven') && (
+          <OnboardingInkomen
+            data={identity}
+            onChange={setIdentity}
+            onNext={goToNext}
+            onBack={goToBack}
+            field={step}
+          />
+        )}
+        {step === 'uitgaven_pensioen' && (
+          <OnboardingUitgavenPensioen
+            data={retirementExpense}
+            onChange={setRetirementExpense}
+            monthlyExpenses={0}
+            monthlyIncome={0}
+            onNext={vi.fn()}
+            onBack={goToBack}
+            onSkip={vi.fn()}
+          />
+        )}
+      </div>
+    )
+  }
+
+  it('bewaart ingevulde inkomen/uitgaven-bedragen bij Vorige stap vanaf twee schermen verder', () => {
+    const { container } = render(<MiniInkomenOrchestrator />)
+
+    // Inkomen invullen → Verder (naar uitgaven).
+    fireEvent.change(screen.getByLabelText(/Geschat netto maandinkomen/), {
+      target: { value: '3000' },
+    })
+    fireEvent.click(footerButton('Verder'))
+
+    // Uitgaven invullen → Verder (naar uitgaven_pensioen — twee schermen
+    // verder dan het inkomenveld, zoals in de gemelde reproductiestappen).
+    fireEvent.change(screen.getByLabelText(/Geschatte maandelijkse uitgaven/), {
+      target: { value: '2100' },
+    })
+    fireEvent.click(footerButton('Verder'))
+    expect(container.textContent).toContain('nodig te hebben') // uitgaven_pensioen-scherm
+
+    // Vorige stap → uitgaven-scherm toont het eerder ingevulde bedrag.
+    fireEvent.click(backButton())
+    expect(
+      (screen.getByLabelText(/Geschatte maandelijkse uitgaven/) as HTMLInputElement).value,
+    ).toBe('2100')
+
+    // Vorige stap → inkomen-scherm toont het eerder ingevulde bedrag.
+    fireEvent.click(backButton())
+    expect(
+      (screen.getByLabelText(/Geschat netto maandinkomen/) as HTMLInputElement).value,
+    ).toBe('3000')
   })
 })

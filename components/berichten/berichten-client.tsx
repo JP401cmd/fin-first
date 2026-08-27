@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
-import { NotificationItem } from '@/components/app/notifications/notification-item'
+import { NotificationRows } from '@/components/app/notifications/notification-bundle'
 import { DensityToggle, useListDensity, type ListDensity } from '@/components/app/density-toggle'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { Bell, ChevronRight, CheckCheck, Newspaper } from 'lucide-react'
@@ -111,15 +111,13 @@ function CollapsedDayGroup({
       </button>
       {expanded && (
         <div>
-          {group.notifications.map((notification) => (
-            <NotificationItem
-              key={notification.id}
-              notification={notification}
-              onRead={markAsRead}
-              onClose={() => {}}
-              density={density}
-            />
-          ))}
+          <NotificationRows
+            items={group.notifications}
+            onRead={markAsRead}
+            onClose={() => {}}
+            density={density}
+            paddingClass="px-4"
+          />
         </div>
       )}
     </div>
@@ -323,15 +321,13 @@ export function BerichtenClient() {
             {urgent.length > 0 && (
               <div>
                 <GroupBar label="Dringend" tone="urgent" />
-                {urgent.map((notification) => (
-                  <NotificationItem
-                    key={notification.id}
-                    notification={notification}
-                    onRead={handleMarkAsRead}
-                    onClose={() => {}}
-                    density={density}
-                  />
-                ))}
+                <NotificationRows
+                  items={urgent}
+                  onRead={handleMarkAsRead}
+                  onClose={() => {}}
+                  density={density}
+                  paddingClass="px-4"
+                />
               </div>
             )}
 
@@ -339,15 +335,13 @@ export function BerichtenClient() {
             {todayItems.length > 0 && (
               <div>
                 <GroupBar label="Vandaag" />
-                {todayItems.map((notification) => (
-                  <NotificationItem
-                    key={notification.id}
-                    notification={notification}
-                    onRead={handleMarkAsRead}
-                    onClose={() => {}}
-                    density={density}
-                  />
-                ))}
+                <NotificationRows
+                  items={todayItems}
+                  onRead={handleMarkAsRead}
+                  onClose={() => {}}
+                  density={density}
+                  paddingClass="px-4"
+                />
               </div>
             )}
 

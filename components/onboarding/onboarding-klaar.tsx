@@ -7,6 +7,10 @@ import { DEBT_TYPE_ICONS } from '@/lib/debt-data'
 import type { AssetQuickInput, DebtQuickInput } from '@/lib/quick-add/types'
 import type { SpaardoelPresetKey } from '@/lib/onboarding-presets'
 import { formatCurrency } from '@/lib/format'
+import {
+  formatOpenOnderdelen,
+  type OnboardingCompleteness,
+} from '@/lib/onboarding-completeness'
 
 /**
  * Stap 5 — Klaar (recap-figures-strip + primaire CTA).
@@ -17,7 +21,12 @@ import { formatCurrency } from '@/lib/format'
  *        - Inkomen → kicker `NETTO/MND`, body DM Mono €
  *        - Bezit  → kicker `NETTO VERMOGEN`, body DM Mono €
  *        - Spaardoel óf Voortgang → kicker `SPAARDOEL`/`VOORTGANG`, body
- *          italic Playfair met highlight-marker (`--module-active-200`)
+ *          italic Playfair met highlight-marker (`--module-active-200`).
+ *          De Voortgang-cel toont "6 van 8" uit `computeOnboardingCompleteness`
+ *          — een echte meting van het profiel. Tot aug 2026 stond hier een
+ *          hardgecodeerde "100%" naast cellen die "Vul je later aan" toonden
+ *          (bevinding M11): dat mat "einde wizard bereikt", niet "profiel
+ *          compleet". Zet hier nooit een vast getal terug.
  *      (De oude "DOEL"-cel is verwijderd: sinds de doel-stap uit onboarding
  *      is, was die altijd leeg — zie git-historie jun 2026.)
  *   3. Primaire CTA `Begin met TriFinity` (orchestrator hangt save+redirect
@@ -52,14 +61,37 @@ export interface OnboardingKlaarProps {
   netMonthlyIncome: number
   netWorth: number | null
   /**
+   * Korte vrijheidstijd ("1j 3m 16d") uit `computeFreedomTicker` — dezelfde
+   * teller die tijdens de flow in de sticky kop meeloopt. `null` wanneer er
+   * niets eerlijks te tonen valt (geen inkomen/uitgaven, niets liquides, of
+   * een tekort); de cel valt dan terug op de kwalitatieve zin.
+   */
+  freedomLabel?: string | null
+  /**
    * Spaardoel-recap van stap v. — `null` wanneer de gebruiker geskipt of
    * niets ingevuld heeft. Caller (orchestrator) bepaalt deze gating.
    */
   spaardoel?: OnboardingKlaarSpaardoelRecap | null
+  /**
+   * Echte profiel-compleetheid ("6 van 8"), berekend door de orchestrator via
+   * `computeOnboardingCompleteness`. Bewust verplicht: het eindscherm mag nooit
+   * meer een vast voortgangsgetal tonen (bevinding M11).
+   */
+  completeness: OnboardingCompleteness
   /** Individuele bezittingen uit de quick-add stap (voor het startpositie-paneel). */
   assets: AssetQuickInput[]
   /** Individuele schulden uit de quick-add stap (voor het startpositie-paneel). */
   debts: DebtQuickInput[]
+  /**
+   * Spring terug naar de inkomen/uitgaven-stap — maakt de lege "Netto/mnd"-cel
+   * direct klikbaar. Weggelaten → de cel blijft statische tekst.
+   */
+  onFillIncome?: () => void
+  /**
+   * Spring terug naar de bezittingen-stap — maakt de lege "Netto vermogen"-cel
+   * direct klikbaar. Weggelaten → de cel blijft statische tekst.
+   */
+  onFillNetWorth?: () => void
   /** "Voeg nog iets toe →" — terug naar stap 4. */
   onAddMore: () => void
   /** Primaire CTA — orchestrator triggert save + redirect. */
@@ -73,9 +105,13 @@ export interface OnboardingKlaarProps {
 export function OnboardingKlaar({
   netMonthlyIncome,
   netWorth,
+  freedomLabel = null,
   spaardoel = null,
+  completeness,
   assets,
   debts,
+  onFillIncome,
+  onFillNetWorth,
   onAddMore,
   onFinish,
   onBack,
@@ -150,12 +186,7 @@ export function OnboardingKlaar({
                 {formatCurrency(netMonthlyIncome)}
               </span>
             ) : (
-              <span
-                className="block text-[13px] italic leading-snug text-[var(--ink-3)]"
-                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-              >
-                Vul je later aan
-              </span>
+              <LegeCelWaarde onFill={onFillIncome} ariaLabel="Vul je inkomen nu in" />
             )
           }
         />
@@ -166,12 +197,10 @@ export function OnboardingKlaar({
           mobileBottomBorder
           value={
             netWorth === null ? (
-              <span
-                className="block text-[13px] italic leading-snug text-[var(--ink-3)]"
-                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-              >
-                Vul je later aan
-              </span>
+              <LegeCelWaarde
+                onFill={onFillNetWorth}
+                ariaLabel="Vul je bezittingen en schulden nu in"
+              />
             ) : (
               <>
                 <span
@@ -183,21 +212,48 @@ export function OnboardingKlaar({
                 >
                   {formatCurrency(netWorth)}
                 </span>
-                {/* Tastbare eerste "win": kwalitatieve vrijheids-vertaling onder
-                    het vermogen. Bewust GEEN cijfer-vertaling (X jaar vrijheid):
-                    de onboarding verzamelt geen uitgaven-/dagkosten-cijfer om door
-                    te delen (estimated_monthly_expenses wordt nooit ingevuld in
-                    deze flow), dus elk getal zou verzonnen zijn. Alleen tonen bij
-                    positief vermogen — bij €0 of een tekort zou "opgebouwde
-                    vrijheid" misleidend zijn. */}
-                {netWorth > 0 && (
+                {/* Tastbare eerste "win": de vrijheids-vertaling onder het
+                    vermogen.
+
+                    Hier stond tot bevinding H12 bewust GÉÉN cijfer, met als
+                    reden dat "estimated_monthly_expenses nooit wordt ingevuld in
+                    deze flow". Die reden is verlopen: het uitgaven-scherm landde
+                    16 dagen ná het schrijven van dat besluit en vult dat veld
+                    wél. De teller komt uit dezelfde bron als de meelopende kop
+                    (`computeFreedomTicker`), dus het getal hier en het getal dat
+                    de gebruiker onderweg zag zijn per constructie hetzelfde.
+
+                    GRONDSLAG-LABEL, geen tweede som: het bedrag boven deze regel
+                    is het netto vermogen (incl. woning, min schulden) en de
+                    vrijheidstijd staat op de FIRE-pot exclusief woning. Dat
+                    verschil benoemen we in één zin in plaats van het weg te
+                    rekenen — twee grondslagen zonder label is precies de
+                    verwarring die H21 opleverde.
+
+                    Zonder teller (geen inkomen/uitgaven, of een tekort) valt de
+                    cel terug op de kwalitatieve zin, en alleen bij positief
+                    vermogen — bij €0 of een tekort zou "opgebouwde vrijheid"
+                    misleidend zijn. */}
+                {freedomLabel ? (
+                  <>
+                    <span className="mt-1.5 block font-mono text-[11px] tabular-nums text-[var(--module-active-700)]">
+                      Al vrijgekocht &middot; {freedomLabel}
+                    </span>
+                    <span
+                      className="mt-1 block text-[11px] italic leading-snug text-[var(--ink-3)]"
+                      style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+                    >
+                      Je eigen woning en je schulden tellen hier nog niet mee.
+                    </span>
+                  </>
+                ) : netWorth > 0 ? (
                   <span
                     className="mt-1.5 block text-[11px] italic leading-snug text-[var(--ink-3)]"
                     style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
                   >
                     Je eerste vrijheid staat op de teller &mdash; vanaf hier laat ik &lsquo;m groeien.
                   </span>
-                )}
+                ) : null}
               </>
             )
           }
@@ -233,39 +289,88 @@ export function OnboardingKlaar({
           <RecapCell
             kicker="Voortgang"
             value={
-              <span
-                className="block text-[22px] sm:text-[28px] font-black leading-none italic tabular-nums tracking-[-0.02em]"
-                style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: 'var(--ink)' }}
-              >
+              <>
                 <span
-                  className="inline px-1"
-                  style={{
-                    backgroundImage:
-                      'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
-                  }}
+                  className="block text-[22px] sm:text-[28px] font-black leading-none italic tabular-nums tracking-[-0.02em]"
+                  style={{ fontFamily: 'var(--font-playfair, Georgia, serif)', color: 'var(--ink)' }}
                 >
-                  100%
+                  <span
+                    className="inline px-1"
+                    style={{
+                      backgroundImage:
+                        'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
+                    }}
+                  >
+                    {completeness.gevuld} van {completeness.totaal}
+                  </span>
                 </span>
-              </span>
+                <span
+                  className="mt-1.5 block text-[11px] italic leading-snug text-[var(--ink-3)]"
+                  style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+                >
+                  onderdelen ingevuld
+                </span>
+              </>
             }
           />
         )}
       </div>
 
-      {/* Subtiele uitleg onder de strip — krant-italic, optioneel. */}
+      {/* Subtiele uitleg onder de strip — krant-italic.
+          Volgt de échte compleetheid, niet "einde wizard bereikt": de oude
+          tekst "Je bent klaar!" verscheen juist wanneer er níets was ingevuld
+          (bevinding M11) en bevestigde daarmee de valse 100%. */}
       <p
         className="mt-4 italic text-sm leading-snug text-[var(--ink-3)] max-w-[60ch]"
         style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
       >
-        {hasOptionalData
-          ? 'Klopt het? Tik door naar je overzicht — alles is later aanpasbaar.'
-          : 'Je bent klaar! Aanvullen kan altijd, vanuit je overzicht.'}
+        {completeness.isCompleet
+          ? 'Alles staat er. Klopt het? Tik door naar je overzicht — alles is later aanpasbaar.'
+          : `Nog open: ${formatOpenOnderdelen(completeness.open)}. Aanvullen kan altijd vanuit je overzicht — je vooruitblik wordt er scherper van.`}
       </p>
     </OnboardingShell>
   )
 }
 
 // ── Subcomponents ─────────────────────────────────────────────────────
+
+/**
+ * Waarde van een nog niet ingevulde recap-cel. Met `onFill` is dit een echte
+ * knop die terugspringt naar de bijbehorende stap — de tweede helft van
+ * bevinding M11 ("maak de lege velden op het eindscherm direct klikbaar").
+ * Zonder handler blijft het de oude statische tekst, zodat de component ook
+ * los (bv. in een test) bruikbaar blijft.
+ */
+function LegeCelWaarde({ onFill, ariaLabel }: { onFill?: () => void; ariaLabel: string }) {
+  const serif = { fontFamily: 'var(--font-source-serif, Georgia, serif)' }
+
+  if (!onFill) {
+    return (
+      <span className="block text-[13px] italic leading-snug text-[var(--ink-3)]" style={serif}>
+        Vul je later aan
+      </span>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onFill}
+      aria-label={ariaLabel}
+      className="group block min-h-11 w-full text-left"
+    >
+      <span className="block text-[13px] italic leading-snug text-[var(--ink-3)]" style={serif}>
+        Nog niet ingevuld
+      </span>
+      <span
+        className="mt-1 block text-[11px] not-italic underline underline-offset-4 text-[var(--ink-2)] transition-colors group-hover:text-[var(--ink)]"
+        style={serif}
+      >
+        Nu invullen &rarr;
+      </span>
+    </button>
+  )
+}
 
 /**
  * Eén cel binnen de recap-figures-strip. De strip is op mobile één gestapelde

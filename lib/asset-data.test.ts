@@ -108,6 +108,15 @@ describe('ASSET_CLIENT_COLUMNS — kolomcontract voor client-lezingen op `assets
     'address_postcode',
     'annual_dividend',
     'asset_type',
+    // Box 3-vrijstellingsoverschrijving — toegevoegd door
+    // supabase/migrations/20260827120000_assets_box3_vrijgesteld.sql (M23).
+    // LET OP: die migratie is geschreven maar nog NIET op de remote database
+    // toegepast; dat gebeurt bij de release-stap, en moet VÓÓR de deploy van
+    // deze code gebeuren — anders geeft PostgREST een 400 op elke lezing die
+    // `ASSET_CLIENT_COLUMNS` gebruikt (en dat is precies de stille-lege-scherm-
+    // fout die deze test bewaakt).
+    'box3_vrijgesteld',
+    'box3_vrijstelling_reden',
     'created_at',
     'current_value',
     'depreciation_rate',
@@ -151,8 +160,8 @@ describe('ASSET_CLIENT_COLUMNS — kolomcontract voor client-lezingen op `assets
     'woz_value',
   ])
 
-  it('SCHEMA_COLUMNS-fixture zelf telt 48 (sanity op de ground truth)', () => {
-    expect(SCHEMA_COLUMNS.size).toBe(48)
+  it('SCHEMA_COLUMNS-fixture zelf telt 50 (sanity op de ground truth)', () => {
+    expect(SCHEMA_COLUMNS.size).toBe(50)
   })
 
   it('bevat GEEN van de drie account-nummer-kolommen — exacte namen, geen substring-check', () => {

@@ -17,11 +17,21 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ASSET_CLIENT_COLUMN_LIST } from '@/lib/asset-data'
 
+/**
+ * Wijst naar de LAATSTE definitie van de functie, niet naar de eerste. De
+ * migratiemap is append-only, dus een herdefinitie (CREATE OR REPLACE) komt in
+ * een nieuw bestand; die is wat er straks draait en dus wat deze test moet
+ * bewaken. Verplaats deze constante mee zodra de functie opnieuw wordt
+ * gedefinieerd — anders keurt de test een definitie goed die niet meer geldt.
+ *
+ * Historie: 20260802190000 (eerste expliciete projectie, verving to_jsonb),
+ * 20260827123000 (M23 — box3_vrijgesteld + box3_vrijstelling_reden erbij).
+ */
 const MIGRATION = join(
   process.cwd(),
   'supabase',
   'migrations',
-  '20260802190000_household_partner_items_expliciete_kolomprojectie.sql',
+  '20260827123000_household_partner_items_box3_vrijgesteld.sql',
 )
 
 const raw = readFileSync(MIGRATION, 'utf8')

@@ -235,6 +235,15 @@ describe('GET /api/report — broncontrole: consumeert de horizon-kernel', () =>
     expect(cardSrc).not.toMatch(/(?<!\w)computeFireProjection\s*\(/)
     expect(cardSrc).toMatch(/loadDashboardData/)
   })
+
+  it('de kaart legt de canonieke /overzicht-kerngetallen over de bundel (H4)', () => {
+    // De bundel leidt freedomPct (en score/noodfonds) ONAFHANKELIJK af; /overzicht
+    // patcht ze met de horizon-waarden. Zonder dezelfde stap toont dit outbound-
+    // artefact een ander vrijheids-% dan het scherm waar de gebruiker 'm deelt —
+    // exact de tegenspraak die H4 beschrijft (24,2% versus 11%).
+    expect(cardSrc).toMatch(/withCanonicalOverviewFigures\s*\(/)
+    expect(cardSrc).toMatch(/loadHorizonData\s*\(/)
+  })
 })
 
 describe('GET /api/report — gedragspin op de FIRE-leeftijd', () => {

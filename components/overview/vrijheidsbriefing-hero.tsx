@@ -28,10 +28,14 @@ export function VrijheidsbriefingHero({
   const up = (deltaDays ?? 0) > 0
   const counted = useCountUp(hasDelta ? Math.abs(deltaDays as number) : 0, { start: hasEntered })
 
+  // H15 (merkstem, geen logica): `isDeficit` is strikt "netto vermogen < 0" —
+  // niet "beginner". Wie €300k bezit naast €350k hypotheek heeft wel degelijk
+  // vrijheid opgebouwd; "je eerste vrijheid" las die opbouw weg. De regel
+  // benoemt nu de stand, niet de gebruiker.
   const fallbackLine = isInfinite
     ? 'Vul je uitgaven aan om je vrijheidstijd te zien'
     : isDeficit
-      ? 'Bouw je eerste vrijheid op — elke euro telt'
+      ? 'Je schulden zijn nu groter dan je bezittingen — elke afgeloste euro telt'
       : `${totalLabel} vrij`
 
   return (

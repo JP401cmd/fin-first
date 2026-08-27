@@ -82,6 +82,15 @@ export const OVERLAY_QUERY_KEYS = {
   // nog niet doorlopen + opgeslagen heeft. Bij close wordt de param
   // weggehaald (horizon-client cleant URL na mount).
   horizonSetup:  'horizonSetup',
+  // Trigger voor de rekenmodal "Zo is het rendement berekend"
+  // (components/core/asset-return-modal.tsx) op
+  // `/overzicht/bezittingen?rendementUitleg=open`. Kaart H7: die uitleg hing aan
+  // precies één knop op precies één pagina, terwijl het woord "rendement" op vijf
+  // andere plekken staat. De dashboard-widgets linken hier nu heen, zodat elk
+  // rendementsgetal bij dezelfde uitleg uitkomt in plaats van dat de modal
+  // gekopieerd wordt naar elke widget. Sheet-achtige overlay, dus (net als
+  // planEditor/newBudget) géén PANE_QUERY_KEY, wél een trigger.
+  rendementUitleg: 'rendementUitleg',
   tab:           'tab',
   edit:          'edit',
   via:           'via',
@@ -104,7 +113,7 @@ export const PANE_QUERY_KEYS = ['budget', 'debt', 'asset', 'cryptoHolding', 'hol
  * binnengekomen trigger-param(s) op te ruimen, zodat de zojuist ontgrendelde
  * pagina kaal opent i.p.v. per ongeluk de overlay te openen.
  */
-export const OVERLAY_TRIGGER_KEYS = [...PANE_QUERY_KEYS, 'planEditor', 'newBudget'] as const satisfies readonly OverlayQueryKey[]
+export const OVERLAY_TRIGGER_KEYS = [...PANE_QUERY_KEYS, 'planEditor', 'newBudget', 'rendementUitleg'] as const satisfies readonly OverlayQueryKey[]
 
 /** De actuele URL-param-namen (values) die een overlay auto-openen — voor whitelist-based strippen uit een query-string. */
 export const OVERLAY_TRIGGER_PARAMS: readonly string[] = OVERLAY_TRIGGER_KEYS.map(

@@ -49,11 +49,14 @@ export const NoodfondsWidget = memo(function NoodfondsWidget({ size, data, href 
     : null
   const freedomStr = freedomTime ? formatFreedomTimeString(freedomTime, 'short') : null
 
-  // TWEE GRONDSLAGEN, expliciet benoemd (W29).
-  // De dekking (`monthsCovered`) en de vrijheidstijd delen dezelfde TELLER (de
-  // canonieke liquide pot) maar hebben bewust een andere NOEMER:
-  //   dekking      = pot ÷ effectiveMonthlyExpenses  → "je maanduitgaven"
+  // DRIE GRONDSLAGEN, expliciet benoemd (W29, bijgewerkt bij H4).
+  // Alle drie delen dezelfde TELLER (de canonieke liquide pot) maar hebben
+  // bewust een andere NOEMER:
+  //   dekking      = pot ÷ netto maandsalaris → de norm (3×, sinds 29 jul 2026)
+  //   runway       = pot ÷ maanduitgaven      → "hoe lang kom je hiervan rond"
   //   vrijheidstijd = pot ÷ dailyExpenseRate (12-mnd rolling) → "je gemiddelde uitgaven"
+  // Op /overzicht komt deze bundel sinds H4 uit `withCanonicalOverviewFigures`,
+  // dus exact dezelfde cijfers als de noodfonds-pijler in de gezondheidsmodal.
   // Beide komen kant-en-klaar uit de bundel (consume, don't recompute); de widget
   // labelt ze alleen zó dat "6 mnd gedekt" naast "~2 mnd vrijheid" geen tegenspraak
   // meer leest. Het gelijktrekken van de noemers zelf is een rekenmotor-besluit.

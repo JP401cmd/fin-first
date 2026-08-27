@@ -22,6 +22,11 @@ import { formatFireAge } from '@/lib/horizon-data'
 import type { SimResult, SimCashflow } from '@/lib/fire-simulation'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import { type FireEndStrategy, STRATEGY_LABELS } from '@/lib/fire-strategy'
+import {
+  guardFireTarget,
+  guardFreedomAge,
+  HORIZON_MISSENDE_GEGEVENS_LABEL,
+} from '@/lib/horizon/outcome-guard'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -301,7 +306,19 @@ export const SimChartModal = memo(function SimChartModal({
             <p className="mb-1 font-sans text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--ink-4)]">
               Benodigde FIRE-vermogen
             </p>
-            <KassabonRow label="Simulatie-berekend vereist bedrag" amount={requiredFirePortfolio} dailyRate={dailyRate} emphasis />
+            {/* M6-vangrail: een niet-positief of uit-de-eind-horizon-terugval-bedrag
+                is geen "benodigd vermogen" — dan een gegevensmelding, geen getal.
+                Zelfde guard als de KPI-tegel op /toekomst (één grondslag). */}
+            {guardFireTarget(requiredFirePortfolio, {
+              isEndOfHorizonFallback: simResult.requiredFireIsEndOfHorizonFallback === true,
+            }).ok ? (
+              <KassabonRow label="Simulatie-berekend vereist bedrag" amount={requiredFirePortfolio} dailyRate={dailyRate} emphasis />
+            ) : (
+              <div className="flex justify-between gap-3 py-0.5">
+                <span className="font-sans text-sm text-[var(--ink-2)]">Simulatie-berekend vereist bedrag</span>
+                <span className="text-right font-sans text-sm text-[var(--ink-3)]">{HORIZON_MISSENDE_GEGEVENS_LABEL}</span>
+              </div>
+            )}
             {fireReachable && (
               <KassabonRow label="Vermogen op FIRE-moment" amount={firePortfolioAtFire} dailyRate={dailyRate} />
             )}
@@ -594,6 +611,8 @@ export const SimChartWidget = memo(function SimChartWidget({
   } = simResult
 
   const resolvedCurrentAge = currentAge ?? 30
+  // Zie de M6-noot bij het kopgetal hieronder.
+  const toonbareFireAge = guardFreedomAge(fireAgeFractional).ok ? fireAgeFractional : null
 
   return (
     <>
@@ -635,12 +654,14 @@ export const SimChartWidget = memo(function SimChartWidget({
               <span className="font-sans text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
                 Vrijheidsleeftijd
               </span>
+              {/* M6-vangrail: een leeftijd op/voorbij het horizonplafond is de
+                  parkeerstand van de bisectie — nooit als "100,0" tonen. */}
               <div className="font-display text-[40px] sm:text-[48px] font-bold leading-none tracking-tight text-[var(--ink)]">
-                {fireAgeFractional !== null ? fireAgeFractional.toFixed(1) : '—'}
+                {toonbareFireAge !== null ? toonbareFireAge.toFixed(1) : '—'}
               </div>
               <span className="font-sans text-[11px] text-[var(--ink-3)]">
-                {fireAgeFractional !== null
-                  ? formatFireAge(fireAgeFractional) + ' oud'
+                {toonbareFireAge !== null
+                  ? formatFireAge(toonbareFireAge) + ' oud'
                   : `niet bereikbaar vóór leeftijd ${simResult.displayEndAge}`}
               </span>
             </div>

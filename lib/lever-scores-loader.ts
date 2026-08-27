@@ -117,6 +117,15 @@ type AssetRow = {
   current_value: number | string
   asset_type?: string | null
   net_worth_inclusion_pct?: number | null
+  // Nodig voor de canonieke Box 3-indeling (classifyAsset via
+  // computeBox3TaxableInput): subtype-nuance (kunst vs. sieraden), de
+  // pensioen-vlag en de handmatige vrijstellings-overschrijving.
+  // `getActiveAssets` levert ze via ASSET_CLIENT_COLUMNS.
+  id?: string | null
+  subtype?: string | null
+  tax_benefit?: boolean | null
+  box3_vrijgesteld?: boolean | null
+  box3_vrijstelling_reden?: string | null
 }
 type DebtRow = {
   current_balance: number | string
@@ -151,11 +160,31 @@ type Tx6mRow = {
  * @param supabase    Server-client (RLS-gescoped op de ingelogde gebruiker).
  * @param perspective Stuurt UITSLUITEND `netWorth` (perspectief-correct, via
  *   `loadPerspectiveDataServer` — privacy reeds server-side toegepast). De vier
- *   LEVER-SCORES + Box 1/3-statussen blijven ALTIJD personal-perspectief: hun
- *   queries zijn user-scoped (eq('user_id')) — identiek aan de sidebar-dots,
- *   die óók geen huishoud-/partnerperspectief op de hefbomen-status toepassen.
- *   Een household/partner-view toont dus dezelfde (persoonlijke) hefboomstatus,
- *   maar wél het perspectief-correcte netto vermogen — gelijk aan de hero.
+ *   LEVER-SCORES + Box 1/3-statussen volgen de PERSPECTIEF-SCHAKELAAR NIET: ze
+ *   staan vast op de RLS-scope van de ingelogde gebruiker en veranderen dus niet
+ *   als je naar een household/partner-view wisselt. Een household-view toont
+ *   daarom dezelfde hefboomstatus, maar wél het perspectief-correcte netto
+ *   vermogen — gelijk aan de hero.
+ *
+ *   WAT DIE RLS-SCOPE PRECIES IS (en wat hier eerder verkeerd stond): dit is
+ *   NIET "alleen eigen rijen". De eerdere formulering beloofde `eq('user_id')`,
+ *   maar die expliciete filter is vervallen toen de queries naar de gedeelde
+ *   basisdata-laag verhuisden (`lib/server-data/base.ts#getActiveAssets`, zie de
+ *   toelichting bij de Promise.all hieronder). De SELECT-policy op `assets` is
+ *   `auth.uid() = user_id OR (ownership = 'shared' AND household_id =
+ *   user_household_id())`, dus de rijen zijn EIGEN + HUISHOUD-GEDEELD bezit.
+ *   Partner-PRIVÉ bezit blijft buiten bereik — RLS blokkeert dat, er lekt niets.
+ *
+ *   Dat is ook de INHOUDELIJK juiste grondslag voor dit signaal, geen toeval:
+ *   een gezamenlijke spaarrekening is echt Box 3-vermogen van deze gebruiker, en
+ *   `computeBox3TaxableInput` weegt elke post met `net_worth_inclusion_pct` —
+ *   precies het mechanisme voor deels-eigen bezit. Zou je hier `eq('user_id')`
+ *   terugzetten, dan verdwijnt gedeeld bezit uit de status terwijl de
+ *   Belasting-kaart (`app/(app)/overzicht/belasting/page.tsx`) via dezelfde
+ *   `getActiveAssets` wél gedeeld bezit meetelt — dan breekt exact de
+ *   "kaart-status == sidebar-status"-belofte waarvoor `lib/box3-taxable-input.ts`
+ *   bestaat. De twee call-sites van `computeBox3TaxableInput` delen bewust één
+ *   scoping; wijzig ze nooit los van elkaar.
  */
 export const loadLeverScores = cache(async function loadLeverScores(
   supabase: SupabaseClient,

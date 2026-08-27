@@ -100,6 +100,62 @@ export function formatCurrencyDecimals(value: number): string {
   }).format(safe)
 }
 
+// ── Prognose-weergave: eerlijke precisie op kopgetallen (M5) ──────────────
+//
+// AANLEIDING (bevinding M5, 24-08-2026): de prognosekoppen op /overzicht en
+// /toekomst tonen een projectie van vijftien jaar vooruit tot op de euro —
+// "Vermogen bij vrijheid → €887.689", "DOELBEDRAG €676.698". Het getal klopt
+// als rekenuitkomst, maar de wéérgave belooft een precisie die geen enkele
+// projectie heeft. Dat leest als schijnzekerheid.
+//
+// De regel die dit blok vastlegt: een bedrag dat uit een PROJECTIE komt en als
+// KOPGETAL op het scherm staat, wordt afgerond op significante cijfers en
+// draagt zichtbaar "ca.". De onderbouwing (rendement, inflatie, SWR) blijft
+// exact — die staat in de kassabon, waar precisie wél iets betekent.
+//
+// Bewust NIET van toepassing op gerealiseerde bedragen (saldo, transactie,
+// huidig netto vermogen): dáár is de euro echt en zou afronden liegen.
+
+/**
+ * Rond af op `digits` significante cijfers — de afrondingsregel achter een
+ * prognose-kopgetal.
+ *
+ * Twee significante cijfers is de standaard: €676.698 → €680.000, €887.689 →
+ * €890.000. Onder de afrondingsdrempel (waar de rondingsfactor ≤ 1 wordt, dus
+ * bij bedragen onder de ~100) valt de helper terug op hele euro's — kleine
+ * bedragen verder afronden maakt ze onherkenbaar, niet eerlijker.
+ *
+ * Symmetrisch in het teken; NaN/Infinity/undefined → 0 via `safeNumber`.
+ */
+export function roundToSignificant(value: number, digits = 2): number {
+  const safe = safeNumber(value)
+  if (safe === 0) return 0
+  const d = Number.isFinite(digits) && digits >= 1 ? Math.floor(digits) : 2
+  const magnitude = Math.floor(Math.log10(Math.abs(safe)))
+  const factor = Math.pow(10, magnitude - d + 1)
+  if (factor <= 1) return Math.round(safe)
+  return Math.round(safe / factor) * factor
+}
+
+/**
+ * Het "ongeveer"-voorvoegsel voor prognosebedragen. Harde spatie, zodat "ca."
+ * nooit alleen op een regel achterblijft — een kopgetal breekt anders midden in
+ * zijn eigen voorbehoud.
+ */
+export const APPROX_PREFIX = 'ca. '
+
+/**
+ * Prognosebedrag als kopgetal: afgerond op significante cijfers én zichtbaar
+ * gemarkeerd als schatting ("ca. €680.000").
+ *
+ * Gebruik dit voor elk bedrag dat uit de projectiemotor komt en als kopgetal op
+ * het scherm staat. Voor de onderbouwing in een kassabon blijft `formatCurrency`
+ * de juiste keuze.
+ */
+export function formatApproxCurrency(value: number, digits = 2): string {
+  return `${APPROX_PREFIX}${formatCurrency(roundToSignificant(value, digits))}`
+}
+
 /**
  * Fixed placeholder for masked monetary amounts.
  *
@@ -133,6 +189,22 @@ export function formatMaskedCurrency(
   if (masked) return MASKED_AMOUNT_PLACEHOLDER
   // formatCurrency's safeNumber guard handles null/undefined/NaN internally.
   return formatCurrency((value ?? 0) as number)
+}
+
+/**
+ * Privacy-bewuste variant van `formatApproxCurrency` — de prognose-tegenhanger
+ * van `formatMaskedCurrency`.
+ *
+ * Gemaskeerd valt óók het "ca."-voorvoegsel weg: de bullets zijn geen bedrag,
+ * dus er valt niets te benaderen.
+ */
+export function formatMaskedApproxCurrency(
+  value: number | null | undefined,
+  masked: boolean,
+  digits = 2,
+): string {
+  if (masked) return MASKED_AMOUNT_PLACEHOLDER
+  return formatApproxCurrency((value ?? 0) as number, digits)
 }
 
 /**
@@ -373,6 +445,70 @@ export function formatFreedomTimeString(
 
   // Join with "en" for the last part: "12 jaar en 3 maanden"
   return parts.slice(0, -1).join(', ') + ' en ' + parts[parts.length - 1]
+}
+
+/** Herkomst van het dagtarief — spiegelt `RecentDailyExpenseRate.source`. */
+export type FreedomRateSource = 'transactions' | 'estimate' | 'none'
+
+/**
+ * De VOETNOOT bij een vrijheidsdagen-getal: welk dagtarief is gebruikt, en waar
+ * komt dat vandaan.
+ *
+ * ── Waarom dit een gedeelde helper is ───────────────────────────────────────
+ * Vrijheidsdagen zijn bedoeld om opties te vergelijken. Dat werkt alleen als
+ * elk scherm dezelfde wisselkoers gebruikt ÉN als die koers afleesbaar is —
+ * anders is "€569 = 3 dagen" hier en "€569 = 17 dagen" daar niet te rijmen
+ * (M22). De koers zelf is nu overal dezelfde (`lib/expense-rate.ts`); deze
+ * functie zorgt dat hij ook overal hetzelfde HEET, zodat er geen acht
+ * formuleringen van dezelfde voetnoot ontstaan.
+ *
+ * Herstelt bewust het patroon uit de oude `/core/belasting`-route
+ * ("= X vrijheidsdagen (bij €Y/dag)"), die met de redirect naar
+ * `/overzicht/belasting` van het scherm verdween.
+ *
+ * @param dailyRate - Het GEBRUIKTE dagtarief (€/dag). ≤ 0 → `null`: zonder
+ *   eerlijke dagbasis hoort er ook geen tijdregel te staan om te voetnoten.
+ * @param source - Herkomst; 'estimate' benoemt zichzelf als schatting, zodat
+ *   een tarief uit het profiel niet als gemeten uitgavenpatroon leest.
+ * @param format - 'long' = losse zin ("Tegen je dagtarief van € 124 per dag —
+ *   je uitgaven over de afgelopen 12 maanden."), 'short' = inline achtervoegsel
+ *   ("bij € 124/dag").
+ * @param masked - Privacymodus (`useMaskedAmounts().masked`). true → `null`.
+ *
+ *   ── WAAROM DE MASKERING HIER WOONT EN NIET BIJ DE CALL-SITES ─────────────
+ *   Het dagtarief is de WISSELKOERS tussen euro's en de vrijheidsdagen ernaast:
+ *   bedrag = dagen × tarief. Staat er "3 vrijheidsdagen" naast een gemaskeerd
+ *   bedrag, dan is dat bedrag met een zichtbaar tarief exact terug te rekenen —
+ *   precies het patroon dat ADR 0091 laag 4 beschrijft (een afgeleide die
+ *   lineair is in een gemaskeerd bedrag maskeert mee). De voetnoot maakt de
+ *   maskering dus INVERTEERBAAR in plaats van hem te ondersteunen.
+ *
+ *   Die regel staat bewust in deze functie en niet in de vier oppervlakken die
+ *   hem renderen: een call-site die de maskering vergeet, opent het lek
+ *   opnieuw, en dat is precies de bugklasse (één regel, meerdere huizen) die
+ *   deze functie zelf bestaat om te sluiten. `masked` heeft géén default —
+ *   TypeScript dwingt elke aanroeper de vraag te beantwoorden.
+ *
+ * @returns De voetnoottekst, of `null` wanneer er geen tarief te tonen is
+ *   (tarief 0, geen eerlijke dagbasis, of privacymodus aan).
+ */
+export function formatFreedomRateFootnote(
+  dailyRate: number,
+  source: FreedomRateSource,
+  masked: boolean,
+  format: 'long' | 'short' = 'long'
+): string | null {
+  if (masked) return null
+  const rate = safeNumber(dailyRate)
+  if (rate <= 0 || source === 'none') return null
+
+  const bedrag = formatCurrency(rate)
+  if (format === 'short') {
+    return source === 'estimate' ? `bij ${bedrag}/dag (schatting)` : `bij ${bedrag}/dag`
+  }
+  return source === 'estimate'
+    ? `Tegen je dagtarief van ${bedrag} per dag — een schatting uit je profiel, want er zijn nog geen uitgaven geboekt.`
+    : `Tegen je dagtarief van ${bedrag} per dag — je uitgaven over de afgelopen 12 maanden.`
 }
 
 /**

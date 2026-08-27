@@ -546,7 +546,7 @@ export interface PensioenPot {
 
 /**
  * AOW-basisbedragen per maand (vóór opbouwkorting) die de kern in B21 gebruikt —
- * de OPTIONELE injectie-variant van de Excel-tabelconstanten (gap-besluit V20,
+ * de OPTIONELE injectie-variant van de Excel-tabelconstanten (gap-besluit V21,
  * ADR 0064).
  *
  * Weggelaten → de kern valt terug op de Excel-oracle-waarden 1452/993 uit
@@ -731,4 +731,33 @@ export interface KernelInput {
    * AAN draaien en vervalt deze vlag.
    */
   readonly tekortAflossingUitLiquide?: boolean
+  /**
+   * **Buiten oracle-domein (gap-besluit V21 — bevinding M6).** Scopt de bewuste
+   * B93-"doel=0-quirk": `reached_now` mag alleen vallen op een doel dat er ook
+   * echt is.
+   *
+   * P!B93 luidt `IF(Prognose!J(0) ≥ B36; "reached_now"; IF(B38 < 0; …))`. Voor
+   * B36 > 0 is dat een zinnige toets ("je hebt het al"); voor B36 = 0 is het de
+   * gedocumenteerde quirk (triviaal waar). Twee gevallen maken de uitkomst dan
+   * ONMOGELIJK i.p.v. quirky:
+   *  - **B36 < 0** — een negatief doelvermogen is geen FIRE-doel maar het teken
+   *    van een structureel tekort; de vergelijking slaagt daar bijna altijd.
+   *  - **B38 < 0 (gap)** — er is géén toereikende maand gevonden en B16 staat op
+   *    de horizon-parkeerstand (leeftijd 100). Bij B36 = 0 maskeert het triviaal
+   *    ware `J(0) ≥ 0` precies die parkeerstand, waarna de bridge
+   *    `fireReachable = true` afleidt en de app "Vrijheidsleeftijd 100,0 jaar"
+   *    toont als hard feit. Dat is de rekenkant van bevinding M6.
+   *
+   * Met de vlag AAN vallen beide gevallen op `unreachable_within_horizon`
+   * (⇒ `fireReachable = false` in de bridge). De `pension_shortfall`-tak blijft
+   * ongemoeid (die gaat vóór). Een `reached_now` mét een niet-negatieve gap
+   * (échte "je bent al vrij") verandert niet.
+   *
+   * Weggelaten/`false` → **byte-identiek aan het Excel v5-oracle**:
+   * `input-from-fixture` zet 'm níet, dus de parity-fixtures blijven groen. De
+   * app-adapter (`buildKernelInputFromApp*`) zet 'm op `true`. De scalar-router
+   * paste deze lezing al toe in zijn eigen status-mapping; hiermee delen beide
+   * paden dezelfde regel.
+   */
+  readonly reachedNowVereistBereikbaarDoel?: boolean
 }

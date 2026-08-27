@@ -4,6 +4,7 @@ import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import {
   formatCurrency,
   formatCurrencyDecimals,
+  roundToSignificant,
   MASKED_AMOUNT_PLACEHOLDER,
 } from '@/lib/format'
 
@@ -24,6 +25,15 @@ interface Props {
   tone?: MaskTone
   /** Use 2-decimal formatting (e.g. €1.234,56). Default false (rounded to whole euros). */
   decimals?: boolean
+  /**
+   * Prognose-weergave: afronden op significante cijfers mét "ca."-voorvoegsel
+   * ("ca. €680.000") via `formatApproxCurrency`. Gebruik dit op KOPGETALLEN die
+   * uit de projectiemotor komen — een projectie tot op de euro leest als
+   * schijnzekerheid (M5). De onderbouwing in de kassabon blijft exact, dus zet
+   * `approx` daar NIET aan. Wint van `decimals` (een benadering met centen is
+   * een tegenspraak). Default false.
+   */
+  approx?: boolean
   /** Optional sign prefix that survives masking (e.g. '+' for deltas). Hidden when masked to avoid leaking direction. */
   signPrefix?: '+' | '-' | ''
   /** Extra classes applied to the wrapper span (size, weight, font-family, etc). */
@@ -41,6 +51,7 @@ export function MaskedAmount({
   value,
   tone = 'module',
   decimals = false,
+  approx = false,
   signPrefix,
   className,
   monoWhenVisible = true,
@@ -57,12 +68,26 @@ export function MaskedAmount({
   }
 
   const safe = value ?? 0
-  const formatted = decimals ? formatCurrencyDecimals(safe) : formatCurrency(safe)
+  const formatted = approx
+    ? formatCurrency(roundToSignificant(safe))
+    : decimals
+      ? formatCurrencyDecimals(safe)
+      : formatCurrency(safe)
   const withSign = signPrefix ? `${signPrefix}${formatted}` : formatted
 
   const fontClass = monoWhenVisible ? 'font-mono tabular-nums' : 'tabular-nums'
   return (
     <span className={`${fontClass} ${className ?? ''}`.trim()}>
+      {/* "ca." als eigen, lichtere prefix — niet ín de tekststring. Op een
+          KPI-kopgetal staat het bedrag in Playfair black op 24-28px; het
+          voorbehoud meelaten groeien zou de cel laten overlopen én het
+          voorbehoud even luid maken als het antwoord. Kleiner, in ink-3, op
+          dezelfde basislijn: leesbaar voorbehoud, ongewijzigde cijferkolom. */}
+      {approx && (
+        <span className="mr-[0.2em] align-baseline text-[0.58em] font-normal not-italic tracking-normal text-[var(--ink-3)]">
+          ca.
+        </span>
+      )}
       {withSign}
     </span>
   )

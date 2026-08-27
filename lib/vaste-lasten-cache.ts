@@ -140,6 +140,25 @@ function digest(input: string): string {
  *     dezelfde tekst op als {naam: 'Huurmonthly', frequentie: ''} — een botsing
  *     vóór het hashen, die geen aantal hash-bits meer kan repareren.
  */
+/**
+ * VERSIE VAN DE SAMENVATTINGSLOGICA — hoogt op bij elke wijziging die bij
+ * ONVERANDERDE gegevens een ANDERE samenvatting oplevert.
+ *
+ * De vingerafdruk meet het INVOERMATERIAAL, niet de code die het verwerkt. Een
+ * warme instance die de vorige versie heeft onthouden zou na een deploy dus een
+ * geldige vingerafdruk zien en het OUDE totaal blijven serveren tot de TTL
+ * (30 min) of de eerstvolgende datawijziging — precies wanneer je wilt dat het
+ * nieuwe getal er staat. In de praktijk start een deploy verse instances, dus
+ * dit is een vangnet, geen mechanisme; het kost één constante en sluit de
+ * mogelijkheid af.
+ *
+ *   1 — oorspronkelijke indeling (abonnementen + vaste kosten; `other_expense`
+ *       telde onvoorwaardelijk mee)
+ *   2 — H14 fase 1: terugkerend-variabele posten uit de quote (frequentiesnede
+ *       + variabele tegenpartijen), als eigen groep getoond
+ */
+const SUMMARY_LOGIC_VERSION = 2
+
 export function vasteLastenFingerprint(input: VasteLastenFingerprintInput): string {
   const recurring = [...input.recurring]
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
@@ -154,6 +173,7 @@ export function vasteLastenFingerprint(input: VasteLastenFingerprintInput): stri
     ])
   return digest(
     JSON.stringify([
+      SUMMARY_LOGIC_VERSION,
       input.windowStart,
       input.txCount,
       input.txTransferCount,

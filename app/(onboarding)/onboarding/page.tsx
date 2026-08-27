@@ -34,6 +34,13 @@ import { applyPensionParseResult } from '@/lib/pension/apply-parse-result'
 import { formatAowAge, lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import type { PensionParseResult } from '@/app/api/pension/parse/route'
 import { SPAARDOEL_PRESETS, type SpaardoelPresetKey } from '@/lib/onboarding-presets'
+import { computeOnboardingCompleteness } from '@/lib/onboarding-completeness'
+import {
+  ONBOARDING_HOUSING_MODE,
+  computeFreedomTicker,
+  freedomTickerBasis,
+} from '@/lib/freedom-ticker'
+import { OnboardingFreedomTickerProvider } from '@/components/onboarding/freedom-ticker'
 import { INITIAL_HORIZON_DATA } from '@/components/onboarding/onboarding-horizon'
 import { OnboardingSuccess } from '@/components/onboarding/onboarding-success'
 import { WelcomePopup } from '@/components/onboarding/welcome-popup'
@@ -48,6 +55,7 @@ import {
   type NonSensitiveDraft,
   type DeferredFieldKey,
 } from './draft-persistence'
+import { DRAFT_RESTORED_NOTICE, SAVE_FAILED_NOTICE } from './draft-notice-copy'
 
 // ── localStorage key for persisting onboarding data ──────────
 const ONBOARDING_STORAGE_KEY = 'trifinity_onboarding_draft'
@@ -796,8 +804,10 @@ export default function OnboardingPage() {
       if (hasRestoredDraft && saved) {
         dispatch({ type: 'RESTORE_STATE', data: saved })
         setRestoredNotice(true)
-        // Auto-dismiss after 4 seconds
-        setTimeout(() => setRestoredNotice(false), 4000)
+        // Auto-dismiss. Sinds C3 vertelt de melding óók wat er NIET bewaard is
+        // (bedragen/posten opnieuw invullen) — dat is een instructie, geen
+        // vinkje, dus langer dan de oude 4s laten staan.
+        setTimeout(() => setRestoredNotice(false), 9000)
       }
 
       // PSD2 bank connect return: force step to bezittingen so the user sees
@@ -1151,10 +1161,18 @@ export default function OnboardingPage() {
       } else {
         message = err instanceof Error ? err.message : 'Onbekende fout bij opslaan'
       }
+      // ── OPSLAG-FOUT: GEEN NAVIGATIE ─────────────────────────────────────
+      // Besluit C3 (optie A, aug 2026): een mislukte eindopslag mag NOOIT
+      // navigeren of herladen. De ingevulde bedragen/posten staan alleen in de
+      // in-memory reducer-state (draft-persistence bewaart ze bewust niet), dus
+      // elke reload/redirect hier wist precies de invoer die de gebruiker net
+      // kwijt dreigde te raken. Alleen state-updates in dit blok — bewaakt door
+      // `save-failure-no-reload.test.ts`.
       setSaveError(message)
       // Go back to last content step before saving — all data is preserved in useReducer state
       const contentSteps = activeStepOrder.filter(s => !['saving', 'success'].includes(s))
       dispatch({ type: 'SET_STEP', step: contentSteps[contentSteps.length - 1] })
+      // ── EINDE OPSLAG-FOUT ───────────────────────────────────────────────
     } finally {
       setSaving(false)
     }
@@ -1236,6 +1254,79 @@ export default function OnboardingPage() {
     return isFinite(n) && n > 0 ? Math.round(n) : 0
   }, [state.identity.estimated_monthly_expenses])
 
+  /**
+   * Meelopende vrijheidstijd-teller (bevinding H12). Verschijnt zodra inkomen,
+   * uitgaven én de eerste bezitting bekend zijn; alle guards zitten in
+   * `computeFreedomTicker`. De grondslag volgt de woonstrategie — de onboarding
+   * vraagt die (nog) niet uit en schrijft `downsize` weg, dus de teller draait
+   * op de FIRE-pot exclusief de eigen woning en kan daardoor niet dalen.
+   */
+  const freedomTicker = useMemo(
+    () =>
+      computeFreedomTicker({
+        monthlyIncome: netMonthlyIncomeForKlaar,
+        monthlyExpenses: monthlyExpensesParsed,
+        assets: state.quickAssets.map((a) => ({
+          value: Number(a.current_value) || 0,
+          isHome: a.asset_type === 'eigen_huis',
+        })),
+        debts: state.quickDebts.reduce((s, d) => s + (Number(d.current_balance) || 0), 0),
+        basis: freedomTickerBasis(ONBOARDING_HOUSING_MODE),
+      }),
+    [netMonthlyIncomeForKlaar, monthlyExpensesParsed, state.quickAssets, state.quickDebts],
+  )
+
+  /**
+   * Spaardoel-recap voor het eindscherm — geskipt of onvolledig ingevuld geeft
+   * `null`. Eén memo zodat de recap-cel en de compleetheids-teller gegarandeerd
+   * dezelfde lezing van "spaardoel ingevuld" gebruiken.
+   */
+  const spaardoelRecap = useMemo(() => {
+    const { skipped, presetKey, name, target_value } = state.spaardoel
+    if (skipped || !presetKey || !name.trim()) return null
+    return {
+      presetKey,
+      label: name.trim(),
+      amount: parseSpaardoelAmount(target_value),
+    }
+  }, [state.spaardoel])
+
+  /**
+   * Echte profiel-compleetheid voor het eindscherm ("6 van 8"). Vervangt de
+   * hardgecodeerde "100%" uit bevinding M11. De definitie per onderdeel staat
+   * in `lib/onboarding-completeness.ts`; hier leveren we alleen de al afgeleide
+   * waarden aan.
+   */
+  const onboardingCompleteness = useMemo(
+    () =>
+      computeOnboardingCompleteness({
+        fullName: state.identity.full_name,
+        dateOfBirth: state.identity.date_of_birth,
+        netMonthlyIncome: netMonthlyIncomeForKlaar,
+        monthlyExpenses: monthlyExpensesParsed,
+        assetCount: state.quickAssets.length,
+        debtCount: state.quickDebts.length,
+        // Zelfde bron als de life_events-write bij de eind-save: alleen een
+        // upload of een schatting met bedrag levert een resultaat op.
+        pensioenResultaat: buildPensionParseResult(state.pension),
+        spaardoel: spaardoelRecap,
+        // De eindstrategie-stap kent geen overslaan-knop en ligt vóór `klaar`
+        // in de stap-volgorde: wie dit scherm ziet, heeft de keuze bevestigd.
+        // Komt er ooit een skip, dan verandert alleen deze regel.
+        eindstrategieBeantwoord: true,
+      }),
+    [
+      state.identity.full_name,
+      state.identity.date_of_birth,
+      netMonthlyIncomeForKlaar,
+      monthlyExpensesParsed,
+      state.quickAssets.length,
+      state.quickDebts.length,
+      state.pension,
+      spaardoelRecap,
+    ],
+  )
+
   // ── Render ───────────────────────────────────────────────────
 
   if (loading) {
@@ -1272,11 +1363,9 @@ export default function OnboardingPage() {
           <div className="mx-auto flex max-w-[640px] flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
             <div className="flex-1 min-w-0">
               <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-negative">
-                Opslaan mislukt
+                {SAVE_FAILED_NOTICE.label}
               </p>
-              <p className="mt-0.5 text-sm text-[var(--ink-2)]">
-                Het opslaan is niet gelukt. Je antwoorden staan nog hier &mdash; probeer het opnieuw.
-              </p>
+              <p className="mt-0.5 text-sm text-[var(--ink-2)]">{SAVE_FAILED_NOTICE.body}</p>
             </div>
             <div className="flex flex-shrink-0 items-center gap-4">
               <button
@@ -1300,16 +1389,19 @@ export default function OnboardingPage() {
       {/* ── Restored data notice ──────────────────────────────────── */}
       {restoredNotice && !saveError && (
         <div
-          className="fixed inset-x-0 top-0 z-40 border-b border-green-200 bg-green-50 px-4 py-2.5 shadow-sm"
+          className="fixed inset-x-0 top-0 z-40 border-b border-[var(--border-ed)] bg-[var(--paper)] px-4 py-2.5 shadow-sm"
           role="status"
         >
-          <div className="mx-auto flex max-w-[640px] items-center justify-between gap-3">
-            <p className="text-sm text-green-700">
-              {'✓'} Je eerder ingevulde gegevens zijn hersteld
-            </p>
+          <div className="mx-auto flex max-w-[640px] items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-[var(--ink-3)]">
+                {DRAFT_RESTORED_NOTICE.label}
+              </p>
+              <p className="mt-0.5 text-sm text-[var(--ink-2)]">{DRAFT_RESTORED_NOTICE.body}</p>
+            </div>
             <button
               onClick={() => setRestoredNotice(false)}
-              className="-mr-1 flex h-[44px] w-[44px] items-center justify-center rounded-lg text-green-400 hover:bg-green-100 hover:text-green-600 sm:mr-0 sm:h-auto sm:w-auto sm:p-1"
+              className="-mr-1 flex h-[44px] w-[44px] flex-shrink-0 items-center justify-center rounded-lg text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink)] sm:mr-0 sm:h-auto sm:w-auto sm:p-1"
               aria-label="Sluiten"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1320,7 +1412,10 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      <div className={`w-full max-w-[480px] sm:max-w-[640px] lg:max-w-none ${saveError || restoredNotice ? 'mt-16' : ''}`}>
+      {/* Clearance onder de vaste banners. Beide meldingen dragen sinds C3 een
+          label + een tweeregelige toelichting; op smal scherm wikkelt die tot
+          ~4 regels, dus mobiel ruimer dan de oude vaste mt-16. */}
+      <div className={`w-full max-w-[480px] sm:max-w-[640px] lg:max-w-none ${saveError || restoredNotice ? 'mt-32 sm:mt-20' : ''}`}>
         {/* Logo / Header — staat boven de shell-progressbar omdat dat z'n
             eigen sticky-rij heeft. Logout-knop blijft beschikbaar voor alle
             content-stappen. */}
@@ -1338,6 +1433,13 @@ export default function OnboardingPage() {
           </div>
         )}
 
+        {/* De teller staat in de sticky kop van élke stap-shell. Op `klaar`
+            bewust NIET: daar staat dezelfde vrijheidstijd al groot in de
+            vermogens-cel van de recap — twee keer hetzelfde getal op één
+            scherm leest als twee cijfers. */}
+        <OnboardingFreedomTickerProvider
+          label={state.step === 'klaar' ? null : (freedomTicker?.label ?? null)}
+        >
         <StepTransition key={state.step} direction={state.direction}>
           {/* ── Profiel-groep: naam + geboortedatum (één veld per scherm) ── */}
           {state.step === 'naam' && (
@@ -1546,19 +1648,13 @@ export default function OnboardingPage() {
             <OnboardingKlaar
               netMonthlyIncome={netMonthlyIncomeForKlaar}
               netWorth={netWorthForKlaar}
+              freedomLabel={freedomTicker?.label ?? null}
               assets={state.quickAssets}
               debts={state.quickDebts}
-              spaardoel={
-                state.spaardoel.skipped
-                  || !state.spaardoel.presetKey
-                  || !state.spaardoel.name.trim()
-                  ? null
-                  : {
-                      presetKey: state.spaardoel.presetKey,
-                      label: state.spaardoel.name.trim(),
-                      amount: parseSpaardoelAmount(state.spaardoel.target_value),
-                    }
-              }
+              spaardoel={spaardoelRecap}
+              completeness={onboardingCompleteness}
+              onFillIncome={() => dispatch({ type: 'SET_STEP', step: 'inkomen' })}
+              onFillNetWorth={() => dispatch({ type: 'SET_STEP', step: 'bezittingen' })}
               onAddMore={() => dispatch({ type: 'SET_STEP', step: 'bezittingen' })}
               onFinish={handleSaveOwnData}
               onBack={goToBack}
@@ -1604,6 +1700,7 @@ export default function OnboardingPage() {
             />
           )}
         </StepTransition>
+        </OnboardingFreedomTickerProvider>
       </div>
     </div>
   )

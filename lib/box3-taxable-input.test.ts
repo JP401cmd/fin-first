@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest'
 import {
   computeBox3TaxableInput,
   box3TaxStatus,
-  BOX3_ASSET_TYPES,
   BOX3_VRIJSTELLING_SINGLE,
 } from './box3-taxable-input'
 import { computeLeverScores } from '@/lib/lever-scores'
@@ -61,14 +60,60 @@ describe('computeBox3TaxableInput — BOX3_ASSET_TYPES filter', () => {
     expect(result.hasBox3Assets).toBe(true)
   })
 
-  it('all BOX3_ASSET_TYPES are recognised', () => {
-    for (const type of BOX3_ASSET_TYPES) {
+  it('elk Box 3-belastbaar assettype wordt herkend (canoniek: classifyAsset)', () => {
+    // M23: dit was een lus over de losse `BOX3_ASSET_TYPES`-set die naast
+    // `classifyAsset` leefde. Die set bevatte óók `deelneming`, terwijl een
+    // aanmerkelijk belang in Box 2 valt — de lus legde die tegenspraak groen
+    // vast. Nu een expliciete lijst van de typen die de canonieke bron in Box 3
+    // plaatst; `deelneming` staat er bewust NIET meer bij.
+    for (const type of ['cash', 'savings', 'investment', 'crypto', 'real_estate', 'vordering', 'other']) {
       const result = computeBox3TaxableInput(
         [{ asset_type: type, current_value: 100_000 }],
         [],
       )
       expect(result.hasBox3Assets, `${type} should be hasBox3Assets=true`).toBe(true)
     }
+  })
+
+  it('deelneming telt NIET mee — aanmerkelijk belang valt in Box 2', () => {
+    // Regressie op de opgeheven tegenspraak: de oude sidebar-set rekende een
+    // deelneming als Box 3-bezit, terwijl `classifyAsset` hem al Box 2 noemde.
+    const result = computeBox3TaxableInput(
+      [{ asset_type: 'deelneming', current_value: 250_000 }],
+      [],
+    )
+    expect(result.hasBox3Assets).toBe(false)
+    expect(result.box3TaxableAboveThreshold).toBe(0)
+  })
+
+  it('physical: sieraden vrijgesteld, kunst wél in Box 3 (subtype-nuance)', () => {
+    const sieraden = computeBox3TaxableInput(
+      [{ asset_type: 'physical', subtype: 'sieraden', current_value: 100_000 }],
+      [],
+    )
+    expect(sieraden.hasBox3Assets).toBe(false)
+
+    const kunst = computeBox3TaxableInput(
+      [{ asset_type: 'physical', subtype: 'kunst', current_value: 100_000 }],
+      [],
+    )
+    expect(kunst.hasBox3Assets).toBe(true)
+  })
+
+  it('box3_vrijgesteld-overschrijving wint van de type-afleiding, beide kanten op', () => {
+    // true op een belegging → eruit
+    const vrijgesteld = computeBox3TaxableInput(
+      [{ asset_type: 'investment', current_value: 200_000, box3_vrijgesteld: true }],
+      [],
+    )
+    expect(vrijgesteld.hasBox3Assets).toBe(false)
+
+    // false op een voertuig → er weer in (bv. een auto die als belegging wordt gehouden)
+    const nietVrijgesteld = computeBox3TaxableInput(
+      [{ asset_type: 'vehicle', current_value: 200_000, box3_vrijgesteld: false }],
+      [],
+    )
+    expect(nietVrijgesteld.hasBox3Assets).toBe(true)
   })
 
   it('mix: only the non-box3 type → hasBox3Assets false', () => {

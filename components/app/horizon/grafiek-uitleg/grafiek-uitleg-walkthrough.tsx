@@ -30,6 +30,7 @@ import {
 import { formatFireAge } from '@/lib/horizon-data'
 import { ASSET_TYPE_LABELS, type AssetType } from '@/lib/asset-data'
 import { STRATEGY_LABELS, type FireEndStrategy } from '@/lib/fire-strategy'
+import { guardFireTarget, HORIZON_MISSENDE_GEGEVENS_LABEL } from '@/lib/horizon/outcome-guard'
 import type { SimResult, SimCashflow } from '@/lib/fire-simulation'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 
@@ -226,12 +227,27 @@ export const GrafiekUitlegWalkthrough = memo(function GrafiekUitlegWalkthrough({
     data.opbouw.debtPrincipalPaidDuringAccumulation > 0
 
   // ── Hoofdstuk 2 — Terugrekening ───────────────────────────────────────────
+  // M6-vangrail: een niet-positief "benodigd vermogen", of een bedrag dat uit de
+  // eind-horizon-terugval komt, is geen benodigd vermogen — dan de gedeelde
+  // gegevensmelding i.p.v. een bedrag. ÉÉN guard-uitkomst voor zowel het
+  // figures-getal als het concept-diagram eronder, en met exact dezelfde invoer
+  // als de KPI-tegel op /toekomst en de sim-widget (anders spreekt dezelfde
+  // pagina zichzelf tegen).
+  const terugGuard = guardFireTarget(data.terugrekening.requiredFirePortfolio, {
+    isEndOfHorizonFallback: data.terugrekening.requiredFireIsEndOfHorizonFallback,
+  })
   const terugFigures: JouwGetal[] = [
-    {
-      label: 'Benodigd vermogen',
-      value: formatCurrency(data.terugrekening.requiredFirePortfolio),
-      sub: freedomNote(data.terugrekening.requiredFirePortfolio, dailyRate) ?? undefined,
-    },
+    terugGuard.ok
+      ? {
+          label: 'Benodigd vermogen',
+          value: formatCurrency(data.terugrekening.requiredFirePortfolio),
+          sub: freedomNote(data.terugrekening.requiredFirePortfolio, dailyRate) ?? undefined,
+        }
+      : {
+          label: 'Benodigd vermogen',
+          value: HORIZON_MISSENDE_GEGEVENS_LABEL,
+          sub: undefined,
+        },
     ...(data.terugrekening.incomeFloorMonthly != null
       ? [
           {
@@ -415,7 +431,9 @@ export const GrafiekUitlegWalkthrough = memo(function GrafiekUitlegWalkthrough({
       >
         <ConceptTerugrekening
           fireAgeFractional={data.snijpunt.fireAgeFractional}
-          requiredFirePortfolio={data.terugrekening.requiredFirePortfolio}
+          // Zelfde guard-uitkomst als het figures-getal hierboven: het diagram
+          // mag het ankerbedrag niet alsnog kaal benoemen (M6).
+          requiredFirePortfolio={terugGuard.ok ? data.terugrekening.requiredFirePortfolio : null}
           hasIncomeFloor={data.terugrekening.hasIncomeFloor}
         />
 

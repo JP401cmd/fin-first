@@ -17,6 +17,18 @@ export type SectionPhase =
   | { kind: 'ask'; qIndex: number }
   | { kind: 'more'; qIndex: number }
   | { kind: 'other-ask' }
+  /**
+   * Aanvinkraster: één scherm waarop de gebruiker meerdere soorten tegelijk
+   * aanvinkt; daarna opent de wizard één keer per aangevinkt type (collect-
+   * queue). Vervangt de staart van losse ja/nee-vragen in de schulden-sectie.
+   * De bezittingen-sectie gebruikt 'm (nog) niet — additief, dus veilig gedeeld.
+   *
+   * De aangevinkte types leven bewust in component-state (en dus hoogstens in
+   * de gelifte fase/orchestrator-state), NOOIT in `NonSensitiveDraft`: dat zou
+   * de veiligheidskeuze van 3 jul 2026 (gevoelige velden niet persisteren)
+   * stilzwijgend omkeren.
+   */
+  | { kind: 'pick-many' }
   | { kind: 'other-pick' }
   | { kind: 'other-more' }
   | { kind: 'review' }

@@ -6,7 +6,7 @@
 // model dat de client-componenten renderen.
 //
 // CONSUME, DON'T RECOMPUTE (harde huisregel):
-//   - aandeel% + status  → `vasteLastenCardStatus` (lib/cashflow-cards.ts)
+//   - aandeel% + status  → `vasteLastenRatio` + `vasteLastenCardStatus` (lib/cashflow-cards.ts)
 //   - meter-zones        → `VASTE_LASTEN_GOOD_MAX` / `VASTE_LASTEN_WARN_MAX`
 //   - vrijheidstijd      → `dailyExpenseRate` → `calculateFreedomTime` (lib/format)
 //   - werktijd           → `dailyIncomeRate` → `calculateWorkTime` (lib/work-time, ADR 0105)
@@ -23,6 +23,7 @@
 import type { VasteLastenSummary, VasteLastenItem } from '@/lib/vaste-lasten-summary'
 import {
   vasteLastenCardStatus,
+  vasteLastenRatio,
   VASTE_LASTEN_GOOD_MAX,
   VASTE_LASTEN_WARN_MAX,
 } from '@/lib/cashflow-cards'
@@ -103,6 +104,19 @@ export interface VasteLastenInsights {
   /** jouw abonnementen − benchmark (€/mnd). Positief = boven gemiddeld. */
   subscriptionDeltaMonthly: number
   aboveSubscriptionBenchmark: boolean
+
+  /**
+   * TERUGKEREND, MAAR VARIABEL (H14 fase 1) — posten die terugkomen maar waarvan
+   * het bedrag een keuze is (boodschappen, tanken, horeca, winkelen). Staan
+   * BUITEN `totalMonthly`, de quote, de status en de samenstelling: ze zijn geen
+   * vaste last. Wél doorgegeven zodat het scherm ze kan tónen — zie
+   * `isTerugkerendVariabel` in lib/vaste-lasten-summary.ts: onzichtbaar weglaten
+   * maakt een verkeerde indeling oncorrigeerbaar.
+   */
+  variabelMonthly: number
+  variabelCount: number
+  /** De variabele posten, aflopend op maandbedrag (gecapt op 6 voor de lijst). */
+  variabelItems: { id: string; name: string; monthlyAmount: number }[]
 
   /** Samenstelling per categorie, aflopend op maandbedrag. */
   composition: CategoryComposition[]
@@ -209,7 +223,7 @@ export function buildVasteLastenInsights(params: {
   // Aandeel + status — CONSUME (geen eigen drempels). Zonder vaste lasten of
   // zonder inkomen is er geen betekenisvol aandeel → null (spiegelt de neutrale
   // status en houdt de meter leeg).
-  const ratioOfIncome = hasData && monthlyIncome > 0 ? totalMonthly / monthlyIncome : null
+  const ratioOfIncome = hasData ? vasteLastenRatio({ totalMonthly, monthlyIncome }) : null
   const status = vasteLastenCardStatus({ totalMonthly, count, monthlyIncome })
 
   // Vrijheidstijd via het canonieke dagtarief — aangeleverd, niet zelf gerekend.
@@ -234,6 +248,12 @@ export function buildVasteLastenInsights(params: {
   )
 
   const largestSub = largestOf(summary.subscriptions)
+
+  // Variabele groep — puur doorgeven/sorteren, geen eigen som van een kerngetal.
+  const variabelItems = [...summary.terugkerendVariabel]
+    .sort((a, b) => b.monthlyAmount - a.monthlyAmount)
+    .slice(0, 6)
+    .map((i) => ({ id: i.id, name: i.name, monthlyAmount: roundCents(i.monthlyAmount) }))
 
   return {
     hasData,
@@ -268,6 +288,10 @@ export function buildVasteLastenInsights(params: {
     subscriptionBenchmarkMonthly,
     subscriptionDeltaMonthly,
     aboveSubscriptionBenchmark: subscriptionsMonthly > subscriptionBenchmarkMonthly,
+
+    variabelMonthly: roundCents(summary.totalMonthlyVariabel),
+    variabelCount: summary.terugkerendVariabel.length,
+    variabelItems,
 
     composition,
     largestItem: largestOf([...summary.subscriptions, ...summary.vasteKosten]),

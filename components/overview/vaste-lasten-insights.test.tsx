@@ -24,9 +24,9 @@ function mkSummary(): VasteLastenSummary {
     categoryLabel: CATEGORY_LABELS.rent, categoryOverride: null,
   }
   return {
-    subscriptions: [sub], vasteKosten: [rent],
+    subscriptions: [sub], vasteKosten: [rent], terugkerendVariabel: [],
     totalMonthlySubscriptions: 16, totalMonthlyVasteKosten: 900,
-    totalMonthly: 916, count: 2,
+    totalMonthlyVariabel: 0, totalMonthly: 916, count: 2,
   }
 }
 

@@ -23,7 +23,11 @@ import {
 import { buildVasteLastenInsights } from '@/lib/vaste-lasten-insights'
 import { dailyExpenseRate } from '@/lib/format'
 import { vasteLastenCardStatus } from '@/lib/cashflow-cards'
-import type { VasteLastenItem, VasteLastenSummary } from '@/lib/vaste-lasten-summary'
+import {
+  isTerugkerendVariabel,
+  type VasteLastenItem,
+  type VasteLastenSummary,
+} from '@/lib/vaste-lasten-summary'
 
 const CAT = 'wil.vaste-kosten-analyse'
 
@@ -166,11 +170,63 @@ const tests: TestCase[] = [
       assert(!SUBSCRIPTION_CATEGORIES.includes(salary), 'Salary not in subscriptions')
       assert(!VASTE_KOSTEN_CATEGORIES.includes(salary), 'Salary not in vaste kosten')
 
-      // other_expense is NOT in VASTE_KOSTEN_CATEGORIES but is included via fallback
-      // in the API route as "overige vaste lasten" when confidence is medium+
+      // other_expense staat in GEEN van beide lijsten, maar wordt via een aparte
+      // tak alsnog als "overige vaste last" meegeteld — MITS hij de H14-zeef
+      // haalt (zie de test hieronder): niet wekelijks, geen winkel/tank/horeca.
       const otherExp = detectCategory('Onbekende Partij', 'onbekend', false)
       assertEqual(otherExp, 'other_expense', 'Unknown expense = other_expense')
       assert(!SUBSCRIPTION_CATEGORIES.includes(otherExp), 'other_expense not in subscriptions')
+    },
+  },
+  {
+    id: 'vaste-kosten-terugkerend-variabel',
+    name: 'H14: boodschappen/tanken/winkelen tellen niet als vaste last',
+    description:
+      'Onherkende terugkerende uitgaven die wekelijks zijn of van een winkel/tankstation/horeca komen, ' +
+      'vallen in de groep "terugkerend, maar variabel" en dus BUITEN de vaste-lastenquote. Een onherkende ' +
+      'maandpost (particuliere verhuurder) blijft er wel in staan — dat is de spiegelfout die deze zeef niet mag maken.',
+    category: CAT,
+    priority: 'critical',
+    estimatedDurationMs: 10,
+    fn() {
+      const item = (
+        name: string,
+        frequency: VasteLastenItem['frequency'],
+        categoryOverride: string | null = null,
+      ) => ({ name, category: 'other_expense' as const, frequency, categoryOverride })
+
+      // 1. Frequentie-snede: wekelijks + onherkend = nooit een vaste last.
+      assert(
+        isTerugkerendVariabel(item('Albert Heijn', 'weekly')),
+        'Wekelijkse supermarkt valt buiten de vaste lasten',
+      )
+      // 2. Variabele tegenpartij, ook als hij maandelijks afrekent.
+      assert(
+        isTerugkerendVariabel(item('Shell Kanaalweg', 'monthly')),
+        'Tankstation valt buiten de vaste lasten',
+      )
+      // 3. SPIEGELFOUT-bewaking: een echte vaste last met onherkende
+      //    tegenpartij MOET blijven meetellen — te veel eruit filteren geeft
+      //    een vals "gezond", en een te lage quote alarmeert niet.
+      assert(
+        !isTerugkerendVariabel(item('J. Jansen', 'monthly')),
+        'Onherkende maandpost blijft een vaste last',
+      )
+      // 4. De gebruiker wint altijd.
+      assert(
+        !isTerugkerendVariabel(item('Albert Heijn', 'weekly', 'vaste_kosten')),
+        'Expliciete override overrulet de zeef',
+      )
+      // 5. Een herkende categorie komt hier nooit doorheen.
+      assert(
+        !isTerugkerendVariabel({
+          name: 'Huurbaas',
+          category: 'rent',
+          frequency: 'weekly',
+          categoryOverride: null,
+        }),
+        'Herkende categorie blijft onaangeroerd',
+      )
     },
   },
   {
@@ -282,8 +338,10 @@ const tests: TestCase[] = [
       const summary: VasteLastenSummary = {
         subscriptions: subs,
         vasteKosten: vk,
+        terugkerendVariabel: [],
         totalMonthlySubscriptions: 26,
         totalMonthlyVasteKosten: 1080,
+        totalMonthlyVariabel: 0,
         totalMonthly: 1106,
         count: 4,
       }
@@ -315,9 +373,9 @@ const tests: TestCase[] = [
       })
       for (const total of [1000, 2400, 3200]) {
         const summary: VasteLastenSummary = {
-          subscriptions: [mk(total)], vasteKosten: [],
+          subscriptions: [mk(total)], vasteKosten: [], terugkerendVariabel: [],
           totalMonthlySubscriptions: total, totalMonthlyVasteKosten: 0,
-          totalMonthly: total, count: 1,
+          totalMonthlyVariabel: 0, totalMonthly: total, count: 1,
         }
         const insights = buildVasteLastenInsights({
           summary, monthlyIncome: 4000, dailyExpenseRate: dailyExpenseRate(2500),

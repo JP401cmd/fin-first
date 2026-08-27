@@ -82,6 +82,8 @@ export function AangifteImportPane({
   fallbackTaxYear,
 }: AangifteImportPaneProps) {
   const [step, setStep] = useState<Step>('choose')
+  /** True wanneer de server deze aangifte herkende en niets opnieuw wegschreef. */
+  const [alreadyImported, setAlreadyImported] = useState(false)
   const [extraction, setExtraction] = useState<AangifteExtractionResult | null>(null)
   // Bewaar welke invoerroute (PDF of handmatig) de gebruiker koos zodat
   // back-navigatie vanaf de review-stap terugkeert naar dezelfde plek
@@ -116,6 +118,7 @@ export function AangifteImportPane({
     (payload: {
       assetIds: string[]
       debtIds: string[]
+      alreadyImported?: boolean
       collected?: {
         assets: AangifteAssetReviewItem[]
         debts: AangifteDebtReviewItem[]
@@ -133,9 +136,18 @@ export function AangifteImportPane({
       } else if (mode === 'direct-import') {
         onImported?.({ assetIds: payload.assetIds, debtIds: payload.debtIds })
       }
+      const replay = payload.alreadyImported === true
+      setAlreadyImported(replay)
       setStep('done')
       // Auto-close na korte success-flash zodat gebruiker visuele bevestiging krijgt.
-      window.setTimeout(() => handleClose(), 600)
+      //
+      // BEHALVE bij een replay: dan is er niets weggeschreven en moet de
+      // gebruiker die melding kunnen lézen. Een flash van 600ms zou precies
+      // het onderscheid wegnemen dat we hier willen tonen; het scherm blijft
+      // dan staan tot de gebruiker zelf sluit.
+      if (!replay) {
+        window.setTimeout(() => handleClose(), 600)
+      }
     },
     [mode, extraction, onCollect, onImported, handleClose],
   )
@@ -218,7 +230,9 @@ export function AangifteImportPane({
           />
         )}
 
-        {step === 'done' && <DoneStep />}
+        {step === 'done' && (
+          <DoneStep alreadyImported={alreadyImported} onClose={handleClose} />
+        )}
       </div>
     </ShellOverlay>
   )
@@ -310,7 +324,19 @@ function ChooseStep({
   )
 }
 
-function DoneStep() {
+/**
+ * Slotscherm. Twee uitkomsten die NIET op elkaar mogen lijken:
+ *   · nieuw geïmporteerd  → korte bevestiging, sluit vanzelf
+ *   · al eerder geïmporteerd → de server schreef niets weg; dat moet de
+ *     gebruiker lezen, inclusief de route om het bewust over te doen.
+ */
+function DoneStep({
+  alreadyImported,
+  onClose,
+}: {
+  alreadyImported: boolean
+  onClose: () => void
+}) {
   return (
     <div className="flex flex-col items-center justify-center text-center py-12 px-4 space-y-3 min-h-[320px]">
       <div
@@ -327,7 +353,15 @@ function DoneStep() {
           strokeLinejoin="round"
           className="h-6 w-6"
         >
-          <polyline points="20 6 9 17 4 12" />
+          {alreadyImported ? (
+            <>
+              <circle cx="12" cy="12" r="9" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </>
+          ) : (
+            <polyline points="20 6 9 17 4 12" />
+          )}
         </svg>
       </div>
       <p
@@ -335,11 +369,22 @@ function DoneStep() {
         role="status"
         aria-live="polite"
       >
-        Items toegevoegd
+        {alreadyImported ? 'Deze aangifte was al geïmporteerd' : 'Items toegevoegd'}
       </p>
       <p className="font-serif italic text-sm text-[var(--ink-3)] max-w-[40ch] leading-relaxed">
-        Werk straks de actuele saldo&apos;s nog even bij — het scherm sluit zo automatisch.
+        {alreadyImported
+          ? 'Er is niets opnieuw weggeschreven — je bezittingen en schulden staan er al. Wil je het bewust overdoen? Verwijder eerst de eerdere aangifte-import van deze peildatum.'
+          : 'Werk straks de actuele saldo’s nog even bij — het scherm sluit zo automatisch.'}
       </p>
+      {alreadyImported && (
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-2 border border-[var(--border-ed)] bg-[var(--paper)] hover:bg-[var(--subtle)]/40 px-4 py-2 text-sm font-semibold text-[var(--ink)] transition-colors"
+        >
+          Sluiten
+        </button>
+      )}
     </div>
   )
 }

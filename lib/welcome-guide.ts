@@ -486,11 +486,245 @@ export function reconcileCompleted(
   return completedStepIds.filter((id) => known.has(id))
 }
 
-/** Aantal afgevinkte stappen op één scherm (voor voortgangs-indicatie). */
-export function countCompletedOnScreen(
+// ── Afgeleide stap-status (M1) ──────────────────────────────────────────────
+//
+// De gids wist tot nu toe NIETS van wat er al in het account staat: de enige
+// schrijver van `completedStepIds` is de handmatige `toggleStep`-actie. Een
+// account met 16 bezittingen zag daardoor "0/4 afgevinkt · Zijn al je
+// bezittingen geregistreerd?".
+//
+// Hier staat de HYBRIDE oplossing (kaart M1, optie C):
+//  · Een code-side REGISTRY op stap-id (de config leeft als admin-bewerkbare
+//    JSONB in app_settings en kan dus geen functies dragen). Onbekende id →
+//    geen regel → de stap blijft puur handmatig. Bewuste, veilige degradatie
+//    wanneer een beheerder een stap hernoemt of toevoegt.
+//  · DRIE toestanden, niet twee: 'nvt' (niet van toepassing) verlaat de noemer,
+//    zodat een stap achter een uitgeschakelde module niet als 'done' wordt
+//    verkocht én de teller niet onhaalbaar wordt.
+//  · AFGELEID ≠ HANDMATIG. De afgeleide staat wordt per render berekend en
+//    NOOIT naar `completedStepIds` geschreven: anders blijft een vinkje staan
+//    als de data verdwijnt en is uitvinken onmogelijk (jsonb-vervuiling).
+//
+// Dit blok blijft PUUR — de feiten komen binnen als `GuideAccountFacts`; het
+// ophalen ervan woont in `lib/account-status.ts`.
+
+export type GuideStepState = 'done' | 'open' | 'nvt'
+
+/** Stap-id → afgeleide toestand. Ontbrekende sleutel = puur handmatige stap. */
+export type GuideDerivedStates = Record<string, GuideStepState>
+
+/**
+ * De feiten waarop de afleiding rust: eigen-account-gescopede signalen +
+ * de bezochte feature-slugs. Bewust geen `perspective`: een compleetheids-
+ * checklist gaat over JOUW account — anders vinkt de gids "bezittingen
+ * geregistreerd" af omdat je partner ze heeft.
+ */
+export interface GuideAccountFacts {
+  hasAssets: boolean
+  hasDebts: boolean
+  hasBudgets: boolean
+  hasBankConnection: boolean
+  hasTransactions: boolean
+  /**
+   * Verwacht rendement / inflatie ingevuld. LET OP: beide kolommen hebben een
+   * DB-default (0.07 / 0.02), dus dit is voor vrijwel elke gebruiker waar —
+   * bruikbaar als coach-signaal, NIET als "heeft de gebruiker iets gekozen".
+   * De gids gebruikt 'm daarom bewust niet.
+   */
+  hasFireParams: boolean
+  hasHorizonSetup: boolean
+  hasLifeEvents: boolean
+  /** Uitgave-na-pensioen bewust gekozen (dus niet de DB-default). */
+  hasRetirementExpenseChoice: boolean
+  hasGoals: boolean
+  hasScenarioPrefs: boolean
+  /** Slugs uit `user_feature_visits` (fase 2 — de "heb je hier al gekeken"-stappen). */
+  visitedSlugs: readonly string[]
+  /** Stappen die voor deze gebruiker niet van toepassing zijn (module uit). */
+  notApplicableStepIds: readonly string[]
+}
+
+/**
+ * Bezoek-slug per gidsstap (fase 2). Ongeveer de helft van de checklist gaat
+ * helemaal niet over data maar over "heb je hier al gekeken" — die stappen zijn
+ * alleen af te leiden uit een bezoekregister (`user_feature_visits`).
+ *
+ * BEWUST NIET voor `s5-briefing` (/overzicht) en `s5-gezondheid` (geen eigen
+ * route): de gids stáát op /overzicht, dus een bezoeksignaal zou die twee voor
+ * iedereen meteen afvinken. Vals-positief is erger dan handmatig.
+ *
+ * Prefix `guide_` houdt deze slugs los van de bestaande setup-markers in
+ * dezelfde tabel (zie `lib/app-setup-status.ts`).
+ */
+export const GUIDE_VISIT_SLUG_BY_STEP_ID: Readonly<Record<string, string>> = {
+  's2-grafiek': 'guide_toekomst_grafiek',
+  's3-vaste-kosten': 'guide_vaste_lasten',
+  's3-will': 'guide_tips',
+  's3-nieuws': 'guide_nieuws',
+  's3-rekenhulp': 'guide_rekenhulp',
+  's4-whatif': 'guide_whatif',
+  's4-belasting': 'guide_belasting',
+  's4-rapportages': 'guide_rapportages',
+  's5-widgets': 'guide_uiterlijk',
+}
+
+/** Alle bezoek-slugs die de gids kent (voor de server-read en de tracker). */
+export const GUIDE_VISIT_SLUGS: readonly string[] = Object.values(
+  GUIDE_VISIT_SLUG_BY_STEP_ID,
+)
+
+/**
+ * Route → bezoek-slug. Eén tabel, zodat de tracker-component dom blijft en de
+ * afbakening testbaar is. `exact` voor /toekomst (anders zou élke subroute de
+ * grafiek-stap afvinken); `prefix` waar diepere routes bij dezelfde functie
+ * horen (een nieuwsartikel telt als "nieuws bekeken").
+ */
+export interface GuideVisitRoute {
+  slug: string
+  pathname: string
+  match: 'exact' | 'prefix'
+  /** Optioneel query-paar dat óók moet kloppen (deeplink opent een paneel). */
+  query?: readonly [key: string, value: string]
+}
+
+export const GUIDE_VISIT_ROUTES: readonly GuideVisitRoute[] = [
+  { slug: 'guide_toekomst_grafiek', pathname: '/toekomst', match: 'exact' },
+  { slug: 'guide_whatif', pathname: '/toekomst', match: 'exact', query: ['whatif', 'open'] },
+  { slug: 'guide_vaste_lasten', pathname: '/overzicht/cashflow/vaste-lasten', match: 'prefix' },
+  { slug: 'guide_tips', pathname: '/overzicht/tips', match: 'prefix' },
+  { slug: 'guide_nieuws', pathname: '/nieuws', match: 'prefix' },
+  { slug: 'guide_rekenhulp', pathname: '/toekomst/rekenhulp', match: 'prefix' },
+  { slug: 'guide_belasting', pathname: '/overzicht/belasting', match: 'prefix' },
+  { slug: 'guide_rapportages', pathname: '/rapportages', match: 'prefix' },
+  { slug: 'guide_uiterlijk', pathname: '/mijn/uiterlijk', match: 'prefix' },
+]
+
+/**
+ * Welke bezoek-slugs horen bij deze route? Meerdere tegelijk kan: /toekomst met
+ * `?whatif=open` is zowel "grafiek bekeken" als "what-if geopend".
+ */
+export function guideVisitSlugsForRoute(
+  pathname: string,
+  query?: (key: string) => string | null,
+): string[] {
+  return GUIDE_VISIT_ROUTES.filter((r) => {
+    const pathOk =
+      r.match === 'exact'
+        ? pathname === r.pathname
+        : pathname === r.pathname || pathname.startsWith(`${r.pathname}/`)
+    if (!pathOk) return false
+    if (!r.query) return true
+    return query?.(r.query[0]) === r.query[1]
+  }).map((r) => r.slug)
+}
+
+/**
+ * Datastappen: het predicaat per stap-id. Elke keuze is hier EXPLICIET, want de
+ * app kende voor "bank gekoppeld", "budgetten", "doelen" en "levensgebeurtenissen"
+ * al meerdere, onderling afwijkende definities (zie lib/account-status.ts).
+ */
+const DATA_CHECK_BY_STEP_ID: Readonly<Record<string, (f: GuideAccountFacts) => boolean>> = {
+  's1-bezittingen': (f) => f.hasAssets,
+  's1-schulden': (f) => f.hasDebts,
+  's1-budget': (f) => f.hasBudgets,
+  // De stap vraagt letterlijk "gekoppeld óf CSV geüpload" — beide tellen.
+  's1-rekening': (f) => f.hasBankConnection || f.hasTransactions,
+  // BEWUST alleen de setup-marker, NIET `hasFireParams`: `expected_return` en
+  // `inflation_rate` dragen een DB-default (0.07 / 0.02) en zijn dus voor 26 van
+  // 27 profielen gevuld zonder dat iemand iets koos — dat zou élke gebruiker
+  // onterecht afvinken.
+  's2-voorkeuren': (f) => f.hasHorizonSetup,
+  // 'aow' is een afgeleide systeemgebeurtenis en telt NIET als "zelf gepland".
+  's2-gebeurtenissen': (f) => f.hasLifeEvents,
+  's2-uitgaven': (f) => f.hasRetirementExpenseChoice,
+  // Doelen = de `goals`-tabel, nadrukkelijk NIET open acties.
+  's4-doelen': (f) => f.hasGoals,
+  's5-grafiek-instellingen': (f) => f.hasScenarioPrefs,
+}
+
+/**
+ * De volledige registry: datastappen + bezoekstappen. Een stap zonder regel
+ * (bv. door een beheerder toegevoegd) ontbreekt hier bewust en blijft handmatig.
+ */
+export function guideAutoCheck(stepId: string): ((f: GuideAccountFacts) => boolean) | undefined {
+  const dataCheck = DATA_CHECK_BY_STEP_ID[stepId]
+  if (dataCheck) return dataCheck
+  const slug = GUIDE_VISIT_SLUG_BY_STEP_ID[stepId]
+  if (!slug) return undefined
+  return (f) => f.visitedSlugs.includes(slug)
+}
+
+/** Bereken de afgeleide toestand van elke stap in de config. */
+export function deriveGuideStates(
+  config: WelcomeGuideConfig,
+  facts: GuideAccountFacts,
+): GuideDerivedStates {
+  const notApplicable = new Set(facts.notApplicableStepIds)
+  const out: GuideDerivedStates = {}
+  for (const screen of config.screens) {
+    for (const step of screen.steps) {
+      if (notApplicable.has(step.id)) {
+        out[step.id] = 'nvt'
+        continue
+      }
+      const check = guideAutoCheck(step.id)
+      if (!check) continue // onbekende stap → handmatig, geen crash
+      out[step.id] = check(facts) ? 'done' : 'open'
+    }
+  }
+  return out
+}
+
+/**
+ * Is deze stap af? Afgeleid 'done' wint; anders telt het handmatige vinkje.
+ * Een 'nvt'-stap is nooit "af" — hij hoort simpelweg niet in de teller.
+ */
+export function isGuideStepDone(
+  stepId: string,
+  completedStepIds: readonly string[],
+  derived?: GuideDerivedStates,
+): boolean {
+  const state = derived?.[stepId]
+  if (state === 'nvt') return false
+  if (state === 'done') return true
+  return completedStepIds.includes(stepId)
+}
+
+export interface ScreenProgress {
+  /** Afgevinkte stappen (afgeleid + handmatig). */
+  done: number
+  /** Noemer: ingeschakelde stappen MINUS de niet-van-toepassing-stappen. */
+  total: number
+  /** Aantal stappen dat niet van toepassing is (buiten de noemer). */
+  notApplicable: number
+}
+
+/** Voortgang op één scherm (voor de teller in de kop). */
+export function countScreenProgress(
   screen: WelcomeGuideScreen,
-  completedStepIds: string[],
-): number {
-  const done = new Set(completedStepIds)
-  return screen.steps.filter((s) => s.enabled && done.has(s.id)).length
+  completedStepIds: readonly string[],
+  derived?: GuideDerivedStates,
+): ScreenProgress {
+  const steps = screen.steps.filter((s) => s.enabled)
+  const notApplicable = steps.filter((s) => derived?.[s.id] === 'nvt').length
+  const done = steps.filter((s) => isGuideStepDone(s.id, completedStepIds, derived)).length
+  return { done, total: steps.length - notApplicable, notApplicable }
+}
+
+/**
+ * Is de gids af? Waar zodra elke stap op elk ZICHTBAAR scherm 'done' of 'nvt'
+ * is. Het predicaat dat S13 nodig heeft om de gids te verbergen zodra alles
+ * klaar is — hier geëxporteerd zodat er niet elders een tweede definitie ontstaat.
+ */
+export function isGuideComplete(
+  config: WelcomeGuideConfig,
+  state: WelcomeGuideState,
+  derived?: GuideDerivedStates,
+): boolean {
+  const screens = getVisibleScreens(config, state)
+  if (screens.length === 0) return false
+  return screens.every((screen) => {
+    const progress = countScreenProgress(screen, state.completedStepIds, derived)
+    return progress.total === 0 || progress.done === progress.total
+  })
 }

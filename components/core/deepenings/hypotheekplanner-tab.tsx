@@ -54,6 +54,11 @@ import { WaardestijgingSlider } from './hypotheekplanner/waardestijging-slider'
 import { AmortisationChart } from './hypotheekplanner/amortisation-chart'
 import { MilestonesList } from './hypotheekplanner/milestones-list'
 import { HypotheekVsBeleggenSectie } from '@/components/app/core/debts/hypotheek-vs-beleggen-modal'
+import { AannameHint } from '@/components/editorial/aanname-hint'
+import {
+  describeDebtTermBasis,
+  resolveDebtTermBasis,
+} from '@/lib/debt-term-basis'
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -69,12 +74,19 @@ function toHvBRepaymentType(rt: DebtRepaymentType | null): HvBRepaymentType {
 }
 
 /**
- * Bereken resterende looptijd in maanden uit `end_date`. Fallback: 360 (30
- * jaar) wanneer geen einddatum beschikbaar — sluit aan bij wat
- * `debtProjection()` doet voor aflossingsvrij.
+ * Terugval-looptijd (maanden) wanneer een hypotheek geen `end_date` heeft —
+ * sluit aan bij wat `debtProjection()` doet voor aflossingsvrij. Wordt óók
+ * door de "waarop gebaseerd?"-hint uitgesproken, zodat het scherm dezelfde
+ * aanname noemt als waar het mee rekent.
+ */
+const FALLBACK_TERM_MONTHS = 360
+
+/**
+ * Bereken resterende looptijd in maanden uit `end_date`. Fallback:
+ * `FALLBACK_TERM_MONTHS` wanneer geen einddatum beschikbaar.
  */
 function remainingMonths(debt: Debt): number {
-  if (!debt.end_date) return 360
+  if (!debt.end_date) return FALLBACK_TERM_MONTHS
   const end = new Date(debt.end_date).getTime()
   const now = Date.now()
   return Math.max(1, Math.round((end - now) / (1000 * 60 * 60 * 24 * 30.44)))
@@ -347,6 +359,17 @@ function ActivePlanner({ mortgage, house, otherTrackedDebts }: ActivePlannerProp
   const interestRate = Number(mortgage.interest_rate)
   const months = useMemo(() => remainingMonths(mortgage), [mortgage])
   const repaymentType: DebtRepaymentType = mortgage.repayment_type ?? 'annuiteit'
+  // Grondslag van `end_date` — bepaalt of de getoonde looptijd (en alles wat
+  // erop rust: mijlpalen, aflosgrafiek, schuldvrij-datum) een gegeven is of
+  // een stille aanname. `null` ⇒ door de gebruiker gezet, geen hint nodig.
+  const termBasisText = useMemo(
+    () =>
+      describeDebtTermBasis(
+        resolveDebtTermBasis(mortgage),
+        FALLBACK_TERM_MONTHS / 12,
+      ),
+    [mortgage],
+  )
 
   // Voor `<DebtPayoffStrategy>` voegen we de hypotheek samen met andere
   // getrackte schulden, met de hypotheek als focus-debt.
@@ -441,6 +464,15 @@ function ActivePlanner({ mortgage, house, otherTrackedDebts }: ActivePlannerProp
                 </li>
               )}
             </ul>
+          )}
+          {/* Waarop gebaseerd? — de resterende looptijd voedt de stat
+              hierboven én de mijlpalen/aflosgrafiek verderop. Staat die op
+              een stille default (30 jaar) of ontbreekt de einddatum, dan mag
+              dat niet als hard feit blijven staan. */}
+          {termBasisText && (
+            <AannameHint subject="de looptijd" className="mt-3">
+              {termBasisText}
+            </AannameHint>
           )}
         </header>
       </section>

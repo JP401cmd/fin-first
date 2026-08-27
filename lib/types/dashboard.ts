@@ -11,6 +11,7 @@ import type { FireEndStrategy } from '@/lib/fire-strategy'
 import type { HealthScore } from '@/lib/financial-health'
 import type { NewsPreview } from '@/lib/news-preview'
 import type { SpendLimitWidgetData } from '@/lib/spend-limits/widget-data'
+import type { PortfolioReturnSummary } from '@/lib/asset-return'
 
 export interface TopAction {
   id: string
@@ -300,7 +301,28 @@ export interface DashboardData {
   // genormaliseerd in computeAssetsByType uit de percent-schaal van
   // assets.expected_return — consumenten doen zelf ×100 voor weergave (kaart H1).
   assetsByType: { type: string; value: number; purchaseValue: number; expectedReturn: number }[]
-  totalPurchaseValue: number
+  /**
+   * Gerealiseerd rendement uit de CANONIEKE motor (lib/asset-return.ts) —
+   * dezelfde die de kop-KPI op /overzicht/bezittingen voedt, hier samengevat
+   * tot totalen + een rollup per type (`summarizePortfolioReturn`). Consumeer
+   * dit veld voor élk "sinds aankoop"-percentage op het dashboard; nooit een
+   * eigen `waarde − aankoopwaarde` over assetsByType (dat mengt pensioen en
+   * banksaldi zonder kostprijsbegrip in de teller — kaart H7).
+   *
+   * Bewust zonder per-bezit rijen: die dragen namen en hoeven niet mee in de
+   * RSC-payload van een scherm dat ze niet toont.
+   *
+   * WEGING: inclusion-gewogen (`net_worth_inclusion_pct`), zoals de rest van
+   * deze bundel. Waarde én kostprijs dragen dezelfde factor, dus `pct` blijft
+   * onvertekend. Op /overzicht/bezittingen weegt dezelfde motor met het
+   * huishoud-aandeel omdat hij daar op het bruto bezittingentotaal sluit —
+   * identieke grondslag, weging per oppervlak.
+   *
+   * Vervangt het verwijderde `totalPurchaseValue` (Σ purchase_value over ÁLLE
+   * types), dat als "Ongerealiseerde winst" een banksaldo zonder aankoopwaarde
+   * volledig als winst liet meetellen.
+   */
+  assetReturn: PortfolioReturnSummary
   // Horizon: scenario range (optimistic/expected/pessimistic FIRE ages)
   fireRange: FireRange | null
   // Vrijheidsmijlpalen (25/50/75/100%) uit de canonieke motor

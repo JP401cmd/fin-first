@@ -11,6 +11,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   detectRecurringTransactions,
   detectCategory,
+  isVariableMerchant,
   CATEGORY_LABELS,
   type RecurringCategory,
 } from '@/lib/recurring-detection'
@@ -162,8 +163,18 @@ export interface VasteLastenItem {
 export interface VasteLastenSummary {
   subscriptions: VasteLastenItem[]
   vasteKosten: VasteLastenItem[]
+  /**
+   * TERUGKEREND, MAAR VARIABEL (H14, fase 1) — posten die wél elke maand
+   * terugkomen maar waarvan het BEDRAG een keuze is: boodschappen, tanken,
+   * horeca, winkelen. Ze staan bewust BUITEN `totalMonthly` (en dus buiten de
+   * vaste-lastenquote en de status), maar worden wél getoond: onzichtbaar
+   * weglaten maakt het oncorrigeerbaar. Zie `isTerugkerendVariabel`.
+   */
+  terugkerendVariabel: VasteLastenItem[]
   totalMonthlySubscriptions: number
   totalMonthlyVasteKosten: number
+  /** Maandtotaal van de variabele groep — NIET meegeteld in `totalMonthly`. */
+  totalMonthlyVariabel: number
   totalMonthly: number
   count: number
 }
@@ -171,10 +182,111 @@ export interface VasteLastenSummary {
 const EMPTY: VasteLastenSummary = {
   subscriptions: [],
   vasteKosten: [],
+  terugkerendVariabel: [],
   totalMonthlySubscriptions: 0,
   totalMonthlyVasteKosten: 0,
+  totalMonthlyVariabel: 0,
   totalMonthly: 0,
   count: 0,
+}
+
+/**
+ * IS DIT EEN TERUGKERENDE MAAR VARIABELE UITGAVE? (H14, fase 1 — optie C1 + A)
+ *
+ * HET DEFECT DAT DIT REPAREERT: posten als Albert Heijn, Lidl, Shell en H&M
+ * werden niet *verkeerd* geclassificeerd maar NIET geclassificeerd —
+ * `detectCategory` kent geen supermarkt-/horeca-/tank-/kledingpatroon en valt
+ * terug op `other_expense`. En `other_expense` telde hier onvoorwaardelijk als
+ * vaste last. Gevolg: een vaste-lastenquote van 58% waar 43% klopt, met een
+ * bijbehorende "Aandacht"-banner die de gebruiker naar zijn abonnementen van
+ * €51 stuurde terwijl er €700 aan boodschappen in de teller zat. Vals alarm dat
+ * het advies naar de verkeerde post richt.
+ *
+ * TWEE SIGNALEN, ALLEBEI ALLEEN OP ONHERKENDE POSTEN:
+ *  1. FREQUENTIE (de structurele regel). Een WEKELIJKSE onherkende uitgave is in
+ *     Nederland nooit een vaste last: huur, hypotheek, energie, verzekering,
+ *     belasting en abonnementen worden maandelijks, per kwartaal of per jaar
+ *     geïnd. Deze ene regel heeft vrijwel geen realistisch vals-negatief.
+ *  2. TEGENPARTIJ (`isVariableMerchant`, de aanvulling). Vangt het deel dat
+ *     maandelijks afrekent — tankbeurt, restaurant, kledingwinkel. Per definitie
+ *     onbegrensd, dus nooit als vervanging van (1) bedoeld.
+ *
+ * WAT HIER BEWUST *NIET* GEBEURT (fase 2, wacht op ijking): sturen op
+ * BEDRAGSSTABILITEIT. `DetectedRecurring.amountVariation`/`isVariableAmount`
+ * bestaan al en staan al op `VasteLastenItem`, maar de bestaande cv-grens (0,1)
+ * is te strak voor dit doel — een energienota varieert meer dan 10%. Een
+ * ongekalibreerde drempel verplaatst het probleem alleen, en de spiegelfout is
+ * hier het gevaarlijkste faalpad: een échte vaste last met onherkende tegenpartij
+ * (particuliere verhuurder, alimentatie, boekhouder) die uit de quote valt geeft
+ * een vals "gezond", en een te lage quote alarmeert niet. Meet eerst op
+ * productiedata welke `amountVariation` de twee groepen scheidt.
+ *
+ * DE GEBRUIKER WINT ALTIJD: een expliciete `category_override` ('subscription'
+ * of 'vaste_kosten') overrulet beide signalen. Wie zijn wekelijkse post zelf als
+ * vaste kost markeert, houdt hem in de quote.
+ */
+export function isTerugkerendVariabel(
+  item: Pick<VasteLastenItem, 'name' | 'category' | 'frequency' | 'categoryOverride'>,
+): boolean {
+  if (item.categoryOverride === 'subscription' || item.categoryOverride === 'vaste_kosten') {
+    return false
+  }
+  // Alleen ONHERKENDE posten. Alles wat `detectCategory` wél heeft geplaatst
+  // (rent, utility, insurance, …) blijft onaangeroerd in de quote.
+  if (item.category !== 'other_expense') return false
+  if (item.frequency === 'weekly') return true
+  return isVariableMerchant(item.name, item.name)
+}
+
+/**
+ * Verdeelt de posten over de drie groepen. ÉÉN plek, zodat het korte pad
+ * (< 3 transacties, alleen bevestigde rijen) en het volle detectiepad niet uit
+ * elkaar kunnen lopen — dat was hiervoor twee losse filterparen met subtiel
+ * andere override-afhandeling.
+ */
+function partitionVasteLasten(items: VasteLastenItem[]): {
+  subscriptions: VasteLastenItem[]
+  vasteKosten: VasteLastenItem[]
+  terugkerendVariabel: VasteLastenItem[]
+} {
+  const subscriptions: VasteLastenItem[] = []
+  const vasteKosten: VasteLastenItem[] = []
+  const terugkerendVariabel: VasteLastenItem[] = []
+  for (const item of items) {
+    const isSub =
+      item.categoryOverride === 'subscription' ||
+      (!item.categoryOverride && SUBSCRIPTION_CATEGORIES.includes(item.category))
+    if (isSub) {
+      subscriptions.push(item)
+      continue
+    }
+    const isVast =
+      item.categoryOverride === 'vaste_kosten' ||
+      (!item.categoryOverride &&
+        (VASTE_KOSTEN_CATEGORIES.includes(item.category) || item.category === 'other_expense'))
+    if (!isVast) continue
+    if (isTerugkerendVariabel(item)) terugkerendVariabel.push(item)
+    else vasteKosten.push(item)
+  }
+  return { subscriptions, vasteKosten, terugkerendVariabel }
+}
+
+/** Bouwt de samenvatting uit een al gefilterde postenlijst (één sommeerplek). */
+function summarize(items: VasteLastenItem[]): VasteLastenSummary {
+  const { subscriptions, vasteKosten, terugkerendVariabel } = partitionVasteLasten(items)
+  const totalSubs = subscriptions.reduce((s, i) => s + i.monthlyAmount, 0)
+  const totalVK = vasteKosten.reduce((s, i) => s + i.monthlyAmount, 0)
+  const totalVar = terugkerendVariabel.reduce((s, i) => s + i.monthlyAmount, 0)
+  return {
+    subscriptions,
+    vasteKosten,
+    terugkerendVariabel,
+    totalMonthlySubscriptions: roundCents(totalSubs),
+    totalMonthlyVasteKosten: roundCents(totalVK),
+    totalMonthlyVariabel: roundCents(totalVar),
+    totalMonthly: roundCents(totalSubs + totalVK),
+    count: subscriptions.length + vasteKosten.length,
+  }
 }
 
 function toMonthly(amount: number, frequency: string): number {
@@ -387,20 +499,7 @@ export const loadVasteLastenSummary = cache(
       })
 
     if (transactions.length < 3) {
-      const subs = confirmedItems.filter((i) => SUBSCRIPTION_CATEGORIES.includes(i.category))
-      const vk = confirmedItems.filter(
-        (i) => VASTE_KOSTEN_CATEGORIES.includes(i.category) || i.category === 'other_expense',
-      )
-      const totalSubs = subs.reduce((s, i) => s + i.monthlyAmount, 0)
-      const totalVK = vk.reduce((s, i) => s + i.monthlyAmount, 0)
-      return remember({
-        subscriptions: subs,
-        vasteKosten: vk,
-        totalMonthlySubscriptions: roundCents(totalSubs),
-        totalMonthlyVasteKosten: roundCents(totalVK),
-        totalMonthly: roundCents(totalSubs + totalVK),
-        count: subs.length + vk.length,
-      })
+      return remember(summarize(confirmedItems))
     }
 
     const allDetected = detectRecurringTransactions(
@@ -460,27 +559,6 @@ export const loadVasteLastenSummary = cache(
       ...newDetections,
     ]
 
-    const subscriptions = allItems.filter(
-      (i) =>
-        i.categoryOverride === 'subscription' ||
-        (!i.categoryOverride && SUBSCRIPTION_CATEGORIES.includes(i.category)),
-    )
-    const vasteKosten = allItems.filter(
-      (i) =>
-        i.categoryOverride === 'vaste_kosten' ||
-        (!i.categoryOverride &&
-          (VASTE_KOSTEN_CATEGORIES.includes(i.category) || i.category === 'other_expense')),
-    )
-    const totalSubs = subscriptions.reduce((s, i) => s + i.monthlyAmount, 0)
-    const totalVK = vasteKosten.reduce((s, i) => s + i.monthlyAmount, 0)
-
-    return remember({
-      subscriptions,
-      vasteKosten,
-      totalMonthlySubscriptions: roundCents(totalSubs),
-      totalMonthlyVasteKosten: roundCents(totalVK),
-      totalMonthly: roundCents(totalSubs + totalVK),
-      count: subscriptions.length + vasteKosten.length,
-    })
+    return remember(summarize(allItems))
   },
 )

@@ -13,7 +13,12 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { detectRecurringTransactions, type TransactionForDetection } from './recurring-detection'
+import {
+  detectRecurringTransactions,
+  detectCategory,
+  isVariableMerchant,
+  type TransactionForDetection,
+} from './recurring-detection'
 
 /** Vier maandelijkse afschrijvingen van dezelfde tegenpartij → één detectie. */
 function maandelijkseTx(
@@ -108,5 +113,60 @@ describe('detectRecurringTransactions — alreadyExists', () => {
     expect(detected).toHaveLength(2)
     expect(detected.every((d) => d.alreadyExists)).toBe(true)
     expect(detected.filter((d) => d.isIncome)).toHaveLength(1)
+  })
+})
+
+/**
+ * H14 — variabele tegenpartijen. Deze lijst is de AANVULLING op de
+ * frequentie-snede in `lib/vaste-lasten-summary.ts`, niet de regel zelf: hij
+ * vangt de winkels/tankstations/horeca die MAANDELIJKS afrekenen en dus niet
+ * door de frequentie worden gepakt.
+ *
+ * `detectCategory` blijft bewust ongewijzigd — een supermarkt is nog steeds
+ * `other_expense`, want er is geen categorie waar hij bij hoort. Alleen de
+ * ROUTERING in de vaste-lastensamenvatting verandert.
+ */
+describe('isVariableMerchant', () => {
+  it('herkent supermarkt, tanken, horeca en winkel', () => {
+    for (const naam of [
+      'ALBERT HEIJN 1234',
+      'Jumbo Supermarkten',
+      'LIDL NEDERLAND',
+      'Aldi Zaandam',
+      'Picnic',
+      'Shell Station Kanaalweg',
+      'BP Amsterdam',
+      'Restaurant De Kade',
+      'McDonalds',
+      'H&M',
+      'Action 4021',
+      'HEMA',
+      'IKEA Delft',
+    ]) {
+      expect(isVariableMerchant(naam, '')).toBe(true)
+    }
+  })
+
+  it('laat echte vaste lasten met rust', () => {
+    for (const naam of [
+      'Vattenfall',
+      'Zilveren Kruis',
+      'Netflix',
+      'Odido',
+      'Gemeente Utrecht belasting',
+      'Vestia',
+      'J. Jansen',
+      'Boekhouder Van Dijk',
+      // Bevat "action" als deel van een woord — mag NIET matchen.
+      'Transaction fee',
+    ]) {
+      expect(isVariableMerchant(naam, '')).toBe(false)
+    }
+  })
+
+  it('detectCategory blijft ongewijzigd (de fix zit in de routering, niet hier)', () => {
+    expect(detectCategory('Albert Heijn', 'Boodschappen', false)).toBe('other_expense')
+    expect(detectCategory('Vattenfall', 'energie', false)).toBe('utility')
+    expect(detectCategory('Netflix', 'Netflix', false)).toBe('subscription')
   })
 })

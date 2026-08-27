@@ -45,6 +45,8 @@ import { loadLeverScores } from '@/lib/lever-scores-loader'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { FinHome } from '@/components/app/fin/fin-home'
 import { parseCoachConfig, type CoachDataGaps } from '@/lib/coach-suggestions'
+import { loadAccountStatusCore, toCoachDataGaps } from '@/lib/account-status'
+import { GuideVisitTracker } from '@/components/app/guide-visit-tracker'
 import { ModuleColorProvider } from '@/components/app/module-color-provider'
 import { FinSlotProvider } from '@/lib/shell/fin-slot'
 import { AccountStorageGuard } from '@/components/app/account-storage-guard'
@@ -114,13 +116,10 @@ export default async function AppLayout({
     debtsRes,
     txRes,
     actionsCountRes,
-    budgetCountRes,
+    accountStatus,
     coachConfigRes,
     platformStatusRes,
     recsCountRes,
-    coachTxRes,
-    coachHoldingsRes,
-    coachLifeEventsRes,
     aandelenStaleRes,
     cryptoStaleRes,
   ] = await Promise.all([
@@ -163,10 +162,20 @@ export default async function AppLayout({
     // `openActions` uit fin-data-loader.ts (open + postponed). Head-only +
     // count: 'exact' = geen rows-payload, alleen totaal.
     supabase.from('actions').select('id', { count: 'exact', head: true }).in('status', ['open', 'postponed']),
-    // Budget-count: coach-bubble data-gap detectie. Head-only + count: 'exact'
-    // = minimale payload (geen rows). Telt alleen top-level budgets
-    // (parent_id is null) zodat sub-budgets niet meetellen.
-    supabase.from('budgets').select('id', { count: 'exact', head: true }).eq('user_id', user.id).is('parent_id', null),
+    // ── Accountstatus (M1) ────────────────────────────────────────────────
+    // De budget-count, de transactie-bestaansvraag, de holdings- en de
+    // levensgebeurtenissen-query stonden hier los; ze wonen nu in
+    // `lib/account-status.ts` — één bron voor "wat staat er al in dit account?",
+    // gedeeld met de welkomstgids (en straks de coach-suggesties). De queries
+    // zijn letterlijk verhuisd, niet herschreven: `toCoachDataGaps` hieronder
+    // reproduceert de vorige uitkomst veld voor veld (vergrendeld in
+    // lib/account-status.test.ts).
+    //
+    // Kosten ongewijzigd: de `core`-variant draait precies dezelfde vier
+    // queries + de drie `cache()`-gedeelde basisfetchers die deze batch toch al
+    // doet. De drie EXTRA gids-signalen (doelen, bankkoppeling, bezoeken)
+    // zitten in de volledige `loadAccountStatus` en draaien alleen op /overzicht.
+    loadAccountStatusCore(supabase, user.id),
     // (Budget-health + maand-budget-transacties zijn hier weggehaald: `budgetsOver`
     // komt nu uit de gedeelde `loadLeverScores` (die dezelfde queries al draait),
     // i.p.v. een dubbele inline-berekening in de shell — zie #847-kompas.)
@@ -183,39 +192,13 @@ export default async function AppLayout({
     // (De Box 1-maandinkomen-query is verhuisd naar `loadLeverScores`, de
     // gedeelde SSoT die zowel deze sidebar-dot als de status-duiding-banner
     // voedt — geen aparte query meer in de shell.)
-    // ── Coach-bubble data-gap queries (voorheen een aparte sequentiële batch) ──
-    // Verplaatst naar deze main-batch: de condities hangen UITSLUITEND aan de
-    // constante `activeModules` (hierboven), niet aan batch-uitkomsten, dus deze
-    // queries kunnen parallel mee i.p.v. één waterfall-stap later. Inactieve
-    // module → Promise.resolve(null) (geen query), identiek aan het oude gedrag.
-    // hasTransactions is een JA/NEE-vraag ("heeft deze gebruiker al ooit een
-    // transactie?"), maar stond hier als `count: 'exact'` — die telt élke rij
-    // van de gebruiker om er één boolean uit af te leiden. Op totale DB-tijd was
-    // dit de #1 query van de hele app (25.215 calls · 39,1 ms mean · 6.064 ms
-    // max · 986 s cumulatief) en hij draait in de layout, dus op élke route.
-    // Vervangen door een BESTAANSVRAAG: één rij ophalen is genoeg voor `> 0`.
-    // Gemeten onder gesimuleerde RLS op de zwaarste gebruiker (9.556 rijen):
-    // 825 buffers / 25,5 ms → 3 buffers / 0,1 ms.
-    // De `.order('date', desc)` is er BEWUST, puur als planner-anker: zonder
-    // sortering koos de planner soms een Seq Scan die stopt bij de eerste hit —
-    // snel als je rijen vooraan de heap staan, een tijdbom als ze achteraan
-    // staan (dat is precies de vorm van die 6-seconden-max). Mét de sortering
-    // is het altijd een Index Scan op `idx_transactions_user_date`.
-    // Semantiek ongewijzigd, óók voor 0 transacties: lege array → false.
-    coachHasTransactionsModule
-      ? supabase
-          .from('transactions')
-          .select('id')
-          .eq('user_id', user.id)
-          .order('date', { ascending: false })
-          .limit(1)
-      : Promise.resolve(null),
-    coachHasHoldingsModule
-      ? supabase.from('investment_holdings').select('id, isin').eq('user_id', user.id).eq('is_active', true)
-      : Promise.resolve(null),
-    coachHasFireModule
-      ? supabase.from('life_events').select('id, event_type').eq('user_id', user.id).eq('is_active', true)
-      : Promise.resolve(null),
+    // (De vier coach-data-gap-queries zijn verhuisd naar `lib/account-status.ts`
+    // — zie `loadAccountStatusCore` hierboven. De module-gating is meeverhuisd
+    // naar `toCoachDataGaps`: die zet het signaal op `true` wanneer de module
+    // uit staat, zodat de gap niet vuurt. Dat de queries nu óók draaien bij een
+    // uitgeschakelde module is geen gedragswijziging op productie — de
+    // module-toggle is uit TriFinity verwijderd, `activeModules` is altijd
+    // `ALL_MODULES`.)
     // Holdings-staleness (sidebar-dot). ONGEGATE meegenomen in de hoofdbatch;
     // de app-gate verschuift naar de boolean-afleiding hieronder.
     //
@@ -396,51 +379,18 @@ export default async function AppLayout({
   // Volgorde (eerste open gap wint): bank > assets > debts > budget >
   // transactions > holdings > isin > goals > fire-params > life-events.
   //
-  // De laatste zes signalen absorberen de setup-prompts die voorheen als
-  // module-nudges bestonden (dat systeem is inmiddels verwijderd, zonder
-  // dekkingsgat). De detectie-logica:
-  //   - hasTransactions:      transactions, ≥1 rij
-  //   - hasHoldings/WithIsin: investment_holdings is_active, isin
-  //   - hasFireParams:        expected_return||inflation_rate
-  //   - hasLifeEvents:        life_events is_active, excl. 'aow'
-  // hasDebts hergebruikt de reeds-geladen debtRows (is_active=true)
-  // i.p.v. een eigen query.
-  //
-  // Module-gating: per-module queries draaien alleen wanneer die module actief
-  // is. Inactieve modules krijgen het signaal default `true`, zodat hun gap niet
-  // kan vuren (de coach gate-t óók op activeModules — dubbele veiligheid).
-  // De queries (`coachTxRes`/`coachHoldingsRes`/`coachLifeEventsRes`) + hun
-  // module-flags zijn bovenaan verplaatst naar de main-batch (parallel i.p.v.
-  // een aparte sequentiële batch) — het gedrag hieronder is ongewijzigd.
-
-  // Holdings: hasHoldings = ≥1 rij; hasHoldingsWithIsin = minstens één met
-  // een niet-lege isin.
-  const coachHoldings = coachHoldingsRes?.data ?? []
-  // Life events: 'aow' is een afgeleide systeem-gebeurtenis, niet door de
-  // gebruiker gepland — uitgesloten.
-  const coachLifeEvents = (coachLifeEventsRes?.data ?? []).filter(e => e.event_type !== 'aow')
-
-  const coachDataGaps: CoachDataGaps = {
-    hasBank: assetRows.some(a => a.asset_type === 'cash'),
-    hasAssets: assetRows.length > 0,
-    hasBudgets: (budgetCountRes.count ?? 0) > 0,
-    hasGoals: sidebarActionCount > 0,
-    // Schulden: hergebruik reeds-geladen debtRows (is_active=true).
-    hasDebts: debtRows.length > 0,
-    // Per-module signalen: default `true` wanneer de module uit staat → gap vuurt niet.
-    // Bestaansvraag i.p.v. exact-count (zie de query in de main-batch): de
-    // uitkomst blijft een boolean met identieke semantiek — ≥1 rij ⇒ true,
-    // 0 rijen ⇒ false.
-    hasTransactions: coachHasTransactionsModule ? (coachTxRes?.data?.length ?? 0) > 0 : true,
-    hasHoldings: coachHasHoldingsModule ? coachHoldings.length > 0 : true,
-    hasHoldingsWithIsin: coachHasHoldingsModule
-      ? coachHoldings.some(h => h.isin !== null && h.isin !== '')
-      : true,
-    hasFireParams: coachHasFireModule
-      ? (profile?.expected_return != null || profile?.inflation_rate != null)
-      : true,
-    hasLifeEvents: coachHasFireModule ? coachLifeEvents.length > 0 : true,
-  }
+  // De signalen komen sinds M1 uit `lib/account-status.ts` — dezelfde bron die
+  // de welkomstgids leest, zodat "heeft deze gebruiker al een budget/bank/
+  // levensgebeurtenis" niet langer per oppervlak een eigen definitie krijgt.
+  // `toCoachDataGaps` bewaart de bestaande lezingen exact (o.a. `hasBank` =
+  // cash-BEZITTING en `hasGoals` = open ACTIES) plus de module-gating; de gids
+  // gebruikt bewust strengere definities. Zie de doc bij die functie.
+  const coachDataGaps: CoachDataGaps = toCoachDataGaps(accountStatus, {
+    hasOpenActions: sidebarActionCount > 0,
+    hasTransactionsModule: coachHasTransactionsModule,
+    hasHoldingsModule: coachHasHoldingsModule,
+    hasFireModule: coachHasFireModule,
+  })
 
   // ── Coach-config (overrides + timing + label) ───────────
   // Genormaliseerd: lege/corrupte config → identiek gedrag aan defaults.
@@ -574,6 +524,12 @@ export default async function AppLayout({
                       </FeatureAccessProvider>
                       <Suspense fallback={null}>
                         <ChatPromptDeeplink />
+                      </Suspense>
+                      {/* Bezoekregister voor de welkomstgids (leest niets,
+                          schrijft hooguit één keer per slug per sessie). Eigen
+                          Suspense-grens vanwege useSearchParams. */}
+                      <Suspense fallback={null}>
+                        <GuideVisitTracker />
                       </Suspense>
                       <Suspense fallback={null}>
                         <FinHome

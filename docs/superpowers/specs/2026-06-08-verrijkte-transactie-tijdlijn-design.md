@@ -212,10 +212,26 @@ detail-kop in de sheet met lopend saldo, `creditor_id`, FX en IBAN.
 ## 8. Dag-kop
 
 ```
-DO 5 JUN  ───────────────────────────────  − €82,40 · ≈ 0,9 vrijheidsdag
+DO 5 JUN  ───────────────────────────────  − €82,40 · ≈ 0,9 vrijheidsdag kwijt
 ```
 Mono kicker links (sticky bij scroll), rechts subtotaal (`−`/`+`) + vrijheidstijd. Bij netto-inkomst-dag:
-`+ €…`. Vrijheidstijd-basis = `avgDailyExpense` (budget-vrij); label blijft eerlijk ("≈").
+`+ €…`. Vrijheidstijd-basis = `avgDailyExpense` (budget-vrij, over het hele venster); label blijft
+eerlijk ("≈").
+
+**Beide cijfers delen één teller: het NETTO dagbedrag** (`incomeTotal − expenseTotal`) — hetzelfde
+getal dat als euro-bedrag in de kop staat. Deze paragraaf specificeerde eerder alleen het
+pure-uitgave-geval; de implementatie vulde dat gat stilzwijgend in met `expenseTotal`, waardoor een dag
+met €507,64 inkomsten en €28,61 uitgaven "+ €479,03 · ≈ 0,3 vrijheidsdag" toonde — twee definities in
+één regel (bevinding M20, aug 2026). Het richtingswoord **"erbij"** (netto-inkomstendag) /
+**"kwijt"** (netto-uitgavendag) maakt het teken expliciet, zodat gewonnen tijd nooit als uitgegeven tijd
+leest. Op zuivere uitgavendagen verandert er niets: daar geldt netto == −expenseTotal. Voorbeeld:
+
+```
+DO 20 AUG ────────────────────────  + €479,03 · ≈ 5,0 vrijheidsdagen erbij
+```
+
+Canonieke implementatie: `dayFreedomLabel()` in `lib/transaction-display.ts` — weergegeven waarde én
+meervoud volgen hetzelfde op één decimaal afgeronde getal.
 
 ## 9. Filtering & zoeken
 

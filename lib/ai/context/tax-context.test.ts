@@ -89,3 +89,48 @@ describe('buildTaxContext — jaarruimte-suppressie', () => {
     expect(ctx).toContain('Box 1')
   })
 })
+
+/**
+ * Regressie voor bevinding L8 — interne tegenspraak in dezelfde payload.
+ *
+ * `getTaxDeadlines` had geen relevantiefilter, dus de Box 2-deadline "Leengrens
+ * DGA + dividendtiming" belandde in de top-3 fiscale deadlines van ÉLKE
+ * gebruiker — óók direct onder de regel "Box 2 (aanmerkelijk belang in een BV):
+ * nee". Het model kreeg zo twee tegenstrijdige signalen over dezelfde positie.
+ * Het filter zit nu in de lib zelf; deze test bewaakt dat de context-builder hem
+ * daadwerkelijk voedt met de uitkomst van `hasBox2Relevance`.
+ */
+describe('buildTaxContext — Box 2-deadlines volgen de AB-relevantie', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    loadPerspectiveBox3Mock.mockResolvedValue({
+      personal: { tax: 0, rendementsgrondslag: 0, heffingsvrijVermogen: 0 },
+      dailyExpenses: 100,
+    })
+    loadActionedMock.mockResolvedValue(new Set<string>())
+  })
+
+  it('zonder aanmerkelijk belang staat de DGA-leengrens NIET bij de deadlines', async () => {
+    hasBox2RelevanceMock.mockResolvedValue(false)
+    const ctx = await buildTaxContext(makeSupabase())
+    expect(ctx).toContain('Box 2 (aanmerkelijk belang in een BV): nee')
+    expect(ctx).not.toContain('Leengrens DGA')
+  })
+
+  it('mét aanmerkelijk belang mag de DGA-leengrens gewoon meereizen', async () => {
+    hasBox2RelevanceMock.mockResolvedValue(true)
+    const ctx = await buildTaxContext(makeSupabase())
+    expect(ctx).toContain('ja — DGA/AB-positie aanwezig')
+    // De deadline-sectie bestaat; of 'Leengrens DGA' in de TOP-3 valt is
+    // runtime-datum-afhankelijk, dus daar hangen we geen vaste verwachting aan.
+    expect(ctx).toContain('Eerstvolgende fiscale deadlines')
+  })
+
+  it('een falende relevantie-query onderdrukt de DGA-deadline (faal-zacht)', async () => {
+    hasBox2RelevanceMock.mockRejectedValue(new Error('boom'))
+    const ctx = await buildTaxContext(makeSupabase())
+    // Geen Box 2-regel én geen Box 2-deadline: bij twijfel niets beweren.
+    expect(ctx).not.toContain('aanmerkelijk belang in een BV')
+    expect(ctx).not.toContain('Leengrens DGA')
+  })
+})

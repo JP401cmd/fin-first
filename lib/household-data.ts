@@ -397,22 +397,19 @@ export function formatOwnershipSubline(
   return `${label}: ${formatCurrency(share)}`
 }
 
-/**
- * Perspectief-correcte dag-uitgaven voor vrijheidstijd-berekeningen.
- *
- * `calculateFreedomTime` moet de juiste noemer krijgen: eigen = mijn dag-uitgaven,
- * huishouden = gecombineerd, partner = het deel dat niet van mij is (afgeleid als
- * `household - personal` wanneer geen expliciete partner-waarde beschikbaar is).
- */
-export function dailyExpensesByPerspective(
-  monthly: { personal: number; household: number; partner?: number },
-  perspective: Perspective,
-): number {
-  const m =
-    perspective === 'household'
-      ? monthly.household
-      : perspective === 'partner'
-        ? monthly.partner ?? Math.max(monthly.household - monthly.personal, 0)
-        : monthly.personal
-  return m / 30
-}
+// ── VERWIJDERD: dailyExpensesByPerspective (M22) ──────────────────────────
+//
+// Was de tweede €→vrijheidstijd-noemer van de app: maanduitgaven ÷ 30, gevoed
+// met de som van budget-LIMIETEN. Twee afwijkingen tegelijk van de canonieke
+// keten (`lib/expense-rate.ts`: 12-mnd rolling GEREALISEERDE uitgaven ×12/365),
+// waardoor dezelfde Box 3-heffing op /overzicht/belasting/box3 een ander aantal
+// vrijheidsdagen droeg dan op de hub, de widget en de optimizer — op productie
+// gemeten −68% tot +441%.
+//
+// Zijn perspectief-bewustheid was het enige wat hij vóór had, maar op een
+// grondslag die de werkelijke uitgaven niet kende. De vervanger is bewust
+// persoonlijk én MARKEERT dat (`PerspectiveBox3Data.dailyExpensesPerspective`);
+// een echt huishoud-dagtarief vraagt partner-TRANSACTIES en dus een eigen
+// RPC + privacy-besluit — zie ADR 0107 ("de grens die bewust blijft staan").
+//
+// Voeg hier geen vervanger toe: één noemer, één huis.

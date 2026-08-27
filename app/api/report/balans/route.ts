@@ -1,7 +1,5 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
-import { localMonthStartMonthsAgo } from '@/lib/month-range'
-import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
-import { EXPENSE_RATE_ROLLING_MONTHS } from '@/lib/constants'
+import { fetchExpenseRowsForRate, recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 import { resolveUnlinkedCashShare, unlinkedCashFractionFor } from '@/lib/unlinked-cash'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -149,15 +147,12 @@ export async function GET(request: Request) {
         .from('profiles')
         .select('full_name')
         .single(),
-      supabase
-        .from('transactions')
-        .select('amount, date')
-        .lt('amount', 0)
-        // Rolling venster uit de CONSTANTE (niet hardgecodeerd "11"): zo blijft dit
-        // venster gelijk aan /api/daily-expense-rate en lib/expense-rate.ts zodra
-        // EXPENSE_RATE_ROLLING_MONTHS ooit wijzigt. Tijdzone-veilige ondergrens.
-        .gte('date', localMonthStartMonthsAgo(new Date(date), EXPENSE_RATE_ROLLING_MONTHS - 1))
-        .lte('date', date),
+      // Dagtarief-grondslag via het MAANDAGGREGAAT, niet via rauwe transactie-rijen
+      // (bevinding L10). Een ongepagineerde `.from('transactions')`-fetch werd door
+      // PostgREST stil op max_rows = 1000 afgekapt, waardoor deze balans €165/dag
+      // toonde naast €106/dag op /overzicht/cashflow — dat oppervlak liep al wél via
+      // het aggregaat. Venster + grondslag wonen nu in `fetchExpenseRowsForRate`.
+      fetchExpenseRowsForRate(supabase, new Date(date)),
     ])
 
     type AssetRow = { id: string; name: string; asset_type: string; current_value: number; is_active: boolean; net_worth_inclusion_pct: number }
@@ -169,7 +164,8 @@ export async function GET(request: Request) {
     const debtsRaw = (debtsResult.status === 'fulfilled' ? debtsResult.value.data ?? [] : []) as DebtRow[]
     const banksRaw = (bankResult.status === 'fulfilled' ? bankResult.value.data ?? [] : []) as BankRow[]
     const profile = profileResult.status === 'fulfilled' ? profileResult.value.data : null
-    const expenses = (expenseResult.status === 'fulfilled' ? expenseResult.value.data ?? [] : []) as TxRow[]
+    // `fetchExpenseRowsForRate` levert de rijen zelf (geen PostgREST-envelope).
+    const expenses = (expenseResult.status === 'fulfilled' ? expenseResult.value : []) as TxRow[]
 
     // ── Classify assets ──────────────────────────────────────────────────────
 
@@ -302,9 +298,10 @@ export async function GET(request: Request) {
 
     // ── Daily expense rate ───────────────────────────────────────────────────
     // Canoniek dagtarief (€/dag) via de gedeelde bron `lib/expense-rate.ts` —
-    // `expenses` is al het 12-mnd rolling venster. Balans, budget-, vermogen- en
-    // cashflow-rapport, dashboard-widgets en de sidebar delen zo één grondslag,
-    // zodat hetzelfde bedrag overal dezelfde vrijheidstijd geeft (KRUIS-20).
+    // `expenses` is al het 12-mnd rolling venster uit het maandaggregaat. Balans,
+    // budget-, vermogen- en cashflow-rapport, dashboard-widgets en de sidebar delen
+    // zo één grondslag én één databron, zodat hetzelfde bedrag overal dezelfde
+    // vrijheidstijd geeft (KRUIS-20 = de formule, L10 = de rijen eronder).
     const dailyExpenseRate = recentDailyExpenseRateFromRows(expenses, new Date(date)).dailyRate
 
     // ── Response ─────────────────────────────────────────────────────────────

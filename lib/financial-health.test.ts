@@ -240,6 +240,59 @@ describe('budgetdiscipline — no-data-beleid (FR-5)', () => {
   })
 })
 
+// ── H4 punt 3 — budgetdiscipline telt per INDIVIDUELE categorie ───────────
+
+describe('budgetdiscipline — per categorie geteld (H4)', () => {
+  const pillarOf = (cats: { limit: number; spent: number }[]) =>
+    computeHealthScoreFromInputs({ ...baseInput, budgetCategories: cats }, true)
+      .pillars.find((p) => p.id === 'budget_discipline')!
+
+  it('score en rawValue tellen álle categorieën, niet drie type-sommen', () => {
+    // 33 categorieën, één eroverheen — het geval uit de bevinding.
+    const cats = Array.from({ length: 33 }, (_, i) =>
+      i === 0 ? { limit: 200, spent: 214 } : { limit: 300, spent: 250 },
+    )
+    const pillar = pillarOf(cats)
+    expect(pillar.rawValue).toBe('32/33')
+    expect(pillar.score).toBe(Math.round((32 / 33) * 100))
+    expect(pillar.improvementTip).toContain('1 van je 33 categorieën')
+  })
+
+  it('rawValue en score lezen altijd dezelfde tally (geen tweede telling)', () => {
+    const cats = [
+      { limit: 100, spent: 150 },
+      { limit: 100, spent: 50 },
+      { limit: 100, spent: 50 },
+      { limit: 100, spent: 250 },
+    ]
+    const pillar = pillarOf(cats)
+    expect(pillar.rawValue).toBe('2/4')
+    expect(pillar.score).toBe(50)
+  })
+
+  it('categorieën zonder limiet doen niet mee in de noemer', () => {
+    const pillar = pillarOf([
+      { limit: 0, spent: 900 },
+      { limit: 100, spent: 50 },
+    ])
+    expect(pillar.rawValue).toBe('1/1')
+    expect(pillar.score).toBe(100)
+  })
+
+  it('exact op de limiet is "bereikt", geen overschrijding (cent-tolerantie, H16)', () => {
+    // Een vaste last waarvan de limiet per constructie gelijk is aan de
+    // afschrijving landt elke maand op float-ruis boven de limiet.
+    const pillar = pillarOf([{ limit: 1280, spent: 1280.0000000000002 }])
+    expect(pillar.rawValue).toBe('1/1')
+    expect(pillar.score).toBe(100)
+  })
+
+  it('een halve cent eroverheen telt nog niet, een euro wél', () => {
+    expect(pillarOf([{ limit: 1000, spent: 1000.004 }]).score).toBe(100)
+    expect(pillarOf([{ limit: 1000, spent: 1001 }]).score).toBe(0)
+  })
+})
+
 // ── FR-6: gewichtsherverdeling — som altijd 1.0 ───────────────────────────
 
 describe('gewichtsherverdeling — som actieve weights = 1.0 (AC-WEIGHT)', () => {
@@ -458,7 +511,6 @@ describe('computeHealthScore(DashboardData) overload', () => {
       fireAgeFractional: null,
       expenseHistory: [],
       budgetTypeHistory: { income: [], expense: [], savings: [], debt: [] },
-      totalPurchaseValue: 90_000,
       fireRange: null,
       simRows: null,
       simRequiredPortfolio: null,
@@ -626,7 +678,10 @@ describe('Defect B — buildHealthScoreInput deelt canoniek pad', () => {
     expect(routeInput.emergencyFundMonths).toBeCloseTo(23_000 / 4_500, 5)
   })
 
-  it('levert 3 budgetcategorieën, minstens één met limiet > 0', () => {
+  it('levert één categorie per budget (hier 3 kinderloze parents), minstens één met limiet > 0', () => {
+    // Sinds H4 is dit per INDIVIDUELE categorie; deze fixture heeft drie
+    // kinderloze parents, dus het aantal valt toevallig samen met de oude
+    // drie type-sommen.
     expect(routeInput.budgetCategories).toHaveLength(3)
     expect(routeInput.budgetCategories.some((c) => c.limit > 0)).toBe(true)
   })

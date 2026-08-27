@@ -1,6 +1,8 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { unauthorized, badRequest, serverError } from '@/lib/api/respond'
 import { loadDashboardData } from '@/lib/dashboard-data-loader'
+import { loadHorizonData } from '@/lib/horizon-data-loader'
+import { withCanonicalOverviewFigures } from '@/lib/overview/canonical-health'
 import { computeFreedomTotal } from '@/lib/briefing/overview-briefing'
 
 /**
@@ -10,6 +12,15 @@ import { computeFreedomTotal } from '@/lib/briefing/overview-briefing'
  * eigen FIRE-doel of -status meer. Ze consumeert exact dezelfde canonieke
  * horizon-kernel-uitkomsten als de hub/dashboard via `loadDashboardData`, zodat
  * de kaart-cijfers per definitie sporen met wat de gebruiker op /overzicht ziet.
+ *
+ * Die belofte vraagt sinds bevinding H4 om DEZELFDE laatste stap als de hub:
+ * `/overzicht` legt `withCanonicalOverviewFigures` over de bundel heen (score,
+ * vrijheids-% en noodfonds uit `loadHorizonData`), omdat de bundel die drie
+ * onafhankelijk afleidt. Zonder die stap zou dit outbound-artefact het rauwe
+ * bundel-percentage tonen — precies het gat dat de oorspronkelijke bevinding
+ * mat (24,2% op de kaart naast 11% in de gezondheidsmodal). De kaart is
+ * persoonlijk (geen perspectief-cookie), dus `loadHorizonData` draait hier op
+ * de standaard `'personal'`-blik — dezelfde blik als `loadDashboardData`.
  *
  * Historie (WF-OVZ-11-bug1): de kaart draaide voorheen een eigen
  * `computeFireProjection` (legacy v1-engine) + `fireTarget = yearlyExpenses/SWR`
@@ -37,8 +48,18 @@ export async function GET(request: Request) {
     // Canonieke bundel — dezelfde bron als de /overzicht-hub. Levert de kernel-
     // gebaseerde freedomPct, simFireCountdown (met scalar-kernel-fallback) en de
     // vrijheidstijd-grondslag (netWorth + recentMonthlyExpenses).
-    const bundle = await loadDashboardData(supabase)
-    const { dashboardData, simFireCountdown, fireProjResult, userName } = bundle
+    // `loadHorizonData` faalt liever niet de hele kaart: bij een horizon-fout
+    // valt de patch terug op de bundel-eigen waarden (zelfde `null`-contract als
+    // op /overzicht). Parallel omdat beide React-`cache()`'d zijn en de kernel-run
+    // gedeeld wordt — geen tweede query-set.
+    const [bundle, horizonData] = await Promise.all([
+      loadDashboardData(supabase),
+      loadHorizonData(supabase).catch(() => null),
+    ])
+    const { simFireCountdown, fireProjResult, userName } = bundle
+    // Canonieke kerngetallen erover heen — identiek aan
+    // components/overview/overzicht-secondary-loader.tsx.
+    const dashboardData = withCanonicalOverviewFigures(bundle.dashboardData, horizonData)
 
     const netWorth = dashboardData.netWorth
     // Uitgaven-basis (canoniek 12-mnd rolling; valt terug op de losse maand voor

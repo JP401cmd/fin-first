@@ -12,10 +12,13 @@ import type { ReactNode } from 'react'
  *      gebruikt Playfair, zie patroon-kaart *Figures-strip*)
  *   3. Italic Source Serif source-citation in `--ink-3`
  *
- * Op stap 4 (Bezittingen) wordt het paneel dynamisch: dan zit er een
- * cumulatief netto-vermogen-bedrag in de `evolution`-slot dat met
- * `useFlashChange` flasht (groen bij toename, rood bij afname). Op de
- * overige stappen blijft de slot leeg.
+ * De `evolution`-slot is een vrije uitbreidingsplek onder de bron-citatie.
+ * Een eerdere versie van dit commentaar beschreef er een cumulatieve
+ * vermogens-teller in; die is er nooit gekomen en hoort er ook niet — de
+ * meelopende vrijheidstijd-teller woont sinds bevinding H12 in de sticky kop
+ * (`OnboardingShell` → `OnboardingProgressBar.tickerSlot`), zodat hij op élk
+ * scherm staat in plaats van alleen op de stappen die dit paneel vullen.
+ * Vandaag vult alleen `onboarding-spaardoel.tsx` de slot.
  *
  * **Renderstrategie**:
  * - Desktop (≥lg): rendert als rechter kolom van de split — wrapper levert

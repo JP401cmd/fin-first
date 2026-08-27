@@ -148,14 +148,40 @@ export const KRUIS_ENGINE_CHECKS: KruisEngineCheck[] = [
   {
     workflow: 'WF-KRUIS-20',
     scenarioId: 'UAT-KRUIS-20',
-    label: 'Eén dagtarief (dailyExpenseRate + calculateFreedomTime): €98,6301/dag → 365 dagen bij €36.000',
+    label:
+      'Eén dagtarief (dailyExpenseRate + calculateFreedomTime): €98,6301/dag → 365 dagen bij €36.000, en dezelfde Box 3-heffing geeft op elk oppervlak hetzelfde dagenaantal',
     run: () => {
       criterion('WF-KRUIS-20')
       const dagtarief = dailyExpenseRate(3000) // 3000×12/365 = 98.6301369863
       const vrijheidsdagenBij36000 = calculateFreedomTime(36000, dagtarief).totalDays // 36000/(36000/365) = 365
+
+      // BRON-ASSERTIE (M22). De check hierboven toetste alleen de FORMULE; een
+      // oppervlak dat diezelfde formule een ándere teller voedde — of zelf ÷30
+      // deed — glipte er per constructie langs. Dat is precies wat er gebeurde:
+      // lib/household-tax.ts leidde `dailyExpenses` af uit budget-LIMIETEN ÷ 30,
+      // waardoor €569 op /overzicht/belasting/box3 3 vrijheidsdagen was en op de
+      // optimizer 17.
+      //
+      // We kunnen hier geen DB raken (deze checks zijn puur en client-veilig),
+      // dus toetsen we de IDENTITEIT die de fix garandeert: het tarief dat de
+      // Box 3-keten gebruikt ís het canonieke tarief, dus beide takken geven
+      // hetzelfde dagenaantal. De oude noemer wordt als CONTRAST meegerekend om
+      // vast te leggen dat hij een ander antwoord gaf. De structurele bewaking
+      // van "geen tweede noemer meer" zit in scripts/check-freedom-time-basis.mjs.
+      const heffing = 569
+      const dagenCanoniek = Math.round(heffing / dagtarief)
+      const dagenBox3Keten = Math.round(heffing / dailyExpenseRate(3000))
+      const dagenOudeNoemer = Math.round(heffing / (3000 / 30))
+      const box3DagenDelta = dagenBox3Keten - dagenCanoniek
+
       return {
-        expected: 'dagtarief=98.6301; vrijheidsdagenBij36000=365',
-        actual: `dagtarief=${fx(dagtarief, 4)}; vrijheidsdagenBij36000=${vrijheidsdagenBij36000}`,
+        expected: 'dagtarief=98.6301; vrijheidsdagenBij36000=365; box3DagenDelta=0',
+        actual:
+          `dagtarief=${fx(dagtarief, 4)}; vrijheidsdagenBij36000=${vrijheidsdagenBij36000}; ` +
+          `box3DagenDelta=${box3DagenDelta}` +
+          (dagenOudeNoemer === dagenCanoniek
+            ? ''
+            : ` (contrast: maand÷30 gaf ${dagenOudeNoemer} i.p.v. ${dagenCanoniek})`),
       }
     },
   },

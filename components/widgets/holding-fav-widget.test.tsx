@@ -3,6 +3,7 @@ import { render } from '@testing-library/react'
 import { HoldingFavWidget } from './holding-fav-widget'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import type { FavoriteHolding } from './widget-renderer'
+import { RETURN_BASIS_LABELS } from '@/lib/asset-return'
 
 // Privacy default zichtbaar (bedragen niet gemaskeerd) — spiegelt holdings-widget.test.
 const mockPrivacy = { masked: false }
@@ -53,7 +54,9 @@ describe('HoldingFavWidget — vrijheidstijd (Geld is opgeslagen tijd)', () => {
     // XL benut de bredere KPI-strip: extra context t.o.v. de kleine tegels.
     expect(text).toContain('Kostprijs')
     expect(text).toContain('Eenheden')
-    expect(text).toContain('Totaal rendement')
+    // Kaart H7: de grondslag staat in het label — dit is het rendement van ÉÉN
+    // positie, niet van de portefeuille die de zuster-widget toont.
+    expect(text).toContain(RETURN_BASIS_LABELS.positionSincePurchase.label)
   })
 
   it('full: toont dezelfde canonieke vrijheidstijd', () => {

@@ -134,6 +134,30 @@ export function computeLiquidPot(
   return liquid + unlinkedCash
 }
 
+/**
+ * Asset-types die bewijzen dat iemand AL BELEGT — de marktportefeuille.
+ * Bewust zónder `retirement`: een pensioenpot is gestort, niet gekocht, en
+ * bewijst geen eigen beleggingskeuze (zelfde standpunt als `NO_BASIS_TYPES` in
+ * lib/asset-return.ts). Daarmee is dit expliciet een ándere set dan
+ * `INVESTMENT_ASSET_TYPES` hierboven, die het verwachte rendement weegt.
+ */
+export const INVESTED_ASSET_TYPES = new Set(['investment', 'crypto'])
+
+/**
+ * "Belegt deze gebruiker al?" — de ene lezing achter de beleggings-CTA's
+ * (kaart H15). Een BESTAANSVRAAG, geen bedrag: de drempels die bepalen óf een
+ * inspiratiekaart rendert blijven bij de aanroeper, deze bepaalt alleen of de
+ * kaart "Start met beleggen" of een gevulde variant toont. Zonder dit stond de
+ * CTA onvoorwaardelijk aan en las een lopende inleg als "nog niet begonnen".
+ */
+export function hasInvestedAssets(
+  assets: readonly { asset_type?: string | null; current_value?: number | string | null }[],
+): boolean {
+  return assets.some(
+    a => INVESTED_ASSET_TYPES.has(a.asset_type ?? '') && Number(a.current_value ?? 0) > 0,
+  )
+}
+
 /** Runway: hoeveel maanden dekt de (liquide) pot de maanduitgaven. */
 export function monthsCoveredFrom(pot: number, monthlyExpenses: number): number {
   return monthlyExpenses > 0 ? pot / monthlyExpenses : 0

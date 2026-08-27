@@ -353,9 +353,19 @@ describe('kernel-tak', () => {
 
   it('deplete op de horizon-eindleeftijd met structureel tekort: verhulde parkeerstand → "Niet haalbaar"', () => {
     // Met endAge = 100 valt de eindleeftijd samen met de horizon: de bisectie kan
-    // niet meer "voorbij" de eindleeftijd ontsnappen en de gap wordt negatief,
-    // maar de doel=0-quirk meldt de stand nog steeds als 'reached_now'. De
-    // weergave-regel herkent die verhulde parkeerstand (gap < 0) → Niet haalbaar.
+    // niet meer "voorbij" de eindleeftijd ontsnappen en de gap wordt negatief.
+    //
+    // BIJGEWERKT bij bevinding M6 (26-08-2026): dit was de plek waar de verhulde
+    // parkeerstand ALLEEN in de weergave werd rechtgezet — de kern meldde nog
+    // 'reached_now' (de doel=0-quirk) en alleen de scalar-router zag daar doorheen.
+    // De kernel doet dat nu zelf op het app-pad (KernelInput
+    // .reachedNowVereistBereikbaarDoel, gap-besluit V21): een reached_now met
+    // gap < 0 of een negatief doelbedrag valt bij de bron op
+    // 'unreachable_within_horizon'. De UITKOMST is ongewijzigd (fireAge null,
+    // "Niet haalbaar", 0 dagen) — alleen de laag waar het wordt opgelost verschoof.
+    // De weergave-tak in de router blijft staan als tweede linie voor invoer
+    // zónder de vlag (parity-/fixture-pad); zie lib/horizon-kernel/
+    // onmogelijke-uitkomst.test.ts voor de kernel-kant.
     const outcome = computeScalarFireProjection(
       makeParams({
         input: makeInput({
@@ -368,7 +378,8 @@ describe('kernel-tak', () => {
       }),
     )
     expect(outcome.engine).toBe('kernel')
-    expect(outcome.kernelStatus).toBe('reached_now') // de quirk-status — kern blijft Excel-exact
+    // Kern lost het nu bij de bron op; de router hoeft er niet meer doorheen te kijken.
+    expect(outcome.kernelStatus).toBe('unreachable_within_horizon')
     expect(outcome.result.fireAge).toBeNull()
     expect(outcome.result.fireDate).toBe('Niet haalbaar')
     expect(outcome.result.countdownDays).toBe(0)

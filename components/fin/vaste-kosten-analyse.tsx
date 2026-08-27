@@ -25,6 +25,7 @@ import {
   Ban,
   RefreshCw,
   Sparkles,
+  ShoppingCart,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────
@@ -49,8 +50,17 @@ export type RecurringItem = {
 interface VasteKostenAnalyseProps {
   subscriptions: RecurringItem[]
   vasteKosten: RecurringItem[]
+  /**
+   * TERUGKEREND, MAAR VARIABEL (H14 fase 1) — boodschappen, tanken, horeca,
+   * winkelen: ze komen terug, maar het bedrag is een keuze. Tellen NIET mee in
+   * `totalMonthly` en staan daarom onder de twee kolommen in een eigen blok:
+   * zichtbaar (en dus corrigeerbaar via het classificeer-venster), maar buiten
+   * de vaste-lastenquote. Optioneel zodat andere aanroepers ongewijzigd blijven.
+   */
+  terugkerendVariabel?: RecurringItem[]
   totalMonthlySubscriptions: number
   totalMonthlyVasteKosten: number
+  totalMonthlyVariabel?: number
   totalMonthly: number
   userProfile: { full_name: string | null } | null
   onCancellationOpen: (metadata: CancellationMetadata) => void
@@ -91,8 +101,10 @@ const FREQ_LABELS: Record<string, string> = {
 export function VasteKostenAnalyse({
   subscriptions,
   vasteKosten,
+  terugkerendVariabel = [],
   totalMonthlySubscriptions,
   totalMonthlyVasteKosten,
+  totalMonthlyVariabel = 0,
   totalMonthly,
   userProfile,
   onCancellationOpen,
@@ -109,6 +121,7 @@ export function VasteKostenAnalyse({
   const [isOpen, setIsOpen] = useState(!collapsible)
   const [mounted, setMounted] = useState(false)
   const totalCount = subscriptions.length + vasteKosten.length
+  const variabelCount = terugkerendVariabel.length
 
   useEffect(() => {
     if (!collapsible) {
@@ -205,7 +218,7 @@ export function VasteKostenAnalyse({
       }`}>
 
       {/* ── Empty state: geen transacties ── */}
-      {totalCount === 0 && (
+      {totalCount === 0 && variabelCount === 0 && (
         <div className="px-5 py-8 text-center">
           <CreditCard className="mx-auto mb-3 h-8 w-8 text-[var(--ink-4)]" />
           <p className="text-sm font-medium text-[var(--ink-2)]">Nog geen vaste kosten gevonden</p>
@@ -215,6 +228,7 @@ export function VasteKostenAnalyse({
         </div>
       )}
 
+      {(totalCount > 0 || variabelCount > 0) && (<>
       {totalCount > 0 && (<>
       {/* ── Mobile tab bar (< md) ── */}
       <div className="border-b border-[var(--border-ed)] px-5 pb-3 pt-3 md:hidden">
@@ -367,6 +381,67 @@ export function VasteKostenAnalyse({
           )}
         </div>
       </div>
+      </>)}
+
+      {/* ── Terugkerend, maar variabel (H14) ──────────────────────
+             Posten die wél terugkomen maar waarvan JIJ het bedrag bepaalt:
+             boodschappen, tanken, horeca, winkelen. Ze tellen niet mee in het
+             totaal hierboven — een vaste-lastenquote hoort te meten wat vastligt,
+             niet wat je uitgeeft. Ze staan hier wél, en elke rij opent hetzelfde
+             classificeer-venster: klopt de indeling niet, dan zet je 'm terug.
+             Volle breedte onder de twee kolommen, met een eigen (grijze) accent-
+             rand zodat het visueel duidelijk buiten de vaste lasten valt. ── */}
+      {variabelCount > 0 && (
+        <div className="border-t border-[var(--border-ed)] p-5">
+          <div className="mb-1 flex items-center gap-2">
+            <ShoppingCart className="h-4 w-4 text-[var(--ink-3)]" />
+            <h4 className="label-editorial text-[var(--ink-2)]">Terugkerend, maar variabel</h4>
+            <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[var(--subtle)] px-1.5 font-mono text-[10px] font-bold tabular-nums text-[var(--ink-3)]">
+              {variabelCount}
+            </span>
+          </div>
+          <p className="mb-3 max-w-prose text-xs leading-relaxed text-[var(--ink-4)]">
+            Deze posten komen elke maand terug, maar het bedrag is jouw keuze. Ze tellen daarom
+            niet mee in je vaste lasten — wel goed om te zien. Klopt er iets niet? Tik erop om het
+            te herclassificeren.
+          </p>
+          <div className="space-y-2">
+            {terugkerendVariabel.map(item => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleClassifyClick(item)}
+                aria-label={`${item.name} classificeren — ${fc(item.monthlyAmount)} per maand, terugkerend maar variabel`}
+                className="flex w-full items-center justify-between rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-wil-500 focus-visible:ring-offset-1"
+              >
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <ShoppingCart className="h-3.5 w-3.5 shrink-0 text-[var(--ink-4)]" aria-hidden="true" />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-[var(--ink)]">{item.name}</p>
+                    <p className="text-xs text-[var(--ink-3)]">
+                      Variabel &middot; {FREQ_LABELS[item.frequency] ?? item.frequency}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <p className="font-mono text-sm tabular-nums text-[var(--ink-2)]">
+                    ~{fc(item.monthlyAmount)}/mnd
+                  </p>
+                  <ChevronRight className="h-4 w-4 text-[var(--ink-4)]" aria-hidden="true" />
+                </div>
+              </button>
+            ))}
+            <div className="flex items-center justify-between border-t border-[var(--border-ed)] pt-3">
+              <span className="text-xs font-medium text-[var(--ink-3)]">
+                Buiten je vaste lasten
+              </span>
+              <span className="font-mono text-sm tabular-nums text-[var(--ink-2)]">
+                ~{fc(totalMonthlyVariabel)}/mnd
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Grand total + Nu scannen ── */}
       <div className="border-t border-[var(--border-ed)] px-5 py-4">
@@ -379,6 +454,11 @@ export function VasteKostenAnalyse({
             <p className="font-mono text-xs tabular-nums text-[var(--ink-3)]">
               {fc(totalMonthly * 12)}/jaar
             </p>
+            {variabelCount > 0 && (
+              <p className="text-xs text-[var(--ink-4)]">
+                excl. {fc(totalMonthlyVariabel)}/mnd terugkerend variabel
+              </p>
+            )}
           </div>
         </div>
 

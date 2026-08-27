@@ -21,14 +21,27 @@
 
 import type { HealthScoreInput } from '@/lib/financial-health'
 import { hasPartner } from '@/lib/household-type'
-import { BOX3_PARAMS, CURRENT_TAX_YEAR } from '@/lib/box3-data'
-import { computeLiquidPot } from '@/lib/dashboard-wealth-weighting'
-import { emergencyTargetBasis } from '@/lib/emergency-fund'
+import { BOX3_PARAMS, CURRENT_TAX_YEAR, classifyAsset } from '@/lib/box3-data'
+import type { Asset } from '@/lib/asset-data'
+import { emergencyTargetBasis, resolveEmergencyFundFromRows } from '@/lib/emergency-fund'
 
 // ── Box 3 (educatief "kans"-inzicht; sinds v2 geen score-pijler, ADR 0010) ───
 
-/** Vermogenstypes die als Box 3-bezit tellen (spaargeld + beleggingen). */
-const BOX3_ASSET_TYPES = new Set(['cash', 'savings', 'checking', 'investment', 'crypto'])
+/**
+ * Of deze bezitting als Box 3-bezit telt — via de canonieke `classifyAsset`.
+ *
+ * Tot M23 stond hier een DERDE eigen type-set (`cash`/`savings`/`checking`/
+ * `investment`/`crypto`) naast die in `box3-taxable-input.ts` en naast
+ * `classifyAsset` zelf. Ze spraken elkaar tegen: deze set miste `real_estate`
+ * en `vordering` (wél Box 3) en bevatte `'checking'`, dat geen geldig
+ * `AssetType` is en dus nooit iets matchte — een dode entry die suggereerde dat
+ * betaalrekeningen apart werden gedekt. Op dezelfde persona gaf deze set
+ * €55.200 waar de canonieke bron €84.500 zag.
+ */
+function isBox3Asset(asset: HealthScoreAsset): boolean {
+  if (!asset.asset_type) return false
+  return classifyAsset(asset as unknown as Asset).category !== null
+}
 
 /** Budgettypes die in de budget-discipline-pijler meewegen. */
 const HEALTH_BUDGET_TYPES = ['income', 'expense', 'savings', 'debt'] as const
@@ -43,6 +56,13 @@ export interface HealthScoreAsset {
    * INCLUSION-gewogen liquide pot meetelt (D1-fix); ontbreekt → 100%.
    */
   net_worth_inclusion_pct?: number | null
+  // ── Velden die de canonieke `classifyAsset` leest (Box 3-kans-inzicht) ──
+  // Optioneel: ontbreken ze in een smallere rij-select, dan valt de indeling
+  // terug op de type-afleiding.
+  subtype?: string | null
+  tax_benefit?: boolean | null
+  box3_vrijgesteld?: boolean | null
+  box3_vrijstelling_reden?: string | null
 }
 
 /** Minimale budgetvorm (parent of child). */
@@ -74,7 +94,7 @@ export function buildTaxData(
 ): HealthScoreInput['taxData'] {
   const box3Bezittingen =
     assets
-      .filter((a) => a.asset_type && BOX3_ASSET_TYPES.has(a.asset_type))
+      .filter(isBox3Asset)
       .reduce((s, a) => s + Number(a.current_value ?? 0), 0) + unlinkedCash
   if (box3Bezittingen < 1_000) return null
   // Bug-fix: voorheen tegen de verouderde woordenschat ('samenwonend'/'getrouwd')
@@ -113,16 +133,16 @@ export function computeEmergencyFundMonths(
   netMonthlySalary: number,
   avgMonthlyExpenses: number,
 ): number {
-  const liquidPot = computeLiquidPot(
-    assets.map((a) => ({
-      current_value: a.current_value ?? 0,
-      asset_type: a.asset_type,
-      net_worth_inclusion_pct: a.net_worth_inclusion_pct,
-    })),
+  // DELEGATIE, geen tweede som (H4 punt 1): dezelfde kern die de noodfonds-
+  // bundel voor widget en briefing bouwt. Voorheen stond hier een eigen
+  // computeLiquidPot + deling, waardoor de gezondheidsmodal en de noodfonds-
+  // widget op twee onafhankelijke paden konden gaan lopen.
+  return resolveEmergencyFundFromRows(
+    assets,
     unlinkedCash,
-  )
-  const { monthlyBase } = emergencyTargetBasis(netMonthlySalary, avgMonthlyExpenses)
-  return monthlyBase > 0 ? liquidPot / monthlyBase : 0
+    netMonthlySalary,
+    avgMonthlyExpenses,
+  ).monthsCovered
 }
 
 // ── Diversificatie (legacy, niet langer een pijler) ──────────────────────────
@@ -187,10 +207,39 @@ export function computeLargestAssetTypeShare(
 // ── Budget-discipline (budget_discipline-pillar) ─────────────────────────────
 
 /**
- * Bouwt de `budgetCategories` (limit/spent per type: expense, savings, debt)
- * exact zoals de loader dat doet: maandlimieten uit parent/child-budgetten
- * (kinderen sommeren over parent), interval genormaliseerd naar maand, en
- * besteed bedrag per type uit transacties via hun budget_id.
+ * Bouwt de `budgetCategories` voor de budget-discipline-pijler: één entry per
+ * INDIVIDUELE budgetcategorie (limiet + besteed deze maand).
+ *
+ * ## Granulariteit — eigenaar-besluit 26 aug 2026 (bevinding H4, punt 3)
+ * Tot dit besluit sommeerde deze functie álle budgetten tot precies DRIE
+ * type-aggregaten (expense-totaal, savings-totaal, debt-totaal). De pijler
+ * meldde dan "3/3 — alles binnen de limiet" terwijl de uitgaven-heatmap op
+ * hetzelfde scherm "Gas, water, licht 107%" toonde: één overschrijding werd
+ * weggemiddeld tegen categorieën die onder hun limiet bleven. Geen rekenfout,
+ * wel een pijler die iets anders mat dan zijn eigen omschrijving ("Hoeveel van
+ * je budgetcategorieën blijven binnen de limiet?") belooft.
+ *
+ * Gekozen richting: **optie A — echt per individuele categorie tellen**.
+ *
+ * ## Welke rij is een "categorie"?
+ * Exact dezelfde populatie als de uitgaven-heatmap
+ * (`heatmapExpenseGroups` in lib/dashboard-data-loader.ts): per parent geldt
+ * `kinderen.length > 0 ? kinderen : [parent]`. Een parent mét kinderen is een
+ * GROEP, geen categorie — anders zou zijn limiet (de som van de kinderen) naast
+ * die kinderen nog een keer meetellen. Zo tellen modal en heatmap dezelfde
+ * dingen, en kan "32/33" nooit meer naast een rode tegel staan.
+ *
+ * Het maandelijkse interval van de PARENT normaliseert ook de kinderlimieten
+ * (`quarterly` ÷3, alles wat niet `monthly`/`quarterly` is ÷12) — kinderen
+ * dragen geen eigen periodiciteit in deze grondslag, net als voorheen.
+ *
+ * ## Bewust ONGEWIJZIGD
+ *  - Alle drie de types (expense/savings/debt) blijven meedoen; `income` niet.
+ *  - De `spent`-pass heeft géén transfer-filter en telt absoluut — hetzelfde
+ *    gedrag als élke andere budget-surface (zie `deriveBudgetTotals`).
+ *  - Een transactie die rechtstreeks aan een parent MÉT kinderen hangt telt niet
+ *    mee, precies zoals in de heatmap. Zo'n koppeling ontstaat niet via de UI
+ *    (die kiest altijd een blad) en zou anders bij een limietloze groep landen.
  *
  * Een lege array (geen budgetten) maakt de budget-discipline-pijler inactief
  * (ADR 0010 / FR-5; geen neutrale 70-dummy meer) — het gewicht wordt herverdeeld.
@@ -202,50 +251,37 @@ export function buildBudgetCategories(
   const parents = budgets.filter((b) => b.parent_id == null)
   const children = budgets.filter((b) => b.parent_id != null)
 
-  // budget_id → type (parents + children erven parent-type)
-  // Onvoorwaardelijk setten — gedragsidentiek aan de loader (die schrijft de
-  // ruwe budget_type altijd weg). isHealthType filtert later op de geldige
-  // types, dus een null/leeg type schaadt de score niet.
-  const budgetTypeMap = new Map<string, string>()
-  for (const b of parents) budgetTypeMap.set(b.id, b.budget_type as string)
-  for (const c of children) {
-    const parentType = budgetTypeMap.get(c.parent_id ?? '')
-    if (parentType) budgetTypeMap.set(c.id, parentType)
-  }
-
   const isHealthType = (t: string | null | undefined): t is HealthBudgetType =>
     !!t && (HEALTH_BUDGET_TYPES as readonly string[]).includes(t)
 
-  // Maandlimieten per type
-  const budgetLimits: Record<HealthBudgetType, number> = { income: 0, expense: 0, savings: 0, debt: 0 }
-  for (const b of parents) {
-    const type = b.budget_type
-    if (!isHealthType(type)) continue
-    const ownChildren = children.filter((c) => c.parent_id === b.id)
-    const limit = ownChildren.length > 0
-      ? ownChildren.reduce((sum, c) => sum + Number(c.default_limit ?? 0), 0)
-      : Number(b.default_limit ?? 0)
-    const monthlyLimit = b.interval === 'monthly' ? limit
-      : b.interval === 'quarterly' ? limit / 3
-      : limit / 12
-    budgetLimits[type] += monthlyLimit
-  }
-
-  // Besteed per type (deze maand) uit transacties
-  const budgetSpent: Record<HealthBudgetType, number> = { income: 0, expense: 0, savings: 0, debt: 0 }
+  // Besteed per budget_id (deze maand) — één pass, daarna per blad opgevraagd.
+  const spentByBudget = new Map<string, number>()
   for (const tx of transactions) {
     const budgetId = tx.budget_id
     if (!budgetId) continue
-    const type = budgetTypeMap.get(budgetId)
-    if (!isHealthType(type)) continue
-    budgetSpent[type] += Math.abs(Number(tx.amount ?? 0))
+    spentByBudget.set(budgetId, (spentByBudget.get(budgetId) ?? 0) + Math.abs(Number(tx.amount ?? 0)))
   }
 
-  return [
-    { limit: budgetLimits.expense, spent: budgetSpent.expense },
-    { limit: budgetLimits.savings, spent: budgetSpent.savings },
-    { limit: budgetLimits.debt, spent: budgetSpent.debt },
-  ]
+  const categories: { limit: number; spent: number }[] = []
+  for (const parent of parents) {
+    const type = parent.budget_type
+    // `income` en onbekende types tellen niet mee in de discipline-pijler.
+    if (!isHealthType(type) || type === 'income') continue
+    const ownChildren = children.filter((c) => c.parent_id === parent.id)
+    const leaves = ownChildren.length > 0 ? ownChildren : [parent]
+    // Periodiciteit staat op de parent; kinderen erven 'm (zie doc hierboven).
+    const toMonthly = (limit: number) =>
+      parent.interval === 'monthly' ? limit
+      : parent.interval === 'quarterly' ? limit / 3
+      : limit / 12
+    for (const leaf of leaves) {
+      categories.push({
+        limit: toMonthly(Number(leaf.default_limit ?? 0)),
+        spent: spentByBudget.get(leaf.id) ?? 0,
+      })
+    }
+  }
+  return categories
 }
 
 // ── Assembler ────────────────────────────────────────────────────────────────

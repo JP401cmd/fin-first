@@ -111,6 +111,20 @@ function QuoteMeter({ insights }: { insights: Insights }) {
       <p className="mt-2 text-xs leading-relaxed text-[var(--ink-3)]">
         {VASTE_LASTEN_BENCHMARK_COPY.nibud}
       </p>
+      {/* H14 — verantwoord waaróm de quote lager is dan de som van alles wat
+          terugkomt. Zonder deze regel lijkt er geld te verdwijnen. */}
+      {insights.variabelCount > 0 && (
+        <p className="mt-1.5 text-xs leading-relaxed text-[var(--ink-4)]">
+          Boodschappen, tanken en winkelen tellen hier niet in mee (
+          <MaskedAmount
+            value={insights.variabelMonthly}
+            tone="ink"
+            className="text-[var(--ink-3)]"
+          />
+          /mnd): ze komen wel terug, maar het bedrag is jouw keuze. Je vindt ze hierboven onder
+          &ldquo;Terugkerend, maar variabel&rdquo;.
+        </p>
+      )}
     </div>
   )
 }

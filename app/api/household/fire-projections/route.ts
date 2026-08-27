@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
-import { computeFireProjection, computeFireRange, type FinancialInput, type FireProjection, type FireRange } from '@/lib/horizon-data'
+import { type FinancialInput, type FireProjection, type FireRange } from '@/lib/horizon-data'
 import { computeSharePct, type SplitMode } from '@/lib/household-data'
 import { annualAmount } from '@/lib/budget-utils'
 import { localMonthBounds } from '@/lib/month-range'
+import { computeScalarFireRange, type ScalarFireParams } from '@/lib/horizon-kernel/scalar-router'
+import { resolveFireParamsWithAssumptions } from '@/lib/fire-params'
+import { resolveFireStrategyWithOverride } from '@/lib/fire-strategy'
+import type { FireAssumptionRow } from '@/lib/fire-assumptions'
 
 /**
  * GET /api/household/fire-projections
@@ -14,6 +18,28 @@ import { localMonthBounds } from '@/lib/month-range'
  * - Partner comparison data
  *
  * Requires authenticated user with a household.
+ *
+ * ## Motor + aannames (H21/F7, ADR 0107)
+ * Deze route draaide op de RAUWE scalar-lus (`computeFireProjection`) **zonder
+ * parameters** — dus op de constanten `DEFAULT_RETURN` / `NL_SWR`, ongeacht wat
+ * de gebruiker zelf als rendement/inflatie had ingesteld. Dat is een dubbele
+ * overtreding: een tweede motor náást de kernel, én een vaste financiële aanname
+ * buiten de params-laag.
+ *
+ * Nu: de kernel-backed router `computeScalarFireRange` (die intern per scenario
+ * `solveFire` draait en alleen bij een gate — geen geboortedatum, negatief
+ * vermogen — netjes naar de scalar-formule degradeert), gevoed met
+ * `resolveFireParamsWithAssumptions` per profiel: eigen keuze wint, anders de
+ * jaargelaagde markt-aanname, anders pas de TS-constante.
+ *
+ * De `projection` is bewust `range.expected` — één run, geen tweede som die kan
+ * gaan afwijken van de band waar hij in hoort te liggen.
+ *
+ * NB: de /toekomst-huishoudweergave leest deze route NIET (meer); die draait op
+ * `lib/household-projection.ts` (volledige unified projection, dual-AOW). Deze
+ * route blijft bestaan als publiek API-oppervlak. Wie hier een derde
+ * huishoud-FIRE-motor wil toevoegen: doe dat niet — consolideer richting
+ * `lib/household-projection.ts`.
  */
 
 interface PartnerFinancials {
@@ -130,11 +156,19 @@ export async function GET() {
     allDebtsResult,
     allEssentialBudgetsResult,
     allChildBudgetsResult,
+    fireAssumptionsResult,
   ] = await Promise.all([
-    // Profiles for all members
+    // Profiles for all members.
+    // De FIRE-kolommen zijn MARKT-aannames + eindstrategie (rendement, inflatie,
+    // box3-methode, stop-leeftijd) — geen persoonlijke financiële feiten. Bewust
+    // GEEN `net_monthly_income`/`marginaal_tarief` erbij: die voeden alleen
+    // `FireParams.marginaalTarief`, dat deze route niet gebruikt, en zouden de
+    // partner-datastroom onnodig verbreden.
     supabase
       .from('profiles')
-      .select('id, full_name, date_of_birth')
+      .select(
+        'id, full_name, date_of_birth, expected_return, inflation_rate, box3_method, fire_end_strategy, fire_end_age, fire_legacy_amount, feature_preferences',
+      )
       .in('id', memberIds),
     // Current month transactions for all members
     supabase
@@ -165,6 +199,12 @@ export async function GET() {
       .from('budgets')
       .select('id, parent_id, default_limit, user_id, ownership')
       .not('parent_id', 'is', null),
+    // FIRE-marktaannames — jaargelaagde override-laag. Ontbrekende/lege set →
+    // `resolveFireAssumptions` valt terug op DEFAULT_RETURN/INFLATION.
+    supabase
+      .from('fire_assumptions')
+      .select('year, expected_return, inflation, volatility, source, is_definitive')
+      .order('year', { ascending: true }),
   ])
 
   const profiles = profilesResult.data ?? []
@@ -173,6 +213,41 @@ export async function GET() {
   const allDebts = allDebtsResult.data ?? []
   const allEssentialBudgets = allEssentialBudgetsResult.data ?? []
   const allChildBudgets = allChildBudgetsResult.data ?? []
+  const assumptionRows = (fireAssumptionsResult.data ?? []) as FireAssumptionRow[]
+
+  /**
+   * Rendement/inflatie/SWR + eindstrategie voor één profiel — de canonieke
+   * params-keten (eigen keuze → jaarlaag → constante). Ontbrekend profiel →
+   * `resolveFireParamsWithAssumptions(null, …)` levert precies de defaults, dus
+   * geen aparte tak met eigen getallen.
+   */
+  type MemberProfileRow = {
+    expected_return?: number | null
+    inflation_rate?: number | null
+    box3_method?: string | null
+    fire_end_strategy?: string | null
+    fire_end_age?: number | null
+    fire_legacy_amount?: number | string | null
+    feature_preferences?: Record<string, unknown> | null
+  }
+  const scalarParamsFor = (
+    input: FinancialInput,
+    profile: MemberProfileRow | null | undefined,
+  ): ScalarFireParams => {
+    const fireParams = resolveFireParamsWithAssumptions(profile ?? null, assumptionRows)
+    const strategy = resolveFireStrategyWithOverride(profile ?? {})
+    return {
+      input,
+      annualReturn: fireParams.grossReturn,
+      swrOverride: fireParams.effectiveSwr,
+      inflationOverride: fireParams.inflationRate,
+      strategyOptions: {
+        strategy: strategy.strategy,
+        endAge: strategy.endAge,
+        legacyAmount: strategy.legacyAmount,
+      },
+    }
+  }
 
   // Compute per-member monthly income first (needed for income_ratio split mode)
   const memberIncomes = new Map<string, number>()
@@ -361,8 +436,14 @@ export async function GET() {
     dateOfBirth: combinedDob,
   }
 
-  const combinedProjection = computeFireProjection(combinedInput)
-  const combinedRange = computeFireRange(combinedInput)
+  // De gecombineerde run draait op de aannames van de AANVRAGER: dat is de blik
+  // die om dit antwoord vraagt, en het is het enige profiel waarvan we zeker
+  // weten dat de gebruiker de keuzes zelf gemaakt heeft.
+  const requesterProfile = profiles.find(p => p.id === claims.sub) as MemberProfileRow | undefined
+  const combinedRange = computeScalarFireRange(scalarParamsFor(combinedInput, requesterProfile)).result
+  // Eén run: de "verwachte" tak ván de band is de projectie. Een aparte
+  // projectie-aanroep is een tweede som die uit de band kan lopen.
+  const combinedProjection = combinedRange.expected
 
   // Compute individual partner projections
   const partnersProjections = partnersData.map(partner => {
@@ -376,14 +457,18 @@ export async function GET() {
       dateOfBirth: partner.dateOfBirth,
     }
 
+    // Elke partner op ZIJN EIGEN aannames + eindstrategie.
+    const partnerProfile = profiles.find(p => p.id === partner.userId) as MemberProfileRow | undefined
+    const partnerRange = computeScalarFireRange(scalarParamsFor(partnerInput, partnerProfile)).result
+
     return {
       userId: partner.userId,
       fullName: partner.fullName,
       isCurrentUser: partner.isCurrentUser,
       financials: partner,
       input: partnerInput,
-      projection: computeFireProjection(partnerInput),
-      range: computeFireRange(partnerInput),
+      projection: partnerRange.expected,
+      range: partnerRange,
     }
   })
 

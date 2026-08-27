@@ -8,6 +8,7 @@ import { formatMaskedCurrency, calculateFreedomTime, formatFreedomTimeString, da
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { ASSET_TYPE_COLORS, ASSET_TYPE_LABELS, type AssetType } from '@/lib/asset-data'
+import { RETURN_BASIS_LABELS, formatGainPct } from '@/lib/asset-return'
 import type { DashboardData } from './widget-renderer'
 import { Landmark, Users, UserCheck } from 'lucide-react'
 import { usePerspective } from '@/components/app/perspective-provider'
@@ -44,7 +45,7 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
   const overrides = isHouseholdView ? data.householdOverrides! : isPartnerView ? data.partnerOverrides! : null
   const totalAssets = overrides ? overrides.totalAssets : data.totalAssets
   const monthlyExpenses = overrides ? overrides.monthlyExpenses : data.monthlyExpenses
-  const { monthlyContributions, assetsByType, totalPurchaseValue } = data
+  const { monthlyContributions, assetsByType, assetReturn } = data
 
   const kickerLabel = isHouseholdView
     ? 'Vermogen — Huishouden'
@@ -161,10 +162,16 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
     )
   }
 
-  const unrealizedGain = totalPurchaseValue > 0 ? totalAssets - totalPurchaseValue : null
-  const unrealizedPct  = unrealizedGain != null && totalPurchaseValue > 0
-    ? (unrealizedGain / totalPurchaseValue) * 100
-    : null
+  // Gerealiseerd rendement uit de CANONIEKE motor (lib/asset-return.ts) via de
+  // bundel — consume, don't recompute. Hiervóór stond hier
+  // `totalAssets − totalPurchaseValue` als "Ongerealiseerde winst": één
+  // aftrekking over álle bezittingen, waarin een banksaldo met
+  // `purchase_value = 0` volledig als winst telde en een pensioenpot van een ton
+  // het getal overstemde. Exact de formule die commit 5857ba0d9 op
+  // /overzicht/bezittingen wegnam en die hier bleef staan (kaart H7, fout F).
+  // Het label draagt nu de grondslag, uit de gedeelde labelbron.
+  const portfolioGain = assetReturn.cost > 0 ? assetReturn.gain : null
+  const portfolioPct = assetReturn.pct
 
   // ── Half-size: horizontal layout — left metric, right breakdown ──
   if (size === 'half') {
@@ -285,20 +292,20 @@ export const AssetsWidget = memo(function AssetsWidget({ size, data, href }: Pro
 
         return (
           <div className="mt-3 space-y-1 border-t border-dashed border-[var(--border-ed)] pt-3">
-            {/* Ongerealiseerde winst */}
-            {unrealizedGain != null && (
+            {/* Rendement — grondslag in het label (gedeelde bron: RETURN_BASIS_LABELS) */}
+            {portfolioGain != null && (
               <div className="mb-1 flex items-baseline justify-between text-[11px]">
-                <span className="text-[var(--ink-3)]">Ongerealiseerde winst</span>
-                <span className={unrealizedGain >= 0 ? 'text-positive' : 'text-negative'}>
+                <span className="text-[var(--ink-3)]">{RETURN_BASIS_LABELS.portfolioSincePurchase.label}</span>
+                <span className={portfolioGain >= 0 ? 'text-positive' : 'text-negative'}>
                   <MaskedAmount
-                    value={unrealizedGain}
-                    signPrefix={unrealizedGain >= 0 ? '+' : ''}
+                    value={portfolioGain}
+                    signPrefix={portfolioGain >= 0 ? '+' : ''}
                     tone="kern"
                     className="font-semibold"
                   />
-                  {unrealizedPct != null && (
+                  {portfolioPct != null && (
                     <span className="ml-1 font-normal text-[var(--ink-3)]">
-                      ({unrealizedPct >= 0 ? '+' : ''}{unrealizedPct.toFixed(1)}%)
+                      ({formatGainPct(portfolioPct)})
                     </span>
                   )}
                 </span>

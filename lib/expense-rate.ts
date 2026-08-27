@@ -19,8 +19,13 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { dailyExpenseRate } from '@/lib/format'
-import { localMonthStartMonthsAgo } from '@/lib/month-range'
+import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
 import { EXPENSE_RATE_ROLLING_MONTHS } from '@/lib/constants'
+import {
+  aggToExpenseRows,
+  fetchTxMonthAggregate,
+  getTxAgg12m,
+} from '@/lib/server-data/tx-aggregates'
 
 export interface RecentDailyExpenseRate {
   /** Dagtarief in €/dag (canonieke jaar/365-basis via `dailyExpenseRate`). */
@@ -85,9 +90,70 @@ export function recentDailyExpenseRateFromRows(
 }
 
 /**
- * Server-variant: query het canonieke rolling-venster (tijdzone-veilige
- * ondergrens via `localMonthStartMonthsAgo`) en bereken het dagtarief. Gebruik
- * deze wanneer een oppervlak nog geen uitgaven-rijen heeft opgehaald (client via
+ * Haal de uitgaven-rijen voor het rolling-venster op — VIA HET MAANDAGGREGAAT.
+ *
+ * ── Waarom niet meer rauw (L10) ─────────────────────────────────────────────
+ * De vorige implementatie deed `.from('transactions').select('amount, date')`
+ * zonder `.order()` en zonder paginering. PostgREST kapt zo'n antwoord STIL af op
+ * `max_rows` (supabase/config.toml = 1000) — óók zonder expliciete `.limit()`.
+ * Boven de 1000 negatieve transacties in het venster kreeg deze functie dus een
+ * willekeurige deelverzameling: zowel `totalExpenses` als de vroegste maand
+ * (`dataMonths`) schoven mee, en het dagtarief LOOG omhoog. Dat is exact het
+ * bugpatroon dat `lib/server-data/tx-aggregates.parity.test.ts` al bewijst voor
+ * de spaarquote — en de reden dat /rapportages/balans €165/dag toonde naast
+ * €106/dag op /overzicht/cashflow (bevinding L10): cashflow liep al wél via het
+ * aggregaat, de rapport-routes nog niet.
+ *
+ * Het aggregaat (`public.tx_month_aggregate`) levert per definitie enkele rijen
+ * (één per maand × budget × type) en kan dus niet afkappen. `aggToExpenseRows`
+ * bouwt daar synthetische maand-rijen van; `recentDailyExpenseRateFromRows`
+ * gebruikt alleen het totaal én de vroegste maand, dus de uitkomst is voor een
+ * niet-afgekapte verzameling byte-identiek aan de rauwe route (bewezen in de
+ * parity-test hierboven).
+ *
+ * ── Venster: maandkorrel, en waarom dat de canonieke keuze is ───────────────
+ * Het aggregaat kent alleen hele kalendermaanden. Het venster is daarom
+ * `[maandstart 11 mnd terug, maandeinde van referenceDate)` — waar de rauwe query
+ * exact op `referenceDate` afkapte. Voor de lopende maand is dat precies wat
+ * `lib/dashboard-data-loader.ts`, `lib/cashflow-kpis.ts`, `lib/core-data-loader.ts`
+ * en de horizon-loader al hanteren; die grondslag is dus de norm, niet de
+ * afwijking. Voor een HISTORISCHE peildatum (rapport-routes met `?date=`) telt de
+ * rest van die kalendermaand mee — bewust geaccepteerd: één grondslag app-breed
+ * weegt zwaarder dan een dag-precieze afkap op één rapport, en de afwijking is
+ * begrensd tot hooguit één deelmaand van de twaalf.
+ *
+ * Valt de peildatum in de HUIDIGE kalendermaand, dan is het venster identiek aan
+ * dat van `getTxAgg12m` en delen we diens `cache()`-entry — dan draait er binnen
+ * één request één RPC voor dashboard-, core-, horizon- én deze consumers samen.
+ */
+export async function fetchExpenseRowsForRate(
+  supabase: SupabaseClient,
+  referenceDate: Date = new Date(),
+): Promise<{ amount: number; date: string }[]> {
+  const now = new Date()
+  const sameMonthAsNow =
+    referenceDate.getFullYear() === now.getFullYear() &&
+    referenceDate.getMonth() === now.getMonth()
+
+  const { data } = sameMonthAsNow
+    ? await getTxAgg12m(supabase)
+    : await fetchTxMonthAggregate(supabase, {
+        from: localMonthStartMonthsAgo(referenceDate, EXPENSE_RATE_ROLLING_MONTHS - 1),
+        // `to` is EXCLUSIEF in de RPC → de 1e van de volgende maand.
+        to: localMonthBounds(referenceDate).end,
+      })
+
+  // `realOnly: false` = álle negatieve transacties, inclusief (joint_)transfers —
+  // byte-identiek aan de vroegere `.lt('amount', 0)`-fetch en aan de grondslag van
+  // `DashboardData.dailyExpenseRate`. Nooit stilzwijgend filteren: dat zou een
+  // ANDERE grondslag zijn en precies de drift terugbrengen die L10 opruimt.
+  return aggToExpenseRows(data ?? [], { realOnly: false })
+}
+
+/**
+ * Server-variant: haal het canonieke rolling-venster op (via het maandaggregaat,
+ * zie `fetchExpenseRowsForRate`) en bereken het dagtarief. Gebruik deze wanneer
+ * een oppervlak nog geen uitgaven-rijen heeft opgehaald (client via
  * `/api/daily-expense-rate`, bezittingen-loader, cashflow-rapport).
  */
 export async function getRecentDailyExpenseRate(
@@ -95,18 +161,6 @@ export async function getRecentDailyExpenseRate(
   referenceDate: Date = new Date(),
   fallbackMonthlyExpenses = 0,
 ): Promise<RecentDailyExpenseRate> {
-  // 12-maands venster = 11 maanden terug t/m de referentiedatum (inclusief).
-  const startWindow = localMonthStartMonthsAgo(referenceDate, EXPENSE_RATE_ROLLING_MONTHS - 1)
-  const refIso = referenceDate.toISOString().split('T')[0]
-  const { data } = await supabase
-    .from('transactions')
-    .select('amount, date')
-    .lt('amount', 0)
-    .gte('date', startWindow)
-    .lte('date', refIso)
-  return recentDailyExpenseRateFromRows(
-    (data ?? []) as ExpenseRow[],
-    referenceDate,
-    fallbackMonthlyExpenses,
-  )
+  const rows = await fetchExpenseRowsForRate(supabase, referenceDate)
+  return recentDailyExpenseRateFromRows(rows, referenceDate, fallbackMonthlyExpenses)
 }

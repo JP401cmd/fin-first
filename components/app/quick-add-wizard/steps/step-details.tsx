@@ -29,14 +29,18 @@ import {
 import {
   AssetQuickInputSchema,
   DebtQuickInputSchema,
+  MAX_TERM_YEARS,
 } from '@/lib/quick-add/validation'
 import { defaultInterestRate } from '@/lib/quick-add/build-drafts'
 import type { AssetQuickInput, DebtQuickInput } from '@/lib/quick-add/types'
 import type { AssetDraftState, DebtDraftState } from '../wizard-reducer'
 
 /**
- * Stap 3 — mini-form met maximaal 3 velden (naam, bedrag, type-specifiek
- * veld). Defaults uit `ASSET_DEFAULT_NAMES` / `DEBT_DEFAULT_NAMES` worden
+ * Stap 3 — mini-form met drie kernvelden (naam, bedrag, type-specifiek
+ * veld), aangevuld met een handvol optionele type-specifieke velden die een
+ * stille aanname corrigeerbaar maken (spaarrente, aflossing per maand,
+ * en voor hypotheken aflossingsvorm/ingangsdatum/resterende looptijd).
+ * Defaults uit `ASSET_DEFAULT_NAMES` / `DEBT_DEFAULT_NAMES` worden
  * automatisch ingevuld zodat de gebruiker in veel gevallen alleen het
  * bedrag hoeft te typen. Suggesties komen via een native `<datalist>` —
  * het simpelste patroon dat zowel keyboard als touch goed ondersteunt.
@@ -85,6 +89,7 @@ type FieldErrors = {
   amount?: string
   field3?: string
   monthlyPayment?: string
+  termYears?: string
 }
 
 function getCurrentYear(): number {
@@ -246,6 +251,15 @@ export function StepDetails(props: StepDetailsProps) {
       }
     }
 
+    // Resterende looptijd (hypotheek): zelfde reden als hierboven — het
+    // formulier is noValidate, dus min/max op de input blokkeert niets.
+    if (!isAsset && typeKey === 'mortgage') {
+      const ty = (props.draft as DebtDraftState).term_years
+      if (typeof ty === 'number' && (ty < 1 || ty > MAX_TERM_YEARS)) {
+        next.termYears = `Vul een looptijd tussen 1 en ${MAX_TERM_YEARS} jaar in`
+      }
+    }
+
     return next
   }
 
@@ -295,7 +309,13 @@ export function StepDetails(props: StepDetailsProps) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setTouched({ name: true, amount: true, field3: true, monthlyPayment: true })
+    setTouched({
+      name: true,
+      amount: true,
+      field3: true,
+      monthlyPayment: true,
+      termYears: true,
+    })
     const nextErrors = validateAll()
     if (Object.keys(nextErrors).length === 0) {
       props.onSubmit()
@@ -306,6 +326,7 @@ export function StepDetails(props: StepDetailsProps) {
   const showAmountError = touched.amount && currentErrors.amount
   const showField3Error = touched.field3 && currentErrors.field3
   const showMonthlyPaymentError = touched.monthlyPayment && currentErrors.monthlyPayment
+  const showTermYearsError = touched.termYears && currentErrors.termYears
 
   const submitLabel = props.submitLabel ?? 'Toevoegen'
 
@@ -424,16 +445,20 @@ export function StepDetails(props: StepDetailsProps) {
         />
       )}
 
-      {/* Hypotheek-only: aflossingsvorm + ingangsdatum. Vult de bestaande
-          debts.repayment_type / debts.start_date-kolommen zodat de eerste-
-          invoer meteen een correcte aflossingsprognose oplevert i.p.v. de
-          annuïteit/vandaag-default. */}
+      {/* Hypotheek-only: aflossingsvorm + ingangsdatum + resterende looptijd.
+          Vult debts.repayment_type / debts.start_date en (via term_years)
+          debts.end_date, zodat de eerste-invoer meteen een correcte
+          aflossingsprognose oplevert i.p.v. de annuïteit/vandaag/30-jaar-
+          default. */}
       {!isAsset && typeKey === 'mortgage' && (
         <MortgageExtraFields
           idBase={nameListId}
           repaymentType={(props.draft as DebtDraftState).repayment_type ?? undefined}
           startDate={(props.draft as DebtDraftState).start_date ?? undefined}
+          termYears={(props.draft as DebtDraftState).term_years ?? undefined}
           onChange={(props as DebtProps).onChange}
+          onTermBlur={() => setTouched((t) => ({ ...t, termYears: true }))}
+          termError={showTermYearsError ? currentErrors.termYears : undefined}
           palette={palette}
         />
       )}
@@ -781,12 +806,13 @@ function DebtAflossingField({
 
 // ── Hypotheek-extra's ─────────────────────────────────────────────
 //
-// Twee extra velden die alleen bij `debt_type='mortgage'` verschijnen:
-// aflossingsvorm (select) + ingangsdatum (date). Ze schrijven rechtstreeks
-// naar de bestaande DebtQuickInput-velden `repayment_type` / `start_date`.
-// Blijft leeg ⇒ `buildDebtDraft` valt terug op de type-defaults, dus het is
-// geen verplicht veld — het corrigeert alleen de stille annuïteit/vandaag-
-// aanname wanneer de gebruiker het invult.
+// Drie extra velden die alleen bij `debt_type='mortgage'` verschijnen:
+// aflossingsvorm (select), ingangsdatum (date) en resterende looptijd
+// (number). Ze schrijven rechtstreeks naar de DebtQuickInput-velden
+// `repayment_type` / `start_date` / `term_years`. Blijft leeg ⇒
+// `buildDebtDraft` valt terug op de type-defaults, dus geen van drieën is
+// verplicht — ze maken alleen de stille annuïteit/vandaag/30-jaar-aannames
+// corrigeerbaar op het moment dat de gebruiker ze kent.
 
 /** Volgorde van de aflossingsvormen in de select — meest gekozen eerst. */
 const MORTGAGE_REPAYMENT_ORDER: readonly RepaymentType[] = [
@@ -799,7 +825,10 @@ interface MortgageExtraFieldsProps {
   idBase: string
   repaymentType: RepaymentType | undefined
   startDate: string | undefined
+  termYears: number | undefined
   onChange: (patch: Partial<DebtQuickInput>) => void
+  onTermBlur: () => void
+  termError?: string
   palette: (typeof PALETTE)['asset'] | (typeof PALETTE)['debt']
 }
 
@@ -807,11 +836,22 @@ function MortgageExtraFields({
   idBase,
   repaymentType,
   startDate,
+  termYears,
   onChange,
+  onTermBlur,
+  termError,
   palette,
 }: MortgageExtraFieldsProps) {
   const repaymentId = `${idBase}-repayment`
   const startDateId = `${idBase}-startdate`
+  const termId = `${idBase}-termyears`
+  // Rode rand bij een zichtbare fout; anders de neutrale editorial-rand.
+  const termBorderClass = termError
+    ? 'border-[var(--negative)] focus:ring-1 focus:ring-[var(--negative)]'
+    : `border-[var(--border-ed)] focus:ring-1 ${palette.focusBorder}`
+  // Toon de aanname die anders stilzwijgend zou gelden, zodat de gebruiker
+  // ziet wát hij corrigeert als hij het veld leeg laat.
+  const defaultTermYears = DEFAULT_TERM_YEARS_PER_TYPE.mortgage
   // Toon de default expliciet zodat de user ziet wat er wordt opgeslagen als
   // hij niets wijzigt (draft blijft leeg → buildDebtDraft vult dezelfde default).
   const selectValue = repaymentType ?? DEBT_DEFAULT_REPAYMENT_TYPE.mortgage ?? 'annuiteit'
@@ -858,6 +898,57 @@ function MortgageExtraFields({
         <p className="mt-1 text-[11px] text-[var(--ink-4)] leading-relaxed">
           Loopt de hypotheek al? Vul de echte startdatum in voor een kloppende
           aflossing.
+        </p>
+      </div>
+
+      <div>
+        <label
+          htmlFor={termId}
+          className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]"
+        >
+          Resterende looptijd{' '}
+          <span className="font-normal text-[var(--ink-4)]">(optioneel)</span>
+        </label>
+        <div className="relative">
+          <input
+            id={termId}
+            type="number"
+            inputMode="numeric"
+            step="1"
+            min={1}
+            max={MAX_TERM_YEARS}
+            value={termYears ?? ''}
+            onChange={(e) =>
+              onChange({ term_years: parseNumberInput(e.target.value) ?? null })
+            }
+            onBlur={onTermBlur}
+            aria-invalid={termError ? true : undefined}
+            aria-describedby={termError ? `${termId}-error` : undefined}
+            placeholder={defaultTermYears != null ? String(defaultTermYears) : ''}
+            className={`w-full border bg-[var(--paper)] py-2.5 pl-3 pr-10 font-mono text-base tabular-nums text-[var(--ink)] outline-none transition-colors ${termBorderClass}`}
+          />
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-[var(--ink-4)]"
+          >
+            jaar
+          </span>
+        </div>
+        {termError && (
+          <p
+            id={`${termId}-error`}
+            role="alert"
+            className="mt-1 text-[11px] text-[var(--negative)]"
+          >
+            {termError}
+          </p>
+        )}
+        <p className="mt-1 text-[11px] text-[var(--ink-4)] leading-relaxed">
+          Hoeveel jaar loopt de hypotheek nog? Bepaalt de getoonde looptijd en
+          de geschatte maandlast.
+          {defaultTermYears != null
+            ? ` Leeg laten = ${defaultTermYears} jaar vanaf de ingangsdatum.`
+            : ''}
         </p>
       </div>
     </>

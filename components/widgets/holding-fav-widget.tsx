@@ -7,6 +7,11 @@ import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { FavoriteHolding } from './widget-renderer'
+// Grondslag-labels uit de gedeelde bron (kaart H7): dit widget toont het
+// rendement van ÉÉN positie plus de dagmutatie — twee andere grootheden dan het
+// portefeuillerendement in de zuster-widgets. Het kale woord "Rendement" stond
+// hier op alle drie.
+import { RETURN_BASIS_LABELS } from '@/lib/asset-return'
 
 /** Truncate display label to max N characters */
 function displayLabel(holding: FavoriteHolding, max = 6): string {
@@ -149,7 +154,7 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({
           {/* Links: grote rendement-ring + label */}
           <div className="flex w-[38%] shrink-0 flex-col items-center justify-center gap-2 border-r border-dashed border-[var(--border-ed)] pr-6">
             <ReturnRing pct={holding.returnPct} hasEntered={hasEntered} diameter={140} strokeWidth={10} fontSize={20} />
-            <p className="text-[11px] uppercase tracking-wide text-[var(--ink-3)]">Totaal rendement</p>
+            <p className="text-[11px] uppercase tracking-wide text-[var(--ink-3)]">{RETURN_BASIS_LABELS.positionSincePurchase.label}</p>
           </div>
 
           {/* Rechts: koers-header, waarde + vrijheidstijd, KPI-grid */}
@@ -171,7 +176,7 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({
                   isPositive ? 'text-positive' : 'text-negative'
                 }`}
               >
-                dag {changeSign}{holding.dailyChangePct.toFixed(2)}%
+                {RETURN_BASIS_LABELS.dayChange.compact.toLowerCase()} {changeSign}{holding.dailyChangePct.toFixed(2)}%
               </span>
             </div>
 
@@ -192,7 +197,7 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({
             <div className="grid grid-cols-3 gap-x-6 gap-y-3">
               <KpiCell label="Kostprijs" value={<MaskedAmount value={holding.totalCost} tone="kern" />} />
               <KpiCell
-                label="Rendement"
+                label={RETURN_BASIS_LABELS.positionSincePurchase.compact}
                 value={
                   returnPositive
                     ? <MaskedAmount value={returnAmount} signPrefix="+" tone="kern" />
@@ -201,7 +206,7 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({
                 color={returnPositive ? 'text-positive' : 'text-negative'}
               />
               <KpiCell
-                label="Dagverandering"
+                label={RETURN_BASIS_LABELS.dayChange.label}
                 value={
                   isPositive
                     ? <MaskedAmount value={dailyChangeAmount} signPrefix="+" tone="kern" />
@@ -211,7 +216,7 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({
               />
               <KpiCell label="Eenheden" value={holding.units.toLocaleString('nl-NL', { maximumFractionDigits: 4 })} />
               <KpiCell
-                label="Totaal rendement"
+                label={RETURN_BASIS_LABELS.positionSincePurchase.label}
                 value={`${returnPositive ? '+' : ''}${holding.returnPct.toFixed(1)}%`}
                 color={returnPositive ? 'text-positive' : 'text-negative'}
               />
@@ -279,7 +284,7 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({
             />
             <KpiCell label="Kostprijs" value={<MaskedAmount value={holding.totalCost} tone="kern" />} />
             <KpiCell
-              label="Rendement"
+              label={RETURN_BASIS_LABELS.positionSincePurchase.compact}
               value={
                 returnPositive
                   ? <MaskedAmount value={returnAmount} signPrefix="+" tone="kern" />
@@ -288,7 +293,7 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({
               color={returnPositive ? 'text-positive' : 'text-negative'}
             />
             <KpiCell
-              label="Dagverandering"
+              label={RETURN_BASIS_LABELS.dayChange.label}
               value={
                 isPositive
                   ? <MaskedAmount value={dailyChangeAmount} signPrefix="+" tone="kern" />
@@ -298,7 +303,7 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({
             />
             <KpiCell label="Eenheden" value={holding.units.toLocaleString('nl-NL', { maximumFractionDigits: 4 })} />
             <KpiCell
-              label="Totaal rendement"
+              label={RETURN_BASIS_LABELS.positionSincePurchase.label}
               value={`${returnPositive ? '+' : ''}${holding.returnPct.toFixed(1)}%`}
               color={returnPositive ? 'text-positive' : 'text-negative'}
             />
@@ -361,7 +366,7 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({
                   isPositive ? 'text-positive' : 'text-negative'
                 }`}
               >
-                dag {changeSign}{holding.dailyChangePct.toFixed(1)}%
+                {RETURN_BASIS_LABELS.dayChange.compact.toLowerCase()} {changeSign}{holding.dailyChangePct.toFixed(1)}%
               </span>
             </div>
           </div>

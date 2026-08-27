@@ -19,7 +19,7 @@
  * "minder hierover"-demotiedrempel.
  */
 
-import { shouldAlert } from '@/lib/budget-alerts'
+import { shouldAlert, budgetLimitStatus } from '@/lib/budget-alerts'
 import { getFirstUndismissedSuggestion, type CoachDataGaps } from '@/lib/coach-suggestions'
 import { amsterdamWeekKey } from '@/lib/briefing/snapshot'
 import { WILL_ACCEPTANCE } from './will'
@@ -77,8 +77,21 @@ function capBadge(n: number): string {
   return n > 9 ? '9+' : n === 0 ? '' : String(n)
 }
 
+/** Mirror van app/api/notifications/route.ts#formatAmountPair — centen zodra
+ *  een échte overschrijding op hele euro's zou samenvallen. */
+function formatAmountPairMirror(spent: number, limit: number): string {
+  const collapsesOnWholeEuros = Math.round(spent) === Math.round(limit)
+  const differsInCents = budgetLimitStatus(spent, limit) !== 'bereikt'
+  if (collapsesOnWholeEuros && differsInCents) {
+    const euro = (v: number) => v.toFixed(2).replace('.', ',')
+    return `€${euro(spent)} van €${euro(limit)}`
+  }
+  return `€${Math.round(spent)} van €${Math.round(limit)}`
+}
+
 /** Mirror van app/api/notifications/route.ts#pushBudgetNotification
- *  (r200-260) voor het 'expense'-pad — titel/omschrijving/priority. */
+ *  (r200-260) voor het 'expense'-pad — titel/omschrijving/priority.
+ *  Drie drempeltakken sinds H16: over (>limiet) · bereikt (=limiet) · besteed. */
 function pushBudgetNotificationMirror(
   spent: number,
   limit: number,
@@ -90,18 +103,26 @@ function pushBudgetNotificationMirror(
   if (!shouldAlert(spent, limit, threshold, budgetType)) return null
   const pct = (spent / limit) * 100
   const pctRounded = Math.round(pct)
-  if (pct >= 120) {
+  const limitStatus = budgetLimitStatus(spent, limit)
+  if (limitStatus === 'over' && pct >= 120) {
     return {
       title: `${name}: ${pctRounded}% — flink over budget`,
-      description: `€${Math.round(spent)} van €${Math.round(limit)} — €${Math.round(spent - limit)} overschrijding`,
+      description: `${formatAmountPairMirror(spent, limit)} — €${Math.round(spent - limit)} overschrijding`,
       priority: 1,
     }
   }
-  if (pct >= 100) {
+  if (limitStatus === 'over') {
     return {
       title: `${name}: ${pctRounded}% — over budget`,
-      description: `€${Math.round(spent)} van €${Math.round(limit)} — budget overschreden`,
+      description: `${formatAmountPairMirror(spent, limit)} — budget overschreden`,
       priority: 1,
+    }
+  }
+  if (limitStatus === 'bereikt') {
+    return {
+      title: `${name}: limiet bereikt`,
+      description: `${formatAmountPairMirror(spent, limit)} — precies op de grens, niets meer over`,
+      priority: 3,
     }
   }
   return {
@@ -190,9 +211,19 @@ export const WILL_ENGINE_CHECKS: WillEngineCheck[] = [
       criterion('WF-WILL-05')
       const eersteRegel = getFirstUndismissedSuggestion(NO_GAPS, '/overzicht', new Set())
       const naDismissBank = getFirstUndismissedSuggestion(NO_GAPS, '/overzicht', new Set(['gap_bank']))
+      // H15: routes zonder pad-regel vielen terug op "Welkom." — óók voor een
+      // account met duizenden transacties. De terugval is gesplitst.
+      const gevuld: CoachDataGaps = Object.fromEntries(
+        Object.keys(NO_GAPS).map((k) => [k, true]),
+      ) as unknown as CoachDataGaps
+      const gevuldMijn = getFirstUndismissedSuggestion(gevuld, '/mijn', new Set())
+      const gevuldBerichten = getFirstUndismissedSuggestion(gevuld, '/berichten', new Set())
       return {
-        expected: 'eersteRegel=gap_bank; naDismissBank=gap_assets',
-        actual: `eersteRegel=${eersteRegel?.key}; naDismissBank=${naDismissBank?.key}`,
+        expected:
+          'eersteRegel=gap_bank; naDismissBank=gap_assets; gevuldMijn=default_gevuld; gevuldBerichten=default_gevuld',
+        actual:
+          `eersteRegel=${eersteRegel?.key}; naDismissBank=${naDismissBank?.key}` +
+          `; gevuldMijn=${gevuldMijn?.key}; gevuldBerichten=${gevuldBerichten?.key}`,
       }
     },
   },
@@ -213,13 +244,23 @@ export const WILL_ENGINE_CHECKS: WillEngineCheck[] = [
   {
     workflow: 'WF-WILL-10',
     scenarioId: 'UAT-WILL-10',
-    label: 'Budgetmelding (pushBudgetNotification-mirror): 320/380 = 84% besteed, amber, priority 2',
+    label: 'Budgetmelding (pushBudgetNotification-mirror): drie drempeltakken — 84% besteed (prio 2), limiet bereikt (prio 3), over budget (prio 1)',
     run: () => {
       criterion('WF-WILL-10')
-      const result = pushBudgetNotificationMirror(320, 380, 80, 'expense', 'Boodschappen')!
+      const onder = pushBudgetNotificationMirror(320, 380, 80, 'expense', 'Boodschappen')!
+      // Exact op de grens — het geval dat vóór H16 ten onrechte "overschreden"
+      // heette en met priority 1 in de Dringend-bak landde.
+      const bereikt = pushBudgetNotificationMirror(1280, 1280, 80, 'expense', 'Huur')!
+      // Echt eroverheen, maar op hele euro's tweemaal "€1280" → centen.
+      const over = pushBudgetNotificationMirror(1280.4, 1279.8, 80, 'expense', 'Huur')!
+      const fmt = (r: { title: string; description: string; priority: number }) =>
+        `titel=${r.title}; omschrijving=${r.description}; priority=${r.priority}`
       return {
-        expected: 'titel=Boodschappen: 84% besteed; omschrijving=€320 van €380 — nog €60 over (drempel: 80%); priority=2',
-        actual: `titel=${result.title}; omschrijving=${result.description}; priority=${result.priority}`,
+        expected:
+          'onder: titel=Boodschappen: 84% besteed; omschrijving=€320 van €380 — nog €60 over (drempel: 80%); priority=2' +
+          ' || bereikt: titel=Huur: limiet bereikt; omschrijving=€1280 van €1280 — precies op de grens, niets meer over; priority=3' +
+          ' || over: titel=Huur: 100% — over budget; omschrijving=€1280,40 van €1279,80 — budget overschreden; priority=1',
+        actual: `onder: ${fmt(onder)} || bereikt: ${fmt(bereikt)} || over: ${fmt(over)}`,
       }
     },
   },

@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft, Heart, GitFork, User } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { loadHorizonData } from '@/lib/horizon-data-loader'
+import { loadHorizonRaw } from '@/lib/horizon-data-loader'
 import {
   buildUserDataContext,
   checkRequirements,
@@ -137,7 +137,7 @@ export default async function BibliotheekDetailPage({
   }
 
   // 4. User-data voor vereisten-checks + prefill van de read-only runner.
-  const horizonData = await loadHorizonData(supabase)
+  const horizonData = await loadHorizonRaw(supabase)
   const userCtx = buildUserDataContext({
     effectiveInput: horizonData.effectiveInput,
     unlinkedCash: horizonData.unlinkedCash,

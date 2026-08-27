@@ -13,7 +13,7 @@
  * ## Convergentie-set-oppervlak (FASE 5 stap 2b, ADR 0032 §6)
  * Dit is oppervlak 3 van de convergentie-set: de engine-keuze loopt via
  * `computeConvergentieProjection` achter de per-gebruiker-vlag
- * `horizon_kernel_convergentie` (uit `loadHorizonData().kernelConvergentie`).
+ * `horizon_kernel_convergentie` (uit `loadHorizonRaw().kernelConvergentie`).
  * Omdat de AI-context de Kern consumeert (`loadCoreData().fireTargetFromHorizon`
  * ← deze functie), flipt de vlag óók de AI mee — zónder extra code. Vlag uit →
  * byte-identiek aan de bestaande v2-run (de router draait dan letterlijk
@@ -27,7 +27,8 @@ import { toSimResult } from '@/lib/unified-projection'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { NL_AOW_AGE } from '@/lib/constants'
 import { getAowLeeftijden } from '@/lib/reference-cache'
-import { loadHorizonData } from '@/lib/horizon-data-loader'
+import { loadHorizonRaw } from '@/lib/horizon/raw-data-loader'
+import type { Perspective } from '@/lib/household-data'
 import { buildHorizonInput } from '@/lib/horizon/build-input'
 import {
   computeConvergentieProjection,
@@ -132,19 +133,51 @@ export interface HorizonFireSim {
  * Wrapped in React `cache()` zodat élke consumer binnen één request (Kern,
  * AI-context, /overzicht-bundel) dezelfde Promise — en dus letterlijk dezelfde
  * cijfers — hergebruikt.
+ *
+ * ## Perspectief (ADR 0107)
+ * De run is PERSPECTIEF-BEWUST: `personal` (default, byte-identiek aan
+ * voorheen), `household` of `partner`. De perspectief-rijen komen uit
+ * `loadHorizonRaw(...).fireAssets` / `.fireDebts` — de kernel rekent per
+ * asset-rij, dus zónder die rijen zou een huishoud-run stil op de persoonlijke
+ * potten draaien en dus hetzelfde antwoord geven als de eigen blik.
+ * De cache-sleutel bevat het perspectief; een blikwissel kost één extra solve.
+ *
+ * BEKENDE GRENS (bewust, volgt uit de rauwe laag): de UITGAVEN-kant blijft in
+ * huishoud-/partnerblik persoonlijk (`effectiveInput.monthlyExpenses` /
+ * `yearlyMustExpenses` komen uit de eigen transacties/budgetten). Dat was óók
+ * de grondslag van de vervangen closed-form benadering, dus deze wijziging
+ * introduceert die scheefheid niet — ze erft 'm. Huishoud-uitgaven zijn belegd
+ * bij de vervolgkaarten (M22/H6).
+ *
+ * ## Waaróm deze module de RAUWE laag leest
+ * `loadHorizonData` (de afgeleide laag) consumeert op zijn beurt DEZE functie.
+ * Zou hier `loadHorizonData` staan, dan was dat oneindige recursie — precies
+ * de reden dat er ooit een tweede, closed-form FIRE-benadering ontstond.
  */
-export const computeHorizonFireSim = cache(async function computeHorizonFireSim(
+const computeHorizonFireSimCached = cache(async function computeHorizonFireSimInner(
   supabase: SupabaseClient,
+  perspective: Perspective,
 ): Promise<HorizonFireSim | null> {
-  // ── Volledige Horizon-data via bestaande loader ──────────────
+  // ── Rauwe Horizon-data (queries + rauwe afleidingen, GEEN kernel) ──────────
   // Hergebruikt assets, debts, life events, fire-strategy, withdrawal-strategy,
   // box3Method, hasPartner, unlinkedCash — alle inputs die de hook ook krijgt.
   let data
   try {
-    data = await loadHorizonData(supabase)
+    data = await loadHorizonRaw(supabase, perspective)
   } catch {
     return null
   }
+
+  // ── Weiger een run op rijen die de kernel niet eerlijk kán modelleren ──────
+  // Staat het privacyniveau van de partner op "totalen", dan levert de
+  // huishoud-/partnerblik één synthetische aggregaatrij zónder asset_type,
+  // rendement of inclusion-percentage. Een SOM is daarmee eerlijk; een POT niet
+  // — de kernel zou dat bedrag in een willekeurige categorie met een verzonnen
+  // rendement laten landen en er een FIRE-leeftijd op bouwen. Liever géén
+  // kernel-antwoord: de afgeleide laag valt dan terug op de closed-form
+  // benadering op de perspectief-TOTALEN (het gedrag van vóór ADR 0107) en
+  // meldt dat via `fireEngine: 'scalar'`.
+  if (!data.fireRowsComplete) return null
 
   // ── AOW-leeftijd: gedeelde module-TTL-cache (zit niet in horizon-data-loader) ──
   // De opgehaalde rijen bewaren we óók als array voor de kernel-rawContext (de
@@ -178,8 +211,9 @@ export const computeHorizonFireSim = cache(async function computeHorizonFireSim(
     grossReturn: data.fireParams.grossReturn,
     inflation: data.fireParams.inflationRate,
     aowAgeFractional,
-    assets: data.assets,
-    debts: data.debts,
+    // Perspectief-rijen (in de eigen blik identiek aan `assets`/`debts`).
+    assets: data.fireAssets,
+    debts: data.fireDebts,
     box3Method: data.box3Method,
     hasPartner: data.hasPartner,
     bankAccountCash: data.unlinkedCash,
@@ -198,8 +232,8 @@ export const computeHorizonFireSim = cache(async function computeHorizonFireSim(
   // `requiredFirePortfolio` ís hier al het portfolio-op-FIRE (óók voor pensioen).
   const rawContext: ConvergentieRawContext = {
     profile: data.rawProfile,
-    assets: data.assets,
-    debts: data.debts,
+    assets: data.fireAssets,
+    debts: data.fireDebts,
     lifeEvents: data.events ?? [],
     aowRows: aowRowsForContext,
     yearlyExpenses: built.input.yearlyExpenses,
@@ -230,6 +264,21 @@ export const computeHorizonFireSim = cache(async function computeHorizonFireSim(
 })
 
 /**
+ * De canonieke server-side FIRE-run. Zie de doc op `computeHorizonFireSimCached`.
+ *
+ * Het perspectief wordt HIER genormaliseerd (niet in de gecachte functie):
+ * `cache()` keyt op de argumentenlijst, dus `computeHorizonFireSim(sb)` en
+ * `computeHorizonFireSim(sb, 'personal')` moeten dezelfde entry — en dus
+ * letterlijk dezelfde cijfers — raken.
+ */
+export function computeHorizonFireSim(
+  supabase: SupabaseClient,
+  perspective: Perspective = 'personal',
+): Promise<HorizonFireSim | null> {
+  return computeHorizonFireSimCached(supabase, perspective)
+}
+
+/**
  * Compute het FIRE-doelbedrag identiek aan Horizon's `useHorizonFireSim`-hook.
  *
  * Dunne afleiding van `computeHorizonFireSim` — géén eigen kernel-run. Retourneert
@@ -237,10 +286,11 @@ export const computeHorizonFireSim = cache(async function computeHorizonFireSim(
  * geboortedatum, geen yearly expenses) of de run faalde; de aanroeper toont dan
  * een eigen fallback.
  */
-export const computeHorizonFireTarget = cache(async function computeHorizonFireTarget(
+const computeHorizonFireTargetCached = cache(async function computeHorizonFireTargetInner(
   supabase: SupabaseClient,
+  perspective: Perspective,
 ): Promise<HorizonFireTargets> {
-  const run = await computeHorizonFireSim(supabase)
+  const run = await computeHorizonFireSim(supabase, perspective)
   if (!run) return EMPTY_HORIZON_FIRE_TARGETS
   const { sim } = run
   // Beide grondslagen uit DEZELFDE run doorgeven (ADR 0034). Zelfde gate/vorm als
@@ -251,3 +301,11 @@ export const computeHorizonFireTarget = cache(async function computeHorizonFireT
     requiredFireNetWorth: (sim.requiredFireNetWorth ?? 0) > 0 ? sim.requiredFireNetWorth! : null,
   }
 })
+
+/** Perspectief-normalisatie buiten de cache — zie `computeHorizonFireSim`. */
+export function computeHorizonFireTarget(
+  supabase: SupabaseClient,
+  perspective: Perspective = 'personal',
+): Promise<HorizonFireTargets> {
+  return computeHorizonFireTargetCached(supabase, perspective)
+}

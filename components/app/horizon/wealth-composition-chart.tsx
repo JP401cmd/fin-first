@@ -325,7 +325,11 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
                   style={{ backgroundColor: hoveredEvent.color }}
                 />
                 <p className="truncate font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-3)]">
-                  {hoveredEvent.kind === 'natural' ? 'Mijlpaal' : 'Gebeurtenis'}
+                  {hoveredEvent.kind === 'natural'
+                    ? 'Mijlpaal'
+                    : hoveredEvent.kind === 'goal'
+                      ? 'Doel'
+                      : 'Gebeurtenis'}
                 </p>
                 <p className="truncate text-[13px] font-semibold text-[var(--ink)]">
                   {hoveredEvent.label}

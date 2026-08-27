@@ -85,6 +85,24 @@ export interface CashflowSettingsData {
   savingsRateMethod: SavingsRateMethod
   /** Transaction-computed monthly expenses (distinct from estimatedMonthlyExpenses = stored profile value). */
   computedMonthlyExpenses: number
+  /**
+   * Het CANONIEKE dagtarief (€/dag) uit `lib/expense-rate.ts` — 12-mnd rolling
+   * gerealiseerde uitgaven ×12/365, doorgegeven uit `CorePageData`.
+   *
+   * ── Waarom dit veld er is (M22, besluit B1) ─────────────────────────────
+   * Dit blok rekende zélf `dailyExpenseRate(monthlyExpenses)` op de GEKOZEN
+   * grondslag (ADR 0103) — bij de tak 'budget' dus op budgetbedragen, bij
+   * 'computed' op het 6-maands gemiddelde. Dat was de derde wisselkoers in
+   * dezelfde module: "Eén dag vrijheid kost je nu €106" hier, terwijl de rest
+   * van de app met ~€124/dag rekende.
+   *
+   * De grondslagkeuze blijft bepalen welk BEDRAG er staat; het dagtarief is
+   * geen grondslagkeuze maar een app-brede wisselkoers. De kassabon blijft
+   * kloppend doordat de regel eronder benoemt wáár het tarief vandaan komt —
+   * dat is de "grondslagregel" uit B1, niet een tarief dat stilzwijgend met een
+   * vinkje meebeweegt.
+   */
+  dailyExpenseRate: number
   /** 6-maands spaarbudget-stortingen (correctie-component van savingsRate6m). */
   savingsBudgetTotal6m: number
   /** 6-maands schuldaflossing (correctie-component van savingsRate6m). */
@@ -226,6 +244,9 @@ export async function loadCashflowSettingsData(
     // override gelijk is aan het ingevoerde bedrag. extHalfYearExpenses komt
     // puur uit transacties, dus de kassabon toont "berekend" los van "handmatig".
     computedMonthlyExpenses: Math.round(core.savingsReceiptData.extHalfYearExpenses / 6),
+    // Doorgeef-veld, GEEN eigen som: `loadCoreData` heeft het canonieke tarief
+    // al langs `recentDailyExpenseRateFromRows` gehaald (M22).
+    dailyExpenseRate: core.dailyExpenseRate ?? 0,
     // Per-maand reeks (12 slots, oudste → nieuwste) uit dezelfde core-load —
     // serializable en zonder extra DB-round-trip.
     monthlyBreakdown: core.monthlyIncomeExpenseSeries,

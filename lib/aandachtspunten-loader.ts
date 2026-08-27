@@ -32,7 +32,7 @@ import {
 import { loadActionedAandachtspuntIds } from './aandachtspunten-actions'
 import { loadFiscaleKansen } from './tax-opportunities-loader'
 import { CURRENT_TAX_YEAR } from './box3-data'
-import { loadHorizonData } from './horizon-data-loader'
+import { loadHorizonRaw } from './horizon-data-loader'
 import {
   getNibudHouseholdType,
   getNibudReferences,
@@ -72,7 +72,7 @@ import type { Asset } from './asset-data'
 // optimizer-keten rimpelt — bewust apart gehouden van deze plak.
 async function collectTaxAandachtspunten(supabase: SupabaseClient): Promise<Aandachtspunt[]> {
   const [horizonData, kansen] = await Promise.all([
-    loadHorizonData(supabase),
+    loadHorizonRaw(supabase),
     loadFiscaleKansen(supabase, 'personal', CURRENT_TAX_YEAR),
   ])
 
@@ -121,7 +121,8 @@ async function collectTaxAandachtspunten(supabase: SupabaseClient): Promise<Aand
 /**
  * Bouw de NIBUD-benchmark-overschrijdingen op — spiegelt de assemblage in
  * lib/ai/context/wil-context.ts: spending per slug uit deze-maand-transacties,
- * household-type uit profile, dailyExpense uit transacties (fallback profile).
+ * household-type uit profile. Het DAGTARIEF komt uit de canonieke bundel, niet
+ * uit deze-maand-transacties (zie hieronder).
  */
 async function collectBudgetAandachtspunten(supabase: SupabaseClient): Promise<Aandachtspunt[]> {
   const {
@@ -132,10 +133,13 @@ async function collectBudgetAandachtspunten(supabase: SupabaseClient): Promise<A
   // Gedeelde basisdata-laag: profiel/budgetten/huidige-maand-transacties draaien
   // als ÉÉN query per tabel per request (gedeeld met dashboard/lever/shell). De
   // huidige-maand-tx heeft exact hetzelfde localMonthBounds-venster als voorheen.
-  const [profileRes, budgetsRes, txRes] = await Promise.all([
+  const [profileRes, budgetsRes, txRes, horizonData] = await Promise.all([
     getOwnProfile(supabase),
     getBudgets(supabase),
     getCurrentMonthTx(supabase),
+    // `loadHorizonRaw` is request-gecachet en al opgehaald door de schuld-/
+    // bezit-producent — dit kost geen extra query.
+    loadHorizonRaw(supabase),
   ])
 
   const profile = profileRes.data
@@ -148,23 +152,21 @@ async function collectBudgetAandachtspunten(supabase: SupabaseClient): Promise<A
     t.transaction_type !== 'transfer' && t.transaction_type !== 'joint_transfer'
 
   const spendingByBudget: Record<string, number> = {}
-  let totalMonthlyExpenses = 0
   for (const t of transactions) {
     if (!isRealTx(t)) continue
-    const amt = Number(t.amount)
-    if (t.budget_id) {
-      spendingByBudget[t.budget_id] = (spendingByBudget[t.budget_id] ?? 0) + Math.abs(amt)
-    }
-    if (amt < 0) totalMonthlyExpenses += Math.abs(amt)
+    if (!t.budget_id) continue
+    spendingByBudget[t.budget_id] =
+      (spendingByBudget[t.budget_id] ?? 0) + Math.abs(Number(t.amount))
   }
 
-  const profileEstExpenses = Number(profile.estimated_monthly_expenses ?? 0)
-  const dailyExpense =
-    totalMonthlyExpenses > 0
-      ? (totalMonthlyExpenses * 12) / 365
-      : profileEstExpenses > 0
-        ? (profileEstExpenses * 12) / 365
-        : 0
+  // CONSUMEER het canonieke 12-mnd rolling dagtarief uit de bundel — dezelfde
+  // waarde als de schuld- en bezit-producent hieronder, zodat de belofte "een
+  // dagtarief over alle aandachtspunt-rijen" ook voor de budget-rijen geldt.
+  // Was: `(totalMonthlyExpenses * 12) / 365` over de LOSSE HUIDIGE KALENDERMAAND
+  // met een profielschatting als terugval — een derde grondslag, die vroeg in de
+  // maand naar ~0 zakte en dezelfde overschrijding dan een absurd aantal
+  // vrijheidsdagen gaf, naast een schuldrij die met het rolling tarief rekende.
+  const dailyExpense = horizonData.dailyExpenseRate
 
   const householdType = getNibudHouseholdType(profile)
   const references = await getNibudReferences(supabase, householdType)
@@ -188,7 +190,7 @@ async function collectBudgetAandachtspunten(supabase: SupabaseClient): Promise<A
 
 /** Laad actieve schulden + dag-uitgaven en zet ze om naar aandachtspunten. */
 async function collectDebtAandachtspunten(supabase: SupabaseClient): Promise<Aandachtspunt[]> {
-  const horizonData = await loadHorizonData(supabase)
+  const horizonData = await loadHorizonRaw(supabase)
   // CONSUMEER het canonieke 12-mnd rolling dagtarief. Was
   // `dailyExpenseRate(effectiveInput.monthlyExpenses) : 100`: de EFFECTIVE
   // grondslag + een verzonnen €100/dag. De fiscale aandachtspunt-producent
@@ -213,7 +215,7 @@ async function collectDebtAandachtspunten(supabase: SupabaseClient): Promise<Aan
  * geeft de adapter dan bewust niets terug (i.p.v. een verzonnen buffer).
  */
 async function collectAssetAandachtspunten(supabase: SupabaseClient): Promise<Aandachtspunt[]> {
-  const horizonData = await loadHorizonData(supabase)
+  const horizonData = await loadHorizonRaw(supabase)
   // Zelfde canonieke bundelwaarde als de schuld-producent hierboven — één
   // dagtarief over alle aandachtspunt-rijen (vervolg KRUIS-20).
   const dailyExpenses = horizonData.dailyExpenseRate

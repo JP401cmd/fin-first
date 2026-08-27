@@ -7,6 +7,7 @@ import {
 } from './chapter-data'
 import type { SimResult, SimRow, SimCashflow } from '@/lib/fire-simulation'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
+import { guardFireTarget } from '@/lib/horizon/outcome-guard'
 import type { UnifiedProjectionRow, AssetBucketDetail, DebtBalanceDetail } from '@/lib/unified-projection'
 
 // ── Test fixtures ────────────────────────────────────────────────────────────
@@ -709,5 +710,47 @@ describe('leadSentenceForWithdrawal', () => {
     for (const strategy of ['deplete', 'legacy', 'pensioen'] as const) {
       expect(leadSentenceForWithdrawal(strategy)).toContain('onttrekt')
     }
+  })
+})
+
+describe('terugrekening — M6-vangrail-invoer (dezelfde pagina mag zichzelf niet tegenspreken)', () => {
+  // De KPI-tegel op /toekomst en de sim-widget voeden guardFireTarget MET
+  // requiredFireIsEndOfHorizonFallback. Droeg TerugrekeningData die vlag niet,
+  // dan toonde de walkthrough "Benodigd vermogen €X" terwijl de tegel ernaast
+  // al "We missen gegevens" zei. Deze test pint de doorgifte vast.
+  it('geleidt de eind-horizon-terugval-vlag door uit SimResult', () => {
+    const data = deriveChapterData(
+      makeResult({ requiredFireIsEndOfHorizonFallback: true }),
+      [],
+    )
+    expect(data.terugrekening.requiredFireIsEndOfHorizonFallback).toBe(true)
+  })
+
+  it('normaliseert een ontbrekende vlag naar false (stub-/preview-SimResult)', () => {
+    const data = deriveChapterData(makeResult({}), [])
+    expect(data.terugrekening.requiredFireIsEndOfHorizonFallback).toBe(false)
+  })
+
+  it('guardFireTarget met deze invoer valt gelijk met de KPI-tegel', () => {
+    const fallback = deriveChapterData(
+      makeResult({ requiredFirePortfolio: 420_000, requiredFireIsEndOfHorizonFallback: true }),
+      [],
+    ).terugrekening
+    // Positief bedrag, maar uit de terugval → geen bedrag tonen.
+    expect(
+      guardFireTarget(fallback.requiredFirePortfolio, {
+        isEndOfHorizonFallback: fallback.requiredFireIsEndOfHorizonFallback,
+      }).ok,
+    ).toBe(false)
+
+    const normaal = deriveChapterData(
+      makeResult({ requiredFirePortfolio: 420_000, requiredFireIsEndOfHorizonFallback: false }),
+      [],
+    ).terugrekening
+    expect(
+      guardFireTarget(normaal.requiredFirePortfolio, {
+        isEndOfHorizonFallback: normaal.requiredFireIsEndOfHorizonFallback,
+      }).ok,
+    ).toBe(true)
   })
 })

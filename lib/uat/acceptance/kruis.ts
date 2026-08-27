@@ -326,11 +326,11 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'compleet',
     given: 'Vaste maanduitgaven (€3.000) — géén persona-seed; het dagtarief is de identiteit.',
     when: 'De gebruiker vergelijkt de hero-vrijheidstijd, de vrijheidstijd-badges bij bedragen (Box 3-heffing "= X dagen"), de belasting-hub-omrekening en de rapport-finales.',
-    then: 'Elke euro→tijd-omrekening gebruikt hetzelfde dagtarief op jaarbasis: dagtarief = jaaruitgaven ÷ 365 (`dailyExpenseRate`, NIET maand ÷ 30). EXACT: maand €3.000 → dagtarief €98,6301/dag; een bedrag gelijk aan de jaaruitgaven (€36.000) → 365 vrijheidsdagen via `calculateFreedomTime` op ditzelfde tarief (delta 0). Één dagtarief, elk oppervlak.',
+    then: 'Elke euro→tijd-omrekening gebruikt hetzelfde dagtarief op jaarbasis: dagtarief = jaaruitgaven ÷ 365 (`dailyExpenseRate`, NIET maand ÷ 30). EXACT: maand €3.000 → dagtarief €98,6301/dag; een bedrag gelijk aan de jaaruitgaven (€36.000) → 365 vrijheidsdagen via `calculateFreedomTime` op ditzelfde tarief (delta 0). Één dagtarief, elk oppervlak. ÉN DE BRON, niet alleen de formule (M22): dezelfde €-heffing levert op /overzicht/belasting/box3 hetzelfde aantal vrijheidsdagen als in de Box 3-widget en de optimizer-kansenlijst, want alle drie lezen het tarief uit `lib/expense-rate.ts`. Een oppervlak dat de formule een ándere teller voert (budget-LIMIETEN i.p.v. gerealiseerde uitgaven) of zelf ÷30 doet, faalt dit criterium — ook al klopt de formule.',
     assertion: {
       kind: 'exact',
-      expected: 'dagtarief=98.6301; vrijheidsdagenBij36000=365',
-      source: 'lib/format.ts#dailyExpenseRate(3000) = 3000×12/365 = 98,6301; calculateFreedomTime(36000, dagtarief).totalDays = 365 (zelfde tarief → één dagtarief overal).',
+      expected: 'dagtarief=98.6301; vrijheidsdagenBij36000=365; box3DagenDelta=0',
+      source: 'lib/format.ts#dailyExpenseRate(3000) = 3000×12/365 = 98,6301; calculateFreedomTime(36000, dagtarief).totalDays = 365 (zelfde tarief → één dagtarief overal). BRON-ASSERTIE: één Box 3-heffing van €569 tegen het canonieke tarief geeft hetzelfde dagenaantal als tegen `PerspectiveBox3Data.dailyExpenses` — die twee zijn sinds M22 hetzelfde getal (lib/household-tax.ts consumeert getRecentDailyExpenseRate). Structureel bewaakt door scripts/check-freedom-time-basis.mjs, dat naast eigen `dailyExpenseRate()`-aanroepen nu óók een eigen maand÷30-deling flagt (de vorm waarin deze bug drie keer terugkwam).',
     },
   },
   {

@@ -5,6 +5,10 @@ import { Compass, Sparkles } from 'lucide-react'
 import { ProgressMilestones } from '@/components/editorial/progress-milestones'
 import { useFlashChange } from '@/lib/hooks/use-flash-change'
 import type { FreedomFraming } from '@/lib/fire-strategy'
+import {
+  HORIZON_MISSENDE_GEGEVENS_HINTS,
+  HORIZON_MISSENDE_GEGEVENS_LABEL,
+} from '@/lib/horizon/outcome-guard'
 
 /**
  * Vrijheid-strip: % op weg naar financiële vrijheid → klik naar /toekomst.
@@ -38,6 +42,7 @@ export function VrijheidStrip({
   currentAge,
   fireAge,
   framing = 'building',
+  dataIssue = false,
 }: {
   freedomPct: number | null
   /** Huidige leeftijd (gerond). Voor aftelling — optioneel. */
@@ -49,10 +54,48 @@ export function VrijheidStrip({
    * 'building' (% op weg). 'free'/'pensioen' tonen de onttrekkings-staat.
    */
   framing?: FreedomFraming
+  /**
+   * M6-vangrail (consume-only, uit `resolveFreedomAgeView`): de motor gaf een
+   * vrijheidsleeftijd die niet kán kloppen. Dan geen percentage/aftelling maar
+   * de gegevensmelding — een onmogelijke uitkomst is geen resultaat.
+   */
+  dataIssue?: boolean
 }) {
   // Flash-puls op het hoofdpercentage bij waardeverandering (flash-up/flash-down,
   // respecteert prefers-reduced-motion). Hook vóór de early returns — rules-of-hooks.
   const { flashClass } = useFlashChange(freedomPct)
+
+  // M6: onmogelijke uitkomst → gegevensmelding i.p.v. een getal. Vóór de
+  // freedomPct-tak: een percentage naast een onberekenbaar vrijheidsmoment leest
+  // als een hard antwoord.
+  if (dataIssue) {
+    return (
+      <Link
+        href="/mijn/profiel"
+        className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-4 sm:p-6 hover:border-horizon-300 hover:shadow-sm transition-all group"
+      >
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="w-9 h-9 rounded-lg bg-horizon-50 flex items-center justify-center shrink-0">
+            <Compass className="w-5 h-5 text-horizon-700" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
+              Op weg naar vrijheid
+            </div>
+            <div className="mt-0.5 text-sm sm:text-base text-[var(--ink-2)]">
+              <strong className="font-semibold text-[var(--ink)]">
+                {HORIZON_MISSENDE_GEGEVENS_LABEL}
+              </strong>{' '}
+              {HORIZON_MISSENDE_GEGEVENS_HINTS['buiten-horizon']}
+            </div>
+          </div>
+        </div>
+        <span className="shrink-0 text-xs font-semibold text-horizon-700 group-hover:underline">
+          Vul profiel aan →
+        </span>
+      </Link>
+    )
+  }
 
   if (freedomPct == null) {
     return (

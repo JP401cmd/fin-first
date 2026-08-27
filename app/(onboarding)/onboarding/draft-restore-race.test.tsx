@@ -7,13 +7,14 @@
  * persisteer-effect vuurt in dezelfde mount-commit. Zonder poort schreef het
  * persisteer-effect het verse, lege begin-draft (`lastStep: 'naam'`) over het
  * bestaande draft heen vóórdat de restore-poging het kon lezen — de voortgang
- * was daarmee blijvend weg en de groene herstel-melding verscheen nooit.
+ * was daarmee blijvend weg en de herstel-melding verscheen nooit.
  *
  * De test houdt `getUser()` bewust *pending* om precies dat venster te openen.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, cleanup, act } from '@testing-library/react'
 import type { NonSensitiveDraft } from './draft-persistence'
+import { DRAFT_RESTORED_NOTICE } from './draft-notice-copy'
 
 const ONBOARDING_STORAGE_KEY = 'trifinity_onboarding_draft'
 
@@ -130,7 +131,10 @@ describe('onboarding draft-restore race (WF-START-23)', () => {
     await waitFor(() => {
       expect(screen.getByTestId('stap-eindstrategie')).toBeInTheDocument()
     })
-    expect(screen.getByRole('status')).toHaveTextContent('hersteld')
+    // Copy komt uit de gedeelde constante (C3): de melding claimt sinds aug
+    // 2026 géén volledig herstel meer, dus asserteren we op de bron i.p.v. op
+    // een letterlijke tekst die opnieuw kan gaan liegen.
+    expect(screen.getByRole('status')).toHaveTextContent(DRAFT_RESTORED_NOTICE.label)
 
     // Het persisteer-effect mag hierna wél schrijven — maar dan met de
     // herstelde staat, niet met de lege beginstaat.

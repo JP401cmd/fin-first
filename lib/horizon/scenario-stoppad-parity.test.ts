@@ -157,3 +157,45 @@ describe('stop-pad-monotonie — stop ≥ verwacht ligt nergens onder het gesolv
     expect(b.netWorth).toBeGreaterThan(a.netWorth)
   })
 })
+
+/**
+ * M2 — het stop-pad draagt de €/mnd-hint van zijn EIGEN stand.
+ *
+ * De bevinding was geen rekenfout: de solver berekende P!B96 (`maandHint`) al voor elke
+ * doorgerekende stand, maar `runForcedStopPath` liet het veld vallen. Het scherm kon
+ * daardoor bij een zelfgekozen stopleeftijd wél tonen dát het niet gedekt is, maar nooit
+ * wat daar dan bij hoort. Deze suite pint de drie eigenschappen vast waarop het nieuwe
+ * tekstblok op /toekomst leunt.
+ *
+ * (a) PARITEIT — op de gesolvede FIRE-leeftijd reduceert het inherit-stop-pad tot de
+ *     hoofdrun (zie de GOLDEN hierboven), dus hoort ook de hint EXACT gelijk te zijn aan
+ *     de hoofdrun-hint (`kernelMaandHint`, de bridge-uitvoer die de banner al gebruikt).
+ *     Exacte gelijkheid, geen epsilon: het is per constructie hetzelfde `solve`-object.
+ * (b) TEKEN — eerder stoppen dan de verwachting laat een gat vallen, dus is de hint
+ *     positief. Dat teken is tegelijk de UI-gate ("dekking onder 100%"), dus het is geen
+ *     losse sanity-check maar de voorwaarde zelf.
+ * (c) MONOTONIE — hoe eerder je wilt stoppen, hoe meer er per maand bij hoort. Een hint
+ *     die de verkeerde kant op loopt zou op het scherm plausibel ogen.
+ */
+describe('stop-pad-maandHint — het omgekeerde antwoord op de gekozen stopleeftijd (M2)', () => {
+  it('(a) stopAge = gesolvede fireAgeFractional ⇒ maandHint ≡ de hoofdrun-hint (exact)', () => {
+    const run = stopPad(VERWACHT_FIRE)
+    expect(run).not.toBeNull()
+    expect(baseOutcome.ok).toBe(true)
+    expect(run!.maandHint).toBe(baseOutcome.ok ? baseOutcome.kernelMaandHint : NaN)
+  })
+
+  it('(b) eerder stoppen dan de verwachting ⇒ maandHint > 0 (= de UI-gate "dekking < 100%")', () => {
+    const run = stopPad(VERWACHT_FIRE - 5)
+    expect(run).not.toBeNull()
+    expect(run!.maandHint).toBeGreaterThan(0)
+    // Het gat waar de hint uit volgt, hoort in dezelfde run te zitten (−gap ÷ maanden).
+    expect(Number.isFinite(run!.maandHint)).toBe(true)
+  })
+
+  it('(c) hoe eerder de gekozen stop, hoe hoger de maandHint', () => {
+    const drieEerder = stopPad(VERWACHT_FIRE - 3)!
+    const achtEerder = stopPad(VERWACHT_FIRE - 8)!
+    expect(achtEerder.maandHint).toBeGreaterThan(drieEerder.maandHint)
+  })
+})

@@ -25,11 +25,7 @@ import {
   clearCheckDraft,
   type CheckStep,
 } from '@/lib/check/use-check-draft'
-import {
-  calculateFreedomTime,
-  formatFreedomTimeString,
-  dailyExpenseRate,
-} from '@/lib/format'
+import { computeFreedomTicker } from '@/lib/freedom-ticker'
 import type { CheckIntake, CheckSubmitPayload } from '@/lib/check/types'
 
 import { StepJij } from './steps/step-jij'
@@ -65,26 +61,27 @@ const STEP_META: Record<
 
 function useFreedomTicker(intake: Partial<CheckIntake> & { assets: CheckIntake['assets'] }) {
   return useMemo(() => {
-    const monthly = intake.monthlyIncomeNet ?? 0
-    const exp = intake.expenses?.totaalMaand ?? 0
-    if (monthly <= 0 || exp <= 0) return null
-
-    // Tel FIRE-eligible vermogen: alles behalve eigen huis
-    const totalAssets =
-      (intake.assets ?? [])
-        .filter((a) => a.assetType !== 'eigen_huis')
-        .reduce((s, a) => s + a.value, 0) +
-      (intake.emergencyFund ?? 0)
-
-    if (totalAssets <= 0) return null
-
-    const daily = dailyExpenseRate(exp)
-    if (daily <= 0) return null
-
-    const breakdown = calculateFreedomTime(totalAssets, daily)
-    if (breakdown.isDeficit) return null
-
-    return formatFreedomTimeString(breakdown, 'short')
+    // Grondslag + guards wonen in lib/freedom-ticker.ts — gedeeld met de
+    // onboarding-teller (bevinding H12), zodat de ingelogde flow en de
+    // publieke trechter niet twee versies van hetzelfde getal tonen.
+    // `fire_pot_excl_home`: eigen huis telt niet mee, schulden gaan er niet
+    // af — dat is wat deze wizard altijd al deed, en het maakt de teller
+    // monotoon tijdens het invullen.
+    const result = computeFreedomTicker({
+      monthlyIncome: intake.monthlyIncomeNet ?? 0,
+      monthlyExpenses: intake.expenses?.totaalMaand ?? 0,
+      assets: [
+        ...(intake.assets ?? []).map((a) => ({
+          value: a.value,
+          isHome: a.assetType === 'eigen_huis',
+        })),
+        // Het noodfonds is geen `asset`-rij in de intake maar telt wél als
+        // liquide vermogen.
+        { value: intake.emergencyFund ?? 0, isHome: false },
+      ],
+      basis: 'fire_pot_excl_home',
+    })
+    return result?.label ?? null
   }, [intake])
 }
 

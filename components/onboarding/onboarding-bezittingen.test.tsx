@@ -94,6 +94,36 @@ describe('OnboardingBezittingen — begeleide ja/nee-flow', () => {
     fireEvent.click(footerButton('Nee'))
     expect(container.textContent).toContain('Heb je een spaargeldrekening?')
   })
+
+  // Regressie L1: de meelopende teller in het FEITEN-paneel bouwde het
+  // wérkwoord "bezitten" ("2 bezitten") en bij één post het kale "1 bezit".
+  it('het FEITEN-paneel telt in "bezitting"/"bezittingen"', () => {
+    const { container } = render(<Host />)
+    fireEvent.click(footerButton('Ja'))
+    fireEvent.click(screen.getByTestId('wizard-collect'))
+    expect(container.textContent).toContain('1 bezitting')
+
+    // Tweede post via de "nog een?"-lus → meervoud.
+    fireEvent.click(footerButton('Ja'))
+    fireEvent.click(screen.getByTestId('wizard-collect'))
+    expect(container.textContent).toContain('2 bezittingen')
+    expect(container.textContent).not.toContain('2 bezitten')
+  })
+
+  // Regressie L2: de "nog een?"-vraag telt één post en moet dus enkelvoud
+  // gebruiken. `ASSET_QUICK_ADD_LABELS.investment` is bewust meervoud
+  // ('Beleggingen') — zonder onboarding-override werd dat "Nog een beleggingen?".
+  it('de "nog een?"-vraag staat in het enkelvoud bij beleggingen', () => {
+    const { container } = render(<Host />)
+    fireEvent.click(footerButton('Nee')) // betaalrekening
+    fireEvent.click(footerButton('Nee')) // spaargeld
+    fireEvent.click(footerButton('Nee')) // eigen huis
+    expect(container.textContent).toContain('Heb je beleggingen?')
+    fireEvent.click(footerButton('Ja'))
+    fireEvent.click(screen.getByTestId('wizard-collect'))
+    expect(container.textContent).toContain('Nog een belegging?')
+    expect(container.textContent).not.toContain('Nog een beleggingen?')
+  })
 })
 
 // ── Afsluitend overzicht (review-fase) ─────────────────────────────────

@@ -1,8 +1,14 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Calculator, ChevronDown, ChevronUp, Clock, Layers, Users, EyeOff } from 'lucide-react'
-import { formatMaskedCurrency } from '@/lib/format'
+import {
+  formatMaskedCurrency,
+  calculateFreedomTime,
+  formatFreedomTimeString,
+  formatFreedomRateFootnote,
+  type FreedomRateSource,
+} from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import {
   BOX3_TOOLTIPS,
@@ -93,6 +99,11 @@ interface Box3View {
   /** Gecombineerd huishoud-resultaat (bron van de gezamenlijke totalen). */
   combined?: Box3Result
   dailyExpenses: number
+  /**
+   * Herkomst van `dailyExpenses` — draagt de voetnoot onder het
+   * vrijheidsdagen-getal (M22: elk tijd-getal benoemt zijn wisselkoers).
+   */
+  dailyExpensesSource: FreedomRateSource
   partnerDataHidden: boolean
   partnerName: string | null
   currentUserName: string
@@ -113,6 +124,7 @@ function fromPerspectiveData(d: PerspectiveBox3Data): Box3View {
     optimalAllocation: d.optimalAllocation,
     combined: d.combined,
     dailyExpenses: d.dailyExpenses,
+    dailyExpensesSource: d.dailyExpensesSource,
     partnerDataHidden: d.partnerDataHidden,
     partnerName: d.partnerName,
     currentUserName: d.currentUserName,
@@ -136,6 +148,10 @@ function fromLegacyApi(data: Box3ApiResponse, year: TaxYear): Box3View {
     optimalAllocation: undefined,
     combined: data.combined,
     dailyExpenses: data.dailyExpenses ?? 0,
+    // Legacy-API draagt geen herkomst; het tarief kwam er langs dezelfde
+    // canonieke keten in, dus 'transactions' is de eerlijke aanname en 0 valt
+    // hoe dan ook weg (de voetnoot rendert dan niet).
+    dailyExpensesSource: (data.dailyExpenses ?? 0) > 0 ? 'transactions' : 'none',
     partnerDataHidden: false,
     partnerName: null,
     currentUserName: 'Jij',
@@ -156,6 +172,8 @@ function CalcRow({
   negative,
   highlight,
   tooltip,
+  onActivate,
+  activateLabel,
   fc,
 }: {
   label: string
@@ -166,8 +184,12 @@ function CalcRow({
   negative?: boolean
   highlight?: boolean
   tooltip?: string
+  /** Maakt het label een echte knop (bv. doorklik naar de indelingslijst). */
+  onActivate?: () => void
+  activateLabel?: string
   fc: (v: number) => string
 }) {
+  const labelClass = `text-xs ${muted ? 'text-[var(--ink-3)]' : 'text-[var(--ink-2)]'} ${bold ? 'font-semibold' : ''}`
   return (
     <div
       className={`flex items-center justify-between gap-3 ${
@@ -176,12 +198,22 @@ function CalcRow({
           : ''
       }`}
     >
-      <span
-        className={`text-xs ${muted ? 'text-[var(--ink-3)]' : 'text-[var(--ink-2)]'} ${bold ? 'font-semibold' : ''}`}
-      >
-        {label}
-        {tooltip && <InfoTooltip text={tooltip} />}
-      </span>
+      {onActivate ? (
+        <button
+          type="button"
+          onClick={onActivate}
+          aria-label={activateLabel ?? label}
+          className={`${labelClass} inline-flex items-center gap-1 text-left underline decoration-dotted underline-offset-2 hover:text-[var(--ink)] transition-colors`}
+        >
+          {label}
+          <ChevronDown className="h-3 w-3 shrink-0" aria-hidden="true" />
+        </button>
+      ) : (
+        <span className={labelClass}>
+          {label}
+          {tooltip && <InfoTooltip text={tooltip} />}
+        </span>
+      )}
       {(value != null || pct != null) && (
         <span
           className={`text-xs tabular-nums font-mono ${bold ? 'font-semibold text-[var(--ink)]' : 'text-[var(--ink-2)]'}`}
@@ -209,6 +241,18 @@ export function Box3Detail({
   const [loading, setLoading] = useState(!initialData)
   const [showDetails, setShowDetails] = useState(false)
   const [showClassificatie, setShowClassificatie] = useState(false)
+  // Doel van de "Uitgesloten (Box 1/2)"-doorklik in Berekeningsstappen. De
+  // bevinding was juist dát het scherm wél een uitgesloten TOTAAL toonde maar
+  // nergens wát erin zat — de per-post-lijst stond in een tweede, dichtgeklapte
+  // accordeon die je moest weten te vinden.
+  const classificatieRef = useRef<HTMLDivElement | null>(null)
+  const openClassificatie = useCallback(() => {
+    setShowClassificatie(true)
+    // Wacht op de render van het opengeklapte paneel voor we ernaartoe scrollen.
+    requestAnimationFrame(() => {
+      classificatieRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }, [])
   const { masked } = useMaskedAmounts()
   const fc = (v: number) => formatMaskedCurrency(v, masked)
   // Entrée-reveal voor het hero-cijfer (rise-in, 250ms). Respecteert
@@ -274,6 +318,17 @@ export function Box3Detail({
   const optimal = view?.optimalAllocation
   const combined = view?.combined
   const dailyExpenses = view?.dailyExpenses ?? 0
+  // Eén voetnoot-formulering app-breed (lib/format.ts). null = geen eerlijke
+  // dagbasis → er staat dan ook geen tijdregel om te voetnoten.
+  //
+  // `masked` MOET mee: dit bestand toont elk bedrag via fc() (= privacy-bewust),
+  // en het dagtarief zou daar een achterdeur in zetten — heffing = dagen ×
+  // tarief (ADR 0091 laag 4).
+  const rateFootnote = formatFreedomRateFootnote(
+    dailyExpenses,
+    view?.dailyExpensesSource ?? 'none',
+    masked,
+  )
   const showPartnerOptim =
     !!view?.hasHousehold && !!optimalSavings && optimalSavings.savingsVsEqual > 0
   const partnerDataHidden = !!view?.partnerDataHidden
@@ -338,6 +393,14 @@ export function Box3Detail({
               </span>
             )}
           </div>
+          {/* Voetnoot bij het vrijheidsdagen-getal: welke wisselkoers, en waar
+              die vandaan komt. Zonder deze regel is "€569 = 3 dagen" niet te
+              rijmen met "€569 = 17 dagen" een scherm verder (M22). */}
+          {result.freedomDays > 0 && rateFootnote && (
+            <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-[var(--ink-3)]">
+              {rateFootnote}
+            </p>
+          )}
           <p
             className="mt-3 max-w-[58ch] text-sm italic leading-snug text-[var(--ink-2)]"
             style={{ fontFamily: SOURCE_SERIF }}
@@ -390,10 +453,33 @@ export function Box3Detail({
               <CalcRow label="Totaal spaargeld" value={result.totaalSpaargeld} fc={fc} />
               <CalcRow label="Totaal beleggingen" value={result.totaalBeleggingen} fc={fc} />
               {result.totaalUitgesloten > 0 && (
-                <CalcRow label="Uitgesloten (Box 1/2)" value={result.totaalUitgesloten} muted fc={fc} />
+                <CalcRow
+                  label="Uitgesloten (Box 1/2, vrijgesteld)"
+                  value={result.totaalUitgesloten}
+                  muted
+                  onActivate={openClassificatie}
+                  activateLabel="Bekijk welke bezittingen buiten Box 3 vallen"
+                  fc={fc}
+                />
               )}
               <div className="h-px bg-[var(--rule-soft)]" />
               <CalcRow label="Box 3 schulden" value={result.totaalBox3Schulden} fc={fc} />
+              {/*
+                Spiegelbeeld van de bezittingen-regel: de bevinding ging óók over
+                een schuld die ten onrechte werd afgetrokken. Zonder deze regel
+                is de eigenwoninghypotheek + belastingschuld alleen zichtbaar als
+                een gat tussen de schuldenlijst en dit totaal.
+              */}
+              {result.totaalUitgeslotenSchulden > 0 && (
+                <CalcRow
+                  label="Niet-aftrekbare schulden"
+                  value={result.totaalUitgeslotenSchulden}
+                  muted
+                  onActivate={openClassificatie}
+                  activateLabel="Bekijk welke schulden niet aftrekbaar zijn"
+                  fc={fc}
+                />
+              )}
               <CalcRow
                 label={`Schuldendrempel (${result.hasPartner ? 'partner' : 'single'})`}
                 value={result.schuldendrempel}
@@ -437,8 +523,16 @@ export function Box3Detail({
         )}
         </HideInSimple>
 
-        {/* 3b — Hoe is je vermogen ingedeeld? (asset/schuld-classificatie) */}
-        <HideInSimple>
+        {/*
+          3b — Hoe is je vermogen ingedeeld? (asset/schuld-classificatie)
+
+          BEWUST BUITEN <HideInSimple>: dit is het enige oppervlak dat laat zien
+          wélke posten buiten Box 3 vallen. Juist de gebruiker in Eenvoudige
+          weergave — die de berekeningsstappen níét ziet — heeft anders geen
+          enkele manier om de indeling te controleren, en dat was de kern van de
+          bevinding ("er is geen corrigeerpunt in het scherm").
+        */}
+        <div ref={classificatieRef}>
         <button
           type="button"
           onClick={() => setShowClassificatie((s) => !s)}
@@ -477,6 +571,8 @@ export function Box3Detail({
                       : 'bg-[var(--ink-4)]'
                 }
                 muted={ac.category === null}
+                reason={ac.exclusionReason}
+                note={ac.note}
                 fc={fc}
               />
             ))}
@@ -493,6 +589,7 @@ export function Box3Detail({
                     categoryLabel={dc.inBox3 ? 'Box 3' : 'Uitgesloten'}
                     dotClass={dc.inBox3 ? 'bg-[var(--negative)]' : 'bg-[var(--ink-4)]'}
                     muted={!dc.inBox3}
+                    reason={dc.exclusionReason}
                     fc={fc}
                   />
                 ))}
@@ -500,7 +597,7 @@ export function Box3Detail({
             )}
           </div>
         )}
-        </HideInSimple>
+        </div>
 
         {/* 3.1 — Forfaitaire opbouw als gestapelde staaf */}
         <Box3Opbouw result={result} fc={fc} />
@@ -515,8 +612,17 @@ export function Box3Detail({
           <Box3Mix result={result} />
         </HideInSimple>
 
-        {/* 3.2 ★ — Tegenbewijs-simulator (werkelijk vs. forfaitair) */}
-        <Box3TegenbewijsCard result={result} />
+        {/* 3.2 ★ — Tegenbewijs-simulator (werkelijk vs. forfaitair).
+            De `key` is load-bearing: de schuif initialiseert éénmalig op het
+            omslagpunt van DEZE portefeuille (M24), en `result` muteert bij een
+            perspectief- of jaarwissel. Zonder remount houdt de schuif het oude
+            omslagpunt vast terwijl de kaart het nieuwe toont — met kans op een
+            besparing + "Voeg toe als actie" op een stand die niemand koos. */}
+        <Box3TegenbewijsCard
+          key={`${perspective}-${year}`}
+          result={result}
+          rateFootnote={rateFootnote}
+        />
 
         {/* 3.6 — Partner-verdeel-slider (alleen household, volledige data) */}
         {showPartnerSlider && optimal && combined && (
@@ -572,11 +678,27 @@ export function Box3Detail({
                 {fc(optimalSavings.savingsVsEqual)}
               </strong>{' '}
               t.o.v. ieder apart
+              {/* Eén functie voor euro→tijd: `calculateFreedomTime`, niet een
+                  eigen Math.round(x / tarief). Onder een maand zijn ze gelijk,
+                  daarboven niet (floor-per-30 vs. round) — en de partner-
+                  besparing kan ruim boven een maand uitkomen (M22). */}
               {dailyExpenses > 0 && (
-                <> — zo&apos;n {Math.round(optimalSavings.savingsVsEqual / dailyExpenses)} vrijheidsdagen</>
+                <>
+                  {' '}
+                  — zo&apos;n{' '}
+                  {formatFreedomTimeString(
+                    calculateFreedomTime(optimalSavings.savingsVsEqual, dailyExpenses),
+                  )}{' '}
+                  vrijheid
+                </>
               )}
               .
             </p>
+            {rateFootnote && (
+              <p className="mt-1.5 font-mono text-[10px] leading-relaxed text-[var(--ink-3)]">
+                {rateFootnote}
+              </p>
+            )}
             <p className="mt-2 text-xs text-[var(--ink-2)] leading-snug">
               Als fiscaal partners mag je het Box 3-vermogen onderling verdelen;
               door het slim te verdelen benut je beide heffingsvrije vermogens
@@ -599,6 +721,8 @@ function ClassRow({
   categoryLabel,
   dotClass,
   muted,
+  reason,
+  note,
   fc,
 }: {
   name: string
@@ -606,24 +730,43 @@ function ClassRow({
   categoryLabel: string
   dotClass: string
   muted?: boolean
+  /** Waaróm deze post buiten Box 3 valt (`exclusionReason` uit de motor). */
+  reason?: string | null
+  /** Toelichting die de gebruiker zelf moet natrekken (`note` uit de motor). */
+  note?: string | null
   fc: (v: number) => string
 }) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="flex items-center gap-2 min-w-0">
-        <span className={`h-2.5 w-2.5 shrink-0 ${dotClass}`} aria-hidden="true" />
-        <span className={`text-xs truncate ${muted ? 'text-[var(--ink-3)]' : 'text-[var(--ink-2)]'}`}>
-          {name}
+    <div className="space-y-0.5">
+      <div className="flex items-center justify-between gap-3">
+        <span className="flex items-center gap-2 min-w-0">
+          <span className={`h-2.5 w-2.5 shrink-0 ${dotClass}`} aria-hidden="true" />
+          <span className={`text-xs truncate ${muted ? 'text-[var(--ink-3)]' : 'text-[var(--ink-2)]'}`}>
+            {name}
+          </span>
         </span>
-      </span>
-      <span className="flex items-center gap-2 shrink-0">
-        <span className="text-[10px] uppercase tracking-[0.06em] text-[var(--ink-3)]">
-          {categoryLabel}
+        <span className="flex items-center gap-2 shrink-0">
+          <span className="text-[10px] uppercase tracking-[0.06em] text-[var(--ink-3)]">
+            {categoryLabel}
+          </span>
+          <span className="text-xs font-mono tabular-nums text-[var(--ink-2)]">
+            {fc(amount)}
+          </span>
         </span>
-        <span className="text-xs font-mono tabular-nums text-[var(--ink-2)]">
-          {fc(amount)}
-        </span>
-      </span>
+      </div>
+      {/*
+        De motor vult `exclusionReason`/`note` al sinds de eerste versie, maar
+        er was geen enkele render-consument: het scherm zei alleen "Uitgesloten
+        (Box 1/2)" en nooit waaróm. Precies dat gat maakte de bevinding
+        onnavolgbaar — de tester kon niet zien wat er in dat bedrag zat.
+      */}
+      {(reason || note) && (
+        <p className="pl-[18px] text-[11px] leading-snug text-[var(--ink-3)]">
+          {reason}
+          {reason && note ? ' — ' : ''}
+          {note}
+        </p>
+      )}
     </div>
   )
 }

@@ -769,6 +769,15 @@ export function kernelToUnifiedResult(
 
   // requiredFirePortfolio = firePortfolioAtFire = Prognose!J@FIRE (nominaal),
   // null-fallback → J op de laatste in-horizon-maand (zie module-doc).
+  //
+  // M6 — DE TERUGVAL IS EEN ANDERE GROOTHEID. Zonder een echte "bij FIRE"-waarde
+  // is dit de GEPROJECTEERDE eindstand op de horizon (leeftijd ~100), niet
+  // "benodigd vermogen om vrij te zijn". Bij een structureel tekort is die stand
+  // fors NEGATIEF — en werd zo ongefilterd als "Doelbedrag … benodigd" getoond.
+  // De bridge blijft de waarde doorgeven (geen stille correctie in de rekenkern),
+  // maar MARKEERT hem nu, zodat de weergavelaag er een gegevensmelding van kan
+  // maken i.p.v. een bedrag. Zie `lib/horizon/outcome-guard.ts`.
+  const requiredFireIsEndOfHorizonFallback = summary.nettoLiquideBijFire == null
   const requiredFirePortfolio = summary.nettoLiquideBijFire ?? summary.eindNettoLiquide
   const firePortfolioAtFire = requiredFirePortfolio
 
@@ -839,6 +848,7 @@ export function kernelToUnifiedResult(
     firePortfolioAtFire,
     requiredFirePortfolio,
     requiredFireNetWorth,
+    requiredFireIsEndOfHorizonFallback,
     implicitWithdrawalRate,
     strategy,
     targetEndPortfolio: solve.doelbedrag,

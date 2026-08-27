@@ -146,7 +146,11 @@ export default async function ToekomstPage({
       {/* embedded: de tijdas leeft ónder de paginakop ("Je tijdas") — degradeer
           de horizon-client-kop tot sectie-niveau (geen tweede H1, geen eigen
           PageInfoButton). Zie K-02 (dubbele-hero-ontstapeling). */}
-      <HorizonPage initialData={horizonData} embedded />
+      {/* `goals` = exact dezelfde slice die de Doelen-navkaart hierboven en de
+          dashboard-widget consumeren (M36): doelen met een streefdatum krijgen
+          een marker op de tijdas, zodat het scherm dát over de toekomst gaat
+          niet langer verzwijgt wat je zojuist hebt ingevoerd. Geen extra query. */}
+      <HorizonPage initialData={horizonData} embedded goals={finData.goals} />
 
       {/* Krant-stijl colophon als landing-footer. print:hidden zodat de
           tijdas-print (PrintTijdasButton) ongewijzigd blijft. */}

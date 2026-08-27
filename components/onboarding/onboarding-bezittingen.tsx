@@ -101,13 +101,16 @@ const ASSET_QUESTIONS: AssetQuestion[] = [
 
 /**
  * Onboarding-specifieke override voor de kleine-letter labels in de
- * "Nog een …?"-vervolgvraag. Alleen `savings` wijkt bewust af van het
- * gedeelde `ASSET_QUICK_ADD_LABELS` ('Spaargeld'): op de vermogensstap
- * spreken we van een concrete "spaargeldrekening" (telbaar → "nog een …"),
- * zonder het app-brede wizard-label te raken. Andere types vallen terug op
- * het gedeelde label. */
+ * "Nog een …?"-vervolgvraag. De vervolgvraag telt één post, dus het label
+ * moet ENKELVOUD en telbaar zijn; `ASSET_QUICK_ADD_LABELS` is daar niet
+ * altijd geschikt voor omdat dat het app-brede wizard-label is:
+ * - `savings` → 'Spaargeld' (niet telbaar) → "spaargeldrekening"
+ * - `investment` → 'Beleggingen' (meervoud) → "belegging"
+ * Andere types vallen terug op het gedeelde label, dat daar al enkelvoud is
+ * ('Betaalrekening', 'Eigen woning'). Raakt het app-brede label niet. */
 const ONBOARDING_MORE_LABELS: Partial<Record<AssetType, string>> = {
   savings: 'spaargeldrekening',
+  investment: 'belegging',
 }
 
 // ── Component ──────────────────────────────────────────────────────────
@@ -271,7 +274,10 @@ export function OnboardingBezittingen({
       }
       source={
         quickAssets.length > 0
-          ? `${quickAssets.length} bezit${quickAssets.length === 1 ? '' : 'ten'}`
+          ? // Stam is "bezitting" (zelfstandig naamwoord), niet "bezit": met de
+            // stam "bezit" + suffix "ten" ontstond het wérkwoord "bezitten"
+            // ("2 bezitten") en bij één post het kale "1 bezit".
+            `${quickAssets.length} bezitting${quickAssets.length === 1 ? '' : 'en'}`
           : 'CBS Vermogensstatistiek, 2023'
       }
     />

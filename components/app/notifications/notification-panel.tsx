@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useScrollLock } from '@/lib/hooks/use-scroll-lock'
 import { acquireOverlay } from '@/lib/overlay-signal'
 import { useNotifications } from './notification-provider'
-import { NotificationItem } from './notification-item'
+import { NotificationRows } from './notification-bundle'
 import { X, ChevronRight } from 'lucide-react'
 import type { Notification } from '@/app/api/notifications/route'
 
@@ -95,14 +95,11 @@ function CollapsedDayGroup({
       </button>
       {expanded && (
         <div>
-          {group.notifications.map((notification) => (
-            <NotificationItem
-              key={notification.id}
-              notification={notification}
-              onRead={markAsRead}
-              onClose={closeModal}
-            />
-          ))}
+          <NotificationRows
+            items={group.notifications}
+            onRead={markAsRead}
+            onClose={closeModal}
+          />
         </div>
       )}
     </div>
@@ -266,14 +263,7 @@ export function NotificationModal() {
                       </button>
                     )}
                   </div>
-                  {urgent.map((notification) => (
-                    <NotificationItem
-                      key={notification.id}
-                      notification={notification}
-                      onRead={markAsRead}
-                      onClose={closeModal}
-                    />
-                  ))}
+                  <NotificationRows items={urgent} onRead={markAsRead} onClose={closeModal} />
                 </div>
               )}
 
@@ -294,14 +284,7 @@ export function NotificationModal() {
                       </button>
                     )}
                   </div>
-                  {todayItems.map((notification) => (
-                    <NotificationItem
-                      key={notification.id}
-                      notification={notification}
-                      onRead={markAsRead}
-                      onClose={closeModal}
-                    />
-                  ))}
+                  <NotificationRows items={todayItems} onRead={markAsRead} onClose={closeModal} />
                 </div>
               )}
 

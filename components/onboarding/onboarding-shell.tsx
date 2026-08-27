@@ -2,6 +2,10 @@
 
 import type { ReactNode } from 'react'
 import { OnboardingProgressBar } from './progress-bar'
+import {
+  OnboardingFreedomTickerRow,
+  useOnboardingFreedomTicker,
+} from './freedom-ticker'
 
 /**
  * Editorial-split layout-shell voor de onboarding-stappen.
@@ -75,6 +79,11 @@ export function OnboardingShell({
   totalSteps,
   onBack,
 }: OnboardingShellProps) {
+  // Meelopende vrijheidstijd-teller. De orchestrator zet 'm in de context
+  // (zie `OnboardingFreedomTickerProvider`); elke stap krijgt 'm daardoor
+  // zonder eigen prop-plumbing. `null` = nog niets eerlijks te tonen.
+  const freedomTicker = useOnboardingFreedomTicker()
+
   return (
     <div className="w-full">
       {/* Sticky top: voortgangsbalk + back-affordance.
@@ -83,6 +92,9 @@ export function OnboardingShell({
       <OnboardingProgressBar
         current={currentStep}
         total={totalSteps}
+        tickerSlot={
+          freedomTicker ? <OnboardingFreedomTickerRow label={freedomTicker} /> : undefined
+        }
         backSlot={
           onBack && (
             <button

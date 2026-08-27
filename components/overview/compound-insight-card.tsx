@@ -38,14 +38,30 @@ const CONSERVATIVE_RATE = 0.005 // spaarrente ~0.5%
 const AMBITIOUS_RATE = 0.07 // belegd lange-termijn ~7%
 const HORIZON_YEARS = 30
 
+/** CTA-varianten: first-use vs. gevuld (kaart H15, uiux "Empty states"). */
+const CTA_FIRST_USE = { label: 'Start met beleggen', href: '/overzicht/bezittingen' }
+const CTA_INVESTED = {
+  label: 'Bekijk je portefeuille',
+  href: '/overzicht/bezittingen/investment?tab=aandelen-holdings',
+}
+
 export function CompoundInsightCard({
   liquidCash,
   monthlyContribution = 0,
+  hasInvestments = false,
 }: {
   /** Huidig liquide cash dat NU op spaarrekening staat. */
   liquidCash: number
   /** Initiële maandelijkse inleg (slider-startwaarde). Default 0. */
   monthlyContribution?: number
+  /**
+   * Belegt de gebruiker al? (bron: `hasInvestedAssets`, lib/dashboard-wealth-weighting).
+   * Stuurt uitsluitend de CTA-variant — de rekensom en de rendergate blijven
+   * op liquide cash. Beide gates keken alleen naar cash, waardoor "Start met
+   * beleggen" ook verscheen naast een lopende inleg (kaart H15). Default
+   * `false` houdt bestaande aanroepers op de first-use-variant.
+   */
+  hasInvestments?: boolean
 }) {
   // Interactieve slider-state: user kan inleg variëren tussen €0 en €1000/mnd
   // om het compound-effect dynamisch te ervaren.
@@ -55,6 +71,7 @@ export function CompoundInsightCard({
   // slider-label (monthly): één kaart met deels zichtbare bedragen breekt de
   // masking-belofte (zie werkqueue "Privacy-modus dekt álle bedragen", A6).
   const { masked } = useMaskedAmounts()
+  const cta = hasInvestments ? CTA_INVESTED : CTA_FIRST_USE
 
   const result = compareCompound({
     principal: liquidCash,
@@ -190,10 +207,10 @@ export function CompoundInsightCard({
           </div>
         </div>
         <Link
-          href="/overzicht/bezittingen"
+          href={cta.href}
           className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--positive)] hover:underline"
         >
-          Start met beleggen
+          {cta.label}
           <ArrowRight className="w-3 h-3" aria-hidden="true" />
         </Link>
       </div>

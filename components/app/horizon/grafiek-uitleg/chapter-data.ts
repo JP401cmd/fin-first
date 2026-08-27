@@ -92,6 +92,16 @@ export interface OpbouwData {
 export interface TerugrekeningData {
   /** Ankerbedrag: het door de simulatie berekende benodigd vermogen. */
   requiredFirePortfolio: number
+  /**
+   * M6: `true` ⇒ `requiredFirePortfolio` komt NIET van een echt FIRE-moment maar
+   * van de geprojecteerde eindstand op de horizon (leeftijd ~100) — een andere
+   * grootheid dan "benodigd vermogen". Doorgeleid uit
+   * `SimResult.requiredFireIsEndOfHorizonFallback` zodat dit hoofdstuk dezelfde
+   * `guardFireTarget`-invoer heeft als de KPI-tegel en de sim-widget; zonder dit
+   * veld toonde de walkthrough een bedrag terwijl de tegel op dezelfde pagina
+   * "We missen gegevens" zei.
+   */
+  requiredFireIsEndOfHorizonFallback: boolean
   /** Klassiek 25× doel ter vergelijking (4%-regel). De UI verbergt de WEERGAVE; het veld blijft. */
   classic25xTarget: number
   /** Of er periodieke inkomstenbodem (AOW/pensioen) meespeelt — dan daalt V_nodig sterker. */
@@ -360,6 +370,7 @@ export function deriveChapterData(
     fireReachable,
     firePortfolioAtFire,
     requiredFirePortfolio,
+    requiredFireIsEndOfHorizonFallback,
     classic25xTarget,
     implicitWithdrawalRate,
     strategy,
@@ -493,6 +504,9 @@ export function deriveChapterData(
     },
     terugrekening: {
       requiredFirePortfolio,
+      // Optioneel op SimResult (stub-/preview-resultaten laten het weg) → hier
+      // normaliseren naar een harde boolean, zodat de guard niet hoeft te raden.
+      requiredFireIsEndOfHorizonFallback: requiredFireIsEndOfHorizonFallback === true,
       classic25xTarget,
       hasIncomeFloor,
       incomeFloorMonthly,

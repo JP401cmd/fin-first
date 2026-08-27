@@ -46,8 +46,10 @@ function mkSummary(
   return {
     subscriptions,
     vasteKosten,
+    terugkerendVariabel: [],
     totalMonthlySubscriptions: totalSubs,
     totalMonthlyVasteKosten: totalVK,
+    totalMonthlyVariabel: 0,
     totalMonthly: totalSubs + totalVK,
     count: subscriptions.length + vasteKosten.length,
   }

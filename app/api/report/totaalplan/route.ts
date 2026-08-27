@@ -23,7 +23,7 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { NL_AOW_AGE } from '@/lib/constants'
-import { loadHorizonData } from '@/lib/horizon-data-loader'
+import { loadHorizonRaw } from '@/lib/horizon-data-loader'
 import { buildHorizonInput } from '@/lib/horizon/build-input'
 import { collectAandachtspunten } from '@/lib/aandachtspunten-loader'
 import type { ConvergentieRawContext, ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
@@ -73,7 +73,7 @@ export async function GET() {
         .from('budgets')
         .select('id, parent_id, name, default_limit, interval, budget_type, is_essential')
         .eq('is_archived', false),
-      loadHorizonData(supabase),
+      loadHorizonRaw(supabase),
       collectAandachtspunten(supabase),
     ])
 

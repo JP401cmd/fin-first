@@ -29,6 +29,9 @@ import { VermogenAssetCard } from '@/components/core/vermogen-asset-card'
 import { loadPerspectiveData } from '@/lib/household/perspective-loader'
 import { loadEntitySparklines } from '@/lib/load-entity-sparklines'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
+import { deriveRealMonthTotals, isIncomeRow } from '@/lib/cashflow-month-totals'
+import { isRealAggRow } from '@/lib/server-data/tx-aggregates'
+import { currentMonthWindowLabel, currentMonthSavingsRate } from '@/lib/cashflow-cards'
 import { type Asset, ASSET_TYPE_COLORS } from '@/lib/asset-data'
 import type { Provenance } from '@/lib/household-data'
 import {
@@ -57,12 +60,20 @@ type BudgetRow = {
 
 type TxAgg = {
   amount: number
-  account_id: string
+  /** Nullable sinds H6: de query scoopt niet meer op getrackte rekeningen. */
+  account_id: string | null
   budget_id: string | null
   is_income: boolean
   transaction_type: string | null
   date: string
 }
+
+/**
+ * Bucket-sleutel voor transacties zonder `account_id`. Sinds H6 scoopt de
+ * geldstroom-query niet meer op rekening, dus zulke rijen bestaan hier — ze
+ * mogen niet stil verdwijnen uit de kassabon-opsomming.
+ */
+const UNASSIGNED_ACCOUNT_KEY = '__unassigned'
 
 type BudgetExpense = {
   id: string
@@ -338,6 +349,29 @@ export function CashOverview({
     [monthDate],
   )
 
+  // ── VENSTER-LABEL (H6, verplicht onderdeel van het eigenaarsbesluit) ────────
+  //
+  // De strip toonde alleen een maandnaam. Voor de LOPENDE maand is dat een halve
+  // waarheid: het saldo groeit nog tot de 1e, en een gebruiker die het naast een
+  // structureel maandcijfer legt (het /overzicht-widget, de kassabon met
+  // instellingen) leest het verschil als een fout in plaats van als een ander
+  // venster. Voor afgesloten maanden is het cijfer wél compleet, dus daar is een
+  // "tot nu toe" juist misleidend — vandaar twee formuleringen.
+  //
+  // De lopende-maand-tekst komt uit `currentMonthWindowLabel` (lib/cashflow-cards.ts),
+  // dezelfde bron als de Transacties-kaart op deze pagina: "augustus tot nu toe".
+  const isCurrentMonth = useMemo(() => {
+    const now = new Date()
+    return now.getFullYear() === monthDate.getFullYear() && now.getMonth() === monthDate.getMonth()
+  }, [monthDate])
+
+  const windowLabel = useMemo(
+    () => (isCurrentMonth
+      ? `gerealiseerd in ${currentMonthWindowLabel(monthDate)} — de maand loopt nog`
+      : `gerealiseerd in ${monthLabel} — volledige maand`),
+    [isCurrentMonth, monthDate, monthLabel],
+  )
+
   // `YYYY-MM` van de geselecteerde maand voor de deeplinks — lokaal opgebouwd
   // (NIET via toISOString, dat schuift in UTC+ tijdzones een dag terug en kan
   // de maand verkeerd zetten).
@@ -504,35 +538,45 @@ export function CashOverview({
     return () => { cancelled = true }
   }, [showAllCashAccounts, cashAssets])
 
-  // Account-IDs die de geldstroom-aggregaties mogen voeden. Wanneer er geen
-  // budget-tracked rekeningen zijn, slaan we de transactions-query over —
-  // anders levert `.in('account_id', [])` een 400 op en ruisen we de
-  // server onnodig met een lege query.
-  // De archief-rekening voedt WEL de aggregatie maar staat NIET in de
-  // kaartenlijst (`accounts`): zonder hem zouden de geldstroomcijfers van
-  // afgelopen maanden veranderen zodra iemand een rekening verwijdert met
-  // "transacties bewaren" — precies wat die keuze belooft niet te doen.
-  const accountIds = useMemo(
-    () => (archiveAccountId ? [...accounts.map((a) => a.id), archiveAccountId] : accounts.map((a) => a.id)),
-    [accounts, archiveAccountId],
-  )
+  // Hier stond `accountIds` — de rekening-witlijst die de geldstroom-queries
+  // scoopte (getrackte rekeningen + de archief-rekening). Weg sinds H6: de
+  // queries hieronder lezen alle RLS-zichtbare rijen, net als de canonieke
+  // maandmotor. De archief-rekening hoefde daar niet meer apart bij te worden
+  // gesleept — hij vált nu vanzelf binnen de scope, wat de belofte van
+  // "transacties bewaren" beter waarmaakt dan de witlijst deed.
+  // `archiveAccountId` blijft bestaan voor de deeplink naar het archief.
 
+  // ── GELDSTROOM-RIJEN VAN DE GEKOZEN MAAND (H6) ─────────────────────────────
+  //
+  // REKENING-SCOPING LOSGELATEN (eigenaarsbesluit 26-08-2026). Deze query filterde
+  // op `.in('account_id', accountIds)`: alleen de budget-getrackte rekeningen plus
+  // de archief-rekening. De canonieke maandmotor (`deriveRealMonthTotals`, gevoed
+  // door `getCurrentMonthTx`/het maandaggregaat) telt ÁLLE RLS-zichtbare rijen.
+  // Daardoor telde de strip stelselmatig een andere verzameling dan het
+  // /overzicht-widget en de Transacties-kaart — een van de vier assen waarop
+  // bevinding H6 zijn ~€12-residu vond.
+  //
+  // GEVOLG, BEWUST GEACCEPTEERD: een rij zonder `account_id`, of op een rekening
+  // die niet (meer) getrackt wordt, telt vanaf nu mee. Historische maandcijfers
+  // kunnen daardoor zichtbaar verschuiven. Dat is precies de afweging die het
+  // comment bij `accountIds` hieronder beschrijft — en die is nu andersom
+  // beslecht: liever één getal op alle oppervlakken dan een stabiel getal dat van
+  // de rest afwijkt.
+  //
+  // WAT WÉL BLIJFT: de `ownership`-filter. Dat is geen rekening-scoping maar het
+  // PERSPECTIEF (persoonlijk vs. huishouden) — dezelfde as waarop de hele pagina
+  // draait. Die loslaten zou partner-rijen in het persoonlijke beeld trekken.
   const loadTransactions = useCallback(async () => {
-    if (accountIds.length === 0) {
-      setTransactions([])
-      return
-    }
     const supabase = createClient()
     let q = supabase
       .from('transactions')
       .select('amount, account_id, budget_id, is_income, transaction_type, date')
       .gte('date', monthStart)
       .lt('date', monthEnd)
-      .in('account_id', accountIds)
     if (perspective === 'personal') q = q.eq('ownership', 'personal')
     const { data } = await q
     if (data) setTransactions(data as TxAgg[])
-  }, [monthStart, monthEnd, perspective, accountIds])
+  }, [monthStart, monthEnd, perspective])
 
   const loadBudgets = useCallback(async () => {
     const supabase = createClient()
@@ -556,20 +600,19 @@ export function CashOverview({
   const [historicalDayPattern, setHistoricalDayPattern] = useState<HistoricalDayPattern | null>(null)
 
   const loadHistorical = useCallback(async () => {
-    if (accountIds.length === 0) {
-      setHistoricalDayPattern(null)
-      return
-    }
     const supabase = createClient()
     // Lokale YYYY-MM-DD grens (zie localMonthBounds: toISOString schuift in UTC+
     // tijdzones een dag terug).
     const start = localMonthStart(new Date(monthDate.getFullYear(), monthDate.getMonth() - 12, 1))
+    // Zelfde scoping als `loadTransactions` (H6): géén `account_id`-filter meer.
+    // Deze pass voedt de forecast-curve die ONDER de strip staat; zou hij op een
+    // kleinere rekeningset draaien dan de strip erboven, dan zouden grafiek en
+    // totalen op hetzelfde scherm een andere populatie beschrijven.
     let q = supabase
       .from('transactions')
       .select('amount, is_income, transaction_type, date')
       .gte('date', start)
       .lt('date', monthStart)
-      .in('account_id', accountIds)
     if (perspective === 'personal') q = q.eq('ownership', 'personal')
     const { data } = await q
     if (!data || data.length === 0) {
@@ -580,7 +623,10 @@ export function CashOverview({
     // Bucket: YYYY-MM → dayOfMonth → { income, expense }.
     const perMonthDay = new Map<string, Map<number, { income: number; expense: number }>>()
     for (const tx of data as Array<{ amount: number; is_income: boolean; transaction_type: string | null; date: string }>) {
-      if (tx.transaction_type === 'transfer') continue
+      // Canonieke transfer-definitie (H6): `isRealAggRow` dekt `transfer` ÉN
+      // `joint_transfer`. De vroegere handmatige toets op alleen 'transfer' liet
+      // huishoud-overboekingen als echt inkomen/echte uitgave meetellen.
+      if (!isRealAggRow(tx)) continue
       const monthKey = tx.date.slice(0, 7)
       const day = Number(tx.date.slice(8, 10))
       if (!Number.isFinite(day)) continue
@@ -594,7 +640,9 @@ export function CashOverview({
         entry = { income: 0, expense: 0 }
         monthMap.set(day, entry)
       }
-      if (tx.is_income) {
+      // Canonieke classificatie (H6): het TEKEN van `amount`, niet de
+      // niet-afgedwongen boolean `is_income`. Zie lib/cashflow-month-totals.ts.
+      if (isIncomeRow(tx)) {
         entry.income += tx.amount
       } else {
         entry.expense += Math.abs(tx.amount)
@@ -637,7 +685,7 @@ export function CashOverview({
     }
 
     setHistoricalDayPattern(pattern)
-  }, [accountIds, monthStart, monthDate, perspective])
+  }, [monthStart, monthDate, perspective])
 
   useEffect(() => {
     setLoading(true)
@@ -775,25 +823,54 @@ export function CashOverview({
     return () => window.clearTimeout(t)
   }, [showAllCashAccounts, cashAssets])
 
+  // Canonieke transfer-filter (H6): `isRealAggRow` sluit `transfer` ÉN
+  // `joint_transfer` uit — de vorige toets liet dat tweede type erdoor.
   const nonTransferTx = useMemo(
-    () => transactions.filter((t) => t.transaction_type !== 'transfer'),
+    () => transactions.filter(isRealAggRow),
     [transactions],
   )
 
+  // ── DE VIER STRIP-CIJFERS (H6) ─────────────────────────────────────────────
+  //
+  // Inkomen en uitgaven komen uit DE canonieke maandmotor
+  // (`deriveRealMonthTotals`, lib/cashflow-month-totals.ts) — dezelfde functie die
+  // `lib/dashboard-data-loader.ts` en `lib/cashflow-kpis.ts` gebruiken. Vóór H6
+  // draaide deze strip een eigen tel-lus die op vier assen afweek van die motor:
+  // classificatie op `is_income` i.p.v. het teken van `amount`, een transfer-filter
+  // dat `joint_transfer` miste, een scoping op getrackte rekeningen, en een eigen
+  // spaarquote-formule. Consume, don't recompute — geen van die vier bestaat hier
+  // nog.
+  //
+  // LET OP: `transactions` (alle rijen van de maand), niet `nonTransferTx` — de
+  // motor doet zijn eigen transfer-filter. Er twee keer overheen filteren is
+  // onschadelijk maar zou suggereren dat het predicaat hier woont.
+  const monthTotals = useMemo(() => deriveRealMonthTotals(transactions), [transactions])
+  const totalIncome = monthTotals.income
+
+  // Inkomen per rekening — alleen voor de inkomsten-kassabon. Rijen zonder
+  // `account_id` (sinds H6 niet meer weggefilterd) landen onder de sleutel
+  // `__unassigned`, zodat de kassabon-regels blijven optellen tot `totalIncome`.
   const incomeByAccount = useMemo(() => {
     const map = new Map<string, number>()
     for (const tx of nonTransferTx) {
-      if (tx.is_income) {
-        map.set(tx.account_id, (map.get(tx.account_id) ?? 0) + tx.amount)
-      }
+      if (!isIncomeRow(tx)) continue
+      const key = tx.account_id ?? UNASSIGNED_ACCOUNT_KEY
+      map.set(key, (map.get(key) ?? 0) + tx.amount)
     }
     return map
   }, [nonTransferTx])
 
-  const totalIncome = useMemo(
-    () => Array.from(incomeByAccount.values()).reduce((s, v) => s + v, 0),
-    [incomeByAccount],
-  )
+  // Inkomen dat niet op een van de getoonde rekening-kaarten staat (geen
+  // account_id, of een rekening buiten `accounts`). Zonder deze restpost zou de
+  // kassabon minder tonen dan zijn eigen totaalregel.
+  const unassignedIncome = useMemo(() => {
+    const listed = new Set(accounts.map((a) => a.id))
+    let rest = 0
+    for (const [key, amount] of incomeByAccount) {
+      if (key === UNASSIGNED_ACCOUNT_KEY || !listed.has(key)) rest += amount
+    }
+    return rest
+  }, [incomeByAccount, accounts])
 
   const expensesByBudget = useMemo(() => {
     // Build parent lookup
@@ -814,7 +891,8 @@ export function CashOverview({
     const aggMap = new Map<string, number>()
     let orphanAmount = 0
     for (const tx of nonTransferTx) {
-      if (tx.is_income) continue
+      // Canonieke classificatie (H6): teken van `amount`, niet `is_income`.
+      if (isIncomeRow(tx)) continue
       if (!tx.budget_id) continue
       const knownBudget = budgetMap.has(tx.budget_id)
       if (!knownBudget) {
@@ -842,7 +920,7 @@ export function CashOverview({
     }
 
     const nullBudgetAmount = nonTransferTx
-      .filter((tx) => !tx.is_income && !tx.budget_id)
+      .filter((tx) => !isIncomeRow(tx) && !tx.budget_id)
       .reduce((s, tx) => s + Math.abs(tx.amount), 0)
     const uncatAmount = nullBudgetAmount + orphanAmount
     if (uncatAmount > 0) {
@@ -853,15 +931,24 @@ export function CashOverview({
     return result
   }, [nonTransferTx, budgets])
 
-  const totalExpenses = useMemo(
-    () => expensesByBudget.reduce((s, b) => s + b.amount, 0),
-    [expensesByBudget],
-  )
+  // Uit DE canonieke motor, niet uit de budget-oprol hieronder (H6). De oprol
+  // blijft de onderverdeling voor de grafiek en de kassabon; hij deelt sinds H6
+  // dezelfde classificatie en transfer-filter, dus zijn som is per constructie
+  // gelijk aan dit totaal — maar het TOTAAL hoort bij de motor te beginnen, niet
+  // bij een weergave-aggregaat.
+  const totalExpenses = monthTotals.expenses
 
   const netAmount = totalIncome - totalExpenses
 
-  // Spaarquote (% van inkomen wat overblijft)
-  const savingsRate = totalIncome > 0 ? (netAmount / totalIncome) * 100 : 0
+  // Spaarquote via `currentMonthSavingsRate` (lib/cashflow-cards.ts) — exact
+  // dezelfde functie als de Transacties-kaart één blok verderop op deze pagina,
+  // die intern de canonieke `savingsRateFromAggregates` aanroept. Hier stond een
+  // eigen `netAmount / totalIncome`; numeriek gelijk, maar het was de derde
+  // handgeschreven kopie van één getal (H6).
+  //
+  // `null` bij €0 inkomen is bewust: "niet te zeggen", niet "0% gespaard" — en
+  // het is dezelfde uitspraak als de kaart ernaast doet.
+  const savingsRate = currentMonthSavingsRate(totalIncome, totalExpenses)
 
   // Dagelijkse geldstroom — voor de cashflow-grafiek. Aggregeert alle
   // transacties (alle rekeningen, transfers uitgesloten) per dag van de
@@ -877,7 +964,9 @@ export function CashOverview({
       const d = new Date(tx.date + 'T00:00:00')
       const dayIdx = d.getDate() - 1
       if (dayIdx < 0 || dayIdx >= buckets.length) continue
-      if (tx.is_income) {
+      // Canonieke classificatie (H6) — teken van `amount`, zodat de
+      // dag-grafiek dezelfde populatie beschrijft als de strip erboven.
+      if (isIncomeRow(tx)) {
         buckets[dayIdx].income += tx.amount
       } else {
         buckets[dayIdx].expense += Math.abs(tx.amount)
@@ -1034,7 +1123,7 @@ export function CashOverview({
     // Aggregate by child budget
     const childMap = new Map<string, number>()
     for (const tx of nonTransferTx) {
-      if (!tx.is_income && tx.budget_id && children.some((c) => c.id === tx.budget_id)) {
+      if (!isIncomeRow(tx) && tx.budget_id && children.some((c) => c.id === tx.budget_id)) {
         childMap.set(tx.budget_id, (childMap.get(tx.budget_id) ?? 0) + Math.abs(tx.amount))
       }
     }
@@ -1297,6 +1386,19 @@ export function CashOverview({
             </div>
           </div>
 
+          {/* Venster-label (H6) — zegt welk tijdvenster de vier cijfers hieronder
+              beschrijven, zodat ze naast het structurele maandcijfer elders in de
+              app niet als tegenspraak lezen. */}
+          <div className="border-b border-[var(--rule-soft)] px-4 sm:px-5 py-1.5">
+            <p
+              className="text-[11px] italic text-[var(--ink-3)]"
+              style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              data-testid="cashflow-window-label"
+            >
+              {windowLabel}
+            </p>
+          </div>
+
           {/* Figures-strip totalen — 4 kolommen: Inkomen / Uitgaven / Saldo / Spaarquote */}
           <div className="grid grid-cols-2 sm:grid-cols-4">
             <button
@@ -1380,13 +1482,15 @@ export function CashOverview({
                 className="text-[22px] sm:text-[26px] font-black leading-none tracking-[-0.02em] tabular-nums"
                 style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
               >
-                {savingsRate.toFixed(0)}%
+                {savingsRate === null ? '—' : `${savingsRate.toFixed(0)}%`}
               </div>
               <div
                 className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
                 style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
               >
-                {savingsRate >= 30 ? 'sterk' : savingsRate >= 15 ? 'gezond' : 'laag'}
+                {savingsRate === null
+                  ? 'geen inkomen deze maand'
+                  : savingsRate >= 30 ? 'sterk' : savingsRate >= 15 ? 'gezond' : 'laag'}
               </div>
             </div>
           </div>
@@ -1501,6 +1605,15 @@ export function CashOverview({
                   </div>
                 )
               })}
+            {/* Restpost (H6): inkomen zonder rekening of op een rekening die niet
+                als kaart getoond wordt. Zonder deze regel telt de kassabon niet
+                op tot zijn eigen totaal. */}
+            {unassignedIncome > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-[var(--ink-2)]">Overige rekeningen</span>
+                <span className="font-bold tabular-nums">{<MaskedAmount value={unassignedIncome} tone="kern" decimals />}</span>
+              </div>
+            )}
             <div className="border-t border-dashed border-[var(--border-md)] pt-2 mt-2">
               <div className="flex items-center justify-between font-bold">
                 <span>Totaal</span>

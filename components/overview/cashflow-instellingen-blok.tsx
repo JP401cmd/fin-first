@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Check, ChevronDown, SlidersHorizontal } from 'lucide-react'
 import { Button, FiguresStrip, Kicker, type FigureProps } from '@/components/editorial'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { resolveAmountWithBasis } from '@/lib/effective-financials'
@@ -14,8 +15,8 @@ import {
 } from '@/lib/cashflow-settings'
 import {
   calculateFreedomTime,
-  dailyExpenseRate,
   formatCurrency,
+  formatFreedomRateFootnote,
   formatFreedomTimeString,
 } from '@/lib/format'
 import type {
@@ -104,6 +105,7 @@ export function CashflowInstellingenBlok({
 }) {
   const router = useRouter()
   const radioName = useId()
+  const { masked } = useMaskedAmounts()
 
   // De bundel komt via een lazy fetch binnen (cashflow-below-fold). Na elke
   // wijziging halen we 'm opnieuw op, zodat de spaarquote en de server-resolutie
@@ -477,7 +479,27 @@ export function CashflowInstellingenBlok({
     setSaveError(null)
   }, [])
 
-  const dailyRate = dailyExpenseRate(monthlyExpenses)
+  // ── Dagtarief: ÉÉN wisselkoers, ook hier (M22, besluit B1) ────────────────
+  // Was `dailyExpenseRate(monthlyExpenses)` — het tarief van het bedrag dat op
+  // dát moment op de kaart stond, dus meebewegend met de grondslagkeuze én met
+  // een nog niet opgeslagen budgetselectie. Dat maakte dit blok de derde
+  // €→vrijheidstijd-koers binnen dezelfde module ("één dag vrijheid kost je nu
+  // €106" naast een app die met ~€124/dag rekende).
+  //
+  // Nu: het canonieke 12-mnd rolling tarief uit de bundel. Een dagtarief is
+  // geen grondslagkeuze maar een app-brede wisselkoers; wat de gebruiker hier
+  // kiest bepaalt welk BEDRAG er staat, niet hoe een euro in tijd wordt
+  // uitgedrukt. De regels eronder benoemen de herkomst van het tarief, zodat de
+  // kassabon niet stilzwijgend twee grondslagen mengt.
+  //
+  // PRIVACY (ADR 0091 laag 4). Elk bedrag in dit blok gaat door `MaskedAmount`,
+  // maar het dagtarief stond er rauw naast — en dat is de wisselkoers waarmee
+  // je de gemaskeerde bedragen terugrekent (jaarinkomen = vrijheidstijd ×
+  // tarief). Onder maskering vallen zowel het tarief als de eruit afgeleide
+  // vrijheidstijd weg; `showRate` is de ene gate voor beide.
+  const dailyRate = data.dailyExpenseRate ?? 0
+  const showRate = !masked && dailyRate > 0
+  const rateFootnote = formatFreedomRateFootnote(dailyRate, 'transactions', masked)
 
   // ── De drie cellen van de samenvatting ────────────────────────────────────
   // De grondslag staat als eigen subregel op ELKE cel (ADR 0103: een grondslag
@@ -536,11 +558,13 @@ export function CashflowInstellingenBlok({
 
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="max-w-[52ch] font-serif text-[13px] italic leading-relaxed text-[var(--ink-2)]">
-          {dailyRate > 0 ? (
+          {showRate ? (
             <>
               Deze drie horen bij elkaar: wat binnenkomt, wat weggaat, en wat je daarmee
               aan vrijheid opbouwt. Eén dag vrijheid kost je nu{' '}
-              <strong className="not-italic">{formatCurrency(dailyRate)}</strong>.
+              <strong className="not-italic">{formatCurrency(dailyRate)}</strong> — je
+              uitgaven over de afgelopen 12 maanden, hetzelfde tarief als op de rest van
+              je schermen.
             </>
           ) : (
             <>
@@ -655,13 +679,16 @@ export function CashflowInstellingenBlok({
 
             {saveError === 'income' && <BlockNote live>{SAVE_ERROR_TEXT}</BlockNote>}
 
-            {annualIncome > 0 && dailyRate > 0 && (
+            {/* De vrijheidstijd is lineair in `annualIncome` — dat bedrag staat
+                erboven als MaskedAmount, dus deze regel maskeert mee (ADR 0091
+                laag 4). Zonder die gate lees je het jaarinkomen gewoon terug. */}
+            {annualIncome > 0 && showRate && (
               <p className="text-[11px] leading-relaxed text-[var(--ink-3)]">
                 Een jaar van dit inkomen is bij je huidige uitgaven{' '}
                 <strong className="text-[var(--ink-2)]">
                   {formatFreedomTimeString(calculateFreedomTime(annualIncome, dailyRate))}
                 </strong>{' '}
-                vrijheid.
+                vrijheid. {rateFootnote}
               </p>
             )}
           </BlockSection>
@@ -744,11 +771,17 @@ export function CashflowInstellingenBlok({
 
             {saveError === 'expenses' && <BlockNote live>{SAVE_ERROR_TEXT}</BlockNote>}
 
-            {dailyRate > 0 && (
+            {/* De grondslagkeuze hierboven bepaalt het BEDRAG op de kaart, niet
+                het dagtarief: dat is één app-brede wisselkoers (M22). Deze regel
+                zegt dat expliciet — anders belooft ze een verband dat er niet
+                meer is zodra je een budget aan- of uitvinkt. */}
+            {showRate && (
               <p className="text-[11px] leading-relaxed text-[var(--ink-3)]">
-                Dit bepaalt je dagtarief: één dag vrijheid kost je{' '}
-                <strong className="text-[var(--ink-2)]">{formatCurrency(dailyRate)}</strong>. Elke
-                euro die je niet uitgeeft, koop je terug als tijd.
+                Je dagtarief staat los van deze keuze: één dag vrijheid kost je{' '}
+                <strong className="text-[var(--ink-2)]">{formatCurrency(dailyRate)}</strong>,
+                gerekend over je uitgaven van de afgelopen 12 maanden — hetzelfde tarief
+                dat elk ander scherm gebruikt. Elke euro die je niet uitgeeft, koop je
+                terug als tijd.
               </p>
             )}
           </BlockSection>

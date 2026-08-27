@@ -14,15 +14,17 @@ import {
   resolveHeroFireAge,
   formatHeroFireAge,
   heroFireAgeCaption,
+  isHeroAnswerInvalid,
   isHeroAnswerPending,
 } from './hero-fire-age'
+import { MAX_AGE } from '@/lib/horizon-kernel/types'
 
 describe('resolveHeroFireAge — welk getal wint', () => {
   it('de kernel wint van een eerder snapshot-antwoord', () => {
     const state = resolveHeroFireAge({
       hasKernelResult: true,
       kernelFireAgeFractional: 52.9,
-      snapshotFireAge: 67,
+      serverFireAge: 67,
     })
     expect(state).toEqual({ status: 'definitief', age: 52.9, bron: 'kernel' })
   })
@@ -44,7 +46,7 @@ describe('resolveHeroFireAge — welk getal wint', () => {
       hasKernelResult: true,
       kernelFireAgeFractional: null,
       kernelFireAge: null,
-      snapshotFireAge: 61.6,
+      serverFireAge: 61.6,
     })
     expect(state).toEqual({ status: 'onbekend', age: null, bron: null })
   })
@@ -52,10 +54,10 @@ describe('resolveHeroFireAge — welk getal wint', () => {
   it('zonder kernel-resultaat toont het snapshot-antwoord, maar als VOORLOPIG', () => {
     const state = resolveHeroFireAge({
       hasKernelResult: false,
-      snapshotFireAge: 61.6,
+      serverFireAge: 61.6,
       isRefining: true,
     })
-    expect(state).toEqual({ status: 'voorlopig', age: 61.6, bron: 'snapshot' })
+    expect(state).toEqual({ status: 'voorlopig', age: 61.6, bron: 'server-kernel' })
     expect(isHeroAnswerPending(state)).toBe(true)
   })
 
@@ -78,7 +80,7 @@ describe('resolveHeroFireAge — welk getal wint', () => {
   it('negeert een niet-eindig getal uit welke bron dan ook', () => {
     expect(resolveHeroFireAge({ hasKernelResult: true, kernelFireAgeFractional: NaN }).status).toBe('onbekend')
     expect(
-      resolveHeroFireAge({ hasKernelResult: false, snapshotFireAge: Infinity, isRefining: false }).status,
+      resolveHeroFireAge({ hasKernelResult: false, serverFireAge: Infinity, isRefining: false }).status,
     ).toBe('onbekend')
   })
 })
@@ -124,7 +126,7 @@ describe('resolveHeroFireAge — determinisme (de eigenlijke klacht)', () => {
     const input = {
       hasKernelResult: true as const,
       kernelFireAgeFractional: 52.9,
-      snapshotFireAge: 67,
+      serverFireAge: 67,
       isRefining: false,
     }
     expect(resolveHeroFireAge(input)).toEqual(resolveHeroFireAge(input))
@@ -138,13 +140,13 @@ describe('resolveHeroFireAge — determinisme (de eigenlijke klacht)', () => {
     const snel = resolveHeroFireAge({ hasKernelResult: true, kernelFireAgeFractional: 52.9 })
     const traagTussenstand = resolveHeroFireAge({
       hasKernelResult: false,
-      snapshotFireAge: 67,
+      serverFireAge: 67,
       isRefining: true,
     })
     const traagNaSettle = resolveHeroFireAge({
       hasKernelResult: true,
       kernelFireAgeFractional: 52.9,
-      snapshotFireAge: 67,
+      serverFireAge: 67,
     })
 
     expect(traagNaSettle).toEqual(snel)
@@ -155,8 +157,12 @@ describe('resolveHeroFireAge — determinisme (de eigenlijke klacht)', () => {
 })
 
 describe('formatHeroFireAge / heroFireAgeCaption', () => {
-  it('toont een FIRE-leeftijd met één decimaal', () => {
-    expect(formatHeroFireAge({ status: 'definitief', age: 52.94, bron: 'kernel' })).toBe('52.9')
+  // M5 — het kopgetal toont HELE jaren. Een tiende van een jaar, vijftien jaar
+  // vooruit, is precisie die de projectie niet heeft; de welkomstoverlay op
+  // dezelfde pagina rondde al af ("rond je 53e"). Eén stijl per getal.
+  it('rondt de FIRE-leeftijd af op een heel jaar', () => {
+    expect(formatHeroFireAge({ status: 'definitief', age: 52.94, bron: 'kernel' })).toBe('53')
+    expect(formatHeroFireAge({ status: 'definitief', age: 52.4, bron: 'kernel' })).toBe('52')
   })
 
   it('toont de voorgeformatteerde AOW-tekst bij bron aow-tabel', () => {
@@ -178,8 +184,42 @@ describe('formatHeroFireAge / heroFireAgeCaption', () => {
   })
 
   it('markeert een voorlopig antwoord in het onderschrift', () => {
-    expect(heroFireAgeCaption({ status: 'voorlopig', age: 61.6, bron: 'snapshot' }, 'jaar')).toBe('jaar · voorlopig')
+    expect(heroFireAgeCaption({ status: 'voorlopig', age: 61.6, bron: 'server-kernel' }, 'jaar')).toBe('jaar · voorlopig')
     expect(heroFireAgeCaption({ status: 'berekenen', age: null, bron: null }, 'jaar')).toBe('wordt berekend…')
     expect(heroFireAgeCaption({ status: 'definitief', age: 52.9, bron: 'kernel' }, 'jaar')).toBe('jaar')
+  })
+})
+
+describe('resolveHeroFireAge — M6-vangrail (parkeerstand op het horizonplafond)', () => {
+  it('een kernel-leeftijd op het plafond is geen antwoord maar een gegevensprobleem', () => {
+    const state = resolveHeroFireAge({ hasKernelResult: true, kernelFireAgeFractional: MAX_AGE })
+    expect(state.status).toBe('ongeldig')
+    expect(state.age).toBeNull()
+    expect(isHeroAnswerInvalid(state)).toBe(true)
+  })
+
+  it('geldt ook voor de voorlopige SERVER-kernelrun', () => {
+    const state = resolveHeroFireAge({ hasKernelResult: false, serverFireAge: MAX_AGE, isRefining: false })
+    expect(state.status).toBe('ongeldig')
+    expect(state.age).toBeNull()
+  })
+
+  it('een leeftijd net onder het plafond blijft gewoon een antwoord', () => {
+    const state = resolveHeroFireAge({ hasKernelResult: true, kernelFireAgeFractional: MAX_AGE - 0.5 })
+    expect(state.status).toBe('definitief')
+    expect(state.age).toBe(MAX_AGE - 0.5)
+  })
+
+  it('toont geen getal en zet de gegevensmelding in het onderschrift', () => {
+    const state = resolveHeroFireAge({ hasKernelResult: true, kernelFireAgeFractional: MAX_AGE })
+    expect(formatHeroFireAge(state)).toBe('–')
+    expect(heroFireAgeCaption(state, 'jaar')).toBe('we missen gegevens')
+  })
+
+  it('"niet haalbaar" (geen leeftijd) blijft onbekend — dat is een ander geval', () => {
+    const state = resolveHeroFireAge({ hasKernelResult: true, kernelFireAgeFractional: null })
+    expect(state.status).toBe('onbekend')
+    expect(isHeroAnswerInvalid(state)).toBe(false)
+    expect(heroFireAgeCaption(state, 'jaar')).toBe('jaar')
   })
 })

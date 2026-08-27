@@ -14,7 +14,13 @@ import type { IdentityData } from './onboarding-identity'
  */
 type IncomeData = Pick<IdentityData, 'net_monthly_income' | 'estimated_monthly_expenses'>
 
-function Host({ onNext = vi.fn() }: { onNext?: () => void }) {
+function Host({
+  onNext = vi.fn(),
+  field,
+}: {
+  onNext?: () => void
+  field?: 'inkomen' | 'uitgaven'
+}) {
   const [data, setData] = useState<IncomeData>({
     net_monthly_income: '',
     estimated_monthly_expenses: '',
@@ -25,6 +31,7 @@ function Host({ onNext = vi.fn() }: { onNext?: () => void }) {
       onChange={setData}
       onNext={onNext}
       onBack={vi.fn()}
+      field={field}
     />
   )
 }
@@ -63,5 +70,36 @@ describe('OnboardingInkomen — inkomen per maand (jun 2026)', () => {
     fireEvent.change(incomeInput, { target: { value: '3000' } })
     // Zonder uitgaven geen spaarquote-preview.
     expect(screen.queryByText(/spaarquote komt hiermee op/i)).toBeNull()
+  })
+})
+
+/**
+ * Regressie L4 — "Twee foutmeldingen voor één veld". Op een begeleid
+ * één-vraag-scherm herhaalt de samenvattings-banner de inline-melding alleen
+ * vager; op het gecombineerde scherm (twee velden) blijft hij wél zinvol.
+ */
+describe('OnboardingInkomen — één melding per veld (L4)', () => {
+  const BANNER = 'Controleer de gemarkeerde velden'
+  // OnboardingShell rendert de footer dubbel (desktop + mobiele sticky bar).
+  const verder = () => screen.getAllByRole('button', { name: 'Verder' })[0]
+
+  it('inkomen-scherm: ongeldig bedrag + Verder toont alleen de inline-melding', () => {
+    render(<Host field="inkomen" />)
+    fireEvent.change(screen.getByLabelText(/Geschat netto maandinkomen/i), {
+      target: { value: '999999' },
+    })
+    fireEvent.click(verder())
+    expect(screen.getByText('Voer een realistisch maandinkomen in')).toBeTruthy()
+    expect(screen.queryByText(BANNER)).toBeNull()
+  })
+
+  it('gecombineerd scherm (twee velden): de banner blijft wél staan', () => {
+    render(<Host />)
+    fireEvent.change(screen.getByLabelText(/Geschat netto maandinkomen/i), {
+      target: { value: '999999' },
+    })
+    fireEvent.click(verder())
+    expect(screen.getByText(BANNER)).toBeTruthy()
+    expect(screen.getByText('Voer een realistisch maandinkomen in')).toBeTruthy()
   })
 })

@@ -58,10 +58,14 @@ import { notFound, serverError, unauthorized } from '@/lib/api/respond'
  *
  * `app/api/assets/` bevat verder alleen statische segmenten (`account-number`,
  * `has-holdings`, `toggle-budget`, `toggle-holdings`, `toggle-rental`,
- * `toggle-woonbalans`) en geen `route.ts` op mapniveau. Next.js resolvet
- * statische segmenten vóór dynamische, dus `[id]` vangt die routes niet af. Dit
- * is hetzelfde patroon als `app/api/budgets/[id]` en `app/api/holdings/[id]`.
- * Geen reden om hier iets aan te "repareren".
+ * `toggle-woonbalans`). Next.js resolvet statische segmenten vóór dynamische,
+ * dus `[id]` vangt die routes niet af. Dit is hetzelfde patroon als
+ * `app/api/budgets/[id]` en `app/api/holdings/[id]`. Geen reden om hier iets aan
+ * te "repareren".
+ *
+ * Sinds bevindingen H8/H9 bestaat er óók een `route.ts` op MAPNIVEAU
+ * (`app/api/assets/route.ts`, `POST` = aanmaken met zod-validatie). Die vangt
+ * uitsluitend het pad `/api/assets` zonder segment en botst dus niet met `[id]`.
  *
  * ## Bekend restrisico (NIET gedekt door deze route)
  *

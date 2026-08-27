@@ -1,6 +1,6 @@
 'use client'
 
-import { Link2, Trash2 } from 'lucide-react'
+import { Check, Link2, Trash2 } from 'lucide-react'
 import {
   ASSET_QUICK_ADD_LABELS,
   ASSET_TYPE_ICONS,
@@ -61,7 +61,7 @@ export function AssetRow({
       <button
         type="button"
         onClick={onRemove}
-        className="ml-1 flex h-9 w-9 items-center justify-center text-[var(--ink-4)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink-2)]"
+        className="ml-1 flex h-11 w-11 items-center justify-center text-[var(--ink-4)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
         aria-label={`Verwijder ${item.name}`}
       >
         <Trash2 className="h-4 w-4" strokeWidth={1.5} />
@@ -102,7 +102,7 @@ export function DebtRow({
       <button
         type="button"
         onClick={onRemove}
-        className="ml-1 flex h-9 w-9 items-center justify-center text-[var(--ink-4)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink-2)]"
+        className="ml-1 flex h-11 w-11 items-center justify-center text-[var(--ink-4)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
         aria-label={`Verwijder ${item.name}`}
       >
         <Trash2 className="h-4 w-4" strokeWidth={1.5} />
@@ -164,7 +164,7 @@ export function LinkedDebtRow({
         <button
           type="button"
           onClick={onRemove}
-          className="ml-1 flex h-9 w-9 items-center justify-center text-[var(--ink-4)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink-2)]"
+          className="ml-1 flex h-11 w-11 items-center justify-center text-[var(--ink-4)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
           aria-label={`Verwijder ${item.name}`}
         >
           <Trash2 className="h-4 w-4" strokeWidth={1.5} />
@@ -238,6 +238,85 @@ export function DebtTypePicker({
   )
 }
 
+/**
+ * Multi-select variant van `DebtTypePicker`: één scherm waarop de gebruiker
+ * aanvinkt wélke schuldsoorten van toepassing zijn, in plaats van per soort een
+ * losse ja/nee-vraag. De aanroeper opent daarna de wizard één keer per
+ * aangevinkt type (collect-queue) — zie `onboarding-schulden.tsx`.
+ *
+ * Bewust een échte `<input type="checkbox">` in een `<label>` (visueel
+ * verborgen, niet `hidden`): een `aria-pressed`-knop meldt "ingedrukt" i.p.v.
+ * "aangevinkt", en de ui-ux-skill verbiedt de TogglePill expliciet als
+ * checkbox-vervanger in forms. `min-h-[44px]` per label is hier een harde eis
+ * (M19), geen richtlijn — het raster toont de volledige catalogus.
+ */
+export function DebtTypeMultiPicker({
+  exclude = [],
+  selected,
+  onToggle,
+}: {
+  exclude?: DebtType[]
+  selected: DebtType[]
+  onToggle: (type: DebtType) => void
+}) {
+  const types = QUICK_ADD_DEBT_ORDER.filter((t) => !exclude.includes(t))
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      {types.map((type) => (
+        <TypeMultiPickerTile
+          key={type}
+          iconName={DEBT_TYPE_ICONS[type] ?? 'CircleDot'}
+          label={DEBT_QUICK_ADD_LABELS[type]}
+          checked={selected.includes(type)}
+          onToggle={() => onToggle(type)}
+        />
+      ))}
+    </div>
+  )
+}
+
+function TypeMultiPickerTile({
+  iconName,
+  label,
+  checked,
+  onToggle,
+}: {
+  iconName: string
+  label: string
+  checked: boolean
+  onToggle: () => void
+}) {
+  return (
+    <label
+      className={`flex min-h-[44px] cursor-pointer flex-col items-center gap-1.5 border p-3 text-center text-xs font-medium transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--ink)] ${
+        checked
+          ? 'border-[var(--module-active-500)] bg-[var(--module-active-50)]/60 text-[var(--ink)]'
+          : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-2)] hover:border-[var(--module-active-500)] hover:bg-[var(--module-active-50)]/40'
+      }`}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onToggle}
+        className="sr-only"
+      />
+      <span
+        aria-hidden
+        className={`flex h-7 w-7 items-center justify-center ${
+          checked ? 'text-[var(--module-active-800)]' : 'text-[var(--module-active-700)]'
+        }`}
+      >
+        {checked ? (
+          <Check className="h-4 w-4" strokeWidth={2} />
+        ) : (
+          <TypeIcon name={iconName} className="h-4 w-4" strokeWidth={1.75} />
+        )}
+      </span>
+      <span className="w-full truncate">{label}</span>
+    </label>
+  )
+}
+
 function TypePickerGrid({
   children,
   onCancel,
@@ -252,7 +331,7 @@ function TypePickerGrid({
         <button
           type="button"
           onClick={onCancel}
-          className="text-xs text-[var(--ink-3)] underline-offset-4 transition-colors hover:text-[var(--ink)] hover:underline"
+          className="inline-flex min-h-11 items-center text-xs text-[var(--ink-3)] underline-offset-4 transition-colors hover:text-[var(--ink)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
         >
           Annuleren
         </button>
@@ -274,7 +353,7 @@ function TypePickerTile({
     <button
       type="button"
       onClick={onClick}
-      className="flex flex-col items-center gap-1.5 border border-[var(--border-ed)] bg-[var(--paper)] p-3 text-center text-xs font-medium text-[var(--ink-2)] transition-colors hover:border-[var(--module-active-500)] hover:bg-[var(--module-active-50)]/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+      className="flex min-h-[44px] flex-col items-center gap-1.5 border border-[var(--border-ed)] bg-[var(--paper)] p-3 text-center text-xs font-medium text-[var(--ink-2)] transition-colors hover:border-[var(--module-active-500)] hover:bg-[var(--module-active-50)]/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
     >
       <span
         aria-hidden

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
-import { loadHorizonData } from '@/lib/horizon-data-loader'
+import { loadHorizonRaw } from '@/lib/horizon-data-loader'
 import { loadDashboardData } from '@/lib/dashboard-data-loader'
 import { ToekomstSubpageShell } from '@/components/future/toekomst-subpage-shell'
 import { VoorkeurenView } from '@/components/future/voorkeuren-view'
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 export default async function ToekomstVoorkeurenPage() {
   const supabase = await createClient()
   const [horizonData, dashboardResult] = await Promise.all([
-    loadHorizonData(supabase),
+    loadHorizonRaw(supabase),
     loadDashboardData(supabase),
   ])
 

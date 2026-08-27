@@ -37,6 +37,7 @@ import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { buildSegments, typeColors, childTypeColors } from '@/components/app/budget-donut'
 import { type BudgetRollover, formatPeriod, getCarriedAmount, getPreviousPeriod, computeRollover, computeEffectiveLimit } from '@/lib/budget-rollover'
 import { computeBudgetPeriod, localDateStr } from '@/lib/budget-period'
+import { budgetLimitStatus } from '@/lib/budget-alerts'
 import { BudgetTree } from '@/components/app/budget-tree'
 import { BudgetPillTree } from '@/components/app/budget-pill-tree'
 import { BudgetDonut } from '@/components/app/budget-donut'
@@ -3211,6 +3212,8 @@ function BudgetDetailModal({
     : getEffectiveLimit(budget)
   const remaining = limit - spent
   const pct = limit > 0 ? Math.min(Math.round((spent / limit) * 100), 100) : 0
+  // Verdict op de rauwe bedragen, niet op het afgeronde/geklemde `pct`.
+  const limitStatus = limit > 0 ? budgetLimitStatus(spent, limit) : 'onder'
   const carry = isParent
     ? children.reduce((sum, c) => sum + getBudgetCarry(c), 0)
     : getBudgetCarry(budget)
@@ -3497,8 +3500,11 @@ function BudgetDetailModal({
 
           {/* Doeltype — 4a: Vaste Maandlast */}
           {budget.goal_type === 'vaste_maandlast' && (
-            <div className={`mt-2 flex items-center gap-2 border px-2 py-1.5 ${spent <= limit ? 'bg-emerald-50 border-emerald-200' : 'bg-kern-50 border-kern-200'}`}>
-              {spent <= limit
+            <div className={`mt-2 flex items-center gap-2 border px-2 py-1.5 ${limitStatus !== 'over' ? 'bg-emerald-50 border-emerald-200' : 'bg-kern-50 border-kern-200'}`}>
+              {/* Zelfde bron als het bestedingslimiet-verdict hieronder: een
+                  euro-float-som die op 1280.0000000000002 uitkomt mag geen
+                  "Tekort: €0" opleveren (bevinding H16). */}
+              {limitStatus !== 'over'
                 ? <><CheckCircle2 className="h-4 w-4 text-emerald-600" /><span className="text-xs font-medium text-emerald-700">Gedekt</span></>
                 : <><AlertTriangle className="h-4 w-4 text-kern-600" /><span className="text-xs font-medium text-kern-700">Tekort: {<MaskedAmount value={spent - limit} tone="wil" />}</span></>
               }
@@ -3506,9 +3512,21 @@ function BudgetDetailModal({
           )}
 
           {/* Doeltype — 4b: Bestedingslimiet */}
+          {/* `pct` hierboven is afgerond én geklemd op 100 — prima voor de
+              ring/balk, maar het verdict mag er niet op leunen: 99,5% rondde
+              naar 100 en heette dan "overschreden" terwijl er nog geld over
+              was, twaalf regels onder een "Gedekt" over exact dezelfde
+              situatie. Het verdict komt daarom van de canonieke
+              `budgetLimitStatus` op de rauwe bedragen (bevinding H16). */}
           {budget.goal_type === 'bestedingslimiet' && pct >= 80 && (
             <p className="mt-1 text-xs font-medium text-kern-700">
-              {pct >= 100 ? '⚠️ Limiet overschreden' : `⚠️ ${100 - pct}% resterend`}
+              {limitStatus === 'over'
+                ? '⚠️ Limiet overschreden'
+                : limitStatus === 'bereikt'
+                  ? '⚠️ Limiet bereikt — niets meer over'
+                  : 100 - pct <= 0
+                    ? '⚠️ Minder dan 1% resterend'
+                    : `⚠️ ${100 - pct}% resterend`}
             </p>
           )}
 

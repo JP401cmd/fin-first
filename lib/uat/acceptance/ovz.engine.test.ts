@@ -64,7 +64,10 @@ describe('UAT Ovz — acceptatiecriteria dekking', () => {
       .sort()
     const checkWorkflows = OVZ_ENGINE_CHECKS.map((c) => c.workflow).sort()
     expect(checkWorkflows).toEqual(exactWorkflows)
-    expect(exactWorkflows.length).toBe(11)
+    // WF-OVZ-14 (welkomstgids) is met M1 van 'ui-only' naar 'exact' gegaan: de
+    // voortgang is sindsdien een uitkomst van échte functies (deriveGuideStates
+    // + countScreenProgress) i.p.v. puur zichtbaarheids-state.
+    expect(exactWorkflows.length).toBe(12)
   })
 
   it('markeert de kernel-/directionele/config-workflows met de juiste kind', () => {
@@ -72,7 +75,7 @@ describe('UAT Ovz — acceptatiecriteria dekking', () => {
       expect(criterion(wf).assertion.kind, `${wf} moet oracle zijn`).toBe('oracle')
     }
     expect(criterion('WF-OVZ-04').assertion.kind).toBe('direction')
-    for (const wf of ['WF-OVZ-08', 'WF-OVZ-11', 'WF-OVZ-12', 'WF-OVZ-13', 'WF-OVZ-14', 'WF-OVZ-16']) {
+    for (const wf of ['WF-OVZ-08', 'WF-OVZ-11', 'WF-OVZ-12', 'WF-OVZ-13', 'WF-OVZ-16']) {
       expect(criterion(wf).assertion.kind, `${wf} moet ui-only zijn`).toBe('ui-only')
     }
   })

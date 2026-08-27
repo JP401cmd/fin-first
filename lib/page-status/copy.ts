@@ -256,6 +256,12 @@ export const PAGE_STATUS_COPY: Record<string, RouteCopy> = {
   // Box 2 is voor ~99% van de gebruikers niet relevant (geen aanmerkelijk
   // belang). resolve.ts levert hier vrijwel altijd 'neutral' → geen banner.
   // We houden de copy klaar voor het zeldzame DGA-geval.
+  //
+  // Sinds bevinding L8 vuurt deze banner op MATERIALITEIT, niet op aanwezigheid:
+  // hij verschijnt alleen wanneer er daadwerkelijk een Box 2-heffing staat
+  // (dividend en/of het bovenmatige deel boven de €500.000-leengrens). De
+  // onderstaande warn-tekst mag daarom stellig zijn — er ís dan iets te doen.
+  // Een DGA zonder heffing ziet de pagina rustig, zonder banner.
   '/overzicht/belasting/box2': {
     title: 'Box 2 — aanmerkelijk belang',
     warn: {

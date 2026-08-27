@@ -102,6 +102,14 @@ export interface SimResult {
    * kernel-pad altijd gevuld en ≥ `requiredFirePortfolio` (overwaarde ≥ 0).
    */
   requiredFireNetWorth?: number
+  /**
+   * `true` ⇒ `requiredFirePortfolio`/`requiredFireNetWorth` komen uit de EIND-HORIZON-
+   * terugval (geprojecteerde stand op leeftijd ~100), niet uit een echt FIRE-moment.
+   * Bij structureel tekort is dat een fors negatief bedrag; de weergavelaag toont dan
+   * een gegevensmelding (bevinding M6, `lib/horizon/outcome-guard.ts`). Optioneel/
+   * additief — stub-/mock-`SimResult`s die het niet zetten blijven geldig.
+   */
+  requiredFireIsEndOfHorizonFallback?: boolean
   /** Whether FIRE is reachable before endAge */
   fireReachable: boolean
   /** yearlyExpenses / requiredFirePortfolio */

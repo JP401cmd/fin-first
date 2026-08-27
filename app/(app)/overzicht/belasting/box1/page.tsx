@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { loadHorizonData } from '@/lib/horizon-data-loader'
+import { loadHorizonRaw } from '@/lib/horizon-data-loader'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { Clock, Users, EyeOff } from 'lucide-react'
 import { JaarruimteCard } from '@/components/overview/jaarruimte-card'
@@ -63,7 +63,7 @@ export default async function BelastingBox1Page() {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  const horizonData = await loadHorizonData(supabase)
+  const horizonData = await loadHorizonRaw(supabase)
 
   // Box 1-bruto-inkomen: handmatige Box 1-override, anders de cashflow-netto-
   // jaarschatting omgerekend naar bruto via de Box 1-motor (grossFromNet).

@@ -261,6 +261,68 @@ describe('buildDebtDraft', () => {
     expect(omitted.start_date).toBe(today)
   })
 
+  // ── Expliciete resterende looptijd (term_years) ──────────────────────
+
+  it('mortgage: expliciete term_years zet end_date op vandaag + looptijd en stuurt het maandbedrag aan', () => {
+    const today = todayIso()
+    const base = {
+      debt_type: 'mortgage',
+      name: 'Lopende hypotheek',
+      current_balance: 300000,
+      field3: 3.5,
+      repayment_type: 'annuiteit',
+      start_date: '2019-05-01',
+    } as const
+
+    const assumed = buildDebtDraft(base)
+    // Regressie-vastlegging van de stille aanname: zonder invoer blijft
+    // end_date = ingangsdatum + 30 jaar (DEFAULT_TERM_YEARS_PER_TYPE).
+    expect(assumed.end_date).toBe(addYearsIso('2019-05-01', 30))
+
+    const explicit = buildDebtDraft({ ...base, term_years: 23 })
+    // Resterend ⇒ geankerd op vandaag, niet op de ingangsdatum.
+    expect(explicit.end_date).toBe(addYearsIso(today, 23))
+    expect(explicit.start_date).toBe('2019-05-01')
+    // Dezelfde termijn voedt de maandlast-schatting: 23 jaar aflossen over
+    // het resterende saldo is duurder per maand dan 30 jaar.
+    expect(explicit.monthly_payment).toBeGreaterThan(assumed.monthly_payment)
+    expect(explicit.minimum_payment).toBe(explicit.monthly_payment)
+  })
+
+  it('mortgage: term_years buiten bereik of niet-numeriek valt terug op de type-default', () => {
+    const base = {
+      debt_type: 'mortgage',
+      name: 'Hyp',
+      current_balance: 300000,
+      field3: 3.5,
+      start_date: '2019-05-01',
+    } as const
+    const fallback = addYearsIso('2019-05-01', 30)
+
+    expect(buildDebtDraft({ ...base, term_years: 0 }).end_date).toBe(fallback)
+    expect(buildDebtDraft({ ...base, term_years: 99 }).end_date).toBe(fallback)
+    expect(buildDebtDraft({ ...base, term_years: null }).end_date).toBe(fallback)
+    expect(buildDebtDraft({ ...base, term_years: Number.NaN }).end_date).toBe(fallback)
+    // Halve jaren worden naar hele jaren afgerond (addYearsIso rekent in
+    // hele jaren — een fractie zou een ongeldige datum opleveren).
+    expect(buildDebtDraft({ ...base, term_years: 22.6 }).end_date).toBe(
+      addYearsIso(todayIso(), 23),
+    )
+  })
+
+  it('mortgage: een expliciete monthly_payment wint nog steeds van term_years', () => {
+    const draft = buildDebtDraft({
+      debt_type: 'mortgage',
+      name: 'Hyp',
+      current_balance: 300000,
+      field3: 3.5,
+      term_years: 23,
+      monthly_payment: 1390,
+    })
+    expect(draft.monthly_payment).toBe(1390)
+    expect(draft.end_date).toBe(addYearsIso(todayIso(), 23))
+  })
+
   it('gekoppelde hypotheek: debt_type=mortgage + fiscale/aflossing-vlaggen + linked_asset_id samen', () => {
     // Borgt de FIRE-correctheid: alleen met debt_type='mortgage' ÉN
     // linked_asset_id filtert filterAssetsForFire huis + hypotheek samen weg.

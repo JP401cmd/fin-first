@@ -71,11 +71,14 @@ export function VasteLastenClient({
   insights,
   subscriptions,
   vasteKosten,
+  terugkerendVariabel = [],
   fullName,
 }: {
   insights: Insights
   subscriptions: RecurringItem[]
   vasteKosten: RecurringItem[]
+  /** Terugkerend maar variabel (H14) — buiten de quote, wél getoond. */
+  terugkerendVariabel?: RecurringItem[]
   fullName: string | null
 }) {
   const router = useRouter()
@@ -172,8 +175,10 @@ export function VasteLastenClient({
       <VasteKostenAnalyse
         subscriptions={subscriptions}
         vasteKosten={vasteKosten}
+        terugkerendVariabel={terugkerendVariabel}
         totalMonthlySubscriptions={insights.subscriptionsMonthly}
         totalMonthlyVasteKosten={insights.vasteKostenMonthly}
+        totalMonthlyVariabel={insights.variabelMonthly}
         totalMonthly={insights.totalMonthly}
         userProfile={fullName ? { full_name: fullName } : null}
         onCancellationOpen={handleCancellationOpen}

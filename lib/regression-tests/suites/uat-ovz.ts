@@ -9,7 +9,8 @@
  *
  * OVZ combineert échte productiefuncties (Box 3, gezondheidspijlers,
  * doel-voortgang, vrijheidsdagen, samengestelde rente) met twee kleine mirrors
- * (schuldratio-pijlerscore, postpone-/uitstel-termijnen) — 10 exacte checks.
+ * (schuldratio-pijlerscore, postpone-/uitstel-termijnen) plus de afgeleide
+ * welkomstgids-voortgang (M1) — 12 exacte checks.
  * Alle checks zijn pure functies — geen netwerk, geen auth-afhankelijkheid,
  * vandaar `requiredRole: 'any'`.
  */

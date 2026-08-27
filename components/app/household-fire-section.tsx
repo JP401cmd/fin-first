@@ -200,7 +200,7 @@ export function HouseholdFireSection({
               <div>
                 <p className="text-[10px] font-medium text-horizon-600/50 uppercase">FIRE-doel</p>
                 <p className="font-mono tabular-nums text-lg font-bold text-horizon-700" data-testid="personal-fire-target">
-                  {<MaskedAmount value={pp.fireTarget} tone="horizon" />}
+                  {<MaskedAmount value={pp.fireTarget} tone="horizon" approx />}
                 </p>
               </div>
               <div>
@@ -314,7 +314,7 @@ export function HouseholdFireSection({
           <div>
             <p className="text-[10px] font-medium text-horizon-600/50 uppercase">FIRE-doel</p>
             <p className="font-mono tabular-nums text-lg font-bold text-horizon-700" data-testid="combined-fire-target">
-              {<MaskedAmount value={combined.projection.fireTarget} tone="horizon" />}
+              {<MaskedAmount value={combined.projection.fireTarget} tone="horizon" approx />}
             </p>
           </div>
 
@@ -1020,7 +1020,7 @@ function PartnerCard({
         <div>
           <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase">FIRE-doel</p>
           <p className="font-mono tabular-nums text-sm font-semibold text-[var(--ink-2)]">
-            {<MaskedAmount value={partner.projection.fireTarget} tone="horizon" />}
+            {<MaskedAmount value={partner.projection.fireTarget} tone="horizon" approx />}
           </p>
         </div>
         <div>

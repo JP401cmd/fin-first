@@ -163,8 +163,142 @@ export function formatGainPct(pct: number | null): string | null {
   return `${pct < 0 ? '−' : '+'}${body}%`
 }
 
+/**
+ * DE VIER GRONDSLAGEN ACHTER HET WOORD "RENDEMENT" — één vocabulaire.
+ *
+ * Aanleiding (kaart H7, testronde 24-08-2026): op /overzicht en
+ * /overzicht/bezittingen stonden vier verschillende percentages onder hetzelfde
+ * kale woord "Rendement" — een portefeuillerendement sinds aankoop, het
+ * rendement van één positie, een 1-daagse koersmutatie en een verwachting per
+ * jaar. Ze zijn geen van alle fout; ze meten iets anders. Het label verzweeg
+ * dat, dus de gebruiker las vier antwoorden op één vraag.
+ *
+ * Zelfde principe als ADR 0073 (grondslag in de veldnaam), maar dan voor
+ * DISPLAY-labels: het kale woord "rendement" is geen zelfstandig label meer.
+ * Het mag alleen nog in een kicker staan waar de grondslag er direct onder
+ * hangt. Elke nieuwe rendement-weergave kiest hier een sleutel; wie er geen kan
+ * kiezen, heeft een vijfde grondslag te pakken en hoort die hier toe te voegen
+ * in plaats van een eigen tekst te bedenken.
+ *
+ * DRIE VELDEN, ELK MET EEN TAAK:
+ * - `label`   — het volle label; gebruik dit waar de ruimte het toelaat.
+ * - `compact` — voor een kicker of KPI-cel waar het volle label afkapt. Deze
+ *   vier zijn ONDERLING NET ZO ONDERSCHEIDEND als de volle labels; dat is de
+ *   hele eis. Een compacte vorm die op twee grondslagen past ("Rendement",
+ *   "Sinds aankoop") is precies de fout die deze tabel opheft — twee tegels op
+ *   /overzicht tonen naast elkaar een portefeuille- én een positierendement.
+ * - `scope`   — het sublabel. Oppervlakken mogen het weglaten, nooit
+ *   hérformuleren.
+ */
+export const RETURN_BASIS_LABELS = {
+  /** Gerealiseerd, hele marktportefeuille, sinds aankoop — `portfolio` hieronder. */
+  portfolioSincePurchase: {
+    label: 'Portefeuille sinds aankoop',
+    compact: 'Portefeuille',
+    scope: 'beleggingen en crypto',
+  },
+  /** Gerealiseerd, ÉÉN positie, sinds aankoop — units × (koers − gemiddelde aankoopkoers). */
+  positionSincePurchase: {
+    label: 'Deze positie sinds aankoop',
+    compact: 'Deze positie',
+    scope: null,
+  },
+  /** Koersmutatie over één dag t.o.v. `previous_close`. */
+  dayChange: {
+    label: 'Vandaag',
+    compact: 'Vandaag',
+    scope: null,
+  },
+  /**
+   * AANNAME, geen meting: het per bezitting ingevulde `assets.expected_return`,
+   * waarde-gewogen. Draagt daarom expliciet "(aanname)" in het label — dit getal
+   * is nooit ergens gerealiseerd.
+   */
+  expectedAnnual: {
+    label: 'Verwacht per jaar (aanname)',
+    compact: 'Verwacht per jaar',
+    scope: 'niet gerealiseerd',
+  },
+} as const satisfies Record<string, { label: string; compact: string; scope: string | null }>
+
+export type ReturnBasisKey = keyof typeof RETURN_BASIS_LABELS
+
 function emptyBucket(): AssetReturnBucket {
   return { rows: [], value: 0, cost: 0, gain: 0, pct: null }
+}
+
+/** Rendement van één asset-type binnen de marktportefeuille. */
+export interface PortfolioReturnTypeRollup {
+  type: string
+  value: number
+  cost: number
+  gain: number
+  /** `gain / cost × 100`; `null` zonder kostprijs. */
+  pct: number | null
+}
+
+/**
+ * DE DASHBOARD-VORM van het portefeuillerendement.
+ *
+ * Bewust NIET de volle `AssetReturnBreakdown`. Die draagt per bezitting een
+ * `id` en een `name`, en alles wat in de dashboardbundel staat gaat als
+ * RSC-payload mee naar de browser van élke /overzicht-render. De widgets hebben
+ * die namen niet nodig — ze tonen totalen en een uitsplitsing per type — en de
+ * rekenmodal die ze wél toont, staat op /overzicht/bezittingen, waar de rijen
+ * langs de perspectief-loader komen. Zo blijft het bedrag hetzelfde en reist de
+ * bezittingenlijst niet mee naar een scherm dat hem niet toont.
+ *
+ * `byType` vervangt de eigen groepeerlus die de rendement-widget had: één
+ * rollup, in de motor, in plaats van per widget een eigen som (kaart H7).
+ */
+export interface PortfolioReturnSummary {
+  value: number
+  cost: number
+  gain: number
+  /** `gain / cost × 100`; `null` zonder kostprijs (geen noemer, geen percentage). */
+  pct: number | null
+  byType: PortfolioReturnTypeRollup[]
+}
+
+/**
+ * Vat de marktportefeuille-emmer samen tot de dashboardvorm: de totalen plus
+ * een rollup per `asset_type`, zonder per-bezit rijen.
+ *
+ * Een type dat geen kostprijs draagt komt hier niet voor — de motor heeft die
+ * rijen dan al in `withoutBasis` gezet. Dat is precies waarom de widgets deze
+ * rollup consumeren in plaats van zelf over `assetsByType.purchaseValue` te
+ * sommeren: een pensioenpot kán per definitie niet in dit lijstje staan.
+ */
+export function summarizePortfolioReturn(breakdown: AssetReturnBreakdown): PortfolioReturnSummary {
+  const { portfolio } = breakdown
+  const byType = new Map<string, PortfolioReturnTypeRollup>()
+  for (const row of portfolio.rows) {
+    const acc = byType.get(row.assetType) ?? { type: row.assetType, value: 0, cost: 0, gain: 0, pct: null }
+    acc.value += row.value
+    acc.cost += row.cost ?? 0
+    acc.gain += row.gain ?? 0
+    byType.set(row.assetType, acc)
+  }
+  const rollups = [...byType.values()]
+    .map((g) => ({ ...g, pct: g.cost > 0 ? (g.gain / g.cost) * 100 : null }))
+    .sort((a, b) => b.value - a.value)
+  return {
+    value: portfolio.value,
+    cost: portfolio.cost,
+    gain: portfolio.gain,
+    pct: portfolio.pct,
+    byType: rollups,
+  }
+}
+
+/**
+ * Lege samenvatting — voor bundel-fallbacks en testfixtures zonder bezittingen.
+ * Eén home, zodat mocks niet elk een eigen (en straks afwijkende) vorm
+ * verzinnen; `pct: null` betekent overal hetzelfde: geen noemer, dus geen
+ * percentage (niet "0%").
+ */
+export function emptyPortfolioReturnSummary(): PortfolioReturnSummary {
+  return { value: 0, cost: 0, gain: 0, pct: null, byType: [] }
 }
 
 function seal(bucket: AssetReturnBucket, sort: (a: AssetReturnRow, b: AssetReturnRow) => number): AssetReturnBucket {

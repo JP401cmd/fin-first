@@ -5,9 +5,12 @@ import {
   parseWelcomeGuideConfig,
   parseWelcomeGuideState,
   reconcileCompleted,
+  deriveGuideStates,
+  type GuideDerivedStates,
   type WelcomeGuideConfig,
   type WelcomeGuideState,
 } from '@/lib/welcome-guide'
+import { loadAccountStatus } from '@/lib/account-status'
 
 /**
  * Server-side SEEDS voor de /overzicht-banners (perf fase 1).
@@ -70,20 +73,30 @@ export async function loadCheckinBannerSeed(
 
 // ── WelcomeGuideBanner ───────────────────────────────────────────────────────
 
-export type WelcomeGuideSeed = { config: WelcomeGuideConfig; state: WelcomeGuideState }
+export type WelcomeGuideSeed = {
+  config: WelcomeGuideConfig
+  state: WelcomeGuideState
+  /**
+   * Afgeleide stap-toestand uit de accountstatus (M1). Bewust NAAST `state`:
+   * `state.completedStepIds` blijft de gebruikersintentie, de afleiding wordt
+   * per render berekend en nooit weggeschreven.
+   */
+  derived: GuideDerivedStates
+}
 
 /**
  * Spiegelt GET /api/welcome-guide: gemergede config (app_settings) + per-user
- * staat (profiles.module_guide_state[welcome:guide]). Ontbreekt de kolom
- * (staging zonder migratie) of gaat er iets mis → null, zodat de banner
- * terugvalt op de route-fetch (die kent de feature_preferences-fallback).
+ * staat (profiles.module_guide_state[welcome:guide]) + de afgeleide stap-
+ * toestand. Ontbreekt de kolom (staging zonder migratie) of gaat er iets mis →
+ * null, zodat de banner terugvalt op de route-fetch (die kent de
+ * feature_preferences-fallback).
  */
 export async function loadWelcomeGuideSeed(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<WelcomeGuideSeed | null> {
   try {
-    const [configRes, stateRes] = await Promise.all([
+    const [configRes, stateRes, accountStatus] = await Promise.all([
       supabase
         .from('app_settings')
         .select('value')
@@ -94,6 +107,9 @@ export async function loadWelcomeGuideSeed(
         .select('module_guide_state')
         .eq('id', userId)
         .single(),
+      // `cache()`-gedeeld met de shell-layout (die de core-variant al draait) —
+      // blok 1 van /overzicht blijft daarmee licht: géén loadDashboardData.
+      loadAccountStatus(supabase, userId),
     ])
 
     // Kolom mist (42703 / "does not exist") → geen seed, banner fetcht met fallback.
@@ -107,7 +123,7 @@ export async function loadWelcomeGuideSeed(
     const state = parseWelcomeGuideState(map[WELCOME_GUIDE_MODULE_KEY], config)
     state.completedStepIds = reconcileCompleted(config, state.completedStepIds)
 
-    return { config, state }
+    return { config, state, derived: deriveGuideStates(config, accountStatus) }
   } catch {
     return null
   }

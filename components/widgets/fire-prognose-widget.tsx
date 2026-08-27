@@ -7,6 +7,9 @@ import { Compass, Users, UserCheck } from 'lucide-react'
 import type { DashboardData } from './widget-renderer'
 import { NL_AOW_AGE } from '@/lib/horizon-data'
 import { weightedExpectedReturn, INVESTMENT_ASSET_TYPES } from '@/lib/dashboard-wealth-weighting'
+// Grondslag-labels uit de gedeelde bron: dit is een AANNAME per jaar, geen
+// gerealiseerd rendement — kaart H7 haalde precies die verwarring weg.
+import { RETURN_BASIS_LABELS } from '@/lib/asset-return'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { buildFactorByAge, deflateRowsByAge } from '@/lib/euro-display'
@@ -141,7 +144,7 @@ export const FirePrognoseWidget = memo(function FirePrognoseWidget({ size, data,
               </p>
               {effectiveFireAgeFractional != null && (
                 <p className="mt-0.5 text-[11px] text-horizon-600">
-                  Leeftijd {effectiveFireAgeFractional.toFixed(1)}
+                  Leeftijd {Math.round(effectiveFireAgeFractional)}
                 </p>
               )}
               {/* Mini progress bar */}
@@ -187,7 +190,7 @@ export const FirePrognoseWidget = memo(function FirePrognoseWidget({ size, data,
               </div>
               {!isReached && !isNotFeasible && effectiveFireAgeFractional != null && (
                 <p className="text-[11px] text-[var(--ink-3)]">
-                  Leeftijd <span className="font-mono font-semibold text-horizon-600">{effectiveFireAgeFractional.toFixed(1)}</span>
+                  Leeftijd <span className="font-mono font-semibold text-horizon-600">{Math.round(effectiveFireAgeFractional)}</span>
                 </p>
               )}
               {isNotFeasible && (
@@ -242,7 +245,7 @@ export const FirePrognoseWidget = memo(function FirePrognoseWidget({ size, data,
               </p>
               {effectiveFireAgeFractional != null ? (
                 <p className="mt-0.5 text-xs text-[var(--ink-3)]">
-                  Vrijheidsleeftijd: <span className="font-mono font-semibold text-horizon-600">{effectiveFireAgeFractional.toFixed(1)}</span> jaar
+                  Vrijheidsleeftijd: <span className="font-mono font-semibold text-horizon-600">{Math.round(effectiveFireAgeFractional)}</span> jaar
                 </p>
               ) : !isShared ? (
                 <p className="mt-0.5 text-xs text-[var(--ink-3)]">
@@ -259,7 +262,7 @@ export const FirePrognoseWidget = memo(function FirePrognoseWidget({ size, data,
         <div className="mt-2 space-y-1">
           {portfolioReturn > 0 && (
             <div className="flex items-center justify-between text-[11px]">
-              <span className="text-[var(--ink-3)]">Verwacht rendement (portefeuille)</span>
+              <span className="text-[var(--ink-3)]">{RETURN_BASIS_LABELS.expectedAnnual.label}</span>
               <span className="font-mono tabular-nums text-[var(--ink-2)]">{(portfolioReturn * 100).toFixed(1)}%</span>
             </div>
           )}
@@ -328,7 +331,7 @@ export const FirePrognoseWidget = memo(function FirePrognoseWidget({ size, data,
               <p className="text-[10px] text-[var(--ink-4)] font-mono">{minAge}j</p>
               {fireAgeFractional != null && (
                 <p className="text-[10px] text-horizon-600 font-mono font-semibold">
-                  FIRE {fireAgeFractional.toFixed(1)}j
+                  FIRE {Math.round(fireAgeFractional)}j
                 </p>
               )}
               <p className="text-[10px] text-[var(--ink-4)] font-mono">{maxAge}j</p>

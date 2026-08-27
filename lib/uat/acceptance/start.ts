@@ -272,11 +272,12 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     given: 'Testpersoon "Jan de Vries": netto maandinkomen €3.000, maanduitgaven €2.100, bezittingen (Betaalrekening €2.500 + Spaargeld €18.000 + Beleggingen €12.000 = €32.500), schulden (Studieschuld €9.000).',
     when: 'De gebruiker doorloopt de stappen "inkomen"/"uitgaven" (spaarquote-preview), "uitgaven na pensioen" (prefill), "spaardoel" (Noodfonds-preset) en "klaar" (recap).',
-    then: 'Spaarquote-preview = 30%. Pensioen-uitgaven-prefill = €20.160/jaar (80% × €2.100 × 12). Noodfonds-prefill = €12.600 (6× €2.100, al een veelvoud van €100). Recap netto vermogen = €32.500 − €9.000 = €23.500. Ná activatie moet /overzicht/cashflow exact dezelfde 30% spaarquote tonen (SSoT-eis, zelfde motor als WF-START-10).',
+    then: 'Spaarquote-preview = 30%. Pensioen-uitgaven-prefill = €20.160/jaar (80% × €2.100 × 12). Noodfonds-prefill = €12.600 (6× €2.100, al een veelvoud van €100). Recap netto vermogen = €32.500 − €9.000 = €23.500. De meelopende vrijheidstijd-teller staat na de derde bezitting op 1j 3m over €32.500 en blijft daar staan als de studieschuld erbij komt — de intake-grondslag telt de eigen woning niet mee en trekt schulden er niet af, zodat het getal tijdens het invullen nooit daalt (bevinding H12). Ná activatie moet /overzicht/cashflow exact dezelfde 30% spaarquote tonen (SSoT-eis, zelfde motor als WF-START-10).',
     assertion: {
       kind: 'exact',
-      expected: 'spaarquotePreview=30; pensioenPrefill=20160; noodfondsPrefill=12600; nettoVermogenRecap=23500',
-      source: 'components/onboarding/onboarding-inkomen.tsx (previewRate-formule, gemirrord) + lib/onboarding/retirement-prefill.ts#computeRetirementPrefill + lib/onboarding-presets.ts#computeNoodfondsTarget + netWorthForKlaar (app/(onboarding)/onboarding/page.tsx, gemirrord) — zie start-checks.ts',
+      expected:
+        'spaarquotePreview=30; pensioenPrefill=20160; noodfondsPrefill=12600; nettoVermogenRecap=23500; vrijheidsteller=1j 3m; tellerBedrag=32500',
+      source: 'components/onboarding/onboarding-inkomen.tsx (previewRate-formule, gemirrord) + lib/onboarding/retirement-prefill.ts#computeRetirementPrefill + lib/onboarding-presets.ts#computeNoodfondsTarget + netWorthForKlaar (app/(onboarding)/onboarding/page.tsx, gemirrord) + lib/freedom-ticker.ts#computeFreedomTicker — zie start-checks.ts',
     },
   },
   {
@@ -286,7 +287,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     given: 'Testpersoon "Eva Jansen": Betaalrekening €1.800, Spaargeld €10.000, Eigen huis €340.000 met gekoppelde hypotheek €280.000 (rente 3,2%, maandlast €1.100), Autolening/private lease €8.000.',
     when: 'De gebruiker doorloopt de bezittingen- en schulden-secties en bekijkt de sectie-review + de klaar-stap-recap.',
-    then: 'Totaal bezittingen = €1.800 + €10.000 + €340.000 = €351.800. Totaal schulden = €280.000 (hypotheek) + €8.000 (autolease) = €288.000. Netto vermogen = €351.800 − €288.000 = €63.800. De hypotheekvraag in de schulden-sectie wordt automatisch overgeslagen omdat de hypotheek al via de bezittingen-stap gekoppeld is.',
+    then: 'Totaal bezittingen = €1.800 + €10.000 + €340.000 = €351.800. Totaal schulden = €280.000 (hypotheek) + €8.000 (autolease) = €288.000. Netto vermogen = €351.800 − €288.000 = €63.800. De schulden-sectie stelt hoogstens vier gerichte ja/nee-vragen (hypotheek, studielening, persoonlijke lening, autolening) en sluit af met één aanvinkraster voor de rest van de catalogus. Elke schuldsoort die al via een bezitting gekoppeld is wordt overgeslagen — hier dus de hypotheekvraag, omdat de hypotheek al via de bezittingen-stap gekoppeld is (en zo ook de autoleningvraag zodra de autolease aan een voertuig hangt).',
     assertion: {
       kind: 'exact',
       expected: 'totaalBezittingen=351800; totaalSchulden=288000; nettoVermogen=63800',
@@ -298,7 +299,7 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-START-20',
     titel: 'Pensioen opgeven tijdens onboarding (schatting, upload of overslaan)',
     kriticiteit: 'KERN',
-    given: 'De pensioen-stap (groep 5/7): schatting-pad met ingangsleeftijd-invoer, geklemd tussen 50 en 75, met de AOW-leeftijd van de gebruiker als fallback (placeholder + hint tonen die leeftijd; een inschat-hulp kan het bedrag vullen uit bruto jaarsalaris × jaren opbouw).',
+    given: 'De pensioen-stap (groep 5/8): schatting-pad met ingangsleeftijd-invoer, geklemd tussen 50 en 75, met de AOW-leeftijd van de gebruiker als fallback (placeholder + hint tonen die leeftijd; een inschat-hulp kan het bedrag vullen uit bruto jaarsalaris × jaren opbouw).',
     when: 'De gebruiker vult een geldige ingangsleeftijd binnen het bereik (75, de bovengrens) resp. laat het veld leeg/ongeldig in.',
     then: 'Een geldige waarde binnen [50,75] (bv. 75) wordt ongewijzigd overgenomen; een ontbrekende/ongeldige waarde valt terug op de AOW-leeftijd van de gebruiker (uit `aow_leeftijd` o.b.v. geboortedatum, bv. 68); zonder geboortedatum/AOW-rijen blijft 67 de laatste fallback.',
     assertion: {
@@ -312,7 +313,7 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-START-21',
     titel: 'Spaardoel kiezen of overslaan tijdens onboarding',
     kriticiteit: 'BELANGRIJK',
-    given: 'Netto maandinkomen €2.800, maanduitgaven €1.900, spaardoel-stap (groep 6/7).',
+    given: 'Netto maandinkomen €2.800, maanduitgaven €1.900, spaardoel-stap (groep 6/8).',
     when: 'De gebruiker kiest de preset "Noodfonds".',
     then: 'Prefill-bedrag = 6× €1.900 = €11.400 (al een veelvoud van €100, geen afronding zichtbaar); bij een leeg/0-bedrag wordt bij opslaan géén doel weggeschreven (stil overgeslagen).',
     assertion: {
@@ -341,7 +342,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     given: 'Enkele stappen ingevuld (incl. naam, geboortedatum, inkomen), tab gesloten zonder af te ronden.',
     when: 'De gebruiker opent /onboarding opnieuw.',
-    then: 'Groene herstel-melding, terug op de opgeslagen stap — MAAR naam/geboortedatum/bedragen zijn bewust leeg (alleen stap-positie/keuzes hersteld); een poging om direct af te ronden wordt door de finish-guard teruggestuurd naar de eerste onvolledige verplichte stap.',
+    then: 'Herstel-melding "Verder waar je was" (neutraal, geen groen vinkje), terug op de opgeslagen stap — MAAR naam/geboortedatum/bedragen zijn bewust leeg (alleen stap-positie/keuzes hersteld). De melding zegt dat sinds C3 óók met zoveel woorden ("naam, bedragen, bezittingen en schulden bewaren we niet op dit apparaat"), zodat de tekst niet meer volledig herstel claimt; een poging om direct af te ronden wordt door de finish-guard teruggestuurd naar de eerste onvolledige verplichte stap.',
     assertion: {
       kind: 'ui-only',
       source: 'app/(onboarding)/onboarding/draft-persistence.ts (serializeDraft/sanitizeStoredDraft/firstIncompleteRequiredStep) + app/(onboarding)/onboarding/page.tsx (restoreChecked-poort: persisteren mag pas ná de restore-poging), geen cijfermatige uitkomst',

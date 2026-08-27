@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { loadAssetsData } from '@/lib/assets-data-loader'
-import { loadHorizonData } from '@/lib/horizon-data-loader'
+import { loadHorizonRaw } from '@/lib/horizon-data-loader'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import type { Perspective } from '@/lib/household-data'
 import { BezittingenView } from '@/components/overview/bezittingen-view'
@@ -12,6 +12,7 @@ import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { InsightToggleButton } from '@/components/editorial/insight-toggle-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
 import { PAGE_INFO } from '@/lib/page-info-content'
+import { hasInvestedAssets } from '@/lib/dashboard-wealth-weighting'
 
 export const metadata: Metadata = {
   title: 'Bezittingen — TriFinity',
@@ -47,7 +48,7 @@ export default async function OverzichtBezittingenPage() {
   const perspective = await getServerPerspective()
   const [assetsData, horizonData] = await Promise.all([
     tryLoadAssetsData(supabase, perspective),
-    loadHorizonData(supabase).catch(() => null),
+    loadHorizonRaw(supabase).catch(() => null),
   ])
 
   // Drempel-data voor de twee inspiratie-blokken. Alleen renderen wanneer
@@ -67,7 +68,12 @@ export default async function OverzichtBezittingenPage() {
   const inspirationCards = showCompound || showFee
     ? (
         <>
-          {showCompound && <CompoundInsightCard liquidCash={liquidCash} />}
+          {showCompound && (
+            <CompoundInsightCard
+              liquidCash={liquidCash}
+              hasInvestments={hasInvestedAssets(assets)}
+            />
+          )}
           {showFee && <FeeImpactCard investmentTotal={investmentTotal} />}
         </>
       )

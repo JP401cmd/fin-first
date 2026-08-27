@@ -7,6 +7,7 @@ import {
   fireAgeForDisplay,
   type FreedomStateInput,
 } from './fire-strategy'
+import { HORIZON_PLAFOND_LEEFTIJD } from '@/lib/constants'
 
 /**
  * Tests voor de afgeleide vrijheids-/pensioentoestand — de gedeelde, consume-only
@@ -219,5 +220,53 @@ describe('resolveFreedomAgeView (seam: drempel vs. weergave)', () => {
     })
     expect(view.framing).toBe('free')
     expect(view.fireAgeDisplay).toBe(56)
+  })
+})
+
+describe('resolveFreedomAgeView / fireAgeForDisplay — M6-vangrail', () => {
+  // Bevinding M6: de kernel parkeert de FIRE-leeftijd op het horizonplafond
+  // wanneer er geen vrijheidsmoment is. /overzicht toonde dat getal ("nog 65
+  // jaar") als gewoon resultaat. Eén guard, gedeeld met de /toekomst-hero.
+  it('toont de parkeerstand op het horizonplafond niet als vrijheidsleeftijd', () => {
+    expect(fireAgeForDisplay(HORIZON_PLAFOND_LEEFTIJD)).toBeNull()
+    expect(fireAgeForDisplay(HORIZON_PLAFOND_LEEFTIJD + 12)).toBeNull()
+  })
+
+  it('een gewone leeftijd blijft gewoon afgerond', () => {
+    expect(fireAgeForDisplay(52.6)).toBe(53)
+    expect(fireAgeForDisplay(HORIZON_PLAFOND_LEEFTIJD - 0.5)).toBe(HORIZON_PLAFOND_LEEFTIJD)
+  })
+
+  it('meldt het probleem via dataIssue i.p.v. het stil weg te laten', () => {
+    const view = resolveFreedomAgeView({
+      fireAgeFractional: HORIZON_PLAFOND_LEEFTIJD,
+      freedomPct: 12,
+      currentAge: 36,
+      strategy: 'perpetual',
+    })
+    expect(view.dataIssue).toBe(true)
+    expect(view.fireAgeDisplay).toBeNull()
+  })
+
+  it('een onmogelijke leeftijd voedt de DREMPEL niet (geen valse framing)', () => {
+    const view = resolveFreedomAgeView({
+      fireAgeFractional: HORIZON_PLAFOND_LEEFTIJD,
+      freedomPct: 12,
+      currentAge: 101,
+      strategy: 'perpetual',
+    })
+    // Zonder de guard zou `101 >= 100` hier 'free'/'pensioen' opleveren.
+    expect(view.framing).toBe('building')
+  })
+
+  it('een normale uitkomst zet dataIssue niet', () => {
+    const view = resolveFreedomAgeView({
+      fireAgeFractional: 52.4,
+      freedomPct: 60,
+      currentAge: 40,
+      strategy: 'deplete',
+    })
+    expect(view.dataIssue).toBe(false)
+    expect(view.fireAgeDisplay).toBe(52)
   })
 })

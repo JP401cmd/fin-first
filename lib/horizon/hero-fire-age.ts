@@ -8,31 +8,50 @@
 // verschillende motoren op dezelfde plek mochten antwoorden zodra de
 // canonieke motor nog niet klaar was:
 //   1. de horizon-kernel (`simResult`)          — canoniek, async via web worker
-//   2. de laatst weggeschreven kernel-scalar    — `net_worth_snapshots.fire_age`
+//   2. de laatst weggeschreven `net_worth_snapshots.fire_age`
 //   3. `computeFireProjection` (fire-scalar.ts) — een TWEEDE, eigen while-loop
 // Bron 3 is een tweede motor op één grootheid en mag hier niet meer antwoorden
 // (zie `lib/architecture/calculations.ts`, calc "scalar-fire-router": "nieuwe
-// call-sites ... NOOIT computeFireProjection rechtstreeks"). Bron 2 mag wel
-// antwoorden — het is een eerder kernel-antwoord — maar dan expliciet als
-// VOORLOPIG, nooit als een van de eindwaarde ononderscheidbaar getal.
+// call-sites ... NOOIT computeFireProjection rechtstreeks").
+//
+// CORRECTIE (bevinding H21, 27-08-2026): bron 2 werd hier omschreven als "een
+// eerder kernel-antwoord". Dat klopte niet — `net_worth_snapshots.fire_age`
+// wordt door `app/api/snapshots/*` geschreven met de RAUWE scalar-lus
+// (`computeFireProjection`), dus bron 2 was in de praktijk bron 3 met een
+// datumstempel: de eerste paint toonde stelselmatig een andere leeftijd dan de
+// worker die erna landde. De voorlopige bron is nu de SERVER-KERNELRUN
+// (`computeHorizonFireSim` → `HorizonPageData.fireAgeFractional`): dezelfde
+// motor, verse data. Hij blijft 'voorlopig' heten omdat de client-run met
+// verse rijen en actieve schuifjes er nog van kán afwijken — maar niet meer
+// omdat er een andere rekenwijze onder ligt.
 //
 // De regel die dit bestand afdwingt: er is altijd precies één getal én er staat
 // altijd bij hoe hard het is. Kan de kernel het niet, dan is "we weten het nog
 // niet" het antwoord — geen tweede antwoord.
 
+import { HORIZON_MISSENDE_GEGEVENS_LABEL, guardFreedomAge } from './outcome-guard'
+
 /** Hoe hard is het getoonde getal? */
 export type HeroAnswerStatus =
   /** De canonieke motor heeft geantwoord; dit getal verandert niet meer vanzelf. */
   | 'definitief'
-  /** Een eerder kernel-antwoord (snapshot) of nog niet geladen AOW-tabel — kan nog wijzigen. */
+  /** De server-kernelrun of een nog niet geladen AOW-tabel — kan nog wijzigen. */
   | 'voorlopig'
   /** De kernel rekent nog en er is geen eerder antwoord om te tonen. */
   | 'berekenen'
   /** Er is geen antwoord: niet haalbaar, of er valt niets te berekenen. */
   | 'onbekend'
+  /**
+   * De motor gaf wél een leeftijd, maar één die niet kán kloppen — op of voorbij
+   * het horizonplafond (de parkeerstand van de bisectie, bevinding M6). Dat is
+   * geen "niet haalbaar" maar een gegevensprobleem: er staat een gegevensmelding
+   * i.p.v. een getal. `age` is `null`, zodat geen enkele consument het
+   * parkeerstand-getal alsnog als drempel of grafiekmarker gebruikt.
+   */
+  | 'ongeldig'
 
 /** Waar het getoonde getal vandaan komt. `null` als er geen getal is. */
-export type HeroAnswerBron = 'kernel' | 'snapshot' | 'aow-tabel'
+export type HeroAnswerBron = 'kernel' | 'server-kernel' | 'aow-tabel'
 
 export interface HeroFireAge {
   status: HeroAnswerStatus
@@ -58,20 +77,26 @@ export interface HeroFireAgeInput {
    * 67"-getal uit de bevinding. Dat is dan een voorlopige waarde, geen antwoord.
    */
   aowTableLoaded?: boolean
-  /** `net_worth_snapshots.fire_age` — het laatst weggeschreven kernel-antwoord. */
-  snapshotFireAge?: number | null
+  /**
+   * De SERVER-kernelrun (`HorizonPageData.fireAgeFractional`, uit
+   * `computeHorizonFireSim`) — dezelfde motor als de client-worker, maar al
+   * beschikbaar bij de eerste paint. Bewust NIET `net_worth_snapshots.fire_age`:
+   * die kolom komt uit de rauwe scalar-lus (zie de correctie in de module-doc).
+   */
+  serverFireAge?: number | null
   /** Draait de kernel-worker nog? (`isRefining` uit `useHorizonFireSim`) */
   isRefining?: boolean
 }
 
 const ONBEKEND: HeroFireAge = { status: 'onbekend', age: null, bron: null }
 const BEREKENEN: HeroFireAge = { status: 'berekenen', age: null, bron: null }
+const ONGELDIG: HeroFireAge = { status: 'ongeldig', age: null, bron: null }
 
 /**
  * Bepaalt welk getal de hero-KPI toont én hoe hard dat getal is.
  *
- * Volgorde is bewust: de kernel wint altijd; daarna een EERDER kernel-antwoord
- * (snapshot, expliciet voorlopig); daarna niets. `computeFireProjection` komt in
+ * Volgorde is bewust: de client-kernel wint altijd; daarna de SERVER-kernelrun
+ * (dezelfde motor, expliciet voorlopig); daarna niets. `computeFireProjection` komt in
  * deze keten niet voor — dat is de tweede motor die de bevinding veroorzaakte.
  */
 export function resolveHeroFireAge(input: HeroFireAgeInput): HeroFireAge {
@@ -94,12 +119,17 @@ export function resolveHeroFireAge(input: HeroFireAgeInput): HeroFireAge {
     // Kernel klaar zonder leeftijd = "niet haalbaar binnen de horizon". Dat is
     // een antwoord, geen gat — en zeker geen aanleiding voor een tweede motor.
     if (age == null || !Number.isFinite(age)) return ONBEKEND
+    // M6-vangrail: een leeftijd op/voorbij het horizonplafond is de parkeerstand
+    // van de bisectie, geen antwoord. De rekenkant hiervan is bij de bron gefixt
+    // (solver-scoping op een negatief doelbedrag); dit is de tweede linie.
+    if (!guardFreedomAge(age).ok) return ONGELDIG
     return { status: 'definitief', age, bron: 'kernel' }
   }
 
-  const snapshot = input.snapshotFireAge
-  if (snapshot != null && Number.isFinite(snapshot)) {
-    return { status: 'voorlopig', age: snapshot, bron: 'snapshot' }
+  const server = input.serverFireAge
+  if (server != null && Number.isFinite(server)) {
+    if (!guardFreedomAge(server).ok) return ONGELDIG
+    return { status: 'voorlopig', age: server, bron: 'server-kernel' }
   }
 
   return input.isRefining ? BEREKENEN : ONBEKEND
@@ -117,6 +147,15 @@ export interface FormatHeroFireAgeOptions {
 /**
  * Weergavevorm van het kernantwoord. Eén functie, zodat de hero, de kassabon en
  * de overlay per constructie hetzelfde getal in dezelfde vorm tonen.
+ *
+ * PRECISIE (bevinding M5, 27-08-2026): het kopgetal toont HELE jaren. Een
+ * vrijheidsleeftijd van "52,8 jaar" belooft een tiende-van-een-jaar-nauwkeurige
+ * projectie vijftien jaar vooruit — schijnzekerheid. De welkomstoverlay op
+ * dezelfde pagina (`toekomst-welcome.tsx`) rondde al af op een heel jaar
+ * ("rond je 53e"); dat was dus twee weergavestijlen voor één getal, op één
+ * scherm. Hele jaren is nu de enige stijl in deze seam. De fractionele waarde
+ * blijft ongemoeid in `state.age` — de kassabon toont hem exact, want dáár is
+ * de onderbouwing juist het punt.
  */
 export function formatHeroFireAge(state: HeroFireAge, opts: FormatHeroFireAgeOptions = {}): string {
   const dash = opts.dash ?? '–'
@@ -124,7 +163,7 @@ export function formatHeroFireAge(state: HeroFireAge, opts: FormatHeroFireAgeOpt
     if (opts.aowText) return opts.aowText
     return state.age != null ? `${Math.round(state.age)} jaar` : dash
   }
-  if (state.age != null) return state.age.toFixed(1)
+  if (state.age != null) return String(Math.round(state.age))
   if (state.status === 'berekenen') return opts.pendingText ?? 'berekenen…'
   return dash
 }
@@ -135,6 +174,14 @@ export function isHeroAnswerPending(state: HeroFireAge): boolean {
 }
 
 /**
+ * Is dit een uitkomst die we NIET als getal mogen tonen (M6)? De aanroeper zet
+ * dan de gegevensmelding neer i.p.v. het kopgetal.
+ */
+export function isHeroAnswerInvalid(state: HeroFireAge): boolean {
+  return state.status === 'ongeldig'
+}
+
+/**
  * Onderschrift bij het getal. `base` is het normale bijschrift ('jaar',
  * 'AOW-leeftijd'); bij een niet-definitief antwoord komt de waarschuwing ervoor
  * in de plaats of erbij, zodat de gebruiker nooit een voorlopig getal voor een
@@ -142,6 +189,9 @@ export function isHeroAnswerPending(state: HeroFireAge): boolean {
  */
 export function heroFireAgeCaption(state: HeroFireAge, base: string): string {
   if (state.status === 'berekenen') return 'wordt berekend…'
+  // M6: geen getal, dus ook geen eenheid — de gegevensmelding IS het onderschrift.
+  // Zelfde formulering als elk ander oppervlak (één bron in outcome-guard.ts).
+  if (state.status === 'ongeldig') return HORIZON_MISSENDE_GEGEVENS_LABEL.toLowerCase()
   if (state.status === 'voorlopig') return base ? `${base} · voorlopig` : 'voorlopig'
   return base
 }

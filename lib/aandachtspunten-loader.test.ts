@@ -21,17 +21,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  */
 
 import type { LifeEvent } from './horizon-data'
-import type { HorizonPageData } from './horizon-data-loader'
+import type { HorizonRawData } from './horizon-data-loader'
 import type { Aandachtspunt } from './aandachtspunten'
 import { calculateBox3 } from './box3-data'
 
-const loadHorizonDataMock = vi.fn()
+const loadHorizonRawMock = vi.fn()
 const computeBox1TaxMock = vi.fn()
 const loadPerspectiveBox3Mock = vi.fn()
 const resolveBox1GrossIncomeMock = vi.fn()
 
 vi.mock('./horizon-data-loader', () => ({
-  loadHorizonData: (...args: unknown[]) => loadHorizonDataMock(...args),
+  loadHorizonRaw: (...args: unknown[]) => loadHorizonRawMock(...args),
 }))
 vi.mock('./box1-tax', () => ({
   computeBox1Tax: (...args: unknown[]) => computeBox1TaxMock(...args),
@@ -172,7 +172,7 @@ function pensionEvent(pensioenType: string): LifeEvent {
 const GROSS_YEARLY = 120_000
 
 /**
- * Bouw een HorizonPageData-mock met alleen de velden die de belasting-producent
+ * Bouw een HorizonRawData-mock met alleen de velden die de belasting-producent
  * en de kansen-loader lezen. Het bruto inkomen komt niet meer hiervandaan maar
  * uit `resolveBox1GrossIncome`; wat hier telt zijn de factor-A-flags die de
  * demping sturen.
@@ -181,7 +181,7 @@ function makeHorizonData(opts: {
   pensioenFactorAKnown: boolean
   pensioenFactorA?: number
   events: LifeEvent[]
-}): HorizonPageData {
+}): HorizonRawData {
   return {
     effectiveInput: {
       monthlyIncome: 5000, // netto/maand → grossYearly ruim boven de franchise
@@ -192,7 +192,7 @@ function makeHorizonData(opts: {
     pensioenFactorA: opts.pensioenFactorA ?? 0,
     pensioenFactorAKnown: opts.pensioenFactorAKnown,
     events: opts.events,
-  } as unknown as HorizonPageData
+  } as unknown as HorizonRawData
 }
 
 function jaarruimtePunt(result: Aandachtspunt[]) {
@@ -217,7 +217,7 @@ describe('collectTaxAandachtspunten — jaarruimte-demping', () => {
   })
 
   it('(a) bedrijfspensioen + ONBEKENDE factor A → géén jaarruimte-aandachtspunt', async () => {
-    loadHorizonDataMock.mockResolvedValue(
+    loadHorizonRawMock.mockResolvedValue(
       makeHorizonData({
         pensioenFactorAKnown: false,
         events: [pensionEvent('bedrijf')],
@@ -228,7 +228,7 @@ describe('collectTaxAandachtspunten — jaarruimte-demping', () => {
   })
 
   it('(b) bekende factor A (ingevuld) → jaarruimte-aandachtspunt WÉL aanwezig', async () => {
-    loadHorizonDataMock.mockResolvedValue(
+    loadHorizonRawMock.mockResolvedValue(
       makeHorizonData({
         pensioenFactorAKnown: true,
         pensioenFactorA: 1200,
@@ -243,7 +243,7 @@ describe('collectTaxAandachtspunten — jaarruimte-demping', () => {
   })
 
   it('(c) geen bedrijfspensioen + ONBEKENDE factor A (zzp-pad) → jaarruimte WÉL aanwezig', async () => {
-    loadHorizonDataMock.mockResolvedValue(
+    loadHorizonRawMock.mockResolvedValue(
       makeHorizonData({
         pensioenFactorAKnown: false,
         events: [], // geen pensioen-event
@@ -254,7 +254,7 @@ describe('collectTaxAandachtspunten — jaarruimte-demping', () => {
   })
 
   it('lijfrente-pensioen (geen bedrijf) + ONBEKENDE factor A → niet gedempt', async () => {
-    loadHorizonDataMock.mockResolvedValue(
+    loadHorizonRawMock.mockResolvedValue(
       makeHorizonData({
         pensioenFactorAKnown: false,
         events: [pensionEvent('lijfrente_levenslang')],
@@ -265,7 +265,7 @@ describe('collectTaxAandachtspunten — jaarruimte-demping', () => {
   })
 
   it('expliciete factor A 0 (zzp, bekend) + bedrijfspensioen-event → niet gedempt', async () => {
-    loadHorizonDataMock.mockResolvedValue(
+    loadHorizonRawMock.mockResolvedValue(
       makeHorizonData({
         pensioenFactorAKnown: true,
         pensioenFactorA: 0,
@@ -289,7 +289,7 @@ describe('collectAandachtspunten — actie-kruising (suppressie)', () => {
     loadPerspectiveBox3Mock.mockResolvedValue(emptyBox3())
     resolveBox1GrossIncomeMock.mockResolvedValue({ grossYearly: GROSS_YEARLY })
     // Gezond inkomen + bekende factor A → tax:jaarruimte verschijnt normaal.
-    loadHorizonDataMock.mockResolvedValue(
+    loadHorizonRawMock.mockResolvedValue(
       makeHorizonData({
         pensioenFactorAKnown: true,
         pensioenFactorA: 1200,

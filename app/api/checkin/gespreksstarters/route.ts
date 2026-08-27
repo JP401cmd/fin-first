@@ -5,7 +5,15 @@ import { loadPerspectiveContext } from '@/lib/household/perspective-loader'
 import { computeFireAge } from '@/lib/checkin/fire-age'
 import { resolveFireParams } from '@/lib/fire-params'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
-import { computeDebtAflossingMonthly, savingsRateFromAggregates } from '@/lib/savings-source'
+import { budgetIdsOfType } from '@/lib/cashflow-kpis'
+import { buildBudgetTypeMap } from '@/lib/budget-utils'
+import { getRecentDailyExpenseRate } from '@/lib/expense-rate'
+import {
+  computeDebtAflossingMonthly,
+  computeSavingsRate6m,
+  savingsRateDataMonths,
+  savingsRateWindow,
+} from '@/lib/savings-source'
 import { selectUnlinkedBankAccounts, unlinkedCashTotal } from '@/lib/unlinked-cash'
 import {
   buildGespreksstarters,
@@ -25,7 +33,11 @@ export async function GET() {
   const { start: monthStart, end: monthEnd } = localMonthBounds(now)
   const prevMonthStart = localMonthStart(new Date(currentYear, currentMonth - 1, 1))
   const prevMonthEnd = monthStart
-  const sixMonthsAgo = localMonthStart(new Date(currentYear, currentMonth - 6, 1))
+  // 6-maands venster uit de CANONIEKE bron (lib/savings-source.ts): zes
+  // VOLTOOIDE kalendermaanden, de lopende maand exclusief — zelfde grenzen als
+  // de spaarquote op /overzicht. Stond hier als `currentMonth - 6` t/m
+  // `monthEnd`, wat ZEVEN kalendermaanden door een deler 6 haalde.
+  const window6m = savingsRateWindow(now)
   const threeMonthsAgo = localMonthStart(new Date(currentYear, currentMonth - 3, 1))
 
   const [
@@ -33,18 +45,23 @@ export async function GET() {
     goalsRes, budgetsRes, actionsRes, snapshotsRes,
     income6mRes, expense6mRes, profileRes, bankRes,
     curCatRes, prevCatRes, recurringRes, perspective,
-    prevFireAge,
+    prevFireAge, expenseRate,
   ] = await Promise.all([
     supabase.from('assets').select('name, current_value, net_worth_inclusion_pct').eq('user_id', claims.sub).eq('is_active', true),
     supabase.from('debts').select('current_balance, name, debt_type, interest_rate, monthly_payment, repayment_type, end_date, start_date, net_worth_inclusion_pct, include_aflossing_in_savings, custom_aflossing_amount, is_active').eq('user_id', claims.sub),
     supabase.from('transactions').select('amount').eq('user_id', claims.sub).eq('is_income', true).gte('date', monthStart).lt('date', monthEnd),
     supabase.from('transactions').select('amount').eq('user_id', claims.sub).eq('is_income', true).gte('date', prevMonthStart).lt('date', prevMonthEnd),
     supabase.from('goals').select('name, current_value, target_value, is_completed, target_date').eq('user_id', claims.sub),
-    supabase.from('budgets').select('name, monthly_limit, budget_type').eq('user_id', claims.sub).eq('budget_type', 'expense'),
+    // ALLE budgetten, niet alleen de uitgave-budgetten: de spaarquote heeft de
+    // spaarbudget-ID's nodig (stortingen op een spaarbudget tellen als sparen,
+    // niet als uitgave) en de parent-erfregel in `buildBudgetTypeMap` vraagt de
+    // parents mee. De uitgave-limieten worden hieronder alsnog uit deze set
+    // gefilterd, dus de categorie-weergave verandert niet.
+    supabase.from('budgets').select('id, name, monthly_limit, budget_type, parent_id').eq('user_id', claims.sub),
     supabase.from('actions').select('id, freedom_days, is_completed, completed_at').eq('user_id', claims.sub),
     supabase.from('net_worth_snapshots').select('value, snapshot_date').eq('user_id', claims.sub).order('snapshot_date', { ascending: false }).limit(6),
-    supabase.from('transactions').select('amount, transaction_type, date').eq('user_id', claims.sub).eq('is_income', true).gte('date', sixMonthsAgo).lt('date', monthEnd),
-    supabase.from('transactions').select('amount, transaction_type, date').eq('user_id', claims.sub).eq('is_income', false).gte('date', sixMonthsAgo).lt('date', monthEnd),
+    supabase.from('transactions').select('amount, transaction_type, date').eq('user_id', claims.sub).eq('is_income', true).gte('date', window6m.fromDate).lt('date', window6m.toDate),
+    supabase.from('transactions').select('amount, transaction_type, date, budget_id').eq('user_id', claims.sub).eq('is_income', false).gte('date', window6m.fromDate).lt('date', window6m.toDate),
     supabase.from('profiles').select('date_of_birth, expected_return, inflation_rate').eq('id', claims.sub).maybeSingle(),
     // Bewust zónder user-filter: de bank_accounts-policy is huishoud-verbreed
     // en RLS scoopt hier al (lib/unlinked-cash.ts).
@@ -54,6 +71,12 @@ export async function GET() {
     supabase.from('transactions').select('amount, counterparty_name, description, date').eq('user_id', claims.sub).eq('is_income', false).gte('date', threeMonthsAgo).lt('date', monthEnd),
     loadPerspectiveContext(supabase),
     loadPrevFireAge(supabase, claims.sub, currentYear, currentMonth),
+    // Canoniek dagtarief (€/dag) — 12-maands rolling venster, gedeeld met de
+    // rest van de app. Hier stond een handmatige `expenses6mAvg * 12 / 365`
+    // op de 6-maands basis, waardoor élk vrijheidsdagen-getal op de check-in
+    // afweek van hetzelfde bedrag op elk ander scherm ("consume, don't
+    // recompute"). Geen user-filter nodig: transactions-RLS is own-only.
+    getRecentDailyExpenseRate(supabase, now),
   ])
 
   // ── Kernmetrics ──────────────────────────────────────────────────────
@@ -96,21 +119,34 @@ export async function GET() {
   const expenses6m = expense6mRows.reduce((s, t) => s + Math.abs(t.amount || 0), 0)
   const earliest6m = [...income6mRows, ...expense6mRows]
     .reduce<string | null>((min, t) => (t.date && (!min || t.date < min) ? t.date : min), null)
-  let dataMonths6 = 6
-  if (earliest6m) {
-    const ed = new Date(earliest6m)
-    dataMonths6 = Math.max(1, Math.min(6,
-      (currentYear - ed.getFullYear()) * 12 + (currentMonth - ed.getMonth()),
-    ))
-  }
+  // Deler uit dezelfde canonieke bron als het venster: VOLTOOIDE maanden.
+  const dataMonths6 = savingsRateDataMonths(now, earliest6m)
   const income6mAvg = income6m / dataMonths6
   const expenses6mAvg = expenses6m / dataMonths6
   const debtAflossing6m = computeDebtAflossingMonthly(activeDebts) * 6
-  const savingsRate6m = savingsRateFromAggregates(income6mAvg * 6, expenses6mAvg * 6, debtAflossing6m)
 
-  // Dagtarief op jaarbasis (×12/365) — zelfde denominator als
-  // calculateFreedomTime in lib/format.ts, niet deze-maand/30.
-  const dailyExpenses = expenses6mAvg > 0 ? (expenses6mAvg * 12) / 365 : 0
+  // Spaarquote via de CANONIEKE `computeSavingsRate6m` i.p.v. de kale
+  // `savingsRateFromAggregates`. Die trekt éérst de spaarbudget-stortingen van
+  // de uitgaven af (sparen is geen uitgave) en extrapoleert bij <6 maanden
+  // data. Zonder die correctie toonde de check-in onder exact hetzelfde label
+  // ("6-maands spaarquote") een lager getal dan /overzicht.
+  const allBudgets = budgetsRes.data || []
+  const savingsBudgetIds = budgetIdsOfType(buildBudgetTypeMap(allBudgets), 'savings')
+  const savingsBudgetSpent6m = expense6mRows.reduce(
+    (s, t) => (t.budget_id && savingsBudgetIds.has(t.budget_id) ? s + Math.abs(t.amount || 0) : s),
+    0,
+  )
+  const savingsRate6m = computeSavingsRate6m({
+    income6m,
+    expenses6m,
+    savingsBudgetSpent6m,
+    debtAflossing6m,
+    dataMonths: dataMonths6,
+  }).savingsRate6m
+
+  // Canoniek dagtarief uit lib/expense-rate.ts (12-maands rolling) — zie de
+  // toelichting bij de query hierboven.
+  const dailyExpenses = expenseRate.dailyRate
 
   // Snapshots → trend
   const snapshots = snapshotsRes.data || []
@@ -140,8 +176,11 @@ export async function GET() {
     now,
   })
   // Categorie-uitgaven (huidig vs vorige maand) + budgetlimieten
+  // Alleen uitgave-budgetten dragen een limiet voor de categorie-weergave — de
+  // query levert nu álle typen (zie hierboven), dus hier expliciet filteren.
   const budgetLimits: Record<string, number> = {}
-  for (const b of budgetsRes.data || []) {
+  for (const b of allBudgets) {
+    if (b.budget_type !== 'expense') continue
     if (b.monthly_limit && b.monthly_limit > 0) budgetLimits[b.name] = b.monthly_limit
   }
   const curByCat = sumByCategory(curCatRes.data || [])

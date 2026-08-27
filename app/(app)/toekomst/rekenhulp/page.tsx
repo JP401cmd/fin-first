@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
-import { loadHorizonData } from '@/lib/horizon-data-loader'
+import { loadHorizonRaw } from '@/lib/horizon-data-loader'
 import { ToekomstSubpageShell } from '@/components/future/toekomst-subpage-shell'
 import { RekenhulpView } from '@/components/future/rekenhulp-view'
 import { buildPrefillValues } from '@/lib/calculator/user-data-keys'
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
  */
 export default async function ToekomstRekenhulpPage() {
   const supabase = await createClient()
-  const horizonData = await loadHorizonData(supabase)
+  const horizonData = await loadHorizonRaw(supabase)
 
   // Rekenhulp (Fin-assisted calculators): prefill-waarden uit de
   // horizon-data + opgeslagen calculators van de gebruiker.

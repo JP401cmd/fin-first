@@ -11,6 +11,20 @@
  *   3. path      — één tip per route, als fallback
  *   4. default   — welkomstbericht, laatste terugval
  *
+ * HARDE REGEL — FIRST-USE-COPY HOORT BIJ FIRST USE (kaart H15, 27-08-2026).
+ * De lagen 3 en 4 worden per constructie pas bereikt als élke data-gap dicht
+ * is: ze zijn dus de "dit account is gevuld"-lagen. Stond daar first-use-copy
+ * ("voeg je eerste … toe", "breng je … in kaart", "welkom"), dan was die
+ * uitsluitend zichtbaar voor wie het betreffende gegeven al hád — precies
+ * omgekeerd. Elke regel in laag 3/4 die zulke copy draagt MOET daarom een
+ * `check`-predicaat hebben dat op de accountstatus toetst; regels zonder
+ * predicaat moeten voor élke datastand kloppen. Bewaakt door de
+ * regressie-toets "geen first-use-copy zonder check" in coach-suggestions.test.ts.
+ *
+ * De statusbron is `CoachDataGaps`, die de shell-layout uit de gedeelde
+ * `lib/account-status.ts` (`toCoachDataGaps`) opbouwt — dezelfde bron die de
+ * welkomstgids gebruikt. Geen tweede definitie van "heeft budgetten".
+ *
  * Admin-overrides (tekst/CTA/aan-uit per regel) + globale timing worden
  * opgeslagen in app_settings (key 'coach_config') en hier toegepast. De
  * predicaten (wanneer een regel van toepassing is) blijven in code — alleen
@@ -134,14 +148,44 @@ export const COACH_LAYER_META: Record<
   path: {
     label: 'Pad-gebaseerd',
     description:
-      'Eén tip per pagina/route, als fallback wanneer er geen data-gap of uitgesteld veld speelt.',
+      'Eén tip per pagina/route, als fallback wanneer er geen data-gap of uitgesteld veld speelt. Deze laag wordt pas bereikt als élke data-gap dicht is — een regel hier moet dus voor een gevuld account kloppen, of een eigen check dragen.',
     order: 3,
   },
   default: {
     label: 'Standaard welkomstbericht',
-    description: 'Laatste terugval als geen enkele andere regel van toepassing is.',
+    description:
+      'Laatste terugval als geen enkele andere regel van toepassing is. Twee varianten: gevuld account eerst, daarna het onvoorwaardelijke welkomstbericht.',
     order: 4,
   },
+}
+
+// ── Accountrijpheid (de ene lezing voor first-use vs. gevuld) ─────────────
+
+/**
+ * "Dit account is gevuld" — het predicaat dat first-use-copy van gevulde copy
+ * scheidt (kaart H15). ÉÉN lezing, hier gedefinieerd, nergens anders herhaald.
+ *
+ * LEZING: bezittingen geregistreerd **én** boekhouding op gang (transacties óf
+ * budgetten). Bewust een conjunctie: één losse bezitting maakt van een nieuw
+ * account nog geen gevuld account, terwijl bezittingen + transacties/budgetten
+ * niet meer als "begin hier" aan te spreken zijn.
+ *
+ * WAAROM NAAST DE LAAGVOLGORDE. De path- en default-laag worden alleen bereikt
+ * als élke data-gap dicht is — dan is dit predicaat per definitie waar. Behalve
+ * wanneer de gebruiker gaps heeft weggeklikt of beheer ze heeft uitgezet: dán
+ * valt de selectie door naar laag 3/4 zónder dat het account gevuld is. Dit
+ * predicaat maakt de COPY zelf-conditionerend in plaats van afhankelijk van de
+ * laagvolgorde — precies de "de bug verplaatst zich"-val uit de kaart.
+ *
+ * LET OP (bewuste onnauwkeurigheden, geërfd van `CoachDataGaps`): `hasAssets`
+ * is RLS-breed en telt dus een gedeelde bezitting van je partner mee, en
+ * module-gated signalen staan op `true` wanneer hun module uit staat. Beide
+ * eigenaardigheden zijn coach-breed; zie `toCoachDataGaps` in
+ * `lib/account-status.ts`. Voor een compleetheids-oordeel (de gids) gebruik je
+ * de eigen-gescopede `AccountStatus`, niet deze.
+ */
+export function isEstablishedAccount(gaps: CoachDataGaps): boolean {
+  return gaps.hasAssets && (gaps.hasTransactions || gaps.hasBudgets)
 }
 
 // ── Catalogus ──────────────────────────────────────────────────────────────
@@ -325,6 +369,15 @@ type PathRule = {
   pathPrefix: string
   key: string
   condition: string
+  /**
+   * Optioneel predicaat op de accountstatus — spiegelt `DataGapRule.check`.
+   * Verplicht zodra de tekst first-use-copy draagt (zie de harde regel in de
+   * module-kop): zonder predicaat spreekt deze laag juist het GEVULDE account
+   * als beginner aan. Levert het predicaat `false` — of zijn de gaps nog
+   * onbekend — dan valt de selectie door naar de volgende (bredere) pad-regel.
+   * Die terugval moet dus zelf voor elke datastand kloppen.
+   */
+  check?: (gaps: CoachDataGaps) => boolean
   suggestion: SuggestionContent
 }
 
@@ -343,10 +396,21 @@ export const PATH_SUGGESTIONS: PathRule[] = [
   {
     pathPrefix: '/overzicht/schulden',
     key: 'path_debts',
-    condition: 'Op een pagina onder /overzicht/schulden.',
+    condition:
+      'Op een pagina onder /overzicht/schulden ÉN er staat minstens één schuld geregistreerd.',
+    // H15: de oude tekst ("Breng je schulden in kaart en kies een strategie")
+    // was first-use-copy zónder predicaat, en deze laag wordt pas bereikt als
+    // alle gaps dicht zijn — je kreeg 'm dus alleen te zien als je je schulden
+    // al hád ingebracht. De first-use-variant bestaat al één laag hoger
+    // (`gap_debts`, check `!hasDebts`); hier blijft alleen de gevulde variant,
+    // met het predicaat dat de scheiding hard maakt. Zonder schulden (of met
+    // de gaps nog onbekend) valt de selectie terug op `path_core`, dat voor
+    // elke datastand klopt.
+    check: (g) => g.hasDebts,
     suggestion: {
-      message: 'Elke afgeloste euro koop je vrijheid terug. Breng je schulden in kaart en kies een strategie.',
-      cta: 'Schuld toevoegen',
+      message:
+        'Je schulden staan in beeld. Kies een aflosvolgorde, dan zie je hoeveel vrijheid je terugkoopt.',
+      cta: 'Bekijk je aflosplan',
     },
   },
   {
@@ -442,15 +506,55 @@ export const PATH_SUGGESTIONS: PathRule[] = [
   },
 ]
 
-export const DEFAULT_SUGGESTION: { key: string; condition: string; suggestion: SuggestionContent } = {
-  key: 'default',
-  condition: 'Altijd van toepassing — wint alleen als geen enkele andere regel matcht.',
-  suggestion: {
-    message: 'Welkom. Geld is opgeslagen tijd — ik help je zien hoeveel vrijheid het je geeft.',
-    cta: 'Aan de slag',
-    ctaHref: '/overzicht',
-  },
+type DefaultRule = {
+  key: string
+  condition: string
+  /** Zelfde semantiek als `PathRule.check`; de láátste regel draagt er géén. */
+  check?: (gaps: CoachDataGaps) => boolean
+  suggestion: SuggestionContent
 }
+
+/**
+ * De terugval, in evaluatievolgorde. Twee varianten sinds H15: routes zónder
+ * pad-regel (o.a. `/mijn` en `/berichten`) kwamen hier uit, waarna een account
+ * met duizenden transacties "Welkom." te lezen kreeg. De terugval moest dus
+ * zélf gevuld-bewust worden — anders verplaatst de bug zich hierheen zodra de
+ * pad-laag wél conditioneert.
+ *
+ * De laatste regel draagt bewust geen predicaat: er moet altijd één terugval
+ * overblijven, óók wanneer de accountstatus nog niet geladen is.
+ */
+export const DEFAULT_SUGGESTIONS: DefaultRule[] = [
+  {
+    key: 'default_gevuld',
+    condition:
+      'Geen enkele andere regel matcht én het account is gevuld (bezittingen + transacties of budgetten).',
+    check: isEstablishedAccount,
+    suggestion: {
+      message: 'Je basis staat. Elke euro die je opzijzet reken ik voor je om naar vrijheidstijd.',
+      cta: 'Naar je overzicht',
+      ctaHref: '/overzicht',
+    },
+  },
+  {
+    key: 'default',
+    condition:
+      'Altijd van toepassing — wint alleen als geen enkele andere regel matcht én het account nog niet gevuld is.',
+    suggestion: {
+      message: 'Welkom. Geld is opgeslagen tijd — ik help je zien hoeveel vrijheid het je geeft.',
+      cta: 'Aan de slag',
+      ctaHref: '/overzicht',
+    },
+  },
+]
+
+/**
+ * Het onvoorwaardelijke welkomstbericht. Blijft geëxporteerd onder de
+ * bestaande naam/key omdat beheer-overrides en weggeklikte suggesties op
+ * `'default'` zijn opgeslagen.
+ */
+export const DEFAULT_SUGGESTION: DefaultRule =
+  DEFAULT_SUGGESTIONS[DEFAULT_SUGGESTIONS.length - 1]
 
 // ── Selectie ───────────────────────────────────────────────────────────────
 
@@ -539,14 +643,22 @@ export function getFirstUndismissedSuggestion(
   for (const entry of PATH_SUGGESTIONS) {
     const matches =
       pathname === entry.pathPrefix || pathname.startsWith(entry.pathPrefix + '/')
-    if (matches && !dismissed.has(entry.key) && isEnabled(entry.key)) {
+    if (!matches) continue
+    // Predicaat op de accountstatus (H15). Zonder gaps kunnen we het niet
+    // toetsen: dan valt de regel weg ten gunste van de bredere, datastand-
+    // onafhankelijke terugval — nooit andersom.
+    if (entry.check && !(dataGaps && entry.check(dataGaps))) continue
+    if (!dismissed.has(entry.key) && isEnabled(entry.key)) {
       return applyOverride(entry.key, entry.suggestion, overrides)
     }
   }
 
-  // 3. Default welkomstbericht
-  if (!dismissed.has(DEFAULT_SUGGESTION.key) && isEnabled(DEFAULT_SUGGESTION.key)) {
-    return applyOverride(DEFAULT_SUGGESTION.key, DEFAULT_SUGGESTION.suggestion, overrides)
+  // 3. Default welkomstbericht — gevulde variant vóór het first-use-welkom
+  for (const entry of DEFAULT_SUGGESTIONS) {
+    if (entry.check && !(dataGaps && entry.check(dataGaps))) continue
+    if (!dismissed.has(entry.key) && isEnabled(entry.key)) {
+      return applyOverride(entry.key, entry.suggestion, overrides)
+    }
   }
 
   return null
@@ -605,14 +717,20 @@ export function buildCoachCatalogForAdmin(overrides: CoachOverrides = {}): Coach
   DEFERRED_FIELD_SUGGESTIONS.forEach((e, i) => push('deferred', e.key, e.condition, i + 1, e.suggestion))
   DATA_GAP_SUGGESTIONS.forEach((e, i) => push('data_gap', e.key, e.condition, i + 1, e.suggestion))
   PATH_SUGGESTIONS.forEach((e, i) => push('path', e.key, e.condition, i + 1, e.suggestion))
-  push('default', DEFAULT_SUGGESTION.key, DEFAULT_SUGGESTION.condition, 1, DEFAULT_SUGGESTION.suggestion)
+  // Beide default-varianten als eigen rij: een gesplitste regel MOET in beheer
+  // twee bewerkbare regels zijn, anders overschrijft één override stilzwijgend
+  // zowel de first-use- als de gevulde tekst (risico 1 op kaart H15).
+  DEFAULT_SUGGESTIONS.forEach((e, i) => push('default', e.key, e.condition, i + 1, e.suggestion))
 
   return rows
 }
 
 /** Totaal aantal coach-regels in de catalogus. */
 export const COACH_RULE_COUNT =
-  DEFERRED_FIELD_SUGGESTIONS.length + DATA_GAP_SUGGESTIONS.length + PATH_SUGGESTIONS.length + 1
+  DEFERRED_FIELD_SUGGESTIONS.length +
+  DATA_GAP_SUGGESTIONS.length +
+  PATH_SUGGESTIONS.length +
+  DEFAULT_SUGGESTIONS.length
 
 // ── Config-parsing ─────────────────────────────────────────────────────────
 

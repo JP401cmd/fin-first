@@ -391,9 +391,36 @@ const tests: TestCase[] = [
       const pensioen = classifyAsset(makeAsset({ asset_type: 'retirement', current_value: 100_000, tax_benefit: true }))
       assertEqual(pensioen.category, null, 'pensioen fiscaal voordeel niet in Box 3')
 
-      // Pensioen zonder fiscaal voordeel WEL in Box 3
+      // M23: pensioen ZONDER de tax_benefit-vlag valt óók buiten Box 3. Deze
+      // assertie legde eerder het omgekeerde vast ('beleggingen') — dat was de
+      // schaal-as van de bevinding: de vlag is een los vinkje dat in het
+      // formulier op false staat tot de gebruiker hem aanraakt, waardoor een
+      // pensioenaanspraak volledig op het 6%-forfait belandde.
       const pensioenZonder = classifyAsset(makeAsset({ asset_type: 'retirement', current_value: 100_000, tax_benefit: false }))
-      assertEqual(pensioenZonder.category, 'beleggingen', 'pensioen zonder voordeel = beleggingen')
+      assertEqual(pensioenZonder.category, null, 'pensioen zonder vlag óók niet in Box 3')
+      assert(pensioenZonder.note !== null, 'pensioen zonder vlag krijgt een toelichting')
+    },
+  },
+  {
+    id: 'box3-classificatie-vrijgesteld', name: 'Box 3: roerende zaken en belastingschuld', category: CAT,
+    description: 'Roerende zaken voor eigen gebruik vallen buiten Box 3; belastingschuld is niet aftrekbaar (M23)',
+    priority: 'high', estimatedDurationMs: 5,
+    fn() {
+      const auto = classifyAsset(makeAsset({ asset_type: 'vehicle', current_value: 8_000 }))
+      assertEqual(auto.category, null, 'auto (roerende zaak eigen gebruik) niet in Box 3')
+
+      const sieraden = classifyAsset(makeAsset({ asset_type: 'physical', current_value: 2_500, subtype: 'sieraden' }))
+      assertEqual(sieraden.category, null, 'sieraden niet in Box 3')
+
+      // Kunst blijft er wél in: hoofdzakelijk ter belegging.
+      const kunst = classifyAsset(makeAsset({ asset_type: 'physical', current_value: 14_000, subtype: 'kunst' }))
+      assertEqual(kunst.category, 'beleggingen', 'kunst wél in Box 3')
+
+      const belastingschuld = classifyDebt(
+        { debt_type: 'belastingschuld', current_balance: 1_200 } as never,
+        new Set<string>(),
+      )
+      assertEqual(belastingschuld.inBox3, false, 'belastingschuld niet aftrekbaar in Box 3')
     },
   },
   {

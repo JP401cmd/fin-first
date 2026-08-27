@@ -4,6 +4,9 @@ import { useState, useCallback, useMemo } from 'react'
 import { OnboardingShell } from './onboarding-shell'
 import { FactsPanel } from './facts-panel'
 import type { IdentityData } from './onboarding-identity'
+import { formatCurrency } from '@/lib/format'
+import { intakeDailyExpenseRate } from '@/lib/freedom-ticker'
+import { savingsRateFromAggregates } from '@/lib/savings-source'
 
 /**
  * Stap 3 — Inkomen & uitgaven.
@@ -193,8 +196,32 @@ export function OnboardingInkomen({
     const monthlyIncome = parseBedragInput(data.net_monthly_income)
     const monthlyExpenses = parseBedragInput(data.estimated_monthly_expenses)
     if (!isFinite(monthlyIncome) || monthlyIncome <= 0 || !isFinite(monthlyExpenses)) return null
-    return Math.round(((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100)
+    // Canonieke quote-formule (lib/savings-source.ts) i.p.v. een handgerolde
+    // deling: numeriek identiek zolang de aflossing 0 is — en die is hier per
+    // definitie 0, want de schulden-stap komt pas later — maar het houdt deze
+    // preview op dezelfde formule als /overzicht/cashflow. Een eigen som naast
+    // de canonieke motor is per definitie toekomstige drift (CLAUDE.md,
+    // "consume, don't recompute").
+    return Math.round(savingsRateFromAggregates(monthlyIncome, monthlyExpenses, 0))
   }, [data.net_monthly_income, data.estimated_monthly_expenses, allErrors])
+
+  /**
+   * Dagtarief van de zojuist ingevulde maanduitgaven — de NOEMER van elke
+   * vrijheidstijd in de app ("elke €69 die je niet uitgeeft is één dag
+   * vrijheid"). Bewust hier al zichtbaar, op het eerste scherm waar hij
+   * stabiel bekend is: de teller (vermogen) begint pas twee groepen later,
+   * dus zonder deze zin blijft de flow tot dan zonder één vrijheidsgetal
+   * (bevinding H12). Alleen de noemer, geen score — er valt hier nog niets
+   * te wegen.
+   */
+  const dailyRate = useMemo(() => {
+    if (!data.estimated_monthly_expenses || allErrors.estimated_monthly_expenses) return null
+    const monthlyExpenses = parseBedragInput(data.estimated_monthly_expenses)
+    if (!isFinite(monthlyExpenses) || monthlyExpenses <= 0) return null
+    const rate = intakeDailyExpenseRate(monthlyExpenses)
+    return rate > 0 ? rate : null
+  }, [data.estimated_monthly_expenses, allErrors])
+
   // Preview tonen op het uitgaven-scherm én op het gecombineerde scherm.
   const showPreview = previewRate !== null && field !== 'inkomen'
 
@@ -251,7 +278,10 @@ export function OnboardingInkomen({
       }
     >
       <div className="space-y-6">
-        {submitted && !isValid && (
+        {/* Samenvattings-banner: alleen zinvol als er méér dan één veld op dit
+            scherm staat. Op een begeleid één-vraag-scherm (`field='inkomen'` /
+            `field='uitgaven'`) herhaalt hij de inline-melding alleen vager. */}
+        {submitted && !isValid && activeFields.length > 1 && (
           <div className="border border-red-200 bg-red-50 px-4 py-3" role="alert">
             <p className="text-sm font-medium text-red-700">
               Controleer de gemarkeerde velden
@@ -383,6 +413,17 @@ export function OnboardingInkomen({
               </span>
               {' '}— dit drijft je toekomst-prognose.
             </p>
+            {/* Vrijheidstijd-noemer: wat één dag leven jou kost. Vanaf hier
+                rekent de app elk bedrag in dagen, maanden en jaren vrijheid. */}
+            {dailyRate !== null && (
+              <p className="mt-1.5 text-sm text-[var(--ink-2)]">
+                Elke{' '}
+                <span className="font-mono font-bold tabular-nums text-[var(--module-active-700)]">
+                  {formatCurrency(Math.round(dailyRate))}
+                </span>
+                {' '}die je niet uitgeeft is één dag vrijheid.
+              </p>
+            )}
           </div>
         )}
 

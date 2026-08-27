@@ -1,7 +1,5 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
-import { localMonthStartMonthsAgo } from '@/lib/month-range'
-import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
-import { EXPENSE_RATE_ROLLING_MONTHS } from '@/lib/constants'
+import { fetchExpenseRowsForRate, recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 import type {
   BudgetReportData,
   BudgetReportCategory,
@@ -150,10 +148,11 @@ export async function GET(request: Request) {
       supabase.from('transactions').select('id, budget_id, amount, date, is_split').gte('date', trendMonths[0].start).lt('date', monthEnd),
       supabase.from('budget_rollovers').select('budget_id, period, carried_amount, rollover_type').eq('period', currentPeriod),
       supabase.from('budget_amounts').select('budget_id, effective_from, amount'),
-      // Dagtarief-venster uit de CONSTANTE (niet hardgecodeerd "11"), zodat het
-      // gelijk blijft aan /api/daily-expense-rate en lib/expense-rate.ts zodra
-      // EXPENSE_RATE_ROLLING_MONTHS wijzigt. Tijdzone-veilige ondergrens.
-      supabase.from('transactions').select('amount, date').lt('amount', 0).gte('date', localMonthStartMonthsAgo(now, EXPENSE_RATE_ROLLING_MONTHS - 1)).lte('date', now.toISOString().split('T')[0]),
+      // Dagtarief-grondslag via het MAANDAGGREGAAT, niet via rauwe transactie-rijen
+      // (bevinding L10): een ongepagineerde `.from('transactions')`-fetch werd door
+      // PostgREST stil op max_rows = 1000 afgekapt en loog het tarief omhoog. Venster
+      // (EXPENSE_RATE_ROLLING_MONTHS) en grondslag wonen in `fetchExpenseRowsForRate`.
+      fetchExpenseRowsForRate(supabase, now),
     ])
 
     const profile = profileResult.data
@@ -162,7 +161,8 @@ export async function GET(request: Request) {
     const trendTx = (trendTxResult.data ?? []) as (TxRow & { date: string })[]
     const rolloverRows = (rolloversResult.data ?? []) as RolloverRow[]
     const amountRows = (amountsResult.data ?? []) as AmountRow[]
-    const expenseTx = (expenseResult.data ?? []) as { amount: number; date: string }[]
+    // `fetchExpenseRowsForRate` levert de rijen zelf (geen PostgREST-envelope).
+    const expenseTx = expenseResult
 
     // ── Fetch split rows for current month ───────────────────────────────────
 
@@ -212,8 +212,9 @@ export async function GET(request: Request) {
     // ── Daily expense rate ───────────────────────────────────────────────────
 
     // Canoniek dagtarief (€/dag) via de gedeelde bron `lib/expense-rate.ts` —
-    // `expenseTx` is al het 12-mnd rolling venster. Zelfde grondslag als de
-    // andere rapporten en de dashboard-widgets (KRUIS-20).
+    // `expenseTx` is al het 12-mnd rolling venster uit het maandaggregaat. Zelfde
+    // grondslag EN databron als de andere rapporten, /overzicht/cashflow en de
+    // dashboard-widgets (KRUIS-20 = de formule, L10 = de rijen eronder).
     const dailyExpenseRate = recentDailyExpenseRateFromRows(expenseTx, now).dailyRate
 
     // ── Build parent-child hierarchy ─────────────────────────────────────────

@@ -32,6 +32,8 @@ import {
   TARGET_EMERGENCY_MONTHS,
   TARGET_EMERGENCY_SALARY_MONTHS,
 } from '@/lib/constants'
+import { computeLiquidPot, type WeightableAssetRow } from '@/lib/dashboard-wealth-weighting'
+import { roundCents } from '@/lib/format'
 
 export { TARGET_EMERGENCY_SALARY_MONTHS }
 
@@ -148,6 +150,95 @@ export function resolveEmergencyFund(input: EmergencyFundInput): EmergencyFundRe
     monthsCovered: monthlyBase > 0 ? liquidPot / monthlyBase : 0,
     runwayMonths: effectiveMonthlyExpenses > 0 ? liquidPot / effectiveMonthlyExpenses : 0,
     source: basis,
+  }
+}
+
+/**
+ * Minimale assetvorm voor de liquide pot: type, waarde en inclusie-percentage.
+ * Bewust losser dan `WeightableAssetRow` (waarde mag ontbreken) zodat zowel de
+ * score-rijen (`HealthScoreAsset`) als rauwe loader-rijen er rechtstreeks in
+ * passen zonder per call-site een eigen map-stap.
+ */
+export interface LiquidPotAssetRow {
+  current_value?: number | string | null
+  asset_type?: string | null
+  net_worth_inclusion_pct?: number | null
+}
+
+/**
+ * Dezelfde resolver, maar gevoed vanuit de RUWE rijen: de canonieke
+ * inclusion-gewogen liquide pot wordt hier zélf afgeleid (`computeLiquidPot`).
+ *
+ * Dit is de gedeelde kern onder twee consumenten die tot bevinding H4 (punt 1)
+ * elk hun eigen pot bouwden:
+ *  - de gezondheidsscore-pijler `emergency_fund`
+ *    (`computeEmergencyFundMonths` in lib/health-score-input.ts delegeert
+ *    hiernaartoe), en
+ *  - de noodfonds-bundel die de widget en de briefing lezen
+ *    (`lib/horizon/raw-data-loader.ts` → `HorizonRawData.emergencyFund`).
+ *
+ * Gelijke rijen + gelijke scalars ⇒ per constructie hetzelfde aantal maanden
+ * dekking en dezelfde norm. Dát is wat "Uitstekend, 4,6 × salaris" in de
+ * gezondheidsmodal naast "vraagt aandacht" in de briefing onmogelijk maakt.
+ *
+ * @param netMonthlySalary effectief netto maandsalaris; 0 → uitgaven-terugval.
+ * @param avgMonthlyExpenses gemiddelde maanduitgaven — terugval-noemer én de
+ *   noemer van de leesbare runway.
+ */
+export function resolveEmergencyFundFromRows(
+  assets: ReadonlyArray<LiquidPotAssetRow>,
+  unlinkedCash: number,
+  netMonthlySalary: number,
+  avgMonthlyExpenses: number,
+): EmergencyFundResult {
+  const rows: WeightableAssetRow[] = assets.map((a) => ({
+    current_value: a.current_value ?? 0,
+    asset_type: a.asset_type,
+    net_worth_inclusion_pct: a.net_worth_inclusion_pct,
+  }))
+  return resolveEmergencyFund({
+    liquidPot: computeLiquidPot(rows, unlinkedCash),
+    effectiveMonthlyExpenses: avgMonthlyExpenses,
+    netMonthlyIncome: netMonthlySalary,
+  })
+}
+
+/**
+ * Weergave-vorm van het noodfonds zoals de bundel (`DashboardData.emergencyFund`)
+ * en de widget 'm dragen: dezelfde cijfers, één keer afgerond.
+ *
+ * Structureel toewijsbaar aan `EmergencyFund` (lib/types/dashboard.ts) zonder
+ * dat deze pure module dat zware type hoeft te importeren.
+ */
+export interface EmergencyFundDisplay {
+  currentAmount: number
+  targetAmount: number
+  monthsCovered: number
+  targetMonths: number
+  isComplete: boolean
+  runwayMonths: number
+  source: EmergencyBasis
+}
+
+/**
+ * De ÉNE afrondings-conventie voor de noodfonds-bundel. Woont hier zodat het
+ * canonieke pad (/overzicht, via `withCanonicalOverviewFigures`) en de
+ * loader-bundel niet elk hun eigen `Math.round(x * 10) / 10` dragen — twee
+ * afrondingen op één getal is precies hoe "4,6" en "4,5" naast elkaar komen te
+ * staan.
+ *
+ * `isComplete` toetst bewust op de ONAFGERONDE waarden: 2,96 maanden mag geen
+ * "compleet" worden omdat de weergave er 3,0 van maakt.
+ */
+export function toEmergencyFundDisplay(result: EmergencyFundResult): EmergencyFundDisplay {
+  return {
+    currentAmount: roundCents(result.currentAmount),
+    targetAmount: roundCents(result.targetAmount),
+    monthsCovered: Math.round(result.monthsCovered * 10) / 10,
+    targetMonths: Math.round(result.targetMonths * 2) / 2,
+    isComplete: result.monthsCovered >= result.targetMonths,
+    runwayMonths: Math.round(result.runwayMonths * 10) / 10,
+    source: result.source,
   }
 }
 

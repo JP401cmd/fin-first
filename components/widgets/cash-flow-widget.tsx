@@ -5,6 +5,7 @@ import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
+import { currentMonthWindowLabel } from '@/lib/cashflow-cards'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData } from './widget-renderer'
 import { ArrowUpDown, TrendingUp, ShoppingCart, PiggyBank, CreditCard, Users, UserCheck } from 'lucide-react'
@@ -127,9 +128,35 @@ interface ComparisonBarProps {
    * (Inkomen, Netto): dan wordt omhoog groen/positief getoond.
    */
   higherIsBetter?: boolean
+  /**
+   * Is de LINKER balk een nog lopende (onvolledige) maand? Dan wordt het
+   * delta-% ONDERDRUKT (H6).
+   *
+   * Waarom niet gewoon tonen: `current` is dan "augustus tot nu toe" en
+   * `previous` een volledige juli. Op de 3e van de maand levert dat −95%
+   * "minder inkomen" terwijl er niets aan de hand is — precies het soort getal
+   * waar bevinding H6 over ging. De twee bedragen mogen náást elkaar staan (de
+   * bijschriften zeggen wélk venster elk is), maar hun VERHOUDING is pas een
+   * uitspraak zodra beide vensters even lang zijn.
+   */
+  currentPartial?: boolean
+  /** Bijschrift onder de linker balk — benoemt het venster van `current`. */
+  currentCaption?: string
+  /** Bijschrift onder de rechter balk — benoemt het venster van `previous`. */
+  previousCaption?: string
 }
 
-function ComparisonBar({ label, current, previous, color, hasEntered, higherIsBetter = false }: ComparisonBarProps) {
+function ComparisonBar({
+  label,
+  current,
+  previous,
+  color,
+  hasEntered,
+  higherIsBetter = false,
+  currentPartial = false,
+  currentCaption,
+  previousCaption,
+}: ComparisonBarProps) {
   // Grondslag op magnitude zodat een negatieve (tekort-)waarde een zichtbare balk
   // krijgt i.p.v. te verdwijnen; het teken sturen we via kleur + het bedrag-label.
   const maxVal = Math.max(Math.abs(current), Math.abs(previous), 1)
@@ -148,7 +175,7 @@ function ComparisonBar({ label, current, previous, color, hasEntered, higherIsBe
     <div className="space-y-1">
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">{label}</span>
-        {previous !== 0 && (
+        {previous !== 0 && !currentPartial && (
           <span className={`text-[10px] font-mono tabular-nums ${deltaClass}`}>
             {deltaUp ? '+' : ''}{Math.round(delta)}%
           </span>
@@ -188,6 +215,14 @@ function ComparisonBar({ label, current, previous, color, hasEntered, higherIsBe
           <MaskedAmount value={previous} tone="kern" className="text-[9px]" />
         </span>
       </div>
+      {/* Vensterbijschriften (H6): zonder deze regel staan een halve en een hele
+          maand naamloos naast elkaar en leest het verschil als een daling. */}
+      {(currentCaption || previousCaption) && (
+        <div className="flex gap-1 text-[8px] leading-tight text-[var(--ink-4)]">
+          <span className="flex-1 truncate text-center">{currentCaption}</span>
+          <span className="flex-1 truncate text-center">{previousCaption}</span>
+        </div>
+      )}
     </div>
   )
 }
@@ -237,16 +272,33 @@ function useMeasuredHeight() {
 // te houden (solid = deze maand, vervaagd = vorige maand blijft conventioneel).
 
 interface MonthComparisonProps {
-  monthlyIncome:    number
-  monthlyExpenses:  number
+  income:           number
+  expenses:         number
   cashFlow:         number
   prevMonthIncome:  number
   prevMonthExpenses:number
   prevCashFlow:     number
   hasEntered:       boolean
+  /** Bijschrift voor de linker (huidige) balk, bv. "aug. tot nu toe". */
+  currentCaption:   string
+  /** Bijschrift voor de rechter (vorige) balk, bv. "juli". */
+  previousCaption:  string
+  /** Loopt de linker maand nog? Dan geen delta-% (zie `ComparisonBar`). */
+  currentPartial:   boolean
 }
 
-function MonthComparison({ monthlyIncome, monthlyExpenses, cashFlow, prevMonthIncome, prevMonthExpenses, prevCashFlow, hasEntered }: MonthComparisonProps) {
+function MonthComparison({
+  income,
+  expenses,
+  cashFlow,
+  prevMonthIncome,
+  prevMonthExpenses,
+  prevCashFlow,
+  hasEntered,
+  currentCaption,
+  previousCaption,
+  currentPartial,
+}: MonthComparisonProps) {
   return (
     <div className="border-t border-dashed border-[var(--border-ed)] pt-2">
       <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
@@ -255,18 +307,24 @@ function MonthComparison({ monthlyIncome, monthlyExpenses, cashFlow, prevMonthIn
       <div className="grid grid-cols-3 gap-3">
         <ComparisonBar
           label="Inkomen"
-          current={monthlyIncome}
+          current={income}
           previous={prevMonthIncome}
           color="var(--color-income-400)"
           hasEntered={hasEntered}
           higherIsBetter
+          currentPartial={currentPartial}
+          currentCaption={currentCaption}
+          previousCaption={previousCaption}
         />
         <ComparisonBar
           label="Uitgaven"
-          current={monthlyExpenses}
+          current={expenses}
           previous={prevMonthExpenses}
           color="var(--color-expense-400)"
           hasEntered={hasEntered}
+          currentPartial={currentPartial}
+          currentCaption={currentCaption}
+          previousCaption={previousCaption}
         />
         <ComparisonBar
           label="Netto"
@@ -275,6 +333,9 @@ function MonthComparison({ monthlyIncome, monthlyExpenses, cashFlow, prevMonthIn
           color="var(--color-savings-400)"
           hasEntered={hasEntered}
           higherIsBetter
+          currentPartial={currentPartial}
+          currentCaption={currentCaption}
+          previousCaption={previousCaption}
         />
       </div>
     </div>
@@ -287,16 +348,16 @@ function MonthComparison({ monthlyIncome, monthlyExpenses, cashFlow, prevMonthIn
 // vorige-maand-vergelijking is (huishouden/partner) of die niet volledig past
 // (mobiel). Het U+2212 minteken is de bewuste mojibake-fix — niet vervangen.
 
-function NetSummaryRow({ monthlyIncome, monthlyExpenses, cashFlow, isPositive }: { monthlyIncome: number; monthlyExpenses: number; cashFlow: number; isPositive: boolean }) {
+function NetSummaryRow({ income, expenses, cashFlow, isPositive }: { income: number; expenses: number; cashFlow: number; isPositive: boolean }) {
   return (
     <div className="flex items-center justify-between rounded-[var(--r-sm)] bg-[var(--subtle)] px-2.5 py-1.5">
       <div className="flex items-center gap-3 text-[11px]">
         <span className="text-positive">
-          <MaskedAmount value={monthlyIncome} signPrefix="+" tone="kern" />
+          <MaskedAmount value={income} signPrefix="+" tone="kern" />
         </span>
         <span className="text-[var(--ink-4)]">−</span>
         <span className="text-negative">
-          <MaskedAmount value={monthlyExpenses} tone="kern" />
+          <MaskedAmount value={expenses} tone="kern" />
         </span>
       </div>
       <span className={isPositive ? 'text-positive' : 'text-negative'}>
@@ -318,25 +379,59 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
   const isHouseholdView = perspective === 'household' && data.householdOverrides != null
   const isPartnerView = perspective === 'partner' && data.partnerOverrides != null
 
-  // Use perspective-appropriate data overrides for the headline cashflow metrics
+  // ── GRONDSLAG (H6) ────────────────────────────────────────────────────────
+  //
+  // Dit widget heette "Cashflow Maand" en rekende met `data.monthlyIncome/
+  // monthlyExpenses` — de EFFECTIVE grondslag (`resolveEffectiveIncomeExpenses`,
+  // ADR 0103: manual > budget > transactie > profiel). Bij `income_source='auto'`
+  // is dat de 12-maands gerealiseerde budgetsom: een STRUCTURELE maandwaarde die
+  // niets met de lopende maand te maken heeft. Eén klik verderop toonde
+  // /overzicht/cashflow de GEREALISEERDE maand. Twee schermen, één label,
+  // tegengesteld teken (+€3.606 vs −€3.618).
+  //
+  // Eigen perspectief consumeert daarom `currentMonth*` — hetzelfde bundelveld
+  // dat de Transacties-kaart op /overzicht/cashflow sinds 30 jul 2026 leest
+  // (lib/cashflow-cards.ts). Consume, don't recompute: geen eigen tel-lus, en het
+  // aggregaat achter dit veld kan niet stil op `max_rows` afkappen (ADR 0073).
+  //
+  // HUISHOUDEN/PARTNER HOUDT DE EFFECTIVE GRONDSLAG. `householdOverrides`/
+  // `partnerOverrides` dragen geen `currentMonth*`-equivalent (lib/types/dashboard.ts).
+  // Dat is geen omissie die hier stil overbrugd mag worden met de eigen
+  // gerealiseerde maand — dat zou het huishoud-getal uit de eigen transacties
+  // opbouwen. De grondslag verschilt dus per perspectief, en daarom verschilt
+  // ook het LABEL: `kickerLabel` hieronder zegt per geval welk venster je ziet.
   const overrides = isHouseholdView ? data.householdOverrides! : isPartnerView ? data.partnerOverrides! : null
-  const monthlyIncome = overrides ? overrides.monthlyIncome : data.monthlyIncome
-  const monthlyExpenses = overrides ? overrides.monthlyExpenses : data.monthlyExpenses
+  const income = overrides ? overrides.monthlyIncome : data.currentMonthIncome
+  const expenses = overrides ? overrides.monthlyExpenses : data.currentMonthExpenses
   const { budgetTotals, prevMonthIncome, prevMonthExpenses } = data
-  const cashFlow = monthlyIncome - monthlyExpenses
+  const cashFlow = income - expenses
   const isPositive = cashFlow >= 0
   const { ref: inViewRef, hasEntered } = useInViewAnimation({ duration: 600 })
   // Vóór alle size-early-returns aanroepen (rules-of-hooks); alleen de
   // full-size-weergave gebruikt de meting.
   const { ref: spaceRef, height: spaceH } = useMeasuredHeight()
 
+  // Het venster-label. Voor het eigen perspectief de canonieke formulering uit
+  // lib/cashflow-cards.ts ("augustus tot nu toe") — dezelfde woorden als de
+  // Transacties-kaart waar dit widget nu naartoe linkt, zodat de twee
+  // oppervlakken herkenbaar hetzelfde venster claimen. `now` blijft binnen de
+  // render: dit is een klant-zijdig label zonder eigen cijfer.
+  const now = new Date()
+  const monthWindow = currentMonthWindowLabel(now)
   const kickerLabel = isHouseholdView
-    ? 'Cashflow Maand — Huishouden'
+    ? 'Cashflow per maand — Huishouden'
     : isPartnerView
-      ? `Cashflow Maand — ${partnerName ?? 'Partner'}`
-      : 'Cashflow Maand'
+      ? `Cashflow per maand — ${partnerName ?? 'Partner'}`
+      : `Cashflow — ${monthWindow}`
 
-  if (monthlyIncome === 0 && monthlyExpenses === 0) {
+  // LEEG-TOETS op de juiste grondslag. Met `currentMonth*` is 0/0 óók de normale
+  // stand op de 1e van de maand: dan is "importeer transacties" een leugen tegen
+  // een gebruiker die gewoon nog niets geboekt heeft. Vorige-maand-data (zelfde
+  // gerealiseerde grondslag) bewijst dat er wél historie is → dan €0 tonen mét
+  // het venster-label, niet de lege staat.
+  const hasAnyRealized = income !== 0 || expenses !== 0 || prevMonthIncome > 0 || prevMonthExpenses > 0
+  const isEmpty = overrides ? income === 0 && expenses === 0 : !hasAnyRealized
+  if (isEmpty) {
     return (
       <WidgetShell module="kern" size={size} kicker={kickerLabel} href={href}>
         <WidgetEmpty icon={ArrowUpDown} message="Importeer transacties om je maandelijkse cashflow te zien." />
@@ -361,9 +456,15 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
 
   // Personal view: canoniek 12-mnd rolling dagtarief uit de bundel (KRUIS-20);
   // override-perspectief houdt zijn eigen (perspectief-eigen) uitgavenniveau.
+  //
+  // H6: de TERUGVAL rekent bewust op `data.monthlyExpenses` (de effective
+  // maandwaarde) en NIET op de lokale `expenses` — die is sinds H6 de
+  // gerealiseerde, halfvolle kalendermaand. Een dagtarief daarop is op de 3e van
+  // de maand een factor 10 te laag en zou elke vrijheidsregel in dit widget
+  // opblazen. Het bundelveld wint altijd; dit is puur het mock-/empty-vangnet.
   const dailyExp = overrides
-    ? dailyExpenseRate(monthlyExpenses)
-    : data.dailyExpenseRate ?? dailyExpenseRate(monthlyExpenses)
+    ? dailyExpenseRate(overrides.monthlyExpenses)
+    : data.dailyExpenseRate ?? dailyExpenseRate(data.monthlyExpenses)
   const freedomDays = dailyExp > 0 && Math.abs(cashFlow) > 0
     ? Math.round(Math.abs(cashFlow) / dailyExp)
     : null
@@ -431,13 +532,13 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
             <div className="flex justify-between text-[11px] text-[var(--ink-3)]">
               <span>Inkomsten</span>
               <span className="text-positive">
-                <MaskedAmount value={monthlyIncome} signPrefix="+" tone="kern" />
+                <MaskedAmount value={income} signPrefix="+" tone="kern" />
               </span>
             </div>
             <div className="flex justify-between text-[11px] text-[var(--ink-3)]">
               <span>Uitgaven</span>
               <span className="text-negative">
-                <MaskedAmount value={monthlyExpenses} signPrefix="-" tone="kern" />
+                <MaskedAmount value={expenses} signPrefix="-" tone="kern" />
               </span>
             </div>
             <div className="border-t border-dashed border-[var(--border-ed)] pt-1 flex justify-between text-[11px]">
@@ -463,6 +564,15 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
   // Vorige-maand vergelijking is per-gebruiker historie — alleen tonen in eigen perspectief
   const hasPrevMonth = !isHouseholdView && !isPartnerView && (prevMonthIncome > 0 || prevMonthExpenses > 0)
 
+  // Bijschriften voor de vergelijking. Links de LOPENDE maand ("aug. tot nu
+  // toe"), rechts de AFGESLOTEN vorige maand ("juli") — beide op de gerealiseerde
+  // grondslag, maar niet even lang. Zolang de linker maand nog loopt is het
+  // delta-% onderdrukt (zie `ComparisonBar.currentPartial`).
+  const shortMonth = (d: Date) => new Intl.DateTimeFormat('nl-NL', { month: 'short' }).format(d)
+  const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  const currentCaption = `${shortMonth(now)} tot nu toe`
+  const previousCaption = shortMonth(prevMonthDate)
+
   // Rest-gebied meten: toon de (zware) vergelijking alleen als hij HÉÉL past.
   // Niet gemeten (SSR/jsdom → null) telt als "past" zodat de weergave
   // deterministisch blijft (spiegelt W1).
@@ -481,8 +591,10 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
         {/* ── Netto cashflow hero — de belangrijke slotregel, altijd in beeld ── */}
         <div className="flex shrink-0 items-end justify-between">
           <div>
+            {/* Het venster staat in het label zelf — niet alleen in de kicker,
+                die op smalle tegels afkapt (`truncate` in WidgetShell). */}
             <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
-              Netto cashflow
+              {overrides ? 'Netto per maand' : `Netto — ${monthWindow}`}
             </p>
             <p className={isPositive ? 'text-[var(--ink)]' : 'text-negative'}>
               <MaskedAmount
@@ -524,18 +636,23 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
         <div ref={spaceRef} className={`mt-2 flex min-h-0 flex-1 flex-col overflow-hidden ${showComparison ? 'justify-start' : 'justify-center'}`}>
           {showComparison ? (
             <MonthComparison
-              monthlyIncome={monthlyIncome}
-              monthlyExpenses={monthlyExpenses}
+              income={income}
+              expenses={expenses}
               cashFlow={cashFlow}
               prevMonthIncome={prevMonthIncome}
               prevMonthExpenses={prevMonthExpenses}
               prevCashFlow={prevCashFlow}
               hasEntered={hasEntered}
+              currentCaption={currentCaption}
+              previousCaption={previousCaption}
+              // De vergelijking rendert alleen in het eigen perspectief
+              // (`hasPrevMonth`), waar links per definitie de lopende maand staat.
+              currentPartial
             />
           ) : (
             <NetSummaryRow
-              monthlyIncome={monthlyIncome}
-              monthlyExpenses={monthlyExpenses}
+              income={income}
+              expenses={expenses}
               cashFlow={cashFlow}
               isPositive={isPositive}
             />

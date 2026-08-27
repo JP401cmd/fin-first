@@ -23,25 +23,29 @@
 
 import type { LeverageStatus } from '@/lib/leverage-status'
 import { hasPartner as deriveHasPartner } from '@/lib/household-type'
-import { BOX3_PARAMS, CURRENT_TAX_YEAR, classifyDebt } from '@/lib/box3-data'
+import { BOX3_PARAMS, CURRENT_TAX_YEAR, classifyAsset, classifyDebt } from '@/lib/box3-data'
 import type { Debt } from '@/lib/debt-data'
+import type { Asset } from '@/lib/asset-data'
 
 /**
- * Box 3-belastbare asset-typen. Pension, eigen_huis, vehicle, physical en
- * levensverzekering zijn vrijgesteld. `other` telt mee (conservatief: meestal
- * wel box3-relevant). Identiek aan de set die voorheen inline in layout.tsx
- * stond.
+ * Of deze bezitting in de Box 3-grondslag valt — één regel, één bron.
+ *
+ * Consumeert de canonieke `classifyAsset` (lib/box3-data.ts) i.p.v. een eigen
+ * type-set. Tot M23 stond hier een losse `BOX3_ASSET_TYPES`-verzameling naast
+ * `classifyAsset` én naast een derde set in `health-score-input.ts#buildTaxData`;
+ * die drie gaven op dezelfde persona €84.500 / €71.500 / €55.200 en weken op
+ * 5 van de 13 assettypen in BÉIDE richtingen af — `deelneming` zat wél in deze
+ * set terwijl het aanmerkelijk belang in Box 2 valt, en `'checking'` in de derde
+ * set is niet eens een geldig `AssetType` (dode entry). Sinds de fiscale
+ * correctie van `classifyAsset` is samenvoegen veilig: de vrijstellingen die
+ * deze set met de hand bijhield (pensioen, eigen woning, voertuig, fysiek,
+ * levensverzekering) zitten nu ín de canonieke afleiding, inclusief de
+ * subtype-nuance en de gebruikers-overschrijving `box3_vrijgesteld`.
  */
-export const BOX3_ASSET_TYPES: ReadonlySet<string> = new Set([
-  'cash',
-  'savings',
-  'investment',
-  'crypto',
-  'real_estate',
-  'deelneming',
-  'vordering',
-  'other',
-])
+function isBox3Asset(asset: Box3AssetLike): boolean {
+  if (asset.asset_type == null) return false
+  return classifyAsset(asset as unknown as Asset).category !== null
+}
 
 /**
  * Box 3-heffingsvrij vermogen (alleenstaande) voor het lopende belastingjaar —
@@ -64,12 +68,19 @@ export interface Box3TaxableInput {
 }
 
 /** Minimale asset-shape die de helper nodig heeft (zowel layout-rows als Asset). */
-interface Box3AssetLike {
+export interface Box3AssetLike {
   /** Nodig om de eigen-woning-asset-set te bouwen voor de hypotheek-uitsluiting. */
   id?: string | null
   asset_type?: string | null
   current_value: number | string
   net_worth_inclusion_pct?: number | null
+  // ── Velden die de canonieke `classifyAsset` leest ──
+  // Ontbreken ze (oudere/smallere rij-selects), dan valt de classificatie terug
+  // op de type-afleiding; dat is exact het gedrag van vóór M23 voor die velden.
+  subtype?: string | null
+  tax_benefit?: boolean | null
+  box3_vrijgesteld?: boolean | null
+  box3_vrijstelling_reden?: string | null
 }
 
 /** Minimale debt-shape die de helper nodig heeft (zowel layout-rows als Debt). */
@@ -108,7 +119,7 @@ export function computeBox3TaxableInput(
   householdType?: string,
 ): Box3TaxableInput {
   const box3Assets = assets
-    .filter((a) => a.asset_type != null && BOX3_ASSET_TYPES.has(a.asset_type))
+    .filter(isBox3Asset)
     .reduce(
       (s, a) => s + Number(a.current_value) * ((a.net_worth_inclusion_pct ?? 100) / 100),
       0,
@@ -128,9 +139,7 @@ export function computeBox3TaxableInput(
   const aftrekbareSchulden = Math.max(0, box3Debts - schuldendrempel)
   const box3Net = box3Assets - aftrekbareSchulden
   const box3TaxableAboveThreshold = Math.max(0, box3Net - BOX3_VRIJSTELLING_SINGLE)
-  const hasBox3Assets = assets.some(
-    (a) => a.asset_type != null && BOX3_ASSET_TYPES.has(a.asset_type),
-  )
+  const hasBox3Assets = assets.some(isBox3Asset)
   return { box3TaxableAboveThreshold, hasBox3Assets, householdType }
 }
 

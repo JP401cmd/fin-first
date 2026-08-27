@@ -3,7 +3,7 @@
  * Geen React/Supabase. Zie transaction-display.test.ts.
  */
 
-import { calculateFreedomTime } from '@/lib/format'
+import { calculateFreedomTime, MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 import { counterpartyKey } from '@/lib/transaction-insights'
 import { PSP_PREFIX_RE, stripPspPrefix } from '@/lib/parsers/counterparty-normalize'
 
@@ -116,6 +116,46 @@ export function avgDailyExpense(
 export function freedomDays(amount: number, dailyExpense: number): number {
   if (dailyExpense <= 0) return 0
   return calculateFreedomTime(Math.abs(amount), dailyExpense).totalDays
+}
+
+/**
+ * Vrijheidstijd-label voor de dagkop van de tijdlijn (M20).
+ *
+ * GRONDSLAG = het NETTO dagbedrag (`incomeTotal - expenseTotal`) — exact dezelfde
+ * teller als het euro-bedrag dat er in de kop naast staat. Vóór M20 rekende de
+ * dagkop met alléén `expenseTotal`, waardoor een dag met €507,64 inkomsten en
+ * €28,61 uitgaven "+ €479,03 · ≈ 0,3 vrijheidsdag" toonde: twee verschillende
+ * grondslagen in één regel, precies op de plek die "geld is opgeslagen tijd" het
+ * meest letterlijk uitlegt. Op zuivere uitgavendagen (`incomeTotal = 0`) is het
+ * netto bedrag gelijk aan `-expenseTotal` en verandert er niets.
+ *
+ * Het richtingswoord maakt het teken expliciet — "erbij" bij een netto-inkomsten-
+ * dag, "kwijt" bij een netto-uitgavendag — zodat gewonnen tijd nooit als
+ * uitgegeven tijd leest. Zowel de weergegeven waarde als het meervoud volgen het
+ * op één decimaal AFGERONDE getal, zodat "≈ 2,0 vrijheidsdag" (1,96 dagen) niet
+ * meer kan ontstaan.
+ *
+ * Onder `masked` (privacy-schakelaar "verberg bedragen") wordt het dagen-cijfer
+ * vervangen door de placeholder: dagen × dagtarief IS het verborgen bedrag, dus een
+ * zichtbaar dagental verklapt precies wat de masking hoort te verbergen. Ook het
+ * onderscheid label-vs-niets zou lekken dat de dag bijna op nul uitkomt — daarom
+ * toont een gemaskeerde kop altijd dezelfde regel. Vorm volgt de buur
+ * `components/overview/transacties/bulk/bulk-impact.tsx`.
+ *
+ * @param net - Netto dagbedrag in euro; positief = inkomsten over, negatief = uitgaven over.
+ * @param dailyExpense - Dagtarief €/dag uit `avgDailyExpense` (budget-vrij, hele venster).
+ * @param masked - Privacy-modus; verbergt het dagental maar niet de richting (die staat
+ *   toch al als `+`/`−` naast het gemaskeerde bedrag).
+ * @returns Label als "≈ 5,0 vrijheidsdagen erbij", of '' wanneer er niets te tonen valt.
+ */
+export function dayFreedomLabel(net: number, dailyExpense: number, masked = false): string {
+  if (dailyExpense <= 0) return ''
+  const direction = net >= 0 ? 'erbij' : 'kwijt'
+  if (masked) return `≈ ${MASKED_AMOUNT_PLACEHOLDER} vrijheidsdagen ${direction}`
+  const rounded = Math.round(freedomDays(net, dailyExpense) * 10) / 10
+  if (rounded <= 0) return ''
+  const value = rounded.toFixed(1).replace('.', ',')
+  return `≈ ${value} vrijheidsdag${rounded >= 2 ? 'en' : ''} ${direction}`
 }
 
 // ─── Task 9: detectRecurring ──────────────────────────────────────────────────

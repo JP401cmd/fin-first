@@ -322,6 +322,63 @@ export function detectCategory(
 }
 
 /**
+ * TEGENPARTIJEN DIE PER DEFINITIE EEN VARIABELE UITGAVE ZIJN (H14, optie A).
+ *
+ * Supermarkt, tankstation, horeca en winkel: ze kómen terug — vaak zelfs
+ * betrouwbaar wekelijks — maar het BEDRAG is een keuze, geen verplichting. Ze
+ * horen dus niet in de vaste-lastenquote (die meet "hoeveel van mijn inkomen ligt
+ * vast?"), maar ze mogen ook niet stilzwijgend verdwijnen.
+ *
+ * DIT IS DE AANVULLING, NIET DE REGEL. De structurele snede is de FREQUENTIE
+ * (zie `isTerugkerendVariabel` in lib/vaste-lasten-summary.ts): een wekelijkse
+ * onherkende post is in Nederland nooit een vaste last. Een merchant-lijst is per
+ * definitie onbegrensd — de volgende onbekende winkel valt er weer doorheen — en
+ * kan de frequentiesnede dus niet vervangen. Hij vangt wél het deel dat maandelijks
+ * afrekent (tankbeurt, restaurant, kledingwinkel), en dat is precies wat de melding
+ * H14 op het scherm liet zien.
+ *
+ * REIKWIJDTE: deze lijst wordt UITSLUITEND geraadpleegd voor posten die
+ * `detectCategory` op `other_expense` heeft gezet — dus voor posten die door géén
+ * enkele CATEGORY_PATTERNS-regel zijn herkend. Een reeds herkende categorie
+ * (utility, insurance, transport, …) kan hier nooit alsnog uit de quote vallen.
+ * Voeg hier daarom geen namen toe die óók een echte vaste last kunnen zijn.
+ */
+const VARIABLE_MERCHANT_PATTERNS: RegExp[] = [
+  // Supermarkt & versspeciaalzaak
+  /albert heijn/i, /\bahold\b/i, /\bah\s*(?:to\s*go|xl)\b/i,
+  /\bjumbo\b/i, /\blidl\b/i, /\baldi\b/i, /plus\s*supermarkt/i,
+  /dirk\s*(?:van den|vd)\s*broek/i, /\bcoop\b/i, /\bspar\b/i,
+  /\bekoplaza\b/i, /\bvomar\b/i, /\bhoogvliet\b/i, /deka\s*markt/i,
+  /\bpicnic\b/i, /\bmarqt\b/i, /\bboni\b/i, /nettorama/i, /\bpoiesz\b/i,
+  /jan linders/i, /supermarkt/i, /\bbakkerij\b/i, /\bslagerij\b/i,
+  // Tanken & laden
+  /\bshell\b/i, /\bbp\b/i, /\besso\b/i, /totalenergies/i, /\btango\b/i,
+  /\btinq\b/i, /firezone/i, /\bavia\b/i, /\btamoil\b/i, /\bgulf\b/i,
+  /tankstation/i, /\bfastned\b/i,
+  // Horeca & bezorging
+  /\brestaurant\b/i, /\bcaf[eé]\b/i, /\bbistro\b/i, /\bbrasserie\b/i,
+  /pizzeria/i, /snackbar/i, /cafetaria/i, /mcdonald/i, /burger king/i,
+  /\bkfc\b/i, /domino'?s/i, /new york pizza/i, /starbucks/i,
+  /uber\s*eats/i, /deliveroo/i,
+  // Winkel, kleding & warenhuis
+  /\bh\s*&\s*m\b/i, /\bzara\b/i, /primark/i, /\bc\s*&\s*a\b/i,
+  /we fashion/i, /bershka/i, /decathlon/i, /\baction\b/i, /\bhema\b/i,
+  /blokker/i, /kruidvat/i, /\betos\b/i, /\bikea\b/i, /mediamarkt/i,
+  /\bbol\.com\b/i, /zalando/i, /\bgamma\b/i, /\bpraxis\b/i, /\bkarwei\b/i,
+  /sephora/i, /\bdouglas\b/i,
+]
+
+/**
+ * Is deze tegenpartij een winkel/tankstation/horeca — dus een terugkerende maar
+ * VARIABELE uitgave? Zie de kop van `VARIABLE_MERCHANT_PATTERNS`: alleen zinvol
+ * voor posten die als `other_expense` zijn geëindigd.
+ */
+export function isVariableMerchant(counterpartyName: string, description: string): boolean {
+  const searchText = `${counterpartyName} ${description}`.toLowerCase()
+  return VARIABLE_MERCHANT_PATTERNS.some((pattern) => pattern.test(searchText))
+}
+
+/**
  * Calculate the median of an array of numbers.
  */
 function median(values: number[]): number {

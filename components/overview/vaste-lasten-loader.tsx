@@ -9,6 +9,9 @@ import { useAbortableFetch, isAbortError } from '@/lib/hooks/use-abortable-fetch
 type ApiResponse = {
   subscriptions?: RecurringItem[]
   vasteKosten?: RecurringItem[]
+  /** Terugkerend maar variabel (H14) — buiten het totaal, wél getoond. */
+  terugkerendVariabel?: RecurringItem[]
+  totalMonthlyVariabel?: number
 }
 
 /**
@@ -30,6 +33,7 @@ export function VasteLastenLoader({
 }) {
   const [subscriptions, setSubscriptions] = useState<RecurringItem[]>([])
   const [vasteKosten, setVasteKosten] = useState<RecurringItem[]>([])
+  const [terugkerendVariabel, setTerugkerendVariabel] = useState<RecurringItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { abortableFetch, isMounted } = useAbortableFetch()
@@ -46,6 +50,7 @@ export function VasteLastenLoader({
       if (!isMounted()) return
       setSubscriptions(data.subscriptions ?? [])
       setVasteKosten(data.vasteKosten ?? [])
+      setTerugkerendVariabel(data.terugkerendVariabel ?? [])
     } catch (e) {
       // Afgebroken fetch (unmount) → stil negeren, geen foutmelding.
       if (isAbortError(e) || !isMounted()) return
@@ -64,6 +69,11 @@ export function VasteLastenLoader({
     0,
   )
   const totalMonthlyVasteKosten = vasteKosten.reduce(
+    (s, i) => s + i.monthlyAmount,
+    0,
+  )
+  // BUITEN het totaal (H14): terugkerend-variabele posten zijn geen vaste last.
+  const totalMonthlyVariabel = terugkerendVariabel.reduce(
     (s, i) => s + i.monthlyAmount,
     0,
   )
@@ -92,7 +102,11 @@ export function VasteLastenLoader({
       </section>
     )
   }
-  if (subscriptions.length === 0 && vasteKosten.length === 0) {
+  if (
+    subscriptions.length === 0 &&
+    vasteKosten.length === 0 &&
+    terugkerendVariabel.length === 0
+  ) {
     return (
       <section className="rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-6 sm:p-8 text-center">
         <p className="text-sm text-[var(--ink-2)] mb-2">
@@ -118,8 +132,10 @@ export function VasteLastenLoader({
     <VasteKostenAnalyse
       subscriptions={subscriptions}
       vasteKosten={vasteKosten}
+      terugkerendVariabel={terugkerendVariabel}
       totalMonthlySubscriptions={totalMonthlySubscriptions}
       totalMonthlyVasteKosten={totalMonthlyVasteKosten}
+      totalMonthlyVariabel={totalMonthlyVariabel}
       totalMonthly={totalMonthly}
       userProfile={fullName ? { full_name: fullName } : null}
       onCancellationOpen={handleCancellation}

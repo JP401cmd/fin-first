@@ -139,20 +139,55 @@ function nextOccurrenceYear(nowUtc: number, month: number, day: number): number 
 // ── Public API ───────────────────────────────────────────────
 
 /**
- * Geeft alle fiscale deadlines terug, elk met de eerstvolgende voorkomende
- * datum t.o.v. 'now' en het aantal hele dagen tot dan. Gesorteerd op
- * daysUntil oplopend (bij gelijke daysUntil stabiel op definitievolgorde).
+ * Relevantie- en jaarkeuze voor `getTaxDeadlines`.
  *
- * @param now   Referentiemoment (verplicht — de lib gebruikt geen interne klok).
- * @param year  Optioneel; momenteel niet gebruikt voor datumkeuze (deadlines zijn
- *              jaarlijks terugkerend), maar gereserveerd voor jaar-specifieke
- *              uitbreiding. Geaccepteerd voor API-stabiliteit.
+ * `hasAanmerkelijkBelang` is BEWUST VERPLICHT (bevinding L8). Vóór deze fix had
+ * `getTaxDeadlines` geen enkel relevantiefilter en gingen alle zes deadlines naar
+ * alle gebruikers: "Leengrens DGA + dividendtiming" (box 2) belandde daardoor op
+ * #1 in de fiscale kalender van élke gebruiker — ook zonder aanmerkelijk belang —
+ * omdat die op 31 december valt en bij gelijke `daysUntil` de definitie-volgorde
+ * wint. Datzelfde ongefilterde resultaat voedde óók de agenda-widget en de
+ * Fin-AI-context, waar het in tegenspraak kwam met de correcte regel "Box 2: nee".
+ *
+ * Het filter leeft daarom hier, in de lib, i.p.v. gedupliceerd bij de callers: een
+ * verplicht veld dwingt elke (ook toekomstige) call-site tot een expliciete keuze,
+ * zodat een vierde call-site het filter niet stil kán vergeten — precies de fout
+ * die de drie bestaande call-sites maakten.
  */
-export function getTaxDeadlines(now: Date, year?: number): TaxDeadline[] {
-  void year // gereserveerd voor toekomstige jaar-specifieke deadlines
+export interface TaxDeadlineOptions {
+  /**
+   * Of de gebruiker een aanmerkelijk belang (Box 2) heeft — canonieke bron:
+   * `hasBox2Relevance` / `hasBox2RelevanceFromRows` (lib/box2-relevance.ts).
+   * `false` verbergt alle `box: 2`-deadlines.
+   */
+  hasAanmerkelijkBelang: boolean
+  /**
+   * Optioneel; momenteel niet gebruikt voor datumkeuze (deadlines zijn jaarlijks
+   * terugkerend), maar gereserveerd voor jaar-specifieke uitbreiding.
+   */
+  year?: number
+}
+
+/**
+ * Geeft de voor deze gebruiker RELEVANTE fiscale deadlines terug, elk met de
+ * eerstvolgende voorkomende datum t.o.v. 'now' en het aantal hele dagen tot dan.
+ * Gesorteerd op daysUntil oplopend (bij gelijke daysUntil stabiel op
+ * definitievolgorde).
+ *
+ * @param now      Referentiemoment (verplicht — de lib gebruikt geen interne klok).
+ * @param options  Relevantie (verplicht) + optionele jaarkeuze. Zie TaxDeadlineOptions.
+ */
+export function getTaxDeadlines(now: Date, options: TaxDeadlineOptions): TaxDeadline[] {
+  void options.year // gereserveerd voor toekomstige jaar-specifieke deadlines
   const nowUtc = startOfUtcDay(now)
 
-  const deadlines: TaxDeadline[] = TAX_DEADLINES.map((t) => {
+  // Relevantiefilter vóór de datumberekening: een deadline die deze gebruiker
+  // niet aangaat, hoort de sortering (en dus de #1-positie) niet te beïnvloeden.
+  const relevant = TAX_DEADLINES.filter(
+    (t) => t.box !== 2 || options.hasAanmerkelijkBelang,
+  )
+
+  const deadlines: TaxDeadline[] = relevant.map((t) => {
     const occYear = nextOccurrenceYear(nowUtc, t.month, t.day)
     const occUtc = Date.UTC(occYear, t.month - 1, t.day)
     const daysUntil = Math.round((occUtc - nowUtc) / MS_PER_DAY)

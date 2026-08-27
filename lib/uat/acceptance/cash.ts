@@ -896,6 +896,26 @@ const criteria: AcceptanceCriterion[] = [
         'lib/spend-limits/engine.ts#computeSpendLimitScore + computeSpendLimitTrend + SPEND_LIMIT_SCORE_THRESHOLDS/SPEND_LIMIT_SCORE_MIN_PERIODS — echte productiefuncties, geen mirror — zie cash-checks.ts',
     },
   },
+  {
+    workflow: 'WF-CASH-62',
+    scenarioId: 'UAT-CASH-62',
+    titel: 'Widget en cashflow-strip tonen hetzelfde saldo voor hetzelfde venster (bevinding H6)',
+    kriticiteit: 'KERN',
+    persona: 'daan',
+    given:
+      'Eén kalendermaand transactierijen die alle vier de assen raakt waarop de figures-strip op /overzicht/cashflow vroeger afweek van de canonieke maandmotor: (a) een POSITIEF bedrag met `is_income = false` (de kolom draagt geen CHECK tegen `sign(amount)` — 20260215000000_create_base_tables.sql r.229), (b) een `joint_transfer`-rij (de strip filterde alleen op `transfer`), (c) een rij zónder `account_id` (de strip scoopte op `.in(\'account_id\', accountIds)`), en (d) gewone in- en uitgaven. Daarnaast een profiel waarin de EFFECTIVE grondslag bewust ANDERE bedragen geeft dan de gerealiseerde maand — precies de situatie uit de bevinding (+€3.606 op /overzicht tegenover −€3.618 op /overzicht/cashflow).',
+    when:
+      'Het cashflow-widget op /overzicht leidt zijn netto af uit `DashboardData.currentMonthIncome/currentMonthExpenses` (het maandaggregaat) en de figures-strip uit `deriveRealMonthTotals` over dezelfde rijen; beide oppervlakken vragen daarna hun spaarquote op bij `currentMonthSavingsRate`.',
+    then:
+      'De twee oppervlakken leveren HETZELFDE saldo en DEZELFDE spaarquote, omdat ze één classificatie (het teken van `amount`), één transfer-definitie (`isRealAggRow`: transfer én joint_transfer) en één quote-formule (`savingsRateFromAggregates`) delen — en géén van beide op rekening scoopt. Het effective maandcijfer (`monthlyIncome − monthlyExpenses`) is bewust een ANDER getal en mag dat blijven: dat is een structurele maandwaarde, geen "deze maand". Voorwaarde waaronder dat verschil is toegestaan: elk oppervlak BENOEMT zijn venster — de widget-kicker draagt `currentMonthWindowLabel` ("Cashflow — augustus tot nu toe") en de strip draagt "gerealiseerd in … tot nu toe / … volledige maand". Huishouden- en partnerperspectief houden de effective grondslag (de overrides dragen geen `currentMonth*`) en zeggen dat in hun eigen label ("Cashflow per maand — Huishouden").',
+    assertion: {
+      kind: 'exact',
+      expected:
+        'stripSaldo=-2446.45; widgetSaldo=-2446.45; gelijk=true; stripQuote=-222.4; widgetQuote=-222.4; effectiefSaldo=1111; effectiefWijktAf=true',
+      source:
+        'lib/cashflow-month-totals.ts#deriveRealMonthTotals + lib/cashflow-cards.ts#currentMonthSavingsRate — échte productiefuncties, geen mirror; de venster-labels zijn vergrendeld in components/widgets/cash-flow-widget.test.tsx en de vier assen in lib/cashflow-month-totals.test.ts — zie cash-checks.ts',
+    },
+  },
 ]
 
 export const CASH_ACCEPTANCE: AcceptanceSet = {

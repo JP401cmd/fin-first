@@ -73,6 +73,7 @@ export const CALC_COVERAGE_IGNORE: CalcCoverageIgnoreEntry[] = [
   { file: 'lib/freedom-milestones.ts', reason: 'Presentatie-mijlpalen afgeleid uit reeds-gecatalogiseerde vrijheidscijfers, geen eigen rekenkern.' },
   { file: 'lib/household-data.ts', reason: 'Perspectiefverdeling (persoonlijk/huishouden/partner) — presentatielaag over reeds-gecatalogiseerde totalen, geen nieuwe rekenkern.' },
   { file: 'lib/jaarruimte-facts.ts', reason: 'Orkestreert uitsluitend de al-gecatalogiseerde jaarruimte-motor (lib/jaarruimte.ts, zie calc "box1") tot een feiten-object voor AI-context — eigen docstring: "orkestreert alleen".' },
+  { file: 'lib/onboarding-completeness.ts', reason: 'Telt hoeveel van de acht onboarding-onderdelen data bevatten ("6 van 8") — een UI-volledigheidsmeting, geen afgeleid financieel cijfer: er komt geen euro, percentage of vrijheidstijd uit. Vervangt de hardgecodeerde 100% op het eindscherm (bevinding M11).' },
   { file: 'lib/onboarding-presets.ts', reason: 'Eenmalige onboarding-defaultberekening (noodfondsdoel-suggestie), geen doorlopende rekenmotor.' },
   { file: 'lib/retirement-aspirations.ts', reason: 'Aggregeert pensioenwensen tot een totaal — presentatiehelper, geen nieuwe rekenkern.' },
   { file: 'lib/settlement-data.ts', reason: 'Verrekening/afwikkeling-weergave (bv. partnersplit-overzicht), dunne afleiding op reeds-vastgelegde bedragen.' },

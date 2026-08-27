@@ -5,6 +5,7 @@ import {
   Landmark, PiggyBank, UserX, UserMinus, Flower2,
   CheckCircle2, PartyPopper, Mountain, Sparkles, AlertTriangle, Shield, Receipt, TrendingUp,
   Compass, Wallet,
+  Target, CreditCard, Sun, Activity, LineChart, Banknote, ShieldCheck, Coins, Hourglass,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -56,6 +57,19 @@ export const EVENT_ICON_COMPONENTS: Record<string, LucideIcon> = {
   Shield,
   Receipt,
   TrendingUp,
+  // ── Doel-markers (GOAL_TYPE_ICONS, lib/goal-data.ts) ──
+  // Zonder deze regels valt de marker-laag terug op `Calendar` en ziet een doel
+  // eruit als een levensgebeurtenis. `PiggyBank`, `Briefcase` en `TrendingUp`
+  // staan hierboven al.
+  Target,
+  CreditCard,
+  Sun,
+  Activity,
+  LineChart,
+  Banknote,
+  ShieldCheck,
+  Coins,
+  Hourglass,
 }
 
 /**

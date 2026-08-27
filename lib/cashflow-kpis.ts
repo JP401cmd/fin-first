@@ -46,9 +46,9 @@ import {
   aggSumPositief,
   aggSumNegatiefAbs,
   aggToExpenseRows,
-  isRealAggRow,
   type TxMonthAggregateRow,
 } from '@/lib/server-data/tx-aggregates'
+import { deriveRealMonthTotals, type MonthTxRow } from '@/lib/cashflow-month-totals'
 import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 import { resolveEffectiveIncomeExpenses, type IncomeExpenseSources } from '@/lib/effective-financials'
 import { buildBudgetTypeMap } from '@/lib/budget-utils'
@@ -76,12 +76,17 @@ export interface BudgetRowForTotals {
   interval: string | null
 }
 
-/** De transactie-kolommen die de huidige-maand-passes nodig hebben. */
-export interface MonthTxRow {
-  amount: number | string
-  budget_id?: string | null
-  transaction_type?: string | null
-}
+// De transactie-kolommen die de huidige-maand-passes nodig hebben (`MonthTxRow`)
+// en de maandtotalen-pass (`deriveRealMonthTotals`) wonen sinds H6 in de
+// bladmodule `lib/cashflow-month-totals.ts` — zie de kop daar voor het waarom.
+// Hier alleen nog RE-EXPORT onder dezelfde namen, zodat geen enkele bestaande
+// importeur van deze module iets merkt van de verhuizing.
+export {
+  deriveRealMonthTotals,
+  isIncomeRow,
+  type MonthTxRow,
+  type RealMonthTotals,
+} from '@/lib/cashflow-month-totals'
 
 /**
  * De snapshot-kolommen die de forecast-laag nodig heeft (subset van de
@@ -249,30 +254,6 @@ export function deriveBudgetScore(budgetTotals: BudgetTotalsByType): number {
   return budgetScoreEntries.length > 0
     ? Math.round(budgetScoreEntries.reduce((s, v) => s + Math.min(100, (1 - Math.max(0, v.spent - v.limit) / v.limit) * 100), 0) / budgetScoreEntries.length)
     : 100
-}
-
-/**
- * Inkomen + uitgaven (absoluut) uit de RAUWE transactierijen van een maand, met
- * de transfer-filter (`transfer`/`joint_transfer` tellen niet mee).
- *
- * Verplaatst uit `loadDashboardData` (was ~r488-495). Het predicaat is
- * `isRealAggRow` uit lib/server-data/tx-aggregates.ts — exact dezelfde
- * transfer-definitie als de `realOnly`-vlag op de aggregaat-reducers, zodat er
- * één plek is waar "wat telt als echte transactie" staat.
- *
- * Deze pass voedt UITSLUITEND de effective grondslag (zie `loadCashflowKpis`),
- * niet de `currentMonth*`-velden.
- */
-export function deriveRealMonthTotals(rows: MonthTxRow[]): { income: number; expenses: number } {
-  let income = 0
-  let expenses = 0
-  for (const tx of rows) {
-    if (!isRealAggRow(tx)) continue
-    const amt = Number(tx.amount)
-    if (amt > 0) income += amt
-    else expenses += Math.abs(amt)
-  }
-  return { income, expenses }
 }
 
 /**

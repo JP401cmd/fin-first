@@ -171,6 +171,22 @@ export interface ForcedStopPathResult {
    * als de rijen — de hoofd-run kan een noodverkoop tonen die het stop-pad niet kent.
    */
   kernelHousingSale: KernelHousingSale | null
+  /**
+   * P!B96 — de €/mnd-extra-sparen-hint van DEZE stop-run (`solve.maandHint`, byte-identiek
+   * aan wat `evaluateFireAt` op dezelfde invoer teruggeeft; de bridge levert hetzelfde veld
+   * voor de hoofdrun als `kernelMaandHint`).
+   *
+   * Waarom het veld hier hoort: de solver rekent de hint al uit voor élke doorgerekende
+   * stand — óók voor een geforceerde stop — maar het stop-pad gooide 'm weg. Daardoor kon
+   * het scherm bij een zelfgekozen stopleeftijd wél tonen dát het niet gedekt is (radar,
+   * strook) maar nooit wat daar dan bij hoort. Doorgeven i.p.v. herberekenen: geen tweede
+   * bron, geen eigen som (bevinding M2).
+   *
+   * Teken: `−gap ÷ maanden tot de eindleeftijd`, dus **> 0 ⟺ gap < 0 ⟺ dekking onder 100%**
+   * op deze stopleeftijd. `≤ 0` = gedekt (of geen maand-noemer). Nominaal — dezelfde
+   * grondslag als de bestaande hoofdrun-hint, geen weergave-deflatie.
+   */
+  maandHint: number
 }
 
 /**
@@ -219,6 +235,8 @@ export function runForcedStopPath(input: ForcedStopPathInput): ForcedStopPathRes
       result: toSimResult(kernelUnified),
       unifiedRows: kernelUnified.rows,
       kernelHousingSale: kernelUnified.kernelHousingSale ?? null,
+      // Doorgeven, niet herberekenen — `solve` IS de stand die de rijen hierboven voedt.
+      maandHint: solve.maandHint,
     }
   } catch {
     return null

@@ -1,6 +1,9 @@
+'use client'
+
 import Link from 'next/link'
 import { ArrowRight, Clock } from 'lucide-react'
-import { formatCurrency } from '@/lib/format'
+import { formatMaskedCurrency, formatFreedomRateFootnote } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type { TaxOpportunity } from '@/lib/tax-optimizer'
 import { Kicker, ScenarioCallout } from '@/components/editorial'
 import { AandachtspuntActieButton } from './aandachtspunt-actie-button'
@@ -24,7 +27,13 @@ const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
  * met `netEffect > 0` door, dus er is hier geen "waarschuwing zonder
  * besparing"-variant meer.
  *
- * Bewust presentationeel/server-compatible (geen hooks, geen fetching).
+ * PRIVACY (ADR 0091 laag 4). Deze kaart rendert bedragen, en daarnaast de
+ * vrijheidsdagen die er lineair uit volgen (netEffect = dagen × dagtarief). Het
+ * blijft een dom presentatie-component — geen fetching, geen state — maar het
+ * leest wél `useMaskedAmounts()` en is daarom een client-component. Zonder dat
+ * zou het het enige onderdeel op de Belasting-hub zijn dat de privacymodus
+ * negeert, en zou de voetnoot met het dagtarief bovendien de wisselkoers
+ * leveren om de gemaskeerde bedragen elders terug te rekenen.
  */
 
 // Per-box coderingskleur (badge-tekst + linker-streep + besparings-bar) via de
@@ -36,7 +45,23 @@ const BOX_BADGE: Record<1 | 2 | 3, { label: string; color: string }> = {
   3: { label: 'Box 3', color: 'var(--color-box3-700)' }, // teal
 }
 
-export function HubKansen({ opportunities }: { opportunities: TaxOpportunity[] }) {
+export function HubKansen({
+  opportunities,
+  dailyExpenses = 0,
+}: {
+  opportunities: TaxOpportunity[]
+  /**
+   * Het CANONIEKE dagtarief (€/dag) waarmee `netFreedomDays` hierboven is
+   * omgerekend — `FiscaleKansen.dailyExpenses`. Draagt de voetnoot, zodat een
+   * lezer kan zien wélke wisselkoers achter "N vrijheidsdagen" zit (M22).
+   * 0 → geen voetnoot (en dan staan er ook geen dagen).
+   */
+  dailyExpenses?: number
+}) {
+  const { masked } = useMaskedAmounts()
+  const fc = (v: number) => formatMaskedCurrency(v, masked)
+  const rateFootnote = formatFreedomRateFootnote(dailyExpenses, 'transactions', masked)
+
   if (opportunities.length === 0) return null
 
   // Schaal op het grootste NETTO effect — dezelfde grootheid waarop de lijst
@@ -91,11 +116,14 @@ export function HubKansen({ opportunities }: { opportunities: TaxOpportunity[] }
                           className="font-black tabular-nums text-lg leading-none text-[var(--positive)]"
                           style={{ fontFamily: PLAYFAIR }}
                         >
-                          {formatCurrency(opp.netEffect)}
+                          {fc(opp.netEffect)}
                         </span>
                         <span className="text-[var(--ink-3)]">netto per jaar</span>
                       </span>
-                      {opp.netFreedomDays > 0 && (
+                      {/* Vrijheidsdagen zijn netEffect ÷ dagtarief; met een
+                          zichtbaar tarief in de voetnoot is het gemaskeerde
+                          bedrag eruit terug te rekenen (ADR 0091 laag 4). */}
+                      {!masked && opp.netFreedomDays > 0 && (
                         <span className="inline-flex items-center gap-1 text-[var(--ink-3)]">
                           <Clock className="h-3 w-3 shrink-0" aria-hidden="true" />
                           {opp.netFreedomDays} vrijheidsdagen
@@ -108,7 +136,7 @@ export function HubKansen({ opportunities }: { opportunities: TaxOpportunity[] }
                         --paper geen AA-contrast. */}
                     {showGrossContext && (
                       <p className="mt-1 text-[11px] text-[var(--ink-3)]">
-                        waarvan {formatCurrency(opp.savings)} belastingbesparing — de rest
+                        waarvan {fc(opp.savings)} belastingbesparing — de rest
                         gaat op aan verwacht misgelopen rendement.
                       </p>
                     )}
@@ -156,6 +184,12 @@ export function HubKansen({ opportunities }: { opportunities: TaxOpportunity[] }
           )
         })}
       </ul>
+
+      {rateFootnote && (
+        <p className="mt-4 font-mono text-[10px] leading-relaxed text-[var(--ink-3)]">
+          {rateFootnote}
+        </p>
+      )}
 
       <div className="mt-5">
         <ScenarioCallout title="Indicatie, geen advies.">

@@ -383,6 +383,9 @@ export function QuickAddWizard({
         // valt dan terug op de type-defaults).
         repayment_type: draft.repayment_type ?? null,
         start_date: draft.start_date ?? null,
+        // Hypotheek-only: resterende looptijd in jaren. Leeg ⇒ buildDebtDraft
+        // valt terug op DEFAULT_TERM_YEARS_PER_TYPE.
+        term_years: draft.term_years ?? null,
         // Looptijd-leningen-only: werkelijke aflossing per maand (optioneel).
         monthly_payment: draft.monthly_payment ?? null,
         linked_asset_id: linkedAssetId ?? draft.linked_asset_id ?? null,
@@ -572,6 +575,7 @@ export function QuickAddWizard({
             totalSteps={totalSteps}
             initialIntent={initialIntent}
             hasTypePrefill={hasTypePrefill}
+            showStepCount={!isCollectMode}
             isSaving={isSaving}
             onBack={handleBack}
             onSelectIntent={selectIntent}
@@ -631,6 +635,13 @@ interface WizardContentProps {
    * details — er is geen vorige stap om naar terug te keren.
    */
   hasTypePrefill: boolean
+  /**
+   * Toont de `StepHeader` zijn eigen "Stap N van M"? In collect-mode staat de
+   * wizard binnen een flow die al een eigen voortgangsbalk voert (onboarding),
+   * die door de half-transparante backdrop heen zichtbaar blijft — dan telt
+   * alléén die buitenste balk (bevinding M12).
+   */
+  showStepCount: boolean
   isSaving: boolean
   onBack: () => void
   onSelectIntent: (intent: QuickAddIntent) => void
@@ -654,6 +665,7 @@ function WizardContent(props: WizardContentProps) {
     totalSteps,
     initialIntent,
     hasTypePrefill,
+    showStepCount,
     isSaving,
     onBack,
     onSelectIntent,
@@ -682,6 +694,7 @@ function WizardContent(props: WizardContentProps) {
         <StepHeader
           step={linkDebtStepNumber}
           total={totalSteps}
+          showStepCount={showStepCount}
           title={DEBT_QUICK_ADD_LABELS[linkDebtCtx.debtDraft.debt_type]}
           kicker={`Voor ${linkDebtCtx.asset.name}`}
           onBack={onBack}
@@ -707,6 +720,7 @@ function WizardContent(props: WizardContentProps) {
         <StepHeader
           step={linkDebtStepNumber}
           total={totalSteps}
+          showStepCount={showStepCount}
           title="Gekoppelde schuld"
           kicker="Extra"
           onBack={onBack}
@@ -728,6 +742,7 @@ function WizardContent(props: WizardContentProps) {
           <StepHeader
             step={1}
             total={totalSteps}
+            showStepCount={showStepCount}
             title="Wat wil je toevoegen?"
             kicker="Nieuw item"
           />
@@ -743,6 +758,7 @@ function WizardContent(props: WizardContentProps) {
           <StepHeader
             step={stepNumber}
             total={totalSteps}
+            showStepCount={showStepCount}
             title={title}
             kicker={state.intent === 'asset' ? 'Bezitting' : 'Schuld'}
             onBack={initialIntent ? undefined : onBack}
@@ -767,6 +783,7 @@ function WizardContent(props: WizardContentProps) {
             <StepHeader
               step={stepNumber}
               total={totalSteps}
+              showStepCount={showStepCount}
               title={label}
               kicker="Gegevens"
               onBack={detailsBack}
@@ -791,6 +808,7 @@ function WizardContent(props: WizardContentProps) {
           <StepHeader
             step={stepNumber}
             total={totalSteps}
+            showStepCount={showStepCount}
             title={label}
             kicker="Gegevens"
             onBack={detailsBack}

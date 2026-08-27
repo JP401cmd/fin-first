@@ -10,23 +10,42 @@
  * Privacy: server-side logging never includes amounts or names. Errors are
  * logged with type/code only; callers see a single human-readable message.
  *
- * Idempotency: a 24h in-memory cache keyed on `${user.id}:${idempotency_key}`.
- * Same key within the window returns the cached response without writing.
- * The cache is process-local — duplicate writes after server restart are
- * defended against by the unique balance_snapshots constraint
- * `(user_id, snapshot_date, entity_type, entity_id)`, which prevents
- * snapshot dupes; asset/debt rows are still written but the chance of a
- * post-restart double-submit is acceptable.
+ * Idempotency: a DURABLE claim row in `import_idempotency`, keyed on a
+ * SERVER-DERIVED SHA-256 content hash of the payload
+ * (`lib/aangifte/import-key.ts`). Two properties matter:
+ *
+ *   · SERVER-BEPAALD. The client-supplied `idempotency_key` is accepted by
+ *     the schema (rolling-deploy compatibility) but IGNORED — exactly as
+ *     `/api/transactions/import` ignores the client `import_hash` and
+ *     recomputes it. That field was a fresh randomUUID per submit attempt,
+ *     so two submits from the same review never carried the same key and
+ *     the old dedup could not fire at all.
+ *   · DUURZAAM. The previous guard was a Map in process memory. On Vercel
+ *     every instance is short-lived, so a second submit after a cold start
+ *     found an empty cache and re-wrote assets and debts. Only
+ *     `balance_snapshots` was protected, by its own UNIQUE constraint.
+ *
+ * Flow: claim `status='pending'` BEFORE the write phase; a 23505 means
+ * someone was here first (replay the stored response, or 409 while it is
+ * still running). Failures delete the claim so a retry is allowed, and a
+ * `pending` claim older than 15 minutes is taken over so a crashed request
+ * cannot block the user forever.
  *
  * DELETE branch: bulk-removal of all aangifte-imported assets+debts for a
  * given peildatum (`?peildatum=YYYY-MM-DD`). Called from the koppelingen-page
- * for "Verwijder alle aangifte-imports van peildatum X".
+ * for "Verwijder alle aangifte-imports van peildatum X". It also releases the
+ * matching claims — otherwise the content hash would permanently block a
+ * legitimate re-import after a deliberate bulk delete.
  */
 
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { buildAssetDraft, buildDebtDraft } from '@/lib/quick-add/build-drafts'
 import { accountNumberWriteColumns } from '@/lib/asset-account-number'
+import {
+  deriveAangifteImportKey,
+  AANGIFTE_IMPORT_SCOPE,
+} from '@/lib/aangifte/import-key'
 import type {
   AangifteImportPayload,
   AangifteImportResponse,
@@ -34,69 +53,198 @@ import type {
   AangifteDebtReviewItem,
 } from '@/lib/aangifte/types'
 
-// ── Idempotency cache ───────────────────────────────────────────────
+// ── Durable idempotency claim ───────────────────────────────────────
 //
-// The plan asks for a 24h cache window. We store both successful and
-// failed responses so retries return the same outcome — the client must
-// generate a NEW idempotency key to retry a failed import. This mirrors
-// the holdings-route pattern (`X-Idempotency-Key` header) but with a
-// longer TTL because aangifte-imports are larger and less repeatable.
+// Vervangt de vorige cache in procesgeheugen (Map + in-flight-Set). Die
+// kon de vraag "is deze aangifte al geïmporteerd?" principieel niet
+// beantwoorden: het antwoord moet het proces overleven en op Vercel doet
+// procesgeheugen dat niet.
 //
-// Concurrency: een naïve "check then write"-flow laat twee gelijktijdige
-// POSTs (double-click, abuse) langs de cache.get-controle glippen vóór de
-// eerste de set heeft gedaan. We tracken daarom *in-flight keys* in een
-// aparte `Set` die zo vroeg mogelijk in de handler wordt gezet en in een
-// `try/finally` weer leeggemaakt; daarmee gedraagt de cache zich als een
-// per-key mutex zonder dat we een externe semaphore nodig hebben.
-//
-// Onbounded growth: de cache wordt alleen opgeschoond bij elke POST. In een
-// pathologisch scenario (veel unieke keys per dag) kan hij oneindig groeien.
-// We bewaken dat met een MAX_CACHE_SIZE en een eenvoudige FIFO-eviction op
-// timestamp — geen volledige LRU want het toegangspatroon is per key
-// nagenoeg one-shot.
+// De claim is één rij in `import_idempotency` met PK (user_id, scope, key).
+// De INSERT zelf is de synchronisatie: Postgres laat er precies één winnen
+// en geeft de verliezer 23505. Daarmee vervalt de aparte in-flight-Set —
+// die werkte alleen binnen één instantie, deze uniciteit werkt erover heen.
 
-interface CachedResponse {
-  body: AangifteImportResponse
-  status: number
-  timestamp: number
+const CLAIM_TABLE = 'import_idempotency'
+
+/**
+ * Een `pending` claim van een request dat stierf midden in de schrijffase
+ * zou de gebruiker permanent blokkeren. Na deze periode nemen we zo'n
+ * verweesde claim over.
+ *
+ * BEWUSTE CAP — expliciet en gedocumenteerd: ruim boven de duur van een
+ * normale import (seconden), ruim onder wat een gebruiker als "vast"
+ * ervaart. Te kort en twee gelijktijdige submits lopen alsnog beide de
+ * schrijffase in; te lang en een crash kost de gebruiker een halve dag.
+ */
+const CLAIM_TAKEOVER_MINUTES = 15
+
+/** Het opgeslagen succes-antwoord: uitsluitend rij-id's, geen bedragen/namen. */
+interface StoredClaimResponse {
+  asset_ids: string[]
+  debt_ids: string[]
 }
 
-const idempotencyCache = new Map<string, CachedResponse>()
-const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000 // 24h
-const MAX_CACHE_SIZE = 1000
-const inFlightKeys = new Set<string>()
+type ClaimOutcome =
+  /** Wij hebben de claim; de schrijffase mag draaien. */
+  | { kind: 'claimed' }
+  /** Deze import was al klaar; geef het bewaarde antwoord terug. */
+  | { kind: 'replay'; body: AangifteImportResponse }
+  /** Een andere request is er nu mee bezig. */
+  | { kind: 'in_progress' }
+  /** De claim-administratie zelf faalde; niet schrijven. */
+  | { kind: 'error' }
 
-function cleanExpiredIdempotencyKeys(): void {
-  const now = Date.now()
-  for (const [key, entry] of idempotencyCache.entries()) {
-    if (now - entry.timestamp > IDEMPOTENCY_TTL_MS) {
-      idempotencyCache.delete(key)
+/**
+ * Legt de claim vóór de schrijffase, of stelt vast waarom dat niet mag.
+ *
+ * Volgorde is essentieel: eerst claimen, dan pas schrijven. Andersom
+ * (schrijven en daarna registreren) laat precies het gat open dat deze
+ * kaart dicht — twee requests die beide al aan het schrijven zijn.
+ */
+async function claimImport(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  key: string,
+  peildatum: string,
+): Promise<ClaimOutcome> {
+  const { error: insertErr } = await supabase.from(CLAIM_TABLE).insert({
+    user_id: userId,
+    scope: AANGIFTE_IMPORT_SCOPE,
+    key,
+    peildatum,
+    status: 'pending',
+  })
+
+  // Geen conflict → wij zijn de eerste.
+  if (!insertErr) return { kind: 'claimed' }
+
+  // Alles behalve een unique-violation is een echte storing.
+  if ((insertErr as PostgresLikeError).code !== '23505') {
+    logSafeError('claim_insert', insertErr)
+    return { kind: 'error' }
+  }
+
+  // 23505 → er ligt al een claim. Bepaal of hij klaar is of nog loopt.
+  const { data: existing, error: readErr } = await supabase
+    .from(CLAIM_TABLE)
+    .select('status, response')
+    .eq('user_id', userId)
+    .eq('scope', AANGIFTE_IMPORT_SCOPE)
+    .eq('key', key)
+    .maybeSingle()
+
+  if (readErr || !existing) {
+    logSafeError('claim_read', readErr)
+    return { kind: 'error' }
+  }
+
+  if (existing.status === 'done') {
+    const stored = (existing.response ?? null) as StoredClaimResponse | null
+    return {
+      kind: 'replay',
+      body: {
+        ok: true,
+        asset_ids: stored?.asset_ids ?? [],
+        debt_ids: stored?.debt_ids ?? [],
+        // Toets 5: zonder deze vlag is "gelukt" niet te onderscheiden van
+        // "er is niets gebeurd".
+        already_imported: true,
+      },
     }
+  }
+
+  // `pending` — alleen overnemen als hij verweesd is. De `.lt(created_at)`
+  // in dezelfde UPDATE maakt de overname atomair: raakt hij nul rijen, dan
+  // was een ander ons voor of is de claim nog vers.
+  const cutoff = new Date(
+    Date.now() - CLAIM_TAKEOVER_MINUTES * 60 * 1000,
+  ).toISOString()
+  const { data: takenOver, error: takeoverErr } = await supabase
+    .from(CLAIM_TABLE)
+    .update({ created_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .eq('scope', AANGIFTE_IMPORT_SCOPE)
+    .eq('key', key)
+    .eq('status', 'pending')
+    .lt('created_at', cutoff)
+    .select('key')
+
+  if (takeoverErr) {
+    logSafeError('claim_takeover', takeoverErr)
+    return { kind: 'error' }
+  }
+  if (takenOver && takenOver.length > 0) return { kind: 'claimed' }
+
+  return { kind: 'in_progress' }
+}
+
+/**
+ * Markeert de claim als afgerond en bewaart het antwoord voor een replay.
+ *
+ * ── WAAROM DIT ÉÉN KEER HERKANST ────────────────────────────────────
+ * Deze UPDATE is de enige stap die de claim van `pending` naar `done`
+ * brengt. Faalt hij, dan blijft er een claim `pending` staan terwijl de
+ * rijen wél geschreven zijn. Na `CLAIM_TAKEOVER_MINUTES` beschouwt de
+ * claim-logica die rij als verweesd, neemt hem over en draait de
+ * schrijffase OPNIEUW — dubbele assets en debts, precies de bug die deze
+ * route hoort te voorkomen.
+ *
+ * De realistische faalvorm is een voorbijgaande netwerk-/poolhik op een
+ * rij die we al bezitten; één herkansing dekt dat. Blijft hij falen, dan
+ * loggen we met een eigen fase zodat het terugvindbaar is. Restrisico bij
+ * twee mislukte pogingen: een dubbele import ná 15 minuten. Dat is
+ * bewust geaccepteerd en hier vastgelegd in plaats van stil gelaten.
+ */
+async function completeClaim(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  key: string,
+  response: StoredClaimResponse,
+): Promise<void> {
+  const apply = () =>
+    supabase
+      .from(CLAIM_TABLE)
+      .update({
+        status: 'done',
+        response,
+        completed_at: new Date().toISOString(),
+      })
+      .eq('user_id', userId)
+      .eq('scope', AANGIFTE_IMPORT_SCOPE)
+      .eq('key', key)
+
+  const { error } = await apply()
+  if (!error) return
+
+  logSafeError('claim_complete_retry', error)
+  const { error: retryErr } = await apply()
+  if (retryErr) {
+    // Laatste redmiddel: de claim blijft `pending`. Beter dan hem te
+    // verwijderen — een replay geeft dan 409 i.p.v. stil dubbel te schrijven.
+    logSafeError('claim_complete_failed', retryErr)
   }
 }
 
 /**
- * Plaats een entry in de cache. Bij overschrijding van MAX_CACHE_SIZE
- * verwijderen we de oudste entry (laagste timestamp). Niet volledig LRU,
- * maar voldoende voor het verwachte one-shot toegangspatroon. Veiliger dan
- * onbounded groeien.
+ * Geeft de claim vrij na een mislukte import.
+ *
+ * Dit behoudt de bestaande, bewuste semantiek "mislukkingen worden niet
+ * gecached": zonder deze stap zou één DB-hik de gebruiker permanent op
+ * deze inhoud blokkeren, want de contenthash blijft bij een retry gelijk.
  */
-function setCachedResponseWithCap(
+async function releaseClaim(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
   key: string,
-  entry: CachedResponse,
-): void {
-  if (idempotencyCache.size >= MAX_CACHE_SIZE && !idempotencyCache.has(key)) {
-    let oldestKey: string | null = null
-    let oldestTimestamp = Number.POSITIVE_INFINITY
-    for (const [k, v] of idempotencyCache.entries()) {
-      if (v.timestamp < oldestTimestamp) {
-        oldestTimestamp = v.timestamp
-        oldestKey = k
-      }
-    }
-    if (oldestKey) idempotencyCache.delete(oldestKey)
-  }
-  idempotencyCache.set(key, entry)
+): Promise<void> {
+  const { error } = await supabase
+    .from(CLAIM_TABLE)
+    .delete()
+    .eq('user_id', userId)
+    .eq('scope', AANGIFTE_IMPORT_SCOPE)
+    .eq('key', key)
+  if (error) logSafeError('claim_release', error)
 }
 
 // ── Zod schemas ─────────────────────────────────────────────────────
@@ -268,68 +416,67 @@ export async function POST(req: Request): Promise<Response> {
 
   const payload: AangifteImportPayload = parsed.data
 
-  // Idempotency check — same `${user.id}:${idempotency_key}` returns the
-  // cached response within 24h. The cache lives in process memory; a
-  // server restart drops it. After restart, a duplicate submit will
-  // re-write the assets/debts but balance_snapshots' UNIQUE constraint
-  // prevents duplicate snapshot rows — partial duplicate is acceptable
-  // since the user can bulk-delete via DELETE on this same route.
-  cleanExpiredIdempotencyKeys()
-  const cacheKey = `${user.id}:${payload.idempotency_key}`
-  const cached = idempotencyCache.get(cacheKey)
-  if (cached) {
-    return Response.json(cached.body, { status: cached.status })
+  // Sleutel SERVER-ZIJDIG afgeleid uit de inhoud. `payload.idempotency_key`
+  // wordt bewust genegeerd (zie kopcommentaar): hij is client-bepaald én per
+  // submit-poging een verse UUID, dus als dedup-sleutel onbruikbaar.
+  const importKey = deriveAangifteImportKey(payload, user.id)
+
+  // Claim vóór de schrijffase. De unieke PK op (user_id, scope, key) is de
+  // synchronisatie — over serverinstanties heen, anders dan de vorige
+  // in-flight-Set die alleen binnen één proces werkte.
+  const claim = await claimImport(supabase, user.id, importKey, payload.peildatum)
+
+  if (claim.kind === 'error') {
+    const body: AangifteImportResponse = {
+      ok: false,
+      error: 'Importeren mislukt. Probeer het opnieuw of corrigeer een rij.',
+    }
+    return Response.json(body, { status: 500 })
   }
 
-  // Concurrent-double-click guard: een tweede POST met dezelfde key terwijl
-  // de eerste nog draait krijgt 409 Conflict. Dit voorkomt dat twee
-  // gelijktijdige requests beide de write-loop ingaan vóór de cache-set
-  // gebeurt, met dubbele rijen tot gevolg. De `inFlightKeys.add` moet vóór
-  // de eerste write plaatsvinden en de finally-block na de laatste, zodat
-  // de window zo klein mogelijk blijft.
-  if (inFlightKeys.has(cacheKey)) {
+  if (claim.kind === 'replay') {
+    // Deze aangifte is al geïmporteerd — niets opnieuw wegschrijven.
+    return Response.json(claim.body, { status: 200 })
+  }
+
+  if (claim.kind === 'in_progress') {
     const conflictBody: AangifteImportResponse = {
       ok: false,
       error: 'Import al bezig.',
     }
     return Response.json(conflictBody, { status: 409 })
   }
-  inFlightKeys.add(cacheKey)
 
-  try {
-    return await runImportWritePhase({
-      supabase,
-      user,
-      payload,
-      cacheKey,
-    })
-  } finally {
-    // Lock-release: ongeacht success/failure of throw moet de key weer
-    // beschikbaar zijn voor toekomstige retries (met diezelfde of een
-    // nieuwe idempotency-key).
-    inFlightKeys.delete(cacheKey)
-  }
+  return await runImportWritePhase({
+    supabase,
+    user,
+    payload,
+    importKey,
+  })
 }
 
 // ── Write-phase helper ──────────────────────────────────────────────
 //
-// Eigenlijke schrijfketen, geëxtraheerd zodat de POST-handler een
-// schoon try/finally om de inFlightKeys-lock kan plaatsen. De helper
-// gooit niet door — alle errors worden hier afgehandeld als 500-response;
-// de caller hoeft alleen de lock te releasen.
+// Eigenlijke schrijfketen, geëxtraheerd zodat de POST-handler alleen over
+// de claim gaat. De helper gooit niet door — alle errors worden hier
+// afgehandeld als 500-response, inclusief het vrijgeven van de claim.
+//
+// Aanroepvoorwaarde: de claim is al gelegd (`status='pending'`). Deze
+// functie is verantwoordelijk voor het afronden (`done`) óf vrijgeven van
+// die claim; ze mag niet worden aangeroepen zonder claim.
 
 interface WritePhaseArgs {
   supabase: Awaited<ReturnType<typeof createClient>>
   user: { id: string }
   payload: AangifteImportPayload
-  cacheKey: string
+  importKey: string
 }
 
 async function runImportWritePhase({
   supabase,
   user,
   payload,
-  cacheKey,
+  importKey,
 }: WritePhaseArgs): Promise<Response> {
   // Write phase — orchestrated as a series of typed Supabase calls.
   //
@@ -621,17 +768,18 @@ async function runImportWritePhase({
       }
     }
 
-    // Success — cache (met size-cap eviction) en return.
+    // Succes — claim afronden zodat een volgende submit met dezelfde inhoud
+    // dit antwoord terugkrijgt in plaats van opnieuw te schrijven.
+    await completeClaim(supabase, user.id, importKey, {
+      asset_ids: insertedAssetIds,
+      debt_ids: insertedDebtIds,
+    })
     const successBody: AangifteImportResponse = {
       ok: true,
       asset_ids: insertedAssetIds,
       debt_ids: insertedDebtIds,
+      already_imported: false,
     }
-    setCachedResponseWithCap(cacheKey, {
-      body: successBody,
-      status: 200,
-      timestamp: Date.now(),
-    })
     return Response.json(successBody, { status: 200 })
   } catch (err) {
     // Compensating deletes — best effort. We delete in reverse order
@@ -668,15 +816,17 @@ async function runImportWritePhase({
         .then(() => undefined, (e) => logSafeError('compensate_assets', e))
     }
 
+    // Claim vrijgeven — mislukkingen worden bewust NIET vastgelegd. Anders
+    // zou een voorbijgaande DB-hik de gebruiker permanent op deze inhoud
+    // blokkeren: de contenthash is bij een retry immers identiek. Dit
+    // gebeurt ná de compenserende deletes, zodat een retry een schone
+    // DB-staat aantreft.
+    await releaseClaim(supabase, user.id, importKey)
+
     const failBody: AangifteImportResponse = {
       ok: false,
       error: 'Importeren mislukt. Probeer het opnieuw of corrigeer een rij.',
     }
-    // We deliberately do NOT cache failures — a transient DB hiccup
-    // should not block the user for 24h on the same idempotency key.
-    // The client retries with the same key (after fixing whatever
-    // caused the failure) and the next attempt runs against fresh DB
-    // state.
     return Response.json(failBody, { status: 500 })
   }
 }
@@ -799,6 +949,24 @@ export async function DELETE(req: Request): Promise<Response> {
       if (error) {
         throw { phase: 'delete_assets', err: error }
       }
+    }
+
+    // Step 4: Geef de idempotentie-claims van deze peildatum vrij.
+    //
+    // DIT IS DE ESCAPE HATCH. De sleutel is een CONTENThash, dus een
+    // gebruiker die dezelfde aangifte bewust opnieuw wil importeren na een
+    // bulk-verwijdering krijgt exact dezelfde sleutel — en zou zonder deze
+    // stap permanent een replay terugkrijgen op rijen die niet meer bestaan.
+    // Bewust ná de rij-deletes: faalt er iets eerder, dan blijft de claim
+    // staan en klopt hij nog steeds bij de (niet-verwijderde) rijen.
+    const { error: claimErr } = await supabase
+      .from(CLAIM_TABLE)
+      .delete()
+      .eq('user_id', user.id)
+      .eq('scope', AANGIFTE_IMPORT_SCOPE)
+      .eq('peildatum', peildatum)
+    if (claimErr) {
+      throw { phase: 'delete_claims', err: claimErr }
     }
 
     return Response.json(

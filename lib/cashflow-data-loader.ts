@@ -27,7 +27,18 @@ import { withDerivedDayOfMonth, type RecurringTransaction, type DayDerivationTx 
 import { getOwnProfile } from '@/lib/server-data/base'
 import { loadPerspectiveTransactionsServer } from '@/lib/household/perspective-loader-server'
 import { type PerspectiveItem } from '@/lib/household/perspective-loader'
+import { localMonthEnd, localMonthStartMonthsAgo } from '@/lib/month-range'
 import type { OwnershipType, Perspective } from '@/lib/household-data'
+
+/**
+ * Lengte van het forecast-baseline-venster in VOLLEDIGE kalendermaanden.
+ *
+ * Bewust loader-lokaal en NIET gekoppeld aan `SAVINGS_RATE_WINDOW_MONTHS`: dat
+ * venster voedt een RATIO (de spaarquote), dit een ABSOLUUT €/maand-gemiddelde.
+ * Ze zijn vandaag even lang, maar een wijziging aan het één hoort het ander niet
+ * stil mee te verschuiven.
+ */
+const BASELINE_WINDOW_MONTHS = 6
 
 // ── Result type ───────────────────────────────────────────────
 
@@ -88,6 +99,38 @@ function shareOf(item: PerspectiveItem, perspective: Perspective): number {
   return 1
 }
 
+// ── Baseline-venster ──────────────────────────────────────────
+
+/**
+ * Het forecast-baseline-venster: de laatste `BASELINE_WINDOW_MONTHS` VOLLEDIGE
+ * kalendermaanden, de lopende maand exclusief.
+ *
+ * Het venster was dag-rollend (`setMonth(-6)` + `toISOString()`) en had daardoor
+ * drie gebreken, alle drie met een vaste deler 6 eronder:
+ *   1. `setMonth`-overflow op een 31e — 31-08 rolde door naar 3 maart, dus het
+ *      venster kromp naar 5 mnd 28 dgn terwijl er door 6 werd gedeeld;
+ *   2. `toISOString()` op een LOKALE `Date` — precies het patroon dat
+ *      lib/month-range.ts verbiedt (schuift de grens in NL een dag terug);
+ *   3. geen bovengrens — toekomstgedateerde transacties telden mee in een
+ *      venster dat "de afgelopen 6 maanden" heet.
+ *
+ * Volledige maanden lossen bovendien de halve-lopende-maand-verwatering op: bij
+ * een ABSOLUUT €/maand-gemiddelde valt een deels geboekte maand niet weg tegen
+ * zichzelf (anders dan bij een RATIO zoals de spaarquote). De deler klopt
+ * hiermee eindelijk met het venster.
+ *
+ * `until` is INCLUSIEF — `windowPerspectiveItems` filtert op `date > until`.
+ *
+ * Geëxporteerd zodat de grenzen los toetsbaar zijn (zie de bijbehorende test);
+ * de loader is de enige productie-lezer.
+ */
+export function baselineWindow(now: Date): { since: string; until: string } {
+  return {
+    since: localMonthStartMonthsAgo(now, BASELINE_WINDOW_MONTHS),
+    until: localMonthEnd(new Date(now.getFullYear(), now.getMonth() - 1, 1)),
+  }
+}
+
 // ── Loader ────────────────────────────────────────────────────
 
 export const loadCashflowData = cache(async (
@@ -97,11 +140,7 @@ export const loadCashflowData = cache(async (
   const user = await getCachedUser(supabase)
   if (!user) return EMPTY
 
-  // Baseline-venster voor forecast: laatste 6 maanden gemiddeld inkomen +
-  // uitgaven. Zelfde 6m-periode als de health-score (consistentie).
-  const sixMonthsAgo = new Date()
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
-  const sixMonthsAgoIso = sixMonthsAgo.toISOString().split('T')[0]
+  const { since: baselineSince, until: baselineUntil } = baselineWindow(new Date())
 
   // Eén perspectief-gestempelde transactie-set over het 6-maands baseline-
   // venster. Ownership/privacy zijn door de loader/RPC al toegepast. De set
@@ -112,7 +151,10 @@ export const loadCashflowData = cache(async (
     recurResult,
     accountsResult,
   ] = await Promise.all([
-    loadPerspectiveTransactionsServer(supabase, perspective, { since: sixMonthsAgoIso }),
+    loadPerspectiveTransactionsServer(supabase, perspective, {
+      since: baselineSince,
+      until: baselineUntil,
+    }),
     // Eigen profielrij uit de GEDEELDE basisdata-laag. Op de drie
     // pagina-callsites draait `loadCashflowKpis`/`loadForecastSectionData` in
     // dezelfde render en die lezen 'm al; `cache()` maakt daar een hele
@@ -169,8 +211,8 @@ export const loadCashflowData = cache(async (
     if (a > 0) totalIncome += a
     else totalExpenses += Math.abs(a)
   }
-  const baselineIncome = Math.round(totalIncome / 6)
-  const baselineExpenses = Math.round(totalExpenses / 6)
+  const baselineIncome = Math.round(totalIncome / BASELINE_WINDOW_MONTHS)
+  const baselineExpenses = Math.round(totalExpenses / BASELINE_WINDOW_MONTHS)
 
   // ── Recurrings: scope op ownership + aandeel ─────────────────────────────
   // RLS levert eigen-persoonlijk + gedeeld. Personal/partner: filter naar het

@@ -32,8 +32,15 @@ global.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver
 
 function makeData(overrides: Partial<DashboardData> = {}): DashboardData {
   return {
-    monthlyIncome: 5500,
-    monthlyExpenses: 3600,
+    // De EFFECTIVE grondslag. Bewust ANDERE bedragen dan currentMonth*: zolang
+    // deze twee uit elkaar liggen, bewijst elke assertie hieronder wélk paar het
+    // widget werkelijk leest (H6). Zet ze nooit gelijk "voor de leesbaarheid" —
+    // dan meet de suite niets meer.
+    monthlyIncome: 9999,
+    monthlyExpenses: 8888,
+    // De GEREALISEERDE huidige kalendermaand — wat het widget hoort te tonen.
+    currentMonthIncome: 5500,
+    currentMonthExpenses: 3600,
     dailyExpenseRate: 120,
     prevMonthIncome: 5000,
     prevMonthExpenses: 3000,
@@ -67,25 +74,83 @@ describe('CashFlowWidget — mojibake-regressie (fix #1)', () => {
 })
 
 describe('CashFlowWidget — kleur-semantiek vergelijkingsgrafiek (fix #2)', () => {
-  it('Inkomen omhoog = positief (groen), Uitgaven omhoog = negatief (rood)', () => {
-    // income 5500 vs 5000 = +10% · expenses 3600 vs 3000 = +20% · netto 1900 vs 2000 = -5%
+  // H6 heeft het delta-% in de LOPENDE maand onderdrukt: een percentage tussen
+  // "augustus tot nu toe" en een volledige juli is geen uitspraak. De
+  // kleur-semantiek zelf (higherIsBetter) blijft en wordt daarom nu op de
+  // ComparisonBar-logica getest via een volledige-maand-vergelijking, die het
+  // widget alleen in het huishoud-/partnerperspectief niet toont — vandaar dat
+  // deze test de onderdrukking vastlegt en de kleurregel bij de unit blijft.
+  it('toont GEEN delta-% zolang de huidige maand nog loopt (H6)', () => {
     render(<CashFlowWidget size="full" data={makeData()} />)
 
-    // Inkomen: méér inkomen wordt groen geduid (higherIsBetter).
-    expect(screen.getByText('+10%').className).toContain('text-positive')
-    // Uitgaven: méér uitgaven blijft rood (default gedrag).
-    expect(screen.getByText('+20%').className).toContain('text-negative')
-    // Netto: lager netto wordt rood geduid (higherIsBetter, delta < 0).
-    expect(screen.getByText('-5%').className).toContain('text-negative')
+    // Vóór H6 stond hier +10% / +20% / -5%, gerekend tussen een halve en een
+    // hele maand. Die drie mogen niet terugkomen.
+    expect(screen.queryByText('+10%')).toBeNull()
+    expect(screen.queryByText('+20%')).toBeNull()
+    expect(screen.queryByText('-5%')).toBeNull()
+    // Geen enkel percentage in de vergelijkingssectie.
+    expect(screen.queryByText(/^[+-]?\d+%$/)).toBeNull()
+  })
+})
+
+describe('CashFlowWidget — grondslag + venster-label (H6)', () => {
+  it('rekent met currentMonth*, niet met de effective monthly*-velden', () => {
+    // makeData: currentMonth 5500/3600 → netto +1.900. Effective 9999/8888 →
+    // +1.111. Zou het widget nog de effective grondslag lezen, dan stond hier
+    // 1.111.
+    render(<CashFlowWidget size="quarter" data={makeData()} />)
+    expect(screen.getByText(/1\.900/)).toBeInTheDocument()
+    expect(screen.queryByText(/1\.111/)).toBeNull()
+  })
+
+  it('draagt het venster in de kicker, met de maandnaam van vandaag', () => {
+    render(<CashFlowWidget size="quarter" data={makeData()} />)
+    const month = new Intl.DateTimeFormat('nl-NL', { month: 'long' }).format(new Date())
+    // "Cashflow — <maand> tot nu toe"; de kicker rendert uppercase via CSS, dus
+    // matchen op de tekstinhoud zelf.
+    expect(screen.getByText(`Cashflow — ${month} tot nu toe`)).toBeInTheDocument()
+  })
+
+  it('full-size zet het venster óók in het hero-label (kicker kan afkappen)', () => {
+    render(<CashFlowWidget size="full" data={makeData()} />)
+    const month = new Intl.DateTimeFormat('nl-NL', { month: 'long' }).format(new Date())
+    expect(screen.getByText(`Netto — ${month} tot nu toe`)).toBeInTheDocument()
+  })
+
+  it('benoemt beide vensters onder de vergelijkingsbalken', () => {
+    render(<CashFlowWidget size="full" data={makeData()} />)
+    const short = new Intl.DateTimeFormat('nl-NL', { month: 'short' }).format(new Date())
+    // Drie balken (Inkomen/Uitgaven/Netto) × hetzelfde bijschrift.
+    expect(screen.getAllByText(`${short} tot nu toe`).length).toBe(3)
+  })
+
+  it('toont NIET de lege staat als de maand nog leeg is maar er wel historie is', () => {
+    // Op de 1e van de maand is currentMonth* 0/0. "Importeer transacties" is dan
+    // een leugen tegen een gebruiker die vorige maand gewoon geboekt heeft.
+    render(<CashFlowWidget size="full" data={makeData({ currentMonthIncome: 0, currentMonthExpenses: 0 })} />)
+    expect(screen.queryByText(/Importeer transacties/)).toBeNull()
+  })
+
+  it('toont WEL de lege staat als er nergens gerealiseerde data is', () => {
+    render(
+      <CashFlowWidget
+        size="full"
+        data={makeData({ currentMonthIncome: 0, currentMonthExpenses: 0, prevMonthIncome: 0, prevMonthExpenses: 0 })}
+      />,
+    )
+    expect(screen.getByText(/Importeer transacties/)).toBeInTheDocument()
   })
 })
 
 describe('CashFlowWidget — tekortmaand zichtbaar (fix #3)', () => {
   it('negatieve netto krijgt een zichtbare, rood getinte balk i.p.v. klem op 0', () => {
     // cashFlow = 3000 - 4000 = -1000 (tekort); prevCashFlow = 3000 - 2500 = +500.
+    // Sinds H6 op de GEREALISEERDE velden — dat is precies het geval dat vaker
+    // voorkomt: halverwege de maand staan de vaste lasten er wel en het salaris
+    // nog niet.
     const data = makeData({
-      monthlyIncome: 3000,
-      monthlyExpenses: 4000,
+      currentMonthIncome: 3000,
+      currentMonthExpenses: 4000,
       prevMonthIncome: 3000,
       prevMonthExpenses: 2500,
     })

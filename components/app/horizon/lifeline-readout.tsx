@@ -41,6 +41,17 @@ export interface LifelineReadoutProps {
   /** "Ruimte / maand" | "Inleg / maand" */
   monthlyLabel: string
   monthlyAmount: number
+  /**
+   * Het PEILMOMENT van `netWorth`, als kort achtervoegsel op het cel-label:
+   * `"nu"` op de huidige leeftijd, `"begin 2031"` verderop de tijdas.
+   *
+   * Waarom dit een prop is en geen afleiding hier (H21/F1): de bar toonde de
+   * EINDstand van het projectieblok onder een label dat het HUIDIGE jaar noemde,
+   * vijf regels boven een zin met het netto vermogen van vandaag — twee bedragen
+   * met een jaar ertussen, beide gepresenteerd als "nu". De parent kiest nu één
+   * peilmoment (de beginstand van het blok) en benoemt het hier.
+   */
+  netWorthMoment?: string
   /** Geen hover/playback actief → rust-toestand (subtiel gedimd). */
   isResting?: boolean
 }
@@ -68,6 +79,7 @@ export function LifelineReadout({
   freedomTime,
   monthlyLabel,
   monthlyAmount,
+  netWorthMoment,
   isResting,
 }: LifelineReadoutProps) {
   const { masked } = useMaskedAmounts()
@@ -98,7 +110,9 @@ export function LifelineReadout({
         </span>
       </div>
 
-      <Cell label="Netto vermogen">{formatMaskedCurrency(netWorth, masked)}</Cell>
+      <Cell label={netWorthMoment ? `Netto vermogen · ${netWorthMoment}` : 'Netto vermogen'}>
+        {formatMaskedCurrency(netWorth, masked)}
+      </Cell>
       {/* Vrijheidstijd is lineair in het vermogen hierboven (bedrag ÷ dagtarief,
           zie horizon-client.tsx "Cijferbar"), dus uit "6 jr 5 mnd" plus een
           bekend dagtarief is het gemaskeerde bedrag terug te rekenen. ADR 0091

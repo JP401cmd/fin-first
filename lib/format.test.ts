@@ -10,6 +10,13 @@ import {
   roundEuro,
   roundTenths,
   roundToDecimals,
+  roundToSignificant,
+  formatApproxCurrency,
+  formatMaskedApproxCurrency,
+  formatFreedomRateFootnote,
+  formatCurrency,
+  APPROX_PREFIX,
+  MASKED_AMOUNT_PLACEHOLDER,
   CENT_EPSILON,
 } from './format'
 
@@ -440,5 +447,86 @@ describe('carryFreedomUnits — gedeelde carry-regel', () => {
     expect(bd.months).toBe(11)
     expect(bd.days).toBeGreaterThanOrEqual(15)
     expect(carryFreedomUnits(bd.years, bd.months + 1, 0)).toEqual({ years: 11, months: 0, days: 0 })
+  })
+})
+
+// ── M5: eerlijke precisie op prognose-kopgetallen ─────────────────────────
+describe('roundToSignificant — afronding achter een prognose-kopgetal', () => {
+  it('rondt af op twee significante cijfers (de gemelde bedragen)', () => {
+    // De letterlijke getallen uit bevinding M5.
+    expect(roundToSignificant(887_689)).toBe(890_000)
+    expect(roundToSignificant(676_698)).toBe(680_000)
+    expect(roundToSignificant(391_910)).toBe(390_000)
+  })
+
+  it('laat een bedrag dat al op twee cijfers staat ongemoeid', () => {
+    expect(roundToSignificant(45_000)).toBe(45_000)
+    expect(roundToSignificant(950)).toBe(950)
+  })
+
+  it('respecteert een afwijkend aantal cijfers', () => {
+    expect(roundToSignificant(887_689, 3)).toBe(888_000)
+    expect(roundToSignificant(887_689, 1)).toBe(900_000)
+  })
+
+  it('valt onder de afrondingsdrempel terug op hele euro’s', () => {
+    // Verder afronden zou kleine bedragen onherkenbaar maken, niet eerlijker.
+    expect(roundToSignificant(95)).toBe(95)
+    expect(roundToSignificant(12.4)).toBe(12)
+  })
+
+  it('is symmetrisch in het teken en veilig bij niet-eindige invoer', () => {
+    expect(roundToSignificant(-676_698)).toBe(-680_000)
+    expect(roundToSignificant(0)).toBe(0)
+    expect(roundToSignificant(NaN)).toBe(0)
+    expect(roundToSignificant(Infinity)).toBe(0)
+  })
+})
+
+describe('formatApproxCurrency — kopgetal mét voorbehoud', () => {
+  it('zet "ca." vóór het afgeronde bedrag', () => {
+    expect(formatApproxCurrency(676_698)).toBe(`${APPROX_PREFIX}${formatCurrency(680_000)}`)
+    expect(formatApproxCurrency(887_689)).toBe(`${APPROX_PREFIX}${formatCurrency(890_000)}`)
+  })
+
+  it('gebruikt een harde spatie, zodat "ca." nooit alleen op een regel valt', () => {
+    expect(APPROX_PREFIX).toBe('ca.\u00a0')
+  })
+
+  it('maskeert zonder voorbehoud — bullets zijn geen bedrag om te benaderen', () => {
+    expect(formatMaskedApproxCurrency(676_698, true)).toBe(MASKED_AMOUNT_PLACEHOLDER)
+    expect(formatMaskedApproxCurrency(676_698, false)).toBe(formatApproxCurrency(676_698))
+    expect(formatMaskedApproxCurrency(null, false)).toBe(formatApproxCurrency(0))
+  })
+})
+
+describe('formatFreedomRateFootnote', () => {
+  it('benoemt het tarief en zijn grondslag', () => {
+    const s = formatFreedomRateFootnote(124, 'transactions', false)
+    expect(s).toContain(formatCurrency(124))
+    expect(s).toContain('afgelopen 12 maanden')
+  })
+
+  it('markeert een profielschatting als schatting', () => {
+    expect(formatFreedomRateFootnote(80, 'estimate', false)).toContain('schatting')
+  })
+
+  it('zwijgt zonder eerlijke dagbasis', () => {
+    expect(formatFreedomRateFootnote(0, 'transactions', false)).toBeNull()
+    expect(formatFreedomRateFootnote(100, 'none', false)).toBeNull()
+  })
+
+  // ADR 0091 laag 4: het dagtarief is de wisselkoers waarmee "N vrijheidsdagen"
+  // terugrekent naar het gemaskeerde bedrag (bedrag = dagen x tarief). De
+  // maskering woont in deze functie, niet bij de vier call-sites, zodat een
+  // vergeten gate het lek niet opnieuw kan openen.
+  it('verdwijnt volledig in privacymodus — ook de "short"-vorm', () => {
+    expect(formatFreedomRateFootnote(124, 'transactions', true)).toBeNull()
+    expect(formatFreedomRateFootnote(124, 'estimate', true)).toBeNull()
+    expect(formatFreedomRateFootnote(124, 'transactions', true, 'short')).toBeNull()
+  })
+
+  it('lekt het bedrag ook niet via de korte vorm wanneer zichtbaar', () => {
+    expect(formatFreedomRateFootnote(124, 'transactions', false, 'short')).toContain('/dag')
   })
 })

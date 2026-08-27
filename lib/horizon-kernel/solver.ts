@@ -27,6 +27,11 @@
  *                        IF(Prognose!J(0) ≥ B36, reached_now,
  *                        IF(B38 < 0, unreachable_within_horizon, reached_at)))
  *    — inclusief de bewuste doel=0-quirk (B36=0 → J(0) ≥ 0 → reached_now).
+ *    Met `KernelInput.reachedNowVereistBereikbaarDoel` (app-pad AAN, fixture-pad
+ *    UIT → parity byte-identiek) is die quirk gescoopt op een doel dat er ook
+ *    echt is: bij B36 < 0 of B38 < 0 valt de status op
+ *    `unreachable_within_horizon` i.p.v. op een vals `reached_now` dat de
+ *    horizon-parkeerstand maskeert (bevinding M6, gap-besluit V21).
  *  - B96 hint          = −B38/((B35−B7)·12) €/mnd.
  *  - B99 tekort        = MAXIFS(S!AB; S!AR ≤ B35) — piek van het
  *    tekort-lening-saldo t/m de eindleeftijd.
@@ -134,10 +139,30 @@ function computeStatusBlok(
   if (tekortLening <= TEKORT_RUIS_DREMPEL) tekortLening = 0
 
   // ── P!B93 — status (exacte geneste IF-volgorde, incl. doel=0-quirk) ────────
+  // M6-VANGRAIL (gap-besluit V21, buiten oracle-domein). Met
+  // `input.reachedNowVereistBereikbaarDoel` mag `reached_now` alleen nog vallen
+  // op een doel dat er ook echt is:
+  //   a) `doelbedrag < 0` — een negatief doelvermogen is geen FIRE-doel maar het
+  //      teken van een structureel tekort; `J(0) ≥ B36` slaagt daar bijna altijd.
+  //   b) `gap < 0` — dan is er GEEN toereikende maand gevonden en staat de
+  //      FIRE-leeftijd op de horizon-parkeerstand. Bij B36 = 0 (deplete/pensioen/
+  //      legacy-0) is `J(0) ≥ 0` triviaal waar en MASKEERT reached_now precies die
+  //      parkeerstand — dat is hoe "Vrijheidsleeftijd 100,0" als hard feit op het
+  //      scherm kwam (bridge: fireReachable = status !== unreachable).
+  // De `gap < 0`-tak bestond al als vierde IF; de vangrail zet hem alleen vóór de
+  // reached_now-tak, zodat die hem niet meer kan overrulen. Vlag weggelaten
+  // (parity-/fixture-pad) → exact het Excel v5-gedrag, byte-identiek.
+  // NB: de scalar-router paste deze correctie al toe in zijn eigen status-mapping
+  // ("een reached_now met gap < 0 is de verhulde parkeerstand"); de kernel-tak
+  // deed dat niet. Nu delen beide paden dezelfde lezing.
+  const schijnbereik =
+    input.reachedNowVereistBereikbaarDoel === true && (doelbedrag < 0 || gap < 0)
   const jMaand0 = prognoseJ(proj, 0) ?? 0
   let status: SolverStatus
   if (code === 'pensioen' && tekortLening > 0) {
     status = 'pension_shortfall'
+  } else if (schijnbereik) {
+    status = 'unreachable_within_horizon'
   } else if (jMaand0 >= doelbedrag) {
     status = 'reached_now'
   } else if (gap < 0) {

@@ -75,11 +75,21 @@ export interface ResolvePageStatusInput {
    */
   cashflowCards?: CashflowCard[]
   /**
-   * Of Box 2 (aanmerkelijk belang) relevant is. Optioneel: laat weg (undefined)
-   * om de Box 2-route over te slaan; `false` betekent expliciet "niet relevant"
+   * Of de Box 2-positie MATERIEEL is — d.w.z. of er daadwerkelijk een heffing
+   * staat (Box 2-belasting over dividend en/of het bovenmatige deel boven de
+   * €500.000-leengrens). Canonieke bron: `loadBox2Materiality`
+   * (lib/box2-relevance.ts), die op `calculateBox2` leunt.
+   *
+   * Optioneel: laat weg (undefined) om de Box 2-route over te slaan; `false`
    * → 'neutral' → geen banner.
+   *
+   * BEWUST NIET de kale relevantie-gate (bevinding L8). Tot 26-08-2026 mapte dit
+   * veld `hasBox2Relevance` — pure aanwezigheid — rechtstreeks op 'warn'. Een DGA
+   * met een klein belang, geen uitkering en een symbolische rekening-courant
+   * kreeg zo een "AANDACHT"-banner bij een heffing van €0. Aandacht vragen mag
+   * alleen wanneer er iets te doen is.
    */
-  box2Relevant?: boolean
+  box2Material?: boolean
 }
 
 /**
@@ -95,7 +105,7 @@ export interface ResolvePageStatusInput {
  * @returns Route → PageStatusInfo, uitsluitend voor warn/bad-routes.
  */
 export function resolvePageStatusMap(input: ResolvePageStatusInput): PageStatusMap {
-  const { levers, cashflowCards, box2Relevant } = input
+  const { levers, cashflowCards, box2Material } = input
 
   const entries: Array<PageStatusInfo | null> = []
 
@@ -168,10 +178,10 @@ export function resolvePageStatusMap(input: ResolvePageStatusInput): PageStatusM
   }
 
   // ── Box 2: alleen wanneer expliciet meegegeven. undefined → route overslaan;
-  // true → 'warn'; false → 'neutral' → geen banner. ──
-  if (box2Relevant !== undefined) {
+  // true (= materiële heffing) → 'warn'; false → 'neutral' → geen banner. ──
+  if (box2Material !== undefined) {
     entries.push(
-      buildInfo('/overzicht/belasting/box2', box2Relevant ? 'warn' : 'neutral', null),
+      buildInfo('/overzicht/belasting/box2', box2Material ? 'warn' : 'neutral', null),
     )
   }
 

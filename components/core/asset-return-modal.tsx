@@ -32,7 +32,7 @@ import {
 } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { ASSET_TYPE_LABELS, type AssetType } from '@/lib/asset-data'
-import { formatGainPct } from '@/lib/asset-return'
+import { formatGainPct, RETURN_BASIS_LABELS } from '@/lib/asset-return'
 import type { AssetReturnBreakdown, AssetReturnReason, AssetReturnRow } from '@/lib/asset-return'
 
 /** Waarom een bezitting geen rendement kan dragen — in gewone taal. */
@@ -138,7 +138,10 @@ export function AssetReturnModal({
           emptyText="Je hebt (nog) geen beleggingen of crypto met een bekende kostprijs."
           fc={fc}
           signed={signed}
-          total={portfolio.cost > 0 ? { label: 'Rendement portefeuille', value: portfolio.gain } : null}
+          // Zelfde label als de KPI die deze modal uitlegt — uit de gedeelde
+          // bron (kaart H7). Wijkt de totaalregel af van de cel waarop de
+          // gebruiker klikte, dan legt de uitleg iets anders uit dan hij vroeg.
+          total={portfolio.cost > 0 ? { label: RETURN_BASIS_LABELS.portfolioSincePurchase.label, value: portfolio.gain } : null}
         />
 
         <Section

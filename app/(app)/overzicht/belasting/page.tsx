@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { Sparkles, ArrowRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getCachedUser } from '@/lib/supabase/cached-user'
-import { loadHorizonData } from '@/lib/horizon-data-loader'
+import { loadHorizonRaw } from '@/lib/horizon-data-loader'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import {
   BelastingBoxCards,
@@ -98,7 +98,7 @@ export default async function OverzichtBelastingPage() {
   // loadCoreData zijn `cache()`-gewrapt, dus overlappende tabellen worden
   // binnen deze render sowieso één keer gehaald).
   const [horizonData, kansen, user] = await Promise.all([
-    loadHorizonData(supabase),
+    loadHorizonRaw(supabase),
     loadFiscaleKansen(supabase, perspective, CURRENT_TAX_YEAR).catch(
       (err): FiscaleKansen | null => {
         console.error('belasting-hub:kansen', err)
@@ -243,7 +243,9 @@ export default async function OverzichtBelastingPage() {
   })
 
   // Fiscale kalender — runtime-klok als 'now' (server-component mag dat).
-  const deadlines = getTaxDeadlines(new Date(), 2026)
+  // `hasAanmerkelijkBelang` filtert de Box 2-deadlines centraal in de lib weg
+  // (bevinding L8): zonder AB stond "Leengrens DGA + dividendtiming" hier op #1.
+  const deadlines = getTaxDeadlines(new Date(), { hasAanmerkelijkBelang, year: 2026 })
 
   // Kaart-samenstelling in één pure functie (app/(app)/overzicht/belasting/
   // box-cards.ts) zodat de BEL-1-regel — Box 2 alleen bij aanmerkelijk belang —
@@ -372,7 +374,10 @@ export default async function OverzichtBelastingPage() {
         {kansen && kansen.taxOpportunities.length > 0 && (
           <Reveal className="pt-12 sm:pt-16">
             <SectionLabel num="II">De kansen</SectionLabel>
-            <HubKansen opportunities={kansen.taxOpportunities} />
+            <HubKansen
+              opportunities={kansen.taxOpportunities}
+              dailyExpenses={kansen.dailyExpenses}
+            />
           </Reveal>
         )}
 

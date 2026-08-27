@@ -100,6 +100,19 @@ export interface Asset {
   household_id: string | null
   // Net worth inclusion
   net_worth_inclusion_pct: number // 0–100, default 100
+  // ── Box 3-vrijstelling (zie lib/box3-data.ts#classifyAsset) ──
+  // OVERSCHRIJVING op de type-/subtype-afleiding, geen vervanging. `null` (de
+  // normale stand) betekent "leid af"; `true` haalt de bezitting uit de Box
+  // 3-grondslag, `false` zet hem er expliciet in. Bewust één as
+  // "vrijgesteld ja/nee" en geen volledige box-keuze per bezitting: box 1 en
+  // box 2 zijn al afleidbaar uit `asset_type = 'eigen_huis'` respectievelijk
+  // `'deelneming'`, dus een handmatige box-kolom zou die twee dupliceren.
+  // Optioneel in TS omdat oudere `Asset`-literals in tests/factories de velden
+  // niet kennen; de DB heeft een default van NULL.
+  box3_vrijgesteld?: boolean | null
+  // Vrije toelichting bij de overschrijving ("boot voor eigen gebruik").
+  // Wordt als uitsluitingsreden getoond wanneer `box3_vrijgesteld = true`.
+  box3_vrijstelling_reden?: string | null
   // ── Verkoop-/liquidatie-configuratie (zie lib/sale-config.ts) ──
   // Per niet-liquide bezitting (vehicle/physical/other/deelneming/real_estate):
   // het of/wanneer van verkoop in de horizon v2-grootboek-engine. JSONB; NULL →
@@ -211,7 +224,7 @@ export type AssetSource = 'manual' | 'aangifte_import' | 'broker_csv' | 'bank_ps
 // het brede `string`, waarop die parser terugvalt op `GenericStringError` en elke
 // rij-cast stukloopt. Een literal parseert wél.
 export const ASSET_CLIENT_COLUMNS =
-  'id, user_id, name, asset_type, current_value, purchase_value, purchase_date, expected_return, monthly_contribution, institution, notes, is_active, sort_order, created_at, updated_at, subtype, risk_profile, tax_benefit, is_liquid, lock_end_date, ticker_symbol, rental_income, woz_value, retirement_provider_type, depreciation_rate, address_postcode, address_house_number, kvk_number, ownership_percentage, annual_dividend, linked_asset_id, ownership, household_id, net_worth_inclusion_pct, sale_config, has_budget_tracking, has_holdings_tracking, has_woonbalans_tracking, has_rental_tracking, monthly_maintenance_cost, vva_fee, vacancy_log, source, imported_peildatum'
+  'id, user_id, name, asset_type, current_value, purchase_value, purchase_date, expected_return, monthly_contribution, institution, notes, is_active, sort_order, created_at, updated_at, subtype, risk_profile, tax_benefit, is_liquid, lock_end_date, ticker_symbol, rental_income, woz_value, retirement_provider_type, depreciation_rate, address_postcode, address_house_number, kvk_number, ownership_percentage, annual_dividend, linked_asset_id, ownership, household_id, net_worth_inclusion_pct, sale_config, has_budget_tracking, has_holdings_tracking, has_woonbalans_tracking, has_rental_tracking, monthly_maintenance_cost, vva_fee, vacancy_log, source, imported_peildatum, box3_vrijgesteld, box3_vrijstelling_reden'
 
 /** Dezelfde kolommen als array — voor tests en assertions. */
 export const ASSET_CLIENT_COLUMN_LIST: readonly string[] = ASSET_CLIENT_COLUMNS.split(', ')

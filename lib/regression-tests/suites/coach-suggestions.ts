@@ -121,9 +121,13 @@ const tests: TestCase[] = [
       const path = getFirstUndismissedSuggestion(fullGaps(), '/overzicht/cashflow/budget', NO_DISMISS, [])
       assertEqual(path?.key, 'path_core', 'path_core bij volledige data op /overzicht/cashflow/budget')
 
-      // Geen gaps, onbekend pad → default
+      // Geen gaps, onbekend pad → de GEVULDE terugval. Sinds kaart H15 is de
+      // default-laag gesplitst: "Welkom." is first-use-copy en hoort niet bij
+      // een account waarvan alle gaps dicht zijn.
       const def = getFirstUndismissedSuggestion(fullGaps(), '/random-pagina', NO_DISMISS, [])
-      assertEqual(def?.key, 'default', 'default bij onbekend pad')
+      assertEqual(def?.key, 'default_gevuld', 'default_gevuld bij onbekend pad en gevuld account')
+      const leegDef = getFirstUndismissedSuggestion(emptyGaps(), '/random-pagina', new Set(['gap_bank', 'gap_assets', 'gap_debts', 'gap_budgets', 'gap_transactions', 'gap_holdings', 'gap_isin', 'gap_goals', 'gap_fire_params', 'gap_life_events']), [])
+      assertEqual(leegDef?.key, 'default', 'default (welkom) blijft voor een leeg account')
     },
   },
 
@@ -233,7 +237,11 @@ const tests: TestCase[] = [
     priority: 'high',
     estimatedDurationMs: 50,
     fn() {
-      const overrides: CoachOverrides = { default: { enabled: false } }
+      // Beide default-varianten uit (H15: de terugval is gesplitst).
+      const overrides: CoachOverrides = {
+        default: { enabled: false },
+        default_gevuld: { enabled: false },
+      }
       const s = getFirstUndismissedSuggestion(fullGaps(), '/random', NO_DISMISS, [], overrides)
       assertEqual(s, null, 'Geen suggestie wanneer alles wegvalt')
     },

@@ -60,7 +60,7 @@ interface ReviewStepProps {
   mode: ReviewMode
   /** Default 'cloud' — bestaande aanroepers blijven werken. */
   herkomst?: ExtractionHerkomst
-  onSuccess: (payload: { assetIds: string[]; debtIds: string[]; collected?: { assets: AangifteAssetReviewItem[]; debts: AangifteDebtReviewItem[]; profileUpdates: AangifteProfileUpdates } }) => void
+  onSuccess: (payload: { assetIds: string[]; debtIds: string[]; alreadyImported?: boolean; collected?: { assets: AangifteAssetReviewItem[]; debts: AangifteDebtReviewItem[]; profileUpdates: AangifteProfileUpdates } }) => void
   onCancel: () => void
 }
 
@@ -435,7 +435,14 @@ export function ReviewStep({ extraction, mode, herkomst = 'cloud', onSuccess, on
         throw new Error(result.error || 'Import mislukt')
       }
 
-      onSuccess({ assetIds: result.asset_ids, debtIds: result.debt_ids })
+      // `already_imported` betekent: de server herkende deze aangifte en heeft
+      // NIETS opnieuw weggeschreven. Die vlag moet de gebruiker bereiken —
+      // anders is "gelukt" niet te onderscheiden van "er is niets gebeurd".
+      onSuccess({
+        assetIds: result.asset_ids,
+        debtIds: result.debt_ids,
+        alreadyImported: result.already_imported === true,
+      })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Onbekende fout bij opslaan'
       setSubmitError(message)

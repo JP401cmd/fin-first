@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo, useRef, useDeferredValue } f
 import dynamic from 'next/dynamic'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { formatMaskedCurrency } from '@/lib/format'
+import { formatMaskedCurrency, dailyExpenseRate } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
@@ -1718,7 +1718,15 @@ export default function WhatIfPage() {
             onEditEvent={handleEditEvent}
             baselineFireAge={baselineFireAge}
             computeImpact={computeImpact}
-            dailyExpenses={whatIfInput ? whatIfInput.monthlyExpenses / 30 : undefined}
+            // Euro→tijd gaat ALTIJD via de canonieke conversie (×12/365), ook op
+            // een hypothetisch scenariobedrag: ÷30 rekent met een jaar van 360
+            // dagen en gaf hier ~1,4% andere "dagen impact" dan elk ander scherm
+            // bij hetzelfde bedrag (M22). De GRONDSLAG mag hier bewust het
+            // what-if-bedrag zijn — dat is de hele vraag van dit scherm — maar de
+            // omrekening is geen keuze.
+            dailyExpenses={
+              whatIfInput ? dailyExpenseRate(whatIfInput.monthlyExpenses) : undefined
+            }
             isHousehold={isHousehold}
           />
 

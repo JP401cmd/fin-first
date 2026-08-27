@@ -120,11 +120,15 @@ export async function buildTaxContext(supabase: SupabaseClient): Promise<string>
       box1Lines = []
     }
 
-    // Box 2 — alleen een ja/nee op aanmerkelijk belang.
+    // Box 2 — alleen een ja/nee op aanmerkelijk belang. De uitkomst reist door
+    // naar het deadlines-blok hieronder: zonder AB horen de Box 2-deadlines daar
+    // niet te staan (bevinding L8 — dat sprak "Box 2: nee" in dezelfde payload
+    // tegen). Faal-zacht: bij een query-fout blijft `false` → geen DGA-deadlines.
+    let box2Relevant = false
     let box2Line: string | null = null
     try {
-      const relevant = await hasBox2Relevance(supabase, user.id)
-      box2Line = `Box 2 (aanmerkelijk belang in een BV): ${relevant ? 'ja — DGA/AB-positie aanwezig' : 'nee'}`
+      box2Relevant = await hasBox2Relevance(supabase, user.id)
+      box2Line = `Box 2 (aanmerkelijk belang in een BV): ${box2Relevant ? 'ja — DGA/AB-positie aanwezig' : 'nee'}`
     } catch {
       box2Line = null
     }
@@ -163,7 +167,9 @@ export async function buildTaxContext(supabase: SupabaseClient): Promise<string>
     // Deadlines — eerstvolgende 2-3 fiscale momenten vanaf nu (runtime-datum).
     let deadlineLines: string[] = []
     try {
-      const deadlines = getTaxDeadlines(new Date()).slice(0, 3)
+      const deadlines = getTaxDeadlines(new Date(), {
+        hasAanmerkelijkBelang: box2Relevant,
+      }).slice(0, 3)
       if (deadlines.length > 0) {
         deadlineLines = [
           'Eerstvolgende fiscale deadlines:',

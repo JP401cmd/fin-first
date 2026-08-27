@@ -36,6 +36,11 @@ import { computeEmergencyFundMonths, type HealthScoreAsset } from '@/lib/health-
 import { resolveSavingsSource } from '@/lib/savings-source'
 import { computeRetirementPrefill } from '@/lib/onboarding/retirement-prefill'
 import { computeNoodfondsTarget } from '@/lib/onboarding-presets'
+import {
+  ONBOARDING_HOUSING_MODE,
+  computeFreedomTicker,
+  freedomTickerBasis,
+} from '@/lib/freedom-ticker'
 import { ADDON_PLANS } from '@/lib/subscription-catalog'
 import { START_ACCEPTANCE } from './start'
 import type { AcceptanceCriterion } from './types'
@@ -200,9 +205,21 @@ export const START_ENGINE_CHECKS: StartEngineCheck[] = [
       const pensioenPrefill = computeRetirementPrefill({ monthlyExpenses: 2100 }).amount
       const noodfondsPrefill = computeNoodfondsTarget({ monthlyIncome: 3000, monthlyExpenses: 2100 })
       const netto = nettoVermogenRecap([2500, 18000, 12000], [9000])
+      // Meelopende vrijheidstijd-teller (bevinding H12): dezelfde persona, na
+      // de derde bezitting en MET de studieschuld erbij — op de intake-
+      // grondslag (excl. eigen woning, schulden niet afgetrokken) mag die
+      // schuld het getal niet verlagen.
+      const teller = computeFreedomTicker({
+        monthlyIncome: 3000,
+        monthlyExpenses: 2100,
+        assets: [2500, 18000, 12000].map((value) => ({ value, isHome: false })),
+        debts: 9000,
+        basis: freedomTickerBasis(ONBOARDING_HOUSING_MODE),
+      })
       return {
-        expected: 'spaarquotePreview=30; pensioenPrefill=20160; noodfondsPrefill=12600; nettoVermogenRecap=23500',
-        actual: `spaarquotePreview=${spaarquote}; pensioenPrefill=${pensioenPrefill}; noodfondsPrefill=${noodfondsPrefill}; nettoVermogenRecap=${netto}`,
+        expected:
+          'spaarquotePreview=30; pensioenPrefill=20160; noodfondsPrefill=12600; nettoVermogenRecap=23500; vrijheidsteller=1j 3m; tellerBedrag=32500',
+        actual: `spaarquotePreview=${spaarquote}; pensioenPrefill=${pensioenPrefill}; noodfondsPrefill=${noodfondsPrefill}; nettoVermogenRecap=${netto}; vrijheidsteller=${teller?.label ?? 'geen'}; tellerBedrag=${teller?.amount ?? 0}`,
       }
     },
   },

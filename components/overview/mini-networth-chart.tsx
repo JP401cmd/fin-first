@@ -2,7 +2,7 @@
 
 import { memo, useId, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { formatMaskedCurrency } from '@/lib/format'
+import { formatMaskedApproxCurrency, formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
@@ -541,7 +541,12 @@ function MiniNetWorthChartComponent({
       : deflate(simRequiredPortfolio, freedomTargetFactor, euroView)
   const freedomTargetLabel =
     !fireReached && viewSimRequiredPortfolio != null && viewSimRequiredPortfolio > 0
-      ? `Vrijheidsdoel ${formatMaskedCurrency(viewSimRequiredPortfolio, masked)} liquide`
+      // M5 — prognose-kopgetal: afgerond op significante cijfers mét "ca.".
+      // Dit doel ligt jaren vooruit en beweegt met rendement en inflatie mee;
+      // het tot op de euro noteren belooft een precisie die de projectie niet
+      // heeft. Het huidige netto vermogen boven de grafiek blijft wél exact —
+      // dat is een gerealiseerd bedrag, geen voorspelling.
+      ? `Vrijheidsdoel ${formatMaskedApproxCurrency(viewSimRequiredPortfolio, masked)} liquide`
       : null
 
   return (
@@ -561,7 +566,7 @@ function MiniNetWorthChartComponent({
             ? simple
               ? `${endLabel} bereikt`
               : `${endLabel} bereikt — verloop tot ${finalAgeLabel}`
-            : `Vermogen bij ${endLabel.toLowerCase()} → ${formatMaskedCurrency(endValue, masked)}`}
+            : `Vermogen bij ${endLabel.toLowerCase()} → ${formatMaskedApproxCurrency(endValue, masked)}`}
         </span>
       </header>
       <div className="font-serif text-xl font-semibold text-[var(--ink)] tabular-nums">

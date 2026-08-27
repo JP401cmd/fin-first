@@ -12,8 +12,26 @@
  * ## De grootheid in gewone taal
  * `RendementMarge.marge` is een verschuiving van het jaarrendement (decimaal:
  * 0,018 = 1,8% per jaar). Positief = het rendement mág zoveel tegenvallen;
- * negatief = er is zoveel méér nodig. Het woord "procentpunt" komt hier bewust
- * NIET in voor — "je rendement valt 1,8% per jaar tegen" is wat een mens zegt.
+ * negatief = er is zoveel méér nodig.
+ *
+ * ## METRIEK-WOORDENSCHAT (H21/F3) — welk woord bij welk getal
+ * Op /toekomst en in de widget-rail leven DRIE onafhankelijke grootheden onder
+ * hetzelfde `%`-teken, uit drie motoren. Zonder eenheid draait de betekenis
+ * 180°: "4,1%" naast "99%" leest als een rampzalige slaagkans, terwijl het juist
+ * een gezonde speling is. De regel:
+ *
+ *   • KANS-metrieken (`backtestSuccessRate` uit de bundel, `mc.fireProb` /
+ *     `successRate` uit de client-runs) dragen het WOORD "kans" bij het getal
+ *     ("succeskans", "historische succeskans") en een kaal `%`. Bereik 0–100.
+ *   • MARGE-metrieken (`RendementMarge.marge`, deze module) dragen de EENHEID
+ *     `%pt/jr` — procentpunt rendement per jaar. Nooit een kaal `%`, ook niet
+ *     in een compacte pil waar het label wegvalt: `margeKort` bevat de eenheid
+ *     zelf, zodat er geen weergave-oppervlak bestaat waar hij weg kan vallen.
+ *
+ * In de ZINNEN (`margeLegenda`, `margeZin`) komt het woord "procentpunt" bewust
+ * NIET voor — "je rendement valt 1,8% per jaar tegen" is wat een mens zegt, en
+ * de zin draagt zijn eigen context. Alleen het losstaande GETAL heeft de
+ * eenheid nodig.
  *
  * Pure module: geen React, geen fs, geen Date.now.
  */
@@ -55,15 +73,28 @@ function leeftijd(m: RendementMarge): number {
 }
 
 /**
+ * De EENHEID van de marge: procentpunt rendement per jaar.
+ *
+ * Eén constante omdat hij op meerdere oppervlakken moet kloppen (pil, legenda-
+ * chip, bron-test) en omdat een marge-getal nooit zónder mag verschijnen —
+ * dat is precies hoe "4,1%" naast "99% succeskans" kwam te staan (H21/F2).
+ */
+export const MARGE_EENHEID = '%pt/jr'
+
+/**
  * De pil-waarde — kort genoeg voor de compacte pillenbalk (waar het label
- * wegvalt en alleen de datawaarde blijft staan):
- * `1,8%` · `−2,9%` · `>15%` · `<−15%`.
+ * wegvalt en alleen de datawaarde blijft staan), MÉT eenheid:
+ * `1,8 %pt/jr` · `−2,9 %pt/jr` · `>15 %pt/jr` · `<−15 %pt/jr`.
+ *
+ * De eenheid zit IN deze functie en niet in het aanroepende oppervlak: zo
+ * bestaat er geen weergaveplek waar hij weg kan vallen. Zie de
+ * METRIEK-WOORDENSCHAT in de module-doc.
  */
 export function margeKort(m: RendementMarge): string {
-  if (m.begrensd === 'boven') return `>${pct(RENDEMENT_MARGE_GRENS)}%`
-  if (m.begrensd === 'onder') return `<−${pct(RENDEMENT_MARGE_GRENS)}%`
-  if (isNul(m)) return '0%'
-  return m.marge > 0 ? `${pct(m.marge)}%` : `−${pct(m.marge)}%`
+  if (m.begrensd === 'boven') return `>${pct(RENDEMENT_MARGE_GRENS)} ${MARGE_EENHEID}`
+  if (m.begrensd === 'onder') return `<−${pct(RENDEMENT_MARGE_GRENS)} ${MARGE_EENHEID}`
+  if (isNul(m)) return `0 ${MARGE_EENHEID}`
+  return m.marge > 0 ? `${pct(m.marge)} ${MARGE_EENHEID}` : `−${pct(m.marge)} ${MARGE_EENHEID}`
 }
 
 /**

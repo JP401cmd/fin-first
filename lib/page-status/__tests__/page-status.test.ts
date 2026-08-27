@@ -372,18 +372,24 @@ describe('resolvePageStatusMap — optional families', () => {
     expect(Object.keys(map)).toHaveLength(0)
   })
 
-  it('box2Relevant: undefined → no box2 entry', () => {
+  it('box2Material: undefined → no box2 entry', () => {
     const map = resolvePageStatusMap({ levers: makeLeverScores() })
     expect(map['/overzicht/belasting/box2']).toBeUndefined()
   })
 
-  it('box2Relevant: false → no box2 entry (neutral status filtered)', () => {
-    const map = resolvePageStatusMap({ box2Relevant: false })
+  // BEWUST HERZIEN (bevinding L8). Dit veld heette `box2Relevant` en droeg de
+  // kale presence-gate `hasBox2Relevance`: loutere AANWEZIGHEID van een belang
+  // gaf 'warn'. Een DGA met een klein belang, geen uitkering en een symbolische
+  // rekening-courant kreeg zo een "AANDACHT"-banner bij een heffing van €0.
+  // De gate is verplaatst naar MATERIALITEIT (`loadBox2Materiality`, die op
+  // calculateBox2 leunt); resolve.ts blijft een pure mapper.
+  it('box2Material: false → no box2 entry (immaterieel belang toont geen banner)', () => {
+    const map = resolvePageStatusMap({ box2Material: false })
     expect(map['/overzicht/belasting/box2']).toBeUndefined()
   })
 
-  it('box2Relevant: true → box2 entry with warn status', () => {
-    const map = resolvePageStatusMap({ box2Relevant: true })
+  it('box2Material: true → box2 entry with warn status', () => {
+    const map = resolvePageStatusMap({ box2Material: true })
     expect(map['/overzicht/belasting/box2']).toBeDefined()
     expect(map['/overzicht/belasting/box2'].status).toBe('warn')
   })

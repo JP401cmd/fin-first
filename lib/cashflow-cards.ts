@@ -12,6 +12,7 @@ import type { VasteLastenSummary } from '@/lib/vaste-lasten-summary'
 import { buildForecast } from '@/lib/cashflow-forecast-math'
 import { pillarStatus, type LeverageStatus } from '@/lib/leverage-status'
 import { formatCurrency } from '@/lib/format'
+import { savingsRateFromAggregates } from '@/lib/savings-source'
 import { CURRENT_MONTH_INCOME_COMPLETE_RATIO } from '@/lib/constants'
 
 export type CashflowCardKey = 'budget' | 'transacties' | 'vaste-lasten' | 'forecast'
@@ -127,6 +128,37 @@ export function budgetCardStatus(input: {
 }
 
 /**
+ * DE spaarquote van één GEREALISEERDE kalendermaand (%), of `null` zonder
+ * inkomen in die maand.
+ *
+ * WAAROM DEZE FUNCTIE BESTAAT (H6). Deze formule stond drie keer met de hand
+ * uitgeschreven: in `transactiesCardStatus`, in `buildCashflowCards` en — met
+ * een andere invoer — in de figures-strip van `components/app/cash-overview.tsx`.
+ * Drie kopieën van één getal op twee schermen; de strip liet daardoor −381% zien
+ * naast een kaart die iets anders zei. Nu is er één huis, en dat huis roept de
+ * canonieke `savingsRateFromAggregates` (lib/savings-source.ts) aan i.p.v. de
+ * deling opnieuw op te schrijven.
+ *
+ * AFLOSSINGSTERM = 0, BEWUST. De canonieke 6-maands quote
+ * (`computeSavingsRate6m`) corrigeert voor schuldaflossing én voor stortingen op
+ * spaarbudgetten. Op maandbasis doen we dat hier NIET: het zou dit maandcijfer
+ * uit de pas laten lopen met de saldoregel ernaast (die de stortingen wél als
+ * uitgave telt) en met de andere maand-oppervlakken. Zie het IMPLEMENTATIE-blok
+ * op de H6-kaart — de maand-variant van die correctie is als open punt
+ * genoteerd, niet stilzwijgend hier ingevoerd.
+ *
+ * `null` ≠ 0: geen inkomen betekent "niet te zeggen", niet "0% gespaard".
+ */
+export function currentMonthSavingsRate(
+  currentMonthIncome: number,
+  currentMonthExpenses: number,
+): number | null {
+  return currentMonthIncome > 0
+    ? savingsRateFromAggregates(currentMonthIncome, currentMonthExpenses, 0)
+    : null
+}
+
+/**
  * Is het inkomen van de LOPENDE kalendermaand nog niet compleet?
  *
  * Meet de gerealiseerde maandinkomsten tegen het EFFECTIEVE maandinkomen (ADR
@@ -187,9 +219,8 @@ export function transactiesCardStatus(input: {
   forecastNetPerMonth?: number | null
 }): LeverageStatus {
   const { currentMonthIncome, currentMonthExpenses } = input
-  const monthlyNet = currentMonthIncome - currentMonthExpenses
   const hasTx = currentMonthIncome > 0 || currentMonthExpenses > 0
-  const rate = currentMonthIncome > 0 ? (monthlyNet / currentMonthIncome) * 100 : null
+  const rate = currentMonthSavingsRate(currentMonthIncome, currentMonthExpenses)
   if (!hasTx || rate == null) return 'neutral'
   if (rate >= 20) return 'good'
   if (rate >= 0) return 'warn'
@@ -219,6 +250,25 @@ export function transactiesCardStatus(input: {
 export const VASTE_LASTEN_GOOD_MAX = 0.5
 export const VASTE_LASTEN_WARN_MAX = 0.7
 
+/**
+ * De VASTE-LASTENQUOTE zelf (0-1), of null zonder inkomen. Één plek, want dit
+ * getal werd op twee oppervlakken los uitgeschreven — de kaart-subtekst hieronder
+ * en `buildVasteLastenInsights` — met identieke formule. Dat is (nog) geen drift,
+ * maar wél de vorm waarin drift ontstaat: één van de twee krijgt ooit een andere
+ * noemer en dan spreken de banner en de meter elkaar tegen (bevinding C6 op de
+ * spaarquote is exact zo begonnen).
+ *
+ * NOEMER: het EFFECTIVE maandinkomen (ADR 0073/0103), bewust niet `currentMonth*`
+ * — een structureel aandeel meet je tegen een stabiel maandinkomen, niet tegen een
+ * half-afgelopen kalendermaand.
+ */
+export function vasteLastenRatio(input: {
+  totalMonthly: number
+  monthlyIncome: number
+}): number | null {
+  return input.monthlyIncome > 0 ? input.totalMonthly / input.monthlyIncome : null
+}
+
 /** Vaste lasten: aandeel van inkomen. <50% good, ≤70% warn, anders bad. */
 export function vasteLastenCardStatus(input: {
   totalMonthly: number
@@ -226,7 +276,7 @@ export function vasteLastenCardStatus(input: {
   monthlyIncome: number
 }): LeverageStatus {
   const hasVaste = input.count > 0
-  const ratio = input.monthlyIncome > 0 ? input.totalMonthly / input.monthlyIncome : null
+  const ratio = vasteLastenRatio(input)
   if (!hasVaste || ratio == null) return 'neutral'
   return ratio < VASTE_LASTEN_GOOD_MAX ? 'good' : ratio <= VASTE_LASTEN_WARN_MAX ? 'warn' : 'bad'
 }
@@ -340,7 +390,7 @@ export function buildCashflowCards(
   const currentMonthExpenses = kpis.currentMonthExpenses
   const monthlyNet = currentMonthIncome - currentMonthExpenses
   const hasTx = currentMonthIncome > 0 || currentMonthExpenses > 0
-  const rate = currentMonthIncome > 0 ? (monthlyNet / currentMonthIncome) * 100 : null
+  const rate = currentMonthSavingsRate(currentMonthIncome, currentMonthExpenses)
   // Meetlat voor "is deze maand al te beoordelen?" — BEWUST het EFFECTIVE
   // maandinkomen (ADR 0073), dezelfde stabiele grondslag die de vaste-lasten-kaart
   // hieronder als noemer gebruikt. Alleen als meetlat: KPI, spaarquote en tip
@@ -407,7 +457,10 @@ export function buildCashflowCards(
   // niet tegen een half-afgelopen kalendermaand (die het aandeel vroeg in de
   // maand kunstmatig naar 100%+ zou duwen).
   const effectiveMonthlyIncome = kpis.monthlyIncome
-  const vasteRatio = effectiveMonthlyIncome > 0 ? vastePerMonth / effectiveMonthlyIncome : null
+  const vasteRatio = vasteLastenRatio({
+    totalMonthly: vastePerMonth,
+    monthlyIncome: effectiveMonthlyIncome,
+  })
   const vasteStatus: LeverageStatus = vasteLastenCardStatus({
     totalMonthly: vastePerMonth,
     count: vasteCount,

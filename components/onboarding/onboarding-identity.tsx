@@ -208,7 +208,11 @@ export function OnboardingIdentity({
     )
   const deck =
     field === 'naam'
-      ? 'Zodat ik je persoonlijk kan aanspreken — verder niets verplichts.'
+      ? // Benoemt expliciet dát dit veld verplicht is: het naamveld draagt een
+        // sterretje en een harde "Naam is verplicht"-validatie. De vorige tekst
+        // ("verder niets verplichts") wees vooruit naar de latere stappen, maar
+        // las naast dat sterretje als "dit veld hoeft ook niet".
+        'Alleen je naam is verplicht — de rest van de vragen mag je overslaan.'
       : field === 'dob'
         ? 'Met je leeftijd vertaal ik je geld naar jouw vrijheid in tijd — op maat van je horizon.'
         : 'Zo vertaal ik je bedragen naar jouw vrijheid in tijd — op maat van je situatie.'
@@ -245,7 +249,11 @@ export function OnboardingIdentity({
       }
     >
       <div className="space-y-6">
-        {submitted && !isValid && (
+        {/* Samenvattings-banner: alleen zinvol als er méér dan één veld op dit
+            scherm staat. Op een begeleid één-vraag-scherm (`field='naam'` /
+            `field='dob'`) herhaalt hij de inline-melding alleen vager — dan
+            volstaat de specifieke melding bij het veld zelf. */}
+        {submitted && !isValid && activeFields.length > 1 && (
           <div
             className="border border-red-200 bg-red-50 px-4 py-3"
             role="alert"

@@ -95,6 +95,7 @@ export async function VasteLastenLoader({ perspective }: { perspective: Perspect
         insights={insights}
         subscriptions={summary.subscriptions}
         vasteKosten={summary.vasteKosten}
+        terugkerendVariabel={summary.terugkerendVariabel}
         fullName={cashflow.fullName}
       />
       {/* Kalender = secundaire diepte ("wanneer komt het"): in Eenvoudig

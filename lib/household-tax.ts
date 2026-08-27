@@ -37,7 +37,11 @@ import {
   loadPerspectiveData,
   type PerspectiveItem,
 } from '@/lib/household/perspective-loader'
-import { dailyExpensesByPerspective, type Perspective } from '@/lib/household-data'
+import {
+  getRecentDailyExpenseRate,
+  type RecentDailyExpenseRate,
+} from '@/lib/expense-rate'
+import { type Perspective } from '@/lib/household-data'
 
 // ── Partner-totalen per Box 3-categorie ──────────────────────────
 
@@ -125,7 +129,43 @@ export interface PerspectiveBox3Data {
   perspective: Perspective
   hasHousehold: boolean
   year: TaxYear
+  /**
+   * CANONIEK dagtarief (€/dag) uit `lib/expense-rate.ts` — 12-mnd rolling
+   * GEREALISEERDE uitgaven ×12/365, exact dezelfde keten als
+   * `DashboardData.dailyExpenseRate` en `HorizonRawData.dailyExpenseRate`.
+   *
+   * Was: de som van budget-LIMIETEN gedeeld door 30, met een verzonnen terugval
+   * van €100/dag. Andere teller (limieten i.p.v. gerealiseerd) én andere noemer
+   * (30 i.p.v. 365/12) — op productie gemeten −68% tot +441% t.o.v. het
+   * canonieke tarief, waardoor dezelfde Box 3-heffing op de subpagina een ander
+   * aantal vrijheidsdagen droeg dan op de hub, de widget en de optimizer (M22).
+   *
+   * 0 = GEEN EERLIJKE DAGBASIS (geen transacties én geen schatting). Dan hoort
+   * er géén tijdregel te staan; `calculateBox3` levert bij 0 vanzelf
+   * `freedomDays: 0` en elk oppervlak guard't daarop.
+   */
   dailyExpenses: number
+  /**
+   * Herkomst van `dailyExpenses`, één-op-één `RecentDailyExpenseRate.source`.
+   * De voetnoot bij een vrijheidsdagen-getal benoemt hiermee zijn grondslag —
+   * zonder die vermelding is een tarief dat kan schuiven een tweede waarheid
+   * met vertraging (zelfde regel als ADR 0103).
+   */
+  dailyExpensesSource: 'transactions' | 'estimate' | 'none'
+  /**
+   * Het perspectief waarop `dailyExpenses` staat — vandaag ALTIJD 'personal',
+   * ook in huishoud-/partnerweergave.
+   *
+   * Bewuste grens, geërfd van ADR 0107: de uitgavenkant blijft persoonlijk
+   * omdat er geen partner-TRANSACTIES bereikbaar zijn (de perspectief-loader
+   * dekt assets/debts/budgets, niet transacties; een huishoud-dagtarief vraagt
+   * een eigen SECURITY DEFINER-RPC + privacy-besluit). De oude budget-limiet-
+   * afleiding wás perspectief-bewust, maar op een grondslag die met de
+   * werkelijkheid niets te maken had — liever een eerlijk persoonlijk tarief
+   * dat zich als zodanig BEKENDMAAKT dan een huishoud-ogend verzonnen getal
+   * (exact de afweging die ADR 0107 bij `fireRowsComplete` maakte).
+   */
+  dailyExpensesPerspective: 'personal'
   currentUserName: string
   partnerName: string | null
   /** Het privé/eigen resultaat (single → personal; household → eigen partner). */
@@ -184,18 +224,43 @@ function box3Input(
 }
 
 /**
- * Maandelijkse uitgaven (perspectief-correct) afgeleid uit budgetten.
- * Spiegelt /api/household/box3: som van 'expense'-budgetten; valt terug op
- * €3000/maand zodat vrijheidsdagen nooit door 0 delen.
+ * Het canonieke dagtarief voor dit oppervlak, mét dezelfde schatting-terugval
+ * die de dashboard- en core-bundel hanteren.
  *
- * In household-view tellen we alle expense-budgetten (eigen + gedeeld +
- * partner via de loader); in personal/partner-view het perspectief-deel.
+ * GEEN eigen som — puur de gedeelde bron (`lib/expense-rate.ts`) plus het
+ * profielbedrag als `fallbackMonthlyExpenses`. Die terugval telt alléén wanneer
+ * er nul uitgaven-transacties in het venster staan; dan ís de profielschatting
+ * de enige eerlijke basis (en anders blijft hij ongebruikt, dus hij kan het
+ * transactie-tarief niet vertroebelen).
+ *
+ * Bewust één kolom-scoped eigen-rij-query i.p.v. `resolveEffectiveIncomeExpenses`:
+ * die resolver kiest tussen transactie- en profielgrondslag, en precies die
+ * keuze maakt `recentDailyExpenseRateFromRows` hier al — hem er nog eens
+ * overheen leggen zou de beslissing verdubbelen.
+ *
+ * Dual-use: alleen `.from`/`.auth`, dus werkt met de server- én de browser-
+ * client (net als de rest van dit bestand).
  */
-function monthlyExpensesFromBudgets(budgets: PerspectiveItem[]): number {
-  const total = budgets
-    .filter((b) => b.budget_type === 'expense')
-    .reduce((sum, b) => sum + (Number(b.default_limit) || 0), 0)
-  return total
+async function resolveCanonicalDailyExpenses(
+  supabase: SupabaseClient,
+): Promise<RecentDailyExpenseRate> {
+  let fallbackMonthly = 0
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('estimated_monthly_expenses')
+        .eq('id', user.id)
+        .maybeSingle()
+      fallbackMonthly = Math.max(Number(profile?.estimated_monthly_expenses ?? 0) || 0, 0)
+    }
+  } catch {
+    /* geen profiel-schatting → alleen de transactiebasis (of 0) */
+  }
+  return getRecentDailyExpenseRate(supabase, new Date(), fallbackMonthly)
 }
 
 /**
@@ -210,30 +275,31 @@ export async function loadPerspectiveBox3(
   perspective: Perspective,
   year: TaxYear,
   currentUserName = 'Jij',
+  canonicalDailyExpenses?: RecentDailyExpenseRate,
 ): Promise<PerspectiveBox3Data> {
   // We hebben in ELKE view de volledige unie nodig om per perspectief zelf te
   // kunnen splitsen/combineren, dus laden we altijd op 'household'-breedte en
   // filteren via provenance. Veilig voor solo: de loader negeert dan het
   // perspectief en levert exact de eigen + gedeelde set (geen partner-rijen).
-  const { context, assets, debts, budgets } = await loadPerspectiveData(
-    supabase,
-    'household',
-  )
+  //
+  // Het dagtarief hangt NIET van die unie af (zie hieronder) en is dus een
+  // onafhankelijke tak — parallel, geen extra serieel wachtblok.
+  const [{ context, assets, debts }, expenseRate] = await Promise.all([
+    loadPerspectiveData(supabase, 'household'),
+    canonicalDailyExpenses
+      ? Promise.resolve(canonicalDailyExpenses)
+      : resolveCanonicalDailyExpenses(supabase),
+  ])
 
   const hasHousehold = context.hasHousehold
   const partnerName = context.partnerName
 
-  // Perspectief-correcte dag-uitgaven. We benaderen partner-uitgaven als
-  // household − personal wanneer geen expliciete partner-waarde bestaat.
-  const householdMonthly = monthlyExpensesFromBudgets(budgets)
-  const ownMonthly = monthlyExpensesFromBudgets(ownItems(budgets).concat(sharedItems(budgets)))
-  const dailyExpenses = (() => {
-    const d = dailyExpensesByPerspective(
-      { personal: ownMonthly, household: householdMonthly },
-      perspective,
-    )
-    return d > 0 ? d : 100
-  })()
+  // ── Dagtarief: ÉÉN noemer, app-breed ──────────────────────────────────
+  // `lib/expense-rate.ts` is de enige €→vrijheidstijd-noemer op een
+  // weergave-oppervlak. Geen budget-limieten (dat is een PLAN, geen uitgave),
+  // geen ÷30 naast een ×12/365 elders, en geen verzonnen €100/dag-terugval:
+  // 0 betekent "geen eerlijke dagbasis" en de tijdregel hoort dan weg te vallen.
+  const dailyExpenses = expenseRate.dailyRate
 
   // ── Solo of geen huishouden: identiek aan vandaag ──────────────
   if (!hasHousehold) {
@@ -251,6 +317,8 @@ export async function loadPerspectiveBox3(
       hasHousehold: false,
       year,
       dailyExpenses,
+      dailyExpensesSource: expenseRate.source,
+      dailyExpensesPerspective: 'personal',
       currentUserName,
       partnerName: null,
       personal,
@@ -281,6 +349,8 @@ export async function loadPerspectiveBox3(
       hasHousehold: true,
       year,
       dailyExpenses,
+      dailyExpensesSource: expenseRate.source,
+      dailyExpensesPerspective: 'personal',
       currentUserName,
       partnerName,
       personal,
@@ -316,6 +386,8 @@ export async function loadPerspectiveBox3(
     hasHousehold: true,
     year,
     dailyExpenses,
+    dailyExpensesSource: expenseRate.source,
+    dailyExpensesPerspective: 'personal',
     currentUserName,
     partnerName,
     personal,

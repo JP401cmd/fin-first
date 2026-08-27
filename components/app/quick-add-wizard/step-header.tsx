@@ -23,6 +23,18 @@ export interface StepHeaderProps {
   title: string
   /** Extra label naast het stap-nummer (bv. "Bezitting toevoegen"). */
   kicker?: string
+  /**
+   * Toon de "Stap N van M"-telling. Default `true`.
+   *
+   * Zet op `false` wanneer de wizard binnen een flow draait die zélf al een
+   * voortgangsteller toont. In de onboarding blijft de sticky
+   * `OnboardingProgressBar` ("3/8") door de half-transparante
+   * BottomSheet-backdrop heen zichtbaar; de modal-telling ("Stap 1 van 2")
+   * loopt op een heel andere schaal en leverde zo twee tot drie
+   * voortgangsverhalen tegelijk op (bevinding M12). Zonder telling blijft de
+   * kicker over als niet-nummerende naam van de stap ("Gegevens", "Extra").
+   */
+  showStepCount?: boolean
   onBack?: () => void
   icon?: ReactNode
   iconColor?: string
@@ -33,11 +45,15 @@ export function StepHeader({
   total,
   title,
   kicker,
+  showStepCount = true,
   onBack,
   icon,
   iconColor,
 }: StepHeaderProps) {
-  const progress = `Stap ${step} van ${total}`
+  const progress = showStepCount ? `Stap ${step} van ${total}` : null
+  // Zonder telling én zonder kicker blijft er niets over voor de meta-regel —
+  // dan vervalt de regel helemaal in plaats van als lege ruimte te blijven staan.
+  const hasMeta = progress !== null || Boolean(kicker)
 
   return (
     <div className="mb-5 flex items-start gap-3">
@@ -53,13 +69,23 @@ export function StepHeader({
       )}
 
       <div className="min-w-0 flex-1">
-        <p className="label-editorial text-[var(--ink-3)]">
-          {progress}
-          {kicker ? <span className="text-[var(--ink-4)]"> · {kicker}</span> : null}
-        </p>
+        {hasMeta && (
+          <p className="label-editorial text-[var(--ink-3)]">
+            {progress}
+            {kicker ? (
+              progress ? (
+                <span className="text-[var(--ink-4)]"> · {kicker}</span>
+              ) : (
+                kicker
+              )
+            ) : null}
+          </p>
+        )}
         <h3
           tabIndex={-1}
-          className="mt-1 font-serif text-xl italic text-[var(--ink)] leading-tight"
+          className={`font-serif text-xl italic text-[var(--ink)] leading-tight${
+            hasMeta ? ' mt-1' : ''
+          }`}
         >
           {title}
         </h3>

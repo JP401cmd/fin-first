@@ -3,6 +3,7 @@ import { render, screen, act } from '@testing-library/react'
 import { DraggableWidgetGrid } from './draggable-widget-grid'
 import type { WidgetPref } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
+import { emptyPortfolioReturnSummary } from '@/lib/asset-return'
 
 // Mock WidgetRenderer to avoid complex dependency chain
 vi.mock('./widget-renderer', () => ({
@@ -109,7 +110,7 @@ const mockData: DashboardData = {
   expenseHistory: [],
   budgetTypeHistory: { income: [], expense: [], savings: [], debt: [] },
   assetsByType: [],
-  totalPurchaseValue: 0,
+  assetReturn: emptyPortfolioReturnSummary(),
   fireAgeFractional: null,
   fireRange: null,
   freedomMilestones: null,

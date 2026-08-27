@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { buildAssetReturnBreakdown, type AssetReturnInput } from './asset-return'
+import {
+  buildAssetReturnBreakdown,
+  emptyPortfolioReturnSummary,
+  RETURN_BASIS_LABELS,
+  summarizePortfolioReturn,
+  type AssetReturnInput,
+} from './asset-return'
 import { sumHoldingTotals } from './holdings-totals'
 
 /**
@@ -248,5 +254,182 @@ describe('buildAssetReturnBreakdown — dekkingspoort op de holdings-kostprijs',
     )
     expect(rowById(b.portfolio.rows, 'a-1').costSource).toBe('holdings')
     expect(rowById(b.portfolio.rows, 'a-1').gain).toBeCloseTo(20_000, 6)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// KAART H7 — "vier verschillende rendement-percentages"
+//
+// TOLERANTIE, EXPLICIET GEKOZEN (niet geërfd van een bestaande comparator):
+//   • PERCENTAGES → ABSOLUUT, 0,05 procentpunt (`toBeCloseTo(x, 1)`). Reden: het
+//     percentage wordt op ÉÉN decimaal getoond; de foutklasse die we willen
+//     vangen is "er staat een ander cijfer op het scherm". Een RELATIEVE
+//     tolerantie zou hier twee kanten op falen: rond 0% explodeert ze (noemer →
+//     0, elk verschil is oneindig procent) en bij een groot percentage is ze
+//     juist veel te ruim — 1% relatief op +260% is ±2,6 procentpunt en zou
+//     precies de regressie verbergen die deze fixture moet betrappen.
+//   • BEDRAGEN → ABSOLUUT, €0,01 (`toBeCloseTo(x, 2)`). Reden: de motor telt
+//     centen op en de UI toont centen; alles boven een cent is een echt
+//     verschil, geen afrondingsruis. Relatief zou hier misgaan op een `gain`
+//     rond nul (waarde ≈ kostprijs) — een volstrekt normale toestand voor een
+//     net gekochte positie.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * De combinatie zoals gemeten op een échte productierij tijdens het onderzoek
+ * van kaart H7 (SQL-lezing 26-08-2026; de bedragen zijn overgenomen, de namen
+ * niet). Drie bezittingen, drie verschillende grondslagen:
+ *   • crypto   — geen holdings-tracking, dus terugval op `purchase_value`
+ *   • belegd   — holdings-kostprijs uit `sumHoldingTotals`, NIET het ronde
+ *                `purchase_value`-veld van EUR 210.000
+ *   • pensioen — geen kostprijsbegrip; onder de oude widget-formule telde deze
+ *                pot van EUR 120.000 met `purchase_value = 0` als volle winst
+ */
+const H7_PRODUCTIE: AssetReturnInput[] = [
+  { id: 'p-crypto', name: 'Cryptoportefeuille', assetType: 'crypto', value: 20000, purchaseValue: 9000 },
+  { id: 'p-belegd', name: 'Wereldwijd indexfonds', assetType: 'investment', value: 300000, purchaseValue: 210000 },
+  { id: 'p-pensioen', name: 'Pensioenfonds', assetType: 'retirement', value: 120000, purchaseValue: 0 },
+]
+
+const H7_HOLDINGS = {
+  'p-belegd': { cost: 226139.98, value: 300000 },
+}
+
+describe('kaart H7 — één grondslag voor "gerealiseerd rendement" op beide oppervlakken', () => {
+  it('rekent de productiecombinatie op +36,1%, niet op +100,9%', () => {
+    // Given: de drie bezittingen hierboven.
+    // When: de canonieke motor draait.
+    const b = buildAssetReturnBreakdown(H7_PRODUCTIE, H7_HOLDINGS)
+
+    // Then: de portefeuille telt 320.000 waarde tegen 235.139,98 kostprijs.
+    expect(b.portfolio.value).toBeCloseTo(320000, 2)
+    expect(b.portfolio.cost).toBeCloseTo(235139.98, 2)
+    expect(b.portfolio.gain).toBeCloseTo(84860.02, 2)
+    expect(b.portfolio.pct).toBeCloseTo(36.1, 1)
+
+    // En het ANKER van het defect: de formule die de widgets tot kaart H7
+    // gebruikten — som(waarde) − som(purchase_value) over investment +
+    // retirement + crypto — komt op ruim het dubbele uit, puur doordat het
+    // pensioensaldo zonder kostprijs volledig als winst meetelt.
+    const oudeWaarde = 20000 + 300000 + 120000
+    const oudeKostprijs = 9000 + 210000 + 0
+    const oudePct = ((oudeWaarde - oudeKostprijs) / oudeKostprijs) * 100
+    expect(oudePct).toBeCloseTo(100.9, 1)
+  })
+
+  it('zet de pensioenpot in withoutBasis met reden "geen-kostprijs-begrip"', () => {
+    const b = buildAssetReturnBreakdown(H7_PRODUCTIE, H7_HOLDINGS)
+    const pensioen = rowById(b.withoutBasis.rows, 'p-pensioen')
+    expect(pensioen.reason).toBe('geen-kostprijs-begrip')
+    expect(pensioen.cost).toBeNull()
+    expect(pensioen.gain).toBeNull()
+    // De pot verdwijnt niet: hij telt vol mee in de totale waarde.
+    expect(b.totalValue).toBeCloseTo(440000, 2)
+  })
+
+  it('gebruikt de holdings-kostprijs, niet het ronde purchase_value-veld', () => {
+    const b = buildAssetReturnBreakdown(H7_PRODUCTIE, H7_HOLDINGS)
+    const belegd = rowById(b.portfolio.rows, 'p-belegd')
+    expect(belegd.costSource).toBe('holdings')
+    expect(belegd.cost).toBeCloseTo(226139.98, 2)
+    // Met het ingevulde 210.000 zou de winst 90.000 zijn geweest.
+    expect(belegd.gain).not.toBeCloseTo(90000, 2)
+  })
+
+  /**
+   * ANTI-DRIFT — de kern van kaart H7. De twee oppervlakken wegen verschillend
+   * (eigenaarsbesluit 26-08-2026): het dashboard weegt met
+   * `net_worth_inclusion_pct`, /overzicht/bezittingen met het huishoud-aandeel,
+   * omdat elk oppervlak op een ánder totaal moet sluiten. Dat mag — maar alléén
+   * zolang het PERCENTAGE er niet door verschuift, want dát is het getal dat op
+   * beide schermen onder hetzelfde label staat. De weegfactor zit in teller én
+   * noemer en moet dus wegvallen.
+   */
+  it('WEGING VALT WEG IN HET PERCENTAGE: dashboard (inclusion) en bezittingen (aandeel) tonen hetzelfde %', () => {
+    // Given: dezelfde bezittingen, twee wegingen — 60% inclusie op het
+    // dashboard, vol aandeel op de bezittingenpagina.
+    const weeg = (factor: number) =>
+      buildAssetReturnBreakdown(
+        H7_PRODUCTIE.map((a) => ({ ...a, value: a.value * factor, shareFraction: factor })),
+        // De holdings-map is ongewogen; de motor weegt hem zelf met shareFraction.
+        H7_HOLDINGS,
+      )
+
+    const dashboard = weeg(0.6)
+    const bezittingen = weeg(1)
+
+    // Then: het percentage is identiek (absolute tolerantie 0,05 procentpunt).
+    expect(dashboard.portfolio.pct).toBeCloseTo(bezittingen.portfolio.pct as number, 1)
+    expect(dashboard.portfolio.pct).toBeCloseTo(36.1, 1)
+
+    // …terwijl de BEDRAGEN wél meebewegen — dat is het verschil dat mag bestaan.
+    expect(dashboard.portfolio.gain).toBeCloseTo(bezittingen.portfolio.gain * 0.6, 2)
+    expect(dashboard.portfolio.value).toBeCloseTo(bezittingen.portfolio.value * 0.6, 2)
+  })
+})
+
+describe('RETURN_BASIS_LABELS — vier grondslagen, vier onderscheidende namen', () => {
+  const entries = Object.values(RETURN_BASIS_LABELS)
+
+  it('geeft elke grondslag een uniek volledig label', () => {
+    const labels = entries.map((e) => e.label)
+    expect(new Set(labels).size).toBe(labels.length)
+  })
+
+  it('geeft elke grondslag óók een uniek COMPACT label', () => {
+    // Geen cosmetische eis: op /overzicht staan het portefeuille- en het
+    // positierendement op hetzelfde scherm. Zou de compacte vorm van beide
+    // "Rendement" of "Sinds aankoop" zijn, dan is de bevinding van kaart H7
+    // terug — twee getallen onder één woord.
+    const compacts = entries.map((e) => e.compact)
+    expect(new Set(compacts).size).toBe(compacts.length)
+  })
+
+  it('houdt het kale woord "rendement" uit elk label', () => {
+    for (const entry of entries) {
+      expect(entry.label.toLowerCase()).not.toContain('rendement')
+      expect(entry.compact.toLowerCase()).not.toContain('rendement')
+    }
+  })
+
+  it('markeert de verwachting expliciet als aanname', () => {
+    expect(RETURN_BASIS_LABELS.expectedAnnual.label).toContain('aanname')
+    expect(RETURN_BASIS_LABELS.expectedAnnual.scope).toBe('niet gerealiseerd')
+  })
+})
+
+describe('summarizePortfolioReturn — de dashboardvorm', () => {
+  it('draagt dezelfde totalen als de portefeuille-emmer, zonder per-bezit rijen', () => {
+    const b = buildAssetReturnBreakdown(H7_PRODUCTIE, H7_HOLDINGS)
+    const s = summarizePortfolioReturn(b)
+    expect(s.value).toBeCloseTo(b.portfolio.value, 2)
+    expect(s.cost).toBeCloseTo(b.portfolio.cost, 2)
+    expect(s.gain).toBeCloseTo(b.portfolio.gain, 2)
+    expect(s.pct).toBeCloseTo(36.1, 1)
+    // Geen namen/ids in de bundelvorm: die reizen niet mee naar een scherm dat
+    // de bezittingenlijst niet toont.
+    expect(JSON.stringify(s)).not.toContain('Wereldwijd indexfonds')
+  })
+
+  it('rolt per asset_type op en laat types zonder kostprijs eruit', () => {
+    const s = summarizePortfolioReturn(buildAssetReturnBreakdown(H7_PRODUCTIE, H7_HOLDINGS))
+    const types = s.byType.map((g) => g.type)
+    expect(types).toContain('investment')
+    expect(types).toContain('crypto')
+    // Pensioen draagt geen kostprijsbegrip en kan hier per definitie niet staan.
+    expect(types).not.toContain('retirement')
+    // Gesorteerd op waarde, grootste eerst.
+    expect(types[0]).toBe('investment')
+    const crypto = s.byType.find((g) => g.type === 'crypto')!
+    expect(crypto.pct).toBeCloseTo(122.2, 1)
+  })
+
+  it('emptyPortfolioReturnSummary levert nullen met pct null (geen noemer, geen percentage)', () => {
+    const s = emptyPortfolioReturnSummary()
+    expect(s.value).toBe(0)
+    expect(s.cost).toBe(0)
+    expect(s.gain).toBe(0)
+    expect(s.pct).toBeNull()
+    expect(s.byType).toEqual([])
   })
 })
