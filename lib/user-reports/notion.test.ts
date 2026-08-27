@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   zoneTagsForPath,
   buildReportPagePayload,
+  hasMeaningfulDescription,
+  pushReportToNotion,
+  sequenceLabel,
+  MIN_DESCRIPTION_CHARS,
   SIGNED_URL_TTL_SECONDS,
   type UserReportRow,
 } from './notion'
@@ -169,6 +174,89 @@ describe('buildReportPagePayload — titel (incl. Europe/Amsterdam-datumgrens)',
     })
     const title = props(buildReportPagePayload(row, null)).Feature.title[0].text.content
     expect(title).toBe('2026-01-16-testwens-abcdef')
+  })
+})
+
+describe('volgnummer in de titel', () => {
+  const ID = 'abcdef12-0000-0000-0000-000000000000'
+  const CREATED = '2026-01-15T23:30:00.000Z' // = 16 jan in Amsterdam
+
+  it.each([
+    ['bug', 1, 'B-001 · 2026-01-16-testbug-abcdef — Budgetoverzicht'],
+    ['vraag', 42, 'V-042 · 2026-01-16-testvraag-abcdef — Budgetoverzicht'],
+  ] as const)('%s krijgt de eigen letter + nulgevuld nummer', (type, seq, expected) => {
+    const row = mkRow({ report_type: type, id: ID, created_at: CREATED })
+    const title = props(buildReportPagePayload(row, null, undefined, seq)).Feature.title[0].text
+      .content
+    expect(title).toBe(expected)
+  })
+
+  it('aanbeveling → W (de melder noemt het een wens), zonder schermsuffix', () => {
+    const row = mkRow({
+      report_type: 'aanbeveling',
+      id: ID,
+      created_at: CREATED,
+      screen_label: null,
+      expected: null,
+    })
+    const title = props(buildReportPagePayload(row, null, undefined, 7)).Feature.title[0].text
+      .content
+    expect(title).toBe('W-007 · 2026-01-16-testwens-abcdef')
+  })
+
+  it('zonder volgnummer blijft de titel de oude vorm — een mislukte telling mag geen kaartje kosten', () => {
+    const row = mkRow({ report_type: 'bug', id: ID, created_at: CREATED })
+    const title = props(buildReportPagePayload(row, null, undefined, null)).Feature.title[0].text
+      .content
+    expect(title).toBe('2026-01-16-testbug-abcdef — Budgetoverzicht')
+  })
+
+  it('driecijferig nulgevuld, maar groeit door voorbij 999', () => {
+    expect(sequenceLabel('bug', 1)).toBe('B-001')
+    expect(sequenceLabel('bug', 999)).toBe('B-999')
+    expect(sequenceLabel('bug', 1000)).toBe('B-1000')
+  })
+
+  it('onbruikbaar nummer → leeg label (nooit "B-0" of "B-NaN" op een kaartje)', () => {
+    expect(sequenceLabel('bug', null)).toBe('')
+    expect(sequenceLabel('bug', 0)).toBe('')
+    expect(sequenceLabel('bug', Number.NaN)).toBe('')
+  })
+})
+
+describe('meldingen zonder inhoud krijgen geen kaartje', () => {
+  it('de drempel ligt op 10 tekens — boven de 5 die het formulier toelaat', () => {
+    expect(MIN_DESCRIPTION_CHARS).toBe(10)
+    expect(MIN_DESCRIPTION_CHARS).toBeGreaterThan(5)
+  })
+
+  it.each([
+    ['', false],
+    ['   ', false],
+    ['test', false],
+    ['.', false],
+    ['123456789', false], // 9 tekens: net te kort
+    ['app crasht', true], // 10 tekens: net genoeg
+    ['  app crasht  ', true], // trim telt niet mee
+    ['De grafiek laadt niet.', true],
+  ] as const)('%j → %s', (description, expected) => {
+    expect(hasMeaningfulDescription(description)).toBe(expected)
+  })
+
+  it('null/undefined → geen inhoud', () => {
+    expect(hasMeaningfulDescription(null)).toBe(false)
+    expect(hasMeaningfulDescription(undefined)).toBe(false)
+  })
+
+  it('pushReportToNotion stopt vóór elke IO — geen Notion-call, geen telling, geen statusupdate', async () => {
+    // De service-client is bewust een lege stub: raakt de push hem tóch aan,
+    // dan klapt deze test in plaats van stil een lege melding door te zetten.
+    const service = {} as unknown as SupabaseClient
+    const result = await pushReportToNotion(service, mkRow({ description: 'test' }), {
+      token: 'ntn_test',
+      dataSourceId: 'ds-test',
+    })
+    expect(result).toEqual({ ok: false, reason: 'geen-inhoud' })
   })
 })
 

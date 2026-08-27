@@ -156,6 +156,98 @@ const TITLE_SLUG_BY_REPORT: Record<UserReportType, string> = {
 }
 
 /**
+ * Letter vóór het volgnummer, per meldingssoort — `B-001`, `V-004`, `W-012`.
+ *
+ * Bewust een MENSELIJK handvat, geen sleutel: je kunt in een gesprek of een
+ * commit naar "B-012" verwijzen zonder een uuid over te typen. De harde sleutel
+ * blijft `user_reports.id` (staat in het technische blok op het kaartje).
+ *
+ * `W` van *wens* — de melder ziet in het formulier "wens", niet "aanbeveling";
+ * het interne type heet `aanbeveling`, maar de titel spreekt de taal van de
+ * melder (net als de `testwens`-slug hierboven).
+ */
+const SEQUENCE_PREFIX_BY_REPORT: Record<UserReportType, string> = {
+  bug: 'B',
+  vraag: 'V',
+  aanbeveling: 'W',
+}
+
+/**
+ * Ondergrens voor "hier staat iets in". Meldingen daaronder ("test", "asdf",
+ * ".") krijgen géén kaartje: ze kosten triage-tijd zonder ooit iets op te
+ * leveren. Ze blijven wél gewoon in Supabase staan — niets gaat verloren, en
+ * zodra de melder alsnog uitlegt wat hij bedoelde kan er alsnog een kaartje van
+ * gemaakt worden.
+ *
+ * LET OP — het formulier laat vanaf 5 tekens door (`ReportSchema` in
+ * `app/api/user-reports/route.ts`). Die grenzen zijn bewust niet gelijk: het
+ * formulier mag een korte-maar-echte melding niet weigeren ("app crasht"), maar
+ * de queue hoeft 'm pas te tonen als er iets te triëren valt.
+ */
+export const MIN_DESCRIPTION_CHARS = 10
+
+/**
+ * Dezelfde ondergrens als LIKE-patroon voor PostgREST — `_` matcht in SQL LIKE
+ * exact één teken, dus tien underscores + `%` betekent "minstens tien tekens".
+ * AFGELEID van de constante hierboven, nooit los ingetypt: anders gaat de
+ * telling (die dit patroon gebruikt) stil uit de pas lopen met de overslaan-
+ * regel (die {@link hasMeaningfulDescription} gebruikt).
+ */
+const MIN_DESCRIPTION_LIKE = `${'_'.repeat(MIN_DESCRIPTION_CHARS)}%`
+
+/**
+ * Heeft deze melding inhoud? De enige plek waar die vraag beantwoord wordt —
+ * zowel de push als de handmatige route toetsen hierop.
+ *
+ * `trim()` is een vangnet: de insert trimt al (`z.string().trim()`), dus voor
+ * elke rij die via het formulier binnenkwam is dit gelijk aan de ruwe lengte —
+ * precies wat {@link MIN_DESCRIPTION_LIKE} in SQL meet.
+ */
+export function hasMeaningfulDescription(description: string | null | undefined): boolean {
+  return (description ?? '').trim().length >= MIN_DESCRIPTION_CHARS
+}
+
+/** `B-001`-label; `null` in, `''` uit (kaartje zonder volgnummer). */
+export function sequenceLabel(type: UserReportType, sequence: number | null): string {
+  if (sequence === null || !Number.isFinite(sequence) || sequence < 1) return ''
+  return `${SEQUENCE_PREFIX_BY_REPORT[type]}-${String(Math.trunc(sequence)).padStart(3, '0')}`
+}
+
+/**
+ * Het volgnummer van deze melding binnen zijn eigen soort: het aantal ÉÉRDERE
+ * meldingen mét inhoud, plus één.
+ *
+ * Bewust AFGELEID en niet opgeslagen: een kolom erbij zou een migratie kosten
+ * voor een getal dat volledig in de bestaande rijen besloten ligt. De
+ * `head: true`-telling haalt geen enkele omschrijving op — alleen een getal.
+ *
+ * Grenzen, eerlijk benoemd:
+ *   - twee meldingen van dezelfde soort in exact dezelfde microseconde krijgen
+ *     hetzelfde nummer. Bij dit volume (een handvol per dag, en de melder zit
+ *     op een rem van 5 per uur) is dat theorie;
+ *   - het nummer wordt bepaald op het moment van het kaartje. Een melding die
+ *     pas later alsnog een kaartje krijgt, schuift dus niet mee — dat is juist
+ *     de bedoeling: een nummer op een kaartje verandert nooit meer.
+ *
+ * Mislukt de telling, dan is dat géén reden om het kaartje te laten liggen:
+ * `null` → titel zonder volgnummer.
+ */
+export async function reportSequenceNumber(
+  service: SupabaseClient,
+  row: Pick<UserReportRow, 'report_type' | 'created_at'>,
+): Promise<number | null> {
+  const { count, error } = await service
+    .from('user_reports')
+    .select('id', { count: 'exact', head: true })
+    .eq('report_type', row.report_type)
+    .lt('created_at', row.created_at)
+    .like('description', MIN_DESCRIPTION_LIKE)
+
+  if (error || count === null || count === undefined) return null
+  return count + 1
+}
+
+/**
  * `Prioriteit`-select per meldingssoort. Zonder deze property landt elk kaartje
  * uit de app leeg in de queue-sortering, en zakt het weg onder alles wat wél een
  * prio draagt — precies het tegenovergestelde van wat een signaal uit echt
@@ -316,19 +408,27 @@ function technicalContext(row: UserReportRow): string {
  * van deze koppeling; ze drift'en zodra iemand in Notion iets hernoemt).
  *
  * `signedUrl` is de tijdelijke link naar het screenshot (of `null`).
+ * `sequence` is het volgnummer binnen de soort ({@link reportSequenceNumber});
+ * `null` levert een titel zonder volgnummer — beter een kaartje zonder nummer
+ * dan geen kaartje.
  */
 export function buildReportPagePayload(
   row: UserReportRow,
   signedUrl: string | null,
   dataSourceId: string = DEFAULT_DATA_SOURCE_ID,
+  sequence: number | null = null,
 ): Record<string, unknown> {
   const isBug = row.report_type === 'bug'
   const date = amsterdamDate(row.created_at)
   const slug = TITLE_SLUG_BY_REPORT[row.report_type]
+  const label = sequenceLabel(row.report_type, sequence)
+  // Volgnummer vóóraan: zo staat het handvat waar je naar verwijst ook in een
+  // afgekapte titelkolom nog in beeld, en sorteert de queue op soort + nummer.
+  const prefix = label ? `${label} · ` : ''
   const title =
     row.report_type === 'aanbeveling'
-      ? `${date}-${slug}-${shortId(row.id)}`
-      : `${date}-${slug}-${shortId(row.id)} — ${screenLabelOf(row)}`
+      ? `${prefix}${date}-${slug}-${shortId(row.id)}`
+      : `${prefix}${date}-${slug}-${shortId(row.id)} — ${screenLabelOf(row)}`
 
   const properties: Record<string, unknown> = {
     Feature: { title: richText(title, 200) },
@@ -444,6 +544,7 @@ export function buildReportPagePayload(
 export type PushReportResult =
   | { ok: true; pageId: string }
   | { ok: false; reason: 'not-configured' }
+  | { ok: false; reason: 'geen-inhoud' }
   | { ok: false; reason: 'error'; error: string }
 
 /**
@@ -487,6 +588,14 @@ export async function pushReportToNotion(
   credentials?: NotionCredentials | null,
 ): Promise<PushReportResult> {
   try {
+    // Geen inhoud, geen kaartje. Dit staat bewust vóór alles: een lege melding
+    // hoeft geen Notion-call, geen screenshot-link en geen telling. De rij
+    // blijft `pending` — dat is eerlijker dan 'm als fout wegschrijven, en de
+    // cron doet er daarna niets meer mee dan deze ene vergelijking.
+    if (!hasMeaningfulDescription(row.description)) {
+      return { ok: false, reason: 'geen-inhoud' }
+    }
+
     const resolved = credentials !== undefined ? credentials : await getNotionCredentials()
     if (!resolved) {
       // Niet geconfigureerd is geen fout: attempts blijven staan, zodat de cron
@@ -504,7 +613,11 @@ export async function pushReportToNotion(
       signedUrl = signed?.signedUrl ?? null
     }
 
-    const payload = buildReportPagePayload(row, signedUrl, resolved.dataSourceId)
+    // Volgnummer vlak vóór het bouwen: zo telt hij alles mee wat tot dit moment
+    // binnenkwam. Faalt de telling, dan gaat het kaartje zonder nummer mee.
+    const sequence = await reportSequenceNumber(service, row)
+
+    const payload = buildReportPagePayload(row, signedUrl, resolved.dataSourceId, sequence)
 
     const response = await fetch('https://api.notion.com/v1/pages', {
       method: 'POST',

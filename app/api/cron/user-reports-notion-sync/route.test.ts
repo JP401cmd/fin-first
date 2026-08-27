@@ -218,6 +218,32 @@ describe('cron verwerking — niet-geconfigureerd Notion-token is geen storing',
   })
 })
 
+describe('cron verwerking — meldingen zonder inhoud', () => {
+  it('overgeslagen rijen tellen niet als storing: job blijft "success", apart geteld', async () => {
+    // Een lege melding krijgt bewust nooit een kaartje. Als 'failed' tellen zou
+    // de dagelijkse job voor eeuwig op 'error' staan door één "test"-melding.
+    cfg.rows = [mkRow({ id: 'row-ok' }), mkRow({ id: 'row-leeg' })]
+    mockPushReportToNotion
+      .mockResolvedValueOnce({ ok: true, pageId: 'p1' })
+      .mockResolvedValueOnce({ ok: false, reason: 'geen-inhoud' })
+
+    const res = await GET(req('cron-secret'))
+    const body = await res.json()
+
+    expect(body.synced).toBe(1)
+    expect(body.skipped_leeg).toBe(1)
+    expect(body.failed).toBe(0)
+    expect(mockRecordJobRun).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        job: 'user-reports-notion-sync',
+        status: 'success',
+        error: null,
+      }),
+    )
+  })
+})
+
 describe('cron verwerking — credentials één keer, niet per rij', () => {
   it('haalt de credentials precies één keer op bij een batch van 3 en geeft ze aan elke push mee', async () => {
     cfg.rows = [mkRow({ id: 'r1' }), mkRow({ id: 'r2' }), mkRow({ id: 'r3' })]

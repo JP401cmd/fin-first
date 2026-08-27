@@ -93,6 +93,7 @@ export async function GET(request: Request) {
   let synced = 0
   let failed = 0
   let notConfigured = 0
+  let skipped = 0
 
   if (!credentials) {
     // Geen token = geen enkele rij kan slagen. Doorlopen zou 50× hetzelfde
@@ -107,6 +108,10 @@ export async function GET(request: Request) {
       const result = await pushReportToNotion(supabase, row, credentials)
       if (result.ok) synced += 1
       else if (result.reason === 'not-configured') notConfigured += 1
+      // Een melding zonder inhoud is geen mislukte push maar een bewuste
+      // overslag; als 'failed' tellen zou de job elke dag op 'error' zetten
+      // voor rijen die nooit een kaartje horen te krijgen.
+      else if (result.reason === 'geen-inhoud') skipped += 1
       else failed += 1
     }
   }
@@ -116,6 +121,7 @@ export async function GET(request: Request) {
     synced,
     failed,
     not_configured: notConfigured,
+    skipped_leeg: skipped,
   }
 
   // Een ontbrekend token is géén harde fout (de koppeling is dan simpelweg nog

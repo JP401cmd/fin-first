@@ -23,6 +23,7 @@
  * Optioneel:
  *   --limit=25        maximaal aantal meldingen (default 25)
  *   --all             ook meldingen die al een Notion-kaartje hebben
+ *   --incl-leeg       ook meldingen zonder inhoud (standaard overgeslagen)
  *
  * Vereist `NEXT_PUBLIC_SUPABASE_URL` en `SUPABASE_SERVICE_ROLE_KEY` in de
  * omgeving. Die staan in `.env.local`; commit ze nooit.
@@ -36,6 +37,28 @@ const BUCKET = 'user-report-screenshots'
 // Verander je er één, verander dan allebei: de link belandt in hetzelfde
 // Notion-kaartje, ongeacht welke route hem daar bracht.
 const SIGNED_URL_TTL_SECONDS = 60 * 60 * 48
+
+// Ondergrens voor "hier staat iets in" — spiegelt MIN_DESCRIPTION_CHARS in
+// lib/user-reports/notion.ts. Verander je er één, verander dan allebei: anders
+// zet de handmatige route kaartjes door die de app zelf zou overslaan.
+// (Dit script is .mjs en kan de TS-module niet importeren; vandaar de kopie —
+// zelfde afspraak als bij SIGNED_URL_TTL_SECONDS hierboven.)
+const MIN_DESCRIPTION_CHARS = 10
+const MIN_DESCRIPTION_LIKE = `${'_'.repeat(MIN_DESCRIPTION_CHARS)}%`
+
+// Letter vóór het volgnummer, per soort — spiegelt SEQUENCE_PREFIX_BY_REPORT.
+const SEQUENCE_PREFIX = { bug: 'B', vraag: 'V', aanbeveling: 'W' }
+
+/** Heeft deze melding inhoud? Eén regel, gelijk aan hasMeaningfulDescription. */
+function heeftInhoud(description) {
+  return (description ?? '').trim().length >= MIN_DESCRIPTION_CHARS
+}
+
+/** `B-001` — leeg bij een onbekend volgnummer (dan géén nummer in de titel). */
+function volgnummerLabel(type, sequence) {
+  if (!Number.isFinite(sequence) || sequence < 1) return ''
+  return `${SEQUENCE_PREFIX[type] ?? '?'}-${String(Math.trunc(sequence)).padStart(3, '0')}`
+}
 
 // Expliciete kolomlijst — nooit `select('*')` op een tabel met persoonsgegevens.
 const COLUMNS =
@@ -61,6 +84,7 @@ async function main() {
 
   const limit = Number(arg('limit', '25'))
   const alles = process.argv.includes('--all')
+  const inclusiefLeeg = process.argv.includes('--incl-leeg')
 
   const supabase = createClient(url, key, { auth: { persistSession: false } })
 
@@ -83,8 +107,38 @@ async function main() {
 
   const rows = data ?? []
   const verrijkt = []
+  let leegOvergeslagen = 0
 
   for (const row of rows) {
+    // Meldingen zonder inhoud ("test", "asdf") krijgen geen kaartje: ze kosten
+    // triage-tijd zonder ooit iets op te leveren. Ze blijven in Supabase staan —
+    // met `--incl-leeg` zie je ze alsnog, mocht je er toch iets mee willen.
+    if (!inclusiefLeeg && !heeftInhoud(row.description)) {
+      leegOvergeslagen += 1
+      continue
+    }
+
+    // Volgnummer binnen de eigen soort: het aantal éérdere meldingen mét inhoud,
+    // plus één. Bewust afgeleid en niet opgeslagen (dat zou een migratie kosten
+    // voor een getal dat al in de rijen zit). `head: true` haalt geen enkele
+    // omschrijving op — alleen een telling. Spiegelt reportSequenceNumber().
+    const { count, error: countError } = await supabase
+      .from('user_reports')
+      .select('id', { count: 'exact', head: true })
+      .eq('report_type', row.report_type)
+      .lt('created_at', row.created_at)
+      .like('description', MIN_DESCRIPTION_LIKE)
+
+    if (countError) {
+      console.error(`[waarschuwing] volgnummer tellen mislukt voor ${row.id}: ${countError.message}`)
+    }
+    // Mislukte telling → geen nummer in de titel. Beter een kaartje zonder
+    // volgnummer dan een verkeerd nummer of een blijven liggende melding.
+    const volgnummer =
+      countError || count === null || count === undefined
+        ? null
+        : volgnummerLabel(row.report_type, count + 1)
+
     let screenshotUrl = null
     if (row.screenshot_path) {
       const { data: signed, error: signError } = await supabase.storage
@@ -95,11 +149,16 @@ async function main() {
       }
       screenshotUrl = signed?.signedUrl ?? null
     }
-    verrijkt.push({ ...row, screenshot_url: screenshotUrl })
+    verrijkt.push({ ...row, volgnummer, screenshot_url: screenshotUrl })
   }
 
   process.stdout.write(`${JSON.stringify(verrijkt, null, 2)}\n`)
   console.error(`\n${verrijkt.length} melding(en) gevonden${alles ? '' : ' zonder Notion-kaartje'}.`)
+  if (leegOvergeslagen > 0) {
+    console.error(
+      `${leegOvergeslagen} melding(en) overgeslagen (geen inhoud, < ${MIN_DESCRIPTION_CHARS} tekens) — zie --incl-leeg.`,
+    )
+  }
 }
 
 main().catch((err) => {

@@ -19,6 +19,8 @@ Staat het token er wél, dan is dit commando een **vangnet**: het pakt alleen op
 4. **`Prioriteit` en `Severity` lopen bij een bug bewust uiteen** — `P1` naast `S2 - medium`. Severity zegt hoe erg het defect zelf is (onbekend bij binnenkomst, dus een neutrale middenwaarde), Prioriteit zegt hoe snel we kijken (hoog, want een testgebruiker liep er in echt gebruik tegenaan). Trek ze niet gelijk "voor de consistentie"; stel bij triage liever de Severity bij.
 5. **De schermafbeelding-link is kortlevend en gevoelig.** 48 uur geldig, en het is een bearer-credential: wie 'm kopieert haalt het beeld op zonder in te loggen. Plak 'm alleen in het kaartje, nergens anders — niet in de hoofdchat, niet in een samenvatting.
 6. **Geen persoonsgegevens in de terminaluitvoer.** Vat samen op aantallen en titels; citeer geen omschrijvingen of e-mailadressen in de hoofdchat.
+7. **Het volgnummer komt uít het script, je verzint het niet.** Elke melding krijgt van het script een veld `volgnummer` (`B-001` / `V-004` / `W-012`) — neem dat letterlijk over in de titel. Zelf tellen (of "even doortellen vanaf het vorige kaartje") loopt gegarandeerd uit de pas met de automatische route, die zijn nummer uit dezelfde telling in `lib/user-reports/notion.ts` haalt. Is `volgnummer` `null` (telling mislukt), maak het kaartje dan zónder nummer — een kaartje zonder nummer is beter dan een verkeerd nummer.
+8. **Meldingen zonder inhoud gaan niet door.** Het script laat ze al weg; kom je er tóch één tegen (bv. via `--incl-leeg`), maak er dan géén kaartje van en laat de rij op `pending` staan.
 
 ## Stappen
 
@@ -30,6 +32,8 @@ node --env-file=.env.local scripts/meldingen-openstaand.mjs --limit=$ARGUMENTS
 
 Geen argument → laat `--limit` weg (default 25). Het script drukt JSON af op stdout en een telling op stderr. Levert het niets op: meld dat en stop.
 
+Elke melding in die JSON draagt een `volgnummer` (`B-001`, `V-004`, `W-012` — bug/vraag/wens) dat je in de titel overneemt. Meldingen zonder inhoud (< 10 tekens omschrijving) laat het script weg en meldt het als aantal op stderr; noem dat aantal in je eindrapport, maar maak er geen kaartjes van. Wil je ze tóch zien: `--incl-leeg`.
+
 ### 2. Maak per melding één Notion-kaartje
 
 Gebruik `mcp__notion__notion-create-pages` op data source `d87e54c5-fb52-4607-a72a-52e4b58ee806`. Er zijn **twee servers met dezelfde tools** (`mcp__notion__*` en `mcp__claude_ai_Notion__*`); verloopt het token van de één, val terug op de ander en gebruik daarna consequent dezelfde.
@@ -38,7 +42,7 @@ Gebruik `mcp__notion__notion-create-pages` op data source `d87e54c5-fb52-4607-a7
 
 | Notion-property | Waarde |
 |---|---|
-| `Feature` (titel) | `<YYYY-MM-DD>-testbug-<id6> — <scherm>` · bij vraag `testvraag`, bij aanbeveling `testwens` (die laatste zonder ` — <scherm>`). Datum uit `created_at` in Europe/Amsterdam; `id6` = eerste 6 tekens van `id`. |
+| `Feature` (titel) | `<volgnummer> · <YYYY-MM-DD>-testbug-<id6> — <scherm>` · bij vraag `testvraag`, bij aanbeveling `testwens` (die laatste zonder ` — <scherm>`). `<volgnummer>` komt kant-en-klaar uit het script (`B-001`/`V-004`/`W-012`), gevolgd door een spatie-middot-spatie; is het `null`, laat dan het hele voorvoegsel weg. Datum uit `created_at` in Europe/Amsterdam; `id6` = eerste 6 tekens van `id`. |
 | `Type` (select) | bug → `Bug` · vraag → `Vraag` · aanbeveling → `Feature` |
 | `Status` (status) | `Nieuw` |
 | `CC-actie` (select) | `Backlog` |
@@ -71,7 +75,7 @@ WHERE id = '<report-id>';
 
 ### 4. Meld de uitkomst
 
-Eén regel per melding: type, scherm en de kaartje-URL. Plus de telling. Ging er iets mis bij een kaartje, laat de rij dan ongemoeid (`pending`) zodat een volgende run 'm oppakt, en noem het expliciet.
+Eén regel per melding: volgnummer, type, scherm en de kaartje-URL. Plus de telling, en — als het script er meldde — het aantal overgeslagen lege meldingen. Ging er iets mis bij een kaartje, laat de rij dan ongemoeid (`pending`) zodat een volgende run 'm oppakt, en noem het expliciet.
 
 ## Token-efficiëntie
 
