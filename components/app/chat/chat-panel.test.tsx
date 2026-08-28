@@ -123,6 +123,10 @@ function makeCtx(overrides: Record<string, unknown> = {}) {
     togglePin: vi.fn(),
     autoOpenMessage: null,
     setAutoOpenMessage: vi.fn(),
+    // M25: de koppeling "pas gelezen bij een echt antwoord". ChatPanel roept
+    // deze aan vanuit zijn effecten; hier alleen als spy aanwezig.
+    resolvePendingAnswer: vi.fn(),
+    dropPendingAnswer: vi.fn(),
     ...overrides,
   }
 }
@@ -881,5 +885,143 @@ describe('ChatPanel — terug-knop sluit het paneel', () => {
     render(<ChatPanel />)
     await waitFor(() => expect(screen.getByText('Fin')).toBeInTheDocument())
     expect(getOverlayHistoryDepth()).toBe(0)
+  })
+})
+
+/**
+ * M27: het chatpaneel sloot als enige overlay-oppervlak NIET met Escape. Het is
+ * een handgerolde overlay (buiten ShellOverlay om — de gedocumenteerde
+ * z-index-uitzondering) en erfde het gedrag van BottomSheet/SlideInPane dus
+ * niet. Escape loopt nu langs dezelfde `veiligSluiten` als het kruisje, de
+ * terug-knop en de swipe-dismiss, met exact dezelfde guards.
+ */
+describe('ChatPanel — Escape sluit het paneel (M27)', () => {
+  beforeEach(() => {
+    localStorage.setItem(WFT_KEY, 'true')
+    stubExecutionFetch({ privacyMode: false })
+  })
+
+  function drukEscape() {
+    fireEvent.keyDown(document, { key: 'Escape' })
+  }
+
+  it('sluit het niet-gepinde paneel', async () => {
+    const close = vi.fn()
+    ctx = makeCtx({ close })
+    render(<ChatPanel />)
+    await waitFor(() => expect(screen.getByText('Fin')).toBeInTheDocument())
+
+    drukEscape()
+
+    expect(close).toHaveBeenCalledTimes(1)
+  })
+
+  it('sluit NIET in gepinde (zijbalk-)modus — dat is geen modaal venster', async () => {
+    const close = vi.fn()
+    ctx = makeCtx({ close, isPinned: true })
+    render(<ChatPanel />)
+    await waitFor(() => expect(screen.getByText('Fin')).toBeInTheDocument())
+
+    drukEscape()
+
+    expect(close).not.toHaveBeenCalled()
+  })
+
+  it('sluit NIET tijdens een lopende melding-verzending', async () => {
+    const close = vi.fn()
+    ctx = makeCtx({ close, meldingRequested: true, clearMeldingRequest: vi.fn() })
+    render(<ChatPanel />)
+    await waitFor(() => expect(screen.getByText('melding-formulier')).toBeTruthy())
+
+    drukEscape()
+
+    expect(close).not.toHaveBeenCalled()
+  })
+
+  it('reageert niet meer nadat het paneel gesloten is', async () => {
+    const close = vi.fn()
+    ctx = makeCtx({ close })
+    const { rerender } = render(<ChatPanel />)
+    await waitFor(() => expect(screen.getByText('Fin')).toBeInTheDocument())
+
+    ctx = makeCtx({ isOpen: false, close })
+    rerender(<ChatPanel />)
+    drukEscape()
+
+    expect(close).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * L7: `submit()` leegde het invoerveld onvoorwaardelijk, ook als de verzending
+ * mislukte. De vraag zelf ging niet verloren (bubbel + "Opnieuw proberen"), maar
+ * wie zijn vraag wilde HERFORMULEREN moest 'm overtypen. Bij een fout komt de
+ * tekst nu terug in het veld — zonder ooit een verse invoer te overschrijven.
+ */
+describe('ChatPanel — getypte vraag komt terug bij een fout (L7)', () => {
+  beforeEach(() => {
+    localStorage.setItem(WFT_KEY, 'true')
+    stubExecutionFetch({ privacyMode: false })
+  })
+
+  async function typEnVerstuur(vraag: string) {
+    const { container, rerender } = render(<ChatPanel />)
+    await waitFor(() => expect(container.querySelector('textarea')).toBeTruthy())
+    const veld = container.querySelector('textarea') as HTMLTextAreaElement
+    fireEvent.change(veld, { target: { value: vraag } })
+    fireEvent.keyDown(veld, { key: 'Enter' })
+    // Verzenden leegt het veld direct — dat blijft zo (optimistisch).
+    expect(veld.value).toBe('')
+    expect(mockSendMessage).toHaveBeenCalledWith({ text: vraag })
+    return { container, rerender, veld }
+  }
+
+  it('zet de vraag terug in het invoerveld zodra de verzending mislukt', async () => {
+    const vraag = 'Hoeveel vrijheidstijd kost mijn abonnement?'
+    const { rerender, veld } = await typEnVerstuur(vraag)
+
+    mockError = new Error('Er ging iets mis')
+    rerender(<ChatPanel />)
+
+    await waitFor(() => expect(veld.value).toBe(vraag))
+  })
+
+  it('overschrijft een inmiddels nieuw getypte vraag NIET', async () => {
+    const { rerender, veld } = await typEnVerstuur('eerste vraag')
+
+    fireEvent.change(veld, { target: { value: 'iets heel anders' } })
+    mockError = new Error('Er ging iets mis')
+    rerender(<ChatPanel />)
+
+    await waitFor(() => expect(screen.getByTestId('chat-error-banner')).toBeTruthy())
+    expect(veld.value).toBe('iets heel anders')
+  })
+
+  it('consumeert de teruggezette tekst bij "Opnieuw proberen" — geen dubbele vraag', async () => {
+    const vraag = 'Wat betekent dit voor mijn FIRE-datum?'
+    const { rerender, veld } = await typEnVerstuur(vraag)
+
+    mockError = new Error('Er ging iets mis')
+    rerender(<ChatPanel />)
+    await waitFor(() => expect(veld.value).toBe(vraag))
+
+    fireEvent.click(screen.getByTestId('chat-retry-button'))
+
+    expect(mockRegenerate).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(veld.value).toBe(''))
+  })
+
+  it('zet niets terug bij een fout op een automatisch verstuurde vraag', async () => {
+    // Notificatie-/deeplink-pad: de gebruiker heeft niets getypt, dus er hoort
+    // ook niets in zijn invoerveld te verschijnen.
+    ctx = makeCtx({ pendingMessage: 'Vraag uit een notificatie' })
+    const { container, rerender } = render(<ChatPanel />)
+    await waitFor(() => expect(mockSendMessage).toHaveBeenCalled())
+
+    mockError = new Error('Er ging iets mis')
+    rerender(<ChatPanel />)
+
+    await waitFor(() => expect(screen.getByTestId('chat-error-banner')).toBeTruthy())
+    expect((container.querySelector('textarea') as HTMLTextAreaElement).value).toBe('')
   })
 })

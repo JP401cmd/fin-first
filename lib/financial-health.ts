@@ -684,7 +684,9 @@ export function computeHealthScoreFromInputs(
       debtRatioScore,
       'Verhouding tussen je schulden en je totale vermogen.',
       debtRatio > 50
-        ? 'Focus op de duurste schuld eerst (avalanche-methode) om sneller schuldenvrij te worden.'
+        // S17: identieke string als lib/page-status/copy.ts — merknaam weg,
+        // duiding blijft. (Het ontdubbelen van die twee hoort bij S1.)
+        ? 'Focus op de duurste schuld eerst om sneller schuldenvrij te worden.'
         : debtRatio > 20
         ? 'Overweeg extra aflossingen op je duurste lening.'
         : debtRatio > 0

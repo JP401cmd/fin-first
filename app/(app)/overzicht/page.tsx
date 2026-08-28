@@ -12,10 +12,12 @@ import {
   OverzichtNetWorthChartLoader,
 } from '@/components/overview/overzicht-secondary-loader'
 import { OverzichtSecondaryFallback } from '@/components/overview/overzicht-secondary'
+import { SindsVorigBezoekLoader } from '@/components/overview/sinds-vorig-bezoek-loader'
 import { MiniNetWorthChartAnchor } from '@/components/overview/mini-networth-chart-anchor'
 import { resolveOverviewGreeting } from '@/lib/overview/greeting'
 import { CheckinBanner } from '@/components/overview/checkin-banner'
 import { WelcomeGuideBanner } from '@/components/overview/welcome-guide-banner'
+import { WelcomeGuideProvider } from '@/components/overview/welcome-guide-provider'
 import { ageAtDate } from '@/lib/horizon-data'
 import { loadLeverScores } from '@/lib/lever-scores-loader'
 import { loadCheckinBannerSeed, loadWelcomeGuideSeed } from '@/lib/overview/banner-seeds'
@@ -131,12 +133,41 @@ export default async function OverzichtPage() {
     <>
       {/* Tab-root → 'rich' TopBar + tab-titel in de mobiele bovenbalk. */}
       <NavStackMeta title="Overzicht" topBar={{ kind: 'rich' }} bottomBar={{ kind: 'tabs' }} />
-      <WelcomeGuideBanner seed={welcomeGuideSeed} />
-      <CheckinBanner seed={checkinBannerSeed} />
+      {/* S13 — één bron voor de welkomstgids, gedeeld door de uitgeklapte
+          banner (blok 1, `banners`-slot) en het geminimaliseerde punt naast de
+          pagina-'i' (blok 2, utility-cluster). De provider staat híer omdat hij
+          beide blokken moet omvatten; de server-seed gaat er nu doorheen i.p.v.
+          rechtstreeks naar de banner. */}
+      <WelcomeGuideProvider seed={welcomeGuideSeed}>
       <OverzichtHeroPrimary
         userName={userName ?? undefined}
         greeting={greeting}
         dateLabel={dateLabel}
+        greetingNote={
+          // H11 — "sinds je vorige bezoek". Eigen `<Suspense>` met `null`-fallback:
+          // de cel deelt de al lopende `loadDashboardData` (React-cache()) en mag
+          // blok 1 dus niet ophouden. Geen skeleton — een reservering voor een
+          // regel die er meestal NIET is, zou zelf de ruis worden.
+          <Suspense fallback={null}>
+            <SindsVorigBezoekLoader
+              supabase={supabase}
+              perspective={perspective}
+              userId={userId}
+              currentNetWorth={currentNetWorth}
+            />
+          </Suspense>
+        }
+        banners={
+          // H20 — de welkomstgids en de check-in stonden hiervóór bóven de
+          // begroeting: op een vers account was het eerste scherm een checklist,
+          // vóór je naam en vóór elk bedrag. Ze verhuizen naar ná de begroeting
+          // (besluit eigenaar 26-08-2026, optie B). Het blokkenaantal in de
+          // Volledige weergave blijft bewust ongewijzigd (besluit 9 aug 2026).
+          <>
+            <WelcomeGuideBanner />
+            <CheckinBanner seed={checkinBannerSeed} />
+          </>
+        }
         health={health}
         leverScores={leverScoresResult.scores}
         totals={totals}
@@ -181,6 +212,7 @@ export default async function OverzichtPage() {
           </Suspense>
         }
       />
+      </WelcomeGuideProvider>
     </>
   )
 }

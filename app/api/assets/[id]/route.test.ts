@@ -48,6 +48,14 @@ async function callDelete(id: string) {
   return mod.DELETE(req, makeParams(id))
 }
 
+async function callPatch(id: string, body: unknown) {
+  const mod = await import('./route')
+  // `parseBody` doet alleen `req.json()`; een minimale stub is genoeg en houdt
+  // de test onafhankelijk van de NextRequest-constructor.
+  const req = { json: async () => body } as unknown as NextRequest
+  return mod.PATCH(req, makeParams(id))
+}
+
 /**
  * Chainable query-builder mock. `resolveWith` is wat de keten oplevert bij
  * `.maybeSingle()` of bij `await`. `updateSpy` vangt de update-payload op.
@@ -174,6 +182,117 @@ describe('DELETE /api/assets/[id] — soft delete met eerlijke 404', () => {
     mockFrom.mockReturnValue(chain)
 
     const res = await callDelete(VALID_UUID)
+
+    expect(res.status).toBe(200)
+    const eqCalls = (chain.eq as ReturnType<typeof vi.fn>).mock.calls
+    expect(eqCalls.map((c) => c[0])).not.toContain('is_active')
+  })
+})
+
+/**
+ * Tests voor PATCH /api/assets/[id] — het terugdraaien van diezelfde soft
+ * delete ("Ongedaan maken" op de toast, bevinding M7).
+ *
+ * De inzet hier is scherper dan bij DELETE: waar een gemiste eigenaarsfilter op
+ * DELETE hooguit een actie blokkeert, zou 'm missen op PATCH betekenen dat je
+ * een rij van je partner (huishoud-gedeelde SELECT-policy, dus zichtbaar en
+ * dus met een bekend id) weer actief kunt zetten. De filter-assertie hieronder
+ * is daarom géén kopie-uit-gewoonte maar de kern van deze route.
+ */
+describe('PATCH /api/assets/[id] — restore van de soft delete', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    mockAuthGetUser.mockReset()
+    mockFrom.mockReset()
+  })
+
+  it('geeft 401 wanneer niet ingelogd', async () => {
+    mockAuthGetUser.mockResolvedValue({ data: { user: null }, error: null })
+
+    const res = await callPatch(VALID_UUID, { action: 'restore' })
+
+    expect(res.status).toBe(401)
+    expect(mockFrom).not.toHaveBeenCalled()
+  })
+
+  it('geeft 404 bij een malformed uuid, vóór enige query', async () => {
+    mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_ID } }, error: null })
+
+    const res = await callPatch('not-a-uuid', { action: 'restore' })
+
+    expect(res.status).toBe(404)
+    expect(mockFrom).not.toHaveBeenCalled()
+  })
+
+  it('weigert een body die niet exact { action: "restore" } is', async () => {
+    mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_ID } }, error: null })
+
+    // Precies het pad dat dicht moet blijven: geen generieke kolom-update via
+    // dit endpoint, ook niet met een plausibel ogende payload.
+    for (const body of [{}, { action: 'delete' }, { is_active: true }, null]) {
+      mockFrom.mockClear()
+      const res = await callPatch(VALID_UUID, body)
+      expect(res.status).toBe(400)
+      expect(mockFrom).not.toHaveBeenCalled()
+    }
+  })
+
+  it('REGRESSIE: geeft 404 wanneer 0 rijen geraakt zijn (rij van de partner)', async () => {
+    mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_ID } }, error: null })
+    mockFrom.mockReturnValue(makeChain({ data: null, error: null }))
+
+    const res = await callPatch(VALID_UUID, { action: 'restore' })
+
+    expect(res.status).toBe(404)
+    const body = await res.json()
+    expect(body.error).toContain('Bezitting niet gevonden')
+  })
+
+  it('geeft 500 met generieke tekst bij een PostgrestError', async () => {
+    mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_ID } }, error: null })
+    mockFrom.mockReturnValue(
+      makeChain({ data: null, error: { message: 'permission denied for table assets' } }),
+    )
+
+    const res = await callPatch(VALID_UUID, { action: 'restore' })
+
+    expect(res.status).toBe(500)
+    const body = await res.json()
+    expect(body.error).not.toContain('permission denied')
+  })
+
+  it('happy path: zet is_active=true op de eigen rij, met id- én user_id-filter', async () => {
+    mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_ID } }, error: null })
+
+    const updateSpy = vi.fn()
+    const chain = makeChain({ data: { id: VALID_UUID }, error: null }, updateSpy)
+    mockFrom.mockReturnValue(chain)
+
+    const res = await callPatch(VALID_UUID, { action: 'restore' })
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ id: VALID_UUID })
+
+    expect(mockFrom).toHaveBeenCalledWith('assets')
+    // Precies één schrijfpad, en dat schrijft uitsluitend de vlag terug —
+    // geen enkel ander veld mag hier meeliften.
+    expect(updateSpy).toHaveBeenCalledTimes(1)
+    expect(updateSpy.mock.calls[0][0]).toEqual({ is_active: true })
+
+    const eqCalls = (chain.eq as ReturnType<typeof vi.fn>).mock.calls
+    expect(eqCalls).toContainEqual(['id', VALID_UUID])
+    expect(eqCalls).toContainEqual(['user_id', USER_ID])
+
+    expect(chain.delete).not.toHaveBeenCalled()
+  })
+
+  it('gebruikt geen .eq("is_active", false) — tweemaal ongedaan maken blijft 200', async () => {
+    mockAuthGetUser.mockResolvedValue({ data: { user: { id: USER_ID } }, error: null })
+
+    const chain = makeChain({ data: { id: VALID_UUID }, error: null })
+    mockFrom.mockReturnValue(chain)
+
+    const res = await callPatch(VALID_UUID, { action: 'restore' })
 
     expect(res.status).toBe(200)
     const eqCalls = (chain.eq as ReturnType<typeof vi.fn>).mock.calls

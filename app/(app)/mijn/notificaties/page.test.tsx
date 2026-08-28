@@ -30,7 +30,43 @@ beforeEach(() => {
   global.fetch = mockFetch as unknown as typeof fetch
 })
 
-function setupMocksWithUser() {
+/**
+ * Antwoord van `GET /api/household/status` zoals de route hem WERKELIJK levert
+ * (`app/api/household/status/route.ts`): snake_case `has_household` plus een
+ * `members`-array. Dat is bewust geen zelfverzonnen vorm — de S10-regressie
+ * ontstond juist doordat deze pagina een veld las (`hasHousehold`) dat geen
+ * enkele route ooit heeft geretourneerd, terwijl de test dat verzonnen veld
+ * mockte en daarmee groen bleef. Een mock die niet op het echte contract staat,
+ * dekt niets af; hij verbergt.
+ */
+function householdStatus(memberCount: number) {
+  if (memberCount === 0) {
+    return {
+      has_household: false,
+      household: null,
+      members: [],
+      pending_invitations_received: [],
+      pending_invitations_sent: [],
+    }
+  }
+  return {
+    has_household: true,
+    household: { id: 'hh-1', name: 'Huishouden' },
+    my_role: 'owner',
+    members: Array.from({ length: memberCount }, (_, i) => ({
+      id: `m-${i}`,
+      user_id: i === 0 ? 'u1' : `u${i + 1}`,
+      role: i === 0 ? 'owner' : 'partner',
+      full_name: null,
+      is_current_user: i === 0,
+    })),
+    pending_invitations_sent: [],
+    pending_invitations_received: [],
+  }
+}
+
+/** @param householdMembers 0 = geen huishouden, 1 = alleen (uitnodiging open), 2 = stel. */
+function setupMocksWithUser(householdMembers = 0) {
   mockSupabase.auth.getUser.mockResolvedValue({ data: { user: { id: 'u1' } } })
   // app_settings query
   mockSupabase.from.mockReturnValue({
@@ -43,8 +79,11 @@ function setupMocksWithUser() {
     if (url === '/api/monthly-checkin') {
       return { ok: true, json: async () => ({ enabled: true }) }
     }
-    if (url === '/api/household/privacy') {
-      return { ok: true, json: async () => ({ hasHousehold: false }) }
+    if (url === '/api/household/status') {
+      return { ok: true, json: async () => householdStatus(householdMembers) }
+    }
+    if (url === '/api/partner-notifications') {
+      return { ok: true, json: async () => ({ mode: 'all_shared', threshold: 100, categories: [] }) }
     }
     return { ok: false, status: 404 }
   })
@@ -86,7 +125,7 @@ describe('MijnNotificatiesPage', () => {
   })
 
   it('verbergt partner-notif-blok als geen huishouden', async () => {
-    setupMocksWithUser()
+    setupMocksWithUser(0)
     render(<MijnNotificatiesPage />)
     await waitFor(() => {
       expect(screen.getByText('Budget alerts')).toBeTruthy()
@@ -94,24 +133,71 @@ describe('MijnNotificatiesPage', () => {
     expect(screen.queryByText('Partner transacties')).toBeNull()
   })
 
-  it('toont partner-notif-blok als huishouden aanwezig', async () => {
-    mockSupabase.auth.getUser.mockResolvedValue({ data: { user: { id: 'u1' } } })
-    mockSupabase.from.mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({ data: null }),
-      order: vi.fn().mockResolvedValue({ data: [] }),
-    })
-    mockFetch.mockImplementation(async (url: string) => {
-      if (url === '/api/monthly-checkin') return { ok: true, json: async () => ({ enabled: true }) }
-      if (url === '/api/household/privacy') return { ok: true, json: async () => ({ hasHousehold: true }) }
-      if (url === '/api/partner-notifications') return { ok: true, json: async () => ({ mode: 'all_shared', threshold: 100, categories: [] }) }
-      return { ok: false, status: 404 }
-    })
+  it('toont partner-notif-blok als er echt een partner is', async () => {
+    setupMocksWithUser(2)
     render(<MijnNotificatiesPage />)
     await waitFor(() => {
       expect(screen.getByText('Partner transacties')).toBeTruthy()
     })
+  })
+})
+
+/**
+ * S10 — de partner-poort.
+ *
+ * Twee dingen gingen hier na elkaar mis en deze suite pint ze allebei:
+ *
+ *  1. **Altijd open.** De monoliet gebruikte `privacyRes.ok` als signaal. Maar
+ *     `POST /api/household/invite` maakt de huishoud-rij én de eigen ledenrij
+ *     al aan bij het uitnodigen — dus wie een uitnodiging had openstaan kreeg
+ *     vier partner-modi en een categorie-picker te zien terwijl er niemand was.
+ *  2. **Altijd dicht.** Bij de page-extractie werd dat vervangen door
+ *     `data.hasHousehold`, een veld dat `GET /api/household/privacy` nooit
+ *     levert. Sindsdien verscheen het blok bij niemand meer — ook niet bij een
+ *     echt stel. De toenmalige test mockte dat verzonnen veld en bleef groen.
+ *
+ * De poort staat nu op `has_household && members.length > 1`, hetzelfde
+ * criterium als `/api/household/box2|box3`.
+ *
+ * Bijt-proef gedraaid (en teruggedraaid): poort terug op `data.has_household`
+ * zónder de ledentelling → de twee 1-lid-tests hieronder lopen rood (het blok
+ * verschijnt, en de partner-instellingen worden opgehaald).
+ */
+describe('MijnNotificatiesPage — partner-poort (S10)', () => {
+  it('houdt het partnerblok dicht bij een huishouden van één lid', async () => {
+    // Dit is het geval uit de audit-klacht: uitnodiging verstuurd (of partner
+    // vertrokken), dus wél een huishouden — maar geen partner. Partner-modi
+    // horen dan niet in beeld.
+    setupMocksWithUser(1)
+    render(<MijnNotificatiesPage />)
+    await waitFor(() => {
+      expect(screen.getByText('Budget alerts')).toBeTruthy()
+    })
+    expect(screen.queryByText('Partner transacties')).toBeNull()
+  })
+
+  it('vraagt de partnerinstellingen niet op zonder partner', async () => {
+    setupMocksWithUser(1)
+    render(<MijnNotificatiesPage />)
+    await waitFor(() => {
+      expect(screen.getByText('Budget alerts')).toBeTruthy()
+    })
+    const opgevraagd = mockFetch.mock.calls.map((c) => c[0])
+    expect(opgevraagd).not.toContain('/api/partner-notifications')
+  })
+
+  it('leest de huishoudstand uit /api/household/status, niet uit de privacy-route', async () => {
+    // Regressie-anker: een pagina die de verkeerde route (of het verkeerde
+    // veld) leest, hoort hier zichtbaar te falen in plaats van stil een lege
+    // sectie op te leveren.
+    setupMocksWithUser(2)
+    render(<MijnNotificatiesPage />)
+    await waitFor(() => {
+      expect(screen.getByText('Partner transacties')).toBeTruthy()
+    })
+    const opgevraagd = mockFetch.mock.calls.map((c) => c[0])
+    expect(opgevraagd).toContain('/api/household/status')
+    expect(opgevraagd).not.toContain('/api/household/privacy')
   })
 })
 

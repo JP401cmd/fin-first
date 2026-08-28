@@ -43,12 +43,16 @@ export function StrategieEditors({
   events,
   data,
   readOnly,
+  autoOpenJaarruimte,
 }: {
   open: ManagedStrategy | null
   onClose: () => void
   events: LifeEvent[]
   data: StrategieEditorsData
   readOnly?: boolean
+  /** S6 — geopend via `?strategie=pensioen` vanaf de factor-A-verwijzing op
+   *  Box 1: dan staat de jaarruimte-/factor-A-uitvraag meteen open. */
+  autoOpenJaarruimte?: boolean
 }) {
   const router = useRouter()
 
@@ -90,6 +94,7 @@ export function StrategieEditors({
         currentAge={data.currentAge}
         inflationRate={data.inflationRate}
         samenwonend={samenwonend}
+        autoOpenJaarruimte={autoOpenJaarruimte}
         onClose={onClose}
         readOnly={readOnly}
       />

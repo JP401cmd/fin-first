@@ -4,6 +4,7 @@ import { FinHome, type FinHomeProps } from './fin-home'
 import { FinSlotProvider } from '@/lib/shell/fin-slot'
 import type { CoachDataGaps } from '@/lib/coach-suggestions'
 import { __resetInflight } from '@/lib/inflight'
+import { acquireOverlay, __resetOverlayCount } from '@/lib/overlay-signal'
 
 const open = vi.fn()
 const toggle = vi.fn()
@@ -36,7 +37,7 @@ beforeEach(() => {
   open.mockReset(); toggle.mockReset(); openWithMessage.mockReset()
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ count: 0 }) }))
 })
-afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); __resetInflight() })
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); __resetInflight(); __resetOverlayCount() })
 
 describe('FinHome', () => {
   it('toont de bubbel-launcher en opent de chat bij klik', () => {
@@ -63,9 +64,63 @@ describe('FinHome', () => {
     expect(screen.queryByText(/Koppel je bank/i)).not.toBeInTheDocument()
   })
 
+  it('auto-dismiss telt pas vanaf het uittypen, niet vanaf verschijnen (H17)', () => {
+    // Geen reduced-motion → de typemachine loopt echt.
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: false } as unknown as MediaQueryList)
+    renderFin({ dataGaps: gaps({ hasBank: false }), delayMs: 0, autoDismissMs: 1000 })
+    act(() => { vi.advanceTimersByTime(400) })
+    // Nog midden in het typen: de volledige auto-dismiss-termijn is verstreken
+    // maar de melding moet blijven staan tot de boodschap áf is.
+    act(() => { vi.advanceTimersByTime(1000) })
+    expect(screen.getByRole('button', { name: /Sluiten/i })).toBeInTheDocument()
+    // Typen afmaken (de auto-dismiss-timer wordt pas ná die commit gezet),
+    // dán pas de termijn laten lopen.
+    act(() => { vi.advanceTimersByTime(20_000) })
+    expect(screen.getByRole('button', { name: /Sluiten/i })).toBeInTheDocument()
+    act(() => { vi.advanceTimersByTime(1000) })
+    expect(screen.queryByRole('button', { name: /Sluiten/i })).not.toBeInTheDocument()
+  })
+
+  it('sluit met reduced-motion (geen typemachine) alsnog na de termijn (H17)', () => {
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as unknown as MediaQueryList)
+    renderFin({ dataGaps: gaps({ hasBank: false }), delayMs: 0, autoDismissMs: 1000 })
+    act(() => { vi.advanceTimersByTime(400) })
+    expect(screen.getByRole('button', { name: /Sluiten/i })).toBeInTheDocument()
+    act(() => { vi.advanceTimersByTime(1000) })
+    expect(screen.queryByRole('button', { name: /Sluiten/i })).not.toBeInTheDocument()
+  })
+
   it('rendert niets wanneer de chat open is (één Fin)', () => {
     isOpenValue = true
     const { container } = renderFin({ dataGaps: gaps(), delayMs: 0 })
     expect(container).toBeEmptyDOMElement()
+  })
+
+  // M15: één hulplaag tegelijk. De coach-melding moet ook wijken voor een
+  // overlay die zich alléén via lib/overlay-signal.ts meldt en géén scroll-lock
+  // claimt — zoals de tips-tour op /toekomst, die pagina-inhoud blijft. Keek
+  // FinHome alleen naar de scroll-lock-teller, dan typte de melding dwars door
+  // de tourtekst heen.
+  it('wijkt voor een overlay die alleen het overlay-signaal claimt (M15)', () => {
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as unknown as MediaQueryList)
+    const release = acquireOverlay()
+    try {
+      renderFin({ dataGaps: gaps({ hasBank: false }), delayMs: 0, autoDismissMs: 999999 })
+      act(() => { vi.advanceTimersByTime(400) })
+      expect(screen.queryByText(/Koppel je bank/i)).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Open chat met Fin/i })).not.toBeInTheDocument()
+    } finally {
+      release()
+    }
+  })
+
+  it('toont de melding weer zodra dat signaal is vrijgegeven (M15)', () => {
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as unknown as MediaQueryList)
+    const release = acquireOverlay()
+    renderFin({ dataGaps: gaps({ hasBank: false }), delayMs: 0, autoDismissMs: 999999 })
+    act(() => { vi.advanceTimersByTime(400) })
+    expect(screen.queryByText(/Koppel je bank/i)).not.toBeInTheDocument()
+    act(() => { release() })
+    expect(screen.getByText(/Koppel je bank/i)).toBeInTheDocument()
   })
 })

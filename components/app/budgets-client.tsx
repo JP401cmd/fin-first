@@ -1133,10 +1133,21 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
   // mismatch: de server kent de voorkeur niet en rendert een andere view
   // (en andere toggle-classNames) dan de client.
   const [viewMode, setViewMode] = useState<'tree' | 'donut' | 'heatmap' | 'pill'>('tree')
+  // M17: een deeplink mag de weergave afdwingen — `?weergave=heatmap` vanaf de
+  // heatmap-tegel op /overzicht. Zonder dat landde je op de weergave die je
+  // toevallig als laatste koos (localStorage), dus tikte je op een heatmap en
+  // kreeg je de boom. De URL wint van de opgeslagen voorkeur, maar OVERSCHRIJFT
+  // die niet: je eigen keuze staat er ongewijzigd zodra je hier gewoon
+  // naartoe navigeert.
+  const viewParam = searchParams.get('weergave')
   useEffect(() => {
+    if (viewParam === 'tree' || viewParam === 'donut' || viewParam === 'heatmap' || viewParam === 'pill') {
+      setViewMode(viewParam)
+      return
+    }
     const stored = localStorage.getItem('budgets-view-mode')
     if (stored === 'donut' || stored === 'heatmap' || stored === 'pill') setViewMode(stored)
-  }, [])
+  }, [viewParam])
   // Eenvoudig-modus (server-geseed via DisplayModeProvider, geen hydration-flash).
   // In simple: hoofdgetallen-blok verbergen, figures-strip → alleen Inkomen +
   // Uitgaven, de weergave geforceerd op de pil-modus (view-toggle verborgen),
@@ -2869,12 +2880,17 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
         />
       )}
 
-      {/* NIBUD Benchmark */}
-      <HideInSimple>
-        <CollapsibleSection storageKey="nibud-benchmark" title="NIBUD Benchmark" defaultOpen={false}>
-          <NibudBenchmarkSection />
-        </CollapsibleSection>
-      </HideInSimple>
+      {/* NIBUD Benchmark — S6 (tier 3): BEWUST GEEN <HideInSimple>.
+          /mijn/profiel belooft in béide weergavemodi "Deze gegevens worden
+          gebruikt voor je NIBUD Budget Gezondheidscheck", terwijl deze sectie
+          in Eenvoudig hard verborgen was: een belofte zonder bestemming, en
+          zonder deeplink of anker om alsnog te landen. De CollapsibleSection
+          staat toch al `defaultOpen={false}`, dus in Eenvoudig verschijnt
+          alleen de ingeklapte kop — bereikbaar, niet opdringerig. In Volledig
+          verandert er niets. */}
+      <CollapsibleSection storageKey="nibud-benchmark" title="NIBUD Benchmark" defaultOpen={false}>
+        <NibudBenchmarkSection />
+      </CollapsibleSection>
 
       {/* Eenmalige koppel-nudge — verschijnt alleen bij een net-ingestelde
           gebruiker (server-afgeleide guard: marker afwezig + 0 rekeningen + 0

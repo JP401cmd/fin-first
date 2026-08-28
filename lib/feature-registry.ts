@@ -208,8 +208,12 @@ export const UNIFIED_FEATURES: UnifiedFeature[] = [
   },
   {
     id: 'ai_rapportage',
-    label: 'AI Rapportage',
-    description: 'Financiële rapporten genereren',
+    label: 'AI-inleiding bij rapporten',
+    // Het rapport zelf is deterministisch en gratis; alléén de geschreven
+    // inleiding komt van het model. De oude omschrijving ("Financiële rapporten
+    // genereren") suggereerde dat het hele rapport betaald was — dat was de
+    // begripsverwarring aan de bron van H28/S9.
+    description: 'De geschreven inleiding bij een periodiek rapport',
     module: 'ai',
     requiredTier: 'ai',
     widgets: [],

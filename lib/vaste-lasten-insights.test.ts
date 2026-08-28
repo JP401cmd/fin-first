@@ -326,3 +326,65 @@ describe('buildVasteLastenInsights — werktijd (C5 / ADR 0105)', () => {
     expect(insights.workTimePerYear.monthsPerYear).toBe(0)
   })
 })
+
+describe('buildVasteLastenInsights — topItems (S2)', () => {
+  const subs = [
+    mkItem('s1', 'Netflix', 16, 'subscription'),
+    mkItem('s2', 'Sportschool', 35, 'subscription'),
+    mkItem('s3', 'Krant', 9, 'subscription'),
+    mkItem('s4', 'Cloud', 4, 'subscription'),
+  ]
+  const vk = [
+    mkItem('v1', 'Huur', 900, 'rent'),
+    mkItem('v2', 'Zorgverzekering', 140, 'insurance'),
+    mkItem('v3', 'Energie', 180, 'utility'),
+  ]
+  const insights = buildVasteLastenInsights({
+    summary: mkSummary(subs, vk),
+    monthlyIncome: 4000,
+    dailyExpenseRate: dailyExpenseRate(2500),
+  })
+
+  it('sorteert aflopend, capt op 5 en mengt abonnementen met vaste kosten', () => {
+    expect(insights.topItems).toHaveLength(5)
+    expect(insights.topItems.map((i) => i.name)).toEqual([
+      'Huur',
+      'Energie',
+      'Zorgverzekering',
+      'Sportschool',
+      'Netflix',
+    ])
+    // Beide bronnen komen erin voor — geen kolom-per-soort.
+    expect(insights.topItems.some((i) => i.category === 'subscription')).toBe(true)
+    expect(insights.topItems.some((i) => i.category === 'rent')).toBe(true)
+  })
+
+  it('draagt het categorie-label mee zoals de bron het geeft', () => {
+    expect(insights.topItems[0].categoryLabel).toBe(CATEGORY_LABELS.rent)
+  })
+
+  it('is leeg zonder vaste lasten', () => {
+    const leeg = buildVasteLastenInsights({
+      summary: EMPTY,
+      monthlyIncome: 4000,
+      dailyExpenseRate: dailyExpenseRate(2500),
+    })
+    expect(leeg.hasData).toBe(false)
+    expect(leeg.topItems).toEqual([])
+  })
+
+  it('telt terugkerend-variabele posten NIET mee (H14)', () => {
+    const summary = mkSummary(subs, vk)
+    const withVariabel: typeof summary = {
+      ...summary,
+      terugkerendVariabel: [mkItem('x1', 'Boodschappen', 600, 'transport')],
+      totalMonthlyVariabel: 600,
+    }
+    const res = buildVasteLastenInsights({
+      summary: withVariabel,
+      monthlyIncome: 4000,
+      dailyExpenseRate: dailyExpenseRate(2500),
+    })
+    expect(res.topItems.some((i) => i.name === 'Boodschappen')).toBe(false)
+  })
+})

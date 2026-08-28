@@ -109,7 +109,11 @@ export type CoachOverrides = Record<string, CoachRuleOverride>
 export interface CoachTiming {
   /** Vertraging vóór de bubble verschijnt (ms). */
   delayMs: number
-  /** Tijd waarna de bubble automatisch sluit (ms). */
+  /**
+   * Tijd waarna de melding automatisch sluit (ms). De klok start pas zodra de
+   * boodschap volledig is uitgetypt (`done`), niet bij het verschijnen —
+   * anders knipt een korte timer een lange boodschap halverwege af.
+   */
   autoDismissMs: number
 }
 
@@ -122,8 +126,20 @@ export interface CoachConfig {
 
 export const DEFAULT_COACH_TIMING: CoachTiming = {
   delayMs: 1500,
-  autoDismissMs: 45_000,
+  // 8s ná het uittypen. Stond op 45s: dat is 7,5-11x de toast-norm uit de
+  // ui-ux-kwaliteitstoets (4-6s, fouten 8-10s) en dekte op 390x844 zo'n
+  // dertig procent van het scherm af — inclusief de primaire actieknop
+  // eronder.
+  autoDismissMs: 8_000,
 }
+
+/**
+ * Rustpauze na een gesloten melding vóór er op een volgende route weer een
+ * route-tip (`path_*`) mag verschijnen. Zonder deze pauze duwt elke navigatie
+ * een nieuwe, nog ongeziene route-tip omhoog — technisch bedoeld gedrag, in
+ * de praktijk las het als "de tip komt op elke pagina terug".
+ */
+export const PATH_SUGGESTION_COOLDOWN_MS = 10 * 60_000
 
 export const DEFAULT_COACH_HEADER = 'Tip van Fin'
 

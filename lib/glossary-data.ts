@@ -11,17 +11,42 @@
  *
  * Naamconventie keys: snake_case, lowercase, geen streepjes.
  * Gebruik dezelfde key als `id` in ConceptFlipCards en als `term` in GlossaryTerm.
+ *
+ * HARDE REGEL (S17): sleutels zijn UNIEK ONGEACHT HOOFDLETTERS. `SWR` naast
+ * `swr` en `FIRE` naast `fire` bestonden allebei, met tegenstrijdige uitleg, en
+ * één bestand (voorkeuren-view.tsx) gebruikte beide casings — twee verschillende
+ * teksten voor hetzelfde begrip op één pagina. `glossary-data.test.ts` bewaakt
+ * dit nu. Losse hoofdletter-sleutels die géén dubbel hebben (AOW, ETF, LTV,
+ * SORR, Monte_Carlo) blijven bewust staan: dat zijn afkortingen die als naam
+ * geschreven worden en op tientallen call-sites leven; hernoemen is geen
+ * taalverbetering maar een refactor.
  */
 
 import { formatCurrency } from '@/lib/format'
 import { BOX3_PARAMS, CURRENT_TAX_YEAR } from '@/lib/box3-data'
 
 export interface GlossaryEntry {
-  /** Korte weergavenaam (bijv. "FIRE", "Vrijheidstijd"). */
+  /** Korte weergavenaam (bijv. "FIRE", "Vrijheidstijd"). Ook de kop van de popover. */
   name: string
   /** Toegankelijk alternatief voor het jargon — begrijpelijk zonder financiële voorkennis.
-   *  Bijv. 'SWR' → 'Opnamestrategie', 'FIRE' → 'Financiële vrijheid'. */
+   *  Bijv. 'SWR' → 'Hoeveel je per jaar kunt opnemen'. Bedoeld als LABEL (kaart-
+   *  voorkant, tooltip-header, keuzelijst), niet per se als inline zinsdeel. */
   alternative: string
+  /**
+   * Inline-veilig alternatief dat in de **Eenvoudige weergave** het zichtbare
+   * woord VERVANGT (`GlossaryTerm`); de vakterm verhuist dan naar de popover-kop.
+   *
+   * AFWEZIG = de vakterm blijft in beide modi staan. Dat is de bewuste
+   * standaard voor wettelijke/fiscale termen — de kaartregel luidt "wettelijke
+   * termen mógen, mét uitleg ter plekke", dus Box 3, aanmerkelijk belang,
+   * tegenbewijs en heffingsvrij vermogen houden hun naam en laten de
+   * `explanation` het werk doen. Alleen afkortingen en merknamen krijgen een
+   * `simpleLabel`.
+   *
+   * Schrijf 'm KLEIN en als zinsdeel ("duurste schuld eerst"), niet als titel:
+   * `GlossaryTerm` matcht de hoofdletter van het oorspronkelijke woord.
+   */
+  simpleLabel?: string
   /** Uitleg in maximaal 2 zinnen, begrijpelijk voor een leek. */
   explanation: string
 }
@@ -48,11 +73,15 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
     explanation:
       'Tik op een getal in de app en je ziet de kassabon — een stapsgewijze berekening die laat zien hoe het bedrag is opgebouwd. Transparantie in elk cijfer.',
   },
+  // ÉÉN fire-entry (was: `fire` + `FIRE` met tegenstrijdige alternatives).
+  // De zichtbare term is "volledige vrijheid" — de projectfilosofie in CLAUDE.md
+  // schrijft die framing voor; FIRE blijft als vakterm in de popover-kop staan.
   fire: {
     name: 'FIRE',
-    alternative: 'Financiële vrijheid',
+    alternative: 'Volledige vrijheid',
+    simpleLabel: 'volledige vrijheid',
     explanation:
-      'Financial Independence, Retire Early — het moment waarop je vermogen genoeg oplevert om je uitgaven te dekken. Werken wordt optioneel.',
+      'Financial Independence, Retire Early — het punt waarop je vermogen genoeg oplevert om je uitgaven te dekken. Werken wordt vanaf dat moment optioneel: je hebt volledige vrijheid.',
   },
   soevereiniteit: {
     name: 'Soevereiniteit',
@@ -88,18 +117,7 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
     explanation:
       'Alles wat je bezit (spaargeld, beleggingen, huis) min alles wat je schuldig bent (hypotheek, leningen). Het totaal dat overblijft is jouw netto vermogen.',
   },
-  SWR: {
-    name: 'SWR',
-    alternative: 'Opnamestrategie',
-    explanation:
-      'Safe Withdrawal Rate — het percentage van je vermogen dat je jaarlijks kunt opnemen zonder dat het opraakt. Vaak rond de 3-4%.',
-  },
-  FIRE: {
-    name: 'FIRE',
-    alternative: 'Financiële onafhankelijkheid',
-    explanation:
-      'Financial Independence, Retire Early — het punt waarop je genoeg vermogen hebt om van te leven zonder te hoeven werken.',
-  },
+  // `SWR` en `FIRE` (hoofdletter-sleutels) zijn opgeheven in `swr` resp. `fire`.
   koopkracht: {
     name: 'Koopkracht',
     alternative: 'Werkelijke waarde van je geld',
@@ -114,7 +132,8 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
   },
   schuldgraad: {
     name: 'Schuldgraad',
-    alternative: 'Schulden ten opzichte van bezittingen',
+    alternative: 'Schuld ten opzichte van wat je bezit',
+    simpleLabel: 'schuldenlast ten opzichte van je bezit',
     explanation:
       'Het percentage van je bezittingen dat met schulden is gefinancierd. Lager is over het algemeen gezonder.',
   },
@@ -260,9 +279,17 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
     explanation:
       'Een dynamische onttrekkings-strategie die je opname verlaagt na slechte beurs-jaren en verhoogt na goede. Floor en ceiling bepalen de min/max correctie t.o.v. je startopname.',
   },
+  // ÉÉN swr-entry (was: `swr` + `SWR`). Bewust "kunt opnemen", niet "opneemt":
+  // de motor onderscheidt de INGESTELDE opnamevoet van de IMPLICIETE, en bij een
+  // teer-op-vermogen-scenario is er helemaal geen vaste voet. "Wat je jaarlijks
+  // opneemt" zou dat onderscheid wegpoetsen en het label onwaar maken.
   swr: {
     name: 'SWR',
-    alternative: 'Veilig opname-percentage',
+    alternative: 'Hoeveel je per jaar kunt opnemen',
+    // Inline moet het een zelfstandig naamwoord zijn dat op de plek van "SWR"
+    // past ("Klassiek opnamepercentage —", "Effectief opnamepercentage").
+    // De volledige nuance staat in de uitleg, één tik verderop.
+    simpleLabel: 'opnamepercentage',
     explanation:
       'Safe Withdrawal Rate — het percentage van je startvermogen dat je elk jaar kunt opnemen zonder voortijdig door je vermogen heen te zijn. Klassieke vuistregel: 4% bij 30 jaar horizon.',
   },
@@ -280,7 +307,8 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
   },
   avalanche: {
     name: 'Avalanche-methode',
-    alternative: 'Hoogste rente eerst',
+    alternative: 'Duurste schuld eerst',
+    simpleLabel: 'duurste schuld eerst',
     explanation:
       'Schuldaflossings-strategie waarbij je extra aflossingen richt op de schuld met het hoogste rente-percentage. Wiskundig de goedkoopste route naar schuldvrij.',
   },
@@ -295,6 +323,91 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
     alternative: 'Beursverhandelbaar indexfonds',
     explanation:
       'Een fonds dat een hele beursindex (bv. MSCI World) volgt en op de beurs wordt verhandeld als een aandeel. Lage kosten en breed gespreid — vandaar de aanbevolen keuze voor lange-termijn beleggers.',
+  },
+
+  // ── Sectie 3: koppelingen & weergave-begrippen (bevinding H19) ─────────
+  // Jargon dat op beslismomenten in beeld komt (/toekomst-navkaart,
+  // /mijn-koppelingen, de netto-vermogen-kassabon op /bezittingen) en tot
+  // nu toe kaal werd getoond.
+
+  psd2: {
+    name: 'PSD2',
+    alternative: 'Bank koppelen',
+    explanation:
+      'De Europese betaalrichtlijn die je het recht geeft je eigen bankgegevens te delen met een app die je zelf kiest. Je koppelt via de inlogpagina van je eigen bank, dus je wachtwoord komt hier nooit langs.',
+  },
+  upo: {
+    name: 'UPO',
+    alternative: 'Pensioenoverzicht',
+    explanation:
+      'Uniform Pensioenoverzicht — het jaarlijkse overzicht van je pensioenuitvoerder met wat je tot nu toe hebt opgebouwd en wat je op pensioenleeftijd mag verwachten. Je vindt het ook op mijnpensioenoverzicht.nl.',
+  },
+  // Bewust GEEN `simpleLabel`: het kaartvoorstel was "hoeveel hiervan meetelt
+  // voor je vrijheid", en dat is een grondslagfout — dit percentage weegt het
+  // NETTO VERMOGEN (incl. niet-liquide bezit), niet de FIRE-eligible/liquide pot.
+  // CLAUDE.md verbiedt die menging expliciet. De duiding zit dus in de uitleg,
+  // en die noemt de juiste grootheid.
+  inclusiepercentage: {
+    name: 'Inclusiepercentage',
+    alternative: 'Hoeveel hiervan meetelt in je netto vermogen',
+    explanation:
+      'Het deel van een bezitting of schuld dat meetelt in je netto vermogen, in procenten. Deel je een rekening met iemand anders, dan zet je hem bijvoorbeeld op 50% zodat alleen jouw helft meetelt.',
+  },
+
+  // ── Sectie 4: fiscaal jargon (bevinding S17) ──────────────────────────
+  // Nooit eerder gesweept: de eerdere jargon-ronde ging over percentielen en
+  // afkortingen, niet over fiscale termen. Wettelijke termen BLIJVEN staan
+  // (geen `simpleLabel`) — ze krijgen hun uitleg ter plekke.
+
+  vervreemdingswinst: {
+    name: 'Vervreemdingswinst',
+    alternative: 'Winst bij verkoop van je aandeel',
+    simpleLabel: 'winst bij verkoop van je aandeel',
+    explanation:
+      'De winst die je maakt als je je aandeel in een BV verkoopt: de verkoopprijs min wat je er ooit voor betaalde. Die winst wordt in Box 2 belast.',
+  },
+  tegenbewijs: {
+    name: 'Tegenbewijs',
+    alternative: 'Rekenen met je werkelijke rendement',
+    // Bewust beschrijvend, geen gebiedende wijs. "Laat zien wat je écht
+    // verdiende en betaal daarover" is een handelingsinstructie om een fiscale
+    // regeling in te roepen — dat is advies, niet inzicht (Wft-grens).
+    explanation:
+      'Je mag laten zien wat je werkelijk aan rendement behaalde. Is dat lager dan het forfait dat de Belastingdienst aanneemt, dan wordt over dat werkelijke rendement geheven.',
+  },
+  // GEEN `excessief_lenen`-entry: die frase draagt op /overzicht/belasting/box2
+  // al zijn uitleg via `BOX2_TOOLTIPS.wetExcessiefLenen` (die sinds S17 het
+  // bedrag uit DGA_LENING_DREMPEL consumeert i.p.v. een letterlijke €500.000).
+  // Een tweede uitleg-kanaal voor dezelfde zin op dezelfde kaart is duplicatie —
+  // en een glossary-entry zonder consument is precies het dode mechanisme dat
+  // deze kaart juist opruimt.
+
+  // Eindstrategieën uit lib/fire-strategy.ts (STRATEGY_LABELS). De namen daar
+  // zijn korte kaart-labels; hier staat de uitleg voor een leek. Keys volgen
+  // `eindstrategie_<FireEndStrategy>` zodat de navkaart ze kan afleiden.
+  eindstrategie_deplete: {
+    name: 'Vermogen opeten',
+    alternative: 'Je vermogen opmaken',
+    explanation:
+      'Je maakt je vermogen bewust op tot het rond je eindleeftijd op nul staat. Dat mag je meer per jaar laten opnemen dan wanneer je alles wilt bewaren.',
+  },
+  eindstrategie_legacy: {
+    name: 'Nalatenschap',
+    alternative: 'Een bedrag overhouden',
+    explanation:
+      'Je houdt aan het eind bewust een doelbedrag over, bijvoorbeeld om na te laten. Wat je daarvoor apart houdt, kun je onderweg niet opnemen.',
+  },
+  eindstrategie_perpetual: {
+    name: 'Eeuwigdurend',
+    alternative: 'Vermogen intact houden',
+    explanation:
+      'Je neemt alleen op wat je vermogen bovenop de inflatie oplevert, zodat de koopkracht van je vermogen intact blijft. De voorzichtigste variant, en dus de traagste weg naar vrijheid.',
+  },
+  eindstrategie_pensioen: {
+    name: 'Pensioenleeftijd',
+    alternative: 'Opbouwen tot je pensioen',
+    explanation:
+      'Je bouwt op tot je AOW-leeftijd en gaat pas daarna onttrekken; wat overblijft is je nalatenschap. Handig als je niet eerder wilt stoppen met werken.',
   },
 }
 
@@ -325,7 +438,7 @@ export const GLOSSARY: Record<string, string> = Object.fromEntries(
 /**
  * Jargon vertaaltabel — koppelt financieel vakjargon aan toegankelijke alternatieven.
  *
- * Gebruik: `JARGON_VERTAALTABEL['SWR']` → `'Opnamestrategie'`
+ * Gebruik: `JARGON_VERTAALTABEL['swr']` → `'Hoeveel je per jaar kunt opnemen'`
  *
  * Dient als bron voor GlossaryTerm tooltip-headers en label-alternatieven
  * op plekken waar het publiek geen financiële voorkennis heeft.

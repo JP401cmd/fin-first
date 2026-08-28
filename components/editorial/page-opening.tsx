@@ -8,9 +8,11 @@ import { EditorialDeck } from './index'
  *
  * Opbouw (in deze volgorde, container `<header className="relative space-y-3">`):
  *   1. Hairline-kicker-rij (mono 10px, module-accent, streep ervoor).
- *   2. Narratieve Playfair-H1 met precies één italic `<em>`-accent in
- *      `--module-active-700` — bewust de líchtere maatvoering (28/36/44px),
- *      niet `EditorialHeadline` (font-black/leading-0.95).
+ *   2. Narratieve Playfair-kop (semantisch `<h2>`) met precies één italic
+ *      `<em>`-accent in `--module-active-700` — bewust de líchtere maatvoering
+ *      (28/36/44px), niet `EditorialHeadline` (font-black/leading-0.95).
+ *      Semantisch `<h2>` omdat de shell-chrome de enige `<h1>` draagt; zie het
+ *      koppencontract in `.claude/skills/ui-ux/quality-checklist.md`.
  *   3. Optionele redactionele deck (`<EditorialDeck>`).
  *   4. Optioneel `children`-slot ONDER de deck voor het hairline-cijferblok of
  *      extra rijen — de consumer vult dat blok zelf (kaart-spec:
@@ -56,8 +58,11 @@ export function PageOpening({
         {kicker}
       </div>
 
-      {/* Narratieve Playfair-headline — líchtere maatvoering (28/36/44px). */}
-      <h1
+      {/* Narratieve Playfair-headline — líchtere maatvoering (28/36/44px).
+          Semantisch een <h2>, geen <h1>: binnen de app-shell is de route-titel
+          in de shell-chrome de enige <h1> (koppencontract, bevinding M28). De
+          visuele maatvoering verandert daar niet door. */}
+      <h2
         className="font-bold leading-tight tracking-[-0.02em] text-[28px] sm:text-[36px] md:text-[44px]"
         style={{ fontFamily: 'var(--font-playfair, serif)' }}
       >
@@ -69,7 +74,7 @@ export function PageOpening({
           {emphasis}
         </em>
         {titleAfter}
-      </h1>
+      </h2>
 
       {deck && <EditorialDeck>{deck}</EditorialDeck>}
 

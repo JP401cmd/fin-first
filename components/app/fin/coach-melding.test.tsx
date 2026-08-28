@@ -17,6 +17,17 @@ describe('CoachMelding', () => {
     expect(screen.getByRole('link', { name: /Bank koppelen/i })).toBeInTheDocument()
   })
 
+  it('geeft de sluitknop een tapzone van 44x44, vrij van de avatar (H17)', () => {
+    render(<CoachMelding {...base} onClose={vi.fn()} onCtaActivate={vi.fn()} onOpenChat={vi.fn()} />)
+    const close = screen.getByRole('button', { name: /Sluiten/i })
+    // h-11/w-11 = 2,75rem = 44px — de app-brede touch-target-eis.
+    expect(close.className).toContain('h-11')
+    expect(close.className).toContain('w-11')
+    // right-12 (48px) houdt de knopbox rechts vrij van de 36px-avatar op
+    // right:10px (die tot 46px vanaf rechts loopt).
+    expect(close.className).toContain('right-12')
+  })
+
   it('verbergt de CTA zolang niet done', () => {
     render(<CoachMelding {...base} done={false} onClose={vi.fn()} onCtaActivate={vi.fn()} onOpenChat={vi.fn()} />)
     expect(screen.queryByRole('link', { name: /Bank koppelen/i })).not.toBeInTheDocument()

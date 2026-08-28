@@ -1171,7 +1171,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       notifications: filtered,
       history: returnHistory,
-      unreadCount: filtered.filter((n) => !n.read).length,
+      // H11/D4b — de teller was leeftijd-ONgebonden terwijl de lijst op
+      // `returnCutoff` filtert. Een generator die een oude `createdAt` meegeeft
+      // (`budget_model_proposal` neemt `proposal.created_at`, en de query op
+      // openstaande voorstellen kent geen leeftijdsgrens) telde daardoor eeuwig
+      // in de badge terwijl de lijst hem nooit kon tonen: "Berichten · 1" boven
+      // een lege lijst. Dezelfde grens als `returnHistory` maakt dat structureel
+      // onmogelijk — wat meetelt, is per definitie ook opvraagbaar.
+      // De bewuste trade-off van WF-WILL-11 (teller = het LIVE venster, niet de
+      // volledige 30-daagse historie) blijft ongemoeid: alleen de asymmetrie
+      // verdwijnt.
+      unreadCount: filtered.filter((n) => !n.read && n.createdAt >= returnCutoff).length,
     })
   } catch (err) {
     console.error('Notifications error:', err)

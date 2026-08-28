@@ -221,8 +221,15 @@ export function BerichtenClient() {
   const hasVisibleItems =
     urgent.length > 0 || todayItems.length > 0 || earlierGroups.length > 0
 
-  const metaLeft =
-    totalCount === 0
+  // H11/D4a — de masthead velde zijn oordeel ("Geen berichten") ál tijdens de
+  // fetch, omdat `totalCount` dan nog 0 is en de masthead buiten de `loading`-tak
+  // rendert. De lijst eronder toonde intussen een spinner: een definitief
+  // klinkende kop boven een ladende lijst. Dat verklaart de gemelde tegenspraak
+  // tussen de badge "Berichten · 1" en "GEEN BERICHTEN". Zolang we laden zegt de
+  // masthead dus wat er feitelijk aan de hand is — en niets meer.
+  const metaLeft = loading
+    ? 'Berichten laden…'
+    : totalCount === 0
       ? 'Geen berichten'
       : displayUnread > 0
         ? `${displayUnread} ongelezen`

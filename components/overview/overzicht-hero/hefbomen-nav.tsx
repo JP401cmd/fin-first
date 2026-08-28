@@ -4,9 +4,16 @@
  * HefbomenNav — vier-hefbomen-rij op /overzicht hero. Klikbare tegels
  * naar /overzicht/{bezittingen,schulden,cashflow,belasting}.
  *
- * Per tegel: icoon + label + bedrag + contextuele status-substext.
- * Status-dot rechtsboven uit pillar.score. Chevron rechtsonder toggle
- * een drill-down met meer detail (zelfde status-kleur, relevante info).
+ * Per tegel: icoon + label + bedrag + het oordeel in gewone taal. Status-dot
+ * rechtsboven uit de gedeelde lever-scores. Chevron rechtsonder toggelt een
+ * drill-down met meer detail (zelfde status-kleur, relevante info).
+ *
+ * Weergavemodus (S1, richtingsbesluit R5 "duiding boven reductie"):
+ *  - Volledig  → `LeverageCard` variant `full`: bedrag primair (serif),
+ *                oordeel als kleine gekleurde regel eronder, chevron.
+ *  - Eenvoudig → variant `verdict`: OORDEEL primair, bedrag gedempt eronder,
+ *                geen chevron en geen "excl. eigen woning"-grondslagregel.
+ * De oordeel-teksten komen uit `lib/hefboom-status-copy.ts` (canoniek).
  */
 
 import { useState } from 'react'
@@ -16,6 +23,10 @@ import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type { HealthScore, HealthPillar } from '@/lib/financial-health'
 import { HEFBOOM_CONFIG, type Hefboom } from '@/lib/hefboom-config'
+import {
+  hefboomVerdict,
+  HEFBOOM_VERDICT_NEUTRAL,
+} from '@/lib/hefboom-status-copy'
 import { LeverageCard } from '@/components/overview/leverage-card'
 import {
   pillarStatus,
@@ -102,33 +113,16 @@ const HEFBOMEN: ReadonlyArray<{
   },
 ] as const
 
-function statusSubText(key: HefboomKey, status: StatusCode, pillar?: HealthPillar): string | null {
-  if (status === 'neutral') return null
-  if (key === 'bezittingen') {
-    return status === 'good' ? 'Goed gespreid' : status === 'warn' ? 'Beperkt gespreid' : 'Sterk geconcentreerd'
-  }
-  if (key === 'schulden') {
-    const ratio = pillar?.rawValue ?? ''
-    return status === 'good' ? 'Aflossing op schema' : status === 'warn' ? `Schuldratio ${ratio}` : 'Hoge schuldenlast'
-  }
-  if (key === 'cashflow') {
-    return status === 'good' ? 'Op koers met sparen' : status === 'warn' ? 'Lager dan doel' : 'Tekort op rekening'
-  }
-  if (key === 'belasting') {
-    // Geen pijler meer (ADR 0010): valt terug op de totaal-score-proxy en is
-    // bewust een richtingaanwijzer — geen handelingsadvies of besparingsbelofte.
-    //
-    // BEL-3 (eenvoudige-weergave-audit, categorie E): "Verken je Box 3-positie"
-    // was jargon — precies het soort zin waar de doelgroep van Eenvoudig op
-    // afhaakt. De vervanging blijft binnen de Wft-grens omdat elk van de drie
-    // eigenschappen behouden is: de hedge "Mogelijk" (geen vaststelling over
-    // déze gebruiker), géén bedrag of besparingsbelofte, en géén imperatief
-    // ("stort", "verschuif"). Wat overblijft is een richtingaanwijzer naar de
-    // eigen positie — dezelfde functie als de oude tekst, in gewone taal.
-    return 'Mogelijk betaal je meer dan nodig'
-  }
-  return null
-}
+/*
+ * De domeinspecifieke oordelen ("Goed gespreid", "Hoge schuldenlast") stonden
+ * hier als lokale `statusSubText()`. Ze zijn verhuisd naar de canonieke
+ * copy-module `lib/hefboom-status-copy.ts` (S1), zodat de tegel, de
+ * toegankelijke naam van de status en toekomstige consumenten dezelfde zin
+ * lezen. Eén inhoudelijke wijziging bij die verhuizing: de warn-variant van
+ * schulden was `Schuldratio {rawValue}` — het enige jargon in de lijst — en is
+ * nu gewone taal; het rátiogetal blijft in de drill-down staan (`pillar.rawValue`
+ * in `HefboomDetailCard`, alleen Volledig).
+ */
 
 /**
  * Dubbele-grondslag-context (incl./excl. eigen woning) voor de bezittingen-
@@ -170,10 +164,18 @@ export function HefbomenNav({
    */
   housingSplit?: HefbomenHousingSplit | null
   /**
-   * Eenvoudige weergave (display_mode === 'simple'): verberg de chevron /
-   * uitklap-drill-down op de hefboomkaarten én de duidende regels eronder
-   * (status-substext + "excl. eigen woning · €X") — er blijft dan per tegel
-   * hoofdcijfer + statuspunt over (OVZ-2). Default false → ongewijzigd.
+   * Eenvoudige weergave (display_mode === 'simple'). De tegels schakelen dan
+   * naar de `verdict`-variant van `LeverageCard`: het OORDEEL in gewone taal
+   * staat primair, het bedrag zakt naar een gedempte tweede regel.
+   *
+   * S1 / richtingsbesluit R5 ("duiding boven reductie") draait hiermee de helft
+   * van OVZ-2 (9 aug 2026) terug: die haalde de status-duiding wég in Eenvoudig,
+   * waardoor een beginner alleen "€ 368.270" + een gekleurd puntje overhield —
+   * en een screenreader- of touch-gebruiker helemaal niets. De ándere helft van
+   * OVZ-2 blijft staan: géén chevron/drill-down en géén "excl. eigen woning · €X"
+   * in Eenvoudig. Dat is diepte respectievelijk grondslag-detail, geen oordeel.
+   *
+   * Default false → ongewijzigd (Volledig).
    */
   simple?: boolean
 }) {
@@ -213,10 +215,14 @@ export function HefbomenNav({
               ? `${formatMaskedCurrency(totalValue, masked)}/jr`
               : formatMaskedCurrency(totalValue, masked)
           : ''
-        // OVZ-2: in de eenvoudige weergave dragen de tegels alléén het
-        // hoofdcijfer + het statuspunt. De status-duiding ("Beperkt gespreid",
-        // "Mogelijk betaal je meer dan nodig") verhuist naar de duwpagina.
-        const subText = simple ? null : statusSubText(key, status, pillar)
+        // Het oordeel in gewone taal — in BEIDE weergaven zichtbaar (S1).
+        // `hefboomVerdict` geeft null bij `neutral` (er valt niets te oordelen):
+        //  - Volledig laat de regel dan leeg, precies zoals voorheen; de
+        //    status-dot krijgt via de shell een sr-only-naam.
+        //  - Eenvoudig toont "Nog geen gegevens", zodat élke tegel daar een
+        //    woord draagt en het stoplicht nooit het enige signaal is.
+        const verdict = hefboomVerdict(key, status)
+        const subText = simple ? (verdict ?? HEFBOOM_VERDICT_NEUTRAL) : verdict
         const expanded = expandedKey === key
 
         const hasDrilldown = Boolean(pillar) || status !== 'neutral'
@@ -226,9 +232,10 @@ export function HefbomenNav({
         // (housingSplit non-null). Weging-consistent: huis/hypotheek zijn al
         // inclusion-gewogen in housingContext, dus dit IS de gefilterde gewogen
         // som. GEEN vrijheidstijd-trailing hier — de tegel blijft compact.
-        // OVZ-2: in Eenvoudig valt de hele dubbele-grondslag-regel weg (inclusief
-        // de uitlijn-placeholder) — er is dan geen enkele extra regel meer om
-        // tegen uit te lijnen, dus alle vier de tegels blijven vanzelf gelijk.
+        // OVZ-2 (het deel dat ná S1 blijft staan): in Eenvoudig valt de hele
+        // dubbele-grondslag-regel weg. Grondslag-detail is geen oordeel, en de
+        // `verdict`-variant rendert `subAmount` sowieso niet — de guard hier
+        // houdt de intentie op de call-site zichtbaar.
         let subAmount: React.ReactNode = null
         if (housingSplit && !simple) {
           if (
@@ -264,7 +271,7 @@ export function HefbomenNav({
             status={status}
             subText={subText}
             subAmount={subAmount}
-            showSubRow={!simple}
+            variant={simple ? 'verdict' : 'full'}
             href={href}
             tooltip={tooltip}
             expandable={hasDrilldown && !simple}
@@ -327,5 +334,8 @@ function HefboomDetailCard({
  * productie-UI gerenderd (alleen in zijn eigen unit-test) en de uitleg van
  * groen/oranje/rood hoort volgens het audit-besluit éénmalig in de pagina-'i'
  * van /overzicht: zie `PAGE_INFO['/overzicht']` in lib/page-info-content.ts.
- * De status-dot zelf houdt zijn `title` uit `LEVERAGE_STATUS_LABEL`.
+ * De status-dot zelf houdt zijn `title` uit `LEVERAGE_STATUS_LABEL` — dat is
+ * sinds S1 bewust een hover-affordance en NIET de toegankelijke naam: die komt
+ * van het zichtbare oordeel, of van de sr-only-regel die `LeverageCard`
+ * bijspringt wanneer er geen zichtbaar oordeel is.
  */

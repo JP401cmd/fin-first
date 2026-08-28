@@ -41,6 +41,13 @@ interface KoppelingenClientProps {
    * met de "Importeer aangifte"-CTA.
    */
   aangifteImports: AangifteImportSummary[]
+  /**
+   * Runtime-vlag `truelayer_enabled` uit app_settings, server-side gelezen in
+   * `page.tsx`. Staat de vlag uit, dan toont de bank-sectie een eerlijke
+   * "nog niet beschikbaar"-state in plaats van een CTA naar een flow die de
+   * gebruiker toch niet mag starten.
+   */
+  bankConnectEnabled: boolean
 }
 
 const EXCHANGE_LABEL: Record<ExchangeId, string> = {
@@ -88,7 +95,7 @@ function linkedAssetHref(linkedAssetType: string): string {
   return `/core/assets/${linkedAssetType}`
 }
 
-export function KoppelingenClient({ initialData, brokerConnections, aangifteImports }: KoppelingenClientProps) {
+export function KoppelingenClient({ initialData, brokerConnections, aangifteImports, bankConnectEnabled }: KoppelingenClientProps) {
   const router = useRouter()
   const pathname = usePathname()
   const moduleContext = pathname?.startsWith('/mijn') ? 'Mijn' : 'Identiteit'
@@ -500,19 +507,70 @@ export function KoppelingenClient({ initialData, brokerConnections, aangifteImpo
         <IsinResolverStatus />
       </ConnectionSection>
 
-      {/* ── Bankrekeningen ─────────────────────────────────────────── */}
-      <ConnectionSection title="Bankrekeningen" description="Saldi en transacties via PSD2.">
-        <div className="border border-dashed border-[var(--border-ed)] bg-[var(--subtle)] p-4 sm:p-5">
+      {/* ── Bankrekeningen ───────────────────────────────────────────
+          Twee wegen naar dezelfde uitkomst: automatisch (PSD2) of een
+          bestand. Het beheer van gekoppelde rekeningen zelf leeft op
+          /overzicht/cashflow (ConnectedAccountCard) — hier linken we,
+          we dupliceren die UI bewust niet. */}
+      <ConnectionSection
+        title="Bankrekeningen"
+        description="Saldi en transacties — automatisch via PSD2 of met een bestand."
+      >
+        {bankConnectEnabled ? (
+          <div className="border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center bg-[var(--subtle)] text-[var(--ink-2)]">
+                <Landmark className="h-4 w-4" aria-hidden="true" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-[var(--ink)]">PSD2-koppeling</p>
+                <p className="mt-0.5 text-xs text-[var(--ink-3)]">
+                  Lees-rechten via je bank. Saldi en transacties komen automatisch
+                  binnen; wij plaatsen nooit betalingen.
+                </p>
+                <Link
+                  href="/core/cash/connect"
+                  className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[var(--ink)] underline underline-offset-4 hover:text-[var(--ink-2)]"
+                >
+                  Bank koppelen
+                </Link>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="border border-dashed border-[var(--border-ed)] bg-[var(--subtle)] p-4 sm:p-5">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center bg-[var(--paper)] text-[var(--ink-2)]">
+                <Landmark className="h-4 w-4" aria-hidden="true" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-[var(--ink)]">PSD2-koppeling</p>
+                <p className="mt-0.5 font-serif italic text-xs text-[var(--ink-3)]">
+                  Automatisch koppelen staat nu uit. Importeer je afschrift als
+                  bestand — dat levert dezelfde transacties op.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5">
           <div className="flex items-start gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center bg-[var(--paper)] text-[var(--ink-2)]">
-              <Landmark className="h-4 w-4" aria-hidden="true" />
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center bg-[var(--subtle)] text-[var(--ink-2)]">
+              <FileSpreadsheet className="h-4 w-4" aria-hidden="true" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-[var(--ink)]">PSD2-koppelingen</p>
-              <p className="mt-0.5 font-serif italic text-xs text-[var(--ink-3)]">
-                Binnenkort beschikbaar via PSD2. Tot die tijd voer je je banksaldo
-                handmatig in op de cash-pagina.
+              <p className="text-sm font-semibold text-[var(--ink)]">Transacties — bestand-import</p>
+              <p className="mt-0.5 text-xs text-[var(--ink-3)]">
+                Ondersteund: CSV, MT940 en OFX. Download het afschrift bij je bank en
+                importeer het op de rekening.
               </p>
+              <Link
+                href="/core/cash/import"
+                className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[var(--ink)] underline underline-offset-4 hover:text-[var(--ink-2)]"
+              >
+                Transacties importeren
+              </Link>
             </div>
           </div>
         </div>

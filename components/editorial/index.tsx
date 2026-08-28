@@ -33,6 +33,15 @@ export { InfoIconTooltip, InfoTooltip } from './info-icon-tooltip'
 export { PageInfoButton } from './page-info-button'
 // Re-export PageOpening (canonieke editorial pagina-aanhef — standaard-aanhef)
 export { PageOpening, PageOpeningFigure } from './page-opening'
+// Re-export TapTarget (gedeelde raakgebied-primitive, 44×44; bewaakt door check-tap-targets.mjs)
+export {
+  TapTarget,
+  tapTargetClass,
+  TAP_TARGET_RESERVE,
+  TAP_TARGET_EXTEND,
+  TAP_TARGET_EXTEND_BLOCK,
+} from './tap-target'
+export type { TapTargetProps, TapTargetHit } from './tap-target'
 // Re-export SubtotalLine (gedeeld "excl. eigen woning"-subtotaal; raakt privacy-context)
 export { SubtotalLine } from './subtotal-line'
 export type { SubtotalLineProps } from './subtotal-line'
@@ -79,21 +88,24 @@ export function Kicker({
   )
 }
 
-/** Editorial headline (H1/H2) met optionele italic-em in module-kleur.
+/** Editorial headline (H2/H3) met optionele italic-em in module-kleur.
  *  Geeft de "narratieve" headlines het signature TriFinity-DNA.
  *  - `emphasis`: het exacte woord (case-sensitive) dat italic-em krijgt.
- *  - `level`: 'h1' (default) of 'h2' voor semantiek; visueel via `size`.
+ *  - `level`: 'h2' (default) of 'h3' voor semantiek; visueel via `size`.
+ *    Bewust GEEN 'h1': binnen de app-shell draagt de route-titel in de
+ *    shell-chrome de enige `<h1>` (koppencontract, bevinding M28). Zie
+ *    `.claude/skills/ui-ux/quality-checklist.md` → "Koppenstructuur".
  *  - `size`: 'sm' (24-30px), 'lg' (28-44px, default), 'xl' (36-60px hero). */
 export function EditorialHeadline({
   children,
   emphasis,
-  level = 'h1',
+  level = 'h2',
   size = 'lg',
   className = '',
 }: {
   children: string
   emphasis?: string
-  level?: 'h1' | 'h2'
+  level?: 'h2' | 'h3'
   size?: 'sm' | 'lg' | 'xl'
   className?: string
 }) {

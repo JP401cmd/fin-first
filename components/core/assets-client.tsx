@@ -11,7 +11,7 @@ import { BottomSheet } from '@/components/app/bottom-sheet'
 // `ToastProvider` gerenderd (onboarding-achtige contexten, tests). De defensieve
 // variant degradeert daar stil in plaats van te gooien.
 import { useOptionalToast } from '@/components/app/toast-provider'
-import { Kicker, FiguresStrip, PageInfoButton, GlossaryTerm, PageOpening, SubtotalLine } from '@/components/editorial'
+import { Kicker, FiguresStrip, PageInfoButton, GlossaryTerm, PageOpening, SubtotalLine, type FigureProps } from '@/components/editorial'
 import { buildAssetReturnBreakdown, formatGainPct, RETURN_BASIS_LABELS } from '@/lib/asset-return'
 import { OVERLAY_QUERY_KEYS } from '@/lib/navigation'
 import { AssetReturnModal } from './asset-return-modal'
@@ -829,6 +829,59 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
       ? toolbarFilter({ assetCount: activeAssets.length })
       : toolbarFilter
 
+  // ÉÉN bron-array voor de figures-strip (S11). Alle vier de cellen consumeren
+  // een reeds berekend getal — `perspectiveAssetValue`, de maandinleg-som,
+  // `buildAssetReturnBreakdown()` en de projectie — er wordt hier niets
+  // herberekend. Welke twee cellen in Eenvoudig blijven staan bepaalt
+  // `simpleFigures` op de strip zelf, niet een ternary hier.
+  const figures: FigureProps[] = [
+    {
+      kicker: 'Totale waarde',
+      amount: fc(totalValue),
+      sub: dailyExpenses > 0 && totalValue > 0
+        ? `${formatFreedomTimeString(calculateFreedomTime(totalValue, dailyExpenses), 'long')} vrijheid`
+        : `${activeAssets.length} bezitting${activeAssets.length === 1 ? '' : 'en'}`,
+      variant: 'winner',
+    },
+    {
+      kicker: 'Maandelijkse inleg',
+      amount: fc(totalMonthlyContrib),
+      sub: 'totale inleg per maand',
+    },
+    {
+      // Grondslag in de naam: dit is het rendement op de MARKTPORTEFEUILLE
+      // (beleggingen + crypto), niet op alles wat je bezit. De rekenmodal
+      // hieronder toont de andere twee stapels — woning/deelneming en de
+      // bezittingen zonder kostprijs — zodat het totaal blijft kloppen.
+      // Het label komt sinds kaart H7 uit de GEDEELDE bron
+      // (RETURN_BASIS_LABELS): dezelfde tekst voor dezelfde grondslag op
+      // /overzicht en hier, zodat er geen vijfde vocabulaire ontstaat.
+      kicker: RETURN_BASIS_LABELS.portfolioSincePurchase.label,
+      amount: portfolioReturn.cost > 0
+        ? `${portfolioReturn.gain >= 0 ? '+' : ''}${fc(portfolioReturn.gain)}`
+        : '—',
+      sub: portfolioReturn.pct != null
+        ? (formatGainPct(portfolioReturn.pct) ?? 'geen kostprijs bekend')
+        : 'geen kostprijs bekend',
+      sub2: portfolioReturn.cost > 0
+        ? portfolioMixedBasis
+          ? `${RETURN_BASIS_LABELS.portfolioSincePurchase.scope} · deels op ingevulde aankoopwaarde`
+          : RETURN_BASIS_LABELS.portfolioSincePurchase.scope
+        : undefined,
+      variant: portfolioReturn.cost > 0
+        ? portfolioReturn.gain >= 0 ? 'positive' : 'negative'
+        : 'neutral',
+    },
+    {
+      kicker: `Waarde over ${projectionYears} jaar`,
+      amount: fc(futureValue),
+      sub: dailyExpenses > 0 && futureValue > 0
+        ? `${formatFreedomTimeString(calculateFreedomTime(futureValue, dailyExpenses), 'long')} vrijheid`
+        : `+${fc(projectedGrowth)} verwacht`,
+      variant: 'positive',
+    },
+  ]
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       {/* ═══ Editorial pagina-opening (standaard-aanhef) ════════════
@@ -873,94 +926,46 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
         )}
       </PageOpening>
 
-      {/* Figures-strip (mini-hero) — Totale waarde krijgt highlight-marker */}
-      {/* In Eenvoudig alleen het hoofdcijfer "Totale waarde"; de projectie-
-          cijfers (inleg, rendement totaal, waarde over N jaar) zijn diepte → verborgen. */}
-      {simple ? (
-        <FiguresStrip
-          cols={2}
-          figures={[
-            {
-              kicker: 'Totale waarde',
-              amount: fc(totalValue),
-              sub: dailyExpenses > 0 && totalValue > 0
-                ? `${formatFreedomTimeString(calculateFreedomTime(totalValue, dailyExpenses), 'long')} vrijheid`
-                : `${activeAssets.length} bezitting${activeAssets.length === 1 ? '' : 'en'}`,
-              variant: 'winner',
-            },
-          ]}
-        />
-      ) : (
-        <FiguresStrip
-          cols={4}
-          figures={[
-            {
-              kicker: 'Totale waarde',
-              amount: fc(totalValue),
-              sub: dailyExpenses > 0 && totalValue > 0
-                ? `${formatFreedomTimeString(calculateFreedomTime(totalValue, dailyExpenses), 'long')} vrijheid`
-                : `${activeAssets.length} bezitting${activeAssets.length === 1 ? '' : 'en'}`,
-              variant: 'winner',
-            },
-            {
-              kicker: 'Maandelijkse inleg',
-              amount: fc(totalMonthlyContrib),
-              sub: 'totale inleg per maand',
-            },
-            {
-              // Grondslag in de naam: dit is het rendement op de MARKTPORTEFEUILLE
-              // (beleggingen + crypto), niet op alles wat je bezit. De rekenmodal
-              // hieronder toont de andere twee stapels — woning/deelneming en de
-              // bezittingen zonder kostprijs — zodat het totaal blijft kloppen.
-              // Het label komt sinds kaart H7 uit de GEDEELDE bron
-              // (RETURN_BASIS_LABELS): dezelfde tekst voor dezelfde grondslag op
-              // /overzicht en hier, zodat er geen vijfde vocabulaire ontstaat.
-              kicker: RETURN_BASIS_LABELS.portfolioSincePurchase.label,
-              amount: portfolioReturn.cost > 0
-                ? `${portfolioReturn.gain >= 0 ? '+' : ''}${fc(portfolioReturn.gain)}`
-                : '—',
-              sub: portfolioReturn.pct != null
-                ? (formatGainPct(portfolioReturn.pct) ?? 'geen kostprijs bekend')
-                : 'geen kostprijs bekend',
-              sub2: portfolioReturn.cost > 0
-                ? portfolioMixedBasis
-                  ? `${RETURN_BASIS_LABELS.portfolioSincePurchase.scope} · deels op ingevulde aankoopwaarde`
-                  : RETURN_BASIS_LABELS.portfolioSincePurchase.scope
-                : undefined,
-              variant: portfolioReturn.cost > 0
-                ? portfolioReturn.gain >= 0 ? 'positive' : 'negative'
-                : 'neutral',
-            },
-            {
-              kicker: `Waarde over ${projectionYears} jaar`,
-              amount: fc(futureValue),
-              sub: dailyExpenses > 0 && futureValue > 0
-                ? `${formatFreedomTimeString(calculateFreedomTime(futureValue, dailyExpenses), 'long')} vrijheid`
-                : `+${fc(projectedGrowth)} verwacht`,
-              variant: 'positive',
-            },
-          ]}
-        />
-      )}
+      {/* Figures-strip (mini-hero) — Totale waarde krijgt highlight-marker.
+          ÉÉN strip, geen mode-ternary (S11). Hier stonden twee losse arrays:
+          in Eenvoudig één cel, in Volledig vier. Dat was een derde
+          reductiemechanisme naast `SIMPLE_MAX_FIGURES` en `HideInSimple` —
+          precies wat ADR 0026 verbiedt — én het knipte het eigen rendement weg
+          terwijl de promo-kaarten eronder bleven staan. Nu één bron-array met
+          `simpleFigures`: de primitive kapt zelf af op twee cellen.
 
-      {/* Rekenmodal-trigger. Alleen in "Volledig": in Eenvoudig valt de
-          rendement-cel zelf weg, dus zou dit naar een uitleg zonder onderwerp
-          wijzen. Bewust een aparte knop en geen klikbare figures-cel — `FigureProps`
-          kent alleen `href` (een `<a>`), en een overlay openen via een nep-link
-          breekt toetsenbord- en screenreader-gedrag. */}
-      {!simple && (
-        <div className="-mt-2 mb-5 flex justify-end">
-          <button
-            type="button"
-            onClick={() => setReturnModalOpen(true)}
-            aria-haspopup="dialog"
-            aria-expanded={returnModalOpen}
-            className="inline-flex min-h-[44px] items-center gap-1.5 font-sans text-xs text-[var(--ink-3)] underline decoration-dotted underline-offset-4 transition-colors hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
-          >
-            Zo is het rendement berekend
-          </button>
-        </div>
-      )}
+          WELKE TWEE: het hoofdcijfer + het eigen rendement, want dat is het
+          antwoord op "hoe doe ik het" — het getal waartegen de
+          beheerkosten-teaser hieronder zích verhoudt. Alleen als er géén
+          kostprijs bekend is (rendement rendert dan '—') valt de tweede cel
+          terug op de maandinleg: twee cellen waarvan één een streepje is, is in
+          Eenvoudig geen antwoord maar een raadsel. */}
+      <FiguresStrip
+        cols={4}
+        simpleFigures={
+          portfolioReturn.cost > 0 ? [figures[0], figures[2]] : [figures[0], figures[1]]
+        }
+        figures={figures}
+      />
+
+      {/* Rekenmodal-trigger — in BÉIDE weergaven (S11). Hij stond alleen in
+          "Volledig" omdat de rendement-cel in Eenvoudig wegviel: een uitleg
+          zonder onderwerp. Nu die cel blijft staan, vervalt die reden — en juist
+          de beginner heeft de uitleg nódig, want het rendement mengt twee
+          grondslagen. Bewust een aparte knop en geen klikbare figures-cel —
+          `FigureProps` kent alleen `href` (een `<a>`), en een overlay openen via
+          een nep-link breekt toetsenbord- en screenreader-gedrag. */}
+      <div className="-mt-2 mb-5 flex justify-end">
+        <button
+          type="button"
+          onClick={() => setReturnModalOpen(true)}
+          aria-haspopup="dialog"
+          aria-expanded={returnModalOpen}
+          className="inline-flex min-h-[44px] items-center gap-1.5 font-sans text-xs text-[var(--ink-3)] underline decoration-dotted underline-offset-4 transition-colors hover:text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+        >
+          Zo is het rendement berekend
+        </button>
+      </div>
 
       <AssetReturnModal
         open={returnModalOpen}
@@ -1014,7 +1019,10 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
       {/* Inspiratie-blokken direct onder de toolbar — leeg/null als de
           page-server geen drempels haalt. */}
       {inspirationCards && (
-        <div className="mb-5 space-y-4">{inspirationCards}</div>
+        // `empty:hidden`: sinds S11 kan de beheerkosten-kaart in Eenvoudig
+        // wegvallen (HideInSimple). Haalt de gebruiker wél die drempel maar de
+        // cash-drempel niet, dan blijft hier anders een lege doos met marge over.
+        <div className="mb-5 space-y-4 empty:hidden">{inspirationCards}</div>
       )}
 
       {/* Allocation + projection — collapsible card. Bewust óók in Eenvoudig

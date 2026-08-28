@@ -6,6 +6,7 @@ import { getServiceClient } from '@/lib/supabase/service'
 import { wrapModelWithTokenLogging, type WrappableModel } from '@/lib/ai/token-usage'
 import { parsePlatformStatus } from '@/lib/platform-status'
 import { decryptField } from '@/lib/crypto/field-encryption'
+import { AI_ERROR_CODE } from '@/lib/ai/error-copy'
 
 // AI-provider-keys worden versleuteld opgeslagen in app_settings (zie
 // app/api/admin/settings/route.ts). Dual-read: een `v1:`-prefixte waarde wordt
@@ -20,10 +21,24 @@ function readSecret(raw: string | undefined): string | undefined {
   return raw.startsWith('v1:') ? (decryptField(raw) ?? undefined) : raw
 }
 
+/**
+ * Machineleesbare reden achter een `AIConfigError` (H27).
+ *
+ * De `message` blijft bewust beheerderstaal — hij noemt provider, beheerpad en
+ * env-variabele — en hoort daarom UITSLUITEND in het serverlog. Wat de route
+ * naar de client stuurt is deze `reason` als foutcode; de tekst komt dan uit
+ * `lib/ai/error-copy.ts`. Nooit meer `err.message` in een responsbody.
+ */
+export type AIConfigReason =
+  | typeof AI_ERROR_CODE.disabledPlatform
+  | typeof AI_ERROR_CODE.unavailable
+
 export class AIConfigError extends Error {
   constructor(
     message: string,
     public provider: string,
+    /** Default = `ai_unavailable`: de veilige, neutrale klasse. */
+    public reason: AIConfigReason = AI_ERROR_CODE.unavailable,
   ) {
     super(message)
     this.name = 'AIConfigError'
@@ -40,10 +55,21 @@ export class AIConfigError extends Error {
 // per call vast te leggen in ai_token_usage — zie lib/ai/token-usage.ts en
 // /beheer/ai-verbruik. Zonder feature wordt er niets gelogd.
 export async function getModel(supabase: SupabaseClient, feature?: string) {
-  const { data } = await getServiceClient()
+  const { data, error } = await getServiceClient()
     .from('app_settings')
     .select('key, value')
     .in('key', ['ai_provider', 'ai_model_anthropic', 'ai_model_openai', 'anthropic_api_key', 'openai_api_key', 'ai_model_mistral', 'mistral_api_key', 'ollama_base_url', 'ai_model_ollama', 'platform_status'])
+
+  // De leesfout werd hier eerder weggegooid. Gevolg: een mislukte
+  // service-lezing (verkeerde service-role-key, RLS, netwerk) leverde een leeg
+  // settings-object en dus de conclusie "API key is niet geconfigureerd" —
+  // terwijl de sleutel gewoon in app_settings staat. Dat maakte de melding ook
+  // voor de BEHEERDER misleidend. We loggen 'm nu expliciet (server-only) en
+  // laten het gedrag verder ongewijzigd: de kill-switch/provider-checks
+  // hieronder blijven de beslissers.
+  if (error) {
+    console.error('[ai-config] app_settings-lezing mislukt:', error.message)
+  }
 
   const settings: Record<string, string> = {}
   for (const row of data ?? []) {
@@ -53,7 +79,7 @@ export async function getModel(supabase: SupabaseClient, feature?: string) {
   // Globale AI-kill-switch (beheerd via /beheer/platform). Staat boven de
   // provider-keuze: als AI uit staat, geen enkele AI-call mag door.
   if (!parsePlatformStatus(settings.platform_status).killSwitches.ai) {
-    throw new AIConfigError('AI is tijdelijk uitgeschakeld door beheer.', 'platform')
+    throw new AIConfigError('AI is tijdelijk uitgeschakeld door beheer.', 'platform', AI_ERROR_CODE.disabledPlatform)
   }
 
   const provider = settings.ai_provider || process.env.AI_PROVIDER || 'anthropic'

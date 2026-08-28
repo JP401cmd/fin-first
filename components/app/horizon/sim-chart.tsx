@@ -281,6 +281,7 @@ export const SimChart = memo(function SimChart({
   onEventClick,
   onEventDragEnd,
   onEventDragMove,
+  onClusterOpen,
   emphasis = null,
   targetInflationFactors,
   liquidPoints,
@@ -351,6 +352,9 @@ export const SimChart = memo(function SimChart({
     newAge: number,
     kind: ChartEventKind,
   ) => void
+  /** M16 — opent de lijst achter een "+N"-clusterbadge op de event-markers.
+   *  Zonder deze prop blijft de badge decoratief (legacy-gedrag). */
+  onClusterOpen?: (events: ChartEventOverlay[], centerAge: number) => void
   /** Benadrukt één segment van de lijn (uitleg-walkthrough); rest wordt gedimd.
    *  Default `null` = ongewijzigd gedrag voor alle bestaande call-sites. */
   emphasis?: 'accumulation' | 'withdrawal' | 'fire' | null
@@ -547,6 +551,7 @@ export const SimChart = memo(function SimChart({
           onEventClick={onEventClick}
           onEventDragEnd={onEventDragEnd}
           onEventDragMove={onEventDragMove}
+          onClusterOpen={onClusterOpen}
         />
 
         {/* Crosshair-laag (hover-rect + verticale lijn + stip) — de enige laag

@@ -386,6 +386,85 @@ describe('ToekomstNavCards — Voorkeuren-kaart', () => {
   })
 })
 
+// ── H19: vaktermen in de drilldown dragen een GlossaryTerm-uitleg ─────────
+//
+// De kaart-VOORKANT blijft kaal (die tekst zit binnen de kaart-<Link>; een
+// <button> in een <a> is ongeldig). De DRILLDOWN rendert als sibling buiten
+// die Link en moet de uitleg wél dragen — dat is precies wat H19 miste.
+
+describe('ToekomstNavCards — glossary-uitleg in de Voorkeuren-drilldown (H19)', () => {
+  /**
+   * De kaart-shell (het buitenste <div>) — de drilldown rendert als SIBLING
+   * van de kaart-<Link>, dus binnen de shell maar buiten de <a>. Precies die
+   * scheiding is de reden dat de uitleg in de drilldown wél mag.
+   */
+  function shellByHref(container: HTMLElement, href: string): HTMLElement {
+    const shell = cardByHref(container, href).parentElement
+    if (!shell) throw new Error(`Geen kaart-shell voor ${href}`)
+    return shell
+  }
+
+  function openVoorkeuren(overrides: RenderProps = {}) {
+    const rendered = renderCards(overrides)
+    fireEvent.click(screen.getByRole('button', { name: 'Toon detail Voorkeuren' }))
+    return rendered
+  }
+
+  it('duidt de eindstrategie-naam met een uitleg-tooltip', () => {
+    const { container } = openVoorkeuren({
+      fireStrategy: { strategy: 'deplete', endAge: 90, legacyAmount: 0 },
+    })
+    const shell = shellByHref(container, '/toekomst/voorkeuren')
+    const term = within(shell).getByRole('button', { name: 'Vermogen opeten' })
+    expect(term.getAttribute('aria-describedby')).toBe('glossary-eindstrategie_deplete')
+    expect(shell.querySelector('#glossary-eindstrategie_deplete')?.textContent).toMatch(
+      /vermogen bewust op/i,
+    )
+  })
+
+  it('duidt SWR met een uitleg-tooltip en toont het percentage ernaast', () => {
+    const { container } = openVoorkeuren()
+    const shell = shellByHref(container, '/toekomst/voorkeuren')
+    expect(within(shell).getByRole('button', { name: 'SWR' })).toBeTruthy()
+    expect(shell.querySelector('#glossary-swr')?.textContent).toMatch(
+      /Safe Withdrawal Rate/i,
+    )
+    // effectiveSwr 0.034 → "3.4%" blijft als getal naast de term staan.
+    expect(shell.textContent).toContain('SWR 3.4%')
+  })
+
+  // `WithdrawalStrategyType` kent vandaag alleen 'static' | 'guardrails'; de
+  // vpw-/bucket-namen in WITHDRAWAL_NAMES lopen vooruit op FASE 6 en hebben
+  // hun glossary-entry (vpw/bucket) al klaarstaan.
+  it('duidt een jargon-onttrekkingsstrategie (Guardrails) in de value-regel', () => {
+    const { container } = openVoorkeuren({
+      withdrawalStrategy: { ...mockWithdrawal, strategy: 'guardrails' },
+    })
+    const shell = shellByHref(container, '/toekomst/voorkeuren')
+    expect(within(shell).getByRole('button', { name: 'Guardrails' })).toBeTruthy()
+    expect(shell.querySelector('#glossary-guardrails')?.textContent).toMatch(
+      /onttrekkings-strategie/i,
+    )
+  })
+
+  it('laat "Vast (4%)" kaal — geen jargon, dus geen tooltip-knop', () => {
+    const { container } = openVoorkeuren()
+    const shell = shellByHref(container, '/toekomst/voorkeuren')
+    expect(within(shell).queryByRole('button', { name: 'Vast (4%)' })).toBeNull()
+    expect(shell.textContent).toContain('Vast (4%)')
+  })
+
+  it('houdt de kaart-voorkant vrij van tooltip-knoppen zolang de drilldown dicht is', () => {
+    const { container } = renderCards()
+    const shell = shellByHref(container, '/toekomst/voorkeuren')
+    // Alleen de chevron-toggle is een <button> vóór uitklappen — een
+    // GlossaryTerm-<button> binnen de kaart-<Link> zou ongeldige HTML zijn.
+    const buttons = within(shell).getAllByRole('button')
+    expect(buttons.length).toBe(1)
+    expect(buttons[0]!.getAttribute('aria-label')).toBe('Toon detail Voorkeuren')
+  })
+})
+
 // ── Rekenhulp-kaart: count / "Geen" ───────────────────────────────────────
 
 describe('ToekomstNavCards — Rekenhulp-kaart', () => {

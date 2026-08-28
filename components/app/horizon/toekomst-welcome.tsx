@@ -34,6 +34,7 @@ import { MaskedAmount } from '@/components/app/masked-amount'
 import { EditorialHeadline } from '@/components/editorial'
 import { useFocusTrap } from '@/lib/hooks/use-focus-trap'
 import { acquireOverlay } from '@/lib/overlay-signal'
+import { buildVrijheidsleeftijdZin } from '@/lib/horizon/vrijheidsleeftijd-zin'
 
 export interface ToekomstWelcomeProps {
   /** Of de overlay zichtbaar is (first-visit-only, door parent bepaald). */
@@ -134,16 +135,18 @@ export function ToekomstWelcome({
         })
       : null
 
-  // Vrijheidsleeftijd-zin. Bij een geldige eindige leeftijd tonen we het hele
-  // getal met "e"-achtervoegsel (zelfde stijl als de overlay: "65e"); anders
-  // een nette alternatieve zin zonder kapot getal.
-  const hasFreedomAge =
-    freedomAge !== null && Number.isFinite(freedomAge) && freedomAge > 0
-  const freedomAgeLabel = hasFreedomAge ? `${Math.round(freedomAge!)}e` : null
-  // Alternatieve zin als de vrijheidsleeftijd (nog) niet bekend/eindig is —
-  // geen kapot getal ("rond je undefined"), wel dezelfde empowering toon.
-  const choiceSentenceFallback =
-    'Werken wordt steeds meer een keuze naarmate je vrijheid opbouwt.'
+  // Vrijheidsleeftijd-zin — woorden én afronding uit de gedeelde bron (S15),
+  // dezelfde als de tips-overlay en de duidingsregel op /toekomst zelf. Bij een
+  // geldige eindige leeftijd het hele getal met "e"-achtervoegsel ("65e", in
+  // pensioenmodus "65e (AOW-leeftijd)"); anders een nette alternatieve zin
+  // zonder kapot getal ("rond je undefined"), met dezelfde empowering toon.
+  const choiceSentence = buildVrijheidsleeftijdZin({
+    freedomAge,
+    isPensioen,
+    variant: 'kaart',
+  })
+  const hasFreedomAge = choiceSentence.kind === 'leeftijd'
+  const freedomAgeLabel = choiceSentence.ageLabel
 
   return createPortal(
     <div
@@ -192,14 +195,14 @@ export function ToekomstWelcome({
         >
           {hasFreedomAge ? (
             <>
-              Werken wordt voor jou een keuze rond je{' '}
+              {choiceSentence.lead}
               <span className="not-italic font-semibold text-[var(--module-active-700)]">
-                {isPensioen ? `${freedomAgeLabel} (AOW-leeftijd)` : freedomAgeLabel}
+                {freedomAgeLabel}
               </span>
-              .
+              {choiceSentence.tail}
             </>
           ) : (
-            choiceSentenceFallback
+            choiceSentence.text
           )}
         </p>
 

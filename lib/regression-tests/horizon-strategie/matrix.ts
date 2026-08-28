@@ -272,27 +272,72 @@ export interface ComboExpectation {
  * niet langer in de niet-liquide schuldcategorie, dus de schuldCap in de Verdeling-
  * waterval blokkeert extra aflossing er niet meer op.
  *
+ * ## Echte-annuiteit-fix (gap V22, herijkt 2026-08-28) — waarom ALLE bewegende goldens daalden
+ * De kernel bevroor de aflossingscomponent van vandaag en paste die constant toe over de
+ * hele horizon (`tables/s.ts#regularSlot`). Met `KernelInput.echteAnnuiteitAflossing` (app-pad
+ * AAN) herrekent `plannedMonthlyAt` de rente/aflossing-split per maand, zodat een annuïteit
+ * op de werkelijke einddatum €0 raakt. Op deze persona betreft dat de hypotheek van
+ * €300.000 @3,1% met maandlast €1.280: bevroren aflossingsdeel €505 ⇒ ~594 maanden;
+ * echte annuïteit ⇒ ~360 maanden.
+ *
+ * **Geen lek — gemeten, niet aangenomen.** Per schuld-slot is de saldo-reeks met vlag AAN
+ * vs. UIT vergeleken over alle 1200 maanden. Alleen de vier `annuiteit`-schulden bewegen
+ * (hypotheek max Δ€117.695; autolening €255; persoonlijke lening €321; DUO €30). Elke
+ * `lineair`- en `aflossingsvrij`-schuld heeft **max Δ = €0,00 exact** — inclusief de
+ * €110.000 beleggingshypotheek die de A-groep-goldens draagt (zie de sectie hierboven) en
+ * de tekort-lening. Aflossingsvrij lost dus niet ineens af.
+ *
+ * **Drie regimes, alle drie consistent met één mechanisme** (`doelbedrag` = Prognose!J@FIRE):
+ *   - **FIRE-maand vast op ~m1** (`A-include_full`, `A-reverse`, `B-deplete`, `B-legacy`,
+ *     `C-oplopend` — de "reached now"-combinaties): er is nog geen amortisatie geweest, dus
+ *     **niets beweegt**. Zelfde blindheid als bij de opeethypotheek-fix hierboven.
+ *   - **FIRE-maand vast op de pensioenleeftijd** (`B-pensioen`, solver kortsluit op 67, geen
+ *     bisectie): J wordt op een VÁSTE maand gemeten, dus het doelbedrag **stijgt** met exact
+ *     de schuldverlaging op die maand: +€78.081 (+1,35%). Dit is de zuiverste meting van het
+ *     effect — en de enige combinatie die omhóóg gaat.
+ *   - **FIRE-maand vrij** (alle overige): J ligt op élke maand hoger, dus de bisectie vindt
+ *     FIRE 2–9 maanden **eerder**; het gerapporteerde doelbedrag is J op die éérdere maand
+ *     en daalt daarom (−1,8% t/m −7,3%). Met de FIRE-maand gepind op één waarde zijn bezit,
+ *     schuld én netto vermogen met de vlag AAN op elke gemeten maand gelijk of beter
+ *     (m=360: netto €6,64 mln → €6,76 mln; schuld €230k → €113k). De richting is dus
+ *     eenduidig; alleen de meet-maand verschuift.
+ *
+ * **Pre-existente kalenderdrift (NIET van deze fix — apart gemeten).** Een schone worktree op
+ * HEAD (4bbc65c0c) levert exact dezelfde waarden als deze tree met de vlag geforceerd UIT,
+ * en béide wijken al van de vorige goldens af: −0,083 à −0,167 jr en −0,5 à −1,6%. Dat
+ * bleef binnen de marges (±0,5 jr / ±2%) en viel dus niet op. Oorzaak: de persona pint de
+ * leeftijd (`COMPLEET_PINNED_AGE`) maar de life-events dragen VÁSTE `target_date`-strings
+ * (AOW '2050-01-08' e.d.), zodat de afstand tot AOW met elke verstreken kalendermaand krimpt
+ * — ~1 maand FIRE-verschuiving per maand reële tijd. Deze herijking zet die klok op nul
+ * zonder de oorzaak weg te nemen: zonder fixture-fix loopt hij over ~6 maanden opnieuw tegen
+ * de ±0,5 jr-marge. Los van gap V22; hoort op een eigen kaart.
+ *
+ * **Tolerantie-keuze (bewust, per grootheid).** Vrijheidsleeftijd: **absoluut** ±0,5 jr —
+ * een half jaar is de betekenisvolle eenheid voor een pensioendatum, ongeacht of die op 42
+ * of op 67 ligt. Doelbedrag: **relatief** ±2% — de bedragen lopen van €0,84 mln tot €5,85
+ * mln, waar een vaste euro-marge bovenaan veel te strak en onderaan veel te ruim zou zijn.
+ *
  * GENERATED:GOLDEN:START
  */
 export const EXPECTED: Record<string, ComboExpectation> = {
-  'A-include_full': { fireAgeFractional: 42.083, doelbedrag: 1102575 },
-  'A-exclude': { fireAgeFractional: 43.083, doelbedrag: 934697 },
-  'A-downsize': { fireAgeFractional: 42.667, doelbedrag: 895119 },
-  'A-reverse': { fireAgeFractional: 42.083, doelbedrag: 840670 },
-  'B-deplete': { fireAgeFractional: 42.083, doelbedrag: 1102575 },
-  'B-legacy': { fireAgeFractional: 42.083, doelbedrag: 1102575 },
-  'B-perpetual': { fireAgeFractional: 45.583, doelbedrag: 1530312 },
-  'B-pensioen': { fireAgeFractional: 67.0, doelbedrag: 5747506 },
+  'A-include_full': { fireAgeFractional: 42.083, doelbedrag: 1102623 },
+  'A-exclude': { fireAgeFractional: 42.667, doelbedrag: 895562 },
+  'A-downsize': { fireAgeFractional: 42.417, doelbedrag: 871910 },
+  'A-reverse': { fireAgeFractional: 42.083, doelbedrag: 840718 },
+  'B-deplete': { fireAgeFractional: 42.083, doelbedrag: 1102623 },
+  'B-legacy': { fireAgeFractional: 42.083, doelbedrag: 1102623 },
+  'B-perpetual': { fireAgeFractional: 45.083, doelbedrag: 1469348 },
+  'B-pensioen': { fireAgeFractional: 67.0, doelbedrag: 5846016 },
   // Groep C/D op de PERPETUAL-baseline (PERP_END) — hier discrimineren de profielen/
   // werk-varianten wél (op deplete vielen ze samen op 42,083).
-  'C-vast': { fireAgeFractional: 45.583, doelbedrag: 1530312 },
-  'C-afnemend': { fireAgeFractional: 43.167, doelbedrag: 1229674 },
-  'C-oplopend': { fireAgeFractional: 42.083, doelbedrag: 1103777 },
-  'C-guardrails': { fireAgeFractional: 47.5, doelbedrag: 1788538 },
-  'D-geen': { fireAgeFractional: 45.583, doelbedrag: 1530312 },
-  'D-groei': { fireAgeFractional: 45.417, doelbedrag: 1525573 },
-  'D-deeltijd': { fireAgeFractional: 46.417, doelbedrag: 1544750 },
-  'D-combi': { fireAgeFractional: 44.917, doelbedrag: 1516249 },
+  'C-vast': { fireAgeFractional: 45.083, doelbedrag: 1469348 },
+  'C-afnemend': { fireAgeFractional: 42.25, doelbedrag: 1121995 },
+  'C-oplopend': { fireAgeFractional: 42.083, doelbedrag: 1103825 },
+  'C-guardrails': { fireAgeFractional: 47.083, doelbedrag: 1737147 },
+  'D-geen': { fireAgeFractional: 45.083, doelbedrag: 1469348 },
+  'D-groei': { fireAgeFractional: 44.917, doelbedrag: 1458972 },
+  'D-deeltijd': { fireAgeFractional: 45.583, doelbedrag: 1472661 },
+  'D-combi': { fireAgeFractional: 44.5, doelbedrag: 1449707 },
 }
 // GENERATED:GOLDEN:END
 

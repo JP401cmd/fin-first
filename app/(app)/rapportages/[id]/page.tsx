@@ -29,6 +29,13 @@ import { MonthlyTable } from './components/monthly-table'
 import { HistoricalComparison } from './components/historical-comparison'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
+/**
+ * Hoe lang we op een uitsluitsel over de uitvoerbestemming wachten voordat we
+ * het rapport zónder inleiding ophalen. Ruim genoeg voor een trage verbinding,
+ * kort genoeg om geen eindeloze spinner te zijn.
+ */
+const RESOLVE_TIMEOUT_MS = 8000
+
 export default function ReportViewerPage() {
   const searchParams = useSearchParams()
   const { id } = useParams<{ id: string }>()
@@ -37,6 +44,7 @@ export default function ReportViewerPage() {
   const [data, setData] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [introNotice, setIntroNotice] = useState<string | null>(null)
 
   // Waar hoort de rapport-inleiding te draaien? Dit bepaalt of we het rapport
   // met `use_ai=true` mogen opvragen. FAIL-CLOSED: zolang de bestemming
@@ -44,8 +52,29 @@ export default function ReportViewerPage() {
   // alsnog een cloud-inleiding uitlokken bij iemand die privé-modus aan heeft.
   const execution = useExecutionMode('rapporten')
 
+  // ── Uitgang uit 'resolving' ───────────────────────────────────────────────
+  // `useExecutionMode` blijft PERMANENT op 'resolving' zodra de voorkeur-lezing
+  // niets bruikbaars oplevert (netwerkfout, half antwoord): het effect zet dan
+  // bewust geen state en er is geen retry. Fail-closed is daar terecht — er mag
+  // niets stilletjes naar de cloud — maar de UI had geen uitgang, dus bleef
+  // "Pagina's worden opgesteld..." eeuwig staan zonder foutmelding (S9).
+  //
+  // Deze timer geeft die uitgang zónder de belofte te breken: hij zet géén
+  // cloud-pad open, hij markeert alleen dat de bestemming onbekend blijft. De
+  // fetch hieronder gaat dan verder met `use_ai=false` — het rapport is
+  // deterministisch, dus de cijfers komen gewoon; alleen de inleiding vervalt.
+  const [resolveTimedOut, setResolveTimedOut] = useState(false)
   useEffect(() => {
-    if (execution.status === 'resolving') return
+    if (execution.status !== 'resolving') {
+      setResolveTimedOut(false)
+      return
+    }
+    const timer = setTimeout(() => setResolveTimedOut(true), RESOLVE_TIMEOUT_MS)
+    return () => clearTimeout(timer)
+  }, [execution.status])
+
+  useEffect(() => {
+    if (execution.status === 'resolving' && !resolveTimedOut) return
 
     async function fetchReport() {
       const periodType = searchParams.get('type') || 'month'
@@ -53,7 +82,10 @@ export default function ReportViewerPage() {
       const dateTo = searchParams.get('to')
       // De gebruiker kan de inleiding uitzetten (?ai=false); de privé-modus kan
       // 'm alleen naar het eigen toestel verplaatsen, nooit naar de cloud.
-      const useAi = searchParams.get('ai') !== 'false' && execution.canUseCloud
+      // Liep de bestemmings-lezing vast (zie de timer hierboven), dan gaan we
+      // door zónder inleiding — nooit mét.
+      const useAi =
+        searchParams.get('ai') !== 'false' && execution.canUseCloud && !resolveTimedOut
 
       if (!dateFrom || !dateTo) {
         setError('Geen datumbereik opgegeven')
@@ -61,16 +93,39 @@ export default function ReportViewerPage() {
         return
       }
 
+      const buildUrl = (ai: boolean) => {
+        let url = `/api/report?period_type=${periodType}&date_from=${dateFrom}&date_to=${dateTo}&use_ai=${ai}`
+        if (configId) url += `&config_id=${configId}`
+        return url
+      }
+
       try {
-        let url = `/api/report?period_type=${periodType}&date_from=${dateFrom}&date_to=${dateTo}&use_ai=${useAi}`
-        if (configId) {
-          url += `&config_id=${configId}`
+        let res = await fetch(buildUrl(useAi))
+
+        // ── Betaalmuur op de INLEIDING, niet op het rapport ──────────────────
+        // Een editie die ooit mét AI-inleiding is opgeslagen wordt met `ai=true`
+        // geopend. Is de AI-add-on er (nog) niet, dan gaf dat een kale 403 op de
+        // hele pagina: "Rapport niet beschikbaar" voor cijfers die volledig
+        // deterministisch zijn en waar geen model aan te pas komt. We halen 'm
+        // dan opnieuw op zónder inleiding en zeggen erbij wat er ontbreekt —
+        // dezelfde redenering als de privé-modus-degradatie in de route zelf.
+        if (res.status === 403 && useAi) {
+          const gate = await res.json().catch(() => null)
+          const retry = await fetch(buildUrl(false))
+          if (retry.ok) {
+            setData((await retry.json()) as ReportData)
+            setIntroNotice(
+              (gate as { error?: string } | null)?.error ??
+                'De AI-inleiding is niet beschikbaar; je rapport staat er verder volledig.',
+            )
+            return
+          }
+          res = retry
         }
 
-        const res = await fetch(url)
         if (!res.ok) {
-          const err = await res.json()
-          throw new Error(err.error || 'Rapport laden mislukt')
+          const err = await res.json().catch(() => null)
+          throw new Error((err as { error?: string } | null)?.error || 'Rapport laden mislukt')
         }
         const reportData: ReportData = await res.json()
         setData(reportData)
@@ -82,7 +137,7 @@ export default function ReportViewerPage() {
     }
 
     fetchReport()
-  }, [searchParams, configId, execution.status, execution.canUseCloud])
+  }, [searchParams, configId, execution.status, execution.canUseCloud, resolveTimedOut])
 
   // ── Lokale inleiding (progressive enhancement) ────────────────────────────
   // Draait 'rapporten' lokaal, dan levert de route geen inleiding en schrijft de
@@ -149,6 +204,18 @@ export default function ReportViewerPage() {
       <PrintToolbar pending={localIntro.pending} />
 
       <ReportMasthead data={data} />
+
+      {/* Duiding in plaats van een dichte deur: het rapport is er wél, alleen
+          de inleiding niet. Bewust géén print-onderdeel — het is een melding
+          over dit scherm, niet over het document. */}
+      {introNotice && (
+        <p
+          role="status"
+          className="mt-4 border-l-2 border-[var(--border-ed)] bg-[var(--subtle)] px-3 py-2 font-inter text-[13px] leading-snug text-[var(--ink-2)] print:hidden"
+        >
+          {introNotice}
+        </p>
+      )}
 
       {/* APP-7-opt-out: een rapportage is een gegenereerd (print)document —
           het mag nooit cijfers verliezen door de weergavemodus van het scherm. */}

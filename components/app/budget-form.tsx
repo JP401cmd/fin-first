@@ -513,7 +513,7 @@ export function BudgetForm({
 
           <header className="mb-8 space-y-2">
             <Kicker>{budget ? 'Bewerken' : 'Nieuw'} · Budget</Kicker>
-            <EditorialHeadline level="h1" emphasis={budget ? 'bewerken' : 'budget'} size="lg">
+            <EditorialHeadline level="h2" emphasis={budget ? 'bewerken' : 'budget'} size="lg">
               {budget ? `Budget ${form.name || 'bewerken'} bewerken` : 'Een nieuw budget'}
             </EditorialHeadline>
           </header>

@@ -63,7 +63,20 @@ const CHAT_GROUP: AiExecutionGroup = 'gesprek'
 
 const OTHER_GROUPS = AI_EXECUTION_GROUPS.filter((g) => g.id !== CHAT_GROUP)
 
-export function ChatSettingsPopover({ onChanged }: { onChanged?: () => void }) {
+export function ChatSettingsPopover({
+  onChanged,
+  onOpenChange,
+}: {
+  onChanged?: () => void
+  /**
+   * Meldt de open/dicht-stand aan de ouder. ChatPanel gebruikt dit alleen om
+   * Escape aan het juiste oppervlak toe te wijzen (M27): staat dit menu open,
+   * dan sluit Escape het menu en niet het hele gesprek. Beide listeners hangen
+   * aan `document` en kunnen elkaar niet stoppen, dus de panel-kant moet weten
+   * dat hij zich moet terugtrekken.
+   */
+  onOpenChange?: (open: boolean) => void
+}) {
   const [open, setOpen] = useState(false)
   const [modes, setModes] = useState<Record<AiExecutionGroup, AiExecutionMode> | null>(null)
   const [saving, setSaving] = useState<AiExecutionGroup | null>(null)
@@ -75,6 +88,14 @@ export function ChatSettingsPopover({ onChanged }: { onChanged?: () => void }) {
   const [cached, setCached] = useState<Record<string, boolean>>({})
 
   const wrapRef = useRef<HTMLDivElement>(null)
+
+  // De ouder mee laten weten of dit menu openstaat (zie `onOpenChange`). De
+  // cleanup meldt 'dicht' bij unmount, zodat een verdwenen popover geen
+  // Escape-blokkade achterlaat in ChatPanel.
+  useEffect(() => {
+    onOpenChange?.(open)
+    return () => onOpenChange?.(false)
+  }, [open, onOpenChange])
 
   // Sluiten bij een klik buiten de popover en bij Escape — het gedrag dat een
   // gebruiker van een menu verwacht, zonder er een modal van te maken.

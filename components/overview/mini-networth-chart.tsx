@@ -561,7 +561,7 @@ function MiniNetWorthChartComponent({
     <div className="flex flex-col rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-4 transition-all h-full">
       <header className="mb-2 flex items-baseline justify-between gap-3">
         {/* Géén euro-weergave-badge meer hier. De weergave-status hangt sinds
-            aug 2026 app-breed bovenaan de sidebar (`SidebarEuroViewBadge`) en de
+            aug 2026 app-breed bovenaan de sidebar (`EuroViewBadge`) en de
             schakelaar in het zoekscherm (⌘K) — één statusplek en één knop, in
             plaats van een badge per grafiek. Zie ADR 0094. */}
         <span className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">

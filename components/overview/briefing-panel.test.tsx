@@ -335,9 +335,57 @@ describe('BriefingPanel — wekelijkse-briefing header + ververs', () => {
     expect((btn as HTMLButtonElement).disabled).toBe(false)
   })
 
-  it('toont geen Ververs-knop wanneer canRefresh false en nog niet gebruikt (AI-abonnee)', () => {
+  // ── L9: de Ververs-knop mag niet verdwijnen na een remount ────────
+  //
+  // BEWUST HERZIEN (besluit eigenaar 26-08-2026). Deze test heette eerder
+  // "toont geen Ververs-knop wanneer canRefresh false en nog niet gebruikt" en
+  // was groen — maar hij legde het DEFECT vast als verwacht gedrag. `canRefresh`
+  // is namelijk ook false in een weergave waar de ververs simpelweg niet van
+  // toepassing is, dus die ene boolean kon "niet van toepassing" en "vandaag al
+  // gebruikt" niet uit elkaar houden. De knop overleefde daardoor alleen via de
+  // ephemere `usedToday`-clientstate, die bij elke remount (F5, nieuwe tab,
+  // later dezelfde dag) terugvalt naar false.
+  //
+  // De twee gevallen staan nu naast elkaar: zonder reden blijft de knop terecht
+  // weg, met 'used_today' blijft hij staan — uitgeschakeld, met uitleg.
+
+  it('toont geen Ververs-knop wanneer de ververs niet van toepassing is (geen reden)', () => {
     renderWithSubs(<BriefingPanel entries={[makeEntry('observation', 'X')]} />, ['ai'])
     expect(screen.queryByRole('button', { name: /ververs/i })).toBeNull()
+  })
+
+  it('houdt de knop na een remount zichtbaar-maar-uit bij refreshState "used_today"', () => {
+    // Exact de post-reload-toestand: de server zegt "vandaag al ververst"
+    // (canRefresh blijft false) en de ephemere clientstate is weg (verse mount).
+    renderWithSubs(
+      <BriefingPanel entries={[makeEntry('observation', 'X')]} refreshState="used_today" />,
+      ['ai'],
+    )
+    const btn = screen.getByRole('button', { name: /vandaag al gebruikt, morgen weer/i })
+    expect((btn as HTMLButtonElement).disabled).toBe(true)
+    expect(btn.getAttribute('title')).toMatch(/vandaag al ververst/i)
+  })
+
+  it('een actieve ververs blijft mogelijk zolang de server "available" zegt', () => {
+    renderWithSubs(
+      <BriefingPanel
+        entries={[makeEntry('observation', 'X')]}
+        canRefresh
+        refreshState="available"
+      />,
+      ['ai'],
+    )
+    const btn = screen.getByRole('button', { name: /ververs je briefing/i })
+    expect((btn as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('zonder AI-abonnement toont "used_today" de upsell, niet de POST-knop', () => {
+    renderWithSubs(
+      <BriefingPanel entries={[makeEntry('observation', 'X')]} refreshState="used_today" />,
+      [],
+    )
+    expect(screen.queryByRole('button', { name: /ververs je briefing/i })).toBeNull()
+    expect(screen.getByRole('link', { name: /AI-abonnement/i })).toBeTruthy()
   })
 })
 

@@ -70,7 +70,7 @@ export function PageMiniHero({
   return (
     <header className={`space-y-3 ${className}`}>
       <Kicker>{kicker}</Kicker>
-      <EditorialHeadline level="h1" emphasis={emphasis} size="lg">
+      <EditorialHeadline level="h2" emphasis={emphasis} size="lg">
         {title}
       </EditorialHeadline>
       {figures && figures.length > 0 && (
@@ -105,7 +105,7 @@ export function PageDetailHeader({
   return (
     <header className={`space-y-2 ${className}`}>
       <Kicker>{kicker}</Kicker>
-      <EditorialHeadline level="h1" emphasis={emphasis} size="lg">
+      <EditorialHeadline level="h2" emphasis={emphasis} size="lg">
         {title}
       </EditorialHeadline>
       {amount && (

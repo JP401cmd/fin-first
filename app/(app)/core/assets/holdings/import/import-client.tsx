@@ -712,7 +712,7 @@ export default function HoldingsImportClient({ targets }: HoldingsImportClientPr
       {/* Page header — editorial blueprint */}
       <header className="mb-8 space-y-2">
         <Kicker>Holdings · Importeren</Kicker>
-        <EditorialHeadline level="h1" emphasis="importeren" size="lg">
+        <EditorialHeadline level="h2" emphasis="importeren" size="lg">
           CSV importeren
         </EditorialHeadline>
         <EditorialDeck>

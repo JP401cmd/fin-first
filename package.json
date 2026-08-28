@@ -23,6 +23,8 @@
     "check:client-reads": "node scripts/check-client-data-reads.mjs",
     "check:freedom-basis": "node scripts/check-freedom-time-basis.mjs",
     "check:overlays": "node scripts/check-overlay-standard.mjs",
+    "check:tap-targets": "node scripts/check-tap-targets.mjs",
+    "check:headings": "node scripts/check-heading-levels.mjs",
     "uat:stale": "node scripts/uat/stale-scan.mjs",
     "litert:check": "node scripts/litert/release-check.mjs",
     "herstelproef:check": "node --env-file=.env.local scripts/herstelproef-check.mjs",

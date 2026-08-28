@@ -293,7 +293,7 @@ export default function RevaluePage() {
       {/* Header — editorial blueprint */}
       <header className="mb-6 space-y-2">
         <Kicker>Bezittingen · Herwaarderen</Kicker>
-        <EditorialHeadline level="h1" emphasis="herwaarderen" size="lg">
+        <EditorialHeadline level="h2" emphasis="herwaarderen" size="lg">
           Assets herwaarderen
         </EditorialHeadline>
         <EditorialDeck>

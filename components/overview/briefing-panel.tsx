@@ -61,9 +61,11 @@ import type { FreedomCardData } from '@/components/app/freedom-card'
 // Datacontracten wonen nu in lib/types/briefing.ts (import-richting UI→lib).
 import type {
   BriefingCategory, BriefingSpan, HefboomTag, BriefingEntry, BriefingWeekHistoryItem,
+  BriefingRefreshState,
 } from '@/lib/types/briefing'
 export type {
   BriefingCategory, BriefingSpan, HefboomTag, BriefingEntry, BriefingWeekHistoryItem,
+  BriefingRefreshState,
 }
 
 const CATEGORY_CONFIG: Record<
@@ -153,6 +155,7 @@ export function BriefingPanel({
   refreshedAt,
   dataChanged = false,
   canRefresh = false,
+  refreshState = 'available',
   freedomHero,
   headline,
   weekHistory,
@@ -167,6 +170,19 @@ export function BriefingPanel({
   dataChanged?: boolean
   /** Of de handmatige ververs vandaag nog beschikbaar is (max 1×/dag). */
   canRefresh?: boolean
+  /**
+   * L9 — WAAROM de ververs niet beschikbaar is, server-bepaald.
+   *
+   * `canRefresh` alleen was niet genoeg: die is óók false in een weergave waar
+   * de ververs helemaal niet van toepassing is. De knop bleef daardoor alleen
+   * zichtbaar via de EPHEMERE `usedToday`-clientstate, die bij elke remount
+   * (F5, nieuwe tab, later dezelfde dag) terugvalt naar false — en dan verdween
+   * de hele affordance: geen knop, geen tooltip, geen uitleg. Met
+   * `refreshState === 'used_today'` blijft de uitgeschakelde knop mét reden
+   * staan, ook na een remount. Default 'available' → gedrag ongewijzigd voor
+   * elke call site die dit (nog) niet meegeeft.
+   */
+  refreshState?: BriefingRefreshState
   /** Vrijheidstijd-hero bovenaan (week-over-week delta). Optioneel. */
   freedomHero?: FreedomHeroProps | null
   /** Eén-zin kop onder de titel (deterministisch of AI bij ververs). */
@@ -253,6 +269,10 @@ export function BriefingPanel({
 
   const shownRefreshedAt = override?.refreshedAt ?? refreshedAt ?? null
   const shownHeadline = override?.headline ?? headline ?? null
+  // L9: de server zegt dat de dagbeurt op is. Dit houdt de knop ZICHTBAAR
+  // (uitgeschakeld, met reden) over remounts heen; `refreshable` blijft false,
+  // dus er kan niets extra's vertrekken.
+  const serverUsedToday = refreshState === 'used_today'
   const refreshable = canRefresh && !usedToday && !refreshing && execReady
 
   async function handleShare() {
@@ -412,7 +432,7 @@ export function BriefingPanel({
         dataChanged={dataChanged && !override}
         refreshable={refreshable}
         refreshing={refreshing}
-        showRefresh={canRefresh || usedToday}
+        showRefresh={canRefresh || usedToday || serverUsedToday}
         hasAi={hasAi}
         // Waarom de knop uit staat is niet altijd "vandaag al gebruikt": zolang
         // we niet weten waar de AI draait (of het toestel het niet kan) mag er

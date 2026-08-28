@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { JaarruimteCard } from './jaarruimte-card'
+import { computeJaarruimte, JAARRUIMTE_FRANCHISE_2025 } from '@/lib/jaarruimte'
+
+/** De DOM-tekst draagt punt-duizendtallen; die zijn regex-metatekens. */
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
 
 describe('JaarruimteCard — render (default 2026)', () => {
   it('toont empty-CTA wanneer grossYearlyIncome = 0', () => {
@@ -39,18 +45,35 @@ describe('JaarruimteCard — render (default 2026)', () => {
     expect(screen.getByText(/≈ 46% effectief/)).toBeTruthy()
   })
 
-  it('toont formule-disclaimer met 2026-waarden in footer', () => {
-    render(<JaarruimteCard grossYearlyIncome={50_000} />)
-    expect(screen.getByText(/30%/)).toBeTruthy()
-    expect(screen.getByText(/19\.172/)).toBeTruthy()
-    expect(screen.getByText(/35\.589/)).toBeTruthy()
+  // S12 — BEWUST HERZIEN (eigenaarsbesluit 26-08-2026). Deze test hing aan de
+  // voetalinea die de formule uit `JaarruimteUitleg` letterlijk dupliceerde.
+  // De rekensom staat nu nog op precies één plek (het uitlegblok direct boven
+  // deze kaart, op de enige pagina die 'm gebruikt). Wat de kaart moet blijven
+  // dragen is de Wft-regel — die assertie is hier de vervanging, plus het
+  // negatieve bewijs dat de dubbeling weg is.
+  it('draagt de Wft-regel maar niet langer de gedupliceerde formule (S12)', () => {
+    const { container } = render(<JaarruimteCard grossYearlyIncome={50_000} />)
+    expect(screen.getByText(/Indicatie, geen advies/i)).toBeTruthy()
+    const tekst = container.textContent ?? ''
+    expect(tekst).not.toMatch(/×\s*\(inkomen/)
+    expect(tekst).not.toMatch(/19\.172/)
+    expect(tekst).not.toMatch(/35\.589/)
+    expect(tekst).not.toMatch(/gepubliceerde referentiewaarde/)
   })
 
-  it('respecteert expliciet jaar 2025', () => {
+  // S12 — BEWUST HERZIEN. De 18.475-assertie hing uitsluitend aan diezelfde
+  // voetalinea. Vervangen door een STERKERE pin: de gerenderde headline wordt
+  // vergeleken met de canonieke engine-uitvoer voor exact deze invoer, zodat
+  // weergave-drift (verkeerd jaar, verkeerde franchise) zichtbaar wordt in
+  // plaats van alleen "er staat een getal".
+  it('respecteert expliciet jaar 2025 (gepind op computeJaarruimte)', () => {
+    const verwacht = computeJaarruimte(50_000, 0, { year: 2025 })
+    expect(verwacht.franchise).toBe(JAARRUIMTE_FRANCHISE_2025)
     render(<JaarruimteCard grossYearlyIncome={50_000} year={2025} />)
-    // €9.458 onbenut (30% × (50000 − 18475), 2025-franchise) — headline + slider.
-    expect(screen.getAllByText(/€\s*9\.458/).length).toBeGreaterThan(0)
-    expect(screen.getByText(/18\.475/)).toBeTruthy()
+    const cijfers = new Intl.NumberFormat('nl-NL').format(verwacht.jaarruimte)
+    expect(
+      screen.getAllByText(new RegExp(`€\\s*${escapeRegExp(cijfers)}`)).length,
+    ).toBeGreaterThan(0)
   })
 })
 

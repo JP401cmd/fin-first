@@ -4,7 +4,7 @@ import { memo, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
-import type { WidgetSize } from '@/lib/widget-catalog'
+import { BUDGET_HEATMAP_HREF, type WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
 import { BudgetHeatmap, type HeatmapSection } from '@/components/app/budget-heatmap'
 import { LayoutGrid } from 'lucide-react'
@@ -98,6 +98,14 @@ export const BudgetHeatmapWidget = memo(function BudgetHeatmapWidget({ size, dat
     router.push(`/overzicht/cashflow/budget?budget=${budgetId}`)
   }, [router])
 
+  // M17: uitweg onder de compacte mobiele lijst (quarter/half) — de schermbrede
+  // heatmap. `?weergave=heatmap` dwingt de weergavekeuze af, zodat je op de
+  // heatmap landt en niet op de boom-view die de gebruiker toevallig als laatste
+  // koos (die keuze staat in localStorage, niet in de URL).
+  const handleShowAll = useCallback(() => {
+    router.push(BUDGET_HEATMAP_HREF)
+  }, [router])
+
   if (sections.length === 0 || sections[0].groups.length === 0) {
     return (
       <WidgetShell module="kern" size={size} kicker="Uitgaven Heatmap" href={href}>
@@ -131,6 +139,7 @@ export const BudgetHeatmapWidget = memo(function BudgetHeatmapWidget({ size, dat
           beschikbaarMap={data.heatmapBeschikbaarMap}
           previousSpending={data.heatmapPreviousSpending}
           size={size}
+          onShowAll={handleShowAll}
         />
       </div>
     </WidgetShell>

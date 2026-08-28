@@ -136,7 +136,9 @@ const ALLOWLIST = new Set([
   // — Fase b, slice 6: beheer / rapportages / onboarding / checkin / overig —
   'app/(app)/beheer/integraties/integraties-shell.tsx',
   'app/(app)/beheer/testdata/page.tsx',
-  'app/(app)/rapportages/page.tsx',
+  // 'app/(app)/rapportages/page.tsx' — GERETIREERD (S9, 28 aug 2026): de hub is
+  // een serverpagina met `lib/rapportages-data-loader.ts`; er wordt niets meer
+  // client-direct gelezen.
   'app/(app)/core/checkin/page.tsx',
   'app/(onboarding)/onboarding/page.tsx',
   'components/app/module-activation-modal.tsx',

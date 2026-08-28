@@ -151,6 +151,23 @@ describe('parseWelcomeGuideState', () => {
     const st = parseWelcomeGuideState({ status: 'dismissed' }, DEFAULT_WELCOME_GUIDE)
     expect(st.status).toBe('dismissed')
   })
+
+  // S13 — `minimized` is ná de eerste rijen aan het staatstype toegevoegd. Elke
+  // bestaande jsonb-rij mist het veld; die moet uitgeklapt terugkomen, niet
+  // één keer stil ingeklapt (er is geen migratie die dit rechtzet).
+  it('minimized ontbreekt in oude rijen → false (uitgeklapt)', () => {
+    expect(parseWelcomeGuideState({}, DEFAULT_WELCOME_GUIDE).minimized).toBe(false)
+    expect(parseWelcomeGuideState(null, DEFAULT_WELCOME_GUIDE).minimized).toBe(false)
+    expect(
+      parseWelcomeGuideState({ minimized: 'ja' }, DEFAULT_WELCOME_GUIDE).minimized,
+    ).toBe(false)
+  })
+
+  it('leest minimized terug — los van dismissed (heropenbaar vs. voorgoed weg)', () => {
+    const st = parseWelcomeGuideState({ minimized: true }, DEFAULT_WELCOME_GUIDE)
+    expect(st.minimized).toBe(true)
+    expect(st.status).toBe('active')
+  })
 })
 
 describe('getVisibleScreens & hasMoreScreens', () => {

@@ -38,6 +38,14 @@ export const SUBSCRIPTION_BENCHMARK = {
 export const VASTE_LASTEN_BENCHMARK_COPY = {
   nibud:
     'Het Nibud houdt als vuistregel aan dat je vaste lasten bij voorkeur onder de helft van je netto-inkomen blijven. Boven ongeveer 70% wordt je begroting kwetsbaar: er blijft weinig ruimte om te sparen of tegenvallers op te vangen.',
+  /**
+   * Ingekorte variant voor de oordeelregel in de weergavemodus "Eenvoudig"
+   * (S2). Zelfde bewering, één zin — bewust GEEN handelingsadvies: de handeling
+   * ("loop je abonnementen langs") staat in de status-melding
+   * (`lib/page-status/copy.ts`), zodat deck en melding elkaar niet herhalen.
+   */
+  nibudKort:
+    'Het Nibud houdt als vuistregel aan dat vaste lasten bij voorkeur onder de helft van je netto-inkomen blijven.',
   fiftyThirtyTwenty:
     'In de bekende 50/30/20-regel vallen je vaste lasten onder de "50% noodzakelijke uitgaven" — de andere helft is voor wensen (30%) en vrijheid opbouwen (20%).',
 } as const

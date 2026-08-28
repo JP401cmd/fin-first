@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { MaskedAmount } from '@/components/app/masked-amount'
-import type { FlowSummary } from '@/lib/transaction-insights'
+import type { FlowDescription, FlowSummary } from '@/lib/transaction-insights'
 
 /**
  * GeldstroomGauge — compacte halfronde naald-meter voor de **spaarquote**,
@@ -65,7 +65,26 @@ function savingsRateLabel(rate: number): string {
   return 'laag'
 }
 
-export function GeldstroomGauge({ summary }: { summary: FlowSummary }) {
+export function GeldstroomGauge({
+  summary,
+  windowLabel,
+}: {
+  summary: FlowSummary
+  /**
+   * Het venster waarover deze meter leest — "augustus tot nu toe", "juli 2026".
+   * Rendert als onderschrift onder de leeswaarde (S3).
+   *
+   * WAAROM DIT ERBIJ MOET. De status-melding bovenaan deze route draait op de
+   * GEREALISEERDE kalendermaand, deze meter op het gekozen periodevenster
+   * (standaard 30 dagen rollend). Die twee kunnen elkaar op hetzelfde scherm
+   * tegenspreken — melding "tekort deze maand", meter +22% — en alleen de
+   * melding benoemde haar venster. Op de cashflow-hub is dat al opgelost met
+   * `kpiWindow` (CF-3); dit is dezelfde ingreep hier. Het label komt uit
+   * `flowWindowLabel`, dat voor de lopende maand `currentMonthWindowLabel`
+   * hergebruikt — één formulering, geen drift tussen hub en detailpagina.
+   */
+  windowLabel?: string
+}) {
   const { income, expense, net, savingsRate } = summary
 
   // Naald: spaarquote geclampt op [−100, +100] → fractie 0..1 (−100=links, +100=rechts).
@@ -169,6 +188,11 @@ export function GeldstroomGauge({ summary }: { summary: FlowSummary }) {
           >
             spaarquote · {savingsRateLabel(savingsRate)}
           </div>
+          {windowLabel && (
+            <div className="mt-0.5 text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">
+              {windowLabel}
+            </div>
+          )}
         </div>
       </div>
 
@@ -183,6 +207,121 @@ export function GeldstroomGauge({ summary }: { summary: FlowSummary }) {
         </KpiCell>
         <KpiCell label="Saldo" tone={net >= 0 ? 'positive' : 'negative'}>
           <MaskedAmount value={net} tone="inherit" decimals signPrefix={net > 0 ? '+' : ''} />
+        </KpiCell>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * GeldstroomZin — wat de `GeldstroomGauge` toont, maar dan als zin. De
+ * Eenvoudig-tegenhanger van de meter (S3, release R5: *duiding boven
+ * reductie*).
+ *
+ * WAAROM EEN ZUSJE EN GEEN VARIANT-PROP: de meter blijft daarmee zuiver
+ * presentational en de modus-keuze staat op de call-site, zichtbaar naast de
+ * andere modus-keuzes van die pagina. Zelfde patroon als CF-3 op de
+ * cashflow-hub.
+ *
+ * De 3-up Inkomen/Uitgaven/Saldo-strip eronder is LETTERLIJK dezelfde als in de
+ * meter (zelfde `KpiCell`): Eenvoudig verliest de naald, niet de cijfers.
+ *
+ * ── Wat deze zinnen wel en niet doen ────────────────────────────────────────
+ * WAARNEMING, GEEN VOORSPELLING. "Er is nog niets binnengekomen" beschrijft wat
+ * er in de data staat. Er staat nergens dat er nog salaris kómt — die projectie
+ * bestaat niet in de app, en beloven wat je niet kunt waarmaken is precies wat
+ * de Wft-grens verbiedt.
+ *
+ * GEEN OORDEEL OVER EEN HALVE PERIODE. Zolang het venster loopt toont deze zin
+ * géén spaarquote: een quote over een halve maand (vaste lasten er al af,
+ * salaris nog niet binnen) is het valse oordeel waar deze kaart om begon. Bij
+ * een afgesloten venster mag het cijfer wél — daar is het een eindstand.
+ *
+ * GEEN TIJD-METAFOOR. Bewust geen "€X = Y dagen vrijheid" aan deze zin: dat is
+ * een tweede tijdvertaling bovenop een uitgaven-dagtarief, en dat is precies
+ * bevinding C5. De vrijheidstijd-vertaling van deze pagina hoort elders.
+ *
+ * PRIVACY: elk bedrag loopt door `<MaskedAmount>`. Daarom levert `describeFlow`
+ * getallen en geen kant-en-klare string — een `formatCurrency` in platte tekst
+ * zou dwars door de privacy-modus heen lekken.
+ */
+export function GeldstroomZin({
+  description,
+  summary,
+}: {
+  description: FlowDescription
+  summary: FlowSummary
+}) {
+  const { kind, windowLabel, income, expense, net, savingsRate, prevIncome } = description
+
+  // De lege staat heeft zijn eigen regel op de call-site (ongewijzigd), zodat
+  // beide modi daar hetzelfde zeggen.
+  if (kind === 'empty') return null
+
+  const bedrag = (value: number, tone: 'positive' | 'negative' | 'ink' = 'ink') => (
+    <MaskedAmount
+      value={value}
+      tone="inherit"
+      className={
+        tone === 'positive'
+          ? 'font-medium text-[var(--color-income-700)]'
+          : tone === 'negative'
+            ? 'font-medium text-[var(--color-expense-600)]'
+            : 'font-medium text-[var(--ink)]'
+      }
+    />
+  )
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm leading-relaxed text-[var(--ink-2)]">
+        <span className="text-[var(--ink-3)]">{windowLabel}: </span>
+        {kind === 'no-income-yet' ? (
+          <>
+            {bedrag(expense, 'negative')} uitgegeven. Er is nog niets binnengekomen.
+            {prevIncome != null && (
+              <> Vorige periode kwam er {bedrag(prevIncome, 'positive')} binnen.</>
+            )}
+          </>
+        ) : kind === 'running' ? (
+          <>
+            {bedrag(income, 'positive')} binnen, {bedrag(expense, 'negative')} uit —{' '}
+            {net >= 0 ? (
+              <>{bedrag(net, 'positive')} over.</>
+            ) : (
+              <>{bedrag(Math.abs(net), 'negative')} meer uit dan in.</>
+            )}{' '}
+            Deze periode loopt nog.
+          </>
+        ) : (
+          <>
+            {bedrag(income, 'positive')} binnen, {bedrag(expense, 'negative')} uit —{' '}
+            {net >= 0 ? (
+              <>je hield {bedrag(net, 'positive')} over.</>
+            ) : (
+              <>je gaf {bedrag(Math.abs(net), 'negative')} meer uit dan er binnenkwam.</>
+            )}
+            {savingsRate != null && net >= 0 && (
+              <> Dat is {savingsRate}% van wat er binnenkwam.</>
+            )}
+          </>
+        )}
+      </p>
+
+      <div className="grid grid-cols-3 border-t border-b border-[var(--border-ed)] text-center">
+        <KpiCell label="Inkomen" tone="positive">
+          <MaskedAmount value={summary.income} tone="inherit" decimals />
+        </KpiCell>
+        <KpiCell label="Uitgaven" tone="negative">
+          <MaskedAmount value={summary.expense} tone="inherit" decimals />
+        </KpiCell>
+        <KpiCell label="Saldo" tone={summary.net >= 0 ? 'positive' : 'negative'}>
+          <MaskedAmount
+            value={summary.net}
+            tone="inherit"
+            decimals
+            signPrefix={summary.net > 0 ? '+' : ''}
+          />
         </KpiCell>
       </div>
     </div>

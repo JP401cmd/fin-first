@@ -154,7 +154,12 @@ export function DoelBewerkenSheet({
   return (
     <>
     <ShellOverlay
-      open
+      // Eén venster tegelijk (M35): zodra "Volledig bewerken" openstaat, sluit
+      // de quick-update-sheet. Vroeger bleef hij open en stapelden twee sheets
+      // op elkaar — dat brak de focus-afhandeling en week af van de
+      // één-overlay-regel (ADR 0039). Sluit de gebruiker GoalForm, dan komt
+      // deze sheet weer terug (`fullEditOpen` → false).
+      open={!fullEditOpen}
       onClose={onClose}
       kind="sheet"
       size="md"
@@ -367,7 +372,8 @@ export function DoelBewerkenSheet({
       </form>
     </ShellOverlay>
 
-      {/* GoalForm sheet — verschijnt boven de quick-update dialog. BEWUST
+      {/* GoalForm sheet — vervángt de quick-update dialog (die staat op
+          `open={!fullEditOpen}`), hij stapelt er niet meer bovenop. BEWUST
           buiten de backdrop-<div onClick={onClose}> gerenderd: GoalForm is
           geen kind van de quick-update <form> (die stopPropagation doet),
           dus binnen de backdrop zou élke klik in GoalForm naar onClose

@@ -118,6 +118,23 @@ export interface VasteLastenInsights {
   /** De variabele posten, aflopend op maandbedrag (gecapt op 6 voor de lijst). */
   variabelItems: { id: string; name: string; monthlyAmount: number }[]
 
+  /**
+   * TOP-5 GROOTSTE POSTEN (S2) — abonnementen én overige vaste kosten door
+   * elkaar, aflopend op maandbedrag, gecapt op 5. Dit is een SORT + SLICE over
+   * de al afgeleide items: exact dezelfde klasse als `largestOf()` en
+   * `buildComposition()` hierboven, géén nieuw rekenpad en geen tweede
+   * grondslag. `terugkerendVariabel` blijft er bewust BUITEN — die posten staan
+   * ook buiten `totalMonthly`, de quote en de status (H14), dus ze horen niet in
+   * een lijst die "je grootste vaste lasten" heet.
+   */
+  topItems: {
+    id: string
+    name: string
+    monthlyAmount: number
+    category: RecurringCategory
+    categoryLabel: string
+  }[]
+
   /** Samenstelling per categorie, aflopend op maandbedrag. */
   composition: CategoryComposition[]
   /** Grootste losse post (naam + bedrag) — bruikbaar als opzeg-suggestie. */
@@ -249,6 +266,18 @@ export function buildVasteLastenInsights(params: {
 
   const largestSub = largestOf(summary.subscriptions)
 
+  // Top-5 — sort + slice over de al afgeleide posten (zie `topItems` hierboven).
+  const topItems = [...summary.subscriptions, ...summary.vasteKosten]
+    .sort((a, b) => b.monthlyAmount - a.monthlyAmount)
+    .slice(0, 5)
+    .map((i) => ({
+      id: i.id,
+      name: i.name,
+      monthlyAmount: roundCents(i.monthlyAmount),
+      category: i.category,
+      categoryLabel: i.categoryLabel,
+    }))
+
   // Variabele groep — puur doorgeven/sorteren, geen eigen som van een kerngetal.
   const variabelItems = [...summary.terugkerendVariabel]
     .sort((a, b) => b.monthlyAmount - a.monthlyAmount)
@@ -293,6 +322,7 @@ export function buildVasteLastenInsights(params: {
     variabelCount: summary.terugkerendVariabel.length,
     variabelItems,
 
+    topItems,
     composition,
     largestItem: largestOf([...summary.subscriptions, ...summary.vasteKosten]),
     largestSubscription: largestSub

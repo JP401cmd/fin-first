@@ -105,26 +105,43 @@ describe('TransactiesAnalyse — actie-rij (Volledig)', () => {
   })
 })
 
-describe('TransactiesAnalyse — actie-rij (Eenvoudig, TXN-1)', () => {
-  it('haalt importeren en bank koppelen uit de rij', () => {
-    renderAnalyse('simple')
-    expect(screen.queryByText('Importeer transacties')).not.toBeInTheDocument()
-    expect(screen.queryByText('Bank koppelen')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Meer acties' })).toBeInTheDocument()
+/**
+ * TXN-1 is op 28 aug 2026 OMGEKEERD (M40, besluit eigenaar 26 aug). De oude
+ * versie van dit blok pinde het tegenovergestelde: importeren en bank koppelen
+ * uit de rij, achter het "…"-menu. Dat besluit (9 aug 2026) ging ervan uit dat
+ * die twee zeldzame beheer-acties zijn; M40 stelt vast dat het juist de twee
+ * vul-routes zijn die een beginner — per default in Eenvoudig — nodig heeft,
+ * terwijl de KoppelRekeningBanner alleen de 0-rekeningen-stand dekt. Het
+ * herschrijven van deze asserties is dus de bedoelde uitkomst, geen regressie;
+ * de audit-regel TXN-1 in docs/eenvoudige-weergave-audit.md is meegedraaid.
+ */
+describe('TransactiesAnalyse — actie-rij (Eenvoudig, TXN-1 herzien via M40)', () => {
+  it('houdt importeren en bank koppelen in de rij', () => {
+    const { container } = renderAnalyse('simple')
+    expect(screen.getByText('Importeer transacties')).toBeInTheDocument()
+    expect(screen.getByText('Bank koppelen')).toBeInTheDocument()
+    const links = Array.from(container.querySelectorAll('a')).map((a) => a.getAttribute('href'))
+    expect(links).toContain('/core/cash/import')
+    expect(links).toContain('/core/cash/connect')
   })
 
-  it('houdt beide acties bereikbaar achter het "…"-menu, met dezelfde hrefs', () => {
+  it('haalt "Zoeken en bulkbewerken" uit de rij en zet het achter het "…"-menu', () => {
     renderAnalyse('simple')
+    expect(screen.queryByText('Zoeken en bulkbewerken')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Meer acties' }))
 
     const menu = screen.getByRole('dialog')
-    const links = within(menu).getAllByRole('link')
-    expect(links.map((a) => a.getAttribute('href'))).toEqual([
-      '/core/cash/import',
-      '/core/cash/connect',
-    ])
-    expect(within(menu).getByText('Importeer transacties')).toBeInTheDocument()
-    expect(within(menu).getByText('Bank koppelen')).toBeInTheDocument()
+    expect(within(menu).getByText('Zoeken en bulkbewerken')).toBeInTheDocument()
+  })
+
+  it('zet géén vul-route meer in het "…"-menu', () => {
+    renderAnalyse('simple')
+    fireEvent.click(screen.getByRole('button', { name: 'Meer acties' }))
+
+    const menu = screen.getByRole('dialog')
+    expect(within(menu).queryAllByRole('link')).toHaveLength(0)
+    expect(within(menu).queryByText('Importeer transacties')).not.toBeInTheDocument()
+    expect(within(menu).queryByText('Bank koppelen')).not.toBeInTheDocument()
   })
 })

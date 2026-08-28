@@ -2,6 +2,7 @@
 
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import type { CashflowSectionScalars } from '@/lib/cashflow-kpis'
 import type { RecurringItem } from './vaste-kosten-analyse'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
@@ -58,6 +59,38 @@ function MiniSparkline({
   )
 }
 
+// ── Uitgaventrend: één afleiding, twee formuleringen ──────────
+//
+// De procentuele delta t.o.v. de vorige maand stond als inline-IIFE in de
+// Volledig-tak. Sinds S5 heeft Eenvoudig er een woordelijke variant van nodig;
+// die moet op EXACT dezelfde afleiding staan, anders kan de zin ("lager dan
+// vorige maand") tegenover het percentage ("+3%") komen te staan. Vandaar één
+// helper met twee formatteringen erboven. Pure presentatie over de al
+// aangeleverde `expenseHistory` — geen kerngetal, geen tweede grondslag.
+
+function expenseTrendDelta(
+  expenseHistory: CashflowSectionScalars['expenseHistory'],
+): number | null {
+  if (expenseHistory.length < 2) return null
+  const curr = expenseHistory[expenseHistory.length - 1].value
+  const prev = expenseHistory[expenseHistory.length - 2].value
+  return prev > 0 ? ((curr - prev) / prev) * 100 : 0
+}
+
+/** Volledig: het percentage. Onder 1% heet dat "stabiel". */
+function expenseTrendPct(delta: number): string {
+  if (Math.abs(delta) < 1) return 'Stabiel t.o.v. vorige maand'
+  return `${delta > 0 ? '+' : ''}${delta.toFixed(0)}% t.o.v. vorige maand`
+}
+
+/** Eenvoudig: dezelfde constatering in woorden, zonder percentage. */
+function expenseTrendWords(delta: number): string {
+  if (Math.abs(delta) < 1) return 'Je uitgaven zijn ongeveer gelijk gebleven aan vorige maand.'
+  return delta > 0
+    ? 'Je uitgaven lagen hoger dan vorige maand.'
+    : 'Je uitgaven lagen lager dan vorige maand.'
+}
+
 // ── Section ─────────────────────────────────────────────────────
 
 interface CashflowSectionProps {
@@ -86,21 +119,71 @@ interface CashflowSectionProps {
 
 /**
  * CashflowSection — compacte cashflow-samenvatting (spaarquote 6m,
- * maandelijks netto, uitgaventrend). Leeft bovenaan de hefboom-pagina
- * /overzicht/cashflow. De vaste-lasten-teaser is bewust verwijderd: die
- * data zit al onder de "Vaste lasten"-tab van diezelfde pagina.
+ * maandelijks netto, uitgaventrend). Leeft bovenaan de forecast-pagina
+ * /overzicht/cashflow/forecast. De vaste-lasten-teaser is bewust verwijderd:
+ * die data zit al op /overzicht/cashflow/vaste-lasten.
+ *
+ * ── WEERGAVEMODUS (S5, release R5) ──────────────────────────────────────────
+ * Dit was het enige blok op deze route dat niet modus-bewust was: in Eenvoudig
+ * stonden er onverkort drie kale KPI-kaarten — een spaarquote als `%`-getal met
+ * voortgangsbalk en sparkline, een netto-split en een `%`-delta. Sinds S5 zegt
+ * Eenvoudig hetzelfde in één kaart en in woorden: het maandbedrag blijft (dát
+ * is de vraag die de pagina beantwoordt), de twee percentages worden zinnen.
+ *
+ * Niet mínder, wél begrijpelijker — het richtingsbesluit van R5. Volledig
+ * verandert niet.
+ *
+ * TWEE VENSTERS, EXPLICIET UIT ELKAAR GEHOUDEN (ADR 0073): `monthlyIncome`/
+ * `monthlyExpenses` zijn de EFFECTIVE maandcijfers, `savingsRate6m` is een
+ * gemiddelde over ZES maanden. In Eenvoudig staan ze in één kaart, dus draagt
+ * elke zin zijn eigen venster in de tekst ("per maand" resp. "over de laatste
+ * zes maanden"). Ze worden nergens bij elkaar opgeteld.
  */
 export function CashflowSection({ data }: CashflowSectionProps) {
   const { monthlyIncome, monthlyExpenses, savingsRate6m, savingsHistory, expenseHistory } = data
+  const { mode } = useDisplayMode()
   const monthlyCashflow = monthlyIncome - monthlyExpenses
   const isPositiveCashflow = monthlyCashflow >= 0
   const isPositiveRate = savingsRate6m >= 0
+  const trendDelta = expenseTrendDelta(expenseHistory)
 
   const CashflowIcon = isPositiveCashflow
     ? TrendingUp
     : monthlyCashflow === 0
       ? Minus
       : TrendingDown
+
+  if (mode === 'simple') {
+    return (
+      <section aria-label="Cashflow-samenvatting">
+        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4">
+          <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--ink-3)]">
+            {isPositiveCashflow ? 'Wat je per maand overhoudt' : 'Wat je per maand tekortkomt'}
+          </p>
+          <div className="mt-1 flex items-center gap-1.5">
+            <CashflowIcon
+              className={`h-5 w-5 ${isPositiveCashflow ? 'text-positive' : 'text-negative'}`}
+              aria-hidden="true"
+            />
+            <MaskedAmount
+              value={Math.abs(monthlyCashflow)}
+              signPrefix={isPositiveCashflow ? '+' : '-'}
+              className={`font-mono text-2xl font-semibold tabular-nums ${isPositiveCashflow ? 'text-positive' : 'text-negative'}`}
+            />
+            <span className="text-xs text-[var(--ink-3)]">per maand</span>
+          </div>
+          {/* Spaarquote in woorden — het percentage blijft staan als maat, maar
+              in een zin met zijn eigen venster erbij, niet als kaal getal. */}
+          <p className="mt-2 text-sm leading-relaxed text-[var(--ink-2)]">
+            {isPositiveRate
+              ? `Over de laatste zes maanden hield je gemiddeld ${savingsRate6m.toFixed(0)}% van je inkomen over.`
+              : 'Over de laatste zes maanden gaf je gemiddeld meer uit dan er binnenkwam.'}
+            {trendDelta != null && ` ${expenseTrendWords(trendDelta)}`}
+          </p>
+        </div>
+      </section>
+    )
+  }
 
   return (
     <section aria-label="Cashflow-samenvatting">
@@ -176,15 +259,9 @@ export function CashflowSection({ data }: CashflowSectionProps) {
                 fillColor="var(--color-expense-200)"
               />
             </div>
-            {expenseHistory.length >= 2 && (
+            {trendDelta != null && (
               <p className="mt-2 text-[11px] text-[var(--ink-3)]">
-                {(() => {
-                  const curr = expenseHistory[expenseHistory.length - 1].value
-                  const prev = expenseHistory[expenseHistory.length - 2].value
-                  const delta = prev > 0 ? ((curr - prev) / prev) * 100 : 0
-                  if (Math.abs(delta) < 1) return 'Stabiel t.o.v. vorige maand'
-                  return `${delta > 0 ? '+' : ''}${delta.toFixed(0)}% t.o.v. vorige maand`
-                })()}
+                {expenseTrendPct(trendDelta)}
               </p>
             )}
           </div>

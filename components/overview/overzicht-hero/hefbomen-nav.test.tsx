@@ -110,10 +110,13 @@ describe('HefbomenNav', () => {
     expect(screen.getByText('Goed gespreid')).toBeTruthy()
   })
 
-  it('status-substext "Schuldratio" tekst bij schulden warn', () => {
+  it('oordeel bij schulden warn is gewone taal (geen "Schuldratio {x}"-jargon)', () => {
     render(<HefbomenNav health={mockHealth()} />)
-    // debt_ratio = 60 → 'warn' → "Schuldratio 20%"
-    expect(screen.getByText(/Schuldratio/)).toBeTruthy()
+    // debt_ratio = 60 → 'warn'. Vóór S1 stond hier "Schuldratio 20%" — het
+    // enige niet-gewone-taal oordeel in de lijst. Het rátiogetal blijft
+    // bereikbaar in de drill-down (pillar.rawValue), niet op de tegelvoorkant.
+    expect(screen.getByText('Schuldenlast vraagt aandacht')).toBeTruthy()
+    expect(screen.queryByText(/Schuldratio/)).toBeNull()
   })
 
   it('status-substext "Tekort op rekening" bij cashflow bad', () => {
@@ -433,11 +436,21 @@ describe('HefbomenNav — dubbele grondslag (excl. eigen woning subregel)', () =
 })
 
 /**
- * OVZ-2 (eenvoudige weergave, fase 1): in `simple` houden de tegels alléén
- * hoofdcijfer + statuspunt over. De status-duiding en de dubbele-grondslag-
- * regel verhuizen naar de duwpagina achter de tegel.
+ * S1 — richtingsbesluit R5 "duiding boven reductie". Deze describe VERVANGT de
+ * eerdere OVZ-2-verwachting (9 aug 2026), die in `simple` alleen hoofdcijfer +
+ * statuspunt overliet. Die reductie is bewust en gedeeltelijk teruggedraaid:
+ *
+ *  - TERUG    → het oordeel in gewone taal staat nu áltijd op de tegel; het
+ *               bedrag zakt naar een gedempte tweede regel.
+ *  - BLIJFT   → geen chevron/drill-down en geen "excl. eigen woning · €X" in
+ *               Eenvoudig (diepte resp. grondslag-detail, geen oordeel).
+ *
+ * Reden voor de omkering: met alleen een gekleurd puntje was de status voor een
+ * screenreader- én touch-gebruiker onbereikbaar (de dot was `aria-hidden` met
+ * een hover-only `title`) — WCAG 2.2 §1.4.1 — en met privacy-masking erbovenop
+ * hield een tegel over: icoon + label + `••••` + een puntje.
  */
-describe('HefbomenNav — eenvoudige weergave (OVZ-2)', () => {
+describe('HefbomenNav — eenvoudige weergave (S1: oordeel primair)', () => {
   const totals: HefbomenTotals = {
     bezittingen: 250_000,
     schulden: 180_000,
@@ -446,11 +459,27 @@ describe('HefbomenNav — eenvoudige weergave (OVZ-2)', () => {
   }
   const housingSplit = { eigenHuisValue: 50_000, mortgageBalance: 20_000 }
 
-  it('toont geen status-substext meer', () => {
+  it('toont het oordeel in gewone taal op elke tegel', () => {
     render(<HefbomenNav health={mockHealth()} totals={totals} simple />)
-    expect(screen.queryByText('Mogelijk betaal je meer dan nodig')).toBeNull()
-    expect(screen.queryByText(/gespreid/i)).toBeNull()
-    expect(screen.queryByText(/Schuldratio/)).toBeNull()
+    expect(screen.getByText('Mogelijk betaal je meer dan nodig')).toBeTruthy()
+    expect(screen.getByText('Schuldenlast vraagt aandacht')).toBeTruthy()
+    expect(screen.getByText('Tekort op rekening')).toBeTruthy()
+  })
+
+  it('houdt het bedrag zichtbaar maar secundair (gedempt, niet weg)', () => {
+    const { container } = render(
+      <HefbomenNav health={mockHealth()} totals={totals} simple />,
+    )
+    expect(container.textContent).toContain('250.000')
+    expect(container.textContent).toContain('12%')
+    // Het bedrag staat op de gedempte regel — niet meer in serif als hoofdcijfer.
+    // Document-volgorde zet voorouders vóór afstammelingen; de laatste match is
+    // dus het element dat het bedrag daadwerkelijk zelf draagt.
+    const kpiEl = Array.from(container.querySelectorAll('div'))
+      .filter((d) => d.textContent?.includes('250.000'))
+      .at(-1)
+    expect(kpiEl?.className).toContain('text-[11px]')
+    expect(kpiEl?.className).not.toContain('font-serif')
   })
 
   it('toont geen "excl. eigen woning"-regel, ook niet als de dubbele grondslag actief is', () => {
@@ -465,21 +494,75 @@ describe('HefbomenNav — eenvoudige weergave (OVZ-2)', () => {
     expect(screen.queryByText(/excl\. eigen woning/i)).toBeNull()
   })
 
-  it('houdt hoofdcijfer, statuspunt en de vier links intact', () => {
+  it('houdt de vier links en de vier statuspunten intact', () => {
     const { container } = render(
       <HefbomenNav health={mockHealth()} totals={totals} simple />,
     )
     expect(container.querySelectorAll('a').length).toBe(4)
-    // Vier status-dots (één per tegel) — het stoplicht blijft het enige signaal.
-    expect(container.querySelectorAll('span[title][aria-hidden="true"]').length).toBe(4)
-    expect(container.textContent).toContain('12%')
+    expect(container.querySelectorAll('span.absolute.rounded-full').length).toBe(4)
   })
 
-  it('laat de volledige weergave ongemoeid (substext + excl.-regel blijven)', () => {
+  it('draagt elke tegel een woord, óók zonder gegevens (neutral)', () => {
+    render(<HefbomenNav health={null} totals={{}} simple />)
+    expect(screen.getAllByText('Nog geen gegevens').length).toBe(4)
+  })
+
+  it('houdt het oordeel leesbaar mét privacy-masking (bedrag weg, woord blijft)', () => {
+    window.localStorage.setItem(PRIVACY_MASKED_STORAGE_KEY, 'true')
+    const { container } = render(
+      <PrivacyProvider>
+        <HefbomenNav health={mockHealth()} totals={totals} simple />
+      </PrivacyProvider>,
+    )
+    expect(container.textContent).toContain(MASKED_AMOUNT_PLACEHOLDER)
+    expect(container.textContent).not.toContain('250.000')
+    // Precies dít is waarom S1 bestaat: gemaskeerd + Eenvoudig hield vóór deze
+    // kaart nul informatie over.
+    expect(screen.getByText('Mogelijk betaal je meer dan nodig')).toBeTruthy()
+    window.localStorage.clear()
+  })
+
+  it('kondigt de status precies één keer aan — geen sr-only-duplicaat naast het oordeel', () => {
+    const { container } = render(
+      <HefbomenNav health={mockHealth()} totals={totals} simple />,
+    )
+    // Het zichtbare oordeel is de drager; de shell springt niet óók bij.
+    expect(container.querySelectorAll('.sr-only').length).toBe(0)
+  })
+
+  it('laat de volledige weergave ongemoeid (oordeel + excl.-regel + chevron blijven)', () => {
     render(
       <HefbomenNav health={mockHealth()} totals={totals} housingSplit={housingSplit} />,
     )
     expect(screen.getByText('Mogelijk betaal je meer dan nodig')).toBeTruthy()
     expect(screen.getAllByText(/excl\. eigen woning/i).length).toBe(2)
+  })
+})
+
+/**
+ * Tabelgedreven: elke hefboom × elke status levert een niet-leeg oordeel in de
+ * eenvoudige weergave. Voorkomt dat een latere status-uitbreiding stilletjes
+ * een woordloze tegel oplevert.
+ */
+describe('HefbomenNav — elk hefboom/status-paar draagt een oordeel', () => {
+  const STATUSES = ['green', 'amber', 'red', 'neutral'] as const
+
+  it.each(STATUSES)('alle vier de tegels dragen een woord bij status %s', (s) => {
+    const entry = { score: null, status: s, detail: '' }
+    const scores: LeverScores = {
+      assets: entry,
+      debts: entry,
+      cashflow: entry,
+      tax: entry,
+    }
+    const { container } = render(
+      <HefbomenNav health={null} leverScores={scores} simple />,
+    )
+    // Vier kaarten, vier oordeel-regels — de regel staat direct onder het label
+    // en draagt de statuskleur-class van LeverageCard.
+    const verdicts = Array.from(
+      container.querySelectorAll('div.leading-snug'),
+    ).filter((el) => (el.textContent ?? '').trim().length > 0)
+    expect(verdicts.length).toBe(4)
   })
 })

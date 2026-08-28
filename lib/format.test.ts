@@ -17,6 +17,7 @@ import {
   formatCurrency,
   APPROX_PREFIX,
   MASKED_AMOUNT_PLACEHOLDER,
+  maskCurrencyInText,
   CENT_EPSILON,
 } from './format'
 
@@ -528,5 +529,49 @@ describe('formatFreedomRateFootnote', () => {
 
   it('lekt het bedrag ook niet via de korte vorm wanneer zichtbaar', () => {
     expect(formatFreedomRateFootnote(124, 'transactions', false, 'short')).toContain('/dag')
+  })
+})
+
+describe('maskCurrencyInText (S4)', () => {
+  it('laat de tekst ongemoeid wanneer masking uit staat', () => {
+    expect(maskCurrencyInText('€ 1.056/mnd', false)).toBe('€ 1.056/mnd')
+  })
+
+  it('maskeert het bedrag maar behoudt de eenheid en de rest van de zin', () => {
+    const masked = maskCurrencyInText(`${formatCurrency(1056)}/mnd`, true)
+    expect(masked).toBe(`${MASKED_AMOUNT_PLACEHOLDER}/mnd`)
+    expect(masked).not.toContain('1.056')
+  })
+
+  it('dekt het signed()-patroon van de cashflow-kaarten (+€ / -€)', () => {
+    expect(maskCurrencyInText(`+${formatCurrency(1100)}`, true)).toBe(
+      MASKED_AMOUNT_PLACEHOLDER,
+    )
+    expect(maskCurrencyInText(formatCurrency(-340), true)).toBe(
+      MASKED_AMOUNT_PLACEHOLDER,
+    )
+  })
+
+  it('maskeert élk bedrag in een samengestelde zin', () => {
+    const tip = `Inkomen ${formatCurrency(4200)} · uitgaven ${formatCurrency(3100)}.`
+    const masked = maskCurrencyInText(tip, true)
+    expect(masked).toBe(
+      `Inkomen ${MASKED_AMOUNT_PLACEHOLDER} · uitgaven ${MASKED_AMOUNT_PLACEHOLDER}.`,
+    )
+  })
+
+  it('laat percentages, aantallen en venster-labels staan — dat zijn geen bedragen', () => {
+    expect(maskCurrencyInText('33% van inkomen', true)).toBe('33% van inkomen')
+    expect(maskCurrencyInText('12 terugkerende posten.', true)).toBe(
+      '12 terugkerende posten.',
+    )
+    expect(maskCurrencyInText('in augustus tot nu toe', true)).toBe(
+      'in augustus tot nu toe',
+    )
+  })
+
+  it('geeft null/undefined ongewijzigd terug', () => {
+    expect(maskCurrencyInText(null, true)).toBeNull()
+    expect(maskCurrencyInText(undefined, true)).toBeUndefined()
   })
 })

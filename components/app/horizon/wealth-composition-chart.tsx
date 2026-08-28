@@ -48,6 +48,7 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
   housingSaleAge,
   eventOverlay,
   onEventClick,
+  onClusterOpen,
   onYearClick,
 }: {
   stackedRows: StackedRow[]
@@ -85,6 +86,14 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
    * natuurlijke mijlpalen.
    */
   onEventClick?: (id: string, kind: ChartEventKind, sourceId?: string) => void
+  /**
+   * M16 — opent de lijst achter een "+N"-clusterbadge. In deze staafmodus is
+   * `ChartEventMarkers` de ENIGE weergave van gebeurtenissen (er staat geen
+   * `EventsTimeline` onder de staven), dus zonder deze uitgang zijn de
+   * geclusterde events hier volstrekt onbereikbaar — waar de lijn-modus nog
+   * de strip eronder als noodgreep had.
+   */
+  onClusterOpen?: (events: ChartEventOverlay[], centerAge: number) => void
   /**
    * Klik-handler voor een jaar (kolom). Opent de kassabon-stijl
    * HorizonYearDetailsSheet in de parent. Wanneer gezet wordt elke kolom
@@ -433,14 +442,16 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
           />
         )}
 
-        {/* Y-axis labels */}
+        {/* Y-axis labels — fontSize 11 (ondergrens uit bevinding M16; was 9).
+            Gelijk gehouden met chart-static-layers zodat beide chartmodi
+            dezelfde as-typografie dragen. */}
         {yTicks.map(({ val, y }) => (
           <text
             key={val}
             x={PAD.left - 5}
             y={y + 4}
             textAnchor="end"
-            fontSize={9}
+            fontSize={11}
             fill="var(--ink-4)"
             fontFamily="var(--font-dm-mono, monospace)"
           >
@@ -448,14 +459,14 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
           </text>
         ))}
 
-        {/* X-axis labels */}
+        {/* X-axis labels — fontSize 11 (M16), gelijk aan de vermogenspad-chart. */}
         {xTickAges.map(age => (
           <text
             key={age}
             x={PAD.left + xScale(age)}
             y={H - 4}
             textAnchor="middle"
-            fontSize={9}
+            fontSize={11}
             fill="var(--ink-4)"
             fontFamily="var(--font-dm-mono, monospace)"
           >
@@ -729,6 +740,7 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
             visibleMaxAge={maxAge}
             onEventClick={onEventClick}
             onEventHover={setHoveredEvent}
+            onClusterOpen={onClusterOpen}
           />
         )}
       </svg>

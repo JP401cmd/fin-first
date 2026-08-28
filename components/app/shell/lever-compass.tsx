@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
+import { tapTargetClass } from '@/components/editorial/tap-target'
 
 // Re-export types and computation from shared (non-client) module so that
 // existing imports from this file continue to work — but the actual logic
@@ -421,8 +422,10 @@ export function LeverCompassMobile({ scores }: { scores: LeverScores }) {
         onClick={() => setExpanded(prev => !prev)}
         className={
           simple
-            ? 'flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border-ed)] bg-[var(--paper)] transition-colors hover:border-[var(--module-active-500)]'
-            : 'flex items-center gap-[3px] rounded-full px-1.5 py-1 transition-colors hover:bg-[var(--subtle)]'
+            ? // `simple`-tak = 28×28, bewust compromis (M19 categorie a, besluit
+              // eigenaar 26-08-2026) — niet aanraken zonder conventiebesluit.
+              'flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border-ed)] bg-[var(--paper)] transition-colors hover:border-[var(--module-active-500)]'
+            : `flex items-center gap-[3px] rounded-full px-1.5 py-1 transition-colors hover:bg-[var(--subtle)] ${tapTargetClass('extend')}`
         }
         aria-label={
           expanded

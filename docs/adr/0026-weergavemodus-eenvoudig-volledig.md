@@ -131,7 +131,11 @@ kent daarmee bewust **twee** mechanismen, en de keuze ertussen is een inhoudelij
 
 Drie oppervlakken staan sinds fase 2/4 op het tweede mechanisme: het cashflow-instellingenblok
 (CF-4), "Alle meldingstypen" op `/mijn/notificaties` (MIJN-3) en de AI-uitvoeringsgroepen op
-`/mijn/privacy` (MIJN-4). Ze delen één implementatieregel die hier hoort omdat hij uit het
+`/mijn/privacy` (MIJN-4). Sinds R5 komt daar `/toekomst/voorkeuren` bij (S7): de drie pot-regels en
+de markt-aannames stonden op `HideInSimple` terwijl de kernel er onverminderd mee rekende en deze
+pagina hun enige ingang is — twee `DepthSection`s ("Pot-regels", "Markt-aannames") met een leesregel
+die de huidige waarde draagt. De `AfbouwOverzichtCard` op diezelfde pagina blijft `HideInSimple`:
+uitkomst-analyse, geen bedieningsvlak. Ze delen één implementatieregel die hier hoort omdat hij uit het
 acceptatiecriterium volgt en niet uit smaak: **`DepthSection` wordt alléén in Eenvoudig gemónt.** In
 Volledig zou hij weliswaar open staan, maar mét kop-knop en kaartrand — en "Volledig blijft
 ongewijzigd" betekent dat daar exact de bestaande boom rendert.
@@ -148,3 +152,83 @@ Tot slot een grens die tijdens fase 3 scherp werd: niet elke audit-bevinding is 
 Waar iets gewoon fout of dubbel was — een permanent lege Box 2-kaart, een tabbalk die het kaartengrid
 eronder exact herhaalt — is het in **beide** modi gerepareerd. De modus is een rustknop, geen
 opbergplek voor UI die er sowieso niet hoorde te staan.
+## Aanvulling — 28 augustus 2026 (positie van de welkomstgids + waar APP-2 landt)
+
+Fase 1 gaf de welkomstgids de rol van **enige plek waar de app zélf over de weergavekeuze praat**
+(APP-2, de regel hierboven). Wat daarbij nooit is vastgelegd: **wáár die gids op de pagina staat en
+hoe je hem wegkrijgt.** Twee bevindingen uit de schermronde van 25 aug 2026 raakten precies dat gat —
+H20/S13 (de gids stond in béíde weergaven bóven de begroeting) en L11 (sluiten vergde twee
+beslissingen). Omdat elke oplossing de APP-2-regel meeneemt, hoort het besluit hier.
+
+**Besluit 1 — de gids staat ná de begroeting, in beide modi.** De eerste seconde van /overzicht
+antwoordt ("zo sta je ervoor"), en vraagt daarna pas. De gids en de maandelijkse check-in renderen in
+het `banners`-slot van `OverzichtHeroPrimary`, tussen de begroeting en het hefbomen-kompas; de
+check-in zakt dus méé (dat overrulet bewust de plaatsing uit "beslissing 7" van 27 mei 2026, die de
+check-in als top-banner zette). De positie is **geen** modus-keuze: hij is in Eenvoudig en Volledig
+gelijk. Bewaakt door `components/overview/overzicht-hero.block-order.test.ts`.
+
+De audit behandelde deze bevinding half: hoofdbevinding 2 deed dezelfde waarneming ("op mobiel is het
+hele eerste scherm welkomstgids") maar koos als remedie **comprimeren** (APP-6, geleverd 9 aug).
+Verplaatsen is toen niet gewogen en stond ook niet bij "afgevallen". Comprimeren en verplaatsen zijn
+allebei nodig: het één gaat over omvang, het ander over hiërarchie.
+
+**Besluit 2 — de gids volgt de meldingen-conventie: één uitgang, en die gooit niets weg.** Het kruisje
+(en "Gids inklappen" / "Nee, klap in") **minimaliseert** de gids tot een klein knopje naast de
+pagina-`i`, precies zoals de status-duiding-banner dat doet. Dat is cross-device onthouden in de
+bestaande jsonb `profiles.module_guide_state['welcome:guide']` (veld `minimized`; géén migratie, géén
+localStorage) en altijd weer te openen. De architectuur is de conventionele: één bron
+(`WelcomeGuideProvider`) die de payload ophaalt en deelt met de uitgeklapte banner én het punt — geen
+tweede fetch-pad. Daarmee vervalt de sessie-only sluitvlag die L11 als tussenstap invoerde.
+
+Twee afwijkingen van de conventie, allebei bewust:
+
+- **Geen automatische heropening bij escalatie.** De conventie laat een geminimaliseerde melding weer
+  uitklappen zodra de status verergert. De gids draagt geen ernst-niveau — er is niets dat kan
+  verergeren. Dezelfde lezing als `MinimizedLevel = 'info'` in `lib/page-status/display.ts`.
+- **Een icoon in plaats van een gekleurd punt.** De kleur van een statuspunt dráágt de ernst; bij de
+  gids zou die kleur niets betekenen en naast het echte statuspunt een alarm suggereren dat er niet
+  is. Vandaar een checklist-icoon in het module-accent van de route.
+
+**Besluit 3 — APP-2 blijft waar hij is, en wordt geen wees.** De regel over de weergavekeuze staat nog
+steeds in de gids, in beide modi — alleen láger op de pagina. Minimaliseren verbergt hem tijdelijk,
+maar is geen eenrichtingsdeur: één klik op het punt brengt hem terug. Dat is precies waarom
+minimaliseren de voorkeur kreeg boven "automatisch verdwijnen zodra de gids af is" (optie B op kaart
+S13): dáár zou APP-2 stil en definitief verdwijnen bij de gebruiker die klaar is met onboarden.
+"Verberg de gids voorgoed" (`status: 'dismissed'`) doet dat wél — maar dat is een expliciete
+gebruikerskeuze, en `components/onboarding/onboarding-success.tsx` draagt dezelfde zin als tweede
+vindplaats.
+
+Wat NIET verandert: de gids blijft in Eenvoudig gecomprimeerd (APP-6) en in Volledig ongewijzigd; het
+blokkenaantal van de Volledige weergave blijft gelijk (besluit 9 aug 2026); er komt géén
+per-sectie-hint of -toggle bij (het afgewezen APP-4). Automatisch verdwijnen zodra de gids af is
+blijft mogelijk als vervolg — het predicaat `isGuideComplete()` bestaat al — maar hééft de
+data-bewuste afvinking (M1) nódig, en is bewust nog niet ingezet.
+## Aanvulling — 28 augustus 2026 (call-site-ternary uitfaseren; wat Eenvoudig als eerste toont)
+
+De stripnorm hierboven (APP-7) legde vast dát een `FiguresStrip` in Eenvoudig maximaal twee cellen
+toont, en waaróm die regel in de primitive hoort en "niet in tientallen losse mode-ternaries op de
+call-sites". Bevinding **S11** vond de eerste zo'n ternary in het wild: `/overzicht/bezittingen`
+rendeerde twee compleet losse strips (één cel in Eenvoudig, vier in Volledig), gebouwd op 22 juni
+2026 — vóór het faseplan, en daarna in de audit geprezen als "wat al goed staat" zonder dat iemand
+woog *welke* cel overbleef.
+
+**Besluit — een call-site kiest niet hóéveel, alleen wélke.** De hoeveelheid is de norm in de
+primitive (`SIMPLE_MAX_FIGURES`); een call-site die vindt dat "de eerste twee" niet de juiste twee
+zijn, gebruikt `simpleFigures`. Twee losse `figures`-arrays achter een `mode`-ternary zijn vánnu
+expliciet fout, ook als de uitkomst toevallig klopt: het is een derde reductiemechanisme naast
+`HideInSimple` en `DepthSection`, het onttrekt zich aan de norm, en het maakt de keuze onzichtbaar
+voor wie de primitive leest.
+
+**De inhoudelijke les erbij, en die is breder dan de strip:** wat Eenvoudig als eerste toont moet het
+**eigen antwoord** zijn, niet een hypothese. Op deze pagina overleefden twee promo-simulators
+("0,5% beheerkosten kost je €51.091 over 30 jaar") terwijl het eigen portefeuillerendement uit de
+strip was geknipt — een beginner kreeg dus wél het hypothetische bedrag en niet zijn eigen cijfer.
+Dat is de omgekeerde volgorde van wat de modus belooft. Concreet doorgevoerd: de rendement-cel blijft
+in Eenvoudig staan (met de rekenmodal-knop, die er juíst voor de beginner is), en de
+beheerkosten-simulator gaat naar Volledig — daarmee is audit-item **OVZ-5** alsnog beperkt
+uitgevoerd, tegen zijn eerdere "afgevallen"-status in.
+
+Wat NIET verandert: Volledig toont exact dezelfde vier cellen als voorheen; er wordt niets
+herberekend (dezelfde reeds berekende `FigureProps`, alleen minder getoond); de
+samengestelde-rente-kaart blijft in beide modi — die is de enige "waarom zou ik"-motivatie voor wie
+nog niet belegt.

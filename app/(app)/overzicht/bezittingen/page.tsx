@@ -11,6 +11,7 @@ import { FeeImpactCard, FEE_IMPACT_ID } from '@/components/overview/fee-impact-c
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { InsightToggleButton } from '@/components/editorial/insight-toggle-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
+import { HideInSimple } from '@/components/app/hide-in-simple'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import { hasInvestedAssets } from '@/lib/dashboard-wealth-weighting'
 
@@ -65,6 +66,15 @@ export default async function OverzichtBezittingenPage() {
 
   const showCompound = liquidCash >= 10_000
   const showFee = investmentTotal >= 25_000
+  // OVZ-5, beperkt uitgevoerd (S11): in Eenvoudig hóógstens één inspiratiekaart,
+  // en pas ná de figures-strip (die volgorde staat al vast in `assets-client`).
+  // De beheerkosten-simulator gaat naar Volledig: hij rekent een hypothetische
+  // 0,5% fee door over 30 jaar terwijl de gebruiker die kosten nergens in de app
+  // kan aflezen — in Eenvoudig stond dat bedrag er dus wél en het eigen
+  // rendement niet. De samengestelde-rente-kaart blijft: die is de enige
+  // "waarom zou ik"-motivatie op de pagina voor wie nog niet belegt.
+  // `HideInSimple` is client, de kaarten blijven server-gerenderd (children over
+  // de grens) — deze pagina blijft dus een server-component.
   const inspirationCards = showCompound || showFee
     ? (
         <>
@@ -74,7 +84,11 @@ export default async function OverzichtBezittingenPage() {
               hasInvestments={hasInvestedAssets(assets)}
             />
           )}
-          {showFee && <FeeImpactCard investmentTotal={investmentTotal} />}
+          {showFee && (
+            <HideInSimple>
+              <FeeImpactCard investmentTotal={investmentTotal} />
+            </HideInSimple>
+          )}
         </>
       )
     : null

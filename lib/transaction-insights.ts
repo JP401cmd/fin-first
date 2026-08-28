@@ -12,6 +12,7 @@
  */
 
 import { savingsRateFromAggregates } from '@/lib/savings-source'
+import { currentMonthWindowLabel } from '@/lib/cashflow-cards'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -212,6 +213,148 @@ export function summarizeFlow(txns: AnalysisTransaction[]): FlowSummary {
   // deling zelf hoort niet voor de derde keer in de codebase te staan.
   const savingsRate = Math.round(savingsRateFromAggregates(income, expense, 0))
   return { income, expense, net, savingsRate, count }
+}
+
+// ── Geldstroom in woorden (S3) ─────────────────────────────────────────────
+//
+// AANLEIDING. In de weergavemodus "Eenvoudig" verbergt de transactiepagina zes
+// analyseblokken; wat er als DUIDING overblijft is de `GeldstroomGauge` — een
+// naald op een −100…+100-schaal met een etiket "spaarquote". Voor een beginner
+// is dat een expertinstrument zonder omringende context: er staat geen trend,
+// geen heatmap en geen vergelijking meer omheen die 'm leesbaar maakt.
+//
+// TWEE HARDE GRENZEN, allebei bewust:
+//
+//  1. `summarizeFlow` HIERBOVEN WORDT NIET AANGERAAKT. De twee bekende
+//     mankementen aan het GETAL — het ongeclampte leescijfer en de 0%-uitkomst
+//     bij `income === 0` — zijn eigendom van bevinding C6 en gelden in BEIDE
+//     modi. Ze hier "even" repareren zou C6's reproductie uit Volledig halen
+//     terwijl die kaart nog loopt. `describeFlow` is een tweede, ONAFHANKELIJKE
+//     lezing van dezelfde `FlowSummary`; hij herberekent niets.
+//
+//  2. GEEN VOORSPELLING. De oorspronkelijke wens was "salaris komt nog" — dat
+//     is een projectie over de rest van de maand, die bestaat nog niet (en is
+//     zelf een C6-optie). Wat hier staat is de WAARNEMINGSVORM: "er is nog
+//     niets binnengekomen", volledig afleidbaar uit de twee samenvattingen die
+//     het component al in geheugen heeft. Geen nieuwe query, geen nieuw veld,
+//     geen belofte die de app niet waar kan maken (Wft).
+//
+// SEGMENTEN, GEEN STRING. De functie geeft bedragen als getallen terug en niet
+// als kant-en-klare zin: de UI moet ze door `<MaskedAmount>` halen, anders lekt
+// een `formatCurrency`-string dwars door de privacy-modus heen.
+
+/**
+ * Welke lezing van het venster van toepassing is.
+ *  · `empty`         — geen enkele transactie; de call-site toont zijn eigen regel.
+ *  · `no-income-yet` — het venster loopt nog, er ging wel geld uit maar er kwam
+ *                      nog niets binnen. De stand die de meter het slechtst leest.
+ *  · `running`       — het venster loopt nog, met in- én uitstroom.
+ *  · `complete`      — het venster is afgesloten; hier mag een eindstand staan.
+ */
+export type FlowDescriptionKind = 'empty' | 'no-income-yet' | 'running' | 'complete'
+
+export interface FlowDescription {
+  kind: FlowDescriptionKind
+  /** Loopt het venster nog? Bepaalt of een eindoordeel eerlijk is. */
+  windowRunning: boolean
+  /** Venster in gewone taal — "augustus tot nu toe", "juli 2026", "Q3 2026". */
+  windowLabel: string
+  income: number
+  expense: number
+  /** income − expense. Negatief = er ging meer uit dan er binnenkwam. */
+  net: number
+  /**
+   * De spaarquote als EINDSTAND — uitsluitend gevuld bij een afgesloten venster
+   * mét inkomen. Bij een lopend venster bewust `null`: een quote over een halve
+   * maand is precies het oordeel dat deze kaart wil vermijden.
+   */
+  savingsRate: number | null
+  /**
+   * Het inkomen van de vorige, even lange periode — alleen gevuld als het > 0
+   * is én de huidige periode nog niets ontving. Dat maakt van "er kwam nog
+   * niets binnen" een waarneming met context, zonder iets te voorspellen.
+   */
+  prevIncome: number | null
+}
+
+/**
+ * Het venster-label voor deze pagina, in ÉÉN formulering.
+ *
+ * Voor de lopende kalendermaand hergebruikt hij `currentMonthWindowLabel` uit
+ * `lib/cashflow-cards.ts` — dezelfde zin die de hub-kaart draagt (CF-3). Bewust
+ * geen tweede formulering: hub en detailpagina beschrijven hier hetzelfde
+ * venster, en twee formuleringen zijn binnen een maand twee betekenissen.
+ *
+ * Alle overige gevallen nemen het label dat `resolvePeriodWindow` al maakte.
+ */
+export function flowWindowLabel(
+  period: PeriodKind,
+  offset: number,
+  window: PeriodWindow,
+  now: Date,
+): string {
+  if (period === 'month' && offset === 0) return currentMonthWindowLabel(now)
+  return window.label
+}
+
+/**
+ * Beschrijf de geldstroom van één periode in termen die zonder meter te lezen
+ * zijn. Puur: leest alleen wat er in gaat.
+ *
+ * @param current - `summarizeFlow` over het gekozen venster.
+ * @param prev - `summarizeFlow` over de even lange voorgaande periode.
+ * @param period - de gekozen periodesoort.
+ * @param offset - 0 = huidige periode, negatief = terug in de tijd.
+ * @param window - het venster uit `resolvePeriodWindow` (voor het label).
+ * @param now - expliciet meegegeven zodat het resultaat deterministisch is.
+ */
+export function describeFlow(
+  current: FlowSummary,
+  prev: FlowSummary,
+  period: PeriodKind,
+  offset: number,
+  window: PeriodWindow,
+  now: Date,
+): FlowDescription {
+  // Een venster "loopt nog" wanneer de einddatum in de toekomst ligt. Bij '30d'
+  // eindigt het venster per definitie vandaag (rollend, inclusief), dus dat is
+  // altijd compleet — ook bij offset 0.
+  const windowRunning = offset === 0 && period !== '30d'
+  const windowLabel = flowWindowLabel(period, offset, window, now)
+
+  const base = {
+    windowRunning,
+    windowLabel,
+    income: current.income,
+    expense: current.expense,
+    net: current.net,
+  }
+
+  if (current.income === 0 && current.expense === 0) {
+    return { ...base, kind: 'empty', savingsRate: null, prevIncome: null }
+  }
+
+  if (windowRunning) {
+    if (current.income === 0) {
+      return {
+        ...base,
+        kind: 'no-income-yet',
+        savingsRate: null,
+        prevIncome: prev.income > 0 ? prev.income : null,
+      }
+    }
+    return { ...base, kind: 'running', savingsRate: null, prevIncome: null }
+  }
+
+  return {
+    ...base,
+    kind: 'complete',
+    // Alleen zinvol met inkomen als noemer; `summarizeFlow` levert bij
+    // `income === 0` een 0 die niets betekent (C6-terrein — hier niet getoond
+    // in plaats van hier gerepareerd).
+    savingsRate: current.income > 0 ? current.savingsRate : null,
+    prevIncome: null,
+  }
 }
 
 /** Top-N tegenpartijen in één richting (uitgaven/inkomsten), op bedrag of aantal. */

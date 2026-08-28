@@ -1,9 +1,11 @@
 import Link from 'next/link'
 import { ArrowRight, Clock } from 'lucide-react'
-import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { calculateWorkTime, formatWorkTimeString } from '@/lib/work-time'
 import type { TaxOverviewResult } from '@/lib/tax-overview'
 import { Kicker, HighlightMark } from '@/components/editorial'
+import { SwapInSimple } from '@/components/app/swap-in-simple'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 
@@ -123,11 +125,22 @@ export function HubTotaleDruk({
           onder (--module-active-200 is hier de hub-highlight, niet box-codering). */}
       <div className="mt-4 flex items-baseline gap-3 flex-wrap">
         <HighlightMark>
-          <span
-            className="font-black leading-[0.9] tracking-[-0.03em] tabular-nums text-[40px] sm:text-[52px] text-[var(--ink)]"
-            style={{ fontFamily: PLAYFAIR }}
-          >
-            {formatCurrency(Math.round(total))}
+          {/* PRIVACY (ADR 0091). Katern I was het laatste hub-blok dat de
+              privacymodus negeerde: het hero-bedrag stond onder het oog-icoon
+              gewoon in beeld terwijl de kansen-kaart ernaast al maskeerde.
+              Oorzaak was structureel — dit is een server-component en kan
+              `useMaskedAmounts()` niet lezen. `MaskedAmount` is de client-child
+              die dat oplost zónder deze kaart client te maken (zelfde route als
+              `HubKansen`, alleen dan zonder de conversie).
+              `monoWhenVisible={false}`: de Playfair-hero houdt zijn eigen font;
+              de bullets schakelen zelf naar mono. */}
+          <span style={{ fontFamily: PLAYFAIR }}>
+            <MaskedAmount
+              value={Math.round(total)}
+              tone="ink"
+              monoWhenVisible={false}
+              className="font-black leading-[0.9] tracking-[-0.03em] text-[40px] sm:text-[52px] text-[var(--ink)]"
+            />
           </span>
         </HighlightMark>
         <span
@@ -188,7 +201,14 @@ export function HubTotaleDruk({
       {/* De twee inkomens-tarieven — of, zonder bekend inkomen, de eerlijke
           mededeling dat ze er niet zijn. Nooit allebei tegelijk: `incomeKnown`
           is dezelfde poort (`grossYearly > 0`) waarmee de loader de tarieven
-          berekent, dus een percentage zónder inkomen kan niet ontstaan. */}
+          berekent, dus een percentage zónder inkomen kan niet ontstaan.
+
+          S14 — in Eenvoudig staat hier ÉÉN beslisbare zin i.p.v. twee
+          expert-cellen naast elkaar. Volledig rendert exact de boom die er
+          altijd stond: nul regressie voor wie beide tarieven wil zien. */}
+      <SwapInSimple
+        simple={<DrukZin incomeKnown={incomeKnown} marginalRate={marginalRate} />}
+      >
       {incomeKnown && (effPct != null || margPct != null) && (
         <div className="mt-auto pt-5 flex items-start gap-8 text-xs">
           {effPct != null && (
@@ -230,6 +250,75 @@ export function HubTotaleDruk({
           </div>
         </div>
       )}
+      </SwapInSimple>
     </article>
+  )
+}
+
+/**
+ * DrukZin (S14) — de Eenvoudig-variant van de twee tariefcellen.
+ *
+ * "Effectief 46,0% · Marginaal 56,0%" naast elkaar is expert-informatie: het
+ * vraagt van de lezer dat hij wéét welk van de twee getallen zijn volgende
+ * keuze stuurt. De zin zegt hetzelfde in beslisbare taal — hoeveel houd je over
+ * van een euro extra — en is daarmee duiding in plaats van reductie.
+ *
+ * CONSUME, DON'T RECOMPUTE. `marginalRate` komt kant-en-klaar uit
+ * `buildTaxOverview` (bron: `computeBox1Tax().marginalRate`, bevinding C9).
+ * `Math.round((1 − marginalRate) * 100)` is een pure WEERGAVE-complement van
+ * dat ene canonieke getal — dezelfde klasse als het bestaande
+ * `Math.round(effectiveRate * 1000) / 10` hierboven. Wat hier verboden is:
+ * `deriveMarginaalTarief()` aanroepen (dat is een netto→bruto-vuistregel die
+ * altijd één van twee vaste schijftarieven teruggeeft, géén user-facing
+ * tarief), een eigen schijf-/afbouwpercentage neerzetten, of een eigen
+ * marginale som maken. De bron-test in `hub-totale-druk.test.tsx` bewaakt dat.
+ *
+ * NULL-PAD (verplicht). `incomeKnown` is dezelfde poort waarmee de loader de
+ * tarieven berekent. Zonder inkomen — of zonder marginaal tarief — komt er
+ * géén zin en géén "0 cent", maar de invulprompt. Vóór C9/M4 rendeerde de
+ * marginaal-cel zelfs náást een Box 1-kaart die "Inkomen onbekend" meldde;
+ * die val mag met een gewone-taalzin zeker niet terugkomen.
+ *
+ * WFT: beschrijvend ("houd je over"), nooit imperatief ("stort dus in…"), en
+ * "ongeveer" blijft staan — de bruto-grondslag onder dit percentage is een
+ * schijfinversie-schatting. De "indicatie, geen advies"-callout onder de
+ * sectie blijft de voetnoot.
+ */
+function DrukZin({
+  incomeKnown,
+  marginalRate,
+}: {
+  incomeKnown: boolean
+  marginalRate: number | null
+}) {
+  const centenOver =
+    marginalRate != null ? Math.min(100, Math.max(0, Math.round((1 - marginalRate) * 100))) : null
+
+  return (
+    <div className="mt-auto pt-5 text-xs">
+      <div className="text-[10px] uppercase tracking-[0.16em] font-mono text-[var(--ink-3)]">
+        Je volgende euro
+      </div>
+      {incomeKnown && centenOver != null ? (
+        <>
+          <p className="mt-1 text-sm leading-snug text-[var(--ink)] max-w-[46ch]">
+            Van elke euro die je extra verdient, houd je ongeveer{' '}
+            <span className="font-semibold tabular-nums">{centenOver} cent</span> over.
+          </p>
+          <p className="mt-0.5 text-[11px] leading-tight text-[var(--ink-3)]">
+            De rest gaat naar belasting en de afbouw van je kortingen.
+          </p>
+        </>
+      ) : (
+        <>
+          <p className="mt-1 text-sm font-medium leading-snug text-[var(--ink-2)]">
+            Inkomen onbekend
+          </p>
+          <p className="mt-0.5 text-[11px] leading-tight text-[var(--ink-3)] max-w-[46ch]">
+            Vul je bruto jaarinkomen in — dan zie je wat een euro extra je oplevert.
+          </p>
+        </>
+      )}
+    </div>
   )
 }

@@ -1,4 +1,7 @@
-import { formatCurrency } from '@/lib/format'
+'use client'
+
+import { formatMaskedCurrency } from '@/lib/format'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
 /**
  * VerdelingStaaf — 100%-gestapelde horizontale staaf.
@@ -10,10 +13,18 @@ import { formatCurrency } from '@/lib/format'
  * Gebruikt voor o.a. box-verdeling (C2 — hoeveel belasting per box) en
  * vermogensmix (3.4 — verdeling van het vermogen over Box 3-categorieën).
  *
- * Bewust presentationeel: geen data-fetching, geen hooks. De caller berekent
+ * Bewust presentationeel: geen data-fetching, geen state. De caller berekent
  * de segmenten en levert per segment een `colorVar` (een CSS-variabele of
  * kleurwaarde) aan, zodat de balk de box/module-kleur van de context overneemt.
- * Server-compatible (geen 'use client').
+ *
+ * PRIVACY (ADR 0091, S14). De legenda en de segment-tooltips tonen EURO's, dus
+ * moeten ze meebewegen met de privacymodus. Dat maakt dit component 'use
+ * client' — het leest `useMaskedAmounts()` en verder niets; de percentages en
+ * de balkverhoudingen blijven zichtbaar (een aandeel verraadt geen bedrag).
+ * Vóór deze wijziging maskeerde katern I van de Belasting-hub als enige blok
+ * níét, precies zoals `HubKansen` dat vóór zijn conversie deed. De aanroepers
+ * (hub-verdeling, box3-mix, box3-opbouw) blijven server-components: dit
+ * component is de client-grens.
  *
  * Vormgeving — Editorial Finance: scherpe rechthoek-balk (radius 0), segmenten
  * gescheiden door papier-haarlijnen i.p.v. afgeronde hoeken. De balk groeit in
@@ -42,6 +53,8 @@ function safeValue(value: number): number {
 }
 
 export function VerdelingStaaf({ segments, showLegend = true }: VerdelingStaafProps) {
+  const { masked } = useMaskedAmounts()
+  const fc = (v: number) => formatMaskedCurrency(v, masked)
   const sanitized = segments.map((s) => ({ ...s, value: safeValue(s.value) }))
   const total = sanitized.reduce((sum, s) => sum + s.value, 0)
 
@@ -92,7 +105,7 @@ export function VerdelingStaaf({ segments, showLegend = true }: VerdelingStaafPr
                   boxShadow: i > 0 ? 'inset 1px 0 0 var(--paper)' : undefined,
                   animation: `verdeling-grow 600ms cubic-bezier(.22,1,.36,1) ${i * 60}ms both`,
                 }}
-                title={`${s.label}: ${formatCurrency(s.value)} (${Math.round(pct)}%)`}
+                title={`${s.label}: ${fc(s.value)} (${Math.round(pct)}%)`}
               />
             )
           })}
@@ -117,7 +130,7 @@ export function VerdelingStaaf({ segments, showLegend = true }: VerdelingStaafPr
                   {pct}%
                 </span>
                 <span className="shrink-0 font-mono text-xs tabular-nums text-[var(--ink)]">
-                  {formatCurrency(s.value)}
+                  {fc(s.value)}
                 </span>
               </li>
             )

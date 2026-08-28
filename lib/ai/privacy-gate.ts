@@ -34,6 +34,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { NextResponse } from 'next/server'
 import { errorResponse } from '@/lib/api/respond'
+import { AI_ERROR_CODE, AI_DISABLED_GATE_MESSAGE } from './error-copy'
 import {
   executionGroupInfo,
   resolveExecutionMode,
@@ -41,8 +42,15 @@ import {
   type AiExecutionPrefsRow,
 } from './execution-groups'
 
-/** De stabiele foutcode waarop de client de privé-blokkade herkent. */
-export const PRIVACY_GATE_CODE = 'privacy_mode_active'
+/**
+ * De stabiele foutcode waarop de client de privé-blokkade herkent.
+ *
+ * De waarde komt uit `lib/ai/error-copy.ts` — dáár staat de canonieke tabel
+ * code → tekst → affordance (H27). Dit blijft een re-export zodat bestaande
+ * importeurs (`app/api/report`, `app/api/calculators/publish`, de tests)
+ * ongewijzigd blijven werken.
+ */
+export const PRIVACY_GATE_CODE = AI_ERROR_CODE.privacyGate
 
 /**
  * De stabiele foutcode voor de kill-switch. Bewust NIET `privacy_mode_active`:
@@ -50,14 +58,15 @@ export const PRIVACY_GATE_CODE = 'privacy_mode_active'
  * /mijn/privacy, niet de uitvoerkeuze), en een client die beide op één code
  * moet onderscheiden gaat op de meldingstekst matchen.
  */
-export const AI_DISABLED_CODE = 'ai_disabled'
+export const AI_DISABLED_CODE = AI_ERROR_CODE.aiDisabled
 
 /**
  * De 403-tekst bij een uitgezette kill-switch. Eén formulering voor alle
  * cloud-AI-routes: hij benoemt de oorzaak (eigen keuze) én de weg terug.
+ * Woont in `error-copy.ts` (client én server delen hem); hier alleen
+ * doorgegeven.
  */
-export const AI_DISABLED_GATE_MESSAGE =
-  'AI staat uit in je instellingen. Via Mijn → Privacy kun je AI weer aanzetten.'
+export { AI_DISABLED_GATE_MESSAGE }
 
 /** Postgres-foutcode voor "kolom bestaat niet" (undefined_column). */
 const UNDEFINED_COLUMN = '42703'

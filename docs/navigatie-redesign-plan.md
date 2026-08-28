@@ -117,6 +117,13 @@ CLAUDE.md beschrijft de Kern → Categorie → App-hiërarchie; apps leven als *
 - Back-knop op een categorie-pagina met actieve app-tab gaat terug naar Kern (categorie-overzicht), niet naar items-tab.
 - Sidebar tag-strip (zie §3.3) linkt **alleen naar categorieën**, niet naar apps. Apps zijn binnen-categorie-context.
 - Op mobile geldt hetzelfde: tab-switch is in-page, geen stack-push.
+- **Tegenhanger (bevinding M10, besluit 26-08-2026 — optie B):** juist omdát de
+  app-strip contextueel is, is een app die je nog niet hebt geactiveerd nergens
+  te zien. Het **commandopalet** is daarom de permanente "alle apps"-ingang:
+  `APP_PAGES` in `lib/command-palette/navigation-index.ts` wordt afgeleid uit
+  dezelfde `OVERVIEW_APP_SUBROUTES` en toont álle apps, altijd, bewust zónder
+  `requiredModule`. De zijbalk blijft rustig; ontdekken doe je via ⌘K
+  (zoekterm "app"). Bewaakt door `navigation-index.apps.test.ts`.
 
 ### 2.6 Module-fallback bij afgesloten modules
 CLAUDE.md punt 2: *"Bouw nooit een feature die stilzwijgend breekt of lege data toont omdat een andere module uit staat."*

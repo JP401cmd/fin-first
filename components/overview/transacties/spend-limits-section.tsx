@@ -63,6 +63,7 @@ import {
 } from 'lucide-react'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { ModalFooter } from '@/components/app/modal-footer'
+import { TapTarget } from '@/components/editorial/tap-target'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
@@ -838,7 +839,7 @@ function SpendLimitCard({
             <p className="mt-1 text-xs font-medium text-[var(--ink-3)]">Gepauzeerd</p>
           )}
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-3">
           <IconButton label={config.isActive ? 'Pauzeren' : 'Hervatten'} onClick={onTogglePause}>
             {config.isActive ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
           </IconButton>
@@ -959,6 +960,12 @@ function Stat({ label, children }: { label: string; children: React.ReactNode })
   )
 }
 
+/**
+ * Icoonknop in de kaart-actiekolom. Blijft visueel 32×32 (de kaartkop is smal),
+ * maar het raakgebied is 44×44 via de gedeelde TapTarget-primitive (M19). De
+ * rij eromheen staat daarom op `gap-3` (12px): 32 + 12 = 44px steek, zodat de
+ * opgerekte raakgebieden elkaar niet overlappen.
+ */
 function IconButton({
   label,
   onClick,
@@ -969,15 +976,14 @@ function IconButton({
   children: React.ReactNode
 }) {
   return (
-    <button
-      type="button"
+    <TapTarget
+      label={label}
+      hit="extend"
       onClick={onClick}
-      aria-label={label}
-      title={label}
-      className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+      className="h-8 w-8 cursor-pointer rounded-full border border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-2)] hover:bg-[var(--subtle)]"
     >
       {children}
-    </button>
+    </TapTarget>
   )
 }
 

@@ -3,6 +3,7 @@
 import { useRef } from 'react'
 import { RotateCcw, AlertTriangle } from 'lucide-react'
 import { generatePalette, SHADES, contrastRatio } from '@/lib/color-palette'
+import { TapTarget } from '@/components/editorial/tap-target'
 
 export interface ColorPreset {
   hex: string
@@ -115,26 +116,31 @@ export function ColorPickerCard({
         </p>
       )}
 
-      {/* Preset swatches */}
+      {/* Preset swatches. Raakgebied: de swatch blijft visueel 20×20, maar de
+          knop eromheen reserveert 44×44 (M19). `reserve` i.p.v. `extend` omdat
+          de swatches in een raster naast elkaar staan — een opgerekt raakgebied
+          zou over de buurman heen vallen. Tussenruimte mee omhoog naar 8px. */}
       {presets.length > 0 && (
-        <div className="mb-1.5 flex flex-wrap gap-1">
+        <div className="mb-1.5 flex flex-wrap gap-2">
           {presets.map((preset) => {
             const active = value.toLowerCase() === preset.hex.toLowerCase()
             return (
-              <button
+              <TapTarget
                 key={preset.hex}
-                type="button"
-                onClick={() => onChange(preset.hex)}
-                aria-label={`${label}: ${preset.name}`}
-                aria-pressed={active}
-                className={`h-5 w-5 rounded-full border-2 transition-all hover:scale-110 ${
-                  active
-                    ? 'border-[var(--ink)] scale-110'
-                    : 'border-[var(--border-ed)]'
-                }`}
-                style={{ backgroundColor: preset.hex }}
+                label={`${label}: ${preset.name}`}
                 title={preset.name}
-              />
+                aria-pressed={active}
+                onClick={() => onChange(preset.hex)}
+                className="group"
+              >
+                <span
+                  aria-hidden="true"
+                  className={`block h-5 w-5 rounded-full border-2 transition-all group-hover:scale-110 ${
+                    active ? 'border-[var(--ink)] scale-110' : 'border-[var(--border-ed)]'
+                  }`}
+                  style={{ backgroundColor: preset.hex }}
+                />
+              </TapTarget>
             )
           })}
         </div>

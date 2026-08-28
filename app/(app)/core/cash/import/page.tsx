@@ -1409,7 +1409,7 @@ export default function ImportPage() {
       <NavStackMeta title="Transacties importeren" />
       <header className="mb-5 sm:mb-8 space-y-2">
         <Kicker>Cash · Importeren</Kicker>
-        <EditorialHeadline level="h1" emphasis="importeren" size="lg">
+        <EditorialHeadline level="h2" emphasis="importeren" size="lg">
           Transacties importeren
         </EditorialHeadline>
         <EditorialDeck>

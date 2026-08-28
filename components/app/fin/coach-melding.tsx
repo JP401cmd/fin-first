@@ -33,17 +33,28 @@ export function CoachMelding({
       aria-label={headerLabel}
     >
       {/* platen-kop: label links, rechts ruimte voor de avatar */}
-      <div className="flex min-h-[2.75rem] items-center border-b border-[var(--border-ed)] pl-3.5 pr-12">
+      {/* pr-24 = 96px: houdt de kop vrij van de 44px-tapzone (48-92px) én de
+          avatar (0-46px), zodat labeltekst nooit ónder de sluitknop loopt. */}
+      <div className="flex min-h-[2.75rem] items-center border-b border-[var(--border-ed)] pl-3.5 pr-24">
         <span className="min-w-0 truncate font-mono text-[10px] uppercase tracking-[0.2em] text-wil-700">
           {headerLabel}
         </span>
       </div>
 
+      {/*
+        Tapzone 44x44 (h-11 w-11) om het onveranderd kleine kruisje — de
+        app-brede touch-target-eis. De rechteroffset is `right-12` (48px) en
+        niet minder: de enige Fin-avatar hangt als los element op `right:10px`
+        en is 36px breed, dus hij loopt tot 46px vanaf rechts. De knopbox
+        begint daar net links van (48-92px) en raakt hem niet — zie de
+        "Hoek-anker-element naast sluitknop"-regel in de ui-ux-patroonkaarten.
+        `top-0 h-11` vult exact de platen-kop (min-h-[2.75rem]).
+      */}
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onClose() }}
         aria-label="Sluiten"
-        className="absolute right-14 top-2.5 z-10 p-1 text-[var(--ink-4)] transition-colors hover:text-[var(--ink-2)]"
+        className="absolute right-12 top-0 z-10 flex h-11 w-11 items-center justify-center text-[var(--ink-4)] transition-colors hover:text-[var(--ink-2)]"
       >
         <X className="h-3.5 w-3.5" />
       </button>

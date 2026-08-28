@@ -2096,7 +2096,7 @@ Route-status vooraf (verhouding nieuw vs. legacy):
 - **/core/assets** en **/core/assets/[type]** zijn nog volwaardig live (géén redirect) en worden intern nog aangestuurd: kaart-klik vanuit het overzicht navigeert naar `/core/assets/[type]?asset=<id>`, de bewerk-knop zet de URL op `/core/assets?asset=<id>&edit=1`, en de "Terug naar Vermogen"-link op de holdings-pagina wijst naar `/core/assets`.
 - **/core/assets/cash/[accountId]** is een pure redirect naar `/overzicht/cashflow#rekening-<assetId>`.
 - **/holdings/[id]** (app-root) rendert altijd `notFound()` — een bewuste 404-guard, geen UI.
-- Sidebar-apps linken naar `/overzicht/bezittingen/investment?tab=aandelen-holdings`, `/overzicht/bezittingen/crypto?tab=crypto-holdings` en `/overzicht/bezittingen/real_estate?tab=verhuurrendement` (lib/nav-config.ts r156-159); die app-entries verschijnen alleen wanneer minstens één asset de bijbehorende tracking-vlag heeft.
+- Sidebar-apps linken naar `/overzicht/bezittingen/investment`, `/overzicht/bezittingen/crypto` en `/overzicht/bezittingen/real_estate` — sinds M41 (28 aug 2026) **zonder** `?tab=`-deeplink, zodat een klik in Eenvoudig op de gewone categorielijst landt en niet in de verdiepingstab die BEZ-4 daar buiten het standaardpad houdt (`OVERVIEW_APP_SUBROUTES` in lib/nav-config.ts; de deeplink staat daar apart als `tabHref` en wordt alleen door het commandopalet gebruikt). Die app-entries verschijnen alleen wanneer minstens één asset de bijbehorende tracking-vlag heeft.
 
 ---
 
@@ -5661,17 +5661,19 @@ Alle workflows zijn gebaseerd op de daadwerkelijke code onder `app/(app)/mijn/**
 #### WF-MIJN-01 — Mijn-hub verkennen en naar een instellingenpagina navigeren
 - **Doel:** De gebruiker vindt vanuit één overzicht alle persoonlijke instellingen en springt naar het juiste onderwerp.
 - **Trigger/startpunt:** De gebruiker opent `/mijn` (tab "Mijn" in de hoofdnavigatie).
-- **Eindresultaat:** De gebruiker staat op de gekozen subpagina (bijv. Profiel of Uiterlijk); de tab-balk bovenaan toont de actieve sectie.
+- **Eindresultaat:** De gebruiker staat op de gekozen subpagina (bijv. Profiel of Uiterlijk); de tab-balk op die subpagina toont de actieve sectie.
 - **Stappen:**
-  1. Open "Mijn" in de hoofdnavigatie.
-  2. Bekijk het kaart-grid met 9 kaarten: Profiel, Account, Privacy, Koppelingen, Uiterlijk, Notificaties, Check-ins, Rapportages, Geavanceerd.
-  3. Klik een kaart (of gebruik de tab-balk bovenaan) en controleer dat de juiste pagina opent.
-  4. Klik op de pagina-`i` (PageInfoButton) rechtsboven en controleer dat de pagina-uitleg verschijnt.
-- **Schermen/componenten:** `/mijn` — `app/(app)/mijn/page.tsx`, `components/mijn/mijn-overview.tsx`, tab-balk `components/app/module-nav.tsx` + `lib/navigation.ts#mijnNav`, layout `app/(app)/mijn/layout.tsx` (zet Wil-accent op de hele tak).
+  1. Open "Mijn" in de hoofdnavigatie. Let op: op `/mijn` zelf staat sinds MIJN-1 (fase 4) géén tab-balk — die herhaalde het grid exact; op de subpagina's staat hij er wél.
+  2. Bekijk het kaart-grid met **7** kaarten: Profiel, Privacy, Koppelingen, Uiterlijk, Notificaties, Check-ins, Geavanceerd. Account en Rapportages staan hier sinds bevinding M14 bewust niet meer (elk al een vaste ingang elders).
+  3. Herhaal in **Eenvoudig**: vier kaarten vooraan (Profiel, Privacy, Koppelingen, Uiterlijk), de andere drie achter de ingeklapte sectie "Alle instellingen" (S8). Klap 'm open en controleer dat de drie er ongewijzigd in staan.
+  4. Klik een kaart en controleer dat de juiste pagina opent.
+  5. Klik op de pagina-`i` (PageInfoButton) rechtsboven en controleer dat de pagina-uitleg verschijnt.
+- **Schermen/componenten:** `/mijn` — `app/(app)/mijn/page.tsx`, `components/mijn/mijn-overview.tsx`, `components/app/depth-section.tsx`, tab-balk `components/app/module-nav.tsx` (`hideOnBasePath`) + `lib/navigation.ts#mijnNav`, layout `app/(app)/mijn/layout.tsx` (zet Wil-accent op de hele tak).
 - **Kriticiteit:** OVERIG
 - **Rekenend:** nee
 - **Varianten & randgevallen:**
-  - De kaart "Rapportages" verwijst naar `/rapportages` (buiten deze scope).
+  - Rapportages is vanaf hier niet meer bereikbaar; de vaste ingang staat in de desktop-zijbalk (`/rapportages`, buiten deze scope).
+  - Toetsenbord in Eenvoudig: met een dichte sectie springt Tab van de laatste primaire kaart naar de disclosure-knop, niet in de weggevouwen links (`inert`).
   - De kaarten Check-ins en Feedback staan níet in de tab-balk; Check-ins wel in het grid, Feedback in geen van beide (zie Ongedekte UI).
 - **Cross-module effecten:** geen (navigatie).
 
@@ -6071,7 +6073,7 @@ Alle workflows zijn gebaseerd op de daadwerkelijke code onder `app/(app)/mijn/**
 
 #### WF-MIJN-21 — Partner-transactiemeldingen configureren
 - **Doel:** De gebruiker kiest wanneer een melding komt over transacties van de partner: alles, boven een drempel, per categorie of nooit.
-- **Trigger/startpunt:** `/mijn/notificaties`, blok "Partner transacties" (alleen zichtbaar mét huishouden; deeplink-anker `#partner-transacties`).
+- **Trigger/startpunt:** `/mijn/notificaties`, blok "Partner transacties" (deeplink-anker `#partner-transacties`). Zichtbaar bij een huishouden met **twee** leden — sinds S10 is de poort `GET /api/household/status` met `has_household && members.length > 1`. Een openstaande uitnodiging maakt het huishouden al aan met één lid; op dát criterium zouden partner-modi verschijnen zonder partner.
 - **Eindresultaat:** Melding "Partner-notificaties opgeslagen!"; toekomstige partner-transactiemeldingen volgen de gekozen modus.
 - **Stappen:**
   1. Kies een van de vier radio-opties: Alle gedeelde transacties / Boven drempelbedrag / Geselecteerde categorieën / Uitgeschakeld.
@@ -11594,11 +11596,12 @@ Drie workflows zijn hier bewust géén volledig scenario maar een verwijsregel, 
 - **Kriticiteit:** OVERIG · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~3 min
 - **Preconditie:** ingelogd, willekeurig testaccount (bv. daan@test.trifinity.nl / Test2026!).
 - **a. Happy path:**
-  1. Open "Mijn" in de hoofdnavigatie → *verwacht:* een kaart-grid met 9 kaarten (Profiel, Account, Privacy, Koppelingen, Uiterlijk, Notificaties, Check-ins, Rapportages, Geavanceerd).
-  2. Klik de kaart "Profiel" → *verwacht:* `/mijn/profiel` opent; de tab-balk bovenaan (Overzicht/Profiel/Account/Notificaties/Uiterlijk/Privacy/Koppelingen/Geavanceerd) toont "Profiel" actief.
-  3. Klik de pagina-`i` rechtsboven → *verwacht:* een korte pagina-uitleg verschijnt.
-  4. Wissel via de tab-balk naar "Uiterlijk" → *verwacht:* `/mijn/uiterlijk` opent, tab wisselt mee.
-  **Eindresultaat:** navigatie via kaart-grid én tab-balk werkt consistent. Let op: vanaf een subpagina is er geen tab terug naar "Check-ins" (alleen via de `/mijn`-root-kaart); de kaart "Rapportages" verwijst naar `/rapportages` (buiten dit testgebied).
+  1. Open "Mijn" in de hoofdnavigatie in **Volledig** → *verwacht:* een kaart-grid met 7 kaarten (Profiel, Privacy, Koppelingen, Uiterlijk, Notificaties, Check-ins, Geavanceerd) en géén tab-balk boven het grid.
+  2. Zet de weergave op **Eenvoudig** (⌘K of `/mijn/uiterlijk`) en keer terug → *verwacht:* vier kaarten (Profiel, Privacy, Koppelingen, Uiterlijk) plus een ingeklapte sectie "Alle instellingen" met de samenvatting "Notificaties, check-ins en geavanceerde opties zoals exports."; één klik opent haar en toont de drie resterende kaarten ongewijzigd.
+  3. Klik de kaart "Profiel" → *verwacht:* `/mijn/profiel` opent; de tab-balk op die subpagina (Overzicht/Profiel/Account/Notificaties/Uiterlijk/Privacy/Koppelingen/Geavanceerd) toont "Profiel" actief.
+  4. Klik de pagina-`i` rechtsboven → *verwacht:* een korte pagina-uitleg verschijnt.
+  5. Wissel via de tab-balk naar "Uiterlijk" → *verwacht:* `/mijn/uiterlijk` opent, tab wisselt mee.
+  **Eindresultaat:** navigatie via kaart-grid én tab-balk werkt consistent, en de weergavemodus verandert alleen de rangorde — nooit de bereikbaarheid. Let op: vanaf een subpagina is er geen tab terug naar "Check-ins" (alleen via de `/mijn`-root-kaart); Account en Rapportages hebben elk hun eigen vaste ingang buiten dit grid.
 
 ---
 

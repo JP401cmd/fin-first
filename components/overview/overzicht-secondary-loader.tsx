@@ -13,7 +13,7 @@ import {
   loadLatestCheckinForBriefing,
   type FreedomHeroProps,
 } from '@/lib/briefing/overview-briefing'
-import { getOrCreateWeeklySnapshot, canRefreshToday } from '@/lib/briefing/snapshot'
+import { getOrCreateWeeklySnapshot, canRefreshToday, refreshStateToday } from '@/lib/briefing/snapshot'
 import { BRIEFING_ROTATION_COOKIE, parseRotationOffset } from '@/lib/briefing/rotation'
 import { loadTopMarketBriefing } from '@/lib/briefing/news-market'
 import { collectAandachtspunten } from '@/lib/aandachtspunten-loader'
@@ -22,6 +22,7 @@ import { resolveFreedomAgeView, fireAgeForDisplay } from '@/lib/fire-strategy'
 import { PageStatusSeed } from '@/components/app/page-status-provider'
 import { computePageStatusInfo, readMinimizedLevel } from '@/lib/page-status/compute'
 import type { BriefingWeekHistoryItem } from '@/components/overview/briefing-panel'
+import type { BriefingRefreshState } from '@/lib/types/briefing'
 import type { HefbomenHousingSplit } from './overzicht-hero/hefbomen-nav'
 import { MiniNetWorthChart } from './mini-networth-chart'
 import { dailyExpenseRate } from '@/lib/format'
@@ -156,6 +157,11 @@ export async function OverzichtSecondaryLoader({
   let briefingEntries = composedBriefing
   let briefingRefreshedAt: string | null = null
   let briefingCanRefresh = false
+  // L9: default 'available' — in huishoud-/partnerweergave bestaat er geen
+  // persoonlijke snapshot, dus dan hoort de knop helemaal niet te verschijnen
+  // (canRefresh blijft false EN de staat is niet 'used_today'). Alleen in eigen
+  // weergave dragen we de echte reden mee.
+  let briefingRefreshState: BriefingRefreshState = 'available'
   let briefingDataChanged = false
   let briefingWeekHistory: BriefingWeekHistoryItem[] | undefined
   // Hero uit live data; in de eerste week (geen basis) toont hij het totaal.
@@ -190,6 +196,7 @@ export async function OverzichtSecondaryLoader({
     briefingEntries = snapshot.entries
     briefingRefreshedAt = snapshot.refreshedAt
     briefingCanRefresh = canRefreshToday(snapshot)
+    briefingRefreshState = refreshStateToday(snapshot)
     briefingWeekHistory = snapshot.history
     // Hero uit de bevroren snapshot → stabiel de hele week.
     if (snapshot.freedomSnapshot) {
@@ -253,6 +260,7 @@ export async function OverzichtSecondaryLoader({
         briefingWeekHistory={briefingWeekHistory}
         briefingRotation={briefingRotation}
         briefingCanRefresh={briefingCanRefresh}
+        briefingRefreshState={briefingRefreshState}
         freedomHero={freedomHero}
         briefingHeadline={briefingHeadline}
         dashboardData={dashboardData}

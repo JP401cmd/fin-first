@@ -213,7 +213,7 @@ export default function BeheerCoachPage() {
           </label>
 
           <label className="block">
-            <span className="text-xs font-medium text-[var(--ink-2)]">Auto-sluiten na (sec)</span>
+            <span className="text-xs font-medium text-[var(--ink-2)]">Auto-sluiten na uittypen (sec)</span>
             <input
               type="number"
               min={3}
@@ -223,7 +223,7 @@ export default function BeheerCoachPage() {
               onChange={(e) => updateTiming('autoDismissMs', parseFloat(e.target.value))}
               className="mt-1 w-full rounded-lg border border-[var(--border-md)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] focus:border-[var(--ink-3)] focus:outline-none"
             />
-            <span className="mt-1 block text-[10px] text-[var(--ink-4)]">3–600s, standaard 45s</span>
+            <span className="mt-1 block text-[10px] text-[var(--ink-4)]">3–600s, standaard 8s — telt pas vanaf het moment dat de tekst volledig is uitgetypt</span>
           </label>
         </div>
       </div>

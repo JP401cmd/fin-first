@@ -10,34 +10,51 @@
  * `buildCashflowCards` en hier alleen gerenderd. Het icoon + de tint per
  * onderdeel zitten client-side (kunnen niet geserialiseerd worden).
  *
- * ── EENVOUDIG (CF-1 · CF-2 uit docs/eenvoudige-weergave-audit.md) ───────────
- * Dit spiegelt `ToekomstNavCards` (components/future/toekomst-nav-cards.tsx)
- * één op één — /toekomst is in de audit het voorbeeld dat de rest hoort te
- * volgen, dus hier geen tweede variant:
+ * ── EENVOUDIG — HERZIEN 28 aug 2026 (S4, release R5) ────────────────────────
+ * Richtingsbesluit R5: **duiding boven reductie**. Eenvoudig moet niet mínder
+ * tonen maar begrijpelijker tonen. De hub deed het omgekeerde: de H1 vroeg
+ * *"Hoeveel vrijheid zet je elke maand opzij?"* en Eenvoudig antwoordde met
+ * drie kale navigatieknoppen — geen cijfer, geen oordeel, geen status-dot.
  *
- *  · CF-1 — de kaarten renderen COMPACT (`compact`-prop van LeverageCard):
- *    één regel met icoon + label, géén KPI/venster/substext/status-dot. Tot nu
- *    toe verdween in Eenvoudig alleen de chevron, waardoor de "rustige" modus
- *    even veel cijfers toonde als de volledige.
- *  · CF-2 — de Forecast-kaart verdwijnt (4 → 3). Forecast is geen landings-
- *    belofte; de toekomst leeft op /toekomst. De ROUTE blijft bereikbaar
- *    (/overzicht/cashflow/forecast) en de sidebar-status-dot blijft staan: de
- *    server-seed in cashflow-cards-loader.tsx projecteert nog steeds ALLE vier
- *    de kaarten, dus dit is puur een landings-reductie.
+ * Wat er nu staat, per kaart: **oordeel primair, kerngetal secundair mét
+ * venster** — de `verdict`-variant van de gedeelde `LeverageCard` (kaart S1).
+ * Er is geen nieuwe som en geen nieuw veld: `buildCashflowCards` levert `kpi`,
+ * `subText`, `status` en `kpiWindow` al mode-onafhankelijk server-side; deze
+ * call-site hield alleen op ze weg te gooien.
  *
- *  · CF-3 — het venster-label ("in augustus tot nu toe") staat ALLEEN in
- *    Volledig, onder de KPI van de Transacties-kaart. HERZIEN 10 aug 2026 na een
- *    melding van een testgebruiker; eerder gaf deze call-site `subAmount`
- *    onvoorwaardelijk door ("optie A"). De reden van CF-3 hangt aan het CIJFER:
- *    het label bestaat om te voorkomen dat het maandcijfer verward wordt met de
- *    30-dagen-cijfers op /overzicht/cashflow/transacties. In Eenvoudig toont de
- *    compacte kaart sinds CF-1 helemaal geen KPI meer — er is dan niets om een
- *    venster bij te zetten, en het label werd losse tekst onder een label. Valt
- *    het cijfer weg, dan valt de reden voor het label weg.
+ * Drie eerdere audit-besluiten worden hiermee bewust herzien:
+ *  · **CF-1** (compacte one-liner zonder cijfer) — teruggedraaid. De one-liner
+ *    was reductie zonder duiding; precies waar R5 tegenin gaat.
+ *  · **CF-3-herziening van 10 aug** (venster alleen in Volledig) — vervalt met
+ *    zijn eigen redenering: die luidde *"in Eenvoudig draagt de kaart geen
+ *    cijfer, dus valt met het cijfer ook de reden voor het venster weg"*. Het
+ *    cijfer is terug, dus het venster is terug — en nu VERPLICHT op elke kaart
+ *    (zie `SIMPLE_KPI_WINDOW`). Een KPI zonder venster is exact de
+ *    dubbelzinnigheid die CF-3 destijds oploste.
+ *  · **CF-2** (Forecast-kaart weg, 4 → 3) — teruggedraaid op kaart S5, één stap
+ *    later. Het argument van CF-2 luidde *"Forecast is geen landingsbelofte"*,
+ *    maar de werkelijke schade was een KAPOTTE VERWIJSKETEN: op mobiel is deze
+ *    kaart de enige contextuele ingang naar /overzicht/cashflow/forecast (het
+ *    `Cashflow`-item in `lib/nav-config.ts` heeft geen `children`, dus de
+ *    NavMenuSheet toont de sub-pagina's niet). Sinds FC-1 (9 aug 2026) heeft die
+ *    pagina bovendien een eigen Eenvoudig-vorm — een samenvattend blok met
+ *    sparkline — dus de reden om er niet naartoe te wijzen verviel. Alle vier de
+ *    kaarten staan er nu in béide modi.
  *
- * De MODUS-AFHANKELIJKE reducties raken Volledig niet: `simple` is false, dus
- * `compact`/de CF-2-filter/het afwijkende raster/de CF-3-gating doen daar niets.
- * Volledig blijft dus wat het was, inclusief de venster-regel onder de KPI.
+ * ── PRIVACY-MASKING (nieuw, S4) ─────────────────────────────────────────────
+ * Dit pad had er GEEN. De KPI's worden server-side in `buildCashflowCards` met
+ * `formatCurrency` tot strings geformatteerd, dus `MaskedAmount`/
+ * `formatMaskedCurrency` (die een `number` willen) konden er niet bij — terwijl
+ * de hefbomen-rij op /overzicht wél maskeert. Zolang Eenvoudig geen cijfer
+ * toonde viel dat nauwelijks op; met de cijfers terug zouden ze zich óók met de
+ * privacy-toggle aan laten zien, in de modus die de standaard is voor nieuwe
+ * accounts. `maskCurrencyInText` (lib/format.ts) maskeert daarom hier de
+ * bedragen ín de al samengestelde strings — in BEIDE modi, inclusief de
+ * drill-down. Percentages, aantallen en venster-labels blijven staan: die zijn
+ * geen bedrag.
+ *
+ * Volledig blijft verder ongewijzigd: `simple` is daar false, dus de
+ * `verdict`-variant, het afwijkende raster en de CF-2-filter doen er niets.
  */
 
 import { useState } from 'react'
@@ -51,8 +68,14 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { LeverageCard } from './leverage-card'
-import { leverageStatusBgClass, leverageStatusTextClass } from '@/lib/leverage-status'
+import {
+  LEVERAGE_STATUS_LABEL,
+  leverageStatusBgClass,
+  leverageStatusTextClass,
+} from '@/lib/leverage-status'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { maskCurrencyInText } from '@/lib/format'
 import type { CashflowCard, CashflowCardKey } from '@/lib/cashflow-cards'
 
 const VISUAL: Record<CashflowCardKey, { Icon: LucideIcon; tint: string }> = {
@@ -63,34 +86,80 @@ const VISUAL: Record<CashflowCardKey, { Icon: LucideIcon; tint: string }> = {
 }
 
 /**
- * Rasters per weergave. Eenvoudig stapelt op mobiel (een one-liner-kaart met
- * label "Vaste lasten" moet één regel blijven) en zet de drie kaarten vanaf
- * `sm` naast elkaar — exact het raster dat ToekomstNavCards in Eenvoudig
- * gebruikt. Gedeeld met de skeleton hieronder zodat fallback en inhoud niet uit
- * elkaar kunnen lopen.
+ * ÉÉN raster voor beide weergaven. Gedeeld met de skeleton hieronder zodat
+ * fallback en inhoud niet uit elkaar kunnen lopen.
+ *
+ * HERZIEN 28 aug 2026 (S4 + S5). Er waren twee rasters, omdat Eenvoudig één
+ * kaart minder toonde (CF-2) en die kaarten one-liners waren (CF-1) die op
+ * mobiel gestapeld werden. Beide redenen zijn vervallen: de kaarten dragen nu in
+ * beide modi hun oordeel + cijfer, en het zijn er in beide modi vier.
  */
-const SIMPLE_GRID = 'grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3'
-const FULL_GRID = 'grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3'
+const CARD_GRID = 'grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3'
 
-/** De kaart die in Eenvoudig van de landing verdwijnt (CF-2). */
-const SIMPLE_HIDDEN_CARD: CashflowCardKey = 'forecast'
+/**
+ * VENSTER-LABEL PER KAART — verplicht in de `verdict`-variant (S4).
+ *
+ * Een KPI zonder venster is precies de dubbelzinnigheid die CF-3 oploste: "€
+ * 1.240" zegt niets zolang niet vaststaat óf dat deze maand, de laatste dertig
+ * dagen of per maand is. Waar `card.kpiWindow` al gevuld is (Transacties) wint
+ * die: dat is de canonieke, datum-gedreven meetlat uit `lib/cashflow-cards.ts`
+ * (`currentMonthWindowLabel`). Voor de overige kaarten is het venster CONSTANT
+ * en datum-onafhankelijk, dus staat het hier als vaste copy — géén tweede
+ * datumafleiding in de client (die zou op een maandgrens uit de pas lopen met
+ * de server-render).
+ *
+ * `vaste-lasten` staat er bewust NIET in: die kaart krijgt `card.subText` (de
+ * quote, "42% van inkomen") als meetlat onder het bedrag — zie de call-site.
+ */
+const SIMPLE_KPI_WINDOW: Partial<Record<CashflowCardKey, string>> = {
+  budget: 'nog te besteden deze maand',
+  transacties: 'deze maand',
+  forecast: 'verwacht over zes maanden',
+}
+
+/**
+ * Het OORDEEL en de MEETLAT per kaart in de `verdict`-variant.
+ *
+ * Drie van de vier kaarten dragen op `subText` al een oordeel in gewone taal
+ * ("Op schema", "Tekort deze maand", "Saldo groeit") — die gaat één op één naar
+ * de verdict-regel.
+ *
+ * `vaste-lasten` is de uitzondering: dáár is `subText` géén oordeel maar een
+ * VERHOUDING ("42% van inkomen"). Dat als verdict-regel zetten zou de status
+ * alleen nog via kleur dragen, en dat is precies wat de S1-regel verbiedt: *een
+ * status draagt altijd een woord.* Daarom draait deze kaart om — het woord uit
+ * `LEVERAGE_STATUS_LABEL` wordt het oordeel, de quote zakt naar de meetlat
+ * onder het bedrag ("€ 1.056/mnd · 42% van inkomen"). Dat is dezelfde
+ * woordenlijst die de vaste-lasten-detailpagina gebruikt (kaart S2), zodat
+ * hub-oordeel en pagina-oordeel niet uiteen kunnen lopen.
+ */
+function verdictLine(card: CashflowCard): string {
+  if (card.key === 'vaste-lasten' && card.subText && card.kpi) {
+    return LEVERAGE_STATUS_LABEL[card.status]
+  }
+  return card.subText ?? LEVERAGE_STATUS_LABEL[card.status]
+}
+
+function meterLine(card: CashflowCard): string | null {
+  // Geen cijfer (lege staat: nog geen budget/transacties) → ook geen meetlat.
+  // De verdict-regel zegt dan zelf wat er ontbreekt ("Nog geen budget").
+  if (!card.kpi) return null
+  if (card.key === 'vaste-lasten') return card.subText
+  return card.kpiWindow ?? SIMPLE_KPI_WINDOW[card.key] ?? null
+}
 
 export function CashflowLandingCards({ cards }: { cards: CashflowCard[] }) {
   // Eén kaart open per keer — accordeon, identiek aan HefbomenNav.
   const [expandedKey, setExpandedKey] = useState<CashflowCardKey | null>(null)
-  // In Eenvoudig: compacte one-liners, geen Forecast-kaart, geen uitklap-chevron.
+  // In Eenvoudig: oordeel-kaarten (verdict), geen uitklap-chevron. Alle VIER de
+  // kaarten staan er sinds S5 in beide modi — zie de CF-2-alinea in de kop.
   const simple = useDisplayMode().mode === 'simple'
-
-  const visibleCards = simple
-    ? cards.filter((card) => card.key !== SIMPLE_HIDDEN_CARD)
-    : cards
+  // Privacy-masking op de server-geformatteerde bedragstrings — zie de kop.
+  const { masked } = useMaskedAmounts()
 
   return (
-    <nav
-      aria-label="Cashflow-onderdelen"
-      className={simple ? SIMPLE_GRID : FULL_GRID}
-    >
-      {visibleCards.map((card) => {
+    <nav aria-label="Cashflow-onderdelen" className={CARD_GRID}>
+      {cards.map((card) => {
         const { Icon, tint } = VISUAL[card.key]
         const expanded = expandedKey === card.key
         return (
@@ -99,23 +168,30 @@ export function CashflowLandingCards({ cards }: { cards: CashflowCard[] }) {
             Icon={Icon}
             tint={tint}
             label={card.label}
-            kpi={card.kpi}
+            kpi={maskCurrencyInText(card.kpi, masked)}
             status={card.status}
-            subText={card.subText}
-            /* CF-3 — venster-label ("in augustus tot nu toe") onder de KPI,
-               ALLEEN in Volledig. In Eenvoudig draagt de compacte kaart geen
-               cijfer (CF-1), dus is er ook geen venster te duiden; de gating
-               zit hier op de call-site en niet in `LeverageCard`, zodat de
-               gedeelde shell generiek blijft. */
-            subAmount={simple ? null : card.kpiWindow}
+            /* Eenvoudig: het oordeel is de primaire regel (zie `verdictLine` —
+               vaste lasten draait om zodat de status een WOORD houdt).
+               Volledig: ongewijzigd `card.subText`. */
+            subText={
+              simple
+                ? maskCurrencyInText(verdictLine(card), masked)
+                : maskCurrencyInText(card.subText, masked)
+            }
+            /* Volledig houdt het CF-3-venster als `subAmount` onder de KPI;
+               `verdict` rendert `subAmount` per definitie niet en krijgt zijn
+               meetlat via `kpiWindow` hieronder. */
+            subAmount={simple ? null : maskCurrencyInText(card.kpiWindow, masked)}
+            /* VERPLICHT in Eenvoudig: elk cijfer draagt zijn venster. */
+            kpiWindow={simple ? maskCurrencyInText(meterLine(card), masked) : null}
             href={card.href}
             tooltip={card.tooltip}
-            compact={simple}
+            variant={simple ? 'verdict' : 'full'}
             expandable={!simple}
             expanded={expanded}
             onToggleExpand={() => setExpandedKey(expanded ? null : card.key)}
           >
-            <CashflowCardDetail card={card} />
+            <CashflowCardDetail card={card} masked={masked} />
           </LeverageCard>
         )
       })}
@@ -157,23 +233,33 @@ export function CashflowLandingCardsSkeleton() {
   const simple = useDisplayMode().mode === 'simple'
 
   if (simple) {
+    /* HERZIEN 28 aug 2026 (S4 + S5). De simple-fallback reserveerde drie tegels
+       met alleen een icoon + label, omdat de kaart toen een one-liner was (CF-1)
+       en de Forecast-kaart ontbrak (CF-2). Beide zijn vervallen: het zijn er
+       vier, en elk rendert de `verdict`-variant — icon-chip, label,
+       oordeel-regel en de bedrag+venster-regel. Zonder deze bijwerking zou élke
+       hub-load in Eenvoudig van drie one-liners naar vier volle tegels
+       springen: gegarandeerde CLS.
+
+       Hoogtes nageteld uit `leverage-card.tsx`, `verdict`-tak:
+         icon-chip  w-8 h-8 / sm:w-9 sm:h-9        → h-8 w-8 / sm:h-9 sm:w-9
+         label      text-sm (20px) / sm:text-base  → h-5 / sm:h-6
+         oordeel    text-sm (20px) / sm:text-base  → h-5 / sm:h-6
+         bedrag     text-[11px] leading-tight      → h-3
+       plus dezelfde `mt-2` / `mt-0.5`-ritmiek. De bedrag-regel wordt bewust
+       gereserveerd hoewel `LeverageCard` 'm bij `kpi === null` weglaat: dat is
+       de lege-account-staat, en reserveren kiest de veelvoorkomende kant. */
     return (
-      <div className={`${SIMPLE_GRID} animate-pulse`}>
-        {[0, 1, 2].map((i) => (
+      <div className={`${CARD_GRID} animate-pulse`}>
+        {[0, 1, 2, 3].map((i) => (
           <div
             key={i}
-            className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3"
+            className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-4"
           >
-            <div className="flex items-center gap-2.5">
-              <div className="h-8 w-8 shrink-0 rounded-lg bg-[var(--subtle)]" />
-              {/* Alleen het label — de compacte kaart draagt sinds de CF-3-
-                  herziening (10 aug 2026) geen venster-regel meer, dus een
-                  gereserveerde tweede regel zou hier gegarandeerd inklappen
-                  zodra de echte kaarten binnenkomen. */}
-              <div className="min-w-0 flex-1">
-                <div className="h-5 w-24 bg-[var(--subtle)] sm:h-6" />
-              </div>
-            </div>
+            <div className="h-8 w-8 rounded-lg bg-[var(--subtle)] sm:h-9 sm:w-9" />
+            <div className="mt-2 h-5 w-20 bg-[var(--subtle)] sm:h-6" />
+            <div className="mt-0.5 h-5 w-28 bg-[var(--subtle)] sm:h-6" />
+            <div className="mt-0.5 h-3 w-32 bg-[var(--subtle)]" />
           </div>
         ))}
       </div>
@@ -181,7 +267,7 @@ export function CashflowLandingCardsSkeleton() {
   }
 
   return (
-    <div className={`${FULL_GRID} animate-pulse`}>
+    <div className={`${CARD_GRID} animate-pulse`}>
       {[0, 1, 2, 3].map((i) => (
         <div
           key={i}
@@ -203,7 +289,7 @@ export function CashflowLandingCardsSkeleton() {
  * getinte achtergrond, secundaire waarde rechtsboven, 1-regel inzicht en een
  * deeplink naar de sub-pagina.
  */
-function CashflowCardDetail({ card }: { card: CashflowCard }) {
+function CashflowCardDetail({ card, masked }: { card: CashflowCard; masked: boolean }) {
   return (
     <div
       className={`mt-2 -mx-3 sm:-mx-4 px-3 sm:px-4 py-3 border-t border-[var(--border-ed)] ${leverageStatusBgClass(card.status)}`}
@@ -213,11 +299,11 @@ function CashflowCardDetail({ card }: { card: CashflowCard }) {
           {card.detail.label}
         </span>
         <span className={`text-[11px] font-mono tabular-nums font-semibold ${leverageStatusTextClass(card.status)}`}>
-          {card.detail.value}
+          {maskCurrencyInText(card.detail.value, masked)}
         </span>
       </div>
       <p className={`text-xs leading-snug ${leverageStatusTextClass(card.status)}`}>
-        {card.detail.tip}
+        {maskCurrencyInText(card.detail.tip, masked)}
       </p>
       <Link
         href={card.href}

@@ -23,7 +23,7 @@ De landing belooft vier pijlers plus één filosofie:
 ## 2 · Hoofdbevindingen
 
 1. **De keuze bestaat, maar niemand kan hem vinden.** `display_mode` ('simple' default voor nieuwe accounts) is uitsluitend via ⌘K te schakelen. Geen instelling op /mijn, geen woord in de onboarding, geen hint in de app (`components/app/hide-in-simple.tsx` sluit dat bewust uit). Wie eenvoudig start weet niet dat er meer is; wie volledig staat (alle bestaande accounts, via de backfill) weet niet dat het rustiger kan.
-2. **Eenvoudig snijdt de diepte, niet de drukte.** De reductie zit vrijwel volledig ónder de vouw (katernen, analyses, grafieken). De bovenkant van /overzicht is in beide modi bijna identiek: welkomstgids (5 schermen × 4 kaarten) + groet + 4 hefboomtegels + legenda + gezondheidsscore + vermogensgrafiek + briefing + 3 "alles bekijken"-links. Op mobiel is het **hele eerste scherm** welkomstgids. Daar ontstaat de overweldiging, niet in katern III van Box 3.
+2. **Eenvoudig snijdt de diepte, niet de drukte.** De reductie zit vrijwel volledig ónder de vouw (katernen, analyses, grafieken). De bovenkant van /overzicht is in beide modi bijna identiek: welkomstgids (5 schermen × 4 kaarten) + groet + 4 hefboomtegels + legenda + gezondheidsscore + vermogensgrafiek + briefing + 3 "alles bekijken"-links. Op mobiel is het **hele eerste scherm** welkomstgids. Daar ontstaat de overweldiging, niet in katern III van Box 3. *(Nagekomen, 28 aug 2026: de remedie hierop — APP-6 — was een halve. Comprimeren maakte de gids kleiner maar liet hem bóven de begroeting staan; H20/S13 verplaatst hem alsnog en maakt hem minimaliseerbaar. Zie de ADR 0026-aanvulling van 28 aug 2026.)*
 3. **De dekking is ongelijk.** /toekomst is het voorbeeld (3 platte kaarten, 3 KPI's, geen fasebalk/playback); Box 1/2/3 en transacties zijn goed gereduceerd. Maar /mijn (9 kaarten + duplicerende tabbalk), notificaties (8 typen + 4 partner-modi), doelen, forecast, de sidebar, de welkomstgids en de mobiele topbar (4 losse statuspunten) negeren de modus volledig.
 4. **Jargon lekt door in Eenvoudig.** "Onzekerheid (P40–P60)", "YTD", "Verken je Box 3-positie", editienummers/jaargang in de krant-masthead. De doelgroep van Eenvoudig is precies wie dit afschrikt.
 5. **Er zijn dubbele ingangen.** Tips & acties / Berichten / Nieuws / briefing = vier plekken voor "wat vraagt aandacht"; /mijn-tabbalk dupliceert het kaartengrid; RAPPORT-knop naast /rapportages; feedback via chat-megafoon én /mijn/feedback; onboarding vraagt bezittingen/schulden die de welkomstgids daarna nóg eens vraagt.
@@ -33,6 +33,7 @@ De landing belooft vier pijlers plus één filosofie:
 
 - **/toekomst in Eenvoudig** is de norm: compacte one-liner-kaarten (`leverage-card` met `compact`-prop), KPI's 4→3, bediening weg, detail achter kassabon-sheets.
 - `FiguresStrip`-reductie (bezittingen 4→1, budget 4→2), pill-lijsten i.p.v. kaart-grids, budget geforceerd op pill-weergave, transacties-analyse van ~8 blokken naar gauge + tijdlijn, Box 3-katernen verborgen.
+  *(Herzien 28 aug 2026 — S11: "bezittingen 4→1" hoorde hier niet. Het was géén `SIMPLE_MAX_FIGURES`-reductie maar een handgerolde call-site-ternary met twee losse arrays — het derde mechanisme dat ADR 0026 juist verbiedt — en de één cel die overbleef was niet gewogen: het eigen rendement viel weg terwijl de beheerkosten-teaser eronder bleef staan. Nu één array + `simpleFigures`, dus 4→2 conform de norm.)*
 - Kassabon/ShellOverlay-deep-dives: detail verhuist naar een klik, verdwijnt niet.
 
 De voorstellen hieronder passen dat bestaande patroon toe op de plekken die het nog niet volgen.
@@ -60,6 +61,7 @@ De voorstellen hieronder passen dat bestaande patroon toe op de plekken die het 
 | APP-4 | **Eén ontdek-voetregel** op de zwaarst gereduceerde pagina's (Box 3, transacties, tijdas): "Je kijkt eenvoudig — meer detail in de volledige weergave →". Herziet de bewuste geen-hints-keuze in `hide-in-simple.tsx` → ADR 0026-aanvulling | F |
 | APP-5 | **Jargonregel voor Eenvoudig**: geen percentielen/afkortingen in beeld — "Onzekerheid (P40–P60)" → "bandbreedte", "YTD" → "dit jaar"; SWR/opnamerate blijft Volledig | E |
 | APP-6 ★ | **Welkomstgids comprimeren**: 4 grote kaarten → één kaart met 4 afvinkregels; "SCHERM 1 VAN 5" → stappen-dots; mobiel max ~⅓ viewport i.p.v. het hele eerste scherm | B |
+| APP-6b ★ | **Welkomstgids verpláátsen** (nágekomen, 28 aug 2026 — H20/S13): comprimeren behandelde de ómvang, niet de hiërarchie. De gids (en de check-in) zakken onder de begroeting, en het kruisje minimaliseert ze tot een knopje naast de pagina-`i` i.p.v. ze weg te gooien. Zie de ADR 0026-aanvulling van 28 aug 2026 | B |
 | APP-7 ★ | **Stripnorm**: in Eenvoudig max 2 cellen per `FiguresStrip`, app-breed. Vangt de achterblijvers (Box 1 toont nu nog 4 KPI's in Eenvoudig, schulden 3) met één regel | B |
 
 ## 6 · Navigatie, sidebar & mobiel
@@ -84,10 +86,28 @@ Nu (Eenvoudig): welkomstgids + groet + 4 hefboomtegels mét €-KPI en substatus
 | # | Voorstel | Cat |
 |---|---|---|
 | OVZ-1 ★ | `HefbomenLegenda` (3 statuslabels) in Eenvoudig weg — de uitleg hoort eenmalig in de pagina-'i' | B |
-| OVZ-2 | Hefboomtegels in Eenvoudig zonder substatusregel en zonder "excl. eigen woning · €X" (hoofdcijfer + statuspunt volstaan; detail op de duwpagina) | B |
+| OVZ-2 ⟲ | Hefboomtegels in Eenvoudig zonder substatusregel en zonder "excl. eigen woning · €X" (hoofdcijfer + statuspunt volstaan; detail op de duwpagina) | B |
 | OVZ-3 | De 3 "alles bekijken"-links onderaan → 0 in Eenvoudig (de nav heeft ze al) | D |
 | OVZ-4 ★ | Grafieklegenda in Eenvoudig: "Historisch / Projectie / Onzekerheid (P40–P60) / Tot 90" → lijn + "bandbreedte"; "tot 90" naar de 'i' | E |
 | OVZ-5 | Inspiratiekaarten (CompoundInsight/FeeImpact): max 1 tegelijk in Eenvoudig, met de bestaande verbergknop | C |
+| OVZ-5b ★ | **OVZ-5 alsnog uitgevoerd, beperkt** (28 aug 2026 — S11, besluit eigenaar): de beheerkosten-simulator gaat naar Volledig, de samengestelde-rente-kaart blijft. Daarmee staat er in Eenvoudig hóógstens één inspiratiekaart, en pas ná de figures-strip. Niet uitgevoerd: verdere herordening of een tweede verbergknop | C |
+
+> **⟲ OVZ-2 is op 28 aug 2026 gedeeltelijk teruggedraaid (kaart S1, release R5).**
+> Richtingsbesluit van de eigenaar voor heel R5: **duiding boven reductie** —
+> Eenvoudig moet niet mínder tonen maar begrijpelijker tonen. De substatusregel
+> is dáárom terug, en zelfs primair: het oordeel in gewone taal ("Hoge
+> schuldenlast") staat waar eerst het bedrag stond, het bedrag zakt naar een
+> gedempte regel eronder. Aanleiding waren drie bevindingen die de
+> oorspronkelijke rechtvaardiging ondergroeven: (a) "detail op de duwpagina"
+> gold alléén bij warn/bad — `buildInfo()` geeft `null` bij good/neutral, dus
+> positieve bevestiging was nérgens bereikbaar; (b) de status-dot was
+> `aria-hidden` met een hover-only `title`, dus met de substatusregel weg was
+> kleur het enige signaal — WCAG 2.2 §1.4.1, en op touch helemaal niets; (c) met
+> privacy-masking erbovenop hield een tegel over: icoon + label + `••••` + een
+> puntje.
+> **Wat van OVZ-2 blijft staan:** de "excl. eigen woning · €X"-regel en de
+> chevron/drill-down blijven in Eenvoudig weg — grondslag-detail respectievelijk
+> diepte, geen oordeel.
 
 ### /overzicht/bezittingen & /overzicht/schulden
 
@@ -98,7 +118,7 @@ Al goed: strip-reductie + pill-lijst. Rest:
 | BEZ-1 | "Herwaarderen"-knop alleen Volledig (beheer-diepte); "Bezitting toevoegen" blijft | A |
 | BEZ-2 | Categoriefilter pas tonen vanaf ~8 items | C |
 | BEZ-3 | Schulden-strip in Eenvoudig 3→2 (Totale schuld + Maandlasten; "Rente gewogen" → Volledig) — valt onder APP-7 | B |
-| BEZ-4 | Verdiepings-tabs (`?tab=` aandelen-/crypto-holdings, verhuurrendement, hypotheekplanner) alleen Volledig; in Eenvoudig de gewone categorielijst — consistent met NAV-1 | A |
+| BEZ-4 | Verdiepings-tabs (`?tab=` aandelen-/crypto-holdings, verhuurrendement, hypotheekplanner) alleen Volledig; in Eenvoudig de gewone categorielijst — consistent met NAV-1. **Nazorg M41 (28 aug 2026):** BEZ-4 (aangenomen) en NAV-1 (afgewezen) botsten in combinatie — het Apps-blok bleef zichtbaar én linkte rechtstreeks naar de `?tab=`-deeplink, dus één klik in Eenvoudig landde alsnog in de verdiepingstab. Opgelost door de nav-hrefs kaal te maken (`OVERVIEW_APP_SUBROUTES.href`); de deeplink leeft nu apart als `tabHref` voor het commandopalet. Beide besluiten blijven overeind. | A |
 
 ### /overzicht/cashflow (hub)
 
@@ -106,9 +126,10 @@ Nu (Eenvoudig): 4 landing-cards met KPI + rekening-pills + maandbanner; geldstro
 
 | # | Voorstel | Cat |
 |---|---|---|
-| CF-1 ★ | De 4 kaarten in Eenvoudig compact (one-liner, zoals /toekomst) — nu is alleen de chevron weg | B |
-| CF-2 ★ | **Forecast-kaart in Eenvoudig verbergen** (4→3); route blijft bereikbaar. Forecast is geen landingsbelofte — de toekomst leeft op /toekomst | A |
-| CF-3 | Maandcijfers venster-labelen: "€ 0 ontvangen **in augustus tot nu toe**" — voorkomt verwarring naast de 30-dagen-cijfers op transacties (zelfde les als ADR 0073). **Alleen in Volledig** — herzien 10 aug 2026 na melding testgebruiker: de eerste uitvoering toonde het label in beide modi ("optie A"), maar in Eenvoudig draagt de compacte kaart sinds CF-1 géén cijfer meer, dus valt met het cijfer ook de reden voor het venster weg. Gating zit op de call-site (`cashflow-landing-cards.tsx`), niet in de gedeelde `LeverageCard`. | E |
+| CF-1 ★ | ~~De 4 kaarten in Eenvoudig compact (one-liner, zoals /toekomst)~~ — **TERUGGEDRAAID 28 aug 2026 (S4).** De one-liner was reductie zónder duiding: de H1 vroeg "Hoeveel vrijheid zet je elke maand opzij?" en Eenvoudig antwoordde met drie kale navigatieknoppen — geen cijfer, geen oordeel, geen status-dot. Onder het R5-richtingsbesluit *duiding boven reductie* dragen de kaarten in Eenvoudig nu de `verdict`-variant van `LeverageCard`: oordeel primair, kerngetal mét venster secundair, status-dot terug. Volledig ongewijzigd | B |
+| CF-2 ★ | ~~**Forecast-kaart in Eenvoudig verbergen** (4→3)~~ — **TERUGGEDRAAID 28 aug 2026 (S5).** Het argument was "Forecast is geen landingsbelofte", maar de schade was een kapotte verwijsketen: op mobiel is deze kaart de énige contextuele ingang naar /overzicht/cashflow/forecast — het `Cashflow`-item in `lib/nav-config.ts` heeft geen `children`, dus de NavMenuSheet toont de sub-pagina's niet. En sinds FC-1 (9 aug 2026) heeft die pagina een eigen Eenvoudig-vorm, dus verviel de reden om er niet naartoe te wijzen. Alle vier de kaarten staan nu in béide modi; de route is nooit verborgen geweest en blijft dat | A |
+| CF-3 | Maandcijfers venster-labelen: "€ 0 ontvangen **in augustus tot nu toe**" — voorkomt verwarring naast de 30-dagen-cijfers op transacties (zelfde les als ADR 0073). **HERZIEN 28 aug 2026 (S4): weer in BEIDE modi, en in Eenvoudig verplicht op élke kaart.** De herziening van 10 aug ("alleen in Volledig") hing het venster aan het cijfer — *"in Eenvoudig draagt de compacte kaart sinds CF-1 géén cijfer meer, dus valt met het cijfer ook de reden voor het venster weg"* — en verviel toen S4 het cijfer terugbracht. Waar `card.kpiWindow` leeg is, levert de call-site een vaste venster-copy (budget: "nog te besteden deze maand"; vaste lasten: de quote als meetlat). Gating zit op de call-site (`cashflow-landing-cards.tsx`), niet in de gedeelde `LeverageCard` | E |
+| CF-5 | **Nieuw 28 aug 2026 (S4).** Privacy-masking op het hub-kaartenpad — dat ontbrak volledig: `buildCashflowCards` formatteert de bedragen server-side tot strings, waar `MaskedAmount`/`formatMaskedCurrency` (die een `number` willen) niet bij kunnen. Opgelost met `maskCurrencyInText` (`lib/format.ts`) op KPI, meetlat, substext en drill-down, in béide modi. Zonder dit zouden de teruggezette cijfers zich óók met de privacy-toggle aan laten zien | E |
 | CF-4 | Instellingenblok als disclosure, standaard dicht | C |
 
 ### /overzicht/cashflow/budget
@@ -127,18 +148,26 @@ Al goed: 6 analyseblokken verborgen. Maar vóór de inhoud staan nog: koppel-ban
 
 | # | Voorstel | Cat |
 |---|---|---|
-| TXN-1 ★ | Actie-rij in Eenvoudig: 1 primaire knop ("Nieuwe transactie") + "…"-menu (importeer, bank koppelen); koppel-banner alleen tonen zolang er 0 rekeningen gekoppeld zijn | B |
+| TXN-1 ★ | **Herzien 28 aug 2026 (M40).** Actie-rij in Eenvoudig: de drie vul-routes staan in de rij ("Nieuwe transactie", "Importeer transacties", "Bank koppelen"); alleen "Zoeken en bulkbewerken" zit achter het "…"-menu. Koppel-banner blijft: alleen tonen zolang er 0 rekeningen gekoppeld zijn. — *Oorspronkelijk (9 aug 2026) precies omgekeerd: 1 primaire knop + importeer/bank-koppelen in het "…"-menu. M40 weerlegde de aanname "beheer-acties die je zelden doet": Eenvoudig is de default voor nieuwe accounts, en de KoppelRekeningBanner dekt alleen de 0-rekeningen-stand — juist ná de eerste rekening begint het vervolg-vullen. Zoeken en bulkbewerken is expertgereedschap en verhuisde daarom naar het menu.* | B |
 | TXN-2 | Periode-tabs in Eenvoudig 4→3 (30 dagen / maand / jaar) — herzien 10 aug 2026 na melding testgebruiker: de reductie stond eerst op 2 (30 dagen / jaar), maar de kalendermaand is de eenheid waarin mensen hun uitgaven lezen én Eenvoudig is de standaard voor nieuwe profielen. Alleen kwartaal blijft Volledig-only. | B |
 | TXN-3 | Grenzenpotten-periodetabs (maand/kwartaal/jaar) in Eenvoudig alleen maand | B |
 | TXN-4 | Rekening-tabs: lange namen afkappen op korte labels | E |
+| TXN-5 ★ | **Nieuw 28 aug 2026 (S3).** Met de zes analyseblokken verborgen was de `GeldstroomGauge` het enige duidingselement dat in Eenvoudig overbleef — een naald op een −100…+100-schaal, zonder trend of vergelijking eromheen die 'm leesbaar maakt. In Eenvoudig staat daar nu `GeldstroomZin`: dezelfde Inkomen/Uitgaven/Saldo-strip, duiding in woorden, en géén spaarquote zolang het venster loopt. In Volledig blijft de meter, mét een venster-onderschrift ("augustus tot nu toe") — die ontbrak, terwijl de status-melding erboven op een ánder venster draait (kalendermaand vs. het gekozen periodevenster). Bewust NIET meegenomen: het ongeclampte leescijfer en de 0%-bij-geen-inkomen — dat is bevinding C6 en moet in Volledig reproduceerbaar blijven | B |
 
 ### /overzicht/cashflow/vaste-lasten & /forecast
 
-Vaste lasten al goed (kalender + insights verborgen). Forecast heeft geen enkele Eenvoudig-reductie.
+**Herzien 28 aug 2026 (S2).** Het oordeel "Vaste lasten al goed (kalender + insights
+verborgen)" is ingetrokken. Verbergen wás hier geen winst: Eenvoudig hield het lángste
+element over (de volle postenlijst) en verloor juist de korte blokken die er betekenis
+aan gaven — de quote met Nibud-context en het abonnementen-sluipverbruik mét opzegknop.
+Dat is precies de fout die het richtingsbesluit van R5 benoemt: **duiding boven
+reductie**. Forecast: zie FC-1 (uitgevoerd) en S5.
 
 | # | Voorstel | Cat |
 |---|---|---|
+| VL-1 ★ | **Nieuw 28 aug 2026 (S2).** Eenvoudig = oordeel vóór lijst: oordeelregel (feit + Nibud-norm, stoplichtwoord uit `LEVERAGE_STATUS_LABEL`) i.p.v. de compacte meter, dan quote-meter + sluipverbruik + top-5 grootste posten; de volle lijst achter DepthSection "Alle {n} posten". Volledig ongewijzigd. Copy-rollen gescheiden: deck = feit, `PageStatusBanner` = handeling | B |
 | FC-1 | Forecast-pagina in Eenvoudig: 6-maands tabel → eindregel ("Over 6 maanden ± € X") + sparkline; tabel in Volledig | B |
+| FC-2 | **Nieuw 28 aug 2026 (S5, V2).** `CashflowSection` (bovenaan /overzicht/cashflow/forecast) was het enige blok op die route dat de modus negeerde: drie kale KPI-kaarten met twee losse percentages. In Eenvoudig nu één kaart — het maandbedrag blijft (dát beantwoordt de pagina-vraag), de spaarquote en de uitgaventrend worden zinnen mét hun venster erin. Percentage en zin staan op één afleiding, zodat ze elkaar niet kunnen tegenspreken. Volledig ongewijzigd; `forecast-fallback.tsx` beweegt mee | B |
 
 ### /overzicht/belasting (+ boxen + optimizer)
 
@@ -150,6 +179,9 @@ Al goed: katernen III/IV/V verborgen, Box 1/2/3-detail grotendeels dicht.
 | BEL-2 | Optimizer-pagina in Eenvoudig: alleen katern II (de vergelijking op één as) + voetnoten; Standing/Details/Levenslang en de sorteermodus → Volledig. De "NIEUW"-badge op de hub-tegel vervalt na 1 kwartaal | B |
 | BEL-3 | Hefboomtegel-substatus "Verken je Box 3-positie" → gewone taal ("Mogelijk betaal je meer dan nodig") | E |
 | BEL-4 | Box 1-strip in Eenvoudig 4→2 (effectief tarief + netto besteedbaar) — valt onder APP-7 | B |
+| BEL-5 | *(nagekomen, S12 · 28 aug 2026)* De jaarruimte-rekensom stond **twee keer** op de pagina (uitlegblok + kaartvoet) en de Wft-regel drie keer. Formule + referentiewaarde-staart zijn uit de kaartvoet weg (Wft-regel blijft daar); de rekensom is nu modus-afhankelijk in `jaarruimte-rekensom.tsx`: Volledig inline, Eenvoudig één gewone zin + uitklap "Zo rekenen we je jaarruimte". Sectie IV blijft buiten `HideInSimple` — `#jaarruimte-uitleg` is een live deeplink-doel. | B/E |
+| BEL-6 | *(nagekomen, S14 · 28 aug 2026)* De twee tariefcellen in **katern I van de hub** ("Effectief" / "Marginaal", `hub-totale-druk.tsx`) waren nooit een `FiguresStrip` geworden en bleven daarom buiten APP-7's bereik — de stripnorm kan een handgerolde cel-rij structureel niet zien. In Eenvoudig staat daar nu één beslisbare zin ("van elke euro die je extra verdient, houd je ongeveer N cent over"), met een verplicht null-pad zonder bekend inkomen. Volledig blijft ongewijzigd. Nieuwe primitive: `components/app/swap-in-simple.tsx` — het derde lid naast `HideInSimple` en `DepthSection`, zodat "toon A i.p.v. B" niet langer een onvindbare call-site-ternary is. **Bewust hub-only**: BEL-4 blijft staan op box1 (het marginale tarief blijft daar expert-diepte); de tegenspraak hub↔box1 is een eigenaarskeuze, geen omissie. | B/E |
+| BEL-7 | *(nagekomen, S14 · 28 aug 2026)* Katern I maskeerde niet onder de privacymodus — het hero-bedrag en de euro-legenda van de verdeelstaaf stonden onder het oog-icoon gewoon in beeld terwijl `HubKansen` ernaast al maskeerde. Oorzaak structureel: beide waren server-components. Opgelost via `MaskedAmount` (hero) en door `verdeling-staaf.tsx` client te maken met `useMaskedAmounts()` (legenda + segment-tooltip); percentages en balkverhoudingen blijven zichtbaar. Werkt door op box3-mix en box3-opbouw, die dezelfde staaf gebruiken. | — |
 
 ### /toekomst (+ subpagina's)
 
@@ -219,7 +251,7 @@ Per fase één kaart in de Notion-werkqueue (🧩 Trifinity), status **Backlog**
 
 ⚠ = raakt bestanden met ongecommit werk van de parallelle sessie (command-palette, sidebar) — eerst afstemmen.
 
-**Afgevallen (bewust niet doen):** APP-4 (ontdek-voetregel; geen-hints-keuze uit ADR 0026 blijft), OVZ-5, NAV-1 (APPS-blok blijft), NAV-3 (RAPPORT-knop blijft), BEZ-1 (herwaarderen blijft), TOE-1 (grafiek-chips blijven), MIJN-2 (Geavanceerd/Check-ins-kaarten blijven), ONB-1 (onboarding blijft), CMD-2 (uitloggen blijft in ⌘K).
+**Afgevallen (bewust niet doen):** APP-4 (ontdek-voetregel; geen-hints-keuze uit ADR 0026 blijft), ~~OVZ-5~~ *(herzien 28 aug 2026 — S11: alsnog beperkt uitgevoerd, zie OVZ-5b. "Afgevallen" en de lof voor "bezittingen 4→1" stonden in twee losse secties en zijn nooit naast elkaar gelegd; samen leverden ze de inversie dat de hypothetische promo overleefde en het eigen cijfer niet)*, NAV-1 (APPS-blok blijft), NAV-3 (RAPPORT-knop blijft), BEZ-1 (herwaarderen blijft), TOE-1 (grafiek-chips blijven), MIJN-2 (Geavanceerd/Check-ins-kaarten blijven), ONB-1 (onboarding blijft), CMD-2 (uitloggen blijft in ⌘K).
 
 ## 9 · Technische kanttekeningen
 
@@ -257,6 +289,16 @@ Fase 2 leverde twee call-site-fixes ("Onzekerheid (P40–P60)" → bandbreedte, 
 
 Het audit-voorstel zei zelf al "SWR/opnamerate blijft Volledig". Deze twee vallen in diezelfde categorie, en "Volledig blijft exact zoals het was" is een acceptatiecriterium. Ze worden dus **niet** herschreven. Komt er ooit percentiel-taal op een oppervlak dat in Eenvoudig wél zichtbaar is, dan is dat een gewone bevinding op dat oppervlak — niet het bewijs dat er een app-brede regel had moeten zijn.
 
+#### Heropend voor de FISCALE scope (28 aug 2026, kaart S17)
+
+De sluiting hierboven blijft staan voor wat ze bedoelde — **percentielen en afkortingen** — maar ze was daar ook op gescopet. Negen van de veertien jargonrijen die S17 aandroeg zijn *fiscaal* (vervreemdingswinst, tegenbewijs, heffingsvrij vermogen, forfaitair, aanmerkelijk belang, excessief lenen, jaarruimte/factor A, schuldgraad, inclusiepercentage) en zijn nooit gesweept — niet door APP-5 en niet daarna. Dat is een nooit-beoordeelde lacune, geen omkering.
+
+**Wat is er wél gebouwd, en waarom in deze vorm.** Niet een verboden-termenlijst — het bezwaar hierboven staat onverkort overeind. Wel is het dode mechanisme in `lib/glossary-data.ts` levend gemaakt: `GlossaryEntry` draagt nu naast `alternative` (label-vorm) een optionele **`simpleLabel`**, en `components/editorial/glossary-term.tsx` is weergavemodus-bewust. In Eenvoudig vervangt `simpleLabel` het zichtbare jargon en verhuist de vakterm naar de kop van de popover; ontbreekt `simpleLabel` — de standaard, en bewust zo voor wettelijke termen als Box 3, tegenbewijs en heffingsvrij vermogen — dan is de render in beide modi identiek.
+
+Daarmee is de vangrail een **datastructuur** in plaats van vrije prose: nieuw jargon komt alleen nog binnen via een `GlossaryEntry`, en `lib/glossary-data.test.ts` toetst die op volledigheid, hoofdletter-eenduidige sleutels (`SWR`/`swr` en `FIRE`/`fire` bestonden náást elkaar, met tegenstrijdige uitleg, en één bestand gebruikte beide) en op drie inhoudelijke grenzen: het inclusiepercentage weegt netto vermogen en géén "vrijheid", de tegenbewijs-uitleg blijft beschrijvend in plaats van gebiedend (Wft), en SWR blijft "wat je kúnt opnemen". Precies het onderscheid — datastructuur toetsbaar, prose niet — dat deze sectie als voorwaarde stelde.
+
+**Nog open na S17:** de app-brede FIRE→"volledige vrijheid"-sweep (tientallen strings in widgets, rapportages en het huishouden-blok) is *niet* meegenomen; die raakt bestanden van vier parallelle werkstromen en is een eigen ronde. Jaarruimte/factor A, aanmerkelijk belang en "Bespreek met Fin" zijn door de eigenaar apart ingepland.
+
 ### APP-6 — claim rechtgezet, bewust geen constraint
 
 De docblock van `welcome-guide-banner.tsx` beloofde "mobiel max ~⅓ viewport" alsof het een regel was; er stond geen `max-h`/`vh` omheen. De schermronde mat 282px op 390×844 = **33,4%**, dus de claim klopte feitelijk — hij was alleen verkeerd geformuleerd. De docblock zegt nu dat dit een *gemeten uitkomst* is en waarom er geen harde kap komt: die zou de afvinkregels of de sluit-/navigatieknoppen afsnijden zodra een scherm één stap meer draagt, en dan verliest de gebruiker functionaliteit in plaats van drukte. Groeit het aantal stappen, dan hermeten — niet afknippen.
@@ -264,6 +306,92 @@ De docblock van `welcome-guide-banner.tsx` beloofde "mobiel max ~⅓ viewport" a
 ### Documentatie-drift, dichtgezet
 
 Vijf plekken beweerden iets dat het werk zelf onwaar had gemaakt: ADR 0026 (`DepthSection` "nooit ingehangen"), de comment bij `action:toggle-display-mode`, en `docs/uat/uat-plan.md` op zes plekken (HefbomenLegenda 2×, "géén toggle op /mijn/uiterlijk", UAT-NAV-10, WF-MIJN-22, UAT-CASH-22, plus een Onbevestigd-regel die inmiddels bevestigd feit was). Alle bijgewerkt; `lib/uat/acceptance/*` was al correct en bleef leidend. De zesde — de tegenstrijdige `subAmount`-comments in `cashflow-landing-cards.tsx` en `leverage-card.tsx` — was al opgelost in `153314dc9`.
+
+### S6 — nagekomen: Eenvoudig mag geen bestemming verbergen waarnaar verwezen wordt
+
+Nooit door deze audit beoordeeld (de /toekomst-sectie kende alleen TOE-1/2/3), maar wél
+een gat: drie plekken droegen in **beide** weergavemodi een zichtbare opdracht waarvan de
+bestemming in Eenvoudig hard verborgen was.
+
+- **Box 1 → pensioen-strategie.** "Vul je factor A in bij je pensioen-strategie"
+  (`box1/page.tsx` + `jaarruimte-card.tsx`) linkt naar
+  `/toekomst/gebeurtenissen?strategie=pensioen`. De deeplink opende de modal wel, maar het
+  strategieblok eromheen zat in `HideInSimple` — na sluiten was er geen ingang meer:
+  een eenrichtingsdeeplink. Opgelost door in Eenvoudig alléén de Pensioen-kaart te
+  renderen, mét duiding waaróm; AOW/Huis/Werk blijven Volledig-diepte.
+- **Welkomstgids → wat-als.** `/toekomst?whatif=open` zette state op een sectie die in
+  Eenvoudig zonder vastgelegd doel niet gemonteerd was; de scroll no-opte stil. De
+  katern-II-gate kent nu een derde tak (`whatIfInlineOpen`), dus een expliciete deeplink
+  opent 'm alsnog — precies het beginnersoppervlak waar Eenvoudig voor bedoeld is.
+- **/mijn/profiel → NIBUD-benchmark.** De belofte "deze gegevens worden gebruikt voor je
+  NIBUD Budget Gezondheidscheck" staat in beide modi; de sectie zelf zat in `HideInSimple`
+  zónder deeplink of anker. De `CollapsibleSection` staat toch al dicht, dus de hard-hide
+  is eraf: in Eenvoudig alleen de ingeklapte kop.
+
+Onderliggende regel: **verwijst zichtbare tekst naar een bestemming, dan mag die
+bestemming in die weergavemodus niet hard-hidden zijn** — voorwaardelijk renderen
+(precedent `horizon-client.tsx`) i.p.v. `HideInSimple`. Het vastleggen van die regel als
+ADR + lint-/testgate is bewust een **eigen kaart**, niet meegenomen in S6.
+
+### MIJN-6 — /mijn-hub: disclosure in plaats van hard verbergen (S8, 28 aug 2026)
+
+**MIJN-1** (duplicerende tabbalk op `/mijn`) is bevestigd geland — `hideOnBasePath` op
+`ModuleNav`, in béíde modi, gedekt door `module-nav.test.tsx`. S8 herhaalde die eis; dat
+deel is als done gesloten.
+
+**MIJN-2** ("Geavanceerd/Check-ins alleen in Volledig, grid 9→7") was 9 aug bewust
+afgevallen. MIJN-6 vervangt hem en herroept dat besluit niet stilzwijgend: waar MIJN-2
+kaarten hárd wilde verbergen, vouwt MIJN-6 ze wég — `DepthSection`, kinderen gemount en
+`inert`, één klik ertussen. Niets verdwijnt uit Eenvoudig; alleen de rangorde verandert.
+Dat is materieel iets anders dan wat toen is afgewezen, en de eigenaar heeft het op S8
+expliciet bevestigd (optie B, 26 aug 2026).
+
+De premisse van de kaart was intussen verschoven: **het zijn zeven kaarten, geen negen.**
+Bevinding M14 haalde Rapportages en Account uit het grid (elk al een vaste ingang elders).
+De vier primaire kaarten van optie B worden daarmee **Profiel, Privacy, Koppelingen,
+Uiterlijk** — Account is geen kaart meer om vooraan te zetten. Achter "Alle instellingen":
+notificaties, check-ins, geavanceerd.
+
+Twee keuzes die de moeite van het vastleggen waard zijn:
+- **Uiterlijk staat vooraan.** Sinds APP-1 woont de weergavekeuze zélf daar. Wie in
+  Eenvoudig staat en meer wil zien, moet die kaart kunnen vinden zónder eerst iets open
+  te klappen — anders is de vluchtroute terug naar Volledig zelf weggevouwen.
+- **Koppelingen staat vooraan** (het verschil tussen optie A en B). "Koppel je bank" is
+  kernbelofte en heeft een eigen coach-suggestie die hierheen wijst.
+
+Test-val die hierbij hoorde, en die is dichtgezet: de bestaande render-tests draaiden
+**zonder** `DisplayModeProvider` en landden dus op de `'simple'`-fallback, terwijl
+`DepthSection` zijn kinderen gemount houdt. `getByText(...)` en de href-lijst zouden dus
+groen blijven óók als de reductie werkt. Alle tests dragen nu een expliciete provider, en
+de curatie wordt gemeten aan `data-collapsed` en aan de plaats in de boom.
+
+### RAPP-1 — /rapportages: gecureerd in plaats van verborgen (S9, 28 aug 2026)
+
+§1 rekent rapportages tot "buiten de belofte … in Eenvoudig mogen ze standaard uit
+beeld", maar er is nooit een RAPP-item van gemaakt en `/rapportages` staat niet in
+`SIMPLE_HIDDEN_NAV_HREFS`. De uitspraak is dus nooit een plan geworden. Bij S9 heeft de
+eigenaar dat alsnog beslecht — en **tegen de §1-lezing in**:
+
+- **Niet verbergen (optie A afgewezen).** De landingsbelofte "je eerste Vrijheidsrapport
+  in 5 minuten" (§1, r.19) wijst juist hierheen; de route verbergen voor precies de
+  beginner die standaard in Eenvoudig landt, breekt die belofte. Bovendien verwijzen
+  `lib/welcome-guide.ts` en `lib/next-steps/engine.ts` naar rapporten — hard verbergen
+  zou de S6-fout herhalen (eenrichtingsdeeplink).
+- **Wel cureren (optie B).** In Eenvoudig staan twee vormen vooraan — **balansstaat** en
+  **persoonlijk plan**, de twee die gratis zijn én zonder invoer klaarstaan — met een
+  duidingsregel die zegt wát ze zijn. De overige vijf zitten achter één `DepthSection`
+  "Meer rapportvormen" met een samenvatting van wat erin zit. In Volledig staat die
+  sectie open: alle zeven vormen zichtbaar. Weggevouwen, nooit weggehaald.
+
+Onderliggende regel, aanvullend op S6: **reductie zonder duiding is geen vereenvoudiging.**
+Waar iets naar de achtergrond gaat, hoort te staan wát daar staat en waarom het vooraan
+gaande deel vooraan staat.
+
+Bijvangst in dezelfde stap: de betaalpoort op het periodieke rapport gold het hele rapport
+in plaats van alleen de AI-inleiding (H28, R1 — daar opgelost). S9 heeft de weergavekant
+gedaan: een vergrendeling is nu vóór de klik zichtbaar mét reden, en verschijnt alleen als
+de add-on daadwerkelijk te koop is (`ADDON_PLANS[…].available`) — een slot zonder kassa is
+een muur zonder deur.
 
 ---
 

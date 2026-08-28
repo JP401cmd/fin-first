@@ -135,6 +135,25 @@ export function resolveHeroFireAge(input: HeroFireAgeInput): HeroFireAge {
   return input.isRefining ? BEREKENEN : ONBEKEND
 }
 
+/**
+ * Het HELE JAAR dat een fractionele leeftijd op het scherm krijgt.
+ *
+ * ÉÉN afrondingsregel voor de hele /toekomst-seam: het kopgetal van de
+ * hero-KPI (`formatHeroFireAge`) én de duidingszin eronder
+ * (`lib/horizon/vrijheidsleeftijd-zin.ts`) lezen hier. Dat is geen
+ * schoonheidsfoutje-preventie maar de kern van bevinding S15: zou de zin
+ * anders afronden dan de KPI, dan staat er "rond je 53e" pal onder een
+ * kopgetal dat 54 toont — en dat leest als een fout.
+ *
+ * `Math.round` en niet `floor`: sinds bevinding M5 (27-08-2026) toont het
+ * kopgetal zelf hele jaren via afronding, niet meer `.toFixed(1)`. De
+ * overlay-samenvatting en de welkomstkaart deden al hetzelfde. Wie dit ooit
+ * naar `floor` wil verzetten, verzet het hier — voor alle drie tegelijk.
+ */
+export function heroFireAgeYear(age: number): number {
+  return Math.round(age)
+}
+
 export interface FormatHeroFireAgeOptions {
   /** Voorgeformatteerde AOW-leeftijd ("67j + 3m"); alleen gebruikt bij bron 'aow-tabel'. */
   aowText?: string
@@ -161,9 +180,9 @@ export function formatHeroFireAge(state: HeroFireAge, opts: FormatHeroFireAgeOpt
   const dash = opts.dash ?? '–'
   if (state.bron === 'aow-tabel') {
     if (opts.aowText) return opts.aowText
-    return state.age != null ? `${Math.round(state.age)} jaar` : dash
+    return state.age != null ? `${heroFireAgeYear(state.age)} jaar` : dash
   }
-  if (state.age != null) return String(Math.round(state.age))
+  if (state.age != null) return String(heroFireAgeYear(state.age))
   if (state.status === 'berekenen') return opts.pendingText ?? 'berekenen…'
   return dash
 }

@@ -5,7 +5,6 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { useDreamTransition } from '@/components/app/horizon/dream-transition-context'
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
 import { HORIZON_EXIT_NOTICE_DISMISSED_SLUG } from '@/lib/horizon-data-loader'
-import { useTipsFirstCloseNavigation } from '@/lib/hooks/use-tips-first-close-navigation'
 import { useHorizonFireSim } from '@/lib/hooks/use-horizon-fire-sim'
 import { type SimRow, type SimResult } from '@/lib/fire-simulation'
 import { createClient } from '@/lib/supabase/client'
@@ -54,6 +53,7 @@ import { resolveEffectiveIncomeExpenses, type IncomeExpenseSources } from '@/lib
 import type { Debt } from '@/lib/debt-data'
 import { deriveNaturalMilestones, naturalMilestoneToLifeEvent, type NaturalMilestone } from '@/lib/natural-milestones'
 import {
+  chartEventOverlayToClusterRow,
   lifeEventSide,
   naturalMilestoneSide,
   type ChartEventKind,
@@ -120,6 +120,7 @@ import { ScenarioKaarten } from '@/components/app/horizon/scenario-kaarten'
 import { computeDekkingsradar, type RadarAs } from '@/lib/horizon/dekkingsradar'
 import { type ScenarioPresetResult } from '@/lib/horizon/scenario-presets'
 import { computeStopMarge } from '@/lib/horizon/stop-marge'
+import { buildVrijheidsleeftijdZin } from '@/lib/horizon/vrijheidsleeftijd-zin'
 import { selectDoelLijnBron } from '@/lib/horizon/doel-lijn-bron'
 import {
   resolveHeroFireAge,
@@ -272,7 +273,6 @@ import {
 import { ToekomstOverlay, type OverlayBalloonDef, type ToekomstOverlayGeometry } from '@/components/app/horizon/toekomst-overlay'
 import { TOEKOMST_OVERLAY_BALLOONS } from '@/components/app/horizon/toekomst-overlay-balloons'
 import { ToekomstWelcome } from '@/components/app/horizon/toekomst-welcome'
-import { ToekomstExitNotice } from '@/components/app/horizon/toekomst-exit-notice'
 import { WidgetEmpty } from '@/components/widgets/widget-empty'
 import { resolveUnlinkedCashShare, unlinkedCashTotal } from '@/lib/unlinked-cash'
 
@@ -691,54 +691,46 @@ export default function HorizonPage({
     setOverlayVisible(val)
     try { localStorage.setItem('horizon_overlay_visible', String(val)) } catch { /* noop */ }
   }, [])
-  // Exit-melding: gecentreerde modal bij het verlaten van het tip-/bubbel-
-  // overlay-scherm. `exitNoticeOpen` stuurt de modal; hij verschijnt VÓÓRDAT de
-  // tips-overlay sluit, zodat de gebruiker eerst een keuze maakt. Heeft de
-  // gebruiker eerder "Niet meer weergeven" gekozen (`exitNoticeDismissed`, uit
-  // de server-marker), dan sluit de overlay direct zonder modal.
+  // ── Tips verlaten: sluiten sluit direct (M38) ────────────────────────────
+  //
+  // Élke exit van de tips-overlay — ✕, Escape, klik op de achtergrond of de
+  // Tips-toggle — verbergt de tips METEEN en onthoudt dat
+  // (`horizon_overlay_visible`). De bevestiging komt daarná, als
+  // niet-blokkerende toast die vertelt waar je de tips terugvindt, met "Niet
+  // meer melden" als optie ter plekke.
+  //
+  // Hiervóór stond hier een gecentreerde modal (`ToekomstExitNotice`) die de
+  // sluiting ophield tot je in een tweede venster nóg een keuze maakte; en de
+  // eerste sluiting navigeerde ongevraagd naar /overzicht. Beide zijn weg: het
+  // eerste las als "sluiten sluit niet", het tweede stond in geen enkele
+  // knoptekst. Terug naar de tips gaat via de Tips-knop boven de grafiek.
   const [exitNoticeDismissed, setExitNoticeDismissed] = useState<boolean>(
     initialData.exitNoticeDismissed,
   )
-  // Eenmalige navigatie naar het post-onboarding stappenplan op /overzicht bij
-  // de EERSTE sluiting van de tips-overlay. De hook gate't cross-device (server-
-  // marker) én binnen de sessie (ref-guard) tegen dubbele navigatie. Alleen een
-  // ECHTE sluiting roept dit aan — onViewChart/persistOverlayVisible(true) nooit.
-  const maybeNavigateAfterFirstTipsClose = useTipsFirstCloseNavigation(
-    initialData.tipsFirstCloseNavigated,
-  )
-  const [exitNoticeOpen, setExitNoticeOpen] = useState(false)
-  const handleOverlayExit = useCallback(() => {
-    if (exitNoticeDismissed) {
-      // Melding al permanent weggeklikt → overlay direct sluiten, geen modal.
-      persistOverlayVisible(false)
-      return
-    }
-    // Toon de modal; de overlay blijft nog open tot de gebruiker een knop kiest.
-    setExitNoticeOpen(true)
-  }, [exitNoticeDismissed, persistOverlayVisible])
-  // "Sluiten" (en Escape/achtergrond): modal dicht + overlay sluit. Niet-
-  // persistent — de melding komt bij een volgende exit terug. Bij de EERSTE
-  // sluiting navigeren we eenmalig naar het overzicht (post-onboarding stappenplan).
-  const handleExitNoticeClose = useCallback(() => {
-    setExitNoticeOpen(false)
-    persistOverlayVisible(false)
-    maybeNavigateAfterFirstTipsClose()
-  }, [persistOverlayVisible, maybeNavigateAfterFirstTipsClose])
-  // "Niet meer weergeven": modal dicht + overlay sluit + persistent verbergen
-  // (cross-device via user_feature_visits, zelfde fire-and-forget-stijl als de
-  // welkomstkaart). De melding verschijnt nooit meer bij toekomstige exits. Ook
-  // dit telt als een eerste sluiting → eenmalige navigatie naar het overzicht.
-  const handleExitNoticeDismissForever = useCallback(() => {
+  /**
+   * "Niet meer melden": zet de bevestigings-toast cross-device uit
+   * (user_feature_visits, zelfde fire-and-forget-stijl als de welkomstkaart).
+   * Raakt de tips-zichtbaarheid NIET — die hangt aan `horizon_overlay_visible`.
+   */
+  const dismissExitNoticeForever = useCallback(() => {
     setExitNoticeDismissed(true)
-    setExitNoticeOpen(false)
-    persistOverlayVisible(false)
     fetch('/api/feature-visits', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ feature_slug: HORIZON_EXIT_NOTICE_DISMISSED_SLUG }),
     }).catch(() => {})
-    maybeNavigateAfterFirstTipsClose()
-  }, [persistOverlayVisible, maybeNavigateAfterFirstTipsClose])
+  }, [])
+  const handleOverlayExit = useCallback(() => {
+    persistOverlayVisible(false)
+    if (exitNoticeDismissed) return
+    addToast({
+      type: 'info',
+      title: 'Tips verborgen',
+      message: 'Je zet ze terug aan met de Tips-knop boven de grafiek.',
+      duration: 8000,
+      action: { label: 'Niet meer melden', onClick: dismissExitNoticeForever },
+    })
+  }, [exitNoticeDismissed, persistOverlayVisible, addToast, dismissExitNoticeForever])
   const persistNaturalMilestones = useCallback((val: boolean) => {
     setShowNaturalMilestones(val)
     try { localStorage.setItem('horizon_show_natural_milestones', String(val)) } catch { /* noop */ }
@@ -2140,6 +2132,33 @@ export default function HorizonPage({
       if (m) setSelectedNaturalMilestone(m)
     },
     [naturalMilestones, router],
+  )
+
+  /**
+   * M16 — uitgang van een cluster op de chart-markers. Bij de standaard
+   * uitgezoomde stand liggen markers uit aangrenzende jaren binnen een paar
+   * pixels van elkaar; ze worden dan gebundeld tot een "+N"-badge en dít is wat
+   * die badge opent. Hergebruikt bewust `EventClusterSheet` — dezelfde sheet die
+   * de EventsTimeline eronder al gebruikt, met dezelfde rij-routing.
+   *
+   * De marker-laag levert `ChartEventOverlay`s; de sheet leest `LifeEvent`s.
+   * Waar een echt LifeEvent bestaat (levensgebeurtenissen + natuurlijke
+   * mijlpalen) pakken we dát object, zodat de bedragregel klopt. Doel-markers
+   * (M36), read-only partner-gebeurtenissen en de tekort-lening hebben geen
+   * LifeEvent-tegenhanger; die gaan door `chartEventOverlayToClusterRow` en
+   * dragen een vooraf gezette tekstregel i.p.v. een verzonnen bedrag. Ze
+   * WEGLATEN is geen optie: dan telt de badge er meer dan de lijst toont.
+   */
+  const handleChartClusterOpen = useCallback(
+    (clusterEvents: ChartEventOverlay[], centerAge: number) => {
+      if (clusterEvents.length === 0) return
+      const byId = new Map(eventsForTimeline.map(e => [e.id, e]))
+      setClusterSheet({
+        events: clusterEvents.map(o => byId.get(o.id) ?? chartEventOverlayToClusterRow(o)),
+        centerAge,
+      })
+    },
+    [eventsForTimeline],
   )
 
   /**
@@ -4573,17 +4592,6 @@ export default function HorizonPage({
         )}
       </header>
 
-      {/* Exit-melding: gecentreerde modal die verschijnt zodra de gebruiker de
-          tip-overlay verlaat (Tips-toggle uit, of ✕/Escape/achtergrond op de
-          overlay) — vóórdat de overlay sluit. "Sluiten" sluit niet-persistent,
-          "Niet meer weergeven" verbergt 'm permanent (cross-device). Rendert via
-          een portal naar document.body (z-[70], boven de nav-pill). */}
-      <ToekomstExitNotice
-        visible={exitNoticeOpen}
-        onClose={handleExitNoticeClose}
-        onDismissForever={handleExitNoticeDismissForever}
-      />
-
       {/* === KATERN I — Waar je staat === */}
       <HideInSimple>
         <SectionLabel num="I">Waar je staat</SectionLabel>
@@ -4595,8 +4603,18 @@ export default function HorizonPage({
         <div className="h-1.5" style={{ background: 'var(--module-active-500)' }} />
 
         <div className="p-4 sm:p-6 md:p-8">
-          {/* Header rij: kicker + Details pill */}
-          <div className="mb-3 sm:mb-6 flex items-center justify-between gap-3">
+          {/* Header rij: kicker + Details pill.
+              `relative z-[46]` (M9): de tips-scrim van ToekomstOverlay is een
+              klik-vanger die als portal-kind van [data-scroll-container] op
+              z-[45] over de VOLLE paginahoogte ligt — hij vervaagt bewust ook
+              deze kop. Zonder eigen stapelniveau viel de Details-pill dus
+              ónder die vanger: de eerste klik sloot de tips i.p.v. de
+              jaar-op-jaar-tabel te openen. 46 tilt de rij precies één stap
+              boven de scrim, en blijft ruim onder de grafiek+markers (z-[50])
+              en onder elke overlay (z-[70]). Werkt omdat de hero-kaart in
+              tips-modus `no-hover-lift` draagt en dus géén eigen
+              stacking-context via hover-transform opent. */}
+          <div className="relative z-[46] mb-3 sm:mb-6 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               {hasPerspectiveHero && (
                 <div>
@@ -4617,6 +4635,11 @@ export default function HorizonPage({
               <button
                 type="button"
                 onClick={() => setSimModalOpen(true)}
+                // Pointerdown-guard, zelfde patroon als de ✕ en de markers in
+                // toekomst-overlay.tsx: houd de pointerdown weg bij alles wat
+                // hem zou kunnen kapen (pointer-capture/klik-vangers) zodat de
+                // knop zijn eigen `onClick` gegarandeerd krijgt.
+                onPointerDown={(e) => e.stopPropagation()}
                 className="flex items-center gap-1 rounded-[var(--r-sm)] border border-horizon-200 bg-horizon-50 px-2 py-0.5 font-sans text-[10px] text-horizon-600 transition-all hover:bg-horizon-100"
               >
                 <TableProperties className="h-3 w-3" />
@@ -4859,6 +4882,59 @@ export default function HorizonPage({
               </div>
             </button>
           </div>
+
+          {/* ── Duiding onder het kerngetal (S15) ────────────────────────────
+              Wat de KPI's laten zien is een getal; wat de gebruiker wil weten
+              is wat dat getal betekent. Die zin bestond al in de tips-overlay en
+              op de welkomstkaart — allebei tijdelijk zichtbaar — maar niet op de
+              pagina zelf, en juist in Eenvoudig (waar de Opnamerate-KPI wegvalt)
+              stonden er drie kale cijfers zonder vertaling.
+
+              Deze plek in de DOM dekt beide layouts met één instantie: op
+              desktop valt hij onder de figures-strip hierboven, op mobiel onder
+              het grote primaire getal (de desktop-strip is daar `hidden` en de
+              2×2-strip volgt pas ná de balk).
+
+              Beide weergavemodi (eigenaarsbesluit D1): Volledig zou anders
+              mínder tekst tonen dan Eenvoudig, en dat keert het contract van
+              `HideInSimple` om. De duiding staat náást de expert-KPI, niet in
+              plaats daarvan.
+
+              Woorden én afronding komen uit `lib/horizon/vrijheidsleeftijd-zin.ts`
+              — dezelfde bron als de overlay en de welkomstkaart, en dezelfde
+              afrondingsregel als het kopgetal hierboven. Consume-only: geen
+              eigen leeftijdsafleiding, geen bedrag (dus buiten de deflator- en
+              maskeringsregels). */}
+          {(() => {
+            const zin = buildVrijheidsleeftijdZin({
+              freedomAge: hasPerspectiveHero ? perspectiveHero!.fireAge : heroFireAge.age,
+              framing: heroFreedomFraming,
+              isPensioen: isPensioenMode,
+              // Nog geen antwoord (kernel rekent) of een gegevensprobleem (M6):
+              // dan draagt de KPI zelf al een melding. Een duidingszin eronder
+              // zou daar tegenin praten.
+              pending:
+                !hasPerspectiveHero &&
+                (heroFireAge.status === 'berekenen' || isHeroAnswerInvalid(heroFireAge)),
+              subjectName: hasPerspectiveHero ? perspectiveHero!.householdName : null,
+            })
+            if (zin.kind === 'berekenen') return null
+            return (
+              <p
+                data-testid="hero-duiding"
+                className="mb-3 sm:mb-4 max-w-[60ch] text-[13px] italic leading-snug text-[var(--ink-2)]"
+                style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+              >
+                {zin.lead}
+                {zin.ageLabel && (
+                  <span className="not-italic font-semibold text-[var(--module-active-700)]">
+                    {zin.ageLabel}
+                  </span>
+                )}
+                {zin.tail}
+              </p>
+            )
+          })()}
 
           {/* Voortgangsbalk */}
           <div className="mb-3 sm:mb-6">
@@ -5288,7 +5364,7 @@ export default function HorizonPage({
                   Labels dragen daarom `data-pill-label`.
 
                   De euro-weergave-badge stond hier; die is verhuisd naar de
-                  weergave-sectie bovenaan de sidebar (`SidebarEuroViewBadge`).
+                  weergave-sectie bovenaan de sidebar (`EuroViewBadge`).
                   De schakelaar zelf woont in het zoekscherm (⌘K) — één plek voor
                   de status, één voor de knop, in plaats van een badge per
                   grafiek. */}
@@ -5634,7 +5710,7 @@ export default function HorizonPage({
               <ChartOverlayExplainer active={isAowStopActive}>
                 <em>Stop op AOW</em> simuleert wat er gebeurt als je tot je
                 AOW-leeftijd doorwerkt en daarna pas onttrekt — zo zie je of
-                je geplande pensioenleeftijd haalbaar is zónder voortijdig <GlossaryTerm term="FIRE">FIRE</GlossaryTerm>.
+                je geplande pensioenleeftijd haalbaar is zónder voortijdig <GlossaryTerm term="fire">FIRE</GlossaryTerm> te bereiken.
               </ChartOverlayExplainer>
 
               <ChartOverlayExplainer active={scenariosExpanded && !!scenarioData}>
@@ -5805,7 +5881,6 @@ export default function HorizonPage({
                           isPensioen: isPensioenMode,
                         }}
                         onClose={handleOverlayExit}
-                        escapeSuspended={exitNoticeOpen}
                       >
                       <div className="relative">
                         {/* Vermogenspad (SimChart) */}
@@ -5879,6 +5954,7 @@ export default function HorizonPage({
                             onEventClick={handleChartEventClick}
                             onEventDragEnd={handleChartEventDragEnd}
                             onEventDragMove={handleChartEventDragMove}
+                            onClusterOpen={handleChartClusterOpen}
                           />
                         </div>
 
@@ -5908,6 +5984,7 @@ export default function HorizonPage({
                             housingSaleAge={kernelHousingSale?.age ?? null}
                             eventOverlay={chartEventOverlay}
                             onEventClick={handleChartEventClick}
+                            onClusterOpen={handleChartClusterOpen}
                             onYearClick={(age) => setSelectedYearAge(age)}
                           />
                         </div>
@@ -6110,8 +6187,21 @@ export default function HorizonPage({
                 )}
               </div>
 
+              {/* Voetnoot. "Details" is hier nu zélf de knop (M9): de echte
+                  Details-pill staat helemaal bovenin dezelfde kaart, dus wie
+                  naar deze regel gescrold heeft ziet 'm niet staan — dat is de
+                  "de knop viel buiten het zichtbare deel"-waarneming uit de
+                  bevinding. Zelfde handler, geen tweede pad. */}
               <p className="mt-3 font-sans text-[10px] text-[var(--ink-4)]">
-                {STRATEGY_LABELS[simResult.strategy].name} &middot; Weergave t/m leeftijd {simResult.displayEndAge - 1} (eindleeftijd {simResult.displayEndAge}) &middot; Klik Details voor jaar-op-jaar tabel
+                {STRATEGY_LABELS[simResult.strategy].name} &middot; Weergave t/m leeftijd {simResult.displayEndAge - 1} (eindleeftijd {simResult.displayEndAge}) &middot;{' '}
+                <button
+                  type="button"
+                  onClick={() => setSimModalOpen(true)}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className="underline underline-offset-2 transition-colors hover:text-horizon-600"
+                >
+                  Open de jaar-op-jaar-tabel
+                </button>
               </p>
 
               {/* Context-hint: modus indicator + link to StrategieModal */}
@@ -6154,8 +6244,19 @@ export default function HorizonPage({
           → géén wat-als-lijn). Weergave: in Volledig altijd; in Eenvoudig
           alléén met een vastgelegd doel (doelActief) — een vástgelegd doel is
           kernfunctionaliteit waar de Doelen-tab naartoe deep-linkt, pure
-          verkenning blijft volledig-weergave-diepte. */}
-      {!(usePartnerMainLine || useHouseholdMainLine) && (displayMode === 'full' || doelActief) && (
+          verkenning blijft volledig-weergave-diepte.
+
+          S6 (tier 1) — ÉN wanneer er expliciet naartoe gedeeplinkt is:
+          `?whatif=open` zet `whatIfInlineOpen` (de welkomstgids-stap "Speel met
+          een what-if scenario" gebruikt dat pad). Zonder deze derde tak zette
+          die deeplink in Eenvoudig zónder vastgelegd doel state op een sectie
+          die niet gemonteerd is en no-opte de scroll stil: een dode
+          verwijzing op precies het beginnersoppervlak waar Eenvoudig voor is.
+          `whatIfInlineOpen` kan alleen wáár worden via die deeplink of via een
+          control binnen deze sectie zelf, dus de gate blijft dicht zolang er
+          niemand hierheen verwezen heeft. */}
+      {!(usePartnerMainLine || useHouseholdMainLine) &&
+        (displayMode === 'full' || doelActief || whatIfInlineOpen) && (
       <>
         <section
           id={VERKEN_SECTION_ID}
@@ -6462,7 +6563,8 @@ export default function HorizonPage({
         // verborgen — doel dicht = alles dicht. In partner-/huishouden-view
         // bestaat KATERN II niet; dan blijft de duiding gewoon staan.
         const katernIIZichtbaar =
-          !(usePartnerMainLine || useHouseholdMainLine) && (displayMode === 'full' || doelActief)
+          !(usePartnerMainLine || useHouseholdMainLine) &&
+          (displayMode === 'full' || doelActief || whatIfInlineOpen)
         if (katernIIZichtbaar && !verkenOpen) return null
         return (
           <>
@@ -9013,7 +9115,7 @@ export default function HorizonPage({
               )}
               {!isPensioenMode && (
                 <div className="flex justify-between py-0.5">
-                  <span className="font-sans text-sm text-[var(--ink-2)]">Opnamerate (<GlossaryTerm term="SWR">SWR</GlossaryTerm>)</span>
+                  <span className="font-sans text-sm text-[var(--ink-2)]"><GlossaryTerm term="swr">Opnamerate</GlossaryTerm></span>
                   <span className="tabular-nums text-[var(--ink)]">{(fireSwr * 100).toFixed(2)}%</span>
                 </div>
               )}
@@ -9570,8 +9672,12 @@ export default function HorizonPage({
       />
 
       {/*
-        Cluster-sheet — opent bij klik op een +N cluster-marker in de
-        EventsTimeline. Toont alle events in dat cluster gegroepeerd per type
+        Cluster-sheet — opent bij klik op een +N cluster-marker, zowel in de
+        EventsTimeline onder de lijn-grafiek als (sinds M16) op de markers ÓP de
+        grafiek in BEIDE chartmodi. Bewust buiten elke chartMode-conditie
+        gemount: in `vermogensopbouw` staat er geen EventsTimeline onder de
+        staven, dus daar is dit de enige uitgang naar een geclusterde
+        gebeurtenis. Toont alle events in dat cluster gegroepeerd per type
         (levensgebeurtenissen + natuurlijke mijlpalen). Klik op een rij volgt
         dezelfde routing als de directe marker-klik: life-event opent EventPane,
         natural milestone deeplinkt naar bron-asset/debt.

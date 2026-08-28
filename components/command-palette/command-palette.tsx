@@ -496,18 +496,32 @@ export function CommandPalette({ open, onClose, role, userId }: CommandPalettePr
         {/* min-h i.p.v. vaste h zodat de iOS-safe-area-padding de balk laat
             groeien (mobiel bottom-anchored: items-end) i.p.v. de home-indicator
             over de hints te laten vallen. Safe-area = 0 op desktop → geen
-            visuele regressie. */}
-        <div className="flex items-center justify-between gap-3 px-4 min-h-9 pb-[var(--safe-area-bottom,0px)] md:pb-0 border-t border-[var(--border-ed)] text-[11px] text-[var(--ink-3)] shrink-0">
-          <div className="flex items-center gap-3">
-            <KbdHint icon={ArrowUp} icon2={ArrowDown}>
-              Navigeer
-            </KbdHint>
-            <KbdHint icon={CornerDownLeft}>Selecteer</KbdHint>
-            <KbdHint label="Esc">Sluiten</KbdHint>
-          </div>
-          <div className="font-mono uppercase tracking-[0.15em] text-[var(--ink-4)]">
-            ⌘K
-          </div>
+            visuele regressie.
+
+            Op touch (`isCoarsePointer`, dezelfde vlag die hierboven de
+            autofocus onderdrukt) vervalt de héle hint-rij: ↑↓ / ⏎ / Esc / ⌘K
+            zijn daar niet uit te voeren. Wat blijft is de kale balk mét
+            safe-area-padding — die houdt de resultatenlijst van de
+            home-indicator af. */}
+        <div
+          className={`flex items-center justify-between gap-3 px-4 pb-[var(--safe-area-bottom,0px)] md:pb-0 border-t border-[var(--border-ed)] text-[11px] text-[var(--ink-3)] shrink-0 ${
+            isCoarsePointer ? '' : 'min-h-9'
+          }`}
+        >
+          {!isCoarsePointer && (
+            <>
+              <div className="flex items-center gap-3">
+                <KbdHint icon={ArrowUp} icon2={ArrowDown}>
+                  Navigeer
+                </KbdHint>
+                <KbdHint icon={CornerDownLeft}>Selecteer</KbdHint>
+                <KbdHint label="Esc">Sluiten</KbdHint>
+              </div>
+              <div className="font-mono uppercase tracking-[0.15em] text-[var(--ink-4)]">
+                ⌘K
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -607,10 +621,18 @@ function CommandRow({
         ) : (
           <span className="w-4 h-4 shrink-0" />
         )}
-        <span className="flex-1 min-w-0 flex items-baseline gap-2">
-          <span className="truncate text-[14px] text-[var(--ink)] font-medium">{item.label}</span>
+        {/* Label + sublabel. Op mobiel gestapeld (`flex-col`) zodat ze niet
+            dezelfde regelbreedte hoeven te delen: naast icoon, kleurbalk en
+            modulebadge bleef er op ~375px zo weinig over dat elke standaard-
+            actie afkapte ("Bedragen verber…"). Elk deel mag nu tot twee
+            regels lopen. Vanaf `md` blijft het gedrag ongewijzigd: één
+            baseline-rij met single-line ellipsis — daar is de breedte geen
+            probleem. `md:line-clamp-none` zet `display` terug op `block`,
+            anders werkt `truncate` niet bovenop een `-webkit-box`. */}
+        <span className="flex-1 min-w-0 flex flex-col items-start gap-0 md:flex-row md:items-baseline md:gap-2">
+          <span className="line-clamp-2 md:line-clamp-none md:truncate text-[14px] text-[var(--ink)] font-medium">{item.label}</span>
           {item.sublabel && (
-            <span className="truncate text-[12px] text-[var(--ink-3)]">{item.sublabel}</span>
+            <span className="line-clamp-2 md:line-clamp-none md:truncate text-[12px] text-[var(--ink-3)]">{item.sublabel}</span>
           )}
         </span>
         {item.module && item.module !== 'globaal' && item.module !== 'beheer' && (

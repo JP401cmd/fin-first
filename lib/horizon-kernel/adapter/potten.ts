@@ -341,6 +341,44 @@ function plannedMonthlyAflossing(debt: Debt): number {
   return split ? split.currentAflossing : 0
 }
 
+/**
+ * Aflossingsvormen die géén annuïteit zijn en dus een CONSTANTE maandaflossing
+ * houden. Spiegelt de takken van `computeRenteAflossingsSplit` (lib/debt-data.ts):
+ * `aflossingsvrij` → aflossing 0, `lineair` → `saldo/n`; al het overige (inclusief
+ * `null`) valt daar op de annuïteit-default. Eén bron voor de classificatie, geen
+ * tweede formule.
+ */
+const NIET_ANNUITAIR: ReadonlySet<string> = new Set<string>(['aflossingsvrij', 'lineair'])
+
+/**
+ * Constante totale MAANDLAST (rente + aflossing) van een échte annuïteit, of `null`
+ * als deze schuld niet annuïtair aflost (gap-besluit V22 — zie
+ * `KernelInput.echteAnnuiteitAflossing`).
+ *
+ * `null` bij:
+ * - `repayment_type` = `aflossingsvrij` of `lineair` — die hébben een vaste
+ *   aflossing; het oracle-gedrag is daar al juist en mag niet wijzigen
+ *   (aflossingsvrij mag zeker niet ineens gaan aflossen);
+ * - een handmatig vastgezette `custom_aflossing_amount` — dat is een door de
+ *   gebruiker gedeclareerd CONSTANT aflossingstempo, geen annuïteit;
+ * - onvoldoende data voor een split, of een niet-positieve maandlast.
+ *
+ * De maandlast komt uit `computeRenteAflossingsSplit` (`monthlyPayment`), dezelfde
+ * canonieke bron als `plannedMonthlyAflossing` — geen tweede PMT-formule hier.
+ */
+function annuiteitMaandlast(debt: Debt): number | null {
+  if (NIET_ANNUITAIR.has(String(debt.repayment_type))) return null
+  const custom = debt.custom_aflossing_amount
+  if (custom != null && Number.isFinite(Number(custom)) && Number(custom) >= 0) return null
+  const split = computeRenteAflossingsSplit(debt)
+  if (!split || !(split.monthlyPayment > 0)) return null
+  // Een maandlast die de rente niet overtreft lost per definitie niets af; die als
+  // annuïteit doorgeven zou de schuld laten stagneren i.p.v. het (juiste) oracle-pad
+  // met de opgegeven aflossing te volgen.
+  if (!(split.currentAflossing > 0)) return null
+  return split.monthlyPayment
+}
+
 /** `classifyDebt`-uitkomst → kern-`DebtBox3Type`. */
 function debtBox3Type(inBox3: boolean): DebtBox3Type {
   return inBox3 ? 'Box 3 schuld' : 'Geen Box 3 schuld'
@@ -392,6 +430,9 @@ const OPEET_POT_NAAM = 'Opeethypotheek'
  * (slot 3 = opeet, 6 = tekort). De tekort-lening bestaat altijd: rol 'tekortLening',
  * startsaldo 0, rente = `tekortLeningRente` (V7). `startwaarde` = `current_balance ×
  * inclusion_pct` (V6); `aflossingEur` = geplande jaaraflossing (× inclusion_pct).
+ * Annuïtair aflossende schulden krijgen daarnaast `annuiteitMaandlast` (× inclusion_pct),
+ * zodat de kern de rente/aflossing-split per maand kan herrekenen (gap V22); lineair,
+ * aflossingsvrij en handmatig vastgezette aflossingen krijgen 'm bewust NIET.
  *
  * ## Opeethypotheek-pot (slot 3) — waarom die hier hoort
  * `woning` is het reeds-gebouwde kern-woningblok (`params.ts#buildWoning`, dus één
@@ -429,6 +470,9 @@ export function buildSchuldPotten(
     const rol: DebtRol | null = isHypotheek ? 'hypotheek' : null
     const factor = inclusionFactor(d.net_worth_inclusion_pct)
     const rente = Number(d.interest_rate ?? 0) / 100
+    // Gap V22: dezelfde `inclusion_pct`-schaling als startwaarde/aflossingEur, zodat
+    // het annuïteit-schema proportioneel blijft en op dezelfde maand op 0 uitkomt.
+    const maandlast = annuiteitMaandlast(d)
     pots.push({
       slot,
       naam: d.name ?? null,
@@ -443,6 +487,7 @@ export function buildSchuldPotten(
       liquide: false, // schulden zijn niet-liquide bezit; de kern gebruikt dit niet als toewijsdoel
       inSparenNaAflossing: mapInSparenNaAflossing(d),
       rol,
+      ...(maandlast !== null ? { annuiteitMaandlast: maandlast * factor } : {}),
     })
   }
 

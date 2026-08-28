@@ -107,13 +107,22 @@ De gebruiker kiest op `/mijn/uiterlijk` drie accentkleuren: **kern** (=Overzicht
 
 Achtergrond + actieplan: `docs/accentkleuren-actieplan.md`.
 
+## Koppenconventie — de shell draagt de enige h1 (verplicht bij UI-werk)
+
+Binnen de app-shell is er **precies één `<h1>` per route en die is van de shell**: de sr-only paginanaam in `components/app/shell/mobile-stack-shell.tsx`, gevoed door `NavStackMeta.title` → `resolveRouteTitle()`. Het besluit staat in `docs/adr/0110-de-shell-draagt-de-enige-h1.md`. Regels:
+
+- **Nooit een `<h1>` in `app/(app)/**` of `components/**`.** De pagina-aanhef is een `<h2>` — gebruik `<PageOpening>` (hard `<h2>`) of `<EditorialHeadline>` (default `'h2'`, union `'h2' | 'h3'`, dus `level="h1"` is een compile-fout). Secties = `h2`, kaarten/widgets/overlay-titels = `h3`, verdieping daarbinnen `h4+` **zonder een niveau over te slaan**.
+- **De zichtbare TopBar-titel is een `<p aria-hidden="true">`**, geen kop: die balk is `lg:hidden` (= weg uit de a11y-tree op desktop), rendert niet bij `topBar: { kind: 'hidden' }` en blijft leeg op tab-roots. Een drager die op drie assen kan wegvallen kan de enige h1 niet zijn — vandaar de sr-only h1 in de shell.
+- **Buiten de app-shell** (landing, onboarding, `/check`, alles buiten de `(app)`-groep) draagt de pagina wél zijn eigen `<h1>`. Enige uitzondering.
+- **Gate:** `npm run check:headings` (`scripts/check-heading-levels.mjs`, ook in pre-push) flagt een nieuwe `<h1>` en elke `level="h1"`. De 35 nog niet omgezette in-shell bestanden staan op de `RESIDUE`-afbouwlijst; die **mag alleen krimpen** — een opgeloste entry die blijft staan maakt de gate hard rood. De gate bewijst bewust **niet** de gerenderde koppenvólgorde (die ontstaat pas in de DOM uit shell + pagina + overlay); dat is een axe-`heading-order`-toets in de UAT-laag.
+
 ## Modal-conventie — boven de zwevende nav-pill (verplicht bij UI-werk)
 
 Op mobiel zweeft de `FloatingNavButton` (`z-[60]`) onderaan het scherm. **Elke modal/overlay rendert standaard BOVEN die pill, niet eronder** — de modal dekt de pill af, zodat content en (sticky) knoppen onderin de volle hoogte hebben i.p.v. erachter/eronder te verdwijnen. Z-index-laag van de app:
 
 - `z-[70]` — gewone modals/overlays (de standaard) · `z-[80]` sleepmodus · `z-[90]` share-dialog · `z-[200]` sessie-timeout
 - `z-[60]` — FloatingNavButton + command-palette (peers; palette wordt dóór de pill geopend)
-- `z-50` — **alleen** de `NavMenuSheet` (bewust ónder de pill: de pill-toggle moet 'm kunnen sluiten)
+- `z-50` — de `NavMenuSheet` (bewust ónder de pill: de pill-toggle moet 'm kunnen sluiten) én de zwevende Fin-companion `.willhome` (`components/app/fin/fin-home.css`) plus de gedokte chat-zijbalk. Die laatste twee zijn **géén overlays**: ze hebben geen backdrop, geen focus-trap, laten de achtergrond interactief en overlappen de pill niet (de melding staat boven `--mobile-nav-clearance`). Nieuwe overlays horen hier dus nooit — die gaan naar `z-[70]`.
 
 Regels:
 - **Gedeelde `BottomSheet` (`components/app/bottom-sheet.tsx`) doet dit al automatisch** (default `z-[70]`); gebruik die waar mogelijk. Alleen `NavMenuSheet` zet de opt-out-prop `belowFloatingNav`.

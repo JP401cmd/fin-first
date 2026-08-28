@@ -49,14 +49,14 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-RAPP-01',
     scenarioId: 'UAT-RAPP-01',
-    titel: 'Rapportage-hub openen en oriënteren',
+    titel: 'Rapportage-hub openen en oriënteren (curatie per weergavemodus)',
     kriticiteit: 'BELANGRIJK',
-    given: 'De hub toont zes rapportkaarten (i-vi) en de sectie "Eerder verschenen" (archief `report_configs`, max. 20 items, Romeins genummerd).',
-    when: 'De gebruiker opent /rapportages.',
-    then: 'Precies zes rapportkaarten zichtbaar; een leeg archief toont "Je archief is leeg." zonder foutmelding; > 20 items toont Romeinse nummering i–xx daarna gewone cijfers.',
+    given: 'De hub toont ZEVEN rapportkaarten (i. balansstaat, ii. persoonlijk plan, iii. periodiek rapport, iv. maandbudget, v. vermogensoverzicht, vi. spiegel, vii. totaalplan — totaalplan erbij sinds 13 jul 2026) en de sectie "Eerder verschenen" (archief `report_configs`, max. 20 items, Romeins genummerd). Archief én abonnementsstand komen sinds S9 uit de server-loader `lib/rapportages-data-loader.ts`; de hub leest zelf niets meer client-direct.',
+    when: 'De gebruiker opent /rapportages in Eenvoudig en daarna in Volledig.',
+    then: 'In Eenvoudig staan i en ii vooraan (beide gratis en zonder invoer) met een duidingsregel erboven; de overige vijf zitten achter één ingeklapte DepthSection "Meer rapportvormen" (`data-collapsed="true"`) — weggevouwen, niet verwijderd. In Volledig staat diezelfde sectie open (`data-collapsed="false"`) en zijn alle zeven zichtbaar. Een leeg archief toont "Je archief is leeg." zonder foutmelding; > 20 items toont Romeinse nummering i–xx daarna gewone cijfers.',
     assertion: {
       kind: 'ui-only',
-      source: 'app/(app)/rapportages/page.tsx — hub-oriëntatie, geen eigen berekening (de hub toont alleen namen/datums)',
+      source: 'app/(app)/rapportages/rapportages-client.tsx — hub-oriëntatie, geen eigen berekening (de hub toont alleen namen/datums); gepind door rapportages-client.test.tsx',
     },
   },
   {

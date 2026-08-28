@@ -11,6 +11,10 @@
  * - **Regulier** (slot 1/2/4/5, 0-gebaseerd): annuïteit met vaste maandaflossing.
  *   - `saldo(m)   = MAX(0, saldo(m−1) − aflossing − extra)`; `saldo(0)=startwaarde`.
  *   - `aflossing  = MIN(saldo(m−1), planned/12)`, `planned = D>0 ? D€ : C%·B` (bens).
+ *     **Kern-uitbreiding (gap V22, app-pad):** met `KernelInput.echteAnnuiteitAflossing`
+ *     én een pot-`annuiteitMaandlast` wordt `planned/12` vervangen door de per-maand
+ *     herrekende annuïteit-split `MAX(0, maandlast − saldo(m−1)·rente/12)` — zie
+ *     `plannedMonthlyAt`. Vlag uit / geen maandlast (élke fixture) → ongewijzigd.
  *   - `extra      = IFERROR(Verdeling-categoriebedrag · saldo(m−1)/categorie-cap, 0)`
  *     (pot-share m−1; > 0 zodra de schuld-waterval extra aflossing routeert — bv.
  *     `schuld-prio` slot 2, m=53: 599,82. In de 18 fixtures zonder prio-aflossing 0).
@@ -159,6 +163,32 @@ function plannedMonthly(pot: DebtPot | null): number {
 }
 
 /**
+ * Geplande maandaflossing van maand `m`, met de échte-annuïteit-uitbreiding
+ * (gap-besluit V22, `KernelInput.echteAnnuiteitAflossing`).
+ *
+ * - Vlag UIT, of pot zonder `annuiteitMaandlast` → `plannedMonthly` (= `D€/12`), dus
+ *   **byte-identiek aan het Excel v5-oracle**. Zo blijven lineaire leningen
+ *   (vaste aflossing, correct in het oracle), aflossingsvrije schulden
+ *   (`aflossingEur = 0` → blijft 0), de opeet-/tekort-slots en schulden met een
+ *   handmatig vastgezette `custom_aflossing_amount` ongemoeid.
+ * - Vlag AAN én `annuiteitMaandlast > 0` → de split wordt per maand herrekend:
+ *   `aflossing = maandlast − saldo(m−1)·rente/12`. De maandlast is constant, het
+ *   aflossingsdeel groeit terwijl de rente over het dalende saldo krimpt — precies
+ *   het annuïteit-mechanisme, zodat het saldo op de werkelijke einddatum €0 raakt.
+ *
+ * Ondergrens 0: bij negatieve amortisatie (maandlast ≤ rente) stagneert de schuld
+ * i.p.v. te groeien — het Excel-saldo kent alleen `MAX(0, …)` als vloer, dus een
+ * negatieve aflossing zou de schuld stil laten oplopen. De bovengrens `saldo(m−1)`
+ * blijft in `regularSlot` staan (laatste termijn / afrondingsrest).
+ */
+function plannedMonthlyAt(pot: DebtPot | null, saldoPrev: number, echteAnnuiteit: boolean): number {
+  if (pot === null) return 0
+  const maandlast = pot.annuiteitMaandlast ?? 0
+  if (!echteAnnuiteit || maandlast <= 0) return plannedMonthly(pot)
+  return Math.max(0, maandlast - (saldoPrev * pot.rente) / 12)
+}
+
+/**
  * Extra aflossen (S!F-familie): categorie-bedrag × pot-share(m−1), met pot-share =
  * saldo(m−1) / categorie-cap. `IFERROR(…,0)` vangt de cap=0-deling. Het categorie-bedrag
  * is > 0 zodra de schuld-waterval extra aflossing routeert (bv. `schuld-prio`); in de 18
@@ -181,6 +211,7 @@ function regularSlot(
   beyond: boolean,
   ayGuard: boolean,
   dep: SDep,
+  echteAnnuiteit: boolean,
 ): SSlot {
   const ay = ayGuard ? dep.verkocht : 0
   const rentePct = pot ? pot.rente : 0
@@ -189,7 +220,7 @@ function regularSlot(
   const extra = ay === 1 ? 0 : extraSplit(pot, saldoPrev, dep)
 
   // aflossing (E): AY buitenste (verkoopmaand 0), dan "" voorbij horizon, dan m=0 → 0.
-  const aflossingNum = m === 0 ? 0 : Math.min(saldoPrev, plannedMonthly(pot))
+  const aflossingNum = m === 0 ? 0 : Math.min(saldoPrev, plannedMonthlyAt(pot, saldoPrev, echteAnnuiteit))
   const aflossing: SCell = ay === 1 ? 0 : beyond ? '' : aflossingNum
 
   // saldo (D): "" buitenste, dan AY (0), dan m=0 → startwaarde, anders MAX(0, …).
@@ -287,7 +318,17 @@ export function computeS(input: KernelInput, dep: SDep, m: MonthIndex): SRow {
       slots.push(opeetSlot(saldoPrev, m, beyond, pot.startwaarde, dep, input.woning.opeetRentePerJaar))
     } else {
       // Reguliere slot; de hypotheek (slot 0) draagt de AY-guard.
-      slots.push(regularSlot(pot, saldoPrev, m, beyond, pot?.rol === 'hypotheek', dep))
+      slots.push(
+        regularSlot(
+          pot,
+          saldoPrev,
+          m,
+          beyond,
+          pot?.rol === 'hypotheek',
+          dep,
+          input.echteAnnuiteitAflossing === true,
+        ),
+      )
     }
   }
 

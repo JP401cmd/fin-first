@@ -5,11 +5,34 @@
  * (/overzicht/cashflow/vaste-lasten). Twee lagen die meebewegen met de
  * weergavemodus:
  *
- *   Eenvoudig → hoofdcijfer €/mnd + vrijheidstijd-onderschrift + compacte
- *               aandeel-stoplichtmeter + de bestaande lijst (VasteKostenAnalyse)
- *               + één "Bespreek met Fin"-knop.
- *   Volledig  → daarbovenop de uitgebreide inzicht-blokken (VasteLastenInsights)
+ *   Eenvoudig → hoofdcijfer €/mnd + vrijheidstijd-onderschrift + OORDEELREGEL
+ *               (deck) + quote-meter + abonnementen-sluipverbruik + top-5
+ *               grootste posten; de volle lijst zit achter "Alle {n} posten".
+ *   Volledig  → ONGEWIJZIGD: compacte aandeel-meter, de volle lijst direct, en
+ *               daaronder de uitgebreide inzicht-blokken (VasteLastenInsights)
  *               onder <HideInSimple>.
+ *
+ * ── S2 · duiding boven reductie (release R5) ────────────────────────────────
+ * Eenvoudig hield hiervóór precies het verkeerde over: het lángste element (de
+ * volle lijst met alle posten) bleef staan, terwijl de korte blokken die er
+ * BETEKENIS aan gaven — de quote met Nibud-context en het abonnementen-
+ * sluipverbruik mét opzegknop — achter <HideInSimple> verdwenen. De selectie is
+ * omgedraaid: eerst het oordeel, dan de handeling, dan de vijf grootste posten;
+ * de volledige lijst blijft één klik weg in een <DepthSection>.
+ *
+ * TWEE COPY-ROLLEN, BEWUST GESCHEIDEN (risico 1 uit de S2-analyse). Bij
+ * warn/bad staat de `PageStatusBanner` (mount: app/(app)/overzicht/layout.tsx,
+ * copy: lib/page-status/copy.ts) boven deze pagina met dezelfde quote. Om te
+ * voorkomen dat er twee keer hetzelfde staat:
+ *   · de DECK hier is FEIT + NORM ("je zit op X% — {oordeel}; het Nibud houdt
+ *     aan …") en draagt géén imperatief;
+ *   · de BANNER is de HANDELING ("loop je abonnementen langs").
+ * De deck staat er ook bij `good` en blijft staan als de banner geminimaliseerd
+ * is — dat was juist het gat: een Eenvoudig-gebruiker met een gezonde quote (of
+ * wie de melding wegklikte) zag helemaal geen duiding.
+ *
+ * Wft: het oordeel is een constatering tegen een geciteerde Nibud-vuistregel,
+ * geen advies. Imperatieve taal hoort in de melding of bij Fin, niet hier.
  *
  * Data komt server-side binnen als props (geen client-fetch/spinner meer);
  * refresh = router.refresh(). Module-chrome = kern (amber); Fin-teal alleen op
@@ -21,23 +44,32 @@
  */
 
 import { useCallback, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { MaskedAmount } from '@/components/app/masked-amount'
-import { PageOpeningFigure } from '@/components/editorial'
+import { EditorialDeck, PageOpeningFigure } from '@/components/editorial'
 import { HideInSimple } from '@/components/app/hide-in-simple'
+import { DepthSection } from '@/components/app/depth-section'
 import { BesprekMetWillButton } from '@/components/app/chat/bespreek-met-fin-button'
 import { OpzegModal } from '@/components/app/opzeg-modal'
 import {
   VasteKostenAnalyse,
   type RecurringItem,
 } from '@/components/fin/vaste-kosten-analyse'
-import { VasteLastenInsights } from '@/components/overview/vaste-lasten-insights'
+import {
+  VasteLastenInsights,
+  VasteLastenAbonnementenBlok,
+  VasteLastenQuoteBlok,
+  VasteLastenTopPostenBlok,
+} from '@/components/overview/vaste-lasten-insights'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { formatCurrency } from '@/lib/format'
 import {
   LEVERAGE_STATUS_DOT,
   LEVERAGE_STATUS_LABEL,
   leverageStatusTextClass,
 } from '@/lib/leverage-status'
+import { VASTE_LASTEN_BENCHMARK_COPY } from '@/lib/vaste-lasten-benchmarks'
 import type { VasteLastenInsights as Insights } from '@/lib/vaste-lasten-insights'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
 
@@ -67,6 +99,59 @@ function CompactMeter({ insights }: { insights: Insights }) {
   )
 }
 
+// ── Oordeelregel (alleen Eenvoudig) ───────────────────────────
+//
+// FEIT + NORM, geen handeling — zie de rolverdeling in de kop van dit bestand.
+// Het oordeelswoord komt uit `LEVERAGE_STATUS_LABEL`: dezelfde ENE lijst die de
+// meters op deze pagina gebruiken (S2 consolideerde het lokale lijstje in
+// QuoteMeter daarheen). De statuskleur is nooit de enige drager — het woord
+// staat er als tekst.
+function OordeelDeck({ insights }: { insights: Insights }) {
+  const { hasData, ratioPct, status } = insights
+
+  // Lege staat: zonder gedetecteerde posten valt er niets te oordelen. Zonder
+  // deze tak stond er een kop met een meter-loze witruimte boven een lege lijst.
+  if (!hasData) {
+    return (
+      <EditorialDeck>
+        We hebben nog geen terugkerende kosten in je transacties herkend. Zodra er
+        afschrijvingen binnenkomen die elke maand terugkomen, staat hier hoeveel er
+        maandelijks vastligt.
+      </EditorialDeck>
+    )
+  }
+
+  // Geen maandinkomen ingevuld → status `neutral`, er is geen aandeel. Geen
+  // doodlopende melding maar een werkende ingang naar de cashflow-instellingen.
+  if (ratioPct == null) {
+    return (
+      <EditorialDeck>
+        Je vaste lasten zijn in beeld, je maandinkomen nog niet — daarom staat er geen
+        aandeel bij.{' '}
+        <Link
+          href="/overzicht/cashflow"
+          className="not-italic font-medium text-[var(--module-active-700)] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+        >
+          Vul je inkomen in bij Cashflow
+        </Link>{' '}
+        om te zien welk deel van je inkomen vastligt.
+      </EditorialDeck>
+    )
+  }
+
+  return (
+    <EditorialDeck>
+      Je vaste lasten zijn{' '}
+      <span className="not-italic font-semibold tabular-nums text-[var(--ink)]">{ratioPct}%</span>{' '}
+      van je inkomen —{' '}
+      <span className={`not-italic font-semibold ${leverageStatusTextClass(status)}`}>
+        {LEVERAGE_STATUS_LABEL[status]}
+      </span>
+      . {VASTE_LASTEN_BENCHMARK_COPY.nibudKort}
+    </EditorialDeck>
+  )
+}
+
 export function VasteLastenClient({
   insights,
   subscriptions,
@@ -82,6 +167,8 @@ export function VasteLastenClient({
   fullName: string | null
 }) {
   const router = useRouter()
+  const { mode } = useDisplayMode()
+  const isSimple = mode === 'simple'
   const [opzegTarget, setOpzegTarget] = useState<CancellationMetadata | null>(null)
 
   const refresh = useCallback(async () => {
@@ -115,6 +202,25 @@ export function VasteLastenClient({
       `. Abonnementen ${formatCurrency(insights.subscriptionsMonthly)}/mnd, overige vaste kosten ${formatCurrency(insights.vasteKostenMonthly)}/mnd.` +
       (insights.largestItem ? ` Grootste post: ${insights.largestItem.name}.` : '')
     : 'Ik heb nog geen vaste lasten in beeld.'
+
+  // Eén definitie van de volle lijst; alleen zijn OMHULSEL verschilt per modus
+  // (zie hieronder). Zo kan de lijst niet uiteenlopen tussen Eenvoudig en
+  // Volledig, en blijven de opzeg-/classificeer-flows in beide modi identiek.
+  const lijst = (
+    <VasteKostenAnalyse
+      subscriptions={subscriptions}
+      vasteKosten={vasteKosten}
+      terugkerendVariabel={terugkerendVariabel}
+      totalMonthlySubscriptions={insights.subscriptionsMonthly}
+      totalMonthlyVasteKosten={insights.vasteKostenMonthly}
+      totalMonthlyVariabel={insights.variabelMonthly}
+      totalMonthly={insights.totalMonthly}
+      userProfile={fullName ? { full_name: fullName } : null}
+      onCancellationOpen={handleCancellationOpen}
+      onRefresh={refresh}
+      collapsible={false}
+    />
+  )
 
   return (
     <div className="space-y-6">
@@ -168,23 +274,46 @@ export function VasteLastenClient({
           />
         </div>
 
-        {insights.hasData && <CompactMeter insights={insights} />}
+        {/* Eén meter per modus, nooit twee. In Eenvoudig neemt de oordeelregel
+            de plaats van de compacte meter in (de volwaardige QuoteMeter mét
+            zones en Nibud-context staat er direct onder); in Volledig blijft de
+            compacte meter hier staan, precies zoals hij stond. */}
+        {isSimple ? (
+          <OordeelDeck insights={insights} />
+        ) : (
+          insights.hasData && <CompactMeter insights={insights} />
+        )}
       </div>
 
-      {/* ── De bestaande lijst (beide modi) ── */}
-      <VasteKostenAnalyse
-        subscriptions={subscriptions}
-        vasteKosten={vasteKosten}
-        terugkerendVariabel={terugkerendVariabel}
-        totalMonthlySubscriptions={insights.subscriptionsMonthly}
-        totalMonthlyVasteKosten={insights.vasteKostenMonthly}
-        totalMonthlyVariabel={insights.variabelMonthly}
-        totalMonthly={insights.totalMonthly}
-        userProfile={fullName ? { full_name: fullName } : null}
-        onCancellationOpen={handleCancellationOpen}
-        onRefresh={refresh}
-        collapsible={false}
-      />
+      {/* ── Duiding vóór de lijst (alleen Eenvoudig) ──
+             Quote-meter (het oordeel mét zones), sluipverbruik (de enige directe
+             handeling op deze pagina) en de vijf grootste posten. Zonder inkomen
+             zegt de QuoteMeter alleen "vul je inkomen in" — dat staat dan al met
+             een werkende link in de deck hierboven, dus laten we 'm daar weg. */}
+      {isSimple && insights.hasData && (
+        <div className="space-y-4">
+          {insights.ratioPct != null && <VasteLastenQuoteBlok insights={insights} />}
+          <VasteLastenAbonnementenBlok insights={insights} onOpzeg={handleOpzegFromBlock} />
+          <VasteLastenTopPostenBlok insights={insights} />
+        </div>
+      )}
+
+      {/* ── De volledige lijst ──
+             Volledig: ongewijzigd, direct op de pagina. Eenvoudig: achter
+             "Alle {n} posten" (DepthSection — daar standaard ingeklapt). Bewust
+             GEEN wikkel in Volledig: DepthSection is zelf een bordered card en
+             zou de analyse-kaart in een tweede kaart zetten, terwijl "Volledig
+             verandert niet" het acceptatiecriterium van deze release is. */}
+      {isSimple ? (
+        <DepthSection
+          title={`Alle ${insights.count} posten`}
+          summary={`${insights.subscriptionCount} abonnementen · ${insights.vasteKostenCount} vaste kosten`}
+        >
+          {lijst}
+        </DepthSection>
+      ) : (
+        lijst
+      )}
 
       {/* ── Uitgebreide inzichten (alleen Volledig) ── */}
       <HideInSimple>

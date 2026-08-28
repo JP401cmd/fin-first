@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
-import RapportagesPage from './page'
+import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
+import type { RapportageArchiveItem } from '@/lib/rapportages-data-loader'
+import { RapportagesClient } from './rapportages-client'
 
 /**
  * H28/S9 — het archief mocht geen "spookverwijdering" meer tonen.
@@ -11,34 +13,31 @@ import RapportagesPage from './page'
  * verwijdering terwijl de rij op de server bleef staan — zichtbaar terug bij de
  * volgende herlaadbeurt. De rij verdwijnt nu alleen na een bevestigd `res.ok`,
  * en anders verschijnt de foutmelding van de server.
+ *
+ * Harnas gewijzigd bij S9: de hub is een serverpagina geworden en het archief
+ * komt als prop uit `lib/rapportages-data-loader.ts`. De supabase-client-mock
+ * is daarmee overbodig — er wordt niets meer client-direct gelezen. Het gedrag
+ * dat deze test bewaakt is ongewijzigd.
  */
 
-const CONFIG_ROW = {
+const CONFIG_ROW: RapportageArchiveItem = {
   id: 'cfg-1',
   name: 'Archiefstuk mei',
   period_type: 'month',
   date_from: '2026-05-01',
   date_to: '2026-06-01',
   use_ai: false,
-  created_at: '2026-05-02T10:00:00.000Z',
-  last_generated_at: '2026-05-02T10:00:00.000Z',
 }
 
 const mockPush = vi.fn()
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush, replace: vi.fn(), prefetch: vi.fn(), back: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/rapportages',
 }))
 
-vi.mock('@/lib/supabase/client', () => ({
-  createClient: () => ({
-    from: () => ({
-      select: () => ({
-        order: () => ({
-          limit: async () => ({ data: [CONFIG_ROW], error: null }),
-        }),
-      }),
-    }),
-  }),
+vi.mock('@/components/app/shell/nav-stack-meta', () => ({
+  NavStackMeta: () => null,
 }))
 
 const mockFetch = vi.fn()
@@ -49,7 +48,13 @@ beforeEach(() => {
 })
 
 async function renderArchive() {
-  render(<RapportagesPage />)
+  render(
+    <DisplayModeProvider initialMode="full">
+      <RapportagesClient
+        data={{ archive: [CONFIG_ROW], hasAiSubscription: false, aiAddonAvailable: false }}
+      />
+    </DisplayModeProvider>,
+  )
   await waitFor(() => expect(screen.getByRole('button', { name: 'Verwijder Archiefstuk mei' })).toBeTruthy())
   return screen.getByRole('button', { name: 'Verwijder Archiefstuk mei' })
 }

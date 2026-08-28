@@ -69,11 +69,11 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Mijn-hub verkennen en naar een instellingenpagina navigeren',
     kriticiteit: 'OVERIG',
     given: 'Ingelogd, open /mijn (de instellingen-hub). Sinds fase 4 van de eenvoudige weergave toont de hub géén subnav-tabbalk meer (MIJN-1): die herhaalde het kaart-grid exact. Op de subpagina\'s staat de balk er wél.',
-    when: 'De gebruiker leest het kaart-grid en klikt door naar een onderwerp (profiel, account, privacy, notificaties, koppelingen, uiterlijk, geavanceerd).',
-    then: 'Elke kaart landt op de juiste /mijn/*-subroute; het grid dekt de in de nav geregistreerde onderwerpen (feedback is bewust verweesd — alleen via ⌘K/URL bereikbaar). Op /mijn zelf staat boven het grid geen tabbalk (in BEIDE weergavemodi — dit is een dubbeling wegnemen, geen diepte verbergen); zodra je op een subpagina landt verschijnt de tabbalk als zijwaartse navigatie.',
+    when: 'De gebruiker leest het kaart-grid in Eenvoudig én in Volledig, en klikt door naar een onderwerp (profiel, privacy, notificaties, koppelingen, uiterlijk, check-ins, geavanceerd).',
+    then: 'Elke kaart landt op de juiste /mijn/*-subroute; het grid dekt de in de nav geregistreerde onderwerpen (feedback is bewust verweesd — alleen via ⌘K/URL bereikbaar). Account en Rapportages staan sinds bevinding M14 bewust NIET meer in het grid: die hebben elk al een vaste ingang elders (Account in de mobiele nav-pill en de zijbalk-footer, Rapportages permanent in de desktop-zijbalk) en verschenen anders twee keer. WEERGAVEMODUS (S8, optie B): in **Volledig** staan alle zeven kaarten in één grid. In **Eenvoudig** staan er vier vooraan — profiel, privacy, koppelingen, uiterlijk — en zitten notificaties, check-ins en geavanceerd achter één ingeklapte DepthSection "Alle instellingen" (`data-collapsed="true"`) met een samenvatting die zegt wát erin zit. Weggevouwen, niet verwijderd: de kinderen blijven gemount en `inert`, dus met een dichte sectie springt Tab van de laatste primaire kaart naar de disclosure-knop en niet in de verborgen links. Uiterlijk staat bewust vooraan — daar woont de weergavekeuze zelf, dus dat is de vluchtroute terug naar Volledig. Op /mijn zelf staat boven het grid geen tabbalk (in BEIDE weergavemodi — dit is een dubbeling wegnemen, geen diepte verbergen); zodra je op een subpagina landt verschijnt de tabbalk als zijwaartse navigatie, mét het Account-tabblad.',
     assertion: {
       kind: 'ui-only',
-      source: 'components/mijn/mijn-overview.tsx + lib/navigation.ts#mijnNav + components/app/module-nav.tsx (hideOnBasePath) — navigatie zonder cijfermatige uitkomst; regressietest components/app/module-nav.test.tsx',
+      source: 'components/mijn/mijn-overview.tsx + lib/navigation.ts#mijnNav + components/app/module-nav.tsx (hideOnBasePath) — navigatie zonder cijfermatige uitkomst; regressietests components/app/module-nav.test.tsx + components/mijn/mijn-overview.test.tsx',
     },
   },
   {
@@ -295,7 +295,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     given: 'Ingelogd, /mijn/notificaties. Sinds fase 4 van de eenvoudige weergave hangt de vorm aan de weergavemodus (MIJN-3): in Eenvoudig drie hoofdschakelaars (meldingen in de app, briefing per e-mail, maandelijkse geldcheck-in) plus een ingeklapte disclosure "Alle meldingstypen"; in Volledig de vlakke lijst met alle zeven types los.',
     when: 'De gebruiker kiest welke meldingstypes binnenkomen en zet de maandelijkse check-in-herinnering aan/uit — in Eenvoudig via de hoofdschakelaar of via de disclosure.',
-    then: 'De gekozen types en de check-in-herinnering worden bewaard; de "push-types" sturen uitsluitend in-app meldingen (geen browser-push — bevestigd geen web-push in de repo). De hoofdschakelaar "Meldingen in de app" is PRESENTATIE over dezelfde voorkeuren-blob: aan = minstens één type aan, uitzetten = alle types uit, aanzetten = alle types aan; er is geen tweede opslagveld en het opslagpad blijft PUT /api/notifications. De disclosure klapt in (niet weg), zodat elke afzonderlijke keuze in Eenvoudig één klik ver blijft. Het partner-blok verschijnt uitsluitend bij een huishouden (beide modi).',
+    then: 'De gekozen types en de check-in-herinnering worden bewaard; de "push-types" sturen uitsluitend in-app meldingen (geen browser-push — bevestigd geen web-push in de repo). De hoofdschakelaar "Meldingen in de app" is PRESENTATIE over dezelfde voorkeuren-blob: aan = minstens één type aan, uitzetten = alle types uit, aanzetten = alle types aan; er is geen tweede opslagveld en het opslagpad blijft PUT /api/notifications. De disclosure klapt in (niet weg), zodat elke afzonderlijke keuze in Eenvoudig één klik ver blijft. Het partner-blok verschijnt uitsluitend bij een ECHTE partner (beide modi): de poort staat sinds S10 op `GET /api/household/status` met `has_household && members.length > 1` — hetzelfde criterium als /api/household/box2|box3. "Huishouden hebben" is bewust niet genoeg: `POST /api/household/invite` maakt de huishoud- én de eigen ledenrij al aan bij het uitnodigen, dus op dat criterium zou iemand met alleen een openstaande uitnodiging vier partner-modi te zien krijgen. Tegenproef bij precies één lid: geen partnerblok, en `/api/partner-notifications` wordt niet eens opgevraagd.',
     assertion: {
       kind: 'ui-only',
       source: 'app/(app)/mijn/notificaties/page.tsx (notificatie-preferences) — in-app meldingen, geen cijfermatige uitkomst; regressietest app/(app)/mijn/notificaties/page.test.tsx',
@@ -306,7 +306,7 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-MIJN-21',
     titel: 'Partner-transactiemeldingen configureren',
     kriticiteit: 'BELANGRIJK',
-    given: 'Ingelogd (huishouden), /mijn/notificaties, sectie partner-transacties.',
+    given: 'Ingelogd in een huishouden met TWEE leden (een openstaande uitnodiging telt niet — zie WF-MIJN-20), /mijn/notificaties, sectie partner-transacties.',
     when: 'De gebruiker kiest wanneer een melding komt over partner-transacties: alles, boven een drempel, per categorie of nooit.',
     then: 'De gekozen regel wordt bewaard en bepaalt welke partner-transactiemeldingen doorkomen (doorwerking naar het berichtencentrum, complementair aan WF-WILL-13); "boven drempel" gebruikt het ingestelde bedrag als grens.',
     assertion: {

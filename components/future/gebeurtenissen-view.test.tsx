@@ -99,10 +99,11 @@ function renderView(props: {
   strategieData?: StrategieEditorsData
   kernelSim?: KernelSimData | null
   eventPaneData?: EventPaneData
+  mode?: 'simple' | 'full'
 }) {
-  const { strategieData, kernelSim, eventPaneData, ...rest } = props
+  const { strategieData, kernelSim, eventPaneData, mode, ...rest } = props
   return render(
-    <DisplayModeProvider initialMode="full">
+    <DisplayModeProvider initialMode={mode ?? 'full'}>
       <GebeurtenissenView
         {...rest}
         strategieData={strategieData ?? mockStrategieData}
@@ -269,6 +270,43 @@ describe('GebeurtenissenView — strategieën-sectie', () => {
       events: [mockEvent({ event_type: 'pension', name: 'Bedrijfspensioen', target_age: 67 })],
     })
     expect(screen.getByText('Beheerd via Pensioen-strategie')).toBeTruthy()
+  })
+})
+
+// ── S6 — de bestemming van de factor-A-verwijzing blijft in Eenvoudig staan ──
+//
+// Box 1 draagt in béide weergavemodi de opdracht "vul je factor A in bij je
+// pensioen-strategie" en linkt naar /toekomst/gebeurtenissen?strategie=pensioen.
+// Was het hele strategieblok in Eenvoudig hard verborgen, dan opende de modal
+// wél (de deeplink-useEffect staat buiten de hide) maar was er ná sluiten geen
+// zichtbare ingang meer: een eenrichtingsdeeplink. Deze tests pinnen dat de
+// bestemming blijft bestaan, en dat de rest wél Volledig-diepte blijft.
+describe('GebeurtenissenView — strategieën in Eenvoudig (S6)', () => {
+  it('toont in Eenvoudig alleen de Pensioen-strategie als ingang', () => {
+    renderView({ events: [], mode: 'simple' })
+    expect(screen.getByText('Pensioen-strategie')).toBeTruthy()
+    expect(screen.queryByText('AOW-strategie')).toBeNull()
+    expect(screen.queryByText('Huis-strategie')).toBeNull()
+    expect(screen.queryByText('Werk-strategie')).toBeNull()
+  })
+
+  it('geeft in Eenvoudig duiding waarom er één strategie staat (duiding boven reductie)', () => {
+    renderView({ events: [], mode: 'simple' })
+    expect(screen.getByText(/hoeveel jaarruimte je in Box 1 overhoudt/i)).toBeTruthy()
+    expect(screen.getByText(/Zet je de weergave op Volledig/i)).toBeTruthy()
+  })
+
+  it('de zichtbare ingang staat los van de modal-state (geen eenrichtingsdeeplink)', () => {
+    // De bug was: de modal opende via ?strategie=pensioen, maar de kaart die
+    // 'm opnieuw kon openen bestond in Eenvoudig niet. Hier openen we via de
+    // kaart en asserten dat die ingang naast de open modal blijft bestaan —
+    // dus ook na een sluitactie, die de kaart niet unmount.
+    renderView({ events: [], mode: 'simple' })
+    const kaart = screen.getByText('Pensioen-strategie').closest('button')
+    expect(kaart).toBeTruthy()
+    fireEvent.click(kaart as HTMLButtonElement)
+    expect(screen.getByTestId('strategie-editors-open').textContent).toBe('pensioen')
+    expect(screen.getByText('Pensioen-strategie')).toBeTruthy()
   })
 })
 

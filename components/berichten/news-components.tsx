@@ -159,8 +159,10 @@ export function NewsArticleActions({ item, isRead, onMarkRead }: { item: NewsIte
   }, [feedbackGiven, item])
 
   const handleDiscuss = useCallback(() => {
-    onMarkRead(item.id)
-
+    // Zelfde patroon als "Vraag Fin" op een notificatie (M25): het item werd
+    // hier als gelezen gemarkeerd bij de klik, terwijl het gesprek pas later —
+    // of helemaal niet — op gang kwam. Nu pas markeren zodra Fin echt
+    // antwoordt; mislukt dat, dan blijft het item ongelezen.
     const googleNewsUrl = `https://news.google.com/search?q=${encodeURIComponent(
       item.sourceContext || item.headline
     )}&hl=nl&gl=NL&ceid=NL:nl`
@@ -170,7 +172,7 @@ export function NewsArticleActions({ item, isRead, onMarkRead }: { item: NewsIte
       `Wat betekent dit voor mijn financiële situatie? ` +
       `Deel de link als je aanraadt om meer te lezen, en verwijs ernaar bij het voorstellen van acties.`
 
-    openWithMessage(message)
+    openWithMessage(message, () => onMarkRead(item.id))
   }, [item, onMarkRead, openWithMessage])
 
   const handleToggleRead = useCallback(() => {

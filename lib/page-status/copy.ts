@@ -95,7 +95,11 @@ export const PAGE_STATUS_COPY: Record<string, RouteCopy> = {
     bad: {
       reason: 'Je schulden wegen zwaar ten opzichte van je vermogen ({figure}).',
       remedy:
-        'Focus op de duurste schuld eerst (avalanche-methode) om sneller schuldenvrij te worden.',
+        // S17: merknaam weg, duiding blijft — "de duurste schuld eerst" ís de
+        // uitleg van de avalanche-methode. De DebtStrategy-enumwaarde
+        // 'avalanche' (lib/debt-data.ts) is een gepersisteerde identifier en
+        // blijft ongemoeid; dit is uitsluitend schermtekst.
+        'Focus op de duurste schuld eerst om sneller schuldenvrij te worden.',
     },
     will: {
       onderwerp: 'Mijn schulden afbouwen',

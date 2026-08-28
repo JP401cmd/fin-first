@@ -6,6 +6,8 @@ import {
   dayOfMonthFromISODate,
   getNextOccurrence,
   getUpcomingTransactions,
+  nextOccurrenceFromSchedule,
+  monthFromISODate,
   type RecurringTransaction,
 } from './recurring-data'
 
@@ -162,6 +164,164 @@ describe('withDerivedDayOfMonth — incassodag uit transactiegeschiedenis', () =
     const tx = [{ counterparty_name: 'HBO', date: '2026-06-20', amount: -100 }]
     const [out] = withDerivedDayOfMonth(rows, tx)
     expect(out.day_of_month).toBe(3)
+  })
+})
+
+/**
+ * M21 — de datumheuristiek achter de kalender. `nextOccurrenceFromSchedule` is
+ * de ENIGE motor: zowel een bevestigde `recurring_transactions`-rij als een nog
+ * niet bevestigde detectie gaat er doorheen. Met injecteerbare `now`, zodat de
+ * maandeinde- en kwartaalgevallen deterministisch te pinnen zijn.
+ */
+describe('nextOccurrenceFromSchedule — maandelijks', () => {
+  const monthly = (dayOfMonth: number | null, startDate: string | null = null) => ({
+    frequency: 'monthly' as const,
+    dayOfMonth,
+    dayOfWeek: null,
+    startDate,
+  })
+
+  it('kiest de incassodag verderop in deze maand', () => {
+    const next = nextOccurrenceFromSchedule(monthly(20), new Date(2026, 4, 5))
+    expect(next?.toDateString()).toBe(new Date(2026, 4, 20).toDateString())
+  })
+
+  it('schuift naar volgende maand zodra de dag geweest is', () => {
+    const next = nextOccurrenceFromSchedule(monthly(3), new Date(2026, 4, 5))
+    expect(next?.toDateString()).toBe(new Date(2026, 5, 3).toDateString())
+  })
+
+  it('behandelt "vandaag" als geweest (de afschrijving van vandaag is geen vooruitblik)', () => {
+    const next = nextOccurrenceFromSchedule(monthly(5), new Date(2026, 4, 5))
+    expect(next?.toDateString()).toBe(new Date(2026, 5, 5).toDateString())
+  })
+
+  it('KLEMT dag 31 op het maandeinde in plaats van door te rollen', () => {
+    // Zonder klemming maakte JS van 31 februari 3 maart — een marker in de
+    // verkeerde week, en in de verkeerde maand.
+    const next = nextOccurrenceFromSchedule(monthly(31), new Date(2026, 1, 10))
+    expect(next?.getMonth()).toBe(1)
+    expect(next?.getDate()).toBe(28)
+  })
+
+  it('klemt op 29 februari in een schrikkeljaar', () => {
+    const next = nextOccurrenceFromSchedule(monthly(31), new Date(2028, 1, 10))
+    expect(next?.getMonth()).toBe(1)
+    expect(next?.getDate()).toBe(29)
+  })
+
+  it('valt terug op de dag uit startDate wanneer de incassodag ontbreekt', () => {
+    const next = nextOccurrenceFromSchedule(monthly(null, '2025-08-17'), new Date(2026, 4, 5))
+    expect(next?.getDate()).toBe(17)
+  })
+
+  it('valt terug op dag 1 wanneer er geen enkele historie is', () => {
+    const next = nextOccurrenceFromSchedule(monthly(null, null), new Date(2026, 4, 5))
+    expect(next?.toDateString()).toBe(new Date(2026, 5, 1).toDateString())
+  })
+})
+
+describe('nextOccurrenceFromSchedule — kwartaal (fase uit startDate)', () => {
+  const quarterly = (dayOfMonth: number, startDate: string | null) => ({
+    frequency: 'quarterly' as const,
+    dayOfMonth,
+    dayOfWeek: null,
+    startDate,
+  })
+
+  it('houdt de kwartaalfase van het anker aan (jan/apr/jul/okt)', () => {
+    // Anker januari, "nu" 20 februari → april, NIET mei. Vóór M21 stapte de
+    // motor vanaf de HUIDIGE maand en landde hij een maand mis.
+    const next = nextOccurrenceFromSchedule(quarterly(15, '2025-01-15'), new Date(2026, 1, 20))
+    expect(next?.getFullYear()).toBe(2026)
+    expect(next?.getMonth()).toBe(3)
+    expect(next?.getDate()).toBe(15)
+  })
+
+  it('pakt de ankermaand zelf zolang de dag nog moet komen', () => {
+    const next = nextOccurrenceFromSchedule(quarterly(15, '2025-01-15'), new Date(2026, 0, 5))
+    expect(next?.getMonth()).toBe(0)
+  })
+
+  it('stapt over de jaargrens heen', () => {
+    // Anker oktober-fase, "nu" 20 november → januari volgend jaar.
+    const next = nextOccurrenceFromSchedule(quarterly(10, '2024-10-10'), new Date(2026, 10, 20))
+    expect(next?.getFullYear()).toBe(2027)
+    expect(next?.getMonth()).toBe(0)
+  })
+
+  it('werkt met een anker dat in de toekomst ligt', () => {
+    const next = nextOccurrenceFromSchedule(quarterly(9, '2026-09-09'), new Date(2026, 4, 5))
+    expect(next?.getFullYear()).toBe(2026)
+    expect(next?.getMonth()).toBe(8)
+  })
+})
+
+describe('nextOccurrenceFromSchedule — jaarlijks', () => {
+  const yearly = (dayOfMonth: number | null, startDate: string | null) => ({
+    frequency: 'yearly' as const,
+    dayOfMonth,
+    dayOfWeek: null,
+    startDate,
+  })
+
+  it('gebruikt de ankermaand uit startDate, dit jaar', () => {
+    const next = nextOccurrenceFromSchedule(yearly(1, '2020-09-01'), new Date(2026, 4, 5))
+    expect(next?.getFullYear()).toBe(2026)
+    expect(next?.getMonth()).toBe(8)
+  })
+
+  it('schuift een jaar op zodra de datum geweest is', () => {
+    const next = nextOccurrenceFromSchedule(yearly(1, '2020-03-01'), new Date(2026, 4, 5))
+    expect(next?.getFullYear()).toBe(2027)
+    expect(next?.getMonth()).toBe(2)
+  })
+
+  it('leest de ankermaand lokaal, niet via UTC-middernacht', () => {
+    // `new Date('2020-03-01').getMonth()` kan in een negatieve offset februari
+    // teruggeven; stringparsing is maand-stabiel.
+    expect(monthFromISODate('2020-03-01')).toBe(2)
+    expect(monthFromISODate('2020-01-01')).toBe(0)
+    expect(monthFromISODate(null)).toBeNull()
+  })
+})
+
+describe('nextOccurrenceFromSchedule — wekelijks', () => {
+  it('pakt de eerstvolgende weekdag', () => {
+    // 5 mei 2026 is een dinsdag (2); volgende vrijdag (5) = 8 mei.
+    const next = nextOccurrenceFromSchedule(
+      { frequency: 'weekly', dayOfMonth: null, dayOfWeek: 5, startDate: null },
+      new Date(2026, 4, 5),
+    )
+    expect(next?.getDay()).toBe(5)
+    expect(next?.toDateString()).toBe(new Date(2026, 4, 8).toDateString())
+  })
+
+  it('geeft null zonder weekdag in plaats van een dag te verzinnen', () => {
+    const next = nextOccurrenceFromSchedule(
+      { frequency: 'weekly', dayOfMonth: null, dayOfWeek: null, startDate: '2026-01-12' },
+      new Date(2026, 4, 5),
+    )
+    expect(next).toBeNull()
+  })
+})
+
+describe('getNextOccurrence — poorten rondom de motor', () => {
+  it('geeft null voor een inactieve regel', () => {
+    const r = makeRecurring({ is_active: false })
+    expect(getNextOccurrence(r, new Date(2026, 4, 5))).toBeNull()
+  })
+
+  it('geeft null voor een verlopen regel', () => {
+    const r = makeRecurring({ end_date: '2026-01-01' })
+    expect(getNextOccurrence(r, new Date(2026, 4, 5))).toBeNull()
+  })
+
+  it('deelt de maandeinde-klemming met de rooster-motor', () => {
+    const r = makeRecurring({ day_of_month: 31, frequency: 'monthly' })
+    const next = getNextOccurrence(r, new Date(2026, 1, 10))
+    expect(next?.getMonth()).toBe(1)
+    expect(next?.getDate()).toBe(28)
   })
 })
 

@@ -6,6 +6,7 @@ import { GepaardeStaven } from './gepaarde-staven'
 import { Box3SectionHeader } from './box3-section-header'
 import { AandachtspuntActieButton } from './aandachtspunt-actie-button'
 import { ScenarioCallout } from '@/components/editorial'
+import { GlossaryTerm } from '@/components/editorial/glossary-term'
 import { formatMaskedCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { compareForfaitairVsWerkelijk } from '@/lib/box3-tegenbewijs'
@@ -114,8 +115,13 @@ export function Box3TegenbewijsCard({
         className="mb-4 text-sm italic leading-snug text-[var(--ink-2)]"
         style={{ fontFamily: SOURCE_SERIF }}
       >
-        Was je werkelijke rendement lager dan het forfait? Dan mag je tegenbewijs
-        leveren en betaal je over het werkelijke rendement. De schuif start op
+        {/* S17: wettelijke term blijft staan, mét uitleg ter plekke. Bewust
+            beschrijvend geformuleerd ("dan mag je … en wordt er geheven"), niet
+            in de gebiedende wijs — een opdracht om een fiscale regeling in te
+            roepen is advies, geen inzicht (Wft-grens). */}
+        Was je werkelijke rendement lager dan het forfait? Dan mag je{' '}
+        <GlossaryTerm term="tegenbewijs">tegenbewijs</GlossaryTerm> leveren en
+        wordt er over het werkelijke rendement geheven. De schuif start op
         jouw omslagpunt — schuif om je eigen rendement te kiezen.
       </p>
 

@@ -11,6 +11,7 @@ import { usePerspective } from '@/components/app/perspective-provider'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { Kicker, HighlightMark, OrnamentColophon } from '@/components/editorial'
+import { GlossaryTerm } from '@/components/editorial/glossary-term'
 import { InfoTooltip } from '@/components/overview/belasting/info-tooltip'
 import { Box2GecombineerdeDruk } from '@/components/overview/belasting/box2-gecombineerde-druk'
 import { Box2DividendSimulator } from '@/components/overview/belasting/box2-dividend-simulator'
@@ -256,7 +257,8 @@ export function Box2Detail({ year = 2026 }: { year?: number }) {
             className="mt-3 max-w-[58ch] border-l-2 pl-3.5 text-sm italic leading-snug text-[var(--ink-2)]"
             style={{ fontFamily: 'var(--font-serif, Georgia, serif)', borderColor: 'var(--module-active-500)' }}
           >
-            Belasting in privé over dividend + vervreemdingswinst uit je
+            Belasting in privé over dividend +{' '}
+            <GlossaryTerm term="vervreemdingswinst">vervreemdingswinst</GlossaryTerm> uit je
             aanmerkelijk belang (≥ 5%-deelneming).
           </p>
         </div>

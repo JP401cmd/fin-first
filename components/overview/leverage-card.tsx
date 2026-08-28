@@ -3,21 +3,63 @@
 /**
  * LeverageCard — gedeelde hefboom-kaart-shell. Geëxtraheerd uit HefbomenNav
  * (components/overview/overzicht-hero/hefbomen-nav.tsx) zodat de vier-hefbomen-
- * rij op /overzicht én de cashflow-landingskaarten op /overzicht/cashflow
- * exact hetzelfde uiterlijk delen en niet uit-sync raken.
+ * rij op /overzicht, de cashflow-landingskaarten op /overzicht/cashflow, de
+ * box-kaarten op /overzicht/belasting en de nav-kaarten op /toekomst exact
+ * hetzelfde uiterlijk delen en niet uit-sync raken.
  *
- * Anatomie (identiek aan de hefboomkaarten):
- *  - Kaart-shell met scherpe-genoeg rounded-2xl, paper-bg, ink-border.
+ * ══ De regel die deze shell afdwingt (S1 · richtingsbesluit R5) ═══════════
+ *
+ *   **Een status draagt altijd een woord; kleur is nooit de enige drager.**
+ *
+ * "Duiding boven reductie": Eenvoudig toont niet MÍNDER, het toont
+ * BEGRIJPELIJKER. Een beginner leest "Hoge schuldenlast" sneller dan
+ * "€ 368.270". Daarom is de kaal-gereduceerde tegel (alleen hoofdcijfer +
+ * gekleurd puntje, OVZ-2 van 9 aug 2026) vervangen door de `verdict`-variant
+ * hieronder. Die omkering is bewust en gedeeltelijk: de "excl. eigen woning"-
+ * grondslagregel en de chevron/drill-down blijven wél weg in Eenvoudig — dat
+ * is grondslag-detail respectievelijk diepte, geen oordeel.
+ *
+ * ══ Drie varianten (`variant`-prop) ═══════════════════════════════════════
+ *
+ *  · `full` (default) — Volledig. Icon-chip · label · KPI (serif, primair) ·
+ *    `subAmount`-grondslagregel · oordeel-rij · chevron. ONGEWIJZIGD t.o.v.
+ *    vóór S1; alle bestaande call-sites die niets meegeven landen hier.
+ *
+ *  · `verdict` — Eenvoudig mét duiding. Icon-chip · label · OORDEEL (primair,
+ *    statuskleur) · bedrag (secundair, gedempt, met optioneel `kpiWindow`).
+ *    Géén `subAmount`, géén chevron. Het aantal regels blijft gelijk aan
+ *    `full`: het oordeel neemt de regel over die de KPI had, de KPI zakt naar
+ *    de regel die `subAmount` had. De tegel wordt dus niet hoger.
+ *
+ *  · `compact` — one-liner: icon-chip + label (+ `subAmount`). Géén KPI,
+ *    oordeel, status-dot of chevron. Voor navigatie-rijen waar de kaart puur
+ *    een doorstap is.
+ *
+ * ══ Toegankelijkheid — ÉÉN drager, nooit twee ════════════════════════════
+ *
+ * De status-dot is ALTIJD decoratief (`aria-hidden`, `title` blijft als
+ * hover-affordance op desktop). De toegankelijke naam van de status komt van
+ * precies één plek:
+ *
+ *  - is er een ZICHTBAAR oordeel → dát is de drager (`full` met `subText`,
+ *    en altijd in `verdict`);
+ *  - is er géén zichtbaar oordeel → een `sr-only`-woord uit
+ *    `LEVERAGE_STATUS_LABEL` springt bij.
+ *
+ * Nooit allebei: een screenreader hoort de status exact één keer. Dit is de
+ * WCAG 2.2 §1.4.1-correctie — vóór S1 was de dot `aria-hidden` mét een
+ * hover-only `title`, dus op touch én voor AT bestond de status niet.
+ *
+ * ══ Anatomie & interactie ════════════════════════════════════════════════
+ *  - Kaart-shell met rounded-2xl, paper-bg, ink-border.
  *  - Heel-kaart `<Link>` (navigatie) + een sibling absolute chevron-`<button>`
  *    (uitklap-toggle) — siblings, niet genest, zodat chevron-klik niet
  *    navigeert.
- *  - Status-dot rechtsboven + gekleurde status-substext onder de KPI.
- *  - Getinte icon-chip als accent (géén linker accent-streep).
- *  - Uitklap-paneel (children) verschijnt onderaan wanneer `expanded`.
- *
- * Accordeon-state (één kaart open per keer) leeft in de parent, net als bij
- * HefbomenNav. De ENIGE animatie is de chevron-rotatie (200ms) — conform de
- * template, geen height/opacity-transitie op het paneel zelf.
+ *  - Uitklap-paneel (`children`) verschijnt onderaan wanneer `expanded`, als
+ *    sibling BUITEN de `<Link>`.
+ *  - Accordeon-state (één kaart open per keer) leeft in de parent.
+ *  - De ENIGE animatie is de chevron-rotatie (200ms) — conform de template,
+ *    geen height/opacity-transitie op het paneel zelf.
  */
 
 import Link from 'next/link'
@@ -30,6 +72,18 @@ import {
   type LeverageStatus,
 } from '@/lib/leverage-status'
 
+/**
+ * Welke behandeling de kaart krijgt. Zie het blok bovenaan dit bestand voor
+ * de volledige beschrijving per variant.
+ *
+ * Kies `verdict` overal waar de gebruiker in de EENVOUDIGE weergave zit en de
+ * kaart een status draagt. Kies `compact` alleen waar de kaart geen oordeel
+ * heeft (pure doorstap-navigatie) — niet als "rustiger" alternatief voor een
+ * kaart die wél iets te zeggen heeft; dat is precies de reductie waar het
+ * R5-richtingsbesluit tegenin gaat.
+ */
+export type LeverageCardVariant = 'full' | 'verdict' | 'compact'
+
 export function LeverageCard({
   Icon,
   tint,
@@ -38,9 +92,10 @@ export function LeverageCard({
   status,
   subText,
   subAmount,
+  kpiWindow,
   href,
   tooltip,
-  compact = false,
+  variant = 'full',
   showSubRow = true,
   expandable = false,
   expanded = false,
@@ -54,46 +109,55 @@ export function LeverageCard({
   /** Hoofdcijfer (al geformatteerd). Niet getoond wanneer leeg/null. */
   kpi?: string | null
   status: LeverageStatus
-  /** Gekleurde substext-regel onder de KPI. */
-  subText?: string | null
+  /**
+   * Het OORDEEL in gewone taal — "Hoge schuldenlast", "Op koers met sparen".
+   * Domeinspecifieke bronnen: `lib/hefboom-status-copy.ts` (de vier hefbomen)
+   * en `lib/cashflow-cards.ts` (de cashflow-kaarten). Laat 'm nooit leeg in
+   * `verdict`: de shell valt dan terug op het generieke
+   * `LEVERAGE_STATUS_LABEL`, en dat is een vangnet, geen ontwerp.
+   *
+   * `ReactNode` zodat een oordeel in de toekomst een `<GlossaryTerm>` kan
+   * dragen. **Let op de HTML-grens:** deze regel rendert BÍNNEN de kaart-
+   * `<Link>`, dus alles wat hier komt moet geldig zijn in een `<a>` — een
+   * `<button>` (de standaard-render van `GlossaryTerm`) is dat NIET. Een
+   * modus-bewuste variant die in Eenvoudig als `<span>` rendert mag hier wel;
+   * de interactieve vorm hoort in `children` (de drill-down rendert buiten de
+   * Link).
+   */
+  subText?: React.ReactNode
   /**
    * Optionele subtiele extra regel direct onder de KPI (gedempt, `--ink-3`) —
-   * bv. de "excl. eigen woning · €X"-grondslag op de bezittingen-/schulden-
-   * hefboom, of het venster-label "in augustus tot nu toe" op de cashflow-
-   * landingskaart (CF-3).
+   * de "excl. eigen woning · €X"-grondslag op de bezittingen-/schulden-
+   * hefboom. Alleen `full` en `compact`; in `verdict` wordt hij bewust NIET
+   * gerenderd (grondslag-detail is geen oordeel en blijft in Eenvoudig weg).
    *
-   * De shell RENDERT hem in beide varianten (ook in `compact`) en beslist er
-   * bewust niet over: of een regel past hangt af van wat de kaart verder toont,
-   * en dat weet alleen de call-site. Geen gating-prop dus.
-   *
-   * Reikwijdte in de praktijk: `hefbomen-nav` vult 'm wél maar zet nooit
-   * `compact` (volledige tak); `toekomst-nav-cards` laat 'm leeg; en
-   * `cashflow-landing-cards` geeft het CF-3-venster sinds de herziening van
-   * 10 aug 2026 alleen door in Volledig — in Eenvoudig toont die kaart geen KPI
-   * meer (CF-1), dus is er geen cijfer waarvan het venster geduid moet worden.
-   * De compacte tak hieronder is daarmee op dit moment ongebruikt maar blijft
-   * staan: een compacte kaart die wél een cijfer draagt, mag zijn grondslag
-   * kwijt kunnen.
+   * De shell beslist verder niet over de inhoud: of een regel past hangt af
+   * van wat de kaart verder toont, en dat weet alleen de call-site.
    */
   subAmount?: React.ReactNode
+  /**
+   * Venster-label bij het bedrag ("in augustus tot nu toe") — ALLEEN in
+   * `verdict`, waar het achter het gedempte bedrag op dezelfde regel komt
+   * (`€ 1.240 · in augustus tot nu toe`). Bestaat omdat het bedrag in deze
+   * variant naar 11px zakt: een los tweede regeltje eronder zou zwaarder
+   * wegen dan het cijfer dat het duidt.
+   *
+   * Draagt de KPI een venster (CF-3), geef 'm dan mee — anders is niet te zien
+   * of "€ 1.240" deze maand of de laatste 30 dagen is.
+   */
+  kpiWindow?: React.ReactNode
   href: string
   tooltip?: string
+  /** Zie `LeverageCardVariant`. Default `full` → byte-identiek aan voorheen. */
+  variant?: LeverageCardVariant
   /**
-   * Compacte variant: icon-chip + label (+ `subAmount` als die er is), heel de
-   * kaart een link — géén KPI, substext, status-dot of chevron. Gebruikt door de
-   * /toekomst-navkaarten en de cashflow-landingskaarten in de Eenvoudig-
-   * weergave; /overzicht geeft dit niet mee → byte-identiek default-gedrag.
-   */
-  compact?: boolean
-  /**
-   * Rendert de substext-rij onder de KPI. Default true — óók zonder `subText`,
-   * want de lege `min-h-[16px]`-placeholder houdt tegels met en zonder status-
-   * regel in dezelfde rij even hoog.
+   * Rendert de oordeel-rij onder de KPI. Alleen van toepassing op `full` —
+   * `verdict` toont het oordeel per definitie, `compact` per definitie niet.
    *
-   * Zet 'm op false wanneer GEEN ENKELE tegel in de rij een substext toont
-   * (eenvoudige weergave, OVZ-2): dan is de placeholder pure lege ruimte en
-   * blijven de tegels onderling nog steeds gelijk. Nooit per tegel mengen —
-   * dat is precies waar de placeholder voor bestaat.
+   * Default true — óók zonder `subText`, want de lege `min-h-[16px]`-
+   * placeholder houdt tegels met en zonder oordeel in dezelfde rij even hoog.
+   * Zet 'm op false wanneer GEEN ENKELE tegel in de rij een oordeel toont.
+   * Nooit per tegel mengen — dat is precies waar de placeholder voor bestaat.
    */
   showSubRow?: boolean
   /** Toont de chevron-toggle wanneer true. */
@@ -103,7 +167,7 @@ export function LeverageCard({
   /** Uitklap-content — alleen gerenderd wanneer `expanded`. */
   children?: React.ReactNode
 }) {
-  if (compact) {
+  if (variant === 'compact') {
     return (
       <div className="group relative rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 transition-all hover:border-[var(--ink-3)] hover:shadow-sm">
         <Link href={href} title={tooltip} className="flex items-center gap-2.5">
@@ -130,6 +194,27 @@ export function LeverageCard({
     )
   }
 
+  const isVerdict = variant === 'verdict'
+
+  /**
+   * Het zichtbare oordeel. In `verdict` valt de shell terug op het generieke
+   * statuslabel wanneer de call-site niets meegeeft — dát is de plek waar de
+   * regel "een status draagt altijd een woord" structureel wordt afgedwongen
+   * i.p.v. per call-site opnieuw uitgevonden.
+   */
+  const shownVerdict: React.ReactNode = isVerdict
+    ? (subText ?? LEVERAGE_STATUS_LABEL[status])
+    : showSubRow
+      ? (subText ?? null)
+      : null
+
+  /**
+   * Geen zichtbaar oordeel → de status heeft nog geen tekstdrager, dus springt
+   * een `sr-only`-woord bij. Is er wél een zichtbaar oordeel, dan blijft dit
+   * weg: twee dragers = dubbele aankondiging.
+   */
+  const needsScreenReaderStatus = shownVerdict == null
+
   return (
     <div
       className={[
@@ -140,11 +225,18 @@ export function LeverageCard({
       ].join(' ')}
     >
       <Link href={href} title={tooltip} className="flex flex-col">
+        {/* Status-dot: ALTIJD decoratief. De toegankelijke naam komt van het
+            zichtbare oordeel, of — als dat er niet is — van de sr-only-regel
+            hieronder. `title` blijft staan als hover-affordance op desktop;
+            hij bereikt AT niet en telt dus niet als drager. */}
         <span
           className={`absolute right-2.5 top-2.5 sm:right-3 sm:top-3 w-2 h-2 rounded-full ${LEVERAGE_STATUS_DOT[status]}`}
           aria-hidden="true"
           title={LEVERAGE_STATUS_LABEL[status]}
         />
+        {needsScreenReaderStatus && (
+          <span className="sr-only">{LEVERAGE_STATUS_LABEL[status]}</span>
+        )}
         <div
           className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center ${tint}`}
         >
@@ -153,29 +245,56 @@ export function LeverageCard({
         <div className="mt-2 text-sm sm:text-base font-semibold text-[var(--ink)]">
           {label}
         </div>
-        {kpi && (
-          <div className="mt-0.5 text-base sm:text-lg font-serif font-semibold text-[var(--ink)] tabular-nums">
-            {kpi}
-          </div>
-        )}
-        {subAmount && (
-          <div className="mt-0.5 text-[11px] leading-tight text-[var(--ink-3)] tabular-nums">
-            {subAmount}
-          </div>
-        )}
-        {/* Subtext + chevron op één rij — chevron rechts naast de
-            status-substext zodat de kaart niet hoger wordt en de primaire
-            link (heel kaartje) intact blijft. */}
-        {showSubRow && (
-          <div className="mt-1 flex items-end justify-between gap-2 min-h-[16px]">
-            {subText ? (
-              <span className={`text-[11px] font-medium ${leverageStatusTextClass(status)}`}>
-                {subText}
-              </span>
-            ) : (
-              <span />
+
+        {isVerdict ? (
+          <>
+            {/* Oordeel primair — neemt de regel over die de KPI in `full` had.
+                Statuskleur is semantiek (stoplicht), geen module-accent; het
+                WOORD draagt de betekenis ook zonder kleur. */}
+            <div
+              className={`mt-0.5 text-sm sm:text-base font-medium leading-snug ${leverageStatusTextClass(status)}`}
+            >
+              {shownVerdict}
+            </div>
+            {/* Bedrag secundair — gedempt, met het venster-label op dezelfde
+                regel zodat het cijfer één duidende eenheid blijft. */}
+            {(kpi || kpiWindow) && (
+              <div className="mt-0.5 text-[11px] leading-tight text-[var(--ink-3)] tabular-nums">
+                {kpi}
+                {kpi && kpiWindow ? ' · ' : null}
+                {kpiWindow}
+              </div>
             )}
-          </div>
+          </>
+        ) : (
+          <>
+            {kpi && (
+              <div className="mt-0.5 text-base sm:text-lg font-serif font-semibold text-[var(--ink)] tabular-nums">
+                {kpi}
+              </div>
+            )}
+            {subAmount && (
+              <div className="mt-0.5 text-[11px] leading-tight text-[var(--ink-3)] tabular-nums">
+                {subAmount}
+              </div>
+            )}
+            {/* Oordeel + chevron op één rij — chevron rechts naast het oordeel
+                zodat de kaart niet hoger wordt en de primaire link (heel
+                kaartje) intact blijft. */}
+            {showSubRow && (
+              <div className="mt-1 flex items-end justify-between gap-2 min-h-[16px]">
+                {shownVerdict ? (
+                  <span
+                    className={`text-[11px] font-medium ${leverageStatusTextClass(status)}`}
+                  >
+                    {shownVerdict}
+                  </span>
+                ) : (
+                  <span />
+                )}
+              </div>
+            )}
+          </>
         )}
       </Link>
 

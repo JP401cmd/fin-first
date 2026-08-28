@@ -12,7 +12,6 @@ import {
   computeJaarruimte,
   jaarruimteBesparing,
   estimateFactorAFromSalary,
-  JAARRUIMTE_OPBOUW_PCT,
   JAARRUIMTE_FACTOR_A_IMPUTATIE,
   JAARRUIMTE_MIDDELLOON_OPBOUW_PCT,
   type JaarruimteJaar,
@@ -433,16 +432,22 @@ export function JaarruimteCard({
         </p>
       )}
 
+      {/* S12 — de rekensom stond hier LETTERLIJK dubbel: het uitlegblok
+          `JaarruimteUitleg` erboven (op /overzicht/belasting/box1, de enige
+          plek waar deze kaart gebruikt wordt, in álle drie de call-sites)
+          draagt dezelfde formule én dezelfde referentiewaarde-staart. Een
+          beginner las de som twee keer en "Indicatie, geen advies" drie keer
+          binnen één schermhoogte. Eén canonieke rekensom-plek: het uitlegblok
+          (waar 'ie in Eenvoudig ook nog achter een uitklap gaat).
+
+          De Wft-regel blijft hier WEL staan — die hoort bij het bedrag dat
+          deze kaart toont en moet in beide weergavemodi zichtbaar zijn. */}
       <p
         className="mt-3 text-[12px] italic text-[var(--ink-3)] leading-snug max-w-[60ch]"
         style={{ fontFamily: SOURCE_SERIF }}
       >
-        Indicatie, geen advies — berekening {year}:{' '}
-        {(JAARRUIMTE_OPBOUW_PCT * 100).toFixed(0)}% × (inkomen −{' '}
-        {formatCurrency(result.franchise)}) − {JAARRUIMTE_FACTOR_A_IMPUTATIE} ×
-        factor A. Max {formatCurrency(result.max)} per persoon — dat is de
-        gepubliceerde referentiewaarde; je exact berekende ruimte kan er door
-        afronding een euro onder liggen.
+        Indicatie, geen advies — een schatting voor {year} op basis van je
+        inkomen en je factor A. De rekensom staat in de uitleg boven deze kaart.
       </p>
     </article>
   )

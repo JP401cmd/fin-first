@@ -12,6 +12,7 @@ import {
   resolveFetchWindow,
   heatmapWindowCovered,
   summarizeFlow,
+  describeFlow,
   newCounterparties,
   counterpartyKey,
   type AnalysisTransaction,
@@ -33,7 +34,7 @@ import { BottomSheet } from '@/components/app/bottom-sheet'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { CounterpartyAnalysisPanel } from '@/components/app/counterparty-analysis-panel'
 import { PeriodeSelector, resolvePeriodForMode } from './periode-selector'
-import { GeldstroomGauge } from './geldstroom-gauge'
+import { GeldstroomGauge, GeldstroomZin } from './geldstroom-gauge'
 import { TopTegenpartijen } from './top-tegenpartijen'
 import { GrootsteUitgaven } from './grootste-uitgaven'
 import { NieuweTegenpartijen } from './nieuwe-tegenpartijen'
@@ -483,6 +484,15 @@ export function TransactiesAnalyse({
   const prevSummary = useMemo(() => summarizeFlow(prevTxns), [prevTxns])
   const newCps = useMemo(() => newCounterparties(currentTxns, priorKeys), [currentTxns, priorKeys])
 
+  // S3 — dezelfde geldstroom, in woorden. Tweede LEZING van `currentSummary`/
+  // `prevSummary`, geen tweede berekening: `describeFlow` kiest alleen welke
+  // formulering past bij het venster. Voedt de zin in Eenvoudig én het
+  // venster-onderschrift onder de meter in Volledig.
+  const flowDescription = useMemo(
+    () => describeFlow(currentSummary, prevSummary, period, offset, periodWindow, new Date()),
+    [currentSummary, prevSummary, period, offset, periodWindow],
+  )
+
   // Lengte van de gekozen periode in dagen (lokaal geparsed) — voedt de
   // vrijheidsdag-omrekening in de tijdlijn (gem. dag-uitgave over het venster).
   const periodDays = useMemo(() => {
@@ -595,11 +605,22 @@ export function TransactiesAnalyse({
       {/* Actie-rij: transactie toevoegen + importeren + bank koppelen.
           Spiegelt de "Snelle acties" van de cashflow-pagina (De Kern → kern-*).
 
-          TXN-1 — in EENVOUDIG staat hier één primaire knop; importeren en bank
-          koppelen zijn beheer-acties die je zelden doet en verhuizen naar het
-          "…"-menu. Ze verdwijnen dus niet, ze staan één klik verderop (zelfde
-          gedachte als de kassabon-deep-dives). In VOLLEDIG staan alle drie de
-          knoppen ongewijzigd naast elkaar. */}
+          TXN-1 (herzien, M40 · 28 aug 2026) — in EENVOUDIG staan de drie
+          vúl-routes in de rij: "Nieuwe transactie", "Importeer transacties" en
+          "Bank koppelen". Achter het "…"-menu staat alleen "Zoeken en
+          bulkbewerken".
+
+          De oorspronkelijke TXN-1 (9 aug 2026) deed het omgekeerd, vanuit de
+          gedachte dat importeren en bank koppelen beheer-acties zijn "die je
+          zelden doet". M40 weerlegt dat voor precies de groep die per default in
+          Eenvoudig staat: een beginner moet de app nog vúllen, en dat gaat via
+          import en koppeling. De KoppelRekeningBanner dekt alleen de zuivere
+          0-rekeningen-stand; zodra er één rekening is verdwijnt hij, en juist
+          dan begint het vervolg-vullen (tweede bank, tweede CSV-batch, jaren
+          historie). Zoeken en bulkbewerken is daarentegen expertgereedschap dat
+          pas nut heeft als er al véél data is — dát hoort achter het menu.
+
+          In VOLLEDIG staan alle vier de knoppen ongewijzigd naast elkaar. */}
       <div className={`flex flex-wrap items-center gap-2${error ? ' opacity-60 pointer-events-none' : ''}`}>
         {bookableAccounts.length > 0 && (
           <button
@@ -623,21 +644,23 @@ export function TransactiesAnalyse({
             <Search className="h-4 w-4" aria-hidden />
             Zoeken en bulkbewerken
           </button>
-          <Link
-            href="/core/cash/import"
-            className="inline-flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-          >
-            <Upload className="h-4 w-4" />
-            Importeer transacties
-          </Link>
-          <Link
-            href="/core/cash/connect"
-            className="inline-flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-          >
-            <Link2 className="h-4 w-4" />
-            Bank koppelen
-          </Link>
         </HideInSimple>
+        {/* Vul-routes: in BEIDE modi in de rij (M40). De import zelf verandert
+            niet — dit is puur de vindbaarheid van de ingang. */}
+        <Link
+          href="/core/cash/import"
+          className="inline-flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+        >
+          <Upload className="h-4 w-4" />
+          Importeer transacties
+        </Link>
+        <Link
+          href="/core/cash/connect"
+          className="inline-flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+        >
+          <Link2 className="h-4 w-4" />
+          Bank koppelen
+        </Link>
         {simple && (
           <button
             type="button"
@@ -692,7 +715,27 @@ export function TransactiesAnalyse({
                   dit periodeoverzicht.
                 </p>
               )}
-              <GeldstroomGauge summary={currentSummary} />
+              {/* S3 — WAT DUIDT ER IN EENVOUDIG?
+                  Zodra de zes analyseblokken hieronder wegvallen, is de meter het
+                  enige duidingselement dat overblijft: een naald op een
+                  −100…+100-schaal, zonder trend of vergelijking eromheen die 'm
+                  leesbaar maakt. In Eenvoudig staat daar daarom een zin (die
+                  bovendien zijn venster benoemt); in Volledig blijft de meter
+                  precies zoals hij was, met het venster-label als onderschrift.
+
+                  De gating staat HIER en niet in `GeldstroomGauge` zelf, zodat de
+                  meter presentational blijft — zelfde keuze als CF-3 op de
+                  cashflow-hub. `summarizeFlow` is bewust NIET aangeraakt: het
+                  ongeclampte leescijfer en de 0%-bij-geen-inkomen zijn C6-terrein
+                  en moeten in Volledig reproduceerbaar blijven. */}
+              {simple ? (
+                <GeldstroomZin description={flowDescription} summary={currentSummary} />
+              ) : (
+                <GeldstroomGauge
+                  summary={currentSummary}
+                  windowLabel={flowDescription.windowLabel}
+                />
+              )}
               {currentSummary.income === 0 && currentSummary.expense === 0 && (
                 <p className="text-sm text-[var(--ink-3)]">Geen transacties in deze periode.</p>
               )}
@@ -819,7 +862,9 @@ export function TransactiesAnalyse({
         </BottomSheet>
       )}
 
-      {/* "…"-menu (alleen Eenvoudig): de beheer-acties uit de actie-rij.
+      {/* "…"-menu (alleen Eenvoudig): het expertgereedschap uit de actie-rij.
+          Sinds M40 is dat alléén "Zoeken en bulkbewerken" — de vul-routes
+          (importeren, bank koppelen) staan weer in de rij zelf.
           Via ShellOverlay — één overlay-systeem (ADR 0039), dus geen
           hand-rolled dropdown en geen eigen z-index. `simple &&` in de
           open-conditie zodat een modus-wissel het menu meteen opruimt. */}
@@ -842,22 +887,9 @@ export function TransactiesAnalyse({
             <Search className="h-4 w-4 shrink-0 text-[var(--ink-3)]" aria-hidden />
             Zoeken en bulkbewerken
           </button>
-          <Link
-            href="/core/cash/import"
-            onClick={() => setMoreOpen(false)}
-            className="flex w-full items-center gap-3 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-sm font-medium text-[var(--ink)] transition-colors duration-150 hover:bg-[var(--subtle)]"
-          >
-            <Upload className="h-4 w-4 shrink-0 text-[var(--ink-3)]" aria-hidden />
-            Importeer transacties
-          </Link>
-          <Link
-            href="/core/cash/connect"
-            onClick={() => setMoreOpen(false)}
-            className="flex w-full items-center gap-3 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 text-sm font-medium text-[var(--ink)] transition-colors duration-150 hover:bg-[var(--subtle)]"
-          >
-            <Link2 className="h-4 w-4 shrink-0 text-[var(--ink-3)]" aria-hidden />
-            Bank koppelen
-          </Link>
+          <p className="px-1 pt-1 text-xs text-[var(--ink-3)]">
+            Zoek door je volledige historie en pas meerdere transacties tegelijk aan.
+          </p>
         </div>
       </ShellOverlay>
 

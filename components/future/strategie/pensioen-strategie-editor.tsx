@@ -185,6 +185,12 @@ interface Props {
   /** Woonsituatie voor de AOW-hoogte bij de JSON-import van mijnpensioen.nl
    *  (samenwonend → lager AOW-bedrag, alleenstaand → hoger). Default: samenwonend. */
   samenwonend?: boolean
+  /** S6 — de editor is geopend vanaf de factor-A-verwijzing op Box 1
+   *  (`?strategie=pensioen`). Dan staat de jaarruimte-/factor-A-uitvraag
+   *  meteen open: wie met één opdracht binnenkomt ("vul je factor A in")
+   *  hoort niet éérst nog "Bereken je fiscale ruimte" te moeten vinden.
+   *  Alleen de start-stand — daarna bepaalt de gebruiker 'm zelf. */
+  autoOpenJaarruimte?: boolean
   onClose: () => void
   readOnly?: boolean
 }
@@ -200,6 +206,7 @@ export function PensioenStrategieEditor({
   currentAge,
   inflationRate,
   samenwonend = true,
+  autoOpenJaarruimte = false,
   onClose,
   readOnly,
 }: Props) {
@@ -207,7 +214,7 @@ export function PensioenStrategieEditor({
   const [draft, setDraft] = useState<PotDraft | null>(null) // null = list-view
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [showJaarruimte, setShowJaarruimte] = useState(false)
+  const [showJaarruimte, setShowJaarruimte] = useState(autoOpenJaarruimte)
   const [uploadMsg, setUploadMsg] = useState<string | null>(null)
   // Review-paneel na een upload: bevat de reconciliatie-entries + AOW-info +
   // per-pot gekozen acties. Geen auto-insert meer — de gebruiker beslist.

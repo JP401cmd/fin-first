@@ -16,6 +16,18 @@ export type BriefingCategory =
 
 export type BriefingSpan = 'narrow' | 'wide'
 
+/**
+ * Waarom de handmatige ververs van de briefing wel/niet beschikbaar is (L9).
+ *
+ * De regel is "1x per kalenderdag" en de server weet altijd welke van de twee
+ * geldt (`snapshot.lastManualRefresh` vs. de Amsterdam-datum). Tot L9 werd dat
+ * onderweg naar de client platgeslagen tot een kale `canRefresh: boolean`,
+ * waardoor "niet van toepassing" en "vandaag al gebruikt, morgen weer" op het
+ * scherm niet meer uit elkaar te houden waren: bij een verse mount verdween de
+ * knop volledig in plaats van uitgeschakeld te blijven staan met de reden.
+ */
+export type BriefingRefreshState = 'available' | 'used_today'
+
 /** Backwards-compatible alias — gedeelde definitie staat in
  *  `lib/hefboom-config.ts`. */
 export type HefboomTag = Hefboom

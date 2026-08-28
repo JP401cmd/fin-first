@@ -10,19 +10,41 @@
  */
 import { StrictMode } from 'react'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, cleanup, act } from '@testing-library/react'
+import { render, screen, cleanup, act, fireEvent } from '@testing-library/react'
 import { WelcomeGuideBanner } from './welcome-guide-banner'
-import { DEFAULT_WELCOME_GUIDE, DEFAULT_WELCOME_GUIDE_STATE } from '@/lib/welcome-guide'
+import { WelcomeGuideProvider } from './welcome-guide-provider'
+import { WelcomeGuideDot } from './welcome-guide-dot'
+import {
+  DEFAULT_WELCOME_GUIDE,
+  DEFAULT_WELCOME_GUIDE_STATE,
+  type WelcomeGuideState,
+} from '@/lib/welcome-guide'
 import { DisplayModeProvider, type DisplayMode } from '@/lib/hooks/use-display-mode'
 
-const SESSION_CLOSED_KEY = 'welcome_guide_closed'
-
-function mockGuideFetch(payload?: { configEnabled?: boolean; status?: 'active' | 'dismissed' }) {
+function mockGuideFetch(payload?: {
+  configEnabled?: boolean
+  status?: 'active' | 'dismissed'
+  /** Basisstaat waarop de PUT-echo de actie toepast (default = de app-default). */
+  state?: WelcomeGuideState
+}) {
   const config = { ...DEFAULT_WELCOME_GUIDE, enabled: payload?.configEnabled ?? true }
-  const state = { ...DEFAULT_WELCOME_GUIDE_STATE, status: payload?.status ?? 'active' }
-  const fn = vi.fn((_url: string, opts?: { method?: string }) => {
+  const state = {
+    ...DEFAULT_WELCOME_GUIDE_STATE,
+    ...(payload?.state ?? {}),
+    status: payload?.status ?? payload?.state?.status ?? 'active',
+  }
+  // De PUT-echo past de actie toe op de staat, net als de echte route. Zonder
+  // dat zou de server-echo de optimistische minimize/restore meteen terugdraaien
+  // — en dan test je het tegenovergestelde van wat je bedoelt.
+  const fn = vi.fn((_url: string, opts?: { method?: string; body?: string }) => {
     if (opts?.method === 'PUT') {
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ state }) })
+      const action = opts.body ? (JSON.parse(opts.body).action as string) : ''
+      const next = {
+        ...state,
+        minimized: action === 'minimize' ? true : action === 'restore' ? false : state.minimized,
+        status: action === 'dismiss' ? ('dismissed' as const) : state.status,
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ state: next }) })
     }
     return Promise.resolve({ ok: true, json: () => Promise.resolve({ config, state }) })
   })
@@ -47,7 +69,9 @@ describe('WelcomeGuideBanner', () => {
     mockGuideFetch()
     render(
       <StrictMode>
-        <WelcomeGuideBanner />
+        <WelcomeGuideProvider>
+          <WelcomeGuideBanner />
+        </WelcomeGuideProvider>
       </StrictMode>,
     )
     // De async fetch landt na de (dubbele) mount → scherm 1 (kop-loze process-
@@ -58,7 +82,11 @@ describe('WelcomeGuideBanner', () => {
 
   it('rendert niets wanneer de gids voor alle gebruikers uit staat', async () => {
     mockGuideFetch({ configEnabled: false })
-    render(<WelcomeGuideBanner />)
+    render(
+      <WelcomeGuideProvider>
+        <WelcomeGuideBanner />
+      </WelcomeGuideProvider>,
+    )
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0))
     })
@@ -67,31 +95,43 @@ describe('WelcomeGuideBanner', () => {
 
   it('rendert niets wanneer de gebruiker de gids voorgoed heeft gesloten', async () => {
     mockGuideFetch({ status: 'dismissed' })
-    render(<WelcomeGuideBanner />)
+    render(
+      <WelcomeGuideProvider>
+        <WelcomeGuideBanner />
+      </WelcomeGuideProvider>,
+    )
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0))
     })
     expect(screen.queryByText('Welkom bij TriFinity')).not.toBeInTheDocument()
   })
 
-  it('rendert niets (en fetcht niet) wanneer de sessie-sluitvlag gezet is', async () => {
-    sessionStorage.setItem(SESSION_CLOSED_KEY, '1')
-    const fn = mockGuideFetch()
-    render(<WelcomeGuideBanner />)
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 0))
-    })
+  it('geminimaliseerde staat uit de seed → geen gids, wél het punt', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    render(
+      <WelcomeGuideProvider
+        seed={{
+          config: DEFAULT_WELCOME_GUIDE,
+          state: { ...DEFAULT_WELCOME_GUIDE_STATE, minimized: true },
+        }}
+      >
+        <WelcomeGuideBanner />
+        <WelcomeGuideDot />
+      </WelcomeGuideProvider>,
+    )
+    expect(
+      await screen.findByRole('button', { name: 'Welkomstgids weer tonen' }),
+    ).toBeInTheDocument()
     expect(screen.queryByText('Welkom bij TriFinity')).not.toBeInTheDocument()
-    expect(fn).not.toHaveBeenCalled()
   })
 
   it('seed aanwezig → toont scherm 1 ZONDER fetch', async () => {
     const fn = vi.fn()
     vi.stubGlobal('fetch', fn)
     render(
-      <WelcomeGuideBanner
-        seed={{ config: DEFAULT_WELCOME_GUIDE, state: DEFAULT_WELCOME_GUIDE_STATE }}
-      />,
+      <WelcomeGuideProvider seed={{ config: DEFAULT_WELCOME_GUIDE, state: DEFAULT_WELCOME_GUIDE_STATE }}>
+        <WelcomeGuideBanner />
+      </WelcomeGuideProvider>,
     )
     expect(await screen.findByText('Zijn al je bezittingen geregistreerd?')).toBeInTheDocument()
     expect(fn).not.toHaveBeenCalled()
@@ -101,12 +141,14 @@ describe('WelcomeGuideBanner', () => {
     const fn = vi.fn()
     vi.stubGlobal('fetch', fn)
     render(
-      <WelcomeGuideBanner
+      <WelcomeGuideProvider
         seed={{
           config: { ...DEFAULT_WELCOME_GUIDE, enabled: false },
           state: DEFAULT_WELCOME_GUIDE_STATE,
         }}
-      />,
+      >
+        <WelcomeGuideBanner />
+      </WelcomeGuideProvider>,
     )
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0))
@@ -133,9 +175,11 @@ describe('WelcomeGuideBanner — afgeleide voortgang', () => {
     vi.stubGlobal('fetch', vi.fn())
     return render(
       <DisplayModeProvider initialMode="full">
-        <WelcomeGuideBanner
+        <WelcomeGuideProvider
           seed={{ config: DEFAULT_WELCOME_GUIDE, state: DEFAULT_WELCOME_GUIDE_STATE, derived }}
-        />
+        >
+          <WelcomeGuideBanner />
+        </WelcomeGuideProvider>
       </DisplayModeProvider>,
     )
   }
@@ -196,9 +240,11 @@ describe('WelcomeGuideBanner — weergavemodus', () => {
     vi.stubGlobal('fetch', vi.fn())
     return render(
       <DisplayModeProvider initialMode={mode}>
-        <WelcomeGuideBanner
+        <WelcomeGuideProvider
           seed={{ config: DEFAULT_WELCOME_GUIDE, state: DEFAULT_WELCOME_GUIDE_STATE }}
-        />
+        >
+          <WelcomeGuideBanner />
+        </WelcomeGuideProvider>
       </DisplayModeProvider>,
     )
   }
@@ -231,5 +277,118 @@ describe('WelcomeGuideBanner — weergavemodus', () => {
       expect(link.getAttribute('href')).toBe('/mijn/uiterlijk')
       unmount()
     }
+  })
+})
+
+/**
+ * L11 + S13 — één uitgang, en die gooit niets weg.
+ *
+ * L11 haalde de blokkerende twee-keuze-dialoog ("Welkomstgids sluiten?") weg:
+ * één kruisje was drie keuzes geworden. S13 maakt van die ene uitgang de
+ * canonieke MELDINGEN-CONVENTIE: de gids klapt in tot het punt naast de
+ * pagina-'i' — server-side onthouden (cross-device) i.p.v. een sessie-vlag — en
+ * is daar altijd weer te openen. "Voorgoed verbergen" blijft de aparte,
+ * secundaire link.
+ *
+ * Wat hier vastligt: welke knop leidt tot welk gedrag, en dat inklappen één
+ * PUT `minimize` stuurt (geen `dismiss`).
+ */
+describe('WelcomeGuideBanner — inklappen tot het punt (L11 + S13)', () => {
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+  })
+
+  /** Alle PUT-bodies die de banner naar /api/welcome-guide stuurde. */
+  const putActions = (fn: ReturnType<typeof mockGuideFetch>): string[] =>
+    fn.mock.calls
+      .filter(([, opts]) => (opts as { method?: string } | undefined)?.method === 'PUT')
+      .map(([, opts]) => JSON.parse((opts as { body: string }).body).action as string)
+
+  const renderSeeded = (state: WelcomeGuideState = DEFAULT_WELCOME_GUIDE_STATE) => {
+    const fn = mockGuideFetch({ state })
+    render(
+      <WelcomeGuideProvider seed={{ config: DEFAULT_WELCOME_GUIDE, state }}>
+        <WelcomeGuideBanner />
+        <WelcomeGuideDot />
+      </WelcomeGuideProvider>,
+    )
+    return fn
+  }
+
+  it('het kruisje klapt meteen in, zonder tussenvraag, en laat het punt achter', async () => {
+    const fn = renderSeeded()
+    await screen.findByText('Zijn al je bezittingen geregistreerd?')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Welkomstgids minimaliseren' }))
+
+    // Geen tussenvraag, gids weg, punt erín de plaats — dat is het verschil met
+    // de oude sessie-sluitvlag, die niets achterliet.
+    expect(screen.queryByText('Welkomstgids sluiten?')).not.toBeInTheDocument()
+    expect(screen.queryByText('Zijn al je bezittingen geregistreerd?')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Welkomstgids weer tonen' })).toBeInTheDocument()
+    // Cross-device onthouden: één `minimize`, en zeker geen `dismiss`.
+    expect(putActions(fn)).toEqual(['minimize'])
+  })
+
+  it('klikken op het punt zet de gids terug op hetzelfde scherm', async () => {
+    const fn = renderSeeded({ ...DEFAULT_WELCOME_GUIDE_STATE, minimized: true })
+    const punt = await screen.findByRole('button', { name: 'Welkomstgids weer tonen' })
+
+    fireEvent.click(punt)
+
+    expect(await screen.findByText('Zijn al je bezittingen geregistreerd?')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Welkomstgids weer tonen' })).not.toBeInTheDocument()
+    expect(putActions(fn)).toEqual(['restore'])
+  })
+
+  // Het laatste scherm wordt geseed i.p.v. er doorheen geklikt: navigeren loopt
+  // via de optimistische PUT-mutatie en dat maakt de test traag én afhankelijk
+  // van het aantal schermen. Wat hier telt is uitsluitend het sluitgedrag.
+  const lastScreenSeed = (canReveal: boolean) => {
+    const enabled = DEFAULT_WELCOME_GUIDE.screens.filter((sc) => sc.enabled)
+    const required = enabled.filter((sc) => sc.required).length
+    // canReveal=false → alles ontgrendeld ("Gids inklappen");
+    // canReveal=true  → alleen de verplichte schermen ("Nee, klap in").
+    const revealedScreens = canReveal ? required : enabled.length
+    return {
+      ...DEFAULT_WELCOME_GUIDE_STATE,
+      revealedScreens,
+      currentScreen: revealedScreens - 1,
+    }
+  }
+
+  it('"Gids inklappen" op het laatste scherm klapt even direct in', async () => {
+    const fn = renderSeeded(lastScreenSeed(false))
+    const knop = await screen.findByRole('button', { name: 'Gids inklappen' })
+
+    fireEvent.click(knop)
+
+    expect(screen.queryByText('Welkomstgids sluiten?')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Welkomstgids weer tonen' })).toBeInTheDocument()
+    expect(putActions(fn)).toEqual(['minimize'])
+  })
+
+  it('"Nee, klap in" naast het "toon meer"-aanbod klapt ook direct in', async () => {
+    const fn = renderSeeded(lastScreenSeed(true))
+    const knop = await screen.findByRole('button', { name: 'Nee, klap in' })
+
+    fireEvent.click(knop)
+
+    expect(screen.getByRole('button', { name: 'Welkomstgids weer tonen' })).toBeInTheDocument()
+    expect(putActions(fn)).toEqual(['minimize'])
+  })
+
+  it('"voorgoed verbergen" haalt óók het punt weg en muteert de server-state', async () => {
+    const fn = renderSeeded()
+    await screen.findByText('Zijn al je bezittingen geregistreerd?')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Verberg de gids voorgoed' }))
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)) })
+
+    expect(screen.queryByText('Zijn al je bezittingen geregistreerd?')).not.toBeInTheDocument()
+    // Geen heringang meer — dat is precies het verschil met inklappen.
+    expect(screen.queryByRole('button', { name: 'Welkomstgids weer tonen' })).not.toBeInTheDocument()
+    expect(putActions(fn)).toEqual(['dismiss'])
   })
 })

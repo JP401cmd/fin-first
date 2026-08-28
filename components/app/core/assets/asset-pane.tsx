@@ -334,10 +334,59 @@ export function AssetPane({ asset, currentUserId, onClose, onChanged }: AssetPan
         })
         return
       }
+      // Vastpinnen vóór de toast: `finishSuccessfully()` sluit de pane, waarna
+      // `currentAsset` in een volgende render null kan zijn. De undo-knop leeft
+      // in de toast (die de pane overleeft) en moet dus zijn eigen id/naam
+      // dragen, niet de props van een component die er niet meer is.
+      const deletedId = currentAsset.id
+      const deletedName = currentAsset.name
       addToast({
         type: 'success',
-        title: `${currentAsset.name} verwijderd`,
+        title: `${deletedName} verwijderd`,
         message: 'Je kunt deze bezitting later weer toevoegen.',
+        // Bewust langer dan de 4s-default: dit is de enige goedkope weg terug
+        // na een destructieve actie, en 4s is te kort om de toast te lezen én
+        // te besluiten. 8s is hiermee de langste duur in de app — verantwoord
+        // omdat de inzet (bv. een eigen woning met volledige
+        // waarderingshistorie) het opnieuw invoeren duur maakt.
+        duration: 8000,
+        action: {
+          label: 'Ongedaan maken',
+          onClick: async () => {
+            try {
+              const undoRes = await fetch(`/api/assets/${deletedId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'restore' }),
+              })
+              if (!undoRes.ok) {
+                const data = await undoRes.json().catch(() => null)
+                // Weer uit de error-envelope (ADR 0044), nooit uit een rauwe
+                // driver-melding.
+                addToast({
+                  type: 'error',
+                  title: 'Ongedaan maken mislukt',
+                  message:
+                    typeof data?.error === 'string' ? data.error : 'Probeer het later opnieuw.',
+                })
+                return
+              }
+              addToast({
+                type: 'success',
+                title: `${deletedName} teruggezet`,
+                message: 'De bezitting staat weer in je overzicht.',
+              })
+              onChanged?.()
+              router.refresh()
+            } catch {
+              addToast({
+                type: 'error',
+                title: 'Ongedaan maken mislukt',
+                message: 'Geen verbinding met de server. Probeer het opnieuw.',
+              })
+            }
+          },
+        },
       })
       finishSuccessfully()
     } catch {

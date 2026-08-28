@@ -41,6 +41,24 @@ type OverzichtHeroPrimaryProps = {
   greeting: string
   /** NL-datumlabel ("Donderdag 16 juli 2026"), zelfde server-bron als `greeting`. */
   dateLabel: string
+  /**
+   * Bijschrift direct ONDER de begroeting, bínnen de `<header>` (H11): de
+   * "sinds je vorige bezoek"-delta-regel, gestreamd achter een eigen
+   * `<Suspense>`. Hoort in de header omdat hij bij de groet leest ("goedemorgen
+   * … sinds gisteren kwam er 3 dagen vrijheid bij") en dezelfde
+   * `pr-12 sm:pr-16`-vrijloop voor de utility-cluster moet respecteren. Rendert
+   * `null` zodra er niets te melden valt.
+   */
+  greetingNote?: ReactNode
+  /**
+   * Bannerstrook NÁ de begroeting en vóór het hefbomen-kompas (H20): de
+   * welkomstgids en de maand-check-in. Die stonden bóven de begroeting, waardoor
+   * je op een vers account eerst een checklist zag en pas daarna wie je bent en
+   * hoe je ervoor staat. Eigen slot (geen deel van `greetingNote`) omdat het
+   * volle-breedte kaarten zijn: in de header zouden ze de rechter vrijloop voor
+   * de utility-cluster erven en scheef uitlijnen.
+   */
+  banners?: ReactNode
   /** Health Score — voedt de status-fallback op de hefboomtegels. Uit horizonData. */
   health: HealthScore | null
   /**
@@ -88,6 +106,8 @@ export function OverzichtHeroPrimary({
   userName,
   greeting,
   dateLabel,
+  greetingNote,
+  banners,
   health,
   leverScores,
   totals,
@@ -119,14 +139,20 @@ export function OverzichtHeroPrimary({
           <PerspectiveContextLabel />
         </div>
         <EditorialHeadline
-          level="h1"
+          level="h2"
           size="sm"
           emphasis={userName || undefined}
           className="mt-1 text-[var(--ink)]"
         >
           {`${greeting}${userName ? `, ${userName}` : ''}`}
         </EditorialHeadline>
+        {greetingNote}
       </header>
+
+      {/* H20 — gids/check-in ná de begroeting. Bewust hier en niet ná het
+          hefbomen-kompas: het kompas is de eerste inhoudelijke rij van de hero,
+          en een banner daartussen zou het blok in tweeën knippen. */}
+      {banners}
 
       <HefbomenNav
         health={health}

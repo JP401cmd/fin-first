@@ -7,6 +7,7 @@ import { DefaultChatTransport, type ChatTransport, type UIMessage } from 'ai'
 import { useRouter, usePathname } from 'next/navigation'
 import { useChatContext } from './chat-provider'
 import { LocalChatTransport } from '@/lib/ai/local/local-chat-transport'
+import { describeAiThrown } from '@/lib/ai/error-copy'
 import { useExecutionMode, type ExecutionBlockedReason } from '@/lib/ai/local/use-execution-mode'
 import { ChatSettingsPopover } from './chat-settings-popover'
 import type { LocalChatOverview } from '@/lib/ai/local/local-chat-context'
@@ -477,7 +478,7 @@ function QuickActionChips({
 /* ── Main ChatPanel ────────────────────────────────────────────────── */
 
 export function ChatPanel() {
-  const { isOpen, close, pendingMessage, clearPendingMessage, isPinned, togglePin, autoOpenMessage, setAutoOpenMessage, meldingRequested, clearMeldingRequest } = useChatContext()
+  const { isOpen, close, pendingMessage, clearPendingMessage, resolvePendingAnswer, dropPendingAnswer, isPinned, togglePin, autoOpenMessage, setAutoOpenMessage, meldingRequested, clearMeldingRequest } = useChatContext()
   const router = useRouter()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -532,6 +533,9 @@ export function ChatPanel() {
 
   // Modal state
   const [editAction, setEditAction] = useState<Action | null>(null)
+  // Staat het instellingenmenu (popover in de kop) open? Alleen nodig om Escape
+  // aan het juiste oppervlak toe te wijzen — zie het Escape-effect verderop.
+  const [instellingenOpen, setInstellingenOpen] = useState(false)
 
   // Chat- of meldmodus. Het gesprek (useChat-state) leeft in dit component en
   // blijft dus staan terwijl de gebruiker een melding maakt.
@@ -765,6 +769,13 @@ export function ChatPanel() {
   // per identieke berichttekst — twee identieke prompts binnen één commit-cyclus
   // tellen bewust als één.
   const dispatchedPendingRef = useRef<string | null>(null)
+  // Staat er een verstuurde vraag open waarvan de uitkomst nog onbeslist is?
+  // Zie het "pas gelezen bij een écht antwoord"-blok hieronder (M25).
+  const wachtOpAntwoordRef = useRef(false)
+  // De laatst GETYPTE vraag waarvan de uitkomst nog openstaat. Alleen gevuld
+  // vanuit `submit()` — een automatisch verstuurde vraag (notificatie, deeplink)
+  // hoort nooit in het invoerveld te belanden. Zie het L7-blok hieronder.
+  const openstaandeVraagRef = useRef<string | null>(null)
   useEffect(() => {
     if (!pendingMessage) {
       dispatchedPendingRef.current = null
@@ -779,10 +790,80 @@ export function ChatPanel() {
     // wordt de vraag alsnog verstuurd (de vraag gaat dus niet verloren).
     if (isOpen && hasAi && chatReady && wftAccepted === true && !isStreaming && dispatchedPendingRef.current !== pendingMessage) {
       dispatchedPendingRef.current = pendingMessage
+      // Vanaf hier wachten we op een ECHT antwoord voordat de aanroeper zijn
+      // gevolg mag uitvoeren (M25: "Vraag Fin" markeerde het bericht al gelezen
+      // bij de klik). Zolang deze vlag aanstaat is de uitkomst nog onbeslist.
+      wachtOpAntwoordRef.current = true
       sendMessage({ text: pendingMessage })
       clearPendingMessage()
     }
   }, [isOpen, hasAi, chatReady, wftAccepted, pendingMessage, isStreaming, sendMessage, clearPendingMessage])
+
+  // ── "Pas gelezen bij een écht antwoord" (M25) ──────────────────────
+  //
+  // De knop "Vraag Fin" (en "Bespreek met Fin" op de nieuws-tab) markeerde het
+  // bronbericht synchroon bij de klik als gelezen, terwijl de aanvraag pas
+  // seconden later async vertrok — of nooit (Wft-modal niet geaccepteerd, chat
+  // gesloten, AI onbereikbaar). Bij een storing liep de ongelezen-teller dus
+  // terug zonder dat de gebruiker iets te lezen kreeg, zonder rollback.
+  //
+  // Nu is de volgorde omgedraaid: de aanroeper geeft zijn gevolg mee als
+  // callback aan `openWithMessage`, en die vuurt hier — pas zodra er
+  // daadwerkelijk assistent-tekst op het scherm staat. Bewust bij de EERSTE
+  // gerenderde tekst en niet bij het einde van de stream: wat de gebruiker ziet
+  // staan, heeft hij kunnen lezen.
+  useEffect(() => {
+    const laatste = messages[messages.length - 1]
+    const antwoordZichtbaar =
+      !!laatste &&
+      laatste.role === 'assistant' &&
+      (laatste.parts as MessagePart[]).some((p) => p.type === 'text' && 'text' in p && !!p.text)
+
+    // L7: staat er een antwoord, dan valt er niets meer terug te zetten in het
+    // invoerveld — de openstaande vraag is beantwoord.
+    if (antwoordZichtbaar && !hasError) openstaandeVraagRef.current = null
+
+    if (!wachtOpAntwoordRef.current) return
+
+    // Fout → uitdrukkelijk NIET markeren. Dit is precies het gemelde geval.
+    if (hasError) {
+      wachtOpAntwoordRef.current = false
+      dropPendingAnswer()
+      return
+    }
+
+    if (!antwoordZichtbaar) return
+
+    wachtOpAntwoordRef.current = false
+    resolvePendingAnswer()
+  }, [messages, hasError, resolvePendingAnswer, dropPendingAnswer])
+
+  // ── Getypte vraag terug in het veld bij een fout (L7) ──────────
+  //
+  // `submit()` leegt het veld direct, vóór bekend is of de verzending slaagt. De
+  // vraag zelf gaat niet verloren (hij blijft als bubbel staan, en "Opnieuw
+  // proberen" herverstuurt 'm identiek), maar wie zijn vraag wil HERFORMULEREN
+  // vóór een nieuwe poging moest 'm overtypen. Bij een fout zetten we de tekst
+  // daarom terug in het invoerveld.
+  //
+  // Alleen als het veld leeg is: heeft de gebruiker inmiddels iets nieuws
+  // getypt, dan wint zijn eigen tekst altijd. De updater-vorm van setInput houdt
+  // dit effect los van elke toetsaanslag.
+  useEffect(() => {
+    if (!hasError) return
+    const vraag = openstaandeVraagRef.current
+    if (!vraag) return
+    setInput((prev) => (prev.trim() === '' ? vraag : prev))
+  }, [hasError])
+
+  // Sluit de gebruiker het paneel vóór het antwoord er is, dan is er niets
+  // gelezen. Strikt de veilige kant: het bericht blijft ongelezen (hij kan het
+  // opnieuw proberen), in plaats van stilletjes te verdwijnen.
+  useEffect(() => {
+    if (isOpen || !wachtOpAntwoordRef.current) return
+    wachtOpAntwoordRef.current = false
+    dropPendingAnswer()
+  }, [isOpen, dropPendingAnswer])
 
   // Auto-send scenario context message when chat opens from whatif page (first open only).
   // Zelfde Wft-gate als het pendingMessage-effect: pas versturen ná acceptatie.
@@ -798,6 +879,8 @@ export function ChatPanel() {
   const submit = () => {
     const text = input.trim()
     if (!text || isStreaming || !chatReady) return
+    // Bewaren vóór het leegmaken: bij een fout zetten we 'm terug (L7).
+    openstaandeVraagRef.current = text
     setInput('')
     sendMessage({ text })
   }
@@ -1086,44 +1169,33 @@ export function ChatPanel() {
 
   /* ── Error helpers ────────────────────────────────────────────── */
 
-  /**
-   * Herkent de subscription-gate (403 uit checkTierGate). Defense-in-depth:
-   * normaliter blokkeert de client-side upsell het versturen al, maar als het
-   * abonnement mid-sessie vervalt kan de server alsnog 403 geven. Dan tonen we
-   * de upsell i.p.v. de "opnieuw proberen"-lus die nooit kan slagen.
+  /*
+   * De foutclassificatie zit NIET meer hier maar in `lib/ai/error-copy.ts`
+   * (H27). De server stuurt een stabiele `code` op de error-envelope; de
+   * transport levert die rauwe body als `Error.message`, en `describeAiThrown`
+   * leest hem uit. Substring-matching blijft alleen als vangnet in die laag —
+   * voor het geval een tussenlaag (edge/proxy) een niet-JSON-body teruggeeft.
+   *
+   * Wat dit oplost: (1) de melding "controleer de API-sleutel in Admin
+   * instellingen" stond hardgecodeerd in deze client en legde een
+   * beheerdershandeling bij de gebruiker; (2) goede servermeldingen
+   * (creditlimiet met resetdatum, privé-modus, kill-switch) werden weggegooid
+   * en werden één generieke fout; (3) de retry-knop verscheen ook bij fouten
+   * waar retry per definitie niet kan slagen. De affordance komt nu uit
+   * dezelfde tabel als de tekst.
    */
-  function isSubscriptionError(err: Error | undefined): boolean {
-    if (!err?.message) return false
-    const msg = err.message.toLowerCase()
-    return msg.includes('abonnement') || msg.includes('403')
-  }
-
-  function getErrorMessage(err: Error | undefined): string {
-    if (!err) return 'Er ging iets mis. Probeer het opnieuw.'
-    const msg = err.message?.toLowerCase() ?? ''
-    if (isSubscriptionError(err)) {
-      return 'Fin is een betaalde functie. Sluit het AI-abonnement af om verder te chatten.'
-    }
-    if (msg.includes('timeout') || msg.includes('duurde te lang') || msg.includes('504')) {
-      return 'Het AI-antwoord duurde te lang. Probeer het opnieuw met een kortere vraag.'
-    }
-    if (msg.includes('unauthorized') || msg.includes('401')) {
-      return 'Je sessie is verlopen. Log opnieuw in.'
-    }
-    if (msg.includes('api key') || msg.includes('422') || msg.includes('niet geconfigureerd')) {
-      return 'De AI is niet geconfigureerd. Controleer de API-sleutel in Admin instellingen.'
-    }
-    if (msg.includes('network') || msg.includes('failed to fetch') || msg.includes('fetch')) {
-      return 'Geen verbinding met de server. Controleer je internetverbinding en probeer het opnieuw.'
-    }
-    return 'Er ging iets mis bij het genereren van een antwoord. Probeer het opnieuw.'
-  }
+  const errorCopy = describeAiThrown(error)
 
   const handleRetry = useCallback(() => {
     // Fail-closed: net als alle andere verzendpaden mag retry pas vuren als de
     // transport gereed is (cloud/local). Anders zou regenerate() tijdens
     // resolving/blocked alsnog over de cloud-transport kunnen vuren.
     if (!chatReady) return
+    // `regenerate()` herverstuurt exact de vraag die we bij de fout in het veld
+    // terugzetten (L7). Laat 'm dan niet dubbel achter: staat de teruggezette
+    // tekst er nog ongewijzigd, dan is de retry-klik de verzending ervan.
+    // Heeft de gebruiker 'm bewerkt, dan blijft zijn versie staan.
+    setInput((prev) => (prev === openstaandeVraagRef.current ? '' : prev))
     clearError()
     regenerate()
   }, [chatReady, clearError, regenerate])
@@ -1163,6 +1235,35 @@ export function ChatPanel() {
     if (!isOpen || isPinned) return
     return pushOverlayHistory(() => veiligSluitenRef.current())
   }, [isOpen, isPinned])
+
+  // ── Escape sluit het paneel (M27) ──────────────────────────
+  // Elk overlay-oppervlak in de app sluit met Escape; ChatPanel is een
+  // handgerolde overlay (buiten ShellOverlay om, de gedocumenteerde
+  // z-index-uitzondering) en erfde dat gedrag daardoor als enige niet. Zelfde
+  // patroon als BottomSheet/SlideInPane: één document-listener zolang het
+  // paneel modaal openstaat.
+  //
+  // Bewust NIET bij `isPinned`: gepind is het paneel een gedokte zijbalk, geen
+  // modaal venster — precies dezelfde afweging als bij de terug-knop en de
+  // swipe-dismiss hierboven. De `meldingBezig`-guard erven we gratis mee via
+  // `veiligSluiten`.
+  //
+  // Genest overlay-oppervlak wint: staat de actie-bewerkmodal (BottomSheet, met
+  // een eigen Escape) of het instellingenmenu (eigen Escape) open, dan hoort
+  // Escape dáár te sluiten en niet het hele gesprek weg te halen. Beide
+  // listeners hangen aan `document` en stoppen elkaar niet, dus de panel-kant
+  // moet zich expliciet terugtrekken.
+  useEffect(() => {
+    if (!isOpen || isPinned) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (editAction || instellingenOpen) return
+      e.stopPropagation()
+      veiligSluitenRef.current()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [isOpen, isPinned, editAction, instellingenOpen])
 
   // Hetzelfde gebaar als elke andere modal (BottomSheet). Uit bij `isPinned`
   // (een gedokte zijbalk swipe je niet weg) en tijdens een lopende verzending —
@@ -1265,7 +1366,7 @@ export function ChatPanel() {
             {/* Instellingen — naast het pin-icoon. Compacte bediening van de
                 bestemming van dit gesprek, het lokale model en de overige
                 functies; de volledige uitleg blijft op /mijn/privacy. */}
-            {mode === 'chat' && <ChatSettingsPopover onChanged={exec.refresh} />}
+            {mode === 'chat' && <ChatSettingsPopover onChanged={exec.refresh} onOpenChange={setInstellingenOpen} />}
             {/* Pin toggle — desktop only. Pinnen dokt het paneel als zijbalk;
                 op mobiel is daar geen ruimte voor. `!hidden`/`md:!flex`
                 (i.p.v. kale `hidden`/`md:flex`): `.touch-target` zet zelf al
@@ -1412,14 +1513,14 @@ export function ChatPanel() {
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
                 <div className="flex-1">
                   <p className="text-sm font-medium text-red-800">
-                    {getErrorMessage(error)}
+                    {errorCopy.text}
                   </p>
                   {/* Rauwe serverfout (was: <details> "Technische details") is
                       bewust verwijderd: er is geen schoon client-side admin-
                       signaal in de chat-context, dus tonen we die nooit aan
-                      gewone gebruikers. Alleen de nette NL-melding + retry
-                      blijven (E-09). */}
-                  {isSubscriptionError(error) ? (
+                      gewone gebruikers. Alleen de nette NL-melding + de
+                      passende vervolgstap blijven (E-09 + H27). */}
+                  {errorCopy.affordance === 'upsell' ? (
                     // Geen retry-lus bij een abonnement-fout — die kan nooit
                     // slagen. Toon de upsell + CTA naar /mijn/account.
                     <div className="mt-2.5">
@@ -1427,16 +1528,28 @@ export function ChatPanel() {
                     </div>
                   ) : (
                     <div className="mt-2 flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleRetry}
-                        disabled={!chatReady}
-                        className="inline-flex items-center gap-1 rounded-lg bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-200 disabled:cursor-not-allowed disabled:opacity-50"
-                        data-testid="chat-retry-button"
-                      >
-                        <RefreshCw className="h-3 w-3" />
-                        Opnieuw proberen
-                      </button>
+                      {errorCopy.affordance === 'opnieuw' && (
+                        <button
+                          type="button"
+                          onClick={handleRetry}
+                          disabled={!chatReady}
+                          className="inline-flex items-center gap-1 rounded-lg bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-200 disabled:cursor-not-allowed disabled:opacity-50"
+                          data-testid="chat-retry-button"
+                        >
+                          <RefreshCw className="h-3 w-3" />
+                          Opnieuw proberen
+                        </button>
+                      )}
+                      {errorCopy.affordance === 'link' && errorCopy.href && (
+                        <Link
+                          href={errorCopy.href}
+                          onClick={handleDismissError}
+                          className="inline-flex items-center gap-1 rounded-lg bg-red-100 px-3 py-1.5 text-xs font-medium text-red-700 transition-colors hover:bg-red-200"
+                          data-testid="chat-error-link"
+                        >
+                          {errorCopy.linkLabel ?? 'Naar instellingen'}
+                        </Link>
+                      )}
                       <button
                         type="button"
                         onClick={handleDismissError}

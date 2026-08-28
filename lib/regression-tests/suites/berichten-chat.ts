@@ -2,6 +2,7 @@ import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertNotNull, assertIncludes } from '../assert'
 import type { TestCase } from '../test-types'
 import { unauthenticatedFetch, authenticatedFetch, getBaseUrl } from '../server-runner'
+import { AI_ERROR_CODE, describeAiError, describeAiThrown } from '@/lib/ai/error-copy'
 
 const CAT = 'berichten.chat'
 
@@ -308,65 +309,53 @@ const tests: TestCase[] = [
     id: 'chat-error-message-mapping',
     name: 'Foutberichten mapping per error type',
     category: CAT,
-    description: 'getErrorMessage retourneert correcte Nederlandse foutmeldingen per error type',
+    description: 'describeAiThrown vertaalt AI-fouten naar NL-copy zonder beheerderstaal',
     priority: 'high',
     estimatedDurationMs: 10,
     fn() {
-      // Reproduce the getErrorMessage logic from ChatPanel
-      function getErrorMessage(err: { message: string } | undefined): string {
-        if (!err) return 'Er ging iets mis. Probeer het opnieuw.'
-        const msg = err.message?.toLowerCase() ?? ''
-        if (msg.includes('timeout') || msg.includes('duurde te lang') || msg.includes('504')) {
-          return 'Het AI-antwoord duurde te lang. Probeer het opnieuw met een kortere vraag.'
-        }
-        if (msg.includes('unauthorized') || msg.includes('401')) {
-          return 'Je sessie is verlopen. Log opnieuw in.'
-        }
-        if (msg.includes('api key') || msg.includes('422') || msg.includes('niet geconfigureerd')) {
-          return 'De AI is niet geconfigureerd. Controleer de API-sleutel in Admin instellingen.'
-        }
-        if (msg.includes('network') || msg.includes('failed to fetch') || msg.includes('fetch')) {
-          return 'Geen verbinding met de server. Controleer je internetverbinding en probeer het opnieuw.'
-        }
-        return 'Er ging iets mis bij het genereren van een antwoord. Probeer het opnieuw.'
-      }
+      // Bewust GEEN gekopieerde implementatie meer: deze test importeerde
+      // eerder een handmatig nagebouwde `getErrorMessage` en bevroor daarmee
+      // juist de fóute string ("controleer de API-sleutel"). Nu toetst hij de
+      // echte gedeelde laag (H27).
 
-      // No error → default message
-      assertEqual(
-        getErrorMessage(undefined),
-        'Er ging iets mis. Probeer het opnieuw.',
-        'no error → default',
-      )
-      // Timeout errors
-      assert(
-        getErrorMessage({ message: 'Request timeout' }).includes('duurde te lang'),
-        'timeout error mapped',
-      )
-      assert(
-        getErrorMessage({ message: 'Error 504' }).includes('duurde te lang'),
-        '504 error mapped',
-      )
-      // Auth errors
-      assert(
-        getErrorMessage({ message: 'Unauthorized 401' }).includes('sessie is verlopen'),
-        '401 error mapped',
-      )
-      // Config errors
-      assert(
-        getErrorMessage({ message: 'API key missing 422' }).includes('niet geconfigureerd'),
-        '422 config error mapped',
-      )
-      // Network errors
-      assert(
-        getErrorMessage({ message: 'Failed to fetch' }).includes('Geen verbinding'),
-        'network error mapped',
-      )
-      // Generic error
-      assertEqual(
-        getErrorMessage({ message: 'some random error' }),
-        'Er ging iets mis bij het genereren van een antwoord. Probeer het opnieuw.',
-        'generic error → fallback',
-      )
+      // Geen fout → vangnet-tekst met retry.
+      assertEqual(describeAiThrown(undefined).code, 'ai_unknown', 'geen fout → vangnet')
+
+      // Server-envelope mét code: die wint en bepaalt ook de affordance.
+      const killSwitch = describeAiThrown({
+        message: JSON.stringify({ error: 'x', code: 'ai_disabled_platform' }),
+      })
+      assertEqual(killSwitch.affordance, 'geen', 'kill-switch → geen retry-lus')
+      assert(killSwitch.text.includes('onderhoud'), 'kill-switch → onderhoudstekst')
+
+      // Creditlimiet: de servertekst (met aantal + resetdatum) wint.
+      const credit = describeAiThrown({
+        message: JSON.stringify({
+          error: 'Je hebt je maandelijkse AI-limiet bereikt (50 credits). De teller reset op 1 september.',
+          code: 'ai_credit_limit',
+        }),
+      })
+      assert(credit.text.includes('50 credits'), 'creditlimiet → servertekst behouden')
+      assertEqual(credit.affordance, 'geen', 'creditlimiet → geen retry-lus')
+
+      // Vangnet op vrije tekst (niet-JSON body van een tussenlaag).
+      assert(describeAiThrown({ message: 'Request timeout' }).text.includes('duurde te lang'), 'timeout')
+      assert(describeAiThrown({ message: 'Unauthorized 401' }).text.includes('sessie is verlopen'), '401')
+      assert(describeAiThrown({ message: 'Failed to fetch' }).text.includes('Geen verbinding'), 'netwerk')
+
+      // De kern van H27: een 422/sleutelfout mag NOOIT meer beheerderstaal geven.
+      const configFout = describeAiThrown({ message: 'API key missing 422' })
+      assertEqual(configFout.code, 'ai_unavailable', '422 → neutrale klasse')
+      assertEqual(configFout.affordance, 'opnieuw', '422 → retry is zinvol')
+
+      // Vangrail: geen enkele gebruikerstekst bevat beheerderstermen.
+      const verboden = ['sleutel', 'api key', 'admin', 'beheer', 'environment', 'anthropic', 'openai', 'mistral']
+      for (const code of Object.values(AI_ERROR_CODE)) {
+        const tekst = describeAiError(code).text.toLowerCase()
+        for (const woord of verboden) {
+          assert(!tekst.includes(woord), `copy voor ${code} bevat geen "${woord}"`)
+        }
+      }
     },
   },
 

@@ -1,6 +1,17 @@
 import { NextResponse, type NextRequest } from 'next/server'
+import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { notFound, serverError, unauthorized } from '@/lib/api/respond'
+import { parseBody } from '@/lib/api/parse-body'
+
+/**
+ * Vorm-controle op het pad-segment, gedeeld door DELETE en PATCH.
+ *
+ * Bewust één constante: twee handmatig overgetypte regexes op hetzelfde
+ * segment is precies het soort stille divergentie waarmee de ene handler een
+ * malformed id afvangt en de andere 'm doorlaat naar Postgres (500).
+ */
+const ASSET_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /**
  * DELETE /api/assets/[id] — een bezitting uit het actieve overzicht halen.
@@ -95,7 +106,7 @@ export async function DELETE(
     // `app/api/budgets/[id]` kiest hier `badRequest`; dat is een bewuste
     // divergentie (dat endpoint wordt door een testsuite op die 400 vastgezet),
     // geen slordigheid — patch de twee niet heen en weer.
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    if (!ASSET_ID_RE.test(id)) {
       return notFound('Bezitting niet gevonden')
     }
 
@@ -119,5 +130,115 @@ export async function DELETE(
     return NextResponse.json({ id: data.id })
   } catch (err) {
     return serverError(err, 'assets:DELETE')
+  }
+}
+
+/**
+ * Body-contract van PATCH. Bewust een gesloten `action`-literal en géén vrije
+ * kolomset: dit endpoint bestaat om precies één ding te doen — de soft delete
+ * hierboven terugdraaien. Een generieke `{ is_active: boolean }` zou hetzelfde
+ * werk doen maar meteen een tweede verwijderpad openen dat langs de
+ * bevestigingsdialoog van `asset-pane.tsx` heen loopt; een literal maakt de
+ * intentie leesbaar in de call-site én in de log.
+ */
+const AssetRestoreSchema = z
+  .object({
+    action: z.literal('restore'),
+  })
+  // `.strict()` is hier geen ceremonie. Vandaag is de update-payload een
+  // hardgecodeerde literal, dus extra sleutels zijn inert — maar zodra iemand
+  // ooit `parsed.data` in de `.update()` spreidt, wordt een tolerant schema
+  // stilzwijgend een open kolom-update-pad. Strict maakt dat een 400 in plaats
+  // van een stilte.
+  .strict()
+
+/**
+ * PATCH /api/assets/[id] — de soft delete van DELETE terugdraaien.
+ *
+ * Bestaat voor bevinding M7: de bevestigingsdialoog én de succes-toast beloven
+ * "je kunt deze bezitting later weer toevoegen", maar er was geen weg terug
+ * vanaf die toast. `components/app/core/assets/asset-pane.tsx` hangt hier nu
+ * een "Ongedaan maken"-actie aan.
+ *
+ * ## Waarom in ditzelfde bestand en niet op `[id]/restore`
+ *
+ * De autorisatie van een restore MOET letterlijk gelijk zijn aan die van de
+ * delete — zelfde anon RLS-client, zelfde `.eq('user_id', user.id)`, zelfde
+ * 404 op 0 geraakte rijen. Naast elkaar in één bestand is die gelijkheid bij
+ * elke latere wijziging in één blik te controleren; in een aparte map drift 't.
+ * Een restore die één guard mist, haalt een rij van iemand anders terug.
+ *
+ * ## Waarom géén `.eq('is_active', false)`
+ *
+ * Zelfde afweging als bij DELETE (zie hierboven): de update filtert niet op de
+ * huidige waarde, dus een dubbele klik of een stale scherm schrijft dezelfde
+ * waarde en levert gewoon 200. Idempotent, geen verwarrende 404 op een actie
+ * die al geslaagd was.
+ *
+ * ## Wat dit NIET herstelt
+ *
+ * Alleen de `is_active`-vlag. Waarderingshistorie, holdings en koppelingen
+ * bleven bij de soft delete sowieso staan (dát is de reden dat het een soft
+ * delete is), dus er valt niets terug te zetten. Een hard verwijderde
+ * crypto-holding — eigen pad, eigen type-to-confirm — is bewust niet
+ * herstelbaar en loopt niet via deze route.
+ *
+ * ## Bekende asymmetrie: dit is NIET de tegenhanger van élke deactivatie
+ *
+ * `is_active = false` heeft een tweede schrijver: de RPC
+ * `public.delete_bank_account`
+ * (`supabase/migrations/20260804102500_delete_bank_account_rpc.sql`) zet in
+ * dezelfde ondeelbare transactie `is_active = false` én
+ * `has_budget_tracking = false` op het gekoppelde cash-bezit, nádat de
+ * `bank_accounts`-rij weg is en transacties verhuisd zijn. Deze route is
+ * id-geadresseerd en flipt uitsluitend de vlag, dus wie het
+ * `deactivated_asset_id` uit die RPC-respons hier indient, reactiveert een
+ * cash-bezit met een stale waarde, zonder bankrekening en met
+ * budget-tracking uit — de helft van een alles-of-niets-besluit.
+ *
+ * Bewust niet dichtgezet in deze wijziging: het treft uitsluitend eigen data
+ * (de eigenaarsfilter blijft onverkort gelden), er is géén UI-pad naartoe (de
+ * undo-knop wordt pas gearmeerd ná een geslaagde `DELETE` op dít endpoint), en
+ * het resultaat is met een gewone verwijderactie weer op te ruimen. De echte
+ * oplossing is een kortlevend, server-gebonden undo-token dat `DELETE`
+ * teruggeeft en `PATCH` eist; dat is een aparte kaart waard. Hier staat het
+ * zodat de volgende lezer dit niet als gedekt leest.
+ */
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    // Anon RLS-client mét de sessie van de aanroeper — nooit service-role.
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) return unauthorized()
+
+    const { id } = await params
+    if (!ASSET_ID_RE.test(id)) {
+      return notFound('Bezitting niet gevonden')
+    }
+
+    const parsed = await parseBody(AssetRestoreSchema, req)
+    if (!parsed.ok) return parsed.response
+
+    const { data, error } = await supabase
+      .from('assets')
+      .update({ is_active: true })
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select('id')
+      .maybeSingle()
+
+    if (error) return serverError(error, 'assets:PATCH')
+    // 0 geraakte rijen = niet van deze gebruiker. De SELECT-policy op `assets`
+    // is huishoud-verbreed, de UPDATE-policy strikt eigen-rij: zonder deze
+    // check zou een restore op de rij van de partner een stille "succes"
+    // opleveren (`.update()` zonder geraakte rijen geeft `error: null`).
+    if (!data) return notFound('Bezitting niet gevonden')
+
+    return NextResponse.json({ id: data.id })
+  } catch (err) {
+    return serverError(err, 'assets:PATCH')
   }
 }

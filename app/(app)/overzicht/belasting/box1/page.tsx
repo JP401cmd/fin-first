@@ -6,12 +6,7 @@ import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { Clock, Users, EyeOff } from 'lucide-react'
 import { JaarruimteCard } from '@/components/overview/jaarruimte-card'
 import { JaarruimteDeeplinkScroll } from '@/components/overview/belasting/jaarruimte-deeplink-scroll'
-import {
-  JAARRUIMTE_OPBOUW_PCT,
-  JAARRUIMTE_FACTOR_A_IMPUTATIE,
-  JAARRUIMTE_FRANCHISE_2026,
-  JAARRUIMTE_MAX_2026,
-} from '@/lib/jaarruimte'
+import { JaarruimteRekensom } from '@/components/overview/belasting/jaarruimte-rekensom'
 import { BelastingBoxPageHeader } from '@/components/overview/belasting-box-page-header'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { computeBox1Tax, grossFromNet, deriveMarginaalTarief, type Box1Result } from '@/lib/box1-tax'
@@ -396,7 +391,6 @@ function Box1DrukHero({
  * bovengrens meer). Eén bundelveld stuurt nu beide teksten.
  */
 function JaarruimteUitleg({ factorAKnown }: { factorAKnown: boolean }) {
-  const opbouwPct = Math.round(JAARRUIMTE_OPBOUW_PCT * 100)
   const linkCls =
     'underline decoration-[var(--border-md)] underline-offset-2 hover:text-[var(--ink)]'
   return (
@@ -423,19 +417,11 @@ function JaarruimteUitleg({ factorAKnown }: { factorAKnown: boolean }) {
           Slim belasting-uitstel dus.
         </p>
 
-        <p className="mt-4 mb-1 font-mono text-[10px] uppercase tracking-[0.18em] not-italic text-[var(--ink-3)]">
-          De rekensom
-        </p>
-        <p>
-          Voor 2026:{' '}
-          <span className="font-mono not-italic tabular-nums text-[var(--ink)]">
-            {opbouwPct}% × (inkomen − {formatCurrency(JAARRUIMTE_FRANCHISE_2026)})
-            − {JAARRUIMTE_FACTOR_A_IMPUTATIE} × factor A
-          </span>
-          , afgetopt op {formatCurrency(JAARRUIMTE_MAX_2026)} per persoon. Dat
-          maximum is de gepubliceerde referentiewaarde; je exact berekende ruimte
-          kan er door afronding een euro onder liggen.
-        </p>
+        {/* S12 — de rekensom is modus-afhankelijk: in Volledig inline (zoals
+            altijd), in Eenvoudig één gewone zin + uitklap "Zo rekenen we je
+            jaarruimte". Client-component als child van deze async server-page,
+            hetzelfde server-children-patroon als <HideInSimple>. */}
+        <JaarruimteRekensom />
 
         <p className="mt-4 mb-1 font-mono text-[10px] uppercase tracking-[0.18em] not-italic text-[var(--ink-3)]">
           De adder: factor A

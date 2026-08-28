@@ -44,9 +44,9 @@ import { useDisplayMode } from '@/lib/hooks/use-display-mode'
  *    plek breekt in plaats van dat wij een breekpunt raden.
  *  · Het AANTAL tabelrijen is wél vast: `FORECAST_MONTHS` = 6, altijd.
  *
- * WAT WÉL GERESERVEERD WORDT HOEWEL HET KAN ONTBREKEN — de derde kaart en de
- * sparkline. De uitgaventrend-kaart rendert alleen bij ≥2 maanden historie en de
- * spaarquote-sparkline alleen bij ≥2 snapshots. Toch gereserveerd, om dezelfde
+ * WAT WÉL GERESERVEERD WORDT HOEWEL HET KAN ONTBREKEN — in VOLLEDIG de derde
+ * kaart en de sparkline. De uitgaventrend-kaart rendert alleen bij ≥2 maanden
+ * historie en de spaarquote-sparkline alleen bij ≥2 snapshots. Toch gereserveerd, om dezelfde
  * reden als de KPI-regel in `CashflowCardsFallback` op de hub: reserveren kiest
  * de veelvoorkomende kant, en op lg zit de derde kaart naast de andere twee (dus
  * kost het daar geen hoogte). Ook de gevulde forecast-tabel is gereserveerd; het
@@ -57,30 +57,46 @@ export function ForecastFallback() {
 
   return (
     <div aria-hidden="true" className="animate-pulse space-y-6">
-      {/* ── Drie samenvattingskaarten — zelfde grid als CashflowSection. ── */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {[0, 1, 2].map((card) => (
-          <div
-            key={card}
-            className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="h-[17px] w-28 bg-[var(--subtle)]" />
-                <div className="mt-1 h-7 w-24 bg-[var(--subtle)]" />
+      {/* ── Samenvatting — zelfde vorm als CashflowSection, per modus.
+             S5: die sectie is sinds 28 aug 2026 óók modus-bewust. In Eenvoudig
+             is het één kaart met een bedrag en twee zinnen; drie kaarten
+             reserveren zou daar ~150px vasthouden die daarna inklapt.
+
+             Eenvoudig-kaart nageteld: 17 (label) + 4 (mt-1) + 32 (font-mono
+             text-2xl, 24/32px) + 8 (mt-2) + 2×20 (text-sm, twee regels) = 101px
+             inhoud, plus 2×16px padding (p-4). ── */}
+      {mode === 'simple' ? (
+        <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4">
+          <div className="h-[17px] w-40 bg-[var(--subtle)]" />
+          <div className="mt-1 h-8 w-44 bg-[var(--subtle)]" />
+          <div className="mt-2 h-5 w-full max-w-md bg-[var(--subtle)]" />
+          <div className="mt-1 h-5 w-2/3 max-w-sm bg-[var(--subtle)]" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {[0, 1, 2].map((card) => (
+            <div
+              key={card}
+              className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-4"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="h-[17px] w-28 bg-[var(--subtle)]" />
+                  <div className="mt-1 h-7 w-24 bg-[var(--subtle)]" />
+                </div>
+                <div className="h-6 w-20 shrink-0 bg-[var(--subtle)]" />
               </div>
-              <div className="h-6 w-20 shrink-0 bg-[var(--subtle)]" />
+              {/* Kaart 1 sluit af met een 3px-voortgangsbalk, kaart 2 en 3 met
+                  een regel meta-tekst van 17px — beide ná `mt-2`. */}
+              {card === 0 ? (
+                <div className="mt-2 h-[3px] w-full rounded-full bg-[var(--subtle)]" />
+              ) : (
+                <div className="mt-2 h-[17px] w-40 bg-[var(--subtle)]" />
+              )}
             </div>
-            {/* Kaart 1 sluit af met een 3px-voortgangsbalk, kaart 2 en 3 met een
-                regel meta-tekst van 17px — beide ná `mt-2`. */}
-            {card === 0 ? (
-              <div className="mt-2 h-[3px] w-full rounded-full bg-[var(--subtle)]" />
-            ) : (
-              <div className="mt-2 h-[17px] w-40 bg-[var(--subtle)]" />
-            )}
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {mode === 'simple' ? (
         /* ── Eenvoudig — kop + één eindregel-kaart + voetnoot. ──

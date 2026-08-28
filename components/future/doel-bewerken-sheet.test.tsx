@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { DoelBewerkenSheet } from './doel-bewerken-sheet'
 import type { Goal, GoalType } from '@/lib/goal-data'
 
@@ -264,17 +264,35 @@ describe('DoelBewerkenSheet — volledig bewerken (GoalForm) sluit de sheet niet
     fireEvent.change(naamInput, { target: { value: 'Nieuwe naam' } })
     fireEvent.click(naamInput)
 
-    // Sheet blijft staan; onClose is NIET aangeroepen. (Beide dialogen zijn
-    // nu gemount — quick-update backdrop én GoalForm-BottomSheet — dus we
-    // selecteren de quick-update-dialog gericht op zijn aria-label.)
+    // De oorspronkelijke regressie-eis blijft staan: interactie in GoalForm
+    // mag onClose van de ouder NIET aanroepen.
     expect(onClose).not.toHaveBeenCalled()
-    // De quick-update-sheet loopt sinds ADR 0039 via <ShellOverlay kind="sheet">;
-    // de toegankelijke naam komt nu van de sheet-titel ("Voortgang bijwerken")
-    // i.p.v. de oude custom aria-label. GoalForm's eigen dialog heet
-    // "Doel bewerken", dus beide dialogen blijven uniek selecteerbaar.
-    expect(
-      screen.getByRole('dialog', { name: /Voortgang bijwerken/i }),
-    ).toBeTruthy()
+    // En sinds M35 geldt bovendien: één venster tegelijk. De quick-update-sheet
+    // ("Voortgang bijwerken") verdwijnt zodra GoalForm ("Doel bewerken") open
+    // is — vroeger stonden ze gestapeld. GoalForm blijft een SIBLING (buiten de
+    // backdrop), dus de bubbling-fix hierboven blijft intact. `waitFor` omdat
+    // BottomSheet eerst zijn exit-animatie speelt en pas daarna unmount.
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: /Voortgang bijwerken/i })).toBeNull(),
+    )
     expect(screen.getByText('Doel bewerken')).toBeTruthy()
+  })
+
+  it('brengt de quick-update-sheet terug zodra GoalForm gesloten wordt', async () => {
+    const onClose = vi.fn()
+    renderSheet(onClose)
+    expect(screen.getByRole('dialog', { name: /Voortgang bijwerken/i })).toBeTruthy()
+
+    fireEvent.click(screen.getByText(/Volledig bewerken/i))
+    expect(await screen.findByText('Doel bewerken')).toBeTruthy()
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: /Voortgang bijwerken/i })).toBeNull(),
+    )
+
+    // GoalForm sluiten (eigen annuleer-knop) → terug naar de quick-update-sheet,
+    // zonder dat de ouder-onClose vuurt.
+    fireEvent.click(screen.getByRole('button', { name: 'Annuleren' }))
+    expect(await screen.findByRole('dialog', { name: /Voortgang bijwerken/i })).toBeTruthy()
+    expect(onClose).not.toHaveBeenCalled()
   })
 })

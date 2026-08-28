@@ -2,6 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ToekomstOverlay, type OverlayBalloonDef, type ToekomstOverlayGeometry } from './toekomst-overlay'
 import { TOEKOMST_OVERLAY_BALLOONS } from './toekomst-overlay-balloons'
+import { getOverlayCount, __resetOverlayCount } from '@/lib/overlay-signal'
 
 // `canHover` (hover-apparaat ja/nee) en `inline` (ruim scherm ja/nee)
 // deterministisch sturen — anders hangt het gedrag af van de jsdom-matchMedia-
@@ -611,5 +612,73 @@ describe('ToekomstOverlay — gewogen layout', () => {
     const vrijheidCard = screen.getByText(TOEKOMST_OVERLAY_BALLOONS[1].body).closest('div')!
     fireEvent.mouseEnter(vrijheidCard)
     expect(onEmphasisChange).toHaveBeenLastCalledWith('fire')
+  })
+})
+
+/**
+ * M15 — drie hulplagen concurreerden op mobiel. De tips-tour was de enige in
+ * zijn familie die zich niet als open overlay meldde (`lib/overlay-signal.ts`),
+ * waardoor de zwevende Fin-hulplagen dwars door de tourtekst bleven staan
+ * terwijl die nog aan het typen was. Bewust GEEN scroll-lock: de tour is
+ * pagina-inhoud waar je doorheen scrollt.
+ */
+describe('ToekomstOverlay — meldt zich als open overlay (M15)', () => {
+  const balloons: OverlayBalloonDef[] = [
+    {
+      id: 'inkomen',
+      icon: null,
+      kicker: 'Je inkomen',
+      body: 'x',
+      cta: 'y',
+      row: 'top',
+      slot: 'bottom-left',
+      emphasis: 'accumulation',
+      onActivate: () => {},
+    },
+  ]
+
+  const renderOverlay = (visible: boolean) =>
+    render(
+      <ToekomstOverlay
+        visible={visible}
+        balloons={balloons}
+        onEmphasisChange={() => {}}
+        onClose={() => {}}
+      >
+        <div data-testid="chart">chart</div>
+      </ToekomstOverlay>,
+    )
+
+  beforeEach(() => { __resetOverlayCount() })
+  afterEach(() => { __resetOverlayCount() })
+
+  it('claimt het overlay-signaal zolang de tour zichtbaar is', () => {
+    const { rerender } = renderOverlay(true)
+    expect(getOverlayCount()).toBe(1)
+
+    // Tips uit → signaal meteen weer vrij (de zwevende hulplagen komen terug).
+    rerender(
+      <ToekomstOverlay
+        visible={false}
+        balloons={balloons}
+        onEmphasisChange={() => {}}
+        onClose={() => {}}
+      >
+        <div data-testid="chart">chart</div>
+      </ToekomstOverlay>,
+    )
+    expect(getOverlayCount()).toBe(0)
+  })
+
+  it('claimt niets zolang de tour verborgen is', () => {
+    renderOverlay(false)
+    expect(getOverlayCount()).toBe(0)
+  })
+
+  it('geeft het signaal vrij bij unmount', () => {
+    const { unmount } = renderOverlay(true)
+    expect(getOverlayCount()).toBe(1)
+    unmount()
+    expect(getOverlayCount()).toBe(0)
   })
 })

@@ -54,4 +54,19 @@ node scripts/check-freedom-time-basis.mjs
 echo "→ Running ShellOverlay-driewegregel check (ADR 0039)…"
 node scripts/check-overlay-standard.mjs
 
+# Raakdrempel (M19): flag een NIEUWE icoonknop die zijn doos onder 44×44 vastzet
+# zonder aantoonbaar raakgebied (touch-target / min-h-[44px] / TapTarget). Het
+# UX-testpanel vond vier verschillende ad-hoc maten voor hetzelfde probleem;
+# de norm stond al in de ui-ux-skill maar had geen gate.
+echo "→ Running raakdrempel-check (M19)…"
+node scripts/check-tap-targets.mjs
+
+# Koppencontract (M28 / ADR 0110): binnen de app-shell draagt de shell de enige
+# <h1> (de sr-only paginanaam); pagina-aanheffen zijn <h2>. Deze gate flagt een
+# NIEUWE <h1> in app/(app)/** of components/**, en elke `level="h1"`. Het
+# UX-testpanel mat twee h1's per pagina — dat kwam uit één gedeelde bouwsteen
+# die op 30 call-sites gekopieerd was.
+echo "→ Running koppencontract-check (M28)…"
+node scripts/check-heading-levels.mjs
+
 exit 0

@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   resolvePeriodWindow,
   summarizeFlow,
+  describeFlow,
+  flowWindowLabel,
   topCounterparties,
   largestTransactions,
   newCounterparties,
@@ -15,6 +17,7 @@ import {
   buildHeatmapWeeks,
   type AnalysisTransaction,
 } from './transaction-insights'
+import { currentMonthWindowLabel } from './cashflow-cards'
 
 // ── Fixtures ───────────────────────────────────────────────────────────────
 
@@ -374,5 +377,113 @@ describe('buildHeatmapWeeks', () => {
     // kolom 0 begint in april, kolom 1 (week van 4 mei) start in mei.
     expect(monthLabels[0]).toEqual({ col: 0, label: 'apr' })
     expect(monthLabels.some((l) => l.label === 'mei')).toBe(true)
+  })
+})
+
+// ── describeFlow (S3) ────────────────────────────────────────────────────────
+//
+// Twee dingen liggen hier hard vast:
+//  1. de vier takken en wanneer ze intreden;
+//  2. de C6-GRENS — `describeFlow` is een tweede LEZING van `summarizeFlow` en
+//     verandert er niets aan. De laatste test in dit blok pint dat vast.
+
+describe('describeFlow — takken', () => {
+  const NOW = new Date(2026, 7, 12) // 12 augustus 2026
+  const flow = (income: number, expense: number) =>
+    summarizeFlow([
+      ...(income > 0 ? [tx({ amount: income })] : []),
+      ...(expense > 0 ? [tx({ amount: -expense })] : []),
+    ])
+
+  function run(
+    current: ReturnType<typeof flow>,
+    prev: ReturnType<typeof flow>,
+    period: 'month' | '30d',
+    offset: number,
+  ) {
+    const w = resolvePeriodWindow(period, offset, NOW)
+    return describeFlow(current, prev, period, offset, w, NOW)
+  }
+
+  it('geen inkomen in een lopende maand → "nog niets binnengekomen", mét vorige periode', () => {
+    const d = run(flow(0, 800), flow(3000, 2500), 'month', 0)
+    expect(d.kind).toBe('no-income-yet')
+    expect(d.windowRunning).toBe(true)
+    expect(d.prevIncome).toBe(3000)
+    // Geen quote-oordeel over een halve maand — dat is precies het valse
+    // oordeel waar deze kaart om begon.
+    expect(d.savingsRate).toBeNull()
+  })
+
+  it('geen inkomen én vorige periode ook niet → dezelfde tak ZONDER vergelijkzin', () => {
+    const d = run(flow(0, 800), flow(0, 0), 'month', 0)
+    expect(d.kind).toBe('no-income-yet')
+    // Geen verzonnen verwachting: zonder eerder inkomen valt er niets te melden.
+    expect(d.prevIncome).toBeNull()
+  })
+
+  it('in- én uitstroom in een lopende maand → "loopt nog", zonder quote', () => {
+    const d = run(flow(3000, 1200), flow(3000, 2500), 'month', 0)
+    expect(d.kind).toBe('running')
+    expect(d.windowRunning).toBe(true)
+    expect(d.net).toBe(1800)
+    expect(d.savingsRate).toBeNull()
+  })
+
+  it('afgesloten maand (offset −1) → eindstand mét spaarquote', () => {
+    const d = run(flow(2800, 1000), flow(2800, 2000), 'month', -1)
+    expect(d.kind).toBe('complete')
+    expect(d.windowRunning).toBe(false)
+    // Exact wat summarizeFlow zegt — geen tweede berekening.
+    expect(d.savingsRate).toBe(summarizeFlow([tx({ amount: 2800 }), tx({ amount: -1000 })]).savingsRate)
+  })
+
+  it('30 dagen rollend met offset 0 geldt als AFGESLOTEN, niet als lopend', () => {
+    // Het venster eindigt per definitie vandaag; er komt niets meer bij.
+    const d = run(flow(2800, 1000), flow(2800, 2000), '30d', 0)
+    expect(d.kind).toBe('complete')
+    expect(d.windowRunning).toBe(false)
+  })
+
+  it('afgesloten venster zonder inkomen toont GEEN quote (C6-getal niet herhaald)', () => {
+    const d = run(flow(0, 900), flow(0, 0), '30d', 0)
+    expect(d.kind).toBe('complete')
+    // summarizeFlow geeft hier 0%; die 0 betekent niets en wordt niet getoond.
+    expect(d.savingsRate).toBeNull()
+  })
+
+  it('helemaal geen transacties → lege tak', () => {
+    const d = run(flow(0, 0), flow(0, 0), 'month', 0)
+    expect(d.kind).toBe('empty')
+  })
+})
+
+describe('describeFlow — venster-label komt uit één formulering', () => {
+  const NOW = new Date(2026, 7, 12)
+
+  it('lopende kalendermaand gebruikt de canonieke hub-formulering (CF-3)', () => {
+    const w = resolvePeriodWindow('month', 0, NOW)
+    expect(flowWindowLabel('month', 0, w, NOW)).toBe(currentMonthWindowLabel(NOW))
+    expect(flowWindowLabel('month', 0, w, NOW)).toContain('tot nu toe')
+  })
+
+  it('elk ander venster houdt het label van resolvePeriodWindow', () => {
+    const vorige = resolvePeriodWindow('month', -1, NOW)
+    expect(flowWindowLabel('month', -1, vorige, NOW)).toBe(vorige.label)
+    const rollend = resolvePeriodWindow('30d', 0, NOW)
+    expect(flowWindowLabel('30d', 0, rollend, NOW)).toBe(rollend.label)
+  })
+})
+
+describe('describeFlow — C6-grens: summarizeFlow blijft ongewijzigd', () => {
+  // Deze assertie is bewust een DUPLICAAT van de summarizeFlow-suite hierboven.
+  // S3 mocht het ongeclampte leescijfer en de 0%-bij-geen-inkomen NIET
+  // repareren: dat is C6-terrein en moet in Volledig reproduceerbaar blijven.
+  // Zou iemand het tijdens dit werk alsnog "even" oplossen, dan valt deze test
+  // om en is dat een bewuste beslissing in plaats van een ongelukje.
+  it('geeft nog steeds 0% bij inkomen 0 en een ongeclampte negatieve quote', () => {
+    expect(summarizeFlow([tx({ amount: -100 })]).savingsRate).toBe(0)
+    const halveMaand = summarizeFlow([tx({ amount: 300 }), tx({ amount: -1095 })])
+    expect(halveMaand.savingsRate).toBe(-265)
   })
 })

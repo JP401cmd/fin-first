@@ -35,9 +35,15 @@ function presetButton(card: HTMLElement, presetName: string): HTMLButtonElement 
   return btn as HTMLButtonElement
 }
 
-/** Of een preset-knop als actief gemarkeerd is (border-[var(--ink)]). */
+/**
+ * Of een preset-knop als actief gemarkeerd is. De knop is sinds M19 het
+ * 44×44-raakgebied (`<TapTarget>`); de zichtbare swatch — en dus de
+ * actief-rand `border-[var(--ink)]` — zit op de span erbinnen.
+ */
 function isActivePreset(btn: HTMLButtonElement): boolean {
-  return btn.className.includes('border-[var(--ink)]')
+  if (btn.getAttribute('aria-pressed') !== 'true') return false
+  const swatch = btn.querySelector('span')
+  return !!swatch?.className.includes('border-[var(--ink)]')
 }
 
 describe('ModuleAccentPicker — render', () => {

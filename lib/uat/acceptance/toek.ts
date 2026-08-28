@@ -44,8 +44,8 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     persona: 'willem',
     given: 'Persona Willem geladen (deplete-strategie, fire_end_age 95).',
-    when: 'De gebruiker opent /toekomst, leest de figures-strip (Vrijheidsleeftijd/Doelbedrag/Opnamerate/Na pensioen) en de voetnoot onder de grafiek.',
-    then: 'De voetnoot toont letterlijk "Vermogen opeten · Weergave t/m leeftijd 94 (eindleeftijd 95) · …". Strategienaam = STRATEGY_LABELS.deplete.name; eindleeftijd = fire_end_age (95, deplete → directe weergaveregel, géén solver-uitkomst); weergave-tot = 95−1 = 94. De pensioen-variant (persona Marijke) toont STRATEGY_LABELS.pensioen.name ("Pensioenleeftijd") en cap 100 → weergave t/m 99. EXACT-provable deel: de strategie-labels + de eindleeftijd-echo + de −1-weergaveregel. De vrijheidsleeftijd/het doelbedrag ZELF komen uit de kernel → toetsvorm oracle (/beheer/horizon-kernel).',
+    when: 'De gebruiker opent /toekomst, leest de figures-strip (Vrijheidsleeftijd/Doelbedrag/Opnamerate/Na pensioen), de duidingsregel direct onder de strip en de voetnoot onder de grafiek.',
+    then: 'De voetnoot toont letterlijk "Vermogen opeten · Weergave t/m leeftijd 94 (eindleeftijd 95) · …". Strategienaam = STRATEGY_LABELS.deplete.name; eindleeftijd = fire_end_age (95, deplete → directe weergaveregel, géén solver-uitkomst); weergave-tot = 95−1 = 94. De pensioen-variant (persona Marijke) toont STRATEGY_LABELS.pensioen.name ("Pensioenleeftijd") en cap 100 → weergave t/m 99. DUIDINGSREGEL (S15, 28-08-2026): tussen de strip en de voortgangsbalk staat één zin die het kerngetal vertaalt — "Dit betekent: werken wordt voor jou een keuze rond je Ne." (pensioenmodus: "…je pensioen valt rond je Ne."; huishoud-/partnerweergave: "…voor <naam> … rond het Ne jaar."). Hij staat in BEIDE weergavemodi, en het jaartal N is per constructie hetzelfde als het kopgetal van de Vrijheidsleeftijd-KPI (gedeelde afronding heroFireAgeYear). Is er geen leeftijd (niet haalbaar / geen geboortedatum) dan staat er "Werken wordt steeds meer een keuze naarmate je vrijheid opbouwt."; zolang de kernel rekent of bij een gegevensmelding (M6) staat er niets. EXACT-provable deel: de strategie-labels + de eindleeftijd-echo + de −1-weergaveregel + de zin-vorm (lib/horizon/vrijheidsleeftijd-zin.ts). De vrijheidsleeftijd/het doelbedrag ZELF komen uit de kernel → toetsvorm oracle (/beheer/horizon-kernel).',
     assertion: {
       kind: 'exact',
       expected: 'strategieLabelDeplete=Vermogen opeten; eindleeftijd=95; weergaveTot=94; strategieLabelPensioen=Pensioenleeftijd',
@@ -130,8 +130,8 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'OVERIG',
     persona: 'willem',
     given: 'Persona Willem, verse laad (welkomst nog niet gezien).',
-    when: 'De gebruiker opent /toekomst voor het eerst, doorloopt de welkomstkaart en de Tips-ballonnen en kiest "Niet meer weergeven".',
-    then: 'Welkomstkaart toont netto vermogen + vrijheidsleeftijd consistent met de hero-KPI (geen eigen som); tips-overlay verschijnt over de vervaagde grafiek; "Niet meer weergeven" sluit permanent, ook na herlaad (server-side, cross-device). Pure interactie/weergave.',
+    when: 'De gebruiker opent /toekomst voor het eerst, doorloopt de welkomstkaart en de Tips-ballonnen en sluit de tips via het kruisje, Escape of de Tips-toggle.',
+    then: 'Welkomstkaart toont netto vermogen + vrijheidsleeftijd consistent met de hero-KPI (geen eigen som); tips-overlay verschijnt over de vervaagde grafiek. Sluiten sluit DIRECT — geen tussenmodal — en wordt onthouden: na wegnavigeren en terugkomen blijven de tips uit (M38). Er volgt alleen een niet-blokkerende toast "Tips verborgen" met de actie "Niet meer melden" (zet die toast cross-device uit; raakt de tips-zichtbaarheid niet). Sluiten navigeert NIET automatisch naar /overzicht. Pure interactie/weergave.',
     assertion: {
       kind: 'ui-only',
     },
@@ -386,7 +386,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     persona: 'willem',
     given: 'Persona Willem geladen.',
-    when: 'De gebruiker opent "Onttrekkingsvolgorde", wijzigt de volgorde en bekijkt de illustratieve pot-flow.',
+    when: 'De gebruiker opent "Onttrekkingsvolgorde" (in Eenvoudig eerst de disclosure "Pot-regels" openklappen — S7), wijzigt de volgorde en bekijkt de illustratieve pot-flow.',
     then: 'De som van de getoonde pot-saldi in de illustratie komt overeen met de bezittingen-optelling die elders (Overzicht/netto vermogen) al zichtbaar is — géén losse hersimulatie (bewust "illustratief"). Consistentie tussen twee weergaves van dezelfde brondata. Volgorde-tekst en toename-/afname-bestemming zijn instelbaar en persistent.',
     assertion: {
       kind: 'consistency',
@@ -400,7 +400,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     persona: 'willem',
     given: 'Persona Willem geladen (inflatie 2%, rendement 6%).',
-    when: 'De gebruiker wijzigt inflatie naar 2,5% en bruto rendement naar 6,5%.',
+    when: 'De gebruiker wijzigt inflatie naar 2,5% en bruto rendement naar 6,5% (in Eenvoudig eerst de disclosure "Markt-aannames" openklappen — S7).',
     then: 'De kaart "Effectief SWR" (badge "Afgeleid", niet-bewerkbaar) toont een ander percentage dan vóór de wijziging, en dat getal is identiek aan het SWR-getal in de KPI-kassabon "Opnamerate" — één bron (resolveFireParams). Consistentie tussen twee weergaves; validatie blokkeert buiten 0-15%.',
     assertion: {
       kind: 'consistency',

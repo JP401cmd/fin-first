@@ -17,7 +17,11 @@
 // (geen freeze, knop blijft beschikbaar maar persisteert niets).
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { BriefingEntry, BriefingWeekHistoryItem } from '@/lib/types/briefing'
+import type {
+  BriefingEntry,
+  BriefingRefreshState,
+  BriefingWeekHistoryItem,
+} from '@/lib/types/briefing'
 
 /** Vrijheidstijd-meetpunt van deze week — basis voor de week-over-week delta. */
 export interface FreedomSnapshotData {
@@ -31,6 +35,23 @@ export interface FreedomSnapshotData {
 export interface FreedomBaseline {
   totalFreedomDays: number
   capturedAt: string
+}
+
+/**
+ * Bezoekmarker — het vrijheidstijd-meetpunt bij een bezoek (H11).
+ *
+ * Twee-slots-patroon, identiek aan `freedomSnapshot`/`previousFreedomSnapshot`
+ * hierboven maar dan op DAG-cadans i.p.v. week: `lastSeen` is de marker van de
+ * kalenderdag waarop je nu kijkt, `previousLastSeen` die van je vorige
+ * bezoekdag. De "sinds je vorige bezoek"-regel zet zich af tegen de VORIGE, niet
+ * tegen `lastSeen` — anders zou de regel bij het tweede bezoek van dezelfde dag
+ * verdwijnen (delta tegen jezelf = 0).
+ */
+export interface LastSeenMarker {
+  /** ISO-tijdstip van het eerste bezoek op die kalenderdag (Amsterdam). */
+  at: string
+  /** Vrijheidsdagen op dat moment — de basis voor de delta. */
+  totalFreedomDays: number
 }
 
 export interface BriefingSnapshot {
@@ -51,6 +72,10 @@ export interface BriefingSnapshot {
   /** Afgesloten weken (nieuwste laatst), gecapt op MAX_WEEK_HISTORY. Bij elke
    *  week-overgang schuift de aflopende week hierin. */
   history?: BriefingWeekHistoryItem[]
+  /** Bezoekmarker van de HUIDIGE bezoekdag (H11). */
+  lastSeen?: LastSeenMarker
+  /** Bezoekmarker van de VORIGE bezoekdag — de basis van de delta-regel (H11). */
+  previousLastSeen?: LastSeenMarker
 }
 
 /** Max. aantal bewaarde voorbije weken in de snapshot-historie (~2 maanden). */
@@ -159,6 +184,13 @@ function parseFreedomBaseline(raw: unknown): FreedomBaseline | undefined {
   }
 }
 
+function parseLastSeen(raw: unknown): LastSeenMarker | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const m = raw as Record<string, unknown>
+  if (typeof m.at !== 'string' || !isFiniteNum(m.totalFreedomDays)) return undefined
+  return { at: m.at, totalFreedomDays: m.totalFreedomDays }
+}
+
 /** Valideer één historie-item (zelfde defensieve aanpak als de snapshot zelf). */
 function parseHistoryItem(raw: unknown): BriefingWeekHistoryItem | null {
   if (!raw || typeof raw !== 'object') return null
@@ -194,6 +226,8 @@ function parseSnapshot(raw: unknown): BriefingSnapshot | null {
     previousFreedomSnapshot: parseFreedomBaseline(s.previousFreedomSnapshot),
     headline: typeof s.headline === 'string' ? s.headline : undefined,
     history,
+    lastSeen: parseLastSeen(s.lastSeen),
+    previousLastSeen: parseLastSeen(s.previousLastSeen),
   }
 }
 
@@ -241,6 +275,23 @@ export function canRefreshToday(
 ): boolean {
   if (!snapshot) return true
   return snapshot.lastManualRefresh !== amsterdamDateString(now)
+}
+
+/**
+ * Waarom de ververs-knop vandaag wel/niet kan (L9).
+ *
+ * Dezelfde regel als `canRefreshToday`, maar met de REDEN erbij in plaats van
+ * een kale boolean. Dat onderscheid is precies wat de UI nodig heeft: bij
+ * 'used_today' hoort de knop zichtbaar-maar-uitgeschakeld te blijven met de
+ * uitleg "morgen weer", terwijl de knop bij een niet-persoonlijke weergave (geen
+ * snapshot, dus 'available' met `canRefresh` false) helemaal niet hoort te
+ * verschijnen. Voorheen waren die twee toestanden op het scherm identiek.
+ */
+export function refreshStateToday(
+  snapshot: BriefingSnapshot | null,
+  now: Date = new Date(),
+): BriefingRefreshState {
+  return canRefreshToday(snapshot, now) ? 'available' : 'used_today'
 }
 
 /**
@@ -312,6 +363,10 @@ export async function getOrCreateWeeklySnapshot(
     previousFreedomSnapshot: priorFreedom ?? undefined,
     headline: opts.headline,
     history: deriveWeekHistory(existing, week),
+    // Bezoekmarkers zijn een ANDERE cadans (dag) dan de week-freeze en horen
+    // niet bij een week-overgang gewist te worden — dragen dus ongemoeid mee.
+    lastSeen: existing?.lastSeen,
+    previousLastSeen: existing?.previousLastSeen,
   }
   await writeBriefingSnapshot(supabase, userId, fresh)
   return { snapshot: fresh, priorFreedom }
@@ -346,7 +401,63 @@ export async function applyManualRefresh(
     previousFreedomSnapshot: derivePreviousBaseline(existing, week) ?? undefined,
     headline: opts.headline,
     history: deriveWeekHistory(existing, week),
+    // Zie getOrCreateWeeklySnapshot: dag-markers overleven een ververs.
+    lastSeen: existing?.lastSeen,
+    previousLastSeen: existing?.previousLastSeen,
   }
   await writeBriefingSnapshot(supabase, userId, refreshed)
   return { allowed: true, snapshot: refreshed }
+}
+
+// ── Bezoekmarker "sinds je vorige bezoek" (H11) ─────────────────────
+
+/**
+ * Zet de bezoekmarker door wanneer dit het eerste bezoek van een nieuwe
+ * Amsterdam-kalenderdag is, en geeft de basis voor de delta-regel terug: de
+ * marker van je VÓRIGE bezoekdag.
+ *
+ * Eigenschappen die de regel rustig houden:
+ *  - **stabiel binnen de dag** — een tweede bezoek vandaag leest exact dezelfde
+ *    basis, dus de regel flikkert niet weg na een refresh;
+ *  - **hoogstens één write per kalenderdag** per gebruiker (geen write-per-
+ *    pageview, dus geen egress-staart);
+ *  - **geen eigen rij/kolom** — het veld leeft in het bestaande own-row jsonb
+ *    `profiles.briefing_snapshot` (precedent: `status_banner_minimized`,
+ *    `module_guide_state`), dus geen migratie en geen extra RLS-oppervlak.
+ *
+ * Bestaat er nog geen snapshot (allereerste bezoek ooit, of de kolom ontbreekt),
+ * dan schrijven we hier NIETS: de weekly-snapshot-stap in hetzelfde request
+ * maakt de rij aan, en de marker landt bij het volgende bezoek. Zo kan deze
+ * functie nooit een snapshot zonder `week`/`entries` achterlaten.
+ *
+ * SAMENLOOP: `getOrCreateWeeklySnapshot` schrijft dezelfde jsonb-kolom, maar
+ * alleen bij het eerste bezoek van een nieuwe ISO-week. Beide dragen elkaars
+ * velden ongemoeid mee (zie hierboven), dus valt zo'n samenloop hooguit één
+ * bezoek terug op de vorige waarde en herstelt zichzelf bij het volgende — er
+ * gaat geen gebruikerszichtbare correctheid verloren.
+ */
+export async function touchLastSeen(
+  supabase: SupabaseClient,
+  userId: string,
+  current: { totalFreedomDays: number },
+  opts: { now?: Date } = {},
+): Promise<{ previous: LastSeenMarker | null }> {
+  const now = opts.now ?? new Date()
+  const existing = await readBriefingSnapshot(supabase, userId)
+  if (!existing) return { previous: null }
+
+  const today = amsterdamDateString(now)
+  const markerDay = existing.lastSeen ? amsterdamDateString(new Date(existing.lastSeen.at)) : null
+
+  // Zelfde kalenderdag → basis ongewijzigd, geen write.
+  if (markerDay === today) return { previous: existing.previousLastSeen ?? null }
+
+  // Dag-overgang: de marker van de vorige bezoekdag schuift door naar de basis.
+  const previous = existing.lastSeen ?? null
+  await writeBriefingSnapshot(supabase, userId, {
+    ...existing,
+    previousLastSeen: previous ?? undefined,
+    lastSeen: { at: now.toISOString(), totalFreedomDays: current.totalFreedomDays },
+  })
+  return { previous }
 }

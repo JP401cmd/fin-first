@@ -96,6 +96,13 @@ export interface WelcomeGuideState {
   currentScreen: number
   /** Aantal ontgrendelde schermen (default = aantal required-schermen). */
   revealedScreens: number
+  /**
+   * Ingeklapt tot het punt naast de pagina-'i' (meldingen-conventie, S13).
+   * Cross-device onthouden — in tegenstelling tot de vroegere sessie-vlag — en
+   * ALTIJD heropenbaar via dat punt; dat is het verschil met
+   * `status: 'dismissed'`, dat de gids voorgoed weghaalt.
+   */
+  minimized: boolean
   /** 'dismissed' = voorgoed verborgen ("geen schermen meer tonen"). */
   status: 'active' | 'dismissed'
 }
@@ -323,6 +330,7 @@ export const DEFAULT_WELCOME_GUIDE_STATE: WelcomeGuideState = {
   completedStepIds: [],
   currentScreen: 0,
   revealedScreens: DEFAULT_REVEALED_SCREENS,
+  minimized: false,
   status: 'active',
 }
 
@@ -442,6 +450,9 @@ export function parseWelcomeGuideState(
     completedStepIds,
     currentScreen: Math.max(0, currentRaw),
     revealedScreens,
+    // Voorwaartse compatibiliteit: bestaande jsonb-rijen kennen het veld niet →
+    // `false` (uitgeklapt), precies het gedrag van vóór S13.
+    minimized: v.minimized === true,
     status: v.status === 'dismissed' ? 'dismissed' : 'active',
   }
 }

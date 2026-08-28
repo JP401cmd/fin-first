@@ -163,6 +163,22 @@ export interface DebtPot {
   readonly inSparenNaAflossing: boolean
   /** Getypte slot-rol (contract) of null. */
   readonly rol: DebtRol | null
+  /**
+   * **Buiten oracle-domein (gap-besluit V22).** Constante totale MAANDLAST van een
+   * échte annuïteit (rente + aflossing samen, in euro's per maand — bewust NIET de
+   * jaarvorm van `aflossingEur`, zodat de schaal in de naam zit).
+   *
+   * Alleen gevuld door de app-adapter, en alleen voor schulden die daadwerkelijk
+   * annuïtair aflossen (`repayment_type` ≠ `aflossingsvrij`/`lineair` én geen
+   * `custom_aflossing_amount`). Samen met `KernelInput.echteAnnuiteitAflossing`
+   * laat dit `tables/s.ts` de rente/aflossing-split PER MAAND herrekenen
+   * (`aflossing(m) = maandlast − saldo(m−1)·rente/12`) i.p.v. de aflossing van
+   * vandaag te bevriezen.
+   *
+   * Weggelaten (`undefined`) → `regularSlot` valt terug op `aflossingEur/12`, dus
+   * **byte-identiek aan het Excel v5-oracle**: `input-from-fixture` zet 'm níet.
+   */
+  readonly annuiteitMaandlast?: number
 }
 
 // ── Kern-uitbreidingen buiten het oracle-domein (FASE 3, snede 2b) ───────────
@@ -760,4 +776,39 @@ export interface KernelInput {
    * paden dezelfde regel.
    */
   readonly reachedNowVereistBereikbaarDoel?: boolean
+
+  /**
+   * **Buiten oracle-domein (gap-besluit V22).** Rekent de rente/aflossing-split van
+   * een annuïteit PER MAAND opnieuw uit i.p.v. de aflossingscomponent van vandaag te
+   * bevriezen.
+   *
+   * Het Excel v5-oracle modelleert élke reguliere slot als "annuïteit met een vaste
+   * maandaflossing" (`tables/s.ts`, slot-rollen): `aflossing = MIN(saldo(m−1),
+   * D€/12)`. Voor een lineaire lening of een aflossingsvrije schuld klopt dat, maar
+   * voor een échte annuïteit is het aflossingsdeel juist het deel dat *groeit* naarmate
+   * de rente over een dalend saldo krimpt. Bevriezen op de stand van vandaag laat de
+   * schuld structureel te langzaam dalen: een hypotheek van €249.278 @4% met een
+   * maandlast van €1.193,54 heeft vandaag een aflossingsdeel van €362,61 — bevroren
+   * duurt aflossen ~687 maanden i.p.v. de werkelijke 358. Gevolg-keten:
+   * `S!AF/AG` → `Prognose!totaalSchulden` → netto vermogen te laag en de FIRE-leeftijd
+   * te laat voor iedereen met een lopende hypotheek.
+   *
+   * Met de vlag AAN gebruikt `regularSlot` voor elke pot met een
+   * `annuiteitMaandlast > 0`:
+   *   `aflossing(m) = CLAMP(maandlast − saldo(m−1)·rente/12, 0, saldo(m−1))`
+   * — dezelfde constante maandlast, maar met de split per periode herrekend, zodat het
+   * saldo op de werkelijke einddatum exact €0 raakt. Potten ZONDER `annuiteitMaandlast`
+   * (lineair, aflossingsvrij, opeet, tekort, `custom_aflossing_amount`) houden
+   * onveranderd `aflossingEur/12` — de vlag zet die niet ineens aan het aflossen.
+   *
+   * Weggelaten/`false` → **byte-identiek aan het Excel v5-oracle**:
+   * `input-from-fixture` zet 'm níet én vult geen `annuiteitMaandlast`, dus de
+   * parity-fixtures blijven groen zónder golden-herijking. De app-adapter
+   * (`buildKernelInputFromApp*`) zet 'm op `true`.
+   *
+   * Bewust BUITEN deze vlag: de payoff-vrijval `CF!G` (`tables/cf.ts`) blijft de
+   * geplande aflossing uit `aflossingEur` vrijgeven — dat is een eigen, apart
+   * gedocumenteerde conventie (ADR 0020-inverse) en geen onderdeel van dit besluit.
+   */
+  readonly echteAnnuiteitAflossing?: boolean
 }

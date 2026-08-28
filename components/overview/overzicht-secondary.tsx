@@ -9,6 +9,7 @@ import type { GoalWithBudget } from '@/lib/fin-data-loader'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
 import type { WidgetPref } from '@/lib/widget-catalog'
 import { BriefingPanel, type BriefingEntry, type BriefingWeekHistoryItem } from './briefing-panel'
+import type { BriefingRefreshState } from '@/lib/types/briefing'
 import type { FreedomHeroProps } from '@/lib/briefing/overview-briefing'
 import { DoelenEmptyState } from './overzicht-hero/empty-states'
 import {
@@ -18,6 +19,7 @@ import {
 import { VrijheidStrip } from './overzicht-hero/vrijheid-strip'
 import type { FreedomFraming } from '@/lib/fire-strategy'
 import { PageStatusDot } from '@/components/app/page-status-dot'
+import { WelcomeGuideDot } from './welcome-guide-dot'
 import {
   HeroEditToggle,
   HeroWidgetRail,
@@ -71,6 +73,13 @@ export type OverzichtSecondaryProps = {
   briefingDataChanged?: boolean
   /** Of de handmatige ververs vandaag nog beschikbaar is (max 1×/dag). */
   briefingCanRefresh?: boolean
+  /**
+   * L9: WAAROM de ververs niet beschikbaar is. `briefingCanRefresh` alleen kon
+   * "niet van toepassing" niet onderscheiden van "vandaag al gebruikt", waardoor
+   * de knop bij een verse mount volledig verdween in plaats van uitgeschakeld te
+   * blijven staan met de reden erbij.
+   */
+  briefingRefreshState?: BriefingRefreshState
   /** Vrijheidstijd-hero bovenaan de briefing (week-over-week delta). */
   freedomHero?: FreedomHeroProps | null
   /** Eén-zin kop boven de briefjes. */
@@ -114,6 +123,7 @@ export function OverzichtSecondary({
   briefingRefreshedAt,
   briefingDataChanged,
   briefingCanRefresh,
+  briefingRefreshState,
   freedomHero,
   briefingHeadline,
   briefingWeekHistory,
@@ -178,6 +188,11 @@ export function OverzichtSecondary({
           />
         )}
         <PrintOverzichtButton />
+        {/* Geminimaliseerde welkomstgids (S13): klein lijstje-knopje dat de
+            gids weer uitklapt. Staat links van het statuspunt — de gids is
+            onboarding, de melding is status; die volgorde houdt de urgentste
+            control het dichtst bij de 'i'. */}
+        <WelcomeGuideDot />
         {/* Geminimaliseerde status-/vrijheidsmelding: gekleurd statuspunt direct
             links van de 'i' (meldingen-conventie). */}
         <PageStatusDot />
@@ -249,6 +264,7 @@ export function OverzichtSecondary({
         refreshedAt={briefingRefreshedAt ?? null}
         dataChanged={briefingDataChanged ?? false}
         canRefresh={briefingCanRefresh ?? false}
+        refreshState={briefingRefreshState ?? 'available'}
         freedomHero={freedomHero ?? null}
         headline={briefingHeadline ?? null}
         weekHistory={briefingWeekHistory}

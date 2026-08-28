@@ -135,6 +135,7 @@ function renderEditor(
     pensionEvents?: LifeEvent[]
     currentAge?: number | null
     inflationRate?: number
+    autoOpenJaarruimte?: boolean
   } = {},
 ) {
   return render(
@@ -148,6 +149,7 @@ function renderEditor(
       pensioenFactorA={overrides.pensioenFactorA ?? 0}
       currentAge={overrides.currentAge ?? 45}
       inflationRate={overrides.inflationRate ?? 0.02}
+      autoOpenJaarruimte={overrides.autoOpenJaarruimte}
       onClose={() => {}}
     />,
   )
@@ -166,6 +168,15 @@ describe('Pensioen-strategie-editor — factor-A-uitvraag', () => {
     renderEditor()
     expect(screen.queryByLabelText(/factor A/i)).toBeNull()
     openUitvraag()
+    expect(screen.getByLabelText(/factor A/i)).toBeTruthy()
+  })
+
+  // S6 — wie via de Box 1-verwijzing binnenkomt (?strategie=pensioen) draagt
+  // één concrete opdracht: "vul je factor A in". Dan hoort het invulveld
+  // meteen te staan, niet achter een tweede klik op "Bereken je fiscale
+  // ruimte". De default hierboven (dicht) blijft ongewijzigd.
+  it('opent de uitvraag meteen bij autoOpenJaarruimte (deeplink vanaf Box 1)', () => {
+    renderEditor({ autoOpenJaarruimte: true })
     expect(screen.getByLabelText(/factor A/i)).toBeTruthy()
   })
 

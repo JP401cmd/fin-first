@@ -23,12 +23,13 @@
  * (geëxporteerd voor tests) — geen nieuwe data-fetch of berekening.
  */
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { ArrowRight, Target, CalendarClock, SlidersHorizontal, Calculator } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { LeverageCard } from '@/components/overview/leverage-card'
+import { GlossaryTerm } from '@/components/editorial/glossary-term'
 import {
   leverageStatusBgClass,
   leverageStatusTextClass,
@@ -68,10 +69,14 @@ export type GoalProgress = Pick<
 type NavCardDetail = {
   /** Uppercase label-regel (bv. 'OP KOERS'). */
   detailLabel: string
-  /** Mono tabular value-regel rechts van het label. */
-  value: string
-  /** Korte tip-zin. */
-  tip: string
+  /**
+   * Mono tabular value-regel rechts van het label. `ReactNode` omdat vaktermen
+   * hier een `<GlossaryTerm>` mogen dragen — de drilldown rendert BUITEN de
+   * kaart-`<Link>` (zie LeverageCard), dus een `<button>` is hier geldig.
+   */
+  value: ReactNode
+  /** Korte tip-zin. Mag `<GlossaryTerm>`-uitleg bevatten (zie `value`). */
+  tip: ReactNode
   /** Tekst van de action-link. */
   actionLabel: string
 }
@@ -100,13 +105,37 @@ export function formatPct(value: number): string {
 /**
  * Onttrekkingsstrategie → leesbare naam voor de Voorkeuren-substext.
  * Spiegelt de WITHDRAWAL_LABELS-mapping uit voorkeuren-view.tsx (alleen de
- * `name`-velden — hier is geen GlossaryTerm-subtitle nodig).
+ * `name`-velden — de uitleg zelf staat in `lib/glossary-data.ts`).
  */
 const WITHDRAWAL_NAMES: Record<string, string> = {
   static: 'Vast (4%)',
   guardrails: 'Guardrails',
   vpw: 'VPW',
   bucket: 'Bucket',
+}
+
+/**
+ * Onttrekkingsstrategie → glossary-key (bevinding H19).
+ *
+ * De kaart-VOORKANT blijft bewust kaal: die tekst zit binnen de kaart-`<Link>`
+ * en een `<button>` (GlossaryTerm) in een `<a>` is ongeldige HTML. De DRILLDOWN
+ * rendert als sibling BUITEN die Link (`LeverageCard`: `{expanded && children}`)
+ * en draagt de uitleg wél. `static` ("Vast (4%)") is geen jargon → geen entry.
+ */
+const WITHDRAWAL_GLOSSARY_KEYS: Record<string, string> = {
+  guardrails: 'guardrails',
+  vpw: 'vpw',
+  bucket: 'bucket',
+}
+
+/**
+ * Vakterm met uitleg-tooltip, of kale tekst als er geen glossary-entry is.
+ * `GlossaryTerm` valt zelf al terug op platte tekst bij een onbekende key;
+ * deze helper houdt de call-sites in `buildNavCards` leesbaar.
+ */
+function withGlossary(term: string | undefined, label: string): ReactNode {
+  if (!term) return label
+  return <GlossaryTerm term={term}>{label}</GlossaryTerm>
 }
 
 /**
@@ -305,8 +334,21 @@ export function buildNavCards({
       subText: `${withdrawalName} · SWR ${formatPct(fireParams.effectiveSwr)}`,
       detail: {
         detailLabel: 'Onttrekking',
-        value: withdrawalName,
-        tip: `${strategy.name} · rendement ${formatPct(fireParams.grossReturn)} · inflatie ${formatPct(fireParams.inflationRate)}`,
+        value: withGlossary(
+          WITHDRAWAL_GLOSSARY_KEYS[withdrawalStrategy.strategy],
+          withdrawalName,
+        ),
+        // Vaktermen uit de kaart-voorkant ("Vermogen opeten", "SWR") krijgen
+        // hier hun uitleg — zie WITHDRAWAL_GLOSSARY_KEYS voor het waarom.
+        tip: (
+          <>
+            {withGlossary(`eindstrategie_${fireStrategy.strategy}`, strategy.name)}
+            {' · '}
+            <GlossaryTerm term="swr">SWR</GlossaryTerm>{' '}
+            {formatPct(fireParams.effectiveSwr)}
+            {` · rendement ${formatPct(fireParams.grossReturn)} · inflatie ${formatPct(fireParams.inflationRate)}`}
+          </>
+        ),
         actionLabel: 'Pas voorkeuren aan',
       },
     },
@@ -387,7 +429,11 @@ export function ToekomstNavCards(props: {
             status={status}
             subText={subText}
             href={href}
-            compact={simple}
+            /* S1: `compact` is een `variant` geworden. Deze kaarten houden hun
+               huidige Eenvoudig-behandeling (one-liner) — of ook /toekomst naar
+               de `verdict`-variant moet, is een eigen afweging en geen
+               neveneffect van de shell-wijziging. */
+            variant={simple ? 'compact' : 'full'}
             expandable={!simple}
             expanded={expanded}
             onToggleExpand={() => setExpandedKey(expanded ? null : key)}

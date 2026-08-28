@@ -11,6 +11,7 @@ import { usePrivacyMode } from '@/components/app/use-privacy-mode'
 import { AiPrivacyIndicator } from '@/components/app/ai-privacy-indicator'
 import { useChatContext } from '@/components/app/chat/chat-provider'
 import { useOverlayOpen } from '@/lib/hooks/use-scroll-lock'
+import { useOverlayOpen as useOverlaySignalOpen } from '@/lib/overlay-signal'
 import { isImmersiveRoute } from '@/lib/shell/immersive-routes'
 import { useFinSlot } from '@/lib/shell/fin-slot'
 import { useCoachSuggestion } from '@/lib/hooks/use-coach-suggestion'
@@ -44,11 +45,21 @@ export function FinHome({
   headerLabel = DEFAULT_COACH_HEADER,
 }: FinHomeProps) {
   const { isOpen, toggle, open, openWithMessage } = useChatContext()
-  // Zwevende bottom-FAB: verberg de Fin-bubbel zolang er een modal/overlay
-  // open is (scroll-lock actief). Anders bloedt de halftransparante z-[70]-
-  // backdrop door en lijkt de FAB bovenop de primaire actieknop onderin de
-  // sheet te staan — net zoals de nav-pill door zo'n overlay wordt afgedekt.
-  const overlayOpen = useOverlayOpen()
+  // Zwevende bottom-FAB: verberg de Fin-bubbel én de melding zolang er een
+  // modal/overlay open is. Anders bloedt de halftransparante z-[70]-backdrop
+  // door en lijkt de FAB bovenop de primaire actieknop onderin de sheet te
+  // staan — net zoals de nav-pill door zo'n overlay wordt afgedekt.
+  //
+  // TWEE tellers, bewust allebei (M15). `use-scroll-lock` telt alles wat de
+  // body vergrendelt (sheets, command-palette, share-dialog, sleepmodus);
+  // `overlay-signal` telt alles wat zich als pill-verbergende overlay meldt.
+  // Die twee vallen meestal samen — BottomSheet doet allebei — maar niet
+  // altijd: een full-page uitleglaag die pagina-inhoud blijft (de tips-tour op
+  // /toekomst) claimt bewust géén scroll-lock. Alleen op de lock-teller kijken
+  // liet de coach-melding dan dwars door de tourtekst heen typen.
+  const scrollLockOpen = useOverlayOpen()
+  const overlaySignalOpen = useOverlaySignalOpen()
+  const overlayOpen = scrollLockOpen || overlaySignalOpen
   // Mobiel woont de idle-bubbel ín de nav-pill: FloatingNavButton rendert daar
   // een slot, wij portalen onze bubbel erin. Zie lib/shell/fin-slot.tsx.
   //
@@ -98,11 +109,15 @@ export function FinHome({
 
   const { shown, done } = useTypewriter(suggestion?.message ?? '', { start: mode === 'melding' && !thinking })
 
+  // Auto-dismiss telt pas vanaf `done` — dus ná de typemachine. Vanaf mount
+  // tellen zou met de korte termijn (8s) een lange boodschap wegknippen
+  // vóórdat hij is uitgetypt. Bij prefers-reduced-motion is er geen
+  // typemachine en is `done` meteen waar; de timer start dan direct.
   useEffect(() => {
-    if (mode !== 'melding') return
+    if (mode !== 'melding' || !done) return
     const t = setTimeout(() => dismiss(), autoDismissMs)
     return () => clearTimeout(t)
-  }, [mode, suggestion?.key, autoDismissMs, dismiss])
+  }, [mode, done, suggestion?.key, autoDismissMs, dismiss])
 
   const [postponedReady, setPostponedReady] = useState(0)
   const fetchPostponedReady = useCallback(async () => {
@@ -218,11 +233,12 @@ export function FinHome({
           op de zwevende instantie hieronder.
 
           `!hideFloating` is hier VERPLICHT, niet optioneel: de pill verbergt
-          zichzelf alleen op lib/overlay-signal.ts (BottomSheet/SlideInPane).
-          `hideFloating` leest lib/hooks/use-scroll-lock.ts, de bredere teller
-          die ook command-palette, share-dialog, notification-panel en
-          sleepmodus meetelt. Zonder deze check bleef de bubbel in die gevallen
-          zichtbaar én tikbaar terwijl hij vóór de samenvoeging altijd verdween. */}
+          zichzelf alleen op lib/overlay-signal.ts (BottomSheet/SlideInPane +
+          de tips-tour). `hideFloating` leest de UNIE van die teller en
+          lib/hooks/use-scroll-lock.ts, die ook command-palette, share-dialog,
+          notification-panel en sleepmodus meetelt. Zonder deze check bleef de
+          bubbel in die gevallen zichtbaar én tikbaar terwijl hij vóór de
+          samenvoeging altijd verdween. */}
       {!hideFloating && slotEl && createPortal(<div className="wh-slot">{renderBubble('slot')}</div>, slotEl)}
 
       {!hideFloating && (

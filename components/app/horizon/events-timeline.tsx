@@ -5,6 +5,7 @@ import type { LifeEvent } from '@/lib/horizon-data'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { CHART_PAD } from '@/lib/chart-constants'
+import { CLUSTER_THRESHOLD_PX, packByPixelProximity } from '@/lib/chart-event-overlay'
 import { EVENT_ICONS } from './log-timeline'
 
 // ── EventsTimeline ──────────────────────────────────────────────────────────
@@ -263,7 +264,9 @@ export function EventsTimeline({
   //
   // De zoomLevel-detectie kijkt naar visibleSpan vs. fullSpan (currentAge →
   // endAge), zodat het regime mee-schaalt met de useChartZoom-state.
-  const CLUSTER_THRESHOLD_PX = 28 // icon-diameter (16) + minimale gap (12)
+  // CLUSTER_THRESHOLD_PX komt uit lib/chart-event-overlay — dezelfde drempel
+  // die ChartEventMarkers sinds M16 gebruikt. Stond hier lokaal; dat is precies
+  // hoe de twee lagen uit de pas konden lopen.
   const SPLIT_ZOOM_THRESHOLD = 2  // ≥ 2× zoom → elk event z'n eigen slot
   const SPLIT_MIN_GAP_PX = 18     // minimum horizontale afstand tussen markers in split-modus
   const xPositions = visibleEvents.map(ev => xScale(ev.target_age!))
@@ -299,21 +302,23 @@ export function EventsTimeline({
       lastX = adjustedX
     }
   } else {
-    // Cluster-modus: pixel-pack groepering met +N marker.
-    for (let i = 0; i < visibleEvents.length; i++) {
-      const ev = visibleEvents[i]
-      const x = xPositions[i]
-      const age = ev.target_age!
-      const last = slots[slots.length - 1]
-      if (last && x - last.x < CLUSTER_THRESHOLD_PX) {
-        const n = last.events.length
-        last.x = (last.x * n + x) / (n + 1)
-        last.centerAge = (last.centerAge * n + age) / (n + 1)
-        last.events.push(ev)
-        last.indices.push(i)
-      } else {
-        slots.push({ x, centerAge: age, events: [ev], indices: [i] })
-      }
+    // Cluster-modus: pixel-pack groepering met +N marker. De pack-logica zélf
+    // woont sinds M16 in lib/chart-event-overlay, zodat de iconen ÓP de
+    // grafiek (ChartEventMarkers) exact hetzelfde clusteren als deze strip
+    // eronder — één implementatie, geen tweede die stil uit de pas loopt.
+    const packed = packByPixelProximity(
+      visibleEvents.map((ev, i) => ({ ev, i })),
+      ({ i }) => xPositions[i],
+      ({ ev }) => ev.target_age!,
+      CLUSTER_THRESHOLD_PX,
+    )
+    for (const cluster of packed) {
+      slots.push({
+        x: cluster.x,
+        centerAge: cluster.centerAge,
+        events: cluster.items.map(({ ev }) => ev),
+        indices: cluster.items.map(({ i }) => i),
+      })
     }
   }
 

@@ -43,7 +43,7 @@ import {
   type ManagedStrategy,
 } from '@/lib/strategy-events'
 import { StrategieEditors, type StrategieEditorsData } from './strategie/strategie-editors'
-import { HideInSimple } from '@/components/app/hide-in-simple'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 
 // EventPane = herstelde toevoeg/bewerk-flow uit /horizon (catalogus + Praat met
@@ -268,6 +268,23 @@ export function GebeurtenissenView({
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const { mode: displayMode } = useDisplayMode()
+  const simpleMode = displayMode === 'simple'
+
+  // S6 — de Pensioen-strategie is de bestemming van twee zichtbare verwijzingen
+  // op /overzicht/belasting/box1 ("vul je factor A in bij je pensioen-strategie").
+  // Komt de gebruiker daar vandaan (?strategie=pensioen), dan staat de
+  // factor-A-uitvraag in de editor meteen open — geen tweede klik op
+  // "Bereken je fiscale ruimte" om de opdracht te kunnen uitvoeren.
+  const jaarruimteDeeplink =
+    openStrategy === 'pensioen' && searchParams.get('strategie') === 'pensioen'
+
+  // In Eenvoudig blijft alleen de strategie staan waar van buiten naartoe
+  // verwezen wordt (Pensioen — zie de toelichting bij het blok hieronder).
+  const zichtbareStrategieen = useMemo(
+    () => (simpleMode ? LEVENSSTRATEGIEEN.filter((s) => s.key === 'pensioen') : LEVENSSTRATEGIEEN),
+    [simpleMode],
+  )
 
   // ── Feature #876: kernel-run (zelfde run-site als de Tijdas-grafiek) ─────
   // De hook draait pas ná hydration (params null → isLoading, skeleton-rij);
@@ -739,24 +756,53 @@ export function GebeurtenissenView({
         )}
       </div>
 
-      {/* Levensstrategieën */}
-      <HideInSimple>
+      {/* Levensstrategieën — S6.
+          BEWUST GEEN <HideInSimple>. Twee zichtbare teksten op
+          /overzicht/belasting/box1 (het jaarruimte-uitlegblok en de
+          JaarruimteCard) dragen de opdracht "vul je factor A in bij je
+          pensioen-strategie" en linken hierheen. Hard-hiden maakte daar een
+          eenrichtingsdeeplink van: de modal opende wél (de deeplink-useEffect
+          en <StrategieEditors> staan buiten de hide), maar zodra je 'm sloot
+          was er in Eenvoudig geen zichtbare ingang meer — een opdracht zonder
+          bestemming.
+
+          In plaats daarvan het bestaande precedent uit horizon-client.tsx:
+          voorwaardelijk renderen omdat er naartoe gedeeplinkt wordt. In
+          Eenvoudig blijft alléén de Pensioen-strategie staan (mét duiding
+          waaróm), AOW/Huis/Werk blijven Volledig-weergave-diepte. */}
       <div>
         <header className="mb-4">
           <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
             Toekomst — levensstrategieën
           </div>
           <h2 className="font-serif text-xl text-[var(--ink)] mt-1">
-            Vier multi-step strategieën
+            {simpleMode ? 'Je pensioen-strategie' : 'Vier multi-step strategieën'}
           </h2>
           <p className="mt-1 text-xs text-[var(--ink-3)]">
-            Anders dan losse gebeurtenissen: strategieën hebben eigen
-            parameters en zijn als bandjes zichtbaar op de tijdas.
+            {simpleMode ? (
+              <>
+                Hier beheer je je pensioenpotten en je factor A — het getal dat
+                bepaalt hoeveel jaarruimte je in Box 1 overhoudt. Zet je de
+                weergave op Volledig, dan staan hier ook de AOW-, huis- en
+                werk-strategie.
+              </>
+            ) : (
+              <>
+                Anders dan losse gebeurtenissen: strategieën hebben eigen
+                parameters en zijn als bandjes zichtbaar op de tijdas.
+              </>
+            )}
           </p>
         </header>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          {LEVENSSTRATEGIEEN.map((strat) => {
+        <div
+          className={
+            simpleMode
+              ? 'grid grid-cols-1 gap-3 sm:max-w-md sm:gap-4'
+              : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4'
+          }
+        >
+          {zichtbareStrategieen.map((strat) => {
             const Icon = strat.Icon
             const cls =
               'rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5 flex flex-col text-left'
@@ -792,7 +838,6 @@ export function GebeurtenissenView({
           })}
         </div>
       </div>
-      </HideInSimple>
 
       <EventPane
         open={eventPaneOpen}
@@ -817,6 +862,7 @@ export function GebeurtenissenView({
         events={events}
         data={strategieData}
         readOnly={false}
+        autoOpenJaarruimte={jaarruimteDeeplink}
       />
 
       {/* Feature #876 — read-only uitleg-sheet voor de tekort-lening-rij.

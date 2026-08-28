@@ -30,6 +30,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import type { GuideDerivedStates, GuideIcon, WelcomeGuideScreen, WelcomeGuideStep } from '@/lib/welcome-guide'
+import { tapTargetClass } from '@/components/editorial/tap-target'
 
 /**
  * GuideScreenView — pure presentatie van één welkomstgids-scherm. Gedeeld door
@@ -344,7 +345,11 @@ function StepCheckbox({
       aria-label={
         isDone ? `Markeer "${step.title}" als niet gedaan` : `Markeer "${step.title}" als gedaan`
       }
-      className={`${base} transition-all ${
+      // Raakgebied 44×44 zonder layout-verschuiving (M19): het vinkje blijft
+      // visueel 20×20, `extend` legt er een transparante ::after overheen.
+      // Bewust `extend` en niet `reserve` — een 44px-hoge knop zou de compacte
+      // gids-rijen uit de eenvoudige weergave (APP-6) uit elkaar trekken.
+      className={`${base} ${tapTargetClass('extend')} transition-all ${
         isDone
           ? 'border-[var(--positive)] bg-[var(--positive)]'
           : 'border-[var(--border-md)] bg-[var(--paper)]'

@@ -15,7 +15,7 @@ import {
   CATEGORY_LABELS,
   type RecurringCategory,
 } from '@/lib/recurring-detection'
-import { isRecurringExpired } from '@/lib/recurring-data'
+import { isRecurringExpired, type RecurringSchedule } from '@/lib/recurring-data'
 import { localMonthStartMonthsAgo } from '@/lib/month-range'
 import { roundCents } from '@/lib/format'
 import { getCachedUser } from '@/lib/supabase/cached-user'
@@ -150,7 +150,24 @@ export interface VasteLastenItem {
   averageAmount: number
   monthlyAmount: number
   frequency: 'monthly' | 'weekly' | 'quarterly' | 'yearly'
+  /**
+   * Bewust ONGEVULD (altijd null). De samenvatting wordt tot 30 minuten gecachet
+   * (`lib/vaste-lasten-cache.ts`); een hier ingebakken datum kan dus over een
+   * middernachtgrens verouderen. De kalender leidt de datum af uit `schedule`
+   * (kale roosterfeiten, die verouderen niet) op het moment van renderen.
+   */
   nextDate: string | null
+  /**
+   * ROOSTER (M21) — de feiten waaruit `nextOccurrenceFromSchedule`
+   * (lib/recurring-data.ts) de eerstvolgende afschrijving afleidt.
+   *
+   * OPTIONEEL en `null`-baar, en dat betekent allebei hetzelfde: "het ritme is
+   * hier niet bekend" → het item verschijnt NIET op de kalender, in plaats van
+   * op een verzonnen dag. Bewust niet verplicht: de meeste bouwplekken van dit
+   * type (fixtures, regressiesuites, de bevestigde tak hieronder) kennen het
+   * rooster niet en zouden er alleen ruis-`null`s bij krijgen.
+   */
+  schedule?: RecurringSchedule | null
   confidence: 'low' | 'medium' | 'high'
   isVariableAmount: boolean
   occurrences: number | null
@@ -488,6 +505,11 @@ export const loadVasteLastenSummary = cache(
           monthlyAmount: toMonthly(Number(r.amount), r.frequency ?? 'monthly'),
           frequency: (r.frequency ?? 'monthly') as VasteLastenItem['frequency'],
           nextDate: null,
+          // Bevestigde rijen komen op de kalender via `cashflow.recurrings` (de
+          // volledige `recurring_transactions`-rij, mét day_of_month/start_date);
+          // de trimmed selectie hier draagt die kolommen niet, dus geen tweede,
+          // armere bron ernaast.
+          schedule: null,
           confidence: 'high',
           isVariableAmount: false,
           occurrences: null,
@@ -542,6 +564,15 @@ export const loadVasteLastenSummary = cache(
       monthlyAmount: toMonthly(d.averageAmount, d.frequency),
       frequency: d.frequency,
       nextDate: null,
+      // M21 — de detectie kent de incassodag (`dayOfMonth`/`dayOfWeek`) en de
+      // eerste waargenomen datum; dat is precies het rooster dat de kalender
+      // nodig heeft om een nog niet bevestigde post te kunnen plaatsen.
+      schedule: {
+        frequency: d.frequency,
+        dayOfMonth: d.dayOfMonth,
+        dayOfWeek: d.dayOfWeek,
+        startDate: d.dates[0] ?? null,
+      },
       confidence: d.confidence,
       isVariableAmount: d.isVariableAmount,
       occurrences: d.occurrences,

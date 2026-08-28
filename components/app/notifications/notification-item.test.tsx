@@ -15,8 +15,10 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
 }))
 
+const openWithMessage = vi.fn()
+
 vi.mock('@/components/app/chat/chat-provider', () => ({
-  useChatContext: () => ({ openWithMessage: vi.fn() }),
+  useChatContext: () => ({ openWithMessage }),
 }))
 
 function makeNotification(overrides: Partial<Notification> & { type: NotificationType }): Notification {
@@ -66,6 +68,47 @@ describe('NotificationItem — onbekende/legacy bericht-types', () => {
     expect(item.className).toMatch(/focus-visible:outline/)
 
     fireEvent.keyDown(item, { key: 'Enter' })
+    expect(onRead).toHaveBeenCalledWith('n1')
+  })
+})
+
+/**
+ * M25: "Vraag Fin" markeerde het bericht synchroon bij de klik als gelezen,
+ * terwijl de AI-aanvraag pas later async vertrok — of nooit. Bij een storing
+ * liep de ongelezen-teller dus terug zonder dat er iets te lezen viel, en
+ * markAsRead kent geen rollback. De lezing hangt nu aan een callback die pas
+ * vuurt zodra Fin echt antwoordt (ChatPanel roept 'm aan).
+ */
+describe('NotificationItem — "Vraag Fin" markeert pas gelezen bij een antwoord (M25)', () => {
+  it('markeert NIET bij de klik, maar geeft de lezing mee als callback', () => {
+    openWithMessage.mockClear()
+    const onRead = vi.fn()
+    const n = makeNotification({ type: 'budget', aiContext: 'Leg mijn budget uit' })
+
+    render(<NotificationItem notification={n} onRead={onRead} onClose={vi.fn()} />)
+    // De rij zelf is óók een role="button" (met de knoptekst in z'n
+    // toegankelijke naam), dus expliciet de geneste knop pakken.
+    fireEvent.click(screen.getByText('Vraag Fin'))
+
+    // De kern van de bevinding: bij de klik is er nog niets gelezen.
+    expect(onRead).not.toHaveBeenCalled()
+    expect(openWithMessage).toHaveBeenCalledWith('Leg mijn budget uit', expect.any(Function))
+
+    // Pas de callback — die ChatPanel aanroept bij een gerenderd antwoord —
+    // markeert het bericht alsnog.
+    const onAnswered = openWithMessage.mock.calls[0][1] as () => void
+    onAnswered()
+    expect(onRead).toHaveBeenCalledWith('n1')
+  })
+
+  it('markeert wél direct als er geen AI-vervolg mogelijk is', () => {
+    openWithMessage.mockClear()
+    const onRead = vi.fn()
+    const n = makeNotification({ type: 'budget' })
+
+    render(<NotificationItem notification={n} onRead={onRead} onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button'))
+
     expect(onRead).toHaveBeenCalledWith('n1')
   })
 })

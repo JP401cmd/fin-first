@@ -13,6 +13,7 @@
  * Pure functions, no Supabase dependency. Follows the pattern of box3-data.ts.
  */
 
+import { formatCurrency } from './format'
 import type { TaxYear } from './box3-data'
 export type { TaxYear } from './box3-data'
 
@@ -158,7 +159,10 @@ export const BOX2_TOOLTIPS: Record<string, string> = {
   dividendOnbekend: 'Je jaarlijks dividend is nog niet ingevuld bij je deelneming. We tonen daarom geen bedrag: €0 zou hier suggereren dat je niets betaalt, terwijl we het simpelweg nog niet weten.',
   vervreemdingswinst: 'Winst bij verkoop van je aandelen: verkoopprijs minus verkrijgingsprijs.',
   fiscaalPartner: 'Met een fiscaal partner verdubbelt de eerste-schijfgrens voor het lage tarief (2026 naar €137.686, 2025 €135.608).',
-  wetExcessiefLenen: 'De Wet excessief lenen bij eigen vennootschap belast leningen boven €500.000 van je BV als fictief regulier voordeel in Box 2. Het bovenmatige deel wordt belast tegen Box 2 tarieven.',
+  // S17: het bedrag komt uit DGA_LENING_DREMPEL, niet uit een letterlijke
+  // string. Een hardgecodeerde "€500.000" tien regels onder de constante die
+  // hem hoort te leveren driftet zodra de wetgever de drempel verzet.
+  wetExcessiefLenen: `De Wet excessief lenen bij eigen vennootschap belast leningen boven ${formatCurrency(DGA_LENING_DREMPEL)} van je BV als fictief regulier voordeel in Box 2. Het bovenmatige deel wordt belast tegen Box 2 tarieven.`,
 }
 
 // ── Core Calculation ─────────────────────────────────────────

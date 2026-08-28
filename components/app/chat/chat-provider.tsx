@@ -1,15 +1,28 @@
 'use client'
 
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react'
 
 type ChatContextType = {
   isOpen: boolean
   open: () => void
   close: () => void
   toggle: () => void
-  openWithMessage: (message: string) => void
+  /**
+   * Opent de chat met een vooraf ingevulde vraag.
+   *
+   * `onAnswered` vuurt pas wanneer Fin daadwerkelijk een antwoord heeft
+   * gerenderd — niet bij de klik (M25). De aanroeper hangt daar het gevolg aan
+   * dat pas ná een antwoord mag gelden, zoals "markeer dit bericht als
+   * gelezen". Faalt de aanvraag, of wordt hij nooit verstuurd (Wft-modal niet
+   * geaccepteerd, chat gesloten), dan blijft de callback ongebruikt.
+   */
+  openWithMessage: (message: string, onAnswered?: () => void) => void
   pendingMessage: string | null
   clearPendingMessage: () => void
+  /** ChatPanel: er staat een gerenderd antwoord — voer de wachtende callback uit. */
+  resolvePendingAnswer: () => void
+  /** ChatPanel: er komt geen antwoord (fout/afgebroken) — laat de callback vallen. */
+  dropPendingAnswer: () => void
   isPinned: boolean
   togglePin: () => void
   setIsPinned: (pinned: boolean) => void
@@ -93,13 +106,31 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, [])
   const toggle = useCallback(() => setIsOpen((v) => !v), [])
 
-  const openWithMessage = useCallback((message: string) => {
+  // De "pas gelezen bij een écht antwoord"-koppeling (M25). Bewust een ref en
+  // geen state: dit is geen renderbare waarde, en een state-update zou elke
+  // consument van de chatcontext opnieuw laten renderen bij iedere klik op
+  // "Vraag Fin". Eén wachtende callback tegelijk — een nieuwe vraag vervangt de
+  // vorige, want dat is ook wat de gebruiker doet.
+  const pendingAnsweredRef = useRef<(() => void) | null>(null)
+
+  const openWithMessage = useCallback((message: string, onAnswered?: () => void) => {
+    pendingAnsweredRef.current = onAnswered ?? null
     setPendingMessage(message)
     setIsOpen(true)
   }, [])
 
   const clearPendingMessage = useCallback(() => {
     setPendingMessage(null)
+  }, [])
+
+  const resolvePendingAnswer = useCallback(() => {
+    const cb = pendingAnsweredRef.current
+    pendingAnsweredRef.current = null
+    cb?.()
+  }, [])
+
+  const dropPendingAnswer = useCallback(() => {
+    pendingAnsweredRef.current = null
   }, [])
 
   const setIsPinned = useCallback((pinned: boolean) => {
@@ -134,6 +165,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     <ChatContext.Provider value={{
       isOpen, open, close, toggle, openWithMessage,
       pendingMessage, clearPendingMessage,
+      resolvePendingAnswer, dropPendingAnswer,
       isPinned, togglePin, setIsPinned,
       autoOpenMessage, setAutoOpenMessage,
       openMelding, meldingRequested, clearMeldingRequest,

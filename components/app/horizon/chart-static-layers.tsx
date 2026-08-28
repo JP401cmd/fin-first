@@ -48,6 +48,9 @@ export type ChartStaticLayersProps = {
     newAge: number,
     kind: ChartEventKind,
   ) => void
+  /** M16 — doorgegeven aan ChartEventMarkers: opent de lijst achter een
+   *  "+N"-clusterbadge. Zie `ChartEventMarkers.onClusterOpen`. */
+  onClusterOpen?: (events: ChartEventOverlay[], centerAge: number) => void
 }
 
 /** Dim-contrast voor niet-benadrukte segmenten (uitleg-walkthrough). Bewust
@@ -81,6 +84,7 @@ export function ChartStaticLayersInner({
   onEventClick,
   onEventDragEnd,
   onEventDragMove,
+  onClusterOpen,
 }: ChartStaticLayersProps) {
   const {
     PAD,
@@ -124,6 +128,26 @@ export function ChartStaticLayersInner({
     depletion,
     iconClampTopY,
   } = geometry
+
+  /**
+   * Baseline-y van de EERSTE regel van een doellijn-label.
+   *
+   * De labels staan sinds M16 op 11px (waren 8 en 7,5px — onleesbaar op
+   * mobiel). Twee dingen volgen daaruit:
+   *
+   *  - de regelafstand moest mee van 8 naar 13px, anders lopen de woordregel en
+   *    de bedragregel door elkaar heen. De bedragregel is daarom `+ 13`;
+   *  - grotere letters steken verder boven de lijn uit. Ligt de doellijn hoog in
+   *    het plot, dan zou het label door de SVG-bovenrand zakken. De clamp op
+   *    `PAD.top + 11` houdt de bovenste regel binnen beeld; het label schuift dan
+   *    ten opzichte van zijn eigen lijn in plaats van weg te vallen.
+   *
+   * Onder maskering is er maar één regel (het bedrag vervalt), dus die staat
+   * dichter op de lijn.
+   */
+  function targetLabelY(yInPlot: number, isMasked: boolean): number {
+    return Math.max(PAD.top + 11, PAD.top + yInPlot - (isMasked ? 5 : 15))
+  }
 
   // Emphasis-afgeleide render-waarden (uitleg-walkthrough). Geen geometrie —
   // daarom hier, niet in de gememoiseerde geometry.
@@ -169,9 +193,13 @@ export function ChartStaticLayersInner({
       {/* Y-axis labels — onder maskering VOLLEDIG weg (ADR 0091: "bullets op een
           as zijn ruis, geen informatie"). De gridlijnen hierboven blijven staan,
           dus de verhoudingen in de grafiek blijven leesbaar; alleen de bedragen
-          bij de as verdwijnen. */}
+          bij de as verdwijnen.
+
+          fontSize 11 is de ondergrens uit bevinding M16 (was 9, op mobiel
+          onleesbaar). Past binnen PAD.left (60) omdat het label rechts uitlijnt
+          op PAD.left − 5: "€1.1M" is ~40px breed. */}
       {!masked && yTicks.map(({ val, y }) => (
-        <text key={val} x={PAD.left - 5} y={y + 4} textAnchor="end" fontSize={9}
+        <text key={val} x={PAD.left - 5} y={y + 4} textAnchor="end" fontSize={11}
           fill="var(--ink-4)" fontFamily="var(--font-dm-mono, monospace)">
           {val >= 1_000_000
             ? `€${(val / 1_000_000).toFixed(1)}M`
@@ -181,9 +209,10 @@ export function ChartStaticLayersInner({
         </text>
       ))}
 
-      {/* X-axis labels */}
+      {/* X-axis labels — fontSize 11 (M16). De baseline op H − 4 laat binnen
+          PAD.bottom (28) ruim genoeg staan voor de grotere letter. */}
       {xTickAges.map(age => (
-        <text key={age} x={PAD.left + xScale(age)} y={H - 4} textAnchor="middle" fontSize={9}
+        <text key={age} x={PAD.left + xScale(age)} y={H - 4} textAnchor="middle" fontSize={11}
           fill="var(--ink-4)" fontFamily="var(--font-dm-mono, monospace)">{age}</text>
       ))}
 
@@ -201,17 +230,20 @@ export function ChartStaticLayersInner({
           {/* Woordlabel blijft altijd staan (de lijn moet benoembaar blijven);
               onder maskering schuift 'ie in het lege bedrag-slot zodat er geen
               zwevend label boven de lijn hangt. */}
+          {/* Doellabel — twee regels op 11px (M16: was 8 / 7,5px). De
+              regelafstand groeide mee van 8 naar 13px, anders overlappen de
+              letters elkaar: woordregel op −15, bedragregel op −2. */}
           <text
-            x={PAD.left + innerW - 2} y={PAD.top + yScale(fireTarget) - (masked ? 4 : 9)}
-            fontSize={8} fill="var(--hor-t, #8a6e42)" textAnchor="end"
+            x={PAD.left + innerW - 2} y={targetLabelY(yScale(fireTarget), masked)}
+            fontSize={11} fill="var(--hor-t, #8a6e42)" textAnchor="end"
             fontFamily="var(--font-inter, sans-serif)" fontWeight={600}
           >
             {exclTargetLabel}
           </text>
           {!masked && (
             <text
-              x={PAD.left + innerW - 2} y={PAD.top + yScale(fireTarget) - 1}
-              fontSize={7.5} fill="var(--hor-t, #8a6e42)" textAnchor="end"
+              x={PAD.left + innerW - 2} y={targetLabelY(yScale(fireTarget), masked) + 13}
+              fontSize={11} fill="var(--hor-t, #8a6e42)" textAnchor="end"
               fontFamily="var(--font-dm-mono, monospace)"
             >
               {fireTarget >= 1_000_000
@@ -233,17 +265,18 @@ export function ChartStaticLayersInner({
             y1={PAD.top + yScale(fireTargetInclHome)} y2={PAD.top + yScale(fireTargetInclHome)}
             stroke="var(--hor-t, #8a6e42)" strokeWidth={1.5} strokeDasharray="6 3" opacity={0.6}
           />
+          {/* Zelfde 11px-typografie en regelafstand als de doellijn hierboven. */}
           <text
-            x={PAD.left + innerW - 2} y={PAD.top + yScale(fireTargetInclHome) - (masked ? 4 : 9)}
-            fontSize={8} fill="var(--hor-t, #8a6e42)" textAnchor="end"
+            x={PAD.left + innerW - 2} y={targetLabelY(yScale(fireTargetInclHome), masked)}
+            fontSize={11} fill="var(--hor-t, #8a6e42)" textAnchor="end"
             fontFamily="var(--font-inter, sans-serif)" fontWeight={600}
           >
             doel met je huis
           </text>
           {!masked && (
             <text
-              x={PAD.left + innerW - 2} y={PAD.top + yScale(fireTargetInclHome) - 1}
-              fontSize={7.5} fill="var(--hor-t, #8a6e42)" textAnchor="end"
+              x={PAD.left + innerW - 2} y={targetLabelY(yScale(fireTargetInclHome), masked) + 13}
+              fontSize={11} fill="var(--hor-t, #8a6e42)" textAnchor="end"
               fontFamily="var(--font-dm-mono, monospace)"
             >
               {fireTargetInclHome >= 1_000_000
@@ -682,6 +715,7 @@ export function ChartStaticLayersInner({
           onEventClick={onEventClick}
           onEventDragEnd={onEventDragEnd}
           onEventDragMove={onEventDragMove}
+          onClusterOpen={onClusterOpen}
         />
       )}
     </>

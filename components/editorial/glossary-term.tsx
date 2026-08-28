@@ -2,12 +2,23 @@
 
 import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react'
 import { GLOSSARY, GLOSSARY_ENTRIES } from '@/lib/glossary-data'
+import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 
 /**
  * GlossaryTerm — wraps financial jargon with a hover/tap tooltip.
  *
  * Styling: dotted underline in module-active-700; on hover/tap a popover
  * appears with a short plain-language explanation.
+ *
+ * WEERGAVEMODUS-BEWUST (S17). In **Eenvoudig** vervangt de component het
+ * zichtbare jargon door `simpleLabel` uit `lib/glossary-data.ts` en verhuist de
+ * vakterm naar de kop van de popover — precies de kaartregel "afkortingen
+ * bestaan in Eenvoudig niet; wettelijke termen mogen, mét uitleg ter plekke".
+ * In **Volledig** verandert er niets: zonder `simpleLabel` (de standaard, o.a.
+ * voor Box 3, tegenbewijs, aanmerkelijk belang) is de render in beide modi
+ * identiek. Wélke term wisselt is dus een DATASTRUCTUUR-keuze in glossary-data,
+ * geen verboden-woordenlijst — een lijst kan niet weten of een treffer in
+ * Eenvoudig zichtbaar is en geeft daardoor vals alarm.
  *
  * Seen-tracking: tracks which terms a user has already opened via localStorage.
  * - **Unseen** terms: bold text + thicker dotted underline (font-semibold, border-b-2)
@@ -19,7 +30,7 @@ import { GLOSSARY, GLOSSARY_ENTRIES } from '@/lib/glossary-data'
  * de glossary-popovers. Eén bron van waarheid.
  *
  * Usage:
- *   <GlossaryTerm term="SWR">SWR</GlossaryTerm>
+ *   <GlossaryTerm term="swr">SWR</GlossaryTerm>
  *
  * Override explanation (rare, prefer adding to glossary-data.ts):
  *   <GlossaryTerm term="custom" explanation="Eigen uitleg hier">custom</GlossaryTerm>
@@ -50,6 +61,28 @@ function markTermSeen(term: string): void {
   }
 }
 
+// ── Eenvoudig-substitutie ───────────────────────────────────────
+
+/**
+ * Neemt de hoofdletter van het oorspronkelijke woord over. `simpleLabel` staat
+ * in glossary-data bewust klein geschreven (het is een zinsdeel); stond het
+ * jargon aan het begin van een zin of als kop ("Opnamerate"), dan hoort het
+ * alternatief dat ook te doen.
+ *
+ * Een ALL-CAPS afkorting ("SWR", "FIRE") telt NIET als zinsbegin: die staat in
+ * hoofdletters omdát het een afkorting is, niet vanwege z'n plek in de zin.
+ * "Klassiek Opnamepercentage —" zou daar een valse hoofdletter van maken.
+ */
+function matchLeadingCase(label: string, source: string): string {
+  const first = source.charAt(0)
+  const isUpperFirst = first !== '' && first === first.toUpperCase() && first !== first.toLowerCase()
+  if (!isUpperFirst) return label
+  const rest = source.slice(1)
+  const isAcronym = rest !== '' && rest === rest.toUpperCase()
+  if (isAcronym) return label
+  return label.charAt(0).toUpperCase() + label.slice(1)
+}
+
 // ── Component ───────────────────────────────────────────────────
 
 export interface GlossaryTermProps {
@@ -62,6 +95,7 @@ export interface GlossaryTermProps {
 }
 
 export function GlossaryTerm({ term, explanation, children }: GlossaryTermProps) {
+  const { mode } = useDisplayMode()
   const [open, setOpen] = useState(false)
   const [seen, setSeen] = useState(true) // default to "seen" to avoid flash of bold on hydration
   const containerRef = useRef<HTMLSpanElement>(null)
@@ -71,7 +105,20 @@ export function GlossaryTerm({ term, explanation, children }: GlossaryTermProps)
   const text = explanation ?? GLOSSARY[term] ?? ''
 
   // Resolve display name: GLOSSARY_ENTRIES name → term with underscores replaced
-  const displayName = GLOSSARY_ENTRIES[term]?.name ?? term.replace(/_/g, ' ')
+  const entry = GLOSSARY_ENTRIES[term]
+  const displayName = entry?.name ?? term.replace(/_/g, ' ')
+
+  // Zichtbaar woord. In Eenvoudig wint `simpleLabel` — maar alléén wanneer het
+  // kind PLATTE TEKST is: een ReactNode-kind (bv. <em>marktcheck</em>) draagt
+  // eigen opmaak die we niet mogen weggooien, en zo'n kind is meestal al de
+  // begrijpelijke variant.
+  const fallbackChild = children ?? term
+  const childIsPlain = children === undefined || typeof children === 'string'
+  const sourceWord = typeof children === 'string' ? children : term
+  const visible: ReactNode =
+    mode === 'simple' && entry?.simpleLabel && childIsPlain
+      ? matchLeadingCase(entry.simpleLabel, sourceWord)
+      : fallbackChild
 
   // On mount, check localStorage for seen status
   useEffect(() => {
@@ -118,7 +165,7 @@ export function GlossaryTerm({ term, explanation, children }: GlossaryTermProps)
 
   if (!text) {
     // No explanation available — render plain text without tooltip
-    return <span>{children ?? term}</span>
+    return <span>{visible}</span>
   }
 
   // Unseen: bold + thick dotted underline (attention-drawing)
@@ -143,7 +190,7 @@ export function GlossaryTerm({ term, explanation, children }: GlossaryTermProps)
         aria-describedby={`glossary-${term}`}
         style={{ fontSize: 'inherit', lineHeight: 'inherit' }}
       >
-        {children ?? term}
+        {visible}
       </button>
 
       {/* Use <span> instead of <div> so GlossaryTerm can safely live inside <p> elements */}

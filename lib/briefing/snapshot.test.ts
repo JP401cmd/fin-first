@@ -6,6 +6,8 @@ import {
   readBriefingSnapshot,
   getOrCreateWeeklySnapshot,
   applyManualRefresh,
+  touchLastSeen,
+  refreshStateToday,
   type BriefingSnapshot,
 } from './snapshot'
 import type { BriefingEntry } from '@/lib/types/briefing'
@@ -456,5 +458,136 @@ describe('week-historie — afgesloten weken in de snapshot', () => {
     expect(snap?.history).toHaveLength(1)
     expect(snap?.history?.[0].entries).toHaveLength(1)
     expect(snap?.history?.[0].entries[0].id).toBe('ok')
+  })
+})
+
+// ── Bezoekmarker "sinds je vorige bezoek" (H11) ─────────────────────
+
+describe('touchLastSeen — bezoekmarker op dagcadans', () => {
+  const base = (over: Partial<BriefingSnapshot> = {}): BriefingSnapshot => ({
+    week: '2026-W34',
+    lastManualRefresh: '',
+    refreshedAt: '2026-08-18T08:00:00.000Z',
+    entries: [entry('observation:a')],
+    ...over,
+  })
+
+  it('schrijft niets zonder bestaande snapshot (nooit een halve rij achterlaten)', async () => {
+    const { supabase, writes } = makeSupabase({ snapshot: null })
+    const res = await touchLastSeen(supabase, 'u', { totalFreedomDays: 100 })
+    expect(res.previous).toBeNull()
+    expect(writes).toHaveLength(0)
+  })
+
+  it('eerste bezoek ooit: zet de marker, maar heeft nog geen basis', async () => {
+    const now = new Date('2026-08-24T09:00:00Z')
+    const { supabase, writes } = makeSupabase({ snapshot: base() })
+    const res = await touchLastSeen(supabase, 'u', { totalFreedomDays: 100 }, { now })
+    expect(res.previous).toBeNull()
+    expect(writes).toHaveLength(1)
+    const w = writes[0] as { briefing_snapshot: BriefingSnapshot }
+    expect(w.briefing_snapshot.lastSeen?.totalFreedomDays).toBe(100)
+    expect(w.briefing_snapshot.previousLastSeen).toBeUndefined()
+  })
+
+  it('nieuwe kalenderdag: de vorige marker schuift door naar de basis', async () => {
+    const now = new Date('2026-08-24T09:00:00Z')
+    const snapshot = base({
+      lastSeen: { at: '2026-08-23T20:00:00.000Z', totalFreedomDays: 90 },
+    })
+    const { supabase, writes } = makeSupabase({ snapshot })
+    const res = await touchLastSeen(supabase, 'u', { totalFreedomDays: 100 }, { now })
+    expect(res.previous?.totalFreedomDays).toBe(90)
+    const w = writes[0] as { briefing_snapshot: BriefingSnapshot }
+    expect(w.briefing_snapshot.previousLastSeen?.totalFreedomDays).toBe(90)
+    expect(w.briefing_snapshot.lastSeen?.totalFreedomDays).toBe(100)
+    // De briefing zelf blijft ongemoeid — dit raakt alleen de bezoekmarkers.
+    expect(w.briefing_snapshot.week).toBe('2026-W34')
+    expect(w.briefing_snapshot.entries).toHaveLength(1)
+  })
+
+  it('tweede bezoek dezelfde dag: geen write, dezelfde basis (regel flikkert niet weg)', async () => {
+    const now = new Date('2026-08-24T21:00:00Z')
+    const snapshot = base({
+      lastSeen: { at: '2026-08-24T09:00:00.000Z', totalFreedomDays: 100 },
+      previousLastSeen: { at: '2026-08-23T20:00:00.000Z', totalFreedomDays: 90 },
+    })
+    const { supabase, writes } = makeSupabase({ snapshot })
+    const res = await touchLastSeen(supabase, 'u', { totalFreedomDays: 104 }, { now })
+    expect(writes).toHaveLength(0)
+    expect(res.previous?.totalFreedomDays).toBe(90)
+  })
+
+  it('een week-overgang wist de bezoekmarkers niet (andere cadans)', async () => {
+    const now = new Date('2026-08-24T09:00:00Z') // maandag, W35
+    const snapshot = base({
+      lastSeen: { at: '2026-08-23T20:00:00.000Z', totalFreedomDays: 90 },
+      previousLastSeen: { at: '2026-08-22T20:00:00.000Z', totalFreedomDays: 80 },
+    })
+    const { supabase, writes } = makeSupabase({ snapshot })
+    await getOrCreateWeeklySnapshot(supabase, 'u', [entry('observation:vers')], { now })
+    const w = writes[0] as { briefing_snapshot: BriefingSnapshot }
+    expect(w.briefing_snapshot.week).toBe(amsterdamWeekKey(now))
+    expect(w.briefing_snapshot.lastSeen?.totalFreedomDays).toBe(90)
+    expect(w.briefing_snapshot.previousLastSeen?.totalFreedomDays).toBe(80)
+  })
+
+  it('parser verdraagt oude snapshots zonder markers', async () => {
+    const { supabase } = makeSupabase({
+      snapshot: {
+        week: '2026-W34',
+        lastManualRefresh: '',
+        refreshedAt: '2026-08-18T08:00:00.000Z',
+        entries: [],
+      },
+    })
+    const snap = await readBriefingSnapshot(supabase, 'u')
+    expect(snap?.lastSeen).toBeUndefined()
+    expect(snap?.previousLastSeen).toBeUndefined()
+  })
+
+  it('parser weigert een onvolledige marker (geen getal → geen basis)', async () => {
+    const { supabase } = makeSupabase({
+      snapshot: {
+        week: '2026-W34',
+        lastManualRefresh: '',
+        refreshedAt: '2026-08-18T08:00:00.000Z',
+        entries: [],
+        lastSeen: { at: '2026-08-23T20:00:00.000Z', totalFreedomDays: 'veel' },
+      },
+    })
+    const snap = await readBriefingSnapshot(supabase, 'u')
+    expect(snap?.lastSeen).toBeUndefined()
+  })
+})
+
+// ── L9: de reden achter "ververs niet beschikbaar" ──────────────────
+
+describe('refreshStateToday — reden i.p.v. kale boolean', () => {
+  const now = new Date('2026-08-24T09:00:00Z')
+  const snap = (lastManualRefresh: string): BriefingSnapshot => ({
+    week: '2026-W35',
+    lastManualRefresh,
+    refreshedAt: '2026-08-24T08:00:00.000Z',
+    entries: [entry('observation:a')],
+  })
+
+  it('zonder snapshot is de ververs gewoon beschikbaar', () => {
+    expect(refreshStateToday(null, now)).toBe('available')
+  })
+
+  it('nog niet ververst vandaag → available', () => {
+    expect(refreshStateToday(snap('2026-08-23'), now)).toBe('available')
+  })
+
+  it('vandaag al ververst → used_today (de knop blijft staan, uitgeschakeld)', () => {
+    expect(refreshStateToday(snap(amsterdamDateString(now)), now)).toBe('used_today')
+  })
+
+  it('blijft in lijn met canRefreshToday — nooit twee waarheden op één scherm', () => {
+    for (const last of ['', '2026-08-01', '2026-08-23', amsterdamDateString(now)]) {
+      const s = snap(last)
+      expect(refreshStateToday(s, now) === 'available').toBe(canRefreshToday(s, now))
+    }
   })
 })

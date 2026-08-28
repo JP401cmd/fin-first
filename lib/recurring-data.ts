@@ -173,48 +173,150 @@ export function withDerivedDayOfMonth(
 }
 
 /**
- * Get the next occurrence date for a recurring transaction.
+ * Maand-index (0-11) uit een 'YYYY-MM-DD'-string — lokaal geparsed, net als
+ * `dayOfMonthFromISODate`. `new Date(str).getMonth()` zet de string op
+ * UTC-middernacht en kan in een negatieve offset een maand terugvallen.
  */
-export function getNextOccurrence(r: RecurringTransaction): Date | null {
-  if (!r.is_active) return null
+export function monthFromISODate(dateStr: string | null | undefined): number | null {
+  if (!dateStr) return null
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr)
+  if (!m) return null
+  const month = parseInt(m[2], 10) - 1
+  return month >= 0 && month <= 11 ? month : null
+}
 
-  const now = new Date()
+/** Jaartal uit een 'YYYY-MM-DD'-string. */
+function yearFromISODate(dateStr: string | null | undefined): number | null {
+  if (!dateStr) return null
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr)
+  return m ? parseInt(m[1], 10) : null
+}
+
+/**
+ * Datum in een maand, GEKLEMD op de laatste dag van die maand.
+ *
+ * `new Date(2026, 1, 31)` (31 februari) rolt in JS door naar 3 maart — een
+ * incasso op de 31e sprong daardoor over de maandgrens heen en landde in de
+ * verkeerde kalenderweek. Klemmen op de laatste dag is wat een incassant
+ * feitelijk doet.
+ */
+function dateInMonth(year: number, monthIndex: number, day: number): Date {
+  const lastDay = new Date(year, monthIndex + 1, 0).getDate()
+  return new Date(year, monthIndex, Math.min(Math.max(day, 1), lastDay))
+}
+
+/**
+ * ROOSTER — de kale feiten waaruit "wanneer komt dit weer" volgt.
+ *
+ * Bewust losgekoppeld van `RecurringTransaction`, zodat óók een nog niet
+ * bevestigde detectie (`DetectedRecurring` uit lib/recurring-detection.ts, met
+ * `dayOfMonth`/`dayOfWeek`/`dates[0]`) door DEZELFDE motor gaat als een
+ * bevestigde rij. Bevinding M21: de kalender liet gedetecteerde vaste lasten weg
+ * omdat er geen datum bij zat; een tweede, eigen datumheuristiek ernaast zou
+ * gegarandeerde drift zijn.
+ */
+export type RecurringSchedule = {
+  frequency: 'monthly' | 'weekly' | 'yearly' | 'quarterly'
+  /** Incassodag 1-31, of null → afgeleid uit `startDate`. */
+  dayOfMonth: number | null
+  /** 0 = zondag … 6 = zaterdag. Alleen voor `weekly`. */
+  dayOfWeek: number | null
+  /**
+   * Anker: eerste (waargenomen of ingestelde) datum, 'YYYY-MM-DD'.
+   * Bepaalt de FASE van een kwartaal-/jaarrooster — zonder anker weet je niet
+   * of "per kwartaal" in jan/apr/jul/okt of in feb/mei/aug/nov valt.
+   */
+  startDate: string | null
+}
+
+/**
+ * Eerstvolgende voorkomen ná `referenceDate` (default: vandaag, lokaal).
+ *
+ * Regels per frequentie:
+ *  · **weekly** — vereist `dayOfWeek`; zonder die dag is er niets eerlijks te
+ *    zeggen en geeft de functie `null` (liever geen marker dan een verzonnen).
+ *  · **monthly** — de incassodag in deze maand; is die geweest, dan volgende
+ *    maand. Geklemd op de maandlengte (de 31e → 28/29/30 in een korte maand).
+ *  · **quarterly** — stapt in blokken van drie maanden vanaf de ANKERMAAND uit
+ *    `startDate`, zodat de fase klopt. (Voorheen werd altijd vanaf de HUIDIGE
+ *    maand gestapt, waardoor een kwartaalpost in het verkeerde kwartaal viel.)
+ *  · **yearly** — de ankermaand + incassodag, dit jaar of anders volgend jaar.
+ *
+ * Val-terug voor de dag: expliciete `dayOfMonth` → dag uit `startDate` → 1.
+ * Nooit een globaal vaste dag, anders klonteren alle regels op één kalenderdag.
+ */
+export function nextOccurrenceFromSchedule(
+  schedule: RecurringSchedule,
+  referenceDate?: Date,
+): Date | null {
+  const now = referenceDate ?? new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
-  if (isRecurringExpired(r, now)) return null
-
-  if (r.frequency === 'weekly' && r.day_of_week != null) {
-    const currentDay = today.getDay()
-    let daysAhead = r.day_of_week - currentDay
+  if (schedule.frequency === 'weekly') {
+    if (schedule.dayOfWeek == null) return null
+    let daysAhead = schedule.dayOfWeek - today.getDay()
     if (daysAhead <= 0) daysAhead += 7
     const next = new Date(today)
     next.setDate(next.getDate() + daysAhead)
     return next
   }
 
-  if (r.frequency === 'monthly' || r.frequency === 'quarterly') {
-    // Per-regel dag: expliciete day_of_month → dag uit start_date → 1. Nooit een
-    // globale vaste dag als val-terug, anders klonteren alle regels samen.
-    const day = r.day_of_month ?? dayOfMonthFromISODate(r.start_date) ?? 1
-    let next = new Date(today.getFullYear(), today.getMonth(), day)
+  const day = schedule.dayOfMonth ?? dayOfMonthFromISODate(schedule.startDate) ?? 1
+
+  if (schedule.frequency === 'monthly') {
+    const next = dateInMonth(today.getFullYear(), today.getMonth(), day)
+    return next > today ? next : dateInMonth(today.getFullYear(), today.getMonth() + 1, day)
+  }
+
+  if (schedule.frequency === 'quarterly') {
+    // Absolute maandindex, zodat de jaargrens vanzelf goed gaat.
+    const anchorMonth = monthFromISODate(schedule.startDate) ?? today.getMonth()
+    const anchorYear = yearFromISODate(schedule.startDate) ?? today.getFullYear()
+    const anchor = anchorYear * 12 + anchorMonth
+    const current = today.getFullYear() * 12 + today.getMonth()
+    const steps = Math.max(0, Math.ceil((current - anchor) / 3))
+    let index = anchor + steps * 3
+    let next = dateInMonth(Math.floor(index / 12), index % 12, day)
     if (next <= today) {
-      const monthsAhead = r.frequency === 'quarterly' ? 3 : 1
-      next = new Date(today.getFullYear(), today.getMonth() + monthsAhead, day)
+      index += 3
+      next = dateInMonth(Math.floor(index / 12), index % 12, day)
     }
     return next
   }
 
-  if (r.frequency === 'yearly') {
-    const day = r.day_of_month ?? dayOfMonthFromISODate(r.start_date) ?? 1
-    const startDate = new Date(r.start_date)
-    let next = new Date(today.getFullYear(), startDate.getMonth(), day)
-    if (next <= today) {
-      next = new Date(today.getFullYear() + 1, startDate.getMonth(), day)
-    }
-    return next
+  if (schedule.frequency === 'yearly') {
+    const anchorMonth = monthFromISODate(schedule.startDate) ?? today.getMonth()
+    const next = dateInMonth(today.getFullYear(), anchorMonth, day)
+    return next > today ? next : dateInMonth(today.getFullYear() + 1, anchorMonth, day)
   }
 
   return null
+}
+
+/**
+ * Get the next occurrence date for a recurring transaction.
+ *
+ * Dunne schil om `nextOccurrenceFromSchedule` — die is de motor; hier staan
+ * alleen de rij-specifieke poorten (inactief / verlopen).
+ */
+export function getNextOccurrence(
+  r: RecurringTransaction,
+  referenceDate?: Date,
+): Date | null {
+  if (!r.is_active) return null
+
+  const now = referenceDate ?? new Date()
+  if (isRecurringExpired(r, now)) return null
+
+  return nextOccurrenceFromSchedule(
+    {
+      frequency: r.frequency,
+      dayOfMonth: r.day_of_month,
+      dayOfWeek: r.day_of_week,
+      startDate: r.start_date,
+    },
+    now,
+  )
 }
 
 /**
@@ -223,15 +325,16 @@ export function getNextOccurrence(r: RecurringTransaction): Date | null {
 export function getUpcomingTransactions(
   recurrings: RecurringTransaction[],
   daysAhead: number = 30,
+  referenceDate?: Date,
 ): { recurring: RecurringTransaction; nextDate: Date }[] {
-  const now = new Date()
+  const now = referenceDate ?? new Date()
   const cutoff = new Date(now)
   cutoff.setDate(cutoff.getDate() + daysAhead)
 
   const upcoming: { recurring: RecurringTransaction; nextDate: Date }[] = []
 
   for (const r of recurrings) {
-    const next = getNextOccurrence(r)
+    const next = getNextOccurrence(r, now)
     if (next && next <= cutoff) {
       upcoming.push({ recurring: r, nextDate: next })
     }

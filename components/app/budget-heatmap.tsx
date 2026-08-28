@@ -23,7 +23,21 @@ interface CombinedBudgetHeatmapProps {
   beschikbaarMap?: Record<string, number>
   previousSpending?: Record<string, number>
   size?: WidgetSize
+  /**
+   * M17 — "toon meer" onder de compacte mobiele lijst (quarter/half): opent de
+   * schermbrede heatmap. Optioneel: zonder deze prop toont de lijst alleen de
+   * top-N zonder uitweg, wat alleen zinvol is buiten widget-context.
+   */
+  onShowAll?: () => void
 }
+
+/**
+ * M17 — hoeveel categorieën de compacte mobiele lijst toont vóór "toon meer".
+ * Besluit eigenaar 26-08-2026: top-5. Dezelfde volgorde als de treemap zelf
+ * (grootste budget eerst — `squarify` sorteert op `weight`), zodat de lijst
+ * dezelfde vijf blokken toont die je op desktop het grootst ziet.
+ */
+const COMPACT_MOBILE_ITEMS = 5
 
 /** A positioned rectangle in the treemap layout */
 interface TreemapRect {
@@ -674,6 +688,122 @@ function MobileCombinedHeatmap({
   )
 }
 
+/* ── Mobile layout: compacte top-N-lijst voor krappe tegels ────── */
+
+/**
+ * MobileCompactHeatmapList — de mobiele lezing van de heatmap in een KRAPPE
+ * tegel (`quarter`/`half`).
+ *
+ * WAAROM (M17): die tegels toonden op mobiel dezelfde SVG-treemap als desktop.
+ * De viewBox van `half` is 800×190 terwijl het content-vlak op 390px-breed
+ * ~330×70px is — `preserveAspectRatio="meet"` schaalt de hele SVG dan met een
+ * factor ~0,4-0,5, en de labels in de `foreignObject` (nominaal 9-10px) schalen
+ * mee tot ~4-5px. Tien categorieën in een halve tegel werden zo decoratie in
+ * plaats van informatie. De `canFitName`/`canFitPct`-checks in `TreemapCell`
+ * merken dat niet op: die rekenen in viewBox-eenheden, niet in echte pixels.
+ *
+ * De rijke `MobileCombinedHeatmap` (groepskaarten met kop en blokken) is voor
+ * deze tegelhoogte veel te hoog — dat was precies de overloop die commit
+ * `edd7ca08` destijds met de treemap probeerde op te lossen. Vandaar een derde,
+ * bewust magere vorm: één regel per categorie, echte HTML-tekst die niet
+ * meeschaalt, top-5, en een altijd zichtbare uitweg naar het volle scherm.
+ *
+ * Layout-contract: `h-full` + de lijst scrollt (`min-h-0 flex-1 overflow-y-auto`)
+ * terwijl de "toon meer"-knop `shrink-0` onderaan staat. Zo kan de uitweg nooit
+ * uit beeld scrollen en wordt er niets geklikt afgesneden — de tegel zelf staat
+ * op `overflow-hidden` en biedt bij deze formaten géén ScrollableContent.
+ */
+function MobileCompactHeatmapList({
+  sections,
+  spending,
+  beschikbaarMap,
+  onNavigate,
+  onShowAll,
+  hasEntered,
+}: {
+  sections: HeatmapSection[]
+  spending: Record<string, number>
+  beschikbaarMap?: Record<string, number>
+  onNavigate: (budgetId: string) => void
+  onShowAll?: () => void
+  hasEntered: boolean
+}) {
+  const all = sections
+    .filter((s) => s.groups.length > 0)
+    .flatMap((s) =>
+      buildTreemapItems(s.groups, spending, s.budgetType, beschikbaarMap).map((it) => ({
+        ...it,
+        budgetType: s.budgetType,
+      })),
+    )
+    // Zelfde ordening als `squarify()`: grootste blok eerst.
+    .sort((a, b) => b.weight - a.weight)
+
+  if (all.length === 0) return null
+
+  const shown = all.slice(0, COMPACT_MOBILE_ITEMS)
+  const rest = all.length - shown.length
+
+  return (
+    <div className="flex h-full flex-col">
+      <ul aria-label="Grootste budgetten" className="min-h-0 flex-1 space-y-[3px] overflow-y-auto">
+        {shown.map((item, idx) => {
+          const pct = item.limit > 0 ? Math.round((item.spent / item.limit) * 100) : 0
+          const color = item.limit > 0 ? getHeatmapColor(item.budgetType, pct) : NEUTRAL_COLOR
+          return (
+            <li key={item.id}>
+              <button
+                type="button"
+                className="flex w-full items-center gap-1.5 text-left"
+                style={{
+                  opacity: hasEntered ? 1 : 0,
+                  transition: `opacity 0.4s ease-out ${idx * 40}ms`,
+                }}
+                onClick={(e) => {
+                  // De tegel is zelf een <Link> (WidgetShell); stop de bubble
+                  // zodat een tik op een regel de categorie opent i.p.v. de
+                  // tegel-href te volgen.
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onNavigate(item.id)
+                }}
+              >
+                {/* Kleurstip = dezelfde heatmap-kleurschaal als de treemap, zodat
+                    "rood is over budget" ook in deze vorm klopt. */}
+                <span
+                  aria-hidden="true"
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: color }}
+                />
+                <span className="min-w-0 flex-1 truncate text-[11px] text-[var(--ink-2)]">
+                  {item.name}
+                </span>
+                <span className="shrink-0 font-mono text-[11px] font-semibold tabular-nums text-[var(--ink)]">
+                  {pct}%
+                </span>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+
+      {rest > 0 && onShowAll && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onShowAll()
+          }}
+          className="mt-1 shrink-0 self-start text-[11px] font-semibold text-[var(--ink-3)] underline underline-offset-2"
+        >
+          Toon alle {all.length}
+        </button>
+      )}
+    </div>
+  )
+}
+
 /* ── Main SVG treemap cell ───────────────────────────────────── */
 
 function TreemapCell({
@@ -833,6 +963,7 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
   beschikbaarMap,
   previousSpending,
   size,
+  onShowAll,
 }: CombinedBudgetHeatmapProps) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 900 })
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -912,17 +1043,22 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
   // natuurlijke hoogte (h-auto, hoogte-uit-breedte) zoals voorheen — ongewijzigd.
   const constrainToHeight = size !== undefined
   // Grote formaten (full/xl) + de vrijstaande pagina houden de mobiele
-  // gestapelde lijst; compacte tegels (quarter/half) tonen op mobiel de fit-
-  // treemap i.p.v. de (overlopende) lijst.
+  // gestapelde groepslijst (die heeft de hoogte om te ademen).
   const showStackedMobile = !size || size === 'full' || size === 'xl'
+  // M17: compacte tegels (quarter/half) kregen op mobiel de fit-treemap. Die
+  // schaalt de labels terug tot ~4-5px — onleesbaar, en dus decoratie. Ze
+  // krijgen nu de compacte top-5-lijst met "toon meer". Desktop houdt de
+  // treemap: daar is de schaalfactor ~1× en leest hij prima.
+  const showCompactMobile = size === 'quarter' || size === 'half'
   // Legenda alleen waar er ruimte is (full/xl + vrijstaande pagina).
   const showLegend = !size || size === 'full' || size === 'xl'
 
-  // SVG-blok: fit-to-height in widget-context; op mobiel verborgen zodra de
-  // gestapelde lijst het overneemt.
+  // SVG-blok: fit-to-height in widget-context; op mobiel verborgen zodra een
+  // van de twee mobiele lezingen het overneemt.
+  const hideSvgOnMobile = showStackedMobile || showCompactMobile
   const svgBlockClass = !constrainToHeight
-    ? (showStackedMobile ? 'hidden md:block' : 'block')
-    : showStackedMobile
+    ? (hideSvgOnMobile ? 'hidden md:block' : 'block')
+    : hideSvgOnMobile
       ? 'hidden md:flex md:min-h-0 md:flex-1 md:flex-col'
       : 'flex min-h-0 flex-1 flex-col'
 
@@ -1033,6 +1169,22 @@ export const BudgetHeatmap = memo(function BudgetHeatmap({
 
       {/* Mobiel: gestapelde secties — alleen grote formaten (full/xl) + de
           vrijstaande pagina; scrollt via WidgetShell's ScrollableContent. */}
+      {/* Mobiel, krappe tegel (quarter/half): compacte top-5-lijst + uitweg naar
+          het volle scherm. `h-full` zodat de interne scroll/anker-layout van de
+          lijst de tegelhoogte krijgt i.p.v. eruit te lopen (M17). */}
+      {showCompactMobile && (
+        <div className="min-h-0 flex-1 md:hidden">
+          <MobileCompactHeatmapList
+            sections={sections}
+            spending={spending}
+            beschikbaarMap={beschikbaarMap}
+            onNavigate={onNavigate}
+            onShowAll={onShowAll}
+            hasEntered={hasEntered}
+          />
+        </div>
+      )}
+
       {showStackedMobile && (
         <div className="md:hidden">
           <MobileCombinedHeatmap

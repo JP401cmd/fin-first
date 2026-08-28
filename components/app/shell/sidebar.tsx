@@ -30,13 +30,11 @@ import {
   ChevronDown,
   ChevronsLeft,
   ChevronsRight,
-  CalendarClock,
   Lock,
   Activity,
   type LucideIcon,
 } from 'lucide-react'
-import { useEuroView } from '@/lib/hooks/use-euro-view'
-import { euroViewLabel } from '@/lib/euro-display'
+import { EuroViewBadge } from '@/components/app/shell/euro-view-badge'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { SIMPLE_HIDDEN_NAV_HREFS } from '@/lib/nav-config'
@@ -207,11 +205,16 @@ const MODULES: ModuleEntry[] = [
       // Bron: components/core/category-deepening-registry.ts. `appKey` matcht
       // de slug uit `getDeepeningSlug()` zodat de Sidebar kan filteren op
       // welke apps daadwerkelijk een gekoppeld asset/debt hebben.
-      { label: 'Budgetteren',       href: '/overzicht/cashflow/budget',                      appKey: 'budgetteren' },
-      { label: 'Aandelen holdings', href: '/overzicht/bezittingen/investment?tab=aandelen-holdings', appKey: 'aandelen-holdings' },
-      { label: 'Crypto holdings',   href: '/overzicht/bezittingen/crypto?tab=crypto-holdings',       appKey: 'crypto-holdings' },
-      { label: 'Hypotheekplanner',  href: '/overzicht/schulden/mortgage?tab=hypotheekplanner',       appKey: 'hypotheekplanner' },
-      { label: 'Verhuurrendement',  href: '/overzicht/bezittingen/real_estate?tab=verhuurrendement', appKey: 'verhuurrendement' },
+      // M41: kale categorie-routes, GÉÉN `?tab=`-deeplink — anders landt één
+      // klik in Eenvoudig rechtstreeks in de verdiepingstab die BEZ-4 juist
+      // buiten het standaardpad houdt. Volledige motivering bij
+      // OVERVIEW_APP_SUBROUTES in lib/nav-config.ts; die lijst is de canonieke
+      // bron (deze kopie voedt de desktop-sidebar en moet er gelijk aan blijven).
+      { label: 'Budgetteren',       href: '/overzicht/cashflow/budget',          appKey: 'budgetteren' },
+      { label: 'Aandelen holdings', href: '/overzicht/bezittingen/investment',   appKey: 'aandelen-holdings' },
+      { label: 'Crypto holdings',   href: '/overzicht/bezittingen/crypto',       appKey: 'crypto-holdings' },
+      { label: 'Hypotheekplanner',  href: '/overzicht/schulden/mortgage',        appKey: 'hypotheekplanner' },
+      { label: 'Verhuurrendement',  href: '/overzicht/bezittingen/real_estate',  appKey: 'verhuurrendement' },
     ],
   },
   // 'wil'-entry is verwijderd: Fin-coach is een persona overal, geen
@@ -249,7 +252,11 @@ const OVERIGE_BASE: OverigeEntry[] = [
   // Zap = de actie-helft van "tips & acties" (zie guide-naslagwerk).
   { label: 'Tips & acties', Icon: Zap, href: '/overzicht/tips' },
   { label: 'Berichten', Icon: Inbox, href: '/berichten' },
-  { label: 'Nieuws', Icon: Newspaper, href: '/nieuws' },
+  // "Krant", niet "Nieuws". `lib/nav-config.ts` (globalNav) is de canonieke IA
+  // en de pagina zelf zet `<NavStackMeta title="Krant">`; deze zijbalk hield
+  // een eigen label aan en dreef daarmee weg (bevinding M14). Eén naam per
+  // concept — de zijbalk volgt de nav-config, niet andersom.
+  { label: 'Krant', Icon: Newspaper, href: '/nieuws' },
   { label: 'Rapportages', Icon: BarChart3, href: '/rapportages' },
 ]
 
@@ -260,6 +267,14 @@ type FooterLink = {
 
 const FOOTER_LINKS: FooterLink[] = [
   { label: 'Mijn', href: '/mijn' },
+  // Account staat op mobiel permanent in de zwevende nav-pill (globalNav,
+  // actie `open-account`), maar die pill is `lg:hidden` — op desktop bestond
+  // hij niet. Tegelijk verbergt `/mijn/layout.tsx` de ModuleNav-tabbalk juist
+  // óp `/mijn` (`hideOnBasePath`, MIJN-1). Zonder deze regel zou het schrappen
+  // van de Account-kaart uit het /mijn-grid (bevinding M14, optie b2) de
+  // desktop-gebruiker via de hub geen Account-ingang meer laten zien. Dit is
+  // de desktop-tegenhanger van de mobiele pill, niet een extra duplicaat.
+  { label: 'Account', href: '/mijn/account' },
   { label: 'Uitloggen', href: '/logout' },
 ]
 
@@ -489,7 +504,11 @@ function SidebarWeergaveSection({ collapsed }: { collapsed: boolean }) {
     return (
       <div className="flex flex-col items-center gap-1.5 py-2 border-b border-[var(--border-ed)]">
         {showPerspective && <PerspectiveSwitcher compact menuAlign="left" />}
-        <SidebarEuroViewBadge collapsed />
+        {/* Ingeklapt is de badge icoon-only; de coachmark hangt bewust aan het
+            uitgeklapte exemplaar en aan de mobiele TopBar, zodat een gebruiker
+            met een ingeklapte zijbalk geen popover naast een naamloos icoontje
+            krijgt. */}
+        <EuroViewBadge variant="compact" />
       </div>
     )
   }
@@ -508,69 +527,9 @@ function SidebarWeergaveSection({ collapsed }: { collapsed: boolean }) {
       </div>
       <div className="flex flex-col items-start gap-1.5">
         {showPerspective && <PerspectiveSwitcher menuAlign="left" />}
-        <SidebarEuroViewBadge />
+        <EuroViewBadge showCoachmark coachmarkAlign="left" />
       </div>
     </div>
-  )
-}
-
-/**
- * Euro-weergave-status: staat de app in *toekomstige* euro's (nominaal, de
- * default) of in *huidige* euro's (koopkracht van vandaag)?
- *
- * WAAROM HIER, EN ALTIJD ZICHTBAAR. Dit is de enige app-brede instelling die
- * de BETEKENIS van elk bedrag verandert zonder dat het bedrag zelf zegt welke
- * meetlat geldt — "€ 1,65M" is een ander getal in beide standen. De knop zelf
- * woont in het zoekscherm (⌘K → "Toon huidige/toekomstige euro's"); dit is de
- * status die daarbij hoort, permanent in beeld. Dat is precies de splitsing die
- * ProjectionLab en Boldin ook maken: de schakelaar in een weergave-/aannames-
- * menu, niet als knop op elke grafiek. Vandaar dat de losse `EuroViewBadge` van
- * de Toekomst-grafiek af is (gebruiker, aug 2026) — één status-plek, niet één
- * per grafiek.
- *
- * NOMINAAL BLIJFT RUSTIG. In `'nominal'` (de default, exact het beeld van
- * vandaag) staat de pill in neutrale ink zonder accent; in `'real'` krijgt hij
- * het horizon-accent. Zo is de indicator altijd afleesbaar — de gebruiker vroeg
- * expliciet om te zien of huidig óf toekomstig aanstaat — maar springt alleen de
- * afwijkende stand eruit. Dat houdt de geest van ADR 0090 §8 overeind (nominaal
- * = geen ruis) zonder de status te verzwijgen.
- *
- * Klikbaar: de pill is meteen de weg terug, net als de oude badge.
- *
- * Icoonkeuze volgt de command-palette (`lib/command-palette/actions.ts`):
- * Wallet = huidige euro's, CalendarClock = toekomstige. Wallet is in dít bestand
- * óók het module-icoon van Het Overzicht; dat is bewust geaccepteerd — één
- * begrippenlijst over alle oppervlakken weegt zwaarder dan een uniek icoon per
- * bestand, en de twee staan in verschillende secties met andere kleur en maat.
- */
-function SidebarEuroViewBadge({ collapsed = false }: { collapsed?: boolean }) {
-  const { view, toggle } = useEuroView()
-  const isReal = view === 'real'
-  const Icon = isReal ? Wallet : CalendarClock
-  const label = euroViewLabel(view)
-  const hint = isReal
-    ? "Bedragen staan in koopkracht van vandaag. Klik voor toekomstige euro's."
-    : "Bedragen staan in de euro's van dat jaar. Klik voor huidige euro's."
-
-  const tint = isReal
-    ? 'border-horizon-300 bg-horizon-50 text-horizon-800'
-    : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:text-[var(--ink-2)] hover:bg-[var(--subtle)]/50'
-
-  return (
-    <button
-      type="button"
-      onClick={toggle}
-      aria-pressed={isReal}
-      aria-label={`Weergave: ${label}. ${hint}`}
-      title={`Weergave: ${label} — ${hint}`}
-      data-testid="sidebar-euro-view-badge"
-      className={`inline-flex items-center gap-1.5 rounded-full border transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ink)] ${tint} ${
-        collapsed ? 'h-8 w-8 justify-center' : 'px-2.5 py-1 text-xs font-medium'
-      }`}
-    >
-      <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
-      {!collapsed && <span className="truncate">{label}</span>}
-    </button>
   )
 }
 

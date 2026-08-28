@@ -150,14 +150,46 @@ export const SIMPLE_HIDDEN_NAV_HREFS: readonly string[] = [
  * components/core/category-deepening-registry.ts. Toevoegen van een
  * nieuwe deep-tool: hier registreren én registry bijwerken.
  */
-export type OverviewAppItem = NavItem & { appKey: string }
+export type OverviewAppItem = NavItem & {
+  appKey: string
+  /**
+   * Deeplink die de verdiepingstab meteen opent (`?tab=…`). BEWUST gescheiden
+   * van `href` — zie de M41-toelichting hieronder. Alleen het commandopalet
+   * gebruikt dit veld; de navigatie (sidebar + nav-sheet) gebruikt `href`.
+   */
+  tabHref?: string
+}
 
+/**
+ * M41 (28 aug 2026) — `href` is de **kale categorie-route**, niet de
+ * `?tab=`-deeplink.
+ *
+ * Twee losstaand-correcte besluiten van 9 aug botsten in combinatie: NAV-1 werd
+ * afgewezen (het Apps-blok blijft óók in Eenvoudig zichtbaar) terwijl BEZ-4 de
+ * verdiepingstabs juist Volledig-only maakte — mét de bewuste uitzondering dat
+ * een binnenkomende `?tab=`-deeplink de tab zichtbaar én actief houdt
+ * (`CategoryTabs.simpleBaseTabKey`). Omdat deze nav-links rechtstreeks naar die
+ * deeplink wezen, landde één zijbalk-klik in Eenvoudig direct in het expert-
+ * scherm dat BEZ-4 buiten het standaardpad wilde houden. Zonder de deeplink
+ * landt de gebruiker op de gewone categorielijst en kan hij zelf doorklikken;
+ * NAV-1 én BEZ-4 blijven daarmee allebei overeind.
+ *
+ * Het commandopalet houdt wél de deeplink (`tabHref`): daar tikt de gebruiker
+ * de app expliciet bij naam aan — hetzelfde "je moet er zelf om vragen"-patroon
+ * als de URL van rekenhulp/whatif. Bovendien vereist M10 dat elke app een
+ * eigen, unieke palet-href heeft; de kale routes bestaan daar al als gewone
+ * categoriepagina's ("Beleggingen", "Crypto", "Hypotheek", "Vastgoed").
+ *
+ * NB: contextuele deeplinks elders (coach-suggesties, widget-catalogus,
+ * compound-insight-kaart, not-found-pagina's) blijven bewust ongemoeid — die
+ * volgen op een expliciete gebruikersvraag over dát onderwerp.
+ */
 export const OVERVIEW_APP_SUBROUTES: OverviewAppItem[] = [
   { label: 'Budgetteren', href: '/overzicht/cashflow/budget', appKey: 'budgetteren' },
-  { label: 'Aandelen holdings', href: '/overzicht/bezittingen/investment?tab=aandelen-holdings', appKey: 'aandelen-holdings' },
-  { label: 'Crypto holdings', href: '/overzicht/bezittingen/crypto?tab=crypto-holdings', appKey: 'crypto-holdings' },
-  { label: 'Hypotheekplanner', href: '/overzicht/schulden/mortgage?tab=hypotheekplanner', appKey: 'hypotheekplanner' },
-  { label: 'Verhuurrendement', href: '/overzicht/bezittingen/real_estate?tab=verhuurrendement', appKey: 'verhuurrendement' },
+  { label: 'Aandelen holdings', href: '/overzicht/bezittingen/investment', tabHref: '/overzicht/bezittingen/investment?tab=aandelen-holdings', appKey: 'aandelen-holdings' },
+  { label: 'Crypto holdings', href: '/overzicht/bezittingen/crypto', tabHref: '/overzicht/bezittingen/crypto?tab=crypto-holdings', appKey: 'crypto-holdings' },
+  { label: 'Hypotheekplanner', href: '/overzicht/schulden/mortgage', tabHref: '/overzicht/schulden/mortgage?tab=hypotheekplanner', appKey: 'hypotheekplanner' },
+  { label: 'Verhuurrendement', href: '/overzicht/bezittingen/real_estate', tabHref: '/overzicht/bezittingen/real_estate?tab=verhuurrendement', appKey: 'verhuurrendement' },
 ]
 
 /**
@@ -267,7 +299,8 @@ function buildRouteTitleMap(): Map<string, string> {
     }
   }
 
-  // Deep-app-tools — strip querystring uit hun href (zie OVERVIEW_APP_SUBROUTES).
+  // Deep-app-tools. Hun `href` is sinds M41 al de kale route (de `?tab=`-
+  // deeplink staat apart in `tabHref`); `add` normaliseert bovendien.
   for (const item of OVERVIEW_APP_SUBROUTES) add(item.href, item.label)
 
   // Globale items met een echte route (Krant/Berichten); action-items overslaan.

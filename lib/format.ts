@@ -192,6 +192,46 @@ export function formatMaskedCurrency(
 }
 
 /**
+ * Herkent één euro-bedrag in een AL GEFORMATTEERDE nl-NL-tekst.
+ *
+ * Dekt wat `formatCurrency`/`formatCurrencyDecimals` en het `signed()`-patroon
+ * in `lib/cashflow-cards.ts` produceren: `€ 1.056`, `€ 1.056,00`, `+€ 512`,
+ * en een negatief bedrag. De spatie na het euroteken is bij `Intl` een NO-BREAK SPACE
+ * (U+00A0). `\s` dekt die al; hij staat er expliciet bij zodat een latere lezer
+ * niet gaat twijfelen of de regex een gewone spatie verwacht.
+ */
+const CURRENCY_TOKEN_RE =
+  /[+\-\u2212]?\u20ac[\s\u00a0]*-?\d+(?:\.\d{3})*(?:,\d+)?/g
+
+/**
+ * Maskeert de EURO-BEDRAGEN binnen een al geformatteerde tekst en laat de rest
+ * van de zin staan.
+ *
+ * Bestaat omdat niet elk bedrag als losse `number` bij de UI aankomt: de
+ * cashflow-kaarten (`lib/cashflow-cards.ts`) formatteren hun KPI's, meetlatten
+ * en drill-down-teksten SERVER-SIDE tot strings, zodat de kaart-shell puur
+ * presentatie blijft. `formatMaskedCurrency` kan daar niet bij — die wil een
+ * getal — waardoor dat hele pad geen enkele masking had (bevinding bij S4).
+ * Deze helper is de laatste redmiddel-variant voor precies die situatie.
+ *
+ * VOORKEUR BLIJFT `MaskedAmount`/`formatMaskedCurrency`: die maskeren bij de
+ * BRON en kunnen niet misgrijpen. Gebruik deze functie alleen wanneer de tekst
+ * al samengesteld is en het getal er niet meer los uit te halen valt.
+ *
+ * Niet-bedragen blijven ongemoeid — een percentage ("42% van inkomen"), een
+ * aantal ("3 posten") of een venster-label ("in augustus tot nu toe") gaat er
+ * ongewijzigd doorheen. Dat is bewust: `MaskedAmount` maskeert bedragen, geen
+ * verhoudingen.
+ */
+export function maskCurrencyInText<T extends string | null | undefined>(
+  text: T,
+  masked: boolean,
+): T {
+  if (!masked || !text) return text
+  return text.replace(CURRENCY_TOKEN_RE, MASKED_AMOUNT_PLACEHOLDER) as T
+}
+
+/**
  * Privacy-bewuste variant van `formatApproxCurrency` — de prognose-tegenhanger
  * van `formatMaskedCurrency`.
  *

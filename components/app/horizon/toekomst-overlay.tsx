@@ -41,6 +41,8 @@ import {
 } from 'lucide-react'
 import { useIsLgUp, useMediaQuery } from '@/lib/hooks/use-media-query'
 import { formatMaskedCurrency } from '@/lib/format'
+import { acquireOverlay } from '@/lib/overlay-signal'
+import { buildVrijheidsleeftijdZin } from '@/lib/horizon/vrijheidsleeftijd-zin'
 
 /** Welke grafiekfase een ballon accentueert bij openen. */
 type OverlayEmphasis = 'accumulation' | 'withdrawal' | 'fire' | null
@@ -149,12 +151,11 @@ export interface ToekomstOverlayProps {
   /** Sluit de tips-overlay (zet de "Tips"-toggle uit). */
   onClose: () => void
   /**
-   * Schort de eigen Escape-afhandeling op. De exit-melding-modal verschijnt
-   * VÓÓRDAT de overlay sluit en blijft de overlay dus `visible` terwijl de modal
-   * open is. Beide luisteren op `window` keydown; zonder deze gate zouden twee
-   * Escape-handlers tegelijk vuren (correct-bij-toeval, afhankelijk van
-   * registratie-volgorde). Staat de modal open, dan bezit hij Escape exclusief
-   * en doet de overlay niets.
+   * Schort de eigen Escape-afhandeling op zolang een ánder venster Escape
+   * exclusief bezit. Sinds M38 sluit de overlay direct (de bevestiging is een
+   * niet-blokkerende toast geworden), dus er is geen venster meer dat de
+   * overlay open houdt — de prop blijft bestaan als vangnet voor een toekomstig
+   * geval en staat standaard uit.
    */
   escapeSuspended?: boolean
   /**
@@ -281,9 +282,19 @@ export function ToekomstOverlay({
     return clearCloseTimer
   }, [visible, close, clearCloseTimer])
 
-  // Escape: eerst een open popover sluiten, anders de hele tips-overlay.
-  // Staat de exit-melding-modal open (`escapeSuspended`), dan bezit die Escape
-  // exclusief — de overlay doet dan niets (zie de prop-doc) en registreert zelfs
+  // Meld je aan als open overlay zolang de tips-tour zichtbaar is (M15).
+  // Spiegelt `toekomst-welcome.tsx`; deze tour was de enige in zijn familie die
+  // het signaal niet claimde, waardoor de zwevende Fin-hulplagen dwars door de
+  // tourtekst heen bleven staan. Bewust GEEN scroll-lock: de tour is
+  // pagina-inhoud waar je doorheen scrollt, geen modale sheet — alleen het
+  // pill-/FAB-signaal wordt gedeeld. Zie lib/overlay-signal.ts.
+  useEffect(() => {
+    if (!visible) return
+    return acquireOverlay()
+  }, [visible])
+
+  // Escape: eerst een open popover sluiten, anders de hele tips-overlay — die
+  // dan direct sluit (M38). Bij `escapeSuspended` registreert de overlay zelfs
   // geen listener, zodat er nooit twee window-keydown-handlers tegelijk vuren.
   useEffect(() => {
     if (!visible || escapeSuspended) return
@@ -539,22 +550,18 @@ export function ToekomstOverlay({
  */
 function SummaryLine({ summary }: { summary: ToekomstOverlaySummary }) {
   const { netWorth, freedomAge, masked, isPensioen } = summary
-  // Hele jaren — "rond je 65e" leest natuurlijker dan "65.0".
+  // Woorden + afronding komen uit de gedeelde bron (S15) — dezelfde als de
+  // welkomstkaart en de duidingsregel op de pagina zelf. Hele jaren, want
+  // "rond je 65e" leest natuurlijker dan "65.0"; alleen de ópmaak is hier lokaal.
+  const zin = buildVrijheidsleeftijdZin({ freedomAge, isPensioen, variant: 'inline' })
   const ageLabel =
-    freedomAge != null ? (
-      isPensioen ? (
-        <>
-          je pensioen valt rond je{' '}
-          <span className="font-semibold text-[var(--module-active-800)]">{Math.round(freedomAge)}e</span>
-        </>
-      ) : (
-        <>
-          werken wordt een keuze rond je{' '}
-          <span className="font-semibold text-[var(--module-active-800)]">{Math.round(freedomAge)}e</span>
-        </>
-      )
+    zin.ageLabel != null ? (
+      <>
+        {zin.lead}
+        <span className="font-semibold text-[var(--module-active-800)]">{zin.ageLabel}</span>
+      </>
     ) : (
-      <span className="text-[var(--ink-3)]">vrijheid nog niet in zicht</span>
+      <span className="text-[var(--ink-3)]">{zin.lead}</span>
     )
 
   return (

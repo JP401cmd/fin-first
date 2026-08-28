@@ -42,7 +42,21 @@ function naturalCategory(ev: LifeEvent): 'asset' | 'debt' | 'simulation' {
   return 'simulation'
 }
 
+/**
+ * Vooraf meegegeven regel, gezet door `chartEventOverlayToClusterRow` voor
+ * markers zonder echt `LifeEvent` (doelen, partner-gebeurtenissen,
+ * tekort-lening). Die rijen hebben geen bedragvelden om uit af te leiden;
+ * zonder deze uitgang zou de sheet er "Geen financiële impact" van maken —
+ * een onwaar bericht bij bijvoorbeeld een doel.
+ */
+function presetImpactLine(ev: LifeEvent): string | null {
+  const preset = ev.metadata?.impactLine
+  return typeof preset === 'string' && preset.length > 0 ? preset : null
+}
+
 function naturalImpactLine(ev: LifeEvent, masked: boolean): string {
+  const preset = presetImpactLine(ev)
+  if (preset) return preset
   const kind = ev.metadata?.kind as string | undefined
   const amount = ev.metadata?.amount as number | undefined
   if (kind === 'sim_out_of_cash') return 'Vermogen op'
@@ -59,6 +73,8 @@ function naturalImpactLine(ev: LifeEvent, masked: boolean): string {
 }
 
 function lifeImpactLine(ev: LifeEvent, masked: boolean): string {
+  const preset = presetImpactLine(ev)
+  if (preset) return preset
   const parts: string[] = []
   if (ev.one_time_cost > 0) {
     parts.push(`−${formatMaskedCurrency(ev.one_time_cost, masked)} eenmalig`)

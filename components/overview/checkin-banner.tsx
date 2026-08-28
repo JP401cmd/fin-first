@@ -93,10 +93,10 @@ export function CheckinBanner({
   const monthLabel = MONTH_NAMES[new Date().getMonth()]
 
   return (
-    <section
-      aria-label="Maandelijkse check-in"
-      className="mx-auto max-w-6xl px-4 pt-4 sm:px-6"
-    >
+    // H20: zie WelcomeGuideBanner — deze banner rendert nu IN de hero-sectie
+    // van /overzicht (slot `banners`, ná de begroeting) en erft daar breedte en
+    // horizontale padding.
+    <section aria-label="Maandelijkse check-in" className="mb-6">
       <div className="flex items-center gap-3 rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-stone-50 p-3 sm:p-4">
         <span className="inline-flex w-9 h-9 rounded-lg bg-violet-100 text-violet-700 items-center justify-center shrink-0">
           <CalendarCheck className="w-4 h-4" aria-hidden="true" />

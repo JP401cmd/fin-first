@@ -9,10 +9,28 @@
  * (lib/vaste-lasten-insights.ts) — herberekent zelf geen kerngetallen. Bedragen
  * lopen via <MaskedAmount> (privacy-masking). Module-chrome = kern (amber);
  * status-semantiek gebruikt de stoplichtkleuren, geen module-accent.
+ *
+ * ── S2: drie blokken zijn óók los bruikbaar ──────────────────────────────
+ * `VasteLastenQuoteBlok`, `VasteLastenAbonnementenBlok` en
+ * `VasteLastenTopPostenBlok` worden door `vaste-lasten-client.tsx` in de
+ * weergavemodus "Eenvoudig" apart gerenderd (richtingsbesluit R5: duiding boven
+ * reductie — Eenvoudig kreeg de kale lijst en verloor juist de betekenis). Ze
+ * staan hier, niet in de client, zodat er één definitie van elk blok bestaat:
+ * `VasteLastenInsights` onderaan hergebruikt exact dezelfde functies. Zo kan
+ * Volledig niet wegdrijven van Eenvoudig.
+ *
+ * ── S2: één oordeelswoordenlijst ─────────────────────────────────────────
+ * `QuoteMeter` had een eigen lijstje ("Gezond"/"Aandacht"/"Risico") náást
+ * `LEVERAGE_STATUS_LABEL`, dat `CompactMeter` op dezelfde pagina al gebruikt.
+ * Onzichtbaar zolang de blokken elkaar nooit zagen; na S2 staan ze in Eenvoudig
+ * boven elkaar. Geconsolideerd naar `LEVERAGE_STATUS_LABEL` — de generieke,
+ * gedeelde statusnaam (zie de bronvergelijking in lib/hefboom-status-copy.ts).
+ * De domeinspecifieke `HEFBOOM_VERDICT` gaat over de vier hefboom-tegels op
+ * /overzicht, niet over deze quote, en is hier dus bewust NIET de bron.
  */
 
 import { useState } from 'react'
-import { Gauge, Clock, CreditCard, PieChart, Scissors, Ban } from 'lucide-react'
+import { Gauge, Clock, CreditCard, PieChart, Scissors, Ban, ListOrdered } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { formatFreedomTimeString } from '@/lib/format'
 import { formatWorkTimeString } from '@/lib/work-time'
@@ -20,7 +38,11 @@ import {
   cancelEffect,
   type VasteLastenInsights as Insights,
 } from '@/lib/vaste-lasten-insights'
-import { LEVERAGE_STATUS_DOT, leverageStatusTextClass } from '@/lib/leverage-status'
+import {
+  LEVERAGE_STATUS_DOT,
+  LEVERAGE_STATUS_LABEL,
+  leverageStatusTextClass,
+} from '@/lib/leverage-status'
 import {
   SUBSCRIPTION_BENCHMARK_COPY,
   VASTE_LASTEN_BENCHMARK_COPY,
@@ -69,14 +91,10 @@ function QuoteMeter({ insights }: { insights: Insights }) {
         <span className="font-serif text-2xl font-semibold tabular-nums text-[var(--ink)]">
           {ratioPct}%
         </span>
+        {/* Oordeelswoord uit de ENE gedeelde lijst (S2) — zie de kop van dit
+            bestand. Het woord is de drager, niet de kleur: die is er alleen bij. */}
         <span className={`text-xs font-medium ${leverageStatusTextClass(status)}`}>
-          {status === 'good'
-            ? 'Gezond'
-            : status === 'warn'
-              ? 'Aandacht'
-              : status === 'bad'
-                ? 'Risico'
-                : '—'}
+          {LEVERAGE_STATUS_LABEL[status]}
         </span>
       </div>
       {/* Track met zones (goed / aandacht / risico) — grenzen = statusdrempels. */}
@@ -344,6 +362,88 @@ function WhatIfCancel({ insights }: { insights: Insights }) {
   )
 }
 
+// ── 6. Top-5 grootste posten (Eenvoudig) ──────────────────────
+//
+// Vervangt in Eenvoudig de volle lijst als eerste aanblik; de volle lijst blijft
+// bereikbaar achter "Alle {n} posten" (DepthSection in vaste-lasten-client.tsx).
+// Puur presentatie over `insights.topItems` — sort+slice in de motor, hier geen
+// eigen selectie of som. Bedragen via <MaskedAmount>.
+function TopPosten({ insights }: { insights: Insights }) {
+  const { topItems, count } = insights
+  if (topItems.length === 0) {
+    return <p className="text-sm text-[var(--ink-3)]">Nog geen posten om te tonen.</p>
+  }
+  return (
+    <div className="space-y-2">
+      <ul className="divide-y divide-[var(--border-ed)]">
+        {topItems.map((item) => (
+          <li key={item.id} className="flex items-center justify-between gap-3 py-2.5 first:pt-0">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-[var(--ink)]">{item.name}</p>
+              <p className="text-xs text-[var(--ink-4)]">{item.categoryLabel}</p>
+            </div>
+            <div className="shrink-0 text-right">
+              <MaskedAmount
+                value={item.monthlyAmount}
+                tone="kern"
+                className="text-sm text-[var(--ink)]"
+              />
+              <span className="ml-0.5 text-xs text-[var(--ink-4)]">/mnd</span>
+            </div>
+          </li>
+        ))}
+      </ul>
+      {count > topItems.length && (
+        <p className="text-xs text-[var(--ink-4)]">
+          Dit zijn je {topItems.length} grootste posten van in totaal {count}. De rest staat
+          hieronder onder &ldquo;Alle {count} posten&rdquo;.
+        </p>
+      )}
+    </div>
+  )
+}
+
+/**
+ * De quote-meter als losstaand blok — gedeeld tussen Eenvoudig (los gerenderd)
+ * en Volledig (via `VasteLastenInsights` hieronder). Eén definitie, twee modi.
+ */
+export function VasteLastenQuoteBlok({ insights }: { insights: Insights }) {
+  return (
+    <SectionShell icon={Gauge} kicker="Vaste-lastenquote">
+      <QuoteMeter insights={insights} />
+    </SectionShell>
+  )
+}
+
+/**
+ * Het abonnementen-sluipverbruik als losstaand blok. Het ENIGE blok op deze
+ * pagina met een directe handeling (opzegknop op het grootste abonnement) —
+ * daarom komt het in Eenvoudig terug. Rendert niets zonder abonnementen.
+ */
+export function VasteLastenAbonnementenBlok({
+  insights,
+  onOpzeg,
+}: {
+  insights: Insights
+  onOpzeg: (item: { name: string; monthlyAmount: number }) => void
+}) {
+  if (insights.subscriptionCount === 0) return null
+  return (
+    <SectionShell icon={CreditCard} kicker="Abonnementen-sluipverbruik">
+      <SubscriptionCreep insights={insights} onOpzeg={onOpzeg} />
+    </SectionShell>
+  )
+}
+
+/** De top-5 grootste posten als losstaand blok (alleen Eenvoudig). */
+export function VasteLastenTopPostenBlok({ insights }: { insights: Insights }) {
+  return (
+    <SectionShell icon={ListOrdered} kicker="Grootste posten">
+      <TopPosten insights={insights} />
+    </SectionShell>
+  )
+}
+
 export function VasteLastenInsights({
   insights,
   onOpzeg,
@@ -354,19 +454,13 @@ export function VasteLastenInsights({
   if (!insights.hasData) return null
   return (
     <div className="space-y-4">
-      <SectionShell icon={Gauge} kicker="Vaste-lastenquote">
-        <QuoteMeter insights={insights} />
-      </SectionShell>
+      <VasteLastenQuoteBlok insights={insights} />
 
       <SectionShell icon={Clock} kicker="In vrijheidstijd">
         <FreedomTranslation insights={insights} />
       </SectionShell>
 
-      {insights.subscriptionCount > 0 && (
-        <SectionShell icon={CreditCard} kicker="Abonnementen-sluipverbruik">
-          <SubscriptionCreep insights={insights} onOpzeg={onOpzeg} />
-        </SectionShell>
-      )}
+      <VasteLastenAbonnementenBlok insights={insights} onOpzeg={onOpzeg} />
 
       <SectionShell icon={PieChart} kicker="Samenstelling">
         <Composition insights={insights} />

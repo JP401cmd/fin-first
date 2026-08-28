@@ -119,10 +119,11 @@ describe('vaste-lasten-loader — draait op de slanke KPI-laag (ADR 0083)', () =
 
 describe('/overzicht/cashflow/vaste-lasten — precies één pagina-aanhef', () => {
   it('de client rendert geen tweede PageOpening', () => {
-    // De kicker + H1 zijn bij T2.4 uit vaste-lasten-client.tsx naar de
-    // server-pagina verhuisd (LCP-kandidaat, hangt van geen data af). Zet iemand
-    // de `<PageOpening>` daar terug — bij een merge, of uit een "hij hoort toch
-    // bij dit blok"-reflex — dan shipt de pagina twee <h1>'s zonder dat een van
+    // De kicker + pagina-aanhef zijn bij T2.4 uit vaste-lasten-client.tsx naar
+    // de server-pagina verhuisd (LCP-kandidaat, hangt van geen data af). Zet
+    // iemand de `<PageOpening>` daar terug — bij een merge, of uit een "hij
+    // hoort toch bij dit blok"-reflex — dan shipt de pagina twee pagina-
+    // aanheffen (twee <h2>'s, ADR 0110) zonder dat een van
     // de asserties hierboven iets merkt: die kijken alleen naar page.tsx en de
     // loader. De client is de enige andere plek waar een kop kan ontstaan
     // (`VasteLastenClient` heeft precies één consument: de loader).

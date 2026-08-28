@@ -91,11 +91,18 @@ export const NotificationItem = memo(function NotificationItem({ notification, o
 
   const handleAskAI = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
-    onRead(notification.id)
     onClose()
     if (notification.aiContext) {
-      openWithMessage(notification.aiContext)
+      // Pas gelezen zodra Fin daadwerkelijk antwoordt (M25). Eerder vuurde
+      // onRead hier synchroon bij de klik, terwijl de AI-aanvraag pas later
+      // async vertrok — of nooit. Bij een storing liep de ongelezen-teller dus
+      // terug zonder dat er ook maar iets te lezen viel, en er is geen rollback
+      // in markAsRead. De koppeling loopt nu via de chatcontext.
+      openWithMessage(notification.aiContext, () => onRead(notification.id))
+      return
     }
+    // Geen AI-vervolg mogelijk: dan is de klik zelf de enige lezing.
+    onRead(notification.id)
   }, [notification, onRead, onClose, openWithMessage])
 
   // ── Standard notification item ─────────────────────────────────────

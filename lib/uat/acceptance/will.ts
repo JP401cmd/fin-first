@@ -172,10 +172,10 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     given: 'Het GLOBALE platform-kill-switch uit via /beheer/platform (`killSwitches.ai`, admin-breed, deterministisch forceerbaar) — te onderscheiden van de EIGEN "AI uit"-knop van de gebruiker op /mijn/privacy (`profiles.ai_enabled`), die sinds bevinding M26 chat al vóór het versturen blokkeert (zie WF-WILL-25). Breed tier-gate-effect over alle AI-oppervlakken hoort bij UAT-KRUIS-25, hier alleen het chat-oppervlak.',
     when: 'De gebruiker stelt een vraag terwijl de AI is uitgeschakeld, en klikt daarna "Opnieuw proberen" (na AI weer aan) of "Sluiten".',
-    then: 'Rode foutbanner met begrijpelijke uitleg + "Technische details" (max 240 tekens) + knoppen "Opnieuw proberen"/"Sluiten"; bubbel en paneel blijven bruikbaar; "Opnieuw proberen" na herstel genereert alsnog een antwoord; "Sluiten" verwijdert de banner.',
+    then: 'Rode foutbanner met een begrijpelijke uitleg in gebruikerstaal — géén beheerderstaal (nooit "controleer de API-sleutel"/"Admin instellingen") en géén rauwe serverfout. Bij een uitgezette kill-switch luidt de melding dat Fin voor onderhoud uit staat en verschijnt er BEWUST geen "Opnieuw proberen" (die kan niet slagen), alleen "Sluiten". Bij een tijdelijke storing/time-out verschijnt "Opnieuw proberen" wél en genereert die na herstel alsnog een antwoord. Bubbel en paneel blijven bruikbaar; "Sluiten" verwijdert de banner.',
     assertion: {
       kind: 'ui-only',
-      source: 'components/app/chat/chat-panel.tsx (getErrorMessage/getErrorDetail) + app/api/ai/chat/route.ts (AI_TIMEOUT_MS=60s, 422/401/403) — procestoets, geen cijfermatige uitkomst',
+      source: 'lib/ai/error-copy.ts (code → tekst + affordance) + components/app/chat/chat-panel.tsx (describeAiThrown) + app/api/ai/chat/route.ts (AI_TIMEOUT_MS=60s; 422/401/403/429 mét stabiele code) — procestoets, geen cijfermatige uitkomst',
     },
   },
   {

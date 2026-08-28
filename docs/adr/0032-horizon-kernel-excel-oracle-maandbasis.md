@@ -102,3 +102,70 @@ De cutover (punt 6 hierboven) is afgerond volgens het C5-precedent:
   is eveneens verwijderd nu er nog maar één motor is.
 - Catalogus-entry hernoemd van `horizon-grootboek-v2` naar `horizon-kernel`
   (`lib/architecture/calculations.ts`).
+
+## Addendum (2026-08-27) — échte annuïteit op het app-pad (gap V22)
+
+Het oracle modelleert élke reguliere schuld-slot als *"annuïteit met een vaste
+maandaflossing"*: `aflossing = MIN(saldo(m−1), D€/12)` (`tables/s.ts`). Voor een
+lineaire lening en een aflossingsvrije schuld klopt dat, maar voor een échte
+annuïteit niet: daar is het aflossingsdeel juist het deel dat **groeit** terwijl de
+rente over een dalend saldo krimpt. De app-adapter bevroor bovendien de
+aflossingscomponent van *vandaag*, waardoor een hypotheek van €249.278,39 @4% met
+een maandlast van €1.193,54 in de projectie ~687 maanden deed over wat in
+werkelijkheid 358 maanden is — netto vermogen structureel te laag en de
+FIRE-leeftijd te laat voor iedere hypotheekhouder.
+
+De eigenaar heeft op 27-08-2026 besloten dit **wél** te corrigeren, via het
+M6-patroon (ADR 0108/0109) i.p.v. een wijziging in de kern zelf:
+
+- **`KernelInput.echteAnnuiteitAflossing`** — optioneel, inert-by-default.
+- **`DebtPot.annuiteitMaandlast`** — optioneel; de constante totale maandlast
+  (rente + aflossing) in euro's per **maand** (bewust niet de jaarvorm van
+  `aflossingEur`, zodat de schaal in de naam zit).
+- Met beide gevuld herrekent `tables/s.ts#plannedMonthlyAt` de split per periode:
+  `aflossing(m) = CLAMP(maandlast − saldo(m−1)·rente/12, 0, saldo(m−1))`.
+
+**Parity blijft de norm.** `input-from-fixture` zet de vlag niet en vult de maandlast
+niet, dus élke oracle-fixture is byte-identiek aan Excel v5 — geen golden-herijking
+(geverifieerd: 53 testbestanden / 1201 assertions groen, geen gewijzigd fixture- of
+golden-bestand). De app-adapter (`adapter/index.ts`) zet de vlag op `true`; de
+adapter vult de maandlast alléén voor schulden die daadwerkelijk annuïtair aflossen —
+`lineair`, `aflossingsvrij`, een handgezette `custom_aflossing_amount` en een
+maandlast ≤ rente krijgen 'm bewust niet.
+
+**Bekende, begrensde restpost.** De payoff-vrijval `CF!G`
+(`tables/cf.ts#geplandeMaandAflossing`) blijft de bevroren `aflossingEur/12`
+vrijgeven i.p.v. de aflossing zoals die op het payoff-moment is. Dat is een eigen,
+apart gedocumenteerde conventie (ADR 0020-inverse) en valt buiten dit besluit; het
+effect is **conservatief** (het onderschat de vrijval, dus het voordeel van de fix).
+Wijzigen vergt een nieuw eigenaar-besluit.
+
+Achtergrond en volledige besluittekst: gap V22 in
+`docs/horizon-excel-oracle-plan.md`. Vangnet:
+`lib/horizon-kernel/annuiteit-aflossing.test.ts`.
+
+### Golden-herijking van de strategiematrix (2026-08-28)
+
+De oracle-fixtures bleven byte-identiek (de vlag staat daar uit), maar de **app-pad**-goldens
+van `lib/regression-tests/horizon-strategie/matrix.ts` niet: die meten juist het app-pad en
+zijn daarom bewust herijkt. Onderbouwing vóór de herijking, per combinatie gemeten:
+
+- **Geen lek.** Per schuld-slot is de saldo-reeks (1200 maanden) met vlag AAN vs. UIT
+  vergeleken. Alleen de vier `annuiteit`-schulden bewegen; elke `lineair`- en
+  `aflossingsvrij`-schuld heeft max Δ = €0,00 exact — inclusief de €110.000
+  beleggingshypotheek die de A-groep-goldens draagt, en de tekort-lening.
+- **Richting eenduidig.** Met de FIRE-maand gepind zijn bezit, schuld én netto vermogen met
+  de vlag AAN op elke gemeten maand gelijk of beter (m=360: netto €6,64 → €6,76 mln, schuld
+  €230k → €113k; vanaf m=480 is de hypotheek weg en resteert exact het aflossingsvrije deel).
+- **Verschuiving van de verwachte orde.** `B-pensioen` heeft een VÁSTE FIRE-maand (de solver
+  kortsluit op 67) en stijgt daar met exact de schuldverlaging op die maand (+€78.081,
+  +1,35%). De combinaties met een vrije FIRE-maand komen 2–9 maanden eerder uit en hun
+  doelbedrag (= Prognose!J@FIRE) daalt navenant (−1,8% t/m −7,3%). De vijf "reached
+  now"-combinaties meten op maand ~1, vóór enige amortisatie, en bewegen niet.
+
+**Apart gevonden, niet van deze fix:** een schone worktree op HEAD levert dezelfde waarden
+als deze tree met de vlag geforceerd UIT, en béide weken al −0,08 à −0,17 jr / −0,5 à
+−1,6% van de vorige goldens af — binnen de marges, dus onopgemerkt. Oorzaak: de
+matrix-persona pint de leeftijd maar de life-events dragen vaste `target_date`-strings,
+zodat de afstand tot AOW met elke verstreken kalendermaand krimpt. Deze herijking zet die
+klok op nul zonder de oorzaak weg te nemen; dat hoort op een eigen kaart.

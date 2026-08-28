@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ChevronRight, Home } from 'lucide-react'
 import type { DomainColor } from '@/lib/navigation'
+import { ASSET_TYPE_LABELS } from '@/lib/asset-data'
+import { DEBT_TYPE_LABELS } from '@/lib/debt-data'
 
 /**
  * Breadcrumb segment type — each crumb in the trail.
@@ -130,7 +132,9 @@ const CANONICAL_TRAILS: Record<string, BreadcrumbSegment[]> = {
   '/core/cash/import': [
     { label: 'Overzicht', href: '/overzicht' },
     { label: 'Bezittingen', href: '/overzicht/bezittingen' },
-    { label: 'Cash', href: '/overzicht/bezittingen/cash' },
+    // Zelfde label als de automatisch gebouwde crumb voor dit pad (L3):
+    // ASSET_TYPE_LABELS.cash — anders heet dezelfde href hier iets anders.
+    { label: ASSET_TYPE_LABELS.cash, href: '/overzicht/bezittingen/cash' },
     { label: 'Importeren', href: '/core/cash/import' },
   ],
 }
@@ -144,10 +148,46 @@ const CANONICAL_ROOT_HREF: Record<string, string> = {
 }
 
 /**
+ * CATEGORIE-SEGMENT → CANONIEKE LABELTABEL (bevinding L3).
+ *
+ * Op `/core/assets/[type]`, `/core/debts/[type]` en hun `/overzicht/*`-tweelingen
+ * is het laatste URL-segment de RUWE database-enum (`asset.asset_type` /
+ * `debt.debt_type`) — er bestaat geen aparte, al vertaalde slug. Zonder deze
+ * lookup viel de breadcrumb terug op de generieke capitalize en lekte de
+ * technische sleutel naar het scherm: "Mortgage", "Vehicle", "Personal_loan".
+ *
+ * De vertaling bestond al en wordt op dezelfde routes al gebruikt voor de
+ * paginatitel (`NavStackMeta title={DEBT_TYPE_LABELS[type]}`). Hier wordt
+ * DIEZELFDE bron geraadpleegd — geen tweede labeltabel, anders driften titel en
+ * kruimelpad uit elkaar zodra er een type bijkomt.
+ *
+ * Gesleuteld op het OUDER-segment, niet op het typewoord zelf: `other` bestaat in
+ * beide enums ("Overig" in allebei, maar dat is toeval, geen garantie).
+ */
+const TYPE_LABELS_BY_PARENT: Record<string, Record<string, string>> = {
+  assets: ASSET_TYPE_LABELS,
+  bezittingen: ASSET_TYPE_LABELS,
+  debts: DEBT_TYPE_LABELS,
+  schulden: DEBT_TYPE_LABELS,
+}
+
+/**
+ * Val-terug voor een segment zonder bekend label: eerste letter kapitaal én
+ * underscores als spatie. Zónder die vervanging lekte een multi-word enum als
+ * `personal_loan` letterlijk door als "Personal_loan" (zelfde bevinding L3).
+ */
+function humanizeSegment(part: string): string {
+  const spaced = part.replace(/_/g, ' ')
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1)
+}
+
+/**
  * Builds breadcrumb segments from a URL pathname.
  * /core/cash/import → [Overzicht /overzicht, Bezittingen …, Cash …, Importeren …]
+ *
+ * Geëxporteerd voor de regressietest die élke asset-/debt-typesleutel langsloopt.
  */
-function buildBreadcrumbs(pathname: string): BreadcrumbSegment[] {
+export function buildBreadcrumbs(pathname: string): BreadcrumbSegment[] {
   const trail = CANONICAL_TRAILS[pathname]
   if (trail) return trail
 
@@ -155,11 +195,16 @@ function buildBreadcrumbs(pathname: string): BreadcrumbSegment[] {
   const segments: BreadcrumbSegment[] = []
 
   let href = ''
-  for (const part of parts) {
+  parts.forEach((part, i) => {
     href += `/${part}`
-    const label = segmentLabels[part] ?? part.charAt(0).toUpperCase() + part.slice(1)
+    // Categorie-typen worden op hun OUDER-segment herkend en gaan vóór de
+    // generieke `segmentLabels`. Dat is bewust: `cash` staat in beide tabellen,
+    // en in de type-positie hoort de crumb hetzelfde te zeggen als de paginatitel
+    // ("Cash / Betaalrekeningen"), niet het generieke route-woord.
+    const typeLabel = i > 0 ? TYPE_LABELS_BY_PARENT[parts[i - 1]!]?.[part] : undefined
+    const label = typeLabel ?? segmentLabels[part] ?? humanizeSegment(part)
     segments.push({ label, href: CANONICAL_ROOT_HREF[href] ?? href })
-  }
+  })
 
   return segments
 }

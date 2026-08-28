@@ -206,6 +206,13 @@ export function buildKernelInputFromAppWithNotices(input: KernelAdapterInput): K
     // leverde "Vrijheidsleeftijd 100,0 jaar" als hard feit. Parity-/fixture-pad
     // zet deze vlag NIET (input-from-fixture) → Excel v5-oracle byte-identiek.
     reachedNowVereistBereikbaarDoel: true,
+    // Gap-besluit V22: een annuïteit lost niet met een vast bedrag af — het
+    // aflossingsdeel groeit terwijl de rente over het dalende saldo krimpt. Het
+    // oracle bevriest de aflossing van vandaag, waardoor een hypotheek ~5× te
+    // langzaam daalt (netto vermogen te laag, FIRE-leeftijd te laat). Parity-/
+    // fixture-pad zet deze vlag NIET én vult geen `annuiteitMaandlast`
+    // (input-from-fixture) → Excel v5-oracle byte-identiek.
+    echteAnnuiteitAflossing: true,
   }
 
   return {

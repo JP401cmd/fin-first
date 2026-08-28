@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { Fragment, useRef, useState } from 'react'
 import {
   positionChartEvents,
   MAX_STACK_VISIBLE,
@@ -71,6 +71,7 @@ export function ChartEventMarkers({
   onEventHover,
   onEventDragEnd,
   onEventDragMove,
+  onClusterOpen,
 }: {
   events: ChartEventOverlay[]
   xScale: (age: number) => number
@@ -132,6 +133,15 @@ export function ChartEventMarkers({
     newAge: number,
     kind: ChartEventKind,
   ) => void
+  /**
+   * M16 — uitgang van een cluster. Wordt aangeroepen wanneer de gebruiker op
+   * de "+N"-badge tikt en krijgt ÁLLE leden van dat cluster mee (niet alleen
+   * de verborgen), plus de gemiddelde leeftijd voor de sheet-titel. De host
+   * opent daarmee `EventClusterSheet` — exact de uitgang die `EventsTimeline`
+   * al had (`onClusterOpen`), maar die tot nu toe ontbrak op de iconen ÓP de
+   * grafiek. Zonder deze prop blijft de badge puur decoratief (legacy).
+   */
+  onClusterOpen?: (events: ChartEventOverlay[], centerAge: number) => void
 }) {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const showInlineTooltip = !onEventHover
@@ -190,7 +200,15 @@ export function ChartEventMarkers({
     ? filteredRaw.map(e => ({ ...e, side: 'above' as const }))
     : filteredRaw
 
-  const positioned = positionChartEvents(filtered, { ageGroupingStrategy: 'integer' })
+  // M16: groeperen op PIXEL-afstand, niet op afgerond jaar. Bij de standaard
+  // uitgezoomde stand (~5-6 px/jaar op een 390px-scherm) landen events uit
+  // aangrenzende jaren binnen één icoon-diameter van elkaar; met de oude
+  // `'integer'`-strategie bleven dat losse markers met vrijwel volledig
+  // overlappende 44px hit-rects, waarbij een tik onvoorspelbaar naar de
+  // laatst-getekende marker ging. `xScale` is dezelfde schaal als de renderer
+  // gebruikt, dus de clustering beweegt automatisch mee met in-/uitzoomen:
+  // inzoomen trekt de cluster vanzelf uit elkaar tot losse markers.
+  const positioned = positionChartEvents(filtered, { pixelClustering: { xScale } })
 
   return (
     <g aria-label="Mijlpalen en levensgebeurtenissen op de chart">
@@ -201,7 +219,11 @@ export function ChartEventMarkers({
         // Snap visueel naar kwartaal-precisie zodat de marker niet
         // jittert op sub-3-maand-niveau.
         const isDragging = drag?.id === p.id && drag?.moved
-        const cxBase = padLeft + xScale(p.age)
+        // Zit deze marker in een pixel-cluster, dan tekenen we hem op het
+        // zwaartepunt van dat cluster — anders staan de leden alsnog een paar
+        // pixels uit elkaar en staat de stapel scheef boven de lijn.
+        const anchorAge = p.clusterCenterAge ?? p.age
+        const cxBase = padLeft + (p.clusterX ?? xScale(p.age))
         // Effectieve leeftijd onder het icoon (drag-bewust) — bepaalt zowel de
         // x-positie als (bij lijn-verankering) de y op de vermogenslijn.
         const effectiveAge = isDragging
@@ -211,7 +233,7 @@ export function ChartEventMarkers({
               const clampedX = Math.max(minX, Math.min(maxX, drag!.currentX))
               return snapAge(invXScale(clampedX - padLeft))
             })()
-          : p.age
+          : anchorAge
         const cx = isDragging ? padLeft + xScale(effectiveAge) : cxBase
         const isAbove = p.side === 'above'
 
@@ -265,8 +287,8 @@ export function ChartEventMarkers({
               : 'default'
 
         return (
+          <Fragment key={p.id}>
           <g
-            key={p.id}
             onMouseEnter={() => {
               setHoveredId(p.id)
               onEventHover?.(p)
@@ -521,26 +543,6 @@ export function ChartEventMarkers({
               )
             })()}
 
-            {/* Cluster-badge: +N op de buitenste zichtbare marker als er meer events bestaan */}
-            {showCluster && (
-              <g style={{ pointerEvents: 'none' }}>
-                <circle
-                  cx={cx + r + 2} cy={cy - r + 2} r={6}
-                  fill="var(--ink)"
-                />
-                <text
-                  x={cx + r + 2} y={cy - r + 2 + 2.5}
-                  textAnchor="middle"
-                  fontSize={7}
-                  fontWeight={700}
-                  fill="var(--paper)"
-                  fontFamily="var(--font-dm-mono, monospace)"
-                >
-                  +{hiddenCount}
-                </text>
-              </g>
-            )}
-
             {/* Hover-tooltip — paper-card boven of onder de marker. Volgt EventsTimeline-stijl.
                 Alleen actief als de host geen `onEventHover` callback aanlevert (legacy/standalone-modus).
                 In de bar-chart wordt de info in een vaste strip boven de chart getoond. */}
@@ -589,6 +591,77 @@ export function ChartEventMarkers({
               )
             })()}
           </g>
+
+          {/*
+            Cluster-uitgang: "+N" op de buitenste zichtbare marker zodra de
+            bucket meer events bevat dan er passen.
+
+            Bewust een SIBLING van de marker-<g> en geen kind daarvan: de badge
+            is een eigen bedieningselement met een eigen doel (de lijst openen,
+            niet dít event), dus een genest tweede role="button" binnen de
+            marker-knop zou zowel voor screenreaders als voor de paint-order
+            rommelig zijn. Als sibling ná de marker getekend, ligt hij er ook
+            gegarandeerd bovenop.
+
+            Zonder `onClusterOpen` (legacy-host) blijft de badge puur
+            informatief — dan geen hit-target, geen rol, geen cursor.
+          */}
+          {showCluster && (() => {
+            // Twee cijfers passen niet in de cirkel van één; de badge groeit mee.
+            const badgeR = hiddenCount >= 10 ? 12 : 9
+            const badgeCx = cx + ICON_R + 4
+            const badgeCy = cy - ICON_R - 2
+            const members = p.clusterMembers ?? []
+            const interactive = !!onClusterOpen && members.length > 0
+            return (
+              <g
+                onPointerDown={(e) => {
+                  // Zelfde reden als bij de marker: de ZoomableChartContainer
+                  // captureert anders de pointer en de tik komt nooit aan.
+                  e.stopPropagation()
+                }}
+                onClick={(e) => {
+                  if (!interactive) return
+                  e.stopPropagation()
+                  onClusterOpen!(members, p.clusterCenterAge ?? p.age)
+                }}
+                style={{
+                  cursor: interactive ? 'pointer' : 'default',
+                  pointerEvents: interactive ? 'auto' : 'none',
+                }}
+                role={interactive ? 'button' : undefined}
+                aria-label={
+                  interactive
+                    ? `${p.bucketSize} gebeurtenissen rond leeftijd ${Math.round(p.clusterCenterAge ?? p.age)} — open lijst`
+                    : undefined
+                }
+                data-testid={`chart-event-cluster-${p.id}`}
+              >
+                {/* Transparant hit-target — kleiner dan de 44px van een losse
+                    marker omdat de badge tussen de markers in zit; groter maken
+                    zou de omliggende iconen juist wéér onbereikbaar maken. */}
+                <rect
+                  x={badgeCx - 15} y={badgeCy - 15}
+                  width={30} height={30}
+                  fill="transparent"
+                  style={{ pointerEvents: interactive ? 'all' : 'none' }}
+                />
+                <circle cx={badgeCx} cy={badgeCy} r={badgeR} fill="var(--ink)" />
+                <text
+                  x={badgeCx} y={badgeCy + 4}
+                  textAnchor="middle"
+                  fontSize={11}
+                  fontWeight={700}
+                  fill="var(--paper)"
+                  fontFamily="var(--font-dm-mono, monospace)"
+                  style={{ pointerEvents: 'none' }}
+                >
+                  +{hiddenCount}
+                </text>
+              </g>
+            )
+          })()}
+          </Fragment>
         )
       })}
     </g>

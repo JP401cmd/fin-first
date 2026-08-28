@@ -211,3 +211,116 @@ describe('ChartEventMarkers — click vs drag (F-1)', () => {
     expect(onEventClick).toHaveBeenCalledOnce()
   })
 })
+
+/**
+ * M16 — met de duim bedienbaar. De xScale hierboven mapt 80 jaar op 800px, dus
+ * 10px per jaar: gebeurtenissen in aangrenzende jaren liggen 10px uit elkaar,
+ * ruim binnen de clusterdrempel van 28px. Dat is dezelfde verhouding als op de
+ * echte uitgezoomde grafiek (~5-6 px/jaar), waar tien iconen van 28px vrijwel
+ * volledig over elkaar heen vielen.
+ */
+describe('ChartEventMarkers — pixel-cluster en de uitgang naar de lijst (M16)', () => {
+  // Vijf jaren op rij: 10px per stap, dus alle vijf binnen de drempel. (Een
+  // zesde op leeftijd 45 zou er NET buiten vallen — de drempel wordt tegen het
+  // meeschuivende zwaartepunt gemeten, zie lib/chart-event-overlay.test.ts.)
+  const dichtOpElkaar = [40, 41, 42, 43, 44].map((age, i) =>
+    makeEvent({ id: `c${i}`, age }),
+  )
+
+  function renderCluster(extra: Record<string, unknown> = {}) {
+    return renderInSvg(
+      <ChartEventMarkers
+        events={dichtOpElkaar}
+        xScale={xScale}
+        padLeft={50}
+        chartTopY={20}
+        chartBottomY={300}
+        visibleMinAge={20}
+        visibleMaxAge={100}
+        {...extra}
+      />,
+    )
+  }
+
+  it('stapelt aangrenzende jaren tot één cluster in plaats van zes losse markers', () => {
+    const { queryByTestId } = renderCluster()
+
+    // Drie zichtbaar (MAX_STACK_VISIBLE), de rest zit achter de badge — waar
+    // vóór deze fix zes markers boven op elkaar stonden.
+    expect(queryByTestId('chart-event-marker-c0')).toBeTruthy()
+    expect(queryByTestId('chart-event-marker-c1')).toBeTruthy()
+    expect(queryByTestId('chart-event-marker-c2')).toBeTruthy()
+    expect(queryByTestId('chart-event-marker-c3')).toBeNull()
+    expect(queryByTestId('chart-event-marker-c4')).toBeNull()
+  })
+
+  it('opent via de badge de VOLLEDIGE lijst, niet alleen de verborgen events', () => {
+    const onClusterOpen = vi.fn()
+    const { getByTestId } = renderCluster({ onClusterOpen })
+
+    fireEvent.click(getByTestId('chart-event-cluster-c2'))
+
+    expect(onClusterOpen).toHaveBeenCalledOnce()
+    const [events, centerAge] = onClusterOpen.mock.calls[0]
+    // Vijf leden — de badge telt er vijf, dus de sheet moet er vijf tonen.
+    expect(events.map((e: ChartEventOverlay) => e.id).sort()).toEqual([
+      'c0', 'c1', 'c2', 'c3', 'c4',
+    ])
+    expect(centerAge).toBeCloseTo(42, 5)
+  })
+
+  it('een tik op de badge opent de lijst en NIET de gebeurtenis eronder', () => {
+    // Dit is de kern van de bevinding: welke marker een tik wint was
+    // onvoorspelbaar. De badge moet zijn eigen tik houden.
+    const onClusterOpen = vi.fn()
+    const onEventClick = vi.fn()
+    const { getByTestId } = renderCluster({ onClusterOpen, onEventClick })
+
+    fireEvent.click(getByTestId('chart-event-cluster-c2'))
+
+    expect(onClusterOpen).toHaveBeenCalledOnce()
+    expect(onEventClick).not.toHaveBeenCalled()
+  })
+
+  it('blijft zonder onClusterOpen puur decoratief (geen valse affordance)', () => {
+    const { getByTestId } = renderCluster()
+    const badge = getByTestId('chart-event-cluster-c2')
+
+    expect(badge.getAttribute('role')).toBeNull()
+    expect(badge.getAttribute('aria-label')).toBeNull()
+  })
+
+  it('draagt een aria-label met het aantal en de leeftijd van het cluster', () => {
+    const { getByTestId } = renderCluster({ onClusterOpen: vi.fn() })
+    const badge = getByTestId('chart-event-cluster-c2')
+
+    expect(badge.getAttribute('role')).toBe('button')
+    expect(badge.getAttribute('aria-label')).toBe(
+      '5 gebeurtenissen rond leeftijd 42 — open lijst',
+    )
+  })
+
+  it('laat losstaande gebeurtenissen ongemoeid — geen badge, gewone klik', () => {
+    const onClusterOpen = vi.fn()
+    const onEventClick = vi.fn()
+    const verspreid = [makeEvent({ id: 'v1', age: 30 }), makeEvent({ id: 'v2', age: 60 })]
+    const { queryByTestId, getByTestId } = renderInSvg(
+      <ChartEventMarkers
+        events={verspreid}
+        xScale={xScale}
+        padLeft={50}
+        chartTopY={20}
+        chartBottomY={300}
+        visibleMinAge={20}
+        visibleMaxAge={100}
+        onClusterOpen={onClusterOpen}
+        onEventClick={onEventClick}
+      />,
+    )
+
+    expect(queryByTestId('chart-event-cluster-v1')).toBeNull()
+    fireEvent.click(getByTestId('chart-event-marker-v1'))
+    expect(onEventClick).toHaveBeenCalledOnce()
+    expect(onClusterOpen).not.toHaveBeenCalled()
+  })
+})

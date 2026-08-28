@@ -1,6 +1,8 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { unauthorized } from '@/lib/api/respond'
+import { z } from 'zod'
+import { serverError, unauthorized } from '@/lib/api/respond'
+import { parseBody } from '@/lib/api/parse-body'
 import {
   WELCOME_GUIDE_SETTINGS_KEY,
   WELCOME_GUIDE_MODULE_KEY,
@@ -16,7 +18,8 @@ import { loadAccountStatus } from '@/lib/account-status'
 
 // ── Welkomstgids — per-user API ─────────────────────────────────────────────
 // GET  → merged config (app_settings) + per-user staat (module_guide_state).
-// PUT  → muteer per-user staat via één actie (afvinken/navigeren/sluiten).
+// PUT  → muteer per-user staat via één actie (afvinken/navigeren/minimaliseren/
+//        heropenen/voorgoed sluiten).
 //
 // De config is leesbaar voor élke ingelogde user; alleen superadmin schrijft hem
 // (zie /api/admin/welcome-guide). De per-user staat leeft genest onder de
@@ -96,28 +99,22 @@ export async function GET() {
 
 // ── PUT ───────────────────────────────────────────────────────────────────────
 
-type Action =
-  | { action: 'toggleStep'; stepId: string }
-  | { action: 'nextScreen' }
-  | { action: 'prevScreen' }
-  | { action: 'revealScreen' }
-  | { action: 'dismiss' }
+// De handgerolde body-parsing is bij S13 (nieuwe minimize/restore-acties) op
+// zod gezet — CLAUDE.md: "zod komt erbij waar de migratie er toch al langskomt".
+// `parseBody` levert bij falen een client-veilige 400 via de gedeelde envelope.
+const ActionSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('toggleStep'), stepId: z.string().min(1) }),
+  z.object({ action: z.literal('nextScreen') }),
+  z.object({ action: z.literal('prevScreen') }),
+  z.object({ action: z.literal('revealScreen') }),
+  // S13 — inklappen tot het punt naast de pagina-'i' (heropenbaar) …
+  z.object({ action: z.literal('minimize') }),
+  z.object({ action: z.literal('restore') }),
+  // … tegenover `dismiss`: voorgoed weg.
+  z.object({ action: z.literal('dismiss') }),
+])
 
-function isValidAction(body: unknown): body is Action {
-  if (!body || typeof body !== 'object' || Array.isArray(body)) return false
-  const b = body as Record<string, unknown>
-  switch (b.action) {
-    case 'toggleStep':
-      return typeof b.stepId === 'string' && b.stepId.length > 0
-    case 'nextScreen':
-    case 'prevScreen':
-    case 'revealScreen':
-    case 'dismiss':
-      return true
-    default:
-      return false
-  }
-}
+type Action = z.infer<typeof ActionSchema>
 
 function applyAction(
   state: WelcomeGuideState,
@@ -157,6 +154,14 @@ function applyAction(
       next.currentScreen = Math.max(0, visible - 1)
       break
     }
+    case 'minimize': {
+      next.minimized = true
+      break
+    }
+    case 'restore': {
+      next.minimized = false
+      break
+    }
     case 'dismiss': {
       next.status = 'dismissed'
       break
@@ -172,21 +177,14 @@ export async function PUT(request: NextRequest) {
   } = await supabase.auth.getUser()
   if (!user) return unauthorized()
 
-  let body: unknown
-  try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
-  }
-  if (!isValidAction(body)) {
-    return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
-  }
+  const parsed = await parseBody(ActionSchema, request)
+  if (!parsed.ok) return parsed.response
 
   const config = await loadConfig(supabase)
   const { raw, useFallback, map } = await loadRawState(supabase, user.id)
   const current = parseWelcomeGuideState(raw, config)
   current.completedStepIds = reconcileCompleted(config, current.completedStepIds)
-  const updated = applyAction(current, body, config)
+  const updated = applyAction(current, parsed.data, config)
 
   if (useFallback) {
     const prefs = { ...map, [FALLBACK_KEY]: { [WELCOME_GUIDE_MODULE_KEY]: updated } }
@@ -194,14 +192,14 @@ export async function PUT(request: NextRequest) {
       .from('profiles')
       .update({ feature_preferences: prefs })
       .eq('id', user.id)
-    if (error) return NextResponse.json({ error: 'Failed to save' }, { status: 500 })
+    if (error) return serverError(error, 'welcome-guide:PUT')
   } else {
     const nextMap = { ...map, [WELCOME_GUIDE_MODULE_KEY]: updated }
     const { error } = await supabase
       .from('profiles')
       .update({ module_guide_state: nextMap })
       .eq('id', user.id)
-    if (error) return NextResponse.json({ error: 'Failed to save' }, { status: 500 })
+    if (error) return serverError(error, 'welcome-guide:PUT')
   }
 
   return NextResponse.json({ state: updated })

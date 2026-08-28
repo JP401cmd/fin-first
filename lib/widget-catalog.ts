@@ -479,11 +479,22 @@ export const DEFAULT_WIDGET_PREFS: WidgetPrefs = {
 // Each widget links directly to its module page.
 // Where a modal can be auto-opened via URL param, include ?modal=...
 
+/**
+ * Schermbrede heatmap-weergave (M17). De budgetten-pagina onthoudt de gekozen
+ * weergave in localStorage; `?weergave=heatmap` overschrijft dat eenmalig zodat
+ * elke ingang die de heatmap bedoelt ook op de heatmap uitkomt.
+ */
+export const BUDGET_HEATMAP_HREF = '/overzicht/cashflow/budget?weergave=heatmap'
+
 export const WIDGET_HREFS: Record<string, string> = {
   netto_vermogen:           '/overzicht',
   cash_flow:                '/overzicht/cashflow',
   budgetten:                '/overzicht/cashflow/budget',
-  uitgaven_heatmap:         '/overzicht/cashflow/budget',
+  // M17: de heatmap-tegel landt op de budgetten-pagina IN heatmap-weergave.
+  // Zonder `?weergave=` valt die pagina terug op de laatst gekozen view uit
+  // localStorage (meestal de boom) — dan tikt de gebruiker op een heatmap en
+  // krijgt hij een lijst. Zie BUDGET_HEATMAP_HREF.
+  uitgaven_heatmap:         BUDGET_HEATMAP_HREF,
   // BEWUST GEEN `?rendementUitleg=open` hier (kaart H7): deze widget gáát over
   // het totale vermogen; de rendement-regel is één regel in de uitsplitsing.
   // De hele tegel is één link, dus een deeplink naar de rekenmodal zou élke klik

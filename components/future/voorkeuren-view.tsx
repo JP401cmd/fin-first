@@ -10,6 +10,7 @@ import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { STRATEGY_LABELS } from '@/lib/fire-strategy'
 import { GlossaryTerm } from '@/components/editorial/glossary-term'
 import { HideInSimple } from '@/components/app/hide-in-simple'
+import { DepthSection } from '@/components/app/depth-section'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { VoorkeurBewerkenSheet } from './voorkeur-bewerken-sheet'
 import { AfbouwOverzichtCard } from './afbouw-overzicht-card'
@@ -29,12 +30,33 @@ import { WEALTH_GROUP_LABELS, type WealthGroup } from '@/lib/wealth-composition'
  *
  * Daaronder: "Markt-aannames" (inflatie + bruto rendement) via VoorkeurBewerkenSheet.
  *
- * Weergavemodus "Eenvoudig" (audit TOE-3): alleen regel 1 & 2 — de twee keuzes
- * die bepalen hóé lang je vermogen meegaat. De drie pot-regels (onttrekkings-
- * volgorde, verdeling bij toename, onttrekking bij afname) en de markt-aannames
- * zijn verfijning voor wie de projectie echt bijstuurt en staan alleen in
- * Volledig. Puur presentatie: de regels blíjven gelden in de doorrekening en de
- * deep-link ?regel=… blijft werken — ze zijn alleen niet in beeld.
+ * Weergavemodus "Eenvoudig" (S7, herziet audit TOE-3): regel 1 & 2 staan open —
+ * de twee keuzes die bepalen hóé lang je vermogen meegaat. De drie pot-regels
+ * (onttrekkingsvolgorde, verdeling bij toename, onttrekking bij afname) en de
+ * markt-aannames staan dáár achter een `DepthSection`, ingeklapt, met een
+ * leesregel die de huidige waarde draagt.
+ *
+ * Waarom `DepthSection` en niet langer `HideInSimple`: dit zijn bedienings-
+ * vlakken (elke kaart heeft `onEdit`) en /toekomst/voorkeuren is de enige
+ * ingang — niets deep-linkt naar ?regel=onttrekkingsvolgorde|verdeling-toename|
+ * onttrekking-afname. ADR 0026 (aanvulling fase 3-5) reserveert `HideInSimple`
+ * voor diepte "waar de gebruiker geen ingang verliest" en wijst voor bedienings-
+ * vlakken juist `DepthSection` aan: hard verbergen zet daar de enige ingang
+ * dicht, terwijl de kernel er onverminderd mee rekent (horizon-data-loader →
+ * adapter/prio-overgang). Vijf verwijzers (coach-suggestie 'Rendement
+ * instellen', module-guide, ⌘K-sublabel, de widgets swr_monitor/inflatie_impact
+ * en de pagina-`i`) liepen in Eenvoudig dood. Precedent: CF-4 in
+ * cashflow-below-fold.tsx.
+ *
+ * De leesregels consumeren de bestaande props/formatters (regelVoorkeuren,
+ * fireParams → formatGroupOrder/surplusLabel/formatPct) — geen tweede afleiding.
+ *
+ * `DepthSection` wordt alléén in Eenvoudig gemónt: in Volledig rendert exact de
+ * bestaande boom (één grid met vijf kaarten, markt-aannames-blok zoals het was),
+ * anders zou Volledig er kop-knoppen en kaartranden bij krijgen.
+ *
+ * De AfbouwOverzichtCard blijft `HideInSimple` — dat is uitkomst-analyse, geen
+ * bedieningsvlak, en valt daarmee aan de goede kant van diezelfde norm.
  */
 
 const WITHDRAWAL_LABELS: Record<
@@ -166,6 +188,120 @@ export function VoorkeurenView({
 
   const openRegel = (id: RegelId) => () => setEditingRegel(id)
 
+  // ── Gedeelde kaartsets ────────────────────────────────────────────────────
+  // Eén definitie, twee montages (Volledig = grid-kind, Eenvoudig = in een
+  // DepthSection). Fragment, zodat de kaarten in Volledig dírecte grid-kinderen
+  // blijven — exact zoals HideInSimple ze eerder doorliet.
+  const potRegelCards = (
+    <>
+      <VoorkeurCard
+        label="Onttrekkingsvolgorde"
+        value={formatGroupOrder(regelVoorkeuren.withdrawalOrderGroups)}
+        subtitle="Welke pot eerst leegtrekken bij afbouw"
+        Icon={SlidersHorizontal}
+        badge="Potten"
+        onEdit={openRegel('onttrekkingsvolgorde')}
+      />
+      <VoorkeurCard
+        label="Verdeling bij toename"
+        value={surplusLabel(regelVoorkeuren.surplusGroup)}
+        subtitle="Waar gaat extra geld heen bij een positief event"
+        Icon={SlidersHorizontal}
+        badge="Potten"
+        onEdit={openRegel('verdeling-toename')}
+      />
+      <VoorkeurCard
+        label="Onttrekking bij afname"
+        value={formatGroupOrder(regelVoorkeuren.deficitOrderGroups)}
+        subtitle="Waar wordt geld vandaan gehaald bij een negatief event"
+        Icon={SlidersHorizontal}
+        badge="Potten"
+        onEdit={openRegel('onttrekking-afname')}
+      />
+    </>
+  )
+
+  const marktAannameCards = (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+      <VoorkeurCard
+        label="Inflatie"
+        value={formatPct(fireParams.inflationRate)}
+        subtitle="Jaarlijkse prijsstijging — index alle bedragen"
+        Icon={TrendingUp}
+        badge="Per jaar"
+        onEdit={() =>
+          setEditing({
+            title: 'Inflatie',
+            column: 'inflation_rate',
+            currentValuePct: fireParams.inflationRate * 100,
+            helperText: 'NL-default 2.5% per jaar. Past op alle euro-bedragen in de projectie.',
+          })
+        }
+      />
+      <VoorkeurCard
+        label="Bruto rendement"
+        value={formatPct(fireParams.grossReturn)}
+        subtitle="Verwacht jaarrendement op het belegbaar vermogen"
+        Icon={TrendingUp}
+        badge="Per jaar"
+        onEdit={() =>
+          setEditing({
+            title: 'Bruto rendement',
+            column: 'expected_return',
+            currentValuePct: fireParams.grossReturn * 100,
+            helperText: 'Wereldwijde aandelen-historie: ~6-8%. Conservatief: 4-5%. Voorkeur per asset-groep op /overzicht/bezittingen.',
+          })
+        }
+      />
+      <VoorkeurCard
+        label={
+          <>
+            Effectief <GlossaryTerm term="swr">SWR</GlossaryTerm>
+          </>
+        }
+        value={formatPct(fireParams.effectiveSwr)}
+        subtitle={
+          <>
+            <GlossaryTerm term="box_3">Box 3</GlossaryTerm>-gecorrigeerd
+            reëel rendement (NL-specifiek)
+          </>
+        }
+        Icon={Wallet}
+        badge="Afgeleid"
+        hint="Niet handmatig"
+      />
+    </div>
+  )
+
+  const marktAannamesIntro = (
+    <p className="text-xs text-[var(--ink-3)]">
+      Inflatie geldt op alle bedragen. Rendement per bezittingen-groep stel je in
+      op{' '}
+      <Link
+        href="/overzicht/bezittingen"
+        className="underline hover:text-[var(--ink-2)]"
+      >
+        /overzicht/bezittingen
+      </Link>{' '}
+      (cash, beleggen, huis, pensioen).
+    </p>
+  )
+
+  // Leesregels bij ingeklapt: draag de hùidige waarde, zodat wegvouwen niet
+  // opnieuw verbergt waar de motor mee rekent. Alles uit de bestaande props via
+  // de bestaande formatters — geen tweede afleiding (consume, don't recompute).
+  const eersteAfbouwPot = regelVoorkeuren.withdrawalOrderGroups[0]
+  const overschotZin = `bij overschot ${surplusLabel(regelVoorkeuren.surplusGroup).toLowerCase()}`
+  const potRegelsSummary = eersteAfbouwPot
+    ? `Bij afbouw eerst ${WEALTH_GROUP_LABELS[eersteAfbouwPot].toLowerCase()} · ${overschotZin}`
+    : `Bij overschot ${surplusLabel(regelVoorkeuren.surplusGroup).toLowerCase()}`
+
+  const marktAannamesSummary = `Inflatie ${formatPct(
+    fireParams.inflationRate,
+  )} · rendement ${formatPct(fireParams.grossReturn)} · SWR ${formatPct(
+    fireParams.effectiveSwr,
+  )}`
+
   return (
     <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-8 space-y-8">
       {/* Toekomst-regels */}
@@ -209,116 +345,48 @@ export function VoorkeurenView({
             }
             onEdit={openRegel('onttrekkingsstrategie')}
           />
-          {/* Pot-regels (3/4/5) — alleen Volledig. HideInSimple rendert een
-              fragment, dus de kaarten blijven directe grid-kinderen. */}
-          <HideInSimple>
-          <VoorkeurCard
-            label="Onttrekkingsvolgorde"
-            value={formatGroupOrder(regelVoorkeuren.withdrawalOrderGroups)}
-            subtitle="Welke pot eerst leegtrekken bij afbouw"
-            Icon={SlidersHorizontal}
-            badge="Potten"
-            onEdit={openRegel('onttrekkingsvolgorde')}
-          />
-          <VoorkeurCard
-            label="Verdeling bij toename"
-            value={surplusLabel(regelVoorkeuren.surplusGroup)}
-            subtitle="Waar gaat extra geld heen bij een positief event"
-            Icon={SlidersHorizontal}
-            badge="Potten"
-            onEdit={openRegel('verdeling-toename')}
-          />
-          <VoorkeurCard
-            label="Onttrekking bij afname"
-            value={formatGroupOrder(regelVoorkeuren.deficitOrderGroups)}
-            subtitle="Waar wordt geld vandaan gehaald bij een negatief event"
-            Icon={SlidersHorizontal}
-            badge="Potten"
-            onEdit={openRegel('onttrekking-afname')}
-          />
-          </HideInSimple>
+          {/* Pot-regels (3/4/5) — in Volledig directe grid-kinderen; in
+              Eenvoudig achter de disclosure hieronder. */}
+          {!simple && potRegelCards}
         </div>
-      </div>
 
-      {/* Markt-aannames */}
-      <HideInSimple>
-      <div>
-        <header className="mb-4">
-          <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-            Toekomst — markt-aannames
+        {simple && (
+          <div className="mt-3 sm:mt-4">
+            <DepthSection title="Pot-regels" summary={potRegelsSummary}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                {potRegelCards}
+              </div>
+            </DepthSection>
           </div>
-          <h2 className="font-serif text-xl text-[var(--ink)] mt-1">
-            Algemene parameters
-          </h2>
-          <p className="mt-1 text-xs text-[var(--ink-3)]">
-            Inflatie geldt op alle bedragen. Rendement per bezittingen-groep
-            stel je in op{' '}
-            <Link
-              href="/overzicht/bezittingen"
-              className="underline hover:text-[var(--ink-2)]"
-            >
-              /overzicht/bezittingen
-            </Link>{' '}
-            (cash, beleggen, huis, pensioen).
-          </p>
-        </header>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-          <VoorkeurCard
-            label="Inflatie"
-            value={formatPct(fireParams.inflationRate)}
-            subtitle="Jaarlijkse prijsstijging — index alle bedragen"
-            Icon={TrendingUp}
-            badge="Per jaar"
-            onEdit={() =>
-              setEditing({
-                title: 'Inflatie',
-                column: 'inflation_rate',
-                currentValuePct: fireParams.inflationRate * 100,
-                helperText: 'NL-default 2.5% per jaar. Past op alle euro-bedragen in de projectie.',
-              })
-            }
-          />
-          <VoorkeurCard
-            label="Bruto rendement"
-            value={formatPct(fireParams.grossReturn)}
-            subtitle="Verwacht jaarrendement op het belegbaar vermogen"
-            Icon={TrendingUp}
-            badge="Per jaar"
-            onEdit={() =>
-              setEditing({
-                title: 'Bruto rendement',
-                column: 'expected_return',
-                currentValuePct: fireParams.grossReturn * 100,
-                helperText: 'Wereldwijde aandelen-historie: ~6-8%. Conservatief: 4-5%. Voorkeur per asset-groep op /overzicht/bezittingen.',
-              })
-            }
-          />
-          <VoorkeurCard
-            label={
-              <>
-                Effectief <GlossaryTerm term="SWR">SWR</GlossaryTerm>
-              </>
-            }
-            value={formatPct(fireParams.effectiveSwr)}
-            subtitle={
-              <>
-                <GlossaryTerm term="box_3">Box 3</GlossaryTerm>-gecorrigeerd
-                reëel rendement (NL-specifiek)
-              </>
-            }
-            Icon={Wallet}
-            badge="Afgeleid"
-            hint="Niet handmatig"
-          />
-        </div>
+        )}
       </div>
-      </HideInSimple>
+
+      {/* Markt-aannames — in Eenvoudig ingeklapt mét leesregel, in Volledig
+          exact de bestaande boom. */}
+      {simple ? (
+        <DepthSection title="Markt-aannames" summary={marktAannamesSummary}>
+          {marktAannamesIntro}
+          <div className="mt-4">{marktAannameCards}</div>
+        </DepthSection>
+      ) : (
+        <div>
+          <header className="mb-4">
+            <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
+              Toekomst — markt-aannames
+            </div>
+            <h2 className="font-serif text-xl text-[var(--ink)] mt-1">
+              Algemene parameters
+            </h2>
+            <div className="mt-1">{marktAannamesIntro}</div>
+          </header>
+
+          {marktAannameCards}
+        </div>
+      )}
 
       <p className="text-[11px] italic text-[var(--ink-3)]">
-        {simple
-          ? 'Klik op een regel om uitleg, instellingen en impact te zien en bij te werken.'
-          : 'Klik op een regel of markt-aanname om uitleg, instellingen en impact te zien en bij te werken.'}
+        Klik op een regel of markt-aanname om uitleg, instellingen en impact te
+        zien en bij te werken.
       </p>
 
       {/* Afbouw-overzicht — eindsaldo bij fireAge vs endAge. */}

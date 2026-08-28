@@ -138,9 +138,15 @@ describe('Box2Detail', () => {
     mockFetch({ personal: mockResult() })
     render(<DisplayModeProvider initialMode="full"><Box2Detail year={2026} /></DisplayModeProvider>)
     await waitFor(() => screen.getByText('Berekeningsstappen'))
-    expect(screen.queryByText('Vervreemdingswinst')).toBeNull()
+    // S17: "vervreemdingswinst" in de intro draagt nu een <GlossaryTerm>, en de
+    // popover daarvan is ALTIJD gemount (hij verschijnt via opacity, niet via
+    // conditional render). De kop daarvan is de weergavenaam "Vervreemdingswinst".
+    // Dit criterium gaat over de berekeningsREGEL, dus filteren we de tooltip weg.
+    const rekenRegels = () =>
+      screen.queryAllByText('Vervreemdingswinst').filter((el) => !el.closest('[role="tooltip"]'))
+    expect(rekenRegels()).toHaveLength(0)
     fireEvent.click(screen.getByText('Berekeningsstappen'))
-    expect(screen.getByText('Vervreemdingswinst')).toBeTruthy()
+    expect(rekenRegels()).toHaveLength(1)
   })
 
   it('rendert niets zonder resultaat', async () => {

@@ -5,6 +5,8 @@ import {
 } from '../assert'
 import type { TestCase } from '../test-types'
 import { unauthenticatedFetch } from '../server-runner'
+import { UNIFIED_FEATURES } from '@/lib/feature-registry'
+import { ADDON_PLANS } from '@/lib/subscription-catalog'
 
 const CAT = 'rapportages.generatie'
 
@@ -846,6 +848,36 @@ const tests: TestCase[] = [
           `${ep.method} ${ep.path} → expected 401/400/403, got ${res.status}`,
         )
       }
+    },
+  },
+
+  // ── 29. Betaalpoort: reikwijdte (H28 / S9) ──────────────────────
+  {
+    id: 'report-ai-gate-scope', name: 'Rapportage-betaalpoort dekt alléén de AI-inleiding', category: CAT,
+    description:
+      'Pint de reikwijdte van de betaalmuur op /rapportages: gegated is de geschreven inleiding, ' +
+      'niet het rapport en niet de zes andere rapportvormen. Verbreedt iemand dit weer tot het ' +
+      'hele rapport (de H28-fout), dan wordt deze test rood.',
+    priority: 'high', estimatedDurationMs: 50,
+    async fn() {
+      const feature = UNIFIED_FEATURES.find((f) => f.id === 'ai_rapportage')
+      assertDefined(feature, 'feature ai_rapportage bestaat')
+      assertEqual(feature!.requiredTier, 'ai', 'ai_rapportage hangt aan de AI-add-on')
+
+      // De omschrijving is geen cosmetiek: zolang die "financiële rapporten
+      // genereren" beloofde, las elke lezer de hele rapportagemodule als betaald
+      // — precies de begripsverwarring waar H28 uit voortkwam.
+      const omschrijving = feature!.description.toLowerCase()
+      assert(
+        omschrijving.includes('inleiding'),
+        `ai_rapportage beschrijft de INLEIDING, niet het rapport (nu: "${feature!.description}")`,
+      )
+
+      // De hub leest de koopbaarheid uit de catalogus om te bepalen of er een
+      // slot getoond mag worden. Verdwijnt dit plan, dan verdwijnt die lezing.
+      const aiPlan = ADDON_PLANS.find((p) => p.tier === 'ai')
+      assertDefined(aiPlan, 'ADDON_PLANS bevat de AI-add-on')
+      assertType(aiPlan!.available, 'boolean', 'available is een expliciete boolean')
     },
   },
 ]

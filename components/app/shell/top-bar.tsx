@@ -49,11 +49,13 @@ import { useNavStack, type TopBarKind } from './nav-stack-provider'
 import { resolveRouteTitle } from '@/lib/nav-config'
 import { PrivacyToggle } from '@/components/app/privacy-toggle'
 import { PerspectiveSwitcher } from '@/components/app/perspective-switcher'
+import { EuroViewBadge } from '@/components/app/shell/euro-view-badge'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
 import { GlobalSyncButton } from '@/components/sync/global-sync-button'
 import { SyncReportModal } from '@/components/sync/sync-report-modal'
 import { LeverCompassMobile } from '@/components/app/shell/lever-compass'
 import { useLeverScores } from '@/components/app/shell/shell-contexts'
+import { TAP_TARGET_EXTEND_BLOCK } from '@/components/editorial/tap-target'
 
 type TopBarProps = {
   /**
@@ -141,9 +143,23 @@ function TopBarUtilities({ email, role }: { email: string; role?: string }) {
   }, [menuOpen])
 
   return (
+    /* Raakgebied-compromis (M19): zeven controls passen niet als 44px-brede
+       knoppen op een 360px-scherm (44×7 + gaps > de ~284px die naast titel en
+       back-placeholder overblijft). De cluster houdt daarom zijn 36px BREEDTE
+       en rekt alleen het raakgebied VERTICAAL op naar 44px — de balk is 48px
+       hoog, dus dat kost niets. Horizontaal blijft 36px met vrije ruimte ruim
+       boven de WCAG-2.5.8-ondergrens (24px). Vastgelegd in de ui-ux-skill. */
     <div className="flex items-center gap-0.5">
       {/* Weergave-badge (eigen/huishouden/partner) — alleen voor huishoudens. */}
       <PerspectiveSwitcher compact menuAlign="right" />
+
+      {/* Euro-weergave (toekomstige ⇄ huidige euro's). Stond hier NIET, terwijl
+          hij op desktop al bovenaan de zijbalk hangt: op mobiel was de stand
+          dus alleen via ⌘K te vinden — op precies het scherm waar de meeste
+          sessies plaatsvinden (bevinding M13). Compact, want de cluster is
+          smal; de eenmalige uitleg hangt hieraan, rechts uitgelijnd zodat de
+          popover binnen het scherm blijft. */}
+      <EuroViewBadge variant="compact" showCoachmark coachmarkAlign="right" />
 
       {/* Vier-hefbomen-kompas — compact dots, expand on tap */}
       <LeverCompassMobile scores={leverScores} />
@@ -153,7 +169,7 @@ function TopBarUtilities({ email, role }: { email: string; role?: string }) {
       <Link
         href="/nieuws"
         aria-label="Nieuws"
-        className="flex h-9 w-9 items-center justify-center text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)]"
+        className={`flex h-9 w-9 items-center justify-center text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] ${TAP_TARGET_EXTEND_BLOCK}`}
       >
         <Newspaper className="h-4 w-4" aria-hidden="true" />
       </Link>
@@ -165,7 +181,7 @@ function TopBarUtilities({ email, role }: { email: string; role?: string }) {
           openModal()
         }}
         aria-label={unreadCount > 0 ? `Meldingen, ${unreadCount > 9 ? 'meer dan 9' : unreadCount} ongelezen` : 'Meldingen'}
-        className="relative flex h-9 w-9 items-center justify-center text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)]"
+        className={`flex h-9 w-9 items-center justify-center text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] ${TAP_TARGET_EXTEND_BLOCK}`}
       >
         <Bell className="h-4 w-4" aria-hidden="true" />
         {unreadCount > 0 && (
@@ -182,7 +198,7 @@ function TopBarUtilities({ email, role }: { email: string; role?: string }) {
           aria-label="Account"
           aria-haspopup="menu"
           aria-expanded={menuOpen}
-          className="flex h-9 w-9 items-center justify-center transition-colors hover:bg-[var(--subtle)]"
+          className={`flex h-9 w-9 items-center justify-center transition-colors hover:bg-[var(--subtle)] ${TAP_TARGET_EXTEND_BLOCK}`}
         >
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--ink)] text-[10px] font-medium text-[var(--paper)]">
             {email[0]?.toUpperCase() ?? '?'}
@@ -399,8 +415,14 @@ export function TopBar({
           <span aria-hidden className="block h-11 w-11" />
         )}
 
-        {/* Midden — titel. aria-live='polite' voor smooth voorlees-update bij
-            stack-transities (plan §4.2 a11y). Editorial serif + module-
+        {/* Midden — titel. Bewust een <p>, GÉÉN <h1> (ADR 0110): deze balk is
+            `lg:hidden` (= display:none, dus weg uit de a11y-tree op desktop),
+            rendert niet bij `kind: 'hidden'`, en blijft op tab-roots ('rich')
+            leeg — een kop die op drie assen kan wegvallen kan de enige h1 niet
+            zijn. De echte <h1> is de sr-only paginanaam in MobileStackShell;
+            die draagt nu ook de `aria-live`. Dit label is puur zichtbaar en
+            daarom `aria-hidden` — anders leest een schermlezer de naam twee
+            keer. Editorial serif + module-
             accentkleur (op module-tabs) zodat de titel visueel bij de actieve
             module + de editorial-toon hoort; truncate op één regel. Op niet-
             module-routes valt de kleur terug op `var(--ink)`.
@@ -409,8 +431,8 @@ export function TopBar({
             zakt bij 16px tekst; -900 blijft in de accent-familie maar haalt het
             contrast. Expliciete fontWeight 400 voorkomt UA-bold op de serif-
             fallback. (Kleur via inline-style, dus geen `text-*`-class hier.) */}
-        <h1
-          aria-live="polite"
+        <p
+          aria-hidden="true"
           className="text-center text-base truncate min-w-0 leading-tight"
           style={{
             fontFamily: 'var(--font-serif, Georgia, serif)',
@@ -419,7 +441,7 @@ export function TopBar({
           }}
         >
           {title}
-        </h1>
+        </p>
 
         {/* Rechts — utility-cluster ('rich' kind) of pagina-specifieke actions. */}
         <div className="flex items-center justify-end gap-1">{renderedActions}</div>

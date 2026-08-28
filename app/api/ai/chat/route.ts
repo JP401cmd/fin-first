@@ -11,7 +11,8 @@ import { maskPIIInOutput } from '@/lib/ai/pii-output-filter'
 import { checkTierGate } from '@/lib/require-tier'
 import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import { checkCreditBudget, creditLimitMessage } from '@/lib/ai/credit-gate'
-import { unauthorized, serverError } from '@/lib/api/respond'
+import { AI_ERROR_CODE, describeAiError } from '@/lib/ai/error-copy'
+import { unauthorized, errorResponse } from '@/lib/api/respond'
 
 /* AI response timeout in milliseconds (60 seconds) */
 const AI_TIMEOUT_MS = 60_000
@@ -50,19 +51,26 @@ export async function POST(req: Request) {
   const privacyGate = await assertCloudAllowed(supabase, user.id, 'gesprek')
   if (privacyGate) return privacyGate
 
+  // Alle gates hieronder sturen een STABIELE `code` mee (ADR 0044 +
+  // lib/ai/error-copy.ts). De client classificeert daarop — niet meer op
+  // substrings van de body — en weet zo per klasse of retry überhaupt kan
+  // slagen. Zonder code belandden kill-switch, creditlimiet en privé-modus
+  // allemaal op één generieke "er ging iets mis" mét een retry-knop die nooit
+  // kon slagen (H27).
   const tierGate = await checkTierGate(supabase, user.id, 'ai')
   if (tierGate) {
-    return new Response(JSON.stringify({ error: tierGate.error }), { status: 403, headers: { 'Content-Type': 'application/json' } })
+    return errorResponse(tierGate.error, 403, AI_ERROR_CODE.subscription)
   }
 
   // Per-gebruiker rate-limit: dwing het maand-creditbudget af (één gedeelde
   // bucket over alle AI-features) vóór de dure LLM-call.
   const creditGate = await checkCreditBudget(supabase, user.id, 'chat')
   if (!creditGate.allowed) {
-    return new Response(JSON.stringify({ error: creditLimitMessage(creditGate) }), {
-      status: 429,
-      headers: { 'Content-Type': 'application/json', 'Retry-After': String(creditGate.retryAfterSeconds) },
-    })
+    // De tekst blijft van de server komen: die noemt het aantal credits en de
+    // resetdatum. `error-copy.ts` markeert deze code als `preferServerText`.
+    const res = errorResponse(creditLimitMessage(creditGate), 429, AI_ERROR_CODE.creditLimit)
+    res.headers.set('Retry-After', String(creditGate.retryAfterSeconds))
+    return res
   }
 
   const { messages, domain = 'wil', context: chatContext, scenarioContext } = await req.json() as {
@@ -94,10 +102,15 @@ export async function POST(req: Request) {
     model = await getModel(supabase, 'chat')
   } catch (err) {
     if (err instanceof AIConfigError) {
-      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
-      return Response.json({ error: err.message }, { status: 422 })
+      // De echte reden (provider, beheerpad, env-variabele) gaat naar het
+      // SERVERLOG — nooit naar de client. Zie /beheer/ai voor de
+      // per-provider sleutel-indicator. De gebruiker krijgt de neutrale tekst
+      // uit de gedeelde copy-tabel plus een stabiele code (H27).
+      console.error(`[ai-chat:config] ${err.provider}: ${err.message}`)
+      return errorResponse(describeAiError(err.reason).text, 422, err.reason)
     }
-    return Response.json({ error: 'AI model kon niet worden geladen.' }, { status: 500 })
+    console.error('[ai-chat:model] model kon niet worden geladen:', err)
+    return errorResponse(describeAiError(AI_ERROR_CODE.unavailable).text, 500, AI_ERROR_CODE.unavailable)
   }
 
   /* Build context and prompts — catch errors to avoid crashing the stream */
@@ -170,9 +183,10 @@ export async function POST(req: Request) {
     }
   } catch (err) {
     console.error('[AI Chat] Context build failed:', err)
-    return Response.json(
-      { error: 'Kon financiele context niet laden. Probeer het opnieuw.' },
-      { status: 500 },
+    return errorResponse(
+      describeAiError(AI_ERROR_CODE.contextFailed).text,
+      500,
+      AI_ERROR_CODE.contextFailed,
     )
   }
 
@@ -196,9 +210,10 @@ export async function POST(req: Request) {
     financialContext = sanitizeForAI(financialContext, sanitizeOpts)
   } catch (err) {
     console.error('[AI Chat] Sanitization failed — AI call blocked (fail-safe):', err)
-    return Response.json(
-      { error: 'De AI-assistent is tijdelijk niet beschikbaar vanwege een beveiligingscontrole. Probeer het later opnieuw.' },
-      { status: 503 },
+    return errorResponse(
+      describeAiError(AI_ERROR_CODE.safetyCheck).text,
+      503,
+      AI_ERROR_CODE.safetyCheck,
     )
   }
 
@@ -227,7 +242,18 @@ export async function POST(req: Request) {
      * We wrap the UIMessageStream with a TransformStream that applies maskPIIInOutput
      * to each chunk's string content. The UIMessageStream encodes chunks as strings
      * at the wire level, so we intercept at that layer. */
-    const rawStream = result.toUIMessageStream()
+    // `onError` bepaalt wat er bij een providerfout MIDDEN in de stream naar de
+    // client gaat. Zonder deze hook stuurt de AI SDK zijn Engelse default
+    // ("An error occurred.") — Engels in een NL-app én niet classificeerbaar.
+    // We geven bewust alléén de envelope met een stabiele code terug; de echte
+    // fout blijft in het serverlog (anders lekt een providerbericht mee).
+    const rawStream = result.toUIMessageStream({
+      onError: (err: unknown) => {
+        console.error('[ai-chat:stream]', err)
+        const copy = describeAiError(AI_ERROR_CODE.streamFailed)
+        return JSON.stringify({ error: copy.text, code: copy.code })
+      },
+    })
     const piiFilter = new TransformStream({
       transform(chunk: unknown, controller: TransformStreamDefaultController) {
         if (typeof chunk === 'string') {
@@ -249,16 +275,14 @@ export async function POST(req: Request) {
 
     if (isTimeout) {
       console.error('[AI Chat] Stream error: TIMEOUT')
-      return Response.json(
-        { error: 'Het AI-antwoord duurde te lang. Probeer het opnieuw met een kortere vraag.', detail: null },
-        { status: 504 },
-      )
+      return errorResponse(describeAiError(AI_ERROR_CODE.timeout).text, 504, AI_ERROR_CODE.timeout)
     }
 
-    // Rauwe error.message hoort niet meer in de response (ADR 0044): serverError
-    // logt de echte fout server-side (met stack + tag) en stuurt een generieke
-    // tekst naar de client — geen `detail`-lek meer.
-    return serverError(err, 'ai-chat:POST', 'Er ging iets mis bij het genereren van een antwoord. Probeer het opnieuw.')
+    // Rauwe error.message hoort niet in de response (ADR 0044): de echte fout
+    // gaat met stack + grep-bare tag naar het serverlog, de client krijgt de
+    // curated tekst plus een code waarop hij de affordance kan bepalen.
+    console.error('[ai-chat:POST]', err, err instanceof Error ? err.stack : '')
+    return errorResponse(describeAiError(AI_ERROR_CODE.streamFailed).text, 500, AI_ERROR_CODE.streamFailed)
   } finally {
     clearTimeout(timeoutId)
   }

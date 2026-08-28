@@ -746,7 +746,7 @@ describe("MiniNetWorthChart — euro-weergave (huidige euro's)", () => {
   })
 
   it('draagt zelf geen euro-weergave-status — die hangt app-breed in de sidebar', () => {
-    // ADR 0094: de weergave-status staat op één plek (`SidebarEuroViewBadge`,
+    // ADR 0094: de weergave-status staat op één plek (`EuroViewBadge`,
     // altijd zichtbaar) en de schakelaar in het zoekscherm; grafieken dragen
     // geen eigen badge meer. Deze assertie is de vangrail tegen terugkeer van
     // een per-grafiek-markering — in BEIDE standen, want juist in 'real' stond

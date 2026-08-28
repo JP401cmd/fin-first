@@ -1,7 +1,17 @@
 /**
- * SANDBOX / Fase 0 — onderdeel van new-navigation-shell migratie.
- * Plan: docs/navigatie-redesign-plan.md §3
- * Achter feature-flag in productie. Voor nu: alleen sandbox-test.
+ * Onderdeel van de new-navigation-shell. Plan: docs/navigatie-redesign-plan.md §3
+ *
+ * AANTEKENING (bevinding M13, 28-08-2026) — deze kop zei tot vandaag "SANDBOX /
+ * Fase 0 … achter feature-flag in productie. Voor nu: alleen sandbox-test."
+ * Dat klopte niet meer: de hook wordt onvoorwaardelijk gebruikt door de live
+ * `Sidebar` (via `responsive-shell.tsx`) en er is geen feature-flag te vinden.
+ * De tekst is bijgewerkt, het gedrag bewust niet — dit was een documentatie-
+ * drift, geen defect. Diezelfde sandbox-kop staat nog op meer shell-bestanden
+ * (o.a. `top-bar.tsx`); die zijn hier niet meegenomen.
+ *
+ * De ingeklapt-stand is bewust PER APPARAAT (localStorage): het is een
+ * ruimtekeuze op dít scherm, geen profielvoorkeur die mee hoort te reizen.
+ * Voorkeuren die wél cross-device gelden staan op de eigen profielrij.
  */
 'use client'
 

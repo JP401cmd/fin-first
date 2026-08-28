@@ -100,9 +100,26 @@ export async function VasteLastenLoader({ perspective }: { perspective: Perspect
       />
       {/* Kalender = secundaire diepte ("wanneer komt het"): in Eenvoudig
           verborgen, in Volledig zichtbaar. De primaire analyse + het
-          hoofdcijfer (VasteLastenClient) blijven altijd staan. */}
+          hoofdcijfer (VasteLastenClient) blijven altijd staan.
+
+          TWEE POPULATIES, ÉÉN KALENDER (M21). `cashflow.recurrings` is de
+          bevestigde tabel; `detections` zijn de posten die de analyse hierboven
+          wél meetelt maar die nog niet bevestigd zijn. Zonder die tweede stroom
+          stond er "geen vaste afschrijvingen" onder een kaart die er 21 telde.
+          `terugkerendVariabel` (boodschappen/tanken) blijft er bewust BUITEN:
+          die staat ook buiten `totalMonthly` en heeft geen vaste afschrijfdag. */}
       <HideInSimple>
-        <CashflowKalender recurrings={cashflow.recurrings} />
+        <CashflowKalender
+          recurrings={cashflow.recurrings}
+          detections={[...summary.subscriptions, ...summary.vasteKosten]
+            .filter((item) => !item.alreadyConfirmed && item.schedule)
+            .map((item) => ({
+              id: item.id,
+              name: item.name,
+              amount: item.averageAmount,
+              schedule: item.schedule ?? null,
+            }))}
+        />
       </HideInSimple>
     </div>
   )
@@ -137,20 +154,31 @@ export async function VasteLastenLoader({ perspective }: { perspective: Perspect
  *    veelvoorkomende orde van grootte, geen belofte. De rij-HOOGTE (62px:
  *    py-3 + `text-sm`-regel + `text-xs`-regel + 1px randen) is wél nageteld, dus
  *    een afwijking kost een veelvoud van één rij en geen willekeurig verschil.
- *  · De uitgebreide inzicht-blokken (`VasteLastenInsights`) en de KALENDER: allebei
- *    `HideInSimple` — in Eenvoudig renderen ze helemaal niet — en allebei ver onder
- *    de vouw. Een vaste reservering zou voor de Eenvoudig-modus een permanent gat
- *    zijn; dezelfde afweging als de inflatiekaart op de hub.
+ *  · De KALENDER (`HideInSimple` — in Eenvoudig rendert hij helemaal niet) en de
+ *    inzicht-blokken. Allebei ver onder de vouw; een vaste reservering zou voor
+ *    de Eenvoudig-modus een permanent gat zijn (dezelfde afweging als de
+ *    inflatiekaart op de hub).
  *
- * WAT WÉL GERESERVEERD WORDT HOEWEL HET KAN ONTBREKEN — de aandeel-meter.
- * `CompactMeter` rendert alleen bij `insights.hasData` (vaste-lasten-client.tsx),
- * dus voor een account zonder gedetecteerde vaste lasten klapt hier ~40px dicht,
- * bóven de vouw. Toch gereserveerd, om dezelfde reden als de KPI-regel in
- * `CashflowCardsFallback` op de hub: reserveren kiest de veelvoorkomende kant.
- * Wie geen enkele vaste last heeft ziet sowieso de lege staat van de
- * analyse-kaart (~400px skeleton → een compacte "nog niets gevonden"-tekst); die
- * 40px weglaten zou zijn instroom niet shift-vrij maken, en zou iedereen mét
- * vaste lasten een groei van 40px kosten.
+ * WAT WÉL GERESERVEERD WORDT HOEWEL HET KAN ONTBREKEN — de strook direct onder
+ * het cijferblok. `CompactMeter` rendert alleen bij `insights.hasData`
+ * (vaste-lasten-client.tsx), dus voor een account zonder gedetecteerde vaste
+ * lasten klapt hier ~40px dicht, bóven de vouw. Toch gereserveerd, om dezelfde
+ * reden als de KPI-regel in `CashflowCardsFallback` op de hub: reserveren kiest
+ * de veelvoorkomende kant.
+ *
+ * S2 — DE OUDE AANNAME "in Eenvoudig rendert daar niets" IS VERVALLEN. Sinds S2
+ * staat in Eenvoudig op precies deze plek de OORDEELREGEL (`OordeelDeck`, ±2
+ * regels ≈ 46px) in plaats van de compacte meter (±28px), en dáár weer onder de
+ * quote-meter, het sluipverbruik en de top-5. Deze fallback is bewust
+ * modus-AGNOSTISCH gebleven: hij is een server-component en kan
+ * `useDisplayMode()` niet lezen, en een tweede, modus-afhankelijke skeleton zou
+ * de modus alsnog naar de serverrender moeten prop-drillen (drift-risico dat
+ * ADR 0026 juist wegneemt). Boven de vouw kost dat ~18px verschil (deck i.p.v.
+ * meter) — kleiner dan de bestaande onzekerheid over het aantal lijstrijen.
+ * Onder de vouw schuift de analyse-kaart in Eenvoudig verder omlaag (de drie
+ * duidingsblokken komen ertussen) en klapt hij bovendien in tot de
+ * DepthSection-kop; die twee heffen elkaar deels op en spelen zich af buiten
+ * het eerste scherm, waar een skeleton geen shift meer voorkomt die iemand ziet.
  */
 export function VasteLastenFallback() {
   return (

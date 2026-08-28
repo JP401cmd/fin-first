@@ -131,6 +131,14 @@ type TrayProps = {
   role?: string
   /** Ref naar het scroll-`<main>` (alleen de persistente tray gebruikt dit). */
   mainRef?: Ref<HTMLElement>
+  /**
+   * De paginanaam die als de ENIGE `<h1>` van de route wordt gerenderd
+   * (sr-only). Alleen de persistente tray geeft dit door — de outgoing-tray is
+   * `aria-hidden` en mag geen tweede h1 in de boom zetten. Leeg/undefined ⇒
+   * geen h1 (beter dan de lege `<h1>` die de TopBar hiervóór rendde op
+   * tab-roots). Zie ADR 0110.
+   */
+  pageName?: string
 }
 
 function Tray({
@@ -146,6 +154,7 @@ function Tray({
   email,
   role,
   mainRef,
+  pageName,
 }: TrayProps) {
   // Desktop-collaps: alleen in productie (niet in een forceVisible-sandbox-
   // frame). De tray valt terug op document-flow; TopBar/BottomBar zijn hidden.
@@ -165,6 +174,21 @@ function Tray({
       aria-hidden={ariaHidden || undefined}
       className={`absolute inset-0 flex flex-col bg-[var(--bg)]${trayDesktop}${animClass ? ` ${animClass}` : ''}`}
     >
+      {/* De ENIGE <h1> van de route (ADR 0110). Bewust hier en niet in TopBar:
+          die is `lg:hidden` (= display:none ⇒ uit de a11y-tree op desktop),
+          rendert `null` bij `topBar.kind: 'hidden'`, en houdt zijn titel leeg
+          op tab-roots ('rich'). Een kop-drager die op één van de drie assen
+          wegvalt kan de "precies één h1"-invariant niet dragen.
+          `sr-only` (clip, géén display:none) houdt 'm op BEIDE breakpoints in
+          de a11y-tree; de zichtbare titel in de TopBar is hetzelfde label maar
+          niet-semantisch. `aria-live="polite"` staat hier — zo kondigt een
+          push/pop de nieuwe paginanaam aan i.p.v. de chrome. */}
+      {pageName && (
+        <h1 className="sr-only" aria-live="polite">
+          {pageName}
+        </h1>
+      )}
+
       {/* TopBar binnen de tray — niet sticky t.o.v. viewport, wel binnen de
           tray-flex-column zodat hij meeschuift bij push/pop. Zelf `lg:hidden`
           (tenzij forceVisible) via zijn eigen visibility-class. */}
@@ -253,6 +277,19 @@ export function MobileStackShell({
   // alleen in productie; een forceVisible-sandbox houdt de mobiele tray.
   const frameCollapse = forceVisible ? '' : ' lg:contents'
 
+  // ── Paginanaam voor de enige <h1> (ADR 0110) ───────────────────
+  // Eigen resolutie, bewust NIET die van TopBar: die houdt tab-roots ('rich')
+  // opzettelijk leeg omdat de chrome daar geen titel wil tónen. De a11y-boom
+  // heeft juist dáár een naam nodig. Volgorde: expliciete NavStackMeta-titel →
+  // nav-config op het pad van de top-entry → nav-config op het live pad
+  // (dekt een pagina die nog geen NavStackMeta rendert). Blijft alles leeg,
+  // dan rendert er géén h1 — beter dan de lege <h1> van hiervoor.
+  const pageName =
+    top?.title ||
+    resolveRouteTitle(top?.pathname ?? '') ||
+    resolveRouteTitle(pathname) ||
+    ''
+
   return (
     // Buitenste frame: mobiel een 100vh-flex-column; desktop collabeert
     // (`lg:contents`) zodat alleen de `<main>` in de document-flow overblijft.
@@ -313,6 +350,7 @@ export function MobileStackShell({
           email={email}
           role={role}
           mainRef={mainScrollRef}
+          pageName={pageName}
         >
           {children}
         </Tray>

@@ -1,35 +1,40 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { X, ArrowRight, ArrowLeft, Lock } from 'lucide-react'
 import { Kicker } from '@/components/editorial'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { GuideScreenView } from './guide-screen-view'
+import { useWelcomeGuide } from './welcome-guide-provider'
 import {
   getVisibleScreens,
   hasMoreScreens,
   countScreenProgress,
-  type GuideDerivedStates,
-  type WelcomeGuideConfig,
-  type WelcomeGuideState,
 } from '@/lib/welcome-guide'
 
 /**
- * WelcomeGuideBanner — altijd-open welkomstkaart bovenaan /overzicht. Zelf-
- * fetchend (zoals CheckinBanner): haalt config + per-user staat op uit
- * /api/welcome-guide en muteert die optimistisch.
+ * WelcomeGuideBanner — de UITGEKLAPTE welkomstkaart op /overzicht. Pure consumer
+ * van `WelcomeGuideProvider`: die haalt config + per-user staat op (of krijgt ze
+ * als server-seed van de pagina) en deelt ze met deze banner én met het
+ * geminimaliseerde punt (`WelcomeGuideDot`). Eén bron, twee vormen — de
+ * meldingen-conventie uit CLAUDE.md.
  *
  * - Toont één scherm tegelijk; required-schermen eerst, optionele schermen
  *   ontgrendelt de gebruiker zelf.
  * - Stappen handmatig afvinken → groen, blijven staan.
- * - Sluiten (X / "sluit gids") → twee-keuze-dialoog: voorgoed verbergen of
- *   volgende keer verder (sessie-flag verbergt 'm alleen deze sessie).
+ * - Het kruisje MINIMALISEERT direct (L11 blijft: geen tussenvraag). De gids
+ *   klapt in tot het punt naast de pagina-'i' en blijft daar staan tot je 'm
+ *   weer opent — server-side onthouden, dus ook op een ander apparaat (S13).
+ *   Waar hier ooit een blokkerende twee-keuze-dialoog stond en daarna een
+ *   sessie-only sluitvlag, is er nu één uitgang die niets weggooit.
+ * - Voorgoed verbergen (`dismissForever`, server-state) blijft een kleine link
+ *   ondér in de gids; zie ook M38, waar dezelfde regel voor de tips-tour op
+ *   /toekomst geldt.
  *
- * SERVER-SEED (perf fase 1): geeft de /overzicht-pagina een `seed`
- * ({ config, state }) mee, dan gebruikt de banner die en slaat de eerste
- * client-fetch naar /api/welcome-guide over. Interacties (afvinken/navigeren/
- * sluiten) blijven via de bestaande PUT-route lopen.
+ * POSITIE (H20/S13): de gids rendert in het `banners`-slot van
+ * `OverzichtHeroPrimary`, dus NÁ de begroeting. Het eerste dat de app zegt is
+ * "hoe je ervoor staat", niet een takenlijst. Bewaakt door
+ * `overzicht-hero.block-order.test.ts`.
  *
  * EENVOUDIGE WEERGAVE (APP-6): in 'simple' comprimeert de gids — de stappen
  * worden afvinkregels i.p.v. grote proceskaarten, de "Scherm N van M"-teller
@@ -48,91 +53,28 @@ import {
  * scherm, hermeet dan hier in plaats van een grens toe te voegen.
  */
 
-const SESSION_CLOSED_KEY = 'welcome_guide_closed'
-
-type Payload = {
-  config: WelcomeGuideConfig
-  state: WelcomeGuideState
-  /**
-   * Wat de app al wéét (M1): stap-id → 'done' | 'open' | 'nvt', server-side
-   * afgeleid uit de accountstatus. Ontbreekt bij een oudere payload → de gids
-   * gedraagt zich exact als voorheen (alles handmatig).
-   */
-  derived?: GuideDerivedStates
-}
-
-export function WelcomeGuideBanner({ seed }: { seed?: Payload | null }) {
-  const [data, setData] = useState<Payload | null>(null)
-  const [hidden, setHidden] = useState(false)
-  const [confirming, setConfirming] = useState(false)
+export function WelcomeGuideBanner() {
+  const { data, display, mutate, minimize, dismissForever } = useWelcomeGuide()
   // SINGLE SOURCE OF TRUTH voor de weergavemodus — één read, net als de rest
   // van /overzicht. Stuurt alleen de compressie hieronder, nooit de data.
   const { mode } = useDisplayMode()
   const simple = mode === 'simple'
 
-  // ── Mount: sessie-flag → niet fetchen (data blijft null → render niets);
-  // anders de server-seed gebruiken (geen fetch) of config + staat ophalen.
-  // Alleen de `cancelled`-flag gebruiken (geen fetchedRef-guard) zodat de dubbele
-  // StrictMode-mount in dev de tweede fetch gewoon laat winnen — setState gebeurt
-  // enkel async in callbacks. ──
-  useEffect(() => {
-    try {
-      if (sessionStorage.getItem(SESSION_CLOSED_KEY) === '1') return
-    } catch {
-      /* sessionStorage onbeschikbaar — ga door */
-    }
-    const applyPayload = (d: Payload) => {
-      if (!d.config?.enabled || d.state?.status === 'dismissed') {
-        setHidden(true)
-        return
-      }
-      setData(d)
-    }
-    // Server-seed aanwezig → geen fetch; zelfde visibility-logica als de fetch.
-    if (seed) {
-      applyPayload(seed)
-      return
-    }
-    let cancelled = false
-    fetch('/api/welcome-guide')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: Payload | null) => {
-        if (cancelled || !d) return
-        applyPayload(d)
-      })
-      .catch(() => {
-        if (!cancelled) setHidden(true)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [seed])
+  // Geminimaliseerd: de gids zelf is weg, maar de aria-live-regio blijft staan
+  // zodat een screenreader de toestandswissel hoort én weet waar de gids heen
+  // ging (spiegel van `PageStatusBanner`).
+  if (display === 'minimized') {
+    return (
+      <section aria-label="Welkomstgids" role="status" aria-live="polite">
+        <span className="sr-only">
+          Welkomstgids geminimaliseerd. Activeer de knop met het lijstje naast de
+          informatie-knop om de gids opnieuw te tonen.
+        </span>
+      </section>
+    )
+  }
 
-  // ── Optimistische mutatie + server-sync ──
-  const mutate = useCallback(
-    async (
-      body: Record<string, unknown>,
-      optimistic: (prev: WelcomeGuideState) => WelcomeGuideState,
-    ) => {
-      setData((prev) => (prev ? { ...prev, state: optimistic(prev.state) } : prev))
-      try {
-        const res = await fetch('/api/welcome-guide', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        })
-        if (res.ok) {
-          const json = (await res.json()) as { state: WelcomeGuideState }
-          setData((prev) => (prev ? { ...prev, state: json.state } : prev))
-        }
-      } catch {
-        /* stil: optimistische staat blijft staan; volgende load corrigeert */
-      }
-    },
-    [],
-  )
-
-  if (hidden || !data) return null
+  if (display !== 'expanded' || !data) return null
 
   const { config, state, derived } = data
   const visible = getVisibleScreens(config, state)
@@ -175,22 +117,12 @@ export function WelcomeGuideBanner({ seed }: { seed?: Payload | null }) {
       currentScreen: visible.length, // nieuw ontgrendeld scherm
     }))
 
-  const closeForSession = () => {
-    try {
-      sessionStorage.setItem(SESSION_CLOSED_KEY, '1')
-    } catch {
-      /* no-op */
-    }
-    setHidden(true)
-  }
-
-  const dismissForever = () => {
-    setHidden(true)
-    void mutate({ action: 'dismiss' }, (s) => ({ ...s, status: 'dismissed' }))
-  }
-
   return (
-    <section aria-label="Welkomstgids" className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
+    // H20: de gids rendert sinds 28-08-2026 IN de hero-sectie van /overzicht
+    // (slot `banners`, ná de begroeting) en erft daar de `max-w-6xl`-breedte en
+    // de horizontale padding. Een eigen container zou die verdubbelen — vandaar
+    // alleen nog verticale ruimte.
+    <section aria-label="Welkomstgids" role="status" aria-live="polite" className="mb-6">
       <div className="overflow-hidden rounded-2xl border border-[var(--border-ed)] bg-[var(--color-kern-50)]/40">
         <div aria-hidden className="h-[3px] w-full" style={{ background: 'var(--color-kern-500)' }} />
         <div className={simple ? 'p-2.5 sm:p-4' : 'p-4 sm:p-5'}>
@@ -235,8 +167,9 @@ export function WelcomeGuideBanner({ seed }: { seed?: Payload | null }) {
             </div>
             <button
               type="button"
-              onClick={() => setConfirming(true)}
-              aria-label="Welkomstgids sluiten"
+              onClick={minimize}
+              aria-label="Welkomstgids minimaliseren"
+              title="Minimaliseren"
               className={`inline-flex shrink-0 items-center justify-center rounded-full text-[var(--ink-3)] transition-colors hover:bg-[var(--subtle)] ${
                 simple ? 'h-7 w-7' : 'h-8 w-8'
               }`}
@@ -257,15 +190,9 @@ export function WelcomeGuideBanner({ seed }: { seed?: Payload | null }) {
             </div>
           )}
 
-          {/* Confirm-dialoog of het scherm */}
-          {confirming ? (
-            <CloseDialog
-              onForever={dismissForever}
-              onSession={closeForSession}
-              onCancel={() => setConfirming(false)}
-            />
-          ) : (
-            <>
+          {/* Sluiten sluit direct (L11) — er stond hier een tussenvraag die
+              het scherm verving en drie keuzes maakte van één kruisje. */}
+          <>
               <GuideScreenView
                 screen={screen}
                 completedStepIds={state.completedStepIds}
@@ -298,8 +225,8 @@ export function WelcomeGuideBanner({ seed }: { seed?: Payload | null }) {
                     </PrimaryButton>
                   ) : canReveal ? (
                     <>
-                      <GhostButton onClick={() => setConfirming(true)} compact={simple}>
-                        Nee, sluit gids
+                      <GhostButton onClick={minimize} compact={simple}>
+                        Nee, klap in
                       </GhostButton>
                       <PrimaryButton onClick={reveal} compact={simple}>
                         Ja, toon meer
@@ -307,8 +234,8 @@ export function WelcomeGuideBanner({ seed }: { seed?: Payload | null }) {
                       </PrimaryButton>
                     </>
                   ) : (
-                    <PrimaryButton onClick={() => setConfirming(true)} compact={simple}>
-                      Gids sluiten
+                    <PrimaryButton onClick={minimize} compact={simple}>
+                      Gids inklappen
                     </PrimaryButton>
                   )}
                 </div>
@@ -330,8 +257,24 @@ export function WelcomeGuideBanner({ seed }: { seed?: Payload | null }) {
                 </Link>
                 .
               </p>
-            </>
-          )}
+
+              {/* "Definitief verbergen" als kleine, niet-blokkerende link (L11).
+                  Inklappen gebeurt direct en gooit niets weg; wie de gids nooit
+                  meer wil zien, kiest dat hier ter plekke — niet via een vraag
+                  die het inklappen ophoudt (S13: één uitgang, geen dialoog). */}
+              <p className="mt-1 text-[11px] leading-snug text-[var(--ink-4)]">
+                Inklappen bewaart je plek: de gids gaat verder als klein lijstje
+                naast de informatie-knop rechtsboven.{' '}
+                <button
+                  type="button"
+                  onClick={dismissForever}
+                  className="font-semibold text-[var(--ink-3)] underline-offset-2 hover:text-[var(--ink-2)] hover:underline"
+                >
+                  Verberg de gids voorgoed
+                </button>
+                .
+              </p>
+          </>
         </div>
       </div>
     </section>
@@ -378,63 +321,6 @@ function ScreenDots({
       })}
       {canReveal && <Lock className="ml-1 h-3 w-3 text-[var(--ink-4)]" aria-hidden />}
     </span>
-  )
-}
-
-// ── Sluit-dialoog (twee keuzes) ─────────────────────────────────────────────
-
-function CloseDialog({
-  onForever,
-  onSession,
-  onCancel,
-}: {
-  onForever: () => void
-  onSession: () => void
-  onCancel: () => void
-}) {
-  return (
-    <div className="py-2">
-      <h3
-        className="text-lg text-[var(--ink)]"
-        style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
-      >
-        Welkomstgids sluiten?
-      </h3>
-      <p className="mt-1 text-sm text-[var(--ink-3)]">
-        Wil je deze schermen niet meer zien, of de volgende keer verdergaan waar je gebleven bent?
-      </p>
-      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-        <button
-          type="button"
-          onClick={onSession}
-          className="flex-1 rounded-xl border border-[var(--border-md)] bg-[var(--paper)] px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)]"
-        >
-          <span className="block text-sm font-semibold text-[var(--ink)]">Volgende keer verder</span>
-          <span className="mt-0.5 block text-xs text-[var(--ink-3)]">
-            Verberg nu; bij je volgende bezoek gaat de gids verder.
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={onForever}
-          className="flex-1 rounded-xl border border-[var(--border-md)] bg-[var(--paper)] px-4 py-3 text-left transition-colors hover:bg-[var(--subtle)]"
-        >
-          <span className="block text-sm font-semibold text-[var(--ink)]">
-            Geen onboarding-schermen meer tonen
-          </span>
-          <span className="mt-0.5 block text-xs text-[var(--ink-3)]">
-            Verberg de gids voorgoed.
-          </span>
-        </button>
-      </div>
-      <button
-        type="button"
-        onClick={onCancel}
-        className="mt-3 text-xs font-medium text-[var(--ink-4)] transition-colors hover:text-[var(--ink-2)]"
-      >
-        Annuleren
-      </button>
-    </div>
   )
 }
 

@@ -767,6 +767,9 @@ function NetWorthKassabon({
           Netto vermogen
         </p>
         <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">
+          {/* Bewust kaal: deze regel staat bovenaan de scroll-container van de
+              BottomSheet, waar de bottom-full-tooltip van GlossaryTerm zou
+              worden afgekapt. De uitleg hangt aan de slotregel hieronder. */}
           Bezittingen minus schulden — gewogen naar inclusiepercentage
         </p>
       </div>
@@ -807,7 +810,8 @@ function NetWorthKassabon({
       </div>
 
       <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">
-        Berekend op basis van actieve bezittingen en schulden, gewogen naar het ingestelde inclusiepercentage.
+        Berekend op basis van actieve bezittingen en schulden, gewogen naar het ingestelde{' '}
+        <GlossaryTerm term="inclusiepercentage">inclusiepercentage</GlossaryTerm>.
       </p>
     </KassabonShell>
   )
@@ -1146,7 +1150,7 @@ function HealthScoreKassabon({ healthScore }: { healthScore: HealthScore }) {
         {healthScore.budgetingActive ? <>budgetdiscipline,{' '}</> : null}
         noodfonds, schuldenlast,{' '}
         <GlossaryTerm term="schuldgraad">schuldratio</GlossaryTerm>,{' '}
-        <GlossaryTerm term="FIRE">FIRE</GlossaryTerm>-voortgang en{' '}
+        voortgang naar <GlossaryTerm term="fire">FIRE</GlossaryTerm> en{' '}
         <GlossaryTerm term="diversificatie">vermogensspreiding</GlossaryTerm>.
         Herberekend bij elke paginaweergave.
       </p>

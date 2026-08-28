@@ -4,6 +4,8 @@ import { useMemo } from 'react'
 import { formatCurrency } from '@/lib/format'
 import {
   getUpcomingTransactions,
+  nextOccurrenceFromSchedule,
+  type RecurringSchedule,
   type RecurringTransaction,
 } from '@/lib/recurring-data'
 
@@ -21,15 +23,40 @@ import {
  * Mounting: nieuwe sub-view op /overzicht/cashflow naast Budget /
  * Transacties / Vaste lasten via de CashflowViewSwitcher.
  *
- * Data: recurring_transactions uit DashboardData (al gefilterd op
- * is_active). getUpcomingTransactions() berekent next-date per
- * recurring; deze component groepeert ze per dag.
+ * TWEE BRONNEN, ÉÉN KALENDER (bevinding M21) — en ze blijven uit elkaar te
+ * houden:
+ *  · `recurrings` — BEVESTIGDE `recurring_transactions` (al gefilterd op
+ *    is_active). Volle markers.
+ *  · `detections` — door de app GEVONDEN maar nog niet bevestigde vaste lasten
+ *    uit dezelfde `loadVasteLastenSummary` die de analyse-kaart erboven voedt.
+ *    Gestippelde, gedempte markers met een `~`-voorvoegsel.
+ *
+ * Vóór M21 las de kalender alléén de bevestigde tabel, terwijl de analyse-kaart
+ * erboven bevestigd + gedetecteerd optelde. Bij een verse koppeling stond er dus
+ * "21 vaste lasten" bovenaan en "geen vaste afschrijvingen" eronder. De kalender
+ * verzint niets bij: beide populaties komen uit hun eigen bron en worden
+ * afzonderlijk geteld en gelabeld.
+ *
+ * `getUpcomingTransactions` / `nextOccurrenceFromSchedule` (lib/recurring-data.ts)
+ * zijn de ENIGE datummotor — geen tweede heuristiek in deze component.
  */
+
+/** Eén nog niet bevestigde, gedetecteerde vaste last op de kalender. */
+export type CashflowDetection = {
+  id: string
+  name: string
+  /** Gemiddeld bedrag per afschrijving, POSITIEF (detecties zijn uitgaven). */
+  amount: number
+  /** Roosterfeiten uit de detectie; null → niet plaatsbaar, niet tonen. */
+  schedule: RecurringSchedule | null
+}
 
 type DayBucket = {
   date: Date
   expenses: { name: string; amount: number }[]
   incomes: { name: string; amount: number }[]
+  /** Nog niet bevestigd — apart gehouden zodat ze apart getoond kunnen worden. */
+  detections: { name: string; amount: number }[]
 }
 
 const WEEKDAYS = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
@@ -41,6 +68,7 @@ const WEEKDAYS = ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
  */
 function buildBuckets(
   recurrings: RecurringTransaction[],
+  detections: CashflowDetection[],
   todayISO: string,
 ): DayBucket[] {
   const today = new Date(todayISO + 'T12:00:00')
@@ -54,17 +82,22 @@ function buildBuckets(
   for (let i = 0; i < 35; i++) {
     const date = new Date(monday)
     date.setDate(monday.getDate() + i)
-    buckets.push({ date, expenses: [], incomes: [] })
+    buckets.push({ date, expenses: [], incomes: [], detections: [] })
+  }
+
+  /** Bucket-index van een datum, of null buiten het 5-weken-venster. */
+  const bucketFor = (date: Date): DayBucket | null => {
+    const idx = Math.floor(
+      (date.getTime() - monday.getTime()) / (1000 * 60 * 60 * 24),
+    )
+    if (idx < 0 || idx >= buckets.length) return null
+    return buckets[idx] ?? null
   }
 
   // Get upcoming over 35 dagen (vanaf vandaag) en sorteer in buckets
-  const upcoming = getUpcomingTransactions(recurrings, 35)
+  const upcoming = getUpcomingTransactions(recurrings, 35, today)
   for (const { recurring, nextDate } of upcoming) {
-    const idx = Math.floor(
-      (nextDate.getTime() - monday.getTime()) / (1000 * 60 * 60 * 24),
-    )
-    if (idx < 0 || idx >= buckets.length) continue
-    const bucket = buckets[idx]
+    const bucket = bucketFor(nextDate)
     if (!bucket) continue
     const amount = Number(recurring.amount)
     if (amount < 0) {
@@ -72,6 +105,21 @@ function buildBuckets(
     } else {
       bucket.incomes.push({ name: recurring.name, amount })
     }
+  }
+
+  // Nog niet bevestigde detecties — zelfde datummotor, eigen bucket-lijst.
+  const cutoff = new Date(today)
+  cutoff.setDate(cutoff.getDate() + 35)
+  for (const detection of detections) {
+    if (!detection.schedule) continue
+    const nextDate = nextOccurrenceFromSchedule(detection.schedule, today)
+    if (!nextDate || nextDate > cutoff) continue
+    const bucket = bucketFor(nextDate)
+    if (!bucket) continue
+    bucket.detections.push({
+      name: detection.name,
+      amount: Math.abs(Number(detection.amount)),
+    })
   }
 
   return buckets
@@ -87,8 +135,11 @@ function isSameDay(a: Date, b: Date): boolean {
 
 export function CashflowKalender({
   recurrings,
+  detections = [],
 }: {
   recurrings: RecurringTransaction[]
+  /** Gevonden maar nog niet bevestigde vaste lasten (M21). */
+  detections?: CashflowDetection[]
 }) {
   // Today gestabiliseerd op render-tijd zodat bucket-buildup pure is.
   const todayISO = useMemo(() => {
@@ -98,11 +149,13 @@ export function CashflowKalender({
   const today = useMemo(() => new Date(todayISO + 'T12:00:00'), [todayISO])
 
   const buckets = useMemo(
-    () => buildBuckets(recurrings, todayISO),
-    [recurrings, todayISO],
+    () => buildBuckets(recurrings, detections, todayISO),
+    [recurrings, detections, todayISO],
   )
 
-  // Totalen voor de header
+  // Totalen voor de header. BEVESTIGD en NOG TE BEVESTIGEN blijven gescheiden:
+  // één opgeteld bedrag zou een geschat totaal even hard laten ogen als een
+  // vastgelegd totaal.
   const totalExpenses = buckets.reduce(
     (s, b) =>
       s + b.expenses.reduce((s2, e) => s2 + Math.abs(e.amount), 0),
@@ -112,8 +165,20 @@ export function CashflowKalender({
     (s, b) => s + b.incomes.reduce((s2, i) => s2 + i.amount, 0),
     0,
   )
+  const totalDetections = buckets.reduce(
+    (s, b) => s + b.detections.reduce((s2, d) => s2 + d.amount, 0),
+    0,
+  )
 
-  const hasAny = buckets.some((b) => b.expenses.length + b.incomes.length > 0)
+  const detectionCount = buckets.reduce((s, b) => s + b.detections.length, 0)
+  const hasConfirmed = buckets.some((b) => b.expenses.length + b.incomes.length > 0)
+  const hasAny = hasConfirmed || detectionCount > 0
+
+  /**
+   * Zijn er wél gevonden vaste lasten, maar viel er niets van in het venster?
+   * Dan is "we vonden niets" onwaar — de lege staat moet dat verschil maken.
+   */
+  const undatedDetections = detections.length - detectionCount
 
   return (
     <div className="space-y-4">
@@ -128,32 +193,83 @@ export function CashflowKalender({
         </div>
         {hasAny && (
           <div className="flex items-center gap-4 text-xs">
-            <div className="text-right">
-              <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
-                Verwacht uit
+            {hasConfirmed && (
+              <>
+                <div className="text-right">
+                  <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                    Verwacht uit
+                  </div>
+                  <div className="font-serif font-semibold text-negative tabular-nums">
+                    {formatCurrency(totalExpenses)}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                    Verwacht in
+                  </div>
+                  <div className="font-serif font-semibold text-positive tabular-nums">
+                    {formatCurrency(totalIncomes)}
+                  </div>
+                </div>
+              </>
+            )}
+            {detectionCount > 0 && (
+              <div className="text-right">
+                <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
+                  Nog te bevestigen
+                </div>
+                <div className="font-serif font-semibold text-[var(--ink-3)] tabular-nums">
+                  {formatCurrency(totalDetections)}
+                </div>
               </div>
-              <div className="font-serif font-semibold text-negative tabular-nums">
-                {formatCurrency(totalExpenses)}
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
-                Verwacht in
-              </div>
-              <div className="font-serif font-semibold text-positive tabular-nums">
-                {formatCurrency(totalIncomes)}
-              </div>
-            </div>
+            )}
           </div>
         )}
       </header>
 
+      {/* Legenda — alleen zinvol zodra beide soorten door elkaar staan. */}
+      {detectionCount > 0 && (
+        <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-[var(--ink-3)]">
+          <span className="inline-flex items-center gap-1.5">
+            <span
+              aria-hidden
+              className="inline-block h-2 w-2 rounded-full bg-[var(--ink-3)]"
+            />
+            Bevestigd
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span
+              aria-hidden
+              className="inline-block h-2 w-2 rounded-full border border-dashed border-[var(--ink-3)]"
+            />
+            Gevonden, nog te bevestigen — datum geschat uit je transacties
+          </span>
+        </p>
+      )}
+
+      {/* Lege staat, in gewoon Nederlands en zonder padverwijzing: de oude tekst
+          stuurde je naar de pagina waar je al stond (M21). Twee gevallen, want
+          "we vonden niets" is onwaar zodra de analyse hierboven wél posten telt. */}
       {!hasAny ? (
         <div className="rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-6 text-center">
           <p className="text-sm text-[var(--ink-3)] italic leading-relaxed">
-            Geen vaste afschrijvingen of inkomsten gepland in de komende
-            5 weken. Voeg recurring transactions toe via{' '}
-            <span className="font-medium">/overzicht/cashflow → Vaste lasten</span>.
+            {undatedDetections > 0 ? (
+              <>
+                We hebben{' '}
+                {undatedDetections === 1
+                  ? 'één terugkerende post'
+                  : `${undatedDetections} terugkerende posten`}{' '}
+                gevonden, maar konden er nog geen vaste afschrijfdag uit
+                afleiden. Bevestig ze in de analyse hierboven, dan verschijnen ze
+                hier op de kalender.
+              </>
+            ) : (
+              <>
+                Nog niets gepland voor de komende vijf weken. Zodra je
+                transacties een terugkerend patroon laten zien, vullen we deze
+                kalender vanzelf.
+              </>
+            )}
           </p>
         </div>
       ) : (
@@ -183,7 +299,13 @@ export function CashflowKalender({
               const isFuture = dayMs > todayMs
               const expCount = bucket.expenses.length
               const incCount = bucket.incomes.length
-              const hasItems = expCount + incCount > 0
+              const detCount = bucket.detections.length
+              const hasItems = expCount + incCount + detCount > 0
+              // Twee bevestigde markers passen; de rest telt in "+N meer".
+              const shownConfirmed = Math.min(expCount, 2) + Math.min(incCount, 2)
+              const shownDetections = detCount > 0 && shownConfirmed < 2 ? 1 : 0
+              const hiddenCount =
+                expCount + incCount + detCount - shownConfirmed - shownDetections
               const dayNum = bucket.date.getDate()
               const monthDay = bucket.date.getDate() === 1
               return (
@@ -192,7 +314,7 @@ export function CashflowKalender({
                   role="gridcell"
                   className={`relative rounded-xl border min-h-[64px] sm:min-h-[80px] p-1 sm:p-1.5 flex flex-col ${
                     isToday
-                      ? 'border-violet-500 bg-violet-50/40'
+                      ? 'border-[var(--module-active-500)] bg-[var(--module-active-50)]/40'
                       : isPast
                         ? 'border-[var(--border-ed)] bg-[var(--subtle)]/30 opacity-60'
                         : isFuture && hasItems
@@ -204,7 +326,7 @@ export function CashflowKalender({
                     <span
                       className={`text-[10px] sm:text-xs font-mono tabular-nums ${
                         isToday
-                          ? 'text-violet-700 font-bold'
+                          ? 'text-[var(--module-active-700)] font-bold'
                           : 'text-[var(--ink-3)]'
                       }`}
                     >
@@ -236,9 +358,20 @@ export function CashflowKalender({
                           +{formatCurrency(i.amount).replace(/\s/g, '')}
                         </div>
                       ))}
-                      {expCount + incCount > 2 && (
+                      {/* Nog te bevestigen: gestippelde rand + `~` én een
+                          expliciete titel — de vorm alléén is geen boodschap. */}
+                      {bucket.detections.slice(0, shownDetections).map((d, idx) => (
+                        <div
+                          key={`det-${idx}`}
+                          className="border-l border-dashed border-[var(--ink-4)] pl-1 text-[8px] sm:text-[9px] text-[var(--ink-3)] font-mono tabular-nums truncate"
+                          title={`${d.name}: ${formatCurrency(d.amount)} — gevonden, nog te bevestigen`}
+                        >
+                          ~{formatCurrency(d.amount).replace(/\s/g, '')}
+                        </div>
+                      ))}
+                      {hiddenCount > 0 && (
                         <div className="text-[8px] text-[var(--ink-4)]">
-                          +{expCount + incCount - 2} meer
+                          +{hiddenCount} meer
                         </div>
                       )}
                     </div>
@@ -251,8 +384,9 @@ export function CashflowKalender({
       )}
 
       <p className="text-[11px] italic text-[var(--ink-3)]">
-        Afschrijvingen uit recurring transactions. Voor budget-overzicht
-        zie tab Budget, voor categorieën zie Vaste lasten.
+        {detectionCount > 0
+          ? 'Bevestigde vaste lasten staan vast; gevonden posten zijn een schatting op basis van je transactiegeschiedenis. Bevestig ze in de analyse hierboven en de schatting wordt een afspraak.'
+          : 'Afschrijvingen uit je bevestigde vaste lasten. Voor het budget-overzicht zie de tab Budget, voor de categorieën de analyse hierboven.'}
       </p>
     </div>
   )

@@ -111,14 +111,19 @@ export default function MijnNotificatiesPage() {
         return
       }
 
-      const [notifData, checkinRes, privacyRes, briefingEmailRes] = await Promise.all([
+      const [notifData, checkinRes, householdRes, briefingEmailRes] = await Promise.all([
         supabase
           .from('app_settings')
           .select('value')
           .eq('key', `notifications_preferences_${user.id}`)
           .maybeSingle(),
         fetch('/api/monthly-checkin'),
-        fetch('/api/household/privacy'),
+        // `/api/household/status` en NIET `/api/household/privacy`: die laatste
+        // levert geen enkel veld waarmee je "heb ik een partner?" kunt
+        // beantwoorden. Deze pagina las er `data.hasHousehold` uit — een veld
+        // dat de route nooit heeft geretourneerd — waardoor het partnerblok bij
+        // niemand meer verscheen, ook niet bij een echt stel (S10).
+        fetch('/api/household/status'),
         fetch('/api/briefing/email/pref'),
       ])
 
@@ -149,11 +154,22 @@ export default function MijnNotificatiesPage() {
         } catch { /* default false */ }
       }
 
-      // Partner-notif: alleen voor huishoudens
-      if (privacyRes.ok) {
+      // ── Partner-notificaties: alleen bij een ECHTE partner ────────────────
+      // De poort is `members.length > 1`, niet "heeft een huishouden". Dat
+      // onderscheid is geen muggenzifterij: `POST /api/household/invite` maakt
+      // de huishoud-rij én de eigen ledenrij al aan op het moment van
+      // uitnodigen — vóór de ander accepteert. Op "heeft een huishouden" gaan
+      // staan zou dus vier partner-modi en een categorie-picker tonen aan
+      // iemand die alleen is. Dezelfde afleiding staat al in
+      // `app/api/household/box2|box3/route.ts`.
+      //
+      // Let op de snake_case van deze route (`has_household`, `members`): het
+      // was precies zo'n naamverschil dat deze sectie stilzwijgend uitzette.
+      if (householdRes.ok) {
         try {
-          const data = await privacyRes.json()
-          if (data.hasHousehold) {
+          const data = await householdRes.json()
+          const memberCount = Array.isArray(data.members) ? data.members.length : 0
+          if (data.has_household === true && memberCount > 1) {
             setHasHousehold(true)
             try {
               const pnRes = await fetch('/api/partner-notifications')

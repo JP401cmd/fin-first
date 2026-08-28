@@ -332,15 +332,10 @@ export interface HorizonRawData {
   /** Of de eenmalige welkomsttekst bovenaan de /toekomst-grafiek al is getoond.
    *  False → toon de welkomstbanner (en markeer 'm bij eerste render). */
   hasSeenWelcome: boolean
-  /** Of de gebruiker "Niet meer weergeven" koos op de exit-melding van de
-   *  tips-overlay. True → toon de exit-melding niet meer; de overlay sluit dan
-   *  direct bij verlaten. */
+  /** Of de gebruiker "Niet meer melden" koos op de bevestigings-toast van de
+   *  tips-overlay. True → toon die toast niet meer. De overlay zelf sluit
+   *  sinds M38 altijd direct; deze marker raakt alleen de melding. */
   exitNoticeDismissed: boolean
-  /** Of de gebruiker de tips-overlay op /toekomst al één keer heeft gesloten
-   *  (marker HORIZON_TIPS_FIRST_CLOSE_NAVIGATED_SLUG aanwezig). False → de
-   *  eerstvolgende sluiting navigeert eenmalig naar /overzicht (post-onboarding
-   *  stappenplan) en zet de marker. True → geen automatische navigatie meer. */
-  tipsFirstCloseNavigated: boolean
   /** Maandelijks spaar-override uit profiles.monthly_savings_override.
    *  NULL = gebruik asset-aggregaat (monthlyContributionFromAssets). */
   monthlySavingsOverride: number | null
@@ -447,12 +442,12 @@ export const HORIZON_WELCOME_SHOWN_SLUG = 'horizon_welcome_shown'
  *  dan direct. */
 export const HORIZON_EXIT_NOTICE_DISMISSED_SLUG = 'horizon_exit_notice_dismissed'
 
-/** Feature slug die bijhoudt of de gebruiker de tips-overlay op /toekomst al
- *  één keer heeft gesloten. Stored in user_feature_visits (zelfde cross-device-
- *  patroon als HORIZON_EXIT_NOTICE_DISMISSED_SLUG). Afwezig → de EERSTE keer dat
- *  de gebruiker de tips-overlay sluit navigeert de app naar /overzicht (waar het
- *  post-onboarding stappenplan staat) en wordt deze marker gezet; daarna nooit
- *  meer. Eén keer, cross-device — géén re-navigatie per apparaat. */
+/** Feature slug die bijhield of de gebruiker de tips-overlay op /toekomst al
+ *  één keer had gesloten. HISTORISCH (M38, aug 2026): die eerste sluiting
+ *  navigeerde de gebruiker ongevraagd naar /overzicht — dat stond in geen
+ *  enkele knoptekst en is weggehaald. De slug blijft bestaan omdat er rijen in
+ *  `user_feature_visits` mee gestempeld zijn; hij wordt niet meer gelezen of
+ *  geschreven. Niet hergebruiken voor iets anders. */
 export const HORIZON_TIPS_FIRST_CLOSE_NAVIGATED_SLUG = 'horizon_tips_first_close_navigated'
 
 /** Default profile fallback values when profile query fails */
@@ -502,7 +497,6 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
     horizonSetupVisitResult,
     horizonWelcomeVisitResult,
     exitNoticeDismissedResult,
-    tipsFirstCloseNavigatedResult,
     aowRowsResult,
     txAgg12Result,
     earliestIncomeResult,
@@ -554,12 +548,6 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
       .from('user_feature_visits')
       .select('feature_slug')
       .eq('feature_slug', HORIZON_EXIT_NOTICE_DISMISSED_SLUG)
-      .maybeSingle(),
-    // Eerste-sluiting-navigatie-marker. Zelfde patroon.
-    supabase
-      .from('user_feature_visits')
-      .select('feature_slug')
-      .eq('feature_slug', HORIZON_TIPS_FIRST_CLOSE_NAVIGATED_SLUG)
       .maybeSingle(),
     // AOW-leeftijd-referentietabel (publiek, geen user-filter) — dezelfde query-
     // vorm die de client tot nu toe op mount deed (loadKernelContext / loadData).
@@ -1279,13 +1267,6 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
   const exitNoticeDismissed = !exitNoticeDismissedResult.error
     && exitNoticeDismissedResult.data?.feature_slug === HORIZON_EXIT_NOTICE_DISMISSED_SLUG
 
-  // tipsFirstCloseNavigated: true zodra de eerste-sluiting-navigatie-marker
-  // bestaat. Bij een ontbrekende tabel (error) → behandel als "nog niet
-  // genavigeerd" zodat de eenmalige navigatie minstens kan plaatsvinden
-  // (graceful degrade, zelfde keuze als exitNoticeDismissed / hasSeenWelcome).
-  const tipsFirstCloseNavigated = !tipsFirstCloseNavigatedResult.error
-    && tipsFirstCloseNavigatedResult.data?.feature_slug === HORIZON_TIPS_FIRST_CLOSE_NAVIGATED_SLUG
-
   // monthlySavingsOverride: handmatige override uit profiles. Null = geen
   // override, simulator gebruikt monthlyContributionFromAssets.
   const overrideRaw =
@@ -1389,7 +1370,6 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
     hasCompletedHorizonSetup,
     hasSeenWelcome,
     exitNoticeDismissed,
-    tipsFirstCloseNavigated,
     monthlySavingsOverride,
     monthlyContributionFromAssets,
     monthlySurplusFromBudget,
