@@ -5,6 +5,7 @@
 ## Kwaliteitstoets (pas dit toe op ELKE review)
 
 ### Typografie
+- [ ] **Koppenhiërarchie (ADR 0110)**: `h1` = alléén de shell (de sr-only paginanaam uit `components/app/shell/mobile-stack-shell.tsx`); pagina-aanhef én secties = `h2` (`PageOpening` is hard `<h2>`, `EditorialHeadline` default `'h2'`); kaarten, widgets en overlay-titels = `h3`; daarbinnen `h4+` in volgorde. Nooit een niveau overslaan, en **nooit een `<h1>` in `components/**` of `app/(app)/**`** — buiten de app-shell (landing, onboarding, /check) draagt de pagina wél zijn eigen `h1`. Bewaakt door `npm run check:headings`; de gerenderde vólgorde per route bewijst die gate níét (dat is een DOM-toets).
 - [ ] Correcte font per context? (Playfair=koppen, Source Serif=body, DM Mono=data, Inter=UI)
 - [ ] Kickers zijn UPPERCASE, 10-11px, letter-spacing 0.08-0.12em?
 - [ ] Geldbedragen in DM Mono met tabular-nums?
@@ -23,7 +24,7 @@
 
 ### Ruimte & Layout
 - [ ] Consistent gebruik van spacing (4px grid: 4, 8, 12, 16, 20, 24, 32)?
-- [ ] Touch targets minimaal 44×44px?
+- [ ] Touch targets minimaal 44×44px? (via `<TapTarget>`/`.touch-target`; twee vastgelegde uitzonderingen — zie *Mobile gestures & touch*)
 - [ ] Responsive: werkt op 360px mobiel en 1280px desktop?
 - [ ] Witruimte als bewuste keuze, niet als toevallige leegte?
 
@@ -89,7 +90,7 @@
 ### Navigatie
 - [ ] Actieve tab heeft `border-b-3` onderstreep + subtiele achtergrond `bg-[module-50]/40`?
 - [ ] Tab-tekst matcht module-kleur bij active state?
-- [ ] Alle navigatie-elementen minimaal 44px touch target?
+- [ ] Alle navigatie-elementen minimaal 44px touch target? (uitzondering: de mobiele TopBar-utility-cluster is 36px breed × 44px hoog raakgebied — zie *Mobile gestures & touch*)
 - [ ] Geen ingebakken back-knop in pagina-content — shell levert die via mobile TopBar of desktop pane-header. Zie patroon-kaart *Mobile TopBar* en page-type 11.
 - [ ] Sidebar-active-state via `--module-active-*` (zelfde tokens als kicker-streep): linker accent 3px in `-500` + bg-tint `-50/40`. Niet hardcoden naar `kern`/`wil`/`horizon`-hex.
 - [ ] Modal-keuze altijd via `<ShellOverlay kind="...">` driewegregel — geen directe `BottomSheet`-imports buiten de wrapper.
@@ -166,7 +167,11 @@
 - [ ] Skeletons in krantstijl: grijze blokken op `--paper`, scherpe hoeken (geen `rounded-*`).
 
 ### Mobile gestures & touch (codificering bestaand)
-- [ ] Tap-target minimaal 44×44px (Apple) / 48×48dp (Material), minimaal 8px spatie ertussen.
+- [ ] Tap-target minimaal 44×44px (Apple) / 48×48dp (Material), minimaal 8px spatie ertussen. **Bouw 'm nooit met de hand** — gebruik `<TapTarget>` / `tapTargetClass()` uit `components/editorial/tap-target.tsx` (of de `.touch-target`-utility). `npm run check:tap-targets` (ook in pre-push) blokkeert een nieuwe icoonknop die zijn doos onder 44px vastzet zonder aantoonbaar raakgebied.
+- [ ] **Welke hit-modus?** `reserve` = het element wordt zélf 44×44 (kies dit waar layout-ruimte is; enige modus die óók de tussenruimte garandeert). `extend` = het zichtbare vlak blijft, het raakgebied groeit via een transparante `::after` — kost geen layout-ruimte, maar de steek (breedte + gap) moet ≥44px zijn, anders overlappen de raakgebieden van buren elkaar. `extend-block` = alleen verticaal, voor dichte horizontale balken.
+- [ ] **Twee vastgelegde uitzonderingen op de 44px-norm** (besluit eigenaar 26-08-2026, bevinding M19). Beide zijn bewuste compromissen, geen slordigheid — breid de lijst niet uit zonder eigenaarsbesluit:
+  - **Pagina-header-controls op 28×28** (`h-7 w-7`): de `PageInfoButton`, het statuspunt en de `InsightToggleButton` rechtsboven op elke pagina. Ze zitten met vaste offsets naast elkaar in de pagina-hoek (zie CLAUDE.md §Pagina-header-controls); 44px zou de kop-zone domineren en raakt ~46 bestanden. 28×28 haalt de WCAG-2.5.5-AA-ondergrens (24×24) ruim, de TriFinity-eigen 44px-norm niet.
+  - **Mobiele TopBar-utility-cluster op 36px breed**: zeven controls (weergave-badge, euro-badge, kompas, privacy, nieuws, meldingen, avatar) passen niet als 44px-brede knoppen op een 360px-scherm. De cluster houdt zijn 36px breedte en rekt alleen het raakgebied **verticaal** op naar 44px (`extend-block`) — de balk is 48px hoog, dus dat kost niets. Horizontaal blijft 36px met vrije ruimte ruim boven de 24px-ondergrens.
 - [ ] Primaire acties in thumb-zone (onderste derde op phones); destructive buiten thumb-zone of achter confirm.
 - [ ] Swipe-to-delete altijd met zichtbare affordance (icoon) + undo-toast 5s. Nooit enige delete-manier.
 - [ ] Pull-to-refresh alleen op scrollbare content-lijsten, niet op forms/dashboards met auto-refresh.

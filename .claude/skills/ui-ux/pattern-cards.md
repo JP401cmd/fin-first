@@ -142,6 +142,14 @@ Bewuste, niet-universele patronen. Activeer alleen wanneer het paginatype erom v
 - **Animatie**: TopBar zit *binnen* de animation-layer van de tray, niet sticky t.o.v. viewport. Schuift mee bij stack-push/pop. Bij scroll van content blijft hij aan de top van zijn tray.
 - **A11y**: `aria-live="polite"` op de titel zodat screen-readers de nieuwe pagina aankondigen na transitie. ←-knop heeft `aria-label="Terug"` + native button.
 
+### TapTarget (raakgebied-primitive) ⭐
+- **Toepassen op**: elke icoon-only knop of link. Productie-implementatie in `components/editorial/tap-target.tsx` (`<TapTarget>`, `tapTargetClass()`, `TAP_TARGET_*`).
+- **Niet toepassen op**: knoppen met zichtbare tekst die uit zichzelf al ≥44px hoog zijn (`<Button>`), en niet-interactieve iconen.
+- **Waarom**: het UX-testpanel (M19) vond zeven icoonknoppen onder de raakdrempel in vier verschillende ad-hoc maten (20/24/32/36). De `.touch-target`-utility bestond wél, maar niets dwong 'm af.
+- **Drie hit-modi**: `reserve` — het element wordt zélf ≥44×44 (`.touch-target`); kies dit waar layout-ruimte is, want het is de enige modus die ook de tussenruimte tussen buren garandeert. `extend` — zichtbaar vlak blijft, raakgebied groeit via een transparante `::after` (geen layout-kosten; steek = breedte + gap moet ≥44px zijn, anders overlappen buren). `extend-block` — alleen verticaal, voor dichte horizontale balken.
+- **Gate**: `npm run check:tap-targets` (`scripts/check-tap-targets.mjs`, ook in pre-push) blokkeert een nieuwe icoonknop die zijn doos onder 44px vastzet zonder aantoonbaar raakgebied. Variant-geprefixte maten (`md:h-11`) tellen niet als bewijs — tap-precisie is een mobiel probleem.
+- **Uitzonderingen**: zie `quality-checklist.md` → *Mobile gestures & touch* (28×28 pagina-header-controls; 36px-brede TopBar-cluster).
+
 ### Slide-in pane (desktop)
 - **Toepassen op**: doorklik vanuit een lijst naar een entiteit-detail die naast de lijst zichtbaar moet blijven (transactie binnen budget, holding-edit binnen overzicht). Productie-implementatie in `components/app/shell/slide-in-pane.tsx`.
 - **Niet toepassen op**: modules-overzichten, categorie-pagina's (vervangen content-area volledig), of mobile (<lg, daar wordt het stack-push).

@@ -135,7 +135,7 @@ Cross-cutting voor alle types: shell-chrome wordt geleverd door `ResponsiveShell
 - **Doel**: scenario-input + live berekening + resultaat-uitkomst.
 - **Top-down structuur**:
   1. Masthead met dubbele lijn boven (`border-t-4 border-double border-b border-[var(--ink)]`): meta-l "Editie · {Module}" → logo "tf." met module-accent dot → meta-r (subtitle).
-  2. Headline-row: kicker-met-streepje → h1 met italic-em (Playfair, `clamp(28px, 5vw, 68px)`) → deck (italic Source Serif, linker module-border).
+  2. Headline-row: kicker-met-streepje → h2 met italic-em (Playfair, `clamp(28px, 5vw, 68px)`) → deck (italic Source Serif, linker module-border). Semantisch **h2, geen h1** — de shell draagt de enige h1 (ADR 0110); de maatvoering blijft die van een hoofdkop.
   3. Optionele regime/scenario-toggle: segmented control of `<TogglePill>` rij.
   4. 2-koloms grid (`grid-cols-[380px_1fr]` op desktop, stacked op `<980px`):
      **Linkerkolom (inputs)**: vertical ink-border rechts; section-labels met romeinse numbering; field-rows (label + value); range-slider met module-thumb; toggle-pills voor optionele velden; derived-block (mono, `bg-[var(--paper)]`).
