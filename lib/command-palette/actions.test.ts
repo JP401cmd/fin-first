@@ -18,7 +18,6 @@ function makeCtx(overrides: Partial<ActionRunContext> = {}): ActionRunContext {
   return {
     router: { push: vi.fn() },
     closePalette: vi.fn(),
-    openChat: vi.fn(),
     togglePrivacy: vi.fn(),
     privacyMasked: false,
     toggleDisplayMode: vi.fn(),
@@ -97,10 +96,10 @@ describe('buildActionItems — perspectief-acties', () => {
     expect(closePalette).toHaveBeenCalledTimes(2)
   })
 
-  it('behoudt de bestaande statische acties (toggle-privacy, sync, logout, chat)', () => {
+  it('behoudt de statische acties (toggle-privacy, sync, logout) — chat bewust niet (B-011-vervolg)', () => {
     const items = buildActionItems(makeCtx(), ['vermogensregistratie'])
     const ids = items.map((i) => i.id)
-    expect(ids).toContain('action:open-chat')
+    expect(ids).not.toContain('action:open-chat')
     expect(ids).toContain('action:toggle-privacy')
     expect(ids).toContain('action:sync-prices')
     expect(ids).toContain('action:logout')

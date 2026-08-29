@@ -33,7 +33,6 @@ import { useScrollLock } from '@/lib/hooks/use-scroll-lock'
 import { useFocusTrap } from '@/lib/hooks/use-focus-trap'
 import { useSwipeToDismiss } from '@/lib/hooks/use-swipe-to-dismiss'
 import { pushOverlayHistory, noteOverlayNavigation } from '@/lib/overlay-history'
-import { useChatContext } from '@/components/app/chat/chat-provider'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { useEuroView } from '@/lib/hooks/use-euro-view'
@@ -115,7 +114,6 @@ export function CommandPalette({ open, onClose, role, userId }: CommandPalettePr
   )
 
   const { activeModules } = useModuleAccess()
-  const { open: openChat } = useChatContext()
   const { masked, toggle: togglePrivacy } = useMaskedAmounts()
   const { mode: displayMode, toggle: toggleDisplayMode } = useDisplayMode()
   const { view: euroView, toggle: toggleEuroView } = useEuroView()
@@ -131,7 +129,6 @@ export function CommandPalette({ open, onClose, role, userId }: CommandPalettePr
     () => ({
       router,
       closePalette: onClose,
-      openChat,
       togglePrivacy,
       privacyMasked: masked,
       toggleDisplayMode,
@@ -148,7 +145,6 @@ export function CommandPalette({ open, onClose, role, userId }: CommandPalettePr
     [
       router,
       onClose,
-      openChat,
       togglePrivacy,
       masked,
       toggleDisplayMode,

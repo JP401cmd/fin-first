@@ -160,7 +160,6 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
       const baseCtx: ActionRunContext = {
         router: { push: () => {} },
         closePalette: () => {},
-        openChat: () => {},
         togglePrivacy: () => {},
         privacyMasked: false,
         toggleDisplayMode: () => {},
@@ -277,7 +276,6 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
       const baseCtx: ActionRunContext = {
         router: { push: () => {} },
         closePalette: () => {},
-        openChat: () => {},
         togglePrivacy: () => {},
         privacyMasked: false,
         toggleDisplayMode: () => {},

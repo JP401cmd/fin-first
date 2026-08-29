@@ -4,7 +4,7 @@
 // route-gebaseerde "acties" leven in `navigation-index.ts` — geen duplicatie.
 
 import {
-  MessageSquare, Eye, EyeOff, RefreshCw, LogOut, User, Users, UserCheck,
+  Eye, EyeOff, RefreshCw, LogOut, User, Users, UserCheck,
   Layers, PanelTopClose, CalendarClock, Wallet, type LucideIcon,
 } from 'lucide-react'
 import type { EuroView } from '@/lib/euro-display'
@@ -23,14 +23,12 @@ export const ACTIONS_LIMIT_VISIBLE = 5
 
 /**
  * Capabilities die een action kan gebruiken. Wordt door de provider gebouwd
- * uit React contexts (`useChatContext`, `useMaskedAmounts`, `useGlobalSync`,
+ * uit React contexts (`useMaskedAmounts`, `useGlobalSync`,
  * `useRouter`, `usePerspective`) en doorgegeven aan de `build`-factory.
  */
 export type ActionRunContext = {
   router: { push: (href: string) => void }
   closePalette: () => void
-  /** Open AI-chat panel. */
-  openChat: () => void
   /** Toggle privacy-masking voor bedragen. */
   togglePrivacy: () => void
   /** Huidige privacy-state — bepaalt label "Bedragen verbergen" vs "Bedragen tonen". */
@@ -73,18 +71,11 @@ type ActionDef = {
 
 // ── Register ─────────────────────────────────────────────────────────────────
 
+/* Geen chat-actie in het palet (besluit 29-08-2026, vervolg op B-011): de chat
+   is altijd al bij de hand via de Fin-knop in de nav-pill / het gedokte paneel —
+   een palet-ingang was een tweede weg naar hetzelfde. Niet her-toevoegen zonder
+   nieuw eigenaarsbesluit. */
 const ACTIONS: ActionDef[] = [
-  {
-    id: 'action:open-chat',
-    getLabel: () => 'Open AI-chat',
-    getSublabel: () => 'Stel een vraag of laat Fin analyseren',
-    getIcon: () => MessageSquare,
-    module: 'wil',
-    build: (ctx) => () => {
-      ctx.closePalette()
-      ctx.openChat()
-    },
-  },
   {
     id: 'action:toggle-privacy',
     getLabel: (ctx) => (ctx.privacyMasked ? 'Bedragen tonen' : 'Bedragen verbergen'),

@@ -304,14 +304,14 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-NAV-20',
     scenarioId: 'UAT-NAV-20',
-    titel: 'Fin-chat openen (bubbel, ⌘K, ?prompt=-deeplink)',
+    titel: 'Fin-chat openen (bubbel, ?prompt=-deeplink)',
     kriticiteit: 'BELANGRIJK',
-    given: 'Drie ingangen: de Fin-bubbel, de ⌘K-actie "Open AI-chat", en een `?prompt=`-deeplink.',
-    when: 'De gebruiker opent de chat via elk van de drie.',
-    then: 'Alle drie openen consistent hetzelfde chatpaneel; een onbekende `?prompt=`-sleutel doet niets (geen crash); "Vraag Fin" in het mobiele nav-menu blijft een bevestigde no-op (zie WF-NAV-04).',
+    given: 'Twee ingangen: de Fin-bubbel en een `?prompt=`-deeplink. De ⌘K-actie "Open AI-chat" is bewust verwijderd (29-08-2026, B-011-vervolg): de chat is altijd bij de hand via de nav-pill, het palet hoort géén chat-ingang te tonen.',
+    when: 'De gebruiker opent de chat via elk van de twee, en zoekt in ⌘K op "chat".',
+    then: 'Beide ingangen openen consistent hetzelfde chatpaneel; ⌘K biedt géén "Open AI-chat"-actie meer; een onbekende `?prompt=`-sleutel doet niets (geen crash); "Vraag Fin" in het mobiele nav-menu blijft een bevestigde no-op (zie WF-NAV-04).',
     assertion: {
       kind: 'ui-only',
-      source: 'components/app/chat/chat-prompt-deeplink.tsx + fin-home.tsx — drie ingangen naar hetzelfde paneel, geen cijfermatige uitkomst',
+      source: 'components/app/chat/chat-prompt-deeplink.tsx + fin-home.tsx — twee ingangen naar hetzelfde paneel, geen cijfermatige uitkomst',
     },
   },
   {

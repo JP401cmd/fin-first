@@ -22,10 +22,6 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
 }))
 
-vi.mock('@/components/app/chat/chat-provider', () => ({
-  useChatContext: () => ({ open: vi.fn(), openWithMessage: vi.fn() }),
-}))
-
 vi.mock('@/components/sync/global-sync-provider', () => ({
   useGlobalSync: () => ({ triggerGlobalSync: vi.fn() }),
 }))
@@ -104,9 +100,10 @@ describe('command-palette — touch-gedrag (M18)', () => {
     zetPointer(true)
     render(<CommandPalette open onClose={vi.fn()} userId="u1" />)
 
-    // Pak een standaardactie die in de lege-query-staat altijd zichtbaar is en
-    // die in de bevinding letterlijk afgekapt werd gerapporteerd.
-    const label = screen.getAllByText('Open AI-chat')[0] as HTMLElement
+    // Pak een standaardactie die in de lege-query-staat altijd zichtbaar is
+    // (state-onafhankelijk label; de oorspronkelijke bevinding trof 'Open
+    // AI-chat', maar die actie is verwijderd — B-011-vervolg).
+    const label = screen.getAllByText('Uitloggen')[0] as HTMLElement
     expect(label).toBeTruthy()
 
     // Het label zelf mag op mobiel niet meer op één regel worden afgekapt.
