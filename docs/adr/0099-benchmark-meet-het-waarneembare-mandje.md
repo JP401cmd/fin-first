@@ -24,13 +24,15 @@ if (!snapshots.every(s => s.pricedFromHistory)) return null
 koersobservatie had. Eén positie zonder koersbron zet de vlag op false, en één
 zulke maand zet het complete venster op `null`.
 
-Dat is precies één positie te streng. De meting tegen productie, 11 aug 2026:
+Dat is precies één positie te streng. De meting tegen productie (11 aug 2026;
+per-account cijfers staan in het meetrapport buiten git, zie ADR 0111) liet drie
+beelden zien:
 
-| Gebruiker | Open posities | Mét koersbron | Waarde zónder koersbron |
-|---|---|---|---|
-| referentie-account | 14 | 13 | **€ 289** van € 27.925 |
-| tweede account | 3 | 2 | € 40.000 van € 134.245 |
-| drie overige | 1–2 | 0 | alles |
+| Accounttype | Dekking van de posities met koersbron |
+|---|---|
+| referentie-account | vrijwel volledig — één positie zonder koersbron, met een verwaarloosbaar waarde-aandeel |
+| account met deels koersloze posities | ruim de meerderheid van de waarde gedekt, maar een merkbaar deel niet |
+| accounts met enkele losse posities | geen enkele positie met koersbron — dus alles ongedekt |
 
 Op het referentie-account blankte dus **1% van de waarde** het rendement van de
 andere 99%. En dit is geen aanloopprobleem dat vanzelf overgaat: de posities
@@ -117,11 +119,12 @@ historie; dat verruimde venster knipte daarna niets meer weg.
 
 ## Gevolgen
 
-- **Vier van de vijf productieaccounts kunnen weer een rendement tonen** zodra er
-  twee maanden koershistorie zijn. Het vijfde (geen enkele positie met koersbron)
-  blijft leeg, en terecht.
-- **Het getal draagt een dekkingspercentage.** Op het tweede account zal dat
-  rond de 70% liggen. Dat is geen disclaimer maar de kern van de mededeling.
+- **Vrijwel alle productieaccounts met posities kunnen weer een rendement tonen** zodra er
+  twee maanden koershistorie zijn (accountaantallen bewust weggelaten, zie ADR 0111).
+  Accounts zonder ook maar één positie met koersbron blijven leeg, en terecht.
+- **Het getal draagt een dekkingspercentage.** Op een account met deels
+  koersloze posities ligt dat merkbaar onder de 100%. Dat is geen disclaimer maar
+  de kern van de mededeling.
 - **De dekking groeit vanzelf** met elke dag dat de cron draait, en sprongsgewijs
   na `POST /api/holdings/backfill-history`.
 - **Restrisico:** een mandje van 13 posities kan een ander rendement laten zien

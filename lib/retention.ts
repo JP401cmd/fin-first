@@ -17,6 +17,10 @@
  *  - lead_intakes    90 dgn — anonieme funnel-intake (ADR 0022); gepurged door
  *                             de bestaande SECURITY DEFINER-functie
  *                             purge_expired_lead_intakes().
+ *
+ * Daarnaast, buiten de created_at-lus omdat hij een andere cutoff-kolom heeft:
+ *  - error_log_resolutions 12 mnd op `last_seen_at` — zie
+ *    {@link ERROR_RESOLUTIONS_RETENTION_MONTHS}.
  */
 
 /** Retentie in MAANDEN per log-/usage-tabel (op basis van `created_at`). */
@@ -30,6 +34,19 @@ export const RETENTION_MONTHS = {
 } as const
 
 export type RetentionTable = keyof typeof RETENTION_MONTHS
+
+/**
+ * `error_log_resolutions` volgt `error_logs` (12 mnd), maar op een ÁNDERE kolom.
+ *
+ * Een resolutie hoort bij een foutSOORT, niet bij een logregel — hij overleeft
+ * bewust de rijen die hem aanleiding gaven, anders zou "dit is behandeld"
+ * stilzwijgend verdwijnen zodra de logregels 12 maanden oud zijn (ADR 0113).
+ * Zonder opruimregel zou die tabel echter monotoon groeien. De cutoff staat
+ * daarom op `last_seen_at`: een foutsoort die 12 maanden niet meer voorkwam
+ * hoeft niet meer als "afgehandeld" geboekt te staan. Komt hij daarna alsnog
+ * terug, dan is hij domweg weer nieuw — precies wat je wilt weten.
+ */
+export const ERROR_RESOLUTIONS_RETENTION_MONTHS = 12
 
 /**
  * lead_intakes: vastgelegd op 90 dagen (ADR 0022). Niet via een created_at-cutoff

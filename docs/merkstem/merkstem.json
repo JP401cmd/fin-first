@@ -1,0 +1,310 @@
+{
+  "generatedAt": "2026-08-28T19:38:57.881Z",
+  "attestedAt": "2026-08-28T19:38:57.858Z",
+  "toneStatus": "attested",
+  "copyStatus": "attested",
+  "toneSources": [
+    {
+      "id": "dna-toon",
+      "label": "Toon (base.ts § TOON)",
+      "file": "lib/ai/dna/base.ts",
+      "section": "TOON",
+      "attestedSha256": "c3b1ed0d4a5bb41c2379b18e72641b7759823f2a97c5ecf2ea0ad4cefa54b719",
+      "liveSha256": "c3b1ed0d4a5bb41c2379b18e72641b7759823f2a97c5ecf2ea0ad4cefa54b719",
+      "status": "attested",
+      "reason": ""
+    },
+    {
+      "id": "dna-framing",
+      "label": "Framing (base.ts § FRAMING)",
+      "file": "lib/ai/dna/base.ts",
+      "section": "FRAMING",
+      "attestedSha256": "f3bab95f6d83c3734c556bc2563fc47309e0ed0cddcb1d6597eafa4e169ea443",
+      "liveSha256": "f3bab95f6d83c3734c556bc2563fc47309e0ed0cddcb1d6597eafa4e169ea443",
+      "status": "attested",
+      "reason": ""
+    },
+    {
+      "id": "claimlijst",
+      "label": "Toegestane claims (compliance-check § De claimlijst)",
+      "file": ".claude/skills/compliance-check/SKILL.md",
+      "section": "De claimlijst",
+      "attestedSha256": "ea46dfcb1ebaa9fc00c1ab51d6ce434bc41223221dc2286159016cf68393b95f",
+      "liveSha256": "ea46dfcb1ebaa9fc00c1ab51d6ce434bc41223221dc2286159016cf68393b95f",
+      "status": "attested",
+      "reason": ""
+    }
+  ],
+  "surfaces": [
+    {
+      "id": "landing",
+      "label": "Landingcopy",
+      "caveat": "",
+      "fileCount": 14,
+      "copyLines": 233,
+      "files": [
+        {
+          "file": "components/landing/demo-mocks.tsx",
+          "attestedSha256": "be8f70cd3027abcb37af730cd6d82a3ea55231a9645868b151f8d2c71335fc10",
+          "liveSha256": "be8f70cd3027abcb37af730cd6d82a3ea55231a9645868b151f8d2c71335fc10",
+          "copyLines": 20,
+          "attestedCopyLines": 20,
+          "extractionCollapsed": false,
+          "status": "attested"
+        },
+        {
+          "file": "components/landing/faq-data.ts",
+          "attestedSha256": "eef53a4598fb0a7b255840918919d6ff9a70edc82df9982280dd7746f54ea27f",
+          "liveSha256": "eef53a4598fb0a7b255840918919d6ff9a70edc82df9982280dd7746f54ea27f",
+          "copyLines": 18,
+          "attestedCopyLines": 18,
+          "extractionCollapsed": false,
+          "status": "attested"
+        },
+        {
+          "file": "components/landing/faq-section.tsx",
+          "attestedSha256": "a56350d8d74eb6f28dab04cc516acd04a150d44e296bbc7ccfe2e01219924b6a",
+          "liveSha256": "a56350d8d74eb6f28dab04cc516acd04a150d44e296bbc7ccfe2e01219924b6a",
+          "copyLines": 4,
+          "attestedCopyLines": 4,
+          "extractionCollapsed": false,
+          "status": "attested"
+        },
+        {
+          "file": "components/landing/footer.tsx",
+          "attestedSha256": "bbedc85d5781397141af18e7701497b0e02068efcfe72f4f0913f10560e0284a",
+          "liveSha256": "bbedc85d5781397141af18e7701497b0e02068efcfe72f4f0913f10560e0284a",
+          "copyLines": 4,
+          "attestedCopyLines": 4,
+          "extractionCollapsed": false,
+          "status": "attested"
+        },
+        {
+          "file": "components/landing/header.tsx",
+          "attestedSha256": "9193b32f889b8f4ede37df5d2d7bd0c75d97db7a80119aca900b66befe97416e",
+          "liveSha256": "9193b32f889b8f4ede37df5d2d7bd0c75d97db7a80119aca900b66befe97416e",
+          "copyLines": 3,
+          "attestedCopyLines": 3,
+          "extractionCollapsed": false,
+          "status": "attested"
+        },
+        {
+          "file": "components/landing/hero.tsx",
+          "attestedSha256": "6671ba1bfe6229f1b1469ddbfc2c5e5e2dbab98235cc1e0e3e84123da5ec5ed0",
+          "liveSha256": "6671ba1bfe6229f1b1469ddbfc2c5e5e2dbab98235cc1e0e3e84123da5ec5ed0",
+          "copyLines": 18,
+          "attestedCopyLines": 18,
+          "extractionCollapsed": false,
+          "status": "attested"
+        },
+        {
+          "file": "components/landing/marketing-page-shell.tsx",
+          "attestedSha256": "62679235e49ad99d10652e528ade5a2b3d016a6eec342c5e7e914426f26d0516",
+          "liveSha256": "62679235e49ad99d10652e528ade5a2b3d016a6eec342c5e7e914426f26d0516",
+          "copyLines": 3,
+          "attestedCopyLines": 3,
+          "extractionCollapsed": false,
+          "status": "attested"
+        },
+        {
+          "file": "components/landing/pricing-tiers.tsx",
+          "attestedSha256": "d7162345f0ca9b9fe3b62970427f4d234c480a17f229b3bd14aa8a2885c82ac2",
+          "liveSha256": "d7162345f0ca9b9fe3b62970427f4d234c480a17f229b3bd14aa8a2885c82ac2",
+          "copyLines": 18,
+          "attestedCopyLines": 18,
+          "extractionCollapsed": false,
+          "status": "attested"
+        },
+        {
+          "file": "components/landing/reveal.tsx",
+          "attestedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "liveSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "copyLines": 0,
+          "attestedCopyLines": 0,
+          "extractionCollapsed": false,
+          "status": "attested"
+        },
+        {
+          "file": "components/landing/section-primitives.tsx",
+          "attestedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "liveSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "copyLines": 0,
+          "attestedCopyLines": 0,
+          "extractionCollapsed": false,
+          "status": "attested"
+        },
+        {
+          "file": "components/landing/sections/functies.tsx",
+          "attestedSha256": "0065015cc4bdaae8fdc0570e22265217b3f731a94bc5b084c4f86061029236c3",
+          "liveSha256": "0065015cc4bdaae8fdc0570e22265217b3f731a94bc5b084c4f86061029236c3",
+          "copyLines": 72,
+          "attestedCopyLines": 72,
+          "extractionCollapsed": false,
+          "status": "attested"
+        },
+        {
+          "file": "components/landing/sections/home.tsx",
+          "attestedSha256": "3b2a2797e2489bf867211cffaf1cb6465019c30a117f77eb4ae313bc82f3e9b8",
+          "liveSha256": "3b2a2797e2489bf867211cffaf1cb6465019c30a117f77eb4ae313bc82f3e9b8",
+          "copyLines": 45,
+          "attestedCopyLines": 45,
+          "extractionCollapsed": false,
+          "status": "attested"
+        },
+        {
+          "file": "components/landing/sections/veiligheid.tsx",
+          "attestedSha256": "c30916a6c559657b8924a0d138fd48b1214b947f9bab63ff00de29076c5d22fc",
+          "liveSha256": "c30916a6c559657b8924a0d138fd48b1214b947f9bab63ff00de29076c5d22fc",
+          "copyLines": 24,
+          "attestedCopyLines": 24,
+          "extractionCollapsed": false,
+          "status": "attested"
+        },
+        {
+          "file": "components/landing/slot-cta.tsx",
+          "attestedSha256": "1becf77198577a7d4d7547e7444692bc2b12505bcf10768b88aeffeec07b700d",
+          "liveSha256": "1becf77198577a7d4d7547e7444692bc2b12505bcf10768b88aeffeec07b700d",
+          "copyLines": 4,
+          "attestedCopyLines": 4,
+          "extractionCollapsed": false,
+          "status": "attested"
+        }
+      ]
+    },
+    {
+      "id": "publiek",
+      "label": "Publieke routes",
+      "caveat": "",
+      "fileCount": 5,
+      "copyLines": 37,
+      "files": [
+        {
+          "file": "app/functies/page.tsx",
+          "attestedSha256": "a2c06519f744bc263e9706671711a270dd639913aa1dd70e4711913158a2c72a",
+          "liveSha256": "a2c06519f744bc263e9706671711a270dd639913aa1dd70e4711913158a2c72a",
+          "copyLines": 5,
+          "attestedCopyLines": 5,
+          "extractionCollapsed": false,
+          "status": "attested"
+        },
+        {
+          "file": "app/over/page.tsx",
+          "attestedSha256": "bd676195ff4a3822616c58ae6501620c1c6a062e06528960b0aceccafdeccdc4",
+          "liveSha256": "bd676195ff4a3822616c58ae6501620c1c6a062e06528960b0aceccafdeccdc4",
+          "copyLines": 14,
+          "attestedCopyLines": 14,
+          "extractionCollapsed": false,
+          "status": "attested"
+        },
+        {
+          "file": "app/page.tsx",
+          "attestedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "liveSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "copyLines": 0,
+          "attestedCopyLines": 0,
+          "extractionCollapsed": false,
+          "status": "attested"
+        },
+        {
+          "file": "app/prijzen/page.tsx",
+          "attestedSha256": "313c346279301754f7de567e411cd40eaecbe47ebc1367a007842b106fbed556",
+          "liveSha256": "313c346279301754f7de567e411cd40eaecbe47ebc1367a007842b106fbed556",
+          "copyLines": 10,
+          "attestedCopyLines": 10,
+          "extractionCollapsed": false,
+          "status": "attested"
+        },
+        {
+          "file": "app/veiligheid/page.tsx",
+          "attestedSha256": "4340df0bae970e7a9b49463ef038244b4084b74f90c97c85cc5645687ac062cd",
+          "liveSha256": "4340df0bae970e7a9b49463ef038244b4084b74f90c97c85cc5645687ac062cd",
+          "copyLines": 8,
+          "attestedCopyLines": 8,
+          "extractionCollapsed": false,
+          "status": "attested"
+        }
+      ]
+    },
+    {
+      "id": "funnel",
+      "label": "Funnel",
+      "caveat": "",
+      "fileCount": 3,
+      "copyLines": 29,
+      "files": [
+        {
+          "file": "app/check/page.tsx",
+          "attestedSha256": "654c3fd95c155e03597af589b1a20c9de3205c9ca828d5fc1926164ae9331620",
+          "liveSha256": "654c3fd95c155e03597af589b1a20c9de3205c9ca828d5fc1926164ae9331620",
+          "copyLines": 7,
+          "attestedCopyLines": 7,
+          "extractionCollapsed": false,
+          "status": "attested"
+        },
+        {
+          "file": "app/contact/page.tsx",
+          "attestedSha256": "d7c73714f8d2eba8242912814a56c5c542ade5b7f2bc873f0412a5858ba519c8",
+          "liveSha256": "d7c73714f8d2eba8242912814a56c5c542ade5b7f2bc873f0412a5858ba519c8",
+          "copyLines": 10,
+          "attestedCopyLines": 10,
+          "extractionCollapsed": false,
+          "status": "attested"
+        },
+        {
+          "file": "app/signup/page.tsx",
+          "attestedSha256": "d413962abbb891ad2c6d352c7d382a50203386d5aa94ccbaf7ccb53c961249f1",
+          "liveSha256": "d413962abbb891ad2c6d352c7d382a50203386d5aa94ccbaf7ccb53c961249f1",
+          "copyLines": 12,
+          "attestedCopyLines": 12,
+          "extractionCollapsed": false,
+          "status": "attested"
+        }
+      ]
+    },
+    {
+      "id": "nieuws",
+      "label": "/nieuws — chrome",
+      "caveat": "Alleen de chrome. De berichten zelf worden door het model geschreven; die stem zit in lib/news-system-prompt.ts en is al bron in het DNA-parity-manifest.",
+      "fileCount": 1,
+      "copyLines": 47,
+      "files": [
+        {
+          "file": "components/berichten/nieuws-only-client.tsx",
+          "attestedSha256": "0b63bc9f6d26ea82a9ef4ced8e9e42be695543cfcdba4fa90e1749bcb9e5fc62",
+          "liveSha256": "0b63bc9f6d26ea82a9ef4ced8e9e42be695543cfcdba4fa90e1749bcb9e5fc62",
+          "copyLines": 47,
+          "attestedCopyLines": 47,
+          "extractionCollapsed": false,
+          "status": "attested"
+        }
+      ]
+    },
+    {
+      "id": "briefing",
+      "label": "Briefing-mail",
+      "caveat": "GEDEELTELIJKE DEKKING: lib/briefing/directives.ts bevat alleen de startwaarden. De draaiende richtlijnen zijn beheer-overschrijfbaar via app_settings.briefing_directives — een hash op dit bestand bewijst dus niets over wat er vandaag daadwerkelijk verstuurd wordt.",
+      "fileCount": 2,
+      "copyLines": 82,
+      "files": [
+        {
+          "file": "lib/briefing/directives.ts",
+          "attestedSha256": "869608c7530c5a1292f0614517683241fc97af0694cbed925d41538886edd50b",
+          "liveSha256": "869608c7530c5a1292f0614517683241fc97af0694cbed925d41538886edd50b",
+          "copyLines": 70,
+          "attestedCopyLines": 70,
+          "extractionCollapsed": false,
+          "status": "attested"
+        },
+        {
+          "file": "lib/briefing/email-template.ts",
+          "attestedSha256": "70fae6968ecd2e9c9d6bd599631374e81b7fd928faa974f7a0737d1d8e8b7445",
+          "liveSha256": "70fae6968ecd2e9c9d6bd599631374e81b7fd928faa974f7a0737d1d8e8b7445",
+          "copyLines": 12,
+          "attestedCopyLines": 12,
+          "extractionCollapsed": false,
+          "status": "attested"
+        }
+      ]
+    }
+  ]
+}

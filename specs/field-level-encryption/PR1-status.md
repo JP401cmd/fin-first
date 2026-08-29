@@ -169,6 +169,24 @@ In deze volgorde:
 
 Pas voorbereiden ná ≥ 1 week succesvolle PR1 in prod. Drie zaken die geblokkeerd zijn op refactor vóór de plaintext-kolommen gedropt kunnen worden:
 
+> **Stand 28-08-2026 — lees dit vóór de drie blockers hieronder; die zijn deels achterhaald.**
+>
+> - **Blocker 1 is opgelost** sinds `20260802093000_auto_link_cash_asset_encrypted_iban.sql`
+>   (toegepast). Niet via optie A: de trigger is blijven bestaan en kopieert nu de
+>   ciphertext + blind index letterlijk door. Vastgelegd in ADR 0077 punt 4. **Optie A
+>   dus NIET alsnog uitvoeren.**
+> - **Blocker 2 is opgelost.** De vier client-side IBAN-writes lopen via
+>   `app/api/assets/account-number/route.ts` en `app/api/bank-accounts/[id]/route.ts`.
+> - **Blocker 3 is gesplitst in twee releases** (besluit eigenaar 26-08-2026):
+>   - *Stage A* = alleen `bank_connections.access_token` / `refresh_token`. Geschreven als
+>     `supabase/migrations/20260828120000_stage_a_drop_plaintext_bank_tokens.sql`;
+>     nul code-impact, data al leeg (0 van 10 rijen). Nog niet toegepast.
+>   - *Stage B* = `bank_accounts.iban`, `bank_connection_accounts.iban`,
+>     `assets.account_number`. **Geblokkeerd op de V1-keyrotatie**: na die drop is
+>     `ENCRYPTION_KEY_V1` het enige pad naar de IBANs. Harde volgorde-eis.
+> - Het hieronder genoemde bestand `20260415000001_drop_plaintext_bank_credentials.sql`
+>   is nooit gemaakt en komt er ook niet — die naam is vervangen door de twee stages.
+
 ### Blocker 1: Postgres trigger leest plaintext
 - File: `supabase/migrations/20260407000001_create_auto_link_bank_account_asset_trigger.sql`
 - Functie `fn_auto_link_bank_account_asset()` kopieert `NEW.iban` → `assets.account_number` (plaintext-kolom) bij elke `bank_accounts` insert

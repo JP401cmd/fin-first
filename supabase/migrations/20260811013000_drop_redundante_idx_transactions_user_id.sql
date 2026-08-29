@@ -29,17 +29,19 @@
 -- heeft geen andere pg_depend-afhankelijken. Er is dus niets dat aan deze index hangt.
 --
 -- GEBRUIK — waarom het scan-getal geen tegenargument is
--- pg_stat_user_indexes toonde 495.432 scans op de oude index. Dat is een CUMULATIEF
--- getal sinds stats_reset op 08-12-2025, dus over ~8 maanden, waarvan de eerste ~7 zonder
+-- pg_stat_user_indexes toonde een hoog scantotaal op de oude index (exacte waarde
+-- bewust weggelaten, zie ADR 0111). Dat is een CUMULATIEF getal sinds stats_reset op
+-- 08-12-2025, dus over ~8 maanden, waarvan de eerste ~7 zonder
 -- de samengestelde index. Het beslissende getal is pg_stat_all_indexes.last_idx_scan
 -- (PG16+), gemeten 11-08-2026 01:31 UTC:
 --   idx_transactions_user_id    laatste scan 09-08-2026 21:13  (~28 uur geleden)
 --   idx_transactions_user_date  laatste scan 11-08-2026 01:24  (7 minuten geleden)
 --   idx_transactions_date       laatste scan 11-08-2026 01:24  (7 minuten geleden)
 -- De oude index is in het afgelopen etmaal niet één keer aangeraakt terwijl het verkeer
--- gewoon doorliep. Hij is dus feitelijk al buiten gebruik; de 495k is historie.
+-- gewoon doorliep. Hij is dus feitelijk al buiten gebruik; het scantotaal is historie.
 --
--- EXPLAIN op de hete queryvormen (read-only, 11-08-2026, gebruiker met 9.556 rijen).
+-- EXPLAIN op de hete queryvormen (read-only, 11-08-2026, op het account met de
+-- grootste transactiehistorie — dus de zwaarste vorm die er in de praktijk is).
 -- Geen enkele vorm kiest de oude index — óók niet de twee vormen waarin een smalle index
 -- klassiek juist zou winnen:
 --   1. pure gelijkheid, geen datum   -> Bitmap Index Scan on idx_transactions_user_date

@@ -112,7 +112,7 @@ export const JOB_CATALOG: Record<JobKey, JobCatalogEntry> = {
     schedule: 'Dagelijks 03:45 UTC',
     path: '/api/cron/retention',
     description:
-      'Purget log-/usage-rijen ouder dan de vastgelegde bewaartermijn (error_logs/mail_log 12m, job_runs 6m, contract_events/ai_token_usage/ai_usage 24m) en verlopen lead_intakes (90d). Zie ADR 0059.',
+      'Purget log-/usage-rijen ouder dan de vastgelegde bewaartermijn (error_logs/mail_log 12m, job_runs 6m, contract_events/ai_token_usage/ai_usage 24m), error_log_resolutions 12m op last_seen_at (ADR 0113) en verlopen lead_intakes (90d). Zie ADR 0059.',
     maxAgeHours: 26,
   },
   'user-reports-notion-sync': {

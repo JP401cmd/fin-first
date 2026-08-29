@@ -118,7 +118,7 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
       {
         label: 'Foutmeldingen',
         href: '/beheer/errors',
-        description: 'Ongevangen client-fouten die gebruikers raakten.',
+        description: 'Foutsoorten uit client en server — afvinkbaar; komt er één terug, dan heropent hij zichzelf.',
         icon: AlertOctagon,
       },
       {
@@ -176,7 +176,7 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
       {
         label: 'Nieuws',
         href: '/beheer/nieuws',
-        description: 'Bronnen, RSS-feeds, ingest en artikelendatabase.',
+        description: 'Bronnen, RSS-feeds, ingest, artikelendatabase en lezersfeedback.',
         icon: Newspaper,
       },
       {

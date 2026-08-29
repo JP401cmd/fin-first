@@ -13,7 +13,7 @@ De downsize-strategie (verkoop eigen woning bij uitputting / op leeftijd) werd g
 Fase B-meting op een echt account legde drie problemen bloot (zie [[project-horizon-housing-downsize-model]]):
 
 1. **Verkoopmoment** werd berekend door een v1-meetrun (`runUnifiedProjection`) terwijl de grafiek v2 is → het moment lag op een ander pad dan de getoonde lijn, en viel op de config-cap (`fallback`) i.p.v. echte uitputting.
-2. **Netto vermogen sprong** bij verkoop (gemeten €117k → €660k), want de ~€580k overwaarde zat vóór verkoop niet in het getoonde nettovermogen (huis gefilterd) en "verscheen" als cash. Liquidatie van vastgoed hoort weinig effect op netto vermogen te hebben (alleen −verkoopkosten) en veel op liquiditeit.
+2. **Netto vermogen sprong** bij verkoop met ruim een factor vijf (bedragen bewust relatief, zie ADR 0111), want de overwaarde zat vóór verkoop niet in het getoonde nettovermogen (huis gefilterd) en "verscheen" als cash. Liquidatie van vastgoed hoort weinig effect op netto vermogen te hebben (alleen −verkoopkosten) en veel op liquiditeit.
 3. **Woningwaarde-groei** was onzichtbaar: het huis stond niet in het grootboek, dus de 3,5%-groei was nergens te zien — de opbrengst dook als één brok op bij verkoop.
 
 ## Besluit

@@ -1,23 +1,29 @@
--- Field-level encryptie — Stage A (PR2), stap 2/3: plaintext-tokens nullen.
+-- ⛔ NOOIT TOEGEPAST — LEEGGEMAAKT, VERVANGEN. Dit bestand draagt bewust geen SQL
+-- meer. Op 2026-08-28 op NAAM geverifieerd in `supabase_migrations.schema_migrations`:
+-- het staat niet in het register en heeft dus nooit gedraaid; `bank_connections.access_token`
+-- bestond op dat moment nog gewoon op productie.
 --
--- Waarom: nadat de encrypted-only code live is en de bestaande rijen zijn
--- ge-backfilld (scripts/encrypt-existing-bank-credentials.mjs), staan er nog
--- historische plaintext-tokens in `access_token`/`refresh_token`. Deze
--- migratie leegt ze. Aparte stap vóór de DROP zodat een rollback mogelijk
--- blijft (kolommen bestaan nog, alleen leeg).
+-- Het werk is overgenomen door
+-- `20260828120000_stage_a_drop_plaintext_bank_tokens.sql`, dat het nullen én het
+-- droppen in één lineage-correcte migratie doet, mét een afgedwongen count-gate.
 --
--- ⚠ HARDE GATE — voer deze migratie pas uit NADAT is geverifieerd dat élke
--- rij een geldige encrypted-tegenhanger heeft. Draai vóór deze migratie:
+-- Waarom leeggemaakt en niet verwijderd: de naam wordt elders geciteerd (o.a. in
+-- `20260713142000` en in specs), én zou dit bestand zijn `UPDATE` houden, dan zou
+-- `supabase db push --include-all` het vanwege de lágere versie vóór
+-- 20260828120000 draaien. De oorspronkelijke UPDATE was ONgegate — de count-gate
+-- stond alleen als comment. Dat zou de nieuwe, afgedwongen gate omzeilen en de
+-- plaintext-tokens wissen zonder te controleren of hun ciphertext-tegenhanger
+-- bestaat. Daarom draagt dit bestand geen DML meer.
+--
+-- Oorspronkelijke bedoeling (staat integraal, mét gate, in de vervanger): nadat de
+-- encrypted-only code live is en de bestaande rijen zijn ge-backfilld
+-- (`scripts/encrypt-existing-bank-credentials.mjs`), de historische plaintext
+-- `access_token` / `refresh_token` legen als aparte stap vóór de DROP, zodat een
+-- terugweg mogelijk blijft. Die gate luidde:
 --
 --   SELECT count(*) FROM public.bank_connections
 --   WHERE (access_token  IS NOT NULL AND access_token_encrypted  IS NULL)
 --      OR (refresh_token IS NOT NULL AND refresh_token_encrypted IS NULL);
 --
--- Dit MOET 0 zijn. Anders zou nullen (en straks droppen) tokens permanent
--- verliezen. Zie het RUNBOOK op het Notion-kaartje.
-
-UPDATE public.bank_connections
-  SET access_token = NULL,
-      refresh_token = NULL
-  WHERE access_token IS NOT NULL
-     OR refresh_token IS NOT NULL;
+-- Dit MOET 0 zijn. In de vervanger is dit geen instructie meer maar een
+-- `RAISE EXCEPTION` die de migratie afbreekt.

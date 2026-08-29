@@ -57,7 +57,7 @@
 --   besluit 1 — gegenereerd uit remote-introspectie (`pg_constraint`,
 --               `pg_attribute`), niet met de hand verzonnen;
 --   besluit 2 — idempotent EN een echte no-op op productie. Niet met
---               `drop constraint` + `add constraint` (dat zou de FK over 37.002
+--               `drop constraint` + `add constraint` (dat zou de FK over álle
 --               transactierijen hervalideren onder een ACCESS EXCLUSIVE-lock,
 --               voor een eindtoestand die al klopt), maar met een voorwaardelijk
 --               `do`-blok dat éérst kijkt of de constraint al de juiste
@@ -76,9 +76,10 @@
 -- is opgezet kan het wél: daar was de kolom nullable en zette de toenmalige
 -- SET NULL-FK er bij elke verwijderde rekening wezen neer.
 --
--- Gemeten op remote (04-08-2026): 0 rijen met `account_id IS NULL` in
--- `transactions` (37.002 rijen totaal) en 0 in `recurring_transactions`
--- (35 rijen). Deze migratie is daar dus in beide blokken een no-op.
+-- Gemeten op remote (04-08-2026): NUL rijen met `account_id IS NULL` in
+-- `transactions` en NUL in `recurring_transactions` (tabelomvang relatief
+-- gehouden, zie ADR 0111 — het nulresultaat is het hele argument). Deze migratie
+-- is daar dus in beide blokken een no-op.
 --
 -- Treft een andere omgeving die wezen wél, dan stopt de migratie met een
 -- expliciete fout die het aantal noemt, in plaats van met een kale

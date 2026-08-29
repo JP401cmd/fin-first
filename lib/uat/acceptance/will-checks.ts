@@ -7,21 +7,25 @@
  *  2. de in-app regressietest-pagina (`lib/regression-tests/suites/uat-will.ts`):
  *     `assertEqual(actual, expected, label)` per check.
  *
- * TWEE ECHTE PURE IMPORTS (geen mirror — de productiefunctie zelf is al
- * client-veilig): `getFirstUndismissedSuggestion` (lib/coach-suggestions.ts) en
- * `amsterdamWeekKey` (lib/briefing/snapshot.ts).
+ * DRIE ECHTE PURE IMPORTS (geen mirror — de productiefunctie zelf is al
+ * client-veilig): `getFirstUndismissedSuggestion` (lib/coach-suggestions.ts),
+ * `amsterdamWeekKey` (lib/briefing/snapshot.ts) en sinds ADR 0113
+ * `demotedCategories`/`demotionWindowStartIso` (lib/news-feedback-summary.ts —
+ * dezelfde functie die zowel `/api/news` als het beheervenster op
+ * `/beheer/nieuws` consumeren; vóór ADR 0113 stond hier nog een handmatige
+ * mirror van een inline `getDemotedCategories` in app/api/news/route.ts).
  *
- * VIJF MIRRORS met bronregel-verwijzing (server-only API-routes met een
+ * VIER MIRRORS met bronregel-verwijzing (server-only API-routes met een
  * Supabase-client-parameter — niet importeerbaar in een pure module, spiegelt
  * de spaardoel-mirror in `budget-checks.ts` en de netto-vermogen-mirror in
  * `start-checks.ts`): postpone-termijn, bel-badge-cap, budgetmelding-tekst,
- * krant-editienummer/jaargang/ververs-resterend, en de
- * "minder hierover"-demotiedrempel.
+ * krant-editienummer/jaargang/ververs-resterend.
  */
 
 import { shouldAlert, budgetLimitStatus } from '@/lib/budget-alerts'
 import { getFirstUndismissedSuggestion, type CoachDataGaps } from '@/lib/coach-suggestions'
 import { amsterdamWeekKey } from '@/lib/briefing/snapshot'
+import { demotedCategories, demotionWindowStartIso } from '@/lib/news-feedback-summary'
 import { WILL_ACCEPTANCE } from './will'
 import type { AcceptanceCriterion } from './types'
 
@@ -173,17 +177,21 @@ function newsActionDefaults(impactScore: number | undefined, deadline: string | 
   }
 }
 
-/** Mirror van app/api/news/route.ts#getDemotedCategories (r219-241):
- *  categorieën met ≥2 'less'-stemmen binnen de laatste 90 dagen. */
-function demotedCategories(
-  feedback: ReadonlyArray<{ category: string; daysAgo: number }>,
-): string[] {
-  const counts = new Map<string, number>()
-  for (const row of feedback) {
-    if (row.daysAgo > 90) continue
-    counts.set(row.category, (counts.get(row.category) ?? 0) + 1)
-  }
-  return [...counts.entries()].filter(([, n]) => n >= 2).map(([cat]) => cat)
+/**
+ * Zet een test-rij (categorie + "N dagen geleden") om in wat de echte route
+ * `/api/news` en het beheervenster op `/beheer/nieuws` daadwerkelijk zien: de
+ * SQL-laag filtert vooraf op `created_at >= demotionWindowStartIso()`, en pas
+ * dát gefilterde restant gaat naar `demotedCategories()`. Deze helper simuleert
+ * precies die twee stappen — geen eigen drempel-/vensterlogica.
+ */
+function withinDemotionWindow(
+  rows: ReadonlyArray<{ category: string; daysAgo: number }>,
+  now: Date,
+): { category: string }[] {
+  const cutoff = demotionWindowStartIso(now)
+  return rows
+    .filter((row) => new Date(now.getTime() - row.daysAgo * 24 * 60 * 60 * 1000).toISOString() >= cutoff)
+    .map((row) => ({ category: row.category }))
 }
 
 // ── Checks — één per 'exact'-workflow in WILL_ACCEPTANCE ───────────────────
@@ -371,15 +379,21 @@ export const WILL_ENGINE_CHECKS: WillEngineCheck[] = [
   {
     workflow: 'WF-WILL-20',
     scenarioId: 'UAT-WILL-20',
-    label: '"Minder hierover"-demotiedrempel (getDemotedCategories-mirror): ≥2 stemmen/90 dagen',
+    label: '"Minder hierover"-demotiedrempel (echte demotedCategories/demotionWindowStartIso): ≥2 stemmen/90 dagen',
     run: () => {
       criterion('WF-WILL-20')
-      const na1 = demotedCategories([{ category: 'macro', daysAgo: 10 }])
-      const na2 = demotedCategories([
-        { category: 'macro', daysAgo: 10 },
-        { category: 'macro', daysAgo: 5 },
-        { category: 'wonen', daysAgo: 95 },
-      ])
+      const now = new Date()
+      const na1 = demotedCategories(withinDemotionWindow([{ category: 'macro', daysAgo: 10 }], now))
+      const na2 = demotedCategories(
+        withinDemotionWindow(
+          [
+            { category: 'macro', daysAgo: 10 },
+            { category: 'macro', daysAgo: 5 },
+            { category: 'wonen', daysAgo: 95 },
+          ],
+          now,
+        ),
+      )
       return {
         expected: 'macroNa1=false; macroNa2=true; wonenGedemoveerd=false',
         actual: `macroNa1=${na1.includes('macro')}; macroNa2=${na2.includes('macro')}; wonenGedemoveerd=${na2.includes('wonen')}`,

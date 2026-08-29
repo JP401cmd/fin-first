@@ -146,8 +146,9 @@
 --
 -- CONCURRENTLY kan niet: apply_migration draait in een transactieblok.
 -- Zelfde afweging als 20260504000001_perf_composite_indexes.sql en de
--- voorganger. Volume op remote (geverifieerd 30-07-2026): 37.002 rijen /
--- 25 MB, waarvan 35.344 met import_hash -- de indexbouw is sub-seconde.
+-- voorganger. Volume op remote (geverifieerd 30-07-2026, relatief weergegeven --
+-- zie ADR 0111): een tabel in de orde van tienduizenden rijen, waarvan de
+-- overgrote meerderheid een import_hash draagt -- de indexbouw is sub-seconde.
 -- De SHARE-lock blokkeert in dat venster schrijvers op transactions,
 -- geen lezers.
 --

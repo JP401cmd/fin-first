@@ -327,7 +327,8 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'exact',
       expected: 'macroNa1=false; macroNa2=true; wonenGedemoveerd=false',
-      source: 'app/api/news/route.ts#getDemotedCategories (r219-241, drempel ≥2/90 dagen, gemirrord) — zie will-checks.ts',
+      source:
+        'lib/news-feedback-summary.ts#demotedCategories + #demotionWindowStartIso (ADR 0113, drempel ≥2/90 dagen — de ene canonieke implementatie die zowel app/api/news/route.ts als het beheervenster op /beheer/nieuws consumeert; direct pure import, geen mirror meer) — zie will-checks.ts',
     },
   },
   {

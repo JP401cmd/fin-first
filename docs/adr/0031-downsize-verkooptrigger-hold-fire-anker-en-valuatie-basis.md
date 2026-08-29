@@ -29,7 +29,7 @@ de spendable woning mee in `liquideVermogen`, dus de FIRE-gate
 terwijl de rauw-besteedbare ex-huis pot (`besteedbaarVermogen`, ADR 0030) dat niet
 kan dragen. De meetrun "pensioneerde" daardoor een nog-werkende gebruiker direct,
 teerde op de kleine ex-huis cash en kruiste de verkoopkosten-buffer al in de
-opbouwfase. Symptoom (persona `janpaul050486`, firsthand): trigger op **41**
+opbouwfase. Symptoom (eigenaar-account, firsthand): trigger op **41**
 terwijl de getoonde run pas op **~59–60** FIRE bereikt.
 
 **Waarom een vaste-punt-iteratie hier DIVERGEERT.** De voor de hand liggende fix —
@@ -46,7 +46,8 @@ convergeert een vaste-punt-zoektocht niet.
 **Bug B — preview-opbrengst week af van de engine.** De getoonde
 `metadata.saleProceeds` kwam uit `buildHousingLifeEventsAtAge` →
 `projectEigenHuisValuesAt` (WOZ-nominaal, met fallback op `woz_value`) en week
-daarmee ~€171k af van de markt-reële verkoop die de engine werkelijk in het
+daarmee met een fors deel van de huiswaarde af (orde: tonnen; exact bedrag buiten
+git, zie ADR 0111) van de markt-reële verkoop die de engine werkelijk in het
 grootboek injecteert. Twee getallen voor één verkoop = drift (schending
 single-source-of-truth voor het bedrag).
 
@@ -139,6 +140,7 @@ byte-identieke continuïteit met de bestaande prognose.
 
 Bewaakt door `test/horizon-downsize-valuation-trigger.test.ts` (Bug A relatieve
 invariant `trigger ≥ eligibility-FIRE` of `no_sale`; Bug B exacte
+<!-- productiecijfer-ok: '€1' is de tolerantie van een test-assertie, geen bedrag uit productie -->
 `saleProceeds == engine-net` binnen €1; woz-basis kleinere huiswaarde;
 `fixed_age`-regressie) en de bestaande
 `test/horizon-downsize-verkopen.test.ts` / `test/housing-strategy.test.ts`.

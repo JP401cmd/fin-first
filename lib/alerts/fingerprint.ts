@@ -1,4 +1,5 @@
 import { createHmac } from 'node:crypto'
+import { normalizeMessage, signatureBasis } from '@/lib/alerts/error-signature'
 
 /**
  * Fingerprinting van foutmeldingen: "is dit een NIEUWE soort fout, of dezelfde
@@ -12,35 +13,14 @@ import { createHmac } from 'node:crypto'
  *     (leesbaar voor elke ingelogde gebruiker) en de melding gaat naar een
  *     kanaal buiten onze stack. Een hash is eenrichting; `message`/`stack`/`url`
  *     komen daar dus nooit terecht — zie `lib/alerts/sweep.ts`.
+ *
+ * De NORMALISATOR zelf woont niet meer hier maar in `./error-signature`, omdat
+ * de resolutie-boekhouding van `/beheer/errors` dezelfde normalisatie nodig
+ * heeft met een ándere (sleutelloze) afgeleide — ADR 0113. Eén normalisator,
+ * twee afgeleiden; hij wordt hier geïmporteerd en her-geëxporteerd zodat elke
+ * bestaande import blijft werken.
  */
-
-/** Volgorde telt: specifieke patronen vóór de generieke cijferregel. */
-const MASKS: [RegExp, string][] = [
-  // e-mailadressen (kunnen in een foutmelding belanden)
-  [/[\w.+-]+@[\w-]+\.[\w.-]+/g, '<email>'],
-  // uuid's
-  [/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '<uuid>'],
-  // ISO-tijdstempels
-  [/\b\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?Z?)?\b/g, '<date>'],
-  // URL's (incl. querystring)
-  [/\bhttps?:\/\/\S+/gi, '<url>'],
-  // lange hex-/base64-achtige tokens
-  [/\b[0-9a-f]{16,}\b/gi, '<hex>'],
-  [/\b[A-Za-z0-9_-]{24,}\b/g, '<token>'],
-  // bedragen en losse getallen (ook 1.234,56 / 1,234.56)
-  [/\b\d[\d.,]*\b/g, '<n>'],
-]
-
-/**
- * Normaliseert een foutmelding tot zijn vorm: variabele delen gemaskeerd,
- * witruimte genormaliseerd, afgekapt. Alleen intern gebruikt (input voor de
- * hash) — de genormaliseerde tekst wordt nooit opgeslagen of verstuurd.
- */
-export function normalizeMessage(message: string | null | undefined): string {
-  let out = (message ?? '').slice(0, 2000)
-  for (const [re, token] of MASKS) out = out.replace(re, token)
-  return out.replace(/\s+/g, ' ').trim().toLowerCase().slice(0, 300)
-}
+export { normalizeMessage }
 
 /**
  * Sleutel voor de fingerprint-HMAC. Server-only; valt in dev terug op een
@@ -67,8 +47,10 @@ export function errorFingerprint(
   context: string | null | undefined,
   message: string | null | undefined,
 ): string {
-  const basis = `${(context ?? '').trim().toLowerCase()}|${normalizeMessage(message)}`
-  return createHmac('sha256', fingerprintKey()).update(basis).digest('hex').slice(0, 16)
+  return createHmac('sha256', fingerprintKey())
+    .update(signatureBasis(context, message))
+    .digest('hex')
+    .slice(0, 16)
 }
 
 /**

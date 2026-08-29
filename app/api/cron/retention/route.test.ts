@@ -108,7 +108,10 @@ describe('cron verwerking', () => {
     for (const table of Object.keys(RETENTION_MONTHS)) {
       expect(deletedTables).toContain(table)
     }
-    expect(deletedTables).toHaveLength(Object.keys(RETENTION_MONTHS).length)
+    // Plus error_log_resolutions: zelfde termijn als error_logs, maar op
+    // `last_seen_at` en dus buiten de created_at-lus (ADR 0113).
+    expect(deletedTables).toContain('error_log_resolutions')
+    expect(deletedTables).toHaveLength(Object.keys(RETENTION_MONTHS).length + 1)
 
     // lead_intakes via de bestaande SECURITY DEFINER-functie.
     expect(rpcCalls).toContain('purge_expired_lead_intakes')

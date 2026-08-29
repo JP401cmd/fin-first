@@ -20,6 +20,7 @@ BEGIN
       curator_id,
       'authenticated',
       'authenticated',
+      -- productiecijfer-ok: 'curator@trifinity.nl' is de systeem-/seedauteur van de prefab-calculators, geen echte gebruiker.
       'curator@trifinity.nl',
       crypt(gen_random_uuid()::text, gen_salt('bf')),
       now(),
@@ -33,7 +34,9 @@ BEGIN
       last_sign_in_at, created_at, updated_at
     ) VALUES (
       gen_random_uuid(), curator_id,
+      -- productiecijfer-ok: 'curator@trifinity.nl' is de systeem-/seedauteur van de prefab-calculators, geen echte gebruiker.
       'curator@trifinity.nl',
+      -- productiecijfer-ok: 'curator@trifinity.nl' is de systeem-/seedauteur van de prefab-calculators, geen echte gebruiker.
       jsonb_build_object('sub', curator_id::text, 'email', 'curator@trifinity.nl'),
       'email', now(), now(), now()
     );

@@ -32,16 +32,19 @@ De v1-scan (`scanRows` / `resolveHousingTriggerFromProjection` in `lib/housing-t
 
 Het gevolg hierboven — *"de schaduw-schuld van de opeethypotheek blijft display-only (drukt niet op de simulatie)"* — is **niet langer waar** en was op het kernel-pad bovendien de bron van een defect.
 
+<!-- productiecijfer-ok: synthetische testconfiguratie (de regel noemt dat zelf), geen productieaccount -->
 ADR 0029 maakte de opeethypotheek al een echte schuld in het toenmalige v2-grootboek. Bij de migratie naar de horizon-kernel bleef die aanname stilzwijgend hangen: het **fixture-/oracle-pad** (`input-from-fixture.ts`) vulde de gereserveerde schuld-slot 3 correct, maar het **app-pad** (`adapter/potten.ts#buildSchuldPotten`) sloeg die slot over ("gereserveerd, niet in deze snede gevuld"). Omdat `tables/s.ts` het opeet-saldo alleen evolueert bij een pot met rol `'opeethypotheek'`, groeide de schuld op het app-pad nooit — terwijl `bridge.ts` de maandopname wél als kasstroom bijtelde. Netto: uitkering zonder tegenpost, en de opname-cap (`MAX(0, BD/(1+r/12) − S!P(m−1))`) kon met een saldo dat permanent 0 was nooit knijpen. Gemeten op een testconfiguratie: €206 mln aan opnames tegen €749k leenruimte (275× de cap).
 
 Gecorrigeerd: `buildSchuldPotten` maakt de pot op slot 3 aan zodra de woonstrategie `reverse_mortgage` is, met de vorm van bens rij 20 (`box3Type: 'Geen Box 3 schuld'`, categorie `Woning`, startwaarde 0, aflossingsvrij). Buiten `reverse_mortgage` is de `KernelInput` byte-identiek.
 
 Twee eigenschappen die uit de correctie volgen en expliciet vastgelegd horen:
 - **De opeetschuld is J-neutraal.** Met `J = I − (L − M)` en categorie `Woning` (niet-liquide zodra de woonstrategie ≠ meerekenen) geldt ΔI = −ΔM, dus ΔJ = 0 tot op de cent. Vrijheidsleeftijd en het doel *excl.* woning leven op J en bewegen daarom per constructie niet mee; het doel *incl.* woning en de nalatenschap wél. De enige gedragsknop van de fix is dus de opname-cap.
+<!-- productiecijfer-ok: gemeten op dezelfde synthetische testconfiguratie -->
 - **Bij de auto-opname knijpt die cap pas ná de eindleeftijd.** De auto-opname spreidt de cap-bij-start exact uit tot leeftijd 90; alleen de opgerolde rente duwt het saldo daarna over de meegegroeide cap (gemeten bindmoment: leeftijd 91,2). Bij een *vaste* maandopname bindt de cap wél binnen de horizon en verschuift de vrijheidsleeftijd navenant (gemeten: +5,4 jaar bij €2.500/mnd).
 
 Bewaakt door `lib/horizon-kernel/adapter/opeethypotheek-pot.test.ts` en een discriminerende invariant in de horizon-strategie-matrix (`opeetSchuldEind`) — de bestaande goldens meten op de FIRE-maand en zijn structureel blind voor alles ná de opeet-startleeftijd.
 
+<!-- productiecijfer-ok: bedragen uit de gemeten testconfiguratie, geen productieaccount -->
 **Besluit over de opeetrente (eigenaar, 5 aug 2026): oracle-conform laten.** De opgerolde opeetrente is echte kosten (~€224k op €220k opnames in de gemeten configuratie), maar landt volledig in de niet-liquide emmer en verlaat daarmee de FIRE-beslissing. De vraag *moet opgerolde opeetrente als toekomstige verplichting meewegen in de vrijheidstoets, of pas bij verkoop/overlijden?* is expliciet voorgelegd en beantwoord met **pas bij verkoop/overlijden** — de rente wordt niet als toekomstige verplichting in de vrijheidstoets betrokken.
 
 Gevolg dat je moet kennen bij het lezen van een opeethypotheek-projectie: een opeethypotheek verschuift de vrijheidsdatum per constructie niet (J-neutraal, zie hierboven), ook niet via de rente. Wat hij wél doet is de nalatenschap drukken — dat is waar de kosten zichtbaar worden. Wie dit ooit wil herzien, verandert daarmee de kern-semantiek én wijkt af van het Excel-oracle; dat is een aparte ADR, geen aanpassing hier.

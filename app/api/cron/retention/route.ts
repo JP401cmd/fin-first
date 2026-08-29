@@ -2,7 +2,12 @@ import { NextResponse } from 'next/server'
 import { errorResponse } from '@/lib/api/respond'
 import { getServiceClient } from '@/lib/supabase/service'
 import { recordJobRun } from '@/lib/job-runs'
-import { RETENTION_MONTHS, retentionCutoffIso, type RetentionTable } from '@/lib/retention'
+import {
+  ERROR_RESOLUTIONS_RETENTION_MONTHS,
+  RETENTION_MONTHS,
+  retentionCutoffIso,
+  type RetentionTable,
+} from '@/lib/retention'
 
 // Node-runtime: we lezen de service-role-key server-side.
 export const runtime = 'nodejs'
@@ -67,6 +72,24 @@ export async function GET(request: Request) {
       deleted[table] = 0
     } else {
       deleted[table] = count ?? 0
+    }
+  }
+
+  // error_log_resolutions: zelfde termijn als error_logs, maar op `last_seen_at`
+  // in plaats van `created_at` — een resolutie hoort bij een foutSOORT en
+  // overleeft bewust zijn logregels (ADR 0113). Daarom buiten de lus hierboven.
+  {
+    const cutoff = retentionCutoffIso(ERROR_RESOLUTIONS_RETENTION_MONTHS, now)
+    const { count, error } = await supabase
+      .from('error_log_resolutions')
+      .delete({ count: 'exact' })
+      .lt('last_seen_at', cutoff)
+    if (error) {
+      console.error(`[cron:retention] error_log_resolutions: ${error.message}`)
+      errors.push('error_log_resolutions')
+      deleted.error_log_resolutions = 0
+    } else {
+      deleted.error_log_resolutions = count ?? 0
     }
   }
 

@@ -145,22 +145,24 @@ bleef — dagelijks vanuit Vercel, en zo vaak als de externe pinger hem aanroept
 
 ### De zes inbakken — wat je langsloopt, en wat "afgehandeld" hier betekent
 
-Let op: **maar drie van de zes hebben een afvinkbare werkvoorraad.** Een checklist die
-suggereert dat je alle inbakken kunt "legen", liegt — daarom staat er per inbak eerlijk bij wat
-je er wél kunt.
+Let op: **vier van de zes hebben een afvinkbare werkvoorraad.** Een checklist die suggereert dat
+je alle inbakken kunt "legen", liegt — daarom staat er per inbak eerlijk bij wat je er wél kunt.
+Nieuwsfeedback is en blijft bewust een *venster*: daar valt niets af te vinken, en dat is geen
+tekortkoming maar de aard van het signaal (ADR 0113).
 
 | Inbak | Waar | Wat "afgehandeld" betekent |
 |---|---|---|
 | Feedback | `/beheer/feedback` | **Afvinkbaar** — status `new` → `reviewed`. Echte werkvoorraad: leeg = klaar. |
 | Rekenhulp-meldingen | `/beheer/calculator-reports` | **Afvinkbaar** — status `open` → `reviewed` / `dismissed`. |
-| Foutmeldingen | `/beheer/errors` | **Niet afvinkbaar.** `error_logs` is append-only: geen `resolved`/`seen`-kolom, geen "nieuw sinds"-notie. Je kunt hier alleen *kijken*. Ontdubbel met de hand — honderden regels zijn typisch een handvol unieke problemen. Afhandelen = een kaart in de werkqueue, niet een vinkje hier. |
-| Nieuwsfeedback | *(geen beheerscherm)* | **Vandaag onbereikbaar voor beheer.** `news_feedback` heeft alleen eigen-rij-RLS (`user_id = auth.uid()`), geen superadmin-leespolicy en geen scherm. Sla over tot die er zijn. |
+| Foutmeldingen | `/beheer/errors` | **Afvinkbaar per foutSOORT** (ADR 0113) — niet per regel. Het scherm groepeert: dezelfde fout met andere ids, bedragen of datums telt als één. Vink een soort af zodra hij is afgehandeld (optioneel met een notitie, bv. het kaartnummer). Komt hij daarna terug, dan **heropent hij zichzelf** en staat er "teruggekomen" bij — dat is een regressie en hoort een kaart te worden. `error_logs` zelf blijft append-only; het vinkje leeft in `error_log_resolutions`. |
+| Nieuwsfeedback | `/beheer/nieuws` (sectie *Feedback op nieuwsitems*) | **Bewust een venster, geen werkvoorraad** (ADR 0113). `news_feedback` is een voorkeurssignaal ("minder/meer hierover"), geen melding die afhandeling vraagt — er is geen natuurlijke `nieuw → gelezen`, dus er valt hier niets af te vinken. Je *leest* welke categorieën lezers dempen; per lezer geldt vanaf 2× "minder" in 90 dagen dat de nieuwsgeneratie voor hem aanstuurt op alleen nog hoge-impact-items uit die categorie (een prompt-instructie, geen hard filter). Geen kolom per gebruiker: het scherm toont aggregaten. |
 | Support-mail | *(geen mailbox)* | **Ontvangt vandaag niets.** Er is nog geen domein; `lib/legal-contact.ts` zet beide adressen op `null` en toont een placeholder in plaats van een `mailto:`. Zolang dat zo is komt hier geen post binnen — **ook geen AVG-verzoek en geen lekmelding.** |
 | In-app meldingen | `public.user_reports` → Notion-werkqueue | **Zichzelf legend.** Bug/vraag/wens uit de app worden automatisch kaartjes in de queue; een dagelijkse cron herstelt wat live misging. Jij controleert alleen of er niets hangt: zonder `notion_api_token` blijven rijen op `notion_sync_status = 'pending'`. Inhaalroute: het commando `/meldingen-doorzetten`. |
 
-**Wat je hier dus werkelijk doet:** twee inbakken legen, één controleren op hangende sync, één
-inbak lezen-en-ontdubbelen, en twee overslaan tot ze bestaan. Duurt het langer dan 15 minuten,
-kort dan de checklist in — verleng niet het moment.
+**Wat je hier dus werkelijk doet:** drie inbakken legen (feedback, rekenhulp-meldingen,
+foutsoorten), één controleren op hangende sync, één venster lezen zonder er iets aan af te
+vinken, en één overslaan tot hij bestaat. Duurt het langer dan 15 minuten, kort dan de checklist
+in — verleng niet het moment.
 
 **Openstaand, en geen af te vinken stap:** zolang de support-mailbox niet bestaat, is er geen
 externe meldroute. Dat raakt de twee klokken hierboven rechtstreeks: een AVG-verzoek of

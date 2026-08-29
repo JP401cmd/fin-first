@@ -18,8 +18,9 @@ vroegtijdig (> 2 jaar voor de eindleeftijd) naar €0 liep.
 
 Dit leverde een inconsistentie op: de FIRE-stip (`firePortfolioAtFire` = liquide op de
 gevonden FIRE-leeftijd) zweefde systematisch **boven** de doel-lijn
-(`requiredFirePortfolio` = V\_nodig op diezelfde leeftijd). Gemeten op het eigen account
-(janpaul050486@gmail.com): ~€220k verschil, ~28% boven de doel-lijn. De oorzaak is
+(`requiredFirePortfolio` = V\_nodig op diezelfde leeftijd). Gemeten op een eigenaar-account
+(cijfers in het meetrapport buiten git, zie ADR 0111): de stip lag ruim boven de doel-lijn,
+in de orde van tientallen procenten. De oorzaak is
 fundamenteel: de forward-spend-down meet een ander vermogen dan de backward-annuïteit die
 V\_nodig uitrekent. Twee modellen leveren twee antwoorden; de stip en de lijn konden per
 definitie niet samenvallen.
@@ -166,13 +167,16 @@ waarde van élk asset = `current_value × net_worth_inclusion_pct`. De `spendabl
 `isNonLiquid`-classificatie (= de FIRE-behandeling) blijft ongewijzigd: het eigen deel van een
 include_full-huis blijft liquide/besteedbaar met zijn eigen reële return.
 
-**Gevolg (echt account, huis €1.000.500 @ inclusion 50%, deplete, include_full):**
+**Gevolg (eigenaar-account, woning @ inclusion 50%, deplete, include_full — bedragen
+bewust relatief, zie ADR 0111):**
 
-- Netto **start**-vermogen: van **boven €1M** → **€583.154** (huis €500.250 i.p.v. €1.000.500
-  + cash/inv/crypto − schuld). Dit sluit nu byte-voor-byte aan op het elders getoonde netto
-  vermogen — **geen desync meer** tussen het dashboard-netto-vermogen en de FIRE/afbouw-grondslag.
-- Minder FIRE-eligible vermogen → FIRE schuift **52 → 59**; `requiredFirePortfolioAtFire`
-  **€1.431.390 → €1.089.101**; `liquideAtFire` **€1.488.016 → €1.117.643**.
+- Netto **start**-vermogen daalt met het niet-meegerekende deel van de woning (huis telt nog
+  voor de helft mee, náást cash/inv/crypto − schuld). Dit sluit nu byte-voor-byte aan op het
+  elders getoonde netto vermogen — **geen desync meer** tussen het dashboard-netto-vermogen en
+  de FIRE/afbouw-grondslag.
+- Minder FIRE-eligible vermogen → FIRE schuift **enkele jaren later**;
+  `requiredFirePortfolioAtFire` en `liquideAtFire` dalen navenant, in ongeveer dezelfde
+  verhouding als de eligible pot.
 
 **Reikwijdte:** de strategie-matrix-persona (`lib/regression-tests/horizon-strategie/persona-fixture.ts`)
 zet alle assets op inclusion_pct 100 → die goldens zijn **byte-identiek** vóór/na de fix

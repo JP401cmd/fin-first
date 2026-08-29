@@ -19,12 +19,13 @@ liquide bezit, waar het Excel v5 die lening eindeloos laat compounden.
   **categoriesaldo van m−1** (lag-veilig, gedocumenteerd `tables/verdeling/index.ts`).
   In de verkoopmaand is het liquide vermogen van m−1 nog nét niet toereikend voor de
   onttrekking → er ontstaat een **één-maand-tekort** dat als tekort-lening (S!AB) wordt
-  geboekt. Op het eigenaar-account: **€6.758 op leeftijd 75**.
+  geboekt. Op een eigenaar-account: een tekort van enkele duizenden euro's rond leeftijd 75
+  (exacte bedragen in het meetrapport buiten git, zie ADR 0111).
 - Die lening kon daarna **nooit worden afgelost.** `tekortAflossing` (S!AC) werd
   uitsluitend gevoed uit het Toename-aflos-budget (`aflossingBudget`, de positieve
   maandkasstroom-surplus-tak) — en dat is in de onttrekkingsfase structureel 0. Gevolg:
-  17 jaar 5%-rente-compounding (€7.074 → €16.521 op 92) terwijl er **>€900k liquide
-  náást stond**.
+  17 jaar 5%-rente-compounding, waardoor de lening tot leeftijd 92 ruim **verdubbelt**,
+  terwijl er een **veelvoud daarvan aan liquide vermogen náást stond**.
 - Dit gedrag is **oracle-getrouw** (Excel v5 doet het exact zo). Het is dus geen
   port-bug maar een **modelbeperking** van het oracle zelf.
 

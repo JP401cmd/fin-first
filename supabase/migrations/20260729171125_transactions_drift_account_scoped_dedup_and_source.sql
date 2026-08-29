@@ -69,9 +69,10 @@ create index if not exists transactions_account_id_idx
 -- automatisch uniek wordt en zo langs de dedup glipt.
 --
 -- CONCURRENTLY kan niet: apply_migration draait in een transactieblok.
--- Zelfde afweging als 20260504000001_perf_composite_indexes.sql. Volume:
--- 37.000 rijen / 26 MB, waarvan 35.342 met import_hash -- de indexbouw is
--- sub-seconde. De SHARE-lock blokkeert in dat venster schrijvers op
+-- Zelfde afweging als 20260504000001_perf_composite_indexes.sql. Volume (relatief;
+-- exacte meting hoort buiten git, zie ADR 0111): een tabel in de orde van
+-- tienduizenden rijen, waarvan de overgrote meerderheid een import_hash draagt --
+-- de indexbouw is sub-seconde. De SHARE-lock blokkeert in dat venster schrijvers op
 -- transactions, geen lezers.
 --
 -- Volgorde: eerst de nieuwe index AANMAKEN, pas daarna de oude DROPPEN, zodat
@@ -93,7 +94,7 @@ drop index if exists public.transactions_import_hash_idx;
 --   'handmatig' -- met de hand ingevoerd
 --
 -- BEWUST NULLABLE EN BEWUST ZONDER DEFAULT.
---   * Nullable: de 37.000 bestaande rijen hebben geen vastgelegde herkomst.
+--   * Nullable: alle bestaande rijen hebben geen vastgelegde herkomst.
 --     Ze terugvullen zou een gok zijn die daarna niet meer van een echt
 --     vastgesteld feit te onderscheiden is. NULL betekent hier precies wat
 --     het moet betekenen: "herkomst niet vastgelegd".

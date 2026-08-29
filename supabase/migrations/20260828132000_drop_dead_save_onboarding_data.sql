@@ -1,0 +1,41 @@
+-- De dode RPC `save_onboarding_data` droppen (Groep B — besluit eigenaar 26-08-2026).
+--
+-- ## Waarom weg, en niet repareren
+--
+-- Eén DROP ruimt drie problemen tegelijk op. Alle drie gemeten op 28-08-2026
+-- tegen de productie-DB (`pg_proc` / `pg_get_functiondef` / `information_schema`),
+-- niet gelezen uit een migratiebestand:
+--
+--   1. DOOD. `app/api/onboarding/save-own-data/route.ts` r. 875-894 zegt het
+--      expliciet: "De atomische RPC `save_onboarding_data` is DEPRECATED en
+--      wordt bewust niet aangeroepen"; `buildRpcPayload` staat er nog slechts
+--      als `void`-referentie voor de payload-vorm. Nul call-sites in de app.
+--
+--   2. STUK. De body doet `UPDATE public.profiles SET … news_description = …`,
+--      maar `profiles.news_description` BESTAAT NIET (0 rijen in
+--      `information_schema.columns`). Het bestand dat die kolom zou toevoegen —
+--      20260331000001_add_news_description — heeft nooit gedraaid. De RPC zou
+--      dus bij de eerste aanroep hard falen. Een landmijn zodra iemand 'm weer
+--      inschakelt.
+--
+--   3. BLOKKEERT DE ENCRYPTIE-KAART. De body raakt de plaintext `iban`-kolom op
+--      twee plekken — geverifieerd in `pg_get_functiondef`:
+--          DELETE FROM public.bank_accounts WHERE user_id = v_user_id AND iban = '';
+--          INSERT … (user_id, name, bank_name, account_type, balance, iban, …)
+--      Stage B van de field-level-encryptie wil die kolom droppen. Zolang deze
+--      functie bestaat, blijft dat een openstaande verwijzing.
+--
+-- ## Risico
+--
+-- Nihil, en dat is meetbaar en niet beredeneerd: EXECUTE is al ingetrokken van
+-- `anon` én `authenticated` door 20260717132632_security_hygiene_revoke_unused_secdef_rpcs.
+-- Gemeten in `information_schema.routine_privileges` (28-08-2026) resteren
+-- alleen `postgres` en `service_role`. De functie is vandaag dus voor geen enkele
+-- ingelogde gebruiker aanroepbaar; er kan geen werkend pad op stukgaan.
+--
+-- Bijwerking: hiermee vervalt ook het laatste schrijfpad dat
+-- `profiles.news_description` veronderstelde. Het nooit-gedraaide bestand
+-- 20260331000001_add_news_description wordt daarmee definitief overbodig — er is
+-- bewust GÉÉN kolom toegevoegd om een dode functie te laten werken.
+
+drop function if exists public.save_onboarding_data(jsonb);

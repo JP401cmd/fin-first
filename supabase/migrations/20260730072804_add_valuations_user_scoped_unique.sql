@@ -7,9 +7,10 @@
 -- `balance_snapshots` doet het wél goed (`UNIQUE (user_id, snapshot_date,
 -- entity_type, entity_id)`); deze sleutel spiegelt dat.
 --
--- Pre-flight op remote (30 juli, vóór toepassen): 39 rijen, 7 gebruikers,
--- 0 groepen die de nieuwe, striktere sleutel zouden schenden, 0
--- (entity_id, valuation_date)-paren met gemengd `entity_type`. De nieuwe sleutel
+-- Pre-flight op remote (30 juli, vóór toepassen — omvang relatief weergegeven,
+-- zie ADR 0111): een kleine tabel, en daarin NUL groepen die de nieuwe, striktere
+-- sleutel zouden schenden en NUL (entity_id, valuation_date)-paren met gemengd
+-- `entity_type`. Die twee nullen zijn het hele argument. De nieuwe sleutel
 -- is per constructie een SUPERSET van de oude en dus per definitie zwakker — hij
 -- kan niet op bestaande data stuklopen.
 --

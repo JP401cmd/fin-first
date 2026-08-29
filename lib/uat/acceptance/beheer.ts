@@ -248,15 +248,15 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-BEHEER-13',
     titel: 'Nieuwsbronnen beheren, ingest draaien en artikelen modereren',
     kriticiteit: 'BELANGRIJK',
-    given: '/beheer/nieuws (web-/RSS-bronnen, ingest-status, artikelendatabase).',
+    given: '/beheer/nieuws (web-/RSS-bronnen, ingest-status, artikelendatabase, en onderaan het alleen-lezen venster Feedback op nieuwsitems).',
     when:
       'De beheerder bewerkt bronnen (URL/label toevoegen/verwijderen), draait een ingest-ronde (POST), bekijkt de bron-gezondheid en doorzoekt/verwijdert artikelen.',
     then:
-      'Bronnen opgeslagen (of Reset naar DEFAULT_WEB_SOURCES/DEFAULT_RSS_FEEDS); de ingest ververst de artikelen met zichtbaar resultaat (gecontroleerd/gevonden/geëxtraheerd/duplicaten/ingevoegd); dit bepaalt de Krant/nieuws-inhoud. Geen eigen berekening.',
+      'Bronnen opgeslagen (of Reset naar DEFAULT_WEB_SOURCES/DEFAULT_RSS_FEEDS); de ingest ververst de artikelen met zichtbaar resultaat (gecontroleerd/gevonden/geëxtraheerd/duplicaten/ingevoegd); dit bepaalt de Krant/nieuws-inhoud. Geen eigen berekening. De sectie Feedback op nieuwsitems (ADR 0113) is BEWUST alleen-lezen: minder/meer per categorie, aantal lezers, en per lezer de demotiestand (vanaf 2x "minder" in 90 dagen). Er hóórt daar geen status- of afvinkknop te staan — verschijnt die wel, dan is dat een bevinding. Bij een lege tabel toont hij een eerlijke lege staat, geen nul-rijen-inbox.',
     assertion: {
       kind: 'ui-only',
       source:
-        'app/(app)/beheer/nieuws/page.tsx + lib/news-sources.ts; API /api/admin/news-ingest e.a. — bronbeheer/ingest/moderatie, geen cijfermatige uitkomst',
+        'app/(app)/beheer/nieuws/page.tsx + lib/news-sources.ts + components/app/beheer/news-feedback-panel.tsx (lib/news-feedback-summary.ts); API /api/admin/news-ingest en /api/admin/news-feedback — bronbeheer/ingest/moderatie + alleen-lezen feedbackvenster, geen cijfermatige uitkomst',
     },
   },
   {
@@ -549,15 +549,15 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-BEHEER-31',
     titel: 'Logboeken controleren: audit-trail, foutmeldingen, e-mail, achtergrondtaken',
     kriticiteit: 'OVERIG',
-    given: '/beheer/audit, /beheer/errors, /beheer/email en /beheer/jobs (alleen-lezen logboeken).',
+    given: '/beheer/audit, /beheer/email en /beheer/jobs (alleen-lezen logboeken) plus /beheer/errors, dat sinds ADR 0113 GEEN alleen-lezen logboek meer is maar een afvinkbare werkvoorraad per foutsoort.',
     when:
-      'De beheerder doorloopt de audit-trail, de client-fouten, de e-mailpogingen en de cron-uitvoeringen; controleert of een gebruikersbeheer-actie (WF-BEHEER-07/08) in de audit-trail verschijnt.',
+      'De beheerder doorloopt de audit-trail, de client-fouten, de e-mailpogingen en de cron-uitvoeringen; controleert of een gebruikersbeheer-actie (WF-BEHEER-07/08) in de audit-trail verschijnt; vinkt op /beheer/errors een foutsoort af en haalt het vinkje weer weg.',
     then:
-      'Elke log toont de juiste rijen (wie/wat/detail/wanneer, status, duur); lege logboeken zijn mogelijk; de audit-trail is de verificatiebron voor de KERN-gebruikersbeheer-flows. Alleen-lezen weergave, geen eigen berekening. OP /beheer/jobs (11 aug 2026) draagt elk schema-label sindsdien expliciet "UTC" — Vercel evalueert cron-expressies in UTC, en zonder dat achtervoegsel las "Dagelijks 05:00" naast een laatste run van 07:55 (Amsterdam) als drift terwijl er niets aan de hand was. De "stil"-drempels (`maxAgeHours`) zijn geen ronde "schema + ruime marge" meer maar een uitgerekende band per taak (bv. de prijsverversing van 26 → 23 uur), afgeleid uit de GEMETEN cron-jitter en het feit dat `job_runs.created_at` pas bij het AFRONDEN wordt geschreven; de pagina telt daar via `deriveJobHealth` nog een eigen toeslag bij op, omdat zij een andere vraag stelt dan de meldingen-sweep. Wat een tester hier controleert blijft dus alleen-lezen, maar een taak die op "stil" staat terwijl hij vanmorgen liep is nú een echte bevinding en geen tijdzone-illusie.',
+      'Elke log toont de juiste rijen (wie/wat/detail/wanneer, status, duur); lege logboeken zijn mogelijk; de audit-trail is de verificatiebron voor de KERN-gebruikersbeheer-flows. Alleen-lezen weergave, geen eigen berekening. OP /beheer/jobs (11 aug 2026) draagt elk schema-label sindsdien expliciet "UTC" — Vercel evalueert cron-expressies in UTC, en zonder dat achtervoegsel las "Dagelijks 05:00" naast een laatste run van 07:55 (Amsterdam) als drift terwijl er niets aan de hand was. De "stil"-drempels (`maxAgeHours`) zijn geen ronde "schema + ruime marge" meer maar een uitgerekende band per taak (bv. de prijsverversing van 26 → 23 uur), afgeleid uit de GEMETEN cron-jitter en het feit dat `job_runs.created_at` pas bij het AFRONDEN wordt geschreven; de pagina telt daar via `deriveJobHealth` nog een eigen toeslag bij op, omdat zij een andere vraag stelt dan de meldingen-sweep. Wat een tester hier controleert blijft dus alleen-lezen, maar een taak die op "stil" staat terwijl hij vanmorgen liep is nú een echte bevinding en geen tijdzone-illusie. AFWIJKING SINDS ADR 0113: /beheer/errors is geen alleen-lezen logboek meer. Het scherm toont FOUTSOORTEN (dezelfde fout met andere ids/bedragen/datums telt als één) met een kop-strip open/soorten/regels; afvinken schrijft naar error_log_resolutions via /api/admin/error-groups en het vinkje verdwijnt weer met "Vinkje weghalen". Een afgevinkte soort die opnieuw voorkomt HEROPENT ZICHZELF en toont "Teruggekomen" — dat is een afleiding uit created_at > resolved_at, geen kolom. De overige drie logboeken blijven alleen-lezen.',
     assertion: {
       kind: 'ui-only',
       source:
-        'app/(app)/beheer/audit/page.tsx + app/(app)/beheer/errors/page.tsx + app/(app)/beheer/email/page.tsx + app/(app)/beheer/jobs/page.tsx (taken uit lib/job-catalog.ts, incl. "Meldingen → Notion-sync" en "Meldingen-sweep") — alleen-lezen logboeken, geen cijfermatige uitkomst',
+        'app/(app)/beheer/audit/page.tsx + app/(app)/beheer/errors/page.tsx (+ app/api/admin/error-groups/route.ts, lib/error-groups.ts) + app/(app)/beheer/email/page.tsx + app/(app)/beheer/jobs/page.tsx (taken uit lib/job-catalog.ts, incl. "Meldingen → Notion-sync" en "Meldingen-sweep") — drie alleen-lezen logboeken plus één afvinkbare foutenwerkvoorraad, geen cijfermatige uitkomst',
     },
   },
   {

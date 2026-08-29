@@ -21,8 +21,9 @@ de per-holding route `/api/holdings/[id]/value-history` replayt transacties al
 naar een units-curve. Toch werkte het niet, om twee onafhankelijke redenen.
 
 **Reden 1 — de benchmark las de verkeerde tabel.** `buildPortfolioHistory`
-waardeerde uitsluitend op `valuations`. Op het referentie-account: 0 rijen, bij
-109 posities. Elke maand kwam daardoor op `pricedFromHistory: false`,
+waardeerde uitsluitend op `valuations`. Op het referentie-account: NUL rijen, bij
+een portefeuille van tientallen open posities (zie ADR 0111 — exacte aantallen
+buiten git). Elke maand kwam daardoor op `pricedFromHistory: false`,
 `computeTwrSeries` gaf `null`, en de melding verscheen — terwijl de koersen wél
 bestonden, alleen in een andere tabel.
 
@@ -46,7 +47,7 @@ die 95 — en dat zijn precies de **gesloten** posities, die de historie dragen.
 Drie opties:
 
 **A. Alleen echte koersen.** Zuiver: elke euro in de grafiek rust op een
-waarneming. Maar 95 van de 109 posities vallen weg, dus de historische waarde
+waarneming. Maar de overgrote meerderheid van de posities valt weg, dus de historische waarde
 ligt structureel te laag — de curve zou suggereren dat de portefeuille jarenlang
 vrijwel leeg was.
 

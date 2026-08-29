@@ -823,3 +823,18 @@
 - **API-routes** toegevoegd: /api/assets
 - **Tabellen** toegevoegd: import_idempotency
 - **Componenten (aantal)** toegevoegd: +10
+
+## 2026-08-28
+
+- **API-routes** toegevoegd: /api/coachmark
+- **Componenten (aantal)** toegevoegd: +27
+
+## 2026-08-28
+
+- **API-routes** toegevoegd: /api/admin/error-groups, /api/admin/news-feedback
+- **Tabellen** toegevoegd: error_log_resolutions
+- **Componenten (aantal)** toegevoegd: +1
+
+## 2026-08-28
+
+- Geen wijzigingen.

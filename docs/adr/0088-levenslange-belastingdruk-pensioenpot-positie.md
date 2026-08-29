@@ -147,6 +147,7 @@ laag `aowBruto` alsnog binnenlaten. Er is nog steeds precies één tariefmotor; 
 is invoer, geen tariefvariant.
 
 Gevolg voor deze sectie, gemeten op `BOX1_PARAMS[2026]` (nieuw − oud per jaarrij
+<!-- productiecijfer-ok: uitgewerkte rekenvoorbeelden op BOX1_PARAMS[2026], geen productiedata -->
 `box1NietVerrekend`): AOW € 0 + pensioen € 30.000 → **+€ 5.381** vóór de AOW en
 **+€ 2.687** erna; AOW € 16.000 netto + pensioen € 30.000 → **+€ 1.990** ná de
 AOW; met een pensioen van € 150.000 draait het naar **−€ 707**. De heffing gaat

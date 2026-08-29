@@ -22,9 +22,13 @@
  *  - **`bank_connections.access_token` / `refresh_token`** (de plaintext
  *    voorgangers van hun `_encrypted`-tweelingen) zijn LEVENDE bankcredentials.
  *    Op remote staan ze op 0 rijen — de migratie naar de versleutelde kolommen
- *    is rond — maar de kolommen bestaan nog, dus één legacy-rij zou volstaan om
- *    van een gebruikersdownload een credential-drager te maken. Dat risico hoort
- *    niet af te hangen van een telling die morgen anders kan zijn.
+ *    is rond — en met
+ *    `supabase/migrations/20260828120000_stage_a_drop_plaintext_bank_tokens.sql`
+ *    verdwijnen de kolommen zelf ook. Ze blijven hier tóch staan: deze lijst is
+ *    kolom-gebaseerd, dus zolang de export `select('*')` doet is dit het vangnet
+ *    voor een teruggezette back-up van vóór de drop of een per ongeluk
+ *    heringevoerde kolom. Na de drop is de regel een stille no-op — dat is de
+ *    bedoeling, niet iets om op te ruimen.
  *  - **`exchange_connections` / `broker_connections`** dragen dezelfde vorm voor
  *    exchange- en broker-API-sleutels.
  *

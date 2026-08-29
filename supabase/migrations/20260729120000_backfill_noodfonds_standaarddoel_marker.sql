@@ -19,21 +19,23 @@
 -- gekozen noodfondsdoel beïnvloedde de gezondheidsscore dus níét. Dat is precies
 -- de klacht op de kaart.
 --
--- PRODUCTIE-METING VOORAF (29 jul 2026, via execute_sql):
---   goals totaal ................................ 26
---   goal_type = 'emergency_fund' ................  0
---   metadata->>'standaardDoel' gezet ............  0   ← geen enkele marker
---   savings-doelen met naam ~* 'noodfonds' ......  4   ← allemaal metadata = {}
--- De 4 rijen: 'Noodfonds' (€10.500), 'Noodfonds' (€5.000), 'Noodfonds' (€18.000)
--- en 'Noodfonds opbouwen' (€3.200) — vier verschillende gebruikers, dus per
--- gebruiker hooguit één treffer (geen ambiguïteit voor pickEmergencyGoal).
+-- PRODUCTIE-METING VOORAF (29 jul 2026, via execute_sql — relatief weergegeven;
+-- exacte tellingen en recordinhoud horen in een rapport buiten git, zie ADR 0111):
+--   * GEEN enkel doel had goal_type = 'emergency_fund';
+--   * GEEN enkel doel had metadata->>'standaardDoel' gezet — nul markers dus,
+--     precies het gat dat deze backfill dicht;
+--   * een handvol savings-doelen matcht op naam ~* 'noodfonds', allemaal met
+--     metadata = {}.
+-- Die naam-treffers zijn verdeeld over evenveel verschillende gebruikers, dus
+-- per gebruiker hooguit één treffer (geen ambiguïteit voor pickEmergencyGoal).
 --
 -- CRITERIUM-KEUZE (bewust NAUW gehouden):
 --   * goal_type = 'savings' — de legacy quick-add/onboarding-vorm. Doelen met
 --     goal_type='emergency_fund' worden al zonder marker gedetecteerd.
 --   * name ~* 'noodfonds' — ondubbelzinnig Nederlands woord voor deze buffer;
---     dekt 4/4 productierijen, inclusief die met een niet-preset icoon ('Target').
---   * GEEN icon = 'ShieldCheck' als extra OR-tak: dat dekt maar 3 van de 4 rijen
+--     dekt ALLE gemeten productierijen, inclusief die met een niet-preset icoon
+--     ('Target').
+--   * GEEN icon = 'ShieldCheck' als extra OR-tak: dat dekt niet alle rijen
 --     én is een vrij door de gebruiker te kiezen icoon (een doel "Verzekering"
 --     met schild-icoon zou dan onterecht de gezondheidsscore gaan sturen).
 --     Naam-match is hier strikt breder én preciezer.
@@ -51,7 +53,7 @@
 -- user-agnostisch maar raakt per gebruiker alleen diens eigen rijen — er wordt
 -- geen data tussen gebruikers verplaatst of zichtbaar gemaakt.
 --
--- GEVOLG NA TOEPASSEN (verwacht, gemeten op de huidige data): voor deze vier
+-- GEVOLG NA TOEPASSEN (verwacht, gemeten op de huidige data): voor de getroffen
 -- gebruikers wisselt de noodfonds-target van de default 6 maanden naar de
 -- maanden-expressie van hun eigen doelbedrag. Dat verhoogt/verlaagt de
 -- buffer-pijler van de gezondheidsscore navenant — dat IS de bedoelde werking

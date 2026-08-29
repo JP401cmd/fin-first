@@ -12,6 +12,7 @@ import { checkTierGate } from '@/lib/require-tier'
 import { NEWS_SYSTEM_PROMPT } from '@/lib/news-system-prompt'
 import { filterGroundedItems, type SelectableArticle } from '@/lib/news-selection'
 import { newsItemSchema, type NewsItem } from '@/lib/news-item'
+import { demotedCategories, demotionWindowStartIso } from '@/lib/news-feedback-summary'
 import {
   archiveCurrentEdition,
   checkRefreshLimit,
@@ -40,23 +41,19 @@ type SupabaseClient = NewsSupabaseClient
 
 async function getDemotedCategories(supabase: SupabaseClient, userId: string): Promise<string[]> {
   try {
-    const ninetyDaysAgo = new Date()
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90)
-
     const { data } = await supabase
       .from('news_feedback')
       .select('category')
       .eq('user_id', userId)
       .eq('verdict', 'less')
-      .gte('created_at', ninetyDaysAgo.toISOString())
+      .gte('created_at', demotionWindowStartIso())
 
     if (!data) return []
-    const counts = new Map<string, number>()
-    for (const row of data) {
-      if (!row.category) continue
-      counts.set(row.category, (counts.get(row.category) ?? 0) + 1)
-    }
-    return [...counts.entries()].filter(([, n]) => n >= 2).map(([cat]) => cat)
+    // Drempel en venster wonen in lib/news-feedback-summary.ts — dezelfde
+    // implementatie die het beheervenster op /beheer/nieuws consumeert. Stond de
+    // regel hier apart, dan zou dat scherm stil gaan liegen zodra hij wijzigt
+    // (ADR 0113).
+    return demotedCategories(data)
   } catch {
     return []
   }

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-27T15:58:54.939Z",
-  "generatedDate": "2026-08-27",
+  "generatedAt": "2026-08-28T23:41:37.574Z",
+  "generatedDate": "2026-08-28",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -188,11 +188,11 @@
   "stats": {
     "routes": 137,
     "routesProduction": 95,
-    "api": 300,
-    "tables": 90,
-    "migrations": 211,
+    "api": 303,
+    "tables": 91,
+    "migrations": 216,
     "integrations": 25,
-    "components": 956,
+    "components": 984,
     "providers": 15,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -1969,6 +1969,16 @@
       ]
     },
     {
+      "url": "/api/admin/error-groups",
+      "file": "app/api/admin/error-groups/route.ts",
+      "domain": "admin",
+      "methods": [
+        "GET",
+        "POST",
+        "DELETE"
+      ]
+    },
+    {
       "url": "/api/admin/extraction-prompt",
       "file": "app/api/admin/extraction-prompt/route.ts",
       "domain": "admin",
@@ -2047,6 +2057,14 @@
       "methods": [
         "GET",
         "DELETE"
+      ]
+    },
+    {
+      "url": "/api/admin/news-feedback",
+      "file": "app/api/admin/news-feedback/route.ts",
+      "domain": "admin",
+      "methods": [
+        "GET"
       ]
     },
     {
@@ -2395,6 +2413,7 @@
       "file": "app/api/assets/[id]/route.ts",
       "domain": "assets",
       "methods": [
+        "PATCH",
         "DELETE"
       ]
     },
@@ -2780,6 +2799,15 @@
       "domain": "checkin",
       "methods": [
         "GET"
+      ]
+    },
+    {
+      "url": "/api/coachmark",
+      "file": "app/api/coachmark/route.ts",
+      "domain": "coachmark",
+      "methods": [
+        "GET",
+        "PUT"
       ]
     },
     {
@@ -4384,7 +4412,7 @@
     {
       "domain": "admin",
       "label": "Beheer",
-      "count": 43,
+      "count": 45,
       "routes": [
         {
           "url": "/api/admin/ai-features",
@@ -4455,6 +4483,16 @@
           "methods": [
             "GET",
             "PUT"
+          ]
+        },
+        {
+          "url": "/api/admin/error-groups",
+          "file": "app/api/admin/error-groups/route.ts",
+          "domain": "admin",
+          "methods": [
+            "GET",
+            "POST",
+            "DELETE"
           ]
         },
         {
@@ -4536,6 +4574,14 @@
           "methods": [
             "GET",
             "DELETE"
+          ]
+        },
+        {
+          "url": "/api/admin/news-feedback",
+          "file": "app/api/admin/news-feedback/route.ts",
+          "domain": "admin",
+          "methods": [
+            "GET"
           ]
         },
         {
@@ -5358,6 +5404,7 @@
           "file": "app/api/assets/[id]/route.ts",
           "domain": "assets",
           "methods": [
+            "PATCH",
             "DELETE"
           ]
         },
@@ -6708,6 +6755,22 @@
       ]
     },
     {
+      "domain": "coachmark",
+      "label": "coachmark",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/coachmark",
+          "file": "app/api/coachmark/route.ts",
+          "domain": "coachmark",
+          "methods": [
+            "GET",
+            "PUT"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "command-palette",
       "label": "command-palette",
       "count": 1,
@@ -7807,6 +7870,10 @@
         "migration": "supabase/migrations/20260215000000_create_base_tables.sql"
       },
       {
+        "name": "error_log_resolutions",
+        "migration": "supabase/migrations/20260828140000_error_log_resolutions.sql"
+      },
+      {
         "name": "error_logs",
         "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
       },
@@ -7920,7 +7987,7 @@
       },
       {
         "name": "news_feedback",
-        "migration": "supabase/migrations/20260611140000_create_news_feedback.sql"
+        "migration": "supabase/migrations/20260611140001_create_news_feedback.sql"
       },
       {
         "name": "next_step_completions",
@@ -8043,7 +8110,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 211
+    "migrationCount": 216
   },
   "tablesByDomain": [
     {
@@ -8096,6 +8163,10 @@
         {
           "name": "contract_events",
           "migration": "supabase/migrations/20260617190000_create_contract_events.sql"
+        },
+        {
+          "name": "error_log_resolutions",
+          "migration": "supabase/migrations/20260828140000_error_log_resolutions.sql"
         },
         {
           "name": "error_logs",
@@ -8368,7 +8439,7 @@
         },
         {
           "name": "news_feedback",
-          "migration": "supabase/migrations/20260611140000_create_news_feedback.sql"
+          "migration": "supabase/migrations/20260611140001_create_news_feedback.sql"
         }
       ]
     },
@@ -8525,11 +8596,11 @@
     }
   ],
   "components": {
-    "total": 956,
+    "total": 984,
     "groups": [
       {
         "group": "app",
-        "count": 373,
+        "count": 381,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8578,6 +8649,7 @@
           "budget-donut",
           "budget-form",
           "budget-heatmap",
+          "budget-heatmap.compact-mobile.test",
           "budget-hub.test",
           "budget-icon-picker",
           "budget-koppel-nudge",
@@ -8643,6 +8715,8 @@
           "debt-valuation-modal",
           "debt-valuation-modal.test",
           "deeltijdwerk-impact",
+          "deficit-notice-provider",
+          "deficit-notice-provider.test",
           "dekkingsradar",
           "dekkingsradar.test",
           "density-toggle",
@@ -8658,6 +8732,8 @@
           "end-of-life",
           "envelope-transfer-sheet",
           "error-reporter",
+          "euro-view-badge",
+          "euro-view-badge.test",
           "event-chat-pane",
           "event-chat-pane.test",
           "event-cluster-sheet",
@@ -8755,11 +8831,13 @@
           "monte-carlo-opbouw",
           "monte-carlo-overgang",
           "natural-milestone-sheet",
+          "natural-milestone-sheet.test",
           "nav-menu-sheet",
           "nav-menu-sheet.test",
           "nav-stack-meta",
           "nav-stack-provider",
           "net-worth-projection-chart",
+          "news-feedback-panel",
           "nibud-benchmark",
           "nieuw-budget-kaart",
           "notification-bundle",
@@ -8831,6 +8909,7 @@
           "shell-overlay.destructive.test",
           "sidebar",
           "sidebar.eenvoudig.test",
+          "sidebar.naamgeving.test",
           "sim-chart",
           "sim-chart-widget",
           "sim-chart-widget.test",
@@ -8858,13 +8937,13 @@
           "surplus-gap-chart",
           "surplus-gap-chart.test",
           "svg-text-no-html-nesting.test",
+          "swap-in-simple",
+          "swap-in-simple.test",
           "sync-status-badge",
           "sync-status-badge.test",
           "target-account-choice",
           "target-account-choice.test",
           "toast-provider",
-          "toekomst-exit-notice",
-          "toekomst-exit-notice.test",
           "toekomst-overlay",
           "toekomst-overlay-balloons",
           "toekomst-overlay.test",
@@ -8908,7 +8987,7 @@
       },
       {
         "group": "overview",
-        "count": 170,
+        "count": 182,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -8979,6 +9058,7 @@
           "filter-dropdown",
           "filter-dropdown.test",
           "geldstroom-gauge",
+          "geldstroom-gauge.test",
           "gepaarde-staven",
           "grootste-uitgaven",
           "guide-screen-view",
@@ -8991,6 +9071,8 @@
           "hero-widget-rail.test",
           "hub-kalender",
           "hub-kansen",
+          "hub-kansen.masking.test",
+          "hub-katern-i.masking.test",
           "hub-stelselradar",
           "hub-stroom",
           "hub-totale-druk",
@@ -9002,9 +9084,12 @@
           "jaarruimte-card",
           "jaarruimte-card.test",
           "jaarruimte-deeplink-scroll",
+          "jaarruimte-rekensom",
+          "jaarruimte-rekensom.test",
           "koppel-rekening-banner",
           "koppel-rekening-banner.test",
           "leverage-card",
+          "leverage-card.test",
           "lokale-tips-generator",
           "lokale-tips-generator.test",
           "marginale-druk-curve",
@@ -9040,6 +9125,9 @@
           "schulden-filter",
           "schulden-filter.test",
           "schulden-view",
+          "sinds-vorig-bezoek",
+          "sinds-vorig-bezoek-loader",
+          "sinds-vorig-bezoek.test",
           "spend-limit-heatmap",
           "spend-limit-performance-pane",
           "spend-limit-performance-pane.test",
@@ -9067,6 +9155,7 @@
           "transacties-geldstroom.test",
           "uitgaven-heatmap",
           "vaste-lasten-client",
+          "vaste-lasten-client.eenvoudig.test",
           "vaste-lasten-insights",
           "vaste-lasten-insights.test",
           "vaste-lasten-loader",
@@ -9079,7 +9168,9 @@
           "vrijheidsbriefing-hero",
           "weekdag-patroon",
           "welcome-guide-banner",
-          "welcome-guide-banner.test"
+          "welcome-guide-banner.test",
+          "welcome-guide-dot",
+          "welcome-guide-provider"
         ]
       },
       {
@@ -9263,13 +9354,14 @@
       },
       {
         "group": "future",
-        "count": 59,
+        "count": 60,
         "items": [
           "afbouw-overzicht-card",
           "afbouw-overzicht-card.test",
           "aow-strategie-editor",
           "calculator-runner",
           "calculator-to-life-event-sheet",
+          "calculator-to-life-event-sheet.test",
           "categorie-prio-editor",
           "categorie-prio-editor.test",
           "disclaimer-strip",
@@ -9448,7 +9540,7 @@
       },
       {
         "group": "editorial",
-        "count": 17,
+        "count": 20,
         "items": [
           "aanname-hint",
           "button",
@@ -9456,6 +9548,7 @@
           "chart-tips",
           "figures-strip.test",
           "glossary-term",
+          "glossary-term.test",
           "index",
           "info-icon-tooltip",
           "inline-info-disclosure",
@@ -9466,7 +9559,28 @@
           "page-opening",
           "progress-milestones",
           "subtotal-line",
-          "subtotal-line.test"
+          "subtotal-line.test",
+          "tap-target",
+          "tap-target.test"
+        ]
+      },
+      {
+        "group": "berichten",
+        "count": 13,
+        "items": [
+          "archive-edition-card",
+          "archive-section",
+          "berichten-client",
+          "berichten-client.density.test",
+          "berichten-client.loading-masthead.test",
+          "berichten-client.unread-count.test",
+          "masthead",
+          "masthead.test",
+          "news-components",
+          "newspaper-footer",
+          "nieuws-only-client",
+          "nieuws-only-client.test",
+          "section-heading"
         ]
       },
       {
@@ -9486,24 +9600,6 @@
           "section-primitives",
           "slot-cta",
           "veiligheid"
-        ]
-      },
-      {
-        "group": "berichten",
-        "count": 12,
-        "items": [
-          "archive-edition-card",
-          "archive-section",
-          "berichten-client",
-          "berichten-client.density.test",
-          "berichten-client.unread-count.test",
-          "masthead",
-          "masthead.test",
-          "news-components",
-          "newspaper-footer",
-          "nieuws-only-client",
-          "nieuws-only-client.test",
-          "section-heading"
         ]
       },
       {
@@ -9559,6 +9655,25 @@
         ]
       },
       {
+        "group": "command-palette",
+        "count": 4,
+        "items": [
+          "command-palette",
+          "command-palette-provider",
+          "command-palette.overlay.test",
+          "command-palette.touch.test"
+        ]
+      },
+      {
+        "group": "fin",
+        "count": 3,
+        "items": [
+          "cashflow-section",
+          "cashflow-section.test",
+          "vaste-kosten-analyse"
+        ]
+      },
+      {
         "group": "horizon",
         "count": 3,
         "items": [
@@ -9574,22 +9689,6 @@
           "persoonlijk-plan-blocks",
           "totaalplan-blocks",
           "totaalplan-blocks.test"
-        ]
-      },
-      {
-        "group": "command-palette",
-        "count": 2,
-        "items": [
-          "command-palette",
-          "command-palette-provider"
-        ]
-      },
-      {
-        "group": "fin",
-        "count": 2,
-        "items": [
-          "cashflow-section",
-          "vaste-kosten-analyse"
         ]
       },
       {
@@ -9958,6 +10057,14 @@
           "write": false
         },
         {
+          "name": "error_log_resolutions",
+          "write": true
+        },
+        {
+          "name": "error_logs",
+          "write": false
+        },
+        {
           "name": "feedback",
           "write": true
         },
@@ -9976,6 +10083,10 @@
         {
           "name": "news_articles",
           "write": true
+        },
+        {
+          "name": "news_feedback",
+          "write": false
         },
         {
           "name": "profiles",
@@ -10324,6 +10435,12 @@
           "write": false
         }
       ],
+      "coachmark": [
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
       "command-palette": [
         {
           "name": "assets",
@@ -10355,6 +10472,10 @@
         }
       ],
       "cron": [
+        {
+          "name": "error_log_resolutions",
+          "write": true
+        },
         {
           "name": "error_logs",
           "write": false
@@ -11446,6 +11567,14 @@
           "write": true,
           "routes": [
             "/api/check/activate"
+          ]
+        },
+        {
+          "domain": "coachmark",
+          "label": "coachmark",
+          "write": true,
+          "routes": [
+            "/api/coachmark"
           ]
         },
         {
@@ -12753,6 +12882,50 @@
           ]
         }
       ],
+      "error_logs": [
+        {
+          "domain": "log-error",
+          "label": "log-error",
+          "write": true,
+          "routes": [
+            "/api/log-error"
+          ]
+        },
+        {
+          "domain": "admin",
+          "label": "Beheer",
+          "write": false,
+          "routes": [
+            "/api/admin/error-groups"
+          ]
+        },
+        {
+          "domain": "cron",
+          "label": "cron",
+          "write": false,
+          "routes": [
+            "/api/cron/alerts-sweep"
+          ]
+        }
+      ],
+      "error_log_resolutions": [
+        {
+          "domain": "admin",
+          "label": "Beheer",
+          "write": true,
+          "routes": [
+            "/api/admin/error-groups"
+          ]
+        },
+        {
+          "domain": "cron",
+          "label": "cron",
+          "write": true,
+          "routes": [
+            "/api/cron/retention"
+          ]
+        }
+      ],
       "feedback": [
         {
           "domain": "admin",
@@ -12788,6 +12961,25 @@
           "write": true,
           "routes": [
             "/api/admin/news-articles"
+          ]
+        }
+      ],
+      "news_feedback": [
+        {
+          "domain": "news",
+          "label": "news",
+          "write": true,
+          "routes": [
+            "/api/news",
+            "/api/news/feedback"
+          ]
+        },
+        {
+          "domain": "admin",
+          "label": "Beheer",
+          "write": false,
+          "routes": [
+            "/api/admin/news-feedback"
           ]
         }
       ],
@@ -13863,24 +14055,6 @@
           ]
         }
       ],
-      "error_logs": [
-        {
-          "domain": "log-error",
-          "label": "log-error",
-          "write": true,
-          "routes": [
-            "/api/log-error"
-          ]
-        },
-        {
-          "domain": "cron",
-          "label": "cron",
-          "write": false,
-          "routes": [
-            "/api/cron/alerts-sweep"
-          ]
-        }
-      ],
       "user_reports": [
         {
           "domain": "cron",
@@ -14080,17 +14254,6 @@
           ]
         }
       ],
-      "news_feedback": [
-        {
-          "domain": "news",
-          "label": "news",
-          "write": true,
-          "routes": [
-            "/api/news",
-            "/api/news/feedback"
-          ]
-        }
-      ],
       "next_step_completions": [
         {
           "domain": "next-steps",
@@ -14239,6 +14402,7 @@
       "bank_accounts",
       "budgets",
       "debts",
+      "error_log_resolutions",
       "goals",
       "investment_holdings",
       "life_events",
@@ -15036,6 +15200,11 @@
         "rls": true
       },
       "import_idempotency": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "error_log_resolutions": {
         "user": true,
         "household": false,
         "rls": true
@@ -16393,6 +16562,56 @@
       ],
       "summary": "Een testpanel opende `/toekomst` met een leeg profiel en las daar, in kopgetallen, zonder enige waarschuwing: **\"VRIJHEIDSLEEFTIJD 100,0 jaar\"** en **\"DOELBEDRAG €−11.328.971 benodigd\"**. Beide getallen waren netjes berekend. Geen van beide kon kloppen.",
       "file": "docs/adr/0109-een-onmogelijke-uitkomst-is-geen-antwoord.md"
+    },
+    {
+      "id": "0110-de-shell-draagt-de-enige-h1",
+      "title": "De shell draagt de enige h1 — de pagina-aanhef is een h2",
+      "status": "aanvaard",
+      "date": "2026-08-28",
+      "elements": [
+        "app-comp"
+      ],
+      "summary": "Een onafhankelijk UX-testpanel liep `/overzicht` en `/overzicht/bezittingen` zoals een schermlezer dat doet, en vond op beide pagina's **twee `<h1>`-koppen** plus sprongen van `h1` direct naar `h3` (bevinding M28). De koppenlijst is voor een schermlezergebruiker wat de scrollbalk",
+      "file": "docs/adr/0110-de-shell-draagt-de-enige-h1.md"
+    },
+    {
+      "id": "0111-productiecijfers-niet-in-git",
+      "title": "Productiecijfers horen niet in git — relatief formuleren, exact meten buiten de repo",
+      "status": "aanvaard",
+      "date": "2026-08-28",
+      "elements": [
+        "app-comp",
+        "t-supabase"
+      ],
+      "summary": "`supabase/migrations/**` en `docs/adr/**` zijn de twee plekken waar we ons huiswerk opschrijven. Dat is goede engineering-hygiëne: een migratie die zegt *waarom* hij veilig is, is te reviewen; een ADR die zijn meting toont, is te controleren. Het gaat mis op één punt — **deze rep",
+      "file": "docs/adr/0111-productiecijfers-niet-in-git.md"
+    },
+    {
+      "id": "0112-merkstem-is-een-attestatie-geen-parity",
+      "title": "Merkstem-drift is een attestatie, geen parity — en de poort is gelaagd",
+      "status": "aanvaard",
+      "date": "2026-08-28",
+      "elements": [
+        "m-filo",
+        "b-bezoeker",
+        "as-nieuws",
+        "as-coach"
+      ],
+      "summary": "De `merkstem`-skill wijst vier oppervlakken aan die dezelfde stem moeten dragen: landingcopy, /nieuws + de briefing-mail, de cloud-DNA en de on-device DNA's. Van die vier was er één bewaakt. `lib/ai/local/parity-manifest.json` + `scripts/ai-parity/scan.mjs` volgen tien afgeleide ",
+      "file": "docs/adr/0112-merkstem-is-een-attestatie-geen-parity.md"
+    },
+    {
+      "id": "0113-de-foutenstapel-is-een-werkvoorraad-geen-logboek",
+      "title": "de foutenstapel is een werkvoorraad geen logboek",
+      "status": "accepted",
+      "date": "2026-08-28",
+      "elements": [
+        "t-platform",
+        "t-supabase",
+        "app-comp"
+      ],
+      "summary": "Twee van de zes inbakken in het beheerders-runbook stonden op *\"niet afvinkbaar\"*:",
+      "file": "docs/adr/0113-de-foutenstapel-is-een-werkvoorraad-geen-logboek.md"
     }
   ],
   "churn": {
@@ -16404,23 +16623,23 @@
       },
       {
         "path": "lib/ai",
-        "commits": 50
+        "commits": 42
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 30
-      },
-      {
-        "path": "app/api/ai",
-        "commits": 18
+        "commits": 29
       },
       {
         "path": "app/api/household",
-        "commits": 18
+        "commits": 19
+      },
+      {
+        "path": "app/api/ai",
+        "commits": 17
       },
       {
         "path": "app/api/assets",
-        "commits": 10
+        "commits": 12
       },
       {
         "path": "lib/horizon-data.ts",
@@ -16432,7 +16651,7 @@
       },
       {
         "path": "lib/fire-simulation.ts",
-        "commits": 5
+        "commits": 6
       },
       {
         "path": "components/horizon",
@@ -16442,18 +16661,18 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 9521,
-        "commits": 77
+        "loc": 9737,
+        "commits": 79
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 5278,
-        "commits": 29
+        "loc": 5294,
+        "commits": 31
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4886,
-        "commits": 37
+        "loc": 4894,
+        "commits": 38
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -16462,8 +16681,8 @@
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 2829,
-        "commits": 51
+        "loc": 2834,
+        "commits": 53
       },
       {
         "file": "lib/release-notes.ts",
@@ -16473,7 +16692,7 @@
       {
         "file": "app/(app)/core/cash/import/page.tsx",
         "loc": 2378,
-        "commits": 21
+        "commits": 23
       },
       {
         "file": "lib/test-personas.ts",
@@ -17578,31 +17797,9 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-08-26",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "API-routes",
-        "added": [
-          "/api/assets"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Tabellen",
-        "added": [
-          "import_idempotency"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+10"
-        ],
-        "removed": []
-      }
-    ]
+    "previousDate": "2026-08-28",
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {
@@ -17911,6 +18108,13 @@
       "api": 300,
       "components": 956,
       "tables": 90,
+      "routesProduction": 95
+    },
+    {
+      "date": "2026-08-28",
+      "api": 303,
+      "components": 984,
+      "tables": 91,
       "routesProduction": 95
     }
   ]

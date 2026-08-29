@@ -69,4 +69,40 @@ node scripts/check-tap-targets.mjs
 echo "→ Running koppencontract-check (M28)…"
 node scripts/check-heading-levels.mjs
 
+# Productiecijfers (ADR 0111): deze repo is PUBLIEK, en migratiecommentaar en ADR's
+# zijn precies waar we ons huiswerk opschrijven — "gemeten op remote, N rijen",
+# "op het eigenaar-account: €N". De sweep vond gegevens op recordniveau, het
+# gebruikersaantal, en een e-mailadres pal naast een vermogenscijfer. De vorige
+# opruiming was een afspraak en hield het zeven minuten vol; daarom een gate.
+echo "→ Running productiecijfer-check (ADR 0111)…"
+node scripts/check-productiecijfers.mjs
+
+# Lokale-prompt-parity (ADR 0062): de gecondenseerde on-device DNA's zijn een
+# AFGELEIDE van lib/ai/dna/base.ts + wil.ts. Wijzigt de bron zonder hercondensatie,
+# dan praat de lokale Fin anders dan de cloud-Fin. Deze poort bestond al als
+# commando maar hing aan NIETS — CI draait alleen arch:check. Hard, want er is een
+# uitvoerbare herstelactie (skill: lokale-prompt-parity → `npm run parity:scan`).
+echo "→ Running lokale-prompt-parity-check (ADR 0062)…"
+node scripts/ai-parity/scan.mjs --check
+
+# Merkstem-attestatie (ADR 0112): GELAAGD, en dat is het hele punt.
+#   hard  — de toon-/claimbron (base.ts § TOON/§ FRAMING, compliance-check
+#           § De claimlijst) is gewijzigd zonder dat de copy opnieuw naast die
+#           bron is gelegd. Daar zit de Wft-relevante schade.
+#   zacht — de copy zelf is bewogen: waarschuwing in de output, geen blokkade.
+#           Hard maken zou wrijving op élke tekstwijziging zetten; het script
+#           bepaalt de laag zelf en gebruikt daarvoor zijn exit-code.
+echo "→ Running merkstem-attestatiecheck (ADR 0112)…"
+node scripts/merkstem/scan.mjs --check
+
+# Zelfmodificatie (.claude/): een te pushen commit die de eigen agent-/skill-/
+# command-definities raakt MOET een `self-improve:`-onderwerp dragen. De gate
+# stond tot nu toe uitsluitend beschreven ín .claude/ en leunde op een
+# Notion-property die elke agent zelf mag schrijven — consent-kanaal en
+# werk-kanaal waren hetzelfde kanaal. Deze check staat er bewust buiten en toont
+# bovendien ongecommitte .claude/-wijzigingen als waarschuwing. Detectie op het
+# moment van pushen, geen preventie (zie de kop van het script).
+echo "→ Running zelfmodificatie-check (.claude/)…"
+node scripts/check-self-modification.mjs
+
 exit 0

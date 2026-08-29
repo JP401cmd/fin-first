@@ -61,6 +61,7 @@ Twee gaten maakten dat onvoldoende:
   tekens vrije tekst). De eerste opzet knipte alleen het alfabet bij en kapte op
   40 tekens; de security-review toonde aan dat dat leestekens verwijdert en geen
   persoonsgegevens — `NL91ABNA0417164300` bleef intact en
+<!-- productiecijfer-ok: fictief voorbeeldadres en -IBAN om een maskeerbug te tonen, geen echte gebruiker -->
   `jan.smit@trifinity.nl` werd `jan.smit-trifinity.nl`. Alleen onze eigen tags
   (`global-error`, `window.onerror`, `unhandledrejection`, `error-boundary`,
   `onRequestError:<routeType>`) passeren; al het andere wordt `'onbekend'`. De

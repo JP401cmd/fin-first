@@ -1,12 +1,17 @@
 import { NextRequest } from 'next/server'
+import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { unauthorized } from '@/lib/api/respond'
+import { serverError, unauthorized } from '@/lib/api/respond'
+import { parseBody } from '@/lib/api/parse-body'
 
 /**
  * POST /api/ai/actions/[id]/assign
  * Assign an action to a household partner.
  * Body: { partner_id: string } or { partner_id: null } to unassign.
  */
+const AssignSchema = z.object({
+  partner_id: z.string().uuid('partner_id moet een geldig id zijn').nullable(),
+})
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -19,7 +24,9 @@ export async function POST(
   }
 
   const { id } = await params
-  const body = await req.json() as { partner_id: string | null }
+  const parsed = await parseBody(AssignSchema, req)
+  if (!parsed.ok) return parsed.response
+  const body = parsed.data
 
   // Verify the action belongs to the current user
   const { data: action, error: fetchError } = await supabase
@@ -78,8 +85,7 @@ export async function POST(
     .eq('user_id', user.id)
 
   if (updateError) {
-    // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
-    return Response.json({ error: updateError.message }, { status: 500 })
+    return serverError(updateError, 'ai-action-assign:POST')
   }
 
   return Response.json({

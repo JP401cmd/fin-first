@@ -1,0 +1,189 @@
+{
+  "attestedAt": "2026-08-28T19:38:57.858Z",
+  "note": "Attestatie-baseline voor de merkstem (ADR 0112). Per toon-/claimbron en per copy-oppervlak een sha256. Bijwerken betekent: de copy is opnieuw naast de bron gelegd. Zie .claude/skills/merkstem/SKILL.md en scripts/merkstem/scan.mjs.",
+  "toneSources": [
+    {
+      "id": "dna-toon",
+      "label": "Toon (base.ts § TOON)",
+      "file": "lib/ai/dna/base.ts",
+      "section": "TOON",
+      "sha256": "c3b1ed0d4a5bb41c2379b18e72641b7759823f2a97c5ecf2ea0ad4cefa54b719"
+    },
+    {
+      "id": "dna-framing",
+      "label": "Framing (base.ts § FRAMING)",
+      "file": "lib/ai/dna/base.ts",
+      "section": "FRAMING",
+      "sha256": "f3bab95f6d83c3734c556bc2563fc47309e0ed0cddcb1d6597eafa4e169ea443"
+    },
+    {
+      "id": "claimlijst",
+      "label": "Toegestane claims (compliance-check § De claimlijst)",
+      "file": ".claude/skills/compliance-check/SKILL.md",
+      "section": "De claimlijst",
+      "sha256": "ea46dfcb1ebaa9fc00c1ab51d6ce434bc41223221dc2286159016cf68393b95f"
+    }
+  ],
+  "surfaces": [
+    {
+      "id": "landing",
+      "label": "Landingcopy",
+      "caveat": "",
+      "files": [
+        {
+          "file": "components/landing/demo-mocks.tsx",
+          "sha256": "be8f70cd3027abcb37af730cd6d82a3ea55231a9645868b151f8d2c71335fc10",
+          "copyLines": 20
+        },
+        {
+          "file": "components/landing/faq-data.ts",
+          "sha256": "eef53a4598fb0a7b255840918919d6ff9a70edc82df9982280dd7746f54ea27f",
+          "copyLines": 18
+        },
+        {
+          "file": "components/landing/faq-section.tsx",
+          "sha256": "a56350d8d74eb6f28dab04cc516acd04a150d44e296bbc7ccfe2e01219924b6a",
+          "copyLines": 4
+        },
+        {
+          "file": "components/landing/footer.tsx",
+          "sha256": "bbedc85d5781397141af18e7701497b0e02068efcfe72f4f0913f10560e0284a",
+          "copyLines": 4
+        },
+        {
+          "file": "components/landing/header.tsx",
+          "sha256": "9193b32f889b8f4ede37df5d2d7bd0c75d97db7a80119aca900b66befe97416e",
+          "copyLines": 3
+        },
+        {
+          "file": "components/landing/hero.tsx",
+          "sha256": "6671ba1bfe6229f1b1469ddbfc2c5e5e2dbab98235cc1e0e3e84123da5ec5ed0",
+          "copyLines": 18
+        },
+        {
+          "file": "components/landing/marketing-page-shell.tsx",
+          "sha256": "62679235e49ad99d10652e528ade5a2b3d016a6eec342c5e7e914426f26d0516",
+          "copyLines": 3
+        },
+        {
+          "file": "components/landing/pricing-tiers.tsx",
+          "sha256": "d7162345f0ca9b9fe3b62970427f4d234c480a17f229b3bd14aa8a2885c82ac2",
+          "copyLines": 18
+        },
+        {
+          "file": "components/landing/reveal.tsx",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "copyLines": 0
+        },
+        {
+          "file": "components/landing/section-primitives.tsx",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "copyLines": 0
+        },
+        {
+          "file": "components/landing/sections/functies.tsx",
+          "sha256": "0065015cc4bdaae8fdc0570e22265217b3f731a94bc5b084c4f86061029236c3",
+          "copyLines": 72
+        },
+        {
+          "file": "components/landing/sections/home.tsx",
+          "sha256": "3b2a2797e2489bf867211cffaf1cb6465019c30a117f77eb4ae313bc82f3e9b8",
+          "copyLines": 45
+        },
+        {
+          "file": "components/landing/sections/veiligheid.tsx",
+          "sha256": "c30916a6c559657b8924a0d138fd48b1214b947f9bab63ff00de29076c5d22fc",
+          "copyLines": 24
+        },
+        {
+          "file": "components/landing/slot-cta.tsx",
+          "sha256": "1becf77198577a7d4d7547e7444692bc2b12505bcf10768b88aeffeec07b700d",
+          "copyLines": 4
+        }
+      ]
+    },
+    {
+      "id": "publiek",
+      "label": "Publieke routes",
+      "caveat": "",
+      "files": [
+        {
+          "file": "app/functies/page.tsx",
+          "sha256": "a2c06519f744bc263e9706671711a270dd639913aa1dd70e4711913158a2c72a",
+          "copyLines": 5
+        },
+        {
+          "file": "app/over/page.tsx",
+          "sha256": "bd676195ff4a3822616c58ae6501620c1c6a062e06528960b0aceccafdeccdc4",
+          "copyLines": 14
+        },
+        {
+          "file": "app/page.tsx",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "copyLines": 0
+        },
+        {
+          "file": "app/prijzen/page.tsx",
+          "sha256": "313c346279301754f7de567e411cd40eaecbe47ebc1367a007842b106fbed556",
+          "copyLines": 10
+        },
+        {
+          "file": "app/veiligheid/page.tsx",
+          "sha256": "4340df0bae970e7a9b49463ef038244b4084b74f90c97c85cc5645687ac062cd",
+          "copyLines": 8
+        }
+      ]
+    },
+    {
+      "id": "funnel",
+      "label": "Funnel",
+      "caveat": "",
+      "files": [
+        {
+          "file": "app/check/page.tsx",
+          "sha256": "654c3fd95c155e03597af589b1a20c9de3205c9ca828d5fc1926164ae9331620",
+          "copyLines": 7
+        },
+        {
+          "file": "app/contact/page.tsx",
+          "sha256": "d7c73714f8d2eba8242912814a56c5c542ade5b7f2bc873f0412a5858ba519c8",
+          "copyLines": 10
+        },
+        {
+          "file": "app/signup/page.tsx",
+          "sha256": "d413962abbb891ad2c6d352c7d382a50203386d5aa94ccbaf7ccb53c961249f1",
+          "copyLines": 12
+        }
+      ]
+    },
+    {
+      "id": "nieuws",
+      "label": "/nieuws — chrome",
+      "caveat": "Alleen de chrome. De berichten zelf worden door het model geschreven; die stem zit in lib/news-system-prompt.ts en is al bron in het DNA-parity-manifest.",
+      "files": [
+        {
+          "file": "components/berichten/nieuws-only-client.tsx",
+          "sha256": "0b63bc9f6d26ea82a9ef4ced8e9e42be695543cfcdba4fa90e1749bcb9e5fc62",
+          "copyLines": 47
+        }
+      ]
+    },
+    {
+      "id": "briefing",
+      "label": "Briefing-mail",
+      "caveat": "GEDEELTELIJKE DEKKING: lib/briefing/directives.ts bevat alleen de startwaarden. De draaiende richtlijnen zijn beheer-overschrijfbaar via app_settings.briefing_directives — een hash op dit bestand bewijst dus niets over wat er vandaag daadwerkelijk verstuurd wordt.",
+      "files": [
+        {
+          "file": "lib/briefing/directives.ts",
+          "sha256": "869608c7530c5a1292f0614517683241fc97af0694cbed925d41538886edd50b",
+          "copyLines": 70
+        },
+        {
+          "file": "lib/briefing/email-template.ts",
+          "sha256": "70fae6968ecd2e9c9d6bd599631374e81b7fd928faa974f7a0737d1d8e8b7445",
+          "copyLines": 12
+        }
+      ]
+    }
+  ]
+}

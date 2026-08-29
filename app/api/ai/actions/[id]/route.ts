@@ -52,15 +52,28 @@ export async function PATCH(
     if (body.priority_score !== undefined) updates.priority_score = body.priority_score
     if (body.scheduled_week !== undefined) updates.scheduled_week = body.scheduled_week || null
 
+    // Eigenaar-scoped, en dat is sinds 20260828130000 geen formaliteit meer: die
+    // migratie geeft een TOEGEWEZENE een eigen UPDATE-policy op andermans actie.
+    // RLS werkt op rij-niveau, niet op kolom-niveau — zonder deze `.eq` zou de
+    // toegewezene titel, omschrijving, euro-impact, vrijheidsdagen, prioriteit en
+    // planning van de eigenaar kunnen herschrijven. Inhoud bewerken hoort bij de
+    // eigenaar; de toegewezene heeft de status-takken hieronder.
     const { data: updated, error } = await supabase
       .from('actions')
       .update(updates)
       .eq('id', id)
+      .eq('user_id', user.id)
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) {
       return serverError(error, 'ai-action-update:PATCH')
+    }
+
+    // Geen rij terug = de actie is van iemand anders (toegewezene probeert inhoud
+    // te wijzigen). Zelfde antwoord als "bestaat niet": geen bestaan-orakel.
+    if (!updated) {
+      return Response.json({ error: 'Action not found' }, { status: 404 })
     }
 
     return Response.json({ action: updated })

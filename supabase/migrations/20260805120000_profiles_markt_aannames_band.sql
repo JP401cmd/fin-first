@@ -26,9 +26,10 @@
 --
 --   1. defaults naar de live waarden (0.07 / 0.02) — corrigeert de eenheidsfout
 --      in de repo-lijn; op productie een no-op.
---   2. legacy percentage-waarden omrekenen naar hun fractie. Op productie 0
---      rijen (gemeten: 26 rijen, expected_return 0,05–0,07 met 1 NULL,
---      inflation_rate 0,02 met 1 NULL, nul buiten de band). Op een verse
+--   2. legacy percentage-waarden omrekenen naar hun fractie. Op productie NUL
+--      rijen (gemeten: alle profielrijen zitten met expected_return 0,05–0,07 en
+--      inflation_rate 0,02 binnen de band, op een enkele NULL na — nul rijen
+--      buiten de band; exacte tellingen buiten git, zie ADR 0111). Op een verse
 --      database vangt dit de rijen op die de seeds vóór deze migratie met de
 --      oude default 7 / 2 aanmaakten — `20260325000002_create_landing_test_users.sql`
 --      en `20260530120000_seed_prefab_calculators.sql` inserten allebei zonder

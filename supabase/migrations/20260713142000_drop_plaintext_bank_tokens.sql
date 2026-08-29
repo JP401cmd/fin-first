@@ -1,21 +1,27 @@
--- Field-level encryptie — Stage A (PR2), stap 3/3: plaintext-token-kolommen droppen.
+-- ⛔ NOOIT TOEGEPAST — LEEGGEMAAKT, VERVANGEN. Dit bestand draagt bewust geen SQL
+-- meer. Op 2026-08-28 op NAAM geverifieerd in `supabase_migrations.schema_migrations`:
+-- het staat niet in het register en heeft dus nooit gedraaid.
 --
--- Waarom: sluitstuk van Stage A. De TrueLayer access/refresh-tokens leven nu
--- uitsluitend versleuteld in access_token_encrypted / refresh_token_encrypted.
--- Deze migratie verwijdert de plaintext-kolommen definitief, zodat een
--- database-lek geen werkende banktokens meer prijsgeeft.
+-- Het werk is overgenomen door
+-- `20260828120000_stage_a_drop_plaintext_bank_tokens.sql`: lineage-correct achter
+-- de toegepaste kop (20260827165521) en mét een afgedwongen count-gate in plaats
+-- van een gate die aan een comment hing.
 --
--- ⚠ ONOMKEERBAAR (dataverlies). Voer pas uit NA:
---   1. backfill gedraaid (encrypted gevuld voor alle rijen),
---   2. count-gate = 0 (zie 20260713141000_null_plaintext_bank_tokens.sql),
---   3. nul-migratie toegepast,
---   4. encrypted-only code gedeployed en live token-refresh bewezen.
--- Zie het RUNBOOK op het Notion-kaartje. Alleen onder toezicht draaien.
+-- Waarom leeggemaakt en niet verwijderd — twee redenen:
+--   1. De naam wordt geciteerd door `lib/truelayer/target-account.ts` en
+--      `lib/truelayer/cash-asset-backfill.ts` als aankondiging van de
+--      IBAN-drop. Die verwijzingen slaan strikt genomen op Stage B en verhuizen
+--      mee zodra de Stage B-migratie geschreven wordt; tot dan blijven ze vindbaar.
+--   2. Zou dit bestand zijn DDL houden, dan zou `supabase db push --include-all`
+--      het vanwege de lágere versie vóór 20260828120000 draaien — en daarmee de
+--      nieuwe count-gate overslaan. Precies de bescherming die de vervanger
+--      toevoegt, zou dan voorwaardelijk zijn op de uitrolmethode.
 --
--- Scope = ALLEEN de tokens (Stage A). De plaintext-IBAN-kolommen
--- (bank_accounts.iban, bank_connection_accounts.iban, assets.account_number)
--- worden in Stage B (apart vervolgkaartje) gedropt.
-
-ALTER TABLE public.bank_connections
-  DROP COLUMN IF EXISTS access_token,
-  DROP COLUMN IF EXISTS refresh_token;
+-- De oorspronkelijke inhoud (`ALTER TABLE public.bank_connections DROP COLUMN
+-- IF EXISTS access_token, DROP COLUMN IF EXISTS refresh_token;`) staat in de
+-- git-historie en integraal, mét gate, in de vervanger.
+--
+-- Scope-herinnering: dit ging ALLEEN over de tokens (Stage A). De
+-- plaintext-IBAN-kolommen (`bank_accounts.iban`, `bank_connection_accounts.iban`,
+-- `assets.account_number`) horen bij Stage B en zijn geblokkeerd op de
+-- V1-keyrotatie.

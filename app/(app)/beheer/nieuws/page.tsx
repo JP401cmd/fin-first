@@ -8,6 +8,7 @@ import {
   type WebSource,
   type RssFeed,
 } from '@/lib/news-sources'
+import { NewsFeedbackPanel } from '@/components/app/beheer/news-feedback-panel'
 
 // ── Types for news sources ───────────────────────────────────────────
 
@@ -737,6 +738,12 @@ export default function BeheerNieuwsPage() {
           </div>
         )}
       </div>
+
+      {/* ── Divider ─────────────────────────────────────────────────── */}
+      <div className="mt-10 mb-6 h-px bg-[var(--border-ed)]" />
+
+      {/* ── Section: Feedback op nieuwsitems (alleen-lezen, ADR 0113) ─ */}
+      <NewsFeedbackPanel />
     </div>
   )
 }
