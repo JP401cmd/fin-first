@@ -37,10 +37,11 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: 'Invalid preferences' }, { status: 400 })
   }
 
-  // Get user's subscriptions for server-side validation
+  // Get user's subscriptions for server-side validation, plus the current
+  // column value: the write below must preserve non-feature keys.
   const { data: profile } = await supabase
     .from('profiles')
-    .select('active_subscriptions')
+    .select('active_subscriptions, feature_preferences')
     .eq('id', user.id)
     .single()
 
@@ -60,9 +61,25 @@ export async function PUT(req: Request) {
     validatedPrefs[featureId] = enabled
   }
 
+  // De kolom draagt náást feature-vlaggen ook niet-feature-sleutels
+  // (wealth_widget_selection — ADR 0120, retirement_aspirations,
+  // _welcome_seen, deferred_onboarding_fields). Die overleven élke schrijf:
+  // feature-vlaggen zijn vervang-semantiek (de body is de complete set, zodat
+  // "reset naar standaard" met een lege body blijft werken), al het andere
+  // wordt onvoorwaardelijk uit de huidige waarde meegenomen. Vóór deze merge
+  // wiste elke feature-toggle de hele JSONB (concern
+  // feature-preferences-volledige-overwrite).
+  const current = (profile?.feature_preferences ?? {}) as Record<string, unknown>
+  const preserved: Record<string, unknown> = {}
+  if (current && typeof current === 'object' && !Array.isArray(current)) {
+    for (const [key, value] of Object.entries(current)) {
+      if (!UNIFIED_FEATURES.some(f => f.id === key)) preserved[key] = value
+    }
+  }
+
   const { error } = await supabase
     .from('profiles')
-    .update({ feature_preferences: validatedPrefs })
+    .update({ feature_preferences: { ...preserved, ...validatedPrefs } })
     .eq('id', user.id)
 
   if (error) {

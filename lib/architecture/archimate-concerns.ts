@@ -70,15 +70,6 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     reviewedAt: '2026-08-11',
   },
   {
-    id: 'feature-preferences-volledige-overwrite',
-    title: 'PUT /api/feature-preferences overschrijft de hele jsonb-kolom',
-    detail:
-      'app/api/feature-preferences/route.ts bouwt `profiles.feature_preferences` bij elke aanroep OPNIEUW op uit uitsluitend bekende `UNIFIED_FEATURES`-id\'s en schrijft die als VOLLEDIGE overwrite — geen read-modify-write. Elke sleutel in die kolom die geen feature-id is, verdwijnt dus bij de eerstvolgende voorkeurenwijziging van de gebruiker. Er wonen daar aantoonbaar niet-feature-sleutels: `_welcome_seen`, `deferred_onboarding_fields` en de intake-sleutels. Concreet: iemand zet ergens een functie aan of uit en verliest daarmee stil zijn onboarding-status of uitgestelde intake-velden — een gegevensverlies zonder foutmelding en zonder spoor. Dit is ook de reden dat ADR 0103 de grondslag-selectie een EIGEN kolom gaf (`profiles.cashflow_basis_prefs`) in plaats van deze: daar zou het betekend hebben dat het inkomen van een gebruiker verandert doordat hij ergens anders een functie uitzette. De structurele fix is een own-row read-modify-write (spiegel `app/api/appearance`) of het uitfaseren van de niet-feature-sleutels naar eigen kolommen; die keuze is NIET in de ADR 0103-snede genomen. Verwijder dit punt zodra de route mergt in plaats van overschrijft, of zodra er geen niet-feature-sleutels meer in de kolom wonen.',
-    severity: 'risk',
-    elementIds: ['t-supabase', 'as-planning'],
-    reviewedAt: '2026-08-11',
-  },
-  {
     id: 'volledige-profielrij-naar-de-client',
     title: 'De hele profiles-rij serialiseert naar de browser in kernel-snapshots',
     detail:

@@ -35,7 +35,7 @@ const USER = 'user-1'
 /** Alle `.update(...)`-payloads die de route naar `profiles` stuurde. */
 let updatePayloads: Record<string, unknown>[] = []
 
-function buildClient(opts: { activeSubscriptions?: string[] }) {
+function buildClient(opts: { activeSubscriptions?: string[]; existingPrefs?: Record<string, unknown> }) {
   return {
     auth: {
       getUser: async () => ({ data: { user: { id: USER } }, error: null }),
@@ -46,7 +46,10 @@ function buildClient(opts: { activeSubscriptions?: string[] }) {
         select: () => ({
           eq: () => ({
             single: async () => ({
-              data: { active_subscriptions: opts.activeSubscriptions ?? [] },
+              data: {
+                active_subscriptions: opts.activeSubscriptions ?? [],
+                feature_preferences: opts.existingPrefs ?? {},
+              },
               error: null,
             }),
           }),
@@ -106,5 +109,51 @@ describe('PUT /api/feature-preferences — R5: raakt cashflow_basis_prefs nooit'
 
     expect(body.preferences).toEqual({ 'feat-free': true })
     expect(Object.keys(updatePayloads[0])).toEqual(['feature_preferences'])
+  })
+})
+
+describe('PUT /api/feature-preferences — niet-feature-sleutels overleven (concern feature-preferences-volledige-overwrite)', () => {
+  /**
+   * Given een profiel waarvan feature_preferences náást feature-vlaggen ook
+   *   niet-feature-sleutels draagt (wealth_widget_selection uit ADR 0120,
+   *   retirement_aspirations, _welcome_seen),
+   * When een feature-toggle de route aanroept,
+   * Then blijven die niet-feature-sleutels onvoorwaardelijk staan in de
+   *   geschreven kolomwaarde — de route mag alleen de feature-vlaggen
+   *   vervangen, nooit de hele JSONB leegschrijven.
+   */
+  const NIET_FEATURE = {
+    wealth_widget_selection: { assetIds: ['11111111-1111-4111-8111-111111111111'], debtIds: [] },
+    retirement_aspirations: { a: 1 },
+    _welcome_seen: true,
+  }
+
+  it('een feature-toggle behoudt wealth_widget_selection en andere niet-feature-sleutels', async () => {
+    mockCreateClient.mockResolvedValue(
+      buildClient({ activeSubscriptions: [], existingPrefs: { 'feat-free': false, ...NIET_FEATURE } }),
+    )
+
+    const res = await PUT(req({ 'feat-free': true }))
+
+    expect(res.status).toBe(200)
+    const written = updatePayloads[0].feature_preferences as Record<string, unknown>
+    expect(written['feat-free']).toBe(true)
+    expect(written.wealth_widget_selection).toEqual(NIET_FEATURE.wealth_widget_selection)
+    expect(written.retirement_aspirations).toEqual(NIET_FEATURE.retirement_aspirations)
+    expect(written._welcome_seen).toBe(true)
+  })
+
+  it('reset naar standaard (lege preferences) wist de feature-vlaggen maar behoudt niet-feature-sleutels', async () => {
+    mockCreateClient.mockResolvedValue(
+      buildClient({ activeSubscriptions: [], existingPrefs: { 'feat-free': true, ...NIET_FEATURE } }),
+    )
+
+    const res = await PUT(req({}))
+
+    expect(res.status).toBe(200)
+    const written = updatePayloads[0].feature_preferences as Record<string, unknown>
+    expect(written).not.toHaveProperty('feat-free')
+    expect(written.wealth_widget_selection).toEqual(NIET_FEATURE.wealth_widget_selection)
+    expect(written._welcome_seen).toBe(true)
   })
 })
