@@ -5,16 +5,28 @@ import {
   computeYearlyMustExpenses,
   type RetirementExpenseMethod,
 } from '@/lib/budget-utils'
-import { deriveRetirementExpenseBasis } from '@/lib/retirement-expense-basis'
+import { deriveRetirementExpenseBasis, extrapolateAnnualIncome } from '@/lib/retirement-expense-basis'
+import { resolveAmountWithBasis } from '@/lib/effective-financials'
+import { loadBudgetBasis, BUDGET_BASIS_COLUMNS } from '@/lib/household/budget-share'
+import type { BudgetBasisRow } from '@/lib/budget-basis'
+import { unauthorized, serverError } from '@/lib/api/respond'
 
 /**
  * Context-loader voor de uitgaven-na-pensioen pane.
  * Geeft alle data terug die UitgavenNaPensioenClient nodig heeft als props.
  */
 export async function GET() {
+  try {
+    return await handleGet()
+  } catch (err) {
+    return serverError(err, 'uitgaven-na-pensioen:GET')
+  }
+}
+
+async function handleGet() {
   const supabase = await createClient()
   const claims = await getAuthClaims(supabase)
-  if (!claims) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 })
+  if (!claims) return unauthorized()
 
   const now = new Date()
   const twelveMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 11, 1))
@@ -28,13 +40,20 @@ export async function GET() {
     supabase
       .from('profiles')
       .select(
-        'retirement_expense_method, retirement_expense_custom_amount, net_monthly_income, estimated_monthly_expenses, budgeting_active, feature_preferences',
+        // `cashflow_basis_prefs` hoort erbij: `loadBudgetBasis` leest de
+        // uitgesloten posten eruit — zonder de kolom telt élke uitgesloten
+        // inkomstenpost hier wél mee en drift de sheet van de KPI (review 🔴).
+        'retirement_expense_method, retirement_expense_custom_amount, net_monthly_income, estimated_monthly_expenses, budgeting_active, feature_preferences, income_source, cashflow_basis_prefs',
       )
       .eq('id', claims.sub)
       .single(),
     supabase
       .from('budgets')
-      .select('id, name, default_limit, interval, budget_type, is_essential, parent_id'),
+      // De canonieke grondslag-kolomlijst (o.a. `created_at` als
+      // extrapolatie-deler) + `is_essential` voor computeYearlyMustExpenses.
+      // Een eigen, smallere lijst liet de budget-grondslag stil driften van de
+      // SSR-loader (review 🔴) — daarom de gedeelde constante.
+      .select(`${BUDGET_BASIS_COLUMNS}, is_essential`),
     supabase
       .from('transactions')
       .select('amount, date')
@@ -54,6 +73,7 @@ export async function GET() {
     estimated_monthly_expenses: 0,
     budgeting_active: true,
     feature_preferences: null as Record<string, unknown> | null,
+    income_source: null as string | null,
   }
 
   const allBudgets = (budgetsResult.data ?? []) as {
@@ -92,6 +112,25 @@ export async function GET() {
   // horizon-client load()-refresh. Géén eigen net_monthly_income*12-fallback
   // meer: die week af van de canonieke extrapolatie en zou de sheet weer laten
   // divergeren van de KPI voor gebruikers zonder inkomenstransacties.
+  //
+  // Grondslag (ADR 0103, melding 29-08-2026): net als de SSR-loader geeft deze
+  // route het EFFECTIEVE jaarinkomen op de gekozen grondslag door — anders
+  // toont de sheet bij methode current_income de rauwe transactie-extrapolatie
+  // terwijl de "Na pensioen"-KPI op /toekomst de gekozen (bv. handmatige)
+  // grondslag volgt. Zusterbug van WF-TOEK-02-bug2: toen het deler-anker, nu
+  // de grondslag.
+  const { income: budgetIncome } = await loadBudgetBasis(
+    supabase,
+    profile as Record<string, unknown>,
+    allBudgets as unknown as BudgetBasisRow[],
+  )
+  const txAnnualIncome = extrapolateAnnualIncome(last12Income, earliestIncomeDate, now)
+  const effectiveAnnualIncome = resolveAmountWithBasis(
+    (profile as { income_source?: string | null }).income_source,
+    Number(profile.net_monthly_income ?? 0) * 12,
+    txAnnualIncome,
+    budgetIncome.annualTotal,
+  )
   const { extrapolatedIncome, yearlyRetirementExpenses } = deriveRetirementExpenseBasis({
     method: initialMethod,
     yearlyMustExpenses,
@@ -100,6 +139,7 @@ export async function GET() {
     customAmount,
     estimatedYearlyExpenses,
     now,
+    effectiveAnnualIncome: effectiveAnnualIncome.amount,
   })
   const yearlyIncome = extrapolatedIncome
   const currentRetirementExpense = yearlyRetirementExpenses
