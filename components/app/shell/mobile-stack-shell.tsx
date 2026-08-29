@@ -65,7 +65,7 @@ import { MobileBottomBar } from './mobile-bottom-bar'
 
 type MobileStackShellProps = {
   /** Optionele custom actions in de TopBar (rechts). Default = utility-cluster
-   *  (PrivacyToggle + News + Bell + Avatar) wanneer `email` aanwezig is. */
+   *  (News + Bell + Avatar) wanneer `email` aanwezig is. */
   topBarActions?: ReactNode
   /** Pagina-content. Wordt in de persistente tray (incoming-laag) gerenderd. */
   children: ReactNode

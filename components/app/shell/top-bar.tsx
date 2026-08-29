@@ -47,9 +47,7 @@ import { Activity, ArrowLeft, Bell, Newspaper } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useNavStack, type TopBarKind } from './nav-stack-provider'
 import { resolveRouteTitle } from '@/lib/nav-config'
-import { PrivacyToggle } from '@/components/app/privacy-toggle'
 import { PerspectiveSwitcher } from '@/components/app/perspective-switcher'
-import { EuroViewBadge } from '@/components/app/shell/euro-view-badge'
 import { useNotifications } from '@/components/app/notifications/notification-provider'
 import { GlobalSyncButton } from '@/components/sync/global-sync-button'
 import { SyncReportModal } from '@/components/sync/sync-report-modal'
@@ -60,7 +58,7 @@ import { TAP_TARGET_EXTEND_BLOCK } from '@/components/editorial/tap-target'
 type TopBarProps = {
   /**
    * Optionele actions rechts in de topbar. Default = `<TopBarUtilities>`
-   * (PrivacyToggle + News + Bell + Avatar-dropdown). Overrule per pagina
+   * (News + Bell + Avatar-dropdown). Overrule per pagina
    * voor context-specifieke knoppen — verlies dan wel de utility-cluster.
    */
   actions?: ReactNode
@@ -104,11 +102,15 @@ type TopBarProps = {
 }
 
 /**
- * Utility-cluster rechts in de TopBar — PrivacyToggle + News + Bell + Avatar.
+ * Utility-cluster rechts in de TopBar — News + Bell + Avatar.
  * Alle utility-affordances op mobile leven hier; de Sidebar levert hetzelfde
  * op desktop.
  *
- * - PrivacyToggle: maskeer bedragen across de app (eye-icoon, context-driven).
+ * De weergave-schakelaars (euro-weergave, bedragen verbergen) staan hier
+ * bewust NIET (B-011): het ⌘K-zoekmenu is de primaire plek om van weergave
+ * te wisselen — één manier van switchen. Dit draait bevinding M13 terug op
+ * eigenaarsbesluit; niet opnieuw toevoegen zonder nieuw besluit.
+ *
  * - Newspaper: shortcut naar `/nieuws` (TriFinity Post).
  * - Bell: opent `NotificationModal` via `useNotifications().openModal`.
  *   Toont badge met `unreadCount` (cap '9+').
@@ -143,28 +145,18 @@ function TopBarUtilities({ email, role }: { email: string; role?: string }) {
   }, [menuOpen])
 
   return (
-    /* Raakgebied-compromis (M19): zeven controls passen niet als 44px-brede
-       knoppen op een 360px-scherm (44×7 + gaps > de ~284px die naast titel en
-       back-placeholder overblijft). De cluster houdt daarom zijn 36px BREEDTE
-       en rekt alleen het raakgebied VERTICAAL op naar 44px — de balk is 48px
+    /* Raakgebied-compromis (M19): de cluster hield ten tijde van M19 zeven
+       controls — te veel voor 44px-brede knoppen op een 360px-scherm. Sinds
+       B-011 zijn het er vijf, maar het compromis blijft: 36px BREEDTE, en
+       alleen het raakgebied VERTICAAL opgerekt naar 44px — de balk is 48px
        hoog, dus dat kost niets. Horizontaal blijft 36px met vrije ruimte ruim
        boven de WCAG-2.5.8-ondergrens (24px). Vastgelegd in de ui-ux-skill. */
     <div className="flex items-center gap-0.5">
       {/* Weergave-badge (eigen/huishouden/partner) — alleen voor huishoudens. */}
       <PerspectiveSwitcher compact menuAlign="right" />
 
-      {/* Euro-weergave (toekomstige ⇄ huidige euro's). Stond hier NIET, terwijl
-          hij op desktop al bovenaan de zijbalk hangt: op mobiel was de stand
-          dus alleen via ⌘K te vinden — op precies het scherm waar de meeste
-          sessies plaatsvinden (bevinding M13). Compact, want de cluster is
-          smal; de eenmalige uitleg hangt hieraan, rechts uitgelijnd zodat de
-          popover binnen het scherm blijft. */}
-      <EuroViewBadge variant="compact" showCoachmark coachmarkAlign="right" />
-
       {/* Vier-hefbomen-kompas — compact dots, expand on tap */}
       <LeverCompassMobile scores={leverScores} />
-
-      <PrivacyToggle />
 
       <Link
         href="/nieuws"
@@ -371,7 +363,7 @@ export function TopBar({
   // Actions-resolutie:
   //  - Pagina-specifieke actions (via prop) winnen altijd — vervangen de
   //    cluster volledig.
-  //  - 'rich' kind: utility-cluster (PrivacyToggle + News + Bell + Avatar)
+  //  - 'rich' kind: utility-cluster (News + Bell + Avatar)
   //    wanneer email beschikbaar is.
   //  - 'simple' kind: geen actions (compact 48px voor sub-pages).
   const renderedActions =

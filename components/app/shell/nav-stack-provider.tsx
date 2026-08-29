@@ -38,7 +38,7 @@ import { shouldLogViewTransitionError } from './view-transition-utils'
 /**
  * Soorten TopBar die een stack-entry kan vereisen. Zie plan §4.3.
  *  - 'rich' (default voor tab-roots): geen ←-knop, titel + utility-cluster
- *    (PrivacyToggle + News + Bell + Avatar-dropdown). Visueel breed.
+ *    (News + Bell + Avatar-dropdown). Visueel breed.
  *  - 'simple' (default voor sub-pages): ←-knop links + titel midden, geen
  *    utility-cluster. Compact 48px. Pop via ←-knop = `router.back()`.
  *  - 'hidden': geen TopBar — full-screen content (rare flows zoals onboarding-
