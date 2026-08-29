@@ -42,8 +42,9 @@ export type FormatId =
   | 'ing-beleggen'
   | 'trading212'
   | 'etoro'
-  // Pensioen-JSON
+  // Pensioen
   | 'pension-json'
+  | 'pension-mijnpensioen'
 
 export interface FormatContract {
   /** Leesbare naam voor logging en UI. */
@@ -268,13 +269,62 @@ export const FORMAT_CONTRACTS: Record<FormatId, FormatContract> = {
     detectMarkers: [...ETORO_MARKERS, 'realized equity change'],
   },
 
-  // ── Pensioen-JSON ─────────────────────────────────────────────────────────
-  // Top-level sleutels van PensionParseResultSchema (app/api/pension/parse/route.ts).
+  // ── Pensioen — UITVOER-contract ───────────────────────────────────────────
+  // LET OP: dit beschrijft niet het INKOMENDE bestand maar het resultaat van het
+  // parsen: de top-level sleutels van PensionParseResultSchema (lib/pension/types.ts),
+  // zoals zowel de AI-PDF-route als de deterministische mappers dat opleveren.
+  // Het bron-contract van het inkomende bestand staat hieronder als
+  // 'pension-mijnpensioen'.
   'pension-json': {
-    label: 'Pensioen-JSON (UPO)',
+    label: 'Pensioen-parseresultaat (UPO)',
     requiredHeaders: ['aowBedrag', 'regelingen', 'nabestaandenpensioen', 'samenvatting'],
-    knownOptionalHeaders: [],
+    knownOptionalHeaders: ['aowLeeftijd', 'aowLeefsituatie'],
     detectMarkers: [],
+  },
+
+  // ── Pensioen — BRON-contract (mijnpensioenoverzicht.nl) ───────────────────
+  // Het datamodel van Stichting Pensioenregister, versie 1.2
+  // (`Specificatie-xml-json-download-v1.2`). XML (`pensioenaanspraken.xml`) en
+  // JSON zijn twee SERIALISATIES van ditzelfde model; beide worden gelezen door
+  // lib/pension/mijnpensioen-json.ts, de XML na omzetting door
+  // lib/pension/mijnpensioen-xml.ts.
+  //
+  // `requiredHeaders`/`knownOptionalHeaders` zijn hier de knoop-/sleutelnamen
+  // die de mapper daadwerkelijk uitleest — verdwijnt of hernoemt het register er
+  // één, dan levert de import stil nul potten. Dit is de plek om dat te zien.
+  // Deze lijst en de constanten in mijnpensioen-xml.ts (`REPEATABLE_NODES`,
+  // `TEXT_ONLY_FIELDS`) horen samen te bewegen.
+  'pension-mijnpensioen': {
+    label: 'mijnpensioenoverzicht.nl-download (XML/JSON, datamodel v1.2)',
+    requiredHeaders: ['StatusCode', 'Details', 'OuderdomsPensioenDetails', 'OuderdomsPensioen'],
+    knownOptionalHeaders: [
+      'Pensioen',
+      'IndicatiefPensioen',
+      'PensioenUitvoerder',
+      'HerkenningsNummer',
+      'TeBereiken',
+      'Opgebouwd',
+      'Van',
+      'Tot',
+      'Leeftijd',
+      'Jaren',
+      'Maanden',
+      'OuderdomsPensioenEvent',
+      'AOW',
+      'AOWDetailsOpbouw',
+      'TeBereikenSamenwonend',
+      'TeBereikenAlleenstaand',
+      'PartnerPensioenDetails',
+      'PartnerPensioen',
+      'PartnerEvent',
+      'Bedragen',
+      'VerzekerdBedragNaPens',
+      'OpgebouwdBedragNaPens',
+      'OntbrekendePuvsError',
+      'Bijzonderheden',
+      'Totalen',
+    ],
+    detectMarkers: ['pensioenaanspraken', 'ouderdomspensioendetails'],
   },
 }
 

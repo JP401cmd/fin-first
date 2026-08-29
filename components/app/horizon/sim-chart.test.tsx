@@ -305,6 +305,72 @@ describe('SimChart — besteedbaar-lijn naast de totale vermogenslijn', () => {
     expect(queryByText('Met je huis')).toBeNull()
   })
 
+  // ── Rolomkering bij woonstrategie "Uitsluiten" (ADR 0114) ────────────────
+  //
+  // Daar is de J-reeks de HOOFDLIJN en de totaallijn de dunne tweede lijn. De
+  // grafiek moet dan overal hetzelfde zeggen: legenda, tooltip-volgorde en de
+  // grondslagkop boven de bewegingsregels.
+
+  /** Zelfde vorm als `besteedbaarProps`, maar mét het J(0)-anker op leeftijd 40. */
+  function uitsluitenProps() {
+    return {
+      ...richProps(),
+      primaryBasis: 'liquid' as const,
+      liquidPoints: Array.from({ length: 26 }, (_, i): [number, number] => [
+        40 + i,
+        (40 + i) * 10_000,
+      ]),
+    }
+  }
+
+  it('benoemt de hoofdlijn als "zonder je huis" en de tweede lijn als "Met je huis"', () => {
+    const { container, getByText } = render(<SimChart {...uitsluitenProps()} />)
+    expect(getByText('Jouw pad')).toBeTruthy()
+    expect(getByText('· zonder je huis')).toBeTruthy()
+    expect(getByText('Met je huis')).toBeTruthy()
+    // De dunne gestippelde lijn bestaat nog steeds — hij draagt nu het totaal.
+    expect(besteedbaarPath(container)).toBeTruthy()
+  })
+
+  it('zet in de tooltip het besteedbare bedrag bovenaan, met het totaal eronder', () => {
+    const { container, getByText, getAllByText } = render(<SimChart {...uitsluitenProps()} />)
+    fireEvent.mouseMove(overlayRectOf(container), { clientX: 120, clientY: 100 })
+    expect(getByText('Leeftijd 43')).toBeTruthy()
+    // Het J-bedrag hoort bij de PRIMAIRE regel — hetzelfde getal waar de
+    // crosshair-stip op staat (beide lezen `allPts`).
+    expect(getByText('€430K')).toBeTruthy() // 43 × €10.000
+    // "Zonder je huis" staat nu in de legenda-kwalificatie én als tooltip-kop;
+    // "Met je huis" in de legenda-entry én als tweede tooltip-regel.
+    expect(getAllByText('Zonder je huis').length).toBe(1)
+    expect(getAllByText('Met je huis').length).toBe(2)
+  })
+
+  it('benoemt de grondslag van de drijvers/drukkers zodra de hoofdlijn J is', () => {
+    // De zes posten decomponeren de TOTALE beweging; `SimRow` draagt geen
+    // liquide tegenhanger. Zonder deze kop zou de gebruiker ze bij het
+    // J-bedrag erboven optellen (ADR 0114 D4).
+    const { container, getByText } = render(<SimChart {...uitsluitenProps()} />)
+    fireEvent.mouseMove(overlayRectOf(container), { clientX: 120, clientY: 100 })
+    expect(getByText('Wat er dit jaar gebeurde (mét je huis)')).toBeTruthy()
+  })
+
+  it('laat die grondslagkop WEG zolang de hoofdlijn het totaal is', () => {
+    const { container } = render(<SimChart {...besteedbaarProps()} />)
+    fireEvent.mouseMove(overlayRectOf(container), { clientX: 120, clientY: 100 })
+    expect(container.textContent).not.toContain('Wat er dit jaar gebeurde')
+  })
+
+  it('verbergt met secondaryLineVisible: false de tweede lijn, niet de kwalificatie', () => {
+    const { container, getByText, queryByText } = render(
+      <SimChart {...uitsluitenProps()} secondaryLineVisible={false} />,
+    )
+    expect(besteedbaarPath(container)).toBeUndefined()
+    expect(queryByText('Met je huis')).toBeNull()
+    // De hoofdlijn blijft benoemd: een onbenoemd "Jouw pad" dat het huis niet
+    // meetelt leest als het totaal.
+    expect(getByText('· zonder je huis')).toBeTruthy()
+  })
+
   it('leest niet als een streeplijn: punt-ritme, niet het "6 3" van de doellijnen', () => {
     const { container } = render(<SimChart {...besteedbaarProps()} fireTargetInclHome={950_000} />)
     const path = besteedbaarPath(container)!

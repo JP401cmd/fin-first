@@ -97,7 +97,15 @@ function pot(over: Partial<SpendLimitConfig> = {}): SpendLimitWithReport {
   return {
     config,
     report: buildSpendLimitReport({
-      rule: { ruleType: config.ruleType, limitAmount: config.limitAmount, period: config.period },
+      // `createdAt` gaat mee zoals de loader hem meegeeft — zonder dat veld past de
+      // motor de aanmaak-ondergrens niet toe (trend, score én, sinds ADR 0119, het
+      // prognosebedrag).
+      rule: {
+        ruleType: config.ruleType,
+        limitAmount: config.limitAmount,
+        period: config.period,
+        createdAt: config.createdAt,
+      },
       rows: [row('2026-07', 150), row('2026-06', 240), row('2026-05', 120)],
       now: NOW,
       windowPeriods: SPEND_LIMIT_WINDOW_BY_PERIOD[config.period],
@@ -605,5 +613,25 @@ describe('SpendLimitsSection — truncatie-kanarie', () => {
     )
 
     expect(screen.queryByText(/kunnen te laag zijn/i)).toBeNull()
+  })
+})
+
+describe('SpendLimitsSection — tempo van de lopende periode (ADR 0119)', () => {
+  it('toont de tempo-regel uit de motor op de kaart, met het prognosebedrag', () => {
+    // NOW = 15 augustus 2026 ⇒ 15 van 31 dagen om = 48%. De kaart rekent dat NIET
+    // zelf uit; zou ze dat wel doen, dan zou een verschoven motorregel hier niet
+    // omvallen.
+    const { container } = renderSection()
+    const text = container.textContent ?? ''
+    expect(text).toContain('48% van augustus 2026 voorbij')
+    expect(text).toContain('van je grens gebruikt')
+    expect(text).toContain('in dit tempo kom je uit op')
+  })
+
+  it('zwijgt over het tempo bij een weekpot — die heeft er per besluit geen', () => {
+    const { container } = renderSection({}, 'grenzenpot', 'full', sectionData({
+      limits: [pot({ period: 'week' })],
+    }))
+    expect(container.textContent ?? '').not.toContain('voorbij')
   })
 })

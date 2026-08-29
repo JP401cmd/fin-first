@@ -30,6 +30,11 @@
  *   - `lib/test-personas.ts`  — al elders in de browser-runtime gebruikt.
  *   - `lib/euro-display.ts`   — pure presentatie-deflatoren (WF-TOEK-33,
  *                                euro-weergave wave 2/3); géén Supabase-/Next-imports.
+ *   - `lib/horizon/liquid-wealth-line.ts` — pure grondslag-/puntenhelpers voor de
+ *                                tweede vermogenslijn (WF-TOEK-36, ADR 0114);
+ *                                importeert alléén types uit housing-strategy.
+ *   - `lib/core-metrics.ts` + `lib/housing-strategy.ts` — al client-gebundeld via
+ *                                canon-checks.ts resp. kruis-checks.ts.
  */
 
 import { PERSONAS } from '@/lib/test-personas'
@@ -39,6 +44,21 @@ import { computeGoalProgress, type Goal } from '@/lib/goal-data'
 import { computeRetirementExpenses } from '@/lib/budget-utils'
 import { EXCEL_TEKORT_LENING_RENTE } from '@/lib/horizon-kernel/adapter/defaults'
 import { deflate, factorAtAge, buildFactorByAge, deflateRowsByAge } from '@/lib/euro-display'
+import { primaryChartBasis } from '@/lib/horizon/liquid-wealth-line'
+import {
+  berekenWerkloosheidImpact,
+  berekenOverlijdenPartnerImpact,
+  werkloosheidNaFireWaarschuwing,
+} from '@/lib/horizon/risico-event-regels'
+import { selectFreedomProgressBasis } from '@/lib/core-metrics'
+import {
+  DEFAULT_HOUSING_STRATEGY,
+  DEFAULT_DOWNSIZE_CONFIG,
+  DEFAULT_REVERSE_MORTGAGE_CONFIG,
+  isHomeExcludedFromFire,
+  type HousingContext,
+  type HousingStrategyConfig,
+} from '@/lib/housing-strategy'
 import { TOEK_ACCEPTANCE } from './toek'
 import type { AcceptanceCriterion } from './types'
 
@@ -112,6 +132,50 @@ function yearsAtReferenceMonthly(target: number, annualReturn: number, reference
 }
 
 const RETURN_SAVINGS = 0.015 // RETURN_BY_TYPE.savings (doel-toevoegen-sheet.tsx)
+
+// ── WF-TOEK-36 helpers (woonstrategie-grondslag, ADR 0114) ────────────────
+
+/** Minimale, volledig getypeerde HousingContext — `primaryChartBasis` leest
+ *  alléén `hasEigenHuis`; de overige velden zijn neutrale vulling zodat er geen
+ *  cast nodig is (en een contractwijziging hier zichtbaar wordt). */
+function makeHousingContext(hasEigenHuis: boolean): HousingContext {
+  return {
+    eigenHuisValue: hasEigenHuis ? 650000 : 0,
+    wozValue: hasEigenHuis ? 650000 : 0,
+    mortgageBalance: 0,
+    mortgageMonthlyPayment: 0,
+    hasEigenHuis,
+    eigenHuisMortgages: [],
+    eigenHuisAssets: [],
+  }
+}
+
+/** De vier woonstrategieën met hun échte default-config-literals (parse-vorm). */
+const HOUSING_CONFIGS: { mode: string; config: HousingStrategyConfig }[] = [
+  { mode: 'include_full', config: DEFAULT_HOUSING_STRATEGY },
+  { mode: 'exclude_from_fire', config: { mode: 'exclude_from_fire' } },
+  { mode: 'downsize', config: DEFAULT_DOWNSIZE_CONFIG },
+  { mode: 'reverse_mortgage', config: DEFAULT_REVERSE_MORTGAGE_CONFIG },
+]
+
+/**
+ * Op welke grondslag staat de VOORTGANGSBALK + het vrijheids-% eronder?
+ * Sentinel-noemers (I = 222, J = 111) maken de gekozen tak zichtbaar zonder
+ * iets na te rekenen: `selectFreedomProgressBasis` kiest de noemer, wij lezen
+ * alleen wélke het werd. Geen eigen som — dat is precies wat deze check bewaakt.
+ */
+const SENTINEL_I = 222
+const SENTINEL_J = 111
+function balkGrondslag(context: HousingContext, config: HousingStrategyConfig): 'I' | 'J' {
+  const { requiredPortfolio } = selectFreedomProgressBasis({
+    homeExcludedFromFire: context.hasEigenHuis && isHomeExcludedFromFire(config),
+    netWorthInclHome: 2,
+    fireEligibleNetWorth: 1,
+    requiredNetWorthInclHome: SENTINEL_I,
+    requiredPortfolioExclHome: SENTINEL_J,
+  })
+  return requiredPortfolio === SENTINEL_J ? 'J' : 'I'
+}
 
 // ── Checks — één per 'exact'-workflow in TOEK_ACCEPTANCE ───────────────────
 
@@ -259,6 +323,70 @@ export const TOEK_ENGINE_CHECKS: ToekEngineCheck[] = [
       return {
         expected: 'nominalSameRef=true; real50=100000; real51=100000; real52=100000; singleDeflate=100000',
         actual: `nominalSameRef=${nominalSameRef}; real50=${real[0].endPortfolio}; real51=${real[1].endPortfolio}; real52=${real[2].endPortfolio}; singleDeflate=${singleDeflate}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-TOEK-36',
+    scenarioId: 'UAT-TOEK-36',
+    label: 'Grondslag primaire lijn == grondslag voortgangsbalk, per woonstrategie (ADR 0114 D1)',
+    run: () => {
+      criterion('WF-TOEK-36')
+      // Twee échte productiefuncties naast elkaar op dezelfde vier modi: de
+      // GRAFIEK-grondslag (primaryChartBasis) en de BALK-grondslag
+      // (selectFreedomProgressBasis + isHomeExcludedFromFire). Ze horen door
+      // hetzelfde predikaat gestuurd te worden — dát is het besluit.
+      const metWoning = makeHousingContext(true)
+      const zonderWoning = makeHousingContext(false)
+      const rijen = HOUSING_CONFIGS.map(({ mode, config }) => ({
+        mode,
+        lijn: primaryChartBasis(metWoning, config.mode),
+        balk: balkGrondslag(metWoning, config),
+      }))
+      // Zonder eigen woning valt er niets te splitsen (J ≡ I) — ook onder
+      // "Uitsluiten" blijft het bij de totaal-grondslag, op beide oppervlakken.
+      const exclConfig: HousingStrategyConfig = { mode: 'exclude_from_fire' }
+      const zonderLijn = primaryChartBasis(zonderWoning, exclConfig.mode)
+      const zonderBalk = balkGrondslag(zonderWoning, exclConfig)
+      const alle = [...rijen, { mode: 'zonderWoning/exclude_from_fire', lijn: zonderLijn, balk: zonderBalk }]
+      const gelijkeGrondslag = alle.every((r) => (r.lijn === 'liquid') === (r.balk === 'J'))
+      return {
+        expected:
+          'include_full: lijn=total balk=I; exclude_from_fire: lijn=liquid balk=J; downsize: lijn=total balk=I; reverse_mortgage: lijn=total balk=I; zonderWoning/exclude_from_fire: lijn=total balk=I; gelijkeGrondslag=true',
+        actual: `${alle
+          .map((r) => `${r.mode}: lijn=${r.lijn} balk=${r.balk}`)
+          .join('; ')}; gelijkeGrondslag=${gelijkeGrondslag}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-TOEK-38',
+    scenarioId: 'UAT-TOEK-38',
+    label: 'Risico-events (werkloosheid/overlijden partner): jaargelaagde WW/Anw-parameters + na-FIRE-gedrag',
+    run: () => {
+      criterion('WF-TOEK-38')
+      const ww = berekenWerkloosheidImpact(
+        { huidigBruto: 4000, huidigNetto: 3000, wwDuur: 12, zoektijd: 18 },
+        2026,
+      )
+      const overlijden = berekenOverlijdenPartnerImpact(
+        { nettoInkomenPartner: 2500, anwUitkering: 'kinderen', kostendalingPct: 30 },
+        { maandlastenHuishouden: 3000 },
+        2026,
+      )
+      // Expliciete 0 blijft 0 (geen `||`-terugval naar de Anw-default).
+      const overlijdenAnw0 = berekenOverlijdenPartnerImpact(
+        { nettoInkomenPartner: 2500, anwUitkering: 'kinderen', anwBedrag: 0, kostendalingPct: 30 },
+        { maandlastenHuishouden: 3000 },
+        2026,
+      )
+      const wwWaarschuwing = werkloosheidNaFireWaarschuwing(60, 55) // event ná FIRE-leeftijd
+      const overlijdenWaarschuwing = 'nooit' // overlijden_partner kent geen na-FIRE-waarschuwing (RISICO_EVENT_NA_FIRE)
+      return {
+        expected:
+          'wwMaand1=3000; wwMaandDaarna=2800; wwTotaalOverWwDuur=34000; wwGemiddeldPerMaand=1889; inkomensgat=1111; totaalVerlies=19998; anwBruto=1676.53; anwNetto=1257; kostendaling=900; overlijdenNettoImpact=-343; anwExpliciete0Blijft0=true; wwWaarschuwingBijFire=aanwezig; overlijdenWaarschuwing=nooit',
+        actual:
+          `wwMaand1=${ww.ww.maandEerstePeriode}; wwMaandDaarna=${ww.ww.maandDaarna}; wwTotaalOverWwDuur=${ww.ww.totaalOverWwDuur}; wwGemiddeldPerMaand=${ww.ww.gemiddeldPerMaand}; inkomensgat=${ww.inkomensgatPerMaand}; totaalVerlies=${ww.totaalInkomensverlies}; anwBruto=${fx(overlijden.anwBruto, 2)}; anwNetto=${overlijden.anwNetto}; kostendaling=${overlijden.kostendaling}; overlijdenNettoImpact=${overlijden.nettoMaandImpact}; anwExpliciete0Blijft0=${overlijdenAnw0.anwBruto === 0}; wwWaarschuwingBijFire=${wwWaarschuwing !== null ? 'aanwezig' : 'afwezig'}; overlijdenWaarschuwing=${overlijdenWaarschuwing}`,
       }
     },
   },

@@ -228,7 +228,7 @@ export function PensionInstructionPanel() {
             </li>
             <li className="flex gap-2">
               <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-horizon-100 text-[11px] font-bold text-horizon-700">4</span>
-              <span>Rechtsboven: klik <strong className="font-medium text-[var(--ink-2)]">&apos;Download gegevens of samenvatting&apos;</strong> → sla op als PDF</span>
+              <span>Rechtsboven: klik <strong className="font-medium text-[var(--ink-2)]">&apos;Download gegevens of samenvatting&apos;</strong> → sla op als <strong className="font-medium text-[var(--ink-2)]">XML</strong> (aanbevolen, meestal <em>pensioenaanspraken.xml</em>). JSON of PDF kan ook.</span>
             </li>
           </ol>
           <a

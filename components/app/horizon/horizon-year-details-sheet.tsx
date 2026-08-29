@@ -575,6 +575,20 @@ export interface HorizonYearDetailsSheetProps {
    * de eerste/laatste leeftijd in `simRows` wordt de relevante pijl gedimd.
    */
   onChangeAge?: (newAge: number) => void
+  /**
+   * Grondslag van de PRIMAIRE lijn in de grafiek waar vandaan deze bon geopend
+   * is (`'total'` = Prognose!I, `'liquid'` = Prognose!J). Default `'total'`.
+   *
+   * De bon zelf BLIJFT altijd de volledige jaarbalans op de I-grondslag
+   * (ADR 0114 D3): een bon is een balans, geen lens — "reken mijn huis niet mee
+   * in mijn doel" betekent niet "ik heb geen huis", en er bestaat geen
+   * kernel-sluitterm tussen `startNettoLiquide` en `nettoLiquide` waarmee een
+   * J-bon sluitend te maken zou zijn. Wat deze prop wél doet: bij `'liquid'`
+   * zet de bon één neutrale "waarvan besteedbaar"-regel onder het hoofdcijfer
+   * én onder de sluitregel, zodat het getal waar de gebruiker op klikte
+   * herkenbaar terugkomt in de bon die opent.
+   */
+  primaryBasis?: 'total' | 'liquid'
 }
 
 export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
@@ -591,6 +605,7 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
   aowAge,
   fireAge,
   onChangeAge,
+  primaryBasis = 'total',
 }: HorizonYearDetailsSheetProps) {
   const row = useMemo(
     () => (age != null ? unifiedRows.find(r => r.age === age) : null),
@@ -818,6 +833,14 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
   // ── Totalen + fase
   const phase = row ? unifiedToUiPhase(row.phase) : 'opbouw'
   const netWorth = row?.netWorth ?? 0
+  // "Waarvan besteedbaar" (ADR 0114 D3). Consume-only uit `row.nettoLiquide`
+  // (Prognose!J) — géén eigen som "netto − overwaarde". Alleen tonen wanneer de
+  // grafiek waar deze bon uit komt op de J-grondslag staat ÉN de twee getallen
+  // daadwerkelijk verschillen (bij "Meerekenen" geldt J ≡ I, dan zou de regel
+  // het hoofdcijfer herhalen).
+  const nettoLiquide = row?.nettoLiquide ?? 0
+  const showBesteedbaar =
+    primaryBasis === 'liquid' && row != null && Math.abs(netWorth - nettoLiquide) >= 0.5
   const totalAssets = row?.totalAssets ?? 0
   const totalDebts = row?.totalDebts ?? 0
 
@@ -899,6 +922,16 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
               {fc(netWorth)}
             </p>
             <PvLine nominal={netWorth} factor={factor} />
+            {/* Het getal waar de gebruiker op klikte: de bon opent op de
+                I-grondslag, de grafiek stond op J. Neutrale regel — hij telt
+                niet mee in de bon en deflateert via dezelfde `fc` (dus dezelfde
+                kernelfactor als het hoofdcijfer erboven, ADR 0093). */}
+            {showBesteedbaar && (
+              <p className="mt-0.5 font-mono text-[10px] tabular-nums text-[var(--ink-3)]">
+                waarvan besteedbaar {fc(nettoLiquide)}
+                <span className="text-[var(--ink-4)]"> (zonder je huis)</span>
+              </p>
+            )}
           </div>
         </div>
 
@@ -1211,6 +1244,19 @@ export const HorizonYearDetailsSheet = memo(function HorizonYearDetailsSheet({
                 {fc(netWorth)}
               </p>
             </div>
+            {/* Opening en sluiting mogen niet uiteenlopen: staat de
+                "waarvan besteedbaar"-regel bovenaan, dan hoort hij ook hier
+                (ADR 0114 D3). */}
+            {showBesteedbaar && (
+              <div className="-mt-1 flex items-baseline justify-between gap-3">
+                <p className="text-[10px] font-mono uppercase tracking-[0.12em] text-[var(--ink-3)]">
+                  waarvan besteedbaar
+                </p>
+                <p className="font-mono text-[11px] tabular-nums text-[var(--ink-3)]">
+                  {fc(nettoLiquide)}
+                </p>
+              </div>
+            )}
 
             {/* Ornament-colophon */}
             <p className="pt-2 text-center text-[10px] italic text-[var(--ink-4)]">

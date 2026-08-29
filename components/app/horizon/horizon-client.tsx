@@ -38,6 +38,11 @@ import { computeKostenKoper } from '@/lib/kosten-koper'
 import { lookupAowAge, type AowLeeftijdRow, type AowAge } from '@/lib/aow-leeftijd'
 import { shouldSkipKernelContextFetch, keepRefIfEqual } from '@/lib/horizon/kernel-context-sync'
 import { computeSuggestedEventValues, type SuggestedEventValues } from '@/lib/horizon/event-prefill'
+import {
+  berekenOverlijdenPartnerImpact,
+  berekenWerkloosheidImpact,
+  werkloosheidNaFireWaarschuwing,
+} from '@/lib/horizon/risico-event-regels'
 import { isKernelReachedNowDisplay, kernelToUnifiedResult, buildKernelSlotMeta } from '@/lib/horizon-kernel/bridge'
 import { buildConvergentieAdapterProfile, computeConvergentieProjection, type ConvergentieRawContext, type ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
 import { buildKernelInputFromApp, deriveEigenHuisIds, type KernelAdapterInput } from '@/lib/horizon-kernel/adapter'
@@ -87,8 +92,8 @@ import {
 } from '@/lib/housing-strategy'
 import {
   shouldShowLiquidWealthLine,
-  defaultLiquidWealthLineVisible,
   buildLiquidWealthPoints,
+  primaryChartBasis,
 } from '@/lib/horizon/liquid-wealth-line'
 import { applyHousingToComposition } from '@/lib/horizon/wealth-composition-housing'
 import { detectDeficitLoanFromRows } from '@/lib/horizon/deficit-loan-display'
@@ -647,15 +652,27 @@ export default function HorizonPage({
   // Doelen toggle (M36) — financiële doelen met streefdatum op de as. Default
   // true; zelfde per-apparaat localStorage-voorkeur als de twee buur-pills.
   const [showGoals, setShowGoals] = useState(true)
-  // Besteedbaar-lijn ("Zonder je huis") toggle — de tweede vermogenslijn in
-  // Pad-modus. Standaardstand hangt aan de woonstrategie (zie
-  // `defaultLiquidWealthLineVisible`): AAN bij uitsluiten, UIT bij de andere
-  // twee. `initialData.housingStrategy` is een server-prop en dus stabiel over
-  // de hydratie heen → veilig als useState-initializer. De opgeslagen
-  // gebruikersvoorkeur (per apparaat, zoals de buur-pills) wint daarna.
-  const [showLiquidLine, setShowLiquidLine] = useState(() =>
-    defaultLiquidWealthLineVisible(initialData.housingStrategy.mode),
+  // ── Grondslag van de PRIMAIRE vermogenslijn (ADR 0114 D1) ────────────────
+  // Server-props, dus stabiel over de hydratie heen — daarom hier bovenaan: de
+  // voorkeur-sleutel van de tweede-lijn-pill hangt eraan.
+  const chartPrimaryBasis = primaryChartBasis(
+    initialData.housingContext,
+    initialData.housingStrategy.mode,
   )
+  // Tweede-grondslag-lijn toggle — de dunne gestippelde lijn in Pad-modus.
+  //
+  // STANDAARD UIT in álle strategieën (ADR 0114 D5). De eerdere uitzondering
+  // (AAN bij uitsluiten) bestond enkel omdat de grafiek daar anders uit de pas
+  // liep met de voortgangsbalk; nu de PRIMAIRE lijn daar zelf op J staat is die
+  // reden vervallen, en een standaard-tweede lijn zou de "te druk"-melding die
+  // spoor A oploste opnieuw openen.
+  const [showLiquidLine, setShowLiquidLine] = useState(false)
+  // De pill schakelt bij "Uitsluiten" een ÁNDERE lijn (de totaallijn) dan in de
+  // overige strategieën (de besteedbaar-lijn). Daarom per rol een eigen
+  // localStorage-sleutel: anders zou een oude "zonder je huis: uit" ineens de
+  // hoofd-tegenhanger van iemands grafiek uitzetten (ADR 0114 D5).
+  const secondaryLinePrefKey =
+    chartPrimaryBasis === 'liquid' ? 'horizon_show_total_line' : 'horizon_show_liquid_line'
   // overlayPrefRestored: pas `true` nadat de localStorage-voorkeur ná hydratie is
   // ingelezen. Gate voor het auto-scroll-effect van de overlay — zo scrolt de
   // pre-restore default `overlayVisible={true}` op de eerste render NIET naar de
@@ -670,9 +687,9 @@ export default function HorizonPage({
       if (storedLife !== null) setShowLifeEvents(storedLife === 'true')
       const storedGoals = localStorage.getItem('horizon_show_goals')
       if (storedGoals !== null) setShowGoals(storedGoals === 'true')
-      // Besteedbaar-lijn: géén key ⇒ de woonstrategie-afhankelijke default uit
-      // de useState-initializer blijft staan.
-      const storedLiquid = localStorage.getItem('horizon_show_liquid_line')
+      // Tweede grondslag-lijn: géén key ⇒ de default UIT blijft staan. De sleutel
+      // hangt aan de ROL van de pill (zie `secondaryLinePrefKey`).
+      const storedLiquid = localStorage.getItem(secondaryLinePrefKey)
       if (storedLiquid !== null) setShowLiquidLine(storedLiquid === 'true')
       // Overlay-zichtbaarheid: default AAN de eerste keer (geen key), daarna
       // de opgeslagen voorkeur. Onafhankelijk van de welkomsttekst-state.
@@ -686,7 +703,9 @@ export default function HorizonPage({
       // op false gezet, dus scrolt het effect niet.
       setOverlayPrefRestored(true)
     }
-  }, [])
+    // `secondaryLinePrefKey` is uit server-props afgeleid en dus stabiel; hij
+    // staat hier zodat de sleutelkeuze zichtbaar bij het effect hoort.
+  }, [secondaryLinePrefKey])
   const persistOverlayVisible = useCallback((val: boolean) => {
     setOverlayVisible(val)
     try { localStorage.setItem('horizon_overlay_visible', String(val)) } catch { /* noop */ }
@@ -745,8 +764,8 @@ export default function HorizonPage({
   }, [])
   const persistLiquidLine = useCallback((val: boolean) => {
     setShowLiquidLine(val)
-    try { localStorage.setItem('horizon_show_liquid_line', String(val)) } catch { /* noop */ }
-  }, [])
+    try { localStorage.setItem(secondaryLinePrefKey, String(val)) } catch { /* noop */ }
+  }, [secondaryLinePrefKey])
 
   // Kassabon modal state
   const [retirementMethod, setRetirementMethod] = useState<RetirementExpenseMethod>('essential_budgets')
@@ -1109,6 +1128,12 @@ export default function HorizonPage({
         debts,
         aowRows,
         yearlyExpenses: built.input.yearlyExpenses,
+        // ADR 0117 — de beheerde jaarlaag `fire_assumptions.volatility` (server-side
+        // geresolveerd in de horizon-loader) voedt MC!B3. Zonder dit veld zou de
+        // marktcheck op deze pagina met een ándere spreiding rekenen dan de jaarlaag
+        // die beheer heeft gezet — dezelfde grondslagdrift die
+        // `resolveFireParamsWithAssumptions` voor rendement/inflatie uitsluit.
+        marktVolatiliteit: initialData.marktVolatiliteit,
       },
     }
   }, [input, fireStrategy, withdrawalStrategyConfig, fireParams.grossReturn, fireParams.inflationRate, userAowAge.fractional, debts, monthlySavingsOverride, initialData, kernelRawProfile, aowRows])
@@ -2838,6 +2863,28 @@ export default function HorizonPage({
   // Huishouden-view: de gecombineerde lijn is de hoofdlijn (matcht de hero-FIRE).
   const useHouseholdMainLine = isHouseholdView && householdMainLine !== null
 
+  // ── Welke grondslagen tekent de grafiek? (ADR 0114 D1/D6) ───────────────
+  //
+  // `chartPrimaryBasis` (bovenaan, uit server-props) zegt wat de woonstrategie
+  // wil; hier komt daar de runtime-werkelijkheid bij. Bij "Uitsluiten" stonden de
+  // voortgangsbalk en het vrijheids-% eronder al op de J-grondslag
+  // (`homeExcludedFromProgress`) terwijl de grafiek op I stond — dát was het
+  // defect.
+  //
+  // Is er überhaupt een tweede grondslag te tónen? Geen J-punten (o.a.
+  // `include_full` — daar valt J exact samen met I) of een vreemde hoofdlijn
+  // (partner/huishouden/AOW-stop, die andere rijen tekenen waar deze punten niet
+  // bij horen) ⇒ één lijn op de totaal-grondslag, en dus ook geen pill.
+  const dualBasisAvailable =
+    liquidWealthPoints != null && !usePartnerMainLine && !useHouseholdMainLine && !isAowStopActive
+  // De grondslag die de grafiek daadwerkelijk tekent: 'liquid' alleen als de
+  // woonstrategie erom vraagt ÉN de J-reeks er ook echt is.
+  const effectiveChartPrimaryBasis: 'total' | 'liquid' =
+    dualBasisAvailable && chartPrimaryBasis === 'liquid' ? 'liquid' : 'total'
+  // De pill schakelt de TWEEDE (dunne, gestippelde) lijn — welke van de twee
+  // grondslagen dat is, volgt uit `effectiveChartPrimaryBasis`.
+  const secondaryLineVisible = dualBasisAvailable && showLiquidLine
+
   // ── Tekort-lening-melding: zichtbaarheid + minimaliseer-toestand ─────────
   // View-gating spiegelt de tijdlijn-marker: in partner-weergave mét partner-pad
   // plot de grafiek de pártnerlijn — dan hoort het eigen tekort-verhaal er niet.
@@ -2961,14 +3008,23 @@ export default function HorizonPage({
   // Marktcheck-band voor SimChart. `startAge` komt UIT de band (de kernel-as
   // `round(startLeeftijd)`), niet uit een tweede leeftijdsberekening hier — anders
   // kan de band één jaar naast de hoofdlijn komen te liggen.
-  const monteCarloOverlay: MonteCarloOverlay | undefined = mcExpanded && mcData
+  //
+  // GRONDSLAG (ADR 0114): de band MOET dezelfde grootheid dragen als de primaire
+  // lijn die erin ligt. Tekent de grafiek J, dan komt de band uit `bandLiquide`
+  // (de J-spiegel uit dezelfde MC-runs, op dezelfde blokranden) — anders omhult
+  // hij een ándere grootheid dan de lijn, en bepaalt hij via de bandtop ook nog
+  // de ashoogte mee. Bij `include_full` zijn beide banden per constructie gelijk.
+  const mcBand = mcData
+    ? (effectiveChartPrimaryBasis === 'liquid' ? mcData.bandLiquide : mcData.band)
+    : null
+  const monteCarloOverlay: MonteCarloOverlay | undefined = mcExpanded && mcBand
     ? {
-        startAge: mcData.band.startAge,
-        p10: [...mcData.band.p10],
-        p25: [...mcData.band.p25],
-        p50: [...mcData.band.p50],
-        p75: [...mcData.band.p75],
-        p90: [...mcData.band.p90],
+        startAge: mcBand.startAge,
+        p10: [...mcBand.p10],
+        p25: [...mcBand.p25],
+        p50: [...mcBand.p50],
+        p75: [...mcBand.p75],
+        p90: [...mcBand.p90],
       }
     : undefined
 
@@ -3089,6 +3145,7 @@ export default function HorizonPage({
           lifeEvents: scenarioEvents,
           aowRows,
           yearlyExpenses,
+          marktVolatiliteit: initialData.marktVolatiliteit,
         },
       })
       if (!outcome.ok) continue
@@ -3631,6 +3688,17 @@ export default function HorizonPage({
       warnings.push('Vervroegd pensioen voor je 40e is zeer ongebruikelijk. Controleer de leeftijd.')
     }
 
+    // Werkloosheid ná de vrijheidsleeftijd: de kern telt een vrije Geb-rij
+    // onvoorwaardelijk door, óók ná FIRE — voor een baanverlies klopt dat niet.
+    // Grondslag vastgelegd in RISICO_EVENT_NA_FIRE (lib/horizon/risico-event-regels.ts).
+    if (formType === 'werkloosheid') {
+      const naFire = werkloosheidNaFireWaarschuwing(
+        typeof formAge === 'number' ? formAge : null,
+        simResult?.fireAgeFractional ?? simResult?.fireAge ?? null,
+      )
+      if (naFire) warnings.push(naFire)
+    }
+
     setFormErrors(errors)
     setFormWarnings(warnings)
     return errors.length === 0
@@ -3714,24 +3782,15 @@ export default function HorizonPage({
       if (maxDuur > 0) durMonths = maxDuur
     }
 
-    // Special handling for werkloosheid: transitievergoeding + income gap
+    // Special handling for werkloosheid: transitievergoeding + income gap.
+    // Canonieke rekenregel (incl. de wettelijke 75%/70%-trap en het maximum-
+    // dagloon) staat in lib/horizon/risico-event-regels.ts — hier alleen consumeren.
     if (formType === 'werkloosheid') {
-      const netto = Number(formMetadata.huidigNetto) || 3000
-      const bruto = Number(formMetadata.huidigBruto) || 4000
-      const transitie = Number(formMetadata.transitievergoeding) || 0
-      const wwDuur = Number(formMetadata.wwDuur) || 12
-      const zoektijd = Number(formMetadata.zoektijd) || 6
-      // WW calculation: 75% first 2 mnd, 70% after, max dagloon €274/dag
-      const maxDagloon = 274
-      const dagloon = Math.min(bruto * 12 / 261, maxDagloon)
-      const wwMaand70 = Math.round(dagloon * 21.75 * 0.70)
-      // Transitievergoeding as one-time income (negative cost)
-      oneTimeCost = -transitie
-      // Monthly income change: WW replaces salary → net loss = netto - WW
-      const inkomensgat = Math.max(0, netto - wwMaand70)
-      monthlyIncomeChange = -inkomensgat // negative = loss of income
-      // Duration = total unemployment period
-      durMonths = Math.max(wwDuur, zoektijd)
+      const impact = berekenWerkloosheidImpact(formMetadata)
+      oneTimeCost = impact.oneTimeCost
+      monthlyCostChange = impact.monthlyCostChange
+      monthlyIncomeChange = impact.monthlyIncomeChange
+      durMonths = impact.durMonths
     }
 
     // Special handling for career_change: three-phase salary model
@@ -3899,31 +3958,17 @@ export default function HorizonPage({
       oneTimeCost = extraKosten
     }
 
-    // Special handling for overlijden_partner: net income impact + cost reduction
+    // Special handling for overlijden_partner: net income impact + cost reduction.
+    // Canonieke rekenregel (incl. het Anw-bedrag uit lib/sociale-zekerheid.ts)
+    // staat in lib/horizon/risico-event-regels.ts — hier alleen consumeren.
     if (formType === 'overlijden_partner') {
-      const partnerInkomen = Number(formMetadata.nettoInkomenPartner) || 2500
-      const nabestaanden = Number(formMetadata.nabestaandenpensioen) || 0
-      const anwType = String(formMetadata.anwUitkering ?? 'kinderen')
-      const anwBedrag = anwType === 'geen' ? 0 : (Number(formMetadata.anwBedrag) || 1380)
-      // Anw bruto → netto approximation (~75%)
-      const anwNetto = Math.round(anwBedrag * 0.75)
-      const verzekering = Number(formMetadata.levensverzekering) || 0
-      const kostendalingPct = Number(formMetadata.kostendalingPct) || 30
-      // Monthly expenses from effective input
-      const maandlasten = effectiveInput?.monthlyExpenses ?? 0
-      const kostendaling = Math.round(maandlasten * (kostendalingPct / 100))
-      // Netto maandelijkse impact: -partnerinkomen +nabestaanden +anw +kostendaling
-      const nettoMaandImpact = -partnerInkomen + nabestaanden + anwNetto + kostendaling
-      if (nettoMaandImpact < 0) {
-        monthlyIncomeChange = nettoMaandImpact // negative = loss
-      } else {
-        monthlyIncomeChange = nettoMaandImpact
-      }
-      monthlyCostChange = 0
-      // Levensverzekering as one-time income (negative cost)
-      oneTimeCost = verzekering > 0 ? -verzekering : 0
-      // Continuous impact (no fixed duration)
-      durMonths = 0
+      const impact = berekenOverlijdenPartnerImpact(formMetadata, {
+        maandlastenHuishouden: effectiveInput?.monthlyExpenses ?? 0,
+      })
+      oneTimeCost = impact.oneTimeCost
+      monthlyCostChange = impact.monthlyCostChange
+      monthlyIncomeChange = impact.monthlyIncomeChange
+      durMonths = impact.durMonths
     }
 
     // Special handling for pension: brutoBedrag → monthlyIncomeChange, uitkeringsduur → duration
@@ -4214,10 +4259,13 @@ export default function HorizonPage({
   )
 
   // ── Chart-feeds: puntenreeksen ────────────────────────────────────────────
-  // Besteedbaar-lijn: `buildLiquidWealthPoints` plot de waarde van rij `age` op
-  // `age + 1` (zie lib/horizon/liquid-wealth-line.ts). De factor hoort dus bij
-  // het BRONJAAR — vandaar de expliciete `x - 1`-sleutel. Zonder die sleutel
-  // deflateert deze lijn stil één jaar te ver.
+  // Besteedbaar-reeks: `buildLiquidWealthPoints` seedt op de beginleeftijd met
+  // het J(0)-anker en plot daarna de waarde van rij `age` op `age + 1` (zie
+  // lib/horizon/liquid-wealth-line.ts). De factor hoort dus bij het BRONJAAR —
+  // vandaar de expliciete `x - 1`-sleutel. Zonder die sleutel deflateert deze
+  // reeks stil één jaar te ver. Het SEED-punt mapt naar startleeftijd − 1, die
+  // bewust niet in `factorByAge` zit: `deflatePoints` laat dat bedrag dan
+  // ongemoeid, en dat is exact goed — jaar 0 draagt factor 1.0 (ADR 0093).
   const viewLiquidWealthPoints = useMemo(
     () =>
       liquidWealthPoints == null
@@ -4225,15 +4273,6 @@ export default function HorizonPage({
         : deflatePoints(liquidWealthPoints, factorByAge, euroView, x => x - 1),
     [liquidWealthPoints, factorByAge, euroView],
   )
-  // Is er überhaupt een besteedbaar-lijn te tónen? Zelfde bron-waarheid als de
-  // `liquidPoints`-prop hieronder: geen punten (o.a. `include_full` — daar valt
-  // J exact samen met I) of een vreemde hoofdlijn (partner/huishouden/AOW-stop)
-  // ⇒ geen lijn, en dus ook geen pill. Bij "Meerekenen" verdwijnt de toggle
-  // daarmee volledig i.p.v. een lijn aan te bieden die al zichtbaar is.
-  const liquidLineAvailable =
-    liquidWealthPoints != null && !usePartnerMainLine && !useHouseholdMainLine && !isAowStopActive
-  // De lijn wordt getekend als 'ie kán én de gebruiker 'm aan heeft staan.
-  const liquidLineVisible = liquidLineAvailable && showLiquidLine
   // Scenario-overlays lopen op de EIGEN leeftijd-as (wat-als/stop-pad/ghosts van
   // dezelfde gebruiker) ⇒ leeftijd-sleutel, met BRONJAAR-sleutel (`x - 1`).
   // Waarom `x - 1`: `simRowsToChartPoints` plot de eindstand van rij `age` op
@@ -5516,15 +5555,25 @@ export default function HorizonPage({
                     </span>
                     </>
                   )}
-                  {/* ── Besteedbaar-lijn toggle ("Zonder je huis") ──
+                  {/* ── Tweede-grondslag-toggle ──
                       Alleen zichtbaar zodra er écht een tweede lijn te tonen is
-                      (`liquidLineAvailable`) — bij "Meerekenen" valt J exact samen
+                      (`dualBasisAvailable`) — bij "Meerekenen" valt J exact samen
                       met I, dus daar verdwijnt de pill in plaats van een lijn aan te
                       bieden die al zichtbaar is. In Eenvoudig verdwijnt de pill
                       helemaal: het onderscheid mét/zonder huis is secundaire
                       diepte. De lijn zelf blijft door de opgeslagen voorkeur
-                      gestuurd en rendert in béíde weergavemodi. */}
-                  {liquidLineAvailable && (
+                      gestuurd en rendert in béíde weergavemodi.
+
+                      LABEL VOLGT DE ROL (ADR 0114): de pill benoemt de lijn die
+                      hij schakelt, niet een vaste grondslag. Bij "Uitsluiten" is
+                      de J-lijn de hóófdlijn en schakelt deze pill dus de
+                      totaallijn ("Met je huis"); in de andere modi andersom.
+                      Een pill die "Zonder je huis" heet terwijl die lijn er
+                      altijd staat, zou een aan/uit-knop voor niets zijn. */}
+                  {dualBasisAvailable && (() => {
+                    const secondaryLabel =
+                      effectiveChartPrimaryBasis === 'liquid' ? 'Met je huis' : 'Zonder je huis'
+                    return (
                     <HideInSimple>
                     <button
                       type="button"
@@ -5535,19 +5584,20 @@ export default function HorizonPage({
                           : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
                       }`}
                       aria-pressed={showLiquidLine}
-                      aria-label="Lijn zonder je huis tonen"
-                      title="Zonder je huis"
+                      aria-label={`Lijn ${secondaryLabel.toLowerCase()} tonen`}
+                      title={secondaryLabel}
                     >
                       {/* Zelfde swatch als de legenda en de tooltip-regel: fijne
                           horizon-streep. Kleur uit de module-token, niet uit een
-                          losse hex (`liquidStroke` in lib/horizon/sim-chart-geometry.ts). */}
+                          losse hex (`secondaryStroke` in lib/horizon/sim-chart-geometry.ts). */}
                       <svg width="20" height="8" viewBox="0 0 20 8" aria-hidden className="shrink-0">
                         <line x1="0" y1="4" x2="20" y2="4" stroke="var(--color-horizon-600)" strokeWidth="1.8" strokeDasharray="2 3" strokeLinecap="round" />
                       </svg>
-                      <span data-pill-label className="hidden sm:inline">Zonder je huis</span>
+                      <span data-pill-label className="hidden sm:inline">{secondaryLabel}</span>
                     </button>
                     </HideInSimple>
-                  )}
+                    )
+                  })()}
                   </>
                 )}
 
@@ -5761,13 +5811,20 @@ export default function HorizonPage({
                 }
               </ChartOverlayExplainer>
 
-              {/* Waarom de twee lijnen uit elkaar lopen — feitelijk, geen advies. */}
+              {/* Waarom de twee lijnen uit elkaar lopen — feitelijk, geen advies.
+                  Het verhaal is hetzelfde, ongeacht welke van de twee de dikke
+                  lijn is; alleen de aanwijzing verschilt. */}
               <ChartOverlayExplainer
-                active={chartMode === 'vermogenspad' && liquidLineVisible}
+                active={chartMode === 'vermogenspad' && secondaryLineVisible}
               >
                 De lijn <em>zonder je huis</em> toont het deel van je vermogen waar
                 je direct bij kunt. Je huis zit daar niet in — daardoor kan de lijn
                 met je huis doorgroeien terwijl die andere lijn daalt.
+                {effectiveChartPrimaryBasis === 'liquid' && (
+                  <> Omdat je je huis buiten je vrijheidsdoel houdt, is de lijn
+                  <em> zonder je huis</em> hier de dikke lijn — dezelfde grondslag
+                  als de balk eronder.</>
+                )}
               </ChartOverlayExplainer>
 
               <ChartOverlayExplainer active={chartMode === 'vermogensopbouw'}>
@@ -5923,13 +5980,21 @@ export default function HorizonPage({
                             // Meegroeiende doellijn alleen op de basis-projectie (niet op
                             // partner-/huishoud-/AOW-stop-lijnen — die hebben eigen rijen).
                             targetInflationFactors={(usePartnerMainLine || useHouseholdMainLine || isAowStopActive) ? undefined : viewTargetInflationFactors}
-                            // Besteedbaar-lijn alleen op de basis-projectie: partner-/
+                            // Besteedbaar-reeks alleen op de basis-projectie: partner-/
                             // huishoud-/AOW-stop-lijnen tekenen andere rijen, waar deze
-                            // punten niet bij horen. Bovendien achter de "Zonder je
-                            // huis"-pill (`liquidLineVisible`): uit ⇒ undefined, en dan
-                            // valt de bijbehorende J-drempel automatisch mee weg
-                            // (`showExclTargetLine` in chart-static-layers.tsx).
-                            liquidPoints={liquidLineVisible ? viewLiquidWealthPoints : undefined}
+                            // punten niet bij horen (`dualBasisAvailable`).
+                            //
+                            // Deze reeks is de PRIMAIRE lijn zodra `primaryBasis`
+                            // 'liquid' is — dan moet 'ie er altijd zijn en schakelt de
+                            // pill de tweede (totaal)lijn. Staat de primaire lijn op
+                            // 'total', dan is dít de tweede lijn en schakelt dezelfde
+                            // pill hem uit. Eén schakelaar, twee richtingen:
+                            // `secondaryLineVisible`. Valt de tweede lijn weg, dan valt
+                            // ook de bijbehorende drempel mee weg (`showExclTargetLine`
+                            // resp. `showInclTargetLine` in chart-static-layers.tsx).
+                            liquidPoints={dualBasisAvailable ? viewLiquidWealthPoints : undefined}
+                            primaryBasis={effectiveChartPrimaryBasis}
+                            secondaryLineVisible={secondaryLineVisible}
                             mainLineLabel={useHouseholdMainLine ? 'Gezamenlijk' : usePartnerMainLine ? (partnerName ?? 'Partner') : undefined}
                             // Partner- én huishoud-projectie krijgen dezelfde teal als de
                             // partner-event-markers, zodat de lijn + de partner-gebeurtenissen
@@ -7943,20 +8008,16 @@ export default function HorizonPage({
                         )
                       })()}
                       {formType === 'werkloosheid' && field.key === 'zoektijd' && (() => {
-                        const bruto = Number(formMetadata.huidigBruto ?? 4000)
-                        const netto = Number(formMetadata.huidigNetto ?? 3000)
-                        const wwDuur = Number(formMetadata.wwDuur ?? 12)
-                        const transitie = Number(formMetadata.transitievergoeding ?? 6667)
-                        const zoektijd = Number(formMetadata.zoektijd ?? 6)
-                        // WW calculation: 75% first 2 months, 70% thereafter, max dagloon €274/dag
-                        const maxDagloon = 274
-                        const dagloon = Math.min(bruto * 12 / 261, maxDagloon) // 261 werkdagen/jaar
-                        const wwMaand75 = Math.round(dagloon * 21.75 * 0.75) // 21.75 werkdagen/mnd
-                        const wwMaand70 = Math.round(dagloon * 21.75 * 0.70)
-                        const gemWW = wwDuur <= 2 ? wwMaand75 : Math.round((wwMaand75 * 2 + wwMaand70 * (wwDuur - 2)) / wwDuur)
-                        const inkomensgat = Math.max(0, netto - gemWW)
-                        const totaleDuur = Math.max(wwDuur, zoektijd)
-                        const totaalInkomensVerlies = Math.round(inkomensgat * totaleDuur)
+                        // Consume-don't-recompute: exact dezelfde rekenregel als de
+                        // som die het event voedt (lib/horizon/risico-event-regels.ts).
+                        const impact = berekenWerkloosheidImpact(formMetadata)
+                        const transitie = impact.transitievergoeding
+                        const wwMaand75 = impact.ww.maandEerstePeriode
+                        const wwMaand70 = impact.ww.maandDaarna
+                        const gemWW = impact.ww.gemiddeldPerMaand
+                        const inkomensgat = impact.inkomensgatPerMaand
+                        const totaleDuur = impact.totaleDuurMaanden
+                        const totaalInkomensVerlies = impact.totaalInkomensverlies
                         return (
                           <div className="mt-2 border border-horizon-200 bg-horizon-50/50 p-3 space-y-1.5">
                             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Financieel overzicht werkloosheid</p>
@@ -7966,15 +8027,15 @@ export default function HorizonPage({
                                 <span className="font-mono tabular-nums text-positive">+{<MaskedAmount value={transitie} tone="horizon" />}</span>
                               </div>
                               <div className="flex justify-between">
-                                <span>WW-uitkering (gem.)</span>
+                                <span>WW-uitkering (gem. over {totaleDuur} mnd)</span>
                                 <span className="font-mono tabular-nums">{<MaskedAmount value={gemWW} tone="horizon" />}/mnd</span>
                               </div>
                               <div className="flex justify-between text-[var(--ink-4)]">
-                                <span className="pl-3">Eerste 2 mnd (75%)</span>
+                                <span className="pl-3">Eerste {impact.ww.wettelijkeEerstePeriodeMaanden} mnd ({Math.round(impact.ww.pctEerstePeriode * 100)}%)</span>
                                 <span className="font-mono tabular-nums">{<MaskedAmount value={wwMaand75} tone="horizon" />}/mnd</span>
                               </div>
                               <div className="flex justify-between text-[var(--ink-4)]">
-                                <span className="pl-3">Daarna (70%)</span>
+                                <span className="pl-3">Daarna ({Math.round(impact.ww.pctDaarna * 100)}%)</span>
                                 <span className="font-mono tabular-nums">{<MaskedAmount value={wwMaand70} tone="horizon" />}/mnd</span>
                               </div>
                               <div className="h-px bg-horizon-200 my-1" />
@@ -8301,16 +8362,19 @@ export default function HorizonPage({
                         )
                       })()}
                       {formType === 'overlijden_partner' && field.key === 'kostendalingPct' && (() => {
-                        const partnerInkomen = Number(formMetadata.nettoInkomenPartner ?? 2500)
-                        const nabestaanden = Number(formMetadata.nabestaandenpensioen ?? 0)
-                        const anwType = String(formMetadata.anwUitkering ?? 'kinderen')
-                        const anwBedrag = anwType === 'geen' ? 0 : (Number(formMetadata.anwBedrag ?? 1380))
-                        const anwNetto = Math.round(anwBedrag * 0.75)
-                        const verzekering = Number(formMetadata.levensverzekering ?? 0)
-                        const kostendalingPct = Number(formMetadata.kostendalingPct ?? 30)
+                        // Consume-don't-recompute: exact dezelfde rekenregel als de
+                        // som die het event voedt (lib/horizon/risico-event-regels.ts).
                         const maandlasten = effectiveInput?.monthlyExpenses ?? 0
-                        const kostendaling = Math.round(maandlasten * (kostendalingPct / 100))
-                        const nettoMaandImpact = -partnerInkomen + nabestaanden + anwNetto + kostendaling
+                        const impact = berekenOverlijdenPartnerImpact(formMetadata, {
+                          maandlastenHuishouden: maandlasten,
+                        })
+                        const partnerInkomen = impact.partnerInkomen
+                        const nabestaanden = impact.nabestaandenpensioen
+                        const anwNetto = impact.anwNetto
+                        const verzekering = impact.levensverzekering
+                        const kostendalingPct = impact.kostendalingPct
+                        const kostendaling = impact.kostendaling
+                        const nettoMaandImpact = impact.nettoMaandImpact
                         return (
                           <div className="mt-2 space-y-3">
                             {/* Reference: current shared monthly costs */}
@@ -9720,6 +9784,10 @@ export default function HorizonPage({
         cashflows={simCashflows ?? []}
         aowAge={userAowAge.fractional}
         fireAge={simResult?.fireAge ?? null}
+        // De bon blijft de volledige jaarbalans op de I-grondslag; deze prop
+        // zorgt alleen dat het getal waarop de gebruiker klikte er als
+        // "waarvan besteedbaar"-regel bij staat (ADR 0114 D3).
+        primaryBasis={effectiveChartPrimaryBasis}
         onChangeAge={(newAge) => {
           // Clamp op de geclipte weergaverijen: de gebruiker mag niet naar het
           // (verborgen) laatste jaar bladeren.

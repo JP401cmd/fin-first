@@ -317,6 +317,19 @@ export interface HorizonRawData {
    * mount-fetch met een structurele-gelijkheidsguard.
    */
   aowRows: AowLeeftijdRow[]
+  /**
+   * ADR 0117 — de jaargelaagde markt-volatiliteit (`fire_assumptions.volatility`,
+   * decimaal), server-side geresolveerd door `resolveFireAssumptions` uit dezelfde
+   * query die rendement en inflatie al shadowt. Voedt MC!B3 en daarmee de breedte
+   * van de marktcheck-band.
+   *
+   * Waarom als EIGEN veld en niet via het profiel: `profiles` heeft geen
+   * volatiliteits-kolom, dus er is niets om te shadowen — de gebruiker kan deze
+   * aanname niet zelf zetten, hij is puur een beheerde markt-default. De client
+   * geeft 'm door aan de kernel-context, zodat de marktcheck dezelfde jaarlaag
+   * gebruikt als de rest van de app.
+   */
+  marktVolatiliteit: number
   /** Pot-regels (profiles.pot_rules) — verdeling/onttrekkingsvolgorde voor v2. */
   potRules: PotRulesConfig
   /** Error message from profile query, null if successful */
@@ -1361,6 +1374,7 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
     pensioenFactorAKnown,
     rawProfile,
     aowRows,
+    marktVolatiliteit: fireAssumptions.volatility,
     potRules,
     profileError: profileResult.error
       ? `Profile query failed: ${profileResult.error.code} — ${profileResult.error.message}`

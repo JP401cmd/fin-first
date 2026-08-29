@@ -63,7 +63,7 @@ function row(over: Record<string, unknown> = {}) {
   }
 }
 
-function makeSupabase(existing: TxRow[], opts: { visibleAccounts?: string[]; visibleBudgets?: string[]; linked?: string[]; failInserts?: boolean; accountOwnership?: 'personal' | 'shared'; sharedAccounts?: string[] } = {}) {
+function makeSupabase(existing: TxRow[], opts: { visibleAccounts?: string[]; visibleBudgets?: string[]; linked?: string[]; failInserts?: boolean; accountOwnership?: 'personal' | 'shared'; sharedAccounts?: string[]; accountUserId?: string; partnerVisibility?: 'none' | 'balance' | 'full' } = {}) {
   const visibleAccounts = opts.visibleAccounts ?? [ACCOUNT, OTHER_ACCOUNT]
   const visibleBudgets = opts.visibleBudgets ?? [BUDGET]
   /**
@@ -160,8 +160,23 @@ function makeSupabase(existing: TxRow[], opts: { visibleAccounts?: string[]; vis
       if (table === 'bank_accounts') {
         const id = eqs['id'] as string | undefined
         // POST: één rekening opzoeken om schrijfrecht + eigendom te bepalen.
+        // De route leest sinds ADR 0118 óók `user_id` en `partner_visibility`
+        // (partner-import-gate). Default in de mock: de importeur ís de
+        // rekeninghouder en gedeelde rekeningen staan op 'full' — dan draait
+        // laag 1b precies zoals vóór de gate; de gate-scenario's zetten
+        // `accountUserId`/`partnerVisibility` expliciet.
         if (id !== undefined) {
-          return { data: visibleAccounts.includes(id) ? { id, ownership: ownershipOf(id) } : null, error: null }
+          return {
+            data: visibleAccounts.includes(id)
+              ? {
+                  id,
+                  ownership: ownershipOf(id),
+                  user_id: opts.accountUserId ?? USER_ID,
+                  partner_visibility: sharedAccounts.has(id) ? (opts.partnerVisibility ?? 'full') : null,
+                }
+              : null,
+            error: null,
+          }
         }
         // GET: de lijst-query naar gedeelde rekeningen.
         const rows = visibleAccounts
@@ -470,6 +485,41 @@ describe('POST /api/transactions/import — laag 1b (partner op gedeelde rekenin
       expect(q.neqs).toMatchObject({ user_id: USER_ID })
       expect(q.eqs).toMatchObject({ account_id: ACCOUNT, ownership: 'shared' })
     }
+  })
+
+  it('weigert een partner-import op een gedeelde rekening die niet op full staat (ADR 0118)', async () => {
+    // De rekening is van de partner en deelt alleen het saldo. Zonder deze gate
+    // zou laag 1b via RLS een lege partnerset lezen en de reeks stil verdubbelen.
+    const { client, householdQueries, inserted } = makeSupabase([], {
+      accountOwnership: 'shared',
+      accountUserId: PARTNER_ID,
+      partnerVisibility: 'balance',
+    })
+    mockCreateClient.mockResolvedValue(client)
+
+    const res = await POST(request({ account_id: ACCOUNT, rows: [row({ ownership: 'shared' })] }))
+
+    expect(res.status).toBe(403)
+    expect(inserted).toHaveLength(0)
+    expect(householdQueries).toHaveLength(0)
+  })
+
+  it('laat de partner wél importeren wanneer de rekening op full staat', async () => {
+    const existing = [await partnerRow({ user_id: 'user-3' })]
+    const { client, inserted } = makeSupabase(existing, {
+      accountOwnership: 'shared',
+      accountUserId: PARTNER_ID,
+      partnerVisibility: 'full',
+    })
+    mockCreateClient.mockResolvedValue(client)
+
+    const res = await POST(request({ account_id: ACCOUNT, rows: [row({ ownership: 'shared' })] }))
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body).toMatchObject({ inserted: 0, duplicates_household_partner: 1 })
+    // Alles is partner-dedup: er is geen enkele insert-batch geweest.
+    expect(inserted).toHaveLength(0)
   })
 })
 

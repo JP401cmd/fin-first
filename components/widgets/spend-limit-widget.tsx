@@ -23,8 +23,11 @@
  * Elk euro-bedrag loopt door `<MaskedAmount tone="kern">`. Reeks-getallen zijn
  * AANTALLEN periodes, geen bedragen — die maskeren dus niet (NFR-B2-04).
  *
- * euro-view: exempt — dit zijn gerealiseerde historische bedragen, geen
- * geprojecteerde; de nominaal/reëel-deflator (ADR 0090) hoort er niet op.
+ * euro-view: exempt — dit zijn gerealiseerde historische bedragen, en sinds
+ * ADR 0119 één geprojecteerd bedrag (het tempo van de lopende periode). Beide
+ * blijven nominaal: het prognosebedrag ligt binnen dezelfde kalenderperiode als
+ * het gerealiseerde bedrag ernaast, dus de nominaal/reëel-deflator (ADR 0090)
+ * hoort er niet op.
  */
 
 import { memo, type ReactNode } from 'react'
@@ -36,6 +39,7 @@ import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import type { SpendLimitWidgetData } from '@/lib/spend-limits/widget-data'
 import type { SpendLimitTrendDirection } from '@/lib/spend-limits/engine'
 import {
+  describeSpendLimitPace,
   resolveSpendLimitDisplayStatus,
   SPEND_LIMIT_SCORE_TEXT_CLASS,
   SPEND_LIMIT_STATUS_COLOR_VAR,
@@ -130,17 +134,28 @@ function TruncationNote({ compact = false }: { compact?: boolean }) {
   )
 }
 
-/** Voortgangsbalk: basis in kern-accent, het stuk boven de grens in het negative-token. */
+/**
+ * Voortgangsbalk: basis in kern-accent, het stuk boven de grens in het
+ * negative-token, plus — sinds ADR 0119 — de TEMPO-MARKERING: een streepje op de
+ * verstreken fractie van de periode.
+ *
+ * Het streepje is bewust neutrale inkt en géén stoplicht- of accentkleur: het is
+ * een referentiepunt op de tijd-as, geen oordeel. Het oordeel staat al in de
+ * kleur van de balk zelf.
+ */
 function LimitBar({
   matched,
   limitAmount,
   hasEntered,
   height = 'h-1.5',
+  paceFraction = null,
 }: {
   matched: number
   limitAmount: number
   hasEntered: boolean
   height?: string
+  /** `pace.elapsedFraction` uit de motor — nooit hier uit datums afgeleid. */
+  paceFraction?: number | null
 }) {
   const pct = limitAmount > 0 ? Math.min(matched / limitAmount, 1) : 0
   // Het deel boven de grens, uitgedrukt op dezelfde schaal (max. 40% extra
@@ -170,7 +185,55 @@ function LimitBar({
           }}
         />
       )}
+      {paceFraction !== null && paceFraction !== undefined && (
+        <div
+          aria-hidden
+          className="absolute inset-y-0 w-[2px] rounded-full"
+          style={{
+            // `calc(… - 1px)` centreert het streepje op de fractie in plaats van
+            // het eraan te laten hángen; op 100% zou het anders half buiten de
+            // balk vallen.
+            left: `calc(${Math.min(Math.max(paceFraction, 0), 1) * 100}% - 1px)`,
+            background: 'var(--ink-2)',
+            opacity: 0.7,
+          }}
+        />
+      )}
     </div>
+  )
+}
+
+/**
+ * De tempo-regel: hoe ver de periode zelf is, en — zodra de pot genoeg eigen
+ * historie heeft — waar je in dit tempo uitkomt.
+ *
+ * De zin komt uit `describeSpendLimitPace` (één home, drie oppervlakken); hier
+ * wordt niets afgerond of gerekend. Het BEDRAG maskeert mee (ADR 0091), de
+ * percentages niet — die zijn geen bedrag.
+ */
+function PaceLine({ limit, compact = false }: { limit: SpendLimitWidgetData; compact?: boolean }) {
+  const pace = limit.pace
+  if (!pace) return null
+  const showAmount = !compact && pace.projectedAmount !== null
+  return (
+    <p
+      className={`truncate text-[var(--ink-3)] ${compact ? 'text-[10px] leading-tight' : 'text-[11px]'}`}
+    >
+      {describeSpendLimitPace(pace, limit.currentPeriodLabel)}
+      {showAmount && (
+        <>
+          <span className="text-[var(--ink-4)]"> · </span>
+          <span className={pace.projectedExceeds ? 'text-negative' : undefined}>
+            op weg naar{' '}
+            <MaskedAmount
+              value={pace.projectedAmount as number}
+              tone={pace.projectedExceeds ? 'inherit' : 'kern'}
+              className="text-[11px]"
+            />
+          </span>
+        </>
+      )}
+    </p>
   )
 }
 
@@ -325,8 +388,15 @@ export const SpendLimitWidget = memo(function SpendLimitWidget({
               <div className="mt-1 text-[13px]">{statusRow}</div>
               <div className="mt-1">{amountRow}</div>
               <div className="mt-2">
-                <LimitBar matched={limit.currentMatchedAmount} limitAmount={limit.limitAmount} hasEntered={hasEntered} height="h-2" />
+                <LimitBar
+                  matched={limit.currentMatchedAmount}
+                  limitAmount={limit.limitAmount}
+                  hasEntered={hasEntered}
+                  height="h-2"
+                  paceFraction={limit.pace?.elapsedFraction ?? null}
+                />
               </div>
+              <PaceLine limit={limit} />
               {freedomLabel && (
                 <p className="mt-1.5 font-serif italic text-[12px] text-[var(--ink-3)]">
                   {isOver ? `${freedomLabel} vrijheid eroverheen` : `nog ${freedomLabel} vrijheid over`}
@@ -385,7 +455,12 @@ export const SpendLimitWidget = memo(function SpendLimitWidget({
           {metaRow}
           <div className="text-[13px]">{statusRow}</div>
           {amountRow}
-          <LimitBar matched={limit.currentMatchedAmount} limitAmount={limit.limitAmount} hasEntered={hasEntered} />
+          <LimitBar
+            matched={limit.currentMatchedAmount}
+            limitAmount={limit.limitAmount}
+            hasEntered={hasEntered}
+            paceFraction={limit.pace?.elapsedFraction ?? null}
+          />
           <p className={`text-xs ${isOver ? 'text-negative' : 'text-positive'}`}>
             {isOver ? (
               <>
@@ -402,6 +477,7 @@ export const SpendLimitWidget = memo(function SpendLimitWidget({
               {isOver ? `≈ ${freedomLabel} vrijheid eroverheen` : `≈ ${freedomLabel} vrijheid over`}
             </p>
           )}
+          <PaceLine limit={limit} />
           {limit.aggregateTruncationSuspected && <TruncationNote />}
           <div className="border-t border-[var(--border-ed)] pt-2">
             <ClosedSparkline
@@ -428,7 +504,12 @@ export const SpendLimitWidget = memo(function SpendLimitWidget({
           {metaRow}
           <div className="text-[12px]">{statusRow}</div>
           {amountRow}
-          <LimitBar matched={limit.currentMatchedAmount} limitAmount={limit.limitAmount} hasEntered={hasEntered} />
+          <LimitBar
+            matched={limit.currentMatchedAmount}
+            limitAmount={limit.limitAmount}
+            hasEntered={hasEntered}
+            paceFraction={limit.pace?.elapsedFraction ?? null}
+          />
           <p className={`truncate text-xs ${isOver ? 'text-negative' : 'text-positive'}`}>
             {isOver ? (
               <>
@@ -458,6 +539,7 @@ export const SpendLimitWidget = memo(function SpendLimitWidget({
               {isOver ? `≈ ${freedomLabel} vrijheid eroverheen` : `≈ ${freedomLabel} vrijheid over`}
             </p>
           )}
+          <PaceLine limit={limit} />
           {limit.aggregateTruncationSuspected && <TruncationNote compact />}
         </div>
       </WidgetShell>
@@ -475,6 +557,9 @@ export const SpendLimitWidget = memo(function SpendLimitWidget({
         <p className="truncate text-[10px] text-[var(--ink-3)]">
           <span className="font-mono tabular-nums text-[var(--ink)]">{limit.currentStreak}</span> op rij binnen je grens
         </p>
+        {/* Op de kleinste tegel alleen de tempo-markering, géén prognosebedrag:
+            de regel moet op 384px binnen één lijn passen. */}
+        <PaceLine limit={limit} compact />
         {limit.aggregateTruncationSuspected && <TruncationNote compact />}
       </div>
     </WidgetShell>

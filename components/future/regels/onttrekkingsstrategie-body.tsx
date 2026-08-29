@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { WithdrawalProfiel, WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
+import { EXCEL_FASE_CURVE } from '@/lib/horizon-kernel/adapter/defaults'
 import { runRegelProjection, type RegelProjection } from '@/lib/future/regel-sim'
 import { SubsectionLabel } from '@/components/editorial'
 import {
@@ -20,11 +21,12 @@ const EMPTY_PROJ: RegelProjection = { rows: [], fireAgeFractional: null }
 /**
  * V4 (F4) — onttrekkingsPROFIEL. De keuze leeft in `withdrawal_profile_config`
  * (profiel + 3-fasen-curve); de OUDE enum (`withdrawal_strategy`) wordt consistent
- * meegeschreven zodat de draaiende v2-engine blijft werken tot FASE 6:
+ * meegeschreven omdat de kernel-adapter er de guardrail-parameters uit leest en
+ * hem als terugval voor het profiel gebruikt:
  *   vast / afnemend / oplopend → 'static' · guardrails → 'guardrails'.
- * F6-OPRUIMPUNT: zodra de horizon-kernel de enige engine is, vervalt de enum en
- * leest alles rechtstreeks `profiel` + curve. vpw/bucket zijn geen keuze meer
- * (bestaande waarden tonen 'Vast'); een echte DB-migratie is F6.
+ * De horizon-kernel is sinds FASE 6 stap 5A de enige engine en leest profiel +
+ * curve rechtstreeks; de enum-kolom opruimen vergt nog een DB-migratie.
+ * vpw/bucket zijn geen keuze meer (bestaande waarden tonen 'Vast').
  */
 const PROFIEL_INFO: Record<WithdrawalProfiel, { label: string; description: string }> = {
   vast: {
@@ -59,13 +61,20 @@ interface Curve {
   nogoPct: number
 }
 
-/** Excel-defaults P!B71-B75 (go-go/slow-go/no-go) — placeholder + reset-waarde. */
+/**
+ * Excel-defaults P!B71-B75 (go-go/slow-go/no-go) — startwaarde, per-veld-terugval bij
+ * het inlezen, en reset-waarde. AFGELEID uit `EXCEL_FASE_CURVE` (adapter/defaults.ts),
+ * de single source: de kernel-adapter vult élk ontbrekend curve-veld met exact díe
+ * getallen. Sinds de live-sim de volledige curve meestuurt is die gelijkheid
+ * load-bearing — een eigen kopie hier zou stil een preview opleveren die van de
+ * baseline afwijkt zonder dat de gebruiker iets verschoof.
+ */
 const EXCEL_CURVE: Curve = {
-  gogoTotLeeftijd: 75,
-  gogoPct: 100,
-  slowgoTotLeeftijd: 85,
-  slowgoPct: 85,
-  nogoPct: 70,
+  gogoTotLeeftijd: EXCEL_FASE_CURVE.fase1TotLeeftijd,
+  gogoPct: EXCEL_FASE_CURVE.factor1Pct,
+  slowgoTotLeeftijd: EXCEL_FASE_CURVE.fase2TotLeeftijd,
+  slowgoPct: EXCEL_FASE_CURVE.factor2Pct,
+  nogoPct: EXCEL_FASE_CURVE.factor3Pct,
 }
 
 /** Profiel → oude enum (F6: verdwijnt zodra de kernel de enige engine is). */
@@ -76,6 +85,46 @@ function profielToEnum(p: WithdrawalProfiel): WithdrawalStrategyConfig['strategy
 /** Enum → profiel (voor bestaande gebruikers; vpw/bucket/static → 'vast'). */
 function enumToProfiel(strategy: string): WithdrawalProfiel {
   return strategy === 'guardrails' ? 'guardrails' : 'vast'
+}
+
+/** Profielen met een instelbare 3-fasen-curve (go-go / slow-go / no-go). */
+function heeftCurve(p: WithdrawalProfiel): boolean {
+  return p === 'afnemend' || p === 'oplopend'
+}
+
+/**
+ * Bouw de `withdrawal_profile_config`-payload uit de editor-staat. ÉÉN bron voor
+ * zowel de live-sim-draft als de PUT bij Opslaan, zodat de grafiek exact toont wat
+ * je opslaat (geen preview-vs-opslag-drift). De kernel-adapter leest deze JSONB —
+ * `buildOnttrekkingsprofiel` (profiel + fase-curve) en `buildInkomenUitgaven`
+ * (flex-spending) — en vult elk ontbrekend veld dáár met de Excel-default.
+ */
+function buildProfileConfig(state: {
+  profiel: WithdrawalProfiel
+  curve: Curve
+  flexNiceOnly: boolean
+  flexNicePct: number
+  flexCutPct: number
+}): Record<string, string | number | boolean> {
+  // profiel altijd; curve alleen bij afnemend/oplopend; flex alleen bij guardrails.
+  const cfg: Record<string, string | number | boolean> = { profiel: state.profiel }
+  if (heeftCurve(state.profiel)) {
+    cfg.gogo_tot_leeftijd = state.curve.gogoTotLeeftijd
+    cfg.gogo_pct = state.curve.gogoPct
+    cfg.slowgo_tot_leeftijd = state.curve.slowgoTotLeeftijd
+    cfg.slowgo_pct = state.curve.slowgoPct
+    cfg.nogo_pct = state.curve.nogoPct
+  }
+  if (state.profiel === 'guardrails') {
+    // Roadmap M — must/nice. Vlag altijd meeschrijven (ook 'uit' expliciet wissen);
+    // fractie/cut-step alleen als de vlag aan staat.
+    cfg.flex_nice_only = state.flexNiceOnly
+    if (state.flexNiceOnly) {
+      cfg.flex_nice_fractie = state.flexNicePct / 100
+      cfg.flex_cut_step = state.flexCutPct / 100
+    }
+  }
+  return cfg
 }
 
 function GuardrailSlider({
@@ -243,10 +292,10 @@ export function OnttrekkingsstrategieBody({
   }, [])
 
   const isGuardrails = profiel === 'guardrails'
-  const showsCurve = profiel === 'afnemend' || profiel === 'oplopend'
+  const showsCurve = heeftCurve(profiel)
   const floorCeilingValid = !isGuardrails || grFloor < grCeiling
 
-  // Live-sim draait op de enum-config (de v2-engine kent de curve nog niet — F6).
+  // De enum-kolom blijft meelopen (guardrail-parameters + de oude `withdrawal_strategy`).
   const simConfig: WithdrawalStrategyConfig = useMemo(
     () => ({
       strategy: profielToEnum(profiel),
@@ -259,29 +308,26 @@ export function OnttrekkingsstrategieBody({
   )
   const debounced = useDebouncedValue(simConfig, 200)
 
-  // Roadmap M — flex-spending draft: alléén als guardrails + flex aan. De kernel-adapter
-  // leest deze `withdrawal_profile_config`-draft (profiel + flex) zodat de live-sim de
-  // must/nice-split reflecteert; `undefined` = kolom ongewijzigd → gedrag als vandaag.
-  const flexDraftConfig = useMemo<Record<string, unknown> | undefined>(() => {
-    if (!isGuardrails || !flexNiceOnly) return undefined
-    return {
-      profiel: 'guardrails',
-      flex_nice_only: true,
-      flex_nice_fractie: flexNicePct / 100,
-      flex_cut_step: flexCutPct / 100,
-    }
-  }, [isGuardrails, flexNiceOnly, flexNicePct, flexCutPct])
-  const debouncedFlex = useDebouncedValue(flexDraftConfig, 200)
+  // Live-sim-draft = de VOLLEDIGE kandidaat-`withdrawal_profile_config` (profiel +
+  // 3-fasen-curve + flex-spending), identiek aan wat Opslaan wegschrijft. De
+  // kernel-adapter leest die kolom, dus schuiven aan een fase-grens/factor verandert
+  // de projectie — en dus de FIRE-delta-footer — meteen mee. De baseline draait
+  // bewust ZONDER override en blijft dus de opgeslagen waarheid.
+  const draftProfileConfig = useMemo(
+    () => buildProfileConfig({ profiel, curve, flexNiceOnly, flexNicePct, flexCutPct }),
+    [profiel, curve, flexNiceOnly, flexNicePct, flexCutPct],
+  )
+  const debouncedProfileConfig = useDebouncedValue(draftProfileConfig, 200)
 
   const { baseline, draftProj } = useMemo(() => {
     if (!simSnapshot) return { baseline: EMPTY_PROJ, draftProj: EMPTY_PROJ }
     const baseline = runRegelProjection(simSnapshot)
     const draftProj = runRegelProjection(simSnapshot, {
       withdrawalStrategy: { ...debounced },
-      withdrawalProfileConfig: debouncedFlex,
+      withdrawalProfileConfig: debouncedProfileConfig,
     })
     return { baseline, draftProj }
-  }, [simSnapshot, debounced, debouncedFlex])
+  }, [simSnapshot, debounced, debouncedProfileConfig])
 
   const curveChanged =
     showsCurve && JSON.stringify(curve) !== JSON.stringify(savedCurve)
@@ -304,25 +350,14 @@ export function OnttrekkingsstrategieBody({
       setSaving(true)
       setError(null)
       try {
-        // withdrawal_profile_config: profiel altijd; curve alleen bij afnemend/oplopend;
-        // flex-spending (must/nice) alleen bij guardrails.
-        const profileConfig: Record<string, string | number | boolean> = { profiel }
-        if (showsCurve) {
-          profileConfig.gogo_tot_leeftijd = curve.gogoTotLeeftijd
-          profileConfig.gogo_pct = curve.gogoPct
-          profileConfig.slowgo_tot_leeftijd = curve.slowgoTotLeeftijd
-          profileConfig.slowgo_pct = curve.slowgoPct
-          profileConfig.nogo_pct = curve.nogoPct
-        }
-        if (isGuardrails) {
-          // Roadmap M — must/nice. Vlag altijd meeschrijven (ook 'uit' expliciet wissen);
-          // fractie/cut-step alleen als de vlag aan staat.
-          profileConfig.flex_nice_only = flexNiceOnly
-          if (flexNiceOnly) {
-            profileConfig.flex_nice_fractie = flexNicePct / 100
-            profileConfig.flex_cut_step = flexCutPct / 100
-          }
-        }
+        // Zelfde payload als de live-sim-preview draaide (één bron: buildProfileConfig).
+        const profileConfig = buildProfileConfig({
+          profiel,
+          curve,
+          flexNiceOnly,
+          flexNicePct,
+          flexCutPct,
+        })
         const res = await fetch('/api/withdrawal-strategy', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -351,13 +386,11 @@ export function OnttrekkingsstrategieBody({
     }
   }, [
     profiel,
-    showsCurve,
     curve,
     grFloor,
     grCeiling,
     grCut,
     grRaise,
-    isGuardrails,
     flexNiceOnly,
     flexNicePct,
     flexCutPct,
@@ -473,8 +506,8 @@ export function OnttrekkingsstrategieBody({
             />
           </div>
           <p className="mt-3 text-[10px] text-[var(--ink-3)] italic leading-snug">
-            De curve wordt nu al opgeslagen; de vrijheidsgrafiek hieronder toont voorlopig het
-            vaste profiel (de nieuwe rekenkern past de fasen straks live toe).
+            De vrijheidsgrafiek hieronder rekent je fasen meteen mee: verschuif een grens of
+            factor en je ziet je vrijheidsdatum live meebewegen.
           </p>
         </div>
       )}
@@ -587,16 +620,7 @@ export function OnttrekkingsstrategieBody({
 
       {/* Live impact */}
       <div className="mt-6">
-        <div className="flex items-center justify-between gap-2">
-          <SubsectionLabel>Impact op je vrijheidspad</SubsectionLabel>
-          {/* Eerlijke disclosure óók bij de grafiek zelf: bij Afnemend/Oplopend
-              toont de v2-engine nog het vaste profiel (zie de curve-uitleg boven). */}
-          {showsCurve && (
-            <span className="mb-2 shrink-0 rounded-full border border-[var(--border-ed)] bg-[var(--subtle)]/50 px-2 py-0.5 text-[10px] font-medium text-[var(--ink-3)]">
-              Grafiek toont nog het vaste profiel
-            </span>
-          )}
-        </div>
+        <SubsectionLabel>Impact op je vrijheidspad</SubsectionLabel>
         <LiveSimImpact baseline={baseline} draft={draftProj} />
       </div>
     </div>

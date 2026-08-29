@@ -4,6 +4,7 @@ import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { parseBody } from '@/lib/api/parse-body'
 import { conflict, notFound, serverError, unauthorized } from '@/lib/api/respond'
 import { ibanWriteColumns } from '@/lib/bank-account-iban'
+import { ownershipWriteColumns } from '@/lib/bank-account-visibility'
 import { ACCOUNT_TYPES } from '@/lib/account-types'
 
 /**
@@ -57,6 +58,22 @@ const PatchSchema = z.object({
   bank_name: z.string().trim().max(120).nullable().optional(),
   account_type: z.enum(AccountTypeValues).optional(),
   balance: z.number().finite().optional(),
+  /**
+   * Per-rekening zichtbaarheid in het huishouden (ADR 0118).
+   *
+   * Eén veld, twee kolommen: de client stuurt alléén de zichtbaarheid en de
+   * server leidt `ownership` eruit af (`ownershipWriteColumns`). `ownership`
+   * apart accepteren zou de twee uit de pas kunnen laten lopen — de
+   * CHECK-constraint weigert dat wel, maar dan als 500 op een verzoek dat de
+   * client redelijkerwijs correct dacht te doen. Beter is één veld waar de
+   * invariant niet ovértreedbaar is.
+   *
+   * Bewust GEEN `z.enum(PARTNER_VISIBILITY_VALUES)`: die constante is
+   * `readonly` en zod verlangt hier een muteerbare tuple. De waarden staan
+   * daarom letterlijk; `ownershipWriteColumns` typecheckt ze alsnog tegen
+   * `PartnerVisibility`.
+   */
+  partner_visibility: z.enum(['none', 'balance', 'full']).optional(),
 })
 
 export async function PATCH(
@@ -82,6 +99,11 @@ export async function PATCH(
     // De drie IBAN-kolommen altijd als één blok — nooit los, zie
     // `lib/bank-account-iban.ts`.
     if (body.iban !== undefined) Object.assign(updates, ibanWriteColumns(body.iban))
+    // `ownership` + `partner_visibility` altijd als één blok — zie
+    // `lib/bank-account-visibility.ts`. De DB-CHECK is de vangrail eronder.
+    if (body.partner_visibility !== undefined) {
+      Object.assign(updates, ownershipWriteColumns(body.partner_visibility))
+    }
 
     const { data, error } = await supabase
       .from('bank_accounts')

@@ -63,32 +63,16 @@ export function shouldShowLiquidWealthLine(
 }
 
 /**
- * Staat de besteedbaar-lijn STANDAARD aan? (Alleen betekenisvol wanneer
- * `shouldShowLiquidWealthLine` al waar is — anders is er geen lijn en dus ook
- * geen toggle.)
- *
- * De lijn zit sinds de "te druk"-melding achter een eigen pill naast de
- * Doel-pill; de grafiek opent daardoor met twee lijnen in plaats van vijf (de
- * J-drempel hangt code-technisch aan de lijn en valt automatisch mee weg — zie
- * `showExclTargetLine` in components/app/horizon/chart-static-layers.tsx).
- *
- * De standaardstand hangt aan de woonstrategie, niet aan één vaste keuze:
- *  - `exclude_from_fire` (selector "Uitsluiten") → **AAN**. Daar is zonder-woning
- *    het hoofdverhaal: de voortgangsbalk en het vrijheids-% staan er al op die
- *    grondslag (`homeExcludedFromProgress` in horizon-client), dus zónder de lijn
- *    loopt de grafiek zichtbaar uit de pas met de balk eronder.
- *  - `downsize` / `reverse_mortgage` → **UIT**. Daar is de totaallijn het
- *    hoofdverhaal en is de besteedbaar-lijn verdieping die je erbij zet.
- *  - `include_full` → n.v.t.; daar bestaat de lijn niet (J ≡ I).
- *
- * NB: dit is de *default*, geen dwang — de gebruikersvoorkeur (per apparaat)
- * wint zodra die gezet is.
+ * ## Standaardstand van de tweede lijn (verwijderd, ADR 0114 D5)
+ * Hier stond `defaultLiquidWealthLineVisible`: AAN bij `exclude_from_fire`, UIT
+ * bij de rest. Die uitzondering bestond om precies één reden — bij "Uitsluiten"
+ * stond de voortgangsbalk al op J terwijl de grafiek op I stond, dus zonder die
+ * tweede lijn liep de grafiek zichtbaar uit de pas met de balk eronder. Sinds de
+ * PRIMAIRE lijn daar zélf op J staat (`primaryChartBasis` hieronder) is die reden
+ * vervallen, en een standaard-AAN tweede lijn zou de "te druk"-melding die spoor A
+ * oploste opnieuw openen. De tweede lijn staat daarom in álle strategieën
+ * standaard UIT; de opgeslagen gebruikersvoorkeur (per apparaat) wint daarna.
  */
-export function defaultLiquidWealthLineVisible(
-  mode: HousingStrategyConfig['mode'],
-): boolean {
-  return mode === 'exclude_from_fire'
-}
 
 /**
  * Minimale rij-vorm die de lijn nodig heeft. `UnifiedProjectionRow` voldoet
@@ -100,27 +84,86 @@ export type LiquidWealthRow = {
   age: number
   /** Netto LIQUIDE vermogen aan het EINDE van dit jaar (Prognose!J). */
   nettoLiquide: number
+  /** Netto LIQUIDE vermogen aan het BEGIN van dit jaar (Prognose!J op de
+   *  vorige blokrand; op rij 0 het J(0)-anker uit de potten). Alleen rij 0
+   *  wordt gebruikt — als seed voor het beginpunt van de reeks.
+   *
+   *  Optioneel, spiegel van `UnifiedProjectionRow.startNettoLiquide`: de
+   *  kernel-bridge vult 'm altijd, test-/preview-rijfabrieken mogen 'm weglaten.
+   *  Ontbreekt hij, dan komt er géén seed — de reeks begint dan op de eerste
+   *  jaargrens, precies zoals vóór het anker. Bewust geen terugval op een
+   *  I-waarde: dat zou de twee grondslagen op één lijn mengen. */
+  startNettoLiquide?: number
 }
 
 /**
  * Zet projectierijen om naar `[leeftijd, besteedbaar]`-punten voor `SimChart`.
  *
- * X-conventie identiek aan de hoofdlijn: die plot per rij de EINDwaarde op
- * `age + 1` (het punt op leeftijd A is de stand aan het begin van jaar A). De
- * besteedbare lijn volgt exact dezelfde as, zodat een crosshair op leeftijd A
- * beide grootheden op hetzelfde moment leest. Gevolg: de lijn begint één jaar
- * ná de hoofdlijn — de kernel levert geen begin-stand voor het liquide vermogen
- * en die wordt hier bewust NIET verzonnen.
+ * X-conventie identiek aan de totaallijn (`simRowsToChartPoints` in
+ * `lib/horizon/sim-chart-geometry.ts`): een seed op de beginleeftijd met de
+ * BEGINstand, daarna per rij de EINDwaarde op `age + 1`. Zo leest een crosshair
+ * op leeftijd A beide grootheden op hetzelfde moment.
  *
- * Niet-eindige waarden worden overgeslagen (defensief tegen een half gevulde rij).
+ * ## Het J(0)-anker (2026-08-29, ADR 0114)
+ * Deze reeks begon eerder bewust op `age + 1`: de kernel leverde geen beginstand
+ * voor het liquide vermogen, en die werd hier terecht niet verzonnen. Sinds de
+ * kernel `UnifiedProjectionRow.startNettoLiquide` levert (de J-spiegel van
+ * `startNetWorth`, herleid uit dezelfde TS!H-vlag als Prognose!L/M) is dat gat
+ * dicht en seedt de reeks net als de totaallijn. Dat is een voorwaarde om deze
+ * reeks als PRIMAIRE lijn te kunnen tekenen — zonder anker zou de hoofdlijn een
+ * jaar later beginnen dan de as suggereert — en het corrigeert meteen de
+ * secundaire lijn, die er één jaar te laat aan begon.
+ *
+ * Nog steeds geen eigen som: het anker wordt geconsumeerd, niet berekend.
+ *
+ * Niet-eindige waarden worden overgeslagen (defensief tegen een half gevulde rij);
+ * een niet-eindig anker levert simpelweg geen seed, en de reeks begint dan zoals
+ * voorheen op de eerste jaargrens.
  */
 export function buildLiquidWealthPoints(
   rows: readonly LiquidWealthRow[],
 ): [number, number][] {
   const points: [number, number][] = []
+  const seed = rows[0]
+  if (seed !== undefined && Number.isFinite(seed.age) && Number.isFinite(seed.startNettoLiquide)) {
+    points.push([seed.age, seed.startNettoLiquide as number])
+  }
   for (const row of rows) {
     if (!Number.isFinite(row.nettoLiquide) || !Number.isFinite(row.age)) continue
     points.push([row.age + 1, row.nettoLiquide])
   }
   return points
+}
+
+/**
+ * Op welke GRONDSLAG staat de PRIMAIRE (massieve, fasegekleurde) lijn van de
+ * Toekomst-grafiek? Eén bron voor die keuze — de grafiek, de doellijn-rollen,
+ * de legenda, de tooltip en de marktcheck-band lezen 'm allemaal hier, zodat ze
+ * niet uiteen kunnen lopen.
+ *
+ * ## Herroeping van "de hoofdlijn blijft in alle vier de modi netWorth" (ADR 0114)
+ * Dat besluit stond hierboven in deze module en in de woonstrategie-entry van
+ * `lib/architecture/calculations.ts`, met als motivering dat een grondslagwissel
+ * een nieuw veld op het gedeelde `SimRow`-contract zou vragen. Die premisse is
+ * vervallen: de wissel woont in de GRAFIEKLAAG (`primaryBasis` op
+ * `SimChartGeometryInput`), `SimRow` blijft ongemoeid.
+ *
+ * De wissel geldt uitsluitend bij `exclude_from_fire` ("Uitsluiten"). Daar — en
+ * alleen daar — staan de voortgangsbalk en het vrijheids-% eronder al op de
+ * J-grondslag (`selectFreedomProgressBasis`, ADR 0034), stond de grafiek dus
+ * aantoonbaar op een ándere grootheid dan de balk, en solvet de kernel de
+ * FIRE-maand al op J — waardoor de FIRE-stip nu exact op de J-drempel landt in
+ * plaats van ernaast.
+ *
+ *  - `downsize` / `reverse_mortgage` → `'total'`. De woning wordt daar
+ *    uiteindelijk besteedbaar; het totaal is het hoofdverhaal en de kloof is
+ *    tijdelijk resp. groeiend — dat lees je juist tegen de totaallijn af.
+ *  - `include_full` → `'total'`, en zonder eigen woning idem: J ≡ I exact, dus
+ *    de keuze is daar betekenisloos.
+ */
+export function primaryChartBasis(
+  context: HousingContext,
+  mode: HousingStrategyConfig['mode'],
+): 'total' | 'liquid' {
+  return context.hasEigenHuis && mode === 'exclude_from_fire' ? 'liquid' : 'total'
 }

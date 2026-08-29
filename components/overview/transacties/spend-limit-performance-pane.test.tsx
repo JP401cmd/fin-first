@@ -76,7 +76,16 @@ function budgetPot(over: Partial<SpendLimitConfig>): SpendLimitWithReport {
   return {
     config,
     report: buildSpendLimitReport({
-      rule: { ruleType: 'budget', limitAmount: config.limitAmount, period: 'month' },
+      // `createdAt` gaat mee zoals de loader hem meegeeft: zonder dat veld past de
+      // motor de aanmaak-ondergrens niet toe (trend, score én — sinds ADR 0119 —
+      // het prognosebedrag), en zou deze helper een pot doorrekenen die in
+      // productie niet kan bestaan.
+      rule: {
+        ruleType: 'budget',
+        limitAmount: config.limitAmount,
+        period: 'month',
+        createdAt: config.createdAt,
+      },
       rows: [row('2026-07', 150), row('2026-06', 240)],
       now: NOW,
       windowPeriods: SPEND_LIMIT_WINDOW_BY_PERIOD.month,
@@ -315,5 +324,31 @@ describe('SpendLimitPerformancePane — uitsplitsing per naam', () => {
 
     expect(screen.getByText(`Samen is dat ≈ ${verwacht} vrijheid`)).toBeTruthy()
     expect(screen.queryByText(`Samen is dat ≈ ${fout} vrijheid`)).toBeNull()
+  })
+})
+
+describe('SpendLimitPerformancePane — tempo van de lopende periode (ADR 0119)', () => {
+  it('toont de tempo-regel, het prognosebedrag en de beperking van het model', () => {
+    // NOW = 15 augustus 2026 ⇒ 15 van 31 dagen om = 48%.
+    // De pane rendert in een portal, dus lezen we de body en niet de container.
+    renderPane(budgetPot({}))
+    const text = document.body.textContent ?? ''
+    expect(text).toContain('48% van augustus 2026 voorbij')
+    expect(text).toContain('In dit tempo kom je uit op')
+    // De pane is het oppervlak waar de bekende zwakte hóórt te staan.
+    expect(text).toContain('Geschat op je eigen tempo')
+    expect(text).toContain('vaste last aan het begin')
+    // En de invariant staat er letterlijk bij.
+    expect(text).toContain('niet mee voor je stand, je reeks of je score')
+  })
+
+  it('meldt de historie-drempel i.p.v. een bedrag te verzinnen', () => {
+    // Pot aangemaakt op 20 juli 2026: geen enkele afgesloten periode begint
+    // volledig ná die datum, dus geen basistempo — wél de tempo-markering.
+    renderPane(budgetPot({ createdAt: '2026-07-20T00:00:00Z' }))
+    const text = document.body.textContent ?? ''
+    expect(text).toContain('48% van augustus 2026 voorbij')
+    expect(text).not.toContain('In dit tempo kom je uit op')
+    expect(text).toContain('Nog geen schatting van het eindbedrag')
   })
 })

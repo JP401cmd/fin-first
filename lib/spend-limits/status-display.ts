@@ -21,7 +21,7 @@
  * niet `kern-*`.
  */
 
-import type { SpendLimitScoreLabel, SpendLimitStatus } from './engine'
+import type { SpendLimitPeriodPace, SpendLimitScoreLabel, SpendLimitStatus } from './engine'
 
 /** De drie standen die elk oppervlak toont. */
 export type SpendLimitDisplayStatus = 'within' | 'near' | 'exceeded'
@@ -93,6 +93,40 @@ export const SPEND_LIMIT_SCORE_TEXT_CLASS: Record<SpendLimitScoreLabel, string> 
   netjes: 'text-[var(--score-ok)]',
   wisselend: 'text-[var(--score-warn)]',
   los: 'text-[var(--score-bad)]',
+}
+
+/**
+ * DE TEMPO-REGEL van de lopende periode, in één zin — "3% van augustus 2026
+ * voorbij · 80% van je grens gebruikt".
+ *
+ * Staat hier en niet drie keer in een component, om exact de reden waarom
+ * `resolveSpendLimitDisplayStatus` hier staat: dezelfde zin op drie oppervlakken
+ * met drie eigen afrondingen is drift zodra iemand ze naast elkaar ziet.
+ *
+ * DIT IS WEERGAVE, GEEN BEREKENING. De fracties komen kant-en-klaar uit
+ * `computeSpendLimitPace`; hier wordt alleen afgerond. Twee afrondingsregels zijn
+ * bewust:
+ *
+ *  - een verstreken-fractie die op 0% zou afronden (1 januari van een jaarpot)
+ *    wordt "minder dan 1%" en NOOIT naar boven bijgeplust. De tempo-regel wordt
+ *    naast het gebruikte percentage gelezen; verstreken tijd overdrijven maakt een
+ *    te hoog verbruik juist onschuldiger dan het is;
+ *  - een NEGATIEF gebruikt-percentage (netto refunds) wordt op 0 geklemd: voor een
+ *    UITGAVENgrens is "per saldo niets van je grens gebruikt" precies wat een
+ *    negatief netto bedrag betekent.
+ *
+ * Bevat geen enkel bedrag — daarom blijft deze regel leesbaar onder bedrag-
+ * maskering (ADR 0091), terwijl het prognosebedrag ernaast wél maskeert.
+ */
+export function describeSpendLimitPace(pace: SpendLimitPeriodPace, periodLabel: string): string {
+  const elapsedPct = Math.round(pace.elapsedFraction * 100)
+  const elapsed =
+    elapsedPct < 1
+      ? `minder dan 1% van ${periodLabel} voorbij`
+      : `${elapsedPct}% van ${periodLabel} voorbij`
+  if (pace.usedFraction === null) return elapsed
+  const usedPct = Math.max(0, Math.round(pace.usedFraction * 100))
+  return `${elapsed} · ${usedPct}% van je grens gebruikt`
 }
 
 export const SPEND_LIMIT_SCORE_COLOR_VAR: Record<SpendLimitScoreLabel, string> = {

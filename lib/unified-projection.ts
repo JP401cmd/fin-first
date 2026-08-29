@@ -223,6 +223,23 @@ export interface UnifiedProjectionRow {
    * vermogen" naast de FIRE-doellijn, die op dezelfde J-grondslag staat.
    */
   nettoLiquide: number
+  /**
+   * Prognose!J aan het BEGIN van het jaar-blok (m = 12k−1; k = 0 → de beginstand uit
+   * de potten via `jaarrand.ts#startNettoLiquide`): netto LIQUIDE vermogen, excl.
+   * niet-liquide bezit zoals de eigen woning.
+   *
+   * GRONDSLAG-WAARSCHUWING: dit is de J-spiegel van `startNetWorth`, NIET van
+   * `netWorth` — `startNetWorth` (Prognose!I begin blok) telt het niet-liquide bezit
+   * mee, dit veld niet. Meng ze nooit op één Y-as of marker (CLAUDE.md-conventie):
+   * wil een grafiek zijn primaire lijn op de J-grondslag tekenen, dan moeten ÓÓK de
+   * beginstand en een eventuele onzekerheidsband op J staan, anders omhult de band
+   * een andere grootheid dan de lijn die erin ligt. Bij `include_full` is niets
+   * niet-liquide en geldt `startNettoLiquide === startNetWorth` exact (net als J ≡ I).
+   *
+   * Optioneel omdat test-/preview-rijfabrieken het veld mogen weglaten (zelfde
+   * afspraak als `totalGrowthLiquide`); de kernel-bridge zet het altijd.
+   */
+  startNettoLiquide?: number
 
   // ── Kasstromen ────────────────────────────────────────────
   /**

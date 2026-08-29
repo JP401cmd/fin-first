@@ -257,3 +257,35 @@ describe('toSpendLimitWidgetData — projectie pint de motoruitvoer', () => {
     expect(w.period).toBe('quarter')
   })
 })
+
+describe('toSpendLimitWidgetData — het tempo reist mee als BLOK, ongewijzigd', () => {
+  it('kopieert report.currentPeriodPace zonder er iets aan te rekenen', () => {
+    // NOW = 15 augustus 2026, dus 15 van de 31 dagen om.
+    const limit = build([row('2026-05', 95), row('2026-06', 95), row('2026-07', 95), row('2026-08', 60)])
+    const w = toSpendLimitWidgetData(limit)
+
+    expect(w.pace).not.toBeNull()
+    // Identiteitsgelijkheid, geen veld-voor-veld hertik: de projectie MAG hier
+    // niets herbouwen — dan zou een nieuw motorveld stil wegvallen.
+    expect(w.pace).toBe(limit.report.currentPeriodPace)
+    expect(w.pace?.elapsedDays).toBe(15)
+    expect(w.pace?.periodDays).toBe(31)
+    expect(w.pace?.remainingDays).toBe(16)
+  })
+
+  it('geeft null door voor een dag- en een weekpot (die hebben geen tempo)', () => {
+    // Geen rijen nodig: de uitsluiting hangt aan de periodeSOORT, niet aan data.
+    const dag = build([], config({ period: 'day', id: 'POT-D' }))
+    const week = build([], config({ period: 'week', id: 'POT-W' }))
+    expect(toSpendLimitWidgetData(dag).pace).toBeNull()
+    expect(toSpendLimitWidgetData(week).pace).toBeNull()
+  })
+
+  it('laat het prognosebedrag weg zolang de pot te weinig eigen historie heeft', () => {
+    const cfg = config({ createdAt: '2026-07-20T00:00:00Z' })
+    const w = toSpendLimitWidgetData(build([row('2026-07', 95), row('2026-08', 60)], cfg))
+    // De markering is er (kalenderfeit), het bedrag niet (historie-poort).
+    expect(w.pace?.elapsedFraction).toBeGreaterThan(0)
+    expect(w.pace?.projectedAmount).toBeNull()
+  })
+})

@@ -4,7 +4,8 @@
  * SpendLimitPerformancePane — het leesoppervlak van één grenzenpot: verloop,
  * reeks, trend en de uitsplitsing achter het bedrag.
  *
- * euro-view: exempt (gerealiseerde historie)
+ * euro-view: exempt (gerealiseerde historie + één geprojecteerd bedrag binnen
+ * dezelfde kalenderperiode — ADR 0119; nominaal, dus geen deflator)
  *
  * ── VORM: <ShellOverlay kind="pane"> (D5, ADR 0039) ─────────────────────────
  * De sectie gebruikt `sheet` voor het formulier en `confirm` voor archiveren; die
@@ -43,10 +44,18 @@ import { Kicker } from '@/components/editorial'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useSpendLimitCopy } from '@/lib/hooks/use-spend-limit-alias'
 import { calculateFreedomTime, formatFreedomTimeString, formatMaskedCurrency } from '@/lib/format'
-import { SPEND_LIMIT_GRAIN_BY_PERIOD } from '@/lib/spend-limits/engine'
-import type { SpendLimitPeriodOutcome, SpendLimitTrend } from '@/lib/spend-limits/engine'
+import {
+  SPEND_LIMIT_GRAIN_BY_PERIOD,
+  SPEND_LIMIT_PACE_MIN_PERIODS,
+} from '@/lib/spend-limits/engine'
+import type {
+  SpendLimitPeriodOutcome,
+  SpendLimitPeriodPace,
+  SpendLimitTrend,
+} from '@/lib/spend-limits/engine'
 import { budgetAttention, describeRule, describeRules } from '@/lib/spend-limits/describe'
 import {
+  describeSpendLimitPace,
   resolveSpendLimitDisplayStatus,
   SPEND_LIMIT_STATUS_BAND_CLASS,
   SPEND_LIMIT_STATUS_LABEL,
@@ -160,6 +169,62 @@ function FreedomLine({
     <p className="mt-0.5 font-serif text-xs italic text-[var(--ink-3)]">
       {prefix} ≈ {time} vrijheid
     </p>
+  )
+}
+
+/**
+ * HET TEMPO van de lopende periode — de volledige vorm, inclusief uitleg van het
+ * model (ADR 0119). Dit is het oppervlak waar de beperking van de schatting
+ * hóórt te staan; de tegel en de kaart tonen alleen de uitkomst.
+ *
+ * Alles komt uit `report.currentPeriodPace`: geen datumrekenwerk, geen eigen
+ * deling, geen tweede drempel. De zin en zijn afronding hebben één eigenaar
+ * (`describeSpendLimitPace`).
+ */
+function PaceBlock({
+  pace,
+  periodLabel,
+}: {
+  pace: SpendLimitPeriodPace | null
+  periodLabel: string
+}) {
+  if (!pace) return null
+  const hasProjection = pace.projectedAmount !== null
+  const missingHistory = pace.baselineDailyAmount === null
+  return (
+    <div className="mt-2 border-t border-[var(--border-ed)]/40 pt-2">
+      <p className="text-xs text-[var(--ink-2)]">{describeSpendLimitPace(pace, periodLabel)}</p>
+      {hasProjection && (
+        <p className="mt-0.5 text-xs text-[var(--ink-2)]">
+          <span className={pace.projectedExceeds ? 'text-negative' : undefined}>
+            In dit tempo kom je uit op{' '}
+            <MaskedAmount
+              value={pace.projectedAmount as number}
+              tone={pace.projectedExceeds ? 'inherit' : 'kern'}
+              className="text-xs"
+            />
+          </span>
+        </p>
+      )}
+      {/* De beperking staat er BIJ, niet weggepoetst: een vaste last aan het begin
+          van de periode (huur, verzekering) laat het historische dagtempo bovenop
+          een al-geboekte eenmalige post vallen en maakt de schatting te hoog. */}
+      {hasProjection && (
+        <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">
+          Geschat op je eigen tempo over de laatste{' '}
+          {pace.basisPeriodCount === 1 ? 'afgesloten periode' : `${pace.basisPeriodCount} afgesloten periodes`}
+          , verdeeld over de resterende {pace.remainingDays === 1 ? 'dag' : `${pace.remainingDays} dagen`}. Staat er
+          een vaste last aan het begin van je periode, dan valt de schatting te hoog uit. Hij telt
+          niet mee voor je stand, je reeks of je score.
+        </p>
+      )}
+      {missingHistory && (
+        <p className="mt-0.5 font-serif text-[11px] italic text-[var(--ink-3)]">
+          Nog geen schatting van het eindbedrag: daarvoor zijn {SPEND_LIMIT_PACE_MIN_PERIODS}{' '}
+          afgesloten periodes ná het aanmaken van deze grens nodig.
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -518,6 +583,7 @@ function PaneBody({
             dailyExpenseRate={dailyExpenseRate}
             prefix={over ? 'Die overschrijding is' : 'Die ruimte is'}
           />
+          <PaceBlock pace={report.currentPeriodPace} periodLabel={current.label} />
           {/* De score gaat over je historie, niet over deze periode — hij staat
               er bewust ONDER de scheidingslijn en draagt het woord "score". */}
           {report.score.score !== null && (

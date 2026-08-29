@@ -114,6 +114,12 @@ export interface ConvergentieRawContext {
   readonly taxYear?: TaxYear
   /** Jaaruitgaven (reëel/koopkracht-nu) voor de bridge-`implicitWithdrawalRate`. */
   readonly yearlyExpenses: number
+  /**
+   * ADR 0117 — jaargelaagde markt-volatiliteit (`fire_assumptions.volatility`,
+   * decimaal) voor MC!B3. Weglaten → de kernel-default (`DEFAULT_VOLATILITY`).
+   * Draagt de MARKTCHECK-breedte; raakt de hoofdprojectie niet.
+   */
+  readonly marktVolatiliteit?: number
 }
 
 /**
@@ -159,6 +165,7 @@ export function computeConvergentieProjection(
       lifeEvents: rawContext.lifeEvents,
       aowRows: rawContext.aowRows,
       taxYear: rawContext.taxYear,
+      marktVolatiliteit: rawContext.marktVolatiliteit,
     }
     const { result } = runKernelUnified({
       adapterInput,
@@ -212,6 +219,7 @@ export function computeMarktcheck(params: {
       lifeEvents: rawContext.lifeEvents,
       aowRows: rawContext.aowRows,
       taxYear: rawContext.taxYear,
+      marktVolatiliteit: rawContext.marktVolatiliteit,
     }
     const { input } = buildKernelInputFromAppWithNotices(adapterInput)
     return runMarktcheckOnKernelInput(input, {

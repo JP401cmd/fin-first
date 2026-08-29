@@ -16,7 +16,7 @@
  */
 
 import type { TaxYear } from '@/lib/box3-data'
-import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '@/lib/constants'
+import { DEFAULT_VOLATILITY, NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '@/lib/constants'
 import type { AowBasisPerMaand } from '../types'
 
 /**
@@ -130,6 +130,20 @@ export const EXCEL_WONING_DEFAULTS = {
 export const EXCEL_ONZEKERHEID_DEFAULTS = {
   /** MC!B1 — aantal runs. */
   mcAantalRuns: 200,
-  /** MC!B3 — sigma (jaarvolatiliteit gedeelde marktschok). */
-  mcSigma: 0.15,
+  /**
+   * MC!B3 — sigma (jaarvolatiliteit gedeelde marktschok), **terugval-laag**.
+   *
+   * ADR 0117 — was tot 29-08-2026 een tweede hardcode `0.15` náást
+   * `DEFAULT_VOLATILITY` in `lib/constants.ts`. Twee bronnen voor één getal: beide
+   * stonden op 0,15, dus er was geen zichtbare drift, maar zette beheer de
+   * jaarlaag `fire_assumptions.volatility` op 0,18 dan veranderde er in de
+   * projectie niets. Nu één bron.
+   *
+   * NB: dit is uitsluitend de APP-pad-terugval. Het oracle-fixture-pad leest
+   * MC!B3 rechtstreeks uit de fixture (`input-from-fixture.ts#buildMc`) en komt
+   * hier nooit langs — de Excel-pariteit hangt dus niet aan deze waarde. De
+   * volledige precedentie is: `KernelAdapterInput.marktVolatiliteit`
+   * (= jaarlaag `fire_assumptions.volatility`) → deze constante.
+   */
+  mcSigma: DEFAULT_VOLATILITY,
 } as const

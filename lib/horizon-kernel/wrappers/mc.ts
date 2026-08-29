@@ -30,6 +30,13 @@
  * `shift` kan de per-pot-ruis niet dragen; daarom het per-pot rendement-overschrijf
  * op de invoer, conform de opdracht.)
  *
+ * Sinds **ADR 0117** wordt élke ruisterm nog geschaald met de markt-risicofactor van
+ * de pot (`wrappers/risico.ts#potRisicoFactor`) — de binaire `investering`-vlag is
+ * daarmee de TERUGVAL geworden, niet meer de poort. Ontbreekt de factor (het
+ * fixture-pad zet 'm nooit) dan is de factor `investering ? 1 : 0` en verandert er
+ * geen bit; met de factor krijgt een obligatiepot effectief 0,3·σ, een aandelenpot
+ * 1,4·σ en beweegt een premieregeling-pensioenpot voor het eerst überhaupt mee.
+ *
  * De live FIRE-leeftijd komt uit `solveFire` (de VBA draait vóór RunMonteCarlo
  * BepaalFIRE, die P!B16 op de echte solver-uitkomst zet — mét pensioen-kortsluiting).
  *
@@ -42,7 +49,14 @@
  * ligt per constructie op dezelfde leeftijdsas en dezelfde grondslag als de
  * hoofdlijn van de Toekomst-grafiek.
  *
- * `band` en `sustainProbability` zijn AFGELEIDE, EXTRA velden: `outcomes` en
+ * Naast die I-band bewaart de wrapper per run ook de netto-LIQUIDE-reeks
+ * (Prognose!J) op DEZELFDE blokranden → `bandLiquide`. Nodig omdat de Toekomst-grafiek
+ * haar primaire lijn per woonstrategie van grondslag laat wisselen (I bij meetellen,
+ * J bij uitsluiten): blijft de band dan op I terwijl de lijn J wordt, dan omhult de
+ * band een ándere grootheid dan de lijn die erin ligt — en de bandtop bepaalt ook nog
+ * eens de ashoogte mee. Grondslagvermenging op één Y-as is verboden (CLAUDE.md).
+ *
+ * `band`, `bandLiquide` en `sustainProbability` zijn AFGELEIDE, EXTRA velden: `outcomes` en
  * `successProbability` blijven cel-exact het Excel-oracle (`test/horizon-oracle/
  * parity-mc.test.ts` toetst uitsluitend die twee). Bak hier dus nooit een
  * afwijking van MC!B8 in — voeg een afgeleid veld toe.
@@ -55,8 +69,9 @@ import { solveFire } from '../solver'
 import { computeEs, type EsRow } from '../tables/es'
 import type { KernelInput } from '../types'
 import { computeGap } from '../gap'
-import { nettoVermogenPerLeeftijd } from '../jaarrand'
+import { nettoLiquidePerLeeftijd, nettoVermogenPerLeeftijd } from '../jaarrand'
 import { potIdiosyncraticNoise, sharedMarketShock } from './noise'
+import { potRisicoFactor } from './risico'
 
 /**
  * Percentielband over de MC-runs, op de grondslag **netto vermogen** (Prognose!I,
@@ -112,8 +127,21 @@ export interface MonteCarloResult {
   readonly runs: number
   /** Aantal engine-runs (solver + n perturbaties) — voor rapportage. */
   readonly engineRuns: number
-  /** Per-leeftijd percentielband over de runs (grondslag: netto vermogen). */
+  /** Per-leeftijd percentielband over de runs (grondslag: netto vermogen, Prognose!I). */
   readonly band: MonteCarloBand
+  /**
+   * Dezelfde percentielband op de netto-LIQUIDE grondslag (Prognose!J) — de J-spiegel
+   * van `band`, uit `nettoLiquidePerLeeftijd` op exact dezelfde leeftijdsas, met
+   * dezelfde `buildBand`/`percentiel`-ordestatistiek en dezelfde `startAge`.
+   *
+   * Voor het oppervlak dat zijn primaire lijn op J tekent (woonstrategie "niet
+   * meetellen"): band en lijn MOETEN dan dezelfde grootheid dragen. Bij `include_full`
+   * is niets niet-liquide en is deze band element-voor-element gelijk aan `band`.
+   *
+   * BEWUST een AFGELEID, EXTRA veld, net als `band`/`sustainProbability`: `outcomes`
+   * en `successProbability` blijven byte-identiek aan het Excel-oracle.
+   */
+  readonly bandLiquide: MonteCarloBand
 }
 
 /**
@@ -128,7 +156,11 @@ function percentiel(gesorteerd: readonly number[], q: number): number {
   return gesorteerd[idx]
 }
 
-/** Bouw de percentielband uit de per-run netto-vermogensreeksen. */
+/**
+ * Bouw de percentielband uit de per-run reeksen. Grondslag-agnostisch: dezelfde
+ * ordestatistiek voor de I-band (`band`) en de J-band (`bandLiquide`), zodat de twee
+ * alleen in hun invoerreeks verschillen — niet in hun statistiek.
+ */
 function buildBand(startAge: number, paden: readonly number[][]): MonteCarloBand {
   const lengte = paden.reduce((max, p) => Math.max(max, p.length), 0)
   const p10: number[] = []
@@ -182,17 +214,38 @@ export function runMonteCarlo(input: KernelInput): MonteCarloResult {
   const outcomes: number[] = []
   const sustainOutcomes: number[] = []
   const paden: number[][] = []
+  const padenLiquide: number[][] = []
   for (let i = 1; i <= n; i++) {
-    const shock = sharedMarketShock(i, sigma) // MC!B10 (gedeeld over investeringspotten)
-    // Bak MC!B10 + MC!<col>12 in het rendement van elke investeringspot; niet-
-    // investeringspotten blijven ongemoeid. `onzekerheid.shift` (P!B43) blijft staan.
+    const shock = sharedMarketShock(i, sigma) // MC!B10 (gedeeld over marktgevoelige potten)
+    // Bak MC!B10 + MC!<col>12 in het rendement van elke marktgevoelige pot; potten met
+    // risicofactor 0 blijven ongemoeid. `onzekerheid.shift` (P!B43) blijft staan.
+    //
+    // ADR 0117 — beide ruistermen worden geschaald met de markt-risicofactor
+    // (`wrappers/risico.ts`). Omdat `normInv(u, 0, σ) = σ·x`, is schalen van de
+    // TREKKING identiek aan een per-pot σ: een obligatiepot krijgt effectief 0,3·σ,
+    // een aandelenpot 1,4·σ, en een premieregeling-pensioenpot zit voor het eerst
+    // überhaupt in de simulatie. De seed-reeks (`i`, `p.slot`) verandert niet, dus de
+    // correlatiestructuur — één gedeelde marktschok, per pot verschillend hard —
+    // blijft exact die van het Excel-model.
+    //
+    // Byte-identiteit zonder overlay: zonder `risicoFactor` is de factor
+    // `investering ? 1 : 0`. Bewust `+ shock * f + ruis * f` en NIET
+    // `+ (shock + ruis) * f`: bij f = 1 is `y * 1 === y` exact, waardoor de
+    // OPTELVOLGORDE (en dus de laatste bit) gelijk blijft aan vóór ADR 0117 —
+    // drijvende-komma-optelling is niet associatief. Bij f = 0 gaat de pot
+    // ongewijzigd door. Het fixture-pad zet `risicoFactor` nooit → `parity-mc` blijft
+    // cel-exact.
     const perturbed: KernelInput = {
       ...input,
-      assetPotten: input.assetPotten.map((p) =>
-        p.investering
-          ? { ...p, rendement: p.rendement + shock + potIdiosyncraticNoise(i, p.slot, sigma) }
-          : p,
-      ),
+      assetPotten: input.assetPotten.map((p) => {
+        const factor = potRisicoFactor(p)
+        if (factor === 0) return p
+        return {
+          ...p,
+          rendement:
+            p.rendement + shock * factor + potIdiosyncraticNoise(i, p.slot, sigma) * factor,
+        }
+      }),
     }
     engineRuns += 1
     // Eén VOLLEDIGE projectie op de LIVE FIRE-leeftijd: de run stopt op het
@@ -203,6 +256,7 @@ export function runMonteCarlo(input: KernelInput): MonteCarloResult {
     outcomes.push(successCriterion(input, es, proj, liveFireAge))
     sustainOutcomes.push(computeGap(input, es, proj, liveFireAge) >= 0 ? 1 : 0)
     paden.push(nettoVermogenPerLeeftijd(perturbed, proj))
+    padenLiquide.push(nettoLiquidePerLeeftijd(perturbed, proj))
   }
 
   const gemiddelde = (xs: readonly number[]): number =>
@@ -216,5 +270,6 @@ export function runMonteCarlo(input: KernelInput): MonteCarloResult {
     runs: n,
     engineRuns,
     band: buildBand(Math.round(input.startLeeftijd), paden),
+    bandLiquide: buildBand(Math.round(input.startLeeftijd), padenLiquide),
   }
 }

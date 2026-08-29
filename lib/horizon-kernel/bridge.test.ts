@@ -629,3 +629,72 @@ describe('bridge — totalGrowthLiquide (defect A: rendement exclusief niet-liqu
     expect(row.totalGrowthLiquide).toBeCloseTo(row.totalGrowth, 6)
   })
 })
+
+// ── startNettoLiquide — de J-spiegel van startNetWorth (spoor B, route 1) ────────
+//
+// De Toekomst-grafiek laat haar primaire lijn per woonstrategie van grondslag wisselen
+// (Prognose!I bij "woning meetellen", Prognose!J bij "uitsluiten"). Daarvoor heeft ze
+// naast de EINDstand (`nettoLiquide`) ook de BEGINstand op J nodig — anders zou het
+// eerste punt van een J-lijn nog op de I-grondslag liggen. `buildRow` vult die uit
+// dezelfde blokrand als `startNetWorth`: J(12k−1), en op k = 0 het J(0)-anker uit de
+// potten (`jaarrand.ts#startNettoLiquide`, gefilterd op TS!H — geen tweede afleiding).
+//
+// TOLERANTIE — bewuste keuze per assertie:
+//  · reeks-aansluiting rows[k].startNettoLiquide ↔ rows[k−1].nettoLiquide: EXACT
+//    (`toBe`). Geen herberekening, maar tweemaal DEZELFDE prognose-cel (maand 12k−1)
+//    lezen; élke tolerantie zou een echte afwijking in de bemonsteringsregel juist
+//    verbergen.
+//  · include_full J(0) ↔ I(0): ook EXACT. Zonder niet-liquide categorie reduceren
+//    beide functies over dezelfde arrays in dezelfde volgorde met dezelfde
+//    optel-/aftrek-stappen — bit-identiek, dus "ongeveer gelijk" zou hier zwakker
+//    zijn dan de waarheid.
+//  · exclude_from_fire J(0) = I(0) − huis + hypotheek: ABSOLUTE cent-tolerantie
+//    (`toBeCloseTo(·, 2)` ⇒ |Δ| < €0,005). Hier herschikt de assertie zelf de
+//    optelvolgorde; een relatieve tolerantie past niet, want J(0) mag legitiem dicht
+//    bij nul liggen (huis + hypotheek zijn van dezelfde orde als het hele vermogen)
+//    en zou daar een willekeurig kleine absolute drempel worden.
+describe('bridge — startNettoLiquide (J-spiegel van startNetWorth)', () => {
+  it('rij 0 draagt startNettoLiquide; bij include_full is het exact startNetWorth', () => {
+    const { ctx, solve } = synthContext({ housing_strategy_config: { mode: 'include_full' } })
+    const rows = kernelToUnifiedResult(solve, ctx).rows
+
+    expect(typeof rows[0].startNettoLiquide).toBe('number')
+    expect(Number.isFinite(rows[0].startNettoLiquide as number)).toBe(true)
+    // Niets is niet-liquide ⇒ L = M = 0 ⇒ J(0) ≡ I(0).
+    expect(rows[0].startNettoLiquide).toBe(rows[0].startNetWorth)
+  })
+
+  it('exclude_from_fire: rij 0 ligt op J(0), dus ONDER startNetWorth (huis eruit, hypotheek erbij)', () => {
+    const { ctx, solve } = synthContext({ housing_strategy_config: { mode: 'exclude_from_fire' } })
+    const rows = kernelToUnifiedResult(solve, ctx).rows
+
+    // SYNTH: huis 350k niet-liquide, hypotheek 200k niet-liquide ⇒ J(0) = I(0) − 350k + 200k.
+    expect(rows[0].startNettoLiquide as number).toBeCloseTo(rows[0].startNetWorth - 350_000 + 200_000, 2)
+    expect(rows[0].startNettoLiquide as number).toBeLessThan(rows[0].startNetWorth)
+  })
+
+  it('reeks sluit aan: rows[k].startNettoLiquide === rows[k−1].nettoLiquide (dezelfde blokrand)', () => {
+    for (const mode of ['include_full', 'exclude_from_fire'] as const) {
+      const { ctx, solve } = synthContext({ housing_strategy_config: { mode } })
+      const rows = kernelToUnifiedResult(solve, ctx).rows
+      const last = solve.projection.summary.lastInHorizonMonth
+
+      expect(rows.length).toBeGreaterThan(1)
+      for (let k = 1; k < rows.length; k++) {
+        // Alleen zolang blok k−1 niet door de horizon is afgekapt: dan is zijn
+        // eindmaand 12k−1 en leest de startstand van blok k dezelfde cel.
+        if (12 * k - 1 > last) break
+        expect(rows[k].startNettoLiquide).toBe(rows[k - 1].nettoLiquide)
+        expect(Number.isFinite(rows[k].startNettoLiquide as number)).toBe(true)
+      }
+    }
+  })
+
+  it('elke rij draagt het veld en is eindig (geen undefined-gaten in de reeks)', () => {
+    const { ctx, solve } = synthContext({ housing_strategy_config: { mode: 'exclude_from_fire' } })
+    for (const row of kernelToUnifiedResult(solve, ctx).rows) {
+      expect(row.startNettoLiquide).not.toBeUndefined()
+      expect(Number.isFinite(row.startNettoLiquide as number)).toBe(true)
+    }
+  })
+})

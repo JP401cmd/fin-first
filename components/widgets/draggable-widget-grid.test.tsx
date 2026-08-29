@@ -544,6 +544,7 @@ describe('DraggableWidgetGrid — grenzenpot-widgets', () => {
         scoreHitRatePct: 75,
         scoreBasisPeriodCount: 12,
         aggregateTruncationSuspected: false,
+        pace: null,
       },
     ],
   }
@@ -698,6 +699,7 @@ describe('DraggableWidgetGrid — save-merge zet niets stil uit', () => {
         scoreHitRatePct: null,
         scoreBasisPeriodCount: 0,
         aggregateTruncationSuspected: false,
+        pace: null,
       },
     ],
   }

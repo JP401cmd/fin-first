@@ -5,6 +5,14 @@
  * criterium: ze zijn in de catalogus verwijsregels naar UAT-REKEN-23/24 resp.
  * UAT-NAV-19 en horen daar getoetst te worden (spiegelt lib/uat/catalog.ts).
  *
+ * WF-TOEK-36/37 (woonstrategie-grondslag van de primaire vermogenslijn) zijn
+ * NIEUW t.o.v. het UAT-plan — toegevoegd bij ADR 0114 (29-08-2026, "De primaire
+ * lijn van de Toekomst-grafiek wisselt van grondslag per woonstrategie"): 36
+ * toetst de grondslag-KEUZE exact (twee pure productiefuncties: de grafiek-
+ * grondslag naast de balk-grondslag), 37 toetst de doorwerking op het scherm
+ * (stip/band/drempels/pill/kassabon/tooltip) als consistentie-eis. Beide
+ * spiegelen géén document-workflow.
+ *
  * WF-TOEK-33/34 (euro-weergave, wave 2/3) zijn NIEUW t.o.v. het UAT-plan —
  * toegevoegd voor de wave-2/3-euro-weergave-uitrol (Notion-kaart
  * 39cf9e8d-568a-80fb-8a99-e090c080b964, brok H): 33 toetst de deflatie-math
@@ -144,10 +152,10 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'willem',
     given: 'Persona Willem geladen (basisrendement 6%).',
     when: 'De gebruiker klikt "Scenario\'s" (±2pp → 4%/8%-lijnen) en "Marktcheck" (p25–p75-band + mediaan + de RENDEMENT-MARGE). De pil heette tot 2026-08-08 "Monte Carlo" en toonde een FIRE-kans uit een losstaande motor; daarna kort een "Plan houdt stand"-percentage. Sinds 2026-08-09 staat er een marge: hoeveel het rendement per jaar mag tegenvallen voordat het plan omvalt, getoetst op de GEKOZEN stopleeftijd (of, zonder keuze, op de AOW-leeftijd — de copy noemt dat anker expliciet). Het percentage is verdwenen omdat het op de gesolvede FIRE-leeftijd werd geëvalueerd en daardoor structureel ~51% was, ongeacht het plan.',
-    then: 'De optimistische lijn (8%) toont op elk toekomstig jaar een gelijk-of-hoger vermogen dan de basislijn (6%); de pessimistische (4%) gelijk-of-lager. Richtingstoets, geen exact cijfer. De marktcheck-band toont p25–p75 (niet p10–p90) en de marge beweegt zichtbaar mee met de stop-slider: later stoppen = meer speling. Pil, legenda, explainer en aria-label zeggen alle vier hetzelfde (één copy-bron).',
+    then: 'De optimistische lijn (8%) toont op elk toekomstig jaar een gelijk-of-hoger vermogen dan de basislijn (6%); de pessimistische (4%) gelijk-of-lager. Richtingstoets, geen exact cijfer. De marktcheck-band toont p25–p75 (niet p10–p90) en de marge beweegt zichtbaar mee met de stop-slider: later stoppen = meer speling. Pil, legenda, explainer en aria-label zeggen alle vier hetzelfde (één copy-bron). SINDS ADR 0117 (29-08-2026, allocatie snede 1) loopt de verstoring achter de band/marge niet meer als één uniforme schuif over alle investeringspotten, maar PER POT geschaald met een markt-risicofactor (laag/obligaties ≈0,3×, middel/gespreid 1×, hoog/individuele aandelen-crypto ≈1,4×) — een premieregeling-pensioenpot beweegt daardoor voor het eerst mee. De richting van deze toets verandert daar niet door (hij toetst de I-grondslag-scenariolijnen), maar de breedte van de band/marge kan bij een gemengde portefeuille smaller of breder uitvallen dan vóór ADR 0117.',
     assertion: {
       kind: 'direction',
-      source: 'richtingstoets: 8%-lijn ≥ 6%-basislijn ≥ 4%-lijn per jaar (kernel-scenariolijnen). Marge: lib/horizon-kernel/rendement-marge.ts#computeRendementMarge — monotoon in de stopleeftijd en in de uitgaven, gepind in lib/horizon-kernel/marktcheck.test.ts + rendement-marge.test.ts.',
+      source: 'richtingstoets: 8%-lijn ≥ 6%-basislijn ≥ 4%-lijn per jaar (kernel-scenariolijnen). Marge: lib/horizon-kernel/rendement-marge.ts#computeRendementMarge — monotoon in de stopleeftijd en in de uitgaven, gepind in lib/horizon-kernel/marktcheck.test.ts + rendement-marge.test.ts. Per-pot risicofactor: lib/horizon-kernel/wrappers/risico.ts#potRisicoFactor (ADR 0117) — geraakt WF-TOEK-08/WF-REKEN-18/WF-REKEN-13/14 gelijkelijk, geen apart engine-check hier (geen exact-criterium).',
     },
   },
   {
@@ -300,7 +308,7 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'willem',
     given: 'Persona Willem geladen (geen pension-type event — ABP staat als custom-event).',
     when: 'De gebruiker voegt een pensioenpot toe (€2.200/mnd vanaf leeftijd 62, geïndexeerd) en importeert een mijnpensioenoverzicht.',
-    then: 'Het toevoegen van €2.200/mnd extra pensioeninkomen vanaf leeftijd 62 kan de vrijheidsleeftijd alleen gelijk houden of vervroegen, nooit vertragen (richtingstoets). De jaarruimte-indicatie valt terug op estimateFactorAFromSalary (Factor A niet ingevuld). Het import-/parse-pad is AI-afhankelijk — bevestig het accepteer-pad, niet de parse-kwaliteit.',
+    then: 'Het toevoegen van €2.200/mnd extra pensioeninkomen vanaf leeftijd 62 kan de vrijheidsleeftijd alleen gelijk houden of vervroegen, nooit vertragen (richtingstoets). De jaarruimte-indicatie valt terug op estimateFactorAFromSalary (Factor A niet ingevuld). SINDS ADR 0115 (29-08-2026) is het import-pad GESPLITST: de datadownload van mijnpensioenoverzicht.nl (XML óf JSON, "Specificatie-xml-json-download-v1.2") wordt volledig CLIENT-SIDE en DETERMINISTISCH gelezen — géén AI, géén serverroundtrip, het bestand verlaat het toestel niet (`lib/pension/mijnpensioen-xml.ts#parseMijnpensioenXml` zet de XML-boom om naar exact dezelfde structuur die `JSON.parse()` van de JSON-export oplevert, waarna beide dezelfde mapper/dedup/write-keten volgen — pariteit vergrendeld in mijnpensioen-xml.test.ts). Alleen de LEGACY PDF-route blijft AI-afhankelijk (server-side extractie); bevestig daar het accepteer-pad, niet de parse-kwaliteit. Een XML- en een JSON-export van dezelfde pot deduppen op de genormaliseerde fondsnaam tot één rij (update, geen dubbele pot).',
     assertion: {
       kind: 'direction',
       source: 'richtingstoets: +€2.200/mnd pensioen vanaf 62 → vrijheidsleeftijd gelijk-of-vroeger (kernel).',
@@ -507,6 +515,64 @@ const criteria: AcceptanceCriterion[] = [
         'lib/goal-data.ts#computeGoalProgress — de pace-toets (a/b) is volledig `exact` vergrendeld in lib/goal-data.test.ts (niet hier herhaald: `computeGoalProgress` heeft geen injecteerbare klok, dus een UAT-cijfer op basis van relatieve dagen zou ofwel de testklok namaken ofwel drijven met de daadwerkelijke kalenderdatum — de vitest-suite is al de canonieke, deterministische toets). (c) components/future/doelen-view.tsx#ManualGoalCard (requiredMonthly-regel, EUR-only gate). (d) components/future/doelen-view.tsx#isVrijheidsgetalGoal + live-prop vanuit app/(app)/toekomst/doelen/page.tsx#vrijheidsgetalLive (FinPageData, lib/goals/vrijheidsgetal-goal.ts).',
     },
   },
+  {
+    workflow: 'WF-TOEK-36',
+    scenarioId: 'UAT-TOEK-36',
+    titel: 'Woonstrategie bepaalt de grondslag van de primaire vermogenslijn (ADR 0114 D1)',
+    kriticiteit: 'KERN',
+    persona: 'willem',
+    given:
+      'Persona Willem geladen (eigen woning "Woning Wassenaar", €650.000). De woonstrategie is instelbaar op /toekomst → Huis-strategie (zie WF-TOEK-21): Meerekenen (`include_full`), Uitsluiten (`exclude_from_fire`), Verkopen (`downsize`) of Opeethypotheek (`reverse_mortgage`). Vóór ADR 0114 (29-08-2026) stond de primaire, massieve, fasegekleurde lijn in ALLE VIER de modi op het totale netto vermogen (Prognose!I), terwijl de voortgangsbalk en het vrijheids-% eronder bij Uitsluiten al sinds ADR 0034 op het besteedbare vermogen (Prognose!J, zonder woning) stonden — twee grootheden op één scherm.',
+    when:
+      'De gebruiker wisselt de huis-strategie en leest telkens de vermogensgrafiek in "Pad"-modus samen met de voortgangsbalk + het vrijheids-% direct eronder.',
+    then:
+      'Bij UITSLUITEN mét eigen woning draagt de hoofdlijn de grondslag van de balk eronder: het besteedbare vermogen ZONDER je huis (Prognose!J). De totaallijn (mét huis) is daar de dunne gestippelde TWEEDE lijn. Bij VERKOPEN, OPEETHYPOTHEEK en MEEREKENEN blijft de hoofdlijn het TOTALE netto vermogen (Prognose!I) — ongewijzigd gedrag; de tweede lijn is daar juist de besteedbare lijn (en bij Meerekenen bestaat ze niet, want J ≡ I exact). Zonder eigen woning valt er niets te splitsen en blijft het bij één totaallijn, óók onder Uitsluiten. De EXACT-provable kern is de GRONDSLAG-CONSISTENTIE, want die is het punt van dit besluit: `primaryChartBasis` (grafiek) en `selectFreedomProgressBasis` (balk + %) worden door HETZELFDE predikaat gestuurd (`isHomeExcludedFromFire` ∧ `hasEigenHuis`), zodat de lijn "liquid" is precies dán wanneer de balk op de J-noemer staat — in geen enkele modus kan de één wisselen zonder de ander. D6: zodra een VREEMDE of GEFORCEERDE hoofdlijn actief is (partner-, huishoud- of AOW-stop-pad) valt de grafiek terug op `\'total\'`, ongeacht de woonstrategie — die runs leveren geen J-reeks (`effectiveChartPrimaryBasis` in horizon-client.tsx); dat deel is UI-gating, geen pure functie. De lijn-, band- en drempel-doorwerking op het scherm staat in WF-TOEK-37.',
+    assertion: {
+      kind: 'exact',
+      expected:
+        'include_full: lijn=total balk=I; exclude_from_fire: lijn=liquid balk=J; downsize: lijn=total balk=I; reverse_mortgage: lijn=total balk=I; zonderWoning/exclude_from_fire: lijn=total balk=I; gelijkeGrondslag=true',
+      source:
+        'lib/horizon/liquid-wealth-line.ts#primaryChartBasis (grafiek, ADR 0114 D1) naast lib/core-metrics.ts#selectFreedomProgressBasis + lib/housing-strategy.ts#isHomeExcludedFromFire (voortgangsbalk/vrijheids-%, ADR 0034) — beide échte productiefuncties, op de vier `HousingStrategyMode`-waarden met en zonder eigen woning.',
+    },
+  },
+  {
+    workflow: 'WF-TOEK-37',
+    scenarioId: 'UAT-TOEK-37',
+    titel: 'Alles wat met de primaire lijn meebeweegt draagt dezelfde grondslag (stip, band, drempels, pill, bon)',
+    kriticiteit: 'KERN',
+    persona: 'willem',
+    given:
+      'Persona Willem geladen, huis-strategie op "Uitsluiten" (`exclude_from_fire`) — de enige modus waarin de primaire lijn op Prognose!J staat (zie WF-TOEK-36).',
+    when:
+      'De gebruiker leest de grafiek in "Pad"-modus, zet de Marktcheck aan, beweegt de crosshair over een projectiejaar, opent de jaar-kassabon en schakelt de pill naast de Doel-pill.',
+    then:
+      'GRONDSLAG-CONSISTENTIE op het scherm: de getekende lijn, de FIRE-drempellijn waar hij naartoe loopt, de Monte-Carlo-band eromheen en het vrijheids-% eronder dragen alle vier dezelfde grootheid (D1/D7). Concreet: (a) de FIRE-stip LANDT op de FIRE-doellijn i.p.v. de volle overwaarde erboven — op de FIRE-maand geldt J == `requiredFirePortfolio` (ADR 0034-endpoint-invariant, vergrendeld in lib/horizon-kernel/fire-basis-invariant.test.ts) en de stip interpoleert nu over de J-punten; (b) de marktcheck-band komt uit de J-variant `bandLiquide` — een I-band om een J-lijn wordt NIET getekend (D7: liever geen band dan een gemengde); (c) elke FIRE-drempel wordt alleen getoond zolang de lijn met háár grondslag op het scherm staat; ook fase-splits, AOW-stip en gebeurtenis-markers verhuizen mee naar de J-lijn (D2). (d) De PILL naast de Doel-pill schakelt altijd de TWEEDE lijn en benoemt die: "Met je huis" bij Uitsluiten, "Zonder je huis" bij Verkopen/Opeethypotheek; bij Meerekenen bestaat hij niet. Hij staat in ÁLLE strategieën standaard UIT (D5) en bewaart zijn stand onder een eigen voorkeur-sleutel, zodat een oude "besteedbaar-lijn uit"-keuze niet stil de totaallijn uitzet. (e) De jaar-kassabon blijft BEWUST de volledige jaarbalans op de I-grondslag (D3: een bon is een balans, geen lens — het huis staat erop omdat je het bezit) met bij Uitsluiten één neutrale "waarvan besteedbaar"-regel op twee plekken: onder het hoofdcijfer én onder "Eind netto". Die regel doet NIET mee in de waterval en de bon blijft sluiten op `row.netWorth`. (f) De crosshair-tooltip zet "Zonder je huis" als primair bedrag met "Met je huis" gedimd eronder; de zes drijvers/drukkers blijven staan onder de grondslagkop "Wat er dit jaar gebeurde (mét je huis)" (D4 — `SimRow.growth` bevat daar de woningwaardestijging; gelabeld verschil, geen fout). Toetsvorm consistentie: alle cijfers zijn kernel-uitkomsten (oracle via /beheer/horizon-kernel); wat hier getoetst wordt is dat ze op één grootheid staan.',
+    assertion: {
+      kind: 'consistency',
+      source:
+        'consistentie-eis: lijn ∧ FIRE-drempel ∧ band ∧ vrijheids-% dragen dezelfde grootheid. Bron van de keuze: lib/horizon/liquid-wealth-line.ts#primaryChartBasis → `SimChartGeometryInput.primaryBasis` (lib/horizon/sim-chart-geometry.ts, default \'total\') → components/app/horizon/horizon-client.tsx#effectiveChartPrimaryBasis (D6-terugval bij partner-/huishoud-/AOW-stop-lijn) + bandLiquide; pill/tooltip in components/app/horizon/sim-chart.tsx; "waarvan besteedbaar"-regel in components/app/horizon/horizon-year-details-sheet.tsx (consume-only `row.nettoLiquide`, geen parallelle som). FIRE-stip-op-drempel = ADR 0034-invariant, vergrendeld in lib/horizon-kernel/fire-basis-invariant.test.ts.',
+    },
+  },
+  {
+    workflow: 'WF-TOEK-38',
+    scenarioId: 'UAT-TOEK-38',
+    titel: 'Risico-levensgebeurtenissen: werkloosheid en overlijden partner (jaargelaagde WW/Anw-parameters, na-FIRE-gedrag)',
+    kriticiteit: 'KERN',
+    persona: 'willem',
+    given:
+      'Twee risico-events uit de catalogus, 2026-jaarlaag (SOCIALE_ZEKERHEID_PARAMS[2026]): "Werkloosheid" (bruto maandsalaris €4.000, netto €3.000, WW-duur 12 mnd, verwachte zoektijd 18 mnd → totale duur = max(12,18) = 18 mnd) en "Overlijden partner" (netto partnerinkomen €2.500, Anw "met kinderen", geen eigen anwBedrag ingevuld, maandlasten huishouden €3.000, kostendaling 30%). VOORHEEN (vóór ADR/kaart 3, 29-08-2026) stonden de WW-/Anw-bedragen tweemaal hardgecodeerd in horizon-client.tsx — één keer in de rekenregel (kaal 70% WW, geen 75%-trap) en één keer in de tooltip-preview (mét de trap) — met de bedragen bovendien twee indexatierondes verouderd (max dagloon €274 = 1-1-2024-niveau).',
+    when:
+      'De gebruiker vult de velden in en leest de kasstroom-impact; als randgeval zet hij het Anw-bedrag expliciet op €0 en plaatst hij het werkloosheid-event op/ná de geprojecteerde vrijheidsleeftijd.',
+    then:
+      'WW-uitkering: dagloon = min(4.000×12/261, maxDagloon(2026)=€309,91) = €183,9080…/dag (ongeklemd, want < maxDagloon); maand-1e-periode (75%, 2 mnd) = round(183,908×21,75×0,75) = €3.000; maand-daarna (70%) = round(183,908×21,75×0,70) = €2.800; totaal over de 12-mnd WW-duur = 2×3.000+10×2.800 = €34.000; gemiddeld over het gekozen 18-mnd-venster (maanden 13-18 tellen als €0, want `overDuurMaanden`=totale duur ≠ WW-duur) = round(34.000/18) = €1.889/mnd; inkomensgat = max(0, 3.000−1.889) = €1.111/mnd; totaal inkomensverlies = round(1.111×18) = €19.998. Overlijden partner: Anw bruto (geen override) = anwNabestaandenBruto(2026) = €1.676,53; Anw netto (benadering 75%) = round(1.676,53×0,75) = €1.257; kostendaling = round(3.000×0,30) = €900; netto maandimpact = −2.500+0+1.257+900 = −€343/mnd (tekort, want geen nabestaandenpensioen ingevuld). EXPLICIETE-0-REGEL: zet de gebruiker het Anw-bedrag zelf op 0 (bv. bij "Beperkt recht"), dan blijft dat 0 — géén stille terugval naar de default-€1.676,53 (`num()`-helper: `??`-semantiek, nooit `||`). NA-FIRE-WAARSCHUWING (D3): een werkloosheid-event op of ná de vrijheidsleeftijd toont de tekst "Je vrijheidsleeftijd ligt op … jaar. Vanaf dat moment is er geen salaris meer dat kan wegvallen…" (advies, geen blokkade); overlijden-partner toont die waarschuwing NOOIT, want dat verlies loopt permanent door na FIRE.',
+    assertion: {
+      kind: 'exact',
+      expected:
+        'wwMaand1=3000; wwMaandDaarna=2800; wwTotaalOverWwDuur=34000; wwGemiddeldPerMaand=1889; inkomensgat=1111; totaalVerlies=19998; anwBruto=1676.53; anwNetto=1257; kostendaling=900; overlijdenNettoImpact=-343; anwExpliciete0Blijft0=true; wwWaarschuwingBijFire=aanwezig; overlijdenWaarschuwing=nooit',
+      source:
+        'lib/horizon/risico-event-regels.ts#berekenWerkloosheidImpact/berekenOverlijdenPartnerImpact/werkloosheidNaFireWaarschuwing/RISICO_EVENT_NA_FIRE (échte productiefuncties) op lib/sociale-zekerheid.ts#SOCIALE_ZEKERHEID_PARAMS[2026] — zie toek-checks.ts',
+    },
+  },
 ]
 
 export const TOEK_ACCEPTANCE: AcceptanceSet = {
@@ -521,5 +587,5 @@ export const TOEK_ACCEPTANCE: AcceptanceSet = {
  */
 export const TOEK_EXPECTED_WORKFLOW_NUMBERS: number[] = [
   ...Array.from({ length: 26 }, (_, i) => i + 1), // 1..26
-  28, 29, 30, 32, 33, 34, 35,
+  28, 29, 30, 32, 33, 34, 35, 36, 37, 38,
 ]

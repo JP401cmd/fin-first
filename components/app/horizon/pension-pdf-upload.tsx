@@ -6,6 +6,7 @@ import {
   parseMijnpensioenJson,
   mijnpensioenJsonToParseResult,
 } from '@/lib/pension/mijnpensioen-json'
+import { parseMijnpensioenXml } from '@/lib/pension/mijnpensioen-xml'
 import { useExecutionMode } from '@/lib/ai/local/use-execution-mode'
 import { extractPdfPageTexts } from '@/lib/pdf/extract-text'
 import { stripSensitiveData } from '@/lib/aangifte/strip-bsn'
@@ -50,11 +51,25 @@ interface PensionPdfUploadProps {
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
-const ACCEPT_ATTR = 'application/pdf,application/json,.pdf,.json'
+const ACCEPT_ATTR =
+  'application/pdf,application/json,text/xml,application/xml,.pdf,.json,.xml'
 
 /** Of een bestand een mijnpensioen.nl JSON-export is (op naam óf MIME-type). */
 function isJsonFile(f: File): boolean {
   return f.type === 'application/json' || f.name.toLowerCase().endsWith('.json')
+}
+
+/**
+ * Of een bestand de mijnpensioen.nl XML-export is (`pensioenaanspraken.xml`).
+ * Op naam óf MIME-type: browsers geven voor .xml zowel 'text/xml' als
+ * 'application/xml', en op sommige systemen een lege string.
+ */
+function isXmlFile(f: File): boolean {
+  return (
+    f.type === 'text/xml' ||
+    f.type === 'application/xml' ||
+    f.name.toLowerCase().endsWith('.xml')
+  )
 }
 
 export function PensionPdfUpload({
@@ -106,20 +121,29 @@ export function PensionPdfUpload({
   }, [])
 
   /**
-   * Deterministische JSON-import van mijnpensioen.nl: volledig client-side,
-   * ZONDER /api/pension/parse (geen AI). De mapper levert exact hetzelfde
-   * PensionParseResult-contract als de PDF-route, zodat de verwerking
-   * downstream identiek is. JSON-bestanden worden NIET in storage bewaard
-   * (dat pad is bewust alleen voor de PDF).
+   * Deterministische DATA-import van mijnpensioen.nl: volledig client-side,
+   * ZONDER /api/pension/parse (geen AI). Twee serialisaties, één pad — het
+   * pensioenregister publiceert één datamodel-spec, dus de XML-adapter levert
+   * dezelfde objectboom als JSON.parse() en daarna is de keten identiek.
+   *
+   * De mapper levert exact hetzelfde PensionParseResult-contract als de
+   * PDF-route, zodat de verwerking downstream (reconcile → review → write)
+   * ongewijzigd blijft. Data-bestanden worden NIET in storage bewaard (dat pad
+   * is bewust alleen voor de PDF).
+   *
+   * Dat dit op het toestel blijft is de productbelofte, niet toeval — zie
+   * docs/adr/0115-pensioen-import-blijft-op-het-toestel.md (bewuste afwijking
+   * van de datapad-conventie in ADR 0058).
    */
-  const handleJsonFile = useCallback(async (f: File) => {
+  const handleDataFile = useCallback(async (f: File, formaat: 'json' | 'xml') => {
     setFile(f)
     setStatus('uploading')
     pendingFileRef.current = null
     onFileSelected?.(f)
     try {
       const text = await f.text()
-      const parsed = parseMijnpensioenJson(text)
+      const parsed =
+        formaat === 'xml' ? parseMijnpensioenXml(text) : parseMijnpensioenJson(text)
       if (!parsed.ok) {
         setStatus('error')
         setError(parsed.error)
@@ -133,7 +157,7 @@ export function PensionPdfUpload({
       setError(
         err instanceof Error
           ? err.message
-          : 'Er ging iets mis bij het lezen van het JSON-bestand.',
+          : `Er ging iets mis bij het lezen van het ${formaat.toUpperCase()}-bestand.`,
       )
     }
   }, [onFileSelected, onParseResult, samenwonend])
@@ -193,7 +217,7 @@ export function PensionPdfUpload({
       console.error('[lokale-ai] pensioen-PDF lokaal uitlezen mislukt:', err)
       setStatus('error')
       setError(
-        'Het uitlezen op je eigen apparaat is niet gelukt. Probeer het opnieuw, of gebruik de JSON-export van mijnpensioen.nl.',
+        'Het uitlezen op je eigen apparaat is niet gelukt. Probeer het opnieuw, of gebruik de XML-download van mijnpensioenoverzicht.nl.',
       )
     } finally {
       setProgressLabel(null)
@@ -213,8 +237,9 @@ export function PensionPdfUpload({
     setError(null)
 
     const json = isJsonFile(f)
-    if (!json && f.type !== 'application/pdf') {
-      setError('Alleen PDF- of JSON-bestanden van mijnpensioen.nl zijn toegestaan.')
+    const xml = isXmlFile(f)
+    if (!json && !xml && f.type !== 'application/pdf') {
+      setError('Alleen XML-, JSON- of PDF-bestanden van mijnpensioen.nl zijn toegestaan.')
       return
     }
     if (f.size > MAX_FILE_SIZE) {
@@ -222,10 +247,17 @@ export function PensionPdfUpload({
       return
     }
 
-    // ── JSON-route: deterministisch, client-side, geen AI ──
+    // ── DATA-route (XML/JSON): deterministisch, client-side, geen AI ──
     // Staat óók in privé-modus voorop: geen model, geen risico, nul tokens.
+    // XML gaat vóór JSON: de downloadknop van mijnpensioenoverzicht.nl levert
+    // `pensioenaanspraken.xml`, dus dat is het bestand dat de meeste
+    // gebruikers daadwerkelijk in handen krijgen.
+    if (xml) {
+      void handleDataFile(f, 'xml')
+      return
+    }
     if (json) {
-      void handleJsonFile(f)
+      void handleDataFile(f, 'json')
       return
     }
 
@@ -242,7 +274,7 @@ export function PensionPdfUpload({
     if (!exec.canUseCloud) {
       if (exec.status === 'blocked') {
         setError(
-          `${exec.message ?? 'Lokale AI is nu niet beschikbaar op dit toestel.'} Gebruik de JSON-export van mijnpensioen.nl, of zet "Documenten lezen" op /mijn/privacy om naar de cloud.`,
+          `${exec.message ?? 'Lokale AI is nu niet beschikbaar op dit toestel.'} Gebruik de XML-download van mijnpensioenoverzicht.nl, of zet "Documenten lezen" op /mijn/privacy om naar de cloud.`,
         )
       } else {
         setError('We controleren nog waar het uitlezen mag draaien. Probeer het zo opnieuw.')
@@ -289,7 +321,7 @@ export function PensionPdfUpload({
     onParseResult,
     lifeEventId,
     uploadToStorage,
-    handleJsonFile,
+    handleDataFile,
     handleLocalPdf,
     exec.canUseLocal,
     exec.canUseCloud,
@@ -564,13 +596,13 @@ export function PensionPdfUpload({
           {/* Desktop: drag & drop text; Mobile: tap to select */}
           <div>
             <p className="text-sm font-medium text-[var(--ink-2)]">
-              <span className="hidden sm:inline">Sleep je PDF of JSON hierheen of </span>
+              <span className="hidden sm:inline">Sleep je XML, JSON of PDF hierheen of </span>
               <span className="text-horizon-600 underline underline-offset-2">kies een bestand</span>
             </p>
             <p className="mt-0.5 text-xs text-[var(--ink-4)]">
               {exec.status === 'lokaal'
-                ? 'JSON van mijnpensioen.nl (aanbevolen) of PDF, max 10 MB'
-                : 'PDF of JSON van mijnpensioen.nl, max 10 MB'}
+                ? 'XML of JSON van mijnpensioenoverzicht.nl (aanbevolen) of PDF, max 10 MB'
+                : 'XML, JSON of PDF van mijnpensioenoverzicht.nl, max 10 MB'}
             </p>
           </div>
         </div>
@@ -580,22 +612,23 @@ export function PensionPdfUpload({
       <p className="mt-1.5 text-[11px] leading-snug text-[var(--ink-4)]">
         {exec.status === 'lokaal' ? (
           <>
-            Beide bestanden verwerken we volledig op je eigen apparaat — er gaat niets naar een
-            AI-dienst. De JSON-export van mijnpensioen.nl is de betrouwbaarste route: die lezen we
-            zonder AI uit. Een PDF laten we door het model op je toestel lezen; je controleert het
-            resultaat daarna zelf.
+            Alle drie de bestanden verwerken we volledig op je eigen apparaat — er gaat niets naar
+            een AI-dienst. De datadownload van mijnpensioenoverzicht.nl (XML, of JSON) is de
+            betrouwbaarste route: die lezen we zonder AI uit. Een PDF laten we door het model op je
+            toestel lezen; je controleert het resultaat daarna zelf.
           </>
         ) : exec.status === 'blocked' ? (
           <>
             Je hebt gekozen om documenten op je eigen apparaat te lezen, maar dat lukt hier niet:{' '}
             {exec.message ?? 'lokale AI is nu niet beschikbaar op dit toestel.'} Gebruik de
-            JSON-export van mijnpensioen.nl — die verwerken we zonder AI, volledig op je apparaat.
+            XML-download van mijnpensioenoverzicht.nl — die verwerken we zonder AI, volledig op je
+            apparaat.
           </>
         ) : (
           <>
             Een PDF wordt eenmalig door een AI-dienst gelezen om de bedragen over te nemen en niet
-            bewaard. Liever niet? Gebruik de JSON-export van mijnpensioen.nl — die verwerken we
-            volledig op je eigen apparaat.
+            bewaard. Liever niet? Gebruik de XML-download van mijnpensioenoverzicht.nl — die
+            verwerken we volledig op je eigen apparaat.
           </>
         )}
       </p>

@@ -58,6 +58,53 @@ export const EXPECTED_SAVINGS_RETURN = 0.013
 export const DEFAULT_VOLATILITY = 0.15
 
 /**
+ * **Markt-risicofactor per risicoprofiel** — de beta waarmee een bezitting-pot de
+ * marktonzekerheid volgt (ADR 0117, snede 1 van de allocatie-modellering).
+ *
+ * ## Wat de factor doet
+ * Eén dimensieloze vermenigvuldiger op de twee onzekerheidshefbomen die de kernel
+ * al kent: de scenarioband-shift (P!B43, ±2 procentpunt) én de Monte-Carlo-ruis
+ * (de gedeelde marktschok MC!B10 + de idiosyncratische ruis MC!<col>12, beide
+ * geschaald op σ = MC!B3). Een pot met factor 0,3 krijgt dus ±0,6pp band en 0,3·σ
+ * ruis; factor 0 betekent "beweegt niet mee met de markt".
+ *
+ * De factor werkt bewust als een **beta op de gedeelde schok**: alle marktgevoelige
+ * potten bewegen in dezelfde richting, alleen verschillend hard. Dat behoudt de
+ * correlatiestructuur die het Excel-model al had (één schok, alle investeringspotten)
+ * en voegt er alleen de mix-gevoeligheid aan toe.
+ *
+ * ## Waarom deze getallen
+ * `middel` = 1 is het ANKER: σ = `DEFAULT_VOLATILITY` (15%) en ±2pp zijn geijkt op
+ * een breed gespreide aandelenportefeuille (ETF/indexfonds/mixprofiel). Dat is
+ * precies het profiel waarop de bestaande band al rekende, dus een bezitting met
+ * `risk_profile: 'middel'` (of zonder profiel) houdt exact het oude gedrag — de
+ * correctie treft alléén wat aantoonbaar rustiger of onrustiger is.
+ *  - `laag` = 0,3 → σ ≈ 4,5%: obligaties, deposito's, lijfrente, uitkeringsregeling.
+ *    Rentedragend of gegarandeerd; wél gevoelig voor markt, ordes rustiger dan aandelen.
+ *  - `hoog` = 1,4 → σ ≈ 21%: individuele aandelen, crypto, niet-beursgenoteerd belang.
+ *    Geconcentreerd i.p.v. gespreid; ruwweg anderhalf keer de spreiding van de index.
+ *
+ * **Bewust GEEN tweede rendementsaanname**: de factor raakt alleen de ONZEKERHEID
+ * rond het rendement, nooit het verwachte rendement zelf (dat blijft per bezitting
+ * `assets.expected_return`, en per gebruiker `resolveFireParams`). Een mix die het
+ * verwachte rendement voedt is snede 2 van dezelfde kaart.
+ */
+export const RISICO_FACTOR_PER_PROFIEL: Readonly<Record<'laag' | 'middel' | 'hoog', number>> = {
+  laag: 0.3,
+  middel: 1,
+  hoog: 1.4,
+}
+
+/**
+ * Markt-risicofactor voor een pot die per definitie niet met de markt meebeweegt:
+ * spaargeld (nominaal gegarandeerd — renterisico is geen marktschok), de eigen
+ * woning (loopt via de woonstrategie, niet via de portefeuillebeta) en de
+ * restcategorie 'Overig' (auto's, inboedel, vorderingen — geen marktnotering).
+ * Gelijk aan het gedrag van vóór ADR 0117 voor die categorieën.
+ */
+export const RISICO_FACTOR_GEEN = 0
+
+/**
  * Zoek-/weergavegrens voor de **rendement-marge** van de marktcheck
  * (`lib/horizon-kernel/rendement-marge.ts`): de binaire zoektocht naar de
  * rendement-verschuiving waarbij het plan omslaat loopt over

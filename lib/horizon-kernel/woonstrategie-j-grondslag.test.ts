@@ -26,6 +26,15 @@ import { solveFire } from '@/lib/horizon-kernel/solver'
 import type { PrognoseComputedRow } from '@/lib/horizon-kernel/tables/prognose'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
+import type { KernelInput } from '@/lib/horizon-kernel/types'
+import {
+  nettoLiquidePerLeeftijd,
+  nettoVermogenPerLeeftijd,
+  startNettoLiquide,
+  startNettoVermogen,
+} from '@/lib/horizon-kernel/jaarrand'
+import { runMonteCarlo } from '@/lib/horizon-kernel/wrappers/mc'
+import { runMarktcheckOnKernelInput } from '@/lib/horizon-kernel/marktcheck'
 
 const HUISWAARDE = 400_000
 const EIGEN_HYP_SALDO = 300_000
@@ -97,5 +106,186 @@ describe('kernel · Prognose!J-grondslag bij een beleggingshypotheek (defect B)'
   it('include_full: niets is nietLiquide → J === I', () => {
     const row = firstPrognoseRow('include_full')
     expect(row.nettoLiquide).toBeCloseTo(row.nettoVermogen, 2)
+  })
+})
+
+// -----------------------------------------------------------------------------
+// SPOOR B / ROUTE 1 - de J-grondslag als PRIMAIRE grafiek-lijn
+//
+// /toekomst tekende zijn hoofdlijn altijd op Prognose!I (netto vermogen incl. woning),
+// terwijl de voortgangsbalk en het vrijheids-% eronder bij `exclude_from_fire` al op
+// Prognose!J stonden. De grafieklaag krijgt daarom een `primaryBasis`-schakelaar; de
+// KERNEL levert daarvoor twee dingen die hij nog niet had:
+//
+//  1. de BEGINSTAND op J (`jaarrand.ts#startNettoLiquide` -> `UnifiedProjectionRow
+//     .startNettoLiquide`) - zonder die zou het eerste punt van een J-lijn nog op de
+//     I-grondslag liggen;
+//  2. de onzekerheidsBAND op J (`wrappers/mc.ts#bandLiquide`) - niet onderhandelbaar:
+//     een I-band om een J-lijn omhult een andere grootheid dan de lijn die erin ligt,
+//     en de bandtop bepaalt bovendien de ashoogte mee. Grondslagvermenging op een
+//     Y-as is verboden (CLAUDE.md).
+//
+// Beide zijn PUUR AFGELEID: `outcomes`/`successProbability` (het Excel-oracle) en de
+// bestaande `band` blijven ongemoeid - dit is een weergave-toevoeging, geen rekenwijziging.
+
+/**
+ * Het niet-liquide NETTO-blok van de fixture bij `exclude_from_fire`: de eigen woning
+ * (L) minus haar eigen-woninghypotheek (M). De beleggingshypotheek zit bewust NIET in
+ * M (zie de defect-B-suite hierboven) en telt dus gewoon liquide mee.
+ *
+ * Rendement en rente staan in deze fixture op 0 en de hypotheek is aflossingsvrij, dus
+ * dit blok is CONSTANT over de hele horizon - daardoor is `I - J` op elke blokrand
+ * exact dit bedrag, wat de band-assertie hieronder scherp maakt in plaats van "ongeveer
+ * lager".
+ */
+const NIET_LIQUIDE_NETTO = HUISWAARDE - EIGEN_HYP_SALDO // 400k - 300k = 100k
+
+/**
+ * MC-parameters van de test: klein aantal runs, echte spreiding. Oneven N zodat de
+ * nearest-rank-mediaan een bestaand element aanwijst (geen interpolatie).
+ */
+const TEST_RUNS = 9
+const TEST_SIGMA = 0.15
+
+function kernelInput(mode: 'exclude_from_fire' | 'include_full'): KernelInput {
+  const input = buildKernelInputFromAppWithNotices({ profile: profileWith(mode), assets, debts }).input
+  return {
+    ...input,
+    onzekerheid: {
+      ...input.onzekerheid,
+      mc: { ...input.onzekerheid.mc, aantalRuns: TEST_RUNS, sigma: TEST_SIGMA },
+    },
+  }
+}
+
+// TOLERANTIE - bewuste keuze per assertie:
+//  - include_full J === I (start en band): EXACT (`toBe` / `toEqual`). Zonder
+//    niet-liquide categorie is L = M = 0 en rekent de kern J = I - (0 - 0) = I;
+//    de startfunctie reduceert dan over dezelfde arrays in dezelfde volgorde. Beide
+//    zijn dus bit-identiek - een tolerantie zou hier zwakker zijn dan de waarheid en
+//    een echt grondslag-lek onzichtbaar maken.
+//  - exclude_from_fire I - J = huis - hypotheek: ABSOLUTE cent-tolerantie
+//    (`toBeCloseTo(., 2)` => |delta| < EUR 0,005). De assertie herschikt zelf de
+//    optelvolgorde (I - huis + hypotheek), dus float-associativiteit mag ~1e-10 kosten.
+//    Bewust NIET relatief: J loopt in een deplete-plan richting nul, en een procentuele
+//    marge op een bedrag rond nul is geen toets meer.
+describe('kernel - J-grondslag als primaire lijn: startstand + MC-band (spoor B, route 1)', () => {
+  describe('include_full - J === I, dus de schakelaar mag niets veranderen', () => {
+    it('startNettoLiquide === startNettoVermogen (exact, geen enkele niet-liquide categorie)', () => {
+      const input = kernelInput('include_full')
+      expect(startNettoLiquide(input)).toBe(startNettoVermogen(input))
+    })
+
+    it('bandLiquide is element-voor-element gelijk aan band (zelfde startAge, zelfde percentielen)', () => {
+      const mc = runMonteCarlo(kernelInput('include_full'))
+      expect(mc.bandLiquide.startAge).toBe(mc.band.startAge)
+      expect(mc.bandLiquide.p10).toEqual(mc.band.p10)
+      expect(mc.bandLiquide.p25).toEqual(mc.band.p25)
+      expect(mc.bandLiquide.p50).toEqual(mc.band.p50)
+      expect(mc.bandLiquide.p75).toEqual(mc.band.p75)
+      expect(mc.bandLiquide.p90).toEqual(mc.band.p90)
+    })
+  })
+
+  describe('exclude_from_fire - J ligt het niet-liquide netto-blok onder I', () => {
+    it('startNettoLiquide = startNettoVermogen - woningstartwaarde + hypotheekstartwaarde', () => {
+      const input = kernelInput('exclude_from_fire')
+      // De niet-liquide SCHULD komt er weer bij: J sluit huis EN eigen-woninghypotheek uit.
+      expect(startNettoLiquide(input)).toBeCloseTo(
+        startNettoVermogen(input) - HUISWAARDE + EIGEN_HYP_SALDO,
+        2,
+      )
+      // Sanity: het verhuurde pand + zijn beleggingshypotheek blijven WEL in J.
+      expect(startNettoLiquide(input)).toBeCloseTo(PAND_WAARDE + 50_000 - BELEGGINGS_HYP_SALDO, 2)
+    })
+
+    it('bandLiquide.p50 ligt structureel onder band.p50 - op elke leeftijd het volle blok', () => {
+      const mc = runMonteCarlo(kernelInput('exclude_from_fire'))
+      expect(mc.bandLiquide.p50.length).toBe(mc.band.p50.length)
+      expect(mc.bandLiquide.p50.length).toBeGreaterThan(1)
+      for (let i = 0; i < mc.band.p50.length; i++) {
+        expect(mc.bandLiquide.p50[i]).toBeLessThan(mc.band.p50[i])
+        expect(mc.band.p50[i] - mc.bandLiquide.p50[i]).toBeCloseTo(NIET_LIQUIDE_NETTO, 2)
+      }
+    })
+
+    it('de HELE band schuift mee - p10..p90 allemaal op de J-grondslag', () => {
+      const mc = runMonteCarlo(kernelInput('exclude_from_fire'))
+      for (const q of ['p10', 'p25', 'p50', 'p75', 'p90'] as const) {
+        expect(mc.bandLiquide[q].length).toBe(mc.band[q].length)
+        for (let i = 0; i < mc.band[q].length; i++) {
+          expect(mc.band[q][i] - mc.bandLiquide[q][i]).toBeCloseTo(NIET_LIQUIDE_NETTO, 2)
+        }
+      }
+    })
+
+    it('index 0 van de band is de startstand: I(0) resp. J(0) uit de potten', () => {
+      const input = kernelInput('exclude_from_fire')
+      const mc = runMonteCarlo(input)
+      expect(mc.band.p50[0]).toBeCloseTo(startNettoVermogen(input), 2)
+      expect(mc.bandLiquide.p50[0]).toBeCloseTo(startNettoLiquide(input), 2)
+    })
+  })
+
+  describe('de leeftijdsas is dezelfde - anders liggen band en lijn uit elkaar', () => {
+    for (const mode of ['include_full', 'exclude_from_fire'] as const) {
+      it(mode + ': nettoLiquidePerLeeftijd en nettoVermogenPerLeeftijd delen lengte + startAge', () => {
+        const input = kernelInput(mode)
+        const proj = solveFire(input).projection
+        const reeksI = nettoVermogenPerLeeftijd(input, proj)
+        const reeksJ = nettoLiquidePerLeeftijd(input, proj)
+
+        expect(reeksJ.length).toBe(reeksI.length)
+        expect(reeksJ.length).toBeGreaterThan(1)
+        expect(reeksJ.every((v) => Number.isFinite(v))).toBe(true)
+
+        // De as zelf: beide reeksen worden door `wrappers/mc.ts` op dezelfde
+        // `startAge = round(startLeeftijd)` gehangen, en `bridge.ts` tekent de
+        // hoofdlijn op precies die as.
+        const mc = runMonteCarlo(input)
+        expect(mc.band.startAge).toBe(Math.round(input.startLeeftijd))
+        expect(mc.bandLiquide.startAge).toBe(mc.band.startAge)
+        expect(mc.band.p50.length).toBe(reeksI.length)
+        expect(mc.bandLiquide.p50.length).toBe(reeksJ.length)
+      })
+    }
+  })
+
+  describe('doorgifte naar het product-oppervlak (marktcheck)', () => {
+    it('runMarktcheckOnKernelInput levert bandLiquide naast band, beide op dezelfde as', () => {
+      const uitkomst = runMarktcheckOnKernelInput(kernelInput('exclude_from_fire'), {
+        maxRuns: TEST_RUNS,
+      })
+      expect(uitkomst.ok).toBe(true)
+      if (!uitkomst.ok) return
+      expect(uitkomst.bandLiquide.startAge).toBe(uitkomst.band.startAge)
+      expect(uitkomst.bandLiquide.p50.length).toBe(uitkomst.band.p50.length)
+      for (let i = 0; i < uitkomst.band.p50.length; i++) {
+        expect(uitkomst.bandLiquide.p50[i]).toBeLessThan(uitkomst.band.p50[i])
+      }
+    })
+
+    it('bandLiquide is structured-clone-veilig (plain arrays over de worker-grens)', () => {
+      const uitkomst = runMarktcheckOnKernelInput(kernelInput('include_full'), {
+        maxRuns: TEST_RUNS,
+      })
+      expect(uitkomst.ok).toBe(true)
+      if (!uitkomst.ok) return
+      const rondtrip = JSON.parse(JSON.stringify(uitkomst.bandLiquide))
+      expect(rondtrip).toEqual(uitkomst.bandLiquide)
+      expect(Array.isArray(uitkomst.bandLiquide.p50)).toBe(true)
+    })
+  })
+
+  describe('de oracle-velden blijven ongemoeid (puur additief)', () => {
+    it('bandLiquide toevoegen raakt outcomes/successProbability niet', () => {
+      const mc = runMonteCarlo(kernelInput('exclude_from_fire'))
+      expect(mc.outcomes.length).toBe(TEST_RUNS)
+      expect(mc.outcomes.every((o) => o === 0 || o === 1)).toBe(true)
+      expect(mc.successProbability).toBeCloseTo(
+        mc.outcomes.reduce((sum, o) => sum + o, 0) / TEST_RUNS,
+        12,
+      )
+    })
   })
 })

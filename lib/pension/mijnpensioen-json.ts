@@ -64,29 +64,29 @@ function jaarNaarMaand(jaar: number): number {
 
 // ── 1. Veilige top-level parser ─────────────────────────────────────────────
 
-type ParseOk = { ok: true; data: unknown }
-type ParseErr = { ok: false; error: string }
+export type ParseOk = { ok: true; data: unknown }
+export type ParseErr = { ok: false; error: string }
 
 /**
- * Parse + valideer een mijnpensioen.nl JSON-export.
+ * Valideer een REEDS gedeserialiseerde mijnpensioen.nl-boom.
  *
- * - Ongeldige JSON → `{ ok:false }`.
- * - Geen non-null object → `{ ok:false }`.
+ * Gedeeld door beide serialisaties (JSON én XML): het pensioenregister
+ * publiceert één gecombineerde datamodel-spec, dus de statussemantiek hoort
+ * maar op één plek te staan. Alleen de melding bij een onleesbaar bestand
+ * verschilt per formaat, en die geeft de aanroeper mee.
+ *
+ * - Geen non-null object → `{ ok:false }` met `invalidMessage`.
  * - `StatusCode !== "000"` → `{ ok:false }` met de echte (of fallback) code.
  * - Een niet-lege `OntbrekendePuvsError` wordt in de foutmelding meegenomen.
  * Throwt nooit.
  */
-export function parseMijnpensioenJson(text: string): ParseOk | ParseErr {
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(text)
-  } catch {
-    return { ok: false, error: 'Ongeldig JSON-bestand.' }
-  }
-
+export function validateMijnpensioenRoot(
+  parsed: unknown,
+  invalidMessage: string,
+): ParseOk | ParseErr {
   const root = asRecord(parsed)
   if (!root) {
-    return { ok: false, error: 'Ongeldig JSON-bestand.' }
+    return { ok: false, error: invalidMessage }
   }
 
   const statusCode = asString(root.StatusCode)
@@ -106,6 +106,24 @@ export function parseMijnpensioenJson(text: string): ParseOk | ParseErr {
   }
 
   return { ok: true, data: parsed }
+}
+
+/**
+ * Parse + valideer een mijnpensioen.nl JSON-export.
+ *
+ * - Ongeldige JSON → `{ ok:false }`.
+ * - Verder: zie `validateMijnpensioenRoot`.
+ * Throwt nooit.
+ */
+export function parseMijnpensioenJson(text: string): ParseOk | ParseErr {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    return { ok: false, error: 'Ongeldig JSON-bestand.' }
+  }
+
+  return validateMijnpensioenRoot(parsed, 'Ongeldig JSON-bestand.')
 }
 
 // ── 2. Pure transformatie naar PensionParseResult ───────────────────────────

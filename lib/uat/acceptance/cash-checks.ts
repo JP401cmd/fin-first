@@ -72,10 +72,21 @@ import {
   computeStreaks,
   computeSpendLimitTrend,
   computeSpendLimitScore,
+  computeSpendLimitPace,
   resolveSpendLimitPeriods,
   type SpendLimitAggregateRow,
   type SpendLimitPeriodOutcome,
 } from '@/lib/spend-limits/engine'
+import { describeSpendLimitPace } from '@/lib/spend-limits/status-display'
+import {
+  normalizePartnerVisibility,
+  ownershipForVisibility,
+  visibilityForOwnership,
+  ownershipWriteColumns,
+  rowOwnershipForImport,
+  DEFAULT_SHARED_VISIBILITY,
+  type PartnerVisibility,
+} from '@/lib/bank-account-visibility'
 import { resolveAmountWithBasis } from '@/lib/effective-financials'
 import { resolveSavingsSource } from '@/lib/savings-source'
 import { spendLimitCounterpartyKey, counterpartyMatchesKey } from '@/lib/spend-limits/counterparty-key'
@@ -1444,6 +1455,150 @@ NEWFILEUID:NONE
           `stripSaldo=${fx(stripSaldo, 2)}; widgetSaldo=${fx(widgetSaldo, 2)}; gelijk=${stripSaldo === widgetSaldo}; ` +
           `stripQuote=${fx(stripQuote ?? 0, 1)}; widgetQuote=${fx(widgetQuote ?? 0, 1)}; ` +
           `effectiefSaldo=${fx(effectiefSaldo, 0)}; effectiefWijktAf=${effectiefSaldo !== stripSaldo}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-CASH-63',
+    scenarioId: 'UAT-CASH-63',
+    label:
+      'Per-rekening partner-zichtbaarheid (ADR 0118): ownership↔visibility-koppeling, privacy-by-default, partner-import geblokkeerd op niet-full',
+    run: () => {
+      criterion('WF-CASH-63')
+
+      // Eigendom↔zichtbaarheid is één gekoppelde invariant (bank_accounts_visibility_matches_ownership).
+      const ownershipNone = ownershipForVisibility('none')
+      const ownershipBalance = ownershipForVisibility('balance')
+      const ownershipFull = ownershipForVisibility('full')
+
+      // Delen → privacy-by-default 'balance', niet 'full'.
+      const visibilityBijDelen = visibilityForOwnership('shared')
+      const defaultIsBalance = DEFAULT_SHARED_VISIBILITY === 'balance'
+      // Een bestaande, ruimere keuze ('full') blijft staan bij een ongerelateerde wijziging.
+      const visibilityBlijftFull = visibilityForOwnership('shared', 'full')
+      // Terugzetten naar persoonlijk forceert altijd 'none'.
+      const visibilityBijPersoonlijk = visibilityForOwnership('personal', 'full')
+
+      // Eén blok, nooit los te schrijven.
+      const kolommenVoorFull = ownershipWriteColumns('full')
+
+      // Rijen van vóór de migratie (kolom ontbreekt) volgen hun ownership.
+      const oudeRijPersonal = normalizePartnerVisibility(undefined, 'personal')
+      const oudeRijShared = normalizePartnerVisibility(undefined, 'shared')
+
+      // Import-gate — spiegelt letterlijk de blokkade-voorwaarde in
+      // app/api/transactions/import/route.ts (POST, ADR 0118): geweigerd alleen
+      // als de rekening gedeeld is, niet op 'full' staat, én de aanroeper niet de
+      // rekeninghouder is.
+      const importGeblokkeerd = (
+        ownership: 'personal' | 'shared',
+        visibility: PartnerVisibility,
+        isEigenaar: boolean,
+      ): boolean => ownership === 'shared' && visibility !== 'full' && !isEigenaar
+      const eigenaarOpBalance = !importGeblokkeerd('shared', 'balance', true)
+      const partnerGeblokkeerdOpBalance = importGeblokkeerd('shared', 'balance', false)
+      const partnerToegestaanOpFull = !importGeblokkeerd('shared', 'full', false)
+
+      // Import-rij-eigendom (tweede gordel, ADR 0101): op een 'balance'-rekening
+      // blijft een nieuwe boeking persoonlijk, ook als het budget gedeeld is.
+      const rijOpBalance = rowOwnershipForImport('shared', 'balance', 'shared')
+      const rijOpFull = rowOwnershipForImport('shared', 'full', 'shared')
+
+      return {
+        expected:
+          'ownershipNone=personal; ownershipBalance=shared; ownershipFull=shared; visibilityBijDelen=balance; defaultIsBalance=true; visibilityBlijftFull=full; visibilityBijPersoonlijk=none; kolommenVoorFull=shared/full; oudeRijPersonal=none; oudeRijShared=balance; eigenaarOpBalance=true; partnerGeblokkeerdOpBalance=true; partnerToegestaanOpFull=true; rijOpBalance=personal; rijOpFull=shared',
+        actual:
+          `ownershipNone=${ownershipNone}; ownershipBalance=${ownershipBalance}; ownershipFull=${ownershipFull}; ` +
+          `visibilityBijDelen=${visibilityBijDelen}; defaultIsBalance=${defaultIsBalance}; visibilityBlijftFull=${visibilityBlijftFull}; visibilityBijPersoonlijk=${visibilityBijPersoonlijk}; ` +
+          `kolommenVoorFull=${kolommenVoorFull.ownership}/${kolommenVoorFull.partner_visibility}; ` +
+          `oudeRijPersonal=${oudeRijPersonal}; oudeRijShared=${oudeRijShared}; ` +
+          `eigenaarOpBalance=${eigenaarOpBalance}; partnerGeblokkeerdOpBalance=${partnerGeblokkeerdOpBalance}; partnerToegestaanOpFull=${partnerToegestaanOpFull}; ` +
+          `rijOpBalance=${rijOpBalance}; rijOpFull=${rijOpFull}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-CASH-64',
+    scenarioId: 'UAT-CASH-64',
+    label:
+      'Grenzenpot-tempo (ADR 0119): verstreken-fractie + prognosebedrag op eigen historisch dagtempo, aanmaak-ondergrens van 3 periodes',
+    run: () => {
+      criterion('WF-CASH-64')
+
+      const LIMIET = 500
+      /** Eén AFGESLOTEN 30-dagen-periode met een vast bedrag — hand-narekenbaar dagtempo. */
+      const gesloten = (nr: number, bedrag: number): SpendLimitPeriodOutcome => ({
+        periodKey: `basis-${nr}`,
+        label: `basis-${nr}`,
+        since: `2026-0${nr}-01`,
+        until: `2026-0${nr}-30`, // 30 dagen inclusief
+        isOpen: false,
+        periodMatchedAmount: bedrag,
+        limitAmount: LIMIET,
+        periodOverAmount: Math.max(0, bedrag - LIMIET),
+        periodHeadroom: Math.max(0, LIMIET - bedrag),
+        status: bedrag > LIMIET ? 'exceeded' : 'within',
+        isNearLimit: false,
+        matchedTransactionCount: 1,
+        matchedCounterpartyNames: [],
+      })
+      // Basistempo: (300+600+900) / (30+30+30) = 1800/90 = €20/dag.
+      const basisPeriodes = [gesloten(5, 300), gesloten(6, 600), gesloten(7, 900)]
+
+      const lopend: SpendLimitPeriodOutcome = {
+        periodKey: '2026-08',
+        label: 'augustus 2026',
+        since: '2026-08-01',
+        until: '2026-08-31', // 31 dagen
+        isOpen: true,
+        periodMatchedAmount: 200,
+        limitAmount: LIMIET,
+        periodOverAmount: 0,
+        periodHeadroom: 300,
+        status: 'within',
+        isNearLimit: false,
+        matchedTransactionCount: 1,
+        matchedCounterpartyNames: [],
+      }
+
+      // Zaterdag 8 augustus 2026 — dezelfde ankerdatum als WF-CASH-53.
+      const now = new Date(Date.UTC(2026, 7, 8))
+      const pace = computeSpendLimitPace({
+        period: 'month',
+        current: lopend,
+        closedPeriods: basisPeriodes,
+        now,
+        createdAt: '2026-01-01', // alle drie de basisperiodes tellen mee
+      })!
+      const zin = describeSpendLimitPace(pace, lopend.label)
+
+      // Onder de 3-periodes-ondergrens: géén prognosebedrag, wél de tempo-markering.
+      const teWeinigPace = computeSpendLimitPace({
+        period: 'month',
+        current: lopend,
+        closedPeriods: basisPeriodes.slice(0, 2),
+        now,
+        createdAt: '2026-01-01',
+      })!
+
+      // day/week krijgen bewust geen tempo (SPEND_LIMIT_PACE_PERIODS = month/quarter/year).
+      const dagPotHeeftGeenPace = computeSpendLimitPace({
+        period: 'day',
+        current: { ...lopend, since: '2026-08-08', until: '2026-08-08' },
+        closedPeriods: basisPeriodes,
+        now,
+        createdAt: '2026-01-01',
+      })
+
+      return {
+        expected:
+          'periodDays=31; elapsedDays=8; remainingDays=23; elapsedFractionPct=26; usedFractionPct=40; baselineDailyAmount=20; basisPeriodCount=3; projectedAmount=660; projectedExceeds=true; zin=26% van augustus 2026 voorbij · 40% van je grens gebruikt; teWeinigProjected=null; teWeinigBasis=2; dagPotHeeftGeenPace=null',
+        actual:
+          `periodDays=${pace.periodDays}; elapsedDays=${pace.elapsedDays}; remainingDays=${pace.remainingDays}; ` +
+          `elapsedFractionPct=${Math.round(pace.elapsedFraction * 100)}; usedFractionPct=${Math.round((pace.usedFraction ?? 0) * 100)}; ` +
+          `baselineDailyAmount=${pace.baselineDailyAmount}; basisPeriodCount=${pace.basisPeriodCount}; ` +
+          `projectedAmount=${pace.projectedAmount}; projectedExceeds=${pace.projectedExceeds}; zin=${zin}; ` +
+          `teWeinigProjected=${teWeinigPace.projectedAmount}; teWeinigBasis=${teWeinigPace.basisPeriodCount}; dagPotHeeftGeenPace=${dagPotHeeftGeenPace}`,
       }
     },
   },

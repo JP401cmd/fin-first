@@ -14,12 +14,20 @@
  *
  * ### Shift-toepassing via een input-transform (tabellen onaangeraakt)
  * De shift P!B43 (`SWITCH(B42, Pessimistisch −0,02, Verwacht 0, Optimistisch
- * 0,02)`) raakt uitsluitend het Bez-rendement van **investeringspotten** (bens!F=1)
- * — en `tables/bez.ts` past `input.onzekerheid.shift` daar al op toe. De wrapper
- * hoeft dus alleen `onzekerheid.scenario`/`onzekerheid.shift` in een kopie van de
- * `KernelInput` te zetten; de tabellen blijven ongewijzigd. De VBA-herstelstap
+ * 0,02)`) raakt in het Excel-model uitsluitend het Bez-rendement van
+ * **investeringspotten** (bens!F=1). De wrapper zet die verstoring in een kopie van
+ * de `KernelInput`; de tabellen blijven ongewijzigd. De VBA-herstelstap
  * (B42→"Verwacht", B16←Sim!B7) is bij ons impliciet: `runScenarioBand` is puur en
  * muteert niets.
+ *
+ * ### Risico volgt de pot (ADR 0117, snede 1) — additief op het oracle
+ * Sinds ADR 0117 landt de shift PER POT, geschaald met de markt-risicofactor uit
+ * `wrappers/risico.ts`: `rendement + P!B43 · f`. Een obligatiepot (f = 0,3) krijgt
+ * dus ±0,6pp waar een aandelenpot (f = 1,4) ±2,8pp krijgt, en een
+ * premieregeling-pensioenpot zit voor het eerst überhaupt in de band. Ontbreekt de
+ * factor — precies wat het fixture-pad doet — dan valt `potRisicoFactor` terug op
+ * `investering ? 1 : 0` en is de uitkomst byte-identiek aan het Excel-oracle
+ * (`test/horizon-oracle/parity-band.test.ts` pint dat).
  *
  * ### Bewuste afwijking van `solveFire` (gerapporteerd)
  * `RunScenarioBand` doet **géén** pensioen-kortsluiting (anders dan `BepaalFIRE`/
@@ -35,6 +43,7 @@ import { runKernelProjection } from '../engine'
 import { computeEs } from '../tables/es'
 import type { KernelInput, ScenarioBand } from '../types'
 import { clng, computeGap, eindMaandVan, eindleeftijdVan, prognoseJ } from '../gap'
+import { potRisicoFactor } from './risico'
 
 /** De scenario's + hun rendement-shift P!B43 (SWITCH op P!B42). */
 const SCENARIO_SHIFT: Readonly<Record<ScenarioBand, number>> = {
@@ -83,9 +92,26 @@ export function runScenarioBand(input: KernelInput): ScenarioBandResult {
 
   for (const scenario of SCENARIOS) {
     // Input-transform: alleen de scenario-shift; de tabellen blijven ongewijzigd.
+    //
+    // ADR 0117 — de shift landt PER POT, geschaald met de markt-risicofactor
+    // (`wrappers/risico.ts`), i.p.v. als één scalar op de binaire investering-vlag.
+    // Zelfde truc als `wrappers/mc.ts` al voor de ruis gebruikt: bak de verstoring in
+    // `pot.rendement` van de INVOER en zet `onzekerheid.shift` op 0, zodat
+    // `tables/bez.ts` er niets bovenop legt en de tabellen onaangeraakt blijven.
+    //
+    // Byte-identiteit zonder overlay: een pot zonder `risicoFactor` krijgt factor
+    // `investering ? 1 : 0`. Bij factor 1 is `rendement + shift * 1` exact het
+    // `rendement + shift` dat bez altijd al rekende; bij factor 0 gaat de pot
+    // ONGEWIJZIGD door en telt bez er `+ 0` bij op (exact). De 19 oracle-fixtures
+    // zetten `risicoFactor` niet → `parity-band` blijft cel-exact.
+    const shift = SCENARIO_SHIFT[scenario]
     const shifted: KernelInput = {
       ...input,
-      onzekerheid: { ...input.onzekerheid, scenario, shift: SCENARIO_SHIFT[scenario] },
+      assetPotten: input.assetPotten.map((p) => {
+        const factor = potRisicoFactor(p)
+        return factor === 0 ? p : { ...p, rendement: p.rendement + shift * factor }
+      }),
+      onzekerheid: { ...input.onzekerheid, scenario, shift: 0 },
     }
     const run = (fireAge: number) => {
       engineRuns += 1

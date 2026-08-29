@@ -12,6 +12,8 @@ import { describe, it, expect } from 'vitest'
 import {
   SPEND_LIMIT_GRAIN_BY_PERIOD,
   SPEND_LIMIT_NEAR_LIMIT_PCT,
+  SPEND_LIMIT_PACE_BASELINE_WINDOW,
+  SPEND_LIMIT_PACE_MIN_PERIODS,
   SPEND_LIMIT_SCORE_MIN_PERIODS,
   SPEND_LIMIT_SCORE_THRESHOLDS,
   SPEND_LIMIT_SCORE_TREND_BONUS,
@@ -20,12 +22,14 @@ import {
   buildSpendLimitReport,
   closedPeriodsSinceCreation,
   computePeriodOutcome,
+  computeSpendLimitPace,
   computeSpendLimitScore,
   computeSpendLimitTrend,
   computeStreaks,
   netSpendFromSums,
   resolveSpendLimitPeriods,
   sliceContainsMonth,
+  spendLimitPeriodHasPace,
   type SpendLimitAggregateRow,
   type SpendLimitPeriodKind,
   type SpendLimitPeriodOutcome,
@@ -1026,5 +1030,254 @@ describe('spendLimitCounterpartyKey', () => {
 
   it('matcht nooit op een lege sleutel — die zou anders álles vangen', () => {
     expect(counterpartyMatchesKey('Albert Heijn', '')).toBe(false)
+  })
+})
+
+// ── Tempo van de lopende periode (ADR 0119) ─────────────────────────────────
+
+/**
+ * Wat hier bewaakt wordt, en waarom:
+ *
+ *  1. de VERSTREKEN-fractie is een kalenderfeit — dagen inclusief vandaag, exact
+ *     1 op de laatste dag, en DST-bestendig (een lokale millisecondendeling zit
+ *     er over de klokwissel een dag naast);
+ *  2. het PROGNOSEBEDRAG rust op het eigen historische DAGtempo en NIET op een
+ *     lineaire run-rate — het EUR 2.480-geval uit de wens is het regressie-anker;
+ *  3. de INVARIANT: het tempo raakt status, near-vlag, reeks, trend en score
+ *     niet. Die assertie is de reden dat de meldingenlaag niet stil meeschuift.
+ */
+
+/** Eén pot-regel voor de tempo-tests; `createdAt` is standaard ruim genoeg. */
+function paceRule(over: Partial<SpendLimitRule> = {}): SpendLimitRule {
+  return {
+    ruleType: 'counterparty',
+    limitAmount: 100,
+    period: 'month',
+    createdAt: '2025-01-01T00:00:00Z',
+    ...over,
+  }
+}
+
+function paceReport(
+  rows: SpendLimitAggregateRow[],
+  now: Date,
+  over: Partial<SpendLimitRule> = {},
+) {
+  const rule = paceRule(over)
+  return buildSpendLimitReport({
+    rule,
+    rows,
+    now,
+    windowPeriods: SPEND_LIMIT_WINDOW_BY_PERIOD[rule.period],
+  })
+}
+
+describe('computeSpendLimitPace — de tijd-as van de lopende periode', () => {
+  it('telt de dag van vandaag mee: op de 1e is er één van 31 dagen om', () => {
+    const pace = paceReport([row('2026-08', 80)], new Date(2026, 7, 1)).currentPeriodPace
+    expect(pace).not.toBeNull()
+    expect(pace?.periodDays).toBe(31)
+    expect(pace?.elapsedDays).toBe(1)
+    expect(pace?.remainingDays).toBe(30)
+    expect(pace?.elapsedFraction).toBeCloseTo(1 / 31, 10)
+    expect(pace?.usedFraction).toBeCloseTo(0.8, 10)
+  })
+
+  it('staat halverwege de maand op de juiste dag', () => {
+    const pace = paceReport([row('2026-08', 50)], new Date(2026, 7, 16)).currentPeriodPace
+    expect(pace?.elapsedDays).toBe(16)
+    expect(pace?.remainingDays).toBe(15)
+    expect(pace?.elapsedFraction).toBeCloseTo(16 / 31, 10)
+  })
+
+  it('staat op de LAATSTE dag exact op 1 — de periode is dan nog wel open', () => {
+    const report = paceReport([row('2026-08', 50)], new Date(2026, 7, 31))
+    expect(report.currentPeriod.isOpen).toBe(true)
+    expect(report.currentPeriodPace?.elapsedFraction).toBe(1)
+    expect(report.currentPeriodPace?.remainingDays).toBe(0)
+    // Er valt niets meer te projecteren: het bedrag is dan de uitkomst zelf.
+    expect(report.currentPeriodPace?.projectedAmount).toBeNull()
+    expect(report.currentPeriodPace?.projectedExceeds).toBeNull()
+  })
+
+  it('kent de lengte van korte, lange en schrikkeljaar-maanden', () => {
+    expect(paceReport([], new Date(2026, 1, 10)).currentPeriodPace?.periodDays).toBe(28)
+    expect(paceReport([], new Date(2028, 1, 10)).currentPeriodPace?.periodDays).toBe(29)
+    expect(paceReport([], new Date(2026, 3, 10)).currentPeriodPace?.periodDays).toBe(30)
+    expect(paceReport([], new Date(2026, 0, 10)).currentPeriodPace?.periodDays).toBe(31)
+  })
+
+  it('blijft exact over een zomertijd-sprong heen (maart 31, oktober 31)', () => {
+    // De klok verspringt in NL op 29 maart en 25 oktober 2026. Een lokale
+    // millisecondendeling zou hier 30,96 resp. 31,04 dagen tellen en dus een dag
+    // te weinig of te veel; de UTC-dagnummers zijn exact.
+    const maart = paceReport([], new Date(2026, 2, 30)).currentPeriodPace
+    expect(maart?.periodDays).toBe(31)
+    expect(maart?.elapsedDays).toBe(30)
+    const oktober = paceReport([], new Date(2026, 9, 26)).currentPeriodPace
+    expect(oktober?.periodDays).toBe(31)
+    expect(oktober?.elapsedDays).toBe(26)
+  })
+
+  it('geeft kwartaal- en jaarpotten wél een tempo, dag- en weekpotten niet', () => {
+    expect(spendLimitPeriodHasPace('month')).toBe(true)
+    expect(spendLimitPeriodHasPace('quarter')).toBe(true)
+    expect(spendLimitPeriodHasPace('year')).toBe(true)
+    expect(spendLimitPeriodHasPace('day')).toBe(false)
+    expect(spendLimitPeriodHasPace('week')).toBe(false)
+
+    // Q3 2026 = 1 jul t/m 30 sep = 92 dagen; 2026 = 365 dagen.
+    const q = paceReport([], new Date(2026, 7, 1), { period: 'quarter' }).currentPeriodPace
+    expect(q?.periodDays).toBe(92)
+    expect(q?.elapsedDays).toBe(32)
+    const y = paceReport([], new Date(2026, 7, 1), { period: 'year' }).currentPeriodPace
+    expect(y?.periodDays).toBe(365)
+    expect(y?.elapsedDays).toBe(213)
+
+    expect(paceReport([], new Date(2026, 7, 1), { period: 'day' }).currentPeriodPace).toBeNull()
+    expect(paceReport([], new Date(2026, 7, 1), { period: 'week' }).currentPeriodPace).toBeNull()
+  })
+
+  it('geeft geen tempo voor een AFGESLOTEN periode', () => {
+    const closed = computePeriodOutcome(
+      {
+        periodKey: '2026-07',
+        label: 'juli 2026',
+        since: '2026-07-01',
+        until: '2026-07-31',
+        isOpen: false,
+      },
+      [row('2026-07', 40)],
+      100,
+    )
+    expect(
+      computeSpendLimitPace({
+        period: 'month',
+        current: closed,
+        closedPeriods: [],
+        now: new Date(2026, 7, 5),
+      }),
+    ).toBeNull()
+  })
+
+  it('deelt niet door nul: een grens van 0 geeft usedFraction null, geen NaN', () => {
+    const pace = paceReport([row('2026-08', 25)], new Date(2026, 7, 10), {
+      limitAmount: 0,
+    }).currentPeriodPace
+    expect(pace?.usedFraction).toBeNull()
+    expect(Number.isNaN(pace?.elapsedFraction)).toBe(false)
+  })
+})
+
+describe('computeSpendLimitPace — het prognosebedrag', () => {
+  /** Mei/juni/juli 2026 op 95 elk: 31 + 30 + 31 = 92 dagen, 285 totaal. */
+  const historie = [row('2026-05', 95), row('2026-06', 95), row('2026-07', 95)]
+  const basisDagtempo = 285 / 92
+
+  it('lost het geval uit de wens op: 80 op 1 augustus wordt ongeveer 173, niet 2.480', () => {
+    const pace = paceReport([...historie, row('2026-08', 80)], new Date(2026, 7, 1))
+      .currentPeriodPace
+    expect(pace?.baselineDailyAmount).toBeCloseTo(basisDagtempo, 10)
+    expect(pace?.projectedAmount).toBeCloseTo(80 + 30 * basisDagtempo, 10)
+    // HET REGRESSIE-ANKER. De lineaire run-rate (gerealiseerd / verstreken-fractie)
+    // geeft hier 80 / (1/31) = 2.480 — formeel juist, communicatief onbruikbaar,
+    // en precies het scenario waarvoor deze uitbreiding is gevraagd.
+    expect(pace?.projectedAmount).toBeLessThan(200)
+    expect(pace?.projectedExceeds).toBe(true)
+  })
+
+  it('weegt het basistempo op DAGEN, niet als gemiddelde van periode-dagtempos', () => {
+    // 285 / 92 = 3,0978. Het ongewogen gemiddelde van 95/31, 95/30 en 95/31 is
+    // 3,0993 — klein, maar het is een andere grootheid en loopt bij kwartaal/jaar op.
+    const ongewogen = (95 / 31 + 95 / 30 + 95 / 31) / 3
+    const pace = paceReport([...historie, row('2026-08', 10)], new Date(2026, 7, 10))
+      .currentPeriodPace
+    expect(pace?.baselineDailyAmount).toBeCloseTo(285 / 92, 12)
+    expect(pace?.baselineDailyAmount).not.toBeCloseTo(ongewogen, 12)
+  })
+
+  it('rust op de laatste N afgesloten periodes — hetzelfde venster als de trend', () => {
+    expect(SPEND_LIMIT_PACE_BASELINE_WINDOW).toBe(SPEND_LIMIT_TREND_WINDOW)
+    // Een oude, veel hogere maand mag het tempo niet omhoog trekken.
+    const pace = paceReport(
+      [row('2025-09', 900), ...historie, row('2026-08', 10)],
+      new Date(2026, 7, 10),
+    ).currentPeriodPace
+    expect(pace?.basisPeriodCount).toBe(SPEND_LIMIT_PACE_BASELINE_WINDOW)
+    expect(pace?.baselineDailyAmount).toBeCloseTo(basisDagtempo, 10)
+  })
+
+  it('zwijgt over het BEDRAG onder de historie-drempel, maar toont de markering wel', () => {
+    expect(SPEND_LIMIT_PACE_MIN_PERIODS).toBe(SPEND_LIMIT_SCORE_MIN_PERIODS)
+    // Aangemaakt op 15 juni 2026: alleen juli begint volledig ná die datum, dus
+    // één meetellende afgesloten periode — te weinig voor een bedrag.
+    const pace = paceReport([...historie, row('2026-08', 80)], new Date(2026, 7, 4), {
+      createdAt: '2026-06-15T09:00:00Z',
+    }).currentPeriodPace
+    expect(pace?.basisPeriodCount).toBe(1)
+    expect(pace?.baselineDailyAmount).toBeNull()
+    expect(pace?.projectedAmount).toBeNull()
+    expect(pace?.projectedExceeds).toBeNull()
+    // De tempo-markering blijft: die heeft geen historie nodig.
+    expect(pace?.elapsedDays).toBe(4)
+    expect(pace?.usedFraction).toBeCloseTo(0.8, 10)
+  })
+
+  it('geeft geen negatieve prognose bij een periode waarin netto geld terugkwam', () => {
+    // Drie lege afgesloten periodes: basistempo 0; de lopende maand staat netto
+    // op -40 door een refund. -40 + 30 x 0 = -40 -> geen bedrag i.p.v. onzin.
+    const pace = paceReport(
+      [row('2026-05', 0), row('2026-06', 0), row('2026-07', 0), row('2026-08', 0, { refund: 40 })],
+      new Date(2026, 7, 1),
+    ).currentPeriodPace
+    expect(pace?.baselineDailyAmount).toBe(0)
+    expect(pace?.projectedAmount).toBeNull()
+    // De markering blijft leesbaar; het negatieve gebruik is niet geklemd in de motor.
+    expect(pace?.usedFraction).toBeCloseTo(-0.4, 10)
+  })
+
+  it('klemt een negatief historisch dagtempo op 0 i.p.v. de prognose te laten dalen', () => {
+    const pace = paceReport(
+      [
+        row('2026-05', 0, { refund: 30 }),
+        row('2026-06', 0, { refund: 30 }),
+        row('2026-07', 0, { refund: 30 }),
+        row('2026-08', 60),
+      ],
+      new Date(2026, 7, 1),
+    ).currentPeriodPace
+    expect(pace?.baselineDailyAmount).toBe(0)
+    expect(pace?.projectedAmount).toBe(60)
+    expect(pace?.projectedExceeds).toBe(false)
+  })
+})
+
+describe('buildSpendLimitReport — het tempo raakt GEEN enkel bestaand getal', () => {
+  it('laat status, near-vlag, reeks, trend en score staan waar ze stonden', () => {
+    const rows = [row('2026-05', 95), row('2026-06', 95), row('2026-07', 95), row('2026-08', 10)]
+    const report = paceReport(rows, new Date(2026, 7, 1))
+
+    // De prognose ligt BOVEN de grens van 100...
+    expect(report.currentPeriodPace?.projectedAmount).toBeGreaterThan(100)
+    expect(report.currentPeriodPace?.projectedExceeds).toBe(true)
+    // ...en toch staat de lopende periode op gerealiseerd 10: binnen, niet near.
+    expect(report.currentPeriod.periodMatchedAmount).toBe(10)
+    expect(report.currentPeriod.status).toBe('within')
+    expect(report.currentPeriod.isNearLimit).toBe(false)
+    expect(report.currentPeriod.periodOverAmount).toBe(0)
+    expect(report.currentPeriod.periodHeadroom).toBe(90)
+
+    // Reeks, trend en score zijn identiek aan de canonieke afleidingen over
+    // uitsluitend de AFGESLOTEN periodes — het tempo zit daar met geen enkel
+    // getal in.
+    const rule = paceRule()
+    const trend = computeSpendLimitTrend(
+      report.closedPeriods,
+      SPEND_LIMIT_TREND_WINDOW,
+      rule.createdAt,
+    )
+    expect(report.streaks).toEqual(computeStreaks(report.closedPeriods))
+    expect(report.trend).toEqual(trend)
+    expect(report.score).toEqual(computeSpendLimitScore(report.closedPeriods, trend, rule.createdAt))
   })
 })

@@ -604,7 +604,7 @@ export function PensioenStrategieEditor({
                 Pensioenoverzicht uploaden
               </div>
               <p className="mb-3 mt-1 text-xs leading-relaxed text-[var(--ink-3)]">
-                Upload je overzicht van mijnpensioenoverzicht.nl — PDF of JSON-export — dan vullen
+                Upload je overzicht van mijnpensioenoverzicht.nl — XML, JSON of PDF — dan vullen
                 we je werknemerspensioen en AOW automatisch in.
               </p>
               <PensionPdfUpload

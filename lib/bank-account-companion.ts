@@ -1,6 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { cashSubtypeToAccountType } from './account-types'
 import { ibanWriteColumns } from './bank-account-iban'
+import {
+  normalizePartnerVisibility,
+  ownershipWriteColumns,
+  visibilityForOwnership,
+} from './bank-account-visibility'
 
 /**
  * De IBAN-kolommen van de companion-rij: plaintext (zolang die kolom bestaat) én
@@ -115,7 +120,7 @@ export async function syncBankAccountCompanion(
   // `loadTargetAccount` in `lib/truelayer/target-account.ts`.
   const { data: existingBA } = await supabase
     .from('bank_accounts')
-    .select('id')
+    .select('id, partner_visibility')
     .eq('linked_asset_id', asset.id)
     .eq('user_id', userId)
     .maybeSingle()
@@ -136,7 +141,28 @@ export async function syncBankAccountCompanion(
       // Sync eigendom mee: een eigendomswijziging op het cash-bezit moet
       // doorwerken naar de gekoppelde bankrekening (DB-trigger herstempelt
       // household_id).
-      ownership: asset.ownership ?? 'personal',
+      //
+      // `ownership` en `partner_visibility` gaan ALTIJD als één blok — de
+      // CHECK-constraint `bank_accounts_visibility_matches_ownership` weigert
+      // een schrijfactie die er maar één zet, en dat is hier precies de
+      // bedoeling: een companion die stil op "gedeeld, zichtbaarheid none"
+      // belandt zou een halve privacytoestand zijn. Een cash-bezit dat gedeeld
+      // wordt krijgt de privacy-by-default stand 'balance' (ADR 0118); de
+      // eigenaar kan 'm daarna op de rekening zelf naar 'full' zetten. Een
+      // bestaande, ruimere keuze blijft staan: `visibilityForOwnership` neemt de
+      // huidige stand mee, zodat het hernoemen van een cash-bezit een
+      // 'full'-rekening niet stil terugzet naar 'balance'.
+      ...ownershipWriteColumns(
+        visibilityForOwnership(
+          asset.ownership === 'shared' ? 'shared' : 'personal',
+          existingBA
+            ? normalizePartnerVisibility(
+                (existingBA as { partner_visibility?: string | null }).partner_visibility,
+                asset.ownership === 'shared' ? 'shared' : 'personal',
+              )
+            : null,
+        ),
+      ),
     }
 
     if (!existingBA) {

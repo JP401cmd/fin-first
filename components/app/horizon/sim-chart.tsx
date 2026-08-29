@@ -285,6 +285,8 @@ export const SimChart = memo(function SimChart({
   emphasis = null,
   targetInflationFactors,
   liquidPoints,
+  primaryBasis = 'total',
+  secondaryLineVisible = true,
   disableCrosshair = false,
   hoverAge,
   onHoverAge,
@@ -372,14 +374,23 @@ export const SimChart = memo(function SimChart({
    *  laten verdwijnen (de geometrie geeft dan `targetLine === null`) — dat is
    *  nadrukkelijk niet de bedoeling. */
   targetInflationFactors?: { age: number; factor: number }[]
-  /** Tweede vermogenslijn: het BESTEEDBARE (liquide) vermogen als `[leeftijd,
-   *  bedrag]`-punten (consume-only uit `UnifiedProjectionRow.nettoLiquide`, zie
-   *  `lib/horizon/liquid-wealth-line.ts`). Zet je 'm, dan tekent de grafiek een
-   *  dunne gestippelde lijn onder de totaallijn ("zonder je huis"), met een eigen
+  /** De BESTEEDBARE (liquide) vermogensreeks als `[leeftijd, bedrag]`-punten
+   *  (consume-only uit `UnifiedProjectionRow.nettoLiquide` + het J(0)-anker, zie
+   *  `lib/horizon/liquid-wealth-line.ts`). Zet je 'm, dan tekent de grafiek twee
+   *  lijnen op twee grondslagen ("met je huis" / "zonder je huis"), met een eigen
    *  legenda-entry en een extra regel in de hover-tooltip. Alleen zinvol wanneer
    *  de gebruiker een eigen woning heeft; anders weglaten → byte-identiek voor
    *  alle bestaande callers. */
   liquidPoints?: [number, number][]
+  /** Welke grondslag de PRIMAIRE (massieve, fasegekleurde) lijn draagt — zie
+   *  `SimChartGeometryInput.primaryBasis`. Default `'total'`. Op `'liquid'`
+   *  wisselen lijn, FIRE-stip, marker-anker, y-domein, legenda én tooltip
+   *  tegelijk mee (ADR 0114); de totaallijn wordt dan de dunne tweede lijn. */
+  primaryBasis?: 'total' | 'liquid'
+  /** Tekent de grafiek de tweede grondslag-lijn? Default `true`. De pill naast
+   *  het Doel-label zet 'm uit; welke van de twee lijnen dat betreft volgt uit
+   *  `primaryBasis`. */
+  secondaryLineVisible?: boolean
   /** Onderdruk de crosshair-tooltip (bv. in de tips-modus van /toekomst). */
   disableCrosshair?: boolean
   /** Controlled hover-leeftijd. Aanwezig → parent bezit de hover-state (cijferbar/
@@ -445,6 +456,8 @@ export const SimChart = memo(function SimChart({
         eventOverlay,
         targetInflationFactors,
         liquidPoints,
+        primaryBasis,
+        secondaryLineVisible,
         containerW,
       }),
     [
@@ -469,11 +482,17 @@ export const SimChart = memo(function SimChart({
       eventOverlay,
       targetInflationFactors,
       liquidPoints,
+      primaryBasis,
+      secondaryLineVisible,
       containerW,
     ],
   )
 
-  const { W, H, PAD, innerW, innerH, minAge, maxAge, xScale, yScale, allPts, mainStrokeAcc, mainStrokeDec, liquidStroke, liquidPath } = geometry
+  const {
+    W, H, PAD, innerW, innerH, minAge, maxAge, xScale, yScale, allPts,
+    mainStrokeAcc, mainStrokeDec, secondaryStroke, secondaryPath, secondaryBasis,
+    primaryBasis: effectivePrimaryBasis,
+  } = geometry
 
   // ── Crosshair tooltip handlers ──────────────────────────────────────────
   const handleOverlayMouseMove = useCallback((e: React.MouseEvent<SVGRectElement>) => {
@@ -587,9 +606,34 @@ export const SimChart = memo(function SimChart({
         // Vertical position: roughly at chart midpoint
         const pctY = (PAD.top + innerH * 0.2) / H
 
-        // Besteedbaar (liquide) vermogen op de gehoverde leeftijd — consume-only
-        // uit dezelfde puntenreeks die de tweede lijn tekent.
+        // De twee grondslagen op de gehoverde leeftijd — consume-only uit
+        // dezelfde reeksen die de twee lijnen tekenen. `startPortfolio` is de
+        // I-stand ÓP `hoveredAge`; `liquidPoints` draagt J op dezelfde as
+        // (seed + één punt per jaargrens), dus beide lezen hetzelfde moment.
+        const totalAtHover = hoveredRow.startPortfolio
         const liquidAtHover = liquidPoints?.find(([a]) => a === hoveredAge)?.[1] ?? null
+        // Welke van de twee bovenaan staat volgt de PRIMAIRE lijn (ADR 0114):
+        // het dikke getal in de tooltip hoort bij de dikke lijn in de grafiek.
+        const primaryIsLiquid = effectivePrimaryBasis === 'liquid' && liquidAtHover !== null
+        const primaryAtHover = primaryIsLiquid ? liquidAtHover! : totalAtHover
+        // De tweede regel toont per definitie de ándere grondslag. Viel de
+        // primaire regel terug op I (geen J-punt op deze leeftijd), dan zou een
+        // I-tweede-regel hetzelfde bedrag twee keer tonen — dan liever één regel.
+        const secondaryAtHover =
+          secondaryBasis === 'liquid'
+            ? liquidAtHover
+            : secondaryBasis === 'total' && primaryIsLiquid
+            ? totalAtHover
+            : null
+        // Staat er maar één grondslag op het scherm, dan blijft "Vermogen"
+        // volstaan — behalve wanneer dat de J-lijn is: een onbenoemd "Vermogen"
+        // dat het huis niet meetelt leest als het totaal, en dat is precies de
+        // verwarring die deze kaart oploste.
+        const primaryLabel =
+          secondaryAtHover !== null
+            ? (primaryIsLiquid ? 'Zonder je huis' : 'Met je huis')
+            : (primaryIsLiquid ? 'Zonder je huis' : 'Vermogen')
+        const secondaryLabel = secondaryBasis === 'liquid' ? 'Zonder je huis' : 'Met je huis'
 
         // Collect drijvers (positive factors)
         const drijvers: { label: string; value: number }[] = []
@@ -644,27 +688,42 @@ export const SimChart = memo(function SimChart({
               {/* Separator */}
               <div className="my-1" style={{ height: 1, background: 'var(--ink-3)', opacity: 0.4 }} />
 
-              {/* Vermogen. Staat er een tweede grondslag onder, dan draagt deze
-                  regel de kwalificatie uit hetzelfde woordpaar als de legenda en
-                  de doellijnen ("met je huis" / "zonder je huis"); anders blijft
-                  het gewoon "Vermogen". */}
+              {/* Vermogen op de PRIMAIRE grondslag — het dikke getal hoort bij de
+                  dikke lijn. Staat er een tweede grondslag onder, dan dragen
+                  beide regels de kwalificatie uit hetzelfde woordpaar als de
+                  legenda en de doellijnen ("met je huis" / "zonder je huis"). */}
               <div className="flex items-baseline justify-between" style={{ fontSize: 10, color: 'var(--paper)' }}>
-                <span>{liquidAtHover !== null ? 'Met je huis' : 'Vermogen'}</span>
-                <span className="font-mono tabular-nums font-semibold">{fmtAbs(hoveredRow.startPortfolio, masked)}</span>
+                <span>{primaryLabel}</span>
+                <span className="font-mono tabular-nums font-semibold">{fmtAbs(primaryAtHover, masked)}</span>
               </div>
 
-              {/* Het vermogen zonder je huis op dezelfde leeftijd — alleen wanneer
-                  de tweede lijn getekend wordt (zelfde as-conventie, dus exact
+              {/* De ándere grondslag op dezelfde leeftijd — alleen wanneer de
+                  tweede lijn getekend wordt (zelfde as-conventie, dus exact
                   hetzelfde moment als het getal hierboven). */}
-              {liquidAtHover !== null && (
+              {secondaryAtHover !== null && (
                 <div className="flex items-baseline justify-between mt-0.5" style={{ fontSize: 10, color: 'var(--paper)', opacity: 0.85 }}>
                   <span className="flex items-center gap-1">
                     <svg width="12" height="6" className="shrink-0" aria-hidden="true">
-                      <line x1="0" y1="3" x2="12" y2="3" stroke={liquidStroke} strokeWidth={1.8} strokeDasharray="2 3" strokeLinecap="round" />
+                      <line x1="0" y1="3" x2="12" y2="3" stroke={secondaryStroke} strokeWidth={1.8} strokeDasharray="2 3" strokeLinecap="round" />
                     </svg>
-                    Zonder je huis
+                    {secondaryLabel}
                   </span>
-                  <span className="font-mono tabular-nums">{fmtAbs(liquidAtHover, masked)}</span>
+                  <span className="font-mono tabular-nums">{fmtAbs(secondaryAtHover, masked)}</span>
+                </div>
+              )}
+
+              {/* Grondslagkop bij de bewegingsregels (ADR 0114 D4). De zes posten
+                  hieronder decomponeren de TOTALE beweging — mét je huis. `SimRow`
+                  draagt geen liquide tegenhanger van `growth`, en vier van de zes
+                  (sparen, inkomsten/uitgaven, eenmalig, onttrekking) landen sowieso
+                  identiek in beide grondslagen; half omrekenen zou een slechter
+                  blok geven dan eerlijk benoemen. Weglaten kan niet: het verschil
+                  tussen de twee bedragen hierboven is juist wat deze posten
+                  verklaren. Alleen nodig zodra de primaire lijn J is — anders
+                  hoort het blok vanzelf bij het getal erboven. */}
+              {primaryIsLiquid && (drijvers.length > 0 || drukkers.length > 0) && (
+                <div className="mt-1.5" style={{ fontSize: 9, color: 'var(--paper)', opacity: 0.6 }}>
+                  Wat er dit jaar gebeurde (mét je huis)
                 </div>
               )}
 
@@ -781,11 +840,11 @@ export const SimChart = memo(function SimChart({
       })()}
 
       {/* Hoofdlijn-legenda — "Jouw pad" + optioneel de gestippelde ink-wat-als-
-          lijn en de besteedbaar-lijn, met optioneel FIRE-leeftijdssuffix. Staat
-          bewust bovenaan (direct onder de grafiek), vóór de ghost-/household-
-          rijen. Alleen zichtbaar bij een variant:'scenario'-overlay of een
-          besteedbaar-lijn → byte-identiek voor bestaande callers. */}
-      {(scenarioVariant || liquidPath) && (
+          lijn en de tweede grondslag-lijn, met optioneel FIRE-leeftijdssuffix.
+          Staat bewust bovenaan (direct onder de grafiek), vóór de ghost-/
+          household-rijen. Alleen zichtbaar bij een variant:'scenario'-overlay of
+          een tweede grondslag → byte-identiek voor bestaande callers. */}
+      {(scenarioVariant || secondaryPath || effectivePrimaryBasis === 'liquid') && (
         <div className="mt-1.5 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 px-4">
           <div className="flex items-center gap-1.5">
             <svg width="20" height="8" className="shrink-0">
@@ -793,9 +852,15 @@ export const SimChart = memo(function SimChart({
             </svg>
             <span className="text-[10px] font-medium text-[var(--ink-3)]">
               Jouw pad
-              {/* Kwalificatie alleen als er een tweede grondslag naast staat —
-                  zelfde woordpaar als de doellijnen en de doel-KPI's. */}
-              {liquidPath && <span className="ml-1 text-[var(--ink-4)]">· met je huis</span>}
+              {/* Kwalificatie zodra de grondslag van deze lijn niet vanzelf
+                  spreekt: er staat een tweede grondslag naast, óf de lijn is de
+                  J-lijn (die zónder benoeming als "het totaal" leest). Zelfde
+                  woordpaar als de doellijnen en de doel-KPI's. */}
+              {(secondaryPath || effectivePrimaryBasis === 'liquid') && (
+                <span className="ml-1 text-[var(--ink-4)]">
+                  · {effectivePrimaryBasis === 'liquid' ? 'zonder je huis' : 'met je huis'}
+                </span>
+              )}
               {(fireAgeFractional ?? fireAge) !== null && (
                 <span className="ml-1 font-mono text-[var(--ink-4)]">
                   ({Math.round((fireAgeFractional ?? fireAge) as number)}j)
@@ -822,13 +887,13 @@ export const SimChart = memo(function SimChart({
               </span>
             </div>
           )}
-          {liquidPath && (
+          {secondaryPath && (
             <div className="flex items-center gap-1.5">
               <svg width="20" height="8" className="shrink-0">
-                <line x1="0" y1="4" x2="20" y2="4" stroke={liquidStroke} strokeWidth={1.8} strokeDasharray="2 3" strokeLinecap="round" />
+                <line x1="0" y1="4" x2="20" y2="4" stroke={secondaryStroke} strokeWidth={1.8} strokeDasharray="2 3" strokeLinecap="round" />
               </svg>
               <span className="text-[10px] font-medium text-[var(--ink-3)]">
-                Zonder je huis
+                {secondaryBasis === 'liquid' ? 'Zonder je huis' : 'Met je huis'}
               </span>
             </div>
           )}

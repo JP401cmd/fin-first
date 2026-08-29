@@ -4,7 +4,13 @@ import { useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { createClient } from '@/lib/supabase/client'
-import { OwnershipToggle, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
+import { useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
+import { AccountVisibilityToggle } from '@/components/app/account-visibility-toggle'
+import {
+  normalizePartnerVisibility,
+  ownershipForVisibility,
+  type PartnerVisibility,
+} from '@/lib/bank-account-visibility'
 
 export type Account = {
   id: string
@@ -17,6 +23,12 @@ export type Account = {
   sort_order: number
   linked_asset_id?: string | null
   ownership?: OwnershipType
+  /**
+   * Wat de huishoudpartner van deze rekening ziet (ADR 0118). Gekoppeld aan
+   * `ownership` via een CHECK in de database; schrijven gaat uitsluitend als
+   * blok via `PATCH /api/bank-accounts/[id]`.
+   */
+  partner_visibility?: PartnerVisibility
 }
 
 // ACCOUNT_TYPES woont nu in lib/account-types.ts (import-richting UI→lib).
@@ -32,7 +44,7 @@ export function AccountFormModal({
 }: {
   account: Account | null
   canDelete: boolean
-  onSave: (data: { name: string; iban: string; bank_name: string; account_type: string; balance: number; ownership: OwnershipType }) => void
+  onSave: (data: { name: string; iban: string; bank_name: string; account_type: string; balance: number; partner_visibility: PartnerVisibility }) => void
   onDelete: (id: string) => void
   onClose: () => void
 }) {
@@ -41,7 +53,12 @@ export function AccountFormModal({
   const [bankName, setBankName] = useState(account?.bank_name ?? '')
   const [accountType, setAccountType] = useState(account?.account_type ?? 'checking')
   const [balance, setBalance] = useState(account ? String(account.balance) : '')
-  const [ownership, setOwnership] = useState<OwnershipType>(account?.ownership ?? 'personal')
+  // Eigendom en zichtbaarheid zijn EEN gekoppelde toestand (ADR 0118); dit
+  // formulier draagt daarom de driewegkeuze en leidt `ownership` eruit af.
+  const [visibility, setVisibility] = useState<PartnerVisibility>(() =>
+    normalizePartnerVisibility(account?.partner_visibility, account?.ownership ?? 'personal'),
+  )
+  const ownership: OwnershipType = ownershipForVisibility(visibility)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const { hasHousehold } = useHouseholdStatus()
 
@@ -58,7 +75,7 @@ export function AccountFormModal({
       bank_name: bankName.trim(),
       account_type: accountType,
       balance: Number(balance) || 0,
-      ownership,
+      partner_visibility: visibility,
     })
   }
 
@@ -178,12 +195,10 @@ export function AccountFormModal({
           {/* Eigendom — alleen relevant met een huishouden. */}
           {hasHousehold && (
             <div>
-              <label className="mb-1 block text-sm font-medium text-[var(--ink-2)]">Eigendom</label>
-              <OwnershipToggle
-                value={ownership}
-                onChange={(v) => { setOwnership(v); setBackfillResult(null) }}
+              <AccountVisibilityToggle
+                value={visibility}
+                onChange={(v) => { setVisibility(v); setBackfillResult(null) }}
                 hasHousehold={hasHousehold}
-                compact
               />
             </div>
           )}

@@ -109,6 +109,10 @@ function pot(o: {
       streaks: computeStreaks(closed),
       trend,
       score: computeSpendLimitScore(closed, trend),
+      // Bewust `null`: de meldingenlaag mag het tempo van de lopende periode NIET
+      // lezen (ADR 0119, invariant 1). Zou `decideSpendLimitEvents` er ooit op
+      // gaan leunen, dan valt hij hier meteen om in plaats van bij een gebruiker.
+      currentPeriodPace: null,
     },
     budgetSplit: [],
     ruleSplit: [],

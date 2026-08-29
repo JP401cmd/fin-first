@@ -347,25 +347,34 @@ export const INTEGRATIONS: IntegrationEntry[] = [
   },
   {
     id: 'pension-pdf',
-    name: 'Pensioen PDF→AI',
+    name: 'Pensioenoverzicht-import (XML/JSON/PDF)',
     kind: 'json',
-    provider: 'Mijn Pensioen Overzicht / AI-extractie',
+    provider: 'mijnpensioenoverzicht.nl (Stichting Pensioenregister)',
     authMethod: 'upload',
-    apiVersionPinned: null,
+    // Drie routes naar één PensionParseResult. De datadownload (XML/JSON) is
+    // deterministisch en blijft VOLLEDIG op het toestel — geen API-route, geen
+    // AI (bewuste afwijking van ADR 0058, vastgelegd in ADR 0115). Alleen de
+    // PDF-route kent een servervariant met AI-extractie.
+    apiVersionPinned: 'Specificatie-xml-json-download-v1.2',
     baseUrl: null,
-    sourceFiles: ['app/api/pension/parse/route.ts'],
+    sourceFiles: [
+      'lib/pension/mijnpensioen-xml.ts',
+      'lib/pension/mijnpensioen-json.ts',
+      'app/api/pension/parse/route.ts',
+    ],
     apiRoutes: ['/api/pension/parse'],
     dbTable: null,
     docsUrl: 'https://www.mijnpensioenoverzicht.nl/',
     changelogUrl: '',
     healthProbe: {
       kind: 'none',
-      note: 'Bestandsimport via AI-extractie — geen publiek endpoint. Route vereist authenticatie.',
+      note: 'Bestandsimport — geen publiek endpoint. XML/JSON worden client-side deterministisch gelezen; de PDF-route vereist authenticatie.',
     },
     formatContract: {
       kind: 'json',
-      ref: 'pension-pdf',
-      description: 'Pensioen PDF via pdfjs-dist → AI-extractie naar PensionParseResultSchema (JSON)',
+      ref: 'pension-mijnpensioen',
+      description:
+        'Datadownload pensioenaanspraken.xml / .json (datamodel v1.2) → deterministische mapper, client-side; PDF via pdfjs-dist → AI-extractie. Beide naar PensionParseResultSchema.',
     },
   },
 ]

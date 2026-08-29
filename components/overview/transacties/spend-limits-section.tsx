@@ -3,7 +3,8 @@
 /**
  * Grenzenpotten op /overzicht/cashflow/transacties — beheer + stand.
  *
- * euro-view: exempt (gerealiseerde historie)
+ * euro-view: exempt (gerealiseerde historie + één geprojecteerd bedrag binnen
+ * dezelfde kalenderperiode — ADR 0119; nominaal, dus geen deflator)
  *
  * DATAPAD (ADR 0058): dit component KRIJGT zijn gegevens als props van de
  * server-page (loadSpendLimitsSection) en haalt zelf niets op om te tonen.
@@ -77,6 +78,7 @@ import { SPEND_LIMIT_WINDOW_BY_PERIOD } from '@/lib/spend-limits/engine'
 import type { SpendLimitTrendDirection } from '@/lib/spend-limits/engine'
 import { budgetAttention, describeLimitShort, describeRule } from '@/lib/spend-limits/describe'
 import {
+  describeSpendLimitPace,
   resolveSpendLimitDisplayStatus,
   SPEND_LIMIT_STATUS_BAND_CLASS,
   SPEND_LIMIT_STATUS_LABEL,
@@ -882,6 +884,30 @@ function SpendLimitCard({
             )}
           </span>
         </div>
+        {/* Het TEMPO van de lopende periode — hoe ver de periode zelf is, naast
+            hoeveel van de grens op is (ADR 0119). Puur informatief: de statusband
+            hierboven, de reeks en de score staan onveranderd op gerealiseerde
+            bedragen. Zin en afronding komen uit describeSpendLimitPace. */}
+        {report.currentPeriodPace && (
+          <p className="mt-1 text-[11px] text-[var(--ink-3)]">
+            {describeSpendLimitPace(report.currentPeriodPace, current.label)}
+            {report.currentPeriodPace.projectedAmount !== null && (
+              <>
+                <span className="text-[var(--ink-4)]"> · </span>
+                <span
+                  className={report.currentPeriodPace.projectedExceeds ? 'text-negative' : undefined}
+                >
+                  in dit tempo kom je uit op{' '}
+                  <MaskedAmount
+                    value={report.currentPeriodPace.projectedAmount}
+                    tone={report.currentPeriodPace.projectedExceeds ? 'inherit' : 'kern'}
+                    className="text-[11px]"
+                  />
+                </span>
+              </>
+            )}
+          </p>
+        )}
         {/* Geld is opgeslagen tijd: de ruimte of de overschrijding ook in
             vrijheidstijd, op het dagtarief uit de loader. */}
         <FreedomLine

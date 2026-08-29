@@ -107,7 +107,7 @@ const SIM_ROWS: SimRow[] = [
   { age: 91, phase: 'retirement', startPortfolio: 0, growth: 0, savings: 0, withdrawal: 0, cashflowNet: 0, oneTimeNet: 0, endPortfolio: 0, grossIncome: 0, grossExpenses: 0, flowIn: 0, flowOut: 0 },
 ]
 
-function renderSheet(row: UnifiedProjectionRow) {
+function renderSheet(row: UnifiedProjectionRow, primaryBasis?: 'total' | 'liquid') {
   return render(
     <HorizonYearDetailsSheet
       open
@@ -120,6 +120,7 @@ function renderSheet(row: UnifiedProjectionRow) {
       debts={[]}
       lifeEvents={[]}
       cashflows={[]}
+      primaryBasis={primaryBasis}
     />,
   )
 }
@@ -341,5 +342,39 @@ describe('HorizonYearDetailsSheet — netto-vermogen kop-strip', () => {
     const strips = screen.getAllByText(/bezittingen/)
     expect(strips.length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText(/schulden/)).toBeTruthy()
+  })
+})
+
+// ── Grondslag-regel bij een J-hoofdlijn (ADR 0114 D3) ──────────────
+
+describe('HorizonYearDetailsSheet — "waarvan besteedbaar" bij woonstrategie Uitsluiten', () => {
+  // De bon BLIJFT de volledige jaarbalans op de I-grondslag — een bon is een
+  // balans, geen lens, en er is geen kernel-sluitterm waarmee een J-bon sluitend
+  // te maken zou zijn. Wat er wel bij moet: het getal waarop de gebruiker klikte.
+
+  const UITSLUITEN = makeYearRow({ nettoLiquide: 180_000 })
+
+  it('zet de regel onder het hoofdcijfer én onder de sluitregel', () => {
+    renderSheet(UITSLUITEN, 'liquid')
+    // Twee plekken: de bon opent met een I-getal terwijl er op een J-punt
+    // geklikt is, dus opening en sluiting mogen daarover niet verschillen.
+    expect(screen.getAllByText(/waarvan besteedbaar/).length).toBe(2)
+  })
+
+  it('houdt het hoofdcijfer op de I-grondslag (de balans verandert niet)', () => {
+    renderSheet(UITSLUITEN, 'liquid')
+    // De secties Bezittingen/Schulden lopen nog steeds over de hele balans.
+    expect(screen.getAllByText(/bezittingen/).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText('Eind netto')).toBeTruthy()
+  })
+
+  it('toont de regel NIET wanneer de grafiek op de totaal-grondslag staat', () => {
+    const { container } = renderSheet(UITSLUITEN)
+    expect(container.textContent).not.toContain('waarvan besteedbaar')
+  })
+
+  it('toont de regel NIET wanneer J ≡ I (Meerekenen — hij zou het hoofdcijfer herhalen)', () => {
+    const { container } = renderSheet(makeYearRow(), 'liquid')
+    expect(container.textContent).not.toContain('waarvan besteedbaar')
   })
 })

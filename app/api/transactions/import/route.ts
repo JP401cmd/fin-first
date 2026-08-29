@@ -237,13 +237,40 @@ export async function POST(req: Request) {
     // reeks hebben weggeschreven.
     const { data: account, error: accountError } = await supabase
       .from('bank_accounts')
-      .select('id, ownership')
+      .select('id, ownership, partner_visibility, user_id')
       .eq('id', accountId)
       .eq('is_active', true)
       .maybeSingle()
 
     if (accountError) return serverError(accountError, 'transactions-import:POST')
     if (!account) return forbidden('Deze rekening bestaat niet of is niet van jou')
+
+    // ── Mag de PARTNER hier importeren? ───────────────────────────────────────
+    // Op een gedeelde rekening die niet op 'full' staat, ziet de partner de
+    // boekingen van de eigenaar niet meer (ADR 0118, lees-tijd-gate). Daarmee
+    // breekt dedup-laag 1b: `loadHouseholdSharedDedupKeys` leest via RLS en
+    // krijgt een lege set terug, waarna dezelfde bankregel stil dubbel wordt
+    // weggeschreven — en beide reeksen tellen mee in uitgaven en spaarquote.
+    //
+    // Dit NIET repareren met een SECURITY DEFINER-hashfunctie: `import_hash` is
+    // zelf een correlatiesleutel (juist daarom is 'ie in 20260802190000 uit de
+    // partnerprojectie gehaald) en over een bekend formaat te brute-forceren.
+    // Op 'balance' is de rekeninghouder daarom de enige importeur. Eerlijk en
+    // uitlegbaar in plaats van stil verdubbeld.
+    const accountRow = account as {
+      ownership?: string | null
+      partner_visibility?: string | null
+      user_id?: string | null
+    }
+    if (
+      accountRow.ownership === 'shared' &&
+      accountRow.partner_visibility !== 'full' &&
+      accountRow.user_id !== user.id
+    ) {
+      return forbidden(
+        'Op deze gedeelde rekening deelt de eigenaar alleen het saldo, niet de boekingen. Alleen de rekeninghouder kan hier importeren.',
+      )
+    }
 
     // ── Zijn de meegestuurde budgetten van deze gebruiker? ────────────────────
     // Zelfde redenering: RLS bepaalt wat zichtbaar is. Zonder deze controle kan
@@ -281,7 +308,7 @@ export async function POST(req: Request) {
     // persoonlijke rekening wordt de partner-query dus niet eens gesteld — geen
     // extra round-trip, en geen leesronde over rijen van een ander waar geen
     // enkele aanleiding voor is.
-    const isSharedAccount = (account as { ownership?: string | null }).ownership === 'shared'
+    const isSharedAccount = accountRow.ownership === 'shared'
 
     // De leesronden zijn onafhankelijk en delen de scope-regel uit
     // `lib/truelayer/existing-hashes.ts` (rekening + datumvenster, gepagineerd).

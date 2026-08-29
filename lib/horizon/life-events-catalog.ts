@@ -6,6 +6,12 @@
 import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND } from '../constants'
 import type { CamelCaseKeys } from '../db-mapper'
 import { formatErfenisTipTekst, formatErfenisRelatieOpties, formatErfenisRelatieTip } from './schenk-erf-belasting'
+import {
+  anwNabestaandenBruto,
+  formatAnwOptieLabel,
+  formatAnwTipTekst,
+  formatWwTipTekst,
+} from '../sociale-zekerheid'
 
 // Afgeleide weergavebedragen (hele euro's) voor labels/tips — blijven in sync
 // met de canonieke AOW-constanten (lib/constants.ts); géén losse €-literals.
@@ -1186,10 +1192,10 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
       { key: 'nabestaandenpensioen', label: 'Nabestaandenpensioen', fieldType: 'number', default: 0, tip: 'Typisch 35–70% van het ouderdomspensioen. Check je UPO op mijnpensioenoverzicht.nl voor het exacte bedrag.' },
       { key: 'anwUitkering', label: 'Anw-uitkering', fieldType: 'select', default: 'kinderen', options: [
         { value: 'geen', label: 'Geen Anw-recht' },
-        { value: 'kinderen', label: 'Met kinderen <18 (~€1.380/mnd bruto)' },
-        { value: 'beperkt', label: 'Beperkt recht (zonder kinderen <18)' },
-      ], tip: 'Anw-uitkering (SVB): met kinderen <18 ca. €1.380/mnd bruto (halfwezenuitkering). Zonder kinderen: beperkt of nihil. Eigen inkomen wordt verrekend.' },
-      { key: 'anwBedrag', label: 'Anw-bedrag per maand (bruto)', fieldType: 'number', default: 1380, tip: 'Halfwezenuitkering 2026: ca. €1.380/mnd bruto. Nabestaandenuitkering (zonder kinderen): ca. €1.380/mnd bruto maar inkomensafhankelijk (SVB).', suffix: '/mnd' },
+        { value: 'kinderen', label: formatAnwOptieLabel() },
+        { value: 'beperkt', label: 'Beperkt recht (inkomen wordt verrekend)' },
+      ], tip: formatAnwTipTekst() },
+      { key: 'anwBedrag', label: 'Anw-bedrag per maand (bruto)', fieldType: 'number', default: Math.round(anwNabestaandenBruto()), tip: formatAnwTipTekst(), suffix: '/mnd' },
       { key: 'levensverzekering', label: 'Levensverzekering uitkering', fieldType: 'number', default: 0, tip: 'Gemiddelde ORV-uitkering: €100.000–€300.000. Premie: €5–€25/mnd. Check je polis voor het exacte bedrag.' },
       { key: 'kostendalingPct', label: 'Verwachte daling gedeelde kosten', fieldType: 'percentage', default: 30, tip: 'Na overlijden partner dalen gedeelde kosten (boodschappen, energie, verzekeringen) gemiddeld met 25–35%. Woonlasten (hypotheek/huur) blijven gelijk.', suffix: '%' },
     ],
@@ -1229,7 +1235,7 @@ export const LIFE_EVENT_CATALOG: Record<string, LifeEventCatalogEntry> = {
     defaultMonthlyIncome: -1500,
     defaultDuration: 12,
     description: 'Onvrijwillig verlies van baan met WW-uitkering en transitievergoeding',
-    tip: 'WW-uitkering: 75% dagloon eerste 2 maanden, daarna 70%. Maximaal 24 maanden (afhankelijk van arbeidsverleden). Max dagloon 2026: ca. €274/dag bruto (UWV).',
+    tip: formatWwTipTekst(),
     fields: [
       { key: 'huidigBruto', label: 'Huidig bruto maandsalaris', fieldType: 'number', default: 4000, tip: 'Je bruto maandsalaris. Nodig voor berekening WW-uitkering en transitievergoeding.' },
       { key: 'huidigNetto', label: 'Huidig netto maandinkomen', fieldType: 'number', default: 3000, tip: 'Je netto maandsalaris. Het verschil met WW bepaalt je maandelijkse inkomensgat.' },

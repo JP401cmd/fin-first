@@ -43,6 +43,7 @@ import type {
 } from '../types'
 import { HORIZON_MONTHS } from '../types'
 import type { EventMappingNotice } from './events'
+import { assetRisicoFactor } from './risico'
 
 // ── Gereserveerde fysieke slots (spiegel Excel-contract) ─────────────────────────
 const HOUSE_SLOT = 2 // bens rij 6 — eigen huis (rol 'eigenHuis')
@@ -145,7 +146,16 @@ export function isNietEigenWoningHypotheek(
   )
 }
 
-/** Categorieën met scenarioband-/MC-gevoeligheid (bens!F = 1). */
+/**
+ * bens!F = 1 — het Excel-contract voor "investeringspot". Stuurt sinds ADR 0117 nog
+ * uitsluitend `tables/bez.ts` (de scalar shift-tak) en de `potMutaties`-scope
+ * (`alleenInvestering`, de market_shock-events). BEWUST ongewijzigd gelaten: hem
+ * verbreden zou stil de reikwijdte van een gebruikers-event veranderen.
+ *
+ * Welke potten in de scenarioband, de Monte-Carlo en de rendement-marge meebewegen —
+ * en hoe hard — loopt sindsdien over `risico.ts#assetRisicoFactor` (die de
+ * pensioenpot wél meeneemt). Zie `wrappers/risico.ts` voor het contract.
+ */
 const INVESTERING_CATEGORIEEN: ReadonlySet<AssetCategorie> = new Set<AssetCategorie>([
   'Beleggingen',
   'Vastgoed',
@@ -252,6 +262,12 @@ export function buildAssetPotten(assets: readonly Asset[]): AssetPot[] {
       startwaarde: Number(a.current_value ?? 0) * inclusionFactor(a.net_worth_inclusion_pct),
       rendement: Number.isFinite(rendement) ? rendement : 0,
       investering: INVESTERING_CATEGORIEEN.has(categorie),
+      // ADR 0117 — markt-risicofactor (beta) uit risk_profile/subtype/categorie. Een
+      // tweede, ADDITIEVE as náást `investering`: die vlag blijft het bens!F-contract
+      // (tables/bez.ts + de market_shock-scope `alleenInvestering`), deze factor stuurt
+      // uitsluitend hoe hard de pot meebeweegt in band/MC/rendement-marge. Het
+      // fixture-pad zet 'm nooit → oracle-pariteit byte-identiek.
+      risicoFactor: assetRisicoFactor(a, categorie),
       rol,
     }
   })

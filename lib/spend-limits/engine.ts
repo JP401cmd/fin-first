@@ -43,6 +43,22 @@
  * poort: de mijlpaal-melding via `streakStartsAfterCreation`, de trend en de
  * score (`computeSpendLimitScore`) via `closedPeriodsSinceCreation`. Wie hier een
  * afgeleide bij bouwt die iets over gedrag zegt, hoort diezelfde poort te zetten.
+ *
+ * ── HET TEMPO VAN DE LOPENDE PERIODE IS INFORMATIEF, NOOIT STUREND ──────────
+ * `computeSpendLimitPace` (ADR 0119) voegt de TIJD-AS van de lopende periode toe:
+ * hoe ver de periode zelf is, naast hoeveel van de grens op is. Twee harde regels
+ * die het verschil maken tussen een hulpmiddel en een tweede waarheid:
+ *
+ *  1. GEEN ENKEL bestaand getal leunt erop. `status`, `isNearLimit`,
+ *     `periodOverAmount`, `periodHeadroom`, de reeks, de trend en de score
+ *     blijven 100 % op GEREALISEERDE bedragen. Zou `isNearLimit` op een prognose
+ *     gaan leunen, dan verschuiven meteen de meldingen (`decideSpendLimitEvents`
+ *     leest `status`/`isNearLimit`) en daarmee de reeks-score.
+ *  2. Het PROGNOSEBEDRAG is een uitspraak over gedrag en draagt daarom dezelfde
+ *     aanmaak-ondergrens als de trend en de score (`closedPeriodsSinceCreation`
+ *     + `SPEND_LIMIT_PACE_MIN_PERIODS`) — precies de poort die hierboven wordt
+ *     geëist. De verstreken-fractie zelf is een kale kalenderdeling zonder
+ *     historie en heeft die poort dus niet nodig.
  */
 
 import { isRealAggRow } from '@/lib/server-data/tx-aggregates'
@@ -239,6 +255,59 @@ export interface SpendLimitPeriodOutcome extends SpendLimitPeriodSlice {
   matchedCounterpartyNames: string[]
 }
 
+/**
+ * Het tempo van de LOPENDE periode — de tijd-as naast het bedrag.
+ *
+ * Twee lagen met een verschillende bewijslast, bewust in één blok zodat een
+ * oppervlak ze niet los kan optellen tot een derde uitspraak:
+ *
+ *  - de VERSTREKEN-fractie is een kale kalenderdeling: altijd beschikbaar, kan
+ *    per definitie niet misleiden, en is GEEN bedrag (blijft dus zichtbaar onder
+ *    bedragmaskering, ADR 0091);
+ *  - het PROGNOSEBEDRAG rust op eigen historie en draagt daarom de
+ *    aanmaak-ondergrens; het is wél een bedrag en maskeert dus mee.
+ *
+ * Zie `computeSpendLimitPace` voor het model en zijn bewust aanvaarde zwakte.
+ */
+export interface SpendLimitPeriodPace {
+  /** Kalenderdagen in de lopende periode (28–31 bij maand, 90–92 bij kwartaal, 365/366 bij jaar). */
+  periodDays: number
+  /** Verstreken dagen INCLUSIEF vandaag: 1 op de eerste dag, `periodDays` op de laatste. */
+  elapsedDays: number
+  /** Dagen ná vandaag tot en met het periode-einde; 0 op de laatste dag. */
+  remainingDays: number
+  /** `elapsedDays ÷ periodDays`, in (0, 1]. Exact 1 op de laatste dag — die telt volledig mee. */
+  elapsedFraction: number
+  /**
+   * Gerealiseerd ÷ grens. `null` bij een grens van 0 (geen deling door nul). Kan
+   * boven 1 uitkomen (overschrijding) of onder 0 (netto refunds) — bewust niet
+   * geklemd, want dit is de rekengrootheid; het klemmen hoort bij de weergave.
+   */
+  usedFraction: number | null
+  /** €/dag uit de eigen historie; `null` zonder genoeg meetellende afgesloten periodes. */
+  baselineDailyAmount: number | null
+  /**
+   * Op hoeveel meetellende afgesloten periodes het basistempo rust (ten hoogste
+   * `SPEND_LIMIT_PACE_BASELINE_WINDOW`). Reist mee zodat een oppervlak kan zeggen
+   * waaróp het bedrag rust in plaats van het als zekerheid te tonen.
+   */
+  basisPeriodCount: number
+  /**
+   * `gerealiseerd + resterende dagen × basistempo`. `null` zonder basistempo, op
+   * de laatste dag van de periode (er valt niets meer te projecteren) en zodra de
+   * uitkomst negatief zou zijn.
+   */
+  projectedAmount: number | null
+  /**
+   * Komt de prognose boven de grens uit? `null` zodra er geen prognosebedrag is.
+   *
+   * NADRUKKELIJK GEEN TWEEDE `isNearLimit`: dit veld stuurt geen status, geen
+   * melding, geen reeks en geen score aan — het kleurt hoogstens de zin waarin het
+   * bedrag staat.
+   */
+  projectedExceeds: boolean | null
+}
+
 export interface SpendLimitStreaks {
   /** Aaneengesloten AFGESLOTEN periodes binnen de grens, tot en met de laatste. */
   currentStreak: number
@@ -397,6 +466,15 @@ export interface SpendLimitReport {
   trend: SpendLimitTrend
   /** Hoe goed je je aan je grens houdt, verdicht tot één cijfer. */
   score: SpendLimitScore
+  /**
+   * Het TEMPO van de lopende periode: hoe ver de periode zelf is, en waar je
+   * uitkomt als je in je eigen ritme doorgaat. `null` bij dag- en weekpotten
+   * (zie `SPEND_LIMIT_PACE_PERIODS`).
+   *
+   * PUUR INFORMATIEF: geen enkel ander veld in dit rapport leest hem, en de
+   * meldingenlaag ziet hem niet. Zie de kop van dit bestand.
+   */
+  currentPeriodPace: SpendLimitPeriodPace | null
 }
 
 // ── Datum-helpers (lokaal geparsed, geen UTC-drift) ─────────────────────────
@@ -968,6 +1046,165 @@ export function computeSpendLimitScore(
   }
 }
 
+// ── Tempo van de lopende periode ─────────────────────────────────────────────
+
+/**
+ * De periodesoorten die een tempo krijgen.
+ *
+ * `day` valt af omdat het TECHNISCH niet kan: bij een dagpot ís de korrel de
+ * periode, er is geen uren-dimensie, dus "hoe ver is vandaag" bestaat niet in dit
+ * model. `week` valt af als PRODUCTKEUZE (eigenaar, 26-08-2026): zeven punten zijn
+ * te ruisgevoelig — één vaste last verschuift het beeld met tientallen procenten.
+ * Kwartaal en jaar lopen mee met maand: zelfde maandkorrel, even zinvolle
+ * verstreken-fractie, één conditie.
+ */
+export const SPEND_LIMIT_PACE_PERIODS: readonly SpendLimitPeriodKind[] = ['month', 'quarter', 'year']
+
+/** Heeft deze periodesoort een tempo? Oppervlakken lezen `pace !== null`, nooit deze lijst. */
+export function spendLimitPeriodHasPace(period: SpendLimitPeriodKind): boolean {
+  return SPEND_LIMIT_PACE_PERIODS.includes(period)
+}
+
+/**
+ * Hoeveel MEETELLENDE afgesloten periodes het basistempo beslaat.
+ *
+ * Bewust gelijk aan `SPEND_LIMIT_TREND_WINDOW`: het is exact het "recente" blok
+ * waarover de trend zijn richting bepaalt. Zou de prognose over een ánder venster
+ * middelen, dan kan de tegel "je geeft minder uit dan daarvoor" zeggen terwijl het
+ * bedrag ernaast op een oudere, hogere basis rust — twee uitspraken over hetzelfde
+ * gedrag die elkaar tegenspreken.
+ */
+export const SPEND_LIMIT_PACE_BASELINE_WINDOW = SPEND_LIMIT_TREND_WINDOW
+
+/**
+ * Ondergrens voor een prognoseBEDRAG: hetzelfde aantal meetellende afgesloten
+ * periodes als de score (`SPEND_LIMIT_SCORE_MIN_PERIODS` = 3), geteld ná de
+ * aanmaak van de pot. Geen nieuwe conventie, en geen tweede drempel: onder deze
+ * grens blijft `projectedAmount` null en toont het oppervlak alleen de
+ * tempo-markering (die heeft geen historie nodig).
+ */
+export const SPEND_LIMIT_PACE_MIN_PERIODS = SPEND_LIMIT_SCORE_MIN_PERIODS
+
+/**
+ * Aantal hele dagen sinds 1970 voor een ISO-datum 'YYYY-MM-DD'.
+ *
+ * Bewust via `Date.UTC` en niet via een lokale millisecondendeling: UTC kent geen
+ * zomertijd, dus het verschil van twee van deze getallen is EXACT het aantal
+ * kalenderdagen. Een lokale deling zit er over een DST-sprong 23 of 25 uur naast
+ * en levert dan een dag te veel of te weinig — precies op de maandgrens waar het
+ * tempo het meest wordt gelezen.
+ */
+function isoDayNumber(isoDate: string): number {
+  const y = Number(isoDate.slice(0, 4))
+  const m = Number(isoDate.slice(5, 7))
+  const d = Number(isoDate.slice(8, 10))
+  return Math.round(Date.UTC(y, m - 1, d) / 86_400_000)
+}
+
+/** Kalenderdagen die een periode beslaat, beide grenzen inclusief. */
+function sliceDayCount(slice: SpendLimitPeriodSlice): number {
+  return isoDayNumber(slice.until) - isoDayNumber(slice.since) + 1
+}
+
+/**
+ * Het tempo van de lopende periode — de TIJD-AS naast het bedrag.
+ *
+ * Twee lagen, met verschillende eisen (ADR 0119):
+ *
+ *  A. TEMPO-MARKERING (`elapsedFraction` / `usedFraction`) — een kale
+ *     kalenderdeling. Werkt vanaf dag 1 en vanaf de eerste dag dat een pot
+ *     bestaat, kan per definitie niet misleiden, en blijft zichtbaar onder
+ *     bedragmaskering (ADR 0091) omdat het geen bedrag is.
+ *  C. PROGNOSEBEDRAG (`projectedAmount`) = gerealiseerd + resterende dagen ×
+ *     eigen historisch dagtempo. Bewust NIET `gerealiseerd ÷ verstreken-fractie`:
+ *     die lineaire run-rate maakt van €80 op 1 augustus €2.480 verwacht — formeel
+ *     juist en communicatief onbruikbaar, en het is precies het geval waarvoor de
+ *     wens is ingediend. Het historische dagtempo is stabiel vanaf dag 1 omdat er
+ *     niet uit één dag wordt geëxtrapoleerd.
+ *
+ * BEWUST AANVAARDE ZWAKTE van C: een pot met een vaste last aan het begin van de
+ * periode (huur, verzekering) over-voorspelt, want het historische dagtempo komt
+ * bovenop een al-geboekte eenmalige post. Het echte antwoord daarop is een
+ * intra-periode-vórm uit dagdata — dat kost een tweede aggregaat (de maandkorrel
+ * geeft de lopende maand als één bucket) en valt buiten deze uitbreiding. De
+ * oppervlakken benoemen de beperking in plaats van haar weg te poetsen.
+ *
+ * PUUR: `now` komt van de aanroeper, er wordt nergens een klok gelezen. Datums
+ * worden lokaal geparsed, identiek aan `resolveSpendLimitPeriods` — één
+ * kalenderbegrip, geen UTC-drift tussen de periodegrens en de verstreken dagen.
+ */
+export function computeSpendLimitPace(args: {
+  period: SpendLimitPeriodKind
+  /** De lopende periode-uitkomst uit `computePeriodOutcome`. */
+  current: SpendLimitPeriodOutcome
+  /** Alle afgesloten periodes in het venster, oud → nieuw. */
+  closedPeriods: SpendLimitPeriodOutcome[]
+  now: Date
+  /** `spend_limits.created_at` — de aanmaak-ondergrens voor het BEDRAG. */
+  createdAt?: string | null
+}): SpendLimitPeriodPace | null {
+  const { period, current, closedPeriods, now, createdAt } = args
+  if (!spendLimitPeriodHasPace(period)) return null
+  // Een afgesloten periode heeft geen tempo meer: daar is de uitkomst het antwoord.
+  if (!current.isOpen) return null
+
+  const periodDays = sliceDayCount(current)
+  if (periodDays <= 0) return null
+
+  const start = isoDayNumber(current.since)
+  const today = isoDayNumber(iso(now))
+  // Inclusief vandaag: op de eerste dag is er één dag begonnen, niet nul. Op de
+  // laatste dag is de fractie exact 1 — de periode blijft dan nog wél `isOpen`.
+  const elapsedDays = Math.min(periodDays, Math.max(1, today - start + 1))
+  const remainingDays = periodDays - elapsedDays
+
+  const usedFraction =
+    current.limitAmount > 0 ? current.periodMatchedAmount / current.limitAmount : null
+
+  // Aanmaak-ondergrens + het recente blok: dezelfde poort als de trend en de score.
+  const basis = closedPeriodsSinceCreation(closedPeriods, createdAt).slice(
+    -SPEND_LIMIT_PACE_BASELINE_WINDOW,
+  )
+
+  let baselineDailyAmount: number | null = null
+  if (basis.length >= SPEND_LIMIT_PACE_MIN_PERIODS) {
+    let amount = 0
+    let days = 0
+    for (const p of basis) {
+      amount += p.periodMatchedAmount
+      days += sliceDayCount(p)
+    }
+    // Gewogen op DAGEN, niet het gemiddelde van losse per-periode-dagtempo's:
+    // februari en januari zijn geen gelijkwaardige noemers, en bij kwartaal/jaar
+    // loopt dat verschil verder op. Negatief basistempo (een blok waarin netto
+    // geld terugkwam) wordt op 0 geklemd — "je krijgt structureel geld terug" is
+    // geen voorspelbaar uitgavepatroon.
+    if (days > 0) baselineDailyAmount = Math.max(0, amount / days)
+  }
+
+  let projectedAmount: number | null = null
+  if (baselineDailyAmount !== null && remainingDays > 0) {
+    const projected = current.periodMatchedAmount + remainingDays * baselineDailyAmount
+    // Er wordt NERGENS door de verstreken-fractie gedeeld, dus een oneindige
+    // prognose kan niet ontstaan. Een NEGATIEVE kan wel (netto refunds die groter
+    // zijn dan wat er nog bij komt) en zegt niets over een uitgavengrens: dan
+    // liever geen bedrag dan een onmogelijk bedrag.
+    if (projected >= 0) projectedAmount = projected
+  }
+
+  return {
+    periodDays,
+    elapsedDays,
+    remainingDays,
+    elapsedFraction: elapsedDays / periodDays,
+    usedFraction,
+    baselineDailyAmount,
+    basisPeriodCount: basis.length,
+    projectedAmount,
+    projectedExceeds: projectedAmount === null ? null : projectedAmount > current.limitAmount,
+  }
+}
+
 // ── Volledig rapport ─────────────────────────────────────────────────────────
 
 /**
@@ -1004,5 +1241,15 @@ export function buildSpendLimitReport(args: {
     streaks: computeStreaks(closedPeriods),
     trend,
     score: computeSpendLimitScore(closedPeriods, trend, rule.createdAt),
+    // Als LAATSTE berekend en door niets hierboven gelezen — dat is de invariant,
+    // niet alleen de volgorde: het tempo is informatief en stuurt geen status,
+    // melding, reeks of score aan.
+    currentPeriodPace: computeSpendLimitPace({
+      period: rule.period,
+      current: currentPeriod,
+      closedPeriods,
+      now,
+      createdAt: rule.createdAt,
+    }),
   }
 }

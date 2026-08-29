@@ -114,13 +114,15 @@ export function ChartStaticLayersInner({
     mainStrokeAcc,
     mainStrokeDec,
     bridgeStroke,
-    liquidStroke,
+    secondaryStroke,
     baselinePath,
     accPath,
     decPath,
     bridgePath,
     withdrawalPath,
-    liquidPath,
+    primaryBasis,
+    secondaryPath,
+    secondaryBasis,
     allPath,
     scenarioPaths,
     householdPaths,
@@ -154,26 +156,34 @@ export function ChartStaticLayersInner({
   const accOpacity = emphasis === null || emphasis === 'accumulation' || emphasis === 'fire' ? 1 : DIMMED
   const decOpacity = emphasis === null || emphasis === 'withdrawal' ? 1 : DIMMED
 
-  // Elke lijn hoort bij precies één drempel.
+  // Elke drempel hoort bij precies één GETEKENDE lijn — en sinds de primaire
+  // lijn per woonstrategie van grondslag kan wisselen (ADR 0114) volgt die regel
+  // uit de grondslagen die daadwerkelijk op het scherm staan, niet meer uit "is
+  // er een besteedbaar-lijn".
   //
-  // Zónder besteedbaar-lijn plot de grafiek alléén het totale netto vermogen
-  // (incl. huis). Een liquide-drempel (`fireTarget` = requiredFirePortfolio,
-  // Prognose!J) hoort dan bij geen enkele getekende lijn en geeft alleen ruis —
-  // vandaar dat 'ie bij de dubbele-woning-grondslag wegvalt ten gunste van de
-  // incl.-woninglijn (`fireTargetInclHome`, Prognose!I).
-  //
-  // MÉT besteedbaar-lijn (`liquidPath`) ligt dat om: er staan dan twee lijnen op
-  // twee grondslagen, dus horen er ook twee drempels bij. Onderdrukken we de
-  // J-drempel dan, dan vergelijkt de gebruiker de besteedbaar-lijn (J) met de
+  // Welke grondslagen liggen er? De primaire lijn draagt `primaryBasis`, de
+  // dunne tweede lijn `secondaryBasis` (null = geen tweede lijn).
+  const heeftLiquideLijn = primaryBasis === 'liquid' || secondaryBasis === 'liquid'
+  const heeftTotaalLijn = primaryBasis === 'total' || secondaryBasis === 'total'
+  // De liquide drempel (`fireTarget` = requiredFirePortfolio, Prognose!J) hoort
+  // bij een J-lijn. Staat die er niet, dan hoort de drempel bij geen enkele
+  // getekende lijn en geeft hij alleen ruis — dan valt hij weg ten gunste van de
+  // incl.-woningdrempel (`fireTargetInclHome`, Prognose!I). Onderdrukken we hem
+  // wél terwijl er een J-lijn ligt, dan vergelijkt de gebruiker die lijn met de
   // enige zichtbare drempel (I) — precies de grondslagvermenging die CLAUDE.md
   // verbiedt, nu op de marker in plaats van op de as.
   const showExclTargetLine =
-    fireTargetInclHome == null || fireTargetInclHome <= 0 || liquidPath != null
+    fireTargetInclHome == null || fireTargetInclHome <= 0 || heeftLiquideLijn
+  // Spiegelbeeld: de I-drempel hoort bij een I-lijn. Zonder totaallijn (de
+  // "Uitsluiten"-modus met de tweede lijn uit) zou hij zwevend boven een
+  // J-grafiek blijven hangen.
+  const showInclTargetLine = heeftTotaalLijn
   // Zodra er twee lijnen op twee grondslagen staan is "doel" te vaag: benoem
   // expliciet bij welke lijn de drempel hoort, in hetzelfde woordpaar als de
   // legenda, de tooltip en de doel-KPI's ("met je huis" / "zonder je huis").
   // Eén lijn ⇒ één grondslag ⇒ het korte "doel" blijft.
-  const exclTargetLabel = liquidPath != null ? 'doel zonder je huis' : 'doel'
+  const toonBeideGrondslagen = secondaryBasis != null
+  const exclTargetLabel = toonBeideGrondslagen ? 'doel zonder je huis' : 'doel'
 
   // Labelpaar van de meegroeiende erfenis/koopkracht-doellijn: het eindlabel
   // (nominale waarde op de laatste zichtbare leeftijd) en het "€… nu"-sublabel
@@ -254,11 +264,12 @@ export function ChartStaticLayersInner({
         </>
       )}
 
-      {/* FIRE-doel op de incl.-woning-grondslag (requiredFireNetWorth) — in de
-          dubbele-woning-grondslag DE ENIGE doellijn (de excl./liquide-lijn
-          vervalt). Zelfde stijl als de gewone doellijn; valt bij FIRE samen met
-          de vermogenslijn (totaal netto vermogen). Anders undefined → geen lijn. */}
-      {!isPensioenMode && fireTargetInclHome != null && fireTargetInclHome > 0 && (
+      {/* FIRE-doel op de incl.-woning-grondslag (requiredFireNetWorth). Zelfde
+          stijl als de gewone doellijn; valt bij FIRE samen met de totaallijn.
+          Alleen zolang er ook echt een I-lijn ligt (`showInclTargetLine`) — bij
+          "Uitsluiten" met de totaallijn uit hoort deze drempel bij niets meer.
+          Zonder `fireTargetInclHome` (geen dubbele grondslag) → geen lijn. */}
+      {!isPensioenMode && showInclTargetLine && fireTargetInclHome != null && fireTargetInclHome > 0 && (
         <>
           <line
             x1={PAD.left} x2={PAD.left + innerW}
@@ -589,21 +600,24 @@ export function ChartStaticLayersInner({
         )
       )}
 
-      {/* Besteedbaar (liquide) vermogen — tweede grondslag naast de hoofdlijn.
-          Bewust ACHTER de hoofdlijn en dunner/gestippeld: de totaallijn blijft de
-          dominante lijn, deze toont het deel waar je écht bij kunt.
+      {/* De tweede grondslag — bij "Uitsluiten" de totaallijn (mét huis), anders
+          het besteedbare vermogen (zonder huis). Welke van de twee zegt
+          `secondaryBasis`; de vórm is in beide richtingen dezelfde, want de
+          betekenis van deze lijn is "de andere grondslag".
+          Bewust ACHTER de primaire lijn en dunner/gestippeld: de fasegekleurde
+          lijn blijft de dominante.
           GESTIPPELD ("2 3"), niet gestreept: de horizontale doellijnen zijn óók
-          bruin-gestreept ("6 3") en de besteedbaar-lijn loopt op het post-FIRE-
-          plateau vlak, dus vlak langs die drempels. Een punt-ritme leest daar
+          bruin-gestreept ("6 3") en deze lijn loopt op het post-FIRE-plateau
+          vlak, dus vlak langs die drempels. Een punt-ritme leest daar
           onmiskenbaar anders dan een streep-ritme, óók zonder kleurwaarneming.
           Reveal via opacity-fade i.p.v. het canonieke pathLength/strokeDasharray="1"-
           reveal: één strokeDasharray-attribuut kan niet én de reveal-lengte én het
           zichtbare stipje zijn (zelfde reden als de wat-als-lijn hierboven). */}
-      {liquidPath && (
+      {secondaryPath && (
         <path
-          d={liquidPath}
+          d={secondaryPath}
           fill="none"
-          stroke={liquidStroke}
+          stroke={secondaryStroke}
           strokeWidth={1.8}
           strokeLinecap="round"
           strokeLinejoin="round"

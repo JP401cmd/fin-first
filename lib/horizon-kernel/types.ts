@@ -134,6 +134,25 @@ export interface AssetPot {
   readonly rendement: number
   /** bens kolom F — investering-vlag (1 = schuift mee met scenarioband/MC/Hist). */
   readonly investering: boolean
+  /**
+   * **V23 — markt-risicofactor (beta), OPTIONEEL en inert-by-default** (ADR 0117).
+   *
+   * Hoe hard deze pot de marktonzekerheid volgt: een dimensieloze vermenigvuldiger
+   * op de scenarioband-shift (P!B43) én op de Monte-Carlo-ruis (MC!B10 + MC!<col>12).
+   * 1 = het huidige, op een breed gespreide aandelenportefeuille geijkte niveau;
+   * 0 = beweegt niet mee.
+   *
+   * **Afwezig ⇒ de kern valt terug op de binaire `investering`-vlag** (`1 : 0`) en
+   * is daarmee byte-identiek aan het Excel-oracle. Het fixture-pad
+   * (`input-from-fixture.ts`) vult dit veld NOOIT; de app-adapter (`adapter/potten.ts`)
+   * altijd. Zelfde overlay-patroon als `tekortAflossingUitLiquide` /
+   * `echteAnnuiteitAflossing` — zie `wrappers/risico.ts#potRisicoFactor`.
+   *
+   * Raakt bewust NIET het verwachte rendement (`rendement`) en niet de
+   * `investering`-vlag zelf: die blijft het bens!F-contract dat `tables/bez.ts` en
+   * de `potMutaties`-scope (`alleenInvestering`) lezen.
+   */
+  readonly risicoFactor?: number
   /** Getypte slot-rol (contract) of null. */
   readonly rol: AssetRol | null
 }

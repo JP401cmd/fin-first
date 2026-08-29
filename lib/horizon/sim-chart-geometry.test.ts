@@ -459,6 +459,101 @@ describe('buildSimChartGeometry — eventOverlay', () => {
  *        eindejaarsstand landt op `age + 1` — dezelfde as-positie die de
  *        hoofdlijn gebruikt, zodat overlays en hoofdlijn samenvallen.
  */
+// ── Grondslag-naad (primaryBasis) ─────────────────────────────────
+
+describe('buildSimChartGeometry — primaryBasis wisselt de grondslag van de hoofdlijn', () => {
+  // ADR 0114: bij woonstrategie "Uitsluiten" tekent de primaire lijn Prognose!J
+  // i.p.v. I. De hele naad is één parameter; deze tests pinnen dat álles wat
+  // achter `allPts` hangt daadwerkelijk meeschakelt — anders is de wissel puur
+  // cosmetisch en blijven stip, markers en y-as op de oude grondslag staan.
+
+  // Een J-reeks die STRUCTUREEL onder de totaallijn ligt (het huis zit er niet
+  // in), op dezelfde as-conventie: seed op de beginleeftijd, daarna één punt per
+  // jaargrens.
+  const totalPts = simRowsToChartPoints(baseInput.rows)
+  const liquidPoints: [number, number][] = totalPts.map(([age, v]) => [age, v - 250_000])
+  const metJ: SimChartGeometryInput = { ...baseInput, liquidPoints, primaryBasis: 'liquid' }
+
+  it("plot de J-reeks als hoofdlijn en de I-reeks als tweede lijn", () => {
+    const g = buildSimChartGeometry(metJ)
+    expect(g.primaryBasis).toBe('liquid')
+    expect(g.allPts).toEqual(liquidPoints)
+    expect(g.secondaryBasis).toBe('total')
+    // De rollen zijn precies verwisseld. Beide geometrieën dragen dezelfde twee
+    // reeksen en dus dezelfde y-schaal, waardoor de paden onderling
+    // vergelijkbaar zijn: het beginpunt van de tweede lijn hier is het beginpunt
+    // van de hóófdlijn daar, en omgekeerd.
+    const basis = buildSimChartGeometry({ ...baseInput, liquidPoints })
+    const startVan = (d: string | null) => (d === null ? null : d.slice(0, d.indexOf(' L ')))
+    expect(g.secondaryPath).not.toBeNull()
+    expect(startVan(g.secondaryPath)).toBe(startVan(basis.accPath))
+    expect(startVan(g.accPath)).toBe(startVan(basis.secondaryPath))
+  })
+
+  it('verplaatst de FIRE-stip, het marker-anker en het y-domein mee', () => {
+    const g = buildSimChartGeometry(metJ)
+    const basis = buildSimChartGeometry({ ...baseInput, liquidPoints })
+    // FIRE-stip: hij hangt aan de getekende lijn, dus op J ligt hij láger op het
+    // scherm (grotere SVG-y) dan op I.
+    expect(g.yFireDot).not.toBeNull()
+    expect(basis.yFireDot).not.toBeNull()
+    expect(g.yFireDot as number).toBeGreaterThan(basis.yFireDot as number)
+    // Marker-anker (`lineYAt`) volgt dezelfde lijn.
+    expect(g.lineYAt(50) as number).toBeGreaterThan(basis.lineYAt(50) as number)
+    // Y-domein: beide reeksen tellen mee, dus de top blijft die van de
+    // totaallijn — de as mag niet stil naar de J-piek zakken zolang de I-lijn
+    // nog getekend wordt.
+    expect(g.yTicks[g.yTicks.length - 1].val).toBe(basis.yTicks[basis.yTicks.length - 1].val)
+  })
+
+  it('laat de fase-split op de J-lijn landen, niet op de I-lijn', () => {
+    const g = buildSimChartGeometry(metJ)
+    // Het laatste opbouwpunt is de FIRE-junction; die moet op de J-reeks liggen.
+    const junction = g.allPts[g.allPts.length - 1]
+    expect(junction[1]).toBe(liquidPoints[liquidPoints.length - 1][1])
+    // En de opbouwlijn eindigt op de geïnterpoleerde J-waarde, niet op de I-waarde.
+    expect(g.accPath).not.toBe(buildSimChartGeometry({ ...baseInput, liquidPoints }).accPath)
+  })
+
+  it('valt terug op de totaal-grondslag zonder J-reeks (geen lege grafiek)', () => {
+    const g = buildSimChartGeometry({ ...baseInput, primaryBasis: 'liquid' })
+    expect(g.primaryBasis).toBe('total')
+    expect(g.allPts).toEqual(totalPts)
+    expect(g.secondaryBasis).toBeNull()
+  })
+
+  it('verbergt de tweede lijn én haar bijdrage aan de y-as met secondaryLineVisible: false', () => {
+    // Een J-reeks die BOVEN de totaallijn uit zou piekken: zichtbaar bepaalt hij
+    // de ashoogte mee, onzichtbaar mag hij dat niet meer doen. Zonder die tweede
+    // helft zou "verbergen" een lege plek in de as achterlaten.
+    const hoog: [number, number][] = totalPts.map(([age, v]) => [age, v * 3])
+    const zichtbaar = buildSimChartGeometry({ ...baseInput, liquidPoints: hoog })
+    const verborgen = buildSimChartGeometry({
+      ...baseInput, liquidPoints: hoog, secondaryLineVisible: false,
+    })
+    expect(zichtbaar.secondaryPath).not.toBeNull()
+    expect(verborgen.secondaryPath).toBeNull()
+    expect(verborgen.secondaryBasis).toBeNull()
+    expect(verborgen.yTicks[verborgen.yTicks.length - 1].val)
+      .toBeLessThan(zichtbaar.yTicks[zichtbaar.yTicks.length - 1].val)
+    // …en zonder tweede reeks is de uitvoer identiek aan de kale basis-invoer.
+    expect(verborgen.yTicks).toEqual(buildSimChartGeometry(baseInput).yTicks)
+    expect(verborgen.accPath).toBe(buildSimChartGeometry(baseInput).accPath)
+  })
+
+  it('blijft byte-identiek wanneer primaryBasis wordt weggelaten', () => {
+    // De vangrail onder elke bestaande caller: geen prop ⇒ exact het oude gedrag.
+    const zonder = buildSimChartGeometry(baseInput)
+    const expliciet = buildSimChartGeometry({ ...baseInput, primaryBasis: 'total' })
+    expect(zonder.primaryBasis).toBe('total')
+    expect(zonder.accPath).toBe(expliciet.accPath)
+    expect(zonder.decPath).toBe(expliciet.decPath)
+    expect(zonder.yTicks).toEqual(expliciet.yTicks)
+    expect(zonder.secondaryPath).toBeNull()
+    expect(zonder.secondaryBasis).toBeNull()
+  })
+})
+
 describe('simRowsToChartPoints — tijdstip-conventie', () => {
   const rows = [
     makeRow(40, 100_000, { endPortfolio: 110_000 }),

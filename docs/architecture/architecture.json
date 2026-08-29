@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-28T23:41:37.574Z",
-  "generatedDate": "2026-08-28",
+  "generatedAt": "2026-08-29T15:55:18.715Z",
+  "generatedDate": "2026-08-29",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -190,9 +190,9 @@
     "routesProduction": 95,
     "api": 303,
     "tables": 91,
-    "migrations": 216,
+    "migrations": 218,
     "integrations": 25,
-    "components": 984,
+    "components": 985,
     "providers": 15,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -8110,7 +8110,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 216
+    "migrationCount": 218
   },
   "tablesByDomain": [
     {
@@ -8596,15 +8596,16 @@
     }
   ],
   "components": {
-    "total": 984,
+    "total": 985,
     "groups": [
       {
         "group": "app",
-        "count": 381,
+        "count": 382,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
           "account-storage-guard",
+          "account-visibility-toggle",
           "action-board",
           "action-board.test",
           "action-card",
@@ -16612,6 +16613,89 @@
       ],
       "summary": "Twee van de zes inbakken in het beheerders-runbook stonden op *\"niet afvinkbaar\"*:",
       "file": "docs/adr/0113-de-foutenstapel-is-een-werkvoorraad-geen-logboek.md"
+    },
+    {
+      "id": "0114-primaire-toekomstlijn-wisselt-van-grondslag",
+      "title": "De primaire lijn van de Toekomst-grafiek wisselt van grondslag per woonstrategie (herroeping van 5 aug 2026)",
+      "status": "aanvaard",
+      "date": "2026-08-29",
+      "elements": [
+        "as-planning",
+        "as-vermogen",
+        "sp-plannen",
+        "app-comp"
+      ],
+      "summary": "Op `/toekomst` tekent de primaire vermogenslijn voortaan dezelfde grondslag als de voortgangsbalk eronder: Prognose!J (besteedbaar, zonder woning) bij woonstrategie `exclude_from_fire`, Prognose!I (totaal netto vermogen) in alle andere gevallen. Dit herroept het besluit van 5 aug",
+      "file": "docs/adr/0114-primaire-toekomstlijn-wisselt-van-grondslag.md"
+    },
+    {
+      "id": "0115-pensioen-import-blijft-op-het-toestel",
+      "title": "De pensioen-datadownload wordt client-side gelezen en geschreven — bewuste afwijking van ADR 0058",
+      "status": "aanvaard",
+      "date": "2026-08-29",
+      "elements": [
+        "as-import",
+        "as-planning",
+        "sp-plannen",
+        "app-comp",
+        "data-cont"
+      ],
+      "summary": "De XML- en JSON-download van mijnpensioenoverzicht.nl wordt volledig in de browser gelezen, gemapt en weggeschreven — het bestand verlaat het toestel niet en er is geen `POST /api/pension/import`. Dat is een bewuste, begrensde afwijking van de datapad-conventie uit ADR 0058 (\"mut",
+      "file": "docs/adr/0115-pensioen-import-blijft-op-het-toestel.md"
+    },
+    {
+      "id": "0116-swr-blijft-op-de-profielaanname-groei-volgt-de-mix",
+      "title": "De SWR blijft op de profielaanname, de groei volgt de mix — twee grondslagen, bewust en benoemd",
+      "status": "aanvaard",
+      "date": "2026-08-29",
+      "elements": [
+        "as-planning",
+        "as-vermogen",
+        "sp-plannen",
+        "app-comp"
+      ],
+      "summary": "Het FIRE-**doelbedrag** blijft afgeleid van één profielgetal (`resolveFireParams().grossReturn` → `computeEffectiveSwr`), terwijl de **groei** van het vermogen per bezitting loopt (`assets.expected_return` → `tables/bez.ts`). Die twee grondslagen bestaan al naast elkaar; dit ADR ",
+      "file": "docs/adr/0116-swr-blijft-op-de-profielaanname-groei-volgt-de-mix.md"
+    },
+    {
+      "id": "0117-risico-volgt-de-categorie",
+      "title": "Risico volgt de categorie — een markt-risicofactor per pot in band, Monte-Carlo en rendement-marge",
+      "status": "aanvaard",
+      "date": "2026-08-29",
+      "elements": [
+        "as-planning",
+        "as-vermogen",
+        "sp-plannen",
+        "app-comp"
+      ],
+      "summary": "De scenarioband (P!B43), de Monte-Carlo (MC!B3/B10/<col>12) en de rendement-marge schalen hun verstoring voortaan met een **markt-risicofactor per bezitting-pot** (`AssetPot.risicoFactor`, een beta) in plaats van met de binaire `investering`-vlag. Daarmee beweegt een premieregeli",
+      "file": "docs/adr/0117-risico-volgt-de-categorie.md"
+    },
+    {
+      "id": "0118-per-rekening-zichtbaarheid-op-lees-tijd",
+      "title": "Per-rekening zichtbaarheid in het huishouden wordt op lees-tijd afgedwongen, niet bij het schrijven",
+      "status": "aanvaard",
+      "date": "2026-08-29",
+      "elements": [
+        "as-huishouden",
+        "as-transacties",
+        "do-huishouden",
+        "do-transactie"
+      ],
+      "summary": "Een bankrekening krijgt een eigen kolom `bank_accounts.partner_visibility` met drie standen — `none` / `balance` / `full` — die bepaalt wat de huishoudpartner van die rekening ziet. De keuze wordt afgedwongen op **lees-tijd**: in de SELECT-policies van `transactions`, `transactio",
+      "file": "docs/adr/0118-per-rekening-zichtbaarheid-op-lees-tijd.md"
+    },
+    {
+      "id": "0119-grenzenpot-tempo-van-de-lopende-periode",
+      "title": "Grenzenpot: het tempo van de lopende periode is informatief, nooit sturend",
+      "status": "aanvaard",
+      "date": "2026-08-29",
+      "elements": [
+        "as-budget",
+        "fn-budgetteren"
+      ],
+      "summary": "Een testgebruiker meldde (13-08-2026): *\"Grenzenpot weergave zou aangevuld kunnen worden met een rolling forecast van de uitgave. Niet de dag en week potten maar maandpot wel. Als de max 100 is en de 1e van de maand heb je al 80 uitgegeven is het fijn dat te zien.\"*",
+      "file": "docs/adr/0119-grenzenpot-tempo-van-de-lopende-periode.md"
     }
   ],
   "churn": {
@@ -16635,7 +16719,7 @@
       },
       {
         "path": "app/api/ai",
-        "commits": 17
+        "commits": 18
       },
       {
         "path": "app/api/assets",
@@ -16661,7 +16745,7 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 9737,
+        "loc": 9805,
         "commits": 79
       },
       {
@@ -16676,7 +16760,7 @@
       },
       {
         "file": "components/app/cash-account-view.tsx",
-        "loc": 3457,
+        "loc": 3525,
         "commits": 19
       },
       {
@@ -16691,7 +16775,7 @@
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
-        "loc": 2378,
+        "loc": 2406,
         "commits": 23
       },
       {
@@ -17797,7 +17881,7 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-08-28",
+    "previousDate": "2026-08-29",
     "hasChanges": false,
     "sections": []
   },
@@ -18114,6 +18198,13 @@
       "date": "2026-08-28",
       "api": 303,
       "components": 984,
+      "tables": 91,
+      "routesProduction": 95
+    },
+    {
+      "date": "2026-08-29",
+      "api": 303,
+      "components": 985,
       "tables": 91,
       "routesProduction": 95
     }

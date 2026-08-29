@@ -51,9 +51,9 @@
  * ## Oracle-pariteit
  * Volledig ADDITIEF: dit bestand raakt `engine`/`solver`/`gap`/`tables`/
  * `wrappers` niet aan en wordt door het fixture-pad nooit aangeroepen. De
- * verstoring loopt over `onzekerheid.shift` (P!B43) — de bestaande invoer-
- * transform die `tables/bez.ts` al op investeringspotten toepast — dus exact
- * dezelfde hefboom als de scenarioband en de MC-ruis. Geen tabel-wijziging.
+ * verstoring loopt over hetzelfde invoer-pad als de scenarioband en de MC-ruis:
+ * het rendement van de marktgevoelige potten, sinds ADR 0117 geschaald met de
+ * markt-risicofactor van de pot. Geen tabel-wijziging.
  *
  * Pure module: geen fs/Supabase/Date.now/Math.random.
  */
@@ -62,6 +62,7 @@ import { RENDEMENT_MARGE_GRENS } from '@/lib/constants'
 import { runKernelProjection } from './engine'
 import { computeEs, type EsRow } from './tables/es'
 import { computeGap, eindleeftijdVan } from './gap'
+import { potRisicoFactor } from './wrappers/risico'
 import type { KernelInput } from './types'
 
 /**
@@ -120,14 +121,30 @@ export function resolveMargeAnker(
 }
 
 /**
- * P!B38 op de anker-leeftijd, met het rendement van élke investeringspot
- * verschoven met `delta` (via `onzekerheid.shift` = P!B43 — dezelfde hefboom als
- * de scenarioband).
+ * P!B38 op de anker-leeftijd, met het rendement van élke marktgevoelige pot
+ * verschoven met `delta · f` — dezelfde hefboom en dezelfde per-pot-schaling als de
+ * scenarioband sinds ADR 0117 (`wrappers/risico.ts#potRisicoFactor`).
+ *
+ * De verstoring wordt PER POT in `pot.rendement` gebakken i.p.v. als scalar in
+ * `onzekerheid.shift`, want een scalar kan de per-pot-factor niet dragen. Zonder
+ * overlay is dat identiek: de factor is dan `investering ? 1 : 0`, en op elk pad dat
+ * deze functie bereikt is `onzekerheid.shift` 0 (de app-adapter zet 'm op 0 en de
+ * marktcheck raakt 'm niet), zodat `rendement + delta` precies het oude
+ * `rendement + (shift + delta)` is.
+ *
+ * BETEKENIS van het getal na ADR 0117: de marge is de tegenvaller op een pot met
+ * beta 1 — een MARKTbrede verschuiving, die per pot met zijn eigen risico
+ * doorwerkt. Dat maakt band en marge weer dezelfde vraag over hetzelfde plan:
+ * bleef de marge op de uniforme Δr staan, dan zou de band de pensioenpot wél
+ * meenemen en de marge niet.
  */
 function gapBijShift(input: KernelInput, es: EsRow, ankerLeeftijd: number, delta: number): number {
   const verschoven: KernelInput = {
     ...input,
-    onzekerheid: { ...input.onzekerheid, shift: input.onzekerheid.shift + delta },
+    assetPotten: input.assetPotten.map((p) => {
+      const factor = potRisicoFactor(p)
+      return factor === 0 ? p : { ...p, rendement: p.rendement + delta * factor }
+    }),
   }
   const proj = runKernelProjection(verschoven, { fireAge: ankerLeeftijd })
   // Het doelblok leest alleen start-/inflatie-parameters uit `input` (die de

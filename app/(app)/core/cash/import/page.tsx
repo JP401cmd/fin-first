@@ -42,28 +42,19 @@ import {
   type InsertedTxRow,
   type PostImportTx,
 } from '@/lib/post-import-categorize'
+import {
+  normalizePartnerVisibility,
+  rowOwnershipForImport,
+  type PartnerVisibility,
+} from '@/lib/bank-account-visibility'
 
 type Account = {
   id: string
   name: string
   iban: string | null
   ownership?: 'personal' | 'shared'
-}
-
-/**
- * Leidt het eigendom van een te importeren transactie af: een gedeeld budget op
- * een persoonlijke rekening maakt de transactie gezamenlijk (volgt het budget),
- * tenzij de gebruiker dat per rij handmatig heeft teruggezet. Anders volgt de
- * transactie het eigendom van de rekening.
- */
-function deriveRowOwnership(
-  accountOwnership: 'personal' | 'shared',
-  budgetOwnership: 'personal' | 'shared' | undefined,
-  manualOverride?: 'personal' | 'shared',
-): 'personal' | 'shared' {
-  if (manualOverride) return manualOverride
-  if (budgetOwnership === 'shared' && accountOwnership === 'personal') return 'shared'
-  return accountOwnership
+  partner_visibility?: PartnerVisibility
+  user_id?: string
 }
 
 type ImportRow = ParsedTransaction & {
@@ -285,7 +276,11 @@ export default function ImportPage() {
       // importeert de pagina vrolijk door en staat de spaarquote van de gebruiker
       // permanent verkeerd — zonder dat iets rood wordt. Liever niet importeren.
       const [accountsRes, budgetsRes, correctionsRes, ownIbansRes, ownAccountIbans] = await Promise.all([
-        supabase.from('bank_accounts').select('id, name, ownership').eq('is_active', true).order('sort_order'),
+        // `partner_visibility` + `user_id` erbij: op een gedeelde rekening die
+        // alleen het saldo deelt, is de rekeninghouder de enige importeur
+        // (ADR 0118). De server weigert zo'n import met een 403; deze pagina
+        // laat 'm dan ook niet in de keuzelijst staan.
+        supabase.from('bank_accounts').select('id, name, ownership, partner_visibility, user_id').eq('is_active', true).order('sort_order'),
         supabase.from('budgets').select('*').order('sort_order'),
         supabase.from('category_corrections').select('match_field, match_value, budget_id'),
         user ? supabase.from('user_own_ibans').select('match_type, match_value, iban').eq('user_id', user.id) : Promise.resolve({ data: [], error: null }),
@@ -303,8 +298,28 @@ export default function ImportPage() {
       }
 
       if (accountsRes.data) {
-        const accountRows = (accountsRes.data as { id: string; name: string; ownership?: 'personal' | 'shared' }[])
-          .map((a) => ({ ...a, iban: ibanByAccountId.get(a.id) ?? null }))
+        const accountRows = (accountsRes.data as {
+          id: string
+          name: string
+          ownership?: 'personal' | 'shared'
+          partner_visibility?: string | null
+          user_id?: string | null
+        }[])
+          .map((a) => ({
+            ...a,
+            iban: ibanByAccountId.get(a.id) ?? null,
+            partner_visibility: normalizePartnerVisibility(a.partner_visibility, a.ownership),
+          }))
+          // Gedeelde rekening van de PARTNER die alleen het saldo deelt: hier mag
+          // je niet importeren (de dedup-set van de eigenaar is voor jou
+          // onzichtbaar, dus je zou stil dubbele boekingen maken). Weglaten uit de
+          // keuzelijst is eerlijker dan een 403 ná het uploaden van een bestand.
+          .filter((a) => !(
+            a.ownership === 'shared' &&
+            a.partner_visibility !== 'full' &&
+            !!user &&
+            a.user_id !== user.id
+          ))
         setAccounts(accountRows as Account[])
         if (accountRows.length > 0) {
           setSelectedAccountId(accountRows[0].id)
@@ -922,13 +937,26 @@ export default function ImportPage() {
 
     const selectedAccount = accounts.find((a) => a.id === selectedAccountId)
     const accountOwnership: 'personal' | 'shared' = selectedAccount?.ownership ?? 'personal'
+    const accountVisibility = normalizePartnerVisibility(
+      selectedAccount?.partner_visibility,
+      accountOwnership,
+    )
 
     const insertRows = finalRows.map((r) => {
       // Eigendom: volgt de rekening, maar een (handmatig of automatisch toegekend)
       // gedeeld budget op een persoonlijke rekening tilt de transactie naar
       // gezamenlijk — tenzij de gebruiker dat per rij heeft teruggezet.
       const budgetOwnership = budgets.find((b) => b.id === r.budget_id)?.ownership
-      const ownership = deriveRowOwnership(accountOwnership, budgetOwnership, r.manualOwnership)
+      // Op een 'balance'-rekening blijven nieuwe boekingen persoonlijk: de
+      // partner ziet ze toch niet (RLS), en 'shared' zou ze wél laten meetellen
+      // in de gezamenlijke uitgaven — een cijfer dat de partner niet kan
+      // navertellen. Zie `rowOwnershipForImport` (ADR 0118).
+      const ownership = rowOwnershipForImport(
+        accountOwnership,
+        accountVisibility,
+        budgetOwnership,
+        r.manualOwnership,
+      )
       return {
       user_id: user!.id,
       account_id: selectedAccountId,

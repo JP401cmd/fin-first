@@ -13,6 +13,13 @@
  * BELANGRIJK — byte-identieke output: deze module reproduceert exact de
  * berekeningen zoals ze eerder inline in `sim-chart.tsx` stonden. Wijzig hier
  * niets aan de formules zonder de snapshot-tests bij te werken.
+ *
+ * GRONDSLAG (ADR 0114): welke grootheid de primaire lijn draagt is sinds
+ * 2026-08-29 een INPUT (`primaryBasis`), geen aanname. De default `'total'`
+ * houdt de uitvoer byte-identiek voor elke bestaande caller; alleen de
+ * woonstrategie "Uitsluiten" zet 'm op `'liquid'`. De omschakeling gebeurt op
+ * één plek — de `allPts`-naad — waar fase-split, FIRE-/AOW-stip, marker-anker
+ * en y-domein alle vier achter hangen.
  */
 import type { SimRow } from '@/lib/fire-simulation'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
@@ -94,13 +101,41 @@ export type SimChartGeometryInput = {
   eventOverlay?: ChartEventOverlay[]
   targetInflationFactors?: { age: number; factor: number }[]
   /**
-   * Tweede vermogenslijn: het BESTEEDBARE (liquide) vermogen als `[leeftijd,
-   * bedrag]`-punten, op dezelfde as-conventie als de hoofdlijn. Alleen gezet bij
-   * de eigen-woningstrategieën waar totaal en besteedbaar blijvend uiteenlopen
-   * (zie `lib/horizon/liquid-wealth-line.ts`); anders undefined → geen extra lijn
-   * en byte-identieke uitvoer voor alle bestaande callers.
+   * De BESTEEDBARE (liquide) vermogensreeks als `[leeftijd, bedrag]`-punten
+   * (Prognose!J), op dezelfde as-conventie als de totaalreeks — inclusief het
+   * J(0)-ankerpunt op de beginleeftijd (zie `buildLiquidWealthPoints` in
+   * `lib/horizon/liquid-wealth-line.ts`). Alleen gezet bij de
+   * eigen-woningstrategieën waar totaal en besteedbaar uiteenlopen; anders
+   * undefined → één lijn en byte-identieke uitvoer voor alle bestaande callers.
+   *
+   * Of dit de PRIMAIRE of de secundaire lijn wordt, bepaalt `primaryBasis`.
    */
   liquidPoints?: [number, number][]
+  /**
+   * Grondslag van de PRIMAIRE (massieve, fasegekleurde) lijn — de lijn waar de
+   * fase-split, de FIRE-/AOW-stip, het Y-anker van álle gebeurtenis-markers en
+   * het y-domein aan hangen.
+   *
+   *  - `'total'` (default) — netto vermogen INCL. woning (Prognose!I), uit `rows`.
+   *  - `'liquid'` — besteedbaar vermogen ZONDER de niet-liquide categorieën
+   *    (Prognose!J), uit `liquidPoints`. De totaalreeks wordt dan de dunne
+   *    secundaire lijn: een rolomkering, geen extra lijn.
+   *
+   * Alleen `'liquid'` bij woonstrategie "Uitsluiten" — daar staan de
+   * voortgangsbalk en het vrijheids-% al op J en liep de grafiek uit de pas
+   * (ADR 0114). Zonder deze prop is de uitvoer byte-identiek aan voorheen.
+   */
+  primaryBasis?: 'total' | 'liquid'
+  /**
+   * Tekent de grafiek de tweede (dunne, gestreepte) lijn met de ándere
+   * grondslag? Default `true`. Op `false` verdwijnt die lijn én zijn bijdrage
+   * aan het y-domein — de gebruikersschakelaar naast de Doel-pill.
+   *
+   * Eén schakelaar voor beide richtingen: bij `primaryBasis: 'total'` verbergt
+   * hij de besteedbaar-lijn, bij `'liquid'` de totaallijn. (Een caller die
+   * `liquidPoints` helemaal weglaat krijgt uiteraard sowieso geen tweede lijn.)
+   */
+  secondaryLineVisible?: boolean
   /** Gemeten containerbreedte (px, uit de ResizeObserver in de component). */
   containerW: number
 }
@@ -197,8 +232,8 @@ export type SimChartGeometry = {
   /** Kleur van de derde band (Overgang FIRE→AOW): een horizon-tussentint die
    *  leesbaar afsteekt tegen de donkere opbouw- en afbouwlijnen op `--paper`. */
   bridgeStroke: string
-  /** Kleur van de besteedbaar-lijn (zie `liquidPath`). */
-  liquidStroke: string
+  /** Kleur van de tweede grondslag-lijn (zie `secondaryPath`). */
+  secondaryStroke: string
   COLOR_OPBOUW: string
   COLOR_AFBOUW: string
   // Voorberekende paden (d-strings)
@@ -209,9 +244,18 @@ export type SimChartGeometry = {
   bridgePath: string | null
   /** Onttrekking vanaf AOW (alleen in `threeBandFire`; anders null). */
   withdrawalPath: string | null
-  /** Besteedbaar (liquide) vermogen — tweede grondslag naast de hoofdlijn.
-   *  null zonder `liquidPoints` (byte-identiek voor bestaande callers). */
-  liquidPath: string | null
+  /** Grondslag van de primaire lijn — echo van de input, zodat de render-laag
+   *  (legenda, tooltip, doellijn-rollen) niet zelf hoeft af te leiden welke
+   *  grootheid `allPts` draagt. */
+  primaryBasis: 'total' | 'liquid'
+  /** De tweede grondslag-lijn: dun en gestreept, naast de primaire lijn. Draagt
+   *  altijd de ÁNDERE grootheid dan `primaryBasis`. null zodra er geen tweede
+   *  lijn is (geen `liquidPoints`, of `secondaryLineVisible: false`) —
+   *  byte-identiek voor bestaande callers. */
+  secondaryPath: string | null
+  /** Welke grootheid `secondaryPath` draagt (`'liquid'` = zonder je huis,
+   *  `'total'` = met je huis), of null als er geen tweede lijn is. */
+  secondaryBasis: 'total' | 'liquid' | null
   allPath: string | null
   scenarioPaths: ScenarioPathGeometry[]
   householdPaths: HouseholdPathGeometry[]
@@ -279,6 +323,8 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
     eventOverlay,
     targetInflationFactors,
     liquidPoints,
+    primaryBasis = 'total',
+    secondaryLineVisible = true,
     containerW,
   } = input
 
@@ -316,8 +362,33 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
   const minAge = visibleMinAge ?? currentAge
   const maxAge = visibleMaxAge ?? endAge
 
-  // Build all path points from rows (tijdstip-conventie: zie simRowsToChartPoints)
-  const allPts: [number, number][] = simRowsToChartPoints(rows)
+  // ── De ÉNE grondslag-naad ───────────────────────────────────────────────────
+  //
+  // Hier, en alleen hier, komt de grootheid van de primaire lijn binnen. Alles
+  // wat daarna volgt — de fase-split opbouw/brug/afbouw, de FIRE- en AOW-stip,
+  // `lineYAt` (het Y-anker van álle gebeurtenis-markers), de depletion-zone en
+  // het y-domein — leest `allPts` en schakelt dus vanzelf mee. Eén parameter,
+  // vier consequenties (ADR 0114).
+  //
+  // Tijdstip-conventie voor beide reeksen: zie `simRowsToChartPoints` resp.
+  // `buildLiquidWealthPoints`. Ze delen dezelfde as (seed op de beginleeftijd,
+  // daarna één punt per jaargrens), dus de rolomkering verschuift niets.
+  const totalPts: [number, number][] = simRowsToChartPoints(rows)
+  const liquidPts: [number, number][] = liquidPoints ?? []
+  // Een 'liquid'-primaire lijn zonder J-reeks bestaat niet: dan valt de grafiek
+  // terug op de totaallijn i.p.v. leeg te renderen.
+  const effectivePrimaryBasis: 'total' | 'liquid' =
+    primaryBasis === 'liquid' && liquidPts.length > 0 ? 'liquid' : 'total'
+  const allPts: [number, number][] =
+    effectivePrimaryBasis === 'liquid' ? liquidPts : totalPts
+  // De tweede lijn draagt per definitie de ándere grootheid. Onzichtbaar ⇒ lege
+  // reeks, zodat hij ook niet meer meetelt in het y-domein hieronder.
+  const rawSecondaryPts: [number, number][] =
+    effectivePrimaryBasis === 'liquid' ? totalPts : liquidPts
+  const secondaryPts: [number, number][] =
+    secondaryLineVisible && rawSecondaryPts.length > 0 ? rawSecondaryPts : []
+  const secondaryBasis: 'total' | 'liquid' | null =
+    secondaryPts.length > 1 ? (effectivePrimaryBasis === 'liquid' ? 'total' : 'liquid') : null
 
   // Build baseline ghost-line points (what-if mode)
   const baselinePts: [number, number][] = simRowsToChartPoints(baselineRows ?? [])
@@ -346,16 +417,17 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
   const hhMax = householdOverlays?.length
     ? Math.max(...householdOverlays.flatMap(o => o.points.filter(inRange).map(([, v]) => v)))
     : 0
-  // De besteedbaar-lijn ligt normaal ónder de totaallijn, maar telt hier tóch mee
-  // in de schaal zodat de y-as beide lijnen hoe dan ook omvat (0 = geen lijn →
-  // geen effect op de bestaande schaal).
-  const visibleLiquidPts = (liquidPoints ?? []).filter(inRange)
-  const liquidMax = visibleLiquidPts.length > 0
-    ? Math.max(...visibleLiquidPts.map(([, v]) => v))
+  // De tweede grondslag-lijn telt mee in de schaal zodat de y-as beide lijnen
+  // hoe dan ook omvat (0 = geen zichtbare tweede lijn → geen effect op de
+  // bestaande schaal). Welke van de twee grootheden dat is, hangt aan
+  // `primaryBasis`; de schaalregel zelf is voor beide richtingen dezelfde.
+  const visibleSecondaryPts = secondaryPts.filter(inRange)
+  const secondaryMax = visibleSecondaryPts.length > 0
+    ? Math.max(...visibleSecondaryPts.map(([, v]) => v))
     : 0
   const rawMax = visibleAllPts.length > 0
-    ? Math.max(...visibleAllPts.map(([, v]) => v), fireTarget ?? 0, fireTargetInclHome ?? 0, baselineMax, overlayMax, mcMax, hhMax, liquidMax)
-    : Math.max(1, overlayMax, mcMax, hhMax, liquidMax)
+    ? Math.max(...visibleAllPts.map(([, v]) => v), fireTarget ?? 0, fireTargetInclHome ?? 0, baselineMax, overlayMax, mcMax, hhMax, secondaryMax)
+    : Math.max(1, overlayMax, mcMax, hhMax, secondaryMax)
   const maxVal = Math.max(rawMax, 1) * 1.08
 
   const xScale = (age: number) =>
@@ -500,14 +572,19 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
   // niet-tekst) — horizon-500 haalde maar 2,3:1. Het OVERGANG-tekstlabel heeft een
   // hógere drempel (4,5:1) en gebruikt daarom apart horizon-700 (zie sim-chart.tsx).
   const bridgeStroke = 'var(--color-horizon-600, #ab8449)'
-  // Besteedbaar (liquide) vermogen: één grootheid, twee grondslagen — dus bewust
+  // De tweede grondslag-lijn: één grootheid, twee grondslagen — dus bewust
   // dezelfde horizon-familie als de hoofdlijn, één tint lichter (horizon-600, als
   // LIJN 3,2:1 op --paper → boven de 3:1-grafiekdrempel). Het ONDERSCHEID leunt
   // niet op kleur maar op de streepstijl + dunnere lijn (zie chart-static-layers),
   // zodat de lijn ook zonder kleurwaarneming te herkennen is. Deelt de tint met
   // `bridgeStroke`; die is altijd doorgetrokken en dikker, en zit bovendien in het
   // verlengde van de hoofdlijn — vandaar geen verwarring.
-  const liquidStroke = 'var(--color-horizon-600, #ab8449)'
+  //
+  // Bewust ÉÉN tint voor beide rollen: de dunne gestreepte lijn betekent "de
+  // andere grondslag", welke van de twee dat is zegt de legenda. Een tweede
+  // kleur zou de rolomkering bij "Uitsluiten" tot een kleurwissel maken, en dat
+  // leest als een derde grootheid.
+  const secondaryStroke = 'var(--color-horizon-600, #ab8449)'
 
   // Veilige bovengrens voor in-plot labels (doellijn-/FIRE-label) zodat ze niet
   // omhoog in de gereserveerde icoon-marge boven het plot kruipen en daar met de
@@ -681,7 +758,7 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
   const decPath = !threeBandFire && decPts.length > 1 ? pointsToPath(decPts) : null
   const bridgePath = threeBandFire && bridgePts.length > 1 ? pointsToPath(bridgePts) : null
   const withdrawalPath = threeBandFire && withdrawalPts.length > 1 ? pointsToPath(withdrawalPts) : null
-  const liquidPath = (liquidPoints?.length ?? 0) > 1 ? pointsToPath(liquidPoints!) : null
+  const secondaryPath = secondaryPts.length > 1 ? pointsToPath(secondaryPts) : null
   const allPath = fireAge === null && allPts.length > 1 ? pointsToPath(allPts) : null
 
   // Depletion-zone (AOW-stop-modus): eerste leeftijd waarop het portfolio ≤ 0.
@@ -729,7 +806,7 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
     mainStrokeAcc,
     mainStrokeDec,
     bridgeStroke,
-    liquidStroke,
+    secondaryStroke,
     COLOR_OPBOUW,
     COLOR_AFBOUW,
     baselinePath,
@@ -737,7 +814,9 @@ export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeo
     decPath,
     bridgePath,
     withdrawalPath,
-    liquidPath,
+    primaryBasis: effectivePrimaryBasis,
+    secondaryPath,
+    secondaryBasis,
     allPath,
     scenarioPaths,
     householdPaths,

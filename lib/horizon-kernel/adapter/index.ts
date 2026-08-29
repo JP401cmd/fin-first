@@ -85,6 +85,19 @@ export interface KernelAdapterInput {
    * alléén het partner-INKOMEN toe (geen partner-potten → geen dubbeltelling).
    */
   readonly partner?: KernelAdapterPartner
+  /**
+   * ADR 0117 — de jaargelaagde markt-volatiliteit (`fire_assumptions.volatility`,
+   * decimaal: 0,18 = 18%), al geresolveerd door `resolveFireAssumptions`. Voedt
+   * MC!B3 en daarmee de breedte van de marktcheck-band en de Monte-Carlo.
+   *
+   * Weglaten → `EXCEL_ONZEKERHEID_DEFAULTS.mcSigma` (= `DEFAULT_VOLATILITY`), dus
+   * byte-identiek aan vóór ADR 0117. Elk oppervlak dat de marktcheck toont hoort
+   * 'm mee te geven; laat een oppervlak het weg, dan rekent het met een ándere
+   * spreiding dan de rest van de app zodra beheer een jaarlaag zet — dezelfde
+   * grondslagdrift die `resolveFireParamsWithAssumptions` voor rendement/inflatie
+   * uitsluit.
+   */
+  readonly marktVolatiliteit?: number
 }
 
 /** `KernelInput` + de niet-(volledig-)mapbare punten uit de event-laag (voor rapport/beheer). */
@@ -180,7 +193,7 @@ export function buildKernelInputFromAppWithNotices(input: KernelAdapterInput): K
     eindstrategie: buildEindstrategie(profile),
     woning,
     onttrekkingsprofiel: buildOnttrekkingsprofiel(profile),
-    onzekerheid: buildOnzekerheid(persoon.startjaar),
+    onzekerheid: buildOnzekerheid(persoon.startjaar, input.marktVolatiliteit),
 
     // overige invoer-tabbladen
     ts,

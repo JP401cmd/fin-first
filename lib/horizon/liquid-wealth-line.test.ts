@@ -5,16 +5,20 @@
  *  1. de CONDITIE — de tweede lijn verschijnt zodra er een eigen woning is ÉN de
  *     woonstrategie de woning buiten de FIRE-pot houdt; hij verdwijnt zonder eigen
  *     woning en bij `include_full` (daar geldt J ≡ I, dus de lijn zou samenvallen);
- *  2. de STANDAARDSTAND van de toggle die de lijn sinds de "te druk"-melding
- *     schakelt — AAN bij uitsluiten, UIT bij de rest;
+ *  2. de GRONDSLAG van de PRIMAIRE lijn — die wisselt sinds ADR 0114 per
+ *     woonstrategie, en alleen bij "Uitsluiten" (daar staan de voortgangsbalk en
+ *     het vrijheids-% al op J);
  *  3. de MAPPING — de punten komen één-op-één uit `nettoLiquide` op de as-conventie
- *     van de hoofdlijn (`age + 1`), zonder eigen som.
+ *     van de hoofdlijn (seed op de beginleeftijd, daarna `age + 1`), zonder eigen som.
+ *
+ * De vroegere `defaultLiquidWealthLineVisible`-tests zijn vervallen met de functie
+ * zelf (ADR 0114 D5): de tweede lijn staat nu in álle strategieën standaard uit.
  */
 import { describe, it, expect } from 'vitest'
 import {
   shouldShowLiquidWealthLine,
-  defaultLiquidWealthLineVisible,
   buildLiquidWealthPoints,
+  primaryChartBasis,
   type LiquidWealthRow,
 } from './liquid-wealth-line'
 import type { HousingContext, HousingStrategyConfig } from '@/lib/housing-strategy'
@@ -94,33 +98,49 @@ describe('shouldShowLiquidWealthLine — eigen woning ÉN een niet-meetellen-str
   })
 })
 
-// ── Standaardstand van de toggle ────────────────────────────────────────────
+// ── Grondslag van de primaire lijn ──────────────────────────────────────────
 
-describe('defaultLiquidWealthLineVisible — conditioneel op de woonstrategie', () => {
-  // De lijn zit sinds de "te druk"-melding achter een eigen pill naast de
-  // Doel-pill. De standaardstand is NIET één vaste keuze: bij uitsluiten staat
-  // de voortgangsbalk / het vrijheids-% al op de zonder-woning-grondslag, dus
-  // dáár moet de lijn meteen zichtbaar zijn — anders liegt de grafiek t.o.v. de
-  // balk eronder. Bij downsize/opeethypotheek is de totaallijn het hoofdverhaal.
+describe('primaryChartBasis — de hoofdlijn wisselt alleen bij "Uitsluiten"', () => {
+  // ADR 0114 herroept "de hoofdlijn blijft in alle vier de modi netWorth". De
+  // wissel is bewust SMAL: alleen `exclude_from_fire` heeft het probleem dat de
+  // kaart beschrijft (balk en vrijheids-% staan daar al op J, de grafiek stond
+  // op I). Bij downsize/opeethypotheek wordt de woning uiteindelijk besteedbaar
+  // en blijft het totaal het hoofdverhaal; bij include_full geldt J ≡ I.
 
-  it('staat AAN bij exclude_from_fire (daar is zonder-woning het hoofdverhaal)', () => {
-    expect(defaultLiquidWealthLineVisible('exclude_from_fire')).toBe(true)
+  it('kiest de liquide grondslag bij een eigen woning + uitsluiten', () => {
+    expect(primaryChartBasis(context(true), 'exclude_from_fire')).toBe('liquid')
   })
 
-  it('staat UIT bij downsize en reverse_mortgage — verdieping, geen openingsbeeld', () => {
-    expect(defaultLiquidWealthLineVisible('downsize')).toBe(false)
-    expect(defaultLiquidWealthLineVisible('reverse_mortgage')).toBe(false)
+  it('houdt de totaal-grondslag bij downsize en reverse_mortgage', () => {
+    expect(primaryChartBasis(context(true), 'downsize')).toBe('total')
+    expect(primaryChartBasis(context(true), 'reverse_mortgage')).toBe('total')
   })
 
-  it('staat UIT bij include_full — daar bestaat de lijn (en dus de pill) niet eens', () => {
-    expect(defaultLiquidWealthLineVisible('include_full')).toBe(false)
-    // Dubbele grendel: de conditie zet 'm daar sowieso al uit.
-    expect(shouldShowLiquidWealthLine(context(true), 'include_full')).toBe(false)
+  it('houdt de totaal-grondslag bij include_full (J ≡ I → de keuze is leeg)', () => {
+    expect(primaryChartBasis(context(true), 'include_full')).toBe('total')
   })
 
-  it('zet precies één van de vier modi standaard aan', () => {
+  it('houdt de totaal-grondslag zonder eigen woning, in elke modus', () => {
+    for (const mode of Object.keys(STRATEGIES) as Array<HousingStrategyConfig['mode']>) {
+      expect(primaryChartBasis(context(false), mode), `strategie ${mode}`).toBe('total')
+    }
+  })
+
+  it('wisselt in precies één van de vier modi', () => {
     const modes = Object.keys(STRATEGIES) as Array<HousingStrategyConfig['mode']>
-    expect(modes.filter(defaultLiquidWealthLineVisible)).toEqual(['exclude_from_fire'])
+    expect(modes.filter(m => primaryChartBasis(context(true), m) === 'liquid'))
+      .toEqual(['exclude_from_fire'])
+  })
+
+  it('wisselt alleen binnen de modi waar óók een tweede lijn bestaat', () => {
+    // Vangrail tegen een toekomstige verruiming: een primaire J-lijn zonder dat
+    // `shouldShowLiquidWealthLine` waar is zou een grondslag tekenen waarvoor de
+    // grafiek geen tweede lijn en geen J-drempel kent.
+    for (const mode of Object.keys(STRATEGIES) as Array<HousingStrategyConfig['mode']>) {
+      if (primaryChartBasis(context(true), mode) === 'liquid') {
+        expect(shouldShowLiquidWealthLine(context(true), mode), `strategie ${mode}`).toBe(true)
+      }
+    }
   })
 })
 
@@ -128,24 +148,46 @@ describe('defaultLiquidWealthLineVisible — conditioneel op de woonstrategie', 
 
 describe('buildLiquidWealthPoints — consume-only mapping van nettoLiquide', () => {
   const rows: LiquidWealthRow[] = [
-    { age: 45, nettoLiquide: 120_000 },
-    { age: 46, nettoLiquide: 145_000 },
-    { age: 47, nettoLiquide: 138_000 },
+    { age: 45, nettoLiquide: 120_000, startNettoLiquide: 108_000 },
+    { age: 46, nettoLiquide: 145_000, startNettoLiquide: 120_000 },
+    { age: 47, nettoLiquide: 138_000, startNettoLiquide: 145_000 },
   ]
 
-  it('plot elke rijwaarde ongewijzigd op leeftijd + 1 (as van de hoofdlijn)', () => {
+  it('seedt op de beginleeftijd en plot elke rijwaarde ongewijzigd op leeftijd + 1', () => {
+    // Zelfde as-conventie als `simRowsToChartPoints` voor de totaallijn: seed op
+    // de beginleeftijd, daarna één punt per jaargrens. Voorwaarde om deze reeks
+    // als PRIMAIRE lijn te kunnen tekenen (ADR 0114).
     expect(buildLiquidWealthPoints(rows)).toEqual([
+      [45, 108_000],
       [46, 120_000],
       [47, 145_000],
       [48, 138_000],
     ])
   })
 
+  it('gebruikt ALLEEN rij 0 als anker — de rest komt uit nettoLiquide', () => {
+    // Anders zou de reeks twee grootheden door elkaar plotten (beginstand van
+    // jaar N én eindstand van jaar N−1 zijn hetzelfde moment, maar de reeks mag
+    // er maar één van tekenen).
+    const pts = buildLiquidWealthPoints(rows)
+    expect(pts).toHaveLength(rows.length + 1)
+    expect(pts.slice(1).map(([, v]) => v)).toEqual(rows.map(r => r.nettoLiquide))
+  })
+
+  it('laat het anker weg wanneer de rij het niet draagt (geen verzonnen beginstand)', () => {
+    // Test-/preview-rijfabrieken mogen `startNettoLiquide` weglaten; er komt dan
+    // geen seed in plaats van een terugval op de I-beginstand — dat zou twee
+    // grondslagen op één lijn mengen.
+    expect(buildLiquidWealthPoints([{ age: 45, nettoLiquide: 120_000 }])).toEqual([
+      [46, 120_000],
+    ])
+  })
+
   it('slaat niet-eindige waarden over en levert een lege reeks bij lege invoer', () => {
     expect(
       buildLiquidWealthPoints([
-        { age: 45, nettoLiquide: Number.NaN },
-        { age: 46, nettoLiquide: 10_000 },
+        { age: 45, nettoLiquide: Number.NaN, startNettoLiquide: Number.NaN },
+        { age: 46, nettoLiquide: 10_000, startNettoLiquide: 9_000 },
       ]),
     ).toEqual([[47, 10_000]])
     expect(buildLiquidWealthPoints([])).toEqual([])

@@ -384,15 +384,29 @@ export function resolveDeficitLoanRate(profile: KernelAdapterProfile): number {
  * Onzekerheidslaag (scenarioband + MC + Hist). Voor snede 1 inert: scenario
  * "Verwacht" (shift 0), shift alleen op investeringspotten (Excel P!B44 = 1),
  * MC/Hist uit. `solveFire` gebruikt dit blok niet; alleen de band-/MC-wrappers.
+ *
+ * `marktVolatiliteit` (ADR 0117) is de jaargelaagde `fire_assumptions.volatility`,
+ * al geresolveerd door `lib/fire-assumptions.ts#resolveFireAssumptions` — dezelfde
+ * caller-queryt/resolver-consumeert-scheiding als `lookupAowAge`. Weggelaten of
+ * ongeldig → `EXCEL_ONZEKERHEID_DEFAULTS.mcSigma` (= `DEFAULT_VOLATILITY`), dus
+ * byte-identiek aan vóór ADR 0117. Sigma moet strikt positief zijn: 0 zou de hele
+ * Monte-Carlo-band tot één lijn platdrukken zonder dat iemand dat als "uit" heeft
+ * bedoeld, en negatief bestaat niet als volatiliteit.
  */
-export function buildOnzekerheid(startjaar: number): OnzekerheidParams {
+export function buildOnzekerheid(startjaar: number, marktVolatiliteit?: number): OnzekerheidParams {
+  const sigma =
+    typeof marktVolatiliteit === 'number' &&
+    Number.isFinite(marktVolatiliteit) &&
+    marktVolatiliteit > 0
+      ? marktVolatiliteit
+      : EXCEL_ONZEKERHEID_DEFAULTS.mcSigma
   return {
     scenario: 'Verwacht',
     shift: 0,
     shiftAlleenInvestering: true,
     mc: {
       aantalRuns: EXCEL_ONZEKERHEID_DEFAULTS.mcAantalRuns,
-      sigma: EXCEL_ONZEKERHEID_DEFAULTS.mcSigma,
+      sigma,
       actief: false,
     },
     hist: {

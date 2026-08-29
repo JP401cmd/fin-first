@@ -119,8 +119,19 @@ export interface MarktcheckParams {
 export type MarktcheckOutcome =
   | {
       readonly ok: true
-      /** Percentielband op de netto-vermogensgrondslag (= de hoofdlijn-grondslag). */
+      /** Percentielband op de netto-vermogensgrondslag (Prognose!I, incl. eigen woning). */
       readonly band: MonteCarloBand
+      /**
+       * De J-spiegel van `band`: dezelfde percentielband op de netto-LIQUIDE grondslag
+       * (Prognose!J, excl. niet-liquide bezit), op exact dezelfde leeftijdsas.
+       *
+       * De Toekomst-grafiek laat haar primaire lijn per woonstrategie van grondslag
+       * wisselen; het oppervlak kiest daarom de band die bij zijn lijn hoort. Band en
+       * lijn moeten dezelfde grootheid dragen — een I-band om een J-lijn omhult iets
+       * anders dan wat erin ligt, en bepaalt bovendien de ashoogte mee. Bij
+       * "woning meetellen" (`include_full`) is deze band gelijk aan `band`.
+       */
+      readonly bandLiquide: MonteCarloBand
       /**
        * Hoeveel het rendement per jaar mag tegenvallen voordat het plan omvalt,
        * getoetst op een VASTE stopleeftijd (`null` = geen zinnige uitspraak).
@@ -184,6 +195,7 @@ export function runMarktcheckOnKernelInput(
     return {
       ok: true,
       band: mc.band,
+      bandLiquide: mc.bandLiquide,
       marge: computeRendementMarge(input, params.stopAge),
       runs: mc.runs,
     }

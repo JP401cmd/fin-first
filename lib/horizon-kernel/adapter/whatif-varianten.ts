@@ -134,6 +134,11 @@ export interface BuildWhatifKernelAdapterInputParams {
   readonly lifeEvents: readonly LifeEvent[]
   readonly aowRows?: readonly AowLeeftijdRow[]
   readonly taxYear?: TaxYear
+  /**
+   * ADR 0117 — jaargelaagde markt-volatiliteit (`fire_assumptions.volatility`,
+   * decimaal) voor MC!B3. Weglaten → de kernel-default (`DEFAULT_VOLATILITY`).
+   */
+  readonly marktVolatiliteit?: number
 }
 
 /**
@@ -179,6 +184,7 @@ export function buildWhatifKernelAdapterInput(
     lifeEvents: params.lifeEvents,
     aowRows: params.aowRows,
     taxYear: params.taxYear,
+    marktVolatiliteit: params.marktVolatiliteit,
   }
 }
 

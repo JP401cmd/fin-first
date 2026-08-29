@@ -41,6 +41,9 @@ function makeLimit(overrides: Partial<SpendLimitWidgetData> = {}): SpendLimitWid
     currentOverAmount: 0,
     status: 'within',
     isNearLimit: false,
+    // Default GEEN tempo — dat is de stand van een dag/week-pot en van elke pot
+    // vóór ADR 0119; de tempo-tests zetten hem expliciet.
+    pace: null,
     currentStreak: 4,
     longestStreak: 7,
     closedPeriodCount: 12,
@@ -238,5 +241,113 @@ describe('SpendLimitWidget — alias', () => {
       <SpendLimitWidget size="quarter" limit={makeLimit({ isActive: false })} dailyExp={50} />,
     )
     expect(container.textContent ?? '').toContain('gepauzeerd')
+  })
+})
+
+/**
+ * TEMPO-MARKERING + PROGNOSE (ADR 0119).
+ *
+ * De tegel rekent hier NIETS: de fracties en het bedrag komen kant-en-klaar uit
+ * `limit.pace`. Wat de tests bewaken is dus of de juiste tak het juiste blok
+ * toont — en, belangrijker, of het bedrag maskeert terwijl de tempo-regel
+ * (percentages, geen bedrag) leesbaar blijft.
+ */
+const PACE_MET_BEDRAG: NonNullable<SpendLimitWidgetData['pace']> = {
+  periodDays: 31,
+  elapsedDays: 1,
+  remainingDays: 30,
+  elapsedFraction: 1 / 31,
+  usedFraction: 0.6,
+  baselineDailyAmount: 3.0978260869565215,
+  basisPeriodCount: 3,
+  projectedAmount: 212.93478260869566,
+  projectedExceeds: true,
+}
+
+const PACE_ZONDER_BEDRAG: NonNullable<SpendLimitWidgetData['pace']> = {
+  ...PACE_MET_BEDRAG,
+  baselineDailyAmount: null,
+  basisPeriodCount: 1,
+  projectedAmount: null,
+  projectedExceeds: null,
+}
+
+describe('SpendLimitWidget — tempo van de lopende periode', () => {
+  it.each<WidgetSize>(['quarter', 'half', 'full', 'xl'])(
+    'toont de tempo-regel op %s',
+    (size) => {
+      const { container } = render(
+        <SpendLimitWidget size={size} limit={makeLimit({ pace: PACE_MET_BEDRAG })} dailyExp={50} />,
+      )
+      const text = container.textContent ?? ''
+      expect(text).toContain('3% van augustus 2026 voorbij')
+      expect(text).toContain('60% van je grens gebruikt')
+    },
+  )
+
+  it('toont op mini niets extra — daar is geen ruimte voor', () => {
+    const { container } = render(
+      <SpendLimitWidget size="mini" limit={makeLimit({ pace: PACE_MET_BEDRAG })} dailyExp={50} />,
+    )
+    expect(container.textContent ?? '').not.toContain('voorbij')
+  })
+
+  it('houdt het prognosebedrag weg van de kleinste tegel, maar toont het op half en groter', () => {
+    const quarter = render(
+      <SpendLimitWidget size="quarter" limit={makeLimit({ pace: PACE_MET_BEDRAG })} dailyExp={50} />,
+    )
+    expect(quarter.container.textContent ?? '').not.toContain('op weg naar')
+    quarter.unmount()
+
+    for (const size of ['half', 'full', 'xl'] as WidgetSize[]) {
+      const { container, unmount } = render(
+        <SpendLimitWidget size={size} limit={makeLimit({ pace: PACE_MET_BEDRAG })} dailyExp={50} />,
+      )
+      expect(container.textContent ?? '').toContain('op weg naar')
+      unmount()
+    }
+  })
+
+  it('zet de tempo-markering op de balk, op de verstreken fractie', () => {
+    const { container } = render(
+      <SpendLimitWidget size="full" limit={makeLimit({ pace: PACE_MET_BEDRAG })} dailyExp={50} />,
+    )
+    // `calc(3.2258…% - 1px)` — de markering hangt aan pace.elapsedFraction en
+    // niet aan het bedrag; zonder pace staat er geen enkele marker.
+    const marker = container.querySelector('[style*="calc("]')
+    expect(marker).not.toBeNull()
+    expect((marker as HTMLElement).style.left).toContain('3.2258')
+  })
+
+  it('toont zonder tempo (dag/week-pot) geen regel en geen markering', () => {
+    const { container } = render(
+      <SpendLimitWidget size="full" limit={makeLimit({ pace: null })} dailyExp={50} />,
+    )
+    expect(container.textContent ?? '').not.toContain('voorbij')
+    expect(container.querySelector('[style*="calc("]')).toBeNull()
+  })
+
+  it('laat het bedrag weg zolang de historie-poort dicht staat, de markering blijft', () => {
+    const { container } = render(
+      <SpendLimitWidget size="full" limit={makeLimit({ pace: PACE_ZONDER_BEDRAG })} dailyExp={50} />,
+    )
+    const text = container.textContent ?? ''
+    expect(text).toContain('3% van augustus 2026 voorbij')
+    expect(text).not.toContain('op weg naar')
+  })
+
+  it('maskeert het prognoseBEDRAG maar houdt de tempo-regel leesbaar', () => {
+    mockPrivacy.masked = true
+    const { container } = render(
+      <SpendLimitWidget size="full" limit={makeLimit({ pace: PACE_MET_BEDRAG })} dailyExp={50} />,
+    )
+    const text = container.textContent ?? ''
+    // Percentages zijn geen bedrag en blijven staan (NFR-B2-04).
+    expect(text).toContain('3% van augustus 2026 voorbij')
+    expect(text).toContain('60% van je grens gebruikt')
+    // Het bedrag zelf niet.
+    expect(text).toContain('op weg naar')
+    expect(text).toContain(MASKED_AMOUNT_PLACEHOLDER)
+    expect(text).not.toContain('212')
   })
 })

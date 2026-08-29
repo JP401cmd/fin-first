@@ -35,7 +35,7 @@ Toonaangevende FIRE-planners investeerden in 2025–2026 zwaar in **drie richtin
 | C | Partner-samenwerkingslaag | **Open** — verfijnd door Monarch Shared Views (zie §4.7) | `app/api/household/**` |
 | D | Plan-brede slagingskans | **Gebouwd** — kernel-Monte-Carlo met `successProbability` over het hele plan, geconsumeerd in horizon/whatif-UI | `lib/horizon-kernel/wrappers/mc.ts`, `lib/architecture/calculations.ts` |
 | E | Risico-APK | **Open** | — |
-| F | Pensioenaggregatie 2e pijler | **Open** — versterkt: Boldin toont dat pensioen-stacking + fiscale optimalisatie één samenhangende laag vormen | `annuitizePension` bestaat; instroom ontbreekt |
+| F | Pensioenaggregatie 2e pijler | **Gebouwd** (aug 2026) — instroom compleet: XML én JSON van mijnpensioenoverzicht.nl deterministisch en client-side, plus PDF via cloud-AI en on-device; reconciliatie, review per pot en projectiegrafiek. NB: `annuitizePension` is hier NIET de koppeling — een UPO levert al een periodiek bedrag, dat rechtstreeks naar `monthly_income_change` gaat | `lib/pension/mijnpensioen-xml.ts`, `mijnpensioen-json.ts`, `reconcile.ts`, `apply-parse-result.ts`, `pension-projection.ts` |
 | G | Sankey-cashflowdiagram | **Gebouwd** — drie oppervlakken | `components/app/horizon/horizon-cashflow-sankey.tsx`, `budget-sankey.tsx`, `cash-account-view.tsx` |
 | H | Per-rekening-privacy | **Open** | — |
 | I | Portefeuille-allocatiemodellering | **Deels** — rendement per categorie zit sinds juli in het wat-als-lab | `lib/horizon/toekomst-scenario.ts` |

@@ -33,7 +33,14 @@ import { BillCalendar, type CalendarTransaction } from '@/components/app/bill-ca
 import { RecurringEditSheet } from '@/components/app/recurring-edit-sheet'
 import { CategoryRulesSheet } from '@/components/app/category-rules-sheet'
 import { usePerspective, usePerspectiveAbort } from '@/components/app/perspective-provider'
-import { OwnershipToggle, useHouseholdStatus } from '@/components/app/ownership-toggle'
+import { useHouseholdStatus } from '@/components/app/ownership-toggle'
+import { AccountVisibilityToggle } from '@/components/app/account-visibility-toggle'
+import {
+  BANK_ACCOUNT_PARTNER_COLUMNS,
+  normalizePartnerVisibility,
+  ownershipForVisibility,
+  type PartnerVisibility,
+} from '@/lib/bank-account-visibility'
 import { computeSharePct, SPLIT_MODE_LABELS, type SplitMode } from '@/lib/household-data'
 import { usePartnerPrivacy, PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
 import { Users, TrendingUp, TrendingDown, Minus, Shield } from 'lucide-react'
@@ -277,6 +284,8 @@ export function CashAccountView({
     expected_return: number
   } | null>(null)
   const [assetSaving, setAssetSaving] = useState(false)
+  /** Zichtbaarheid/naam kon niet worden opgeslagen — het bewerkscherm blijft dan open. */
+  const [assetSaveError, setAssetSaveError] = useState<string | null>(null)
   const [showRevalue, setShowRevalue] = useState(false)
   // I-05: confirms i.p.v. kale window.confirm.
   //  - `showDisconnectConfirm`: bevestig loskoppelen van transactie-tracking.
@@ -452,7 +461,7 @@ export function CashAccountView({
       // hieronder.
       let accountsQuery = supabase
         .from('bank_accounts')
-        .select('id, name, bank_name, account_type, balance, is_active, sort_order, linked_asset_id, ownership, user_id, is_archive_bucket')
+        .select(BANK_ACCOUNT_PARTNER_COLUMNS)
         .eq('is_active', true)
         .order('sort_order', { ascending: true })
       if (perspective === 'personal') {
@@ -480,7 +489,7 @@ export function CashAccountView({
       if (!allData) throw new Error('Geen rekeningen gevonden')
 
       const ibanFor = ibanById(ownAccountIbans)
-      const allAccounts = (allData as AccountRow[]).map((a) => ({ ...a, iban: ibanFor.get(a.id) ?? null }))
+      const allAccounts = (allData as unknown as AccountRow[]).map((a) => ({ ...a, iban: ibanFor.get(a.id) ?? null }))
       setAllAccounts(allAccounts)
 
       if (isCombined) {
@@ -515,7 +524,7 @@ export function CashAccountView({
           // naar de browser sturen.
           let targetQuery = supabase
             .from('bank_accounts')
-            .select('id, name, bank_name, account_type, balance, is_active, sort_order, linked_asset_id, ownership, user_id, is_archive_bucket')
+            .select(BANK_ACCOUNT_PARTNER_COLUMNS)
             .eq('id', accountId!)
           if (perspective === 'personal') {
             targetQuery = targetQuery.eq('ownership', 'personal')
@@ -523,7 +532,7 @@ export function CashAccountView({
           const { data: targetRow } = await targetQuery.maybeSingle()
           if (signal?.aborted) return
           if (targetRow) {
-            const row = targetRow as AccountRow
+            const row = targetRow as unknown as AccountRow
             target = { ...row, iban: ibanFor.get(row.id) ?? null }
           }
         }
@@ -1129,35 +1138,74 @@ export function CashAccountView({
 
   useEffect(() => { loadLinkedAsset() }, [loadLinkedAsset])
 
-  async function handleSaveAsset(formData: { name: string; expected_return: number; ownership: 'personal' | 'shared' }) {
+  async function handleSaveAsset(formData: { name: string; expected_return: number; partner_visibility: PartnerVisibility }) {
     if (!linkedAsset || !account) return
     setAssetSaving(true)
     const supabase = createClient()
     const prevOwnership = (account as { ownership?: 'personal' | 'shared' }).ownership ?? 'personal'
+    // Zichtbaarheid en eigendom zijn één gekoppelde toestand (ADR 0118): de
+    // driewegkeuze levert de zichtbaarheid, het eigendom volgt daaruit.
+    const nextOwnership = ownershipForVisibility(formData.partner_visibility)
+    // Sync de bank_account-weergavenaam + zichtbaarheid met de asset.
+    //
+    // Dit liep hiervoor als directe client-update. Dat kan niet blijven: een
+    // privacyknop is precies de verkeerde plek voor een uitzondering op de
+    // datapad-conventie (ADR 0058), en `ownership` + `partner_visibility` moeten
+    // als één blok geschreven worden — de CHECK-constraint weigert de halve
+    // toestand. De route is de enige plek waar die koppeling wordt gelegd.
+    // De DB-trigger stempelt `household_id` uit `ownership`, dus die hoeft niet
+    // mee over de lijn.
+    //
+    // De uitkomst wordt WEL gelezen, anders dan bij de oude client-update. Een
+    // privacyknop die stil faalt is geen controle: het scherm zou sluiten alsof
+    // het gelukt is terwijl de rekening op 'full' blijft staan en de partner de
+    // boekingen blijft zien. Bij een fout blijft het bewerkscherm open met een
+    // melding, zodat de gebruiker weet dat zijn keuze NIET is toegepast.
+    const res = await fetch(`/api/bank-accounts/${account.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: formData.name,
+        partner_visibility: formData.partner_visibility,
+      }),
+    }).catch(() => null)
+
+    if (!res || !res.ok) {
+      setAssetSaveError(
+        'De zichtbaarheid voor je partner kon niet worden opgeslagen. Je vorige keuze blijft gelden — probeer het opnieuw.',
+      )
+      setAssetSaving(false)
+      return
+    }
+    setAssetSaveError(null)
+
+    // Pas NA de geslaagde rekening-update. Andersom om (zoals het hier stond)
+    // liet een gefaalde PATCH de asset al op het nieuwe eigendom staan terwijl
+    // de rekening op het oude bleef — en `assets` heeft zelf een
+    // huishoud-verbrede SELECT-policy, dus dan zou de cash-waarde gedeeld raken
+    // bij een rekening die persoonlijk bleef.
     await supabase.from('assets').update({
       name: formData.name,
       expected_return: formData.expected_return,
-      ownership: formData.ownership,
+      ownership: nextOwnership,
     }).eq('id', linkedAsset.id)
-    // Sync de bank_account-weergavenaam + eigendom met de asset (de DB-trigger
-    // stempelt household_id uit ownership, dus die hoeft niet mee).
-    await supabase.from('bank_accounts').update({
-      name: formData.name,
-      ownership: formData.ownership,
-    }).eq('id', account.id)
     // Eigendom gewijzigd? Bied opt-in aan om bestaande transacties mee om te
     // zetten — default is historie ongemoeid laten. De opt-in loopt nu via een
     // ShellOverlay-confirm (I-05): we sluiten het bewerkscherm en openen de
     // vraag als losse modal, i.p.v. een synchrone window.confirm midden in deze
     // async flow.
-    if (formData.ownership !== prevOwnership) {
+    // Alleen aanbieden als het EIGENDOM wisselt. 'balance' → 'full' verandert
+    // wél de zichtbaarheid maar niet het eigendom: de bestaande boekingen
+    // worden dan vanzelf zichtbaar via de lees-tijd-gate, zonder datamutatie.
+    // Dat is precies waarom lees-tijd gekozen is boven stempelen (ADR 0118).
+    if (nextOwnership !== prevOwnership) {
       const { count } = await supabase
         .from('transactions')
         .select('id', { count: 'exact', head: true })
         .eq('account_id', account.id)
         .eq('ownership', prevOwnership)
       if ((count ?? 0) > 0) {
-        setOwnershipMigration({ count: count ?? 0, newOwnership: formData.ownership })
+        setOwnershipMigration({ count: count ?? 0, newOwnership: nextOwnership })
       }
     }
     setAssetSaving(false)
@@ -2804,6 +2852,7 @@ export function CashAccountView({
               asset={linkedAsset}
               account={account}
               saving={assetSaving}
+              saveError={assetSaveError}
               bankConnectEnabled={gcEnabled}
               gcAccounts={gcAccounts}
               /* Het oordeel komt van boven (de loader-prop), de rijen uit
@@ -3257,6 +3306,7 @@ function AssetEditForm({
   asset,
   account,
   saving,
+  saveError,
   bankConnectEnabled,
   gcAccounts,
   accountIsBankLinked,
@@ -3283,14 +3333,19 @@ function AssetEditForm({
   onDisconnectBank: () => void
   onReauthorize: () => void
   onRevalue: () => void
-  onSave: (data: { name: string; expected_return: number; ownership: 'personal' | 'shared' }) => void
+  /** Melding wanneer opslaan mislukte; het scherm blijft dan open. */
+  saveError?: string | null
+  onSave: (data: { name: string; expected_return: number; partner_visibility: PartnerVisibility }) => void
   onCancel: () => void
   onDisconnect: () => void
 }) {
   const [name, setName] = useState(asset.name)
   const [expectedReturn, setExpectedReturn] = useState(String(asset.expected_return ?? 0))
-  const [ownership, setOwnership] = useState<'personal' | 'shared'>(
-    (account as { ownership?: 'personal' | 'shared' }).ownership ?? 'personal',
+  const [visibility, setVisibility] = useState<PartnerVisibility>(() =>
+    normalizePartnerVisibility(
+      (account as { partner_visibility?: string | null }).partner_visibility,
+      (account as { ownership?: 'personal' | 'shared' }).ownership ?? 'personal',
+    ),
   )
   const { hasHousehold } = useHouseholdStatus()
   const [confirmDisconnect, setConfirmDisconnect] = useState(false)
@@ -3377,14 +3432,17 @@ function AssetEditForm({
         />
       </div>
 
-      {/* 5. Eigendom (alleen met huishouden) */}
+      {/* 5. Zichtbaarheid voor de partner (alleen met huishouden).
+          Vervangt de oude tweewegkeuze "Eigendom": eigendom en zichtbaarheid
+          zijn één gekoppelde toestand (ADR 0118) en horen dus één knop te zijn.
+          De server leidt `ownership` af uit de gekozen stand. */}
       {hasHousehold && (
         <div data-testid="account-ownership-toggle">
-          <label className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]">Eigendom</label>
-          <OwnershipToggle value={ownership} onChange={setOwnership} hasHousehold={hasHousehold} compact />
-          <p className="mt-1.5 text-xs text-[var(--ink-4)]">
-            Nieuwe transacties op deze rekening erven dit eigendom.
-          </p>
+          <AccountVisibilityToggle
+            value={visibility}
+            onChange={setVisibility}
+            hasHousehold={hasHousehold}
+          />
         </div>
       )}
 
@@ -3431,6 +3489,16 @@ function AssetEditForm({
         )}
       </div>
 
+      {saveError && (
+        <p
+          role="alert"
+          className="rounded-[var(--r)] border border-[var(--border-md)] bg-[var(--subtle)] px-3 py-2 text-xs text-negative"
+          data-testid="account-save-error"
+        >
+          {saveError}
+        </p>
+      )}
+
       <div className="flex justify-end gap-3 border-t border-[var(--border-ed)] pt-4">
         <button
           onClick={onCancel}
@@ -3442,7 +3510,7 @@ function AssetEditForm({
           onClick={() => onSave({
             name,
             expected_return: Number(expectedReturn) || 0,
-            ownership,
+            partner_visibility: visibility,
           })}
           disabled={saving || !name.trim()}
           className="inline-flex items-center gap-2 rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"

@@ -51,6 +51,8 @@ export const TOEK_FLOW: UatFlow = {
     { id: 'verdieping', scenarioId: 'UAT-TOEK-32', label: 'WF-TOEK-32 · Verdieping: trends & geplande acties', kind: 'screen', stage: 2, lane: 'aflezen' },
     { id: 'euroweergave', scenarioId: 'UAT-TOEK-33', label: "WF-TOEK-33 · Huidige euro's: grafiek/hero/fasetabel", kind: 'action', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
     { id: 'maskering', scenarioId: 'UAT-TOEK-34', label: 'WF-TOEK-34 · Bedragmaskering op de grafiek', kind: 'action', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
+    { id: 'grondslaglijn', scenarioId: 'UAT-TOEK-36', label: 'WF-TOEK-36 · Grondslag hoofdlijn per woonstrategie', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
+    { id: 'grondslagdoorwerking', scenarioId: 'UAT-TOEK-37', label: 'WF-TOEK-37 · Stip, band, drempels, pill & kassabon bewegen mee', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grondslaglijn' },
 
     // ── 2 · navigeren & delen ─────────────────────────────────────────────
     { id: 'navkaarten', scenarioId: 'UAT-TOEK-28', label: 'WF-TOEK-28 · Navigatiekaarten (drilldown)', kind: 'screen', stage: 2, lane: 'navigeren' },
@@ -70,6 +72,7 @@ export const TOEK_FLOW: UatFlow = {
     { id: 'eventdrag', scenarioId: 'UAT-TOEK-15', label: 'WF-TOEK-15 · Slepen op de tijdas & undo', kind: 'action', stage: 3, lane: 'gebeurtenissen', subOf: 'eventadd' },
     { id: 'eventpagina', scenarioId: 'UAT-TOEK-17', label: 'WF-TOEK-17 · Gebeurtenissen-pagina (kernel-momenten)', kind: 'screen', stage: 3, lane: 'gebeurtenissen' },
     { id: 'tekortbeslis', label: 'Tekort in de projectie?', kind: 'decision', stage: 3, lane: 'gebeurtenissen', subOf: 'eventpagina' },
+    { id: 'risicoevents', scenarioId: 'UAT-TOEK-38', label: 'WF-TOEK-38 · Risico-events: werkloosheid & overlijden partner (WW/Anw)', kind: 'action', stage: 3, lane: 'gebeurtenissen', subOf: 'eventadd' },
 
     // ── 4 · de toekomst configureren · levens-/werk-/huis-strategie ───────
     { id: 'strategiebeslis', label: 'Welke levensgebeurtenis?', kind: 'decision', stage: 4, lane: 'strategie' },
@@ -115,6 +118,8 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'grafiek', to: 'details' },
     { from: 'grafiek', to: 'euroweergave' },
     { from: 'grafiek', to: 'maskering' },
+    { from: 'grafiek', to: 'grondslaglijn' },
+    { from: 'grondslaglijn', to: 'grondslagdoorwerking' },
     { from: 'tijdas', to: 'fasebalk' },
     { from: 'tijdas', to: 'markers' },
     { from: 'tijdas', to: 'verdieping' },
@@ -136,6 +141,7 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'tijdas', to: 'eventadd' },
     { from: 'eventadd', to: 'eventedit' },
     { from: 'eventadd', to: 'eventdrag' },
+    { from: 'eventadd', to: 'risicoevents' },
     { from: 'navkaarten', to: 'eventpagina', kind: 'branch', label: 'Gebeurtenissen' },
     { from: 'eventpagina', to: 'tekortbeslis' },
     { from: 'tekortbeslis', to: 'x-reken', kind: 'cross', label: 'ja: tekort-lening (kernel)' },
@@ -147,6 +153,9 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'strategiebeslis', to: 'werkstrat', kind: 'branch', label: 'werk' },
     { from: 'strategiebeslis', to: 'huisstrat', kind: 'branch', label: 'huis' },
     { from: 'huisstrat', to: 'downsizebeslis' },
+    // De woonstrategie bepaalt de grondslag van de PRIMAIRE vermogenslijn
+    // (ADR 0114 D1) — de keuze wordt hier gemaakt, op de grafiek afgelezen.
+    { from: 'huisstrat', to: 'grondslaglijn', kind: 'branch', label: 'grondslag hoofdlijn (I of J)' },
     { from: 'navkaarten', to: 'eindstrat', kind: 'branch', label: 'Voorkeuren' },
     { from: 'eindstrat', to: 'potregels' },
     { from: 'eindstrat', to: 'marktaannames' },
@@ -158,6 +167,7 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'sliders', to: 'fire' },
     { from: 'aowstop', to: 'fire' },
     { from: 'eventadd', to: 'fire' },
+    { from: 'risicoevents', to: 'fire' },
     { from: 'tekortbeslis', to: 'fire' },
     { from: 'aowstrat', to: 'fire' },
     { from: 'pensioenstrat', to: 'fire' },

@@ -18,6 +18,7 @@
 
 import type {
   SpendLimitPeriodKind,
+  SpendLimitPeriodPace,
   SpendLimitRuleType,
   SpendLimitScoreLabel,
   SpendLimitStatus,
@@ -44,6 +45,16 @@ export interface SpendLimitWidgetData {
   status: SpendLimitStatus
   /** Nog binnen, maar op/boven de near-drempel van de motor. Nooit hier herrekenen. */
   isNearLimit: boolean
+  /**
+   * Het tempo van de lopende periode, ONGEWIJZIGD uit `report.currentPeriodPace`
+   * — `null` bij dag- en weekpotten.
+   *
+   * Reist als BLOK mee en niet als losse velden: de verstreken-fractie en het
+   * prognosebedrag horen bij elkaar en mogen op geen enkel oppervlak los tot een
+   * derde uitspraak worden opgeteld. Het zijn negen scalars per pot; de
+   * sparkline hiernaast draagt er al tot dertien.
+   */
+  pace: SpendLimitPeriodPace | null
 
   // ── Reeks-context (aantallen, geen bedragen — maskeren dus niet) ──────────
   currentStreak: number
@@ -111,6 +122,7 @@ export function toSpendLimitWidgetData(
     currentOverAmount: current.periodOverAmount,
     status: current.status,
     isNearLimit: current.isNearLimit,
+    pace: report.currentPeriodPace,
 
     currentStreak: streaks.currentStreak,
     longestStreak: streaks.longestStreak,

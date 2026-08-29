@@ -66,7 +66,14 @@ import type {
 } from '@/lib/unified-projection'
 import type { SolveFireResult, SolverStatus } from './solver'
 import type { KernelProjection } from './engine'
-import { jaarBlokEindMaand, laatsteJaarBlok, startNettoVermogen } from './jaarrand'
+import {
+  jaarBlokEindMaand,
+  laatsteJaarBlok,
+  startNettoVermogen,
+  // Alias: binnen `buildRow` heet de LOKALE stand `startNettoLiquide` (shorthand naar
+  // het gelijknamige rijveld), dus de t=0-functie krijgt hier een eigen naam.
+  startNettoLiquide as startNettoLiquideT0,
+} from './jaarrand'
 import { computeEs, type EindstrategieCode } from './tables/es'
 import type { GebPostHelpers } from './tables/geb'
 import { inflationIndex } from './scaffold'
@@ -217,6 +224,16 @@ function prognoseNetWorth(proj: KernelProjection, m: number): number {
   const row = proj.prognose[m]
   if (row === undefined || row.beyondHorizon) return 0
   return row.nettoVermogen
+}
+
+/**
+ * Prognose!J(m) — netto LIQUIDE vermogen; ontbrekend/voorbij-horizon → 0.
+ * Exacte spiegel van `prognoseNetWorth` (zelfde guard), alleen een andere kolom.
+ */
+function prognoseNettoLiquide(proj: KernelProjection, m: number): number {
+  const row = proj.prognose[m]
+  if (row === undefined || row.beyondHorizon) return 0
+  return row.nettoLiquide
 }
 
 // ── Slot-groepering per bridge-run (één keer opgebouwd) ──────────────────────
@@ -386,6 +403,11 @@ function buildRow(
   // startNetWorth: Prognose!I(12k−1); k=0 → beginwaarden uit de potten.
   const startNetWorth =
     k === 0 ? startNettoVermogen(input) : prognoseNetWorth(proj, monthStart - 1)
+  // startNettoLiquide: Prognose!J(12k−1); k=0 → beginwaarden uit de potten, gefilterd
+  // op dezelfde TS!H-niet-liquide-vlag die Prognose!L/M gebruikt. De J-spiegel van
+  // startNetWorth — nooit met elkaar mengen op één as (zie het veld-doccommentaar).
+  const startNettoLiquide =
+    k === 0 ? startNettoLiquideT0(input) : prognoseNettoLiquide(proj, monthStart - 1)
 
   const endProg = proj.prognose[monthEnd]
   const totalAssets = endProg && !endProg.beyondHorizon ? endProg.totaalBezittingen : 0
@@ -611,6 +633,7 @@ function buildRow(
     netWorth,
     startNetWorth,
     nettoLiquide,
+    startNettoLiquide,
     grossIncome,
     savings,
     withdrawal,

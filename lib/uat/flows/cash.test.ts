@@ -89,7 +89,11 @@ describe('CASH_FLOW — curatie-integriteit', () => {
     }
     // 59 → 61: WF-CASH-60 (grondslagkeuze inkomen/uitgaven, ADR 0103) en
     // WF-CASH-61 (grenzenpot-reeksscore/prestatiebadge).
-    expect(covered.size).toBe(61)
+    // 61 → 63: WF-CASH-63 (rekening-zichtbaarheid voor de partner, ADR 0118) en
+    // WF-CASH-64 (grenzenpot-tempo, ADR 0119) zijn als flow-knoop toegevoegd.
+    // WF-CASH-62 heeft (nog) geen eigen flow-knoop — bestaande, hier ongewijzigde
+    // dekkingsleemte, geen regressie van deze wijziging.
+    expect(covered.size).toBe(63)
   })
 
   it('de domeinoverschrijdende cross-knopen dekken BUDGET/OVZ/TOEK/WILL/BEZIT/MIJN', () => {
