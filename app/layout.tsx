@@ -56,6 +56,12 @@ export const viewport: Viewport = {
   maximumScale: 5,
   viewportFit: 'cover',
   themeColor: '#faf9f6',
+  // Toetsenbord verkleint de layout-viewport (B-013, 29-08-2026): zonder deze
+  // instelling is Chrome/Android sinds v108 'resizes-visual' — het toetsenbord
+  // schuift dan de visuele viewport omhoog en de kop van vol-hoge, dvh-gebaseerde
+  // panelen (Fin-chat, sheets) valt uit beeld. Met 'resizes-content' krimpt
+  // 100dvh mee en blijft bottom-verankerde UI boven het toetsenbord.
+  interactiveWidget: 'resizes-content',
 }
 
 export const metadata: Metadata = {
