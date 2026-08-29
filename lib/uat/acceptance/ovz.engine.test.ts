@@ -37,8 +37,10 @@ describe('UAT Ovz — acceptatiecriteria dekking', () => {
   it('heeft precies één criterium per catalogus-OVZ-scenario (22 stuks, WF-OVZ-17/18 bestaan niet in de catalogus)', () => {
     const workflows = OVZ_ACCEPTANCE.criteria.map((c) => c.workflow).sort()
     expect(workflows).toEqual(catalogOvzWorkflows)
+    // Afgeleid van de catalogus — bewust géén hardgecodeerde telling: die
+    // moest bij elk nieuw OVZ-scenario met de hand mee en voegde naast de
+    // set-vergelijking hierboven niets toe.
     expect(new Set(workflows).size).toBe(catalogOvzWorkflows.length)
-    expect(workflows.length).toBe(22)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {
@@ -64,11 +66,11 @@ describe('UAT Ovz — acceptatiecriteria dekking', () => {
       .sort()
     const checkWorkflows = OVZ_ENGINE_CHECKS.map((c) => c.workflow).sort()
     expect(checkWorkflows).toEqual(exactWorkflows)
-    // WF-OVZ-14 (welkomstgids) is met M1 van 'ui-only' naar 'exact' gegaan: de
-    // voortgang is sindsdien een uitkomst van échte functies (deriveGuideStates
-    // + countScreenProgress) i.p.v. puur zichtbaarheids-state. WF-OVZ-23
-    // (vermogens-widget met eigen selectie, ADR 0120) is nieuw en 'exact'.
-    expect(exactWorkflows.length).toBe(13)
+    // Historie van de kind-verschuivingen (WF-OVZ-14 ui-only→exact met M1,
+    // WF-OVZ-23 nieuw en exact met ADR 0120) leeft in de criteria zelf; een
+    // losse `.toBe(N)`-teller erbovenop moest bij elke uitbreiding met de
+    // hand mee en is daarom vervallen — de `toEqual` hierboven pint de
+    // volledige verzameling al.
   })
 
   it('markeert de kernel-/directionele/config-workflows met de juiste kind', () => {
