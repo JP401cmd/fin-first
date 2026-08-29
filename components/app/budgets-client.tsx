@@ -53,6 +53,7 @@ import { PrivacyHiddenNotice } from '@/components/app/privacy-hidden-notice'
 import { SpendingConfidenceBadge, SpendingVarianceDetailPanel, calculateSpendingVariance, type SpendingVarianceData } from '@/components/app/spending-confidence-indicator'
 import { useChatContext } from '@/components/app/chat/chat-provider'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
+import { createPaneUrlHistory } from '@/lib/pane-url-history'
 import type { BudgetFormActionsState } from '@/components/app/budget-form'
 
 // Modals/sheets/panes die alleen achter een open-state worden gerenderd, worden
@@ -1707,8 +1708,11 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
 
   // Pane open/sluit/stap-toggle — alle drie schrijven naar de URL en triggeren
   // zo een re-render van deze component (selectedBudgetId/modalStep komen uit
-  // searchParams). `router.replace` ipv `push` om history-vervuiling te voorkomen
-  // (plan §8.2): de gebruiker moet één browser-back-klik = één pane-stap zien.
+  // searchParams). History-beleid (B-012, via lib/pane-url-history): open vanaf
+  // gesloten = push (de terugknop sluit de pane en blijft op deze pagina),
+  // wisselen binnen een open pane = replace (plan §8.2: één browser-back-klik =
+  // één pane-stap, geen entry-stapeling), sluiten via X = back (consumeert de
+  // eigen entry), deeplink zonder eigen entry = replace-fallback.
   //
   // Pathname-preserverend: BudgetsClient wordt zowel standalone (`/core/budgets`)
   // als embedded (`/core/assets/cash?tab=budgetteren`) gerenderd. Hardcoded
@@ -1722,19 +1726,29 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
     return qs ? `${pathname}?${qs}` : pathname
   }, [pathname, searchParams])
 
+  const paneHistory = useMemo(() => createPaneUrlHistory(router), [router])
+
+  // Sloot de terugknop (popstate) de pane zelf, dan is de history-entry al
+  // geconsumeerd — een latere programmatische close mag geen extra back doen.
+  const paneOpenRef = useRef(selectedBudgetId != null)
+  useEffect(() => {
+    if (selectedBudgetId == null && paneOpenRef.current) paneHistory.reset()
+    paneOpenRef.current = selectedBudgetId != null
+  }, [selectedBudgetId, paneHistory])
+
   const openBudgetModal = useCallback((id: string) => {
-    router.replace(buildPaneUrl((p) => {
+    paneHistory.open(buildPaneUrl((p) => {
       p.set(OVERLAY_QUERY_KEYS.budget, id)
       p.delete(OVERLAY_QUERY_KEYS.edit)
-    }), { scroll: false })
-  }, [router, buildPaneUrl])
+    }), selectedBudgetId != null)
+  }, [paneHistory, buildPaneUrl, selectedBudgetId])
 
   const closeBudgetModal = useCallback(() => {
-    router.replace(buildPaneUrl((p) => {
+    paneHistory.close(buildPaneUrl((p) => {
       p.delete(OVERLAY_QUERY_KEYS.budget)
       p.delete(OVERLAY_QUERY_KEYS.edit)
-    }), { scroll: false })
-  }, [router, buildPaneUrl])
+    }))
+  }, [paneHistory, buildPaneUrl])
 
   // BudgetPlanEditorSheet — getriggerd door `?planEditor=true` (gezet door de
   // in-app bottom-bar "Plan"-knop). Bij sluiten halen we alleen die ene param
@@ -1802,8 +1816,10 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
     next.delete(OVERLAY_QUERY_KEYS.planEditor)
     next.set(OVERLAY_QUERY_KEYS.budget, budgetId)
     next.set(OVERLAY_QUERY_KEYS.edit, 'true')
-    router.replace(`${pathname}?${next.toString()}`, { scroll: false })
-  }, [router, pathname, searchParams])
+    // Ook dit open-pad loopt via paneHistory (B-012): opent het bewerkscherm
+    // vanaf gesloten, dan hoort er een entry bij zodat terug de pane sluit.
+    paneHistory.open(`${pathname}?${next.toString()}`, selectedBudgetId != null)
+  }, [paneHistory, pathname, searchParams, selectedBudgetId])
 
   // Edit-toggle binnen pane (plan §6.4): pane blijft open, alleen `?edit=true`
   // wordt toegevoegd of verwijderd. De pane-content rendert detail vs edit
@@ -1840,12 +1856,15 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
   // om een vroege false-negative tijdens initial-render te vermijden.
   useEffect(() => {
     if (selectedBudgetId && !selectedBudget && !loading) {
-      router.replace(buildPaneUrl((p) => {
+      // Via paneHistory: was de pane vanaf gesloten geopend (push), dan
+      // consumeert close() die entry — een kale replace liet 'm als
+      // duplicaat staan en maakte de eerstvolgende terugdruk een no-op.
+      paneHistory.close(buildPaneUrl((p) => {
         p.delete(OVERLAY_QUERY_KEYS.budget)
         p.delete(OVERLAY_QUERY_KEYS.edit)
-      }), { scroll: false })
+      }))
     }
-  }, [selectedBudgetId, selectedBudget, loading, router, buildPaneUrl])
+  }, [selectedBudgetId, selectedBudget, loading, paneHistory, buildPaneUrl])
   // Siblings for ordering: parents of same type, or children of same parent
   const selectedSiblings: Budget[] = selectedBudget
     ? selectedBudget.parent_id

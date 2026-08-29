@@ -220,7 +220,7 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
     `${targetEndPortfolio > 0 ? `${strategy === 'pensioen' ? 'Geschatte nalatenschap' : 'Doelvermogen'}: ${formatCurrency(Math.round(targetEndPortfolio))}.` : ''}`
 
   return (
-    <ShellOverlay open={open} onClose={onClose} kind="pane" title={title}>
+    <ShellOverlay open={open} onClose={onClose} kind="pane" mobileBackCloses title={title}>
       {/* Accent line at top — kern-500 */}
       <div className="h-[2px] w-full bg-[var(--color-kern-500,#8b6914)]" />
 

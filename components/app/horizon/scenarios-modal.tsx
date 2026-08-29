@@ -115,7 +115,7 @@ export function ScenariosModal({ input, debts = [], open, onClose, simRows, simF
   const baseReturn = weather === 'normal' ? (grossReturn ?? 0) : MARKET_WEATHER[weather].return
 
   return (
-    <ShellOverlay open={true} onClose={onClose} kind="pane" title="Toekomstpaden">
+    <ShellOverlay open={true} onClose={onClose} kind="pane" mobileBackCloses title="Toekomstpaden">
         {/* Outer padding wordt geleverd door SlideInPane (driewegregel — ui-ux skill).
             Hier alleen verticaal ritme. */}
         <div className="space-y-6">

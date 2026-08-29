@@ -128,6 +128,7 @@ export function UitgavenPane({ open, onClose }: UitgavenPaneProps) {
       open={open}
       onClose={onClose}
       kind="pane"
+      mobileBackCloses
       title="Uitgave na pensioen"
       primaryAction={primaryAction}
       secondaryAction={secondaryAction}

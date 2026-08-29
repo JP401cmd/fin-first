@@ -225,7 +225,7 @@ export const PhaseModalOpbouw = memo(function PhaseModalOpbouw({
     <ShellOverlay
       open={open}
       onClose={onClose}
-      kind="pane"
+      kind="pane" mobileBackCloses
       title={`Opbouwfase \u00b7 ${Math.round(currentAge)} \u2192 ${Math.round(fireAge)} jaar`}
     >
       {/* Accent line */}

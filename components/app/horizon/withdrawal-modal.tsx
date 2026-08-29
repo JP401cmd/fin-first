@@ -143,7 +143,7 @@ export function WithdrawalModal({ input, open, onClose }: Props) {
   if (!open || !result) return null
 
   return (
-    <ShellOverlay open={true} onClose={onClose} kind="pane" title="Opnamestrategie">
+    <ShellOverlay open={true} onClose={onClose} kind="pane" mobileBackCloses title="Opnamestrategie">
         {/* Outer padding wordt geleverd door SlideInPane (driewegregel — ui-ux skill).
             Hier alleen verticaal ritme. */}
         <div className="space-y-6">

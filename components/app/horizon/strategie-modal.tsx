@@ -592,7 +592,7 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
 
   if (loading) {
     return (
-      <ShellOverlay open={open} onClose={onClose} kind="pane" title="Strategieën">
+      <ShellOverlay open={open} onClose={onClose} kind="pane" mobileBackCloses title="Strategieën">
         {/* Outer padding wordt geleverd door SlideInPane (driewegregel — ui-ux skill). */}
         <div>
           <div className="space-y-4">
@@ -616,7 +616,7 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
 
   if (error || !input) {
     return (
-      <ShellOverlay open={open} onClose={onClose} kind="pane" title="Strategieën">
+      <ShellOverlay open={open} onClose={onClose} kind="pane" mobileBackCloses title="Strategieën">
         <div className="flex flex-col items-center text-center py-12 px-4 max-w-md mx-auto">
           <div className="mb-3 flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
             <span
@@ -654,7 +654,7 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
   const fireAge = selectedSim?.fireAge ?? null
 
   return (
-    <ShellOverlay open={open} onClose={onClose} kind="pane" title="Strategieën">
+    <ShellOverlay open={open} onClose={onClose} kind="pane" mobileBackCloses title="Strategieën">
       {/* Outer padding wordt geleverd door SlideInPane (driewegregel — ui-ux skill). */}
       <div>
 

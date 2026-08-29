@@ -305,7 +305,7 @@ export function EventPane({
       <ShellOverlay
         open={open}
         onClose={onClose}
-        kind="pane"
+        kind="pane" mobileBackCloses
         title={title}
         primaryAction={primaryAction}
         secondaryAction={secondaryAction}

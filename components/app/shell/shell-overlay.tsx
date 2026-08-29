@@ -79,6 +79,17 @@ type ShellOverlayProps = {
    *  Voor kind="pane" gebruik je in plaats hiervan `primaryAction`/
    *  `secondaryAction` (die genereren zelf de footer op desktop én mobiel). */
   footer?: ReactNode
+  /**
+   * Alleen voor kind="pane": laat de mobiele terugknop de pane sluiten via de
+   * centrale overlay-history (B-012-klasse). Zet dit AAN voor STATE-gedreven
+   * panes (open-staat in een useState, close muteert geen URL) — daar is het
+   * gewoon correct gedrag. Laat het UIT (default) voor URL-gedreven panes
+   * (`?budget=`, `?asset=`, …): hun `onClose` herschrijft de URL met
+   * `router.replace` en botst dan met de entry-claim (pane heropent na
+   * "terug"); die familie regelt zijn history zelf via
+   * lib/pane-url-history.ts (push bij openen, back bij sluiten).
+   */
+  mobileBackCloses?: boolean
   children: ReactNode
 }
 
@@ -99,6 +110,7 @@ export function ShellOverlay({
   secondaryAction,
   footerInfo,
   footer,
+  mobileBackCloses = false,
   children,
 }: ShellOverlayProps) {
   // SSR-safe matchMedia hook — bepaalt voor `kind="pane"` of we de SlideInPane
@@ -188,13 +200,14 @@ export function ShellOverlay({
           size="full"
           footerSlot={mobileFooterSlot}
           actions={actions}
-          // Panes zijn de URL-gestuurde familie: hun open-staat komt uit een
-          // query-param (`?holding=<id>`, `?budget=<id>`, `?asset=<id>`) en hun
-          // `onClose` schrijft die met `router.replace` weer weg. De centrale
-          // overlay-history zou dan een tweede claim op dezelfde entry leggen,
-          // met een pane die na "terug" opnieuw opent. Back-integratie voor
-          // panes hoort bij de stack-push van Fase 0.5 (NavStackProvider).
-          manageHistory={false}
+          // URL-gestuurde panes (`?budget=`, `?asset=`, …) blijven standaard
+          // buiten de centrale overlay-history: hun `onClose` herschrijft de
+          // URL met `router.replace` en een tweede claim op dezelfde entry
+          // liet de pane na "terug" heropenen — die familie regelt zijn
+          // history zelf (lib/pane-url-history.ts). STATE-gedreven panes
+          // zetten `mobileBackCloses` en krijgen zo wél terugknop-sluit-gedrag
+          // (B-012-klasse). Volledige stack-push blijft Fase 0.5.
+          manageHistory={mobileBackCloses}
         >
           {children}
         </BottomSheet>

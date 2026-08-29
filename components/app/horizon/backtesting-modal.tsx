@@ -53,7 +53,7 @@ export function BacktestingModal({ input, swr, open, onClose, perspectiveLabel }
 
   return (
     <>
-      <ShellOverlay open={true} onClose={onClose} kind="pane" title={perspectiveLabel ? `Historische robuustheid — ${perspectiveLabel}` : 'Historische robuustheid'}>
+      <ShellOverlay open={true} onClose={onClose} kind="pane" mobileBackCloses title={perspectiveLabel ? `Historische robuustheid — ${perspectiveLabel}` : 'Historische robuustheid'}>
         {/* Outer padding wordt geleverd door SlideInPane (driewegregel — ui-ux skill).
             Hier alleen verticaal ritme. */}
         <div className="space-y-6">

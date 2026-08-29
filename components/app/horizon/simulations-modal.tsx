@@ -108,7 +108,7 @@ export function SimulationsModal({
 
   if (computing || !mc) {
     return (
-      <ShellOverlay open={true} onClose={onClose} kind="pane" title="Monte Carlo Simulaties">
+      <ShellOverlay open={true} onClose={onClose} kind="pane" mobileBackCloses title="Monte Carlo Simulaties">
           {/* Outer padding wordt geleverd door SlideInPane (driewegregel — ui-ux skill).
               Extra verticale lucht voor centered loader. */}
           <div className="flex flex-col items-center justify-center py-10">
@@ -128,7 +128,7 @@ export function SimulationsModal({
       : (input.monthlyExpenses * 12) / NL_SWR)
 
   return (
-    <ShellOverlay open={true} onClose={onClose} kind="pane" title="Monte Carlo Simulaties">
+    <ShellOverlay open={true} onClose={onClose} kind="pane" mobileBackCloses title="Monte Carlo Simulaties">
         {/* Outer padding wordt geleverd door SlideInPane (driewegregel — ui-ux skill).
             Hier alleen verticaal ritme. */}
         <div className="space-y-6">

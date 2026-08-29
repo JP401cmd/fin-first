@@ -194,7 +194,7 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
     `${dekkingVoldoende ? 'Mijn vermogen overbrugt deze periode met buffer.' : 'Er dreigt een tekort tijdens de overgang.'}`
 
   return (
-    <ShellOverlay open={open} onClose={onClose} kind="pane" title={title}>
+    <ShellOverlay open={open} onClose={onClose} kind="pane" mobileBackCloses title={title}>
       {/* Accent line */}
       <div className="h-[2px] bg-[var(--color-horizon-200)]" />
 
