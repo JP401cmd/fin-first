@@ -452,6 +452,16 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     sizes: ['mini', 'quarter', 'half', 'full'],
     defaultSize: 'half',
   },
+  {
+    id: 'vermogen_selectie',
+    name: 'Vermogen — eigen selectie',
+    description: 'Het totaal van de bezittingen en schulden die jij zelf kiest, met verloop',
+    module: 'kern',
+    // 'mini' staat bewust niet in de kiezer: die maat ontstaat alleen via
+    // downsizeForMobile(quarter → mini) — de widget rendert 'm wél.
+    sizes: ['quarter', 'half', 'full'],
+    defaultSize: 'half',
+  },
 ]
 
 /**
@@ -548,6 +558,7 @@ export const WIDGET_HREFS: Record<string, string> = {
   rebalancing:             '/overzicht/bezittingen',
   fee_analyzer:            '/overzicht/bezittingen',
   hypotheek_vs_beleggen:   '/overzicht/schulden/mortgage',
+  vermogen_selectie:       '/overzicht/bezittingen',
 }
 
 // ── Widget → Feature mapping ─────────────────────────────────

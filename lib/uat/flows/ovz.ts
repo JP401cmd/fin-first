@@ -55,6 +55,8 @@ export const OVZ_FLOW: UatFlow = {
     { id: 'doelen', scenarioId: 'UAT-OVZ-06', label: 'WF-OVZ-06 · Voortgang van doelen volgen', kind: 'screen', stage: 2, lane: 'doelen' },
     { id: 'vrijheidsstrip', scenarioId: 'UAT-OVZ-07', label: 'WF-OVZ-07 · Vrijheidsstrip: voortgang naar vrijheid', kind: 'screen', stage: 2, lane: 'doelen' },
     { id: 'widgets', scenarioId: 'UAT-OVZ-08', label: 'WF-OVZ-08 · Hero-widgets samenstellen', kind: 'action', stage: 2, lane: 'doelen' },
+    { id: 'vermogenselectie', scenarioId: 'UAT-OVZ-23', label: 'WF-OVZ-23 · Vermogens-widget met eigen selectie (gewogen som + verloop)', kind: 'screen', stage: 2, lane: 'doelen', subOf: 'widgets' },
+    { id: 'vermogenselectiebewerken', scenarioId: 'UAT-OVZ-24', label: 'WF-OVZ-24 · Vermogens-widget: bewerk-sheet, privacy, perspectief, lege staat', kind: 'action', stage: 2, lane: 'doelen', subOf: 'vermogenselectie' },
 
     // ── 3 · briefing ──────────────────────────────────────────────────────
     { id: 'vrijheidweek', scenarioId: 'UAT-OVZ-09', label: 'WF-OVZ-09 · "Jouw vrijheid deze week"', kind: 'screen', stage: 3, lane: 'briefing' },
@@ -101,6 +103,8 @@ export const OVZ_FLOW: UatFlow = {
     { from: 'widgetbeslis', to: 'widgets', kind: 'branch', label: 'eigen widgets' },
     { from: 'doelen', to: 'vrijheidsstrip' },
     { from: 'doelen', to: 'x-toek', kind: 'cross' },
+    { from: 'widgets', to: 'vermogenselectie' },
+    { from: 'vermogenselectie', to: 'vermogenselectiebewerken' },
 
     // briefing
     { from: 'hefboom', to: 'vrijheidweek' },
@@ -131,6 +135,8 @@ export const OVZ_FLOW: UatFlow = {
     { from: 'euroweergave', to: 'uitkomst' },
     { from: 'vrijheidsstrip', to: 'uitkomst' },
     { from: 'widgets', to: 'uitkomst' },
+    { from: 'vermogenselectie', to: 'uitkomst' },
+    { from: 'vermogenselectiebewerken', to: 'uitkomst' },
     { from: 'delen', to: 'uitkomst' },
     { from: 'statusmelding', to: 'uitkomst' },
     { from: 'welkomstgids', to: 'uitkomst' },

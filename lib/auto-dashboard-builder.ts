@@ -111,6 +111,9 @@ export const WIDGET_POPULARITY: Record<string, number> = {
   rebalancing: 3,
   fee_analyzer: 3,
   hypotheek_vs_beleggen: 3,
+  // Laag: vereist een expliciete eigen selectie voordat hij iets toont — geen
+  // kandidaat voor een automatisch samengesteld dashboard.
+  vermogen_selectie: 1,
 }
 
 /** Grid size × detail level → size distribution budget */

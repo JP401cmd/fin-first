@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-29T15:55:18.715Z",
+  "generatedAt": "2026-08-29T22:29:40.882Z",
   "generatedDate": "2026-08-29",
   "repo": {
     "name": "fin",
@@ -188,11 +188,11 @@
   "stats": {
     "routes": 137,
     "routesProduction": 95,
-    "api": 303,
+    "api": 304,
     "tables": 91,
     "migrations": 218,
     "integrations": 25,
-    "components": 985,
+    "components": 988,
     "providers": 15,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -4331,6 +4331,15 @@
       "methods": []
     },
     {
+      "url": "/api/wealth-selection",
+      "file": "app/api/wealth-selection/route.ts",
+      "domain": "wealth-selection",
+      "methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
       "url": "/api/web-vitals",
       "file": "app/api/web-vitals/route.ts",
       "domain": "web-vitals",
@@ -7633,6 +7642,22 @@
       ]
     },
     {
+      "domain": "wealth-selection",
+      "label": "wealth-selection",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/wealth-selection",
+          "file": "app/api/wealth-selection/route.ts",
+          "domain": "wealth-selection",
+          "methods": [
+            "GET",
+            "PUT"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "welcome",
       "label": "welcome",
       "count": 1,
@@ -8596,7 +8621,7 @@
     }
   ],
   "components": {
-    "total": 985,
+    "total": 988,
     "groups": [
       {
         "group": "app",
@@ -9176,7 +9201,7 @@
       },
       {
         "group": "widgets",
-        "count": 91,
+        "count": 94,
         "items": [
           "abonnementen-widget",
           "acties-widget",
@@ -9248,6 +9273,9 @@
           "surplus-gap-widget",
           "swr-monitor-widget",
           "vaste-lasten-widget",
+          "vermogen-selectie-sheet",
+          "vermogen-selectie-widget",
+          "vermogen-selectie-widget.test",
           "volgende-stap-widget",
           "volgende-stap-widget.test",
           "voorstellen-widget",
@@ -11400,6 +11428,20 @@
           "write": true
         }
       ],
+      "wealth-selection": [
+        {
+          "name": "assets",
+          "write": false
+        },
+        {
+          "name": "debts",
+          "write": false
+        },
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
       "web-vitals": [
         {
           "name": "web_vitals",
@@ -11771,6 +11813,14 @@
           "write": true,
           "routes": [
             "/api/verhuurrendement/setup"
+          ]
+        },
+        {
+          "domain": "wealth-selection",
+          "label": "wealth-selection",
+          "write": true,
+          "routes": [
+            "/api/wealth-selection"
           ]
         },
         {
@@ -12183,6 +12233,14 @@
           ]
         },
         {
+          "domain": "wealth-selection",
+          "label": "wealth-selection",
+          "write": false,
+          "routes": [
+            "/api/wealth-selection"
+          ]
+        },
+        {
           "domain": "year-in-review",
           "label": "year-in-review",
           "write": false,
@@ -12378,6 +12436,14 @@
             "/api/snapshots",
             "/api/snapshots/auto",
             "/api/snapshots/cron"
+          ]
+        },
+        {
+          "domain": "wealth-selection",
+          "label": "wealth-selection",
+          "write": false,
+          "routes": [
+            "/api/wealth-selection"
           ]
         },
         {
@@ -16696,6 +16762,18 @@
       ],
       "summary": "Een testgebruiker meldde (13-08-2026): *\"Grenzenpot weergave zou aangevuld kunnen worden met een rolling forecast van de uitgave. Niet de dag en week potten maar maandpot wel. Als de max 100 is en de 1e van de maand heb je al 80 uitgegeven is het fijn dat te zien.\"*",
       "file": "docs/adr/0119-grenzenpot-tempo-van-de-lopende-periode.md"
+    },
+    {
+      "id": "0120-vermogenswidget-met-eigen-selectie",
+      "title": "Vermogens-widget met eigen selectie: weergave-pref, gewogen som, persoonlijk perspectief",
+      "status": "aanvaard",
+      "date": "2026-08-29",
+      "elements": [
+        "as-vermogen",
+        "do-bezitting"
+      ],
+      "summary": "De eigenaar vroeg (29-08-2026) om een widget die het totale vermogen toont van een **zélf gekozen** deelverzameling bezittingen en schulden — bijvoorbeeld wél aandelen en bankrekening, níét crypto en eigen huis — met een bewerk-knop op de widget en een historisch verloop. Zo'n ge",
+      "file": "docs/adr/0120-vermogenswidget-met-eigen-selectie.md"
     }
   ],
   "churn": {
@@ -16703,7 +16781,7 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 71
+        "commits": 70
       },
       {
         "path": "lib/ai",
@@ -16711,7 +16789,7 @@
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 29
+        "commits": 28
       },
       {
         "path": "app/api/household",
@@ -16727,7 +16805,7 @@
       },
       {
         "path": "lib/horizon-data.ts",
-        "commits": 9
+        "commits": 8
       },
       {
         "path": "app/api/budgets",
@@ -16735,7 +16813,7 @@
       },
       {
         "path": "lib/fire-simulation.ts",
-        "commits": 6
+        "commits": 5
       },
       {
         "path": "components/horizon",
@@ -16746,27 +16824,27 @@
       {
         "file": "components/app/horizon/horizon-client.tsx",
         "loc": 9805,
-        "commits": 79
+        "commits": 80
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 5294,
-        "commits": 31
+        "loc": 5313,
+        "commits": 32
       },
       {
         "file": "components/core/assets-client.tsx",
         "loc": 4894,
-        "commits": 38
+        "commits": 37
       },
       {
         "file": "components/app/cash-account-view.tsx",
         "loc": 3525,
-        "commits": 19
+        "commits": 20
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 2834,
-        "commits": 53
+        "loc": 2893,
+        "commits": 52
       },
       {
         "file": "lib/release-notes.ts",
@@ -16776,7 +16854,7 @@
       {
         "file": "app/(app)/core/cash/import/page.tsx",
         "loc": 2406,
-        "commits": 23
+        "commits": 24
       },
       {
         "file": "lib/test-personas.ts",
@@ -17882,8 +17960,23 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-08-29",
-    "hasChanges": false,
-    "sections": []
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "API-routes",
+        "added": [
+          "/api/wealth-selection"
+        ],
+        "removed": []
+      },
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+3"
+        ],
+        "removed": []
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -18203,8 +18296,8 @@
     },
     {
       "date": "2026-08-29",
-      "api": 303,
-      "components": 985,
+      "api": 304,
+      "components": 988,
       "tables": 91,
       "routesProduction": 95
     }

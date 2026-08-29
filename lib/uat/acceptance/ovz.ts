@@ -314,6 +314,33 @@ const criteria: AcceptanceCriterion[] = [
       source: 'lib/horizon/networth-rows.ts#buildSimNetWorthRows + lib/euro-display.ts#deflate — échte productiefuncties, synthetische kernelrijen (geen mirror) — zie ovz-checks.ts',
     },
   },
+  {
+    workflow: 'WF-OVZ-23',
+    scenarioId: 'UAT-OVZ-23',
+    titel: 'Vermogens-widget met eigen selectie: gewogen som, verloop en stale filtering (ADR 0120)',
+    kriticiteit: 'KERN',
+    given: "Selectie {assetIds:[a1,a2,verwijderde-id], debtIds:[d1,verwijderde-id]}: a1 DEGIRO €200.000 (net_worth_inclusion_pct 100), a2 spaarrekening €50.000 (pct 50 → gewogen €25.000), d1 hypotheek €30.000 (pct 100). Twee historie-scenario's op hetzelfde 12-maands venster: (kort) alleen a1 heeft één maandmeting → minder dan de vereiste 2 echte maanden; (lang) a1/a2/d1 hebben elk twee maandmetingen, al gewogen door de aanroeper (zoals `loadEntitySparklines` levert).",
+    when: "`buildWealthSelectionWidgetData` bouwt het widget-bundelveld uit selectie + rijen + historie-input, voor beide historie-scenario's.",
+    then: "Gewogen som: assetsTotal = 200.000 + (50.000×0,5) = €225.000; debtsTotal = 30.000 (schulden verlagen het totaal) → total = €195.000. De twee verwijderde id's in de selectie tellen niet mee — niet in de som, niet in `count` (2 bezittingen, 1 schuld i.p.v. 3/2) — stale id's verdwijnen stil (ADR 0120 besluit 5). Historie kort: onder de 2-maanden-drempel → `history=[]`, de widget toont \"Nog geen verloop\" i.p.v. een verzonnen lijn (ADR 0120 gevolgen). Historie lang: de reeks is de SOM van de gewogen per-entiteit-reeksen per maand (180.000+22.500−28.000=€174.500, dan 200.000+25.000−30.000=€195.000), rechts uitgelijnd op de laatste twee maandsleutels van het venster — het laatste punt (€195.000) is exact gelijk aan het actuele `total`, dus geen knik op de naad historie↔actueel (zelfde eis als de euro-weergave-ADR's 0090/0093 elders afdwingen).",
+    assertion: {
+      kind: 'exact',
+      expected: 'total=195000; count=2a/1d; kortHistorie=leeg; langHistorieLengte=2; langLaatstePunt=195000',
+      source: 'lib/wealth-selection.ts#buildWealthSelectionWidgetData (échte productiefunctie, ook getest in lib/wealth-selection.test.ts) — zie ovz-checks.ts',
+    },
+  },
+  {
+    workflow: 'WF-OVZ-24',
+    scenarioId: 'UAT-OVZ-24',
+    titel: 'Vermogens-widget met eigen selectie: bewerk-sheet, privacy-modus, perspectief en lege staat (ADR 0120)',
+    kriticiteit: 'BELANGRIJK',
+    given: "Widget `vermogen_selectie` staat standaard UIT (geen default-aanwezigheid in de hero-rail). GET /api/wealth-selection levert de keuzelijst en filtert hard op `user_id` (de assets-SELECT-policy is huishoud-gedeeld, dit filter is de enige scoping die dat corrigeert). PUT /api/wealth-selection schrijft alleen de eigen `wealth_widget_selection`-sleutel — een id van een andere gebruiker (partner) in de PUT-body valt stil af (`route.test.ts`: \"slaat alleen EIGEN, bestaande id's op — een id van een andere gebruiker valt stil af\"). Perspectief-provider staat op een niet-personal perspectief (huishouden/partner); privacy-modus (`useMaskedAmounts`) staat aan.",
+    when: 'De gebruiker klikt het bewerk-potlood op de widget (buiten de globale grid-edit-modus) → de ShellOverlay-sheet opent, kiest bezittingen/schulden en slaat op; apart: de gebruiker heeft nog geen selectie; apart: de gebruiker wisselt perspectief; apart: de gebruiker zet privacy-modus aan.',
+    then: 'De keuzelijst in de sheet toont uitsluitend eigen bezittingen/schulden — nooit de posten van de partner, ondanks de huishoud-gedeelde SELECT-policy op `assets`. Opslaan muteert uitsluitend `profiles.feature_preferences.wealth_widget_selection`; een meegestuurd partner-id wordt server-side genegeerd, niet opgeslagen (route.test.ts-fixture dekt dit). Bij géén selectie toont de widget een empty state met CTA "Kies bezittingen" (full/quarter-varianten hebben elk hun eigen compacte empty-view) en telt de widget niet mee als default-aanwezige widget. Bij een ander perspectief dan personal toont de widget het label "Persoonlijk" (`showPersonalTag`) — de widget blijft altijd op eigen data, `balance_snapshots` kent geen huishoud-model (ADR 0120 besluit 4). Bij privacy-modus maskeren alle bedragen, INCLUSIEF het SVG-tekstlabel (`spark.firstValue` via `formatMaskedCurrency(…, masked)`) — niet alleen de HTML-bedragen via `MaskedAmount`. Dit laatste (SVG-maskering) is een VISUELE render-eis zonder geautomatiseerde test op dit moment — markeer als handmatige check bij een live UAT-run.',
+    assertion: {
+      kind: 'ui-only',
+      source: "app/api/wealth-selection/route.ts (GET/PUT, own-row filter) + app/api/wealth-selection/route.test.ts (partner-id-fixture) + components/widgets/vermogen-selectie-widget.tsx (personalTag/empty-state/SVG-maskering) — configuratie-/weergave-workflow zonder eigen berekening; de SVG-maskering is een niet-geautomatiseerde visuele check (handmatig te toetsen)",
+    },
+  },
 ]
 
 export const OVZ_ACCEPTANCE: AcceptanceSet = {

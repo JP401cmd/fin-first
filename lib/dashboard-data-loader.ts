@@ -20,7 +20,17 @@ import type {
   UpcomingEvent,
   HouseholdActivityItem,
   WeekOverviewData,
+  WealthSelectionWidgetData,
 } from '@/lib/types/dashboard'
+import {
+  buildWealthSelectionWidgetData,
+  isWealthSelectionWidgetActive,
+  parseWealthSelection,
+  wealthSelectionMonthKeys,
+  type WealthSelectionAssetRow,
+  type WealthSelectionDebtRow,
+} from '@/lib/wealth-selection'
+import { loadEntitySparklines } from '@/lib/load-entity-sparklines'
 import type { WidgetPref, WidgetPrefs } from '@/lib/widget-catalog'
 import type { FireProjection, FireCountdown } from '@/lib/horizon-data'
 import { loadNewsPreview } from '@/lib/news-preview'
@@ -927,6 +937,52 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
 
   // Compute-gating vlaggen: welke dure, widget-exclusieve velden moeten draaien.
   const { wantWeekOverview, wantHeatmap, wantHouseholdActivity } = resolveWidgetComputeFlags(activeWidgets)
+
+  // ── Vermogens-widget met eigen selectie (ADR 0120) ──────────────────────────
+  // GEGATED op twee dingen tegelijk: de widget moet aanstaan én er moet een
+  // selectie zijn. Zonder één van beide blijft het bundelveld `null` en kost dit
+  // blok NUL extra queries — de snapshot-lezing draait alleen voor wie de widget
+  // daadwerkelijk gebruikt.
+  //
+  // PERSOONLIJK PERSPECTIEF (ADR 0120 besluit 4): de SELECT-policy op `assets`
+  // is huishoud-gedeeld, dus `assetsResult` kán rijen van de partner bevatten.
+  // De widget rekent op `balance_snapshots`, dat géén huishoud-model kent — een
+  // partnerrij zou dus een actueel bedrag optellen waar nooit historie bij komt.
+  // Vandaar het harde `user_id`-filter hier; haal dat niet weg.
+  //
+  // Hergebruikt de al opgehaalde rijen: `ASSET_CLIENT_COLUMNS` (getActiveAssets)
+  // en `select('*')` (getActiveDebts) dragen naam, waarde en
+  // `net_worth_inclusion_pct` al. Geen tweede rij-query, alleen de snapshots.
+  const wealthSelection = parseWealthSelection(profileResult.data?.feature_preferences)
+  let wealthSelectionWidget: WealthSelectionWidgetData | null = null
+  if (currentUserId && isWealthSelectionWidgetActive(activeWidgets.map(w => w.id), wealthSelection) && wealthSelection) {
+    const ownAssets = (assetsResult.data ?? []).filter(
+      (a: { user_id?: string | null }) => a.user_id === currentUserId,
+    ) as WealthSelectionAssetRow[]
+    const ownDebts = (debtsResult.data ?? []).filter(
+      (d: { user_id?: string | null }) => d.user_id === currentUserId,
+    ) as WealthSelectionDebtRow[]
+
+    // Stale id's vóór alles wegfilteren: dode referenties mogen niet in de
+    // `.in(...)` van de sparkline-lezing belanden (ADR 0120 besluit 5).
+    const liveAssetIds = new Set(ownAssets.map(a => a.id))
+    const liveDebtIds = new Set(ownDebts.map(d => d.id))
+    const liveSelection = {
+      assetIds: wealthSelection.assetIds.filter(id => liveAssetIds.has(id)),
+      debtIds: wealthSelection.debtIds.filter(id => liveDebtIds.has(id)),
+    }
+
+    const [assetSeries, debtSeries] = await Promise.all([
+      loadEntitySparklines(supabase, 'asset', liveSelection.assetIds),
+      loadEntitySparklines(supabase, 'debt', liveSelection.debtIds),
+    ])
+
+    wealthSelectionWidget = buildWealthSelectionWidgetData(liveSelection, ownAssets, ownDebts, {
+      monthKeys: wealthSelectionMonthKeys(now),
+      assetSeries,
+      debtSeries,
+    })
+  }
 
   const last12Income = aggSumPositief(txAgg12, { realOnly: true })
   let extrapolatedIncome = last12Income
@@ -2729,6 +2785,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     // Alle niet-gearchiveerde grenzenpotten (actief én gepauzeerd) als compacte
     // projectie — voedt de `spend_limit:<id>`-widgets én hun stale-check.
     spendLimitWidgets,
+    // Gated (ADR 0120): gevuld zodra de widget `vermogen_selectie` aanstaat én er
+    // een selectie in `feature_preferences` staat; anders bewust `null`.
+    wealthSelectionWidget,
     allBudgets,
     // Real widget data from queries and computations
     notifications,

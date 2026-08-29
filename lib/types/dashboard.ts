@@ -11,6 +11,30 @@ import type { FireEndStrategy } from '@/lib/fire-strategy'
 import type { HealthScore } from '@/lib/financial-health'
 import type { NewsPreview } from '@/lib/news-preview'
 import type { SpendLimitWidgetData } from '@/lib/spend-limits/widget-data'
+
+/**
+ * Compacte projectie voor de vermogens-widget met eigen selectie (ADR 0120).
+ * Bewust hier gedefinieerd (niet in een lib met loaders): dit is het
+ * RSC-payload-contract — klein, zonder per-bezit-rijen buiten `topItems`.
+ * Alle bedragen zijn gewogen met `net_worth_inclusion_pct/100`.
+ */
+export interface WealthSelectionWidgetData {
+  /** assetsTotal − debtsTotal. */
+  total: number
+  assetsTotal: number
+  /** Som van de geselecteerde schulden, als positief getal. */
+  debtsTotal: number
+  count: { assets: number; debts: number }
+  /**
+   * 12 maandpunten oud→nieuw (som van de gewogen LOCF-reeksen uit
+   * balance_snapshots). Leeg array wanneer er minder dan 2 maanden met echte
+   * snapshot-data zijn — de widget toont dan "nog geen verloop", nooit een
+   * verzonnen lijn.
+   */
+  history: { month: string; value: number }[]
+  /** Max 4 grootste posten voor het full-formaat; schuld-values positief. */
+  topItems: { name: string; value: number; kind: 'asset' | 'debt' }[]
+}
 import type { PortfolioReturnSummary } from '@/lib/asset-return'
 
 export interface TopAction {
@@ -443,6 +467,15 @@ export interface DashboardData {
    * mock-/empty-bundels zonder dit veld gedragen zich als "geen potten".
    */
   spendLimitWidgets?: SpendLimitWidgetData[]
+  /**
+   * Vermogens-widget met eigen selectie (ADR 0120). Alleen gevuld wanneer de
+   * widget `vermogen_selectie` enabled is ÉN er een selectie is opgeslagen
+   * (`feature_preferences.wealth_widget_selection`); anders undefined/null —
+   * de widget toont dan zijn empty state. Waarden gewogen met
+   * `net_worth_inclusion_pct` (identiek aan de balance_snapshots-historie);
+   * schulden verlagen `total`. Optioneel/additief zoals `spendLimitWidgets`.
+   */
+  wealthSelectionWidget?: WealthSelectionWidgetData | null
   // All budgets (parents + children, non-archive) for auto-dashboard wizard
   allBudgets: {
     id: string

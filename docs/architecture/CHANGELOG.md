@@ -854,3 +854,8 @@
 ## 2026-08-29
 
 - Geen wijzigingen.
+
+## 2026-08-29
+
+- **API-routes** toegevoegd: /api/wealth-selection
+- **Componenten (aantal)** toegevoegd: +3

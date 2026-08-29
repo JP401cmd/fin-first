@@ -160,6 +160,7 @@ export const WIDGET_MODULE_MAP: Record<string, ModuleId> = {
   netto_vermogen: 'vermogensregistratie',
   schulden: 'vermogensregistratie',
   hypotheek_vs_beleggen: 'vermogensregistratie',
+  vermogen_selectie: 'vermogensregistratie',
 
   // Aandelenregistratie
   holdings: 'aandelenregistratie',

@@ -18,11 +18,13 @@ import {
   downsizeForMobile,
   mergeWidgetPrefs,
   getWidgetSizes,
+  getWidgetDef,
   HOLDING_FAV_SIZES,
   BUDGET_FAV_SIZES,
   SPEND_LIMIT_SIZES,
   type WidgetPrefs,
 } from './widget-catalog'
+import { WEALTH_SELECTION_WIDGET_ID } from './wealth-selection'
 
 // ── 1. DEFAULT_WIDGET_PREFS: alle widgets disabled ────────────────────────────
 
@@ -289,5 +291,63 @@ describe('mergeWidgetPrefs — randgevallen', () => {
     // Stale catalog-ids worden niet overgenomen (savedMap wordt gebruikt maar
     // de output wordt gebouwd vanuit WIDGET_CATALOG, niet vanuit saved.widgets)
     expect(stale).toBeUndefined()
+  })
+})
+
+// ── 6. vermogen_selectie (ADR 0120) — catalog-koppeling en maatgedrag ────────
+//
+// De gate in lib/wealth-selection.ts (`isWealthSelectionWidgetActive`) checkt
+// `activeWidgetIds.includes(WEALTH_SELECTION_WIDGET_ID)` tegen widget-prefs die
+// hun `id` uit de WIDGET_CATALOG-entry halen. Die twee strings zijn twee losse
+// bronnen — een tikfout of hernoeming aan één kant zet de gate stil altijd op
+// "uit" zonder dat er ergens een compile- of runtime-fout verschijnt. Deze pin
+// dwingt ze gelijk.
+describe('vermogen_selectie — drift-pin catalog ↔ loader-gate', () => {
+  it('WEALTH_SELECTION_WIDGET_ID verwijst naar een bestaande WIDGET_CATALOG-entry', () => {
+    const def = getWidgetDef(WEALTH_SELECTION_WIDGET_ID)
+    expect(def).toBeDefined()
+    expect(def?.id).toBe(WEALTH_SELECTION_WIDGET_ID)
+  })
+
+  it('die entry heeft precies het verwachte id "vermogen_selectie" (mens-leesbare check naast de import-koppeling)', () => {
+    expect(WEALTH_SELECTION_WIDGET_ID).toBe('vermogen_selectie')
+  })
+})
+
+describe('vermogen_selectie — maten (mini ontstaat via downsizeForMobile, niet kiesbaar)', () => {
+  it('getWidgetSizes levert quarter/half/full — bewust geen mini in de kiezer', () => {
+    expect(getWidgetSizes(WEALTH_SELECTION_WIDGET_ID)).toEqual(['quarter', 'half', 'full'])
+  })
+
+  it('downsizeForMobile(quarter) geeft mini — de widget moet dus een mini-rendertak hebben', () => {
+    const sizes = getWidgetSizes(WEALTH_SELECTION_WIDGET_ID)
+    const smallest = sizes[0] // 'quarter'
+    expect(downsizeForMobile(smallest)).toBe('mini')
+  })
+
+  it('een opgeslagen "mini" voor vermogen_selectie wordt server-side gesaniteerd naar quarter', () => {
+    // mergeWidgetPrefs zet 'mini' altijd eerst hard om naar 'quarter' (mini
+    // wordt nooit gepersisteerd); pas als 'quarter' zelf niet in def.sizes zou
+    // staan, valt het terug op defaultSize. Voor vermogen_selectie staat
+    // 'quarter' wél in de toegestane maten, dus landt de sanitatie daar.
+    const saved: WidgetPrefs = {
+      widgets: [{ id: WEALTH_SELECTION_WIDGET_ID, enabled: true, size: 'mini', order: 0 }],
+    }
+    const result = mergeWidgetPrefs(saved)
+    const pref = result.widgets.find(w => w.id === WEALTH_SELECTION_WIDGET_ID)
+    expect(pref?.size).not.toBe('mini')
+    expect(pref?.size).toBe('quarter')
+  })
+
+  it('een geldig opgeslagen "quarter" blijft ongewijzigd', () => {
+    const saved: WidgetPrefs = {
+      widgets: [{ id: WEALTH_SELECTION_WIDGET_ID, enabled: true, size: 'quarter', order: 0 }],
+    }
+    const result = mergeWidgetPrefs(saved)
+    expect(result.widgets.find(w => w.id === WEALTH_SELECTION_WIDGET_ID)?.size).toBe('quarter')
+  })
+
+  it('staat default UIT (AC8) — spiegelt de generieke DEFAULT_WIDGET_PREFS-regel voor dit specifieke id', () => {
+    expect(DEFAULT_WIDGET_PREFS.widgets.find(w => w.id === WEALTH_SELECTION_WIDGET_ID)?.enabled).toBe(false)
   })
 })

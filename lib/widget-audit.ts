@@ -95,6 +95,9 @@ export const WIDGET_CLASSIFICATION: Record<string, WidgetClassification> = {
   rebalancing:              'insight',       // → /core/assets (rebalance portfolio)
   fee_analyzer:             'insight',       // onClick → fee detail modal
   hypotheek_vs_beleggen:    'insight',       // → /core/debts (decide strategy)
+  // Zuivere weergave van een zelfgekozen deelverzameling — het getal ís het
+  // inzicht. De bewerk-knop is configuratie van de weergave, geen call-to-action.
+  vermogen_selectie:        'observation',
 }
 
 // ── Review decision tracking ─────────────────────────────────────────────────

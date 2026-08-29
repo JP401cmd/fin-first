@@ -103,14 +103,16 @@ describe('Observation widgets retain legitimacy without forced actions (#802)', 
     expect(observationViolations).toEqual([])
   })
 
-  it('total observation count is stable (13 widgets)', () => {
+  it('total observation count is stable (14 widgets)', () => {
     const observations = WIDGET_CATALOG.filter(w =>
       isObservationWidget(w.id)
     )
-    // 13 observation widgets: netto_vermogen, vrijheidsvoortgang,
+    // 14 observation widgets: netto_vermogen, vrijheidsvoortgang,
     // pensioen_aow, vrijheidsmijlpalen, maandoverzicht, weekoverzicht,
     // trend_inkomen, trend_uitgaven, trend_sparen, trend_schulden,
-    // huishouden_vergelijking, huishouden_activiteit, beleggingsrendement
-    expect(observations.length).toBe(13)
+    // huishouden_vergelijking, huishouden_activiteit, beleggingsrendement,
+    // vermogen_selectie (ADR 0120 - het getal is het inzicht; de bewerk-knop
+    // is weergave-configuratie, geen call-to-action)
+    expect(observations.length).toBe(14)
   })
 })

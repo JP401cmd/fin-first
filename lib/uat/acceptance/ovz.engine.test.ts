@@ -10,8 +10,8 @@
  * OVZ is — net als SCHULD/TOEK/WILL — NIET aaneengesloten op WF-nummer:
  * WF-OVZ-17/18 hebben geen eigen UAT-OVZ-scenario (→ gedekt door UAT-NAV-19
  * resp. UAT-NAV-10) en ontbreken dus terecht in de catalogus voor zone OVZ.
- * De 20 criteria hier zijn wél 1-op-1 met de 20 catalogus-scenario's
- * (UAT-OVZ-01..16, 19..22).
+ * De 22 criteria hier zijn wél 1-op-1 met de 22 catalogus-scenario's
+ * (UAT-OVZ-01..16, 19..24).
  */
 
 import { describe, it, expect } from 'vitest'
@@ -34,11 +34,11 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Ovz — acceptatiecriteria dekking', () => {
-  it('heeft precies één criterium per catalogus-OVZ-scenario (20 stuks, WF-OVZ-17/18 bestaan niet in de catalogus)', () => {
+  it('heeft precies één criterium per catalogus-OVZ-scenario (22 stuks, WF-OVZ-17/18 bestaan niet in de catalogus)', () => {
     const workflows = OVZ_ACCEPTANCE.criteria.map((c) => c.workflow).sort()
     expect(workflows).toEqual(catalogOvzWorkflows)
     expect(new Set(workflows).size).toBe(catalogOvzWorkflows.length)
-    expect(workflows.length).toBe(20)
+    expect(workflows.length).toBe(22)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {
@@ -66,8 +66,9 @@ describe('UAT Ovz — acceptatiecriteria dekking', () => {
     expect(checkWorkflows).toEqual(exactWorkflows)
     // WF-OVZ-14 (welkomstgids) is met M1 van 'ui-only' naar 'exact' gegaan: de
     // voortgang is sindsdien een uitkomst van échte functies (deriveGuideStates
-    // + countScreenProgress) i.p.v. puur zichtbaarheids-state.
-    expect(exactWorkflows.length).toBe(12)
+    // + countScreenProgress) i.p.v. puur zichtbaarheids-state. WF-OVZ-23
+    // (vermogens-widget met eigen selectie, ADR 0120) is nieuw en 'exact'.
+    expect(exactWorkflows.length).toBe(13)
   })
 
   it('markeert de kernel-/directionele/config-workflows met de juiste kind', () => {
@@ -75,7 +76,7 @@ describe('UAT Ovz — acceptatiecriteria dekking', () => {
       expect(criterion(wf).assertion.kind, `${wf} moet oracle zijn`).toBe('oracle')
     }
     expect(criterion('WF-OVZ-04').assertion.kind).toBe('direction')
-    for (const wf of ['WF-OVZ-08', 'WF-OVZ-11', 'WF-OVZ-12', 'WF-OVZ-13', 'WF-OVZ-16']) {
+    for (const wf of ['WF-OVZ-08', 'WF-OVZ-11', 'WF-OVZ-12', 'WF-OVZ-13', 'WF-OVZ-16', 'WF-OVZ-24']) {
       expect(criterion(wf).assertion.kind, `${wf} moet ui-only zijn`).toBe('ui-only')
     }
   })

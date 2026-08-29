@@ -10,7 +10,8 @@
  * OVZ combineert échte productiefuncties (Box 3, gezondheidspijlers,
  * doel-voortgang, vrijheidsdagen, samengestelde rente) met twee kleine mirrors
  * (schuldratio-pijlerscore, postpone-/uitstel-termijnen) plus de afgeleide
- * welkomstgids-voortgang (M1) — 12 exacte checks.
+ * welkomstgids-voortgang (M1) en de vermogens-widget met eigen selectie
+ * (ADR 0120) — 13 exacte checks.
  * Alle checks zijn pure functies — geen netwerk, geen auth-afhankelijkheid,
  * vandaar `requiredRole: 'any'`.
  */

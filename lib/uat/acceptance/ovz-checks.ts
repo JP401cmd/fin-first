@@ -34,6 +34,7 @@ import { compareCompound } from '@/lib/compound-projection'
 import { buildSimNetWorthRows } from '@/lib/horizon/networth-rows'
 import { DEFAULT_HOUSING_STRATEGY } from '@/lib/housing-strategy'
 import { deflate } from '@/lib/euro-display'
+import { buildWealthSelectionWidgetData } from '@/lib/wealth-selection'
 import {
   DEFAULT_WELCOME_GUIDE,
   countScreenProgress,
@@ -422,6 +423,60 @@ export const OVZ_ENGINE_CHECKS: OvzEngineCheck[] = [
       return {
         expected: 'real60=500000; real61=500000; real62=500000; jaar0GelijkAanCurrentNetWorth=true',
         actual: `real60=${deflated[0]}; real61=${deflated[1]}; real62=${deflated[2]}; jaar0GelijkAanCurrentNetWorth=${deflated[0] === currentNetWorth}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-OVZ-23',
+    scenarioId: 'UAT-OVZ-23',
+    label: 'Vermogens-widget met eigen selectie (buildWealthSelectionWidgetData): gewogen som, stale-filtering, historie <2 vs. ≥2 punten',
+    run: () => {
+      criterion('WF-OVZ-23')
+      // a1 pct 100 → gewogen 200.000; a2 pct 50 → gewogen 25.000; d1 pct 100 →
+      // gewogen 30.000. De selectie draagt ook een verwijderde asset- en
+      // debt-id die niet in de rijen voorkomen (stale — moet stil filteren).
+      const selection = { assetIds: ['a1', 'a2', 'a-verwijderd'], debtIds: ['d1', 'd-verwijderd'] }
+      const assets = [
+        { id: 'a1', name: 'DEGIRO', current_value: 200000, net_worth_inclusion_pct: 100 },
+        { id: 'a2', name: 'Spaarrekening', current_value: 50000, net_worth_inclusion_pct: 50 },
+      ]
+      const debts = [
+        { id: 'd1', name: 'Hypotheek', current_balance: 30000, net_worth_inclusion_pct: 100 },
+      ]
+      const monthKeys = Array.from({ length: 12 }, (_, i) => `m${i + 1}`)
+
+      // Kort: a1 heeft maar 1 maandmeting → onder de 2-punten-drempel → lege
+      // historie ("Nog geen verloop"), geen verzonnen lijn.
+      const kort = buildWealthSelectionWidgetData(selection, assets, debts, {
+        monthKeys,
+        assetSeries: { a1: [200000] },
+        debtSeries: {},
+      })
+
+      // Lang: elke entiteit heeft 2 maandmetingen (al gewogen door de
+      // aanroeper, zoals loadEntitySparklines levert) → som per maand, rechts
+      // uitgelijnd; het laatste punt moet gelijk zijn aan het actuele total.
+      const lang = buildWealthSelectionWidgetData(selection, assets, debts, {
+        monthKeys,
+        assetSeries: { a1: [180000, 200000], a2: [22500, 25000] },
+        debtSeries: { d1: [28000, 30000] },
+      })
+
+      // De builder geeft null bij een selectie zonder levende rijen (review
+      // 🟡3); in dit scenario bestaan alle rijen, dus null zou zelf een
+      // faaluitkomst zijn — expliciet zichtbaar gemaakt in `actual`.
+      if (!kort || !lang) {
+        return {
+          expected: 'total=195000; count=2a/1d; kortHistorie=leeg; langHistorieLengte=2; langLaatstePunt=195000',
+          actual: `builder gaf null (kort=${kort === null ? 'null' : 'ok'}, lang=${lang === null ? 'null' : 'ok'})`,
+        }
+      }
+      return {
+        expected: 'total=195000; count=2a/1d; kortHistorie=leeg; langHistorieLengte=2; langLaatstePunt=195000',
+        actual:
+          `total=${lang.total}; count=${lang.count.assets}a/${lang.count.debts}d` +
+          `; kortHistorie=${kort.history.length === 0 ? 'leeg' : kort.history.length}` +
+          `; langHistorieLengte=${lang.history.length}; langLaatstePunt=${lang.history[lang.history.length - 1]?.value}`,
       }
     },
   },

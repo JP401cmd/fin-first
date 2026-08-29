@@ -246,6 +246,10 @@ const HypotheekVsBeleggenWidget = dynamic(
   () => import('./hypotheek-vs-beleggen-widget').then(m => ({ default: m.HypotheekVsBeleggenWidget })),
   { loading: WidgetLoadingFallback }
 )
+const VermogenSelectieWidget = dynamic(
+  () => import('./vermogen-selectie-widget').then(m => ({ default: m.VermogenSelectieWidget })),
+  { loading: WidgetLoadingFallback }
+)
 const BudgetHeatmapWidget = dynamic(
   () => import('./budget-heatmap-widget').then(m => ({ default: m.BudgetHeatmapWidget })),
   { loading: WidgetLoadingFallback }
@@ -461,6 +465,8 @@ function renderWidgetById(
       return <FeeAnalyzerWidget size={size} data={data} href={href} />
     case 'hypotheek_vs_beleggen':
       return <HypotheekVsBeleggenWidget size={size} data={data} href={href} />
+    case 'vermogen_selectie':
+      return <VermogenSelectieWidget size={size} data={data} href={href} />
     default:
       return null
   }
