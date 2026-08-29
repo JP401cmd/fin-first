@@ -85,7 +85,7 @@
 - [ ] Elke `WidgetShell` MOET een `kicker` prop hebben — het UPPERCASE label bovenaan de widget. Geen widget zonder kicker.
 - [ ] `SectionDivider` gebruiken voor visuele scheiding tussen content-blokken. Drie varianten: (1) dunne lijn `border-t border-[var(--border-ed)]` met `my-6`, (2) redactioneel asterisk-patroon `* * *` in `text-[var(--ink-4)] text-center my-8`, of (3) **`variant="double-rule"`** voor hero-koppen op editorial-pagina's: rendert `border-t-4 border-double border-b border-[var(--ink)]` (krant-masthead-stijl). Niet voor chrome (`AppHeader`) — kost te veel verticale ruimte op mobile.
 - [ ] Tijdnotatie krant-stijl: `HH:mm` voor vandaag, `d MMM` voor dit jaar, `d MMM yyyy` voor oudere datums. NOOIT relatieve tijden als "2 uur geleden" of "3 dagen geleden" — dit doorbreekt de krant-esthetiek.
-- [ ] Tests die getoonde bedragen pinnen: assert `formatCurrency`-output met een regex (bv. `/€\s*1\.234/`) of een genormaliseerde string — de nbsp (` `) tussen `€` en het bedrag matcht níet tegen testing-library's default whitespace-normalizer (kostte in jul 2026 twee extra iteraties).
+- [ ] Tests die getoonde bedragen pinnen: assert `formatCurrency`-output met een regex (bv. `/€\s*1\.234/`) of via `formatCurrency(x).replace(/ /g, ' ')` — de nbsp (` `) tussen `€` en het bedrag matcht níet tegen testing-library's default whitespace-normalizer, en de foutmelding ("Unable to find … normalized from …") wijst precies de verkeerde kant op (kostte in jul 2026 twee extra iteraties en in aug 2026 opnieuw een verspilde run). Typ het bedrag nooit met de hand over — dat verbreekt de koppeling met de formatter.
 
 ### Navigatie
 - [ ] Actieve tab heeft `border-b-3` onderstreep + subtiele achtergrond `bg-[module-50]/40`?
