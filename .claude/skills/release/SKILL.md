@@ -29,6 +29,8 @@ Lees en volg `.claude/skills/_shared/pijplijn-conventies.md`: orchestrator-rol (
 ### 1. Scope & hygiëne
 `git status` + `git diff master...HEAD --stat`: gaan alleen bedoelde bestanden mee? Geen debug-rommel, geen vergeten bestanden. Nieuwe env-variabelen ⇒ placeholder in `env.example` én de echte waarde in de productie-omgeving gezet vóór deploy.
 
+**Zelfmodificatie apart.** Draai `git status --porcelain -- .claude/` + `npm run check:self-modification` en rapporteer de uitkomst, óók als die leeg is. `.claude/`-wijzigingen (commands/agents/skills) horen in een eigen commit met prefix `self-improve:`, en alleen ná een expliciet akkoord van de eigenaar — de pre-push-gate weigert ze anders. Ligt er zo'n wijziging zonder akkoord: die gaat niet mee in deze release.
+
 ### 2. Statische checks
 `npx tsc --noEmit` schoon. Lint gericht op de gewijzigde bestanden (`npx eslint <geraakte paden>`): geen nieuwe errors t.o.v. master (baseline-errors blokkeren niet, vergelijk bij twijfel via stash). Geen repo-brede lint-run.
 

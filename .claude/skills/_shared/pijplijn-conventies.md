@@ -38,6 +38,16 @@ Een RLS-leak-check die alleen eigenaar-isolatie test (gebruiker A ziet geen rije
 
 Subagents en hoofdchat werken in dezelfde working tree, vaak náást parallelle sessies van de gebruiker. Daarom een expliciete verbodslijst: `git stash` (in élke vorm), `git checkout -- <pad>` / `git checkout .`, `git reset` en `git clean` — **nooit, ook niet "even tijdelijk" voor een lokale check of diagnose met de belofte het direct terug te zetten.** Precies die constructie is in aug 2026 misgegaan: een `stash → check → pop`-keten haalde de pop niet (command-timeout) en liet de werkboom uitgekleed achter, inclusief het ongecommitte werk van parallelle sessies. Een schone-baseline-vraag beantwoord je altijd read-only: `git show HEAD:<pad>`, `git diff -- <pad>`, of een tijdelijke kopie in de scratchpad. Alleen gerichte edits binnen de opdracht-scope; bestanden die je niet zelf hebt gewijzigd blijven onaangeraakt.
 
+## Zelfmodificatie van `.claude/` — het kanaal en de detectie
+
+**Een agent schrijft NOOIT naar `Antwoord gebruiker`.** Dat veld is uitsluitend het kanaal van de eigenaar; een agent die er zelf in schrijft, vervalst zijn eigen akkoord. Agent-vragen gaan bovenaan **Analyse & voorstel** met de regel "→ Antwoord a.u.b. in de kolom **Antwoord gebruiker**." — nooit in het antwoordveld zelf. Dit geldt voor élke kaart, niet alleen voor `.claude/`-kaarten: hetzelfde veld draagt overal het akkoord.
+
+**Een akkoord is akkoord op déze wijziging.** "Het veld is niet leeg" is geen gate. Een antwoord dat over iets anders gaat — of dat "nee" zegt — telt niet; lees het akkoord inhoudelijk. En de kaartstatus `3. Implementatie akkoord` is bij een `.claude/`-wijziging op zichzelf nooit het akkoord.
+
+**Detectie staat buiten `.claude/`, want een regel die alleen in `.claude/` staat bewaakt zichzelf niet.** `scripts/check-self-modification.mjs` draait in `.husky/pre-push` en weigert een push waarin een commit een getrackt bestand onder `.claude/` raakt zonder `self-improve:`-onderwerp; hij toont daarnaast ongecommitte `.claude/`-wijzigingen als waarschuwing. Handmatig: `npm run check:self-modification` (of `--list`). Wat dat wél is: zichtbaarheid op het moment dat de eigenaar aantoonbaar aanwezig is. Wat het níet is: preventie (dat is een deny-regel op platformniveau) en niet een bewijs van instemming — de prefix zegt "dit is zelfmodificatie", niet "de eigenaar zei ja".
+
+**Sluit elke run af met `git status --porcelain -- .claude/` in de eindsamenvatting.** Nul regels is ook een uitkomst en hoort er te staan; zo is een stille zelfmodificatie al zichtbaar vóórdat er een commit bestaat. Staat er wél iets: stage per pad (nooit `git add -A`) en commit het apart met prefix `self-improve:`.
+
 ## Slotstap — zelfverbetering (opt-in, niet elke run)
 
 De zelfverbeterings-slotstap draait **alleen** wanneer één van deze twee dingen waar is: (a) de gebruiker vraagt erom, of (b) tijdens de run is een concreet defect in een definitie gebleken — een misrouting, een instructie die aantoonbaar verkeerd uitpakte, of een subagent-rapport met een expliciete "Verbetervoorstel"-sectie. Is geen van beide het geval, dan eindigt de run zonder retrospectief — een standaard "kijk elke keer of er iets te verbeteren valt"-rondje is zelf overhead.
