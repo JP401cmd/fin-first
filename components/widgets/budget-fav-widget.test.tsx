@@ -83,4 +83,17 @@ describe('BudgetFavWidget — vrijheidstijd (Geld is opgeslagen tijd)', () => {
     const { container } = render(<BudgetFavWidget size="full" budget={budget} dailyExp={100} />)
     expect(container.textContent ?? '').not.toContain('vrijheid over')
   })
+
+  // Getekende besteed-som (6898c9dc7): een uitgavenbudget met netto-inkomsten
+  // krijgt een NEGATIEVE spent. Melding 6142d204-case: spent −6735 op limiet
+  // 1642 ⇒ ring 0%, geen "-410%", en het restant klemt op de limiet (geen
+  // "€ 8.377 over" bij een budget van € 1.642).
+  it('negatieve besteding: 0% op de ring en restant geklemd op de limiet', () => {
+    const budget = makeBudget({ limit: 1642, spent: -6735 })
+    const { container } = render(<BudgetFavWidget size="full" budget={budget} dailyExp={100} />)
+    const text = container.textContent ?? ''
+    expect(text).toContain('0%')
+    expect(text).not.toContain('-410')
+    expect(text).not.toContain('8.377')
+  })
 })

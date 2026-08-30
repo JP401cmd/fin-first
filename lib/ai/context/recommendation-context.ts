@@ -3,6 +3,8 @@ import { buildSharedContext } from './shared-context'
 import { section, formatCurrency, bulletList } from './formatter'
 import { getNibudHouseholdType, getNibudReferences, calculateBenchmarks } from '@/lib/nibud/reference-data'
 import { detectRecurringTransactions } from '@/lib/recurring-detection'
+import { buildBudgetSpendingMap, type SpendingTxRow } from '@/lib/budget-spending'
+import { buildAiBudgetTypeMap, loadSplitRows } from './budget-spending-source'
 
 const TEMPORAL_LABELS: Record<number, string> = {
   1: 'De Levensgenieter (level 1) — Comfort > Snelheid. Wil niet inleveren op comfort. FIRE is een leuke bonus, geen obsessie.',
@@ -59,7 +61,9 @@ export async function buildRecommendationContext(supabase: SupabaseClient, budge
 
   const { data: transactions } = await supabase
     .from('transactions')
-    .select('budget_id, amount, date, is_income, transaction_type')
+    // `id`/`is_split` erbij: split-regels horen op hun eigen budget, en de
+    // ouderrij mag niet dubbel geteld worden.
+    .select('id, budget_id, amount, date, is_income, transaction_type, is_split')
     .gte('date', getMonthsAgoDate(3))
 
   const { data: txForSubscriptions } = await supabase
@@ -73,20 +77,24 @@ export async function buildRecommendationContext(supabase: SupabaseClient, budge
     t.transaction_type !== 'transfer' && t.transaction_type !== 'joint_transfer'
 
   if (budgets && transactions && budgetingActive) {
-    // Aggregate spending per budget over last 3 months
-    const spendingMap = new Map<string, number>()
-    for (const tx of transactions) {
-      if (tx.is_income || !tx.budget_id || !isRealTx(tx)) continue
-      const current = spendingMap.get(tx.budget_id) || 0
-      spendingMap.set(tx.budget_id, current + Math.abs(Number(tx.amount)))
-    }
+    // Besteding per budget over de laatste 3 maanden — canoniek. Was: inkomsten
+    // UITSLUITEN op basis van de `is_income`-vlag + `Math.abs()`. Nu getekend,
+    // met richting per budget en met de split-regels op hun eigen budget.
+    // Dit is A5: deze regels schrijven door naar de `recommendations`-rijen.
+    const budgetTypes = buildAiBudgetTypeMap(budgets)
+    const splits = await loadSplitRows(supabase, transactions)
+    const spending = buildBudgetSpendingMap(transactions as SpendingTxRow[], splits, budgetTypes)
+    const spendingMap = new Map<string, number>(Object.entries(spending))
 
     const budgetLines: string[] = []
     for (const budget of budgets) {
-      if (budget.budget_type === 'income' || budget.parent_id) continue
+      if (budgetTypes.get(budget.id) === 'income' || budget.parent_id) continue
       const totalSpent = spendingMap.get(budget.id) || 0
       const monthlyAvg = Math.round(totalSpent / 3)
-      if (monthlyAvg > 0) {
+      // `!== 0` i.p.v. `> 0`: een budget met netto inkomsten (negatief) is echt
+      // en hoort in beeld — maar krijgt per definitie géén OVER-budget-regel,
+      // want die vergt `monthlyAvg > limit` met een positieve limiet.
+      if (monthlyAvg !== 0) {
         const limit = Number(budget.default_limit) || 0
         const essential = budget.is_essential ? ' [essentieel]' : ''
         const overBudget = limit > 0 && monthlyAvg > limit ? ` (OVER budget: ${formatCurrency(monthlyAvg - limit)})` : ''
@@ -96,12 +104,13 @@ export async function buildRecommendationContext(supabase: SupabaseClient, budge
       }
     }
 
-    // Also add child budget details
+    // Also add child budget details. Richting via de type-map (child erft
+    // parent) i.p.v. de eigen budget_type-kolom van de kindrij.
     for (const budget of budgets) {
-      if (budget.budget_type === 'income' || !budget.parent_id) continue
+      if (budgetTypes.get(budget.id) === 'income' || !budget.parent_id) continue
       const totalSpent = spendingMap.get(budget.id) || 0
       const monthlyAvg = Math.round(totalSpent / 3)
-      if (monthlyAvg > 0) {
+      if (monthlyAvg !== 0) {
         const limit = Number(budget.default_limit) || 0
         const essential = budget.is_essential ? ' [essentieel]' : ''
         budgetLines.push(
@@ -130,9 +139,11 @@ export async function buildRecommendationContext(supabase: SupabaseClient, budge
           // Build spending-by-slug map from child budgets
           const spendingBySlug: Record<string, number> = {}
           for (const budget of budgets ?? []) {
-            if (!budget.slug || budget.budget_type === 'income') continue
+            if (!budget.slug || budgetTypes.get(budget.id) === 'income') continue
             const totalSpent = spendingMap.get(budget.id) || 0
             const monthlyAvg = Math.round(totalSpent / 3)
+            // Hier bewust `> 0`: een negatieve netto-besteding is geen
+            // uitgavenniveau en zou de NIBUD-vergelijking omkeren.
             if (monthlyAvg > 0) {
               spendingBySlug[budget.slug] = (spendingBySlug[budget.slug] ?? 0) + monthlyAvg
             }

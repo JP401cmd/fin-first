@@ -27,6 +27,9 @@ import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { useDailyExpenseRate } from '@/components/app/freedom-time-label'
 import { capDateGroups } from '@/lib/transaction-list-cap'
 import { localMonthBounds } from '@/lib/month-range'
+import { buildBudgetTypeMap } from '@/lib/budget-utils'
+import { buildBudgetSpendingMap } from '@/lib/budget-spending'
+import { isRealAggRow } from '@/lib/server-data/tx-aggregates'
 import { SankeyDiagram, type SankeyNode, type SankeyLink } from '@/components/app/sankey-diagram'
 import { type RecurringTransaction, getExpectedMonthlyTotal, getNextOccurrence, formatSchedule } from '@/lib/recurring-data'
 import { BillCalendar, type CalendarTransaction } from '@/components/app/bill-calendar'
@@ -968,20 +971,38 @@ export function CashAccountView({
     const savingsColors = ['#8B5CB8', '#9e74c6', '#b18cd4', '#c4a4e2']
     const debtColors = ['#ef4444', '#f87171', '#fca5a5', '#fecaca']
 
-    const sankeyTx = transactions.filter((t) => t.transaction_type !== 'transfer')
-    const spendingByBudget: Record<string, number> = {}
+    // Canonieke besteed-som per budget (lib/budget-spending.ts) i.p.v. een eigen
+    // |amount|-som. Die som had drie gebreken tegelijk: het transfer-filter
+    // miste `joint_transfer` (huishoud-overboekingen liepen als echte stromen
+    // mee), er zat geen richting in (een teruggave verdíkte de uitgavenstroom
+    // i.p.v. 'm te verdunnen, en een storno verdikte de inkomstenstroom) en een
+    // split-ouder werd vol op zijn eigen budget geboekt.
+    //
+    // Splits: dit scherm laadt `transaction_splits` alléén lazy per opengeklapte
+    // rij, dus er is hier geen volledige split-set. `buildBudgetSpendingMap`
+    // krijgt daarom een lege lijst en slaat de split-ouders over; de lus
+    // hieronder vangt ze op onder "Overig", zodat hun geld niet stil verdwijnt
+    // én niet één post laat opzwellen.
+    const budgetTypes = buildBudgetTypeMap(
+      budgets.map((b) => ({
+        id: b.id,
+        parent_id: b.parent_id ?? null,
+        // DB-default; NULL mag nooit inkomsten-semantiek geven.
+        budget_type: b.budget_type ?? 'expense',
+      })),
+    )
+    const spendingByBudget = buildBudgetSpendingMap(transactions, [], budgetTypes)
+
     let uncategorizedIncome = 0
     let uncategorizedExpense = 0
-
-    for (const tx of sankeyTx) {
+    for (const tx of transactions) {
+      // `isRealAggRow` = de canonieke transfer-definitie: `transfer` ÉN
+      // `joint_transfer`. De oude toets keek alleen naar `'transfer'`.
+      if (!isRealAggRow(tx)) continue
+      if (tx.budget_id && !tx.is_split) continue
       const amount = Math.abs(Number(tx.amount))
-      if (tx.budget_id) {
-        spendingByBudget[tx.budget_id] = (spendingByBudget[tx.budget_id] ?? 0) + amount
-      } else if (Number(tx.amount) > 0) {
-        uncategorizedIncome += amount
-      } else {
-        uncategorizedExpense += amount
-      }
+      if (Number(tx.amount) > 0) uncategorizedIncome += amount
+      else uncategorizedExpense += amount
     }
 
     const nodes: SankeyNode[] = []
@@ -1018,6 +1039,13 @@ export function CashAccountView({
       const childValues = group.children.reduce((sum, c) => sum + (spendingByBudget[c.id] ?? 0), 0)
       const parentDirect = group.children.length === 0 ? (spendingByBudget[group.parent.id] ?? 0) : 0
       const total = childValues + parentDirect
+      // Een Sankey-stroom kan niet negatief zijn: de dikte van een band is een
+      // hoeveelheid, geen saldo. De canonieke som mag dat sinds de
+      // richting-norm wél worden (meer terug dan uitgegeven). Zo'n post wordt
+      // hier dus overgeslagen — een netto-inkomst-budget draagt geen stroom —
+      // i.p.v. met een negatieve hoogte de layout te vergiftigen. Het echte
+      // (negatieve) bedrag hoort op /core/budgets; als label meegeven kan hier
+      // niet, want `secondaryLabel` omzeilt de bedrag-maskering van de grafiek.
       if (total <= 0) continue
 
       const budgetType = group.parent.budget_type
@@ -1079,7 +1107,7 @@ export function CashAccountView({
     }
 
     return { nodes, links }
-  }, [transactions, budgetGroups])
+  }, [transactions, budgetGroups, budgets])
 
   function handleSankeyNodeClick(nodeId: string) {
     const match = nodeId.match(/^(?:sub|grp|inc)-(.+)$/)

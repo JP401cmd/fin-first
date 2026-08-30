@@ -845,7 +845,7 @@ const tests: TestCase[] = [
         netMonthlySalary: 4_000,
       }
       const rows = {
-        assets, unlinkedCash: 0, budgets, transactions,
+        assets, unlinkedCash: 0, budgets, transactions, splits: [],
         householdType: 'solo' as const, debtMonthlyPayments: 600,
       }
 

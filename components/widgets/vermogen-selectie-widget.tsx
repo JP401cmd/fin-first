@@ -20,7 +20,7 @@
  * ── Bewerk-affordance ────────────────────────────────────────────────────
  * De eerste per-widget-config in de app: een potlood rechtsboven, ZICHTBAAR IN
  * NORMALE MODUS (niet alleen in de grid-edit-modus). Hij staat bewust BUITEN de
- * `<WidgetShell>` — die rendert bij een `href` een `<Link>` om de hele tegel, en
+ * `WidgetShell` — die rendert bij een `href` een `<Link>` om de hele tegel, en
  * een knop dáárin zou een genest interactief element zijn. Als absolute sibling
  * ná de shell schildert hij eroverheen; hij krijgt bewust GEEN z-index, zodat de
  * grid-edit-controls (`z-10`, eerder in de DOM) er in edit-modus overheen komen

@@ -318,18 +318,26 @@ async function loadUitgavenpatronen(supabase: SupabaseClient): Promise<LocalChat
     ])
 
     const budgets = budgetsResult.data ?? []
-    const transactions = (transactionsResult.data ?? []).filter(
-      (t) =>
-        (t as { transaction_type?: string | null }).transaction_type !== 'transfer' &&
-        (t as { transaction_type?: string | null }).transaction_type !== 'joint_transfer',
-    )
+    // GEEN transfer-filter meer op de rijen die de SOM voeden: die woont sinds
+    // 30 aug 2026 in `buildCategorySpending` zelf. Hier blijft alleen de
+    // data-genoeg-poort, en die telt terecht geen maanden mee waarin er
+    // uitsluitend tussen eigen rekeningen geschoven is.
+    const transactions = transactionsResult.data ?? []
     if (budgets.length === 0 || transactions.length === 0) return []
 
-    const maanden = new Set(transactions.map((t) => String(t.date).slice(0, 7)))
+    const maanden = new Set(
+      transactions
+        .filter(
+          (t) =>
+            (t as { transaction_type?: string | null }).transaction_type !== 'transfer' &&
+            (t as { transaction_type?: string | null }).transaction_type !== 'joint_transfer',
+        )
+        .map((t) => String(t.date).slice(0, 7)),
+    )
     if (maanden.size < MIN_PATROON_MAANDEN) return []
 
     return buildCategorySpending(
-      transactions as { budget_id: string; amount: number; date: string; is_income: boolean }[],
+      transactions as { budget_id: string; amount: number; date: string; is_income: boolean; transaction_type: string | null }[],
       budgets as { id: string; name: string; icon: string; parent_id: string | null; budget_type: string; is_essential: boolean }[],
     )
       .filter((c) => c.averageMonthly > 0)

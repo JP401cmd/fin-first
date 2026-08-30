@@ -1,6 +1,9 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { unauthorized } from '@/lib/api/respond'
 import { localMonthBounds } from '@/lib/month-range'
+import { buildBudgetTypeMap } from '@/lib/budget-utils'
+import { buildBudgetSpendingMap, spentForBudget } from '@/lib/budget-spending'
+import { BUDGET_SPENDING_TX_COLUMNS } from '@/lib/budget-spending-fetch'
 
 type ExportType = 'transactions' | 'budgets' | 'net_worth' | 'assets' | 'debts' | 'goals'
 
@@ -73,31 +76,63 @@ export async function GET(req: Request) {
       const [budgetsRes, txRes] = await Promise.all([
         supabase
           .from('budgets')
+          // Zónder `.not('parent_id','is',null)`: die filter liet niet alleen de
+          // parent-regels uit de export weg, hij maakte de parent-rollup
+          // onmogelijk. De export toont nu dezelfde boom als het scherm.
           .select('id, name, slug, budget_type, default_limit, is_essential, parent_id')
           .eq('user_id', claims.sub)
-          .not('parent_id', 'is', null)
           .order('sort_order'),
         supabase
           .from('transactions')
-          .select('budget_id, amount')
+          // `id`/`transaction_type`/`is_split` horen bij de rijselectie van de
+          // canonieke besteed-som: transfers dragen niet bij en de split-ouder
+          // wordt overgeslagen (die bedragen leven op `transaction_splits`).
+          .select(BUDGET_SPENDING_TX_COLUMNS)
           .eq('user_id', claims.sub)
           .gte('date', monthStart)
           .lt('date', monthEnd),
       ])
 
-      const spendingMap: Record<string, number> = {}
-      for (const t of txRes.data ?? []) {
-        if (t.budget_id) {
-          spendingMap[t.budget_id] = (spendingMap[t.budget_id] ?? 0) + Math.abs(Number(t.amount))
-        }
+      const allBudgets = budgetsRes.data ?? []
+
+      // Split-regels erbij, anders draagt een gesplitste transactie niets bij.
+      const splitTxIds = (txRes.data ?? []).filter(t => t.is_split).map(t => t.id)
+      let splitRows: Array<{ budget_id: string | null; amount: number }> = []
+      if (splitTxIds.length > 0) {
+        const { data: splitData } = await supabase
+          .from('transaction_splits')
+          .select('budget_id, amount')
+          .in('transaction_id', splitTxIds)
+        splitRows = (splitData ?? []) as Array<{ budget_id: string | null; amount: number }>
       }
 
-      rows = (budgetsRes.data ?? []).map(b => [
+      // Canonieke besteed-som + richting per budget (child erft parent-type).
+      // Was: een kale `Math.abs`-som zonder transfer-filter, zonder richting en
+      // zonder splits — de kolom "Besteed deze maand" droeg daardoor andere
+      // bedragen dan /core/budgets voor dezelfde maand.
+      const budgetTypes = buildBudgetTypeMap(
+        allBudgets.map(b => ({
+          id: b.id,
+          parent_id: b.parent_id ?? null,
+          // DB-default; NULL mag nooit inkomsten-semantiek geven.
+          budget_type: b.budget_type ?? 'expense',
+        })),
+      )
+      const spendingMap = buildBudgetSpendingMap(txRes.data ?? [], splitRows, budgetTypes)
+
+      const childIdsByParent: Record<string, string[]> = {}
+      for (const b of allBudgets) {
+        if (b.parent_id) (childIdsByParent[b.parent_id] ??= []).push(b.id)
+      }
+
+      rows = allBudgets.map(b => [
         b.name,
         b.slug,
         b.budget_type,
         b.default_limit,
-        spendingMap[b.id] ?? 0,
+        // Parent-rollup zoals het scherm 'm toont: een parent met kinderen is de
+        // som van zijn kinderen, een blad zijn eigen besteding.
+        spentForBudget(b.id, childIdsByParent[b.id] ?? [], spendingMap),
         b.is_essential ? 'Ja' : 'Nee',
       ])
 

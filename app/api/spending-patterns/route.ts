@@ -2,6 +2,7 @@ import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { unauthorized } from '@/lib/api/respond'
 import {
   buildCategorySpending,
+  derivePatternExpenseBasis,
   detectSeasonalPatterns,
   detectTrends,
   detectAnomalies,
@@ -37,7 +38,10 @@ export async function GET() {
         .order('sort_order', { ascending: true }),
       supabase
         .from('transactions')
-        .select('budget_id, amount, date, is_income')
+        // `transaction_type` hoort bij de rijselectie: zonder die kolom kan
+        // `buildCategorySpending` de eigen-rekening-transfers niet uitsluiten en
+        // telt een overboeking als uitgave (lib/spending-patterns.ts).
+        .select('budget_id, amount, date, is_income, transaction_type')
         .gte('date', startDate)
         .not('budget_id', 'is', null),
       supabase
@@ -63,9 +67,15 @@ export async function GET() {
       })
     }
 
-    // Count how many distinct months of data we have
-    const months = new Set(transactions.map(t => t.date.slice(0, 7)))
-    const dataMonths = months.size
+    // Maandtelling + dagtarief uit ÉÉN gedeelde afleiding, dezelfde die de
+    // cloud-context gebruikt (lib/spending-patterns.ts#derivePatternExpenseBasis):
+    // transfer-gefilterde maandtelling, getekende som, onderaan op 0 geklemd.
+    // Hier stond `filter(!t.is_income).reduce(Math.abs)` over álle rijen — een
+    // tweede grondslag voor de DREMPEL waarmee de detectoren beslissen of een
+    // patroon groot genoeg is om te melden.
+    const { dataMonths, dailyExpenses } = derivePatternExpenseBasis(
+      transactions.map(t => ({ ...t, amount: Number(t.amount) })),
+    )
 
     if (dataMonths < 3) {
       return Response.json({
@@ -75,13 +85,6 @@ export async function GET() {
         message: `${dataMonths} maand${dataMonths !== 1 ? 'en' : ''} data gevonden. Minimaal 3 maanden nodig voor patroonanalyse.`,
       })
     }
-
-    // Calculate daily expense rate for freedom-day conversion
-    const totalExpenses = transactions
-      .filter(t => !t.is_income)
-      .reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
-    const avgMonthlyExpenses = totalExpenses / dataMonths
-    const dailyExpenses = (avgMonthlyExpenses * 12) / 365
 
     // Build category spending data
     const categorySpending = buildCategorySpending(

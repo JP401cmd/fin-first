@@ -32,7 +32,9 @@ import {
   isHomeExcludedFromFire,
 } from '@/lib/housing-strategy'
 import { computeHorizonFireTarget, EMPTY_HORIZON_FIRE_TARGETS } from '@/lib/fire-target-shared'
-import { computeYearlyMustExpenses, computeRetirementExpenses } from '@/lib/budget-utils'
+import { buildBudgetSpendingMap } from '@/lib/budget-spending'
+import { BUDGET_SPENDING_TX_COLUMNS, fetchSpendingSplits } from '@/lib/budget-spending-fetch'
+import { buildBudgetTypeMap, computeYearlyMustExpenses, computeRetirementExpenses } from '@/lib/budget-utils'
 import { resolveFireParams } from '@/lib/fire-params'
 import { DEFAULT_RETURN, INFLATION, SAVINGS_RATE_WINDOW_MONTHS } from '@/lib/constants'
 import { ALL_MODULES } from '@/lib/module-registry'
@@ -72,7 +74,7 @@ import {
   aggSumNegatiefAbs,
   aggIncomeByMonth,
   aggExpenseByMonthAbs,
-  aggAbsByBudgetMonth,
+  aggSpendingByBudgetMonth,
   aggToExpenseRows,
 } from '@/lib/server-data/tx-aggregates'
 import { recentDailyExpenseRateFromRows } from './expense-rate'
@@ -954,7 +956,15 @@ export const loadCoreData = cache(async function loadCoreData(
     holdingsResult, prevSpendingResult,
   ] = await Promise.all([
     supabase.from('budgets').select('id, name, icon, default_limit, budget_type, parent_id, is_essential, interval, is_favorite, alert_threshold').limit(500),
-    supabase.from('transactions').select('budget_id, amount').gte('date', monthStart).lt('date', monthEnd),
+    // KOLOMSET VAN DE CANONIEKE BESTEED-SOM: de gedeelde
+    // `BUDGET_SPENDING_TX_COLUMNS` (lib/budget-spending-fetch.ts), niet een
+    // eigen string. Zonder `transaction_type`/`is_income`/`is_split`+`id` kan
+    // `spendingContribution` haar regel niet toepassen en valt de som stil terug
+    // op de teken-blinde Σ|amount| die op productie €1.265 aan uitgaven als
+    // €9.265 toonde. Dit venster heeft een EIGEN grens (huidige maand, eigen
+    // client-scope) en gebruikt daarom de kolomconstante + `fetchSpendingSplits`
+    // i.p.v. de gedeelde `getCurrentMonthTx`-ingang.
+    supabase.from('transactions').select(BUDGET_SPENDING_TX_COLUMNS).gte('date', monthStart).lt('date', monthEnd),
     supabase.from('net_worth_snapshots').select('snapshot_date, total_assets, total_debts, net_worth, freedom_percentage, fire_age, sovereignty_level, savings_rate, resilience_score, fire_portfolio_required').order('snapshot_date', { ascending: true }).limit(24),
     // debt-progress (original_amount/current_balance, is_active) hergebruikt nu
     // `debtsResult` uit batch-1 — aparte query verwijderd (−1 query, byte-identiek).
@@ -982,6 +992,11 @@ export const loadCoreData = cache(async function loadCoreData(
     // tx-rijke gebruiker kapt dit 6-maands venster dus stil af; de structurele route
     // is het maandaggregaat (ADR 0050 — kan per definitie niet afkappen, en draait
     // hierboven al als `txAgg12` op een ruimer venster) of keyset-paginatie.
+    // BEWUST NIET de kolomlijst van het bestedingscontract: dit venster voedt
+    // de BRUTO/absolute spaarquote-grondslag, niet de canonieke besteed-som, en
+    // leest `transaction_type`/`is_income`/`is_split` dus nergens. De smalle
+    // select houdt die uitzondering zichtbaar in de QUERY — met de brede lijst
+    // ziet het eruit alsof hier de canonieke som draait.
     supabase.from('transactions').select('budget_id, amount').gte('date', sixMonthsAgoForBudgets).lt('date', budgetWindowEnd).limit(1000),
     // Holdings from tracked assets for portfolio card. Na de tabel-split
     // (migratie 20260502000003) zit deze data alleen in `investment_holdings`
@@ -991,8 +1006,35 @@ export const loadCoreData = cache(async function loadCoreData(
       .from('investment_holdings')
       .select('id, name, ticker, units, current_price, avg_purchase_price, daily_change_percent, asset_id, asset:assets!asset_id(has_holdings_tracking)')
       .eq('is_active', true),
-    supabase.from('transactions').select('budget_id, amount').gte('date', prevMonthStart).lt('date', monthStart),
+    supabase.from('transactions').select(BUDGET_SPENDING_TX_COLUMNS).gte('date', prevMonthStart).lt('date', monthStart),
   ])
+
+  // ── Split-regels bij de bestedingsvensters ─────────────────────────────────
+  // `transaction_splits` draagt de bedragen van een gesplitste transactie op hun
+  // EIGEN budget; `buildBudgetSpendingMap` slaat de ouder-rij over. PER VENSTER
+  // ophalen (en niet één keer over de vereniging), want de teruggegeven regels
+  // dragen geen transaction_id meer — vorige-maand-splits mogen niet in de
+  // huidige-maand-som belanden. `fetchSpendingSplits` doet zonder split-ouders
+  // GEEN query, en dat is vandaag het normale geval: er staat één split op
+  // productie en die hangt aan een transactie zonder budget.
+  // Alleen voor de twee vensters die de CANONIEKE som draaien; het 6-maands
+  // venster blijft bruto/absoluut (zie de toelichting daar) en heeft ze niet nodig.
+  const [currentSplits, prevSplits] = await Promise.all([
+    fetchSpendingSplits(supabase, (spendingResult.data ?? []) as { id?: string; is_split?: boolean | null }[]),
+    fetchSpendingSplits(supabase, (prevSpendingResult.data ?? []) as { id?: string; is_split?: boolean | null }[]),
+  ])
+
+  // Richting per budget (child erft parent-type; NULL → DB-default 'expense').
+  // VERPLICHTE input van de canonieke besteed-som: de inkomst-aftrek geldt
+  // alleen op een uitgaven-budget. Bron is de ONGEFILTERDE budget-lijst — een
+  // transactie op een gearchiveerd budget houdt zijn richting.
+  const budgetTypeMap = buildBudgetTypeMap(
+    ((budgetResult.data ?? []) as Budget[]).map(b => ({
+      id: b.id,
+      parent_id: b.parent_id ?? null,
+      budget_type: b.budget_type ?? 'expense',
+    })),
+  )
 
   // Goals state
   const hasGoals = (goalsResult.data?.length ?? 0) > 0
@@ -1017,12 +1059,16 @@ export const loadCoreData = cache(async function loadCoreData(
   }
 
   if (budgetResult.data && spendingResult.data) {
-    const spendMap: Record<string, number> = {}
-    for (const t of spendingResult.data) {
-      if (t.budget_id) {
-        spendMap[t.budget_id] = (spendMap[t.budget_id] ?? 0) + Math.abs(Number(t.amount))
-      }
-    }
+    // CANONIEKE BESTEED-SOM (lib/budget-spending.ts) i.p.v. een eigen Σ|amount|:
+    // op een uitgaven-budget gaat een inkomst ERAF, transfers tellen niet mee, en
+    // split-regels tellen op hun eigen budget met de ouder-rij overgeslagen. De
+    // uitkomst per budget KAN NEGATIEF ZIJN; dat is bedoeld en wordt hier niet
+    // geklemd — de weergave-lijnen klemmen zelf (budgetSpentPct/budgetBarPct).
+    const spendMap = buildBudgetSpendingMap(
+      spendingResult.data,
+      currentSplits,
+      budgetTypeMap,
+    )
 
     // Compute over-budget count for mission control card
     const expenseParents = (budgetResult.data as Budget[])
@@ -1060,15 +1106,15 @@ export const loadCoreData = cache(async function loadCoreData(
     // Store data for budget legend overview
     overviewSpending = spendMap
 
-    // Build previous-month spending map
+    // Build previous-month spending map — zelfde canonieke som als hierboven,
+    // ander venster. Twee vensters van één grootheid moeten per definitie
+    // dezelfde grondslag dragen, anders is de maand-op-maand-vergelijking scheef.
     if (prevSpendingResult.data) {
-      const prevMap: Record<string, number> = {}
-      for (const t of prevSpendingResult.data) {
-        if (t.budget_id) {
-          prevMap[t.budget_id] = (prevMap[t.budget_id] ?? 0) + Math.abs(Number(t.amount))
-        }
-      }
-      prevMonthSpending = prevMap
+      prevMonthSpending = buildBudgetSpendingMap(
+        prevSpendingResult.data,
+        prevSplits,
+        budgetTypeMap,
+      )
     }
 
     const allBudgets = budgetResult.data as Budget[]
@@ -1079,7 +1125,31 @@ export const loadCoreData = cache(async function loadCoreData(
       children: budgetChildren.filter(c => c.parent_id === p.id),
     }))
 
-    // Compute 6-month spending per parent budget for kassabon breakdown
+    // ── 6-maands som per hoofdbudget — BEWUST NIET de canonieke besteed-som ───
+    //
+    // Deze map voedt maar twee dingen: `savingsBreakdown` (kassabon-regels) en
+    // daaruit `savingsBudgetTotal6m`, dat als `sbTotal6m` van de UITGAVEN-term
+    // van de spaarquote wordt AFGETROKKEN (zie `savingsRateFromAggregates`
+    // hieronder). Dat is de SPAARQUOTE-familie, met een eigen bruto contract —
+    // "wat ging er naar sparen" — en niet de besteed-som van de budgetten-pagina.
+    //
+    // Waarom hier géén `buildBudgetSpendingMap`: de term waar dit vanaf gaat is
+    // `extHalfYearExpenses` = `aggSumNegatiefAbs(...)`, dus een BRUTO, ABSOLUTE
+    // uitgavensom. De canonieke besteed-som is dat per constructie niet — op een
+    // savings-budget (inkomsten-richting) IS de bijdrage het bedrag zélf, en een
+    // spaarstorting staat als NEGATIEVE transactie in de boeken. Omzetten zou
+    // `sbTotal6m` van +€3.000 naar −€3.000 kantelen en die aftrek in een
+    // OPTELLING veranderen: de spaarquote zou omhoog schieten op precies de
+    // grondslag die hem hoort te corrigeren. De grondslag blijft daarom bruto.
+    //
+    // BEKEND VERSCHIL MET DE CANONIEKE SPAARCORRECTIE (niet in deze convergentie
+    // rechtgetrokken, want het is een gedragswijziging op de spaarquote met een
+    // eigen regressiepas): de gedeelde `deriveSavingsRate6mWindow`
+    // (lib/cashflow-kpis.ts) berekent dezelfde grootheid als
+    // `aggSumNegatiefAbs(..., realOnly: true, budgetIds: savingsBudgetIds)` —
+    // dus Σ|NEGATIEVE| bedragen ZONDER transfers. Deze lus telt Σ|ALLE| bedragen
+    // MÉT transfers, dus een opname úít een spaarbudget en een interne
+    // overboeking verhogen de correctie hier wel en daar niet.
     if (spending6mResult.data) {
       const spend6mMap: Record<string, number> = {}
       for (const t of spending6mResult.data) {
@@ -1284,6 +1354,9 @@ export const loadCoreData = cache(async function loadCoreData(
       unlinkedCash,
       budgets: (budgetResult.data ?? []) as HealthScoreBudget[],
       transactions: (spendingResult.data ?? []) as HealthScoreTransaction[],
+      // Zonder splits wordt een split-ouder overgeslagen zónder vervanging —
+      // vandaag inert (split-ouders dragen budget_id NULL) maar een echte vork.
+      splits: currentSplits,
       householdType: (profileResult.data as Record<string, unknown> | null)?.household_type as string | null,
       debtMonthlyPayments: coreDebtMonthlyPayments,
     },
@@ -1310,12 +1383,20 @@ export const loadCoreData = cache(async function loadCoreData(
         sparkMonths.push({ month: start, start, monthKey: start.substring(0, 7), label })
       }
 
-      // Twee maps uit het aggregaat — identiek aan de vroegere rij-pass:
-      //  - sumByBudgetMonth: budgetId → monthKey → Σ|amount| (beide tekens)
-      //  - totalExpenseByMonth: monthKey → Σ|amount| over de uitgaven
-      // Transfers tellen hier bewust MEE (`realOnly: false`), net als in de
-      // vroegere ongefilterde rij-pass — een sparkline toont wat er omging.
-      const sumByBudgetMonth = aggAbsByBudgetMonth(txAgg12)
+      // Twee maps uit het aggregaat:
+      //  - sumByBudgetMonth: budgetId → monthKey → Σ BESTEED, op de canonieke
+      //    richting-regel (lib/budget-spending.ts). Was een teken-blinde
+      //    Σ|amount| mét transfers; dat maakte de sparkline aantoonbaar
+      //    inconsistent met het "Besteed"-bedrag dat er in de UI boven staat —
+      //    de gemelde case toonde €1.265 in de kop en €9.265 in de grafiek.
+      //    Transfers tellen nu alleen nog mee op archief-budgetten (geen
+      //    richting), precies zoals in de som.
+      //  - totalExpenseByMonth: monthKey → Σ|amount| over de uitgaven. Bewust
+      //    ONGEWIJZIGD: dat is een totaal over ALLE budgetten (incl. rijen
+      //    zónder budget_id) en hoort bij de uitgaven-familie, niet bij de
+      //    per-budget besteed-som.
+      // AGGREGAAT-GRENS: split-blind (zie de kop van lib/server-data/tx-aggregates.ts).
+      const sumByBudgetMonth = aggSpendingByBudgetMonth(txAgg12, budgetTypeMap)
       const totalExpenseByMonth = aggExpenseByMonthAbs(txAgg12)
 
       const sparklines: CorePageData['budgetSparklines'] = []

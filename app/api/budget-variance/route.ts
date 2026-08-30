@@ -1,6 +1,9 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
+import { buildBudgetTypeMap } from '@/lib/budget-utils'
+import { buildBudgetSpendingMap, spentForBudget } from '@/lib/budget-spending'
+import { BUDGET_OR_SPLIT_FILTER, BUDGET_SPENDING_TX_COLUMNS } from '@/lib/budget-spending-fetch'
 
 /**
  * GET /api/budget-variance — Calculate spending variance per budget category.
@@ -52,11 +55,19 @@ export async function GET() {
     // Fetch all transactions in the date range
     const { data: transactions, error: txError } = await supabase
       .from('transactions')
-      .select('budget_id, amount, date')
+      // Kolomlijst van het bestedingscontract; `date` erbij voor de maandgroepering.
+      .select(`${BUDGET_SPENDING_TX_COLUMNS}, date`)
+      // RIJFILTER: rijen mét budget_id ÓF split-ouders. Het eerdere
+      // `.not('budget_id','is',null)` was terecht weg (het hield de split-ouders
+      // buiten), maar filter-lóós lezen is hier het gevaarlijkst van de drie
+      // opties: dit venster loopt over TWAALF maanden zonder `.limit()`, dus
+      // PostgREST kapt stil af op max_rows (1000) en dan mist de variantie
+      // willekeurige rijen — zonder foutmelding. BUDGET_OR_SPLIT_FILTER doet
+      // allebei: filteren én de split-ouders binnenhouden.
+      .or(BUDGET_OR_SPLIT_FILTER)
       .eq('user_id', claims.sub)
       .gte('date', startStr)
       .lt('date', endStr)
-      .not('budget_id', 'is', null)
 
     if (txError) {
       // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
@@ -73,17 +84,48 @@ export async function GET() {
     const parentBudgets = budgets.filter(b => !b.parent_id)
     const childBudgets = budgets.filter(b => b.parent_id)
 
+    // Split-regels van het hele venster, per transactie gegroepeerd.
+    const splitTxIds = (transactions ?? []).filter(t => t.is_split).map(t => t.id)
+    const splitsByTxId = new Map<string, Array<{ budget_id: string | null; amount: number }>>()
+    if (splitTxIds.length > 0) {
+      const { data: splitData } = await supabase
+        .from('transaction_splits')
+        .select('transaction_id, budget_id, amount')
+        .in('transaction_id', splitTxIds)
+      for (const s of (splitData ?? []) as Array<{ transaction_id: string; budget_id: string | null; amount: number }>) {
+        const list = splitsByTxId.get(s.transaction_id) ?? []
+        list.push({ budget_id: s.budget_id, amount: s.amount })
+        splitsByTxId.set(s.transaction_id, list)
+      }
+    }
+
+    // Richting per budget (child erft parent-type) + canonieke besteed-map per
+    // maand (lib/budget-spending.ts). Was: een kale `Math.abs`-som zonder
+    // transfer-filter, zonder richting en zonder splits — de spreiding werd dus
+    // berekend over andere bedragen dan het scherm toont.
+    const budgetTypes = buildBudgetTypeMap(
+      budgets.map(b => ({
+        id: b.id,
+        parent_id: b.parent_id ?? null,
+        // DB-default; NULL mag nooit inkomsten-semantiek geven.
+        budget_type: b.budget_type ?? 'expense',
+      })),
+    )
+    const spendingByMonth = months.map(m => {
+      const txInMonth = (transactions ?? []).filter(t => t.date >= m.start && t.date < m.end)
+      const splitsInMonth = txInMonth.flatMap(t => (t.is_split ? splitsByTxId.get(t.id) ?? [] : []))
+      return buildBudgetSpendingMap(txInMonth, splitsInMonth, budgetTypes)
+    })
+
     const categories = parentBudgets.map(parent => {
       const children = childBudgets.filter(c => c.parent_id === parent.id)
       const budgetIds = children.length > 0 ? children.map(c => c.id) : [parent.id]
 
-      // Calculate monthly spending for this category
-      const monthlySpending = months.map(m => {
-        const monthTx = (transactions ?? []).filter(t =>
-          t.date >= m.start && t.date < m.end && budgetIds.includes(t.budget_id)
-        )
-        return monthTx.reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
-      })
+      // Calculate monthly spending for this category — parent-rollup uit
+      // dezelfde bron (parent met kinderen = som van de kinderen).
+      const monthlySpending = spendingByMonth.map(spending =>
+        spentForBudget(parent.id, children.map(c => c.id), spending),
+      )
 
       // Get effective limit for the most recent month
       let limit = Number(parent.default_limit) || 0

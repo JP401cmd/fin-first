@@ -194,7 +194,11 @@ describe('base fetchers — transactievensters', () => {
     const res = await getCurrentMonthTx(supabase)
     expect(res.data).toEqual([{ amount: 10 }])
     const q = findQuery(queries, 'transactions')
-    expect(q.select).toBe('amount, date, budget_id, transaction_type')
+    // Kolomset verbreed (30 aug 2026) met id/is_income/is_split — de kolommen
+    // van het canonieke bestedingscontract (BUDGET_SPENDING_TX_COLUMNS in
+    // lib/budget-spending-fetch.ts). Zonder die drie kan buildBudgetSpendingMap
+    // haar split- en inkomst-regels niet toepassen op de gedeelde maandrijen.
+    expect(q.select).toBe('id, amount, date, budget_id, transaction_type, is_income, is_split')
     const { start, end } = localMonthBounds(new Date())
     expect(q.filters).toContainEqual(['gte', 'date', start])
     expect(q.filters).toContainEqual(['lt', 'date', end])

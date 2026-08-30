@@ -28,6 +28,9 @@ import {
   box3TaxStatus,
   type Box3TaxableInput,
 } from '@/lib/box3-taxable-input'
+import { buildBudgetSpendingMap, type SpendingSplitRow } from '@/lib/budget-spending'
+import { getCurrentMonthSplits } from '@/lib/budget-spending-fetch'
+import { buildBudgetTypeMap } from '@/lib/budget-utils'
 import { box1JaarruimteStatus, resolvePensionFactorA } from '@/lib/jaarruimte'
 import { resolveEffectiveIncomeExpenses } from '@/lib/effective-financials'
 import { loadBudgetBasis } from '@/lib/household/budget-share'
@@ -139,12 +142,74 @@ type BudgetRow = {
   parent_id: string | null
   is_archived: boolean
 }
-type BudgetTxRow = { budget_id: string; amount: number | string }
 type Tx6mRow = {
   amount: number | string
   budget_id?: string | null
   transaction_type?: string | null
   date: string
+}
+/**
+ * De huidige-maand-rijen uit `getCurrentMonthTx`. Die kolomset is verbreed naar
+ * `BUDGET_SPENDING_TX_COLUMNS` (lib/budget-spending-fetch.ts), dus `id` en
+ * `is_split` zijn hier beschikbaar — nodig om de split-ouder over te slaan.
+ */
+type CurrentMonthTxRow = Tx6mRow & {
+  id?: string
+  is_income?: boolean | null
+  is_split?: boolean | null
+}
+
+/** De drie budget-health-tellers die de cashflow-hefboom voedt. */
+export interface BudgetHealthCounts {
+  /** Top-level budgetten met een echte limiet (> 0). */
+  budgetsTotal: number
+  /** Daarvan: boven de maandlimiet. */
+  budgetsOver: number
+  /** De rest. */
+  budgetsOnTrack: number
+}
+
+/**
+ * Budget-health voor de kompas-cashflow-indicator: hoeveel top-level
+ * expense/savings-budgetten staan deze maand boven hun limiet.
+ *
+ * De besteed-som is de CANONIEKE (`buildBudgetSpendingMap`, lib/budget-spending.ts)
+ * en niet langer een eigen `Math.abs(amount)`-lus. Gevolg, bedoeld: op een
+ * uitgaven-budget gaat een inkomst van de besteding AF, dus een budget waar
+ * netto geld binnenkwam is NOOIT "over" — het sidebar-statuspunt kleurt niet
+ * meer rood op een terugbetaling. Op een savings-budget (inkomsten-richting) is
+ * de bijdrage het bedrag zelf, dus een spaarSTORTING (negatieve boeking) telt
+ * daar negatief en zet het budget evenmin "over"; dat is dezelfde uitkomst als
+ * de budgetten-pagina toont, en de reden dat deze teller die grondslag deelt.
+ *
+ * TWEE BEWUSTE GRENZEN, allebei ONGEWIJZIGD t.o.v. de vorige implementatie:
+ *  - GEEN parent-rollup. `healthBudgets` bevat alleen top-level budgetten, en de
+ *    som leest uitsluitend het budget_id van de transactie zelf. Een hoofdbudget
+ *    dat zijn uitgaven via kinderen boekt telt hier dus 0. Dat rechttrekken
+ *    verandert het aantal "over" budgetten en hoort bij een eigen beoordeling.
+ *  - `splits` is VERPLICHT en zonder default — dezelfde compiler-vangrail als op
+ *    `buildBudgetSpendingMap`: een aanroep die ze weglaat zou stil de
+ *    split-ouder op zijn eigen budget tellen i.p.v. haar regels.
+ */
+export function deriveBudgetHealthCounts(
+  healthBudgets: { id: string; default_limit: number }[],
+  monthTx: {
+    id?: string
+    budget_id?: string | null
+    amount: number | string
+    transaction_type?: string | null
+    is_split?: boolean | null
+  }[],
+  splits: SpendingSplitRow[],
+  budgetTypes: Map<string, string>,
+): BudgetHealthCounts {
+  const spendPerBudget = buildBudgetSpendingMap(monthTx, splits, budgetTypes)
+  const budgetsTotal = healthBudgets.filter((b) => b.default_limit > 0).length
+  const budgetsOver = healthBudgets.filter((b) => {
+    if (b.default_limit <= 0) return false
+    return (spendPerBudget[b.id] ?? 0) > b.default_limit
+  }).length
+  return { budgetsTotal, budgetsOver, budgetsOnTrack: budgetsTotal - budgetsOver }
 }
 
 /**
@@ -323,14 +388,18 @@ export const loadLeverScores = cache(async function loadLeverScores(
   // Transacties hangen aan child-budgetten, dus de spaarbudget-correctie op de
   // spaarquote heeft de child-IDs nodig (child erft het type van zijn parent).
   const allBudgets = (budgetsRes.data ?? []) as BudgetRow[]
-  const budgetTypeById = new Map<string, string>()
-  for (const b of allBudgets) if (b.parent_id === null) budgetTypeById.set(b.id, b.budget_type)
-  for (const b of allBudgets) {
-    if (b.parent_id !== null) {
-      const parentType = budgetTypeById.get(b.parent_id)
-      if (parentType) budgetTypeById.set(b.id, parentType)
-    }
-  }
+  // Canonieke erfregel (lib/budget-utils.ts) i.p.v. een handgeschreven kopie
+  // ernaast: dezelfde map voedt hieronder óók de richting van de besteed-som,
+  // en twee eigenaren van één erfregel is precies de drift die dit domein al
+  // eerder opleverde. NULL budget_type → DB-default 'expense' (de veilige kant:
+  // inkomsten-semantiek zou een inkomst laten optellen).
+  const budgetTypeById = buildBudgetTypeMap(
+    allBudgets.map(b => ({
+      id: b.id,
+      parent_id: b.parent_id,
+      budget_type: b.budget_type ?? 'expense',
+    })),
+  )
   const savingsBudgetIds = new Set<string>()
   for (const [id, type] of budgetTypeById) if (type === 'savings') savingsBudgetIds.add(id)
 
@@ -386,25 +455,19 @@ export const loadLeverScores = cache(async function loadLeverScores(
       (b.budget_type === 'expense' || b.budget_type === 'savings') &&
       b.is_archived === false,
   )
-  // Huidige-maand budget-transacties (budget_id NOT NULL) — geslicet uit de
-  // gedeelde huidige-maand fetch (byte-identiek aan .not('budget_id','is',null)).
-  const budgetTxRows: BudgetTxRow[] = ((currentMonthTxRes.data ?? []) as Tx6mRow[]).flatMap((t) =>
-    t.budget_id != null ? [{ budget_id: t.budget_id, amount: t.amount }] : [],
+  // Split-regels bij dezelfde huidige-maand-rijen — gedeelde, `cache()`-
+  // gededupeerde fetch die zonder split-ouders geen query doet. De rijen gaan
+  // EXPLICIET mee: zonder dat argument haalt de fetcher ze zelf op, en buiten
+  // een Next-request (vitest) dedupt `cache()` niet — dan is dat een tweede
+  // maand-query op rijen die hier al in scope staan.
+  const currentMonthRows = (currentMonthTxRes.data ?? []) as CurrentMonthTxRow[]
+  const currentMonthSplits = await getCurrentMonthSplits(supabase, currentMonthRows)
+  const { budgetsTotal, budgetsOver, budgetsOnTrack } = deriveBudgetHealthCounts(
+    healthBudgets,
+    currentMonthRows,
+    currentMonthSplits,
+    budgetTypeById,
   )
-  const spendPerBudget = new Map<string, number>()
-  for (const tx of budgetTxRows) {
-    spendPerBudget.set(
-      tx.budget_id,
-      (spendPerBudget.get(tx.budget_id) ?? 0) + Math.abs(Number(tx.amount)),
-    )
-  }
-  const budgetsTotal = healthBudgets.filter((b) => b.default_limit > 0).length
-  const budgetsOver = healthBudgets.filter((b) => {
-    if (b.default_limit <= 0) return false
-    const spent = spendPerBudget.get(b.id) ?? 0
-    return spent > b.default_limit
-  }).length
-  const budgetsOnTrack = budgetsTotal - budgetsOver
 
   const scores = computeLeverScores({
     totalAssets,

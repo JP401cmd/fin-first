@@ -11,7 +11,8 @@ import { getModel } from '@/lib/ai/config'
 import type { ReportData, ReportConfig, HistoricalPeriodSummary } from '@/lib/report-data'
 import { checkTierGate } from '@/lib/require-tier'
 import { resolveFireParams } from '@/lib/fire-params'
-import { yearlyMustExpensesFromBudgets } from '@/lib/budget-utils'
+import { yearlyMustExpensesFromBudgets, buildBudgetTypeMap } from '@/lib/budget-utils'
+import { buildBudgetSpendingMap, spentForBudget, budgetBarPct } from '@/lib/budget-spending'
 import { computeFreedomProgressWithBasis, inclHomeTargetFromScalar } from '@/lib/core-metrics'
 import { resolveSavingsSource, savingsRateFromAggregates, computeDebtAflossingMonthly } from '@/lib/savings-source'
 import { resolveAmountWithBasis } from '@/lib/effective-financials'
@@ -26,6 +27,7 @@ import {
 } from '@/lib/housing-strategy'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
+import { BUDGET_SPENDING_TX_COLUMNS } from '@/lib/budget-spending-fetch'
 
 const MONTH_LABELS_NL: Record<number, string> = {
   0: 'jan', 1: 'feb', 2: 'mrt', 3: 'apr', 4: 'mei', 5: 'jun',
@@ -219,7 +221,10 @@ export async function GET(request: Request) {
         .order('snapshot_date', { ascending: true }),
       supabase
         .from('transactions')
-        .select('id, amount, date, is_income, budget_id, description, counterparty_name')
+        // `transaction_type` + `is_split` horen bij de rijselectie: zonder die
+        // kolommen kan de canonieke besteed-som transfers niet uitsluiten en de
+        // split-ouder niet overslaan (die bedragen leven op `transaction_splits`).
+        .select(`${BUDGET_SPENDING_TX_COLUMNS}, date, description, counterparty_name`)
         .gte('date', dateFrom)
         .lt('date', dateTo)
         .order('date', { ascending: true }),
@@ -260,7 +265,7 @@ export async function GET(request: Request) {
 
     // Safe extraction
     type SnapshotRow = { snapshot_date: string; net_worth: number; total_assets: number; total_debts: number; freedom_percentage?: number }
-    type TxRow = { id: string; amount: number; date: string; is_income: boolean; budget_id: string | null; description: string | null; counterparty_name: string | null }
+    type TxRow = { id: string; amount: number; date: string; is_income: boolean; budget_id: string | null; description: string | null; counterparty_name: string | null; transaction_type: string | null; is_split: boolean | null }
     type BudgetRow = { id: string; name: string; slug: string; icon: string; budget_type: string; default_limit: number | null; interval: string | null; is_essential: boolean; parent_id: string | null }
     type AssetRow = { id: string; name: string; asset_type: string; current_value: number; woz_value: number | null; monthly_contribution: number; expected_return: number | null; is_active: boolean; net_worth_inclusion_pct: number }
     type DebtRow = { id: string; name: string; debt_type: string; original_amount: number; current_balance: number; interest_rate: number; monthly_payment: number; is_active: boolean; linked_asset_id: string | null; net_worth_inclusion_pct: number; include_aflossing_in_savings: boolean | null; custom_aflossing_amount: number | null; repayment_type: string | null; end_date: string | null; start_date: string | null }
@@ -426,19 +431,42 @@ export async function GET(request: Request) {
     const expenseBudgets = allBudgets.filter(b => b.budget_type === 'expense' && !b.parent_id)
     const childBudgets = allBudgets.filter(b => b.parent_id)
 
-    const budgetSpending = new Map<string, number>()
-    for (const tx of transactions) {
-      if (Number(tx.amount) >= 0 || !tx.budget_id) continue
-      // Find parent budget
-      const child = childBudgets.find(c => c.id === tx.budget_id)
-      const parentId = child ? child.parent_id! : tx.budget_id
-      const current = budgetSpending.get(parentId) || 0
-      budgetSpending.set(parentId, current + Math.abs(Number(tx.amount)))
+    // Canonieke besteed-som (lib/budget-spending.ts) i.p.v. de eigen
+    // teken-filter hierboven. Die filter sloot een inkomst UIT waar de norm 'm
+    // AFTREKT, liet transfers als besteding meetellen, en telde een split-ouder
+    // op zijn eigen budget terwijl de bedragen op `transaction_splits` leven.
+    const splitTxIds = transactions.filter(t => t.is_split).map(t => t.id)
+    let splitRows: Array<{ budget_id: string | null; amount: number }> = []
+    if (splitTxIds.length > 0) {
+      const { data: splitData } = await supabase
+        .from('transaction_splits')
+        .select('budget_id, amount')
+        .in('transaction_id', splitTxIds)
+      splitRows = (splitData ?? []) as Array<{ budget_id: string | null; amount: number }>
+    }
+
+    // Richting per budget; `allBudgets` is ongefilterd opgehaald (inclusief
+    // gearchiveerd), dus een transactie op een gearchiveerd budget houdt zijn
+    // richting. De erfregel (child erft parent-type) zit in buildBudgetTypeMap.
+    const reportBudgetTypes = buildBudgetTypeMap(
+      allBudgets.map(b => ({
+        id: b.id,
+        parent_id: b.parent_id ?? null,
+        // DB-default; NULL mag nooit inkomsten-semantiek geven.
+        budget_type: b.budget_type ?? 'expense',
+      })),
+    )
+    const budgetSpending = buildBudgetSpendingMap(transactions, splitRows, reportBudgetTypes)
+    const childIdsByParent: Record<string, string[]> = {}
+    for (const c of childBudgets) {
+      if (c.parent_id) (childIdsByParent[c.parent_id] ??= []).push(c.id)
     }
 
     const budgetBreakdown = expenseBudgets
       .map(b => {
-        const spent = Math.round(budgetSpending.get(b.id) || 0)
+        // Parent-rollup uit dezelfde bron: een parent met kinderen = de som van
+        // zijn kinderen, een blad zijn eigen besteding.
+        const spent = Math.round(spentForBudget(b.id, childIdsByParent[b.id] ?? [], budgetSpending))
         const limit = Number(b.default_limit) || 0
         // Scale limit to period length
         const monthsInPeriod = monthsWithData.length || 1
@@ -454,10 +482,18 @@ export async function GET(request: Request) {
           limit: scaledLimit,
           spent,
           isEssential: b.is_essential,
-          pctOfLimit: scaledLimit > 0 ? Math.round((spent / scaledLimit) * 100) : 0,
+          // `budgetBarPct`: onderaan geklemd (de getekende som kan negatief zijn),
+          // bovenaan bewust niet — het rapport moet een overschrijding kunnen tonen.
+          pctOfLimit: Math.round(budgetBarPct(spent, scaledLimit)),
         }
       })
-      .filter(b => b.spent > 0)
+      // `!== 0`, niet `> 0`: sinds de besteed-som getekend is (norm 30 aug 2026)
+      // is een negatief bedrag een ECHT resultaat — netto geld binnen op een
+      // uitgaven-budget — en de norm luidt "negatief zichtbaar". Met `> 0`
+      // verdween zo'n budget stil uit het rapport, terwijl de budgetpagina 'm
+      // wél toont. Zelfde keuze als lib/ai/context/recommendation-context.ts.
+      // Een budget met exact 0 blijft eruit: dat is "geen activiteit".
+      .filter(b => b.spent !== 0)
       .sort((a, b) => b.spent - a.spent)
 
     // Asset breakdown
@@ -520,6 +556,12 @@ export async function GET(request: Request) {
         amount: Number(tx.amount),
         date: tx.date,
         is_income: tx.is_income,
+        // MOET MEE: de query haalt `transaction_type` op (zie de select), maar
+        // deze object-literal liet 'm vallen — waardoor `buildCategorySpending`
+        // de transfers niet kon uitsluiten en een eigen overboeking als uitgave
+        // in het rapport terechtkwam. Een `...tx`-spread zou dit niet hebben
+        // laten gebeuren; de expliciete vorm blijft, mét de kolom.
+        transaction_type: tx.transaction_type,
       }))
     const budgetsForPatterns = allBudgets.map(b => ({
       id: b.id,
@@ -730,6 +772,14 @@ export async function GET(request: Request) {
           .lt('snapshot_date', p.to)
           .order('snapshot_date', { ascending: false })
           .limit(1),
+        // budget-spending: bruto-grondslag — BEWUST NIET het bestedingscontract.
+        // Deze rijen voeden de historische SPAARQUOTE (inkomen, uitgaven en de
+        // spaarbudget-correctie), niet "besteed per budget": de bedragen worden
+        // absoluut opgeteld en van elkaar afgetrokken, nooit naast een
+        // budgetlimiet gelegd. Dezelfde uitzondering als
+        // `monthlySavingsBudgetSpent` (lib/dashboard-data-loader.ts) en het
+        // 6-maands venster in lib/core-data-loader.ts. De smalle select houdt
+        // dat zichtbaar in de QUERY.
         supabase
           .from('transactions')
           .select('amount, budget_id')

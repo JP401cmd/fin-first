@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { section, formatCurrency, bulletList } from './formatter'
 import {
   buildCategorySpending,
+  derivePatternExpenseBasis,
   detectSeasonalPatterns,
   detectTrends,
   detectAnomalies,
@@ -31,27 +32,23 @@ export async function buildSpendingPatternsContext(supabase: SupabaseClient): Pr
   ])
 
   const budgets = budgetsResult.data ?? []
-  const transactions = (transactionsResult.data ?? []).filter(
-    (t) => (t as { transaction_type?: string | null }).transaction_type !== 'transfer' &&
-           (t as { transaction_type?: string | null }).transaction_type !== 'joint_transfer'
-  )
+  // GEEN transfer-filter meer op deze regel: die woont sinds 30 aug 2026 IN
+  // `buildCategorySpending` (een filter dat de som bepaalt hoort bij de som).
+  // De twee afleidingen hieronder hebben elk hun eigen, andere grondslag.
+  const transactions = transactionsResult.data ?? []
 
   if (budgets.length === 0 || transactions.length === 0) {
     return ''
   }
 
-  // Count distinct months
-  const months = new Set(transactions.map(t => t.date.slice(0, 7)))
-  const dataMonths = months.size
+  // Data-genoeg-poort én dagtarief: één gedeelde afleiding met
+  // /api/spending-patterns (lib/spending-patterns.ts#derivePatternExpenseBasis).
+  // Transfer-gefilterde maandtelling, getekende som, klem op 0.
+  const { dataMonths, dailyExpenses } = derivePatternExpenseBasis(
+    transactions.map((t) => ({ ...t, amount: Number(t.amount) })),
+  )
 
   if (dataMonths < 6) return '' // Need at least 6 months for meaningful patterns
-
-  // Calculate daily expense rate
-  const totalExpenses = transactions
-    .filter(t => !t.is_income)
-    .reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
-  const avgMonthlyExpenses = totalExpenses / dataMonths
-  const dailyExpenses = (avgMonthlyExpenses * 12) / 365
 
   // Build spending data and detect patterns
   const categorySpending = buildCategorySpending(

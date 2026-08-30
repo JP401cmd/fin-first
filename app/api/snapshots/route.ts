@@ -9,6 +9,7 @@ import {
   type HealthScoreBudget,
   type HealthScoreTransaction,
 } from '@/lib/health-score-input'
+import { BUDGET_SPENDING_TX_COLUMNS, fetchSpendingSplits } from '@/lib/budget-spending-fetch'
 import { resolveFireParams } from '@/lib/fire-params'
 import { yearlyMustExpensesFromBudgets } from '@/lib/budget-utils'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
@@ -205,10 +206,13 @@ export async function POST() {
       .eq('id', user.id)
       .maybeSingle()
       .then((r) => r, () => ({ data: null })),
-    // Huidige-maand-transacties met budget_id voor budget-discipline.
+    // Huidige-maand-transacties met budget_id voor budget-discipline. De
+    // kolomlijst is die van het canonieke bestedingscontract
+    // (BUDGET_SPENDING_TX_COLUMNS): zonder transaction_type/is_income/is_split
+    // kan `buildBudgetCategories` haar transfer- en split-regels niet toepassen.
     supabase
       .from('transactions')
-      .select('amount, budget_id')
+      .select(BUDGET_SPENDING_TX_COLUMNS)
       .eq('user_id', user.id)
       .gte('date', monthStart)
       .lt('date', monthEnd),
@@ -357,6 +361,16 @@ export async function POST() {
   })
   // DSTI-teller: Σ maandlasten over de actieve schulden (select bevat monthly_payment).
   const debtMonthlyPayments = debts.reduce((s, d) => s + Number(d.monthly_payment ?? 0), 0)
+  // Split-regels bij de gesplitste maandtransacties; zonder splits draait er geen
+  // query. Zie de sompas-aantekening onder `buildHealthScoreInput` hieronder.
+  const monthTxRows = (monthTxResult.data ?? []) as unknown as HealthScoreTransaction[]
+  const monthSplits = await fetchSpendingSplits(supabase, monthTxRows)
+  // GRONDSLAG-BREUK, BEWUST ZONDER BACKFILL (eigenaar-besluit 30 aug 2026):
+  // vanaf nu wordt de budget-discipline-pijler van `resilience_score` op de
+  // canonieke bestedingssom berekend (inkomsten gaan eraf, transfers tellen niet
+  // mee). Bestaande snapshot-rijen blijven staan: historie vóór 30 aug 2026 op
+  // de oude grondslag (ongefilterde Σ|amount|), bewust geaccepteerd. De trendlijn
+  // op /toekomst kan daardoor een eenmalige knik tonen op de naad.
   const healthScore = computeHealthScoreFromInputs(
     buildHealthScoreInput(
       {
@@ -374,7 +388,8 @@ export async function POST() {
         assets: assets as HealthScoreAsset[],
         unlinkedCash,
         budgets: allBudgets as HealthScoreBudget[],
-        transactions: (monthTxResult.data ?? []) as HealthScoreTransaction[],
+        transactions: monthTxRows,
+        splits: monthSplits,
         householdType: profileResult.data?.household_type ?? null,
         debtMonthlyPayments,
       },

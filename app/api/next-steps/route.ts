@@ -3,6 +3,9 @@ import { NextResponse } from 'next/server'
 import { unauthorized } from '@/lib/api/respond'
 import { localMonthBounds } from '@/lib/month-range'
 import { resolveFireParams } from '@/lib/fire-params'
+import { buildBudgetTypeMap } from '@/lib/budget-utils'
+import { buildBudgetSpendingMap, spentForBudget } from '@/lib/budget-spending'
+import { BUDGET_OR_SPLIT_FILTER, BUDGET_SPENDING_TX_COLUMNS } from '@/lib/budget-spending-fetch'
 
 /**
  * GET /api/next-steps — Get user's next recommended steps.
@@ -56,11 +59,13 @@ export async function GET() {
         .select('id')
         .eq('user_id', claims.sub)
         .limit(1),
+      // Álle budgetten, niet alleen de parents: de canonieke besteed-som heeft
+      // de hele boom nodig voor de richting (child erft parent-type) én voor de
+      // parent-rollup. De parents worden hieronder in JS gefilterd.
       supabase
         .from('budgets')
-        .select('id, name, default_limit')
-        .eq('user_id', claims.sub)
-        .is('parent_id', null),
+        .select('id, name, default_limit, parent_id, budget_type')
+        .eq('user_id', claims.sub),
       supabase
         .from('assets')
         .select('id, current_value, net_worth_inclusion_pct')
@@ -92,13 +97,20 @@ export async function GET() {
         .select('step_key, dismissed')
         .eq('user_id', claims.sub),
       // Budget spending this month (for alert detection)
+      // `id`/`transaction_type`/`is_split` horen bij de rijselectie van de
+      // canonieke besteed-som; `.lt('amount', 0)` is weg omdat de norm een
+      // inkomst AFTREKT i.p.v. 'm uit te sluiten (en een teruggave dus een
+      // budget van zijn limiet af duwt, niet erlangs).
       supabase
         .from('transactions')
-        .select('budget_id, amount')
+        .select(BUDGET_SPENDING_TX_COLUMNS)
+        // Rijen mét budget_id óf split-ouders — zie BUDGET_OR_SPLIT_FILTER voor
+        // waarom een kale `.not('budget_id','is',null)` de split-ouders zou
+        // wegsnijden en filter-loos lezen op max_rows kan afkappen.
+        .or(BUDGET_OR_SPLIT_FILTER)
         .eq('user_id', claims.sub)
         .gte('date', monthStart)
-        .lt('date', monthEnd)
-        .lt('amount', 0),
+        .lt('date', monthEnd),
       // Monthly income/expenses for FIRE check
       supabase
         .from('transactions')
@@ -132,15 +144,44 @@ export async function GET() {
     // Calculate budget alerts (budgets over their limit this month)
     let alertBudgetCount = 0
     if (budgetsResult.data && budgetSpendingResult.data) {
-      const spendingByBudget = new Map<string, number>()
-      for (const tx of budgetSpendingResult.data) {
-        if (tx.budget_id) {
-          const current = spendingByBudget.get(tx.budget_id) ?? 0
-          spendingByBudget.set(tx.budget_id, current + Math.abs(tx.amount))
-        }
+      const allBudgets = budgetsResult.data
+      const txRows = budgetSpendingResult.data
+
+      // Split-regels: zonder deze levert een gesplitste transactie niets aan de
+      // budgetten waarover ze verdeeld is.
+      const splitTxIds = txRows.filter(t => t.is_split).map(t => t.id)
+      let splitRows: Array<{ budget_id: string | null; amount: number }> = []
+      if (splitTxIds.length > 0) {
+        const { data: splitData } = await supabase
+          .from('transaction_splits')
+          .select('budget_id, amount')
+          .in('transaction_id', splitTxIds)
+        splitRows = (splitData ?? []) as Array<{ budget_id: string | null; amount: number }>
       }
-      for (const budget of budgetsResult.data) {
-        const spent = spendingByBudget.get(budget.id) ?? 0
+
+      // Canonieke besteed-som (lib/budget-spending.ts) i.p.v. een eigen
+      // `Math.abs`-som: die telde transfers als besteding mee en negeerde de
+      // richting, waardoor deze route een budget "over de limiet" kon noemen
+      // dat op /core/budgets ruim binnen zijn limiet staat.
+      const budgetTypes = buildBudgetTypeMap(
+        allBudgets.map(b => ({
+          id: b.id,
+          parent_id: b.parent_id ?? null,
+          // DB-default; NULL mag nooit inkomsten-semantiek geven.
+          budget_type: b.budget_type ?? 'expense',
+        })),
+      )
+      const spendingByBudget = buildBudgetSpendingMap(txRows, splitRows, budgetTypes)
+
+      const childIdsByParent: Record<string, string[]> = {}
+      for (const b of allBudgets) {
+        if (b.parent_id) (childIdsByParent[b.parent_id] ??= []).push(b.id)
+      }
+
+      // Alleen de parents tellen als "categorie over limiet" — zoals vóór deze
+      // wijziging, toen de query zelf al op `parent_id is null` filterde.
+      for (const budget of allBudgets.filter(b => !b.parent_id)) {
+        const spent = spentForBudget(budget.id, childIdsByParent[budget.id] ?? [], spendingByBudget)
         if (budget.default_limit && spent > budget.default_limit) {
           alertBudgetCount++
         }

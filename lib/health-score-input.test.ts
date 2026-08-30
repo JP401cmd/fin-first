@@ -187,7 +187,7 @@ describe('buildBudgetCategories', () => {
     // H4 punt 3: voorheen kwamen hier drie lege TYPE-sommen uit. De pijler wordt
     // op dezelfde manier inactief (geen entry met limit > 0), maar de vorm zegt
     // nu de waarheid: er zijn nul categorieën.
-    expect(buildBudgetCategories([], [])).toEqual([])
+    expect(buildBudgetCategories([], [], [])).toEqual([])
   })
 
   it('parent-budget met expense-type: limit en spent klopt', () => {
@@ -198,7 +198,7 @@ describe('buildBudgetCategories', () => {
       { amount: -1200, budget_id: 'exp' },
       { amount: -100, budget_id: 'exp' },
     ]
-    const result = buildBudgetCategories(budgets, transactions)
+    const result = buildBudgetCategories(budgets, transactions, [])
     const exp = result.find((c) => c.limit === 1500)
     expect(exp?.limit).toBe(1500)
     expect(exp?.spent).toBe(1300) // abs(-1200) + abs(-100)
@@ -208,7 +208,7 @@ describe('buildBudgetCategories', () => {
     const budgets: HealthScoreBudget[] = [
       { id: 'q', parent_id: null, budget_type: 'expense', default_limit: 3000, interval: 'quarterly' },
     ]
-    const result = buildBudgetCategories(budgets, [])
+    const result = buildBudgetCategories(budgets, [], [])
     const exp = result.find((c) => c.limit > 0)
     expect(exp?.limit).toBe(1000) // 3000/3
   })
@@ -217,7 +217,7 @@ describe('buildBudgetCategories', () => {
     const budgets: HealthScoreBudget[] = [
       { id: 'y', parent_id: null, budget_type: 'savings', default_limit: 12000, interval: 'yearly' },
     ]
-    const result = buildBudgetCategories(budgets, [])
+    const result = buildBudgetCategories(budgets, [], [])
     const sav = result.find((c) => c.limit === 1000)
     expect(sav?.limit).toBe(1000) // 12000/12
   })
@@ -230,7 +230,7 @@ describe('buildBudgetCategories', () => {
       { id: 'gwl', parent_id: 'wonen', budget_type: null, default_limit: 200, interval: 'monthly' },
       { id: 'huur', parent_id: 'wonen', budget_type: null, default_limit: 1200, interval: 'monthly' },
     ]
-    const result = buildBudgetCategories(budgets, [])
+    const result = buildBudgetCategories(budgets, [], [])
     expect(result).toHaveLength(2)
     expect(result.map((c) => c.limit).sort((a, b) => a - b)).toEqual([200, 1200])
   })
@@ -247,7 +247,7 @@ describe('buildBudgetCategories', () => {
       { amount: -214, budget_id: 'gwl' },   // 107% van 200
       { amount: -1000, budget_id: 'huur' }, // ruim binnen
     ]
-    const result = buildBudgetCategories(budgets, transactions)
+    const result = buildBudgetCategories(budgets, transactions, [])
     const gwl = result.find((c) => c.limit === 200)
     expect(gwl?.spent).toBe(214)
     expect(result.filter((c) => c.spent > c.limit)).toHaveLength(1)
@@ -266,7 +266,7 @@ describe('buildBudgetCategories', () => {
       { id: 'aflossen', parent_id: null, budget_type: 'debt', default_limit: 300, interval: 'monthly' },
       { id: 'salaris', parent_id: null, budget_type: 'income', default_limit: 4000, interval: 'monthly' },
     ]
-    const result = buildBudgetCategories(budgets, [])
+    const result = buildBudgetCategories(budgets, [], [])
     // income doet niet mee in de discipline-pijler (ongewijzigd gedrag).
     expect(result.map((c) => c.limit).sort((a, b) => a - b)).toEqual([300, 400, 500])
   })
@@ -276,7 +276,7 @@ describe('buildBudgetCategories', () => {
       { id: 'verzekering', parent_id: null, budget_type: 'expense', default_limit: 0, interval: 'quarterly' },
       { id: 'inboedel', parent_id: 'verzekering', budget_type: null, default_limit: 300, interval: 'monthly' },
     ]
-    const result = buildBudgetCategories(budgets, [])
+    const result = buildBudgetCategories(budgets, [], [])
     expect(result).toEqual([{ limit: 100, spent: 0 }]) // 300/3
   })
 
@@ -284,7 +284,80 @@ describe('buildBudgetCategories', () => {
     const budgets: HealthScoreBudget[] = [
       { id: 'raar', parent_id: null, budget_type: 'onzin', default_limit: 500, interval: 'monthly' },
     ]
-    expect(buildBudgetCategories(budgets, [])).toEqual([])
+    expect(buildBudgetCategories(budgets, [], [])).toEqual([])
+  })
+
+  // ── Canonieke bestedingssom (convergentie 30 aug 2026) ───────────────────
+  // Deze functie had een eigen Σ|amount|-lus ZONDER filter. De vier tests
+  // hieronder pinnen elk één regel van de gedeelde `spendingContribution`.
+
+  it('een inkomst op een uitgaven-categorie gaat ERAF (was: telde absoluut op)', () => {
+    const budgets: HealthScoreBudget[] = [
+      { id: 'inventaris', parent_id: null, budget_type: 'expense', default_limit: 1642, interval: 'monthly' },
+    ]
+    const transactions: HealthScoreTransaction[] = [
+      { amount: -1265, budget_id: 'inventaris' },
+      { amount: 6000, budget_id: 'inventaris' }, // partner-overboeking
+      { amount: 2000, budget_id: 'inventaris' },
+    ]
+    // Oude lus: 1265 + 6000 + 2000 = 9265 ⇒ 564% van de limiet, pijler rood.
+    expect(buildBudgetCategories(budgets, transactions, [])).toEqual([
+      { limit: 1642, spent: -6735 },
+    ])
+  })
+
+  it('een transfer telt niet mee op een uitgaven-categorie', () => {
+    const budgets: HealthScoreBudget[] = [
+      { id: 'boodschappen', parent_id: null, budget_type: 'expense', default_limit: 500, interval: 'monthly' },
+    ]
+    const transactions: HealthScoreTransaction[] = [
+      { amount: -120, budget_id: 'boodschappen' },
+      { amount: -300, budget_id: 'boodschappen', transaction_type: 'transfer' },
+      { amount: -80, budget_id: 'boodschappen', transaction_type: 'joint_transfer' },
+    ]
+    expect(buildBudgetCategories(budgets, transactions, [])[0].spent).toBe(120)
+  })
+
+  it('op een SAVINGS-categorie geldt de inkomsten-richting (de zichtbaarste verschuiving)', () => {
+    // Norm 30 aug 2026: op income/savings IS de positieve rij de realisatie.
+    // Een spaarbudget dat door negatieve rijen wordt gevoed telt dus niet meer
+    // als besteding — bewust vastgelegd, niet als bijvangst.
+    const budgets: HealthScoreBudget[] = [
+      { id: 'sparen', parent_id: null, budget_type: 'savings', default_limit: 400, interval: 'monthly' },
+    ]
+    const inleg: HealthScoreTransaction[] = [{ amount: 400, budget_id: 'sparen' }]
+    const uitgaandeOverboeking: HealthScoreTransaction[] = [{ amount: -400, budget_id: 'sparen' }]
+    expect(buildBudgetCategories(budgets, inleg, [])[0].spent).toBe(400)
+    expect(buildBudgetCategories(budgets, uitgaandeOverboeking, [])[0].spent).toBe(-400)
+  })
+
+  it('split-regels tellen op hun eigen categorie; de ouderrij wordt overgeslagen', () => {
+    const budgets: HealthScoreBudget[] = [
+      { id: 'wonen', parent_id: null, budget_type: 'expense', default_limit: 0, interval: 'monthly' },
+      { id: 'gwl', parent_id: 'wonen', budget_type: null, default_limit: 200, interval: 'monthly' },
+      { id: 'huur', parent_id: 'wonen', budget_type: null, default_limit: 1200, interval: 'monthly' },
+    ]
+    const transactions: HealthScoreTransaction[] = [
+      { id: 'ouder', amount: -29.24, budget_id: 'gwl', is_split: true },
+    ]
+    // transaction_splits staan POSITIEF in de DB en tellen altijd +|amount|.
+    const result = buildBudgetCategories(budgets, transactions, [
+      { budget_id: 'gwl', amount: 4.5 },
+      { budget_id: 'huur', amount: 24.74 },
+    ])
+    expect(result.find((c) => c.limit === 200)?.spent).toBeCloseTo(4.5, 10)
+    expect(result.find((c) => c.limit === 1200)?.spent).toBeCloseTo(24.74, 10)
+  })
+
+  it('zonder is_split-kolom telt de ouderrij mee — het pad van de nog niet omgezette aanroepers', () => {
+    // core-data-loader / horizon-raw-data-loader / check-build-report halen
+    // `is_split` (nog) niet op en geven geen splits mee. Dat mag geen
+    // ONDERTELLING geven: de ouderrij telt dan gewoon mee, zoals voorheen.
+    const budgets: HealthScoreBudget[] = [
+      { id: 'gwl', parent_id: null, budget_type: 'expense', default_limit: 200, interval: 'monthly' },
+    ]
+    const zonderKolom: HealthScoreTransaction[] = [{ amount: -29.24, budget_id: 'gwl' }]
+    expect(buildBudgetCategories(budgets, zonderKolom, [])[0].spent).toBeCloseTo(29.24, 10)
   })
 })
 
@@ -309,6 +382,7 @@ describe('buildHealthScoreInput — doorgifte v2-velden', () => {
     unlinkedCash: 0,
     budgets: [] as HealthScoreBudget[],
     transactions: [] as HealthScoreTransaction[],
+    splits: [],
     householdType: 'solo' as const,
     debtMonthlyPayments: 350,
   }

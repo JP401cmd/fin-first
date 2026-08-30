@@ -4,6 +4,7 @@ import { memo, type ReactNode } from 'react'
 import { WidgetShell } from './widget-shell'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { isOverPositive, computeBarSegments, type BudgetType } from '@/components/app/budget-shared'
+import { budgetFillRatio } from '@/lib/budget-spending'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import type { WidgetSize } from '@/lib/widget-catalog'
@@ -38,13 +39,18 @@ export const BudgetFavWidget = memo(function BudgetFavWidget({
   dailyExp?: number
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 600 })
-  const pct = budget.limit > 0 ? Math.min(budget.spent / budget.limit, 1) : 0
+  // Geklemd op [0,1]: sinds de getekende besteed-som (6898c9dc7) kan `spent`
+  // negatief zijn (netto geld binnen) — ongeklemd werd de ring-offset ongeldig
+  // en het label "-410%".
+  const pct = budgetFillRatio(budget.spent, budget.limit)
   const isOver = budget.spent > budget.limit && budget.limit > 0
   const typeOverPositive = isOverPositive(budget.budgetType as BudgetType)
   const overPositive = isOver && typeOverPositive
   const cssType = budget.budgetType === 'archive' ? 'other' : budget.budgetType
 
-  const remaining = Math.max(budget.limit - budget.spent, 0)
+  // Weergave volgt de carry-klem: meegenomen ruimte boven de limiet bestaat
+  // niet (zelfde besluit als "Resterend" in de budget-detailpane).
+  const remaining = Math.max(Math.min(budget.limit - budget.spent, budget.limit), 0)
   const today = new Date()
   const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
   const daysLeft = daysInMonth - today.getDate()

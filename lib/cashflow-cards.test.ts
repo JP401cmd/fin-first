@@ -137,6 +137,55 @@ describe('buildCashflowCards — Bug A: Budget-KPI toont resterend budget, niet 
   })
 })
 
+describe('buildCashflowCards — Budget-KPI klemt op de limiet (getekende som)', () => {
+  // Sinds `deriveBudgetTotals` een GETEKENDE som levert (norm 30 aug 2026) kan
+  // `expense.spent` negatief zijn: netto meer geld binnen dan uit op een
+  // uitgaven-budget. De kale `limiet − besteed` gaf dan MEER "nog te besteden"
+  // dan er ooit begroot is. De klem (`budgetBeschikbaar`) zat al op de
+  // heatmap-tegels; deze kaart was de laatste zonder.
+
+  it('negatieve besteding: KPI is de LIMIET, niet limiet + inkomsten', () => {
+    const dashboardData = baseDashboard({
+      budgetingActive: true,
+      budgetTotals: {
+        income: { limit: 5200, spent: 5200 },
+        expense: { limit: 7701, spent: -1000 },
+        savings: { limit: 1500, spent: 1400 },
+        debt: { limit: 500, spent: 500 },
+      },
+    })
+    expect(budgetCard(dashboardData).kpi).toBe(formatCurrency(7701))
+    // Zonder klem: 7701 − (−1000) = 8701 — meer ruimte dan de limiet.
+    expect(budgetCard(dashboardData).kpi).not.toBe(formatCurrency(8701))
+  })
+
+  it('de gemelde productiecase: besteed €2.616 van €7.701 ⇒ €5.085 over', () => {
+    const dashboardData = baseDashboard({
+      budgetingActive: true,
+      budgetTotals: {
+        income: { limit: 5200, spent: 5200 },
+        expense: { limit: 7701, spent: 2616 },
+        savings: { limit: 1500, spent: 1400 },
+        debt: { limit: 500, spent: 500 },
+      },
+    })
+    expect(budgetCard(dashboardData).kpi).toBe(formatCurrency(5085))
+  })
+
+  it('de ONDERkant blijft ongeklemd: een overschrijding blijft negatief zichtbaar', () => {
+    const dashboardData = baseDashboard({
+      budgetingActive: true,
+      budgetTotals: {
+        income: { limit: 5200, spent: 5200 },
+        expense: { limit: 3950, spent: 5000 },
+        savings: { limit: 1500, spent: 1400 },
+        debt: { limit: 500, spent: 500 },
+      },
+    })
+    expect(budgetCard(dashboardData).kpi).toBe(formatCurrency(-1050))
+  })
+})
+
 describe('buildCashflowCards — Budget-kaart: gedrag dat de fix NIET mag verschuiven', () => {
   it('budgetCardStatus (de statusdot) blijft gebaseerd op monthSummary.budgetScore — niet op remaining', () => {
     // budgetScore laag (bad) terwijl remaining ruim positief is: status volgt

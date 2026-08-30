@@ -1,114 +1,108 @@
 /**
  * lib/lever-scores-loader.budgets-over.test.ts
  *
- * PARITY-LOCK voor stap 3 van de layout-waterfall-refactor (jul 2026).
+ * `budgetsOver` (aantal top-level expense/savings-budgetten boven de maandlimiet)
+ * voedt de cashflow-hefboom en daarmee het STATUSPUNT in de zijbalk — op élke
+ * route. Deze test staat op de echte loader-helper (`deriveBudgetHealthCounts`),
+ * niet op een kopie ervan: de vorige versie van dit bestand hield twee woordelijk
+ * gekopieerde varianten naast elkaar en bewees daarmee alleen dat twee kopieën
+ * gelijk waren — precies de constructie die de teken-blinde som zo lang liet staan.
  *
- * `budgetsOver` (aantal top-level expense/savings-budgets boven de maandlimiet,
- * kompas-cashflow-indicator #847) werd voorheen INLINE in app/(app)/layout.tsx
- * berekend uit een eigen budget-health-query + maand-budget-transactie-query.
- * De refactor schrapt die dubbele queries en consumeert `budgetsOver` uit
- * `loadLeverScores` — dat het getal al intern uit DEZELFDE queries berekent.
- *
- * Deze test bewijst dat de loader-berekening BYTE-IDENTIEK is aan de oude
- * inline-berekening, zodat het sidebar-`budgetOver`-signaal onveranderd blijft.
- * Geen Supabase-calls — puur de aggregatie-logica getest (beide varianten
- * woordelijk gekopieerd uit de respectievelijke bron).
+ * WAT HIER VASTLIGT: de teller consumeert de canonieke besteed-som
+ * (`buildBudgetSpendingMap`, lib/budget-spending.ts), dus
+ *   - een inkomst op een uitgaven-budget gaat van de besteding AF en kan een
+ *     budget niet "over" maken;
+ *   - een transfer telt niet mee op een richting-budget;
+ *   - op een savings-budget (inkomsten-richting) IS de positieve rij de
+ *     realisatie, dus een spaarstorting (negatieve boeking) zet het budget niet
+ *     over de limiet.
  */
 
 import { describe, it, expect } from 'vitest'
+import { deriveBudgetHealthCounts } from './lever-scores-loader'
 
-type BudgetHealthRow = { id: string; default_limit: number; budget_type: string }
-type BudgetTxRow = { budget_id: string; amount: number | string }
+type Tx = { budget_id?: string | null; amount: number | string; transaction_type?: string | null }
 
-// ── OUDE inline-berekening (woordelijk uit app/(app)/layout.tsx, vóór refactor) ─
-function budgetsOverInline(
-  healthBudgets: BudgetHealthRow[],
-  budgetTxRows: BudgetTxRow[],
-): number {
-  const spendPerBudget = new Map<string, number>()
-  for (const tx of budgetTxRows) {
-    spendPerBudget.set(
-      tx.budget_id,
-      (spendPerBudget.get(tx.budget_id) ?? 0) + Math.abs(Number(tx.amount)),
-    )
-  }
-  return healthBudgets.filter((b) => {
-    if (b.default_limit <= 0) return false
-    const spent = spendPerBudget.get(b.id) ?? 0
-    return spent > b.default_limit
-  }).length
-}
-
-// ── NIEUWE bron (woordelijk uit lib/lever-scores-loader.ts) ────────────────────
-function budgetsOverLoader(
-  healthBudgets: BudgetHealthRow[],
-  budgetTxRows: BudgetTxRow[],
-): number {
-  const spendPerBudget = new Map<string, number>()
-  for (const tx of budgetTxRows) {
-    spendPerBudget.set(
-      tx.budget_id,
-      (spendPerBudget.get(tx.budget_id) ?? 0) + Math.abs(Number(tx.amount)),
-    )
-  }
-  return healthBudgets.filter((b) => {
-    if (b.default_limit <= 0) return false
-    const spent = spendPerBudget.get(b.id) ?? 0
-    return spent > b.default_limit
-  }).length
-}
-
-// ── Fixtures ───────────────────────────────────────────────────────────────────
-const BUDGETS: BudgetHealthRow[] = [
-  { id: 'boodschappen', default_limit: 400, budget_type: 'expense' },
-  { id: 'uit-eten', default_limit: 150, budget_type: 'expense' },
-  { id: 'sparen', default_limit: 500, budget_type: 'savings' },
-  { id: 'geen-limiet', default_limit: 0, budget_type: 'expense' }, // limit 0 → nooit "over"
+// Top-level budgetten zoals `healthBudgets` ze aanlevert (expense + savings).
+const BUDGETS = [
+  { id: 'boodschappen', default_limit: 400 },
+  { id: 'uit-eten', default_limit: 150 },
+  { id: 'sparen', default_limit: 500 },
+  { id: 'geen-limiet', default_limit: 0 }, // limit 0 → nooit "over", telt niet mee
 ]
 
-describe('budgetsOver — loader == oude inline-berekening (byte-identiek, stap 3)', () => {
-  const cases: { name: string; tx: BudgetTxRow[]; expected: number }[] = [
-    {
-      name: 'niets uitgegeven → geen enkel budget over',
-      tx: [],
-      expected: 0,
-    },
-    {
-      name: 'boodschappen over de limiet (negatieve bedragen via abs)',
-      tx: [
+const TYPES = new Map<string, string>([
+  ['boodschappen', 'expense'],
+  ['uit-eten', 'expense'],
+  ['sparen', 'savings'],
+  ['geen-limiet', 'expense'],
+])
+
+const over = (tx: Tx[]) => deriveBudgetHealthCounts(BUDGETS, tx, [], TYPES).budgetsOver
+
+describe('deriveBudgetHealthCounts — budgetsOver op de canonieke besteed-som', () => {
+  it('niets uitgegeven → geen enkel budget over', () => {
+    expect(over([])).toBe(0)
+  })
+
+  it('uitgaven boven de limiet tellen als over', () => {
+    expect(
+      over([
         { budget_id: 'boodschappen', amount: -250 },
         { budget_id: 'boodschappen', amount: -200 }, // 450 > 400 → over
         { budget_id: 'uit-eten', amount: -100 }, // 100 < 150 → ok
-      ],
-      expected: 1,
-    },
-    {
-      name: 'twee budgetten over, gemengde teken/string-bedragen',
-      tx: [
-        { budget_id: 'boodschappen', amount: '-500' }, // 500 > 400
-        { budget_id: 'uit-eten', amount: 200 }, // 200 > 150
-        { budget_id: 'sparen', amount: -300 }, // 300 < 500 → ok
-      ],
-      expected: 2,
-    },
-    {
-      name: 'exact op de limiet telt NIET als over (strikt groter-dan)',
-      tx: [{ budget_id: 'boodschappen', amount: -400 }],
-      expected: 0,
-    },
-    {
-      name: 'uitgave op een budget met limiet 0 telt nooit mee',
-      tx: [{ budget_id: 'geen-limiet', amount: -9_999 }],
-      expected: 0,
-    },
-  ]
+      ]),
+    ).toBe(1)
+  })
 
-  for (const c of cases) {
-    it(c.name, () => {
-      const inline = budgetsOverInline(BUDGETS, c.tx)
-      const loader = budgetsOverLoader(BUDGETS, c.tx)
-      expect(loader).toBe(inline)
-      expect(loader).toBe(c.expected)
-    })
-  }
+  it('exact op de limiet telt NIET als over (strikt groter-dan)', () => {
+    expect(over([{ budget_id: 'boodschappen', amount: -400 }])).toBe(0)
+  })
+
+  it('een budget zonder limiet telt nooit mee', () => {
+    expect(over([{ budget_id: 'geen-limiet', amount: -9_999 }])).toBe(0)
+  })
+
+  it('REGRESSIE: een INKOMST op een uitgaven-budget maakt het niet "over"', () => {
+    // De teken-blinde voorganger telde |200| als besteding en zette dit budget
+    // over de limiet van 150 — een terugbetaling kleurde het statuspunt rood.
+    expect(over([{ budget_id: 'uit-eten', amount: 200 }])).toBe(0)
+  })
+
+  it('REGRESSIE: een inkomst trekt een echte overschrijding weer terug', () => {
+    expect(
+      over([
+        { budget_id: 'boodschappen', amount: -450 }, // 450 > 400
+        { budget_id: 'boodschappen', amount: 100 }, // → 350, niet meer over
+      ]),
+    ).toBe(0)
+  })
+
+  it('REGRESSIE: een transfer is geen besteding op een uitgaven-budget', () => {
+    expect(
+      over([{ budget_id: 'boodschappen', amount: -9_999, transaction_type: 'transfer' }]),
+    ).toBe(0)
+  })
+
+  it('REGRESSIE: een spaarSTORTING zet een savings-budget niet over de limiet', () => {
+    // Inkomsten-richting: de negatieve boeking is de storting, geen besteding.
+    // Voorheen telde |800| > 500 als "over".
+    expect(over([{ budget_id: 'sparen', amount: -800 }])).toBe(0)
+    // Een OPNAME (positieve rij) is daar wél de realisatie.
+    expect(over([{ budget_id: 'sparen', amount: 800 }])).toBe(1)
+  })
+
+  it('budgetsTotal/onTrack tellen alleen budgetten met een echte limiet', () => {
+    const counts = deriveBudgetHealthCounts(BUDGETS, [{ budget_id: 'boodschappen', amount: -500 }], [], TYPES)
+    expect(counts.budgetsTotal).toBe(3)
+    expect(counts.budgetsOver).toBe(1)
+    expect(counts.budgetsOnTrack).toBe(2)
+  })
+
+  it('GRENS: er is geen parent-rollup — een kind-boeking telt niet op de parent', () => {
+    // Bewust vastgelegd: `healthBudgets` bevat alleen top-level budgetten en de
+    // som leest het budget_id van de transactie zelf. Verandert dat, dan hoort
+    // deze verwachting mee te veranderen (en niet stilzwijgend).
+    expect(over([{ budget_id: 'boodschappen-kind', amount: -9_999 }])).toBe(0)
+  })
 })

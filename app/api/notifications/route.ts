@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { shouldAlert, budgetLimitStatus } from '@/lib/budget-alerts'
+import { buildBudgetTypeMap } from '@/lib/budget-utils'
+import { buildBudgetSpendingMap, budgetBarPct } from '@/lib/budget-spending'
 import { shouldSendWozReminder, WOZ_REMINDER_TEMPLATE } from '@/lib/notifications/woz-reminder'
 import { shouldSendPensionReminder, PENSION_REMINDER_TEMPLATE } from '@/lib/notifications/pension-reminder'
 import { amsterdamWeekKey } from '@/lib/briefing/snapshot'
@@ -14,6 +16,7 @@ import {
   parseSpendLimitEventGate,
 } from '@/lib/notifications/spend-limit'
 import { loadSpendLimitsSection } from '@/lib/spend-limits/loader'
+import { BUDGET_OR_SPLIT_FILTER, BUDGET_SPENDING_TX_COLUMNS } from '@/lib/budget-spending-fetch'
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -165,13 +168,21 @@ export async function GET(request: NextRequest) {
         .from('budgets')
         .select('id, name, slug, parent_id, budget_type, default_limit, alert_threshold')
         .eq('user_id', user.id),
+      // `id` + `is_split` erbij: de canonieke besteed-som slaat de split-ouder
+      // over en telt de split-regels op hun eigen budget.
+      //
+      // Het eerdere `.not('budget_id','is',null)` kon niet blijven: een
+      // split-OUDER draagt `budget_id = null` (components/app/transaction-form.tsx
+      // r380), dus die filter hield precies de rijen buiten waarvan de
+      // split-regels wél op budgetten geboekt staan. Filter-lóós is echter ook
+      // fout (max_rows kapt stil af); `BUDGET_OR_SPLIT_FILTER` doet allebei.
       supabase
         .from('transactions')
-        .select('budget_id, amount, transaction_type')
+        .select(BUDGET_SPENDING_TX_COLUMNS)
+        .or(BUDGET_OR_SPLIT_FILTER)
         .eq('user_id', user.id)
         .gte('date', monthStart)
-        .lt('date', monthEnd)
-        .not('budget_id', 'is', null),
+        .lt('date', monthEnd),
       // NB: budget_amounts heeft géén user_id-kolom — RLS scopet via de
       // budgets-join (zelfde patroon als lib/budgets-data-loader.ts). Het
       // eerdere .eq('user_id', …) gaf elke poll een 400 waardoor effectieve
@@ -218,12 +229,36 @@ export async function GET(request: NextRequest) {
         return baseLimit + carry
       }
 
+      // ── Canonieke besteed-som (lib/budget-spending.ts) ───────────────────
+      // Was: een eigen `Math.abs`-som met alleen een transfer-filter. Daardoor
+      // telde een inkomst op een uitgaven-budget hier OP i.p.v. eraf (een
+      // teruggave duwde een budget richting zijn alarmgrens in plaats van
+      // ervandaan) en telde een split-ouder vol mee op één budget.
+      const splitTxIds = transactions.filter((t) => t.is_split).map((t) => t.id)
+      let splitRows: Array<{ budget_id: string | null; amount: number }> = []
+      if (splitTxIds.length > 0) {
+        const { data: splitData } = await supabase
+          .from('transaction_splits')
+          .select('budget_id, amount')
+          .in('transaction_id', splitTxIds)
+        splitRows = (splitData ?? []) as Array<{ budget_id: string | null; amount: number }>
+      }
+
+      // Richting per budget — de erfregel (child erft parent-type) zit in
+      // buildBudgetTypeMap. `budgets` is hier ongefilterd op is_archived, dus
+      // een transactie op een gearchiveerd budget houdt zijn richting.
+      const budgetTypes = buildBudgetTypeMap(
+        budgets.map((b) => ({
+          id: b.id,
+          parent_id: b.parent_id ?? null,
+          // DB-default; NULL mag nooit inkomsten-semantiek geven.
+          budget_type: b.budget_type ?? 'expense',
+        })),
+      )
+      const spendingMap = buildBudgetSpendingMap(transactions, splitRows, budgetTypes)
+
       function getSpent(budgetId: string): number {
-        return transactions
-          .filter((t) => t.budget_id === budgetId &&
-            (t as { transaction_type?: string | null }).transaction_type !== 'transfer' &&
-            (t as { transaction_type?: string | null }).transaction_type !== 'joint_transfer')
-          .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
+        return spendingMap[budgetId] ?? 0
       }
 
       /**
@@ -258,7 +293,12 @@ export async function GET(request: NextRequest) {
 
         if (!shouldAlert(spent, limit, threshold, bt)) return
 
-        const pct = (spent / limit) * 100
+        // `budgetBarPct` i.p.v. een eigen deling: onderaan geklemd op 0 (de
+        // canonieke besteed-som is getekend en kan negatief zijn — "-410%
+        // besteed" gaat ook de chat in via `aiContext`), bovenaan bewust NIET,
+        // want de takken hieronder hebben >100 nodig om een overschrijding te
+        // herkennen. Voor elke niet-negatieve som is dit exact de oude waarde.
+        const pct = budgetBarPct(spent, limit)
         const pctRounded = Math.round(pct)
         const id = `budget_${budget.id}`
 

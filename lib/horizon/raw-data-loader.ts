@@ -118,6 +118,7 @@ import {
   type HealthScoreBudget,
   type HealthScoreTransaction,
 } from '@/lib/health-score-input'
+import { getCurrentMonthSplits } from '@/lib/budget-spending-fetch'
 import {
   resolveEmergencyFundFromRows,
   toEmergencyFundDisplay,
@@ -1096,6 +1097,9 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
       unlinkedCash,
       budgets: allBudgetsRaw as HealthScoreBudget[],
       transactions: (txResult.data ?? []) as HealthScoreTransaction[],
+      // Zonder splits wordt een split-ouder overgeslagen zónder vervanging —
+      // vandaag inert (split-ouders dragen budget_id NULL) maar een echte vork.
+      splits: await getCurrentMonthSplits(supabase, txResult.data ?? []),
       householdType: (profile as Record<string, unknown>).household_type as string | null,
       debtMonthlyPayments: healthDebtMonthlyPayments,
     },

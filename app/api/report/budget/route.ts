@@ -1,5 +1,7 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { fetchExpenseRowsForRate, recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
+import { buildBudgetTypeMap } from '@/lib/budget-utils'
+import { buildBudgetSpendingMap, budgetBarPct } from '@/lib/budget-spending'
 import type {
   BudgetReportData,
   BudgetReportCategory,
@@ -7,6 +9,7 @@ import type {
   BudgetReportVarianceItem,
   BudgetReportRolloverItem,
 } from '@/lib/budget-report-data'
+import { BUDGET_SPENDING_TX_COLUMNS } from '@/lib/budget-spending-fetch'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -43,8 +46,17 @@ type BudgetRow = {
   sort_order: number
 }
 
-type TxRow = { budget_id: string | null; amount: number; is_split: boolean; id: string }
+type TxRow = {
+  budget_id: string | null
+  amount: number
+  is_split: boolean
+  id: string
+  /** Nodig voor de canonieke besteed-som: transfers dragen niet bij. */
+  transaction_type: string | null
+}
 type SplitRow = { budget_id: string | null; amount: number }
+/** Richtingsbron voor `buildBudgetTypeMap` — bewust ZONDER is_archived-filter. */
+type BudgetTypeRow = { id: string; parent_id: string | null; budget_type: string | null }
 type AmountRow = { budget_id: string; effective_from: string; amount: number }
 type RolloverRow = { budget_id: string; period: string; carried_amount: number; rollover_type: string }
 
@@ -56,19 +68,18 @@ function getMonthRange(year: number, month: number): { start: string; end: strin
   return { start, end }
 }
 
-function buildSpendingMap(txRows: TxRow[], splitRows: SplitRow[]): Record<string, number> {
-  const map: Record<string, number> = {}
-  for (const t of txRows) {
-    if (t.budget_id && !t.is_split) {
-      map[t.budget_id] = (map[t.budget_id] ?? 0) + Math.abs(Number(t.amount))
-    }
-  }
-  for (const s of splitRows) {
-    if (s.budget_id) {
-      map[s.budget_id] = (map[s.budget_id] ?? 0) + Math.abs(Number(s.amount))
-    }
-  }
-  return map
+/**
+ * Weergave-percentage voor het PDF-rapport.
+ *
+ * Bewust `budgetBarPct` en NIET `budgetSpentPct`: dit rapport leest het
+ * percentage terug om te bepalen of een post overschreden is (`percentUsed >
+ * 100` → healthScore 'over', `categoriesOverBudget`). Zou hier op 100 geklemd
+ * worden, dan verdwijnt elke overschrijdings-signalering uit het rapport.
+ * `budgetBarPct` klemt alleen de negatieve kant weg — nodig sinds de
+ * besteed-som getekend is en dus negatief kan uitvallen.
+ */
+function reportPercentUsed(spent: number, limit: number): number {
+  return Math.round(budgetBarPct(spent, limit))
 }
 
 function getEffectiveLimit(
@@ -141,11 +152,15 @@ export async function GET(request: Request) {
       rolloversResult,
       amountsResult,
       expenseResult,
+      budgetTypeResult,
     ] = await Promise.all([
       supabase.from('profiles').select('full_name').single(),
       supabase.from('budgets').select('id, parent_id, name, icon, default_limit, budget_type, is_essential, rollover_type, sort_order').eq('is_archived', false).order('sort_order', { ascending: true }),
-      supabase.from('transactions').select('id, budget_id, amount, is_split').gte('date', monthStart).lt('date', monthEnd),
-      supabase.from('transactions').select('id, budget_id, amount, date, is_split').gte('date', trendMonths[0].start).lt('date', monthEnd),
+      // `transaction_type` hoort bij de rijselectie: zonder die kolom kan de
+      // canonieke besteed-som de transfers niet uitsluiten en telde dit rapport
+      // huishoud-overboekingen als besteding mee.
+      supabase.from('transactions').select(BUDGET_SPENDING_TX_COLUMNS).gte('date', monthStart).lt('date', monthEnd),
+      supabase.from('transactions').select(`${BUDGET_SPENDING_TX_COLUMNS}, date`).gte('date', trendMonths[0].start).lt('date', monthEnd),
       supabase.from('budget_rollovers').select('budget_id, period, carried_amount, rollover_type').eq('period', currentPeriod),
       supabase.from('budget_amounts').select('budget_id, effective_from, amount'),
       // Dagtarief-grondslag via het MAANDAGGREGAAT, niet via rauwe transactie-rijen
@@ -153,6 +168,10 @@ export async function GET(request: Request) {
       // PostgREST stil op max_rows = 1000 afgekapt en loog het tarief omhoog. Venster
       // (EXPENSE_RATE_ROLLING_MONTHS) en grondslag wonen in `fetchExpenseRowsForRate`.
       fetchExpenseRowsForRate(supabase, now),
+      // Richtingsbron, BEWUST ZONDER is_archived-filter: een transactie op een
+      // gearchiveerd budget houdt zijn richting, ook al staat dat budget niet
+      // meer in de rapport-boom hierboven. Gelijk aan lib/budgets-data-loader.ts.
+      supabase.from('budgets').select('id, parent_id, budget_type'),
     ])
 
     const profile = profileResult.data
@@ -190,14 +209,27 @@ export async function GET(request: Request) {
 
     // ── Build spending maps ──────────────────────────────────────────────────
 
-    const currentSpending = buildSpendingMap(currentTx, currentSplitRows)
+    // Richting per budget (canonieke erfregel: een child erft het type van zijn
+    // parent). Zonder die richting zou de aftrek ook op inkomsten-, spaar- en
+    // archief-budgetten slaan en daar de realisatie omkeren.
+    const budgetTypes = buildBudgetTypeMap(
+      ((budgetTypeResult.data ?? []) as BudgetTypeRow[]).map(b => ({
+        id: b.id,
+        parent_id: b.parent_id ?? null,
+        // DB-default. De kolom is nullable; zonder deze terugval krijgt zo'n rij
+        // inkomsten-semantiek — de onveilige kant.
+        budget_type: b.budget_type ?? 'expense',
+      })),
+    )
+
+    const currentSpending = buildBudgetSpendingMap(currentTx, currentSplitRows, budgetTypes)
 
     // Build spending maps per trend month
     const trendSpendingByMonth: Record<string, number>[] = trendMonths.map(tm => {
       const txInMonth = trendTx.filter(t => t.date >= tm.start && t.date < tm.end)
       const splitIds = txInMonth.filter(t => t.is_split).map(t => t.id)
       const splitsInMonth = trendSplitRows.filter(s => splitIds.includes(s.transaction_id))
-      return buildSpendingMap(txInMonth, splitsInMonth)
+      return buildBudgetSpendingMap(txInMonth, splitsInMonth, budgetTypes)
     })
 
     // Previous month spending is trendMonths index 4 (second-to-last)
@@ -259,7 +291,7 @@ export async function GET(request: Request) {
             icon: item.icon,
             limit: effectiveLimit,
             spent,
-            percentUsed: effectiveLimit > 0 ? Math.round((spent / effectiveLimit) * 100) : 0,
+            percentUsed: reportPercentUsed(spent, effectiveLimit),
             rolloverAmount,
           })
         }
@@ -278,7 +310,7 @@ export async function GET(request: Request) {
       }, 0)
 
       const variance = parentLimit - parentSpent
-      const percentUsed = parentLimit > 0 ? Math.round((parentSpent / parentLimit) * 100) : 0
+      const percentUsed = reportPercentUsed(parentSpent, parentLimit)
 
       // Health score
       let healthScore: 'healthy' | 'warning' | 'over' = 'healthy'

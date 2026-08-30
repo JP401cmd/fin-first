@@ -52,6 +52,12 @@ import { deriveRealMonthTotals, type MonthTxRow } from '@/lib/cashflow-month-tot
 import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 import { resolveEffectiveIncomeExpenses, type IncomeExpenseSources } from '@/lib/effective-financials'
 import { buildBudgetTypeMap } from '@/lib/budget-utils'
+import {
+  buildBudgetSpendingMap,
+  type SpendingSplitRow,
+  type SpendingTxRow,
+} from '@/lib/budget-spending'
+import { getCurrentMonthSplits } from '@/lib/budget-spending-fetch'
 import { loadBudgetBasis } from '@/lib/household/budget-share'
 import type { BudgetBasisRow } from '@/lib/budget-basis'
 import { localMonthBounds } from '@/lib/month-range'
@@ -182,24 +188,47 @@ export { buildBudgetTypeMap }
 /**
  * Budgetlimiet + besteding per type over de HUIDIGE kalendermaand.
  *
- * Verplaatst uit `loadDashboardData` (was ~r550-589) — gedragsneutraal, regel
- * voor regel. Twee eigenschappen die bewust ONGEWIJZIGD zijn overgenomen en dus
- * geen "verbetering" mogen krijgen zonder eigen besluit:
+ * Verplaatst uit `loadDashboardData` (was ~r550-589) — destijds gedragsneutraal,
+ * regel voor regel.
  *
- *  1. **De limiet rolt kinderen op**: heeft een parent kinderen, dan is de
- *     limiet de som van de kinder-limieten (anders de eigen `default_limit`).
- *     Daarna genormaliseerd naar een maand (`quarterly` ÷3, alles wat niet
- *     `monthly`/`quarterly` is ÷12).
- *  2. **De `spent`-pass heeft GÉÉN transfer-filter.** Anders dan de
- *     inkomen/uitgaven-sommen (die `isRealTx`/`realOnly` toepassen) telt hier
- *     élke transactie mét budget_id mee, ongeacht `transaction_type`, en
- *     absoluut (`Math.abs`). Dat is bestaand gedrag van élke budget-surface;
- *     het hier "logischer" maken zou de budgetdekking op /overzicht en op
- *     /overzicht/cashflow uit elkaar laten lopen.
+ *  1. **De limiet rolt kinderen op** (ONGEWIJZIGD): heeft een parent kinderen,
+ *     dan is de limiet de som van de kinder-limieten (anders de eigen
+ *     `default_limit`). Daarna genormaliseerd naar een maand (`quarterly` ÷3,
+ *     alles wat niet `monthly`/`quarterly` is ÷12).
+ *  2. **De `spent`-pass volgt sinds 30 aug 2026 de canonieke norm.**
+ *
+ * ## Waarom punt 2 is omgedraaid (eigenaar-besluit 30 aug 2026)
+ * Hier stond: "de spent-pass heeft GÉÉN transfer-filter … dat is bestaand
+ * gedrag van élke budget-surface; het hier logischer maken zou de budgetdekking
+ * op /overzicht en op /overzicht/cashflow uit elkaar laten lopen." Dat argument
+ * is inmiddels precies OMGEKEERD: de referentie-schermen (budgetten-pagina,
+ * detail-pane, rollover-carry, AI-lookup) staan sinds de hotfix van 30 aug 2026
+ * op de canonieke som, dus het ongefilterde `Math.abs` hield deze KPI juist als
+ * enige uit de pas. Niet-filteren was nooit een grondslag-keuze — het was de
+ * afwezigheid van één.
+ *
+ * De som loopt nu door `spendingContribution` (lib/budget-spending.ts) met de
+ * richting per budget uit `buildBudgetTypeMap`: op expense/debt telt een uitgave
+ * op, gaat een inkomst ERAF en draagt een transfer 0 bij; op income/savings is
+ * het spiegelbeeld van kracht; een onbekend type telt absoluut. **Het
+ * KPI-bedrag verschuift daardoor eenmalig** — gewenst, en zichtbaar op de
+ * Budget-KPI van /overzicht en /overzicht/cashflow én in de briefing-weekmail
+ * (`lib/briefing/overview-briefing.ts` → budgetdruk).
+ *
+ * Er wordt per budget_TYPE geaggregeerd, dus zonder parent-rollup: elke
+ * bestedingssom hangt aan het budget waar de transactie op geboekt staat, en
+ * parent en child dragen (via de erfregel) hetzelfde type. Elke rij telt zo
+ * exact één keer mee — een `spentForBudget`-rollup zou hier dubbeltellen.
+ *
+ * `splits` is een VERPLICHTE parameter zonder default, spiegel van
+ * `buildSpendingSums`/`buildBudgetSpendingMap`: een achtergebleven
+ * tweeargument-aanroep breekt op de compiler in plaats van stil de oude,
+ * ongefilterde som te herstellen.
  */
 export function deriveBudgetTotals(
   budgets: BudgetRowForTotals[],
-  currentMonthTx: MonthTxRow[],
+  currentMonthTx: SpendingTxRow[],
+  splits: ReadonlyArray<SpendingSplitRow>,
 ): BudgetTotalsByType {
   const parents = budgets.filter(b => b.parent_id === null)
   const children = budgets.filter(b => b.parent_id !== null)
@@ -220,13 +249,11 @@ export function deriveBudgetTotals(
   }
 
   const budgetSpent: Record<string, number> = { income: 0, expense: 0, savings: 0, debt: 0 }
-  for (const tx of currentMonthTx) {
-    const amt = Number(tx.amount)
-    const budgetId = tx.budget_id
-    if (!budgetId) continue
+  const spending = buildBudgetSpendingMap(currentMonthTx, splits as SpendingSplitRow[], budgetTypeMap)
+  for (const [budgetId, amount] of Object.entries(spending)) {
     const type = budgetTypeMap.get(budgetId)
     if (!type || !BUDGET_TYPES.includes(type as BudgetType)) continue
-    budgetSpent[type] = (budgetSpent[type] ?? 0) + Math.abs(amt)
+    budgetSpent[type] = (budgetSpent[type] ?? 0) + amount
   }
 
   return {
@@ -517,10 +544,17 @@ export const loadCashflowKpis = cache(async (supabase: SupabaseClient): Promise<
   const profile = (profileResult.data ?? null) as (Record<string, unknown> & IncomeExpenseSources) | null
   const budgets = (budgetsResult.data ?? []) as unknown as BudgetRowForTotals[]
   const monthTx = (txResult.data ?? []) as unknown as MonthTxRow[]
+  const spendingTx = (txResult.data ?? []) as unknown as SpendingTxRow[]
   const txAgg12 = (txAgg12Result.data ?? []) as TxMonthAggregateRow[]
 
+  // Split-regels bij DEZELFDE maandrijen — expliciet meegegeven, dus geen
+  // tweede maand-fetch, en zonder split-ouders draait er helemaal geen query.
+  // Daarom blijft het querybudget van deze laag 3 (zie de assertie in
+  // lib/cashflow-kpis.parity.test.ts).
+  const monthSplits = await getCurrentMonthSplits(supabase, spendingTx)
+
   // Budget: limiet/besteding per type → de expense-KPI + de dekkings-score.
-  const budgetTotals = deriveBudgetTotals(budgets, monthTx)
+  const budgetTotals = deriveBudgetTotals(budgets, spendingTx, monthSplits)
 
   // Gerealiseerde maand uit het aggregaat (zie de asymmetrie hierboven).
   const monthKey = currentMonthKey(now)

@@ -10,6 +10,7 @@ import {
   type HealthScoreBudget,
   type HealthScoreTransaction,
 } from '@/lib/health-score-input'
+import { BUDGET_SPENDING_TX_COLUMNS, fetchSpendingSplits } from '@/lib/budget-spending-fetch'
 import { resolveFireParams } from '@/lib/fire-params'
 import { yearlyMustExpensesFromBudgets } from '@/lib/budget-utils'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
@@ -190,7 +191,7 @@ export async function GET(request: Request) {
     // Huidige-maand-transacties met budget_id voor budget-discipline.
     supabase
       .from('transactions')
-      .select('amount, budget_id')
+      .select(BUDGET_SPENDING_TX_COLUMNS)
       .eq('user_id', user.id)
       .gte('date', monthStart)
       .lt('date', monthEnd),
@@ -321,6 +322,14 @@ export async function GET(request: Request) {
   })
   // DSTI-teller: Σ maandlasten over de actieve schulden (select bevat monthly_payment).
   const debtMonthlyPayments = debts.reduce((s, d) => s + Number(d.monthly_payment ?? 0), 0)
+  // Split-regels bij de gesplitste maandtransacties; zonder splits geen query.
+  const monthTxRows = (monthTxResult.data ?? []) as unknown as HealthScoreTransaction[]
+  const monthSplits = await fetchSpendingSplits(supabase, monthTxRows)
+  // GRONDSLAG-BREUK, BEWUST ZONDER BACKFILL (eigenaar-besluit 30 aug 2026): de
+  // budget-discipline-pijler van `resilience_score` draait vanaf nu op de
+  // canonieke bestedingssom (inkomsten gaan eraf, transfers tellen niet mee).
+  // Bestaande snapshot-rijen blijven staan: historie voor 30 aug 2026 op de oude
+  // grondslag (ongefilterde som van |amount|), bewust geaccepteerd.
   const healthScore = computeHealthScoreFromInputs(
     buildHealthScoreInput(
       {
@@ -338,7 +347,8 @@ export async function GET(request: Request) {
         assets: assets as HealthScoreAsset[],
         unlinkedCash,
         budgets: allBudgets as HealthScoreBudget[],
-        transactions: (monthTxResult.data ?? []) as HealthScoreTransaction[],
+        transactions: monthTxRows,
+        splits: monthSplits,
         householdType: profileResult.data?.household_type ?? null,
         debtMonthlyPayments,
       },

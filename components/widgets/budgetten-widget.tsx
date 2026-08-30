@@ -22,7 +22,9 @@ type TopBudget = DashboardData['topBudgets'][number]
 
 function progressPct(spent: number, limit: number): number {
   if (limit <= 0) return 0
-  return Math.min((spent / limit) * 100, 100)
+  // Onderaan geklemd op 0: sinds de getekende besteed-som (6898c9dc7) kan
+  // `spent` negatief zijn — ongeklemd rendert het label "-410%".
+  return Math.min(Math.max((spent / limit) * 100, 0), 100)
 }
 
 /** Benuttingsgraad — kant-en-klaar veld, geen financiële herberekening. */

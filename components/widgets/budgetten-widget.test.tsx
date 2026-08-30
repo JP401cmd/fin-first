@@ -59,6 +59,20 @@ describe('BudgettenWidget — top-N ranking', () => {
     expect(names).toEqual(['Over', 'Midden', 'Laag'])
   })
 
+  // Getekende besteed-som (6898c9dc7): negatieve spent (netto geld binnen)
+  // rendert 0% — niet "-410%" — en sorteert onderaan (minst "druk").
+  it('negatieve besteding: label 0%, geen negatief percentage, onderaan gesorteerd', () => {
+    const data = makeData([
+      B('a', 'Normaal', 'expense', 100, 50),
+      B('b', 'NettoBinnen', 'expense', 1642, -6735),
+    ])
+    const { container } = render(<BudgettenWidget size="full" data={data} />)
+    const text = container.textContent ?? ''
+    expect(text).not.toContain('-410')
+    const names = Array.from(container.querySelectorAll('span.truncate')).map(n => n.textContent)
+    expect(names).toEqual(['Normaal', 'NettoBinnen'])
+  })
+
   it('quarter toont alleen de top-3 drukste budgetten', () => {
     const data = makeData([
       B('a', 'B-een', 'expense', 100, 95),

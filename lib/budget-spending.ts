@@ -230,6 +230,31 @@ export function budgetBarPct(spent: number, limit: number): number {
 }
 
 /**
+ * "Beschikbaar" op een budget: de effectieve limiet min wat er besteed is,
+ * GEKLEMD OP DE LIMIET.
+ *
+ * De klem is niet cosmetisch. Sinds de canonieke besteed-som negatief mag zijn
+ * (meer inkomsten dan uitgaven op een uitgaven-budget — norm 30 aug 2026) zou de
+ * kale aftrek méér ruimte tonen dan er ooit begroot is: een limiet van €1.642
+ * met −€6.735 besteed geeft €8.377 "beschikbaar", een bedrag dat nergens op
+ * slaat. Je kunt nooit meer beschikbaar hebben dan je limiet.
+ *
+ * De ONDERkant blijft bewust ongeklemd: een negatief bedrag is hier de
+ * overschrijding, en die moet zichtbaar blijven.
+ *
+ * DERDE LID VAN DE WEERGAVE-KLEMFAMILIE, en daarom woont hij hier: net als
+ * `budgetFillRatio`/`budgetSpentPct` (boven op 100) en `budgetBarPct` (alleen
+ * onder op 0) is dit een klem op de WEERGAVE, nooit op de som. Hij stond tot
+ * 31 aug 2026 alleen in lib/dashboard-data-loader.ts, waardoor de Budget-kaart
+ * in lib/cashflow-cards.ts hem niet kon vinden en daar een kale
+ * `limiet - besteed` bleef staan: bij een netto-inkomst-maand toonde die kaart
+ * meer "nog te besteden" dan de limiet zelf.
+ */
+export function budgetBeschikbaar(effectiveLimit: number, spent: number): number {
+  return Math.min(effectiveLimit, effectiveLimit - spent)
+}
+
+/**
  * Mag er vrijheidstijd bij dit bestedingsbedrag getoond worden?
  *
  * Vrijheidstijd drukt in deze app KOSTEN uit in levenstijd ("dit kostte je 14,5

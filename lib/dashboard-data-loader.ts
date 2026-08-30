@@ -110,7 +110,7 @@ import {
   aggSumPositief,
   aggIncomeByMonth,
   aggExpenseByMonthAbs,
-  aggAbsByMonthForBudgets,
+  aggSpendingByMonthForBudgets,
   aggToExpenseRows,
   isRealAggRow,
   type TxMonthAggregateRow,
@@ -156,8 +156,11 @@ import {
   BUDGET_TYPES,
   type NetWorthSnapshotRow,
 } from '@/lib/cashflow-kpis'
+import { buildBudgetSpendingMap, budgetBarPct, budgetBeschikbaar } from '@/lib/budget-spending'
+import { getCurrentMonthSplits } from '@/lib/budget-spending-fetch'
 import { resolveSavingsSource, savingsRateFromAggregates, computeDebtAflossingMonthly, monthlySavingsFromRate } from './savings-source'
-import { buildHealthScoreInput } from '@/lib/health-score-input'
+import { buildHealthScoreInput, type HealthScoreTransaction } from '@/lib/health-score-input'
+import type { SpendingTxRow } from '@/lib/budget-spending'
 import { computeHealthScoreWithTrend, type HealthScore } from '@/lib/financial-health'
 
 /**
@@ -266,6 +269,7 @@ export function resolveWidgetComputeFlags(activeWidgets: WidgetPref[]): WidgetCo
     wantHouseholdActivity: has(HOUSEHOLD_ACTIVITY_WIDGET_ID),
   }
 }
+
 
 // ── Main loader ────────────────────────────────────────────────
 // Wrapped with React cache() — multiple calls within a single server
@@ -684,14 +688,56 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // (ADR 0083). Hier is dat een zuivere verplaatsing — de map voedt verderop nog
   // de spaar- en schuld-budget-ID-sets.
   const budgetTypeMap = buildBudgetTypeMap(allBudgetsRaw)
-  const budgetTotals = deriveBudgetTotals(allBudgetsRaw, txResult.data ?? [])
+  // Split-regels bij DEZELFDE maandrijen, expliciet meegegeven zodat er geen
+  // tweede maand-fetch ontstaat; zonder split-ouders draait er geen query.
+  const monthSpendingTx = (txResult.data ?? []) as unknown as SpendingTxRow[]
+  const monthSplits = await getCurrentMonthSplits(supabase, monthSpendingTx)
+  const budgetTotals = deriveBudgetTotals(allBudgetsRaw, monthSpendingTx, monthSplits)
+
+  // ── ÉÉN besteed-som per budget, gedeeld door vier oppervlakken ─────────────
+  // De favorieten-widget, de Budgetten-widget (topBudgets), de budget-alert-
+  // meldingen en de uitgaven-heatmap draaiden elk hun EIGEN lus met
+  // `Math.abs(Number(tx.amount))` — vier onafhankelijke eigenaren van één
+  // grootheid, alle vier teken-blind. Ze lezen nu dezelfde canonieke som
+  // (lib/budget-spending.ts): op een uitgaven-budget gaat een inkomst ERAF,
+  // transfers tellen alleen op archief-budgetten mee, en de richting komt uit
+  // `budgetTypeMap` (child erft parent-type).
+  //
+  // De uitkomst per budget KAN NEGATIEF ZIJN (netto geld binnen op een
+  // uitgaven-budget). Dat is bedoeld en wordt hier niet geklemd; percentages en
+  // balkbreedtes klemmen bij de aanroep via `budgetBarPct`/`budgetSpentPct`.
+  //
+  // SPLITS: `monthSplits` uit de hoofdbatch (getCurrentMonthSplits) — dezelfde
+  // regels die `deriveBudgetTotals` hierboven al krijgt, dus geen tweede fetch en
+  // geen tweede grondslag. Het VORIGE-maand-venster is een slice van `getTx12m`,
+  // dat (nog) geen `id`/`is_split` selecteert en dus split-blind blijft: de
+  // split-ouder telt daar op zijn eigen budget_id i.p.v. via zijn regels. Vandaag
+  // latent — er staat één split op productie en die heeft budget_id NULL, dus hij
+  // valt hoe dan ook buiten elke per-budget-som.
+  const spentByBudgetId = buildBudgetSpendingMap(txResult.data ?? [], monthSplits, budgetTypeMap)
+  const prevSpentByBudgetId = buildBudgetSpendingMap(prevMonthTxRows, [], budgetTypeMap)
+  /** Besteed over een budget + zijn kinderen, uit de gedeelde map. */
+  const spentOverIds = (ids: Iterable<string>): number => {
+    let sum = 0
+    for (const id of ids) sum += spentByBudgetId[id] ?? 0
+    return sum
+  }
 
   // ── Savings-budget ID set (for spaarquote correction) ─────
   // Gedeelde helper: de forecast-laag leidt dezelfde set af voor exact dezelfde
   // spaarbudget-correctie op de 6-maands quote.
   const savingsBudgetIds = budgetIdsOfType(budgetTypeMap, 'savings')
 
-  // Current month: savings-budget spend (absolute)
+  // ── Spaarbudget-storting per maand — BEWUST BRUTO/ABSOLUUT ────────────────
+  // NIET omzetten naar de canonieke besteed-som hierboven. Dit hoort bij de
+  // SPAARQUOTE-familie: het bedrag wordt van een RÚWE, absolute uitgavensom
+  // afgetrokken ("wat ging er naar sparen"), niet naast een budgetlimiet gelegd.
+  // Op een savings-budget is de canonieke bijdrage het BEDRAG ZELF (inkomsten-
+  // richting) en staat een storting negatief in de boeken — die som hier
+  // gebruiken zou de aftrek in een optelling veranderen. De canonieke
+  // 6-maands-variant is `deriveSavingsRate6mWindow` (lib/cashflow-kpis.ts), die
+  // Σ|negatief| zónder transfers neemt; deze maandvariant telt Σ|alle| mét
+  // transfers en wijkt daar dus van af (bekend, eigen regressiepas).
   let monthlySavingsBudgetSpent = 0
   for (const tx of txResult.data ?? []) {
     const bid = (tx as { budget_id?: string | null }).budget_id
@@ -741,11 +787,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         if (c.parent_id === fb.id) relevantIds.add(c.id)
       }
     }
-    let spent = 0
-    for (const tx of txData) {
-      const bid = (tx as { budget_id?: string | null }).budget_id
-      if (bid && relevantIds.has(bid)) spent += Math.abs(Number(tx.amount))
-    }
+    const spent = spentOverIds(relevantIds)
 
     return {
       id: fb.id,
@@ -761,20 +803,19 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // Afgeleid bundel-veld voor de Budgetten-widget: per hoofdbudget {limit, spent}
   // — dezelfde vorm als favoriteBudgets, maar over ALLE (niet-archief) budgetten,
   // zodat de widget zelf de top-N kan ranken zónder te herberekenen.
-  // Besteding komt uit één pass over dezelfde current-month-tx als budgetTotals:
-  // per transactie rollen kind-budgetten naar hun parent (spentByParent).
+  // Besteding komt uit de gedeelde canonieke besteed-map (`spentByBudgetId`):
+  // kind-budgetten rollen op naar hun parent (spentByParent). Een negatief kind
+  // verlaagt de parent — dat is de canonieke rollup-regel, niet een randgeval.
   const parentOfBudget = new Map<string, string>()
   for (const b of allParentBudgets) parentOfBudget.set(b.id, b.id)
   for (const c of allChildren) {
     if (c.parent_id) parentOfBudget.set(c.id, c.parent_id)
   }
   const spentByParent = new Map<string, number>()
-  for (const tx of txData) {
-    const bid = (tx as { budget_id?: string | null }).budget_id
-    if (!bid) continue
+  for (const [bid, amount] of Object.entries(spentByBudgetId)) {
     const pid = parentOfBudget.get(bid)
     if (!pid) continue
-    spentByParent.set(pid, (spentByParent.get(pid) ?? 0) + Math.abs(Number(tx.amount)))
+    spentByParent.set(pid, (spentByParent.get(pid) ?? 0) + amount)
   }
   const topBudgets = allParentBudgets
     .filter(b => BUDGET_TYPES.includes(b.budget_type as typeof BUDGET_TYPES[number]))
@@ -1614,7 +1655,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       assets: (assetsResult.data ?? []) as { asset_type?: string | null; current_value?: number | string | null; net_worth_inclusion_pct?: number | null }[],
       unlinkedCash,
       budgets: allBudgetsRaw,
-      transactions: (txResult.data ?? []) as { amount?: number | string | null; budget_id?: string | null }[],
+      // Canoniek bestedingscontract: de brede rijen + hun split-regels, niet de
+      // smalle `txResult`-rijen. Zonder transaction_type/is_income/is_split kan
+      // `buildBudgetCategories` haar transfer- en split-regels niet toepassen.
+      transactions: (txResult.data ?? []) as HealthScoreTransaction[],
+      splits: monthSplits,
       householdType: healthHouseholdType,
       debtMonthlyPayments: healthDebtMonthlyPayments,
     },
@@ -1675,8 +1720,12 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   )
   let debtHistory = debtSaldoHistory
   if (debtHistory.length === 0) {
+    // Aflossingen per maand op de canonieke besteed-grondslag: een terugstorting
+    // ván een schuldbudget gaat er nu áf i.p.v. de "afgeloste" reeks te
+    // verhogen. `realOnly` is vervallen — de transfer-regel is richting-gescoped
+    // en zit al in de reducer (schuld = uitgaven-richting ⇒ transfer telt niet).
     const debtBudgetIds = budgetIdsOfType(budgetTypeMap, 'debt')
-    const debtMonthAgg = aggAbsByMonthForBudgets(txAgg12, debtBudgetIds, { realOnly: true })
+    const debtMonthAgg = aggSpendingByMonthForBudgets(txAgg12, debtBudgetIds, budgetTypeMap)
     debtHistory = toSortedMonthHistory(debtMonthAgg)
   }
 
@@ -1788,15 +1837,16 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       : Number(bData.default_limit)
     if (bData.interval === 'quarterly') limit = limit / 3
     else if (bData.interval === 'yearly') limit = limit / 12
-    // Sum spent for this budget + children
+    // Besteed voor dit budget + zijn kinderen, uit de gedeelde canonieke map.
     const relevantIds = new Set<string>([bData.id])
     for (const c of children) relevantIds.add(c.id)
-    let spent = 0
-    for (const tx of txData) {
-      const bid = (tx as { budget_id?: string | null }).budget_id
-      if (bid && relevantIds.has(bid)) spent += Math.abs(Number(tx.amount))
-    }
-    const pctUsed = limit > 0 ? (spent / limit) * 100 : 0
+    const spent = spentOverIds(relevantIds)
+    // `budgetBarPct` klemt alleen de ONDERKANT (0): een budget waar netto geld
+    // binnenkwam geeft 0% en vuurt dus nooit een "besteed"-alarm af. De
+    // bovenkant blijft bewust ongeklemd — juist de overschrijding is hier het
+    // signaal (>120% ⇒ critical), dus `budgetSpentPct` (klem op 100) zou de
+    // melding van haar ernst beroven.
+    const pctUsed = budgetBarPct(spent, limit)
     if (pctUsed >= threshold) {
       notifications.push({
         id: `budget-alert-${bData.id}`,
@@ -2557,25 +2607,16 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         })),
     }))
 
-  // Per-budget spending map (all budget ids → absolute amount spent this month)
-  heatmapSpending = {}
-  for (const tx of txResult.data ?? []) {
-    const bid = (tx as { budget_id?: string | null }).budget_id
-    if (!bid) continue
-    const amt = Math.abs(Number(tx.amount))
-    heatmapSpending[bid] = (heatmapSpending[bid] ?? 0) + amt
-  }
+  // Per-budget besteed deze maand — de gedeelde canonieke map, dezelfde
+  // grootheid als de favorieten-/Budgetten-widget en de alert-meldingen. Was een
+  // vijfde eigen Σ|amount|-lus.
+  heatmapSpending = { ...spentByBudgetId }
 
-  // Vorige-maand spending per budget — voedt de maand-op-maand trend-pijl in de
+  // Vorige-maand besteed per budget — voedt de maand-op-maand trend-pijl in de
   // heatmap-tooltip (was dode code: geen enkele caller gaf `previousSpending`).
-  // Zelfde grondslag als heatmapSpending (abs. bedrag per budget), maar over de
-  // vorige kalendermaand (hergebruikt de al opgehaalde prevMonthTx-query).
-  heatmapPreviousSpending = {}
-  for (const tx of prevMonthTxRows) {
-    const bid = (tx as { budget_id?: string | null }).budget_id
-    if (!bid) continue
-    heatmapPreviousSpending[bid] = (heatmapPreviousSpending[bid] ?? 0) + Math.abs(Number(tx.amount))
-  }
+  // Zelfde grondslag als heatmapSpending, ander venster; twee vensters van één
+  // grootheid moeten dezelfde grondslag dragen, anders wijst de pijl scheef.
+  heatmapPreviousSpending = { ...prevSpentByBudgetId }
 
   // Beschikbaar map: effectieve limiet − besteed per budget. De effectieve
   // limiet komt uit de canonieke `computeEffectiveLimit` (rollover-carry +
@@ -2606,7 +2647,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         period: currentPeriod,
         displayDate: monthStart,
       })
-      heatmapBeschikbaarMap[b.id] = effectiveLimit - spent
+      // Klem op de limiet — zie `budgetBeschikbaar`.
+      heatmapBeschikbaarMap[b.id] = budgetBeschikbaar(effectiveLimit, spent)
     }
   }
   } // einde if (wantHeatmap)

@@ -667,6 +667,7 @@ describe('Defect B — buildHealthScoreInput deelt canoniek pad', () => {
     unlinkedCash,
     budgets,
     transactions,
+    splits: [],
     householdType,
     debtMonthlyPayments: 700,
   }

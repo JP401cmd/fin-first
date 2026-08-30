@@ -45,6 +45,9 @@ import {
   getBudgets,
   getCurrentMonthTx,
 } from './server-data/base'
+import { buildBudgetTypeMap } from './budget-utils'
+import { buildBudgetSpendingMap, type SpendingTxRow } from './budget-spending'
+import { getCurrentMonthSplits } from './budget-spending-fetch'
 import type { Debt } from './debt-data'
 import type { Asset } from './asset-data'
 
@@ -142,22 +145,33 @@ async function collectBudgetAandachtspunten(supabase: SupabaseClient): Promise<A
     loadHorizonRaw(supabase),
   ])
 
+  // Split-regels bij DEZELFDE maandrijen, expliciet meegegeven zodat er geen
+  // tweede maand-fetch ontstaat; zonder split-ouders draait er geen query.
+  const monthSpendingTx = (txRes.data ?? []) as unknown as SpendingTxRow[]
+  const monthSplits = await getCurrentMonthSplits(supabase, monthSpendingTx)
+
   const profile = profileRes.data
   if (!profile) return []
   const budgets = budgetsRes.data ?? []
-  const transactions = txRes.data ?? []
 
-  // Eigen-rekening-transfers tellen niet als uitgave (spiegelt wil-context).
-  const isRealTx = (t: { transaction_type?: string | null }) =>
-    t.transaction_type !== 'transfer' && t.transaction_type !== 'joint_transfer'
-
-  const spendingByBudget: Record<string, number> = {}
-  for (const t of transactions) {
-    if (!isRealTx(t)) continue
-    if (!t.budget_id) continue
-    spendingByBudget[t.budget_id] =
-      (spendingByBudget[t.budget_id] ?? 0) + Math.abs(Number(t.amount))
-  }
+  // CANONIEKE bestedingssom (lib/budget-spending.ts) i.p.v. een eigen lus. Het
+  // transfer-filter stond hier al, maar de RICHTING en de SPLIT-regels
+  // ontbraken: een inkomst op een uitgaven-budget telde als besteding (en blies
+  // dus de NIBUD-overschrijding op), en een gesplitste transactie telde op haar
+  // ouder in plaats van op de budgetten van haar deelregels. De richting per
+  // budget komt uit `buildBudgetTypeMap` (child erft van parent), zodat een
+  // slug-kind hetzelfde teken-oordeel krijgt als op de budgetten-pagina.
+  const spendingByBudget = buildBudgetSpendingMap(
+    monthSpendingTx,
+    monthSplits,
+    buildBudgetTypeMap(
+      budgets.map((b) => ({
+        id: b.id,
+        parent_id: b.parent_id ?? null,
+        budget_type: (b.budget_type as string | null) ?? 'expense',
+      })),
+    ),
+  )
 
   // CONSUMEER het canonieke 12-mnd rolling dagtarief uit de bundel — dezelfde
   // waarde als de schuld- en bezit-producent hieronder, zodat de belofte "een

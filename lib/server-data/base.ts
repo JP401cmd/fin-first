@@ -180,12 +180,26 @@ export const getUnlinkedBankAccounts = cache(async (supabase: SupabaseClient) =>
  * Transacties in de HUIDIGE kalendermaand `[monthStart, monthEnd)`.
  * Voedt: dashboard current-month, horizon current-month, lever-scores
  * budget-tx + maand-inkomen, aandachtspunten budget-benchmark.
+ *
+ * KOLOMSET VERBREED (30 aug 2026) met `id, is_income, is_split` — de kolommen
+ * van het canonieke bestedingscontract (`BUDGET_SPENDING_TX_COLUMNS` in
+ * lib/budget-spending-fetch.ts). Zonder die drie kan `buildBudgetSpendingMap`
+ * haar split- en inkomst-regels niet toepassen, en dan bouwt elke consument
+ * weer zijn eigen som — precies wat deze laag moet voorkomen. Verbreden i.p.v.
+ * een tweede maand-fetch, omdat `loadCashflowKpis` een bewaakt querybudget
+ * heeft (lib/cashflow-kpis.parity.test.ts) en een duplicaat-fetch dat zou
+ * breken.
+ *
+ * VEILIG VOOR NIET-OMGEZETTE CONSUMENTEN: de extra kolommen zijn inert tenzij
+ * je ze leest, en de enige die semantiek draagt (`is_split`) doet dat alleen op
+ * een rij MÉT budget_id — terwijl een split-ouder in deze database juist
+ * `budget_id = NULL` heeft en dus in élke bestedingssom al werd overgeslagen.
  */
 export const getCurrentMonthTx = cache(async (supabase: SupabaseClient) => {
   const { start, end } = localMonthBounds(new Date())
   return supabase
     .from('transactions')
-    .select('amount, date, budget_id, transaction_type')
+    .select('id, amount, date, budget_id, transaction_type, is_income, is_split')
     .gte('date', start)
     .lt('date', end)
 })

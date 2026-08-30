@@ -3,6 +3,8 @@ import { section, formatCurrency, bulletList } from './formatter'
 import { getNibudHouseholdType, getNibudReferences, calculateBenchmarks } from '@/lib/nibud/reference-data'
 import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
 import type { ModuleId } from '@/lib/module-registry'
+import { buildBudgetSpendingMap, type SpendingTxRow } from '@/lib/budget-spending'
+import { buildAiBudgetTypeMap, loadSplitRows } from './budget-spending-source'
 
 /**
  * Wil-specific context: goals, budget optimization opportunities,
@@ -28,8 +30,11 @@ export async function buildWilContext(supabase: SupabaseClient, budgetingActive 
       .select('id, name, slug, budget_type, default_limit, is_essential, parent_id')
       .order('sort_order', { ascending: true }),
     supabase
+      // Bewust ZONDER budget_id-filter: `totalMonthlyExpenses` hieronder telt
+      // ook ongecategoriseerde uitgaven mee. `is_split`/`id` zijn erbij gekomen
+      // zodat de split-regels op hun eigen budget kunnen landen.
       .from('transactions')
-      .select('budget_id, amount, transaction_type')
+      .select('id, budget_id, amount, is_income, transaction_type, is_split')
       .gte('date', monthStart)
       .lt('date', monthEnd),
     // Goals, recommendations, actions belong to inzicht_acties module — skip when inactive
@@ -91,19 +96,21 @@ export async function buildWilContext(supabase: SupabaseClient, budgetingActive 
   const pastActions = pastActionsRes.data ?? []
   const pastRecommendations = pastRecsRes.data ?? []
 
-  // Calculate spending per budget from real transactions (exclude own-account transfers)
+  // Overboekingen tussen eigen rekeningen zijn geen uitgave.
   const isRealTx = (t: { transaction_type?: string | null }) =>
-    (t as { transaction_type?: string | null }).transaction_type !== 'transfer' &&
-    (t as { transaction_type?: string | null }).transaction_type !== 'joint_transfer'
+    t.transaction_type !== 'transfer' && t.transaction_type !== 'joint_transfer'
 
-  const spendingByBudget: Record<string, number> = {}
-  for (const t of transactions) {
-    if (t.budget_id && isRealTx(t)) {
-      spendingByBudget[t.budget_id] = (spendingByBudget[t.budget_id] ?? 0) + Math.abs(Number(t.amount))
-    }
-  }
+  // Besteed per budget — canoniek (getekend, richting per budget, split-regels
+  // op hun eigen budget). Was: `Math.abs()` over elke rij, zonder richting en
+  // zonder splits, waardoor een inkomst op een uitgaven-budget de besteding
+  // VERHOOGDE in plaats van verlaagde.
+  const budgetTypes = buildAiBudgetTypeMap(budgets)
+  const splits = await loadSplitRows(supabase, transactions)
+  const spendingByBudget = buildBudgetSpendingMap(transactions as SpendingTxRow[], splits, budgetTypes)
 
-  // Get monthly expenses for freedom-day conversion
+  // Get monthly expenses for freedom-day conversion. Bewust over ALLE rijen van
+  // de maand (ook zonder budget_id) — dit is het uitgavenniveau, niet de
+  // budgetsom. Split-ouders dragen hier hun eigen (negatieve) bedrag.
   const totalMonthlyExpenses = transactions
     .filter(t => Number(t.amount) < 0 && isRealTx(t))
     .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
@@ -128,21 +135,9 @@ export async function buildWilContext(supabase: SupabaseClient, budgetingActive 
         : (profileEstExpenses > 0 ? (profileEstExpenses * 12) / 365 : 0)
 
       // Identify optimization opportunities (non-essential child budgets with spending)
-      const parentBudgets = budgets.filter(b => !b.parent_id)
-      const nonEssentialParentIds = new Set(
-        parentBudgets
-          .filter(b => !b.is_essential && b.budget_type !== 'income' && b.budget_type !== 'savings' && b.budget_type !== 'debt')
-          .map(b => b.id)
+      const opportunities = selectOptimizationOpportunities(budgets, spendingByBudget).map(
+        (o) => `${o.name}: ${formatCurrency(o.spent)}/mnd (= ${formatCurrency(o.spent * 12)}/jaar richting FIRE-doel)`,
       )
-
-      const opportunities: string[] = []
-      for (const child of budgets.filter(b => b.parent_id)) {
-        if (!nonEssentialParentIds.has(child.parent_id ?? '')) continue
-        const spent = spendingByBudget[child.id] ?? 0
-        if (spent > 0) {
-          opportunities.push(`${child.name}: ${formatCurrency(spent)}/mnd (= ${formatCurrency(spent * 12)}/jaar richting FIRE-doel)`)
-        }
-      }
 
       if (opportunities.length > 0) {
         parts.push(section('OPTIMALISATIEKANSEN', 'Niet-essentiële uitgaven deze maand:\n' + bulletList(opportunities)))
@@ -157,6 +152,9 @@ export async function buildWilContext(supabase: SupabaseClient, budgetingActive 
           const spendingBySlug: Record<string, number> = {}
           for (const child of budgets.filter(b => b.slug)) {
             const spent = spendingByBudget[child.id] ?? 0
+            // Alleen positieve besteding: een negatieve netto-besteding
+            // (meer inkomsten dan uitgaven) is geen uitgavenniveau en zou de
+            // NIBUD-vergelijking omkeren.
             if (spent > 0 && child.slug) {
               spendingBySlug[child.slug] = (spendingBySlug[child.slug] ?? 0) + spent
             }
@@ -221,4 +219,59 @@ export async function buildWilContext(supabase: SupabaseClient, budgetingActive 
   }
 
   return parts.join('\n')
+}
+
+/** Budgetrij zoals de optimalisatiekansen 'm nodig hebben. */
+export interface OptimizationBudgetRow {
+  id: string
+  name: string
+  parent_id: string | null
+  budget_type: string | null
+  is_essential?: boolean | null
+}
+
+/** Eén optimalisatiekans: een niet-essentieel subbudget met échte uitgaven. */
+export interface OptimizationOpportunity {
+  id: string
+  name: string
+  /** Netto besteding deze maand, altijd > 0 (zie de filterregel hieronder). */
+  spent: number
+}
+
+/**
+ * De niet-essentiële subbudgetten waar deze maand daadwerkelijk geld naartoe
+ * ging — de kandidaten waar De Wil een besparing op mag voorstellen.
+ *
+ * HARDE REGEL: een budget met een NEGATIEVE netto-besteding is GEEN
+ * optimalisatiekans. Op zo'n budget kwam er netto geld binnen (meer inkomsten
+ * dan uitgaven, sinds de norm van 30 aug 2026 een getekende som); "bespaar
+ * hierop en win EUR -80.820/jaar aan vrijheid" is geen advies maar een fout.
+ * Het filter staat daarom expliciet in de code, niet impliciet in een
+ * `formatCurrency`-uitkomst.
+ */
+export function selectOptimizationOpportunities(
+  budgets: OptimizationBudgetRow[],
+  spendingByBudget: Record<string, number>,
+): OptimizationOpportunity[] {
+  const nonEssentialParentIds = new Set(
+    budgets
+      .filter(
+        (b) =>
+          !b.parent_id &&
+          !b.is_essential &&
+          b.budget_type !== 'income' &&
+          b.budget_type !== 'savings' &&
+          b.budget_type !== 'debt',
+      )
+      .map((b) => b.id),
+  )
+
+  const opportunities: OptimizationOpportunity[] = []
+  for (const child of budgets.filter((b) => b.parent_id)) {
+    if (!nonEssentialParentIds.has(child.parent_id ?? '')) continue
+    const spent = spendingByBudget[child.id] ?? 0
+    if (spent <= 0) continue
+    opportunities.push({ id: child.id, name: child.name, spent })
+  }
+  return opportunities
 }

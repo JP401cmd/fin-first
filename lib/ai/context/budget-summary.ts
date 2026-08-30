@@ -10,19 +10,39 @@
 // bestand is de tweede weg — precies wat C2b vraagt: "één gedeelde
 // overview-extractor zodat lokaal en cloud dezelfde cijfergrondslag lezen".
 //
-// GEEN GEDRAGSWIJZIGING AAN DE CLOUDKANT. De regels hieronder zijn één-op-één
-// overgenomen uit `buildKernContext`: het maandvenster via `localMonthBounds`
-// (einde exclusief, dus `.lt()` — anders lekt de vorige maand mee), alleen rijen
-// mét `budget_id`, `transaction_type` 'transfer'/'joint_transfer' eruit (een
-// overboeking naar je eigen rekening is geen uitgave), bedragen absoluut, en het
-// bestede bedrag van een ouder = de som van zijn kinderen plus wat er direct op
-// de ouder geboekt staat.
+// DE SOM ZELF IS NIET VAN DIT BESTAND (convergentie 30 aug 2026). Waar hier
+// eerder een eigen optelling stond — `Math.abs()` per rij, transfers eruit,
+// ouder = kinderen PLUS eigen boekingen — draait de samenvatting nu op de
+// canonieke bron `lib/budget-spending.ts`:
+//
+//   • `buildBudgetSpendingMap(transactions, splits, budgetTypes)` — getekend per
+//     richting: op een uitgaven-budget (expense/debt) gaat een inkomst ERAF, op
+//     een inkomsten-budget (income/savings) IS de positieve rij de realisatie,
+//     op archive telt alles absoluut. Transfers tellen niet op de uitgavenkant.
+//   • `spentForBudget` — de parent-rollup is ÓF/ÓF: een ouder mét kinderen is de
+//     som van zijn kinderen, een ouder zonder kinderen zijn eigen boekingen.
+//     Kinderen PLUS eigen boekingen (de oude regel hier) telde een rechtstreeks
+//     op de ouder geboekte rij dubbel zodra er ook kinderen waren.
+//
+// Het maandvenster blijft van dit bestand: `localMonthBounds`, einde EXCLUSIEF
+// (dus `.lt()` — met `.lte()` op de laatste dag lekt de vorige maand mee).
 //
 // Puur waar het kan: `summarizeBudgets` rekent zonder database en is dus zonder
-// Supabase te testen. `loadBudgetSummary` doet alleen de twee queries.
+// Supabase te testen. `loadBudgetSummary` doet alleen de queries.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { localMonthBounds } from '@/lib/month-range'
+import {
+  buildBudgetSpendingMap,
+  spentForBudget,
+  budgetBarPct,
+  type SpendingSplitRow,
+} from '@/lib/budget-spending'
+import {
+  BUDGET_OR_SPLIT_FILTER,
+  buildAiBudgetTypeMap,
+  loadSplitRows,
+} from './budget-spending-source'
 
 /** Budgetrij zoals beide context-builders 'm opvragen. */
 export interface BudgetRow {
@@ -36,19 +56,40 @@ export interface BudgetRow {
 
 /** Transactierij: alleen wat voor de optelling nodig is. */
 export interface BudgetTransactionRow {
+  /** Nodig om de split-regels aan hun ouder te koppelen. */
+  id?: string
   budget_id: string | null
   amount: number | string
+  /**
+   * De vlag doet mee als extra marker naast het teken; het TEKEN blijft de
+   * harde toets (de kolom is BOOLEAN DEFAULT false zonder CHECK). Zie
+   * `spendingContribution` in lib/budget-spending.ts.
+   */
+  is_income?: boolean | null
   transaction_type?: string | null
+  /** True = de bedragen leven op `transaction_splits`, niet op deze rij. */
+  is_split?: boolean | null
 }
+
+/** Split-regel; `amount` staat POSITIEF in de database. */
+export type BudgetSplitRow = SpendingSplitRow
 
 export interface BudgetSummaryChild {
   id: string
   name: string
   /** Maandlimiet in EUR (0 = geen limiet ingesteld). */
   limit: number
-  /** Deze maand besteed in EUR. */
+  /**
+   * Deze maand besteed in EUR. KAN NEGATIEF ZIJN: op een uitgaven-budget met
+   * meer inkomsten dan uitgaven kwam er netto geld binnen. Dat bedrag wordt
+   * bewust niet op 0 geklemd — de eigenaar wil het zien.
+   */
   spent: number
-  /** Besteed t.o.v. limiet in procenten; 0 wanneer er geen limiet is. */
+  /**
+   * Besteed t.o.v. limiet in procenten; 0 wanneer er geen limiet is.
+   * Onderaan geklemd op 0 (een negatieve besteding is geen −410% budget),
+   * bovenaan bewust NIET (anders verdwijnt elke overschrijdingssignalering).
+   */
   pct: number
   /** 'OK' | 'BIJNA' (≥80%) | 'OVER' (≥100%) — alleen zinvol bij een limiet. */
   status: 'OK' | 'BIJNA' | 'OVER'
@@ -57,10 +98,10 @@ export interface BudgetSummaryChild {
 export interface BudgetSummaryParent {
   id: string
   name: string
-  /** 'expense' | 'savings' | 'debt' | 'income'. */
+  /** 'expense' | 'savings' | 'debt' | 'income' | 'archive'. */
   type: string
   limit: number
-  /** Kinderen plus wat direct op de ouder geboekt is. */
+  /** Kinderen ÓF (bij een ouder zonder kinderen) zijn eigen boekingen. */
   spent: number
   children: BudgetSummaryChild[]
 }
@@ -72,11 +113,6 @@ export interface BudgetSummary {
 }
 
 export const EMPTY_BUDGET_SUMMARY: BudgetSummary = { hasBudgets: false, parents: [] }
-
-/** Overboekingen tussen eigen rekeningen zijn geen uitgave. */
-function isTransfer(t: BudgetTransactionRow): boolean {
-  return t.transaction_type === 'transfer' || t.transaction_type === 'joint_transfer'
-}
 
 function limitOf(row: BudgetRow): number {
   const n = Number(row.default_limit)
@@ -96,34 +132,40 @@ function statusFor(pct: number): BudgetSummaryChild['status'] {
 export function summarizeBudgets(
   budgets: BudgetRow[],
   transactions: BudgetTransactionRow[],
+  // VERPLICHT, zonder default — spiegel van `buildBudgetSpendingMap` en
+  // `buildSpendingSums`. Met `= []` compileert een achtergebleven
+  // tweeargument-aanroep gewoon door, en sinds de queries óók split-ouders
+  // meenemen (BUDGET_OR_SPLIT_FILTER) betekent dat: ouderrij overgeslagen,
+  // split-regels nooit opgeteld — het bedrag verdwijnt stil. Geen splits
+  // opgehaald? Geef expliciet `[]`.
+  splits: BudgetSplitRow[],
 ): BudgetSummary {
   if (budgets.length === 0) return EMPTY_BUDGET_SUMMARY
 
-  const spendingByBudget: Record<string, number> = {}
-  for (const t of transactions) {
-    if (!t.budget_id) continue
-    if (isTransfer(t)) continue
-    const amount = Math.abs(Number(t.amount))
-    if (!Number.isFinite(amount)) continue
-    spendingByBudget[t.budget_id] = (spendingByBudget[t.budget_id] ?? 0) + amount
-  }
+  // Richting per budget (child erft parent) + de canonieke, getekende som.
+  const budgetTypes = buildAiBudgetTypeMap(budgets)
+  const spendingByBudget = buildBudgetSpendingMap(transactions, splits, budgetTypes)
 
   const parentRows = budgets.filter((b) => !b.parent_id)
   const childRows = budgets.filter((b) => b.parent_id)
 
   const parents: BudgetSummaryParent[] = parentRows.map((parent) => {
+    const childIds = childRows.filter((c) => c.parent_id === parent.id).map((c) => c.id)
+
     const children: BudgetSummaryChild[] = childRows
       .filter((c) => c.parent_id === parent.id)
       .map((child) => {
-        const spent = spendingByBudget[child.id] ?? 0
+        const spent = spentForBudget(child.id, [], spendingByBudget)
         const limit = limitOf(child)
-        const pct = limit > 0 ? Math.round((spent / limit) * 100) : 0
+        // budgetBarPct: onderaan geklemd op 0, bovenaan niet — zie de doc-comment
+        // op `pct` en de rekenregel in lib/budget-spending.ts.
+        const pct = limit > 0 ? Math.round(budgetBarPct(spent, limit)) : 0
         return { id: child.id, name: child.name, limit, spent, pct, status: statusFor(pct) }
       })
 
-    // Ouder-totaal = kinderen + wat er rechtstreeks op de ouder geboekt staat.
-    const spent =
-      children.reduce((sum, c) => sum + c.spent, 0) + (spendingByBudget[parent.id] ?? 0)
+    // Canonieke rollup, ÓF/ÓF: kinderen wanneer die er zijn, anders de eigen
+    // boekingen. Zie `spentForBudget` in lib/budget-spending.ts.
+    const spent = spentForBudget(parent.id, childIds, spendingByBudget)
 
     return { id: parent.id, name: parent.name, type: parent.budget_type, limit: limitOf(parent), spent, children }
   })
@@ -152,15 +194,30 @@ export async function loadBudgetSummary(supabase: SupabaseClient): Promise<Budge
         .order('sort_order', { ascending: true }),
       supabase
         .from('transactions')
-        .select('budget_id, amount, is_income, transaction_type')
+        .select('id, budget_id, amount, is_income, transaction_type, is_split')
         .gte('date', start)
         .lt('date', end)
-        .not('budget_id', 'is', null),
+        // Verbreed t.o.v. `.not('budget_id','is',null)`: een split-OUDER heeft
+        // per definitie `budget_id = NULL` (transaction-form regel 380), en viel
+        // dus volledig buiten het beeld van de AI terwijl het scherm z'n
+        // split-regels wél meetelt.
+        .or(BUDGET_OR_SPLIT_FILTER),
     ])
+
+    // Zacht falen mag, stil falen niet: zonder deze regel ziet een kapotte
+    // filter/kolom eruit als "deze gebruiker heeft geen budgetten" — en dat is
+    // precies het soort verschil dat maanden onopgemerkt blijft.
+    if (transactionsResult.error) {
+      console.warn('[ai-context] budget-summary: transacties niet geladen', transactionsResult.error.message)
+    }
+
+    const transactions = (transactionsResult.data ?? []) as BudgetTransactionRow[]
+    const splits = await loadSplitRows(supabase, transactions)
 
     return summarizeBudgets(
       (budgetsResult.data ?? []) as BudgetRow[],
-      (transactionsResult.data ?? []) as BudgetTransactionRow[],
+      transactions,
+      splits,
     )
   } catch {
     return EMPTY_BUDGET_SUMMARY

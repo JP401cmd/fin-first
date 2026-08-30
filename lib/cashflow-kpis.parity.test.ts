@@ -38,6 +38,7 @@ import {
   type BudgetRowForTotals,
   type MonthTxRow,
 } from '@/lib/cashflow-kpis'
+import type { SpendingTxRow } from '@/lib/budget-spending'
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -105,9 +106,10 @@ function buildFixtures(): Fixture[] {
     tx(-400, `${THIS_MONTH}-07`, B_SAVINGS),
     tx(9000, `${THIS_MONTH}-08`, null, 'transfer'),
     tx(-9000, `${THIS_MONTH}-09`, null, 'joint_transfer'),
-    // Transfer MÉT budget_id: telt WÉL mee in budgetTotals.spent (die pass heeft
-    // bewust geen transfer-filter) en NIET in currentMonthExpenses (die wél).
-    // Dat contrast is de end-to-end getuige van de filterloze spent-pass.
+    // Transfer MÉT budget_id: telt sinds 30 aug 2026 in GEEN van beide mee —
+    // `budgetTotals.spent` draait nu op dezelfde canonieke bestedingssom als de
+    // budgetten-pagina, en `currentMonthExpenses` had het filter al. De rij
+    // blijft staan als getuige dát beide paden hem hetzelfde behandelen.
     tx(-300, `${THIS_MONTH}-10`, B_EXPENSE_KID, 'transfer'),
     tx(3100, `${PREV_MONTH}-25`),
   ]
@@ -277,13 +279,13 @@ describe('de twee grondslagen blijven uit elkaar (ADR 0073)', () => {
     // Gerealiseerd deze maand: 2500 in, 1750 + 400 = 2150 uit (transfers tellen niet mee).
     expect(nieuw.currentMonthIncome).toBe(2500)
     expect(nieuw.currentMonthExpenses).toBe(2150)
-    // ── Filterloze spent-pass, end-to-end ───────────────────────────────────
-    // De -300-transfer draagt een budget_id en telt dus WÉL mee in `spent`
-    // (1750 + 300 = 2050), terwijl hij in `currentMonthExpenses` (2150) juist
-    // NIET meetelt. Corrigeert iemand de spent-pass ooit "logisch" naar een
-    // transfer-filter, dan valt deze assertie om — op beide paden tegelijk.
-    expect(nieuw.budgetTotals.expense.spent).toBe(2050)
-    expect(oud.budgetTotals.expense.spent).toBe(2050)
+    // ── Canonieke spent-pass, end-to-end (30 aug 2026) ──────────────────────
+    // De -300-transfer draagt een budget_id maar telt NIET meer mee: op een
+    // uitgaven-budget is een transfer geen besteding. `spent` is dus 1750, niet
+    // 2050. Deze regel stond hier tot 30 aug 2026 omgekeerd in — zie de
+    // docstring van `deriveBudgetTotals` voor waarom dat argument is gedraaid.
+    expect(nieuw.budgetTotals.expense.spent).toBe(1750)
+    expect(oud.budgetTotals.expense.spent).toBe(1750)
     expect(nieuw.budgetTotals.expense.spent).not.toBe(nieuw.currentMonthExpenses)
     // Effective: de handmatige profielbedragen winnen — een ANDER getal.
     expect(nieuw.monthlyIncome).toBe(5000)
@@ -311,10 +313,13 @@ describe('de twee grondslagen blijven uit elkaar (ADR 0073)', () => {
     expect(nieuw.budgetTotals.expense.limit).toBe(2000)
     expect(oud.budgetTotals.expense.limit).toBe(2000)
     expect(nieuw.budgetTotals.expense.spent).toBe(1300 + 250)
-    // Dekkings-score over álle vier de types met limit>0 (zie de waarde-getuige
-    // hieronder voor de volledige uitwerking): (60 + 100 + 50) / 3 = 70.
-    expect(nieuw.monthSummary.budgetScore).toBe(70)
-    expect(oud.monthSummary.budgetScore).toBe(70)
+    // Dekkings-score over álle vier de types met limit>0. WAS 70 —
+    // (60 + 100 + 50) / 3 — met een savings-besteding van +600 op een limiet van
+    // 400 (150% ⇒ 50 punten). Onder de canonieke norm geldt op `savings` de
+    // inkomsten-richting, dus die −600-rij levert −600 en er is niets
+    // overschreden: (60 + 100 + 100) / 3 = 86,67 ⇒ 87.
+    expect(nieuw.monthSummary.budgetScore).toBe(87)
+    expect(oud.monthSummary.budgetScore).toBe(87)
   })
 
   it('fixture 3: het AGGREGAAT telt door voorbij 1000 rijen, de rauwe pass niet — en beide paden zien hetzelfde', async () => {
@@ -403,11 +408,11 @@ describe('deriveBudgetTotals — waarde-getuige (de verplaatste oprol)', () => {
 
   it('een parent met kinderen krijgt de SOM van de kinderen, niet zijn eigen default_limit', () => {
     // expense-parent: default_limit 9999, kind 2000 ⇒ 2000 wint.
-    expect(deriveBudgetTotals(budgets, []).expense.limit).toBe(2000)
+    expect(deriveBudgetTotals(budgets, [], []).expense.limit).toBe(2000)
   })
 
   it('normaliseert het interval naar één maand (quarterly ÷3, yearly ÷12)', () => {
-    const totals = deriveBudgetTotals(budgets, [])
+    const totals = deriveBudgetTotals(budgets, [], [])
     expect(totals.savings.limit).toBe(1200 / 3) // 400 — quarterly
     expect(totals.income.limit).toBe(36000 / 12) // 3000 — yearly
     expect(totals.expense.limit).toBe(2000) // monthly blijft ongewijzigd
@@ -418,7 +423,7 @@ describe('deriveBudgetTotals — waarde-getuige (de verplaatste oprol)', () => {
     const raar: BudgetRowForTotals[] = [
       { id: 'x', parent_id: null, budget_type: 'expense', default_limit: 2400, interval: 'sinterklaas' },
     ]
-    expect(deriveBudgetTotals(raar, []).expense.limit).toBe(200)
+    expect(deriveBudgetTotals(raar, [], []).expense.limit).toBe(200)
   })
 
   it('slaat budget-types buiten de vier (bv. archive) over', () => {
@@ -426,51 +431,144 @@ describe('deriveBudgetTotals — waarde-getuige (de verplaatste oprol)', () => {
       ...budgets,
       { id: 'arch', parent_id: null, budget_type: 'archive', default_limit: 5000, interval: 'monthly' },
     ]
-    const totals = deriveBudgetTotals(metArchief, [])
-    expect(totals).toEqual(deriveBudgetTotals(budgets, []))
+    const totals = deriveBudgetTotals(metArchief, [], [])
+    expect(totals).toEqual(deriveBudgetTotals(budgets, [], []))
   })
 
-  it('spent: een TRANSFER met budget_id telt WÉL mee (de pass heeft geen transfer-filter)', () => {
-    const rows: MonthTxRow[] = [
+  // ── Grondslag omgezet naar de canonieke norm (30 aug 2026) ────────────────
+  // De twee tests hieronder pinden tot deze datum het OMGEKEERDE: "een transfer
+  // telt WÉL mee" en "spent is absoluut". Dat was geen keuze maar de afwezigheid
+  // van een filter; sinds de referentie-schermen op `spendingContribution`
+  // draaien is deze KPI de laatste die uit de pas liep.
+
+  it('spent: transfers tellen NIET mee op een uitgaven-budget (canonieke norm)', () => {
+    const rows: SpendingTxRow[] = [
       { amount: -100, budget_id: B_EXPENSE_KID, transaction_type: null },
       { amount: -25, budget_id: B_EXPENSE_KID, transaction_type: 'transfer' },
       { amount: -10, budget_id: B_EXPENSE_KID, transaction_type: 'joint_transfer' },
     ]
-    // 100 + 25 + 10 = 135. Zou iemand hier isRealTx toevoegen, dan wordt het 100.
-    expect(deriveBudgetTotals(budgets, rows).expense.spent).toBe(135)
+    // Was 135 (100+25+10) onder de oude abs-grondslag; nu alleen de echte uitgave.
+    expect(deriveBudgetTotals(budgets, rows, []).expense.spent).toBe(100)
   })
 
-  it('spent: absoluut (teken-onafhankelijk) en alleen voor rijen MÉT een bekend budget_id', () => {
-    const rows: MonthTxRow[] = [
+  it('spent: een inkomst op een uitgaven-budget gaat ERAF (getekend, niet absoluut)', () => {
+    const rows: SpendingTxRow[] = [
       { amount: -100, budget_id: B_EXPENSE_KID },
-      { amount: 40, budget_id: B_EXPENSE_KID }, // positief telt óók, absoluut
+      { amount: 40, budget_id: B_EXPENSE_KID }, // inkomst ⇒ −40
       { amount: -999, budget_id: null }, // geen budget ⇒ genegeerd
       { amount: -888, budget_id: 'onbekend-budget' }, // onbekend ⇒ genegeerd
     ]
-    expect(deriveBudgetTotals(budgets, rows).expense.spent).toBe(140)
+    // Was 140 (100+40) onder de oude abs-grondslag.
+    expect(deriveBudgetTotals(budgets, rows, []).expense.spent).toBe(60)
+  })
+
+  it('spent: de is_income-vlag doet mee náást het teken', () => {
+    const rows: SpendingTxRow[] = [
+      { amount: -100, budget_id: B_EXPENSE_KID },
+      { amount: -30, budget_id: B_EXPENSE_KID, is_income: true }, // vlag wint ⇒ −30
+    ]
+    expect(deriveBudgetTotals(budgets, rows, []).expense.spent).toBe(70)
+  })
+
+  it('spent: split-regels tellen op hun eigen budget, de ouderrij wordt overgeslagen', () => {
+    const rows: SpendingTxRow[] = [
+      { id: 'ouder', amount: -29.24, budget_id: B_EXPENSE, is_split: true },
+    ]
+    // transaction_splits staan POSITIEF in de DB; ze tellen altijd +|amount|.
+    const splits = [
+      { budget_id: B_EXPENSE_KID, amount: 4.5 },
+      { budget_id: B_EXPENSE_KID, amount: 24.74 },
+    ]
+    const totals = deriveBudgetTotals(budgets, rows, splits)
+    expect(totals.expense.spent).toBeCloseTo(29.24, 10)
   })
 
   it('een child erft het type van zijn parent (spent landt op het parent-type)', () => {
-    const rows: MonthTxRow[] = [{ amount: -50, budget_id: B_EXPENSE_KID }]
-    const totals = deriveBudgetTotals(budgets, rows)
+    const rows: SpendingTxRow[] = [{ amount: -50, budget_id: B_EXPENSE_KID }]
+    const totals = deriveBudgetTotals(budgets, rows, [])
     expect(totals.expense.spent).toBe(50)
     expect(totals.savings.spent).toBe(0)
   })
 
   it('de volledige fixture-2-uitkomst, alle vier de types', () => {
-    const rows: MonthTxRow[] = [
+    const rows: SpendingTxRow[] = [
       { amount: 4200, budget_id: B_INCOME },
       { amount: -1300, budget_id: B_EXPENSE_KID },
       { amount: -250, budget_id: B_EXPENSE },
       { amount: -600, budget_id: B_SAVINGS },
       { amount: -77, budget_id: null },
     ]
-    expect(deriveBudgetTotals(budgets, rows)).toEqual({
+    expect(deriveBudgetTotals(budgets, rows, [])).toEqual({
       income: { limit: 3000, spent: 4200 },
       expense: { limit: 2000, spent: 1550 },
-      savings: { limit: 400, spent: 600 },
+      // OMGEKEERD T.O.V. VÓÓR 30 AUG 2026 (was 600). Op een `savings`-budget
+      // geldt de INKOMSTEN-richting: de positieve rij is de realisatie, dus een
+      // negatieve rij (geld dat de betaalrekening verlaat) telt −600. Dit is de
+      // zichtbaarste verschuiving van de omzetting en staat hier expliciet,
+      // niet als bijvangst in een totaal.
+      savings: { limit: 400, spent: -600 },
       debt: { limit: 0, spent: 0 },
     })
+  })
+
+  // ── De gemelde productiecase (eigenaar-account, augustus 2026) ─────────────
+  //
+  // Budgetpagina (na de hotfix, getekende som): "uitgaven € 2.616 / € 7.701".
+  // Budget-kaart op /overzicht/cashflow (oude abs-grondslag): "€ 26 · nog te
+  // besteden deze maand" — want ±€2.530 aan ruis-rijen op uitgavenbudgetten
+  // telde er twee keer absoluut bij op: 2.616 + 2×2.530 = 7.676 ⇒ restant 25.
+  //
+  // Acceptatie ná de omzetting: besteed €2.616 en restant €5.085 (7.701 −
+  // 2.616), hetzelfde getal als de budgetpagina. De ruis kan op twee manieren
+  // in de data staan en beide moeten op 2.616 uitkomen — daarom staan ze er
+  // allebei in: als eigen-rekening-TRANSFERS (bijdrage 0) en als een
+  // INKOMST/tegenboeking-paar (−2.530 en +2.530, die tegen elkaar wegvallen).
+  const LIMIET = 7701
+  const ECHTE_UITGAVEN = 2616
+  const RUIS = 2530
+  const eigenBudget: BudgetRowForTotals[] = [
+    { id: 'uitgaven', parent_id: null, budget_type: 'expense', default_limit: LIMIET, interval: 'monthly' },
+  ]
+
+  it.each([
+    [
+      'twee eigen-rekening-transfers',
+      [
+        { amount: RUIS, budget_id: 'uitgaven', transaction_type: 'transfer' },
+        { amount: -RUIS, budget_id: 'uitgaven', transaction_type: 'joint_transfer' },
+      ] as SpendingTxRow[],
+    ],
+    [
+      'een inkomst met haar tegenboeking',
+      [
+        { amount: RUIS, budget_id: 'uitgaven' }, // inkomst ⇒ −2.530
+        { amount: -RUIS, budget_id: 'uitgaven' }, // tegenboeking ⇒ +2.530
+      ] as SpendingTxRow[],
+    ],
+  ])('MELDING (%s): Budget-kaart toont €5.085 restant i.p.v. €26', (_naam, ruisRijen) => {
+    const rows: SpendingTxRow[] = [
+      { amount: -ECHTE_UITGAVEN, budget_id: 'uitgaven' },
+      ...ruisRijen,
+    ]
+
+    // Wat de kaart TOT NU toonde: de ongefilterde abs-som.
+    const oudeAbsSom = rows.reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
+    expect(oudeAbsSom).toBe(7676) // ≈ de gemelde 7.675
+    expect(LIMIET - oudeAbsSom).toBe(25) // ≈ de gemelde "€ 26 · nog te besteden"
+
+    // Wat de kaart NA de omzetting toont: dezelfde grondslag als de budgetpagina.
+    const totals = deriveBudgetTotals(eigenBudget, rows, [])
+    expect(totals.expense.limit).toBe(LIMIET)
+    expect(totals.expense.spent).toBe(ECHTE_UITGAVEN)
+    expect(totals.expense.limit - totals.expense.spent).toBe(5085)
+
+    // DE STATUSDOT BEWEEGT HIER NIET, en dat is een bewuste vastlegging.
+    // `deriveBudgetScore` straft alleen OVERSCHRIJDING (`spent − limit`), en
+    // 7.676 bleef net onder 7.701 — de dot stond dus al op 'good'/"Op schema".
+    // Wat de melding zichtbaar maakte is het KPI-BEDRAG (€26 → €5.085), niet de
+    // dot. Pas als een type écht over zijn limiet gaat, verschuift ook de score.
+    expect(deriveBudgetScore(totals)).toBe(100)
+    expect(deriveBudgetScore({ ...totals, expense: { limit: LIMIET, spent: oudeAbsSom } })).toBe(100)
   })
 })
 

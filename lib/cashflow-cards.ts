@@ -12,6 +12,7 @@ import type { VasteLastenSummary } from '@/lib/vaste-lasten-summary'
 import { buildForecast } from '@/lib/cashflow-forecast-math'
 import { pillarStatus, type LeverageStatus } from '@/lib/leverage-status'
 import { formatCurrency } from '@/lib/format'
+import { budgetBeschikbaar } from '@/lib/budget-spending'
 import { savingsRateFromAggregates } from '@/lib/savings-source'
 import { CURRENT_MONTH_INCOME_COMPLETE_RATIO } from '@/lib/constants'
 
@@ -326,7 +327,15 @@ export function buildCashflowCards(
   // status: `budgetCardStatus` blijft op monthSummary.budgetScore staan zodat er
   // geen tweede statusbron naast lib/leverage-status.ts ontstaat.
   // Grondslag uitsluitend budgetTotals.expense — savings-budgetten tellen niet mee.
-  const budgetRemaining = budgetLimit - budgetSpent
+  //
+  // KLEM OP DE LIMIET (`budgetBeschikbaar`, lib/budget-spending.ts). Hier stond
+  // een kale `budgetLimit - budgetSpent`, en sinds `deriveBudgetTotals` een
+  // GETEKENDE som levert (norm 30 aug 2026) mag `budgetSpent` negatief zijn:
+  // een limiet van €7.701 met −€1.000 besteed gaf dan €8.701 "nog te besteden",
+  // meer ruimte dan er ooit begroot is. De heatmap-tegels klemden al; deze kaart
+  // deed dat als enige niet. De ONDERkant blijft ongeklemd — een negatief bedrag
+  // is de overschrijding en moet zichtbaar blijven.
+  const budgetRemaining = budgetBeschikbaar(budgetLimit, budgetSpent)
   const budgetStatus: LeverageStatus = budgetCardStatus({
     budgetingActive: kpis.budgetingActive,
     expenseLimit: budgetLimit,

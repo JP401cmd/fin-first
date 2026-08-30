@@ -4,6 +4,8 @@
  * Used by the AI-powered spending pattern predictions feature.
  */
 
+import { spendingContribution } from '@/lib/budget-spending'
+
 export interface MonthlySpending {
   month: string       // YYYY-MM
   monthLabel: string   // e.g., "jan", "feb" (Dutch)
@@ -54,11 +56,85 @@ const DUTCH_MONTHS_SHORT = [
   'jul', 'aug', 'sep', 'okt', 'nov', 'dec',
 ]
 
+/** Transactierij voor de patroonanalyse. */
+export interface SpendingPatternTxRow {
+  budget_id: string
+  amount: number
+  date: string
+  is_income?: boolean | null
+  /**
+   * Overboekingen tussen eigen rekeningen. OPTIONEEL zodat bestaande callers
+   * blijven compileren — maar zonder deze kolom kán de functie de transfers
+   * niet uitsluiten. Selecteer 'm in de query.
+   */
+  transaction_type?: string | null
+}
+
+/**
+ * De UITGAVEN-GRONDSLAG van de patroonanalyse: hoeveel maanden échte data er
+ * zijn, wat de gemiddelde maanduitgave is en het dagtarief dat de detectoren
+ * gebruiken om een bedrag naar vrijheidsdagen om te rekenen.
+ *
+ * EEN AFLEIDING, TWEE AANROEPERS (convergentie 31 aug 2026). De cloud-context
+ * (lib/ai/context/spending-patterns-context.ts) rekende getekend en
+ * transfer-gefilterd; /api/spending-patterns deed nog
+ * `filter(!is_income).reduce(Math.abs)` over álle rijen. Dat is geen cosmetisch
+ * verschil: het dagtarief is de DREMPEL waarmee `detectSeasonalPatterns`,
+ * `detectTrends` en `detectAnomalies` bepalen of een patroon groot genoeg is om
+ * te melden — twee grondslagen betekent dus letterlijk andere inzichten per
+ * oppervlak op dezelfde data.
+ *
+ * Drie keuzes, expliciet:
+ *  - `dataMonths` telt alleen maanden met ÉCHTE boekingen; een maand waarin
+ *    uitsluitend tussen eigen rekeningen geschoven is, is geen maand data. Het
+ *    is óók de deler, dus dit bepaalt het gemiddelde mede.
+ *  - De som is GETEKEND via `spendingContribution` op de uitgaven-richting: een
+ *    inkomst gaat eraf i.p.v. te worden uitgesloten (norm 30 aug 2026).
+ *  - Het totaal wordt onderaan op 0 geklemd — een negatief dagtarief zou élke
+ *    euro→vrijheidsdagen-omrekening omkeren. De klem zit hier, niet bij de
+ *    aanroeper.
+ *
+ * De MINIMUMEIS aan `dataMonths` blijft bewust bij de aanroeper: de cloud-
+ * context eist er 6, de route 3. Dat is een beleidskeuze over wanneer je iets
+ * durft te zeggen, geen grondslag.
+ */
+export function derivePatternExpenseBasis(
+  transactions: SpendingPatternTxRow[],
+): { dataMonths: number; avgMonthlyExpenses: number; dailyExpenses: number } {
+  const realTx = transactions.filter(
+    (t) => t.transaction_type !== 'transfer' && t.transaction_type !== 'joint_transfer',
+  )
+  const dataMonths = new Set(realTx.map((t) => t.date.slice(0, 7))).size
+  if (dataMonths === 0) return { dataMonths: 0, avgMonthlyExpenses: 0, dailyExpenses: 0 }
+
+  const totalExpenses = realTx.reduce(
+    (sum, t) => sum + spendingContribution({ ...t, amount: Number(t.amount) }, 'expense'),
+    0,
+  )
+  const avgMonthlyExpenses = Math.max(0, totalExpenses) / dataMonths
+  return { dataMonths, avgMonthlyExpenses, dailyExpenses: (avgMonthlyExpenses * 12) / 365 }
+}
+
 /**
  * Build monthly spending data per category from raw transactions.
+ *
+ * DE FILTERS ZITTEN IN DE FUNCTIE, NIET BIJ DE AANROEPER (convergentie 30 aug
+ * 2026). Deze functie voedde vier oppervlakken — de cloud-context, de
+ * on-device chat, /api/spending-patterns en /api/report — en de
+ * transfer-uitsluiting zat maar bij twee daarvan. Een filter dat de uitkomst
+ * bepaalt hoort bij de som, niet bij de call-site; anders is "vergeten" de
+ * standaardtoestand.
+ *
+ * De bijdrage per rij komt uit `spendingContribution` (lib/budget-spending.ts):
+ * alle categorieën hier zijn expense-parents, dus de uitgaven-richting geldt —
+ * een uitgave telt op, een inkomst gaat ERAF (was: uitgesloten via de
+ * `is_income`-vlag), een transfer telt niet mee. De maandtotalen kunnen
+ * daardoor negatief zijn; de patroondetectoren hieronder slaan een categorie
+ * met een gemiddelde onder EUR 10 over, dus een netto-inkomsten-categorie
+ * levert geen patroonuitspraak op.
  */
 export function buildCategorySpending(
-  transactions: { budget_id: string; amount: number; date: string; is_income: boolean }[],
+  transactions: SpendingPatternTxRow[],
   budgets: { id: string; name: string; icon: string; parent_id: string | null; budget_type: string; is_essential: boolean }[],
 ): CategorySpending[] {
   const parentBudgets = budgets.filter(b => !b.parent_id && b.budget_type === 'expense')
@@ -68,17 +144,21 @@ export function buildCategorySpending(
 
   for (const parent of parentBudgets) {
     const childIds = childBudgets.filter(c => c.parent_id === parent.id).map(c => c.id)
-    const budgetIds = childIds.length > 0 ? childIds : [parent.id]
+    const budgetIds = new Set(childIds.length > 0 ? childIds : [parent.id])
 
     // Group transactions by month
     const monthMap = new Map<string, number>()
 
     for (const tx of transactions) {
-      if (tx.is_income || !budgetIds.includes(tx.budget_id)) continue
+      if (!budgetIds.has(tx.budget_id)) continue
+      // Uitgaven-richting: dit zijn per definitie expense-parents (en hun
+      // kinderen erven dat type).
+      const contribution = spendingContribution(tx, 'expense')
+      if (contribution === 0) continue
       const date = new Date(tx.date)
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
       const current = monthMap.get(monthKey) || 0
-      monthMap.set(monthKey, current + Math.abs(tx.amount))
+      monthMap.set(monthKey, current + contribution)
     }
 
     if (monthMap.size === 0) continue

@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { serverError, unauthorized } from '@/lib/api/respond'
 import { localMonthBounds } from '@/lib/month-range'
+import { buildBudgetTypeMap } from '@/lib/budget-utils'
+import { buildBudgetSpendingMap, spentForBudget } from '@/lib/budget-spending'
+import { BUDGET_SPENDING_TX_COLUMNS } from '@/lib/budget-spending-fetch'
 
 /**
  * GET /api/budget-trends
@@ -54,7 +57,10 @@ export async function GET() {
         .order('sort_order', { ascending: true }),
       supabase
         .from('transactions')
-        .select('budget_id, amount, date')
+        // `id`/`transaction_type`/`is_split` horen bij de rijselectie van de
+        // canonieke besteed-som: transfers dragen niet bij, en de split-ouder
+        // wordt overgeslagen omdat zijn bedragen op `transaction_splits` leven.
+        .select(`${BUDGET_SPENDING_TX_COLUMNS}, date`)
         .gte('date', months[0].start)
         .lt('date', months[months.length - 1].end),
     ])
@@ -69,29 +75,51 @@ export async function GET() {
     const parents = allBudgets.filter(b => !b.parent_id)
     const children = allBudgets.filter(b => b.parent_id)
 
-    // Build spending map: budget_id -> month -> amount
-    const spendingMap: Record<string, Record<string, number>> = {}
-    for (const tx of allTx) {
-      if (!tx.budget_id) continue
-      if (!spendingMap[tx.budget_id]) spendingMap[tx.budget_id] = {}
-      for (const m of months) {
-        if (tx.date >= m.start && tx.date < m.end) {
-          spendingMap[tx.budget_id][m.month] = (spendingMap[tx.budget_id][m.month] ?? 0) + Math.abs(Number(tx.amount))
-          break
-        }
+    // Split-regels van het hele venster, gegroepeerd per transactie — zodat elke
+    // maand alleen zijn eigen splits meekrijgt.
+    const splitTxIds = allTx.filter(t => t.is_split).map(t => t.id)
+    const splitsByTxId = new Map<string, Array<{ budget_id: string | null; amount: number }>>()
+    if (splitTxIds.length > 0) {
+      const { data: splitData } = await supabase
+        .from('transaction_splits')
+        .select('transaction_id, budget_id, amount')
+        .in('transaction_id', splitTxIds)
+      for (const s of (splitData ?? []) as Array<{ transaction_id: string; budget_id: string | null; amount: number }>) {
+        const list = splitsByTxId.get(s.transaction_id) ?? []
+        list.push({ budget_id: s.budget_id, amount: s.amount })
+        splitsByTxId.set(s.transaction_id, list)
       }
+    }
+
+    // Richting per budget (child erft parent-type). Zonder richting zou de
+    // aftrek ook op inkomsten-, spaar- en archief-budgetten slaan.
+    const budgetTypes = buildBudgetTypeMap(
+      allBudgets.map(b => ({
+        id: b.id,
+        parent_id: b.parent_id ?? null,
+        // DB-default; NULL mag nooit inkomsten-semantiek geven.
+        budget_type: b.budget_type ?? 'expense',
+      })),
+    )
+
+    // Canonieke besteed-map per maand (lib/budget-spending.ts) i.p.v. de eigen
+    // `Math.abs`-som: die telde transfers als besteding mee, negeerde de
+    // richting en boekte een split-ouder vol op zijn eigen budget.
+    const spendingByMonth = new Map<string, Record<string, number>>()
+    for (const m of months) {
+      const txInMonth = allTx.filter(t => t.date >= m.start && t.date < m.end)
+      const splitsInMonth = txInMonth.flatMap(t => (t.is_split ? splitsByTxId.get(t.id) ?? [] : []))
+      spendingByMonth.set(m.month, buildBudgetSpendingMap(txInMonth, splitsInMonth, budgetTypes))
     }
 
     // Aggregate per parent category
     const trends = parents.map(parent => {
       const childIds = children.filter(c => c.parent_id === parent.id).map(c => c.id)
-      const relevantIds = childIds.length > 0 ? childIds : [parent.id]
 
       const monthlyData = months.map(m => {
-        let totalSpent = 0
-        for (const id of relevantIds) {
-          totalSpent += spendingMap[id]?.[m.month] ?? 0
-        }
+        // Parent-rollup uit dezelfde bron: een parent met kinderen = de som van
+        // zijn kinderen, een blad zijn eigen besteding.
+        const totalSpent = spentForBudget(parent.id, childIds, spendingByMonth.get(m.month) ?? {})
         return {
           month: m.month,
           label: m.label,

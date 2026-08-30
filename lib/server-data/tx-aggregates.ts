@@ -36,6 +36,10 @@
 
 import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import {
+  isExpenseDirectionBudget,
+  isIncomeDirectionBudget,
+} from '@/lib/budget-spending'
 import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
 
 /** Één aggregaat-rij zoals `tx_month_aggregate` teruggeeft. */
@@ -120,41 +124,124 @@ export function aggExpenseByMonthAbs(rows: TxMonthAggregateRow[], opts: ReduceOp
   return m
 }
 
+// ── Bestedingssom op het aggregaat ───────────────────────────────────────────
+//
+// De canonieke besteed-som per budget woont in lib/budget-spending.ts
+// (`spendingContribution`), maar die werkt per TRANSACTIE-RIJ. Het aggregaat
+// levert per (maand × budget × type) alleen `sum_positief` en `sum_negatief` —
+// genoeg om exact dezelfde uitkomst te reproduceren, want de canonieke regel is
+// per richting lineair in die twee sommen (zie `aggSpendingContribution`).
+//
+// TWEE BEKENDE GRENZEN, allebei bewust:
+//
+//  1. SPLIT-BLIND. `tx_month_aggregate` leest uitsluitend `transactions`; de
+//     bedragen in `transaction_splits` zitten er niet in, en de aggregaat-rij
+//     draagt geen `is_split`-vlag om de ouder over te slaan. Waar
+//     `buildBudgetSpendingMap` split-regels op hun eigen budget bijtelt en de
+//     ouder overslaat, telt het aggregaat de OUDER-rij op zijn eigen budget_id.
+//     Vandaag is dat LATENT: er staat één split op productie en die heeft
+//     budget_id NULL, dus hij valt hoe dan ook buiten elke per-budget-som. Een
+//     aggregaat-migratie (splits meenemen in de SQL-functie) is een aparte
+//     wijziging en valt buiten deze convergentie.
+//  2. GEEN `is_income`. De aggregaat-rij draagt de kolom niet, dus de richting
+//     komt hier uitsluitend uit het TEKEN. Dat is precies de volgorde die
+//     `spendingContribution` zelf voorschrijft ("TEKEN VOOR VLAG"); de
+//     combinatie is_income=true met een negatief bedrag komt op productie 0×
+//     voor, dus de uitkomst is er gelijk aan.
+
 /**
- * Map maand → Σ |alle bedragen| voor rijen waarvan het budget in `budgetIds`
- * zit (bv. schuld-budgetten). Telt zowel de positieve als de |negatieve| som,
- * identiek aan de vroegere `Math.abs(amount)`-reductie over income+expense-rijen.
+ * De bijdrage van ÉÉN aggregaat-rij aan de bestedingssom van zijn budget —
+ * de aggregaat-vorm van `spendingContribution` (lib/budget-spending.ts).
+ * Getekend: positief = besteding, negatief = geld dat terugkwam.
+ *
+ * Per richting is de canonieke regel lineair in de twee groepssommen, dus één
+ * aggregaat-rij vervangt de lus over haar transacties zonder afrondingsverschil:
+ *
+ *   - expense/debt  → transfer telt niet (0); anders Σ|negatief| − Σpositief,
+ *     want elke negatieve rij levert +|amount| en elke positieve −|amount|.
+ *   - income/savings → transfer telt niet (0); anders Σpositief + Σnegatief,
+ *     want de bijdrage IS daar het bedrag zelf (het teken klopt al).
+ *   - archive/onbekend → Σpositief + Σ|negatief|, transfers INCLUIS: die post
+ *     ("Eigen rekening") heeft geen richting en de transfers zijn er juist de
+ *     realisatie.
+ *
+ * `budgetType` is VERPLICHT, met dezelfde reden als bij `spendingContribution`:
+ * zonder richting zou de aftrek ook op inkomsten-, spaar- en archief-budgetten
+ * slaan en daar de realisatie omkeren.
  */
-export function aggAbsByMonthForBudgets(
+export function aggSpendingContribution(
+  row: Pick<TxMonthAggregateRow, 'transaction_type' | 'sum_positief' | 'sum_negatief'>,
+  budgetType: string | null | undefined,
+): number {
+  const pos = Number(row.sum_positief) || 0
+  const neg = Number(row.sum_negatief) || 0
+  const isTransfer = TRANSFER_TYPES.has(row.transaction_type ?? '')
+
+  if (isExpenseDirectionBudget(budgetType)) {
+    if (isTransfer) return 0
+    return Math.abs(neg) - pos
+  }
+  if (isIncomeDirectionBudget(budgetType)) {
+    if (isTransfer) return 0
+    return pos + neg
+  }
+  return pos + Math.abs(neg)
+}
+
+/**
+ * Map maand → Σ besteed voor rijen waarvan het budget in `budgetIds` zit (bv.
+ * schuld-budgetten voor de schuld-reeks van de trend-widget).
+ *
+ * `budgetTypes` is de canonieke type-map uit `buildBudgetTypeMap`
+ * (lib/budget-utils.ts) en is VERPLICHT — dezelfde compiler-vangrail als bij
+ * `buildBudgetSpendingMap`: een achtergebleven aanroep zonder richting breekt op
+ * de compiler in plaats van stil de teken-blinde som te herstellen.
+ *
+ * Geef hier GEEN `realOnly: true` mee: de transfer-regel is richting-gescoped en
+ * zit al in `aggSpendingContribution`. `realOnly` zou transfers óók van
+ * archief-budgetten wegnemen, en dáár zijn ze juist de realisatie.
+ *
+ * Maanden met een netto-bijdrage van exact 0 krijgen geen entry (spiegelt de
+ * vroegere reductie); consumers lezen met `?? 0`.
+ */
+export function aggSpendingByMonthForBudgets(
   rows: TxMonthAggregateRow[],
   budgetIds: Set<string>,
+  budgetTypes: Map<string, string>,
   opts: ReduceOpts = {},
 ): Map<string, number> {
   const m = new Map<string, number>()
   for (const r of rows) {
     if (!passes(r, { ...opts, budgetIds })) continue
-    const v = Number(r.sum_positief) + Math.abs(Number(r.sum_negatief))
+    if (!r.budget_id) continue
+    const v = aggSpendingContribution(r, budgetTypes.get(r.budget_id))
     if (v !== 0) m.set(r.month, (m.get(r.month) ?? 0) + v)
   }
   return m
 }
 
 /**
- * Map budget_id → maand → Σ |alle bedragen| (positief + |negatief|), voor de
- * budget-sparklines: die tonen per budget wat er in een maand omging, ongeacht
- * teken. Rijen zonder budget_id vallen weg (spiegelt de vroegere `if (t.budget_id)`-
- * guard). Complement van `aggAbsByMonthForBudgets`, dat over een budget-SET
- * platslaat; hier blijft de budget-dimensie juist behouden.
+ * Map budget_id → maand → Σ besteed, voor de budget-sparklines: die tonen per
+ * budget wat er in een maand besteed is, op DEZELFDE grondslag als het
+ * "Besteed"-bedrag boven de grafiek. Rijen zonder budget_id vallen weg
+ * (spiegelt de vroegere `if (t.budget_id)`-guard). Complement van
+ * `aggSpendingByMonthForBudgets`, dat over een budget-SET platslaat; hier blijft
+ * de budget-dimensie juist behouden.
+ *
+ * De uitkomst per maand KAN NEGATIEF ZIJN (meer inkomsten dan uitgaven op een
+ * uitgaven-budget). Dat is bedoeld en wordt hier niet geklemd — weergave-lijnen
+ * die een breedte/hoogte tekenen klemmen zelf, bij de aanroep.
  */
-export function aggAbsByBudgetMonth(
+export function aggSpendingByBudgetMonth(
   rows: TxMonthAggregateRow[],
+  budgetTypes: Map<string, string>,
   opts: ReduceOpts = {},
 ): Map<string, Map<string, number>> {
   const out = new Map<string, Map<string, number>>()
   for (const r of rows) {
     if (!passes(r, opts)) continue
     if (!r.budget_id) continue
-    const v = Number(r.sum_positief) + Math.abs(Number(r.sum_negatief))
+    const v = aggSpendingContribution(r, budgetTypes.get(r.budget_id))
     if (v === 0) continue
     let m = out.get(r.budget_id)
     if (!m) {

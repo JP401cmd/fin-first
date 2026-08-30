@@ -24,6 +24,13 @@ import { hasPartner } from '@/lib/household-type'
 import { BOX3_PARAMS, CURRENT_TAX_YEAR, classifyAsset } from '@/lib/box3-data'
 import type { Asset } from '@/lib/asset-data'
 import { emergencyTargetBasis, resolveEmergencyFundFromRows } from '@/lib/emergency-fund'
+import { buildBudgetTypeMap } from '@/lib/budget-utils'
+import {
+  buildBudgetSpendingMap,
+  spentForBudget,
+  type SpendingSplitRow,
+  type SpendingTxRow,
+} from '@/lib/budget-spending'
 
 // ── Box 3 (educatief "kans"-inzicht; sinds v2 geen score-pijler, ADR 0010) ───
 
@@ -74,10 +81,24 @@ export interface HealthScoreBudget {
   interval?: string | null
 }
 
-/** Minimale transactievorm met budgetkoppeling. */
+/**
+ * Minimale transactievorm met budgetkoppeling.
+ *
+ * De vier extra kolommen zijn die van het canonieke bestedingscontract
+ * (`SpendingTxRow` in lib/budget-spending.ts): `transaction_type` sluit
+ * transfers uit, `is_income` is de tweede (niet-afgedwongen) inkomst-marker
+ * náást het teken, `is_split` slaat de ouderrij van een split over en `id`
+ * koppelt die ouderrij aan haar split-regels. Ze zijn OPTIONEEL omdat niet elke
+ * aanroeper ze vandaag ophaalt — zie `HealthScoreRows.splits` voor wat er dan
+ * precies degradeert.
+ */
 export interface HealthScoreTransaction {
+  id?: string
   amount?: number | string | null
   budget_id?: string | null
+  transaction_type?: string | null
+  is_income?: boolean | null
+  is_split?: boolean | null
 }
 
 /**
@@ -233,20 +254,46 @@ export function computeLargestAssetTypeShare(
  * (`quarterly` ÷3, alles wat niet `monthly`/`quarterly` is ÷12) — kinderen
  * dragen geen eigen periodiciteit in deze grondslag, net als voorheen.
  *
+ * ## De besteding komt uit de CANONIEKE som (convergentie 30 aug 2026)
+ * Deze functie had tot die datum een eigen `Σ|amount|`-lus ZONDER enig filter:
+ * een partner-overboeking van +€6.000 op een uitgaven-budget telde als €6.000
+ * besteed, en een eigen-rekening-transfer net zo. Dat maakte de
+ * budget-discipline-pijler een vierde grondslag naast de budgetten-pagina, de
+ * KPI-laag en de AI-lookup. De som loopt nu door `buildBudgetSpendingMap` +
+ * `spentForBudget` (lib/budget-spending.ts) met de richting per budget uit
+ * `buildBudgetTypeMap` (lib/budget-utils.ts).
+ *
+ * TWEE GEVOLGEN, BEIDE BEDOELD:
+ *  - Op een expense/debt-categorie gaat een inkomst er nu AF en telt een
+ *    transfer niet mee; de uitkomst mag negatief zijn. De pijler scoort
+ *    "binnen de limiet" — dat is juist: er is netto niets uitgegeven.
+ *  - Op een `savings`-categorie geldt de INKOMSTEN-richting: de positieve rij
+ *    is de realisatie. Een spaarbudget dat door NEGATIEVE rijen (geld dat de
+ *    betaalrekening verlaat) of door `transfer`-rijen wordt gevoed, telt dus
+ *    niet meer als besteding. Dat is de norm van 30 aug 2026, geen zijeffect —
+ *    maar het is wél de zichtbaarste verschuiving van deze conversie.
+ *
  * ## Bewust ONGEWIJZIGD
  *  - Alle drie de types (expense/savings/debt) blijven meedoen; `income` niet.
- *  - De `spent`-pass heeft géén transfer-filter en telt absoluut — hetzelfde
- *    gedrag als élke andere budget-surface (zie `deriveBudgetTotals`).
  *  - Een transactie die rechtstreeks aan een parent MÉT kinderen hangt telt niet
  *    mee, precies zoals in de heatmap. Zo'n koppeling ontstaat niet via de UI
  *    (die kiest altijd een blad) en zou anders bij een limietloze groep landen.
+ *    De `spentForBudget`-rollup krijgt daarom bewust een LEGE kinderlijst per
+ *    blad: bladeren zijn hier al de categorieën, dus er valt niets op te rollen.
  *
  * Een lege array (geen budgetten) maakt de budget-discipline-pijler inactief
  * (ADR 0010 / FR-5; geen neutrale 70-dummy meer) — het gewicht wordt herverdeeld.
+ *
+ * `splits` is een VERPLICHTE parameter zonder default (spiegelt
+ * `buildSpendingSums`/`buildBudgetSpendingMap`): een achtergebleven
+ * tweeargument-aanroep breekt zo op de compiler in plaats van stil de
+ * ongefilterde som te herstellen. Geen splits opgehaald? Geef `[]` — dan telt
+ * de ouderrij mee zoals voorheen (mits `is_split` óók niet is opgehaald).
  */
 export function buildBudgetCategories(
   budgets: ReadonlyArray<HealthScoreBudget>,
   transactions: ReadonlyArray<HealthScoreTransaction>,
+  splits: ReadonlyArray<SpendingSplitRow>,
 ): { limit: number; spent: number }[] {
   const parents = budgets.filter((b) => b.parent_id == null)
   const children = budgets.filter((b) => b.parent_id != null)
@@ -254,13 +301,24 @@ export function buildBudgetCategories(
   const isHealthType = (t: string | null | undefined): t is HealthBudgetType =>
     !!t && (HEALTH_BUDGET_TYPES as readonly string[]).includes(t)
 
-  // Besteed per budget_id (deze maand) — één pass, daarna per blad opgevraagd.
-  const spentByBudget = new Map<string, number>()
-  for (const tx of transactions) {
-    const budgetId = tx.budget_id
-    if (!budgetId) continue
-    spentByBudget.set(budgetId, (spentByBudget.get(budgetId) ?? 0) + Math.abs(Number(tx.amount ?? 0)))
-  }
+  // Richting per budget_id, inclusief de erfregel child → parent-type. NULL
+  // budget_type valt terug op de DB-default 'expense' (de veilige kant: de
+  // inkomsten-semantiek zou een inkomst laten OPTELLEN).
+  const budgetTypes = buildBudgetTypeMap(
+    budgets.map((b) => ({
+      id: b.id,
+      parent_id: b.parent_id ?? null,
+      budget_type: b.budget_type ?? 'expense',
+    })),
+  )
+
+  // Besteed per budget_id (deze maand) — canonieke som, daarna per blad
+  // opgevraagd. Geen eigen lus meer: één formule, één huis.
+  const spending = buildBudgetSpendingMap(
+    transactions as ReadonlyArray<SpendingTxRow> as SpendingTxRow[],
+    splits as SpendingSplitRow[],
+    budgetTypes,
+  )
 
   const categories: { limit: number; spent: number }[] = []
   for (const parent of parents) {
@@ -277,7 +335,7 @@ export function buildBudgetCategories(
     for (const leaf of leaves) {
       categories.push({
         limit: toMonthly(Number(leaf.default_limit ?? 0)),
-        spent: spentByBudget.get(leaf.id) ?? 0,
+        spent: spentForBudget(leaf.id, [], spending),
       })
     }
   }
@@ -326,8 +384,32 @@ export interface HealthScoreRows {
   unlinkedCash: number
   /** Alle budgetten (parents + children, alle types). [] → budget-pijler inactief. */
   budgets: ReadonlyArray<HealthScoreBudget>
-  /** Transacties van de huidige maand met budget_id. */
+  /**
+   * Transacties van de huidige maand met budget_id. Haal ook
+   * `transaction_type`, `is_income`, `is_split` en `id` op — zonder die
+   * kolommen kan de canonieke bestedingssom haar transfer- en split-regels niet
+   * toepassen (de richting werkt wél, want het TEKEN is de harde marker).
+   */
   transactions: ReadonlyArray<HealthScoreTransaction>
+  /**
+   * Split-regels bij de bovenstaande transacties (`transaction_splits`:
+   * budget_id + POSITIEF bedrag), op te halen met `fetchSpendingSplits` of
+   * `getCurrentMonthSplits` (lib/budget-spending-fetch.ts).
+   *
+   * VERPLICHT, zonder default — spiegel van `buildBudgetSpendingMap` en
+   * `buildSpendingSums`. Dit veld was tijdens de conversie kort optioneel omdat
+   * drie aanroepers nog niet om waren; sinds 31 aug 2026 leveren ALLE
+   * productie-aanroepers splits (dashboard-loader, de drie snapshot-routes,
+   * `lib/core-data-loader.ts` en `lib/horizon/raw-data-loader.ts`). De enige
+   * die `[]` doorgeeft is `lib/check/build-report.ts`, en die geeft óók een
+   * lege `transactions` mee — daar valt niets te splitsen.
+   *
+   * De verplichting is de vangrail: de transactierijen dragen inmiddels
+   * `is_split`, dus een aanroeper die splits vergeet slaat de OUDERRIJ over
+   * zonder dat haar deelregels ervoor in de plaats komen — het bedrag verdwijnt
+   * stil uit de pijler. Geen splits opgehaald? Geef expliciet `[]`.
+   */
+  splits: ReadonlyArray<SpendingSplitRow>
   /** household_type uit profiel (voor heffingsvrij vermogen, educatief inzicht). */
   householdType: string | null | undefined
   /**
@@ -367,7 +449,7 @@ export function buildHealthScoreInput(
       scalars.avgMonthlyExpenses,
     ).targetMonths,
     largestAssetTypeShare: computeLargestAssetTypeShare(rows.assets, rows.unlinkedCash),
-    budgetCategories: buildBudgetCategories(rows.budgets, rows.transactions),
+    budgetCategories: buildBudgetCategories(rows.budgets, rows.transactions, rows.splits),
     // Backward-compat-velden (voeden geen pijler meer, ADR 0010) — voor het
     // educatieve Box 3-/diversificatie-inzicht buiten de score.
     assetTypeCount: computeAssetTypeCount(rows.assets, rows.unlinkedCash),

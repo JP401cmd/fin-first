@@ -66,6 +66,8 @@ type TxAgg = {
   is_income: boolean
   transaction_type: string | null
   date: string
+  /** Split-ouder: bedragen leven op `transaction_splits`, niet op deze rij. */
+  is_split: boolean | null
 }
 
 /**
@@ -570,7 +572,7 @@ export function CashOverview({
     const supabase = createClient()
     let q = supabase
       .from('transactions')
-      .select('amount, account_id, budget_id, is_income, transaction_type, date')
+      .select('amount, account_id, budget_id, is_income, transaction_type, date, is_split')
       .gte('date', monthStart)
       .lt('date', monthEnd)
     if (perspective === 'personal') q = q.eq('ownership', 'personal')
@@ -894,6 +896,18 @@ export function CashOverview({
       // Canonieke classificatie (H6): teken van `amount`, niet `is_income`.
       if (isIncomeRow(tx)) continue
       if (!tx.budget_id) continue
+      // Split-OUDER: zijn bedrag staat verdeeld over `transaction_splits`, en
+      // die tabel is hier niet geladen (dit scherm mag er geen client-read bij
+      // krijgen). Hem op zijn eigen budget_id boeken zou het hele bedrag op één
+      // post zetten terwijl de gebruiker het net over meerdere verdeelde. Naar
+      // "Ongecategoriseerd" i.p.v. weggooien, want `totalExpenses` telt hem wél
+      // mee en de kassabon moet op zijn eigen totaalregel uitkomen.
+      // (Vandaag 0 rijen: het formulier schrijft `budget_id = null` bij een
+      // split — dit is de vangrail voor import-/legacy-rijen die dat niet doen.)
+      if (tx.is_split) {
+        orphanAmount += Math.abs(tx.amount)
+        continue
+      }
       const knownBudget = budgetMap.has(tx.budget_id)
       if (!knownBudget) {
         orphanAmount += Math.abs(tx.amount)
@@ -1123,7 +1137,10 @@ export function CashOverview({
     // Aggregate by child budget
     const childMap = new Map<string, number>()
     for (const tx of nonTransferTx) {
-      if (!isIncomeRow(tx) && tx.budget_id && children.some((c) => c.id === tx.budget_id)) {
+      // `!tx.is_split` spiegelt `expensesByBudget`: een split-ouder telt op
+      // geen enkel niveau mee met zijn eigen budget_id — zijn bedragen leven op
+      // `transaction_splits`, die dit scherm niet laadt.
+      if (!isIncomeRow(tx) && !tx.is_split && tx.budget_id && children.some((c) => c.id === tx.budget_id)) {
         childMap.set(tx.budget_id, (childMap.get(tx.budget_id) ?? 0) + Math.abs(tx.amount))
       }
     }

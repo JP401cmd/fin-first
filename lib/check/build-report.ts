@@ -954,6 +954,7 @@ function buildHealth(ctx: EngineContext): CheckReportData['health'] {
       unlinkedCash: 0,
       budgets: [],
       transactions: [],
+      splits: [],
       householdType: ctx.hasPartner ? 'samenwonend' : 'alleenstaand',
       debtMonthlyPayments: debtMonthly,
     },

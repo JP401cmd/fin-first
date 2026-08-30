@@ -5,11 +5,12 @@ import {
   aggSumNegatiefAbs,
   aggIncomeByMonth,
   aggExpenseByMonthAbs,
-  aggAbsByMonthForBudgets,
-  aggAbsByBudgetMonth,
+  aggSpendingByMonthForBudgets,
+  aggSpendingByBudgetMonth,
   aggToExpenseRows,
   type TxMonthAggregateRow,
 } from './tx-aggregates'
+import { spendingContribution } from '@/lib/budget-spending'
 import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 import { savingsRateFromAggregates } from '@/lib/savings-source'
 
@@ -28,6 +29,17 @@ const SAVINGS = 'budget-savings'
 const DEBT = 'budget-debt'
 const savingsBudgetIds = new Set([SAVINGS])
 const debtBudgetIds = new Set([DEBT])
+
+/**
+ * De richting per budget — verplichte input van de besteed-reducers, en dus
+ * ook van de rij-voor-rij referentie waartegen ze hier worden gelegd.
+ * expense/debt = uitgaven-richting, savings = inkomsten-richting.
+ */
+const BUDGET_TYPE_BY_ID = new Map<string, string>([
+  [RENT, 'expense'],
+  [SAVINGS, 'savings'],
+  [DEBT, 'debt'],
+])
 
 const isRealTx = (t: { transaction_type?: string | null }) =>
   t.transaction_type !== 'transfer' && t.transaction_type !== 'joint_transfer'
@@ -92,13 +104,29 @@ function oldIncomeByMonth(rows: Raw[]): Map<string, number> {
   }
   return m
 }
-function oldDebtMonthAgg(rows: Raw[]): Map<string, number> {
-  const m = new Map<string, number>()
-  const hist = [...rows.filter(r => r.amount > 0), ...rows.filter(r => r.amount < 0)].filter(isRealTx)
-  for (const t of hist) {
-    if (!t.budget_id || !debtBudgetIds.has(t.budget_id)) continue
+// ── Referentie voor de BESTEED-reducers: rij voor rij door de canonieke
+//    `spendingContribution` (lib/budget-spending.ts) — de functie die de
+//    budgetten-pagina en de AI-lookup gebruiken. Bewijst dat de aggregaat-vorm
+//    exact dezelfde uitkomst geeft als de rij-vorm, dus dat een sparkline en het
+//    "Besteed"-bedrag erboven niet meer uit elkaar kunnen lopen.
+function rowSpendingByBudgetMonth(rows: Raw[]): Map<string, Map<string, number>> {
+  const out = new Map<string, Map<string, number>>()
+  for (const t of rows) {
+    if (!t.budget_id) continue
+    const v = spendingContribution(t, BUDGET_TYPE_BY_ID.get(t.budget_id))
     const k = t.date.slice(0, 7)
-    m.set(k, (m.get(k) ?? 0) + Math.abs(t.amount))
+    let b = out.get(t.budget_id)
+    if (!b) { b = new Map(); out.set(t.budget_id, b) }
+    b.set(k, (b.get(k) ?? 0) + v)
+  }
+  return out
+}
+function rowSpendingByMonthForBudgets(rows: Raw[], budgetIds: Set<string>): Map<string, number> {
+  const m = new Map<string, number>()
+  for (const t of rows) {
+    if (!t.budget_id || !budgetIds.has(t.budget_id)) continue
+    const k = t.date.slice(0, 7)
+    m.set(k, (m.get(k) ?? 0) + spendingContribution(t, BUDGET_TYPE_BY_ID.get(t.budget_id)))
   }
   return m
 }
@@ -109,6 +137,15 @@ const oldDailyRate = (rows: Raw[]) =>
 function mapEq(a: Map<string, number>, b: Map<string, number>) {
   expect([...a.entries()].sort()).toEqual([...b.entries()].sort())
 }
+/**
+ * Vergelijking van twee maand-maps waarbij een 0-waarde gelijkstaat aan een
+ * ontbrekende sleutel. Nodig omdat de reducers een aggregaat-rij met bijdrage 0
+ * overslaan (géén entry) terwijl de rij-referentie de sleutel wél aanmaakt en
+ * op 0 uitkomt; consumers lezen beide met `?? 0`, dus dat is geen verschil in
+ * uitkomst.
+ */
+const dropZeros = (m: Map<string, number>) =>
+  new Map([...m.entries()].filter(([, v]) => v !== 0))
 
 describe('tx-aggregate parity (oud JS ↔ nieuw aggregaat)', () => {
   const fixture = buildFixture()
@@ -132,7 +169,10 @@ describe('tx-aggregate parity (oud JS ↔ nieuw aggregaat)', () => {
   it('expenseHistory / incomeByMonth / debtMonthAgg buckets — byte-identiek', () => {
     mapEq(aggExpenseByMonthAbs(agg, { realOnly: true }), oldExpenseByMonth(fixture))
     mapEq(aggIncomeByMonth(agg, { realOnly: true }), oldIncomeByMonth(fixture))
-    mapEq(aggAbsByMonthForBudgets(agg, debtBudgetIds, { realOnly: true }), oldDebtMonthAgg(fixture))
+    mapEq(
+      dropZeros(aggSpendingByMonthForBudgets(agg, debtBudgetIds, BUDGET_TYPE_BY_ID)),
+      dropZeros(rowSpendingByMonthForBudgets(fixture, debtBudgetIds)),
+    )
   })
 
   it('dagtarief (recentDailyExpenseRate, transfers meegeteld) — byte-identiek', () => {
@@ -162,32 +202,56 @@ describe('tx-aggregate parity (oud JS ↔ nieuw aggregaat)', () => {
   // De sparkline-fetch in loadCoreData haalde 12 maanden RUWE rijen op zonder
   // `.limit()` en werd dus óók op 1000 afgekapt: budget-sparklines toonden te lage
   // bedragen. Ze consumeren nu hetzelfde aggregaat.
-  describe('core-data-loader budget-sparklines (afkap-regressie)', () => {
-    // Oude rij-pass, letterlijk zoals hij in de loader stond (transfers tellen MEE).
-    function oldSumByBudgetMonth(rows: Raw[]): Map<string, Map<string, number>> {
-      const out = new Map<string, Map<string, number>>()
-      for (const t of rows) {
-        if (!t.budget_id) continue
-        const mKey = t.date.slice(0, 7)
-        let b = out.get(t.budget_id)
-        if (!b) { b = new Map(); out.set(t.budget_id, b) }
-        b.set(mKey, (b.get(mKey) ?? 0) + Math.abs(t.amount))
-      }
-      return out
-    }
+  describe('core-data-loader budget-sparklines (afkap-regressie + richting)', () => {
     const flatten = (m: Map<string, Map<string, number>>) =>
-      [...m.entries()].flatMap(([b, mm]) => [...mm.entries()].map(([k, v]) => `${b}|${k}=${v}`)).sort()
+      [...m.entries()]
+        .flatMap(([b, mm]) => [...mm.entries()].filter(([, v]) => v !== 0).map(([k, v]) => `${b}|${k}=${v}`))
+        .sort()
 
-    it('per-budget maandsommen — byte-identiek aan de volledige rij-pass', () => {
-      expect(flatten(aggAbsByBudgetMonth(agg))).toEqual(flatten(oldSumByBudgetMonth(fixture)))
+    it('per-budget maandsommen — identiek aan de rij-voor-rij besteed-som', () => {
+      expect(flatten(aggSpendingByBudgetMonth(agg, BUDGET_TYPE_BY_ID)))
+        .toEqual(flatten(rowSpendingByBudgetMonth(fixture)))
     })
 
     it('REGRESSIE: de afgekapte rij-pass mist bedragen die het aggregaat wél telt', () => {
-      const capped = oldSumByBudgetMonth(fixture.slice(0, 1000))
-      const full = aggAbsByBudgetMonth(agg)
+      const capped = rowSpendingByBudgetMonth(fixture.slice(0, 1000))
+      const full = aggSpendingByBudgetMonth(agg, BUDGET_TYPE_BY_ID)
       // De huur-sparkline in de recentste maand: 1200×10 + 1200 = 13200 volledig.
       expect(full.get(RENT)?.get('2026-07')).toBe(13200)
       expect(capped.get(RENT)?.get('2026-07') ?? 0).toBeLessThan(13200)
+    })
+
+    it('RICHTING: een inkomst op een uitgaven-budget gaat van de sparkline AF', () => {
+      // De gemelde productie-case in sparkline-vorm: één uitgave van 1.265 met
+      // twee inkomsten van 6.000 en 2.000 op hetzelfde uitgaven-budget.
+      const rows: Raw[] = [
+        { amount: -1265, date: '2026-07-01', budget_id: RENT, transaction_type: null },
+        { amount: 6000, date: '2026-07-02', budget_id: RENT, transaction_type: null },
+        { amount: 2000, date: '2026-07-03', budget_id: RENT, transaction_type: null },
+      ]
+      const m = aggSpendingByBudgetMonth(buildMonthAggregatesFromRows(rows), BUDGET_TYPE_BY_ID)
+      expect(m.get(RENT)?.get('2026-07')).toBe(-6735)
+    })
+
+    it('RICHTING: transfers tellen niet op een uitgaven-budget, wél op archief', () => {
+      const rows: Raw[] = [
+        { amount: -500, date: '2026-07-01', budget_id: RENT, transaction_type: 'transfer' },
+        { amount: -500, date: '2026-07-01', budget_id: 'budget-archief', transaction_type: 'transfer' },
+      ]
+      const types = new Map([...BUDGET_TYPE_BY_ID, ['budget-archief', 'archive']])
+      const m = aggSpendingByBudgetMonth(buildMonthAggregatesFromRows(rows), types)
+      expect(m.get(RENT)).toBeUndefined()
+      expect(m.get('budget-archief')?.get('2026-07')).toBe(500)
+    })
+
+    it('RICHTING: op een spaarbudget IS de positieve rij de realisatie', () => {
+      // Inkomsten-richting: +3.200 met een correctie van −100 geeft 3.100.
+      const rows: Raw[] = [
+        { amount: 3200, date: '2026-07-01', budget_id: SAVINGS, transaction_type: null },
+        { amount: -100, date: '2026-07-02', budget_id: SAVINGS, transaction_type: null },
+      ]
+      const m = aggSpendingByBudgetMonth(buildMonthAggregatesFromRows(rows), BUDGET_TYPE_BY_ID)
+      expect(m.get(SAVINGS)?.get('2026-07')).toBe(3100)
     })
   })
 
