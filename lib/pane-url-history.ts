@@ -25,6 +25,13 @@
  * andere navigatie) al gesloten is — de entry is dan al geconsumeerd en een
  * latere close mag géén extra `back()` doen.
  *
+ * EÉN INSTANTIE PER PANE: open en close moeten dezelfde `createPaneUrlHistory`
+ * delen. Zit de open-actie in een kindcomponent (grid, kassabon-sheet), hijs
+ * 'm dan naar de controller en geef 'm als prop door — anders weet `close()`
+ * niet dat er gepusht is en doet hij een replace bovenop de pane-entry. Dit is
+ * de enige faalmodus die de unit-tests niet zien (die instantiëren er altijd
+ * één); tweemaal gevonden op 30-08-2026 (crypto-grid, holdings-maandkassabon).
+ *
  * BEKENDE BEPERKING (review 29-08-2026): `close()` doet een blinde
  * `router.back()` zonder de isCurrent-/navigatie-detectie van
  * lib/overlay-history.ts. Een `<Link>` of `router.push` BINNEN de pane die

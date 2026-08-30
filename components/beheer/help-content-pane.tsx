@@ -212,7 +212,7 @@ export function HelpContentPane({
     <ShellOverlay
       open={open}
       onClose={onClose}
-      kind="pane"
+      kind="pane" mobileBackCloses
       title={stepLabel ? `Uitleg: ${stepLabel}` : 'Uitleg bewerken'}
       primaryAction={primaryAction}
       secondaryAction={secondaryAction}

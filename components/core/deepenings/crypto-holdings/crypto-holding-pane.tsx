@@ -32,7 +32,8 @@
  * URL-state: deze component is **stateless** voor pane-open/close — de
  * parent (`crypto-holdings-page.tsx`) leest `?crypto=<id>` uit
  * `useSearchParams()` en geeft de holding (of `null`) als prop door.
- * `onClose` ruimt de query-param op via `router.replace()`.
+ * `onClose` ruimt de query-param op via de pane-history van de parent
+ * (`lib/pane-url-history`: back als de pane zelf gepusht is, anders replace).
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'

@@ -41,7 +41,9 @@
  * URL-state: deze component is **stateless** voor pane-open/close — de
  * parent (`holdings-client.tsx`) leest `?holding=<id>` uit
  * `useSearchParams()` en geeft de holding (of `null`) als prop door.
- * `onClose` ruimt de query-param op via `router.replace()`.
+ * `onClose` loopt via de pane-url-history van de parent (open = push,
+ * sluiten = back met replace-fallback — lib/pane-url-history.ts), zodat de
+ * mobiele terugknop de pane sluit in plaats van de route te verlaten.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'

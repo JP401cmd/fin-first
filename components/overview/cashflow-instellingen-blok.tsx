@@ -587,7 +587,7 @@ export function CashflowInstellingenBlok({
       <ShellOverlay
         open={open !== null}
         onClose={closeVenster}
-        kind="pane"
+        kind="pane" mobileBackCloses
         title="Inkomen, uitgaven en spaarquote"
         primaryAction={{ label: 'Klaar', onClick: closeVenster }}
       >

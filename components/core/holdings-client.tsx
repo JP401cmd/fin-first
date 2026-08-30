@@ -30,6 +30,7 @@ import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { HoldingsPageData } from '@/lib/holdings-data-loader'
 import { OVERLAY_QUERY_KEYS } from '@/lib/navigation'
+import { createPaneUrlHistory } from '@/lib/pane-url-history'
 import { PortfolioSummary, PeriodRail } from './holdings/portfolio-summary'
 import { PortfolioValueChart } from './holdings/portfolio-value-chart'
 import {
@@ -326,8 +327,8 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
   // was de enige one-off in de app; sinds `BottomSheet` dit centraal doet
   // (`lib/overlay-history.ts`) zouden beide dezelfde entry claimen en samen
   // dubbel-poppen. De pane (`?holding=<id>`) blijft bewust buiten die centrale
-  // integratie — die regelt z'n close via URL-state (zie `manageHistory` op
-  // `<ShellOverlay kind="pane">`).
+  // integratie — die regelt z'n eigen entry via `lib/pane-url-history`
+  // (open = push / sluit = back; zie `paneHistory` verderop).
 
   // On mount, check if we arrived here via back-button after a form submission
   // and prevent re-opening the form
@@ -663,29 +664,52 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
     }
   }, [holdings, requestedHoldingId])
 
-  // Open de pane door alleen `?holding=<id>` aan de URL toe te voegen —
-  // overige query-state (bv. `?asset=…` deeplink-filter) blijft bestaan.
-  // `router.replace` ipv `push` zodat schakelen tussen posities niet de
-  // history vervuilt; het pane-open-moment zelf is één history-entry,
-  // ongeacht hoeveel rijen de gebruiker bekijkt voordat ze sluiten.
+  // Pane-URL-bouwer — muteert alleen de pane-param en behoudt pathname +
+  // overige query-state (bv. `?asset=…` deeplink-filter, `?tab=holdings`).
+  const buildPaneUrl = useCallback(
+    (mutate: (params: URLSearchParams) => void) => {
+      const params = new URLSearchParams(searchParams.toString())
+      mutate(params)
+      const qs = params.toString()
+      return qs ? `${pathname}?${qs}` : pathname
+    },
+    [pathname, searchParams],
+  )
+
+  // History-beleid voor de URL-gedreven pane (B-012, `lib/pane-url-history`):
+  // open vanaf gesloten = push (de mobiele terugknop sluit de pane i.p.v. de
+  // route te verlaten), wisselen tussen posities = replace (zie de guard in
+  // `open()`: één entry per pane-sessie, ongeacht hoeveel rijen de gebruiker
+  // bekijkt voordat ze sluiten), sluiten = back, deeplink = replace-fallback.
+  const paneHistory = useMemo(() => createPaneUrlHistory(router), [router])
+
+  // Sloot de terugknop (popstate) de pane zelf, dan is de eigen history-entry
+  // al geconsumeerd — een latere programmatische close mag geen extra back doen.
+  const paneOpenRef = useRef(requestedHoldingId != null)
+  useEffect(() => {
+    if (requestedHoldingId == null && paneOpenRef.current) paneHistory.reset()
+    paneOpenRef.current = requestedHoldingId != null
+  }, [requestedHoldingId, paneHistory])
+
+  // Open de pane door alleen `?holding=<id>` aan de URL toe te voegen.
   const openHoldingPane = useCallback(
     (id: string) => {
-      const params = new URLSearchParams(searchParams.toString())
-      params.set(OVERLAY_QUERY_KEYS.holding, id)
-      router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+      paneHistory.open(
+        buildPaneUrl((params) => params.set(OVERLAY_QUERY_KEYS.holding, id)),
+        requestedHoldingId != null,
+      )
     },
-    [router, pathname, searchParams],
+    [paneHistory, buildPaneUrl, requestedHoldingId],
   )
 
   // Sluit de pane door alleen `?holding=` uit de URL te halen — overige
   // query-state blijft behouden zodat de gebruiker terugkeert naar
   // dezelfde context.
   const closeHoldingPane = useCallback(() => {
-    const params = new URLSearchParams(searchParams.toString())
-    params.delete(OVERLAY_QUERY_KEYS.holding)
-    const qs = params.toString()
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
-  }, [router, pathname, searchParams])
+    paneHistory.close(
+      buildPaneUrl((params) => params.delete(OVERLAY_QUERY_KEYS.holding)),
+    )
+  }, [paneHistory, buildPaneUrl])
 
   // Pane-callback bij save/delete — laad de holdings opnieuw zodat de
   // KPI-strip en figures-strip de nieuwe waarden tonen.
@@ -935,6 +959,7 @@ export default function HoldingsPage({ initialData }: { initialData?: HoldingsPa
         <PortfolioValueChart
           months={chartMonths}
           yearlyEssentialExpenses={initialData?.yearlyEssentialExpenses ?? 0}
+          onOpenHolding={openHoldingPane}
         />
       </section>
 

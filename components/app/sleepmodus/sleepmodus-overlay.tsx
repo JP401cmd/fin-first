@@ -39,6 +39,7 @@ import {
 import { getEventCoordinates } from '@dnd-kit/utilities'
 import { Loader2, Save, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { pushOverlayHistory } from '@/lib/overlay-history'
 import { loadAutoCatContext } from '@/lib/auto-categorize-context'
 import { buildAssignmentPlan, applyAssignmentPlan } from '@/lib/category-rules'
 import { suggestTarget } from '@/lib/sleepmodus/suggest'
@@ -263,6 +264,17 @@ export function SleepmodusOverlay({
 }: Props) {
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
+
+  // Terugknop verlaat de sleepmodus langs dezelfde weg als de X (onExit) in
+  // plaats van de pagina te verlaten met de modus nog open — zelfde
+  // overlay-history-mechaniek als BottomSheet (audit 30-08-2026). De overlay
+  // is alleen gemount terwijl de modus actief is, dus de entry leeft precies
+  // zo lang als de modus zelf.
+  const onExitRef = useRef(onExit)
+  onExitRef.current = onExit
+  useEffect(() => {
+    return pushOverlayHistory(() => onExitRef.current())
+  }, [])
 
   const [state, dispatch] = useReducer(sleepmodusReducer, transactions, initQueue)
   const [ctx, setCtx] = useState<AutoCatContext | null>(null)

@@ -12,6 +12,9 @@ import {
   formatFreedomTimeString,
 } from '@/lib/format'
 
+/** Vereiste prop sinds de pane-url-history-koppeling; deze suite toetst de grafiek, niet het open-gedrag. */
+const noopOpenHolding = () => {}
+
 /**
  * De historische waardegrafiek van de effectenportefeuille.
  *
@@ -131,7 +134,7 @@ afterEach(() => {
 describe('PortfolioValueChart — met data', () => {
   it('tekent de marktwaarde-lijn en toont de stand van vandaag', async () => {
     mockHistory(response())
-    render(<PortfolioValueChart />)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} />)
 
     expect(await screen.findByTestId('portfolio-value-chart')).toBeInTheDocument()
     expect(screen.getByTestId('portfolio-value-market-line')).toBeInTheDocument()
@@ -149,7 +152,7 @@ describe('PortfolioValueChart — met data', () => {
   // niet achter een toggle: weg.
   it('toont geen inleg-lijn, geen INLEG/VERSCHIL-legenda en geen verschil-getal', async () => {
     mockHistory(response())
-    render(<PortfolioValueChart />)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} />)
 
     await screen.findByTestId('portfolio-value-chart')
     expect(screen.queryByTestId('portfolio-value-cost-line')).toBeNull()
@@ -162,7 +165,7 @@ describe('PortfolioValueChart — met data', () => {
 
   it('vraagt het opgegeven aantal maanden op bij de route', async () => {
     const fetchMock = mockHistory(response())
-    render(<PortfolioValueChart months={36} />)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} months={36} />)
 
     await screen.findByTestId('portfolio-value-chart')
     expect(fetchMock).toHaveBeenCalledWith(
@@ -177,7 +180,7 @@ describe('PortfolioValueChart — met data', () => {
   // lege of foute reeks laten teruggeven.
   it('laat de months-param weg bij months={null}', async () => {
     const fetchMock = mockHistory(response())
-    render(<PortfolioValueChart months={null} />)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} months={null} />)
 
     await screen.findByTestId('portfolio-value-chart')
     expect(fetchMock).toHaveBeenCalledWith(
@@ -188,7 +191,7 @@ describe('PortfolioValueChart — met data', () => {
 
   it('vat de trend samen in het aria-label van de SVG', async () => {
     mockHistory(response())
-    render(<PortfolioValueChart />)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} />)
 
     const svg = await screen.findByTestId('portfolio-value-chart-svg')
     expect(svg).toHaveAttribute('role', 'img')
@@ -201,7 +204,7 @@ describe('PortfolioValueChart — met data', () => {
   it('vertaalt de eindwaarde naar vrijheidstijd wanneer de uitgaven bekend zijn', async () => {
     mockHistory(response())
     const yearlyEssentialExpenses = 18_250
-    render(<PortfolioValueChart yearlyEssentialExpenses={yearlyEssentialExpenses} />)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} yearlyEssentialExpenses={yearlyEssentialExpenses} />)
 
     // Pin de gerénderde tekst tegen de canonieke motor voor dezelfde input:
     // dagtarief via dailyExpenseRate (×12/365), tijd via calculateFreedomTime.
@@ -221,7 +224,7 @@ describe('PortfolioValueChart — met data', () => {
 
   it('laat de vrijheidsregel weg zonder bekende uitgaven', async () => {
     mockHistory(response())
-    render(<PortfolioValueChart />)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} />)
 
     await screen.findByTestId('portfolio-value-chart')
     expect(screen.queryByTestId('portfolio-value-freedom')).toBeNull()
@@ -231,7 +234,7 @@ describe('PortfolioValueChart — met data', () => {
 describe('PortfolioValueChart — weergave lijn ⇄ balken', () => {
   it('wisselt naar balken en onthoudt die keuze', async () => {
     mockHistory(response())
-    render(<PortfolioValueChart />)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} />)
 
     await screen.findByTestId('portfolio-value-chart')
     // Start op de lijn.
@@ -249,7 +252,7 @@ describe('PortfolioValueChart — weergave lijn ⇄ balken', () => {
   it('herstelt de opgeslagen weergave bij een volgend bezoek', async () => {
     localStorage.setItem('holdings-value-chart-mode', 'bars')
     mockHistory(response())
-    render(<PortfolioValueChart />)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} />)
 
     await screen.findByTestId('portfolio-value-chart')
     expect(screen.getByTestId('value-chart-toggle-bars')).toHaveAttribute('aria-pressed', 'true')
@@ -268,7 +271,7 @@ describe('PortfolioValueChart — weergave lijn ⇄ balken', () => {
     )
     mockHistory(response({ points: withRest }))
     localStorage.setItem('holdings-value-chart-mode', 'bars')
-    render(<PortfolioValueChart />)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} />)
 
     await screen.findByTestId('portfolio-value-chart')
     // Eerste maand: drie posities, geen staart.
@@ -284,7 +287,7 @@ describe('PortfolioValueChart — weergave lijn ⇄ balken', () => {
   // Then valt de grafiek terug op de lijn mét melding — geen lege as, geen crash.
   it('valt terug op de lijn wanneer de reeks geen verdeling per positie draagt', async () => {
     mockHistory(response({ points: pointsWithoutBreakdown() }))
-    render(<PortfolioValueChart />)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} />)
 
     await screen.findByTestId('portfolio-value-chart')
     fireEvent.click(screen.getByTestId('value-chart-toggle-bars'))
@@ -301,7 +304,7 @@ describe('PortfolioValueChart — kassabon achter een maand', () => {
   it('opent bij een kolom-klik de posities van díé maand', async () => {
     localStorage.setItem('holdings-value-chart-mode', 'bars')
     mockHistory(response())
-    render(<PortfolioValueChart />)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} />)
 
     await screen.findByTestId('portfolio-value-chart')
     fireEvent.click(screen.getByTestId('portfolio-value-bar-hit-5'))
@@ -321,7 +324,7 @@ describe('PortfolioValueChart — kassabon achter een maand', () => {
   it('toont de posities van de aangeklikte maand, niet die van de laatste', async () => {
     localStorage.setItem('holdings-value-chart-mode', 'bars')
     mockHistory(response())
-    render(<PortfolioValueChart />)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} />)
 
     await screen.findByTestId('portfolio-value-chart')
     fireEvent.click(screen.getByTestId('portfolio-value-bar-hit-0'))
@@ -338,7 +341,7 @@ describe('PortfolioValueChart — kassabon achter een maand', () => {
     )
     localStorage.setItem('holdings-value-chart-mode', 'bars')
     mockHistory(response({ points: withRest }))
-    render(<PortfolioValueChart />)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} />)
 
     await screen.findByTestId('portfolio-value-chart')
     fireEvent.click(screen.getByTestId('portfolio-value-bar-hit-5'))
@@ -346,10 +349,15 @@ describe('PortfolioValueChart — kassabon achter een maand', () => {
     expect(await screen.findByTestId('portfolio-month-rest')).toHaveTextContent('nog 7 posities')
   })
 
-  it('navigeert bij een rij-klik naar de detail-pane van die positie', async () => {
+  it('opent bij een rij-klik de detail-pane via de controller (onOpenHolding), niet via een eigen replace', async () => {
+    // Sinds de terugknop-audit deelt de kassabon de pane-url-history van
+    // holdings-client: de rij levert alleen de intentie (onOpenHolding) aan en
+    // schrijft zélf geen URL meer — een eigen router.replace was het tweede
+    // open-pad zonder terugknop-sluitgedrag.
     localStorage.setItem('holdings-value-chart-mode', 'bars')
     mockHistory(response())
-    render(<PortfolioValueChart />)
+    const openHolding = vi.fn()
+    render(<PortfolioValueChart onOpenHolding={openHolding} />)
 
     await screen.findByTestId('portfolio-value-chart')
     fireEvent.click(screen.getByTestId('portfolio-value-bar-hit-5'))
@@ -357,10 +365,8 @@ describe('PortfolioValueChart — kassabon achter een maand', () => {
 
     fireEvent.click(screen.getByTestId('portfolio-month-row-h-2'))
 
-    expect(replaceMock).toHaveBeenCalledWith(
-      '/core/assets/holdings?holding=h-2',
-      { scroll: false },
-    )
+    expect(openHolding).toHaveBeenCalledWith('h-2')
+    expect(replaceMock).not.toHaveBeenCalled()
   })
 })
 
@@ -390,7 +396,7 @@ describe('PortfolioValueChart — kleur per positie', () => {
   it('kleurt hoogstens twaalf posities eigen en laat de staart samenvallen met de rest-kleur', async () => {
     localStorage.setItem('holdings-value-chart-mode', 'bars')
     mockHistory(response({ points: manyHoldings(31) }))
-    render(<PortfolioValueChart />)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} />)
 
     await screen.findByTestId('portfolio-value-chart')
     const fills = screen
@@ -412,7 +418,7 @@ describe('PortfolioValueChart — toetsenbord (roving tabindex)', () => {
   async function renderBars() {
     localStorage.setItem('holdings-value-chart-mode', 'bars')
     mockHistory(response())
-    render(<PortfolioValueChart />)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} />)
     await screen.findByTestId('portfolio-value-chart')
   }
 
@@ -504,19 +510,19 @@ describe('PortfolioValueChart — venster-cache', () => {
   // koershistorie, en bij "Alles" is de payload ~1400 verrijkte regels.
   it('haalt een eerder bekeken venster niet opnieuw op', async () => {
     const fetchMock = mockHistory(response())
-    const { rerender } = render(<PortfolioValueChart months={12} />)
+    const { rerender } = render(<PortfolioValueChart onOpenHolding={noopOpenHolding} months={12} />)
 
     await screen.findByTestId('portfolio-value-chart')
     expect(fetchMock).toHaveBeenCalledTimes(1)
 
-    rerender(<PortfolioValueChart months={36} />)
+    rerender(<PortfolioValueChart onOpenHolding={noopOpenHolding} months={36} />)
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
 
-    rerender(<PortfolioValueChart months={12} />)
+    rerender(<PortfolioValueChart onOpenHolding={noopOpenHolding} months={12} />)
     await screen.findByTestId('portfolio-value-chart')
     expect(fetchMock).toHaveBeenCalledTimes(2)
 
-    rerender(<PortfolioValueChart months={36} />)
+    rerender(<PortfolioValueChart onOpenHolding={noopOpenHolding} months={36} />)
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
@@ -531,11 +537,11 @@ describe('PortfolioValueChart — venster-cache', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    const { rerender } = render(<PortfolioValueChart months={12} />)
+    const { rerender } = render(<PortfolioValueChart onOpenHolding={noopOpenHolding} months={12} />)
     await screen.findByTestId('portfolio-value-chart')
     expect(screen.getByTestId('portfolio-value-chart')).not.toHaveAttribute('aria-busy')
 
-    rerender(<PortfolioValueChart months={36} />)
+    rerender(<PortfolioValueChart onOpenHolding={noopOpenHolding} months={36} />)
 
     // De vorige reeks blijft staan (geen skeleton-flits) maar zegt eerlijk dat
     // hij nog niet bij de zojuist gekozen periode hoort.
@@ -561,7 +567,7 @@ describe('PortfolioValueChart — venster-cache', () => {
       .mockResolvedValue({ ok: true, status: 200, json: async () => response() })
     vi.stubGlobal('fetch', fetchMock)
 
-    render(<PortfolioValueChart months={12} />)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} months={12} />)
     await screen.findByTestId('portfolio-value-chart-error')
 
     fireEvent.click(screen.getByRole('button', { name: /Opnieuw proberen/i }))
@@ -580,7 +586,7 @@ describe('PortfolioValueChart — eerlijke grondslag', () => {
         totalHoldings: 4,
       }),
     )
-    render(<PortfolioValueChart />)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} />)
 
     const note = await screen.findByTestId('portfolio-value-basis-note')
     expect(note).toHaveTextContent(
@@ -615,7 +621,7 @@ describe('PortfolioValueChart — eerlijke grondslag', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    render(<PortfolioValueChart />)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} />)
     await screen.findByTestId('portfolio-value-basis-note')
 
     const knop = screen.getByRole('button', { name: /koershistorie ophalen/i })
@@ -650,7 +656,7 @@ describe('PortfolioValueChart — eerlijke grondslag', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    render(<PortfolioValueChart />)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} />)
     await screen.findByTestId('portfolio-value-basis-note')
     fireEvent.click(screen.getByRole('button', { name: /koershistorie ophalen/i }))
 
@@ -661,7 +667,7 @@ describe('PortfolioValueChart — eerlijke grondslag', () => {
 
   it('laat de uitweg weg wanneer er niets op te halen valt', async () => {
     mockHistory(response({ averagePricedFromMarket: 1, holdingsWithoutMarketPriceCount: 0 }))
-    render(<PortfolioValueChart />)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} />)
 
     await screen.findByTestId('portfolio-value-chart')
     expect(screen.queryByRole('button', { name: /koershistorie ophalen/i })).toBeNull()
@@ -669,7 +675,7 @@ describe('PortfolioValueChart — eerlijke grondslag', () => {
 
   it('verzint geen 100% bij een net-niet-volledige dekking', async () => {
     mockHistory(response({ averagePricedFromMarket: 0.998 }))
-    render(<PortfolioValueChart />)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} />)
 
     // 0,998 rondt naar 100 af; dat zou "alles op marktkoersen" beweren terwijl
     // de regel juist zegt dat er een rest is. Knijp naar 99.
@@ -679,7 +685,7 @@ describe('PortfolioValueChart — eerlijke grondslag', () => {
 
   it('laat de regel weg wanneer alles op marktkoersen staat', async () => {
     mockHistory(response({ averagePricedFromMarket: 1 }))
-    render(<PortfolioValueChart />)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} />)
 
     await screen.findByTestId('portfolio-value-chart')
     expect(screen.queryByTestId('portfolio-value-basis-note')).toBeNull()
@@ -693,7 +699,7 @@ describe('PortfolioValueChart — lege staat', () => {
     )
     // `months={null}` = de volledige historie. Alleen dán kan het venster niets
     // hebben afgesneden en is "er is geen historie" de juiste verklaring.
-    render(<PortfolioValueChart months={null} />)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} months={null} />)
 
     const empty = await screen.findByTestId('portfolio-value-chart-empty')
     expect(empty).toHaveTextContent('Er is nog geen transactiehistorie')
@@ -713,7 +719,7 @@ describe('PortfolioValueChart — lege staat', () => {
     mockHistory(
       response({ points: [], averagePricedFromMarket: 0, totalHoldings: 12 }),
     )
-    render(<PortfolioValueChart months={1} />)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} months={1} />)
 
     const empty = await screen.findByTestId('portfolio-value-chart-empty')
     expect(empty).toHaveTextContent('te weinig maandpunten')
@@ -723,7 +729,7 @@ describe('PortfolioValueChart — lege staat', () => {
 
   it('behandelt één datapunt óók als "nog geen verloop"', async () => {
     mockHistory(response({ points: [point('2026-02-01', 12_900, 11_000)] }))
-    render(<PortfolioValueChart />)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} />)
 
     expect(await screen.findByTestId('portfolio-value-chart-empty')).toBeInTheDocument()
   })
@@ -732,7 +738,7 @@ describe('PortfolioValueChart — lege staat', () => {
 describe('PortfolioValueChart — fout', () => {
   it('degradeert stil, zonder rode banner, mét herstelpad', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
-    render(<PortfolioValueChart />)
+    render(<PortfolioValueChart onOpenHolding={noopOpenHolding} />)
 
     const failed = await screen.findByTestId('portfolio-value-chart-error')
     expect(failed).toHaveTextContent('Het waardeverloop is nu niet op te halen')

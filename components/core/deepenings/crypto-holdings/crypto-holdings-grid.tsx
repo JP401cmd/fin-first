@@ -10,13 +10,11 @@
 // Filter: optionele bron-filter via prop (host-controlled — zie
 // `crypto-source-breakdown.tsx` voor de selectie-UI).
 
-import { useCallback, useMemo } from 'react'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useMemo } from 'react'
 import { ArrowDownAZ, ArrowDownWideNarrow, LayoutGrid, List, TrendingUp, Hash } from 'lucide-react'
 import type { CryptoHoldingRow, CryptoSparklinePoint } from '@/lib/crypto-holdings-data'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
-import { OVERLAY_QUERY_KEYS } from '@/lib/navigation'
 import { CryptoHoldingCard } from '@/components/holdings/crypto-holding-card'
 import { CryptoSparkline } from '@/components/holdings/crypto-sparkline'
 import { labelForSource } from './crypto-source-breakdown'
@@ -40,6 +38,14 @@ interface CryptoHoldingsGridProps {
    * werken; alleen de tabel-view gebruikt hem.
    */
   sparklinesByHoldingId?: Record<string, CryptoSparklinePoint[]>
+  /**
+   * Opent de coin-detail pane (`?crypto=<id>`). Komt van de host-pagina
+   * (`crypto-holdings-page.tsx`) en NIET meer uit een eigen `router`-call hier:
+   * openen én sluiten moeten dezelfde `createPaneUrlHistory`-instantie delen,
+   * anders weet de sluit-actie niet dat er een history-entry gepusht is (B-012).
+   * Bewust gedeeld tussen card-view en table-view zodat het gedrag identiek is.
+   */
+  onOpenHolding: (holding: CryptoHoldingRow) => void
 }
 
 export function CryptoHoldingsGrid({
@@ -50,27 +56,8 @@ export function CryptoHoldingsGrid({
   onViewModeChange,
   sourceFilter,
   sparklinesByHoldingId,
+  onOpenHolding,
 }: CryptoHoldingsGridProps) {
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-
-  // Open de coin-detail pane door alleen `?crypto=<id>` aan de URL toe te
-  // voegen — overige query-state (bv. `?tab=crypto-holdings` of een actieve
-  // `?source=…`-filter) blijft bestaan. `router.replace` ipv `push` zodat
-  // schakelen tussen coins niet de history vervuilt; de pane-open zelf is
-  // dan één history-entry, ongeacht hoeveel coins de gebruiker bekijkt
-  // voordat ze sluiten. Bewust gedeeld tussen card-view en table-view zodat
-  // het gedrag gegarandeerd identiek is.
-  const openHolding = useCallback(
-    (holding: CryptoHoldingRow) => {
-      const params = new URLSearchParams(searchParams.toString())
-      params.set(OVERLAY_QUERY_KEYS.cryptoHolding, holding.id)
-      router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-    },
-    [router, pathname, searchParams],
-  )
-
   const filtered = useMemo(() => {
     if (!sourceFilter) return holdings
     return holdings.filter((h) => labelForSource(h) === sourceFilter)
@@ -123,7 +110,7 @@ export function CryptoHoldingsGrid({
               key={h.id}
               holding={h}
               staggerIndex={idx}
-              onClick={openHolding}
+              onClick={onOpenHolding}
             />
           ))}
         </div>
@@ -131,7 +118,7 @@ export function CryptoHoldingsGrid({
         <CryptoHoldingsTable
           holdings={sorted}
           sparklinesByHoldingId={sparklinesByHoldingId}
-          onOpenHolding={openHolding}
+          onOpenHolding={onOpenHolding}
         />
       )}
     </section>
@@ -255,7 +242,7 @@ interface CryptoHoldingsTableProps {
   /**
    * Click-handler die de coin-detail pane opent — gedeeld met de card-view
    * zodat beide weergaven exact hetzelfde gedrag hebben (URL-state
-   * `?crypto=<id>` via `router.replace`).
+   * `?crypto=<id>`, gepusht via de pane-history van de host-pagina).
    */
   onOpenHolding: (holding: CryptoHoldingRow) => void
 }

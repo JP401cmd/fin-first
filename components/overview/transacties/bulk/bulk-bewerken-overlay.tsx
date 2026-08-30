@@ -579,7 +579,7 @@ export function BulkBewerkenOverlay({
       <ShellOverlay
         open={open}
         onClose={onClose}
-        kind="pane"
+        kind="pane" mobileBackCloses
         title="Zoeken en bulkbewerken"
         footerInfo={
           hasSelection ? (

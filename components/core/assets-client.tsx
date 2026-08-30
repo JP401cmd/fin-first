@@ -14,6 +14,7 @@ import { useOptionalToast } from '@/components/app/toast-provider'
 import { Kicker, FiguresStrip, PageInfoButton, GlossaryTerm, PageOpening, SubtotalLine, type FigureProps } from '@/components/editorial'
 import { buildAssetReturnBreakdown, formatGainPct, RETURN_BASIS_LABELS } from '@/lib/asset-return'
 import { OVERLAY_QUERY_KEYS } from '@/lib/navigation'
+import { createPaneUrlHistory } from '@/lib/pane-url-history'
 import { AssetReturnModal } from './asset-return-modal'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
@@ -728,27 +729,56 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
   const futureValue = projection.length > 0 ? projection[projection.length - 1].total : totalValue
   const projectedGrowth = futureValue - totalValue
 
-  // URL-state setter — pane-open/-close wisselt `?asset=<id>` via shallow
-  // route-replace. Optionele `editMode` zet de extra key `edit=1` zodat
-  // de bewerk-knop op de kaart één klik direct in edit-mode landt. Bij
+  // Pane-URL-bouwer — muteert alleen de pane-params en behoudt de HUIDIGE
+  // pathname. Deze client draait namelijk óók als embed onder
+  // `/overzicht/bezittingen` (zie `components/overview/bezittingen-view.tsx`);
+  // de vroegere hardgecodeerde `/core/assets`-basis wisselde daar bij elke
+  // pane-actie de hele route. Spiegelt `closeReturnModal` hieronder en
+  // `buildPaneUrl` in `components/app/budgets-client.tsx`.
+  const buildPaneUrl = useCallback(
+    (mutate: (params: URLSearchParams) => void) => {
+      const params = new URLSearchParams(searchParams.toString())
+      mutate(params)
+      const queryString = params.toString()
+      return queryString ? `${pathname}?${queryString}` : pathname
+    },
+    [pathname, searchParams],
+  )
+
+  // History-beleid voor de URL-gedreven pane (B-012, `lib/pane-url-history`):
+  // open vanaf gesloten = push (de mobiele terugknop sluit de pane en blijft
+  // op deze pagina i.p.v. de route te verlaten), wisselen binnen een open pane
+  // = replace (één entry per pane-sessie), programmatisch sluiten = back
+  // (consumeert die entry), deeplink zonder eigen entry = replace-fallback.
+  const paneHistory = useMemo(() => createPaneUrlHistory(router), [router])
+
+  // Sloot de terugknop (popstate) de pane zelf, dan is de eigen history-entry
+  // al geconsumeerd — een latere programmatische close mag geen extra back doen.
+  const paneOpenRef = useRef(requestedAssetId != null)
+  useEffect(() => {
+    if (requestedAssetId == null && paneOpenRef.current) paneHistory.reset()
+    paneOpenRef.current = requestedAssetId != null
+  }, [requestedAssetId, paneHistory])
+
+  // URL-state setter — pane-open/-close wisselt `?asset=<id>` via de
+  // pane-history hierboven. Optionele `editMode` zet de extra key `edit=1`
+  // zodat de bewerk-knop op de kaart één klik direct in edit-mode landt. Bij
   // sluiten (`id === null`) worden alle keys gestript.
   const setSelectedAssetId = useCallback(
     (id: string | null, editMode = false) => {
-      const params = new URLSearchParams(searchParams.toString())
-      params.delete('edit')
-      if (id) {
-        params.set('asset', id)
-        if (editMode) params.set('edit', '1')
-      } else {
-        params.delete('asset')
-      }
-      const queryString = params.toString()
-      router.replace(
-        `/core/assets${queryString ? `?${queryString}` : ''}`,
-        { scroll: false },
-      )
+      const url = buildPaneUrl((params) => {
+        params.delete('edit')
+        if (id) {
+          params.set('asset', id)
+          if (editMode) params.set('edit', '1')
+        } else {
+          params.delete('asset')
+        }
+      })
+      if (id) paneHistory.open(url, requestedAssetId != null)
+      else paneHistory.close(url)
     },
-    [router, searchParams],
+    [buildPaneUrl, paneHistory, requestedAssetId],
   )
 
   // Sluiten van de rekenmodal ruimt de deeplink-param op, zodat een refresh of
@@ -773,7 +803,11 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
 
   // Initial deep-link via prop (gebruikt door de core-page modal-embed):
   // promote prop naar URL-state op de eerste render zodat alle vervolg-
-  // navigatie via dezelfde URL-driven flow loopt.
+  // navigatie via dezelfde URL-driven flow loopt. Bewust een kale
+  // `router.replace` en NIET `paneHistory.open()`: dit is een deeplink, geen
+  // gebruikersactie — er hoort geen eigen history-entry bij (sluiten valt dan
+  // terug op de replace-strip van de helper). Spiegelt het
+  // `hasInitialRedirected`-effect in `budgets-client.tsx`.
   const initialAssetIdAppliedRef = useRef(false)
   useEffect(() => {
     if (initialAssetIdAppliedRef.current) return
@@ -785,9 +819,15 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
     const found = assets.find(a => a.id === initialAssetId)
     if (found) {
       initialAssetIdAppliedRef.current = true
-      setSelectedAssetId(initialAssetId)
+      router.replace(
+        buildPaneUrl((params) => {
+          params.delete('edit')
+          params.set('asset', initialAssetId)
+        }),
+        { scroll: false },
+      )
     }
-  }, [initialAssetId, loading, assets, requestedAssetId, setSelectedAssetId])
+  }, [initialAssetId, loading, assets, requestedAssetId, router, buildPaneUrl])
 
   // Snelle acties vanuit de kaart-actie-rij. Bewerken opent de detail-pane
   // in edit-mode op de huidige pagina (geen cash-deeplink — de gebruiker

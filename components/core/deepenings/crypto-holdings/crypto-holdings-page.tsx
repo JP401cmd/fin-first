@@ -16,7 +16,7 @@
 // initial state; alleen view-state (sortering, filter, view-mode, periode)
 // leeft hier in `useState`.
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Coins, Plug, Wallet } from 'lucide-react'
 import {
@@ -32,6 +32,7 @@ import {
   type CryptoFeesSummary,
 } from '@/lib/crypto-holdings-data'
 import { OVERLAY_QUERY_KEYS } from '@/lib/navigation'
+import { createPaneUrlHistory } from '@/lib/pane-url-history'
 import { CryptoKpiStrip } from './crypto-kpi-strip'
 import { CryptoDistributionPanel } from './crypto-distribution-panel'
 import { CryptoPerformanceChart } from './crypto-performance-chart'
@@ -119,18 +120,58 @@ export function CryptoHoldingsPage({
     ? sparklinesByHoldingId[selectedHolding.id]
     : undefined
 
-  // Sluit de pane door alleen `?crypto=` uit de URL te halen — overige
-  // query-state (zoals `?tab=crypto-holdings`) blijft behouden zodat de
-  // gebruiker terugkeert naar dezelfde tab. `router.replace` ipv `push`
-  // omdat één pane-open al een history-entry kostte (zie click-handlers
-  // in `crypto-holdings-grid.tsx`); sluit-actie hoeft daar niet bovenop
-  // te stapelen.
+  // Pane-URL-bouwer — muteert alleen de pane-param; overige query-state
+  // (zoals `?tab=crypto-holdings` of een actieve `?source=…`-filter) en de
+  // pathname blijven staan zodat de gebruiker in dezelfde tab terugkeert.
+  const buildPaneUrl = useCallback(
+    (mutate: (params: URLSearchParams) => void) => {
+      const params = new URLSearchParams(searchParams.toString())
+      mutate(params)
+      const qs = params.toString()
+      return qs ? `${pathname}?${qs}` : pathname
+    },
+    [pathname, searchParams],
+  )
+
+  // History-beleid voor de URL-gedreven pane (B-012, `lib/pane-url-history`):
+  // open vanaf gesloten = push (de mobiele terugknop sluit de pane i.p.v. de
+  // hele route te verlaten), wisselen van coin = replace (één entry per
+  // pane-sessie), sluiten = back, deeplink = replace-fallback.
+  //
+  // De OPEN-actie woont hier en niet meer in `crypto-holdings-grid.tsx`: open
+  // en sluit moeten dezelfde helper-instantie delen, anders weet `close()`
+  // niet dat er een entry gepusht is en doet hij een replace bovenop de
+  // pane-entry (= terugknop opent de pane opnieuw).
+  const paneHistory = useMemo(() => createPaneUrlHistory(router), [router])
+
+  // Sloot de terugknop (popstate) de pane zelf, dan is de eigen history-entry
+  // al geconsumeerd — een latere programmatische close mag geen extra back doen.
+  const paneOpenRef = useRef(requestedHoldingId != null)
+  useEffect(() => {
+    if (requestedHoldingId == null && paneOpenRef.current) paneHistory.reset()
+    paneOpenRef.current = requestedHoldingId != null
+  }, [requestedHoldingId, paneHistory])
+
+  const openPane = useCallback(
+    (holding: CryptoHoldingRow) => {
+      paneHistory.open(
+        buildPaneUrl((params) =>
+          params.set(OVERLAY_QUERY_KEYS.cryptoHolding, holding.id),
+        ),
+        requestedHoldingId != null,
+      )
+    },
+    [paneHistory, buildPaneUrl, requestedHoldingId],
+  )
+
+  // Sluit de pane door alleen `?crypto=` uit de URL te halen.
   const closePane = useCallback(() => {
-    const params = new URLSearchParams(searchParams.toString())
-    params.delete(OVERLAY_QUERY_KEYS.cryptoHolding)
-    const qs = params.toString()
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
-  }, [router, pathname, searchParams])
+    paneHistory.close(
+      buildPaneUrl((params) =>
+        params.delete(OVERLAY_QUERY_KEYS.cryptoHolding),
+      ),
+    )
+  }, [paneHistory, buildPaneUrl])
 
   // Pane-callback bij save/delete — laad de page-bundle opnieuw zodat de
   // holdings-list, KPI-strip en figures-strip de nieuwe waarden tonen.
@@ -217,6 +258,7 @@ export function CryptoHoldingsPage({
         onViewModeChange={setViewMode}
         sourceFilter={sourceFilter}
         sparklinesByHoldingId={sparklinesByHoldingId}
+        onOpenHolding={openPane}
       />
 
       {/* 5. Recente transacties (alleen als er trades zijn) */}

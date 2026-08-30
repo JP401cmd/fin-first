@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useScrollLock } from '@/lib/hooks/use-scroll-lock'
+import { pushOverlayHistory } from '@/lib/overlay-history'
 import {
   Share2,
   Download,
@@ -126,6 +127,17 @@ export function ShareDialog({
   const [webShareSupported, setWebShareSupported] = useState(false)
   const dialogRef = useRef<HTMLDivElement>(null)
   const toast = useToast()
+
+  // Terugknop sluit de dialog, niet de pagina — zelfde mechaniek als
+  // BottomSheet (één entry per open dialog; cleanup consumeert 'm weer).
+  // Dit was de enige hand-rolled overlay op de uitzonderingslijst zonder
+  // history-integratie (audit 30-08-2026).
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+  useEffect(() => {
+    if (!open) return
+    return pushOverlayHistory(() => onCloseRef.current())
+  }, [open])
 
   // Check Web Share API support on mount
   useEffect(() => {

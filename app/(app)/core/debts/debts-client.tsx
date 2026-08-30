@@ -31,6 +31,7 @@ import {
 import { formatOwnershipSubline } from '@/lib/household-data'
 import { DebtPayoffStrategy } from '@/components/core/deepenings/debt-payoff-strategy'
 import { OVERLAY_QUERY_KEYS } from '@/lib/navigation'
+import { createPaneUrlHistory } from '@/lib/pane-url-history'
 import { formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 
@@ -334,24 +335,55 @@ export function DebtsClient({ toolbarFilter, debtTypeFilter, initialData, showPa
 
   // ── Pane-state setters ─────────────────────────────────────
 
-  // URL-state setter — opent/sluit de pane via shallow route-replace zodat
+  // Pane-URL-bouwer — muteert alleen de pane-params en behoudt de HUIDIGE
+  // pathname. Deze client draait namelijk óók als embed onder
+  // `/overzicht/schulden` (zie `components/overview/schulden-view.tsx`); de
+  // vroegere hardgecodeerde `/core/debts`-basis wisselde daar bij elke
+  // pane-actie de hele route. Spiegelt `buildPaneUrl` in `budgets-client.tsx`.
+  const buildPaneUrl = useCallback(
+    (mutate: (params: URLSearchParams) => void) => {
+      const params = new URLSearchParams(searchParams.toString())
+      mutate(params)
+      const queryString = params.toString()
+      return queryString ? `${pathname}?${queryString}` : pathname
+    },
+    [pathname, searchParams],
+  )
+
+  // History-beleid voor de URL-gedreven pane (B-012, `lib/pane-url-history`):
+  // open vanaf gesloten = push (de mobiele terugknop sluit de pane en blijft
+  // op deze pagina i.p.v. de route te verlaten), wisselen binnen een open pane
+  // = replace (één entry per pane-sessie), programmatisch sluiten = back
+  // (consumeert die entry), deeplink zonder eigen entry = replace-fallback.
+  const paneHistory = useMemo(() => createPaneUrlHistory(router), [router])
+
+  // Sloot de terugknop (popstate) de pane zelf, dan is de eigen history-entry
+  // al geconsumeerd — een latere programmatische close mag geen extra back doen.
+  const paneOpenRef = useRef(requestedDebtId != null)
+  useEffect(() => {
+    if (requestedDebtId == null && paneOpenRef.current) paneHistory.reset()
+    paneOpenRef.current = requestedDebtId != null
+  }, [requestedDebtId, paneHistory])
+
+  // URL-state setter — opent/sluit de pane via de pane-history hierboven zodat
   // deeplinks deelbaar zijn en browser-back de pane sluit zonder van pagina
   // te wisselen. Optionele `editMode` zet `edit=1` voor één-klik bewerken
   // vanaf de kaart. Bij sluiten (`id === null`) worden alle keys gestript.
   const setSelectedDebtId = useCallback(
     (id: string | null, editMode = false) => {
-      const params = new URLSearchParams(searchParams.toString())
-      params.delete('edit')
-      if (id) {
-        params.set('debt', id)
-        if (editMode) params.set('edit', '1')
-      } else {
-        params.delete('debt')
-      }
-      const queryString = params.toString()
-      router.replace(`/core/debts${queryString ? `?${queryString}` : ''}`, { scroll: false })
+      const url = buildPaneUrl((params) => {
+        params.delete('edit')
+        if (id) {
+          params.set('debt', id)
+          if (editMode) params.set('edit', '1')
+        } else {
+          params.delete('debt')
+        }
+      })
+      if (id) paneHistory.open(url, requestedDebtId != null)
+      else paneHistory.close(url)
     },
-    [router, searchParams],
+    [buildPaneUrl, paneHistory, requestedDebtId],
   )
 
   // Valideer de URL-waarde tegen de bekende strategie-set. Onbekende of
@@ -374,18 +406,29 @@ export function DebtsClient({ toolbarFilter, debtTypeFilter, initialData, showPa
   // verandert om history-vervuiling te voorkomen. `avalanche` (default) komt
   // niet in de URL terecht — net als andere "default"-states blijft de URL
   // dan kort.
+  //
+  // BEWUST GEEN `paneHistory` (B-012-beoordeling): `?strategie=` opent hier
+  // géén overlay maar zet de waarde van een segmented control op de INLINE
+  // "Schuldenprofiel & Aflosroute"-kaart (geen backdrop, geen focus-trap, geen
+  // ShellOverlay — hij klapt alleen de collapsible open). Een push per keuze
+  // zou precies de entry-stapeling geven die `lib/pane-url-history` bij een
+  // pane vermijdt: vier strategie-tikken = vier terugdrukken vóór je de pagina
+  // verlaat. `strategie` staat wél in PANE_QUERY_KEYS, maar dát slaat op de
+  // tijdas-pane van `/toekomst?strategie=open` — een ander oppervlak.
+  // Wel meegenomen: pathname-behoud, zodat een keuze op `/overzicht/schulden`
+  // je niet langer naar `/core/debts` verplaatst.
   const setStrategieInUrl = useCallback(
     (s: PayoffStrategy) => {
-      const params = new URLSearchParams(searchParams.toString())
-      if (s === 'avalanche') {
-        params.delete(OVERLAY_QUERY_KEYS.strategie)
-      } else {
-        params.set(OVERLAY_QUERY_KEYS.strategie, s)
-      }
-      const queryString = params.toString()
-      router.replace(`/core/debts${queryString ? `?${queryString}` : ''}`, { scroll: false })
+      const url = buildPaneUrl((params) => {
+        if (s === 'avalanche') {
+          params.delete(OVERLAY_QUERY_KEYS.strategie)
+        } else {
+          params.set(OVERLAY_QUERY_KEYS.strategie, s)
+        }
+      })
+      router.replace(url, { scroll: false })
     },
-    [router, searchParams],
+    [router, buildPaneUrl],
   )
 
   // Auto-open de kaart wanneer de gebruiker via deeplink `?strategie=…` arriveert

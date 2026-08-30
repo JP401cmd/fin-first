@@ -21,10 +21,9 @@
  */
 
 import { memo, useCallback, useMemo } from 'react'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
-import { OVERLAY_QUERY_KEYS } from '@/lib/navigation'
+import { noteOverlayNavigation } from '@/lib/overlay-history'
 import {
   calculateFreedomTime,
   formatFreedomTimeString,
@@ -64,6 +63,9 @@ export type PortfolioMonthDetails = {
 export type PortfolioMonthDetailsSheetProps = {
   open: boolean
   onClose: () => void
+  /** Opent de holding-pane via de pane-history van de controller (één
+   *  instantie per pane — lib/pane-url-history.ts). */
+  onOpenHolding: (id: string) => void
   /** Het maandpunt waarvan de posities getoond worden; `null` = niets te tonen. */
   details: PortfolioMonthDetails | null
   /**
@@ -108,12 +110,10 @@ function sharePct(value: number, total: number): string | null {
 export const PortfolioMonthDetailsSheet = memo(function PortfolioMonthDetailsSheet({
   open,
   onClose,
+  onOpenHolding,
   details,
   dailyExpenses = 0,
 }: PortfolioMonthDetailsSheetProps) {
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
   const { masked } = useMaskedAmounts()
   const fc = useCallback((v: number) => formatMaskedCurrency(v, masked), [masked])
 
@@ -123,20 +123,20 @@ export const PortfolioMonthDetailsSheet = memo(function PortfolioMonthDetailsShe
   const rest = details?.rest ?? null
 
   /**
-   * Opent de bestaande `InvestmentHoldingPane` door alleen `?holding=<id>` aan
-   * de huidige route toe te voegen; overige query-state (bv. een `?asset=`-
-   * filter) blijft staan. `replace` in plaats van `push` zodat het doorklikken
-   * vanuit de kassabon de history niet vervuilt — zelfde keuze als de
-   * holdings-lijst zelf maakt.
+   * Opent de bestaande `InvestmentHoldingPane` via de controller: de
+   * pane-url-history leeft in holdings-client en open én sluit moeten dezelfde
+   * instantie delen (zie lib/pane-url-history.ts) — een eigen `router.replace`
+   * hier was het tweede open-pad dat géén terugknop-sluitgedrag kreeg.
+   * `noteOverlayNavigation` meldt de sluitende sheet dat een navigatie de
+   * history overneemt, zodat zijn release geen back() tegen de push in doet.
    */
   const openHolding = useCallback(
     (id: string) => {
-      const params = new URLSearchParams(searchParams?.toString() ?? '')
-      params.set(OVERLAY_QUERY_KEYS.holding, id)
+      noteOverlayNavigation()
       onClose()
-      router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+      onOpenHolding(id)
     },
-    [router, pathname, searchParams, onClose],
+    [onClose, onOpenHolding],
   )
 
   // Vrijheidstijd van de maandwaarde — geld is opgeslagen tijd. Bij masking valt

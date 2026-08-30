@@ -105,6 +105,9 @@ export type PortfolioValueChartProps = {
    * verzonnen dagtarief.
    */
   yearlyEssentialExpenses?: number
+  /** Opent de holding-pane; komt uit holdings-client zodat open en sluiten
+   *  dezelfde pane-url-history-instantie delen. */
+  onOpenHolding: (id: string) => void
   className?: string
 }
 
@@ -181,6 +184,7 @@ function layoutFor(width: number) {
 export const PortfolioValueChart = memo(function PortfolioValueChart({
   months = 12,
   yearlyEssentialExpenses = 0,
+  onOpenHolding,
   className = '',
 }: PortfolioValueChartProps) {
   const [data, setData] = useState<PortfolioValueHistoryResponse | null>(null)
@@ -348,6 +352,7 @@ export const PortfolioValueChart = memo(function PortfolioValueChart({
       totalHoldings={data!.totalHoldings}
       yearlyEssentialExpenses={yearlyEssentialExpenses}
       onReload={retry}
+      onOpenHolding={onOpenHolding}
       // Nieuwe periode onderweg terwijl er nog een oudere reeks staat: die reeks
       // blijft zichtbaar maar gedimd + `aria-busy`, zodat hij niet stilletjes
       // doorgaat voor het antwoord op de zojuist gekozen periode.
@@ -411,6 +416,7 @@ function ValueHistoryChart({
   totalHoldings,
   yearlyEssentialExpenses,
   onReload,
+  onOpenHolding,
   busy = false,
   className = '',
 }: {
@@ -421,6 +427,8 @@ function ValueHistoryChart({
   yearlyEssentialExpenses: number
   /** Herlaadt de reeks nadat de koershistorie is opgehaald. */
   onReload: () => void
+  /** Opent de holding-pane via de controller (pane-url-history). */
+  onOpenHolding: (id: string) => void
   /** Nieuwe periode onderweg: dim de getoonde reeks en meld het aan AT. */
   busy?: boolean
   className?: string
@@ -1272,6 +1280,7 @@ function ValueHistoryChart({
       <PortfolioMonthDetailsSheet
         open={detailsPoint !== null}
         onClose={() => setDetailsIdx(null)}
+        onOpenHolding={onOpenHolding}
         details={
           detailsPoint
             ? {

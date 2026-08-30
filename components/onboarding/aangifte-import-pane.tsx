@@ -176,7 +176,7 @@ export function AangifteImportPane({
       open={open}
       onClose={handleClose}
       onBack={handleBack}
-      kind="pane"
+      kind="pane" mobileBackCloses
       title={paneTitle}
     >
       {/* Outer padding wordt geleverd door SlideInPane (driewegregel — ui-ux skill).
