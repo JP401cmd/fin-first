@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, memo } from 'react'
 import { type BudgetWithChildren } from '@/lib/budget-data'
 import { BudgetIcon, isOverPositive, type BudgetType } from '@/components/app/budget-shared'
+import { budgetSpentPct } from '@/lib/budget-spending'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { Eye, EyeOff, ChevronDown } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
@@ -274,12 +275,14 @@ function TypeDonut({ budgetType, segments, onNavigate, hiddenBudgets, onToggleHi
   const activeSeg = active !== null ? visibleSegments[active] : null
   const activeChild = hoveredChild !== null ? visibleSegments[hoveredChild.parentIdx]?.children[hoveredChild.childIdx] : null
 
-  const pctUsed = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0
+  // Geklemd: totalSpent is een SOM over alle segmenten, dus één budget met een
+  // negatieve besteding (netto inkomsten) zou de hele ring omlaag trekken.
+  const pctUsed = budgetSpentPct(totalSpent, totalBudget)
 
   // Center text
   let centerContent: React.ReactNode
   if (activeChild) {
-    const childPct = activeChild.limit > 0 ? Math.round((activeChild.spent / activeChild.limit) * 100) : 0
+    const childPct = budgetSpentPct(activeChild.spent, activeChild.limit)
     centerContent = (
       <g>
         <text x={cx} y={cy - 14} textAnchor="middle" className="fill-[var(--ink-2)] font-sans text-[10px] font-semibold">
@@ -296,7 +299,7 @@ function TypeDonut({ budgetType, segments, onNavigate, hiddenBudgets, onToggleHi
       </g>
     )
   } else if (activeSeg) {
-    const segPct = activeSeg.limit > 0 ? Math.round((activeSeg.spent / activeSeg.limit) * 100) : 0
+    const segPct = budgetSpentPct(activeSeg.spent, activeSeg.limit)
     centerContent = (
       <g>
         <text x={cx} y={cy - 14} textAnchor="middle" className="fill-[var(--ink)] font-sans text-[11px] font-bold">
@@ -515,7 +518,7 @@ function TypeDonut({ budgetType, segments, onNavigate, hiddenBudgets, onToggleHi
         {/* Legend */}
         <div className="mt-4 space-y-1">
           {segments.map((seg, i) => {
-            const pct = seg.limit > 0 ? Math.round((seg.spent / seg.limit) * 100) : 0
+            const pct = budgetSpentPct(seg.spent, seg.limit)
             const isOver = seg.spent > seg.limit && seg.limit > 0
             const isHidden = hiddenBudgets.has(seg.id)
             const visibleIdx = visibleSegments.indexOf(seg)
@@ -574,7 +577,7 @@ function TypeDonut({ budgetType, segments, onNavigate, hiddenBudgets, onToggleHi
                 {isExpanded && seg.children.length > 0 && (
                   <div className="ml-4 mt-0.5 space-y-0.5">
                     {seg.children.map((child, ci) => {
-                      const childPct = child.limit > 0 ? Math.round((child.spent / child.limit) * 100) : 0
+                      const childPct = budgetSpentPct(child.spent, child.limit)
                       const childOver = child.spent > child.limit && child.limit > 0
                       const cc = childTypeColors(budgetType, ci, seg.children.length)
 

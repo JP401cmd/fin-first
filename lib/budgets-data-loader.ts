@@ -8,6 +8,8 @@ import { getCachedUser } from '@/lib/supabase/cached-user'
 import type { Budget, BudgetWithChildren } from '@/lib/budget-data'
 import type { BudgetRollover } from '@/lib/budget-rollover'
 import { formatPeriod } from '@/lib/budget-rollover'
+import { isExpenseDirectionBudget, spendingContribution, splitContribution } from '@/lib/budget-spending'
+import { buildBudgetTypeMap } from '@/lib/budget-utils'
 
 // ── Helper ────────────────────────────────────────────────────
 
@@ -84,7 +86,7 @@ export const loadBudgetsData = cache(async (supabase: SupabaseClient): Promise<B
   const twelveMonthsAgoStart = localDateStr(new Date(now.getFullYear(), now.getMonth() - 12, 1))
 
   // Parallel batch: budgets, transactions, rollovers, budget amounts, goals, 12mo history
-  const [budgetsRes, txRes, rolloversRes, amountsRes, goalsRes, historyTxRes] = await Promise.all([
+  const [budgetsRes, txRes, rolloversRes, amountsRes, goalsRes, historyTxRes, budgetTypeRes] = await Promise.all([
     supabase
       .from('budgets')
       .select('*')
@@ -120,6 +122,12 @@ export const loadBudgetsData = cache(async (supabase: SupabaseClient): Promise<B
       .gte('date', twelveMonthsAgoStart)
       .lt('date', monthStart)
       .limit(1000),
+    // Type-map-bron, BEWUST ZONDER is_archived-filter: een transactie kan op een
+    // gearchiveerd budget staan, en dan bepaalt zijn richting nog steeds hoe hij
+    // meetelt. De boom hierboven blijft wel gefilterd (dat is de weergavelijst).
+    // Spiegelt de client, die dit al zo doet — server en client bouwen zo
+    // dezelfde, complete type-map.
+    supabase.from('budgets').select('id, parent_id, budget_type'),
   ])
 
   // ── Build budget tree ───────────────────────────────────────
@@ -135,13 +143,37 @@ export const loadBudgetsData = cache(async (supabase: SupabaseClient): Promise<B
   }))
 
   // ── Build spending map and transaction list ─────────────────
+  // Richting per budget (canonieke erfregel: een child erft het type van zijn
+  // parent). De bestedingssom sluit inkomsten alleen uit op een UITGAVEN-budget
+  // — op een income/savings/archive-budget is de positieve rij de realisatie.
+  const budgetTypes = buildBudgetTypeMap(
+    ((budgetTypeRes.data ?? []) as Array<{ id: string; parent_id: string | null; budget_type: string | null }>).map(
+      (b) => ({
+        id: b.id,
+        parent_id: b.parent_id ?? null,
+        // DB-default. De kolom is nullable en de plan-RPC's kunnen NULL
+        // schrijven; zonder deze terugval krijgt zo'n rij inkomsten-semantiek —
+        // de onveilige kant, want dan telt een inkomst op i.p.v. eraf.
+        budget_type: b.budget_type ?? 'expense',
+      }),
+    ),
+  )
   const txData = txRes.data ?? []
   const spending: Record<string, number> = {}
   const transactions: BudgetTransaction[] = []
 
   for (const t of txData) {
     if (t.budget_id) {
-      spending[t.budget_id] = (spending[t.budget_id] ?? 0) + Math.abs(Number(t.amount))
+      // Getekende bijdrage per rij (gedeelde spendingContribution): op een
+      // uitgaven-budget telt een uitgave op en gaat een inkomst ERAF, een
+      // transfer draagt 0 bij. De som kan dus negatief zijn — niet klemmen.
+      // De parent-rij van een split slaan we over; die bedragen komen hieronder
+      // via transaction_splits binnen. De transactie-LIJST blijft ongefilterd:
+      // die toont wat er op het budget geboekt staat, ook een inkomst.
+      if (!t.is_split) {
+        spending[t.budget_id] =
+          (spending[t.budget_id] ?? 0) + spendingContribution(t, budgetTypes.get(t.budget_id))
+      }
       transactions.push({
         id: t.id,
         account_id: t.account_id,
@@ -195,7 +227,7 @@ export const loadBudgetsData = cache(async (supabase: SupabaseClient): Promise<B
         transactions: { id: string; account_id: string; date: string; description: string; counterparty_name: string | null } | null
       }>) {
         if (s.budget_id) {
-          spending[s.budget_id] = (spending[s.budget_id] ?? 0) + Math.abs(Number(s.amount))
+          spending[s.budget_id] = (spending[s.budget_id] ?? 0) + splitContribution(s)
         }
         if (s.budget_id && s.transactions) {
           transactions.push({
@@ -253,8 +285,10 @@ export const loadBudgetsData = cache(async (supabase: SupabaseClient): Promise<B
   }
 
   const aggregates = new Map<string, { total: number; months: Set<string> }>()
-  const addToAggregate = (budgetId: string, amount: number, date: string, transactionType: string | null) => {
-    if (transactionType === 'transfer' || transactionType === 'joint_transfer') return
+  // `contribution` is de GETEKENDE bijdrage, al door spendingContribution/
+  // splitContribution heen: de transfer- en inkomst-regels wonen daar, zodat
+  // maandgemiddelde en maandsom exact dezelfde grondslag delen.
+  const addToAggregate = (budgetId: string, contribution: number, date: string) => {
     if (!date) return
     const monthKey = date.slice(0, 7)
     let entry = aggregates.get(budgetId)
@@ -262,7 +296,7 @@ export const loadBudgetsData = cache(async (supabase: SupabaseClient): Promise<B
       entry = { total: 0, months: new Set() }
       aggregates.set(budgetId, entry)
     }
-    entry.total += Math.abs(Number(amount) || 0)
+    entry.total += contribution
     entry.months.add(monthKey)
   }
 
@@ -270,11 +304,25 @@ export const loadBudgetsData = cache(async (supabase: SupabaseClient): Promise<B
     // Parent row of a split: skip — amounts live on the splits.
     if (t.is_split) continue
     if (!t.budget_id) continue
-    addToAggregate(t.budget_id, t.amount, t.date, t.transaction_type)
+    // Zelfde grondslag als de maand-som hierboven: een inkomst op een
+    // uitgaven-budget is geen besteding en mag het maandgemiddelde niet
+    // opblazen. Split-regels (positief opgeslagen) gaan bewust NIET door dit
+    // filter — die lopen door de eigen lus hieronder.
+    addToAggregate(t.budget_id, spendingContribution(t, budgetTypes.get(t.budget_id)), t.date)
   }
   for (const s of historySplits) {
     if (!s.budget_id) continue
-    addToAggregate(s.budget_id, s.amount, s.date, s.transaction_type)
+    // Split van een TRANSFER-ouder: telt niet mee op een uitgaven-budget —
+    // behoud van het bestaande gedrag hier, waar de oudersoort via de join
+    // beschikbaar is. (De huidige-maand-splitpaden halen transaction_type niet
+    // op en kunnen deze toets dus niet doen; dat verschil is bestaand.)
+    if (
+      isExpenseDirectionBudget(budgetTypes.get(s.budget_id)) &&
+      (s.transaction_type === 'transfer' || s.transaction_type === 'joint_transfer')
+    ) {
+      continue
+    }
+    addToAggregate(s.budget_id, splitContribution(s), s.date)
   }
 
   const monthlyAverages: Record<string, { avg: number; months: number }> = {}

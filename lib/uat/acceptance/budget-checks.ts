@@ -48,6 +48,11 @@ import { shouldAlert } from '@/lib/budget-alerts'
 import { computeRollover, getEffectiveLimit, getPreviousPeriod, type BudgetRollover } from '@/lib/budget-rollover'
 import { computeBudgetForecast } from '@/lib/budget-forecast'
 import { buildSpendingSums, combineSpending, shareFractionFor } from '@/lib/budget-perspective'
+import {
+  buildBudgetSpendingMap,
+  budgetSpentPct,
+  showsFreedomTime,
+} from '@/lib/budget-spending'
 import { buildTemplateSeed } from '@/lib/budget-templates/onboarding-presets'
 import { getNibudHouseholdType, calculateBenchmarks } from '@/lib/nibud/reference-data'
 import { dailyExpenseRate, calculateFreedomTime } from '@/lib/format'
@@ -362,7 +367,8 @@ export const BUDGET_ENGINE_CHECKS: BudgetEngineCheck[] = [
         { budget_id: 'b1', amount: -80, ownership: 'shared' },
         { budget_id: 'b2', amount: -30 },
       ]
-      const sums = buildSpendingSums(rows)
+      // Geen split-regels in dit scenario; beide budgetten zijn uitgaven-budgetten.
+      const sums = buildSpendingSums(rows, [], new Map([['b1', 'expense'], ['b2', 'expense']]))
       const b1 = sums.get('b1')!
       const b2 = sums.get('b2')!
       const sharePersonal = shareFractionFor('personal', 'shared', 60)
@@ -371,9 +377,34 @@ export const BUDGET_ENGINE_CHECKS: BudgetEngineCheck[] = [
       const combinedPersonal = combineSpending(b1.personalSum, b1.sharedSum, 'personal', 60)
       const combinedPartner = combineSpending(b1.personalSum, b1.sharedSum, 'partner', 60)
       const combinedHousehold = combineSpending(b1.personalSum, b1.sharedSum, 'household', 60)
+      // Negatieve-besteding-tak (norm 30-08-2026, melding 6142d204): inkomsten
+      // gaan van de besteding af op een uitgaven-budget; de weergave klemt.
+      const NEG_LIMIET = 1642
+      const negMap = buildBudgetSpendingMap(
+        [
+          { budget_id: 'inventaris', amount: -1265 },
+          { budget_id: 'inventaris', amount: 6000 },
+          { budget_id: 'inventaris', amount: 2000 },
+        ],
+        [],
+        new Map([['inventaris', 'expense']]),
+      )
+      const negatiefBesteed = negMap.inventaris
+      const negatiefPct = budgetSpentPct(negatiefBesteed, NEG_LIMIET)
+      const negatiefVrijheidstijd = showsFreedomTime(negatiefBesteed) ? 'ja' : 'nee'
+      const negatiefResterend = Math.min(NEG_LIMIET, NEG_LIMIET - negatiefBesteed)
+      // Spiegel: op een inkomsten-budget telt positief op en gaat negatief eraf.
+      const inkomstenBudget = buildBudgetSpendingMap(
+        [
+          { budget_id: 'salaris', amount: 3200 },
+          { budget_id: 'salaris', amount: -100 },
+        ],
+        [],
+        new Map([['salaris', 'income']]),
+      ).salaris
       return {
-        expected: 'b1Personal=50; b1Shared=80; b2Personal=30; b2Shared=0; sharePersonal=0.6; sharePartner=0.4; shareHousehold=1; combinedPersonal=98; combinedPartner=82; combinedHousehold=130',
-        actual: `b1Personal=${b1.personalSum}; b1Shared=${b1.sharedSum}; b2Personal=${b2.personalSum}; b2Shared=${b2.sharedSum}; sharePersonal=${sharePersonal}; sharePartner=${sharePartner}; shareHousehold=${shareHousehold}; combinedPersonal=${combinedPersonal}; combinedPartner=${combinedPartner}; combinedHousehold=${combinedHousehold}`,
+        expected: 'b1Personal=50; b1Shared=80; b2Personal=30; b2Shared=0; sharePersonal=0.6; sharePartner=0.4; shareHousehold=1; combinedPersonal=98; combinedPartner=82; combinedHousehold=130; negatiefBesteed=-6735; negatiefPct=0; negatiefVrijheidstijd=nee; negatiefResterend=1642; inkomstenBudget=3100',
+        actual: `b1Personal=${b1.personalSum}; b1Shared=${b1.sharedSum}; b2Personal=${b2.personalSum}; b2Shared=${b2.sharedSum}; sharePersonal=${sharePersonal}; sharePartner=${sharePartner}; shareHousehold=${shareHousehold}; combinedPersonal=${combinedPersonal}; combinedPartner=${combinedPartner}; combinedHousehold=${combinedHousehold}; negatiefBesteed=${negatiefBesteed}; negatiefPct=${negatiefPct}; negatiefVrijheidstijd=${negatiefVrijheidstijd}; negatiefResterend=${negatiefResterend}; inkomstenBudget=${inkomstenBudget}`,
       }
     },
   },

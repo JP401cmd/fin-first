@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeEffectiveLimit, type BudgetRollover, type BudgetAmountOverride } from './budget-rollover'
+import { computeEffectiveLimit, computeRollover, type BudgetRollover, type BudgetAmountOverride } from './budget-rollover'
 
 // Regressie: de effectieve-limiet is de ENE bron die zowel de budgetten-pagina
 // (budgets-client) als de heatmap-widget (dashboard-data-loader) consumeren.
@@ -111,5 +111,42 @@ describe('computeEffectiveLimit', () => {
         shareFraction: 0.5,
       }),
     ).toBe(300)
+  })
+})
+
+describe('computeRollover — negatieve besteding mag de carry niet opblazen', () => {
+  // Sinds de norm van 30 aug 2026 kan de bestedingssom van een uitgaven-budget
+  // NEGATIEF zijn (meer inkomsten dan uitgaven). Zonder klem zou
+  // `Math.max(0, effectiveLimit - spent)` de carry boven de limiet tillen — en
+  // die carry wordt PERMANENT weggeschreven in budget_rollovers (UNIQUE op
+  // budget_id+period). De klem zit IN computeRollover, dus deze tests geven de
+  // rauwe negatieve som door: haalt iemand de klem weg, dan vallen ze om.
+
+  it('een negatieve maand levert hoogstens de volle limiet', () => {
+    const { carry } = computeRollover(1642, -6735, 0, 'carry-over')
+    expect(carry).toBe(1642)
+    expect(carry).toBeLessThanOrEqual(1642)
+  })
+
+  it('een extreem negatieve maand tilt de carry niet verder op', () => {
+    expect(computeRollover(1642, -1_000_000, 0, 'carry-over').carry).toBe(1642)
+  })
+
+  it('verandert niets aan een gewone positieve maand', () => {
+    expect(computeRollover(1642, 1265, 0, 'carry-over').carry).toBe(377)
+  })
+
+  it('respecteert de vorige carry en blijft binnen basis + carry', () => {
+    expect(computeRollover(1642, -6735, 200, 'carry-over').carry).toBe(1842)
+  })
+
+  it('invest-sweep sweept hoogstens de volle limiet', () => {
+    const { carry, swept } = computeRollover(1642, -6735, 0, 'invest-sweep')
+    expect(carry).toBe(0)
+    expect(swept).toBe(1642)
+  })
+
+  it('reset blijft 0, ook bij een negatieve maand', () => {
+    expect(computeRollover(1642, -6735, 0, 'reset')).toEqual({ carry: 0, swept: 0 })
   })
 })

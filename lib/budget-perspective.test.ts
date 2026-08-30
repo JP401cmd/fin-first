@@ -129,58 +129,195 @@ describe('combineSpending', () => {
 })
 
 describe('buildSpendingSums', () => {
+  // Alle budget-ids in dit blok zijn UITGAVEN-budgetten — daarop geldt de
+  // inkomst-/transfer-uitsluiting. De richting-scoping zelf staat in het
+  // aparte blok onderaan.
+  const EXPENSE_TYPES = new Map<string, string>([
+    ['a', 'expense'],
+    ['b', 'expense'],
+    ['inventaris', 'expense'],
+  ])
+
   it('splitst per budget naar personal/shared sommen', () => {
-    const map = buildSpendingSums([
-      { budget_id: 'a', amount: -30, ownership: 'personal' },
-      { budget_id: 'a', amount: -20, ownership: 'shared' },
-      { budget_id: 'b', amount: -40, ownership: 'shared' },
-    ])
+    const map = buildSpendingSums(
+      [
+        { budget_id: 'a', amount: -30, ownership: 'personal' },
+        { budget_id: 'a', amount: -20, ownership: 'shared' },
+        { budget_id: 'b', amount: -40, ownership: 'shared' },
+      ],
+      [],
+      EXPENSE_TYPES,
+    )
     expect(map.get('a')).toEqual({ personalSum: 30, sharedSum: 20 })
     expect(map.get('b')).toEqual({ personalSum: 0, sharedSum: 40 })
   })
 
-  it('gebruikt Math.abs op bedragen', () => {
-    const map = buildSpendingSums([
-      { budget_id: 'a', amount: -100, ownership: 'personal' },
-      { budget_id: 'a', amount: 100, ownership: 'personal' },
-    ])
-    expect(map.get('a')).toEqual({ personalSum: 200, sharedSum: 0 })
+  it('somt uitgaven positief en trekt de inkomst eraf', () => {
+    // Tekenconventie: amount <= 0 = uitgave, amount > 0 = inkomst. De uitgave
+    // telt als +100, de inkomst van +100 gaat eraf: netto 0 (norm 30 aug 2026).
+    const map = buildSpendingSums(
+      [
+        { budget_id: 'a', amount: -100, ownership: 'personal' },
+        { budget_id: 'a', amount: 100, ownership: 'personal' },
+      ],
+      [],
+      EXPENSE_TYPES,
+    )
+    expect(map.get('a')).toEqual({ personalSum: 0, sharedSum: 0 })
+  })
+
+  // Given een uitgavenbudget met één uitgave van 1.265 en twee inkomsten van
+  // 6.000 en 2.000 (melding 6142d204: partner-overboekingen op "Inventaris &
+  // apparaten"), When de bestedingssom wordt gebouwd, Then telt alleen de
+  // uitgave mee. De canonieke norm staat al in lib/budget-spending.ts:
+  // "inkomsten tellen niet mee als besteding op een uitgaven-budget".
+  it('trekt inkomstenrijen af van de besteding op een uitgavenbudget', () => {
+    const map = buildSpendingSums(
+      [
+        { budget_id: 'inventaris', amount: -1265, ownership: 'personal' },
+        { budget_id: 'inventaris', amount: 6000, ownership: 'personal' },
+        { budget_id: 'inventaris', amount: 2000, ownership: 'personal' },
+      ],
+      [],
+      EXPENSE_TYPES,
+    )
+    // DE GEMELDE CASE: 1.265 - 6.000 - 2.000 = -6.735, zichtbaar negatief.
+    expect(map.get('inventaris')).toEqual({ personalSum: -6735, sharedSum: 0 })
+  })
+
+  it('trekt een inkomst ook af als alleen is_income het zegt (negatief teken)', () => {
+    // is_income is BOOLEAN DEFAULT false zonder CHECK tegen het teken; beide
+    // markers moeten dus meedoen, geen van beide alleen.
+    const map = buildSpendingSums(
+      [
+        { budget_id: 'a', amount: -40, ownership: 'personal' },
+        { budget_id: 'a', amount: -3000, ownership: 'personal', is_income: true },
+      ],
+      [],
+      EXPENSE_TYPES,
+    )
+    expect(map.get('a')).toEqual({ personalSum: 40 - 3000, sharedSum: 0 })
+  })
+
+  it('telt transfers niet mee als besteding', () => {
+    const map = buildSpendingSums(
+      [
+        { budget_id: 'a', amount: -40, ownership: 'personal' },
+        { budget_id: 'a', amount: -500, ownership: 'personal', transaction_type: 'transfer' },
+        { budget_id: 'a', amount: -500, ownership: 'shared', transaction_type: 'joint_transfer' },
+      ],
+      [],
+      EXPENSE_TYPES,
+    )
+    expect(map.get('a')).toEqual({ personalSum: 40, sharedSum: 0 })
   })
 
   it('telt ontbrekende ownership als personal', () => {
-    const map = buildSpendingSums([{ budget_id: 'a', amount: -25 }])
+    const map = buildSpendingSums([{ budget_id: 'a', amount: -25 }], [], EXPENSE_TYPES)
     expect(map.get('a')).toEqual({ personalSum: 25, sharedSum: 0 })
   })
 
   it('slaat rijen zonder budget_id over', () => {
-    const map = buildSpendingSums([
-      { budget_id: null, amount: -25, ownership: 'personal' },
-      { budget_id: 'a', amount: -10, ownership: 'personal' },
-    ])
+    const map = buildSpendingSums(
+      [
+        { budget_id: null, amount: -25, ownership: 'personal' },
+        { budget_id: 'a', amount: -10, ownership: 'personal' },
+      ],
+      [],
+      EXPENSE_TYPES,
+    )
     expect(map.size).toBe(1)
     expect(map.get('a')).toEqual({ personalSum: 10, sharedSum: 0 })
   })
 
-  it('verwerkt split-achtige rijen (parent-ownership per regel)', () => {
-    // Een gesplitste transactie draagt per budget bij met de ownership van de
-    // ouder; hier komen twee regels van een gedeelde transactie binnen.
-    const map = buildSpendingSums([
-      { budget_id: 'a', amount: -15, ownership: 'shared' },
-      { budget_id: 'b', amount: -35, ownership: 'shared' },
-    ])
-    expect(map.get('a')).toEqual({ personalSum: 0, sharedSum: 15 })
-    expect(map.get('b')).toEqual({ personalSum: 0, sharedSum: 35 })
+  // REGRESSIE — de split-valkuil. `transaction_splits.amount` wordt POSITIEF
+  // opgeslagen (geverifieerd op productie: 4,50 + 24,74 bij een ouder van
+  // −29,24). Een teken-filter over één gedeelde rijen-array zou dus élke
+  // split-regel als "inkomst" wegfilteren. Split-regels lopen daarom door de
+  // tweede parameter, zonder teken-toets — ze erven de ownership van de ouder.
+  it('telt positief opgeslagen split-regels gewoon mee (geen teken-filter)', () => {
+    const map = buildSpendingSums(
+      [{ budget_id: 'a', amount: -10, ownership: 'shared' }],
+      [
+        { budget_id: 'a', amount: 4.5, ownership: 'shared' },
+        { budget_id: 'b', amount: 24.74, ownership: 'shared' },
+      ],
+      EXPENSE_TYPES,
+    )
+    expect(map.get('a')).toEqual({ personalSum: 0, sharedSum: 14.5 })
+    expect(map.get('b')).toEqual({ personalSum: 0, sharedSum: 24.74 })
+  })
+
+  it('trekt de inkomst af én houdt de split-regels heel in dezelfde ronde', () => {
+    // Beide fouten tegelijk uitgesloten: de inkomst van +6.000 gaat eraf, de
+    // positieve split-regels tellen gewoon op.
+    const map = buildSpendingSums(
+      [
+        { budget_id: 'a', amount: -1265, ownership: 'personal' },
+        { budget_id: 'a', amount: 6000, ownership: 'personal' },
+      ],
+      [{ budget_id: 'a', amount: 100, ownership: 'personal' }],
+      EXPENSE_TYPES,
+    )
+    expect(map.get('a')).toEqual({ personalSum: 1265 - 6000 + 100, sharedSum: 0 })
+  })
+
+  it('slaat de parent-rij van een split over (bedragen leven op de splits)', () => {
+    const map = buildSpendingSums(
+      [
+        { budget_id: 'a', amount: -100, ownership: 'personal', is_split: true },
+        { budget_id: 'b', amount: -20, ownership: 'personal' },
+      ],
+      [{ budget_id: 'a', amount: 60, ownership: 'personal' }],
+      EXPENSE_TYPES,
+    )
+    expect(map.get('a')).toEqual({ personalSum: 60, sharedSum: 0 })
+    expect(map.get('b')).toEqual({ personalSum: 20, sharedSum: 0 })
   })
 
   it('lege input → lege map', () => {
-    expect(buildSpendingSums([]).size).toBe(0)
+    expect(buildSpendingSums([], [], EXPENSE_TYPES).size).toBe(0)
+  })
+
+  it('een budget met alleen inkomsten krijgt een negatieve som', () => {
+    const map = buildSpendingSums([{ budget_id: 'a', amount: 6000, ownership: 'personal' }], [], EXPENSE_TYPES)
+    expect(map.get('a')).toEqual({ personalSum: -6000, sharedSum: 0 })
+  })
+
+  it('een income-budget houdt zijn positieve rij, ook per ownership', () => {
+    // REGRESSIE: de inkomst-uitsluiting geldt alleen op een uitgaven-budget.
+    const map = buildSpendingSums(
+      [
+        { budget_id: 'salaris', amount: 4328.81, ownership: 'personal' },
+        { budget_id: 'salaris', amount: 73, ownership: 'shared' },
+      ],
+      [],
+      new Map([['salaris', 'income']]),
+    )
+    expect(map.get('salaris')).toEqual({ personalSum: 4328.81, sharedSum: 73 })
+  })
+
+  it('een archive-budget houdt zijn transfers', () => {
+    const map = buildSpendingSums(
+      [
+        { budget_id: 'eigen-rekening', amount: -200, ownership: 'personal', transaction_type: 'transfer' },
+        { budget_id: 'eigen-rekening', amount: -77.56, ownership: 'personal', transaction_type: 'joint_transfer' },
+      ],
+      [],
+      new Map([['eigen-rekening', 'archive']]),
+    )
+    expect(map.get('eigen-rekening')).toEqual({ personalSum: 277.56, sharedSum: 0 })
   })
 
   it('integreert met combineSpending over alle perspectieven', () => {
-    const map = buildSpendingSums([
-      { budget_id: 'a', amount: -100, ownership: 'personal' },
-      { budget_id: 'a', amount: -200, ownership: 'shared' },
-    ])
+    const map = buildSpendingSums(
+      [
+        { budget_id: 'a', amount: -100, ownership: 'personal' },
+        { budget_id: 'a', amount: -200, ownership: 'shared' },
+      ],
+      [],
+      EXPENSE_TYPES,
+    )
     const { personalSum, sharedSum } = map.get('a')!
     expect(combineSpending(personalSum, sharedSum, 'personal', 50)).toBe(200)
     expect(combineSpending(personalSum, sharedSum, 'household', 50)).toBe(300)

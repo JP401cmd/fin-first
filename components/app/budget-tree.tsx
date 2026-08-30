@@ -3,6 +3,7 @@
 import { useState, memo } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { BudgetIcon, getTypeColors, isOverPositive, computeBarSegments, anyChildOverBudget, BudgetOverWarningIcon, type BudgetType } from '@/components/app/budget-shared'
+import { budgetSpentPct } from '@/lib/budget-spending'
 import type { Budget, BudgetWithChildren } from '@/lib/budget-data'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { useFlashChange } from '@/lib/hooks/use-flash-change'
@@ -179,7 +180,7 @@ function TreeGroup({
         ? beschikbaarMap[parent.id] + (spending[parent.id] ?? 0)
         : Number(parent.default_limit))
 
-  const pct = totalLimit > 0 ? Math.round((totalSpent / totalLimit) * 100) : 0
+  const pct = budgetSpentPct(totalSpent, totalLimit)
   const overBudget = totalSpent > totalLimit && totalLimit > 0
   // Waarschuwing voor een (mogelijk ingeklapte) parent waarvan een deelbudget
   // over budget is, terwijl het totaal zelf nog binnen budget kan vallen.

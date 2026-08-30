@@ -3,6 +3,7 @@ import { tool } from 'ai'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { localMonthBounds } from '@/lib/month-range'
 import { buildBudgetSpendingMap, spentForBudget } from '@/lib/budget-spending'
+import { buildBudgetTypeMap } from '@/lib/budget-utils'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 
 /**
@@ -95,7 +96,7 @@ export function createLookupTool(supabase: SupabaseClient) {
           // Trek gelijk met de budgets-pagina: ALLE budgetten (parent + child),
           // besteding per budget via de gedeelde aggregatie (inkomsten/transfers
           // uitgesloten, split-bedragen op hun eigen budget), en parent-rollup.
-          const [budgetsRes, txRes] = await Promise.all([
+          const [budgetsRes, txRes, budgetTypeRes] = await Promise.all([
             supabase
               .from('budgets')
               .select('id, name, slug, default_limit, budget_type, parent_id, is_archived')
@@ -106,6 +107,10 @@ export function createLookupTool(supabase: SupabaseClient) {
               .select('id, budget_id, amount, is_income, transaction_type, is_split')
               .gte('date', monthStart)
               .lt('date', monthEnd),
+            // Type-map-bron, BEWUST ZONDER is_archived-filter: een transactie op
+            // een gearchiveerd budget houdt zijn richting. De resultatenlijst
+            // hierboven blijft wel gefilterd. Gelijk aan loader en client.
+            supabase.from('budgets').select('id, parent_id, budget_type'),
           ])
 
           const budgets = budgetsRes.data ?? []
@@ -122,7 +127,19 @@ export function createLookupTool(supabase: SupabaseClient) {
             splits = (splitData ?? []) as Array<{ budget_id: string | null; amount: number }>
           }
 
-          const spendingMap = buildBudgetSpendingMap(txData, splits)
+          // Richting per budget: de inkomst-/transfer-uitsluiting geldt alleen
+          // op een uitgaven-budget. Canonieke erfregel (child erft parent-type).
+          const budgetTypes = buildBudgetTypeMap(
+            ((budgetTypeRes.data ?? []) as Array<{ id: string; parent_id: string | null; budget_type: string | null }>).map(
+              (b) => ({
+                id: b.id,
+                parent_id: b.parent_id ?? null,
+                // DB-default; NULL mag nooit inkomsten-semantiek geven.
+                budget_type: b.budget_type ?? 'expense',
+              }),
+            ),
+          )
+          const spendingMap = buildBudgetSpendingMap(txData, splits, budgetTypes)
 
           // Child-ids per parent voor de rollup.
           const childIdsByParent: Record<string, string[]> = {}

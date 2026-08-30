@@ -29,8 +29,18 @@ export function computeRollover(
   previousCarry: number,
   rolloverType: string,
 ): { carry: number; swept: number } {
+  // KLEM OP 0 — hier, niet bij de aanroeper. Sinds de norm van 30 aug 2026 kan
+  // een bestedingssom NEGATIEF zijn (meer inkomsten dan uitgaven op een
+  // uitgaven-budget). Met spent = −6.735 en limiet 1.642 zou `remaining`
+  // 8.377 worden en die carry landt PERMANENT in budget_rollovers (UNIQUE op
+  // budget_id+period: de rij wordt per periode maar één keer aangemaakt), zodat
+  // het budget van volgende maand stil opgeblazen blijft.
+  // De WEERGAVE mag negatief zijn, de carry-grondslag niet — en die grens hoort
+  // in deze functie te zitten, niet bij de ene aanroeper: verdwijnt de klem
+  // daar, dan is er niets dat het tegenhoudt.
+  const spentForCarry = Math.max(0, spent)
   const effectiveLimit = limit + previousCarry
-  const remaining = Math.max(0, effectiveLimit - spent)
+  const remaining = Math.max(0, effectiveLimit - spentForCarry)
 
   switch (rolloverType) {
     case 'carry-over':

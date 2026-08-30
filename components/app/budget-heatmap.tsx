@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback, useRef, memo } from 'react'
 import type { BudgetWithChildren } from '@/lib/budget-data'
 import { BudgetIcon, isOverPositive, type BudgetType } from '@/components/app/budget-shared'
+import { budgetSpentPct, budgetBarPct } from '@/lib/budget-spending'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { MaskedAmount } from '@/components/app/masked-amount'
@@ -442,8 +443,12 @@ function HeatmapTooltip({
 }) {
   const { rect, mouseX, mouseY } = data
   const budgetType = rect.budgetType
-  const pct = rect.limit > 0 ? Math.round((rect.spent / rect.limit) * 100) : 0
-  const remaining = Math.max(0, rect.limit - rect.spent)
+  // Weergave-percentage geklemd op [0,100]; de KLEUR gebruikt de niet-boven-
+  // geklemde waarde, want getHeatmapColor kleurt pas rood boven de 100.
+  const pct = budgetSpentPct(rect.spent, rect.limit)
+  const colorPct = budgetBarPct(rect.spent, rect.limit)
+  // Weergave volgt de carry-klem: meegenomen ruimte boven de limiet bestaat niet.
+  const remaining = Math.max(0, Math.min(rect.limit, rect.limit - rect.spent))
   const overPositive = isOverPositive(budgetType)
   const isOver = rect.spent > rect.limit && rect.limit > 0
   const trend = getTrendArrow(rect.spent, previousSpending, rect.id)
@@ -491,8 +496,8 @@ function HeatmapTooltip({
           <div
             className="absolute inset-y-0 left-0 rounded-full transition-all"
             style={{
-              width: `${Math.min(pct, 100)}%`,
-              backgroundColor: rect.limit > 0 ? getHeatmapColor(budgetType, pct) : NEUTRAL_COLOR,
+              width: `${pct}%`, // budgetSpentPct is al geklemd op [0,100]
+              backgroundColor: rect.limit > 0 ? getHeatmapColor(budgetType, colorPct) : NEUTRAL_COLOR,
             }}
           />
         </div>
@@ -633,8 +638,9 @@ function MobileCombinedHeatmap({
                       <div className="flex flex-wrap gap-1 p-2">
                         {groupItems.map((item) => {
                           const idx = globalIndex++
-                          const pct = item.limit > 0 ? Math.round((item.spent / item.limit) * 100) : 0
-                          const color = item.limit > 0 ? getHeatmapColor(section.budgetType, pct) : NEUTRAL_COLOR
+                          const pct = budgetSpentPct(item.spent, item.limit)
+          const colorPct = budgetBarPct(item.spent, item.limit)
+                          const color = item.limit > 0 ? getHeatmapColor(section.budgetType, colorPct) : NEUTRAL_COLOR
                           const isOver = item.spent > item.limit && item.limit > 0
 
                           // Width proportional to weight within the group
@@ -748,8 +754,9 @@ function MobileCompactHeatmapList({
     <div className="flex h-full flex-col">
       <ul aria-label="Grootste budgetten" className="min-h-0 flex-1 space-y-[3px] overflow-y-auto">
         {shown.map((item, idx) => {
-          const pct = item.limit > 0 ? Math.round((item.spent / item.limit) * 100) : 0
-          const color = item.limit > 0 ? getHeatmapColor(item.budgetType, pct) : NEUTRAL_COLOR
+          const pct = budgetSpentPct(item.spent, item.limit)
+          const colorPct = budgetBarPct(item.spent, item.limit)
+          const color = item.limit > 0 ? getHeatmapColor(item.budgetType, colorPct) : NEUTRAL_COLOR
           return (
             <li key={item.id}>
               <button
@@ -826,8 +833,11 @@ function TreemapCell({
   onClick: () => void
 }) {
   const budgetType = rect.budgetType
-  const pct = rect.limit > 0 ? Math.round((rect.spent / rect.limit) * 100) : 0
-  const color = rect.limit > 0 ? getHeatmapColor(budgetType, pct) : NEUTRAL_COLOR
+  // Weergave-percentage geklemd op [0,100]; de KLEUR gebruikt de niet-boven-
+  // geklemde waarde, want getHeatmapColor kleurt pas rood boven de 100.
+  const pct = budgetSpentPct(rect.spent, rect.limit)
+  const colorPct = budgetBarPct(rect.spent, rect.limit)
+  const color = rect.limit > 0 ? getHeatmapColor(budgetType, colorPct) : NEUTRAL_COLOR
   const overPositive = isOverPositive(budgetType)
   const isOver = rect.spent > rect.limit && rect.limit > 0
 

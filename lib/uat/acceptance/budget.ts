@@ -217,10 +217,10 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'lisa',
     given: 'Persona Lisa geladen; ongecategoriseerde transactie(s) op de betaalrekening.',
     when: 'De gebruiker (of de AI-suggestie) categoriseert een transactie naar een budget.',
-    then: 'Het aantal ongecategoriseerde transacties daalt met 1 en "besteed" op dat budget stijgt met het transactiebedrag — richting is toetsbaar, het exacte bedrag niet (AI-categorisatie en de transactiebedragen zelf zijn niet-deterministisch/gejitterd).',
+    then: 'Het aantal ongecategoriseerde transacties daalt met 1 en "besteed" op dat budget beweegt met de GETEKENDE bijdrage van die transactie: op een uitgaven-budget stijgt besteed bij een uitgave (negatief bedrag) en DAALT hij bij een inkomst (positief bedrag), want die gaat er sinds de norm van 30-08-2026 vanaf. Op een inkomsten-budget is het precies omgekeerd. Richting is toetsbaar, het exacte bedrag niet (AI-categorisatie en de transactiebedragen zelf zijn niet-deterministisch/gejitterd).',
     assertion: {
       kind: 'direction',
-      source: 'buildSpendingSums (lib/budget-perspective.ts) herberekent na elke categorisatie-mutatie; richting van de teller/besteed-delta is toetsbaar, geen vast cijfer',
+      source: 'buildSpendingSums (lib/budget-perspective.ts) herberekent na elke categorisatie-mutatie via spendingContribution (lib/budget-spending.ts); richting van de teller/besteed-delta is toetsbaar, geen vast cijfer — het TEKEN van de gecategoriseerde transactie bepaalt de richting van de besteed-delta',
     },
   },
   {
@@ -318,11 +318,11 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'lisa',
     given: 'Gedeeld budget "b1": personal-transacties €50, shared-transacties €80 (eigen blik); apart budget "b2": alleen personal €30. Eigen aandeel (mySharePct) 60%. ⚠ LIVE vereist een ÉCHT tweede account — persona-seed alleen toont de reken-split.',
     when: 'De gebruiker schakelt tussen eigen blik, huishoud-blik en partner-blik.',
-    then: 'Uitgaven-map: b1 personalSum=€50, sharedSum=€80; b2 personalSum=€30, sharedSum=€0. Aandeel-fractie voor gedeeld: eigen blik 0,6; partner-blik 0,4; huishoud-blik 1. Gecombineerd bedrag op b1: eigen blik 50+80×0,6=€98; partner-blik 50+80×0,4=€82; huishoud-blik 50+80×1=€130.',
+    then: 'Uitgaven-map: b1 personalSum=€50, sharedSum=€80; b2 personalSum=€30, sharedSum=€0. Aandeel-fractie voor gedeeld: eigen blik 0,6; partner-blik 0,4; huishoud-blik 1. Gecombineerd bedrag op b1: eigen blik 50+80×0,6=€98; partner-blik 50+80×0,4=€82; huishoud-blik 50+80×1=€130. NEGATIEVE BESTEDING (norm 30-08-2026, melding 6142d204): een uitgaven-budget met één uitgave van €1.265 en inkomsten van €6.000 + €2.000 levert besteed = €-6.735 — inkomsten gaan ERAF en het negatieve bedrag blijft zichtbaar (niet op 0 geklemd). De WEERGAVE klemt wel: percentage 0%, ringvulling 0, geen vrijheidstijd-regel, status "onder" (geen rode stip) en Resterend hoogstens de limiet. Een INKOMSTEN-budget spiegelt: +3.200 met -100 geeft 3.100.',
     assertion: {
       kind: 'exact',
-      expected: 'b1Personal=50; b1Shared=80; b2Personal=30; b2Shared=0; sharePersonal=0.6; sharePartner=0.4; shareHousehold=1; combinedPersonal=98; combinedPartner=82; combinedHousehold=130',
-      source: 'lib/budget-perspective.ts#buildSpendingSums + shareFractionFor + combineSpending op synthetische transactierijen (mySharePct=60)',
+      expected: 'b1Personal=50; b1Shared=80; b2Personal=30; b2Shared=0; sharePersonal=0.6; sharePartner=0.4; shareHousehold=1; combinedPersonal=98; combinedPartner=82; combinedHousehold=130; negatiefBesteed=-6735; negatiefPct=0; negatiefVrijheidstijd=nee; negatiefResterend=1642; inkomstenBudget=3100',
+      source: 'lib/budget-perspective.ts#buildSpendingSums + shareFractionFor + combineSpending op synthetische transactierijen (mySharePct=60); negatieve-besteding-tak via spendingContribution + budgetSpentPct/showsFreedomTime (lib/budget-spending.ts) en de Resterend-klem Math.min(limit, limit - spent)',
     },
   },
   {

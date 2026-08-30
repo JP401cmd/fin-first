@@ -123,7 +123,19 @@ import {
   buildSpendingSums,
   formatShareCaption,
   type SpendingSums,
+  type SpendingSumTxRow,
+  type SpendingSumSplitRow,
 } from '@/lib/budget-perspective'
+import {
+  buildBudgetSpendingMap,
+  budgetFillRatio,
+  budgetSpentPct,
+  isExpenseDirectionBudget,
+  showsFreedomTime,
+  spendingContribution,
+  splitContribution,
+} from '@/lib/budget-spending'
+import { buildBudgetTypeMap } from '@/lib/budget-utils'
 import { Users } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { PageOpening } from '@/components/editorial'
@@ -1318,17 +1330,44 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
       .lt('date', monthEnd)
       .order('date', { ascending: false })
 
-    const { data } = await spendQuery
+    // Richting per budget (income/expense/savings/debt/archive) — de bestedings-
+    // som sluit inkomsten en transfers alleen uit op een UITGAVEN-budget. Bewust
+    // een eigen kleine fetch i.p.v. de `budgets`-state: die staat niet in de deps
+    // van deze callback, en 'm toevoegen zou élke budget-mutatie een volledige
+    // transactie-herlaad geven. Geen is_archived-filter: een compleet type-beeld
+    // is hier juist gewenst.
+    const budgetTypesQuery = supabase.from('budgets').select('id, parent_id, budget_type')
+
+    const [{ data }, { data: budgetTypeRows }] = await Promise.all([spendQuery, budgetTypesQuery])
     if (signal?.aborted) return // Discard stale results
+
+    const spendingBudgetTypes = buildBudgetTypeMap(
+      (budgetTypeRows ?? []).map((b) => ({
+        id: b.id as string,
+        parent_id: (b.parent_id ?? null) as string | null,
+        budget_type: (b.budget_type ?? 'expense') as string, // DB-default; NULL mag nooit inkomsten-semantiek geven
+      })),
+    )
 
     if (data && data.length > 0) {
       // Rijen voor de twee-sommen-map: transacties + split-regels (een split
       // erft de ownership van de oudertransactie). De map houdt personalSum
       // (eigen geld, ×1) en sharedSum (gedeeld, ×aandeel) per budget gescheiden.
-      const sumRows: Array<{ budget_id: string | null; amount: number; ownership?: string }> = []
+      // De twee soorten rijen gaan bewust in APARTE arrays: alleen transacties
+      // gaan door het inkomst-/transfer-filter (teken is de harde marker), want
+      // transaction_splits.amount staat POSITIEF in de DB — één gedeelde array
+      // met teken-filter zou elke split-regel wegfilteren.
+      const txSumRows: Array<SpendingSumTxRow> = []
+      const splitSumRows: Array<SpendingSumSplitRow> = []
       for (const t of data) {
         if (t.budget_id) {
-          sumRows.push({ budget_id: t.budget_id, amount: Number(t.amount), ownership: t.ownership as string | undefined })
+          txSumRows.push({
+            budget_id: t.budget_id,
+            amount: Number(t.amount),
+            ownership: t.ownership as string | undefined,
+            transaction_type: t.transaction_type as string | null,
+            is_split: t.is_split as boolean | null,
+          })
         }
       }
 
@@ -1346,7 +1385,7 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
         if (splits) {
           for (const s of splits) {
             if (s.budget_id) {
-              sumRows.push({
+              splitSumRows.push({
                 budget_id: s.budget_id,
                 amount: Number(s.amount),
                 ownership: ownershipByTxId.get(s.transaction_id),
@@ -1376,7 +1415,7 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
       if (signal?.aborted) return // Discard stale results after split query
 
       // Twee-sommen-map (ruw) + perspectief-geschaalde display-Record.
-      const sums = buildSpendingSums(sumRows)
+      const sums = buildSpendingSums(txSumRows, splitSumRows, spendingBudgetTypes)
       const scaled: Record<string, number> = {}
       for (const [budgetId, { personalSum, sharedSum }] of sums) {
         scaled[budgetId] = combineSpending(personalSum, sharedSum, perspective, mySharePct)
@@ -1463,7 +1502,7 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
       // Fetch previous month rollovers and spending
       const [prevRolloversRes, prevTxRes, budgetsForRolloverRes] = await Promise.all([
         supabase.from('budget_rollovers').select('*').eq('period', prevPeriod),
-        supabase.from('transactions').select('id, is_split, budget_id, amount').gte('date', prevStart).lt('date', prevEnd),
+        supabase.from('transactions').select('id, is_split, budget_id, amount, is_income, transaction_type').gte('date', prevStart).lt('date', prevEnd),
         supabase.from('budgets').select('id, default_limit, rollover_type, parent_id, user_id, ownership').not('parent_id', 'is', null),
       ])
       // Alleen de aanmaker van een (gedeeld) budget schrijft rollover-rijen weg —
@@ -1477,29 +1516,28 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
       const prevTx = prevTxRes.data ?? []
       const childBudgets = budgetsForRolloverRes.data ?? []
 
-      // Calculate previous month spending per budget
-      const prevSpending: Record<string, number> = {}
-      for (const t of prevTx) {
-        if (t.budget_id) {
-          prevSpending[t.budget_id] = (prevSpending[t.budget_id] ?? 0) + Math.abs(Number(t.amount))
-        }
-      }
-
-      // Add spending from split transactions (previous month)
+      // Vorige-maand-besteding per budget. Dit is de ENIGE bestedingssom met een
+      // blijvende datastaart: de uitkomst gaat via computeRollover als
+      // `carried_amount` naar budget_rollovers, en die rij wordt per periode maar
+      // één keer aangemaakt (UNIQUE op budget_id+period). Een inkomst die hier
+      // meetelt, blijft dus permanent in de meegenomen ruimte zitten — daarom
+      // loopt deze som door hetzelfde predicaat als de weergavesom.
       const prevSplitTxIds = prevTx.filter(t => t.is_split).map(t => t.id)
+      const prevSplitRows: Array<{ budget_id: string | null; amount: number }> = []
       if (prevSplitTxIds.length > 0) {
         const { data: prevSplits } = await supabase
           .from('transaction_splits')
           .select('budget_id, amount')
           .in('transaction_id', prevSplitTxIds)
-        if (prevSplits) {
-          for (const s of prevSplits) {
-            if (s.budget_id) {
-              prevSpending[s.budget_id] = (prevSpending[s.budget_id] ?? 0) + Math.abs(Number(s.amount))
-            }
-          }
+        for (const s of prevSplits ?? []) {
+          if (s.budget_id) prevSplitRows.push({ budget_id: s.budget_id, amount: Number(s.amount) })
         }
       }
+      const prevSpending = buildBudgetSpendingMap(
+        prevTx as Array<{ id?: string; budget_id?: string | null; amount: number | string; is_income?: boolean | null; transaction_type?: string | null; is_split?: boolean | null }>,
+        prevSplitRows,
+        spendingBudgetTypes,
+      )
 
       // Only compute rollovers if there was spending data in the previous month
       if (prevTx.length > 0) {
@@ -1511,6 +1549,8 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
           // huidige gebruiker bezit (eigen of door mij aangemaakt gedeeld).
           if (rolloverUser && budget.user_id && budget.user_id !== rolloverUser.id) continue
           const prevCarry = getCarriedAmount(prevRollovers, prevPeriod)
+          // De klem op een negatieve besteding zit IN computeRollover, niet hier
+          // — zie lib/budget-rollover.ts. Deze aanroep geeft de rauwe som door.
           const { carry } = computeRollover(
             Number(budget.default_limit),
             prevSpending[budget.id] ?? 0,
@@ -2158,7 +2198,10 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
     for (const group of budgets) {
       const items = group.children.length > 0 ? group.children : [group as Budget]
       for (const b of items) {
-        beschikbaarMap[b.id] = getEffectiveLimit(b) - (spending[b.id] ?? 0)
+        // Zelfde klem als 'Resterend': beschikbaar kan de effectieve limiet niet
+        // overstijgen, ook niet bij een negatieve besteding.
+        const eff = getEffectiveLimit(b)
+        beschikbaarMap[b.id] = Math.min(eff, eff - (spending[b.id] ?? 0))
       }
     }
 
@@ -2939,7 +2982,11 @@ function DetailModalDonut({
   const { ref, hasEntered } = useInViewAnimation({ duration: 600 })
   const overBudget = spent > limit && limit > 0
   const overPositive = overBudget && isOverPositive(budgetType)
-  const ratio = limit > 0 ? Math.min(spent / limit, 1) : 0
+  // Zelfde gedeelde klem als `pct`: een negatieve besteding vult de ring niet
+  // negatief. Vrijheidstijd drukt KOSTEN uit in levenstijd; bij een negatief
+  // totaal is "-14,5 dagen" betekenisloos, dus onderdrukt.
+  const ratio = budgetFillRatio(spent, limit)
+  const freedomAllowed = showsFreedomTime(spent)
 
   const ringSize = 120
   const cx = ringSize / 2
@@ -2989,7 +3036,7 @@ function DetailModalDonut({
           <p className="mt-0.5 font-mono text-base font-bold tabular-nums text-[var(--ink)]" data-testid="modal-spent">
             {<MaskedAmount value={spent} tone="wil" />}
           </p>
-          {hasFreedomData && spent >= 100 && (
+          {hasFreedomData && freedomAllowed && spent >= 100 && (
             <p className="font-serif text-xs italic text-[var(--ink-3)]" data-testid="modal-spent-freedom">
               ≈ {eurToFreedomTime(spent, dailyExpenseRate).formattedDagen}
             </p>
@@ -3004,7 +3051,7 @@ function DetailModalDonut({
           }`} data-testid="modal-remaining">
             {<MaskedAmount value={Math.abs(remaining)} tone="wil" />}
           </p>
-          {hasFreedomData && Math.abs(remaining) >= 100 && (
+          {hasFreedomData && freedomAllowed && Math.abs(remaining) >= 100 && (
             <p className="font-serif text-xs italic text-[var(--ink-3)]" data-testid="modal-remaining-freedom">
               {remaining >= 0
                 ? `nog ${eurToFreedomTime(remaining, dailyExpenseRate).formattedDagen}`
@@ -3245,8 +3292,14 @@ function BudgetDetailModal({
   const limit = isParent
     ? children.reduce((sum, c) => sum + getEffectiveLimit(c), 0)
     : getEffectiveLimit(budget)
-  const remaining = limit - spent
-  const pct = limit > 0 ? Math.min(Math.round((spent / limit) * 100), 100) : 0
+  // Weergave volgt de carry-klem: meegenomen ruimte boven de limiet bestaat
+  // niet. Zonder deze klem toont een netto-inkomst-maand "Resterend €8.377"
+  // bij een limiet van €1.642 — precies het oordeel dat de rollover-klem al velde.
+  const remaining = Math.min(limit, limit - spent)
+  // Geklemd op [0, 100] via de gedeelde weergave-helper: bij een negatieve
+  // besteding (meer inkomsten dan uitgaven) toont de ring "0% van budget" —
+  // geen negatief percentage. Het BEDRAG blijft wel negatief in beeld.
+  const pct = budgetSpentPct(spent, limit)
   // Verdict op de rauwe bedragen, niet op het afgeronde/geklemde `pct`.
   const limitStatus = limit > 0 ? budgetLimitStatus(spent, limit) : 'onder'
   const carry = isParent
@@ -3296,7 +3349,7 @@ function BudgetDetailModal({
       const [{ data: txData }, { data: splitTxInRange }, { data: amountData }] = await Promise.all([
         supabase
           .from('transactions')
-          .select('budget_id, amount, date')
+          .select('budget_id, amount, date, is_income, transaction_type, is_split')
           .in('budget_id', budgetIds)
           .gte('date', months[0].start)
           .lt('date', months[months.length - 1].end),
@@ -3330,6 +3383,21 @@ function BudgetDetailModal({
         }
       }
 
+      // Bestedingsgrondslag gelijk aan de "Besteed"-kop erboven: zonder dit
+      // toont de grafiek een ander bedrag dan de kop voor hetzelfde budget.
+      // Elke rij draagt zijn GETEKENDE bijdrage bij (inkomst gaat eraf), dus een
+      // maand kan negatief zijn. `budgetType` is de richting van deze pane
+      // (children erven het type van hun parent, dus dat geldt voor alle
+      // budgetIds hier). De split-PARENT wordt overgeslagen; zijn bedragen komen
+      // via splitRows binnen.
+      const spendableTx = (txData ?? [])
+        .filter((t) => !t.is_split)
+        .map((t) => ({
+          budget_id: t.budget_id as string,
+          date: t.date as string,
+          contribution: spendingContribution(t, budgetType),
+        }))
+
       // Build limit change timeline
       const changes = (amountData ?? [])
         .sort((a, b) => a.effective_from.localeCompare(b.effective_from))
@@ -3337,10 +3405,10 @@ function BudgetDetailModal({
       setLimitHistory(changes)
 
       const result = months.map(m => {
-        const monthTx = (txData ?? []).filter(t => t.date >= m.start && t.date < m.end && budgetIds.includes(t.budget_id))
+        const monthTx = spendableTx.filter(t => t.date >= m.start && t.date < m.end && budgetIds.includes(t.budget_id))
         const monthSplits = splitRows.filter(s => s.date >= m.start && s.date < m.end)
-        const monthSpent = monthTx.reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
-          + monthSplits.reduce((s, r) => s + Math.abs(r.amount), 0)
+        const monthSpent = monthTx.reduce((s, t) => s + t.contribution, 0)
+          + monthSplits.reduce((s, r) => s + splitContribution(r), 0)
 
         // Calculate effective limit for this month
         let monthLimit = 0
@@ -3364,10 +3432,10 @@ function BudgetDetailModal({
         const childData: Record<string, SparklineDataPoint[]> = {}
         for (const child of children) {
           childData[child.id] = months.map(m => {
-            const monthTx = (txData ?? []).filter(t => t.date >= m.start && t.date < m.end && t.budget_id === child.id)
+            const monthTx = spendableTx.filter(t => t.date >= m.start && t.date < m.end && t.budget_id === child.id)
             const monthChildSplits = splitRows.filter(s => s.date >= m.start && s.date < m.end && s.budget_id === child.id)
-            const monthSpent = monthTx.reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
-              + monthChildSplits.reduce((s, r) => s + Math.abs(r.amount), 0)
+            const monthSpent = monthTx.reduce((s, t) => s + t.contribution, 0)
+              + monthChildSplits.reduce((s, r) => s + splitContribution(r), 0)
             return { month: m.month, label: m.label, spent: monthSpent }
           })
         }
@@ -3797,7 +3865,6 @@ function BudgetDetailModal({
               {children.map((child) => {
                 const childSpent = getSpent(child)
                 const childLimit = getEffectiveLimit(child)
-                const childPct = childLimit > 0 ? Math.min(Math.round((childSpent / childLimit) * 100), 100) : 0
                 const childSparkData = childSparklines[child.id]
                 return (
                   <div
@@ -3827,7 +3894,7 @@ function BudgetDetailModal({
                             <span className="text-xs text-[var(--ink-3)]">
                               {<MaskedAmount value={childSpent} tone="wil" />} / {<MaskedAmount value={childLimit} tone="wil" />}
                             </span>
-                            {hasFreedomData && childLimit - childSpent >= 100 && (
+                            {hasFreedomData && showsFreedomTime(childSpent) && childLimit - childSpent >= 100 && (
                               <p className="text-sm italic text-[var(--ink-3)]" data-testid="child-freedom-remaining">
                                 nog {eurToFreedomTime(childLimit - childSpent, dailyExpenseRate).formattedDagen}
                               </p>
@@ -3888,6 +3955,15 @@ function BudgetDetailModal({
               {budgetTx.map((tx, i) => {
                 const isSplitRow = tx.is_split_row === true
                 const isExpense = budgetType !== 'income'
+                // Een positieve rij op een uitgaven-budget wordt van de
+                // besteding AFGETROKKEN (zie spendingContribution). Ze blijft
+                // zichtbaar — dit is een lijst van wat er geboekt staat — maar
+                // krijgt géén vrijheidstijd, want die drukt KOSTEN uit in
+                // levenstijd, en het label vertelt wat er met het bedrag gebeurt.
+                const isNonSpendingIncome =
+                  !isSplitRow &&
+                  isExpenseDirectionBudget(budgetType) &&
+                  Number(tx.amount) > 0
                 const amountColor = isSplitRow
                   ? (isExpense ? 'text-negative' : 'text-positive')
                   : (Number(tx.amount) < 0 ? 'text-negative' : 'text-positive')
@@ -3920,10 +3996,16 @@ function BudgetDetailModal({
                       <span className={`text-xs font-medium ${amountColor}`}>
                         {<MaskedAmount value={Math.abs(Number(tx.amount))} tone="wil" />}
                       </span>
-                      {hasFreedomData && Math.abs(Number(tx.amount)) >= 100 && (
-                        <p className="text-sm italic text-[var(--ink-3)]" data-testid="tx-freedom-time">
-                          {eurToFreedomTime(Math.abs(Number(tx.amount)), dailyExpenseRate).formattedDagen}
+                      {isNonSpendingIncome ? (
+                        <p className="text-[10px] italic text-[var(--ink-3)]" data-testid="tx-non-spending-income">
+                          inkomst — gaat van de besteding af
                         </p>
+                      ) : (
+                        hasFreedomData && Math.abs(Number(tx.amount)) >= 100 && (
+                          <p className="text-sm italic text-[var(--ink-3)]" data-testid="tx-freedom-time">
+                            {eurToFreedomTime(Math.abs(Number(tx.amount)), dailyExpenseRate).formattedDagen}
+                          </p>
+                        )
                       )}
                     </div>
                   </button>
@@ -3950,7 +4032,9 @@ function BudgetDetailModal({
             </div>
             <div className="flex items-end gap-1" style={{ height: 80 }}>
               {history.map((h, i) => {
-                const spentH = (h.spent / maxHistoryValue) * 100
+                // Onder geklemd: een netto-inkomst-maand (negatieve besteding) zou
+                // anders een negatieve hoogte krijgen — ongeldige CSS, balk verdwijnt.
+                const spentH = Math.max(0, (h.spent / maxHistoryValue) * 100)
                 const limitH = (h.limit / maxHistoryValue) * 100
                 const over = h.spent > h.limit && h.limit > 0
                 const isSelected = selectedHistMonth === h.month
@@ -4060,7 +4144,11 @@ function BudgetDetailModal({
         {/* Budget forecast next month prediction with spending variance confidence */}
         {(() => {
           // Exclude current (incomplete) month from forecast and variance calculations
-          const monthlySpending = history.slice(0, -1).map(h => h.spent)
+          // Een netto-inkomst-maand is voor de PROGNOSE een maand zonder uitgaven,
+          // geen ontbrekende maand. computeBudgetForecast filtert op `v > 0`, dus
+          // zonder deze klem vallen negatieve maanden volledig weg en flipt het
+          // paneel bij ≥3 zulke maanden naar "Nog niet genoeg uitgavenhistorie".
+          const monthlySpending = history.slice(0, -1).map(h => Math.max(0, h.spent))
           if (monthlySpending.length < 3) return null
           const forecast = computeBudgetForecast(monthlySpending, limit, budget.name)
           const varianceData = calculateSpendingVariance(monthlySpending, budget.name)

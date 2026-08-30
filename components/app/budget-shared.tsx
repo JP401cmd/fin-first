@@ -50,6 +50,7 @@ export function BudgetIcon({ name, className }: { name: string; className?: stri
 import { formatCurrency as _formatCurrency, formatCurrencyDecimals as _formatCurrencyDecimals } from '@/lib/format'
 export { _formatCurrency as formatCurrency, _formatCurrencyDecimals as formatCurrencyDecimals }
 import type { Budget } from '@/lib/budget-data'
+import { budgetBarPct } from '@/lib/budget-spending'
 
 export type BudgetType = 'income' | 'expense' | 'savings' | 'debt' | 'archive'
 
@@ -272,10 +273,17 @@ export function computeBarSegments(
   colors: { barHex: string; barHexWarn: string },
   overPositive: boolean,
 ): BarSegments {
-  const rawPct = limit > 0 ? (spent / limit) * 100 : 0
+  // Onderaan geklemd op 0 (budgetBarPct), bovenaan NIET: een negatieve
+  // besteding — meer inkomsten dan uitgaven op een uitgaven-budget — zou anders
+  // een breedte van `-410%` opleveren, wat ongeldige CSS is en de balk stil laat
+  // verdwijnen. De >100-staart blijft wél intact, want die draagt de
+  // overschrijdings-signalering (extensie-segment + 105%-schaling).
+  const rawPct = budgetBarPct(spent, limit)
   // Stoplicht-semantiek via design-tokens (oklch), niet losse hexen — zo valt de
   // 'volledig over budget'-balk exact samen met bg-positive/negative elders.
   const overColor = overPositive ? 'var(--positive)' : 'var(--negative)'
+  // Op de rauwe (niet-boven-geklemde) waarde: een negatieve besteding is nooit
+  // 'volledig over', dus de onder-klem verandert dit oordeel niet.
   const isFullyOver = rawPct > 105
 
   // When overbudget, scale everything so 105% fits within the track

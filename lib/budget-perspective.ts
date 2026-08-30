@@ -11,16 +11,20 @@
  *     partner-aandeel (1 − mySharePct/100), eigen-persoonlijke budgetten ×1.
  *
  * Uitgaven per budget worden in TWEE sommen bijgehouden:
- *   • personalSum — transacties met ownership='personal' (jouw eigen geld,
+ *   • personalSum — bestedingen met ownership='personal' (jouw eigen geld,
  *     telt áltijd ×1, ook wanneer geboekt op een gedeeld budget).
- *   • sharedSum   — transacties met ownership='shared' (×aandeel in personal/
+ *   • sharedSum   — bestedingen met ownership='shared' (×aandeel in personal/
  *     partner-blik, ×1 in household-blik).
+ *
+ * Wat als "besteding" telt is NIET van deze laag: dat predicaat woont in
+ * lib/budget-spending.ts (`spendingContribution`) en wordt hier geconsumeerd.
  *
  * Deze laag is bewust puur zodat ze los te unit-testen is; budgets-client.tsx
  * (Supabase + React) consumeert het resultaat.
  */
 
 import type { Perspective } from '@/lib/household-data'
+import { spendingContribution, splitContribution } from '@/lib/budget-spending'
 
 /**
  * Het aandeel (0-1) dat in dit perspectief telt voor een item met de gegeven
@@ -83,37 +87,99 @@ export function combineSpending(
   return personalSum + sharedSum * sharedFraction
 }
 
-/** Eén budget-key in de uitgaven-map: gesplitst naar herkomst van het geld. */
+/**
+ * Eén budget-key in de uitgaven-map: gesplitst naar herkomst van het geld.
+ *
+ * Beide sommen KUNNEN NEGATIEF ZIJN: op een uitgaven-budget gaat een inkomst
+ * van de besteding af (norm 30 aug 2026). Klem ze niet af — de weergave toont
+ * bewust dat er netto geld binnenkwam.
+ */
 export interface SpendingSums {
-  /** Som van |bedrag| van transacties met ownership='personal'. */
+  /** Getekende bestedingssom van rijen met ownership='personal'. */
   personalSum: number
-  /** Som van |bedrag| van transacties met ownership='shared'. */
+  /** Getekende bestedingssom van rijen met ownership='shared'. */
   sharedSum: number
+}
+
+/** Transactie-rij voor de bestedingssom — gaat door `spendingContribution`. */
+export interface SpendingSumTxRow {
+  budget_id: string | null
+  amount: number
+  ownership?: string
+  is_income?: boolean | null
+  transaction_type?: string | null
+  is_split?: boolean | null
+}
+
+/**
+ * Split-regel (`transaction_splits`) voor de bestedingssom. Bewust een EIGEN
+ * type: split-bedragen staan POSITIEF in de DB en mogen dus nooit door het
+ * teken-regel van `spendingContribution`. `ownership` erft van de oudertransactie.
+ */
+export interface SpendingSumSplitRow {
+  budget_id: string | null
+  amount: number
+  ownership?: string
 }
 
 /**
  * Bouw een per-budget uitgaven-map met twee sommen (personal/shared).
  *
- * Gebruikt `Math.abs(amount)` — gelijk aan de bestaande spending-map-semantiek
- * (uitgaven zijn negatief in de DB, maar de map houdt positieve bedragen bij).
- * Rijen zonder `budget_id` worden overgeslagen. Een ontbrekende `ownership`
- * telt als 'personal' (eigen geld), conform de DB-default.
+ * Twee gescheiden lussen — gelijk aan het canonieke
+ * `buildBudgetSpendingMap(transactions, splits)` in lib/budget-spending.ts:
+ *
+ *   1. transacties: elke rij levert zijn GETEKENDE bijdrage via
+ *      `spendingContribution`. Op een uitgaven-budget telt een uitgave op en
+ *      gaat een inkomst eraf; een transfer draagt 0 bij. De parent-rij van een
+ *      split wordt overgeslagen — die bedragen leven op de splits.
+ *   2. split-regels: `splitContribution`, altijd positief en zónder teken-toets.
+ *      `transaction_splits.amount` wordt positief opgeslagen, dus een teken-
+ *      regel over deze rijen zou elke split als inkomst aftrekken.
+ *
+ * `splits` én `budgetTypes` zijn bewust VERPLICHT (geen default): een caller
+ * die de twee soorten rijen op één hoop gooit, of die de richting van het
+ * budget niet meelevert, moet stuklopen op de compiler in plaats van stil het
+ * verkeerde getal te tonen. Geen splits? Geef `[]` mee.
+ *
+ * `budgetTypes` is de canonieke type-map uit `buildBudgetTypeMap`
+ * (lib/budget-utils.ts), inclusief de parent→child-erfregel. Zonder die
+ * richting zou de inkomst-uitsluiting óók op inkomsten-, spaar- en
+ * archief-budgetten slaan, waar de positieve rij juist de realisatie is.
+ *
+ * De map houdt positieve bedragen bij. Rijen zonder `budget_id` worden
+ * overgeslagen; een ontbrekende `ownership` telt als 'personal' (eigen geld),
+ * conform de DB-default.
  */
 export function buildSpendingSums(
-  rows: Array<{ budget_id: string | null; amount: number; ownership?: string }>,
+  transactions: SpendingSumTxRow[],
+  splits: SpendingSumSplitRow[],
+  budgetTypes: Map<string, string>,
 ): Map<string, SpendingSums> {
   const map = new Map<string, SpendingSums>()
-  for (const row of rows) {
-    if (!row.budget_id) continue
-    const entry = map.get(row.budget_id) ?? { personalSum: 0, sharedSum: 0 }
-    const value = Math.abs(Number(row.amount) || 0)
-    if (row.ownership === 'shared') {
+
+  // `value` is de GETEKENDE bijdrage; geen Math.abs hier, dat zou de aftrek
+  // van een inkomst weer in een optelling veranderen.
+  const add = (budgetId: string, ownership: string | undefined, value: number) => {
+    const entry = map.get(budgetId) ?? { personalSum: 0, sharedSum: 0 }
+    if (ownership === 'shared') {
       entry.sharedSum += value
     } else {
       entry.personalSum += value
     }
-    map.set(row.budget_id, entry)
+    map.set(budgetId, entry)
   }
+
+  for (const row of transactions) {
+    if (row.is_split) continue // bedragen leven op de splits
+    if (!row.budget_id) continue
+    add(row.budget_id, row.ownership, spendingContribution(row, budgetTypes.get(row.budget_id)))
+  }
+
+  for (const row of splits) {
+    if (!row.budget_id) continue
+    add(row.budget_id, row.ownership, splitContribution(row))
+  }
+
   return map
 }
 
