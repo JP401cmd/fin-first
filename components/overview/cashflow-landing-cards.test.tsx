@@ -55,7 +55,10 @@ const CARDS: CashflowCard[] = [
     kpi: '€ 1.000/mnd',
     status: 'good',
     subText: 'Onder budget',
-    kpiWindow: null,
+    // Productievorm sinds de budgetpagina-pariteit: buildCashflowCards vult
+    // hier de Volledig-grondslag. S4 bewijst dat Eenvoudig desondanks de
+    // venster-copy toont — een null-fixture zou die regressie stil maskeren.
+    kpiWindow: 'van € 1.234 uitgavenbudget',
     detail: { label: 'Budgetdekking', value: '80%', tip: 'Je zit op koers.', actionLabel: 'Bekijk budget' },
   },
   {

@@ -29,7 +29,10 @@ import { describe, it, expect } from 'vitest'
  */
 describe('onboarding save-own-data — geen placeholder-bezittingen (UR2-02)', () => {
   const routePath = path.resolve(__dirname, 'route.ts')
-  const source = readFileSync(routePath, 'utf8')
+  // Normaliseer CRLF: op een checkout met autocrlf=true eindigt elke regel op
+  // `\r`, en `.` matcht in JS geen `\r` — waardoor `/\/\/.*$/` zonder deze
+  // normalisatie niets stript en de scan vals-positief aanslaat op commentaar.
+  const source = readFileSync(routePath, 'utf8').replace(/\r\n/g, '\n')
 
   // Strip line- en block-commentaar: de comments noemen de verwijderde namen
   // bewust nog, als waarschuwing tegen herintroductie.

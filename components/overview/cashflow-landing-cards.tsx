@@ -145,6 +145,12 @@ function meterLine(card: CashflowCard): string | null {
   // De verdict-regel zegt dan zelf wat er ontbreekt ("Nog geen budget").
   if (!card.kpi) return null
   if (card.key === 'vaste-lasten') return card.subText
+  // Budget: `card.kpiWindow` draagt sinds de budgetpagina-pariteit de
+  // Volledig-grondslag ("van € X uitgavenbudget"). In Eenvoudig moet de vaste
+  // venster-copy winnen — het cijfer is een restant, en zonder "nog te
+  // besteden deze maand" is niet vast te stellen of € X het bestede of het
+  // resterende deel is (CF-3/S4). Volledig toont de grondslag via `subAmount`.
+  if (card.key === 'budget') return SIMPLE_KPI_WINDOW.budget ?? card.kpiWindow ?? null
   return card.kpiWindow ?? SIMPLE_KPI_WINDOW[card.key] ?? null
 }
 

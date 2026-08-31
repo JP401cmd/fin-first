@@ -4,7 +4,7 @@ import { loadDashboardData } from '@/lib/dashboard-data-loader'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { withCanonicalOverviewFigures } from '@/lib/overview/canonical-health'
 import { computeFreedomTotal } from '@/lib/briefing/overview-briefing'
-import { credibleMonthlyBasis } from '@/lib/format'
+import { credibleDailyExpense, credibleMonthlyBasis } from '@/lib/format'
 
 /**
  * Deelbare vrijheidskaart (/overzicht → "Deel je vrijheidsweek").
@@ -65,7 +65,11 @@ export async function GET(request: Request) {
     const netWorth = dashboardData.netWorth
     // Uitgaven-basis (canoniek 12-mnd rolling; valt terug op de losse maand voor
     // accounts zonder aggregaat). Bepaalt of de kaart een vrijheids-% kan tonen.
-    const dailyExpenseRate = dashboardData.dailyExpenseRate ?? 0
+    // Zelfde geloofwaardigheidsvloer als de maandbasis hieronder: zonder deze
+    // vloer houdt één transactie van € 1 in het rolling venster
+    // `canCalculateFire`/`hasExpenses` true en publiceert de deelkaart een
+    // becijferd vrijheids-% naast een vrijheidstijd van nul (UR2-03).
+    const dailyExpenseRate = credibleDailyExpense(dashboardData.dailyExpenseRate)
     // Voorkeursvolgorde ongewijzigd, maar een kandidaat die door de
     // geloofwaardigheidsvloer zakt slaan we over (UR2-03) — dezelfde regel als
     // op /overzicht, zodat een deelbare kaart nooit een eeuw vrijheid claimt op
