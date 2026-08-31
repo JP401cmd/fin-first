@@ -867,3 +867,17 @@
 ## 2026-08-31
 
 - Geen wijzigingen.
+
+## 2026-08-31
+
+- **API-routes** toegevoegd: /api/milestones/acknowledge, /api/onboarding/draft
+- **Tabellen** toegevoegd: achieved_milestones
+- **Componenten (aantal)** toegevoegd: +12
+
+## 2026-08-31
+
+- Geen wijzigingen.
+
+## 2026-08-31
+
+- Geen wijzigingen.

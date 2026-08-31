@@ -58,7 +58,10 @@ export function OffTrackDoelenLijst({
     progress: GoalProgress
   }[]
   const offTrack = pairs
-    .filter((p) => !p.progress.onTrack && p.progress.pct < 100)
+    // `!is_completed` expliciet: een afgetekend doel waarvan het doelbedrag
+    // daarna is verhoogd heeft pct < 100 maar staat in het Bereikt-archief —
+    // dat hoort hier niet nogmaals als "vraagt aandacht" op te duiken.
+    .filter((p) => !p.progress.onTrack && p.progress.pct < 100 && !p.goal.is_completed)
     // Slechtste eerst — minder pct = hogere prio
     .sort((a, b) => a.progress.pct - b.progress.pct)
 

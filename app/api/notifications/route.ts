@@ -17,6 +17,8 @@ import {
 } from '@/lib/notifications/spend-limit'
 import { loadSpendLimitsSection } from '@/lib/spend-limits/loader'
 import { BUDGET_OR_SPLIT_FILTER, BUDGET_SPENDING_TX_COLUMNS } from '@/lib/budget-spending-fetch'
+import { buildMilestoneCopy } from '@/lib/milestones/copy'
+import { MILESTONE_FRESH_WINDOW_MS, type AchievedMilestoneRow } from '@/lib/milestones/types'
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -30,6 +32,7 @@ export type NotificationType =
   | 'briefing'
   | 'budget_model_proposal'
   | 'spend_limit'
+  | 'milestone'
 
 /**
  * Eén koppelrij met de embed erbij. PostgREST levert een to-one embed soms als
@@ -120,6 +123,7 @@ export async function GET(request: NextRequest) {
       holding_alert: true, briefing: true,
       budget_model_proposal: true,
       spend_limit: true,
+      milestone: true,
     }
     const prefs: Record<string, boolean> = prefsRes.data?.value
       ? { ...defaultPrefs, ...JSON.parse(prefsRes.data.value) }
@@ -655,6 +659,66 @@ export async function GET(request: NextRequest) {
       }
     } catch (err) {
       console.error('Spend limit notification error:', err)
+    }
+
+    // ── 4e. Mijlpaal-melding (gepasseerde drempel) ───────────────────
+    // Leest de log die de detectiemotor bij de /overzicht-load schrijft
+    // (lib/milestones/run.ts, ADR 0123); genereert hier NIETS zelf. Eén melding:
+    // de recentste rij die óf nog niet bevestigd is, óf binnen het verse venster
+    // valt.
+    //
+    // Twee harde filters, allebei omdat de "óf <48u"-tak anders precies de twee
+    // gevallen zou vieren die het besluit stil wil houden:
+    //  - `source = 'detect'`  — seed-rijen dragen `achieved_at = nu` waar geen
+    //    historische datering mogelijk was; zonder dit filter zou de allereerste
+    //    run alsnog een reeks meldingen geven (ADR 0123 §5: de eerste run viert
+    //    niets).
+    //  - `kind <> 'doel'`     — het doelen-scherm viert een behaald doel al in
+    //    context; twee vieringen voor één gebeurtenis devalueert beide
+    //    (ADR 0123 §7).
+    //
+    // Geen eigen gate in app_settings: de dedupe zit al in de melding-id
+    // (`milestone_<key>`, stabiel per mijlpaal) plus de read-state, en de
+    // acknowledge-route haalt de rij vanzelf uit de niet-bevestigde tak.
+    if (computeSlow && prefs.milestone !== false) try {
+      const milestoneCutoff = new Date(Date.now() - MILESTONE_FRESH_WINDOW_MS).toISOString()
+      const { data: milestoneRows } = await supabase
+        .from('achieved_milestones')
+        .select(
+          'id, user_id, milestone_key, kind, threshold_value, observed_value, achieved_at, acknowledged_at, source',
+        )
+        .eq('user_id', user.id)
+        .eq('source', 'detect')
+        .neq('kind', 'doel')
+        .or(`acknowledged_at.is.null,achieved_at.gte."${milestoneCutoff}"`)
+        .order('achieved_at', { ascending: false })
+        .limit(1)
+
+      const milestoneRow = (milestoneRows ?? [])[0] as AchievedMilestoneRow | undefined
+      if (milestoneRow) {
+        // dailyExpenseRate bewust `null`: de canonieke waarde staat in de
+        // dashboardbundel en die laadt deze poll-route niet. Zelf een €/dag
+        // afleiden zou een tweede grondslag zijn voor een getal dat elders al
+        // canoniek is; de copy valt dan terug op een feitelijke duiding zonder
+        // vrijheidstijd. Krijgt deze route ooit de bundel, dan geef je 'm hier
+        // door — niets anders hoeft mee te veranderen.
+        const { titel, betekenis } = buildMilestoneCopy(milestoneRow, null)
+        const id = `milestone_${milestoneRow.milestone_key}`
+        slow.push({
+          id,
+          type: 'milestone',
+          priority: 4,
+          title: titel,
+          description: betekenis,
+          icon: 'Trophy',
+          color: 'violet',
+          createdAt: milestoneRow.achieved_at,
+          read: readIds.includes(id),
+          actionUrl: '/overzicht',
+        })
+      }
+    } catch (err) {
+      console.error('Milestone notification error:', err)
     }
 
     // ── 6. Partner transaction notifications ─────────────────────────
@@ -1320,7 +1384,7 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const validTypes = ['budget', 'sync', 'recommendation', 'partner_transaction', 'horizon', 'holding_alert', 'briefing', 'budget_model_proposal', 'spend_limit']
+    const validTypes = ['budget', 'sync', 'recommendation', 'partner_transaction', 'horizon', 'holding_alert', 'briefing', 'budget_model_proposal', 'spend_limit', 'milestone']
     const sanitized: Record<string, boolean> = {}
     for (const key of validTypes) {
       sanitized[key] = preferences[key] !== false

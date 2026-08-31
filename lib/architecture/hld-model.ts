@@ -122,6 +122,7 @@ export function buildHldModel(): HldModel {
           { title: 'Mijn doorgerekende toekomst vastleggen als doel', desc: 'Sta je op een "wat als"-stand die klopt? Maak er met één klik je doelsituatie van — spaarquote, salaris, rendement en vrijheidsleeftijd worden echte doelen die meegroeien met je cijfers, terug te vinden bij je doelen.' },
           { title: 'Je hele plan als één deelbaar document', desc: 'Het totaalplan bundelt je aannames, je vermogensprojectie naar volledige vrijheid, de slagingskans onder marktschommelingen en concrete inzichten in één rapport — deelbaar als PDF met je partner of adviseur, met alle cijfers uit dezelfde rekenmotor als Toekomst en Overzicht.' },
           { title: 'Zien wat een toekomstig bedrag vandaag waard is', desc: 'Zet je grafiek op /overzicht en /toekomst om naar wat de bedragen vandaag waard zijn; wat je al hebt of al hebt uitgegeven verandert niet mee.' },
+          { title: 'Merken wanneer je een mijlpaal passeert', desc: 'Ga je door €100.000 of door de helft van je vrijheid, dan zegt de app dat één keer — met wat het in vrijheidstijd betekent. Daarna staat het in je geschiedenis, met de datum erbij.' },
         ],
       },
       {

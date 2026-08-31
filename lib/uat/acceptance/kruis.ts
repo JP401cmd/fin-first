@@ -340,8 +340,8 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     persona: 'compleet',
     given: 'Persona Tessa geladen; vrijheids-%, netto vermogen en spaarquote genoteerd op /overzicht.',
-    when: 'De gebruiker genereert de vrijheidskaart op privacyniveau "volledig" en daarna "anoniem".',
-    then: 'De kaart toont vrijheids-% (1 decimaal), gewonnen vrijheidsdagen, spaarquote en — bij "volledig" — netto vermogen/FIRE-doel; deze sporen met de app (vrijheids-% == hero via dezelfde `computeFreedomProgress` op FIRE-eligible grondslag; netto vermogen == hero; spaarquote == cashflow-tegel). Bij "anoniem" verdwijnen bedragen maar blijft het percentage. Consistentie tussen de share-route-queryset en de app-loaders.',
+    when: 'De gebruiker opent de deel-sheet en bekijkt de kaart in de stand "Veel" (na bevestiging) en daarna "Gemiddeld".',
+    then: 'De kaart toont vrijheids-% (1 decimaal), gewonnen vrijheidsdagen, spaarquote en — bij "Veel" — netto vermogen/FIRE-doel; deze sporen met de app (vrijheids-% == hero via dezelfde `computeFreedomProgress` op FIRE-eligible grondslag; netto vermogen == hero; spaarquote == cashflow-tegel). Bij "Gemiddeld" verdwijnen bedragen maar blijft het percentage; "Weinig" toont uitsluitend vrijheidstijd (geen cijfertoets hier). Consistentie tussen de share-route-queryset en de app-loaders.',
     assertion: {
       kind: 'consistency',
       source: 'consistentie-eis: deel-kaart-cijfers == app-oppervlakken (app/api/share/freedom-card deelt computeFreedomProgress + inclusie-gewogen vermogen); privacyniveau filtert alleen de weergave.',

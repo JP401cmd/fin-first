@@ -78,11 +78,20 @@ function monthlyContributionForTarget(
 export type DoelToevoegenSheetProps = {
   monthlyIncome?: number
   monthlyExpenses?: number
+  /**
+   * Open-verzoek van buitenaf (brug vanuit de doel-behaald-viering). Bewust een
+   * TELLER en geen boolean: elke VERHOGING opent de sheet één keer. Een boolean
+   * zou na handmatig sluiten blijven hangen op `true` en de sheet direct weer
+   * openen. De interne trigger-knop blijft ongewijzigd werken — dit is een
+   * extra ingang, geen controlled-overname van `open`.
+   */
+  openRequest?: number
 }
 
 export function DoelToevoegenSheet({
   monthlyIncome = 0,
   monthlyExpenses = 0,
+  openRequest = 0,
 }: DoelToevoegenSheetProps = {}) {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
@@ -105,6 +114,17 @@ export function DoelToevoegenSheet({
   const [assets, setAssets] = useState<AssetLite[]>([])
   const [debts, setDebts] = useState<DebtLite[]>([])
   const router = useRouter()
+
+  // Extern open-verzoek: alleen reageren op een VERHOGING van de teller, zodat
+  // de eerste render (en elke re-render met dezelfde waarde) niets doet.
+  // Render-tijd-patroon (React-docs "adjusting state when a prop changes")
+  // i.p.v. een effect: zelfde gedrag, zonder set-state-in-effect-warning en
+  // zonder extra render-pass.
+  const [gezienOpenRequest, setGezienOpenRequest] = useState(openRequest)
+  if (openRequest > gezienOpenRequest) {
+    setGezienOpenRequest(openRequest)
+    setOpen(true)
+  }
 
   useEffect(() => {
     if (!advancedOpen) return

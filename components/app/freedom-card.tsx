@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { Download, Share2, AlertTriangle } from 'lucide-react'
 import { ShareDialog, type ShareContent } from '@/components/app/share-dialog'
 import { formatCurrency, formatFreedomTimeString } from '@/lib/format'
+import { CHECK_SHARE_PATH } from '@/lib/check/share-freedom'
 
 export interface FreedomCardData {
   privacyLevel: 'anonymous' | 'named' | 'full'
@@ -37,6 +38,21 @@ export interface FreedomCardData {
 // ── Gedeelde afgeleide waarden (canvas + on-screen preview delen dezelfde bron) ──
 
 /**
+ * De uitnodigingsregel in het colofon — waar de lezer zijn eigen vrijheid
+ * uitrekent. Eén bron voor de canvas-kaart én de on-screen preview; het pad komt
+ * uit `CHECK_SHARE_PATH` (ADR 0067), zodat de link nooit uit elkaar loopt met het
+ * publieke deelpad. De host wordt op rendermoment meegegeven — nooit hardcoden.
+ */
+export function buildCheckInvitation(host: string): string {
+  return `Bereken je eigen vrijheid — ${host}${CHECK_SHARE_PATH}`
+}
+
+/** `window.location.host` waar beschikbaar; leeg tijdens SSR. */
+function currentHost(): string {
+  return typeof window !== 'undefined' ? window.location.host : ''
+}
+
+/**
  * Narratieve vrijheidszin voor de Playfair-hoofdkop. Precies één accent-woord
  * (italic, module-accent). De zin wordt gekozen op basis van de aanwezige data
  * zodat de kop altijd de sterkste beschikbare vrijheidsuitkomst draagt.
@@ -50,7 +66,11 @@ function buildFreedomNarrative(data: FreedomCardData): { pre: string; accent: st
   if (reached) return { pre: 'Ik bereikte ', accent: 'volledige vrijheid', post: '.' }
   if (fY > 0) return { pre: 'Ik kocht al ', accent: `${fY} jaar`, post: ' vrijheid.' }
   if (fM > 0) return { pre: 'Ik kocht al ', accent: `${fM} ${fM === 1 ? 'maand' : 'maanden'}`, post: ' vrijheid.' }
-  if (pct != null && pct > 0) return { pre: 'Ik ben ', accent: `${pct}%`, post: ' onderweg naar vrijheid.' }
+  // In de Weinig-stand draagt de kaart uitsluitend vrijheidstijd. Dan mag ook de
+  // kop geen percentage lenen — anders lekt het cijfer alsnog via de zin binnen.
+  if (pct != null && pct > 0 && data.privacyLevel !== 'anonymous') {
+    return { pre: 'Ik ben ', accent: `${pct}%`, post: ' onderweg naar vrijheid.' }
+  }
   return { pre: 'Mijn reis naar ', accent: 'vrijheid', post: ' begint hier.' }
 }
 
@@ -59,7 +79,7 @@ function buildFreedomNarrative(data: FreedomCardData): { pre: string; accent: st
  * renderer én de React-preview, zodat beide identiek zijn. Vrijheidstijd loopt
  * via de canonieke `formatFreedomTimeString` (lib/format) — nooit zelf omrekenen.
  */
-function deriveCardStats(data: FreedomCardData) {
+export function deriveCardStats(data: FreedomCardData) {
   const hasFreedomPct = data.freedomPercentage != null
   const pctText = hasFreedomPct ? `${data.freedomPercentage!.toFixed(1)}%` : 'N.t.b.'
   const pctFill = hasFreedomPct ? Math.max(0, Math.min(100, data.freedomPercentage!)) : 0
@@ -89,8 +109,24 @@ function deriveCardStats(data: FreedomCardData) {
 
   const savingsText = data.savingsRate != null ? `${data.savingsRate.toFixed(0)}%` : 'N.t.b.'
 
-  return { hasFreedomPct, pctText, pctFill, freedomTimeLong, freedomTimeShort, daysWonText, countdownText, savingsText }
+  // De losse eenheden van diezelfde canonieke string: "2 jaar en 9 maanden" →
+  // ['2 jaar', '9 maanden']. De Weinig-variant zet de vrijheidstijd als
+  // gestapeld hoofdcijfer; we splitsen bewust de formatter-uitvoer in plaats van
+  // de Nederlandse meervoudsvormen opnieuw op te bouwen.
+  const freedomTimeLines = freedomTimeLong
+    ? freedomTimeLong.split(/,\s+|\s+en\s+/).filter(Boolean)
+    : []
+
+  return { hasFreedomPct, pctText, pctFill, freedomTimeLong, freedomTimeShort, freedomTimeLines, daysWonText, countdownText, savingsText }
 }
+
+/**
+ * Weinig-variant zonder enige berekenbare vrijheidstijd (`freedomTimeLines` leeg
+ * ⇔ geen percentage én geen jaren/maanden): dan géén reusachtig "N.t.b." als
+ * hoofdcijfer, maar deze bescheiden zin. Eén constante voor canvas én visual,
+ * zodat de twee weergaven niet uiteen kunnen lopen.
+ */
+const GEEN_GEGEVENS_HINT = 'Nog geen gegevens om je vrijheid te berekenen.'
 
 /**
  * Render the Freedom Card to a Canvas element for reliable PNG download.
@@ -198,8 +234,9 @@ export async function renderFreedomCardToCanvas(data: FreedomCardData): Promise<
   ctx.letterSpacing = '0px'
   y += 46
 
-  // Naam (named/full)
-  if (data.displayName) {
+  // Naam (named/full) — in de Weinig-stand staat er per definitie geen naam op.
+  const isMinimal = data.privacyLevel === 'anonymous'
+  if (data.displayName && !isMinimal) {
     ctx.font = `italic 400 32px ${SERIF}`
     ctx.fillStyle = INK2
     ctx.fillText(data.displayName, P, y)
@@ -256,6 +293,94 @@ export async function renderFreedomCardToCanvas(data: FreedomCardData): Promise<
     if (line.length) flush()
   }
   y += 26
+
+  // ── Colofon-geometrie vooraf ──
+  // De Weinig-variant centreert haar hoofdcijfer in de band tussen kop en
+  // colofon, dus die ondergrens moet hier al bekend zijn. Het colofon zelf is
+  // twee regels hoog (merkregel + datum, daaronder de uitnodiging).
+  const footY = H - P - 62
+  const ruleY = footY - 22
+
+  const drawColophon = () => {
+    ctx.strokeStyle = BORDER
+    ctx.lineWidth = 2
+    ctx.beginPath(); ctx.moveTo(P, ruleY); ctx.lineTo(W - P, ruleY); ctx.stroke()
+    // links: Trifinity ✦ vrijheid (ornament in serif zodat het glyph zeker rendert)
+    ctx.font = `500 22px ${MONO}`
+    ctx.letterSpacing = '1.5px'
+    ctx.fillStyle = INK4
+    ctx.fillText('Trifinity', P, footY)
+    const tW = ctx.measureText('Trifinity').width
+    ctx.letterSpacing = '0px'
+    ctx.font = `400 22px ${SERIF}`
+    ctx.fillStyle = ACCENT_BAR
+    ctx.fillText('  ✦  ', P + tW, footY)
+    const oW = ctx.measureText('  ✦  ').width
+    ctx.font = `500 22px ${MONO}`
+    ctx.letterSpacing = '1.5px'
+    ctx.fillStyle = INK4
+    ctx.fillText('vrijheid', P + tW + oW, footY)
+    ctx.letterSpacing = '0px'
+    // rechts: datum
+    const dateText = new Date(data.generatedAt).toLocaleDateString('nl-NL', {
+      day: 'numeric', month: 'short', year: 'numeric',
+    })
+    ctx.font = `400 22px ${MONO}`
+    ctx.fillStyle = INK4
+    const dW = ctx.measureText(dateText).width
+    ctx.fillText(dateText, W - P - dW, footY)
+    // onderregel: uitnodiging. Klein en waardig — geen knop-look, dezelfde
+    // mono-familie als de rest van het colofon.
+    const host = currentHost()
+    if (host) {
+      ctx.font = `400 20px ${MONO}`
+      ctx.letterSpacing = '0.5px'
+      ctx.fillStyle = INK3
+      ctx.fillText(buildCheckInvitation(host), P, footY + 32)
+      ctx.letterSpacing = '0px'
+    }
+  }
+
+  if (isMinimal) {
+    // ── Weinig: de vrijheidstijd ÍS het hoofdcijfer ──
+    // Geen percentage, geen voortgangsbalk, geen figures-strip, geen bedragen.
+    // De eenheden staan gestapeld ("2 jaar" / "9 maanden") zodat geen regel
+    // buiten de kolom loopt en het cijfer op krantenformaat leesbaar blijft; het
+    // blok wordt in de resterende band gecentreerd zodat het wit meebeweegt met
+    // de kophoogte in plaats van als leegte onderaan te blijven staan.
+    const heeftTijd = stats.freedomTimeLines.length > 0
+    const lines = stats.freedomTimeLines
+    const numLine = 118
+    const labelGap = 14
+    const labelH = 26
+    const groupH = heeftTijd ? lines.length * numLine + labelGap + labelH : 40
+    const bandTop = y
+    const bandBottom = ruleY - 48
+    let ny = bandTop + Math.max(0, (bandBottom - bandTop - groupH) / 2)
+    if (heeftTijd) {
+      ctx.font = `500 100px ${MONO}`
+      ctx.fillStyle = INK
+      for (const line of lines) {
+        ctx.fillText(line, P, ny)
+        ny += numLine
+      }
+      ny += labelGap
+      ctx.font = `500 24px ${MONO}`
+      ctx.letterSpacing = '2.5px'
+      ctx.fillStyle = INK3
+      ctx.fillText('VRIJHEID OPGEBOUWD', P, ny)
+      ctx.letterSpacing = '0px'
+    } else {
+      // Geen berekenbare tijd: geen reusachtig "N.t.b." — een bescheiden zin.
+      ctx.font = `italic 400 34px ${SERIF}`
+      ctx.fillStyle = INK3
+      ctx.fillText(GEEN_GEGEVENS_HINT, P, ny)
+    }
+
+    drawColophon()
+    document.body.removeChild(probe)
+    return canvas
+  }
 
   // ── Hoofdcijfer: vrijheids-% (DM Mono, tabular) + voortgangsbalk ──
   ctx.font = `500 118px ${MONO}`
@@ -335,34 +460,7 @@ export async function renderFreedomCardToCanvas(data: FreedomCardData): Promise<
   y = gridTop + rowH * 2
 
   // ── Colofon onderaan ──
-  const footY = H - P - 30
-  ctx.strokeStyle = BORDER
-  ctx.lineWidth = 2
-  ctx.beginPath(); ctx.moveTo(P, footY - 22); ctx.lineTo(W - P, footY - 22); ctx.stroke()
-  // links: Trifinity ✦ vrijheid (ornament in serif zodat het glyph zeker rendert)
-  ctx.font = `500 22px ${MONO}`
-  ctx.letterSpacing = '1.5px'
-  ctx.fillStyle = INK4
-  ctx.fillText('Trifinity', P, footY)
-  const tW = ctx.measureText('Trifinity').width
-  ctx.letterSpacing = '0px'
-  ctx.font = `400 22px ${SERIF}`
-  ctx.fillStyle = ACCENT_BAR
-  ctx.fillText('  ✦  ', P + tW, footY)
-  const oW = ctx.measureText('  ✦  ').width
-  ctx.font = `500 22px ${MONO}`
-  ctx.letterSpacing = '1.5px'
-  ctx.fillStyle = INK4
-  ctx.fillText('vrijheid', P + tW + oW, footY)
-  ctx.letterSpacing = '0px'
-  // rechts: datum
-  const dateText = new Date(data.generatedAt).toLocaleDateString('nl-NL', {
-    day: 'numeric', month: 'short', year: 'numeric',
-  })
-  ctx.font = `400 22px ${MONO}`
-  ctx.fillStyle = INK4
-  const dW = ctx.measureText(dateText).width
-  ctx.fillText(dateText, W - P - dW, footY)
+  drawColophon()
 
   document.body.removeChild(probe)
   return canvas
@@ -372,6 +470,16 @@ function FreedomCardVisual({ data }: { data: FreedomCardData }) {
   const { privacyLevel, displayName, netWorth } = data
   const stats = deriveCardStats(data)
   const narrative = buildFreedomNarrative(data)
+  /** Weinig-stand: alleen kicker, kop, vrijheidstijd en colofon. */
+  const isMinimal = privacyLevel === 'anonymous'
+  const freedomLines = stats.freedomTimeLines
+
+  // Host pas ná mount: bij een server-render bestaat `window` niet, en een
+  // gegokte host zou een verzonnen link in het colofon zetten.
+  const [host, setHost] = useState('')
+  useEffect(() => {
+    setHost(currentHost())
+  }, [])
 
   const cells: { kicker: string; value: string }[] = [
     { kicker: 'Vrijheidstijd', value: stats.freedomTimeShort },
@@ -396,82 +504,123 @@ function FreedomCardVisual({ data }: { data: FreedomCardData }) {
           Mijn vrijheidskaart
         </span>
       </div>
-      {displayName && (
+      {displayName && !isMinimal && (
         <p className="mt-2 font-serif text-lg italic text-[var(--ink-2)]">{displayName}</p>
       )}
 
       {/* Narratieve Playfair-hoofdkop met één italic accent-woord */}
-      <h2 className="mt-5 font-display text-[30px] font-bold leading-tight tracking-[-0.02em] text-[var(--ink)]">
+      {/* Bewust een <p>, geen kop: de kaart rendert ín een sheet waarvan de
+          titel al <h3> is (ADR 0110-hiërarchie), en deze regel is de headline
+          van het deelbeeld — geen sectiekop in de documentstructuur. */}
+      <p className="mt-5 font-display text-[30px] font-bold leading-tight tracking-[-0.02em] text-[var(--ink)]">
         {narrative.pre}
         <em className="font-normal italic text-horizon-700">{narrative.accent}</em>
         {narrative.post}
-      </h2>
+      </p>
 
-      {/* Hoofdcijfer: vrijheids-% + voortgangsbalk */}
-      <div className="mt-7">
-        <div className="flex items-baseline gap-3">
-          <span className="font-mono text-[52px] font-medium leading-none tabular-nums text-[var(--ink)]">
-            {stats.pctText}
-          </span>
-          <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--ink-3)]">
-            van je volledige vrijheid
-          </span>
-        </div>
-        <div className="mt-4 h-[10px] w-full bg-[var(--subtle)]">
-          <div
-            className="h-full bg-horizon-500 transition-all duration-700"
-            style={{ width: `${stats.pctFill}%` }}
-          />
-        </div>
-        {!stats.hasFreedomPct && (
-          <p className="mt-2 font-serif text-[13px] italic text-[var(--ink-3)]">
-            Voeg transacties toe om je vrijheidspercentage te berekenen.
-          </p>
-        )}
-      </div>
-
-      {/* Netto vermogen (alleen volledige privacy) */}
-      {privacyLevel === 'full' && netWorth != null && (
-        <div className="mt-6 border-t border-[var(--border-ed)] pt-4">
-          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--ink-3)]">
-            Netto vermogen
-          </p>
-          <p className="mt-1 font-mono text-2xl font-medium tabular-nums text-[var(--ink)]">
-            {formatCurrency(netWorth)}
-          </p>
-          {stats.freedomTimeLong && (
-            <p className="mt-0.5 font-serif text-sm italic text-[var(--ink-3)]">
-              {stats.freedomTimeLong} vrijheid
+      {isMinimal ? (
+        /* Weinig: de vrijheidstijd ÍS het hoofdcijfer. Geen percentage, geen
+           voortgangsbalk, geen figures-strip, geen bedragen — de eenheden
+           gestapeld, met ruim wit eromheen zodat de kaart met minder blokken
+           gebalanceerd blijft. */
+        <div className="mb-10 mt-8">
+          {freedomLines.length > 0 ? (
+            <>
+              {freedomLines.map((line, i) => (
+                <p
+                  key={i}
+                  className="font-mono text-[42px] font-medium leading-[1.12] tabular-nums text-[var(--ink)]"
+                >
+                  {line}
+                </p>
+              ))}
+              <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--ink-3)]">
+                Vrijheid opgebouwd
+              </p>
+            </>
+          ) : (
+            /* Geen berekenbare tijd: geen reusachtig "N.t.b." — dezelfde zin als de canvas. */
+            <p className="font-serif text-[15px] italic leading-snug text-[var(--ink-3)]">
+              {GEEN_GEGEVENS_HINT}
             </p>
           )}
         </div>
+      ) : (
+        <>
+          {/* Hoofdcijfer: vrijheids-% + voortgangsbalk */}
+          <div className="mt-7">
+            <div className="flex items-baseline gap-3">
+              <span className="font-mono text-[52px] font-medium leading-none tabular-nums text-[var(--ink)]">
+                {stats.pctText}
+              </span>
+              <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--ink-3)]">
+                van je volledige vrijheid
+              </span>
+            </div>
+            <div className="mt-4 h-[10px] w-full bg-[var(--subtle)]">
+              <div
+                className="h-full bg-horizon-500 transition-all duration-700"
+                style={{ width: `${stats.pctFill}%` }}
+              />
+            </div>
+            {!stats.hasFreedomPct && (
+              <p className="mt-2 font-serif text-[13px] italic text-[var(--ink-3)]">
+                Voeg transacties toe om je vrijheidspercentage te berekenen.
+              </p>
+            )}
+          </div>
+
+          {/* Netto vermogen (alleen volledige privacy) */}
+          {privacyLevel === 'full' && netWorth != null && (
+            <div className="mt-6 border-t border-[var(--border-ed)] pt-4">
+              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--ink-3)]">
+                Netto vermogen
+              </p>
+              <p className="mt-1 font-mono text-2xl font-medium tabular-nums text-[var(--ink)]">
+                {formatCurrency(netWorth)}
+              </p>
+              {stats.freedomTimeLong && (
+                <p className="mt-0.5 font-serif text-sm italic text-[var(--ink-3)]">
+                  {stats.freedomTimeLong} vrijheid
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Kerncijfers: 2×2 figures-strip met hairlines */}
+          <div className="mt-6 grid grid-cols-2 border-t border-[var(--border-ed)]">
+            {cells.map((cell, i) => (
+              <div
+                key={cell.kicker}
+                className={`py-4 ${i % 2 === 0 ? 'border-r border-[var(--border-ed)] pr-4' : 'pl-4'} ${i < 2 ? 'border-b border-[var(--border-ed)]' : ''}`}
+              >
+                <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--ink-3)]">
+                  {cell.kicker}
+                </p>
+                <p className="mt-1.5 font-mono text-xl font-medium tabular-nums text-[var(--ink)]">
+                  {cell.value}
+                </p>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
-      {/* Kerncijfers: 2×2 figures-strip met hairlines */}
-      <div className="mt-6 grid grid-cols-2 border-t border-[var(--border-ed)]">
-        {cells.map((cell, i) => (
-          <div
-            key={cell.kicker}
-            className={`py-4 ${i % 2 === 0 ? 'border-r border-[var(--border-ed)] pr-4' : 'pl-4'} ${i < 2 ? 'border-b border-[var(--border-ed)]' : ''}`}
-          >
-            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--ink-3)]">
-              {cell.kicker}
-            </p>
-            <p className="mt-1.5 font-mono text-xl font-medium tabular-nums text-[var(--ink)]">
-              {cell.value}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      {/* Colofon */}
-      <div className="mt-6 flex items-center justify-between border-t border-[var(--border-ed)] pt-3">
-        <p className="font-mono text-[10px] tracking-[0.1em] text-[var(--ink-4)]">
-          Trifinity <span className="font-serif not-italic text-horizon-500">✦</span> vrijheid
-        </p>
-        <p className="font-mono text-[10px] tracking-[0.1em] tabular-nums text-[var(--ink-4)]">
-          {dateText}
-        </p>
+      {/* Colofon — merkregel + datum, met daaronder de uitnodiging */}
+      <div className="mt-6 border-t border-[var(--border-ed)] pt-3">
+        <div className="flex items-center justify-between">
+          <p className="font-mono text-[10px] tracking-[0.1em] text-[var(--ink-4)]">
+            Trifinity <span className="font-serif not-italic text-horizon-500">✦</span> vrijheid
+          </p>
+          <p className="font-mono text-[10px] tracking-[0.1em] tabular-nums text-[var(--ink-4)]">
+            {dateText}
+          </p>
+        </div>
+        {host && (
+          <p className="mt-1.5 font-mono text-[10px] tracking-[0.06em] text-[var(--ink-3)]">
+            {buildCheckInvitation(host)}
+          </p>
+        )}
       </div>
     </div>
   )

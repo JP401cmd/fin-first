@@ -463,8 +463,8 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     {
       id: 'do-doel', x: 789, y: 1186 + DATA_Y_SHIFT, w: 138, h: 56, kind: 'data',
       title: 'Doel & gebeurtenis',
-      lead: 'Doelen, levensgebeurtenissen en FIRE-parameters.',
-      items: ['goals', 'life_events'],
+      lead: 'Doelen, levensgebeurtenissen, FIRE-parameters en de log van gepasseerde mijlpalen (eenmalig per sleutel, cross-device bevestigd — ADR 0123).',
+      items: ['goals', 'life_events', 'achieved_milestones'],
     },
     {
       id: 'do-huishouden', x: 935, y: 1186 + DATA_Y_SHIFT, w: 138, h: 56, kind: 'data',
@@ -596,6 +596,7 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     // Applicatie ↔ data
     'app-comp->data-cont': { payload: 'Alle informatieobjecten — lezen en schrijven', mechanism: 'rpc', cadence: 'realtime', note: 'Elke query loopt server-side met Row Level Security op auth.uid().' },
     'as-coach->do-melding': { payload: 'Gebruikersmelding (bug/vraag/aanbeveling) + optionele screenshot-referentie; leest de eigen syncstatus terug', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['user-reports'], note: 'RPC reserve_user_report_slot begrenst het aantal per gebruiker; own-row RLS.' },
+    'as-coach->do-doel': { payload: 'gepasseerde mijlpalen + bevestigingsstatus', mechanism: 'rest', cadence: 'on-demand', contractDomains: ['milestones'], note: 'In-band RSC-append + acknowledge-route: detectie draait in-band in OverzichtSecondaryLoader per /overzicht-load (geen cron), idempotent via UNIQUE(user_id, milestone_key). De acknowledge-mutatie loopt wél via POST /api/milestones/acknowledge (ADR 0123).' },
     // Actor → proces
     'b-actor->b-main': { payload: 'Stuurt het proces, kiest modules', mechanism: 'process', cadence: 'on-demand' },
     'b-partner->b-main': { payload: 'Deelt financiën via huishouden-koppeling', mechanism: 'process', cadence: 'on-demand' },
@@ -713,6 +714,9 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
 
   // Inzicht- & coachingsdienst legt de gebruikersmelding vast (own-row)
   addEdge({ from: 'as-coach', to: 'do-melding', type: 'access', fromSide: 'B', toSide: 'T', readWrite: true, via: [[700, 1220 + DATA_Y_SHIFT]] })
+
+  // Inzicht- & coachingsdienst detecteert en bevestigt gepasseerde mijlpalen (ADR 0123)
+  addEdge({ from: 'as-coach', to: 'do-doel', type: 'access', fromSide: 'B', toSide: 'T', readWrite: true, via: [[730, 1160 + DATA_Y_SHIFT]] })
 
   return { width: 1660, height: 1370 + DATA_Y_SHIFT, nodes, edges }
 }

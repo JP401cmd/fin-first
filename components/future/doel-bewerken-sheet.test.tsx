@@ -37,6 +37,8 @@ function makeGoal(overrides: Partial<Goal> = {}): Goal {
 const mockUpdate = vi.fn()
 const mockDelete = vi.fn()
 const mockRefresh = vi.fn()
+/** Vangt de update-payload zelf op — nodig om `completed_at` te kunnen pinnen. */
+const mockUpdatePayload = vi.fn()
 
 function mockEq(fn: () => unknown) {
   return () => fn()
@@ -45,7 +47,10 @@ function mockEq(fn: () => unknown) {
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
     from: () => ({
-      update: vi.fn(() => ({ eq: mockEq(mockUpdate) })),
+      update: vi.fn((payload: unknown) => {
+        mockUpdatePayload(payload)
+        return { eq: mockEq(mockUpdate) }
+      }),
       delete: vi.fn(() => ({ eq: mockEq(mockDelete) })),
       // Volledig-bewerken laadt lazy assets+debts via select().order().
       select: vi.fn(() => ({ order: vi.fn(async () => ({ data: [] })) })),
@@ -61,17 +66,43 @@ vi.mock('next/navigation', () => ({
 beforeEach(() => {
   mockUpdate.mockReset()
   mockUpdate.mockResolvedValue({ error: null })
+  mockUpdatePayload.mockReset()
   mockDelete.mockReset()
   mockDelete.mockResolvedValue({ error: null })
   mockRefresh.mockReset()
 })
 
+type CompletedPayload = { id: string; name: string; goalType: string | null }
+
 function renderSheet(
   onClose = () => {},
-  opts: { goalType?: GoalType } = {},
+  opts: {
+    goalType?: GoalType
+    goal?: Partial<Goal>
+    onCompleted?: (g: CompletedPayload) => void
+  } = {},
 ) {
-  const goal = makeGoal({ goal_type: opts.goalType ?? ('savings' as GoalType) })
-  return render(<DoelBewerkenSheet goal={goal} onClose={onClose} />)
+  const goal = makeGoal({
+    goal_type: opts.goalType ?? ('savings' as GoalType),
+    ...opts.goal,
+  })
+  return render(
+    <DoelBewerkenSheet goal={goal} onClose={onClose} onCompleted={opts.onCompleted} />,
+  )
+}
+
+/** Laatste payload die naar `goals.update()` ging. */
+function laatstePayload(): Record<string, unknown> {
+  const calls = mockUpdatePayload.mock.calls
+  return (calls[calls.length - 1]?.[0] ?? {}) as Record<string, unknown>
+}
+
+async function submitMet(waarde: string) {
+  fireEvent.change(document.querySelector('input[type="number"]')!, {
+    target: { value: waarde },
+  })
+  fireEvent.submit(document.querySelector('form')!)
+  await new Promise((r) => setTimeout(r, 10))
 }
 
 describe('DoelBewerkenSheet — render', () => {
@@ -294,5 +325,68 @@ describe('DoelBewerkenSheet — volledig bewerken (GoalForm) sluit de sheet niet
     fireEvent.click(screen.getByRole('button', { name: 'Annuleren' }))
     expect(await screen.findByRole('dialog', { name: /Voortgang bijwerken/i })).toBeTruthy()
     expect(onClose).not.toHaveBeenCalled()
+  })
+})
+
+// ── Kaart #19: completed_at volgt de OVERGANG, niet de stand ──────────────
+
+describe('DoelBewerkenSheet — completed_at bij de 100%-overgang', () => {
+  it('stempelt completed_at bij de echte 0→100%-overgang en meldt het doeltype', async () => {
+    const onCompleted = vi.fn()
+    renderSheet(() => {}, {
+      goal: { is_completed: false, completed_at: null, current_value: 20000 },
+      onCompleted,
+    })
+    await submitMet('50000')
+
+    const payload = laatstePayload()
+    expect(payload.is_completed).toBe(true)
+    expect(typeof payload.completed_at).toBe('string')
+    // Geldige ISO-tijdstempel (geen lege string / Invalid Date).
+    expect(Number.isNaN(Date.parse(payload.completed_at as string))).toBe(false)
+
+    expect(onCompleted).toHaveBeenCalledWith({
+      id: 'g1',
+      name: 'Spaargeld voor woning',
+      goalType: 'savings',
+    })
+  })
+
+  it('laat completed_at ONAANGEROERD bij een re-save van een al voltooid doel', async () => {
+    const onCompleted = vi.fn()
+    renderSheet(() => {}, {
+      goal: {
+        is_completed: true,
+        completed_at: '2026-01-05T10:00:00.000Z',
+        current_value: 50000,
+      },
+      onCompleted,
+    })
+    await submitMet('55000')
+
+    const payload = laatstePayload()
+    expect(payload.is_completed).toBe(true)
+    // Het veld gaat NIET mee in de update — anders schuift de oorspronkelijke
+    // behaald-datum bij elke save op.
+    expect('completed_at' in payload).toBe(false)
+    expect(onCompleted).not.toHaveBeenCalled()
+  })
+
+  it('wist completed_at wanneer een voltooid doel weer wordt heropend', async () => {
+    const onCompleted = vi.fn()
+    renderSheet(() => {}, {
+      goal: {
+        is_completed: true,
+        completed_at: '2026-01-05T10:00:00.000Z',
+        current_value: 50000,
+      },
+      onCompleted,
+    })
+    await submitMet('10000')
+
+    const payload = laatstePayload()
+    expect(payload.is_completed).toBe(false)
+    expect(payload.completed_at).toBeNull()
+    expect(onCompleted).not.toHaveBeenCalled()
   })
 })

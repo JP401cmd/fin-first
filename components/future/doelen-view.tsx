@@ -3,9 +3,10 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Target, Pencil, ArrowUpRight, MoreHorizontal } from 'lucide-react'
+import { Target, Pencil, ArrowUpRight, MoreHorizontal, ChevronDown } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 import { formatGoalValue, GOAL_TYPE_META, type GoalProgress } from '@/lib/goal-data'
+import { getGoalSuggestions } from '@/lib/goal-suggestions'
 import type { GoalWithBudget } from '@/lib/fin-data-loader'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { DoelToevoegenSheet } from './doel-toevoegen-sheet'
@@ -70,6 +71,23 @@ function isVrijheidsgetalGoal(goal: GoalWithBudget): boolean {
 
 function formatMarge(v: number): string {
   return v.toLocaleString('nl-NL', { maximumFractionDigits: 1 })
+}
+
+/**
+ * "Behaald 31 aug 2026" — of kaal "Behaald" wanneer er (nog) geen
+ * `completed_at` staat. Doelen die vóór de completed_at-fix werden voltooid
+ * dragen die datum niet; die krijgen dus geen verzonnen datum, maar de kale
+ * vaststelling.
+ */
+function behaaldLabel(completedAt: string | null | undefined): string {
+  if (!completedAt) return 'Behaald'
+  const d = new Date(completedAt)
+  if (Number.isNaN(d.getTime())) return 'Behaald'
+  return `Behaald ${d.toLocaleDateString('nl-NL', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })}`
 }
 
 function statusFor(progress: GoalDisplay['progress']): {
@@ -307,15 +325,93 @@ function ManualGoalCard({
   )
 }
 
+/**
+ * BereiktArchief — behaalde handmatige doelen, onderaan de pagina en standaard
+ * ingeklapt. Voorstel 3a: een behaald doel verdwijnt uit de actieve lijst (die
+ * moet gaan over wat nog loopt) maar wordt niet weggegooid — het archief is het
+ * bewijs dat er iets stáát. Native `<details>`-disclosure zoals elders in de
+ * app: dicht by default, toetsenbord-bedienbaar zonder JS-state.
+ *
+ * Bewust géén voortgangsbalken of status-pills: die vertellen hier niets meer.
+ * Naam, doelbedrag en de datum waarop het rond was — meer is het niet. Klikken
+ * opent dezelfde bewerken-sheet als in de actieve lijst (daar kan een doel ook
+ * weer heropend worden door de waarde te verlagen).
+ */
+function BereiktArchief({
+  items,
+  onEdit,
+}: {
+  /** Behaalde doelen — kale rijen, geen voortgang (die zegt hier niets meer). */
+  items: GoalWithBudget[]
+  onEdit: (goal: GoalWithBudget) => void
+}) {
+  if (items.length === 0) return null
+  return (
+    <details
+      data-testid="bereikt-archief"
+      className="group mt-10 border-t border-[var(--border-ed)] pt-4"
+    >
+      <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+        <h2 className="inline-flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-3)] transition-colors group-hover:text-[var(--ink-2)]">
+          <ChevronDown
+            className="h-3 w-3 shrink-0 transition-transform group-open:rotate-180"
+            aria-hidden="true"
+          />
+          Bereikt ({items.length})
+        </h2>
+      </summary>
+
+      <p className="mt-2 text-[11px] italic text-[var(--ink-3)]">
+        Wat je al hebt gehaald. Vrijheid die vaststaat.
+      </p>
+
+      <ul className="mt-3 border-t border-[var(--border-ed)]">
+        {items.map((goal) => (
+          <li key={goal.id} className="border-b border-[var(--border-ed)]">
+            <button
+              type="button"
+              onClick={() => onEdit(goal)}
+              aria-label={`Bewerk doel ${goal.name}`}
+              className="flex w-full flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 px-1 py-2.5 text-left transition-colors hover:bg-[var(--subtle)]"
+            >
+              <span className="min-w-0 flex-1 truncate text-sm text-[var(--ink)]">
+                {goal.name}
+              </span>
+              <span className="shrink-0 font-mono text-xs tabular-nums text-[var(--ink-2)]">
+                {formatGoalValue(
+                  Number(goal.target_value),
+                  goal.goal_type,
+                  goal.custom_unit,
+                )}
+              </span>
+              <span className="shrink-0 text-[11px] italic text-[var(--ink-3)]">
+                {behaaldLabel(goal.completed_at)}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </details>
+  )
+}
+
 export function DoelenView({
   goals,
   goalProgresses,
+  completedGoals = [],
   monthlyIncome = 0,
   monthlyExpenses = 0,
   vrijheidsgetalLive = false,
 }: {
   goals: GoalWithBudget[]
   goalProgresses: GoalDisplay['progress'][]
+  /**
+   * Behaalde doelen, APART aangeleverd (`FinPageData.completedGoals`): de
+   * actieve `goals`-lijst is door `splitActiveGoals` al op `!is_completed`
+   * gefilterd, dus behaald-uit-`goals`-afleiden levert per definitie niets
+   * (review-🔴 31 aug 2026). Bron van het Bereikt-archief.
+   */
+  completedGoals?: GoalWithBudget[]
   /** Canonieke effectieve maand-cijfers uit de loader — voeden de gepersonaliseerde
    *  standaard-doelen-kiezer in DoelToevoegenSheet (consume, don't recompute). */
   monthlyIncome?: number
@@ -337,7 +433,16 @@ export function DoelenView({
   // Mijlpaal "doel behaald" — gezet zodra een doel bij het bijwerken de
   // 100%-overgang maakt. De viering zelf (once-guard per doel-id) zit in
   // MilestoneCelebration.
-  const [reachedGoal, setReachedGoal] = useState<{ id: string; name: string } | null>(null)
+  const [reachedGoal, setReachedGoal] = useState<{
+    id: string
+    name: string
+    goalType: string | null
+  } | null>(null)
+
+  // Brug naar het volgende doel (voorstel 3b): een teller die DoelToevoegenSheet
+  // van buitenaf opent. Elke verhoging = één open-verzoek; zie de prop-uitleg
+  // daar waarom dit een teller is en geen boolean.
+  const [toevoegenRequest, setToevoegenRequest] = useState(0)
 
   // Doelsituatie-groep: overflow-menu + loslaten-bevestiging.
   const [menuOpen, setMenuOpen] = useState(false)
@@ -372,10 +477,24 @@ export function DoelenView({
 
   const parameterDisplay = all.filter((d) => isParameterGoal(d.goal))
 
+  /**
+   * Behaald-archief (voorstel 3a): behaalde handmatige doelen verlaten de
+   * actieve lijst en verhuizen naar de ingeklapte sectie onderaan. Criterium is
+   * bewust de OPGESLAGEN vlag `is_completed` — niet `progress.pct >= 100`. Die
+   * twee kunnen uiteenlopen (een doel waarvan het doelbedrag ná voltooiing
+   * verhoogd is staat op 100%+ noch voltooid, of andersom), en de vlag is wat de
+   * gebruiker zelf heeft afgetekend. Parameter-doelen (doelsituatie) blijven
+   * buiten deze splitsing: die zijn read-only en horen bij het lab.
+   * Nieuwste eerst; doelen zonder `completed_at` sluiten achteraan aan.
+   */
+  const bereiktGoals = completedGoals
+    .filter((g) => !isParameterGoal(g))
+    .sort((a, b) => (b.completed_at ?? '').localeCompare(a.completed_at ?? ''))
+
   // Handmatige doelen — sorteer op status: off-track eerst zodat aandacht-
-  // vereisende doelen bovenaan staan.
+  // vereisende doelen bovenaan staan. Behaalde doelen zitten hier niet meer in.
   const manualDisplay = all
-    .filter((d) => !isParameterGoal(d.goal))
+    .filter((d) => !isParameterGoal(d.goal) && !d.goal.is_completed)
     .sort((a, b) => {
       const aOff = !a.progress.onTrack && a.progress.pct < 100
       const bOff = !b.progress.onTrack && b.progress.pct < 100
@@ -395,7 +514,10 @@ export function DoelenView({
    */
   const mergedDisplay = [...parameterDisplay, ...manualDisplay]
 
-  if (all.length === 0) {
+  // Volledig leeg = géén actieve doelen ÉN niets bereikt. Wie alles al haalde
+  // krijgt niet de starters-lege-staat maar de gewone lay-out mét het
+  // Bereikt-archief (de lege-actieve-lijst-tekst verwijst er dan naar).
+  if (all.length === 0 && bereiktGoals.length === 0) {
     return (
       <section className="mx-auto max-w-6xl px-4 sm:px-6 pb-8">
         <article className="rounded-2xl border border-dashed border-[var(--border-md)] bg-[var(--paper)] p-6 sm:p-8 text-center">
@@ -501,10 +623,19 @@ export function DoelenView({
             {simple ? 'Je doelen' : manualHeading}
           </h2>
         </div>
-        <DoelToevoegenSheet monthlyIncome={monthlyIncome} monthlyExpenses={monthlyExpenses} />
+        <DoelToevoegenSheet
+          monthlyIncome={monthlyIncome}
+          monthlyExpenses={monthlyExpenses}
+          openRequest={toevoegenRequest}
+        />
       </header>
 
-      {simple ? (
+      {simple && mergedDisplay.length === 0 ? (
+        <p className="text-sm text-[var(--ink-2)] leading-relaxed">
+          Je hebt op dit moment geen lopend doel. Wat je al haalde staat onderaan
+          bij Bereikt — kies hierboven je volgende.
+        </p>
+      ) : simple ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           {mergedDisplay.map((d) =>
             isParameterGoal(d.goal) ? (
@@ -546,6 +677,9 @@ export function DoelenView({
           : 'Klik op een doel om voortgang bij te werken of het te verwijderen. Volledige edit van naam/bedrag/datum via /will.'}
       </p>
 
+      {/* ── Bereikt — behaalde doelen, ingeklapt onderaan (voorstel 3a) ── */}
+      <BereiktArchief items={bereiktGoals} onEdit={(g) => setEditingGoal(g)} />
+
       {editingGoal && (
         <DoelBewerkenSheet
           goal={editingGoal}
@@ -563,6 +697,37 @@ export function DoelenView({
             </>
           }
           meaning="Je hebt gehaald wat je jezelf voornam — een stuk vrijheid dat nu vaststaat."
+          /* Voorstel 3b — de brug. Zonder een volgend doel zakt de motivatie na
+             een behaald doel in; de knop is het punt, de suggestieregel de kers.
+             Suggestietekst komt ongewijzigd uit lib/goal-suggestions (geen
+             nieuw geformuleerd advies); is er geen suggestie voor dit type,
+             dan staat de knop er alleen. */
+          action={
+            <div className="flex flex-col items-center gap-2.5">
+              {(() => {
+                const suggestie = getGoalSuggestions(reachedGoal.goalType, 1)[0]
+                return suggestie ? (
+                  <p
+                    data-testid="volgend-doel-suggestie"
+                    className="max-w-[34ch] font-serif text-[13px] italic leading-snug text-[var(--ink-3)]"
+                  >
+                    {suggestie.text}
+                  </p>
+                ) : null
+              })()}
+              <button
+                type="button"
+                onClick={() => {
+                  setReachedGoal(null)
+                  setToevoegenRequest((n) => n + 1)
+                }}
+                className="inline-flex items-center gap-1.5 border border-[var(--module-active-500)] px-3 py-1.5 text-xs font-semibold text-[var(--module-active-700)] transition-colors hover:bg-[var(--subtle)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--module-active-500)]"
+              >
+                Kies je volgende doel
+                <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            </div>
+          }
           onDismiss={() => setReachedGoal(null)}
         />
       )}

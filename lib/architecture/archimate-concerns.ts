@@ -34,6 +34,15 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     reviewedAt: '2026-08-31',
   },
   {
+    id: 'mijlpaaldetectie-alleen-in-eigen-perspectief',
+    title: 'Mijlpaaldetectie draait alleen in het eigen perspectief',
+    detail:
+      'ADR 0123 legt mijlpaaldetectie in-band in OverzichtSecondaryLoader, tegen de canonieke waarden (netWorth, freedomPct, totalDebts, emergencyFund) van het EIGEN perspectief. Wie uitsluitend in huishoud- of partnerweergave kijkt, krijgt geen mijlpaal-detectie: de personal-canonieke waarden zijn daar niet zonder extra kosten beschikbaar — ze zouden een tweede horizon-load vergen, alleen om te toetsen of een drempel is gepasseerd. Bewust geaccepteerd in ADR 0123 (Gevolgen): de detectie blijft op dit moment gebonden aan wanneer de gebruiker zijn eigen perspectief laadt. Verwijder dit punt zodra de personal-canonieke freedomPct in elk perspectief beschikbaar is zonder extra load (bv. via een gecachete of vooraf berekende waarde), zodat detectie ook vanuit huishoud-/partnerweergave kan draaien.',
+    severity: 'debt',
+    elementIds: ['as-coach', 'as-huishouden'],
+    reviewedAt: '2026-08-31',
+  },
+  {
     id: 'per-rekening-zichtbaarheid-nog-niet-bewezen-op-de-database',
     title: 'De per-rekening zichtbaarheidsgate is geschreven maar nog niet op de database bewezen',
     detail:

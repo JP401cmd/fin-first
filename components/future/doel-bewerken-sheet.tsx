@@ -42,8 +42,12 @@ export function DoelBewerkenSheet({
    * niet-voltooid naar voltooid). De parent viert de mijlpaal ingetogen
    * (MilestoneCelebration). Wordt niet aangeroepen bij een re-save van een al
    * voltooid doel.
+   *
+   * `goalType` gaat mee zodat de viering de brug naar een volgend doel kan
+   * leggen (suggestie uit `lib/goal-suggestions`) zonder het doel-object
+   * opnieuw op te hoeven zoeken. Kan `null` zijn bij een doel zonder type.
    */
-  onCompleted?: (goal: { id: string; name: string }) => void
+  onCompleted?: (goal: { id: string; name: string; goalType: string | null }) => void
 }) {
   const goalId = goal.id
   const goalName = goal.name
@@ -98,13 +102,27 @@ export function DoelBewerkenSheet({
     // current_value = 0 (afgelost) — dat patroon volgt later wanneer
     // de schema goal_type-specifieke completion-logica heeft.
     const willBeCompleted = targetValue > 0 && numeric >= targetValue
+    // `completed_at` volgt de OVERGANG, niet de stand (kaart #19). Alleen bij de
+    // échte 0→100%-overgang stempelen we de datum; bij heropenen van een
+    // voltooid doel wissen we 'm; bij een re-save van een al voltooid doel gaat
+    // het veld NIET mee in de update, zodat de oorspronkelijke behaald-datum
+    // blijft staan (anders schuift het Bereikt-archief bij elke save op).
+    const justCompleted = willBeCompleted && !goal.is_completed
+    const justReopened = !willBeCompleted && !!goal.is_completed
+    const patch: {
+      current_value: number
+      is_completed: boolean
+      completed_at?: string | null
+    } = {
+      current_value: numeric,
+      is_completed: willBeCompleted,
+    }
+    if (justCompleted) patch.completed_at = new Date().toISOString()
+    else if (justReopened) patch.completed_at = null
     const supabase = createClient()
     const { error: updateError } = await supabase
       .from('goals')
-      .update({
-        current_value: numeric,
-        is_completed: willBeCompleted,
-      })
+      .update(patch)
       .eq('id', goalId)
     if (updateError) {
       setError(`Opslaan mislukt: ${updateError.message}`)
@@ -115,8 +133,8 @@ export function DoelBewerkenSheet({
     // Mijlpaal: alleen bij de échte 100%-overgang (niet bij re-save van een al
     // voltooid doel). De parent viert 'm ingetogen; de once-guard per doel-id
     // voorkomt herhaling.
-    if (willBeCompleted && !goal.is_completed) {
-      onCompleted?.({ id: goalId, name: goalName })
+    if (justCompleted) {
+      onCompleted?.({ id: goalId, name: goalName, goalType: goalType ?? null })
     }
     onClose()
     router.refresh()

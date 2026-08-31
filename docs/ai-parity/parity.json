@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-08-04T13:00:42.836Z",
+  "generatedAt": "2026-08-31T02:04:52.846Z",
   "manifestGeneratedAt": "2026-08-03T00:00:00.000Z",
-  "inSync": true,
+  "inSync": false,
   "budgetsOk": true,
   "dnaSubBudget": 2000,
   "dnaEstimatedTokens": 847,
@@ -55,13 +55,13 @@
       "estimatedTokens": 227,
       "tokenSource": "live",
       "withinBudget": true,
-      "inSync": true,
+      "inSync": false,
       "sources": [
         {
           "file": "lib/briefing/redactie.ts",
           "storedSha256": "5a06942d7c02a1837baaa8a8af58ae789e905da21f7a42a1edccad9c2480a918",
-          "liveSha256": "5a06942d7c02a1837baaa8a8af58ae789e905da21f7a42a1edccad9c2480a918",
-          "inSync": true
+          "liveSha256": "8dee3d00746f622f590bf592f6764f688cbb23160cdff0067600c65974cddcef",
+          "inSync": false
         },
         {
           "file": "lib/ai/dna/base.ts",

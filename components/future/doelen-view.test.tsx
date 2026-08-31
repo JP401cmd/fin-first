@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import type { ReactElement } from 'react'
 import { render as rtlRender, screen, fireEvent } from '@testing-library/react'
 import { DoelenView } from './doelen-view'
@@ -12,7 +12,15 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
-    from: () => ({ insert: vi.fn().mockResolvedValue({ error: null }) }),
+    // DoelBewerkenSheet (bewerken/voltooien) hangt óók aan deze mock zodra een
+    // doel-kaart wordt aangeklikt: update().eq(), delete().eq() en de lazy
+    // select().order() voor de volledig-bewerken-flow.
+    from: () => ({
+      insert: vi.fn().mockResolvedValue({ error: null }),
+      update: vi.fn(() => ({ eq: vi.fn().mockResolvedValue({ error: null }) })),
+      delete: vi.fn(() => ({ eq: vi.fn().mockResolvedValue({ error: null }) })),
+      select: vi.fn(() => ({ order: vi.fn().mockResolvedValue({ data: [] }) })),
+    }),
     auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'u1' } } }) },
   }),
 }))
@@ -458,5 +466,214 @@ describe('DoelenView — weergavemodus (TOE-2)', () => {
     // Twee koppen = twee groepen.
     expect(screen.getAllByRole('heading', { level: 2 }).length).toBe(2)
     expect(screen.getByRole('button', { name: 'Doelsituatie-opties' })).toBeTruthy()
+  })
+})
+
+// ── Voorstel 3a: het Bereikt-archief ─────────────────────────────────────
+
+/**
+ * Behaalde doelen (`is_completed`) verlaten de actieve lijst en verhuizen naar
+ * een standaard ingeklapte `<details>`-sectie "Bereikt" onderaan. Criterium is
+ * de opgeslagen vlag, niet `pct >= 100` — daarom dragen deze fixtures die vlag
+ * expliciet.
+ */
+function behaaldGoal(overrides: Partial<GoalWithBudget> = {}): GoalWithBudget {
+  return mockGoal({
+    id: 'b1',
+    name: 'Noodfonds',
+    is_completed: true,
+    completed_at: '2026-08-31T12:00:00.000Z',
+    current_value: 50000,
+    ...overrides,
+  } as Partial<GoalWithBudget>)
+}
+
+describe('DoelenView — Bereikt-archief (3a)', () => {
+  it('haalt een behaald doel uit de actieve lijst en zet het in Bereikt, met datum', () => {
+    // Loader-getrouwe vorm: behaalde doelen komen APART binnen via
+    // `completedGoals` (FinPageData) — de actieve `goals`-lijst bevat ze per
+    // constructie niet (splitActiveGoals filtert op !is_completed).
+    render(<DoelenView goals={[]} goalProgresses={[]} completedGoals={[behaaldGoal()]} />)
+
+    // Niet als actieve doel-kaart (die dragen een h3 met de naam).
+    expect(screen.queryByRole('heading', { level: 3, name: /Noodfonds/ })).toBeNull()
+    expect(screen.getByText(/Je hebt nog geen eigen doelen/)).toBeTruthy()
+
+    // Wel in het archief, met aantal in de summary en de behaald-datum.
+    const archief = screen.getByTestId('bereikt-archief')
+    expect(archief.textContent).toContain('Bereikt (1)')
+    expect(archief.textContent).toContain('Noodfonds')
+    expect(archief.textContent).toMatch(/Behaald 31 [a-z]{3}\.? 2026/)
+    // Standaard ingeklapt.
+    expect((archief as HTMLDetailsElement).open).toBe(false)
+  })
+
+  it('valt terug op kaal "Behaald" zonder completed_at (oude rijen)', () => {
+    render(
+      <DoelenView
+        goals={[]}
+        goalProgresses={[]}
+        completedGoals={[behaaldGoal({ completed_at: null } as Partial<GoalWithBudget>)]}
+      />,
+    )
+    const archief = screen.getByTestId('bereikt-archief')
+    expect(archief.textContent).toContain('Behaald')
+    expect(archief.textContent).not.toMatch(/Behaald \d/)
+  })
+
+  it('toont GEEN Bereikt-sectie zonder behaalde doelen', () => {
+    render(
+      <DoelenView
+        goals={[mockGoal()]}
+        goalProgresses={[
+          { current: 20000, target: 50000, pct: 40, onTrack: false, measured: true, requiredMonthly: null, eta: null },
+        ]}
+      />,
+    )
+    expect(screen.queryByTestId('bereikt-archief')).toBeNull()
+  })
+
+  it('telt een behaald doel niet mee als "actief doel"', () => {
+    render(
+      <DoelenView
+        goals={[mockGoal({ id: 'a1', name: 'Vakantiepot' })]}
+        goalProgresses={[
+          { current: 500, target: 3000, pct: 17, onTrack: false, measured: true, requiredMonthly: null, eta: null },
+        ]}
+        completedGoals={[behaaldGoal()]}
+      />,
+    )
+    expect(screen.getByText('1 actief doel')).toBeTruthy()
+    expect(screen.getByRole('heading', { level: 3, name: /Vakantiepot/ })).toBeTruthy()
+    expect(screen.getByTestId('bereikt-archief').textContent).toContain('Noodfonds')
+  })
+
+  it('een archief-regel opent de bestaande bewerken-sheet', async () => {
+    render(<DoelenView goals={[]} goalProgresses={[]} completedGoals={[behaaldGoal()]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Bewerk doel Noodfonds' }))
+    expect(
+      await screen.findByRole('dialog', { name: /Voortgang bijwerken/i }),
+    ).toBeTruthy()
+  })
+
+  it('Eenvoudig: dezelfde splitsing — behaald uit de lijst, in Bereikt', () => {
+    render(
+      <DoelenView
+        goals={[mockGoal({ id: 'a1', name: 'Vakantiepot' })]}
+        goalProgresses={[
+          { current: 500, target: 3000, pct: 17, onTrack: false, measured: true, requiredMonthly: null, eta: null },
+        ]}
+        completedGoals={[behaaldGoal()]}
+      />,
+      'simple',
+    )
+    const namen = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent ?? '')
+    expect(namen.some((n) => n.includes('Vakantiepot'))).toBe(true)
+    expect(namen.some((n) => n.includes('Noodfonds'))).toBe(false)
+    expect(screen.getByTestId('bereikt-archief').textContent).toContain('Noodfonds')
+  })
+
+  it('Eenvoudig: zonder lopend doel verwijst de lijst naar het archief', () => {
+    render(
+      <DoelenView goals={[]} goalProgresses={[]} completedGoals={[behaaldGoal()]} />,
+      'simple',
+    )
+    expect(screen.getByText(/geen lopend doel/)).toBeTruthy()
+    expect(screen.getByTestId('bereikt-archief')).toBeTruthy()
+  })
+
+  it('sorteert het archief op behaald-datum, nieuwste eerst', () => {
+    render(
+      <DoelenView
+        goals={[]}
+        goalProgresses={[]}
+        completedGoals={[
+          behaaldGoal({
+            id: 'oud',
+            name: 'Oud doel',
+            completed_at: '2025-02-01T12:00:00.000Z',
+          } as Partial<GoalWithBudget>),
+          behaaldGoal({
+            id: 'nieuw',
+            name: 'Nieuw doel',
+            completed_at: '2026-08-31T12:00:00.000Z',
+          } as Partial<GoalWithBudget>),
+        ]}
+      />,
+    )
+    const regels = screen.getByTestId('bereikt-archief').querySelectorAll('li')
+    expect(regels[0]?.textContent).toContain('Nieuw doel')
+    expect(regels[1]?.textContent).toContain('Oud doel')
+  })
+})
+
+// ── Voorstel 3b: de brug naar het volgende doel ──────────────────────────
+
+/**
+ * Bij de 0→100%-overgang viert MilestoneCelebration het doel en biedt het
+ * meteen de brug: een suggestieregel uit lib/goal-suggestions plus de knop
+ * "Kies je volgende doel". Die knop sluit de viering en opent
+ * DoelToevoegenSheet via de `openRequest`-teller.
+ */
+async function haalDoelBehaald(goalType = 'savings') {
+  render(
+    <DoelenView
+      goals={[
+        mockGoal({
+          id: 'vier1',
+          name: 'Noodfonds',
+          goal_type: goalType,
+        } as Partial<GoalWithBudget>),
+      ]}
+      goalProgresses={[
+        { current: 20000, target: 50000, pct: 40, onTrack: false, measured: true, requiredMonthly: null, eta: null },
+      ]}
+    />,
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'Bewerk doel Noodfonds' }))
+  await screen.findByRole('dialog', { name: /Voortgang bijwerken/i })
+  fireEvent.change(document.querySelector('input[type="number"]')!, {
+    target: { value: '50000' },
+  })
+  fireEvent.submit(document.querySelector('form')!)
+  await new Promise((r) => setTimeout(r, 20))
+}
+
+describe('DoelenView — brug naar het volgende doel (3b)', () => {
+  beforeEach(() => {
+    // MilestoneCelebration heeft een localStorage-once-guard per doel-id.
+    window.localStorage.clear()
+  })
+
+  it('toont de viering met suggestieregel en de knop', async () => {
+    await haalDoelBehaald('savings')
+
+    expect(screen.getByText(/Doel behaald:/)).toBeTruthy()
+    // Suggestietekst komt ongewijzigd uit lib/goal-suggestions (savings[0]).
+    expect(screen.getByTestId('volgend-doel-suggestie').textContent).toContain(
+      'automatische maandoverboeking',
+    )
+    expect(screen.getByRole('button', { name: /Kies je volgende doel/ })).toBeTruthy()
+  })
+
+  it('knop sluit de viering en opent de toevoegen-sheet (openRequest)', async () => {
+    await haalDoelBehaald('savings')
+
+    // Sheet staat nog dicht vóór de klik.
+    expect(screen.queryByRole('dialog', { name: /Doel toevoegen/i })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: /Kies je volgende doel/ }))
+
+    expect(await screen.findByRole('dialog', { name: /Doel toevoegen/i })).toBeTruthy()
+    expect(screen.queryByText(/Doel behaald:/)).toBeNull()
+  })
+
+  it('zonder suggestie voor het doeltype blijft alleen de knop over', async () => {
+    // 'custom' heeft geen suggestion-set in lib/goal-suggestions.
+    await haalDoelBehaald('custom')
+
+    expect(screen.getByText(/Doel behaald:/)).toBeTruthy()
+    expect(screen.queryByTestId('volgend-doel-suggestie')).toBeNull()
+    expect(screen.getByRole('button', { name: /Kies je volgende doel/ })).toBeTruthy()
   })
 })

@@ -365,7 +365,7 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'willem',
     given: 'Persona Willem geladen, met een "Noodfonds"-doel (€0/€5.000, type Sparen).',
     when: 'De gebruiker vult "Huidige waarde" in als €3.000.',
-    then: 'De voortgangsbalk springt naar 60% (computeGoalProgress: round(3.000/5.000×100)=60) en de bijdrage-monitor toont "+€3.000 · +60 pp" (t.o.v. de vorige waarde €0). Doel behalen (€5.000) markeert het doel als voltooid. Exacte voortgang via de échte functie computeGoalProgress.',
+    then: 'De voortgangsbalk springt naar 60% (computeGoalProgress: round(3.000/5.000×100)=60) en de bijdrage-monitor toont "+€3.000 · +60 pp" (t.o.v. de vorige waarde €0). Doel behalen (€5.000) markeert het doel als voltooid MÉT `completed_at` (de datum blijft staan bij een re-save en wordt gewist bij heropenen — kaart #19), toont de krant-viering die eindigt met een doelsuggestie plus de knop "Kies je volgende doel" (opent de toevoegen-sheet; post-goal-dip-brug, plan-voorstel 3b), en verplaatst het doel uit de actieve lijst naar het ingeklapte "Bereikt"-archief onderaan met de behaald-datum (3a); het verschijnt daarna nergens meer als "vraagt aandacht" (off-track-lijst filtert op `is_completed`). Exacte voortgang via de échte functie computeGoalProgress.',
     assertion: {
       kind: 'exact',
       expected: 'pctBij3000=60; pctBij0=0; deltaPp=60',

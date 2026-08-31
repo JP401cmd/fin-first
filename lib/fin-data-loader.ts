@@ -87,6 +87,14 @@ export interface FinPageData {
   kpiData: FinKpiData
   goals: GoalWithBudget[]
   goalProgresses: GoalProgress[]
+  /**
+   * Behaalde doelen, APART van `goals`: `syncActiveGoalValues` filtert
+   * voltooide doelen uit de actieve lijst (splitActiveGoals), dus een consument
+   * die "behaald" uit `goals` probeert af te leiden krijgt per definitie niets
+   * (review-🔴 voorstel 3, 31 aug 2026). Bron voor het Bereikt-archief en de
+   * doel-behaald-mijlpaallog. Geen live-sync nodig: de waarde staat vast.
+   */
+  completedGoals: GoalWithBudget[]
   partnerInfo: { partnerId: string; partnerName: string } | null
   currentUserId: string | null
   userProfile: { full_name: string | null }
@@ -333,6 +341,7 @@ export async function loadFinData(
     kpiData,
     goals,
     goalProgresses,
+    completedGoals: allGoals.filter((g) => g.is_completed),
     partnerInfo,
     currentUserId,
     userProfile,

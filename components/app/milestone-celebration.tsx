@@ -25,6 +25,11 @@ import { X } from 'lucide-react'
  * van een server-rondgang waard. Voor cross-device onthouden (zoals de status-
  * banner) bestaat een eigen-rij-pref-pad; celebrations vallen daar bewust buiten.
  *
+ * Uitzondering: `guard="none"` slaat localStorage over en laat de once-beslissing
+ * volledig aan de aanroeper. Dat pad draagt de server-gedreven mijlpalen
+ * (`MilestoneCelebrationHost` + de acknowledge-API) — daar is de once-guard wél
+ * cross-device. Met een `action` erbij blijft de viering 12s staan i.p.v. 4,5s.
+ *
  * Module-accent loopt via `--module-active-*` (route-breed gezet) — geen
  * hardcodes. Respecteert `prefers-reduced-motion` (instant, geen translate).
  */
@@ -55,6 +60,16 @@ export interface MilestoneCelebrationProps {
   /** localStorage once-guard key, uniek per mijlpaal (bv. 'first-asset', `goal-reached:${id}`). */
   celebrationKey: string
   /**
+   * Waar de once-beslissing vandaan komt. Default `'local'` — het bestaande
+   * gedrag: `hasCelebrated`/`markCelebrated` op localStorage (per-device).
+   *
+   * `'none'` slaat localStorage volledig over (geen lees, geen schrijf): de
+   * aanroeper bepaalt dan zélf of hij mag renderen. Dat is het pad voor de
+   * server-gedreven mijlpalen, waar de acknowledge-API de once-guard draagt en
+   * de viering dus cross-device precies één keer verschijnt.
+   */
+  guard?: 'local' | 'none'
+  /**
    * Playfair-kop. Bevat idealiter precies één `<em>`-accent (wordt automatisch
    * in module-accent + italic gezet). Bv. `<>Je eerste <em>bezitting</em> staat.</>`.
    */
@@ -63,7 +78,16 @@ export interface MilestoneCelebrationProps {
   meaning: string
   /** Hairline-kicker boven de kop. Default 'Mijlpaal'. */
   kicker?: string
-  /** Auto-dismiss-duur in ms. Default 4500. */
+  /**
+   * Optionele actieregel onder de betekeniszin (bv. een ingetogen deel-knop).
+   * Is er een actie, dan blijft de viering langer staan — een gebruiker moet
+   * 'm kunnen pakken vóór de auto-dismiss (zie `durationMs`).
+   */
+  action?: ReactNode
+  /**
+   * Auto-dismiss-duur in ms. Default 4500 — of 12000 zodra `action` gezet is,
+   * zodat de actie leesbaar én klikbaar blijft. Expliciete waarde wint altijd.
+   */
   durationMs?: number
   /** Aangeroepen wanneer de viering zichzelf sluit (auto-dismiss, sluitknop, of overslaan). */
   onDismiss?: () => void
@@ -71,17 +95,22 @@ export interface MilestoneCelebrationProps {
 
 export function MilestoneCelebration({
   celebrationKey,
+  guard = 'local',
   title,
   meaning,
   kicker = 'Mijlpaal',
-  durationMs = 4500,
+  action,
+  durationMs,
   onDismiss,
 }: MilestoneCelebrationProps) {
+  // Met een actie erbij: langer zichtbaar, zodat de actie te pakken is.
+  const effectiveDurationMs = durationMs ?? (action ? 12000 : 4500)
+
   // Bevries de once-beslissing bij de eerste render zodat een re-render (bv.
   // door router.refresh of parent-state) 'm niet mid-animatie omgooit.
   const shouldShowRef = useRef<boolean | null>(null)
   if (shouldShowRef.current === null) {
-    shouldShowRef.current = !hasCelebrated(celebrationKey)
+    shouldShowRef.current = guard === 'none' ? true : !hasCelebrated(celebrationKey)
   }
   const shouldShow = shouldShowRef.current
 
@@ -92,6 +121,8 @@ export function MilestoneCelebration({
       window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   )
   const [visible, setVisible] = useState(false)
+  /** Hover/focus pauzeert de auto-dismiss (alleen relevant mét `action`). */
+  const [paused, setPaused] = useState(false)
   const onDismissRef = useRef(onDismiss)
   onDismissRef.current = onDismiss
 
@@ -101,7 +132,9 @@ export function MilestoneCelebration({
       onDismissRef.current?.()
       return
     }
-    markCelebrated(celebrationKey)
+    // guard='none': de aanroeper draagt de once-guard (server-side acknowledge),
+    // dus hier geen localStorage-schrijf.
+    if (guard !== 'none') markCelebrated(celebrationKey)
 
     // Fade-in: één frame na mount de eindstate zetten zodat de transition pakt.
     // (Reduced motion → direct zichtbaar, geen transition.)
@@ -112,7 +145,20 @@ export function MilestoneCelebration({
       enterT = setTimeout(() => setVisible(true), 10)
     }
 
-    // Auto-dismiss: fade-out, dan onDismiss ná de fade zodat de exit zichtbaar is.
+    return () => {
+      if (enterT) clearTimeout(enterT)
+    }
+    // celebrationKey/guard/reduced zijn stabiel voor de levensduur van deze mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Auto-dismiss: fade-out, dan onDismiss ná de fade zodat de exit zichtbaar is.
+  // Apart effect zodat hover/focus 'm kan PAUZEREN (WCAG 2.2.1 — een aflopende
+  // klok op een vignet mét interactief element moet stil te zetten zijn). Bij
+  // loslaten start de volledige duur opnieuw — ruimhartiger dan resterende tijd
+  // bijhouden, en veel eenvoudiger.
+  useEffect(() => {
+    if (!shouldShow || paused) return
     let exitT: ReturnType<typeof setTimeout> | undefined
     const dismissT = setTimeout(() => {
       setVisible(false)
@@ -121,16 +167,14 @@ export function MilestoneCelebration({
       } else {
         exitT = setTimeout(() => onDismissRef.current?.(), 260)
       }
-    }, durationMs)
-
+    }, effectiveDurationMs)
     return () => {
-      if (enterT) clearTimeout(enterT)
       clearTimeout(dismissT)
       if (exitT) clearTimeout(exitT)
     }
-    // celebrationKey/durationMs/reduced zijn stabiel voor de levensduur van deze mount.
+    // shouldShow/effectiveDurationMs/reduced zijn stabiel voor deze mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [paused])
 
   if (!shouldShow) return null
 
@@ -142,6 +186,10 @@ export function MilestoneCelebration({
     >
       <div
         className="pointer-events-auto relative border border-[var(--ink)] bg-[var(--paper)] px-6 py-6 text-center shadow-[var(--s2)]"
+        onMouseEnter={action ? () => setPaused(true) : undefined}
+        onMouseLeave={action ? () => setPaused(false) : undefined}
+        onFocus={action ? () => setPaused(true) : undefined}
+        onBlur={action ? () => setPaused(false) : undefined}
         style={{
           opacity: visible ? 1 : 0,
           transform: reduced ? 'none' : visible ? 'translateY(0)' : 'translateY(-8px)',
@@ -184,6 +232,8 @@ export function MilestoneCelebration({
         <p className="mx-auto mt-2 max-w-[34ch] font-serif text-sm italic leading-snug text-[var(--ink-2)]">
           {meaning}
         </p>
+
+        {action && <div className="mt-3 flex justify-center">{action}</div>}
       </div>
     </div>
   )

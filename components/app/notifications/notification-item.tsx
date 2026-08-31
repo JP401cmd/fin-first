@@ -35,6 +35,9 @@ const MODULE_MAP: Record<NotificationType, ModuleInfo> = {
   // Naamneutraal label: de gebruiker kiest zelf hoe dit concept heet, dus staat
   // de naam alleen in de melding zelf (samengesteld uit lib/spend-limits/copy.ts).
   spend_limit:         { label: 'Je grens',    colorVar: 'var(--kern)',   textVar: 'var(--kern-t)',   lightVar: 'var(--kern-l)', mediumVar: 'var(--kern-m)' },
+  // Mijlpaal = een moment van De Wil (vieren/handelen), dus de will-tokens —
+  // dezelfde familie als briefing en partner-actie.
+  milestone:           { label: 'Mijlpaal',    colorVar: 'var(--will)',   textVar: 'var(--will-t)',   lightVar: 'var(--will-l)', mediumVar: 'var(--will-m)' },
 }
 
 /**

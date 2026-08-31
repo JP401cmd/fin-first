@@ -83,7 +83,7 @@ const tests: TestCase[] = [
     id: 'notif-prefs-valid-types',
     name: 'Notification preferences bevat alle geldige typen',
     category: CAT,
-    description: 'PUT /api/notifications sanitiseert naar de 8 bekende notification types',
+    description: 'PUT /api/notifications sanitiseert naar de 10 bekende notification types',
     priority: 'high',
     estimatedDurationMs: 10,
     fn() {
@@ -91,8 +91,9 @@ const tests: TestCase[] = [
       const validTypes = [
         'budget', 'sync', 'recommendation', 'partner_transaction',
         'horizon', 'holding_alert', 'briefing', 'budget_model_proposal',
+        'spend_limit', 'milestone',
       ]
-      assertEqual(validTypes.length, 8, '8 valid notification preference types')
+      assertEqual(validTypes.length, 10, '10 valid notification preference types')
       // Each must be a non-empty string
       for (const t of validTypes) {
         assert(t.length > 0, `Type "${t}" is non-empty`)
@@ -114,9 +115,10 @@ const tests: TestCase[] = [
         partner_transaction: true, horizon: true,
         holding_alert: true, briefing: true,
         budget_model_proposal: true,
+        spend_limit: true, milestone: true,
       }
       const keys = Object.keys(defaultPrefs)
-      assertGreaterThanOrEqual(keys.length, 8, 'At least 8 default pref keys')
+      assertGreaterThanOrEqual(keys.length, 10, 'At least 10 default pref keys')
       for (const [key, val] of Object.entries(defaultPrefs)) {
         assertEqual(val, true, `Default pref for "${key}" is true`)
       }
@@ -163,26 +165,32 @@ const tests: TestCase[] = [
   },
   {
     id: 'notif-notification-type-enum',
-    name: 'NotificationType bevat alle 8 typen',
+    name: 'NotificationType bevat alle 10 typen',
     category: CAT,
-    // Het blijven er 8: de bankkoppeling-verloopwaarschuwing (2026-07-31) is
-    // bewust ONDER `sync` gehangen en kreeg géén eigen type. `sync` is in de
-    // praktijk de "Bank"-bak — MODULE_MAP labelt 'm zo, en WOZ_REMINDER_TEMPLATE
-    // gebruikt 'm ook al voor een niet-synchronisatie-signaal. Een eigen type zou
-    // deze telling, MODULE_MAP, de PUT-validTypes én de voorkeurenpagina raken,
-    // en een gebruiker die "Bank"-meldingen uitzette alsnog laten waarschuwen.
-    description: 'NotificationType union omvat budget, sync, recommendation, partner_transaction, horizon, holding_alert, briefing, budget_model_proposal',
+    // De bankkoppeling-verloopwaarschuwing (2026-07-31) is bewust ONDER `sync`
+    // gehangen en kreeg géén eigen type. `sync` is in de praktijk de "Bank"-bak
+    // — MODULE_MAP labelt 'm zo, en WOZ_REMINDER_TEMPLATE gebruikt 'm ook al
+    // voor een niet-synchronisatie-signaal. Een eigen type zou deze telling,
+    // MODULE_MAP, de PUT-validTypes én de voorkeurenpagina raken, en een
+    // gebruiker die "Bank"-meldingen uitzette alsnog laten waarschuwen.
+    //
+    // De telling stond tot 2026-08-31 op 8 en liep achter: `spend_limit` was er
+    // al bij gekomen en `milestone` kwam erbij met de mijlpalen-motor
+    // (ADR 0123). Deze lijst spiegelt de union in app/api/notifications/route.ts
+    // — loopt hij achter, dan bewaakt hij niets.
+    description: 'NotificationType union omvat budget, sync, recommendation, partner_transaction, horizon, holding_alert, briefing, budget_model_proposal, spend_limit, milestone',
     priority: 'high',
     estimatedDurationMs: 10,
     fn() {
       const allTypes = [
         'budget', 'sync', 'recommendation', 'partner_transaction',
         'horizon', 'holding_alert', 'briefing', 'budget_model_proposal',
+        'spend_limit', 'milestone',
       ]
-      assertEqual(allTypes.length, 8, '8 notification types')
+      assertEqual(allTypes.length, 10, '10 notification types')
       // Verify uniqueness
       const unique = new Set(allTypes)
-      assertEqual(unique.size, 8, 'All types are unique')
+      assertEqual(unique.size, 10, 'All types are unique')
     },
   },
   {
@@ -308,7 +316,7 @@ const tests: TestCase[] = [
   // ──────────────── Step 5: notificatie weergave in de UI ──────────────────────
   {
     id: 'notif-module-map-completeness',
-    name: 'MODULE_MAP bevat mapping voor alle 8 NotificationTypes',
+    name: 'MODULE_MAP bevat mapping voor alle 10 NotificationTypes',
     category: CAT,
     description: 'NotificationItem component mapt elk type naar een concept-label en CSS variabelen',
     priority: 'high',
@@ -324,9 +332,11 @@ const tests: TestCase[] = [
         holding_alert:         { label: 'Belegging' },
         briefing:              { label: 'Briefing' },
         budget_model_proposal: { label: 'Huishouden' },
+        spend_limit:           { label: 'Je grens' },
+        milestone:             { label: 'Mijlpaal' },
       }
       const keys = Object.keys(moduleMap)
-      assertEqual(keys.length, 8, '8 types in MODULE_MAP')
+      assertEqual(keys.length, 10, '10 types in MODULE_MAP')
       // Verify each has a non-empty label
       for (const [type, info] of Object.entries(moduleMap)) {
         assert(info.label.length > 0, `${type} maps to a non-empty label: ${info.label}`)

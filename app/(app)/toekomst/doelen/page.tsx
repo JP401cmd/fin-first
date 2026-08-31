@@ -41,6 +41,7 @@ export default async function ToekomstDoelenPage() {
       <DoelenView
         goals={finData.goals}
         goalProgresses={finData.goalProgresses}
+        completedGoals={finData.completedGoals}
         monthlyIncome={monthlyFigures.monthlyIncome}
         monthlyExpenses={monthlyFigures.monthlyExpenses}
         vrijheidsgetalLive={finData.vrijheidsgetalLive}

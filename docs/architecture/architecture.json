@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-31T01:52:09.772Z",
+  "generatedAt": "2026-08-31T18:30:15.157Z",
   "generatedDate": "2026-08-31",
   "repo": {
     "name": "fin",
@@ -188,11 +188,11 @@
   "stats": {
     "routes": 137,
     "routesProduction": 95,
-    "api": 304,
-    "tables": 91,
-    "migrations": 218,
+    "api": 306,
+    "tables": 92,
+    "migrations": 221,
     "integrations": 25,
-    "components": 991,
+    "components": 1003,
     "providers": 15,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -3547,6 +3547,14 @@
       ]
     },
     {
+      "url": "/api/milestones/acknowledge",
+      "file": "app/api/milestones/acknowledge/route.ts",
+      "domain": "milestones",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
       "url": "/api/module-guide/progress",
       "file": "app/api/module-guide/progress/route.ts",
       "domain": "module-guide",
@@ -3681,6 +3689,16 @@
       "domain": "onboarding",
       "methods": [
         "POST",
+        "DELETE"
+      ]
+    },
+    {
+      "url": "/api/onboarding/draft",
+      "file": "app/api/onboarding/draft/route.ts",
+      "domain": "onboarding",
+      "methods": [
+        "GET",
+        "PUT",
         "DELETE"
       ]
     },
@@ -5471,7 +5489,7 @@
     {
       "domain": "onboarding",
       "label": "Onboarding",
-      "count": 7,
+      "count": 8,
       "routes": [
         {
           "url": "/api/onboarding/aangifte-extract",
@@ -5487,6 +5505,16 @@
           "domain": "onboarding",
           "methods": [
             "POST",
+            "DELETE"
+          ]
+        },
+        {
+          "url": "/api/onboarding/draft",
+          "file": "app/api/onboarding/draft/route.ts",
+          "domain": "onboarding",
+          "methods": [
+            "GET",
+            "PUT",
             "DELETE"
           ]
         },
@@ -7224,6 +7252,21 @@
       ]
     },
     {
+      "domain": "milestones",
+      "label": "milestones",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/milestones/acknowledge",
+          "file": "app/api/milestones/acknowledge/route.ts",
+          "domain": "milestones",
+          "methods": [
+            "POST"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "monthly-checkin",
       "label": "monthly-checkin",
       "count": 1,
@@ -7783,6 +7826,10 @@
         "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
       },
       {
+        "name": "achieved_milestones",
+        "migration": "supabase/migrations/20260831160000_add_achieved_milestones.sql"
+      },
+      {
         "name": "actions",
         "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
       },
@@ -8135,12 +8182,16 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 218
+    "migrationCount": 221
   },
   "tablesByDomain": [
     {
       "domain": "Overig",
       "tables": [
+        {
+          "name": "achieved_milestones",
+          "migration": "supabase/migrations/20260831160000_add_achieved_milestones.sql"
+        },
         {
           "name": "actions",
           "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
@@ -8621,11 +8672,11 @@
     }
   ],
   "components": {
-    "total": 991,
+    "total": 1003,
     "groups": [
       {
         "group": "app",
-        "count": 383,
+        "count": 394,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8741,6 +8792,8 @@
           "debt-trajectory-chart",
           "debt-valuation-modal",
           "debt-valuation-modal.test",
+          "deel-kaart-sheet",
+          "deel-kaart-sheet.test",
           "deeltijdwerk-impact",
           "deficit-notice-provider",
           "deficit-notice-provider.test",
@@ -8783,6 +8836,7 @@
           "form-error",
           "form-error.test",
           "freedom-card",
+          "freedom-card.weinig.test",
           "freedom-days-animation",
           "freedom-time-label",
           "freshness-label",
@@ -8840,6 +8894,8 @@
           "melding-view",
           "melding-view.test",
           "milestone-celebration",
+          "milestone-celebration-host",
+          "milestone-celebration-host.test",
           "milestone-celebration.test",
           "mobile-app-strip",
           "mobile-app-strip-state",
@@ -8908,6 +8964,7 @@
           "postpone-form",
           "privacy-hidden-notice",
           "privacy-toggle",
+          "quick-add-bedrag-bevestiging.test",
           "quick-add-trigger",
           "quick-add-wizard",
           "quick-add-wizard-collect.test",
@@ -8934,6 +8991,7 @@
           "shell-contexts",
           "shell-overlay",
           "shell-overlay.destructive.test",
+          "shell-overlay.suspended.test",
           "sidebar",
           "sidebar.eenvoudig.test",
           "sidebar.naamgeving.test",
@@ -8950,8 +9008,11 @@
           "sorr-analyse",
           "spaarquote-gevoeligheid",
           "spending-confidence-indicator",
+          "stale-transactions-banner",
+          "stale-transactions-banner.test",
           "step-choice",
           "step-details",
+          "step-details-bedrag.test",
           "step-header",
           "step-header-count.test",
           "step-link-debt",
@@ -8980,6 +9041,7 @@
           "transacties-feed",
           "transacties-feed.test",
           "transaction-form",
+          "transaction-form.bedrag-plausibiliteit.test",
           "transaction-form.test",
           "transfer-confirm-sheet",
           "trend-chart",
@@ -9014,7 +9076,7 @@
       },
       {
         "group": "overview",
-        "count": 182,
+        "count": 181,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -9192,7 +9254,6 @@
           "voortgang-doelen-card.test",
           "vrijheid-strip",
           "vrijheid-strip.test",
-          "vrijheidsbriefing-hero",
           "weekdag-patroon",
           "welcome-guide-banner",
           "welcome-guide-banner.test",
@@ -9202,7 +9263,7 @@
       },
       {
         "group": "widgets",
-        "count": 94,
+        "count": 95,
         "items": [
           "abonnementen-widget",
           "acties-widget",
@@ -9272,6 +9333,7 @@
           "spend-limit-widget",
           "spend-limit-widget.test",
           "surplus-gap-widget",
+          "surplus-gap-widget.test",
           "swr-monitor-widget",
           "vaste-lasten-widget",
           "vermogen-selectie-sheet",
@@ -9302,7 +9364,7 @@
       },
       {
         "group": "core",
-        "count": 78,
+        "count": 79,
         "items": [
           "account-source-icon",
           "account-source-icon.test",
@@ -9358,6 +9420,7 @@
           "holdings-client.pane-history.test",
           "holdings-toolbar",
           "hypotheekplanner-tab",
+          "hypotheekplanner-tab.test",
           "investment-holding-pane",
           "investment-holdings-tab",
           "milestones-list",
@@ -10893,6 +10956,12 @@
           "write": true
         }
       ],
+      "milestones": [
+        {
+          "name": "achieved_milestones",
+          "write": true
+        }
+      ],
       "module-guide": [
         {
           "name": "app_settings",
@@ -10980,6 +11049,10 @@
         }
       ],
       "notifications": [
+        {
+          "name": "achieved_milestones",
+          "write": false
+        },
         {
           "name": "app_settings",
           "write": true
@@ -11719,6 +11792,7 @@
           "routes": [
             "/api/onboarding/aangifte-extract",
             "/api/onboarding/aangifte-import",
+            "/api/onboarding/draft",
             "/api/onboarding/reset",
             "/api/onboarding/save-own-data",
             "/api/onboarding/seed"
@@ -12122,8 +12196,7 @@
           "write": true,
           "routes": [
             "/api/holdings",
-            "/api/holdings/import",
-            "/api/holdings/refresh-prices/cron"
+            "/api/holdings/import"
           ]
         },
         {
@@ -14385,6 +14458,24 @@
           ]
         }
       ],
+      "achieved_milestones": [
+        {
+          "domain": "milestones",
+          "label": "milestones",
+          "write": true,
+          "routes": [
+            "/api/milestones/acknowledge"
+          ]
+        },
+        {
+          "domain": "notifications",
+          "label": "notifications",
+          "write": false,
+          "routes": [
+            "/api/notifications"
+          ]
+        }
+      ],
       "news_editions": [
         {
           "domain": "news",
@@ -15336,6 +15427,11 @@
         "rls": true
       },
       "error_log_resolutions": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "achieved_milestones": {
         "user": true,
         "household": false,
         "rls": true
@@ -16851,6 +16947,47 @@
       ],
       "summary": "Op een productie-account van de eigenaar (schermafdrukken 31-08-2026, grondslag \"uit je budgetten\") toonden vier oppervlakken **drie verschillende percentages voor één grootheid**:",
       "file": "docs/adr/0121-een-spaarquote-app-breed.md"
+    },
+    {
+      "id": "0122-het-onboarding-concept-staat-server-side",
+      "title": "Het onboarding-concept staat server-side op de eigen profielrij, niet in localStorage",
+      "status": "aanvaard",
+      "date": "2026-08-31",
+      "elements": [
+        "sp-registreren",
+        "do-meta",
+        "app-comp"
+      ],
+      "summary": "Tot juli 2026 bewaarde de onboarding haar volledige concept in `localStorage`: naam, geboortedatum, inkomen, uitgaven, budgetbedragen, bezittingen, schulden en pensioenbedragen. Op een gedeeld apparaat, of via één XSS-gaatje, was dat alles leesbaar zolang de onboarding liep.",
+      "file": "docs/adr/0122-het-onboarding-concept-staat-server-side.md"
+    },
+    {
+      "id": "0123-een-mijlpaal-is-een-gebeurtenis-geen-stand",
+      "title": "Een mijlpaal is een gelogde gebeurtenis, geen live herberekende stand",
+      "status": "aanvaard",
+      "date": "2026-08-31",
+      "elements": [
+        "sp-inzicht",
+        "as-coach",
+        "as-nieuws",
+        "do-doel",
+        "t-supabase"
+      ],
+      "summary": "De app kende mijlpalen tot nu toe uitsluitend als **live berekening**. `lib/freedom-milestones.ts` bepaalt bij elk request opnieuw of 25/50/75/100% vrijheid \"bereikt\" is; `lib/natural-milestones.ts` projecteert \"Schuldenvrij\" en \"Eerste miljoen\" vooruit. Geen van beide weet wánne",
+      "file": "docs/adr/0123-een-mijlpaal-is-een-gebeurtenis-geen-stand.md"
+    },
+    {
+      "id": "0124-fire-voortgang-oordeelt-peer-relatief",
+      "title": "De FIRE-voortgang-pijler oordeelt peer-relatief: koers t.o.v. de FIRE-nastrevers-lat, niet de kale vulling",
+      "status": "aanvaard",
+      "date": "2026-08-31",
+      "elements": [
+        "as-planning",
+        "as-vermogen",
+        "do-huishouden"
+      ],
+      "summary": "De deelscore **FIRE-voortgang** (pijler Vrijheid, gewicht 0.18) van de gezondheidsscore was leeftijdsblind: `score = clamp(freedomPct, 0, 100)`. Dat getal beantwoordt \"hoe vol is de pot\", niet \"ligt deze persoon op koers\". Een 30-jarige met 8% vulling die op schema ligt om op z'n",
+      "file": "docs/adr/0124-fire-voortgang-oordeelt-peer-relatief.md"
     }
   ],
   "churn": {
@@ -16858,11 +16995,11 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 69
+        "commits": 70
       },
       {
         "path": "lib/ai",
-        "commits": 44
+        "commits": 45
       },
       {
         "path": "app/(app)/toekomst",
@@ -16900,12 +17037,12 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 9805,
+        "loc": 9892,
         "commits": 80
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 5401,
+        "loc": 5412,
         "commits": 33
       },
       {
@@ -16915,13 +17052,13 @@
       },
       {
         "file": "components/app/cash-account-view.tsx",
-        "loc": 3553,
-        "commits": 21
+        "loc": 3595,
+        "commits": 22
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 2966,
-        "commits": 54
+        "loc": 3007,
+        "commits": 56
       },
       {
         "file": "lib/release-notes.ts",
@@ -16930,7 +17067,7 @@
       },
       {
         "file": "app/(app)/core/cash/import/page.tsx",
-        "loc": 2406,
+        "loc": 2436,
         "commits": 24
       },
       {
@@ -18365,9 +18502,9 @@
     },
     {
       "date": "2026-08-31",
-      "api": 304,
-      "components": 991,
-      "tables": 91,
+      "api": 306,
+      "components": 1003,
+      "tables": 92,
       "routesProduction": 95
     }
   ]
