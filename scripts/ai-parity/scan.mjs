@@ -52,7 +52,13 @@ const PROMPT_FILE = join(ROOT, 'lib', 'ai', 'local', 'local-chat-prompt.ts')
 // ── kleine fs-helpers (spiegel van generate.mjs) ─────────────────────────────
 function read(file) {
   try {
-    return readFileSync(file, 'utf8')
+    // CRLF→LF vóór alles: met autocrlf=true checkt git dezelfde blob op de ene
+    // machine als LF en op de andere als CRLF uit. Zonder normalisatie is de
+    // live-hash (en de token-telling) een functie van de LOKALE
+    // regelinde-representatie en verklaart elke verse checkout het gecommitte
+    // rapport onterecht stale — precies zo gevonden bij de release van 31 aug
+    // 2026 (base.ts LF naast wil.ts CRLF in dezelfde boom).
+    return readFileSync(file, 'utf8').replace(/\r\n/g, '\n')
   } catch {
     return ''
   }
