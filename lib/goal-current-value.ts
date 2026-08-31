@@ -228,6 +228,11 @@ export function computeParameterWeightedReturnPct(
  * levert de meest recente niet-NULL rij vooraan; NUMERIC komt als string terug uit
  * Supabase → expliciet casten. Geen snapshot / niet-positief → `undefined` (tolerant:
  * laat de DB-waarde staan, geen misleidende 0 die "0% rood" zou schreeuwen).
+ *
+ * NB: sinds 31-08-2026 is dit de TERUGVAL, niet de bron. De snapshotkolom wordt
+ * afwisselend door de scalar- (daily-open-sync) en de kernel-motor (/toekomst-
+ * bezoek) beschreven; `syncActiveGoalValues` laat daarom de canonieke kernel-run
+ * (`VrijheidsgetalSnapshot.fireAgeFractional`) winnen zodra die er is.
  */
 export function pickLatestSnapshotFireAge(
   rows: readonly { fire_age?: number | string | null }[],
@@ -405,10 +410,11 @@ export async function injectParameterGoalCurrentValues(
  * `goals` (+ de `parameterGoals`-subset) terug.
  *
  * `loadFireSnapshot` is de DERDE synchronisatiebron (bevinding C10): het
- * vrijheidsgetal-doel volgt de canonieke FIRE-motor i.p.v. een statisch
- * opgeslagen bedrag. Bewust een THUNK en geen waarde: hij wordt alleen
- * aangeroepen wanneer er daadwerkelijk zo'n doel actief is, zodat gebruikers
- * zonder FIRE-doel geen kernel-run betalen — hetzelfde lazy-patroon als de
+ * vrijheidsgetal-doel én het fire_age-parameterdoel volgen de canonieke
+ * FIRE-motor i.p.v. een statisch opgeslagen bedrag resp. de motor-wisselende
+ * snapshotkolom. Bewust een THUNK en geen waarde: hij wordt alleen aangeroepen
+ * wanneer er daadwerkelijk zo'n FIRE-doel actief is, zodat gebruikers zonder
+ * FIRE-doel geen kernel-run betalen — hetzelfde lazy-patroon als de
  * parameter-injectie hierboven.
  */
 export async function syncActiveGoalValues<T extends SyncableGoal>(
@@ -422,12 +428,32 @@ export async function syncActiveGoalValues<T extends SyncableGoal>(
   const { goals, parameterGoals } = splitActiveGoals(allGoals)
   autolinkGoalCurrentValues(goals, assets, debts)
 
-  const wantsFire = Boolean(loadFireSnapshot) && goals.some(isVrijheidsgetalGoal)
+  // De fire-thunk draait bij ELK doel dat de canonieke FIRE-motor nodig heeft:
+  // het vrijheidsgetal-doel (bevinding C10) én het fire_age-parameterdoel (zie
+  // hieronder). Beide zijn FIRE-doelen; wie er geen heeft betaalt geen kernel-run.
+  const wantsFire =
+    Boolean(loadFireSnapshot) &&
+    (goals.some(isVrijheidsgetalGoal) || parameterGoals.some(gl => gl.goal_type === 'fire_age'))
   const [, fireSnapshot] = await Promise.all([
     injectParameterGoalCurrentValues(supabase, parameterGoals, userId),
     wantsFire ? loadFireSnapshot!() : Promise.resolve(null),
   ])
   const vrijheidsgetalSynced = applyVrijheidsgetalSync(goals, fireSnapshot)
+
+  // fire_age-parameterdoel: de canonieke kernel-run wint van de snapshotkolom.
+  // `net_worth_snapshots.fire_age` wordt 's ochtends door de daily-open-sync met
+  // de SCALAR-motor herschreven en pas bij een /toekomst-bezoek door de kernel
+  // gepatcht — zonder deze override wisselde de doelkaart binnen één dag van
+  // motor (scalar 42,8 vs kernel 46,3 op een productie-account, 31 aug 2026).
+  // De injectie hierboven blijft de terugval wanneer de kernel geen uitkomst
+  // heeft (geen geboortedatum, FIRE onhaalbaar): dan is de laatste snapshot
+  // eerlijker dan niets.
+  const kernelFireAge = fireSnapshot?.fireAgeFractional
+  if (kernelFireAge != null && Number.isFinite(kernelFireAge) && kernelFireAge > 0) {
+    for (const gl of parameterGoals) {
+      if (gl.goal_type === 'fire_age') gl.current_value = kernelFireAge
+    }
+  }
 
   return { goals, parameterGoals, fireSnapshot, vrijheidsgetalSynced }
 }

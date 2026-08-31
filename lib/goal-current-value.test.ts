@@ -116,3 +116,56 @@ describe('syncActiveGoalValues — widget consumeert dezelfde live-waarde als he
     expect(goals[0]).toBe(fireGoal)
   })
 })
+
+describe('syncActiveGoalValues — fire_age-doel volgt de canonieke kernel-run boven de snapshotkolom', () => {
+  /**
+   * `net_worth_snapshots.fire_age` wordt elke ochtend door de daily-open-sync met
+   * de SCALAR-motor herschreven en pas bij een /toekomst-bezoek door de kernel
+   * gepatcht — de doelkaart wisselde daardoor binnen één dag van motor (42,8 vs
+   * 46,3 op een productie-account, 31 aug 2026). Norm: is de canonieke kernel-run
+   * beschikbaar (dezelfde `loadVrijheidsgetalSnapshot`-thunk die het
+   * vrijheidsgetal-doel al voedt), dan wint die; de snapshotkolom is alleen nog
+   * de terugval wanneer de kernel geen uitkomst heeft.
+   */
+  const kernelSnapshot = {
+    currentValue: 500_000,
+    targetValue: 900_000,
+    eta: 'mrt 2039',
+    fireAgeFractional: 52.1,
+  }
+
+  it('kernel-run beschikbaar → fire_age-doel toont fireAgeFractional, niet de scalar-snapshotwaarde', async () => {
+    const fireGoal = g({ goal_type: 'fire_age', target_value: 53, current_value: 0, metadata: { bron: 'parameter' } })
+    const supabase = makeSupabase([{ fire_age: 42.8 }])
+    const { goals } = await syncActiveGoalValues(supabase, [fireGoal], [], [], 'u1', async () => kernelSnapshot)
+    expect(goals[0].current_value).toBe(52.1)
+  })
+
+  it('de fire-thunk draait óók zonder vrijheidsgetal-doel zodra er een fire_age-parameterdoel is', async () => {
+    const fireGoal = g({ goal_type: 'fire_age', target_value: 53, current_value: 0, metadata: { bron: 'parameter' } })
+    const supabase = makeSupabase([])
+    let calls = 0
+    await syncActiveGoalValues(supabase, [fireGoal], [], [], 'u1', async () => {
+      calls++
+      return kernelSnapshot
+    })
+    expect(calls).toBe(1)
+  })
+
+  it('kernel zonder uitkomst (fireAgeFractional null) → snapshotkolom blijft de terugval', async () => {
+    const fireGoal = g({ goal_type: 'fire_age', target_value: 53, current_value: 0, metadata: { bron: 'parameter' } })
+    const supabase = makeSupabase([{ fire_age: 42.8 }])
+    const { goals } = await syncActiveGoalValues(supabase, [fireGoal], [], [], 'u1', async () => ({
+      ...kernelSnapshot,
+      fireAgeFractional: null,
+    }))
+    expect(goals[0].current_value).toBe(42.8)
+  })
+
+  it('zonder thunk (aanroeper zonder fire-bron) blijft het bestaande snapshotgedrag intact', async () => {
+    const fireGoal = g({ goal_type: 'fire_age', target_value: 53, current_value: 0, metadata: { bron: 'parameter' } })
+    const supabase = makeSupabase([{ fire_age: 42.8 }])
+    const { goals } = await syncActiveGoalValues(supabase, [fireGoal], [], [], 'u1')
+    expect(goals[0].current_value).toBe(42.8)
+  })
+})
