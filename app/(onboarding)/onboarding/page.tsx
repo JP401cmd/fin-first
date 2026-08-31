@@ -55,7 +55,11 @@ import {
   type NonSensitiveDraft,
   type DeferredFieldKey,
 } from './draft-persistence'
-import { DRAFT_RESTORED_NOTICE, SAVE_FAILED_NOTICE } from './draft-notice-copy'
+import {
+  DRAFT_RESTORED_NOTICE,
+  resolveNoticeDisplay,
+  type OnboardingNotice,
+} from './draft-notice-copy'
 
 // ── localStorage key for persisting onboarding data ──────────
 const ONBOARDING_STORAGE_KEY = 'trifinity_onboarding_draft'
@@ -691,7 +695,14 @@ export default function OnboardingPage() {
   const userIdRef = useRef<string | null>(null)
   const [saveProgress, setSaveProgress] = useState(0)
   const [saveMessageIdx, setSaveMessageIdx] = useState(0)
-  const [saveError, setSaveError] = useState<string | null>(null)
+  /**
+   * De melding bovenaan de onboarding. Draagt zijn OORZAAK mee: een ontbrekend
+   * verplicht antwoord is iets anders dan een mislukte opslag, en verdient
+   * andere copy (geen "ververs de pagina niet", geen "Opnieuw proberen").
+   * Zolang dit één losse string was, kreeg het validatiepad de opslag-copy en
+   * bleef zijn eigen, specifieke boodschap onzichtbaar.
+   */
+  const [saveError, setSaveError] = useState<OnboardingNotice | null>(null)
   const [restoredNotice, setRestoredNotice] = useState(false)
   // Poort voor het persisteer-effect. Het check-effect hieronder leest het
   // localStorage-draft pas ná een `await` (getUser + profielquery); zonder
@@ -922,7 +933,11 @@ export default function OnboardingPage() {
     // eerste onvolledige verplichte stap i.p.v. te saven.
     const incompleteStep = firstIncompleteRequiredStep(state.identity, activeStepOrder)
     if (incompleteStep) {
-      setSaveError('Vul eerst je naam en geboortedatum in — die hebben we nodig om je profiel af te ronden.')
+      setSaveError({
+        kind: 'validation',
+        message:
+          'Vul eerst je naam en geboortedatum in — die hebben we nodig om je profiel af te ronden.',
+      })
       dispatch({ type: 'SET_STEP', step: incompleteStep })
       return
     }
@@ -1168,7 +1183,10 @@ export default function OnboardingPage() {
       // elke reload/redirect hier wist precies de invoer die de gebruiker net
       // kwijt dreigde te raken. Alleen state-updates in dit blok — bewaakt door
       // `save-failure-no-reload.test.ts`.
-      setSaveError(message)
+      // De technische tekst is diagnostiek, geen bannercopy: naar de console,
+      // niet naar de state (zie `OnboardingNotice`).
+      console.error('[onboarding] eindopslag mislukt', message, err)
+      setSaveError({ kind: 'save' })
       // Go back to last content step before saving — all data is preserved in useReducer state
       const contentSteps = activeStepOrder.filter(s => !['saving', 'success'].includes(s))
       dispatch({ type: 'SET_STEP', step: contentSteps[contentSteps.length - 1] })
@@ -1210,6 +1228,10 @@ export default function OnboardingPage() {
   }, [activeStepOrder, state.step, handleSaveOwnData])
 
   const dismissError = useCallback(() => setSaveError(null), [])
+
+  // Kop, tekst en herkansings-knop van de meldingsbanner — één beslissing,
+  // getest in `draft-notice-copy.test.ts` zonder deze component te mounten.
+  const noticeDisplay = resolveNoticeDisplay(saveError)
 
   // Helper voor stap 4 → handlers de orchestrator nodig heeft.
   const handleAssetsChange = useCallback(
@@ -1353,8 +1375,12 @@ export default function OnboardingPage() {
           drafts (zie check-effect). Sluit alleen via primary CTA of ESC. */}
       {showWelcomePopup && <WelcomePopup onDismiss={dismissWelcomePopup} />}
 
-      {/* ── Sticky error banner ─────────────────────────────────── */}
-      {saveError && (
+      {/* ── Sticky meldingsbanner ────────────────────────────────
+          Twee oorzaken, twee teksten: `resolveNoticeDisplay` beslist welke
+          copy hoort bij een ontbrekend verplicht antwoord (geen opslagpoging
+          geweest → geen "Opnieuw proberen", geen ververs-waarschuwing) en
+          welke bij een echte opslagfout. */}
+      {noticeDisplay && (
         <div
           className="fixed inset-x-0 top-0 z-50 border-b-2 border-[var(--negative)] bg-[var(--paper)] px-4 py-3 shadow-sm"
           role="alert"
@@ -1363,18 +1389,20 @@ export default function OnboardingPage() {
           <div className="mx-auto flex max-w-[640px] flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
             <div className="flex-1 min-w-0">
               <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-negative">
-                {SAVE_FAILED_NOTICE.label}
+                {noticeDisplay.label}
               </p>
-              <p className="mt-0.5 text-sm text-[var(--ink-2)]">{SAVE_FAILED_NOTICE.body}</p>
+              <p className="mt-0.5 text-sm text-[var(--ink-2)]">{noticeDisplay.body}</p>
             </div>
             <div className="flex flex-shrink-0 items-center gap-4">
-              <button
-                onClick={handleSaveOwnData}
-                disabled={saving}
-                className="inline-flex min-h-11 items-center justify-center bg-[var(--ink)] px-5 text-sm font-medium text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)] disabled:opacity-50"
-              >
-                {saving ? 'Bezig …' : 'Opnieuw proberen'}
-              </button>
+              {noticeDisplay.showRetry && (
+                <button
+                  onClick={handleSaveOwnData}
+                  disabled={saving}
+                  className="inline-flex min-h-11 items-center justify-center bg-[var(--ink)] px-5 text-sm font-medium text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)] disabled:opacity-50"
+                >
+                  {saving ? 'Bezig …' : 'Opnieuw proberen'}
+                </button>
+              )}
               <button
                 onClick={dismissError}
                 className="text-sm text-[var(--ink-3)] underline-offset-2 hover:text-[var(--ink)] hover:underline"

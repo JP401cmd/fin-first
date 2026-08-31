@@ -57,3 +57,65 @@ export const SAVE_FAILED_NOTICE = {
   body:
     'Het opslaan is niet gelukt. Je antwoorden staan nog in dit scherm — probeer het opnieuw. Ververs de pagina niet: dan ben je je bedragen en posten kwijt.',
 } as const
+
+/**
+ * Melding wanneer een verplicht antwoord nog ontbreekt. Dit is GEEN opslagfout:
+ * er is niets naar de server gegaan, dus "opslaan mislukt", "ververs de pagina
+ * niet" en een knop "Opnieuw proberen" zijn hier alle drie onjuist. Wat de
+ * gebruiker moet weten staat in het specifieke bericht (welk veld ontbreekt);
+ * deze `body` is de terugval wanneer dat bericht leeg is.
+ */
+export const INCOMPLETE_INPUT_NOTICE = {
+  label: 'Nog niet compleet',
+  body:
+    'Er ontbreekt nog een verplicht antwoord. We hebben je teruggebracht naar die vraag — vul hem aan en ga verder.',
+} as const
+
+/**
+ * De twee oorzaken waarvoor de onboarding een melding bovenaan toont. Bewust
+ * één gediscrimineerde vorm en geen losse boolean: de bug was juist dat beide
+ * oorzaken op dezelfde `string | null`-state landden, waarna de banner niet
+ * meer kón weten welke copy erbij hoorde.
+ */
+export type OnboardingNotice =
+  /**
+   * Een ontbrekend verplicht antwoord. Draagt zijn eigen tekst, want die is per
+   * geval anders en wordt letterlijk getoond.
+   */
+  | { kind: 'validation'; message: string }
+  /**
+   * Een mislukte eindopslag. Bewust ZONDER tekst: de banner toont hier de
+   * vaste, client-veilige `SAVE_FAILED_NOTICE`. Een meereizend message-veld dat
+   * nergens landt, suggereert dat de technische fouttekst de gebruiker bereikt
+   * — die hoort in de console, niet in de state.
+   */
+  | { kind: 'save' }
+
+/** Wat de banner moet tonen: kop, tekst en of een herkansing zinvol is. */
+export interface NoticeDisplay {
+  label: string
+  body: string
+  /** Alleen bij een échte opslagpoging is "Opnieuw proberen" een echte actie. */
+  showRetry: boolean
+}
+
+/**
+ * Vertaalt de melding-state naar wat er op het scherm hoort — één beslissing,
+ * los van de render, zodat hij testbaar is zonder de hele onboarding-keten te
+ * mounten (zelfde opzet als `lib/page-status/display.ts#resolveBannerDisplay`).
+ */
+export function resolveNoticeDisplay(notice: OnboardingNotice | null): NoticeDisplay | null {
+  if (!notice) return null
+  if (notice.kind === 'validation') {
+    return {
+      label: INCOMPLETE_INPUT_NOTICE.label,
+      body: notice.message.trim() || INCOMPLETE_INPUT_NOTICE.body,
+      showRetry: false,
+    }
+  }
+  return {
+    label: SAVE_FAILED_NOTICE.label,
+    body: SAVE_FAILED_NOTICE.body,
+    showRetry: true,
+  }
+}

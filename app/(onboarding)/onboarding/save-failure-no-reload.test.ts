@@ -51,6 +51,41 @@ describe('onboarding: mislukte eindopslag navigeert niet (C3)', () => {
     // De enige toegestane "verplaatsing" is een reducer-dispatch: die houdt de
     // ingevulde bedragen/posten in dezelfde in-memory state.
     expect(blok).toContain("dispatch({ type: 'SET_STEP'")
-    expect(blok).toContain('setSaveError(message)')
+    // De melding draagt sinds de scheiding validatie/opslag haar oorzaak mee;
+    // dit blok is per definitie het opslagpad. De technische fouttekst gaat
+    // naar de console, niet naar de state — de banner toont er toch de vaste
+    // tekst, en meereizen zou suggereren dat hij de gebruiker bereikt.
+    expect(blok).toContain("setSaveError({ kind: 'save' })")
+    expect(blok).toContain('console.error')
+  })
+})
+
+/**
+ * Het validatiepad (ontbrekende naam/geboortedatum) zette dezelfde melding-state
+ * als een échte opslagfout, waardoor de gebruiker "Opslaan mislukt — ververs de
+ * pagina niet" las terwijl er nooit iets naar de server was gegaan. De copy-
+ * beslissing zelf is getest in `draft-notice-copy.test.ts`; hier grendelen we
+ * dat de bron beide oorzaken ook werkelijk gescheiden aanlevert — anders is die
+ * beslissing niet meer te nemen.
+ */
+describe('onboarding: validatiemelding is geen opslagfout', () => {
+  it('markeert het validatiepad expliciet als kind "validation"', () => {
+    const bron = readFileSync(SOURCE_PATH, 'utf8')
+    // Regex i.p.v. `toContain`: de regeleindes in de werkboom mogen CRLF zijn.
+    expect(/setSaveError\(\{\s*kind:\s*'validation',/.test(bron)).toBe(true)
+  })
+
+  it('zet geen enkele melding meer als kale string', () => {
+    const bron = readFileSync(SOURCE_PATH, 'utf8')
+    expect(/setSaveError\(\s*['"`]/.test(bron)).toBe(false)
+  })
+
+  it('rendert de banner uit de gedeelde beslissing, niet uit de save-copy', () => {
+    const bron = readFileSync(SOURCE_PATH, 'utf8')
+    expect(bron).toContain('resolveNoticeDisplay(saveError)')
+    // SAVE_FAILED_NOTICE hoort nog uitsluitend in draft-notice-copy.ts te
+    // worden gelezen; staat hij hier weer, dan is de banner-copy opnieuw
+    // hardgedraaid op het opslaggeval.
+    expect(bron).not.toContain('SAVE_FAILED_NOTICE')
   })
 })

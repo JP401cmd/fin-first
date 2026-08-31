@@ -75,3 +75,40 @@ describe('<AmountInput>', () => {
     expect(veld.getAttribute('aria-describedby')).toBe(screen.getByRole('alert').id)
   })
 })
+
+/**
+ * Het `€`-teken hangt absoluut gepositioneerd in een `relative`-box om de
+ * input. Stond de altijd-gemounte meldingsregel in diezelfde box, dan groeide
+ * die box zodra er een melding verschijnt en zakte het teken mee naar het
+ * midden van de nieuwe hoogte — precies in de foutsituatie dus. Vandaar dat de
+ * component het prefix zelf plaatst: de positioned box omsluit alleen de input.
+ */
+describe('<AmountInput> — prefix', () => {
+  it('plaatst het prefix in een box om alleen de input, melding erbuiten', () => {
+    render(<AmountInput value="" onChange={() => {}} prefix="€" aria-label="Bedrag" />)
+    const veld = screen.getByLabelText('Bedrag')
+    const box = veld.parentElement
+
+    expect(box?.className).toContain('relative')
+    expect(box?.textContent).toBe('€')
+
+    const melding = document.getElementById(`${veld.id}-melding`)
+    expect(melding).not.toBeNull()
+    expect(box?.contains(melding)).toBe(false)
+  })
+
+  it('houdt het prefix buiten de toegankelijkheidsboom', () => {
+    render(<AmountInput value="" onChange={() => {}} prefix="€" aria-label="Bedrag" />)
+    const teken = screen.getByLabelText('Bedrag').parentElement?.querySelector('span')
+    expect(teken?.getAttribute('aria-hidden')).toBe('true')
+  })
+
+  it('voegt zonder prefix geen extra wikkel toe rond de input', () => {
+    const { container } = render(
+      <AmountInput value="" onChange={() => {}} aria-label="Bedrag" />,
+    )
+    // Zonder prefix blijft input + melding directe kinderen van de mount —
+    // bestaande call-sites (assets-client) krijgen geen gewijzigde DOM.
+    expect(screen.getByLabelText('Bedrag').parentElement).toBe(container)
+  })
+})

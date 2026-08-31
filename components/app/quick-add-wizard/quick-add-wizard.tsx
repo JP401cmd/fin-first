@@ -14,6 +14,8 @@ import {
   LINKED_DEBT_SUGGESTIONS,
   type AssetType,
 } from '@/lib/asset-data'
+import { ASSET_AMOUNT_CONFIRM_THRESHOLD } from '@/lib/asset-parameter-bands'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import {
   DEBT_QUICK_ADD_LABELS,
   DEBT_TYPE_COLORS,
@@ -148,6 +150,17 @@ export function QuickAddWizard({
   const [state, dispatch] = useReducer(wizardReducer, initialWizardState)
   const [isSaving, setIsSaving] = useState(false)
   const [linkDebtCtx, setLinkDebtCtx] = useState<LinkDebtContext>(null)
+  /**
+   * Openstaande plausibiliteitsvraag bij een groot bedrag (H8). Draagt de
+   * complete draft mee, zodat "Ja, dit klopt" exact hetzelfde pad hervat dat
+   * de vraag onderbrak — inclusief de koppel-prompt voor types met een
+   * schuldsuggestie. `bedragBevestigdRef` houdt het bevestigde bedrag vast
+   * zodat de vraag bij een dáárna gewijzigde waarde opnieuw komt.
+   */
+  const [bedragBevestiging, setBedragBevestiging] = useState<
+    { bedrag: number; draft: AssetDraftState } | null
+  >(null)
+  const bedragBevestigdRef = useRef<number | null>(null)
   // Mijlpaal "eerste bezitting": bevries de telling bij openen (zie prop-doc) en
   // toon de viering zodra er in commit-mode een bezitting bijkomt vanaf nul.
   const assetCountAtOpenRef = useRef<number | undefined>(assetCountBefore)
@@ -177,6 +190,11 @@ export function QuickAddWizard({
   // Open/reset — sync met de `open`-prop uit de parent. Bij heropening
   // starten we schoon (OPEN action met optionele intent + type-prefill).
   useEffect(() => {
+    // De bedrag-bevestiging (H8) hoort bij één ingevoerde bezitting, niet bij
+    // de wizard: laat je 'm staan, dan slaat een volgende invoer met exact
+    // hetzelfde bedrag de wedervraag over.
+    setBedragBevestiging(null)
+    bedragBevestigdRef.current = null
     if (open) {
       dispatch({
         type: 'OPEN',
@@ -308,6 +326,21 @@ export function QuickAddWizard({
   const proceedFromAssetDetails = useCallback(
     async (draft: AssetDraftState) => {
       if (typeof draft.current_value !== 'number' || !draft.name) return
+
+      // ── Plausibiliteitsvraag bij een groot bedrag (H8, optie B) ───────────
+      //
+      // Geen blokkade maar een vraag — een harde cap zou een legitieme
+      // UHNW-gebruiker buitensluiten. De check staat vóór élke vertakking
+      // hieronder, zodat commit-modus én collect-modus (onboarding) er allebei
+      // doorheen lopen. `bedragBevestigdRef` onthoudt het exact bevestigde
+      // bedrag, zodat een daarna gewijzigde waarde opnieuw doorgevraagd wordt.
+      if (
+        draft.current_value >= ASSET_AMOUNT_CONFIRM_THRESHOLD &&
+        bedragBevestigdRef.current !== draft.current_value
+      ) {
+        setBedragBevestiging({ bedrag: draft.current_value, draft })
+        return
+      }
 
       const complete: AssetQuickInput = {
         asset_type: draft.asset_type,
@@ -522,6 +555,9 @@ export function QuickAddWizard({
 
   const handleAddAnother = useCallback(() => {
     setLinkDebtCtx(null)
+    // Zie het open-effect: de bevestiging geldt per ingevoerde bezitting.
+    setBedragBevestiging(null)
+    bedragBevestigdRef.current = null
     dispatch({ type: 'ADD_ANOTHER' })
   }, [])
 
@@ -561,12 +597,19 @@ export function QuickAddWizard({
 
   return (
     <>
+      {/* `suspended` en niet `open={false}`: de wedervraag hieronder is een
+          tweede overlay bovenop deze sheet, en beide luisteren naar Escape.
+          Zonder terugtreden sloot één toetsaanslag ze allebei — met de getypte
+          naam en het bedrag erin, want een gesloten BottomSheet rendert `null`
+          en neemt de hele wizard-boom mee. Terugtreden houdt die boom gemount
+          én geeft Escape aan het bovenste venster (M35-mechaniek). */}
       <BottomSheet
         open={open}
         onClose={handleClose}
         title={sheetTitle}
         size="md"
         initialMobileHeight={sheetHeight}
+        suspended={bedragBevestiging !== null}
       >
         <div className="p-5 sm:p-6">
           <WizardContent
@@ -603,6 +646,62 @@ export function QuickAddWizard({
           />
         </div>
       </BottomSheet>
+
+      {/* Plausibiliteitsvraag bij een groot bedrag (H8). Geen blokkade: de
+          gebruiker mag doorzetten. Spiegelt de dialoog in de volledige
+          AssetForm (`components/core/assets-client.tsx`) zodat beide invoerpaden
+          dezelfde vraag stellen. */}
+      <ShellOverlay
+        open={bedragBevestiging !== null}
+        onClose={() => setBedragBevestiging(null)}
+        kind="confirm"
+        title="Klopt dit bedrag?"
+        footer={
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const bevestigd = bedragBevestiging
+                setBedragBevestiging(null)
+                if (!bevestigd) return
+                bedragBevestigdRef.current = bevestigd.bedrag
+                void proceedFromAssetDetails(bevestigd.draft)
+              }}
+              className="flex-1 rounded-[var(--r)] bg-[var(--ink)] px-4 py-2 text-sm font-medium text-[var(--paper)]"
+              data-testid="quick-add-bedrag-bevestigen"
+            >
+              Ja, dit klopt
+            </button>
+            <button
+              type="button"
+              onClick={() => setBedragBevestiging(null)}
+              className="flex-1 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)]"
+            >
+              Aanpassen
+            </button>
+          </div>
+        }
+      >
+        {bedragBevestiging !== null && (
+          <div className="px-6 py-4 text-sm leading-relaxed text-[var(--ink-2)]">
+            <p>
+              Je vult{' '}
+              <span className="font-medium text-[var(--ink)]">
+                <MaskedAmount value={bedragBevestiging.bedrag} tone="kern" />
+              </span>{' '}
+              in bij{' '}
+              <span className="font-medium text-[var(--ink)]">
+                {bedragBevestiging.draft.name}
+              </span>
+              .
+            </p>
+            <p className="mt-2 text-[var(--ink-3)]">
+              Een bedrag van deze omvang is meestal een typefout — één nul te
+              veel. Klopt het wel, dan gaan we gewoon verder.
+            </p>
+          </div>
+        )}
+      </ShellOverlay>
 
       {/* Mijlpaal "eerste bezitting" — ingetogen, zelf-sluitend; zweeft boven het
           success-scherm en verdwijnt vanzelf. Once-guard zit in de component. */}

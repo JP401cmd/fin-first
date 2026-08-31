@@ -164,7 +164,12 @@ describe('QuickAddWizard — collect-modus, eigen woning', () => {
     }
   })
 
-  it('autolening: negatieve aflossing blokkeert submit met een veldfout (noValidate-vangnet)', async () => {
+  // Sinds H9 loopt de aflossing door `<AmountInput sign="positive-only">`. Een
+  // negatief bedrag komt daardoor niet meer tot de draft — het minteken wordt
+  // GEWEIGERD met een melding erbij. Dat vervangt de oude vangnet-route (draft
+  // krijgt -50 → veldfout → submit geblokkeerd): de gebruiker leest nu wát er
+  // met zijn invoer gebeurde in plaats van alleen dát hij niet verder mag.
+  it('autolening: negatieve aflossing wordt zichtbaar geweigerd, niet stil gestript', async () => {
     const onCollect = vi.fn()
     render(
       <QuickAddWizard
@@ -182,16 +187,17 @@ describe('QuickAddWizard — collect-modus, eigen woning', () => {
     const aflossing = screen.getByLabelText(/Aflossing per maand/)
     fireEvent.change(aflossing, { target: { value: '-50' } })
 
-    // Zelfde patroon als de overige velden: de submit-knop disable't live op
-    // de fout, en de veldfout verschijnt bij blur (touched).
-    expect(
-      (screen.getByRole('button', { name: 'Toevoegen' }) as HTMLButtonElement).disabled,
-    ).toBe(true)
-    fireEvent.blur(aflossing)
-    expect(await screen.findByText('Bedrag mag niet negatief zijn')).toBeTruthy()
+    expect(await screen.findByText(/negatief bedrag kan hier niet/i)).toBeTruthy()
+    expect((aflossing as HTMLInputElement).value).toBe('50')
 
+    // Wat overblijft is een geldig bedrag, dus de submit mag door — met exact
+    // het bedrag dat op het scherm staat.
     fireEvent.click(screen.getByRole('button', { name: 'Toevoegen' }))
-    expect(onCollect).not.toHaveBeenCalled()
+    await waitFor(() => expect(onCollect).toHaveBeenCalledTimes(1))
+    const arg = onCollect.mock.calls[0][0] as QuickAddInput
+    if (arg.kind === 'debt') {
+      expect(arg.debt.monthly_payment).toBe(50)
+    }
   })
 
   it('creditcard: géén aflossing-veld (type buiten DEBT_MONTHLY_PAYMENT_FIELD_TYPES)', () => {

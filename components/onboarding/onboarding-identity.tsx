@@ -208,11 +208,14 @@ export function OnboardingIdentity({
     )
   const deck =
     field === 'naam'
-      ? // Benoemt expliciet dát dit veld verplicht is: het naamveld draagt een
-        // sterretje en een harde "Naam is verplicht"-validatie. De vorige tekst
-        // ("verder niets verplichts") wees vooruit naar de latere stappen, maar
-        // las naast dat sterretje als "dit veld hoeft ook niet".
-        'Alleen je naam is verplicht — de rest van de vragen mag je overslaan.'
+      ? // Benoemt expliciet wát verplicht is. Twee eerdere versies beloofden te
+        // veel: "verder niets verplichts" las naast het sterretje als "dit veld
+        // hoeft ook niet", en "alleen je naam is verplicht" verzweeg dat de
+        // geboortedatum één scherm later net zo hard is (`getFieldErrors`, de
+        // server-zod op /api/onboarding/save-own-data, en de AOW/FIRE-
+        // afleidingen die eraan hangen). De verplichting zelf klopt; de tekst
+        // noemt nu beide velden, zodat de gebruiker de blokkade ziet aankomen.
+        'Je naam en geboortedatum hebben we nodig — de rest van de vragen mag je overslaan.'
       : field === 'dob'
         ? 'Met je leeftijd vertaal ik je geld naar jouw vrijheid in tijd — op maat van je horizon.'
         : 'Zo vertaal ik je bedragen naar jouw vrijheid in tijd — op maat van je situatie.'

@@ -33,6 +33,8 @@ import {
 } from '@/lib/quick-add/validation'
 import { defaultInterestRate } from '@/lib/quick-add/build-drafts'
 import type { AssetQuickInput, DebtQuickInput } from '@/lib/quick-add/types'
+import { AmountInput } from '@/components/app/amount-input'
+import { parseAmountInput } from '@/lib/amount-input'
 import type { AssetDraftState, DebtDraftState } from '../wizard-reducer'
 
 /**
@@ -97,11 +99,35 @@ function getCurrentYear(): number {
 }
 
 /**
- * Helper om string-invoer veilig naar number te parsen voor currency-
- * en percentage-inputs. Lege string → `undefined` (geen waarde), zodat
- * de reducer het veld "niet gezet" laat.
+ * BEDRAGEN — de canonieke NL-lezing (bevinding H9).
+ *
+ * De voorganger van deze helper deed `Number(raw.replace(',', '.'))` en las
+ * daarmee `45.000` als 45: de duizendtalscheiding werd een decimale punt.
+ * `parseAmountInput` is de gedeelde lezing (`45.000` → 45000, `2.150,50` →
+ * 2150,5) en geeft `null` bij ongeldig i.p.v. een stille 0. Hier vertalen we
+ * die `null` naar `undefined`, omdat de reducer een veld daarmee "niet gezet"
+ * laat.
+ *
+ * `positive-only`: alle drie de bedragvelden van deze stap (waarde/saldo,
+ * currency-field3, aflossing per maand) zijn positief. `<AmountInput>` weigert
+ * een minteken dan zichtbaar, zodat een getypte `-500` niet stilzwijgend als
+ * 500 wordt opgeslagen.
  */
-function parseNumberInput(raw: string): number | undefined {
+function parseCurrencyInput(raw: string): number | undefined {
+  return parseAmountInput(raw, 'positive-only') ?? undefined
+}
+
+/**
+ * PERCENTAGES EN JAARTALLEN — bewust NIET de bedrag-lezing.
+ *
+ * Deze velden dragen geen duizendtalscheiding, dus de NL-lezing van
+ * `parseAmountInput` zou hier schade doen in plaats van goed: een rente van
+ * `4.750`% zou als 4750% gelezen worden. De platte decimale lezing (`,` → `.`)
+ * is voor deze velden de juiste, en negatief blijft toegestaan — de
+ * percentage-validatie hieronder moet een negatieve rente kunnen zién om hem
+ * te kunnen afwijzen.
+ */
+function parseDecimalInput(raw: string): number | undefined {
   if (raw.trim().length === 0) return undefined
   const normalised = raw.replace(',', '.')
   const parsed = Number(normalised)
@@ -226,24 +252,30 @@ export function StepDetails(props: StepDetailsProps) {
     }
 
     if (field3Config?.kind === 'year') {
-      const year = parseNumberInput(field3Raw)
+      const year = parseDecimalInput(field3Raw)
       if (year != null && (year < 1900 || year > 2100)) {
         next.field3 = 'Vul een geldig jaartal in'
       }
     }
     if (field3Config?.kind === 'percentage') {
-      const pct = parseNumberInput(field3Raw)
+      const pct = parseDecimalInput(field3Raw)
       if (pct != null && pct < 0) next.field3 = 'Percentage mag niet negatief zijn'
     }
+    // Vangnet, geen hoofdroute: het currency-field3 loopt via `<AmountInput>`
+    // met `positive-only`, dus een minteken bereikt de draft niet meer (het
+    // veld meldt zelf dat het geweigerd is). De check blijft staan voor een
+    // waarde die langs een andere weg binnenkomt — bv. een voor-ingevulde draft.
     if (field3Config?.kind === 'currency') {
-      const value = parseNumberInput(field3Raw)
+      const value = parseCurrencyInput(field3Raw)
       if (value != null && value < 0) next.field3 = 'Bedrag mag niet negatief zijn'
     }
 
-    // Aflossing per maand (looptijd-leningen): het formulier is noValidate,
-    // dus min={0} op de input blokkeert niets — zonder deze check strandt een
-    // negatieve waarde pas op de zod-validatie bij de (eind)save, met een
-    // generieke fout i.p.v. een veldfout.
+    // Aflossing per maand (looptijd-leningen): vangnet, geen hoofdroute. Het
+    // veld loopt sinds H9 door `<AmountInput>` met `positive-only`, dat een
+    // minteken al zichtbaar weigert vóór het de draft raakt. Deze check vangt
+    // wat langs een andere weg binnenkomt (bv. een voor-ingevulde draft) —
+    // anders zou dat pas op de zod-validatie bij de (eind)save stranden, met
+    // een generieke fout i.p.v. een veldfout.
     if (!isAsset && DEBT_MONTHLY_PAYMENT_FIELD_TYPES.includes(typeKey as DebtType)) {
       const mp = (props.draft as DebtDraftState).monthly_payment
       if (typeof mp === 'number' && mp < 0) {
@@ -280,7 +312,7 @@ export function StepDetails(props: StepDetailsProps) {
 
   function handleAmountChange(raw: string) {
     setAmountRaw(raw)
-    const parsed = parseNumberInput(raw)
+    const parsed = parseCurrencyInput(raw)
     if (isAsset) {
       ;(props as AssetProps).onChange({ current_value: parsed as number })
     } else {
@@ -299,7 +331,8 @@ export function StepDetails(props: StepDetailsProps) {
       }
       return
     }
-    const parsed = parseNumberInput(raw)
+    const parsed =
+      field3Config.kind === 'currency' ? parseCurrencyInput(raw) : parseDecimalInput(raw)
     if (isAsset) {
       ;(props as AssetProps).onChange({ field3: parsed ?? null })
     } else {
@@ -383,40 +416,27 @@ export function StepDetails(props: StepDetailsProps) {
         >
           {amountLabel}
         </label>
-        <div className="relative">
-          <span
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm tabular-nums text-[var(--ink-4)]"
-            aria-hidden="true"
-          >
-            &euro;
-          </span>
-          <input
-            id={`${nameListId}-amount`}
-            type="number"
-            inputMode="decimal"
-            step={100}
-            min={0}
-            value={amountRaw}
-            onChange={(e) => handleAmountChange(e.target.value)}
-            onBlur={() => setTouched((t) => ({ ...t, amount: true }))}
-            aria-invalid={Boolean(showAmountError)}
-            aria-describedby={showAmountError ? `${nameListId}-amount-error` : undefined}
-            className={`w-full border bg-[var(--paper)] py-2.5 pl-8 pr-3 font-mono text-base tabular-nums text-[var(--ink)] outline-none transition-colors ${
-              showAmountError
-                ? 'border-[var(--negative)] focus:border-[var(--negative)] focus:ring-1 focus:ring-[var(--negative)]'
-                : `border-[var(--border-ed)] focus:ring-1 ${palette.focusBorder}`
-            }`}
-          />
-        </div>
-        {showAmountError && (
-          <p
-            id={`${nameListId}-amount-error`}
-            role="alert"
-            className="mt-1 text-[11px] text-[var(--negative)]"
-          >
-            {currentErrors.amount}
-          </p>
-        )}
+        {/* `<AmountInput>` i.p.v. `type="number"` (H9): een number-input laat de
+            browser ongeldige invoer stilzwijgend weggooien vóórdat React hem
+            ziet, dus het veld kon nooit iets melden. Deze component weigert
+            dezelfde tekens ZICHTBAAR en rendert zijn eigen meldingsregel —
+            vandaar dat de losse error-`<p>` hieronder weg is: één veldfout, één
+            melding (L4). Het euroteken gaat via `prefix`, zodat de melding
+            buiten de box valt waarin dat teken gepositioneerd staat. */}
+        <AmountInput
+          id={`${nameListId}-amount`}
+          prefix="€"
+          sign="positive-only"
+          value={amountRaw}
+          onChange={handleAmountChange}
+          onBlur={() => setTouched((t) => ({ ...t, amount: true }))}
+          error={showAmountError ? currentErrors.amount ?? null : null}
+          className={`w-full border bg-[var(--paper)] py-2.5 pl-8 pr-3 font-mono text-base tabular-nums text-[var(--ink)] outline-none transition-colors ${
+            showAmountError
+              ? 'border-[var(--negative)] focus:border-[var(--negative)] focus:ring-1 focus:ring-[var(--negative)]'
+              : `border-[var(--border-ed)] focus:ring-1 ${palette.focusBorder}`
+          }`}
+        />
       </div>
 
       {/* Optioneel veld 3 — type-afhankelijk. */}
@@ -560,25 +580,21 @@ function Field3Input({
       )}
 
       {config.kind === 'currency' && (
-        <div className="relative">
-          <span
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm tabular-nums text-[var(--ink-4)]"
-            aria-hidden="true"
-          >
-            &euro;
-          </span>
-          <input
-            id={id}
-            type="number"
-            inputMode="decimal"
-            step={100}
-            min={0}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            onBlur={onBlur}
-            className={`w-full border bg-[var(--paper)] py-2.5 pl-8 pr-3 font-mono text-base tabular-nums text-[var(--ink)] outline-none transition-colors ${borderClass}`}
-          />
-        </div>
+        /* Zelfde H9-reden als het hoofdbedrag: een currency-veld is een
+           bedragveld en gaat dus door `<AmountInput>`. Die rendert zijn eigen
+           meldingsregel, dus de gedeelde error-`<p>` onderaan deze component
+           slaat het currency-geval over — en plaatst het euroteken zelf, buiten
+           de meldingsregel om. */
+        <AmountInput
+          id={id}
+          prefix="€"
+          sign="positive-only"
+          value={value}
+          onChange={onChange}
+          onBlur={onBlur}
+          error={error ?? null}
+          className={`w-full border bg-[var(--paper)] py-2.5 pl-8 pr-3 font-mono text-base tabular-nums text-[var(--ink)] outline-none transition-colors ${borderClass}`}
+        />
       )}
 
       {config.kind === 'percentage' && (
@@ -628,7 +644,9 @@ function Field3Input({
         />
       )}
 
-      {error && (
+      {/* Het currency-geval meldt zelf (via `<AmountInput>`); die hier nog eens
+          herhalen zou twee meldingen voor één veldfout geven (L4). */}
+      {error && config.kind !== 'currency' && (
         <p role="alert" className="mt-1 text-[11px] text-[var(--negative)]">
           {error}
         </p>
@@ -678,7 +696,7 @@ function SavingsRenteField({ idBase, value, onChange, palette }: SavingsRenteFie
           value={raw}
           onChange={(e) => {
             setRaw(e.target.value)
-            onChange({ expected_return: parseNumberInput(e.target.value) ?? null })
+            onChange({ expected_return: parseDecimalInput(e.target.value) ?? null })
           }}
           className={`w-full border bg-[var(--paper)] py-2.5 pl-3 pr-8 font-mono text-base tabular-nums text-[var(--ink)] outline-none transition-colors focus:ring-1 border-[var(--border-ed)] ${palette.focusBorder}`}
         />
@@ -736,7 +754,7 @@ function DebtAflossingField({
   // geleegd rente-veld valt op dezelfde per-type rente-default terug als de
   // draft (defaultInterestRate — bv. dga_schuld 2,5%), anders zou de hint
   // een ander bedrag beloven dan wat er wordt opgeslagen.
-  const rate = parseNumberInput(rateRaw)
+  const rate = parseDecimalInput(rateRaw)
   const defaultEstimate =
     balance != null && balance > 0
       ? computeDefaultMonthlyPayment(
@@ -760,40 +778,25 @@ function DebtAflossingField({
         Aflossing per maand{' '}
         <span className="font-normal text-[var(--ink-4)]">(optioneel)</span>
       </label>
-      <div className="relative">
-        <span
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm tabular-nums text-[var(--ink-4)]"
-          aria-hidden="true"
-        >
-          &euro;
-        </span>
-        <input
-          id={aflossingId}
-          type="number"
-          inputMode="decimal"
-          step={10}
-          min={0}
-          value={raw}
-          placeholder={defaultEstimate != null && defaultEstimate > 0 ? String(Math.round(defaultEstimate)) : undefined}
-          onChange={(e) => {
-            setRaw(e.target.value)
-            onChange({ monthly_payment: parseNumberInput(e.target.value) ?? null })
-          }}
-          onBlur={onBlur}
-          aria-invalid={Boolean(error)}
-          aria-describedby={error ? `${aflossingId}-error` : undefined}
-          className={`w-full border bg-[var(--paper)] py-2.5 pl-8 pr-3 font-mono text-base tabular-nums text-[var(--ink)] outline-none transition-colors ${borderClass}`}
-        />
-      </div>
-      {error && (
-        <p
-          id={`${aflossingId}-error`}
-          role="alert"
-          className="mt-1 text-[11px] text-[var(--negative)]"
-        >
-          {error}
-        </p>
-      )}
+      {/* Ook dit is een bedragveld en gaat dus door `<AmountInput>` (H9): als
+          `type="number"` slikte het `1.250` in als 1,25 en ongeldige tekens
+          zonder een woord. De component levert de meldingsregel zelf, dus geen
+          losse error-`<p>` meer eronder (L4), en plaatst het euroteken zodat
+          dat niet meezakt wanneer die melding verschijnt. */}
+      <AmountInput
+        id={aflossingId}
+        prefix="€"
+        sign="positive-only"
+        value={raw}
+        placeholder={defaultEstimate != null && defaultEstimate > 0 ? String(Math.round(defaultEstimate)) : undefined}
+        onChange={(next) => {
+          setRaw(next)
+          onChange({ monthly_payment: parseCurrencyInput(next) ?? null })
+        }}
+        onBlur={onBlur}
+        error={error ?? null}
+        className={`w-full border bg-[var(--paper)] py-2.5 pl-8 pr-3 font-mono text-base tabular-nums text-[var(--ink)] outline-none transition-colors ${borderClass}`}
+      />
       <p className="mt-1 text-[11px] text-[var(--ink-4)] leading-relaxed">
         Wat je nu maandelijks aflost (zie je leningcontract of afschrijving).
         {defaultEstimate != null && defaultEstimate > 0
@@ -919,7 +922,7 @@ function MortgageExtraFields({
             max={MAX_TERM_YEARS}
             value={termYears ?? ''}
             onChange={(e) =>
-              onChange({ term_years: parseNumberInput(e.target.value) ?? null })
+              onChange({ term_years: parseDecimalInput(e.target.value) ?? null })
             }
             onBlur={onTermBlur}
             aria-invalid={termError ? true : undefined}

@@ -60,6 +60,16 @@ export interface AmountInputProps {
   'data-testid'?: string
   inputRef?: React.RefObject<HTMLInputElement | null>
   onBlur?: () => void
+  /**
+   * Teken vóór het bedrag, meestal `'€'`. De component plaatst het ZELF, en
+   * dat is geen sierlijkheid: het teken hangt absoluut gepositioneerd in een
+   * `relative`-box, en de meldingsregel hieronder is altijd gemount. Wikkelt
+   * een aanroeper input + melding samen in zo'n box, dan groeit die box zodra
+   * er iets te melden valt (`sr-only` → in-flow) en zakt het teken mee naar
+   * het midden van de nieuwe hoogte — zichtbaar scheef, precies wanneer het
+   * veld al iets fout heeft. Hier omsluit de box alleen de input.
+   */
+  prefix?: React.ReactNode
 }
 
 export function AmountInput({
@@ -76,6 +86,7 @@ export function AmountInput({
   className,
   inputRef,
   onBlur,
+  prefix,
   'aria-label': ariaLabel,
   'data-testid': testId,
 }: AmountInputProps) {
@@ -98,35 +109,51 @@ export function AmountInput({
     onChange(result.value)
   }
 
+  const veld = (
+    <input
+      id={inputId}
+      name={name}
+      ref={inputRef}
+      type="text"
+      inputMode="decimal"
+      autoComplete="off"
+      value={value}
+      onChange={(e) => handleChange(e.target.value)}
+      onBlur={onBlur}
+      disabled={disabled}
+      readOnly={readOnly}
+      title={title}
+      placeholder={placeholder}
+      aria-label={ariaLabel}
+      aria-invalid={isInvalid || undefined}
+      aria-describedby={message ? messageId : undefined}
+      data-testid={testId}
+      className={
+        className ??
+        `w-full rounded-[var(--r)] border px-3 py-2 text-sm ${
+          isInvalid
+            ? 'border-negative bg-negative/5 text-negative'
+            : 'border-[var(--border-ed)]'
+        }`
+      }
+    />
+  )
+
   return (
     <>
-      <input
-        id={inputId}
-        name={name}
-        ref={inputRef}
-        type="text"
-        inputMode="decimal"
-        autoComplete="off"
-        value={value}
-        onChange={(e) => handleChange(e.target.value)}
-        onBlur={onBlur}
-        disabled={disabled}
-        readOnly={readOnly}
-        title={title}
-        placeholder={placeholder}
-        aria-label={ariaLabel}
-        aria-invalid={isInvalid || undefined}
-        aria-describedby={message ? messageId : undefined}
-        data-testid={testId}
-        className={
-          className ??
-          `w-full rounded-[var(--r)] border px-3 py-2 text-sm ${
-            isInvalid
-              ? 'border-negative bg-negative/5 text-negative'
-              : 'border-[var(--border-ed)]'
-          }`
-        }
-      />
+      {prefix != null ? (
+        <div className="relative">
+          <span
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm tabular-nums text-[var(--ink-4)]"
+            aria-hidden="true"
+          >
+            {prefix}
+          </span>
+          {veld}
+        </div>
+      ) : (
+        veld
+      )}
       {/* Altijd gemount: een regio die pas bij een fout in de DOM verschijnt,
           wordt door schermlezers niet betrouwbaar voorgelezen. */}
       <p
