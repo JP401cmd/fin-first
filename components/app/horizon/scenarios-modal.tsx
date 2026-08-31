@@ -97,6 +97,10 @@ export function ScenariosModal({ input, debts = [], open, onClose, simRows, simF
         // Geen noodfonds fabriceren zonder cash-detail → neutraal 0.
         emergencyFundMonths: 0,
         freedomPct: fPct,
+        // Scenario-preview zonder kernel-run of profiel-leeftijd → de
+        // fire_progress-pijler oordeelt hier leeftijdsblind (ADR 0124-terugval).
+        currentAge: null,
+        fireAgeFractional: null,
         netMonthlyIncome: input.monthlyIncome,
         debtMonthlyPayments: debts.reduce((s, d) => s + Number(d.monthly_payment ?? 0), 0),
         largestAssetTypeShare: null,

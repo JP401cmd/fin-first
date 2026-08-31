@@ -608,7 +608,7 @@ export function buildReport(intake: CheckIntake, now: Date = new Date()): CheckR
   const fireReachable = fireAge != null
 
   // Health één keer berekenen: de sectie én de benchmark-score delen 'm.
-  const health = buildHealth(ctx)
+  const health = buildHealth(ctx, fireProj.fireAge)
 
   return {
     generatedAt: ctx.now.toISOString(),
@@ -924,7 +924,7 @@ function buildMonthBalance(ctx: EngineContext, dailyExpense: number): CheckRepor
   return { rows, savingsRatePct: round1(ctx.savingsRatePct) }
 }
 
-function buildHealth(ctx: EngineContext): CheckReportData['health'] {
+function buildHealth(ctx: EngineContext, fireAgeFractional: number | null): CheckReportData['health'] {
   const debtMonthly = ctx.portfolio.debts.reduce((s, d) => s + d.monthly_payment, 0)
 
   // freedomPct via de canonieke voortgang (FIRE-eligible ÷ benodigde portfolio).
@@ -942,6 +942,10 @@ function buildHealth(ctx: EngineContext): CheckReportData['health'] {
       totalAssets: ctx.totalAssets,
       totalDebts: ctx.totalDebts,
       freedomPct,
+      // Peer-relatieve fire_progress: intake-leeftijd + de canonieke
+      // scalar-FIRE-koers (zelfde bron als de hero-FIRE-leeftijd).
+      currentAge: ctx.age,
+      fireAgeFractional,
       avgMonthlyExpenses: ctx.monthlyExpenses,
       netMonthlyIncome: ctx.netMonthlyIncome,
       // Noodbuffer-norm: 3 × netto maandsalaris (lib/emergency-fund.ts).

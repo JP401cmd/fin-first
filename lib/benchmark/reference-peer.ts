@@ -85,6 +85,10 @@ export function computeReferencePeer(
     totalDebts: 0,
     emergencyFundMonths: PEER_EMERGENCY_FUND_MONTHS,
     freedomPct: proj.freedomPercentage,
+    // De peer wordt langs dezelfde peer-relatieve fire_progress-maat gelegd
+    // als de gebruiker — anders vergelijkt /check twee verschillende scores.
+    currentAge: midAge,
+    fireAgeFractional: proj.fireAge,
     netMonthlyIncome: monthlyIncome,
     debtMonthlyPayments: 0,
     largestAssetTypeShare: null, // concentratie-pijler inactief voor de peer

@@ -1268,6 +1268,15 @@ export const loadCoreData = cache(async function loadCoreData(
 
   const snapshots = (snapshotResult.data ?? []) as NetWorthSnapshot[]
 
+  // Meest recente snapshot-FIRE-leeftijd — de /core-terugval voor de
+  // peer-relatieve fire_progress-pijler (er draait hier geen kernel).
+  const coreLatestFireAgeRow = snapshots
+    .filter(s => (s as { fire_age?: number | null }).fire_age != null)
+    .at(-1)
+  const coreSnapshotFireAge = coreLatestFireAgeRow
+    ? Number((coreLatestFireAgeRow as { fire_age?: number | null }).fire_age)
+    : null
+
   // ── FIRE target via shared helper (single source of truth) ──
   // Promise is vroeg gestart (zie boven), nu pas resolven zodat hij parallel
   // met de Kern-batches heeft kunnen draaien. Identieke output als Horizon.
@@ -1355,6 +1364,12 @@ export const loadCoreData = cache(async function loadCoreData(
       totalAssets: effectiveTotalAssets,
       totalDebts: effectiveTotalDebts,
       freedomPct: coreFreedomPct,
+      currentAge,
+      // Geen kernel-run op dit pad → zelfde snapshot-terugval als de
+      // dashboard-loader (simFireAgeFractional ?? snapshotFireAge), zodat de
+      // /core-score niet van /overzicht wegdrijft en de koers-tip niet ten
+      // onrechte "niet in zicht" meldt (review C1, ADR 0124).
+      fireAgeFractional: coreSnapshotFireAge,
       avgMonthlyExpenses: effectiveMonthlyExpenses,
       netMonthlyIncome: extHalfYearIncome > 0 ? extHalfYearIncome / 6 : effectiveMonthlyIncome,
       // Noodbuffer-norm: 3 × netto maandsalaris (lib/emergency-fund.ts).

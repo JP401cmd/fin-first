@@ -1,7 +1,7 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { unauthorized, serverError } from '@/lib/api/respond'
-import { computeFireProjection, type FinancialInput } from '@/lib/horizon-data'
+import { computeFireProjection, ageAtDate, type FinancialInput } from '@/lib/horizon-data'
 import { computeHealthScoreFromInputs } from '@/lib/financial-health'
 import {
   buildHealthScoreInput,
@@ -378,6 +378,10 @@ export async function POST() {
         totalAssets: weightedAssets + unlinkedCash,
         totalDebts,
         freedomPct: freedomPercentage,
+        // Peer-relatieve fire_progress: leeftijd uit profiel; koers uit dezelfde
+        // scalar-FIRE-projectie die fire_age op de snapshot-rij voedt.
+        currentAge: dateOfBirth ? ageAtDate(dateOfBirth) : null,
+        fireAgeFractional: fireProjection.fireAge,
         avgMonthlyExpenses: monthlyExpenses,
         // Zelfde inkomensbron als de transactiequote (income/6) — DSTI-noemer.
         netMonthlyIncome: monthlyIncome,

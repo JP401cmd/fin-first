@@ -153,6 +153,8 @@ describe('computeHealthScoreWithTrend — trend verandert het cijfer niet', () =
     emergencyFundMonths: 4,
     emergencyTargetMonths: 6,
     freedomPct: 42,
+    currentAge: null,
+    fireAgeFractional: null,
     netMonthlyIncome: 4_000,
     debtMonthlyPayments: 600,
     largestAssetTypeShare: 0.55,

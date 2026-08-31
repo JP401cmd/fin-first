@@ -135,7 +135,13 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   // De vrijheids-pijler van de gezondheidsscore erft dezelfde noemer; zonder
   // deze stap zou de score op een ándere FIRE-grondslag draaien dan de hero
   // erboven (bevinding H4 punt 2, dezelfde oorzaak vanaf de /overzicht-kant).
-  const healthScoreInput: HealthScoreInput = { ...raw.healthScoreInputBase, freedomPct }
+  const healthScoreInput: HealthScoreInput = {
+    ...raw.healthScoreInputBase,
+    freedomPct,
+    // Kernel-koers voor de peer-relatieve fire_progress-pijler — zelfde bron
+    // als het `fireAgeFractional`-veld dat deze bundel hieronder exposeert.
+    fireAgeFractional: run?.sim.fireAgeFractional ?? null,
+  }
   // Canonieke gezondheidsscore (ADR 0008/0010) — de ÉNE bron voor zowel de
   // /overzicht-hero als de Gezondheid-widget (die 'm consumeert via
   // withCanonicalOverviewFigures i.p.v. de eigen bundel-score te herberekenen).

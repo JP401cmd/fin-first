@@ -202,7 +202,7 @@ export interface HorizonRawData {
    * compiler af dat elke consument de kernel-waarde bijzet. Een stille 0 zou de
    * vrijheids-pijler laten instorten zonder dat iets rood wordt.
    */
-  healthScoreInputBase: Omit<HealthScoreInput, 'freedomPct'>
+  healthScoreInputBase: Omit<HealthScoreInput, 'freedomPct' | 'fireAgeFractional'>
   /**
    * CANONIEKE noodfonds-bundel — dezelfde rijen en dezelfde norm als de
    * `emergency_fund`-pijler van de gezondheidsscore hierboven.
@@ -1087,6 +1087,11 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
       totalAssets: perspectiveTotalAssets,
       totalDebts: perspectiveTotalDebts,
       freedomPct: 0,
+      // Leeftijd is statisch profiel-feit → hier; de kernel-FIRE-leeftijd is
+      // net als freedomPct kernel-afgeleid en wordt hieronder AFGESTRIPT zodat
+      // de afgeleide laag (lib/horizon-data-loader.ts) 'm moet injecteren.
+      currentAge,
+      fireAgeFractional: null,
       avgMonthlyExpenses: emergencyExpenseBase,
       netMonthlyIncome: avgIncome6m,
       // Noodbuffer-norm: 3 × netto maandsalaris (lib/emergency-fund.ts).
@@ -1104,9 +1109,9 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
       debtMonthlyPayments: healthDebtMonthlyPayments,
     },
   )
-  const healthScoreInputBase: Omit<HealthScoreInput, 'freedomPct'> = (() => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- de plaatshouder wordt bewust weggegooid
-    const { freedomPct, ...rest } = healthScoreInputWithPlaceholder
+  const healthScoreInputBase: Omit<HealthScoreInput, 'freedomPct' | 'fireAgeFractional'> = (() => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- de plaatshouders worden bewust weggegooid
+    const { freedomPct, fireAgeFractional, ...rest } = healthScoreInputWithPlaceholder
     return rest
   })()
 

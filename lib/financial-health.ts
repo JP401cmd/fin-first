@@ -26,6 +26,8 @@ import type { DashboardData } from '@/lib/types/dashboard'
 import type { ModuleId } from '@/lib/module-registry'
 import { TARGET_EMERGENCY_SALARY_MONTHS, emergencyScoreTargetMonths } from '@/lib/emergency-fund'
 import { budgetLimitStatus } from '@/lib/budget-alerts'
+import { DEFAULT_RETURN } from '@/lib/constants'
+import { firePeerAgeForAge, FIRE_PEER_CURVE_START_AGE } from '@/lib/benchmark/fire-peer-lat'
 
 // ── Lightweight input for server-side / snapshot usage ───────
 // Allows computing the health score without a full DashboardData bundle.
@@ -46,6 +48,22 @@ export interface HealthScoreInput {
    */
   emergencyTargetMonths?: number
   freedomPct: number
+  /**
+   * Leeftijd van de gebruiker (jaren, fractioneel toegestaan). Maakt de
+   * fire_progress-pijler PEER-RELATIEF (koers + voortgang-op-leeftijd t.o.v.
+   * de FIRE-nastrevers-lat, lib/benchmark/fire-peer-lat.ts). `null` →
+   * de pijler valt terug op de leeftijdsblinde freedomPct-score.
+   * VERPLICHT (geen `?`): een vergeten veld hoort een compile-fout te zijn,
+   * niet een stil legacy-pad (review M1).
+   */
+  currentAge: number | null
+  /**
+   * FIRE-leeftijd uit de canonieke projectie van het eigen pad (kernel-run,
+   * scalar-FIRE of snapshot-terugval) — consume, don't recompute. `null` =
+   * geen haalbare FIRE-leeftijd bekend: dan telt alleen het
+   * voortgang-op-leeftijd-signaal. VERPLICHT (geen `?`), zie currentAge.
+   */
+  fireAgeFractional: number | null
   /**
    * Netto maandinkomen — dezelfde canonieke inkomensbron die `savingsRate6m`
    * voedt (income6m/6 resp. effectiveMonthlyIncome). Noemer van de DSTI-pijler.
@@ -226,9 +244,59 @@ function scoreEmergencyFund(
   return Math.round(60 + ((monthsCovered - half) / (target - half)) * 40)
 }
 
-/** FIRE-voortgang: freedomPct (0–100+). Already 0-100 scale, cap at 100. */
+/**
+ * FIRE-voortgang, leeftijdsblind: freedomPct (0–100+), cap op 100. Sinds de
+ * peer-relatieve score alleen nog de TERUGVAL voor aanroepers zonder leeftijd
+ * (oude snapshots, mocks, de referentie-peer vóór zijn eigen leeftijd bekend is).
+ */
 function scoreFireProgress(freedomPct: number): number {
   return Math.max(0, Math.min(Math.round(freedomPct), 100))
+}
+
+/**
+ * FIRE-voortgang, PEER-RELATIEF (eigenaar-akkoord 31 aug 2026). Twee signalen
+ * tegen de FIRE-nastrevers-lat (lib/benchmark/fire-peer-lat.ts):
+ *
+ *   A — koers (60%): haalt de kernel-projectie de peer-FIRE-leeftijd?
+ *       delta = peerFireAge − fireAgeFractional (jaren vóór)
+ *       scoreA = clamp(70 + 6·delta, 0, 100)  → op de lat = 70, 5 jr eerder = 100
+ *   B — voortgang-op-leeftijd (40%): ligt freedomPct op de samengestelde
+ *       opbouwcurve die bij de peer-lat hoort?
+ *       verwachtPct(lft) = 100·((1+r)^(lft−25) − 1)/((1+r)^(peer−25) − 1)
+ *       met r = DEFAULT_RETURN — precies op de curve = 75.
+ *
+ * FIRE onhaalbaar/onbekend (fireAgeFractional null) → alleen B. Geen leeftijd →
+ * legacy leeftijdsblinde score. freedomPct ≥ 100 → 100, ongeacht de koers.
+ * Waarom: de leeftijdsblinde score las een 30-jarige óp schema als "zwak" en
+ * kan een 55-jarige mét achterstand geruststellen — de vraag is niet "hoe vol
+ * is de pot" maar "gaat je koers de lat van je leeftijdsgenoten halen".
+ */
+export function scoreFireProgressVsPeers(
+  input: Pick<HealthScoreInput, 'freedomPct' | 'currentAge' | 'fireAgeFractional'>,
+): number {
+  const { freedomPct } = input
+  const age = input.currentAge
+  if (age == null || !Number.isFinite(age)) return scoreFireProgress(freedomPct)
+  if (freedomPct >= 100) return 100
+
+  const peerAge = firePeerAgeForAge(age)
+
+  // Signaal B — voortgang-op-leeftijd. Vloer op 1% zodat een prille twintiger
+  // met íets opbouw niet door een ~0-noemer schiet.
+  const growth = (a: number) =>
+    Math.pow(1 + DEFAULT_RETURN, Math.max(0, a - FIRE_PEER_CURVE_START_AGE)) - 1
+  const peerGrowth = growth(peerAge)
+  const expectedPct = peerGrowth > 0
+    ? Math.max(1, Math.min(100, (growth(Math.min(age, peerAge)) / peerGrowth) * 100))
+    : 100
+  const scoreB = Math.max(0, Math.min(Math.round((75 * Math.max(0, freedomPct)) / expectedPct), 100))
+
+  // Signaal A — koers t.o.v. de peer-lat; zonder haalbare FIRE telt alleen B.
+  const fireAge = input.fireAgeFractional
+  if (fireAge == null || !Number.isFinite(fireAge)) return scoreB
+  const scoreA = Math.max(0, Math.min(Math.round(70 + 6 * (peerAge - fireAge)), 100))
+
+  return Math.round(0.6 * scoreA + 0.4 * scoreB)
 }
 
 /**
@@ -505,6 +573,9 @@ export function computeHealthScore(
     emergencyFundMonths: data.emergencyFund.monthsCovered,
     emergencyTargetMonths: data.emergencyFund.targetMonths,
     freedomPct: data.freedomPct,
+    // Peer-relatieve fire_progress: de bundel draagt beide velden al.
+    currentAge: data.currentAge ?? null,
+    fireAgeFractional: data.fireAgeFractional ?? null,
     netMonthlyIncome: 0,            // not available on DashboardData
     debtMonthlyPayments: 0,         // 0 = geen-schulden-pad → DSTI actief op 100
     largestAssetTypeShare: null,    // not available → concentration inactive
@@ -531,9 +602,13 @@ export function computeHealthScore(
     budget_discipline: scoreBudgetDiscipline(input.budgetCategories),
     emergency_fund: scoreEmergencyFund(data.emergencyFund.monthsCovered, data.emergencyFund.targetMonths),
     debt_ratio: scoreDebtRatio(prevNetWorth + data.totalDebts, data.totalDebts),
-    fire_progress: scoreFireProgress(
-      data.fireTarget > 0 ? (prevNetWorth / data.fireTarget) * 100 : data.freedomPct,
-    ),
+    // Zelfde peer-relatieve scorer als `current`, alleen de vulling van vorige
+    // maand; koers (fireAgeFractional) en leeftijd blijven de huidige.
+    fire_progress: scoreFireProgressVsPeers({
+      freedomPct: data.fireTarget > 0 ? (prevNetWorth / data.fireTarget) * 100 : data.freedomPct,
+      currentAge: input.currentAge,
+      fireAgeFractional: input.fireAgeFractional,
+    }),
     // debt_service_ratio / asset_concentration are inactive on this path.
   }
   const previousMonth = Math.round(
@@ -600,8 +675,14 @@ export function computeHealthScoreFromInputs(
   const debtRatioScore = scoreDebtRatio(input.totalAssets, input.totalDebts)
   const debtRatio = Math.round(debtRatioPercent(input.totalAssets, input.totalDebts))
 
-  // FIRE-voortgang — always has a value.
-  const fireScore = scoreFireProgress(input.freedomPct)
+  // FIRE-voortgang — always has a value. Peer-relatief zodra de leeftijd
+  // bekend is; anders de leeftijdsblinde terugval (zie scoreFireProgressVsPeers).
+  const fireScore = scoreFireProgressVsPeers(input)
+  const firePeerActive = input.currentAge != null && Number.isFinite(input.currentAge)
+  const firePeerAge = firePeerActive ? firePeerAgeForAge(input.currentAge as number) : null
+  const fireDelta = firePeerAge != null && input.fireAgeFractional != null && Number.isFinite(input.fireAgeFractional)
+    ? firePeerAge - input.fireAgeFractional
+    : null
 
   // Vermogensconcentratie — inactief wanneer largestAssetTypeShare === null.
   const concentrationPct = input.largestAssetTypeShare != null
@@ -698,8 +779,30 @@ export function computeHealthScoreFromInputs(
       'fire_progress',
       'FIRE-voortgang',
       fireScore,
-      'Hoever ben je op weg naar financiële vrijheid?',
-      input.freedomPct < 10
+      firePeerActive
+        // "Onze lat", niet "leeftijdsgenoten": dit is een gecureerde
+        // ambitie-richtlijn (fire-peer-lat.ts), géén gemeten statistiek — de
+        // copy mag geen meting claimen (review H1, Wft: inzicht, geen feit
+        // over anderen verzinnen).
+        ? `Ligt je koers vóór of achter op onze vrijheidslat voor jouw leeftijd (vrij op ${firePeerAge})?`
+        : 'Hoever ben je op weg naar financiële vrijheid?',
+      // Peer-actief: de tip duidt de KOERS t.o.v. de lat; terugval: de oude
+      // freedomPct-ladder. FIRE bereikt wint altijd.
+      input.freedomPct >= 100
+        ? 'FIRE bereikt — geniet van je financiële vrijheid!'
+        : firePeerActive
+        ? fireDelta == null
+          ? 'Nog geen haalbare vrijheidsleeftijd in beeld op dit pad — elke verhoging van je inleg of verlaging van je doeluitgaven telt dubbel.'
+          : fireDelta >= 5
+          ? `Je koers ligt ${Math.round(fireDelta)} jaar vóór op onze lat van ${firePeerAge} jaar — houd je strategie vast.`
+          : fireDelta > 0
+          ? `Op koers om eerder vrij te zijn dan onze lat van ${firePeerAge} jaar.`
+          : fireDelta === 0
+          ? `Precies op onze lat van ${firePeerAge} jaar — elke extra inleg brengt je ervoor.`
+          : fireDelta >= -5
+          ? `Net achter op onze lat van ${firePeerAge} jaar — een hogere maandinleg verkleint het verschil.`
+          : `Je koers ligt ${Math.round(-fireDelta)} jaar achter op onze lat van ${firePeerAge} jaar — verhoog je spaarquote of verlaag je doeluitgaven.`
+        : input.freedomPct < 10
         ? 'Begin klein — elke euro opgebouwd vermogen brengt je dichter bij vrijheid.'
         : input.freedomPct < 25
         ? 'Verhoog je maandelijkse inleg in beleggingen voor versneld vermogensopbouw.'
@@ -707,9 +810,7 @@ export function computeHealthScoreFromInputs(
         ? 'Je bent halverwege! Overweeg je spaarquote te optimaliseren.'
         : input.freedomPct < 75
         ? 'Sterk op weg — de compound interest werkt steeds harder voor je.'
-        : input.freedomPct < 100
-        ? 'Bijna vrij! Focus op het volhouden van je strategie.'
-        : 'FIRE bereikt — geniet van je financiële vrijheid!',
+        : 'Bijna vrij! Focus op het volhouden van je strategie.',
       `${Math.round(input.freedomPct)}%`,
     ),
     makePillar(

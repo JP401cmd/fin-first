@@ -238,6 +238,8 @@ describe('score-curve anti-gaming via computeHealthScoreFromInputs', () => {
     totalAssets: 100_000,
     totalDebts: 0,
     freedomPct: 25,
+    currentAge: null,
+    fireAgeFractional: null,
     netMonthlyIncome: 4_000,
     debtMonthlyPayments: 0,
     largestAssetTypeShare: 0.4,
@@ -328,6 +330,10 @@ describe('D1-pariteit — loader-bundel == health-pijler (inclusion-gewogen)', (
         avgMonthlyExpenses,
         netMonthlyIncome: 4_000,
         netMonthlySalary,
+        // Legacy leeftijdsblind pad — de peer-relatieve fire_progress-cases
+        // staan in financial-health.test.ts.
+        currentAge: null,
+        fireAgeFractional: null,
       },
       {
         assets,
@@ -372,6 +378,10 @@ describe('D1-pariteit — loader-bundel == health-pijler (inclusion-gewogen)', (
         avgMonthlyExpenses,
         netMonthlyIncome: 4_000,
         netMonthlySalary,
+        // Legacy leeftijdsblind pad — de peer-relatieve fire_progress-cases
+        // staan in financial-health.test.ts.
+        currentAge: null,
+        fireAgeFractional: null,
       },
       {
         assets,

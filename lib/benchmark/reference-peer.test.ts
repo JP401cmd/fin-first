@@ -69,6 +69,10 @@ function buildPeerInputs(
     totalDebts: 0,
     emergencyFundMonths: 3,
     freedomPct: proj.freedomPercentage,
+    // Spiegel van de productie-constructie: de peer wordt langs dezelfde
+    // peer-relatieve fire_progress-maat gelegd als de gebruiker.
+    currentAge: midAge,
+    fireAgeFractional: proj.fireAge,
     netMonthlyIncome: monthlyIncome,
     debtMonthlyPayments: 0,
     largestAssetTypeShare: null,

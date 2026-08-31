@@ -137,6 +137,9 @@ function makeInput(overrides: Partial<HealthScoreInput> = {}): HealthScoreInput 
     totalDebts: 20_000,
     emergencyFundMonths: 3,
     freedomPct: 25,
+    // Default legacy leeftijdsblind pad; de peer-relatieve case zet ze expliciet.
+    currentAge: null,
+    fireAgeFractional: null,
     netMonthlyIncome: 4_000,
     debtMonthlyPayments: 600,
     largestAssetTypeShare: 0.5,
@@ -327,8 +330,8 @@ const tests: TestCase[] = [
   // ── Pillar 4: FIRE-voortgang ──────────────────────────────────────────
   {
     id: 'health-fire-zero',
-    name: 'FIRE-voortgang: 0% → score 0',
-    description: '0% FIRE progress yields pillar score 0',
+    name: 'FIRE-voortgang (terugval zonder leeftijd): 0% → score 0',
+    description: 'Zonder currentAge geldt de leeftijdsblinde terugval: 0% progress → score 0',
     category: CAT,
     priority: 'critical',
     estimatedDurationMs: 10,
@@ -340,8 +343,8 @@ const tests: TestCase[] = [
   },
   {
     id: 'health-fire-half',
-    name: 'FIRE-voortgang: 50% → score 50',
-    description: '50% FIRE progress yields pillar score 50',
+    name: 'FIRE-voortgang (terugval zonder leeftijd): 50% → score 50',
+    description: 'Zonder currentAge geldt de leeftijdsblinde terugval: 50% progress → score 50',
     category: CAT,
     priority: 'high',
     estimatedDurationMs: 10,
@@ -353,7 +356,7 @@ const tests: TestCase[] = [
   },
   {
     id: 'health-fire-full',
-    name: 'FIRE-voortgang: 100%+ → score max 100',
+    name: 'FIRE-voortgang: 100%+ → score max 100 (ook peer-relatief)',
     description: '100% or more FIRE progress is capped at pillar score 100',
     category: CAT,
     priority: 'high',
@@ -369,6 +372,26 @@ const tests: TestCase[] = [
           .pillars.find(p => p.id === 'fire_progress')!.score,
         100, '150% capped → 100',
       )
+    },
+  },
+
+  {
+    id: 'health-fire-peer-relative',
+    name: 'FIRE-voortgang peer-relatief: 30 jr op koers scoort hoog ondanks lage vulling',
+    description: 'Met currentAge + fireAgeFractional oordeelt de pijler op koers t.o.v. de FIRE-nastrevers-lat (ADR 0124): 30 jr, 8% gevuld, FIRE 57 (lat 55) → 74 — niet de kale 8',
+    category: CAT,
+    priority: 'critical',
+    estimatedDurationMs: 10,
+    fn() {
+      const peer = computeHealthScoreFromInputs(
+        makeInput({ freedomPct: 8, currentAge: 30, fireAgeFractional: 57 }), true,
+      ).pillars.find(p => p.id === 'fire_progress')!
+      assertEqual(peer.score, 74, '30 jr · 8% · FIRE 57 → 74 (peer-relatief)')
+      // Onhaalbare FIRE → alleen het voortgang-op-leeftijd-signaal.
+      const bOnly = computeHealthScoreFromInputs(
+        makeInput({ freedomPct: 20, currentAge: 50, fireAgeFractional: null }), true,
+      ).pillars.find(p => p.id === 'fire_progress')!
+      assertEqual(bOnly.score, 38, '50 jr · 20% · onhaalbaar → 38 (alleen signaal B)')
     },
   },
 
@@ -719,6 +742,8 @@ const tests: TestCase[] = [
       const perfect = computeHealthScoreFromInputs({
         savingsRate6m: 35, totalAssets: 500_000, totalDebts: 0,
         emergencyFundMonths: 8, freedomPct: 95,
+        currentAge: null,
+        fireAgeFractional: null,
         netMonthlyIncome: 5_000, debtMonthlyPayments: 0,
         largestAssetTypeShare: 0.3,
         budgetCategories: [{ limit: 1_000, spent: 800 }],
@@ -730,6 +755,8 @@ const tests: TestCase[] = [
       const worst = computeHealthScoreFromInputs({
         savingsRate6m: 0, totalAssets: 1_000, totalDebts: 50_000,
         emergencyFundMonths: 0, freedomPct: 0,
+        currentAge: null,
+        fireAgeFractional: null,
         netMonthlyIncome: 1_000, debtMonthlyPayments: 800,
         largestAssetTypeShare: 0.95,
         budgetCategories: [{ limit: 100, spent: 500 }],
@@ -751,6 +778,8 @@ const tests: TestCase[] = [
       const score = computeHealthScoreFromInputs({
         savingsRate6m: 0, totalAssets: 0, totalDebts: 0,
         emergencyFundMonths: 0, freedomPct: 0,
+        currentAge: null,
+        fireAgeFractional: null,
         netMonthlyIncome: 0, debtMonthlyPayments: 0,
         largestAssetTypeShare: null,
         budgetCategories: [],
@@ -777,6 +806,8 @@ const tests: TestCase[] = [
       const score = computeHealthScoreFromInputs({
         savingsRate6m: 2, totalAssets: 10_000, totalDebts: 80_000,
         emergencyFundMonths: 0.5, freedomPct: 2,
+        currentAge: null,
+        fireAgeFractional: null,
         netMonthlyIncome: 3_000, debtMonthlyPayments: 2_400, // DSTI = 80%
         largestAssetTypeShare: null,
         budgetCategories: [{ limit: 1_000, spent: 1_500 }],
@@ -843,6 +874,10 @@ const tests: TestCase[] = [
         savingsRate6m: 25, totalAssets: 125_000, totalDebts: 30_000,
         freedomPct: 40, avgMonthlyExpenses: 2_500, netMonthlyIncome: 4_000,
         netMonthlySalary: 4_000,
+        // Legacy leeftijdsblind pad — de peer-relatieve fire_progress-cases
+        // staan in financial-health.test.ts.
+        currentAge: null,
+        fireAgeFractional: null,
       }
       const rows = {
         assets, unlinkedCash: 0, budgets, transactions, splits: [],

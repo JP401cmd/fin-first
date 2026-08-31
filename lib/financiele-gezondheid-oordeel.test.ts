@@ -106,6 +106,10 @@ describe('gezondheidsscore — noodfonds-pijler scoort tegen de salaris-norm', (
         avgMonthlyExpenses: 3_500,
         netMonthlyIncome: 5_000,
         netMonthlySalary,
+        // Legacy leeftijdsblind pad — de peer-relatieve fire_progress-cases
+        // staan in financial-health.test.ts.
+        currentAge: null,
+        fireAgeFractional: null,
       },
       {
         assets,
@@ -136,6 +140,10 @@ describe('gezondheidsscore — noodfonds-pijler scoort tegen de salaris-norm', (
         avgMonthlyExpenses: 1_000,
         netMonthlyIncome: 10_000,
         netMonthlySalary: 10_000,
+        // Legacy leeftijdsblind pad — de peer-relatieve fire_progress-cases
+        // staan in financial-health.test.ts.
+        currentAge: null,
+        fireAgeFractional: null,
       },
       {
         assets: [{ asset_type: 'savings', current_value: 9_000 }],

@@ -72,6 +72,8 @@ describe('GezondheidScoreWidget — getoond cijfer = canonieke engine', () => {
       totalDebts: 5_000,
       emergencyFundMonths: 4,
       freedomPct: 35,
+      currentAge: null,
+      fireAgeFractional: null,
       netMonthlyIncome: 3200,
       debtMonthlyPayments: 250,
       largestAssetTypeShare: 0.45,

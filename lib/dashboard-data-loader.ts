@@ -1696,6 +1696,17 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     (s, d) => s + Number((d as { monthly_payment?: number | string | null }).monthly_payment ?? 0),
     0,
   )
+  // FIRE-leeftijd: prefereer simulatieresultaat (consistent met horizon pagina),
+  // val terug op meest recente snapshot als simulatie niet is uitgevoerd. Staat
+  // hier (vóór de health-input) zodat de peer-relatieve fire_progress-pijler
+  // exact hetzelfde getal consumeert als de bundel straks exposeert.
+  const latestSnapshotFireAge = snapshotRows
+    .filter(s => (s as { fire_age?: number | null }).fire_age != null)
+    .at(-1)
+  const snapshotFireAge = latestSnapshotFireAge
+    ? Number((latestSnapshotFireAge as { fire_age?: number | null }).fire_age)
+    : null
+  const fireAgeFractional = simFireAgeFractional ?? snapshotFireAge
   const healthScoreInput = buildHealthScoreInput(
     {
       // Oordeelt op de EFFECTIEVE spaarquote (handmatige invoer wint), niet op
@@ -1705,6 +1716,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       totalAssets,
       totalDebts,
       freedomPct,
+      currentAge,
+      fireAgeFractional,
       avgMonthlyExpenses: effectiveMonthlyExpenses,
       netMonthlyIncome: healthNetMonthlyIncome,
       // Noodbuffer-norm: 3 × dit salaris (zie lib/emergency-fund.ts).
@@ -1794,16 +1807,6 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     savings: toSortedMonthHistory(savingsByMonth),
     debt:    debtHistory,
   }
-
-  // FIRE-leeftijd: prefereer simulatieresultaat (consistent met horizon pagina),
-  // val terug op meest recente snapshot als simulatie niet is uitgevoerd.
-  const latestSnapshotFireAge = snapshotRows
-    .filter(s => (s as { fire_age?: number | null }).fire_age != null)
-    .at(-1)
-  const snapshotFireAge = latestSnapshotFireAge
-    ? Number((latestSnapshotFireAge as { fire_age?: number | null }).fire_age)
-    : null
-  const fireAgeFractional = simFireAgeFractional ?? snapshotFireAge
 
   // Vaste lasten (widgets): consumeer de canonieke bron zodat widgettotaal == paginatotaal.
   // Bevat confirmed uitgaven-recurrings (amount<0, excl. 'excluded') + auto-detectie; recurring

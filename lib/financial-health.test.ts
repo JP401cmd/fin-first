@@ -21,6 +21,8 @@ const baseInput: HealthScoreInput = {
   totalDebts: 20_000,
   emergencyFundMonths: 3,
   freedomPct: 25,
+  currentAge: null,
+  fireAgeFractional: null,
   netMonthlyIncome: 4_000,
   debtMonthlyPayments: 600,
   largestAssetTypeShare: 0.5,
@@ -388,6 +390,8 @@ describe('label-banden (80/60/40/20)', () => {
       totalDebts: 0,
       emergencyFundMonths: 6,
       freedomPct: 90,
+      currentAge: null,
+      fireAgeFractional: null,
       netMonthlyIncome: 5_000,
       debtMonthlyPayments: 0,
       largestAssetTypeShare: 0.3,
@@ -405,6 +409,8 @@ describe('label-banden (80/60/40/20)', () => {
       totalDebts: 20_000,
       emergencyFundMonths: 4,
       freedomPct: 40,
+      currentAge: null,
+      fireAgeFractional: null,
       netMonthlyIncome: 4_000,
       debtMonthlyPayments: 200,
       largestAssetTypeShare: 0.45,
@@ -421,6 +427,8 @@ describe('label-banden (80/60/40/20)', () => {
       totalDebts: 50_000,
       emergencyFundMonths: 0,
       freedomPct: 0,
+      currentAge: null,
+      fireAgeFractional: null,
       netMonthlyIncome: 1_000,
       debtMonthlyPayments: 800,
       largestAssetTypeShare: 0.95,
@@ -661,6 +669,10 @@ describe('Defect B — buildHealthScoreInput deelt canoniek pad', () => {
     avgMonthlyExpenses,
     netMonthlyIncome: 4_500,
     netMonthlySalary: 4_500,
+    // Legacy leeftijdsblind pad — de peer-relatieve fire_progress-cases
+    // staan in financial-health.test.ts.
+    currentAge: null,
+    fireAgeFractional: null,
   }
   const rows = {
     assets,
@@ -750,5 +762,51 @@ describe('activePillarCount en budgetingActive flag', () => {
     )
     expect(score.activePillarCount).toBe(6)
     expect(score.budgetingActive).toBe(false)
+  })
+})
+
+// ── fire_progress — peer-relatieve score (koers + voortgang-op-leeftijd) ────
+// Formules (eigenaar-akkoord 31 aug 2026):
+//   A (koers)     = clamp(70 + 6·(peerFireAge − fireAgeFractional), 0, 100)
+//   B (voortgang) = clamp(round(75 · freedomPct / verwachtPct(leeftijd)), 0, 100)
+//     met verwachtPct = 100·(1.07^(lft−25) − 1)/(1.07^(peer−25) − 1)  [DEFAULT_RETURN]
+//   totaal = round(0.6·A + 0.4·B); zonder haalbare FIRE alleen B; ≥100% gevuld → 100.
+
+describe('fire_progress — peer-relatieve score', () => {
+  const firePillar = (over: Partial<HealthScoreInput>) =>
+    computeHealthScoreFromInputs({ ...baseInput, ...over }, true)
+      .pillars.find((p) => p.id === 'fire_progress')!
+
+  it('valt zonder currentAge terug op de leeftijdsblinde freedomPct-score (regressie-eis)', () => {
+    expect(firePillar({ freedomPct: 67 }).score).toBe(67)
+    expect(firePillar({ freedomPct: 0 }).score).toBe(0)
+    expect(firePillar({ freedomPct: 120 }).score).toBe(100)
+  })
+
+  it('40 jr · 67% gevuld · FIRE 46,58 (peer-lat 58) → 100: ver vóór op peers', () => {
+    expect(
+      firePillar({ freedomPct: 67, currentAge: 40, fireAgeFractional: 46.583333333333336 }).score,
+    ).toBe(100)
+  })
+
+  it('30 jr · 8% gevuld · FIRE 57 (peer-lat 55) → 74: op schema ondanks lage vulling', () => {
+    expect(firePillar({ freedomPct: 8, currentAge: 30, fireAgeFractional: 57 }).score).toBe(74)
+  })
+
+  it('50 jr · 20% gevuld · FIRE onhaalbaar (peer-lat 62) → 38: alleen voortgang-op-leeftijd', () => {
+    expect(firePillar({ freedomPct: 20, currentAge: 50, fireAgeFractional: null }).score).toBe(38)
+  })
+
+  it('freedomPct ≥ 100 → 100, ongeacht koers of leeftijd', () => {
+    expect(firePillar({ freedomPct: 105, currentAge: 40, fireAgeFractional: 44 }).score).toBe(100)
+  })
+
+  it('de tip duidt de koers t.o.v. onze lat — als eigen richtlijn, nooit als gemeten leeftijdsgenoten', () => {
+    // "onze lat" is bewust: de lat is gecureerd (fire-peer-lat.ts), geen
+    // statistiek — copy die een meting over echte peers claimt is verboden
+    // (ADR 0124, Wft-/merkstem-kader).
+    const p = firePillar({ freedomPct: 8, currentAge: 30, fireAgeFractional: 57 })
+    expect(p.improvementTip).toMatch(/onze lat van 55 jaar/)
+    expect(p.improvementTip).not.toMatch(/leeftijdsgenoten/)
   })
 })

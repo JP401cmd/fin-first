@@ -354,6 +354,18 @@ export interface HealthScoreScalars {
   totalDebts: number
   /** Strategy-adjusted FIRE-voortgang (0–100+); persisteer wat hier wordt gebruikt. */
   freedomPct: number
+  /**
+   * Leeftijd van de gebruiker (jaren) — maakt de fire_progress-pijler
+   * peer-relatief. `null` (geen geboortedatum) → leeftijdsblinde terugval.
+   * VERPLICHT veld zodat geen aanroeper de peer-score stil kan vergeten.
+   */
+  currentAge: number | null
+  /**
+   * Kernel-FIRE-leeftijd (fireAgeFractional) uit de canonieke run — consume,
+   * don't recompute. `null` = onhaalbaar óf geen kernel-run op dit pad
+   * (snapshot-routes): dan telt alleen het voortgang-op-leeftijd-signaal.
+   */
+  fireAgeFractional: number | null
   /** 6-maands gemiddelde maanduitgaven — terugval-noemer van de noodbuffer. */
   avgMonthlyExpenses: number
   /**
@@ -434,6 +446,8 @@ export function buildHealthScoreInput(
     totalAssets: scalars.totalAssets,
     totalDebts: scalars.totalDebts,
     freedomPct: scalars.freedomPct,
+    currentAge: scalars.currentAge,
+    fireAgeFractional: scalars.fireAgeFractional,
     netMonthlyIncome: scalars.netMonthlyIncome,
     debtMonthlyPayments: rows.debtMonthlyPayments,
     emergencyFundMonths: computeEmergencyFundMonths(
