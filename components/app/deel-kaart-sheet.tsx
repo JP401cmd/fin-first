@@ -137,10 +137,18 @@ export function buildDeelTekst(data: FreedomCardData, origin: string): ShareCont
   }
 
   const pct = data.freedomPercentage != null ? `${data.freedomPercentage}%` : 'N/B'
-  const dagen = data.freedomDaysWonThisMonth ?? data.freedomDaysWon
+  // Het maandgetal draagt zijn herkomst in de zin: het kale "371 vrijheidsdagen"
+  // las als totale vrijheid en sprak zowel de vrijheidstijd op de kaart als de
+  // week-hero tegen (compliance-toets 31 aug 2026). Bij 0 valt het segment weg —
+  // "+0 vrijheidsdagen gewonnen" is geen zin om te delen.
+  const dagenDezeMaand = data.freedomDaysWonThisMonth ?? 0
+  const dagenDeel =
+    dagenDezeMaand > 0
+      ? ` · +${dagenDezeMaand} vrijheidsdagen gewonnen met acties deze maand`
+      : ''
   return {
-    title: 'Mijn TriFinity vrijheidsweek',
-    text: `Mijn financiële vrijheid: ${pct} · ${dagen} vrijheidsdagen · FIRE: ${data.fireCountdown?.label ?? 'N/B'} #TriFinity`,
+    title: 'Mijn TriFinity vrijheidskaart',
+    text: `Mijn financiële vrijheid: ${pct}${dagenDeel} · FIRE: ${data.fireCountdown?.label ?? 'N/B'} #TriFinity`,
     url,
     contentType: 'freedom_card',
     privacyLevel: data.privacyLevel,

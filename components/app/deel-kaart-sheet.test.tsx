@@ -76,11 +76,24 @@ describe('buildDeelTekst — stand Weinig deelt alleen vrijheidstijd', () => {
 })
 
 describe('buildDeelTekst — Gemiddeld/Veel houden de rijkere tekst', () => {
-  it('noemt percentage en vrijheidsdagen, met dezelfde check-link', () => {
+  it('noemt percentage en gekwalificeerde vrijheidsdagen, met dezelfde check-link', () => {
     const inhoud = buildDeelTekst(maakKaart('named'), 'https://app.trifinity.nl')
     expect(inhoud.text).toContain('24.2%')
-    expect(inhoud.text).toMatch(/vrijheidsdagen/i)
+    // Het maandgetal draagt zijn herkomst in de zin: een kaal "5 vrijheidsdagen"
+    // las als totale vrijheid en sprak de vrijheidstijd op de kaart tegen
+    // (compliance-toets 31 aug 2026).
+    expect(inhoud.text).toContain('+5 vrijheidsdagen gewonnen met acties deze maand')
     expect(inhoud.url).toBe('https://app.trifinity.nl/check')
+  })
+
+  it('laat het dagen-segment weg wanneer er deze maand niets gewonnen is', () => {
+    const inhoud = buildDeelTekst(
+      maakKaart('named', { freedomDaysWonThisMonth: 0 }),
+      'https://app.trifinity.nl',
+    )
+    // Geen terugval op het all-time-getal: dat was precies de dubbelzinnigheid.
+    expect(inhoud.text).not.toMatch(/vrijheidsdagen/i)
+    expect(inhoud.text).toContain('24.2%')
   })
 })
 

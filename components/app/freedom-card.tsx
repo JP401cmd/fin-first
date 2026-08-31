@@ -390,7 +390,7 @@ export async function renderFreedomCardToCanvas(data: FreedomCardData): Promise<
   ctx.font = `500 24px ${MONO}`
   ctx.letterSpacing = '2.5px'
   ctx.fillStyle = INK3
-  ctx.fillText('VAN JE VOLLEDIGE VRIJHEID', P, y)
+  ctx.fillText('VAN MIJN VOLLEDIGE VRIJHEID', P, y)
   ctx.letterSpacing = '0px'
   y += 44
   // balk: lichte track + accent-vulling (highlight-marker-gevoel)
@@ -431,8 +431,8 @@ export async function renderFreedomCardToCanvas(data: FreedomCardData): Promise<
   // ── Kerncijfers: 2×2 figures-strip met hairlines ──
   const cellCells: { kicker: string; value: string }[] = [
     { kicker: 'VRIJHEIDSTIJD', value: stats.freedomTimeShort },
-    { kicker: 'DEZE MAAND', value: stats.daysWonText },
-    { kicker: 'VOLLEDIGE VRIJHEID', value: stats.countdownText },
+    { kicker: 'ACTIES DEZE MAAND', value: stats.daysWonText },
+    { kicker: 'TOT VOLLEDIGE VRIJHEID', value: stats.countdownText },
     { kicker: 'SPAARQUOTE', value: stats.savingsText },
   ]
   const colW = contentW / 2
@@ -483,8 +483,8 @@ function FreedomCardVisual({ data }: { data: FreedomCardData }) {
 
   const cells: { kicker: string; value: string }[] = [
     { kicker: 'Vrijheidstijd', value: stats.freedomTimeShort },
-    { kicker: 'Deze maand', value: stats.daysWonText },
-    { kicker: 'Volledige vrijheid', value: stats.countdownText },
+    { kicker: 'Acties deze maand', value: stats.daysWonText },
+    { kicker: 'Tot volledige vrijheid', value: stats.countdownText },
     { kicker: 'Spaarquote', value: stats.savingsText },
   ]
 
@@ -554,7 +554,7 @@ function FreedomCardVisual({ data }: { data: FreedomCardData }) {
                 {stats.pctText}
               </span>
               <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--ink-3)]">
-                van je volledige vrijheid
+                van mijn volledige vrijheid
               </span>
             </div>
             <div className="mt-4 h-[10px] w-full bg-[var(--subtle)]">
