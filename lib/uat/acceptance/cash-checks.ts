@@ -43,7 +43,8 @@ import type { VasteLastenSummary } from '@/lib/vaste-lasten-summary'
 import { localMonthBounds } from '@/lib/month-range'
 import { recomputeTriple } from '@/lib/cashflow-overrides'
 import { resolvePeriodWindow, summarizeFlow, resolveHeatmapWindow, type AnalysisTransaction } from '@/lib/transaction-insights'
-import { avgDailyExpense, freedomDays } from '@/lib/transaction-display'
+import { freedomDays } from '@/lib/transaction-display'
+import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 import { computeCounterpartyStats, type CounterpartyTransaction } from '@/lib/counterparty-analysis'
 import { recurringPerMonth, buildForecast, type ForecastRow } from '@/lib/cashflow-forecast-math'
 import type { RecurringTransaction } from '@/lib/recurring-data'
@@ -436,16 +437,24 @@ export const CASH_ENGINE_CHECKS: CashEngineCheck[] = [
   {
     workflow: 'WF-CASH-10',
     scenarioId: 'UAT-CASH-10',
-    label: 'Vrijheidsdagen-label (avgDailyExpense/freedomDays): 10 dagen, €1.000 uitgaven, dagtransactie €50',
+    label: 'Vrijheidsdagen-label op het canonieke dagtarief: 12 mnd × €1.000 uitgaven, dagtransactie €50',
     run: () => {
       criterion('WF-CASH-10')
-      const txns = Array.from({ length: 4 }, (_, i) =>
-        ({ amount: -250, transaction_type: null as string | null }))
-      const rate = avgDailyExpense(txns, 10)
-      const dagen = freedomDays(50, rate)
+      // Het dagtarief komt sinds M22 uit de canonieke 12-mnd rolling bron, niet
+      // uit het zichtbare filtervenster van de tijdlijn. Deze check draait dus de
+      // échte `recentDailyExpenseRateFromRows`: twaalf maanden van €1.000 →
+      // €12.000/jaar → €32,88/dag (×12/365, nooit ÷30).
+      const rijen = Array.from({ length: 12 }, (_, i) => ({
+        amount: -1000,
+        date: `2026-${String(i + 1).padStart(2, '0')}-15`,
+      }))
+      const { dailyRate } = recentDailyExpenseRateFromRows(rijen, new Date(2026, 11, 31))
+      // `freedomDays` levert `calculateFreedomTime.totalDays`, dat al op één
+      // decimaal is afgerond: 50/32,8767 = 1,5208 → 1,5.
+      const dagen = freedomDays(50, dailyRate)
       return {
-        expected: 'avgDailyExpense=100; freedomDays=0.5',
-        actual: `avgDailyExpense=${rate}; freedomDays=${dagen}`,
+        expected: 'dagtarief=32.88; freedomDays=1.5',
+        actual: `dagtarief=${dailyRate.toFixed(2)}; freedomDays=${dagen.toFixed(1)}`,
       }
     },
   },

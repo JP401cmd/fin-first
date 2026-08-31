@@ -4,9 +4,10 @@ import { Repeat, CreditCard, RefreshCw, Smartphone, ArrowLeftRight, ArrowDownLef
 import { AccountSourceIcon, accountSourceSuffix } from '@/components/core/account-source-icon'
 import type { BankLinkState } from '@/lib/bank-connection-status'
 import {
-  cleanMerchantName, deriveType, parseLocationTime, avgDailyExpense,
+  cleanMerchantName, deriveType, parseLocationTime,
   dayFreedomLabel, detectRecurring, groupByDay, monogram, parseSmartQuery, type TxKind,
 } from '@/lib/transaction-display'
+import { useDailyExpenseRate } from '@/components/app/freedom-time-label'
 import { formatCurrencyDecimals, MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -38,7 +39,6 @@ type SortKey = 'date' | 'amount' | 'merchant'
 
 interface Props {
   transactions: AnalysisTransaction[]
-  windowDays: number
   accounts: AccountOption[]
   selectedAccountId: string | null
   onSelectAccount: (id: string | null) => void
@@ -61,7 +61,7 @@ const FX_FMT = new Intl.NumberFormat('nl-NL', { minimumFractionDigits: 2, maximu
 // + focus-trap) onevenredig duur. Pagineren houdt de DOM klein. "Toon meer" verhoogt.
 const ROW_PAGE = 50
 
-export function TransactieTijdlijn({ transactions, windowDays, accounts, selectedAccountId, onSelectAccount, onSelect }: Props) {
+export function TransactieTijdlijn({ transactions, accounts, selectedAccountId, onSelectAccount, onSelect }: Props) {
   const { masked } = useMaskedAmounts()
 
   // ── Filter-state ───────────────────────────────────────────────────────────
@@ -79,8 +79,24 @@ export function TransactieTijdlijn({ transactions, windowDays, accounts, selecte
   // (de PeriodeSelector bovenaan de pagina is de enige tijdsbron).
   const smart = useMemo(() => parseSmartQuery(query, new Date()), [query])
 
-  // Basisdata blijft op de VOLLEDIGE window berekend (vrijheidsbasis + terugkerend-detectie).
-  const daily = useMemo(() => avgDailyExpense(transactions, windowDays), [transactions, windowDays])
+  // Dagtarief voor de vrijheidsdagen in de dagkop = het CANONIEKE 12-mnd rolling
+  // €/dag uit de gedeelde client-bron (`DailyExpenseProvider` →
+  // /api/daily-expense-rate → lib/expense-rate.ts), exact het tarief dat de
+  // check-in, de badges en de bulk-actiebalk lezen.
+  //
+  // Hier stond tot M22 een eigen `avgDailyExpense(transactions, windowDays)`: de
+  // uitgaven van het ZICHTBARE venster gedeeld door de vensterlengte. Dat maakte
+  // de wisselkoers "€ → tijd" afhankelijk van de periodekeuze en de filters —
+  // € 2.500 las hier als 6000,0 vrijheidsdagen en op de check-in als 6083. Een
+  // dagtarief is geen eigenschap van de lijst die je toevallig open hebt staan.
+  //
+  // Zolang het tarief niet bekend is (fetch loopt nog, of geen transactiebasis)
+  // is er 0 en laat `dayFreedomLabel` de tijdregel weg — liever geen tijdclaim
+  // dan een verzonnen tijdclaim; zelfde degradatie als `bulk/bulk-impact.tsx`.
+  const { dailyExpenseRate, loading: tariefLoading, source: tariefSource } = useDailyExpenseRate()
+  const daily = tariefLoading || tariefSource === 'none' ? 0 : dailyExpenseRate
+
+  // Terugkerend-detectie blijft op de VOLLEDIGE window (niet op de filterselectie).
   const recurring = useMemo(
     () => detectRecurring(transactions.map((t) => ({ id: t.id, counterparty_name: t.counterparty_name, counterparty_iban: t.counterparty_iban, creditor_id: t.creditor_id, amount: t.amount, date: t.date }))),
     [transactions],

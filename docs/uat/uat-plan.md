@@ -3204,9 +3204,9 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
   4. Open "Filters" (bottom-sheet) voor min/max-bedrag en sortering (datum/bedrag/winkel); het resultaat-aantal telt live mee.
   5. Verwijder een actieve filter-chip of klik "Alles wissen".
   6. Klik "Toon meer · N resterend" om verder te bladeren.
-- **Schermen/componenten:** /overzicht/cashflow/transacties — components/overview/transacties/transactie-tijdlijn.tsx; lib/transaction-display.ts (`parseSmartQuery`, `cleanMerchantName`, `deriveType`, `detectRecurring`, `freedomDays`, `avgDailyExpense`)
+- **Schermen/componenten:** /overzicht/cashflow/transacties — components/overview/transacties/transactie-tijdlijn.tsx; lib/transaction-display.ts (`parseSmartQuery`, `cleanMerchantName`, `deriveType`, `detectRecurring`, `freedomDays`); het dagtarief komt uit `useDailyExpenseRate` (components/app/freedom-time-label.tsx → /api/daily-expense-rate → lib/expense-rate.ts)
 - **Kriticiteit:** BELANGRIJK
-- **Rekenend:** ja — dagtotaal (in − uit) per daggroep en het vrijheidsdagen-label (dag-uitgave ÷ gemiddelde daguitgave over het venster). Bron: `freedomDays` + `avgDailyExpense` in lib/transaction-display.ts; saldo- en FX-subregels per rij uit de transactievelden.
+- **Rekenend:** ja — dagtotaal (in − uit) per daggroep en het vrijheidsdagen-label (netto dagbedrag ÷ het CANONIEKE 12-mnd rolling dagtarief). Bron: `freedomDays` in lib/transaction-display.ts op het tarief uit `recentDailyExpenseRateFromRows` (lib/expense-rate.ts); saldo- en FX-subregels per rij uit de transactievelden. Sinds M22 rekent de tijdlijn NIET meer met een eigen gemiddelde over het zichtbare venster — het label verandert dus niet als je van periode wisselt of filtert.
 - **Varianten & randgevallen:**
   - Eerste gebruik (0 transacties): lege staat met CTA "Koppel of importeer".
   - Filters zonder resultaat: "Geen resultaten" + knop "Wis filters".

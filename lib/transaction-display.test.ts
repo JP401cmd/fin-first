@@ -58,18 +58,14 @@ describe('parseLocationTime', () => {
   })
 })
 
-import { avgDailyExpense, dayFreedomLabel, freedomDays, groupByDay } from './transaction-display'
+import { dayFreedomLabel, freedomDays, groupByDay } from './transaction-display'
 
-describe('avgDailyExpense + freedomDays', () => {
-  const txns = [
-    { amount: -90, transaction_type: null },
-    { amount: -90, transaction_type: null },
-    { amount: 1000, transaction_type: null },
-    { amount: -50, transaction_type: 'transfer' },
-  ]
-  it('gemiddelde dag-uitgave over venster', () => {
-    expect(avgDailyExpense(txns, 2)).toBeCloseTo(90)
-  })
+/**
+ * `avgDailyExpense` — het vensterafhankelijke dagtarief — is bij M22 verwijderd;
+ * de bijbehorende case is met de functie meegegaan. Het dagtarief komt sindsdien
+ * uitsluitend uit `lib/expense-rate.ts`; `freedomDays` krijgt het aangereikt.
+ */
+describe('freedomDays', () => {
   it('vrijheidsdagen = bedrag / dag-uitgave', () => {
     expect(freedomDays(180, 90)).toBeCloseTo(2)
     expect(freedomDays(100, 0)).toBe(0)

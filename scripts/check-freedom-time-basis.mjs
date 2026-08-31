@@ -87,6 +87,27 @@ const COMMENT_LINE = /^\s*(\*|\/\/|\/\*)/
 const MONTH_DIVISION = /(?<![A-Za-z0-9_$])([A-Za-z0-9_$.]*(?:xpense|itgave|osten|pend)[A-Za-z0-9_$.]*)\s*\/\s*30(?:\.[45]?\d*)?(?![\d.])/
 
 /**
+ * REGEL 3 (M22, tweede ronde) — een dagtarief uit het ZICHTBARE VENSTER.
+ *
+ * Blinde vlek (a) sloeg een tweede keer toe, nu zónder deling door 30: de
+ * transactielijst had een eigen `avgDailyExpense(txns, windowDays)` in
+ * lib/transaction-display.ts, die de uitgaven van de op dat moment gefilterde
+ * lijst deelde door de lengte van de gekozen periode. Grammaticaal onschuldig —
+ * geen `dailyExpenseRate(`, geen `/ 30` — maar het maakte de wisselkoers
+ * "€ → tijd" een eigenschap van je filterkeuze: € 2.500 las op de transactielijst
+ * als 6000,0 vrijheidsdagen en op de check-in als 6083.
+ *
+ * De functie is verwijderd (de tijdlijn leest nu `useDailyExpenseRate`); deze
+ * regel houdt de naam bezet zodat herintroductie hard faalt. Niet-allowlistbaar,
+ * net als regel 2: een venster-gemiddelde is geen andere GRONDSLAG maar een
+ * tarief dat per scherm verschilt — precies wat één bron moet uitsluiten.
+ *
+ * Wat dit NIET vangt: dezelfde som onder een andere naam. Dit blijft een
+ * vangrail, geen dekkingsbewijs.
+ */
+const WINDOW_AVERAGE = /(?<![A-Za-z0-9_$.])avgDailyExpense(?![A-Za-z0-9_$])/
+
+/**
  * Verwijder string-literals uit een regel vóór de match-test. De naam
  * `dailyExpenseRate(3000)` komt namelijk óók voor in PROZA — UAT-verwachtingen
  * ("vrijheidsdagen = calculateFreedomTime(…, dailyExpenseRate(2200))") en de
@@ -252,6 +273,22 @@ for (const file of files) {
     })
   }
 
+  // ── Regel 3: dagtarief uit het zichtbare venster (M22) ──────────────────
+  // Ook niet-allowlistbaar. Een tarief dat met de filterkeuze meebeweegt is per
+  // definitie een tweede wisselkoers, geen tweede grondslag.
+  if (WINDOW_AVERAGE.test(src)) {
+    src.split(/\r?\n/).forEach((rawLine, i) => {
+      if (COMMENT_LINE.test(rawLine)) return
+      if (!WINDOW_AVERAGE.test(stripStrings(rawLine))) return
+      violations.push({
+        rel,
+        line: i + 1,
+        text: rawLine.trim(),
+        rule: 'venster-gemiddeld dagtarief i.p.v. de canonieke 12-mnd rolling bron',
+      })
+    })
+  }
+
   if (!CALL.test(src)) continue
   const lines = src.split(/\r?\n/)
   lines.forEach((rawLine, i) => {
@@ -313,7 +350,11 @@ if (violations.length > 0) {
       '\nSTAAT ER [maand÷30] bij? Dan is de ALLOWLIST NIET de uitweg: twaalf maanden\n' +
       'van 30 dagen is 360, geen jaar. Een andere GRONDSLAG kies je door\n' +
       '`dailyExpenseRate()` een ander maandbedrag te voeren — de CONVERSIE zelf\n' +
-      '(×12/365) is nooit een keuze.\n',
+      '(×12/365) is nooit een keuze.\n' +
+      '\nSTAAT ER [venster-gemiddeld] bij? Ook dan niet: een tarief dat uit de op dat\n' +
+      'moment zichtbare/gefilterde lijst komt, verandert zodra de gebruiker van\n' +
+      'periode wisselt — dat is een tweede wisselkoers, geen tweede grondslag.\n' +
+      'Client-side lees je het tarief uit `useDailyExpenseRate()`.\n',
   )
   process.exit(1)
 }

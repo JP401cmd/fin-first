@@ -177,13 +177,13 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-CASH-10',
     titel: 'Transacties zoeken en filteren in de verrijkte tijdlijn',
     kriticiteit: 'BELANGRIJK',
-    given: 'Synthetisch venster van 10 dagen met €1.000 totale uitgaven (transfers uitgesloten); dagtransactie van €50. UI-nevendetail (TXN-4, beide modi): een lange rekeningnaam in de account-filterchips (bv. "Betaalrekening gezamenlijk ABN AMRO") wordt VISUEEL afgekapt met CSS-ellipsis (`max-w-[9rem] sm:max-w-[13rem] truncate`) en een `title`-tooltip met de volledige naam; de DOM-tekst en dus de accessible name blijven compleet — geen toetsbaar cijfer, alleen genoteerd zodat een chip die er "afgekapt" uitziet niet als bug wordt gelogd.',
-    when: 'Het vrijheidsdagen-label voor die dagtransactie wordt berekend.',
-    then: 'Gemiddelde daguitgave = 1.000/10 = €100/dag; vrijheidsdagen = 50/100 = 0,5 dag (`calculateFreedomTime.totalDays`, al afgerond op 1 decimaal).',
+    given: 'Twaalf maanden transactiehistorie van €1.000 uitgaven per maand; dagkop met €50 netto uitgegeven. Het dagtarief van de tijdlijn is sinds M22 het CANONIEKE 12-mnd rolling €/dag (`useDailyExpenseRate` → /api/daily-expense-rate → lib/expense-rate.ts) — hetzelfde tarief als de check-in, de badges en de bulk-actiebalk. Vóór M22 deelde de tijdlijn de uitgaven van het ZICHTBARE filtervenster door de vensterlengte, waardoor de wisselkoers "€ → tijd" met elke periodekeuze en elk filter meekantelde (live gemeten: €2.500 = 6000,0 vrijheidsdagen op de lijst vs. 6083 op de check-in). UI-nevendetail (TXN-4, beide modi): een lange rekeningnaam in de account-filterchips (bv. "Betaalrekening gezamenlijk ABN AMRO") wordt VISUEEL afgekapt met CSS-ellipsis (`max-w-[9rem] sm:max-w-[13rem] truncate`) en een `title`-tooltip met de volledige naam; de DOM-tekst en dus de accessible name blijven compleet — geen toetsbaar cijfer, alleen genoteerd zodat een chip die er "afgekapt" uitziet niet als bug wordt gelogd.',
+    when: 'Het vrijheidsdagen-label voor die dagkop wordt berekend.',
+    then: 'Canoniek dagtarief = €1.000/mnd × 12 / 365 = €32,88/dag (nooit ÷30); vrijheidsdagen = 50/32,8767 = 1,5 dag (`calculateFreedomTime.totalDays`, al afgerond op 1 decimaal). Wisselen van periode of filter verandert dit getal NIET. Zolang het tarief nog niet bekend is (fetch loopt, of geen transactiebasis) vervalt de vrijheidsregel en blijft alleen het euro-bedrag staan.',
     assertion: {
       kind: 'exact',
-      expected: 'avgDailyExpense=100; freedomDays=0.5',
-      source: 'lib/transaction-display.ts#avgDailyExpense + freedomDays — echte productiefuncties, geen mirror',
+      expected: 'dagtarief=32.88; freedomDays=1.5',
+      source: 'lib/expense-rate.ts#recentDailyExpenseRateFromRows + lib/transaction-display.ts#freedomDays — echte productiefuncties, geen mirror',
     },
   },
   {

@@ -493,15 +493,11 @@ export function TransactiesAnalyse({
     [currentSummary, prevSummary, period, offset, periodWindow],
   )
 
-  // Lengte van de gekozen periode in dagen (lokaal geparsed) — voedt de
-  // vrijheidsdag-omrekening in de tijdlijn (gem. dag-uitgave over het venster).
-  const periodDays = useMemo(() => {
-    const [ys, ms, ds] = periodWindow.since.split('-').map(Number)
-    const [yu, mu, du] = periodWindow.until.split('-').map(Number)
-    const a = new Date(ys, ms - 1, ds).getTime()
-    const b = new Date(yu, mu - 1, du).getTime()
-    return Math.max(1, Math.round((b - a) / 86400000) + 1)
-  }, [periodWindow.since, periodWindow.until])
+  // (Tot M22 stond hier `periodDays`: de lengte van de gekozen periode, enkel om
+  // de tijdlijn een vensterafhankelijk dagtarief te laten maken. De tijdlijn leest
+  // nu het canonieke dagtarief uit de gedeelde bron, dus die periodelengte heeft
+  // geen consument meer — de PeriodeSelector blijft alleen bepalen WELKE
+  // transacties je ziet, niet wat een dag vrijheid kost.)
 
   // Rekening-filter voor de tijdlijn (null = alle rekeningen).
   const accountFiltered = useMemo(
@@ -791,7 +787,6 @@ export function TransactiesAnalyse({
 
           <TransactieTijdlijn
             transactions={accountFiltered}
-            windowDays={periodDays}
             accounts={accounts}
             selectedAccountId={selectedAccountId}
             onSelectAccount={setSelectedAccountId}

@@ -98,21 +98,18 @@ export function parseLocationTime(description: string | null): { place: string |
   return { place, time }
 }
 
-// ─── Task 8: avgDailyExpense + freedomDays ────────────────────────────────────
+// ─── freedomDays ──────────────────────────────────────────────────────────────
 
-export function avgDailyExpense(
-  txns: { amount: number; transaction_type: string | null }[],
-  windowDays: number,
-): number {
-  if (windowDays <= 0) return 0
-  let expense = 0
-  for (const t of txns) {
-    if (t.transaction_type === 'transfer') continue
-    if (t.amount < 0) expense += Math.abs(t.amount)
-  }
-  return expense / windowDays
-}
-
+/**
+ * Zet een bedrag om in vrijheidsdagen tegen een GEGEVEN dagtarief.
+ *
+ * Het tarief komt hier binnen, het wordt hier niet gemaakt: de enige geldige bron
+ * is de canonieke 12-mnd rolling €/dag (`lib/expense-rate.ts`, client via
+ * `useDailyExpenseRate`). Tot M22 woonde hier een `avgDailyExpense(txns, windowDays)`
+ * die de uitgaven van het zichtbare filtervenster door de vensterlengte deelde —
+ * een tweede wisselkoers die met elke periodekeuze meekantelde. Die is verwijderd;
+ * `scripts/check-freedom-time-basis.mjs` faalt op herintroductie.
+ */
 export function freedomDays(amount: number, dailyExpense: number): number {
   if (dailyExpense <= 0) return 0
   return calculateFreedomTime(Math.abs(amount), dailyExpense).totalDays
@@ -143,7 +140,10 @@ export function freedomDays(amount: number, dailyExpense: number): number {
  * `components/overview/transacties/bulk/bulk-impact.tsx`.
  *
  * @param net - Netto dagbedrag in euro; positief = inkomsten over, negatief = uitgaven over.
- * @param dailyExpense - Dagtarief €/dag uit `avgDailyExpense` (budget-vrij, hele venster).
+ * @param dailyExpense - Het CANONIEKE dagtarief €/dag (12-mnd rolling, `lib/expense-rate.ts`;
+ *   client-side via `useDailyExpenseRate`). Nooit een gemiddelde over de zichtbare lijst:
+ *   dan verandert de wisselkoers "€ → tijd" met elk filter (M22). 0 = geen tarief bekend →
+ *   geen label.
  * @param masked - Privacy-modus; verbergt het dagental maar niet de richting (die staat
  *   toch al als `+`/`−` naast het gemaskeerde bedrag).
  * @returns Label als "≈ 5,0 vrijheidsdagen erbij", of '' wanneer er niets te tonen valt.
