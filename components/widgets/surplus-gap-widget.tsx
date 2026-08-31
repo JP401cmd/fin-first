@@ -1,6 +1,6 @@
 'use client'
 
-import { memo } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { LineChart } from 'lucide-react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
@@ -23,8 +23,35 @@ interface Props {
 
 const KICKER = 'Surplus / Gap'
 
+/**
+ * Beschikbare hoogte van het grafiekvak, gemeten. Rekenen op vaste kaarthoogtes
+ * bleek twee keer mis te gaan (120 en daarna 72): de shell eet per variant een
+ * ándere hap (kicker-regel, hover-pijl-rij), en de svg rendert zijn
+ * viewBox-hoogte ongeacht hoe ver flex de wrapper kromp — de samenvatting
+ * schoof er dan overheen. Meten is de enige grondslag die met de shell
+ * meebeweegt. Terugval 48 (geen meting, bv. jsdom of vóór de eerste observe).
+ */
+function useMeasuredChartHeight() {
+  const boxRef = useRef<HTMLDivElement>(null)
+  const [measured, setMeasured] = useState(0)
+  useEffect(() => {
+    const el = boxRef.current
+    if (!el) return
+    const ro = new ResizeObserver(entries => {
+      const h = entries[0]?.contentRect.height
+      if (h && h > 0) setMeasured(Math.round(h))
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const chartH = Math.max(40, Math.min(measured || 48, 120))
+  return { boxRef, chartH }
+}
+
 export const SurplusGapWidget = memo(function SurplusGapWidget({ size, data, href }: Props) {
   const { simRows, fireAgeFractional, fireEndStrategy } = data
+  // Onvoorwaardelijk (hooks-regel) — alleen de half-tak gebruikt de meting.
+  const { boxRef: halfChartBoxRef, chartH: halfChartH } = useMeasuredChartHeight()
 
   if (!simRows || simRows.length < 2) {
     // Géén href op de shell: de WidgetEmpty-CTA rendert een eigen <Link> en een
@@ -73,23 +100,45 @@ export const SurplusGapWidget = memo(function SurplusGapWidget({ size, data, hre
   if (size === 'half') {
     return (
       <WidgetShell module="horizon" size={size} kicker={KICKER} href={href}>
-        <div className="flex h-full flex-col gap-2">
-          <div className="flex-1 min-h-0">
-            {/* 72px, niet meer: de half-kaart heeft op mobiel ~113px binnen-
-                hoogte en de samenvatting eronder kost ~33px. Bij 120px schoof
-                de samenvatting óver de grafiek heen (viewBox-hoogte negeert de
-                flex-shrink van de wrapper). */}
+        <div className="flex h-full flex-col gap-1.5">
+          {/* basis-0: de vakhoogte volgt puur uit de resterende flex-ruimte,
+              onafhankelijk van de svg-inhoud — anders meet de ResizeObserver
+              een hoogte die van zijn eigen uitkomst afhangt. */}
+          <div ref={halfChartBoxRef} className="min-h-0 flex-1 basis-0 overflow-hidden">
             <SurplusGapChart
               rows={simRows as SurplusGapRow[]}
               currentAge={currentAge}
               endAge={endAge}
               fireAge={fireAgeFractional ?? null}
               planningMode={planningMode}
-              height={72}
+              height={halfChartH}
               showLegend={false}
             />
           </div>
-          <SurplusGapSummary rows={simRows as SurplusGapRow[]} variant="inline" />
+          {/* Eén regel i.p.v. het 3-koloms grid: het grid kost ~33px en
+              verdringt op de 140px-kaart de grafiek. */}
+          <p
+            data-testid="surplus-half-summary-line"
+            className="flex shrink-0 items-baseline gap-x-2 truncate font-mono text-[10px] leading-tight text-[var(--ink-3)]"
+          >
+            <span className="truncate">
+              Opgebouwd{' '}
+              <MaskedAmount value={totals.opgebouwd} tone="ink" signPrefix="+" className="text-[10px] font-semibold text-[var(--positive)]" />
+            </span>
+            <span className="truncate">
+              Ingeteerd{' '}
+              <MaskedAmount value={totals.ingeteerd} tone="ink" signPrefix="-" className="text-[10px] font-semibold text-[var(--negative)]" />
+            </span>
+            <span className="truncate">
+              Saldo{' '}
+              <MaskedAmount
+                value={Math.abs(totals.saldo)}
+                tone="ink"
+                signPrefix={totals.saldo >= 0 ? '+' : '-'}
+                className="text-[10px] font-semibold text-[var(--ink)]"
+              />
+            </span>
+          </p>
         </div>
       </WidgetShell>
     )

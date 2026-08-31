@@ -34,7 +34,18 @@ describe('SurplusGapWidget — half past binnen de kaart', () => {
     expect(svg).not.toBeNull()
     const viewBox = svg?.getAttribute('viewBox') ?? ''
     const height = Number(viewBox.split(' ')[3])
-    expect(height).toBeLessThanOrEqual(72)
+    // Gemeten hoogte; zonder ResizeObserver-meting (jsdom) de terugval 48.
+    // De shell laat op mobiel maar ~70px over (kicker + pijl-rij), dus een
+    // vaste 72 was nog steeds te hoog.
+    expect(height).toBeLessThanOrEqual(48)
+  })
+
+  it('de half-samenvatting is een regel met een eigen wrap-slot, geen 3-koloms grid', () => {
+    // Het inline-grid (labels boven bedragen) kost ~33px; op de resterende
+    // ~70px verdringt dat de grafiek. Een regel van ~14px laat de grafiek
+    // ademen.
+    const { container } = render(<SurplusGapWidget size="half" data={makeData()} />)
+    expect(container.querySelector('[data-testid="surplus-half-summary-line"]')).not.toBeNull()
   })
 
   it('toont in half óók de drie samenvattingscellen', () => {

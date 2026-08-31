@@ -368,4 +368,13 @@ describe('SpendLimitWidget — veilige centrering bij overloop', () => {
     expect(offenders).toHaveLength(0)
     expect(container.querySelector('.my-auto')).not.toBeNull()
   })
+
+  it('quarter houdt de bedragregel op een regel (compact, geen wrap)', () => {
+    // Op een smalle mobiele cel (~136px content) wrapte "€ 55 van / € 100"
+    // naar twee regels, waardoor de inhoud de vaste kaarthoogte overschreed
+    // en er regels wegvielen. De quarter-bedragregel is daarom compact
+    // (kleinere corpsen) en hard op een regel geklemd.
+    const { container } = render(<SpendLimitWidget size="quarter" limit={makeLimit()} dailyExp={50} />)
+    expect(container.querySelector('p.truncate.whitespace-nowrap')).not.toBeNull()
+  })
 })

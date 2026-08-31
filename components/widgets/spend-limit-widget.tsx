@@ -338,6 +338,19 @@ export const SpendLimitWidget = memo(function SpendLimitWidget({
     </p>
   )
 
+  // Quarter kan op mobiel in een halve-breedte cel (~136px content) landen;
+  // daar wrapte de standaardregel ("€ 55 van / € 100") naar twee regels en
+  // overschreed de inhoud de vaste kaarthoogte. Compacter corps + hard op
+  // één regel geklemd — truncate vangt extreem lange bedragen.
+  const amountRowCompact = (
+    <p className="truncate whitespace-nowrap text-[var(--ink)]">
+      <MaskedAmount value={limit.currentMatchedAmount} tone="kern" className="text-base font-semibold" />
+      <span className="text-[var(--ink-4)]">
+        {' '}van <MaskedAmount value={limit.limitAmount} tone="kern" className="text-xs" />
+      </span>
+    </p>
+  )
+
   const metaRow = (
     <p className="truncate font-serif italic text-[11px] text-[var(--ink-3)]">
       {copy.singularLower} · {limit.currentPeriodLabel}
@@ -559,7 +572,7 @@ export const SpendLimitWidget = memo(function SpendLimitWidget({
         <div className="my-auto flex min-h-0 flex-col gap-1">
         {metaRow}
         <div className="text-[12px]">{statusRow}</div>
-        {amountRow}
+        {amountRowCompact}
         <LimitBar matched={limit.currentMatchedAmount} limitAmount={limit.limitAmount} hasEntered={hasEntered} />
         <p className="truncate text-[10px] text-[var(--ink-3)]">
           <span className="font-mono tabular-nums text-[var(--ink)]">{limit.currentStreak}</span> op rij binnen je grens
