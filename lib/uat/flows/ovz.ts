@@ -59,11 +59,12 @@ export const OVZ_FLOW: UatFlow = {
     { id: 'vermogenselectiebewerken', scenarioId: 'UAT-OVZ-24', label: 'WF-OVZ-24 · Vermogens-widget: bewerk-sheet, privacy, perspectief, lege staat', kind: 'action', stage: 2, lane: 'doelen', subOf: 'vermogenselectie' },
 
     // ── 3 · briefing ──────────────────────────────────────────────────────
-    { id: 'vrijheidweek', scenarioId: 'UAT-OVZ-09', label: 'WF-OVZ-09 · "Jouw vrijheid deze week"', kind: 'screen', stage: 3, lane: 'briefing' },
+    { id: 'vrijheidweek', scenarioId: 'UAT-OVZ-09', label: 'WF-OVZ-09 · Vrijheidstijd-totaal + week-delta (kop-zin en briefing-mail)', kind: 'screen', stage: 3, lane: 'briefing' },
     { id: 'briefing', scenarioId: 'UAT-OVZ-10', label: 'WF-OVZ-10 · Wekelijkse briefing lezen/verversen', kind: 'screen', stage: 3, lane: 'briefing', subOf: 'vrijheidweek' },
     { id: 'delen', scenarioId: 'UAT-OVZ-11', label: 'WF-OVZ-11 · Vrijheidsweek delen', kind: 'action', stage: 3, lane: 'briefing', subOf: 'briefing' },
 
     // ── 4 · status & onboarding ───────────────────────────────────────────
+    { id: 'mijlpaalviering', scenarioId: 'UAT-OVZ-25', label: 'WF-OVZ-25 · Mijlpaal gepasseerd: eenmalige viering (ADR 0123)', kind: 'action', stage: 3, lane: 'briefing', subOf: 'briefing' },
     { id: 'statusmelding', scenarioId: 'UAT-OVZ-12', label: 'WF-OVZ-12 · Status-/vrijheidsmelding minimaliseren', kind: 'action', stage: 4, lane: 'status' },
     { id: 'checkin', scenarioId: 'UAT-OVZ-13', label: 'WF-OVZ-13 · Maand-check-in starten', kind: 'action', stage: 4, lane: 'status' },
     { id: 'welkomstgids', scenarioId: 'UAT-OVZ-14', label: 'WF-OVZ-14 · Welkomstgids doorlopen', kind: 'action', stage: 4, lane: 'status' },
@@ -110,6 +111,7 @@ export const OVZ_FLOW: UatFlow = {
     { from: 'hefboom', to: 'vrijheidweek' },
     { from: 'vrijheidweek', to: 'briefing' },
     { from: 'briefing', to: 'delen' },
+    { from: 'briefing', to: 'mijlpaalviering' },
 
     // status & onboarding
     { from: 'hefboom', to: 'statusmelding' },
@@ -138,6 +140,7 @@ export const OVZ_FLOW: UatFlow = {
     { from: 'vermogenselectie', to: 'uitkomst' },
     { from: 'vermogenselectiebewerken', to: 'uitkomst' },
     { from: 'delen', to: 'uitkomst' },
+    { from: 'mijlpaalviering', to: 'uitkomst' },
     { from: 'statusmelding', to: 'uitkomst' },
     { from: 'welkomstgids', to: 'uitkomst' },
     { from: 'print', to: 'uitkomst' },

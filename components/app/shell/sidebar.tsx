@@ -48,6 +48,7 @@ import { formatNetWorthShort } from '@/lib/net-worth-format'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { PerspectiveSwitcher } from '@/components/app/perspective-switcher'
 import { LeverCompassCollapsed, type LeverScores, type LeverStatus } from '@/components/app/shell/lever-compass'
+import { leverStatusLabel } from '@/components/app/shell/lever-scores'
 import { GlobalSyncButton } from '@/components/sync/global-sync-button'
 import { SyncReportModal } from '@/components/sync/sync-report-modal'
 import { useCommandPalette } from '@/components/command-palette/command-palette-provider'
@@ -823,12 +824,11 @@ const SUBTAG_STATUS_DOT: Record<LeverStatus, string> = {
   neutral: 'bg-[var(--ink-4)]',
 }
 
-const SUBTAG_STATUS_LABEL: Record<LeverStatus, string> = {
-  green: 'Gezond',
-  amber: 'Aandacht',
-  red: 'Zorg',
-  neutral: 'Geen data',
-}
+// Géén eigen woordenlijst meer (UR2-04): het statuswoord komt uit dezelfde
+// generieke `LEVERAGE_STATUS_LABEL` die de Box 1/2/3-kinderen even verderop in
+// deze sidebar (SubTagChild) én de hefboomkaarten op /overzicht al lazen —
+// vóór de fix zei de Belasting-subtag "Gezond" terwijl zijn eigen Box 3-kind
+// "Goed op koers" zei. Vertaling via `leverStatusLabel` (lib/lever-scores.ts).
 
 // ── Status-dots ───────────────────────────────────────────────────────────
 //
@@ -954,7 +954,7 @@ function SubTagStrip({
               className={`flex items-center gap-2 py-0.5 ${linkHoverClass} transition-colors duration-150`}
               title={
                 entry
-                  ? `${tag.label}: ${SUBTAG_STATUS_LABEL[entry.status]} — ${entry.detail}`
+                  ? `${tag.label}: ${leverStatusLabel(entry.status)} — ${entry.detail}`
                   : tag.label
               }
             >
@@ -962,7 +962,7 @@ function SubTagStrip({
               {entry && (
                 <span
                   className={`w-1.5 h-1.5 rounded-full shrink-0 ${SUBTAG_STATUS_DOT[entry.status]}`}
-                  aria-label={`${tag.label}: ${SUBTAG_STATUS_LABEL[entry.status]}`}
+                  aria-label={`${tag.label}: ${leverStatusLabel(entry.status)}`}
                 />
               )}
             </Link>

@@ -157,6 +157,38 @@ export function FinHome({
     open()
   }, [dismiss, open])
 
+  // ── De meldingstrook eist op mobiel haar eigen band op (UR2-08) ────────────
+  //
+  // Onder lg dokt de melding over de volle breedte boven de nav-pill (zie
+  // fin-home.css). Zonder reservering lag ze dáár bovenop pagina-inhoud en was
+  // een link eronder onbereikbaar. We publiceren daarom de gemeten hoogte als
+  // `--fin-melding-height`; `--fin-melding-clearance` (app/globals.css) telt de
+  // pill-clearance erbij op en de mobiele `<main>` maakt zich net zoveel korter
+  // (components/app/shell/mobile-stack-shell.tsx). Content schuift dus boven de
+  // strook uit i.p.v. eronder te verdwijnen — en er is géén sprong: de
+  // scrollport wordt alleen ónderaan korter, de zichtbare inhoud verschuift niet.
+  //
+  // Een ref-callback (met React 19-cleanup) i.p.v. een effect: die vuurt exact
+  // op mount/unmount van de strook zelf, dus hij hoeft de vijf condities die
+  // bepalen óf de melding rendert (chat open, overlay, immersieve route, modus,
+  // suggestie) niet te dupliceren in een dependency-lijst.
+  const meldingRef = useCallback((el: HTMLDivElement | null) => {
+    const root = document.documentElement
+    const reset = () => root.style.setProperty('--fin-melding-height', '0px')
+    if (!el) { reset(); return }
+    // `offsetHeight`, niet getBoundingClientRect: de entree-animatie schaalt de
+    // strook, en een geschaalde hoogte zou de band laten meeademen.
+    const publish = () => root.style.setProperty('--fin-melding-height', `${el.offsetHeight}px`)
+    publish()
+    // De strook groeit terwijl de typemachine loopt; zonder observer klopt de
+    // band alleen op het eerste frame. jsdom kent geen ResizeObserver — daar
+    // blijft het bij de eenmalige meting.
+    if (typeof ResizeObserver === 'undefined') return reset
+    const ro = new ResizeObserver(publish)
+    ro.observe(el)
+    return () => { ro.disconnect(); reset() }
+  }, [])
+
   // ── Waarschuwing: lokaal gekozen, maar hier niet bruikbaar ──────────────────
   //
   // Wie op één toestel lokaal aanzet, staat op ÉLK toestel op lokaal — die keuze
@@ -247,7 +279,7 @@ export function FinHome({
         >
           {mode === 'melding' && suggestion ? (
             <>
-              <div className="wh-melding-face">
+              <div className="wh-melding-face" ref={meldingRef}>
                 <CoachMelding
                   headerLabel={headerLabel}
                   shown={shown}

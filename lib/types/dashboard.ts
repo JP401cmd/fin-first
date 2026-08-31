@@ -258,6 +258,24 @@ export interface DashboardData {
    * gerealiseerde maand. Zuster: `prevMonthExpenses` (vorige maand).
    */
   currentMonthExpenses: number
+  /**
+   * VERSHEID: de jongste kalendermaand ('YYYY-MM') waarin daadwerkelijk iets
+   * geboekt is, uit hetzelfde 12-maands maandaggregaat als `currentMonth*` —
+   * `null` wanneer het venster leeg is.
+   *
+   * Bestaat omdat een LEEG VENSTER geen bewijs is van GEEN DATA (UR2-13): een
+   * account met 407 transacties waarvan de jongste vijf maanden oud is, gaf
+   * `currentMonth*` én `prevMonth*` op 0 en kreeg daarom "Importeer transacties"
+   * te zien. Oppervlakken die een lege staat of een versheidsmelding tonen,
+   * toetsen op DIT veld (via `transactionFreshness` in
+   * lib/transaction-staleness.ts) — nooit op een nul-som, en nooit op een eigen
+   * tel-lus over transacties.
+   *
+   * Optioneel/additief, spiegel van `dailyExpenseRate`: mock-/empty-bundels
+   * zonder dit veld gelden als "geen historie bekend" en houden hun bestaande
+   * lege staat.
+   */
+  latestTransactionMonth?: string | null
   monthlyContributions: number
   yearlyMustExpenses: number
   budgetTotals: {

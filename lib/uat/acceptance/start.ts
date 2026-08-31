@@ -340,12 +340,12 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-START-23',
     titel: 'Onboarding onderbreken en hervatten (concept-herstel)',
     kriticiteit: 'BELANGRIJK',
-    given: 'Enkele stappen ingevuld (incl. naam, geboortedatum, inkomen), tab gesloten zonder af te ronden.',
+    given: 'Enkele stappen ingevuld (incl. naam, geboortedatum, inkomen, een bezitting), tab gesloten of pagina ververst zonder af te ronden.',
     when: 'De gebruiker opent /onboarding opnieuw.',
-    then: 'Herstel-melding "Verder waar je was" (neutraal, geen groen vinkje), terug op de opgeslagen stap — MAAR naam/geboortedatum/bedragen zijn bewust leeg (alleen stap-positie/keuzes hersteld). De melding zegt dat sinds C3 óók met zoveel woorden ("naam, bedragen, bezittingen en schulden bewaren we niet op dit apparaat"), zodat de tekst niet meer volledig herstel claimt; een poging om direct af te ronden wordt door de finish-guard teruggestuurd naar de eerste onvolledige verplichte stap.',
+    then: 'Herstel-melding "Verder waar je was" (neutraal, geen groen vinkje), terug op de opgeslagen stap MÉT alle eerder gegeven antwoorden — naam, geboortedatum, bedragen, bezittingen en schulden staan er weer (concept op de eigen profielrij, ADR 0122). Alleen een geüpload pensioenoverzicht komt niet terug (ADR 0115: dat blijft op het toestel) en de melding zegt dat met zoveel woorden. De finish-guard stuurt een afrondpoging met een nog lege verplichte naam/geboortedatum terug naar die stap.',
     assertion: {
       kind: 'ui-only',
-      source: 'app/(onboarding)/onboarding/draft-persistence.ts (serializeDraft/sanitizeStoredDraft/firstIncompleteRequiredStep) + app/(onboarding)/onboarding/page.tsx (restoreChecked-poort: persisteren mag pas ná de restore-poging), geen cijfermatige uitkomst',
+      source: 'app/(onboarding)/onboarding/draft-persistence.ts (serializeDraft/sanitizeStoredDraft/firstIncompleteRequiredStep) + app/api/onboarding/draft/route.ts + app/(onboarding)/onboarding/page.tsx (restoreChecked-poort: persisteren mag pas ná de restore-poging), geen cijfermatige uitkomst',
     },
   },
   {
@@ -368,10 +368,10 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'OVERIG',
     given: 'Onboarding gestart, enkele stappen ingevuld.',
     when: 'De gebruiker klikt de tekstknop "Uitloggen" rechtsboven.',
-    then: 'Het onboarding-concept in localStorage wordt gewist, de sessie beëindigd en de gebruiker landt op /login; bij opnieuw inloggen komt hij terug in /onboarding zonder hersteld concept. De knop is bewust verborgen op het opslag-/succes-scherm.',
+    then: 'Het onboarding-concept op de eigen profielrij wordt gewist (DELETE /api/onboarding/draft) én de schrijver verzegeld, zodat een nog lopende gedebouncede schrijf het niet opnieuw aanmaakt; de sessie wordt beëindigd en de gebruiker landt op /login. Bij opnieuw inloggen komt hij terug in /onboarding zonder hersteld concept. De knop is bewust verborgen op het opslag-/succes-scherm.',
     assertion: {
       kind: 'ui-only',
-      source: 'handleLogout (app/(onboarding)/onboarding/page.tsx), geen cijfermatige uitkomst',
+      source: 'handleLogout (app/(onboarding)/onboarding/page.tsx) + createDraftWriter#clear (app/(onboarding)/onboarding/draft-transport.ts), geen cijfermatige uitkomst',
     },
   },
   {

@@ -135,10 +135,46 @@ describe('CashFlowWidget — grondslag + venster-label (H6)', () => {
     render(
       <CashFlowWidget
         size="full"
-        data={makeData({ currentMonthIncome: 0, currentMonthExpenses: 0, prevMonthIncome: 0, prevMonthExpenses: 0 })}
+        data={makeData({
+          currentMonthIncome: 0,
+          currentMonthExpenses: 0,
+          prevMonthIncome: 0,
+          prevMonthExpenses: 0,
+          // Expliciet: er is écht nooit iets geboekt. Zonder dit veld zou de
+          // assertie ook slagen op een bundel die de versheid simpelweg niet
+          // draagt, en dan bewijst ze de UR2-13-grens niet meer.
+          latestTransactionMonth: null,
+        })}
       />,
     )
     expect(screen.getByText(/Importeer transacties/)).toBeInTheDocument()
+  })
+})
+
+// ── UR2-13 — de lege staat mag bestaande transacties niet ontkennen ─────────
+// Een account met 407 transacties waarvan de jongste vijf maanden oud was, viel
+// door élk venster van dit widget (huidige én vorige maand op 0) en las daarom
+// "Importeer transacties om je maandelijkse cashflow te zien". De toets staat nu
+// op `latestTransactionMonth` — het enige veld dat "leeg venster" van "geen
+// data" kan onderscheiden.
+describe('CashFlowWidget — verouderde data (UR2-13)', () => {
+  const stale = {
+    currentMonthIncome: 0,
+    currentMonthExpenses: 0,
+    prevMonthIncome: 0,
+    prevMonthExpenses: 0,
+    latestTransactionMonth: '2024-05',
+  }
+
+  it('ontkent de bestaande transacties niet meer', () => {
+    render(<CashFlowWidget size="full" data={makeData(stale)} />)
+    expect(screen.queryByText(/Importeer transacties/)).toBeNull()
+  })
+
+  it('benoemt het lege venster én de laatste boeking', () => {
+    render(<CashFlowWidget size="full" data={makeData(stale)} />)
+    expect(screen.getByText(/Geen transacties in /)).toBeInTheDocument()
+    expect(screen.getByText(/Je laatste boeking is van mei 2024/)).toBeInTheDocument()
   })
 })
 

@@ -15,6 +15,7 @@ import { formatCurrency } from '@/lib/format'
 import { budgetBeschikbaar } from '@/lib/budget-spending'
 import { savingsRateFromAggregates } from '@/lib/savings-source'
 import { CURRENT_MONTH_INCOME_COMPLETE_RATIO } from '@/lib/constants'
+import { transactionFreshness, transactionAgeLabel } from '@/lib/transaction-staleness'
 
 export type CashflowCardKey = 'budget' | 'transacties' | 'vaste-lasten' | 'forecast'
 
@@ -316,6 +317,12 @@ export function buildCashflowCards(
   // meten.
   const monthWindow = currentMonthWindowLabel(now)
 
+  // Versheid van de transactiedata (UR2-13) — het canonieke oordeel uit
+  // lib/transaction-staleness.ts, op het bundelveld dat uit hetzelfde aggregaat
+  // komt als `currentMonth*`. Voedt hieronder de Transacties-kaart: die mocht
+  // een leeg venster niet langer als "geen transacties" presenteren.
+  const txFreshness = transactionFreshness(kpis.latestTransactionMonth, now)
+
   // ── Budget ──────────────────────────────────────────────────
   const budgetLimit = kpis.budgetTotals.expense.limit
   const budgetSpent = kpis.budgetTotals.expense.spent
@@ -355,11 +362,13 @@ export function buildCashflowCards(
           ? 'Let op je budget'
           : 'Boven budget'
       : 'Nog geen budget',
-    // BEWUST GEEN venster-regel onder de KPI: dit cijfer is een RESTANT
-    // (maandlimiet − wat er tot nu toe af is), geen som over het venster. Een
-    // "in augustus tot nu toe" eronder zou beschrijven wat het niet is. Het
-    // venster hoort hier bij de besteding, en die staat in `detail.tip`.
-    kpiWindow: null,
+    // GRONDSLAG-regel, bewust geen VENSTER-regel: dit cijfer is een RESTANT
+    // (maandlimiet − wat er tot nu toe af is), geen som over het venster — een
+    // "in augustus tot nu toe" eronder zou beschrijven wat het niet is (het
+    // venster van de besteding staat in `detail.tip`). Wél zegt deze regel
+    // wáárvan het een restant is, zodat de kaart en de budgetpagina-hero
+    // ("Nog te besteden … van €X uitgavenbudget") herkenbaar één getal dragen.
+    kpiWindow: budgetActive ? `van ${formatCurrency(budgetLimit)} uitgavenbudget` : null,
     detail: {
       label: 'Budgetdekking',
       value: budgetActive ? `${Math.round(budgetScore)}/100` : '—',
@@ -423,8 +432,15 @@ export function buildCashflowCards(
     // Bij een negatief saldo dat door de halve-maand-uitzondering op 'neutral'
     // blijft (zie `transactiesCardStatus`) zegt de regel wát er ontbreekt, i.p.v.
     // een tekort te melden dat de prognose ernaast weerlegt.
+    //
+    // LEGE MAAND ≠ LEGE ADMINISTRATIE (UR2-13). "Nog geen transacties" was tot
+    // 31 aug 2026 de enige lege-tekst, en dus ook wat een account met 407
+    // transacties las zodra de lopende maand toevallig leeg was. De kaart zegt nu
+    // wélk venster leeg is; alleen zonder énige historie blijft de oude tekst.
     subText: !hasTx
-      ? 'Nog geen transacties'
+      ? txFreshness.hasHistory
+        ? `Geen transacties in ${monthWindow}`
+        : 'Nog geen transacties'
       : txStatus === 'good'
         ? 'Goed gespaard deze maand'
         : txStatus === 'warn'
@@ -446,10 +462,17 @@ export function buildCashflowCards(
       // Loopt de maand nog (inkomen niet compleet) en staat er een prognose
       // tegenover? Zet die er letterlijk bij — dat is de toets die de kaart zelf
       // ook doet, en zonder die regel leest een negatief saldo als een tekort.
+      //
+      // STAAT DE ADMINISTRATIE STIL, dan gaat die duiding vóór (UR2-13): een
+      // €0-tegen-€0 uitleggen als "de maand loopt nog" is precies de verkeerde
+      // geruststelling wanneer er al maanden niets binnenkomt. De regel noemt dan
+      // de laatste boeking, zodat het lege venster verklaard is i.p.v. ontkend.
       tip:
-        txIncomeIncomplete && hasForecast
-          ? `Inkomen ${formatCurrency(currentMonthIncome)} · uitgaven ${formatCurrency(currentMonthExpenses)}. Deze maand loopt nog; prognose voor een volle maand ${signed(netPerMonth)}.`
-          : `Inkomen ${formatCurrency(currentMonthIncome)} · uitgaven ${formatCurrency(currentMonthExpenses)}.`,
+        txFreshness.state === 'stale' && !hasTx
+          ? `Je laatste boeking is van ${txFreshness.latestMonthLabel} (${transactionAgeLabel(txFreshness.monthsBehind)}). Importeer of koppel je rekening om deze cijfers bij te werken.`
+          : txIncomeIncomplete && hasForecast
+            ? `Inkomen ${formatCurrency(currentMonthIncome)} · uitgaven ${formatCurrency(currentMonthExpenses)}. Deze maand loopt nog; prognose voor een volle maand ${signed(netPerMonth)}.`
+            : `Inkomen ${formatCurrency(currentMonthIncome)} · uitgaven ${formatCurrency(currentMonthExpenses)}.`,
       actionLabel: 'Bekijk transacties',
     },
   }

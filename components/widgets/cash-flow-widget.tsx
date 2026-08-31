@@ -6,6 +6,7 @@ import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
 import { currentMonthWindowLabel } from '@/lib/cashflow-cards'
+import { transactionFreshness } from '@/lib/transaction-staleness'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData } from './widget-renderer'
 import { ArrowUpDown, TrendingUp, ShoppingCart, PiggyBank, CreditCard, Users, UserCheck } from 'lucide-react'
@@ -432,9 +433,25 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
   const hasAnyRealized = income !== 0 || expenses !== 0 || prevMonthIncome > 0 || prevMonthExpenses > 0
   const isEmpty = overrides ? income === 0 && expenses === 0 : !hasAnyRealized
   if (isEmpty) {
+    // LEEG VENSTER ≠ LEGE ADMINISTRATIE (UR2-13). "Importeer transacties" bleef
+    // ook staan voor een account met 407 transacties waarvan de jongste vijf
+    // maanden oud was: die vallen buiten de huidige én de vorige maand, dus
+    // `hasAnyRealized` is onwaar terwijl de data bestaat. Het bundelveld
+    // `latestTransactionMonth` (zelfde 12-mnd aggregaat als `currentMonth*`) is
+    // de enige toets die dat onderscheid kan maken — nooit een nul-som, en nooit
+    // een eigen tel-lus over transacties. Het override-perspectief draagt geen
+    // eigen versheidsveld en houdt daarom de generieke tekst.
+    const freshness = transactionFreshness(overrides ? null : data.latestTransactionMonth, now)
     return (
       <WidgetShell module="kern" size={size} kicker={kickerLabel} href={href}>
-        <WidgetEmpty icon={ArrowUpDown} message="Importeer transacties om je maandelijkse cashflow te zien." />
+        <WidgetEmpty
+          icon={ArrowUpDown}
+          message={
+            freshness.hasHistory
+              ? `Geen transacties in ${monthWindow}. Je laatste boeking is van ${freshness.latestMonthLabel}.`
+              : 'Importeer transacties om je maandelijkse cashflow te zien.'
+          }
+        />
       </WidgetShell>
     )
   }

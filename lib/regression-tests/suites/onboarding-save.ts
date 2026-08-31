@@ -2,6 +2,7 @@ import { registerTests } from '../test-registry'
 import { assert, assertEqual, assertIncludes } from '../assert'
 import type { TestCase } from '../test-types'
 import { authenticatedFetch } from '../server-runner'
+import { sanitizeStoredDraft } from '@/app/(onboarding)/onboarding/draft-persistence'
 
 const CAT = 'onboarding.save'
 
@@ -641,44 +642,43 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 15: Error resilience via localStorage ────────────────────────
+  // ── Step 15: Error resilience via het server-side concept ─────────────
   {
-    id: 'ob-save-localstorage-resilience',
-    name: 'Error resilience: data bewaard via localStorage bij save failure',
+    id: 'ob-save-draft-resilience',
+    name: 'Error resilience: antwoorden bewaard als server-concept bij save failure',
     category: CAT,
-    description: 'Bij save failure is alle data bewaard in localStorage voor herstel',
+    description:
+      'Bij een mislukte eindopslag blijven de antwoorden herstelbaar uit het ' +
+      'concept op de eigen profielrij (kaart UR2-01)',
     priority: 'high',
     estimatedDurationMs: 100,
     fn() {
-      const DRAFT_KEY = 'trifinity_onboarding_draft'
-      assertEqual(DRAFT_KEY, 'trifinity_onboarding_draft', 'Draft localStorage key correct')
-
-      // Simulate the resilience flow including new fields
-      const mockDraft = {
+      // Het concept zoals het na een mislukte eindopslag op de profielrij staat.
+      const opgeslagen = {
+        version: 2,
+        lastStep: 'klaar',
         identity: { full_name: 'Error Test', net_monthly_income: '4000' },
-        persona: 'pensioenplanner',
-        selectedModules: ['vermogensregistratie', 'toekomstplannen', 'inzicht_acties'],
+        activeModules: ['vermogensregistratie', 'toekomstplannen', 'inzicht_acties'],
         horizon: { fire_end_strategy: 'deplete', fire_end_age: 90, temporal_balance: 3 },
-        newsDescription: 'Test beschrijving',
         budgetAmounts: { 'huur-hypotheek': 960 },
-        bankAccounts: [{ name: 'ING', balance: '3000', has_budget_tracking: true }],
-        assets: [],
-        debts: [],
-        preferences: { focuses: ['fire_freedom'] },
+        quickAssets: [{ asset_type: 'cash', name: 'ING', current_value: 3000 }],
+        quickDebts: [],
       }
 
-      const serialized = JSON.stringify(mockDraft)
-      const restored = JSON.parse(serialized)
-      assertEqual(restored.identity.full_name, 'Error Test', 'Draft identity hersteld na error')
-      assertEqual(restored.bankAccounts[0].has_budget_tracking, true, 'Draft budget tracking hersteld')
-      assertEqual(restored.persona, 'pensioenplanner', 'Draft persona hersteld')
-      assertEqual(restored.selectedModules.length, 3, 'Draft modules hersteld')
-      assertEqual(restored.horizon.fire_end_strategy, 'deplete', 'Draft horizon hersteld')
-      assertEqual(restored.newsDescription, 'Test beschrijving', 'Draft newsDescription hersteld')
+      // Round-trip door de ECHTE sanitizer — niet door een lokale JSON-kopie,
+      // want die bewijst alleen dat JSON werkt.
+      const hersteld = sanitizeStoredDraft(opgeslagen)
+      assert(hersteld !== null, 'Concept is herstelbaar na een mislukte save')
+      assertEqual(hersteld!.identity.full_name, 'Error Test', 'Identiteit hersteld na error')
+      assertEqual(hersteld!.identity.net_monthly_income, '4000', 'Inkomen hersteld')
+      assertEqual(hersteld!.budgetAmounts['huur-hypotheek'], 960, 'Budgetbedrag hersteld')
+      assertEqual(hersteld!.quickAssets[0].current_value, 3000, 'Bezitting hersteld')
+      assertEqual(hersteld!.activeModules.length, 3, 'Modules hersteld')
+      assertEqual(hersteld!.horizon.fire_end_strategy, 'deplete', 'Horizon hersteld')
 
-      // After successful save, draft should be cleared
-      const clearedDraft = null
-      assertEqual(clearedDraft, null, 'Draft gewist na succesvolle save')
+      // Na een geslaagde save wist de client het concept (DELETE) — een leeg
+      // concept is niet meer herstelbaar.
+      assertEqual(sanitizeStoredDraft(null), null, 'Concept gewist na succesvolle save')
     },
   },
 

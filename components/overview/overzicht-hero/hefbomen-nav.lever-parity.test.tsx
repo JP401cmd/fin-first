@@ -35,7 +35,9 @@ import { describe, it, expect } from 'vitest'
 import { render } from '@testing-library/react'
 import { HefbomenNav } from './hefbomen-nav'
 import type { LeverScores, LeverStatus } from '@/components/app/shell/lever-scores'
-import { LEVERAGE_STATUS_DOT } from '@/lib/leverage-status'
+import { leverToLeverageStatus } from '@/components/app/shell/lever-scores'
+import { LeverCompassExpanded } from '@/components/app/shell/lever-compass'
+import { LEVERAGE_STATUS_DOT, LEVERAGE_STATUS_LABEL } from '@/lib/leverage-status'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -284,5 +286,47 @@ describe('Status-parity — mapping-tabel consistentie (unit)', () => {
   it('neutral → neutral → bg-stone-300', () => {
     expect(expectedCardDotClass('neutral')).toBe(LEVERAGE_STATUS_DOT['neutral'])
     expect(expectedCardDotClass('neutral')).toBe('bg-stone-300')
+  })
+})
+
+/**
+ * WOORD-pariteit (UR2-04) — de kleur was al single-sourced, het WOORD niet.
+ *
+ * De sidebar/topbar-kompas droeg een eigen lijst ("Gezond/Aandacht/Zorg/Geen
+ * data") náást de generieke `LEVERAGE_STATUS_LABEL` die de hefboomkaart-dot op
+ * /overzicht en de Box 1/2/3-kinderen in diezelfde sidebar al lazen. Eén
+ * scherm, één hefboom, twee oordeelswoorden — precies de klacht op de kaart.
+ * Deze test houdt beide oppervlakken aan die ene lijst.
+ */
+describe('Kompas == kaart: één statuswoord per status', () => {
+  const statuses: LeverStatus[] = ['green', 'amber', 'red', 'neutral']
+
+  it.each(statuses)(
+    "kompas-rij toont het generieke statuswoord bij '%s'",
+    (leverStatus) => {
+      const { container } = render(
+        <LeverCompassExpanded scores={makeLeverScores(leverStatus)} />,
+      )
+      const woord = LEVERAGE_STATUS_LABEL[leverToLeverageStatus(leverStatus)]
+      const dots = Array.from(container.querySelectorAll('span[aria-label]'))
+      expect(dots.length).toBe(4)
+      dots.forEach((el) => {
+        expect(el.getAttribute('aria-label')).toContain(woord)
+      })
+    },
+  )
+
+  it('kaart-dot en kompas-rij noemen dezelfde status met hetzelfde woord', () => {
+    const scores = makeLeverScores('green')
+    const kaart = render(<HefbomenNav health={null} leverScores={scores} />)
+    const kompas = render(<LeverCompassExpanded scores={scores} />)
+
+    const woord = LEVERAGE_STATUS_LABEL.good
+    // De kaart draagt het generieke woord op de status-dot (title/sr-only);
+    // het kompas in de aria-label van zijn rij-dot.
+    const kaartDot = kaart.container.querySelector('span.absolute.rounded-full')
+    expect(kaartDot?.getAttribute('title')).toBe(woord)
+    const kompasDot = kompas.container.querySelector('span[aria-label]')
+    expect(kompasDot?.getAttribute('aria-label')).toContain(woord)
   })
 })

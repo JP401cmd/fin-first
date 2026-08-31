@@ -49,10 +49,19 @@ import type { LeverageStatus } from './leverage-status'
  *  - `schulden.warn` was `Schuldratio {rawValue}` — het enige niet-gewone-taal
  *    oordeel in de lijst. Vervangen door een zin; het rátiogetal blijft
  *    bereikbaar in de drill-down (`pillar.rawValue`, Volledig).
- *  - `belasting` is voor good/warn/bad bewust identiek: sinds ADR 0010 heeft
- *    belasting geen eigen pijler meer en valt de tegel terug op een
- *    totaalscore-proxy. Eén richtingaanwijzer is dan eerlijker dan drie
- *    oordelen die op dezelfde proxy leunen.
+ *  - `belasting` was voor good/warn/bad bewust IDENTIEK ("Mogelijk betaal je
+ *    meer dan nodig"). De motivering daarvoor — belasting heeft sinds ADR 0010
+ *    geen eigen gezondheidspijler en de tegel zou terugvallen op een
+ *    totaalscore-proxy — is achterhaald: de tegel leest zijn status sinds de
+ *    lever-pariteitsfix uit `loadLeverScores` → `box3TaxStatus`, een échte,
+ *    betekenisvolle Box 3-status. De proxy is nog uitsluitend fallback voor het
+ *    geval `leverScores` ontbreekt.
+ *
+ *    Gevolg van die achterstallige koppeling was bug UR2-04: bij een GROENE
+ *    belasting-hefboom (onder de vrijstelling) stond op één scherm de kaart
+ *    "Belasting — Mogelijk betaal je meer dan nodig" naast het kompas
+ *    "Belasting: Goed op koers". Het oordeel volgt nu de status; de geijkte
+ *    BEL-3-hedge blijft staan waar hij hoort — op `warn`.
  */
 export const HEFBOOM_VERDICT: Record<
   Hefboom,
@@ -73,10 +82,15 @@ export const HEFBOOM_VERDICT: Record<
     warn: 'Lager dan doel',
     bad: 'Tekort op rekening',
   },
+  // Elk van de drie is een CONSTATERING over de eigen Box 3-positie, geen
+  // imperatief en geen besparingsbelofte (Wft). `good` dekt twee gevallen —
+  // onder de heffingsvrije voet, én beperkt erboven mét fiscaal partner
+  // (box3TaxStatus) — vandaar "beperkt" en niet "geen": dat laatste zou voor het
+  // partner-geval onwaar zijn.
   belasting: {
-    good: 'Mogelijk betaal je meer dan nodig',
+    good: 'Belastingdruk beperkt',
     warn: 'Mogelijk betaal je meer dan nodig',
-    bad: 'Mogelijk betaal je meer dan nodig',
+    bad: 'Hoge belastingdruk',
   },
 }
 

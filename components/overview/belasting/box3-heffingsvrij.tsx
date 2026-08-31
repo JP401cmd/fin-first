@@ -73,9 +73,22 @@ export function Box3Heffingsvrij({
                 <span className="not-italic font-mono tabular-nums">{fc(heffingsvrij)}</span>. Alles
                 daarboven is belast.
               </p>
+              {/*
+                De spatie ná de eerste </span> staat bewust als expliciete
+                {' '}-expressie, en de zin erna past op ÉÉN bronregel. Reden:
+                deze tekst draagt een HTML-entiteit (&apos;), en dan lopen de
+                twee Turbopack-compilatielagen uiteen op JSX-witruimte — de
+                browserlaag (SWC + babel-plugin-react-compiler, `reactCompiler:
+                true`) hield de impliciete voorloopspatie, de ssr-laag (SWC
+                alleen) liet 'm vallen. Dat verschil is een hydration-mismatch
+                op élke Box 3-load, waarna React de hele boom client-side
+                opnieuw rendert (UR2-15). Een tekstkind zonder impliciete
+                rand-witruimte kan niet uiteenlopen. Bewaakt door
+                box3-heffingsvrij.jsx-witruimte.test.ts.
+              */}
               <p className="text-[var(--ink-3)]">
-                Elke <span className="not-italic font-mono tabular-nums">{fc(1000)}</span> extra Box 3-vermogen
-                kost zo&apos;n{' '}
+                Elke <span className="not-italic font-mono tabular-nums">{fc(1000)}</span>{' '}
+                extra Box 3-vermogen kost zo&apos;n{' '}
                 <span className="not-italic font-mono tabular-nums text-[var(--ink)]">
                   {fc(Math.round(taxPerThousandAbove))}
                 </span>{' '}

@@ -755,6 +755,91 @@ describe('buildBriefingEntries — finance-verrijking', () => {
     expect(result.find((e) => e.id === 'finance:salary')).toBeUndefined()
   })
 
+  // ── Geloofwaardigheidsvloer op de maandbasis (UR2-03) ───────────────
+  //
+  // Gemelde bevinding: "Je spaart 34% van je inkomen — 2677 dagen vrijheid per
+  // maand" op een account zonder ingevuld inkomen. 2677 dagen = ruim 7 jaar
+  // vrijheid opgebouwd in één maand, en het spreekt de 34% in dezelfde zin
+  // tegen (34% sparen koopt hooguit ±16 dagen per maand). Oorzaak: de zin mengt
+  // twee grondslagen — het percentage komt uit de effectieve spaarquote, de
+  // dagen uit het 12-maands rollende dagtarief. Bij (bijna) lege data zakt dat
+  // dagtarief naar centen per dag terwijl elke guard alleen `> 0` toetst.
+
+  it('sub-vloer maandinkomen → géén spaarquote-briefje (geen verzonnen percentage)', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: { monthlyIncome: 12, monthlyExpenses: 8, savingsRatePct: 34 },
+      }),
+    )
+    expect(result.find((e) => e.id === 'finance:savings')).toBeUndefined()
+  })
+
+  it('sub-vloer uitgavenbasis → géén spaarquote-briefje', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: { monthlyIncome: 2400, monthlyExpenses: 1, savingsRatePct: 34 },
+      }),
+    )
+    expect(result.find((e) => e.id === 'finance:savings')).toBeUndefined()
+  })
+
+  it('sub-vloer dagtarief → briefje zonder vrijheidsdagen-claim (geen 2677 dagen)', () => {
+    // Reële effectieve maandbasis (€2.400 in / €1.600 uit) naast een dagtarief
+    // van €0,03/dag uit één losse transactie. Het briefje mag verschijnen, maar
+    // de dagen-omrekening moet op DEZELFDE grondslag als het bedrag gebeuren —
+    // nooit €800 ÷ €0,03 = 24.333 dagen.
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: {
+          monthlyIncome: 2400,
+          monthlyExpenses: 1600,
+          dailyExpenseRate: 0.033,
+          savingsRatePct: 34,
+        },
+      }),
+    )
+    const sav = result.find((e) => e.id === 'finance:savings')
+    expect(sav?.text).toMatch(/34%/)
+    // €800 ÷ (€1.600×12/365 = €52,60/dag) ≈ 15 dagen — consistent met 34%.
+    expect(sav?.text).toMatch(/15 dagen vrijheid/)
+    expect(sav?.text).not.toMatch(/\d{3,} dagen/)
+  })
+
+  it('sub-vloer dagtarief → vermogensgroei zonder absurde dagen-claim', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: financeNow,
+        finance: {
+          netWorthHistory: [
+            { month: '2026-08', value: 100000 },
+            { month: '2026-09', value: 101449 },
+          ],
+          // Geen geloofwaardige uitgavenbasis: dagtarief én maandbasis zakken
+          // door de vloer → het briefje verschijnt zónder dagen-suffix.
+          dailyExpenseRate: 0.033,
+          monthlyExpenses: 1,
+        },
+      }),
+    )
+    const nw = result.find((e) => e.id === 'finance:networth')
+    expect(nw?.text).toMatch(/groeide met/)
+    expect(nw?.text).not.toMatch(/dagen vrijheid/)
+  })
+
+  it('sub-vloer maandinkomen → géén salaris-countdown en géén vaste-lasten-%', () => {
+    const result = buildBriefingEntries(
+      emptyInput({
+        now: new Date('2026-10-20T12:00:00Z'),
+        finance: { monthlyIncome: 12, totalRecurringAmount: 40 },
+      }),
+    )
+    expect(result.find((e) => e.id === 'finance:salary')).toBeUndefined()
+    expect(result.find((e) => e.id === 'finance:recurring')).toBeUndefined()
+  })
+
   it('open acties → tip met vrijheidsdagen', () => {
     const result = buildBriefingEntries(
       emptyInput({

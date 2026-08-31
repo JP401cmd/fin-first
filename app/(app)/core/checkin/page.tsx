@@ -943,7 +943,7 @@ function StepTerugblik({ overview, previous }: { overview: CheckinOverview | nul
         <MetricCard
           label="Gespaard"
           value={fc(overview.monthlySavings)}
-          positive={overview.monthlySavings > 0}
+          verdict={overview.monthlySavings}
           delta={prevMetrics ? overview.monthlySavings - prevMetrics.monthlySavings : null}
         />
       </div>
@@ -2121,7 +2121,7 @@ function MetricCard({
   value,
   change,
   invertColor,
-  positive,
+  verdict,
   delta,
   deltaInverted,
 }: {
@@ -2129,7 +2129,16 @@ function MetricCard({
   value: string
   change?: number
   invertColor?: boolean
-  positive?: boolean
+  /**
+   * Ondertitel-oordeel op basis van het TEKEN van dit bedrag: > 0 "Positief",
+   * < 0 "Negatief", en bij exact 0 géén label (UR2-16b).
+   *
+   * Bewust het bedrag zelf en niet een `positive: boolean`: die kende maar twee
+   * standen, dus "Gespaard € 0" viel automatisch in de negatieve tak en de kaart
+   * bestempelde nul als negatief. Met het teken als bron kan die derde stand niet
+   * meer per ongeluk wegvallen — ook niet bij een volgende call-site.
+   */
+  verdict?: number
   delta?: number | null
   deltaInverted?: boolean
 }) {
@@ -2148,9 +2157,9 @@ function MetricCard({
           {change! > 0 ? '+' : ''}{change!.toFixed(1)}% t.o.v. vorige maand
         </p>
       )}
-      {typeof positive === 'boolean' && !showDelta && (
-        <p className={`mt-0.5 text-[10px] font-medium ${positive ? 'text-positive' : 'text-negative'}`}>
-          {positive ? 'Positief' : 'Negatief'}
+      {typeof verdict === 'number' && verdict !== 0 && !showDelta && (
+        <p className={`mt-0.5 text-[10px] font-medium ${verdict > 0 ? 'text-positive' : 'text-negative'}`}>
+          {verdict > 0 ? 'Positief' : 'Negatief'}
         </p>
       )}
       {showDelta && (

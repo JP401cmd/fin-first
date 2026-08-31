@@ -365,7 +365,11 @@ function WoonbalansAppBlock({ data }: { data: VermogenWoonbalansSection }) {
   const fc = useFc()
   return (
     <div className="mb-8">
-      <SectionLabel num="c.">Woonbalans</SectionLabel>
+      {/* Eén app, twee blokken: c. is de woning-kant van de Hypotheekplanner
+          (`has_woonbalans_tracking`), e. de hypotheek-kant
+          (`has_hypotheekplanner_tracking`). De kolomnaam heet nog
+          "woonbalans"; de gebruiker ziet overal dezelfde app-naam. */}
+      <SectionLabel num="c.">Hypotheekplanner — woning</SectionLabel>
       {data.items.map((item, idx) => (
         <div
           key={`${item.assetName}-${idx}`}
@@ -457,7 +461,7 @@ function HypotheekAppBlock({ data }: { data: VermogenHypotheekSection }) {
   const fc = useFc()
   return (
     <div className="mb-8">
-      <SectionLabel num="e.">Hypotheekplanner</SectionLabel>
+      <SectionLabel num="e.">Hypotheekplanner — hypotheek</SectionLabel>
       {data.items.map((item, idx) => (
         <div
           key={`${item.debtName}-${idx}`}

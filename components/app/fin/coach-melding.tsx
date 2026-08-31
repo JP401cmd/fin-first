@@ -28,7 +28,10 @@ export function CoachMelding({
 }: CoachMeldingProps) {
   return (
     <div
-      className="relative w-80 max-w-[calc(100vw-2rem)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s2)]"
+      // `wh-melding-card` is de haak voor de mobiele dok-modus: onder lg rekt
+      // fin-home.css de kaart tot volle breedte (UR2-08). De Tailwind-breedte
+      // hier blijft de desktop-hoekkaart bedienen.
+      className="wh-melding-card relative w-80 max-w-[calc(100vw-2rem)] border border-[var(--border-ed)] bg-[var(--paper)] shadow-[var(--s2)]"
       role="complementary"
       aria-label={headerLabel}
     >

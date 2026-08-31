@@ -330,9 +330,72 @@ describe('POST /api/holdings/refresh-prices', () => {
     expect(byId['h-stale']).toBe('stale')
     expect(byId['h-error']).toBe('error')
 
-    // The error holding's failed write is NOT counted as a silent "updated" —
-    // and the sync roll-up must only run for successfully updated assets.
-    expect(mockSyncInvestment).toHaveBeenCalledTimes(2) // h-ok-1's + h-ok-2's asset_id only
+    // The error holding's failed write is NOT counted as a silent "updated".
+    //
+    // De rollup draait bewust WÉL voor alle vier de bezittingen, ook die met een
+    // stale of gefaalde koers. Hij was hiervóór gekoppeld aan
+    // `status === 'updated'`, waardoor `assets.current_value` — een weggeschreven
+    // kopie van Σ holdings — permanent bleef hangen voor elke positie die de feed
+    // niet kan prijzen. De holdings-pagina toonde dan de verse som en élk
+    // vermogens-oppervlak het oude getal (kaart UR2-12). De rollup is idempotent
+    // en leest zelf de actuele holdings-rijen, dus 'm ook draaien op een ronde
+    // zonder koerswijziging kost niets en sluit het gat.
+    expect(mockSyncInvestment).toHaveBeenCalledTimes(4)
+  })
+
+  // -------------------------------------------------------------------------
+  // 2b. UR2-12 — de rollup volgt de POSITIE, niet de koers-uitkomst
+  // -------------------------------------------------------------------------
+
+  /**
+   * Het defect: een fonds zonder Yahoo-symbool (bv. `MEESMAN-WWT`) krijgt élke
+   * ronde `stale`, dus draaide de rollup er nooit voor. `assets.current_value`
+   * bleef op de laatst geschreven waarde staan terwijl de holdings-pagina
+   * `units × current_price` toonde — twee bedragen voor hetzelfde bezit, op de
+   * kop van de categoriepagina (€48.949) én in het marktwaarde-blok (€48.947).
+   */
+  it('rollup draait ook voor een positie die de koersfeed NIET kan prijzen (stale)', async () => {
+    const holdings = [
+      makeHoldingRow({ id: 'h-geen-feed', ticker: 'MEESMAN-WWT', asset_id: 'asset-meesman', units: 310 }),
+    ]
+    mockFetchPriceData.mockResolvedValue(null) // → stale
+
+    const updateLog: Array<{ id: string; fields: Record<string, unknown> }> = []
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'investment_holdings') {
+        return makeInvestmentHoldingsChainFactory(holdings, () => ({ error: null }), updateLog)()
+      }
+      return makeGenericChain({ data: null, error: null })
+    })
+
+    const res = await callRoute(makeRequest({ bucket: 'investment' }))
+    const body = await res.json()
+
+    expect(body.summary.stale).toBe(1)
+    expect(body.summary.updated).toBe(0)
+    // Geen koers-update, maar wél de rollup: `assets.current_value` wordt
+    // gelijkgetrokken met Σ holdings.
+    expect(mockSyncInvestment).toHaveBeenCalledTimes(1)
+    expect(mockSyncInvestment).toHaveBeenCalledWith(expect.anything(), 'asset-meesman', USER_ID)
+  })
+
+  it('gesloten positie (0 stuks) jaagt GEEN rollup aan — dat zou een geldige waarde naar €0 wissen', async () => {
+    const holdings = [
+      makeHoldingRow({ id: 'h-dicht', ticker: 'CLOSED', asset_id: 'asset-dicht', units: 0 }),
+    ]
+    mockFetchPriceData.mockResolvedValue(makePriceData())
+
+    const updateLog: Array<{ id: string; fields: Record<string, unknown> }> = []
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'investment_holdings') {
+        return makeInvestmentHoldingsChainFactory(holdings, () => ({ error: null }), updateLog)()
+      }
+      return makeGenericChain({ data: null, error: null })
+    })
+
+    await callRoute(makeRequest({ bucket: 'investment' }))
+
+    expect(mockSyncInvestment).not.toHaveBeenCalled()
   })
 
   // -------------------------------------------------------------------------

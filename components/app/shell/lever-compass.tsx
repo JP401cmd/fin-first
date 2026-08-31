@@ -35,6 +35,7 @@ import { tapTargetClass } from '@/components/editorial/tap-target'
 export { computeLeverScores } from '@/components/app/shell/lever-scores'
 export type { LeverStatus, LeverScores, LeverEntry } from '@/components/app/shell/lever-scores'
 
+import { leverStatusLabel } from '@/components/app/shell/lever-scores'
 import type { LeverStatus, LeverScores } from '@/components/app/shell/lever-scores'
 
 // ── Lever config ─────────────────────────────────────────────────────────────
@@ -65,12 +66,12 @@ const STATUS_COLORS: Record<LeverStatus, { dot: string; text: string; bg: string
   neutral: { dot: 'bg-[var(--ink-4)]', text: 'text-[var(--ink-3)]', bg: 'bg-[var(--subtle)]', border: 'border-[var(--border-ed)]' },
 }
 
-const STATUS_LABELS: Record<LeverStatus, string> = {
-  green: 'Gezond',
-  amber: 'Aandacht',
-  red: 'Zorg',
-  neutral: 'Geen data',
-}
+// Het statuswoord komt uit de ENE generieke lijst (`LEVERAGE_STATUS_LABEL`, via
+// `leverStatusLabel` in lib/lever-scores.ts) — dezelfde die de hefboomkaart op
+// /overzicht, de status-dot en de status-duiding-melding lezen. Hier stond tot
+// UR2-04 een EIGEN lijst ("Gezond/Aandacht/Zorg/Geen data"): op /overzicht las je
+// daardoor voor dezelfde hefboom twee verschillende oordeelswoorden naast elkaar
+// (kompas "Belasting: Gezond" naast de kaart-dot "Goed op koers").
 
 // Ernst-volgorde voor het samenvatten van vier hefbomen tot één punt (NAV-6).
 // 'neutral' (geen data) is bewust de laagste: geen data is geen probleem, maar
@@ -159,7 +160,7 @@ function MiniTooltip({
           <div className="flex items-center gap-1.5">
             <span className={`w-1.5 h-1.5 rounded-full ${colors.dot} shrink-0`} aria-hidden />
             <span className={`text-[11px] font-semibold ${colors.text}`}>
-              {label}: {STATUS_LABELS[status]}
+              {label}: {leverStatusLabel(status)}
             </span>
           </div>
           <div className="text-[10px] text-[var(--ink-3)] mt-0.5 pl-3">
@@ -267,7 +268,7 @@ export function LeverCompassDots({ scores }: { scores: LeverScores }) {
         const dot = (
           <span
             className={`block w-2 h-2 rounded-full ${colors.dot} ${href ? 'cursor-pointer' : 'cursor-default'}`}
-            aria-label={`${label}: ${STATUS_LABELS[entry.status]} — ${entry.detail}`}
+            aria-label={`${label}: ${leverStatusLabel(entry.status)} — ${entry.detail}`}
           />
         )
         return (
@@ -317,7 +318,7 @@ export function LeverCompassExpanded({ scores }: { scores: LeverScores }) {
             ) : (
               <span
                 className={`w-2 h-2 rounded-full ${colors.dot} shrink-0`}
-                aria-label={`${STATUS_LABELS[entry.status]} — ${entry.detail}`}
+                aria-label={`${leverStatusLabel(entry.status)} — ${entry.detail}`}
               />
             )}
           </div>
@@ -354,7 +355,7 @@ export function LeverCompassCollapsed({ scores }: { scores: LeverScores }) {
         const dot = (
           <span
             className={`block w-2 h-2 rounded-full ${colors.dot} ${href ? 'cursor-pointer' : 'cursor-default'}`}
-            aria-label={`${label}: ${STATUS_LABELS[entry.status]} — ${entry.detail}`}
+            aria-label={`${label}: ${leverStatusLabel(entry.status)} — ${entry.detail}`}
           />
         )
         return (
@@ -431,7 +432,7 @@ export function LeverCompassMobile({ scores }: { scores: LeverScores }) {
           expanded
             ? 'Kompas sluiten'
             : simple
-              ? `Kompas: ${STATUS_LABELS[worst].toLowerCase()} — open het kompas`
+              ? `Kompas: ${leverStatusLabel(worst).toLowerCase()} — open het kompas`
               : 'Kompas openen'
         }
         aria-expanded={expanded}
@@ -491,7 +492,7 @@ export function LeverCompassMobile({ scores }: { scores: LeverScores }) {
                       />
                     )}
                     <span className={`text-[10px] font-semibold ${colors.text} ml-auto`}>
-                      {STATUS_LABELS[entry.status]}
+                      {leverStatusLabel(entry.status)}
                     </span>
                   </div>
                   <div className="text-[11px] text-[var(--ink-3)] mt-0.5 leading-snug">

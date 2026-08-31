@@ -125,16 +125,23 @@ describe('HefbomenNav', () => {
     expect(screen.getByText('Tekort op rekening')).toBeTruthy()
   })
 
-  it('belasting-tegel toont altijd "Mogelijk betaal je meer dan nodig" (v2: proxy op health.total)', () => {
-    // v2 (ADR 0010): belasting heeft pillarKey=null → valt terug op health.total als proxy.
-    // tax_optimization bestaat niet meer als pijler. De belasting-tegel toont altijd
-    // dezelfde vaste educatieve tekst (Wft-richtingaanwijzer) — sinds BEL-3 in
-    // gewone taal i.p.v. het jargon "Verken je Box 3-positie".
-    const health = mockHealth({ total: 85 })
-    render(<HefbomenNav health={health} />)
-    expect(screen.getByText('Mogelijk betaal je meer dan nodig')).toBeTruthy()
+  it('belasting-oordeel volgt de status i.p.v. één vaste waarschuwing (UR2-04)', () => {
+    // v2 (ADR 0010): belasting heeft pillarKey=null → zonder leverScores valt de
+    // tegel terug op health.total als proxy. Tot UR2-04 gaf HEFBOOM_VERDICT voor
+    // good/warn/bad dezelfde alarmerende zin, waardoor een GROENE belasting-
+    // hefboom op /overzicht "Mogelijk betaal je meer dan nodig" droeg terwijl
+    // het kompas ernaast "Goed op koers" zei.
+    render(<HefbomenNav health={mockHealth({ total: 85 })} />)
+    expect(screen.getByText('Belastingdruk beperkt')).toBeTruthy()
+    expect(screen.queryByText('Mogelijk betaal je meer dan nodig')).toBeNull()
     // Het oude jargon mag nergens meer opduiken op de tegel.
     expect(screen.queryByText('Verken je Box 3-positie')).toBeNull()
+  })
+
+  it('belasting-tegel houdt de BEL-3-hedge bij een warn-status', () => {
+    // total 55 → pillarStatus → 'warn' (proxy-tak, geen leverScores).
+    render(<HefbomenNav health={mockHealth({ total: 55 })} />)
+    expect(screen.getByText('Mogelijk betaal je meer dan nodig')).toBeTruthy()
   })
 
   it('rendert geen status-substext bij ontbrekende health (neutral)', () => {
@@ -436,6 +443,65 @@ describe('HefbomenNav — dubbele grondslag (excl. eigen woning subregel)', () =
 })
 
 /**
+ * UR2-12 — de belasting-tegel zegt WAT haar bedrag is.
+ *
+ * `totals.belasting` draagt `horizonData.box3Tax`: alleen de Box 3-heffing, niet
+ * de totale belastingdruk die /overzicht/belasting toont (daar telt Box 1 mee).
+ * Zonder eenheid las de tegel als "dit betaal ik aan belasting" en week ze
+ * onverklaarbaar af van de hub — €164/jr naast €5.054/jr totale druk. Het bedrag
+ * blijft bewust Box 3 (de STATUS van deze hefboom is óók box3-exposure); de
+ * eenheid staat er nu bij.
+ */
+describe('HefbomenNav — eenheid van het belastingbedrag', () => {
+  afterEach(() => {
+    window.localStorage.clear()
+  })
+
+  const totals: HefbomenTotals = {
+    bezittingen: 250_000,
+    schulden: 120_000,
+    cashflow: 42,
+    belasting: 164,
+  }
+
+  it('toont de grondslagregel "Box 3 · sparen en beleggen" onder het bedrag (Volledig)', () => {
+    const { container } = render(<HefbomenNav health={mockHealth()} totals={totals} />)
+    expect(screen.getByText(/Box 3 · sparen en beleggen/i)).toBeTruthy()
+    expect(container.textContent).toContain('164')
+  })
+
+  it('toont de eenheid ook in Eenvoudig, waar de grondslagregel bewust wegvalt', () => {
+    const { container } = render(<HefbomenNav health={mockHealth()} totals={totals} simple />)
+    // In `verdict` rendert `subAmount` niet; de eenheid reist mee als
+    // venster-label achter het gedempte bedrag.
+    expect(screen.queryByText(/Box 3 · sparen en beleggen/i)).toBeNull()
+    expect(container.textContent).toContain('Box 3')
+  })
+
+  it('de tooltip belooft geen Box 1/Box 2 meer naast een Box 3-bedrag', () => {
+    const { container } = render(<HefbomenNav health={mockHealth()} totals={totals} />)
+    const belastingLink = Array.from(container.querySelectorAll('a')).find(
+      (a) => a.getAttribute('href') === '/overzicht/belasting',
+    )
+    const tooltip = belastingLink?.getAttribute('title') ?? ''
+    expect(tooltip).toMatch(/Box 3-heffing per jaar/i)
+    // Box 1 en 2 mogen genoemd worden als VERWIJZING, nooit als belofte over dít
+    // getal — de oude tekst somde ze op alsof het bedrag ze bevatte.
+    expect(tooltip).toMatch(/belastingpagina/i)
+  })
+
+  it('zonder belastingbedrag verschijnt er geen losse grondslagregel', () => {
+    render(
+      <HefbomenNav
+        health={mockHealth()}
+        totals={{ ...totals, belasting: null }}
+      />,
+    )
+    expect(screen.queryByText(/Box 3 · sparen en beleggen/i)).toBeNull()
+  })
+})
+
+/**
  * S1 — richtingsbesluit R5 "duiding boven reductie". Deze describe VERVANGT de
  * eerdere OVZ-2-verwachting (9 aug 2026), die in `simple` alleen hoofdcijfer +
  * statuspunt overliet. Die reductie is bewust en gedeeltelijk teruggedraaid:
@@ -461,7 +527,7 @@ describe('HefbomenNav — eenvoudige weergave (S1: oordeel primair)', () => {
 
   it('toont het oordeel in gewone taal op elke tegel', () => {
     render(<HefbomenNav health={mockHealth()} totals={totals} simple />)
-    expect(screen.getByText('Mogelijk betaal je meer dan nodig')).toBeTruthy()
+    expect(screen.getByText('Belastingdruk beperkt')).toBeTruthy()
     expect(screen.getByText('Schuldenlast vraagt aandacht')).toBeTruthy()
     expect(screen.getByText('Tekort op rekening')).toBeTruthy()
   })
@@ -518,7 +584,7 @@ describe('HefbomenNav — eenvoudige weergave (S1: oordeel primair)', () => {
     expect(container.textContent).not.toContain('250.000')
     // Precies dít is waarom S1 bestaat: gemaskeerd + Eenvoudig hield vóór deze
     // kaart nul informatie over.
-    expect(screen.getByText('Mogelijk betaal je meer dan nodig')).toBeTruthy()
+    expect(screen.getByText('Belastingdruk beperkt')).toBeTruthy()
     window.localStorage.clear()
   })
 
@@ -534,7 +600,7 @@ describe('HefbomenNav — eenvoudige weergave (S1: oordeel primair)', () => {
     render(
       <HefbomenNav health={mockHealth()} totals={totals} housingSplit={housingSplit} />,
     )
-    expect(screen.getByText('Mogelijk betaal je meer dan nodig')).toBeTruthy()
+    expect(screen.getByText('Belastingdruk beperkt')).toBeTruthy()
     expect(screen.getAllByText(/excl\. eigen woning/i).length).toBe(2)
   })
 })

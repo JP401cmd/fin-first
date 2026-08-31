@@ -4,6 +4,7 @@ import { loadDashboardData } from '@/lib/dashboard-data-loader'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { withCanonicalOverviewFigures } from '@/lib/overview/canonical-health'
 import { computeFreedomTotal } from '@/lib/briefing/overview-briefing'
+import { credibleMonthlyBasis } from '@/lib/format'
 
 /**
  * Deelbare vrijheidskaart (/overzicht → "Deel je vrijheidsweek").
@@ -65,7 +66,13 @@ export async function GET(request: Request) {
     // Uitgaven-basis (canoniek 12-mnd rolling; valt terug op de losse maand voor
     // accounts zonder aggregaat). Bepaalt of de kaart een vrijheids-% kan tonen.
     const dailyExpenseRate = dashboardData.dailyExpenseRate ?? 0
-    const recentMonthlyExpenses = dashboardData.recentMonthlyExpenses ?? dashboardData.monthlyExpenses
+    // Voorkeursvolgorde ongewijzigd, maar een kandidaat die door de
+    // geloofwaardigheidsvloer zakt slaan we over (UR2-03) — dezelfde regel als
+    // op /overzicht, zodat een deelbare kaart nooit een eeuw vrijheid claimt op
+    // een rolling venster met één transactie van €1.
+    const recentMonthlyExpenses =
+      credibleMonthlyBasis(dashboardData.recentMonthlyExpenses) ||
+      credibleMonthlyBasis(dashboardData.monthlyExpenses)
     const canCalculateFire = dailyExpenseRate > 0 || recentMonthlyExpenses > 0
 
     // ── Vrijheids-% (FIRE-voortgang, ADR 0009) — canoniek uit de bundel ──

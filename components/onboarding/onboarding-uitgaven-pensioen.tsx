@@ -138,7 +138,12 @@ export function OnboardingUitgavenPensioen({
 
   return (
     <OnboardingShell
-      kicker="Later"
+      // Groep ii (`STEP_GROUP.uitgaven_pensioen = 2`) draagt drie schermen:
+      // verdienen, uitgeven en uitgeven-later. Het cijfer noemt de GROEP, dus
+      // alle drie voeren dezelfde kicker — een eigen naam onder hetzelfde
+      // cijfer leest als een nieuwe categorie terwijl de teller stilstaat
+      // (UR2-07). Bewaakt door `onboarding-kicker-taxonomie.test.ts`.
+      kicker="Inkomen & uitgaven"
       romanNum="ii."
       title={headline}
       deck="Dit gaat over je uitgaven straks, na je pensioen — niet over je pensioeninkomen. Geef een bedrag in prijspeil van vandaag; inflatie rekenen wij er later overheen."

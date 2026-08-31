@@ -37,41 +37,32 @@ const GOAL_TO_INTENT_FALLBACK: Record<GoalSlug, IntentId> = {
   'bewust-leven': 'coaching',
 }
 
-/**
- * Module-vereisten — server-side fallback voor modules die een rekening
- * verwachten:
- *   · `budgetteren` heeft minstens één cash-asset met `has_budget_tracking=true`
- *     nodig (anders kunnen transacties niet aan budgetten gekoppeld worden).
- *   · `aandelenregistratie` heeft minstens één investment-asset nodig als anker.
- *     `has_holdings_tracking` wordt bij onboarding NIET automatisch aangezet:
- *     dat is een bewust selectieve opt-in via de setup-wizard
- *     (aandelen-holdings.config.tsx + /api/aandelen-holdings/setup). De asset
- *     wordt dus wél geseed, maar met tracking uit tot de gebruiker kiest.
- *
- * Wanneer de gebruiker de bezittingen-stap heeft overgeslagen of de juiste
- * categorie niet heeft toegevoegd, seedt de server hier een placeholder met
- * saldo 0. De gebruiker kan dat later in /core/assets/{type} bewerken.
- *
- * Conform CLAUDE.md fallback-regel: een feature mag niet stilzwijgend breken
- * omdat een andere module geen data heeft.
- */
-function applyModuleSeeding(
-  quickAssets: AssetQuickInput[],
-  activeModules: ModuleId[] | undefined,
-): AssetQuickInput[] {
-  if (!activeModules) return quickAssets
-  const result = [...quickAssets]
-  if (activeModules.includes('budgetteren') && !result.some((a) => a.asset_type === 'cash')) {
-    result.push({ asset_type: 'cash', name: 'Lopende rekening', current_value: 0, field3: null })
-  }
-  if (
-    activeModules.includes('aandelenregistratie') &&
-    !result.some((a) => a.asset_type === 'investment')
-  ) {
-    result.push({ asset_type: 'investment', name: 'Beleggingsrekening', current_value: 0, field3: null })
-  }
-  return result
-}
+// `applyModuleSeeding` is VERWIJDERD (UR2-02, aug 2026). Deze helper duwde een
+// placeholder-bezitting van € 0 in de save zodra `budgetteren` of
+// `aandelenregistratie` actief was zonder bijpassend asset-type: een cash-rij
+// "Lopende rekening" en/of een investment-rij "Beleggingsrekening".
+//
+// WAAROM WEG. Dat gebeurde óók — juist — wanneer de gebruiker de bezittingen-
+// stap expliciet had overgeslagen. Het resultaat was "Totale waarde € 0 · 2
+// bezittingen" op /core/assets voor iemand die aantoonbaar niets had ingevuld,
+// plus een groen afgevinkte welkomst-stap "Zijn al je bezittingen
+// geregistreerd?" (die leest `hasAssets` = bestaat er een rij). De app
+// registreerde dus bezit dat de gebruiker nooit heeft bevestigd, en sprak
+// daarmee haar eigen onboarding-belofte tegen. Dat is een datakwaliteits- en
+// vertrouwensdefect, geen comfort-feature.
+//
+// WAT IN DE PLAATS KOMT: niets — de leegte is de waarheid. Beide setup-wizards
+// vangen "nog geen rekening" al netjes op met een eigen lege staat die naar de
+// juiste plek wijst:
+//   · budgetteren → `components/app/app-setup/configs/budgetteren.config.tsx`
+//     ("Je hebt nog geen cash-rekening. Voeg er één toe via …")
+//   · aandelenregistratie → `.../aandelen-holdings.config.tsx`
+//     ("Je hebt nog geen belegging geregistreerd. Voeg er eerst één toe …")
+// De CLAUDE.md-fallbackregel ("een feature mag niet stilzwijgend breken omdat
+// een andere module geen data heeft") is daarmee gedekt door een zichtbare,
+// eerlijke lege staat in plaats van door een verzonnen rij in de database.
+//
+// Herintroduceer dit niet: `no-placeholder-assets.test.ts` bewaakt het.
 
 // `applyModuleTrackingFlags` is verwijderd samen met de gedeprecate RPC-success-
 // tak (probleem 4 / Keuze B). Het multi-step pad zet has_budget_tracking /
@@ -672,10 +663,9 @@ export async function POST(req: Request) {
   const intent: IntentId | undefined = rawIntent
     ?? (primaryGoalSlug ? GOAL_TO_INTENT_FALLBACK[primaryGoalSlug] : undefined)
 
-  // Pas module-vereisten-seeding toe vóór persist: bv. een placeholder cash-
-  // rekening als budgetteren actief is zonder cash-asset. Vermijdt module-
-  // landing-pagina's met lege state. Zie applyModuleSeeding().
-  const quickAssets: AssetQuickInput[] = applyModuleSeeding(rawQuickAssets ?? [], activeModules)
+  // Alleen wat de gebruiker zélf heeft bevestigd wordt bezit. Geen module-
+  // seeding meer: zie het blok bij `applyModuleSeeding` bovenaan dit bestand.
+  const quickAssets: AssetQuickInput[] = rawQuickAssets ?? []
   const quickDebts: DebtQuickInput[] = rawQuickDebts ?? []
 
   try {
@@ -1069,9 +1059,18 @@ export async function POST(req: Request) {
     // volstaat, staan in `lib/onboarding-bank-cleanup.ts`.
     await deleteEmptyOnboardingBankAccounts(supabase, user.id)
     await supabase.from('assets').delete().eq('user_id', user.id).eq('asset_type', 'cash')
+    // ONVOORWAARDELIJK, net als de cash-tak hierboven (UR2-02). Deze delete
+    // stond tot aug 2026 ín de `quickAssets.length > 0`-tak, waardoor een
+    // herstarte onboarding waarin de gebruiker bezittingen OVERSLAAT de
+    // non-cash rijen van de vorige, gestrande poging liet staan. Dat viel niet
+    // op zolang `applyModuleSeeding` de lijst altijd op ≥ 1 hield; nu die weg
+    // is, is `quickAssets` echt leeg als de gebruiker overslaat en moet het
+    // opruimen dus buiten de guard. De route is alleen bereikbaar zolang
+    // `onboarding_completed` false is (idempotency-check hierboven), dus dit
+    // raakt uitsluitend rijen van een nog niet afgeronde onboarding.
+    await supabase.from('assets').delete().eq('user_id', user.id).neq('asset_type', 'cash')
 
     if (quickAssets.length > 0) {
-      await supabase.from('assets').delete().eq('user_id', user.id).neq('asset_type', 'cash')
       const today = new Date().toISOString().split('T')[0]
       const hasBudgetteren = activeModules?.includes('budgetteren') ?? false
       const rows = quickAssets.map((q, i) => {

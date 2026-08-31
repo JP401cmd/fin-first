@@ -3,6 +3,11 @@ import { NextResponse } from 'next/server'
 import { fetchPriceData } from '@/lib/price-feed'
 import { buildClassificationUpdate } from '@/lib/holdings-classification'
 import { fetchCoinPricesEurBatch } from '@/lib/integrations/coingecko-client'
+import { fetchBatchForexRates } from '@/lib/forex'
+import {
+  syncAssetValueFromInvestmentHoldings,
+  syncAssetValueFromCryptoHoldings,
+} from '@/lib/holdings-sync'
 import { syncAllExchangeConnections } from '@/lib/integrations/exchange-cron'
 import { syncAllWalletAddresses } from '@/lib/integrations/wallet-cron'
 import { recordJobRun } from '@/lib/job-runs'
@@ -201,7 +206,10 @@ async function refreshInvestmentHoldings(supabase: SupabaseClient): Promise<Buck
     // gebruiker heeft dit zelf ingevuld", en zou de feed een handmatige keuze
     // overschrijven. Het 52-weeks bereik hoeft NIET meegelezen: dat is een
     // koersveld dat elke ronde onvoorwaardelijk vervangen wordt.
-    .select('id, user_id, asset_id, ticker, isin, current_price, asset_class, geography, exchange')
+    // `units` is nodig voor de rollup-selectie hieronder: een gesloten positie
+    // (0 stuks) mag haar bezit nooit een rollup naar €0 bezorgen. `currency`
+    // dient om de FX-cache te warmen vóór de rollup naar euro rekent.
+    .select('id, user_id, asset_id, ticker, isin, current_price, units, currency, asset_class, geography, exchange')
     .eq('is_active', true)
     .or('ticker.neq.null,isin.neq.null')
 
@@ -232,7 +240,20 @@ async function refreshInvestmentHoldings(supabase: SupabaseClient): Promise<Buck
     }
   }
 
+  // ── Rollup-kandidaten: elke LOPENDE positie, ongeacht de koers-uitkomst ──
+  // `assets.current_value` is de weggeschreven kopie van Σ holdings, geen eigen
+  // feit. Zolang alleen geslaagde koers-updates een rollup aanjoegen, bleef die
+  // kopie eeuwig hangen voor posities die de feed niet kan prijzen — de
+  // holdings-pagina toonde dan Σ holdings en élk vermogens-oppervlak het oude
+  // getal (kaart UR2-12). Gesloten posities (0 stuks) tellen bewust niet mee:
+  // die zouden een geldige waarde naar €0 kunnen wissen (WF-BEZIT-21).
   const assetsToSync = new Set<string>()
+  for (const h of rows) {
+    const assetId = h.asset_id as string | null
+    if (assetId && h.user_id && Math.abs(Number(h.units) || 0) >= 1e-9) {
+      assetsToSync.add(`${assetId}:${h.user_id as string}`)
+    }
+  }
 
   for (const [ticker, holdings] of tickerToHoldings.entries()) {
     const priceData = priceResults.get(ticker)
@@ -278,7 +299,6 @@ async function refreshInvestmentHoldings(supabase: SupabaseClient): Promise<Buck
         continue
       }
       summary.updated++
-      if (h.asset_id) assetsToSync.add(`${h.asset_id}:${h.user_id}`)
 
       await supabase
         .from('investment_holding_prices')
@@ -295,33 +315,34 @@ async function refreshInvestmentHoldings(supabase: SupabaseClient): Promise<Buck
     }
   }
 
-  // Roll up parent assets
+  // Warm de FX-cache vóór de rollup: `syncAssetValueFromInvestmentHoldings`
+  // gebruikt `getEURRateSync`, dat zónder verse cache op de hardgecodeerde
+  // FALLBACK_RATES terugvalt. Eén batch-call per ronde; EUR-only portefeuilles
+  // (de meeste) doen hier niets.
+  const foreignCurrencies = Array.from(new Set(
+    rows
+      .map((h) => ((h.currency as string | null) || 'EUR').trim().toUpperCase())
+      .filter((c) => c !== 'EUR'),
+  ))
+  if (foreignCurrencies.length > 0) {
+    try {
+      await fetchBatchForexRates(foreignCurrencies)
+    } catch {
+      // Koersen niet op te halen → de helper valt terug op FALLBACK_RATES.
+      // Nooit de hele ronde laten klappen op een wisselkoers.
+    }
+  }
+
+  // Roll up parent assets — via de CANONIEKE helper, niet via een eigen som.
+  // De inline kopie die hier stond liet `getEURRateSync` weg: een positie in USD
+  // of GBP werd door de nachtelijke ronde ONGECONVERTEERD naar
+  // `assets.current_value` geschreven, terwijl de handmatige refresh én de
+  // getoonde marktwaarde (`sumHoldingTotals`) wél naar euro rekenen. Twee sommen
+  // voor hetzelfde feit, met de valuta-koers als verschil.
   for (const key of assetsToSync) {
     const [assetId, userId] = key.split(':')
-    try {
-      const { data: assetHoldings } = await supabase
-        .from('investment_holdings')
-        .select('units, current_price, avg_purchase_price')
-        .eq('asset_id', assetId)
-        .eq('user_id', userId)
-        .eq('is_active', true)
-
-      if (assetHoldings && assetHoldings.length > 0) {
-        const totalValue = assetHoldings.reduce((sum, h) => {
-          const price = (h.current_price as number | null) ?? (h.avg_purchase_price as number | null) ?? 0
-          const units = (h.units as number) ?? 0
-          return sum + price * units
-        }, 0)
-        await supabase
-          .from('assets')
-          .update({ current_value: totalValue })
-          .eq('id', assetId)
-          .eq('user_id', userId)
-        summary.assets_synced++
-      }
-    } catch {
-      // Non-critical
-    }
+    const { synced } = await syncAssetValueFromInvestmentHoldings(supabase, assetId, userId)
+    if (synced) summary.assets_synced++
   }
 
   return summary
@@ -332,7 +353,9 @@ async function refreshCryptoHoldings(supabase: SupabaseClient): Promise<BucketSu
 
   const { data: rows, error } = await supabase
     .from('crypto_holdings')
-    .select('id, user_id, asset_id, symbol, current_price, is_fiat_balance')
+    // `units` is nodig voor de rollup-selectie hieronder — zie de
+    // investment-kant: een gesloten positie mag geen rollup naar €0 aanjagen.
+    .select('id, user_id, asset_id, symbol, current_price, units, is_fiat_balance')
     .eq('is_active', true)
 
   if (error || !rows) return summary
@@ -373,7 +396,16 @@ async function refreshCryptoHoldings(supabase: SupabaseClient): Promise<BucketSu
     ? await fetchCoinPricesEurBatch(yahooMisses)
     : {}
 
+  // Rollup-kandidaten: zie de investment-kant. Fiat-saldi tellen hier bewust
+  // WEL mee — `syncAssetValueFromCryptoHoldings` rekent ze in de bezit-waarde
+  // mee (het totaal op de exchange), ook al krijgen ze geen koers.
   const assetsToSync = new Set<string>()
+  for (const h of rows) {
+    const assetId = h.asset_id as string | null
+    if (assetId && h.user_id && Math.abs(Number(h.units) || 0) >= 1e-9) {
+      assetsToSync.add(`${assetId}:${h.user_id as string}`)
+    }
+  }
   const today = new Date().toISOString().slice(0, 10)
 
   for (const [sym, holdings] of symbolToHoldings.entries()) {
@@ -413,7 +445,6 @@ async function refreshCryptoHoldings(supabase: SupabaseClient): Promise<BucketSu
         continue
       }
       summary.updated++
-      if (h.asset_id) assetsToSync.add(`${h.asset_id}:${h.user_id}`)
 
       await supabase
         .from('crypto_holding_prices')
@@ -430,33 +461,11 @@ async function refreshCryptoHoldings(supabase: SupabaseClient): Promise<BucketSu
     }
   }
 
-  // Roll up parent assets
+  // Roll up parent assets — via de canonieke helper (zie de investment-kant).
   for (const key of assetsToSync) {
     const [assetId, userId] = key.split(':')
-    try {
-      const { data: assetHoldings } = await supabase
-        .from('crypto_holdings')
-        .select('units, current_price, avg_purchase_price')
-        .eq('asset_id', assetId)
-        .eq('user_id', userId)
-        .eq('is_active', true)
-
-      if (assetHoldings && assetHoldings.length > 0) {
-        const totalValue = assetHoldings.reduce((sum, h) => {
-          const price = (h.current_price as number | null) ?? (h.avg_purchase_price as number | null) ?? 0
-          const units = (h.units as number) ?? 0
-          return sum + price * units
-        }, 0)
-        await supabase
-          .from('assets')
-          .update({ current_value: totalValue })
-          .eq('id', assetId)
-          .eq('user_id', userId)
-        summary.assets_synced++
-      }
-    } catch {
-      // Non-critical
-    }
+    const { synced } = await syncAssetValueFromCryptoHoldings(supabase, assetId, userId)
+    if (synced) summary.assets_synced++
   }
 
   return summary

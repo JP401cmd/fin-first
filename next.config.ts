@@ -198,6 +198,25 @@ const nextConfig: NextConfig = {
       },
       { source: '/horizon/whatif', destination: '/toekomst?whatif=open', permanent: false },
 
+      // Derde lichting (31 aug 2026, UR2-11) — /toekomst/whatif was de LAATSTE
+      // route van deze familie die zijn redirect nog op render-tijd deed: de
+      // server-component riep zonder `?via=dreamgate` meteen
+      // `redirect('/toekomst?whatif=open')` aan. Dat is exact de trigger
+      // hierboven (harde-navigatie-pad → React #310), en verklaart de transiënte
+      // HTTP 500 die de UAT op /toekomst/whatif zag. De redirect verhuist
+      // daarom naar de routing-laag; de dreamgate-tak blijft een échte pagina.
+      //
+      // `missing` i.p.v. `has`: de regel matcht wanneer `via` afwezig is ÓF een
+      // andere waarde heeft (Next: `!missing.some(hasMatch)`), zodat alleen
+      // `?via=dreamgate` de volledige what-if-ervaring bereikt — precies de
+      // twee takken van de oude server-component.
+      {
+        source: '/toekomst/whatif',
+        missing: [{ type: 'query', key: 'via', value: 'dreamgate' }],
+        destination: '/toekomst?whatif=open',
+        permanent: false,
+      },
+
       // Tweede lichting (11 aug 2026) — dezelfde behandeling voor de vier
       // resterende redirect-only server-componenten. Ze waren latent: geen
       // enkel #310-event stond op hun naam, maar ze droegen exact dezelfde

@@ -1,11 +1,16 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { X, Save, Trash2, Repeat, GitFork, Plus, History, ArrowRight, FileText, BarChart3, Sparkles, Users, ArrowLeftRight } from 'lucide-react'
 import { CounterpartyAnalysisPanel } from '@/components/app/counterparty-analysis-panel'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { OwnershipToggle, useHouseholdStatus } from '@/components/app/ownership-toggle'
+import { useDailyExpenseRate } from '@/components/app/freedom-time-label'
+import { useOptionalToast } from '@/components/app/toast-provider'
 import { createClient } from '@/lib/supabase/client'
+import { formatCurrency, calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
+import { needsTransactionAmountConfirmation } from '@/lib/transactions/amount-plausibility'
 import { buildBudgetSelectEntries, budgetOptionLabel, type Budget } from '@/lib/budget-data'
 import {
   TRANSFER_TYPES,
@@ -93,12 +98,25 @@ export function TransactionForm({
 }) {
   const isEdit = !!transaction
   const { hasHousehold } = useHouseholdStatus()
+  const { dailyExpenseRate } = useDailyExpenseRate()
+  const { addToast } = useOptionalToast()
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [phase, setPhase] = useState<Phase>('form')
   const [pendingRow, setPendingRow] = useState<PendingRow | null>(null)
+
+  /**
+   * Openstaande plausibiliteitsvraag bij een uitzonderlijk bedrag (UR2-18).
+   * Geen blokkade maar een vraag — spiegelt de wedervraag in de bezittingen-
+   * formulieren (`components/core/assets-client.tsx`, `quick-add-wizard.tsx`).
+   * `bedragBevestigdRef` houdt het exact bevestigde bedrag vast, zodat een
+   * dáárna gewijzigde waarde opnieuw doorgevraagd wordt.
+   */
+  const [bedragBevestiging, setBedragBevestiging] = useState<number | null>(null)
+  const bedragBevestigdRef = useRef<number | null>(null)
+  const amountInputRef = useRef<HTMLInputElement>(null)
 
   type SplitRow = { id: string; budget_id: string; amount: string; description: string }
   const [isSplit, setIsSplit] = useState(!!transaction?.is_split)
@@ -319,8 +337,16 @@ export function TransactionForm({
     onSaved()
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    void submitForm()
+  }
+
+  /**
+   * Het eigenlijke opslaan, losgetrokken van het submit-event zodat de
+   * bedrag-wedervraag exact hetzelfde pad kan hervatten dat zij onderbrak.
+   */
+  async function submitForm() {
     if (!form.description.trim()) {
       setError('Beschrijving is verplicht')
       return
@@ -341,6 +367,26 @@ export function TransactionForm({
         setError(`Splits (${splitTotal.toFixed(2)}) moeten optellen tot het totaalbedrag (${mainAmount.toFixed(2)})`)
         return
       }
+    }
+
+    // ── Plausibiliteitsvraag bij een uitzonderlijk bedrag (UR2-18) ────────────
+    //
+    // Ná de vormvalidatie (een leeg of onleesbaar bedrag hoort een fout te
+    // geven, geen wedervraag) en vóór élk schrijfpad — nieuw én bewerken, split
+    // én terugkerend. Eén nul te veel valt in het bedragveld niet op, maar
+    // trekt daarna spaarquote, gezondheidsgetal en briefing mee.
+    //
+    // De splits hoeven geen eigen check: hun som is hierboven al gelijkgesteld
+    // aan het hoofdbedrag, dus een uitschieter dáár tilt dit bedrag mee over de
+    // drempel.
+    const teBevestigen = parseFloat(form.amount)
+    if (
+      needsTransactionAmountConfirmation(teBevestigen) &&
+      bedragBevestigdRef.current !== teBevestigen
+    ) {
+      setError('')
+      setBedragBevestiging(teBevestigen)
+      return
     }
 
     setSaving(true)
@@ -452,6 +498,7 @@ export function TransactionForm({
       }
 
       // Create recurring template if toggled
+      let recurringId: string | null = null
       if (form.is_recurring) {
         const recurringRow = {
           user_id: user.id,
@@ -472,7 +519,45 @@ export function TransactionForm({
           ownership: form.ownership,
         }
 
-        await supabase.from('recurring_transactions').insert(recurringRow)
+        const { data: insertedRecurring } = await supabase
+          .from('recurring_transactions')
+          .insert(recurringRow)
+          .select('id')
+          .single()
+        recurringId = (insertedRecurring as { id?: string } | null)?.id ?? null
+      }
+
+      // ── Tweede net: ongedaan maken ná opslaan (UR2-18) ────────────────────
+      //
+      // De wedervraag hierboven vangt de tikfout vóór het schrijven; deze toast
+      // vangt de gebruiker die 'm wegklikte. Bewust ALLEEN op een nieuwe rij
+      // met een uitzonderlijk bedrag: bij een bewerking kennen we de vorige
+      // waarden niet meer, dus "ongedaan maken" zou daar iets anders beloven
+      // dan het doet. Alles wat deze save aanmaakte gaat mee terug — de rij,
+      // haar splits en een eventueel terugkerend sjabloon.
+      if (needsTransactionAmountConfirmation(teBevestigen)) {
+        const newTxId = insertedTx.id as string
+        const createdRecurringId = recurringId
+        addToast({
+          type: 'warning',
+          title: `${formatCurrency(Math.abs(amount))} opgeslagen`,
+          message: 'Uitzonderlijk bedrag — klopt het niet, dan draai je het hier meteen terug.',
+          duration: 12000,
+          action: {
+            label: 'Ongedaan maken',
+            onClick: () => {
+              void (async () => {
+                const undoClient = createClient()
+                await undoClient.from('transaction_splits').delete().eq('transaction_id', newTxId)
+                if (createdRecurringId) {
+                  await undoClient.from('recurring_transactions').delete().eq('id', createdRecurringId)
+                }
+                await undoClient.from('transactions').delete().eq('id', newTxId)
+                onSaved()
+              })()
+            },
+          },
+        })
       }
     }
 
@@ -521,11 +606,16 @@ export function TransactionForm({
   ]
 
   return (
+    <>
     <BottomSheet
       open={true}
       onClose={onClose}
       title={phase === 'analyse' ? (transaction?.counterparty_name ?? 'Tegenpartij analyse') : (isEdit ? 'Transactie bewerken' : 'Nieuwe transactie')}
       size={phase === 'analyse' ? 'lg' : 'md'}
+      // Zolang de bedrag-wedervraag openstaat treedt dit formulier terug: één
+      // venster tegelijk (ADR 0039), en Escape sluit dan alleen de vraag —
+      // niet het formulier mét de ingevulde regel.
+      suspended={bedragBevestiging !== null}
     >
       {phase === 'analyse' && transaction && (
         <CounterpartyAnalysisPanel
@@ -632,6 +722,7 @@ export function TransactionForm({
                 </label>
                 <input
                   id="tx-amount"
+                  ref={amountInputRef}
                   type="number"
                   min="0.01"
                   step="0.01"
@@ -1030,6 +1121,68 @@ export function TransactionForm({
         </form>
       )}
     </BottomSheet>
+
+    {/* Plausibiliteitsvraag bij een uitzonderlijk bedrag (UR2-18). Geen
+        blokkade: de gebruiker mag doorzetten. De vraag staat bewust óók in
+        vrijheidstijd — een extra nul valt in euro's niet op, in jaren wel. */}
+    <ShellOverlay
+      open={bedragBevestiging !== null}
+      onClose={() => setBedragBevestiging(null)}
+      kind="confirm"
+      title="Klopt dit bedrag?"
+      footer={
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              const bedrag = bedragBevestiging
+              setBedragBevestiging(null)
+              if (bedrag === null) return
+              bedragBevestigdRef.current = bedrag
+              void submitForm()
+            }}
+            className="flex-1 rounded-[var(--r)] bg-[var(--ink)] px-4 py-2 text-sm font-medium text-[var(--paper)]"
+            data-testid="tx-bedrag-bevestigen"
+          >
+            Ja, dit klopt
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setBedragBevestiging(null)
+              amountInputRef.current?.focus()
+            }}
+            className="flex-1 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)]"
+          >
+            Aanpassen
+          </button>
+        </div>
+      }
+    >
+      {bedragBevestiging !== null && (
+        <div className="px-6 py-4 text-sm leading-relaxed text-[var(--ink-2)]" data-testid="tx-bedrag-bevestiging">
+          <p>
+            Je boekt{' '}
+            <span className="font-medium text-[var(--ink)]">{formatCurrency(bedragBevestiging)}</span>
+            {form.is_income ? ' aan inkomen' : ' aan uitgave'}
+            {form.description.trim() ? <> bij <span className="font-medium text-[var(--ink)]">{form.description.trim()}</span></> : null}.
+          </p>
+          {dailyExpenseRate > 0 && (
+            <p className="mt-2">
+              Dat is{' '}
+              <span className="font-medium text-[var(--ink)]" data-testid="tx-bedrag-bevestiging-vrijheid">
+                {formatFreedomTimeString(calculateFreedomTime(bedragBevestiging, dailyExpenseRate), 'long')}
+              </span>{' '}
+              vrijheid bij je huidige uitgaven.
+            </p>
+          )}
+          <p className="mt-2 text-[var(--ink-3)]">
+            Een bedrag van deze omvang is meestal een typefout — één nul te veel. Klopt het wel, dan gaan we gewoon verder.
+          </p>
+        </div>
+      )}
+    </ShellOverlay>
+    </>
   )
 }
 

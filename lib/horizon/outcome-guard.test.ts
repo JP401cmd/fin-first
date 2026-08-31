@@ -2,8 +2,11 @@ import { describe, it, expect } from 'vitest'
 import {
   guardFreedomAge,
   guardFireTarget,
+  guardFreedomMoment,
+  guardRetirementExpense,
   HORIZON_MISSENDE_GEGEVENS_LABEL,
 } from './outcome-guard'
+import { CREDIBLE_MONTHLY_BASIS_MIN, FREEDOM_MONTHS_PER_YEAR } from '@/lib/format'
 import { HORIZON_PLAFOND_LEEFTIJD } from '@/lib/constants'
 import { MAX_AGE } from '@/lib/horizon-kernel/types'
 
@@ -84,5 +87,67 @@ describe('guardFireTarget', () => {
     ]
     for (const g of problemen) expect(g.label).toBe(HORIZON_MISSENDE_GEGEVENS_LABEL)
     expect(new Set(problemen.map((g) => g.hint)).size).toBe(3)
+  })
+})
+
+/**
+ * Bevinding UR2-05: op een leeg profiel toonde de Doelbedrag-tegel eerlijk "We
+ * missen gegevens", terwijl de twee tegels ernaast — vrijheidsleeftijd en
+ * uitgave ná pensioen — met hetzelfde gewicht een exact getal neerzetten. Eén
+ * ontbrekende grondslag, drie verschillende beloftes. Deze twee guards trekken
+ * die behandeling gelijk.
+ */
+describe('guardFreedomMoment', () => {
+  it('laat een gewoon kernantwoord door', () => {
+    expect(guardFreedomMoment({ ageIsInvalid: false, fireTarget: guardFireTarget(875_000) }).ok).toBe(true)
+    expect(guardFreedomMoment().ok).toBe(true)
+  })
+
+  it('blokkeert de horizon-parkeerstand (M6) met de leeftijd-uitleg', () => {
+    const g = guardFreedomMoment({ ageIsInvalid: true })
+    expect(g.ok).toBe(false)
+    expect(g.issue).toBe('buiten-horizon')
+  })
+
+  it('blokkeert het moment zodra het DOELBEDRAG ernaast niet te noemen is', () => {
+    // De kern van de bevinding: doelbedrag 0 ⇒ melding op tegel 2, terwijl tegel
+    // 1 gewoon "83" bleef tonen. Het moment en het doel zijn één antwoord.
+    const g = guardFreedomMoment({ ageIsInvalid: false, fireTarget: guardFireTarget(0) })
+    expect(g.ok).toBe(false)
+    expect(g.issue).toBe('geen-vrijheidsmoment')
+    expect(g.label).toBe(HORIZON_MISSENDE_GEGEVENS_LABEL)
+    expect(g.hint).toBeTruthy()
+  })
+
+  it('de parkeerstand wint van het doelbedrag — specifiekste uitleg eerst', () => {
+    const g = guardFreedomMoment({ ageIsInvalid: true, fireTarget: guardFireTarget(0) })
+    expect(g.issue).toBe('buiten-horizon')
+  })
+})
+
+describe('guardRetirementExpense', () => {
+  it('laat een echte jaaruitgave door', () => {
+    expect(guardRetirementExpense(25_200).ok).toBe(true)
+  })
+
+  it('blokkeert de terugval-uitkomst 0 uit computeRetirementExpenses', () => {
+    const g = guardRetirementExpense(0)
+    expect(g.ok).toBe(false)
+    expect(g.issue).toBe('geen-uitgavenbasis')
+    expect(g.label).toBe(HORIZON_MISSENDE_GEGEVENS_LABEL)
+  })
+
+  it('blokkeert ontbrekende/niet-eindige bedragen', () => {
+    expect(guardRetirementExpense(null).issue).toBe('geen-uitgavenbasis')
+    expect(guardRetirementExpense(undefined).issue).toBe('geen-uitgavenbasis')
+    expect(guardRetirementExpense(Number.NaN).issue).toBe('geen-uitgavenbasis')
+  })
+
+  it('hergebruikt de geloofwaardigheidsvloer uit lib/format (UR2-03) — geen tweede grens', () => {
+    const opDeVloer = CREDIBLE_MONTHLY_BASIS_MIN * FREEDOM_MONTHS_PER_YEAR
+    expect(guardRetirementExpense(opDeVloer).ok).toBe(true)
+    // Eén tientje per maand is geen bestedingspatroon maar een artefact.
+    expect(guardRetirementExpense(opDeVloer - FREEDOM_MONTHS_PER_YEAR).ok).toBe(false)
+    expect(guardRetirementExpense(120).ok).toBe(false)
   })
 })

@@ -4,7 +4,6 @@ import {
   computeFreedomTotal,
   computeFreedomDelta,
   isImplausibleFreedomDelta,
-  buildFreedomSparkline,
   buildFreedomHeroProps,
   buildBriefingHeadline,
   sanitizeAiHeadline,
@@ -232,95 +231,88 @@ describe('vrijheidstijd-hero — plausibiliteitsgrens op de week-delta', () => {
     const hero = buildFreedomHeroProps(
       { totalFreedomDays: 2070, netWorth: 120000, monthlyExpenses: 1750 },
       { totalFreedomDays: 5858 }, // opgeblazen basis → −3788
-      [],
     )
     expect(hero.deltaDays).toBeNull()
     expect(hero.isImplausibleDelta).toBe(true)
     expect(hero.totalLabel.length).toBeGreaterThan(0)
   })
-
-  it('buildBriefingHeadline: valt bij een onderdrukte delta terug op de totaal-zin', () => {
-    // Geen "Deze week 3788 dagen minder" meer — de kop noemt alleen het totaal.
-    const headline = buildBriefingHeadline({
-      deltaDays: null,
-      totalLabel: '5 jaar en 8 maanden',
-      isInfinite: false,
-      isDeficit: false,
-    })
-    expect(headline).toBe('Je vermogen staat voor 5 jaar en 8 maanden aan vrijheid.')
-    expect(headline).not.toMatch(/dagen minder/)
-  })
 })
 
-describe('vrijheidstijd-hero helpers (vervolg)', () => {
-
-  it('buildFreedomSparkline: vermogen → vrijheidsdagen per maand', () => {
-    const series = buildFreedomSparkline(
-      [
-        { month: '2026-04', value: 36500 }, // €98,63/dag → 370 dagen
-        { month: '2026-05', value: 73000 }, // €98,63/dag → 740 dagen
-      ],
-      3000,
-    )
-    expect(series).toHaveLength(2)
-    // Canonieke dagbasis €3000×12/365 = €98,63/dag (was €100/dag bij /30).
-    expect(series[0].spent).toBe(370)
-    expect(series[1].spent).toBe(740)
-    expect(series[0].label).toBe('apr')
-  })
-
-  it('buildFreedomSparkline: leeg zonder uitgaven', () => {
-    expect(buildFreedomSparkline([{ month: '2026-05', value: 1000 }], 0)).toEqual([])
-  })
-
-  it('buildFreedomSparkline: klemt tekort-maanden op 0 (geen valse piek)', () => {
-    const series = buildFreedomSparkline(
-      [
-        { month: '2026-04', value: -20000 }, // schuld → 0 dagen
-        { month: '2026-05', value: 50000 }, // €98,63/dag → 507 dagen
-      ],
-      3000,
-    )
-    expect(series[0].spent).toBe(0)
-    expect(series[1].spent).toBe(507)
-  })
-
+describe('vrijheidstijd-e-mailblok helpers (vervolg)', () => {
   it('buildFreedomHeroProps: delta + totaal-label uit meetpunt + basis', () => {
     const hero = buildFreedomHeroProps(
       { totalFreedomDays: 1000, netWorth: 100000, monthlyExpenses: 3000 },
       { totalFreedomDays: 940 },
-      [],
     )
     expect(hero.deltaDays).toBe(60)
     expect(hero.isFirstWeek).toBe(false)
     expect(hero.isInfinite).toBe(false)
     expect(hero.totalLabel.length).toBeGreaterThan(0)
   })
+})
 
-  it('buildBriefingHeadline: positieve delta noemt dagen + totaal', () => {
-    const h = buildBriefingHeadline({ deltaDays: 5, totalLabel: '2 jaar', isInfinite: false, isDeficit: false })
-    expect(h).toMatch(/5 dagen vrijheid erbij/)
-    expect(h).toMatch(/2 jaar/)
+// ── De kop-zin naast de masthead (UR2-09) ────────────────────────────
+//
+// De zin rekent uit de LIVE `computeFreedomTotal` van het request, niet uit de
+// bevroren week-snapshot. Dat was het defect: na een Ververs (die alleen de
+// briefjes herschrijft) bleef "Je vermogen staat voor 113 jaar en 4 maanden aan
+// vrijheid" staan naast een op-weg-balk van 0%. Er is bewust géén week-over-
+// week-variant meer: die hoorde bij het verwijderde "Jouw vrijheid deze week"-
+// blok en kan als losse zin niet betrouwbaar naast live cijfers staan.
+describe('buildBriefingHeadline — canonieke live bron', () => {
+  it('noemt het totaal uit computeFreedomTotal, zonder weekverschil', () => {
+    const h = buildBriefingHeadline(computeFreedomTotal(100000, 3000))
+    expect(h).toBe('Je vermogen staat voor 2 jaar en 9 maanden aan vrijheid.')
+    expect(h).not.toMatch(/deze week/i)
   })
 
-  it('buildBriefingHeadline: negatieve delta blijft kalm', () => {
-    const h = buildBriefingHeadline({ deltaDays: -3, totalLabel: '2 jaar', isInfinite: false, isDeficit: false })
-    expect(h).toMatch(/3 dagen minder/)
+  it('null bij een ontbrekende uitgavenbasis (isInfinite)', () => {
+    expect(buildBriefingHeadline(computeFreedomTotal(100000, 0))).toBeNull()
   })
 
-  it('buildBriefingHeadline: null bij isInfinite', () => {
-    expect(buildBriefingHeadline({ deltaDays: 5, totalLabel: 'x', isInfinite: true, isDeficit: false })).toBeNull()
+  it('null bij een tekort — schuld-dagen zijn geen vrijheid', () => {
+    expect(buildBriefingHeadline(computeFreedomTotal(-4200, 3000))).toBeNull()
   })
 
-  it('buildBriefingHeadline: null bij tekort (consistent met de hero)', () => {
-    expect(
-      buildBriefingHeadline({ deltaDays: 5, totalLabel: '8 maanden', isInfinite: false, isDeficit: true }),
-    ).toBeNull()
+  it('de gemelde stale zin kan niet meer ontstaan: €1/mnd geeft geen kop', () => {
+    // Zonder vloer: €1.361 ÷ €0,03/dag ≈ 41.365 dagen = "113 jaar en 4 maanden".
+    const h = buildBriefingHeadline(computeFreedomTotal(1361, 1))
+    expect(h).toBeNull()
+  })
+})
+
+// ── Geloofwaardigheidsvloer op de uitgavenbasis (UR2-03) ─────────────
+//
+// Regressie op de gemelde bevinding: op een account met alleen naam +
+// geboortedatum opende /overzicht met "Je vermogen staat voor 113 jaar en 4
+// maanden aan vrijheid." Oorzaak: elke guard toetste de noemer op `> 0`, maar
+// bij (bijna) lege data wordt hij niet nul maar MINUSCUUL — één losse
+// transactie van €1 in het 12-maands venster geeft €1/mnd ⇒ €0,03/dag, en dan
+// koopt een paar honderd euro een eeuw vrijheid. De vloer laat zo'n basis in de
+// staat vallen die de app al eerlijk behandelt (isInfinite → "Vul je uitgaven
+// aan om je vrijheidstijd te zien"), in plaats van hem als meting te tonen.
+describe('vrijheidstijd-hero — geloofwaardigheidsvloer op de uitgavenbasis', () => {
+  it('computeFreedomTotal: een basis van €1/mnd is geen basis (isInfinite, geen eeuw vrijheid)', () => {
+    // Zonder vloer: €1.361 ÷ (€1×12/365 = €0,0329/dag) ≈ 41.365 dagen
+    // = "113 jaar en 4 maanden" — exact de gemelde regel.
+    const t = computeFreedomTotal(1361, 1)
+    expect(t.breakdown.isInfinite).toBe(true)
+    expect(t.totalFreedomDays).toBe(0)
+    expect(t.monthlyExpenses).toBe(0)
   })
 
-  it('buildBriefingHeadline: zonder delta toont het totaal', () => {
-    const h = buildBriefingHeadline({ deltaDays: null, totalLabel: '8 jaar', isInfinite: false, isDeficit: false })
-    expect(h).toMatch(/8 jaar/)
+  it('computeFreedomTotal: een reële maandbasis blijft ongemoeid', () => {
+    const t = computeFreedomTotal(100000, 3000)
+    expect(t.breakdown.isInfinite).toBe(false)
+    expect(t.totalFreedomDays).toBeCloseTo(1013.9, 1)
+  })
+
+  it('buildFreedomHeroProps: sub-vloer basis → e-mailblok valt terug op "onbepaald"', () => {
+    const hero = buildFreedomHeroProps(
+      { totalFreedomDays: 41365, netWorth: 1361, monthlyExpenses: 1 },
+      null,
+    )
+    expect(hero.isInfinite).toBe(true)
   })
 })
 

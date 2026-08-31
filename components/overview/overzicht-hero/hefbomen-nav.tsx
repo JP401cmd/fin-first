@@ -34,25 +34,20 @@ import {
   leverageStatusTextClass,
   type LeverageStatus,
 } from '@/lib/leverage-status'
-import type { LeverScores, LeverStatus } from '@/components/app/shell/lever-scores'
+import {
+  leverToLeverageStatus,
+  type LeverScores,
+} from '@/components/app/shell/lever-scores'
 
-/**
- * Map de kompas-status (`LeverStatus`: green/amber/red/neutral) naar het
- * `LeverageStatus`-vocabulaire (good/warn/bad/neutral) dat de hefboomkaarten
- * renderen. Zo lezen de overzicht-kaarten EXACT dezelfde status als de
- * sidebar-dots — beide komen uit `loadLeverScores` (gedeelde SSoT die ook de
- * status-duiding-banner voedt). Geen tweede scoringssysteem meer (BUG: kaart
- * groen, sidebar oranje voor dezelfde hefboom).
- */
-function leverToLeverageStatus(status: LeverStatus): LeverageStatus {
-  return status === 'green'
-    ? 'good'
-    : status === 'amber'
-      ? 'warn'
-      : status === 'red'
-        ? 'bad'
-        : 'neutral'
-}
+// `leverToLeverageStatus` mapt de kompas-status (`LeverStatus`:
+// green/amber/red/neutral) naar het `LeverageStatus`-vocabulaire
+// (good/warn/bad/neutral) dat de hefboomkaarten renderen. Zo lezen de
+// overzicht-kaarten EXACT dezelfde status als de sidebar-dots — beide komen uit
+// `loadLeverScores` (gedeelde SSoT die ook de status-duiding-banner voedt).
+// Geen tweede scoringssysteem meer (BUG: kaart groen, sidebar oranje voor
+// dezelfde hefboom). De functie stond hiér als lokale kopie naast een identieke
+// omkering in `lib/lever-scores.ts`; sinds UR2-04 is er één vertaling, in dat
+// bestand — samen met het statuswoord (`leverStatusLabel`).
 
 /** Hefboom-key → de bijbehorende LeverScores-entry. */
 const LEVER_KEY_MAP: Record<Hefboom, keyof LeverScores> = {
@@ -65,6 +60,23 @@ const LEVER_KEY_MAP: Record<Hefboom, keyof LeverScores> = {
 type HefboomKey = Hefboom
 type StatusCode = LeverageStatus
 
+/**
+ * Wát het bedrag op de belasting-tegel is. `totals.belasting` draagt
+ * `horizonData.box3Tax` — uitsluitend de Box 3-vermogensheffing, niet de totale
+ * belastingdruk die /overzicht/belasting toont (daar telt Box 1 mee, en die is
+ * doorgaans een orde groter). Zonder deze regel las de tegel als "dit betaal ik
+ * aan belasting" en week ze onverklaarbaar af van de hub (kaart UR2-12).
+ *
+ * Waarom labelen en niet convergeren op de totale druk: de STATUS van deze
+ * hefboom is óók box3-exposure (`lib/lever-scores.ts`), en Box 1 zou een tweede,
+ * zware loader (`loadTaxOpportunities`) in blok 1 van de hub trekken. Bedrag en
+ * oordeel blijven dus dezelfde grootheid; alleen de eenheid staat er nu bij.
+ *
+ * Bewoording spiegelt de box-kaart op de hub ("Box 3 · Sparen + beleggen",
+ * `app/(app)/overzicht/belasting/box-cards.ts`), zodat de doorklik herkenbaar is.
+ */
+const BELASTING_BASIS_LABEL = 'Box 3 · sparen en beleggen'
+
 export type HefbomenTotals = {
   /** Totale waarde bezittingen, in EUR. */
   bezittingen?: number | null
@@ -72,7 +84,10 @@ export type HefbomenTotals = {
   schulden?: number | null
   /** Spaarquote 6-maands gemiddelde (0–100 %). */
   cashflow?: number | null
-  /** Jaarlijkse Box 3-belasting, in EUR. */
+  /**
+   * Jaarlijkse Box 3-belasting, in EUR — NIET de totale belastingdruk.
+   * De tegel labelt dat zichtbaar; zie `BELASTING_BASIS_LABEL`.
+   */
   belasting?: number | null
 }
 
@@ -109,7 +124,12 @@ const HEFBOMEN: ReadonlyArray<{
     key: 'belasting',
     href: '/overzicht/belasting',
     pillarKey: null,
-    tooltip: 'Box 1, Box 2 en Box 3 — verken je positie en hoe je het verdeelt.',
+    // De tooltip beloofde "Box 1, Box 2 en Box 3" naast een bedrag dat ALLEEN
+    // Box 3 is (`totals.belasting` = `horizonData.box3Tax`). Wie doorklikte zag
+    // op de hub een totale druk van een heel andere orde en kon nergens lezen
+    // wat het kaartbedrag dan wél was (kaart UR2-12). De tooltip zegt nu wat de
+    // tegel toont en waar de rest staat.
+    tooltip: 'Box 3-heffing per jaar over sparen en beleggen. Box 1 en Box 2 staan op de belastingpagina.',
   },
 ] as const
 
@@ -187,6 +207,14 @@ export function HefbomenNav({
   // privacy-toggle. Het cashflow-percentage is géén saldo en blijft zichtbaar.
   const { masked } = useMaskedAmounts()
 
+  // Toont ten minste één tegel een grondslagregel onder de KPI? Dan krijgen ze
+  // alle vier minstens de placeholder (zie de `subAmount`-blok hieronder).
+  // Twee bronnen: de dubbele grondslag (incl./excl. eigen woning) en de
+  // eenheid-regel onder het belastingbedrag.
+  const showsBasisRow =
+    housingSplit != null ||
+    (typeof totals?.belasting === 'number' && totals.belasting > 0)
+
   return (
     <nav
       aria-label="Vier hefbomen"
@@ -236,9 +264,14 @@ export function HefbomenNav({
         // dubbele-grondslag-regel weg. Grondslag-detail is geen oordeel, en de
         // `verdict`-variant rendert `subAmount` sowieso niet — de guard hier
         // houdt de intentie op de call-site zichtbaar.
+        // De grondslagregel heeft sinds UR2-12 twee bronnen: de dubbele
+        // grondslag hierboven, én de EENHEID van het belastingbedrag. Zodra één
+        // van beide een regel oplevert, krijgen álle vier de tegels minstens de
+        // placeholder — anders loopt de rij scheef.
         let subAmount: React.ReactNode = null
-        if (housingSplit && !simple) {
+        if (showsBasisRow && !simple) {
           if (
+            housingSplit &&
             showTotal &&
             typeof totalValue === 'number' &&
             (key === 'bezittingen' || key === 'schulden')
@@ -250,13 +283,14 @@ export function HefbomenNav({
             subAmount = (
               <>excl. eigen woning · {formatMaskedCurrency(exclValue, masked)}</>
             )
+          } else if (key === 'belasting' && showTotal) {
+            subAmount = BELASTING_BASIS_LABEL
           } else {
-            // Dual-modus actief, maar deze tegel (cashflow/belasting, of zonder
-            // totaal) heeft geen excl.-regel → lege placeholder, zodat alle vier
-            // tegels in de desktop-rij (align-items: stretch) gelijke content-
-            // hoogte houden en de absolute chevron niet wegzweeft. Spiegelt het
-            // subText-placeholder-patroon. Bij housingSplit == null: geen enkele
-            // placeholder (byte-identiek aan voorheen).
+            // Deze tegel heeft geen grondslagregel → lege placeholder, zodat alle
+            // vier tegels in de desktop-rij (align-items: stretch) gelijke
+            // content-hoogte houden en de absolute chevron niet wegzweeft.
+            // Spiegelt het subText-placeholder-patroon. Zonder enige bron:
+            // geen enkele placeholder (byte-identiek aan voorheen).
             subAmount = <span aria-hidden="true">&nbsp;</span>
           }
         }
@@ -268,6 +302,10 @@ export function HefbomenNav({
             tint={accent}
             label={label}
             kpi={showTotal ? formattedTotal : null}
+            // In Eenvoudig rendert `subAmount` bewust niet; de eenheid van het
+            // belastingbedrag mag daar niet mee wegvallen, dus die reist via het
+            // venster-label achter het gedempte bedrag mee.
+            kpiWindow={key === 'belasting' && showTotal ? 'Box 3' : undefined}
             status={status}
             subText={subText}
             subAmount={subAmount}

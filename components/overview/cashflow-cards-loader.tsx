@@ -4,6 +4,8 @@ import { loadCashflowData } from '@/lib/cashflow-data-loader'
 import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
 import { buildCashflowCards, cashflowCardStatuses } from '@/lib/cashflow-cards'
 import { CashflowStatusSeed } from '@/components/app/cashflow-status-provider'
+import { StaleTransactionsBanner } from '@/components/app/stale-transactions-banner'
+import { transactionFreshness } from '@/lib/transaction-staleness'
 import {
   CashflowLandingCards,
   CashflowLandingCardsSkeleton,
@@ -51,6 +53,7 @@ export async function CashflowCardsLoader({ perspective }: { perspective: Perspe
     loadVasteLastenSummary(supabase),
   ])
   const cards = buildCashflowCards(kpis, cashflow, vasteLasten)
+  const txFreshness = transactionFreshness(kpis.latestTransactionMonth)
 
   return (
     <>
@@ -58,6 +61,17 @@ export async function CashflowCardsLoader({ perspective }: { perspective: Perspe
           array, zelfde projectie) — daardoor fetcht de hub `/api/overzicht/
           cashflow-status` niet. Rendert niets. */}
       <CashflowStatusSeed statuses={cashflowCardStatuses(cards)} />
+
+      {/* Versheidsmelding bóven de kaarten (UR2-13): de vier KPI's hieronder —
+          budgetstand, maandsaldo, vaste lasten, prognose — rusten allemaal op
+          transacties, dus als die stilstaan hoort dat te staan vóór de cijfers,
+          niet erna. De sectie-wrapper hangt aan hetzelfde canonieke oordeel als
+          de banner zelf, zodat er bij verse data geen lege padding overblijft. */}
+      {txFreshness.state === 'stale' && (
+        <section className="mx-auto max-w-6xl px-4 pb-4 sm:px-6">
+          <StaleTransactionsBanner latestTransactionMonth={kpis.latestTransactionMonth} />
+        </section>
+      )}
 
       <section className="mx-auto max-w-6xl px-4 sm:px-6">
         <CashflowLandingCards cards={cards} />

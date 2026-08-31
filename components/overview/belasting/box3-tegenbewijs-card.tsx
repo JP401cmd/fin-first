@@ -77,6 +77,7 @@ function initialRendementPct(result: Box3Result): number {
 export function Box3TegenbewijsCard({
   result,
   rateFootnote = null,
+  embedded = false,
 }: {
   result: Box3Result
   /**
@@ -90,6 +91,14 @@ export function Box3TegenbewijsCard({
    * `null` = geen eerlijke dagbasis of gemaskeerd → geen voetnoot.
    */
   rateFootnote?: string | null
+  /**
+   * `true` = de kaart wordt in een omhulsel gerenderd dat de kop al draagt
+   * (`DepthSection` in Eenvoudig, UR2-16d). Dan vervallen de eigen katern-rand,
+   * -padding en `Box3SectionHeader`; anders zou de gebruiker twee koppen en een
+   * dubbele rand zien. Standaard `false` = de bestaande, ongewijzigde
+   * katern-vorm voor de volledige weergave.
+   */
+  embedded?: boolean
 }) {
   const { masked } = useMaskedAmounts()
   const fc = (v: number) => formatMaskedCurrency(v, masked)
@@ -104,13 +113,15 @@ export function Box3TegenbewijsCard({
   const freedom = calculateFreedomTime(cmp.besparing, result.dailyExpenses)
 
   return (
-    <div className="border-t border-[var(--ink)] px-4 py-5 sm:px-7">
-      <Box3SectionHeader num="3.2">
-        <span className="inline-flex items-center gap-1.5">
-          <Scale className="h-3.5 w-3.5" style={{ color: ACCENT_700 }} aria-hidden="true" />
-          Tegenbewijs-simulator
-        </span>
-      </Box3SectionHeader>
+    <div className={embedded ? '' : 'border-t border-[var(--ink)] px-4 py-5 sm:px-7'}>
+      {!embedded && (
+        <Box3SectionHeader num="3.2">
+          <span className="inline-flex items-center gap-1.5">
+            <Scale className="h-3.5 w-3.5" style={{ color: ACCENT_700 }} aria-hidden="true" />
+            Tegenbewijs-simulator
+          </span>
+        </Box3SectionHeader>
+      )}
       <p
         className="mb-4 text-sm italic leading-snug text-[var(--ink-2)]"
         style={{ fontFamily: SOURCE_SERIF }}

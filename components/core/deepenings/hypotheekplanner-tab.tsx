@@ -16,13 +16,22 @@
  *
  * Beide paden leiden tot dezelfde rendering (`<HypotheekplannerActive>`).
  *
+ * Beide entries hebben ook een koppelscherm (`<AppLinkGate>`) in plaats van
+ * een doodlopende empty-state: is er niets gekoppeld, dan kiest de gebruiker
+ * hier direct welke hypotheek (debt-entry) of welke woning (asset-entry) de
+ * planner volgt. De vlag die daarbij geschreven wordt is exact dezelfde als
+ * de "Hypotheekplanner"-schakelaar op het item zelf.
+ *
  * Graceful degradation:
  *  - Geen gekoppeld huis → `<EquityBuildupBar>` + `<WaardestijgingSlider>`
  *    + LTV-mijlpalen worden verborgen. `<DebtPayoffStrategy>`,
  *    `<AmortisationChart>`, `<HypotheekVsBeleggenSectie>`, schuldvrij-datum
  *    blijven werken.
  *  - Geen mortgage (alleen huis getrackt) → tab toont noot dat planner
- *    pas inhoud krijgt zodra gebruiker een hypotheek koppelt.
+ *    pas inhoud krijgt zodra gebruiker een hypotheek koppelt. Bewust géén
+ *    koppelscherm: de asset-entry zoekt de hypotheek via
+ *    `debts.linked_asset_id`, en dat veld zet je op de hypotheek-detail —
+ *    een tracking-toggle alleen zou de woning nog steeds niet vinden.
  *
  * Data-loading: client-side bij tab-mount. Symmetrisch met
  * `cash-budgetteren-tab.tsx` — de host-pagina levert geen mortgage-prop.
@@ -30,7 +39,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Building2, Landmark, Shield, Percent } from 'lucide-react'
+import { Building2, Home, Landmark, Shield, Percent } from 'lucide-react'
 import { ASSET_CLIENT_COLUMNS, type Asset } from '@/lib/asset-data'
 import {
   type Debt,
@@ -98,26 +107,45 @@ function remainingMonths(debt: Debt): number {
  * Top-level entry. Splitst op `moduleActive` zodat de actieve tak (incl.
  * Supabase-fetch) nooit mount wanneer Toekomstplannen uit staat.
  */
-export function HypotheekplannerTab({ type, moduleActive, currentUserId }: DeepeningTabProps) {
+export function HypotheekplannerTab({
+  type,
+  moduleActive,
+  assets,
+  currentUserId,
+}: DeepeningTabProps) {
   if (!moduleActive) {
     return <HypotheekplannerTeaser />
   }
-  return <HypotheekplannerGated type={type} currentUserId={currentUserId} />
+  return (
+    <HypotheekplannerGated
+      type={type}
+      assets={assets}
+      currentUserId={currentUserId}
+    />
+  )
 }
 
 // ── Gate-laag (setup-check) ──────────────────────────────────
 
 function HypotheekplannerGated({
   type,
+  assets,
   currentUserId,
 }: {
   type: AssetType | DebtType
+  assets?: Asset[]
   currentUserId?: string
 }) {
   const setupCompleted = useIsAppSetupCompleted('hypotheekplanner')
   if (setupCompleted === null) return <SkeletonBox />
   if (setupCompleted === false) return <AppSetupGate appKey="hypotheekplanner" />
-  return <HypotheekplannerActive type={type} currentUserId={currentUserId} />
+  return (
+    <HypotheekplannerActive
+      type={type}
+      assets={assets}
+      currentUserId={currentUserId}
+    />
+  )
 }
 
 // ── Teaser-tak (module uit) ──────────────────────────────────
@@ -166,9 +194,16 @@ interface LoadedData {
 
 function HypotheekplannerActive({
   type,
+  assets,
   currentUserId,
 }: {
   type: AssetType | DebtType
+  /**
+   * Server-geladen bezittingen van de eigen_huis-categorie (asset-entry).
+   * Voedt het koppelscherm zonder eigen client-read — datapad-conventie
+   * ADR 0058. Debt-hosts laten dit leeg; die entry heeft 'm niet nodig.
+   */
+  assets?: Asset[]
   currentUserId?: string
 }) {
   const [data, setData] = useState<LoadedData | null>(null)
@@ -289,8 +324,7 @@ function HypotheekplannerActive({
   // Zelfde vlag als de instelling op de hypotheek zelf
   // (has_hypotheekplanner_tracking, via /api/debts/toggle-hypotheekplanner);
   // na koppelen herlaadt de tab zijn eigen fetch. Zonder kandidaten toont
-  // de gate een voeg-eerst-toe-CTA naar de items-tab. De eigen_huis-entry
-  // houdt zijn bestaande woonbalans-paden (Pad 1/2 hieronder).
+  // de gate een voeg-eerst-toe-CTA naar de items-tab.
   if (type === 'mortgage' && !data.mortgage) {
     return (
       <AppLinkGate
@@ -312,22 +346,46 @@ function HypotheekplannerActive({
     )
   }
 
-  // Pad 1: gebruiker landde op asset-pagina maar er is geen hypotheek
-  // gekoppeld → toon noot met instructie. We tonen GEEN equity-bar omdat
-  // die zonder schuld niets toevoegt boven de WidgetEmpty-state.
-  if (!data.mortgage && data.house) {
-    return <NoMortgageState />
+  // Pad 1 — huis-entry zonder gekoppelde woning: koppelscherm. Spiegel van
+  // Pad 0, maar op de andere vlag (`has_woonbalans_tracking`, via
+  // /api/assets/toggle-woonbalans) — precies dezelfde schakelaar als
+  // "Hypotheekplanner" in het bezitting-bewerkformulier. Kandidaten komen
+  // uit de server-bundel van de host (geen tweede client-read), beperkt tot
+  // éígen woningen: lezen op `assets` is huishoud-gedeeld, maar de
+  // toggle-write is strikt eigen-rij en zou op een partnerwoning altijd
+  // stuklopen.
+  if (type === 'eigen_huis' && !data.house) {
+    const houses = assets ?? []
+    const linkableHouses = currentUserId
+      ? houses.filter((a) => a.user_id === currentUserId)
+      : houses
+    return (
+      <AppLinkGate
+        kicker="Woning koppelen"
+        title="Koppel je woning aan de planner"
+        intro="De Hypotheekplanner toont je equity-opbouw voor de woning die je koppelt. Kies hieronder welke woning je in de planner wilt volgen."
+        itemNoun="woning"
+        icon={Home}
+        candidates={linkableHouses.map((a) => ({
+          id: a.id,
+          name: a.name,
+          value: Number(a.current_value),
+        }))}
+        endpoint="/api/assets/toggle-woonbalans"
+        emptyCopy="Je hebt nog geen eigen woning geregistreerd. Voeg er eerst één toe bij je bezittingen — daarna kun je 'm hier aan de planner koppelen."
+        emptyCtaLabel="Voeg woning toe"
+        onLinked={() => setReloadKey((k) => k + 1)}
+      />
+    )
   }
 
-  // Pad 2: noch hypotheek noch huis getrackt — algemene empty state.
-  if (!data.mortgage && !data.house) {
-    return <NoTrackedItemsState type={type} />
-  }
-
+  // Pad 2 — woning gekoppeld, maar geen hypotheek die naar haar wijst.
+  // Bewust een instructie-noot en géén koppelscherm: de asset-entry vindt de
+  // hypotheek via `debts.linked_asset_id`, en dat veld zet je op de
+  // hypotheek-detail. Een tracking-toggle alleen zou het gat niet dichten.
+  // We tonen GEEN equity-bar: die voegt zonder schuld niets toe.
   if (!data.mortgage) {
-    // TypeScript-narrowing — onbereikbaar door bovenstaande returns, maar
-    // expliciet zodat de rest van de tree zonder optional chaining werkt.
-    return <NoTrackedItemsState type={type} />
+    return <NoMortgageState />
   }
 
   return (
@@ -580,21 +638,10 @@ function Stat({
 
 // ── Empty / loading / error states ───────────────────────────
 
-function NoTrackedItemsState({ type }: { type: AssetType | DebtType }) {
-  const isAsset = type === 'eigen_huis'
-  return (
-    <div className="border border-dashed border-[var(--border-md)] bg-[var(--subtle)]/40 px-6 py-8 text-center">
-      <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
-        Nog niets getrackt
-      </p>
-      <p className="mt-2 font-serif italic text-sm leading-relaxed text-[var(--ink-2)]">
-        {isAsset
-          ? 'Activeer woonbalans-tracking op je woning om hier de planner-inhoud te zien.'
-          : 'Activeer aflossings-tracking op je hypotheek om hier de planner-inhoud te zien.'}
-      </p>
-    </div>
-  )
-}
+// De vroegere `NoTrackedItemsState` ("Activeer woonbalans-tracking…") is
+// vervallen: beide entries lopen nu op een koppelscherm uit. Die tekst was
+// bovendien de derde naam voor één schakelaar (tab + kaartchip + formulier
+// zeggen allemaal "Hypotheekplanner").
 
 function NoMortgageState() {
   return (

@@ -24,7 +24,7 @@
 // de doc-volgorde hieronder per generator is dus de bron-volgorde, niet
 // per se de getoonde volgorde.
 
-import { formatCurrency } from '@/lib/format'
+import { credibleDailyExpense, credibleMonthlyBasis, formatCurrency } from '@/lib/format'
 import { formatGoalValue, type GoalType } from '@/lib/goal-data'
 import type { HealthScore } from '@/lib/financial-health'
 import type { LifeEvent } from '@/lib/horizon-data'
@@ -502,12 +502,27 @@ function buildFinanceEntries(finance: BriefingFinanceInput, now: Date): Briefing
   // CASHFLOW-widget op dezelfde pagina. Formule van de fallback blijft
   // jaaruitgaven/365 (= maand×12/365), zoals calculateFreedomTime in
   // lib/format.ts — niet maand/30 (= jaar/360), wat ~1,4% afweek.
+  //
+  // GELOOFWAARDIGHEIDSVLOER (UR2-03): elke kandidaat moet door
+  // `credibleDailyExpense`/`credibleMonthlyBasis`. Bij een (bijna) leeg account
+  // wordt het rollende dagtarief niet nul maar centen-per-dag (één transactie
+  // van €1 ⇒ €0,03/dag), terwijl de guard hierboven alleen `> 0` toetste —
+  // daardoor stond er "2677 dagen vrijheid per maand" in de briefing. Zakt het
+  // rollende tarief door de vloer, dan valt de engine terug op de effectieve
+  // maandbasis: dat is óók de grondslag van de BEDRAGEN in deze briefjes
+  // (monthSavings = inkomen − uitgaven), dus de dagen zijn dan per constructie
+  // consistent met het percentage dat in dezelfde zin staat. Haalt geen van
+  // beide de vloer, dan is er geen dagbasis en vervalt de dagen-toevoeging —
+  // de zin blijft staan, de onmogelijke claim verdwijnt.
   const dailyExp =
-    finance.dailyExpenseRate && finance.dailyExpenseRate > 0
-      ? finance.dailyExpenseRate
-      : finance.monthlyExpenses && finance.monthlyExpenses > 0
-        ? (finance.monthlyExpenses * 12) / 365
-        : 0
+    credibleDailyExpense(finance.dailyExpenseRate) ||
+    (credibleMonthlyBasis(finance.monthlyExpenses) * 12) / 365
+
+  // Maandgrondslagen waarop de briefjes hun percentages en bedragen baseren —
+  // gefloord op dezelfde vloer, zodat een restwaarde van een paar euro geen
+  // spaarquote, salarisverwachting of vaste-lasten-percentage kan dragen.
+  const monthlyIncome = credibleMonthlyBasis(finance.monthlyIncome)
+  const monthlyExpenses = credibleMonthlyBasis(finance.monthlyExpenses)
 
   // 1. Vermogensgroei/-daling deze maand (uit de laatste twee snapshots).
   const hist = finance.netWorthHistory ?? []
@@ -562,19 +577,16 @@ function buildFinanceEntries(finance: BriefingFinanceInput, now: Date): Briefing
   }
 
   // 3. Spaarquote — alleen tonen als budgetdruk niet al de cashflow-kaart vult
-  //    én er échte uitgaven-data is (anders rekent income-0 = 100% spaarquote,
-  //    wat een ontbrekende-data-staat als perfecte spaarquote zou tonen).
-  if (
-    !budgetShown &&
-    finance.monthlyIncome &&
-    finance.monthlyIncome > 0 &&
-    finance.monthlyExpenses != null &&
-    finance.monthlyExpenses > 0
-  ) {
-    const income = finance.monthlyIncome
+  //    én er échte inkomens- én uitgaven-data is. Niet "> 0" maar de
+  //    geloofwaardigheidsvloer (UR2-03): met €0 rekende de engine 100%
+  //    spaarquote, en met een restwaarde van een paar euro presenteerde ze een
+  //    ontbrekende-data-staat als becijferde spaarquote ("Je spaart 34% van je
+  //    inkomen" op een account zonder ingevuld inkomen).
+  if (!budgetShown && monthlyIncome > 0 && monthlyExpenses > 0) {
+    const income = monthlyIncome
     // Deze-maand-surplus blijft de bron voor de "meer uitgegeven dan
     // binnenkwam"-observatie (expliciet een déze-maand-signaal).
-    const monthSavings = income - finance.monthlyExpenses
+    const monthSavings = income - monthlyExpenses
     const days = freedomDaysLabel(monthSavings, dailyExp)
     // Spaarquote-PRESENTATIE op de EFFECTIEVE, grondslag-geresolveerde quote —
     // exact wat de cashflow-pagina toont. Valt terug op het 1-maands-percentage
@@ -630,8 +642,9 @@ function buildFinanceEntries(finance: BriefingFinanceInput, now: Date): Briefing
     })
   }
 
-  // 5. Salaris-countdown — binnen 10 dagen, alleen met bekend inkomen.
-  if (finance.monthlyIncome && finance.monthlyIncome > 0) {
+  // 5. Salaris-countdown — binnen 10 dagen, alleen met een geloofwaardig
+  //    bekend inkomen (een restwaarde van een paar euro is geen salaris).
+  if (monthlyIncome > 0) {
     const dts = daysUntilSalary(now)
     if (dts >= 0 && dts <= 10) {
       out.push({
@@ -695,14 +708,14 @@ function buildFinanceEntries(finance: BriefingFinanceInput, now: Date): Briefing
   }
 
   // 10. Vaste lasten — som van terugkerende lasten, met de grootste benoemd.
-  //     Alleen met bekend inkomen zodat het percentage betekenis heeft.
+  //     Alleen met een geloofwaardig bekend inkomen: op een restwaarde deelt het
+  //     percentage door bijna niets en schiet het naar honderden procenten.
   if (
     finance.totalRecurringAmount != null &&
     finance.totalRecurringAmount > 0 &&
-    finance.monthlyIncome &&
-    finance.monthlyIncome > 0
+    monthlyIncome > 0
   ) {
-    const pct = Math.round((finance.totalRecurringAmount / finance.monthlyIncome) * 100)
+    const pct = Math.round((finance.totalRecurringAmount / monthlyIncome) * 100)
     const top = finance.recurring?.[0]
     const topLabel = top ? ` — grootste: ${top.name} (${formatCurrency(top.amount)})` : ''
     out.push({

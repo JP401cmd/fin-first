@@ -214,7 +214,7 @@ const criteria: AcceptanceCriterion[] = [
     then: 'Redirect naar /toekomst?whatif=open (gescrold naar "Verken je aannames", URL opgeschoond); dream-transitie opent /toekomst/whatif?via=dreamgate. Eenvoudig-weergave verbergt beide routes uit de nav (SIMPLE_HIDDEN_NAV_HREFS) maar de deeplink werkt. Geen basisgegevens → lege staat met CTA naar /overzicht/bezittingen.',
     assertion: {
       kind: 'ui-only',
-      source: 'app/(app)/toekomst/whatif/page.tsx (redirect-guard) + components/app/horizon/horizon-client.tsx (?whatif=open-scroll) — routing/interactie, geen eigen berekening',
+      source: 'next.config.ts#redirects (routing-laag-guard op /toekomst/whatif, `missing: via=dreamgate`) + components/app/horizon/horizon-client.tsx (?whatif=open-scroll) + lib/horizon/deeplink-cleanup.ts (URL-opschoning blijft op dezelfde route) — routing/interactie, geen eigen berekening',
     },
   },
   {

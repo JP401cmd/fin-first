@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import {
   TrendingUp,
   Lightbulb,
@@ -23,14 +24,21 @@ import {
   rotateEntries,
 } from '@/lib/briefing/rotation'
 import { formatTimestamp } from '@/lib/format'
-import { ShareDialog, type ShareContent } from '@/components/app/share-dialog'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { AiSubscriptionUpsell } from '@/components/app/ai-subscription-upsell'
 import { useExecutionMode } from '@/lib/ai/local/use-execution-mode'
 import type { LocalBriefingProgress } from '@/lib/ai/local/local-briefing-resolver'
-import { VrijheidsbriefingHero } from './vrijheidsbriefing-hero'
-import type { FreedomHeroProps } from '@/lib/briefing/overview-briefing'
-import type { FreedomCardData } from '@/components/app/freedom-card'
+
+/**
+ * De deel-flow (standen-keuze + live kaartvoorbeeld + canvas-renderer) is een
+ * eigen scherm; lazy geladen zodat de kaart-tekencode en de deel-dialoog buiten
+ * de initiële /overzicht-bundle blijven — precies wat de oude klik-tijd
+ * `import()` van de canvas-renderer hier deed.
+ */
+const DeelKaartSheet = dynamic(
+  () => import('@/components/app/deel-kaart-sheet').then((m) => m.DeelKaartSheet),
+  { ssr: false },
+)
 
 /**
  * BriefingPanel — de "wekelijkse briefing" op /overzicht. Toont een 3-koloms
@@ -86,17 +94,6 @@ const MAX_BRIEFING_ENTRIES = 6
 /** Eenvoudige weergave: 3 briefjes naast elkaar op sm+, 1 op mobiel. */
 const SIMPLE_BRIEFING_ENTRIES = 3
 
-/** Lees het gedeelde privacy-niveau (zelfde key als de vrijheidskaart-generator). */
-function readPrivacyLevel(): 'anonymous' | 'named' | 'full' {
-  try {
-    const s = typeof window !== 'undefined' ? localStorage.getItem('trifinity_privacy_level') : null
-    if (s === 'anonymous' || s === 'named' || s === 'full') return s
-  } catch {
-    /* localStorage niet beschikbaar */
-  }
-  return 'anonymous'
-}
-
 /**
  * Voortgangstekst tijdens de ON-DEVICE redactie. De eerste sessie-load is een
  * stille GPU-warmup van ~45-60s; zonder deze tekst voelt dat als een hang.
@@ -137,26 +134,12 @@ export function herschrevenNotice(
   return `Je briefing is ververst; Fin herschreef ${herschreven} van de ${totaal} briefjes${waar}, de rest bleef zoals hij was.`
 }
 
-/** Bouw de ShareContent-tekst uit de vrijheidskaart-data. */
-function buildShareContent(data: FreedomCardData): ShareContent {
-  const pct = data.freedomPercentage != null ? `${data.freedomPercentage}%` : 'N/B'
-  const daysWon = data.freedomDaysWonThisMonth ?? data.freedomDaysWon
-  return {
-    title: 'Mijn TriFinity vrijheidsweek',
-    text: `Mijn financiële vrijheid: ${pct} · ${daysWon} vrijheidsdagen · FIRE: ${data.fireCountdown?.label ?? 'N/B'} #TriFinity`,
-    url: typeof window !== 'undefined' ? window.location.origin : '',
-    contentType: 'freedom_card',
-    privacyLevel: data.privacyLevel,
-  }
-}
-
 export function BriefingPanel({
   entries,
   refreshedAt,
   dataChanged = false,
   canRefresh = false,
   refreshState = 'available',
-  freedomHero,
   headline,
   weekHistory,
   simpleMode = false,
@@ -183,17 +166,21 @@ export function BriefingPanel({
    * elke call site die dit (nog) niet meegeeft.
    */
   refreshState?: BriefingRefreshState
-  /** Vrijheidstijd-hero bovenaan (week-over-week delta). Optioneel. */
-  freedomHero?: FreedomHeroProps | null
-  /** Eén-zin kop onder de titel (deterministisch of AI bij ververs). */
+  /**
+   * Eén-zin kop onder de titel (deterministisch of AI bij ververs).
+   *
+   * UR2-09: de deterministische variant wordt server-side uit de LIVE canonieke
+   * vrijheidstijd gerekend, niet uit de bevroren week-snapshot. Dat was de
+   * tweede drager van hetzelfde stale getal als het verwijderde
+   * "Jouw vrijheid deze week"-blok.
+   */
   headline?: string | null
   /** Afgesloten weken uit de snapshot-historie (nieuwste laatst). */
   weekHistory?: BriefingWeekHistoryItem[]
   /**
-   * Eenvoudige weergave (display_mode === 'simple'): verberg de
-   * "Jouw vrijheid deze week"-hero en toon een ROULEREND venster over de zes
-   * briefjes in hetzelfde 3-koloms grid als de volledige weergave — 3 naast
-   * elkaar op sm+, 1 op mobiel. Ook de "Vorige weken"-terugblik onderaan valt
+   * Eenvoudige weergave (display_mode === 'simple'): toon een ROULEREND venster
+   * over de zes briefjes in hetzelfde 3-koloms grid als de volledige weergave —
+   * 3 naast elkaar op sm+, 1 op mobiel. Ook de "Vorige weken"-terugblik onderaan valt
    * weg: Eenvoudig gaat over nú, de historie hoort bij de volledige weergave.
    * Default false → volledige briefing (max 6, geen rotatie).
    */
@@ -238,14 +225,10 @@ export function BriefingPanel({
   const exec = useExecutionMode('briefing', hasAi)
   const execReady = exec.canUseCloud || exec.canUseLocal
 
-  // Deel-state: de canvas-renderer wordt dynamisch geïmporteerd bij de eerste
-  // klik zodat de tekencode buiten de initiële /overzicht-bundle blijft.
-  const [sharing, setSharing] = useState(false)
-  const [shareOpen, setShareOpen] = useState(false)
-  const [shareData, setShareData] = useState<FreedomCardData | null>(null)
-  const [shareRenderer, setShareRenderer] = useState<
-    ((d: FreedomCardData) => HTMLCanvasElement | Promise<HTMLCanvasElement>) | null
-  >(null)
+  // Deel-state: de knop opent alleen nog de deel-sheet. Die draagt zelf de
+  // standen-keuze, het live voorbeeld, het ophalen van de kaart én de
+  // deel-dialoog — hier blijft niets van die flow achter.
+  const [deelOpen, setDeelOpen] = useState(false)
 
   // In Eenvoudig rouleert een venster van 3 over dezelfde zes briefjes die de
   // volledige weergave toont; anders het volledige grid (max 6, ongeroteerd).
@@ -274,27 +257,6 @@ export function BriefingPanel({
   // dus er kan niets extra's vertrekken.
   const serverUsedToday = refreshState === 'used_today'
   const refreshable = canRefresh && !usedToday && !refreshing && execReady
-
-  async function handleShare() {
-    if (sharing) return
-    setSharing(true)
-    setError(null)
-    try {
-      const [res, mod] = await Promise.all([
-        fetch(`/api/share/freedom-card?privacy=${readPrivacyLevel()}`),
-        import('@/components/app/freedom-card'),
-      ])
-      if (!res.ok) throw new Error('Kon je vrijheidskaart niet genereren')
-      const data: FreedomCardData = await res.json()
-      setShareData(data)
-      setShareRenderer(() => mod.renderFreedomCardToCanvas)
-      setShareOpen(true)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Delen mislukt')
-    } finally {
-      setSharing(false)
-    }
-  }
 
   /**
    * Gedeelde 403-afhandeling. DRIE heel verschillende oorzaken delen die status:
@@ -424,7 +386,6 @@ export function BriefingPanel({
 
   return (
     <div id="briefing" className="mt-6 scroll-mt-20">
-      {freedomHero && !simpleMode && <VrijheidsbriefingHero {...freedomHero} />}
       <BriefingHeader
         refreshedAt={shownRefreshedAt}
         headline={shownHeadline}
@@ -445,8 +406,7 @@ export function BriefingPanel({
             : null
         }
         onRefresh={handleRefresh}
-        onShare={handleShare}
-        sharing={sharing}
+        onShare={() => setDeelOpen(true)}
       />
 
       {error && (
@@ -503,14 +463,7 @@ export function BriefingPanel({
         <BriefingWeekHistory items={weekHistory} />
       )}
 
-      {shareOpen && shareData && shareRenderer && (
-        <ShareDialog
-          open={shareOpen}
-          onClose={() => setShareOpen(false)}
-          content={buildShareContent(shareData)}
-          renderCanvas={() => shareRenderer(shareData)}
-        />
-      )}
+      {deelOpen && <DeelKaartSheet open onClose={() => setDeelOpen(false)} />}
     </div>
   )
 }
@@ -583,7 +536,6 @@ function BriefingHeader({
   disabledReason,
   onRefresh,
   onShare,
-  sharing,
 }: {
   refreshedAt: string | null
   headline: string | null
@@ -596,8 +548,8 @@ function BriefingHeader({
   /** Waarom de knop uit staat, wanneer dat níet "vandaag al gebruikt" is. */
   disabledReason?: string | null
   onRefresh: () => void
+  /** Opent de deel-sheet (standen-keuze + voorbeeld); doet zelf geen fetch. */
   onShare: () => void
-  sharing: boolean
 }) {
   return (
     <div className="mb-5">
@@ -614,16 +566,12 @@ function BriefingHeader({
         <button
           type="button"
           onClick={onShare}
-          disabled={sharing}
           title="Deel je vrijheidsweek"
           aria-label="Deel je vrijheidsweek"
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-2)] transition-colors hover:border-[var(--ink-3)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-45"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-1.5 text-[11px] font-semibold text-[var(--ink-2)] transition-colors hover:border-[var(--ink-3)] hover:text-[var(--ink)]"
         >
-          <Share2
-            className={`h-3.5 w-3.5 ${sharing ? 'animate-pulse' : ''}`}
-            aria-hidden="true"
-          />
-          {sharing ? 'Even…' : 'Deel'}
+          <Share2 className="h-3.5 w-3.5" aria-hidden="true" />
+          Deel
         </button>
 
         {showRefresh &&

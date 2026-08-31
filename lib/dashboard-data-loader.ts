@@ -118,6 +118,7 @@ import {
   aggIncomeByMonth,
   aggExpenseByMonthAbs,
   aggSpendingByMonthForBudgets,
+  aggLatestMonth,
   aggToExpenseRows,
   isRealAggRow,
   type TxMonthAggregateRow,
@@ -1771,6 +1772,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const monthKey = currentMonthKey(now)
   const currentMonthIncome = incomeByMonth.get(monthKey) ?? 0
   const currentMonthExpenses = expenseByMonth.get(monthKey) ?? 0
+  // VERSHEID (UR2-13): de jongste maand mét boekingen in ditzelfde aggregaat.
+  // `realOnly: false` — voor de vraag "heeft deze gebruiker transacties?" telt
+  // een maand met alleen transfers óók als bewijs; het gaat hier niet om een som
+  // maar om het bestaan van data. Nul extra queries.
+  const latestTransactionMonth = aggLatestMonth(txAgg12)
 
   // Savings history: income minus expenses per month (using all transactions)
   const savingsByMonth = new Map<string, number>()
@@ -2813,6 +2819,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     // /overzicht/cashflow toont "deze maand" en consumeert deze twee.
     currentMonthIncome,
     currentMonthExpenses,
+    // Versheid van diezelfde grondslag: een leeg venster is geen bewijs van geen
+    // data (UR2-13). Consumenten oordelen via `transactionFreshness`.
+    latestTransactionMonth,
     monthlyContributions,
     yearlyMustExpenses,
     budgetTotals,

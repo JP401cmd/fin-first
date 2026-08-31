@@ -138,14 +138,35 @@ export async function POST(request: NextRequest) {
         return serverError(invErr, 'holdings-refresh-prices:POST')
       }
 
+      // ── Rollup-kandidaten: elke LOPENDE positie, ongeacht de koers-uitkomst ──
+      // `assets.current_value` is een AFGELEIDE kolom (een weggeschreven kopie van
+      // Σ holdings, zie lib/holdings-sync.ts) en geen eigen feit. Zolang de rollup
+      // alleen draaide bij `status === 'updated'`, bleef die kopie permanent staan
+      // op de laatst geschreven waarde voor elke positie die de koersfeed niet kan
+      // prijzen (fonds zonder Yahoo-symbool, ISIN-only, tijdelijke feed-storing).
+      // Gevolg: de holdings-pagina toonde Σ holdings en élk vermogens-oppervlak
+      // (bezittingen-totaal, netto vermogen, Box 3) het oude getal — precies de
+      // cross-surface drift van kaart UR2-12 (€48.949 kop vs. €48.947 marktwaarde,
+      // en €1.051 verschil op het bezittingen-totaal).
+      //
+      // Gesloten posities (0 stuks) tellen hier bewust NIET mee: een bezit waarvan
+      // álle posities op nul staan zou anders een rollup naar €0 krijgen en
+      // daarmee een geldige, met de hand ingevoerde waarde wissen (WF-BEZIT-21).
+      for (const holding of invHoldings ?? []) {
+        const h = holding as { asset_id?: string | null; units?: number | string | null }
+        if (h.asset_id && Math.abs(Number(h.units) || 0) >= 1e-9) {
+          investmentAssetIdsToSync.add(h.asset_id)
+        }
+      }
+
       // Parallelliseer per holding met gebonden concurrency (zie
-      // `mapWithConcurrency`). Resultaten + asset-sync-ids worden index-geordend
-      // teruggegeven en pas ná de pool samengevoegd, zodat de gedeelde
-      // `results`-array en de sync-Set thread-safe gevuld blijven.
+      // `mapWithConcurrency`). Resultaten worden index-geordend teruggegeven en
+      // pas ná de pool samengevoegd, zodat de gedeelde `results`-array
+      // thread-safe gevuld blijft.
       const invOutcomes = await mapWithConcurrency(
         invHoldings ?? [],
         REFRESH_CONCURRENCY,
-        async (holding): Promise<{ result: RefreshResult; assetIdToSync: string | null }> => {
+        async (holding): Promise<RefreshResult> => {
           const h = holding as {
             id: string
             ticker: string | null
@@ -156,30 +177,19 @@ export async function POST(request: NextRequest) {
           // ook Yahoo-calls op de lange staart aan volledig verkochte posities.
           if (Math.abs(Number(h.units) || 0) < 1e-9) {
             return {
-              result: {
-                id: h.id,
-                bucket: 'investment',
-                ticker: h.ticker,
-                status: 'skipped',
-                message: 'Gesloten positie (0 stuks)',
-                current_price: h.current_price,
-              },
-              assetIdToSync: null,
+              id: h.id,
+              bucket: 'investment',
+              ticker: h.ticker,
+              status: 'skipped',
+              message: 'Gesloten positie (0 stuks)',
+              current_price: h.current_price,
             }
           }
-          const result = await refreshInvestmentHolding(supabase, user.id, holding as never)
-          const assetId = (holding as { asset_id?: string }).asset_id
-          return {
-            result,
-            assetIdToSync: result.status === 'updated' && assetId ? assetId : null,
-          }
+          return refreshInvestmentHolding(supabase, user.id, holding as never)
         },
       )
 
-      for (const { result, assetIdToSync } of invOutcomes) {
-        results.push(result)
-        if (assetIdToSync) investmentAssetIdsToSync.add(assetIdToSync)
-      }
+      for (const result of invOutcomes) results.push(result)
     }
 
     // ── Crypto holdings ────────────────────────────────────────
@@ -194,6 +204,18 @@ export async function POST(request: NextRequest) {
       const { data: cryHoldings, error: cryErr } = await cryQuery
       if (cryErr) {
         return serverError(cryErr, 'holdings-refresh-prices:POST')
+      }
+
+      // Zelfde rollup-regel als aan de investment-kant hierboven: elke lopende
+      // positie maakt haar bezit een rollup-kandidaat, ongeacht of de koers ook
+      // écht ververst is. Fiat-saldi tellen mee — `syncAssetValueFromCryptoHoldings`
+      // rekent ze bewust in de bezit-waarde mee (het totaal op de exchange), dus ze
+      // mogen de rollup ook aanjagen.
+      for (const holding of cryHoldings ?? []) {
+        const h = holding as { asset_id?: string | null; units?: number | string | null }
+        if (h.asset_id && Math.abs(Number(h.units) || 0) >= 1e-9) {
+          cryptoAssetIdsToSync.add(h.asset_id)
+        }
       }
 
       // Pre-resolve CoinGecko prices for the symbols Yahoo can't price so we
@@ -264,9 +286,6 @@ export async function POST(request: NextRequest) {
         const cgPrice = cgPrices[h.symbol.toUpperCase()]
         const result = await persistCryptoPrice(supabase, user.id, h.id, h.symbol, yahooData, cgPrice)
         results.push(result)
-        if (result.status === 'updated' && h.asset_id) {
-          cryptoAssetIdsToSync.add(h.asset_id)
-        }
       }
     }
 

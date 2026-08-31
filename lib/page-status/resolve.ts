@@ -29,11 +29,16 @@ export function leverToLeverageStatus(s: LeverStatus): LeverageStatus {
 
 /**
  * Sentinel waarmee `lever-scores.ts` een hefboom zonder echte data markeert
- * (bv. lege schulden → debtScore 50 → amber, maar detail "Geen data — Start";
- * lege bezittingen → "Geen bezittingen geregistreerd — Start", enz.). Zo'n
- * synthetische status mag GEEN banner tonen — een nieuwe gebruiker zonder
- * schulden hoort niet "Je schulden wegen zwaar" te lezen. We hergebruiken exact
- * hetzelfde sentinel dat de vier hefboom-details aanhouden.
+ * ("Geen data — Start", "Geen bezittingen geregistreerd — Start", enz.).
+ *
+ * Deze gate ontstond als PLEISTER: de schulden-hefboom codeerde 'geen data' als
+ * het getal 50, wat in de amber-band valt, dus een lege gebruiker kreeg hier
+ * bijna "Je schulden wegen zwaar" te lezen. Sinds UR2-10 is dat bij de bron
+ * opgelost — alle vier de hefbomen geven `null` → 'neutral' zodra hun detail dit
+ * sentinel draagt, en `buildInfo` filtert 'neutral' al weg. De gate blijft
+ * bewust staan als goedkope vangrail voor een toekomstige hefboom die weer een
+ * synthetisch middengetal zou invoeren; de échte grendel is de invariant-test in
+ * `lib/lever-scores.test.ts` (detail bevat "— Start" ⟺ status is 'neutral').
  */
 const LEVER_NO_DATA_MARKER = '— Start'
 

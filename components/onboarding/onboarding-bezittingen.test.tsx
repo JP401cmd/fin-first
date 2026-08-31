@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { useState } from 'react'
 import { render, fireEvent, screen } from '@testing-library/react'
 import type { AssetQuickInput, DebtQuickInput } from '@/lib/quick-add/types'
+import { formatCurrency } from '@/lib/format'
 
 // Mock de QuickAddWizard: rendert (wanneer open) één knop die exact één item
 // via `onCollect` teruggeeft — zo kunnen we de begeleide ja/nee-loop testen
@@ -273,5 +274,51 @@ describe('OnboardingBezittingen — gekoppelde hypotheek', () => {
     const { getByLabelText } = renderWith([HOUSE], [LINKED_MORTGAGE], { onDebtsChange })
     fireEvent.click(getByLabelText('Verwijder Hypotheek — Mijn woning'))
     expect(onDebtsChange).toHaveBeenCalledWith([])
+  })
+
+  // Regressie UR2-06: het lopende totaal was de kale bezittingen-som, terwijl
+  // de gekoppelde hypotheek er als eigen "−"-regel tussen stond. Het bedrag las
+  // daardoor als netto vermogen (€500.000 i.p.v. €200.000).
+  it('markeert het lopende totaal als bruto en sluit af met het netto-bedrag', () => {
+    const { container } = renderWith([HOUSE], [LINKED_MORTGAGE])
+    const text = container.textContent ?? ''
+    expect(text).toContain(`Toegevoegd · ${formatCurrency(500_000)} bruto`)
+    expect(text).toContain(`Netto na gekoppelde schuld · ${formatCurrency(200_000)}`)
+  })
+
+  it('toont in het FEITEN-paneel het netto-bedrag, met het bruto-bedrag in de bronregel', () => {
+    const { container } = renderWith([HOUSE], [LINKED_MORTGAGE])
+    const text = container.textContent ?? ''
+    expect(text).toContain(`1 bezitting · ${formatCurrency(500_000)} bruto`)
+    expect(text).toContain('jouw bezittingen min de gekoppelde schuld')
+    // Het bruto-bedrag mag nergens meer kaal als "jouw bezittingen tot nu toe"
+    // (= het kopgetal) staan.
+    expect(text).not.toContain('jouw bezittingen tot nu toe')
+  })
+
+  it('laat het totaal ongemoeid zolang er geen gekoppelde schuld is', () => {
+    const { container } = renderWith([HOUSE], [])
+    const text = container.textContent ?? ''
+    expect(text).toContain(`Toegevoegd · ${formatCurrency(500_000)}`)
+    expect(text).not.toContain('bruto')
+    expect(text).not.toContain('Netto na')
+    expect(text).toContain('jouw bezittingen tot nu toe')
+  })
+
+  // Losse schulden komen pas in de schulden-sectie aan bod en worden hier niet
+  // getoond — ze mogen het getoonde totaal dus ook niet verlagen (de som blijft
+  // exact de som van de zichtbare rijen).
+  it('trekt een ONgekoppelde schuld niet af van het bezit-totaal', () => {
+    const losseSchuld: DebtQuickInput = {
+      debt_type: 'personal_loan',
+      name: 'Persoonlijke lening',
+      current_balance: 10_000,
+      linked_asset_id: null,
+      linked_client_ref: null,
+    }
+    const { container } = renderWith([HOUSE], [LINKED_MORTGAGE, losseSchuld])
+    const text = container.textContent ?? ''
+    expect(text).toContain(`Netto na gekoppelde schuld · ${formatCurrency(200_000)}`)
+    expect(text).not.toContain('Persoonlijke lening')
   })
 })

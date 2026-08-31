@@ -386,6 +386,27 @@
      De pill is `lg:hidden`, dus boven 1024px wordt de var op 0 gezet (zie de
      media-query hieronder) en werkt elke consument automatisch responsive. */
   --mobile-nav-clearance: calc(var(--safe-area-bottom, 0px) + 4.75rem);
+
+  /* Gedokte Fin-melding op mobiel (UR2-08). `--fin-melding-height` wordt door
+     FinHome gemeten en op :root gezet zolang de meldingstrook staat (0px zodra
+     hij weg is); `--fin-melding-clearance` is de band die de strook voor
+     zichzelf opeist — de nav-pill-clearance waar hij bovenop staat plus zijn
+     eigen hoogte. Beide staan hier op 0 en worden alléén ingeschakeld door de
+     `:root:has(.willhome--melding)`-regel hieronder, zodat een pagina zonder
+     melding exact de oude bodemruimte houdt. */
+  --fin-melding-height: 0px;
+  --fin-melding-clearance: 0px;
+}
+
+/* Zolang de meldingstrook in beeld is, maakt de mobiele `<main>` zich met deze
+   band korter (zie components/app/shell/mobile-stack-shell.tsx). Zo schuift
+   pagina-content bóven de strook uit in plaats van eronder te verdwijnen —
+   de melding is geen overlay en mag geen interactief element afdekken.
+   Specificiteit: `:root:has(.willhome--melding)` (0,2,0) wint van `:root`
+   (0,1,0); de lg-override hieronder heeft dezelfde specificiteit maar staat
+   later, dus die wint op desktop. */
+:root:has(.willhome--melding) {
+  --fin-melding-clearance: calc(var(--mobile-nav-clearance) + var(--fin-melding-height));
 }
 
 /* Boven de lg-breakpoint (1024px) verbergt FloatingNavButton zich (`lg:hidden`)
@@ -397,6 +418,12 @@
 @media (min-width: 1024px) {
   :root {
     --mobile-nav-clearance: 0px;
+  }
+  /* Boven lg is de melding weer een hoekkaart met de volle pagina ernaast; daar
+     hoeft er niets gereserveerd te worden. Zelfde specificiteit als de
+     `:has`-regel hierboven, maar later in het bestand → deze wint. */
+  :root:has(.willhome--melding) {
+    --fin-melding-clearance: 0px;
   }
 }
 

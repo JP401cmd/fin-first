@@ -211,6 +211,18 @@ function Tray({
       <main
         ref={mainRef}
         className={`flex-1 overflow-y-auto${mainClearance}${mainDesktop}`}
+        // `--fin-melding-clearance` is 0px behalve zolang de gedokte
+        // Fin-meldingstrook onderin staat (UR2-08; gezet in app/globals.css,
+        // hoogte gemeten door components/app/fin/fin-home.tsx). Bewust een
+        // MARGE en geen padding: een marge maakt de scrollport zelf korter,
+        // zodat er geen pagina-inhoud onder de strook kán liggen. Padding zou
+        // alleen aan het eind van de content ruimte bijzetten en de melding
+        // midden op de pagina nog steeds over een link heen leggen. Boven lg is
+        // de var 0, dus de desktop-flow blijft ongemoeid. De `pb`-clearance
+        // hierboven blijft gewoon staan: die zit ín de scrollport (ruimte ná de
+        // laatste content) en is zolang de strook staat wat royaal — ~76px
+        // extra scrollruimte aan het eind, onzichtbaar en zonder sprong.
+        style={{ marginBottom: 'var(--fin-melding-clearance, 0px)' }}
       >
         {children}
       </main>

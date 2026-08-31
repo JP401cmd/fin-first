@@ -18,6 +18,7 @@ import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { ageAtDate } from '@/lib/horizon-data'
 import {
   calculateFreedomTime,
+  credibleMonthlyBasis,
   formatFreedomTimeString,
   type FreedomTimeBreakdown,
 } from '@/lib/format'
@@ -26,7 +27,6 @@ import { loadTopMarketBriefing } from './news-market'
 import { collectAandachtspunten } from '@/lib/aandachtspunten-loader'
 import type { Aandachtspunt } from '@/lib/aandachtspunten'
 import type { BriefingEntry } from '@/lib/types/briefing'
-import type { SparklineDataPoint } from '@/lib/types/briefing'
 import type { DashboardData } from '@/lib/types/dashboard'
 
 type FinData = Awaited<ReturnType<typeof loadFinData>>
@@ -234,11 +234,16 @@ export async function loadAndComposeOverviewBriefing(
   // NIET de losse huidige-kalendermaand-som — die gaf een onmogelijk hoog
   // vrijheidstotaal in de handmatige ververs (KRUIS-17). Fallback op
   // monthlyExpenses voor bundels zonder het veld.
+  //
+  // De voorkeursvolgorde blijft, maar een kandidaat die door de
+  // geloofwaardigheidsvloer zakt slaan we OVER i.p.v. hem te gebruiken
+  // (UR2-03): een rolling venster met één transactie van €1 mag de effectieve
+  // maandbasis niet verdringen. Blijft er niets over, dan is 0 het eerlijke
+  // antwoord en toont de hero de ontbrekende-data-staat.
   const total = computeFreedomTotal(
     currentNetWorth,
-    dashboardResult.dashboardData.recentMonthlyExpenses ??
-      dashboardResult.dashboardData.monthlyExpenses ??
-      0,
+    credibleMonthlyBasis(dashboardResult.dashboardData.recentMonthlyExpenses) ||
+      credibleMonthlyBasis(dashboardResult.dashboardData.monthlyExpenses),
   )
   return {
     entries,
@@ -253,14 +258,17 @@ export async function loadAndComposeOverviewBriefing(
 
 // ── Vrijheidstijd-hero (week-over-week delta) ───────────────────────
 //
-// De emotionele kern van de briefing: "Geld is opgeslagen tijd" voelbaar
-// gemaakt als de vrijheidswinst van je week. Alle waarden zijn afgeleid van
-// de bevroren week-snapshot zodat de hero de hele week stabiel blijft.
-
-const NL_MONTH_ABBR = [
-  'jan', 'feb', 'mrt', 'apr', 'mei', 'jun',
-  'jul', 'aug', 'sep', 'okt', 'nov', 'dec',
-]
+// "Geld is opgeslagen tijd" als de vrijheidswinst van je week, afgeleid van de
+// bevroren week-snapshot zodat het beeld de hele week stabiel blijft.
+//
+// UR2-09 (eigenaar-besluit 31 aug 2026): op /overzicht is deze hero VERWIJDERD.
+// Een blok dat per definitie een week bevriest kwam daar naast live-herrekenende
+// kerngetallen te staan; hetzelfde getal las binnen vijf minuten drie keer
+// anders (113 jaar bevroren, 0% op-weg-balk, 0 dagen na een weergave-wissel) en
+// de Ververs-knop raakte het niet. De ENIGE overgebleven consument van deze
+// hero-vorm is de wekelijkse briefing-e-mail (lib/briefing/email-template.ts) —
+// een momentopname in een bericht mág bevroren zijn, want hij staat niet naast
+// live cijfers. Voeg hier dus geen tweede in-app consument aan toe.
 
 export interface FreedomTotal {
   totalFreedomDays: number
@@ -269,7 +277,8 @@ export interface FreedomTotal {
   breakdown: FreedomTimeBreakdown
 }
 
-/** Props die `VrijheidsbriefingHero` rendert (server berekent, client toont). */
+/** Het vrijheidstijd-blok van de wekelijkse briefing-e-mail (zie hierboven:
+ *  in-app bestaat deze hero sinds UR2-09 niet meer). */
 export interface FreedomHeroProps {
   totalFreedomDays: number
   /** Vooraf geformatteerd ("8 jaar en 4 maanden"). */
@@ -282,7 +291,6 @@ export interface FreedomHeroProps {
   /** De week-over-week delta is onderdrukt omdat hij buiten de plausibele
    *  bandbreedte viel (settelende data / eenmalige vermogenscorrectie). */
   isImplausibleDelta: boolean
-  sparkline: SparklineDataPoint[]
   /** Geen daguitgaven bekend → vrijheidstijd onbepaald. */
   isInfinite: boolean
   /** Netto vermogen ≤ 0 → schuld-framing i.p.v. viering. */
@@ -292,14 +300,25 @@ export interface FreedomHeroProps {
 /** Bereken het huidige vrijheidstijd-totaal uit netto vermogen + maanduitgaven.
  *  `totalFreedomDays` is GETEKEND: negatief bij een tekort (netto vermogen ≤ 0),
  *  zodat de week-over-week delta klopt wanneer iemand de nul-lijn kruist
- *  (calculateFreedomTime rekent zelf op de absolute waarde). */
+ *  (calculateFreedomTime rekent zelf op de absolute waarde).
+ *
+ *  GELOOFWAARDIGHEIDSVLOER (UR2-03): een maandbasis onder
+ *  `CREDIBLE_MONTHLY_BASIS_MIN` is geen basis maar een gegevensartefact — één
+ *  losse transactie van €1 gaf €0,03/dag en daarmee "113 jaar en 4 maanden aan
+ *  vrijheid" op een leeg account. Zo'n grondslag valt hier terug op 0, waarmee
+ *  de hero automatisch in de al bestaande ontbrekende-data-staat komt
+ *  (`isInfinite` → "Vul je uitgaven aan om je vrijheidstijd te zien"). De
+ *  gefloorde basis gaat ook in het RESULTAAT mee, zodat de bevroren
+ *  week-snapshot geen bogus grondslag conserveert en `buildFreedomHeroProps`
+ *  bij het herrekenen tot dezelfde uitkomst komt. */
 export function computeFreedomTotal(netWorth: number, monthlyExpenses: number): FreedomTotal {
+  const basis = credibleMonthlyBasis(monthlyExpenses)
   // Canonieke dagbasis: jaaruitgaven/365 (= maanduitgaven×12/365), gelijk aan
   // calculateFreedomTime/core-metrics — niet maand/30 (=jaar/360).
-  const dailyExpenses = monthlyExpenses > 0 ? (monthlyExpenses * 12) / 365 : 0
+  const dailyExpenses = basis > 0 ? (basis * 12) / 365 : 0
   const breakdown = calculateFreedomTime(netWorth, dailyExpenses)
   const totalFreedomDays = breakdown.isDeficit ? -breakdown.totalDays : breakdown.totalDays
-  return { totalFreedomDays, netWorth, monthlyExpenses, breakdown }
+  return { totalFreedomDays, netWorth, monthlyExpenses: basis, breakdown }
 }
 
 // ── Plausibiliteitsgrens op de week-over-week delta ─────────────────
@@ -357,30 +376,10 @@ export function computeFreedomDelta(
   return { deltaDays, isFirstWeek: false, isImplausibleDelta: false }
 }
 
-/** Vrijheidsdagen-sparkline-serie uit het vermogensverloop (per maand → dagen). */
-export function buildFreedomSparkline(
-  netWorthHistory: { month: string; value: number }[],
-  monthlyExpenses: number,
-): SparklineDataPoint[] {
-  // Canonieke dagbasis: jaaruitgaven/365 (zie computeFreedomTotal).
-  const dailyExpenses = monthlyExpenses > 0 ? (monthlyExpenses * 12) / 365 : 0
-  if (dailyExpenses <= 0) return []
-  return netWorthHistory.map((h) => {
-    // Tekort-maanden klemmen op 0 dagen: calculateFreedomTime rekent op de
-    // absolute waarde, dus een negatief vermogen zou anders als een positieve
-    // piek renderen (schuld die op vrijheid lijkt).
-    const days = h.value > 0 ? calculateFreedomTime(h.value, dailyExpenses).totalDays : 0
-    const mIdx = Number(h.month.slice(5, 7)) - 1
-    const label = mIdx >= 0 && mIdx < 12 ? NL_MONTH_ABBR[mIdx] : ''
-    return { month: h.month, label, spent: Math.round(days) }
-  })
-}
-
-/** Bouw de hero-props uit een (bevroren) vrijheidstijd-meetpunt + basis. */
+/** Bouw het e-mail-vrijheidsblok uit een (bevroren) vrijheidstijd-meetpunt + basis. */
 export function buildFreedomHeroProps(
   freedom: { totalFreedomDays: number; netWorth: number; monthlyExpenses: number },
   baseline: { totalFreedomDays: number } | null,
-  netWorthHistory: { month: string; value: number }[],
 ): FreedomHeroProps {
   const total = computeFreedomTotal(freedom.netWorth, freedom.monthlyExpenses)
   const delta = computeFreedomDelta({ totalFreedomDays: freedom.totalFreedomDays }, baseline)
@@ -390,39 +389,36 @@ export function buildFreedomHeroProps(
     deltaDays: delta.deltaDays,
     isFirstWeek: delta.isFirstWeek,
     isImplausibleDelta: delta.isImplausibleDelta,
-    sparkline: buildFreedomSparkline(netWorthHistory, freedom.monthlyExpenses),
     isInfinite: total.breakdown.isInfinite,
     isDeficit: total.breakdown.isDeficit,
   }
 }
 
 /**
- * Deterministische kop-zin boven de briefjes — afgeleid van de bevroren
- * hero-waarden zodat hij de hele week stabiel is. Wordt overschreven door een
- * AI-kop wanneer die bij een handmatige ververs is gegenereerd (snapshot.headline).
+ * Deterministische kop-zin naast de masthead "De briefing". Wordt overschreven
+ * door een AI-kop wanneer die bij een handmatige ververs is gegenereerd
+ * (snapshot.headline).
+ *
+ * UR2-09 — REKENT UIT DE LIVE CANONIEKE BRON, NIET UIT DE WEEK-SNAPSHOT.
+ * Deze zin was de tweede drager van het bevroren vrijheidsgetal: hij las het
+ * `totalLabel` van de week-hero, dus na een Ververs (die alleen de briefjes
+ * herschrijft) bleef "Je vermogen staat voor 113 jaar en 4 maanden aan vrijheid"
+ * staan terwijl de rest van /overzicht al op 0 stond. Voed 'm daarom met het
+ * `computeFreedomTotal` van dit request — dezelfde grondslag, inclusief de
+ * geloofwaardigheidsvloer (UR2-03), die de widgets en de vrijheidsstrip tonen.
+ *
+ * Geen week-over-week-variant meer: de delta hoorde bij het verwijderde
+ * "Jouw vrijheid deze week"-blok en kan als losse zin niet betrouwbaar naast
+ * live cijfers staan.
  */
-export function buildBriefingHeadline(hero: {
-  deltaDays: number | null
-  totalLabel: string
-  isInfinite: boolean
-  isDeficit: boolean
-}): string | null {
-  // Bij oneindig (geen uitgaven) of tekort (negatief vermogen) geen kop — de
-  // hero toont daar zijn eigen kalme fallback; een "X dagen vrijheid erbij"
-  // zou debt-dagen als vrijheid presenteren en de hero tegenspreken.
-  if (hero.isInfinite || hero.isDeficit) return null
-  const d = hero.deltaDays
-  if (d != null && d > 0) {
-    return `Deze week ${d} ${d === 1 ? 'dag' : 'dagen'} vrijheid erbij — je staat op ${hero.totalLabel}.`
-  }
-  if (d != null && d < 0) {
-    const a = Math.abs(d)
-    return `Deze week ${a} ${a === 1 ? 'dag' : 'dagen'} minder, maar je staat nog op ${hero.totalLabel}.`
-  }
-  if (hero.totalLabel) {
-    return `Je vermogen staat voor ${hero.totalLabel} aan vrijheid.`
-  }
-  return null
+export function buildBriefingHeadline(freedom: FreedomTotal): string | null {
+  // Bij oneindig (geen geloofwaardige uitgavenbasis) of tekort (negatief
+  // vermogen) geen kop: een vrijheidsclaim zou dan een gegevensartefact of
+  // schuld-dagen als vrijheid presenteren.
+  if (freedom.breakdown.isInfinite || freedom.breakdown.isDeficit) return null
+  const label = formatFreedomTimeString(freedom.breakdown, 'long')
+  if (!label) return null
+  return `Je vermogen staat voor ${label} aan vrijheid.`
 }
 
 /**

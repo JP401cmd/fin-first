@@ -290,6 +290,58 @@ export const FREEDOM_DAYS_PER_YEAR = 365
 export const FREEDOM_DAYS_PER_MONTH = 30
 export const FREEDOM_MONTHS_PER_YEAR = 12
 
+// ── Geloofwaardigheidsvloer op de €/maand-grondslag (UR2-03) ─────────
+//
+// Elke €→vrijheidstijd-conversie deelt door een uitgaven-dagtarief. Alle guards
+// in de app toetsten die noemer op `> 0` — en precies daar zit de fout: bij een
+// (bijna) leeg account wordt hij niet nul maar MINUSCUUL. Eén losse transactie
+// van €1 in het 12-maands rollende venster levert €1/mnd ⇒ €0,03/dag
+// (`recentDailyExpenseRateFromRows` in lib/expense-rate.ts geeft die dan netjes
+// als `source: 'transactions'` terug), en dan koopt een paar honderd euro een
+// eeuw vrijheid. Zo opende /overzicht met "Je vermogen staat voor 113 jaar en 4
+// maanden aan vrijheid" en "2677 dagen vrijheid per maand" op een account
+// zonder ingevuld inkomen.
+//
+// Nul is de enige degeneratie die de app al eerlijk behandelt: `isInfinite` →
+// "Vul je uitgaven aan om je vrijheidstijd te zien". Deze vloer laat een
+// niet-geloofwaardige grondslag in diezelfde bekende staat vallen, in plaats van
+// hem als meting te presenteren. Spiegel van `WORK_TIME_DISPLAY_MAX_MONTHS`
+// (lib/constants.ts), dat hetzelfde doet voor de werktijd-metafoor (ADR 0105):
+// een WEERGAVE-grens op een gedegenereerde noemer, geen grens op de meting —
+// de loaders en de rekenkernen blijven ongemoeid.
+//
+// Hoogte: €100/maand ≈ €3,29/dag. Bewust ver ónder elke reële uitgaven- of
+// inkomensbasis in Nederland gekozen, zodat de vloer geen enkele echte
+// gebruiker raakt maar de artefact-regio (centen per dag) volledig afvangt.
+// Hij staat hier, in het canonieke huis van de vrijheidstijd, om dezelfde reden
+// als de kalenderbasis hierboven: het is een weergaveconventie, geen financiële
+// aanname.
+export const CREDIBLE_MONTHLY_BASIS_MIN = 100
+export const CREDIBLE_DAILY_EXPENSE_MIN =
+  (CREDIBLE_MONTHLY_BASIS_MIN * FREEDOM_MONTHS_PER_YEAR) / FREEDOM_DAYS_PER_YEAR
+
+/**
+ * Maandgrondslag (€/mnd) zoals een becijferde claim hem mag gebruiken, of 0
+ * wanneer hij onder de geloofwaardigheidsvloer ligt. 0 is bewust dezelfde
+ * uitkomst als "geen data": consumenten hoeven maar één ontbrekende-data-pad te
+ * kennen.
+ */
+export function credibleMonthlyBasis(monthly: number | null | undefined): number {
+  const safe = safeNumber(monthly)
+  return safe >= CREDIBLE_MONTHLY_BASIS_MIN ? safe : 0
+}
+
+/**
+ * Dagtarief (€/dag) zoals een €→vrijheidstijd-conversie het mag gebruiken, of 0
+ * wanneer het onder de geloofwaardigheidsvloer ligt. Zie
+ * `credibleMonthlyBasis` — dit is dezelfde vloer, in de eenheid waarin
+ * `DashboardData.dailyExpenseRate` binnenkomt.
+ */
+export function credibleDailyExpense(daily: number | null | undefined): number {
+  const safe = safeNumber(daily)
+  return safe >= CREDIBLE_DAILY_EXPENSE_MIN ? safe : 0
+}
+
 /**
  * Freedom time breakdown from a EUR amount and daily expenses.
  */

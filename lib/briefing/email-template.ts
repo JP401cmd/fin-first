@@ -130,7 +130,6 @@ export function buildBriefingEmail(input: BriefingEmailInput): BriefingEmailOutp
     const hero = buildFreedomHeroProps(
       snapshot.freedomSnapshot,
       snapshot.previousFreedomSnapshot ?? null,
-      [], // sparkline niet nodig in de mail
     )
     heroLabel = hero.totalLabel
     if (hero.deltaDays !== null && hero.deltaDays !== 0) {

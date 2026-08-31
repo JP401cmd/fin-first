@@ -136,8 +136,10 @@ import {
 } from '@/lib/horizon/hero-fire-age'
 import {
   guardFireTarget,
-  HORIZON_MISSENDE_GEGEVENS_HINTS,
+  guardFreedomMoment,
+  guardRetirementExpense,
   HORIZON_MISSENDE_GEGEVENS_LABEL,
+  type HorizonOutcomeGuard,
 } from '@/lib/horizon/outcome-guard'
 import {
   scenarioMonthlySpendDelta,
@@ -261,6 +263,7 @@ import { PillRow } from '@/components/app/pill-row'
 import { parseFireStrategy, DEFAULT_FIRE_STRATEGY, type FireStrategyConfig, STRATEGY_LABELS, resolveFreedomFraming, fireAgeForDisplay } from '@/lib/fire-strategy'
 import { toSimResult } from '@/lib/unified-projection'
 import { buildHorizonInput } from '@/lib/horizon/build-input'
+import { buildDeeplinkCleanupUrl } from '@/lib/horizon/deeplink-cleanup'
 import type { PreviewBaseline } from '@/lib/strategy-preview'
 import { ScenarioOverlayPicker } from '@/components/app/horizon/scenario-overlay-picker'
 import { WHATIF_SCENARIO_COLORS, type SavedScenario } from '@/lib/scenario-types'
@@ -316,6 +319,40 @@ function ReceiptCue() {
     <>
       <Receipt className="ml-auto h-3 w-3 shrink-0 text-[var(--ink-4)]" aria-hidden />
       <span className="sr-only">— tik voor de aannames achter dit getal</span>
+    </>
+  )
+}
+
+/**
+ * De "we missen gegevens"-melding ín een hero-KPI-tegel — ÉÉN vorm voor alle
+ * tegels van de figures-strip (bevinding UR2-05).
+ *
+ * De melding bestond al, maar alleen op de Doelbedrag-tegel en tweemaal met de
+ * hand uitgeschreven (desktop + mobiel). Daardoor kon een buur-KPI met dezelfde
+ * ontbrekende brondata rustig een exact getal blijven tonen: er was geen vorm om
+ * te hergebruiken, alleen markup om te kopiëren. Dit component ís die vorm —
+ * kop (`guard.label`) in de cijferregel, uitleg (`guard.hint`) op de plek van
+ * het bijschrift, zodat de tegel even hoog blijft als zijn buren en de rij niet
+ * verspringt.
+ *
+ * `compact` = de mobiele 2×2-strip (kleinere typografie, krappere marges).
+ * Tekst komt uitsluitend uit `lib/horizon/outcome-guard.ts` — nooit hier.
+ */
+function HeroKpiNotice({ guard, compact = false }: { guard: HorizonOutcomeGuard; compact?: boolean }) {
+  return (
+    <>
+      <div
+        className={`${compact ? 'text-[13px]' : 'text-[16px] sm:text-[18px]'} font-black leading-tight tracking-[-0.01em]`}
+        style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+      >
+        {guard.label}
+      </div>
+      <div
+        className={`italic text-[var(--ink-3)] ${compact ? 'text-[10px] mt-1' : 'text-[11px] mt-1.5'}`}
+        style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+      >
+        {guard.hint}
+      </div>
     </>
   )
 }
@@ -939,9 +976,17 @@ export default function HorizonPage({
       shouldReplace = true
     }
 
-    if (shouldReplace) router.replace('/horizon', { scroll: false })
-   
-  }, [searchParams, router, triggerDream])
+    // Opschonen mag NOOIT van route wisselen. Dit stond hier als een
+    // hardgecodeerd `router.replace('/horizon')`, en `/horizon` redirect op de
+    // routing-laag naar `/toekomst` (next.config.ts). Elke deeplink maakte
+    // zichzelf daarmee ongedaan: state gezet → router wisselt van route → boom
+    // remount → `whatIfInlineOpen` c.s. weer op de beginwaarde, gebruiker op een
+    // kale /toekomst zonder paneel (UR2-11). Zie `lib/horizon/deeplink-cleanup.ts`.
+    if (shouldReplace) {
+      router.replace(buildDeeplinkCleanupUrl(pathname, searchParams), { scroll: false })
+    }
+
+  }, [searchParams, router, pathname, triggerDream])
 
   // Event form state
   const [showForm, setShowForm] = useState(false)
@@ -4557,6 +4602,38 @@ export default function HorizonPage({
   const freeHeroPhrase = heroFreedomFraming === 'pensioen' ? 'Je bent met pensioen' : 'Je bent vrij'
   const freeHeroLabel = heroFreedomFraming === 'pensioen' ? 'Pensioen' : 'Vrijheid'
 
+  // ── Gelijke behandeling van ontbrekende brondata op de hele KPI-rij (UR2-05) ─
+  // De Doelbedrag-tegel had als enige een gegevensmelding (`showFireTargetNotice`,
+  // M6). Op een leeg profiel stond die melding dus naast een "Vrijheidsleeftijd"
+  // van 83 en een "Na pensioen" met een exact jaarbedrag — drie tegels, één
+  // ontbrekende grondslag, drie verschillende beloftes. Elke tegel toetst nu zijn
+  // EIGEN bron met dezelfde guard-familie; de vorm van de melding is één
+  // component (`HeroKpiNotice`).
+  //
+  // Vrijheidsleeftijd volgt bewust het DOELBEDRAG en niet een eigen toets: het
+  // moment en het doel zijn twee helften van hetzelfde kernantwoord (zie
+  // horizon-client.hero-fire-age.test.ts) — kunnen we het doel niet noemen, dan
+  // is het moment ernaartoe evenmin een antwoord. `berekenen` wordt uitgezonderd:
+  // zolang de kernel nog rekent is er geen gegevensprobleem maar een lege hand,
+  // en dáár heeft de tegel al zijn eigen "···".
+  const fireAgeNoticeGuard = guardFreedomMoment({
+    ageIsInvalid: isHeroAnswerInvalid(heroFireAge),
+    fireTarget: fireTargetGuard,
+  })
+  const showFireAgeNotice =
+    !hasPerspectiveHero &&
+    !isPensioenMode &&
+    heroFireAge.status !== 'berekenen' &&
+    !fireAgeNoticeGuard.ok
+  // De uitgave ná pensioen toetst zijn eigen grondslag: de methode-uitkomst uit
+  // `computeRetirementExpenses` valt stil terug op de profielschatting en dan op
+  // 0 — een terugval die op het scherm niet van een meting te onderscheiden was.
+  // Net als de doelbedrag-guard alléén in de EIGEN weergave: huishoud-/
+  // partnercijfers komen uit de perspectief-loader en hebben hun eigen keten;
+  // ze hier half meeguarden zou de rij juist opnieuw uit de pas laten lopen.
+  const retirementExpenseGuard = guardRetirementExpense(input?.yearlyMustExpenses ?? null)
+  const showRetirementExpenseNotice = !hasPerspectiveHero && !retirementExpenseGuard.ok
+
   const hasNoDob = !effectiveInput?.dateOfBirth
   const fireNotReachable = effectiveCountdown.fireDate === 'Niet haalbaar'
   const hasDebt = (effectiveInput?.totalDebts ?? 0) > 0
@@ -4732,9 +4809,15 @@ export default function HorizonPage({
             >
               <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1.5">
                 <Hourglass className="h-3 w-3 shrink-0" aria-hidden />
-                <span>{showFreeHero ? freeHeroLabel : isPensioenMode ? 'Pensioenleeftijd' : 'Vrijheidsleeftijd'}</span>
+                <span>{showFireAgeNotice ? 'Vrijheidsleeftijd' : showFreeHero ? freeHeroLabel : isPensioenMode ? 'Pensioenleeftijd' : 'Vrijheidsleeftijd'}</span>
                 <ReceiptCue />
               </div>
+              {showFireAgeNotice ? (
+                /* UR2-05: geen onderbouwd kernantwoord — dezelfde melding als de
+                   Doelbedrag-tegel ernaast, niet een kaal getal of een streepje. */
+                <HeroKpiNotice guard={fireAgeNoticeGuard} />
+              ) : (
+                <>
               <div
                 className={`${showFreeHero ? 'text-[18px] sm:text-[20px] leading-tight' : 'text-[28px] sm:text-[32px] leading-none'} font-black tracking-[-0.02em] tabular-nums`}
                 style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
@@ -4763,6 +4846,8 @@ export default function HorizonPage({
                     ? (isPartnerView ? `jaar (${perspectiveHero!.householdName})` : 'jaar (huishouden)')
                     : heroFireAgeCaption(heroFireAge, isPensioenMode ? 'AOW-leeftijd' : 'jaar')}
               </div>
+                </>
+              )}
             </button>
 
             {/* KPI 2: Doelbedrag / Verwacht vermogen op AOW */}
@@ -4780,20 +4865,7 @@ export default function HorizonPage({
               </div>
               {!hasPerspectiveHero && showFireTargetNotice ? (
                 /* M6: onmogelijk/niet-berekenbaar doelbedrag — melding i.p.v. getal. */
-                <>
-                  <div
-                    className="text-[16px] sm:text-[18px] font-black leading-tight tracking-[-0.01em]"
-                    style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
-                  >
-                    {fireTargetGuard.label}
-                  </div>
-                  <div
-                    className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
-                    style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-                  >
-                    {fireTargetGuard.hint}
-                  </div>
-                </>
+                <HeroKpiNotice guard={fireTargetGuard} />
               ) : !hasPerspectiveHero && showDualFireTarget ? (
                 <>
                   {/* Doel MET je huis — het grote doel; kwalificatie inline zodat de kaart even hoog blijft als de buur-KPI's */}
@@ -4907,6 +4979,12 @@ export default function HorizonPage({
                 <Compass className="h-3 w-3 shrink-0" aria-hidden />
                 <span>Na pensioen</span>
               </div>
+              {showRetirementExpenseNotice ? (
+                /* UR2-05: de methode viel terug op de profielschatting en daarna
+                   op 0 — dat is geen bestedingspatroon, dus geen bedrag. */
+                <HeroKpiNotice guard={retirementExpenseGuard} />
+              ) : (
+                <>
               <div
                 className="text-[24px] sm:text-[28px] font-black leading-none tracking-[-0.02em]"
                 style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
@@ -4919,6 +4997,8 @@ export default function HorizonPage({
               >
                 per jaar
               </div>
+                </>
+              )}
             </button>
           </div>
 
@@ -4949,12 +5029,13 @@ export default function HorizonPage({
               freedomAge: hasPerspectiveHero ? perspectiveHero!.fireAge : heroFireAge.age,
               framing: heroFreedomFraming,
               isPensioen: isPensioenMode,
-              // Nog geen antwoord (kernel rekent) of een gegevensprobleem (M6):
-              // dan draagt de KPI zelf al een melding. Een duidingszin eronder
-              // zou daar tegenin praten.
+              // Nog geen antwoord (kernel rekent) of een gegevensprobleem (M6 /
+              // UR2-05): dan draagt de KPI zelf al een melding. Een duidingszin
+              // eronder zou daar tegenin praten — `showFireAgeNotice` dekt óók
+              // het geval waarin het doelbedrag de melding veroorzaakt.
               pending:
                 !hasPerspectiveHero &&
-                (heroFireAge.status === 'berekenen' || isHeroAnswerInvalid(heroFireAge)),
+                (heroFireAge.status === 'berekenen' || showFireAgeNotice),
               subjectName: hasPerspectiveHero ? perspectiveHero!.householdName : null,
             })
             if (zin.kind === 'berekenen') return null
@@ -5025,9 +5106,14 @@ export default function HorizonPage({
             >
               <div className="flex items-center gap-1.5 text-[9px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1">
                 <Hourglass className="h-3 w-3 shrink-0" aria-hidden />
-                <span>{showFreeHero ? freeHeroLabel : isPensioenMode ? 'Pensioenlft' : 'Vrijheidslft'}</span>
+                <span>{showFireAgeNotice ? 'Vrijheidslft' : showFreeHero ? freeHeroLabel : isPensioenMode ? 'Pensioenlft' : 'Vrijheidslft'}</span>
                 <ReceiptCue />
               </div>
+              {showFireAgeNotice ? (
+                /* UR2-05 — zie de desktop-tegel. */
+                <HeroKpiNotice guard={fireAgeNoticeGuard} compact />
+              ) : (
+                <>
               <div
                 className={`${showFreeHero ? 'text-[15px] leading-tight' : 'text-[22px] leading-none'} font-black tracking-[-0.02em] tabular-nums`}
                 style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
@@ -5052,6 +5138,8 @@ export default function HorizonPage({
               >
                 {showFreeHero ? '' : hasPerspectiveHero ? 'jaar' : heroFireAgeCaption(heroFireAge, 'jaar')}
               </div>
+                </>
+              )}
             </button>
 
             {/* KPI 2: Doelbedrag */}
@@ -5067,20 +5155,7 @@ export default function HorizonPage({
               </div>
               {!hasPerspectiveHero && showFireTargetNotice ? (
                 /* M6: onmogelijk/niet-berekenbaar doelbedrag — melding i.p.v. getal. */
-                <>
-                  <div
-                    className="text-[13px] font-black leading-tight tracking-[-0.01em]"
-                    style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
-                  >
-                    {fireTargetGuard.label}
-                  </div>
-                  <div
-                    className="italic text-[10px] text-[var(--ink-3)] mt-1"
-                    style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-                  >
-                    {fireTargetGuard.hint}
-                  </div>
-                </>
+                <HeroKpiNotice guard={fireTargetGuard} compact />
               ) : !hasPerspectiveHero && showDualFireTarget ? (
                 <>
                   {/* Doel MET je huis — het grote doel; kwalificatie inline zodat de kaart even hoog blijft als de buur-KPI's */}
@@ -5181,6 +5256,11 @@ export default function HorizonPage({
                 <Compass className="h-3 w-3 shrink-0" aria-hidden />
                 <span>Na pensioen</span>
               </div>
+              {showRetirementExpenseNotice ? (
+                /* UR2-05 — zie de desktop-tegel. */
+                <HeroKpiNotice guard={retirementExpenseGuard} compact />
+              ) : (
+                <>
               <div
                 className="text-[18px] font-black leading-none tracking-[-0.02em]"
                 style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
@@ -5193,6 +5273,8 @@ export default function HorizonPage({
               >
                 per jaar
               </div>
+                </>
+              )}
             </button>
           </div>
 
@@ -6574,11 +6656,16 @@ export default function HorizonPage({
               </div>
             )}
 
-            {/* Footer — draaien hier, archiveren daar */}
+            {/* Footer — draaien hier, archiveren daar.
+                De dream-gate stuurt naar de CANONIEKE route, niet de legacy
+                `/horizon/whatif`: die redirect op de routing-laag, en een
+                client-push náár een redirect-only pad is de gedocumenteerde
+                React #310-trigger (zie het redirect-blok in next.config.ts en
+                de comment in whatif-page-client.tsx). */}
             <div className="border-t border-[var(--border-ed)] pt-3">
               <button
                 type="button"
-                onClick={() => triggerDream('/horizon/whatif')}
+                onClick={() => triggerDream('/toekomst/whatif')}
                 className="font-serif text-[11px] italic text-horizon-600 transition-colors hover:text-horizon-700"
               >
                 Scenario&apos;s vergelijken &rarr;
@@ -9093,10 +9180,10 @@ export default function HorizonPage({
           <KassabonShell>
             {/* M6: de motor gaf een leeftijd op/voorbij het horizonplafond — dat is
                 de parkeerstand, geen antwoord. Melding vóór de onderbouwing. */}
-            {isHeroAnswerInvalid(heroFireAge) && (
+            {showFireAgeNotice && (
               <div className="mb-3 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)] p-2.5 font-sans text-[11px] leading-relaxed text-[var(--ink-2)]">
                 <strong className="font-semibold text-[var(--ink)]">{HORIZON_MISSENDE_GEGEVENS_LABEL}.</strong>{' '}
-                {HORIZON_MISSENDE_GEGEVENS_HINTS['buiten-horizon']}
+                {fireAgeNoticeGuard.hint}
               </div>
             )}
             <div className="mb-3 text-center">
@@ -9273,7 +9360,7 @@ export default function HorizonPage({
                 bedrag onderbouwen dat de tegel als "we missen gegevens" toont. */}
             {showFireTargetNotice && (
               <div className="mb-3 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)] p-2.5 font-sans text-[11px] leading-relaxed text-[var(--ink-2)]">
-                <strong className="font-semibold text-[var(--ink)]">{fireTargetGuard.label}.</strong>{' '}
+                <strong className="font-semibold text-[var(--ink)]">{HORIZON_MISSENDE_GEGEVENS_LABEL}.</strong>{' '}
                 {fireTargetGuard.hint}
               </div>
             )}

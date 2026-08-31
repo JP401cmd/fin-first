@@ -150,6 +150,30 @@ export function OnboardingBezittingen({
     [quickAssets],
   )
 
+  /**
+   * Gekoppelde schuld (hypotheek onder de woning, RC onder de BV, …) die in
+   * DÉZE lijst als eigen rode regel zichtbaar is.
+   *
+   * Bevinding UR2-06: het getoonde totaal was de kale bezittingen-som, terwijl
+   * de gekoppelde hypotheek er als "−€285.000" naast stond. Dat leest als netto
+   * vermogen en is het niet. We tellen daarom uitsluitend de schulden mee die
+   * hier ook echt gerenderd worden — zo is de som per definitie de som van de
+   * getoonde rijen. Losse schulden komen pas in de schulden-sectie aan bod en
+   * horen hier dus niet in (de recap op het eindscherm trekt die er wél af).
+   */
+  const linkedDebtAmounts = useMemo(
+    () =>
+      quickAssets
+        .map((asset) => (asset.client_ref ? debtByRef.get(asset.client_ref) : undefined))
+        .map((entry) => (entry ? Number(entry.debt.current_balance) || 0 : 0))
+        .filter((amount) => amount > 0),
+    [quickAssets, debtByRef],
+  )
+  const linkedDebtTotal = linkedDebtAmounts.reduce((s, amount) => s + amount, 0)
+  const hasLinkedDebt = linkedDebtTotal > 0
+  const netAssets = totalAssets - linkedDebtTotal
+  const linkedDebtLabel = `gekoppelde schuld${linkedDebtAmounts.length === 1 ? '' : 'en'}`
+
   // ── Wizard-collect ──────────────────────────────────────────────────
   function handleWizardCollect(item: QuickAddInput) {
     setUnlinkNotice(null)
@@ -222,6 +246,7 @@ export function OnboardingBezittingen({
       <div className="space-y-2">
         <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--ink-3)]">
           Toegevoegd · {formatCurrency(totalAssets)}
+          {hasLinkedDebt ? ' bruto' : ''}
         </p>
         <ul className="space-y-2">
           {quickAssets.map((item, idx) => {
@@ -239,6 +264,14 @@ export function OnboardingBezittingen({
             )
           })}
         </ul>
+        {/* Netto-afsluiting: zonder deze regel leest het bruto-totaal boven de
+            lijst als netto vermogen, terwijl de gekoppelde schuld er als eigen
+            rode regel tússen staat (UR2-06). */}
+        {hasLinkedDebt && (
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--ink-2)]">
+            Netto na {linkedDebtLabel} · {formatCurrency(netAssets)}
+          </p>
+        )}
         {unlinkNotice && (
           <p className="text-[11px] italic text-[var(--ink-3)]">
             {unlinkNotice} blijft als losse schuld staan na het verwijderen van de woning.
@@ -264,21 +297,33 @@ export function OnboardingBezittingen({
       )
     ) : null
 
+  // Stam is "bezitting" (zelfstandig naamwoord), niet "bezit": met de stam
+  // "bezit" + suffix "ten" ontstond het wérkwoord "bezitten" ("2 bezitten") en
+  // bij één post het kale "1 bezit".
+  const assetCountLabel = `${quickAssets.length} bezitting${quickAssets.length === 1 ? '' : 'en'}`
   const factsPanel = (
     <FactsPanel
-      stat={quickAssets.length > 0 ? formatCurrency(totalAssets) : '€128.500'}
-      sub={
+      // Kopgetal is netto zodra er een gekoppelde schuld tussen staat — anders
+      // belooft het bruto-bedrag een vermogen dat de gebruiker niet heeft
+      // (UR2-06). Het bruto-bedrag blijft zichtbaar in de bron-regel.
+      stat={
         quickAssets.length > 0
-          ? 'jouw bezittingen tot nu toe'
-          : 'mediaan huishoud-vermogen in Nederland'
+          ? formatCurrency(hasLinkedDebt ? netAssets : totalAssets)
+          : '€128.500'
+      }
+      sub={
+        quickAssets.length === 0
+          ? 'mediaan huishoud-vermogen in Nederland'
+          : hasLinkedDebt
+            ? `jouw bezittingen min de ${linkedDebtLabel}`
+            : 'jouw bezittingen tot nu toe'
       }
       source={
-        quickAssets.length > 0
-          ? // Stam is "bezitting" (zelfstandig naamwoord), niet "bezit": met de
-            // stam "bezit" + suffix "ten" ontstond het wérkwoord "bezitten"
-            // ("2 bezitten") en bij één post het kale "1 bezit".
-            `${quickAssets.length} bezitting${quickAssets.length === 1 ? '' : 'en'}`
-          : 'CBS Vermogensstatistiek, 2023'
+        quickAssets.length === 0
+          ? 'CBS Vermogensstatistiek, 2023'
+          : hasLinkedDebt
+            ? `${assetCountLabel} · ${formatCurrency(totalAssets)} bruto`
+            : assetCountLabel
       }
     />
   )

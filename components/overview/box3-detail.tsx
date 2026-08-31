@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Calculator, ChevronDown, ChevronUp, Clock, Layers, Users, EyeOff } from 'lucide-react'
+import { Calculator, ChevronDown, ChevronUp, Clock, Layers, Scale, Users, EyeOff } from 'lucide-react'
 import {
   formatMaskedCurrency,
   calculateFreedomTime,
@@ -32,6 +32,8 @@ import { Box3PartnerSlider } from '@/components/overview/belasting/box3-partner-
 import { Box3Peildatum } from '@/components/overview/belasting/box3-peildatum'
 import { Box3Stelsel2028 } from '@/components/overview/belasting/box3-stelsel2028'
 import { HideInSimple } from '@/components/app/hide-in-simple'
+import { SwapInSimple } from '@/components/app/swap-in-simple'
+import { DepthSection } from '@/components/app/depth-section'
 
 /**
  * Box3Detail — compacte, inklapbare Box 3-berekening op de Box 3-subpagina
@@ -617,12 +619,52 @@ export function Box3Detail({
             omslagpunt van DEZE portefeuille (M24), en `result` muteert bij een
             perspectief- of jaarwissel. Zonder remount houdt de schuif het oude
             omslagpunt vast terwijl de kaart het nieuwe toont — met kans op een
-            besparing + "Voeg toe als actie" op een stand die niemand koos. */}
-        <Box3TegenbewijsCard
-          key={`${perspective}-${year}`}
-          result={result}
-          rateFootnote={rateFootnote}
-        />
+            besparing + "Voeg toe als actie" op een stand die niemand koos.
+
+            WEERGAVEMODUS (UR2-16d). Dit katern was het enige op deze pagina dat
+            in Eenvoudig op volle expert-diepte bleef staan, terwijl elk buur-
+            katern (3.3 heffingsvrij, 3.4 mix, 3.5 peildatum, 3.10 stelsel-2028)
+            in de HideInSimple-uitrol (b9ab63429) hard verborgen werd. Dat was
+            geen gedocumenteerde curatiekeuze — het faseplan noemt de kaart
+            nergens — maar een overgeslagen zusje.
+
+            Toch NIET alsnog `HideInSimple`, want ADR 0026 (aanvulling fase 3-5)
+            maakt de keuze tussen de twee mechanismen inhoudelijk:
+            `HideInSimple` is voor diepte "waar de gebruiker geen ingang
+            verliest", `DepthSection` voor BEDIENINGSVLAKKEN. Deze kaart is een
+            bedieningsvlak (rendement-schuif + "Voeg toe als actie") en dit
+            scherm is de enige ingang ervoor — de actieknop linkt zelfs terug
+            naar /overzicht/belasting/box3. Hard verbergen zou die ingang in
+            Eenvoudig dichtzetten voor een regeling met echt geld eraan.
+            Ingeklapt-maar-bereikbaar lost de inconsistentie op zonder dat.
+
+            `DepthSection` wordt alléén in Eenvoudig gemónt (zelfde regel als
+            voorkeuren-view.tsx / CF-4): in Volledig rendert exact de bestaande
+            boom, anders zou Volledig er een kop-knop en kaartrand bij krijgen. */}
+        <SwapInSimple
+          simple={
+            <div className="border-t border-[var(--ink)] px-4 py-5 sm:px-7">
+              <DepthSection
+                title="Tegenbewijs-simulator"
+                summary="Vergelijk de forfaitaire heffing met je werkelijke rendement"
+                icon={<Scale className="h-4 w-4 text-[var(--module-active-700)]" aria-hidden="true" />}
+              >
+                <Box3TegenbewijsCard
+                  key={`${perspective}-${year}`}
+                  result={result}
+                  rateFootnote={rateFootnote}
+                  embedded
+                />
+              </DepthSection>
+            </div>
+          }
+        >
+          <Box3TegenbewijsCard
+            key={`${perspective}-${year}`}
+            result={result}
+            rateFootnote={rateFootnote}
+          />
+        </SwapInSimple>
 
         {/* 3.6 — Partner-verdeel-slider (alleen household, volledige data) */}
         {showPartnerSlider && optimal && combined && (

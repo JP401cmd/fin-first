@@ -1646,7 +1646,7 @@ Scope: `/overzicht` (hoofdpagina/hub), `/dashboard` (redirect), `/overzicht/tips
 - **Kriticiteit:** BELANGRIJK
 - **Rekenend:** ja — het detailpaneel toont `pillar.rawValue` (bv. schuldratio) en `improvementTip` uit de gezondheidsscore-pijlers (`lib/financial-health.ts`); de statuskleur komt uit `loadLeverScores` (`lib/lever-scores-loader.ts`) gemapt via `leverToLeverageStatus`.
 - **Varianten & randgevallen:**
-  - Belasting-kaart heeft geen eigen pijler → drill-down toont alleen de proxy-substatus "Mogelijk betaal je meer dan nodig"; zonder pijler is er géén detailpaneel-inhoud.
+  - Belasting-kaart heeft geen eigen pijler → drill-down toont alleen de substatus bij de Box 3-status ("Belastingdruk beperkt" / "Mogelijk betaal je meer dan nodig" / "Hoge belastingdruk", sinds UR2-04 status-afhankelijk); zonder pijler is er géén detailpaneel-inhoud.
   - Status 'neutral' én geen pijler → geen chevron (niet uitklapbaar).
   - Eenvoudige weergave (display_mode 'simple') → chevrons verborgen, kaarten blijven wel klikbaar.
 - **Cross-module effecten:** Deeplinks naar de vier deelgebieden onder /overzicht; actie-link (`pillar.actionHref`) kan dieper linken.
@@ -1790,6 +1790,15 @@ Scope: `/overzicht` (hoofdpagina/hub), `/dashboard` (redirect), `/overzicht/tips
 ---
 
 #### WF-OVZ-09 — "Jouw vrijheid deze week" volgen (wekelijkse vrijheidsdagen)
+> ⚠️ **IN-APP OPPERVLAK VERVALLEN (UR2-09, eigenaar-besluit 31 aug 2026).** Het blok
+> "Jouw vrijheid deze week" op /overzicht is verwijderd (`components/overview/vrijheidsbriefing-hero.tsx`
+> bestaat niet meer): een week bevroren vrijheidsgetal naast live-herrekenende kerngetallen
+> liet dezelfde grootheid drie waarden tegelijk aannemen. De week-delta leeft nog uitsluitend
+> in de wekelijkse briefing-e-mail (`lib/briefing/email-template.ts`); op /overzicht blijft
+> alleen de kop-zin naast de masthead, live gerekend uit `computeFreedomTotal`
+> (`buildBriefingHeadline`, zonder weekverschil). Onderstaande beschrijving is historie —
+> de levende definitie staat in `lib/uat/acceptance/ovz.ts` (WF-OVZ-09).
+
 - **Doel:** Ervaren hoeveel dagen vrijheid je er deze week bij hebt gekregen (of verloren) en op welk totaal je staat.
 - **Trigger/startpunt:** Het blok "Jouw vrijheid deze week" bovenaan de wekelijkse briefing op /overzicht.
 - **Eindresultaat:** Groot oplopend getal "+X dagen vrijheid erbij" (groen) of "−X dagen minder" (oranje), de zin "Je staat nu op [X jaar en Y maanden] aan vrijheid." en een sparkline van vrijheidsdagen per maand. De waarden zijn per ISO-week bevroren en blijven de hele week stabiel.
@@ -9386,7 +9395,7 @@ WF-NAV-13 (Uitloggen) → **géén eigen scenario** in dit document; gedekt door
   4. Klik op een andere kaart se chevron → *verwacht:* het vorige paneel sluit (max. één open, accordeon-gedrag).
   - **Eindresultaat:** navigatie werkt, precies één detailpaneel tegelijk open.
   - **Berekening verwachting (rekenend):** schuldratio (pillar `rawValue`, `lib/financial-health.ts` regel 154-160) = totalDebts/totalAssets = €13.900/€9.700 = **1,433 (143%)** → `ratio ≥ 1 → score 0` → statuskleur **rood**, verbetertip in rode toon (bv. gericht op schuldreductie). Dit is een bewust "slecht" cijfer (schuld groter dan bezit) — precies wat de drill-down-tip moet duiden.
-- **c. Variant — Belasting-kaart zonder pijler:** open het detailpaneel van de Belasting-kaart bij Daan → *verwacht:* alleen de proxy-substatus "Mogelijk betaal je meer dan nodig" zichtbaar, géén rawValue/verbetertip (Belasting heeft geen eigen gezondheidspijler). Zet weergavemodus op Eenvoudig → *verwacht:* chevrons verdwijnen, kaarten blijven klikbaar.
+- **c. Variant — Belasting-kaart zonder pijler:** open het detailpaneel van de Belasting-kaart bij Daan → *verwacht:* alleen de substatus bij zijn Box 3-status zichtbaar (Daan zit ruim ónder de heffingsvrije voet → "Belastingdruk beperkt"; sinds UR2-04 volgt dit oordeel de status i.p.v. altijd de waarschuwingszin), géén rawValue/verbetertip (Belasting heeft geen eigen gezondheidspijler). Zet weergavemodus op Eenvoudig → *verwacht:* chevrons verdwijnen, kaarten blijven klikbaar.
 
 ---
 

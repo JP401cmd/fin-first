@@ -171,6 +171,19 @@ export default async function BibliotheekPage({
   ]
   const nonEmptyGroups = groups.filter((g) => g.items.length > 0)
 
+  // UR2-16c — de pagina noemde alleen een aantal PER niveau, nooit een totaal.
+  // De eerste sectie ("Starters · 4") las daardoor als de hele bibliotheek,
+  // terwijl de post-onboarding-belofte 12 gecureerde rekenhulpen noemt
+  // (`components/onboarding/onboarding-success.tsx`). Die belofte klopt — alle
+  // twaalf uit `PREFAB_CALCULATORS` staan publiek in de database (seed-migratie
+  // 20260530120000) — alleen was ze op dit scherm niet na te tellen. Beide
+  // getallen zijn afgeleid uit de al opgebouwde groepen; geen los getal in copy.
+  const curatedCount = nonEmptyGroups
+    .filter((g) => g.key !== 'community')
+    .reduce((sum, g) => sum + g.items.length, 0)
+  const curatedTierCount = nonEmptyGroups.filter((g) => g.key !== 'community').length
+  const communityCount = nonEmptyGroups.find((g) => g.key === 'community')?.items.length ?? 0
+
   return (
     <section className="relative mx-auto max-w-6xl px-4 sm:px-6 pb-12 pt-4">
       <PageInfoButton
@@ -203,6 +216,18 @@ export default async function BibliotheekPage({
       {visible.length === 0 ? (
         <EmptyState showOnlyUsable={showOnlyUsable && enriched.length > 0} />
       ) : (
+        <>
+        {/* Totaalregel — alleen ongefilterd: met `?filter=usable` zou een lager
+            getal de belofte juist tegenspreken in plaats van 'm te staven. */}
+        {!showOnlyUsable && curatedCount > 0 && (
+          <p className="mb-4 text-xs text-[var(--ink-3)]" data-testid="bibliotheek-totaal">
+            {curatedCount} rekenhulpen van TriFinity, verdeeld over{' '}
+            {curatedTierCount} {curatedTierCount === 1 ? 'niveau' : 'niveaus'}
+            {communityCount > 0 &&
+              ` · ${communityCount} ${communityCount === 1 ? 'rekenhulp' : 'rekenhulpen'} van de community`}
+            .
+          </p>
+        )}
         <div className="space-y-8">
           {nonEmptyGroups.map((group) => (
             <section key={group.key}>
@@ -227,6 +252,7 @@ export default async function BibliotheekPage({
             </section>
           ))}
         </div>
+        </>
       )}
 
       <DisclaimerStrip variant="card" />

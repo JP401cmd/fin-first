@@ -128,6 +128,7 @@ import {
 } from '@/lib/budget-perspective'
 import {
   buildBudgetSpendingMap,
+  budgetBeschikbaar,
   budgetFillRatio,
   budgetSpentPct,
   isExpenseDirectionBudget,
@@ -180,20 +181,22 @@ export function BudgetEditorialHeader({
   monthLabel,
   teVerdelen,
   totalIncome,
-  totalIncomeActual,
-  totalActualOutflow,
+  totalExpenseBudget,
+  totalExpenseSpent,
   simple = false,
 }: {
   monthLabel: string
   teVerdelen: number
   totalIncome: number
-  totalIncomeActual: number
   /**
-   * Som van werkelijke uitgaven + sparen + aflossingen deze periode.
-   * Wordt gebruikt voor de "Werkelijk"-kolom: hoeveel van het verwachte
-   * inkomen is feitelijk al uit het huishouden gestroomd.
+   * Som van de effectieve limieten van alle uitgavenbudgetten — dezelfde
+   * grondslag als `budgetTotals.expense.limit` op de cashflow-Budget-kaart
+   * (pariteit bewaakt in lib/cashflow-kpis.parity.test.ts), zodat het
+   * ankergetal hier en de kaart op /overzicht/cashflow hetzelfde zeggen.
    */
-  totalActualOutflow: number
+  totalExpenseBudget: number
+  /** Getekende besteding op de uitgavenbudgetten deze periode. */
+  totalExpenseSpent: number
   /**
    * Eenvoudig-modus: verbergt het plan/werkelijk-cijferblok. Kicker + headline
    * blijven staan zodat de pagina nog steeds een editorial aanhef houdt.
@@ -204,22 +207,24 @@ export function BudgetEditorialHeader({
     ? monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)
     : ''
 
-  // Twee perspectieven op "ruimte":
-  //  - Volgens plan: verwacht inkomen − toegewezen budgetten (`teVerdelen`).
-  //    Toont of het BUDGET dat je hebt opgesteld klopt met je inkomen.
-  //  - Werkelijk: verwacht inkomen − werkelijke outflow tot nu toe.
-  //    Toont hoeveel je deze maand nog vrij hebt op basis van wat al weg is.
+  // Twee perspectieven op "ruimte", met het bestedingsrestant als anker:
+  //  - Nog te besteden: uitgavenlimiet − besteed, via de canonieke klem
+  //    `budgetBeschikbaar` — EXACT het getal van de Budget-kaart op
+  //    /overzicht/cashflow, zodat doorklikken geen ander cijfer oplevert.
+  //  - Nog te verdelen: verwacht inkomen − toegewezen budgetten (`teVerdelen`).
+  //    Plan-hygiëne (klopt je opzet?), bewust sober — géén besteedbare ruimte.
   const { masked } = useMaskedAmounts()
-  const planRuimte = teVerdelen
-  const planPositive = planRuimte >= 0
+  const bestedenActive = totalExpenseBudget > 0
+  const bestedenRuimte = budgetBeschikbaar(totalExpenseBudget, totalExpenseSpent)
+  const bestedenPositive = bestedenRuimte >= 0
   // Alleen het minteken als prefix; formatMaskedCurrency levert het €-teken al.
-  const planLabel = planPositive ? '' : '−'
-  const planBedrag = formatMaskedCurrency(Math.abs(planRuimte), masked)
+  const bestedenLabel = bestedenPositive ? '' : '−'
+  const bestedenBedrag = formatMaskedCurrency(Math.abs(bestedenRuimte), masked)
+  const bestedenSpentLabel = `${totalExpenseSpent < 0 ? '−' : ''}${formatMaskedCurrency(Math.abs(totalExpenseSpent), masked)}`
 
-  const werkelijkRuimte = totalIncome - totalActualOutflow
-  const werkelijkPositive = werkelijkRuimte >= 0
-  const werkelijkLabel = werkelijkPositive ? '' : '−'
-  const werkelijkBedrag = formatMaskedCurrency(Math.abs(werkelijkRuimte), masked)
+  const verdelenPositive = teVerdelen >= 0
+  const verdelenLabel = verdelenPositive ? '' : '−'
+  const verdelenBedrag = formatMaskedCurrency(Math.abs(teVerdelen), masked)
 
   return (
     <PageOpening
@@ -234,15 +239,18 @@ export function BudgetEditorialHeader({
       emphasis="ruimte"
       titleAfter=" heb je nog?"
     >
-      {/* Twee kolommen: plan vs. werkelijk. Plan gebruikt highlight-marker
-          (Kern-200), werkelijk blijft sober — zo vormt het plan-cijfer het
-          anker en is werkelijk de aanvullende lezing. In Eenvoudig-modus
-          verbergen we dit cijferblok volledig (kicker + headline blijven). */}
+      {/* Twee kolommen: besteden vs. verdelen. "Nog te besteden" draagt de
+          highlight-marker en is het anker — hetzelfde getal als de Budget-
+          kaart op /overzicht/cashflow; "Nog te verdelen" is de sobere
+          plan-hygiëne-lezing ernaast. In Eenvoudig-modus verbergen we dit
+          cijferblok volledig (kicker + headline blijven). Zonder actief
+          uitgavenbudget valt de anker-kolom weg en blijft alleen verdelen. */}
       {!simple && (
-      <div className="mt-2 grid grid-cols-1 gap-4 border-t border-[var(--border-ed)] pt-3 sm:grid-cols-2 sm:divide-x sm:divide-[var(--border-ed)] sm:gap-0">
+      <div className={`mt-2 grid grid-cols-1 gap-4 border-t border-[var(--border-ed)] pt-3 ${bestedenActive ? 'sm:grid-cols-2 sm:divide-x sm:divide-[var(--border-ed)] sm:gap-0' : ''}`}>
+        {bestedenActive && (
         <div className="sm:pr-6">
           <p className="text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)]">
-            Volgens plan
+            Nog te besteden
           </p>
           <p className="mt-1 font-mono tabular-nums text-[28px] sm:text-[36px] font-bold leading-none">
             <span
@@ -250,42 +258,40 @@ export function BudgetEditorialHeader({
               style={{
                 backgroundImage:
                   'linear-gradient(transparent 60%, var(--module-active-200) 60%)',
-                color: planPositive ? 'var(--ink)' : 'var(--negative)',
+                color: bestedenPositive ? 'var(--ink)' : 'var(--negative)',
               }}
             >
-              {planLabel}{planBedrag}
+              {bestedenLabel}{bestedenBedrag}
             </span>
           </p>
           <p
             className="mt-2 italic text-[12px] text-[var(--ink-3)]"
             style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
           >
-            {planPositive
-              ? `Te verdelen van ${formatMaskedCurrency(totalIncome, masked)} verwacht inkomen`
-              : `Over-toegewezen — ${formatMaskedCurrency(Math.abs(planRuimte), masked)} meer dan verwacht inkomen`}
+            {bestedenPositive
+              ? `van ${formatMaskedCurrency(totalExpenseBudget, masked)} uitgavenbudget · ${bestedenSpentLabel} al besteed`
+              : `Boven budget — ${formatMaskedCurrency(Math.abs(bestedenRuimte), masked)} over de limiet van ${formatMaskedCurrency(totalExpenseBudget, masked)}`}
           </p>
         </div>
+        )}
 
-        <div className="sm:pl-6">
+        <div className={bestedenActive ? 'sm:pl-6' : ''}>
           <p className="text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)]">
-            Werkelijk
+            Nog te verdelen
           </p>
           <p
             className="mt-1 font-mono tabular-nums text-[28px] sm:text-[36px] font-bold leading-none"
-            style={{ color: werkelijkPositive ? 'var(--ink)' : 'var(--negative)' }}
+            style={{ color: verdelenPositive ? 'var(--ink)' : 'var(--negative)' }}
           >
-            {werkelijkLabel}{werkelijkBedrag}
+            {verdelenLabel}{verdelenBedrag}
           </p>
           <p
             className="mt-2 italic text-[12px] text-[var(--ink-3)]"
             style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
           >
-            {werkelijkPositive
-              ? `Nog te besteden — ${formatMaskedCurrency(totalActualOutflow, masked)} al weg deze maand`
-              : `Boven inkomen — ${formatMaskedCurrency(Math.abs(werkelijkRuimte), masked)} meer uitgegeven dan verwacht`}
-            {totalIncomeActual > 0 &&
-              totalIncome > 0 &&
-              ` · ontvangen: ${formatMaskedCurrency(totalIncomeActual, masked)}`}
+            {verdelenPositive
+              ? `van ${formatMaskedCurrency(totalIncome, masked)} verwacht inkomen nog niet toegewezen`
+              : `Over-toegewezen — ${formatMaskedCurrency(Math.abs(teVerdelen), masked)} meer dan verwacht inkomen`}
           </p>
         </div>
       </div>
@@ -944,7 +950,7 @@ export function BudgetHub({
                         </p>
                         {freedomTime && (
                           <p className="text-[12px] italic text-[var(--ink-3)]">
-                            {fmt(overAmount)} over — {freedomTime.formattedDagen} ingeleverd
+                            {fmt(overAmount)} over — {freedomTime.formattedDagen} vrijheid ingeleverd
                           </p>
                         )}
                       </div>
@@ -2424,14 +2430,15 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
       )}
 
       {/* Editorial header — blueprint stijl (Type App: Budgetteren).
-          Toont kicker met streep, headline met italic-em, hoofdcijfer 'Te besteden'
-          met halve transparante streep (Kern-200) en italic Source Serif sub-meta. */}
+          Toont kicker met streep, headline met italic-em, ankergetal 'Nog te
+          besteden' (= Budget-kaart op /overzicht/cashflow) met halve
+          transparante streep en sobere 'Nog te verdelen'-kolom ernaast. */}
       <BudgetEditorialHeader
         monthLabel={monthLabel}
         teVerdelen={teVerdelen}
         totalIncome={totalIncome}
-        totalIncomeActual={totalIncomeActual}
-        totalActualOutflow={totalExpenseSpent + totalSavingsActual + totalDebtActual}
+        totalExpenseBudget={totalExpenseBudget}
+        totalExpenseSpent={totalExpenseSpent}
         simple={simple}
       />
 
@@ -3036,9 +3043,13 @@ function DetailModalDonut({
           <p className="mt-0.5 font-mono text-base font-bold tabular-nums text-[var(--ink)]" data-testid="modal-spent">
             {<MaskedAmount value={spent} tone="wil" />}
           </p>
+          {/* UR2-16a: het kale "1,9 maanden" las als een resterende KALENDER-
+              periode terwijl het de vrijheidstijd-tegenwaarde is. De eenheid
+              draagt daarom overal in dit scherm het woord "vrijheid" — zelfde
+              formulering als de grenzenpot-widget en de doelregel hieronder. */}
           {hasFreedomData && freedomAllowed && spent >= 100 && (
             <p className="font-serif text-xs italic text-[var(--ink-3)]" data-testid="modal-spent-freedom">
-              ≈ {eurToFreedomTime(spent, dailyExpenseRate).formattedDagen}
+              ≈ {eurToFreedomTime(spent, dailyExpenseRate).formattedDagen} vrijheid
             </p>
           )}
         </div>
@@ -3054,10 +3065,10 @@ function DetailModalDonut({
           {hasFreedomData && freedomAllowed && Math.abs(remaining) >= 100 && (
             <p className="font-serif text-xs italic text-[var(--ink-3)]" data-testid="modal-remaining-freedom">
               {remaining >= 0
-                ? `nog ${eurToFreedomTime(remaining, dailyExpenseRate).formattedDagen}`
+                ? `nog ${eurToFreedomTime(remaining, dailyExpenseRate).formattedDagen} vrijheid`
                 : (overPositive
-                  ? `+${eurToFreedomTime(Math.abs(remaining), dailyExpenseRate).formattedDagen}`
-                  : `${eurToFreedomTime(Math.abs(remaining), dailyExpenseRate).formattedDagen} ingeleverd`)
+                  ? `+${eurToFreedomTime(Math.abs(remaining), dailyExpenseRate).formattedDagen} vrijheid`
+                  : `${eurToFreedomTime(Math.abs(remaining), dailyExpenseRate).formattedDagen} vrijheid ingeleverd`)
               }
             </p>
           )}
@@ -3512,7 +3523,7 @@ function BudgetDetailModal({
                     {<MaskedAmount value={fullSpent * budgetPartnerSplit.mySharePct / 100} tone="wil" />}
                   </p>
                   <p className="text-xs italic text-[var(--ink-3)]">
-                    ≈ {eurToFreedomTime(fullSpent * budgetPartnerSplit.mySharePct / 100, dailyExpenseRate).formattedDagen}
+                    ≈ {eurToFreedomTime(fullSpent * budgetPartnerSplit.mySharePct / 100, dailyExpenseRate).formattedDagen} vrijheid
                   </p>
                 </div>
                 <div>
@@ -3521,7 +3532,7 @@ function BudgetDetailModal({
                     {<MaskedAmount value={fullSpent * (100 - budgetPartnerSplit.mySharePct) / 100} tone="wil" />}
                   </p>
                   <p className="text-xs italic text-[var(--ink-3)]">
-                    ≈ {eurToFreedomTime(fullSpent * (100 - budgetPartnerSplit.mySharePct) / 100, dailyExpenseRate).formattedDagen}
+                    ≈ {eurToFreedomTime(fullSpent * (100 - budgetPartnerSplit.mySharePct) / 100, dailyExpenseRate).formattedDagen} vrijheid
                   </p>
                 </div>
               </div>
@@ -3896,15 +3907,15 @@ function BudgetDetailModal({
                             </span>
                             {hasFreedomData && showsFreedomTime(childSpent) && childLimit - childSpent >= 100 && (
                               <p className="text-sm italic text-[var(--ink-3)]" data-testid="child-freedom-remaining">
-                                nog {eurToFreedomTime(childLimit - childSpent, dailyExpenseRate).formattedDagen}
+                                nog {eurToFreedomTime(childLimit - childSpent, dailyExpenseRate).formattedDagen} vrijheid
                               </p>
                             )}
                             {hasFreedomData && childSpent > childLimit && childSpent - childLimit >= 100 && (
                               <p className="text-sm italic text-[var(--ink-3)]" data-testid="child-freedom-over">
                                 <span className={isOverPositive(budgetType) ? 'text-positive' : 'text-negative'}>
                                   {isOverPositive(budgetType)
-                                    ? `+${eurToFreedomTime(childSpent - childLimit, dailyExpenseRate).formattedDagen}`
-                                    : `${eurToFreedomTime(childSpent - childLimit, dailyExpenseRate).formattedDagen} ingeleverd`}
+                                    ? `+${eurToFreedomTime(childSpent - childLimit, dailyExpenseRate).formattedDagen} vrijheid`
+                                    : `${eurToFreedomTime(childSpent - childLimit, dailyExpenseRate).formattedDagen} vrijheid ingeleverd`}
                                 </span>
                               </p>
                             )}
@@ -4003,7 +4014,7 @@ function BudgetDetailModal({
                       ) : (
                         hasFreedomData && Math.abs(Number(tx.amount)) >= 100 && (
                           <p className="text-sm italic text-[var(--ink-3)]" data-testid="tx-freedom-time">
-                            {eurToFreedomTime(Math.abs(Number(tx.amount)), dailyExpenseRate).formattedDagen}
+                            {eurToFreedomTime(Math.abs(Number(tx.amount)), dailyExpenseRate).formattedDagen} vrijheid
                           </p>
                         )
                       )}
@@ -4211,7 +4222,7 @@ function BudgetDetailModal({
                     {/* Freedom time equivalent */}
                     {hasFreedomData && forecast.predicted >= 100 && (
                       <p className="font-serif text-sm italic text-[var(--ink-3)] mt-3">
-                        ≈ {eurToFreedomTime(forecast.predicted, dailyExpenseRate).formattedDagen}
+                        ≈ {eurToFreedomTime(forecast.predicted, dailyExpenseRate).formattedDagen} vrijheid
                       </p>
                     )}
 

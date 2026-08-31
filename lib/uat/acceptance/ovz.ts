@@ -31,12 +31,14 @@
  * — 1 'direction'; (4) config-/weergave-/print-/deel-workflows zonder eigen
  * berekening — 6 'ui-only'.
  *
- * TWEE MIRRORS met bronregel-verwijzing (niet-geëxporteerde interne helper
- * resp. client-inline constante — spiegelt de mirrors in eerdere zones):
- *  - `scoreDebtRatio` (lib/financial-health.ts, NIET geëxporteerd — de
- *    schuldratio-pijlerscore wordt hier met bronregel-verwijzing gemirrord)
+ * NOG ÉÉN MIRROR met bronregel-verwijzing (client-inline constante — spiegelt
+ * de mirrors in eerdere zones):
  *  - de postpone-termijn (POSTPONE_DAYS=14, `tips-lijst.tsx`/`action-board.tsx`,
  *    identiek aan de WILL-mirror)
+ *
+ * De `scoreDebtRatio`-mirror is bij UR2-10 vervallen: die curve is geëxporteerd
+ * uit lib/financial-health.ts en wordt door de checks rechtstreeks aangeroepen —
+ * dezelfde bron die sindsdien ook de Schulden-hefboom voedt.
  */
 
 import type { AcceptanceCriterion, AcceptanceSet } from './types'
@@ -63,11 +65,11 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     given: 'Persona Daan Bakker: totalAssets €9.700, totalDebts €13.900.',
     when: 'De schuldratio-pijlerscore (`rawValue`) voor het detailpaneel wordt berekend.',
-    then: 'Schuldratio = 13.900/9.700 = 1,433 (143%) ≥ 1 → pijlerscore 0 → statuskleur rood (via `pillarStatus`, <50 → bad). In de Eenvoudige weergave draagt elke tegel het OORDEEL in gewone taal als primaire regel ("Hoge schuldenlast", "Mogelijk betaal je meer dan nodig"; zonder gegevens "Nog geen gegevens") met het bedrag gedempt eronder — S1, richtingsbesluit R5 "duiding boven reductie". Dat vervangt de eerdere OVZ-2-reductie (alleen hoofdcijfer + statuspunt), die de status voor screenreader- en touch-gebruikers onbereikbaar maakte. Wél nog steeds weg in Eenvoudig: de chevron/drill-down en de "excl. eigen woning · €X"-regel. In Volledig zijn de tegels ongewijzigd, met één uitzondering: het schulden-oordeel bij warn is gewone taal ("Schuldenlast vraagt aandacht") i.p.v. "Schuldratio {rawValue}" — het ratiogetal staat in de drill-down.',
+    then: 'Schuldratio = 13.900/9.700 = 1,433 (143%) ≥ 1 → pijlerscore 0 → statuskleur rood (via `pillarStatus`, <50 → bad). In de Eenvoudige weergave draagt elke tegel het OORDEEL in gewone taal als primaire regel ("Hoge schuldenlast"; voor Daan op de Belasting-tegel "Belastingdruk beperkt" — hij zit onder de heffingsvrije voet; zonder gegevens "Nog geen gegevens") met het bedrag gedempt eronder — S1, richtingsbesluit R5 "duiding boven reductie". Dat vervangt de eerdere OVZ-2-reductie (alleen hoofdcijfer + statuspunt), die de status voor screenreader- en touch-gebruikers onbereikbaar maakte. Wél nog steeds weg in Eenvoudig: de chevron/drill-down en de "excl. eigen woning · €X"-regel. In Volledig zijn de tegels ongewijzigd, met één uitzondering: het schulden-oordeel bij warn is gewone taal ("Schuldenlast vraagt aandacht") i.p.v. "Schuldratio {rawValue}" — het ratiogetal staat in de drill-down. Sinds UR2-04 volgt óók het Belasting-oordeel zijn eigen status ("Belastingdruk beperkt" / "Mogelijk betaal je meer dan nodig" / "Hoge belastingdruk") i.p.v. één vaste waarschuwingszin voor alle drie de statussen, en leest het kompas in de shell hetzelfde generieke statuswoord als de kaart-dot (LEVERAGE_STATUS_LABEL). Sinds UR2-10 geldt bovendien: op een account waar NIETS geregistreerd staat (geen vermogen én geen schuld) is de Schulden-tegel neutraal — dus "Nog geen gegevens" in Eenvoudig en géén oordeelregel in Volledig, in plaats van de eerdere waarschuwing "Schuldenlast vraagt aandacht". Schuldenvrij MÉT vermogen blijft groen.',
     assertion: {
       kind: 'exact',
       expected: 'schuldratioScore=0; status=bad',
-      source: 'lib/financial-health.ts scoreDebtRatio (niet geëxporteerd, gemirrord met bronregel-verwijzing r154-160) + lib/leverage-status.ts#pillarStatus (échte productiefunctie) — zie ovz-checks.ts',
+      source: 'lib/financial-health.ts#scoreDebtRatio + lib/leverage-status.ts#pillarStatus (beide échte productiefuncties) — zie ovz-checks.ts',
     },
   },
   {
@@ -81,7 +83,7 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'exact',
       expected: 'schuldratioScore=100; dstiScore=100; concentratieScore=62',
-      source: 'lib/financial-health.ts#scoreDSTI + scoreAssetConcentration (échte productiefuncties) + scoreDebtRatio-mirror — zie ovz-checks.ts',
+      source: 'lib/financial-health.ts#scoreDSTI + scoreAssetConcentration + scoreDebtRatio (échte productiefuncties) — zie ovz-checks.ts',
     },
   },
   {
@@ -153,11 +155,11 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-OVZ-09',
     scenarioId: 'UAT-OVZ-09',
-    titel: '"Jouw vrijheid deze week" volgen',
+    titel: 'Vrijheidstijd-totaal + week-delta (kop-zin en briefing-mail)',
     kriticiteit: 'KERN',
     given: 'Persona Willem (netto vermogen €1.619.700, begrote maanduitgaven €1.495) en persona Daan (netto vermogen −€4.200). Plus een week-over-week-scenario op één account: week 1 wordt bevroren terwijl de transactiehistorie nog half geïmporteerd is (€120.000 netto vermogen bij een kunstmatig lage €200/mnd → ±18.250 vrijheidsdagen), week 2 draait op de realistische €3.000/mnd (±1.217 dagen).',
     when: '`computeFreedomTotal` berekent de vrijheidsdagen voor beide persona\'s; `computeFreedomDelta` bepaalt daarna de week-over-week delta inclusief plausibiliteitsgrens.',
-    then: 'Willem: dailyExpenses = 1.495×12/365 = €49,15/dag; totalDays ≈ 32.957 (positief, isDeficit=false). Daan: netto vermogen −4.200 → isDeficit=true (geen gevierde dagen-teller, "Je schulden zijn nu groter dan je bezittingen — elke afgeloste euro telt" i.p.v. een positief getal; sinds kaart H15 benoemt die regel de stand en niet de gebruiker — een tekort is geen beginner). De totaal-formule is ongewijzigd; de week-overzichtdata wordt sinds fase 2 alleen berekend zolang de "deze week"-widget actief is (widget-gated) — bij een net aangezette widget kan de kaart tot de eerstvolgende refresh nog leeg zijn. WEEK-OVER-WEEK (guard, bug "−3788 dagen minder"): het ruwe verschil van ±−17.033 dagen is géén weekbeweging maar een datacorrectie; het valt buiten de plausibele bandbreedte — |delta| ≥ 365 dagen (FREEDOM_DELTA_MIN_DAYS) ÉN > 25% van het huidige totaal (FREEDOM_DELTA_MAX_SHARE) — en wordt onderdrukt: deltaDays=null + isImplausibleDelta=true, waarna de hero het totaal toont met een kalme "je cijfers zijn net flink bijgesteld"-regel en `buildBriefingHeadline` terugvalt op de totaal-zin. Een normale week (€2.500 gespaard bij €3.000/mnd) geeft gewoon +25 dagen; een grote absolute beweging op een grote portefeuille (bv. 1.500 dagen op 32.000) blijft óók zichtbaar — beide voorwaarden moeten gelden.',
+    then: 'Willem: dailyExpenses = 1.495×12/365 = €49,15/dag; totalDays ≈ 32.957 (positief, isDeficit=false). Daan: netto vermogen −4.200 → isDeficit=true (geen gevierde dagen-teller, "Je schulden zijn nu groter dan je bezittingen — elke afgeloste euro telt" i.p.v. een positief getal; sinds kaart H15 benoemt die regel de stand en niet de gebruiker — een tekort is geen beginner). De totaal-formule is ongewijzigd; de week-overzichtdata wordt sinds fase 2 alleen berekend zolang de "deze week"-widget actief is (widget-gated) — bij een net aangezette widget kan de kaart tot de eerstvolgende refresh nog leeg zijn. WEEK-OVER-WEEK (guard, bug "−3788 dagen minder"): het ruwe verschil van ±−17.033 dagen is géén weekbeweging maar een datacorrectie; het valt buiten de plausibele bandbreedte — |delta| ≥ 365 dagen (FREEDOM_DELTA_MIN_DAYS) ÉN > 25% van het huidige totaal (FREEDOM_DELTA_MAX_SHARE) — en wordt onderdrukt: deltaDays=null + isImplausibleDelta=true, waarna het vrijheidsblok van de briefing-mail het totaal zonder weekverschil toont. Een normale week (€2.500 gespaard bij €3.000/mnd) geeft gewoon +25 dagen; een grote absolute beweging op een grote portefeuille (bv. 1.500 dagen op 32.000) blijft óók zichtbaar — beide voorwaarden moeten gelden. IN-APP SURFACE VERVALLEN (UR2-09, eigenaar-besluit 31 aug 2026): het blok "Jouw vrijheid deze week" op /overzicht is verwijderd — een week bevroren getal naast live-herrekenende kerngetallen liet dezelfde vrijheidstijd binnen vijf minuten drie waarden aannemen (113 jaar bevroren, 0% op-weg-balk, 0 dagen na weergave-wissel) en de Ververs-knop raakte het niet. De week-delta leeft nog uitsluitend in de briefing-e-mail (lib/briefing/email-template.ts). Op /overzicht blijft alleen de kop-zin naast de masthead, en die rekent LIVE uit `computeFreedomTotal` van het request (`buildBriefingHeadline`, zonder weekverschil) — bij een ontbrekende geloofwaardige uitgavenbasis of een tekort valt hij weg i.p.v. een becijferde claim te doen.',
     assertion: {
       kind: 'exact',
       expected: 'willemIsDeficit=false; willemTotalDaysPositief=true; daanIsDeficit=true; opgeblazenDelta=onderdrukt; opgeblazenImplausibel=true; normaleDelta=25',
@@ -184,11 +186,11 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Vrijheidsweek delen',
     kriticiteit: 'OVERIG',
     given: 'De deelbare vrijheidskaart toont vrijheids-%/gewonnen dagen/FIRE-aftelling, server-side samengesteld.',
-    when: 'De gebruiker klikt "Deel" en kiest een deel-optie.',
-    then: 'De cijfers op de kaart moeten sporen met de hub-waarden (OVZ-07/OVZ-09); de kaart zelf en de deel-mechaniek (afbeelding/link/native share) zijn een presentatie-/trackinglaag zonder eigen berekening (`app/api/share/freedom-card/route.ts` niet gelezen — "Onbevestigd" in het plan).',
+    when: 'De gebruiker klikt "Deel" in de briefing-kop; de deel-sheet opent met drie inzichts-standen (Weinig/Gemiddeld/Veel) en een live kaart-voorbeeld; hij kiest een stand en daarna een deel-optie.',
+    then: 'De sheet toont per stand een voorbeeld dat exact is wat gedeeld wordt (Weinig: alleen vrijheidstijd — geen %, naam of bedragen; Veel pas na expliciete bevestiging, ook bij een onthouden voorkeur). De cijfers op de kaart sporen met de hub-waarden (OVZ-07/OVZ-09); kaart, colofon-uitnodiging (<host>/check) en deel-mechaniek (afbeelding/link/native share) zijn een presentatie-/trackinglaag zonder eigen berekening; de deel-link wijst naar /check, niet naar de ingelogde app.',
     assertion: {
       kind: 'ui-only',
-      source: 'components/app/freedom-card.tsx + share-dialog.tsx — presentatielaag, geen eigen cijfermatige uitkomst hier getoetst',
+      source: 'components/app/deel-kaart-sheet.tsx + freedom-card.tsx + share-dialog.tsx — presentatielaag, geen eigen cijfermatige uitkomst hier getoetst; Weinig-grens bewaakt door freedom-card.weinig.test.tsx + deel-kaart-sheet.test.tsx',
     },
   },
   {
@@ -339,6 +341,19 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'ui-only',
       source: "app/api/wealth-selection/route.ts (GET/PUT, own-row filter) + app/api/wealth-selection/route.test.ts (partner-id-fixture) + components/widgets/vermogen-selectie-widget.tsx (personalTag/empty-state/SVG-maskering) — configuratie-/weergave-workflow zonder eigen berekening; de SVG-maskering is een niet-geautomatiseerde visuele check (handmatig te toetsen)",
+    },
+  },
+  {
+    workflow: 'WF-OVZ-25',
+    scenarioId: 'UAT-OVZ-25',
+    titel: 'Mijlpaal gepasseerd: eenmalige viering, briefing boven de vouw, melding (ADR 0123)',
+    kriticiteit: 'BELANGRIJK',
+    given: 'Een gebruiker (eigen perspectief) wiens motor eerder is geseed (`profiles.milestones_seeded_at` gezet) en wiens canonieke netto vermogen sindsdien een drempel passeerde (bv. €98k → €101k, drempel €100k). De detectie draait in-band bij de /overzicht-load (OverzichtSecondaryLoader), consume-don\'t-recompute op de bundelwaarden.',
+    when: 'De gebruiker opent /overzicht; apart (b): sluit de viering (of laat \'m auto-dismissen) en opent /overzicht op een tweede apparaat; apart (c): herlaadt /overzicht meermaals in dezelfde staat.',
+    then: 'a) Er verschijnt precies één `achieved_milestones`-rij (sleutel `vermogen-100k`) en de krant-stijl viering (MilestoneCelebration via de host, geen confetti/emoji — W4.5) toont de mijlpaal mét vrijheidstijd-vertaling en een "Deel dit"-aanbod; de briefing draagt de entry `milestone:fresh:<key>` boven de vouw (positioneel vooraan geïnjecteerd ná de week-freeze, <48u; daarna verdwijnt de entry — hij wordt nooit in de snapshot teruggeschreven) en /berichten bevat een melding van het type `milestone` (seed- en doel-rijen geven géén melding). b) Elke dismiss-route bevestigt server-side (`acknowledged_at` via POST /api/milestones/acknowledge); daarna viert géén enkel apparaat de mijlpaal opnieuw (cross-device once-guard, geen localStorage). c) Herlaad voegt geen tweede rij toe (UNIQUE user_id+milestone_key) en een drempel die na een dip opnieuw gepasseerd wordt viert niet opnieuw. Randgeval: bij de allereerste run (seed) wordt niets gevierd — reeds gepasseerde drempels landen stil met `source=\'seed\'`. Checkpoints op verre doelen (≥2 jaar looptijd; sleutels `doel-checkpoint:<id>:25/50/75`, plan 3c) tellen als lichtste mijlpaalsoort mee: gevierd mét doelnaam, maar een zwaardere drempel in dezelfde run wint en passeren meerdere drempels tegelijk dan viert alleen de zwaarste (regen-rem).',
+    assertion: {
+      kind: 'ui-only',
+      source: 'lib/milestones/{detect,run}.ts (idempotentie + seed getest in run.test.ts/detect.test.ts) + lib/briefing/milestone-entry.ts (rang/48u getest) + components/app/milestone-celebration-host.tsx (acknowledge getest) + supabase/migrations/20260831160000 (UNIQUE + RLS, leaktest scripts/verify-achieved-milestones-rls.sql bij apply) — de live cross-device-toets (b) is een handmatige check in de UAT-run',
     },
   },
 ]

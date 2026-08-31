@@ -3,6 +3,7 @@ import { loadDashboardData } from '@/lib/dashboard-data-loader'
 import { computeFreedomTotal } from '@/lib/briefing/overview-briefing'
 import { touchLastSeen } from '@/lib/briefing/snapshot'
 import type { Perspective } from '@/lib/household-data'
+import { credibleMonthlyBasis } from '@/lib/format'
 import { buildSindsVorigBezoek } from '@/lib/overview/sinds-vorig-bezoek'
 import { SindsVorigBezoek } from './sinds-vorig-bezoek'
 
@@ -45,8 +46,13 @@ export async function SindsVorigBezoekLoader({
   if (!userId || perspective !== 'personal') return null
 
   const { dashboardData } = await loadDashboardData(supabase)
+  // Zelfde voorkeursvolgorde als de briefing-hero, met dezelfde
+  // geloofwaardigheidsvloer (UR2-03): een rolling venster met één transactie van
+  // €1 mag de effectieve maandbasis niet verdringen. Blijft er niets over, dan
+  // levert `computeFreedomTotal` een oneindig totaal en toont deze regel niets.
   const monthlyExpenses =
-    dashboardData.recentMonthlyExpenses ?? dashboardData.monthlyExpenses ?? 0
+    credibleMonthlyBasis(dashboardData.recentMonthlyExpenses) ||
+    credibleMonthlyBasis(dashboardData.monthlyExpenses)
   const freedomTotal = computeFreedomTotal(currentNetWorth, monthlyExpenses)
 
   const { previous } = await touchLastSeen(supabase, userId, {

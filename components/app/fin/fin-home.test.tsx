@@ -114,6 +114,58 @@ describe('FinHome', () => {
     }
   })
 
+  // UR2-08: op mobiel dokt de melding als strook onderin. Ze mag daar geen
+  // pagina-inhoud afdekken, dus eist ze haar eigen band op: FinHome publiceert
+  // de gemeten hoogte als `--fin-melding-height`, globals.css telt de
+  // nav-pill-clearance erbij op en de mobiele `<main>` wordt net zoveel korter.
+  // Zonder deze publicatie is die band 0 en ligt de strook weer bovenop een link.
+  describe('bandreservering onderin (UR2-08)', () => {
+    const MELDING_HEIGHT = 132
+    let restoreOffsetHeight: PropertyDescriptor | undefined
+
+    beforeEach(() => {
+      // jsdom rekent geen layout; offsetHeight is er altijd 0.
+      restoreOffsetHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')
+      Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+        configurable: true,
+        get: () => MELDING_HEIGHT,
+      })
+      document.documentElement.style.removeProperty('--fin-melding-height')
+    })
+    afterEach(() => {
+      if (restoreOffsetHeight) {
+        Object.defineProperty(HTMLElement.prototype, 'offsetHeight', restoreOffsetHeight)
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        delete (HTMLElement.prototype as any).offsetHeight
+      }
+      document.documentElement.style.removeProperty('--fin-melding-height')
+    })
+
+    const height = () =>
+      document.documentElement.style.getPropertyValue('--fin-melding-height')
+
+    it('publiceert de hoogte van de strook zolang ze staat', () => {
+      vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as unknown as MediaQueryList)
+      renderFin({ dataGaps: gaps({ hasBank: false }), delayMs: 0, autoDismissMs: 999999 })
+      act(() => { vi.advanceTimersByTime(400) })
+      expect(height()).toBe(`${MELDING_HEIGHT}px`)
+    })
+
+    it('geeft de band terug zodra de melding weg is', () => {
+      vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as unknown as MediaQueryList)
+      renderFin({ dataGaps: gaps({ hasBank: false }), delayMs: 0, autoDismissMs: 999999 })
+      act(() => { vi.advanceTimersByTime(400) })
+      act(() => { fireEvent.click(screen.getByRole('button', { name: /Sluiten/i })) })
+      expect(height()).toBe('0px')
+    })
+
+    it('claimt geen band zolang er alleen een bubbel staat', () => {
+      renderFin({ dataGaps: gaps(), delayMs: 1000 })
+      expect(height()).toBe('')
+    })
+  })
+
   it('toont de melding weer zodra dat signaal is vrijgegeven (M15)', () => {
     vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as unknown as MediaQueryList)
     const release = acquireOverlay()

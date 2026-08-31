@@ -254,6 +254,12 @@ const LIMIET_FIXTURE_DB: FakeDb = {
  * te rekenen (vervolg KRUIS-20). Pariteit-bewaking op dít veld is precies de rem
  * die een derde grondslag-familie moet voorkomen: wijkt het rolling tarief van de
  * slanke laag ooit af van de dashboardbundel, dan valt deze suite om.
+ *
+ * NEGEN sinds UR2-13: `latestTransactionMonth` — het versheidsoordeel achter de
+ * melding "gegevens verouderd" en achter de lege-staat-copy. /overzicht leest 'm
+ * uit de dashboardbundel en /overzicht/cashflow uit de slanke laag; zouden die
+ * uiteenlopen, dan waarschuwt het ene scherm terwijl het andere zwijgt. Beide
+ * paden draaien `aggLatestMonth` op hetzelfde aggregaat, en deze suite houdt dat zo.
  */
 function sevenFromBundle(d: DashboardData): CashflowCardScalars {
   return {
@@ -265,6 +271,7 @@ function sevenFromBundle(d: DashboardData): CashflowCardScalars {
     monthlyIncome: d.monthlyIncome,
     monthlyExpenses: d.monthlyExpenses,
     dailyExpenseRate: d.dailyExpenseRate,
+    latestTransactionMonth: d.latestTransactionMonth,
   }
 }
 
@@ -309,6 +316,9 @@ describe('loadCashflowKpis ↔ loadDashboardData — parity op alle acht velden'
     // draaien dezelfde keten (aggToExpenseRows → recentDailyExpenseRateFromRows)
     // op hetzelfde aggregaat. Drift hier = twee dagtarieven in de app.
     expect(nieuw.dailyExpenseRate).toBe(oud.dailyExpenseRate)
+    // Versheid (UR2-13): één oordeel over "hoe oud is deze data", anders
+    // waarschuwt /overzicht/cashflow terwijl /overzicht zwijgt (of omgekeerd).
+    expect(nieuw.latestTransactionMonth).toBe(oud.latestTransactionMonth)
   })
 
   it('de slanke laag doet aantoonbaar minder tabel-queries', async () => {

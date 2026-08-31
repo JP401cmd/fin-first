@@ -51,6 +51,7 @@ import {
   aggSumPositief,
   aggSumNegatiefAbs,
   aggToExpenseRows,
+  aggLatestMonth,
   type TxMonthAggregateRow,
 } from '@/lib/server-data/tx-aggregates'
 import { deriveRealMonthTotals, type MonthTxRow } from '@/lib/cashflow-month-totals'
@@ -172,6 +173,19 @@ export interface CashflowCardScalars {
    * een eigen maand-conversie.
    */
   dailyExpenseRate?: number
+  /**
+   * VERSHEID: jongste maand ('YYYY-MM') mét boekingen in hetzelfde 12-maands
+   * aggregaat, of `null` bij een leeg venster. Identiek aan
+   * `DashboardData.latestTransactionMonth` — zelfde reducer, zelfde rijen, nul
+   * extra queries.
+   *
+   * De Transacties-kaart heeft 'm nodig om "Nog geen transacties" te scheiden van
+   * "geen transacties in dit venster" (UR2-13): `currentMonth*` op 0 bewijst
+   * alleen het eerste als er ook nergens anders iets staat.
+   *
+   * Optioneel/additief om dezelfde reden als `dailyExpenseRate`.
+   */
+  latestTransactionMonth?: string | null
 }
 
 // ── Pure afleidingen (verplaatst uit lib/dashboard-data-loader.ts) ───────────
@@ -628,6 +642,9 @@ export const loadCashflowKpis = cache(async (supabase: SupabaseClient): Promise<
   const monthKey = currentMonthKey(now)
   const currentMonthIncome = aggIncomeByMonth(txAgg12, { realOnly: true }).get(monthKey) ?? 0
   const currentMonthExpenses = aggExpenseByMonthAbs(txAgg12, { realOnly: true }).get(monthKey) ?? 0
+  // Versheid uit diezelfde rijen (UR2-13) — `realOnly: false`, want de vraag is
+  // "bestaan er transacties?", niet "hoeveel is er verdiend/uitgegeven".
+  const latestTransactionMonth = aggLatestMonth(txAgg12)
 
   // Effective grondslag uit de rauwe maand-rijen (zie de asymmetrie hierboven).
   // De budgetgrondslag (ADR 0103) loopt via dezelfde gedeelde samenstelling als
@@ -662,6 +679,7 @@ export const loadCashflowKpis = cache(async (supabase: SupabaseClient): Promise<
     monthlyIncome,
     monthlyExpenses,
     dailyExpenseRate: canonicalDailyExpenseRate,
+    latestTransactionMonth,
   }
 })
 

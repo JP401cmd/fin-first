@@ -17,6 +17,35 @@
   .willhome { bottom: 1.5rem; right: calc(1.5rem + var(--chat-sidebar-width, 0px)); }
 }
 
+/* ── Mobiel: de melding DOKT, hij zweeft niet (UR2-08) ──────────────────────
+   Op 390px is de meldingkaart (w-80 = 320px) bijna schermbreed. Als losse
+   hoekkaart lag hij daardoor bovenop pagina-inhoud — in de melding uit de
+   review viel de "Open →"-link van de welkomstgids eronder, dus onbereikbaar.
+   Onder lg is de melding daarom een strook over de volle breedte, direct boven
+   de nav-pill-clearance, die zijn band ook écht opeist: FinHome publiceert de
+   gemeten hoogte als `--fin-melding-height`, waarna `--fin-melding-clearance`
+   (app/globals.css) de mobiele `<main>` net zoveel korter maakt. Content
+   schuift dus bóven de strook uit i.p.v. eronder te verdwijnen.
+
+   Dit maakt de melding GEEN overlay: nog steeds geen backdrop, geen
+   focus-trap, en hij blijft op z-50 ónder de gewone overlay-laag (z-[70]) en
+   naast de nav-pill (z-[60]), die hij bewust niet afdekt. Zie CLAUDE.md
+   §Modal-conventie. */
+@media (max-width: 1023.98px) {
+  .willhome--melding {
+    left: 0.75rem;
+    right: calc(0.75rem + var(--chat-sidebar-width, 0px));
+  }
+  .willhome--melding .wh-melding-face { width: 100%; }
+  /* Overrulet de Tailwind-breedte op de kaart zelf (`w-80 max-w-…`), die de
+     desktop-hoekkaart blijft bedienen. Unlayered CSS wint van Tailwinds
+     `@layer utilities`, dus hier is geen `!important` nodig. */
+  .willhome--melding .wh-melding-card { width: 100%; max-width: none; }
+  /* Een strook over de volle breedte groeit vanuit zijn midden, niet uit de
+     rechterhoek waar hij niet meer staat. */
+  .willhome--melding .wh-melding-face { transform-origin: bottom center; }
+}
+
 .wh-bubble {
   position: relative;
   display: flex; align-items: center; justify-content: center;

@@ -212,6 +212,52 @@ describe('Box3TegenbewijsCard — grondslag-voetnoot (M24, review 4c)', () => {
   })
 })
 
+/**
+ * UR2-16d — katern-gating binnen één pagina.
+ *
+ * In de HideInSimple-uitrol (b9ab63429) kregen alle buur-katernen op
+ * /overzicht/belasting/box3 een hard-hide, behalve dit katern. Het faseplan
+ * (`docs/eenvoudige-weergave-audit.md`) documenteert dat nergens als keuze, dus
+ * het was een overslag — maar de reparatie is NIET alsnog `HideInSimple`: ADR
+ * 0026 (aanvulling fase 3-5) reserveert dat mechanisme voor diepte "waar de
+ * gebruiker geen ingang verliest" en wijst bedieningsvlakken juist
+ * `DepthSection` aan. Deze kaart is een bedieningsvlak (schuif + actieknop) en
+ * dit scherm is de enige ingang.
+ *
+ * Twee grendels: de `embedded`-vorm mag geen tweede kop/rand meenemen, en de
+ * call-site moet de DepthSection-route houden in plaats van hard te verbergen.
+ */
+describe('Box3TegenbewijsCard — weergavemodus Eenvoudig (UR2-16d)', () => {
+  it('houdt in de standaardvorm de eigen katern-kop en -rand', () => {
+    const { container } = render(<Box3TegenbewijsCard result={SPAARDER} />)
+
+    expect(screen.getByText('Tegenbewijs-simulator')).toBeTruthy()
+    expect(container.firstElementChild?.className).toContain('border-t')
+  })
+
+  it('laat in embedded-vorm kop én katern-rand weg, maar houdt het bedieningsvlak', () => {
+    const { container } = render(<Box3TegenbewijsCard result={SPAARDER} embedded />)
+
+    // De DepthSection eromheen draagt de titel; een tweede kop zou dubbel lezen.
+    expect(screen.queryByText('Tegenbewijs-simulator')).toBeNull()
+    expect(container.firstElementChild?.className).toBe('')
+    // De schuif — het hele punt van collapsed-but-reachable — blijft bestaan.
+    expect(slider()).toBeTruthy()
+  })
+
+  it('blijft op de box3-pagina bereikbaar via DepthSection, niet hard verborgen', () => {
+    const detail = readFileSync(join(process.cwd(), 'components/overview/box3-detail.tsx'), 'utf8')
+    const start = detail.indexOf('<SwapInSimple')
+    expect(start, 'de tegenbewijs-call-site hoort een modus-tak te hebben').toBeGreaterThan(-1)
+
+    const callSite = detail.slice(start, detail.indexOf('</SwapInSimple>', start))
+    expect(callSite).toContain('<DepthSection')
+    expect(callSite).toContain('<Box3TegenbewijsCard')
+    // Hard verbergen zou de enige ingang naar de tegenbewijsregeling dichtzetten.
+    expect(callSite).not.toContain('HideInSimple')
+  })
+})
+
 describe('Box3TegenbewijsCard — neutrale beginstand (M24)', () => {
   it('zet op de beginstand géén besparings-CTA klaar', () => {
     render(<Box3TegenbewijsCard result={BELEGGER} />)

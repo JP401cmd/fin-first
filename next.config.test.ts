@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import nextConfig from './next.config'
 
@@ -92,6 +92,38 @@ describe('next.config redirects — legacy routes redirecten op de routing-laag 
 
     expect(fallback.has).toBeUndefined()
     expect(fallback.destination).toBe('/toekomst/gebeurtenissen?strategie=aow')
+  })
+
+  it('/toekomst/whatif redirect op de routing-laag, behalve de dreamgate-tak', async () => {
+    // DERDE LICHTING (31 aug 2026, UR2-11). Deze route droeg als laatste nog een
+    // runtime-redirect: zonder ?via=dreamgate riep de server-component meteen
+    // `redirect('/toekomst?whatif=open')` aan — dezelfde trigger, en de
+    // verklaring voor de transiënte HTTP 500 die de UAT hier zag.
+    const rules = await rulesFor('/toekomst/whatif')
+    expect(rules).toHaveLength(1)
+
+    // `missing` i.p.v. `has`: de regel matcht als `via` afwezig is óf een andere
+    // waarde heeft, zodat alléén ?via=dreamgate de echte pagina bereikt.
+    expect(rules[0].missing).toEqual([{ type: 'query', key: 'via', value: 'dreamgate' }])
+    expect(rules[0].has).toBeUndefined()
+    expect(rules[0].destination).toBe('/toekomst?whatif=open')
+    expect(rules[0].permanent).toBe(false)
+  })
+
+  it('/toekomst/whatif/page.tsx rendert alleen — geen runtime-redirect meer', () => {
+    // De route MOET blijven bestaan (hij is de dreamgate-bestemming), dus de
+    // existsSync-grendel hieronder kan hem niet bewaken. Wat hem wél bewaakt: de
+    // bron mag geen `redirect(` meer bevatten.
+    const source = readFileSync(
+      path.join(process.cwd(), 'app/(app)/toekomst/whatif/page.tsx'),
+      'utf8',
+    )
+    const codeLines = source
+      .split(/\r?\n/)
+      .filter((line) => !/^\s*(\*|\/\/|\/\*)/.test(line))
+      .join('\n')
+    expect(codeLines).not.toMatch(/\bredirect\s*\(/)
+    expect(codeLines).not.toMatch(/from 'next\/navigation'/)
   })
 
   it('geen page.tsx meer op de zes routes — anders is de runtime-redirect terug', () => {

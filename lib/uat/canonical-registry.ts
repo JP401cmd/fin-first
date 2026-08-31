@@ -269,9 +269,24 @@ export const CANONICAL_REGISTRY: CanonicalEntry[] = [
     id: 'hefboom-status',
     nr: 12,
     label: 'Hefboom-status (stoplicht)',
-    sourceFn: 'computeLeverScores / loadLeverScores / pillarStatus',
-    sourceFiles: ['lib/leverage-status.ts', 'lib/lever-scores-loader.ts'],
-    consumers: ['sidebar-dots', 'hefboomkaarten', 'status-banner', 'box1/2/3-kaarten'],
+    sourceFn: 'computeLeverScores / loadLeverScores / pillarStatus / leverStatusLabel / scoreDebtRatio',
+    sourceFiles: [
+      'lib/leverage-status.ts',
+      'lib/lever-scores.ts',
+      'lib/lever-scores-loader.ts',
+      'lib/financial-health.ts',
+    ],
+    // De schulden-hefboom deelt sinds UR2-10 één curve met de gezondheidspijler
+    // `debt_ratio` (`scoreDebtRatio`, lib/financial-health.ts) in plaats van een
+    // eigen kopie te draaien. Die kopie codeerde "niets geregistreerd" als 50 —
+    // amber — waardoor een leeg account "Schuldenlast vraagt aandacht" las naast
+    // een subscore "Schuld: 80". Geen data is nu overal `null` → neutral.
+    // Ook het WOORD is canoniek, niet alleen de kleur (UR2-04): kompas en
+    // sidebar-subtags lazen tot dan een eigen lijst ("Gezond/Zorg") naast
+    // LEVERAGE_STATUS_LABEL, waardoor één hefboom op één scherm twee
+    // oordeelswoorden droeg. `leverStatusLabel` (lib/lever-scores.ts) is de ene
+    // vertaling van kompas- naar kaartvocabulaire plus het woord erbij.
+    consumers: ['sidebar-dots', 'hefboomkaarten', 'status-banner', 'box1/2/3-kaarten', 'lever-kompas'],
     toetsbaar: 'consistency',
     kruisWorkflow: 'WF-KRUIS-18',
     canonWorkflow: 'WF-CANON-12',

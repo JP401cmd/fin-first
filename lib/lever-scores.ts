@@ -7,10 +7,60 @@
  */
 
 import { box3TaxStatus } from '@/lib/box3-taxable-input'
+import { hasDebtRatioData, scoreDebtRatio } from '@/lib/financial-health'
+import { LEVERAGE_STATUS_LABEL, type LeverageStatus } from '@/lib/leverage-status'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type LeverStatus = 'green' | 'amber' | 'red' | 'neutral'
+
+// ── Statusvocabulaire: één vertaling, één woordenlijst ───────────────────────
+//
+// Het kompas rekent in `LeverStatus` (green/amber/red/neutral), de kaarten en
+// de status-dots in `LeverageStatus` (good/warn/bad/neutral). Diezelfde
+// vertaling stond drie keer met de hand overgeschreven — hier (voor de
+// tax-lever), in `hefbomen-nav.tsx` en impliciet in de pariteitstest — en
+// dáárnaast bestonden twee EIGEN woordenlijsten ("Gezond/Aandacht/Zorg/Geen
+// data") in `lever-compass.tsx` en `sidebar.tsx`. Gevolg op één scherm:
+// de Belasting-hefboomkaart droeg het generieke `LEVERAGE_STATUS_LABEL`-woord
+// ("Goed op koers") terwijl het kompas ernaast "Gezond" zei, en de sidebar
+// zijn eigen derde kopie las — terwijl de Box 1/2/3-kinderen in diezelfde
+// sidebar wél al `LEVERAGE_STATUS_LABEL` gebruikten (bug UR2-04).
+//
+// Sindsdien geldt: de vertaling staat hier, en het WOORD komt uit de ene
+// generieke lijst `LEVERAGE_STATUS_LABEL` (lib/leverage-status.ts). De
+// domeinspecifieke oordelen ("Goed gespreid", "Hoge schuldenlast") blijven
+// bewust een aparte laag — zie lib/hefboom-status-copy.ts.
+
+/** Kompasvocabulaire → kaart-/dot-vocabulaire. */
+export function leverToLeverageStatus(status: LeverStatus): LeverageStatus {
+  return status === 'green'
+    ? 'good'
+    : status === 'amber'
+      ? 'warn'
+      : status === 'red'
+        ? 'bad'
+        : 'neutral'
+}
+
+/** Kaart-/dot-vocabulaire → kompasvocabulaire. */
+export function leverageToLeverStatus(status: LeverageStatus): LeverStatus {
+  return status === 'good'
+    ? 'green'
+    : status === 'warn'
+      ? 'amber'
+      : status === 'bad'
+        ? 'red'
+        : 'neutral'
+}
+
+/**
+ * Het generieke statuswoord bij een kompas-status — dezelfde ene lijst die de
+ * hefboomkaart, de status-dot en de status-duiding-melding lezen.
+ */
+export function leverStatusLabel(status: LeverStatus): string {
+  return LEVERAGE_STATUS_LABEL[leverToLeverageStatus(status)]
+}
 
 export type LeverEntry = {
   score: number | null
@@ -99,17 +149,28 @@ export function computeLeverScores(input: {
       : Math.round((input.assetTypeCount / 5) * 100)
 
   // 2. Schulden: debt-to-asset ratio
-  let debtScore: number
-  if (input.totalAssets <= 0 && input.totalDebts <= 0) {
-    debtScore = 50 // neutral — no financial data
-  } else if (input.totalDebts <= 0) {
-    debtScore = 100 // no debts = great
-  } else if (input.totalAssets <= 0) {
-    debtScore = 0 // debts but no assets = worst
-  } else {
-    const ratio = input.totalDebts / input.totalAssets
-    debtScore = ratio >= 1 ? 0 : Math.round((1 - ratio) * 100)
-  }
+  //
+  // CANONIEK: exact de curve van de gezondheidspijler `debt_ratio`
+  // (`scoreDebtRatio`, lib/financial-health.ts). Die formule stond hier tot
+  // UR2-10 als letterlijke tweede kopie — twee eigenaren van één curve, en dus
+  // per definitie toekomstige drift.
+  //
+  // Niets geregistreerd (geen vermogen én geen schuld) → `null` → 'neutral'.
+  // Dát is wat deze tak altijd al BEDOELDE — het commentaar zei "neutral — no
+  // financial data" — maar niet DEED: hij gaf 50 terug, en 50 valt in de
+  // amber-band (>= 30). Op een schoon account las je daardoor op /overzicht de
+  // kaart "Schuldenlast vraagt aandacht" bóven zijn eigen detailregel "Geen data
+  // — Start", naast een gezondheidsscore-onderverdeling "Schuld: 80" (bug
+  // UR2-10). De drie andere hefbomen coderen 'geen data' al als `null`; de
+  // schulden-tak was de enige met een magisch middengetal. `lib/page-status/
+  // resolve.ts` moest die synthetische amber daarom met een string-sentinel uit
+  // de status-banner houden — die vangrail is nu overbodig geworden.
+  //
+  // Let op de grens: géén schulden mét vermogen blijft gewoon 100/groen
+  // (schuldenvrij). Alleen het volledig lege account is 'geen oordeel'.
+  const debtScore: number | null = hasDebtRatioData(input.totalAssets, input.totalDebts)
+    ? scoreDebtRatio(input.totalAssets, input.totalDebts)
+    : null
 
   // 3. Cashflow: combined savings rate + budget health (#847)
   //
@@ -191,8 +252,10 @@ export function computeLeverScores(input: {
     ? 'Geen bezittingen geregistreerd — Start'
     : `${input.assetTypeCount} ${input.assetTypeCount === 1 ? 'type' : 'typen'} · ${fmtShort(input.totalAssets)}`
 
+  // Detail en status delen sinds UR2-10 hetzelfde predicaat: de "— Start"-regel
+  // verschijnt exact wanneer de status 'neutral' is, nooit meer los daarvan.
   let debtDetail: string
-  if (input.totalDebts <= 0 && input.totalAssets <= 0) {
+  if (!hasDebtRatioData(input.totalAssets, input.totalDebts)) {
     debtDetail = 'Geen data — Start'
   } else if (input.totalDebts <= 0) {
     debtDetail = 'Schuldenvrij'
@@ -268,14 +331,7 @@ export function computeLeverScores(input: {
     hasBox3Assets: hasBox3,
     householdType: input.householdType,
   })
-  const taxStatus: LeverStatus =
-    taxLeverageStatus === 'good'
-      ? 'green'
-      : taxLeverageStatus === 'warn'
-        ? 'amber'
-        : taxLeverageStatus === 'bad'
-          ? 'red'
-          : 'neutral'
+  const taxStatus: LeverStatus = leverageToLeverStatus(taxLeverageStatus)
 
   return {
     assets: { score: assetScore, status: statusFromScore(assetScore), detail: assetDetail },

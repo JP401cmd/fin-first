@@ -10,7 +10,6 @@ import type { DashboardData } from '@/components/widgets/widget-renderer'
 import type { WidgetPref } from '@/lib/widget-catalog'
 import { BriefingPanel, type BriefingEntry, type BriefingWeekHistoryItem } from './briefing-panel'
 import type { BriefingRefreshState } from '@/lib/types/briefing'
-import type { FreedomHeroProps } from '@/lib/briefing/overview-briefing'
 import { DoelenEmptyState } from './overzicht-hero/empty-states'
 import {
   VoortgangDoelenCard,
@@ -27,6 +26,10 @@ import {
 } from './hero-widget-rail'
 import { CompoundInsightCard } from './compound-insight-card'
 import { PrintOverzichtButton } from './print-overzicht-button'
+import {
+  MilestoneCelebrationHost,
+  type CelebratableMilestone,
+} from '@/components/app/milestone-celebration-host'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 
 /**
@@ -80,8 +83,6 @@ export type OverzichtSecondaryProps = {
    * blijven staan met de reden erbij.
    */
   briefingRefreshState?: BriefingRefreshState
-  /** Vrijheidstijd-hero bovenaan de briefing (week-over-week delta). */
-  freedomHero?: FreedomHeroProps | null
   /** Eén-zin kop boven de briefjes. */
   briefingHeadline?: string | null
   /** Afgesloten weken uit de snapshot-historie (terugblik-disclosure). */
@@ -109,6 +110,11 @@ export type OverzichtSecondaryProps = {
   /** Active + all widget-prefs voor de hero-rail. */
   activeWidgets?: WidgetPref[]
   allWidgetPrefs?: WidgetPref[]
+  /**
+   * Verse (niet-bevestigde) mijlpaal uit de server-detectie (ADR 0123): kant-en-
+   * klare strings voor de vieringshost. Null = niets te vieren.
+   */
+  freshMilestone?: CelebratableMilestone | null
 }
 
 export function OverzichtSecondary({
@@ -124,7 +130,6 @@ export function OverzichtSecondary({
   briefingDataChanged,
   briefingCanRefresh,
   briefingRefreshState,
-  freedomHero,
   briefingHeadline,
   briefingWeekHistory,
   briefingRotation = 0,
@@ -133,6 +138,7 @@ export function OverzichtSecondary({
   allWidgetPrefs,
   liquidCash,
   hasInvestments = false,
+  freshMilestone = null,
 }: OverzichtSecondaryProps) {
   const rail = useHeroRailState(activeWidgets ?? [])
 
@@ -174,6 +180,9 @@ export function OverzichtSecondary({
 
   return (
     <>
+      {/* Viering van een verse mijlpaal (ADR 0123): server-gedetecteerd,
+          server-side once-guard — de host rendert niets bij null. */}
+      <MilestoneCelebrationHost milestone={freshMilestone} />
       {/* Utility-controls die rechtsboven over de hero zweven. Ze wonen in dit
           gestreamde blok omdat de bewerken-toggle de widget-rail-state deelt
           (useHeroRailState) en de status-dot dezelfde server-seed als de
@@ -265,7 +274,6 @@ export function OverzichtSecondary({
         dataChanged={briefingDataChanged ?? false}
         canRefresh={briefingCanRefresh ?? false}
         refreshState={briefingRefreshState ?? 'available'}
-        freedomHero={freedomHero ?? null}
         headline={briefingHeadline ?? null}
         weekHistory={briefingWeekHistory}
         simpleMode={simple}

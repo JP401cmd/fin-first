@@ -6,10 +6,10 @@
  * foutpad van `handleSaveOwnData` geen enkele navigatie/reload staan. Een
  * render-test kan aantonen dat één pad geen reload doet, maar niet dat er
  * nérgens in dat blok later een `window.location.reload()` of `router.replace()`
- * bijkomt. Precies dat is de regressie die de gebruiker z'n invoer kost: de
- * bedragen, bezittingen en schulden leven alléén in de in-memory reducer-state
- * (`draft-persistence.ts` persisteert ze bewust niet), dus een reload op het
- * foutpad wist ze definitief. Precedent voor deze vorm:
+ * bijkomt. Sinds kaart UR2-01 staat het concept server-side, dus een reload op
+ * het foutpad is niet meer fataal — hij blijft wél fout: hij gooit de gebruiker
+ * uit de flow, kost de niet-bewaarde pensioen-parse (ADR 0115) en verbergt de
+ * fout die hij net moest lezen. Precedent voor deze vorm:
  * `components/app/horizon/horizon-client.euro-view.test.ts`.
  */
 import { describe, it, expect } from 'vitest'

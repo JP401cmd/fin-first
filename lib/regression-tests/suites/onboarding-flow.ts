@@ -1,6 +1,7 @@
 import { registerTests } from '../test-registry'
 import { assert, assertEqual } from '../assert'
 import { unauthenticatedFetch } from '../server-runner'
+import { sanitizeStoredDraft } from '@/app/(onboarding)/onboarding/draft-persistence'
 import type { TestCase } from '../test-types'
 
 const CAT = 'onboarding.flow'
@@ -37,8 +38,12 @@ function getDirection(stepOrder: Step[], from: Step, to: Step): Direction {
   return stepOrder.indexOf(to) >= stepOrder.indexOf(from) ? 'forward' : 'back'
 }
 
-/** localStorage key for onboarding draft persistence */
-const LOCALSTORAGE_DRAFT_KEY = 'trifinity_onboarding_draft'
+/**
+ * Endpoint waar het onboarding-concept sinds aug 2026 (kaart UR2-01) leeft: de
+ * eigen profielrij, via `/api/onboarding/draft`. De oude localStorage-sleutel
+ * `trifinity_onboarding_draft` bestaat nog uitsluitend als legacy-opruimpad.
+ */
+const DRAFT_ENDPOINT = '/api/onboarding/draft'
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
@@ -108,31 +113,43 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── Step 4: localStorage draft persistence ─────────────────────────────────
+  // ── Step 4: server-side conceptpersistentie ────────────────────────────────
   {
-    id: 'ob-flow-localstorage-persistence',
-    name: 'localStorage draft persistence: key trifinity_onboarding_draft',
+    id: 'ob-flow-draft-persistence',
+    name: 'Conceptpersistentie: /api/onboarding/draft bewaart de antwoorden',
     category: CAT,
-    description: 'Onboarding draft wordt opgeslagen onder de stabiele localStorage-key',
+    description:
+      'Het onboarding-concept staat server-side op de eigen profielrij; ' +
+      'de sanitizer herstelt identiteit, bedragen en posten (kaart UR2-01)',
     priority: 'high',
     estimatedDurationMs: 100,
     fn() {
-      assertEqual(LOCALSTORAGE_DRAFT_KEY, 'trifinity_onboarding_draft', 'localStorage key correct')
+      assertEqual(DRAFT_ENDPOINT, '/api/onboarding/draft', 'Concept-endpoint correct')
 
-      // Serialization roundtrip met de huidige draft-shape
-      const mockState = {
+      // Round-trip door de ECHTE sanitizer — niet door een lokale JSON-kopie,
+      // want die bewijst alleen dat JSON werkt.
+      const opgeslagen = {
+        version: 2,
+        lastStep: 'bezittingen',
         identity: { full_name: 'Draft Test', date_of_birth: '1990-01-15' },
         selectedGoals: ['vermogen-overzicht', 'eerder-stoppen'],
-        activeModules: ['vermogensregistratie', 'toekomstplannen'],
-        bankAccounts: [{ name: 'ING', balance: '2500' }],
-        assets: [],
-        debts: [],
-        lastStep: 'bezittingen',
+        quickAssets: [{ asset_type: 'cash', name: 'ING', current_value: 2500 }],
+        pension: { mode: 'upload', grossMonthly: '2000', parseResult: { geheim: true } },
       }
-      const roundtrip = JSON.parse(JSON.stringify(mockState))
-      assertEqual(roundtrip.identity.full_name, 'Draft Test', 'Draft identity hersteld')
-      assertEqual(roundtrip.selectedGoals.length, 2, 'Draft doelen hersteld')
-      assertEqual(roundtrip.lastStep, 'bezittingen', 'Draft lastStep hersteld')
+      const hersteld = sanitizeStoredDraft(opgeslagen)
+      assert(hersteld !== null, 'Concept is herstelbaar')
+      assertEqual(hersteld!.identity.full_name, 'Draft Test', 'Naam hersteld')
+      assertEqual(hersteld!.identity.date_of_birth, '1990-01-15', 'Geboortedatum hersteld')
+      assertEqual(hersteld!.quickAssets.length, 1, 'Bezitting hersteld')
+      assertEqual(hersteld!.quickAssets[0].current_value, 2500, 'Bedrag hersteld')
+      assertEqual(hersteld!.lastStep, 'bezittingen', 'Stap-positie hersteld')
+      // ADR 0115: het geparste pensioenoverzicht verlaat het toestel niet en
+      // komt dus ook nooit uit het concept terug.
+      assertEqual(
+        JSON.stringify(hersteld).includes('geheim'),
+        false,
+        'Pensioenoverzicht blijft buiten het concept',
+      )
     },
   },
 

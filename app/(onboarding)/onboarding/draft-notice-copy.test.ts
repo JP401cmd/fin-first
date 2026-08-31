@@ -3,56 +3,58 @@ import {
   DRAFT_RESTORED_NOTICE,
   INCOMPLETE_INPUT_NOTICE,
   SAVE_FAILED_NOTICE,
-  SENSITIVE_FIELD_MENTIONS,
+  UNRESTORED_FIELD_MENTIONS,
   resolveNoticeDisplay,
 } from './draft-notice-copy'
-import { SENSITIVE_DRAFT_KEYS } from './draft-persistence'
+import { UNRESTORED_DRAFT_KEYS } from './draft-persistence'
 
 /**
- * Regressie-lock op kaart C3 — "Onboarding-invoer gaat verloren".
- *
- * Het gedrag (alleen een niet-gevoelig draft persisteren) is bewust en blijft;
- * de meldingen mogen daar nooit meer overheen claimen dat álles bewaard/
- * hersteld is.
+ * Regressie-lock op kaart C3 (melding mag niet méér claimen dan het product
+ * waarmaakt) en op kaart UR2-01 (het product bewaart nu wél alles, dus de
+ * melding mag ook niet MINDER claimen: een gebruiker die zijn bedragen gewoon
+ * ziet staan, mag niet lezen dat ze weg zijn).
  */
-describe('onboarding herstel-melding (C3)', () => {
-  it('claimt niet langer dat ingevulde gegevens zijn hersteld', () => {
-    const text = `${DRAFT_RESTORED_NOTICE.label} ${DRAFT_RESTORED_NOTICE.body}`.toLowerCase()
-    expect(text).not.toContain('zijn hersteld')
-    expect(text).not.toContain('gegevens hersteld')
+describe('onboarding herstel-melding (C3 + UR2-01)', () => {
+  it('bevestigt dat de ingevulde antwoorden terug zijn', () => {
+    const body = DRAFT_RESTORED_NOTICE.body.toLowerCase()
+    expect(body).toContain('antwoorden')
+    expect(body).toContain('bedragen')
   })
 
-  it('benoemt elk niet-bewaard veld, zodat de tekst niet stil kan verouderen', () => {
+  it('claimt niet dat bedragen of posten verloren zijn', () => {
     const body = DRAFT_RESTORED_NOTICE.body.toLowerCase()
-    for (const key of SENSITIVE_DRAFT_KEYS) {
-      const mentions = SENSITIVE_FIELD_MENTIONS[key]
+    expect(body).not.toContain('vul je opnieuw in')
+    expect(body).not.toContain('bewaren we niet op dit apparaat')
+  })
+
+  it('benoemt elk niet-hersteld veld, zodat de tekst niet stil kan verouderen', () => {
+    const body = DRAFT_RESTORED_NOTICE.body.toLowerCase()
+    for (const key of UNRESTORED_DRAFT_KEYS) {
+      const mentions = UNRESTORED_FIELD_MENTIONS[key]
       expect(
-        mentions.some((word) => body.includes(word.toLowerCase())),
+        mentions.some((word: string) => body.includes(word.toLowerCase())),
         `herstel-melding noemt "${key}" niet (verwacht een van: ${mentions.join(', ')})`,
       ).toBe(true)
     }
   })
 
-  it('vertelt zowel wat WEL terugkomt als wat NIET bewaard blijft', () => {
-    const body = DRAFT_RESTORED_NOTICE.body.toLowerCase()
-    expect(body).toContain('onthouden')
-    expect(body).toContain('bewaren we niet')
-  })
-
-  it('houdt een mention-regel voor precies de gevoelige velden', () => {
-    expect(Object.keys(SENSITIVE_FIELD_MENTIONS).sort()).toEqual([...SENSITIVE_DRAFT_KEYS].sort())
+  it('houdt een mention-regel voor precies de niet-herstelde velden', () => {
+    expect(Object.keys(UNRESTORED_FIELD_MENTIONS).sort()).toEqual(
+      [...UNRESTORED_DRAFT_KEYS].sort(),
+    )
   })
 })
 
-describe('onboarding opslag-foutmelding (C3)', () => {
+describe('onboarding opslag-foutmelding (C3 + UR2-01)', () => {
   it('claimt niet langer onvoorwaardelijk dat antwoorden blijven staan', () => {
     expect(SAVE_FAILED_NOTICE.body.toLowerCase()).not.toContain('staan nog hier')
   })
 
-  it('waarschuwt expliciet dat verversen de invoer wist', () => {
+  it('waarschuwt niet meer voor verversen — het concept staat server-side', () => {
     const body = SAVE_FAILED_NOTICE.body.toLowerCase()
-    expect(body).toContain('ververs de pagina niet')
-    expect(body).toContain('kwijt')
+    expect(body).not.toContain('ververs de pagina niet')
+    expect(body).not.toContain('kwijt')
+    expect(body).toContain('concept')
   })
 
   it('houdt de uitnodiging om het opnieuw te proberen', () => {

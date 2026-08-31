@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/server'
 import { getCachedUser } from '@/lib/supabase/cached-user'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { getOwnProfile } from '@/lib/server-data/base'
+import { getTxAgg12m, aggLatestMonth, type TxMonthAggregateRow } from '@/lib/server-data/tx-aggregates'
+import { StaleTransactionsBanner } from '@/components/app/stale-transactions-banner'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { OverzichtHeroPrimary } from '@/components/overview/overzicht-hero'
 import {
@@ -68,16 +70,25 @@ export default async function OverzichtPage() {
   // `getOwnProfile` is `cache()`-wrapped en wordt óók door de twee loaders
   // aangeroepen → hier "gratis" (voor de gebruikersnaam). De banner-seeds hangen
   // enkel van de user-id af.
-  const [leverScoresResult, horizonData, ownProfileRes, checkinBannerSeed, welcomeGuideSeed] =
+  const [leverScoresResult, horizonData, ownProfileRes, checkinBannerSeed, welcomeGuideSeed, txAgg12Res] =
     await Promise.all([
       loadLeverScores(supabase, perspective),
       loadHorizonData(supabase, perspective),
       getOwnProfile(supabase),
       userId ? loadCheckinBannerSeed(supabase, userId) : Promise.resolve(undefined),
       userId ? loadWelcomeGuideSeed(supabase, userId) : Promise.resolve(null),
+      // VERSHEID (UR2-13): de jongste maand mét boekingen, voor de melding
+      // "gegevens verouderd" in de banner-slot hieronder. `getTxAgg12m` is
+      // React-`cache()`-gewrapt en wordt in blok 2 door `loadDashboardData`
+      // opnieuw aangeroepen — deze aanroep verschuift die RPC dus naar voren in
+      // plaats van er één toe te voegen, en houdt hem in dezelfde parallelle golf.
+      getTxAgg12m(supabase),
     ])
 
   const userName = (ownProfileRes.data as { full_name?: string | null } | null)?.full_name ?? null
+  // `realOnly: false` — voor "heeft deze gebruiker transacties?" telt een maand
+  // met alleen transfers ook mee; het gaat om het bestaan van data, niet om een som.
+  const latestTransactionMonth = aggLatestMonth((txAgg12Res.data ?? []) as TxMonthAggregateRow[])
 
   const health = horizonData?.healthScore ?? null
   const freedomPct = horizonData?.healthScoreInput?.freedomPct ?? null
@@ -166,6 +177,18 @@ export default async function OverzichtPage() {
           <>
             <WelcomeGuideBanner />
             <CheckinBanner seed={checkinBannerSeed} />
+            {/* UR2-13 — staat de administratie stil, dan rusten de hefboom-tegels
+                hieronder (o.a. "Cashflow 38 %") op maandenoude transacties zonder
+                dat iets dat verraadt. Rendert zichzelf weg bij verse data.
+
+                ALLEEN IN HET EIGEN PERSPECTIEF: `getTxAgg12m` is RLS-breed (eigen
+                + gedeeld huishouden) en kent geen partner-variant, terwijl de
+                tegels hieronder in Huishouden/Partner wél perspectief-correct
+                zijn. Een melding over "jouw laatste boeking" naast partnercijfers
+                zou een bewering doen die deze bron niet kan onderbouwen. */}
+            {perspective === 'personal' && (
+              <StaleTransactionsBanner latestTransactionMonth={latestTransactionMonth} />
+            )}
           </>
         }
         health={health}

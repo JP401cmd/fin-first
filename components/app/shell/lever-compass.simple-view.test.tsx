@@ -52,7 +52,9 @@ describe('LeverCompassMobile — NAV-6 statuspunt-reductie', () => {
 
   it("laat in 'simple' de zwaarste status winnen (rood boven oranje)", () => {
     renderCompass('simple', scoresWith({ debts: 'amber', tax: 'red' }))
-    expect(screen.getByRole('button', { name: /Kompas: zorg/ })).toBeInTheDocument()
+    // "risico" i.p.v. het vroegere "zorg": het kompas leest sinds UR2-04 de ENE
+    // generieke woordenlijst (LEVERAGE_STATUS_LABEL) i.p.v. een eigen kopie.
+    expect(screen.getByRole('button', { name: /Kompas: risico/ })).toBeInTheDocument()
   })
 
   it("laat 'geen data' nooit een echte waarschuwing overstemmen", () => {

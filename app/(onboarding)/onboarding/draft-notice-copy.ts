@@ -2,60 +2,56 @@
  * Copy voor de twee onboarding-meldingen die een uitspraak doen over het
  * BEHOUD van al ingevulde gegevens.
  *
- * ACHTERGROND (kaart C3, aug 2026): sinds de security-fix van jul 2026
- * (optie A, commit `0b33ede80`) bewaart `draft-persistence.ts` bewust alléén
- * een NIET-gevoelig draft in localStorage — stap-positie en keuzes-zonder-
- * bedrag. Naam/geboortedatum, budgetbedragen, bezittingen en schulden staan
- * uitsluitend in de in-memory reducer-state en zijn na een refresh, op een
- * ander apparaat of in een privévenster weg.
+ * ACHTERGROND — de tekst is twee keer verhuisd, achter het gedrag aan:
  *
- * Beide meldingen claimden méér dan het product waarmaakt: de herstel-banner
- * meldde "je eerder ingevulde gegevens zijn hersteld" (terwijl alleen de
- * stap-positie terugkomt) en de opslag-fout meldde "je antwoorden staan nog
- * hier" (waar is: alleen zolang de gebruiker niet ververst). Het gedrag blijft
- * zoals het is — de tekst vertelt nu wat er WEL en NIET bewaard blijft.
+ *  · kaart C3 (aug 2026): het concept bewaarde toen alléén stap-positie en
+ *    keuzes-zonder-bedrag, terwijl de banner "je eerder ingevulde gegevens zijn
+ *    hersteld" meldde. De tekst is toen eerlijk gemaakt over wat er wegviel.
+ *  · kaart UR2-01 (aug 2026): het concept staat nu server-side op de eigen
+ *    profielrij en bevat wél alle antwoorden. Die eerlijke tekst van C3 is
+ *    daarmee zélf onwaar geworden — hij zou een gebruiker die zijn bedragen
+ *    gewoon ziet staan vertellen dat ze weg zijn. Wat nu resteert is één veld
+ *    dat niet terugkomt: het geparste pensioenoverzicht (ADR 0115 — dat blijft
+ *    op het toestel).
  *
  * Deze copy staat bewust in een eigen module (geen export uit `page.tsx`)
  * zodat de tekst getest kan worden zonder de hele client-component-keten te
  * mounten.
  */
-import type { SENSITIVE_DRAFT_KEYS } from './draft-persistence'
+import type { UNRESTORED_DRAFT_KEYS } from './draft-persistence'
 
-/** Union van de draft-velden die bewust NIET gepersisteerd worden. */
-export type SensitiveDraftKey = (typeof SENSITIVE_DRAFT_KEYS)[number]
+/** Union van de conceptvelden die na een reload bewust NIET terugkomen. */
+export type UnrestoredDraftKey = (typeof UNRESTORED_DRAFT_KEYS)[number]
 
 /**
- * Per niet-bewaard veld de woorden waarmee de herstel-melding dat veld voor
- * de gebruiker benoemt. `Record` over de union: komt er een gevoelig veld bij
- * in `SENSITIVE_DRAFT_KEYS`, dan geeft dit een compile-fout tot de melding het
+ * Per niet-hersteld veld de woorden waarmee de herstel-melding dat veld voor
+ * de gebruiker benoemt. `Record` over de union: komt er een veld bij in
+ * `UNRESTORED_DRAFT_KEYS`, dan geeft dit een compile-fout tot de melding het
  * óók noemt — precies de drift die C3 veroorzaakte.
  */
-export const SENSITIVE_FIELD_MENTIONS: Record<SensitiveDraftKey, readonly string[]> = {
-  identity: ['naam'],
-  budgetAmounts: ['bedragen'],
-  quickAssets: ['bezittingen'],
-  quickDebts: ['schulden'],
+export const UNRESTORED_FIELD_MENTIONS: Record<UnrestoredDraftKey, readonly string[]> = {
+  pensionParseResult: ['pensioenoverzicht'],
 }
 
 /**
- * Melding bij het hervatten van een draft. Zegt exact wat er terugkomt (de
- * plek in de wizard) en wat niet (alles met een bedrag of een naam eraan).
+ * Melding bij het hervatten van een concept. Bevestigt dat de antwoorden terug
+ * zijn en noemt het ene veld dat dat niet is.
  */
 export const DRAFT_RESTORED_NOTICE = {
   label: 'Verder waar je was',
   body:
-    'We hebben je plek in de vragenlijst onthouden. Je naam, bedragen, bezittingen en schulden bewaren we niet op dit apparaat — die vul je opnieuw in.',
+    'Je eerder ingevulde antwoorden staan er weer — inclusief je bedragen, bezittingen en schulden. Alleen een geüpload pensioenoverzicht bewaren we niet; dat lees je zo nodig opnieuw in.',
 } as const
 
 /**
- * Melding na een mislukte eindopslag. De ingevulde antwoorden staan nog in de
- * in-memory state (er volgt geen reload op deze fout), maar een refresh wist
- * ze alsnog — dat staat er nu bij.
+ * Melding na een mislukte eindopslag. De antwoorden staan nog in het scherm én
+ * als concept op de server, dus verversen is niet meer fataal — maar het helpt
+ * ook niet: de fout zit in het afronden, niet in het concept.
  */
 export const SAVE_FAILED_NOTICE = {
   label: 'Opslaan mislukt',
   body:
-    'Het opslaan is niet gelukt. Je antwoorden staan nog in dit scherm — probeer het opnieuw. Ververs de pagina niet: dan ben je je bedragen en posten kwijt.',
+    'Het afronden is niet gelukt. Je antwoorden staan nog in dit scherm en zijn als concept bewaard — probeer het opnieuw.',
 } as const
 
 /**

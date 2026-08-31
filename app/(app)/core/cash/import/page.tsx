@@ -27,6 +27,7 @@ import { Kicker, EditorialHeadline, EditorialDeck } from '@/components/editorial
 import { AICategorizeSheet } from '@/components/app/ai-categorize-sheet'
 import { selectAllState, withAllSkip, type CrossSourceFlag } from './select-all'
 import { countImportRows, selectionCounterLabel } from './import-counters'
+import { summarizeImplausibleAmounts } from '@/lib/transactions/amount-plausibility'
 import { rowCheckboxLabel } from './row-checkbox-label'
 import {
   CROSS_SOURCE_DATE_TOLERANCE_DAYS,
@@ -1350,6 +1351,11 @@ export default function ImportPage() {
   const counters = countImportRows(rows)
   const { crossSourceCount, newCount, dupCount, toImportCount } = counters
   const selectionLabel = selectionCounterLabel(counters)
+  // Zachte plausibiliteitscheck op de aangevinkte rijen (UR2-18). Dezelfde
+  // grens als het transactieformulier — bij een bestand is de bron van de fout
+  // een andere (een verkeerd gelezen decimaalteken maakt van "1.234,56" stil
+  // €123.456), het gevolg is identiek: één rij die alle aggregaten meesleurt.
+  const implausible = summarizeImplausibleAmounts(rows)
   const totalBij = rows.filter((r) => !r.skipImport && r.amount > 0).reduce((s, r) => s + r.amount, 0)
   const totalAf = rows.filter((r) => !r.skipImport && r.amount < 0).reduce((s, r) => s + r.amount, 0)
 
@@ -1979,6 +1985,30 @@ export default function ImportPage() {
                   )}
                 </button>
               </div>
+
+              {/* Zachte plausibiliteitscheck (UR2-18): geen blokkade, wél een
+                  vraag. Een uitzonderlijk bedrag in een bestand komt vrijwel
+                  altijd uit een verkeerd gelezen decimaalteken — en één zo'n
+                  rij trekt daarna spaarquote, gezondheidsgetal en briefing mee. */}
+              {implausible.count > 0 && (
+                <div
+                  className="border border-orange-300 bg-orange-50 p-4 text-sm text-orange-800"
+                  data-testid="import-bedrag-plausibiliteit"
+                >
+                  <div className="flex items-center gap-2 font-medium">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    {implausible.count === 1
+                      ? '1 geselecteerde regel heeft een uitzonderlijk bedrag'
+                      : `${implausible.count} geselecteerde regels hebben een uitzonderlijk bedrag`}
+                  </div>
+                  <p className="mt-1 text-orange-700">
+                    De grootste is <MaskedAmount value={implausible.largest} tone="kern" decimals />.
+                    Controleer of het decimaalteken goed gelezen is — “1.234,56” dat als €123.456
+                    binnenkomt trekt je spaarquote en overzicht stil scheef. Klopt het wel, dan
+                    importeer je gewoon door.
+                  </p>
+                </div>
+              )}
 
               {dupCount > 0 && (
                 <div className="border border-orange-200 bg-orange-50 p-4 text-sm text-orange-700">

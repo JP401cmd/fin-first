@@ -239,13 +239,15 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
       const dashboardNaarOverzicht = redirects.some((r) => r.source === '/dashboard' && r.destination === '/overzicht')
       const coreAssetsGeenRedirect = !redirects.some((r) => r.source === '/core/assets')
       return {
-        // 24 = 16 + de drie regels die /core/cash en /horizon/whatif van een
+        // 25 = 16 + de drie regels die /core/cash en /horizon/whatif van een
         // runtime-`redirect()`-pagina naar de routing-laag verhuisden (React
         // #310-fix) + de vijf regels van de tweede lichting (11 aug 2026:
         // /horizon/strategie, /horizon/uitgaven-na-pensioen,
         // /toekomst/uitgaven-na-pensioen en /toekomst/strategie met zijn twee
-        // focus-takken). Zie het redirect-blok in next.config.ts.
-        expected: 'aantalRedirects=24; coreNaarOverzicht=true; dashboardNaarOverzicht=true; coreAssetsGeenRedirect=true',
+        // focus-takken) + de derde lichting (31 aug 2026, UR2-11):
+        // /toekomst/whatif zonder `?via=dreamgate`. Zie het redirect-blok in
+        // next.config.ts.
+        expected: 'aantalRedirects=25; coreNaarOverzicht=true; dashboardNaarOverzicht=true; coreAssetsGeenRedirect=true',
         actual: `aantalRedirects=${redirects.length}; coreNaarOverzicht=${coreNaarOverzicht}; dashboardNaarOverzicht=${dashboardNaarOverzicht}; coreAssetsGeenRedirect=${coreAssetsGeenRedirect}`,
       }
     },

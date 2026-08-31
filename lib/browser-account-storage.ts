@@ -41,7 +41,7 @@ const LAST_USER_KEY = 'trifinity_last_user'
 /** Sleutels met gegevens of concepten van één specifiek account. */
 const ACCOUNT_DATA_KEYS = [
   'fintwo_import_session', // hervat-marker: bankrekening-id, bestandsnaam, rij-hashes
-  'trifinity_onboarding_draft', // ingevulde inkomens-/vermogensantwoorden
+  'trifinity_onboarding_draft', // legacy onboarding-concept (staat sinds aug 2026 server-side)
   'trifinity_onboarding_welcome_seen', // hoort bij de persoon, niet bij het toestel
   'vrijheidscheck_draft', // ingevulde vrijheidscheck
   'trifinity-chat-wft-accepted', // instemming met de Wft-disclaimer — per persoon

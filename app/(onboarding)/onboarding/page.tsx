@@ -49,20 +49,30 @@ import type { GoalSlug } from '@/lib/goals/types'
 import { isGoalSlug } from '@/lib/goals/catalog'
 import {
   serializeDraft,
-  sanitizeStoredDraft,
   hasResumableDraft,
   firstIncompleteRequiredStep,
-  type NonSensitiveDraft,
+  type OnboardingDraft,
   type DeferredFieldKey,
 } from './draft-persistence'
+import {
+  fetchDraft,
+  clearDraft,
+  clearLegacyLocalDraft,
+  takeLegacyLocalDraft,
+  createDraftWriter,
+} from './draft-transport'
 import {
   DRAFT_RESTORED_NOTICE,
   resolveNoticeDisplay,
   type OnboardingNotice,
 } from './draft-notice-copy'
 
-// ── localStorage key for persisting onboarding data ──────────
-const ONBOARDING_STORAGE_KEY = 'trifinity_onboarding_draft'
+/**
+ * Wachttijd voordat een gewijzigd concept naar de server gaat. Lang genoeg dat
+ * doortypen in een bedragveld niet elke toetsaanslag een PUT kost, kort genoeg
+ * dat een reload vlak na "Toevoegen" de post al bewaard aantreft.
+ */
+const DRAFT_PERSIST_DEBOUNCE_MS = 600
 
 // ── localStorage key voor de "is de welkomstpopup al gezien?"-flag.
 // Bewust een aparte key buiten het draft-payload: de flag moet ook
@@ -397,7 +407,7 @@ type Action =
    * Idempotent: voegt de key alleen toe als hij er nog niet in zit.
    */
   | { type: 'DEFER_FIELD'; key: DeferredFieldKey }
-  | { type: 'RESTORE_STATE'; data: NonSensitiveDraft }
+  | { type: 'RESTORE_STATE'; data: OnboardingDraft }
 
 export const _initialState: State = {
   step: 'naam',
@@ -477,56 +487,50 @@ export function _reducer(state: State, action: Action): State {
           `[onboarding] lastStep ${action.data.lastStep ?? '(none)'} not in active order, falling back to ${restoredStep}`
         )
       }
-      // Security (optie A): het draft bevat alléén niet-gevoelige velden. Alle
-      // gevoelige data (identity, bedragen, vermogen, pensioenbedragen,
-      // spaardoel-naam/bedrag) wordt NOOIT hersteld — die houdt de
-      // _initialState-shape en wordt door de gebruiker opnieuw ingevoerd. De
-      // finish-guard (`firstIncompleteRequiredStep`) voorkomt dat de eind-save
-      // met lege verplichte velden vertrekt.
+      // Het concept staat sinds aug 2026 server-side op de eigen profielrij
+      // (kaart UR2-01), dus ALLE antwoorden komen terug — naam, bedragen,
+      // bezittingen, schulden. Enige uitzondering: `pension.parseResult`, het
+      // geparste pensioenoverzicht, dat per ADR 0115 het toestel niet verlaat
+      // en dus opnieuw ingelezen wordt. De finish-guard
+      // (`firstIncompleteRequiredStep`) blijft de eind-save bewaken voor
+      // concepten waarin de naam alsnog ontbreekt (oud v1-concept, of "later
+      // invullen").
       const restoredGoals = action.data.selectedGoals.filter(isGoalSlug)
+      // Een lege fase-stack (oud v1-concept, of een sectie waar de gebruiker
+      // nog niet was) zou de sub-machine zonder scherm laten — val dan terug
+      // op de beginstack.
+      const restoredBezittingenPhases =
+        action.data.bezittingenPhases.length > 0
+          ? action.data.bezittingenPhases
+          : initialSectionPhases()
+      const restoredSchuldenPhases =
+        action.data.schuldenPhases.length > 0
+          ? action.data.schuldenPhases
+          : initialSectionPhases()
       return {
         ...state,
         step: restoredStep,
         direction: 'forward',
-        // Gevoelig — nooit hersteld: houd de lege initiële identiteit.
-        identity: { ..._initialState.identity },
+        identity: { ...action.data.identity },
         selectedGoals: restoredGoals,
         // Sinds jun 2026 kiest de gebruiker geen modules meer in onboarding —
         // alles staat default aan.
         activeModules: [...ALL_MODULES],
-        // Alleen de niet-gevoelige horizon-strategiekeuzes terug; de gevoelige
-        // bedragen (fire_legacy_amount, retirement_custom_amount) en life_events
-        // blijven op de initiële shape.
-        horizon: {
-          ...INITIAL_HORIZON_DATA,
-          fire_end_strategy: action.data.horizon.fire_end_strategy,
-          fire_end_age: action.data.horizon.fire_end_age,
-          temporal_balance: action.data.horizon.temporal_balance,
-        },
-        // Gevoelig — nooit hersteld.
-        budgetAmounts: {},
-        quickAssets: [],
-        quickDebts: [],
-        // De fase-stack hangt aan de (net-gewiste) posten — reset naar vraag 1
-        // zodat een herstelde draft niet op een lege review-fase landt.
-        bezittingenPhases: initialSectionPhases(),
-        schuldenPhases: initialSectionPhases(),
-        // Alleen preset-keuze + skip-vlag terug; naam/streefbedrag/datum blijven leeg.
-        spaardoel: {
-          ..._initialState.spaardoel,
-          presetKey: action.data.spaardoel.presetKey,
-          skipped: action.data.spaardoel.skipped,
-        },
-        // Alleen methode + skip-vlag terug; het bedrag blijft leeg.
-        retirementExpense: {
-          ..._initialState.retirementExpense,
-          method: action.data.retirementExpense.method,
-          skipped: action.data.retirementExpense.skipped,
-        },
-        // Alleen het gekozen pad terug; brutobedrag/leeftijd/parseResult blijven leeg.
+        horizon: { ...action.data.horizon },
+        budgetAmounts: { ...action.data.budgetAmounts },
+        quickAssets: action.data.quickAssets.map((a) => ({ ...a })),
+        quickDebts: action.data.quickDebts.map((d) => ({ ...d })),
+        bezittingenPhases: restoredBezittingenPhases,
+        schuldenPhases: restoredSchuldenPhases,
+        spaardoel: { ...action.data.spaardoel },
+        retirementExpense: { ...action.data.retirementExpense },
+        // Het gekozen pad + de handmatige schatting terug; `parseResult` blijft
+        // leeg (ADR 0115 — het overzicht blijft op het toestel).
         pension: {
           ..._initialState.pension,
           mode: action.data.pension.mode,
+          grossMonthly: action.data.pension.grossMonthly,
+          startAge: action.data.pension.startAge,
         },
         deferredFields: [...action.data.deferredFields],
       }
@@ -549,53 +553,22 @@ function StepTransition({ direction, children }: {
   )
 }
 
-// ── localStorage helpers ─────────────────────────────────────
+// ── Concept: lezen bij binnenkomst ───────────────────────────
 
-function saveToLocalStorage(state: State) {
-  try {
-    // Security (optie A): schrijf ALLEEN het niet-gevoelige draft weg — de
-    // serialisatie leeft in `draft-persistence.ts` en laat bedragen, namen en
-    // identiteit per definitie buiten het gepersisteerde object.
-    localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(serializeDraft(state)))
-  } catch {
-    // localStorage may be full or unavailable — silently ignore
+/**
+ * Haal het te hervatten concept op. Eerst de server (`/api/onboarding/draft`);
+ * is daar niets, dan éénmalig het achtergebleven localStorage-concept van vóór
+ * aug 2026 — dat draagt alleen stap-positie en keuzes, maar zet iemand die
+ * middenin zat wel op de juiste plek terug. De legacy-sleutel wordt daarbij
+ * hoe dan ook gewist.
+ */
+async function loadResumableDraft(): Promise<OnboardingDraft | null> {
+  const serverDraft = await fetchDraft()
+  if (serverDraft) {
+    clearLegacyLocalDraft()
+    return serverDraft
   }
-}
-
-function loadFromLocalStorage(): NonSensitiveDraft | null {
-  try {
-    const raw = localStorage.getItem(ONBOARDING_STORAGE_KEY)
-    if (!raw) return null
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(raw)
-    } catch {
-      return null
-    }
-    // Strip gevoelige velden uit een (mogelijk oud, vol) draft → alléén de
-    // niet-gevoelige keuzes + stap blijven over.
-    const sanitized = sanitizeStoredDraft(parsed)
-    if (!sanitized) return null
-    // Eenmalige migratie: overschrijf de opgeslagen key met de gestripte
-    // versie zodat oude bedragen/identiteit al bij de eerste load uit
-    // localStorage verdwijnen — óók wanneer we niet daadwerkelijk herstellen.
-    try {
-      localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(sanitized))
-    } catch {
-      // ignore — best-effort strip
-    }
-    return sanitized
-  } catch {
-    return null
-  }
-}
-
-function clearLocalStorage() {
-  try {
-    localStorage.removeItem(ONBOARDING_STORAGE_KEY)
-  } catch {
-    // silently ignore
-  }
+  return takeLegacyLocalDraft()
 }
 
 /**
@@ -711,6 +684,13 @@ export default function OnboardingPage() {
   // hervat-voortgang was daarmee weg vóórdat de restore-poging 'm kon lezen
   // (WF-START-23). Blijft dus `false` tot de restore-poging is afgerond.
   const [restoreChecked, setRestoreChecked] = useState(false)
+  // Schrijver van het concept — één instantie per mount, zodat de interne
+  // wachtrij de PUT's in volgorde houdt (zie createDraftWriter). Lazy init in
+  // een ref: `useMemo` geeft geen identiteitsgarantie, en een tweede schrijver
+  // zou precies de volgorde-garantie opheffen waar hij voor bestaat.
+  const draftWriterRef = useRef<ReturnType<typeof createDraftWriter> | null>(null)
+  if (draftWriterRef.current === null) draftWriterRef.current = createDraftWriter()
+  const draftWriter = draftWriterRef.current
 
   // PSD2 bank connect return state — detected via query params from callback redirect.
   // Uses useState instead of useSearchParams to avoid Suspense boundary requirement.
@@ -781,7 +761,10 @@ export default function OnboardingPage() {
         .single()
 
       if (profile?.onboarding_completed) {
-        clearLocalStorage()
+        clearLegacyLocalDraft()
+        // Wissen vóór de redirect: een concept van een al voltooide onboarding
+        // is dode, gevoelige data op de profielrij.
+        await clearDraft()
         router.replace('/overzicht')
         return
       }
@@ -805,19 +788,18 @@ export default function OnboardingPage() {
         // netwerkfout — fallback op NL_AOW_AGE
       }
 
-      // Try to restore previously entered data from localStorage. Sinds de
-      // security-fix (optie A) bevat het draft alléén niet-gevoelige velden;
-      // het "is er iets te hervatten?"-signaal baseert daarom op de stap +
-      // keuzes (`hasResumableDraft`), niet meer op de (niet meer gepersisteerde)
-      // naam/geboortedatum.
-      const saved = loadFromLocalStorage()
+      // Haal het lopende concept op. Sinds aug 2026 (kaart UR2-01) staat dat
+      // server-side op de eigen profielrij en bevat het ALLE antwoorden, dus
+      // een reload wist niets meer. `hasResumableDraft` bepaalt of er iets
+      // zinvols te hervatten valt.
+      const saved = await loadResumableDraft()
       const hasRestoredDraft = hasResumableDraft(saved)
       if (hasRestoredDraft && saved) {
         dispatch({ type: 'RESTORE_STATE', data: saved })
         setRestoredNotice(true)
-        // Auto-dismiss. Sinds C3 vertelt de melding óók wat er NIET bewaard is
-        // (bedragen/posten opnieuw invullen) — dat is een instructie, geen
-        // vinkje, dus langer dan de oude 4s laten staan.
+        // Auto-dismiss. De melding bevestigt dat de antwoorden terug zijn en
+        // noemt het ene veld dat dat niet is (het pensioenoverzicht) — één
+        // zin meer dan een vinkje, dus langer dan de oude 4s laten staan.
         setTimeout(() => setRestoredNotice(false), 9000)
       }
 
@@ -886,25 +868,38 @@ export default function OnboardingPage() {
     }
   }, [aowRows, state.identity.date_of_birth])
 
-  // Persist state to localStorage on every step change (except saving/success).
-  // Gated op `restoreChecked`: schrijven vóórdat de restore-poging klaar is
-  // wist het bestaande draft (zie de poort-toelichting bij de state-declaratie).
+  // Bewaar het concept server-side bij elke wijziging (behalve op de
+  // terminal-stappen saving/success). Twee poorten:
+  //  · `restoreChecked` — schrijven vóórdat de restore-poging klaar is zou het
+  //    bestaande concept met de lege beginstaat overschrijven (zie de
+  //    poort-toelichting bij de state-declaratie).
+  //  · de debounce — doortypen in een bedragveld verandert de state per
+  //    toetsaanslag; zonder wachttijd zou dat evenzoveel PUT's kosten.
   useEffect(() => {
     if (!restoreChecked) return
     if (['saving', 'success'].includes(state.step)) return
-    saveToLocalStorage(state)
-  }, [state, restoreChecked])
+    const draft = serializeDraft(state)
+    // Nog niets te hervatten (net binnengekomen, niets ingevuld) → geen rij
+    // beschrijven. Zodra er één antwoord staat, slaat dit om en blijft het om.
+    if (!hasResumableDraft(draft)) return
+    const timer = setTimeout(() => {
+      void draftWriter.write(draft)
+    }, DRAFT_PERSIST_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [state, restoreChecked, draftWriter])
 
   // ── Handlers ─────────────────────────────────────────────────
 
   const handleLogout = useCallback(async () => {
-    // Afbreken = concept wissen. Zonder deze clear bleef een (al gestript,
-    // maar nog altijd resumbaar) draft op een gedeeld apparaat achter na
-    // uitloggen — acceptatiecriterium "gewist bij afbreken".
-    clearLocalStorage()
+    // Afbreken = concept wissen. Zonder deze clear bleef het (nu volledige)
+    // concept achter op de profielrij na uitloggen — acceptatiecriterium
+    // "gewist bij afbreken". Via de schrijver, niet via `clearDraft` los: die
+    // verzegelt 'm, zodat een nog lopende schrijf het concept niet meteen ná
+    // de wis opnieuw aanmaakt.
+    await draftWriter.clear()
     await supabase.auth.signOut()
     window.location.href = '/login'
-  }, [supabase])
+  }, [supabase, draftWriter])
 
   // Animate progress bar and rotating messages during save
   useEffect(() => {
@@ -1163,8 +1158,12 @@ export default function OnboardingPage() {
       setSaveProgress(100)
       await new Promise((r) => setTimeout(r, 400))
 
-      // Clear localStorage — onboarding is complete
-      clearLocalStorage()
+      // Concept wissen — de onboarding is afgerond, de gegevens staan nu op hun
+      // echte plek. `draftWriter.clear()` verzegelt de schrijver, zodat een nog
+      // lopende gedebouncede schrijf het concept niet meteen ná de wis opnieuw
+      // aanmaakt. Best-effort: een mislukte wis mag de geslaagde save niet
+      // terugdraaien (de volgende paginabezoek-check wist 'm alsnog).
+      await draftWriter.clear()
 
       dispatch({ type: 'SET_STEP', step: 'success' })
     } catch (err) {
@@ -1177,12 +1176,12 @@ export default function OnboardingPage() {
         message = err instanceof Error ? err.message : 'Onbekende fout bij opslaan'
       }
       // ── OPSLAG-FOUT: GEEN NAVIGATIE ─────────────────────────────────────
-      // Besluit C3 (optie A, aug 2026): een mislukte eindopslag mag NOOIT
-      // navigeren of herladen. De ingevulde bedragen/posten staan alleen in de
-      // in-memory reducer-state (draft-persistence bewaart ze bewust niet), dus
-      // elke reload/redirect hier wist precies de invoer die de gebruiker net
-      // kwijt dreigde te raken. Alleen state-updates in dit blok — bewaakt door
-      // `save-failure-no-reload.test.ts`.
+      // Besluit C3 (aug 2026): een mislukte eindopslag mag NOOIT navigeren of
+      // herladen. Sinds UR2-01 staat het concept server-side, dus een reload
+      // is niet meer fataal — maar hij is nog steeds fout: hij gooit de
+      // gebruiker uit de flow, kost de niet-bewaarde pensioen-parse (ADR 0115)
+      // en verbergt de fout die hij net moest lezen. Alleen state-updates in
+      // dit blok — bewaakt door `save-failure-no-reload.test.ts`.
       // De technische tekst is diagnostiek, geen bannercopy: naar de console,
       // niet naar de state (zie `OnboardingNotice`).
       console.error('[onboarding] eindopslag mislukt', message, err)
@@ -1717,7 +1716,10 @@ export default function OnboardingPage() {
           {state.step === 'success' && (
             <OnboardingSuccess
               onDashboard={() => {
-                clearLocalStorage()
+                // Vangnet: het concept is bij een geslaagde save al gewist.
+                // Faalde die wis (netwerk), dan is dit de tweede kans — de
+                // gebruiker verlaat de onboarding hier definitief.
+                void draftWriter.clear()
                 // Hard navigation: voorkomt stale-read redirect-loop in (app)/layout.tsx
                 // direct na het wegschrijven van `onboarding_completed = true`. Bij een
                 // soft-navigation kan de server-layout de nét-geschreven row missen en

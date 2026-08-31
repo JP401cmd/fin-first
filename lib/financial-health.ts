@@ -190,9 +190,41 @@ export function debtRatioPercent(totalAssets: number, totalDebts: number): numbe
   return totalDebts > 0 ? 100 : 0
 }
 
-/** Schuldratio: debt-to-asset ratio. 0% = 100, 50% = 50, 100%+ = 0 */
-function scoreDebtRatio(totalAssets: number, totalDebts: number): number {
-  if (totalAssets <= 0) return totalDebts > 0 ? 0 : 50 // no assets no debts = neutral
+/**
+ * Is er iets te oordelen over de schuld-verhouding?
+ *
+ * `false` betekent: er staat niets geregistreerd — geen vermogen én geen schuld
+ * — dus de verhouding schuld/vermogen is onbepaald. Géén uitspraak over "wel of
+ * geen schulden": een gebruiker mét vermogen en zonder schuld is gewoon
+ * schuldenvrij (ratio 0, score 100).
+ *
+ * Canoniek predicaat, gedeeld met de Schulden-hefboom (`computeLeverScores`,
+ * lib/lever-scores.ts). Die codeert deze toestand als `null` → status
+ * 'neutral'. Vóór UR2-10 had de hefboom een eigen kopie van de curve hieronder
+ * en gaf hij voor dit geval het getal 50 terug — dat valt in de amber-band, dus
+ * een leeg account las "Schuldenlast vraagt aandacht" naast een detailregel
+ * "Geen data — Start". Eén predicaat + één curve houdt de twee oppervlakken
+ * per definitie bij elkaar.
+ */
+export function hasDebtRatioData(totalAssets: number, totalDebts: number): boolean {
+  return totalAssets > 0 || totalDebts > 0
+}
+
+/**
+ * Schuldratio: debt-to-asset ratio. 0% = 100, 50% = 50, 100%+ = 0.
+ *
+ * Canonieke curve — consumenten: de gezondheidspijler `debt_ratio` (hieronder),
+ * de Schulden-hefboom (`computeLeverScores`) en de UAT-engine-check WF-OVZ-02/03
+ * (lib/uat/acceptance/ovz-checks.ts, die hier tot UR2-10 een mirror van hield).
+ *
+ * LET OP de 50 in de eerste regel: dat is de "niets geregistreerd"-uitkomst en
+ * géén oordeel. Roep bij twijfel eerst `hasDebtRatioData()` aan — de hefboom
+ * doet dat en toont dan 'neutral'. De gezondheidspijler laat de 50 bewust staan:
+ * hem inactief maken verschuift het canonieke gezondheidsgetal van elk leeg
+ * account en hoort bij een eigen beoordeling van ADR 0010's no-data-beleid.
+ */
+export function scoreDebtRatio(totalAssets: number, totalDebts: number): number {
+  if (totalAssets <= 0) return totalDebts > 0 ? 0 : 50 // niets geregistreerd → geen oordeel
   const ratio = totalDebts / totalAssets
   if (ratio <= 0) return 100
   if (ratio >= 1) return 0

@@ -583,7 +583,7 @@ export function RapportagesClient({ data }: { data: RapportagesData }) {
                   </EditorialHeadline>
 
                   <EditorialDeck className="mb-5">
-                    Elke bezitting en schuld met alle kenmerken. Plus een diepere blik per actieve app: budgetten, holdings, woonbalans, verhuurrendement, hypotheekplanner.
+                    Elke bezitting en schuld met alle kenmerken. Plus een diepere blik per actieve app: budgetten, holdings, verhuurrendement, hypotheekplanner.
                   </EditorialDeck>
 
                   <div className="mb-5">

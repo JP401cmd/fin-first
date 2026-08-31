@@ -114,6 +114,30 @@ export function aggIncomeByMonth(rows: TxMonthAggregateRow[], opts: ReduceOpts =
   return m
 }
 
+/**
+ * De JONGSTE maand ('YYYY-MM') waarin daadwerkelijk geboekt is, of `null`.
+ *
+ * Voedt het versheidsoordeel in `lib/transaction-staleness.ts` — "hoe oud is de
+ * data waarop dit scherm rust?" — zonder één extra query: het aggregaat ligt op
+ * elke cashflow-loader toch al klaar. Bewust GEEN som maar een MAX over de
+ * sleutel; `count > 0` houdt een hypothetische lege groep buiten het oordeel.
+ *
+ * De aanroeper kiest zelf `realOnly`. Voor de vraag "is er hier iets geboekt?"
+ * hoort dat `false` te zijn: een maand met alleen (joint_)transfers is bewijs
+ * dat de gebruiker transacties HEEFT, en dat is precies wat een melding die
+ * bestaande data niet mag ontkennen nodig heeft.
+ */
+export function aggLatestMonth(rows: TxMonthAggregateRow[], opts: ReduceOpts = {}): string | null {
+  let latest: string | null = null
+  for (const r of rows) {
+    if (!passes(r, opts)) continue
+    if (Number(r.count) <= 0) continue
+    // 'YYYY-MM' is lexicografisch = chronologisch, óók over een jaargrens.
+    if (latest === null || r.month > latest) latest = r.month
+  }
+  return latest
+}
+
 /** Map maand → Σ |negatieve bedragen| (uitgaven per maand, absoluut). */
 export function aggExpenseByMonthAbs(rows: TxMonthAggregateRow[], opts: ReduceOpts = {}): Map<string, number> {
   const m = new Map<string, number>()

@@ -292,6 +292,83 @@ describe('buildCashflowCards — Bug B: Transacties-KPI draait op de gerealiseer
   })
 })
 
+// ── UR2-13 — een leeg venster mag bestaande transacties niet ontkennen ──────
+// Op een account met 407 transacties waarvan de jongste van 25 maart 2026 was,
+// zei deze kaart op 31 augustus 2026 "Nog geen transacties". Waar binnen het
+// venster, onwaar als mededeling: de administratie stond stil, ze was niet leeg.
+// De kaart onderscheidt nu de twee, op `latestTransactionMonth` uit hetzelfde
+// 12-maands aggregaat als `currentMonth*` — niet op een nul-som.
+describe('UR2-13 — Transacties-kaart bij een leeg maandvenster', () => {
+  const NOW = new Date(2026, 7, 31)
+  const cardAt = (data: DashboardData) => {
+    const card = buildCashflowCards(data, EMPTY_CASHFLOW, EMPTY_VASTE_LASTEN, NOW).find(
+      (c) => c.key === 'transacties',
+    )
+    if (!card) throw new Error('transacties-kaart ontbreekt')
+    return card
+  }
+
+  it('mét historie maar een lege maand: benoemt het VENSTER, niet de afwezigheid van data', () => {
+    const card = cardAt(
+      baseDashboard({
+        currentMonthIncome: 0,
+        currentMonthExpenses: 0,
+        latestTransactionMonth: '2026-03',
+      }),
+    )
+    expect(card.subText).toBe(`Geen transacties in ${currentMonthWindowLabel(NOW)}`)
+    expect(card.subText).not.toContain('Nog geen transacties')
+  })
+
+  it('en zet de laatste boeking in de uitklap-tip, zodat het lege venster verklaard is', () => {
+    const card = cardAt(
+      baseDashboard({
+        currentMonthIncome: 0,
+        currentMonthExpenses: 0,
+        latestTransactionMonth: '2026-03',
+      }),
+    )
+    expect(card.detail.tip).toContain('maart 2026')
+    expect(card.detail.tip).toContain('5 maanden geleden')
+  })
+
+  it('zonder enige historie blijft de oude, dan wél juiste tekst staan', () => {
+    const card = cardAt(
+      baseDashboard({
+        currentMonthIncome: 0,
+        currentMonthExpenses: 0,
+        latestTransactionMonth: null,
+      }),
+    )
+    expect(card.subText).toBe('Nog geen transacties')
+  })
+
+  it('een lege maand mét verse historie (vorige maand) is geen veroudering: geen stale-tip', () => {
+    const card = cardAt(
+      baseDashboard({
+        currentMonthIncome: 0,
+        currentMonthExpenses: 0,
+        latestTransactionMonth: '2026-07',
+      }),
+    )
+    expect(card.subText).toBe(`Geen transacties in ${currentMonthWindowLabel(NOW)}`)
+    expect(card.detail.tip).not.toContain('Je laatste boeking')
+  })
+
+  it('met transacties in de maand verandert er niets aan de bestaande duiding', () => {
+    const card = cardAt(
+      baseDashboard({
+        monthlyIncome: 5000,
+        currentMonthIncome: 5000,
+        currentMonthExpenses: 3000,
+        latestTransactionMonth: '2026-03',
+      }),
+    )
+    expect(card.subText).toBe('Goed gespaard deze maand')
+    expect(card.detail.tip).toContain('Inkomen')
+  })
+})
+
 // ── CF-3 — venster-label bij de maandcijfers ───────────────────────────────
 // De Transacties-KPI is de gerealiseerde LOPENDE kalendermaand; op
 // /overzicht/cashflow/transacties staan 30-DAGEN-cijfers. Zonder venster zijn
@@ -347,7 +424,7 @@ describe('buildCashflowCards — CF-3: maandcijfers dragen hun venster', () => {
     expect(card.kpiWindow).toBeNull()
   })
 
-  it('Budget: de bestedings-tip noemt het venster; de KPI zelf krijgt géén venster-regel (het is een restant, geen som over de maand)', () => {
+  it('Budget: de bestedings-tip noemt het venster; onder de KPI staat een GRONDSLAG-regel (waarvan het een restant is), géén venster-regel', () => {
     const dashboardData = baseDashboard({
       budgetingActive: true,
       budgetTotals: {
@@ -361,6 +438,17 @@ describe('buildCashflowCards — CF-3: maandcijfers dragen hun venster', () => {
     expect(card.detail.tip).toBe(
       `${formatCurrency(2000)} van ${formatCurrency(3950)} besteed in augustus tot nu toe.`,
     )
+    // Grondslag, geen venster: de regel zegt wáárvan het restant is — dezelfde
+    // formulering als de "Nog te besteden"-hero op de budgetpagina.
+    expect(card.kpiWindow).toBe(`van ${formatCurrency(3950)} uitgavenbudget`)
+    expect(card.kpiWindow).not.toMatch(/tot nu toe/)
+  })
+
+  it('Budget: zonder actief budget géén grondslag-regel', () => {
+    const card = cardsAt(
+      baseDashboard({ budgetingActive: false }),
+    ).find((c) => c.key === 'budget')!
+    expect(card.kpi).toBeNull()
     expect(card.kpiWindow).toBeNull()
   })
 

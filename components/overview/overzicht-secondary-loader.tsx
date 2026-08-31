@@ -8,10 +8,8 @@ import type { Perspective } from '@/lib/household-data'
 import {
   composeOverviewBriefing,
   computeFreedomTotal,
-  buildFreedomHeroProps,
   buildBriefingHeadline,
   loadLatestCheckinForBriefing,
-  type FreedomHeroProps,
 } from '@/lib/briefing/overview-briefing'
 import { getOrCreateWeeklySnapshot, canRefreshToday, refreshStateToday } from '@/lib/briefing/snapshot'
 import { BRIEFING_ROTATION_COOKIE, parseRotationOffset } from '@/lib/briefing/rotation'
@@ -25,13 +23,40 @@ import type { BriefingWeekHistoryItem } from '@/components/overview/briefing-pan
 import type { BriefingRefreshState } from '@/lib/types/briefing'
 import type { HefbomenHousingSplit } from './overzicht-hero/hefbomen-nav'
 import { MiniNetWorthChart } from './mini-networth-chart'
-import { dailyExpenseRate } from '@/lib/format'
+import { credibleMonthlyBasis, dailyExpenseRate } from '@/lib/format'
+import { runMilestoneDetection } from '@/lib/milestones/run'
+import { isFarHorizonGoal } from '@/lib/milestones/detect'
+import { isParameterGoal } from '@/lib/goal-current-value'
+import type { AchievedMilestoneRow } from '@/lib/milestones/types'
+import { buildMilestoneCopy } from '@/lib/milestones/copy'
+import { withFreshMilestone } from '@/lib/briefing/milestone-entry'
 import { hasInvestedAssets } from '@/lib/dashboard-wealth-weighting'
 import { OverzichtSecondary } from './overzicht-secondary'
 
 // Stabiele lege-array-referentie voor de mini-vermogen-grafiek — voorkomt dat
 // een verse `[]` de memo op MiniNetWorthChart breekt.
 const EMPTY_NET_WORTH_HISTORY: { month: string; value: number }[] = []
+
+/**
+ * Doelnaam voor een `doel`-mijlpaal (behaald of checkpoint). De log-rij draagt
+ * bewust geen naam; de sleutelvormen zijn `doel-behaald:<id>` en
+ * `doel-checkpoint:<id>:<pct>`. Onbekend doel (verwijderd, ander type) → null,
+ * de copy blijft dan generiek.
+ */
+function resolveFreshGoalName(
+  row: { milestone_key: string } | null,
+  goals: { id: string; name: string; user_id: string }[],
+  userId: string | null,
+): string | null {
+  if (!row || !userId) return null
+  const match = row.milestone_key.match(/^doel-(?:behaald|checkpoint):([^:]+)/)
+  if (!match) return null
+  // Eigenaarscheck als defence-in-depth: de goals-lijst is huishoud-gescoopt
+  // (own-or-shared) en de log is append-only — een naam van een partner-doel
+  // mag hier nooit aan een eigen mijlpaal-rij hangen, ook niet bij een
+  // toekomstige regressie in de sleutel-productie.
+  return goals.find((g) => g.id === match[1] && g.user_id === userId)?.name ?? null
+}
 
 /**
  * OverzichtSecondaryLoader — async server-child achter de `<Suspense>` op
@@ -124,10 +149,6 @@ export async function OverzichtSecondaryLoader({
     : perspective === 'partner' ? dashboardData.partnerOverrides
     : null
 
-  // Netto-vermogen-verloop — basis voor zowel de vrijheidstijd-hero als de
-  // mini-vermogen-grafiek. currentNetWorth komt (perspectief-correct) uit blok 1.
-  const netWorthHistory = dashboardData.netWorthHistory ?? []
-
   // Wekelijkse briefing — verrijkte engine (finance-bronnen) + snapshot.
   // In huishoud-/partnerweergave compose't de briefing met de perspectief-
   // inkomsten/-uitgaven.
@@ -148,11 +169,18 @@ export async function OverzichtSecondaryLoader({
     checkinForBriefing,
   )
   // Freedom-time: netto vermogen (perspectief-correct) ÷ dagelijkse uitgaven.
+  // Voedt de kop-zin naast de masthead — LIVE, elk request opnieuw (UR2-09).
+  //
+  // Voorkeursvolgorde ongewijzigd (perspectief → canoniek 12-mnd rolling →
+  // effectief), maar een kandidaat die door de geloofwaardigheidsvloer zakt
+  // wordt OVERGESLAGEN i.p.v. gebruikt (UR2-03). Een rolling venster met één
+  // transactie van €1 gaf €0,03/dag en daarmee "113 jaar en 4 maanden aan
+  // vrijheid" bovenaan de briefing; nu wint de effectieve maandbasis, en is die
+  // er ook niet, dan valt de kop-zin helemaal weg.
   const freedomMonthlyExpenses =
-    perspectiveOverride?.monthlyExpenses ??
-    dashboardData.recentMonthlyExpenses ??
-    dashboardData.monthlyExpenses ??
-    0
+    credibleMonthlyBasis(perspectiveOverride?.monthlyExpenses) ||
+    credibleMonthlyBasis(dashboardData.recentMonthlyExpenses) ||
+    credibleMonthlyBasis(dashboardData.monthlyExpenses)
   const freedomTotal = computeFreedomTotal(currentNetWorth, freedomMonthlyExpenses)
   let briefingEntries = composedBriefing
   let briefingRefreshedAt: string | null = null
@@ -164,55 +192,121 @@ export async function OverzichtSecondaryLoader({
   let briefingRefreshState: BriefingRefreshState = 'available'
   let briefingDataChanged = false
   let briefingWeekHistory: BriefingWeekHistoryItem[] | undefined
-  // Hero uit live data; in de eerste week (geen basis) toont hij het totaal.
-  let freedomHero: FreedomHeroProps = buildFreedomHeroProps(
-    freedomTotal,
-    null,
-    netWorthHistory,
-  )
-  let briefingHeadline: string | null = null
+  // Kop-zin uit de LIVE canonieke vrijheidstijd (UR2-09). Een AI-kop uit de
+  // week-snapshot mag 'm overschrijven — die is expliciet gedateerd met de
+  // "Bijgewerkt …"-stempel; de deterministische zin was dat niet en claimde
+  // daarom stilzwijgend een bevroren getal.
+  let briefingHeadline: string | null = buildBriefingHeadline(freedomTotal)
   // Weekly snapshot + briefing-freeze blijven PERSOONLIJK. In huishoud-/partner-
-  // weergave geen snapshot-write; freedomHero wordt live berekend.
+  // weergave geen snapshot-write.
+  let freshMilestoneRow: AchievedMilestoneRow | null = null
   if (userId && perspective === 'personal') {
-    // NB: bij het eerste bezoek van een nieuwe ISO-week schrijft dit de snapshot
-    // weg tíjdens de RSC-render. Dat is bewust en veilig: het is een pure data-
-    // `.update()` (zet geen cookies) en idempotent per week. Deze `.update()`
-    // moet de ENIGE write in dit request blijven en nooit met een sessie-refresh
-    // gecombineerd worden. In het streamende blok verandert dat niet — de write
-    // gebeurt server-side vóór dit blok naar de client wordt gestroomd.
-    const { snapshot } = await getOrCreateWeeklySnapshot(
-      supabase,
-      userId,
-      composedBriefing,
-      {
-        freedom: {
-          totalFreedomDays: freedomTotal.totalFreedomDays,
-          netWorth: freedomTotal.netWorth,
-          monthlyExpenses: freedomTotal.monthlyExpenses,
-          capturedAt: new Date().toISOString(),
+    // NB: bij het eerste bezoek van een nieuwe ISO-week (en bij een gepasseerde
+    // mijlpaal) schrijft dit blok data weg tíjdens de RSC-render. Dat is bewust
+    // en veilig, en de invariant is: uitsluitend PURE, idempotente data-writes
+    // zonder sessie-/cookie-effect (ADR 0123) — nooit met een sessie-refresh
+    // combineren. Twee writes leven hier: (1) de mijlpaal-detectie (log-append,
+    // idempotent via UNIQUE-sleutel), (2) de weeksnapshot (idempotent per week).
+    // In het streamende blok verandert dat niet — beide gebeuren server-side
+    // vóór dit blok naar de client wordt gestroomd.
+    //
+    // Mijlpaal-detectie (ADR 0123): consume-don't-recompute — vijf canonieke
+    // waarden in, sleutels uit. Gooit nooit; faalt naar null. ALLEEN wanneer
+    // horizonData er is: zonder horizon geeft `withCanonicalOverviewFigures` de
+    // rauwe bundel terug (de niet-canonieke freedomPct/noodfonds-afleiding), en
+    // een op die tweede grondslag gedetecteerde mijlpaal is nooit meer uit de
+    // DELETE-loze log te krijgen. Dan liever een load géén detectie.
+    const detectionPromise = horizonData
+      ? runMilestoneDetection(
+          supabase,
+          userId,
+          {
+            // BEWUST currentNetWorth (blok 1, persoonlijk/hero-grondslag) en NIET
+            // dashboardData.netWorth: die bundelsom is RLS-breed en telt gedeelde
+            // partner-bezittingen voor 100% mee, terwijl de seed-datering uit
+            // net_worth_snapshots op eigen rijen staat. Eén grondslag voor toets én
+            // datering — en het gevierde getal is het getal dat de hero toont.
+            netWorth: currentNetWorth,
+            freedomPct: dashboardData.freedomPct ?? null,
+            totalDebts: dashboardData.totalDebts,
+            emergencyFundMonthsCovered: dashboardData.emergencyFund?.monthsCovered ?? null,
+            emergencyFundTargetMonths: dashboardData.emergencyFund?.targetMonths ?? null,
+          },
+          // BRON = completedGoals, NIET finData.goals: de actieve lijst is door
+          // splitActiveGoals al op !is_completed gefilterd, dus daar behaalde
+          // doelen uit vissen levert per definitie niets (review-rood 31 aug).
+          // Expliciet op eigen doelen filteren: de lijst is huishoud-gescoopt
+          // (own-or-shared), en een partner-doel-id zou hier anders permanent
+          // als eigen mijlpaal gelogd worden (review H1).
+          finData.completedGoals
+            .filter((g) => g.user_id === userId)
+            .map((g) => ({ id: g.id, completedAt: g.completed_at ?? null })),
+          // Checkpoint-doelen (plan 3c): actieve, EIGEN, verre doelen met hun
+          // canonieke voortgang (goalProgresses is index-gekoppeld aan goals —
+          // lib/fin-data-loader.ts r270). Zelfde H1-scoping als hierboven.
+          finData.goals
+            .map((g, i) => ({ goal: g, progress: finData.goalProgresses[i] }))
+            .filter(
+              ({ goal, progress }) =>
+                progress != null &&
+                !goal.is_completed &&
+                goal.user_id === userId &&
+                // Parameterdoelen (lab-doelsituatie) EXPLICIET uitsluiten — niet
+                // leunen op het toeval dat ze geen target_date dragen: een
+                // checkpoint op een direction:'down'-doel als vrijheidsleeftijd
+                // is semantisch onzin en de log is append-only (review-M3/3c).
+                !isParameterGoal(goal) &&
+                isFarHorizonGoal(goal.target_date, goal.created_at ?? null, new Date()),
+            )
+            .map(({ goal, progress }) => ({
+              id: goal.id,
+              name: goal.name,
+              progressPct: progress.pct,
+            })),
+        )
+      : Promise.resolve({ fresh: null })
+    // Parallel met de weeksnapshot: de twee writes raken verschillende tabellen
+    // en zijn onafhankelijk — alleen de brieifing-injectie moet ná de snapshot.
+    const [milestoneRun, { snapshot }] = await Promise.all([
+      detectionPromise,
+      getOrCreateWeeklySnapshot(
+        supabase,
+        userId,
+        composedBriefing,
+        {
+          freedom: {
+            totalFreedomDays: freedomTotal.totalFreedomDays,
+            netWorth: freedomTotal.netWorth,
+            monthlyExpenses: freedomTotal.monthlyExpenses,
+            capturedAt: new Date().toISOString(),
+          },
         },
-      },
+      ),
+    ])
+    freshMilestoneRow = milestoneRun.fresh
+    // Verse mijlpaal ná de week-freeze injecteren (ADR 0123 §6): de snapshot
+    // bevriest de briefing per ISO-week — zonder injectie zou een mijlpaal van
+    // dinsdag pas de week erop zichtbaar worden.
+    briefingEntries = withFreshMilestone(
+      snapshot.entries,
+      freshMilestoneRow,
+      dashboardData.dailyExpenseRate ?? null,
+      new Date(),
+      { goalName: resolveFreshGoalName(freshMilestoneRow, [...finData.goals, ...finData.completedGoals], userId) },
     )
-    briefingEntries = snapshot.entries
     briefingRefreshedAt = snapshot.refreshedAt
     briefingCanRefresh = canRefreshToday(snapshot)
     briefingRefreshState = refreshStateToday(snapshot)
     briefingWeekHistory = snapshot.history
-    // Hero uit de bevroren snapshot → stabiel de hele week.
+    // Het bevroren vrijheidsmeetpunt voedt geen zichtbaar getal meer, alleen
+    // nog het versheidssignaal onder de "Bijgewerkt …"-stempel (en de e-mail).
     if (snapshot.freedomSnapshot) {
-      freedomHero = buildFreedomHeroProps(
-        snapshot.freedomSnapshot,
-        snapshot.previousFreedomSnapshot ?? null,
-        netWorthHistory,
-      )
       briefingDataChanged =
         Math.abs(
           freedomTotal.totalFreedomDays - snapshot.freedomSnapshot.totalFreedomDays,
         ) >= 2
     }
-    briefingHeadline = snapshot.headline ?? buildBriefingHeadline(freedomHero)
-  } else {
-    briefingHeadline = buildBriefingHeadline(freedomHero)
+    if (snapshot.headline) briefingHeadline = snapshot.headline
   }
 
   // Vrijheidsleeftijd voor de Vrijheid-strip (de mini-vermogen-grafiek zelf
@@ -236,6 +330,19 @@ export async function OverzichtSecondaryLoader({
     strategy: horizonData?.fireStrategy?.strategy,
   })
 
+  // Vieringsprop voor de client-host: kant-en-klare strings (plat/serialiseerbaar),
+  // zodat de host geen lib/milestones hoeft te bundelen. De once-guard is
+  // server-side (`acknowledged_at`), dus de prop is alleen gevuld bij een échte
+  // verse mijlpaal.
+  const freshMilestone = freshMilestoneRow
+    ? {
+        key: freshMilestoneRow.milestone_key,
+        ...buildMilestoneCopy(freshMilestoneRow, dashboardData.dailyExpenseRate ?? null, {
+          goalName: resolveFreshGoalName(freshMilestoneRow, [...finData.goals, ...finData.completedGoals], userId),
+        }),
+      }
+    : null
+
   return (
     <>
       {/* Seedt de status-duiding-banner met de reeds server-berekende status.
@@ -255,13 +362,13 @@ export async function OverzichtSecondaryLoader({
         freedomFraming={freedomFraming}
         freedomDataIssue={freedomDataIssue}
         briefingEntries={briefingEntries}
+        freshMilestone={freshMilestone}
         briefingRefreshedAt={briefingRefreshedAt}
         briefingDataChanged={briefingDataChanged}
         briefingWeekHistory={briefingWeekHistory}
         briefingRotation={briefingRotation}
         briefingCanRefresh={briefingCanRefresh}
         briefingRefreshState={briefingRefreshState}
-        freedomHero={freedomHero}
         briefingHeadline={briefingHeadline}
         dashboardData={dashboardData}
         activeWidgets={activeWidgets}

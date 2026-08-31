@@ -44,6 +44,17 @@ vi.mock('@/lib/ai/local/use-execution-mode', () => ({
   }),
 }))
 
+// ── Deel-sheet-stub ──────────────────────────────────────────────────────────
+//
+// De Deel-knop opent sinds "Deelkaart 2.0" de deel-sheet in plaats van zelf de
+// vrijheidskaart op te halen en meteen de ShareDialog te openen. De echte sheet
+// sleept de canvas-renderer en de deel-dialoog mee; hier volstaat een marker om
+// te bewijzen dát hij opent — en dat het paneel zelf niets meer fetcht.
+vi.mock('@/components/app/deel-kaart-sheet', () => ({
+  DeelKaartSheet: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="deel-kaart-sheet" /> : null,
+}))
+
 const redactBriefingLocally = vi.fn()
 vi.mock('@/lib/ai/local/local-briefing-resolver', () => ({
   redactBriefingLocally: (...args: unknown[]) => redactBriefingLocally(...args),
@@ -247,27 +258,21 @@ describe('BriefingPanel — kleur-codering per categorie', () => {
   })
 })
 
-describe('BriefingPanel — vrijheidstijd-hero + kop', () => {
-  const hero = {
-    totalFreedomDays: 1000,
-    totalLabel: '2 jaar en 9 maanden',
-    deltaDays: 12,
-    isFirstWeek: false,
-    sparkline: [],
-    isInfinite: false,
-    isDeficit: false,
-    isImplausibleDelta: false,
-  }
-
-  it('rendert de hero wanneer freedomHero gegeven is', () => {
-    render(<BriefingPanel entries={[makeEntry('observation', 'X')]} freedomHero={hero} />)
-    expect(screen.getByText(/Jouw vrijheid deze week/i)).toBeTruthy()
-    expect(screen.getByText(/2 jaar en 9 maanden/)).toBeTruthy()
-  })
-
-  it('rendert geen hero zonder freedomHero', () => {
-    render(<BriefingPanel entries={[makeEntry('observation', 'X')]} />)
+describe('BriefingPanel — kop-zin (week-vrijheid-blok verwijderd, UR2-09)', () => {
+  // UR2-09: het blok "JOUW VRIJHEID DEZE WEEK" is op eigenaar-besluit
+  // verwijderd. Het bevroor een week lang één getal naast live-herrekenende
+  // kerngetallen, waardoor /overzicht binnen vijf minuten drie waarden voor
+  // dezelfde vrijheidstijd toonde. Deze test is de grendel: geen enkele
+  // prop-combinatie mag het terugbrengen.
+  it('rendert nergens meer een week-vrijheid-blok', () => {
+    render(
+      <BriefingPanel
+        entries={[makeEntry('observation', 'X')]}
+        headline="Je vermogen staat voor 2 jaar en 9 maanden aan vrijheid."
+      />,
+    )
     expect(screen.queryByText(/Jouw vrijheid deze week/i)).toBeNull()
+    expect(screen.queryByText(/dagen vrijheid erbij/i)).toBeNull()
   })
 
   it('toont de kop-zin wanneer headline gegeven is', () => {
@@ -323,6 +328,24 @@ describe('BriefingPanel — wekelijkse-briefing header + ververs', () => {
   it('toont altijd een Deel-knop in de header', () => {
     render(<BriefingPanel entries={[makeEntry('observation', 'X')]} />)
     expect(screen.getByRole('button', { name: /deel je vrijheidsweek/i })).toBeTruthy()
+  })
+
+  it('opent met de Deel-knop de deel-sheet en fetcht zelf niets meer', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    try {
+      render(<BriefingPanel entries={[makeEntry('observation', 'X')]} />)
+      expect(screen.queryByTestId('deel-kaart-sheet')).toBeNull()
+
+      fireEvent.click(screen.getByRole('button', { name: /deel je vrijheidsweek/i }))
+
+      // De sheet komt via next/dynamic binnen — findBy wacht daarop.
+      expect(await screen.findByTestId('deel-kaart-sheet')).toBeTruthy()
+      // De vrijheidskaart wordt door de sheet opgehaald, niet meer hier.
+      expect(fetchMock).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('toont een actieve Ververs-knop wanneer canRefresh true is (AI-abonnee)', () => {
@@ -627,17 +650,6 @@ describe('localeVoortgangTekst', () => {
 })
 
 describe('BriefingPanel — Eenvoudige weergave (simpleMode)', () => {
-  const hero = {
-    totalFreedomDays: 1000,
-    totalLabel: '2 jaar en 9 maanden',
-    deltaDays: 12,
-    isFirstWeek: false,
-    sparkline: [],
-    isInfinite: false,
-    isDeficit: false,
-    isImplausibleDelta: false,
-  }
-
   const sixEntries: BriefingEntry[] = [
     makeEntry('observation', 'Belangrijkste eerst', { id: 'top' }),
     makeEntry('tip', 'Tweede briefje', { id: 'two' }),
@@ -669,11 +681,6 @@ describe('BriefingPanel — Eenvoudige weergave (simpleMode)', () => {
     const { container } = render(<BriefingPanel entries={sixEntries} simpleMode />)
     const grid = container.querySelector('.grid')
     expect(grid?.className).toContain('sm:grid-cols-3')
-  })
-
-  it('verbergt "Jouw vrijheid deze week" in Eenvoudig, ook als freedomHero gegeven is', () => {
-    render(<BriefingPanel entries={sixEntries} freedomHero={hero} simpleMode />)
-    expect(screen.queryByText(/Jouw vrijheid deze week/i)).toBeNull()
   })
 
   it('verbergt de "Vorige weken"-terugblik in Eenvoudig', () => {
@@ -740,13 +747,12 @@ describe('BriefingPanel — Eenvoudige weergave (simpleMode)', () => {
     expect(document.cookie).not.toContain('tf_briefing_rot=3')
   })
 
-  it('toont in Volledig (default) wél alle 6 briefjes + de vrijheid-hero (geen regressie)', () => {
-    const { container } = render(
-      <BriefingPanel entries={sixEntries} freedomHero={hero} />,
-    )
+  it('toont in Volledig (default) wél alle 6 briefjes (geen regressie)', () => {
+    const { container } = render(<BriefingPanel entries={sixEntries} />)
     expect(container.textContent).toContain('Belangrijkste eerst')
     expect(container.textContent).toContain('Zesde briefje')
-    expect(screen.getByText(/Jouw vrijheid deze week/i)).toBeTruthy()
+    // UR2-09: ook in Volledig staat er geen week-vrijheid-blok meer boven.
+    expect(screen.queryByText(/Jouw vrijheid deze week/i)).toBeNull()
     const grid = container.querySelector('.grid')
     expect(grid?.className).toContain('sm:grid-cols-3')
   })

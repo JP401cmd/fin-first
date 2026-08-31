@@ -8,7 +8,7 @@ import {
 } from './page'
 import { ALL_MODULES } from '@/lib/module-registry'
 import type { PensionDraft } from '@/components/onboarding/onboarding-pensioen'
-import type { NonSensitiveDraft } from './draft-persistence'
+import type { OnboardingDraft } from './draft-persistence'
 
 // The component module imports a CSS file and a chain of client components
 // (onboarding-identity, onboarding-inkomen, etc.) plus `@/lib/supabase/client`.
@@ -127,23 +127,49 @@ describe('onboarding _initialState — modules default aan', () => {
   })
 })
 
-describe('onboarding _reducer — RESTORE_STATE (niet-gevoelig)', () => {
-  // Sinds de security-fix (optie A) draagt RESTORE_STATE alléén een
-  // niet-gevoelig draft: stap + keuzes-zonder-bedrag. Gevoelige velden
-  // (identity, bedragen, vermogen, pensioenbedragen, spaardoel-naam/bedrag)
-  // worden NOOIT hersteld en houden de _initialState-shape.
-  function makeDraft(overrides: Partial<NonSensitiveDraft> = {}): NonSensitiveDraft {
-    return {
-      selectedGoals: [],
-      activeModules: [...ALL_MODULES],
-      deferredFields: [],
-      spaardoel: { presetKey: null, skipped: false },
-      pension: { mode: null },
-      retirementExpense: { method: 'custom_amount', skipped: false },
-      horizon: { fire_end_strategy: 'deplete', fire_end_age: 90, temporal_balance: 3 },
-      ...overrides,
-    }
+/**
+ * Leeg conceptobject zoals `/api/onboarding/draft` het teruggeeft. Sinds kaart
+ * UR2-01 draagt RESTORE_STATE ALLE antwoorden — identiteit, bedragen, posten.
+ * Enige uitzondering: `pension.parseResult` (ADR 0115, blijft op het toestel).
+ */
+function makeRestoreDraft(overrides: Partial<OnboardingDraft> = {}): OnboardingDraft {
+  return {
+    version: 2,
+    identity: {
+      full_name: '',
+      date_of_birth: '',
+      household_type: 'solo',
+      number_of_children: 0,
+      net_monthly_income: '',
+      estimated_yearly_income: '',
+      estimated_monthly_expenses: '',
+    },
+    selectedGoals: [],
+    activeModules: [...ALL_MODULES],
+    deferredFields: [],
+    budgetAmounts: {},
+    quickAssets: [],
+    quickDebts: [],
+    bezittingenPhases: [],
+    schuldenPhases: [],
+    spaardoel: { presetKey: null, name: '', target_value: '', target_date: '', skipped: false },
+    pension: { mode: null, grossMonthly: '', startAge: '' },
+    retirementExpense: { method: 'custom_amount', customAmount: '', skipped: false },
+    horizon: {
+      fire_end_strategy: 'deplete',
+      fire_end_age: 90,
+      fire_legacy_amount: '',
+      retirement_expense_method: 'current_income',
+      retirement_custom_amount: '',
+      temporal_balance: 3,
+      life_events: [],
+    },
+    ...overrides,
   }
+}
+
+describe('onboarding _reducer — RESTORE_STATE', () => {
+  const makeDraft = makeRestoreDraft
 
   let warnSpy: ReturnType<typeof vi.spyOn>
 
@@ -166,28 +192,82 @@ describe('onboarding _reducer — RESTORE_STATE (niet-gevoelig)', () => {
     expect(warnSpy).not.toHaveBeenCalled()
   })
 
-  it('herstelt de identiteit NOOIT — die blijft de lege initiële shape', () => {
-    // Kern van de security-fix: zelfs met een lastStep diep in de flow blijft
-    // de naam/geboortedatum/inkomen leeg (nooit gepersisteerd, nooit hersteld).
+  it('herstelt de identiteit — de kern van UR2-01', () => {
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
-      data: makeDraft({ lastStep: 'schulden' }),
+      data: makeDraft({
+        lastStep: 'schulden',
+        identity: {
+          full_name: 'Jan Paul',
+          date_of_birth: '1986-04-05',
+          household_type: 'solo',
+          number_of_children: 0,
+          net_monthly_income: '',
+          estimated_yearly_income: '42000',
+          estimated_monthly_expenses: '2200',
+        },
+      }),
     })
     expect(result.step).toBe('schulden')
-    expect(result.identity).toEqual(_initialState.identity)
-    expect(result.identity.full_name).toBe('')
-    expect(result.identity.net_monthly_income).toBe('')
+    expect(result.identity.full_name).toBe('Jan Paul')
+    expect(result.identity.date_of_birth).toBe('1986-04-05')
+    expect(result.identity.estimated_yearly_income).toBe('42000')
   })
 
-  it('herstelt gevoelige bezittingen/schulden NOOIT (blijven leeg)', () => {
+  it('herstelt bezittingen, schulden en budgetbedragen', () => {
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
-      data: makeDraft({ lastStep: 'schulden' }),
+      data: makeDraft({
+        lastStep: 'schulden',
+        quickAssets: [{ asset_type: 'cash', name: 'Betaalrekening', current_value: 1800 }],
+        quickDebts: [{ debt_type: 'mortgage', name: 'Hypotheek', current_balance: 285000 }],
+        budgetAmounts: { boodschappen: 400 },
+      }),
     })
-    expect(result.quickAssets).toEqual([])
-    expect(result.quickDebts).toEqual([])
-    expect(result.budgetAmounts).toEqual({})
+    expect(result.quickAssets).toEqual([
+      { asset_type: 'cash', name: 'Betaalrekening', current_value: 1800 },
+    ])
+    expect(result.quickDebts).toEqual([
+      { debt_type: 'mortgage', name: 'Hypotheek', current_balance: 285000 },
+    ])
+    expect(result.budgetAmounts).toEqual({ boodschappen: 400 })
     expect(warnSpy).not.toHaveBeenCalled()
+  })
+
+  it('herstelt het pensioenpad en de schatting, maar nooit een parseResult (ADR 0115)', () => {
+    const result = _reducer(_initialState, {
+      type: 'RESTORE_STATE',
+      data: makeDraft({
+        lastStep: 'pensioen',
+        pension: { mode: 'estimate', grossMonthly: '1500', startAge: '67' },
+      }),
+    })
+    expect(result.pension.mode).toBe('estimate')
+    expect(result.pension.grossMonthly).toBe('1500')
+    expect(result.pension.startAge).toBe('67')
+    expect(result.pension.parseResult).toBeNull()
+  })
+
+  it('valt terug op de begin-fasestack wanneer het concept er geen draagt', () => {
+    // Een oud v1-concept (of een sectie waar de gebruiker nog niet was) heeft
+    // een lege stack; de sub-machine zou dan zonder scherm staan.
+    const result = _reducer(_initialState, {
+      type: 'RESTORE_STATE',
+      data: makeDraft({ lastStep: 'bezittingen', bezittingenPhases: [], schuldenPhases: [] }),
+    })
+    expect(result.bezittingenPhases).toEqual(_initialState.bezittingenPhases)
+    expect(result.schuldenPhases).toEqual(_initialState.schuldenPhases)
+  })
+
+  it('herstelt een bewaarde fase-stack ongewijzigd', () => {
+    const result = _reducer(_initialState, {
+      type: 'RESTORE_STATE',
+      data: makeDraft({
+        lastStep: 'bezittingen',
+        bezittingenPhases: [{ kind: 'ask', qIndex: 0 }, { kind: 'review' }],
+      }),
+    })
+    expect(result.bezittingenPhases).toEqual([{ kind: 'ask', qIndex: 0 }, { kind: 'review' }])
   })
 
   it('herstelt de niet-gevoelige keuzes (selectedGoals, deferredFields)', () => {
@@ -203,21 +283,27 @@ describe('onboarding _reducer — RESTORE_STATE (niet-gevoelig)', () => {
     expect(result.deferredFields).toEqual(['income', 'assets'])
   })
 
-  it('herstelt alléén de horizon-strategiekeuzes, niet de bedragen/life_events', () => {
+  it('herstelt de volledige horizon-substate, inclusief de bedragen', () => {
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
       data: makeDraft({
-        horizon: { fire_end_strategy: 'legacy', fire_end_age: 85, temporal_balance: 4 },
+        horizon: {
+          fire_end_strategy: 'legacy',
+          fire_end_age: 85,
+          fire_legacy_amount: '100000',
+          retirement_expense_method: 'custom_amount',
+          retirement_custom_amount: '32000',
+          temporal_balance: 4,
+          life_events: [],
+        },
         lastStep: 'klaar',
       }),
     })
     expect(result.horizon.fire_end_strategy).toBe('legacy')
     expect(result.horizon.fire_end_age).toBe(85)
     expect(result.horizon.temporal_balance).toBe(4)
-    // Gevoelige horizon-velden blijven de initiële (lege) shape.
-    expect(result.horizon.fire_legacy_amount).toBe('')
-    expect(result.horizon.retirement_custom_amount).toBe('')
-    expect(result.horizon.life_events).toEqual([])
+    expect(result.horizon.fire_legacy_amount).toBe('100000')
+    expect(result.horizon.retirement_custom_amount).toBe('32000')
   })
 
   it('migrates a legacy "identity" lastStep to "naam"', () => {
@@ -442,18 +528,7 @@ describe('onboarding _reducer — SET_HORIZON (eindstrategie-keuze)', () => {
 })
 
 describe('onboarding _reducer — RESTORE_STATE keuzes (spaardoel + pensioen)', () => {
-  function makeDraft(overrides: Partial<NonSensitiveDraft> = {}): NonSensitiveDraft {
-    return {
-      selectedGoals: [],
-      activeModules: [...ALL_MODULES],
-      deferredFields: [],
-      spaardoel: { presetKey: null, skipped: false },
-      pension: { mode: null },
-      retirementExpense: { method: 'custom_amount', skipped: false },
-      horizon: { fire_end_strategy: 'deplete', fire_end_age: 90, temporal_balance: 3 },
-      ...overrides,
-    }
-  }
+  const makeDraft = makeRestoreDraft
 
   let warnSpy: ReturnType<typeof vi.spyOn>
   beforeEach(() => {
@@ -463,45 +538,52 @@ describe('onboarding _reducer — RESTORE_STATE keuzes (spaardoel + pensioen)', 
     warnSpy.mockRestore()
   })
 
-  it('herstelt alléén de spaardoel-keuze (preset + skip), niet naam/bedrag', () => {
+  it('herstelt de volledige spaardoel-substate — preset én naam/bedrag/datum', () => {
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
       data: makeDraft({
         selectedGoals: ['noodfonds'],
-        spaardoel: { presetKey: 'vakantie', skipped: false },
+        spaardoel: {
+          presetKey: 'vakantie',
+          name: 'Italië 2027',
+          target_value: '3500',
+          target_date: '2027-06',
+          skipped: false,
+        },
         lastStep: 'spaardoel',
       }),
     })
     expect(result.step).toBe('spaardoel')
     expect(result.spaardoel.presetKey).toBe('vakantie')
-    // Gevoelig — nooit hersteld: blijven de lege initiële shape.
-    expect(result.spaardoel.name).toBe('')
-    expect(result.spaardoel.target_value).toBe('')
-    expect(result.spaardoel.target_date).toBe('')
+    expect(result.spaardoel.name).toBe('Italië 2027')
+    expect(result.spaardoel.target_value).toBe('3500')
+    expect(result.spaardoel.target_date).toBe('2027-06')
   })
 
   it('herstelt de spaardoel-skip-vlag', () => {
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
-      data: makeDraft({ spaardoel: { presetKey: null, skipped: true }, lastStep: 'spaardoel' }),
+      data: makeDraft({
+        spaardoel: { presetKey: null, name: '', target_value: '', target_date: '', skipped: true },
+        lastStep: 'spaardoel',
+      }),
     })
     expect(result.spaardoel.skipped).toBe(true)
     expect(result.spaardoel.name).toBe('')
   })
 
-  it('herstelt alléén de retirementExpense-methode + skip, niet het bedrag', () => {
+  it('herstelt de retirementExpense inclusief het ingevulde bedrag', () => {
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
       data: makeDraft({
-        retirementExpense: { method: 'custom_amount', skipped: false },
+        retirementExpense: { method: 'custom_amount', customAmount: '30.000', skipped: false },
         lastStep: 'uitgaven_pensioen',
       }),
     })
     expect(result.step).toBe('uitgaven_pensioen')
     expect(result.retirementExpense.method).toBe('custom_amount')
     expect(result.retirementExpense.skipped).toBe(false)
-    // Gevoelig bedrag — nooit hersteld.
-    expect(result.retirementExpense.customAmount).toBe('')
+    expect(result.retirementExpense.customAmount).toBe('30.000')
   })
 
   it('valt terug op de initiële retirementExpense bij default keuzes', () => {
@@ -512,23 +594,29 @@ describe('onboarding _reducer — RESTORE_STATE keuzes (spaardoel + pensioen)', 
     expect(result.retirementExpense).toEqual(_initialState.retirementExpense)
   })
 
-  it('herstelt alléén het pensioen-pad (mode), niet brutobedrag/leeftijd/parseResult', () => {
+  it('herstelt pad én schatting, maar nooit het geparste overzicht (ADR 0115)', () => {
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
-      data: makeDraft({ pension: { mode: 'estimate' }, lastStep: 'pensioen' }),
+      data: makeDraft({
+        pension: { mode: 'estimate', grossMonthly: '1500', startAge: '67' },
+        lastStep: 'pensioen',
+      }),
     })
     expect(result.step).toBe('pensioen')
     expect(result.pension.mode).toBe('estimate')
-    // Gevoelig — nooit hersteld.
-    expect(result.pension.grossMonthly).toBe('')
-    expect(result.pension.startAge).toBe('')
+    expect(result.pension.grossMonthly).toBe('1500')
+    expect(result.pension.startAge).toBe('67')
+    // Blijft op het toestel — nooit in het concept, dus nooit hersteld.
     expect(result.pension.parseResult).toBeNull()
   })
 
   it('valt terug op de initiële pension-shape wanneer geen pad gekozen is', () => {
     const result = _reducer(_initialState, {
       type: 'RESTORE_STATE',
-      data: makeDraft({ pension: { mode: null }, lastStep: 'klaar' }),
+      data: makeDraft({
+        pension: { mode: null, grossMonthly: '', startAge: '' },
+        lastStep: 'klaar',
+      }),
     })
     expect(result.step).toBe('klaar')
     expect(result.pension).toEqual(_initialState.pension)

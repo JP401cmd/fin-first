@@ -37,8 +37,8 @@ const HEADER_PROPS = {
   monthLabel: 'juni 2026',
   teVerdelen: 500,
   totalIncome: 3000,
-  totalIncomeActual: 2800,
-  totalActualOutflow: 1900,
+  totalExpenseBudget: 1800,
+  totalExpenseSpent: 1500,
 }
 
 const STRIP_PROPS = {
@@ -57,26 +57,48 @@ const STRIP_PROPS = {
 }
 
 describe('BudgetEditorialHeader — Eenvoudig vs Volledig', () => {
-  it('simple: verbergt de hoofdgetallen "Volgens plan" en "Werkelijk"', () => {
+  it('simple: verbergt de hoofdgetallen "Nog te besteden" en "Nog te verdelen"', () => {
     render(
       <DisplayModeProvider initialMode="simple">
         <BudgetEditorialHeader {...HEADER_PROPS} simple />
       </DisplayModeProvider>,
     )
-    expect(screen.queryByText('Volgens plan')).toBeNull()
-    expect(screen.queryByText('Werkelijk')).toBeNull()
+    expect(screen.queryByText('Nog te besteden')).toBeNull()
+    expect(screen.queryByText('Nog te verdelen')).toBeNull()
     // Headline (kicker/titel) blijft staan.
     expect(screen.getByText(/heb je nog/i)).toBeTruthy()
   })
 
-  it('full: toont de hoofdgetallen "Volgens plan" en "Werkelijk"', () => {
+  it('full: toont de hoofdgetallen "Nog te besteden" en "Nog te verdelen"', () => {
     render(
       <DisplayModeProvider initialMode="full">
         <BudgetEditorialHeader {...HEADER_PROPS} simple={false} />
       </DisplayModeProvider>,
     )
-    expect(screen.getByText('Volgens plan')).toBeTruthy()
-    expect(screen.getByText('Werkelijk')).toBeTruthy()
+    expect(screen.getByText('Nog te besteden')).toBeTruthy()
+    expect(screen.getByText('Nog te verdelen')).toBeTruthy()
+  })
+
+  it('full: het ankergetal is budgetBeschikbaar (limiet − besteed) — zelfde getal als de cashflow-Budget-kaart', () => {
+    const { container } = render(
+      <DisplayModeProvider initialMode="full">
+        <BudgetEditorialHeader {...HEADER_PROPS} simple={false} />
+      </DisplayModeProvider>,
+    )
+    // 1800 − 1500 = 300 restant; grondslag-regel noemt limiet + besteed.
+    const text = container.textContent ?? ''
+    expect(text).toContain('300')
+    expect(text).toMatch(/uitgavenbudget/)
+  })
+
+  it('full: zonder actief uitgavenbudget valt de anker-kolom weg, verdelen blijft', () => {
+    render(
+      <DisplayModeProvider initialMode="full">
+        <BudgetEditorialHeader {...HEADER_PROPS} totalExpenseBudget={0} totalExpenseSpent={0} simple={false} />
+      </DisplayModeProvider>,
+    )
+    expect(screen.queryByText('Nog te besteden')).toBeNull()
+    expect(screen.getByText('Nog te verdelen')).toBeTruthy()
   })
 })
 
@@ -91,14 +113,14 @@ describe('BudgetEditorialHeader — één euroteken (regressie WF-BUDGET-02-bug2
     expect(text).not.toMatch(/€\s*€/)
   })
 
-  it('negatief: over-toegewezen plan + boven inkomen tonen "−€" zonder dubbel teken', () => {
-    // teVerdelen < 0 → over-toegewezen; outflow > inkomen → werkelijk negatief.
+  it('negatief: over-toegewezen plan + boven budget tonen "−€" zonder dubbel teken', () => {
+    // teVerdelen < 0 → over-toegewezen; besteed > limiet → besteden negatief.
     const { container } = render(
       <DisplayModeProvider initialMode="full">
         <BudgetEditorialHeader
           {...HEADER_PROPS}
           teVerdelen={-500}
-          totalActualOutflow={3500}
+          totalExpenseSpent={2500}
           simple={false}
         />
       </DisplayModeProvider>,

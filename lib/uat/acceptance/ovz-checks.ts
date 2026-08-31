@@ -8,13 +8,15 @@
  *     `assertEqual(actual, expected, label)` per check.
  *
  * De meeste checks roepen ÉCHTE productiefuncties aan (calculateBox3,
- * scoreDSTI/scoreAssetConcentration, pillarStatus, computeGoalProgress,
- * computeFreedomTotal, compareCompound, buildSimNetWorthRows, deflate).
- * Twee mirrors met bronregel-verwijzing (spiegelt de mirrors in
- * start/will/cash-checks.ts):
- *  - `scoreDebtRatio` (lib/financial-health.ts — NIET geëxporteerd)
+ * scoreDSTI/scoreAssetConcentration/scoreDebtRatio, pillarStatus,
+ * computeGoalProgress, computeFreedomTotal, compareCompound,
+ * buildSimNetWorthRows, deflate). Nog één mirror met bronregel-verwijzing
+ * (spiegelt de mirrors in start/will/cash-checks.ts):
  *  - de postpone-/uitstel-termijn (POSTPONE_DAYS=14 resp. weken×7, identiek
  *    patroon aan de WILL-mirror)
+ *
+ * De `scoreDebtRatio`-mirror is bij UR2-10 vervallen — die functie is nu
+ * geëxporteerd en wordt rechtstreeks aangeroepen.
  *
  * WF-OVZ-22 (euro-weergave, wave 2/3): `buildSimNetWorthRows` (nominaal, D7)
  * levert sinds brok E `inflationFactor` op elke rij zelf (single-source join
@@ -26,7 +28,7 @@
 import { calculateBox3 } from '@/lib/box3-data'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
-import { scoreDSTI, scoreAssetConcentration } from '@/lib/financial-health'
+import { scoreDSTI, scoreAssetConcentration, scoreDebtRatio } from '@/lib/financial-health'
 import { pillarStatus } from '@/lib/leverage-status'
 import { computeGoalProgress, type Goal } from '@/lib/goal-data'
 import { computeFreedomTotal, computeFreedomDelta } from '@/lib/briefing/overview-briefing'
@@ -123,14 +125,11 @@ function makeAsset(overrides: Partial<Asset> & { id: string; asset_type: Asset['
   }
 }
 
-/** Mirror van scoreDebtRatio (lib/financial-health.ts r154-160, NIET geëxporteerd). */
-function scoreDebtRatioMirror(totalAssets: number, totalDebts: number): number {
-  if (totalAssets <= 0) return totalDebts > 0 ? 0 : 50
-  const ratio = totalDebts / totalAssets
-  if (ratio <= 0) return 100
-  if (ratio >= 1) return 0
-  return Math.round((1 - ratio) * 100)
-}
+/* De mirror van `scoreDebtRatio` is bij UR2-10 vervallen: de curve is nu
+ * geëxporteerd uit lib/financial-health.ts en wordt hieronder rechtstreeks
+ * aangeroepen. Dat was ook de aanleiding — dezelfde formule stond in drie
+ * bestanden, en de derde kopie (de Schulden-hefboom) week af op het lege-data-
+ * pad. */
 
 /** Mirror van de postpone-termijn (identiek aan de WILL-mirror,
  *  components/overview/tips-lijst.tsx r37/79). */
@@ -170,10 +169,10 @@ export const OVZ_ENGINE_CHECKS: OvzEngineCheck[] = [
   {
     workflow: 'WF-OVZ-02',
     scenarioId: 'UAT-OVZ-02',
-    label: 'Schuldratio-pijlerscore (mirror) + statuskleur (pillarStatus): 13.900/9.700',
+    label: 'Schuldratio-pijlerscore (scoreDebtRatio) + statuskleur (pillarStatus): 13.900/9.700',
     run: () => {
       criterion('WF-OVZ-02')
-      const score = scoreDebtRatioMirror(9700, 13900)
+      const score = scoreDebtRatio(9700, 13900)
       const status = pillarStatus(score)
       return {
         expected: 'schuldratioScore=0; status=bad',
@@ -184,10 +183,10 @@ export const OVZ_ENGINE_CHECKS: OvzEngineCheck[] = [
   {
     workflow: 'WF-OVZ-03',
     scenarioId: 'UAT-OVZ-03',
-    label: 'Gezondheidspijler-scores (scoreDSTI/scoreAssetConcentration + schuldratio-mirror)',
+    label: 'Gezondheidspijler-scores (scoreDSTI/scoreAssetConcentration/scoreDebtRatio)',
     run: () => {
       criterion('WF-OVZ-03')
-      const schuldratioScore = scoreDebtRatioMirror(1619700, 0)
+      const schuldratioScore = scoreDebtRatio(1619700, 0)
       const dstiScore = scoreDSTI(0)
       const concentratieScore = scoreAssetConcentration((570000 / (1619700 - 650000)) * 100)
       return {

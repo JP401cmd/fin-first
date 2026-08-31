@@ -252,7 +252,9 @@ export function OnboardingInkomen({
 
   return (
     <OnboardingShell
-      kicker="Inkomen"
+      // Groepsnaam, geen schermnaam: ii. draagt ook "Wat geef je uit?" en de
+      // uitgaven-later-vraag. Zie `onboarding-kicker-taxonomie.test.ts`.
+      kicker="Inkomen & uitgaven"
       romanNum="ii."
       title={headline}
       deck={deck}
