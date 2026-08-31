@@ -104,8 +104,12 @@ export async function GET(request: Request) {
     const freedomDaysWonThisMonth =
       dashboardData.freedomDaysMonthly.find((m) => m.month === currentMonthKey)?.days ?? 0
 
-    // Spaarquote — canonieke 6-maands quote (savingsRate6m), gelijk aan /overzicht.
-    const savingsRate6m = dashboardData.savingsRate6m
+    // Spaarquote — HET app-brede getal: de EFFECTIEVE, grondslag-geresolveerde
+    // quote uit de bundel (ADR 0103), gelijk aan /overzicht, het instellingenblok
+    // en de spaarquote-widget. Was `savingsRate6m` (de rauwe 6-maands meting):
+    // een deelbare kaart die een ander percentage draagt dan het scherm waar hij
+    // vandaan komt, is precies de drift die het besluit van 31 aug 2026 opruimt.
+    const savingsRatePct = dashboardData.effectiveSavingsRatePct
 
     // Build card data based on privacy level
     const cardData: Record<string, unknown> = {
@@ -115,7 +119,7 @@ export async function GET(request: Request) {
       freedomDaysWonThisMonth: Math.round(freedomDaysWonThisMonth),
       fireCountdown,
       freedomTime,
-      savingsRate: canCalculateFire ? Math.round(savingsRate6m * 10) / 10 : null,
+      savingsRate: canCalculateFire ? Math.round(savingsRatePct * 10) / 10 : null,
       generatedAt: new Date().toISOString(),
       // Metadata about data availability (helps the card show N/A for missing metrics)
       dataAvailability: {

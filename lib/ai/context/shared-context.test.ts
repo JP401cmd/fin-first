@@ -43,7 +43,11 @@ function makeCoreData(overrides: Partial<CorePageData> = {}): CorePageData {
     hasTransactions: true,
     retirementMethodUsed: 'essential_budgets',
     budgetingActive: true,
-    savingsRate6m: 25,
+    // De rauwe 6-maands MÉTING en de EFFECTIEVE quote staan bewust uit elkaar:
+    // Fin citeert sinds 31 aug 2026 de effectieve (het getal dat het scherm
+    // toont). Zou de context terugvallen op de meting, dan valt dat luid om.
+    savingsRate6m: 9,
+    effectiveSavingsRatePct: 25,
     fireParams: { effectiveSwr: 0.0288, grossReturn: 0.07, inflationRate: 0.02 },
     // FIRE-doel uit de unified projection (zelfde getal als de loaders).
     fireTargetFromHorizon: 500_000,

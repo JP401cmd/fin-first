@@ -6,6 +6,7 @@ import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
 import { FIRE_SAVINGS_RATE_BENCHMARK_PCT } from '@/lib/constants'
+import { savingsRateBasisLabel, savingsRateFollowsTransactions } from '@/lib/budget-basis'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData } from './widget-renderer'
 import { PiggyBank, Users, UserCheck } from 'lucide-react'
@@ -31,10 +32,16 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
   // Spaarquote-% én -bedrag: BEIDE uit de canonieke bundel/override — de widget
   // rekent niets meer zelf uit (consume-don't-recompute). Het €-bedrag staat op
   // dezelfde grondslag als de %-quote (bedrag / inkomen == quote), dus de twee
-  // getallen op één kaart spreken elkaar niet meer tegen. De loader single-sourcet
-  // beide via savingsRateFromAggregates + monthlySavingsFromRate.
-  const rate = overrides ? overrides.savingsRate : data.savingsRate6m
-  const savings = overrides ? overrides.monthlySavings : data.monthlySavingsAmount
+  // getallen op één kaart spreken elkaar niet meer tegen.
+  //
+  // DE EFFECTIEVE QUOTE, NIET DE 6-MAANDS METING (31 aug 2026). Deze widget las
+  // `savingsRate6m`, terwijl het instellingenblok onderaan /overzicht/cashflow en
+  // de hefboomkaart op /overzicht de grondslag-geresolveerde quote tonen. Wie op
+  // budgetten of eigen bedragen staat, zag daardoor 9,5 % op de widget naast 30 %
+  // op /overzicht. `effectiveSavingsRatePct` is HET spaarquote-getal; de meting
+  // (`savingsRate6m`) hoort alleen daar waar hij als meting gelabeld staat.
+  const rate = overrides ? overrides.savingsRate : data.effectiveSavingsRatePct
+  const savings = overrides ? overrides.monthlySavings : data.effectiveMonthlySavings
   const isPositive = rate >= 0
 
   // In-view fill-animatie (700ms bezier, 0% → doel; transition:none pre-entered).
@@ -44,9 +51,29 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
   const barTransition = hasEntered ? 'width 700ms cubic-bezier(.22,1,.36,1)' : 'none'
   const barWidth = hasEntered ? `${Math.min(Math.abs(rate), 100)}%` : '0%'
 
-  // De eigen 6m-quote kan een schatting zijn (profiel/net-worth-delta-fallback).
-  // Alleen in eigen perspectief markeren; household/partner is een aparte grondslag.
-  const isEstimate = !overrides && data.savingsRateIsEstimate
+  // Grondslag-label (ADR 0103: elke kaart benoemt waar zijn getal op rust) — via
+  // de gedeelde helper, zodat de widget letterlijk dezelfde woorden gebruikt als
+  // het instellingenblok en de forecast-kaart.
+  //
+  // OOK IN HUISHOUD-PERSPECTIEF (L5). Het label stond eerst alleen in eigen
+  // perspectief, met als argument "household/partner draagt zijn eigen kop". Dat
+  // gold toen die override een eigen formule had; sinds 31 aug 2026 ÍS de
+  // huishoud-quote de effectieve quote van de gebruiker zelf, dus rust hij op
+  // exact dezelfde grondslag — en dan eist ADR 0121 het label daar net zo goed.
+  // PARTNER blijft er bewust zonder: dat getal komt uit de partner-RPC (diens
+  // eigen inkomsten/uitgaven) en niet uit deze grondslagkeuze; een label over
+  // ónze grondslag zou daar juist misleiden.
+  const basisLabel = isPartnerView
+    ? null
+    : savingsRateBasisLabel(data.savingsRateIncomeBasis, data.savingsRateExpensesBasis)
+
+  // "Geschat" hoort ALLEEN bij een quote die daadwerkelijk de 6-maands meting is
+  // (profiel/net-worth-delta-fallback). Staat de gebruiker op budgetten of eigen
+  // bedragen, dan komt het getal uit zijn eigen keuze en zou de markering liegen.
+  const isEstimate =
+    !overrides &&
+    savingsRateFollowsTransactions(data.savingsRateIncomeBasis, data.savingsRateExpensesBasis) &&
+    data.savingsRateIsEstimate
 
   const kickerLabel = isHouseholdView
     ? 'Spaarquote — Huishouden'
@@ -112,10 +139,20 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
 
   // ── Eén canonieke historische spaarquote-serie (snapshot savings_rate) ──
   // Historie/delta zijn per-gebruiker — alleen in eigen perspectief (household/
-  // partner-projecties worden niet per-maand gesnapshot). De live 6m-quote (rate)
+  // partner-projecties worden niet per-maand gesnapshot). De live quote (rate)
   // wordt als 'nu'-anker toegevoegd ALLEEN als er nog geen snapshot voor de huidige
   // maand bestaat. Delta, gemiddelden én YoY komen uit DEZELFDE serie — voorheen
   // mengde de widget drie grondslagen (snapshot + 6m-anker + huidige-maand-delta).
+  //
+  // GRONDSLAG VAN DE REEKS (31 aug 2026): `net_worth_snapshots.savings_rate` is
+  // door alle drie de snapshot-schrijvers vastgelegd als
+  // `resolveSavingsSource(...).effectiveSavingsRatePct` — dus de EFFECTIEVE quote.
+  // Het 'nu'-anker was tot vandaag de rauwe 6-maands meting, waardoor deze ene as
+  // twee grondslagen droeg en de "t.o.v. vorige maand"-delta een sprong toonde die
+  // niets met sparen te maken had (gemeten: 29 % historie → 9,5 % anker = −19,5 %).
+  // Nu het anker óók de effectieve quote is, staat de hele reeks op één grondslag
+  // en is er niets te markeren. Historische rijen blijven staan zoals ze gemeten
+  // zijn — geen backfill, conform de snapshot-regel in ADR 0103.
   const showHistory = !isHouseholdView && !isPartnerView
   const snapshotSeries = (data.savingsHistory ?? []).map(s => Math.max(-100, Math.min(100, s.value)))
   const now = new Date()
@@ -245,6 +282,9 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
             <span>· 6m: {avg6m.toFixed(1)}%</span>
           )}
           <span className="text-[var(--ink-4)]">{showHistory ? '· ' : ''}FIRE: {fireBenchmark}%+</span>
+          {/* ADR 0103: de kaart benoemt zijn grondslag. Zelfde woorden als het
+              instellingenblok en de forecast-kaart (gedeelde helper). */}
+          {basisLabel && <span className="text-[var(--ink-4)]">· {basisLabel}</span>}
           {isEstimate && <span className="text-[var(--ink-4)]">· geschat</span>}
         </div>
         {/* Year-over-year comparison */}

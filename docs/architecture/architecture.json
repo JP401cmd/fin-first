@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-29T22:29:40.882Z",
-  "generatedDate": "2026-08-29",
+  "generatedAt": "2026-08-31T01:52:09.772Z",
+  "generatedDate": "2026-08-31",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -192,7 +192,7 @@
     "tables": 91,
     "migrations": 218,
     "integrations": 25,
-    "components": 988,
+    "components": 991,
     "providers": 15,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -8621,11 +8621,11 @@
     }
   ],
   "components": {
-    "total": 988,
+    "total": 991,
     "groups": [
       {
         "group": "app",
-        "count": 382,
+        "count": 383,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8681,6 +8681,7 @@
           "budget-koppel-nudge",
           "budget-koppel-nudge.test",
           "budget-merge-wizard",
+          "budget-negative-spend.test",
           "budget-pill-tree",
           "budget-pill-tree.test",
           "budget-plan-editor-sheet",
@@ -9301,7 +9302,7 @@
       },
       {
         "group": "core",
-        "count": 76,
+        "count": 78,
         "items": [
           "account-source-icon",
           "account-source-icon.test",
@@ -9337,6 +9338,7 @@
           "crypto-holding-price-chart",
           "crypto-holdings-grid",
           "crypto-holdings-page",
+          "crypto-holdings-page.pane-history.test",
           "crypto-holdings-tab",
           "crypto-kpi-strip",
           "crypto-performance-chart",
@@ -9353,6 +9355,7 @@
           "holding-row.test",
           "holdings-client",
           "holdings-client.heatmap.test",
+          "holdings-client.pane-history.test",
           "holdings-toolbar",
           "hypotheekplanner-tab",
           "investment-holding-pane",
@@ -10320,6 +10323,10 @@
           "write": false
         },
         {
+          "name": "transaction_splits",
+          "write": false
+        },
+        {
           "name": "transactions",
           "write": false
         }
@@ -10331,6 +10338,10 @@
         },
         {
           "name": "budgets",
+          "write": false
+        },
+        {
+          "name": "transaction_splits",
           "write": false
         },
         {
@@ -10603,6 +10614,10 @@
         },
         {
           "name": "net_worth_snapshots",
+          "write": false
+        },
+        {
+          "name": "transaction_splits",
           "write": false
         },
         {
@@ -10946,6 +10961,10 @@
           "write": false
         },
         {
+          "name": "transaction_splits",
+          "write": false
+        },
+        {
           "name": "transactions",
           "write": false
         }
@@ -11015,6 +11034,10 @@
         },
         {
           "name": "target_allocations",
+          "write": false
+        },
+        {
+          "name": "transaction_splits",
           "write": false
         },
         {
@@ -13841,6 +13864,57 @@
           ]
         }
       ],
+      "transaction_splits": [
+        {
+          "domain": "budget-trends",
+          "label": "budget-trends",
+          "write": false,
+          "routes": [
+            "/api/budget-trends"
+          ]
+        },
+        {
+          "domain": "budget-variance",
+          "label": "budget-variance",
+          "write": false,
+          "routes": [
+            "/api/budget-variance"
+          ]
+        },
+        {
+          "domain": "export",
+          "label": "export",
+          "write": false,
+          "routes": [
+            "/api/export"
+          ]
+        },
+        {
+          "domain": "next-steps",
+          "label": "next-steps",
+          "write": false,
+          "routes": [
+            "/api/next-steps"
+          ]
+        },
+        {
+          "domain": "notifications",
+          "label": "notifications",
+          "write": false,
+          "routes": [
+            "/api/notifications"
+          ]
+        },
+        {
+          "domain": "report",
+          "label": "Rapportages",
+          "write": false,
+          "routes": [
+            "/api/report",
+            "/api/report/budget"
+          ]
+        }
+      ],
       "budget_amounts": [
         {
           "domain": "budget-variance",
@@ -14426,16 +14500,6 @@
           "write": true,
           "routes": [
             "/api/questionnaires/[id]/respond"
-          ]
-        }
-      ],
-      "transaction_splits": [
-        {
-          "domain": "report",
-          "label": "Rapportages",
-          "write": false,
-          "routes": [
-            "/api/report/budget"
           ]
         }
       ],
@@ -16774,6 +16838,19 @@
       ],
       "summary": "De eigenaar vroeg (29-08-2026) om een widget die het totale vermogen toont van een **zélf gekozen** deelverzameling bezittingen en schulden — bijvoorbeeld wél aandelen en bankrekening, níét crypto en eigen huis — met een bewerk-knop op de widget en een historisch verloop. Zo'n ge",
       "file": "docs/adr/0120-vermogenswidget-met-eigen-selectie.md"
+    },
+    {
+      "id": "0121-een-spaarquote-app-breed",
+      "title": "Eén spaarquote, app-breed: de effectieve quote is het getal, de 6-maands quote is een meting",
+      "status": "aanvaard",
+      "date": "2026-08-31",
+      "elements": [
+        "as-budget",
+        "as-transacties",
+        "fn-budgetteren"
+      ],
+      "summary": "Op een productie-account van de eigenaar (schermafdrukken 31-08-2026, grondslag \"uit je budgetten\") toonden vier oppervlakken **drie verschillende percentages voor één grootheid**:",
+      "file": "docs/adr/0121-een-spaarquote-app-breed.md"
     }
   ],
   "churn": {
@@ -16781,15 +16858,15 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 70
+        "commits": 69
       },
       {
         "path": "lib/ai",
-        "commits": 42
+        "commits": 44
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 28
+        "commits": 27
       },
       {
         "path": "app/api/household",
@@ -16828,23 +16905,23 @@
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 5313,
-        "commits": 32
+        "loc": 5401,
+        "commits": 33
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4894,
-        "commits": 37
+        "loc": 4934,
+        "commits": 38
       },
       {
         "file": "components/app/cash-account-view.tsx",
-        "loc": 3525,
-        "commits": 20
+        "loc": 3553,
+        "commits": 21
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 2893,
-        "commits": 52
+        "loc": 2966,
+        "commits": 54
       },
       {
         "file": "lib/release-notes.ts",
@@ -17959,24 +18036,9 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-08-29",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "API-routes",
-        "added": [
-          "/api/wealth-selection"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+3"
-        ],
-        "removed": []
-      }
-    ]
+    "previousDate": "2026-08-31",
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {
@@ -18298,6 +18360,13 @@
       "date": "2026-08-29",
       "api": 304,
       "components": 988,
+      "tables": 91,
+      "routesProduction": 95
+    },
+    {
+      "date": "2026-08-31",
+      "api": 304,
+      "components": 991,
       "tables": 91,
       "routesProduction": 95
     }

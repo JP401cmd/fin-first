@@ -15,19 +15,22 @@
  * (welke huidige waarde voeren we die functie).
  *
  * Alle queries zijn LAZY (alleen bij aanwezige parameter-doelen) en per-type gated;
- * er draait GEEN kernel/projectie. Elke bron reuse't de canonieke rekenhelpers
- * (`savingsRateFromAggregates`, `computeDebtAflossingMonthly`,
- * `resolveEffectiveIncomeExpenses`) of dezelfde weegregels als
- * `buildCategorieReturnGroups` — geen tweede formule-thuis.
+ * er draait GEEN kernel/projectie. Elke bron CONSUMEERT de canonieke laag
+ * (`loadForecastSectionData` voor de spaarquote, `resolveEffectiveIncomeExpenses`
+ * voor het salaris) of dezelfde weegregels als `buildCategorieReturnGroups` —
+ * geen tweede formule-thuis.
+ *
+ * SPIEGELEN IS GEEN CONSUMEREN (les, 31 aug 2026). Het spaarquote-doel rekende
+ * hier tot vandaag met een eigen kopie van de loader-formule, met in de docstring
+ * de belofte "DEZELFDE grondslag als de spaarquote-widget". Die belofte hield de
+ * kopie niet: op productie stond 5,8 % op de doelkaart naast 9,5 % op de widget
+ * en 30 % in het instellingenblok. Een tweede rekenweg met een parity-belofte in
+ * een comment is geen parity; alleen dezelfde aanroep is dat.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Debt } from '@/lib/debt-data'
-import {
-  savingsRateFromAggregates,
-  computeDebtAflossingMonthly,
-  savingsRateWindow,
-} from '@/lib/savings-source'
+import { savingsRateWindow } from '@/lib/savings-source'
+import { loadForecastSectionData } from '@/lib/cashflow-kpis'
 import { resolveEffectiveIncomeExpenses, type IncomeExpenseSources } from '@/lib/effective-financials'
 import { loadBudgetBasis } from '@/lib/household/budget-share'
 import type { BudgetBasisRow } from '@/lib/budget-basis'
@@ -113,10 +116,9 @@ export function autolinkGoalCurrentValues<
 // ── Rij-types voor de lazy injectie-queries (kolom-scoped, licht) ──
 type ParamTxRow = { amount: number | string; budget_id: string | null; date: string }
 /**
- * De velden ná `parent_id` worden alleen door de budgetGRONDSLAG gebruikt
- * (ADR 0103, `computeBudgetBasis`); `computeParameterSavingsRatePct` heeft
- * genoeg aan de eerste drie. Ze staan hier zodat de rij-vorm eerlijk is en de
- * cast naar `BudgetBasisRow` geen velden verzint.
+ * De velden ná `parent_id` worden gebruikt door de budgetGRONDSLAG (ADR 0103,
+ * `computeBudgetBasis`) die het SALARIS-doel voedt. Ze staan hier zodat de
+ * rij-vorm eerlijk is en de cast naar `BudgetBasisRow` geen velden verzint.
  */
 type ParamBudgetRow = {
   id: string
@@ -138,62 +140,25 @@ type ParamAssetRow = {
   is_active: boolean
 }
 
-/**
- * Actuele spaarquote (%) — CONSUME van de canonieke `savingsRateFromAggregates`
- * op 6-maands transactie-aggregaten, mét de savings-budget- en schuldaflossing-
- * add-backs die /overzicht/cashflow óók toepast (spiegelt lib/horizon-data-loader.ts
- * `savingsRate6m`: spaarbudget-uitgaven tellen als sparen → uit de uitgaven-term;
- * schuldaflossing via de gedeelde `computeDebtAflossingMonthly`). Zo staat het
- * getal op de goal-kaart op DEZELFDE grondslag als de spaarquote-widget.
+/*
+ * VERWIJDERD (31 aug 2026): `computeParameterSavingsRatePct`.
  *
- * BEWUSTE VEREENVOUDIGINGEN t.o.v. de volledige loader (gedocumenteerd in rapport):
- *   - GEEN <6-maands extrapolatie: bij ≥6 mnd data byte-identiek; <6 mnd wijkt licht
- *     af (de ratio is grotendeels schaal-invariant).
- *   - GEEN nul-transactie profiel-fallback: `income6m ≤ 0` → `undefined` (tolerant:
- *     laat de DB-waarde staan i.p.v. een misleidende 0%).
- * Rondt op 1 decimaal (zoals `formatGoalValue` voor `%`). Een negatieve quote
- * (meer uitgeven dan verdienen) blijft eerlijk behouden — geen kunstmatige clamp.
+ * Deze functie claimde in haar docstring "DEZELFDE grondslag als de
+ * spaarquote-widget" maar SPIEGELDE de loader-formule ("spiegelt
+ * lib/horizon-data-loader.ts") in plaats van hem te consumeren — en de kopie
+ * dreef weg. Op een productie-account van de eigenaar toonde de doelkaart 5,8 %
+ * waar de widget 9,5 % toonde en het instellingenblok 30 %: drie percentages voor
+ * één grootheid. De drift had drie oorzaken tegelijk, en dat is precies waarom een
+ * kopie geen gelijkheid kan garanderen: (1) de eigen rij-lus filterde géén
+ * eigen-rekening-overboekingen weg (de loaders doen dat met `realOnly`), (2) er
+ * was geen <6-maands extrapolatie en geen profiel-/net-vermogen-delta-fallback,
+ * en (3) ze rekende sowieso de MÉTING uit, niet de grondslag-geresolveerde quote
+ * die elk ander oppervlak toont.
+ *
+ * Het doel consumeert nu `loadForecastSectionData(...).effectiveSavingsRatePct`
+ * — dezelfde gedeelde laag die de forecast-pagina voedt, met alle acht fetches
+ * `cache()`-gedeeld. Zie `injectParameterGoalCurrentValues` hieronder.
  */
-export function computeParameterSavingsRatePct(
-  tx: readonly ParamTxRow[],
-  budgets: readonly ParamBudgetRow[],
-  debts: readonly Debt[],
-  /**
-   * Exclusieve bovengrens ('YYYY-MM-DD', = de 1e van de LOPENDE maand) uit
-   * `savingsRateWindow`. De query hierboven haalt bewust ook de lopende maand op
-   * — het salaris-doel heeft die nodig — dus de vensterknip gebeurt hier.
-   * Weglaten = het oude gedrag (alles wat binnenkomt telt mee).
-   */
-  windowEnd?: string,
-): number | undefined {
-  // Savings-budget-ids: eigen type 'savings' OF (kind met savings-parent) — zelfde
-  // parent-eerst-erving als de dashboard/horizon-loader.
-  const typeById = new Map<string, string>()
-  for (const b of budgets) if (b.budget_type) typeById.set(b.id, b.budget_type)
-  const effType = (b: ParamBudgetRow): string | undefined =>
-    b.parent_id ? (typeById.get(b.parent_id) ?? b.budget_type ?? undefined) : (b.budget_type ?? undefined)
-  const savingsBudgetIds = new Set<string>()
-  for (const b of budgets) if (effType(b) === 'savings') savingsBudgetIds.add(b.id)
-
-  let income6m = 0
-  let expenses6m = 0
-  let savingsBudgetSpent6m = 0
-  for (const t of tx) {
-    // De LOPENDE maand valt buiten het meetvenster (bevinding C6): vaste lasten
-    // zijn er al af, het salaris nog niet binnen — dat trekt de quote scheef.
-    if (windowEnd && t.date >= windowEnd) continue
-    const amt = Number(t.amount)
-    if (!Number.isFinite(amt)) continue
-    if (amt > 0) { income6m += amt; continue }
-    expenses6m += Math.abs(amt)
-    if (t.budget_id && savingsBudgetIds.has(t.budget_id)) savingsBudgetSpent6m += Math.abs(amt)
-  }
-  if (!(income6m > 0)) return undefined
-
-  const debtAflossing6m = computeDebtAflossingMonthly(debts as Debt[]) * 6
-  const pct = savingsRateFromAggregates(income6m, expenses6m - savingsBudgetSpent6m, debtAflossing6m)
-  return Math.round(pct * 10) / 10
-}
 
 /**
  * Effectief maandinkomen (€) — CONSUME van de canonieke `resolveEffectiveIncomeExpenses`
@@ -279,6 +244,14 @@ export function pickLatestSnapshotFireAge(
  * hierboven). Draait GEEN query wanneer er geen parameter-doelen zijn, en per bron
  * alleen wat een aanwezig doel-type nodig heeft. Ontbrekende bron → `current_value`
  * blijft op de DB-waarde (tolerante degradatie; de UI toont "onbekend/live in het lab").
+ *
+ * Vier bronnen, drie eigen queries + één gedeelde laag: het SPAARQUOTE-doel doet
+ * sinds 31 aug 2026 geen eigen query meer maar consumeert
+ * `loadForecastSectionData` (lib/cashflow-kpis.ts) — dezelfde acht `cache()`-gedeelde
+ * fetches die de forecast-pagina en (via overlap) de dashboardbundel toch al
+ * gebruiken. Dat is meer I/O dan de vroegere drie eigen queries wanneer er één
+ * spaarquote-doel bestaat en verder niets op de pagina draait; die prijs is bewust
+ * betaald voor één getal in plaats van drie.
  */
 export async function injectParameterGoalCurrentValues(
   supabase: SupabaseClient,
@@ -291,18 +264,20 @@ export async function injectParameterGoalCurrentValues(
   const needsSalary = parameterGoals.some(g => g.goal_type === 'salary')
   const needsReturn = parameterGoals.some(g => g.goal_type === 'expected_return')
   const needsFireAge = parameterGoals.some(g => g.goal_type === 'fire_age')
-  const needsTx = needsSavingsRate || needsSalary
+  // Alleen het SALARIS-doel leest nog rauwe transactierijen. Het spaarquote-doel
+  // deed dat ook, met een eigen rij-lus die transfers meetelde; het consumeert nu
+  // de gedeelde forecast-laag (zie hieronder) en heeft dus geen eigen tx-, budget-
+  // of schulden-query meer nodig.
+  const needsTx = needsSalary
 
   const now = new Date()
   const monthStart = localMonthStart(now)
   const monthEnd = localMonthBounds(now).end
-  // Meetvenster van de spaarquote — gedeelde bron (lib/savings-source.ts): zes
-  // VOLTOOIDE kalendermaanden. De QUERY loopt bewust dóór tot het einde van de
-  // lopende maand omdat het salaris-doel diezelfde rijen leest; de vensterknip
-  // voor de spaarquote gebeurt in `computeParameterSavingsRatePct` (`savingsWindowEnd`).
-  const { fromDate: sixMonthsAgo, toDate: savingsWindowEnd } = savingsRateWindow(now)
+  // Ondergrens van de tx-query voor het salaris-doel. Bewust nog steeds het
+  // spaarquote-venster (lib/savings-source.ts): dezelfde rijen, één query.
+  const { fromDate: sixMonthsAgo } = savingsRateWindow(now)
 
-  const [txRows, budgetRows, debtRows, profileRow, basisPrefsRow, assetRows, snapshotRows] = await Promise.all([
+  const [txRows, budgetRows, profileRow, basisPrefsRow, assetRows, snapshotRows, forecastScalars] = await Promise.all([
     needsTx
       ? supabase
           .from('transactions')
@@ -311,23 +286,14 @@ export async function injectParameterGoalCurrentValues(
           .lt('date', monthEnd)
           .then(r => ((r.data ?? []) as ParamTxRow[]))
       : Promise.resolve([] as ParamTxRow[]),
-    // Ook nodig voor `needsSalary`: het salaris-doel draait sinds ADR 0103 op de
-    // grondslag (budget/transactie/handmatig), niet meer alleen op transacties.
-    needsSavingsRate || needsSalary
+    // Het salaris-doel draait sinds ADR 0103 op de grondslag (budget/transactie/
+    // handmatig), niet meer alleen op transacties.
+    needsSalary
       ? supabase
           .from('budgets')
           .select('id, budget_type, parent_id, name, default_limit, interval, ownership, is_archived, merged_into, created_at')
           .then(r => ((r.data ?? []) as ParamBudgetRow[]))
       : Promise.resolve([] as ParamBudgetRow[]),
-    needsSavingsRate
-      ? supabase
-          .from('debts')
-          .select(
-            'id, current_balance, interest_rate, monthly_payment, repayment_type, end_date, is_active, include_aflossing_in_savings, custom_aflossing_amount, net_worth_inclusion_pct',
-          )
-          .eq('is_active', true)
-          .then(r => ((r.data ?? []) as unknown as Debt[]))
-      : Promise.resolve([] as Debt[]),
     needsSalary && userId
       ? supabase
           .from('profiles')
@@ -366,11 +332,39 @@ export async function injectParameterGoalCurrentValues(
           .limit(1)
           .then(r => ((r.data ?? []) as { fire_age?: number | string | null }[]))
       : Promise.resolve([] as { fire_age?: number | string | null }[]),
+    // DE SPAARQUOTE WORDT GECONSUMEERD, NIET NAGEBOUWD (31 aug 2026).
+    // `loadForecastSectionData` is de gedeelde slanke laag die ook de
+    // forecast-pagina voedt; zijn `effectiveSavingsRatePct` komt uit dezelfde
+    // `resolveSavingsSource` als /overzicht, het instellingenblok en de
+    // spaarquote-widget — inclusief transfer-filter, <6-maands extrapolatie,
+    // profiel-fallback, net-vermogen-delta-tak en de grondslagkeuze van de
+    // gebruiker.
+    //
+    // STAAT BEWUST ÍN DEZE Promise.all. Hij hing er eerst serieel achter, met als
+    // argument dat zijn acht fetches `cache()`-gedeeld zijn. Dat argument klopt
+    // voor een render waarop `loadDashboardData` toch al draait, maar NIET voor
+    // `loadFinData` (het doelen-scherm): daar is er niets om mee te delen en
+    // wachtte de pagina eerst de doel-queries áf en dán nog eens acht fetches.
+    // Als element van deze Promise.all lopen ze parallel; gedeelde fetches
+    // blijven gedeeld, dus dit kost nooit méér.
+    needsSavingsRate
+      ? loadForecastSectionData(supabase)
+      : Promise.resolve(null as Awaited<ReturnType<typeof loadForecastSectionData>> | null),
   ])
 
-  const savingsRatePct = needsSavingsRate
-    ? computeParameterSavingsRatePct(txRows, budgetRows, debtRows, savingsWindowEnd)
-    : undefined
+  // TOLERANTIE-GUARD OP DE INVOER, NIET OP DE UITKOMST (M4).
+  // De vroegere regel was `income6m ≤ 0 → undefined`: geen bruikbaar inkomen ⇒
+  // niets te zeggen ⇒ laat de opgeslagen doelwaarde staan. Die is hier eerst
+  // vertaald naar `uitkomst !== 0`, en dat is iets anders: een gebruiker die
+  // precies quitte speelt heeft een ECHTE spaarquote van 0 %, en die hoort het
+  // doel wél te verversen — anders blijft er een oude, te rooskleurige waarde op
+  // de kaart staan juist wanneer het slechter gaat. De guard staat daarom weer op
+  // de invoer: is er geen effectief maandinkomen, dan is er geen noemer en dus
+  // geen uitspraak; is die er wel, dan telt ook 0 % (en een negatieve quote).
+  const savingsRatePct =
+    forecastScalars && forecastScalars.monthlyIncome > 0
+      ? forecastScalars.effectiveSavingsRatePct
+      : undefined
   const salaryMonthly = needsSalary
     ? computeParameterEffectiveSalary(
         profileRow,

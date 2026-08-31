@@ -2,16 +2,19 @@
  * PARITY: `loadDashboardData` (het oude, volledige pad) ↔ `loadForecastSectionData`
  * (de slanke forecast-laag) — ADR 0083, taak T2.5.
  *
- * `CashflowSection` op /overzicht/cashflow/forecast leest VIJF velden uit de
- * bundel: `monthlyIncome`, `monthlyExpenses`, `savingsRate6m`, `savingsHistory` en
- * `expenseHistory`. Van die vijf is `savingsRate6m` het gevaarlijke: het staat óók
- * op /overzicht en in het instellingenblok onderaan /overzicht/cashflow. Wijkt het
- * af, dan toont de app twee verschillende spaarquotes — precies wat de
- * "consume, don't recompute"-regel moet voorkomen.
+ * De forecast-laag levert de scalars voor `CashflowSection` op
+ * /overzicht/cashflow/forecast: `monthlyIncome`, `monthlyExpenses`, de twee
+ * spaarquotes (`savingsRate6m` = de METING, `effectiveSavingsRatePct` = het
+ * GETOONDE getal met zijn twee grondslagen) plus `savingsHistory` en
+ * `expenseHistory`. De spaarquotes zijn de gevaarlijke: ze staan óók op
+ * /overzicht, in het instellingenblok onderaan /overzicht/cashflow, op de
+ * spaarquote-widget en op het spaarquote-doel. Wijken ze af, dan toont de app
+ * twee verschillende spaarquotes — precies wat de "consume, don't recompute"-regel
+ * moet voorkomen, en precies wat er op 31 aug 2026 op productie gebeurde.
  *
  * Net als `cashflow-kpis.parity.test.ts` draaien hier BEIDE paden écht,
  * end-to-end, tegen dezelfde nep-database (`test/helpers/fake-supabase.ts`): pad A
- * is de volledige productieloader waar we achteraf de vijf velden uit selecteren,
+ * is de volledige productieloader waar we achteraf de scalars uit selecteren,
  * pad B is de nieuwe loader met zijn acht fetches.
  *
  * ── DE VIJF VERPLICHTE VARIANTEN ────────────────────────────────────────────
@@ -283,14 +286,28 @@ function buildFixtures(): Fixture[] {
   ]
 }
 
-// ── De vijf velden uit het OUDE pad ─────────────────────────────────────────
+// ── De scalars uit het OUDE pad ─────────────────────────────────────────
 
-/** Selecteert precies de vijf velden die `CashflowSection` uit de bundel leest. */
-function vijfUitBundel(d: DashboardData): CashflowSectionScalars {
+/**
+ * Selecteert uit de volle bundel precies de scalars die de forecast-laag levert.
+ *
+ * Sinds 31 aug 2026 staan daar TWEE spaarquotes in, en dat is opzet:
+ * `savingsRate6m` is de METING (die voedt de transactie-kassabon in het
+ * instellingenblok) en `effectiveSavingsRatePct` is het GETOONDE getal
+ * (grondslag-geresolveerd, ADR 0103). Ze worden allebei vergrendeld — juist de
+ * effectieve, want dat is het getal waar de forecast-kaart, de spaarquote-widget
+ * en het spaarquote-doel op staan; wijkt hij af tussen de twee paden, dan toont
+ * de app opnieuw twee spaarquotes.
+ */
+function scalarsUitBundel(d: DashboardData): CashflowSectionScalars {
   return {
     monthlyIncome: d.monthlyIncome,
     monthlyExpenses: d.monthlyExpenses,
     savingsRate6m: d.savingsRate6m,
+    effectiveSavingsRatePct: d.effectiveSavingsRatePct,
+    savingsRateIncomeBasis: d.savingsRateIncomeBasis,
+    savingsRateExpensesBasis: d.savingsRateExpensesBasis,
+    savingsRateIsEstimate: d.savingsRateIsEstimate,
     savingsHistory: d.savingsHistory,
     expenseHistory: d.expenseHistory,
   }
@@ -302,7 +319,7 @@ async function runBothPaths(db: FakeDb) {
   const bundle = await loadDashboardData(oud.client)
   const slank = await loadForecastSectionData(nieuw.client)
   return {
-    oud: vijfUitBundel(bundle.dashboardData),
+    oud: scalarsUitBundel(bundle.dashboardData),
     nieuw: slank,
     bundle: bundle.dashboardData,
     oudQueries: oud.tableQueries(),
@@ -322,10 +339,10 @@ function bevriesDeKlok() {
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
-describe('loadForecastSectionData ↔ loadDashboardData — parity op alle vijf velden', () => {
+describe('loadForecastSectionData ↔ loadDashboardData — parity op alle scalars (incl. BEIDE spaarquotes)', () => {
   bevriesDeKlok()
 
-  it.each(buildFixtures())('$label — vijf velden identiek', async ({ db }) => {
+  it.each(buildFixtures())('$label — alle scalars identiek', async ({ db }) => {
     const { oud, nieuw } = await runBothPaths(db)
     expect(nieuw).toEqual(oud)
     // Expliciet per veld, zodat een falende run meteen benoemt wélk veld dreef.
@@ -359,7 +376,7 @@ describe('loadForecastSectionData ↔ loadDashboardData — parity op alle vijf 
   })
 })
 
-describe('de vijf velden, met harde waarden op beide paden', () => {
+describe('de scalars, met harde waarden op beide paden', () => {
   bevriesDeKlok()
 
   it('fixture 1: aggregaat-quote 54,0 % — de snapshots blijven ONGEBRUIKT', async () => {

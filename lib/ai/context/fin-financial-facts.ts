@@ -203,7 +203,9 @@ export function buildWillFinancialFacts(coreData: CorePageData, profile: FinFact
     displayFireGoal,
     fireDoel: displayFireGoal ?? core.fireTarget,
     fireDoelUitKernel,
-    spaarquotePct: coreData.savingsRate6m,
+    // DE spaarquote: grondslag-geresolveerd (ADR 0103), niet de rauwe 6-maands
+    // meting — Fin moet hetzelfde percentage citeren als het scherm toont.
+    spaarquotePct: coreData.effectiveSavingsRatePct,
     swr: effectiveSwr,
     // CONSUMEER het canonieke 12-mnd rolling dagtarief uit de bundel. Was
     // `dailyExpenseRate(rawFinancials.monthlyExpenses)`: de EFFECTIVE grondslag

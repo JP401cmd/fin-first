@@ -44,6 +44,89 @@ export type ResolvedBasis = 'budget' | 'transaction' | 'manual' | 'profile'
 export const BASIS_SOURCES: readonly BasisSource[] = ['auto', 'budget', 'transaction', 'manual']
 
 /**
+ * Menselijk label per grondslag — het harde acceptatiecriterium uit ADR 0103:
+ * elke kaart benoemt waar zijn getal vandaan komt. Een grondslag die kan
+ * schuiven zonder zich bekend te maken is een tweede waarheid met vertraging.
+ *
+ * Woonde tot 31 aug 2026 in `components/overview/cashflow-instellingen-blok.tsx`
+ * en is hierheen verhuisd toen de spaarquote app-breed op de EFFECTIEVE
+ * grondslag kwam te staan: het instellingenblok, de forecast-kaart en de
+ * spaarquote-widget benoemen sindsdien dezelfde grondslag, en drie kopieën van
+ * dezelfde vier woorden zijn drie kansen op afwijkende copy. Het blok
+ * her-exporteert 'm, zodat bestaande imports blijven werken.
+ */
+export const BASIS_LABEL: Record<ResolvedBasis, string> = {
+  budget: 'uit je budgetten',
+  transaction: 'uit je transacties',
+  manual: 'eigen invoer',
+  profile: 'uit je profiel',
+}
+
+/**
+ * Dezelfde grondslag, maar als ZINSDEEL — met voorzetsel, zodat hij in een lopende
+ * zin past.
+ *
+ * `BASIS_LABEL` is een LOSSE aanduiding onder een cijfer ("uit je budgetten") en
+ * werkt daar prima. Ingeplakt in een zin loopt hij alleen goed af voor de
+ * budget- en transactievariant: "Van je inkomen uit je budgetten hou je 30 %
+ * over" leest nog, maar `manual` gaf "Van je inkomen eigen invoer hou je 30 %
+ * over" en de gemengde variant "Van je inkomen gemengde grondslag …". Twee van de
+ * vijf mogelijke waarden waren dus kapot, en de één die getest werd was toevallig
+ * de één die leest.
+ *
+ * Vandaar twee vormen naast elkaar in plaats van één dubbelgebruikte: een kaart
+ * kiest het label, een zin kiest de frase.
+ */
+export const BASIS_PHRASE: Record<ResolvedBasis, string> = {
+  budget: 'volgens je budgetten',
+  transaction: 'volgens je transacties',
+  manual: 'volgens je eigen invoer',
+  profile: 'volgens je profiel',
+}
+
+/** De zinsvorm bij een GEMENGDE grondslag (inkomen en uitgaven verschillen). */
+export const BASIS_PHRASE_MIXED = 'volgens een gemengde grondslag'
+
+/**
+ * Het grondslag-label bij de SPAARQUOTE. De quote volgt twee grondslagen
+ * (inkomen én uitgaven, ADR 0103); vallen die samen, dan draagt de kaart dat ene
+ * label, anders is het eerlijker om te zeggen dát het gemengd is dan één van de
+ * twee te noemen.
+ */
+export function savingsRateBasisLabel(
+  incomeBasis: ResolvedBasis,
+  expensesBasis: ResolvedBasis,
+): string {
+  return incomeBasis === expensesBasis ? BASIS_LABEL[incomeBasis] : 'gemengde grondslag'
+}
+
+/**
+ * Dezelfde uitspraak als `savingsRateBasisLabel`, maar als zinsdeel met
+ * voorzetsel — voor de plekken waar de grondslag in een lopende zin staat
+ * (bv. de Eenvoudig-tekst op de forecast-pagina). Zie `BASIS_PHRASE`.
+ */
+export function savingsRateBasisPhrase(
+  incomeBasis: ResolvedBasis,
+  expensesBasis: ResolvedBasis,
+): string {
+  return incomeBasis === expensesBasis ? BASIS_PHRASE[incomeBasis] : BASIS_PHRASE_MIXED
+}
+
+/**
+ * Is de getoonde (effectieve) spaarquote IDENTIEK aan de gemeten 6-maands
+ * transactiequote? Alleen dán zeggen `savingsRateIsEstimate` en de
+ * transactie-kassabon iets over het getal op het scherm — bij elke andere
+ * grondslag-combinatie komt de quote uit een keuze van de gebruiker en is een
+ * "geschat"-markering onjuist (zie `resolveSavingsSource`).
+ */
+export function savingsRateFollowsTransactions(
+  incomeBasis: ResolvedBasis,
+  expensesBasis: ResolvedBasis,
+): boolean {
+  return incomeBasis === 'transaction' && expensesBasis === 'transaction'
+}
+
+/**
  * DRAGENDE INVARIANT (ADR 0103), geen filterkeuze:
  * de uitgavengrondslag bestaat UITSLUITEND uit `budget_type = 'expense'`.
  *

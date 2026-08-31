@@ -28,7 +28,6 @@ import { loadVrijheidsgetalSnapshot } from '@/lib/goals/vrijheidsgetal-source'
 export {
   isParameterGoal,
   splitActiveGoals,
-  computeParameterSavingsRatePct,
   computeParameterEffectiveSalary,
   computeParameterWeightedReturnPct,
   pickLatestSnapshotFireAge,

@@ -178,6 +178,15 @@ export interface GespreksstartersInput {
   prevMonthExpenses: number
   monthlySavings: number
   prevMonthlySavings: number
+  /**
+   * De GEMETEN 6-maands transactiequote (`computeSavingsRate6m`), NIET de
+   * effectieve spaarquote die de app-oppervlakken tonen (ADR 0103 /
+   * eigenaar-besluit 31 aug 2026). Dat is hier bewust: de gespreksstarters zetten
+   * dit getal steeds naast een gemeten maandbedrag, en elke tekst die 'm gebruikt
+   * benoemt het venster ("6-maands", "over 6 maanden") — de enige toegestane
+   * plek voor de meting. Gebruik hem NOOIT in een zin die 'm als "je spaarquote"
+   * presenteert; dat getal is `effectiveSavingsRatePct`.
+   */
   savingsRate6m: number
   dailyExpenses: number
 
@@ -495,7 +504,7 @@ const detectSparenVrijheid: Detector = (i) => {
     variants: [
       (v) => ({
         vraag: `${v.subjCap} ${v.hebt} deze maand ${formatEUR(i.monthlySavings)} gespaard — dat zijn ${days} nieuwe vrijheidsdagen. Hoe ${v.voelt} daarover?`,
-        context: `Spaarquote: ${i.savingsRate6m.toFixed(0)}% van het inkomen.`,
+        context: `6-maands spaarquote (gemeten): ${i.savingsRate6m.toFixed(0)}% van het inkomen.`,
         actie: `Bespreek of ${v.subj} tevreden ${v.bent} of ${v.wilt} versnellen.`,
         vrijheidstijd: `${days} dagen`,
       }),
@@ -567,7 +576,7 @@ const detectSpaarquoteTrend: Detector = (i) => {
           actie: `Bespreek ${v.samen} of dit comfortabel voelt of te streng.`,
         }),
         (v) => ({
-          vraag: `${i.savingsRate6m.toFixed(0)}% spaarquote — sterk. Voelt de balans tussen nu en later goed?`,
+          vraag: `${i.savingsRate6m.toFixed(0)}% spaarquote over de laatste zes maanden — sterk. Voelt de balans tussen nu en later goed?`,
           context: `Gemiddeld over 6 maanden.`,
           actie: `Toets ${v.samen} of ${v.subj} ook genoeg ${v.subj === 'je' ? 'geniet' : 'genieten'}.`,
         }),
@@ -585,7 +594,7 @@ const detectSpaarquoteTrend: Detector = (i) => {
           actie: `Kies ${v.samen} één uitgave om bij te sturen.`,
         }),
         (v) => ({
-          vraag: `Met ${i.savingsRate6m.toFixed(0)}% spaarquote bouwt vrijheid langzaam op. Bewuste keuze of ruimte voor meer?`,
+          vraag: `Met ${i.savingsRate6m.toFixed(0)}% spaarquote over zes maanden bouwt vrijheid langzaam op. Bewuste keuze of ruimte voor meer?`,
           context: `Gemiddeld over 6 maanden.`,
           actie: `Bepaal ${v.samen} een haalbaar streefpercentage.`,
         }),

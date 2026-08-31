@@ -329,8 +329,13 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
     { id: 'le2', name: 'Erfenis', year: 2035, targetAge: 44, impactType: 'positive', estimatedImpact: 50000 },
   ],
   savingsRate6m: 27,
-  // Canoniek maandspaarbedrag op savingsRate6m-grondslag: 5200 × 27% = 1404.
-  monthlySavingsAmount: 1404,
+  // De GETOONDE quote (grondslag-geresolveerd) valt in deze demo samen met de
+  // meting: beide grondslagen staan op transacties. Het €-bedrag hoort erbij:
+  // 5200 × 27 % = 1404.
+  effectiveSavingsRatePct: 27,
+  effectiveMonthlySavings: 1404,
+  savingsRateIncomeBasis: 'transaction',
+  savingsRateExpensesBasis: 'transaction',
   savingsRateIsEstimate: false,
   monthlySavingsBudgetSpent: 1400,
   savingsBudgetSpent6m: 8400,

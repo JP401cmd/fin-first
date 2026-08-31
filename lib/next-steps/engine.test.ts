@@ -18,7 +18,7 @@ function ingericht(overrides: Partial<NextStepInput> = {}): NextStepInput {
     netWorth: 180_000,
     emergencyMonthsCovered: 6,
     emergencyTargetMonths: 6,
-    savingsRate6mPct: 32,
+    savingsRatePct: 32,
     monthlyIncome: 4_500,
     monthlyRecurringAmount: 1_200,
     budgetsOverLimit: 0,
@@ -44,7 +44,7 @@ function leeg(overrides: Partial<NextStepInput> = {}): NextStepInput {
     netWorth: 0,
     emergencyMonthsCovered: 0,
     emergencyTargetMonths: 6,
-    savingsRate6mPct: 0,
+    savingsRatePct: 0,
     monthlyIncome: 0,
     monthlyRecurringAmount: 0,
     lifeEventCount: 0,
@@ -77,7 +77,7 @@ describe('computeNextSteps — fundament', () => {
 
   it('wijst elke stap naar een bestaande route (geen /will, /identity, /core/assets)', () => {
     const hrefs = [...computeNextSteps(leeg()), ...computeNextSteps(ingericht({
-      emergencyMonthsCovered: 1, savingsRate6mPct: 4, budgetsOverLimit: 2,
+      emergencyMonthsCovered: 1, savingsRatePct: 4, budgetsOverLimit: 2,
       monthlyRecurringAmount: 4_000, openActionCount: 3, freedomDaysOpen: 12,
       lifeEventCount: 0, fireCountdownYears: 11,
     }))].map(s => s.href)
@@ -115,8 +115,8 @@ describe('computeNextSteps — groei (post-onboarding)', () => {
   })
 
   it('nudget op spaarquote onder de drempel, niet erboven', () => {
-    const onder = computeNextSteps(ingericht({ savingsRate6mPct: VOLGENDE_STAP_SPAARQUOTE_MIN_PCT - 1 }))
-    const boven = computeNextSteps(ingericht({ savingsRate6mPct: VOLGENDE_STAP_SPAARQUOTE_MIN_PCT }))
+    const onder = computeNextSteps(ingericht({ savingsRatePct: VOLGENDE_STAP_SPAARQUOTE_MIN_PCT - 1 }))
+    const boven = computeNextSteps(ingericht({ savingsRatePct: VOLGENDE_STAP_SPAARQUOTE_MIN_PCT }))
     expect(onder.map(s => s.key)).toContain('spaarquote_verhogen')
     expect(boven.map(s => s.key)).not.toContain('spaarquote_verhogen')
     expect(onder.find(s => s.key === 'spaarquote_verhogen')!.metric).toBe('spaarquote 14%')
@@ -151,7 +151,7 @@ describe('computeNextSteps — groei (post-onboarding)', () => {
 
   it('verzint geen impact wanneer er geen canonieke bron is', () => {
     const steps = computeNextSteps(ingericht({
-      emergencyMonthsCovered: 1, savingsRate6mPct: 2, budgetsOverLimit: 2, lifeEventCount: 0,
+      emergencyMonthsCovered: 1, savingsRatePct: 2, budgetsOverLimit: 2, lifeEventCount: 0,
     }))
     expect(steps.length).toBeGreaterThan(0)
     expect(steps.every(s => s.impact === null)).toBe(true)
@@ -193,7 +193,7 @@ describe('computeNextSteps — volgorde en afhandeling', () => {
     const uitgegeven = new Set([
       ...computeNextSteps(leeg({ netWorth: -1 })).map(s => s.key),
       ...computeNextSteps(ingericht({
-        emergencyMonthsCovered: 1, savingsRate6mPct: 2, budgetsOverLimit: 1,
+        emergencyMonthsCovered: 1, savingsRatePct: 2, budgetsOverLimit: 1,
         monthlyRecurringAmount: 4_000, openActionCount: 1, freedomDaysOpen: 4,
         lifeEventCount: 0, fireCountdownYears: 9,
       })).map(s => s.key),

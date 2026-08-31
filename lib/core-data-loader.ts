@@ -1320,16 +1320,27 @@ export const loadCoreData = cache(async function loadCoreData(
     (s, d) => s + Number((d as { monthly_payment?: number | string | null }).monthly_payment ?? 0),
     0,
   )
-  // EFFECTIEVE spaarquote: handmatige invoer wint over de 6-maands transactie-
-  // quote — hetzelfde percentage dat het instellingenblok onderaan
-  // /overzicht/cashflow toont. Zelfde helper als de dashboard-/horizon-loader.
+  // EFFECTIEVE spaarquote: de gekozen grondslag wint over de 6-maands transactie-
+  // meting — hetzelfde percentage dat het instellingenblok onderaan
+  // /overzicht/cashflow toont én dat Fin citeert (beide lezen DÉZE loader, dus daar
+  // is de gelijkheid per constructie). Zelfde helper als de dashboard-/horizon-loader.
+  //
+  // ONAFGEROND DOORGEVEN (M5, 31 aug 2026). Hier stond
+  // `Math.round(computedSavingsRate6m * 10) / 10`: de meting werd afgerond VÓÓR ze
+  // de rekenstap in ging, terwijl dashboard- en horizon-loader hun onafgeronde
+  // waarde doorgeven en pas bij het teruggeven afronden. Op de tak waar beide
+  // grondslagen 'transaction' zijn is `effectiveSavingsRatePct` letterlijk deze
+  // invoer, dus die volgorde-fout maakte een verschil van maximaal 0,05 pp tussen
+  // wat Fin citeert en wat de widget toont — zonder enige inhoudelijke reden.
+  // Afronden gebeurt nu uitsluitend bij het teruggeven (zie `savingsRate6m` /
+  // `effectiveSavingsRatePct` onderaan deze loader).
   const { effectiveSavingsRatePct: coreEffectiveSavingsRate } = resolveSavingsSource({
     incomeSource: (profileResult.data as { income_source?: string | null } | null)?.income_source,
     expensesSource: (profileResult.data as { expenses_source?: string | null } | null)?.expenses_source,
     netMonthlyIncome: profileMonthlyIncome,
     estimatedAnnualIncome: extrapolatedIncome,
     estimatedMonthlyExpenses: profileMonthlyExpenses,
-    savingsRate6m: Math.round(computedSavingsRate6m * 10) / 10,
+    savingsRate6m: computedSavingsRate6m,
     // De spaarquote VOLGT de grondslag (ADR 0103) — geen aparte instelbare bron.
     basis: {
       income: annualIncomeResolution.basis,
@@ -1542,7 +1553,7 @@ export const loadCoreData = cache(async function loadCoreData(
     // De grondslag-geresolveerde quote (ADR 0103) — dezelfde waarde die
     // hierboven de gezondheidsscore voedt, nu ook op de bundel zodat de
     // cashflow-kaart hem kan tonen i.p.v. de rauwe transactiemeting.
-    effectiveSavingsRatePct: coreEffectiveSavingsRate,
+    effectiveSavingsRatePct: Math.round(coreEffectiveSavingsRate * 10) / 10,
     savingsRateMonths: dataMonths6,
     savingsRateMethod,
     savingsReceiptData: {

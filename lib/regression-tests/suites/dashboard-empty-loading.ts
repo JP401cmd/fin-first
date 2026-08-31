@@ -127,7 +127,10 @@ function makeEmptyDashboardData(): DashboardData {
     topLifeEvents: [],
     // Savings & Budgeting
     savingsRate6m: 0,
-    monthlySavingsAmount: 0,
+    effectiveSavingsRatePct: 0,
+    effectiveMonthlySavings: 0,
+    savingsRateIncomeBasis: 'profile',
+    savingsRateExpensesBasis: 'profile',
     savingsRateIsEstimate: false,
     monthlySavingsBudgetSpent: 0,
     savingsBudgetSpent6m: 0,

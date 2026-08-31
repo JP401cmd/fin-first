@@ -28,7 +28,7 @@ function input(overrides: Partial<NextStepInput> = {}): NextStepInput {
     netWorth: 180_000,
     emergencyMonthsCovered: 6,
     emergencyTargetMonths: 6,
-    savingsRate6mPct: 32,
+    savingsRatePct: 32,
     monthlyIncome: 4_500,
     monthlyRecurringAmount: 1_200,
     budgetsOverLimit: 0,
@@ -48,7 +48,7 @@ function makeData(nextSteps: DashboardData['nextSteps']): DashboardData {
 // Post-onboarding gebruiker met werk aan de winkel in alle drie de modules.
 const GROEI_INPUT = input({
   emergencyMonthsCovered: 1.8,
-  savingsRate6mPct: 8,
+  savingsRatePct: 8,
   budgetsOverLimit: 2,
   openActionCount: 4,
   freedomDaysOpen: 18.4,

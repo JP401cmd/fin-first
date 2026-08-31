@@ -19,6 +19,7 @@ import {
   formatFreedomRateFootnote,
   formatFreedomTimeString,
 } from '@/lib/format'
+import { BASIS_LABEL, savingsRateBasisLabel } from '@/lib/budget-basis'
 import type {
   BasisSource,
   BudgetBasisEntry,
@@ -28,16 +29,12 @@ import type {
 import type { CashflowSettingsData } from '@/lib/cashflow-settings-data'
 
 /**
- * Menselijk label per grondslag — het harde acceptatiecriterium uit ADR 0103:
- * elke kaart benoemt waar zijn getal vandaan komt. Een grondslag die kan
- * schuiven zonder zich bekend te maken is een tweede waarheid met vertraging.
+ * Menselijk label per grondslag. Woont sinds 31 aug 2026 in
+ * `lib/budget-basis.ts` — de forecast-kaart en de spaarquote-widget benoemen
+ * dezelfde grondslag en moeten letterlijk dezelfde woorden gebruiken. Hier
+ * alleen nog her-geëxporteerd voor de bestaande call-sites.
  */
-export const BASIS_LABEL: Record<ResolvedBasis, string> = {
-  budget: 'uit je budgetten',
-  transaction: 'uit je transacties',
-  manual: 'eigen invoer',
-  profile: 'uit je profiel',
-}
+export { BASIS_LABEL }
 
 /**
  * Instellingenblok onderaan /overzicht/cashflow — inkomen, uitgaven en
@@ -228,8 +225,9 @@ export function CashflowInstellingenBlok({
   const showDerivedReceipt = !bothTransaction
   const showEstimateNote = bothTransaction && data.savingsRateMethod !== 'transaction'
 
-  const savingsBasisLabel =
-    incomeBasis === expensesBasis ? BASIS_LABEL[incomeBasis] : 'gemengde grondslag'
+  // Gedeelde helper (lib/budget-basis.ts): de forecast-kaart en de
+  // spaarquote-widget benoemen dezelfde grondslag met dezelfde woorden.
+  const savingsBasisLabel = savingsRateBasisLabel(incomeBasis, expensesBasis)
   const savingsSub = showTxReceipt
     ? 'laatste 6 maanden'
     : showEstimateNote

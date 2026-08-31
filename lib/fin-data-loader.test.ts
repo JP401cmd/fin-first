@@ -18,17 +18,50 @@ vi.mock('@/lib/supabase/cached-user', () => ({
   getCachedUser: vi.fn(async () => ({ id: 'u1' })),
 }))
 
+/**
+ * Het spaarquote-parameterdoel CONSUMEERT sinds 31 aug 2026 de gedeelde
+ * forecast-laag (`loadForecastSectionData`) in plaats van een eigen kopie van de
+ * loader-formule te draaien. Hier stubben we precies die ene functie — partieel,
+ * zodat de rest van de module echt blijft — en meten we de BEDRADING: krijgt het
+ * doel het getal dat de canonieke laag zegt? De rekenkundige gelijkheid tussen
+ * doel, widget, forecast-kaart en bundel wordt end-to-end (zonder stubs) bewezen
+ * in lib/spaarquote-eenduidige-grondslag.test.tsx.
+ */
+const { STUB_EFFECTIEVE_SPAARQUOTE, STUB_FORECAST_SCALARS } = vi.hoisted(() => {
+  const pct = 30.0
+  return {
+    STUB_EFFECTIEVE_SPAARQUOTE: pct,
+    STUB_FORECAST_SCALARS: {
+      monthlyIncome: 6000,
+      monthlyExpenses: 4200,
+      savingsRate6m: 9.5,
+      effectiveSavingsRatePct: pct,
+      savingsRateIncomeBasis: 'budget' as const,
+      savingsRateExpensesBasis: 'budget' as const,
+      savingsRateIsEstimate: false,
+      savingsHistory: [],
+      expenseHistory: [],
+    },
+  }
+})
+
+vi.mock('@/lib/cashflow-kpis', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/cashflow-kpis')>()
+  return {
+    ...actual,
+    loadForecastSectionData: vi.fn(async () => STUB_FORECAST_SCALARS),
+  }
+})
+
 import {
   loadFinData,
   isParameterGoal,
   splitActiveGoals,
-  computeParameterSavingsRatePct,
   computeParameterEffectiveSalary,
   computeParameterWeightedReturnPct,
   pickLatestSnapshotFireAge,
   type GoalWithBudget,
 } from './fin-data-loader'
-import type { Debt } from './debt-data'
 
 // ── Fixtures ──────────────────────────────────────────────────────────────
 
@@ -118,79 +151,18 @@ describe('splitActiveGoals — parameter-doelen buiten de max-5-slice', () => {
   })
 })
 
-// ── computeParameterSavingsRatePct ──────────────────────────────────────────
-
-describe('computeParameterSavingsRatePct — canonieke spaarquote-grondslag', () => {
-  const tx6m = [
-    { amount: 30000, budget_id: null, date: '2026-03-01' }, // 6 × 5000 inkomen
-    { amount: -18000, budget_id: null, date: '2026-03-01' }, // 6 × 3000 uitgaven
-  ]
-
-  it('basis: (inkomen − uitgaven) / inkomen', () => {
-    expect(computeParameterSavingsRatePct(tx6m, [], [])).toBe(40) // (30000-18000)/30000
-  })
-
-  it('spaarbudget-uitgaven tellen als sparen (add-back)', () => {
-    const budgets = [{ id: 'b-spaar', budget_type: 'savings', parent_id: null }]
-    const tx = [
-      { amount: 30000, budget_id: null, date: '2026-03-01' },
-      { amount: -18000, budget_id: null, date: '2026-03-01' },
-      { amount: -3000, budget_id: 'b-spaar', date: '2026-03-01' }, // 6 × 500 spaarbudget
-    ]
-    // uitgaven 21000, waarvan 3000 spaarbudget → (30000 − (21000−3000))/30000 = 40
-    expect(computeParameterSavingsRatePct(tx, budgets, [])).toBe(40)
-  })
-
-  it('kind-budget erft savings-type van zijn parent', () => {
-    const budgets = [
-      { id: 'b-parent', budget_type: 'savings', parent_id: null },
-      { id: 'b-child', budget_type: 'expense', parent_id: 'b-parent' },
-    ]
-    const tx = [
-      { amount: 30000, budget_id: null, date: '2026-03-01' },
-      { amount: -18000, budget_id: null, date: '2026-03-01' },
-      { amount: -3000, budget_id: 'b-child', date: '2026-03-01' },
-    ]
-    expect(computeParameterSavingsRatePct(tx, budgets, [])).toBe(40)
-  })
-
-  it('schuldaflossing telt als sparen (via computeDebtAflossingMonthly)', () => {
-    const debts = [
-      {
-        id: 'd1',
-        is_active: true,
-        include_aflossing_in_savings: true,
-        custom_aflossing_amount: 200, // €200/mnd → 6m = 1200
-        net_worth_inclusion_pct: 100,
-        current_balance: 10000,
-      } as unknown as Debt,
-    ]
-    // (30000 − 18000 + 1200)/30000 = 44
-    expect(computeParameterSavingsRatePct(tx6m, [], debts)).toBe(44)
-  })
-
-  it('geen inkomen → undefined (tolerant: laat DB-waarde staan)', () => {
-    expect(computeParameterSavingsRatePct([{ amount: -500, budget_id: null, date: '2026-03-01' }], [], [])).toBeUndefined()
-    expect(computeParameterSavingsRatePct([], [], [])).toBeUndefined()
-  })
-
-  it('negatieve spaarquote blijft eerlijk behouden (geen clamp)', () => {
-    const tx = [
-      { amount: 12000, budget_id: null, date: '2026-03-01' },
-      { amount: -18000, budget_id: null, date: '2026-03-01' },
-    ]
-    expect(computeParameterSavingsRatePct(tx, [], [])).toBe(-50)
-  })
-
-  it('rondt op 1 decimaal', () => {
-    const tx = [
-      { amount: 3000, budget_id: null, date: '2026-03-01' },
-      { amount: -2000, budget_id: null, date: '2026-03-01' },
-    ]
-    // (3000-2000)/3000 = 33.333% → 33.3
-    expect(computeParameterSavingsRatePct(tx, [], [])).toBe(33.3)
-  })
-})
+/*
+ * computeParameterSavingsRatePct — VERWIJDERD (31 aug 2026), met zijn zeven
+ * unit-tests.
+ *
+ * Die tests bewezen dat de KOPIE intern klopte, niet dat ze hetzelfde getal gaf
+ * als de rest van de app — en dat was precies het defect: op productie stond
+ * 5,8 % op de doelkaart naast 9,5 % op de spaarquote-widget en 30 % in het
+ * instellingenblok. Het spaarquote-doel consumeert nu
+ * `loadForecastSectionData(...).effectiveSavingsRatePct`; de vergrendeling van
+ * dat gedrag staat in lib/spaarquote-eenduidige-grondslag.test.tsx, die de
+ * doelwaarde end-to-end naast de bundel- en forecast-waarde legt.
+ */
 
 // ── computeParameterEffectiveSalary ─────────────────────────────────────────
 
@@ -392,10 +364,13 @@ describe('loadFinData — cap-split + lazy injectie (integratie)', () => {
     expect(called).not.toContain('net_worth_snapshots')
   })
 
-  it('savings_rate-parameterdoel krijgt de canonieke 6m-spaarquote geïnjecteerd', async () => {
+  it('savings_rate-parameterdoel consumeert de EFFECTIEVE spaarquote uit de gedeelde laag', async () => {
     goalSeq = 0
     const goals = [paramGoal('savings_rate', { target_value: 50, current_value: 0 })]
-    const { supabase, called } = makeSupabase({
+    // De transacties staan er bewust in: zou het doel nog een eigen rij-lus
+    // draaien, dan kwam er 40 % uit ((30000−18000)/30000) i.p.v. de 30 % die de
+    // canonieke laag zegt — en dan valt deze assertie luid om.
+    const { supabase } = makeSupabase({
       goals,
       transactions: [
         { amount: 30000, budget_id: null, date: '2026-05-01' },
@@ -404,9 +379,8 @@ describe('loadFinData — cap-split + lazy injectie (integratie)', () => {
     })
     const data = await loadFinData(supabase)
 
-    expect(called).toContain('transactions')
-    expect(data.goals[0].current_value).toBe(40) // (30000-18000)/30000
-    expect(data.goalProgresses[0].current).toBe(40)
+    expect(data.goals[0].current_value).toBe(STUB_EFFECTIEVE_SPAARQUOTE)
+    expect(data.goalProgresses[0].current).toBe(STUB_EFFECTIEVE_SPAARQUOTE)
   })
 
   it('ontbrekende bron: current_value blijft op de DB-waarde (geen kunstmatige 0)', async () => {

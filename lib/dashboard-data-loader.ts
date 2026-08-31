@@ -159,6 +159,7 @@ import {
 import { buildBudgetSpendingMap, budgetBarPct, budgetBeschikbaar } from '@/lib/budget-spending'
 import { getCurrentMonthSplits } from '@/lib/budget-spending-fetch'
 import { resolveSavingsSource, savingsRateFromAggregates, computeDebtAflossingMonthly, monthlySavingsFromRate } from './savings-source'
+import { extrapolateAnnualIncome } from '@/lib/retirement-expense-basis'
 import { buildHealthScoreInput, type HealthScoreTransaction } from '@/lib/health-score-input'
 import type { SpendingTxRow } from '@/lib/budget-spending'
 import { computeHealthScoreWithTrend, type HealthScore } from '@/lib/financial-health'
@@ -1026,18 +1027,14 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   }
 
   const last12Income = aggSumPositief(txAgg12, { realOnly: true })
-  let extrapolatedIncome = last12Income
-  // earliestIncomeDateD is hierboven al afgeleid uit de gedeelde 12-maands slice.
-  if (earliestIncomeDateD && last12Income > 0) {
-    const earliest = new Date(earliestIncomeDateD)
-    const incomeMonths = Math.max(1, Math.min(12,
-      (now.getFullYear() - earliest.getFullYear()) * 12 +
-      (now.getMonth() - earliest.getMonth())
-    ))
-    if (incomeMonths < 12) {
-      extrapolatedIncome = (last12Income / incomeMonths) * 12
-    }
-  }
+  // Annualiseren via de gedeelde `extrapolateAnnualIncome` (ADR 0050) i.p.v. een
+  // vierde inline-kopie van dezelfde deler-clamp. Byte-identiek aan de vorige
+  // inline-variant; het verschil in GRONDSLAG (hier transfer-exclusief) zit in de
+  // invoer, niet in de formule. `earliestIncomeDateD` komt uit de ALL-TIME
+  // `getEarliestIncomeDate`-query (`order(date asc).limit(1)`, zie hierboven) —
+  // nadrukkelijk NIET uit de 12-maands slice: die is gecapt en zou het deler-anker
+  // te recent zetten, wat precies de over-extrapolatie geeft die ADR 0050 opruimde.
+  const extrapolatedIncome = extrapolateAnnualIncome(last12Income, earliestIncomeDateD, now)
 
   // JAAR-grondslag (ADR 0103): dezelfde precedentie, op jaarbedragen. Voedt
   // `computeRetirementExpenses` (methode current_income → FIRE-doel) en de
@@ -1077,9 +1074,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // van deze keten zouden precies de dubbele spaarquote geven die de
   // "consume, don't recompute"-regel moet voorkomen.
   //
-  // `isEstimate` = de AGGREGAAT-formule gaf 0 (vóór élke fallback) → stuurt zowel
-  // de delta-tak binnen de helper als, hieronder, het inkomen-anker van
-  // `monthlySavingsAmount` (extIncome6/6 vs. effectiveMonthlyIncome).
+  // `isEstimate` = de AGGREGAAT-formule gaf 0 (vóór élke fallback) → stuurt de
+  // delta-tak binnen de helper, en markeert in de bundel dat de MÉTING een
+  // schatting is (relevant zodra beide grondslagen op 'transaction' staan).
   const savings6m = resolveSavingsRate6m({
     income6m,
     expenses6m,
@@ -1095,15 +1092,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const savingsRateIsEstimate = savings6m.isEstimate
   const savingsRate6m = savings6m.savingsRate6m
 
-  // Canoniek maandspaarbedrag op DEZELFDE grondslag als savingsRate6m (6m-geëxtra-
-  // poleerd, incl. spaarbudgetten + schuldaflossing). Zo geldt altijd
-  // bedrag / inkomen == savingsRate6m en tonen alle oppervlakken één grondslag —
-  // i.p.v. dat de spaarquote-widget zelf een afwijkend huidige-maand-bedrag optelt
-  // (income − expenses + spaarbudget, zónder aflossing). Het inkomen-anker is de
-  // noemer van savingsRate6m: het 6m-gemiddelde in het normale pad, het
-  // profiel/net-worth-delta-inkomen (effectiveMonthlyIncome) op het fallback-pad.
-  const savingsRate6mIncomeMonthly = savingsRateIsEstimate ? effectiveMonthlyIncome : extIncome6 / 6
-  const monthlySavingsAmount = monthlySavingsFromRate(savingsRate6mIncomeMonthly, savingsRate6m)
+  // Het maandspaarbedrag dat bij het GETOONDE percentage hoort wordt hieronder
+  // afgeleid uit `resolveSavingsSource` (`effectiveMonthlySavings`) — dus op de
+  // EFFECTIEVE grondslag, niet op de 6-maands meting. Tot 31 aug 2026 stond hier
+  // een `monthlySavingsFromRate(extIncome6/6, savingsRate6m)`-bedrag; dat hoorde
+  // bij een percentage dat de widget sindsdien niet meer toont.
 
   // ── FIRE-marktaannames: jaarlaag-shadow (Optie 2, DB-override met TS-fallback) ──
   // Vul rendement/inflatie ALLEEN aan met de jaar-geresolveerde markt-default wanneer
@@ -1155,10 +1148,13 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const dashboardSavingsOverride = dashboardSavingsOverrideRaw == null ? null : Number(dashboardSavingsOverrideRaw)
   const {
     baseAnnualSavings: dashboardBaseAnnualSavings,
-    // De EFFECTIEVE spaarquote: handmatige invoer wint over de 6-maands
-    // transactiequote. Dit is exact het percentage dat het instellingenblok
-    // onderaan /overzicht/cashflow toont, en dus het getal waarop de
-    // gezondheidsscore hoort te oordelen (zie healthScoreInput hieronder).
+    // De EFFECTIEVE spaarquote: de gekozen grondslag wint over de 6-maands
+    // transactiemeting. Dit is exact het percentage dat het instellingenblok
+    // onderaan /overzicht/cashflow toont, het getal waarop de gezondheidsscore
+    // oordeelt (zie healthScoreInput hieronder) — en sinds 31 aug 2026 óók het
+    // getal dat de bundel als `effectiveSavingsRatePct` exporteert, zodat de
+    // widget, de forecast-kaart en het spaarquote-doel er niet elk een eigen
+    // versie van tonen (eigenaar-besluit: één spaarquote, app-breed).
     effectiveSavingsRatePct: effectiveSavingsRate,
   } = resolveSavingsSource({
     incomeSource: (profileResult.data as { income_source?: string | null } | null)?.income_source,
@@ -1179,6 +1175,27 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // dashboardSavingsOverride + dashboardBaseAnnualSavings worden als parameters aan
   // buildHorizonInput doorgegeven (dezelfde annualSavings-prioriteit als de
   // /toekomst-hook); de engine-input wordt daar samengesteld (SSoT).
+
+  // Het €-bedrag dat bij de GETOONDE quote hoort. Geen tweede som: het is
+  // letterlijk `baseAnnualSavings` uit `resolveSavingsSource`, gedeeld door twaalf.
+  //
+  // WAT DIT WÉL EN NIET IS (L1/L3, review 31 aug 2026):
+  //  · het is `effectiveAnnualIncome × effectiveSavingsRatePct% / 12`, dus percentage
+  //    en bedrag staan per definitie op DEZELFDE grondslag — dat is de eigenschap
+  //    waar de widget op leunt;
+  //  · het is NIET automatisch het bedrag waarmee de FIRE-prognose rekent. Die
+  //    kiest via `buildHorizonInput` eerst `monthly_savings_override` (handmatig
+  //    gezet door de gebruiker) en pas daarna dit jaarbedrag. Staat die override,
+  //    dan spaart de prognose een ander bedrag dan hier staat — bewust, want de
+  //    override is een expliciete keuze;
+  //  · `bedrag / inkomen == quote` geldt met het JAAR-geresolveerde inkomen
+  //    (`dashboardEffectiveAnnualIncome / 12`), niet met `monthlyIncome` uit de
+  //    maand-resolutie. Op de transactiegrondslag lopen die twee uiteen (12-maands
+  //    extrapolatie vs. de lopende kalendermaand), dus de identiteit is er één per
+  //    grondslag — geen rekenkundige gelijkheid tussen twee vensters.
+  const effectiveMonthlySavings = dashboardBaseAnnualSavings / 12
+  const savingsRateIncomeBasis = dashboardAnnualIncome.basis
+  const savingsRateExpensesBasis = dashboardSavingsExpenses.basis
   const fireStrategy = resolveFireStrategyWithOverride(profileResult.data ?? {})
   const dob = profileResult.data?.date_of_birth ?? null
   const currentAge = dob ? ageAtDate(dob) : null
@@ -2059,7 +2076,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     // maanduitgaven en de canonieke versie door het 6-maands gemiddelde.
     emergencyMonthsCovered: emergencyFund.monthsCovered,
     emergencyTargetMonths: emergencyFund.targetMonths,
-    savingsRate6mPct: savingsRate6m,
+    // DE spaarquote (effectief, grondslag-geresolveerd) — de kaart noemt dit
+    // percentage letterlijk, dus het moet hetzelfde getal zijn als op /overzicht.
+    savingsRatePct: effectiveSavingsRate,
     monthlyIncome: effectiveMonthlyIncome,
     monthlyRecurringAmount: totalRecurringAmount,
     budgetsOverLimit: topBudgets.filter(b => b.budgetType === 'expense' && b.limit > 0 && b.spent > b.limit).length,
@@ -2158,17 +2177,17 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
                 }
               : {}
 
-          // Canonieke spaarquote via de gedeelde formule (savingsRateFromAggregates)
-          // i.p.v. inline in de widget herrekenen. Household toont de gebruiker's
-          // eigen inkomen/uitgaven, dus dezelfde correcties als het persoonlijke
-          // pad: spaarbudgetten uit de uitgaven-term, schuldaflossing erbij. Het
-          // €-spaarbedrag komt via monthlySavingsFromRate uit diezelfde quote →
-          // bedrag / inkomen == quote (geen tweede grondslag op één kaart).
-          const householdSavingsRate = savingsRateFromAggregates(
-            effectiveMonthlyIncome,
-            effectiveMonthlyExpenses - monthlySavingsBudgetSpent,
-            debtAflossingMonthly,
-          )
+          // Huishoud-spaarquote = de EFFECTIEVE quote van de gebruiker zelf
+          // (31 aug 2026). Dat is geen versimpeling maar het wegnemen van een
+          // tweede grondslag: `monthlyIncome`/`monthlyExpenses` in deze override
+          // ZIJN de eigen effectieve bedragen (de partner-RPC levert alleen
+          // bezittingen en schulden), dus er valt hier niets huishoud-breeds te
+          // meten. De vorige inline-formule legde bovendien de spaarbudget-/
+          // aflossingscorrectie — die uitsluitend bij een RÚWE transactiesom
+          // hoort — over effectieve bedragen heen; op een budget- of handmatige
+          // grondslag telde dat hetzelfde spaargeld twee keer, precies de
+          // dubbeltelling die `resolveSavingsSource` documenteert.
+          const householdSavingsRate = effectiveSavingsRate
           householdOverrides = {
             netWorth: netWorth + partnerAssets - partnerDebts,
             totalAssets: totalAssets + partnerAssets,
@@ -2177,8 +2196,13 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
             // (these represent the household's tracked expenses from the user's bank accounts)
             monthlyExpenses: effectiveMonthlyExpenses,
             monthlyIncome: effectiveMonthlyIncome,
+            // Rate en bedrag komen uit één `resolveSavingsSource`-uitkomst en staan
+            // dus op dezelfde grondslag. Let op: `monthlyIncome` hierboven is de
+            // MAAND-resolutie en het bedrag hangt aan de JAAR-resolutie — op de
+            // transactiegrondslag zijn dat twee vensters, dus reken het bedrag niet
+            // terug uit dat inkomen (zie de toelichting bij `effectiveMonthlySavings`).
             savingsRate: Math.round(householdSavingsRate * 10) / 10,
-            monthlySavings: roundCents(monthlySavingsFromRate(effectiveMonthlyIncome, householdSavingsRate)),
+            monthlySavings: roundCents(effectiveMonthlySavings),
             ...fireFields(combinedProj),
           }
 
@@ -2841,12 +2865,19 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     totalRecurringAmount: roundCents(totalRecurringAmount),
     topRecommendations,
     topLifeEvents,
+    // De MÉTING (rauwe 6-maands transactiequote) — alleen te tonen waar hij als
+    // meting gelabeld staat (de transactie-kassabon in het instellingenblok).
     savingsRate6m: Math.round(savingsRate6m * 10) / 10,
-    // Canoniek maandspaarbedrag op savingsRate6m-grondslag (zie berekening boven) —
-    // de spaarquote-widget consumeert dit i.p.v. een eigen huidige-maand-som.
-    monthlySavingsAmount: roundCents(monthlySavingsAmount),
-    // Transparantie: de 6m-quote viel terug op een profiel/net-worth-delta-schatting
-    // (er was geen transactie-gebaseerde 6m-quote). De widget kan dit markeren.
+    // HET spaarquote-getal, app-breed: grondslag-geresolveerd (ADR 0103) + het
+    // €-bedrag op diezelfde grondslag, plus de twee grondslagen zelf zodat elk
+    // oppervlak kan benoemen waar het getal op rust.
+    effectiveSavingsRatePct: Math.round(effectiveSavingsRate * 10) / 10,
+    effectiveMonthlySavings: roundCents(effectiveMonthlySavings),
+    savingsRateIncomeBasis,
+    savingsRateExpensesBasis,
+    // Transparantie: de 6m-MÉTING viel terug op een profiel/net-worth-delta-
+    // schatting (er was geen transactie-gebaseerde 6m-quote). Alleen betekenisvol
+    // voor het getoonde getal wanneer beide grondslagen 'transaction' zijn.
     savingsRateIsEstimate,
     monthlySavingsBudgetSpent: roundCents(monthlySavingsBudgetSpent),
     savingsBudgetSpent6m: roundCents(savingsBudgetSpent6m),

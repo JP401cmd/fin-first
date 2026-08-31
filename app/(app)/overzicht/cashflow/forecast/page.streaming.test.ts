@@ -128,9 +128,25 @@ describe('/overzicht/cashflow/forecast — CashflowSection hangt niet meer aan d
     expect(src).not.toContain('DashboardData')
   })
 
-  it('leest precies de vijf velden en niets meer', () => {
-    expect(src).toContain(
-      'const { monthlyIncome, monthlyExpenses, savingsRate6m, savingsHistory, expenseHistory } = data',
-    )
+  it('destructureert precies de velden die het rendert — en de EFFECTIEVE spaarquote, niet de 6m-meting', () => {
+    // Één destructurering bovenaan het component: alles wat de kaartenrij toont
+    // komt uit de meegegeven scalars, niets wordt eromheen berekend. Sinds
+    // 31 aug 2026 staat daar `effectiveSavingsRatePct` (het app-brede
+    // spaarquote-getal) en NIET `savingsRate6m` — die meting stond op de
+    // forecast-pagina naast een "maandelijks netto" op de ándere grondslag.
+    for (const veld of [
+      'monthlyIncome',
+      'monthlyExpenses',
+      'effectiveSavingsRatePct',
+      'savingsRateIncomeBasis',
+      'savingsRateExpensesBasis',
+      'savingsHistory',
+      'expenseHistory',
+    ]) {
+      expect(src).toContain(veld)
+    }
+    expect(src).toMatch(/\}\s*=\s*data/)
+    // De meting mag hier nergens meer voorkomen — ook niet als terugval.
+    expect(src).not.toContain('savingsRate6m')
   })
 })

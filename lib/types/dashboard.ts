@@ -4,6 +4,7 @@
 // (lib mag deze contracten importeren zonder terug naar components te reiken).
 // Zuiver type-only: geen runtime, geen React-verwijzing.
 
+import type { ResolvedBasis } from '@/lib/budget-basis'
 import type { FireProjection, FireRange, FireCountdown } from '@/lib/horizon-data'
 import type { FreedomMilestoneResult } from '@/lib/freedom-milestones'
 import type { FeeAnalysis } from '@/lib/fee-analysis'
@@ -498,14 +499,34 @@ export interface DashboardData {
   topRecommendations: TopRecommendation[]
   // Enriched widget data: top life events
   topLifeEvents: TopLifeEvent[]
-  // 6-month rolling average savings rate (%)
+  // ── Spaarquote: één getoond getal, één gemeten getal (31 aug 2026) ────────
+  // De RAUWE 6-maands transactiequote (%) — de MÉTING. Blijft in de bundel omdat
+  // het instellingenblok 'm expliciet als transactiequote naast de grondslagkeuze
+  // toont, en omdat de parity-suite hem tegen de slanke forecast-laag vergrendelt.
+  // Toon 'm NERGENS als "de spaarquote" — dat is `effectiveSavingsRatePct`.
   savingsRate6m: number
-  // Canoniek maandspaarbedrag (€) op DEZELFDE grondslag als savingsRate6m
-  // (6m-geëxtrapoleerd, incl. spaarbudgetten + schuldaflossing): bedrag / inkomen
-  // == savingsRate6m. De spaarquote-widget consumeert dit i.p.v. zelf een afwijkend
-  // huidige-maand-bedrag te berekenen (consume-don't-recompute).
-  monthlySavingsAmount: number
-  // De 6m-quote is een schatting (profiel/net-worth-delta-fallback i.p.v. transacties).
+  // DE spaarquote, app-breed: grondslag-geresolveerd via
+  // `resolveSavingsSource(...).effectiveSavingsRatePct` (ADR 0103) — de
+  // gebruikerskeuze budget/handmatig/transactie wint van de meting. Dit is het
+  // percentage dat het instellingenblok, de hefboomkaart op /overzicht, de
+  // gezondheidsscore, de FIRE-prognose, de forecast-kaart, de spaarquote-widget
+  // en het spaarquote-doel tonen. Gelijk aan `savingsRate6m` zolang inkomen én
+  // uitgaven op de transactiegrondslag staan.
+  effectiveSavingsRatePct: number
+  // Het maandelijkse spaarbedrag (€) op DIE grondslag: `baseAnnualSavings / 12`,
+  // dus exact de €-stroom waarmee de FIRE-prognose rekent. Zo geldt altijd
+  // bedrag / inkomen == effectiveSavingsRatePct en spreken het percentage en het
+  // bedrag op één kaart elkaar niet tegen (consume, don't recompute).
+  effectiveMonthlySavings: number
+  // Waar de spaarquote op rust (ADR 0103: elke kaart benoemt zijn grondslag).
+  // Label via `savingsRateBasisLabel(...)`, "is dit de meting?" via
+  // `savingsRateFollowsTransactions(...)` — beide in lib/budget-basis.ts.
+  savingsRateIncomeBasis: ResolvedBasis
+  savingsRateExpensesBasis: ResolvedBasis
+  // De 6m-MÉTING is een schatting (profiel/net-worth-delta-fallback i.p.v.
+  // transacties). Zegt alleen iets over het getoonde getal wanneer
+  // `savingsRateFollowsTransactions(...)` waar is — bij een budget-/handmatige
+  // grondslag komt de quote uit een keuze van de gebruiker, niet uit een schatting.
   savingsRateIsEstimate: boolean
   // Savings-budget amounts (for spaarquote correction)
   monthlySavingsBudgetSpent: number
@@ -522,9 +543,15 @@ export interface DashboardData {
     totalDebts: number
     monthlyExpenses: number
     monthlyIncome: number
-    // Canonieke huishoud-spaarquote (%) via savingsRateFromAggregates + het
-    // bijbehorende €-maandspaarbedrag (bedrag / inkomen == savingsRate) — de
-    // spaarquote-widget consumeert deze i.p.v. inline een afwijkende formule.
+    // Huishoud-spaarquote (%) + het bijbehorende €-maandspaarbedrag. Sinds 31
+    // aug 2026 is dit exact het EFFECTIEVE paar van de gebruiker zelf
+    // (`effectiveSavingsRatePct` / `effectiveMonthlySavings`): `monthlyIncome`
+    // en `monthlyExpenses` hierboven ZIJN de eigen effectieve bedragen — de RPC
+    // levert van de partner alleen bezittingen/schulden — dus een eigen formule
+    // hier zou dezelfde grootheid op een tweede grondslag zetten. De vorige
+    // variant deed dat ook echt: die legde de spaarbudget-/aflossingscorrectie
+    // (die alleen bij een RÚWE transactiesom hoort) over effectieve bedragen
+    // heen, precies de dubbeltelling die resolveSavingsSource vermijdt.
     savingsRate: number
     monthlySavings: number
     freedomPct?: number

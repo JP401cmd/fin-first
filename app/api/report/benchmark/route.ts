@@ -63,7 +63,12 @@ export async function GET() {
       // Gelijk aan /overzicht (horizonData); valt terug op de dashboard-loader.
       healthScoreTotal: horizonData?.healthScore?.total ?? dashboardData.healthScore?.total ?? null,
       fireAgeFractional: dashboardData.fireAgeFractional ?? null,
-      savingsRate6m: dashboardData.savingsRate6m ?? null,
+      // HET spaarquote-getal (effectief, grondslag-geresolveerd) — hetzelfde
+      // percentage dat de gebruiker op /overzicht en in het instellingenblok
+      // ziet. Het benchmark-rapport zet 'm naast een peer-mediaan; op de rauwe
+      // 6-maands meting zou hij met een ander getal vergeleken worden dan de app
+      // toont. Veldnaam volgt het `BenchmarkUserMetrics`-contract.
+      savingsRate6m: dashboardData.effectiveSavingsRatePct ?? null,
       netWorth: dashboardData.netWorth ?? null,
       yearlyIncome,
       // CONSUMEER het canonieke bundelveld (12-mnd rolling, lib/expense-rate.ts).

@@ -123,11 +123,12 @@ export function buildOverviewBriefingInput(
       // consumeren, zodat de briefing-tip nooit een ander aantal vrijheidsdagen
       // noemt dan de CASHFLOW-widget op dezelfde pagina (WF-CANON-06).
       dailyExpenseRate: dashboardData.dailyExpenseRate,
-      // Canonieke 6m-spaarquote (incl. spaarbudgetten + aflossing) — zit al in
+      // DE spaarquote (effectief, grondslag-geresolveerd) — zit al in
       // DashboardData. De engine gebruikt dít voor elke spaarquote-presentatie
-      // i.p.v. een 1-maands surplus, zodat de briefing nooit een ander
-      // spaarpercentage noemt dan de cashflow-pagina.
-      savingsRate6m: dashboardData.savingsRate6m,
+      // i.p.v. een 1-maands surplus of de rauwe 6-maands meting, zodat de
+      // briefing nooit een ander spaarpercentage noemt dan de cashflow-pagina
+      // waarnaar hij linkt.
+      savingsRatePct: dashboardData.effectiveSavingsRatePct,
       budgetExpense: dashboardData.budgetTotals?.expense,
       liquidCash: computeLiquidCash(horizonData),
       freedomPct,

@@ -98,17 +98,33 @@ export const CANONICAL_REGISTRY: CanonicalEntry[] = [
   {
     id: 'spaarquote-6m',
     nr: 2,
-    label: 'Spaarquote (6 maanden)',
+    // Sinds het eigenaar-besluit van 31 aug 2026 ("één spaarquote, app-breed") is het
+    // GETOONDE getal overal `resolveSavingsSource(...).effectiveSavingsRatePct`:
+    // de grondslag-geresolveerde quote (ADR 0103). `savingsRateFromAggregates`
+    // blijft de kernformule erónder — zówel voor de 6-maands meting als voor de
+    // uniforme (I − E) / I op de gekozen grondslag — en dus terecht de `sourceFn`.
+    // Een als METING getoonde quote is nog op DRIE plekken zichtbaar, en daar draagt
+    // de tekst zijn venster: (1) de transactie-kassabon in het instellingenblok,
+    // (2) de check-in-gespreksstarters, en (3) de geldstroom-gauge op
+    // /overzicht/transacties — een PERIODE-quote uit `summarizeFlow`
+    // (lib/transaction-insights.ts, ADR 0020-carve-out zonder aflossingscorrectie)
+    // die zijn `windowLabel` op de kaart draagt.
+    label: 'Spaarquote (effectief, grondslag-geresolveerd)',
     sourceFn: 'savingsRateFromAggregates',
     sourceFiles: ['lib/savings-source.ts'],
     consumers: [
       'cashflow-tegel',
-      'cashflow-instellingenblok + kassabon',
-      'forecast',
+      'cashflow-instellingenblok (kaart = effectief; kassabon = de 6m-meting)',
+      'forecast-kaart',
+      'spaarquote-widget',
+      'spaarquote-doel (parameterdoel)',
       'gezondheidspijler',
       'FIRE-spaarbron',
-      'maand-check-in',
+      'volgende-stap-kaart + briefing',
+      'maand-check-in (de 6m-METING, met venster in de tekst)',
+      'geldstroom-gauge /overzicht/transacties (PERIODE-meting, met venster in de tekst)',
       'deel-kaart',
+      'benchmark-rapport',
       'maandsnapshots',
       'Fin (AI-context)',
     ],

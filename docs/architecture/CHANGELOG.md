@@ -859,3 +859,11 @@
 
 - **API-routes** toegevoegd: /api/wealth-selection
 - **Componenten (aantal)** toegevoegd: +3
+
+## 2026-08-31
+
+- **Componenten (aantal)** toegevoegd: +3
+
+## 2026-08-31
+
+- Geen wijzigingen.

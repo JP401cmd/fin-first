@@ -59,11 +59,14 @@ import {
 } from '@/lib/budget-spending'
 import { getCurrentMonthSplits } from '@/lib/budget-spending-fetch'
 import { loadBudgetBasis } from '@/lib/household/budget-share'
-import type { BudgetBasisRow } from '@/lib/budget-basis'
+import type { BudgetBasisRow, ResolvedBasis } from '@/lib/budget-basis'
 import { localMonthBounds } from '@/lib/month-range'
+import { resolveAmountWithBasis } from '@/lib/effective-financials'
+import { extrapolateAnnualIncome } from '@/lib/retirement-expense-basis'
 import {
   computeSavingsRate6m,
   computeDebtAflossingMonthly,
+  resolveSavingsSource,
   savingsRateWindow,
   savingsRateDataMonths,
 } from '@/lib/savings-source'
@@ -459,8 +462,11 @@ export interface SavingsRate6mOutcome {
  *    houdt het gedrag identiek.
  *  · `isEstimate` blijft de uitkomst van de AGGREGAAT-formule — ook wanneer de
  *    delta-tak een getal levert. De bundel exporteert 'm als
- *    `savingsRateIsEstimate` ("dit is geen transactie-quote") en gebruikt 'm om
- *    het inkomen-anker van `monthlySavingsAmount` te kiezen.
+ *    `savingsRateIsEstimate` ("de MÉTING is geen transactie-quote"). Sinds 31 aug
+ *    2026 stuurt die vlag geen bedrag meer aan — het getoonde €-bedrag hangt aan
+ *    de EFFECTIEVE quote (`effectiveMonthlySavings` = baseAnnualSavings / 12) —
+ *    en zegt alleen nog iets over het scherm wanneer beide grondslagen
+ *    'transaction' zijn (`savingsRateFollowsTransactions`, lib/budget-basis.ts).
  */
 export function resolveSavingsRate6m(input: SavingsRate6mInput): SavingsRate6mOutcome {
   const savings6m = computeSavingsRate6m({
@@ -609,8 +615,39 @@ export interface CashflowSectionScalars {
   monthlyIncome: number
   /** EFFECTIVE maanduitgaven (`expenses_source='manual'` wint) — ADR 0073. */
   monthlyExpenses: number
-  /** Canonieke 6-maands spaarquote (%), afgerond op één decimaal. */
+  /**
+   * De rauwe 6-maands transactieMETING (%), afgerond op één decimaal.
+   *
+   * `CashflowSection` RENDERT dit veld sinds 31 aug 2026 niet meer — de kaart
+   * toont `effectiveSavingsRatePct`. Het blijft in het contract omdat
+   * `cashflow-kpis.forecast-parity.test.ts` deze meting veld-voor-veld tegen de
+   * dashboardbundel vergrendelt: zonder dat anker kan de slanke laag ongemerkt
+   * van de bundel wegdrijven op precies het getal waar de transactie-kassabon in
+   * het instellingenblok op steunt.
+   */
   savingsRate6m: number
+  /**
+   * DE spaarquote (%) die de kaart toont: grondslag-geresolveerd via
+   * `resolveSavingsSource` (ADR 0103), afgerond op één decimaal. Identiek aan
+   * `DashboardData.effectiveSavingsRatePct` — de forecast-pagina zette hier tot
+   * 31 aug 2026 de 6-maands meting neer, náást een "maandelijks netto" dat wél op
+   * de effectieve grondslag stond. Op een productie-account stond daar 9,5 %
+   * naast een overschot dat op datzelfde scherm ~30 % van het inkomen was.
+   */
+  effectiveSavingsRatePct: number
+  /** Grondslag van het inkomen waarop die quote rust (label/marker via lib/budget-basis.ts). */
+  savingsRateIncomeBasis: ResolvedBasis
+  /** Grondslag van de uitgaven waarop die quote rust. */
+  savingsRateExpensesBasis: ResolvedBasis
+  /**
+   * De 6-maands MÉTING viel terug op een profiel- of net-vermogen-delta-schatting
+   * (het aggregaat gaf 0). Alleen betekenisvol voor het GETOONDE getal wanneer
+   * beide grondslagen 'transaction' zijn — dan ís de getoonde quote die meting,
+   * en zegt de kaart "uit je transacties" terwijl er geen transacties in het
+   * venster stonden. Zonder deze vlag kan de forecast-kaart dat niet markeren
+   * zoals de spaarquote-widget dat wél doet; de parity-suite vergrendelt hem mee.
+   */
+  savingsRateIsEstimate: boolean
   /** Spaarquote per snapshot-maand (uit `net_worth_snapshots.savings_rate`). */
   savingsHistory: MonthValue[]
   /** Uitgaven per maand uit het 12-maands maandaggregaat. */
@@ -642,12 +679,18 @@ export interface CashflowSectionScalars {
  *    aggregaten (zie `deriveSavingsHistory`).
  *  · `expenseHistory` — het 12-maands maandaggregaat.
  *
- * ── WAT HIER BEWUST NIET GEBEURT ───────────────────────────────────────────
- * De EFFECTIEVE spaarquote (`resolveSavingsSource`, waar `expenses_source =
- * 'manual'` de transactiequote overrulet) is een ANDER getal dan `savingsRate6m`,
- * en de bundel houdt ze uit elkaar: de kaart toont de 6-maands transactiequote,
- * de gezondheidsscore oordeelt op de effectieve. Die splitsing verhuist hier niet
- * mee — `CashflowSection` las altijd al `savingsRate6m`.
+ * ── DE EFFECTIEVE QUOTE HOORT HIER WÉL (herzien 31 aug 2026) ───────────────
+ * Tot vandaag stond hier dat de effectieve spaarquote (`resolveSavingsSource`,
+ * waar de grondslagkeuze de transactiemeting overruled) NIET meeverhuisde omdat
+ * "`CashflowSection` altijd al `savingsRate6m` las". Dat was de bug, niet de
+ * rechtvaardiging: op een productie-account stond op één en dezelfde
+ * forecast-pagina een maandelijks netto-overschot op de effectieve grondslag —
+ * daar ~30 % van het inkomen — naast "SPAARQUOTE (6m) 9,5 %" (de meting). Sinds
+ * het eigenaar-besluit "één spaarquote, app-breed" is
+ * de effectieve quote HET getal, en levert deze laag hem dus mee — via exact
+ * dezelfde `resolveSavingsSource`-aanroep als `loadDashboardData`, met dezelfde
+ * grondslag-invoer (jaarinkomen uit `extrapolateAnnualIncome`, uitgaven op de
+ * 6-maands meetbasis). De parity-suite vergrendelt beide getallen.
  *
  * RLS: MOET met de anon/authenticated client worden aangeroepen — nooit met
  * getServiceClient(). Zie de koptekst van lib/server-data/base.ts.
@@ -698,14 +741,58 @@ export const loadForecastSectionData = cache(async (supabase: SupabaseClient): P
   const savingsBudgetIds = budgetIdsOfType(buildBudgetTypeMap(budgets), 'savings')
   const window6m = deriveSavingsRate6mWindow(now, txAgg12, savingsBudgetIds)
 
-  const { savingsRate6m } = resolveSavingsRate6m({
+  const earliestIncomeDate = (earliestIncomeResult.data as { date?: string | null } | null)?.date
+
+  const { savingsRate6m, isEstimate: savingsRateIsEstimate } = resolveSavingsRate6m({
     ...window6m,
     debtAflossing6m: computeDebtAflossingMonthly(debts) * 6,
-    dataMonths: deriveDataMonths6(now, (earliestIncomeResult.data as { date?: string | null } | null)?.date),
+    dataMonths: deriveDataMonths6(now, earliestIncomeDate),
     effectiveMonthlyIncome: monthlyIncome,
     effectiveMonthlyExpenses: monthlyExpenses,
     netWorthSnapshots: snapshots,
     assets,
+  })
+
+  // ── De EFFECTIEVE quote: dezelfde assemblage als `loadDashboardData` ───────
+  // Geen tweede formule — `resolveSavingsSource` blijft de enige plek waar de
+  // grondslagkeuze in een percentage wordt omgezet. Wat hier staat is uitsluitend
+  // het samenstellen van dezelfde invoer: jaarinkomen via de gedeelde
+  // `extrapolateAnnualIncome`, uitgaven op de 6-maands MEETBASIS (`expenses6m/6`,
+  // dezelfde meting waar `savingsRate6m` op staat) en de budgetgrondslag uit
+  // `loadBudgetBasis`. De parity-suite draait beide paden tegen dezelfde fixtures.
+  const forecastProfile = profile ?? {}
+  const forecastExtrapolatedIncome = extrapolateAnnualIncome(
+    aggSumPositief(txAgg12, { realOnly: true }),
+    earliestIncomeDate,
+    now,
+  )
+  const forecastAnnualIncome = resolveAmountWithBasis(
+    forecastProfile.income_source,
+    Number(forecastProfile.net_monthly_income ?? 0) * 12,
+    forecastExtrapolatedIncome,
+    forecastBudgetBasis.income.annualTotal,
+  )
+  const forecastSavingsExpenses = resolveAmountWithBasis(
+    forecastProfile.expenses_source,
+    Number(forecastProfile.estimated_monthly_expenses ?? 0),
+    window6m.expenses6m / 6,
+    forecastBudgetBasis.expenses.monthlyTotal,
+  )
+  const { effectiveSavingsRatePct } = resolveSavingsSource({
+    incomeSource: forecastProfile.income_source,
+    expensesSource: forecastProfile.expenses_source,
+    netMonthlyIncome: Number(forecastProfile.net_monthly_income ?? 0),
+    // Terugval binnen `resolveSavingsSource` wanneer de grondslag geen bruikbaar
+    // jaarinkomen geeft — dezelfde waarde als in `loadDashboardData`.
+    estimatedAnnualIncome: forecastExtrapolatedIncome,
+    estimatedMonthlyExpenses: Number(forecastProfile.estimated_monthly_expenses ?? 0),
+    savingsRate6m,
+    basis: {
+      income: forecastAnnualIncome.basis,
+      expenses: forecastSavingsExpenses.basis,
+      annualIncome: forecastAnnualIncome.amount,
+      monthlyExpenses: forecastSavingsExpenses.amount,
+    },
   })
 
   return {
@@ -713,6 +800,10 @@ export const loadForecastSectionData = cache(async (supabase: SupabaseClient): P
     monthlyExpenses,
     // Zelfde afronding als `DashboardData.savingsRate6m` — één decimaal.
     savingsRate6m: Math.round(savingsRate6m * 10) / 10,
+    effectiveSavingsRatePct: Math.round(effectiveSavingsRatePct * 10) / 10,
+    savingsRateIncomeBasis: forecastAnnualIncome.basis,
+    savingsRateExpensesBasis: forecastSavingsExpenses.basis,
+    savingsRateIsEstimate,
     savingsHistory: deriveSavingsHistory(snapshots),
     expenseHistory: deriveExpenseHistory(txAgg12),
   }

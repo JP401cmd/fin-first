@@ -91,12 +91,12 @@ export function buildEngineMetrics(input: BriefingEngineInput): EngineMetrics {
     f.monthlyIncome != null && f.monthlyIncome > 0 &&
     f.monthlyExpenses != null && f.monthlyExpenses > 0
   ) {
-    // Spaarquote-metric op het canonieke 6-maands getal (zelfde getal als de
+    // Spaarquote-metric op de EFFECTIEVE quote (zelfde getal als de
     // briefing-tekst en de cashflow-pagina), met fallback op het 1-maands
-    // (inkomen−uitgaven)/inkomen-cijfer wanneer savingsRate6m ontbreekt.
+    // (inkomen−uitgaven)/inkomen-cijfer wanneer die ontbreekt.
     metrics.savingsRate =
-      f.savingsRate6m != null
-        ? Math.round(f.savingsRate6m)
+      f.savingsRatePct != null
+        ? Math.round(f.savingsRatePct)
         : Math.round((1 - f.monthlyExpenses / f.monthlyIncome) * 100)
     metrics.monthlyIncome = f.monthlyIncome
   }

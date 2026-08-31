@@ -63,8 +63,15 @@ export interface NextStepInput {
   emergencyMonthsCovered: number
   /** emergencyFund.targetMonths uit de bundel (gebruikersdoel of default). */
   emergencyTargetMonths: number
-  /** savingsRate6m (%) uit de bundel. */
-  savingsRate6mPct: number
+  /**
+   * DE spaarquote (%) uit de bundel: `effectiveSavingsRatePct` — het
+   * grondslag-geresolveerde getal dat de gebruiker overal ziet staan (ADR 0103).
+   * Sinds 31 aug 2026 GEEN `savingsRate6m` meer: de kaart noemt het percentage
+   * letterlijk in zijn metric-regel, en dat mag niet een ander getal zijn dan op
+   * /overzicht en in het instellingenblok. Naam bewust hernoemd zodat een
+   * call-site die nog de meting doorgeeft niet stilzwijgend compileert.
+   */
+  savingsRatePct: number
   /** Effectief maandinkomen — noemer voor het vaste-lastenaandeel. */
   monthlyIncome: number
   /** totalRecurringAmount (vaste lasten per maand) uit de bundel. */
@@ -209,7 +216,7 @@ export function computeNextSteps(input: NextStepInput): NextStep[] {
   if (
     input.transactionCount > 0 &&
     input.monthlyIncome > 0 &&
-    input.savingsRate6mPct < VOLGENDE_STAP_SPAARQUOTE_MIN_PCT
+    input.savingsRatePct < VOLGENDE_STAP_SPAARQUOTE_MIN_PCT
   ) {
     add(
       'spaarquote_verhogen', 'kern', 'groei',
@@ -217,7 +224,7 @@ export function computeNextSteps(input: NextStepInput): NextStep[] {
       'Bouw sneller vrijheid op',
       'Elk procent spaarquote erbij haalt je vrijheidsdatum naar voren.',
       '/overzicht/cashflow/budget',
-      { metric: `spaarquote ${nl(input.savingsRate6mPct)}%` },
+      { metric: `spaarquote ${nl(input.savingsRatePct)}%` },
     )
   }
   if (input.budgetsOverLimit > 0) {

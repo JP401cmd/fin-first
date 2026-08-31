@@ -658,13 +658,13 @@ describe('buildBriefingEntries — finance-verrijking', () => {
     expect(sav?.text).toMatch(/meer uit/)
   })
 
-  it('spaarquote gebruikt savingsRate6m wanneer aanwezig (≠ maandcijfer)', () => {
+  it('spaarquote gebruikt de effectieve quote wanneer aanwezig (≠ maandcijfer)', () => {
     // 1-maands cijfer zou 25% zijn; de canonieke 6m-spaarquote is 32%.
     // Het briefje MOET het 6m-getal noemen, niet het maandsurplus.
     const result = buildBriefingEntries(
       emptyInput({
         now: financeNow,
-        finance: { monthlyIncome: 4000, monthlyExpenses: 3000, savingsRate6m: 32 },
+        finance: { monthlyIncome: 4000, monthlyExpenses: 3000, savingsRatePct: 32 },
       }),
     )
     const sav = result.find((e) => e.id === 'finance:savings')
@@ -673,11 +673,11 @@ describe('buildBriefingEntries — finance-verrijking', () => {
     expect(sav?.text).not.toMatch(/25%/)
   })
 
-  it('lage savingsRate6m → spaarquote-framing met het 6m-getal', () => {
+  it('lage effectieve quote → spaarquote-framing met dat getal', () => {
     const result = buildBriefingEntries(
       emptyInput({
         now: financeNow,
-        finance: { monthlyIncome: 4000, monthlyExpenses: 3000, savingsRate6m: 4 },
+        finance: { monthlyIncome: 4000, monthlyExpenses: 3000, savingsRatePct: 4 },
       }),
     )
     const sav = result.find((e) => e.id === 'finance:savings')

@@ -3,6 +3,7 @@
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
+import { savingsRateBasisPhrase, savingsRateFollowsTransactions } from '@/lib/budget-basis'
 import type { CashflowSectionScalars } from '@/lib/cashflow-kpis'
 import type { RecurringItem } from './vaste-kosten-analyse'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
@@ -95,10 +96,13 @@ function expenseTrendWords(delta: number): string {
 
 interface CashflowSectionProps {
   /**
-   * Precies de vijf velden die dit component leest — niet de volle
-   * `DashboardData`. Het type is structureel, dus een caller die alsnog de hele
-   * bundel doorgeeft blijft compileren; de smalle vorm maakt zichtbaar dat de
-   * pagina hiervoor geen dashboard-bundel meer hoeft te laden (ADR 0083).
+   * De smalle scalar-vorm van de forecast-laag — niet de volle `DashboardData`.
+   * Het type is structureel, dus een caller die alsnog de hele bundel doorgeeft
+   * blijft compileren; de smalle vorm maakt zichtbaar dat de pagina hiervoor
+   * geen dashboard-bundel meer hoeft te laden (ADR 0083).
+   *
+   * Dit component rendert `savingsRate6m` NIET (zie de kop hieronder); dat veld
+   * blijft in het contract als parity-anker tussen de slanke laag en de bundel.
    */
   data: CashflowSectionScalars
   /**
@@ -133,18 +137,60 @@ interface CashflowSectionProps {
  * Niet mínder, wél begrijpelijker — het richtingsbesluit van R5. Volledig
  * verandert niet.
  *
- * TWEE VENSTERS, EXPLICIET UIT ELKAAR GEHOUDEN (ADR 0073): `monthlyIncome`/
- * `monthlyExpenses` zijn de EFFECTIVE maandcijfers, `savingsRate6m` is een
- * gemiddelde over ZES maanden. In Eenvoudig staan ze in één kaart, dus draagt
- * elke zin zijn eigen venster in de tekst ("per maand" resp. "over de laatste
- * zes maanden"). Ze worden nergens bij elkaar opgeteld.
+ * ÉÉN GRONDSLAG OVER DE HELE KAARTENRIJ (31 aug 2026). Tot vandaag stond hier
+ * "twee vensters, expliciet uit elkaar gehouden": `monthlyIncome`/
+ * `monthlyExpenses` op de EFFECTIVE grondslag en de spaarquote als 6-maands
+ * transactieMETING ernaast. Dat leverde op een productie-account twee getallen
+ * naast elkaar die elkaar tegenspraken: het maandelijks netto-overschot kwam daar
+ * neer op ~30 % van het inkomen, terwijl de kaart ernaast "SPAARQUOTE (6m) 9,5 %"
+ * zei — dezelfde pagina, dezelfde rij. Sinds het eigenaar-besluit "één
+ * spaarquote, app-breed" (ADR 0121) toont de kaart `effectiveSavingsRatePct`:
+ * dezelfde grondslag als het maandbedrag ernaast, hetzelfde getal als op
+ * /overzicht en in het instellingenblok.
+ *
+ * Daarmee vervalt ook het venster-label "(6m)": het cijfer is geen zes-maands
+ * gemiddelde meer. In plaats daarvan draagt de kaart zijn GRONDSLAG ("volgens je
+ * budgetten" / "volgens je transacties" / "volgens je eigen invoer" / "volgens je
+ * profiel" / "volgens een gemengde grondslag") — het harde acceptatiecriterium uit
+ * ADR 0103, uit dezelfde gedeelde bron als het instellingenblok
+ * (lib/budget-basis.ts).
+ *
+ * Valt de meting terug op een schatting terwijl de grondslag wél "transacties"
+ * zegt (leeg meetvenster), dan markeert de kaart dat — zelfde regel als de
+ * spaarquote-widget.
  */
 export function CashflowSection({ data }: CashflowSectionProps) {
-  const { monthlyIncome, monthlyExpenses, savingsRate6m, savingsHistory, expenseHistory } = data
+  const {
+    monthlyIncome,
+    monthlyExpenses,
+    effectiveSavingsRatePct,
+    savingsRateIncomeBasis,
+    savingsRateExpensesBasis,
+    savingsRateIsEstimate,
+    savingsHistory,
+    expenseHistory,
+  } = data
   const { mode } = useDisplayMode()
   const monthlyCashflow = monthlyIncome - monthlyExpenses
   const isPositiveCashflow = monthlyCashflow >= 0
-  const isPositiveRate = savingsRate6m >= 0
+  const isPositiveRate = effectiveSavingsRatePct >= 0
+  // ÉÉN vorm op deze kaart: de FRASE met voorzetsel ("volgens je budgetten"). De
+  // losse `BASIS_LABEL`-vorm ("uit je budgetten") staat elders onder een cijfer en
+  // werkt daar, maar hier komt de grondslag óók in een lopende zin te staan — en
+  // dan liep hij stuk op twee van de vijf mogelijke waarden: "Van je inkomen eigen
+  // invoer hou je 30 % over" en "… gemengde grondslag hou je …". Zie `BASIS_PHRASE`
+  // in lib/budget-basis.ts. De frase leest óók als kicker ("Spaarquote volgens je
+  // eigen invoer"), dus één vorm volstaat en er valt niets te verwisselen.
+  // "Geschat" hoort ALLEEN bij een quote die daadwerkelijk de 6-maands meting is
+  // — dezelfde regel als de spaarquote-widget. Staat de gebruiker op budgetten of
+  // eigen bedragen, dan komt het getal uit zijn eigen keuze en zou de markering
+  // liegen; staat hij op transacties met een leeg venster, dan zégt de kaart
+  // "volgens je transacties" terwijl er een profiel-/vermogensdelta-schatting
+  // onder ligt — en dat hoort de lezer te weten.
+  const basisPhrase = savingsRateBasisPhrase(savingsRateIncomeBasis, savingsRateExpensesBasis)
+  const toontSchatting =
+    savingsRateIsEstimate &&
+    savingsRateFollowsTransactions(savingsRateIncomeBasis, savingsRateExpensesBasis)
   const trendDelta = expenseTrendDelta(expenseHistory)
 
   const CashflowIcon = isPositiveCashflow
@@ -173,11 +219,14 @@ export function CashflowSection({ data }: CashflowSectionProps) {
             <span className="text-xs text-[var(--ink-3)]">per maand</span>
           </div>
           {/* Spaarquote in woorden — het percentage blijft staan als maat, maar
-              in een zin met zijn eigen venster erbij, niet als kaal getal. */}
+              in een zin met zijn grondslag erbij, niet als kaal getal. Het is
+              geen zes-maands gemiddelde meer (zie de kop van dit bestand), dus
+              zegt de zin waar het cijfer op rust in plaats van over welk venster. */}
           <p className="mt-2 text-sm leading-relaxed text-[var(--ink-2)]">
             {isPositiveRate
-              ? `Over de laatste zes maanden hield je gemiddeld ${savingsRate6m.toFixed(0)}% van je inkomen over.`
-              : 'Over de laatste zes maanden gaf je gemiddeld meer uit dan er binnenkwam.'}
+              ? `Van je inkomen ${basisPhrase} hou je ${effectiveSavingsRatePct.toFixed(0)}% over.`
+              : `Op je cijfers ${basisPhrase} geef je meer uit dan er binnenkomt.`}
+            {toontSchatting && ' Dit is een schatting: er stonden geen transacties in het meetvenster.'}
             {trendDelta != null && ` ${expenseTrendWords(trendDelta)}`}
           </p>
         </div>
@@ -194,11 +243,14 @@ export function CashflowSection({ data }: CashflowSectionProps) {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--ink-3)]">
-                Spaarquote <span className="normal-case tracking-normal">(6m)</span>
+                Spaarquote <span className="normal-case tracking-normal">{basisPhrase}</span>
               </p>
               <p className={`mt-1 font-mono text-lg font-semibold tabular-nums ${isPositiveRate ? 'text-positive' : 'text-negative'}`}>
-                {savingsRate6m.toFixed(1)}%
+                {effectiveSavingsRatePct.toFixed(1)}%
               </p>
+              {toontSchatting && (
+                <p className="mt-0.5 text-[11px] text-[var(--ink-4)]">geschat</p>
+              )}
             </div>
             {savingsHistory.length >= 2 && (
               <MiniSparkline
@@ -212,7 +264,7 @@ export function CashflowSection({ data }: CashflowSectionProps) {
           <div className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-[var(--subtle)]">
             <div
               className={`h-full rounded-full ${isPositiveRate ? 'bg-positive' : 'bg-negative'}`}
-              style={{ width: `${Math.min(Math.abs(savingsRate6m), 100)}%` }}
+              style={{ width: `${Math.min(Math.abs(effectiveSavingsRatePct), 100)}%` }}
             />
           </div>
         </div>

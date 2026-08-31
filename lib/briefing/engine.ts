@@ -132,12 +132,16 @@ export interface BriefingFinanceInput {
   dailyExpenseRate?: number
   /** Maandinkomen — basis voor de maand-observatie (déze-maand-surplus). */
   monthlyIncome?: number
-  /** Canonieke 6-maands spaarquote (%) incl. spaarbudgetten + schuldaflossing —
-   *  exact het getal onderaan /overzicht/cashflow. Wanneer aanwezig is dít de
-   *  bron voor elke spaarquote-presentatie; het 1-maands (inkomen−uitgaven)/
-   *  inkomen-cijfer blijft alleen voor de "deze maand meer uitgegeven dan
-   *  binnenkwam"-observatie. Zie lib/savings-source.ts / dashboard-data-loader. */
-  savingsRate6m?: number | null
+  /** DE spaarquote (%): het grondslag-geresolveerde `effectiveSavingsRatePct`
+   *  uit de bundel (ADR 0103) — exact het getal onderaan /overzicht/cashflow, op
+   *  de hefboomkaart en op de spaarquote-widget. Wanneer aanwezig is dít de bron
+   *  voor elke spaarquote-presentatie; het 1-maands (inkomen−uitgaven)/inkomen-
+   *  cijfer blijft alleen voor de "deze maand meer uitgegeven dan binnenkwam"-
+   *  observatie. Was tot 31 aug 2026 `savingsRate6m` (de rauwe meting) — daarmee
+   *  noemde de briefing een ander percentage dan de pagina waarnaar hij linkt.
+   *  Naam bewust hernoemd zodat een call-site die nog de meting doorgeeft niet
+   *  stilzwijgend compileert. Zie lib/savings-source.ts / dashboard-data-loader. */
+  savingsRatePct?: number | null
   /** Uitgaven-budget deze maand — voor de budgetdruk-heads-up. */
   budgetExpense?: { spent: number; limit: number }
   /** Liquide cash die stilstaat — voor de cash-drag-tip. */
@@ -572,13 +576,13 @@ function buildFinanceEntries(finance: BriefingFinanceInput, now: Date): Briefing
     // binnenkwam"-observatie (expliciet een déze-maand-signaal).
     const monthSavings = income - finance.monthlyExpenses
     const days = freedomDaysLabel(monthSavings, dailyExp)
-    // Spaarquote-PRESENTATIE op het canonieke 6-maands getal (incl.
-    // spaarbudgetten + schuldaflossing) — exact wat de cashflow-pagina toont.
-    // Valt terug op het 1-maands-percentage wanneer savingsRate6m ontbreekt
-    // (no-finance-pad blijft byte-identiek; geen verzonnen getallen).
+    // Spaarquote-PRESENTATIE op de EFFECTIEVE, grondslag-geresolveerde quote —
+    // exact wat de cashflow-pagina toont. Valt terug op het 1-maands-percentage
+    // wanneer die ontbreekt (no-finance-pad blijft byte-identiek; geen verzonnen
+    // getallen).
     const ratePct =
-      finance.savingsRate6m != null
-        ? Math.round(finance.savingsRate6m)
+      finance.savingsRatePct != null
+        ? Math.round(finance.savingsRatePct)
         : Math.round((monthSavings / income) * 100)
     if (monthSavings < 0) {
       out.push({

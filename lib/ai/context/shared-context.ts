@@ -159,7 +159,7 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     `Maandinkomen: ${formatCurrency(rawFinancials.monthlyIncome)} | Maanduitgaven: ${formatCurrency(rawFinancials.monthlyExpenses)}`,
     monthlyMustExpenses > 0 ? `Must-uitgaven (essentieel): ${formatCurrency(monthlyMustExpenses)}/mnd` : null,
     monthlyRetirementExpenses > 0 ? `Jaarlijkse uitgave na retirement: ${formatCurrency(monthlyRetirementExpenses)}/mnd (methode: ${coreData.retirementMethodUsed}) — basis voor FIRE & vrijheidsdagen` : null,
-    `Spaarquote: ${formatPercentage(coreData.savingsRate6m)} — canonieke 6-maands spaarquote incl. sparen in budgetten + schuldaflossing (exact hetzelfde getal als onderaan de cashflow-pagina). Gebruik dit getal letterlijk; herbereken het NIET uit inkomen/uitgaven.`,
+    `Spaarquote: ${formatPercentage(coreData.effectiveSavingsRatePct)} — DE spaarquote: grondslag-geresolveerd (budget/transactie/handmatig, ADR 0103). Exact hetzelfde getal als onderaan /overzicht/cashflow — dat instellingenblok leest deze ééne loader, dus daar kan het niet uiteenlopen. De hefboomkaart op /overzicht en de spaarquote-widget draaien op dezelfde formule via hun eigen loader en tonen hetzelfde percentage, op afronding en één bekende grondslagafwijking na (de spaarbudget-correctie telt hier bruto én transfer-inclusief). Gebruik dit getal letterlijk; herbereken het NIET uit inkomen/uitgaven.`,
     `Dagen vrijheid verdiend per maand: ${core.daysWonPerMonth}`,
     `Vrije dagen per jaar (passief inkomen): ${core.freeDaysPerYear}`,
     `Autonomiescore: ${core.autonomyScore}`,
