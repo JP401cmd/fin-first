@@ -83,6 +83,12 @@ export interface DebtQuickInput {
    * `buildDebtDraft` valt terug op de berekende default
    * (`computeDefaultMonthlyPayment`). Types met een eigen maandbedrag-pad
    * (payment_plan via field3, belastingschuld, creditcard) laten dit leeg.
+   *
+   * Bepaalt óók `debts.end_date`: saldo, rente en aflossingsvorm leggen bij
+   * een gegeven maandbedrag de looptijd vast, dus `buildDebtDraft` leidt de
+   * einddatum hieruit af in plaats van uit `DEFAULT_TERM_YEARS_PER_TYPE` —
+   * deze types krijgen in de wizard immers geen looptijdveld te zien. Levert
+   * die afleiding niets plausibels op, dan blijft `end_date` leeg.
    */
   monthly_payment?: number | null
   /**

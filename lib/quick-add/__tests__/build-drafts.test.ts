@@ -24,6 +24,15 @@ function addYearsIso(startIso: string, years: number): string {
   return d.toISOString().split('T')[0]
 }
 
+// Spiegelt `addMonthsIso` uit lib/debt-term-basis.ts. Bewust lokaal herhaald
+// (net als addYearsIso hierboven) zodat de assertion het aantal maanden
+// vastlegt en niet de datumrekenkunde van de implementatie napraat.
+function addMonthsIso(startIso: string, months: number): string {
+  const d = new Date(startIso)
+  d.setMonth(d.getMonth() + months)
+  return d.toISOString().split('T')[0]
+}
+
 describe('buildAssetDraft', () => {
   it('savings: zet bank in institution en gebruikt TYPICAL_RETURNS.savings', () => {
     const draft = buildAssetDraft({
@@ -352,9 +361,69 @@ describe('buildDebtDraft', () => {
     })
     expect(draft.monthly_payment).toBe(450)
     expect(draft.minimum_payment).toBe(450)
-    // Overige afleiding blijft intact (rente, looptijd 5j).
     expect(draft.interest_rate).toBe(6.5)
-    expect(draft.end_date).toBe(addYearsIso(todayIso(), 5))
+    // De einddatum volgt uit saldo + maandbedrag + rente, niet uit de stille
+    // 5-jaar-typedefault: €28.700 tegen 6,5% lost bij €450 per maand in 79
+    // maanden af (annuïteit). De gebruiker krijgt voor dit type geen
+    // looptijdveld te zien, dus de default zou hier een verzonnen getal zijn.
+    expect(draft.end_date).toBe(addMonthsIso(todayIso(), 79))
+  })
+
+  it('leidt de einddatum af uit het maandbedrag i.p.v. de type-default (bug H2)', () => {
+    // €320 bij €80 per maand is in 4 maanden weg; de personal_loan-default
+    // van 5 jaar maakte hier "60 mnd resterend" van.
+    const draft = buildDebtDraft({
+      debt_type: 'personal_loan',
+      name: 'Kleine lening',
+      current_balance: 320,
+      field3: 0,
+      monthly_payment: 80,
+    })
+    expect(draft.monthly_payment).toBe(80)
+    expect(draft.end_date).toBe(addMonthsIso(todayIso(), 4))
+    expect(draft.end_date).not.toBe(addYearsIso(todayIso(), 5))
+  })
+
+  it('volgt het lineaire pad voor een lineair afgelost type', () => {
+    // familielening = lineair: aflossing = maandbedrag − rente over het saldo.
+    // €20.000 bij 0% en €250 per maand ⇒ 80 maanden (default was 10 jaar).
+    const draft = buildDebtDraft({
+      debt_type: 'familielening',
+      name: 'Lening ouders',
+      current_balance: 20000,
+      field3: 0,
+      monthly_payment: 250,
+    })
+    expect(draft.repayment_type).toBe('lineair')
+    expect(draft.end_date).toBe(addMonthsIso(todayIso(), 80))
+  })
+
+  it('laat de einddatum leeg als het maandbedrag de rente niet dekt', () => {
+    // €10.000 tegen 12% kost €100 rente per maand; met €50 lost de schuld
+    // nooit af. Geen einddatum is dan eerlijker dan een afgeronde aanname —
+    // alle consumers guarden al op een ontbrekende end_date.
+    const draft = buildDebtDraft({
+      debt_type: 'personal_loan',
+      name: 'Dure lening',
+      current_balance: 10000,
+      field3: 12,
+      monthly_payment: 50,
+    })
+    expect(draft.monthly_payment).toBe(50)
+    expect(draft.end_date).toBeNull()
+  })
+
+  it('een expliciete looptijd wint van de afleiding uit het maandbedrag', () => {
+    // Beide ingevuld ⇒ de looptijd is het directe antwoord van de gebruiker.
+    const draft = buildDebtDraft({
+      debt_type: 'personal_loan',
+      name: 'Lening',
+      current_balance: 320,
+      field3: 0,
+      monthly_payment: 80,
+      term_years: 3,
+    })
+    expect(draft.end_date).toBe(addYearsIso(todayIso(), 3))
   })
 
   it('car_loan: zonder monthly_payment blijft de berekende default staan (regressie)', () => {

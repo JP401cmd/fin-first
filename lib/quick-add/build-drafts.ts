@@ -24,7 +24,8 @@ import {
   DEFAULT_TERM_YEARS_PER_TYPE,
   computeDefaultMonthlyPayment,
 } from '@/lib/debt-data'
-import { addYearsIso } from '@/lib/debt-term-basis'
+import { deriveRemainingMonths } from '@/lib/debt-remaining-term'
+import { addMonthsIso, addYearsIso } from '@/lib/debt-term-basis'
 import { MAX_TERM_YEARS } from './validation'
 import type { AssetQuickInput, DebtQuickInput } from './types'
 
@@ -257,8 +258,13 @@ export function defaultInterestRate(debt_type: DebtType): number {
 
 /**
  * Bouw een volledige Debt-draft uit de 3-velden-input van stap 3.
- * Berekent `monthly_payment` / `end_date` via de centrale helpers in
- * `lib/debt-data.ts` zodat de full-form logica later niet verschilt.
+ *
+ * `monthly_payment` en `end_date` komen uit de centrale helpers
+ * (`computeDefaultMonthlyPayment` in `lib/debt-data.ts`,
+ * `deriveRemainingMonths` in `lib/debt-remaining-term.ts`) zodat de wizard
+ * geen eigen rekenwerk draagt en de full-form logica later niet verschilt.
+ * De twee velden hangen samen: vult de gebruiker het maandbedrag in, dan
+ * volgt de einddatum daaruit — niet uit de type-default.
  */
 export function buildDebtDraft(input: DebtQuickInput): DebtDraft {
   const {
@@ -339,16 +345,37 @@ export function buildDebtDraft(input: DebtQuickInput): DebtDraft {
     )
   }
 
-  // Einddatum. Met expliciete resterende looptijd ankeren we op vandaag
-  // (resterend ⇒ vandaag + looptijd); zonder invoer op de (echte)
-  // ingangsdatum + type-default — voor het default-pad (start_date=vandaag)
-  // identiek aan het oude gedrag.
-  const end_date =
-    explicitTermYears != null
-      ? addYearsIso(today, explicitTermYears)
-      : years != null && years > 0
-        ? addYearsIso(start_date, years)
-        : null
+  // Einddatum, in aflopende volgorde van hoe hard het antwoord is:
+  //
+  // 1. Een expliciete resterende looptijd is het directe antwoord van de
+  //    gebruiker en ankert op vandaag (resterend ⇒ vandaag + looptijd).
+  // 2. Een expliciet maandbedrag legt de looptijd óók vast — saldo, rente en
+  //    aflossingsvorm bepalen samen wanneer die schuld weg is. De types met
+  //    een maandbedrag-veld (`DEBT_MONTHLY_PAYMENT_FIELD_TYPES`) hebben in de
+  //    wizard géén looptijdveld, dus zonder deze afleiding kreeg een lening
+  //    van €320 bij €80 per maand de stille 5-jaar-default mee (bug H2). Dat
+  //    lekt verder dan de kaart: `computeRenteAflossingsSplit` herrekent het
+  //    maandbedrag als PMT over de gezette einddatum, waarmee het ingevulde
+  //    bedrag helemaal uit beeld verdween. Valt er niets af te leiden (de
+  //    betaling dekt de rente niet, of de looptijd is niet plausibel), dan
+  //    blijft de einddatum leeg — alle consumers guarden daarop, en dat is
+  //    eerlijker dan een verzonnen datum.
+  // 3. Zonder beide: de (echte) ingangsdatum + type-default, ongewijzigd.
+  let end_date: string | null
+  if (explicitTermYears != null) {
+    end_date = addYearsIso(today, explicitTermYears)
+  } else if (explicitMonthly != null) {
+    const derivedMonths = deriveRemainingMonths(
+      current_balance,
+      monthly_payment,
+      interest_rate,
+      repayment,
+      new Date(today),
+    )
+    end_date = derivedMonths != null ? addMonthsIso(today, derivedMonths) : null
+  } else {
+    end_date = years != null && years > 0 ? addYearsIso(start_date, years) : null
+  }
 
   // Hypotheek met annuiteit/lineair = fiscaal aftrekbaar (box 1 eigen woning).
   const is_tax_deductible =

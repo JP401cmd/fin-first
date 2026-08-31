@@ -7,7 +7,10 @@
  * op drie manieren tot stand komen:
  *
  *  1. de gebruiker vulde hem zelf in (wizard-veld "Resterende looptijd" of
- *     het einddatum-veld in het volledige schuldformulier);
+ *     het einddatum-veld in het volledige schuldformulier), of `buildDebtDraft`
+ *     leidde hem af uit een door de gebruiker opgegeven maandbedrag — dat
+ *     bedrag legt bij een gegeven saldo en rente de looptijd vast, dus het
+ *     getal rust op eigen invoer en niet op een aanname van ons;
  *  2. `buildDebtDraft` leidde hem stil af uit `DEFAULT_TERM_YEARS_PER_TYPE`
  *     (hypotheek = 30 jaar) — de gebruiker is dit nooit gevraagd;
  *  3. hij ontbreekt, waarna elk oppervlak zijn eigen terugval hanteert.
@@ -25,6 +28,20 @@ import { DEFAULT_TERM_YEARS_PER_TYPE, type DebtType } from '@/lib/debt-data'
 export function addYearsIso(startIso: string, years: number): string {
   const d = new Date(startIso)
   d.setFullYear(d.getFullYear() + years)
+  return d.toISOString().split('T')[0]
+}
+
+/**
+ * `end_date` als ISO-datum op basis van een startdatum + looptijd in maanden.
+ * Nodig omdat een uit een maandbedrag afgeleide looptijd (zie
+ * `deriveRemainingMonths` in lib/debt-remaining-term.ts) zelden op hele jaren
+ * uitkomt. Rekent met dezelfde `setMonth`-overloop als `amortizationSchedule`
+ * in lib/debt-data.ts, zodat de einddatum en het aflosschema op dezelfde
+ * maand landen.
+ */
+export function addMonthsIso(startIso: string, months: number): string {
+  const d = new Date(startIso)
+  d.setMonth(d.getMonth() + months)
   return d.toISOString().split('T')[0]
 }
 
