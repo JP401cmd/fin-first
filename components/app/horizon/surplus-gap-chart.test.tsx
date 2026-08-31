@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import {
+  SurplusGapChart,
   SurplusGapSummary,
   computeLifetimeTotals,
   type SurplusGapRow,
@@ -56,4 +57,53 @@ describe('SurplusGapSummary privacy-masking', () => {
       expect(screen.queryByText(/5\.000/)).not.toBeInTheDocument()
     })
   }
+})
+
+// ── FIRE-marker & compacte modus ─────────────────────────────────────────────
+
+// Lange horizon zodat de FIRE-lijn (46,58…) binnen het zichtbare bereik valt.
+const LONG_ROWS: SurplusGapRow[] = Array.from({ length: 51 }, (_, i) => ({
+  age: 40 + i,
+  flowIn: 40 + i < 47 ? 10000 : 0,
+  flowOut: 40 + i < 47 ? 2000 : 5000,
+  oneTimeNet: 0,
+  phase: 40 + i < 47 ? 'accumulation' : 'retirement',
+}))
+
+describe('SurplusGapChart — FIRE-marker', () => {
+  it('toont de FIRE-leeftijd op één decimaal, nooit de rauwe fractional', () => {
+    const { container } = render(
+      <SurplusGapChart
+        rows={LONG_ROWS}
+        currentAge={40}
+        endAge={90}
+        fireAge={46.583333333333336}
+        planningMode="fire"
+      />,
+    )
+    const text = container.textContent ?? ''
+    expect(text).toContain('FIRE 46.6')
+    expect(text).not.toContain('46.58333')
+  })
+})
+
+describe('SurplusGapChart — compacte hoogte (kaart-inbedding)', () => {
+  it('respecteert een kleine height in de viewBox en dunt de y-ticks uit', () => {
+    // De half-widget mag maar ~72px grafiek kwijt; vijf y-labels op zo'n
+    // binnenhoogte lopen door elkaar, dus compact = alleen +max / €0 / −max.
+    const { container } = render(
+      <SurplusGapChart
+        rows={LONG_ROWS}
+        currentAge={40}
+        endAge={90}
+        fireAge={null}
+        height={72}
+        showLegend={false}
+      />,
+    )
+    const svg = container.querySelector('svg')
+    expect(svg?.getAttribute('viewBox')).toMatch(/^0 0 \d+ 72$/)
+    const yLabels = (container.textContent ?? '').match(/[+−]€/g) ?? []
+    expect(yLabels.length).toBeLessThanOrEqual(2)
+  })
 })

@@ -108,8 +108,13 @@ export const SurplusGapChart = memo(function SurplusGapChart({
   const W = containerW
   const isDesktop = containerW >= 768
   const H = height ?? (isDesktop ? 200 : 150)
-  const innerW = W - PAD.left - PAD.right
-  const innerH = H - PAD.top - PAD.bottom
+  // Compacte modus voor kaart-inbedding (o.a. de half-widget): met de volle
+  // marges blijft er onder ~100px hoogte vrijwel geen tekengebied over, en
+  // vijf y-labels lopen op zo'n binnenhoogte door elkaar.
+  const compact = H < 100
+  const P = compact ? { top: 8, right: 12, bottom: 14, left: 44 } : PAD
+  const innerW = W - P.left - P.right
+  const innerH = H - P.top - P.bottom
 
   const minAge = visibleMinAge ?? currentAge
   const maxAge = visibleMaxAge ?? endAge
@@ -121,7 +126,7 @@ export const SurplusGapChart = memo(function SurplusGapChart({
 
   const resolveAge = useCallback((clientX: number, svgRect: DOMRect) => {
     const mouseX = ((clientX - svgRect.left) / svgRect.width) * W
-    const relX = mouseX - PAD.left
+    const relX = mouseX - P.left
     if (relX < 0 || relX > innerW) return null
     const age = Math.round(minAge + (relX / innerW) * (maxAge - minAge))
     return Math.max(minAge, Math.min(maxAge, age))
@@ -159,7 +164,7 @@ export const SurplusGapChart = memo(function SurplusGapChart({
   const yMaxRaw = quantile(sortedAbs, 0.95)
   const yMaxAbs = Math.max(yMaxRaw, 1)
 
-  const yZero = PAD.top + innerH / 2
+  const yZero = P.top + innerH / 2
   const yScale = (val: number) => {
     const clamped = Math.max(-yMaxAbs, Math.min(yMaxAbs, val))
     return yZero - (clamped / yMaxAbs) * (innerH / 2)
@@ -173,13 +178,19 @@ export const SurplusGapChart = memo(function SurplusGapChart({
   const xTickAges: number[] = []
   for (let a = Math.ceil(minAge / xStep) * xStep; a <= maxAge; a += xStep) xTickAges.push(a)
 
-  const yTicks = [
-    { val: yMaxAbs, y: yZero - innerH / 2 },
-    { val: yMaxAbs / 2, y: yZero - innerH / 4 },
-    { val: 0, y: yZero },
-    { val: -yMaxAbs / 2, y: yZero + innerH / 4 },
-    { val: -yMaxAbs, y: yZero + innerH / 2 },
-  ]
+  const yTicks = compact
+    ? [
+        { val: yMaxAbs, y: yZero - innerH / 2 },
+        { val: 0, y: yZero },
+        { val: -yMaxAbs, y: yZero + innerH / 2 },
+      ]
+    : [
+        { val: yMaxAbs, y: yZero - innerH / 2 },
+        { val: yMaxAbs / 2, y: yZero - innerH / 4 },
+        { val: 0, y: yZero },
+        { val: -yMaxAbs / 2, y: yZero + innerH / 4 },
+        { val: -yMaxAbs, y: yZero + innerH / 2 },
+      ]
 
   const hovered = hoveredAge !== null ? nets.find(n => n.age === hoveredAge) : null
 
@@ -187,15 +198,15 @@ export const SurplusGapChart = memo(function SurplusGapChart({
   const COLOR_NEG = 'var(--negative)'
 
   const xFireLine = !isPensioenMode && fireAge != null && fireAge >= minAge && fireAge <= maxAge
-    ? PAD.left + xScale(fireAge) : null
+    ? P.left + xScale(fireAge) : null
   const xAowLine = isPensioenMode && aowAgeFractional != null && aowAgeFractional >= minAge && aowAgeFractional <= maxAge
-    ? PAD.left + xScale(aowAgeFractional) : null
+    ? P.left + xScale(aowAgeFractional) : null
 
   const phaseShadeStart = isPensioenMode && aowAgeFractional != null
     ? aowAgeFractional
     : (fireAge ?? null)
   const xShadeStart = phaseShadeStart != null && phaseShadeStart >= minAge && phaseShadeStart <= maxAge
-    ? PAD.left + xScale(phaseShadeStart)
+    ? P.left + xScale(phaseShadeStart)
     : null
 
   const totals = computeLifetimeTotals(visibleRows)
@@ -219,8 +230,8 @@ export const SurplusGapChart = memo(function SurplusGapChart({
         {xShadeStart !== null && (
           <rect
             x={xShadeStart}
-            y={PAD.top}
-            width={Math.max(0, PAD.left + innerW - xShadeStart)}
+            y={P.top}
+            width={Math.max(0, P.left + innerW - xShadeStart)}
             height={innerH}
             fill="var(--subtle)"
             opacity={hasEntered ? 0.6 : 0}
@@ -229,22 +240,22 @@ export const SurplusGapChart = memo(function SurplusGapChart({
         )}
 
         {yTicks.map(({ val, y }) => (
-          <line key={val} x1={PAD.left} x2={PAD.left + innerW} y1={y} y2={y}
+          <line key={val} x1={P.left} x2={P.left + innerW} y1={y} y2={y}
             stroke="var(--border-ed)" strokeWidth={1} strokeDasharray="4 4" />
         ))}
 
-        <line x1={PAD.left} x2={PAD.left + innerW} y1={yZero} y2={yZero}
+        <line x1={P.left} x2={P.left + innerW} y1={yZero} y2={yZero}
           stroke="var(--border-md)" strokeWidth={1.5} />
 
         {yTicks.map(({ val, y }) => (
-          <text key={`yl-${val}`} x={PAD.left - 5} y={y + 4} textAnchor="end" fontSize={9}
+          <text key={`yl-${val}`} x={P.left - 5} y={y + 4} textAnchor="end" fontSize={9}
             fill="var(--ink-4)" fontFamily="var(--font-dm-mono, monospace)">
             {val === 0 ? '€0' : (val > 0 ? '+' : '−') + fmtY(Math.abs(val))}
           </text>
         ))}
 
         {xTickAges.map(age => (
-          <text key={`xl-${age}`} x={PAD.left + xScale(age)} y={H - 4} textAnchor="middle" fontSize={9}
+          <text key={`xl-${age}`} x={P.left + xScale(age)} y={H - 4} textAnchor="middle" fontSize={9}
             fill="var(--ink-4)" fontFamily="var(--font-dm-mono, monospace)">{age}</text>
         ))}
 
@@ -254,8 +265,8 @@ export const SurplusGapChart = memo(function SurplusGapChart({
           const barH = Math.abs(yEnd - yZero)
           const yTop = isPos ? yEnd : yZero
           const isFirstBar = n.age === minAge
-          const cx = PAD.left + xScale(n.age)
-          const x = Math.max(PAD.left, cx - barWidth / 2) + (isFirstBar ? 0 : 0)
+          const cx = P.left + xScale(n.age)
+          const x = Math.max(P.left, cx - barWidth / 2) + (isFirstBar ? 0 : 0)
           const isClipped = Math.abs(n.net) > yMaxAbs
           const fill = isPos ? COLOR_POS : COLOR_NEG
           const staggerSec = Math.min((i / Math.max(nets.length, 1)) * 1.2, 1.2)
@@ -297,19 +308,21 @@ export const SurplusGapChart = memo(function SurplusGapChart({
 
         {xFireLine !== null && (
           <g>
-            <line x1={xFireLine} x2={xFireLine} y1={PAD.top} y2={PAD.top + innerH}
+            <line x1={xFireLine} x2={xFireLine} y1={P.top} y2={P.top + innerH}
               stroke="var(--hor-t, #8a6e42)" strokeWidth={1.5} strokeDasharray="4 2" opacity={0.85} />
-            <text x={xFireLine + 4} y={PAD.top + 10} fontSize={7}
+            <text x={xFireLine + 4} y={P.top + 10} fontSize={7}
               fill="var(--hor-t, #8a6e42)" fontFamily="var(--font-inter, sans-serif)" fontWeight={600}>
-              FIRE {fireAge}
+              {/* Eén decimaal — de rauwe fractional (46.5833…) hoort nooit op
+                  het scherm; spiegelt sim-chart. */}
+              FIRE {fireAge?.toFixed(1)}
             </text>
           </g>
         )}
         {xAowLine !== null && aowAgeFractional != null && (
           <g>
-            <line x1={xAowLine} x2={xAowLine} y1={PAD.top} y2={PAD.top + innerH}
+            <line x1={xAowLine} x2={xAowLine} y1={P.top} y2={P.top + innerH}
               stroke="var(--hor-t, #8a6e42)" strokeWidth={1.8} strokeDasharray="4 2" opacity={0.85} />
-            <text x={xAowLine - 4} y={PAD.top + 10} textAnchor="end" fontSize={7}
+            <text x={xAowLine - 4} y={P.top + 10} textAnchor="end" fontSize={7}
               fill="var(--hor-t, #8a6e42)" fontFamily="var(--font-inter, sans-serif)" fontWeight={600}>
               AOW
             </text>
@@ -317,15 +330,15 @@ export const SurplusGapChart = memo(function SurplusGapChart({
         )}
 
         {hovered && (() => {
-          const hx = PAD.left + xScale(hovered.age)
+          const hx = P.left + xScale(hovered.age)
           const tooltipW = 150
           const tooltipH = 60
-          const tx = Math.max(PAD.left, Math.min(hx - tooltipW / 2, W - PAD.right - tooltipW))
-          const ty = PAD.top + 4
+          const tx = Math.max(P.left, Math.min(hx - tooltipW / 2, W - P.right - tooltipW))
+          const ty = P.top + 4
           const isPos = hovered.net >= 0
           return (
             <g>
-              <line x1={hx} x2={hx} y1={PAD.top} y2={PAD.top + innerH}
+              <line x1={hx} x2={hx} y1={P.top} y2={P.top + innerH}
                 stroke="var(--ink-3)" strokeWidth={1} strokeDasharray="3 3" opacity={0.5} />
               <rect x={tx} y={ty} width={tooltipW} height={tooltipH} rx={4} fill="var(--ink)" opacity={0.94} />
               <text x={tx + tooltipW / 2} y={ty + 13} textAnchor="middle" fontSize={8}

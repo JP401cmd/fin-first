@@ -500,7 +500,11 @@ export const SpendLimitWidget = memo(function SpendLimitWidget({
   if (size === 'half') {
     return (
       <WidgetShell module="kern" size={size} kicker={limit.name} href={href} kickerPosition="left">
-        <div ref={ref} className="flex h-full flex-col justify-center gap-1.5">
+        {/* my-auto i.p.v. justify-center: auto-marges vallen bij overloop terug
+            op 0, zodat een te hoge inhoud alleen onderaan wegvalt — met
+            justify-center knipt de kaart boven én onder tekst half af. */}
+        <div ref={ref} className="flex h-full flex-col">
+          <div className="my-auto flex min-h-0 flex-col gap-1.5">
           {metaRow}
           <div className="text-[12px]">{statusRow}</div>
           {amountRow}
@@ -541,6 +545,7 @@ export const SpendLimitWidget = memo(function SpendLimitWidget({
           )}
           <PaceLine limit={limit} />
           {limit.aggregateTruncationSuspected && <TruncationNote compact />}
+          </div>
         </div>
       </WidgetShell>
     )
@@ -549,7 +554,9 @@ export const SpendLimitWidget = memo(function SpendLimitWidget({
   // ── Quarter (default): status + lopend bedrag vs. grens + reeks ──
   return (
     <WidgetShell module="kern" size={size} kicker={limit.name} href={href} kickerPosition="left">
-      <div ref={ref} className="flex h-full flex-col justify-center gap-1">
+      {/* Zelfde veilige centrering als half — zie de comment daar. */}
+      <div ref={ref} className="flex h-full flex-col">
+        <div className="my-auto flex min-h-0 flex-col gap-1">
         {metaRow}
         <div className="text-[12px]">{statusRow}</div>
         {amountRow}
@@ -561,6 +568,7 @@ export const SpendLimitWidget = memo(function SpendLimitWidget({
             de regel moet op 384px binnen één lijn passen. */}
         <PaceLine limit={limit} compact />
         {limit.aggregateTruncationSuspected && <TruncationNote compact />}
+        </div>
       </div>
     </WidgetShell>
   )

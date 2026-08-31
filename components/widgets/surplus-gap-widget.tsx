@@ -75,13 +75,17 @@ export const SurplusGapWidget = memo(function SurplusGapWidget({ size, data, hre
       <WidgetShell module="horizon" size={size} kicker={KICKER} href={href}>
         <div className="flex h-full flex-col gap-2">
           <div className="flex-1 min-h-0">
+            {/* 72px, niet meer: de half-kaart heeft op mobiel ~113px binnen-
+                hoogte en de samenvatting eronder kost ~33px. Bij 120px schoof
+                de samenvatting óver de grafiek heen (viewBox-hoogte negeert de
+                flex-shrink van de wrapper). */}
             <SurplusGapChart
               rows={simRows as SurplusGapRow[]}
               currentAge={currentAge}
               endAge={endAge}
               fireAge={fireAgeFractional ?? null}
               planningMode={planningMode}
-              height={120}
+              height={72}
               showLegend={false}
             />
           </div>

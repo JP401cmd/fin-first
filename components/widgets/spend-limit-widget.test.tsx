@@ -351,3 +351,21 @@ describe('SpendLimitWidget — tempo van de lopende periode', () => {
     expect(text).not.toContain('212')
   })
 })
+
+describe('SpendLimitWidget — veilige centrering bij overloop', () => {
+  // Op een smalle mobiele kaart kan de bedragregel wrappen en wordt de inhoud
+  // hoger dan de vaste kaarthoogte. `justify-center` knipt dan boven ÉN onder
+  // tekst half af (bug /overzicht 31 aug); auto-marges (`my-auto`) vallen bij
+  // overloop terug op 0, zodat alleen de onderste (minst belangrijke) regel
+  // wegvalt en de potnaam/status leesbaar blijven.
+  it.each(['quarter', 'half'] as const)('%s centreert via my-auto, niet via justify-center', size => {
+    const { container } = render(<SpendLimitWidget size={size} limit={makeLimit()} dailyExp={50} />)
+    // De kicker-rail van de shell mag centreren (één kort label); de
+    // content-kolom — herkenbaar aan de euro-bedragen — niet.
+    const offenders = Array.from(container.querySelectorAll('.justify-center')).filter(el =>
+      (el.textContent ?? '').includes('€'),
+    )
+    expect(offenders).toHaveLength(0)
+    expect(container.querySelector('.my-auto')).not.toBeNull()
+  })
+})
