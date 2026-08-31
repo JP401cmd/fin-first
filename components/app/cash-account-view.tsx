@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useId, useMemo, useDeferredValue } from 'react'
+import { useEffect, useState, useCallback, useId, useMemo, useRef, useDeferredValue } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -141,6 +141,7 @@ export function CashAccountView({
   onNavigateToAccount,
   initialMonth,
   bankLink,
+  onExclusiveOverlayChange,
 }: {
   accountId?: string
   backHref?: string
@@ -148,6 +149,19 @@ export function CashAccountView({
   embedded?: boolean
   onNavigateToAccount?: (accountId: string | undefined) => void
   initialMonth?: string // 'YYYY-MM' format
+  /**
+   * Meldt de host dat dit scherm zélf een overlay toont die het volledige
+   * scherm opeist (het bewerkscherm, en de herwaardering die eruit volgt).
+   * Rendert de host dit component ÍN een overlay — `cash-overview` doet dat in
+   * embedded modus — dan hoort die host terug te treden; anders staan er twee
+   * sheets tegelijk op het scherm (M35, ADR 0039).
+   *
+   * Bewust een melding en geen sluit-opdracht: de host mag niet sluiten. Dit
+   * component leeft ín zijn children en een gesloten BottomSheet rendert
+   * `null`, dus sluiten zou het bewerkscherm mee wegnemen. De host suspendeert
+   * in plaats daarvan (`ShellOverlay`/`BottomSheet` prop `suspended`).
+   */
+  onExclusiveOverlayChange?: (open: boolean) => void
   /**
    * De koppelrij van DÉZE rekening uit de server-loader (`loadCashBankLinks()`,
    * doorgegeven door `cash-overview.tsx`). Fase 7: dit is de ENIGE bron voor het
@@ -290,6 +304,30 @@ export function CashAccountView({
   /** Zichtbaarheid/naam kon niet worden opgeslagen — het bewerkscherm blijft dan open. */
   const [assetSaveError, setAssetSaveError] = useState<string | null>(null)
   const [showRevalue, setShowRevalue] = useState(false)
+
+  /**
+   * M35 — de host treedt terug zolang dit scherm een schermvullende eigen
+   * overlay toont. Bewerkscherm en herwaardering tellen als één keten: de
+   * herwaardering vervángt het bewerkscherm, en zou de host daartussen even
+   * terugkomen dan flitst de onderliggende sheet zichtbaar tussen twee
+   * vensters door.
+   *
+   * De callback loopt via een ref zodat het effect alleen op de keten-toestand
+   * hangt; hing het op de callback-identiteit, dan meldde elke re-render van de
+   * host dezelfde toestand opnieuw.
+   */
+  const exclusiveOverlayOpen = showAssetEdit || showRevalue
+  const exclusiveOverlayChangeRef = useRef(onExclusiveOverlayChange)
+  exclusiveOverlayChangeRef.current = onExclusiveOverlayChange
+  useEffect(() => {
+    exclusiveOverlayChangeRef.current?.(exclusiveOverlayOpen)
+    // Bij unmount de host altijd vrijgeven: een host die teruggetreden blijft
+    // hangen terwijl dit scherm weg is, toont niets meer.
+    return () => {
+      if (exclusiveOverlayOpen) exclusiveOverlayChangeRef.current?.(false)
+    }
+  }, [exclusiveOverlayOpen])
+
   // I-05: confirms i.p.v. kale window.confirm.
   //  - `showDisconnectConfirm`: bevestig loskoppelen van transactie-tracking.
   //  - `ownershipMigration`: na een eigendomswissel de opt-in of ook de
@@ -2889,7 +2927,11 @@ export function CashAccountView({
               onSync={() => { loadAccount(); loadGcAccounts() }}
               onDisconnectBank={() => loadGcAccounts()}
               onReauthorize={() => router.push('/core/cash/connect')}
-              onRevalue={() => setShowRevalue(true)}
+              /* De herwaardering VERVANGT het bewerkscherm — zelfde conventie
+                 als `onDisconnect` hieronder en als `handleSaveAsset`. Liet dit
+                 pad het bewerkscherm openstaan, dan lag de herwaardeer-modal
+                 als derde laag bovenop de rekeningdetail (M35). */
+              onRevalue={() => { setShowAssetEdit(false); setShowRevalue(true) }}
               onSave={handleSaveAsset}
               onCancel={() => setShowAssetEdit(false)}
               onDisconnect={() => { setShowAssetEdit(false); setShowDisconnectConfirm(true) }}

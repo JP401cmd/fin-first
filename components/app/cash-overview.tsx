@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import {
@@ -272,16 +272,38 @@ export function CashOverview({
 
   // Nested account detail modal (only used in embedded mode)
   const [detailAccountId, setDetailAccountId] = useState<string | null>(null)
+  /**
+   * De rekeningdetail meldt hier dat hij zélf een schermvullend venster toont
+   * (bewerken, herwaarderen). Deze overlay treedt dan terug — zie de
+   * `suspended`-prop op de ShellOverlay verderop (M35).
+   */
+  const [detailSubOverlayOpen, setDetailSubOverlayOpen] = useState(false)
+  /** Spiegel van bovenstaande state voor guards die op EVENT-tijd moeten
+   *  oordelen (de Escape-handler hieronder), niet op registratie-tijd. */
+  const detailSubOverlayRef = useRef(detailSubOverlayOpen)
+  detailSubOverlayRef.current = detailSubOverlayOpen
 
   // Capture-phase Escape handler: closes the nested detail modal
   // without also closing the parent FullScreenModal (which uses bubble phase)
   useEffect(() => {
+    // Staat er een venster ÍN de rekeningdetail open, dan is dat het bovenste
+    // venster en hoort Escape daar te landen. Zonder deze uitzondering wint
+    // deze capture-handler (hij stopt de gebeurtenis vóór de sheet 'm ziet) en
+    // sluit één toetsaanslag de hele detailweergave, inclusief het
+    // bewerkscherm waar de gebruiker in stond.
     if (!detailAccountId) return
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopImmediatePropagation()
-        setDetailAccountId(null)
-      }
+      if (e.key !== 'Escape') return
+      // De guard staat BEWUST hier en niet in de effect-conditie, en leest een
+      // ref i.p.v. de state: zo geldt hij op het moment van de toetsaanslag,
+      // niet op het moment van registreren. Een handler die één render (of een
+      // fast-refresh) achterloopt zou anders én de gebeurtenis opslokken
+      // (`stopImmediatePropagation` — het geneste venster ziet 'm dan nooit)
+      // én de detailweergave sluiten. Dat is precies het waargenomen defect:
+      // één Escape sloot alles en er kwam niets terug.
+      if (detailSubOverlayRef.current) return
+      e.stopImmediatePropagation()
+      setDetailAccountId(null)
     }
     document.addEventListener('keydown', handler, true)
     return () => document.removeEventListener('keydown', handler, true)
@@ -1730,6 +1752,13 @@ export function CashOverview({
           kind="sheet"
           size="full"
           title={detailAccountTitle}
+          /* M35 — één overlay tegelijk. Opent de rekeningdetail zélf een
+             schermvullend venster ("Rekening bewerken", herwaarderen), dan
+             treedt deze sheet terug in plaats van eronder te blijven staan.
+             Sluiten kán hier niet: de rekeningdetail is een KIND van deze
+             overlay, en een gesloten sheet rendert `null` — dat zou het
+             bewerkscherm mee wegnemen. Vandaar `suspended` en niet `open`. */
+          suspended={detailSubOverlayOpen}
         >
           {detailAccountId && (
             /* De koppeltoestand reist mee als prop: de rekeningdetail leest 'm
@@ -1739,6 +1768,7 @@ export function CashOverview({
               accountId={detailAccountId}
               embedded
               bankLink={bankLinkRowForAccount(bankLinks, detailAccountId)}
+              onExclusiveOverlayChange={setDetailSubOverlayOpen}
             />
           )}
         </ShellOverlay>

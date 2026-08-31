@@ -79,6 +79,24 @@ type BottomSheetProps = {
    * dit daarom voor de hele pane-familie uit.
    */
   manageHistory?: boolean
+  /**
+   * TERUGTREDEN ZONDER TE SLUITEN. De sheet blijft gemonteerd maar verdwijnt
+   * van het scherm (`display: none`) en geeft focus-trap en Escape op, zodat
+   * een overlay die ÍN zijn children opent het scherm alleen bezit — de
+   * één-overlay-tegelijk-regel van ADR 0039, zonder de boom af te breken.
+   *
+   * Waarom niet gewoon `open={false}`: een gesloten BottomSheet rendert `null`,
+   * dus zijn children en alle React-state daarin verdwijnen. Leeft de geneste
+   * overlay ín die children — zoals het bewerkscherm ín de rekeningdetail
+   * (M35) — dan neemt de ouder het kind mee weg en blijft er niets over. Het
+   * kind zelf blijft bij suspenderen gewoon zichtbaar, want élke BottomSheet
+   * hangt via `createPortal` in `document.body`, buiten dit verborgen paneel.
+   *
+   * Alleen voor dat geval. Is de geneste overlay een SIBLING van de ouder —
+   * zoals `components/future/doel-bewerken-sheet.tsx` het opzet — dan is
+   * `open={false}` de eenvoudiger en juiste weg.
+   */
+  suspended?: boolean
 }
 
 const sizeClasses = {
@@ -89,7 +107,7 @@ const sizeClasses = {
   full: 'md:max-w-5xl',
 } as const
 
-export function BottomSheet({ open, onClose, title, children, size = 'md', initialMobileHeight, footerSlot, actions, belowFloatingNav = false, closeOnBackdropClick = false, manageHistory = true }: BottomSheetProps) {
+export function BottomSheet({ open, onClose, title, children, size = 'md', initialMobileHeight, footerSlot, actions, belowFloatingNav = false, closeOnBackdropClick = false, manageHistory = true, suspended = false }: BottomSheetProps) {
   const [visible, setVisible] = useState(false)
   const [expandedToFull, setExpandedToFull] = useState(false)
   const sheetRef = useRef<HTMLDivElement>(null)
@@ -105,6 +123,9 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
   const exitAnimationInProgress = useRef(false)
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
+  // Zie `handleProgrammaticClose`: de suspend-guard moet op event-tijd gelden.
+  const suspendedRef = useRef(suspended)
+  suspendedRef.current = suspended
 
   // Reduced-motion preference
   const prefersReducedMotion = useRef(false)
@@ -209,6 +230,13 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
   // ── Programmatic close (X / Escape / backdrop click) ───────
 
   const handleProgrammaticClose = useCallback(() => {
+    // Een teruggetreden sheet sluit NOOIT zichzelf: het venster erbovenop
+    // bezit de interactie. De guard leest een ref, zodat hij geldt op het
+    // moment van de gebeurtenis en niet op het moment dat de listener werd
+    // opgehangen — een handler die één render achterloopt (of een die na een
+    // fast-refresh blijft hangen) sluit anders de hele host weg terwijl de
+    // gebruiker alleen het bovenste venster wilde verlaten.
+    if (suspendedRef.current) return
     if (phaseRef.current === 'closing') return
     animateExit()
     onCloseRef.current()
@@ -280,18 +308,23 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
 
   // ── Focus management + trap ────────────────────────────────
 
-  useFocusTrap({ active: visible, containerRef: sheetRef })
+  // Een teruggetreden sheet vangt geen focus meer: de geneste overlay heeft
+  // zijn eigen trap, en twee traps die om dezelfde focus vechten trekken de
+  // cursor uit het bovenste venster terug naar het onzichtbare eronder.
+  useFocusTrap({ active: visible && !suspended, containerRef: sheetRef })
 
   // ── Escape key ─────────────────────────────────────────────
 
   useEffect(() => {
-    if (!visible) return
+    // Escape hoort bij het BOVENSTE venster. Zou de teruggetreden ouder
+    // meeluisteren, dan sloot één toetsaanslag beide lagen tegelijk.
+    if (!visible || suspended) return
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') handleProgrammaticClose()
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [visible, handleProgrammaticClose])
+  }, [visible, suspended, handleProgrammaticClose])
 
   const handleBackdrop = useCallback((e: React.MouseEvent) => {
     if (closeOnBackdropClick && e.target === e.currentTarget) handleProgrammaticClose()
@@ -303,7 +336,13 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
     <div
       ref={backdropRef}
       className={`fixed inset-0 ${belowFloatingNav ? 'z-50' : 'z-[70]'} flex items-end justify-center md:items-center`}
-      style={{ backgroundColor: scrimColor() }}
+      // `display: none` en niet unmounten: de children — en de geneste overlay
+      // die erin leeft — blijven zo gemonteerd mét hun state. Ook de scrim
+      // verdwijnt daarmee, zodat de geneste sheet niet door twee lagen dimming
+      // heen wordt gekeken. `aria-hidden` haalt de teruggetreden laag uit de
+      // toegankelijkheidsboom; die kent immers maar één modaal venster tegelijk.
+      style={{ backgroundColor: scrimColor(), display: suspended ? 'none' : undefined }}
+      aria-hidden={suspended || undefined}
       onClick={handleBackdrop}
     >
       <div

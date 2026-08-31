@@ -90,6 +90,18 @@ type ShellOverlayProps = {
    * lib/pane-url-history.ts (push bij openen, back bij sluiten).
    */
   mobileBackCloses?: boolean
+  /**
+   * Alleen voor kind="sheet". Houd de overlay gemonteerd maar haal 'm van het
+   * scherm zolang een overlay ÍN zijn children het scherm opeist — één overlay
+   * tegelijk (ADR 0039) zonder de children te unmounten. Zie
+   * `BottomSheet.suspended` voor het waarom; kort: `open={false}` neemt de
+   * geneste overlay mee, want een gesloten sheet rendert `null`.
+   *
+   * Bedoeld voor overlays die een heel scherm als children dragen (de
+   * rekeningdetail, M35). Draagt de geneste overlay zichzelf als sibling van
+   * de ouder, gebruik dan gewoon `open`.
+   */
+  suspended?: boolean
   children: ReactNode
 }
 
@@ -111,6 +123,7 @@ export function ShellOverlay({
   footerInfo,
   footer,
   mobileBackCloses = false,
+  suspended = false,
   children,
 }: ShellOverlayProps) {
   // SSR-safe matchMedia hook — bepaalt voor `kind="pane"` of we de SlideInPane
@@ -221,7 +234,7 @@ export function ShellOverlay({
     // bv. pijl-navigatie of share-icons binnen een sheet.
     return (
       <ModalFooterToneProvider tone={destructive ? 'destructive' : 'default'}>
-        <BottomSheet open={open} onClose={onClose} title={title} size={size} actions={actions} footerSlot={footer}>
+        <BottomSheet open={open} onClose={onClose} title={title} size={size} actions={actions} footerSlot={footer} suspended={suspended}>
           {children}
         </BottomSheet>
       </ModalFooterToneProvider>

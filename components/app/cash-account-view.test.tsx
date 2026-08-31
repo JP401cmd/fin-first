@@ -284,6 +284,16 @@ vi.mock('@/components/app/transaction-form', () => ({
   TransactionForm: () => <div data-testid="transaction-form-stub" />,
 }))
 
+// De herwaardeer-modal komt uit `assets-client` — een zwaar scherm waarvan hier
+// alleen telt DÁT het opent. Partiële mock: de overige exports blijven echt,
+// zodat geen andere consument in de boom op een leeg module-object stuit.
+vi.mock('@/components/core/assets-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/components/core/assets-client')>()),
+  ValuationModal: ({ entityName }: { entityName: string }) => (
+    <div data-testid="herwaardeer-modal">{entityName}</div>
+  ),
+}))
+
 import { CashAccountView } from './cash-account-view'
 
 /**
@@ -941,5 +951,116 @@ describe('CashAccountView — companion-asset zonder plaintext rekeningnummer', 
       const requested = String(call!.args[0] ?? '').split(',').map((c) => c.trim())
       expect(requested).not.toContain('account_number')
     })
+  })
+})
+
+/**
+ * M35 — één overlay tegelijk rond "Rekening bewerken".
+ *
+ * Twee lagen stapelden hier op elkaar. Binnen dit bestand liet `onRevalue` het
+ * bewerkscherm openstaan terwijl de herwaardeer-modal erbovenop kwam (drie
+ * lagen); de conventie stond één regel eronder al goed bij `onDisconnect`.
+ * Cross-bestand rendert `cash-overview` dit scherm in een eigen
+ * `<ShellOverlay kind="sheet">`, die er dus ónder bleef staan.
+ *
+ * Sluiten kan die host niet: dit component leeft ín zijn children en een
+ * gesloten BottomSheet rendert `null` — de host zou het bewerkscherm mee
+ * wegnemen. Vandaar een MELDING (`onExclusiveOverlayChange`) waarop de host
+ * terugtreedt (`BottomSheet.suspended`). Bewerkscherm en herwaardering gelden
+ * daarbij als één keten: tussen die twee mag de host niet even terugflitsen.
+ */
+describe('CashAccountView — één overlay tegelijk (M35)', () => {
+  /** Opent het ⋮-menu en daarin "Rekening bewerken". */
+  async function openBewerkscherm() {
+    fireEvent.click(await screen.findByTitle('Instellingen'))
+    fireEvent.click(await screen.findByText('Rekening bewerken'))
+  }
+
+  it('meldt de host dat het bewerkscherm het scherm opeist, en geeft het bij annuleren weer vrij', async () => {
+    setupEnv()
+    const meldingen: boolean[] = []
+    render(
+      <CashAccountView
+        accountId="acc-1"
+        onExclusiveOverlayChange={(open) => meldingen.push(open)}
+      />,
+    )
+
+    await screen.findByRole('heading', { name: 'Betaalrekening' })
+    // Bij het monteren staat er niets open — de host hoort gewoon zichtbaar te
+    // zijn en dat moet ook actief gemeld worden, niet stilzwijgend aangenomen.
+    expect(meldingen.at(-1)).toBe(false)
+
+    await openBewerkscherm()
+    await waitFor(() => expect(meldingen.at(-1)).toBe(true))
+
+    // "Annuleren" komt ook voor in de inline bevestiging van "Budgetteren
+    // uitschakelen"; die staat hier dicht, maar we pakken toch de laatst
+    // gerenderde knop — hetzelfde patroon als de toggle-budget-suite.
+    const annuleer = await screen.findAllByRole('button', { name: 'Annuleren' })
+    fireEvent.click(annuleer[annuleer.length - 1])
+    await waitFor(() => expect(meldingen.at(-1)).toBe(false))
+  })
+
+  it('vervangt het bewerkscherm door de herwaardering i.p.v. er een derde laag op te stapelen', async () => {
+    setupEnv()
+    const meldingen: boolean[] = []
+    render(
+      <CashAccountView
+        accountId="acc-1"
+        onExclusiveOverlayChange={(open) => meldingen.push(open)}
+      />,
+    )
+
+    await screen.findByRole('heading', { name: 'Betaalrekening' })
+    await openBewerkscherm()
+    await waitFor(() => expect(meldingen.at(-1)).toBe(true))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Herwaardeer' }))
+
+    // De herwaardering staat er, het bewerkscherm verdwijnt (de sheet speelt
+    // eerst zijn exit-animatie af, vandaar `waitFor`).
+    expect(await screen.findByTestId('herwaardeer-modal')).toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.queryByRole('heading', { name: 'Rekening bewerken' })).not.toBeInTheDocument(),
+    )
+
+    // En de host blijft de hele overgang teruggetreden: geen enkele
+    // tussentijdse `false`, anders flitst de onderliggende sheet zichtbaar
+    // tussen de twee vensters door.
+    expect(meldingen.at(-1)).toBe(true)
+    expect(meldingen.slice(meldingen.indexOf(true))).not.toContain(false)
+  })
+})
+
+/**
+ * M35-restdefect uit de live-smoke: één Escape in het bewerkscherm sloot ALLES
+ * — daarna nul vensters open én de detailweergave kwam niet terug, terwijl
+ * "Annuleren" wél goed werkte. Deze test isoleert de KIND-kant: geeft dit
+ * scherm de host ook via het Escape-pad weer vrij, of blijft de melding op
+ * `true` hangen (waardoor de host teruggetreden blijft en er niets terugkomt)?
+ */
+describe('CashAccountView — Escape geeft de host weer vrij (M35-restdefect)', () => {
+  it('meldt `false` na Escape in het bewerkscherm, net als na Annuleren', async () => {
+    setupEnv()
+    const meldingen: boolean[] = []
+    render(
+      <CashAccountView
+        accountId="acc-1"
+        onExclusiveOverlayChange={(open) => meldingen.push(open)}
+      />,
+    )
+
+    await screen.findByRole('heading', { name: 'Betaalrekening' })
+    fireEvent.click(await screen.findByTitle('Instellingen'))
+    fireEvent.click(await screen.findByText('Rekening bewerken'))
+    await waitFor(() => expect(meldingen.at(-1)).toBe(true))
+
+    // Escape vanuit een element ÍN het bewerkscherm — zoals in de browser,
+    // waar het doelwit binnen het bovenste venster ligt en de capture-fase op
+    // document dus vóór de bubble-fase komt.
+    fireEvent.keyDown(await screen.findByRole('button', { name: 'Herwaardeer' }), { key: 'Escape' })
+
+    await waitFor(() => expect(meldingen.at(-1)).toBe(false))
   })
 })
