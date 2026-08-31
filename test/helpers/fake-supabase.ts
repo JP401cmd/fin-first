@@ -168,6 +168,17 @@ export interface FakeDb {
   assets?: Row[]
   netWorthSnapshots?: Row[]
   recurringTransactions?: Row[]
+  /** Rollover-carry per budget/periode (`budget_rollovers`). */
+  budgetRollovers?: Row[]
+  /**
+   * Periode-limiet-overrides (`budget_amounts`).
+   *
+   * Deze tabel heeft in de echte database GÉÉN `user_id`-kolom — RLS scopet via
+   * het bovenliggende budget (zie lib/user-data-tables.ts). Daarom gaat hij
+   * bewust NIET door `withUserId`: een stempel zou hier een fantoomkolom
+   * introduceren, precies zoals bij `profiles`.
+   */
+  budgetAmounts?: Row[]
 }
 
 export interface FakeSupabase {
@@ -222,6 +233,9 @@ export function makeSupabase(db: FakeDb): FakeSupabase {
     assets: withUserId(db.assets ?? []),
     net_worth_snapshots: withUserId(db.netWorthSnapshots ?? []),
     recurring_transactions: withUserId(db.recurringTransactions ?? []),
+    budget_rollovers: withUserId(db.budgetRollovers ?? []),
+    // GEEN withUserId — `budget_amounts` heeft geen user_id-kolom (zie FakeDb).
+    budget_amounts: db.budgetAmounts ?? [],
   }
 
   function builder(table: string) {

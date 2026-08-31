@@ -10,9 +10,12 @@
 // bisectie-solve). Op /overzicht is die tak warm; op cashflow niet.
 //
 // HET BESLUIT: EXTRAHEREN, NIET HERBEREKENEN (ADR 0083)
-// De zeven scalars hangen aan VIER fetches die alle vier al `cache()`-gedeeld
-// zijn (`getOwnProfile`, `getBudgets`, `getCurrentMonthTx` uit
-// lib/server-data/base.ts + `getTxAgg12m` uit lib/server-data/tx-aggregates.ts).
+// De zeven scalars hangen aan ZES fetches die alle zes al `cache()`-gedeeld zijn
+// (`getOwnProfile`, `getBudgets`, `getCurrentMonthTx`,
+// `getBudgetRolloversCurrentPeriod`, `getBudgetAmountOverridesUpToCurrentMonth`
+// uit lib/server-data/base.ts + `getTxAgg12m` uit
+// lib/server-data/tx-aggregates.ts). De laatste twee kwamen erbij op 31 aug 2026,
+// toen de budget-LIMIET op de canonieke `computeEffectiveLimit` ging.
 // De afleidingen zelf zijn pure JS. Die afleidingen zijn hierheen VERPLAATST —
 // niet nagebouwd — en `lib/dashboard-data-loader.ts` consumeert exact dezelfde
 // helpers. Eén implementatie, dus geen tweede rekenweg die kan wegdrijven; een
@@ -38,6 +41,8 @@ import {
   getActiveDebts,
   getEarliestIncomeDate,
   getNetWorthSnapshots12m,
+  getBudgetRolloversCurrentPeriod,
+  getBudgetAmountOverridesUpToCurrentMonth,
 } from '@/lib/server-data/base'
 import {
   getTxAgg12m,
@@ -58,6 +63,12 @@ import {
   type SpendingTxRow,
 } from '@/lib/budget-spending'
 import { getCurrentMonthSplits } from '@/lib/budget-spending-fetch'
+import {
+  createEffectiveLimitLookup,
+  type EffectiveLimitContext,
+  type BudgetRollover,
+  type BudgetAmountOverride,
+} from '@/lib/budget-rollover'
 import { loadBudgetBasis } from '@/lib/household/budget-share'
 import type { BudgetBasisRow, ResolvedBasis } from '@/lib/budget-basis'
 import { localMonthBounds } from '@/lib/month-range'
@@ -194,11 +205,40 @@ export { buildBudgetTypeMap }
  * Verplaatst uit `loadDashboardData` (was ~r550-589) — destijds gedragsneutraal,
  * regel voor regel.
  *
- *  1. **De limiet rolt kinderen op** (ONGEWIJZIGD): heeft een parent kinderen,
- *     dan is de limiet de som van de kinder-limieten (anders de eigen
- *     `default_limit`). Daarna genormaliseerd naar een maand (`quarterly` ÷3,
- *     alles wat niet `monthly`/`quarterly` is ÷12).
+ *  1. **De limiet rolt kinderen op**: heeft een parent kinderen, dan is de limiet
+ *     de som van de kinder-limieten (anders zijn eigen limiet). Daarna
+ *     genormaliseerd naar een maand (`quarterly` ÷3, alles wat niet
+ *     `monthly`/`quarterly` is ÷12). Per budget is die limiet sinds 31 aug 2026
+ *     de CANONIEKE effectieve limiet — zie hieronder.
  *  2. **De `spent`-pass volgt sinds 30 aug 2026 de canonieke norm.**
+ *
+ * ## Waarom punt 1 sinds 31 aug 2026 door `computeEffectiveLimit` loopt
+ * Hier stond een kale `Number(b.default_limit)`. Dat is NIET "het budget van deze
+ * maand": `computeEffectiveLimit` (lib/budget-rollover.ts — docstring: "de ENE
+ * bron van waarheid voor wat is het budget deze periode") telt er twee dingen bij
+ * op die de budgetten-pagina en de heatmap-widget wél meenemen:
+ *   · de periode-override uit `budget_amounts` (meest recente
+ *     `effective_from <= displayDate` wint per budget) VERVANGT `default_limit`;
+ *   · de rollover-carry uit `budget_rollovers` voor déze periode komt erbij.
+ * Zonder die twee droegen de Budget-kaart en de budgetten-pagina een andere
+ * limiet — en dus een ander "nog te besteden" — bij een gelijke besteding. De
+ * limiet komt nu per budget uit `createEffectiveLimitLookup`, dezelfde functie die
+ * de heatmap-widget consumeert; er staat hier géén tweede limiet-formule.
+ *
+ * ONGESCHAALD (geen `shareFraction`): deze KPI legt de limiet naast een
+ * ONGESCHAALDE besteding (`buildBudgetSpendingMap` hieronder), dus een pro-rata
+ * huishoud-aandeel op alleen de limiet zou teller en noemer uit elkaar trekken.
+ * De budgetten-pagina schaalt beide kanten wél — dat is een andere blik, geen
+ * andere formule.
+ *
+ * INTERVAL-NORMALISATIE ONGEWIJZIGD: de deling ÷3/÷12 blijft op het PARENT-
+ * interval staan en wordt op de effectieve limiet (base + carry) toegepast — de
+ * carry hoort bij dezelfde periode als de rest van het bedrag en wordt dus
+ * meegenormaliseerd. Dat een kind met een ánder interval dan zijn parent hier
+ * verkeerd binnenkomt is een APART, al geregistreerd aandachtspunt
+ * (`budget-kind-oprol-interval-mismatch` in lib/architecture/archimate-concerns.ts) —
+ * bewust niet in deze wijziging meegenomen, want dat verschuift het getal om een
+ * andere reden en hoort een eigen besluit te zijn.
  *
  * ## Waarom punt 2 is omgedraaid (eigenaar-besluit 30 aug 2026)
  * Hier stond: "de spent-pass heeft GÉÉN transfer-filter … dat is bestaand
@@ -223,19 +263,23 @@ export { buildBudgetTypeMap }
  * parent en child dragen (via de erfregel) hetzelfde type. Elke rij telt zo
  * exact één keer mee — een `spentForBudget`-rollup zou hier dubbeltellen.
  *
- * `splits` is een VERPLICHTE parameter zonder default, spiegel van
- * `buildSpendingSums`/`buildBudgetSpendingMap`: een achtergebleven
- * tweeargument-aanroep breekt op de compiler in plaats van stil de oude,
- * ongefilterde som te herstellen.
+ * `splits` en `limitContext` zijn VERPLICHTE parameters zonder default, spiegel
+ * van `buildSpendingSums`/`buildBudgetSpendingMap`: een achtergebleven aanroep
+ * met te weinig argumenten breekt op de compiler in plaats van stil de oude
+ * grondslag te herstellen (de ongefilterde som, resp. de kale `default_limit`).
  */
 export function deriveBudgetTotals(
   budgets: BudgetRowForTotals[],
   currentMonthTx: SpendingTxRow[],
   splits: ReadonlyArray<SpendingSplitRow>,
+  limitContext: EffectiveLimitContext,
 ): BudgetTotalsByType {
   const parents = budgets.filter(b => b.parent_id === null)
   const children = budgets.filter(b => b.parent_id !== null)
   const budgetTypeMap = buildBudgetTypeMap(budgets)
+  // Canonieke effectieve limiet per budget (periode-override + carry, één maand,
+  // ongeschaald) — geen tweede limiet-formule; zie de docstring hierboven.
+  const effectiveLimitOf = createEffectiveLimitLookup(limitContext)
 
   const budgetLimits: Record<string, number> = { income: 0, expense: 0, savings: 0, debt: 0 }
   for (const b of parents) {
@@ -243,8 +287,8 @@ export function deriveBudgetTotals(
     if (!BUDGET_TYPES.includes(type as BudgetType)) continue
     const kids = children.filter(c => c.parent_id === b.id)
     const limit = kids.length > 0
-      ? kids.reduce((sum, c) => sum + Number(c.default_limit), 0)
-      : Number(b.default_limit)
+      ? kids.reduce((sum, c) => sum + effectiveLimitOf(c), 0)
+      : effectiveLimitOf(b)
     const monthlyLimit = b.interval === 'monthly' ? limit
       : b.interval === 'quarterly' ? limit / 3
       : limit / 12
@@ -498,14 +542,14 @@ export function resolveSavingsRate6m(input: SavingsRate6mInput): SavingsRate6mOu
 // ── De loader ───────────────────────────────────────────────────────────────
 
 /**
- * De zeven scalars die `buildCashflowCards` nodig heeft, uit VIER gedeelde
+ * De zeven scalars die `buildCashflowCards` nodig heeft, uit ZES gedeelde
  * fetches — zonder de rest van `loadDashboardData` (en zonder de koude
  * horizon-tak met haar bisectie-solve).
  *
  * `cache()`-gewrapt op ALLEEN de supabase-client, precies zoals
  * lib/server-data/base.ts: `createClient()` is zelf `cache()`-gewrapt → één
  * instantie per RSC-render, dus pagina en API-route binnen hetzelfde request
- * raken dezelfde entry. De vier onderliggende fetches zijn óók `cache()`-gedeeld,
+ * raken dezelfde entry. De zes onderliggende fetches zijn óók `cache()`-gedeeld,
  * dus draait `loadDashboardData` in hetzelfde request tóch mee (bv. op
  * /overzicht), dan kosten ze daar nul extra queries.
  *
@@ -540,12 +584,20 @@ export const loadCashflowKpis = cache(async (supabase: SupabaseClient): Promise<
   // getarget hebben — een gratis asymmetrie met het pad dat dit moet spiegelen.
   const now = new Date()
 
-  const [profileResult, budgetsResult, txResult, txAgg12Result] = await Promise.all([
-    getOwnProfile(supabase),
-    getBudgets(supabase),
-    getCurrentMonthTx(supabase),
-    getTxAgg12m(supabase),
-  ])
+  const [profileResult, budgetsResult, txResult, txAgg12Result, rolloversResult, amountOverridesResult] =
+    await Promise.all([
+      getOwnProfile(supabase),
+      getBudgets(supabase),
+      getCurrentMonthTx(supabase),
+      getTxAgg12m(supabase),
+      // De twee tabellen achter de CANONIEKE effectieve limiet (rollover-carry +
+      // periode-override). Ze staan in DEZELFDE golf als de rest: ze hangen
+      // nergens van af, dus dit kost een extra query maar geen extra round-trip.
+      // Beide zijn `cache()`-gedeeld met `loadDashboardData`, dus op /overzicht —
+      // waar die loader toch draait — kosten ze daar nul.
+      getBudgetRolloversCurrentPeriod(supabase),
+      getBudgetAmountOverridesUpToCurrentMonth(supabase),
+    ])
 
   const profile = (profileResult.data ?? null) as (Record<string, unknown> & IncomeExpenseSources) | null
   const budgets = (budgetsResult.data ?? []) as unknown as BudgetRowForTotals[]
@@ -555,12 +607,22 @@ export const loadCashflowKpis = cache(async (supabase: SupabaseClient): Promise<
 
   // Split-regels bij DEZELFDE maandrijen — expliciet meegegeven, dus geen
   // tweede maand-fetch, en zonder split-ouders draait er helemaal geen query.
-  // Daarom blijft het querybudget van deze laag 3 (zie de assertie in
+  // Daarom blijft het querybudget van deze laag 5 (zie de assertie in
   // lib/cashflow-kpis.parity.test.ts).
   const monthSplits = await getCurrentMonthSplits(supabase, spendingTx)
 
   // Budget: limiet/besteding per type → de expense-KPI + de dekkings-score.
-  const budgetTotals = deriveBudgetTotals(budgets, spendingTx, monthSplits)
+  // De LIMIET-kant loopt via `computeEffectiveLimit` (periode-override + carry),
+  // dezelfde bron als de budgetten-pagina en de heatmap-widget. `now` levert
+  // periode én displayDate, zodat ze niet uiteen kunnen lopen; de fetches
+  // hierboven vensteren op precies diezelfde maand.
+  const monthStart = localMonthBounds(now).start
+  const budgetTotals = deriveBudgetTotals(budgets, spendingTx, monthSplits, {
+    rollovers: (rolloversResult.data ?? []) as unknown as BudgetRollover[],
+    amountOverrides: (amountOverridesResult.data ?? []) as unknown as BudgetAmountOverride[],
+    period: monthStart.slice(0, 7),
+    displayDate: monthStart,
+  })
 
   // Gerealiseerde maand uit het aggregaat (zie de asymmetrie hierboven).
   const monthKey = currentMonthKey(now)

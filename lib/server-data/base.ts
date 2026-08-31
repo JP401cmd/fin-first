@@ -46,9 +46,16 @@
 //
 // NIET hier thuis: perspectief/household-overlays (loadPerspectiveDataServer),
 // dashboard-specifieke tabellen (life_events, actions, recommendations, goals,
-// investment_holdings, budget_rollovers/_amounts) en de recurring-detectie-fetch
-// in lib/vaste-lasten-summary.ts (eigen kolomset + venster). Die blijven
+// investment_holdings) en de recurring-detectie-fetch in
+// lib/vaste-lasten-summary.ts (eigen kolomset + venster). Die blijven
 // loader-lokaal.
+//
+// `budget_rollovers`/`budget_amounts` stonden op die uitsluitingslijst zolang
+// alleen de dashboard-loader ze las (voor de heatmap-widget); sinds de Budget-KPI
+// haar limiet via de canonieke `computeEffectiveLimit` bepaalt heeft óók
+// `lib/cashflow-kpis.ts#loadCashflowKpis` ze nodig — zie punt 9. Zelfde route als
+// `net_worth_snapshots` hierboven: een tweede lezer maakt er een gedeelde fetcher
+// van, i.p.v. twee loaders die dezelfde rijen apart ophalen.
 //
 // `net_worth_snapshots` stond op die uitsluitingslijst zolang alleen de
 // dashboard-loader het 12-maands-venster las; sinds de forecast-laag
@@ -349,4 +356,49 @@ export const getNetWorthSnapshots12m = cache(async (supabase: SupabaseClient) =>
     .gte('snapshot_date', localMonthStartMonthsAgo(new Date(), 11))
     .order('snapshot_date', { ascending: true })
     .limit(12),
+)
+
+// ── 9. Effectieve budgetlimiet: carry + periode-overrides ──────────────────
+//
+// De twee tabellen die `computeEffectiveLimit` (lib/budget-rollover.ts) nodig
+// heeft om "wat is het budget déze maand" te beantwoorden. Twee lezers, en dat is
+// precies waarom ze hier staan:
+//  · `lib/dashboard-data-loader.ts` — de heatmap-"beschikbaar"-map én (sinds
+//    31 aug 2026) de limiet-kant van `deriveBudgetTotals`;
+//  · `lib/cashflow-kpis.ts#loadCashflowKpis` — diezelfde limiet-kant, zonder de
+//    rest van de dashboardbundel (ADR 0083).
+//
+// De maandgrens wordt hier INTERN uit `new Date()` afgeleid (net als
+// `getCurrentMonthTx`), zodat de cache-sleutel het enkele `supabase`-argument
+// blijft. Dat levert dezelfde `YYYY-MM-01`-string als de `Date.UTC(jaar, maand,
+// 1).toISOString()`-afleiding die de dashboard-loader zelf gebruikt — beide
+// bouwen de grens uit de LOKALE jaar/maand van `now` met dag 01.
+
+/**
+ * De rollover-carry van de HUIDIGE periode (`'YYYY-MM'`), alle budgetten.
+ *
+ * Kolomset = de ruimste van de twee lezers (de dashboard-loader cast de rijen naar
+ * `BudgetRollover`, dat `id`/`user_id`/`created_at` draagt).
+ */
+export const getBudgetRolloversCurrentPeriod = cache(async (supabase: SupabaseClient) =>
+  supabase
+    .from('budget_rollovers')
+    .select('id, user_id, budget_id, period, carried_amount, rollover_type, created_at')
+    .eq('period', localMonthBounds(new Date()).start.slice(0, 7)),
+)
+
+/**
+ * De periode-limiet-overrides die op de huidige maand van toepassing KUNNEN zijn:
+ * `effective_from <= <1e van deze maand>`. De keuze wélke override wint (de meest
+ * recente per budget) blijft in `computeEffectiveLimit` — hier alleen het venster.
+ *
+ * `budget_amounts` heeft GEEN `user_id`-kolom; RLS scopet via het bovenliggende
+ * budget (zie lib/user-data-tables.ts). Deze fetcher mag dus, net als alle andere
+ * hier, UITSLUITEND met de anon/authenticated client draaien.
+ */
+export const getBudgetAmountOverridesUpToCurrentMonth = cache(async (supabase: SupabaseClient) =>
+  supabase
+    .from('budget_amounts')
+    .select('budget_id, effective_from, amount')
+    .lte('effective_from', localMonthBounds(new Date()).start),
 )

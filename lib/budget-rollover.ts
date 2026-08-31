@@ -136,6 +136,76 @@ export function computeEffectiveLimit(params: {
 }
 
 /**
+ * De rijen die een effectieve-limiet-berekening voor ÉÉN periode nodig heeft,
+ * ongeïndexeerd zoals ze uit de database komen.
+ *
+ * `period` en `displayDate` horen bij elkaar: `displayDate` is de 1e van diezelfde
+ * maand (`'YYYY-MM-01'`). Beide meegeven i.p.v. de een uit de ander afleiden,
+ * zodat de aanroeper dezelfde maandgrens gebruikt als zijn eigen queries — een
+ * loader die zijn maand vóór de fetches bemonstert mag daar niet stil van
+ * afwijken.
+ */
+export interface EffectiveLimitContext {
+  /** Rollover-rijen; alleen die van `period` tellen mee (`getCarriedAmount`). */
+  rollovers: BudgetRollover[]
+  /** Periode-overrides; de meest recente met `effective_from <= displayDate` wint. */
+  amountOverrides: BudgetAmountOverride[]
+  /** `'YYYY-MM'` van de getoonde periode. */
+  period: string
+  /** `'YYYY-MM-DD'` — de 1e van diezelfde maand. */
+  displayDate: string
+}
+
+/**
+ * Bouwt één opzoeker `budget → effectieve limiet deze maand` uit een
+ * `EffectiveLimitContext`, met de rijen vooraf per budget geïndexeerd (O(1) per
+ * budget i.p.v. een filter over álle rijen per budget — dezelfde reden waarom
+ * `budgets-client` zijn `budgetAmountsIndex`/`rolloversIndex` memoïseert).
+ *
+ * ELKE consument die "de limiet van dit budget déze maand" nodig heeft consumeert
+ * `computeEffectiveLimit` — via deze opzoeker of rechtstreeks. Een tweede
+ * limiet-formule (kale `default_limit`) laat kaart en pagina uiteenlopen: dat was
+ * precies de melding van 31 aug 2026, waar de Budget-KPI op /overzicht(/cashflow)
+ * de periode-override en de carry niet meenam en de budgetten-pagina wél.
+ *
+ * TWEE VASTE KEUZES, en ze horen bij elkaar:
+ *  · `periodMonthCount = 1` — deze opzoeker beschrijft ÉÉN kalendermaand. De
+ *    meermaands-tak van `computeEffectiveLimit` (YTD/12m-blik op de budgetten-
+ *    pagina) laat de carry bewust vallen; wie die blik nodig heeft roept
+ *    `computeEffectiveLimit` rechtstreeks aan.
+ *  · `shareFraction = 1` — ONGESCHAALD, geen huishoud-aandeel. Correct zolang de
+ *    bijbehorende BESTEDING óók ongeschaald is (de persoonlijke dashboard-/
+ *    KPI-grondslag); zou de limiet hier pro-rata worden en de besteding niet,
+ *    dan lopen teller en noemer uiteen.
+ */
+export function createEffectiveLimitLookup(
+  ctx: EffectiveLimitContext,
+): (budget: { id: string; default_limit: number | string | null }) => number {
+  const rolloversById = new Map<string, BudgetRollover[]>()
+  for (const r of ctx.rollovers) {
+    const list = rolloversById.get(r.budget_id)
+    if (list) list.push(r)
+    else rolloversById.set(r.budget_id, [r])
+  }
+
+  const overridesById = new Map<string, BudgetAmountOverride[]>()
+  for (const a of ctx.amountOverrides) {
+    const list = overridesById.get(a.budget_id)
+    if (list) list.push(a)
+    else overridesById.set(a.budget_id, [a])
+  }
+
+  return (budget) =>
+    computeEffectiveLimit({
+      defaultLimit: Number(budget.default_limit),
+      rollovers: rolloversById.get(budget.id) ?? [],
+      amountOverrides: overridesById.get(budget.id) ?? [],
+      period: ctx.period,
+      displayDate: ctx.displayDate,
+    })
+}
+
+/**
  * Format a period string from a Date.
  */
 export function formatPeriod(date: Date): string {

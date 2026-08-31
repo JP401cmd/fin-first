@@ -39,6 +39,8 @@ import {
   type MonthTxRow,
 } from '@/lib/cashflow-kpis'
 import type { SpendingTxRow } from '@/lib/budget-spending'
+import { budgetBeschikbaar } from '@/lib/budget-spending'
+import { computeEffectiveLimit, type EffectiveLimitContext } from '@/lib/budget-rollover'
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -184,7 +186,62 @@ function buildFixtures(): Fixture[] {
         transactions: transactioneel,
       },
     },
+    {
+      // ── 7. periode-override + rollover-carry ────────────────────────────────
+      // Zie `LIMIET_FIXTURE` hieronder voor de opbouw en de verwachte getallen.
+      label: '7. periode-override (budget_amounts) + carry (budget_rollovers)',
+      db: LIMIET_FIXTURE_DB,
+    },
   ]
+}
+
+// ── Fixture 7: de LIMIET-kant (periode-override + carry) ────────────────────
+//
+// Synthetische bedragen, bewust ver van elkaar zodat elk verkeerd pad een ANDER
+// getal geeft dan het goede: de kale `default_limit` (2.000), de override zonder
+// carry (2.600), de carry zonder override (2.150) en de toekomstige override
+// (9.999) zijn alle vier onderscheidbaar van de verwachte 2.750.
+
+/** Kind-budget: `default_limit` 2.000, override 2.600 deze maand, carry 150. */
+const KID_DEFAULT_LIMIT = 2000
+const KID_OVERRIDE_VORIGE_MAAND = 1800
+const KID_OVERRIDE_DEZE_MAAND = 2600
+const KID_OVERRIDE_VOLGENDE_MAAND = 9999
+const KID_CARRY = 150
+/** Wat `computeEffectiveLimit` voor dit kind oplevert: override + carry. */
+const KID_EFFECTIEVE_LIMIET = KID_OVERRIDE_DEZE_MAAND + KID_CARRY // 2.750
+const KID_BESTEED = 800
+
+/** Spaar-parent ZONDER kinderen: quarterly 1.200, override 1.500 deze maand. */
+const SAVINGS_OVERRIDE = 1500
+
+const NEXT_MONTH = '2026-08'
+
+const LIMIET_FIXTURE_DB: FakeDb = {
+  profile: { ...PROFILE_BASE },
+  budgets: BUDGETS,
+  transactions: [
+    tx(3000, `${THIS_MONTH}-02`, B_INCOME),
+    tx(-KID_BESTEED, `${THIS_MONTH}-08`, B_EXPENSE_KID),
+  ],
+  budgetAmounts: [
+    // Oudere override — moet VERLIEZEN van de recentere (meest recente
+    // `effective_from <= displayDate` wint per budget).
+    { budget_id: B_EXPENSE_KID, effective_from: `${PREV_MONTH}-01`, amount: KID_OVERRIDE_VORIGE_MAAND },
+    { budget_id: B_EXPENSE_KID, effective_from: `${THIS_MONTH}-01`, amount: KID_OVERRIDE_DEZE_MAAND },
+    // Toekomstige override — mag NIET meetellen. Getuige voor zowel het
+    // `.lte('effective_from', monthStart)`-fetchfilter als de JS-filter in
+    // `computeEffectiveLimit`; valt er één van beide weg, dan springt de limiet
+    // naar 9.999 + carry.
+    { budget_id: B_EXPENSE_KID, effective_from: `${NEXT_MONTH}-01`, amount: KID_OVERRIDE_VOLGENDE_MAAND },
+    { budget_id: B_SAVINGS, effective_from: `${THIS_MONTH}-01`, amount: SAVINGS_OVERRIDE },
+  ],
+  budgetRollovers: [
+    { id: 'ro-kid', budget_id: B_EXPENSE_KID, period: THIS_MONTH, carried_amount: KID_CARRY, rollover_type: 'carry-over', created_at: `${THIS_MONTH}-01T00:00:00Z` },
+    // Carry in een ANDERE periode — mag niet meetellen (getuige voor het
+    // `.eq('period', …)`-filter én voor `getCarriedAmount`).
+    { id: 'ro-kid-vorig', budget_id: B_EXPENSE_KID, period: PREV_MONTH, carried_amount: 4444, rollover_type: 'carry-over', created_at: `${PREV_MONTH}-01T00:00:00Z` },
+  ],
 }
 
 // ── De zeven velden uit het OUDE pad ────────────────────────────────────────
@@ -257,11 +314,90 @@ describe('loadCashflowKpis ↔ loadDashboardData — parity op alle acht velden'
   it('de slanke laag doet aantoonbaar minder tabel-queries', async () => {
     const { oudQueries, nieuwQueries } = await runBothPaths(buildFixtures()[1].db)
     expect(nieuwQueries).toBeLessThan(oudQueries)
-    // Vier fetches: profiel, budgetten, huidige-maand-tx (+ het aggregaat via RPC).
-    // Dit getal is een BUDGET, geen momentopname: komt er een fetch bij, verhoog
-    // 'm bewust en verantwoord waarom. Nooit versoepelen naar een ongelijkheid —
-    // dan verdwijnt precies de bewaking waarvoor deze assertie bestaat.
-    expect(nieuwQueries).toBe(3)
+    // Vijf tabel-fetches: profiel, budgetten, huidige-maand-tx, rollover-carry en
+    // periode-overrides (+ het maandaggregaat via RPC, dat geen `from(...)` is).
+    //
+    // WAS 3 (31 aug 2026 → 5), bewust verhoogd. De twee erbij zijn
+    // `budget_rollovers` + `budget_amounts`: zonder die rijen kán deze laag de
+    // canonieke `computeEffectiveLimit` niet consumeren en houdt ze een tweede
+    // limiet-formule (kale `default_limit`) in leven — precies de drift tussen
+    // Budget-kaart en budgetten-pagina die deze module bestaat om te voorkomen.
+    // Beide zijn `cache()`-gedeelde fetchers (lib/server-data/base.ts) die
+    // `loadDashboardData` óók gebruikt, dus op een request waar die loader mee
+    // draait (o.a. /overzicht) kosten ze daar nul extra queries; ze zitten in
+    // DEZELFDE Promise.all-golf, dus ook geen extra round-trip.
+    //
+    // Dit getal blijft een BUDGET, geen momentopname: komt er een fetch bij,
+    // verhoog 'm bewust en verantwoord waarom. Nooit versoepelen naar een
+    // ongelijkheid — dan verdwijnt precies de bewaking waarvoor deze assertie
+    // bestaat.
+    expect(nieuwQueries).toBe(5)
+  })
+})
+
+// ── De LIMIET-kant: dezelfde effectieve limiet als de budgetten-pagina ───────
+//
+// De `spent`-kant convergeerde op 30 aug 2026; de LIMIET-kant bleef tot 31 aug
+// 2026 een kale `default_limit`-som en negeerde daarmee de twee dingen die
+// `computeEffectiveLimit` (lib/budget-rollover.ts — "de ENE bron van waarheid
+// voor wat is het budget deze periode") wél meeneemt: de periode-override uit
+// `budget_amounts` en de rollover-carry uit `budget_rollovers`. Kaart en pagina
+// droegen daardoor een andere limiet en dus een ander restant.
+describe('budget-limiet == computeEffectiveLimit (override + carry)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(NOW)
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('de expense-limiet is de EFFECTIEVE kinderlimiet (override + carry), niet de kale default_limit', async () => {
+    const { nieuw, oud } = await runBothPaths(LIMIET_FIXTURE_DB)
+    // 2.600 (override deze maand) + 150 (carry) = 2.750. Niet 2.000 (kaal),
+    // niet 1.800 (oude override), niet 10.149 (toekomstige override + carry).
+    expect(nieuw.budgetTotals.expense.limit).toBe(KID_EFFECTIEVE_LIMIET)
+    expect(oud.budgetTotals.expense.limit).toBe(KID_EFFECTIEVE_LIMIET)
+    expect(nieuw.budgetTotals.expense.limit).not.toBe(KID_DEFAULT_LIMIT)
+    expect(nieuw.budgetTotals.expense.spent).toBe(KID_BESTEED)
+  })
+
+  it('een parent ZONDER kinderen krijgt zijn eigen override, daarna interval-genormaliseerd', async () => {
+    const { bundle } = await runBothPaths(LIMIET_FIXTURE_DB)
+    // Spaar-budget: quarterly, default 1.200, override 1.500 ⇒ 1.500 / 3 = 500.
+    // (Zonder de override zou hier 400 staan.)
+    expect(bundle.budgetTotals.savings.limit).toBe(SAVINGS_OVERRIDE / 3)
+  })
+
+  it('ACCEPTATIE: kaart-restant == pagina-restant op dezelfde effectieve limiet', async () => {
+    const { nieuw } = await runBothPaths(LIMIET_FIXTURE_DB)
+
+    // Wat de BUDGETTEN-PAGINA rekent (components/app/budgets-client.tsx →
+    // getParentEffectiveLimit/getEffectiveLimit): per KIND de canonieke
+    // effectieve limiet, opgeteld. Hier letterlijk nagespeeld op de canonieke
+    // functie, niet nagebouwd.
+    const paginaLimiet = computeEffectiveLimit({
+      defaultLimit: KID_DEFAULT_LIMIT,
+      rollovers: [{
+        id: 'ro-kid', user_id: 'user-parity', budget_id: B_EXPENSE_KID, period: THIS_MONTH,
+        carried_amount: KID_CARRY, rollover_type: 'carry-over', created_at: `${THIS_MONTH}-01T00:00:00Z`,
+      }],
+      amountOverrides: [
+        { budget_id: B_EXPENSE_KID, effective_from: `${PREV_MONTH}-01`, amount: KID_OVERRIDE_VORIGE_MAAND },
+        { budget_id: B_EXPENSE_KID, effective_from: `${THIS_MONTH}-01`, amount: KID_OVERRIDE_DEZE_MAAND },
+      ],
+      period: THIS_MONTH,
+      displayDate: `${THIS_MONTH}-01`,
+    })
+    const paginaRestant = paginaLimiet - KID_BESTEED
+
+    // Wat de KAART toont (lib/cashflow-cards.ts → budgetBeschikbaar).
+    const kaartRestant = budgetBeschikbaar(nieuw.budgetTotals.expense.limit, nieuw.budgetTotals.expense.spent)
+
+    expect(kaartRestant).toBe(paginaRestant)
+    expect(kaartRestant).toBe(KID_EFFECTIEVE_LIMIET - KID_BESTEED) // 1.950
+    // En NIET het restant op de kale limiet — dat is precies het gemelde gat.
+    expect(kaartRestant).not.toBe(KID_DEFAULT_LIMIT - KID_BESTEED)
   })
 })
 
@@ -403,16 +539,30 @@ describe('de twee grondslagen blijven uit elkaar (ADR 0073)', () => {
 // vóór/ná-refactor-vergelijking: verschuift de verplaatste logica, dan valt hier
 // iets om, ook in CI.
 
+/**
+ * Limiet-context ZONDER overrides en ZONDER carry: dan is de effectieve limiet
+ * per budget gelijk aan `default_limit`, en meten de getuigen hieronder precies
+ * wat ze bedoelen te meten (kind-oprol, interval-normalisatie, spent-grondslag).
+ * De override/carry-kant heeft haar eigen getuigen — zie de describes hierboven
+ * en de MELDING-case onderaan dit blok.
+ */
+const GEEN_LIMIET_CONTEXT: EffectiveLimitContext = {
+  rollovers: [],
+  amountOverrides: [],
+  period: THIS_MONTH,
+  displayDate: `${THIS_MONTH}-01`,
+}
+
 describe('deriveBudgetTotals — waarde-getuige (de verplaatste oprol)', () => {
   const budgets = BUDGETS as unknown as BudgetRowForTotals[]
 
   it('een parent met kinderen krijgt de SOM van de kinderen, niet zijn eigen default_limit', () => {
     // expense-parent: default_limit 9999, kind 2000 ⇒ 2000 wint.
-    expect(deriveBudgetTotals(budgets, [], []).expense.limit).toBe(2000)
+    expect(deriveBudgetTotals(budgets, [], [], GEEN_LIMIET_CONTEXT).expense.limit).toBe(2000)
   })
 
   it('normaliseert het interval naar één maand (quarterly ÷3, yearly ÷12)', () => {
-    const totals = deriveBudgetTotals(budgets, [], [])
+    const totals = deriveBudgetTotals(budgets, [], [], GEEN_LIMIET_CONTEXT)
     expect(totals.savings.limit).toBe(1200 / 3) // 400 — quarterly
     expect(totals.income.limit).toBe(36000 / 12) // 3000 — yearly
     expect(totals.expense.limit).toBe(2000) // monthly blijft ongewijzigd
@@ -423,7 +573,7 @@ describe('deriveBudgetTotals — waarde-getuige (de verplaatste oprol)', () => {
     const raar: BudgetRowForTotals[] = [
       { id: 'x', parent_id: null, budget_type: 'expense', default_limit: 2400, interval: 'sinterklaas' },
     ]
-    expect(deriveBudgetTotals(raar, [], []).expense.limit).toBe(200)
+    expect(deriveBudgetTotals(raar, [], [], GEEN_LIMIET_CONTEXT).expense.limit).toBe(200)
   })
 
   it('slaat budget-types buiten de vier (bv. archive) over', () => {
@@ -431,8 +581,8 @@ describe('deriveBudgetTotals — waarde-getuige (de verplaatste oprol)', () => {
       ...budgets,
       { id: 'arch', parent_id: null, budget_type: 'archive', default_limit: 5000, interval: 'monthly' },
     ]
-    const totals = deriveBudgetTotals(metArchief, [], [])
-    expect(totals).toEqual(deriveBudgetTotals(budgets, [], []))
+    const totals = deriveBudgetTotals(metArchief, [], [], GEEN_LIMIET_CONTEXT)
+    expect(totals).toEqual(deriveBudgetTotals(budgets, [], [], GEEN_LIMIET_CONTEXT))
   })
 
   // ── Grondslag omgezet naar de canonieke norm (30 aug 2026) ────────────────
@@ -448,7 +598,7 @@ describe('deriveBudgetTotals — waarde-getuige (de verplaatste oprol)', () => {
       { amount: -10, budget_id: B_EXPENSE_KID, transaction_type: 'joint_transfer' },
     ]
     // Was 135 (100+25+10) onder de oude abs-grondslag; nu alleen de echte uitgave.
-    expect(deriveBudgetTotals(budgets, rows, []).expense.spent).toBe(100)
+    expect(deriveBudgetTotals(budgets, rows, [], GEEN_LIMIET_CONTEXT).expense.spent).toBe(100)
   })
 
   it('spent: een inkomst op een uitgaven-budget gaat ERAF (getekend, niet absoluut)', () => {
@@ -459,7 +609,7 @@ describe('deriveBudgetTotals — waarde-getuige (de verplaatste oprol)', () => {
       { amount: -888, budget_id: 'onbekend-budget' }, // onbekend ⇒ genegeerd
     ]
     // Was 140 (100+40) onder de oude abs-grondslag.
-    expect(deriveBudgetTotals(budgets, rows, []).expense.spent).toBe(60)
+    expect(deriveBudgetTotals(budgets, rows, [], GEEN_LIMIET_CONTEXT).expense.spent).toBe(60)
   })
 
   it('spent: de is_income-vlag doet mee náást het teken', () => {
@@ -467,7 +617,7 @@ describe('deriveBudgetTotals — waarde-getuige (de verplaatste oprol)', () => {
       { amount: -100, budget_id: B_EXPENSE_KID },
       { amount: -30, budget_id: B_EXPENSE_KID, is_income: true }, // vlag wint ⇒ −30
     ]
-    expect(deriveBudgetTotals(budgets, rows, []).expense.spent).toBe(70)
+    expect(deriveBudgetTotals(budgets, rows, [], GEEN_LIMIET_CONTEXT).expense.spent).toBe(70)
   })
 
   it('spent: split-regels tellen op hun eigen budget, de ouderrij wordt overgeslagen', () => {
@@ -479,13 +629,13 @@ describe('deriveBudgetTotals — waarde-getuige (de verplaatste oprol)', () => {
       { budget_id: B_EXPENSE_KID, amount: 4.5 },
       { budget_id: B_EXPENSE_KID, amount: 24.74 },
     ]
-    const totals = deriveBudgetTotals(budgets, rows, splits)
+    const totals = deriveBudgetTotals(budgets, rows, splits, GEEN_LIMIET_CONTEXT)
     expect(totals.expense.spent).toBeCloseTo(29.24, 10)
   })
 
   it('een child erft het type van zijn parent (spent landt op het parent-type)', () => {
     const rows: SpendingTxRow[] = [{ amount: -50, budget_id: B_EXPENSE_KID }]
-    const totals = deriveBudgetTotals(budgets, rows, [])
+    const totals = deriveBudgetTotals(budgets, rows, [], GEEN_LIMIET_CONTEXT)
     expect(totals.expense.spent).toBe(50)
     expect(totals.savings.spent).toBe(0)
   })
@@ -498,7 +648,7 @@ describe('deriveBudgetTotals — waarde-getuige (de verplaatste oprol)', () => {
       { amount: -600, budget_id: B_SAVINGS },
       { amount: -77, budget_id: null },
     ]
-    expect(deriveBudgetTotals(budgets, rows, [])).toEqual({
+    expect(deriveBudgetTotals(budgets, rows, [], GEEN_LIMIET_CONTEXT)).toEqual({
       income: { limit: 3000, spent: 4200 },
       expense: { limit: 2000, spent: 1550 },
       // OMGEKEERD T.O.V. VÓÓR 30 AUG 2026 (was 600). Op een `savings`-budget
@@ -557,7 +707,7 @@ describe('deriveBudgetTotals — waarde-getuige (de verplaatste oprol)', () => {
     expect(LIMIET - oudeAbsSom).toBe(25) // ≈ de gemelde "€ 26 · nog te besteden"
 
     // Wat de kaart NA de omzetting toont: dezelfde grondslag als de budgetpagina.
-    const totals = deriveBudgetTotals(eigenBudget, rows, [])
+    const totals = deriveBudgetTotals(eigenBudget, rows, [], GEEN_LIMIET_CONTEXT)
     expect(totals.expense.limit).toBe(LIMIET)
     expect(totals.expense.spent).toBe(ECHTE_UITGAVEN)
     expect(totals.expense.limit - totals.expense.spent).toBe(5085)
@@ -569,6 +719,37 @@ describe('deriveBudgetTotals — waarde-getuige (de verplaatste oprol)', () => {
     // dot. Pas als een type écht over zijn limiet gaat, verschuift ook de score.
     expect(deriveBudgetScore(totals)).toBe(100)
     expect(deriveBudgetScore({ ...totals, expense: { limit: LIMIET, spent: oudeAbsSom } })).toBe(100)
+
+    // ── VERVOLG 31 AUG 2026: dezelfde case MÉT een periode-override + carry ──
+    // De case hierboven draait op een budget zónder overrides — daar viel het
+    // tweede deel van de melding niet mee te vangen. Met een (synthetische)
+    // override en carry erbij moet de kaart de EFFECTIEVE limiet dragen, en dus
+    // exact hetzelfde restant als de budgetten-pagina: die rekent per budget
+    // `computeEffectiveLimit` en deed dat al vóór deze fix.
+    const OVERRIDE = 6000
+    const CARRY = 250
+    const rollovers = [{
+      id: 'ro-melding', user_id: 'user-parity', budget_id: 'uitgaven', period: THIS_MONTH,
+      carried_amount: CARRY, rollover_type: 'carry-over', created_at: `${THIS_MONTH}-01T00:00:00Z`,
+    }]
+    const amountOverrides = [{ budget_id: 'uitgaven', effective_from: `${THIS_MONTH}-01`, amount: OVERRIDE }]
+    const metOverride = deriveBudgetTotals(eigenBudget, rows, [], {
+      rollovers, amountOverrides, period: THIS_MONTH, displayDate: `${THIS_MONTH}-01`,
+    })
+    // Wat de budgetten-pagina voor ditzelfde budget rekent — de canonieke functie.
+    const paginaLimiet = computeEffectiveLimit({
+      defaultLimit: LIMIET, rollovers, amountOverrides, period: THIS_MONTH, displayDate: `${THIS_MONTH}-01`,
+    })
+
+    expect(metOverride.expense.limit).toBe(paginaLimiet)
+    expect(metOverride.expense.limit).toBe(OVERRIDE + CARRY)
+    // De override VERVANGT `default_limit` — hij komt er niet bovenop.
+    expect(metOverride.expense.limit).not.toBe(LIMIET)
+    expect(metOverride.expense.spent).toBe(ECHTE_UITGAVEN)
+    // ACCEPTATIE: kaart-restant == pagina-restant, zelfde limiet én zelfde
+    // getekende besteding.
+    expect(budgetBeschikbaar(metOverride.expense.limit, metOverride.expense.spent))
+      .toBe(paginaLimiet - ECHTE_UITGAVEN)
   })
 })
 

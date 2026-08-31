@@ -48,6 +48,8 @@ import {
   getTx12m,
   getEarliestIncomeDate,
   getNetWorthSnapshots12m,
+  getBudgetRolloversCurrentPeriod,
+  getBudgetAmountOverridesUpToCurrentMonth,
 } from '@/lib/server-data/base'
 import { resolveUnlinkedCashShare, unlinkedCashTotal } from '@/lib/unlinked-cash'
 import { localDateStr } from '@/lib/budget-period'
@@ -72,7 +74,12 @@ import { clipRowsToPlanEnd } from '@/lib/horizon/clip-rows-to-plan-end'
 import type { RegelSimSnapshot } from '@/lib/future/regel-sim'
 import { resolvePotRules, POT_RULES_DEFAULTS, type PotRulesConfig } from '@/lib/pot-rules'
 import { computeRetirementExpenses, computeYearlyMustExpenses, type RetirementExpenseMethod, type BudgetRow, type ChildBudgetRow } from '@/lib/budget-utils'
-import { computeEffectiveLimit, type BudgetRollover, type BudgetAmountOverride } from '@/lib/budget-rollover'
+import {
+  createEffectiveLimitLookup,
+  type EffectiveLimitContext,
+  type BudgetRollover,
+  type BudgetAmountOverride,
+} from '@/lib/budget-rollover'
 import { calculateBox3, CURRENT_TAX_YEAR, type TaxYear } from '@/lib/box3-data'
 import { NL_AOW_AGE, WEERBAARHEID_DISPLAY_MAX } from '@/lib/constants'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
@@ -397,8 +404,12 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     // overrides uit budget_amounts, zodat de widget dezelfde effectieve limiet
     // consumeert als /overzicht/cashflow/budget (getEffectiveLimit) i.p.v. een
     // eigen som op enkel default_limit — één bron van waarheid.
-    supabase.from('budget_rollovers').select('id, user_id, budget_id, period, carried_amount, rollover_type, created_at').eq('period', monthStart.slice(0, 7)),
-    supabase.from('budget_amounts').select('budget_id, effective_from, amount').lte('effective_from', monthStart),
+    // Sinds 31 aug 2026 GEDEELDE fetchers (lib/server-data/base.ts): ze voeden
+    // behalve de heatmap ook de limiet-kant van `deriveBudgetTotals` hieronder,
+    // en `loadCashflowKpis` leest exact dezelfde twee — één query per request in
+    // plaats van twee loaders die elk hun eigen ophalen.
+    getBudgetRolloversCurrentPeriod(supabase),
+    getBudgetAmountOverridesUpToCurrentMonth(supabase),
     // Week-venster raw rijen (≤ 2 weken) voor het weekoverzicht — dag/categorie-
     // granulariteit die het maandaggregaat niet levert. Klein venster ⇒ geen stille
     // max_rows-afkap. Vervangt het week-deel van de vroegere 12-mnd expense/income-fetch.
@@ -693,7 +704,22 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // tweede maand-fetch ontstaat; zonder split-ouders draait er geen query.
   const monthSpendingTx = (txResult.data ?? []) as unknown as SpendingTxRow[]
   const monthSplits = await getCurrentMonthSplits(supabase, monthSpendingTx)
-  const budgetTotals = deriveBudgetTotals(allBudgetsRaw, monthSpendingTx, monthSplits)
+  // ── De ENE effectieve-limiet-context van deze loader ──────────────────────
+  // Periode-override (`budget_amounts`) + rollover-carry (`budget_rollovers`) van
+  // DEZE maand, in de vorm die `computeEffectiveLimit` verwacht. Gedeeld door de
+  // drie plekken die "wat is het budget deze maand" beantwoorden: de type-oprol
+  // (`deriveBudgetTotals`), de per-budget maandlimiet (`monthlyLimitFor` →
+  // favorieten + topBudgets) en de heatmap-beschikbaar-map verderop. Ongeschaald
+  // (geen huishoud-aandeel), want alle drie leggen hem naast een ongeschaalde
+  // besteding — zie `createEffectiveLimitLookup`.
+  const effectiveLimitContext: EffectiveLimitContext = {
+    rollovers: (budgetRolloversResult.data ?? []) as unknown as BudgetRollover[],
+    amountOverrides: (budgetAmountsResult.data ?? []) as unknown as BudgetAmountOverride[],
+    period: monthStart.slice(0, 7),
+    displayDate: monthStart,
+  }
+  const effectiveLimitOf = createEffectiveLimitLookup(effectiveLimitContext)
+  const budgetTotals = deriveBudgetTotals(allBudgetsRaw, monthSpendingTx, monthSplits, effectiveLimitContext)
 
   // ── ÉÉN besteed-som per budget, gedeeld door vier oppervlakken ─────────────
   // De favorieten-widget, de Budgetten-widget (topBudgets), de budget-alert-
@@ -762,15 +788,31 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
 
   // Gedeelde limit-afleiding (parent rolt kinderen op, genormaliseerd naar maand).
   // Zowel de favorieten-loop als het topBudgets-veld gebruiken dit — één bron.
+  //
+  // ── Per budget de CANONIEKE effectieve limiet (31 aug 2026) ───────────────
+  // Hier stond een kale `Number(c.default_limit)`, precies zoals in
+  // `deriveBudgetTotals`. Gevolg: op /overzicht stond de Budget-KPI (die de
+  // periode-override + carry meerekent zodra hij door `computeEffectiveLimit`
+  // loopt) náást een Budgetten-widget die dezelfde budgetten op hun kale
+  // `default_limit` afbeeldde — dezelfde grootheid, twee grondslagen, twee
+  // vullingspercentages. Beide lezen nu `effectiveLimitOf` hierboven.
+  //
+  // LET OP — de interval-terugval hieronder is BEWUST niet aangeraakt, en hij is
+  // niet gelijk aan die in `deriveBudgetTotals`: hier telt een onbekend/NULL
+  // interval als MAANDbedrag (×1), daar als JAARbedrag (÷12, gelijk aan
+  // `annualAmount` in lib/budget-utils.ts). De CHECK-constraint op
+  // `budgets.interval` laat alleen monthly/quarterly/yearly toe, dus dat pad is
+  // vandaag onbereikbaar — maar het is een echte divergentie en hoort bij het
+  // aandachtspunt `budget-kind-oprol-interval-mismatch`, niet bij deze fix.
   const monthlyLimitFor = (b: { id: string; default_limit: number; interval: string; parent_id: string | null }): number => {
     let limit: number
     if (b.parent_id === null) {
       const children = allChildren.filter(c => c.parent_id === b.id)
       limit = children.length > 0
-        ? children.reduce((sum, c) => sum + Number(c.default_limit), 0)
-        : Number(b.default_limit)
+        ? children.reduce((sum, c) => sum + effectiveLimitOf(c), 0)
+        : effectiveLimitOf(b)
     } else {
-      limit = Number(b.default_limit)
+      limit = effectiveLimitOf(b)
     }
     if (b.interval === 'quarterly') limit = limit / 3
     else if (b.interval === 'yearly') limit = limit / 12
@@ -2646,33 +2688,20 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // limiet komt uit de canonieke `computeEffectiveLimit` (rollover-carry +
   // periode-override), dezelfde bron als de budgetten-pagina — zo tonen widget
   // en pagina exact dezelfde vulling/kleur (geen "twee schermen, twee sommen").
-  const currentPeriod = monthStart.slice(0, 7) // 'YYYY-MM'
-  const rolloversByBudget: Record<string, BudgetRollover[]> = {}
-  for (const r of (budgetRolloversResult.data ?? []) as BudgetRollover[]) {
-    ;(rolloversByBudget[r.budget_id] ??= []).push(r)
-  }
-  const amountsByBudget: Record<string, BudgetAmountOverride[]> = {}
-  for (const a of (budgetAmountsResult.data ?? []) as BudgetAmountOverride[]) {
-    ;(amountsByBudget[a.budget_id] ??= []).push(a)
-  }
-
+  //
+  // Consumeert sinds 31 aug 2026 de gedeelde `effectiveLimitOf` van deze loader
+  // (dashboard = personal-perspective, huidige maand: periodMonthCount = 1 en
+  // geen household-aandeel — `heatmapSpending` is hier óók ongeschaald, dus
+  // limiet en besteding blijven consistent). Dat was een eigen index-opbouw met
+  // een eigen `computeEffectiveLimit`-aanroep; dezelfde rijen, dezelfde
+  // parameters, maar op twee plekken bij te houden.
   heatmapBeschikbaarMap = {}
   for (const group of heatmapExpenseGroups) {
     const items = group.children.length > 0 ? group.children : [group]
     for (const b of items) {
       const spent = heatmapSpending[b.id] ?? 0
-      // Dashboard = personal-perspective, huidige maand: geen periode-schaling
-      // (periodMonthCount = 1) en geen household-aandeel — heatmapSpending is
-      // hier óók ongeschaald, dus limiet en besteding blijven consistent.
-      const effectiveLimit = computeEffectiveLimit({
-        defaultLimit: Number(b.default_limit),
-        rollovers: rolloversByBudget[b.id] ?? [],
-        amountOverrides: amountsByBudget[b.id] ?? [],
-        period: currentPeriod,
-        displayDate: monthStart,
-      })
       // Klem op de limiet — zie `budgetBeschikbaar`.
-      heatmapBeschikbaarMap[b.id] = budgetBeschikbaar(effectiveLimit, spent)
+      heatmapBeschikbaarMap[b.id] = budgetBeschikbaar(effectiveLimitOf(b), spent)
     }
   }
   } // einde if (wantHeatmap)
