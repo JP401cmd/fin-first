@@ -931,8 +931,10 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
       <PageOpening
         // Rechter-gutter blijft óók bij showPageInfo=false: de overzicht-shell
         // rendert daar zijn eigen i-cluster (i + statuspunt + insight-toggle),
-        // dus de kicker/H1 mogen die zone niet in lopen.
-        className="mb-5 pr-24 sm:pr-28"
+        // dus de kicker/H1 mogen die zone niet in lopen. De deck valt búiten de
+        // gutter (staat onder de knoppen) en houdt de volle breedte.
+        className="mb-5"
+        gutterClassName="pr-24 sm:pr-28"
         kicker={
           <>
             Bezittingen · opgeslagen vrijheid

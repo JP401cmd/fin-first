@@ -322,7 +322,10 @@ function FiguresStripCell({
   }
   const variant = figure.variant ?? 'neutral'
   const isWinner = variant === 'winner'
-  const cellClass = `p-3 sm:p-4 border-r border-[var(--rule-soft)] last:border-r-0 ${mobileRowBorderRule} last:border-b-0`
+  // Subgrid: kicker/bedrag/sub delen per rij dezelfde tracks, zodat bedragen op
+  // één lijn staan óók wanneer één kicker over twee regels wrapt (bv.
+  // "Portefeuille sinds aankoop" naast "Waarde over 10 jaar").
+  const cellClass = `p-3 sm:p-4 border-r border-[var(--rule-soft)] last:border-r-0 ${mobileRowBorderRule} last:border-b-0 grid grid-rows-subgrid row-span-3`
 
   const inner = (
     <>
@@ -338,20 +341,27 @@ function FiguresStripCell({
       >
         {isWinner ? <HighlightMark>{figure.amount}</HighlightMark> : figure.amount}
       </div>
-      {figure.sub && (
-        <div
-          className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
-          style={{ fontFamily: SOURCE_SERIF }}
-        >
-          {figure.sub}
-        </div>
-      )}
-      {figure.sub2 && (
-        <div
-          className="italic text-[11px] text-[var(--ink-3)] leading-snug"
-          style={{ fontFamily: SOURCE_SERIF }}
-        >
-          {figure.sub2}
+      {/* sub + sub2 samen in één wrapper: de cel heeft precies drie subgrid-
+          tracks (kicker / bedrag / sub-blok); twee losse sub-divs zouden een
+          vierde track claimen en de rij-uitlijning breken. */}
+      {(figure.sub || figure.sub2) && (
+        <div className="mt-1.5">
+          {figure.sub && (
+            <div
+              className="italic text-[11px] text-[var(--ink-3)]"
+              style={{ fontFamily: SOURCE_SERIF }}
+            >
+              {figure.sub}
+            </div>
+          )}
+          {figure.sub2 && (
+            <div
+              className="italic text-[11px] text-[var(--ink-3)] leading-snug"
+              style={{ fontFamily: SOURCE_SERIF }}
+            >
+              {figure.sub2}
+            </div>
+          )}
         </div>
       )}
     </>
@@ -365,7 +375,7 @@ function FiguresStripCell({
     return (
       <a
         href={figure.href}
-        className={`${cellClass} block transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]`}
+        className={`${cellClass} transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]`}
       >
         {inner}
       </a>

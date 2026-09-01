@@ -284,7 +284,7 @@ export default async function OverzichtBelastingPage() {
           className="absolute right-4 top-6 sm:right-6 sm:top-8"
         />
         <PageOpening
-          className="pr-20 sm:pr-24"
+          gutterClassName="pr-20 sm:pr-24"
           kicker={opening.kicker}
           titleBefore={opening.titleBefore}
           emphasis={opening.emphasis}

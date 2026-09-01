@@ -31,6 +31,7 @@ export function PageOpening({
   deck,
   children,
   className = '',
+  gutterClassName = '',
 }: {
   /** Kicker-inhoud (tekst of nodes, bv. periode + perspectief-label). */
   kicker: ReactNode
@@ -45,11 +46,16 @@ export function PageOpening({
   /** Optioneel blok ONDER de deck (hairline-cijferblok / extra rijen). */
   children?: ReactNode
   className?: string
+  /** Rechter-gutter (bv. `pr-20 sm:pr-24`) voor de zone waar het absolute
+   *  i-cluster zweeft. Wordt alléén op de kicker-rij en de kop gezet — de deck
+   *  en `children` staan daar visueel onder en houden zo de volle breedte.
+   *  Een `pr-*` in `className` zou óók de deck knijpen; gebruik deze prop. */
+  gutterClassName?: string
 }) {
   return (
     <header className={`relative space-y-3 ${className}`}>
       {/* Kicker met hairline — module-accent via --module-active-* */}
-      <div className="flex flex-wrap items-center gap-2.5 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--module-active-700)]">
+      <div className={`flex flex-wrap items-center gap-2.5 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--module-active-700)] ${gutterClassName}`}>
         <span
           aria-hidden
           className="inline-block h-px w-7 shrink-0"
@@ -63,7 +69,7 @@ export function PageOpening({
           in de shell-chrome de enige <h1> (koppencontract, bevinding M28). De
           visuele maatvoering verandert daar niet door. */}
       <h2
-        className="font-bold leading-tight tracking-[-0.02em] text-[28px] sm:text-[36px] md:text-[44px]"
+        className={`font-bold leading-tight tracking-[-0.02em] text-[28px] sm:text-[36px] md:text-[44px] ${gutterClassName}`}
         style={{ fontFamily: 'var(--font-playfair, serif)' }}
       >
         {titleBefore}
