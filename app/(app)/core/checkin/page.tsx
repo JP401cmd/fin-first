@@ -617,7 +617,7 @@ function CheckinPageContent() {
                       <div key={i}>
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-sm font-medium text-[var(--ink)]">
-                            {g.icon && <span className="mr-1">{g.icon}</span>}
+                            {g.icon && <BudgetIcon name={g.icon} className="inline h-3.5 w-3.5 mr-1" />}
                             {g.name}
                           </span>
                           <span className="text-xs font-mono tabular-nums text-[var(--ink-3)]">
@@ -1584,7 +1584,7 @@ function StepDoelen({
                 <div className="flex items-center gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-[var(--ink)] truncate">
-                      {goal.icon && <span className="mr-1.5">{goal.icon}</span>}
+                      {goal.icon && <BudgetIcon name={goal.icon} className="inline h-3.5 w-3.5 mr-1.5" />}
                       {goal.name}
                     </p>
                     <p className="text-xs text-[var(--ink-3)] mt-0.5 font-mono tabular-nums">
@@ -1636,7 +1636,7 @@ function StepDoelen({
                 <div key={goal.id} className="flex items-center gap-2 py-1">
                   <Check className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
                   <span className="text-sm text-[var(--ink-2)] truncate">
-                    {goal.icon && <span className="mr-1">{goal.icon}</span>}
+                    {goal.icon && <BudgetIcon name={goal.icon} className="inline h-3.5 w-3.5 mr-1" />}
                     {goal.name}
                   </span>
                 </div>
@@ -2238,7 +2238,7 @@ function BudgetRow({
     <div className={`card-editorial p-3 ${hasChanged ? 'border-kern-300' : ''}`}>
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm text-[var(--ink)] truncate">
-          {budget.icon && <span className="mr-1">{budget.icon}</span>}
+          {budget.icon && <BudgetIcon name={budget.icon} className="inline h-3.5 w-3.5 mr-1" />}
           {budget.name}
         </p>
         <p className="text-xs font-mono tabular-nums text-[var(--ink-2)] shrink-0">

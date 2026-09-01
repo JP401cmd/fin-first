@@ -345,6 +345,18 @@ describe('GOAL_TYPE_META — nieuwe types', () => {
     expect(GOAL_TYPE_ICONS.expected_return).toBe('Coins')
     expect(GOAL_TYPE_ICONS.fire_age).toBe('Hourglass')
   })
+
+  it('elke doel-icoonnaam resolvet in de gedeelde iconMap (geen Circle-fallback) — bug 1 sep 2026', async () => {
+    // De check-in (en elk oppervlak dat BudgetIcon gebruikt) rendert
+    // doel-iconen op naam via components/app/budget-shared. Een naam die daar
+    // ontbreekt valt stil terug op Circle — 'Target' (de goal-form-default!)
+    // en 'Sun' ontbraken. Deze test pint dat elke GOAL_TYPE_ICONS-waarde een
+    // echte mapping heeft.
+    const { iconMap } = await import('@/components/app/budget-shared')
+    for (const [type, iconName] of Object.entries(GOAL_TYPE_ICONS)) {
+      expect(iconMap[iconName], `icoon '${iconName}' (type '${type}') ontbreekt in iconMap`).toBeDefined()
+    }
+  })
 })
 
 describe('GOAL_TYPE_META — vlaggen op bestaande types (regressie)', () => {

@@ -21,6 +21,10 @@ import {
   // Toegevoegd voor de uitgebreide budget-templates (telefoon/internet,
   // onderhoud huis & tuin, huisdieren, cadeaus & feestdagen)
   Wifi, Hammer, PawPrint, Gift,
+  // Doel-iconen (GOAL_TYPE_ICONS in lib/goal-data.ts) — 'Target' (custom,
+  // tevens de goal-form-default) en 'Sun' (freedom_days) ontbraken, waardoor
+  // die doelen op de Circle-fallback vielen.
+  Target, Sun,
 } from 'lucide-react'
 
 export const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -38,6 +42,7 @@ export const iconMap: Record<string, React.ComponentType<{ className?: string }>
   Heart,
   Hourglass, Warehouse, Coins, Clock, MoreHorizontal, FileText, Users,
   Wifi, Hammer, PawPrint, Gift,
+  Target, Sun,
 }
 
 export const iconOptions = Object.keys(iconMap)
