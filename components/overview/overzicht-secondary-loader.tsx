@@ -27,6 +27,8 @@ import { credibleMonthlyBasis, dailyExpenseRate } from '@/lib/format'
 import { runMilestoneDetection } from '@/lib/milestones/run'
 import { isFarHorizonGoal } from '@/lib/milestones/detect'
 import { isParameterGoal } from '@/lib/goal-current-value'
+import { reconcileAutoCompletedGoals } from '@/lib/goals/auto-complete'
+import { GOAL_TYPE_META } from '@/lib/goal-data'
 import type { AchievedMilestoneRow } from '@/lib/milestones/types'
 import { buildMilestoneCopy } from '@/lib/milestones/copy'
 import { withFreshMilestone } from '@/lib/briefing/milestone-entry'
@@ -210,6 +212,25 @@ export async function OverzichtSecondaryLoader({
     // In het streamende blok verandert dat niet — beide gebeuren server-side
     // vóór dit blok naar de client wordt gestroomd.
     //
+    // Write (3): doelen die hun doelwaarde LIVE hebben gehaald daadwerkelijk
+    // afsluiten (lib/goals/auto-complete.ts). Dit is de ENIGE plek waar dat
+    // gebeurt, en bewust niet in `loadFinData`: die leesloader heeft vijf
+    // aanroepsites — waaronder de briefing-refresh-POST — en de datapad-
+    // conventie (ADR 0058) houdt lezen en muteren gescheiden. Hier staat de al
+    // bestaande, ADR-0123-gesanctioneerde in-render-schrijfnaad: own-row,
+    // idempotent, nooit fataal, persoonlijk perspectief.
+    //
+    // VÓÓR de detectie, en awaited: de functie markeert de doelrijen ook
+    // in-memory, zodat de checkpoint-filter hieronder (`!goal.is_completed`) een
+    // zojuist afgesloten doel niet alsnog een 75%-checkpoint geeft. Zonder te
+    // sluiten doelen draait er geen enkele query.
+    const autoCompletedGoals = await reconcileAutoCompletedGoals(
+      supabase,
+      userId,
+      finData.goals,
+      new Set(finData.linkedGoalIds),
+    )
+
     // Mijlpaal-detectie (ADR 0123): consume-don't-recompute — vijf canonieke
     // waarden in, sleutels uit. Gooit nooit; faalt naar null. ALLEEN wanneer
     // horizonData er is: zonder horizon geeft `withCanonicalOverviewFigures` de
@@ -238,9 +259,18 @@ export async function OverzichtSecondaryLoader({
           // Expliciet op eigen doelen filteren: de lijst is huishoud-gescoopt
           // (own-or-shared), en een partner-doel-id zou hier anders permanent
           // als eigen mijlpaal gelogd worden (review H1).
-          finData.completedGoals
-            .filter((g) => g.user_id === userId)
-            .map((g) => ({ id: g.id, completedAt: g.completed_at ?? null })),
+          // De doelen die deze render zojuist automatisch zijn afgesloten gaan
+          // er expliciet bij: ze zaten bij het laden nog in de ACTIEVE lijst en
+          // staan dus niet in `finData.completedGoals`. Zonder deze samenvoeging
+          // zou een auto-behaald doel pas bij het vólgende bezoek een
+          // mijlpaal-rij krijgen. `reconcileAutoCompletedGoals` scoopt zelf al
+          // op `user_id`, dus de H1-filter is daar niet nogmaals nodig.
+          [
+            ...finData.completedGoals
+              .filter((g) => g.user_id === userId)
+              .map((g) => ({ id: g.id, completedAt: g.completed_at ?? null })),
+            ...autoCompletedGoals.map((g) => ({ id: g.id, completedAt: g.completedAt })),
+          ],
           // Checkpoint-doelen (plan 3c): actieve, EIGEN, verre doelen met hun
           // canonieke voortgang (goalProgresses is index-gekoppeld aan goals —
           // lib/fin-data-loader.ts r270). Zelfde H1-scoping als hierboven.
@@ -256,6 +286,16 @@ export async function OverzichtSecondaryLoader({
                 // checkpoint op een direction:'down'-doel als vrijheidsleeftijd
                 // is semantisch onzin en de log is append-only (review-M3/3c).
                 !isParameterGoal(goal) &&
+                // ÉN de richting zelf uitsluiten, niet alleen de herkomst (ADR
+                // 0125). `!isParameterGoal` dekte 'down' vroeger per toeval: het
+                // enige down-type was `fire_age`, en dat was lab-exclusief. Nu
+                // kan een gebruiker zelf een down-doel maken (vrijheidsleeftijd,
+                // schuldenvrij-datum, belastingdruk) mét streefdatum, en dan
+                // klopt de checkpoint-rekensom niet: `pct = target/current` staat
+                // bij zo'n doel al hoog wanneer je er nog ver vanaf zit (doel
+                // 2031 vs. huidig 2035 = 99,8%), zodat 25/50/75% in één run
+                // tegelijk zouden vuren — permanent, want de log is append-only.
+                GOAL_TYPE_META[goal.goal_type]?.direction !== 'down' &&
                 isFarHorizonGoal(goal.target_date, goal.created_at ?? null, new Date()),
             )
             .map(({ goal, progress }) => ({

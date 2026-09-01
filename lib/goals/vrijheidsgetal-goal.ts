@@ -72,6 +72,61 @@ export interface VrijheidsgetalSnapshot {
   eta: string | null
   /** Fractionele FIRE-leeftijd waar de `eta` uit volgt (diagnostiek/tests). */
   fireAgeFractional: number | null
+  /**
+   * Eindsaldo op de LEVENSVERWACHTING-proxy (`profiles.fire_end_age`, default 90
+   * — zie lib/persoonlijk-plan-assembly.ts:147-158): de stand in de laatste
+   * projectierij op `SimResult.displayEndAge`. Voedt het `end_balance`-doel.
+   *
+   * GRONDSLAG (bewust, CLAUDE.md-waarschuwing): dit is de LIQUIDE FIRE-
+   * portefeuille (`SimRow.endPortfolio`), NIET het netto vermogen incl. eigen
+   * woning. Reden: de kernelrijen dragen alleen de portefeuille, en dit is
+   * dezelfde grondslag als `requiredFirePortfolio` — de noemer waar de rest van
+   * de FIRE-kaart al op staat. Een incl.-woning eindsaldo zou een tweede
+   * grondslag op dezelfde kaart zetten, precies de menging die verboden is.
+   *
+   * EENHEID: NOMINAAL (kernel-native), gelijk aan `targetValue` hierboven, die
+   * óók nominaal uit de kernel komt. Wil een oppervlak "geld van vandaag" tonen,
+   * dan deflateert het via `factorAtAge` op `HorizonFireSim.unifiedRows`
+   * (lib/euro-display.ts) — nooit met een eigen machtsverheffing, en nooit twee
+   * keer (ADR 0090/0093).
+   *
+   * OPTIONEEL/ADDITIEF (zelfde patroon als `SimResult.requiredFireNetWorth?`):
+   * stub-/mock-snapshots die het veld niet zetten blijven geldig; `undefined` en
+   * `null` betekenen allebei "de motor kon dit niet leveren" ⇒ de opgeslagen
+   * doelwaarde blijft staan.
+   */
+  endBalanceAtEndAge?: number | null
+}
+
+/** Minimale rij-/resultaatvorm die `pickEndBalanceAtEndAge` leest. */
+export interface EndBalanceSimShape {
+  rows: readonly { age: number; endPortfolio: number }[]
+  displayEndAge: number
+}
+
+/**
+ * Eindsaldo op `displayEndAge` uit een REEDS GEDRAAIDE kernel-run — geen tweede
+ * solve, puur een rij-selectie.
+ *
+ * Keuze van de rij: de laatste rij met `age <= displayEndAge`. Dat is robuuster
+ * dan een exacte match (rijen kunnen op fractionele leeftijden of net onder de
+ * eindleeftijd stoppen) en robuuster dan "de allerlaatste rij" (die kan bij een
+ * afwijkende clip vóórbij de eindleeftijd liggen). Geen enkele rij binnen bereik
+ * ⇒ `null`: liever niets dan het saldo van een andere leeftijd.
+ */
+export function pickEndBalanceAtEndAge(sim: EndBalanceSimShape | null | undefined): number | null {
+  if (!sim || !Array.isArray(sim.rows) || sim.rows.length === 0) return null
+  const endAge = sim.displayEndAge
+  if (!Number.isFinite(endAge)) return null
+
+  let best: { age: number; endPortfolio: number } | null = null
+  for (const row of sim.rows) {
+    if (!Number.isFinite(row.age) || row.age > endAge) continue
+    if (best === null || row.age > best.age) best = row
+  }
+  if (best === null) return null
+  const value = Number(best.endPortfolio)
+  return Number.isFinite(value) ? value : null
 }
 
 /**
@@ -91,6 +146,12 @@ export interface VrijheidsgetalSnapshotInput {
   fireAgeFractional: number | null
   /** Huidige leeftijd (`ageAtDate(dateOfBirth)`); `null` zonder geboortedatum. */
   currentAge: number | null
+  /**
+   * Eindsaldo op `displayEndAge` uit DEZELFDE kernel-run — de aanroeper haalt 'm
+   * met `pickEndBalanceAtEndAge(run.sim)`. Weglaten ⇒ `null` (geen eindsaldo-doel
+   * te synchroniseren); bestaande aanroepers blijven daarmee ongewijzigd geldig.
+   */
+  endBalanceAtEndAge?: number | null
 }
 
 /**
@@ -137,6 +198,10 @@ export function buildVrijheidsgetalSnapshot(
         : null,
     eta,
     fireAgeFractional: fireAge,
+    endBalanceAtEndAge:
+      input.endBalanceAtEndAge != null && Number.isFinite(input.endBalanceAtEndAge)
+        ? input.endBalanceAtEndAge
+        : null,
   }
 }
 

@@ -8,6 +8,7 @@
  * Carlo draait deterministisch op de `SeededRandom`-klasse.
  */
 import type { FinancialInput } from '../core-metrics'
+import { computePassiveIncomeMonthly } from '../core-metrics'
 import { DEFAULT_RETURN, DEFAULT_VOLATILITY, NL_SWR, NL_AOW_AGE, NL_AOW_MONTHLY, INFLATION } from '../constants'
 import { MSCI_REAL_RETURNS, NAMED_PERIODS } from '../msci-data'
 import { ageAtDate } from './fire-format'
@@ -138,7 +139,7 @@ export function projectForward(
     const date = new Date(now)
     date.setMonth(date.getMonth() + m)
     const age = currentAge !== null ? currentAge + m / 12 : null
-    const passiveIncome = (netWorth * swr) / 12
+    const passiveIncome = computePassiveIncomeMonthly(netWorth, swr)
 
     // Cashflow adjustments based on age
     let cashflowIncome = 0
@@ -223,7 +224,7 @@ export function computeScenarios(
         month: m,
         date: date.toISOString().split('T')[0],
         netWorth: Math.round(nw),
-        passiveIncome: Math.round((nw * NL_SWR) / 12),
+        passiveIncome: Math.round(computePassiveIncomeMonthly(nw, NL_SWR)),
         age,
         contributions: m === 0 ? 0 : Math.round(mSavings),
         growth: 0,

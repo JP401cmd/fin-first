@@ -144,7 +144,13 @@ export function buildMilestoneCopy(
       }
       return {
         titel: naam ? `Doel behaald: "${naam}"` : 'Doel behaald',
-        betekenis: 'Een doel dat je zelf stelde staat op honderd procent.',
+        // Bewust RICHTING-NEUTRAAL geformuleerd (ADR 0125). "Staat op honderd
+        // procent" gold zolang elk behaalbaar doel omhoog liep; sinds een doel
+        // ook een vrijheidsleeftijd, schuldenvrij-datum of belastingdruk kan
+        // zijn, betekent behalen daar juist ONDER de doelwaarde zakken. De copy
+        // kent het doeltype niet (`MilestoneGoalRef` draagt alleen id + naam),
+        // dus is de enige zin die in beide richtingen waar blijft de juiste.
+        betekenis: 'Een doel dat je zelf stelde is bereikt.',
       }
     }
 

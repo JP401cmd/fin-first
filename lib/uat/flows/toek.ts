@@ -91,6 +91,8 @@ export const TOEK_FLOW: UatFlow = {
     { id: 'doelen', scenarioId: 'UAT-TOEK-22', label: 'WF-TOEK-22 · Doelen bekijken & toevoegen (ETA)', kind: 'screen', stage: 4, lane: 'doelen' },
     { id: 'doelvoortgang', scenarioId: 'UAT-TOEK-23', label: 'WF-TOEK-23 · Doel-voortgang bijwerken/behalen', kind: 'screen', stage: 4, lane: 'doelen', subOf: 'doelen' },
     { id: 'doelpace', scenarioId: 'UAT-TOEK-35', label: 'WF-TOEK-35 · Pace-toets ("op koers") & live vrijheidsgetal-doel', kind: 'screen', stage: 4, lane: 'doelen', subOf: 'doelen' },
+    { id: 'doelkoppelen', scenarioId: 'UAT-TOEK-39', label: 'WF-TOEK-39 · Meervoudig koppelen (bezittingen + schulden, netto)', kind: 'screen', stage: 4, lane: 'doelen', subOf: 'doelen' },
+    { id: 'doelbasis', scenarioId: 'UAT-TOEK-40', label: 'WF-TOEK-40 · Doelbasis: live meesyncen & richting-bewust afsluiten', kind: 'screen', stage: 4, lane: 'doelen', subOf: 'doelen' },
 
     // ── 5 · uitkomst ──────────────────────────────────────────────────────
     { id: 'fire', label: 'Toekomstbeeld bijgewerkt · vrijheidsleeftijd, FIRE-datum & doelen', kind: 'outcome', stage: 5 },
@@ -162,6 +164,8 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'navkaarten', to: 'doelen', kind: 'branch', label: 'Doelen' },
     { from: 'doelen', to: 'doelvoortgang' },
     { from: 'doelen', to: 'doelpace' },
+    { from: 'doelen', to: 'doelkoppelen' },
+    { from: 'doelen', to: 'doelbasis' },
 
     // samenvloeien → uitkomst
     { from: 'sliders', to: 'fire' },
@@ -178,6 +182,8 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'marktaannames', to: 'fire' },
     { from: 'doelvoortgang', to: 'fire' },
     { from: 'doelpace', to: 'fire' },
+    { from: 'doelkoppelen', to: 'fire' },
+    { from: 'doelbasis', to: 'fire' },
 
     // uitkomst → cross-doorwerking (OUTPUT)
     { from: 'fire', to: 'x-ovz', kind: 'cross' },

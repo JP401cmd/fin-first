@@ -6,7 +6,7 @@ import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData, TopGoal } from './widget-renderer'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
-import { getGoalColorClasses, computeGoalProgress, type GoalType } from '@/lib/goal-data'
+import { getGoalColorClasses, computeGoalProgress, isGoalReached, type GoalType } from '@/lib/goal-data'
 import { Target } from 'lucide-react'
 
 interface Props {
@@ -37,12 +37,22 @@ function goalPct(goal: TopGoal): number {
   }).pct
 }
 
+/**
+ * "Binnen?" — de canonieke richting-bewuste toets, niet `pct >= 100`. Bij een
+ * omlaag-doel is dat percentage geen oordeel: `target / current` staat op een
+ * schuldenvrij-datum (jaartallen rond 2030) afgerond op 100% terwijl het doel
+ * jaren achterloopt.
+ */
+function goalDone(goal: TopGoal): boolean {
+  return isGoalReached(goal.goal_type as GoalType, goal.current_value, goal.target_value)
+}
+
 function isOverdue(goal: TopGoal): boolean {
   // Een live-gesynchroniseerd doel (canonieke `eta`) toont de GEPROJECTEERDE
   // datum; "Verlopen" hoort bij een streefdatum, niet bij een projectie.
   if (goal.eta) return false
   if (!goal.target_date) return false
-  return new Date(goal.target_date) < new Date() && goalPct(goal) < 100
+  return new Date(goal.target_date) < new Date() && !goalDone(goal)
 }
 
 function etaLabel(goal: TopGoal): string | null {
@@ -280,7 +290,7 @@ export const DoelenWidget = memo(function DoelenWidget({ size, data, href }: Pro
   }
 
   // ── Full-size: summary + vertical goal list (336px height) ────
-  const completedGoals = topGoals.filter(g => goalPct(g) >= 100).length
+  const completedGoals = topGoals.filter(goalDone).length
   const avgPct = topGoals.length > 0
     ? Math.round(topGoals.reduce((sum, g) => sum + goalPct(g), 0) / topGoals.length)
     : 0
@@ -288,7 +298,7 @@ export const DoelenWidget = memo(function DoelenWidget({ size, data, href }: Pro
   // Find the goal with the nearest future deadline
   const now = new Date()
   const closestDeadlineGoal = topGoals
-    .filter(g => g.target_date && new Date(g.target_date) > now && goalPct(g) < 100)
+    .filter(g => g.target_date && new Date(g.target_date) > now && !goalDone(g))
     .sort((a, b) => new Date(a.target_date!).getTime() - new Date(b.target_date!).getTime())[0] ?? null
 
   const fullGoals = sortedGoals.slice(0, 3)

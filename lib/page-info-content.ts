@@ -258,7 +258,14 @@ export const PAGE_INFO: Record<string, string> = {
   '/toekomst/doelen':
     'Je financiële doelen en hun voortgang: hoeveel je al hebt, hoeveel nog te gaan en wanneer je er bent. ' +
     'Elk doel is een stuk vrijheid dat je opbouwt. ' +
-    'Voeg een doel toe of stel een bestaande bij.',
+    'Voeg een doel toe of stel een bestaande bij; het label toont of je op koers ligt, aandacht nodig hebt of achterloopt op je planning. ' +
+    'Een doel kan een bedrag zijn dat je bijhoudt, maar je kunt het ook vastknopen aan wat je al hebt: koppel er één of meer bezittingen aan, of juist schulden om af te bouwen — dan telt de voortgang mee met wat je aflost. ' +
+    'Koppel je allebei, dan rekent het doel netto: de waarde van je bezittingen min wat er nog aan schuld openstaat. ' +
+    'Daarnaast kun je een doel op een cijfer zetten dat de app zelf al bijhoudt — je spaarquote, je netto vermogen, de leeftijd waarop je vrij bent, je noodfonds in maanden, je passieve inkomen, je belastingdruk, wanneer je schuldenvrij bent of wat er overblijft aan het eind van je plan. ' +
+    'Zulke doelen hoef je nooit handmatig bij te werken: ze lopen mee met dezelfde cijfers die je elders in de app ziet. ' +
+    'Een doel dat twee jaar of verder weg ligt krijgt onderweg automatisch een seintje bij 25%, 50% en 75% — zo voelt een ver doel als een reeks haalbare stappen; doelen waarbij juist lager beter is (je vrijheidsleeftijd, je belastingdruk, wanneer je schuldenvrij bent) krijgen die tussenstappen niet. ' +
+    'Behaal je een doel, dan wordt dat even gevierd en verhuist het naar het ingeklapte archief onderaan; meteen krijg je een suggestie voor je volgende doel. ' +
+    'Bovenaan staan je eigen doelen (die je hier zelf toevoegt en bijwerkt); doelen uit je doelsituatie — zoals je vrijheidsleeftijd — komen uit het Toekomst-lab en werk je daar bij, niet op deze pagina.',
 
   '/toekomst/gebeurtenissen':
     'De levensgebeurtenissen op je tijdas: pensioen, AOW, een huis kopen of verkopen, een erfenis. ' +

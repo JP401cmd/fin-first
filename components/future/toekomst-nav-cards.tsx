@@ -41,7 +41,7 @@ import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import { STRATEGY_LABELS } from '@/lib/fire-strategy'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import type { FireParams } from '@/lib/fire-params'
-import type { GoalProgress as CanonicalGoalProgress } from '@/lib/goal-data'
+import { goalReachedFromProgress, type GoalProgress as CanonicalGoalProgress } from '@/lib/goal-data'
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -167,11 +167,20 @@ export function deriveDoelenStatus(
   goals.forEach((goal, i) => {
     const p = goalProgresses[i]
     if (!p) return
-    if (p.pct >= 100) return // voltooid → negeren
-    activeCount += 1 // fire_age-/ongemeten parameter-doel telt WEL mee in het aantal
-
     // Defensieve parameter-herkenning (metadata kan ontbreken/null/{} zijn).
     const isParameter = goal.metadata?.bron === 'parameter'
+    // Voltooid → negeren. Via de canonieke toets op de WAARDE, niet via het
+    // percentage: bij een omlaag-doel (schuldenvrij-datum, belastingdruk,
+    // vrijheidsleeftijd) staat `target / current` afgerond al op 100% terwijl
+    // het doel jaren achterloopt — zo'n doel zou stil uit de telling én uit de
+    // stoplichtstatus vallen, juist wanneer het aandacht vraagt.
+    //
+    // Parameterdoelen (de doelsituatie uit het lab) zijn hiervan uitgezonderd:
+    // die zijn nooit "af". Ze beschrijven een koers die je aanhoudt, niet iets
+    // wat je afvinkt, en horen dus altijd in het aantal mee te tellen.
+    if (!isParameter && goalReachedFromProgress(goal.goal_type, p)) return
+    activeCount += 1 // fire_age-/ongemeten parameter-doel telt WEL mee in het aantal
+
     // Parameter-doel zonder betekenisvolle stoplicht-status: fire_age (marge)
     // of nog geen meting (pct ≤ 0) → buiten attention/status houden.
     if (isParameter && (goal.goal_type === 'fire_age' || p.pct <= 0)) return

@@ -125,8 +125,10 @@ export const STANDAARD_DOELEN: StandaardDoel[] = [
     goalType: 'debt',
     icon: 'CreditCard',
     color: 'red',
-    // Geen data-afgeleide richtwaarde: schuldsaldo verschilt per gebruiker en de
-    // sheet koppelt (nog) geen schuld. Leeg laten + hint.
+    // Geen data-afgeleide richtwaarde: welk schuldsaldo je bedoelt hangt af van
+    // WELKE schulden je koppelt. Sinds ADR 0125 schakelt deze preset door naar
+    // het volledige formulier met `debt_payoff` voorgeselecteerd, waar je één of
+    // meer schulden aanvinkt; het doelbedrag volgt uit die keuze.
     computeTarget: () => 0,
   },
   {

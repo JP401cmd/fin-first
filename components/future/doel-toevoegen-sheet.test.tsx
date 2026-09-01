@@ -13,7 +13,14 @@ const mockGetUser = vi.fn()
 
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
-    from: () => ({ insert: mockInsert }),
+    from: () => ({
+      insert: mockInsert,
+      // De geavanceerde modus (GoalForm) laadt lazy assets+debts via
+      // select().eq().order() — de eq() scoopt op de eigen gebruiker. Zonder die
+      // schakel valt het effect om in een unhandled rejection: groene
+      // assertions, exit 1, rode CI.
+      select: vi.fn(() => ({ eq: vi.fn(() => ({ order: vi.fn(async () => ({ data: [] })) })) })),
+    }),
     auth: { getUser: mockGetUser },
   }),
 }))
@@ -206,14 +213,49 @@ describe('DoelToevoegenSheet — standaard-doelen-kiezer', () => {
     expect(targetInput.value).toBe('600000')
   })
 
-  it('klik op Schuldenvrij zet goalType naar debt (bedrag leeg — gebruiker vult zelf)', () => {
+  /**
+   * SPEC-WIJZIGING (1 sep 2026). Deze test controleerde eerder dat de kiezer
+   * `select.value === 'debt'` zette — een type dat in `GOAL_TYPE_META` niet
+   * bestaat en op de doelkaart stil terugviel. De preset schakelt nu door naar
+   * de geavanceerde GoalForm met `debt_payoff` voorgeselecteerd, want een
+   * afbouwdoel heeft een schuld-koppeling nodig en die kan het snelle pad niet.
+   */
+  it('klik op Schuldenvrij schakelt door naar GoalForm met "Schuld aflossen" voorgeselecteerd', async () => {
     render(<DoelToevoegenSheet monthlyExpenses={2000} />)
     fireEvent.click(screen.getByText('Doel toevoegen'))
     fireEvent.click(screen.getByText('Schuldenvrij'))
-    const dialog = screen.getByRole('dialog')
-    const select = dialog.querySelector('select') as HTMLSelectElement
-    const targetInput = dialog.querySelector('input[type="number"]') as HTMLInputElement
-    expect(select.value).toBe('debt')
-    expect(targetInput.value).toBe('')
+
+    expect(await screen.findByText('Nieuw doel')).toBeTruthy()
+    const typeSelect = screen.getByLabelText('Type doel') as HTMLSelectElement
+    expect(typeSelect.value).toBe('debt_payoff')
+    // De naam uit de preset gaat mee (het bedrag vult de gebruiker of de
+    // koppeling). Eén venster tegelijk: de quick-add-sheet is weg.
+    expect((document.getElementById('goal-name') as HTMLInputElement).value).toBe('Schuldenvrij')
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: /Doel toevoegen/i })).toBeNull(),
+    )
+  })
+
+  it('de type-select spreekt canonieke GoalTypes (geen eigen enum meer)', () => {
+    render(<DoelToevoegenSheet />)
+    fireEvent.click(screen.getByText('Doel toevoegen'))
+    const select = screen.getByRole('dialog').querySelector('select') as HTMLSelectElement
+    const waarden = Array.from(select.options).map((o) => o.value)
+    expect(waarden).toEqual(['savings', 'net_worth', 'debt_payoff'])
+    // Gedeelde labels uit lib/goal-data.
+    expect(Array.from(select.options).map((o) => o.textContent)).toEqual([
+      'Spaardoel',
+      'Netto vermogen',
+      'Schuld aflossen',
+    ])
+  })
+
+  it('een Vermogen-preset schrijft het canonieke type weg (niet "wealth")', async () => {
+    render(<DoelToevoegenSheet monthlyExpenses={2000} />)
+    fireEvent.click(screen.getByText('Doel toevoegen'))
+    fireEvent.click(screen.getByText('Vrijheidsgetal'))
+    fireEvent.submit(screen.getByRole('dialog').querySelector('form')!)
+    await new Promise((r) => setTimeout(r, 10))
+    expect(mockInsert.mock.calls[0]?.[0].goal_type).toBe('net_worth')
   })
 })

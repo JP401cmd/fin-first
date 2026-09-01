@@ -87,7 +87,15 @@ import { buildPensionProjection } from '@/lib/pension/pension-projection'
 import { resolveFireAssumptions, type FireAssumptionRow } from '@/lib/fire-assumptions'
 import { getAowLeeftijden } from '@/lib/reference-cache'
 import type { Asset } from '@/lib/asset-data'
-import { computeAssetsByType, computeLiquidPot, monthsCoveredFrom, inclusionFactor, weightedAssetValue } from '@/lib/dashboard-wealth-weighting'
+import {
+  computeAssetsByType,
+  computeLiquidPot,
+  computeWeightedAssetsTotal,
+  computeWeightedDebtsTotal,
+  monthsCoveredFrom,
+  inclusionFactor,
+  weightedAssetValue,
+} from '@/lib/dashboard-wealth-weighting'
 import { buildAssetReturnBreakdown, summarizePortfolioReturn, type AssetHoldingsCost } from '@/lib/asset-return'
 import { loadHoldingsCostByAssetId } from '@/lib/holdings-cost'
 import { resolveEmergencyFund, toEmergencyFundDisplay } from '@/lib/emergency-fund'
@@ -99,6 +107,7 @@ import { recurringToUpcomingEvents, taxDeadlinesToUpcomingEvents } from '@/lib/u
 import { syncActiveGoalValues } from '@/lib/goal-current-value'
 import { isVrijheidsgetalGoal } from '@/lib/goals/vrijheidsgetal-goal'
 import { loadVrijheidsgetalSnapshot } from '@/lib/goals/vrijheidsgetal-source'
+import { buildGoalMetricSources, loadGoalLinks } from '@/lib/goals/metric-sources'
 import type { GoalType } from '@/lib/goal-data'
 import { type Debt } from '@/lib/debt-data'
 import {
@@ -617,9 +626,14 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const prevMonthIncome = incomeByMonth.get(prevMonthKey) ?? 0
   const prevMonthExpenses = expenseByMonth.get(prevMonthKey) ?? 0
 
-  // Cash assets already included via assets table — only add unlinked bank_accounts (legacy/transition)
-  const totalAssetsOnly = (assetsResult.data ?? []).reduce((s, a) =>
-    s + Number(a.current_value) * (((a as { net_worth_inclusion_pct?: number | null }).net_worth_inclusion_pct ?? 100) / 100), 0)
+  // Cash assets already included via assets table — only add unlinked bank_accounts (legacy/transition).
+  // Weging via de gedeelde `weightedAssetValue`/`computeWeighted*`-helpers
+  // (lib/dashboard-wealth-weighting.ts): deze drie sommen schreven de
+  // inclusion-factor tot 1 sep 2026 elk apart uit, terwijl de helper er al was en
+  // in dit bestand al geïmporteerd stond. Sinds het `net_worth`-doel dezelfde
+  // grootheid live consumeert, moet er één formule zijn — anders toont de
+  // doelkaart een ander netto vermogen dan de bundel.
+  const totalAssetsOnly = (assetsResult.data ?? []).reduce((s, a) => s + weightedAssetValue(a), 0)
   // Losse bankrekeningen via DE canonieke optelling (lib/unlinked-cash.ts),
   // gewogen op het huishoud-aandeel: een GEDEELDE rekening is voor beide
   // partners zichtbaar en zou ongewogen twee keer volledig meetellen. Geen
@@ -629,12 +643,12 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     await resolveUnlinkedCashShare(supabase, bankAccountsResult.data),
   )
   const totalAssetsRaw = totalAssetsOnly + unlinkedCash
-  const totalDebtsRaw = (debtsResult.data ?? []).reduce((s, d) =>
-    s + Number(d.current_balance) * (((d as { net_worth_inclusion_pct?: number | null }).net_worth_inclusion_pct ?? 100) / 100), 0)
+  const totalDebtsRaw = computeWeightedDebtsTotal(debtsResult.data ?? [])
   // When vermogensregistratie is not active, use cash-only as net worth
-  const cashOnlyAssets = (assetsResult.data ?? [])
-    .filter((a: { asset_type?: string | null }) => a.asset_type === 'cash')
-    .reduce((s, a) => s + Number(a.current_value) * (((a as { net_worth_inclusion_pct?: number | null }).net_worth_inclusion_pct ?? 100) / 100), 0) + unlinkedCash
+  const cashOnlyAssets = computeWeightedAssetsTotal(
+    (assetsResult.data ?? []).filter((a: { asset_type?: string | null }) => a.asset_type === 'cash'),
+    unlinkedCash,
+  )
   const totalAssets = hasVermogen ? totalAssetsRaw : cashOnlyAssets
   const totalDebts = hasVermogen ? totalDebtsRaw : 0
   const netWorth = totalAssets - totalDebts
@@ -2748,6 +2762,16 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // FIRE-motor. `loadVrijheidsgetalSnapshot` deelt via React-`cache()` letterlijk
   // dezelfde uitkomst met /toekomst/doelen, en leunt op de `computeHorizonFireSim`-
   // run die deze loader hierboven al deed — geen tweede kernel-solve.
+  // Vierde en vijfde live bron (1 sep 2026): meerdere koppelingen per doel
+  // (`goal_links`) en auto-sync metric-doelen. `buildGoalMetricSources` is
+  // LETTERLIJK dezelfde thunk-set die het doelen-scherm doorgeeft — de widget en
+  // het scherm kunnen daardoor per constructie geen ander cijfer per doel tonen.
+  // Alle onderliggende fetchers zijn cache()'d, dus op deze render (waar assets/
+  // schulden/bankrekeningen toch al binnen zijn) kost dit geen extra query.
+  const widgetGoalLinks = await loadGoalLinks(
+    supabase,
+    goalsForWidget.map(g => g.id).filter((id): id is string => !!id),
+  )
   const { goals: syncedWidgetGoals, fireSnapshot, vrijheidsgetalSynced } = await syncActiveGoalValues(
     supabase,
     goalsForWidget,
@@ -2755,6 +2779,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     (debtsResult.data ?? []) as { id: string; current_balance: number | string | null }[],
     currentUserId,
     () => loadVrijheidsgetalSnapshot(supabase),
+    widgetGoalLinks,
+    buildGoalMetricSources(supabase),
   )
   const widgetFireEta = vrijheidsgetalSynced > 0 ? (fireSnapshot?.eta ?? null) : null
   const topGoals: TopGoal[] = syncedWidgetGoals.slice(0, 3).map(g => ({

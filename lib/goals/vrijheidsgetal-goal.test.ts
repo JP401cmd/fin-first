@@ -4,6 +4,7 @@ import {
   isVrijheidsgetalGoal,
   buildVrijheidsgetalSnapshot,
   applyVrijheidsgetalSync,
+  pickEndBalanceAtEndAge,
   type VrijheidsgetalSnapshot,
 } from '@/lib/goals/vrijheidsgetal-goal'
 import { computeGoalProgress } from '@/lib/goal-data'
@@ -124,6 +125,51 @@ describe('applyVrijheidsgetalSync', () => {
     const goals = [{ ...OPGESLAGEN }]
     expect(applyVrijheidsgetalSync(goals, null)).toBe(0)
     expect(goals[0].current_value).toBe(960_000)
+  })
+})
+
+describe('pickEndBalanceAtEndAge — rij-selectie op een reeds gedraaide kernel-run', () => {
+  it('kiest de laatste rij met age <= displayEndAge en slaat rijen erna over', () => {
+    const sim = {
+      rows: [
+        { age: 80, endPortfolio: 100 },
+        { age: 90, endPortfolio: 200 },
+        { age: 95, endPortfolio: 300 },
+      ],
+      displayEndAge: 90,
+    }
+    expect(pickEndBalanceAtEndAge(sim)).toBe(200)
+  })
+
+  it('geen enkele rij binnen bereik → null (nooit het saldo van een andere leeftijd)', () => {
+    const sim = {
+      rows: [{ age: 91, endPortfolio: 200 }, { age: 95, endPortfolio: 300 }],
+      displayEndAge: 90,
+    }
+    expect(pickEndBalanceAtEndAge(sim)).toBeNull()
+  })
+
+  it('lege rijen → null', () => {
+    expect(pickEndBalanceAtEndAge({ rows: [], displayEndAge: 90 })).toBeNull()
+  })
+
+  it('ontbrekende/null sim → null', () => {
+    expect(pickEndBalanceAtEndAge(null)).toBeNull()
+    expect(pickEndBalanceAtEndAge(undefined)).toBeNull()
+  })
+
+  it('niet-eindige displayEndAge → null', () => {
+    expect(
+      pickEndBalanceAtEndAge({ rows: [{ age: 80, endPortfolio: 100 }], displayEndAge: NaN }),
+    ).toBeNull()
+  })
+
+  it('slaat rijen met een niet-eindige age over', () => {
+    const sim = {
+      rows: [{ age: NaN, endPortfolio: 999 }, { age: 70, endPortfolio: 150 }],
+      displayEndAge: 90,
+    }
+    expect(pickEndBalanceAtEndAge(sim)).toBe(150)
   })
 })
 

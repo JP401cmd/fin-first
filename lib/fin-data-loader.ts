@@ -21,6 +21,13 @@ import type { BudgetBasisRow } from '@/lib/budget-basis'
 import { syncActiveGoalValues } from '@/lib/goal-current-value'
 import { isVrijheidsgetalGoal } from '@/lib/goals/vrijheidsgetal-goal'
 import { loadVrijheidsgetalSnapshot } from '@/lib/goals/vrijheidsgetal-source'
+import { buildGoalMetricSources, loadGoalLinks } from '@/lib/goals/metric-sources'
+import {
+  linkedGoalIdSet,
+  selectAutoCompletedNotices,
+  type AutoCompletedGoal,
+} from '@/lib/goals/auto-complete'
+import type { DebtTermBasis } from '@/lib/debt-term-basis'
 // Doel-`current_value`-sync + cap-splitsing wonen nu in de gedeelde
 // `lib/goal-current-value.ts` (ÉNE bron voor scherm + dashboard-widget). Deze
 // re-export houdt de bestaande import-paden (o.a. lib/fin-data-loader.test.ts)
@@ -107,6 +114,39 @@ export interface FinPageData {
    * "volgt automatisch"-belofte doen.
    */
   vrijheidsgetalLive: boolean
+  /**
+   * Grondslag van de LIVE schuldenvrij-datum (`debt_free_date`-doel). `user_set`
+   * = hard feit; bij `default_term`/`no_end_date` moet de kaart een aanname-regel
+   * tonen (`describeDebtTermBasis`). `null` wanneer er geen zo'n doel actief is —
+   * dan is er ook niets te labelen.
+   */
+  debtFreeBasis: DebtTermBasis | null
+  /**
+   * Goal-ids met ≥1 bruikbare `goal_links`-rij, over ÁLLE doelen (ook de
+   * voltooide). Dit is het signaal "de waarde van dit doel wordt door een
+   * machine bijgehouden", dat `reconcileAutoCompletedGoals` nodig heeft en dat
+   * niet uit de doelrij zelf af te leiden is — de koppelingen leven in een
+   * aparte tabel. Bewust als kale id-lijst en niet als ruwe koppelrijen: de
+   * consumenten hoeven niet te weten wélke bezitting eraan hangt.
+   */
+  linkedGoalIds: string[]
+  /**
+   * Doelen die de SERVER automatisch heeft afgesloten (bereikt via een live
+   * meelopende waarde) en die het doelen-scherm nog één keer mag vieren —
+   * nieuwste eerst, binnen `AUTO_COMPLETED_NOTICE_WINDOW_DAYS`.
+   *
+   * Bestaat omdat een auto-afgesloten doel geen gebruikersactie kent: de
+   * bestaande viering hangt aan de `onCompleted`-callback van de bewerk-sheet,
+   * en de mijlpalenmotor bevestigt een `doel`-rij bewust meteen
+   * (`acknowledged_at = nu`) omdat "het doelen-scherm het al viert". Zonder dit
+   * veld zou dat argument niet meer kloppen en verdween de viering geruisloos.
+   *
+   * Consumeren: neem de eerste entry en render `<MilestoneCelebration
+   * celebrationKey={`goal-reached:${id}`} …>` — exact dezelfde sleutel als de
+   * bewerk-sheet-viering, zodat de localStorage-once-guard dubbel vieren
+   * uitsluit.
+   */
+  autoCompletedGoals: AutoCompletedGoal[]
 }
 
 // ---------------------------------------------------------------------------
@@ -279,14 +319,39 @@ export async function loadFinData(
   // Het vrijheidsgetal-doel is de derde live bron (bevinding C10): huidige
   // waarde, doelbedrag én verwachte datum komen uit dezelfde canonieke FIRE-motor
   // die /overzicht toont. Thunk = lazy: zonder zo'n doel geen kernel-run.
-  const { goals, fireSnapshot, vrijheidsgetalSynced } = await syncActiveGoalValues(
+  //
+  // Twee uitbreidingen (1 sep 2026):
+  //  • `goal_links` — een doel mag meerdere bezittingen ÉN schulden dragen; één
+  //    kolom-scoped query op de al geladen goal-ids, tolerant wanneer de tabel er
+  //    nog niet is (dan geldt het legacy-koppelpad).
+  //  • `metricSources` — de GEDEELDE thunk-set (lib/goals/metric-sources.ts) die
+  //    ook de dashboard-widget doorgeeft. Bewust niet per loader samengesteld:
+  //    twee assemblages van hetzelfde cijfer is exact de drift die deze gedeelde
+  //    sync-laag moet uitsluiten. Elke thunk is lazy en per doel-type gegated.
+  const goalLinks = await loadGoalLinks(
+    supabase,
+    allGoals.map(g => g.id).filter((id): id is string => !!id),
+  )
+  const { goals, fireSnapshot, vrijheidsgetalSynced, debtFreeBasis } = await syncActiveGoalValues(
     supabase,
     allGoals,
     loadedAssets,
     loadedDebts,
     currentUserId,
     () => loadVrijheidsgetalSnapshot(supabase),
+    goalLinks,
+    buildGoalMetricSources(supabase),
   )
+
+  // Machine-bijgehouden-signaal + vieringslijst. Bewust AFLEIDEN uit wat er al
+  // geladen is (geen extra query) en bewust GEEN write hier: `loadFinData` is
+  // een leesloader met vijf aanroepsites — waaronder de briefing-refresh-POST —
+  // en de datapad-conventie (ADR 0058) houdt lezen en muteren gescheiden. Het
+  // afsluiten zelf gebeurt op de ene, al bestaande in-render-schrijfnaad
+  // (components/overview/overzicht-secondary-loader.tsx, ADR 0123), die deze
+  // twee velden consumeert.
+  const linkedIds = linkedGoalIdSet(goalLinks)
+  const autoCompletedGoals = selectAutoCompletedNotices(allGoals, currentUserId, linkedIds)
 
   // 7. Compute goal progresses
   // De geprojecteerde FIRE-datum vervangt de opgeslagen streefdatum als `eta`;
@@ -348,6 +413,9 @@ export async function loadFinData(
     completedGoalCount,
     totalGoalCount,
     vrijheidsgetalLive: vrijheidsgetalSynced > 0,
+    debtFreeBasis,
+    linkedGoalIds: [...linkedIds],
+    autoCompletedGoals,
   }
 }
 

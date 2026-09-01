@@ -35,12 +35,21 @@
  *                                importeert alléén types uit housing-strategy.
  *   - `lib/core-metrics.ts` + `lib/housing-strategy.ts` — al client-gebundeld via
  *                                canon-checks.ts resp. kruis-checks.ts.
+ *   - `lib/goal-current-value.ts` — pure `computeLinkedCurrentValue` (WF-TOEK-39,
+ *                                meervoudig koppelen); de module heeft ook zware,
+ *                                server-achtige buren (cashflow-kpis e.d.) maar
+ *                                geen ervan draagt een 'server-only'-directive.
+ *   - `lib/goals/auto-complete.ts` — pure `isMachineTrackedGoal`/
+ *                                `selectReachedAutoGoals` (WF-TOEK-40, ADR 0125);
+ *                                importeert alleen goal-data + goal-current-value.
  */
 
 import { PERSONAS } from '@/lib/test-personas'
 import { STRATEGY_LABELS, parseFireStrategy } from '@/lib/fire-strategy'
 import { computeAowMonthly } from '@/lib/horizon-data'
-import { computeGoalProgress, type Goal } from '@/lib/goal-data'
+import { computeGoalProgress, isGoalReached, type Goal } from '@/lib/goal-data'
+import { computeLinkedCurrentValue } from '@/lib/goal-current-value'
+import { isMachineTrackedGoal, selectReachedAutoGoals, type ReconcilableGoal } from '@/lib/goals/auto-complete'
 import { computeRetirementExpenses } from '@/lib/budget-utils'
 import { EXCEL_TEKORT_LENING_RENTE } from '@/lib/horizon-kernel/adapter/defaults'
 import { deflate, factorAtAge, buildFactorByAge, deflateRowsByAge } from '@/lib/euro-display'
@@ -387,6 +396,76 @@ export const TOEK_ENGINE_CHECKS: ToekEngineCheck[] = [
           'wwMaand1=3000; wwMaandDaarna=2800; wwTotaalOverWwDuur=34000; wwGemiddeldPerMaand=1889; inkomensgat=1111; totaalVerlies=19998; anwBruto=1676.53; anwNetto=1257; kostendaling=900; overlijdenNettoImpact=-343; anwExpliciete0Blijft0=true; wwWaarschuwingBijFire=aanwezig; overlijdenWaarschuwing=nooit',
         actual:
           `wwMaand1=${ww.ww.maandEerstePeriode}; wwMaandDaarna=${ww.ww.maandDaarna}; wwTotaalOverWwDuur=${ww.ww.totaalOverWwDuur}; wwGemiddeldPerMaand=${ww.ww.gemiddeldPerMaand}; inkomensgat=${ww.inkomensgatPerMaand}; totaalVerlies=${ww.totaalInkomensverlies}; anwBruto=${fx(overlijden.anwBruto, 2)}; anwNetto=${overlijden.anwNetto}; kostendaling=${overlijden.kostendaling}; overlijdenNettoImpact=${overlijden.nettoMaandImpact}; anwExpliciete0Blijft0=${overlijdenAnw0.anwBruto === 0}; wwWaarschuwingBijFire=${wwWaarschuwing !== null ? 'aanwezig' : 'afwezig'}; overlijdenWaarschuwing=${overlijdenWaarschuwing}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-TOEK-39',
+    scenarioId: 'UAT-TOEK-39',
+    label: 'Meervoudig koppelen: netto-voortgang via computeLinkedCurrentValue (bezittingen/schulden/gemengd)',
+    run: () => {
+      criterion('WF-TOEK-39')
+      const bezittingen = [{ current_value: 8000 }, { current_value: 5000 }]
+      const schulden = [{ current_balance: 3000 }]
+      const alleenBezittingen = computeLinkedCurrentValue(20000, bezittingen, [])
+      const alleenSchulden = computeLinkedCurrentValue(20000, [], [{ current_balance: 12000 }])
+      const gemengd = computeLinkedCurrentValue(20000, bezittingen, schulden)
+      return {
+        expected: 'alleenBezittingen=13000; alleenSchulden=8000; gemengd=10000',
+        actual: `alleenBezittingen=${alleenBezittingen}; alleenSchulden=${alleenSchulden}; gemengd=${gemengd}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-TOEK-40',
+    scenarioId: 'UAT-TOEK-40',
+    label: 'Richting-bewust behaald + machine-getrackt afsluiten (isGoalReached/isMachineTrackedGoal/selectReachedAutoGoals, ADR 0125)',
+    run: () => {
+      criterion('WF-TOEK-40')
+      // (a) Richting-bewust: fire_age (down) 46 t.o.v. doel 55 = behaald; tax_burden
+      // (down) 35% t.o.v. doel 30% = NIET behaald. Een kale `current >= target` zou
+      // dat precies omdraaien — dat becijferen we hier expliciet als contrast.
+      const fireAgeReached = isGoalReached('fire_age', 46, 55)
+      const taxBurdenReached = isGoalReached('tax_burden', 35, 30)
+      const fireAgeKaleVergelijkingZou = 46 >= 55
+      const taxBurdenKaleVergelijkingZou = 35 >= 30
+
+      // (b) Alleen machine-bijgehouden doelen mogen zichzelf sluiten.
+      const autoSyncGoal: ReconcilableGoal = {
+        id: 'g1', user_id: 'u1', name: 'Vrijheidsleeftijd', goal_type: 'fire_age',
+        current_value: 46, target_value: 55, is_completed: false,
+        metadata: { sync: 'auto' },
+      }
+      const parameterGoal: ReconcilableGoal = {
+        id: 'g2', user_id: 'u1', name: 'Lab-scenario', goal_type: 'fire_age',
+        current_value: 46, target_value: 55, is_completed: false,
+        metadata: { bron: 'parameter' },
+      }
+      const manualGoal: ReconcilableGoal = {
+        id: 'g3', user_id: 'u1', name: 'Handmatig doel', goal_type: 'savings',
+        current_value: 5000, target_value: 5000, is_completed: false,
+        metadata: {},
+      }
+      const linkedGoalIds = new Set<string>()
+      const autoSyncMachineTracked = isMachineTrackedGoal(autoSyncGoal, linkedGoalIds)
+      const parameterGoalMachineTracked = isMachineTrackedGoal(parameterGoal, linkedGoalIds)
+      const manualGoalMachineTracked = isMachineTrackedGoal(manualGoal, linkedGoalIds)
+
+      // (c) selectReachedAutoGoals: alleen het bereikte auto-sync-doel komt terug —
+      // het parameter-doel (zelfde cijfers) en het handmatige doel (target al gelijk
+      // aan current, maar niet machine-getrackt) niet.
+      const reached = selectReachedAutoGoals(
+        [autoSyncGoal, parameterGoal, manualGoal],
+        'u1',
+        linkedGoalIds,
+      )
+      const reachedAutoGoalSelected = reached.length === 1 && reached[0].id === 'g1'
+
+      return {
+        expected:
+          'fireAgeReached_46_v_55=true; taxBurdenReached_35_v_30=false; fireAgeKaleVergelijkingZou=false; taxBurdenKaleVergelijkingZou=true; autoSyncMachineTracked=true; parameterGoalMachineTracked=false; manualGoalMachineTracked=false; reachedAutoGoalSelected=true',
+        actual:
+          `fireAgeReached_46_v_55=${fireAgeReached}; taxBurdenReached_35_v_30=${taxBurdenReached}; fireAgeKaleVergelijkingZou=${fireAgeKaleVergelijkingZou}; taxBurdenKaleVergelijkingZou=${taxBurdenKaleVergelijkingZou}; autoSyncMachineTracked=${autoSyncMachineTracked}; parameterGoalMachineTracked=${parameterGoalMachineTracked}; manualGoalMachineTracked=${manualGoalMachineTracked}; reachedAutoGoalSelected=${reachedAutoGoalSelected}`,
       }
     },
   },

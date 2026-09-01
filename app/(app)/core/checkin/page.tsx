@@ -29,6 +29,12 @@ import {
   Link2,
 } from 'lucide-react'
 import { formatMaskedCurrency, calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
+import {
+  computeGoalProgress,
+  formatGoalValue,
+  GOAL_TYPE_META,
+  type GoalType,
+} from '@/lib/goal-data'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { PageInfoButton } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
@@ -106,13 +112,39 @@ interface PreviousSnapshot {
 interface GoalSummary {
   id: string
   name: string
+  /** Bepaalt richting én eenheid — zonder dit veld leest een omlaag-doel
+   *  omgekeerd en wordt elk doel als euro's geformatteerd. */
+  goal_type: string
   current_value: number
   target_value: number
+  target_date?: string | null
+  custom_unit?: string | null
   icon: string | null
   color: string | null
   is_completed: boolean
   linked_asset_id: string | null
   linked_debt_id: string | null
+  /** Koppelingen uit `goal_links` — `/api/goals` levert ze per doel mee. */
+  links?: { asset_id: string | null; debt_id: string | null }[]
+  /** Draagt o.a. `sync: 'auto'` voor doelen die op een kengetal meelopen. */
+  metadata?: Record<string, unknown> | null
+}
+
+/**
+ * Houdt de app dit doel ZELF bij? Dan slaat de check-in het over: om een
+ * handmatige update vragen van een cijfer dat de app zelf bijhoudt levert
+ * invoer op die bij de volgende load wordt overschreven.
+ *
+ * Drie bronnen: koppelingen (`goal_links`), de legacy-kolommen voor
+ * niet-gemigreerde rijen, en de auto-sync-marker. Die laatste is een mirror van
+ * `lib/goal-current-value#isAutoSyncMetricGoal` — bewust lokaal, want die module
+ * trekt de complete server-loader-graaf mee en dit is een triviale tag-check.
+ * Houd identiek aan de canonieke bron.
+ */
+function isLiveGoal(g: GoalSummary): boolean {
+  if ((g.links?.length ?? 0) > 0 || g.linked_asset_id || g.linked_debt_id) return true
+  const m = g.metadata
+  return typeof m === 'object' && m !== null && (m as Record<string, unknown>).sync === 'auto'
 }
 
 interface BudgetSummary {
@@ -270,7 +302,7 @@ function CheckinPageContent() {
           const goalData: GoalSummary[] = Array.isArray(data) ? data : data.goals || []
           const gVals: Record<string, string> = {}
           for (const g of goalData) {
-            if (!g.is_completed && !g.linked_asset_id && !g.linked_debt_id) {
+            if (!g.is_completed && !isLiveGoal(g)) {
               gVals[g.id] = String(Number(g.current_value))
             }
           }
@@ -1499,7 +1531,7 @@ function StepDoelen({
   const changedCount = useMemo(() => {
     let count = 0
     for (const g of activeGoals) {
-      if (g.linked_asset_id || g.linked_debt_id) continue
+      if (isLiveGoal(g)) continue
       const current = Number(g.current_value)
       const newVal = Number(newValues[g.id])
       if (!isNaN(newVal) && Math.abs(newVal - current) >= 0.01) count++
@@ -1518,7 +1550,7 @@ function StepDoelen({
     try {
       const changes: { id: string; current_value: number }[] = []
       for (const g of activeGoals) {
-        if (g.linked_asset_id || g.linked_debt_id) continue
+        if (isLiveGoal(g)) continue
         const current = Number(g.current_value)
         const newVal = Number(newValues[g.id])
         if (isNaN(newVal) || Math.abs(newVal - current) < 0.01) continue
@@ -1573,9 +1605,23 @@ function StepDoelen({
       ) : (
         <>
           {activeGoals.map(goal => {
-            const isLinked = !!(goal.linked_asset_id || goal.linked_debt_id)
+            const isLinked = isLiveGoal(goal)
             const currentVal = isLinked ? goal.current_value : Number(newValues[goal.id] ?? goal.current_value)
-            const pct = goal.target_value > 0 ? Math.min(100, (currentVal / goal.target_value) * 100) : 0
+            // Voortgang uit de canonieke motor: die kent de richting van het
+            // doel. De eigen `currentVal / target`-som stond hier nog en leest
+            // een omlaag-doel omgekeerd.
+            const goalType = goal.goal_type as GoalType
+            const pct = computeGoalProgress({
+              goal_type: goalType,
+              current_value: currentVal,
+              target_value: goal.target_value,
+              target_date: goal.target_date ?? null,
+            }).pct
+            // En de eenheid van het doel i.p.v. altijd euro's — anders leest een
+            // belastingdruk-doel als "€ 35 / € 30".
+            const fmtGoal = (v: number) =>
+              GOAL_TYPE_META[goalType] ? formatGoalValue(v, goalType, goal.custom_unit) : fc(v)
+            const isEuroGoal = !GOAL_TYPE_META[goalType] || GOAL_TYPE_META[goalType].unit === 'EUR'
             const delta = isLinked ? 0 : currentVal - Number(goal.current_value)
             const hasChanged = Math.abs(delta) >= 0.01
 
@@ -1588,7 +1634,7 @@ function StepDoelen({
                       {goal.name}
                     </p>
                     <p className="text-xs text-[var(--ink-3)] mt-0.5 font-mono tabular-nums">
-                      {fc(goal.current_value)} / {fc(goal.target_value)}
+                      {fmtGoal(goal.current_value)} / {fmtGoal(goal.target_value)}
                     </p>
                   </div>
                   {isLinked ? (
@@ -1599,13 +1645,18 @@ function StepDoelen({
                   ) : (
                     <div className="w-28 shrink-0">
                       <div className="relative">
-                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-[var(--ink-3)]">€</span>
+                        {/* Het €-teken alleen bij een doel dat écht in euro's
+                            loopt — op een spaarquote- of leeftijddoel is het
+                            onjuist. */}
+                        {isEuroGoal && (
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-[var(--ink-3)]">€</span>
+                        )}
                         <input
                           type="text"
                           inputMode="decimal"
                           value={newValues[goal.id] ?? ''}
                           onChange={e => handleValueChange(goal.id, e.target.value)}
-                          className="w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] pl-6 pr-2 py-1.5 text-sm font-mono tabular-nums text-[var(--ink)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400"
+                          className={`w-full rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] ${isEuroGoal ? 'pl-6' : 'pl-2.5'} pr-2 py-1.5 text-sm font-mono tabular-nums text-[var(--ink)] focus:border-kern-400 focus:outline-none focus:ring-1 focus:ring-kern-400`}
                         />
                       </div>
                     </div>
@@ -1645,7 +1696,7 @@ function StepDoelen({
           )}
 
           {/* Save button */}
-          {activeGoals.some(g => !g.linked_asset_id && !g.linked_debt_id) && (
+          {activeGoals.some(g => !isLiveGoal(g)) && (
             <button
               onClick={handleSave}
               disabled={changedCount === 0 || savingGoals || saved}

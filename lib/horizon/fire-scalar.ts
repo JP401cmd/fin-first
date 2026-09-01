@@ -10,6 +10,7 @@ import {
   computeFireTarget,
   computeFreedomPercentage,
   computeFreedomTime,
+  computePassiveIncomeMonthly,
   computeSavingsRate,
 } from '../core-metrics'
 import { DEFAULT_RETURN, INFLATION, NL_SWR } from '../constants'
@@ -86,7 +87,7 @@ export function computeFireProjection(
   const freedomPercentage = computeFreedomPercentage(netWorth, fireTarget)
   const monthlySavings = monthlyIncome - monthlyExpenses
   const savingsRate = computeSavingsRate(monthlyIncome, monthlyExpenses)
-  const monthlyPassiveIncome = (netWorth * swr) / 12
+  const monthlyPassiveIncome = computePassiveIncomeMonthly(netWorth, swr)
 
   // Freedom time (shared primitives from core-metrics.ts)
   const { years: freedomYears, months: freedomMonths } = computeFreedomTime(netWorth, effectiveYearlyExpenses)

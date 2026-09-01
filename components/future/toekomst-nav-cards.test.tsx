@@ -315,7 +315,11 @@ describe('ToekomstNavCards — Doelen-kaart', () => {
     const { container } = renderCards({
       goals: [mockGoal({ id: 'done' }), mockGoal({ id: 'active' })],
       goalProgresses: [
-        mockProgress({ pct: 100, onTrack: true }),
+        // "Voltooid" wordt sinds ADR 0125 op de WAARDE bepaald (isGoalReached),
+        // niet op het percentage — dat percentage is voor een omlaag-doel geen
+        // oordeel. De fixture moet dus current >= target dragen; `pct: 100` bij
+        // 20.000 van 50.000 sprak zichzelf tegen.
+        mockProgress({ current: 50000, target: 50000, pct: 100, onTrack: true }),
         mockProgress({ pct: 70, onTrack: true }),
       ],
     })
@@ -522,8 +526,12 @@ describe('deriveDoelenStatus', () => {
 
   it('neutral zonder actieve doelen', () => {
     expect(deriveDoelenStatus([], []).status).toBe('neutral')
-    // alleen voltooide doelen → ook neutral
-    const r = deriveDoelenStatus([mockGoal()], [mockProgress({ pct: 100, onTrack: true })])
+    // alleen voltooide doelen → ook neutral. Voltooid = de canonieke toets op de
+    // waarde (ADR 0125), dus de fixture draagt current >= target.
+    const r = deriveDoelenStatus(
+      [mockGoal()],
+      [mockProgress({ current: 50000, target: 50000, pct: 100, onTrack: true })],
+    )
     expect(r.status).toBe('neutral')
     expect(r.activeCount).toBe(0)
   })

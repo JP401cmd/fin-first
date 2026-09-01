@@ -52,8 +52,12 @@ vi.mock('@/lib/supabase/client', () => ({
         return { eq: mockEq(mockUpdate) }
       }),
       delete: vi.fn(() => ({ eq: mockEq(mockDelete) })),
-      // Volledig-bewerken laadt lazy assets+debts via select().order().
-      select: vi.fn(() => ({ order: vi.fn(async () => ({ data: [] })) })),
+      // Volledig-bewerken laadt lazy assets+debts via select().eq().order() —
+      // de eq() scoopt op de eigen gebruiker (de SELECT-policies zijn
+      // huishoud-verbreed). Ontbreekt die schakel hier, dan valt het effect om
+      // in een unhandled rejection: de assertions blijven groen, maar vitest
+      // eindigt op exit 1 en dus is CI rood.
+      select: vi.fn(() => ({ eq: vi.fn(() => ({ order: vi.fn(async () => ({ data: [] })) })) })),
     }),
     auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'u1' } } })) },
   }),
@@ -325,6 +329,95 @@ describe('DoelBewerkenSheet — volledig bewerken (GoalForm) sluit de sheet niet
     fireEvent.click(screen.getByRole('button', { name: 'Annuleren' }))
     expect(await screen.findByRole('dialog', { name: /Voortgang bijwerken/i })).toBeTruthy()
     expect(onClose).not.toHaveBeenCalled()
+  })
+})
+
+// ── ADR 0125: de behaald-toets is RICHTING-BEWUST ─────────────────────────
+
+/**
+ * Een kale `numeric >= targetValue` is fout voor 'down'-doelen (lager is beter):
+ * een belastingdruk van 35% tegen doel 30% zou meteen "behaald" zijn — mét
+ * viering én een onomkeerbare mijlpaal-regel — en een vrijheidsleeftijd van 46
+ * tegen doel 55 zou het nooit worden. De sheet consumeert daarom `isGoalReached`.
+ */
+describe('DoelBewerkenSheet — richting-bewuste behaald-toets', () => {
+  it('down-doel: een waarde BOVEN het doel is NIET behaald', async () => {
+    const onCompleted = vi.fn()
+    renderSheet(() => {}, {
+      goalType: 'tax_burden' as GoalType,
+      goal: { target_value: 30, current_value: 40 },
+      onCompleted,
+    })
+    // 35% tegen doel 30% — hoger dan het doel, dus juist niet gehaald.
+    fireEvent.change(document.querySelector('input[type="number"]')!, {
+      target: { value: '35' },
+    })
+    expect(screen.queryByTestId('doel-behaald')).toBeNull()
+
+    fireEvent.submit(document.querySelector('form')!)
+    await new Promise((r) => setTimeout(r, 10))
+    expect(laatstePayload().is_completed).toBe(false)
+    expect(onCompleted).not.toHaveBeenCalled()
+  })
+
+  it('down-doel: een waarde ONDER het doel is wél behaald', async () => {
+    const onCompleted = vi.fn()
+    renderSheet(() => {}, {
+      goalType: 'tax_burden' as GoalType,
+      goal: { target_value: 30, current_value: 40 },
+      onCompleted,
+    })
+    fireEvent.change(document.querySelector('input[type="number"]')!, {
+      target: { value: '28' },
+    })
+    expect(screen.getByTestId('doel-behaald')).toBeTruthy()
+
+    fireEvent.submit(document.querySelector('form')!)
+    await new Promise((r) => setTimeout(r, 10))
+    expect(laatstePayload().is_completed).toBe(true)
+    expect(onCompleted).toHaveBeenCalled()
+  })
+
+  it('down-doel: label en getallen staan in de eenheid van het doel, niet in euro’s', () => {
+    renderSheet(() => {}, {
+      goalType: 'tax_burden' as GoalType,
+      goal: { target_value: 30, current_value: 40 },
+    })
+    expect(screen.getByText('Huidige belastingdruk (%)')).toBeTruthy()
+    fireEvent.change(document.querySelector('input[type="number"]')!, {
+      target: { value: '35' },
+    })
+    const monitor = screen.getByTestId('bijdrage-monitor')
+    expect(monitor.textContent).toMatch(/5,0%/)
+    expect(monitor.textContent).not.toMatch(/€/)
+  })
+})
+
+// ── Live doelen: geen invoerveld ──────────────────────────────────────────
+
+describe('DoelBewerkenSheet — doelen die de app zelf bijhoudt', () => {
+  it('auto-sync-doel: geen invoerveld, wel de stand + herkomst', () => {
+    renderSheet(() => {}, {
+      goalType: 'net_worth' as GoalType,
+      goal: { metadata: { sync: 'auto' }, current_value: 125000, target_value: 500000 },
+    })
+    expect(screen.queryByRole('spinbutton')).toBeNull()
+    const blok = screen.getByTestId('doel-loopt-mee')
+    expect(blok.textContent).toMatch(/125\.000/)
+    expect(blok.textContent).toMatch(/houdt de app zelf bij/i)
+    // Niets bij te werken → geen Opslaan-knop.
+    expect(screen.queryByRole('button', { name: 'Opslaan' })).toBeNull()
+    expect(screen.getByRole('button', { name: /Terug naar je doelen/ })).toBeTruthy()
+  })
+
+  it('gekoppeld doel: zelfde behandeling, met de koppeling als herkomst', () => {
+    renderSheet(() => {}, {
+      goal: { links: [{ asset_id: 'a1', debt_id: null }] },
+    })
+    expect(screen.queryByRole('spinbutton')).toBeNull()
+    expect(screen.getByTestId('doel-loopt-mee').textContent).toMatch(
+      /gekoppelde bezittingen en schulden/i,
+    )
   })
 })
 

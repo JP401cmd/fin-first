@@ -76,6 +76,37 @@ export function depleteFireTarget(
   return yearlyExpenses * (1 - Math.pow(1 + realReturn, -yearsInRetirement)) / realReturn
 }
 
+/**
+ * PASSIEF INKOMEN — één home, twee vensters (jaar en maand).
+ *
+ * Formule: vermogen × onttrekkingsvoet. `swr` is ALTIJD de per-gebruiker
+ * afgeleide `computeEffectiveSwr` (lib/fire-params.ts) of een expliciete
+ * referentie-SWR uit lib/constants.ts — nooit een hardcoded 0.04 op de call-site.
+ *
+ * LET OP DE SCHAAL. Deze twee zijn twaalf keer elkaar en werden tot nu toe elk
+ * apart uitgeschreven: de JAAR-variant in `computeCoreData` (vrije-dagen-teller,
+ * `passiveIncome / dailyMustExpense` — een jaarbedrag gedeeld door een dagtarief
+ * geeft dagen per jaar, dus die was correct), de MAAND-variant in
+ * `lib/horizon/fire-scalar.ts`, twee keer in `lib/horizon/fire-sim-legacy.ts` en
+ * nog eens in `components/widgets/swr-monitor-widget.tsx`. Vijf kopieën van één
+ * formule met twee verschillende schalen is precies hoe een €/mnd-getal op het
+ * ene scherm naast een €/jr-getal met hetzelfde label op het andere belandt.
+ * `computePassiveIncomeMonthly` is de canonieke maandvariant; de jaarvariant is
+ * de gedeelde wortel zodat (x/12)×12 nergens een afrondingsverschil introduceert.
+ */
+export function computePassiveIncomeAnnual(netWorth: number, swr: number): number {
+  return netWorth * swr
+}
+
+/**
+ * Passief inkomen per MAAND bij de gegeven onttrekkingsvoet — `netWorth × swr / 12`.
+ * Consumeer deze helper i.p.v. de formule te herhalen (zie de toelichting bij
+ * {@link computePassiveIncomeAnnual}).
+ */
+export function computePassiveIncomeMonthly(netWorth: number, swr: number): number {
+  return computePassiveIncomeAnnual(netWorth, swr) / 12
+}
+
 /** Freedom percentage: progress toward FIRE (0–100). */
 export function computeFreedomPercentage(
   netWorth: number,
@@ -364,7 +395,9 @@ export function computeCoreData(
   // Falls back to dailyExpense when no essential budget data is available.
   // See also: DailyExpenseProvider (dailyExpenseRate) — transaction-history-based daily rate.
   const dailyMustExpense = effectiveYearlyExpenses > 0 ? effectiveYearlyExpenses / 365 : dailyExpense
-  const passiveIncome = netWorth * swr
+  // JAAR-variant (canonieke helper hierboven): het quotiënt met een DAGtarief
+  // levert dagen per jaar, dus hier hoort bewust géén /12.
+  const passiveIncome = computePassiveIncomeAnnual(netWorth, swr)
   const freeDaysPerYear = dailyMustExpense > 0 ? Math.round(passiveIncome / dailyMustExpense) : 0
 
   // Expected FIRE date

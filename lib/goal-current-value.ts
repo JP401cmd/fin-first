@@ -20,6 +20,16 @@
  * voor het salaris) of dezelfde weegregels als `buildCategorieReturnGroups` —
  * geen tweede formule-thuis.
  *
+ * UITBREIDING (1 sep 2026), twee stuks, allebei op ditzelfde principe gebouwd:
+ *  1. MEERDERE KOPPELINGEN per doel (tabel `goal_links`): een doel mag bezittingen
+ *     én schulden tegelijk dragen. De ene formule staat in
+ *     `computeLinkedCurrentValue` en wordt óók door het formulier gebruikt voor
+ *     de prefill — prefill ≡ runtime, geen tweede rekenweg.
+ *  2. AUTO-SYNC METRIC-DOELEN (`metadata.sync === 'auto'`): een doel op een
+ *     afgeleid cijfer dat live meeloopt met de canonieke motor. Élke bron is een
+ *     THUNK die een BESTAANDE laag aanroept (`GoalMetricSources` onderaan) —
+ *     nooit een formule die hier opnieuw wordt opgeschreven.
+ *
  * SPIEGELEN IS GEEN CONSUMEREN (les, 31 aug 2026). Het spaarquote-doel rekende
  * hier tot vandaag met een eigen kopie van de loader-formule, met in de docstring
  * de belofte "DEZELFDE grondslag als de spaarquote-widget". Die belofte hield de
@@ -36,6 +46,7 @@ import { loadBudgetBasis } from '@/lib/household/budget-share'
 import type { BudgetBasisRow } from '@/lib/budget-basis'
 import { localMonthStart, localMonthBounds } from '@/lib/month-range'
 import type { GoalType } from '@/lib/goal-data'
+import type { DebtTermBasis } from '@/lib/debt-term-basis'
 import {
   applyVrijheidsgetalSync,
   isVrijheidsgetalGoal,
@@ -48,6 +59,13 @@ import {
  * hieraan, dus beide loaders kunnen deze helpers zonder cast consumeren.
  */
 export type SyncableGoal = {
+  /**
+   * Nodig om `goal_links`-rijen aan het doel te koppelen. OPTIONEEL zodat
+   * bestaande lichte projecties (en de unit-tests) zonder id blijven voldoen:
+   * een doel zonder id kan simpelweg geen link-rijen hebben en volgt dan het
+   * legacy-pad.
+   */
+  id?: string
   goal_type: GoalType
   current_value: number
   target_value: number
@@ -55,6 +73,17 @@ export type SyncableGoal = {
   metadata?: Record<string, unknown> | null
   linked_asset_id?: string | null
   linked_debt_id?: string | null
+}
+
+/**
+ * Eén rij uit `goal_links` zoals de loaders 'm kolom-scoped ophalen. De DB-CHECK
+ * garandeert dat precies één van `asset_id`/`debt_id` gevuld is; deze laag gaat
+ * er defensief mee om (een rij met beide of geen van beide wordt genegeerd).
+ */
+export type GoalLinkRow = {
+  goal_id: string
+  asset_id: string | null
+  debt_id: string | null
 }
 
 /**
@@ -69,37 +98,194 @@ export function isParameterGoal(goal: { metadata?: Record<string, unknown> | nul
 }
 
 /**
+ * Marker voor een AUTO-SYNC metric-doel: een door de gebruiker aangemaakt doel op
+ * een AFGELEID cijfer dat live uit een canonieke motor meesynchroniseert
+ * (`metadata.sync === 'auto'`, gezet door de doelbasis-kiezer).
+ *
+ * Bewust een EIGEN marker naast `isParameterGoal`, niet een verbreding daarvan:
+ * `metadata.bron === 'parameter'` betekent "door het /toekomst-lab gegenereerd"
+ * en draagt zijn eigen levenscyclus (partial unique index, één per type). Een
+ * auto-sync-doel is gewoon een handmatig doel met een live bron.
+ *
+ * REGRESSIE-EIS (docstring r. 60-69 hierboven, en de bestaande unit-tests):
+ * bestaande doelen ZONDER marker blijven volledig ongemoeid. `metadata` mag
+ * ontbreken (oude rijen), `null` of `{}` zijn — alle drie leveren false.
+ */
+export function isAutoSyncMetricGoal(goal: { metadata?: Record<string, unknown> | null }): boolean {
+  const m = goal.metadata
+  return typeof m === 'object' && m !== null && (m as Record<string, unknown>).sync === 'auto'
+}
+
+/**
+ * Hoeveel door de GEBRUIKER aangemaakte doelen het doelen-scherm/de widget
+ * hoogstens toont. Bewust ongewijzigd op 5 (bestaand gedrag) en bewust een
+ * WEERGAVE-cap, geen financiële aanname — vandaar hier en niet in lib/constants.ts.
+ */
+export const MAX_HANDMATIGE_DOELEN = 5
+
+/**
  * Cap-splitsing: actieve doelen → parameter-doelen (vooraan, ongelimiteerd; de
  * partial unique index begrenst ze feitelijk op één per type = max 4) + maximaal
- * 5 handmatige. `parameterGoals` wordt apart teruggegeven zodat de injectie
- * alleen die rijen hoeft te raken (én zonder de handmatige rijen aan te tikken).
+ * 5 door de gebruiker aangemaakte doelen. `parameterGoals` en `autoSyncGoals`
+ * worden apart teruggegeven zodat de injectie alleen die rijen hoeft te raken
+ * (én zonder de gewone handmatige rijen aan te tikken).
  *
  * Dit is óók de canonieke VOLGORDE (parameter-doelen eerst) die het doelen-scherm
  * gebruikt; de dashboard-widget moet dezelfde slice/volgorde consumeren zodat
  * scherm en widget dezelfde top-doelen in dezelfde volgorde tonen.
+ *
+ * ## Waar auto-sync-doelen landen, en waarom de cap zinnig blijft
+ * Auto-sync-doelen krijgen VOORRANG binnen de bestaande cap in plaats van erbuiten
+ * te vallen zoals de parameter-doelen. Reden: parameter-doelen zijn per type
+ * uniek (de partial unique index maakt er feitelijk hoogstens vier), dus die
+ * kunnen de lijst niet laten ontsporen — auto-sync-doelen zijn gewone,
+ * ONBEGRENSD door de gebruiker aan te maken rijen. Zou de cap ze overslaan, dan
+ * kan één gebruiker met tien doelbasis-doelen elk handmatig spaardoel van het
+ * scherm duwen. "Maximaal 5 door jou aangemaakte doelen" blijft dus letterlijk
+ * gelden; binnen die vijf staan de live-getrackte doelen vooraan.
+ *
+ * Gevolg (bewust): een auto-sync-doel dat buiten de cap valt, wordt ook niet
+ * gesynchroniseerd. Dat is de juiste kant om op te falen — het doel wordt dan
+ * immers ook niet getoond, dus er verschijnt nooit een verouderd getal.
  */
 export function splitActiveGoals<T extends { is_completed?: boolean; metadata?: Record<string, unknown> | null }>(
   allGoals: T[],
-): { goals: T[]; parameterGoals: T[] } {
+): { goals: T[]; parameterGoals: T[]; autoSyncGoals: T[] } {
   const active = allGoals.filter(g => !g.is_completed)
   const parameterGoals = active.filter(isParameterGoal)
   const overige = active.filter(g => !isParameterGoal(g))
-  return { goals: [...parameterGoals, ...overige.slice(0, 5)], parameterGoals }
+  const autoSync = overige.filter(isAutoSyncMetricGoal)
+  const handmatig = overige.filter(g => !isAutoSyncMetricGoal(g))
+  const capped = [...autoSync, ...handmatig].slice(0, MAX_HANDMATIGE_DOELEN)
+  return {
+    goals: [...parameterGoals, ...capped],
+    parameterGoals,
+    // Alleen de auto-sync-doelen die de cap daadwerkelijk haalden: de injectie
+    // mag geen rij aanraken die niet in `goals` staat.
+    autoSyncGoals: capped.filter(isAutoSyncMetricGoal),
+  }
 }
 
 /**
- * Asset/debt-gekoppelde doelen: override `current_value` met de LIVE bron-waarde
- * (asset `current_value`, of voor debt-payoff: doel − resterende schuld). Pure,
- * synchrone in-place mutatie — geen query (de assets/debts zijn al geladen).
+ * DE ENE huidige-waarde-formule voor een doel met koppelingen (`goal_links`).
+ *
+ * Drie takken, en de derde is de nieuwe:
+ *  - alleen bezittingen  ⇒ Σ waarden. Identiek aan het legacy asset-pad.
+ *  - alleen schulden     ⇒ max(0, doel − Σ saldi). Identiek aan het legacy
+ *    debt-pad: bij een AFBOUW is de voortgang het AFGELOSTE bedrag, niet het
+ *    resterende saldo. De clamp op 0 blijft: een schuld die groter is dan het
+ *    doel betekent "nog niets afgelost", niet "negatieve voortgang".
+ *  - GEMENGD             ⇒ Σ waarden − Σ saldi. Netto, en bewust NIET geklemd:
+ *    wie €10.000 spaargeld tegenover €25.000 schuld zet staat op −€15.000, en
+ *    dat is een eerlijk beeld. Een clamp zou "€0" tonen en daarmee suggereren
+ *    dat de schuld niet meetelt.
+ *
+ * Bewust geëxporteerd: het formulier gebruikt 'm voor de PREFILL, zodat wat de
+ * gebruiker bij het koppelen ziet exact is wat de sync er runtime van maakt.
+ * Dat heft de bestaande afwijking op waarbij `handleDebtLink` in
+ * `components/app/goal-form.tsx` de huidige waarde op het RUWE saldo zette —
+ * een prefill die de eigen runtime-formule tegensprak.
+ *
+ * NUMERIEK: bedragen komen uit Supabase NUMERIC-kolommen en dus als STRING
+ * binnen. Elke waarde gaat door `Number(...)`; niet-finite waarden tellen als 0
+ * i.p.v. het totaal op NaN te zetten.
+ */
+export function computeLinkedCurrentValue(
+  targetValue: number,
+  linkedAssets: readonly { current_value: number | string | null }[],
+  linkedDebts: readonly { current_balance: number | string | null }[],
+): number {
+  const sumAssets = linkedAssets.reduce((s, a) => {
+    const v = Number(a.current_value)
+    return s + (Number.isFinite(v) ? v : 0)
+  }, 0)
+  const sumDebts = linkedDebts.reduce((s, d) => {
+    const v = Number(d.current_balance)
+    return s + (Number.isFinite(v) ? v : 0)
+  }, 0)
+
+  const hasAssets = linkedAssets.length > 0
+  const hasDebts = linkedDebts.length > 0
+
+  if (hasAssets && hasDebts) return sumAssets - sumDebts
+  if (hasDebts) {
+    const target = Number(targetValue)
+    return Math.max(0, (Number.isFinite(target) ? target : 0) - sumDebts)
+  }
+  return sumAssets
+}
+
+/**
+ * Asset/debt-gekoppelde doelen: override `current_value` met de LIVE bron-waarde.
+ * Pure, synchrone in-place mutatie — geen query (de assets/debts zijn al geladen).
+ *
+ * ROUTERING (`links` meegegeven én ≥1 rij voor dít doel):
+ *  - ≥1 link-rij  ⇒ `computeLinkedCurrentValue` (meerdere bezittingen én
+ *    schulden, netto-semantiek).
+ *  - geen link-rij ⇒ EXACT het legacy-gedrag op `linked_asset_id`/
+ *    `linked_debt_id`, byte-identiek aan voorheen. De legacy-kolommen worden niet
+ *    meer geschreven maar blijven gevuld voor niet-gemigreerde rijen, dus deze
+ *    tak mag nooit wijzigen.
+ *
+ * Een link-rij die naar een niet-geladen bezitting/schuld wijst (inactief,
+ * verwijderd, buiten het perspectief) wordt overgeslagen. Kon GEEN ENKELE
+ * link-rij worden opgelost, dan blijft de opgeslagen waarde staan — zelfde
+ * tolerante degradatie als het legacy-pad (`if (asset)`), zodat een doel niet
+ * stilletjes op €0 springt omdat de bronrijen ontbreken.
  */
 export function autolinkGoalCurrentValues<
-  T extends { linked_asset_id?: string | null; linked_debt_id?: string | null; current_value: number; target_value: number },
+  T extends {
+    id?: string
+    linked_asset_id?: string | null
+    linked_debt_id?: string | null
+    current_value: number
+    target_value: number
+  },
 >(
   goals: T[],
   assets: readonly { id: string; current_value: number | string | null }[],
   debts: readonly { id: string; current_balance: number | string | null }[],
+  links?: readonly GoalLinkRow[],
 ): void {
+  // Index de link-rijen één keer per goal_id (i.p.v. per doel over alle rijen).
+  const linksByGoal = new Map<string, { assetIds: string[]; debtIds: string[] }>()
+  for (const row of links ?? []) {
+    if (!row?.goal_id) continue
+    // CHECK-invariant: precies één van beide. Een rij die daar niet aan voldoet
+    // is onbruikbaar en wordt genegeerd (geen gok welke kant bedoeld was).
+    const isAsset = row.asset_id != null && row.debt_id == null
+    const isDebt = row.debt_id != null && row.asset_id == null
+    if (!isAsset && !isDebt) continue
+    let entry = linksByGoal.get(row.goal_id)
+    if (!entry) {
+      entry = { assetIds: [], debtIds: [] }
+      linksByGoal.set(row.goal_id, entry)
+    }
+    if (isAsset) entry.assetIds.push(row.asset_id as string)
+    else entry.debtIds.push(row.debt_id as string)
+  }
+
   for (const goal of goals) {
+    const entry = goal.id ? linksByGoal.get(goal.id) : undefined
+
+    if (entry && (entry.assetIds.length > 0 || entry.debtIds.length > 0)) {
+      const linkedAssets = entry.assetIds
+        .map(id => assets.find(a => a.id === id))
+        .filter((a): a is { id: string; current_value: number | string | null } => !!a)
+      const linkedDebts = entry.debtIds
+        .map(id => debts.find(d => d.id === id))
+        .filter((d): d is { id: string; current_balance: number | string | null } => !!d)
+      if (linkedAssets.length > 0 || linkedDebts.length > 0) {
+        goal.current_value = computeLinkedCurrentValue(
+          Number(goal.target_value),
+          linkedAssets,
+          linkedDebts,
+        )
+      }
+      continue
+    }
+
+    // ── Legacy-pad, ongewijzigd ──
     if (goal.linked_asset_id) {
       const asset = assets.find(a => a.id === goal.linked_asset_id)
       if (asset) goal.current_value = Number(asset.current_value)
@@ -111,6 +297,16 @@ export function autolinkGoalCurrentValues<
       }
     }
   }
+}
+
+/** Heeft dit doel ≥1 bruikbare link-rij? (Link wint van metric-injectie.) */
+function hasGoalLinks(goalId: string | undefined, links: readonly GoalLinkRow[] | undefined): boolean {
+  if (!goalId || !links || links.length === 0) return false
+  return links.some(
+    r =>
+      r.goal_id === goalId &&
+      ((r.asset_id != null && r.debt_id == null) || (r.debt_id != null && r.asset_id == null)),
+  )
 }
 
 // ── Rij-types voor de lazy injectie-queries (kolom-scoped, licht) ──
@@ -402,20 +598,79 @@ export async function injectParameterGoalCurrentValues(
   }
 }
 
+// ── Auto-sync metric-bronnen ────────────────────────────────────────────────
+
+/**
+ * Wat één metric-bron oplevert. `null`/`undefined` = "deze bron kon niets
+ * zeggen" ⇒ de opgeslagen DB-waarde blijft staan (tolerante degradatie, exact
+ * het bestaande patroon van `injectParameterGoalCurrentValues`).
+ */
+export type GoalMetricValue = number | null | undefined
+
+/**
+ * Een metric-bron is een THUNK, geen waarde: hij wordt uitsluitend aangeroepen
+ * wanneer er daadwerkelijk een actief doel van dat type is. Zelfde lazy-patroon
+ * als `loadFireSnapshot` — een gebruiker zonder belastingdruk-doel betaalt geen
+ * Box 1/Box 3-resolutie.
+ */
+export type GoalMetricThunk = () => GoalMetricValue | Promise<GoalMetricValue>
+
+/**
+ * Schuldenvrij-datum + PROVENANCE. De datum zelf is nooit meer dan de laatste
+ * `debts.end_date`; of dat een hard feit is of een stille aanname hangt aan
+ * `resolveDebtTermBasis` (lib/debt-term-basis.ts). Alleen `user_set` telt als
+ * feit — bij `default_term`/`no_end_date` hoort er een aanname-label bij het
+ * getal (`describeDebtTermBasis` → components/editorial/aanname-hint.tsx).
+ */
+export interface DebtFreeDateSource {
+  /** Decimaal jaar (2031.5 = juli 2031), of `null` als onbepaalbaar. */
+  decimalYear: number | null
+  /** Waarop de datum rust. `null` wanneer er geen datum is. */
+  basis: DebtTermBasis | null
+}
+
+/**
+ * De canonieke bronnen voor auto-sync metric-doelen. Elke sleutel wijst naar een
+ * BESTAANDE motor; deze module roept aan en rekent NIETS zelf uit.
+ *
+ * SPIEGELEN IS GEEN CONSUMEREN — zie de module-docstring bovenaan. Een bron die
+ * hier binnenkomt is per constructie dezelfde aanroep die het bijbehorende
+ * oppervlak toont; een bron die hier zou worden nagebouwd, drijft weg.
+ *
+ * `savings_rate`, `salary`, `expected_return` en `fire_age` staan hier bewust
+ * NIET in: die lopen al via `injectParameterGoalCurrentValues` resp. de
+ * kernel-snapshot, en krijgen sinds deze wijziging ook auto-sync-doelen mee.
+ */
+export interface GoalMetricSources {
+  /** `net_worth` — inclusion-gewogen netto vermogen (€). */
+  netWorth?: GoalMetricThunk
+  /** `passive_income` — `computePassiveIncomeMonthly(netWorth, effectiveSwr)` (€/mnd). */
+  passiveIncomeMonthly?: GoalMetricThunk
+  /** `emergency_fund` — `resolveEmergencyFund(...).monthsCovered` (maanden). */
+  emergencyFundMonths?: GoalMetricThunk
+  /** `tax_burden` — `buildTaxOverview(...).effectiveRate × 100` (%). */
+  taxBurdenPct?: GoalMetricThunk
+  /** `debt_free_date` — laatste einddatum over actieve schulden + provenance. */
+  debtFreeDate?: () => DebtFreeDateSource | null | Promise<DebtFreeDateSource | null>
+}
+
 /**
  * ENE ingang die beide loaders (doelen-scherm + dashboard-widget) consumeren:
  * split actieve doelen in canonieke volgorde (parameter-doelen eerst + max 5
- * handmatige), synchroniseer daarna de `current_value` van asset/debt-gekoppelde
- * en parameter-doelen live. Muteert de doelen in-place en geeft de gesorteerde
- * `goals` (+ de `parameterGoals`-subset) terug.
+ * gebruikersdoelen, auto-sync vooraan), synchroniseer daarna de `current_value`
+ * van gekoppelde, parameter- en auto-sync-doelen live. Muteert de doelen
+ * in-place en geeft de gesorteerde `goals` (+ subsets) terug.
  *
  * `loadFireSnapshot` is de DERDE synchronisatiebron (bevinding C10): het
- * vrijheidsgetal-doel én het fire_age-parameterdoel volgen de canonieke
- * FIRE-motor i.p.v. een statisch opgeslagen bedrag resp. de motor-wisselende
- * snapshotkolom. Bewust een THUNK en geen waarde: hij wordt alleen aangeroepen
- * wanneer er daadwerkelijk zo'n FIRE-doel actief is, zodat gebruikers zonder
- * FIRE-doel geen kernel-run betalen — hetzelfde lazy-patroon als de
- * parameter-injectie hierboven.
+ * vrijheidsgetal-doel, het fire_age-doel én (nieuw) het eindsaldo-doel volgen de
+ * canonieke FIRE-motor i.p.v. een statisch opgeslagen bedrag resp. de
+ * motor-wisselende snapshotkolom. Bewust een THUNK en geen waarde: hij wordt
+ * alleen aangeroepen wanneer er daadwerkelijk zo'n FIRE-doel actief is, zodat
+ * gebruikers zonder FIRE-doel geen kernel-run betalen — hetzelfde lazy-patroon
+ * als de parameter-injectie hierboven.
+ *
+ * `links` en `metricSources` staan ACHTERAAN en zijn optioneel: zonder beide is
+ * het gedrag byte-identiek aan voorheen (de regressie-eis).
  */
 export async function syncActiveGoalValues<T extends SyncableGoal>(
   supabase: SupabaseClient,
@@ -424,23 +679,66 @@ export async function syncActiveGoalValues<T extends SyncableGoal>(
   debts: readonly { id: string; current_balance: number | string | null }[],
   userId: string | null,
   loadFireSnapshot?: () => Promise<VrijheidsgetalSnapshot | null>,
-): Promise<{ goals: T[]; parameterGoals: T[]; fireSnapshot: VrijheidsgetalSnapshot | null; vrijheidsgetalSynced: number }> {
-  const { goals, parameterGoals } = splitActiveGoals(allGoals)
-  autolinkGoalCurrentValues(goals, assets, debts)
+  links?: readonly GoalLinkRow[],
+  metricSources?: GoalMetricSources,
+): Promise<{
+  goals: T[]
+  parameterGoals: T[]
+  autoSyncGoals: T[]
+  fireSnapshot: VrijheidsgetalSnapshot | null
+  vrijheidsgetalSynced: number
+  /**
+   * Provenance van de schuldenvrij-datum, zodat de UI een aanname-label kan
+   * tonen wanneer de datum op een STILLE type-default rust i.p.v. op eigen
+   * invoer. `null` wanneer er geen schuldenvrij-doel actief was.
+   */
+  debtFreeBasis: DebtTermBasis | null
+}> {
+  const { goals, parameterGoals, autoSyncGoals } = splitActiveGoals(allGoals)
+  autolinkGoalCurrentValues(goals, assets, debts, links)
+
+  // Auto-sync-doelen MET koppelingen volgen hun koppelingen: dat is de meer
+  // specifieke intentie van de gebruiker, en de link-waarde staat er hierboven
+  // al in. Alleen de ongekoppelde rest krijgt een motor-waarde.
+  const metricGoals = autoSyncGoals.filter(g => !hasGoalLinks(g.id, links))
+
+  // De parameter-injectie draait óók over de auto-sync-doelen: `savings_rate`,
+  // `salary` en `expected_return` hebben daar al een canonieke bron, en die is
+  // per definitie dezelfde als voor een lab-parameterdoel. Eén tak, één cijfer.
+  const injectionSet = [...parameterGoals, ...metricGoals]
 
   // De fire-thunk draait bij ELK doel dat de canonieke FIRE-motor nodig heeft:
-  // het vrijheidsgetal-doel (bevinding C10) én het fire_age-parameterdoel (zie
-  // hieronder). Beide zijn FIRE-doelen; wie er geen heeft betaalt geen kernel-run.
+  // het vrijheidsgetal-doel (bevinding C10), het fire_age-doel en het
+  // eindsaldo-doel. Wie er geen heeft betaalt geen kernel-run.
   const wantsFire =
     Boolean(loadFireSnapshot) &&
-    (goals.some(isVrijheidsgetalGoal) || parameterGoals.some(gl => gl.goal_type === 'fire_age'))
-  const [, fireSnapshot] = await Promise.all([
-    injectParameterGoalCurrentValues(supabase, parameterGoals, userId),
-    wantsFire ? loadFireSnapshot!() : Promise.resolve(null),
-  ])
+    (goals.some(isVrijheidsgetalGoal) ||
+      injectionSet.some(gl => gl.goal_type === 'fire_age' || gl.goal_type === 'end_balance'))
+
+  // Per-type gating: elke metric-thunk draait alleen bij een actief doel van dat
+  // type. `has` kijkt uitsluitend in `metricGoals` — parameter-doelen hebben hun
+  // eigen bronnen en mogen deze thunks niet activeren.
+  const has = (type: GoalType) => metricGoals.some(g => g.goal_type === type)
+  const wantNetWorth = has('net_worth') && !!metricSources?.netWorth
+  const wantPassive = has('passive_income') && !!metricSources?.passiveIncomeMonthly
+  const wantEmergency = has('emergency_fund') && !!metricSources?.emergencyFundMonths
+  const wantTax = has('tax_burden') && !!metricSources?.taxBurdenPct
+  const wantDebtFree = has('debt_free_date') && !!metricSources?.debtFreeDate
+
+  const [, fireSnapshot, netWorthValue, passiveValue, emergencyValue, taxValue, debtFree] =
+    await Promise.all([
+      injectParameterGoalCurrentValues(supabase, injectionSet, userId),
+      wantsFire ? loadFireSnapshot!() : Promise.resolve(null),
+      wantNetWorth ? metricSources!.netWorth!() : Promise.resolve(undefined),
+      wantPassive ? metricSources!.passiveIncomeMonthly!() : Promise.resolve(undefined),
+      wantEmergency ? metricSources!.emergencyFundMonths!() : Promise.resolve(undefined),
+      wantTax ? metricSources!.taxBurdenPct!() : Promise.resolve(undefined),
+      wantDebtFree ? metricSources!.debtFreeDate!() : Promise.resolve(null),
+    ])
+
   const vrijheidsgetalSynced = applyVrijheidsgetalSync(goals, fireSnapshot)
 
-  // fire_age-parameterdoel: de canonieke kernel-run wint van de snapshotkolom.
+  // fire_age-doel: de canonieke kernel-run wint van de snapshotkolom.
   // `net_worth_snapshots.fire_age` wordt 's ochtends door de daily-open-sync met
   // de SCALAR-motor herschreven en pas bij een /toekomst-bezoek door de kernel
   // gepatcht — zonder deze override wisselde de doelkaart binnen één dag van
@@ -450,10 +748,52 @@ export async function syncActiveGoalValues<T extends SyncableGoal>(
   // eerlijker dan niets.
   const kernelFireAge = fireSnapshot?.fireAgeFractional
   if (kernelFireAge != null && Number.isFinite(kernelFireAge) && kernelFireAge > 0) {
-    for (const gl of parameterGoals) {
+    for (const gl of injectionSet) {
       if (gl.goal_type === 'fire_age') gl.current_value = kernelFireAge
     }
   }
 
-  return { goals, parameterGoals, fireSnapshot, vrijheidsgetalSynced }
+  // ── Auto-sync metric-waarden toepassen ──
+  // Overal dezelfde tolerantie-regel: alleen een FINITE getal overschrijft de
+  // DB-waarde. Nul is een geldige uitkomst (0% belastingdruk, €0 vermogen) en
+  // wordt dus wél doorgezet — het is `null`/`undefined`/NaN dat "geen uitspraak"
+  // betekent, niet de nul zelf (bevinding M4).
+  const apply = (goal: T, value: GoalMetricValue) => {
+    if (value == null) return
+    const n = Number(value)
+    if (Number.isFinite(n)) goal.current_value = n
+  }
+
+  const endBalance = fireSnapshot?.endBalanceAtEndAge
+  for (const goal of metricGoals) {
+    switch (goal.goal_type) {
+      case 'net_worth':
+        apply(goal, netWorthValue)
+        break
+      case 'passive_income':
+        apply(goal, passiveValue)
+        break
+      case 'emergency_fund':
+        apply(goal, emergencyValue)
+        break
+      case 'tax_burden':
+        apply(goal, taxValue)
+        break
+      case 'end_balance':
+        apply(goal, endBalance)
+        break
+      case 'debt_free_date':
+        apply(goal, debtFree?.decimalYear)
+        break
+    }
+  }
+
+  return {
+    goals,
+    parameterGoals,
+    autoSyncGoals,
+    fireSnapshot,
+    vrijheidsgetalSynced,
+    debtFreeBasis: debtFree?.basis ?? null,
+  }
 }

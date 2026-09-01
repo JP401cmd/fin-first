@@ -887,3 +887,15 @@
 - **Schermen** toegevoegd: /mijn/jaaroverzicht, /mijn/mijlpalen
 - **API-routes** toegevoegd: /api/home-screen
 - **Componenten (aantal)** toegevoegd: +7
+
+## 2026-09-01
+
+- **Tabellen** toegevoegd: goal_links
+
+## 2026-09-01
+
+- Geen wijzigingen.
+
+## 2026-09-01
+
+- Geen wijzigingen.

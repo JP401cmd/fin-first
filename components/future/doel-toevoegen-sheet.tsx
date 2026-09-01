@@ -8,41 +8,55 @@ import { formatCurrency } from '@/lib/format'
 import { GoalForm } from '@/components/app/goal-form'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { ModalFooter } from '@/components/app/modal-footer'
-import { STANDAARD_DOELEN } from '@/lib/goals/standaard-doelen'
+import { STANDAARD_DOELEN, type StandaardDoelGoalType } from '@/lib/goals/standaard-doelen'
+import { GOAL_TYPE_LABELS, GOAL_TYPE_ICONS, type GoalType } from '@/lib/goal-data'
 
 type AssetLite = { id: string; name: string; current_value: number }
 type DebtLite = { id: string; name: string; current_balance: number }
 
 /**
- * DoelToevoegenSheet — plan §6.3 Tab 2 detail-pane: doelen toevoegen
- * direct op de Doelen-tab zonder doorklikken naar /will.
+ * DoelToevoegenSheet — plan §6.3 Tab 2 detail-pane: doelen toevoegen direct op
+ * de Doelen-tab.
  *
  * Form-velden (minimaal):
  *  - Naam (verplicht, max 100 chars)
  *  - Doelbedrag in EUR (verplicht, positief getal)
  *  - Streefdatum (optioneel, ISO yyyy-mm-dd)
- *  - Doel-type (savings / wealth / debt) — default 'savings'
+ *  - Doel-type — de drie euro-types uit `GOAL_TYPE_META`, default 'savings'
  *
- * Edit-flow blijft op /will (legacy). Deze sheet is alleen voor het
- * snel toevoegen-pad zodat de Doelen-tab een complete CRUD-plek
- * wordt zonder bestaande pagina te dupliceren.
+ * Meer doel-types, de doelbasis-keuze en koppelingen zitten achter
+ * "Geavanceerd" (GoalForm). Dit is bewust het SNELLE pad.
+ *
+ * ENUM-BOTSING OPGERUIMD (1 sep 2026): dit bestand had een eigen
+ * `type GoalType = 'savings' | 'wealth' | 'debt'`. Die eerste botste met de
+ * canonieke `GoalType`, en de andere twee BESTAAN daar niet: een doel dat hier
+ * werd aangemaakt kwam als `goal_type: 'wealth'` in de database en viel op de
+ * doelkaart stil terug (geen meta, geen eenheid, geen richting). De sheet praat
+ * nu uitsluitend in canonieke types; `StandaardDoelGoalType` wordt vertaald via
+ * `PRESET_TYPE_MAP`.
  */
 
-type GoalType = 'savings' | 'wealth' | 'debt'
+/** De drie euro-types die het snelle pad aanbiedt (canonieke `GoalType`s). */
+const QUICK_ADD_TYPES: GoalType[] = ['savings', 'net_worth', 'debt_payoff']
 
-const GOAL_TYPE_LABELS: Record<GoalType, string> = {
-  savings: 'Sparen',
-  wealth: 'Vermogen groeien',
-  debt: 'Schuld aflossen',
+/**
+ * Vertaling van de preset-enum (`lib/goals/standaard-doelen.ts`) naar de
+ * canonieke `GoalType`. De preset-laag houdt bewust een eigen, kleinere enum;
+ * deze map is de ENE plek waar die twee elkaar raken.
+ */
+const PRESET_TYPE_MAP: Record<StandaardDoelGoalType, GoalType> = {
+  savings: 'savings',
+  wealth: 'net_worth',
+  debt: 'debt_payoff',
 }
 
 /** Default jaarrendement per goal-type. NL-context: sparen ~1.5%
  *  (deposito), beleggen ~6% (wereldwijde ETF lange termijn), schuld
  *  loopt 0% (we tellen alleen inleg). */
-const RETURN_BY_TYPE: Record<GoalType, number> = {
+const RETURN_BY_TYPE: Partial<Record<GoalType, number>> = {
   savings: 0.015,
-  wealth: 0.06,
-  debt: 0,
+  net_worth: 0.06,
+  debt_payoff: 0,
 }
 
 /**
@@ -111,6 +125,8 @@ export function DoelToevoegenSheet({
   // Geavanceerd-modus: opent GoalForm met alle goal_types + asset/debt-
   // koppeling. Assets+debts laden we lazy bij open van die overlay.
   const [advancedOpen, setAdvancedOpen] = useState(false)
+  /** Voorgeselecteerd type bij het doorschakelen naar GoalForm (bv. een afbouwdoel). */
+  const [advancedType, setAdvancedType] = useState<GoalType | undefined>(undefined)
   const [assets, setAssets] = useState<AssetLite[]>([])
   const [debts, setDebts] = useState<DebtLite[]>([])
   const router = useRouter()
@@ -131,9 +147,19 @@ export function DoelToevoegenSheet({
     let cancelled = false
     async function load() {
       const supabase = createClient()
+      // EIGEN rijen, expliciet. De SELECT-policies op `assets` en `debts` zijn
+      // huishoud-verbreed (own OR shared), en de privacy-voorkeuren van de
+      // partner worden pas in de perspectief-laag toegepast — die zit hier niet
+      // tussen. Zonder dit filter verschijnt een gedeelde schuld die de partner
+      // op verborgen zette alsnog mét naam en saldo in de koppel-lijst.
+      // Kosteloos: de server weigert een niet-eigen koppeling toch (guard-trigger
+      // + eigenaarscontrole in /api/goals), dus tonen levert alleen een keuze op
+      // die niet af te maken is.
+      const { data: { user } } = await supabase.auth.getUser()
+      if (cancelled || !user) return
       const [aRes, dRes] = await Promise.all([
-        supabase.from('assets').select('id, name, current_value').order('name'),
-        supabase.from('debts').select('id, name, current_balance').order('name'),
+        supabase.from('assets').select('id, name, current_value').eq('user_id', user.id).order('name'),
+        supabase.from('debts').select('id, name, current_balance').eq('user_id', user.id).order('name'),
       ])
       if (cancelled) return
       setAssets(((aRes.data ?? []) as AssetLite[]))
@@ -216,7 +242,10 @@ export function DoelToevoegenSheet({
 
       {open && (
         <ShellOverlay
-          open
+          // Eén venster tegelijk (M35 / ADR 0039): zodra de geavanceerde
+          // GoalForm openstaat, verdwijnt deze sheet i.p.v. eronder te blijven
+          // staan. Sluit de gebruiker GoalForm, dan komt hij terug.
+          open={!advancedOpen}
           onClose={() => {
             setOpen(false)
             reset()
@@ -266,12 +295,21 @@ export function DoelToevoegenSheet({
                       key={preset.key}
                       type="button"
                       onClick={() => {
+                        const type = PRESET_TYPE_MAP[preset.goalType]
                         setName(preset.label)
                         setTargetValue(computed > 0 ? String(computed) : '')
-                        setGoalType(preset.goalType)
+                        setGoalType(type)
                         setIcon(preset.icon)
                         setColor(preset.color)
                         setSelectedPreset(preset.key)
+                        // Een AFBOUWDOEL heeft een schuld nodig om iets te
+                        // betekenen — en koppelen kan alleen in GoalForm. Dit
+                        // snelle pad schakelt daarom door i.p.v. een doel
+                        // zonder schuld achter te laten.
+                        if (type === 'debt_payoff') {
+                          setAdvancedType(type)
+                          setAdvancedOpen(true)
+                        }
                       }}
                       className="flex flex-col items-start gap-0.5 border border-[var(--border-ed)] bg-[var(--paper)] p-2.5 text-left hover:border-[var(--ink-3)] hover:shadow-sm transition-all"
                     >
@@ -346,10 +384,14 @@ export function DoelToevoegenSheet({
                 </span>
                 <select
                   value={goalType}
-                  onChange={(e) => setGoalType(e.target.value as GoalType)}
+                  onChange={(e) => {
+                    const t = e.target.value as GoalType
+                    setGoalType(t)
+                    setIcon(GOAL_TYPE_ICONS[t])
+                  }}
                   className="w-full border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--ink-3)]"
                 >
-                  {(Object.keys(GOAL_TYPE_LABELS) as GoalType[]).map((t) => (
+                  {QUICK_ADD_TYPES.map((t) => (
                     <option key={t} value={t}>
                       {GOAL_TYPE_LABELS[t]}
                     </option>
@@ -375,6 +417,7 @@ export function DoelToevoegenSheet({
               type="button"
               onClick={(e) => {
                 e.stopPropagation()
+                setAdvancedType(goalType)
                 setAdvancedOpen(true)
               }}
               className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-horizon-700 hover:text-horizon-800 hover:underline"
@@ -397,10 +440,15 @@ export function DoelToevoegenSheet({
             name: name || undefined,
             target_value: targetValue || undefined,
             target_date: targetDate || undefined,
+            goal_type: advancedType,
           }}
-          onClose={() => setAdvancedOpen(false)}
+          onClose={() => {
+            setAdvancedOpen(false)
+            setAdvancedType(undefined)
+          }}
           onSaved={() => {
             setAdvancedOpen(false)
+            setAdvancedType(undefined)
             setOpen(false)
             reset()
             router.refresh()
@@ -437,7 +485,9 @@ function EtaPreview({
   const target = Number(targetValue)
   if (!Number.isFinite(target) || target <= 0) return null
 
-  const annualReturn = RETURN_BY_TYPE[goalType]
+  // Onbekend type (kan alleen via een handmatig aangepast doel) → geen
+  // rendement-aanname: dan telt alleen de inleg.
+  const annualReturn = RETURN_BY_TYPE[goalType] ?? 0
 
   // Case 1: doel + datum → maandelijkse inleg
   if (targetDate) {
@@ -465,9 +515,9 @@ function EtaPreview({
           </strong>{' '}
           per maand inleggen over{' '}
           <strong className="font-semibold text-[var(--ink)]">{yearsLabel}</strong>
-          {goalType === 'wealth' && ` bij ${Math.round(annualReturn * 100)}% rendement`}
+          {goalType === 'net_worth' && ` bij ${Math.round(annualReturn * 100)}% rendement`}
           {goalType === 'savings' && ` op deposito (~${(annualReturn * 100).toFixed(1)}%)`}
-          {goalType === 'debt' && ' extra-aflossing'}.
+          {goalType === 'debt_payoff' && ' extra-aflossing'}.
         </p>
       </section>
     )

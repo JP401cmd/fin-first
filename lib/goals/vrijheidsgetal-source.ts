@@ -26,6 +26,7 @@ import { isHomeExcludedFromFire } from '@/lib/housing-strategy'
 import { ageAtDate } from '@/lib/horizon-data'
 import {
   buildVrijheidsgetalSnapshot,
+  pickEndBalanceAtEndAge,
   type VrijheidsgetalSnapshot,
 } from '@/lib/goals/vrijheidsgetal-goal'
 
@@ -79,5 +80,8 @@ export const loadVrijheidsgetalSnapshot = cache(async function loadVrijheidsgeta
     requiredPortfolioExclHome,
     fireAgeFractional: run?.sim.fireAgeFractional ?? null,
     currentAge: dob ? ageAtDate(dob) : null,
+    // Eindsaldo op de levensverwachting-proxy uit DEZELFDE run — geen tweede
+    // kernel-solve. `displayEndAge` volgt uit `profiles.fire_end_age` (default 90).
+    endBalanceAtEndAge: pickEndBalanceAtEndAge(run?.sim ?? null),
   })
 })

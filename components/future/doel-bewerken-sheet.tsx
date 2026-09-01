@@ -10,10 +10,55 @@ import { getGoalSuggestions } from '@/lib/goal-suggestions'
 import { GoalForm } from '@/components/app/goal-form'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { ModalFooter } from '@/components/app/modal-footer'
-import type { Goal } from '@/lib/goal-data'
+import {
+  computeGoalProgress,
+  formatGoalValue,
+  goalValueLabels,
+  isGoalReached,
+  GOAL_TYPE_META,
+  type Goal,
+} from '@/lib/goal-data'
 
 type AssetLite = { id: string; name: string; current_value: number }
 type DebtLite = { id: string; name: string; current_balance: number }
+
+/**
+ * Mirror van lib/goal-current-value#isAutoSyncMetricGoal — bewust lokaal: die
+ * module trekt via de metric-bronnen de complete server-loader-graaf mee, en dit
+ * is een triviale tag-check (`metadata.sync === 'auto'`). Houd identiek aan de
+ * canonieke bron.
+ */
+function isAutoSyncMetricGoal(goal: Goal): boolean {
+  const m = goal.metadata
+  return typeof m === 'object' && m !== null && (m as Record<string, unknown>).sync === 'auto'
+}
+
+/**
+ * Houdt de app dit doel zélf bij? Dan hoort er geen invoerveld te staan: wat je
+ * hier zou typen wordt bij de volgende load overschreven door de koppeling
+ * (`goal_links`, of de legacy-kolommen) of door de canonieke motor achter een
+ * auto-sync-doel. Zelfde drieslag als de "loopt automatisch mee"-regel op de
+ * doelkaart en als de check-in-overslaan-regel.
+ */
+function isLiveGoal(goal: Goal): boolean {
+  return (
+    (goal.links?.length ?? 0) > 0 ||
+    !!goal.linked_asset_id ||
+    !!goal.linked_debt_id ||
+    isAutoSyncMetricGoal(goal)
+  )
+}
+
+/**
+ * Waar de live waarde vandaan komt, in gewone taal. Koppelingen winnen van de
+ * metric-bron — zelfde voorrang als `syncActiveGoalValues`.
+ */
+function liveHerkomst(goal: Goal): string {
+  if ((goal.links?.length ?? 0) > 0 || goal.linked_asset_id || goal.linked_debt_id) {
+    return 'Deze stand komt uit je gekoppelde bezittingen en schulden.'
+  }
+  return 'Deze stand houdt de app zelf bij, uit je eigen cijfers.'
+}
 
 /**
  * DoelBewerkenSheet — quick-update flow per doel op /toekomst Doelen-tab.
@@ -55,6 +100,21 @@ export function DoelBewerkenSheet({
   const targetValue = Number(goal.target_value)
   const goalType = goal.goal_type
   const suggestions = getGoalSuggestions(goalType)
+  // Defensief: legacy-rijen kunnen een type dragen dat niet (meer) in
+  // GOAL_TYPE_META staat. Zonder meta valt de weergave terug op euro's — het
+  // gedrag van vóór deze wijziging.
+  const meta = GOAL_TYPE_META[goalType] as (typeof GOAL_TYPE_META)[keyof typeof GOAL_TYPE_META] | undefined
+  const fmtValue = (v: number) => (meta ? formatGoalValue(v, goalType, goal.custom_unit) : formatCurrency(v))
+  const valueLabels = goalValueLabels(goalType)
+  const isEuroGoal = !meta || meta.unit === 'EUR' || meta.unit === 'EUR/mnd'
+  // Euro-doelen houden hun bestaande stap van €100; andere eenheden (procenten,
+  // maanden, jaren) volgen de stap van hun type — 100 zou daar onzin zijn.
+  const stepForInput = isEuroGoal ? 100 : (meta?.step ?? 1)
+  /** Vanaf welk verschil de bijdrage-monitor iets te melden heeft. */
+  const deltaDrempel = isEuroGoal ? 0.5 : 0.005
+  // Live doel = geen invoerveld: wat je typt wordt bij de volgende load door de
+  // koppeling of de motor overschreven.
+  const live = isLiveGoal(goal)
   const [newValue, setNewValue] = useState(String(currentValue))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -74,9 +134,15 @@ export function DoelBewerkenSheet({
     let cancelled = false
     async function load() {
       const supabase = createClient()
+      // EIGEN rijen, expliciet — zie de gelijkluidende toelichting in
+      // doel-toevoegen-sheet.tsx: de SELECT-policies op `assets`/`debts` zijn
+      // huishoud-verbreed en de privacy-voorkeuren van de partner worden pas in
+      // de perspectief-laag toegepast, die hier niet tussen zit.
+      const { data: { user } } = await supabase.auth.getUser()
+      if (cancelled || !user) return
       const [aRes, dRes] = await Promise.all([
-        supabase.from('assets').select('id, name, current_value').order('name'),
-        supabase.from('debts').select('id, name, current_balance').order('name'),
+        supabase.from('assets').select('id, name, current_value').eq('user_id', user.id).order('name'),
+        supabase.from('debts').select('id, name, current_balance').eq('user_id', user.id).order('name'),
       ])
       if (cancelled) return
       setAssets(((aRes.data ?? []) as AssetLite[]))
@@ -91,17 +157,31 @@ export function DoelBewerkenSheet({
   async function handleSubmit(e?: React.FormEvent) {
     e?.preventDefault()
     const numeric = Number(newValue)
-    if (!Number.isFinite(numeric) || numeric < 0) {
-      setError('Waarde moet een getal ≥ 0 zijn.')
+    if (!Number.isFinite(numeric)) {
+      setError('Vul een geldig getal in.')
+      return
+    }
+    // Ondergrens uit het type (`GOAL_TYPE_META.min`), niet hardcoded 0: een
+    // schuldenvrij-datum loopt in decimale jaren (min 1900) en een leeftijd in
+    // jaren (min 18). De 0-ondergrens houdt zijn bestaande tekst.
+    const minValue = meta?.min ?? 0
+    if (numeric < minValue) {
+      setError(
+        minValue === 0
+          ? 'Waarde moet een getal ≥ 0 zijn.'
+          : `Waarde moet minimaal ${fmtValue(minValue)} zijn.`,
+      )
       return
     }
     setSaving(true)
     setError(null)
-    // Auto-completion: zodra current_value ≥ target_value markeren we
-    // het doel als voltooid. Voor schuld-doelen ligt 'voltooid' bij
-    // current_value = 0 (afgelost) — dat patroon volgt later wanneer
-    // de schema goal_type-specifieke completion-logica heeft.
-    const willBeCompleted = targetValue > 0 && numeric >= targetValue
+    // Behaald? RICHTING-BEWUST via `isGoalReached` (lib/goal-data.ts), niet via
+    // een kale `numeric >= targetValue`. Bij een 'down'-doel (belastingdruk,
+    // vrijheidsleeftijd, schuldenvrij-datum) draait de toets om: 35% tegen een
+    // doel van 30% zou anders METEEN "behaald" zijn — mét viering en een
+    // onomkeerbare regel in het mijlpalen-logboek — en een vrijheidsleeftijd van
+    // 46 tegen doel 55 zou het nooit worden.
+    const willBeCompleted = isGoalReached(goalType, numeric, targetValue)
     // `completed_at` volgt de OVERGANG, niet de stand (kaart #19). Alleen bij de
     // échte 0→100%-overgang stempelen we de datum; bij heropenen van een
     // voltooid doel wissen we 'm; bij een re-save van een al voltooid doel gaat
@@ -160,8 +240,18 @@ export function DoelBewerkenSheet({
 
   const parsedNew = Number(newValue)
   const validNew = Number.isFinite(parsedNew) ? parsedNew : currentValue
-  const pct = targetValue > 0 ? Math.min(100, (validNew / targetValue) * 100) : 0
-  const oldPct = targetValue > 0 ? Math.min(100, (currentValue / targetValue) * 100) : 0
+  // Voortgang via de CANONIEKE motor i.p.v. een eigen `current / target`: die
+  // laatste klopt niet voor 'down'-doelen (lager-is-beter), waar voortgang
+  // `target / current` is. Consume, don't recompute.
+  const progressFor = (value: number) =>
+    computeGoalProgress({
+      goal_type: goalType,
+      current_value: value,
+      target_value: targetValue,
+      target_date: null,
+    }).pct
+  const pct = progressFor(validNew)
+  const oldPct = progressFor(currentValue)
   // Bijdrage-delta vs. originele waarde — voedt de monitor onder de input
   // zodat de user de wijziging ziet vóór "Opslaan". Plan §6.3 "bijdrage-
   // monitor". MVP-versie: alleen verschil-bedrag + delta in percentage-
@@ -183,10 +273,17 @@ export function DoelBewerkenSheet({
       size="md"
       title="Voortgang bijwerken"
       footer={
-        <ModalFooter
-          primary={{ label: 'Opslaan', onClick: () => handleSubmit(), loading: saving }}
-          secondary={{ label: 'Annuleer', onClick: onClose }}
-        />
+        live ? (
+          // Niets bij te werken: dit doel loopt mee. Een "Opslaan"-knop zou hier
+          // een wijziging suggereren die niet bestaat; de vervolgactie is
+          // uitkomst-gemodelleerd i.p.v. een kale "Sluiten".
+          <ModalFooter primary={{ label: 'Terug naar je doelen', onClick: onClose }} />
+        ) : (
+          <ModalFooter
+            primary={{ label: 'Opslaan', onClick: () => handleSubmit(), loading: saving }}
+            secondary={{ label: 'Annuleer', onClick: onClose }}
+          />
+        )
       }
     >
       <form onSubmit={handleSubmit} className="p-5 sm:p-6">
@@ -203,22 +300,40 @@ export function DoelBewerkenSheet({
           </div>
         )}
 
-        <label className="block mb-3">
-          <span className="block text-xs font-semibold text-[var(--ink-2)] mb-1">
-            Huidige waarde (€)
-          </span>
-          <input
-            type="number"
-            inputMode="decimal"
-            min={0}
-            step={100}
-            value={newValue}
-            onChange={(e) => setNewValue(e.target.value)}
-            className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm focus:outline-none focus:border-[var(--ink-3)]"
-            required
-            autoFocus
-          />
-        </label>
+        {live ? (
+          /* Live doel: geen invoerveld. De waarde komt van je koppelingen of
+             van een canonieke motor; hier iets laten typen belooft invloed die
+             er niet is (de eerstvolgende load overschrijft 'm). */
+          <div data-testid="doel-loopt-mee" className="mb-3">
+            <span className="block text-xs font-semibold text-[var(--ink-2)] mb-1">
+              {valueLabels.current}
+            </span>
+            <p className="font-mono text-lg tabular-nums text-[var(--ink)]">
+              {fmtValue(currentValue)}
+            </p>
+            <p className="mt-1 text-[11px] italic text-[var(--ink-3)]">
+              {liveHerkomst(goal)} Je hoeft hier niets bij te werken.
+            </p>
+          </div>
+        ) : (
+          <label className="block mb-3">
+            <span className="block text-xs font-semibold text-[var(--ink-2)] mb-1">
+              {valueLabels.current}
+            </span>
+            <input
+              type="number"
+              inputMode="decimal"
+              min={meta?.min ?? 0}
+              max={meta?.max}
+              step={stepForInput}
+              value={newValue}
+              onChange={(e) => setNewValue(e.target.value)}
+              className="w-full rounded-lg border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm font-mono tabular-nums focus:outline-none focus:border-[var(--ink-3)]"
+              required
+              autoFocus
+            />
+          </label>
+        )}
 
         <div className="mb-1 flex items-baseline justify-between text-[11px] text-[var(--ink-3)]">
           <span>Voortgang</span>
@@ -246,8 +361,9 @@ export function DoelBewerkenSheet({
 
         {/* Bijdrage-monitor — toont de wijziging vóór opslaan. Alleen
             zichtbaar als er een delta is, zodat de standaard-state rustig
-            blijft. */}
-        {Math.round(delta) !== 0 && (
+            blijft. Bij een live doel is er niets te vergelijken (geen invoer),
+            dus dan valt het hele blok weg. */}
+        {!live && Math.abs(delta) >= deltaDrempel && (
           <div
             data-testid="bijdrage-monitor"
             className={`mb-4 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
@@ -262,7 +378,7 @@ export function DoelBewerkenSheet({
               <TrendingDown className="w-3 h-3" aria-hidden="true" />
             )}
             <span className="tabular-nums">
-              {delta > 0 ? '+' : '−'}{formatCurrency(Math.abs(Math.round(delta)))}
+              {delta > 0 ? '+' : '−'}{fmtValue(Math.abs(delta))}
             </span>
             <span className="text-[var(--ink-3)]">·</span>
             <span className="tabular-nums">
@@ -270,7 +386,7 @@ export function DoelBewerkenSheet({
             </span>
           </div>
         )}
-        {Math.round(delta) === 0 && (
+        {!live && Math.abs(delta) < deltaDrempel && (
           <div
             data-testid="bijdrage-monitor"
             className="mb-4 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold bg-[var(--subtle)] text-[var(--ink-3)]"
@@ -281,10 +397,13 @@ export function DoelBewerkenSheet({
         )}
 
         {/* Doel-behaald-bevestiging: zichtbaar zodra de gebruiker een waarde
-            invoert die ≥ target is. Vóór submit zodat 't voelt als bevestiging
-            tijdens typen. Ingetogen en feitelijk (geen emoji/confetti — de
-            échte viering volgt ná opslaan via MilestoneCelebration). */}
-        {targetValue > 0 && validNew >= targetValue && (
+            invoert die het doel haalt. Vóór submit zodat 't voelt als
+            bevestiging tijdens typen. Ingetogen en feitelijk (geen
+            emoji/confetti — de échte viering volgt ná opslaan via
+            MilestoneCelebration). RICHTING-BEWUST via `isGoalReached`: dezelfde
+            toets als de save, zodat scherm en schrijfactie nooit iets anders
+            zeggen. */}
+        {!live && isGoalReached(goalType, validNew, targetValue) && (
           <div
             data-testid="doel-behaald"
             className="mb-4 flex items-center gap-2 border-l-[3px] border-positive bg-positive/10 px-3 py-2 text-xs text-positive"

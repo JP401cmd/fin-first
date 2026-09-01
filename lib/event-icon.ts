@@ -6,6 +6,7 @@ import {
   CheckCircle2, PartyPopper, Mountain, Sparkles, AlertTriangle, Shield, Receipt, TrendingUp,
   Compass, Wallet,
   Target, CreditCard, Sun, Activity, LineChart, Banknote, ShieldCheck, Coins, Hourglass,
+  Vault, CalendarCheck,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -70,6 +71,10 @@ export const EVENT_ICON_COMPONENTS: Record<string, LucideIcon> = {
   ShieldCheck,
   Coins,
   Hourglass,
+  // Doelbasis-types (1 sep 2026): eindsaldo bij levensverwachting en
+  // schuldenvrij-datum. `Receipt` (belastingdruk) staat hierboven al.
+  Vault,
+  CalendarCheck,
 }
 
 /**

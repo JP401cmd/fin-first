@@ -25,7 +25,7 @@
 // per se de getoonde volgorde.
 
 import { credibleDailyExpense, credibleMonthlyBasis, formatCurrency } from '@/lib/format'
-import { formatGoalValue, type GoalType } from '@/lib/goal-data'
+import { formatGoalValue, isGoalReached, type GoalType } from '@/lib/goal-data'
 import type { HealthScore } from '@/lib/financial-health'
 import type { LifeEvent } from '@/lib/horizon-data'
 import type { Recommendation } from '@/lib/recommendation-data'
@@ -309,9 +309,15 @@ export function buildBriefingEntries(input: BriefingEngineInput): BriefingEntry[
   //    (a) doel dat 100% raakt (= behaald)
   //    (b) health-score-trend >= +5 punten t.o.v. vorige maand
   //    Voorkeur: (a) eerst, want concreter dan een score-stijging.
-  const completedGoalIdx = input.goalProgresses.findIndex(
-    (p) => p.pct >= 100,
-  )
+  // De CANONIEKE toets, niet het percentage. Bij een omlaag-doel rekent de
+  // voortgang `target / current`; op jaartallen (schuldenvrij-datum) zit daar
+  // ruim tien jaar speling in vóór het quotiënt onder de 100% zakt, dus zo'n
+  // doel zou hier structureel als "behaald" gevierd worden terwijl het jaren
+  // achterloopt. Zonder `goalTypes` (oude callers) blijft het oude gedrag staan.
+  const completedGoalIdx = input.goalProgresses.findIndex((p, i) => {
+    const goalType = input.goalTypes?.[i]
+    return goalType ? isGoalReached(goalType, p.current, p.target) : p.pct >= 100
+  })
   if (completedGoalIdx !== -1) {
     const goalName = input.goalNames[completedGoalIdx]
     if (goalName) {

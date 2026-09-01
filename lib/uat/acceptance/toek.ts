@@ -31,7 +31,10 @@
  * functie of constante): AOW-bedragen (computeAowMonthly), de tekort-lening-rente
  * (EXCEL_TEKORT_LENING_RENTE), de strategie-labels + weergave-eindleeftijd-regel,
  * de jaarlijkse pensioenuitgave (custom_amount×12), guardrail-echo's, de
- * doel-ETA-annuïteitsformule en doel-voortgang (computeGoalProgress). Alleen die
+ * doel-ETA-annuïteitsformule, doel-voortgang (computeGoalProgress), het
+ * meervoudig koppelen (computeLinkedCurrentValue, WF-TOEK-39) en de
+ * richting-bewuste behaald-/auto-afsluit-toets (isGoalReached/
+ * isMachineTrackedGoal/selectReachedAutoGoals, WF-TOEK-40, ADR 0125). Alleen die
  * 'exact'-criteria hebben een engine-check in toek-checks.ts (bewezen door
  * toek.engine.test.ts + de in-app suite uat-toek.ts).
  *
@@ -349,12 +352,12 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     persona: 'willem',
     given: 'Persona Willem geladen (heeft al 2 goals).',
-    when: 'De gebruiker kiest preset "Noodfonds €5.000" (type Sparen, geen datum) en daarna een variant met streefdatum over 24 maanden.',
-    then: 'Zonder datum: "Bij €100/maand haal je dit doel in ~4 jaar" — n = ln(1+(5.000×r)/100)/ln(1+r) met r=0,015/12 → n≈48,5 mnd → round(4,04)=4 jaar. Met streefdatum (24 mnd): PMT = 5.000×(0,015/12)/((1+0,015/12)^24−1) ≈ €205,35/maand. DISCREPANTIE (uat2-toek.md 22b): het document noemt €205,36; de precieze annuïteitsformule geeft €205,35 (1-cent afrondingsslip in het document; de UI toont Math.round → €205). De doel-ETA-annuïteitsformule staat LOS van de kernel → exact narekenbaar.',
+    when: 'De gebruiker kiest preset "Noodfonds €5.000" (type Sparen, geen datum) en daarna een variant met streefdatum over 24 maanden; apart (d) kiest hij de preset "Schuldenvrij".',
+    then: 'Zonder datum: "Bij €100/maand haal je dit doel in ~4 jaar" — n = ln(1+(5.000×r)/100)/ln(1+r) met r=0,015/12 → n≈48,5 mnd → round(4,04)=4 jaar. Met streefdatum (24 mnd): PMT = 5.000×(0,015/12)/((1+0,015/12)^24−1) ≈ €205,35/maand. DISCREPANTIE (uat2-toek.md 22b): het document noemt €205,36; de precieze annuïteitsformule geeft €205,35 (1-cent afrondingsslip in het document; de UI toont Math.round → €205). De doel-ETA-annuïteitsformule staat LOS van de kernel → exact narekenbaar. (d) SINDS DE ENUM-OPRUIMING (1 sep 2026, ADR 0125): de snelle-toevoegen-sheet praat uitsluitend in canonieke `GoalType`s (savings/net_worth/debt_payoff) i.p.v. een eigen `savings/wealth/debt`-enum die op de doelkaart stil terugviel naar "geen meta, geen eenheid, geen richting" (het doel kwam als `goal_type: \'wealth\'` in de database terecht — geen bug in deze release, wel de reden dat de enums nu identiek zijn). De preset "Schuldenvrij" schakelt daarom NIET meer door naar een leeg doel zonder schuld: hij opent direct "Geavanceerd" (GoalForm) met `debt_payoff` voorgeselecteerd, want een afbouwdoel heeft een gekoppelde schuld nodig om iets te betekenen (koppelen kan alleen daar — zie WF-TOEK-39).',
     assertion: {
       kind: 'exact',
       expected: 'etaJaren=4; maandinlegMetDatum=205.35',
-      source: 'annuïteitsformule monthlyContributionForTarget / no-date-solve (components/future/doel-toevoegen-sheet.tsx, RETURN_BY_TYPE.savings=0.015). LIMITATIE: die functie is component-privé/niet-exporteerbaar; de check spiegelt exact dezelfde pure formule (bewijst de math, niet de component-wiring).',
+      source: 'annuïteitsformule monthlyContributionForTarget / no-date-solve (components/future/doel-toevoegen-sheet.tsx, RETURN_BY_TYPE.savings=0.015). LIMITATIE: die functie is component-privé/niet-exporteerbaar; de check spiegelt exact dezelfde pure formule (bewijst de math, niet de component-wiring). De preset→doeltype-vertaling (d) is UI-routing (component-wiring), niet in dit exact-cijfer meegenomen.',
     },
   },
   {
@@ -573,6 +576,43 @@ const criteria: AcceptanceCriterion[] = [
         'lib/horizon/risico-event-regels.ts#berekenWerkloosheidImpact/berekenOverlijdenPartnerImpact/werkloosheidNaFireWaarschuwing/RISICO_EVENT_NA_FIRE (échte productiefuncties) op lib/sociale-zekerheid.ts#SOCIALE_ZEKERHEID_PARAMS[2026] — zie toek-checks.ts',
     },
   },
+  {
+    workflow: 'WF-TOEK-39',
+    scenarioId: 'UAT-TOEK-39',
+    titel: 'Doel koppelen aan meerdere bezittingen én schulden tegelijk (netto-voortgang, migratie 20260901140000)',
+    kriticiteit: 'KERN',
+    persona: 'willem',
+    given:
+      'Een geld-doel (savings/net_worth/invested_assets/debt_payoff/custom — de types met `allowsMixedLinks: true`) in GoalForm, sectie "Koppelen (optioneel)" (twee aanvinkbare groepen: Bezittingen/Schulden, tabel `goal_links`, vervangt de twee wederzijds-exclusieve dropdowns van vóór 1 sep 2026). Doelbedrag €20.000. Drie scenario\'s: (a) alleen bezittingen aangevinkt (€8.000 + €5.000), (b) alleen schulden aangevinkt (restsaldo €12.000 — afbouwdoel), (c) gemengd: dezelfde twee bezittingen ÉN een schuld van €3.000.',
+    when: 'De gebruiker vinkt de koppelingen aan; het formulier toont de live "huidige waarde" (read-only zodra ≥1 koppeling actief is) en de server slaat ze op via `PATCH/POST /api/goals` (`links`-diff, `goal_links`).',
+    then:
+      '(a) Alleen bezittingen: huidige waarde = Σ waarden = 8.000+5.000 = €13.000 — identiek aan het legacy asset-pad. (b) Alleen schulden: huidige waarde = max(0, doel − Σ saldi) = max(0, 20.000−12.000) = €8.000 — de voortgang is het AFGELOSTE bedrag, niet het restsaldo (identiek aan het legacy debt-pad). (c) GEMENGD (nieuw): huidige waarde = Σ bezittingen − Σ schulden = 13.000−3.000 = €10.000, NIET geklemd op 0 — bij een schuld die groter is dan de bezittingen mag de uitkomst negatief zijn (een eerlijk beeld, geen stille clamp naar €0). Dezelfde formule voedt zowel de FORMULIER-PREFILL (bij het aanvinken) als de RUNTIME-sync op elke pageload (`autolinkGoalCurrentValues`/`syncActiveGoalValues`) — één rekenweg, geen tweede die kan wegdrijven. Alleen-schulden op een AFBOUWDOEL zonder het type-`allowsMixedLinks` (bv. een doel dat geen geld-type is) toont geen koppel-sectie (`showLinkSection` = false).',
+    assertion: {
+      kind: 'exact',
+      expected: 'alleenBezittingen=13000; alleenSchulden=8000; gemengd=10000',
+      source: 'lib/goal-current-value.ts#computeLinkedCurrentValue (échte productiefunctie — dezelfde aanroep als components/app/goal-form.tsx voor de prefill en lib/goal-current-value.ts#autolinkGoalCurrentValues voor de runtime-sync).',
+    },
+  },
+  {
+    workflow: 'WF-TOEK-40',
+    scenarioId: 'UAT-TOEK-40',
+    titel: 'Doel op een kengetal zetten: live meesyncen, richting-bewust afsluiten en éénmalig vieren (doelbasis, ADR 0125)',
+    kriticiteit: 'KERN',
+    persona: 'willem',
+    given:
+      'Bij een NIEUW doel de vraag "Waar meet je dit doel aan af?": `manual` (zelf bijhouden, default) of één van de acht `metricBasis`-types (spaarquote, netto vermogen, vrijheidsleeftijd, passief inkomen, noodfonds in maanden, eindsaldo, schuldenvrij-datum, belastingdruk) — bij die keuze schrijft `POST /api/goals` `metadata.sync = \'auto\'` (server-bepaald; nooit door de client). Drie omlaag-doelen (`direction: \'down\'`) zijn hierin het scherpst: `fire_age` (huidige vrijheidsleeftijd 46 tegen doelwaarde 55 — eerder is beter), `tax_burden` (huidige belastingdruk 35% tegen doelwaarde 30% — lager is beter) en `debt_free_date`.',
+    when:
+      'De canonieke motor (horizon-kernel resp. `buildTaxOverview`) levert een nieuwe stand; de gebruiker bezoekt /overzicht (server-reconciliatie) en daarna /toekomst/doelen.',
+    then:
+      '(a) RICHTING-BEWUST BEHAALD (kern van ADR 0125): een kale `current >= target` zou bij `fire_age` 46 tegen doel 55 NOOIT "behaald" opleveren (46>=55 is onwaar, terwijl het doel ruim gehaald is) en bij `tax_burden` 35% tegen doel 30% juist METEEN "behaald" opleveren (35>=30 is waar, terwijl het doel mislukt is) — twee tegengestelde fouten tegelijk. `isGoalReached` corrigeert dit met de type-richting: bij `direction: \'down\'` geldt bereikt ⇔ current <= target. (b) ALLEEN MACHINE-BIJGEHOUDEN DOELEN SLUITEN ZICHZELF: `isMachineTrackedGoal` (auto-sync óf ≥1 koppeling óf de legacy asset/debt-kolommen) bepaalt of de server mag afsluiten; een lab-parameterdoel (`metadata.bron===\'parameter\'`) en een handmatig doel vallen er expliciet buiten — die sluit de gebruiker nog altijd zelf af in de bewerk-sheet. (c) Bij een bereikt machine-doel markeert `reconcileAutoCompletedGoals` het bij het EERSTVOLGENDE /overzicht-bezoek als `is_completed` met `completed_at` (één UPDATE, race-veilig via `.eq(\'is_completed\', false)` — een parallelle render wint hoogstens één keer), en de doelenpagina biedt het daarna tot 14 dagen (`AUTO_COMPLETED_NOTICE_WINDOW_DAYS`) als ongeziene viering aan (once-guard per doel-id, net als de handmatige viering uit WF-TOEK-23) voordat het naar het Bereikt-archief verhuist. (d) CHECK-IN SLAAT HET OVER: `isLiveGoal` (koppeling, auto-sync of legacy-koppeling) laat de maandelijkse check-in-stap dit doel met rust — er wordt niet om een handmatige update gevraagd voor een cijfer dat de app zelf al bijhoudt. Voortgang/pace-toets zelf blijven ongewijzigd bij WF-TOEK-35.',
+    assertion: {
+      kind: 'exact',
+      expected:
+        'fireAgeReached_46_v_55=true; taxBurdenReached_35_v_30=false; fireAgeKaleVergelijkingZou=false; taxBurdenKaleVergelijkingZou=true; autoSyncMachineTracked=true; parameterGoalMachineTracked=false; manualGoalMachineTracked=false; reachedAutoGoalSelected=true',
+      source:
+        'lib/goal-data.ts#isGoalReached (richting-bewuste toets) + lib/goals/auto-complete.ts#isMachineTrackedGoal/selectReachedAutoGoals (échte productiefuncties, geen kernel-run nodig — pure selectie op een reeds-gesynchroniseerde doel-rij). Viering-venster = AUTO_COMPLETED_NOTICE_WINDOW_DAYS (lib/goals/auto-complete.ts). Check-in-skip = app/(app)/core/checkin/page.tsx#isLiveGoal (spiegelt bewust lokaal, zelfde drie bronnen).',
+    },
+  },
 ]
 
 export const TOEK_ACCEPTANCE: AcceptanceSet = {
@@ -587,5 +627,5 @@ export const TOEK_ACCEPTANCE: AcceptanceSet = {
  */
 export const TOEK_EXPECTED_WORKFLOW_NUMBERS: number[] = [
   ...Array.from({ length: 26 }, (_, i) => i + 1), // 1..26
-  28, 29, 30, 32, 33, 34, 35, 36, 37, 38,
+  28, 29, 30, 32, 33, 34, 35, 36, 37, 38, 39, 40,
 ]

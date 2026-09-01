@@ -187,6 +187,109 @@ describe('DoelenView — basis-render', () => {
     expect(screen.queryByText(/per maand nodig/)).toBeNull()
   })
 
+  // ── Eenheid-bewuste weergave: niet alles is een euro ──────────────────
+  it('rendert een schuldenvrij-doel als datum, niet als euro-bedrag', () => {
+    render(
+      <DoelenView
+        goals={[
+          mockGoal({
+            id: 'sv',
+            name: 'Schuldenvrij',
+            goal_type: 'debt_free_date',
+            target_value: 2031.5,
+            current_value: 2035.5,
+          } as Partial<GoalWithBudget>),
+        ]}
+        goalProgresses={[
+          { current: 2035.5, target: 2031.5, pct: 99, onTrack: false, measured: true, requiredMonthly: null, eta: null },
+        ]}
+      />,
+    )
+    // formatGoalValue kent de 'datum'-eenheid: decimaal jaar → maand + jaar.
+    expect(screen.getByText(/juli 2035/)).toBeTruthy()
+    expect(screen.getByText(/van juli 2031/)).toBeTruthy()
+    // ... en nergens het oude "€ 2.035 van € 2.031".
+    expect(screen.queryByText(/€\s*2\.03/)).toBeNull()
+  })
+
+  it('rendert een vrijheidsleeftijd-doel in jaren', () => {
+    render(
+      <DoelenView
+        goals={[
+          mockGoal({
+            id: 'fa',
+            name: 'Eerder vrij',
+            goal_type: 'fire_age',
+            target_value: 55,
+            current_value: 46,
+          } as Partial<GoalWithBudget>),
+        ]}
+        goalProgresses={[
+          { current: 46, target: 55, pct: 100, onTrack: true, measured: true, requiredMonthly: null, eta: null },
+        ]}
+      />,
+    )
+    expect(screen.getByText('46 jaar')).toBeTruthy()
+    expect(screen.getByText('van 55 jaar')).toBeTruthy()
+  })
+
+  // ── "Loopt automatisch mee" ───────────────────────────────────────────
+  it('markeert een auto-sync-doel als meelopend', () => {
+    render(
+      <DoelenView
+        goals={[
+          mockGoal({
+            id: 'auto',
+            name: 'Netto vermogen',
+            goal_type: 'net_worth',
+            metadata: { sync: 'auto' },
+          } as Partial<GoalWithBudget>),
+        ]}
+        goalProgresses={[
+          { current: 20000, target: 50000, pct: 40, onTrack: true, measured: true, requiredMonthly: null, eta: null },
+        ]}
+      />,
+    )
+    expect(screen.getByTestId('doel-loopt-mee').textContent).toMatch(/Loopt automatisch mee/)
+  })
+
+  it('markeert een gekoppeld doel als meelopend', () => {
+    render(
+      <DoelenView
+        goals={[mockGoal({ links: [{ asset_id: 'a1', debt_id: null }] } as Partial<GoalWithBudget>)]}
+        goalProgresses={[
+          { current: 20000, target: 50000, pct: 40, onTrack: true, measured: true, requiredMonthly: null, eta: null },
+        ]}
+      />,
+    )
+    expect(screen.getByTestId('doel-loopt-mee')).toBeTruthy()
+  })
+
+  it('markeert een doel dat de loader als gekoppeld aanlevert (linkedGoalIds)', () => {
+    render(
+      <DoelenView
+        goals={[mockGoal({ id: 'gk' } as Partial<GoalWithBudget>)]}
+        goalProgresses={[
+          { current: 20000, target: 50000, pct: 40, onTrack: true, measured: true, requiredMonthly: null, eta: null },
+        ]}
+        linkedGoalIds={['gk']}
+      />,
+    )
+    expect(screen.getByTestId('doel-loopt-mee')).toBeTruthy()
+  })
+
+  it('een gewoon handmatig doel krijgt GEEN meeloop-regel', () => {
+    render(
+      <DoelenView
+        goals={[mockGoal()]}
+        goalProgresses={[
+          { current: 20000, target: 50000, pct: 40, onTrack: true, measured: true, requiredMonthly: null, eta: null },
+        ]}
+      />,
+    )
+    expect(screen.queryByTestId('doel-loopt-mee')).toBeNull()
+  })
+
   it('sorteert off-track doelen bovenaan', () => {
     const goals = [
       mockGoal({ id: 'g1', name: 'Op koers doel' }),

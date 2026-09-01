@@ -5,7 +5,13 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Target, Pencil, ArrowUpRight, MoreHorizontal, ChevronDown } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
-import { formatGoalValue, GOAL_TYPE_META, type GoalProgress } from '@/lib/goal-data'
+import {
+  formatGoalValue,
+  goalReachedFromProgress,
+  GOAL_TYPE_META,
+  type GoalProgress,
+  type GoalType,
+} from '@/lib/goal-data'
 import { getGoalSuggestions } from '@/lib/goal-suggestions'
 import type { GoalWithBudget } from '@/lib/fin-data-loader'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
@@ -13,7 +19,7 @@ import { DoelToevoegenSheet } from './doel-toevoegen-sheet'
 import { DoelBewerkenSheet } from './doel-bewerken-sheet'
 import { DoelLoslatenConfirm } from './doel-loslaten-confirm'
 import { ProgressMilestones } from '@/components/editorial/progress-milestones'
-import { MilestoneCelebration } from '@/components/app/milestone-celebration'
+import { MilestoneCelebration, hasCelebrated } from '@/components/app/milestone-celebration'
 
 /**
  * DoelenView — content voor de Doelen-tab op /toekomst.
@@ -69,6 +75,37 @@ function isVrijheidsgetalGoal(goal: GoalWithBudget): boolean {
   )
 }
 
+/**
+ * Mirror van lib/goal-current-value#isAutoSyncMetricGoal — om dezelfde reden
+ * lokaal als de twee mirrors hierboven: die module trekt via `loadForecastSectionData`
+ * de complete server-loader-graaf mee, en dit is een triviale tag-check
+ * (`metadata.sync === 'auto'`), geen financiële herberekening. Houd identiek aan
+ * de canonieke bron.
+ */
+function isAutoSyncMetricGoal(goal: GoalWithBudget): boolean {
+  const m = goal.metadata
+  return typeof m === 'object' && m !== null && (m as Record<string, unknown>).sync === 'auto'
+}
+
+/**
+ * Houdt de app dit doel ZELF bij? Drie bronnen, allemaal "je kunt hier geen
+ * waarde in typen":
+ *  - `links` (tabel `goal_links`) — gekoppeld aan bezittingen/schulden;
+ *  - de legacy-kolommen `linked_asset_id`/`linked_debt_id` (niet-gemigreerde rijen);
+ *  - `metadata.sync === 'auto'` — een doel op een kengetal uit een canonieke motor.
+ *
+ * NB: `links` is `undefined` zolang een loader ze niet meelevert; dat is iets
+ * anders dan `[]`. Daarom blijven de legacy-kolommen hier meedoen.
+ */
+function isLiveGoal(goal: GoalWithBudget): boolean {
+  return (
+    (goal.links?.length ?? 0) > 0 ||
+    !!goal.linked_asset_id ||
+    !!goal.linked_debt_id ||
+    isAutoSyncMetricGoal(goal)
+  )
+}
+
 function formatMarge(v: number): string {
   return v.toLocaleString('nl-NL', { maximumFractionDigits: 1 })
 }
@@ -90,12 +127,21 @@ function behaaldLabel(completedAt: string | null | undefined): string {
   })}`
 }
 
-function statusFor(progress: GoalDisplay['progress']): {
+function statusFor(progress: GoalDisplay['progress'], goalType?: GoalType): {
   label: string
   color: string
   bg: string
 } {
-  if (progress.pct >= 100) {
+  // "Behaald" volgt de CANONIEKE toets, niet het percentage. Bij een omlaag-doel
+  // (vrijheidsleeftijd, schuldenvrij-datum, belastingdruk) rekent de voortgang
+  // `target / current`; bij jaartallen rond 2030 staat dat quotiënt afgerond op
+  // 100% zodra je er ergens in de buurt zit, ook als je er jaren naast zit.
+  // Zonder deze toets zou de kaart permanent "Behaald" tonen terwijl het doel
+  // nooit afsluit — scherm en werkelijkheid die elkaar tegenspreken.
+  const behaald = goalType
+    ? goalReachedFromProgress(goalType, progress)
+    : progress.pct >= 100
+  if (behaald) {
     return { label: 'Behaald', color: 'text-positive', bg: 'bg-positive/10' }
   }
   // Bevinding M31: een zojuist gesteld doel waarop nog niets binnenkwam heeft
@@ -239,8 +285,24 @@ function ManualGoalCard({
   progress,
   onEdit,
   live = false,
-}: GoalDisplay & { onEdit: () => void; live?: boolean }) {
-  const status = statusFor(progress)
+  linked = false,
+}: GoalDisplay & { onEdit: () => void; live?: boolean; linked?: boolean }) {
+  // Houdt de app dit doel zelf bij? Dan is er geen waarde om in te typen — dat
+  // hoort op de kaart te staan, in dezelfde ingetogen meta-regel-familie als de
+  // parameter-doelen ("bekijk live in het lab"). `linked` komt van de loader
+  // (`FinPageData.linkedGoalIds`); `isLiveGoal` dekt de gevallen waarin het doel
+  // zijn koppeling/marker zélf draagt.
+  const autoTracked = linked || isLiveGoal(goal)
+  // Defensief: een niet-gemigreerde legacy-rij kan een type dragen dat niet in
+  // GOAL_TYPE_META staat. `formatGoalValue` leest daar `meta.unit` op — zonder
+  // deze guard zou zo'n rij de hele doelenlijst laten crashen i.p.v. terug te
+  // vallen op de euro-weergave van vóór deze wijziging.
+  const fmtValue = (v: number) =>
+    GOAL_TYPE_META[goal.goal_type]
+      ? formatGoalValue(v, goal.goal_type, goal.custom_unit)
+      : formatCurrency(v)
+  const status = statusFor(progress, goal.goal_type)
+  const behaald = goalReachedFromProgress(goal.goal_type, progress)
   const pct = Math.min(100, Math.max(0, Math.round(progress.pct)))
   // Bevinding M32: het stoplicht rust voortaan op het benodigde maandbedrag tot
   // de streefdatum — toon dat bedrag erbij, anders is het oordeel niet
@@ -272,12 +334,17 @@ function ManualGoalCard({
           {status.label}
         </span>
       </header>
+      {/* Eenheid-bewust formatteren: `formatCurrency` maakte van een
+          schuldenvrij-datum "€ 2.035 van € 2.031" en van een vrijheidsleeftijd
+          "€ 46 van € 55". `formatGoalValue` kent de eenheid van het type
+          (euro's, procenten, maanden, jaren, datum) — zelfde bron als
+          ParameterGoalCard. */}
       <div className="flex items-baseline gap-1.5 mb-2">
         <span className="font-serif text-lg font-semibold text-[var(--ink)] tabular-nums">
-          {formatCurrency(progress.current)}
+          {fmtValue(progress.current)}
         </span>
         <span className="text-xs text-[var(--ink-3)]">
-          van {formatCurrency(progress.target)}
+          van {fmtValue(progress.target)}
         </span>
       </div>
       <div
@@ -290,7 +357,7 @@ function ManualGoalCard({
       >
         <div
           className={`h-full ${
-            pct >= 100
+            behaald
               ? 'bg-positive'
               : progress.onTrack
                 ? 'bg-positive'
@@ -313,14 +380,19 @@ function ManualGoalCard({
           {formatCurrency(Math.round(requiredMonthly))} per maand nodig
         </p>
       )}
-      {live && (
-        // Bevinding C10: dit doel toont niet je ingevoerde bedragen maar de
-        // canonieke FIRE-stand. Zonder dit regeltje lijkt de kaart handmatig
-        // bij te werken terwijl invoer genegeerd wordt.
-        <p className="mt-1 text-[10px] text-[var(--ink-4)]">
+      {/* Bevinding C10: dit doel toont niet je ingevoerde bedragen maar een
+          canonieke stand. Zonder dit regeltje lijkt de kaart handmatig bij te
+          werken terwijl invoer genegeerd wordt. Eén regel, meest specifieke
+          eerst — het vrijheidsgetal noemt zijn bron bij naam. */}
+      {live ? (
+        <p className="mt-1.5 text-[11px] italic text-[var(--ink-3)]">
           Volgt automatisch je vrijheidsgetal
         </p>
-      )}
+      ) : autoTracked ? (
+        <p data-testid="doel-loopt-mee" className="mt-1.5 text-[11px] italic text-[var(--ink-3)]">
+          Loopt automatisch mee — de app houdt deze stand bij
+        </p>
+      ) : null}
     </button>
   )
 }
@@ -402,6 +474,8 @@ export function DoelenView({
   monthlyIncome = 0,
   monthlyExpenses = 0,
   vrijheidsgetalLive = false,
+  linkedGoalIds,
+  autoCompletedGoals,
 }: {
   goals: GoalWithBudget[]
   goalProgresses: GoalDisplay['progress'][]
@@ -418,8 +492,30 @@ export function DoelenView({
   monthlyExpenses?: number
   /** Draait het vrijheidsgetal-doel live op de FIRE-motor? (`FinPageData.vrijheidsgetalLive`) */
   vrijheidsgetalLive?: boolean
+  /**
+   * Doelen met ≥1 koppeling in `goal_links` (`FinPageData.linkedGoalIds`). De
+   * doel-rijen zelf dragen die koppelingen niet — ze leven in een aparte tabel —
+   * dus zonder deze lijst kan de kaart niet zien dat de waarde meeloopt.
+   * Optioneel: zonder de prop valt de kaart terug op wat het doel zélf draagt
+   * (`links`, de legacy-kolommen, de auto-sync-marker).
+   */
+  linkedGoalIds?: string[]
+  /**
+   * Doelen die de SERVER afsloot omdat ze hun doelwaarde bereikten
+   * (`FinPageData.autoCompletedGoals`) — meelopende doelen, waar geen
+   * gebruikersactie aan te pas komt. Nieuwste eerst.
+   *
+   * Nodig omdat de viering hieronder van oudsher aan de bewerk-sheet hangt: die
+   * roept `onCompleted` aan wanneer JIJ een waarde opslaat die het doel haalt.
+   * Een doel dat meeloopt met je vermogen of je spaarquote passeert zijn doel
+   * zonder dat je iets doet, en zou dus geruisloos in het archief belanden.
+   * `MilestoneCelebration` bewaakt met dezelfde `celebrationKey` dat er per doel
+   * maar één keer gevierd wordt, ook als beide paden hetzelfde doel aandragen.
+   */
+  autoCompletedGoals?: { id: string; name: string; goalType: string | null }[]
 }) {
   const router = useRouter()
+  const linkedIds = new Set(linkedGoalIds ?? [])
   // Weergavemodus: single source of truth (geen prop-drilling van de modus).
   const { mode } = useDisplayMode()
   const simple = mode === 'simple'
@@ -433,11 +529,22 @@ export function DoelenView({
   // Mijlpaal "doel behaald" — gezet zodra een doel bij het bijwerken de
   // 100%-overgang maakt. De viering zelf (once-guard per doel-id) zit in
   // MilestoneCelebration.
+  //
+  // De beginwaarde komt uit `autoCompletedGoals`: een meelopend doel dat zijn
+  // doelwaarde haalde is server-side al afgesloten, dus er komt hier nooit een
+  // `onCompleted` voor binnen. Eén tegelijk — een rij vieringen achter elkaar
+  // devalueert ze alle drie.
+  //
+  // We nemen bewust het eerste doel dat op dit apparaat NOG NIET gevierd is, niet
+  // simpelweg het nieuwste: sluiten er twee doelen kort na elkaar automatisch af,
+  // dan zou het nieuwste zijn once-guard zetten en daarna bij elk bezoek de kop
+  // van de lijst blijven — het tweede doel viel dan uit het venster zonder ooit
+  // gevierd te zijn.
   const [reachedGoal, setReachedGoal] = useState<{
     id: string
     name: string
     goalType: string | null
-  } | null>(null)
+  } | null>(() => autoCompletedGoals?.find((g) => !hasCelebrated(`goal-reached:${g.id}`)) ?? null)
 
   // Brug naar het volgende doel (voorstel 3b): een teller die DoelToevoegenSheet
   // van buitenaf opent. Elke verhoging = één open-verzoek; zie de prop-uitleg
@@ -647,6 +754,7 @@ export function DoelenView({
                 progress={d.progress}
                 onEdit={() => setEditingGoal(d.goal)}
                 live={vrijheidsgetalLive && isVrijheidsgetalGoal(d.goal)}
+                linked={linkedIds.has(d.goal.id)}
               />
             ),
           )}
@@ -666,6 +774,7 @@ export function DoelenView({
               progress={d.progress}
               onEdit={() => setEditingGoal(d.goal)}
               live={vrijheidsgetalLive && isVrijheidsgetalGoal(d.goal)}
+              linked={linkedIds.has(d.goal.id)}
             />
           ))}
         </div>
@@ -674,7 +783,7 @@ export function DoelenView({
       <p className="mt-6 text-[11px] italic text-[var(--ink-3)]">
         {simple
           ? 'Klik op een doel om je voortgang bij te werken.'
-          : 'Klik op een doel om voortgang bij te werken of het te verwijderen. Volledige edit van naam/bedrag/datum via /will.'}
+          : 'Klik op een doel om voortgang bij te werken of het te verwijderen. Naam, bedrag, datum en koppelingen wijzig je daar via "Volledig bewerken".'}
       </p>
 
       {/* ── Bereikt — behaalde doelen, ingeklapt onderaan (voorstel 3a) ── */}

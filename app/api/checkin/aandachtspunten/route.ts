@@ -1,6 +1,13 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
+import {
+  computeGoalProgress,
+  formatGoalValue,
+  isGoalReached,
+  GOAL_TYPE_META,
+  type GoalType,
+} from '@/lib/goal-data'
 
 /* ── Types ──────────────────────────────────────────────────────────── */
 export interface Aandachtspunt {
@@ -69,7 +76,9 @@ export async function GET() {
     // Goals with deadlines
     supabase
       .from('goals')
-      .select('id, name, current_value, target_value, target_date, is_completed, icon')
+      // `goal_type` hoort erbij: zonder dat veld is er geen richting, en dan
+      // leest een omlaag-doel (schuldenvrij-datum, belastingdruk) omgekeerd.
+      .select('id, name, goal_type, current_value, target_value, target_date, is_completed, icon')
       .eq('user_id', claims.sub)
       .eq('is_completed', false),
     // All current month expenses (for daily expense calculation)
@@ -154,8 +163,22 @@ export async function GET() {
     if (!goal.target_date || goal.is_completed) continue
 
     const targetDate = new Date(goal.target_date)
-    const pct = goal.target_value > 0 ? (goal.current_value / goal.target_value) * 100 : 0
-    const remaining = goal.target_value - goal.current_value
+    // Voortgang uit de canonieke motor (richting-bewust) i.p.v. een eigen
+    // current/target-deling, en de restwaarde in de EENHEID van het doel. De
+    // eigen som las een omlaag-doel verkeerd om: een schuldenvrij-doel met doel
+    // 2031 en een verwachting van 2035 gaf "nog € -4 te gaan (100% bereikt)".
+    const goalType = goal.goal_type as GoalType
+    const progress = computeGoalProgress({
+      goal_type: goalType,
+      current_value: goal.current_value,
+      target_value: goal.target_value,
+      target_date: goal.target_date,
+    })
+    if (isGoalReached(goalType, goal.current_value, goal.target_value)) continue
+    const pct = progress.pct
+    const fmtGoal = (v: number) =>
+      GOAL_TYPE_META[goalType] ? formatGoalValue(v, goalType) : formatEUR(v)
+    const remainingLabel = fmtGoal(Math.abs(goal.target_value - goal.current_value))
 
     // Goal deadline passed
     if (goal.target_date < todayStr) {
@@ -163,7 +186,7 @@ export async function GET() {
         id: `goal-overdue-${goal.id}`,
         type: 'goal_overdue',
         title: `${goal.icon ? goal.icon + ' ' : ''}${goal.name}: deadline verstreken`,
-        description: `Doel was gepland voor ${targetDate.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}. Nog ${formatEUR(remaining)} te gaan (${Math.round(pct)}% bereikt).`,
+        description: `Doel was gepland voor ${targetDate.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}. Nog ${remainingLabel} te gaan (${Math.round(pct)}% bereikt).`,
         severity: 'high',
       })
     }
@@ -175,7 +198,7 @@ export async function GET() {
           id: `goal-behind-${goal.id}`,
           type: 'goal_behind',
           title: `${goal.icon ? goal.icon + ' ' : ''}${goal.name}: achter op schema`,
-          description: `Nog ${daysUntilDeadline} dagen tot de deadline (${targetDate.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })}). ${Math.round(pct)}% bereikt, nog ${formatEUR(remaining)} te gaan.`,
+          description: `Nog ${daysUntilDeadline} dagen tot de deadline (${targetDate.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long' })}). ${Math.round(pct)}% bereikt, nog ${remainingLabel} te gaan.`,
           severity: daysUntilDeadline <= 14 ? 'high' : 'medium',
         })
       }

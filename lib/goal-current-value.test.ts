@@ -1,8 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   autolinkGoalCurrentValues,
+  computeLinkedCurrentValue,
   splitActiveGoals,
   syncActiveGoalValues,
+  MAX_HANDMATIGE_DOELEN,
+  type GoalLinkRow,
   type SyncableGoal,
 } from './goal-current-value'
 import { computeGoalProgress, type GoalType } from './goal-data'
@@ -167,5 +170,207 @@ describe('syncActiveGoalValues — fire_age-doel volgt de canonieke kernel-run b
     const supabase = makeSupabase([{ fire_age: 42.8 }])
     const { goals } = await syncActiveGoalValues(supabase, [fireGoal], [], [], 'u1')
     expect(goals[0].current_value).toBe(42.8)
+  })
+})
+
+// ── computeLinkedCurrentValue — de ENE huidige-waarde-formule voor `goal_links` ──
+
+describe('computeLinkedCurrentValue', () => {
+  it('alleen bezittingen: som van de gekoppelde waarden', () => {
+    const v = computeLinkedCurrentValue(
+      0,
+      [{ current_value: 1000 }, { current_value: 2000 }],
+      [],
+    )
+    expect(v).toBe(3000)
+  })
+
+  it('alleen schulden: doel min som van de saldi, geklemd op 0', () => {
+    // Onder het doel: normale voortgang.
+    expect(
+      computeLinkedCurrentValue(10000, [], [{ current_balance: 3000 }, { current_balance: 2000 }]),
+    ).toBe(5000)
+    // Schuldsaldo groter dan het doel → geklemd op 0, niet negatief.
+    expect(computeLinkedCurrentValue(1000, [], [{ current_balance: 5000 }])).toBe(0)
+  })
+
+  it('gemengd (bezittingen én schulden): netto, NIET geklemd op 0', () => {
+    // €10.000 spaargeld tegenover €25.000 schuld → eerlijk −€15.000, geen clamp.
+    const v = computeLinkedCurrentValue(
+      0,
+      [{ current_value: 10000 }],
+      [{ current_balance: 25000 }],
+    )
+    expect(v).toBe(-15000)
+  })
+
+  it('lege koppelset: 0', () => {
+    expect(computeLinkedCurrentValue(5000, [], [])).toBe(0)
+  })
+
+  it('niet-numerieke/null waarden tellen als 0, geen NaN-besmetting', () => {
+    const v = computeLinkedCurrentValue(
+      0,
+      [{ current_value: 'abc' }, { current_value: null }, { current_value: '500' }],
+      [],
+    )
+    expect(v).toBe(500)
+    expect(Number.isNaN(v)).toBe(false)
+  })
+})
+
+// ── autolinkGoalCurrentValues — routering via `goal_links` (meervoudige koppelingen) ──
+
+describe('autolinkGoalCurrentValues — links-routering', () => {
+  it('een link-rij die naar een onbekende/verwijderde bezitting wijst: geen enkele link oplosbaar → DB-waarde blijft staan', () => {
+    const goals = [g({ goal_type: 'savings', current_value: 777, target_value: 20000 })]
+    goals[0].id = 'g1'
+    const links: GoalLinkRow[] = [{ goal_id: 'g1', asset_id: 'ghost-asset', debt_id: null }]
+    autolinkGoalCurrentValues(goals, [], [], links)
+    expect(goals[0].current_value).toBe(777)
+  })
+
+  it('doel met ZOWEL links als legacy-kolommen: de link-rij wint, de legacy-kolom wordt genegeerd', () => {
+    const goals = [
+      g({
+        goal_type: 'savings',
+        current_value: 0,
+        target_value: 20000,
+        linked_asset_id: 'legacy-asset',
+      }),
+    ]
+    goals[0].id = 'g1'
+    const links: GoalLinkRow[] = [{ goal_id: 'g1', asset_id: 'a1', debt_id: null }]
+    autolinkGoalCurrentValues(
+      goals,
+      [
+        { id: 'a1', current_value: 5000 },
+        { id: 'legacy-asset', current_value: 9999 },
+      ],
+      [],
+      links,
+    )
+    // De link-waarde (5000), niet de legacy-waarde (9999).
+    expect(goals[0].current_value).toBe(5000)
+  })
+
+  it('meerdere link-rijen, gemengd: netto-som via computeLinkedCurrentValue', () => {
+    const goals = [g({ goal_type: 'net_worth', current_value: 0, target_value: 100000 })]
+    goals[0].id = 'g1'
+    const links: GoalLinkRow[] = [
+      { goal_id: 'g1', asset_id: 'a1', debt_id: null },
+      { goal_id: 'g1', asset_id: 'a2', debt_id: null },
+      { goal_id: 'g1', asset_id: null, debt_id: 'd1' },
+    ]
+    autolinkGoalCurrentValues(
+      goals,
+      [
+        { id: 'a1', current_value: 30000 },
+        { id: 'a2', current_value: 20000 },
+      ],
+      [{ id: 'd1', current_balance: 10000 }],
+      links,
+    )
+    expect(goals[0].current_value).toBe(40000) // (30000+20000) - 10000
+  })
+})
+
+// ── splitActiveGoals — auto-sync-doelen krijgen voorrang binnen de cap ──────
+
+describe('splitActiveGoals — auto-sync-injectie en cap-voorrang', () => {
+  it('een auto-sync-doel landt in de autoSyncGoals-subset (en dus in de injectie)', () => {
+    const autoSync = g({ goal_type: 'net_worth', metadata: { sync: 'auto' } })
+    const handmatig = g({ goal_type: 'savings' })
+    const { autoSyncGoals, goals } = splitActiveGoals([handmatig, autoSync])
+    expect(autoSyncGoals).toEqual([autoSync])
+    expect(goals).toContain(autoSync)
+  })
+
+  it('auto-sync-doelen staan VOORAAN binnen de cap van 5 door de gebruiker aangemaakte doelen', () => {
+    const autoSync = g({ goal_type: 'net_worth', metadata: { sync: 'auto' } })
+    // 5 gewone handmatige doelen — samen met het auto-sync-doel 6 kandidaten
+    // voor de cap van MAX_HANDMATIGE_DOELEN (5), dus één moet eruit vallen.
+    const handmatig = Array.from({ length: 5 }, () => g({ goal_type: 'savings' }))
+    const { goals, autoSyncGoals, parameterGoals } = splitActiveGoals([...handmatig, autoSync])
+
+    // Geen parameter-doelen in deze fixture, dus `goals` IS de gecapte subset.
+    expect(parameterGoals).toEqual([])
+    expect(goals).toHaveLength(MAX_HANDMATIGE_DOELEN)
+    expect(goals[0]).toBe(autoSync) // vooraan binnen de cap
+    // Het laatste handmatige doel (index 4) is uit de cap gevallen — de eerste
+    // vier bleven staan, in hun oorspronkelijke volgorde.
+    expect(goals).not.toContain(handmatig[4])
+    expect(goals.slice(1)).toEqual(handmatig.slice(0, 4))
+    expect(autoSyncGoals).toEqual([autoSync])
+  })
+})
+
+// ── Lazy gating: een metric-thunk draait alleen bij een actief doel van dat type ──
+
+describe('syncActiveGoalValues — lazy per-type gating van metricSources', () => {
+  it('draait GEEN enkele metric-thunk zonder een actief auto-sync-doel van dat type', async () => {
+    const handmatig = g({ goal_type: 'savings', current_value: 100 })
+    const supabase = makeSupabase([])
+    const netWorth = vi.fn(async () => 500000)
+    const passive = vi.fn(async () => 1000)
+    const emergency = vi.fn(async () => 6)
+    const tax = vi.fn(async () => 30)
+    const debtFree = vi.fn(async () => ({ decimalYear: 2030, basis: { kind: 'user_set' as const } }))
+
+    await syncActiveGoalValues(supabase, [handmatig], [], [], 'u1', undefined, undefined, {
+      netWorth,
+      passiveIncomeMonthly: passive,
+      emergencyFundMonths: emergency,
+      taxBurdenPct: tax,
+      debtFreeDate: debtFree,
+    })
+
+    expect(netWorth).not.toHaveBeenCalled()
+    expect(passive).not.toHaveBeenCalled()
+    expect(emergency).not.toHaveBeenCalled()
+    expect(tax).not.toHaveBeenCalled()
+    expect(debtFree).not.toHaveBeenCalled()
+  })
+
+  it('draait UITSLUITEND de thunk van het type dat daadwerkelijk actief is (net_worth)', async () => {
+    const netWorthGoal = g({ goal_type: 'net_worth', metadata: { sync: 'auto' }, current_value: 0 })
+    const supabase = makeSupabase([])
+    const netWorth = vi.fn(async () => 500000)
+    const tax = vi.fn(async () => 30)
+
+    const { goals } = await syncActiveGoalValues(supabase, [netWorthGoal], [], [], 'u1', undefined, undefined, {
+      netWorth,
+      taxBurdenPct: tax,
+    })
+
+    expect(netWorth).toHaveBeenCalledTimes(1)
+    expect(tax).not.toHaveBeenCalled()
+    expect(goals[0].current_value).toBe(500000)
+  })
+})
+
+// ── Tolerante degradatie: 0 is een echte waarde, null/undefined/NaN zijn dat niet ──
+
+describe('syncActiveGoalValues — tolerante degradatie op metric-waarden', () => {
+  it('een bron die 0 levert overschrijft de DB-waarde (0% is een echte uitkomst)', async () => {
+    const taxGoal = g({ goal_type: 'tax_burden', metadata: { sync: 'auto' }, current_value: 99, target_value: 30 })
+    const supabase = makeSupabase([])
+    const { goals } = await syncActiveGoalValues(supabase, [taxGoal], [], [], 'u1', undefined, undefined, {
+      taxBurdenPct: async () => 0,
+    })
+    expect(goals[0].current_value).toBe(0)
+  })
+
+  it.each([
+    ['null', null],
+    ['undefined', undefined],
+    ['NaN', NaN],
+  ] as const)('een bron die %s levert laat de DB-waarde staan', async (_label, value) => {
+    const taxGoal = g({ goal_type: 'tax_burden', metadata: { sync: 'auto' }, current_value: 42, target_value: 30 })
+    const supabase = makeSupabase([])
+    const { goals } = await syncActiveGoalValues(supabase, [taxGoal], [], [], 'u1', undefined, undefined, {
+      taxBurdenPct: async () => value,
+    })
+    expect(goals[0].current_value).toBe(42)
   })
 })

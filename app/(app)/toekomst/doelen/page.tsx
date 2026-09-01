@@ -45,6 +45,8 @@ export default async function ToekomstDoelenPage() {
         monthlyIncome={monthlyFigures.monthlyIncome}
         monthlyExpenses={monthlyFigures.monthlyExpenses}
         vrijheidsgetalLive={finData.vrijheidsgetalLive}
+        linkedGoalIds={finData.linkedGoalIds}
+        autoCompletedGoals={finData.autoCompletedGoals}
       />
     </>
   )

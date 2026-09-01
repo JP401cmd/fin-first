@@ -33,6 +33,57 @@ export function weightedAssetValue(row: WeightableAssetRow): number {
   return Number(row.current_value) * inclusionFactor(row)
 }
 
+/**
+ * Losse schuldrij met dezelfde inclusion-weging als een bezitting. Een schuld
+ * die maar voor 60% van jou is, drukt ook maar voor 60% op je netto vermogen —
+ * dezelfde regel, dezelfde kolom.
+ */
+export type WeightableDebtRow = {
+  current_balance: number | string | null
+  net_worth_inclusion_pct?: number | null
+} & Record<string, unknown>
+
+/** Inclusion-gewogen huidig saldo van één schuld. */
+export function weightedDebtBalance(row: WeightableDebtRow): number {
+  return Number(row.current_balance) * inclusionFactor(row)
+}
+
+/** Inclusion-gewogen bezittingentotaal, inclusief losse (niet-gekoppelde) cash. */
+export function computeWeightedAssetsTotal(
+  assets: readonly WeightableAssetRow[],
+  unlinkedCash: number,
+): number {
+  return assets.reduce((s, a) => s + weightedAssetValue(a), 0) + unlinkedCash
+}
+
+/** Inclusion-gewogen schuldentotaal. */
+export function computeWeightedDebtsTotal(debts: readonly WeightableDebtRow[]): number {
+  return debts.reduce((s, d) => s + weightedDebtBalance(d), 0)
+}
+
+/**
+ * NETTO VERMOGEN — de canonieke inclusion-gewogen som, één home.
+ *
+ * `Σ(bezitting × inclusion) + losse cash − Σ(schuld × inclusion)`. Dit is de
+ * grootheid die CLAUDE.md als "netto vermogen (weighted by inclusion_pct)"
+ * aanwijst; de dashboard-loader was de plek waar hij inline stond en is nu de
+ * eerste consument. Elk ander oppervlak dat hetzelfde getal nodig heeft (het
+ * `net_worth`-doel, de doelen-widget) roept déze functie aan op DEZELFDE
+ * cache()'de rijen — zo kan de doelkaart per constructie geen ander netto
+ * vermogen tonen dan /overzicht.
+ *
+ * Bewust GEEN liquide/FIRE-eligible variant: dat zijn andere grootheden met een
+ * eigen home (`computeLiquidPot` hier, `getFireEligibleNetWorth` in
+ * lib/housing-strategy.ts) en ze mogen nooit door elkaar lopen.
+ */
+export function computeWeightedNetWorth(
+  assets: readonly WeightableAssetRow[],
+  unlinkedCash: number,
+  debts: readonly WeightableDebtRow[],
+): number {
+  return computeWeightedAssetsTotal(assets, unlinkedCash) - computeWeightedDebtsTotal(debts)
+}
+
 export interface AssetTypeGroup {
   type: string
   value: number

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-01T09:07:43.240Z",
+  "generatedAt": "2026-09-01T20:34:07.714Z",
   "generatedDate": "2026-09-01",
   "repo": {
     "name": "fin",
@@ -130,6 +130,7 @@
         "household_invitations"
       ],
       "Toekomst & doelen": [
+        "goal",
         "goals",
         "life_events",
         "aow_leeftijd",
@@ -189,8 +190,8 @@
     "routes": 139,
     "routesProduction": 97,
     "api": 307,
-    "tables": 92,
-    "migrations": 222,
+    "tables": 93,
+    "migrations": 223,
     "integrations": 25,
     "components": 1010,
     "providers": 16,
@@ -8017,6 +8018,10 @@
         "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
       },
       {
+        "name": "goal_links",
+        "migration": "supabase/migrations/20260901140000_goal_links_meervoudige_koppelingen.sql"
+      },
+      {
         "name": "goals",
         "migration": "supabase/migrations/20260215000000_create_base_tables.sql"
       },
@@ -8229,7 +8234,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 222
+    "migrationCount": 223
   },
   "tablesByDomain": [
     {
@@ -8306,10 +8311,6 @@
         {
           "name": "fire_assumptions",
           "migration": "supabase/migrations/20260721000000_create_fire_assumptions.sql"
-        },
-        {
-          "name": "goal_contributions",
-          "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
         },
         {
           "name": "household_budget_model_proposals",
@@ -8500,6 +8501,31 @@
       ]
     },
     {
+      "domain": "Toekomst & doelen",
+      "tables": [
+        {
+          "name": "aow_leeftijd",
+          "migration": "supabase/migrations/20260315000001_create_aow_leeftijd.sql"
+        },
+        {
+          "name": "goal_contributions",
+          "migration": "supabase/migrations/20260717120000_sync_remote_baseline.sql"
+        },
+        {
+          "name": "goal_links",
+          "migration": "supabase/migrations/20260901140000_goal_links_meervoudige_koppelingen.sql"
+        },
+        {
+          "name": "goals",
+          "migration": "supabase/migrations/20260215000000_create_base_tables.sql"
+        },
+        {
+          "name": "life_events",
+          "migration": "supabase/migrations/20260215000000_create_base_tables.sql"
+        }
+      ]
+    },
+    {
       "domain": "Engagement & features",
       "tables": [
         {
@@ -8584,23 +8610,6 @@
         {
           "name": "questionnaires",
           "migration": "supabase/migrations/20260326000001_create_questionnaire_tables.sql"
-        }
-      ]
-    },
-    {
-      "domain": "Toekomst & doelen",
-      "tables": [
-        {
-          "name": "aow_leeftijd",
-          "migration": "supabase/migrations/20260315000001_create_aow_leeftijd.sql"
-        },
-        {
-          "name": "goals",
-          "migration": "supabase/migrations/20260215000000_create_base_tables.sql"
-        },
-        {
-          "name": "life_events",
-          "migration": "supabase/migrations/20260215000000_create_base_tables.sql"
         }
       ]
     },
@@ -10766,8 +10775,20 @@
       ],
       "goals": [
         {
+          "name": "assets",
+          "write": false
+        },
+        {
+          "name": "debts",
+          "write": false
+        },
+        {
           "name": "goal_contributions",
           "write": false
+        },
+        {
+          "name": "goal_links",
+          "write": true
         },
         {
           "name": "goals",
@@ -12338,6 +12359,14 @@
           ]
         },
         {
+          "domain": "goals",
+          "label": "Doelen",
+          "write": false,
+          "routes": [
+            "/api/goals"
+          ]
+        },
+        {
           "domain": "guide-progress",
           "label": "guide-progress",
           "write": false,
@@ -12541,6 +12570,14 @@
           "write": false,
           "routes": [
             "/api/export"
+          ]
+        },
+        {
+          "domain": "goals",
+          "label": "Doelen",
+          "write": false,
+          "routes": [
+            "/api/goals"
           ]
         },
         {
@@ -14399,6 +14436,16 @@
           ]
         }
       ],
+      "goal_links": [
+        {
+          "domain": "goals",
+          "label": "Doelen",
+          "write": true,
+          "routes": [
+            "/api/goals"
+          ]
+        }
+      ],
       "holding_alerts": [
         {
           "domain": "holding-alerts",
@@ -14833,6 +14880,21 @@
       },
       {
         "from": "goal_contributions",
+        "to": "goals",
+        "column": "goal_id"
+      },
+      {
+        "from": "goal_links",
+        "to": "assets",
+        "column": "asset_id"
+      },
+      {
+        "from": "goal_links",
+        "to": "debts",
+        "column": "debt_id"
+      },
+      {
+        "from": "goal_links",
         "to": "goals",
         "column": "goal_id"
       },
@@ -15504,6 +15566,11 @@
         "rls": true
       },
       "achieved_milestones": {
+        "user": true,
+        "household": false,
+        "rls": true
+      },
+      "goal_links": {
         "user": true,
         "household": false,
         "rls": true
@@ -17060,6 +17127,19 @@
       ],
       "summary": "De deelscore **FIRE-voortgang** (pijler Vrijheid, gewicht 0.18) van de gezondheidsscore was leeftijdsblind: `score = clamp(freedomPct, 0, 100)`. Dat getal beantwoordt \"hoe vol is de pot\", niet \"ligt deze persoon op koers\". Een 30-jarige met 8% vulling die op schema ligt om op z'n",
       "file": "docs/adr/0124-fire-voortgang-oordeelt-peer-relatief.md"
+    },
+    {
+      "id": "0125-een-doel-koppelt-meervoudig-en-syncbaar",
+      "title": "Een doel koppelt meervoudig en netto, en syncbaar-zijn is opt-in per doel",
+      "status": "aanvaard",
+      "date": "2026-09-01",
+      "elements": [
+        "as-planning",
+        "as-vermogen",
+        "do-doel"
+      ],
+      "summary": "Handmatige doelen konden aan **precies één** bezitting **óf** één schuld hangen (`goals.linked_asset_id` / `linked_debt_id`, wederzijds exclusief in de UI). Twee gevolgen:",
+      "file": "docs/adr/0125-een-doel-koppelt-meervoudig-en-syncbaar.md"
     }
   ],
   "churn": {
@@ -17067,7 +17147,7 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 71
+        "commits": 72
       },
       {
         "path": "lib/ai",
@@ -17075,7 +17155,7 @@
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 29
+        "commits": 30
       },
       {
         "path": "app/api/household",
@@ -17109,8 +17189,8 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 9892,
-        "commits": 81
+        "loc": 9895,
+        "commits": 82
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -17119,8 +17199,8 @@
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4934,
-        "commits": 38
+        "loc": 4936,
+        "commits": 39
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -17129,7 +17209,7 @@
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 3007,
+        "loc": 3033,
         "commits": 58
       },
       {
@@ -17143,8 +17223,8 @@
         "commits": 25
       },
       {
-        "file": "lib/test-personas.ts",
-        "loc": 2236,
+        "file": "app/(app)/core/checkin/page.tsx",
+        "loc": 2299,
         "commits": 9
       }
     ]
@@ -18245,32 +18325,9 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-08-31",
-    "hasChanges": true,
-    "sections": [
-      {
-        "label": "Schermen",
-        "added": [
-          "/mijn/jaaroverzicht",
-          "/mijn/mijlpalen"
-        ],
-        "removed": []
-      },
-      {
-        "label": "API-routes",
-        "added": [
-          "/api/home-screen"
-        ],
-        "removed": []
-      },
-      {
-        "label": "Componenten (aantal)",
-        "added": [
-          "+7"
-        ],
-        "removed": []
-      }
-    ]
+    "previousDate": "2026-09-01",
+    "hasChanges": false,
+    "sections": []
   },
   "statsHistory": [
     {
@@ -18606,7 +18663,7 @@
       "date": "2026-09-01",
       "api": 307,
       "components": 1010,
-      "tables": 92,
+      "tables": 93,
       "routesProduction": 97
     }
   ]

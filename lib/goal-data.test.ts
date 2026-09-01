@@ -15,6 +15,7 @@ import {
   computeGoalProgress,
   formatGoalValue,
   goalValueLabels,
+  isGoalReached,
   GOAL_TYPE_META,
   GOAL_TYPE_LABELS,
   GOAL_TYPE_ICONS,
@@ -312,6 +313,50 @@ describe('computeGoalProgress — down-richting (fire_age)', () => {
   })
 })
 
+// ── 1c. isGoalReached — de ENE richting-bewuste bereikt-toets (ADR 0125) ────
+
+describe('isGoalReached', () => {
+  it('up-doel: bereikt zodra current >= target', () => {
+    expect(isGoalReached('savings', 100, 100)).toBe(true)
+    expect(isGoalReached('savings', 101, 100)).toBe(true)
+    expect(isGoalReached('savings', 99, 100)).toBe(false)
+  })
+
+  it('down-doel: bereikt zodra current <= target (lager is beter)', () => {
+    expect(isGoalReached('fire_age', 58, 58)).toBe(true)
+    expect(isGoalReached('fire_age', 50, 58)).toBe(true) // eerder vrij dan gepland
+    expect(isGoalReached('fire_age', 62, 58)).toBe(false)
+  })
+
+  it('target <= 0 → nooit bereikt, in beide richtingen', () => {
+    expect(isGoalReached('savings', 100, 0)).toBe(false)
+    expect(isGoalReached('savings', 100, -50)).toBe(false)
+    expect(isGoalReached('fire_age', 40, 0)).toBe(false)
+    expect(isGoalReached('fire_age', 40, -10)).toBe(false)
+  })
+
+  it('niet-eindige invoer levert nooit "bereikt"', () => {
+    expect(isGoalReached('savings', NaN, 100)).toBe(false)
+    expect(isGoalReached('savings', 100, NaN)).toBe(false)
+    expect(isGoalReached('savings', Infinity, 100)).toBe(false)
+    expect(isGoalReached('fire_age', -Infinity, 58)).toBe(false)
+  })
+
+  it('pint de twee historische fouten uit de ADR 0125-analyse expliciet', () => {
+    // Een vrijheidsleeftijd van 46 tegen een doel van 55 IS bereikt — een kale
+    // `current >= target` (46 >= 55) zou dit ten onrechte missen.
+    expect(isGoalReached('fire_age', 46, 55)).toBe(true)
+    // Een belastingdruk van 35% tegen een doel van 30% is NIET bereikt — een
+    // kale `current >= target` (35 >= 30) zou dit ten onrechte vieren.
+    expect(isGoalReached('tax_burden', 35, 30)).toBe(false)
+  })
+
+  it('schuldenvrij-datum (down): eerder dan het doeljaar is bereikt, later niet', () => {
+    expect(isGoalReached('debt_free_date', 2029.5, 2031)).toBe(true)
+    expect(isGoalReached('debt_free_date', 2035, 2031)).toBe(false)
+  })
+})
+
 // ── 3. Meta-velden ─────────────────────────────────────────────────────────
 
 describe('GOAL_TYPE_META — nieuwe types', () => {
@@ -360,12 +405,17 @@ describe('GOAL_TYPE_META — nieuwe types', () => {
 })
 
 describe('GOAL_TYPE_META — vlaggen op bestaande types (regressie)', () => {
-  it('alleen fire_age heeft direction "down"; alle andere zijn up (undefined)', () => {
+  it('alleen de drie lager-is-beter-types hebben direction "down"; alle andere zijn up (undefined)', () => {
+    // Uitgebreid 1 sep 2026: `debt_free_date` (eerder schuldenvrij is beter) en
+    // `tax_burden` (minder belasting is beter) kwamen erbij naast `fire_age`.
+    // De lijst blijft bewust een WITTE lijst: een nieuw type erft 'up' tenzij het
+    // hier expliciet wordt opgevoerd.
+    const downTypes: GoalType[] = ['fire_age', 'debt_free_date', 'tax_burden']
     for (const type of Object.keys(GOAL_TYPE_META) as GoalType[]) {
-      if (type === 'fire_age') {
-        expect(GOAL_TYPE_META[type].direction).toBe('down')
+      if (downTypes.includes(type)) {
+        expect(GOAL_TYPE_META[type].direction, type).toBe('down')
       } else {
-        expect(GOAL_TYPE_META[type].direction).toBeUndefined()
+        expect(GOAL_TYPE_META[type].direction, type).toBeUndefined()
       }
     }
   })

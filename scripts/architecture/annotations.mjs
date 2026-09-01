@@ -128,7 +128,9 @@ export const annotations = {
     'Snapshots & historie': ['net_worth_snapshots', 'balance_snapshots', 'valuations'],
     'Externe koppelingen': ['external_connections', 'exchange_connections', 'broker_connections', 'wallet_addresses'],
     'Huishouden': ['households', 'household_members', 'household_invitations'],
-    'Toekomst & doelen': ['goals', 'life_events', 'aow_leeftijd', 'retirement'],
+    // 'goal' (enkelvoud) dekt ook `goal_links` en `goal_contributions`; op
+    // 'goals' matchten die niet en belandden ze in "Overig".
+    'Toekomst & doelen': ['goal', 'goals', 'life_events', 'aow_leeftijd', 'retirement'],
     'AI & calculators': ['ai_calculator_usage', 'custom_calculators', 'calculator_likes', 'calculator_reports', 'calculators'],
     'Nieuws & briefing': ['news_articles', 'news', 'briefing_history', 'briefing'],
     'Vragenlijsten': ['questionnaires', 'questionnaire_questions', 'questionnaire_sessions', 'questionnaire_responses', 'questionnaire'],
