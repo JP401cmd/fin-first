@@ -765,7 +765,9 @@ export default function OnboardingPage() {
         // Wissen vóór de redirect: een concept van een al voltooide onboarding
         // is dode, gevoelige data op de profielrij.
         await clearDraft()
-        router.replace('/overzicht')
+        // /dashboard = "ga naar home": de middleware vertaalt naar het gekozen
+        // homescherm (profiles.home_screen).
+        router.replace('/dashboard')
         return
       }
 

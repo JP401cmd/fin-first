@@ -110,11 +110,11 @@ export function Header() {
             {menuOpen && (
               <div className="absolute right-0 mt-2 w-44 rounded-[var(--r)] border border-[var(--border-ed)] bg-[var(--paper)] py-1 shadow-[var(--s2)]">
                 <Link
-                  href="/overzicht"
+                  href="/dashboard"
                   className="block px-4 py-2 font-sans text-sm text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)]"
                   onClick={() => setMenuOpen(false)}
                 >
-                  Overzicht
+                  Naar de app
                 </Link>
                 <Link
                   href="/logout"
@@ -169,11 +169,11 @@ export function Header() {
             })}
             {user ? (
               <Link
-                href="/overzicht"
+                href="/dashboard"
                 onClick={() => setMobileOpen(false)}
                 className="mt-3 rounded-[var(--r)] border-2 border-[var(--ink)] bg-[var(--ink)] px-4 py-2.5 text-center font-sans text-sm font-medium text-[var(--bg)] transition-all hover:border-[var(--ink-2)] hover:bg-[var(--ink-2)]"
               >
-                Overzicht
+                Naar de app
               </Link>
             ) : (
               <>

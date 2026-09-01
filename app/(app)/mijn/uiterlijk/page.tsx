@@ -8,6 +8,7 @@ import { BudgetTintPicker } from '@/components/mijn/budget-tint-picker'
 import { CategoryTintPicker } from '@/components/mijn/category-tint-picker'
 import { SpendLimitAliasPicker } from '@/components/mijn/spend-limit-alias-picker'
 import { DisplayModePicker } from '@/components/mijn/display-mode-picker'
+import { HomeScreenPicker } from '@/components/mijn/home-screen-picker'
 
 export const metadata: Metadata = {
   title: 'Uiterlijk — TriFinity',
@@ -47,6 +48,12 @@ export default function MijnUiterlijkPage() {
         */}
         <div className="border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
           <DisplayModePicker />
+        </div>
+
+        {/* Essentieel — Startscherm bepaalt waar de app voor je opent (⌘K-toggle
+            heeft hetzelfde schrijfpad; zie home-screen-picker.tsx). */}
+        <div className="mt-4 border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-6">
+          <HomeScreenPicker />
         </div>
 
         {/* Essentieel — Palet wisselt het complete token-systeem in één klik. */}

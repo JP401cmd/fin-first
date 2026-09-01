@@ -248,18 +248,14 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'OVERIG',
     given: 'De redirect-lijst in `next.config.ts`.',
     when: '`nextConfig.redirects()` wordt aangeroepen.',
-    then: '/core → /overzicht, /horizon → /toekomst, /identity → /mijn, /will → /overzicht, /dashboard → /overzicht, /core/budgets → /overzicht/cashflow, /core/cash → /overzicht/cashflow, /horizon/whatif (twee takken: met/zonder ?via=dreamgate), /toekomst/whatif zónder ?via=dreamgate → /toekomst?whatif=open (mét dreamgate valt de regel niet aan en rendert de pagina), /horizon/strategie → /toekomst?strategie=open, /horizon/uitgaven-na-pensioen en /toekomst/uitgaven-na-pensioen → /toekomst?uitgaven=open, /toekomst/strategie (twee takken: met/zonder ?focus=aow|pensioen|huis), /overzicht/acties → /overzicht/tips zitten allemaal in de lijst; een diepere legacy-subroute zonder regel (bv. /core/assets) heeft GEEN redirect-entry (blijft live backing-UI).',
+    then: '/core → /overzicht, /horizon → /toekomst, /identity → /mijn, /will → /overzicht, /core/budgets → /overzicht/cashflow, /core/cash → /overzicht/cashflow, /horizon/whatif (twee takken: met/zonder ?via=dreamgate), /toekomst/whatif zónder ?via=dreamgate → /toekomst?whatif=open (mét dreamgate valt de regel niet aan en rendert de pagina), /horizon/strategie → /toekomst?strategie=open, /horizon/uitgaven-na-pensioen en /toekomst/uitgaven-na-pensioen → /toekomst?uitgaven=open, /toekomst/strategie (twee takken: met/zonder ?focus=aow|pensioen|huis), /overzicht/acties → /overzicht/tips zitten allemaal in de lijst; een diepere legacy-subroute zonder regel (bv. /core/assets) heeft GEEN redirect-entry (blijft live backing-UI). /dashboard heeft sinds 1 sep 2026 (kiesbaar homescherm) bewust GEEN config-regel meer: de edge-middleware vertaalt hem naar het gekozen homescherm (profiles.home_screen); een statische regel zou die vertaling onbereikbaar maken.',
     assertion: {
       kind: 'exact',
-      // 25 = 16 + de drie regels die /core/cash en /horizon/whatif van een
-      // runtime-`redirect()`-pagina naar de routing-laag verhuisden (React
-      // #310-fix) + de vijf regels van de tweede lichting (11 aug 2026:
-      // /horizon/strategie, /horizon/uitgaven-na-pensioen,
-      // /toekomst/uitgaven-na-pensioen en /toekomst/strategie met zijn twee
-      // focus-takken) + de derde lichting (31 aug 2026, UR2-11):
-      // /toekomst/whatif zonder `?via=dreamgate`. Zie het redirect-blok in
-      // next.config.ts.
-      expected: 'aantalRedirects=25; coreNaarOverzicht=true; dashboardNaarOverzicht=true; coreAssetsGeenRedirect=true',
+      // 24 = de eerdere 25 (16 + React #310-lichtingen, zie het redirect-blok
+      // in next.config.ts) MIN de /dashboard-regel (1 sep 2026, kiesbaar
+      // homescherm): /dashboard wordt nu door de edge-middleware naar het
+      // gekozen homescherm (profiles.home_screen) vertaald.
+      expected: 'aantalRedirects=24; coreNaarOverzicht=true; dashboardGeenConfigRedirect=true; coreAssetsGeenRedirect=true',
       source: 'next.config.ts#redirects — échte productieconfiguratie, geen mirror',
     },
   },

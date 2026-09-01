@@ -16,6 +16,8 @@ import { PrivacyProvider } from '@/lib/hooks/use-privacy'
 import { DisplayModeProvider, type DisplayMode } from '@/lib/hooks/use-display-mode'
 import { EuroViewProvider, type EuroView } from '@/lib/hooks/use-euro-view'
 import { SpendLimitAliasProvider } from '@/lib/hooks/use-spend-limit-alias'
+import { HomeScreenProvider } from '@/lib/hooks/use-home-screen'
+import { DEFAULT_HOME_SCREEN, isHomeScreen } from '@/lib/home-screen'
 import { DEFAULT_SPEND_LIMIT_ALIAS, type SpendLimitAlias } from '@/lib/spend-limits/copy'
 import { SessionMonitor } from '@/components/app/session-monitor'
 import { ErrorReporter } from '@/components/app/error-reporter'
@@ -456,6 +458,12 @@ export default async function AppLayout({
         <SpendLimitAliasProvider
           initialAlias={(profile?.spend_limit_alias as SpendLimitAlias) ?? DEFAULT_SPEND_LIMIT_ALIAS}
         >
+        {/* Gekozen homescherm (⌘K-toggle + /mijn/uiterlijk). SSR-seed uit de
+            eigen profielrij; een rij van vóór de migratie levert `undefined`
+            en valt terug op de default ('overzicht' = huidig gedrag). */}
+        <HomeScreenProvider
+          initialHomeScreen={isHomeScreen(profile?.home_screen) ? profile.home_screen : DEFAULT_HOME_SCREEN}
+        >
         <ToastProvider>
           <SessionMonitor />
           <ErrorReporter />
@@ -551,6 +559,7 @@ export default async function AppLayout({
             </ChatProvider>
           </PerspectiveProvider>
         </ToastProvider>
+        </HomeScreenProvider>
         </SpendLimitAliasProvider>
         </EuroViewProvider>
         </DisplayModeProvider>

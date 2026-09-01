@@ -33,7 +33,7 @@ export function GoogleAuthButton({
    * Veilig, relatief pad waar de gebruiker na de callback landt (bv. het
    * oorspronkelijk gevraagde `redirectTo`, of de check-activeren-route). Wordt
    * als `next` aan de callback meegegeven; de callback zelf weigert nog eens
-   * open-redirects via `safeRelativePath`. Leeg = de callback-default (/overzicht).
+   * open-redirects via `safeRelativePath`. Leeg = de callback-default (/dashboard, door de middleware vertaald naar het gekozen homescherm).
    */
   next?: string | null
 }) {

@@ -53,6 +53,7 @@ import { GlobalSyncButton } from '@/components/sync/global-sync-button'
 import { SyncReportModal } from '@/components/sync/sync-report-modal'
 import { LeverCompassMobile } from '@/components/app/shell/lever-compass'
 import { useLeverScores } from '@/components/app/shell/shell-contexts'
+import { useHomeScreen } from '@/lib/hooks/use-home-screen'
 import { TAP_TARGET_EXTEND_BLOCK } from '@/components/editorial/tap-target'
 
 type TopBarProps = {
@@ -313,6 +314,9 @@ export function TopBar({
   role,
 }: TopBarProps) {
   const { activeTab, currentStack, pop } = useNavStack()
+  // Gekozen homescherm — voedt de "← home"-knop op de secundaire tab-roots.
+  // Vóór de conditionele returns (rules of hooks).
+  const { homeScreen, homeHref } = useHomeScreen()
 
   const top = currentStack[currentStack.length - 1]
   const kind = resolveTopBarKind(kindOverride, top?.topBar?.kind, currentStack.length)
@@ -340,14 +344,17 @@ export function TopBar({
   // tijdens transitie van sub-page naar tab-root.
   const showBack = showBackOverride ?? (kind === 'simple' && currentStack.length > 1)
 
-  // "Terug naar overzicht" op de secundaire tab-roots (Toekomst/Mijn). Die
+  // "Terug naar home" op de secundaire tab-roots (Toekomst/Mijn). Die
   // tonen normaliter géén ←-knop ('rich' kind), maar de gebruiker wil van
-  // daaruit altijd één tik terug naar het Overzicht — de "home" tab-root.
+  // daaruit altijd één tik terug naar zijn homescherm — default het Overzicht,
+  // of de Budgetteren-pagina als hij die als startscherm koos (useHomeScreen).
   // Kern (Overzicht zelf) krijgt 'm niet; sub-pages houden hun eigen pop-←.
   // Tab-bepaald (niet pad-exact) zodat de knop op de outgoing rich-tray
   // tijdens een within-tab transitie blijft staan i.p.v. weg te flikkeren.
   const showHomeBack =
     !showBack && kind === 'rich' && (activeTab === 'horizon' || activeTab === 'identity')
+  const homeBackLabel =
+    homeScreen === 'budget' ? 'Terug naar budgetteren' : 'Terug naar overzicht'
 
   // Module-aware onderlijn: hoofdmodules krijgen `--module-active-500`-streep,
   // andere tabs (identity, other) → defaultkleur.
@@ -397,8 +404,8 @@ export function TopBar({
           </button>
         ) : showHomeBack ? (
           <Link
-            href="/overzicht"
-            aria-label="Terug naar overzicht"
+            href={homeHref}
+            aria-label={homeBackLabel}
             className="touch-target text-[var(--ink-2)] hover:bg-[var(--subtle)] tap-highlight"
           >
             <ArrowLeft className="h-5 w-5" />

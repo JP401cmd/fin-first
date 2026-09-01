@@ -15,8 +15,14 @@
  * tweede '/' of een '\'. Alles wat niet voldoet valt terug op de app-home.
  */
 
-/** Fallback-bestemming wanneer een redirect-doel onveilig of afwezig is. */
-export const SAFE_REDIRECT_FALLBACK = '/overzicht'
+/**
+ * Fallback-bestemming wanneer een redirect-doel onveilig of afwezig is.
+ * '/dashboard' is het "ga naar home"-doel: de edge-middleware
+ * (lib/supabase/proxy.ts) vertaalt hem naar het gekozen homescherm
+ * (profiles.home_screen) — zo landen login en auth-callback zonder eigen
+ * profielread op het scherm dat de gebruiker koos.
+ */
+export const SAFE_REDIRECT_FALLBACK = '/dashboard'
 
 /**
  * True als `path` een veilig relatief pad is: begint met precies één '/',
@@ -28,7 +34,8 @@ export function isSafeRelativePath(path: string | null | undefined): path is str
 }
 
 /**
- * Geeft `path` terug als het veilig is, anders de fallback (default `/overzicht`).
+ * Geeft `path` terug als het veilig is, anders de fallback (default
+ * `/dashboard`, dat de middleware naar het gekozen homescherm vertaalt).
  */
 export function safeRelativePath(
   path: string | null | undefined,

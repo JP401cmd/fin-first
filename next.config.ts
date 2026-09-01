@@ -134,8 +134,15 @@ const nextConfig: NextConfig = {
    *
    * /will redirect naar /overzicht: WillLanding wordt nu gerenderd op
    * /overzicht (zie app/(app)/overzicht/page.tsx) dus de oude route is
-   * duplicate. /dashboard redirect ook direct (was eerder zelf een
-   * redirect naar /will, slaan we nu een hop over).
+   * duplicate.
+   *
+   * /dashboard staat hier bewust NIET (meer): dat is het "ga naar home"-doel
+   * dat het gekozen homescherm (profiles.home_screen) moet volgen, en een
+   * statische config-redirect kan de gebruiker niet kennen — bovendien draaien
+   * config-redirects VÓÓR de middleware, dus een regel hier zou de
+   * middleware-vertaling onbereikbaar maken. De edge-middleware
+   * (lib/supabase/proxy.ts) vertaalt /dashboard naar het gekozen scherm;
+   * app/(app)/dashboard/page.tsx blijft de geschaduwde terugval.
    */
   async redirects() {
     return [
@@ -143,7 +150,6 @@ const nextConfig: NextConfig = {
       { source: '/horizon', destination: '/toekomst', permanent: false },
       { source: '/identity', destination: '/mijn', permanent: false },
       { source: '/will', destination: '/overzicht', permanent: false },
-      { source: '/dashboard', destination: '/overzicht', permanent: false },
 
       // ── Alias-opschoning (route-audit categorie 2) ──────────────
       // Legacy-pagina's worden door de nieuwe routes ge-re-export

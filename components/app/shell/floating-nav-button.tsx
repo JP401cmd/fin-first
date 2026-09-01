@@ -7,7 +7,18 @@ import { useCommandPalette } from '@/components/command-palette/command-palette-
 import { useOverlayOpen } from '@/lib/overlay-signal'
 import { isImmersiveRoute } from '@/lib/shell/immersive-routes'
 import { useFinSlot } from '@/lib/shell/fin-slot'
+import { useHomeScreen } from '@/lib/hooks/use-home-screen'
 import { NavMenuSheet } from './nav-menu-sheet'
+
+// Long-press-configuratie voor de waffle-knop: 1500 ms vasthouden = direct
+// naar het gekozen homescherm (useHomeScreen). Bewust ruim boven de
+// systeem-long-press (~500 ms) zodat de gesture nooit botst met een gewone
+// tik; de 8px-move-drempel matcht HORIZONTAL_DECISION_PX uit
+// lib/hooks/use-swipe-back.ts — daarboven is het een scroll/swipe en cancelen
+// we. Patroon gespiegeld op de (inmiddels dode) long-press in
+// bottom-nav-tabs.tsx.
+const LONG_PRESS_HOME_MS = 1500
+const MOVE_CANCEL_PX = 8
 
 /**
  * FloatingNavButton — Vercel-style mobile nav-control.
@@ -18,6 +29,9 @@ import { NavMenuSheet } from './nav-menu-sheet'
  *  - ⊞ Waffle/grid (toggle) → opent NavMenuSheet met de complete nav-
  *    structuur. Wanneer menu open is, verandert het waffle-icoon in een
  *    kruisje (✕) en sluit een klik het menu — geen dubbele dismiss-area.
+ *    LONG-PRESS (1,5 s, touch-only): direct naar het gekozen homescherm —
+ *    een verrijking, geen enige weg (home blijft via het menu en de
+ *    top-bar-← bereikbaar, dus geen apart SR-/toetsenbord-equivalent nodig).
  *
  * Eén centrale knop = één mentale instap. Sub-routes en globale items
  * leven in het sheet-menu (Vercel-stijl).
@@ -42,6 +56,37 @@ export function FloatingNavButton() {
   // sticky primaire actie onderaan zet. Zie lib/shell/immersive-routes.ts.
   const pathname = usePathname()
   const hidden = overlayOpen || isImmersiveRoute(pathname)
+  // Gekozen homescherm — het doel van de long-press op de waffle.
+  const { homeHref } = useHomeScreen()
+
+  // Long-press-administratie (touch-only, zie de constanten bovenaan).
+  const pressTimerRef = useRef<number | null>(null)
+  const longPressFiredRef = useRef(false)
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null)
+
+  const clearPressTimer = () => {
+    if (pressTimerRef.current !== null) {
+      window.clearTimeout(pressTimerRef.current)
+      pressTimerRef.current = null
+    }
+  }
+
+  // De pill blijft gemount wanneer hij verborgen wordt (visibility:hidden bij
+  // overlay/immersive) — een nog lopende press-timer mag dan niet alsnog
+  // onder de overlay door navigeren. Zelfde opruiming bij unmount.
+  useEffect(() => {
+    if (!hidden) return
+    if (pressTimerRef.current !== null) {
+      window.clearTimeout(pressTimerRef.current)
+      pressTimerRef.current = null
+    }
+  }, [hidden])
+  useEffect(
+    () => () => {
+      if (pressTimerRef.current !== null) window.clearTimeout(pressTimerRef.current)
+    },
+    [],
+  )
 
   // Fin portalt zijn idle-bubbel in het slot hiernaast (zie lib/shell/fin-slot.tsx).
   // Registratie loopt via een effect, NIET rechtstreeks vanuit de ref-callback:
@@ -71,6 +116,71 @@ export function FloatingNavButton() {
     }
     // open-chat wordt later gekoppeld aan de Fin-coach-pane. Voor nu no-op
     // zodat de knop niet crasht.
+  }
+
+  // ── Long-press op de waffle: 1,5 s vasthouden → gekozen homescherm ────────
+  const goHomeFromLongPress = () => {
+    longPressFiredRef.current = true
+    try {
+      navigator.vibrate?.(10)
+    } catch {
+      // ignore — vibration not supported
+    }
+    // Zelfde volgorde als handleAction: eerst het menu dicht, dan navigeren.
+    // router.push naar een tab-root volstaat — de nav-stack reset zichzelf.
+    setMenuOpen(false)
+    router.push(homeHref)
+  }
+
+  const handleWaffleTouchStart = (e: React.TouchEvent<HTMLButtonElement>) => {
+    // Multi-touch (twee+ vingers) cancelt de long-press direct — voorkomt dat
+    // een pinch-gesture per ongeluk naar home navigeert.
+    if (e.touches.length !== 1) {
+      clearPressTimer()
+      return
+    }
+    const touch = e.touches[0]
+    if (!touch) return
+    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY }
+    longPressFiredRef.current = false
+    clearPressTimer()
+    pressTimerRef.current = window.setTimeout(() => {
+      pressTimerRef.current = null
+      goHomeFromLongPress()
+    }, LONG_PRESS_HOME_MS)
+  }
+
+  const handleWaffleTouchMove = (e: React.TouchEvent<HTMLButtonElement>) => {
+    if (!touchStartPosRef.current || pressTimerRef.current === null) return
+    const touch = e.touches[0]
+    if (!touch) return
+    const dx = touch.clientX - touchStartPosRef.current.x
+    const dy = touch.clientY - touchStartPosRef.current.y
+    if (Math.abs(dx) + Math.abs(dy) > MOVE_CANCEL_PX) {
+      clearPressTimer()
+    }
+  }
+
+  const handleWaffleTouchEnd = () => {
+    clearPressTimer()
+    touchStartPosRef.current = null
+  }
+
+  const handleWaffleClick = () => {
+    // Click vuurt automatisch ná touchend. Was de long-press al afgegaan, dan
+    // mag diezelfde aanraking het menu niet alsnog togglen. (Geen
+    // preventDefault nodig: een <button type="button"> heeft geen
+    // default-actie — de suppressie ís de vroege return.)
+    if (longPressFiredRef.current) {
+      longPressFiredRef.current = false
+      return
+    }
+    setMenuOpen((prev) => !prev)
+  }
+
+  const handleWaffleContextMenu = (e: React.MouseEvent<HTMLButtonElement>) => {
+    // Onderdrukt het iOS/Android-systeemmenu tijdens de long-press.
+    e.preventDefault()
   }
 
   return (
@@ -109,7 +219,12 @@ export function FloatingNavButton() {
           <div className="w-px self-stretch bg-white/15" aria-hidden="true" />
           <button
             type="button"
-            onClick={() => setMenuOpen((prev) => !prev)}
+            onClick={handleWaffleClick}
+            onTouchStart={handleWaffleTouchStart}
+            onTouchMove={handleWaffleTouchMove}
+            onTouchEnd={handleWaffleTouchEnd}
+            onTouchCancel={handleWaffleTouchEnd}
+            onContextMenu={handleWaffleContextMenu}
             aria-label={menuOpen ? 'Menu sluiten' : 'Menu openen'}
             aria-expanded={menuOpen}
             className="flex items-center justify-center rounded-full px-5 py-2.5 text-white/90 hover:bg-white/10 active:bg-white/15 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--paper)]"

@@ -57,9 +57,10 @@ test.describe('Auth-smoke: login → dashboard → beveiligde route', () => {
     await page.getByLabel('Wachtwoord').fill(PASSWORD!)
     await page.getByRole('button', { name: 'Inloggen' }).click()
 
-    // Ingelogde bezoekers op /login worden naar /overzicht gestuurd
-    // (proxy.ts: authPages-redirect) — dit is de "dashboard"-stap uit de
-    // kaarttitel.
+    // Ingelogde bezoekers op /login worden naar hun homescherm gestuurd
+    // (proxy.ts: authPages-redirect volgt profiles.home_screen) — dit is de
+    // "dashboard"-stap uit de kaarttitel. De assertie op /overzicht geldt
+    // zolang het smoke-account de default-keuze houdt.
     await page.waitForURL((url) => url.pathname.startsWith('/overzicht'), {
       timeout: 15_000,
     })

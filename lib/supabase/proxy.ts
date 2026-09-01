@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { HOME_SCREEN_HREFS, homeHrefFor } from '@/lib/home-screen'
 
 /**
  * Cron-routes: headless aangeroepen, dus GEEN sessiecookie. Het echte auth-slot
@@ -132,11 +133,29 @@ export async function updateSession(request: NextRequest) {
   // Redirect authenticated users away from public auth pages to the app.
   // /reset-password hoort hier NIET bij: de recovery-link logt de gebruiker in
   // via /auth/callback en moet daarna op /reset-password kunnen landen.
+  //
+  // /dashboard hoort hier WEL bij: dat is het universele "ga naar home"-doel
+  // (PWA start_url, SAFE_REDIRECT_FALLBACK, onboarding-guard). De vertaling
+  // naar het gekozen homescherm gebeurt bewust HIER op de routing-laag en
+  // niet in een redirect-only server component — die triggert bij
+  // SPA-navigatie React #310 (zie de uitleg in next.config.ts bij de
+  // legacy-redirects). De profielquery draait uitsluitend in deze branch
+  // (login-landings + /dashboard-hits), dus niet op elk request; bij een
+  // fout of ontbrekende rij (verse signup) valt hij terug op /overzicht,
+  // anders zou de loginflow zelf breken.
   const authPages = ['/', '/login', '/signup', '/forgot-password']
-  if (user && authPages.includes(pathname)) {
+  if (user && (authPages.includes(pathname) || pathname === '/dashboard')) {
     const url = request.nextUrl.clone()
-    url.pathname = '/overzicht'
-    return NextResponse.redirect(url)
+    url.pathname = await resolveHomeHref(supabase, user.sub)
+    // Draag de door setAll ververste sessiecookies over op de redirect: een
+    // kale NextResponse.redirect draagt de Set-Cookie-headers van
+    // `supabaseResponse` niet, en juist de PWA-koudstart (start_url =
+    // /dashboard) landt hier op het moment dat getClaims() het refresh-token
+    // rotéért — zonder overdracht houdt de browser het oude token en logt de
+    // sessie buiten het reuse-venster uit. Canoniek @supabase/ssr-patroon.
+    const redirect = NextResponse.redirect(url)
+    supabaseResponse.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie))
+    return redirect
   }
 
   // Only redirect to login for known protected routes
@@ -158,8 +177,45 @@ export async function updateSession(request: NextRequest) {
     if (hadSession) {
       url.searchParams.set('expired', '1')
     }
-    return NextResponse.redirect(url)
+    // Zelfde cookie-overdracht als bij de home-redirect hierboven: hier gaat
+    // het om het propageren van cookie-clears van een verlopen sessie.
+    const loginRedirect = NextResponse.redirect(url)
+    supabaseResponse.cookies.getAll().forEach((cookie) => loginRedirect.cookies.set(cookie))
+    return loginRedirect
   }
 
   return supabaseResponse
+}
+
+// Maximale wachttijd op de homescherm-lookup in de edge. De fail-open op
+// fouten dekt een HANGENDE Supabase-call niet — zonder deze race zou een
+// degraderende REST-endpoint elke ingelogde login-landing blokkeren tot de
+// platform-timeout, precies de flow die nooit mag breken.
+const HOME_LOOKUP_TIMEOUT_MS = 800
+
+/**
+ * Gekozen homescherm van de ingelogde gebruiker (profiles.home_screen) →
+ * route. De `.eq('id', userId)` maakt de eigen-rij-scoping expliciet i.p.v.
+ * alleen op de (vandaag own-row) RLS-policy te leunen — een toekomstige
+ * bredere SELECT-policy op profiles kan deze lookup dan niet verleggen.
+ * Fail-open naar /overzicht: een query-fout, timeout, ontbrekende rij
+ * (verse signup) of onbekende waarde mag de login-landing nooit breken.
+ */
+async function resolveHomeHref(
+  supabase: ReturnType<typeof createServerClient>,
+  userId: unknown,
+): Promise<string> {
+  if (typeof userId !== 'string' || !userId) return HOME_SCREEN_HREFS.overzicht
+  try {
+    const result = await Promise.race([
+      supabase.from('profiles').select('home_screen').eq('id', userId).single(),
+      new Promise<null>((resolve) =>
+        setTimeout(() => resolve(null), HOME_LOOKUP_TIMEOUT_MS),
+      ),
+    ])
+    if (!result || result.error) return HOME_SCREEN_HREFS.overzicht
+    return homeHrefFor((result.data as { home_screen?: unknown } | null)?.home_screen)
+  } catch {
+    return HOME_SCREEN_HREFS.overzicht
+  }
 }

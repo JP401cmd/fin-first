@@ -194,7 +194,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     given: 'Bestaand account met bekend wachtwoord.',
     when: 'De gebruiker vult e-mail + wachtwoord in en klikt "Inloggen" (evt. met `?redirectTo=`).',
-    then: 'Bij succes navigatie naar het veilige redirect-doel (redirectTo indien aanwezig en veilig, anders /overzicht); onveilige redirectTo-waarden vallen terug op /overzicht.',
+    then: 'Bij succes navigatie naar het veilige redirect-doel (redirectTo indien aanwezig en veilig, anders /dashboard — het "ga naar home"-doel dat de middleware naar het gekozen homescherm vertaalt, profiles.home_screen, default /overzicht); onveilige redirectTo-waarden vallen terug op datzelfde /dashboard.',
     assertion: {
       kind: 'ui-only',
       source: 'signInWithPassword + lib/safe-redirect.ts, geen cijfermatige uitkomst',
@@ -246,7 +246,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     given: 'Afwisselend uitgelogde en ingelogde staat.',
     when: 'De tester opent beveiligde routes uitgelogd, publieke check-routes uitgelogd, en publieke auth-pagina\'s ingelogd; roept een beveiligde API-route uitgelogd rechtstreeks aan.',
-    then: 'Beveiligde routes → login-redirect met `redirectTo` (en terugkeer na inloggen); /check en /check/rapport blijven publiek bereikbaar; ingelogd op /, /login, /signup, /forgot-password → automatische redirect naar /overzicht; een beveiligde API-route geeft uitgelogd JSON 401, geen HTML-redirect.',
+    then: 'Beveiligde routes → login-redirect met `redirectTo` (en terugkeer na inloggen); /check en /check/rapport blijven publiek bereikbaar; ingelogd op /, /login, /signup, /forgot-password of /dashboard → automatische redirect naar het gekozen homescherm (profiles.home_screen; default /overzicht, keuze "budget" → /overzicht/cashflow/budget); een beveiligde API-route geeft uitgelogd JSON 401, geen HTML-redirect.',
     assertion: {
       kind: 'ui-only',
       source: 'proxy.ts + lib/supabase/proxy.ts publieke/beschermde padenlijst, geen cijfermatige uitkomst',
@@ -381,7 +381,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     given: 'Een vers-geonboarde gebruiker en een reeds-geonboarde gebruiker.',
     when: 'De vers-geonboarde gebruiker klikt "Ga naar je toekomst"; de reeds-geonboarde gebruiker opent handmatig /onboarding; een niet-geonboarde gebruiker opent direct een app-route.',
-    then: 'Harde navigatie naar /toekomst zonder terug-flits naar /onboarding; een reeds-geonboarde gebruiker die /onboarding opent → redirect naar /overzicht; een niet-geonboarde gebruiker die een app-route opent → redirect naar /onboarding. Op het successcherm zelf staat sinds APP-2 (nazorg eenvoudige weergave, 11 aug 2026) één regel die de weergavekeuze noemt: "Rustig beginnen of meteen alle detail? Je weergave kies je later bij Mijn → Uiterlijk." Twee eigenschappen daarvan zijn te toetsen en bewust zo: de regel is GEEN link (klikken doet niets — een soft-navigation hiernaast zou de `clearLocalStorage()` + harde navigatie van de CTA omzeilen), en hij is NIET modus-afhankelijk (de `DisplayModeProvider` hangt alleen in de (app)-groep, dus buiten die groep zou elke modus-tekst op de \'simple\'-fallback landen — ADR 0026). De cijfers zelf zijn al gedekt door WF-START-18/19; hier telt alleen de landing/poort-navigatie.',
+    then: 'Harde navigatie naar /toekomst zonder terug-flits naar /onboarding; een reeds-geonboarde gebruiker die /onboarding opent → redirect naar /dashboard (de middleware vertaalt naar het gekozen homescherm); een niet-geonboarde gebruiker die een app-route opent → redirect naar /onboarding. Op het successcherm zelf staat sinds APP-2 (nazorg eenvoudige weergave, 11 aug 2026) één regel die de weergavekeuze noemt: "Rustig beginnen of meteen alle detail? Je weergave kies je later bij Mijn → Uiterlijk." Twee eigenschappen daarvan zijn te toetsen en bewust zo: de regel is GEEN link (klikken doet niets — een soft-navigation hiernaast zou de `clearLocalStorage()` + harde navigatie van de CTA omzeilen), en hij is NIET modus-afhankelijk (de `DisplayModeProvider` hangt alleen in de (app)-groep, dus buiten die groep zou elke modus-tekst op de \'simple\'-fallback landen — ADR 0026). De cijfers zelf zijn al gedekt door WF-START-18/19; hier telt alleen de landing/poort-navigatie.',
     assertion: {
       kind: 'ui-only',
       source: 'window.location.assign + onboarding-poort in app/(app)/layout.tsx + components/onboarding/onboarding-success.tsx (statische copy), geen eigen berekening',

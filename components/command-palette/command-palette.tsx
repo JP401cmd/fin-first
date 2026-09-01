@@ -36,6 +36,7 @@ import { pushOverlayHistory, noteOverlayNavigation } from '@/lib/overlay-history
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { useEuroView } from '@/lib/hooks/use-euro-view'
+import { useHomeScreen } from '@/lib/hooks/use-home-screen'
 import { useGlobalSync } from '@/components/sync/global-sync-provider'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { usePerspective } from '@/components/app/perspective-provider'
@@ -117,6 +118,7 @@ export function CommandPalette({ open, onClose, role, userId }: CommandPalettePr
   const { masked, toggle: togglePrivacy } = useMaskedAmounts()
   const { mode: displayMode, toggle: toggleDisplayMode } = useDisplayMode()
   const { view: euroView, toggle: toggleEuroView } = useEuroView()
+  const { homeScreen, toggle: toggleHomeScreen } = useHomeScreen()
   const { triggerGlobalSync } = useGlobalSync()
   const {
     perspective: currentPerspective,
@@ -135,6 +137,8 @@ export function CommandPalette({ open, onClose, role, userId }: CommandPalettePr
       displayMode,
       toggleEuroView,
       euroView,
+      toggleHomeScreen,
+      homeScreen,
       triggerPricesSync: async () => {
         await triggerGlobalSync({ exchanges: [], wallets: [], pricesOnly: true })
       },
@@ -151,6 +155,8 @@ export function CommandPalette({ open, onClose, role, userId }: CommandPalettePr
       displayMode,
       toggleEuroView,
       euroView,
+      toggleHomeScreen,
+      homeScreen,
       triggerGlobalSync,
       currentPerspective,
       availablePerspectives,

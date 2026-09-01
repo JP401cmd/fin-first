@@ -44,7 +44,9 @@ describe('GET /auth/callback — bestaand gedrag (ongewijzigd)', () => {
   it('weigert een onveilig `next`-pad en valt terug op de safe-redirect-fallback', async () => {
     mockExchangeCodeForSession.mockResolvedValue({ error: null })
     const res = await GET(requestFor('/auth/callback?code=abc&next=//evil.com'))
-    expect(locationOf(res)).toBe(`${ORIGIN}/overzicht`)
+    // /dashboard = het "ga naar home"-doel; de middleware vertaalt hem daarna
+    // naar het gekozen homescherm (profiles.home_screen).
+    expect(locationOf(res)).toBe(`${ORIGIN}/dashboard`)
   })
 
   it('kale /login?confirm_error=1 bij ontbrekende code en geen ?error=', async () => {

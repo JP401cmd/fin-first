@@ -166,6 +166,8 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
         displayMode: 'full',
         toggleEuroView: () => {},
         euroView: 'nominal',
+        toggleHomeScreen: () => {},
+        homeScreen: 'overzicht',
         triggerPricesSync: () => {},
         currentPerspective: 'personal',
         availablePerspectives: perspectives,
@@ -236,19 +238,19 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
       criterion('WF-NAV-16')
       const redirects = (await nextConfig.redirects?.()) ?? []
       const coreNaarOverzicht = redirects.some((r) => r.source === '/core' && r.destination === '/overzicht')
-      const dashboardNaarOverzicht = redirects.some((r) => r.source === '/dashboard' && r.destination === '/overzicht')
+      // /dashboard mag juist GEEN config-regel meer hebben: de middleware
+      // vertaalt hem naar het gekozen homescherm (profiles.home_screen).
+      const dashboardGeenConfigRedirect = !redirects.some((r) => r.source === '/dashboard')
       const coreAssetsGeenRedirect = !redirects.some((r) => r.source === '/core/assets')
       return {
-        // 25 = 16 + de drie regels die /core/cash en /horizon/whatif van een
-        // runtime-`redirect()`-pagina naar de routing-laag verhuisden (React
-        // #310-fix) + de vijf regels van de tweede lichting (11 aug 2026:
-        // /horizon/strategie, /horizon/uitgaven-na-pensioen,
-        // /toekomst/uitgaven-na-pensioen en /toekomst/strategie met zijn twee
-        // focus-takken) + de derde lichting (31 aug 2026, UR2-11):
-        // /toekomst/whatif zonder `?via=dreamgate`. Zie het redirect-blok in
-        // next.config.ts.
-        expected: 'aantalRedirects=25; coreNaarOverzicht=true; dashboardNaarOverzicht=true; coreAssetsGeenRedirect=true',
-        actual: `aantalRedirects=${redirects.length}; coreNaarOverzicht=${coreNaarOverzicht}; dashboardNaarOverzicht=${dashboardNaarOverzicht}; coreAssetsGeenRedirect=${coreAssetsGeenRedirect}`,
+        // 24 = de eerdere 25 (16 + React #310-lichtingen, zie het redirect-blok
+        // in next.config.ts) MIN de /dashboard-regel (1 sep 2026, kiesbaar
+        // homescherm): /dashboard is nu het "ga naar home"-doel dat de
+        // edge-middleware (lib/supabase/proxy.ts) naar profiles.home_screen
+        // vertaalt — een statische config-regel zou die vertaling
+        // onbereikbaar maken (config-redirects draaien vóór de middleware).
+        expected: 'aantalRedirects=24; coreNaarOverzicht=true; dashboardGeenConfigRedirect=true; coreAssetsGeenRedirect=true',
+        actual: `aantalRedirects=${redirects.length}; coreNaarOverzicht=${coreNaarOverzicht}; dashboardGeenConfigRedirect=${dashboardGeenConfigRedirect}; coreAssetsGeenRedirect=${coreAssetsGeenRedirect}`,
       }
     },
   },
@@ -284,6 +286,8 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
         displayMode: 'full',
         toggleEuroView: () => {},
         euroView: 'nominal',
+        toggleHomeScreen: () => {},
+        homeScreen: 'overzicht',
         triggerPricesSync: () => {},
         currentPerspective: 'personal',
         availablePerspectives: [],

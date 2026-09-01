@@ -5,9 +5,10 @@
 
 import {
   Eye, EyeOff, RefreshCw, LogOut, User, Users, UserCheck,
-  Layers, PanelTopClose, CalendarClock, Wallet, type LucideIcon,
+  Layers, PanelTopClose, CalendarClock, Wallet, Home, PiggyBank, type LucideIcon,
 } from 'lucide-react'
 import type { EuroView } from '@/lib/euro-display'
+import type { HomeScreen } from '@/lib/home-screen'
 import type { ModuleId } from '@/lib/module-registry'
 import type { Perspective, PerspectiveOption } from '@/lib/types/perspective'
 import type { CommandItem, CommandModuleContext } from './types'
@@ -19,7 +20,7 @@ import type { CommandItem, CommandModuleContext } from './types'
  * toevoegen zonder de cap te verhogen drukt anders stilzwijgend de onderste
  * actie uit de standaardlijst.
  */
-export const ACTIONS_LIMIT_VISIBLE = 5
+export const ACTIONS_LIMIT_VISIBLE = 6
 
 /**
  * Capabilities die een action kan gebruiken. Wordt door de provider gebouwd
@@ -41,6 +42,10 @@ export type ActionRunContext = {
   toggleEuroView: () => void
   /** Huidige euro-weergave — bepaalt het label van de toggle-actie. */
   euroView: EuroView
+  /** Toggle het profiel-brede homescherm (Overzicht ⇄ Budgetteren). */
+  toggleHomeScreen: () => void
+  /** Huidig homescherm — bepaalt het label van de toggle-actie. */
+  homeScreen: HomeScreen
   /** Trigger een prices-only sync (geen bank-/exchange-koppelingen vereist). */
   triggerPricesSync: () => Promise<void> | void
   /** Huidig actief perspectief (personal/household/partner). */
@@ -120,6 +125,27 @@ const ACTIONS: ActionDef[] = [
     module: 'globaal',
     build: (ctx) => () => {
       ctx.toggleEuroView()
+      ctx.closePalette()
+    },
+  },
+  {
+    // Derde profiel-brede voorkeur in dit rijtje (na weergavemodus en
+    // euro-weergave): waar de app voor je opent. Alleen semantische
+    // "ga naar hoofdscherm"-navigaties volgen de keuze (login-landing,
+    // /dashboard/PWA, top-bar ←, long-press op de waffle) — de menu-indeling
+    // verandert niet mee. Bewust NIET gegate op de budgetteren-app: wie
+    // 'budget' kiest zonder inrichting ziet de AppSetupGate als startscherm —
+    // zelfverklarend en hier direct omkeerbaar.
+    id: 'action:toggle-home-screen',
+    getLabel: (ctx) =>
+      ctx.homeScreen === 'overzicht'
+        ? 'Budgetteren als startscherm'
+        : 'Overzicht als startscherm',
+    getSublabel: () => 'Waar de app voor je opent',
+    getIcon: (ctx) => (ctx.homeScreen === 'overzicht' ? PiggyBank : Home),
+    module: 'globaal',
+    build: (ctx) => () => {
+      ctx.toggleHomeScreen()
       ctx.closePalette()
     },
   },

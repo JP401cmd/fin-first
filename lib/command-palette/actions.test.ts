@@ -24,6 +24,8 @@ function makeCtx(overrides: Partial<ActionRunContext> = {}): ActionRunContext {
     displayMode: 'simple',
     toggleEuroView: vi.fn(),
     euroView: 'nominal',
+    toggleHomeScreen: vi.fn(),
+    homeScreen: 'overzicht',
     triggerPricesSync: vi.fn(),
     currentPerspective: 'personal',
     availablePerspectives: PERSPECTIVES,
@@ -127,6 +129,18 @@ describe('buildActionItems — zichtbaarheid binnen de standaard-cap', () => {
     expect(defaultVisible).toContain('action:sync-prices')
     expect(defaultVisible).toContain('action:toggle-euro-view')
   })
+
+  // De homescherm-toggle kwam er als zesde actie bij; de cap ging mee van 5
+  // naar 6. Deze assertie bewaakt dat óók 'Uitloggen' — de onderste actie —
+  // binnen de standaardlijst blijft vallen: een nieuwe actie toevoegen zonder
+  // de cap te verhogen drukt anders stilzwijgend de onderste actie eruit.
+  it("houdt de homescherm-toggle én 'Uitloggen' binnen de standaardlijst", () => {
+    const items = buildActionItems(makeCtx(), ['vermogensregistratie'])
+    const general = items.filter((i) => !i.id.startsWith('action:perspective-'))
+    const defaultVisible = general.slice(0, ACTIONS_LIMIT_VISIBLE).map((i) => i.id)
+    expect(defaultVisible).toContain('action:toggle-home-screen')
+    expect(defaultVisible).toContain('action:logout')
+  })
 })
 
 describe('buildActionItems — euro-weergave', () => {
@@ -161,6 +175,46 @@ describe('buildActionItems — euro-weergave', () => {
     const ids = buildActionItems(makeCtx(), []).map((i) => i.id)
     expect(ids.indexOf('action:toggle-euro-view')).toBe(
       ids.indexOf('action:toggle-display-mode') + 1,
+    )
+  })
+})
+
+describe('buildActionItems — homescherm', () => {
+  function homeItem(ctx: ActionRunContext) {
+    const item = buildActionItems(ctx, []).find((i) => i.id === 'action:toggle-home-screen')
+    if (!item) throw new Error('action:toggle-home-screen ontbreekt in het register')
+    return item
+  }
+
+  it('biedt vanuit Overzicht de stap naar Budgetteren als startscherm aan', () => {
+    expect(homeItem(makeCtx({ homeScreen: 'overzicht' })).label).toBe(
+      'Budgetteren als startscherm',
+    )
+  })
+
+  it('biedt vanuit Budgetteren de stap terug naar Overzicht als startscherm aan', () => {
+    expect(homeItem(makeCtx({ homeScreen: 'budget' })).label).toBe(
+      'Overzicht als startscherm',
+    )
+  })
+
+  it('roept de toggle aan en sluit het palet', () => {
+    const toggleHomeScreen = vi.fn()
+    const closePalette = vi.fn()
+    const item = homeItem(makeCtx({ toggleHomeScreen, closePalette }))
+    // Een action-item is per definitie een runner, geen href — als `run` ontbreekt
+    // is de actie stuk, dus dat is hier een echte assertie en geen type-formaliteit.
+    expect(item.run).toBeDefined()
+    expect(item.href).toBeUndefined()
+    item.run!()
+    expect(toggleHomeScreen).toHaveBeenCalledTimes(1)
+    expect(closePalette).toHaveBeenCalledTimes(1)
+  })
+
+  it('staat direct onder de euro-weergave-actie (profiel-brede voorkeuren bij elkaar)', () => {
+    const ids = buildActionItems(makeCtx(), []).map((i) => i.id)
+    expect(ids.indexOf('action:toggle-home-screen')).toBe(
+      ids.indexOf('action:toggle-euro-view') + 1,
     )
   })
 })

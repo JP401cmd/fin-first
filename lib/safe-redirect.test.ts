@@ -44,7 +44,7 @@ describe('safeRelativePath', () => {
     expect(safeRelativePath('/toekomst?tab=fire')).toBe('/toekomst?tab=fire')
   })
 
-  it('valt terug op /overzicht bij onveilige of ontbrekende input', () => {
+  it('valt terug op de home-fallback (/dashboard) bij onveilige of ontbrekende input', () => {
     expect(safeRelativePath('//evil.com')).toBe(SAFE_REDIRECT_FALLBACK)
     expect(safeRelativePath('/\\evil.com')).toBe(SAFE_REDIRECT_FALLBACK)
     expect(safeRelativePath('@evil.com')).toBe(SAFE_REDIRECT_FALLBACK)

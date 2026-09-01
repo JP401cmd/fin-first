@@ -38,7 +38,9 @@ export default function CheckActiverenPage() {
         })
         if (cancelled) return
         if (res.ok) {
-          window.location.href = '/overzicht'
+          // /dashboard = "ga naar home": de middleware vertaalt naar het
+          // gekozen homescherm (profiles.home_screen).
+          window.location.href = '/dashboard'
           return
         }
         setStatus('error')
@@ -82,10 +84,10 @@ export default function CheckActiverenPage() {
             <h1 className="mb-2 text-xl font-bold text-zinc-900">Bijna klaar</h1>
             <p className="mb-6 text-sm text-zinc-600">{message}</p>
             <a
-              href="/overzicht"
+              href="/dashboard"
               className="inline-block rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
             >
-              Naar mijn overzicht
+              Naar de app
             </a>
           </div>
         )}

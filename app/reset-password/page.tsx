@@ -73,8 +73,10 @@ export default function ResetPasswordPage() {
         setError(translateAuthError(error))
       } else {
         setSuccess(true)
-        // Redirect to dashboard after short delay so user sees success message
-        setTimeout(() => router.push('/overzicht'), 2000)
+        // Redirect naar home na een korte pauze zodat de succes-melding leesbaar
+        // is. /dashboard = "ga naar home": de middleware vertaalt naar het
+        // gekozen homescherm (profiles.home_screen).
+        setTimeout(() => router.push('/dashboard'), 2000)
       }
     } catch (err) {
       // Netwerkfout/timeout: zonder deze catch bleef `loading` eeuwig true.
@@ -133,10 +135,10 @@ export default function ResetPasswordPage() {
             Je wachtwoord is succesvol bijgewerkt. Je wordt doorgestuurd...
           </p>
           <Link
-            href="/overzicht"
+            href="/dashboard"
             className="mt-6 inline-block text-sm font-medium text-zinc-900 hover:underline"
           >
-            Naar Overzicht
+            Naar de app
           </Link>
         </div>
       </div>
