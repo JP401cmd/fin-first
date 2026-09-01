@@ -79,7 +79,7 @@ export function HomeScreenPicker() {
         Je keuze reist mee naar je andere apparaten. Snel wisselen kan ook met het zoekscherm (
         <kbd className="font-mono">⌘K</kbd> of <kbd className="font-mono">Ctrl</kbd>+
         <kbd className="font-mono">K</kbd>); op mobiel ga je direct naar je startscherm door de
-        middelste knop van de navigatiepil anderhalve seconde ingedrukt te houden.
+        middelste knop van de navigatiepil een seconde ingedrukt te houden.
       </p>
     </div>
   )

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { Search, LayoutGrid, X } from 'lucide-react'
+import { Search, LayoutGrid, X, Home } from 'lucide-react'
 import { useCommandPalette } from '@/components/command-palette/command-palette-provider'
 import { useOverlayOpen } from '@/lib/overlay-signal'
 import { isImmersiveRoute } from '@/lib/shell/immersive-routes'
@@ -10,14 +10,16 @@ import { useFinSlot } from '@/lib/shell/fin-slot'
 import { useHomeScreen } from '@/lib/hooks/use-home-screen'
 import { NavMenuSheet } from './nav-menu-sheet'
 
-// Long-press-configuratie voor de waffle-knop: 1500 ms vasthouden = direct
-// naar het gekozen homescherm (useHomeScreen). Bewust ruim boven de
+// Long-press-configuratie voor de waffle-knop: 1000 ms vasthouden = direct
+// naar het gekozen homescherm (useHomeScreen). Bewust boven de
 // systeem-long-press (~500 ms) zodat de gesture nooit botst met een gewone
 // tik; de 8px-move-drempel matcht HORIZONTAL_DECISION_PX uit
 // lib/hooks/use-swipe-back.ts — daarboven is het een scroll/swipe en cancelen
-// we. Patroon gespiegeld op de (inmiddels dode) long-press in
-// bottom-nav-tabs.tsx.
-const LONG_PRESS_HOME_MS = 1500
+// we. Tijdens het vasthouden wisselt het icoon naar een huisje dat over
+// precies deze duur meegroeit (druk-registratie); de CSS-transition op de
+// icon-wrapper gebruikt duration-1000 — houd die gelijk aan deze constante.
+// Patroon gespiegeld op de (inmiddels dode) long-press in bottom-nav-tabs.tsx.
+const LONG_PRESS_HOME_MS = 1000
 const MOVE_CANCEL_PX = 8
 
 /**
@@ -29,7 +31,8 @@ const MOVE_CANCEL_PX = 8
  *  - ⊞ Waffle/grid (toggle) → opent NavMenuSheet met de complete nav-
  *    structuur. Wanneer menu open is, verandert het waffle-icoon in een
  *    kruisje (✕) en sluit een klik het menu — geen dubbele dismiss-area.
- *    LONG-PRESS (1,5 s, touch-only): direct naar het gekozen homescherm —
+ *    LONG-PRESS (1 s, touch-only): direct naar het gekozen homescherm; het
+ *    icoon wisselt tijdens het vasthouden naar een meegroeiend huisje —
  *    een verrijking, geen enige weg (home blijft via het menu en de
  *    top-bar-← bereikbaar, dus geen apart SR-/toetsenbord-equivalent nodig).
  *
@@ -63,6 +66,10 @@ export function FloatingNavButton() {
   const pressTimerRef = useRef<number | null>(null)
   const longPressFiredRef = useRef(false)
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null)
+  // Zichtbare druk-registratie: waar tijdens het vasthouden het huisje-icoon
+  // meegroeit. Gaat aan op touchstart en uit bij loslaten, cancelen,
+  // wegbewegen, verbergen van de pill of het afgaan van de navigatie.
+  const [pressing, setPressing] = useState(false)
 
   const clearPressTimer = () => {
     if (pressTimerRef.current !== null) {
@@ -80,6 +87,7 @@ export function FloatingNavButton() {
       window.clearTimeout(pressTimerRef.current)
       pressTimerRef.current = null
     }
+    setPressing(false)
   }, [hidden])
   useEffect(
     () => () => {
@@ -121,6 +129,7 @@ export function FloatingNavButton() {
   // ── Long-press op de waffle: 1,5 s vasthouden → gekozen homescherm ────────
   const goHomeFromLongPress = () => {
     longPressFiredRef.current = true
+    setPressing(false)
     try {
       navigator.vibrate?.(10)
     } catch {
@@ -137,6 +146,7 @@ export function FloatingNavButton() {
     // een pinch-gesture per ongeluk naar home navigeert.
     if (e.touches.length !== 1) {
       clearPressTimer()
+      setPressing(false)
       return
     }
     const touch = e.touches[0]
@@ -144,6 +154,7 @@ export function FloatingNavButton() {
     touchStartPosRef.current = { x: touch.clientX, y: touch.clientY }
     longPressFiredRef.current = false
     clearPressTimer()
+    setPressing(true)
     pressTimerRef.current = window.setTimeout(() => {
       pressTimerRef.current = null
       goHomeFromLongPress()
@@ -158,11 +169,13 @@ export function FloatingNavButton() {
     const dy = touch.clientY - touchStartPosRef.current.y
     if (Math.abs(dx) + Math.abs(dy) > MOVE_CANCEL_PX) {
       clearPressTimer()
+      setPressing(false)
     }
   }
 
   const handleWaffleTouchEnd = () => {
     clearPressTimer()
+    setPressing(false)
     touchStartPosRef.current = null
   }
 
@@ -227,13 +240,26 @@ export function FloatingNavButton() {
             onContextMenu={handleWaffleContextMenu}
             aria-label={menuOpen ? 'Menu sluiten' : 'Menu openen'}
             aria-expanded={menuOpen}
+            data-pressing={pressing || undefined}
             className="flex items-center justify-center rounded-full px-5 py-2.5 text-white/90 hover:bg-white/10 active:bg-white/15 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--paper)]"
           >
-            {menuOpen ? (
-              <X size={18} strokeWidth={2.5} />
-            ) : (
-              <LayoutGrid size={18} strokeWidth={2.25} />
-            )}
+            {/* Druk-registratie: tijdens het vasthouden wisselt het icoon naar
+                een huisje dat over exact LONG_PRESS_HOME_MS meegroeit
+                (duration-1000 = die constante); bij loslaten/cancel springt
+                het snel terug (duration-150). */}
+            <span
+              className={`flex items-center justify-center transition-transform ease-linear ${
+                pressing ? 'duration-1000 scale-125' : 'duration-150 scale-100'
+              }`}
+            >
+              {pressing ? (
+                <Home size={18} strokeWidth={2.25} />
+              ) : menuOpen ? (
+                <X size={18} strokeWidth={2.5} />
+              ) : (
+                <LayoutGrid size={18} strokeWidth={2.25} />
+              )}
+            </span>
           </button>
 
           {/* Fin — derde segment van dezelfde capsule, geen apart element meer.

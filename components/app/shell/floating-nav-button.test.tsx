@@ -2,14 +2,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
 
 /**
- * Long-press op de waffle-knop (1,5 s) → direct naar het gekozen homescherm.
+ * Long-press op de waffle-knop (1 s) → direct naar het gekozen homescherm.
  *
- * Borgt de vier gedragingen die ertoe doen:
+ * Borgt de gedragingen die ertoe doen:
  *  - korte tik blijft de menu-toggle (bestaand gedrag, regressie-eis)
- *  - 1500 ms vasthouden navigeert naar `homeHref` uit useHomeScreen, sluit het
+ *  - 1000 ms vasthouden navigeert naar `homeHref` uit useHomeScreen, sluit het
  *    menu en onderdrukt de click die ná touchend automatisch nog vuurt
- *  - loslaten vóór 1500 ms navigeert NIET
+ *  - loslaten vóór 1000 ms navigeert NIET
  *  - >8px bewegen (scroll/swipe) cancelt de long-press
+ *  - de druk-registratie (data-pressing, voedt huisje-icoon + groei-animatie)
+ *    gaat aan op touchstart en uit bij loslaten én bij het afgaan
  */
 
 const pushMock = vi.fn()
@@ -75,16 +77,20 @@ describe('FloatingNavButton — long-press waffle', () => {
     expect(pushMock).not.toHaveBeenCalled()
   })
 
-  it('1500 ms vasthouden navigeert naar het gekozen homescherm, sluit het menu en onderdrukt de na-click', () => {
+  it('1000 ms vasthouden navigeert naar het gekozen homescherm, sluit het menu en onderdrukt de na-click', () => {
     renderPill()
     // Menu eerst open, zodat het sluiten door de long-press zichtbaar is.
     fireEvent.click(waffleButton())
     expect(sheetOpen()).toBe('true')
 
     fireEvent.touchStart(waffleButton(), touchAt(10, 10))
+    // Druk-registratie aan tijdens het vasthouden (voedt huisje + animatie).
+    expect(waffleButton().getAttribute('data-pressing')).toBe('true')
     act(() => {
-      vi.advanceTimersByTime(1500)
+      vi.advanceTimersByTime(1000)
     })
+    // …en uit zodra de navigatie afgaat.
+    expect(waffleButton().getAttribute('data-pressing')).toBeNull()
 
     expect(pushMock).toHaveBeenCalledTimes(1)
     expect(pushMock).toHaveBeenCalledWith('/overzicht/cashflow/budget')
@@ -98,13 +104,14 @@ describe('FloatingNavButton — long-press waffle', () => {
     expect(pushMock).toHaveBeenCalledTimes(1)
   })
 
-  it('loslaten vóór 1500 ms navigeert niet', () => {
+  it('loslaten vóór 1000 ms navigeert niet en zet de druk-registratie uit', () => {
     renderPill()
     fireEvent.touchStart(waffleButton(), touchAt(10, 10))
     act(() => {
-      vi.advanceTimersByTime(1400)
+      vi.advanceTimersByTime(900)
     })
     fireEvent.touchEnd(waffleButton())
+    expect(waffleButton().getAttribute('data-pressing')).toBeNull()
     act(() => {
       vi.advanceTimersByTime(500)
     })
