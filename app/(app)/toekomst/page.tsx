@@ -8,7 +8,7 @@ import HorizonPage from '@/components/app/horizon/horizon-client'
 import { ToekomstNavCards } from '@/components/future/toekomst-nav-cards'
 import { PrintTijdasButton } from '@/components/future/print-tijdas-button'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
-import { PageOpening, OrnamentColophon } from '@/components/editorial'
+import { PageOpening, EditorialDeck, OrnamentColophon } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
 import {
   DeficitNoticeProvider,
@@ -138,14 +138,17 @@ export default async function ToekomstPage({
           `components/app/horizon/deficit-notice-provider.tsx`. */}
       <DeficitNoticeProvider initialMinimizedPeak={deficitMinimizedPeak}>
       <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-4 sm:pt-6 print:hidden">
-        <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          {/* Deck bewust NIET via de `deck`-prop: dan zit hij in deze flex-
+              kolom en reserveert de knoppen-cluster rechts zijn breedte over
+              de vólle hoogte — op mobiel wikkelde de intro daardoor in vier
+              smalle regels. De deck rendert hieronder vol-breed. */}
           <PageOpening
             className="min-w-0 flex-1"
             kicker="De Toekomst"
             titleBefore="Je "
             emphasis="tijdas"
             titleAfter=""
-            deck="Geld is opgeslagen tijd — kies wat je later met die tijd doet."
           />
           <div className="flex shrink-0 items-center gap-2">
             {/* Statuspunt van een geminimaliseerde melding: links naast de 'i',
@@ -161,6 +164,11 @@ export default async function ToekomstPage({
             {hasProjection && <PrintTijdasButton />}
           </div>
         </div>
+
+        {/* Vol-breed onder de kop-rij (zie de aantekening hierboven). */}
+        <EditorialDeck className="mb-4">
+          Geld is opgeslagen tijd — kies wat je later met die tijd doet.
+        </EditorialDeck>
 
         {/* Navkaarten staan nu altijd boven de altijd-zichtbare tijdas. */}
         <ToekomstNavCards

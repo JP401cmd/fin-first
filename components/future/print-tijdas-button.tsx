@@ -27,7 +27,10 @@ export function PrintTijdasButton() {
       title="Afdrukken (Cmd/Ctrl + P)"
     >
       <Printer className="w-3.5 h-3.5" aria-hidden="true" />
-      Delen / Afdrukken
+      {/* Op mobiel icon-only: het brede label drukte de kop-rij plat;
+          betekenis blijft via title + aria-label (zelfde patroon als de
+          pillenrij-labels). */}
+      <span className="hidden sm:inline">Delen / Afdrukken</span>
     </button>
   )
 }

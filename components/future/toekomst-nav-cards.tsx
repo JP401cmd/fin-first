@@ -409,10 +409,10 @@ export function ToekomstNavCards(props: {
       aria-label="Toekomst-navigatie"
       className={
         simple
-          ? // Compact (Eenvoudig): 3 one-liner-kaarten — gestapeld op mobiel
-            // (labels als "Gebeurtenissen" blijven dan één regel), naast
-            // elkaar vanaf sm.
-            'grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3'
+          ? // Compact (Eenvoudig): 3 kleine kaarten naast elkaar — ook op
+            // mobiel (eigenaarswens sep 2026); de compact-variant stapelt
+            // daar icoon boven label zodat "Gebeurtenissen" past.
+            'grid grid-cols-3 gap-2 sm:gap-3'
           : 'grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3'
       }
     >

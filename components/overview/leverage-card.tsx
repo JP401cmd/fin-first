@@ -169,16 +169,23 @@ export function LeverageCard({
 }) {
   if (variant === 'compact') {
     return (
-      <div className="group relative rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 transition-all hover:border-[var(--ink-3)] hover:shadow-sm">
-        <Link href={href} title={tooltip} className="flex items-center gap-2.5">
+      <div className="group relative rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-2 sm:p-3 transition-all hover:border-[var(--ink-3)] hover:shadow-sm">
+        {/* Op mobiel gestapeld (icoon boven label, gecentreerd) zodat drie
+            compact-kaarten naast elkaar passen zonder dat "Gebeurtenissen"
+            afkapt; vanaf sm de oorspronkelijke one-liner. */}
+        <Link
+          href={href}
+          title={tooltip}
+          className="flex flex-col items-center gap-1.5 text-center sm:flex-row sm:items-center sm:gap-2.5 sm:text-left"
+        >
           <div
             className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center ${tint}`}
           >
             <Icon className="w-4 h-4" />
           </div>
           {/* `min-w-0` op de tekstkolom houdt `truncate` werkend binnen de flex-rij. */}
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm sm:text-base font-semibold text-[var(--ink)]">
+          <span className="min-w-0 max-w-full sm:flex-1">
+            <span className="block truncate text-xs sm:text-base font-semibold text-[var(--ink)]">
               {label}
             </span>
             {/* Zelfde typografie als de subAmount-regel in de volledige tak, zodat
