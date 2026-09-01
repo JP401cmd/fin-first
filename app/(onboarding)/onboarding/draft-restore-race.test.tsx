@@ -228,7 +228,7 @@ describe('onboarding draft-restore race (WF-START-23)', () => {
     resolveGetUser({ data: { user: { id: 'user-1' } } })
 
     await waitFor(() => {
-      expect(routerReplace).toHaveBeenCalledWith('/overzicht')
+      expect(routerReplace).toHaveBeenCalledWith('/dashboard')
     })
     // `waitFor` keert terug zodra de redirect gebeurd is — een state-update in
     // dezelfde async-continuation is dan nog niet doorgerenderd. Expliciet

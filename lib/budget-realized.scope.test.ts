@@ -133,10 +133,18 @@ describe('fetchRealizedBudgetAmounts — het gescoopte cron-pad', () => {
   })
 
   it('reduceert de gescoopte rijen tot realisatie per budget', async () => {
+    // Maandsleutels RELATIEF aan vandaag: het 12-maandsvenster schuift elke
+    // maandwissel op, en hardgecodeerde maanden ('2025-09') vielen er op
+    // 1 sep 2026 precies uit — de test werd rood door de kalender, niet door
+    // de code (release-poort 1 sep 2026).
+    const maandTerug = (n: number) => {
+      const d = new Date(Date.UTC(new Date().getFullYear(), new Date().getMonth() - n, 1))
+      return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
+    }
     const { supabase } = makeSupabase([
-      [aggRow('2025-09', 'b1', -100)],
-      [aggRow('2026-01', 'b1', -200)],
-      [aggRow('2026-07', 'b2', -50)],
+      [aggRow(maandTerug(11), 'b1', -100)],
+      [aggRow(maandTerug(7), 'b1', -200)],
+      [aggRow(maandTerug(1), 'b2', -50)],
     ])
     const out = await fetchRealizedBudgetAmounts(supabase, { userId: USER, householdId: HOUSEHOLD })
 
