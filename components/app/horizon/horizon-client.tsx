@@ -5096,8 +5096,11 @@ export default function HorizonPage({
             </div>
           </div>
 
-          {/* Mobile: 2x2 figures-strip — editorial blueprint */}
-          <div className="grid grid-cols-2 sm:hidden items-start border-t border-b border-[var(--ink)] mb-5">
+          {/* Mobile: 2x2 figures-strip — editorial blueprint.
+              Cellen stretchen (géén items-start): de rand tussen de cellen moet
+              doorlopen tot de volle rijhoogte, ook als één KPI (dual doelbedrag)
+              hoger uitvalt dan zijn buur. */}
+          <div className="grid grid-cols-2 sm:hidden border-t border-b border-[var(--ink)] mb-5">
             {/* KPI 1: Vrijheidsleeftijd / Pensioenleeftijd — winner */}
             <button
               type="button"
@@ -5547,7 +5550,7 @@ export default function HorizonPage({
                       <GitBranch className="h-3 w-3" />
                       <span data-pill-label className="hidden sm:inline">Scenario&apos;s</span>
                       {scenarioData && scenariosExpanded && (
-                        <span className="flex items-center gap-0.5">
+                        <span data-pill-badge className="flex items-center gap-0.5">
                           {scenarioData.map(s => (
                             <span key={s.name} className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: s.color }} />
                           ))}
@@ -5585,15 +5588,15 @@ export default function HorizonPage({
                         Marktcheck
                       </span>
                       {mcExpanded && mcPending && (
-                        <span className="font-mono text-[10px] tabular-nums opacity-60">…</span>
+                        <span data-pill-badge className="font-mono text-[10px] tabular-nums opacity-60">…</span>
                       )}
                       {mcExpanded && !mcPending && mcFailed && (
-                        <span className="font-mono text-[10px] tabular-nums opacity-60">—</span>
+                        <span data-pill-badge className="font-mono text-[10px] tabular-nums opacity-60">—</span>
                       )}
                       {/* De datawaarde blijft ook in de compacte pillenbalk staan (daar
                           valt alleen het label weg) — vandaar de korte vorm. */}
                       {mcExpanded && !mcPending && mcMarge && (
-                        <span className="font-mono text-[10px] tabular-nums opacity-75">
+                        <span data-pill-badge className="font-mono text-[10px] tabular-nums opacity-75">
                           {margeKort(mcMarge)}
                         </span>
                       )}
@@ -5627,7 +5630,7 @@ export default function HorizonPage({
                       {/* Delta t.o.v. de basislijn is alleen betekenisvol bij een echt
                           wat-als; een stop-only-lijn zou hier "gelijk" tonen. */}
                       {hasScenario && scenarioFireDeltaLabel && (
-                        <span className="ml-0.5 font-mono text-[10px] tabular-nums opacity-75">
+                        <span data-pill-badge className="ml-0.5 font-mono text-[10px] tabular-nums opacity-75">
                           {scenarioFireDeltaLabel}
                         </span>
                       )}
@@ -5699,7 +5702,7 @@ export default function HorizonPage({
                   <Calendar className="h-3 w-3" />
                   <span data-pill-label className="hidden sm:inline">Levensgebeurtenissen</span>
                   {showLifeEvents && events.length > 0 && (
-                    <span className="ml-0.5 font-mono text-[10px] tabular-nums opacity-75">
+                    <span data-pill-badge className="ml-0.5 font-mono text-[10px] tabular-nums opacity-75">
                       {events.length}
                     </span>
                   )}
@@ -5724,7 +5727,7 @@ export default function HorizonPage({
                     <Target className="h-3 w-3" />
                     <span data-pill-label className="hidden sm:inline">Doelen</span>
                     {showGoals && (
-                      <span className="ml-0.5 font-mono text-[10px] tabular-nums opacity-75">
+                      <span data-pill-badge className="ml-0.5 font-mono text-[10px] tabular-nums opacity-75">
                         {goalChartMarkers.length}
                       </span>
                     )}
@@ -5747,7 +5750,7 @@ export default function HorizonPage({
                   <Sparkles className="h-3 w-3" />
                   <span data-pill-label className="hidden sm:inline">Natuurlijke mijlpalen</span>
                   {showNaturalMilestones && naturalMilestones.length > 0 && (
-                    <span className="ml-0.5 font-mono text-[10px] tabular-nums opacity-75">
+                    <span data-pill-badge className="ml-0.5 font-mono text-[10px] tabular-nums opacity-75">
                       {naturalMilestones.length}
                     </span>
                   )}

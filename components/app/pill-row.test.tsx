@@ -163,6 +163,38 @@ describe('PillRow', () => {
     expect(row(container).getAttribute('data-compact')).toBe('false')
   })
 
+  // ── Derde stand: tight ────────────────────────────────────────────────────
+  //
+  // Op smal mobiel scherm zijn de labels sowieso al weg (`hidden sm:inline`),
+  // maar kan zelfs de iconen-only-rij breder zijn dan het scherm. Dan zet de
+  // rij `data-tight="true"` en vallen ook de databadges weg (CSS-regel op
+  // `data-pill-badge` in app/globals.css).
+
+  it('blijft uit tight zolang de iconen-only-stand past', () => {
+    layout = { rowWidth: 500, withLabels: 900, iconsOnly: 400 }
+    const { container } = render(<Pills />)
+    expect(row(container).getAttribute('data-compact')).toBe('true')
+    expect(row(container).getAttribute('data-tight')).toBe('false')
+  })
+
+  it('gaat naar tight zodra zelfs de iconen-only-rij niet past', () => {
+    layout = { rowWidth: 300, withLabels: 900, iconsOnly: 400 }
+    const { container } = render(<Pills extra />)
+    expect(row(container).getAttribute('data-compact')).toBe('true')
+    expect(row(container).getAttribute('data-tight')).toBe('true')
+  })
+
+  it('verlaat tight weer als de inhoud smaller wordt', () => {
+    layout = { rowWidth: 300, withLabels: 900, iconsOnly: 400 }
+    const { container, rerender } = render(<Pills extra />)
+    expect(row(container).getAttribute('data-tight')).toBe('true')
+
+    layout = { rowWidth: 300, withLabels: 900, iconsOnly: 250 }
+    rerender(<Pills />)
+    expect(row(container).getAttribute('data-compact')).toBe('true')
+    expect(row(container).getAttribute('data-tight')).toBe('false')
+  })
+
   it('draagt het CSS-aangrijpingspunt: data-pill-row op de rij, data-pill-label op elk label', () => {
     const { container } = render(<Pills extra />)
     expect(row(container).hasAttribute('data-pill-row')).toBe(true)

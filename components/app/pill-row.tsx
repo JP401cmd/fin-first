@@ -20,6 +20,13 @@
  * de meting ooit faalt of nooit draait (SSR). De meting bepaalt alleen of de
  * labels mee mogen.
  *
+ * **Derde stand — `data-tight`.** Past zelfs de iconen-only-stand niet (smal
+ * mobiel scherm, waar `hidden sm:inline` de labels sowieso al verbergt), dan
+ * zet de rij `data-tight="true"`: elementen met `data-pill-badge` (delta's,
+ * telbadges) vallen weg en gap/padding worden strakker — regels in
+ * `app/globals.css`. Liever een badge kwijt dan pillen die onbereikbaar
+ * voorbij de schermrand staan; de betekenis blijft via `title`/`aria-label`.
+ *
  * ## Waarom de meting eruitziet zoals hij eruitziet
  *
  * **Meten op elke commit, niet op een dependency.** Een eerdere versie triggerde
@@ -102,19 +109,33 @@ export function PillRow({
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const [compact, setCompact] = useState(false)
+  const [tight, setTight] = useState(false)
 
   const measure = useCallback(() => {
     const el = ref.current
     if (!el) return
     // Even naar de labels-aan-stand om de natuurlijke breedte te lezen, dan
     // terug. `getBoundingClientRect` forceert een layout-herberekening, dus de
-    // CSS-regel op `data-compact` is op dat moment al verwerkt.
-    const before = el.dataset.compact
+    // CSS-regels op `data-compact`/`data-tight` zijn op dat moment al verwerkt.
+    const beforeCompact = el.dataset.compact
+    const beforeTight = el.dataset.tight
     el.dataset.compact = 'false'
+    el.dataset.tight = 'false'
     const overflows = overflowsRow(el)
-    if (before !== undefined) el.dataset.compact = before
+    // Tweede trap: past zelfs de iconen-only-stand niet (smal mobiel scherm),
+    // dan gaat de rij naar 'tight' — databadges weg, strakkere gap/padding
+    // (regels in app/globals.css). Liever een badge kwijt dan pillen die
+    // onbereikbaar voorbij de schermrand staan.
+    let stillOverflows = false
+    if (overflows) {
+      el.dataset.compact = 'true'
+      stillOverflows = overflowsRow(el)
+    }
+    if (beforeCompact !== undefined) el.dataset.compact = beforeCompact
+    if (beforeTight !== undefined) el.dataset.tight = beforeTight
     // Zelfde waarde ⇒ React bailt uit, dus dit kan niet gaan rondzingen.
     setCompact(overflows)
+    setTight(stillOverflows)
   }, [])
 
   // Elke commit opnieuw meten: de inhoud kan gewijzigd zijn zonder dat de
@@ -136,6 +157,7 @@ export function PillRow({
       aria-label={ariaLabel}
       data-pill-row=""
       data-compact={compact ? 'true' : 'false'}
+      data-tight={tight ? 'true' : 'false'}
       className={`flex min-w-0 flex-nowrap items-center gap-1.5 ${className}`}
     >
       {children}

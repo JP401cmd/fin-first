@@ -446,6 +446,24 @@
   flex-shrink: 0;
 }
 
+/* Derde stand — 'tight': past zelfs de iconen-only-rij niet (smal mobiel
+   scherm), dan vallen ook de databadges (delta's, telbadges, `data-pill-badge`)
+   weg en worden gap en pill-padding strakker. Liever een badge kwijt dan
+   pillen die onbereikbaar voorbij de schermrand staan; betekenis blijft via
+   `title`/`aria-label`. De padding-regel raakt bewust alleen de pillen zelf
+   (directe kinderen + één niveau diep, voor de rechter `ml-auto`-groep en
+   popover-triggers) — de popover-ínhoud (dieper genest) blijft ongemoeid. */
+[data-pill-row][data-tight='true'] [data-pill-badge] {
+  display: none;
+}
+[data-pill-row][data-tight='true'] {
+  gap: 0.25rem;
+}
+[data-pill-row][data-tight='true'] > button,
+[data-pill-row][data-tight='true'] > * > button {
+  padding-inline: 0.375rem;
+}
+
 @theme inline {
   /* ── Scherpe hoeken (editorial) ── */
   --radius-xs: 0px;
