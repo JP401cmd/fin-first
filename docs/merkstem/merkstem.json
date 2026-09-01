@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-28T19:38:57.881Z",
-  "attestedAt": "2026-08-28T19:38:57.858Z",
+  "generatedAt": "2026-09-01T10:40:41.719Z",
+  "attestedAt": "2026-09-01T10:40:41.691Z",
   "toneStatus": "attested",
   "copyStatus": "attested",
   "toneSources": [
@@ -41,7 +41,7 @@
       "label": "Landingcopy",
       "caveat": "",
       "fileCount": 14,
-      "copyLines": 233,
+      "copyLines": 235,
       "files": [
         {
           "file": "components/landing/demo-mocks.tsx",
@@ -81,10 +81,10 @@
         },
         {
           "file": "components/landing/header.tsx",
-          "attestedSha256": "9193b32f889b8f4ede37df5d2d7bd0c75d97db7a80119aca900b66befe97416e",
-          "liveSha256": "9193b32f889b8f4ede37df5d2d7bd0c75d97db7a80119aca900b66befe97416e",
-          "copyLines": 3,
-          "attestedCopyLines": 3,
+          "attestedSha256": "ce338bfaa73570425a02326f44d2a7a14dd0529e0d2c2f510649d9f5d77f8f2e",
+          "liveSha256": "ce338bfaa73570425a02326f44d2a7a14dd0529e0d2c2f510649d9f5d77f8f2e",
+          "copyLines": 5,
+          "attestedCopyLines": 5,
           "extractionCollapsed": false,
           "status": "attested"
         },
