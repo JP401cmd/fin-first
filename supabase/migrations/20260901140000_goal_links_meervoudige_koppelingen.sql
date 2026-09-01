@@ -30,10 +30,12 @@
 --     `anon_zonder_execute` afkeurt. Om dezelfde reden staat de helper hier
 --     gewikkeld als (select public.user_household_id()) — kaal evalueert hij per
 --     rij (ADR 0048 + addendum).
---   * Pre-flight op de data: 25 doelen, 3 met een gekoppelde bezitting, 0 met een
---     gekoppelde schuld, 0 met beide, 0 wijzend naar een bezitting/schuld van een
---     ándere gebruiker, 0 verweesde verwijzingen, 0 doelen met ownership='shared'.
---     De backfill zet dus 3 rijen om en de guard-trigger raakt geen bestaande rij.
+--   * Pre-flight op de data (relatief geformuleerd — ADR 0111, deze repo is
+--     publiek): een handvol doelen draagt een gekoppelde bezitting, geen enkel
+--     doel draagt een gekoppelde schuld of beide, en er is GEEN doel dat naar een
+--     bezitting/schuld van een ándere gebruiker wijst, geen verweesde verwijzing
+--     en geen gedeeld doel. De backfill zet dus die handvol koppelingen om en de
+--     guard-trigger keurt geen enkele bestaande rij af.
 --   * public.goal_links bestond nog niet.
 --
 -- ── AFWIJKING VAN DE OPDRACHT: user_id → auth.users, niet profiles ─────────────
@@ -254,7 +256,7 @@ create trigger trg_guard_goal_link_owner
 -- De bestaande enkelvoudige koppelingen overzetten. `user_id` komt uit
 -- goals.user_id, zodat de guard-trigger per definitie klopt — en de backfill is
 -- daarmee meteen het bewijs dat de guard geen enkele bestaande rij afkeurt
--- (pre-flight: 3 rijen, 0 met een afwijkende eigenaar, 0 verweesd).
+-- (pre-flight: geen enkele koppeling met een afwijkende eigenaar, geen verweesde).
 --
 -- `on conflict do nothing` zonder conflict-doel: dat dekt béíde partial uniques
 -- in één keer, dus deze migratie kan zonder gevolg twee keer draaien.
