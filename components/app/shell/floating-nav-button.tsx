@@ -109,15 +109,6 @@ export function FloatingNavButton() {
     [],
   )
 
-  // Vangnet (bug 1 sep 2026): op sommige toestellen komt de click (menu-
-  // toggle) door terwijl de touchend op de knop uitblijft — de druk-
-  // registratie bleef dan hangen (huisje-icoon terwijl het menu open stond)
-  // en de nog lopende timer kon 1 s later alsnog naar home navigeren. De
-  // menu-toggle zelf is het bewijs dat de tik voorbij is: wis timer + state.
-  useEffect(() => {
-    clearPressTimer()
-    setPressing(false)
-  }, [menuOpen])
 
   // Fin portalt zijn idle-bubbel in het slot hiernaast (zie lib/shell/fin-slot.tsx).
   // Registratie loopt via een effect, NIET rechtstreeks vanuit de ref-callback:
@@ -208,6 +199,13 @@ export function FloatingNavButton() {
   }
 
   const handleWaffleClick = () => {
+    // Vangnet (bug 1 sep 2026): op sommige toestellen komt de click door
+    // terwijl de touchend de knop nooit bereikte — de druk-registratie bleef
+    // dan hangen (huisje-icoon terwijl het menu open stond) en de nog lopende
+    // timer kon 1 s later alsnog naar home navigeren. De click zelf is het
+    // bewijs dat de tik voorbij is: wis timer + state, altijd.
+    clearPressTimer()
+    setPressing(false)
     // Click vuurt automatisch ná touchend. Was de long-press al afgegaan, dan
     // mag diezelfde aanraking het menu niet alsnog togglen. (Geen
     // preventDefault nodig: een <button type="button"> heeft geen
