@@ -15,11 +15,16 @@ import { NavMenuSheet } from './nav-menu-sheet'
 // systeem-long-press (~500 ms) zodat de gesture nooit botst met een gewone
 // tik; de 8px-move-drempel matcht HORIZONTAL_DECISION_PX uit
 // lib/hooks/use-swipe-back.ts — daarboven is het een scroll/swipe en cancelen
-// we. Tijdens het vasthouden wisselt het icoon naar een huisje dat over
-// precies deze duur meegroeit (druk-registratie); de CSS-transition op de
-// icon-wrapper gebruikt duration-1000 — houd die gelijk aan deze constante.
-// Patroon gespiegeld op de (inmiddels dode) long-press in bottom-nav-tabs.tsx.
+// we. Patroon gespiegeld op de (inmiddels dode) long-press in bottom-nav-tabs.tsx.
+//
+// Druk-registratie (huisje-icoon + groei) verschijnt pas ná
+// PRESS_VISUAL_DELAY_MS: een gewone korte tik (menu-toggle) mag nooit een
+// huisje flitsen — dat las als "de knop blijft hangen" (bug-melding 1 sep
+// 2026). De groei-animatie overbrugt daarna de rést van de drempel; de
+// CSS-transition op de icon-wrapper is dus LONG_PRESS_HOME_MS −
+// PRESS_VISUAL_DELAY_MS = duration-[750ms] — houd die drie in sync.
 const LONG_PRESS_HOME_MS = 1000
+const PRESS_VISUAL_DELAY_MS = 250
 const MOVE_CANCEL_PX = 8
 
 /**
@@ -64,17 +69,24 @@ export function FloatingNavButton() {
 
   // Long-press-administratie (touch-only, zie de constanten bovenaan).
   const pressTimerRef = useRef<number | null>(null)
+  const pressVisualTimerRef = useRef<number | null>(null)
   const longPressFiredRef = useRef(false)
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null)
   // Zichtbare druk-registratie: waar tijdens het vasthouden het huisje-icoon
-  // meegroeit. Gaat aan op touchstart en uit bij loslaten, cancelen,
-  // wegbewegen, verbergen van de pill of het afgaan van de navigatie.
+  // meegroeit. Gaat aan ná PRESS_VISUAL_DELAY_MS écht vasthouden (een korte
+  // tik toont dus nooit een huisje) en uit bij loslaten, cancelen,
+  // wegbewegen, de menu-toggle, verbergen van de pill of het afgaan van de
+  // navigatie.
   const [pressing, setPressing] = useState(false)
 
   const clearPressTimer = () => {
     if (pressTimerRef.current !== null) {
       window.clearTimeout(pressTimerRef.current)
       pressTimerRef.current = null
+    }
+    if (pressVisualTimerRef.current !== null) {
+      window.clearTimeout(pressVisualTimerRef.current)
+      pressVisualTimerRef.current = null
     }
   }
 
@@ -92,9 +104,20 @@ export function FloatingNavButton() {
   useEffect(
     () => () => {
       if (pressTimerRef.current !== null) window.clearTimeout(pressTimerRef.current)
+      if (pressVisualTimerRef.current !== null) window.clearTimeout(pressVisualTimerRef.current)
     },
     [],
   )
+
+  // Vangnet (bug 1 sep 2026): op sommige toestellen komt de click (menu-
+  // toggle) door terwijl de touchend op de knop uitblijft — de druk-
+  // registratie bleef dan hangen (huisje-icoon terwijl het menu open stond)
+  // en de nog lopende timer kon 1 s later alsnog naar home navigeren. De
+  // menu-toggle zelf is het bewijs dat de tik voorbij is: wis timer + state.
+  useEffect(() => {
+    clearPressTimer()
+    setPressing(false)
+  }, [menuOpen])
 
   // Fin portalt zijn idle-bubbel in het slot hiernaast (zie lib/shell/fin-slot.tsx).
   // Registratie loopt via een effect, NIET rechtstreeks vanuit de ref-callback:
@@ -154,7 +177,12 @@ export function FloatingNavButton() {
     touchStartPosRef.current = { x: touch.clientX, y: touch.clientY }
     longPressFiredRef.current = false
     clearPressTimer()
-    setPressing(true)
+    // Druk-registratie pas ná de vertraging: een korte tik blijft visueel een
+    // gewone menu-toggle (zie de constanten bovenaan).
+    pressVisualTimerRef.current = window.setTimeout(() => {
+      pressVisualTimerRef.current = null
+      setPressing(true)
+    }, PRESS_VISUAL_DELAY_MS)
     pressTimerRef.current = window.setTimeout(() => {
       pressTimerRef.current = null
       goHomeFromLongPress()
@@ -237,19 +265,24 @@ export function FloatingNavButton() {
             onTouchMove={handleWaffleTouchMove}
             onTouchEnd={handleWaffleTouchEnd}
             onTouchCancel={handleWaffleTouchEnd}
+            /* Redundant einde-signaal: op toestellen waar de touchend de knop
+               niet bereikt (browser-gesture-heuristiek) ruimt de pointerup
+               dezelfde press-state op. Idempotent — dubbel wissen is gratis. */
+            onPointerUp={handleWaffleTouchEnd}
+            onPointerCancel={handleWaffleTouchEnd}
             onContextMenu={handleWaffleContextMenu}
             aria-label={menuOpen ? 'Menu sluiten' : 'Menu openen'}
             aria-expanded={menuOpen}
             data-pressing={pressing || undefined}
             className="flex items-center justify-center rounded-full px-5 py-2.5 text-white/90 hover:bg-white/10 active:bg-white/15 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--paper)]"
           >
-            {/* Druk-registratie: tijdens het vasthouden wisselt het icoon naar
-                een huisje dat over exact LONG_PRESS_HOME_MS meegroeit
-                (duration-1000 = die constante); bij loslaten/cancel springt
-                het snel terug (duration-150). */}
+            {/* Druk-registratie: verschijnt ná PRESS_VISUAL_DELAY_MS en groeit
+                dan over de resterende drempel mee (duration-[750ms] =
+                LONG_PRESS_HOME_MS − PRESS_VISUAL_DELAY_MS); bij loslaten/
+                cancel springt het snel terug (duration-150). */}
             <span
               className={`flex items-center justify-center transition-transform ease-linear ${
-                pressing ? 'duration-1000 scale-125' : 'duration-150 scale-100'
+                pressing ? 'duration-[750ms] scale-125' : 'duration-150 scale-100'
               }`}
             >
               {pressing ? (

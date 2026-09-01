@@ -11,7 +11,11 @@ import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
  *  - loslaten vóór 1000 ms navigeert NIET
  *  - >8px bewegen (scroll/swipe) cancelt de long-press
  *  - de druk-registratie (data-pressing, voedt huisje-icoon + groei-animatie)
- *    gaat aan op touchstart en uit bij loslaten én bij het afgaan
+ *    gaat pas aan ná PRESS_VISUAL_DELAY_MS (250 ms) écht vasthouden — een
+ *    korte tik toont nooit een huisje — en uit bij loslaten én bij het afgaan
+ *  - vangnet: komt de click (menu-toggle) door zonder dat touchend de knop
+ *    bereikte (device-gesture-anomalie, bug 1 sep 2026), dan wist de
+ *    menu-toggle zelf de press-state en de nog lopende home-timer
  */
 
 const pushMock = vi.fn()
@@ -84,10 +88,14 @@ describe('FloatingNavButton — long-press waffle', () => {
     expect(sheetOpen()).toBe('true')
 
     fireEvent.touchStart(waffleButton(), touchAt(10, 10))
-    // Druk-registratie aan tijdens het vasthouden (voedt huisje + animatie).
+    // Druk-registratie nog niet direct — pas ná PRESS_VISUAL_DELAY_MS.
+    expect(waffleButton().getAttribute('data-pressing')).toBeNull()
+    act(() => {
+      vi.advanceTimersByTime(250)
+    })
     expect(waffleButton().getAttribute('data-pressing')).toBe('true')
     act(() => {
-      vi.advanceTimersByTime(1000)
+      vi.advanceTimersByTime(750)
     })
     // …en uit zodra de navigatie afgaat.
     expect(waffleButton().getAttribute('data-pressing')).toBeNull()
@@ -116,6 +124,44 @@ describe('FloatingNavButton — long-press waffle', () => {
       vi.advanceTimersByTime(500)
     })
     expect(pushMock).not.toHaveBeenCalled()
+  })
+
+  it('korte tik toont nooit de druk-registratie (geen huisje-flits)', () => {
+    renderPill()
+    fireEvent.touchStart(waffleButton(), touchAt(10, 10))
+    act(() => {
+      vi.advanceTimersByTime(200)
+    })
+    // Onder PRESS_VISUAL_DELAY_MS: geen huisje, gewoon een tik.
+    expect(waffleButton().getAttribute('data-pressing')).toBeNull()
+    fireEvent.touchEnd(waffleButton())
+    fireEvent.click(waffleButton())
+    expect(sheetOpen()).toBe('true')
+    expect(waffleButton().getAttribute('data-pressing')).toBeNull()
+    expect(pushMock).not.toHaveBeenCalled()
+  })
+
+  it('vangnet: click zonder touchend wist de press-state en de home-timer (bug 1 sep 2026)', () => {
+    renderPill()
+    // Device-anomalie: touchstart komt aan, de touchend bereikt de knop
+    // nooit, maar de click (menu-toggle) komt wél door. Zonder vangnet bleef
+    // data-pressing hangen (huisje-icoon terwijl het menu open stond) en
+    // navigeerde de nog lopende timer 1 s later alsnog naar home.
+    fireEvent.touchStart(waffleButton(), touchAt(10, 10))
+    act(() => {
+      vi.advanceTimersByTime(300)
+    })
+    expect(waffleButton().getAttribute('data-pressing')).toBe('true')
+    fireEvent.click(waffleButton())
+    expect(sheetOpen()).toBe('true')
+    // De menu-toggle is het bewijs dat de tik voorbij is: state gewist…
+    expect(waffleButton().getAttribute('data-pressing')).toBeNull()
+    // …en de home-timer ontwapend: geen spooknavigatie op de drempel.
+    act(() => {
+      vi.advanceTimersByTime(1500)
+    })
+    expect(pushMock).not.toHaveBeenCalled()
+    expect(sheetOpen()).toBe('true')
   })
 
   it('meer dan 8px bewegen cancelt de long-press (scroll wint)', () => {
