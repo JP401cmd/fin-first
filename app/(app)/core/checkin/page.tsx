@@ -32,6 +32,8 @@ import { formatMaskedCurrency, calculateFreedomTime, formatFreedomTimeString, da
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { PageInfoButton } from '@/components/editorial'
 import { PAGE_INFO } from '@/lib/page-info-content'
+import { berekenReeks } from '@/lib/checkin/reeks'
+import { CheckinAfsluitViering } from './afsluit-viering'
 
 /**
  * Masked-aware currency formatter hook. Returns a stable callback that
@@ -183,6 +185,12 @@ function CheckinPageContent() {
   const [step, setStep] = useState<StepKey>('terugblik')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  /**
+   * Het afsluitmoment na een geslaagde afronding: `null` = niet afgerond,
+   * anders de lopende reeks in maanden. Component-state is hier de once-guard —
+   * de viering hoort bij déze afronding, niet bij een eenmalige mijlpaal.
+   */
+  const [afsluitReeks, setAfsluitReeks] = useState<number | null>(null)
 
   // Data states
   const [overview, setOverview] = useState<CheckinOverview | null>(null)
@@ -393,20 +401,50 @@ function CheckinPageContent() {
           },
         }),
       })
-      // Mark the month as completed
-      await fetch('/api/monthly-checkin', { method: 'POST' })
+      // Mark the month as completed. De response draagt additief de verse
+      // `completedMonths` — daaruit leiden we de lopende reeks af voor het
+      // afsluitmoment (geen tweede rondgang naar GET).
+      const monthlyRes = await fetch('/api/monthly-checkin', { method: 'POST' })
+      let reeks = 0
+      try {
+        const monthly = await monthlyRes.json()
+        // Een herhaalde afronding binnen dezelfde maand (alreadyCompleted) mag
+        // een reeks-mijlpaal niet nogmaals vieren: dan het standaard-vignet
+        // (reeks 0 → geen mijlpaal-variant).
+        if (Array.isArray(monthly?.completedMonths) && monthly?.alreadyCompleted !== true) {
+          // Anker op de SERVER-maand (monthKey), niet op de client-klok: rond
+          // een maandwissel (1 feb 00:30 CET = 31 jan UTC) lopen die uiteen en
+          // zou een verdiende erkenning wegvallen (review 1 sep). Dag 15 is
+          // tijdzone-neutraal binnen de maand.
+          const m = /^(\d{4})-(\d{2})$/.exec(String(monthly?.monthKey ?? ''))
+          const anker = m ? new Date(Number(m[1]), Number(m[2]) - 1, 15) : new Date()
+          reeks = berekenReeks(monthly.completedMonths, anker)
+        }
+      } catch {
+        // Onleesbare response → gewone afsluiting zonder reeks-erkenning.
+      }
       // Suppress the dashboard card immediately via sessionStorage
       // (the card checks this key on mount before fetching the API)
       const monthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
       sessionStorage.setItem('checkin_dismissed', monthKey)
-      // Navigate back to the page that started the check-in
-      const allowedPaths = ['/overzicht', '/mijn', '/mijn/checkins']
-      const dest = allowedPaths.includes(returnTo) ? returnTo : '/overzicht'
-      window.location.href = dest
+      // Niet meer direct wegsturen: eerst het afsluitmoment. De navigatie hangt
+      // aan `onDismiss` van de viering (zie `navigeerNaAfronding`).
+      setAfsluitReeks(reeks)
     } catch {
       setSaving(false)
     }
-  }, [reflection, overview, goals, assets, debts, budgets, returnTo])
+  }, [reflection, overview, goals, assets, debts, budgets])
+
+  /**
+   * Navigatie ná het afsluitmoment — de returnTo-afhandeling is ongewijzigd
+   * overgenomen uit de oude `handleComplete`.
+   */
+  const navigeerNaAfronding = useCallback(() => {
+    // Navigate back to the page that started the check-in
+    const allowedPaths = ['/overzicht', '/mijn', '/mijn/checkins']
+    const dest = allowedPaths.includes(returnTo) ? returnTo : '/overzicht'
+    window.location.href = dest
+  }, [returnTo])
 
   if (loading || readOnlyLoading) {
     return (
@@ -667,6 +705,12 @@ function CheckinPageContent() {
     // onderrand van de container kunnen plakken, anders laat hij 24–40px vóór
     // het einde van de pagina al los.
     <div className="mx-auto max-w-2xl px-4 pt-6 sm:pt-10">
+      {/* ── Afsluitmoment — verschijnt ná een geslaagde afronding en
+             draagt de navigatie in zijn onDismiss ──────────────────── */}
+      {afsluitReeks !== null && (
+        <CheckinAfsluitViering reeks={afsluitReeks} onDismiss={navigeerNaAfronding} />
+      )}
+
       {/* ── Header — editorial blueprint met kicker-streep ─────────── */}
       <div className="relative mb-6 flex items-center gap-3">
         <PageInfoButton

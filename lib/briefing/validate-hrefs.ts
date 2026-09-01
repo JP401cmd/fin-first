@@ -42,6 +42,7 @@ const VALID_ROUTES = new Set([
   '/mijn/profiel',
   '/mijn/koppelingen',
   '/mijn/checkins',
+  '/mijn/mijlpalen',
   '/berichten',
   '/rapportages',
 ])

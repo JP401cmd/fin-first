@@ -124,6 +124,7 @@ export function buildHldModel(): HldModel {
           { title: 'Je hele plan als één deelbaar document', desc: 'Het totaalplan bundelt je aannames, je vermogensprojectie naar volledige vrijheid, de slagingskans onder marktschommelingen en concrete inzichten in één rapport — deelbaar als PDF met je partner of adviseur, met alle cijfers uit dezelfde rekenmotor als Toekomst en Overzicht.' },
           { title: 'Zien wat een toekomstig bedrag vandaag waard is', desc: 'Zet je grafiek op /overzicht en /toekomst om naar wat de bedragen vandaag waard zijn; wat je al hebt of al hebt uitgegeven verandert niet mee.' },
           { title: 'Merken wanneer je een mijlpaal passeert', desc: 'Ga je door €100.000 of door de helft van je vrijheid, dan zegt de app dat één keer — met wat het in vrijheidstijd betekent. Daarna staat het in je geschiedenis, met de datum erbij.' },
+          { title: 'Je jaar in vrijheid teruglezen', desc: 'Eén pagina over jouw jaar: hoeveel vrijheidsdagen je won, hoe je vermogen groeide, je beste maand en hoeveel dichter je bij je vrijheidsdoel kwam.' },
         ],
       },
       {

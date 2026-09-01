@@ -174,6 +174,14 @@ export interface AchievedMilestoneRow {
   achieved_at: string
   acknowledged_at: string | null
   source: MilestoneSource
+  /**
+   * Insert-moment van de rij (DB-default `now()`). Voor `seed`-rijen is dit het
+   * moment van de seed-run; het verschil met `achieved_at` verraadt of de seed
+   * de gebeurtenis historisch kon dateren (snapshots) of terugviel op "nu" —
+   * de tijdlijn toont dat laatste eerlijk als "datum onbekend". Optioneel,
+   * zodat bestaande fixtures zonder de kolom geldig blijven.
+   */
+  created_at?: string | null
 }
 
 /** Kandidaat vóór hij een rij is — de uitkomst van de pure detectie. */

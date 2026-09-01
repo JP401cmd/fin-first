@@ -39,11 +39,12 @@ function agedHours(hours: number): string {
 }
 
 describe('buildFreshMilestoneEntry', () => {
-  it('bouwt een milestone-entry met de verse id-prefix en /overzicht als doel', () => {
+  it('bouwt een milestone-entry met de verse id-prefix en de tijdlijn als doel', () => {
     const entry = buildFreshMilestoneEntry(milestone(), 100)
     expect(entry.id).toBe(`${FRESH_MILESTONE_ID_PREFIX}vermogen-100k`)
     expect(entry.category).toBe('milestone')
-    expect(entry.href).toBe('/overzicht')
+    // Sinds /mijn/mijlpalen bestaat is de tijdlijn de blijvende bestemming.
+    expect(entry.href).toBe('/mijn/mijlpalen')
     expect(entry.text).toContain('100.000')
     // De vrijheidstijd-vertaling komt uit copy.ts (calculateFreedomTime).
     expect(entry.text).toContain('2 jaar en 9 maanden')

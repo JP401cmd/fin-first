@@ -32,7 +32,9 @@ export function buildFreshMilestoneEntry(
     id: `${FRESH_MILESTONE_ID_PREFIX}${row.milestone_key}`,
     category: 'milestone',
     text: `${titel}. ${betekenis}`,
-    href: '/overzicht',
+    // Naar de tijdlijn: sinds /mijn/mijlpalen bestaat is dát de plek waar de
+    // gebeurtenis blijvend staat — /overzicht toont alleen het moment zelf.
+    href: '/mijn/mijlpalen',
   }
 }
 

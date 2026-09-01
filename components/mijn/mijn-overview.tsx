@@ -9,6 +9,8 @@ import {
   Bell,
   Settings2,
   CalendarCheck,
+  CalendarRange,
+  Milestone,
   ArrowRight,
   type LucideIcon,
 } from 'lucide-react'
@@ -58,8 +60,10 @@ type SubRoute = {
  *
  * De oorspronkelijke kaart noemde ook **Account** als primair. Die staat sinds
  * bevinding M14 bewust niet meer in dit grid (vaste ingang in de nav-pill en de
- * zijbalk-footer); één ingang per functie gaat vóór. Er zijn dus zeven kaarten,
- * geen negen — vier vooraan, drie achter de disclosure.
+ * zijbalk-footer); één ingang per functie gaat vóór. Er zijn dus negen
+ * kaarten, geen elf — vier vooraan, vijf achter de disclosure.
+ * (Jaaroverzicht en Mijlpalen kwamen er later bij en staan, net als
+ * Check-ins, bewust alleen hier en niet ook in `navGroups`.)
  */
 const PRIMARY_ROUTES: SubRoute[] = [
   {
@@ -104,6 +108,18 @@ const SECONDARY_ROUTES: SubRoute[] = [
     label: 'Check-ins',
     description: 'Tijdlijn van al je maandelijkse geldcheck-ins.',
     Icon: CalendarCheck,
+  },
+  {
+    href: '/mijn/jaaroverzicht',
+    label: 'Jaaroverzicht',
+    description: 'Jouw jaar in vrijheid — dagen, vermogen en de rekening.',
+    Icon: CalendarRange,
+  },
+  {
+    href: '/mijn/mijlpalen',
+    label: 'Mijlpalen',
+    description: 'Dit heb je bereikt — elke gepasseerde drempel met datum.',
+    Icon: Milestone,
   },
   {
     href: '/mijn/geavanceerd',
@@ -169,7 +185,7 @@ export function MijnOverview() {
         deck="Elk onderwerp op een eigen rustige pagina."
       />
 
-      {/* Volledig: één grid met alle zeven kaarten — pixelgelijk aan wat er
+      {/* Volledig: één grid met alle negen kaarten — pixelgelijk aan wat er
           stond. Eenvoudig: vier vooraan, de rest achter één disclosure.
 
           `DepthSection` en NIET `HideInSimple`: instellingen zijn geen diepte
@@ -192,7 +208,7 @@ export function MijnOverview() {
               // De samenvatting is het duidings-deel: wie de sectie dicht ziet
               // staan, moet zonder klikken weten wát erin zit — anders is dit
               // reductie zonder uitleg.
-              summary="Notificaties, check-ins en geavanceerde opties zoals exports."
+              summary="Notificaties, check-ins, je jaaroverzicht, je mijlpalen en geavanceerde opties zoals exports."
               icon={<Settings2 className="w-4 h-4 text-[var(--ink-3)]" aria-hidden />}
             >
               <div className={GRID_CLASSES}>

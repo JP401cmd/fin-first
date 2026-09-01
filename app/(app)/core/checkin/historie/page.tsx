@@ -22,6 +22,7 @@ import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useModuleHex } from '@/components/app/module-color-provider'
 import { ReportSparkline } from '@/app/(app)/rapportages/[id]/components/report-sparkline'
 import { monthKeyFromDate, daysUntilNextCheckin, describeNextCheckin } from './cadence'
+import { ReeksRegel } from './reeks-regel'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 
@@ -87,15 +88,31 @@ export default function CheckinHistoriePage() {
   const [checkins, setCheckins] = useState<CheckinSnapshot[]>([])
   const [hasHousehold, setHasHousehold] = useState(false)
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null)
+  /** Afgevinkte maanden (`YYYY-MM`) — voedt de reeks-regel bovenin. */
+  const [completedMonths, setCompletedMonths] = useState<string[]>([])
 
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch('/api/checkin/save?mode=history')
-        if (res.ok) {
-          const data = await res.json()
+        // Twee lezingen langs bestaande API-routes (toegestaan lazy client-read
+        // pad): de snapshots én de afvinklijst waar de reeks uit volgt.
+        // De reeks-fetch is versiering en mag de historie nooit blanken: een
+        // rejectende tweede fetch zou via Promise.all de catch in springen
+        // vóórdat de geslaagde historie-respons verwerkt is (review 1 sep).
+        const [historyRes, monthlyRes] = await Promise.all([
+          fetch('/api/checkin/save?mode=history'),
+          fetch('/api/monthly-checkin').catch(() => null),
+        ])
+        if (historyRes.ok) {
+          const data = await historyRes.json()
           setCheckins(data.checkins || [])
           setHasHousehold(data.hasHousehold || false)
+        }
+        if (monthlyRes?.ok) {
+          const monthly = await monthlyRes.json()
+          if (Array.isArray(monthly?.completedMonths)) {
+            setCompletedMonths(monthly.completedMonths)
+          }
         }
       } catch {
         // Graceful failure
@@ -131,6 +148,9 @@ export default function CheckinHistoriePage() {
         emphasis="Historie"
         titleAfter=" van je check-ins"
       />
+
+      {/* Lopende reeks — rustige regel, verschijnt vanaf twee maanden op rij */}
+      <ReeksRegel completedMonths={completedMonths} />
 
       {hasHousehold && (
         <div className="mb-4 flex items-center gap-2 rounded-xl bg-wil-50 px-4 py-2.5">

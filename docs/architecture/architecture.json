@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-31T18:30:15.157Z",
-  "generatedDate": "2026-08-31",
+  "generatedAt": "2026-09-01T09:07:43.240Z",
+  "generatedDate": "2026-09-01",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -186,14 +186,14 @@
     }
   },
   "stats": {
-    "routes": 137,
-    "routesProduction": 95,
-    "api": 306,
+    "routes": 139,
+    "routesProduction": 97,
+    "api": 307,
     "tables": 92,
-    "migrations": 221,
+    "migrations": 222,
     "integrations": 25,
-    "components": 1003,
-    "providers": 15,
+    "components": 1010,
+    "providers": 16,
     "contextBuilders": 9,
     "briefingTools": 0,
     "coachLayers": 4,
@@ -718,6 +718,12 @@
       "isTest": false
     },
     {
+      "url": "/mijn/jaaroverzicht",
+      "file": "app/(app)/mijn/jaaroverzicht/page.tsx",
+      "group": "persoonlijk",
+      "isTest": false
+    },
+    {
       "url": "/mijn/koppelingen",
       "file": "app/(app)/mijn/koppelingen/page.tsx",
       "group": "persoonlijk",
@@ -726,6 +732,12 @@
     {
       "url": "/mijn/lokale-chat",
       "file": "app/(app)/mijn/lokale-chat/page.tsx",
+      "group": "persoonlijk",
+      "isTest": false
+    },
+    {
+      "url": "/mijn/mijlpalen",
+      "file": "app/(app)/mijn/mijlpalen/page.tsx",
       "group": "persoonlijk",
       "isTest": false
     },
@@ -1323,6 +1335,12 @@
         "isTest": false
       },
       {
+        "url": "/mijn/jaaroverzicht",
+        "file": "app/(app)/mijn/jaaroverzicht/page.tsx",
+        "group": "persoonlijk",
+        "isTest": false
+      },
+      {
         "url": "/mijn/koppelingen",
         "file": "app/(app)/mijn/koppelingen/page.tsx",
         "group": "persoonlijk",
@@ -1331,6 +1349,12 @@
       {
         "url": "/mijn/lokale-chat",
         "file": "app/(app)/mijn/lokale-chat/page.tsx",
+        "group": "persoonlijk",
+        "isTest": false
+      },
+      {
+        "url": "/mijn/mijlpalen",
+        "file": "app/(app)/mijn/mijlpalen/page.tsx",
         "group": "persoonlijk",
         "isTest": false
       },
@@ -3132,6 +3156,14 @@
       "domain": "holdings",
       "methods": [
         "GET"
+      ]
+    },
+    {
+      "url": "/api/home-screen",
+      "file": "app/api/home-screen/route.ts",
+      "domain": "home-screen",
+      "methods": [
+        "PUT"
       ]
     },
     {
@@ -7085,6 +7117,21 @@
       ]
     },
     {
+      "domain": "home-screen",
+      "label": "home-screen",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/home-screen",
+          "file": "app/api/home-screen/route.ts",
+          "domain": "home-screen",
+          "methods": [
+            "PUT"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "housing-strategy",
       "label": "housing-strategy",
       "count": 1,
@@ -8182,7 +8229,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 221
+    "migrationCount": 222
   },
   "tablesByDomain": [
     {
@@ -8643,6 +8690,10 @@
       "source": "@/components/sync/global-sync-provider"
     },
     {
+      "name": "HomeScreenProvider",
+      "source": "@/lib/hooks/use-home-screen"
+    },
+    {
       "name": "MobilePreviewProvider",
       "source": "@/components/app/beheer/mobile-preview-provider"
     },
@@ -8672,11 +8723,11 @@
     }
   ],
   "components": {
-    "total": 1003,
+    "total": 1010,
     "groups": [
       {
         "group": "app",
-        "count": 394,
+        "count": 395,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8833,6 +8884,7 @@
           "fin-home.test",
           "fin-table",
           "floating-nav-button",
+          "floating-nav-button.test",
           "form-error",
           "form-error.test",
           "freedom-card",
@@ -9515,7 +9567,7 @@
       },
       {
         "group": "mijn",
-        "count": 39,
+        "count": 45,
         "items": [
           "abonnement-section",
           "account-basis-section",
@@ -9537,16 +9589,22 @@
           "font-picker",
           "font-picker.test",
           "geavanceerd-settings",
+          "home-screen-picker",
+          "home-screen-picker.test",
           "household-budget-model-section",
           "household-budget-model-section.test",
           "household-privacy-settings",
           "household-privacy-settings.test",
+          "jaaroverzicht-client",
+          "jaaroverzicht-client.test",
           "local-categorization-settings",
           "local-categorization-settings.test",
           "local-chat-panel",
           "local-chat-panel.test",
           "local-model-section",
           "local-setup-steps",
+          "mijlpalen-tijdlijn",
+          "mijlpalen-tijdlijn.test",
           "mijn-overview",
           "mijn-overview.test",
           "module-accent-picker",
@@ -10806,6 +10864,12 @@
           "write": true
         }
       ],
+      "home-screen": [
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
       "household": [
         {
           "name": "app_settings",
@@ -11754,6 +11818,14 @@
           "write": true,
           "routes": [
             "/api/fire-settings"
+          ]
+        },
+        {
+          "domain": "home-screen",
+          "label": "home-screen",
+          "write": true,
+          "routes": [
+            "/api/home-screen"
           ]
         },
         {
@@ -16995,7 +17067,7 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 70
+        "commits": 71
       },
       {
         "path": "lib/ai",
@@ -17003,7 +17075,7 @@
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 27
+        "commits": 29
       },
       {
         "path": "app/api/household",
@@ -17038,12 +17110,12 @@
       {
         "file": "components/app/horizon/horizon-client.tsx",
         "loc": 9892,
-        "commits": 80
+        "commits": 81
       },
       {
         "file": "components/app/budgets-client.tsx",
         "loc": 5412,
-        "commits": 33
+        "commits": 34
       },
       {
         "file": "components/core/assets-client.tsx",
@@ -17058,7 +17130,7 @@
       {
         "file": "lib/dashboard-data-loader.ts",
         "loc": 3007,
-        "commits": 56
+        "commits": 58
       },
       {
         "file": "lib/release-notes.ts",
@@ -17068,7 +17140,7 @@
       {
         "file": "app/(app)/core/cash/import/page.tsx",
         "loc": 2436,
-        "commits": 24
+        "commits": 25
       },
       {
         "file": "lib/test-personas.ts",
@@ -18174,8 +18246,31 @@
   "diff": {
     "baseline": false,
     "previousDate": "2026-08-31",
-    "hasChanges": false,
-    "sections": []
+    "hasChanges": true,
+    "sections": [
+      {
+        "label": "Schermen",
+        "added": [
+          "/mijn/jaaroverzicht",
+          "/mijn/mijlpalen"
+        ],
+        "removed": []
+      },
+      {
+        "label": "API-routes",
+        "added": [
+          "/api/home-screen"
+        ],
+        "removed": []
+      },
+      {
+        "label": "Componenten (aantal)",
+        "added": [
+          "+7"
+        ],
+        "removed": []
+      }
+    ]
   },
   "statsHistory": [
     {
@@ -18506,6 +18601,13 @@
       "components": 1003,
       "tables": 92,
       "routesProduction": 95
+    },
+    {
+      "date": "2026-09-01",
+      "api": 307,
+      "components": 1010,
+      "tables": 92,
+      "routesProduction": 97
     }
   ]
 }

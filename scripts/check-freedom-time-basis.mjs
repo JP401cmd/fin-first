@@ -137,6 +137,15 @@ const ALLOWED_FILES = new Map([
 
   // ── Andere, bewust gedocumenteerde grondslag ──────────────────────────────
   [
+    'components/mijn/jaaroverzicht-client.tsx',
+    'JAAR-grondslag: het jaaroverzicht meet vrijheidstijd aan de uitgaven van ' +
+      'het GETOONDE jaar (totalExpenses uit /api/year-in-review, gedeeld door ' +
+      'het aantal maanden mét gegevens — nooit vast /12, zodat een lopend of ' +
+      'half geïmporteerd jaar niet vertekent), niet aan het 12-mnd rollende ' +
+      'tarief van vandaag. De zin benoemt die grondslag zichtbaar. Conversie ' +
+      'zelf via de canonieke helpers (dailyExpenseRate + credibleDailyExpense).',
+  ],
+  [
     'components/app/horizon/sim-chart-widget.tsx',
     'ONTTREKKINGSFASE-grondslag: rekent op yearlyMustExpenses (uitgaven ná pensioen, ' +
       'de FIRE-doel-invoer uit lib/budget-utils.ts), niet op de huidige levensstijl. ' +

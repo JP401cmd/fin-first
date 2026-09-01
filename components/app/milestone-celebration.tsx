@@ -121,7 +121,8 @@ export function MilestoneCelebration({
       window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   )
   const [visible, setVisible] = useState(false)
-  /** Hover/focus pauzeert de auto-dismiss (alleen relevant mét `action`). */
+  /** Hover/focus pauzeert de auto-dismiss — altijd, want de klok kan bij de
+   *  aanroeper een navigatie aansturen (WCAG 2.2.1). */
   const [paused, setPaused] = useState(false)
   const onDismissRef = useRef(onDismiss)
   onDismissRef.current = onDismiss
@@ -186,10 +187,14 @@ export function MilestoneCelebration({
     >
       <div
         className="pointer-events-auto relative border border-[var(--ink)] bg-[var(--paper)] px-6 py-6 text-center shadow-[var(--s2)]"
-        onMouseEnter={action ? () => setPaused(true) : undefined}
-        onMouseLeave={action ? () => setPaused(false) : undefined}
-        onFocus={action ? () => setPaused(true) : undefined}
-        onBlur={action ? () => setPaused(false) : undefined}
+        // Onvoorwaardelijk (niet alleen mét `action`): een aanroeper kan aan
+        // de auto-dismiss een navigatie hangen (check-in-afsluiting), en een
+        // aflopende klok die je wegstuurt moet altijd te pauzeren zijn
+        // (WCAG 2.2.1; review 1 sep).
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
+        onFocus={() => setPaused(true)}
+        onBlur={() => setPaused(false)}
         style={{
           opacity: visible ? 1 : 0,
           transform: reduced ? 'none' : visible ? 'translateY(0)' : 'translateY(-8px)',

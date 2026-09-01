@@ -42,9 +42,9 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Mijn — acceptatiecriteria dekking', () => {
-  it('is de MIJN-zone met precies 27 criteria', () => {
+  it('is de MIJN-zone met precies 29 criteria', () => {
     expect(MIJN_ACCEPTANCE.zone).toBe('MIJN')
-    expect(MIJN_ACCEPTANCE.criteria.length).toBe(27)
+    expect(MIJN_ACCEPTANCE.criteria.length).toBe(29)
   })
 
   it('heeft precies één criterium per catalogus-MIJN-scenario (op scenarioId)', () => {
@@ -117,7 +117,7 @@ describe('UAT Mijn — acceptatiecriteria dekking', () => {
     for (const c of MIJN_ACCEPTANCE.criteria) counts[c.assertion.kind]++
     expect(counts.exact).toBe(4)
     expect(counts.consistency).toBe(1)
-    expect(counts['ui-only']).toBe(22)
+    expect(counts['ui-only']).toBe(24)
   })
 })
 

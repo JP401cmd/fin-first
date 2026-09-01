@@ -54,9 +54,9 @@ export function parseCheckinMonth(
  * save-route (`app/api/checkin/save/route.ts`) opbouwt, zodat de historie
  * dezelfde grondslag hanteert als de opslag.
  */
-export function monthKeyFromDate(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-}
+// Canonieke bron verhuisd naar lib/checkin/reeks.ts (importrichting: lib mag
+// nooit uit app/** lezen); her-export zodat bestaande consumenten blijven werken.
+export { monthKeyFromDate } from '@/lib/checkin/reeks'
 
 /**
  * De datum waarop de eerstvolgende check-in "klaar" staat: de eerste dag van

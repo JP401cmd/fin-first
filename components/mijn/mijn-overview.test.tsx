@@ -24,7 +24,13 @@ function renderIn(mode: DisplayMode) {
 }
 
 const PRIMAIR = ['Profiel', 'Privacy', 'Koppelingen', 'Uiterlijk']
-const SECUNDAIR = ['Notificaties', 'Check-ins', 'Geavanceerd']
+const SECUNDAIR = [
+  'Notificaties',
+  'Check-ins',
+  'Jaaroverzicht',
+  'Mijlpalen',
+  'Geavanceerd',
+]
 
 beforeEach(() => {
   // Een modus-wissel doet een optimistische PUT; die mag geen netwerk raken.
@@ -47,7 +53,7 @@ describe('MijnOverview — render', () => {
     expect(heading.textContent).toBe('Alles naar jouw hand gezet')
   })
 
-  it('rendert de 7 sub-route cards', () => {
+  it('rendert de 9 sub-route cards', () => {
     renderIn('full')
     for (const label of [...PRIMAIR, ...SECUNDAIR]) {
       expect(screen.getByText(label)).toBeTruthy()
@@ -65,6 +71,8 @@ describe('MijnOverview — render', () => {
     expect(hrefs).toContain('/mijn/uiterlijk')
     expect(hrefs).toContain('/mijn/notificaties')
     expect(hrefs).toContain('/mijn/checkins')
+    expect(hrefs).toContain('/mijn/jaaroverzicht')
+    expect(hrefs).toContain('/mijn/mijlpalen')
     expect(hrefs).toContain('/mijn/geavanceerd')
   })
 
@@ -111,12 +119,12 @@ describe('MijnOverview — render', () => {
  * Bijt-proef gedraaid (en teruggedraaid): `simple` hardgecodeerd op `false`,
  * zodat beide modi de volledige boom renderen → vier van de zes tests hieronder
  * lopen rood op de ontbrekende `depth-section`. De twee die groen bleven zijn
- * dat terecht: "alle zeven in Volledig" meet het onveranderde pad, en
+ * dat terecht: "alle negen in Volledig" meet het onveranderde pad, en
  * "bereikbaar in Eenvoudig" is bewust modus-agnostisch — bereikbaarheid moet
  * gelden of de kaarten nu gevouwen zijn of niet.
  */
 describe('MijnOverview — curatie per weergavemodus (S8, optie B)', () => {
-  it('toont in Volledig alle zeven kaarten in één grid, zonder disclosure', () => {
+  it('toont in Volledig alle negen kaarten in één grid, zonder disclosure', () => {
     renderIn('full')
     expect(screen.queryByTestId('depth-section')).toBeNull()
     for (const label of [...PRIMAIR, ...SECUNDAIR]) {
@@ -135,7 +143,7 @@ describe('MijnOverview — curatie per weergavemodus (S8, optie B)', () => {
     for (const label of PRIMAIR) {
       expect(depth.contains(screen.getByText(label))).toBe(false)
     }
-    // ...en de drie secundaire zitten er allemaal ín.
+    // ...en de vier secundaire zitten er allemaal in.
     for (const label of SECUNDAIR) {
       expect(within(depth).getByText(label)).toBeTruthy()
     }
@@ -148,6 +156,8 @@ describe('MijnOverview — curatie per weergavemodus (S8, optie B)', () => {
     )
     expect(hrefs).toContain('/mijn/notificaties')
     expect(hrefs).toContain('/mijn/checkins')
+    expect(hrefs).toContain('/mijn/jaaroverzicht')
+    expect(hrefs).toContain('/mijn/mijlpalen')
     expect(hrefs).toContain('/mijn/geavanceerd')
   })
 

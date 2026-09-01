@@ -30,7 +30,7 @@ export default function MijnLayout({ children }: { children: React.ReactNode }) 
         } as React.CSSProperties
       }
     >
-      {/* MIJN-1: op de hub (`/mijn`) toont `MijnOverview` alle acht bestemmingen
+      {/* MIJN-1: op de hub (`/mijn`) toont `MijnOverview` alle negen bestemmingen
           al als kaartengrid; de tabbalk daarboven herhaalt exact dezelfde lijst.
           Op de subpagina's blijft hij — daar is hij de enige zijwaartse nav. */}
       <ModuleNav config={mijnNav} hideOnBasePath />

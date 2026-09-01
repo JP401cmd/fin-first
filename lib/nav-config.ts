@@ -228,6 +228,12 @@ export const EXTRA_ROUTE_TITLES: Record<string, string> = {
   '/toekomst/inflatie-koopkracht': 'Inflatie & koopkracht',
   '/toekomst/samengestelde-interest': 'Samengestelde interest',
   '/mijn/checkins': 'Check-ins',
+  // Jaaroverzicht zit — net als Check-ins — wél in het kaartengrid op /mijn
+  // (`components/mijn/mijn-overview.tsx`) maar niet in `navGroups`. Eén ingang
+  // per functie; de TopBar-titel komt dus hiervandaan.
+  '/mijn/jaaroverzicht': 'Jaaroverzicht',
+  // Mijlpalen: idem — alleen in het kaartengrid op /mijn, niet in `navGroups`.
+  '/mijn/mijlpalen': 'Mijlpalen',
   '/mijn/lokale-chat': 'Lokale chat',
   // ADR 0096: geen inzendformulier meer maar een verwijspagina naar de
   // meldmodus. De mobiele TopBar valt hierop terug (de pagina zet geen eigen

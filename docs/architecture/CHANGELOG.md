@@ -881,3 +881,9 @@
 ## 2026-08-31
 
 - Geen wijzigingen.
+
+## 2026-09-01
+
+- **Schermen** toegevoegd: /mijn/jaaroverzicht, /mijn/mijlpalen
+- **API-routes** toegevoegd: /api/home-screen
+- **Componenten (aantal)** toegevoegd: +7

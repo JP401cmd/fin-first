@@ -79,22 +79,45 @@ export async function POST() {
     : { completedMonths: [] }
 
   // Add current month if not already completed
-  if (!checkinData.completedMonths.includes(monthKey)) {
+  const alreadyCompleted = checkinData.completedMonths.includes(monthKey)
+  if (!alreadyCompleted) {
     checkinData.completedMonths.push(monthKey)
-    // Keep last 12 months only
-    if (checkinData.completedMonths.length > 12) {
-      checkinData.completedMonths = checkinData.completedMonths.slice(-12)
+    // Bewaar de laatste DERTIEN maanden — 13, niet 12: de reeks-erkenning kent
+    // 12-op-rij als hoogste mijlpaal, en met een cap van 12 zou maand 13+ op
+    // rij onmeetbaar zijn en als exact 12 lezen — waarmee "Twaalf op rij" elke
+    // volgende maand opnieuw gevierd zou worden (review 1 sep). Met 13 is
+    // >12 zichtbaar en is n=12 gegarandeerd de éérste keer.
+    if (checkinData.completedMonths.length > 13) {
+      checkinData.completedMonths = checkinData.completedMonths.slice(-13)
     }
   }
 
-  await supabase
+  const { error: upsertError } = await supabase
     .from('app_settings')
     .upsert(
       { key, value: JSON.stringify(checkinData), updated_by: user.id },
       { onConflict: 'key' }
     )
+  if (upsertError) {
+    // Zonder bevestigde write geen reeks-materiaal teruggeven: de client zou
+    // anders een mijlpaal vieren over een maand die niet is opgeslagen
+    // (review 1 sep). `completed: false` zonder lijst → standaard-afsluiting.
+    console.error('[monthly-checkin] afvinken niet opgeslagen:', upsertError)
+    return NextResponse.json({ completed: false, monthKey })
+  }
 
-  return NextResponse.json({ completed: true, monthKey })
+  // `completedMonths` is additief meegegeven (bestaande consumenten lezen
+  // alleen `completed`): het afsluitmoment op /core/checkin leidt hieruit de
+  // lopende reeks af zonder een tweede rondgang naar GET.
+  return NextResponse.json({
+    completed: true,
+    // Additief: een herhaalde afronding binnen dezelfde maand mag de reeks-
+    // mijlpaal niet nogmaals vieren — de client valt dan terug op het
+    // standaard-afsluitmoment.
+    alreadyCompleted,
+    monthKey,
+    completedMonths: checkinData.completedMonths,
+  })
 }
 
 // ── PUT — Update check-in preferences ───────────────────────────────────

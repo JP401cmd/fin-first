@@ -48,6 +48,8 @@ const KERN_PAGES: StaticPage[] = [
   { label: 'Belasting',                 sublabel: 'Box 1, 2 en 3',                      href: '/overzicht/belasting',                   icon: Calculator,  module: 'kern',  requiredModule: 'vermogensregistratie' },
   { label: 'Maandelijkse check-in',     sublabel: '7-stap reflectie en snapshot',       href: '/core/checkin',                          icon: Calendar,    module: 'kern' },
   { label: 'Check-in historie',         sublabel: 'Eerdere check-ins met trendline',    href: '/mijn/checkins',                         icon: History,     module: 'kern' },
+  { label: 'Jaaroverzicht',            sublabel: 'Jouw jaar in vrijheid',              href: '/mijn/jaaroverzicht',                    icon: History,     module: 'wil' },
+  { label: 'Mijlpalen',                sublabel: 'Dit heb je bereikt — de tijdlijn',   href: '/mijn/mijlpalen',                        icon: History,     module: 'wil' },
   // NB: `/mijn/koppelingen` stond hier tot bevinding M10 een tweede keer, als
   // "Bank koppelen" naast "Koppelingen" in IDENTITY_PAGES. Eén route, twee
   // namen, twee treffers — én twee items met dezelfde `page:<href>`-id.

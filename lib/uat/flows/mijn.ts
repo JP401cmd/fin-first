@@ -52,6 +52,8 @@ export const MIJN_FLOW: UatFlow = {
     { id: 'ai-credits', scenarioId: 'UAT-MIJN-12', label: 'WF-MIJN-12 · AI-creditsverbruik inzien', kind: 'screen', stage: 2, lane: 'account' },
     { id: 'inloggegevens', scenarioId: 'UAT-MIJN-13', label: 'WF-MIJN-13 · Inloggegevens beheren (e-mail/wachtwoord/overal uitloggen)', kind: 'screen', stage: 2, lane: 'account' },
     { id: 'ai-instellingen', scenarioId: 'UAT-MIJN-16', label: 'WF-MIJN-16 · AI-instellingen (toelichting + AI aan/uit)', kind: 'screen', stage: 2, lane: 'account' },
+    { id: 'mijlpalen', scenarioId: 'UAT-MIJN-32', label: 'WF-MIJN-32 · Mijlpalen-tijdlijn: dit heb je bereikt', kind: 'screen', stage: 2, lane: 'account' },
+    { id: 'jaaroverzicht', scenarioId: 'UAT-MIJN-31', label: 'WF-MIJN-31 · Jaaroverzicht: jouw jaar in vrijheid', kind: 'screen', stage: 2, lane: 'account' },
     { id: 'ai-uitvoerkeuze', scenarioId: 'UAT-MIJN-30', label: 'WF-MIJN-30 · Per functionaliteit kiezen waar de AI draait (lokaal/cloud)', kind: 'screen', stage: 2, lane: 'account', subOf: 'ai-instellingen' },
     { id: 'account-verwijderen', scenarioId: 'UAT-MIJN-14', label: 'WF-MIJN-14 · Account permanent verwijderen (getypte bevestiging)', kind: 'action', stage: 2, lane: 'account' },
 

@@ -129,6 +129,22 @@ export const PAGE_INFO: Record<string, string> = {
     'PSD2-bank, UPO-pensioenoverzicht en crypto-brokerage — telkens een handmatige import minder. ' +
     'Koppel of ontkoppel per dienst.',
 
+  '/mijn/jaaroverzicht':
+    'Eén afgelopen jaar, gemeten in tijd. ' +
+    'Gewonnen vrijheidsdagen per maand, je vermogen van begin tot eind, je beste en zwakste spaarmaand, ' +
+    'en de rekening eronder: wat er binnenkwam, wat eruit ging en wat er overbleef. ' +
+    'Bijna alles is historie; alleen het vrijheidsdoel in het laatste katern rust op je persoonlijke opnamepercentage en je huidige essentiële budgetten.',
+
+  '/mijn/mijlpalen':
+    'Elke drempel die je passeerde, als gebeurtenis vastgelegd met de datum erbij — ' +
+    'vermogen, vrijheidspercentage, schuldenvrij, noodfonds en je eigen doelen, per jaar gegroepeerd. ' +
+    'Een mijlpaal verdwijnt hier niet meer, ook niet als je later onder de drempel zakt: het is historie, geen stand. ' +
+    'Bij een datum staat soms "omstreeks": vermogens- en vrijheidsmijlpalen die je al vóór deze pagina passeerde ' +
+    'zijn achteraf gedateerd op je maandelijkse vermogenssnapshots, dus de dag is een benadering. ' +
+    'Kon een eerdere mijlpaal helemaal niet gedateerd worden (bijvoorbeeld schuldenvrij worden vóór je de app gebruikte), ' +
+    'dan staat hij onderaan bij "Zonder datum" — eerlijker dan een verzonnen dag. ' +
+    'Wat je nog vóór je hebt staat met een verwachte datum op Toekomst.',
+
   '/mijn/account':
     'Je abonnement en account op één plek. ' +
     'Zie welke add-ons (AI, Connected) actief zijn, wijzig e-mail of wachtwoord, log overal uit. ' +
