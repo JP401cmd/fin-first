@@ -3,7 +3,8 @@ import { unauthorized, badRequest, serverError } from '@/lib/api/respond'
 import { loadDashboardData } from '@/lib/dashboard-data-loader'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { withCanonicalOverviewFigures } from '@/lib/overview/canonical-health'
-import { computeFreedomTotal } from '@/lib/briefing/overview-briefing'
+import { summarizeRunway, runwayYearsMonths } from '@/lib/briefing/overview-briefing'
+import { computeHorizonRunway } from '@/lib/fire-target-shared'
 import { credibleDailyExpense, credibleMonthlyBasis } from '@/lib/format'
 
 /**
@@ -47,15 +48,23 @@ export async function GET(request: Request) {
     }
 
     // Canonieke bundel — dezelfde bron als de /overzicht-hub. Levert de kernel-
-    // gebaseerde freedomPct, simFireCountdown (met scalar-kernel-fallback) en de
-    // vrijheidstijd-grondslag (netWorth + recentMonthlyExpenses).
+    // gebaseerde freedomPct en simFireCountdown (met scalar-kernel-fallback). De
+    // VRIJHEIDSTIJD komt sinds ADR 0126 PR C niet meer uit deze bundel maar uit
+    // de runway hieronder; `recentMonthlyExpenses` bepaalt hier alleen nog of er
+    // überhaupt een geloofwaardige uitgavenbasis is (canCalculateFire).
     // `loadHorizonData` faalt liever niet de hele kaart: bij een horizon-fout
     // valt de patch terug op de bundel-eigen waarden (zelfde `null`-contract als
     // op /overzicht). Parallel omdat beide React-`cache()`'d zijn en de kernel-run
     // gedeeld wordt — geen tweede query-set.
-    const [bundle, horizonData] = await Promise.all([
+    const [bundle, horizonData, runway] = await Promise.all([
       loadDashboardData(supabase),
       loadHorizonData(supabase).catch(() => null),
+      // De "stop nu"-runway (ADR 0126 D1 + PR C) — de TOTALE vrijheidstijd van
+      // deze kaart. Persoonlijke blik, gelijk aan de twee loaders hierboven;
+      // draait op de React-cache()'de gedeelde FIRE-run, dus geen tweede
+      // query-set. Faalt hij, dan levert de motor zelf `unavailable` en toont de
+      // kaart geen vrijheidstijd — nooit een fallback-som.
+      computeHorizonRunway(supabase),
     ])
     const { simFireCountdown, fireProjResult, userName } = bundle
     // Canonieke kerngetallen erover heen — identiek aan
@@ -97,14 +106,26 @@ export async function GET(request: Request) {
       label: fireCountdownLabel,
     }
 
-    // ── Vrijheidstijd (netto vermogen ÷ dagtarief) — DEZELFDE motor en grondslag
-    //    als de "Jouw vrijheid deze week"-hero (computeFreedomTotal op netWorth +
-    //    recentMonthlyExpenses). Bij een tekort (negatief vermogen) 0/0 i.p.v. de
-    //    absolute-waarde-lezing, zodat de kaart geen "gekochte vrijheid" suggereert.
-    const freedomTotal = computeFreedomTotal(netWorth, recentMonthlyExpenses)
-    const freedomTime = freedomTotal.breakdown.isDeficit
-      ? { years: 0, months: 0 }
-      : { years: freedomTotal.breakdown.years, months: freedomTotal.breakdown.months }
+    // ── Vrijheidstijd — DE RUNWAY, niet de platte deling (ADR 0126 D1 + PR C).
+    //    Dit is een uitspraak over een HEEL vermogen ("hoe lang kom ik mee als ik
+    //    nu stop"), dus hoort ze bij de kernel-run mét rendement, inflatie, AOW,
+    //    belasting en de eigen woon-/eindstrategie — dezelfde grootheid als de
+    //    kop op /overzicht waar deze kaart vandaan wordt gedeeld. Tot PR C stond
+    //    hier netto vermogen ÷ 12-mnd dagtarief: een MARGINALE grondslag die als
+    //    totaal werd gepubliceerd, en die op een outbound artefact structureel
+    //    afweek van het scherm ernaast.
+    //
+    //    Zwijggevallen (tekort, geen geboortedatum, geen geloofwaardige
+    //    uitgavenbasis, D7-inconsistentie) leveren `null` en dus 0/0 — de kaart
+    //    valt dan terug op haar bestaande "nog geen gegevens"-staat i.p.v. een
+    //    becijferde claim te publiceren.
+    //
+    //    Bij de twee OPEN uitkomsten (het vermogen raakt binnen de horizon niet
+    //    op) is `months` een ONDERGRENS tot de eigen eindleeftijd resp. het
+    //    horizonplafond. Op een deelbare kaart is dat de veilige kant: de kaart
+    //    onderschat dan hooguit, en claimt nooit meer dan de kernel rekende.
+    const runwayPoint = summarizeRunway(runway)
+    const freedomTime = runwayPoint ? runwayYearsMonths(runwayPoint) : { years: 0, months: 0 }
 
     // ── Vrijheidsdagen gewonnen uit acties (all-time + deze maand) — canoniek uit
     //    de bundel (afkap-vrije actions_kpi_aggregate-RPC). Dit is een ANDERE

@@ -9,7 +9,7 @@
  *
  * De meeste checks roepen ÉCHTE productiefuncties aan (calculateBox3,
  * scoreDSTI/scoreAssetConcentration/scoreDebtRatio, pillarStatus,
- * computeGoalProgress, computeFreedomTotal, compareCompound,
+ * computeGoalProgress, summarizeRunway/computeRunwayWeekDelta, compareCompound,
  * buildSimNetWorthRows, deflate). Nog één mirror met bronregel-verwijzing
  * (spiegelt de mirrors in start/will/cash-checks.ts):
  *  - de postpone-/uitstel-termijn (POSTPONE_DAYS=14 resp. weken×7, identiek
@@ -31,7 +31,13 @@ import type { Debt } from '@/lib/debt-data'
 import { scoreDSTI, scoreAssetConcentration, scoreDebtRatio } from '@/lib/financial-health'
 import { pillarStatus } from '@/lib/leverage-status'
 import { computeGoalProgress, type Goal } from '@/lib/goal-data'
-import { computeFreedomTotal, computeFreedomDelta } from '@/lib/briefing/overview-briefing'
+import {
+  summarizeRunway,
+  runwayDurationLabel,
+  runwaySentence,
+  computeRunwayWeekDelta,
+} from '@/lib/briefing/overview-briefing'
+import { buildSindsVorigBezoek } from '@/lib/overview/sinds-vorig-bezoek'
 import { compareCompound } from '@/lib/compound-projection'
 import { buildSimNetWorthRows } from '@/lib/horizon/networth-rows'
 import { DEFAULT_HOUSING_STRATEGY } from '@/lib/housing-strategy'
@@ -231,29 +237,57 @@ export const OVZ_ENGINE_CHECKS: OvzEngineCheck[] = [
   {
     workflow: 'WF-OVZ-09',
     scenarioId: 'UAT-OVZ-09',
-    label: 'Vrijheidsdagen-totaal (computeFreedomTotal) + week-delta-plausibiliteitsgrens (computeFreedomDelta)',
+    label:
+      'Vrijheidstijd: TOTAAL = runway (summarizeRunway) + week-delta-plausibiliteitsgrens (computeRunwayWeekDelta); MARGINAAL = bezoekdelta (buildSindsVorigBezoek)',
     run: () => {
       criterion('WF-OVZ-09')
-      const willem = computeFreedomTotal(1619700, 1495)
-      const daan = computeFreedomTotal(-4200, 1500)
-      // Week-over-week: basis bevroren op half-geïmporteerde data (€200/mnd)
-      // vs. de realistische week erna (€3.000/mnd) → ±−17.033 dagen, buiten de
-      // plausibele bandbreedte → onderdrukt (bug "−3788 dagen minder").
-      const opgeblazenBasis = computeFreedomTotal(120000, 200)
-      const realistisch = computeFreedomTotal(120000, 3000)
-      const gesprongen = computeFreedomDelta(realistisch, opgeblazenBasis)
-      // Normale week: €2.500 gespaard bij €3.000/mnd → +25 dagen, blijft zichtbaar.
-      const normaal = computeFreedomDelta(
-        computeFreedomTotal(122500, 3000),
-        computeFreedomTotal(120000, 3000),
+      // ── TOTAAL — de runway. Willem stopt op zijn 45e en zijn vermogen reikt
+      //    tot voorbij zijn eigen eindleeftijd (90): 45 jaar, als ONDERGRENS.
+      const willemBasis = {
+        strategy: 'Vermogen opeten' as const,
+        expenseBasis: { yearly: 17940, method: 'essential_budgets' as const },
+        startAge: 45,
+        solverStatus: 'reached_now' as const,
+      }
+      const willem = summarizeRunway({ ...willemBasis, kind: 'reaches-end-age', endAge: 90 })
+      // Daan staat vandaag al zonder liquide vermogen → geen claim, geen meetpunt.
+      const daan = summarizeRunway({
+        ...willemBasis,
+        solverStatus: 'unreachable_within_horizon',
+        kind: 'deficit',
+      })
+
+      // ── Week-over-week guard (bug "−3788 dagen minder"), nu op maanden: een
+      //    bevroren basis van 124 maanden tegen een huidige runway van 24 is
+      //    geen weekbeweging maar een datacorrectie → onderdrukt.
+      const huidig = { kind: 'months' as const, months: 24, reachesAge: 47 }
+      const gesprongen = computeRunwayWeekDelta(huidig, { months: 124 })
+      // Normale week: twee maanden erbij, blijft zichtbaar.
+      const normaal = computeRunwayWeekDelta(
+        { kind: 'months', months: 120, reachesAge: 55 },
+        { months: 118 },
       )
+
+      // ── MARGINAAL — de bezoekdelta. Bewust een ANDERE grootheid (ADR 0126 D1):
+      //    €2.500 erbij ÷ €100/dag = 25 vrijheidsdagen. Die dagen mogen nooit bij
+      //    de runway hierboven opgeteld worden.
+      const bezoek = buildSindsVorigBezoek(
+        { netWorth: 122500 },
+        { at: '2026-08-23T09:00:00.000Z', netWorth: 120000 },
+        100,
+        new Date('2026-08-24T09:00:00Z'),
+      )
+
       return {
         expected:
-          'willemIsDeficit=false; willemTotalDaysPositief=true; daanIsDeficit=true; opgeblazenDelta=onderdrukt; opgeblazenImplausibel=true; normaleDelta=25',
+          'willemKind=reaches-end-age; willemDuur=minstens 45 jaar; willemZin=Als je nu zou stoppen, reikt je vermogen tot voorbij je 90e.; daanMeetpunt=geen; opgeblazenDelta=onderdrukt; opgeblazenImplausibel=true; normaleDeltaMaanden=2; marginaleBezoekdagen=25',
         actual:
-          `willemIsDeficit=${willem.breakdown.isDeficit}; willemTotalDaysPositief=${willem.totalFreedomDays > 0}; daanIsDeficit=${daan.breakdown.isDeficit}` +
-          `; opgeblazenDelta=${gesprongen.deltaDays === null ? 'onderdrukt' : gesprongen.deltaDays}` +
-          `; opgeblazenImplausibel=${gesprongen.isImplausibleDelta}; normaleDelta=${normaal.deltaDays}`,
+          `willemKind=${willem?.kind}; willemDuur=${willem ? runwayDurationLabel(willem) : 'geen'}` +
+          `; willemZin=${willem ? runwaySentence(willem) : 'geen'}` +
+          `; daanMeetpunt=${daan === null ? 'geen' : daan.kind}` +
+          `; opgeblazenDelta=${gesprongen.deltaMonths === null ? 'onderdrukt' : gesprongen.deltaMonths}` +
+          `; opgeblazenImplausibel=${gesprongen.isImplausibleDelta}; normaleDeltaMaanden=${normaal.deltaMonths}` +
+          `; marginaleBezoekdagen=${bezoek?.deltaDays}`,
       }
     },
   },

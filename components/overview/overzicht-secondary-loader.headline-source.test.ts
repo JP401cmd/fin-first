@@ -70,14 +70,30 @@ describe('overzicht-secondary-loader — kop-zin uit de canonieke live bron', ()
   })
 
   it('leidt de kop-zin nergens af uit het bevroren vrijheidsmeetpunt of de platte deling', () => {
-    // `snapshot.freedomSnapshot` en `freedomTotal` mogen blijven bestaan
-    // (versheidssignaal + e-mail + week-meetpunt; PR C ruimt ze op), maar nooit
-    // als invoer voor de zichtbare vrijheidsclaim op /overzicht.
+    // `snapshot.freedomSnapshot` bestaat nog (bevroren week-meetpunt voor de
+    // e-mail + het versheidssignaal), maar is sinds PR C dezelfde RUNWAY-
+    // grootheid en nooit de invoer voor de zichtbare claim op /overzicht.
     for (const arg of calls) {
       expect(arg).not.toMatch(/snapshot/i)
       expect(arg).not.toMatch(/freedomHero/i)
       expect(arg).not.toMatch(/freedomTotal/i)
     }
+  })
+
+  it('kent de platte vrijheidstijd-deling helemaal niet meer (ADR 0126 PR C)', () => {
+    // PR C heeft `computeFreedomTotal` verwijderd. Deze grendel houdt de tweede
+    // motor weg uit precies het bestand waar hij het langst overleefde: het
+    // week-meetpunt en het versheidssignaal draaien nu op `summarizeRunway`.
+    expect(source).not.toContain('computeFreedomTotal')
+    expect(source).not.toContain('freedomTotal')
+    expect(code).toMatch(/summarizeRunway\(\s*runway\s*\)/)
+  })
+
+  it('het versheidssignaal meet dezelfde grootheid als de kop (geen tweede grondslag)', () => {
+    // Vóór PR C vergeleek `briefingDataChanged` de platte deling terwijl de kop
+    // al de runway toonde: "je cijfers zijn veranderd" naast een ongewijzigde
+    // zin, en omgekeerd. Beide lezen nu `runwayPoint`.
+    expect(code).toMatch(/briefingDataChanged\s*=[\s\S]{0,200}hasRunwayMoved\(\s*runwayPoint\b/)
   })
 
   it('de AI-kop uit de snapshot mag de deterministische zin nog steeds overschrijven (gedateerde freeze)', () => {

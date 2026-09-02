@@ -22,23 +22,40 @@ import type {
   BriefingRefreshState,
   BriefingWeekHistoryItem,
 } from '@/lib/types/briefing'
+// Alleen het TYPE — de duiding-laag zelf (summarizeRunway/runwaySentence) hoort
+// bij de briefing-composer; deze module bewaart en valideert alleen.
+import type { RunwayPoint } from './overview-briefing'
 
-/** Vrijheidstijd-meetpunt van deze week — basis voor de week-over-week delta. */
-export interface FreedomSnapshotData {
-  totalFreedomDays: number
-  netWorth: number
-  monthlyExpenses: number
+/**
+ * Vrijheidstijd-meetpunt van deze week — de BEVROREN RUNWAY (ADR 0126 PR C).
+ *
+ * Tot PR C bevroor dit veld de platte deling (netto vermogen ÷ dagtarief). Sinds
+ * PR C is het de duiding van één geforceerde kernel-run: `RunwayPoint` +
+ * het moment van bevriezen. Een momentopname in een verstuurd bericht mág
+ * bevroren zijn — hij staat niet naast live cijfers — maar het moet wel dezelfde
+ * GROOTHEID zijn als wat de app live toont.
+ *
+ * BACK-COMPAT: snapshots in productie dragen nog de oude vorm
+ * (`totalFreedomDays`/`netWorth`/`monthlyExpenses`). `parseFreedomSnapshot`
+ * herkent die niet en levert `undefined` — bewust GEEN omrekening: die zou de
+ * verwijderde tweede motor via de achterdeur terugbrengen, en een deling als
+ * runway presenteren is een onjuiste claim. Gevolg: één briefing-mail zonder
+ * vrijheidsblok, waarna het eerste bezoek in een nieuwe ISO-week het meetpunt in
+ * de nieuwe vorm wegschrijft.
+ */
+export interface FreedomSnapshotData extends RunwayPoint {
   capturedAt: string
 }
 
 /** Slankere variant: alleen wat nodig is om de delta tegen af te zetten. */
 export interface FreedomBaseline {
-  totalFreedomDays: number
+  kind: RunwayPoint['kind']
+  months: number
   capturedAt: string
 }
 
 /**
- * Bezoekmarker — het vrijheidstijd-meetpunt bij een bezoek (H11).
+ * Bezoekmarker — het VERMOGENSPEIL bij een bezoek (H11).
  *
  * Twee-slots-patroon, identiek aan `freedomSnapshot`/`previousFreedomSnapshot`
  * hierboven maar dan op DAG-cadans i.p.v. week: `lastSeen` is de marker van de
@@ -46,12 +63,23 @@ export interface FreedomBaseline {
  * bezoekdag. De "sinds je vorige bezoek"-regel zet zich af tegen de VORIGE, niet
  * tegen `lastSeen` — anders zou de regel bij het tweede bezoek van dezelfde dag
  * verdwijnen (delta tegen jezelf = 0).
+ *
+ * WAAROM NETTO VERMOGEN EN GEEN DAGENAANTAL (ADR 0126 PR C): de regel is een
+ * MARGINALE uitspraak (Δ vermogen ÷ dagtarief van vandaag). Bewaar je een
+ * dagenaantal, dan vergelijk je twee getallen die met verschillende dagtarieven
+ * — dus verschillende motoren — zijn gemaakt, en beweegt de regel ook wanneer
+ * alleen het uitgavenpatroon verschoof. Bewaar je het vermogenspeil, dan meet de
+ * regel exact wat ze belooft: wat er sinds je vorige bezoek is bijgekomen.
+ *
+ * BACK-COMPAT: markers in productie dragen `totalFreedomDays` i.p.v. `netWorth`.
+ * `parseLastSeen` herkent die niet (→ `undefined`); het eerstvolgende bezoek
+ * schrijft een marker in de nieuwe vorm en de regel is een dag later terug.
  */
 export interface LastSeenMarker {
   /** ISO-tijdstip van het eerste bezoek op die kalenderdag (Amsterdam). */
   at: string
-  /** Vrijheidsdagen op dat moment — de basis voor de delta. */
-  totalFreedomDays: number
+  /** Netto vermogen op dat moment — de basis voor de marginale delta. */
+  netWorth: number
 }
 
 export interface BriefingSnapshot {
@@ -160,16 +188,32 @@ function sanitizeEntries(raw: unknown[]): BriefingEntry[] {
   return out
 }
 
+/** De drie doorgerekende runway-uitkomsten die bevroren mogen worden. */
+const RUNWAY_KINDS = new Set<RunwayPoint['kind']>([
+  'months',
+  'reaches-end-age',
+  'beyond-horizon',
+])
+
+function isRunwayKind(v: unknown): v is RunwayPoint['kind'] {
+  return typeof v === 'string' && RUNWAY_KINDS.has(v as RunwayPoint['kind'])
+}
+
+/**
+ * Valideer een bevroren runway-meetpunt. Een meetpunt in de OUDE vorm
+ * (`totalFreedomDays`, pre-ADR-0126 PR C) mist `kind`/`months` en valt hier uit
+ * — bewust niet omgerekend, zie de toelichting bij `FreedomSnapshotData`.
+ */
 function parseFreedomSnapshot(raw: unknown): FreedomSnapshotData | undefined {
   if (!raw || typeof raw !== 'object') return undefined
   const f = raw as Record<string, unknown>
-  if (!isFiniteNum(f.totalFreedomDays) || !isFiniteNum(f.netWorth) || !isFiniteNum(f.monthlyExpenses)) {
+  if (!isRunwayKind(f.kind) || !isFiniteNum(f.months) || !isFiniteNum(f.reachesAge)) {
     return undefined
   }
   return {
-    totalFreedomDays: f.totalFreedomDays,
-    netWorth: f.netWorth,
-    monthlyExpenses: f.monthlyExpenses,
+    kind: f.kind,
+    months: f.months,
+    reachesAge: f.reachesAge,
     capturedAt: typeof f.capturedAt === 'string' ? f.capturedAt : new Date().toISOString(),
   }
 }
@@ -177,18 +221,21 @@ function parseFreedomSnapshot(raw: unknown): FreedomSnapshotData | undefined {
 function parseFreedomBaseline(raw: unknown): FreedomBaseline | undefined {
   if (!raw || typeof raw !== 'object') return undefined
   const f = raw as Record<string, unknown>
-  if (!isFiniteNum(f.totalFreedomDays)) return undefined
+  if (!isRunwayKind(f.kind) || !isFiniteNum(f.months)) return undefined
   return {
-    totalFreedomDays: f.totalFreedomDays,
+    kind: f.kind,
+    months: f.months,
     capturedAt: typeof f.capturedAt === 'string' ? f.capturedAt : new Date().toISOString(),
   }
 }
 
+/** Bezoekmarker. Een marker in de oude vorm (`totalFreedomDays`) mist `netWorth`
+ *  en valt hier uit; het eerstvolgende bezoek schrijft de nieuwe vorm. */
 function parseLastSeen(raw: unknown): LastSeenMarker | undefined {
   if (!raw || typeof raw !== 'object') return undefined
   const m = raw as Record<string, unknown>
-  if (typeof m.at !== 'string' || !isFiniteNum(m.totalFreedomDays)) return undefined
-  return { at: m.at, totalFreedomDays: m.totalFreedomDays }
+  if (typeof m.at !== 'string' || !isFiniteNum(m.netWorth)) return undefined
+  return { at: m.at, netWorth: m.netWorth }
 }
 
 /** Valideer één historie-item (zelfde defensieve aanpak als de snapshot zelf). */
@@ -200,7 +247,11 @@ function parseHistoryItem(raw: unknown): BriefingWeekHistoryItem | null {
     week: h.week,
     headline: typeof h.headline === 'string' ? h.headline : undefined,
     entries: sanitizeEntries(h.entries),
-    freedomDays: isFiniteNum(h.freedomDays) ? h.freedomDays : undefined,
+    // Sinds ADR 0126 PR C: runway-MAANDEN, niet meer vrijheidsDAGEN uit de platte
+    // deling. Historie-items van vóór PR C dragen `freedomDays` en vallen hier
+    // dus uit — die week toont geen getal meer i.p.v. een getal uit een motor die
+    // niet meer bestaat.
+    freedomMonths: isFiniteNum(h.freedomMonths) ? h.freedomMonths : undefined,
   }
 }
 
@@ -307,7 +358,8 @@ function derivePreviousBaseline(
   if (existing.week === week) return existing.previousFreedomSnapshot ?? null
   return existing.freedomSnapshot
     ? {
-        totalFreedomDays: existing.freedomSnapshot.totalFreedomDays,
+        kind: existing.freedomSnapshot.kind,
+        months: existing.freedomSnapshot.months,
         capturedAt: existing.freedomSnapshot.capturedAt,
       }
     : null
@@ -329,7 +381,7 @@ function deriveWeekHistory(
     week: existing.week,
     headline: existing.headline,
     entries: existing.entries,
-    freedomDays: existing.freedomSnapshot?.totalFreedomDays,
+    freedomMonths: existing.freedomSnapshot?.months,
   }
   return [...base.filter((h) => h.week !== existing.week), closed].slice(-MAX_WEEK_HISTORY)
 }
@@ -439,7 +491,7 @@ export async function applyManualRefresh(
 export async function touchLastSeen(
   supabase: SupabaseClient,
   userId: string,
-  current: { totalFreedomDays: number },
+  current: { netWorth: number },
   opts: { now?: Date } = {},
 ): Promise<{ previous: LastSeenMarker | null }> {
   const now = opts.now ?? new Date()
@@ -457,7 +509,7 @@ export async function touchLastSeen(
   await writeBriefingSnapshot(supabase, userId, {
     ...existing,
     previousLastSeen: previous ?? undefined,
-    lastSeen: { at: now.toISOString(), totalFreedomDays: current.totalFreedomDays },
+    lastSeen: { at: now.toISOString(), netWorth: current.netWorth },
   })
   return { previous }
 }

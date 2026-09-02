@@ -1,9 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { loadDashboardData } from '@/lib/dashboard-data-loader'
-import { computeFreedomTotal } from '@/lib/briefing/overview-briefing'
 import { touchLastSeen } from '@/lib/briefing/snapshot'
 import type { Perspective } from '@/lib/household-data'
-import { credibleMonthlyBasis } from '@/lib/format'
+import { credibleDailyExpense } from '@/lib/format'
 import { buildSindsVorigBezoek } from '@/lib/overview/sinds-vorig-bezoek'
 import { SindsVorigBezoek } from './sinds-vorig-bezoek'
 
@@ -14,12 +13,18 @@ import { SindsVorigBezoek } from './sinds-vorig-bezoek'
  * DEDUP: `loadDashboardData` is React-`cache()`-wrapped en wordt in hetzelfde
  * request al door `OverzichtSecondaryLoader`, `OverzichtNetWorthChartLoader` en
  * de page-status-seed aangeroepen → deze cel voegt GEEN query's toe, ze deelt de
- * bestaande query-set. Alleen de maanduitgaven komen hiervandaan; het netto
- * vermogen komt (perspectief-correct) als prop uit blok 1 mee.
+ * bestaande query-set. Alleen het dagtarief komt hiervandaan; het netto vermogen
+ * komt (perspectief-correct) als prop uit blok 1 mee.
  *
- * CONSUME, DON'T RECOMPUTE: het vrijheidstotaal loopt via `computeFreedomTotal`
- * — dezelfde canonieke dagbasis (jaaruitgaven/365) als de briefing-hero, de
- * kassabon en de snapshot. Hier wordt niets eigen uitgerekend.
+ * MARGINAAL, NIET TOTAAL (ADR 0126 D1 + PR C). Deze regel is een DELTA en rekent
+ * daarom met het canonieke dagtarief uit de bundel — niet met de runway die de
+ * kop van deze pagina toont. De bezoekmarker bewaart het netto vermogen (zie
+ * `touchLastSeen`); het omrekenen naar dagen gebeurt met het tarief van vandaag,
+ * op één plek (`buildSindsVorigBezoek`).
+ *
+ * CONSUME, DON'T RECOMPUTE: `dashboardData.dailyExpenseRate` is het app-brede
+ * 12-mnd rolling tarief op gezuiverde consumptie (ADR 0126 D2) — hier wordt geen
+ * eigen dagbasis gemaakt, alleen de geloofwaardigheidsvloer toegepast.
  *
  * ALLEEN IN EIGEN WEERGAVE. In huishoud-/partnerperspectief schrijft /overzicht
  * bewust geen persoonlijke snapshot weg (zie `OverzichtSecondaryLoader`); een
@@ -46,18 +51,20 @@ export async function SindsVorigBezoekLoader({
   if (!userId || perspective !== 'personal') return null
 
   const { dashboardData } = await loadDashboardData(supabase)
-  // Zelfde voorkeursvolgorde als de briefing-hero, met dezelfde
-  // geloofwaardigheidsvloer (UR2-03): een rolling venster met één transactie van
-  // €1 mag de effectieve maandbasis niet verdringen. Blijft er niets over, dan
-  // levert `computeFreedomTotal` een oneindig totaal en toont deze regel niets.
-  const monthlyExpenses =
-    credibleMonthlyBasis(dashboardData.recentMonthlyExpenses) ||
-    credibleMonthlyBasis(dashboardData.monthlyExpenses)
-  const freedomTotal = computeFreedomTotal(currentNetWorth, monthlyExpenses)
+  // Geloofwaardigheidsvloer (UR2-03/ADR 0126 D2b): één losse transactie van €1 in
+  // het rolling venster gaf ooit €0,03/dag en daarmee absurde dagentellingen.
+  // Onder de vloer is er geen wisselkoers €→tijd en zwijgt deze regel.
+  const dailyExpense = credibleDailyExpense(dashboardData.dailyExpenseRate)
 
+  // De marker bewaart het VERMOGENSPEIL, niet een dagenaantal (ADR 0126 PR C):
+  // zo wordt de delta altijd tegen één tarief — dat van vandaag — omgerekend.
   const { previous } = await touchLastSeen(supabase, userId, {
-    totalFreedomDays: freedomTotal.totalFreedomDays,
+    netWorth: currentNetWorth,
   })
 
-  return <SindsVorigBezoek view={buildSindsVorigBezoek(freedomTotal, previous)} />
+  return (
+    <SindsVorigBezoek
+      view={buildSindsVorigBezoek({ netWorth: currentNetWorth }, previous, dailyExpense)}
+    />
+  )
 }

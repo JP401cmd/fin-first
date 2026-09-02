@@ -58,8 +58,10 @@ export interface BriefingWeekHistoryItem {
   week: string
   headline?: string
   entries: BriefingEntry[]
-  /** Vrijheidsdagen-stand van die week (voor de mini-samenvatting). */
-  freedomDays?: number
+  /** Runway-stand van die week in hele maanden (voor de mini-samenvatting).
+   *  Sinds ADR 0126 PR C de kernel-runway; wat vóór PR C als `freedomDays` (de
+   *  platte deling) bewaard werd, komt bewust niet meer terug. */
+  freedomMonths?: number
 }
 
 export type SparklineDataPoint = {

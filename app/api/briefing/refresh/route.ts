@@ -5,8 +5,10 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   loadAndComposeOverviewBriefing,
   sanitizeAiHeadline,
+  summarizeRunway,
   OVERVIEW_BRIEFING_MAX,
 } from '@/lib/briefing/overview-briefing'
+import { computeHorizonRunway } from '@/lib/fire-target-shared'
 import {
   readBriefingSnapshot,
   canRefreshToday,
@@ -138,7 +140,18 @@ export async function POST(req: Request) {
     }
 
     const now = new Date()
-    const { entries, freedom, input } = await loadAndComposeOverviewBriefing(supabase, now)
+    // Het bevroren vrijheidsmeetpunt is sinds ADR 0126 PR C de RUNWAY, niet meer
+    // de platte deling. Hij wordt HIER opgehaald en niet in
+    // `loadAndComposeOverviewBriefing`: die module wordt ook door de UAT-/
+    // regressielaag geïmporteerd en hoort de kernel-motor niet in zijn
+    // importgraaf te trekken (alleen het `RunwayResult`-type). De ververs is
+    // persoonlijk, dus de standaard 'personal'-blik — gelijk aan /overzicht in
+    // eigen weergave, dat hetzelfde meetpunt bevriest.
+    const [{ entries, input }, runway] = await Promise.all([
+      loadAndComposeOverviewBriefing(supabase, now),
+      computeHorizonRunway(supabase),
+    ])
+    const freedom = summarizeRunway(runway)
 
     // AI-redactie: directives uit beheer + metrics uit de engine-input sturen
     // de herschrijving. Faalt dit (AI uit, fout, guard) → deterministisch.
@@ -169,7 +182,7 @@ export async function POST(req: Request) {
     const redactedEntries = applyRedactie(entries, texts)
 
     const { allowed, snapshot } = await applyManualRefresh(supabase, user.id, redactedEntries, {
-      freedom: { ...freedom, capturedAt: new Date().toISOString() },
+      freedom: freedom ? { ...freedom, capturedAt: new Date().toISOString() } : undefined,
       headline: headline ?? undefined,
     })
     if (!allowed) {
@@ -270,7 +283,12 @@ async function persistLokaleRedactie(
   if (!parsed.ok) return parsed.response
 
   const now = new Date()
-  const { entries, freedom } = await loadAndComposeOverviewBriefing(supabase, now)
+  // Zie het cloudpad hierboven: het meetpunt is de runway, hier opgehaald.
+  const [{ entries }, runway] = await Promise.all([
+    loadAndComposeOverviewBriefing(supabase, now),
+    computeHorizonRunway(supabase),
+  ])
+  const freedom = summarizeRunway(runway)
 
   const bronById = new Map(entries.map((e) => [e.id, e]))
   const goedgekeurd = new Map<string, string>()
@@ -292,7 +310,7 @@ async function persistLokaleRedactie(
   )
 
   const { allowed, snapshot } = await applyManualRefresh(supabase, userId, redactedEntries, {
-    freedom: { ...freedom, capturedAt: new Date().toISOString() },
+    freedom: freedom ? { ...freedom, capturedAt: new Date().toISOString() } : undefined,
     headline: headline ?? undefined,
   })
   if (!allowed) {

@@ -8,7 +8,8 @@ import type { HorizonPageData } from '@/lib/horizon-data-loader'
 import type { Perspective } from '@/lib/household-data'
 import {
   composeOverviewBriefing,
-  computeFreedomTotal,
+  summarizeRunway,
+  hasRunwayMoved,
   buildBriefingHeadline,
   loadLatestCheckinForBriefing,
 } from '@/lib/briefing/overview-briefing'
@@ -24,7 +25,7 @@ import type { BriefingWeekHistoryItem } from '@/components/overview/briefing-pan
 import type { BriefingRefreshState } from '@/lib/types/briefing'
 import type { HefbomenHousingSplit } from './overzicht-hero/hefbomen-nav'
 import { MiniNetWorthChart } from './mini-networth-chart'
-import { credibleMonthlyBasis, dailyExpenseRate } from '@/lib/format'
+import { dailyExpenseRate } from '@/lib/format'
 import { runMilestoneDetection } from '@/lib/milestones/run'
 import { isFarHorizonGoal } from '@/lib/milestones/detect'
 import { isParameterGoal } from '@/lib/goal-current-value'
@@ -177,22 +178,21 @@ export async function OverzichtSecondaryLoader({
     aandachtspunten,
     checkinForBriefing,
   )
-  // Freedom-time: netto vermogen (perspectief-correct) ÷ dagelijkse uitgaven.
-  // Sinds ADR 0126 (PR B) voedt dit NIET meer de kop-zin (die leest de runway,
-  // zie hieronder) maar alleen nog het bevroren vrijheidsmeetpunt van de
-  // week-snapshot en het versheidssignaal — PR C ruimt die laatste consumenten op.
+  // Het week-MEETPUNT is sinds ADR 0126 PR C de RUNWAY, niet meer de platte
+  // deling (netto vermogen ÷ dagtarief). Eén duiding van de live kernel-run van
+  // dit request, gedeeld door drie dingen:
+  //   1. de kop-zin naast de masthead (`buildBriefingHeadline`, hieronder),
+  //   2. het bevroren meetpunt in de weeksnapshot (voedt de briefing-e-mail),
+  //   3. het versheidssignaal onder de "Bijgewerkt …"-stempel.
+  // Dat (1) en (3) nu dezelfde grootheid meten is de kern van PR C: vóórdien
+  // vergeleek het signaal de platte deling terwijl de kop de runway toonde, dus
+  // meldde het "je cijfers zijn veranderd" terwijl de zin gelijk bleef — en
+  // omgekeerd.
   //
-  // Voorkeursvolgorde ongewijzigd (perspectief → canoniek 12-mnd rolling →
-  // effectief), maar een kandidaat die door de geloofwaardigheidsvloer zakt
-  // wordt OVERGESLAGEN i.p.v. gebruikt (UR2-03). Een rolling venster met één
-  // transactie van €1 gaf €0,03/dag en daarmee "113 jaar en 4 maanden aan
-  // vrijheid" bovenaan de briefing; nu wint de effectieve maandbasis, en is die
-  // er ook niet, dan valt het meetpunt op "onbepaald".
-  const freedomMonthlyExpenses =
-    credibleMonthlyBasis(perspectiveOverride?.monthlyExpenses) ||
-    credibleMonthlyBasis(dashboardData.recentMonthlyExpenses) ||
-    credibleMonthlyBasis(dashboardData.monthlyExpenses)
-  const freedomTotal = computeFreedomTotal(currentNetWorth, freedomMonthlyExpenses)
+  // `null` = geen claim (tekort, geen geboortedatum, geen geloofwaardige
+  // uitgavenbasis, of een D7-inconsistentie in de kernel-run). Dan wordt er ook
+  // geen meetpunt bevroren en toont de e-mail geen vrijheidsblok.
+  const runwayPoint = summarizeRunway(runway)
   let briefingEntries = composedBriefing
   let briefingRefreshedAt: string | null = null
   let briefingCanRefresh = false
@@ -320,19 +320,11 @@ export async function OverzichtSecondaryLoader({
     // en zijn onafhankelijk — alleen de brieifing-injectie moet ná de snapshot.
     const [milestoneRun, { snapshot }] = await Promise.all([
       detectionPromise,
-      getOrCreateWeeklySnapshot(
-        supabase,
-        userId,
-        composedBriefing,
-        {
-          freedom: {
-            totalFreedomDays: freedomTotal.totalFreedomDays,
-            netWorth: freedomTotal.netWorth,
-            monthlyExpenses: freedomTotal.monthlyExpenses,
-            capturedAt: new Date().toISOString(),
-          },
-        },
-      ),
+      getOrCreateWeeklySnapshot(supabase, userId, composedBriefing, {
+        freedom: runwayPoint
+          ? { ...runwayPoint, capturedAt: new Date().toISOString() }
+          : undefined,
+      }),
     ])
     freshMilestoneRow = milestoneRun.fresh
     // Verse mijlpaal ná de week-freeze injecteren (ADR 0123 §6): de snapshot
@@ -349,14 +341,17 @@ export async function OverzichtSecondaryLoader({
     briefingCanRefresh = canRefreshToday(snapshot)
     briefingRefreshState = refreshStateToday(snapshot)
     briefingWeekHistory = snapshot.history
-    // Het bevroren vrijheidsmeetpunt voedt geen zichtbaar getal meer, alleen
-    // nog het versheidssignaal onder de "Bijgewerkt …"-stempel (en de e-mail).
-    if (snapshot.freedomSnapshot) {
-      briefingDataChanged =
-        Math.abs(
-          freedomTotal.totalFreedomDays - snapshot.freedomSnapshot.totalFreedomDays,
-        ) >= 2
-    }
+    // Versheidssignaal onder de "Bijgewerkt …"-stempel: is de runway sinds het
+    // bevriezen van deze week méér dan een hele maand verschoven (of van soort
+    // veranderd)? Zelfde grootheid als de zichtbare kop-zin, zodat het signaal
+    // en de zin niet meer uit elkaar kunnen lopen (ADR 0126 PR C). Een snapshot
+    // in de pre-PR-C-vorm levert `freedomSnapshot: undefined`: dan is de bevroren
+    // stand onbekend en meldt het signaal bewust NIETS — een "je cijfers zijn
+    // veranderd" zonder vergelijkbare basis is een vals alarm. Zelfherstellend bij
+    // de eerstvolgende week-freeze.
+    briefingDataChanged = snapshot.freedomSnapshot
+      ? hasRunwayMoved(runwayPoint, snapshot.freedomSnapshot)
+      : false
     if (snapshot.headline) briefingHeadline = snapshot.headline
   }
 

@@ -69,6 +69,15 @@ interface RunwayComputed {
   /** P!B48 — de EIGEN eindstrategie van de gebruiker (geërfd in de run; D7 geldt bij 'Vermogen opeten'). */
   readonly strategy: Eindstrategie
   readonly solverStatus: SolverStatus
+  /**
+   * `KernelInput.startLeeftijd` — de leeftijd waarop deze run begint (= nu).
+   * Doorgegeven, niet herrekend, zodat een consument de runway ook bij de twee
+   * OPEN uitkomsten (`reaches-end-age`/`beyond-horizon`) als DUUR kan uitdrukken:
+   * daar is `eindleeftijd − startAge` de ondergrens van de runway. Zonder dit veld
+   * zou een oppervlak dat een duur toont (de deelkaart) juist voor de sterkste
+   * posities op nul uitkomen. ADR 0093: een duur, geen euro — geen deflator.
+   */
+  readonly startAge: number
 }
 
 export type RunwayResult =
@@ -126,6 +135,7 @@ export function computeRunwayFromSolve(
     expenseBasis: { yearly, method },
     strategy: kernelInput.eindstrategie.selector,
     solverStatus: solve.status,
+    startAge: kernelInput.startLeeftijd,
   }
   const endAge = solve.eindleeftijd
 

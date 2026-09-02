@@ -31,13 +31,15 @@ function snapshot(overrides: Partial<BriefingSnapshot> = {}): BriefingSnapshot {
       entry({ id: 'e1', category: 'observation', text: 'Je uitgaven daalden deze week.' }),
       entry({ id: 'e2', category: 'tip', text: 'Je abonnementen kosten €48 per maand — kijk of je kunt schrappen.' }),
     ],
+    // Bevroren RUNWAY (ADR 0126 PR C): 100 maanden = 8 jaar en 4 maanden, twee
+    // maanden meer dan de week ervoor.
     freedomSnapshot: {
-      totalFreedomDays: 1520,
-      netWorth: 100000,
-      monthlyExpenses: 2000,
+      kind: 'months',
+      months: 100,
+      reachesAge: 53.3,
       capturedAt: '2026-07-13T06:00:00.000Z',
     },
-    previousFreedomSnapshot: { totalFreedomDays: 1500, capturedAt: '2026-07-06T06:00:00.000Z' },
+    previousFreedomSnapshot: { kind: 'months', months: 98, capturedAt: '2026-07-06T06:00:00.000Z' },
     ...overrides,
   }
 }
@@ -93,10 +95,76 @@ describe('buildBriefingEmail', () => {
     expect(out!.html).toContain('Een tip om vrijheid te winnen')
   })
 
-  it('toont week-over-week delta in dagen (geen euro)', () => {
+  it('toont de bevroren runway als duur én als zin, zonder euro', () => {
     const out = buildBriefingEmail({ snapshot: snapshot(), baseUrl: BASE, unsubscribeToken: TOKEN })
-    // 1520 - 1500 = 20 dagen erbij
-    expect(out!.html).toMatch(/20 dagen vrijheid erbij/)
+    expect(out!.html).toContain('8 jaar en 4 maanden')
+    expect(out!.html).toContain('Als je nu zou stoppen, reikt je vermogen tot je 53e.')
+    expect(out!.subject).toBe('Je week in vrijheid: 8 jaar en 4 maanden')
+  })
+
+  it('toont week-over-week delta in MAANDEN (de runway is maandnauwkeurig)', () => {
+    const out = buildBriefingEmail({ snapshot: snapshot(), baseUrl: BASE, unsubscribeToken: TOKEN })
+    // 100 - 98 = 2 maanden erbij. Tot PR C stond hier een dagen-delta uit de
+    // platte deling; die grootheid bestaat niet meer.
+    expect(out!.html).toMatch(/Deze week 2 maanden erbij/)
+    expect(out!.html).not.toMatch(/dagen vrijheid erbij/)
+  })
+
+  it('een beweging kleiner dan een hele maand levert geen deltaregel op', () => {
+    const out = buildBriefingEmail({
+      snapshot: snapshot({
+        previousFreedomSnapshot: { kind: 'months', months: 100, capturedAt: '2026-07-06T06:00:00.000Z' },
+      }),
+      baseUrl: BASE,
+      unsubscribeToken: TOKEN,
+    })
+    expect(out!.html).not.toMatch(/Deze week/)
+    // Het totaal blijft wél staan — geen delta is geen reden om te zwijgen.
+    expect(out!.html).toContain('8 jaar en 4 maanden')
+  })
+
+  it('geen basis → "eerste meting op deze basis", niet "eerste meting ooit"', () => {
+    const out = buildBriefingEmail({
+      snapshot: snapshot({ previousFreedomSnapshot: undefined }),
+      baseUrl: BASE,
+      unsubscribeToken: TOKEN,
+    })
+    expect(out!.html).toContain('Je eerste meting op deze basis')
+  })
+
+  it('een open runway toont een ONDERGRENS ("minstens"), nooit een exacte duur', () => {
+    const out = buildBriefingEmail({
+      snapshot: snapshot({
+        freedomSnapshot: {
+          kind: 'beyond-horizon',
+          months: 660,
+          reachesAge: 100,
+          capturedAt: '2026-07-13T06:00:00.000Z',
+        },
+        previousFreedomSnapshot: undefined,
+      }),
+      baseUrl: BASE,
+      unsubscribeToken: TOKEN,
+    })
+    expect(out!.html).toContain('minstens 55 jaar')
+    expect(out!.html).toContain('zover het model rekent: tot je 100e')
+    expect(out!.html).not.toMatch(/oneindig/i)
+  })
+
+  // BACK-COMPAT (ADR 0126 PR C): snapshots in productie dragen nog de oude vorm.
+  // `parseFreedomSnapshot` laat die vallen, dus komt hier `freedomSnapshot:
+  // undefined` binnen. De mail gaat gewoon uit — met de briefjes, zonder
+  // vrijheidsblok. Geen claim liever dan een claim uit een verwijderde motor.
+  it('zonder meetpunt (oude snapshotvorm) blijft de mail bestaan, maar zonder vrijheidsblok', () => {
+    const out = buildBriefingEmail({
+      snapshot: snapshot({ freedomSnapshot: undefined, previousFreedomSnapshot: undefined }),
+      baseUrl: BASE,
+      unsubscribeToken: TOKEN,
+    })
+    expect(out).not.toBeNull()
+    expect(out!.subject).toBe('Je wekelijkse briefing staat klaar')
+    expect(out!.html).not.toContain('Zo ver reikt je vermogen')
+    expect(out!.html).toContain('Een observatie over je week')
   })
 
   it('lege snapshot (geen entries, geen freedom) → null', () => {

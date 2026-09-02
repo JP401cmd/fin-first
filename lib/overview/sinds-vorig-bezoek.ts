@@ -11,16 +11,29 @@
 // Verandert er niets, dan staat er niets — een lege belofte elke dag herhalen
 // is precies de ruis die deze kaart moet oplossen.
 //
-// CONSUME, DON'T RECOMPUTE: het huidige vrijheidstotaal komt uit
-// `computeFreedomTotal` (dezelfde canonieke dagbasis als de briefing-hero en de
-// kassabon); hier wordt niets opnieuw uitgerekend behalve het verschil.
+// MARGINALE GROOTHEID (ADR 0126 D1 + PR C). Deze regel is een DELTA — "wat kocht
+// de verandering sinds je vorige bezoek aan tijd" — en hoort dus bij het
+// dagtarief (`dailyExpenseRate`), niet bij de runway. De runway is
+// maandnauwkeurig en kan per definitie geen dag-delta leveren; dat is precies
+// waarom deze grootheid marginaal wordt in plaats van te verdwijnen. De som van
+// zulke dagen is bewust NIET gelijk aan de runway op de kop van dezelfde pagina
+// — een prijs is geen projectie — en de kopij benoemt de grondslag daarom
+// expliciet ("tegen je huidige uitgaven").
+//
+// CONSUME, DON'T RECOMPUTE: het dagtarief komt kant-en-klaar uit de bundel
+// (`DashboardData.dailyExpenseRate`, 12-mnd rolling gezuiverde consumptie); hier
+// wordt alleen het verschil gedeeld. De bezoekmarker bewaart sinds PR C het
+// NETTO VERMOGEN, niet een dagenaantal: anders zou je twee getallen aftrekken die
+// met verschillende dagtarieven zijn gemaakt, en bewoog de regel ook wanneer
+// alleen het uitgavenpatroon verschoof.
 
 import { isImplausibleFreedomDelta } from '@/lib/briefing/overview-briefing'
 import { amsterdamDateString } from '@/lib/briefing/snapshot'
 
 /** Wat de regel toont, of `null` wanneer er niets te melden valt. */
 export interface SindsVorigBezoekView {
-  /** Verschil in hele vrijheidsdagen t.o.v. je vorige bezoekdag (nooit 0). */
+  /** Verschil in hele vrijheidsdagen t.o.v. je vorige bezoekdag (nooit 0),
+   *  gerekend tegen het dagtarief van vandaag. */
   deltaDays: number
   /** Hoe we naar dat vorige bezoek verwijzen ("gisteren", "dinsdag", "12 augustus"). */
   sinceLabel: string
@@ -60,23 +73,37 @@ export function formatSinceLabel(previousAt: Date, now: Date): string | null {
 }
 
 /**
- * Bouw de delta-regel. Geeft `null` (= toon niets) wanneer:
- *  - er nog geen vorige bezoekdag bekend is (eerste bezoek);
+ * Bouw de delta-regel: Δ netto vermogen ÷ het dagtarief van vandaag.
+ *
+ * Geeft `null` (= toon niets) wanneer:
+ *  - er nog geen vorige bezoekdag bekend is (eerste bezoek, of een marker in de
+ *    pre-PR-C-vorm die bewust niet wordt omgerekend);
  *  - het vorige bezoek van vandaag is (twee bezoeken op dezelfde dag);
- *  - een van beide totalen niet eindig is (oneindige vrijheid / geen uitgaven);
+ *  - een van beide vermogenspeilen niet eindig is;
+ *  - er geen geloofwaardig dagtarief is (`dailyExpense <= 0`) — dan is er geen
+ *    wisselkoers €→tijd en doet de regel geen uitspraak;
  *  - het verschil afgerond 0 dagen is;
- *  - de sprong implausibel groot is — dezelfde dubbele grens als de
- *    week-over-week-hero (`isImplausibleFreedomDelta`), zodat een settelende
- *    dataset geen "−3788 dagen" bovenaan /overzicht zet.
+ *  - de sprong implausibel groot is (`isImplausibleFreedomDelta`), zodat een
+ *    settelende dataset of een eenmalige vermogenscorrectie geen "−3788 dagen"
+ *    bovenaan /overzicht zet.
+ *
+ * REFERENTIESCHAAL VAN DE GUARD. De relatieve voorwaarde van de guard heeft een
+ * "huidig totaal" nodig. Dat is hier het huidige vermogen omgerekend tegen
+ * hetzelfde dagtarief — dezelfde eenheid en dezelfde wisselkoers als de delta,
+ * dus een zuivere schaalmaat. Het is uitdrukkelijk GEEN vrijheidstijd-grootheid:
+ * het getal wordt nergens getoond en mag nergens als totaal gepresenteerd worden
+ * (dat totaal is de runway — ADR 0126 D1).
  */
 export function buildSindsVorigBezoek(
-  current: { totalFreedomDays: number },
-  previous: { at: string; totalFreedomDays: number } | null,
+  current: { netWorth: number },
+  previous: { at: string; netWorth: number } | null,
+  dailyExpense: number,
   now: Date = new Date(),
 ): SindsVorigBezoekView | null {
   if (!previous) return null
-  if (!Number.isFinite(current.totalFreedomDays)) return null
-  if (!Number.isFinite(previous.totalFreedomDays)) return null
+  if (!Number.isFinite(current.netWorth)) return null
+  if (!Number.isFinite(previous.netWorth)) return null
+  if (!Number.isFinite(dailyExpense) || dailyExpense <= 0) return null
 
   const previousAt = new Date(previous.at)
   if (Number.isNaN(previousAt.getTime())) return null
@@ -84,9 +111,9 @@ export function buildSindsVorigBezoek(
   const sinceLabel = formatSinceLabel(previousAt, now)
   if (!sinceLabel) return null
 
-  const deltaDays = Math.round(current.totalFreedomDays - previous.totalFreedomDays)
+  const deltaDays = Math.round((current.netWorth - previous.netWorth) / dailyExpense)
   if (deltaDays === 0) return null
-  if (isImplausibleFreedomDelta(deltaDays, current.totalFreedomDays)) return null
+  if (isImplausibleFreedomDelta(deltaDays, current.netWorth / dailyExpense)) return null
 
   return { deltaDays, sinceLabel }
 }
@@ -95,11 +122,19 @@ export function buildSindsVorigBezoek(
  * De zin zelf. Bewust twee kalme varianten zonder waardeoordeel: erbij is geen
  * felicitatie, eraf is geen alarm. Enkelvoud/meervoud correct — "1 dagen" leest
  * als een bug en ondermijnt het vertrouwen dat deze kaart juist wil herstellen.
+ *
+ * DE GRONDSLAG STAAT VOORAAN (ADR 0126 D1). "Tegen je huidige uitgaven" maakt van
+ * meet af aan duidelijk dat dit de MARGINALE lezing is — wat de verandering
+ * kostte of opleverde tegen het dagtarief van vandaag — en niet de runway die de
+ * kop van dezelfde pagina noemt. Zonder die aanhef leest de lezer twee
+ * vrijheidsgetallen op één scherm als hetzelfde soort getal, terwijl ze bewust
+ * verschillen (prijs vs. projectie). Definitieve formulering gaat nog langs
+ * merkstem/compliance; beschrijvend, geen aansporing.
  */
 export function sindsVorigBezoekZin(view: SindsVorigBezoekView): string {
   const abs = Math.abs(view.deltaDays)
   const eenheid = abs === 1 ? 'dag' : 'dagen'
   return view.deltaDays > 0
-    ? `Sinds ${view.sinceLabel} kwam er ${abs} ${eenheid} vrijheid bij.`
-    : `Sinds ${view.sinceLabel} ging er ${abs} ${eenheid} vrijheid af.`
+    ? `Tegen je huidige uitgaven kwam er sinds ${view.sinceLabel} ${abs} ${eenheid} vrijheid bij.`
+    : `Tegen je huidige uitgaven ging er sinds ${view.sinceLabel} ${abs} ${eenheid} vrijheid af.`
 }

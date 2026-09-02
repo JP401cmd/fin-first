@@ -121,7 +121,62 @@ bedoeld is.
   `core-data-loader.ts`, `cashflow-kpis.ts`, `horizon/raw-data-loader.ts`,
   `spend-limits/loader.ts`).
 - **PR B** — de runway (D3).
-- **PR C** — exports + verwijdering van `computeFreedomTotal`.
+- **PR C** — de laatste consumenten om, en `computeFreedomTotal` weg.
+
+#### PR C — uitgevoerd (2 sep 2026)
+
+De platte deling is verwijderd; er staat geen tweede vrijheidstijd-motor meer.
+Weg uit `lib/briefing/overview-briefing.ts`: `computeFreedomTotal`,
+`FreedomTotal`, `buildFreedomHeroProps`, `FreedomHeroProps` en
+`computeFreedomDelta`. Ervoor in de plaats staat één DUIDING-laag op het
+`RunwayResult` van PR B — `RunwayPoint` (bevriesbare samenvatting),
+`summarizeRunway`, `runwaySentence`, `runwayDurationLabel`/`runwayYearsMonths`,
+`computeRunwayWeekDelta` en `hasRunwayMoved`. `buildBriefingHeadline` is nu een
+dunne compositie van de eerste twee, zodat de kop, de deelkaart, de mail en het
+versheidssignaal dezelfde zwijggevallen delen (deficit, unavailable, de
+D7-inconsistentie).
+
+Per oppervlak, met de grootheid erbij:
+
+- **Deelkaart** (`app/api/share/freedom-card/route.ts`) — TOTAAL → runway.
+  `freedomTime` komt uit `runwayYearsMonths(summarizeRunway(...))`. Bij de twee
+  open uitkomsten is die duur een ONDERGRENS (tot de eigen eindleeftijd resp.
+  het horizonplafond); op een outbound artefact is dat de veilige kant.
+- **Briefing-e-mail** (`lib/briefing/email-template.ts`) — TOTAAL → bevroren
+  runway. Blijft bevroren (een momentopname in een bericht staat niet naast live
+  cijfers), maar is nu de bevroren *runway* in plaats van de bevroren *deling*.
+  De week-delta staat in MAANDEN; de plausibiliteitsguard geldt onverkort en
+  krijgt de maanden via 365/12 in dagen aangereikt, zodat beide voorwaarden
+  letterlijk hetzelfde betekenen als voorheen.
+- **"Sinds je vorige bezoek"** (`lib/overview/sinds-vorig-bezoek.ts`) —
+  MARGINAAL, want een delta: Δ netto vermogen ÷ het dagtarief van vandaag. De
+  runway is maandnauwkeurig en kan geen dag-delta leveren; daarom wordt deze
+  grootheid marginaal in plaats van te verdwijnen. De **bezoekmarker bewaart
+  sinds PR C het netto vermogen**, niet een dagenaantal — anders trek je twee
+  getallen van elkaar af die met verschillende dagtarieven zijn gemaakt. De
+  kopij benoemt de grondslag ("Tegen je huidige uitgaven …") zodat deze dagen
+  niet als de runway op dezelfde pagina gelezen worden.
+- **Versheidssignaal** (`components/overview/overzicht-secondary-loader.tsx`) —
+  TOTAAL → runway, drempel één hele maand (de resolutie van de motor). Dit
+  signaal mat de platte deling terwijl de kop al de runway toonde: het meldde
+  "je cijfers zijn veranderd" terwijl de zin gelijk bleef, en omgekeerd.
+- **Week-historie** in de briefing-panel toont `freedomMonths` in plaats van
+  `freedomDays`.
+
+**Back-compat, bewust zonder omrekening.** Snapshots en bezoekmarkers in
+productie dragen de oude velden. De parsers herkennen die niet en leveren
+`undefined`: omrekenen zou de verwijderde motor via de achterdeur terugbrengen,
+en een deling als runway presenteren is een onjuiste claim. Gevolg is begrensd
+en zelfherstellend — hooguit één briefing-mail zonder vrijheidsblok (de briefjes
+gaan gewoon mee) en één dag zonder bezoekregel. Een gebruiker die nog nooit een
+runway-meetpunt had, leest in de mail "je eerste meting op deze basis", niet "je
+eerste meting ooit".
+
+**Aangeraakt buiten de briefing-laag:** `lib/horizon/runway.ts` kreeg één
+additief veld, `startAge` (= `KernelInput.startLeeftijd`, doorgegeven, niet
+herrekend). Zonder dat veld is de runway bij `reaches-end-age`/`beyond-horizon`
+niet als duur uit te drukken en zou de deelkaart juist voor de sterkste posities
+op nul uitkomen.
 
 ## Bewust open punten
 

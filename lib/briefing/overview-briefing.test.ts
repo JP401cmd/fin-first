@@ -1,10 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildOverviewBriefingInput,
-  computeFreedomTotal,
-  computeFreedomDelta,
+  summarizeRunway,
+  runwayYearsMonths,
+  runwayDurationLabel,
+  runwaySentence,
+  computeRunwayWeekDelta,
+  hasRunwayMoved,
   isImplausibleFreedomDelta,
-  buildFreedomHeroProps,
   buildBriefingHeadline,
   sanitizeAiHeadline,
 } from './overview-briefing'
@@ -140,41 +143,59 @@ describe('buildOverviewBriefingInput — finance-mapping', () => {
   })
 })
 
-describe('vrijheidstijd-hero helpers', () => {
-  it('computeFreedomTotal: €100k bij €3000/mnd ≈ 1014 vrijheidsdagen', () => {
-    // Canonieke dagbasis = €3000×12/365 = €98,63/dag → €100k ≈ 1013,9 dagen
-    // (de oude maand/30-basis gaf exact 1000; ~1,4% hoger nu — gelijkgetrokken
-    // met calculateFreedomTime/core-metrics).
-    const t = computeFreedomTotal(100000, 3000)
-    expect(t.totalFreedomDays).toBeCloseTo(1013.9, 1)
-    expect(t.breakdown.isInfinite).toBe(false)
+describe('runway-duiding: van kernel-uitkomst naar meetpunt', () => {
+  const basis = { yearly: 36_000, method: 'essential_budgets' as const }
+  const opeten = {
+    strategy: 'Vermogen opeten' as const,
+    expenseBasis: basis,
+    startAge: 45,
+    solverStatus: 'reached_now' as const,
+  }
+
+  it('kind months: de maanden en de uitputtingsleeftijd komen ONGEWIJZIGD uit de run', () => {
+    const point = summarizeRunway({ ...opeten, kind: 'months', months: 100, depletionAge: 53.33, endAge: 90 })
+    expect(point).toEqual({ kind: 'months', months: 100, reachesAge: 53.33 })
+    // 100 maanden = 8 jaar en 4 maanden - een deling van `months`, geen eigen
+    // tijdrekening.
+    expect(runwayYearsMonths(point!)).toEqual({ years: 8, months: 4 })
+    expect(runwayDurationLabel(point!)).toBe('8 jaar en 4 maanden')
   })
 
-  it('computeFreedomTotal: zonder uitgaven = oneindig (isInfinite)', () => {
-    const t = computeFreedomTotal(100000, 0)
-    expect(t.breakdown.isInfinite).toBe(true)
-    expect(t.totalFreedomDays).toBe(0)
+  it('reaches-end-age: de duur is een ONDERGRENS tot de eigen eindleeftijd, en dat staat er ook', () => {
+    const point = summarizeRunway({ ...opeten, kind: 'reaches-end-age', endAge: 90 })
+    // 90 - 45 = 45 jaar = 540 maanden.
+    expect(point).toEqual({ kind: 'reaches-end-age', months: 540, reachesAge: 90 })
+    expect(runwayDurationLabel(point!)).toBe('minstens 45 jaar')
   })
 
-  it('computeFreedomTotal: tekort levert een NEGATIEF totaal (getekend)', () => {
-    // Canonieke dagbasis €98,63/dag → €30k schuld ≈ 304,2 dagen.
-    const t = computeFreedomTotal(-30000, 3000)
-    expect(t.breakdown.isDeficit).toBe(true)
-    expect(t.totalFreedomDays).toBeCloseTo(-304.2, 1)
+  it('beyond-horizon: de ondergrens loopt tot het horizonplafond, nooit "oneindig"', () => {
+    const point = summarizeRunway({ ...opeten, kind: 'beyond-horizon' })
+    // 100 - 45 = 55 jaar = 660 maanden.
+    expect(point).toEqual({ kind: 'beyond-horizon', months: 660, reachesAge: 100 })
+    expect(runwayDurationLabel(point!)).not.toMatch(/oneindig/i)
   })
 
-  it('computeFreedomDelta: null-basis = eerste week', () => {
-    expect(computeFreedomDelta({ totalFreedomDays: 1000 }, null)).toEqual({
-      deltaDays: null,
-      isFirstWeek: true,
-      isImplausibleDelta: false,
-    })
+  it('deficit en unavailable leveren GEEN meetpunt (geen claim)', () => {
+    expect(summarizeRunway({ ...opeten, kind: 'deficit' })).toBeNull()
+    expect(summarizeRunway({ kind: 'unavailable', reason: 'kern-fout' })).toBeNull()
   })
 
-  it('computeFreedomDelta: positieve week-over-week winst', () => {
-    expect(
-      computeFreedomDelta({ totalFreedomDays: 1000 }, { totalFreedomDays: 940 }),
-    ).toEqual({ deltaDays: 60, isFirstWeek: false, isImplausibleDelta: false })
+  it('D7: een intern strijdige deplete-run levert geen meetpunt - dezelfde poort voor elk oppervlak', () => {
+    // Voor PR C deed alleen de kop-zin deze toets; de deelkaart en de e-mail
+    // lazen een andere motor en konden dus wel een claim doen.
+    const strijdig = {
+      ...opeten,
+      solverStatus: 'unreachable_within_horizon' as const,
+      kind: 'reaches-end-age' as const,
+      endAge: 90,
+    }
+    expect(summarizeRunway(strijdig)).toBeNull()
+    expect(buildBriefingHeadline(strijdig)).toBeNull()
+  })
+
+  it('runwaySentence en buildBriefingHeadline geven dezelfde zin (een duiding-laag)', () => {
+    const runway = { ...opeten, kind: 'months' as const, months: 231, depletionAge: 61.25, endAge: 90 }
+    expect(buildBriefingHeadline(runway)).toBe(runwaySentence(summarizeRunway(runway)!))
   })
 })
 
@@ -184,70 +205,90 @@ describe('vrijheidstijd-hero helpers', () => {
 // half-geïmporteerde transactiehistorie is bevroren (kunstmatig lage
 // maanduitgave → torenhoog vrijheidstotaal) gaf de week erna een absurde
 // negatieve delta op /overzicht. De guard onderdrukt die.
-describe('vrijheidstijd-hero — plausibiliteitsgrens op de week-delta', () => {
+describe('plausibiliteitsgrens op de week-delta', () => {
   it('isImplausibleFreedomDelta: onder de absolute ondergrens nooit implausibel', () => {
     // 300 dagen erbij op een klein totaal: relatief enorm, maar absoluut
-    // onder de 365-dagen-ondergrens → gewoon tonen.
+    // onder de 365-dagen-ondergrens -> gewoon tonen.
     expect(isImplausibleFreedomDelta(300, 400)).toBe(false)
     expect(isImplausibleFreedomDelta(-364, 400)).toBe(false)
   })
 
   it('isImplausibleFreedomDelta: grote absolute beweging op een groot totaal blijft plausibel', () => {
-    // €1,6M-portefeuille ≈ 32.000 vrijheidsdagen; een marktweek van ~5%
+    // Portefeuille van 1,6 mln ~ 32.000 vrijheidsdagen; een marktweek van ~5%
     // (1.500 dagen) is geen datafout maar echte volatiliteit.
     expect(isImplausibleFreedomDelta(1500, 32000)).toBe(false)
     expect(isImplausibleFreedomDelta(-1500, 32000)).toBe(false)
   })
 
-  it('isImplausibleFreedomDelta: de gemelde −3788 dagen op ~5 jaar en 8 maanden is implausibel', () => {
-    // Screenshot uit de melding: "−3788 dagen minder" naast "5 jaar en 8
-    // maanden" (≈ 2.070 dagen) → verschil is bijna 2× het hele totaal.
+  it('isImplausibleFreedomDelta: de gemelde -3788 dagen op ~5 jaar en 8 maanden is implausibel', () => {
+    // Screenshot uit de melding: "-3788 dagen minder" naast "5 jaar en 8
+    // maanden" (~ 2.070 dagen) -> verschil is bijna 2x het hele totaal.
     expect(isImplausibleFreedomDelta(-3788, 2070)).toBe(true)
-  })
-
-  it('computeFreedomDelta: onderdrukt de sprong van een opgeblazen eerste-week-basis', () => {
-    // Week 1 bevroren met onvolledige transactiedata: €120k netto vermogen bij
-    // een kunstmatig lage €200/mnd → ~18.250 dagen. Week 2 met de realistische
-    // €3.000/mnd → ~1.217 dagen. Zonder guard: −17.033 dagen op de hoofdpagina.
-    const opgeblazenBasis = computeFreedomTotal(120000, 200)
-    const realistisch = computeFreedomTotal(120000, 3000)
-    expect(Math.round(realistisch.totalFreedomDays - opgeblazenBasis.totalFreedomDays)).toBeLessThan(-15000)
-
-    const delta = computeFreedomDelta(realistisch, opgeblazenBasis)
-    expect(delta.deltaDays).toBeNull()
-    expect(delta.isImplausibleDelta).toBe(true)
-    expect(delta.isFirstWeek).toBe(false)
-  })
-
-  it('computeFreedomDelta: een normale week (spaargeld erbij) blijft ongemoeid', () => {
-    const vorige = computeFreedomTotal(120000, 3000)
-    const nu = computeFreedomTotal(122500, 3000) // €2.500 gespaard → ~25 dagen
-    const delta = computeFreedomDelta(nu, vorige)
-    expect(delta.isImplausibleDelta).toBe(false)
-    expect(delta.deltaDays).toBe(25)
-  })
-
-  it('buildFreedomHeroProps: implausibele delta → geen getal, wél de vlag + totaal', () => {
-    const hero = buildFreedomHeroProps(
-      { totalFreedomDays: 2070, netWorth: 120000, monthlyExpenses: 1750 },
-      { totalFreedomDays: 5858 }, // opgeblazen basis → −3788
-    )
-    expect(hero.deltaDays).toBeNull()
-    expect(hero.isImplausibleDelta).toBe(true)
-    expect(hero.totalLabel.length).toBeGreaterThan(0)
   })
 })
 
-describe('vrijheidstijd-e-mailblok helpers (vervolg)', () => {
-  it('buildFreedomHeroProps: delta + totaal-label uit meetpunt + basis', () => {
-    const hero = buildFreedomHeroProps(
-      { totalFreedomDays: 1000, netWorth: 100000, monthlyExpenses: 3000 },
-      { totalFreedomDays: 940 },
-    )
-    expect(hero.deltaDays).toBe(60)
-    expect(hero.isFirstWeek).toBe(false)
-    expect(hero.isInfinite).toBe(false)
-    expect(hero.totalLabel.length).toBeGreaterThan(0)
+describe('computeRunwayWeekDelta - week-over-week op de bevroren runway', () => {
+  const point = (months: number) =>
+    ({ kind: 'months', months, reachesAge: 40 + months / 12 }) as const
+
+  it('geen basis = eerste meting op deze basis (ook na een oude, niet-vergelijkbare snapshot)', () => {
+    expect(computeRunwayWeekDelta(point(120), null)).toEqual({
+      deltaMonths: null,
+      isFirstWeek: true,
+      isImplausibleDelta: false,
+    })
+  })
+
+  it('een normale week: het verschil in hele maanden, met teken', () => {
+    expect(computeRunwayWeekDelta(point(120), { months: 118 })).toEqual({
+      deltaMonths: 2,
+      isFirstWeek: false,
+      isImplausibleDelta: false,
+    })
+    expect(computeRunwayWeekDelta(point(118), { months: 120 }).deltaMonths).toBe(-2)
+  })
+
+  it('een beweging onder een hele maand levert 0 op (de runway is maandnauwkeurig)', () => {
+    expect(computeRunwayWeekDelta(point(120), { months: 120 }).deltaMonths).toBe(0)
+  })
+
+  it('de plausibiliteitsguard blijft gelden - nu op maanden i.p.v. dagen', () => {
+    // 100 maanden verschil op een runway van 24 maanden: >= 1 jaar absoluut EN
+    // > 25% van het totaal => onderdrukt, precies zoals de "-3788 dagen"-guard.
+    const gesprongen = computeRunwayWeekDelta(point(24), { months: 124 })
+    expect(gesprongen.deltaMonths).toBeNull()
+    expect(gesprongen.isImplausibleDelta).toBe(true)
+    expect(gesprongen.isFirstWeek).toBe(false)
+  })
+
+  it('een grote absolute beweging op een grote runway blijft zichtbaar', () => {
+    // 40 maanden op een runway van 600: absoluut fors, relatief < 25% => tonen.
+    expect(computeRunwayWeekDelta(point(600), { months: 560 }).deltaMonths).toBe(40)
+  })
+})
+
+describe('hasRunwayMoved - versheidssignaal meet dezelfde grootheid als de kop', () => {
+  const p = (kind: 'months' | 'reaches-end-age' | 'beyond-horizon', months: number) =>
+    ({ kind, months, reachesAge: 90 }) as const
+
+  it('minder dan een hele maand verschil is geen beweging', () => {
+    expect(hasRunwayMoved(p('months', 120), { kind: 'months', months: 120 })).toBe(false)
+    expect(hasRunwayMoved(p('months', 120.4), { kind: 'months', months: 120 })).toBe(false)
+  })
+
+  it('een hele maand of meer is beweging', () => {
+    expect(hasRunwayMoved(p('months', 121), { kind: 'months', months: 120 })).toBe(true)
+    expect(hasRunwayMoved(p('months', 119), { kind: 'months', months: 120 })).toBe(true)
+  })
+
+  it('een soort-wissel telt altijd als beweging', () => {
+    expect(hasRunwayMoved(p('reaches-end-age', 600), { kind: 'months', months: 600 })).toBe(true)
+  })
+
+  it('een verschijnende of verdwijnende claim telt als beweging; twee keer niets niet', () => {
+    expect(hasRunwayMoved(null, { kind: 'months', months: 120 })).toBe(true)
+    expect(hasRunwayMoved(p('months', 120), null)).toBe(true)
+    expect(hasRunwayMoved(null, null)).toBe(false)
   })
 })
 
@@ -261,7 +302,7 @@ describe('vrijheidstijd-e-mailblok helpers (vervolg)', () => {
 // opeten' hoort "reikt tot (voorbij) de eindleeftijd" samen te vallen met
 // solver `reached_now`; anders zwijgt de kop.
 const BASIS = { yearly: 36_000, method: 'essential_budgets' as const }
-const deplete = { strategy: 'Vermogen opeten' as const, expenseBasis: BASIS }
+const deplete = { strategy: 'Vermogen opeten' as const, expenseBasis: BASIS, startAge: 42 }
 
 describe('buildBriefingHeadline — runway-kopij', () => {
   it('months ≥ 12: "tot je Xe" op de hele leeftijd van de uitputtingsmaand', () => {
@@ -317,12 +358,12 @@ describe('buildBriefingHeadline — runway-kopij', () => {
 
   it('legacy/perpetual: de zin blijft een liquiditeitsuitspraak, geen doel-claim, en vraagt geen reached_now', () => {
     const legacy = buildBriefingHeadline({
-      strategy: 'Nalatenschap', expenseBasis: BASIS, kind: 'reaches-end-age', endAge: 90, solverStatus: 'reached_at',
+      strategy: 'Nalatenschap' as const, expenseBasis: BASIS, startAge: 42, kind: 'reaches-end-age', endAge: 90, solverStatus: 'reached_at',
     })
     expect(legacy).toBe('Als je nu zou stoppen, reikt je vermogen tot voorbij je 90e.')
     expect(legacy).not.toMatch(/nalatenschap|doel|bereikt/i)
     const perpetual = buildBriefingHeadline({
-      strategy: 'Eeuwigdurend', expenseBasis: BASIS, kind: 'beyond-horizon', solverStatus: 'unreachable_within_horizon',
+      strategy: 'Eeuwigdurend' as const, expenseBasis: BASIS, startAge: 42, kind: 'beyond-horizon', solverStatus: 'unreachable_within_horizon',
     })
     expect(perpetual).toBe('Als je nu zou stoppen, reikt je vermogen zover het model rekent: tot je 100e.')
   })
@@ -335,38 +376,39 @@ describe('buildBriefingHeadline — runway-kopij', () => {
   })
 })
 
-// ── Geloofwaardigheidsvloer op de uitgavenbasis (UR2-03) ─────────────
+// -- Geen geloofwaardige uitgavenbasis => geen claim (UR2-03 -> ADR 0126) ---
 //
-// Regressie op de gemelde bevinding: op een account met alleen naam +
-// geboortedatum opende /overzicht met "Je vermogen staat voor 113 jaar en 4
-// maanden aan vrijheid." Oorzaak: elke guard toetste de noemer op `> 0`, maar
-// bij (bijna) lege data wordt hij niet nul maar MINUSCUUL — één losse
-// transactie van €1 in het 12-maands venster geeft €1/mnd ⇒ €0,03/dag, en dan
-// koopt een paar honderd euro een eeuw vrijheid. De vloer laat zo'n basis in de
-// staat vallen die de app al eerlijk behandelt (isInfinite → "Vul je uitgaven
-// aan om je vrijheidstijd te zien"), in plaats van hem als meting te tonen.
-describe('vrijheidstijd-hero — geloofwaardigheidsvloer op de uitgavenbasis', () => {
-  it('computeFreedomTotal: een basis van €1/mnd is geen basis (isInfinite, geen eeuw vrijheid)', () => {
-    // Zonder vloer: €1.361 ÷ (€1×12/365 = €0,0329/dag) ≈ 41.365 dagen
-    // = "113 jaar en 4 maanden" — exact de gemelde regel.
-    const t = computeFreedomTotal(1361, 1)
-    expect(t.breakdown.isInfinite).toBe(true)
-    expect(t.totalFreedomDays).toBe(0)
-    expect(t.monthlyExpenses).toBe(0)
+// HERPIND BIJ PR C. Deze regressie ging over "Je vermogen staat voor 113 jaar en
+// 4 maanden aan vrijheid" op een account met alleen naam + geboortedatum: een
+// losse transactie van EUR 1 gaf EUR 0,03/dag, en elke guard toetste de noemer op
+// `> 0`. De vloer die dat afving zat in `computeFreedomTotal` - een functie die
+// PR C verwijderd heeft. Hij is niet vervallen maar VERHUISD, in twee stappen:
+//  - ADR 0126 D2b zet de vloer bij de PRODUCENT van het dagtarief
+//    (`recentDailyExpenseRateFromRows`), zodat elke marginale consument hem erft;
+//  - de TOTALE grootheid loopt sinds PR B/C door de kernel, die zijn eigen
+//    `guardRetirementExpense` toepast en `unavailable/geen-uitgavenbasis` levert.
+// De assertie hieronder is daarom herpind op dat nieuwe gedrag: zonder
+// geloofwaardige uitgavenbasis doet geen enkel oppervlak nog een uitspraak.
+describe('vrijheidstijd - zonder geloofwaardige uitgavenbasis geen claim', () => {
+  it('unavailable/geen-uitgavenbasis levert geen meetpunt en geen kop', () => {
+    const runway = { kind: 'unavailable', reason: 'geen-uitgavenbasis' } as const
+    expect(summarizeRunway(runway)).toBeNull()
+    expect(buildBriefingHeadline(runway)).toBeNull()
   })
 
-  it('computeFreedomTotal: een reële maandbasis blijft ongemoeid', () => {
-    const t = computeFreedomTotal(100000, 3000)
-    expect(t.breakdown.isInfinite).toBe(false)
-    expect(t.totalFreedomDays).toBeCloseTo(1013.9, 1)
+  it('een tekort levert evenmin een meetpunt (geen "gekochte vrijheid" bij schuld)', () => {
+    const runway = { ...deplete, kind: 'deficit', solverStatus: 'unreachable_within_horizon' } as const
+    expect(summarizeRunway(runway)).toBeNull()
+    expect(buildBriefingHeadline(runway)).toBeNull()
   })
 
-  it('buildFreedomHeroProps: sub-vloer basis → e-mailblok valt terug op "onbepaald"', () => {
-    const hero = buildFreedomHeroProps(
-      { totalFreedomDays: 41365, netWorth: 1361, monthlyExpenses: 1 },
-      null,
-    )
-    expect(hero.isInfinite).toBe(true)
+  it('een eeuw vrijheid kan niet meer uit een minuscule uitgavenbasis ontstaan', () => {
+    // De platte deling maakte van EUR 1.361 bij EUR 1/mnd ~ 41.365 dagen ("113 jaar
+    // en 4 maanden"). Die motor bestaat niet meer: de duur komt uit de kernel-run
+    // en is per constructie begrensd door HORIZON_PLAFOND_LEEFTIJD.
+    const point = summarizeRunway({ ...deplete, kind: 'beyond-horizon', solverStatus: 'reached_now' })
+    expect(point).not.toBeNull()
+    expect(runwayYearsMonths(point!).years).toBeLessThanOrEqual(100)
   })
 })
 

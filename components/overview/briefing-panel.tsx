@@ -497,9 +497,13 @@ function BriefingWeekHistory({ items }: { items: BriefingWeekHistoryItem[] }) {
               <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-3)]">
                 {formatWeekLabel(item.week)}
               </h3>
-              {item.freedomDays != null && (
+              {/* Runway-stand van die week (ADR 0126 PR C): "als je toen zou
+                  stoppen, reikte je vermogen nog N maanden". Bewust maanden en
+                  geen dagen — de runway is maandnauwkeurig, en een dagenaantal
+                  hier zou de MARGINALE grootheid naast de TOTALE zetten. */}
+              {item.freedomMonths != null && (
                 <span className="text-[11px] text-[var(--ink-3)] tabular-nums">
-                  {Math.round(item.freedomDays)} vrijheidsdagen
+                  {Math.round(item.freedomMonths)} maanden vermogen
                 </span>
               )}
             </div>

@@ -2,9 +2,21 @@
 //
 // Rendert de BEVROREN weeksnapshot (lib/briefing/snapshot.ts) tot een e-mail.
 // Puur en unit-testbaar: geen DB, geen env, geen recompute van kerngetallen.
-// De vrijheidstijd komt uit dezelfde canonieke helper als /overzicht
-// (buildFreedomHeroProps → computeFreedomTotal → formatFreedomTimeString);
-// hier wordt niets financieels opnieuw berekend, alleen geformatteerd.
+//
+// VRIJHEIDSTIJD = DE RUNWAY (ADR 0126 D1 + PR C). Dit blok gaat over een HEEL
+// vermogen ("hoe lang kom ik mee als ik nu stop") en consumeert daarom het
+// bevroren `RunwayPoint` uit de snapshot, via dezelfde duiding-laag als de kop op
+// /overzicht (`runwaySentence`/`runwayDurationLabel`). Tot PR C stond hier de
+// platte deling netto vermogen ÷ dagtarief — een MARGINALE grondslag die als
+// totaal werd gepresenteerd.
+//
+// BEVROREN MAG (eigenaar-besluit): een momentopname in een verstuurd bericht
+// staat niet naast live cijfers. Wat niet mag is een bevroren getal uit een
+// ándere motor dan de app toont — daarom is dit de bevroren runway en niet meer
+// de bevroren deling. Snapshots van vóór PR C dragen de oude vorm; die vallen in
+// `parseFreedomSnapshot` uit en leveren hier eenvoudig géén vrijheidsblok op
+// (geen claim liever dan een onjuiste claim). Zelfherstellend: het eerste bezoek
+// in een nieuwe ISO-week schrijft het meetpunt in de nieuwe vorm.
 //
 // PRIVACY (harde regel): e-mail is een onbeveiligd kanaal (via Resend). De mail
 // is bewust een TEASER: elk briefje degradeert naar een neutrale categorie-teaser
@@ -16,7 +28,11 @@
 
 import type { BriefingSnapshot } from './snapshot'
 import type { BriefingEntry } from '@/lib/types/briefing'
-import { buildFreedomHeroProps } from './overview-briefing'
+import {
+  computeRunwayWeekDelta,
+  runwayDurationLabel,
+  runwaySentence,
+} from './overview-briefing'
 
 export interface BriefingEmailInput {
   snapshot: BriefingSnapshot
@@ -123,25 +139,30 @@ export function buildBriefingEmail(input: BriefingEmailInput): BriefingEmailOutp
   const finUrl = `${origin}/overzicht?prompt=briefing-week`
   const unsubscribeUrl = `${origin}/api/briefing/email/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}`
 
-  // ── Vrijheidstijd-hero (canoniek geformatteerd, geen recompute) ──
+  // ── Runway-hero (canoniek geduid, geen recompute) ──
+  const point = snapshot.freedomSnapshot
   let heroLabel = ''
+  let heroSentence = ''
   let deltaLine = ''
-  if (snapshot.freedomSnapshot) {
-    const hero = buildFreedomHeroProps(
-      snapshot.freedomSnapshot,
-      snapshot.previousFreedomSnapshot ?? null,
-    )
-    heroLabel = hero.totalLabel
-    if (hero.deltaDays !== null && hero.deltaDays !== 0) {
-      const gained = hero.deltaDays > 0
-      const n = Math.abs(hero.deltaDays)
-      const dayWord = n === 1 ? 'dag' : 'dagen'
-      deltaLine = gained
-        ? `Deze week ${n} ${dayWord} vrijheid erbij.`
-        : `Deze week ${n} ${dayWord} vrijheid eraf.`
-    } else if (hero.isFirstWeek) {
-      deltaLine = 'Je eerste vrijheidsmeting — vanaf nu volgen we je weekwinst.'
+  if (point) {
+    heroLabel = runwayDurationLabel(point)
+    heroSentence = runwaySentence(point)
+    const delta = computeRunwayWeekDelta(point, snapshot.previousFreedomSnapshot ?? null)
+    if (delta.deltaMonths !== null && delta.deltaMonths !== 0) {
+      const n = Math.abs(delta.deltaMonths)
+      const monthWord = n === 1 ? 'maand' : 'maanden'
+      deltaLine =
+        delta.deltaMonths > 0
+          ? `Deze week ${n} ${monthWord} erbij.`
+          : `Deze week ${n} ${monthWord} eraf.`
+    } else if (delta.isFirstWeek) {
+      // Bewust "op deze basis": voor bestaande gebruikers is dit de eerste
+      // meting van de RUNWAY, niet hun eerste meting ooit (ADR 0126 PR C).
+      deltaLine = 'Je eerste meting op deze basis — vanaf nu volgen we de beweging per week.'
     }
+    // Een beweging kleiner dan een hele maand levert géén regel op: de runway is
+    // maandnauwkeurig, en een gesuggereerde precisie die de motor niet heeft is
+    // precies de drift die ADR 0126 opruimt.
   }
 
   // ── Kop + briefjes (euro-vrij) ──
@@ -153,10 +174,15 @@ export function buildBriefingEmail(input: BriefingEmailInput): BriefingEmailOutp
     : 'Je wekelijkse briefing staat klaar'
 
   // ── HTML (sobere editorial-stijl, spiegel householdInviteEmail) ──
+  // De kicker benoemt de GRONDSLAG ("zo ver reikt je vermogen"), niet "je
+  // opgeslagen tijd": dat laatste is de marginale lezing en zou dit totaal
+  // opnieuw met het dagtarief laten verwarren. De zin eronder maakt expliciet
+  // dat het om stoppen-vandaag gaat. Beschrijvend, geen aansporing.
   const heroBlock = heroLabel
     ? `
-      <p style="margin:0 0 4px;font-size:13px;color:#78716c;text-transform:uppercase;letter-spacing:0.08em;">Je opgeslagen tijd</p>
+      <p style="margin:0 0 4px;font-size:13px;color:#78716c;text-transform:uppercase;letter-spacing:0.08em;">Zo ver reikt je vermogen</p>
       <p style="margin:0 0 6px;font-size:26px;font-weight:700;color:#1c1917;">${escapeHtml(heroLabel)}</p>
+      ${heroSentence ? `<p style="margin:0 0 6px;font-size:14px;color:#57534e;">${escapeHtml(heroSentence)}</p>` : ''}
       ${deltaLine ? `<p style="margin:0 0 20px;font-size:14px;color:#57534e;">${escapeHtml(deltaLine)}</p>` : '<div style="height:12px"></div>'}
     `
     : ''

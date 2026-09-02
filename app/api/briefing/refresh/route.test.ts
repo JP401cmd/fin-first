@@ -20,6 +20,7 @@ const mockAssertCloudAllowed = vi.fn()
 const mockAssertAiEnabled = vi.fn()
 const mockIsCloudAllowed = vi.fn()
 const mockLoadAndCompose = vi.fn()
+const mockComputeHorizonRunway = vi.fn()
 const mockReadSnapshot = vi.fn()
 const mockApplyManualRefresh = vi.fn()
 const mockRedactBriefing = vi.fn()
@@ -47,6 +48,13 @@ vi.mock('@/lib/briefing/overview-briefing', async (importOriginal) => {
     loadAndComposeOverviewBriefing: (...args: unknown[]) => mockLoadAndCompose(...args),
   }
 })
+// De runway-motor (kernel) hoort niet in een route-test te draaien: de route
+// haalt hem sinds ADR 0126 PR C zelf op om het bevroren vrijheidsmeetpunt te
+// vullen. Hier wordt alleen bewezen DAT hij als meetpunt in de snapshot landt;
+// de duiding zelf is getest in lib/briefing/overview-briefing.test.ts.
+vi.mock('@/lib/fire-target-shared', () => ({
+  computeHorizonRunway: (...args: unknown[]) => mockComputeHorizonRunway(...args),
+}))
 vi.mock('@/lib/briefing/snapshot', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/briefing/snapshot')>()
   return {
@@ -82,7 +90,17 @@ const BRON: BriefingEntry[] = [
   { id: 'finance:savings', category: 'tip', text: 'Je spaarquote staat op 31%.' },
 ]
 
-const FREEDOM = { totalFreedomDays: 1000, netWorth: 125000, monthlyExpenses: 2400 }
+/** Een doorgerekende "stop nu"-run: het vermogen reikt nog 100 maanden. */
+const RUNWAY = {
+  kind: 'months' as const,
+  months: 100,
+  depletionAge: 53.33,
+  endAge: 90,
+  startAge: 45,
+  strategy: 'Vermogen opeten' as const,
+  solverStatus: 'unreachable_within_horizon' as const,
+  expenseBasis: { yearly: 36_000, method: 'essential_budgets' as const },
+}
 
 function buildSupabase(user: { id: string } | null = USER) {
   return {
@@ -116,9 +134,9 @@ beforeEach(() => {
   mockLoadDirectives.mockResolvedValue({ temporal: [], functional: [] })
   mockLoadAndCompose.mockResolvedValue({
     entries: BRON,
-    freedom: FREEDOM,
     input: { finance: null },
   })
+  mockComputeHorizonRunway.mockResolvedValue(RUNWAY)
   mockApplyManualRefresh.mockImplementation(
     async (_s: unknown, _u: unknown, entries: BriefingEntry[], opts: { headline?: string }) => ({
       allowed: true,
@@ -288,7 +306,6 @@ describe('POST ?stap=persist — server-side her-sanitatie (harde eis)', () => {
     // De data is tussen compose en persist gewijzigd: het bedrag is nu anders.
     mockLoadAndCompose.mockResolvedValue({
       entries: [{ ...BRON[0], text: 'Je vermogen groeide met €2.000 deze maand.' }],
-      freedom: FREEDOM,
       input: { finance: null },
     })
     const res = await POST(
