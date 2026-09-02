@@ -911,3 +911,11 @@
 ## 2026-09-02
 
 - Geen wijzigingen.
+
+## 2026-09-02
+
+- **Componenten (aantal)** toegevoegd: +1
+
+## 2026-09-02
+
+- Geen wijzigingen.

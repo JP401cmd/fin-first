@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-02T18:40:16.879Z",
+  "generatedAt": "2026-09-02T22:31:29.558Z",
   "generatedDate": "2026-09-02",
   "repo": {
     "name": "fin",
@@ -191,9 +191,9 @@
     "routesProduction": 97,
     "api": 307,
     "tables": 93,
-    "migrations": 223,
+    "migrations": 224,
     "integrations": 25,
-    "components": 1010,
+    "components": 1011,
     "providers": 16,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -8234,7 +8234,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 223
+    "migrationCount": 224
   },
   "tablesByDomain": [
     {
@@ -8732,11 +8732,11 @@
     }
   ],
   "components": {
-    "total": 1010,
+    "total": 1011,
     "groups": [
       {
         "group": "app",
-        "count": 395,
+        "count": 396,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8881,6 +8881,7 @@
           "event-pane",
           "event-pane-catalog",
           "event-pane-edit",
+          "event-pane-edit.age.test",
           "event-pane-view",
           "events-timeline",
           "export-dropdown",
@@ -17154,6 +17155,20 @@
       ],
       "summary": "De canonieke dagtarief-bron (`lib/expense-rate.ts`, voedt élke €→vrijheidstijd- conversie via `dailyExpenseRate`) rekende op **álle** negatieve transacties in het 12-maands rolling venster — geen transfer-filter, geen budgettype-filter. Op een productie-account bestond ~60% van h",
       "file": "docs/adr/0126-dagtarief-op-gezuiverde-consumptie.md"
+    },
+    {
+      "id": "0127-nu-stoppen-als-vijfde-eindstrategie",
+      "title": "'Nu stoppen' als vijfde eindstrategie, kernel-native op het startleeftijd-anker",
+      "status": "aanvaard",
+      "date": "2026-09-02",
+      "elements": [
+        "as-planning",
+        "as-vermogen",
+        "do-budget",
+        "do-transactie"
+      ],
+      "summary": "Wie ná zijn FIRE-leeftijd doorwerkt heeft niets aan een plan dat FIRE-relatief ankert (`verwachtFireAge + offset`): de offset staat op een datum die al gepasseerd is. Wie werkelijk gestopt is wil zijn beeld vanaf vandaag zien. De horizon-kernel-runway (ADR 0126, PR B — \"als ik nu",
+      "file": "docs/adr/0127-nu-stoppen-als-vijfde-eindstrategie.md"
     }
   ],
   "churn": {
@@ -17177,7 +17192,7 @@
       },
       {
         "path": "app/api/household",
-        "commits": 17
+        "commits": 16
       },
       {
         "path": "app/api/assets",
@@ -17193,7 +17208,7 @@
       },
       {
         "path": "lib/fire-simulation.ts",
-        "commits": 5
+        "commits": 6
       },
       {
         "path": "components/horizon",
@@ -17204,7 +17219,7 @@
       {
         "file": "components/app/horizon/horizon-client.tsx",
         "loc": 9895,
-        "commits": 82
+        "commits": 81
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -17223,8 +17238,8 @@
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 3031,
-        "commits": 59
+        "loc": 3053,
+        "commits": 61
       },
       {
         "file": "lib/release-notes.ts",
@@ -18715,7 +18730,7 @@
     {
       "date": "2026-09-02",
       "api": 307,
-      "components": 1010,
+      "components": 1011,
       "tables": 93,
       "routesProduction": 97
     }

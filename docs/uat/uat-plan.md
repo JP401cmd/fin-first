@@ -1795,9 +1795,12 @@ Scope: `/overzicht` (hoofdpagina/hub), `/dashboard` (redirect), `/overzicht/tips
 > bestaat niet meer): een week bevroren vrijheidsgetal naast live-herrekenende kerngetallen
 > liet dezelfde grootheid drie waarden tegelijk aannemen. De week-delta leeft nog uitsluitend
 > in de wekelijkse briefing-e-mail (`lib/briefing/email-template.ts`); op /overzicht blijft
-> alleen de kop-zin naast de masthead, live gerekend uit `computeFreedomTotal`
-> (`buildBriefingHeadline`, zonder weekverschil). Onderstaande beschrijving is historie —
-> de levende definitie staat in `lib/uat/acceptance/ovz.ts` (WF-OVZ-09).
+> alleen de kop-zin naast de masthead, live gerekend uit `computeHorizonRunway`
+> (`buildBriefingHeadline`, zonder weekverschil). Sinds ADR 0126 PR C (2 sep 2026) is
+> `computeFreedomTotal` — de platte deling die dit blok ooit voedde — VERWIJDERD; de kop,
+> de deelkaart, de briefing-mail en het versheidssignaal delen sindsdien één duiding-laag
+> op het `RunwayResult` (`summarizeRunway`/`runwaySentence`). Onderstaande beschrijving is
+> historie — de levende definitie staat in `lib/uat/acceptance/ovz.ts` (WF-OVZ-09).
 
 - **Doel:** Ervaren hoeveel dagen vrijheid je er deze week bij hebt gekregen (of verloren) en op welk totaal je staat.
 - **Trigger/startpunt:** Het blok "Jouw vrijheid deze week" bovenaan de wekelijkse briefing op /overzicht.
@@ -1808,7 +1811,7 @@ Scope: `/overzicht` (hoofdpagina/hub), `/dashboard` (redirect), `/overzicht/tips
   3. Bekijk de sparkline rechts (desktop).
 - **Schermen/componenten:** /overzicht — `components/overview/vrijheidsbriefing-hero.tsx`, `components/overview/briefing-panel.tsx`; snapshot-logica `lib/briefing/snapshot.ts` (`getOrCreateWeeklySnapshot`), berekening `lib/briefing/overview-briefing.ts`.
 - **Kriticiteit:** KERN
-- **Rekenend:** ja — vrijheidsdagen = netto vermogen ÷ dagelijkse uitgaven, dagbasis jaaruitgaven/365 (`computeFreedomTotal` in `lib/briefing/overview-briefing.ts` regel 277-284, via `calculateFreedomTime` in `lib/format.ts`); delta = huidige dagen − vorige-week-basis (`computeFreedomDelta`), mét plausibiliteitsgrens (`isImplausibleFreedomDelta`: |delta| ≥ 365 dagen ÉN > 25% van het huidige totaal → delta onderdrukt); sparkline per maand uit `buildFreedomSparkline`; weekbevriezing in `profiles.briefing_snapshot` (`lib/briefing/snapshot.ts`).
+- **Rekenend (HISTORIE — deze functies bestaan niet meer sinds ADR 0126 PR C, 2 sep 2026):** vrijheidsdagen = netto vermogen ÷ dagelijkse uitgaven, dagbasis jaaruitgaven/365 (`computeFreedomTotal`, via `calculateFreedomTime` in `lib/format.ts`); delta = huidige dagen − vorige-week-basis (`computeFreedomDelta`), mét plausibiliteitsgrens (`isImplausibleFreedomDelta`: |delta| ≥ 365 dagen ÉN > 25% van het huidige totaal → delta onderdrukt); sparkline per maand uit `buildFreedomSparkline`; weekbevriezing in `profiles.briefing_snapshot` (`lib/briefing/snapshot.ts`). De levende opvolger: `computeHorizonRunway` (kop, live) + `summarizeRunway`/`computeRunwayWeekDelta`/`hasRunwayMoved` (mail + versheidssignaal, bevroren) — `isImplausibleFreedomDelta` is ongewijzigd overgenomen.
 - **Varianten & randgevallen:**
   - Eerste week (geen basis) → alleen het totaal + hint "Vanaf volgende week zie je hier je wekelijkse vrijheidswinst."
   - Implausibele sprong (basis bevroren op nog-settelende data of eenmalige vermogenscorrectie) → delta onderdrukt, hero toont het totaal met de regel "Je cijfers zijn net flink bijgesteld …" en de kop valt terug op de totaal-zin.
@@ -1981,7 +1984,7 @@ Scope: `/overzicht` (hoofdpagina/hub), `/dashboard` (redirect), `/overzicht/tips
   4. Wissel terug naar Eigen weergave → chip verdwijnt, eigen cijfers terug.
 - **Schermen/componenten:** /overzicht — `app/(app)/overzicht/page.tsx` (getServerPerspective + perspectiveOverride regel 60-91, 119-129, 147-236), `components/app/perspective-context-label.tsx`, `components/app/perspective-provider.tsx`.
 - **Kriticiteit:** KERN
-- **Rekenend:** ja — cashflow-tegel in huishoud-/partnerweergave = afgeronde spaarquote uit de override: (inkomen − uitgaven) / inkomen × 100 (`app/(app)/overzicht/page.tsx` regel 125-127); vrijheidsdagen uit perspectief-uitgaven via `computeFreedomTotal`; vermogen/schulden/vrijheids-% perspectief-correct uit `loadHorizonData(supabase, perspective)`.
+- **Rekenend:** ja — cashflow-tegel in huishoud-/partnerweergave = afgeronde spaarquote uit de override: (inkomen − uitgaven) / inkomen × 100 (`app/(app)/overzicht/page.tsx` regel 125-127); de vrijheids-kop uit perspectief-uitgaven via `computeHorizonRunway` (sinds ADR 0126 PR C — de vervallen `computeFreedomTotal` bestaat niet meer); vermogen/schulden/vrijheids-% perspectief-correct uit `loadHorizonData(supabase, perspective)`.
 - **Varianten & randgevallen:**
   - Solo-gebruiker (geen huishouden) → geen chip, geen wissel-mogelijkheid.
   - Override-inkomen 0 → cashflow-tegel valt terug op de eigen 6-maands-spaarquote.
@@ -7039,7 +7042,8 @@ Dit deelgebied toetst niet één pagina, maar de belofte dat **hetzelfde kernget
 | Box 3 | `lib/box3-data.ts#calculateBox3` (volledig) en `lib/health-score-input.ts#buildTaxData` (vereenvoudigde schatting) | /overzicht/belasting (hub-KPI), /overzicht/belasting/box3, Box 3-widget, hero-belastingtegel, schulden-belastingsectie, FIRE-projectie (intern) |
 | FIRE-datum/-leeftijd | horizon-kernel via `lib/horizon-kernel/convergentie-router.ts` + gedeelde `lib/horizon/build-input.ts#buildHorizonInput`; scalar-fallback `lib/horizon-kernel/scalar-router.ts` | /toekomst (tijdas), /overzicht (mini-grafiek + FIRE-countdown-widget), snapshot-FIRE-trend, deel-kaart, persoonlijk plan |
 | SWR | `lib/fire-params.ts#computeEffectiveSwr` (bruto rendement − Box 3-drag − inflatie, vloer 0,1%) | SWR-monitor-widget, pensioen/AOW-widget, spaarquote-gevoeligheid (fase-analyse), FIRE-doel |
-| Vrijheidstijd (dagen) | `lib/format.ts#dailyExpenseRate` (jaaruitgaven ÷ 365) + `lib/briefing/overview-briefing.ts#computeFreedomTotal` | /overzicht-hero (vrijheidstijd), FreedomTimeBadge/eurToFreedomTime in rapporten en widgets |
+| Vrijheidstijd (dagen, marginaal) | `lib/format.ts#dailyExpenseRate` (jaaruitgaven ÷ 365) + `calculateFreedomTime` | FreedomTimeBadge/eurToFreedomTime in rapporten en widgets, badges, transactie-labels |
+| Vrijheidstijd (runway, totaal) | `lib/fire-target-shared.ts#computeHorizonRunway` + `lib/briefing/overview-briefing.ts#summarizeRunway`/`runwaySentence` (ADR 0126 D1/PR C — vervangt de verwijderde platte deling `computeFreedomTotal`) | /overzicht-hero (kop naast "De briefing"), deel-kaart, briefing-mail, versheidssignaal |
 
 **Bewuste grondslag-verschillen (géén defecten):** netto vermogen (incl. huis/niet-liquide) ≠ FIRE-eligible/liquide vermogen (huis gefilterd via housing-strategie); de wekelijks bevroren vrijheidsbriefing ≠ live cijfer; Box 3 kent drie bewust verschillende weergaven (zie WF-KRUIS-12).
 
@@ -7354,24 +7358,32 @@ Dit deelgebied toetst niet één pagina, maar de belofte dat **hetzelfde kernget
   - Engine-wissel (v2 → kernel): FIRE-trend toont een annotatie in plaats van een schijnbare "sprong als datawijziging".
 - **Cross-module effecten:** snapshots voeden de trendpijl van het gezondheidsgetal, de vermogens-sparkline en de net-worth-delta-fallback van de spaarquote.
 
-#### WF-KRUIS-17 — Wekelijkse vrijheidsbriefing-freeze vs live cijfers (bewust verschil)
-- **Doel:** Als gebruiker begrijp ik dat de vrijheidstijd-hero op /overzicht per week bevroren is, zie ik een hint wanneer live cijfers zijn weggelopen, en kan ik dagelijks één keer verversen.
-- **Trigger/startpunt:** /overzicht in een nieuwe ISO-week (eerste bezoek schrijft de week-snapshot).
-- **Eindresultaat:** De hero toont het bevroren weektotaal ("X jaar en Y maanden vrijheid") met week-op-week-delta; na een flinke datawijziging (≥ 2 vrijheidsdagen verschil) verschijnt een kalme versheids-hint; de Ververs-knop (max 1×/dag) actualiseert het bevroren beeld naar live.
+#### WF-KRUIS-17 — Vrijheids-kop is live, alleen de wekelijkse mail/versheidssignaal bevriezen (bewust verschil)
+> ⚠️ **HERZIEN 2 sep 2026 (ADR 0126 PR B2/C).** De vrijheids-kop naast "De briefing" op
+> /overzicht is niet langer wekelijks bevroren — sinds UR2-09 (31 aug 2026) rekent hij
+> altijd LIVE uit `computeHorizonRunway`. Wat wél bevriest is de wekelijkse briefing-mail
+> en het versheidssignaal onder het "Bijgewerkt …"-stempel; die vergelijken de live
+> runway tegen een wekelijks momentopname met een drempel van ÉÉN HELE MAAND (niet meer
+> de oude 2-dagen-drempel van de verwijderde platte deling `computeFreedomTotal`). De
+> stappen hieronder zijn bijgewerkt naar dat gedrag.
+
+- **Doel:** Als gebruiker begrijp ik dat de vrijheids-kop op /overzicht altijd live is, en dat alleen de wekelijkse mail en het versheidssignaal een bevroren referentiepunt kennen.
+- **Trigger/startpunt:** /overzicht in een nieuwe ISO-week (eerste bezoek schrijft de week-snapshot t.b.v. de mail/het versheidssignaal).
+- **Eindresultaat:** De kop naast "De briefing" toont direct de live runway ("… reikt je vermogen tot je Xe" / "… nog N maanden" / etc.) en verandert direct mee met een datawijziging — geen Ververs-knop nodig. Het versheidssignaal onder de "Bijgewerkt …"-stempel blijft stil zolang de live runway minder dan één maand van het bevroren weekpunt afwijkt; wijkt ze een hele maand of meer af (of wisselt de `kind`, bv. van een uitputtingsmaand naar "reikt tot voorbij je plan"), dan verschijnt een kalme hint. De wekelijkse briefing-mail toont de bevroren runway van het snapshotmoment.
 - **Stappen:**
-  1. Open /overzicht en noteer het vrijheidstotaal in de hero + de "Bijgewerkt …"-stempel.
-  2. Voeg een bezitting van bv. €20.000 toe (dat is ≥ 2 vrijheidsdagen bij normale uitgaven).
-  3. Herlaad /overzicht: de hero toont NOG het bevroren weektotaal, maar mét versheids-hint — dit is bewust gedrag, geen bug.
-  4. Klik "Ververs": de hero springt naar het live totaal; de knop is daarna vandaag uitgeschakeld.
-  5. Controleer dat het netto vermogen elders op de pagina (grafiek/tegels) wél al live was — alleen de briefing-hero bevriest.
-- **Schermen/componenten:** `lib/briefing/snapshot.ts#getOrCreateWeeklySnapshot`/`canRefreshToday`, hero-props `lib/briefing/overview-briefing.ts#buildFreedomHeroProps`/`computeFreedomTotal`, weergave `components/overview/briefing-panel.tsx` binnen `components/overview/overzicht-hero.tsx`; freshness-drempel `app/(app)/overzicht/page.tsx` r228–232.
+  1. Open /overzicht en noteer de vrijheids-kop + de "Bijgewerkt …"-stempel.
+  2. Voeg een bezitting van bv. €20.000 toe en herlaad /overzicht (geen Ververs-knop meer).
+  3. Controleer dat de kop-zin ZONDER extra actie al het nieuwe (live) beeld toont.
+  4. Controleer het versheidssignaal: alleen bij een verschil van een hele maand of meer (of een gewisselde `kind`) verschijnt een hint — bij een kleine wijziging blijft het stil.
+  5. Vergelijk optioneel met de laatst verstuurde briefing-mail: die toont de runway van het snapshotmoment, niet de live wijziging van stap 2.
+- **Schermen/componenten:** `lib/briefing/snapshot.ts#getOrCreateWeeklySnapshot`, kop `lib/briefing/overview-briefing.ts#buildBriefingHeadline`/`summarizeRunway`/`runwaySentence`, versheidssignaal `hasRunwayMoved`/`computeRunwayWeekDelta`, motor `lib/fire-target-shared.ts#computeHorizonRunway`, weergave `components/overview/overzicht-secondary-loader.tsx` binnen `components/overview/overzicht-hero.tsx`.
 - **Kriticiteit:** KERN
-- **Rekenend:** ja — vrijheidstotaal = netto vermogen ÷ dagtarief (jaaruitgaven ÷ 365); bron: `lib/briefing/overview-briefing.ts#computeFreedomTotal` + `lib/format.ts#dailyExpenseRate`; delta-drempel = 2 dagen; de week-over-week delta zelf kent daarnaast een plausibiliteitsgrens (`isImplausibleFreedomDelta`).
+- **Rekenend:** ja — de kop is een geforceerde kernel-run vanaf vandaag (`computeHorizonRunway`, ADR 0126 D1); bron: `lib/fire-target-shared.ts#computeHorizonRunway` + `lib/briefing/overview-briefing.ts#summarizeRunway`/`runwaySentence`; het versheidssignaal vergelijkt via `hasRunwayMoved` met drempel = 1 hele maand; de week-over-week mail-delta kent daarnaast een plausibiliteitsgrens (`isImplausibleFreedomDelta`, ongewijzigd overgenomen uit de verwijderde `computeFreedomTotal`-route).
 - **Varianten & randgevallen:**
-  - Eerste week ooit (geen basis): hero toont het totaal zonder delta.
-  - Huishoud-/partnerweergave: geen snapshot-write; hero live berekend uit het perspectief — geen freeze-gedrag.
-  - Tweede keer verversen op één dag: knop geblokkeerd.
-- **Cross-module effecten:** geen berekenings-doorwerking; wel een verwachtings-kader voor testers die "hero ≠ widget" zouden rapporteren.
+  - Eerste week ooit (geen basis): de mail/het versheidssignaal tonen het totaal zonder delta (`isFirstWeek`).
+  - Huishoud-/partnerweergave: geen snapshot-write; kop live berekend uit het perspectief — geen freeze-gedrag, net als voorheen.
+  - Een `unavailable`/`deficit`-uitkomst: de kop zwijgt liever dan een verkeerde claim te tonen (D7-consistentie-invariant, ADR 0126 PR B2).
+- **Cross-module effecten:** geen berekenings-doorwerking; wel een verwachtings-kader voor testers die "kop ≠ mail" zouden rapporteren — dat verschil is nu bewust beperkt tot de mail en het versheidssignaal, niet meer de in-app kop.
 
 #### WF-KRUIS-18 — Status-semantiek: sidebar-dot == hefboomkaart == statusbanner == boxkaart
 - **Doel:** Als gebruiker zie ik voor elk domein (Bezittingen/Schulden/Cashflow/Belasting en Box 1/2/3) overal dezelfde stoplichtstatus.
@@ -7421,7 +7433,7 @@ Dit deelgebied toetst niet één pagina, maar de belofte dat **hetzelfde kernget
   2. Deel het netto vermogen door dit tarief en vergelijk met de hero-vrijheidstijd (afronding in dagen/maanden/jaren toegestaan).
   3. Open de Box 3-widget of de belastingpagina en controleer dat "kost X vrijheidsdagen" = heffing ÷ hetzelfde dagtarief.
   4. Open /rapportages/vermogen of /rapportages/balans en controleer de vrijheidstijd-finale met dezelfde deling.
-- **Schermen/componenten:** `lib/format.ts#dailyExpenseRate`/`calculateFreedomTime`/`formatFreedomTimeString`, `components/app/freedom-time-label.tsx` (FreedomTimeBadge/eurToFreedomTime), hero (`lib/briefing/overview-briefing.ts#computeFreedomTotal`), Box 3-widget (`components/widgets/belasting-box3-widget.tsx` r37–40).
+- **Schermen/componenten:** `lib/format.ts#dailyExpenseRate`/`calculateFreedomTime`/`formatFreedomTimeString`, `components/app/freedom-time-label.tsx` (FreedomTimeBadge/eurToFreedomTime), hero (`lib/fire-target-shared.ts#computeHorizonRunway` + `lib/briefing/overview-briefing.ts#summarizeRunway`/`runwaySentence`, sinds ADR 0126 PR C — de vervallen `computeFreedomTotal` bestaat niet meer), Box 3-widget (`components/widgets/belasting-box3-widget.tsx` r37–40).
 - **Kriticiteit:** KERN
 - **Rekenend:** ja — dagtarief = jaaruitgaven ÷ 365; bron: `lib/format.ts#dailyExpenseRate` (en de gelijkwaardige (maand×12)÷365 in de widget).
 - **Varianten & randgevallen:**
@@ -12899,19 +12911,22 @@ Deze totalen wijken bewust af van het ronde marketing-cijfer in `meta.netWorth` 
 
 ---
 
-#### UAT-KRUIS-17 — Wekelijkse vrijheidsbriefing-freeze vs. live cijfers (bewust verschil) (dekt WF-KRUIS-17)
+#### UAT-KRUIS-17 — Vrijheids-kop is live, alleen de wekelijkse mail/versheidssignaal bevriezen (bewust verschil) (dekt WF-KRUIS-17)
+> ⚠️ **HERZIEN 2 sep 2026 (ADR 0126 PR B2/C).** Geen Ververs-knop meer: de kop is altijd
+> live. Zie de waarschuwing bij WF-KRUIS-17 hierboven voor de volledige toelichting.
+
 - **Kriticiteit:** KERN · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~8 min
 - **Preconditie:** Persona Tessa/compleet, eigen (niet-huishoud-)weergave.
 - **a. Happy path:**
-  1. Open /overzicht en noteer het vrijheidstotaal in de hero ("X jaar en Y maanden vrijheid") + de "Bijgewerkt …"-stempel.
-  2. Voeg een bezitting van €20.000 toe (≥2 vrijheidsdagen bij Tessa's uitgavenniveau — zie berekening).
-  3. Herlaad /overzicht: de hero toont NOG het bevroren weektotaal, maar mét een versheids-hint. → *Dit is bewust gedrag, geen bug.*
-  4. Klik "Ververs": de hero springt naar het live totaal; de knop is daarna vandaag uitgeschakeld.
-  5. Controleer dat het netto vermogen elders op de pagina (grafiek/tegels) al wél live was in stap 3 — alleen de briefing-hero bevriest.
-  - **Eindresultaat:** een bewust, gedocumenteerd verschil tussen de briefing-hero (weekvers) en de rest van de pagina (live) — met een expliciete versheids-hint als brug.
-  - **Berekening verwachting:** vrijheidstotaal = netto vermogen ÷ dagtarief (jaaruitgaven ÷ 365); drempel voor de versheids-hint = 2 vrijheidsdagen verschil. Bij Tessa's geschatte maanduitgaven (€4.100 uit het profiel, of het hogere werkelijke 6-maands-transactiegemiddelde) komt €20.000 ruim boven de 2-dagen-drempel uit (2 dagen ≈ €4.100×12/365×2 ≈ €270 verschil in vermogen volstaat al) — de hint hóórt dus te verschijnen.
-- **b./c. Niet van toepassing (gemotiveerd):** dit scenario toetst zelf een bewust verschil (freeze vs. live), niet een consistentie-eis met een fout-invoer-pad.
-- **d. Persistentie:** na het klikken op "Ververs" herlaad /overzicht — het live totaal blijft getoond (niet terug naar bevroren); de volgende dag wordt de knop weer actief (niet los te testen binnen deze sessie, wel te controleren dat de knop NIET vandaag opnieuw klikbaar wordt na een refresh).
+  1. Open /overzicht en noteer de vrijheids-kop naast "De briefing" + de "Bijgewerkt …"-stempel.
+  2. Voeg een bezitting van €20.000 toe.
+  3. Herlaad /overzicht: de kop toont ZONDER extra actie al het nieuwe beeld (live) — geen Ververs-knop, geen freeze op de kop zelf.
+  4. Controleer het versheidssignaal onder de stempel: bij een wijziging kleiner dan één hele maand runway blijft het stil; pas bij een verschil van een hele maand of meer (of een gewisselde `kind`) verschijnt een hint.
+  5. Controleer dat het netto vermogen elders op de pagina (grafiek/tegels) al net zo live was als de kop — er is geen los "freeze-oppervlak" meer op /overzicht.
+  - **Eindresultaat:** de kop op /overzicht is altijd live; alleen de wekelijkse briefing-mail en het versheidssignaal kennen een bevroren referentiepunt, met een drempel van één hele maand.
+  - **Berekening verwachting:** de kop = `computeHorizonRunway` (een geforceerde kernel-run vanaf vandaag — rendement, inflatie, AOW en de eigen eindstrategie zitten erin, dus GEEN vaste dagtarief-deling meer); het versheidssignaal vergelijkt via `hasRunwayMoved` (drempel = 1 hele maand runway, niet meer de oude 2-dagen-drempel van de verwijderde platte deling).
+- **b./c. Niet van toepassing (gemotiveerd):** dit scenario toetst zelf een bewust verschil (kop live vs. mail/versheidssignaal bevroren), niet een consistentie-eis met een fout-invoer-pad.
+- **d. Persistentie:** herlaad /overzicht na stap 3 — de live kop blijft getoond; de wekelijkse briefing-mail (indien verstuurd) toont nog steeds de runway van het snapshotmoment, niet de wijziging uit stap 2 (niet los te testen binnen deze sessie).
 
 ---
 

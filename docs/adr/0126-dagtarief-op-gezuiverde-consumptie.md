@@ -217,8 +217,17 @@ spaarquote-meting — blijven budgettype-blind: `TxMonthAggregateRow` draagt
 - `lib/server-data/tx-aggregates.ts#ReduceOpts` draagt een nieuwe
   `excludeBudgetIds`-optie, de spiegel van het bestaande `budgetIds`.
 - De vrijheidstijd-kop op /overzicht, de deelkaart en de briefing-mail
-  blijven vooralsnog op de oude (totale) grondslag tot PR B — D1 maakt dat
-  verschil expliciet in plaats van het stilzwijgend te laten voortbestaan.
+  bleven tot PR B op de oude (totale) grondslag — D1 maakte dat verschil
+  expliciet in plaats van het stilzwijgend te laten voortbestaan. PR B
+  (2 sep 2026) leverde die runway alsnog: een geforceerde kernel-run vanaf
+  vandaag (`computeHorizonRunway`), met `depletionMonth` als uitputtingslezer
+  en een guardrails-anker-fix bij FIRE-maand 0 (zie ADR 0127 D3). PR C
+  verwijderde de oude platte-delingsroute (`computeFreedomTotal`) volledig —
+  de kop, de deelkaart, de briefing-mail en het versheidssignaal delen sinds
+  2 sep 2026 allemaal dezelfde runway. ADR 0127 bouwt de kiesbare
+  eindstrategie `'nu-stoppen'` op exact deze runway-motor: onder dat anker
+  leest de kop dezelfde gedeelde run als de eindstrategie zelf, geen tweede
+  engine-run per surface.
 
 ## Alternatieven overwogen
 

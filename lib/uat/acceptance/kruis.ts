@@ -279,15 +279,15 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-KRUIS-17',
     scenarioId: 'UAT-KRUIS-17',
-    titel: 'Wekelijkse vrijheidsbriefing-freeze vs. live cijfers (bewust verschil)',
+    titel: 'Vrijheids-kop is live, alleen de wekelijkse mail/versheidssignaal bevriezen (bewust verschil)',
     kriticiteit: 'KERN',
     persona: 'compleet',
-    given: 'Persona Tessa geladen; het vrijheidstotaal + "Bijgewerkt …"-stempel in de hero genoteerd (nieuwe ISO-week).',
-    when: 'De gebruiker voegt een bezitting van €20.000 toe (≥ 2 vrijheidsdagen), herlaadt en klikt "Ververs".',
-    then: 'De hero toont ná de wijziging NOG het bevroren weektotaal (`computeFreedomTotal` = netto vermogen ÷ dagtarief), mét een kalme versheids-hint (drempel 2 dagen) — dit is BEWUST gedrag, geen bug. "Ververs" (max 1×/dag) springt naar het live totaal; de rest van de pagina (grafiek/tegels) was al live. Consistentie: alleen de briefing-hero bevriest; het onderliggende vermogen is overal gelijk.',
+    given: 'Persona Tessa geladen; de vrijheids-kop naast "De briefing" + het "Bijgewerkt …"-versheidssignaal genoteerd (nieuwe ISO-week).',
+    when: 'De gebruiker voegt een bezitting van €20.000 toe en herlaadt /overzicht (geen "Ververs" nodig).',
+    then: 'Sinds ADR 0126 (PR B2/C) rekent de kop-zin zelf altijd LIVE uit `computeHorizonRunway` (UR2-09 — nooit de week-snapshot) en verandert dus direct mee. Wat wél bevriest is (a) de wekelijkse briefing-e-mail, die de runway van het snapshotmoment toont, en (b) het versheidssignaal onder het "Bijgewerkt …"-stempel, dat de live runway tegen dat bevroren meetpunt afzet (`hasRunwayMoved`) met een drempel van ÉÉN HELE MAAND — de resolutie van de runway zelf, niet de oude 2-dagen-drempel van de verwijderde platte deling (`computeFreedomTotal`). Een `kind`-wissel (bv. van een uitputtingsmaand naar "reikt tot voorbij je plan") telt altijd als beweging. Dit is BEWUST gedrag, geen bug: de kop is overal live, alleen het outbound artefact (mail) en het versheidssignaal kennen een bevroren referentiepunt.',
     assertion: {
       kind: 'consistency',
-      source: 'consistentie-eis: briefing-hero bevriest wekelijks (getOrCreateWeeklySnapshot) terwijl overige oppervlakken live zijn — verwacht verschil, zelfde onderliggende netto vermogen/dagtarief (lib/briefing).',
+      source: 'consistentie-eis: de /overzicht-kop is altijd live (buildBriefingHeadline op computeHorizonRunway); alleen de briefing-mail en het versheidssignaal vergelijken tegen de wekelijkse snapshot (hasRunwayMoved, drempel 1 maand) — lib/briefing/overview-briefing.ts.',
     },
   },
   {
