@@ -24,8 +24,9 @@
  * Bij eindstrategie 'Vermogen opeten' (deplete) geldt: *runway reikt tot de eind-
  * leeftijd ⇒ solver-status `reached_now`* — J(0) ≥ 0 en J(eind) ≥ 0 = doelbedrag 0.
  * Voor 'Nalatenschap'/'Eeuwigdurend' is de runway-uitspraak zwakker (het doel is
- * niet "op nul uitkomen") en wordt die claim NIET gedaan. `solverStatus` reist mee
- * zodat een oppervlak (en de test) de invariant kan toetsen zonder tweede run.
+ * niet "op nul uitkomen") en wordt die claim NIET gedaan. `strategy` en
+ * `solverStatus` reizen mee zodat een oppervlak (en de test) de invariant kan toetsen
+ * zonder tweede run — de kop op /overzicht doet dat (`buildBriefingHeadline`).
  *
  * ADR 0093: de runway is een DUUR, geen euro — geen deflator, geen eigen `Math.pow`;
  * de indexatie zit in de kernel.
@@ -35,7 +36,7 @@ import type { RetirementExpenseMethod } from '@/lib/budget-utils'
 import type { ConvergentieRawContext } from '@/lib/horizon-kernel/convergentie-router'
 import { eindMaandVan } from '@/lib/horizon-kernel/gap'
 import type { SolveFireResult, SolverStatus } from '@/lib/horizon-kernel/solver'
-import type { KernelInput } from '@/lib/horizon-kernel/types'
+import type { Eindstrategie, KernelInput } from '@/lib/horizon-kernel/types'
 import { guardRetirementExpense } from '@/lib/horizon/outcome-guard'
 import { bridgeForcedStop, buildForcedStopSolve } from '@/lib/horizon/scenario-presets'
 
@@ -62,8 +63,16 @@ export type RunwayUnavailableReason =
   /** De gedeelde FIRE-run (`computeHorizonFireSim`) leverde geen rauwe context. */
   | 'geen-basisrun'
 
+/** De velden die elke doorgerekende uitkomst draagt (alles behalve `unavailable`). */
+interface RunwayComputed {
+  readonly expenseBasis: RunwayExpenseBasis
+  /** P!B48 — de EIGEN eindstrategie van de gebruiker (geërfd in de run; D7 geldt bij 'Vermogen opeten'). */
+  readonly strategy: Eindstrategie
+  readonly solverStatus: SolverStatus
+}
+
 export type RunwayResult =
-  | {
+  | (RunwayComputed & {
       readonly kind: 'months'
       /** Eerste aanhoudende uitputtingsmaand (maand 0 = nu) — `kernelDepletionMonth`. */
       readonly months: number
@@ -71,28 +80,13 @@ export type RunwayResult =
       readonly depletionAge: number
       /** P!B35 — eindleeftijd van de EIGEN eindstrategie. */
       readonly endAge: number
-      readonly expenseBasis: RunwayExpenseBasis
-      readonly solverStatus: SolverStatus
-    }
+    })
   /** J > 0 (op bruggetjes na) t/m de eindmaand van de eigen eindstrategie. */
-  | {
-      readonly kind: 'reaches-end-age'
-      readonly endAge: number
-      readonly expenseBasis: RunwayExpenseBasis
-      readonly solverStatus: SolverStatus
-    }
+  | (RunwayComputed & { readonly kind: 'reaches-end-age'; readonly endAge: number })
   /** J > 0 (op bruggetjes na) t/m de laatste in-horizon maand (HORIZON_PLAFOND_LEEFTIJD). */
-  | {
-      readonly kind: 'beyond-horizon'
-      readonly expenseBasis: RunwayExpenseBasis
-      readonly solverStatus: SolverStatus
-    }
+  | (RunwayComputed & { readonly kind: 'beyond-horizon' })
   /** Vandaag al zonder liquide vermogen: aanhoudende uitputting vanaf maand 0. */
-  | {
-      readonly kind: 'deficit'
-      readonly expenseBasis: RunwayExpenseBasis
-      readonly solverStatus: SolverStatus
-    }
+  | (RunwayComputed & { readonly kind: 'deficit' })
   | { readonly kind: 'unavailable'; readonly reason: RunwayUnavailableReason }
 
 const RETIREMENT_EXPENSE_METHODS: readonly RetirementExpenseMethod[] = [
@@ -128,25 +122,27 @@ export function computeRunwayFromSolve(
   if (!guardRetirementExpense(yearly).ok) {
     return { kind: 'unavailable', reason: 'geen-uitgavenbasis' }
   }
-  const expenseBasis: RunwayExpenseBasis = { yearly, method }
-  const solverStatus = solve.status
+  const computed: RunwayComputed = {
+    expenseBasis: { yearly, method },
+    strategy: kernelInput.eindstrategie.selector,
+    solverStatus: solve.status,
+  }
   const endAge = solve.eindleeftijd
 
   const m = kernelDepletionMonth
-  if (m === 0) return { kind: 'deficit', expenseBasis, solverStatus }
-  if (m === null) return { kind: 'beyond-horizon', expenseBasis, solverStatus }
+  if (m === 0) return { ...computed, kind: 'deficit' }
+  if (m === null) return { ...computed, kind: 'beyond-horizon' }
 
   // Eindmaand van de EIGEN eindstrategie op dezelfde maandas als de solver (P!B35).
   const eindMaand = eindMaandVan(endAge, kernelInput.startLeeftijd)
-  if (m > eindMaand) return { kind: 'reaches-end-age', endAge, expenseBasis, solverStatus }
+  if (m > eindMaand) return { ...computed, kind: 'reaches-end-age', endAge }
 
   return {
+    ...computed,
     kind: 'months',
     months: m,
     depletionAge: kernelInput.startLeeftijd + m / 12,
     endAge,
-    expenseBasis,
-    solverStatus,
   }
 }
 

@@ -28,6 +28,10 @@ import { collectAandachtspunten } from '@/lib/aandachtspunten-loader'
 import type { Aandachtspunt } from '@/lib/aandachtspunten'
 import type { BriefingEntry } from '@/lib/types/briefing'
 import type { DashboardData } from '@/lib/types/dashboard'
+// Alleen het TYPE: de runway-motor zelf (kernel) hoort niet in deze briefing-module
+// te worden meegebundeld; de loader levert het resultaat aan.
+import type { RunwayResult } from '@/lib/horizon/runway'
+import { HORIZON_PLAFOND_LEEFTIJD } from '@/lib/constants'
 
 type FinData = Awaited<ReturnType<typeof loadFinData>>
 type HorizonData = Awaited<ReturnType<typeof loadHorizonData>> | null
@@ -394,31 +398,62 @@ export function buildFreedomHeroProps(
   }
 }
 
+/** Nederlands rangtelwoord voor een leeftijd: 42 → "42e". */
+function leeftijdOrdinaal(age: number): string {
+  return `${Math.floor(age)}e`
+}
+
 /**
- * Deterministische kop-zin naast de masthead "De briefing". Wordt overschreven
- * door een AI-kop wanneer die bij een handmatige ververs is gegenereerd
- * (snapshot.headline).
+ * Deterministische kop-zin naast de masthead "De briefing" — sinds ADR 0126 (PR B)
+ * een echte ONTTREKKINGSPROJECTIE: *als je vandaag zou stoppen, tot wanneer reikt je
+ * vermogen?* Consumeert het `RunwayResult` uit `computeHorizonRunway`
+ * (lib/fire-target-shared.ts): dezelfde kernel-run-familie als de vrijheidsleeftijd op
+ * hetzelfde scherm, met rendement, inflatie, AOW en de eigen eindstrategie erin — geen
+ * platte deling meer (`computeFreedomTotal` blijft alleen voor de week-snapshot en de
+ * e-mail bestaan, PR C ruimt die op). Wordt overschreven door een AI-kop wanneer die
+ * bij een handmatige ververs is gegenereerd (`snapshot.headline`).
  *
- * UR2-09 — REKENT UIT DE LIVE CANONIEKE BRON, NIET UIT DE WEEK-SNAPSHOT.
- * Deze zin was de tweede drager van het bevroren vrijheidsgetal: hij las het
- * `totalLabel` van de week-hero, dus na een Ververs (die alleen de briefjes
- * herschrijft) bleef "Je vermogen staat voor 113 jaar en 4 maanden aan vrijheid"
- * staan terwijl de rest van /overzicht al op 0 stond. Voed 'm daarom met het
- * `computeFreedomTotal` van dit request — dezelfde grondslag, inclusief de
- * geloofwaardigheidsvloer (UR2-03), die de widgets en de vrijheidsstrip tonen.
+ * UR2-09 — REKENT UIT DE LIVE CANONIEKE BRON, NIET UIT DE WEEK-SNAPSHOT. Deze zin
+ * was de tweede drager van het bevroren vrijheidsgetal; na een Ververs bleef "113
+ * jaar en 4 maanden" staan naast live cijfers. De loader voedt 'm daarom met de
+ * runway van DIT request (grendel: overzicht-secondary-loader.headline-source.test.ts).
  *
- * Geen week-over-week-variant meer: de delta hoorde bij het verwijderde
- * "Jouw vrijheid deze week"-blok en kan als losse zin niet betrouwbaar naast
- * live cijfers staan.
+ * KOPIJ (beschrijvend, nooit aansporend — geen "je kunt nu stoppen"; definitieve
+ * zinnen gaan nog langs merkstem/compliance):
+ *  - `months` < 12   → "Als je nu zou stoppen, reikt je vermogen nog N maanden."
+ *  - `months` ≥ 12   → "Als je nu zou stoppen, reikt je vermogen tot je Xe."
+ *                      (X = hele leeftijd van de uitputtingsmaand)
+ *  - `reaches-end-age` → "… reikt je vermogen tot voorbij je Ee." (E = eigen eindleeftijd)
+ *  - `beyond-horizon`  → "… reikt je vermogen zover het model rekent: tot je 100e."
+ *                      Bewust zonder "oneindig": het model stopt bij
+ *                      HORIZON_PLAFOND_LEEFTIJD en claimt daar niets voorbij.
+ *  - `deficit` / `unavailable` → GEEN kop: geen claim is beter dan een verkeerde
+ *                      (zoals `isInfinite`/`isDeficit` dat eerder ook deden).
+ *
+ * D7 — bij eindstrategie 'Vermogen opeten' geldt *runway reikt tot de eindleeftijd ⇒
+ * solver `reached_now`*. Spreken die twee elkaar tegen (kernel-inconsistentie), dan
+ * doet de kop géén claim. Bij 'Nalatenschap'/'Eeuwigdurend' is de runway-uitspraak
+ * zwakker (geld dat tot 90 reikt is nog geen nalatenschap gehaald); de zin blijft daar
+ * een pure liquiditeitsuitspraak en zegt niets over het doel.
  */
-export function buildBriefingHeadline(freedom: FreedomTotal): string | null {
-  // Bij oneindig (geen geloofwaardige uitgavenbasis) of tekort (negatief
-  // vermogen) geen kop: een vrijheidsclaim zou dan een gegevensartefact of
-  // schuld-dagen als vrijheid presenteren.
-  if (freedom.breakdown.isInfinite || freedom.breakdown.isDeficit) return null
-  const label = formatFreedomTimeString(freedom.breakdown, 'long')
-  if (!label) return null
-  return `Je vermogen staat voor ${label} aan vrijheid.`
+export function buildBriefingHeadline(runway: RunwayResult): string | null {
+  if (runway.kind === 'unavailable' || runway.kind === 'deficit') return null
+
+  if (runway.kind === 'reaches-end-age' || runway.kind === 'beyond-horizon') {
+    if (runway.strategy === 'Vermogen opeten' && runway.solverStatus !== 'reached_now') {
+      return null
+    }
+    if (runway.kind === 'reaches-end-age') {
+      return `Als je nu zou stoppen, reikt je vermogen tot voorbij je ${leeftijdOrdinaal(runway.endAge)}.`
+    }
+    return `Als je nu zou stoppen, reikt je vermogen zover het model rekent: tot je ${leeftijdOrdinaal(HORIZON_PLAFOND_LEEFTIJD)}.`
+  }
+
+  if (runway.months < 12) {
+    const n = runway.months
+    return `Als je nu zou stoppen, reikt je vermogen nog ${n} ${n === 1 ? 'maand' : 'maanden'}.`
+  }
+  return `Als je nu zou stoppen, reikt je vermogen tot je ${leeftijdOrdinaal(runway.depletionAge)}.`
 }
 
 /**

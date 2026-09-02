@@ -251,33 +251,87 @@ describe('vrijheidstijd-e-mailblok helpers (vervolg)', () => {
   })
 })
 
-// ── De kop-zin naast de masthead (UR2-09) ────────────────────────────
+// ── De kop-zin naast de masthead (UR2-09 → ADR 0126 PR B) ────────────
 //
-// De zin rekent uit de LIVE `computeFreedomTotal` van het request, niet uit de
-// bevroren week-snapshot. Dat was het defect: na een Ververs (die alleen de
-// briefjes herschrijft) bleef "Je vermogen staat voor 113 jaar en 4 maanden aan
-// vrijheid" staan naast een op-weg-balk van 0%. Er is bewust géén week-over-
-// week-variant meer: die hoorde bij het verwijderde "Jouw vrijheid deze week"-
-// blok en kan als losse zin niet betrouwbaar naast live cijfers staan.
-describe('buildBriefingHeadline — canonieke live bron', () => {
-  it('noemt het totaal uit computeFreedomTotal, zonder weekverschil', () => {
-    const h = buildBriefingHeadline(computeFreedomTotal(100000, 3000))
-    expect(h).toBe('Je vermogen staat voor 2 jaar en 9 maanden aan vrijheid.')
-    expect(h).not.toMatch(/deze week/i)
+// De zin is sinds ADR 0126 een echte onttrekkingsprojectie: hij consumeert het
+// `RunwayResult` van de LIVE "stop nu"-run van het request (computeHorizonRunway),
+// niet de bevroren week-snapshot en niet meer de platte deling. Kopij per
+// uitkomst is beschrijvend (nooit "je kunt nu stoppen"); deficit/unavailable
+// geven géén kop — geen claim is beter dan een verkeerde. D7: bij 'Vermogen
+// opeten' hoort "reikt tot (voorbij) de eindleeftijd" samen te vallen met
+// solver `reached_now`; anders zwijgt de kop.
+const BASIS = { yearly: 36_000, method: 'essential_budgets' as const }
+const deplete = { strategy: 'Vermogen opeten' as const, expenseBasis: BASIS }
+
+describe('buildBriefingHeadline — runway-kopij', () => {
+  it('months ≥ 12: "tot je Xe" op de hele leeftijd van de uitputtingsmaand', () => {
+    const h = buildBriefingHeadline({
+      ...deplete,
+      kind: 'months',
+      months: 231,
+      depletionAge: 61.25,
+      endAge: 90,
+      solverStatus: 'unreachable_within_horizon',
+    })
+    expect(h).toBe('Als je nu zou stoppen, reikt je vermogen tot je 61e.')
+    expect(h).not.toMatch(/kunt|kan je|oneindig|deze week/i)
   })
 
-  it('null bij een ontbrekende uitgavenbasis (isInfinite)', () => {
-    expect(buildBriefingHeadline(computeFreedomTotal(100000, 0))).toBeNull()
+  it('months < 12: in maanden, met enkelvoud bij 1', () => {
+    expect(
+      buildBriefingHeadline({ ...deplete, kind: 'months', months: 7, depletionAge: 42.58, endAge: 90, solverStatus: 'unreachable_within_horizon' }),
+    ).toBe('Als je nu zou stoppen, reikt je vermogen nog 7 maanden.')
+    expect(
+      buildBriefingHeadline({ ...deplete, kind: 'months', months: 1, depletionAge: 42.08, endAge: 90, solverStatus: 'unreachable_within_horizon' }),
+    ).toBe('Als je nu zou stoppen, reikt je vermogen nog 1 maand.')
   })
 
-  it('null bij een tekort — schuld-dagen zijn geen vrijheid', () => {
-    expect(buildBriefingHeadline(computeFreedomTotal(-4200, 3000))).toBeNull()
+  it('reaches-end-age: "tot voorbij je Ee" — eerlijk, zonder "oneindig"', () => {
+    const h = buildBriefingHeadline({ ...deplete, kind: 'reaches-end-age', endAge: 90, solverStatus: 'reached_now' })
+    expect(h).toBe('Als je nu zou stoppen, reikt je vermogen tot voorbij je 90e.')
+    expect(h).not.toMatch(/oneindig/i)
   })
 
-  it('de gemelde stale zin kan niet meer ontstaan: €1/mnd geeft geen kop', () => {
-    // Zonder vloer: €1.361 ÷ €0,03/dag ≈ 41.365 dagen = "113 jaar en 4 maanden".
-    const h = buildBriefingHeadline(computeFreedomTotal(1361, 1))
-    expect(h).toBeNull()
+  it('beyond-horizon: benoemt de modelgrens (HORIZON_PLAFOND_LEEFTIJD), claimt niets daarvoorbij', () => {
+    const h = buildBriefingHeadline({ ...deplete, kind: 'beyond-horizon', solverStatus: 'reached_now' })
+    expect(h).toBe('Als je nu zou stoppen, reikt je vermogen zover het model rekent: tot je 100e.')
+    expect(h).not.toMatch(/oneindig|voorbij je 100e/i)
+  })
+
+  it('deficit en unavailable → geen kop (geen claim is beter dan een verkeerde)', () => {
+    expect(buildBriefingHeadline({ ...deplete, kind: 'deficit', solverStatus: 'unreachable_within_horizon' })).toBeNull()
+    expect(buildBriefingHeadline({ kind: 'unavailable', reason: 'geen-uitgavenbasis' })).toBeNull()
+    expect(buildBriefingHeadline({ kind: 'unavailable', reason: 'geen-geboortedatum' })).toBeNull()
+    expect(buildBriefingHeadline({ kind: 'unavailable', reason: 'kern-fout' })).toBeNull()
+    expect(buildBriefingHeadline({ kind: 'unavailable', reason: 'geen-basisrun' })).toBeNull()
+  })
+
+  it('D7 (deplete): reikt-tot-eindleeftijd zonder reached_now is inconsistent → geen kop', () => {
+    expect(
+      buildBriefingHeadline({ ...deplete, kind: 'reaches-end-age', endAge: 90, solverStatus: 'unreachable_within_horizon' }),
+    ).toBeNull()
+    expect(
+      buildBriefingHeadline({ ...deplete, kind: 'beyond-horizon', solverStatus: 'reached_at' }),
+    ).toBeNull()
+  })
+
+  it('legacy/perpetual: de zin blijft een liquiditeitsuitspraak, geen doel-claim, en vraagt geen reached_now', () => {
+    const legacy = buildBriefingHeadline({
+      strategy: 'Nalatenschap', expenseBasis: BASIS, kind: 'reaches-end-age', endAge: 90, solverStatus: 'reached_at',
+    })
+    expect(legacy).toBe('Als je nu zou stoppen, reikt je vermogen tot voorbij je 90e.')
+    expect(legacy).not.toMatch(/nalatenschap|doel|bereikt/i)
+    const perpetual = buildBriefingHeadline({
+      strategy: 'Eeuwigdurend', expenseBasis: BASIS, kind: 'beyond-horizon', solverStatus: 'unreachable_within_horizon',
+    })
+    expect(perpetual).toBe('Als je nu zou stoppen, reikt je vermogen zover het model rekent: tot je 100e.')
+  })
+
+  it('de gemelde stale zin kan niet meer ontstaan: de kop kent geen vrijheidsdagen-deling meer', () => {
+    // "Je vermogen staat voor 113 jaar en 4 maanden aan vrijheid" kwam uit
+    // netWorth ÷ (€1/mnd). De kop consumeert nu uitsluitend een RunwayResult.
+    const h = buildBriefingHeadline({ ...deplete, kind: 'months', months: 14, depletionAge: 43.17, endAge: 90, solverStatus: 'unreachable_within_horizon' })
+    expect(h).not.toMatch(/jaar en \d+ maanden aan vrijheid/)
   })
 })
 

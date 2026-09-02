@@ -77,6 +77,8 @@ describe('computeRunwayFromRawContext — contract en D3-grondslag', () => {
     // De persona: essential_budgets met €48.000 essentiële jaaruitgaven.
     expect(r.expenseBasis.yearly).toBe(48_000)
     expect(r.expenseBasis.method).toBe('essential_budgets')
+    // De EIGEN eindstrategie reist mee (geërfd in de run) — de kop toetst er D7 op.
+    expect(r.strategy).toBe('Vermogen opeten')
   })
 
   it('de run staat op FIRE-maand 0, de engine ankert op T0 en de eigen eindstrategie wordt geërfd', () => {
@@ -139,6 +141,7 @@ describe('D7 — deplete: runway reikt tot de eindleeftijd ⇒ solver reached_no
     const r = computeRunwayFromRawContext(ctx({ profile: perpetual }))
     expect(KINDS).toContain(r.kind)
     if (r.kind === 'months') expect(r.endAge).toBe(100)
+    if (r.kind !== 'unavailable') expect(r.strategy).toBe('Eeuwigdurend')
   })
 })
 

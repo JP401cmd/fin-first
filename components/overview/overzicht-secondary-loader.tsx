@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { loadDashboardData } from '@/lib/dashboard-data-loader'
 import { withCanonicalOverviewFigures } from '@/lib/overview/canonical-health'
 import { loadFinData } from '@/lib/fin-data-loader'
+import { computeHorizonRunway } from '@/lib/fire-target-shared'
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
 import type { Perspective } from '@/lib/household-data'
 import {
@@ -113,6 +114,7 @@ export async function OverzichtSecondaryLoader({
     pageStatusInfo,
     pageStatusMinimized,
     cookieStore,
+    runway,
   ] = await Promise.all([
     loadDashboardData(supabase),
     loadFinData(supabase),
@@ -128,6 +130,11 @@ export async function OverzichtSecondaryLoader({
     // Rotatiecursor van de briefing in Eenvoudig — een cookie, zodat de server
     // meteen het juiste venster rendert (zie lib/briefing/rotation.ts).
     cookies(),
+    // De "stop nu"-runway voor de kop-zin (ADR 0126, PR B): één extra kernel-run op
+    // FIRE-maand 0 op de PERSPECTIEF-CORRECTE rauwe context van de gedeelde FIRE-run
+    // (`computeHorizonFireSim`, React-cache() → die basisrun kost hier niets extra).
+    // LIVE, elk request opnieuw (UR2-09) — nooit uit de week-snapshot.
+    computeHorizonRunway(supabase, perspective),
   ])
 
   const { dashboardData: rawDashboardData, activeWidgets, allWidgetPrefs } = dashboardResult
@@ -171,14 +178,16 @@ export async function OverzichtSecondaryLoader({
     checkinForBriefing,
   )
   // Freedom-time: netto vermogen (perspectief-correct) ÷ dagelijkse uitgaven.
-  // Voedt de kop-zin naast de masthead — LIVE, elk request opnieuw (UR2-09).
+  // Sinds ADR 0126 (PR B) voedt dit NIET meer de kop-zin (die leest de runway,
+  // zie hieronder) maar alleen nog het bevroren vrijheidsmeetpunt van de
+  // week-snapshot en het versheidssignaal — PR C ruimt die laatste consumenten op.
   //
   // Voorkeursvolgorde ongewijzigd (perspectief → canoniek 12-mnd rolling →
   // effectief), maar een kandidaat die door de geloofwaardigheidsvloer zakt
   // wordt OVERGESLAGEN i.p.v. gebruikt (UR2-03). Een rolling venster met één
   // transactie van €1 gaf €0,03/dag en daarmee "113 jaar en 4 maanden aan
   // vrijheid" bovenaan de briefing; nu wint de effectieve maandbasis, en is die
-  // er ook niet, dan valt de kop-zin helemaal weg.
+  // er ook niet, dan valt het meetpunt op "onbepaald".
   const freedomMonthlyExpenses =
     credibleMonthlyBasis(perspectiveOverride?.monthlyExpenses) ||
     credibleMonthlyBasis(dashboardData.recentMonthlyExpenses) ||
@@ -194,11 +203,13 @@ export async function OverzichtSecondaryLoader({
   let briefingRefreshState: BriefingRefreshState = 'available'
   let briefingDataChanged = false
   let briefingWeekHistory: BriefingWeekHistoryItem[] | undefined
-  // Kop-zin uit de LIVE canonieke vrijheidstijd (UR2-09). Een AI-kop uit de
+  // Kop-zin uit de LIVE "stop nu"-runway van dit request (UR2-09, ADR 0126): een
+  // echte onttrekkingsprojectie uit dezelfde kernel-familie als de vrijheids-
+  // leeftijd op dit scherm — geen platte deling meer. Een AI-kop uit de
   // week-snapshot mag 'm overschrijven — die is expliciet gedateerd met de
   // "Bijgewerkt …"-stempel; de deterministische zin was dat niet en claimde
   // daarom stilzwijgend een bevroren getal.
-  let briefingHeadline: string | null = buildBriefingHeadline(freedomTotal)
+  let briefingHeadline: string | null = buildBriefingHeadline(runway)
   // Weekly snapshot + briefing-freeze blijven PERSOONLIJK. In huishoud-/partner-
   // weergave geen snapshot-write.
   let freshMilestoneRow: AchievedMilestoneRow | null = null
