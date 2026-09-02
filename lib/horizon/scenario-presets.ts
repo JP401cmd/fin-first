@@ -11,8 +11,12 @@
  *    inleg / downsize): de gewone `computeConvergentieProjection` met een aangepaste
  *    `ConvergentieRawContext` (zelfde motorpad als de hoofdlijn — géén what-if-adapter).
  *
- * ## De vijf kaarten (vaste volgorde)
+ * ## De zes kaarten (vaste volgorde)
  *  1. `basis` — de basislijn (solve).
+ *  1b. `stop-nu` — stop op de kernel-startleeftijd (FIRE-maand 0), eigen eindstrategie
+ *     geërfd (stop; ADR 0126 PR B4). Het naast-beeld "en als ik vandaag stop?" — ook
+ *     zinvol voor wie ná zijn FIRE-leeftijd doorwerkt, waar de FIRE-relatieve
+ *     kaarten op een gepasseerde datum ankeren.
  *  2. `een-jaar-langer` — stop op verwacht-FIRE + 1 (stop).
  *  3. `minder-uitgeven` — structureel −€300/mnd (input; verlaagt uitgaven → lager doel én
  *     meer sparen).
@@ -61,6 +65,7 @@ export type ScenarioPresetId =
   | 'downsize'
   | 'extra-inleg'
   | 'eerder-stoppen'
+  | 'stop-nu'
 
 /** Hoe een kaart wordt doorgerekend. */
 export type ScenarioPresetKind = 'basis' | 'stop' | 'input'
@@ -68,13 +73,27 @@ export type ScenarioPresetKind = 'basis' | 'stop' | 'input'
 /** UI-status van een kaart t.o.v. de basis. */
 export type ScenarioPresetStatus = 'basis' | 'groen' | 'amber' | 'rood'
 
+/**
+ * Waar een stop-variant zijn stopmoment aan ANKERT. Twee ankers, expliciet in het type
+ * i.p.v. een magische offset:
+ *  - `'verwacht-fire'` — relatief aan de verwachte FIRE-leeftijd (+1 / −2 jaar). Zinloos
+ *    voor wie ná zijn FIRE-leeftijd doorwerkt: de offset staat dan op een gepasseerde datum.
+ *  - `'nu'` — de startleeftijd van de kernel-tijdas (hele jaren, P!B7 = FIRE-maand 0;
+ *    NOOIT de fractionele leeftijd: 47,6 zou FIRE-maand 7 geven en is dan niet "nu").
+ *    De run erft de eigen eindstrategie/eindleeftijd (`endStrategy: 'inherit'`) — een
+ *    naast-beeld, geen profielwijziging (ADR 0126, PR B4).
+ */
+export type StopAnker =
+  | { readonly soort: 'verwacht-fire'; readonly offsetJaren: number }
+  | { readonly soort: 'nu' }
+
 /** Statische definitie van één preset-kaart. */
 export interface ScenarioPresetSpec {
   id: ScenarioPresetId
   label: string
   kind: ScenarioPresetKind
-  /** stop-varianten: leeftijd-offset t.o.v. verwacht-FIRE (bv. +1, −2). */
-  stopOffsetJaren?: number
+  /** stop-varianten: het anker van het stopmoment (zie `StopAnker`). */
+  stopAnker?: StopAnker
   /** minder-uitgeven: structurele maand-uitgave-delta (negatief = minder uitgeven). */
   maandUitgaveDelta?: number
   /** extra-inleg: extra maandelijkse inleg (positief). */
@@ -85,11 +104,12 @@ export interface ScenarioPresetSpec {
 
 export const SCENARIO_PRESET_SPECS: Record<ScenarioPresetId, ScenarioPresetSpec> = {
   basis: { id: 'basis', label: 'Basisplan', kind: 'basis' },
+  'stop-nu': { id: 'stop-nu', label: 'Nu stoppen', kind: 'stop', stopAnker: { soort: 'nu' } },
   'een-jaar-langer': {
     id: 'een-jaar-langer',
     label: 'Een jaar langer',
     kind: 'stop',
-    stopOffsetJaren: SCENARIO_EEN_JAAR_LANGER_OFFSET,
+    stopAnker: { soort: 'verwacht-fire', offsetJaren: SCENARIO_EEN_JAAR_LANGER_OFFSET },
   },
   'minder-uitgeven': {
     id: 'minder-uitgeven',
@@ -108,7 +128,7 @@ export const SCENARIO_PRESET_SPECS: Record<ScenarioPresetId, ScenarioPresetSpec>
     id: 'eerder-stoppen',
     label: 'Eerder stoppen',
     kind: 'stop',
-    stopOffsetJaren: SCENARIO_EERDER_STOPPEN_OFFSET,
+    stopAnker: { soort: 'verwacht-fire', offsetJaren: SCENARIO_EERDER_STOPPEN_OFFSET },
   },
 }
 
@@ -196,6 +216,12 @@ export interface ForcedStopPathResult {
    * `stopAge: 'nu'`-run ís dit de runway; op een stop-kaart de uitputting van dát pad.
    */
   depletionMonth: number | null
+  /**
+   * De feitelijk geforceerde stopleeftijd van deze run — bij `stopAge: 'nu'` de
+   * kernel-startleeftijd (hele jaren, P!B7), anders de meegegeven waarde. Doorgegeven
+   * zodat een kaart de stop-nu-leeftijd niet zelf hoeft af te leiden.
+   */
+  stopAge: number
 }
 
 /**
@@ -284,6 +310,7 @@ export function bridgeForcedStop(
     // Doorgeven, niet herberekenen — `solve` IS de stand die de rijen hierboven voedt.
     maandHint: run.solve.maandHint,
     depletionMonth: kernelUnified.kernelDepletionMonth,
+    stopAge: run.stopAge,
   }
 }
 
@@ -303,7 +330,7 @@ export function bridgeForcedStop(
  *  - `'inherit'` — laat beide geforceerde velden WEG; het profiel draagt z'n eigen
  *    eindstrategie én eigen `fire_end_age` (zie `ForcedStopPathInput.endStrategy`).
  */
-export function runForcedStopPath(input: ForcedStopPathInput): ForcedStopPathResult | null {
+export function runForcedStopPath(input: ForcedStopSolveInput): ForcedStopPathResult | null {
   try {
     return bridgeForcedStop(buildForcedStopSolve(input), input)
   } catch {
@@ -331,20 +358,22 @@ export interface ScenarioPresetResult {
 }
 
 /**
- * Selecteert de vijf van toepassing zijnde presets in kaart-volgorde. Slot 4 is de wissel:
+ * Selecteert de zes van toepassing zijnde presets in kaart-volgorde. `stop-nu` staat direct
+ * náást het basisplan (het naast-beeld "en als ik vandaag stop?"). Slot 5 is de wissel:
  * `downsize` wanneer de gebruiker een eigen huis heeft én er nog géén verkoop-woonstrategie
  * actief is; anders `extra-inleg`.
  */
 export function resolveScenarioPresets(ctx: ScenarioPresetContext): ScenarioPresetSpec[] {
-  const slot4: ScenarioPresetSpec =
+  const slot5: ScenarioPresetSpec =
     ctx.hasEigenHuis && !ctx.downsizeStrategyActief
       ? SCENARIO_PRESET_SPECS.downsize
       : SCENARIO_PRESET_SPECS['extra-inleg']
   return [
     SCENARIO_PRESET_SPECS.basis,
+    SCENARIO_PRESET_SPECS['stop-nu'],
     SCENARIO_PRESET_SPECS['een-jaar-langer'],
     SCENARIO_PRESET_SPECS['minder-uitgeven'],
-    slot4,
+    slot5,
     SCENARIO_PRESET_SPECS['eerder-stoppen'],
   ]
 }
@@ -455,21 +484,31 @@ export function runScenarioPreset(
   })
 
   if (spec.kind === 'stop') {
-    if (ctx.verwachtFireAge === null) {
-      // Geen anker → geen stop-run mogelijk (zichtbare degradatie).
-      return base(null, null, null, null)
-    }
-    const stopAge = ctx.verwachtFireAge + (spec.stopOffsetJaren ?? 0)
-    const run = runForcedStopPath({
+    const anker: StopAnker = spec.stopAnker ?? { soort: 'verwacht-fire', offsetJaren: 0 }
+    const basisInput = {
       profile: ctx.profile,
       assets: ctx.assets,
       debts: ctx.debts,
       lifeEvents: ctx.lifeEvents,
       aowRows: ctx.aowRows,
       yearlyExpenses: ctx.yearlyExpenses,
-      stopAge,
-      fireEndAge: ctx.fireEndAge,
-    })
+    }
+
+    if (anker.soort === 'nu') {
+      // "Nu stoppen": FIRE-maand 0 op de kernel-startleeftijd (hele jaren, via het
+      // gedeelde recept), met de EIGEN eindstrategie/eindleeftijd — een naast-beeld
+      // dat ook zinvol blijft voor wie ná zijn FIRE-leeftijd doorwerkt.
+      const run = runForcedStopPath({ ...basisInput, stopAge: 'nu', endStrategy: 'inherit' })
+      if (run === null) return base(null, null, null, null)
+      return base(run.stopAge, run.result.fireAgeFractional, computeLaagsteBuffer(run.unifiedRows), null)
+    }
+
+    if (ctx.verwachtFireAge === null) {
+      // Geen FIRE-anker → geen FIRE-relatieve stop-run mogelijk (zichtbare degradatie).
+      return base(null, null, null, null)
+    }
+    const stopAge = ctx.verwachtFireAge + anker.offsetJaren
+    const run = runForcedStopPath({ ...basisInput, stopAge, fireEndAge: ctx.fireEndAge })
     if (run === null) return base(stopAge, null, null, null)
     return base(stopAge, run.result.fireAgeFractional, computeLaagsteBuffer(run.unifiedRows), null)
   }

@@ -68,29 +68,37 @@ function makeCtx(over: Partial<ScenarioPresetContext> = {}): ScenarioPresetConte
 }
 
 describe('resolveScenarioPresets — slot-4-wissel', () => {
-  it('eigen huis + geen verkoop-strategie → downsize op slot 4', () => {
+  it('eigen huis + geen verkoop-strategie → downsize op slot 5; stop-nu direct naast het basisplan', () => {
     const ids = resolveScenarioPresets(makeCtx({ hasEigenHuis: true, downsizeStrategyActief: false })).map((s) => s.id)
-    expect(ids).toEqual(['basis', 'een-jaar-langer', 'minder-uitgeven', 'downsize', 'eerder-stoppen'])
+    expect(ids).toEqual(['basis', 'stop-nu', 'een-jaar-langer', 'minder-uitgeven', 'downsize', 'eerder-stoppen'])
   })
 
-  it('geen eigen huis → extra-inleg op slot 4', () => {
+  it('geen eigen huis → extra-inleg op slot 5', () => {
     const ids = resolveScenarioPresets(makeCtx({ hasEigenHuis: false })).map((s) => s.id)
-    expect(ids).toEqual(['basis', 'een-jaar-langer', 'minder-uitgeven', 'extra-inleg', 'eerder-stoppen'])
+    expect(ids).toEqual(['basis', 'stop-nu', 'een-jaar-langer', 'minder-uitgeven', 'extra-inleg', 'eerder-stoppen'])
   })
 
-  it('downsize-strategie al actief → extra-inleg op slot 4', () => {
+  it('downsize-strategie al actief → extra-inleg op slot 5', () => {
     const ids = resolveScenarioPresets(makeCtx({ hasEigenHuis: true, downsizeStrategyActief: true })).map((s) => s.id)
-    expect(ids[3]).toBe('extra-inleg')
+    expect(ids[4]).toBe('extra-inleg')
+  })
+
+  it('de stop-ankers staan expliciet in het type: FIRE-relatief met offset vs. "nu"', () => {
+    expect(SCENARIO_PRESET_SPECS['een-jaar-langer'].stopAnker).toEqual({ soort: 'verwacht-fire', offsetJaren: 1 })
+    expect(SCENARIO_PRESET_SPECS['eerder-stoppen'].stopAnker).toEqual({ soort: 'verwacht-fire', offsetJaren: -2 })
+    expect(SCENARIO_PRESET_SPECS['stop-nu'].stopAnker).toEqual({ soort: 'nu' })
+    expect(SCENARIO_PRESET_SPECS['stop-nu'].kind).toBe('stop')
   })
 })
 
-describe('runScenarioPresets — vijf doorgerekende kaarten', () => {
-  it('levert 5 kaarten, basis eerst met status basis', () => {
+describe('runScenarioPresets — zes doorgerekende kaarten', () => {
+  it('levert 6 kaarten, basis eerst met status basis, stop-nu ernaast', () => {
     const cards = runScenarioPresets(makeCtx())
-    expect(cards).toHaveLength(5)
+    expect(cards).toHaveLength(6)
     expect(cards[0].id).toBe('basis')
     expect(cards[0].status).toBe('basis')
-    expect(cards.map((c) => c.id)).toEqual(['basis', 'een-jaar-langer', 'minder-uitgeven', 'downsize', 'eerder-stoppen'])
+    expect(cards[1].id).toBe('stop-nu')
+    expect(cards.map((c) => c.id)).toEqual(['basis', 'stop-nu', 'een-jaar-langer', 'minder-uitgeven', 'downsize', 'eerder-stoppen'])
   })
 
   it('elke kaart levert een laagste buffer (rijen geproduceerd)', () => {
@@ -99,9 +107,13 @@ describe('runScenarioPresets — vijf doorgerekende kaarten', () => {
     }
   })
 
-  it('eerder-stoppen is de "rood"-kaart: negatieve óf laagste buffer', () => {
+  it('eerder-stoppen is de "rood"-kaart onder de FIRE-relatieve kaarten: negatieve óf laagste buffer', () => {
     const cards = runScenarioPresets(makeCtx())
-    const buffers = cards.map((c) => c.laagsteBuffer?.bedrag ?? Number.POSITIVE_INFINITY)
+    // `stop-nu` staat buiten deze vergelijking: vandaag stoppen is per definitie het
+    // scherpste beeld en geen FIRE-relatieve variant van het plan.
+    const buffers = cards
+      .filter((c) => c.id !== 'stop-nu')
+      .map((c) => c.laagsteBuffer?.bedrag ?? Number.POSITIVE_INFINITY)
     const eerder = cards.find((c) => c.id === 'eerder-stoppen')!
     const eenJaar = cards.find((c) => c.id === 'een-jaar-langer')!
     const eerderBedrag = eerder.laagsteBuffer!.bedrag
@@ -287,9 +299,10 @@ describe('buildForcedStopSolve — motor-helft van het geforceerde-stop-recept',
     }
 
     const nieuw = runForcedStopPath({ ...base, stopAge: STOP_AGE })
-    // De vier bestaande velden byte-identiek; `depletionMonth` is het additieve
-    // bridge-veld (ADR 0126) — óók dat komt uit dezelfde bridge, niet uit een eigen lezing.
-    expect(nieuw).toEqual({ ...oud, depletionMonth: unified.kernelDepletionMonth })
+    // De vier bestaande velden byte-identiek; `depletionMonth` (bridge-veld, ADR 0126)
+    // en `stopAge` (de feitelijke stopleeftijd) zijn additief — óók die komen uit
+    // dezelfde bridge/run, niet uit een eigen lezing.
+    expect(nieuw).toEqual({ ...oud, depletionMonth: unified.kernelDepletionMonth, stopAge: STOP_AGE })
     expect(nieuw!.depletionMonth).toBe(depletionMonth(solve.projection))
   })
 
@@ -324,5 +337,69 @@ describe('buildForcedStopSolve — motor-helft van het geforceerde-stop-recept',
     const kapot = { ...base, profile: { ...profile, date_of_birth: null }, stopAge: STOP_AGE }
     expect(() => buildForcedStopSolve(kapot)).toThrow()
     expect(runForcedStopPath(kapot)).toBeNull()
+  })
+})
+
+// ── De stop-nu-kaart (ADR 0126, PR B4) ───────────────────────────────────────
+//
+// Ankert op de kernel-startleeftijd (hele jaren, P!B7 = FIRE-maand 0), nooit op de
+// fractionele leeftijd, met de eigen eindstrategie geërfd. Een naast-beeld: het plan
+// blijft staan, de stop-nu-variant staat ernaast.
+
+describe('stop-nu-kaart — geforceerde stop op de kernel-startleeftijd', () => {
+  const base = {
+    profile,
+    assets: fx.assets,
+    debts: fx.debts,
+    lifeEvents: fx.lifeEvents,
+    aowRows: [] as const,
+    yearlyExpenses: 30_000,
+  }
+
+  it('de rijen zijn identiek aan evaluateFireAt(kernelInput, startLeeftijd) door de bridge', () => {
+    const { kernelInput, solve, stopAge } = buildForcedStopSolve({ ...base, stopAge: 'nu', endStrategy: 'inherit' })
+    // Referentie: het kale recept op de HELE startleeftijd (P!B7), zonder `'nu'`-vorm.
+    const referentie = evaluateFireAt(kernelInput, kernelInput.startLeeftijd)
+    expect(Number.isInteger(kernelInput.startLeeftijd)).toBe(true)
+    expect(stopAge).toBe(kernelInput.startLeeftijd)
+    expect(solve).toEqual(referentie)
+
+    const { assetSlotMeta, debtSlotMeta } = buildKernelSlotMeta(fx.assets, fx.debts, deriveEigenHuisIds(fx.assets))
+    const referentieRijen = kernelToUnifiedResult(referentie, { input: kernelInput, yearlyExpenses: 30_000, assetSlotMeta, debtSlotMeta }).rows
+    const kaartRun = runForcedStopPath({ ...base, stopAge: 'nu', endStrategy: 'inherit' })
+    expect(kaartRun).not.toBeNull()
+    expect(kaartRun!.unifiedRows).toEqual(referentieRijen)
+    expect(kaartRun!.stopAge).toBe(kernelInput.startLeeftijd)
+  })
+
+  it('de kaart verschijnt naast het basisplan met de startleeftijd als stopmoment en zonder delta', () => {
+    const cards = runScenarioPresets(makeCtx())
+    const { kernelInput } = buildForcedStopSolve({ ...base, stopAge: 'nu', endStrategy: 'inherit' })
+    const kaart = cards[1]
+    expect(kaart.id).toBe('stop-nu')
+    expect(kaart.kind).toBe('stop')
+    expect(kaart.label).toBe('Nu stoppen')
+    expect(kaart.stopLeeftijd).toBe(kernelInput.startLeeftijd)
+    expect(kaart.stopLeeftijd).toBe(PINNED_AGE)
+    expect(kaart.maandruimteOfDelta).toBeNull()
+    expect(kaart.laagsteBuffer).not.toBeNull()
+    expect(['groen', 'amber', 'rood']).toContain(kaart.status)
+  })
+
+  it('ankert NIET FIRE-relatief: de kaart bestaat ook zonder verwachte FIRE-leeftijd', () => {
+    const cards = runScenarioPresets(makeCtx({ verwachtFireAge: null }))
+    const stopNu = cards.find((c) => c.id === 'stop-nu')!
+    const eenJaar = cards.find((c) => c.id === 'een-jaar-langer')!
+    expect(stopNu.stopLeeftijd).toBe(PINNED_AGE)
+    expect(stopNu.laagsteBuffer).not.toBeNull()
+    // De FIRE-relatieve kaarten degraderen zichtbaar zonder anker.
+    expect(eenJaar.stopLeeftijd).toBeNull()
+    expect(eenJaar.laagsteBuffer).toBeNull()
+  })
+
+  it('erft de eigen eindstrategie (perpetual-fixture → displayEndAge 100), geen geforceerde deplete', () => {
+    const run = runForcedStopPath({ ...base, stopAge: 'nu', endStrategy: 'inherit' })!
+    expect(run.result.strategy).toBe('perpetual')
+    expect(run.result.displayEndAge).toBe(100)
   })
 })

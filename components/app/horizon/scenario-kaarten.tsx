@@ -1,9 +1,11 @@
 'use client'
 
 /**
- * ScenarioKaarten — de vijf scenario's naast elkaar (/toekomst, ronde 3, element ⑨).
- * Puur presentational: consumeert `ScenarioPresetResult[]` (5 stuks, doorgerekend
- * door `lib/horizon/scenario-presets.ts` — het RUNNEN gebeurt elders in de wiring).
+ * ScenarioKaarten — de zes scenario's naast elkaar (/toekomst, ronde 3, element ⑨;
+ * `stop-nu` erbij sinds ADR 0126 PR B4). Puur presentational: consumeert
+ * `ScenarioPresetResult[]` in de volgorde van `resolveScenarioPresets` (doorgerekend
+ * door `lib/horizon/scenario-presets.ts` — het RUNNEN gebeurt elders in de wiring);
+ * een extra kaart in de specs verschijnt hier vanzelf.
  *
  * Per kaart: een status-flag (BASIS / GROEN / AMBER / ROOD — SEMANTISCHE stoplicht-
  * tinten, géén module-accent), het preset-label als serif-titel, en drie meet-rijen
@@ -132,8 +134,11 @@ function SkeletonCard() {
   )
 }
 
+/** Aantal kaarten in `resolveScenarioPresets` — alleen voor het skeleton. */
+const SCENARIO_KAART_AANTAL = 6
+
 export interface ScenarioKaartenProps {
-  /** De vijf doorgerekende preset-kaarten (vaste volgorde). */
+  /** De doorgerekende preset-kaarten (vaste volgorde van `resolveScenarioPresets`). */
   kaarten: ScenarioPresetResult[]
   /** Skeleton-weergave zolang de runs nog lopen. */
   isLoading?: boolean
@@ -154,11 +159,17 @@ export function ScenarioKaarten({ kaarten, isLoading }: ScenarioKaartenProps) {
           dezelfde rekenkern (één run per kaart). De{' '}
           <b className="text-[var(--ink)]">laagste buffer</b> = de diepste belegbare (liquide)
           stand over de hele horizon — meestal in de brugjaren. De stop-varianten gebruiken een
-          geforceerde run: je stopt dan écht op die leeftijd en teert daarna in (deplete).
+          geforceerde run: je stopt dan écht op die leeftijd. Bij &ldquo;Een jaar langer&rdquo; en
+          &ldquo;Eerder stoppen&rdquo; teer je daarna in (deplete); &ldquo;Nu stoppen&rdquo; houdt je
+          eigen eindstrategie en eindleeftijd.
         </p>
         <ul className="mt-2 mb-0 list-none space-y-0.5 pl-0">
           <li>
             <b className="text-[var(--ink)]">Basis</b> — je huidige pad.
+          </li>
+          <li>
+            <b className="text-[var(--ink)]">Nu stoppen</b> — stop vandaag, op je huidige leeftijd;
+            je plan blijft staan, dit is het beeld ernaast.
           </li>
           <li>
             <b className="text-[var(--ink)]">Een jaar langer</b> — stop op verwacht + 1.
@@ -180,10 +191,10 @@ export function ScenarioKaarten({ kaarten, isLoading }: ScenarioKaartenProps) {
       <ul
         role="list"
         aria-label="Scenario's naast elkaar"
-        className="grid grid-cols-2 gap-3 sm:grid-cols-5"
+        className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
       >
         {isLoading
-          ? Array.from({ length: 5 }, (_, i) => <SkeletonCard key={i} />)
+          ? Array.from({ length: SCENARIO_KAART_AANTAL }, (_, i) => <SkeletonCard key={i} />)
           : kaarten.map(kaart => <ScenarioCard key={kaart.id} kaart={kaart} />)}
       </ul>
     </div>
