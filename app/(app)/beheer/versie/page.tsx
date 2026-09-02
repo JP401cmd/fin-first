@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { PageInfoButton } from '@/components/editorial'
+import { getPageInfo } from '@/lib/page-info-content'
 import { VersieClient } from './versie-client'
 
 export const metadata: Metadata = { title: 'Versie & git — Beheer' }
@@ -16,7 +17,7 @@ export default function BeheerVersiePage() {
     <div className="relative">
       <PageInfoButton
         className="absolute right-0 top-0 z-10"
-        description="Alleen-lezen overzicht van je git-, deploy- en migratie-staat. Toont waar localhost staat t.o.v. master en productie, welke werkboom je open hebt, of er ongecommit of ongepusht werk is, en of alle Supabase-migraties zijn toegepast. Onderaan staat een spiekbrief over hoe committen, branches, pushen en worktrees samenhangen."
+        content={getPageInfo('/beheer/versie')}
       />
       <VersieClient />
     </div>

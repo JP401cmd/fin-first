@@ -4,7 +4,7 @@ import { useMemo } from 'react'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import { PageInfoButton } from '@/components/editorial'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 import type { GoalWithBudget } from '@/lib/fin-data-loader'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
 import type { WidgetPref } from '@/lib/widget-catalog'
@@ -205,7 +205,7 @@ export function OverzichtSecondary({
         {/* Geminimaliseerde status-/vrijheidsmelding: gekleurd statuspunt direct
             links van de 'i' (meldingen-conventie). */}
         <PageStatusDot />
-        <PageInfoButton description={PAGE_INFO['/overzicht'] ?? ''} />
+        <PageInfoButton content={getPageInfo('/overzicht')} />
       </div>
 
       {/* Optionele power-user widget-rail OP DEZELFDE PLEK als Voortgang-

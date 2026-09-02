@@ -4,7 +4,7 @@ import { PrivacyOverview } from '@/components/mijn/privacy-overview'
 import { AiPrivacySettings } from '@/components/mijn/ai-privacy-settings'
 import { AiExecutionSettings } from '@/components/mijn/local-categorization-settings'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 
 export const metadata: Metadata = {
   title: 'Privacy & transparantie — TriFinity',
@@ -23,7 +23,7 @@ export default function MijnPrivacyPage() {
       <NavStackMeta title="Privacy" bottomBar={{ kind: 'tabs' }} />
       <div className="relative mx-auto max-w-3xl px-4 pt-4 sm:px-6">
         <PageInfoButton
-          description={PAGE_INFO['/mijn/privacy'] ?? ''}
+          content={getPageInfo('/mijn/privacy')}
           className="absolute right-4 top-4 sm:right-6"
         />
       </div>

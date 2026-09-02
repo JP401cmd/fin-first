@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { loadFinData } from '@/lib/fin-data-loader'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 import { TipsActiesPage } from '@/components/overview/tips-acties-page'
 
 export const metadata: Metadata = {
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
 export default async function OverzichtTipsPage() {
   const supabase = await createClient()
   const finData = await loadFinData(supabase)
-  const description = PAGE_INFO['/overzicht/tips'] ?? ''
+  const description = getPageInfo('/overzicht/tips')
 
   return (
     <>
@@ -34,7 +34,7 @@ export default async function OverzichtTipsPage() {
         actions={finData.actions}
         partnerInfo={finData.partnerInfo}
         currentUserId={finData.currentUserId}
-        infoDescription={description}
+        infoContent={description}
       />
     </>
   )

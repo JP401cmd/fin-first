@@ -200,6 +200,10 @@ export const SKILL_CURATION: Record<string, SkillCuration> = {
     kind: 'tooling',
     tagline: 'Live-verificatie van de fiscale keuzes op de optimizer: seed-account met beleggingen, pensioen én jaarruimte, katern I–IV via chromedev uitgelezen uit de DOM, invarianten-toets bovenop de vitest-suites — gericht op het gat tussen motor en scherm.',
   },
+  'info-knoppen-actueel': {
+    kind: 'tooling',
+    tagline: 'Houdt de info-knoppen (PAGE_INFO/PageInfoButton) actueel: detector (npm run page-info:check) vindt ontbrekende, verweesde of omzeilde content, en de skill werkt die standaard direct bij — geen aparte goedkeuring voor deze copy-only wijziging.',
+  },
 }
 
 // ── Curatie: groepen + agents ───────────────────────────────────────────────-

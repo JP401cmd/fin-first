@@ -21,7 +21,7 @@ import {
   OrnamentColophon,
   PageInfoButton,
 } from '@/components/editorial'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import {
   DemografieBlock,
@@ -106,7 +106,7 @@ export default function TotaalplanPage() {
 
       {/* ── Toolbar ── */}
       <div data-print-hide className="mb-6 flex items-center justify-end gap-3">
-        <PageInfoButton description={PAGE_INFO['/rapportages/totaalplan'] ?? ''} />
+        <PageInfoButton content={getPageInfo('/rapportages/totaalplan')} />
         <button
           type="button"
           onClick={() => window.print()}

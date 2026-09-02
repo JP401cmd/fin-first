@@ -7,7 +7,7 @@ import { AiPrivacyIndicator } from '@/components/app/ai-privacy-indicator'
 import { Masthead } from './masthead'
 import { SectionHeading } from './section-heading'
 import { PageInfoButton } from '@/components/editorial'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 import { NewspaperFooter } from './newspaper-footer'
 import { HeroNewsArticle, NewsArticle, NewsSkeletonLoader } from './news-components'
 import { ArchiveSection } from './archive-section'
@@ -486,7 +486,7 @@ export function NieuwsOnlyClient({ userId }: { userId: string }) {
   return (
     <div className="relative mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
       <PageInfoButton
-        description={PAGE_INFO['/nieuws']}
+        content={getPageInfo('/nieuws')}
         className="absolute right-4 top-5 sm:right-6 sm:top-8"
       />
       {/* NWS-1 — in Eenvoudig draagt de masthead alleen datum + "N artikelen".

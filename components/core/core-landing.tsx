@@ -24,7 +24,7 @@ import { MaskedAmount } from '@/components/app/masked-amount'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { computeHealthScoreFromInputs, type HealthScore, type HealthPillar } from '@/lib/financial-health'
 import { GlossaryTerm, PageInfoButton } from '@/components/editorial'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 import { CoreHero } from './core-hero'
 import { CashflowHeroTile } from './cashflow-hero-tile'
 import { NetWorthProjectionChart } from './net-worth-projection-chart'
@@ -428,7 +428,7 @@ export function CoreLanding({ initialData }: CoreLandingProps) {
           registratie-pagina met een neutrale kicker. */}
       <header className="relative px-4 pt-5 sm:px-6 sm:pt-8 mb-6 space-y-2">
         <PageInfoButton
-          description={PAGE_INFO['/core']}
+          content={getPageInfo('/core')}
           className="absolute right-4 top-5 sm:right-6 sm:top-8"
         />
         <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">

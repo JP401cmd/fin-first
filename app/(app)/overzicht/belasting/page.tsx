@@ -16,7 +16,7 @@ import { computeBox3TaxableInput, box3TaxStatus } from '@/lib/box3-taxable-input
 import { CURRENT_TAX_YEAR } from '@/lib/box3-data'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { buildTaxOverview } from '@/lib/tax-overview'
@@ -280,7 +280,7 @@ export default async function OverzichtBelastingPage() {
       <div className="relative mx-auto max-w-6xl px-4 pt-6 sm:px-6 sm:pt-8">
         <PageStatusDot className="absolute right-[52px] top-6 sm:right-[60px] sm:top-8" />
         <PageInfoButton
-          description={PAGE_INFO['/overzicht/belasting'] ?? ''}
+          content={getPageInfo('/overzicht/belasting')}
           className="absolute right-4 top-6 sm:right-6 sm:top-8"
         />
         <PageOpening

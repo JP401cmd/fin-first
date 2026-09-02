@@ -12,7 +12,7 @@ import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { InsightToggleButton } from '@/components/editorial/insight-toggle-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
 import { HideInSimple } from '@/components/app/hide-in-simple'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 import { hasInvestedAssets } from '@/lib/dashboard-wealth-weighting'
 
 export const metadata: Metadata = {
@@ -103,7 +103,7 @@ export default async function OverzichtBezittingenPage() {
         />
         <PageStatusDot className="absolute right-[52px] top-4 sm:right-[60px]" />
         <PageInfoButton
-          description={PAGE_INFO['/overzicht/bezittingen'] ?? ''}
+          content={getPageInfo('/overzicht/bezittingen')}
           className="absolute right-4 top-4 sm:right-6"
         />
       </div>

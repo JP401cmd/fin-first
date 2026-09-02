@@ -8,7 +8,7 @@ import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { PageInfoButton, PageOpening } from '@/components/editorial'
 import { DepthSection } from '@/components/app/depth-section'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 
 type PartnerNotifMode = 'all_shared' | 'threshold' | 'categories' | 'disabled'
 
@@ -332,7 +332,7 @@ export default function MijnNotificatiesPage() {
         deck="Stel in welke meldingen je wilt ontvangen — push-types, partner-transacties en maandelijkse geld-checkin."
       >
         <PageInfoButton
-          description={PAGE_INFO['/mijn/notificaties'] ?? ''}
+          content={getPageInfo('/mijn/notificaties')}
           className="absolute right-0 top-0"
         />
       </PageOpening>

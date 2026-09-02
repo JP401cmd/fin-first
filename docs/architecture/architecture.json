@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-01T20:34:07.714Z",
-  "generatedDate": "2026-09-01",
+  "generatedAt": "2026-09-02T07:58:27.817Z",
+  "generatedDate": "2026-09-02",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -17147,7 +17147,7 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 72
+        "commits": 71
       },
       {
         "path": "lib/ai",
@@ -17155,14 +17155,14 @@
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 30
-      },
-      {
-        "path": "app/api/household",
-        "commits": 19
+        "commits": 31
       },
       {
         "path": "app/api/ai",
+        "commits": 18
+      },
+      {
+        "path": "app/api/household",
         "commits": 18
       },
       {
@@ -17195,12 +17195,12 @@
       {
         "file": "components/app/budgets-client.tsx",
         "loc": 5412,
-        "commits": 34
+        "commits": 33
       },
       {
         "file": "components/core/assets-client.tsx",
         "loc": 4936,
-        "commits": 39
+        "commits": 38
       },
       {
         "file": "components/app/cash-account-view.tsx",
@@ -17210,7 +17210,7 @@
       {
         "file": "lib/dashboard-data-loader.ts",
         "loc": 3033,
-        "commits": 58
+        "commits": 59
       },
       {
         "file": "lib/release-notes.ts",
@@ -17224,8 +17224,8 @@
       },
       {
         "file": "app/(app)/core/checkin/page.tsx",
-        "loc": 2299,
-        "commits": 9
+        "loc": 2329,
+        "commits": 10
       }
     ]
   },
@@ -17249,7 +17249,7 @@
         "id": "architect",
         "name": "architect",
         "description": "Use this agent as the Enterprise & Solution Architect for TriFinity: the owner of the structural blueprint and architectural decisions, and the person accountable that the in-app architecture plates (`/beheer/architectuur` — Praatplaat/HLD, ArchiMate, Database/ERD, Berekeningen) stay truthful. He works at TWO moments: (1) at the START of a new feature — solution design, how it fits the enterprise architecture, the principles/trade-offs and the ADR; and (2) as a REVIEWER of structure — does this change respect the architecture, the domains, the single-source-of-truth and the documented decisions? He owns architectural CONTENT and DECISIONS; the mechanical doc-sync is delegated to `architecture-docs-keeper`, and code-level direction and code-level review to `senior-developer`/`code-review`.",
-        "model": "opus",
+        "model": "fable",
         "color": "pink"
       },
       {
@@ -17277,14 +17277,14 @@
         "id": "calc-engine-specialist",
         "name": "calc-engine-specialist",
         "description": "Use this agent for TriFinity's financial calculation engines (rekenmotoren): the code that turns raw DB data into the derived numbers users see — spaarquote, netto vermogen, belastingdruk (box 1/box 3), FIRE-doel, vrijheids-% and vrijheidstijd. It owns `lib/horizon-kernel/**` (the FIRE/Horizon engine: engine/solver/gap/bridge/run-unified/wrappers/adapter), `lib/horizon/build-input.ts`, `lib/horizon/networth-rows.ts`, `lib/constants.ts`, `lib/fire-params.ts`, `lib/budget-utils.ts`, `lib/effective-financials.ts`, `lib/savings-source.ts`, `lib/housing-strategy.ts`, `lib/box1-tax.ts`, `lib/box3-data.ts`, `lib/dashboard-data-loader.ts` and `lib/format.ts`; `lib/unified-projection.ts` is only the consumer type contract (SimRow/SimResult) produced by the kernel bridge — not an engine. Use it whenever a calculation, constant or assumption changes, or to verify a number is correct and single-sourced. It also keeps the curated *Berekeningen* view (`lib/architecture/calculations.ts`) in sync.",
-        "model": "opus",
+        "model": "fable",
         "color": "amber"
       },
       {
         "id": "code-review",
         "name": "code-review",
         "description": "Use this agent when you need a thorough code review of recently written code, when you want to ensure code quality meets the highest standards, when checking for technical debt, security vulnerabilities, or performance issues, or when you need to run quality checks like linting and type checking.",
-        "model": "opus",
+        "model": "fable",
         "color": "red"
       },
       {
@@ -17298,7 +17298,7 @@
         "id": "deep-dive",
         "name": "deep-dive",
         "description": "Use this agent for a deep second opinion before a critical or hard-to-reverse decision, and for research that reaches beyond the codebase — comparing solution approaches, library/API research via the web, multi-source verification of assumptions. It complements the specialists, it does not replace them: bug investigation → bug-reporter, security audit → security-specialist, quick codebase lookup → Explore, solution design → architect. Pipelines may also dispatch it explicitly for deep pre-work analysis (e.g. understanding current behaviour before extending a feature).",
-        "model": "opus",
+        "model": "fable",
         "color": "purple"
       },
       {
@@ -17333,14 +17333,14 @@
         "id": "security-specialist",
         "name": "security-specialist",
         "description": "Use this agent for application-security and privacy review in TriFinity: auditing new/changed API routes, service-role usage, secrets/keys, dev/test endpoints, partner/household privacy, AI data-exposure and Wft/AVG-sensitive surfaces. Use it as the security gate in the feature/bug pipelines, before shipping any change that touches data access, auth, external calls or admin paths — and for periodic security sweeps of the whole app. RLS/schema mechanics belong to `supabase-db-specialist`; this agent owns the security view ACROSS layers (route → proxy → client → AI → DB).",
-        "model": "opus",
+        "model": "fable",
         "color": "red"
       },
       {
         "id": "senior-developer",
         "name": "senior-developer",
         "description": "Use this agent as the senior/principal engineer for TriFinity: code-level technical direction, tricky cross-cutting refactors, hard debugging, and final technical judgement that spans multiple domains (Next.js 16, React 19, Supabase/RLS, AI, the calc engines, the self-documenting architecture). It coordinates the specialist agents, weighs trade-offs, and owns codebase-wide quality and consistency. Boundary: structural/domain decisions, enterprise fit and ADRs belong to the `architect` agent — this agent owns how it gets built well. Use it when a change touches several subsystems, needs a build/refactor plan, or when you want a seasoned 'is this the right approach?' call before committing.",
-        "model": "opus",
+        "model": "fable",
         "color": "red"
       },
       {
@@ -17708,6 +17708,33 @@
         "steps": []
       },
       {
+        "id": "info-knoppen-actueel",
+        "name": "info-knoppen-actueel",
+        "description": "Houdt de info-knoppen (\"Wat zie ik hier?\", PageInfoButton) app-breed actueel — detecteert ontbrekende, verweesde of omzeilde PAGE_INFO-content en werkt die standaard direct bij, zonder aparte goedkeuring. Gebruik na het toevoegen/verplaatsen van een pagina of route, als losse controle, of vanuit de release-skill (stap 8).",
+        "steps": [
+          {
+            "index": 1,
+            "title": "Detector draaien",
+            "agents": []
+          },
+          {
+            "index": 2,
+            "title": "Orphaned-treffers met de hand verifiëren vóór verwijderen",
+            "agents": []
+          },
+          {
+            "index": 3,
+            "title": "Missing en inlineLiterals direct oplossen",
+            "agents": []
+          },
+          {
+            "index": 4,
+            "title": "Verifiëren",
+            "agents": []
+          }
+        ]
+      },
+      {
         "id": "juridische-brief",
         "name": "juridische-brief",
         "description": "Gebruik wanneer een juridisch punt beslisbaar op papier moet — de verplichte wijzigingsaantekening bij /privacy, /voorwaarden of /wft, of elke keuze die de eigenaar moet maken zonder zelf jurist te worden. Levert één pagina met de vraag, de opties en het gevolg per optie, plus een aanbeveling.",
@@ -18014,11 +18041,16 @@
           },
           {
             "index": 8,
-            "title": "Build & echte verificatie",
+            "title": "Info-knoppen",
             "agents": []
           },
           {
             "index": 9,
+            "title": "Build & echte verificatie",
+            "agents": []
+          },
+          {
+            "index": 10,
             "title": "Review",
             "agents": [
               "calc-engine-specialist",
@@ -18031,17 +18063,17 @@
             ]
           },
           {
-            "index": 10,
+            "index": 11,
             "title": "Ship",
             "agents": []
           },
           {
-            "index": 11,
+            "index": 12,
             "title": "Deploy-verificatie & rollback-pad",
             "agents": []
           },
           {
-            "index": 12,
+            "index": 13,
             "title": "Slotstap",
             "agents": []
           }
@@ -18661,6 +18693,13 @@
     },
     {
       "date": "2026-09-01",
+      "api": 307,
+      "components": 1010,
+      "tables": 93,
+      "routesProduction": 97
+    },
+    {
+      "date": "2026-09-02",
       "api": 307,
       "components": 1010,
       "tables": 93,

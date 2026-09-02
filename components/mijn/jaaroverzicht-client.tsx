@@ -46,7 +46,7 @@ import {
   formatTimestamp,
 } from '@/lib/format'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 
 /**
  * De deel-sheet draagt de hele deel-flow (standen-keuze, kaart-preview,
@@ -568,7 +568,7 @@ export function JaaroverzichtClient() {
   return (
     <section className="bg-editorial relative mx-auto max-w-4xl px-4 pt-6 pb-10 sm:px-6 sm:pt-8">
       <PageInfoButton
-        description={PAGE_INFO['/mijn/jaaroverzicht'] ?? ''}
+        content={getPageInfo('/mijn/jaaroverzicht')}
         className="absolute right-4 top-4 sm:right-6"
       />
 

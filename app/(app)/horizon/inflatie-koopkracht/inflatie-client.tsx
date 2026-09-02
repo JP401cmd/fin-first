@@ -4,7 +4,7 @@ import { ArrowLeft, TrendingDown } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { PageOpening, PullQuote, HL, HLNeg, GlossaryTerm, PageInfoButton } from '@/components/editorial'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 import { InflationErosionChart } from '@/components/app/horizon/inflation-erosion-chart'
 
 export function InflatieKoopkrachtClient({
@@ -17,14 +17,14 @@ export function InflatieKoopkrachtClient({
   const pathname = usePathname()
   // /toekomst/inflatie-koopkracht krijgt nieuwe info; legacy /horizon-pad valt terug
   const pageInfoText =
-    (pathname && PAGE_INFO[pathname]) || PAGE_INFO['/toekomst/inflatie-koopkracht'] || ''
+    getPageInfo(pathname, '/toekomst/inflatie-koopkracht')
   // Back-link wijst naar canonieke route /toekomst (was /horizon)
   const backHref = pathname?.startsWith('/toekomst') ? '/toekomst' : '/horizon'
   const backLabel = pathname?.startsWith('/toekomst') ? 'De Toekomst' : 'Toekomst'
   return (
     <div className="relative max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
       <PageInfoButton
-        description={pageInfoText}
+        content={pageInfoText}
         className="absolute right-4 top-6 sm:right-6 sm:top-8"
       />
       {/* Back link */}

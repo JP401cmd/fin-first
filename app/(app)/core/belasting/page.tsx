@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { PageInfoButton, GlossaryTerm } from '@/components/editorial'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 
 const Box3PartnerModal = dynamic(
   () => import('@/components/app/core/box3-partner-modal').then((m) => ({ default: m.Box3PartnerModal })),
@@ -231,7 +231,7 @@ export default function BelastingPage() {
           {/* Editorial header — blueprint Type 10 (Calculator) */}
           <header className="relative mb-3 sm:mb-4 space-y-1.5">
             <PageInfoButton
-              description={PAGE_INFO['/core/belasting']}
+              content={getPageInfo('/core/belasting')}
               className="absolute right-0 top-0"
             />
             <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">

@@ -4,7 +4,7 @@ import { ArrowLeft, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { PageOpening, PullQuote, HL, GlossaryTerm, PageInfoButton } from '@/components/editorial'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 import { CompoundInterestChart } from '@/components/app/horizon/compound-interest-chart'
 
 export function CompoundInterestPage({
@@ -17,14 +17,14 @@ export function CompoundInterestPage({
   const pathname = usePathname()
   // /toekomst/samengestelde-interest krijgt nieuwe info; legacy fallback
   const pageInfoText =
-    (pathname && PAGE_INFO[pathname]) || PAGE_INFO['/toekomst/samengestelde-interest'] || ''
+    getPageInfo(pathname, '/toekomst/samengestelde-interest')
   // Back-link wijst naar canonieke route /toekomst (was /horizon)
   const backHref = pathname?.startsWith('/toekomst') ? '/toekomst' : '/horizon'
   const backLabel = pathname?.startsWith('/toekomst') ? 'De Toekomst' : 'Toekomst'
   return (
     <div className="relative max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
       <PageInfoButton
-        description={pageInfoText}
+        content={pageInfoText}
         className="absolute right-4 top-6 sm:right-6 sm:top-8"
       />
       {/* Back link */}

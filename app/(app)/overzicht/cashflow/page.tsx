@@ -14,7 +14,7 @@ import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { InsightToggleButton } from '@/components/editorial/insight-toggle-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
 import { PageOpening } from '@/components/editorial'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 
 export const metadata: Metadata = {
   title: 'Cashflow — TriFinity',
@@ -72,7 +72,7 @@ export default async function OverzichtCashflowPage() {
         />
         <PageStatusDot className="absolute right-[52px] top-4 sm:right-[60px]" />
         <PageInfoButton
-          description={PAGE_INFO['/overzicht/cashflow'] ?? ''}
+          content={getPageInfo('/overzicht/cashflow')}
           className="absolute right-4 top-4 sm:right-6"
         />
       </div>

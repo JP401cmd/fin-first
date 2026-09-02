@@ -80,7 +80,7 @@ describe('RegimeKaart', () => {
           { label: 'Vermogen', hint: 'onttrekking', weight: 8_000, value: 'B', tone: 'wealth' },
         ]}
         footnote="Vaste inkomsten nemen de druk weg bij je vermogen."
-        infoDescription="Uitleg over de kaart."
+        infoContent={{ insight: 'Uitleg over de kaart.', grip: '' }}
       />,
     )
     expect(screen.getByText('Waar je jaarinkomen vandaan komt')).toBeInTheDocument()
@@ -103,7 +103,7 @@ describe('RegimeKaart', () => {
           { label: 'Pensioen', weight: 0, value: 'z', tone: 'zero' },
         ]}
         footnote="f"
-        infoDescription="i"
+        infoContent={{ insight: 'i', grip: '' }}
       />,
     )
     // Alleen de fill-divs dragen een inline width.
@@ -121,7 +121,7 @@ describe('RegimeKaart', () => {
         statusPill={{ label: 'Vaste basis', tone: 'good' }}
         rows={[{ label: 'AOW', weight: 1, value: 'x', tone: 'income' }]}
         footnote="f"
-        infoDescription="i"
+        infoContent={{ insight: 'i', grip: '' }}
       />,
     )
     expect(screen.getByText('Vaste basis')).toBeInTheDocument()
@@ -146,7 +146,7 @@ describe('RegimeKaart', () => {
           { label: 'Vermogen', hint: 'onttrekking', weight: withdrawalPerYear, value: <MaskedAmount value={Math.round(withdrawalPerYear)} tone="horizon" />, tone: 'wealth' },
         ]}
         footnote="f"
-        infoDescription="i"
+        infoContent={{ insight: 'i', grip: '' }}
       />,
     )
     // De gerenderde euro-waarden moeten exact de split-afgeleide waarden zijn.

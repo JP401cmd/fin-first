@@ -50,7 +50,7 @@ import { CategoryGroupHeader } from '@/components/core/category-group-header'
 import { EenvoudigPillList, type PillItem } from '@/components/overview/eenvoudig-pill-list'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { Kicker, FiguresStrip, PageInfoButton, GlossaryTerm, PageOpening, SubtotalLine } from '@/components/editorial'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 import { loadEntitySparklines } from '@/lib/load-entity-sparklines'
 import { buildKpiContext } from '@/lib/kpi-context'
 import { computeDebtKpi } from '@/lib/debt-kpi'
@@ -159,7 +159,7 @@ export function DebtsClient({ toolbarFilter, debtTypeFilter, initialData, showPa
   const searchParams = useSearchParams()
   const pathname = usePathname()
   // /overzicht/schulden toont nieuwe overzicht-tekst; legacy /core/debts blijft fallback
-  const pageInfoText = (pathname && PAGE_INFO[pathname]) || PAGE_INFO['/core/debts']
+  const pageInfoText = getPageInfo(pathname, '/core/debts')
 
   // URL-driven pane-state: `?debt=<id>` opent de slide-in pane voor die
   // schuld. Consistent met `/core/debts/[type]` (debt-category-page.tsx).
@@ -707,7 +707,7 @@ export function DebtsClient({ toolbarFilter, debtTypeFilter, initialData, showPa
       >
         {showPageInfo && (
           <PageInfoButton
-            description={pageInfoText}
+            content={pageInfoText}
             className="absolute right-0 top-0"
           />
         )}

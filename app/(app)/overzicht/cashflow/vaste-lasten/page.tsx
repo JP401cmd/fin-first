@@ -6,7 +6,7 @@ import { VasteLastenLoader, VasteLastenFallback } from './vaste-lasten-loader'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
 import { PageOpening } from '@/components/editorial'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 
 export const metadata: Metadata = {
   title: 'Vaste lasten — TriFinity',
@@ -53,7 +53,7 @@ export default async function OverzichtCashflowVasteLastenPage() {
       <div className="relative mx-auto max-w-6xl px-4 pt-4 sm:px-6">
         <PageStatusDot className="absolute right-[52px] top-4 sm:right-[60px]" />
         <PageInfoButton
-          description={PAGE_INFO['/overzicht/cashflow/vaste-lasten'] ?? ''}
+          content={getPageInfo('/overzicht/cashflow/vaste-lasten')}
           className="absolute right-4 top-4 sm:right-6"
         />
       </div>

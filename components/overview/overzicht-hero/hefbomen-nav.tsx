@@ -371,7 +371,7 @@ function HefboomDetailCard({
  * statuslabels onder de hefbomen-rij — is verwijderd. Hij werd nergens in de
  * productie-UI gerenderd (alleen in zijn eigen unit-test) en de uitleg van
  * groen/oranje/rood hoort volgens het audit-besluit éénmalig in de pagina-'i'
- * van /overzicht: zie `PAGE_INFO['/overzicht']` in lib/page-info-content.ts.
+ * van /overzicht: zie `PAGE_INFO['/overzicht']` in lib/page-info-content.ts (nu een {insight, grip}-object).
  * De status-dot zelf houdt zijn `title` uit `LEVERAGE_STATUS_LABEL` — dat is
  * sinds S1 bewust een hover-affordance en NIET de toegankelijke naam: die komt
  * van het zichtbare oordeel, of van de sr-only-regel die `LeverageCard`

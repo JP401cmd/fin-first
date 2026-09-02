@@ -15,7 +15,7 @@ import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { PageOpening, PageInfoButton } from '@/components/editorial'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 
 export function ToekomstSubpageShell({
   kicker,
@@ -49,7 +49,7 @@ export function ToekomstSubpageShell({
     <div className="relative mx-auto max-w-6xl px-4 sm:px-6 pt-4">
       {infoKey && (
         <PageInfoButton
-          description={PAGE_INFO[infoKey] ?? ''}
+          content={getPageInfo(infoKey)}
           className="absolute right-4 top-4 sm:right-6"
         />
       )}

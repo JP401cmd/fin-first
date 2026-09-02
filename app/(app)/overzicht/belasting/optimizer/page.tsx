@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PageOpening } from '@/components/editorial'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 import { createClient } from '@/lib/supabase/server'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { loadFiscaleKansen } from '@/lib/tax-opportunities-loader'
@@ -47,7 +47,7 @@ export default async function BelastingOptimizerPage() {
 
       <div className="relative mx-auto max-w-6xl px-4 pt-6 pb-3 sm:px-6 sm:pt-8">
         <PageInfoButton
-          description={PAGE_INFO['/overzicht/belasting/optimizer'] ?? ''}
+          content={getPageInfo('/overzicht/belasting/optimizer')}
           className="absolute right-4 top-6 sm:right-6 sm:top-8"
         />
         <PageOpening

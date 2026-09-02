@@ -30,6 +30,7 @@ import type { LifeEvent } from '@/lib/horizon-data'
 import type { SimCashflow } from '@/lib/fire-simulation'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import { BOX3_DRAG } from '@/lib/constants'
+import { getPageInfo } from '@/lib/page-info-content'
 import { formatCurrency } from '@/lib/format'
 import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { ReceiptRow } from '@/components/app/horizon/phase-analysis/receipt-row'
@@ -208,7 +209,7 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
               ? 'Tussen het moment dat je stopt met werken en je AOW ingaat, leef je volledig van je opgebouwde vermogen — elke euro die je eerder opzij zette koop je hier vrijheid mee. Deze analyses laten zien of je vermogen die jaren overbrugt.'
               : 'Je AOW is al ingegaan, maar je volledige vrijheid (FIRE) komt nog. In deze brugperiode vult je vermogen aan wat je AOW niet dekt. Deze analyses laten zien of je vermogen dat tekort overbrugt.'
           }
-          infoDescription="De overgangsfase is de periode tussen stoppen met werken en het bereiken van je AOW én volledige vrijheid. Omdat AOW en FIRE niet altijd op hetzelfde moment vallen, ontstaat er een brug die je vermogen moet financieren. Hier zie je de kassabon van die jaren, een Monte Carlo simulatie van het risico, strategie-opties, de impact van deeltijdwerk, en wat er nodig is om eerder te stoppen."
+          infoContent={getPageInfo('/toekomst/fase-overgang/intro')}
         />
 
         {/* 0b. Regime-kaart — waar de dekking van de brug vandaan komt (€) */}
@@ -241,7 +242,7 @@ export const PhaseModalOvergang = memo(function PhaseModalOvergang({
               ? 'Dit is de smalste brug: AOW en pensioen dragen nog niets bij — alles moet uit je vermogen komen.'
               : 'AOW en pensioen vullen al aan; het restant van de brug financier je uit je vermogen.'
           }
-          infoDescription="In de overgangsfase zie je waar de dekking van je uitgaven vandaan komt. De balk toont het relatieve gewicht van elke bron t.o.v. de zwaarste. Vermogen is het geoormerkte bruggeld dat je onttrekt; AOW en pensioen zijn je vaste inkomsten. AOW en pensioen komen exact uit de projectie (grossIncomeBySource) — in de brug tussen stoppen en je AOW dragen ze vaak nog €0 bij, waardoor het gewicht volledig op je vermogen rust."
+          infoContent={getPageInfo('/toekomst/fase-overgang/dekking')}
         />
 
         {/* 1. PhaseChartZoom — full trajectory with transition phase highlighted */}

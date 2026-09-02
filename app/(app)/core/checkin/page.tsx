@@ -37,7 +37,7 @@ import {
 } from '@/lib/goal-data'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { PageInfoButton } from '@/components/editorial'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 import { berekenReeks } from '@/lib/checkin/reeks'
 import { CheckinAfsluitViering } from './afsluit-viering'
 
@@ -746,7 +746,7 @@ function CheckinPageContent() {
       {/* ── Header — editorial blueprint met kicker-streep ─────────── */}
       <div className="relative mb-6 flex items-center gap-3">
         <PageInfoButton
-          description={PAGE_INFO['/core/checkin']}
+          content={getPageInfo('/core/checkin')}
           className="absolute right-0 top-0"
         />
         {/* Back-affordance wordt geleverd door de TopBar (mobile) /

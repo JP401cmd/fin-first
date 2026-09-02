@@ -10,7 +10,8 @@ import { IsinResolverStatus } from '@/components/connections/isin-resolver-statu
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { useToast } from '@/components/app/toast-provider'
 import { WidgetEmpty } from '@/components/widgets/widget-empty'
-import { PageOpening } from '@/components/editorial'
+import { PageOpening, PageInfoButton } from '@/components/editorial'
+import { getPageInfo } from '@/lib/page-info-content'
 import { computeFreshness, type ConnectionsData, type ExchangeConnectionRow, type ExchangeId, type WalletAddressRow, type WalletChain } from '@/lib/connections-data'
 import type { BrokerConnectionRow, BrokerId } from '@/lib/broker-connections-data'
 import type { AangifteImportSummary } from '@/lib/aangifte/imports-loader'
@@ -347,7 +348,11 @@ export function KoppelingenClient({ initialData, brokerConnections, aangifteImpo
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-8">
+    <div className="relative mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-8">
+      <PageInfoButton
+        content={getPageInfo('/mijn/koppelingen')}
+        className="absolute right-4 top-4 sm:right-6 sm:top-6"
+      />
       {/* Editorial pagina-opening — blueprint Type 2 (List) */}
       <PageOpening
         className="mb-6"

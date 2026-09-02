@@ -161,7 +161,7 @@ import { buildSliderEvent, readSliderValueFromEvents, type SliderKey } from '@/l
 import type { HorizonScenarioOverrides } from '@/lib/hooks/use-horizon-fire-sim'
 import type { AssetCategorie } from '@/lib/horizon-kernel/types'
 import { runMarktcheckAsync, runScenarioPresetsAsync } from '@/lib/horizon-kernel/worker/run-in-worker'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 
 const ScenariosModal = dynamic(() =>
   import('@/components/app/horizon/scenarios-modal').then(m => ({ default: m.ScenariosModal })),
@@ -925,7 +925,7 @@ export default function HorizonPage({
   const router = useRouter()
   const pathname = usePathname()
   // /toekomst krijgt nieuwe overzicht-tekst; /horizon-fallback voor legacy bezoeken
-  const pageInfoText = (pathname && PAGE_INFO[pathname]) || PAGE_INFO['/horizon']
+  const pageInfoText = getPageInfo(pathname, '/horizon')
   useEffect(() => {
     const modal = searchParams.get('modal')
     const strategieParam = searchParams.get('strategie')
@@ -4676,7 +4676,7 @@ export default function HorizonPage({
           {/* Embedded (op /toekomst): geen eigen PageInfoButton — de paginakop
               (PageOpening "Je tijdas") levert 'm al. Alleen op de legacy-route
               /horizon (standalone) rendert de i-knop hier. */}
-          {!embedded && <PageInfoButton description={pageInfoText} />}
+          {!embedded && <PageInfoButton content={pageInfoText} />}
         </div>
         {/* Kicker met 28×1px Horizon-streep */}
         <div className="flex items-center gap-2.5 pr-20 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)] sm:pr-24">

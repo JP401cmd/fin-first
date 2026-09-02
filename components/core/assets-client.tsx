@@ -16,7 +16,7 @@ import { buildAssetReturnBreakdown, formatGainPct, RETURN_BASIS_LABELS } from '@
 import { OVERLAY_QUERY_KEYS } from '@/lib/navigation'
 import { createPaneUrlHistory } from '@/lib/pane-url-history'
 import { AssetReturnModal } from './asset-return-modal'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { AssetPane } from '@/components/app/core/assets/asset-pane'
 import { createClient } from '@/lib/supabase/client'
@@ -237,7 +237,7 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
   const pathname = usePathname()
   // Show juiste PAGE_INFO afhankelijk van canonieke route: /overzicht/bezittingen
   // krijgt nieuwe overzicht-tekst; legacy /core/assets blijft fallback.
-  const pageInfoText = (pathname && PAGE_INFO[pathname]) || PAGE_INFO['/core/assets']
+  const pageInfoText = getPageInfo(pathname, '/core/assets')
   const fc = useFc()
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [aangifteImportOpen, setAangifteImportOpen] = useState(false)
@@ -959,7 +959,7 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
       >
         {showPageInfo && (
           <PageInfoButton
-            description={pageInfoText}
+            content={pageInfoText}
             className="absolute right-0 top-0"
           />
         )}

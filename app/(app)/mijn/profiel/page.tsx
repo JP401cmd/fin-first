@@ -6,9 +6,10 @@ import { HouseholdSection } from '@/components/app/household-section'
 import { HouseholdPrivacySettings } from '@/components/mijn/household-privacy-settings'
 import { HouseholdBudgetModelSection } from '@/components/mijn/household-budget-model-section'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
-import { PageOpening, Button } from '@/components/editorial'
+import { PageOpening, Button, PageInfoButton } from '@/components/editorial'
 import { FormError, formErrorId } from '@/components/app/form-error'
 import { useToast } from '@/components/app/toast-provider'
+import { getPageInfo } from '@/lib/page-info-content'
 
 type HouseholdType = 'solo' | 'samen' | 'gezin'
 
@@ -146,8 +147,12 @@ export default function ProfielPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-8">
+    <div className="relative mx-auto max-w-4xl px-4 py-5 sm:px-6 sm:py-8">
       <NavStackMeta title="Profiel" bottomBar={{ kind: 'tabs' }} />
+      <PageInfoButton
+        content={getPageInfo('/mijn/profiel')}
+        className="absolute right-4 top-4 sm:right-6 sm:top-6"
+      />
       {/* Editorial pagina-opening — blueprint Type 8 (Settings) */}
       <PageOpening
         className="mb-5 sm:mb-8"

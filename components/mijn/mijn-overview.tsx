@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { PageOpening } from '@/components/editorial'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 import { DepthSection } from '@/components/app/depth-section'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 
@@ -173,7 +173,7 @@ export function MijnOverview() {
   return (
     <section className="relative mx-auto max-w-6xl px-4 sm:px-6 pt-6 pb-2 md:pt-8 md:pb-4">
       <PageInfoButton
-        description={PAGE_INFO['/mijn'] ?? ''}
+        content={getPageInfo('/mijn')}
         className="absolute right-4 top-6 sm:right-6 sm:top-8"
       />
       <PageOpening

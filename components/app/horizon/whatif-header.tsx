@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ChevronLeft } from 'lucide-react'
 import { PageInfoButton } from '@/components/editorial'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 
 /**
  * Editorial header voor /toekomst/whatif (Type 10: Calculator).
@@ -13,11 +13,11 @@ import { PAGE_INFO } from '@/lib/page-info-content'
 export function WhatIfHeader() {
   const pathname = usePathname()
   // /toekomst/whatif toont nieuwe overzicht-tekst; /horizon/whatif fallback voor legacy
-  const pageInfoText = (pathname && PAGE_INFO[pathname]) || PAGE_INFO['/horizon/whatif']
+  const pageInfoText = getPageInfo(pathname, '/horizon/whatif')
   return (
     <header className="relative mb-4 space-y-2 px-4 sm:px-6">
       <PageInfoButton
-        description={pageInfoText}
+        content={pageInfoText}
         className="absolute right-4 top-0 sm:right-6"
       />
       {/* Back link in mono UPPERCASE */}

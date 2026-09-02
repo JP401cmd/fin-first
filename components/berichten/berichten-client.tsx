@@ -13,7 +13,7 @@ import { NewspaperFooter } from './newspaper-footer'
 import { SectionHeading } from './section-heading'
 import type { Notification } from '@/app/api/notifications/route'
 import { PageInfoButton } from '@/components/editorial'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 
 // Het berichtencentrum toont een ruimer venster dan de bel-dropdown (7 dagen):
 // hier komt alles samen wat de gebruiker de afgelopen maand ontving.
@@ -128,7 +128,7 @@ function CollapsedDayGroup({
 
 export function BerichtenClient() {
   const pathname = usePathname()
-  const pageInfoText = (pathname && PAGE_INFO[pathname]) || PAGE_INFO['/berichten']
+  const pageInfoText = getPageInfo(pathname, '/berichten')
 
   const { unreadCount, markAsRead, refresh } = useNotifications()
 
@@ -238,7 +238,7 @@ export function BerichtenClient() {
   return (
     <div className="relative mx-auto max-w-3xl px-4 py-5 sm:px-6 sm:py-8">
       <PageInfoButton
-        description={pageInfoText}
+        content={pageInfoText}
         className="absolute right-4 top-5 sm:right-6 sm:top-8"
       />
       <Masthead metaLeft={metaLeft} />

@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 import { Kicker, EditorialHeadline } from '@/components/editorial'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
+import type { PageInfoContent } from '@/lib/page-info-content'
 
 /**
  * PhaseIntro — herbruikbaar intro-/uitlegblok bovenaan elke fase-modal
@@ -18,7 +19,7 @@ export function PhaseIntro({
   kicker,
   title,
   body,
-  infoDescription,
+  infoContent,
   className = '',
 }: {
   /** Korte mono-kicker, bijv. "OPBOUWFASE". */
@@ -27,13 +28,13 @@ export function PhaseIntro({
   title: string
   /** 1-2 zinnen uitleg (serif). */
   body: ReactNode
-  /** Tekst in de "Wat zie ik hier?"-popover. */
-  infoDescription: string
+  /** INZICHT + GRIP getoond in de "Wat zie ik hier?"-sheet. */
+  infoContent: PageInfoContent
   className?: string
 }) {
   return (
     <div className={`relative pr-9 ${className}`}>
-      <PageInfoButton description={infoDescription} className="absolute right-0 top-0" />
+      <PageInfoButton content={infoContent} className="absolute right-0 top-0" />
       <Kicker size="small">{kicker}</Kicker>
       <div className="mt-1">
         <EditorialHeadline level="h2" size="sm">

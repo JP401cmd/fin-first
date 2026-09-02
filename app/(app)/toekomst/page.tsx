@@ -9,7 +9,7 @@ import { ToekomstNavCards } from '@/components/future/toekomst-nav-cards'
 import { PrintTijdasButton } from '@/components/future/print-tijdas-button'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PageOpening, EditorialDeck, OrnamentColophon } from '@/components/editorial'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 import {
   DeficitNoticeProvider,
   DeficitNoticeDot,
@@ -157,7 +157,7 @@ export default async function ToekomstPage({
                 absoluut staat; deze kop is een flex-cluster, dus DOM-volgorde +
                 gap-2 (8px) geeft exact dezelfde plaatsing. */}
             <DeficitNoticeDot />
-            <PageInfoButton description={PAGE_INFO['/toekomst'] ?? ''} />
+            <PageInfoButton content={getPageInfo('/toekomst')} />
             {/* Print/Deel toont op basis van een ECHTE projectie (geboortedatum
                 aanwezig → tijdas berekenbaar), niet langer op de verwijderde
                 setup-flag. Geen data-backfill nodig. */}

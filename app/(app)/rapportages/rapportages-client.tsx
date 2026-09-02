@@ -16,7 +16,7 @@ import {
   TogglePill,
   PageInfoButton,
 } from '@/components/editorial'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 import { SectionDivider } from '@/components/app/section-divider'
 import { DepthSection } from '@/components/app/depth-section'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
@@ -222,7 +222,7 @@ export function RapportagesClient({ data }: { data: RapportagesData }) {
       {/* Editorial header — Type 1 Module-landing */}
       <header className="relative mb-6 space-y-3">
         <PageInfoButton
-          description={PAGE_INFO['/rapportages']}
+          content={getPageInfo('/rapportages')}
           className="absolute right-0 top-0"
         />
         <Kicker>Rapportages</Kicker>

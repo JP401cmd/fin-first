@@ -24,7 +24,7 @@ import { formatAmsterdamTime } from '@/lib/tz'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { formatFireAge } from '@/lib/horizon-data'
 import { ScenarioCallout, SectionLabel, OrnamentColophon, PageInfoButton } from '@/components/editorial'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { resolveMetricCaption } from '@/lib/benchmark-report-data'
 import type {
@@ -184,7 +184,7 @@ export default function BenchmarkPage() {
 
       {/* ── Toolbar — page-eigen print-actie ── */}
       <div data-print-hide className="mb-4 flex items-center justify-end gap-3">
-        <PageInfoButton description={PAGE_INFO['/rapportages/benchmark'] ?? ''} />
+        <PageInfoButton content={getPageInfo('/rapportages/benchmark')} />
         <button
           type="button"
           onClick={() => window.print()}

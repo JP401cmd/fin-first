@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { PageOpening, PageInfoButton } from '@/components/editorial'
+import { getPageInfo } from '@/lib/page-info-content'
 import {
   CalendarCheck,
   CalendarClock,
@@ -138,7 +139,7 @@ export default function CheckinHistoriePage() {
       <NavStackMeta title="Check-in historie" />
       <PageInfoButton
         className="absolute top-4 right-4 sm:right-6"
-        description="Hier vind je al je maandelijkse geldcheck-ins terug — een tijdlijn van je vermogen, sparen en reflecties. Bovenaan zie je de trend en wanneer je volgende check-in klaarstaat; klik een maand open voor de details."
+        content={getPageInfo('/core/checkin/historie')}
       />
       {/* Editorial pagina-opening */}
       <PageOpening

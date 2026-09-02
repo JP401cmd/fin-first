@@ -11,7 +11,7 @@ import {
 import { amsterdamParts, NL_MONTH_FULL } from '@/lib/tz'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { formatCurrency } from '@/lib/format'
-import { PAGE_INFO } from '@/lib/page-info-content'
+import { getPageInfo } from '@/lib/page-info-content'
 import type {
   MilestoneTimelineEntry,
   MilestoneTimelineYear,
@@ -273,7 +273,7 @@ export function MijlpalenTijdlijn({
   return (
     <section className="relative mx-auto max-w-4xl px-4 pt-6 pb-10 sm:px-6 sm:pt-8">
       <PageInfoButton
-        description={PAGE_INFO['/mijn/mijlpalen'] ?? ''}
+        content={getPageInfo('/mijn/mijlpalen')}
         className="absolute right-4 top-4 sm:right-6"
       />
 

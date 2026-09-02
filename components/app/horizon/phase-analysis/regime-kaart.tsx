@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
+import type { PageInfoContent } from '@/lib/page-info-content'
 
 /**
  * RegimeKaart — gedeeld presentational blok voor de "regime-drieluik"-inhoud
@@ -106,7 +107,7 @@ export interface RegimeKaartProps {
   /** Voetnoot (serif italic) onder de rijen. */
   footnote: ReactNode
   /** i-uitleg ("Wat betekent dit?"). */
-  infoDescription: string
+  infoContent: PageInfoContent
   /** Optionele status-pill rechtsboven (stoplicht-semantiek, geen accent). */
   statusPill?: { label: string; tone: 'good' | 'warn' | 'bad' }
   className?: string
@@ -123,7 +124,7 @@ export function RegimeKaart({
   kicker,
   rows,
   footnote,
-  infoDescription,
+  infoContent,
   statusPill,
   className = '',
 }: RegimeKaartProps) {
@@ -137,7 +138,7 @@ export function RegimeKaart({
       {/* i-uitleg rechtsboven — zelfde patroon als PhaseIntro */}
       <PageInfoButton
         label="Wat betekent dit?"
-        description={infoDescription}
+        content={infoContent}
         className="absolute right-3 top-3"
       />
 

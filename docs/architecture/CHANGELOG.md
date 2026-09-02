@@ -899,3 +899,7 @@
 ## 2026-09-01
 
 - Geen wijzigingen.
+
+## 2026-09-02
+
+- Geen wijzigingen.

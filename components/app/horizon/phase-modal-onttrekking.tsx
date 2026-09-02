@@ -10,6 +10,7 @@ import { memo, useMemo, useState } from 'react'
 import { ChevronRight, ChevronDown } from 'lucide-react'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { KassabonShell } from '@/components/app/kassabon-shell'
+import { getPageInfo } from '@/lib/page-info-content'
 import { formatCurrency } from '@/lib/format'
 import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { PhaseIntro } from '@/components/app/horizon/phase-analysis/phase-intro'
@@ -230,7 +231,7 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
           kicker="AFBOUWFASE"
           title="Nu leef je van opgeslagen tijd"
           body="Je hebt jarenlang vrijheid opgebouwd; nu leef je ervan. Elke euro die je onttrekt is een stukje teruggekochte levenstijd. De eerste jaren wegen het zwaarst: een tegenvaller vlak na je stop raakt je vermogen blijvend, want je verkoopt op een laag punt zonder herstelkans (volgorde-risico)."
-          infoDescription="Deze analyses laten zien hoelang je vermogen meegaat en welke risico's de afbouwfase bepalen: een Monte Carlo-slagingskans, het volgorde-risico (SORR) van de eerste jaren, koopkrachterosie door inflatie, de keuze huis behouden of verkopen, en je nalatenschap aan het einde."
+          infoContent={getPageInfo('/toekomst/fase-onttrekking/intro')}
         />
 
         {/* 0b. Regime-kaart — waar je jaarinkomen vandaan komt (exact, per jaar) */}
@@ -268,7 +269,7 @@ export const PhaseModalOnttrekking = memo(function PhaseModalOnttrekking({
             },
           ]}
           footnote="Vaste inkomsten nemen de druk weg bij je vermogen: hoe groter hun aandeel, hoe minder je hoeft te onttrekken."
-          infoDescription="Hier zie je hoe je jaarinkomen in de afbouwfase is opgebouwd (gemiddeld per jaar). AOW en pensioen zijn vaste inkomsten; het restant haal je uit je vermogen (onttrekking). De balk toont het relatieve gewicht van elke bron. Deze cijfers komen exact uit de projectie (grossIncomeBySource) in plaats van een schatting — hoe meer vaste inkomsten, hoe minder druk op je vermogen."
+          infoContent={getPageInfo('/toekomst/fase-onttrekking/inkomen')}
         />
 
         {/* 1. PhaseChartZoom — full trajectory with withdrawal phase highlighted */}
