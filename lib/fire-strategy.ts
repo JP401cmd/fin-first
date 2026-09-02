@@ -12,7 +12,12 @@
 
 import { guardFreedomAge } from '@/lib/horizon/outcome-guard'
 
-export type FireEndStrategy = 'perpetual' | 'legacy' | 'deplete' | 'pensioen'
+/**
+ * De vijf eindstrategieën. 'nu-stoppen' (ADR 0127): werken stopt vandaag — de kernel
+ * kortsluit FIRE op de startleeftijd (maand 0) en toetst of het vermogen tot de eigen
+ * eindleeftijd reikt (doel €0). Geen doelvermogen (D4), vrijheids-% = tijdsdekking (D5).
+ */
+export type FireEndStrategy = 'perpetual' | 'legacy' | 'deplete' | 'pensioen' | 'nu-stoppen'
 
 export interface FireStrategyConfig {
   strategy: FireEndStrategy
@@ -43,18 +48,43 @@ export const STRATEGY_LABELS: Record<FireEndStrategy, { name: string; subtitle: 
     name: 'Pensioenleeftijd',
     subtitle: 'Opbouw tot AOW, inflatiebestendige onttrekking, restant als nalatenschap',
   },
+  // ADR 0127 — RELEASE-SCHAKELAAR: de UI-pickers itereren over deze map, dus deze
+  // entry maakt 'nu-stoppen' overal kiesbaar. Beschrijvend, nooit "je kunt stoppen"
+  // (definitieve tekst gaat nog langs merkstem/compliance).
+  'nu-stoppen': {
+    name: 'Nu stoppen',
+    subtitle: 'Werken stopt vandaag — zie tot welke leeftijd je vermogen reikt',
+  },
 }
 
-/** Parse profile data to FireStrategyConfig with safe defaults. */
+/**
+ * De canonieke allowlist — AFGELEID uit `STRATEGY_LABELS`, nooit een handmatige lijst
+ * (ADR 0127 D9). Elke tweede lijst (parser, draft-persistentie, regressiesuites,
+ * API-allowlist) leest hier, zodat een vijfde strategie niet stil naar 'deplete' vouwt.
+ */
+export const FIRE_END_STRATEGIES: readonly FireEndStrategy[] = Object.keys(
+  STRATEGY_LABELS,
+) as FireEndStrategy[]
+
+/** Type-guard op de canonieke allowlist. */
+export function isFireEndStrategy(value: unknown): value is FireEndStrategy {
+  return typeof value === 'string' && (FIRE_END_STRATEGIES as readonly string[]).includes(value)
+}
+
+/**
+ * Parse profile data to FireStrategyConfig with safe defaults.
+ *
+ * DE GEVAARLIJKSTE CONSUMENT (ADR 0127 D9): een onbekende waarde vouwt hier stil
+ * naar 'deplete' — de DB zegt dan X en de hele app rekent een deplete-plan. Daarom
+ * leest de allowlist uit `STRATEGY_LABELS` en niet uit een eigen `includes`-lijst.
+ */
 export function parseFireStrategy(profile: {
   fire_end_strategy?: string | null
   fire_end_age?: number | null
   fire_legacy_amount?: number | string | null
 }): FireStrategyConfig {
   return {
-    strategy: (['perpetual', 'legacy', 'deplete', 'pensioen'].includes(profile.fire_end_strategy ?? '')
-      ? profile.fire_end_strategy as FireEndStrategy
-      : 'deplete'),
+    strategy: isFireEndStrategy(profile.fire_end_strategy) ? profile.fire_end_strategy : 'deplete',
     endAge: profile.fire_end_age ?? 90,
     legacyAmount: Number(profile.fire_legacy_amount ?? 0),
   }
@@ -102,6 +132,10 @@ export interface FreedomStateInput {
 export function isFinanciallyFree(input: FreedomStateInput): boolean {
   const { freedomPct, currentAge, fireAge } = input
   if (freedomPct != null && Number.isFinite(freedomPct) && freedomPct >= 100) return true
+  // ADR 0127 D5 — onder 'nu-stoppen' is `fireAge` per constructie de startleeftijd,
+  // dus `currentAge >= fireAge` is triviaal waar en zegt niets over het geld. Alleen de
+  // tijdsdekking (freedomPct = uitputtingsmaand ÷ eindmaand) mag hier "vrij" verklaren.
+  if (input.strategy === 'nu-stoppen') return false
   if (currentAge != null && fireAge != null && currentAge >= fireAge) return true
   return false
 }
@@ -123,14 +157,17 @@ export function isRetiredView(input: FreedomStateInput): boolean {
   return false
 }
 
-export type FreedomFraming = 'building' | 'free' | 'pensioen'
+export type FreedomFraming = 'building' | 'free' | 'pensioen' | 'nu-stoppen'
 
 /**
  * Hero-/banner-woordkeuze in één afgeleide waarde:
- *  - 'building' — nog op weg ("X% op weg naar vrijheid"); de bestaande framing.
- *  - 'pensioen' — vrij rond de AOW-leeftijd: 'regulier pensioen' (strategy
+ *  - 'building'   — nog op weg ("X% op weg naar vrijheid"); de bestaande framing.
+ *  - 'pensioen'   — vrij rond de AOW-leeftijd: 'regulier pensioen' (strategy
  *    'pensioen', óf leeftijd/vrijheidsleeftijd op of voorbij AOW).
- *  - 'free'     — vrij vóór de AOW-leeftijd: 'vervroegde vrijheid'.
+ *  - 'free'       — vrij vóór de AOW-leeftijd: 'vervroegde vrijheid'.
+ *  - 'nu-stoppen' — eindstrategie 'Nu stoppen' én het geld reikt tot de eindleeftijd
+ *    (tijdsdekking 100%, ADR 0127 D5/D6): geen belofte over een moment maar een
+ *    uitspraak over bereik ("als je nu stopt, reikt je vermogen tot je eindleeftijd").
  *
  * Zonder `aowAge` (niet altijd geplumbd) leunt het pensioen-onderscheid op de
  * expliciete 'pensioen'-strategie — het canonieke "ik stop rond AOW"-signaal dat
@@ -138,6 +175,7 @@ export type FreedomFraming = 'building' | 'free' | 'pensioen'
  */
 export function resolveFreedomFraming(input: FreedomStateInput): FreedomFraming {
   if (!isFinanciallyFree(input)) return 'building'
+  if (input.strategy === 'nu-stoppen') return 'nu-stoppen'
   const atOrPastAow =
     input.aowAge != null && input.currentAge != null && input.currentAge >= input.aowAge
   const fireAtOrPastAow =
@@ -236,13 +274,18 @@ export function resolveFireStrategyWithOverride(
 ): FireStrategyConfig {
   const base = parseFireStrategy(profile)
 
-  // If DB already has 'pensioen', no fallback needed
-  if (base.strategy === 'pensioen') return base
+  // De kolom draagt een echte keuze (≠ de 'deplete'-parkeerwaarde van het
+  // schaduwpad) → die wint; een override is dan hoogstens stale.
+  if (base.strategy !== 'deplete') return base
 
-  // Check feature_preferences for pensioen override
+  // Parkeerwaarde 'deplete' + een override → de override, mits die op de canonieke
+  // allowlist staat (ADR 0127 D9: generiek, niet hardcoded op 'pensioen' — een
+  // derde strategie loopt anders over dezelfde kabel). In de praktijk kan het
+  // schaduwpad alleen nog 'pensioen' parkeren (zie app/api/fire-settings/route.ts).
   const fp = profile.feature_preferences ?? {}
-  if (fp.fire_strategy_override === 'pensioen') {
-    return { ...base, strategy: 'pensioen' }
+  const override = fp.fire_strategy_override
+  if (isFireEndStrategy(override) && override !== 'deplete') {
+    return { ...base, strategy: override }
   }
 
   return base

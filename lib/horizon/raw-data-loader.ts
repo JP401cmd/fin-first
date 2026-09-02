@@ -1089,6 +1089,9 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
       // de afgeleide laag (lib/horizon-data-loader.ts) 'm moet injecteren.
       currentAge,
       fireAgeFractional: null,
+      // ADR 0127 D5: onder 'nu-stoppen' oordeelt de fire_progress-pijler op
+      // tijdsdekking, niet peer-relatief — de afgeleide laag injecteert de freedomPct.
+      fireEndStrategy: fireStrategy.strategy,
       avgMonthlyExpenses: emergencyExpenseBase,
       netMonthlyIncome: avgIncome6m,
       // Noodbuffer-norm: 3 × netto maandsalaris (lib/emergency-fund.ts).

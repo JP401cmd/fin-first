@@ -575,6 +575,20 @@ export interface UnifiedProjectionResult {
    * stub-/mock-/preview-resultaten die het veld niet zetten blijven geldig.
    */
   requiredFireIsEndOfHorizonFallback?: boolean
+  /**
+   * `true` ⇒ FIRE valt op maand 0 (eindstrategie 'nu-stoppen', ADR 0127 D4):
+   * `requiredFirePortfolio`/`requiredFireNetWorth` zijn dan J(0)/I(0) ≈ het huidige
+   * vermogen — géén "benodigd vermogen" (de kernel bisecteert op tijd, niet op
+   * kapitaal). Weergave toont dan geen doelbedrag (`guardFireTarget` →
+   * 'geen-doelvermogen'). Optioneel/additief, spiegel van de eind-horizon-vlag.
+   */
+  requiredFireIsStartPortfolio?: boolean
+  /**
+   * Eerste AANHOUDENDE maand (maand 0 = nu) waarin Prognose!J op is, of `null`
+   * (ADR 0126, `depletionMonth`). Alleen het kernel-pad zet dit; onder 'nu-stoppen'
+   * voedt het de tijdsdekking-vrijheidsvoortgang (`computeRunwayCoveragePct`).
+   */
+  kernelDepletionMonth?: number | null
   /** Impliciete onttrekkingsratio (jaarlijkse uitgaven / benodigde portfolio) */
   implicitWithdrawalRate: number
   /** Gebruikte eindstrategie */
@@ -687,6 +701,8 @@ export function toSimResult(result: UnifiedProjectionResult): SimResult {
     requiredFirePortfolio: result.requiredFirePortfolio,
     requiredFireNetWorth: result.requiredFireNetWorth,
     requiredFireIsEndOfHorizonFallback: result.requiredFireIsEndOfHorizonFallback,
+    requiredFireIsStartPortfolio: result.requiredFireIsStartPortfolio,
+    kernelDepletionMonth: result.kernelDepletionMonth,
     fireReachable: result.fireReachable,
     implicitWithdrawalRate: result.implicitWithdrawalRate,
     classic25xTarget,

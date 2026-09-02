@@ -36,6 +36,7 @@ const STATUS_LABEL: Record<SolverResult['status'], string> = {
   reached_at: 'Bereikt op leeftijd',
   unreachable_within_horizon: 'Niet binnen horizon',
   pension_shortfall: 'Pensioen-tekort',
+  stop_now_shortfall: 'Stop-nu-tekort',
 }
 
 function SolverStrip({ solver, nettoLiquideBijFire, tekortPiek, startLeeftijd, eindstrategieSelector }: {

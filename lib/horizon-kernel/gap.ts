@@ -50,10 +50,13 @@ export function prognoseI(proj: KernelProjection, m: number): number | null {
 
 /**
  * P!B35 — eindleeftijd per eindstrategie (IFS): deplete→B51, legacy→B52,
- * perpetual/pensioen→100.
+ * perpetual/pensioen→100. 'nu' (ADR 0127 D2) → B51, BEWUST niet 100 zoals
+ * pensioen: die 100 is een Excel-artefact, en de stop-nu-run wordt (net als de
+ * geforceerde stops van `runForcedStopPath`) getoetst tegen de eigen
+ * `fire_end_age`. Zo is `reached_now ⇔ runway reikt tot de eindleeftijd` exact.
  */
 export function eindleeftijdVan(es: EsRow): number {
-  return es.interneCode === 'deplete'
+  return es.interneCode === 'deplete' || es.interneCode === 'nu'
     ? es.eindleeftijdOpeten
     : es.interneCode === 'legacy'
       ? es.eindleeftijdNalatenschap

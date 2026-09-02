@@ -50,8 +50,13 @@ export type HeroAnswerStatus =
    */
   | 'ongeldig'
 
-/** Waar het getoonde getal vandaan komt. `null` als er geen getal is. */
-export type HeroAnswerBron = 'kernel' | 'server-kernel' | 'aow-tabel'
+/**
+ * Waar het getoonde getal vandaan komt. `null` als er geen getal is.
+ * `'kernel-runway'` (ADR 0127): onder 'nu-stoppen' is het getal geen FIRE-leeftijd
+ * maar de leeftijd tot waar het vermogen reikt (`kernelDepletionMonth` → leeftijd,
+ * of de eigen eindleeftijd wanneer het geld daar reikt).
+ */
+export type HeroAnswerBron = 'kernel' | 'server-kernel' | 'aow-tabel' | 'kernel-runway'
 
 export interface HeroFireAge {
   status: HeroAnswerStatus
@@ -69,6 +74,21 @@ export interface HeroFireAgeInput {
   kernelFireAge?: number | null
   /** `simResult.strategy === 'pensioen'`: de hero toont dan de AOW-leeftijd. */
   isPensioenMode?: boolean
+  /**
+   * `simResult.strategy === 'nu-stoppen'` (ADR 0127 D6): de hero toont dan NIET de
+   * kernel-`fireAge` (die is per constructie de startleeftijd) maar de leeftijd tot
+   * waar het vermogen reikt — spiegel van `isPensioenMode`. `planningMode` blijft
+   * tweewaardig; dit is een eigen tak, geen derde mode.
+   */
+  isNuStoppenMode?: boolean
+  /**
+   * De runway van de stop-nu-run, uit dezelfde kernel-run als `simResult`:
+   * `depletionAgeFractional` = `startLeeftijd + kernelDepletionMonth / 12` (of `null`
+   * wanneer het geld — op bruggetjes na — tot de eindleeftijd/horizon reikt) en
+   * `endAge` = de eigen eindleeftijd (`simResult.displayEndAge`). `null`/weggelaten
+   * = nog geen run → 'berekenen' (zolang de kernel rekent) of 'onbekend'.
+   */
+  nuStoppenRunway?: { depletionAgeFractional: number | null; endAge: number } | null
   /** `userAowAge.fractional`. */
   aowAgeFractional?: number | null
   /**
@@ -100,6 +120,18 @@ const ONGELDIG: HeroFireAge = { status: 'ongeldig', age: null, bron: null }
  * deze keten niet voor — dat is de tweede motor die de bevinding veroorzaakte.
  */
 export function resolveHeroFireAge(input: HeroFireAgeInput): HeroFireAge {
+  // Nu-stoppen-modus (ADR 0127 D6): de kernel-`fireAge` ís de startleeftijd en zegt
+  // niets; het kernantwoord is tot welke leeftijd het vermogen reikt. Geen
+  // M6-vangrail hier: een runway die tot de eindleeftijd (bv. 100) reikt is een
+  // antwoord, geen parkeerstand.
+  if (input.isNuStoppenMode) {
+    const runway = input.nuStoppenRunway
+    if (runway == null) return input.isRefining ? BEREKENEN : ONBEKEND
+    const age = runway.depletionAgeFractional ?? runway.endAge
+    if (!Number.isFinite(age)) return ONBEKEND
+    return { status: 'definitief', age, bron: 'kernel-runway' }
+  }
+
   // Pensioen-modus: de hero toont de wettelijke AOW-leeftijd, niet een
   // FIRE-leeftijd. `isPensioenMode` volgt uit `simResult.strategy`, dus de
   // kernel heeft hier per definitie al geantwoord; de onzekerheid zit

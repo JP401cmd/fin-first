@@ -14,7 +14,7 @@ import {
 } from '@/lib/horizon-data'
 import { BOX3_DRAG } from '@/lib/constants'
 import type { SimCashflow } from '@/lib/fire-simulation'
-import type { FireStrategyConfig } from '@/lib/fire-strategy'
+import type { FireEndStrategy, FireStrategyConfig } from '@/lib/fire-strategy'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 
 // ── Schenking Constants ─────────────────────────────────────────────────────
@@ -365,7 +365,7 @@ function findBreakevenHuur(
 
 export interface EndOfLifeInput {
   rows: UnifiedProjectionRow[]
-  strategy: 'perpetual' | 'legacy' | 'deplete' | 'pensioen'
+  strategy: FireEndStrategy
   endAge: number
   /** Erfgenamen: relatie tot erflater + fractie van de nalatenschap */
   erfgenamen?: { relatie: 'kind' | 'partner' | 'overig'; fractie: number }[]

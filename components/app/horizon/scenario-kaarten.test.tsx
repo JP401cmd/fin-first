@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, within, fireEvent } from '@testing-library/react'
 import { ScenarioKaarten } from './scenario-kaarten'
 import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
+import { SCENARIO_PRESET_SPECS } from '@/lib/horizon/scenario-presets'
 import type { ScenarioPresetResult } from '@/lib/horizon/scenario-presets'
 
 // Stuurbare privacy-mock — default zichtbaar; per test op masked te zetten.
@@ -144,10 +145,15 @@ describe('ScenarioKaarten', () => {
     expect(screen.getByText('60,3 jr')).toBeTruthy()
   })
 
-  it('toont skeleton-kaarten bij isLoading (geen echte data)', () => {
+  // Het skeleton telt NIET uit de props: het rendert juist vóórdat de kaarten
+  // doorgerekend zijn. Toets daarom tegen dezelfde bron als de component —
+  // een overgetypt getal liep achter zodra er een preset bijkwam ("Nu stoppen"),
+  // en dan springt de grid bij het inladen zonder dat een test dat merkt.
+  it('toont één skeleton-kaart per preset bij isLoading (geen echte data)', () => {
     render(<ScenarioKaarten kaarten={VIJF} isLoading />)
-    // Vijf skeleton-listitems, maar geen echte labels.
-    expect(screen.getAllByRole('listitem')).toHaveLength(5)
+    expect(screen.getAllByRole('listitem')).toHaveLength(
+      Object.keys(SCENARIO_PRESET_SPECS).length,
+    )
     expect(screen.queryByText('Basisplan')).toBeNull()
   })
 

@@ -227,6 +227,7 @@ const FIRE_END_TO_SELECTOR: Record<FireEndStrategy, Eindstrategie> = {
   legacy: 'Nalatenschap',
   perpetual: 'Eeuwigdurend',
   pensioen: 'Pensioenleeftijd',
+  'nu-stoppen': 'Nu stoppen',
 }
 
 /**

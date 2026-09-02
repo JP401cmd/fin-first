@@ -39,7 +39,9 @@ import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Perspective } from '@/lib/household-data'
 import { computeHealthScoreFromInputs, type HealthScore, type HealthScoreInput } from '@/lib/financial-health'
-import { computeFreedomProgressWithBasis, inclHomeTargetFromScalar } from '@/lib/core-metrics'
+import { computeFreedomProgressWithBasis, computeRunwayCoveragePct, inclHomeTargetFromScalar } from '@/lib/core-metrics'
+import { eindMaandVan } from '@/lib/horizon-kernel/gap'
+import { ageAtDate } from '@/lib/horizon-data'
 import { computeHorizonFireSim } from '@/lib/fire-target-shared'
 import { loadHorizonRaw, type HorizonRawData } from '@/lib/horizon/raw-data-loader'
 
@@ -117,20 +119,39 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   // Zelfde gate/vorm als `dashboard-data-loader.ts` (simRequiredPortfolio /
   // simRequiredNetWorth) zodat /overzicht-hero, widget-rail, /toekomst en de
   // Fin-chat letterlijk hetzelfde paar cijfers consumeren.
-  const kernelPortfolio = run && run.sim.requiredFirePortfolio > 0 ? run.sim.requiredFirePortfolio : null
-  const kernelNetWorth = run && (run.sim.requiredFireNetWorth ?? 0) > 0 ? run.sim.requiredFireNetWorth! : null
-  const requiredPortfolioExclHome = kernelPortfolio ?? scalarRequiredPortfolioExclHome
-  const requiredNetWorthInclHome =
-    kernelNetWorth ??
-    inclHomeTargetFromScalar(requiredPortfolioExclHome, netWorthInclHome, fireEligibleNetWorth)
+  // ADR 0127 D4 — 'nu-stoppen': FIRE op maand 0, "benodigd" = huidig vermogen ⇒ geen
+  // doel. Beide noemers op null (de grafiekgeometrie laat de doellijn dan al weg).
+  const isNuStoppen = run?.sim.requiredFireIsStartPortfolio === true
+  const kernelPortfolio =
+    run && !isNuStoppen && run.sim.requiredFirePortfolio > 0 ? run.sim.requiredFirePortfolio : null
+  const kernelNetWorth =
+    run && !isNuStoppen && (run.sim.requiredFireNetWorth ?? 0) > 0 ? run.sim.requiredFireNetWorth! : null
+  const requiredPortfolioExclHome = isNuStoppen ? null : (kernelPortfolio ?? scalarRequiredPortfolioExclHome)
+  const requiredNetWorthInclHome = isNuStoppen
+    ? null
+    : (kernelNetWorth ??
+      inclHomeTargetFromScalar(requiredPortfolioExclHome, netWorthInclHome, fireEligibleNetWorth))
 
-  const freedomPct = computeFreedomProgressWithBasis({
-    homeExcludedFromFire,
-    netWorthInclHome,
-    fireEligibleNetWorth,
-    requiredNetWorthInclHome,
-    requiredPortfolioExclHome,
-  })
+  // ADR 0127 D5 — vrijheids-%: onder 'nu-stoppen' TIJDSDEKKING (uitputtingsmaand ÷
+  // eindmaand) uit het bridge-veld `kernelDepletionMonth`; anders de vulling-van-het-
+  // doel. Eén home per definitie (lib/core-metrics.ts), strategie-bewust gekozen.
+  // Alleen nodig onder 'nu-stoppen'; optioneel gelezen zodat een gedegradeerde/gemockte
+  // rauwe laag zonder `effectiveInput` het gewone pad niet laat struikelen.
+  const startAge =
+    isNuStoppen && raw.effectiveInput?.dateOfBirth ? ageAtDate(raw.effectiveInput.dateOfBirth) : null
+  const freedomPct =
+    isNuStoppen && run && startAge != null
+      ? computeRunwayCoveragePct({
+          kernelDepletionMonth: run.sim.kernelDepletionMonth ?? null,
+          eindMaand: eindMaandVan(run.sim.displayEndAge, startAge),
+        })
+      : computeFreedomProgressWithBasis({
+          homeExcludedFromFire,
+          netWorthInclHome,
+          fireEligibleNetWorth,
+          requiredNetWorthInclHome,
+          requiredPortfolioExclHome,
+        })
 
   // De vrijheids-pijler van de gezondheidsscore erft dezelfde noemer; zonder
   // deze stap zou de score op een ándere FIRE-grondslag draaien dan de hero

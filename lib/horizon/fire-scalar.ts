@@ -5,6 +5,7 @@
  * Afgesplitst van lib/horizon-data.ts (pure move, geen gedragswijziging).
  */
 import type { FinancialInput } from '../core-metrics'
+import type { FireEndStrategy } from '../fire-strategy'
 import {
   computeEffectiveExpenses,
   computeFireTarget,
@@ -64,7 +65,7 @@ export function computeFireProjection(
   swrOverride?: number,
   inflationOverride?: number,
   strategyOptions?: {
-    strategy?: 'perpetual' | 'legacy' | 'deplete' | 'pensioen'
+    strategy?: FireEndStrategy
     endAge?: number
   },
 ): FireProjection {
@@ -189,7 +190,7 @@ export function computeFireRange(
   inflationOverride?: number,
   baseReturn: number = DEFAULT_RETURN,
   strategyOptions?: {
-    strategy?: 'perpetual' | 'legacy' | 'deplete' | 'pensioen'
+    strategy?: FireEndStrategy
     endAge?: number
   },
 ): FireRange {

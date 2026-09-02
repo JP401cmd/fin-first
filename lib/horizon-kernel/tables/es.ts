@@ -31,8 +31,12 @@
 
 import type { Eindstrategie, KernelInput } from '../types'
 
-/** Interne eindstrategie-code (ES!C7) — de canonieke sleutel die de solver/MC gebruikt. */
-export type EindstrategieCode = 'deplete' | 'legacy' | 'perpetual' | 'pensioen'
+/**
+ * Interne eindstrategie-code (ES!C7) — de canonieke sleutel die de solver/MC gebruikt.
+ * `'nu'` (ADR 0127) bestaat niet in het Excel-oracle: FIRE = startleeftijd (maand 0),
+ * eindleeftijd = B51, doel €0 — zie solver.ts en gap.ts.
+ */
+export type EindstrategieCode = 'deplete' | 'legacy' | 'perpetual' | 'pensioen' | 'nu'
 
 /** ES!C7 — mapping van de P!B48-keuze naar de interne code (Excel-IFS). */
 const CODE_PER_EINDSTRATEGIE: Record<Eindstrategie, EindstrategieCode> = {
@@ -40,6 +44,7 @@ const CODE_PER_EINDSTRATEGIE: Record<Eindstrategie, EindstrategieCode> = {
   Nalatenschap: 'legacy',
   Eeuwigdurend: 'perpetual',
   Pensioenleeftijd: 'pensioen',
+  'Nu stoppen': 'nu',
 }
 
 /** ES!C6 — "wat dit betekent"-uitleg per interne code (Excel-SWITCH). */
@@ -48,6 +53,7 @@ const BETEKENIS_PER_CODE: Record<EindstrategieCode, string> = {
   legacy: 'Eindigt met een doelbedrag dat op de eindleeftijd nog in de pot moet zitten.',
   perpetual: 'Alleen het reële rendement wordt onttrokken; de koopkracht van de pot blijft intact.',
   pensioen: 'Je stopt met werken op de AOW-leeftijd; de rest is een gevolg.',
+  nu: 'Werken stopt vandaag; het vermogen moet tot de gekozen eindleeftijd reiken (doel €0).',
 }
 
 /** ES!E-actief-marker (BLACK LEFT-POINTING TRIANGLE + " actief"); leeg = "". */
@@ -59,13 +65,15 @@ export const EEUWIGDUREND_NVT = 'n.v.t.'
 /**
  * De actief-markers (ES!E10:E15) per interne code: "◀ actief" op de parameterrijen
  * die bij de gekozen strategie horen, anders "". Rij-mapping:
- *   deplete → E10 · legacy → E11/E12/E13 · perpetual → E14 · pensioen → E15.
+ *   deplete → E10 · legacy → E11/E12/E13 · perpetual → E14 · pensioen → E15 ·
+ *   nu → E10 (dezelfde eindleeftijd-parameter B51 als deplete; ADR 0127).
  */
 const ACTIEVE_RIJEN_PER_CODE: Record<EindstrategieCode, ReadonlySet<number>> = {
   deplete: new Set([10]),
   legacy: new Set([11, 12, 13]),
   perpetual: new Set([14]),
   pensioen: new Set([15]),
+  nu: new Set([10]),
 }
 
 /** De actief-marker voor E-rij `rij` (10..15) bij interne code `code`. */

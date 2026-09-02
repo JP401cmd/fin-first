@@ -36,7 +36,8 @@ import type { FireProjection, FireCountdown } from '@/lib/horizon-data'
 import { loadNewsPreview } from '@/lib/news-preview'
 import { computeNextSteps } from '@/lib/next-steps/engine'
 
-import { computeEffectiveExpenses, computeFireTarget, computeFreedomProgressWithBasis, inclHomeTargetFromScalar } from '@/lib/core-metrics'
+import { computeEffectiveExpenses, computeFireTarget, computeFreedomProgressWithBasis, computeRunwayCoveragePct, inclHomeTargetFromScalar } from '@/lib/core-metrics'
+import { eindMaandVan } from '@/lib/horizon-kernel/gap'
 import { localMonthStart } from '@/lib/month-range'
 import {
   getActiveAssets,
@@ -1336,6 +1337,8 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     swrRate: fireSwr,
     yearlyMustExpenses: yearlyRetirementExpenses,
     dateOfBirth: dob,
+    // ADR 0127 D4: onder 'nu-stoppen' geen doel → lege mijlpalen met reden.
+    strategy: fireStrategy.strategy,
   }).result
 
   // Horizon extra: sim rows for vermogenspad chart
@@ -1356,6 +1359,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // Prognose!J@FIRE). Puur uit de sim (requiredFireNetWorth via de kernel-bridge), geen eigen som.
   let simRequiredNetWorth: number | null = null
   let simFireAgeFractional: number | null = null
+  // ADR 0127: FIRE op maand 0 ('nu-stoppen') + de runway-maand voor de tijdsdekking.
+  let simIsStartPortfolio = false
+  let simKernelDepletionMonth: number | null = null
   // Kernel-eindleeftijd (SimResult.displayEndAge = solve.eindleeftijd): bij deplete/legacy
   // = plan-eindleeftijd (fire_end_age), bij perpetual/pensioen = horizon-cap 100. Dit is de
   // leeftijd die /horizon als aslabel toont; widgets consumeren 'm i.p.v. een hardcoded 90.
@@ -1432,10 +1438,16 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         // levert per constructie firePortfolioAtFire === requiredFirePortfolio (bisectie stopt
         // op de eerste toereikende maand). Lees requiredFirePortfolio + fireAgeFractional
         // direct uit simResult (óók correct voor niet-pensioen).
-        simRequiredPortfolio = simResult.requiredFirePortfolio > 0 ? simResult.requiredFirePortfolio : null
+        // ADR 0127 D4 — 'nu-stoppen' (FIRE op maand 0): "benodigd" = huidig vermogen, geen
+        // doel → beide op null; de grafiekgeometrie laat de doellijn dan al weg.
+        simIsStartPortfolio = simResult.requiredFireIsStartPortfolio === true
+        simRequiredPortfolio =
+          !simIsStartPortfolio && simResult.requiredFirePortfolio > 0 ? simResult.requiredFirePortfolio : null
         // Incl.-woning FIRE-doel (Prognose!I@FIRE) — zelfde bron/gate als simRequiredPortfolio.
-        simRequiredNetWorth = (simResult.requiredFireNetWorth ?? 0) > 0 ? simResult.requiredFireNetWorth! : null
+        simRequiredNetWorth =
+          !simIsStartPortfolio && (simResult.requiredFireNetWorth ?? 0) > 0 ? simResult.requiredFireNetWorth! : null
         simFireAgeFractional = simResult.fireAgeFractional
+        simKernelDepletionMonth = simResult.kernelDepletionMonth ?? null
       }
     } catch (err) {
       console.error('[dashboard-data-loader] FIRE-projectie faalde:', err)
@@ -1469,13 +1481,23 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const homeExcludedFromFire = housingContext.hasEigenHuis && isHomeExcludedFromFire(housingStrategyCfg)
   const requiredNetWorthForProgress =
     simRequiredNetWorth ?? inclHomeTargetFromScalar(requiredPortfolioForProgress, netWorth, fireEligibleNetWorth)
-  const freedomPct = computeFreedomProgressWithBasis({
-    homeExcludedFromFire,
-    netWorthInclHome: netWorth,
-    fireEligibleNetWorth,
-    requiredNetWorthInclHome: requiredNetWorthForProgress,
-    requiredPortfolioExclHome: requiredPortfolioForProgress,
-  })
+  // ADR 0127 D5 — onder 'nu-stoppen' is vrijheids-% TIJDSDEKKING (uitputtingsmaand ÷
+  // eindmaand, bridge-veld `kernelDepletionMonth`), niet vulling-van-het-doel: bij
+  // FIRE-maand 0 is het "doel" ≈ het huidige vermogen en zou de ratio voor iedereen
+  // ~100 zijn. Eén home (lib/core-metrics.ts), hier strategie-bewust gekozen.
+  const freedomPct =
+    simIsStartPortfolio && simDisplayEndAge != null && currentAge != null
+      ? computeRunwayCoveragePct({
+          kernelDepletionMonth: simKernelDepletionMonth,
+          eindMaand: eindMaandVan(simDisplayEndAge, currentAge),
+        })
+      : computeFreedomProgressWithBasis({
+          homeExcludedFromFire,
+          netWorthInclHome: netWorth,
+          fireEligibleNetWorth,
+          requiredNetWorthInclHome: requiredNetWorthForProgress,
+          requiredPortfolioExclHome: requiredPortfolioForProgress,
+        })
 
   // Countdown afgeleid uit simulatie-engine (consistent met fireAgeFractional)
   const simCurrentAge = dob ? ageAtDate(dob) : null

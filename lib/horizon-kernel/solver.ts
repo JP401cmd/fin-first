@@ -53,12 +53,19 @@ import type { KernelInput } from './types'
 // dit staartrisico is aanvaard en hier gedocumenteerd. Zelfde geldt voor
 // wrappers/band.ts (identieke bisectie).
 
-/** P!B93/B100 — de vier solver-statussen (exacte Excel-teksten). */
+/**
+ * P!B93/B100 — de vier solver-statussen (exacte Excel-teksten) plus
+ * `stop_now_shortfall` (ADR 0127, buiten oracle-domein): bij eindstrategie 'Nu
+ * stoppen' springt de tekort-lening aan vóór de eigen eindleeftijd. BEWUST geen
+ * hergebruik van `pension_shortfall` — dat draagt AOW-kopij, terwijl dit tekort
+ * ook vóór de AOW kan vallen.
+ */
 export type SolverStatus =
   | 'reached_now'
   | 'reached_at'
   | 'unreachable_within_horizon'
   | 'pension_shortfall'
+  | 'stop_now_shortfall'
 
 export interface SolveFireResult {
   /** P!B16 — gevonden FIRE-leeftijd (bij unreachable: geparkeerd op de horizon). */
@@ -161,6 +168,12 @@ function computeStatusBlok(
   let status: SolverStatus
   if (code === 'pensioen' && tekortLening > 0) {
     status = 'pension_shortfall'
+  } else if (code === 'nu' && tekortLening > 0) {
+    // ADR 0127 D2 — stop-nu: het geld reikt niet tot de eigen eindleeftijd. Bij doel
+    // €0 mét `tekortAflossingUitLiquide` kan `gap < 0` niet zonder tekort-lening > 0,
+    // dus de M6-schijnbereik-tak hieronder wordt voor 'nu' nooit bereikt (vastgepind
+    // in nu-stoppen.test.ts): de status is óf dit, óf `reached_now`.
+    status = 'stop_now_shortfall'
   } else if (schijnbereik) {
     status = 'unreachable_within_horizon'
   } else if (jMaand0 >= doelbedrag) {
@@ -220,6 +233,17 @@ export function solveFire(input: KernelInput): SolveFireResult {
   // ── Pensioenleeftijd: FIRE = AOW-leeftijd, geen bisectie ────────────────────
   if (es.interneCode === 'pensioen') {
     const fireAge = es.pensioenleeftijd
+    return afronden(fireAge, run(fireAge))
+  }
+
+  // ── Nu stoppen (ADR 0127 D1): FIRE = startleeftijd P!B7 (hele jaren, maand 0), ──
+  //    geen bisectie — precies het pensioen-patroon, maar op vandaag. NOOIT de
+  //    fractionele leeftijd: 47,6 zou FIRE-maand 7 geven en is dan niet "nu". Zo erft
+  //    élke solveFire-consument (convergentie-, household-, whatif-, scalar-router,
+  //    Monte-Carlo, marktcheck, kernel-report, gouden matrix) het anker zonder eigen
+  //    tak. Het guardrails-anker regelt de engine zelf op FIRE-maand 0 (T0-stand).
+  if (es.interneCode === 'nu') {
+    const fireAge = leeftijd
     return afronden(fireAge, run(fireAge))
   }
 

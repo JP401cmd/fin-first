@@ -26,6 +26,7 @@ import { BUDGET_SLUGS } from '@/lib/budget-data'
 import type { ModuleId } from '@/lib/module-registry'
 import { ALL_MODULES } from '@/lib/module-registry'
 import type { WithdrawalStrategyType } from '@/lib/withdrawal-strategy'
+import type { FireEndStrategy } from '@/lib/fire-strategy'
 import type { SaleConfig } from '@/lib/sale-config'
 import { getCurrentWeek, getNextWeek } from '@/lib/week-utils'
 
@@ -71,7 +72,7 @@ export interface PersonaProfile {
   // FIRE parameters
   expected_return?: number        // bijv. 0.07
   inflation_rate?: number         // bijv. 0.02
-  fire_end_strategy?: 'perpetual' | 'legacy' | 'deplete' | 'pensioen'
+  fire_end_strategy?: FireEndStrategy
   fire_end_age?: number           // 60–120
   fire_legacy_amount?: number     // alleen bij 'legacy'
   retirement_expense_method?: 'essential_budgets' | 'custom_amount' | 'current_income'

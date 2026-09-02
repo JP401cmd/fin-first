@@ -79,8 +79,12 @@ import type { KernelInput } from './types'
  */
 export const RENDEMENT_MARGE_ITERATIES = 12
 
-/** Waar de vaste toets-leeftijd vandaan komt. */
-export type MargeAnker = 'stopkeuze' | 'aow'
+/**
+ * Waar de vaste toets-leeftijd vandaan komt. `'nu'` (ADR 0127): eindstrategie
+ * 'Nu stoppen' ankert op de startleeftijd — zonder deze tak zou de marge terugvallen
+ * op AOW en een ánder plan doorrekenen dan de hoofdlijn.
+ */
+export type MargeAnker = 'stopkeuze' | 'aow' | 'nu'
 
 /** De uitkomst van één marge-bepaling. */
 export interface RendementMarge {
@@ -112,6 +116,13 @@ export function resolveMargeAnker(
   es: EsRow = computeEs(input),
 ): { readonly leeftijd: number; readonly anker: MargeAnker } | null {
   const eindleeftijd = eindleeftijdVan(es)
+  // 'Nu stoppen' (ADR 0127 D6): het plan stopt vandaag, dus de marge toetst op de
+  // startleeftijd — een meegegeven stopkeuze zou een ander plan doorrekenen.
+  if (es.interneCode === 'nu') {
+    const leeftijd = input.startLeeftijd
+    if (leeftijd >= eindleeftijd) return null
+    return { leeftijd, anker: 'nu' }
+  }
   const gekozen = stopAge != null && Number.isFinite(stopAge)
   const leeftijd = gekozen ? stopAge : es.pensioenleeftijd
   if (!Number.isFinite(leeftijd)) return null

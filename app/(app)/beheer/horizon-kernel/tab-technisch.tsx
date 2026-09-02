@@ -34,6 +34,7 @@ const STATUSSEN: ReadonlyArray<{ code: string; titel: string; tekst: string }> =
   { code: 'reached_at', titel: 'Bereikt op leeftijd', tekst: 'De bisectie vond de kleinste maand waarop de gap ≥ 0 is: dát is de FIRE-leeftijd.' },
   { code: 'unreachable_within_horizon', titel: 'Niet haalbaar binnen horizon', tekst: 'Zelfs op leeftijd 100 blijft de gap negatief. Het model parkeert FIRE op de horizon en geeft een €/maand-extra-sparen-hint.' },
   { code: 'pension_shortfall', titel: 'Pensioen-tekort', tekst: 'Bij de eindstrategie "Pensioenleeftijd" springt de tekort-lening aan vóór de eindleeftijd — het plan komt niet rond zonder bijsturen.' },
+  { code: 'stop_now_shortfall', titel: 'Stop-nu-tekort', tekst: 'Bij de eindstrategie "Nu stoppen" (FIRE op maand 0, ADR 0127) springt de tekort-lening aan vóór de eigen eindleeftijd — het vermogen reikt niet tot daar. Buiten het Excel-oracle.' },
 ]
 
 const AFWIJKINGEN: ReadonlyArray<{ titel: string; tekst: string; akkoord: string }> = [

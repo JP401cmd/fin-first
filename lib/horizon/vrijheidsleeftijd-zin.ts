@@ -137,12 +137,22 @@ export function buildVrijheidsleeftijdZin(
   // weergave; in een perspectiefweergave gaat de zin over iemand anders en valt
   // de eigen framing weg (precies zoals `showFreeHero` in horizon-client).
   if (framing !== 'building' && !naam) {
+    // 'nu-stoppen' (ADR 0127): geen belofte over een moment maar over bereik —
+    // beschrijvend, nooit "je kunt nu stoppen".
     const zin =
       framing === 'pensioen'
         ? 'Je pensioen is ingegaan — werken is nu een keuze.'
-        : 'Werken is voor jou nu al een keuze.'
+        : framing === 'nu-stoppen'
+          ? 'Als je nu stopt, reikt je vermogen tot je eindleeftijd.'
+          : 'Werken is voor jou nu al een keuze.'
     if (variant === 'inline') {
-      return samenstellen('nu-al', framing === 'pensioen' ? 'je pensioen is ingegaan' : 'werken is nu al een keuze', null, '')
+      const inline =
+        framing === 'pensioen'
+          ? 'je pensioen is ingegaan'
+          : framing === 'nu-stoppen'
+            ? 'je vermogen reikt tot je eindleeftijd als je nu stopt'
+            : 'werken is nu al een keuze'
+      return samenstellen('nu-al', inline, null, '')
     }
     return samenstellen('nu-al', zin, null, '')
   }

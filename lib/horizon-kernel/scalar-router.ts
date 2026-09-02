@@ -54,6 +54,7 @@ import {
 } from '@/lib/horizon-data'
 import { DEFAULT_RETURN } from '@/lib/constants'
 import { computeEffectiveExpenses } from '@/lib/core-metrics'
+import type { FireEndStrategy } from '@/lib/fire-strategy'
 import {
   computeFreedomMilestones,
   presentFreedomMilestones,
@@ -77,7 +78,12 @@ export type ScalarEngine = 'kernel' | 'scalar-fallback'
 
 /** Eindstrategie-opties van de scalar-helpers + het additieve `legacyAmount`. */
 export interface ScalarStrategyOptions {
-  strategy?: 'perpetual' | 'legacy' | 'deplete' | 'pensioen'
+  /**
+   * Canonieke union (lib/fire-strategy.ts). Let op: 'nu-stoppen' levert in de
+   * scalar-formules GEEN doel (`computeFireTarget` → 0, ADR 0127 D4); de kernel-tak
+   * kortsluit dan op de startleeftijd.
+   */
+  strategy?: FireEndStrategy
   endAge?: number
   /**
    * Nalatenschap-doelbedrag (euro's van nu) voor de kernel-tak bij 'legacy'. De bestaande
@@ -125,6 +131,12 @@ export interface ScalarMilestoneParams {
   readonly yearlyMustExpenses?: number
   /** Nodig voor de kernel-tijdas; de scalar-loop kon zonder. Weggelaten → scalar-fallback. */
   readonly dateOfBirth?: string | null
+  /**
+   * Eindstrategie van het plan (ADR 0127 D4): onder 'nu-stoppen' bestaat er geen
+   * doelvermogen om mijlpalen tegen te kruisen → lege mijlpalen mét reden, geen
+   * kernel-run. Weggelaten → ongewijzigd gedrag.
+   */
+  readonly strategy?: FireEndStrategy
 }
 
 /** Uitkomst van de mijlpalen-router. */
@@ -132,6 +144,12 @@ export interface ScalarMilestonesOutcome {
   readonly result: FreedomMilestoneResult
   readonly engine: ScalarEngine
   readonly fallbackReason?: string
+  /**
+   * Gezet wanneer mijlpalen voor dit plan NIET VAN TOEPASSING zijn (geen
+   * doelvermogen — 'nu-stoppen'). Geen degradatie (dat is `fallbackReason`): het
+   * antwoord is bewust leeg, en het oppervlak hoort dat te zeggen.
+   */
+  readonly notApplicableReason?: string
 }
 
 // ── Synthetische kernel-invoer ───────────────────────────────────────────────
@@ -411,6 +429,23 @@ export function computeScalarFreedomMilestones(
       params.swrRate,
       params.yearlyMustExpenses,
     )
+
+  // ADR 0127 D4 — 'nu-stoppen' kent geen doelvermogen: de kernel bisecteert op tijd,
+  // niet op kapitaal. Mijlpalen "25/50/75/100% van het doel" kruisen dan tegen een
+  // doel dat niet bestaat → bewust LEEG, met reden — geen scalar-doel verzinnen.
+  if (params.strategy === 'nu-stoppen') {
+    return {
+      result: presentFreedomMilestones({
+        fireTarget: 0,
+        netWorth: params.netWorth,
+        monthlySavings: params.monthlySavings,
+        milestoneMonths: new Map(),
+      }),
+      engine: 'kernel',
+      notApplicableReason:
+        "eindstrategie 'nu-stoppen' — geen doelvermogen, dus geen mijlpalen op weg naar een doel",
+    }
+  }
 
   if (!params.dateOfBirth) {
     return { result: runFallback(), engine: 'scalar-fallback', fallbackReason: 'geen geboortedatum — kernel kan geen tijdas bouwen' }

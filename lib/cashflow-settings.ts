@@ -2,6 +2,7 @@ import type { FireProjection } from './horizon-data'
 import { computeScalarFireProjection } from './horizon-kernel/scalar-router'
 import type { FinancialInput } from './core-metrics'
 import { computeRetirementExpenses, type RetirementExpenseMethod } from './budget-utils'
+import type { FireEndStrategy } from './fire-strategy'
 import {
   BASIS_SOURCES,
   computeBudgetBasis,
@@ -200,7 +201,7 @@ export interface FireRecomputeParams {
   /** Jaarlijkse must-expenses uit essentiële budgetten (alleen relevant als budgetingActive). */
   yearlyMustExpenses: number
   fireStrategy: {
-    strategy: 'perpetual' | 'legacy' | 'deplete' | 'pensioen'
+    strategy: FireEndStrategy
     endAge: number
     /** Nalatenschap-doelbedrag; alleen relevant voor 'legacy' op de kernel-tak. */
     legacyAmount?: number

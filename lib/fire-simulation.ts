@@ -110,6 +110,17 @@ export interface SimResult {
    * additief — stub-/mock-`SimResult`s die het niet zetten blijven geldig.
    */
   requiredFireIsEndOfHorizonFallback?: boolean
+  /**
+   * `true` ⇒ FIRE op maand 0 ('nu-stoppen', ADR 0127 D4): het "benodigde" bedrag is
+   * het huidige vermogen — geen doelbedrag. Weergave toont dan géén doel. Optioneel/
+   * additief (stub-/mock-`SimResult`s blijven geldig).
+   */
+  requiredFireIsStartPortfolio?: boolean
+  /**
+   * Eerste aanhoudende uitputtingsmaand van Prognose!J (maand 0 = nu) of `null`
+   * (ADR 0126). Kernel-pad only; voedt onder 'nu-stoppen' de tijdsdekking.
+   */
+  kernelDepletionMonth?: number | null
   /** Whether FIRE is reachable before endAge */
   fireReachable: boolean
   /** yearlyExpenses / requiredFirePortfolio */

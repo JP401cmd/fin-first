@@ -3,6 +3,7 @@ import { assert, assertEqual, assertIncludes } from '../assert'
 import type { TestCase } from '../test-types'
 import { authenticatedFetch } from '../server-runner'
 import { sanitizeStoredDraft } from '@/app/(onboarding)/onboarding/draft-persistence'
+import { FIRE_END_STRATEGIES } from '@/lib/fire-strategy'
 
 const CAT = 'onboarding.save'
 
@@ -19,7 +20,8 @@ type ModuleId =
 
 const IDENTITY_REQUIRED_FIELDS = ['full_name', 'date_of_birth', 'household_type', 'net_monthly_income'] as const
 const HOUSEHOLD_TYPES = ['solo', 'samen', 'gezin'] as const
-const FIRE_STRATEGIES = ['perpetual', 'legacy', 'deplete'] as const
+// De canonieke allowlist (ADR 0127 D9) — geen eigen kopie die stil kan achterlopen.
+const FIRE_STRATEGIES = FIRE_END_STRATEGIES
 const RETIREMENT_METHODS = ['essential_budgets', 'custom_amount', 'current_income'] as const
 const BUDGETTERING_MODES = ['none', 'template', 'manual'] as const
 const WIDGET_SIZES = ['quarter', 'half', 'full'] as const

@@ -117,12 +117,13 @@ const CATEGORIE_REP_TYPE: Record<AssetCategorie, AssetType> = {
   Overig: 'other',
 }
 
-/** ES-eindstrategie-code → app-`FireEndStrategy` (1-op-1; 'pensioen' bestaat in beide). */
+/** ES-eindstrategie-code → app-`FireEndStrategy` (1-op-1; 'pensioen' bestaat in beide, 'nu' ↔ 'nu-stoppen'). */
 const CODE_TO_STRATEGY: Record<EindstrategieCode, FireEndStrategy> = {
   deplete: 'deplete',
   legacy: 'legacy',
   perpetual: 'perpetual',
   pensioen: 'pensioen',
+  nu: 'nu-stoppen',
 }
 
 /** Per-slot app-koppeling (asset): fysiek kern-slot → app-`AssetType` + app-id. */
@@ -813,6 +814,13 @@ export function kernelToUnifiedResult(
   // maar MARKEERT hem nu, zodat de weergavelaag er een gegevensmelding van kan
   // maken i.p.v. een bedrag. Zie `lib/horizon/outcome-guard.ts`.
   const requiredFireIsEndOfHorizonFallback = summary.nettoLiquideBijFire == null
+  // ADR 0127 D4 — FIRE-maand 0 (eindstrategie 'Nu stoppen'): "requiredFirePortfolio"
+  // is dan J(0) ≈ het huidige liquide vermogen. Dat is geen "benodigd vermogen" — de
+  // kernel bisecteert op TIJD, niet op kapitaal — dus de weergavelaag toont er geen
+  // doelbedrag voor (`guardFireTarget` → 'geen-doelvermogen'; loaders zetten
+  // `simRequiredPortfolio`/`simRequiredNetWorth` op null). Spiegel van de
+  // eind-horizon-vlag hierboven: markeren, niet stil corrigeren.
+  const requiredFireIsStartPortfolio = fireMonth === 0
   const requiredFirePortfolio = summary.nettoLiquideBijFire ?? summary.eindNettoLiquide
   const firePortfolioAtFire = requiredFirePortfolio
 
@@ -884,6 +892,7 @@ export function kernelToUnifiedResult(
     requiredFirePortfolio,
     requiredFireNetWorth,
     requiredFireIsEndOfHorizonFallback,
+    requiredFireIsStartPortfolio,
     implicitWithdrawalRate,
     strategy,
     targetEndPortfolio: solve.doelbedrag,

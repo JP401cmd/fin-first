@@ -3,6 +3,7 @@ import { loadCoreData } from '@/lib/core-data-loader'
 import { getCachedUser } from '@/lib/supabase/cached-user'
 import type { FinancialInput, SavingsRateMethod } from '@/lib/core-metrics'
 import type { RetirementExpenseMethod } from '@/lib/budget-utils'
+import type { FireEndStrategy } from '@/lib/fire-strategy'
 import type { BasisSource, BudgetBasisResult, ResolvedBasis } from '@/lib/budget-basis'
 
 export interface CashflowSettingsData {
@@ -41,7 +42,7 @@ export interface CashflowSettingsData {
   grossReturn: number
   effectiveSwr: number
   inflationRate: number
-  fireStrategy: { strategy: 'perpetual' | 'legacy' | 'deplete' | 'pensioen'; endAge: number }
+  fireStrategy: { strategy: FireEndStrategy; endAge: number }
   /**
    * De KEUZE van de gebruiker (ADR 0103): 'budget' | 'transaction' | 'manual', of
    * 'auto' zolang hij nooit koos. 'auto' is geen optie in de interface.

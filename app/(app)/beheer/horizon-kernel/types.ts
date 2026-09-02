@@ -4,6 +4,7 @@ import type { KernelRunSummary } from '@/lib/horizon-kernel'
 import type { ColKind } from '@/lib/horizon-kernel-report/table-columns'
 import type { RawInputSummary } from '@/lib/horizon-kernel-report/load-input'
 import type { VerifReport } from '@/lib/horizon-kernel-report/engine-parity'
+import type { SolverStatus } from '@/lib/horizon-kernel'
 
 export type { RawInputSummary, VerifReport, KernelInput, KernelRunSummary, CellValue, ColKind }
 
@@ -19,7 +20,8 @@ export interface SolverResult {
   readonly doelbedrag: number
   readonly modelwaarde: number
   readonly gap: number
-  readonly status: 'reached_now' | 'reached_at' | 'unreachable_within_horizon' | 'pension_shortfall'
+  /** De canonieke solver-union (incl. `stop_now_shortfall`, ADR 0127) — geen eigen kopie. */
+  readonly status: SolverStatus
   readonly maandHint: number
   readonly tekortLeningTotEindleeftijd: number
   readonly engineRuns: number

@@ -21,6 +21,7 @@
 import { formatCurrency } from '@/lib/format'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { InlineInfoDisclosure } from '@/components/editorial'
+import { SCENARIO_PRESET_SPECS } from '@/lib/horizon/scenario-presets'
 import type { ScenarioPresetResult, ScenarioPresetStatus } from '@/lib/horizon/scenario-presets'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
@@ -134,8 +135,17 @@ function SkeletonCard() {
   )
 }
 
-/** Aantal kaarten in `resolveScenarioPresets` — alleen voor het skeleton. */
-const SCENARIO_KAART_AANTAL = 6
+/**
+ * Aantal kaarten in `resolveScenarioPresets` — alleen voor het skeleton, dat
+ * rendert vóórdat de doorgerekende kaarten er zijn en dus niet uit de props kan
+ * tellen.
+ *
+ * AFGELEID, niet overgetypt: dit getal is precies het aantal presets. Als
+ * handmatige constante liep het achter zodra er een kaart bijkwam — bij
+ * "Nu stoppen" (ADR 0126) toonde het skeleton één plek te weinig en sprong de
+ * grid bij het inladen. Nu is de constante per constructie mee-veranderd.
+ */
+export const SCENARIO_KAART_AANTAL = Object.keys(SCENARIO_PRESET_SPECS).length
 
 export interface ScenarioKaartenProps {
   /** De doorgerekende preset-kaarten (vaste volgorde van `resolveScenarioPresets`). */

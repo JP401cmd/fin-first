@@ -28,6 +28,7 @@ import { TARGET_EMERGENCY_SALARY_MONTHS, emergencyScoreTargetMonths } from '@/li
 import { budgetLimitStatus } from '@/lib/budget-alerts'
 import { DEFAULT_RETURN } from '@/lib/constants'
 import { firePeerAgeForAge, FIRE_PEER_CURVE_START_AGE } from '@/lib/benchmark/fire-peer-lat'
+import type { FireEndStrategy } from '@/lib/fire-strategy'
 
 // ── Lightweight input for server-side / snapshot usage ───────
 // Allows computing the health score without a full DashboardData bundle.
@@ -64,6 +65,14 @@ export interface HealthScoreInput {
    * voortgang-op-leeftijd-signaal. VERPLICHT (geen `?`), zie currentAge.
    */
   fireAgeFractional: number | null
+  /**
+   * Eindstrategie van het plan (ADR 0127 D5). Onder 'nu-stoppen' is `freedomPct`
+   * geen vulling-van-een-doel maar TIJDSDEKKING (uitputtingsmaand ÷ eindmaand), en
+   * oordeelt de fire_progress-pijler daar rechtstreeks op — niet peer-relatief (de
+   * peer-lat meet opbouw naar een FIRE-moment dat hier per definitie "nu" is).
+   * Optioneel/additief: oude snapshots en mocks zonder het veld blijven geldig.
+   */
+  fireEndStrategy?: FireEndStrategy
   /**
    * Netto maandinkomen — dezelfde canonieke inkomensbron die `savingsRate6m`
    * voedt (income6m/6 resp. effectiveMonthlyIncome). Noemer van de DSTI-pijler.
@@ -304,9 +313,13 @@ function scoreFireProgress(freedomPct: number): number {
  * is de pot" maar "gaat je koers de lat van je leeftijdsgenoten halen".
  */
 export function scoreFireProgressVsPeers(
-  input: Pick<HealthScoreInput, 'freedomPct' | 'currentAge' | 'fireAgeFractional'>,
+  input: Pick<HealthScoreInput, 'freedomPct' | 'currentAge' | 'fireAgeFractional' | 'fireEndStrategy'>,
 ): number {
   const { freedomPct } = input
+  // ADR 0127 D5 — 'nu-stoppen': freedomPct is tijdsdekking (hoe ver reikt het geld
+  // t.o.v. de eigen eindleeftijd). De peer-lat meet opbouw naar een FIRE-moment en
+  // is hier betekenisloos (fireAge = startleeftijd) → direct op de dekking oordelen.
+  if (input.fireEndStrategy === 'nu-stoppen') return scoreFireProgress(freedomPct)
   const age = input.currentAge
   if (age == null || !Number.isFinite(age)) return scoreFireProgress(freedomPct)
   if (freedomPct >= 100) return 100

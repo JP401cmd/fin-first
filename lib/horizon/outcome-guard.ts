@@ -33,6 +33,12 @@ export type HorizonOutcomeIssue =
   | 'geen-uitgavenbasis'
   /** Het doelbedrag naast het moment is zelf niet te noemen — dan het moment ook niet. */
   | 'geen-vrijheidsmoment'
+  /**
+   * Eindstrategie 'nu-stoppen' (ADR 0127 D4): FIRE op maand 0, het "benodigde"
+   * bedrag is het huidige vermogen — er ís geen doelvermogen; de vraag is hoe lang
+   * het geld reikt.
+   */
+  | 'geen-doelvermogen'
   /** Waarde ontbreekt of is niet-eindig (NaN/Infinity). */
   | 'geen-gegevens'
 
@@ -70,6 +76,8 @@ export const HORIZON_MISSENDE_GEGEVENS_HINTS: Record<HorizonOutcomeIssue, string
     'We kunnen je vrijheidsmoment nog niet berekenen. Vul je inkomen, bestedingen en vermogen aan.',
   'geen-gegevens':
     'We hebben nog te weinig gegevens om dit te berekenen. Vul je profiel aan.',
+  'geen-doelvermogen':
+    'Bij "Nu stoppen" is er geen doelbedrag: de vraag is tot welke leeftijd je vermogen reikt.',
 }
 
 function issue(kind: HorizonOutcomeIssue): HorizonOutcomeGuard {
@@ -101,11 +109,16 @@ export function guardFreedomAge(age: number | null | undefined): HorizonOutcomeG
  * `isEndOfHorizonFallback` = `SimResult.requiredFireIsEndOfHorizonFallback`: dan
  * is het bedrag de geprojecteerde EINDSTAND op de horizon, niet "benodigd bij
  * FIRE" — een andere grootheid, die we niet als doelbedrag presenteren.
+ *
+ * `isStartPortfolio` = `SimResult.requiredFireIsStartPortfolio` (ADR 0127 D4): FIRE
+ * op maand 0 ('nu-stoppen'), het bedrag is het huidige vermogen — geen doel. Wint
+ * van elke bedragtoets: ook een positief getal is hier geen doelbedrag.
  */
 export function guardFireTarget(
   amount: number | null | undefined,
-  opts: { isEndOfHorizonFallback?: boolean } = {},
+  opts: { isEndOfHorizonFallback?: boolean; isStartPortfolio?: boolean } = {},
 ): HorizonOutcomeGuard {
+  if (opts.isStartPortfolio === true) return issue('geen-doelvermogen')
   if (amount == null || !Number.isFinite(amount)) return issue('geen-gegevens')
   if (amount <= 0) return issue('onmogelijk-bedrag')
   if (opts.isEndOfHorizonFallback === true) return issue('geen-fire-moment')

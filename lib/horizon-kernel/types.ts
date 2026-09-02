@@ -322,8 +322,18 @@ export interface StrategieSelectors {
   readonly onttrekking: OnttrekkingStrategie
 }
 
-/** P!B48 — Eindstrategie-selector. */
-export type Eindstrategie = 'Vermogen opeten' | 'Nalatenschap' | 'Eeuwigdurend' | 'Pensioenleeftijd'
+/**
+ * P!B48 — Eindstrategie-selector. De vier Excel-waarden plus 'Nu stoppen' (ADR 0127,
+ * buiten oracle-domein: geen fixture draagt 'm, dus parity blijft byte-identiek).
+ * 'Nu stoppen' = FIRE op de startleeftijd (P!B7, FIRE-maand 0), doel €0 op de
+ * eindleeftijd B51 — de kernel-native vorm van de stop-nu-runway (ADR 0126).
+ */
+export type Eindstrategie =
+  | 'Vermogen opeten'
+  | 'Nalatenschap'
+  | 'Eeuwigdurend'
+  | 'Pensioenleeftijd'
+  | 'Nu stoppen'
 
 /** Ja/Nee-schakelaar (Excel-tekst). */
 export type JaNee = 'Ja' | 'Nee'

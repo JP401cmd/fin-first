@@ -150,6 +150,8 @@ export const COMBOS: ComboDef[] = [
   { id: 'B-legacy', label: `Nalaten €${LEGACY_AMOUNT.toLocaleString('nl-NL')} (legacy)`, group: 'end', config: { housing: STD_HOUSING, end: { strategy: 'legacy', endAge: 90, legacyAmount: LEGACY_AMOUNT }, withdrawal: STD_WITHDRAWAL } },
   { id: 'B-perpetual', label: 'Eeuwigdurend (perpetual)', group: 'end', config: { housing: STD_HOUSING, end: { strategy: 'perpetual', endAge: 90, legacyAmount: 0 }, withdrawal: STD_WITHDRAWAL } },
   { id: 'B-pensioen', label: 'Pensioen (opbouw tot AOW)', group: 'end', config: { housing: STD_HOUSING, end: { strategy: 'pensioen', endAge: 90, legacyAmount: 0 }, withdrawal: STD_WITHDRAWAL } },
+  // ADR 0127: FIRE op de startleeftijd (maand 0), doel €0 op de eigen eindleeftijd.
+  { id: 'B-nu-stoppen', label: 'Nu stoppen (FIRE = vandaag)', group: 'end', config: { housing: STD_HOUSING, end: { strategy: 'nu-stoppen', endAge: 90, legacyAmount: 0 }, withdrawal: STD_WITHDRAWAL } },
 
   // ── Groep C — onttrekkingsprofiel varieert (F4: profielen, niet de oude v2-enum) ──
   //    Op de PERPETUAL-baseline (PERP_END), niet deplete — zie PERP_END-doc.
@@ -328,6 +330,11 @@ export const EXPECTED: Record<string, ComboExpectation> = {
   'B-legacy': { fireAgeFractional: 42.083, doelbedrag: 1102623 },
   'B-perpetual': { fireAgeFractional: 45.083, doelbedrag: 1469348 },
   'B-pensioen': { fireAgeFractional: 67.0, doelbedrag: 5846016 },
+  // 'nu-stoppen' (ADR 0127): fireAge = de hele startleeftijd (42, FIRE-maand 0), en het
+  // "doelbedrag" is per constructie J(0) — de liquide stand na maand 0 op de compleet-
+  // persona, géén benodigd vermogen (D4; de bridge markeert requiredFireIsStartPortfolio).
+  // Gouden rij gegenereerd 2026-09-02 uit de kernel (eerste run: €1.096.980).
+  'B-nu-stoppen': { fireAgeFractional: 42.0, doelbedrag: 1096980 },
   // Groep C/D op de PERPETUAL-baseline (PERP_END) — hier discrimineren de profielen/
   // werk-varianten wél (op deplete vielen ze samen op 42,083).
   'C-vast': { fireAgeFractional: 45.083, doelbedrag: 1469348 },
@@ -601,7 +608,9 @@ function invariantChecks(combo: ComboDef, actual: ComboActual, currentAge: numbe
   // die mode verankert FIRE op de AOW-leeftijd en rapporteert een afwijkende
   // requiredFirePortfolio, waardoor de impliciete ratio buiten de normale SWR-band
   // valt — geen drift-signaal.
-  if (strat !== 'pensioen') {
+  // 'nu-stoppen' (ADR 0127 D4) idem: requiredFirePortfolio is J(0), geen doel — de
+  // impliciete ratio zegt hier niets over drift.
+  if (strat !== 'pensioen' && strat !== 'nu-stoppen') {
     checks.push({
       name: 'Impliciete SWR plausibel',
       pass: actual.implicitWithdrawalRate > SWR_MIN && actual.implicitWithdrawalRate < SWR_MAX,
@@ -614,9 +623,9 @@ function invariantChecks(combo: ComboDef, actual: ComboActual, currentAge: numbe
   // de eindleeftijd) — bij deplete per constructie 0 (B93-doel=0-quirk, zie
   // bridge.ts#isKernelReachedNowDisplay-docs), bij perpetual de bewaarde pot, bij legacy
   // het nominaal-op-eindleeftijd nagelaten bedrag.
-  if (strat === 'deplete' || strat === 'pensioen') {
-    // Kernel: B36 = 0 bij deplete → exact €0 (geen VPW-restvermogen). Marge ruim (5%)
-    // gehouden voor de pensioen-tak (B36 ≠ 0 mogelijk).
+  if (strat === 'deplete' || strat === 'pensioen' || strat === 'nu-stoppen') {
+    // Kernel: B36 = 0 bij deplete én nu-stoppen (ADR 0127 D2) → exact €0 (geen
+    // VPW-restvermogen). Marge ruim (5%) gehouden voor de pensioen-tak (B36 ≠ 0 mogelijk).
     const ratio = actual.requiredFirePortfolio > 0 ? Math.abs(actual.targetEndPortfolio) / actual.requiredFirePortfolio : Math.abs(actual.targetEndPortfolio)
     checks.push({
       name: `Eind-doelvermogen ≈ €0 (${strat})`,

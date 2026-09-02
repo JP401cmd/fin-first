@@ -25,6 +25,7 @@ import { BOX3_PARAMS, CURRENT_TAX_YEAR, classifyAsset } from '@/lib/box3-data'
 import type { Asset } from '@/lib/asset-data'
 import { emergencyTargetBasis, resolveEmergencyFundFromRows } from '@/lib/emergency-fund'
 import { buildBudgetTypeMap } from '@/lib/budget-utils'
+import type { FireEndStrategy } from '@/lib/fire-strategy'
 import {
   buildBudgetSpendingMap,
   spentForBudget,
@@ -366,6 +367,11 @@ export interface HealthScoreScalars {
    * (snapshot-routes): dan telt alleen het voortgang-op-leeftijd-signaal.
    */
   fireAgeFractional: number | null
+  /**
+   * Eindstrategie van het plan (ADR 0127 D5) — onder 'nu-stoppen' oordeelt de
+   * fire_progress-pijler op tijdsdekking i.p.v. peer-relatief. Optioneel/additief.
+   */
+  fireEndStrategy?: FireEndStrategy
   /** 6-maands gemiddelde maanduitgaven — terugval-noemer van de noodbuffer. */
   avgMonthlyExpenses: number
   /**
@@ -448,6 +454,7 @@ export function buildHealthScoreInput(
     freedomPct: scalars.freedomPct,
     currentAge: scalars.currentAge,
     fireAgeFractional: scalars.fireAgeFractional,
+    fireEndStrategy: scalars.fireEndStrategy,
     netMonthlyIncome: scalars.netMonthlyIncome,
     debtMonthlyPayments: rows.debtMonthlyPayments,
     emergencyFundMonths: computeEmergencyFundMonths(

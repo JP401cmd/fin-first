@@ -2,6 +2,7 @@ import { registerCategory, registerTests } from '../test-registry'
 import { assert, assertEqual, assertIncludes } from '../assert'
 import { unauthenticatedFetch } from '../server-runner'
 import type { TestCase } from '../test-types'
+import { FIRE_END_STRATEGIES } from '@/lib/fire-strategy'
 
 const CAT = 'onboarding.api-flow'
 
@@ -10,8 +11,8 @@ const CAT = 'onboarding.api-flow'
 /** Valid household types accepted by save-own-data */
 const HOUSEHOLD_TYPES = ['solo', 'samen', 'gezin'] as const
 
-/** FIRE end strategies */
-const FIRE_STRATEGIES = ['perpetual', 'legacy', 'deplete'] as const
+/** FIRE end strategies — de canonieke allowlist (ADR 0127 D9), geen eigen kopie. */
+const FIRE_STRATEGIES = FIRE_END_STRATEGIES
 
 /** Retirement expense methods */
 const RETIREMENT_METHODS = ['essential_budgets', 'custom_amount', 'current_income'] as const

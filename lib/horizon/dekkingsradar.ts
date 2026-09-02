@@ -254,14 +254,17 @@ function axisEindstrategie(input: DekkingsradarInput): RadarAs {
   }
   const eind = input.rows[input.rows.length - 1].netWorth
 
-  if (input.endStrategy === 'deplete') {
+  // 'nu-stoppen' (ADR 0127) deelt de deplete-semantiek: doel €0 op de eigen
+  // eindleeftijd, dus eindvermogen ≥ 0 = gehaald. Alleen de duiding verschilt.
+  if (input.endStrategy === 'deplete' || input.endStrategy === 'nu-stoppen') {
+    const naam = input.endStrategy === 'nu-stoppen' ? 'Nu-stoppen' : 'Opeten-strategie'
     const base = Math.max(input.jaarBesteding, 1)
     const jarenOver = eind / base
     const pct = clamp(100 + jarenOver * EINDSTRATEGIE_DEPLETE_PUNTEN_PER_JAAR, 0, RADAR_PCT_MAX)
     const detail =
       eind >= 0
-        ? `Opeten-strategie: aan het eind blijft €${round(eind)} over (≈ ${jarenOver.toFixed(1)} jaar besteding).`
-        : `Opeten-strategie: aan het eind een tekort van €${round(-eind)} (≈ ${(-jarenOver).toFixed(1)} jaar besteding te kort).`
+        ? `${naam}: aan het eind blijft €${round(eind)} over (≈ ${jarenOver.toFixed(1)} jaar besteding).`
+        : `${naam}: aan het eind een tekort van €${round(-eind)} (≈ ${(-jarenOver).toFixed(1)} jaar besteding te kort).`
     return as('eindstrategie', label, pct, detail)
   }
 

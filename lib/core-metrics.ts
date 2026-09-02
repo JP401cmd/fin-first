@@ -15,6 +15,7 @@
 
 import { DEFAULT_RETURN } from '@/lib/constants'
 import { resolveFireParams } from '@/lib/fire-params'
+import type { FireEndStrategy } from '@/lib/fire-strategy'
 
 // ── Shared FIRE calculation primitives ───────────────────────
 
@@ -31,17 +32,22 @@ export function computeEffectiveExpenses(
  *
  * Optioneel: bij deplete strategie wordt depleteFireTarget() gebruikt
  * als strategy en yearsInRetirement worden meegegeven.
+ *
+ * 'nu-stoppen' (ADR 0127 D4) levert GEEN doel (0): de kernel bisecteert dan op
+ * tijd, niet op kapitaal, en de scalar-formule mag 'm niet stil als perpetual
+ * (uitgaven ÷ SWR) behandelen.
  */
 export function computeFireTarget(
   effectiveYearlyExpenses: number,
   swr: number,
   options?: {
-    strategy?: 'perpetual' | 'legacy' | 'deplete' | 'pensioen'
+    strategy?: FireEndStrategy
     yearsInRetirement?: number
     realReturn?: number
   },
 ): number {
   if (effectiveYearlyExpenses <= 0) return 0
+  if (options?.strategy === 'nu-stoppen') return 0
 
   if (options?.strategy === 'deplete' && options.yearsInRetirement && options.yearsInRetirement > 0) {
     const r = options.realReturn ?? swr
@@ -155,6 +161,43 @@ export function computeFreedomProgress({
   }
   if (fireEligibleNetWorth >= requiredPortfolio) return 100
   return Math.max(0, Math.min((fireEligibleNetWorth / requiredPortfolio) * 100, 100))
+}
+
+/**
+ * Vrijheidsvoortgang als TIJDSDEKKING (0–100) — de definitie onder eindstrategie
+ * 'nu-stoppen' (ADR 0127 D5). De gewone `computeFreedomProgress` is daar zinloos:
+ * bij FIRE-maand 0 is `requiredPortfolio` ≈ het huidige vermogen, dus de ratio is
+ * ~100 voor iedereen en de app zou "je bent vrij" zeggen ongeacht of het geld twee
+ * jaar reikt. Hier telt hoe ver de runway reikt ten opzichte van de eigen eindmaand:
+ *
+ *   pct = min(100, uitputtingsmaand ÷ eindmaand × 100)
+ *
+ * met `kernelDepletionMonth` = het bridge-veld uit `depletionMonth` (ADR 0126; eerste
+ * AANHOUDENDE maand met Prognose!J ≤ 0, maand 0 = nu) en `eindMaand` =
+ * `eindMaandVan(fire_end_age, startLeeftijd)` (lib/horizon-kernel/gap.ts).
+ *
+ * Semantiek (vastgepind in core-metrics.runway-coverage.test.ts):
+ *  - eindMaand niet-finite of ≤ 0                         ⇒ 0
+ *  - kernelDepletionMonth === 0 (deficit)                 ⇒ 0
+ *  - kernelDepletionMonth === null (reikt tot horizon)    ⇒ 100
+ *  - kernelDepletionMonth > eindMaand (reikt tot eind)    ⇒ 100
+ *  - anders                                               ⇒ (m / eindMaand) × 100
+ *
+ * Eén home naast `computeFreedomProgress`; de loaders kiezen strategie-bewust welke
+ * van de twee ze aanroepen — nooit beide mengen.
+ */
+export function computeRunwayCoveragePct({
+  kernelDepletionMonth,
+  eindMaand,
+}: {
+  kernelDepletionMonth: number | null
+  eindMaand: number
+}): number {
+  if (!Number.isFinite(eindMaand) || eindMaand <= 0) return 0
+  if (kernelDepletionMonth === null) return 100
+  if (!Number.isFinite(kernelDepletionMonth) || kernelDepletionMonth <= 0) return 0
+  if (kernelDepletionMonth > eindMaand) return 100
+  return Math.min(100, (kernelDepletionMonth / eindMaand) * 100)
 }
 
 // ── Vrijheidsvoortgang-grondslag: incl./excl. eigen woning (ADR 0009 herzien) ──
@@ -366,7 +409,7 @@ export function computeCoreData(
   input: FinancialInput,
   swrOverride?: number,
   strategyOptions?: {
-    strategy?: 'perpetual' | 'legacy' | 'deplete' | 'pensioen'
+    strategy?: FireEndStrategy
     yearsInRetirement?: number
     realReturn?: number
   },

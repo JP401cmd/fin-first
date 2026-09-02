@@ -16,6 +16,7 @@ import {
   type SavingsRateMethod,
   computeSavingsRateFromNetWorthDelta,
   computeFreedomProgressWithBasis,
+  computeRunwayCoveragePct,
   inclHomeTargetFromScalar,
 } from '@/lib/core-metrics'
 import type { HealthScoreInput } from '@/lib/financial-health'
@@ -31,7 +32,8 @@ import {
   getFireEligibleNetWorth,
   isHomeExcludedFromFire,
 } from '@/lib/housing-strategy'
-import { computeHorizonFireTarget, EMPTY_HORIZON_FIRE_TARGETS } from '@/lib/fire-target-shared'
+import { computeHorizonFireSim, computeHorizonFireTarget, EMPTY_HORIZON_FIRE_TARGETS } from '@/lib/fire-target-shared'
+import { eindMaandVan } from '@/lib/horizon-kernel/gap'
 import { buildBudgetSpendingMap } from '@/lib/budget-spending'
 import { BUDGET_SPENDING_TX_COLUMNS, fetchSpendingSplits } from '@/lib/budget-spending-fetch'
 import { buildBudgetTypeMap, computeYearlyMustExpenses, computeRetirementExpenses } from '@/lib/budget-utils'
@@ -1323,15 +1325,29 @@ export const loadCoreData = cache(async function loadCoreData(
   const coreHomeExcludedFromFire = housingContext.hasEigenHuis && isHomeExcludedFromFire(housingStrategyCfg)
   const coreRequiredPortfolioExcl =
     fireTargetFromHorizon != null && fireTargetFromHorizon > 0 ? fireTargetFromHorizon : null
-  const coreFreedomPct = computeFreedomProgressWithBasis({
-    homeExcludedFromFire: coreHomeExcludedFromFire,
-    netWorthInclHome: netWorth,
-    fireEligibleNetWorth: coreFireEligibleNetWorth,
-    requiredNetWorthInclHome:
-      fireNetWorthTargetFromHorizon ??
-      inclHomeTargetFromScalar(coreRequiredPortfolioExcl, netWorth, coreFireEligibleNetWorth),
-    requiredPortfolioExclHome: coreRequiredPortfolioExcl,
-  })
+  // ADR 0127 D5 — 'nu-stoppen': vrijheids-% = TIJDSDEKKING uit de gedeelde kernel-run
+  // (`computeHorizonFireSim`, React-cache() → dezelfde run die `fireTargetFromHorizon`
+  // al leverde; geen extra solve). `computeHorizonFireTarget` gaf hier al null-doelen
+  // (D4), dus zonder deze tak zou de score op 0 vallen.
+  const coreSharedRun = await computeHorizonFireSim(supabase).catch(() => null)
+  const coreStartAge = coreSharedRun?.rawContext?.profile?.date_of_birth
+    ? ageAtDate(coreSharedRun.rawContext.profile.date_of_birth)
+    : null
+  const coreFreedomPct =
+    coreSharedRun?.sim.requiredFireIsStartPortfolio === true && coreStartAge != null
+      ? computeRunwayCoveragePct({
+          kernelDepletionMonth: coreSharedRun.sim.kernelDepletionMonth ?? null,
+          eindMaand: eindMaandVan(coreSharedRun.sim.displayEndAge, coreStartAge),
+        })
+      : computeFreedomProgressWithBasis({
+          homeExcludedFromFire: coreHomeExcludedFromFire,
+          netWorthInclHome: netWorth,
+          fireEligibleNetWorth: coreFireEligibleNetWorth,
+          requiredNetWorthInclHome:
+            fireNetWorthTargetFromHorizon ??
+            inclHomeTargetFromScalar(coreRequiredPortfolioExcl, netWorth, coreFireEligibleNetWorth),
+          requiredPortfolioExclHome: coreRequiredPortfolioExcl,
+        })
   const coreDebtMonthlyPayments = (debtsResult.data ?? []).reduce(
     (s, d) => s + Number((d as { monthly_payment?: number | string | null }).monthly_payment ?? 0),
     0,

@@ -13,6 +13,8 @@
 
 // ── Types ────────────────────────────────────────────────────────────
 
+import type { FireEndStrategy } from '@/lib/fire-strategy'
+
 export type WithdrawalStrategyType = 'static' | 'guardrails'
 
 export interface WithdrawalStrategyConfig {
@@ -48,7 +50,7 @@ export interface WithdrawalContext {
   /** Eindleeftijd (voor VPW resterende-jaren berekening) */
   endAge: number
   /** FIRE eindstrategie — bij 'deplete' gebruikt applyStatic annuïteitsonttrekking */
-  endStrategy?: 'perpetual' | 'legacy' | 'deplete' | 'pensioen'
+  endStrategy?: FireEndStrategy
   /** Geïndexeerd nalatenschapsbedrag (alleen voor legacy strategie) */
   legacyAmount?: number
   /** Inflatiepercentage als decimaal (bijv. 0.02 voor 2%) — nodig voor reëel rendement in annuïteit */

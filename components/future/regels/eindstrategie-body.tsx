@@ -22,6 +22,8 @@ const SHOWS_END_AGE: Record<FireEndStrategy, boolean> = {
   legacy: true,
   perpetual: false,
   pensioen: true,
+  // ADR 0127: het geld moet tot de eigen eindleeftijd (B51) reiken — instelbaar.
+  'nu-stoppen': true,
 }
 
 interface Draft {

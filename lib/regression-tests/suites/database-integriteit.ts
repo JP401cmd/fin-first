@@ -9,6 +9,7 @@ import type { Asset, AssetType } from '@/lib/asset-data'
 import type { Budget, BudgetAmount } from '@/lib/budget-data'
 import type { Debt, DebtType } from '@/lib/debt-data'
 import type { LifeEvent } from '@/lib/horizon-data'
+import { FIRE_END_STRATEGIES, STRATEGY_LABELS, parseFireStrategy } from '@/lib/fire-strategy'
 import { authenticatedFetch } from '../server-runner'
 
 const CAT = 'data.database-integriteit'
@@ -33,7 +34,10 @@ const VALID_BUDGET_INTERVALS = ['monthly', 'quarterly', 'yearly'] as const
 const VALID_ROLLOVER_TYPES = ['reset', 'carry-over', 'invest-sweep'] as const
 const VALID_LIMIT_TYPES = ['soft', 'hard'] as const
 const VALID_OWNERSHIP_TYPES = ['personal', 'shared'] as const
-const VALID_FIRE_STRATEGIES = ['perpetual', 'legacy', 'deplete'] as const
+// ADR 0127 D9: AFGELEID uit de canonieke allowlist (lib/fire-strategy.ts), niet een
+// eigen lijst — die stond hier sinds maart op drie waarden terwijl de app er vier
+// kende, en niets viel. Een lokale literal toetst zichzelf; dit toetst de bron.
+const VALID_FIRE_STRATEGIES = FIRE_END_STRATEGIES
 const VALID_WITHDRAWAL_STRATEGIES = ['static', 'guardrails', 'vpw', 'abw'] as const
 const VALID_HOLDING_TX_TYPES = ['buy', 'sell', 'dividend'] as const
 
@@ -949,20 +953,46 @@ const tests: TestCase[] = [
 
   {
     id: 'db-check-fire-strategy-enum',
-    name: 'CHECK: fire_end_strategy values (3 strategies)',
+    name: 'CHECK: fire_end_strategy values (canonieke allowlist, 5 strategieën)',
     category: CAT,
-    description: 'FIRE strategy must be perpetual/legacy/deplete — no fixed_age variant',
+    description:
+      'De canonieke allowlist (Object.keys(STRATEGY_LABELS)) telt vijf strategieën — perpetual/legacy/deplete/pensioen/nu-stoppen (ADR 0127) — en elke waarde overleeft parseFireStrategy; geen fixed_age. Toetst de BRON, niet een lokale kopie: de vorige lokale lijst stond sinds maart op drie en asserteerde een onwaarheid zonder op te vallen.',
     priority: 'high',
     estimatedDurationMs: 200,
     fn() {
-      assertEqual(VALID_FIRE_STRATEGIES.length, 3, '3 FIRE strategies')
-      assertIncludes(VALID_FIRE_STRATEGIES as unknown as string[], 'perpetual', 'perpetual valid')
-      assertIncludes(VALID_FIRE_STRATEGIES as unknown as string[], 'legacy', 'legacy valid')
-      assertIncludes(VALID_FIRE_STRATEGIES as unknown as string[], 'deplete', 'deplete valid')
+      assertEqual(VALID_FIRE_STRATEGIES.length, 5, '5 FIRE strategies (canoniek)')
+      for (const s of ['perpetual', 'legacy', 'deplete', 'pensioen', 'nu-stoppen']) {
+        assertIncludes(VALID_FIRE_STRATEGIES as unknown as string[], s, `${s} valid`)
+        // De parser vouwt een geldige waarde NIET naar 'deplete' (ADR 0127 D9).
+        assertEqual(parseFireStrategy({ fire_end_strategy: s }).strategy, s, `parseFireStrategy(${s}) behoudt de waarde`)
+        assert(!!STRATEGY_LABELS[s as keyof typeof STRATEGY_LABELS]?.name, `${s} heeft een label`)
+      }
+      assertEqual(parseFireStrategy({ fire_end_strategy: 'fixed_age' }).strategy, 'deplete', 'onbekende waarde vouwt naar deplete')
       // Explicitly verify no 'fixed_age' variant (per project memory)
       assert(
         !(VALID_FIRE_STRATEGIES as unknown as string[]).includes('fixed_age'),
-        'no fixed_age strategy — only perpetual/legacy/deplete',
+        'no fixed_age strategy',
+      )
+    },
+  },
+
+  {
+    id: 'db-check-fire-strategy-roundtrip',
+    name: 'DB: opgeslagen fire_end_strategy is canoniek (GET /api/fire-settings)',
+    category: CAT,
+    description:
+      'De waarde die de database voor de ingelogde gebruiker teruggeeft staat op de canonieke allowlist. Dit is de enige toets in deze suite die de ECHTE database raakt (via de eigen-rij-route); een CHECK-constraint die achterloopt op de app kan hier zichtbaar worden zodra een gebruiker een nieuwe strategie heeft gekozen.',
+    priority: 'high',
+    estimatedDurationMs: 800,
+    async fn() {
+      const res = await authenticatedFetch('/api/fire-settings')
+      assertEqual(res.status, 200, 'GET /api/fire-settings → 200')
+      const body = (await res.json()) as { fire_end_strategy?: string }
+      assertDefined(body.fire_end_strategy, 'fire_end_strategy aanwezig')
+      assertIncludes(
+        VALID_FIRE_STRATEGIES as unknown as string[],
+        body.fire_end_strategy as string,
+        `opgeslagen strategie '${body.fire_end_strategy}' is canoniek`,
       )
     },
   },

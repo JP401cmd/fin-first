@@ -49,7 +49,7 @@ import type { IdentityData } from '@/components/onboarding/onboarding-identity'
 import type { AssetQuickInput, DebtQuickInput } from '@/lib/quick-add/types'
 import type { AssetType } from '@/lib/asset-data'
 import type { DebtType, RepaymentType } from '@/lib/debt-data'
-import type { FireEndStrategy } from '@/lib/fire-strategy'
+import { FIRE_END_STRATEGIES, type FireEndStrategy } from '@/lib/fire-strategy'
 import type { HouseholdType } from '@/lib/household-type'
 
 /** Velden die de gebruiker expliciet oversloeg via "Later invullen" (feature #830). */
@@ -119,12 +119,10 @@ const VALID_PRESET_KEYS: readonly SpaardoelPresetKey[] = [
   'custom',
 ]
 
-const VALID_FIRE_END_STRATEGIES: readonly FireEndStrategy[] = [
-  'perpetual',
-  'legacy',
-  'deplete',
-  'pensioen',
-]
+// De canonieke allowlist (ADR 0127 D9). De onboarding BIEDT 'nu-stoppen' niet aan
+// (een nieuwe gebruiker zonder plan hoort daar niet mee te beginnen), maar een
+// opgeslagen concept mag de waarde niet stil naar 'deplete' vouwen.
+const VALID_FIRE_END_STRATEGIES: readonly FireEndStrategy[] = FIRE_END_STRATEGIES
 
 const VALID_HOUSEHOLD_TYPES: readonly HouseholdType[] = ['solo', 'samen', 'gezin']
 

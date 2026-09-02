@@ -409,6 +409,12 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
     explanation:
       'Je bouwt op tot je AOW-leeftijd en gaat pas daarna onttrekken; wat overblijft is je nalatenschap. Handig als je niet eerder wilt stoppen met werken.',
   },
+  'eindstrategie_nu-stoppen': {
+    name: 'Nu stoppen',
+    alternative: 'Werken stopt vandaag',
+    explanation:
+      'Het model rekent alsof je vandaag stopt met werken en laat zien tot welke leeftijd je vermogen dan reikt. Er is geen doelbedrag: de vraag is hoe lang het geld strekt, niet hoeveel je nog moet opbouwen.',
+  },
 }
 
 /**

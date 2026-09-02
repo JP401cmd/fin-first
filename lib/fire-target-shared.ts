@@ -323,6 +323,9 @@ const computeHorizonFireTargetCached = cache(async function computeHorizonFireTa
   const run = await computeHorizonFireSim(supabase, perspective)
   if (!run) return EMPTY_HORIZON_FIRE_TARGETS
   const { sim } = run
+  // ADR 0127 D4 — 'nu-stoppen': FIRE op maand 0, het "benodigde" bedrag is het huidige
+  // vermogen en geen doel. Zelfde gate als de loaders (`simRequiredPortfolio` → null).
+  if (sim.requiredFireIsStartPortfolio) return EMPTY_HORIZON_FIRE_TARGETS
   // Beide grondslagen uit DEZELFDE run doorgeven (ADR 0034). Zelfde gate/vorm als
   // `dashboard-data-loader` (simRequiredPortfolio/simRequiredNetWorth) zodat de Kern,
   // de AI-context en /overzicht letterlijk hetzelfde paar cijfers consumeren.
