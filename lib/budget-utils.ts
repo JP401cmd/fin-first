@@ -24,7 +24,18 @@ export interface MustExpenseItem {
   interval: string
 }
 
-const EXCLUDED_BUDGET_TYPES = ['archive', 'income', 'savings']
+/**
+ * Budgettypes die GEEN uitgave/consumptie vertegenwoordigen: de blocklist die
+ * `computeYearlyMustExpenses` al hanteert (essentiële jaaruitgaven) en sinds ADR
+ * 0126 óók de consumptie-grondslag van het canonieke dagtarief
+ * (`consumptionExpenseRows` in lib/expense-rate.ts). Eén lijst, twee lezers —
+ * een tweede kopie zou precies de drift zijn die de blocklist bestrijdt.
+ *
+ * Blocklist en niet allowlist, want `budget_type` is optioneel: rijen zónder
+ * type blijven meetellen. 'debt' staat er bewust NIET in — een aflossing is een
+ * uitgave (spiegelt EXPENSE_DIRECTION_BUDGET_TYPES in lib/budget-spending.ts).
+ */
+export const EXCLUDED_BUDGET_TYPES: readonly string[] = ['archive', 'income', 'savings']
 
 /**
  * De ENIGE toegestane jaarconversie van een budget-limiet: monthly ×12,

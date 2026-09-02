@@ -120,7 +120,7 @@ import {
   type HousingStrategyConfig,
 } from '@/lib/housing-strategy'
 import { formatCurrency, calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate, roundCents } from '@/lib/format'
-import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
+import { consumptionExpenseRows, recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 import {
   getTxAgg12m,
   aggSumPositief,
@@ -128,7 +128,6 @@ import {
   aggExpenseByMonthAbs,
   aggSpendingByMonthForBudgets,
   aggLatestMonth,
-  aggToExpenseRows,
   isRealAggRow,
   type TxMonthAggregateRow,
 } from '@/lib/server-data/tx-aggregates'
@@ -1597,17 +1596,16 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     })
 
   // Canoniek dagtarief (€/dag) voor de €→vrijheidstijd-conversies. Grondslag =
-  // 12-mnd rolling gemiddelde van de RUWE negatieve transacties (zelfde basis als
-  // balans/budget/vermogen-rapport en de sidebar), via de gedeelde bron
-  // `lib/expense-rate.ts` — NIET langer de losse huidige kalendermaand, die per
-  // maand kon uitschieten en hetzelfde bedrag een andere vrijheidstijd gaf dan de
-  // rapporten (KRUIS-20). `txAgg12` is het 12-mnd maandaggregaat; de synthetische
-  // maand-uitgaven-rijen worden bewust ZONDER isRealTx-filter (realOnly:false)
-  // opgebouwd zodat de basis identiek is aan de rapport-routes. De helper gebruikt
-  // alleen het totaal én de vroegste maand; beide blijven byte-identiek.
+  // 12-mnd rolling gemiddelde van de GEZUIVERDE CONSUMPTIE (ADR 0126 D2: geen
+  // transfers, geen archief-/inkomsten-/spaarbudgetten — child erft het type via
+  // `budgetTypeMap`), via de gedeelde bron `lib/expense-rate.ts` — dezelfde
+  // definitie als balans/budget/vermogen-rapport en de sidebar, en NIET de losse
+  // huidige kalendermaand, die per maand kon uitschieten (KRUIS-20). `txAgg12` is
+  // het 12-mnd maandaggregaat; `consumptionExpenseRows` is de ENIGE plek die
+  // bepaalt welke rijen meetellen — bouw hier geen eigen `aggToExpenseRows`-opts.
   // Fallback naar de maand-schatting voor gebruikers zonder transacties.
   const recentExpenseRate = recentDailyExpenseRateFromRows(
-    aggToExpenseRows(txAgg12, { realOnly: false }),
+    consumptionExpenseRows(txAgg12, budgetTypeMap),
     now,
     effectiveMonthlyExpenses,
   )

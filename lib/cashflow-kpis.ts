@@ -50,12 +50,11 @@ import {
   aggExpenseByMonthAbs,
   aggSumPositief,
   aggSumNegatiefAbs,
-  aggToExpenseRows,
   aggLatestMonth,
   type TxMonthAggregateRow,
 } from '@/lib/server-data/tx-aggregates'
 import { deriveRealMonthTotals, type MonthTxRow } from '@/lib/cashflow-month-totals'
-import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
+import { consumptionExpenseRows, recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 import { resolveEffectiveIncomeExpenses, type IncomeExpenseSources } from '@/lib/effective-financials'
 import { buildBudgetTypeMap } from '@/lib/budget-utils'
 import {
@@ -660,12 +659,14 @@ export const loadCashflowKpis = cache(async (supabase: SupabaseClient): Promise<
     })
 
   // Canoniek dagtarief — GEEN eigen som: dezelfde helper-keten als de
-  // dashboardbundel, op het al opgehaalde 12-mnd aggregaat. `realOnly: false`
-  // houdt de basis (alle ruwe negatieve transacties) byte-identiek aan
-  // `DashboardData.dailyExpenseRate`; de effective maandwaarde dient alleen nog
-  // als terugval voor gebruikers zónder transacties in het venster.
+  // dashboardbundel, op het al opgehaalde 12-mnd aggregaat en dezelfde
+  // consumptie-grondslag (`consumptionExpenseRows`, ADR 0126 D2: geen transfers,
+  // geen archief-/inkomsten-/spaarbudgetten). De type-map komt uit dezelfde
+  // `getBudgets`-rijen als `loadDashboardData` gebruikt, dus het blijft één
+  // dagtarief; de effective maandwaarde dient alleen nog als terugval voor
+  // gebruikers zónder transacties in het venster.
   const { dailyRate: canonicalDailyExpenseRate } = recentDailyExpenseRateFromRows(
-    aggToExpenseRows(txAgg12, { realOnly: false }),
+    consumptionExpenseRows(txAgg12, buildBudgetTypeMap(budgets)),
     now,
     monthlyExpenses,
   )

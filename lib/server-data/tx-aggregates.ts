@@ -80,6 +80,18 @@ interface ReduceOpts {
   beforeMonth?: string
   /** Beperk tot deze budget-ids (bv. spaarbudget-correctie). */
   budgetIds?: Set<string>
+  /**
+   * Sluit deze budget-ids UIT — de spiegel van `budgetIds`. Bestaat voor de
+   * consumptie-grondslag van het dagtarief (ADR 0126 D2, `consumptionExpenseRows`
+   * in lib/expense-rate.ts): de ids van archief-, inkomsten- en spaarbudgetten
+   * (incl. children via `buildBudgetTypeMap`) gaan hierin, zodat een
+   * hypotheekaflossing op "Eigen rekening" niet als consumptie telt.
+   *
+   * BLOCKLIST-semantiek: een rij ZONDER `budget_id` (ongecategoriseerd) blijft
+   * meetellen — het aggregaat draagt geen budgettype, dus dit is de enige plek
+   * waar die kennis (via de id-set) binnenkomt. Weglaten = ongewijzigd gedrag.
+   */
+  excludeBudgetIds?: Set<string>
 }
 
 function passes(row: TxMonthAggregateRow, opts: ReduceOpts): boolean {
@@ -87,6 +99,7 @@ function passes(row: TxMonthAggregateRow, opts: ReduceOpts): boolean {
   if (opts.sinceMonth && row.month < opts.sinceMonth) return false
   if (opts.beforeMonth && row.month >= opts.beforeMonth) return false
   if (opts.budgetIds && !(row.budget_id && opts.budgetIds.has(row.budget_id))) return false
+  if (opts.excludeBudgetIds && row.budget_id && opts.excludeBudgetIds.has(row.budget_id)) return false
   return true
 }
 
@@ -281,9 +294,14 @@ export function aggSpendingByBudgetMonth(
  * Bouw synthetische uitgaven-rijen ({amount ≤ 0, date = 'YYYY-MM-01'}) uit het
  * aggregaat, zodat een bestaande rij-verwachtende helper (bv.
  * `recentDailyExpenseRateFromRows`) ONGEWIJZIGD gevoed kan worden. Alleen groepen
- * met een echte negatieve som doen mee (spiegelt de vroegere `.lt('amount',0)`-
- * fetch): het totaal én de vroegste maand — de enige twee dingen die die helper
- * gebruikt — blijven daardoor byte-identiek.
+ * met een echte negatieve som doen mee; welke groepen dat zijn bepaalt `opts`.
+ * De helper gebruikt alleen het totaal én de vroegste maand, dus voor dezelfde
+ * filterset is de uitkomst byte-identiek aan een rij-voor-rij reductie.
+ *
+ * Dit is een BOUWSTEEN, geen grondslag. De canonieke dagtarief-grondslag
+ * (consumptie: geen transfers, geen archief/inkomsten/spaar-budgetten) woont in
+ * `consumptionExpenseRows` (lib/expense-rate.ts) — roep voor het dagtarief díe
+ * aan, niet deze functie met een eigen `opts`.
  */
 export function aggToExpenseRows(
   rows: TxMonthAggregateRow[],

@@ -47,7 +47,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 import {
-  aggToExpenseRows,
   getTxAgg12m,
   isRealAggRow,
   type TxMonthAggregateRow,
@@ -55,9 +54,10 @@ import {
 import { getCurrentMonthTx, getOwnProfile, getBudgets } from '@/lib/server-data/base'
 import { loadBudgetBasis } from '@/lib/household/budget-share'
 import type { BudgetBasisRow } from '@/lib/budget-basis'
+import { buildBudgetTypeMap, type BudgetTypeRow } from '@/lib/budget-utils'
 import { deriveRealMonthTotals, type MonthTxRow } from '@/lib/cashflow-kpis'
 import { resolveEffectiveIncomeExpenses, type IncomeExpenseSources } from '@/lib/effective-financials'
-import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
+import { consumptionExpenseRows, recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 import {
   SPEND_LIMIT_GRAIN_BY_PERIOD,
   SPEND_LIMIT_WINDOW_BY_PERIOD,
@@ -306,9 +306,9 @@ export function aggregateChunkMonths(grain: SpendLimitGrain, hasBudgetOnlyRule: 
 /**
  * De €→vrijheidstijd-dagbasis, uit de CANONIEKE 12-MAANDS ROLLING BRON —
  * dezelfde keten die `DashboardData.dailyExpenseRate` produceert
- * (lib/dashboard-data-loader.ts): `getTxAgg12m` → `aggToExpenseRows(…,
- * { realOnly: false })` → `recentDailyExpenseRateFromRows` (lib/expense-rate.ts,
- * ×12/365 via `dailyExpenseRate`).
+ * (lib/dashboard-data-loader.ts): `getTxAgg12m` → `consumptionExpenseRows(…,
+ * budgetTypes)` (consumptie-grondslag, ADR 0126 D2) → `recentDailyExpenseRateFromRows`
+ * (lib/expense-rate.ts, ×12/365 via `dailyExpenseRate`).
  *
  * ── WAAROM NIET DE EFFECTIVE MAANDUITGAVEN (was: de bug) ────────────────────
  * Hier stond `dailyExpenseRate(resolveEffectiveIncomeExpenses(...).expenses)`:
@@ -377,8 +377,19 @@ async function resolveDailyExpenseRate(
       console.error('[spend-limits:loader] 12-maands aggregaat mislukt — dagtarief valt terug op de schatting', aggResult.error)
     }
     const agg12 = (aggResult.data ?? []) as TxMonthAggregateRow[]
+    // Consumptie-grondslag (ADR 0126 D2) op DEZELFDE `getBudgets`-rijen als de
+    // budgetgrondslag hierboven — geen tweede budgets-query, geen eigen type-map.
+    const budgetTypes = buildBudgetTypeMap(
+      ((budgetsResult.data ?? []) as { id: string; parent_id: string | null; budget_type: string | null }[]).map(
+        (b): BudgetTypeRow => ({
+          id: b.id,
+          parent_id: b.parent_id ?? null,
+          budget_type: b.budget_type ?? 'expense',
+        }),
+      ),
+    )
     const { dailyRate } = recentDailyExpenseRateFromRows(
-      aggToExpenseRows(agg12, { realOnly: false }),
+      consumptionExpenseRows(agg12, budgetTypes),
       now,
       expenses,
     )

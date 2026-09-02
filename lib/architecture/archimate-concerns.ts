@@ -384,6 +384,24 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
     elementIds: ['as-transacties', 'as-budget'],
     reviewedAt: '2026-08-11',
   },
+  {
+    id: 'overige-transactiesommen-blijven-budgettype-blind',
+    title: 'Buiten het dagtarief blijven de transactiegebaseerde sommen budgettype-blind',
+    detail:
+      'ADR 0126 (D2) zuivert de dagtarief-grondslag tot consumptie (geen transfers, geen archief-/inkomsten-/spaarbudget) via `consumptionExpenseRows` in lib/expense-rate.ts. De overige transactiegebaseerde sommen op hetzelfde maandaggregaat blijven budgettype-blind: `aggExpenseByMonthAbs`, de effective `monthlyExpenses`, de `currentMonth*`-velden (ADR 0073) en de 6-maands spaarquote-meting filteren wél op (joint_)transfer (`isRealAggRow`) maar niet op budgettype — `TxMonthAggregateRow` draagt `budget_id`, geen type, en die sommen bouwen (bewust, binnen ADR 0126) geen eigen budgettype-map. Een gebruiker die zijn hypotheekaflossing op een archiefbudget boekt ziet die aflossing dus WEL uit het dagtarief verdwijnen maar NOG STEEDS in bv. `monthlyExpenses` en de 6-maands spaarquote — dezelfde onderliggende transactie telt op twee schermen verschillend mee, met opzet: het dagtarief is de marginale prijs (D1), de overige sommen blijven de bredere kasstroom. Verwijder dit punt zodra bewust is besloten die sommen óók te zuiveren (met een expliciete afweging van de kosten: elke caller zou dan zijn eigen budgettype-map moeten meenemen) of zodra het verschil elders zichtbaar is uitgelegd.',
+    severity: 'debt',
+    elementIds: ['as-budget', 'as-transacties', 'do-transactie'],
+    reviewedAt: '2026-09-02',
+  },
+  {
+    id: 'consumptiegrondslag-mist-partnerbudgettypes',
+    title: 'De consumptie-grondslag van het dagtarief kent het budgettype van partnerbudgetten niet',
+    detail:
+      'De consumptie-definitie van het dagtarief (ADR 0126 D2) leest aggregaatrijen uit een huishoud-brede bron (`tx_month_aggregate` over `transactions`: zichtbaar bij `ownership=\'shared\'` binnen het huishouden) maar bouwt de budgettype-map uit de smallere `getBudgets` (eigen rijen óf `ownership=\'shared\'`). In het default budgetmodel \'separate\' zijn partnerbudgetten `personal` en dus onzichtbaar voor die map — een gedeelde transactie op een partner-ARCHIEFbudget valt daardoor door de blocklist en telt als eigen consumptie, precies de fout die ADR 0126 voor eigen budgetten oplost. `transactions.budget_id` draagt `ON DELETE SET NULL` (geverifieerd op de live database), dus de enige bron van "onbekend budgettype" is de partner, niet een opgeruimd budget. Kan vandaag niet vuren: nul huishoudens op productie (nagemeten 2 sep 2026), daarom bewust niet in dezelfde PR gefixt. Voorgestelde oplossing: een SECURITY DEFINER-RPC die uitsluitend `id, parent_id, budget_type` van de huishoudpartner teruggeeft (privacy-neutraal — geen bedragen/namen) en die in `buildBudgetTypeMap` wordt meegemengd. Verwijder dit punt zodra die RPC bestaat en de type-map huishoud-breed is, of zodra het eerste huishouden op productie staat en dit met voorrang is opgelost.',
+    severity: 'risk',
+    elementIds: ['as-budget', 'as-huishouden', 'do-budget'],
+    reviewedAt: '2026-09-02',
+  },
 ]
 
 /** Aandachtspunten die een specifiek element raken. */

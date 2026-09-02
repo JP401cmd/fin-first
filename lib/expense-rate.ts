@@ -11,30 +11,69 @@
  * rolling-venster (`EXPENSE_RATE_ROLLING_MONTHS`) en converteert via de canonieke
  * `dailyExpenseRate()` (×12/365) uit `lib/format.ts`.
  *
- * Grondslag = ALLE negatieve transacties in het venster (ruwe uitgaven, geen
- * essentieel/"must"-filter). Dat is bewust dezelfde basis als vóór de consolidatie
- * — dit ticket harmoniseert alléén het venster/codepad, niet wélke uitgaven meetellen.
+ * ── Grondslag = GEZUIVERDE CONSUMPTIE (ADR 0126, besluit D2) ─────────────────
+ * Een aggregaatrij (maand × budget × type) telt als consumptie wanneer
+ *   1. `sum_negatief < 0`,
+ *   2. het geen (joint_)transfer is (`isRealAggRow`), én
+ *   3. het GEËRFDE budgettype niet in `EXCLUDED_BUDGET_TYPES` zit
+ *      ('archive' · 'income' · 'savings'; lib/budget-utils.ts).
+ * Expliciete randen: ongecategoriseerd (`budget_id` null) telt MEE (blocklist-
+ * semantiek), 'debt' telt mee (een aflossing is een uitgave), en een child erft
+ * het type van zijn parent (`buildBudgetTypeMap`).
+ *
+ * BEKENDE BEPERKING — een niet-null `budget_id` die NIET in de type-map staat.
+ * Een verwijderd budget kan dat niet zijn (`transactions.budget_id` is
+ * `ON DELETE SET NULL`). De enige bron is een RLS-onzichtbaar PARTNER-budget:
+ * `transactions` is zichtbaar bij `ownership='shared'` binnen het huishouden,
+ * maar `budgets` alleen bij eigen rijen óf `ownership='shared'`, en in het
+ * default budgetmodel 'separate' zijn partnerbudgetten `personal`. Een
+ * partner-hypotheek op diens archiefbudget valt dan door de blocklist en telt
+ * als jouw consumptie. Vandaag onbereikbaar (nul huishoudens in productie),
+ * dus bewust niet in PR A opgelost.
+ * TODO(ADR 0126-vervolg): partnerbudgettypes ontsluiten (bv. via de
+ * perspective-loader) of shared-transacties zonder bekend type uitsluiten.
+ *
+ * Tot ADR 0126 was de grondslag "ALLE negatieve transacties". Op een echt account
+ * bestond ~60% van dat 12-maandstotaal uit één hypotheekaflossing (type NULL,
+ * archief-budget "Eigen rekening") en één terugbetaald voorschot (type transfer):
+ * het dagtarief stond ~2,6× te hoog en élke €→vrijheidstijd dus ~2,6× te kort.
+ * De budgetgebaseerde sommen (`computeYearlyMustExpenses`, budget-spending) sloten
+ * archief al uit; de transactiegebaseerde niet — dat verschil is hier gedicht.
+ * Eén functie draagt die definitie: `consumptionExpenseRows`. Bouw nergens een
+ * eigen `aggToExpenseRows(…, opts)` voor het dagtarief.
+ *
  * De aparte onttrekkingsfase-grondslag (`uitgaveNaPensioenPerJaar` → horizon-kernel)
  * is een ánder concept en hoort hier NIET thuis.
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { dailyExpenseRate } from '@/lib/format'
+import { credibleMonthlyBasis, dailyExpenseRate } from '@/lib/format'
 import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
 import { EXPENSE_RATE_ROLLING_MONTHS } from '@/lib/constants'
+import { buildBudgetTypeMap, EXCLUDED_BUDGET_TYPES, type BudgetTypeRow } from '@/lib/budget-utils'
+import { getBudgets } from '@/lib/server-data/base'
 import {
   aggToExpenseRows,
   fetchTxMonthAggregate,
   getTxAgg12m,
+  type TxMonthAggregateRow,
 } from '@/lib/server-data/tx-aggregates'
 
 export interface RecentDailyExpenseRate {
   /** Dagtarief in €/dag (canonieke jaar/365-basis via `dailyExpenseRate`). */
   dailyRate: number
-  /** Gemiddelde maanduitgaven over het rolling-venster (of de schatting-fallback). */
+  /**
+   * Gemiddelde maanduitgaven over het rolling-venster (of de schatting-fallback).
+   * Altijd 0 óf ≥ `CREDIBLE_MONTHLY_BASIS_MIN` (lib/format.ts): een grondslag
+   * onder die geloofwaardigheidsvloer wordt hier al als "geen data" behandeld.
+   */
   monthlyExpenses: number
   /** Aantal maanden met data (1..EXPENSE_RATE_ROLLING_MONTHS); 0 bij schatting/geen data. */
   dataMonths: number
-  /** Herkomst van het tarief: echte transacties, profiel-schatting, of geen. */
+  /**
+   * Herkomst van het tarief: echte transacties, profiel-schatting, of geen.
+   * 'transactions' impliceert een GELOOFWAARDIGE transactiebasis (≥ vloer);
+   * consumenten die hierop toetsen hoeven de vloer dus niet zelf te kennen.
+   */
   source: 'transactions' | 'estimate' | 'none'
 }
 
@@ -46,11 +85,26 @@ type ExpenseRow = { amount: number | string; date: string }
  * eindigt. Gebruik deze wanneer een oppervlak de rijen tóch al fetcht
  * (rapport-routes, dashboard-loader) — zo delen we de formule zonder extra query.
  *
+ * ── Geloofwaardigheidsvloer BIJ DE PRODUCENT (UR2-03, ADR 0126) ─────────────
+ * Een maandgrondslag onder `CREDIBLE_MONTHLY_BASIS_MIN` (€100/mnd, lib/format.ts)
+ * telt hier als "geen rijen": de uitkomst valt door naar de schatting-tak
+ * (`source: 'estimate'`) en zonder schatting naar `source: 'none'`. Dat is exact
+ * de al gedocumenteerde intentie van `credibleMonthlyBasis` ("0 is bewust
+ * dezelfde uitkomst als geen data"), alleen op ÉÉN plek in plaats van bij elke
+ * consument. De consumptie-grondslag maakt dit noodzakelijk: een account met
+ * vooral overboekingen en één ongecategoriseerde bankkostenpost van €2/mnd
+ * kreeg vroeger een opgeblazen maar plausibel tarief, en zou ná de zuivering
+ * een piepklein-maar-niet-nul tarief houden — waarmee €10.000 spaargeld als
+ * "414 jaar vrijheid" leest op elk oppervlak dat alleen op `source ===
+ * 'transactions'` of `dailyRate > 0` toetst. Dezelfde vloer geldt voor de
+ * schatting zelf: een profielinschatting van €50/mnd is even ongeloofwaardig.
+ *
  * @param rows - Transactie-rijen met negatieve `amount` over het venster.
  * @param referenceDate - Einddatum van het venster (bepaalt dataMonths).
  * @param fallbackMonthlyExpenses - Optionele maand-schatting; alléén gebruikt
- *   wanneer er GEEN transactie-rijen zijn (bv. onboarding zonder transacties),
- *   zodat een schatting-only gebruiker niet plots "0 vrijheid" ziet.
+ *   wanneer er GEEN geloofwaardige transactiebasis is (geen rijen, of een
+ *   grondslag onder de vloer — bv. onboarding zonder transacties), zodat een
+ *   schatting-only gebruiker niet plots "0 vrijheid" ziet.
  */
 export function recentDailyExpenseRateFromRows(
   rows: ExpenseRow[],
@@ -70,18 +124,23 @@ export function recentDailyExpenseRateFromRows(
         1,
     )
     dataMonths = Math.min(dataMonths, EXPENSE_RATE_ROLLING_MONTHS)
-    const monthlyExpenses = totalExpenses / dataMonths
-    return {
-      dailyRate: dailyExpenseRate(monthlyExpenses),
-      monthlyExpenses,
-      dataMonths,
-      source: 'transactions',
+    // Vloer: onder CREDIBLE_MONTHLY_BASIS_MIN geeft `credibleMonthlyBasis` 0 en
+    // valt de transactiebasis weg — door naar schatting of 'none' (zie kop).
+    const monthlyExpenses = credibleMonthlyBasis(totalExpenses / dataMonths)
+    if (monthlyExpenses > 0) {
+      return {
+        dailyRate: dailyExpenseRate(monthlyExpenses),
+        monthlyExpenses,
+        dataMonths,
+        source: 'transactions',
+      }
     }
   }
-  if (fallbackMonthlyExpenses > 0) {
+  const estimate = credibleMonthlyBasis(fallbackMonthlyExpenses)
+  if (estimate > 0) {
     return {
-      dailyRate: dailyExpenseRate(fallbackMonthlyExpenses),
-      monthlyExpenses: fallbackMonthlyExpenses,
+      dailyRate: dailyExpenseRate(estimate),
+      monthlyExpenses: estimate,
       dataMonths: 0,
       source: 'estimate',
     }
@@ -90,7 +149,49 @@ export function recentDailyExpenseRateFromRows(
 }
 
 /**
- * Haal de uitgaven-rijen voor het rolling-venster op — VIA HET MAANDAGGREGAAT.
+ * De budget-ids die NIET als consumptie tellen: elk budget waarvan het (geërfde)
+ * type in `EXCLUDED_BUDGET_TYPES` zit. `budgetTypes` is de canonieke type-map uit
+ * `buildBudgetTypeMap` (lib/budget-utils.ts) — child erft parent — zodat een
+ * "Hypotheek"-kind onder "Eigen rekening" (archive) óók buiten de consumptie valt.
+ */
+function nonConsumptionBudgetIds(budgetTypes: Map<string, string>): Set<string> {
+  const out = new Set<string>()
+  for (const [id, type] of budgetTypes) {
+    if (EXCLUDED_BUDGET_TYPES.includes(type)) out.add(id)
+  }
+  return out
+}
+
+/**
+ * DE canonieke dagtarief-grondslag: de synthetische uitgaven-rijen (één per
+ * maand × budget × type, `amount < 0`) die als CONSUMPTIE tellen — zie de
+ * kop van dit bestand voor de definitie (ADR 0126 D2).
+ *
+ * Elk oppervlak dat `recentDailyExpenseRateFromRows` voedt vanuit het 12-maands
+ * maandaggregaat (dashboard-, core-, cashflow-, horizon- en grenzenpot-loader,
+ * plus `fetchExpenseRowsForRate` hieronder) roept DEZE functie aan. Nooit een
+ * eigen `aggToExpenseRows(txAgg, { … })` met losse opties: dat is een tweede
+ * grondslag, en twee grondslagen geven hetzelfde bedrag twee vrijheidstijden.
+ *
+ * @param txAgg - Aggregaatrijen over het rolling-venster (`getTxAgg12m` of
+ *   `fetchTxMonthAggregate` met het canonieke venster).
+ * @param budgetTypes - `buildBudgetTypeMap(budgets)` over de VOLLEDIGE
+ *   budgetlijst (ongefilterd, ook gearchiveerde/gemergde rijen): een transactie
+ *   op een archiefbudget moet zijn type behouden om buiten de consumptie te vallen.
+ */
+export function consumptionExpenseRows(
+  txAgg: TxMonthAggregateRow[],
+  budgetTypes: Map<string, string>,
+): { amount: number; date: string }[] {
+  return aggToExpenseRows(txAgg, {
+    realOnly: true,
+    excludeBudgetIds: nonConsumptionBudgetIds(budgetTypes),
+  })
+}
+
+/**
+ * Haal de uitgaven-rijen voor het rolling-venster op — VIA HET MAANDAGGREGAAT,
+ * gezuiverd tot consumptie via `consumptionExpenseRows`.
  *
  * ── Waarom niet meer rauw (L10) ─────────────────────────────────────────────
  * De vorige implementatie deed `.from('transactions').select('amount, date')`
@@ -105,11 +206,16 @@ export function recentDailyExpenseRateFromRows(
  * aggregaat, de rapport-routes nog niet.
  *
  * Het aggregaat (`public.tx_month_aggregate`) levert per definitie enkele rijen
- * (één per maand × budget × type) en kan dus niet afkappen. `aggToExpenseRows`
+ * (één per maand × budget × type) en kan dus niet afkappen. `consumptionExpenseRows`
  * bouwt daar synthetische maand-rijen van; `recentDailyExpenseRateFromRows`
  * gebruikt alleen het totaal én de vroegste maand, dus de uitkomst is voor een
- * niet-afgekapte verzameling byte-identiek aan de rauwe route (bewezen in de
- * parity-test hierboven).
+ * niet-afgekapte verzameling byte-identiek aan een rij-voor-rij reductie op
+ * dezelfde consumptie-definitie (bewezen in de parity-test hierboven).
+ *
+ * De budgettypes komen via de gedeelde, `cache()`-gewrapte `getBudgets`
+ * (lib/server-data/base.ts): binnen een request waar een loader die rijen al
+ * heeft kost dat nul extra queries, en het is een tabel van enkele tientallen
+ * rijen — geen rij-fetch die op `max_rows` kan afkappen.
  *
  * ── Venster: maandkorrel, en waarom dat de canonieke keuze is ───────────────
  * Het aggregaat kent alleen hele kalendermaanden. Het venster is daarom
@@ -135,19 +241,46 @@ export async function fetchExpenseRowsForRate(
     referenceDate.getFullYear() === now.getFullYear() &&
     referenceDate.getMonth() === now.getMonth()
 
-  const { data } = sameMonthAsNow
-    ? await getTxAgg12m(supabase)
-    : await fetchTxMonthAggregate(supabase, {
-        from: localMonthStartMonthsAgo(referenceDate, EXPENSE_RATE_ROLLING_MONTHS - 1),
-        // `to` is EXCLUSIEF in de RPC → de 1e van de volgende maand.
-        to: localMonthBounds(referenceDate).end,
-      })
+  const [aggResult, budgetsResult] = await Promise.all([
+    sameMonthAsNow
+      ? getTxAgg12m(supabase)
+      : fetchTxMonthAggregate(supabase, {
+          from: localMonthStartMonthsAgo(referenceDate, EXPENSE_RATE_ROLLING_MONTHS - 1),
+          // `to` is EXCLUSIEF in de RPC → de 1e van de volgende maand.
+          to: localMonthBounds(referenceDate).end,
+        }),
+    getBudgets(supabase),
+  ])
 
-  // `realOnly: false` = álle negatieve transacties, inclusief (joint_)transfers —
-  // byte-identiek aan de vroegere `.lt('amount', 0)`-fetch en aan de grondslag van
-  // `DashboardData.dailyExpenseRate`. Nooit stilzwijgend filteren: dat zou een
-  // ANDERE grondslag zijn en precies de drift terugbrengen die L10 opruimt.
-  return aggToExpenseRows(data ?? [], { realOnly: false })
+  // FOUTEN NIET SLIKKEN. Zonder budgettypes zou `data ?? []` een LEGE type-map
+  // geven en telt alles behalve transfers weer mee — precies de oude, ~2,6× te
+  // hoge grondslag, stil en zonder log. Een mislukte budgets-fetch is daarom
+  // "geen data" (lege rijen → schatting of 'none' via de vloer in
+  // `recentDailyExpenseRateFromRows`), nooit "alles is consumptie". Het
+  // aggregaat-pad viel al op "geen data" terug; alleen de log ontbrak. Spiegelt
+  // lib/spend-limits/loader.ts, dat zijn aggregaat-fout wél logt.
+  if (aggResult.error) {
+    console.error('[expense-rate] 12-maands aggregaat mislukt — dagtarief valt terug op de schatting', aggResult.error)
+  }
+  if (budgetsResult.error) {
+    console.error('[expense-rate] budgets-fetch mislukt — geen budgettypes, dagtarief valt terug op de schatting', budgetsResult.error)
+    return []
+  }
+
+  // Dezelfde consumptie-grondslag als `DashboardData.dailyExpenseRate` en de
+  // loaders (dashboard/core/cashflow/horizon/grenzenpot): één functie, één
+  // definitie. `budget_type` heeft in de DB default 'expense'; de `?? 'expense'`
+  // hieronder spiegelt de type-map-bron van lib/core-data-loader.ts.
+  const budgetTypes = buildBudgetTypeMap(
+    ((budgetsResult.data ?? []) as { id: string; parent_id: string | null; budget_type: string | null }[]).map(
+      (b): BudgetTypeRow => ({
+        id: b.id,
+        parent_id: b.parent_id ?? null,
+        budget_type: b.budget_type ?? 'expense',
+      }),
+    ),
+  )
+  return consumptionExpenseRows(aggResult.data ?? [], budgetTypes)
 }
 
 /**

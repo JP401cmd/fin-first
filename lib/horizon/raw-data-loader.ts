@@ -46,7 +46,7 @@ import {
   type LifeEventImpact,
 } from '@/lib/horizon-data'
 import type { Action } from '@/lib/recommendation-data'
-import { computeYearlyMustExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
+import { buildBudgetTypeMap, computeYearlyMustExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { deriveRetirementExpenseBasis, extrapolateAnnualIncome } from '@/lib/retirement-expense-basis'
 import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import type { Asset } from '@/lib/asset-data'
@@ -105,10 +105,10 @@ import {
   getTxAgg12m,
   aggSumPositief,
   aggSumNegatiefAbs,
-  aggToExpenseRows,
   type TxMonthAggregateRow,
 } from '../server-data/tx-aggregates'
 import {
+  consumptionExpenseRows,
   recentDailyExpenseRateFromRows,
   type RecentDailyExpenseRate,
 } from '../expense-rate'
@@ -145,10 +145,10 @@ export interface HorizonRawData {
   effectiveInput: FinancialInput
   /**
    * Canoniek dagtarief (€/dag) voor élke €→vrijheidstijd-vertaling die op deze
-   * bundel leunt — 12-mnd rolling grondslag via `lib/expense-rate.ts`, exact
-   * dezelfde keten als `DashboardData.dailyExpenseRate`
-   * (`getTxAgg12m` → `aggToExpenseRows(…, { realOnly: false })` →
-   * `recentDailyExpenseRateFromRows` → `dailyExpenseRate` ×12/365).
+   * bundel leunt — 12-mnd rolling consumptie-grondslag via `lib/expense-rate.ts`,
+   * exact dezelfde keten als `DashboardData.dailyExpenseRate`
+   * (`getTxAgg12m` → `consumptionExpenseRows(…, budgetTypeMap)` →
+   * `recentDailyExpenseRateFromRows` → `dailyExpenseRate` ×12/365; ADR 0126 D2).
    *
    * ── WAAROM DIT VELD BESTAAT ────────────────────────────────────────────────
    * Consumers rekenden `dailyExpenseRate(effectiveInput.monthlyExpenses)`. Dát
@@ -762,16 +762,13 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
   // ── Budget subsets from single query ──────────────────────────
   const allBudgetsRaw = (allBudgetsResult.data ?? []) as { id: string; name: string; default_limit: number; interval: string; budget_type: string; is_essential: boolean; parent_id: string | null }[]
   const essentialBudgets = allBudgetsRaw.filter(b => b.is_essential && b.budget_type === 'expense' && b.parent_id === null)
-  const allParentBudgets = allBudgetsRaw.filter(b => b.parent_id === null)
   const allChildren = allBudgetsRaw.filter(b => b.parent_id !== null)
 
-  // Budget type map: budget_id → budget_type (parent + child)
-  const budgetTypeMap = new Map<string, string>()
-  for (const b of allParentBudgets) budgetTypeMap.set(b.id, b.budget_type)
-  for (const c of allChildren) {
-    const parentType = budgetTypeMap.get(c.parent_id ?? '')
-    if (parentType) budgetTypeMap.set(c.id, parentType)
-  }
+  // Budget type map: budget_id → budget_type (parent + child, child erft) — de
+  // canonieke erfregel uit lib/budget-utils.ts, gedeeld met dashboard/core en
+  // met de consumptie-grondslag van het dagtarief (`consumptionExpenseRows`).
+  // Was hier een handgeschreven kopie van dezelfde lus; één home voorkomt drift.
+  const budgetTypeMap = buildBudgetTypeMap(allBudgetsRaw)
 
   // Yearly must expenses + retirement expenses
   const { yearlyMustExpenses } = computeYearlyMustExpenses(
@@ -1343,12 +1340,13 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
   // Canoniek dagtarief voor de €→vrijheidstijd-vertalingen die op deze bundel
   // leunen (belasting-hub, box 1, fiscale kansen, totaalplan, aandachtspunten,
   // /toekomst). GEEN eigen som: exact dezelfde helper-keten als
-  // `DashboardData.dailyExpenseRate`, op het al-opgehaalde 12-mnd aggregaat —
-  // `realOnly: false` zodat de basis (alle ruwe negatieve transacties, incl.
-  // overboekingen) byte-identiek is aan de dashboardbundel en de rapport-routes.
+  // `DashboardData.dailyExpenseRate`, op het al-opgehaalde 12-mnd aggregaat en de
+  // gezuiverde consumptie-grondslag (`consumptionExpenseRows`, ADR 0126 D2: geen
+  // transfers, geen archief-/inkomsten-/spaarbudgetten via `budgetTypeMap`) —
+  // byte-identiek aan de dashboardbundel en de rapport-routes.
   // Zie het veldcommentaar op `HorizonRawData.dailyExpenseRate` voor het waarom.
   const canonicalDailyExpenses = recentDailyExpenseRateFromRows(
-    aggToExpenseRows(txAgg12, { realOnly: false }),
+    consumptionExpenseRows(txAgg12, budgetTypeMap),
     now,
     effectiveMonthlyExpenses,
   )

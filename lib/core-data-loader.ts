@@ -75,9 +75,8 @@ import {
   aggIncomeByMonth,
   aggExpenseByMonthAbs,
   aggSpendingByBudgetMonth,
-  aggToExpenseRows,
 } from '@/lib/server-data/tx-aggregates'
-import { recentDailyExpenseRateFromRows } from './expense-rate'
+import { consumptionExpenseRows, recentDailyExpenseRateFromRows } from './expense-rate'
 
 // ── Result type ────────────────────────────────────────────────
 
@@ -903,11 +902,28 @@ export const loadCoreData = cache(async function loadCoreData(
     yearlyRetirementExpenses,
   }
 
+  // Richting per budget (child erft parent-type; NULL → DB-default 'expense').
+  // VERPLICHTE input van de canonieke besteed-som (de inkomst-aftrek geldt alleen
+  // op een uitgaven-budget) én van de consumptie-grondslag van het dagtarief.
+  // Bron is de ONGEFILTERDE budget-lijst uit de gedeelde, cache()-gewrapte
+  // `getBudgets` (batch 1, `allBudgetsBasisResult`) — dezelfde rijen waaruit
+  // dashboard-, horizon-, cashflow- en grenzenpot-loader én lib/expense-rate.ts
+  // hun type-map bouwen, zodat het dagtarief op elk oppervlak dezelfde budgetten
+  // als consumptie ziet. Een transactie op een gearchiveerd budget houdt zijn type.
+  const budgetTypeMap = buildBudgetTypeMap(
+    ((allBudgetsBasisResult.data ?? []) as { id: string; parent_id: string | null; budget_type: string | null }[]).map(b => ({
+      id: b.id,
+      parent_id: b.parent_id ?? null,
+      budget_type: b.budget_type ?? 'expense',
+    })),
+  )
+
   // Canoniek dagtarief — GEEN eigen som: dezelfde helper-keten als de dashboard-
-  // en horizon-bundel, op het al opgehaalde 12-mnd aggregaat. De effective
+  // en horizon-bundel, op het al opgehaalde 12-mnd aggregaat en de gezuiverde
+  // consumptie-grondslag (`consumptionExpenseRows`, ADR 0126 D2). De effective
   // maandwaarde dient alleen nog als terugval voor wie geen transacties heeft.
   const { dailyRate: canonicalDailyExpenseRate } = recentDailyExpenseRateFromRows(
-    aggToExpenseRows(txAgg12, { realOnly: false }),
+    consumptionExpenseRows(txAgg12, budgetTypeMap),
     now,
     effectiveMonthlyExpenses,
   )
@@ -1024,17 +1040,8 @@ export const loadCoreData = cache(async function loadCoreData(
     fetchSpendingSplits(supabase, (prevSpendingResult.data ?? []) as { id?: string; is_split?: boolean | null }[]),
   ])
 
-  // Richting per budget (child erft parent-type; NULL → DB-default 'expense').
-  // VERPLICHTE input van de canonieke besteed-som: de inkomst-aftrek geldt
-  // alleen op een uitgaven-budget. Bron is de ONGEFILTERDE budget-lijst — een
-  // transactie op een gearchiveerd budget houdt zijn richting.
-  const budgetTypeMap = buildBudgetTypeMap(
-    ((budgetResult.data ?? []) as Budget[]).map(b => ({
-      id: b.id,
-      parent_id: b.parent_id ?? null,
-      budget_type: b.budget_type ?? 'expense',
-    })),
-  )
+  // `budgetTypeMap` (richting per budget) is hierboven al gebouwd, vóór het
+  // dagtarief — één type-map voor besteed-som én consumptie-grondslag.
 
   // Goals state
   const hasGoals = (goalsResult.data?.length ?? 0) > 0

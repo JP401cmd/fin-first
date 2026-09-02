@@ -7,11 +7,11 @@ import {
   aggExpenseByMonthAbs,
   aggSpendingByMonthForBudgets,
   aggSpendingByBudgetMonth,
-  aggToExpenseRows,
   type TxMonthAggregateRow,
 } from './tx-aggregates'
 import { spendingContribution } from '@/lib/budget-spending'
-import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
+import { EXCLUDED_BUDGET_TYPES } from '@/lib/budget-utils'
+import { consumptionExpenseRows, recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 import { savingsRateFromAggregates } from '@/lib/savings-source'
 
 // ── Parity: oude JS-aggregatie over ruwe rijen == nieuwe aggregaat-consumptie ──
@@ -27,18 +27,21 @@ type Raw = { amount: number; date: string; budget_id: string | null; transaction
 const RENT = 'budget-rent'
 const SAVINGS = 'budget-savings'
 const DEBT = 'budget-debt'
+/** "Eigen rekening" — het archiefbudget waarop hypotheekaflossing/voorschot landen. */
+const ARCHIVE = 'budget-eigen-rekening'
 const savingsBudgetIds = new Set([SAVINGS])
 const debtBudgetIds = new Set([DEBT])
 
 /**
  * De richting per budget — verplichte input van de besteed-reducers, en dus
  * ook van de rij-voor-rij referentie waartegen ze hier worden gelegd.
- * expense/debt = uitgaven-richting, savings = inkomsten-richting.
+ * expense/debt = uitgaven-richting, savings = inkomsten-richting, archive = geen.
  */
 const BUDGET_TYPE_BY_ID = new Map<string, string>([
   [RENT, 'expense'],
   [SAVINGS, 'savings'],
   [DEBT, 'debt'],
+  [ARCHIVE, 'archive'],
 ])
 
 const isRealTx = (t: { transaction_type?: string | null }) =>
@@ -65,7 +68,24 @@ function buildFixture(): Raw[] {
     rows.push({ amount: -500, date: `${m}-02`, budget_id: SAVINGS, transaction_type: null })    // spaarbudget
     rows.push({ amount: -300, date: `${m}-03`, budget_id: DEBT, transaction_type: null })       // schuldbudget
     rows.push({ amount: 5000, date: `${m}-04`, budget_id: null, transaction_type: 'transfer' }) // transfer + (geen echte tx)
-    rows.push({ amount: -5000, date: `${m}-05`, budget_id: null, transaction_type: 'transfer' })// transfer - (telt WEL in dagtarief, niet in isRealTx-sommen)
+    rows.push({ amount: -5000, date: `${m}-05`, budget_id: null, transaction_type: 'transfer' })// transfer - (telt in geen enkele som: niet in isRealTx, niet in consumptie)
+  }
+  return rows
+}
+
+/**
+ * De dagtarief-fixture: de basisfixture PLUS de twee productie-rijen die ADR 0126
+ * afdwongen — een hypotheekaflossing (type NULL) en een terugbetaald voorschot
+ * (type transfer), beide op het archiefbudget "Eigen rekening". Apart gehouden
+ * van `buildFixture()` zodat de vastgepinde getallen van de L10-afkapgetuige
+ * (14000 / 24000 / 13200) onaangeroerd blijven.
+ */
+function buildDagtariefFixture(): Raw[] {
+  const rows = buildFixture()
+  for (const m of MONTHS) {
+    rows.push({ amount: -2000, date: `${m}-06`, budget_id: ARCHIVE, transaction_type: null })      // aflossing op archief — geen consumptie
+    rows.push({ amount: -900, date: `${m}-07`, budget_id: ARCHIVE, transaction_type: 'transfer' }) // voorschot terug — geen consumptie
+    rows.push({ amount: -75, date: `${m}-08`, budget_id: null, transaction_type: null })           // ongecategoriseerd — WEL consumptie
   }
   return rows
 }
@@ -130,8 +150,19 @@ function rowSpendingByMonthForBudgets(rows: Raw[], budgetIds: Set<string>): Map<
   }
   return m
 }
-// dagtarief: expense12 = amount<0, ALLE types (geen isRealTx-filter).
-const oldDailyRate = (rows: Raw[]) =>
+// ── Dagtarief: de rij-voor-rij CONSUMPTIE-definitie (ADR 0126 D2) ────────────
+// Een transactie is consumptie als amount < 0, geen (joint_)transfer, en het
+// (geërfde) budgettype niet in EXCLUDED_BUDGET_TYPES zit. Geen budget of een
+// onbekend budget ⇒ meetellen (blocklist). Dit is de referentie waartegen de
+// aggregaat-vorm (`consumptionExpenseRows`) byte-identiek moet zijn.
+const isConsumptionTx = (t: Raw) =>
+  t.amount < 0 &&
+  isRealTx(t) &&
+  !EXCLUDED_BUDGET_TYPES.includes(BUDGET_TYPE_BY_ID.get(t.budget_id ?? '') ?? '')
+const rowDailyRate = (rows: Raw[]) =>
+  recentDailyExpenseRateFromRows(rows.filter(isConsumptionTx), NOW, 0)
+// De grondslag van VÓÓR ADR 0126: amount<0, alle types, alle budgetten.
+const legacyAllNegativeDailyRate = (rows: Raw[]) =>
   recentDailyExpenseRateFromRows(rows.filter(r => r.amount < 0), NOW, 0)
 
 function mapEq(a: Map<string, number>, b: Map<string, number>) {
@@ -175,13 +206,71 @@ describe('tx-aggregate parity (oud JS ↔ nieuw aggregaat)', () => {
     )
   })
 
-  it('dagtarief (recentDailyExpenseRate, transfers meegeteld) — byte-identiek', () => {
-    const fromAgg = recentDailyExpenseRateFromRows(aggToExpenseRows(agg, { realOnly: false }), NOW, 0)
-    const old = oldDailyRate(fixture)
-    expect(fromAgg.dailyRate).toBe(old.dailyRate)
-    expect(fromAgg.monthlyExpenses).toBe(old.monthlyExpenses)
-    expect(fromAgg.dataMonths).toBe(old.dataMonths)
-    expect(fromAgg.source).toBe(old.source)
+  // ── Dagtarief: consumptie-grondslag (ADR 0126 D2) ─────────────────────────
+  describe('dagtarief (consumptionExpenseRows ↔ rij-voor-rij consumptie)', () => {
+    const dagFixture = buildDagtariefFixture()
+    const dagAgg = buildMonthAggregatesFromRows(dagFixture)
+
+    it('aggregaat-vorm == rij-voor-rij consumptie-definitie — byte-identiek', () => {
+      const fromAgg = recentDailyExpenseRateFromRows(consumptionExpenseRows(dagAgg, BUDGET_TYPE_BY_ID), NOW, 0)
+      const fromRows = rowDailyRate(dagFixture)
+      expect(fromAgg.dailyRate).toBe(fromRows.dailyRate)
+      expect(fromAgg.monthlyExpenses).toBe(fromRows.monthlyExpenses)
+      expect(fromAgg.dataMonths).toBe(fromRows.dataMonths)
+      expect(fromAgg.source).toBe(fromRows.source)
+      // Per maand: huur 1200 + schuld 300 + ongecategoriseerd 75 = 1575, plus in
+      // 2026-07 de 1200 losse huur-rijen × 10 = 12000 ⇒ (12×1575 + 12000) / 12.
+      expect(fromAgg.monthlyExpenses).toBe((12 * 1575 + 12000) / 12)
+      expect(fromAgg.dataMonths).toBe(12)
+    })
+
+    it('de oude "alles negatief"-grondslag telde archief, spaar en transfers mee — en stond dus te hoog', () => {
+      const consumptie = recentDailyExpenseRateFromRows(consumptionExpenseRows(dagAgg, BUDGET_TYPE_BY_ID), NOW, 0)
+      const legacy = legacyAllNegativeDailyRate(dagFixture)
+      // Per maand kwam er 500 (spaar) + 5000 (transfer) + 2000 (archief) + 900
+      // (archief-transfer) = 8400 bovenop de consumptie van 1575.
+      expect(legacy.monthlyExpenses - consumptie.monthlyExpenses).toBe(8400)
+      expect(legacy.dailyRate).toBeGreaterThan(consumptie.dailyRate)
+    })
+
+    it('AFKAP-GETUIGE op het dagtarief-pad: de afgekapte rij-route liegt, het aggregaat niet', () => {
+      // PostgREST leverde de eerste 1000 rijen; dat zijn hier uitsluitend de losse
+      // 2026-07-huurrijen → één maand data, en een ander maandbedrag.
+      const capped = rowDailyRate(dagFixture.slice(0, 1000))
+      const truth = recentDailyExpenseRateFromRows(consumptionExpenseRows(dagAgg, BUDGET_TYPE_BY_ID), NOW, 0)
+      expect(capped.dataMonths).toBe(1)
+      expect(truth.dataMonths).toBe(12)
+      expect(capped.monthlyExpenses).not.toBe(truth.monthlyExpenses)
+    })
+
+    it('blocklist-randen: geen budget telt mee; debt telt mee; child erft archief; RLS-onzichtbaar partnerbudget valt erdoor (bekende beperking)', () => {
+      const KID = 'budget-hypotheek-kind'
+      const types = new Map([...BUDGET_TYPE_BY_ID, [KID, 'archive']]) // zoals buildBudgetTypeMap 'm levert: child erft
+      // `budget-partner-onzichtbaar`: een niet-null id dat NIET in de type-map
+      // staat. Geen verwijderd budget (ON DELETE SET NULL) maar een partnerbudget
+      // dat RLS voor deze gebruiker verbergt — vandaag onbereikbaar, wél een
+      // bekende beperking. TODO(ADR 0126-vervolg), zie de kop van lib/expense-rate.ts.
+      const rows: Raw[] = [
+        { amount: -100, date: '2026-07-01', budget_id: null, transaction_type: null },       // geen budget → telt
+        { amount: -200, date: '2026-07-02', budget_id: 'budget-partner-onzichtbaar', transaction_type: null }, // valt door de blocklist → telt (beperking)
+        { amount: -300, date: '2026-07-03', budget_id: DEBT, transaction_type: null },       // debt → telt
+        { amount: -400, date: '2026-07-04', budget_id: KID, transaction_type: null },        // child van archief → telt NIET
+        { amount: -500, date: '2026-07-05', budget_id: SAVINGS, transaction_type: null },    // savings → telt NIET
+        { amount: -600, date: '2026-07-06', budget_id: RENT, transaction_type: 'joint_transfer' }, // transfer → telt NIET
+        { amount: 700, date: '2026-07-07', budget_id: RENT, transaction_type: null },        // inkomst → geen negatieve som
+      ]
+      const r = recentDailyExpenseRateFromRows(consumptionExpenseRows(buildMonthAggregatesFromRows(rows), types), NOW, 0)
+      expect(r.monthlyExpenses).toBe(600)
+    })
+
+    it('Σconsumptie = 0 ⇒ geen rijen ⇒ source "none" (geen verzonnen dagtarief)', () => {
+      const rows: Raw[] = [
+        { amount: -2000, date: '2026-07-01', budget_id: ARCHIVE, transaction_type: null },
+        { amount: -5000, date: '2026-07-02', budget_id: null, transaction_type: 'transfer' },
+      ]
+      const r = recentDailyExpenseRateFromRows(consumptionExpenseRows(buildMonthAggregatesFromRows(rows), BUDGET_TYPE_BY_ID), NOW, 0)
+      expect(r).toEqual({ dailyRate: 0, monthlyExpenses: 0, dataMonths: 0, source: 'none' })
+    })
   })
 
   it('REGRESSIE-GETUIGE: oude code afgekapt op 1000 rijen wijkt af; aggregaat geeft de volle waarheid', () => {
@@ -299,10 +388,19 @@ describe('tx-aggregate parity (oud JS ↔ nieuw aggregaat)', () => {
     })
   })
 
-  it('transfers tellen NIET in isRealTx-sommen, WEL in het dagtarief (parity op beide paden)', () => {
-    // isRealTx-som negeert de transfer-uitgaven van -5000/maand.
-    const realExpense12 = aggSumNegatiefAbs(agg, { realOnly: true })
+  it('drie grondslagen, strikt geordend: alles-negatief > isRealTx-som > consumptie (dagtarief)', () => {
+    // De isRealTx-som negeert de transfer-uitgaven van -5000/maand; de
+    // consumptie-grondslag van het dagtarief (ADR 0126 D2) laat daarbovenop ook
+    // de spaar-/archief-/inkomstenbudgetten weg (hier: -500/maand op SAVINGS).
+    // De budgettype-blindheid van de `realOnly: true`-sommen (spaarquote,
+    // maandsommen) is een APART aandachtspunt en wordt hier bewust niet
+    // gelijkgetrokken — deze test pint alleen de ordening vast.
     const allExpense12 = aggSumNegatiefAbs(agg, { realOnly: false })
+    const realExpense12 = aggSumNegatiefAbs(agg, { realOnly: true })
+    const consumptie12 = consumptionExpenseRows(agg, BUDGET_TYPE_BY_ID)
+      .reduce((s, r) => s + Math.abs(r.amount), 0)
     expect(allExpense12).toBeGreaterThan(realExpense12) // transfers zitten alleen in de "alles"-variant
+    expect(realExpense12).toBeGreaterThan(consumptie12) // spaarbudget zit wel in realOnly, niet in consumptie
+    expect(realExpense12 - consumptie12).toBe(12 * 500)
   })
 })

@@ -264,8 +264,9 @@ export interface SpendLimitsSectionData {
   /**
    * €/dag voor de vrijheidstijd-vertaling (`formatWithFreedom`), uit de canonieke
    * 12-MAANDS ROLLING bron — exact dezelfde keten die `DashboardData.dailyExpenseRate`
-   * produceert (`getTxAgg12m` → `aggToExpenseRows` → `recentDailyExpenseRateFromRows`,
-   * ×12/365 via `dailyExpenseRate`). NIET de effective maanduitgaven: die dienen
+   * produceert (`getTxAgg12m` → `consumptionExpenseRows` → `recentDailyExpenseRateFromRows`,
+   * ×12/365 via `dailyExpenseRate`; consumptie-grondslag ADR 0126 D2). NIET de
+   * effective maanduitgaven: die dienen
    * uitsluitend als fallback wanneer er geen uitgaven-rijen in het venster zijn.
    * Zo tonen de sectie (dit veld) en de widget (`DashboardData.dailyExpenseRate`)
    * dezelfde vrijheidstijd bij hetzelfde bedrag — één metriek, één grondslag.

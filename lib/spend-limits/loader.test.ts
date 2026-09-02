@@ -34,8 +34,9 @@ import {
 import { spendLimitCounterpartyKey } from './counterparty-key'
 import { resolveEffectiveIncomeExpenses } from '@/lib/effective-financials'
 import { dailyExpenseRate } from '@/lib/format'
-import { recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
-import { aggToExpenseRows, type TxMonthAggregateRow } from '@/lib/server-data/tx-aggregates'
+import { consumptionExpenseRows, recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
+import { buildBudgetTypeMap } from '@/lib/budget-utils'
+import type { TxMonthAggregateRow } from '@/lib/server-data/tx-aggregates'
 import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
 
 type Row = Record<string, unknown>
@@ -986,10 +987,16 @@ describe('dailyExpenseRate — pariteit met DashboardData.dailyExpenseRate', () 
     return aggRow(maand, 'b1', 3000)
   })
 
-  /** De keten die lib/dashboard-data-loader.ts draait voor `DashboardData.dailyExpenseRate`. */
+  /**
+   * De keten die lib/dashboard-data-loader.ts draait voor `DashboardData.dailyExpenseRate`:
+   * consumptie-grondslag (ADR 0126 D2) via `consumptionExpenseRows` op de
+   * canonieke type-map. Deze fakes dragen geen budgetten, dus de map is leeg en
+   * 'b1' telt (blocklist-semantiek: onbekend type ⇒ meetellen) — precies wat de
+   * loader op dezelfde `getBudgets`-rijen ook ziet.
+   */
   function bundelDagtarief(agg: Row[], fallbackMonthlyExpenses: number): number {
     return recentDailyExpenseRateFromRows(
-      aggToExpenseRows(agg as unknown as TxMonthAggregateRow[], { realOnly: false }),
+      consumptionExpenseRows(agg as unknown as TxMonthAggregateRow[], buildBudgetTypeMap([])),
       NOW,
       fallbackMonthlyExpenses,
     ).dailyRate

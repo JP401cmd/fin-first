@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-02T07:58:27.817Z",
+  "generatedAt": "2026-09-02T18:40:16.879Z",
   "generatedDate": "2026-09-02",
   "repo": {
     "name": "fin",
@@ -17140,6 +17140,20 @@
       ],
       "summary": "Handmatige doelen konden aan **precies één** bezitting **óf** één schuld hangen (`goals.linked_asset_id` / `linked_debt_id`, wederzijds exclusief in de UI). Twee gevolgen:",
       "file": "docs/adr/0125-een-doel-koppelt-meervoudig-en-syncbaar.md"
+    },
+    {
+      "id": "0126-dagtarief-op-gezuiverde-consumptie",
+      "title": "Dagtarief op gezuiverde consumptie, gescheiden van de runway",
+      "status": "aanvaard",
+      "date": "2026-09-02",
+      "elements": [
+        "as-budget",
+        "as-vermogen",
+        "do-budget",
+        "do-transactie"
+      ],
+      "summary": "De canonieke dagtarief-bron (`lib/expense-rate.ts`, voedt élke €→vrijheidstijd- conversie via `dailyExpenseRate`) rekende op **álle** negatieve transacties in het 12-maands rolling venster — geen transfer-filter, geen budgettype-filter. Op een productie-account bestond ~60% van h",
+      "file": "docs/adr/0126-dagtarief-op-gezuiverde-consumptie.md"
     }
   ],
   "churn": {
@@ -17147,7 +17161,7 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 71
+        "commits": 72
       },
       {
         "path": "lib/ai",
@@ -17155,7 +17169,7 @@
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 31
+        "commits": 32
       },
       {
         "path": "app/api/ai",
@@ -17163,7 +17177,7 @@
       },
       {
         "path": "app/api/household",
-        "commits": 18
+        "commits": 17
       },
       {
         "path": "app/api/assets",
@@ -17204,12 +17218,12 @@
       },
       {
         "file": "components/app/cash-account-view.tsx",
-        "loc": 3595,
-        "commits": 22
+        "loc": 3662,
+        "commits": 23
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 3033,
+        "loc": 3031,
         "commits": 59
       },
       {
@@ -17225,7 +17239,7 @@
       {
         "file": "app/(app)/core/checkin/page.tsx",
         "loc": 2329,
-        "commits": 10
+        "commits": 11
       }
     ]
   },
@@ -18357,7 +18371,7 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-09-01",
+    "previousDate": "2026-09-02",
     "hasChanges": false,
     "sections": []
   },
