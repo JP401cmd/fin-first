@@ -22,6 +22,7 @@ import {
   type EditFormState,
   type EventEditActionsState,
 } from './event-pane-edit'
+import { setSharedAge } from '@/lib/horizon/event-pane-edit-form'
 import { EventPaneView } from './event-pane-view'
 
 export type EventPaneMode = 'catalog' | 'chat' | 'view' | 'edit'
@@ -139,10 +140,11 @@ export function EventPane({
     const baseAge = currentAge(baselineInput)
     const initial = initFormState(payload.event_type, null, baseAge)
     // Override de catalog-defaults met de tool-output
+    // setSharedAge spiegelt Fin's leeftijd óók naar de story-vraag, anders
+    // wint het oude story-antwoord bij de eerstvolgende story-wijziging.
     const next: EditFormState = {
-      ...initial,
+      ...setSharedAge(initial, payload.target_age ?? initial.shared_age),
       name: payload.name,
-      shared_age: payload.target_age ?? initial.shared_age,
       oneTimeAmount: Math.abs(payload.one_time_cost),
       oneTimeDirection: payload.one_time_cost >= 0 ? 'expense' : 'income',
       tempEnabled: payload.duration_months > 0,

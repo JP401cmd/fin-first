@@ -95,6 +95,13 @@ export interface LifeEventStory {
   /** Het woord dat italic emphasis krijgt in de headline. */
   headlineEmphasis?: string
   questions: StoryQuestion[]
+  /**
+   * Key van de vraag die de leeftijd van de gebeurtenis draagt (bv. 'startAge').
+   * Verplicht zodra `computeImpact` een `suggestedAge` teruggeeft: het veld
+   * "Leeftijd" bovenaan het formulier en deze vraag zijn twee vensters op
+   * dezelfde waarde en worden via deze key in beide richtingen gespiegeld.
+   */
+  ageKey?: string
   /** Map answers → impact-deltas. baseAge = profiel currentAge fallback. */
   computeImpact: (answers: Record<string, StoryAnswerValue>, baseAge: number) => StoryImpact
 }
@@ -121,6 +128,7 @@ export const LIFE_EVENT_STORIES: Record<string, LifeEventStory> = {
       'Een nieuw mens in je leven is geen kostenpost — het is een tijdperk. Hieronder vragen helpen je een eerlijk beeld te schetsen, zonder dat het zwaar wordt.',
     headline: 'Een kind in je leven',
     headlineEmphasis: 'kind',
+    ageKey: 'startAge',
     questions: [
       {
         key: 'aantal',
@@ -209,6 +217,7 @@ export const LIFE_EVENT_STORIES: Record<string, LifeEventStory> = {
       'Een pauze om weer adem te halen, te reizen, te leren of helemaal niets. Een waardevolle investering — laten we kijken wat het kost.',
     headline: 'Tijd voor jezelf',
     headlineEmphasis: 'jezelf',
+    ageKey: 'startAge',
     questions: [
       {
         key: 'duurMnd',
@@ -295,6 +304,7 @@ export const LIFE_EVENT_STORIES: Record<string, LifeEventStory> = {
       'De wereld zien — alleen, met een rugzak, of met je gezin. Een avontuur vraagt budget en (vaak) een tijdelijke pauze van inkomen.',
     headline: 'Een grote reis',
     headlineEmphasis: 'reis',
+    ageKey: 'startAge',
     questions: [
       {
         key: 'duurMnd',
@@ -385,6 +395,7 @@ export const LIFE_EVENT_STORIES: Record<string, LifeEventStory> = {
       'Een onverwachte meevaller, of een al verwachte. Een erfenis kan vrijheid versnellen — afhankelijk van timing en bedrag.',
     headline: 'Een meevaller',
     headlineEmphasis: 'meevaller',
+    ageKey: 'verwachtAge',
     questions: [
       {
         key: 'verwachtAge',
@@ -447,6 +458,7 @@ export const LIFE_EVENT_STORIES: Record<string, LifeEventStory> = {
     intro:
       'Pensioen verandert je inkomen voorgoed. Hieronder bouw je het zoals jouw cijfers het zeggen — bruto, ingangsleeftijd, indexatie.',
     headline: 'Pensioen',
+    ageKey: 'startAge',
     questions: [
       {
         key: 'startAge',
@@ -511,6 +523,7 @@ export const LIFE_EVENT_STORIES: Record<string, LifeEventStory> = {
     intro:
       'Een keuken, badkamer, dak — een ingreep die je woongenot verandert. Eenmalige uitgaven, soms met blijvende impact op vaste lasten.',
     headline: 'Verbouwing',
+    ageKey: 'startAge',
     questions: [
       {
         key: 'omvang',
@@ -586,6 +599,7 @@ export const LIFE_EVENT_STORIES: Record<string, LifeEventStory> = {
       'Een huis kopen — eenmalige kosten koper en een nieuwe maandelijkse routine. Hieronder snel het verschil tussen oud en nieuw.',
     headline: 'Een nieuw huis',
     headlineEmphasis: 'huis',
+    ageKey: 'startAge',
     questions: [
       {
         key: 'startAge',
@@ -653,6 +667,7 @@ export const LIFE_EVENT_STORIES: Record<string, LifeEventStory> = {
       'Een dag om te vieren — en met grote impact op je spaarpot. Vul in zoals je het wilt, niet zoals het "hoort".',
     headline: 'De grote dag',
     headlineEmphasis: 'dag',
+    ageKey: 'startAge',
     questions: [
       {
         key: 'stijl',

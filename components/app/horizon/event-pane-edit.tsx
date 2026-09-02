@@ -33,7 +33,7 @@ import { EventImpactPreview } from './event-impact-preview'
 import { EVENT_ICONS } from './log-timeline'
 
 // EditFormState + form-helpers wonen nu in lib/horizon/event-pane-edit-form.ts (UI→lib).
-import { buildDraftEvent, initFormState, applyStory, type EditFormState } from '@/lib/horizon/event-pane-edit-form'
+import { buildDraftEvent, initFormState, applyStory, setSharedAge, type EditFormState } from '@/lib/horizon/event-pane-edit-form'
 export { buildDraftEvent, initFormState, applyStory }
 export type { EditFormState }
 
@@ -116,8 +116,9 @@ export function EventPaneEdit({
   // Leeftijd binnen het toegestane venster? Vangt zowel getypte/geplakte out-of-range
   // waarden als reeds-gepersisteerde onzin (bv. een eerder opgeslagen 421) af — beide
   // moeten "Opslaan" blokkeren.
+  // Integer: life_events.target_age is INT — een decimaal zou pas op de DB falen.
   const ageValid =
-    Number.isFinite(state.shared_age) && state.shared_age >= currentAge && state.shared_age <= maxAge
+    Number.isInteger(state.shared_age) && state.shared_age >= currentAge && state.shared_age <= maxAge
 
   const draftEvent = useMemo(
     () => buildDraftEvent(debouncedState, existingEvent),
@@ -229,21 +230,18 @@ export function EventPaneEdit({
           />
         </div>
         <div>
-          <label className="text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)]">
+          <label htmlFor="event-shared-age" className="text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)]">
             Leeftijd
           </label>
-          <input
-            type="number"
+          {/* Bewust géén klem in onChange: die maakte "45" ontypbaar (leeg → nu,
+              doortypen → eindleeftijd). Validatie via ageValid + foutmelding. */}
+          <NumberField
+            id="event-shared-age"
             min={currentAge}
             max={maxAge}
             value={state.shared_age}
-            aria-invalid={!ageValid}
-            onChange={e =>
-              setState({
-                ...state,
-                shared_age: Math.min(maxAge, Math.max(currentAge, Number(e.target.value) || currentAge)),
-              })
-            }
+            invalid={!ageValid}
+            onCommit={n => setState(setSharedAge(state, n))}
             className="mt-1 w-24 px-3 py-2 border bg-[var(--paper)] font-mono tabular-nums focus:outline-none aria-invalid:border-red-500 aria-invalid:focus:border-red-500 border-[var(--border-md)] focus:border-[var(--module-active-700)]"
           />
           {!ageValid && (
@@ -262,6 +260,25 @@ export function EventPaneEdit({
           onChange={next => setState(applyStory(state, state.event_type, next, currentAge))}
         />
       )}
+
+      {/* Sectiekop boven de drie blokken — maakt de rolverdeling expliciet:
+          de story-vragen zijn de invoer, de blokken zijn de vertaling naar
+          geld (automatisch ingevuld, tweaken mag). Zonder deze kop leek het
+          alsof beide ingevuld moesten worden. */}
+      <div className="mb-4 mt-2">
+        <Kicker>{hasStory(state.event_type) ? 'Stap 2 · In cijfers' : 'In cijfers'}</Kicker>
+        <h3
+          className="mt-2 text-2xl sm:text-3xl font-black tracking-[-0.02em]"
+          style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
+        >
+          {hasStory(state.event_type) ? 'Zo vertaalt dat zich in geld' : 'Wat verandert er in geld?'}
+        </h3>
+        <EditorialDeck className="mt-3">
+          {hasStory(state.event_type)
+            ? 'Automatisch ingevuld op basis van je antwoorden hierboven. Pas alleen aan als jouw situatie anders is.'
+            : 'Kies wat past: een eenmalig bedrag, een tijdelijke periode, of een blijvende verandering.'}
+        </EditorialDeck>
+      </div>
 
       {/* Block 1: Eenmalig */}
       <CardEditorial accent className="p-5 mb-4">
@@ -595,7 +612,7 @@ function StorySection({
   return (
     <div className="mb-6">
       <div className="mb-5">
-        <Kicker>Vertel even</Kicker>
+        <Kicker>Stap 1 · Vertel even</Kicker>
         <h3
           className="mt-2 text-2xl sm:text-3xl font-black tracking-[-0.02em]"
           style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
@@ -614,19 +631,92 @@ function StorySection({
           <StoryQuestionRenderer
             key={q.key}
             question={q}
+            isAgeQuestion={story.ageKey === q.key}
             value={answers[q.key] ?? q.default}
             onChange={v => update(q.key, v)}
           />
         ))}
       </div>
 
-      <div className="mt-5 mb-7 border-t border-dashed border-[var(--border-ed)] pt-4">
-        <p className="text-xs italic text-[var(--ink-3)]" style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}>
-          Op basis van je antwoorden hebben we de drie blokken hieronder ingevuld.
-          Je mag ze nog tweaken.
-        </p>
-      </div>
+      <div className="mt-6 mb-2 border-t border-dashed border-[var(--border-ed)]" aria-hidden />
     </div>
+  )
+}
+
+/**
+ * Getalveld dat vrij typen toelaat. Houdt de rauwe tekst lokaal vast en geeft
+ * alleen een eindig getal door — zodat een tussenstand ("", "4") niet meteen
+ * door een klem in de state wordt overschreven. Optioneel klemt hij pas bij
+ * blur op [min, max] (voor velden zonder eigen foutmelding). Loopt de waarde
+ * van buiten mee (bv. story-vraag → veld bovenaan), dan volgt de tekst.
+ */
+function NumberField({
+  id,
+  value,
+  onCommit,
+  min,
+  max,
+  step,
+  invalid,
+  clampOnBlur,
+  className,
+}: {
+  id?: string
+  value: number
+  onCommit: (n: number) => void
+  min?: number
+  max?: number
+  step?: number
+  invalid?: boolean
+  clampOnBlur?: boolean
+  className?: string
+}) {
+  const [text, setText] = useState(() => (Number.isFinite(value) ? String(value) : ''))
+  const [focused, setFocused] = useState(false)
+  // Externe wijziging (andere bron voor dezelfde waarde) → tekst volgt — maar
+  // nooit terwijl de gebruiker hier zelf typt: een tussenstand ("4") mag niet
+  // door een afgeleide waarde overschreven worden. Bij blur wordt alsnog gesynct.
+  useEffect(() => {
+    if (focused || !Number.isFinite(value)) return
+    if (Number(text) === value && text.trim() !== '') return
+    setText(String(value))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, focused])
+  return (
+    <input
+      id={id}
+      type="number"
+      inputMode="numeric"
+      min={min}
+      max={max}
+      step={step}
+      value={text}
+      aria-invalid={invalid || undefined}
+      onChange={e => {
+        const raw = e.target.value
+        setText(raw)
+        const n = Number(raw)
+        if (raw.trim() !== '' && Number.isFinite(n)) onCommit(n)
+      }}
+      onFocus={() => setFocused(true)}
+      onBlur={() => {
+        setFocused(false)
+        const n = Number(text)
+        // Leeg of onleesbaar gelaten → terug naar de laatste waarde in de state
+        // (die is nooit leeg; het veld hoort dat na verlaten ook niet te zijn).
+        if (text.trim() === '' || !Number.isFinite(n)) {
+          if (Number.isFinite(value)) setText(String(value))
+          return
+        }
+        if (!clampOnBlur) return
+        const clamped = Math.min(max ?? Infinity, Math.max(min ?? -Infinity, n))
+        if (clamped !== n) {
+          setText(String(clamped))
+          onCommit(clamped)
+        }
+      }}
+      className={className}
+    />
   )
 }
 
@@ -646,16 +736,20 @@ function renderHeadlineWithEmphasis(text: string, emphasis: string): React.React
 
 function StoryQuestionRenderer({
   question,
+  isAgeQuestion,
   value,
   onChange,
 }: {
   question: StoryQuestion
+  /** Draagt deze vraag de leeftijd (story.ageKey)? Dan geen blur-klem: het veld bovenaan valideert. */
+  isAgeQuestion: boolean
   value: StoryAnswerValue
   onChange: (v: StoryAnswerValue) => void
 }) {
   return (
     <div>
       <label
+        htmlFor={question.type === 'number' || question.type === 'slider' ? `story-q-${question.key}` : undefined}
         className="block text-base sm:text-lg italic font-normal text-[var(--ink)] mb-2"
         style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
       >
@@ -666,17 +760,19 @@ function StoryQuestionRenderer({
           {question.microcopy}
         </p>
       )}
-      <StoryQuestionInput question={question} value={value} onChange={onChange} />
+      <StoryQuestionInput question={question} isAgeQuestion={isAgeQuestion} value={value} onChange={onChange} />
     </div>
   )
 }
 
 function StoryQuestionInput({
   question,
+  isAgeQuestion,
   value,
   onChange,
 }: {
   question: StoryQuestion
+  isAgeQuestion: boolean
   value: StoryAnswerValue
   onChange: (v: StoryAnswerValue) => void
 }) {
@@ -741,6 +837,7 @@ function StoryQuestionInput({
           </span>
         </div>
         <input
+          id={`story-q-${question.key}`}
           type="range"
           min={question.min}
           max={question.max}
@@ -756,20 +853,18 @@ function StoryQuestionInput({
     const num = typeof value === 'number' ? value : Number(value) || question.default
     return (
       <div className="flex items-center gap-2">
-        <input
-          type="number"
+        {/* Vrij typen; het vraag-venster wordt pas bij blur afgedwongen (een
+            klem per toetsaanslag maakte tussenwaarden ontypbaar). De leeftijd-
+            vraag krijgt géén blur-klem: die loopt via het veld bovenaan, dat
+            zijn eigen venster (nu..eindleeftijd) en foutmelding heeft. */}
+        <NumberField
+          id={`story-q-${question.key}`}
           min={question.min}
           max={question.max}
           step={question.step ?? 1}
           value={num}
-          onChange={e => {
-            // Clamp naar het vraag-venster zodat een out-of-range invoer (typen/plakken)
-            // niet in de story-afgeleide waarden lekt — spiegel van de shared_age-clamp.
-            const raw = Number(e.target.value) || 0
-            const lo = Number.isFinite(question.min) ? (question.min as number) : -Infinity
-            const hi = Number.isFinite(question.max) ? (question.max as number) : Infinity
-            onChange(Math.min(hi, Math.max(lo, raw)))
-          }}
+          clampOnBlur={!isAgeQuestion}
+          onCommit={onChange}
           className="w-40 px-3 py-2 border border-[var(--border-md)] bg-[var(--paper)] font-mono tabular-nums focus:border-[var(--module-active-700)] focus:outline-none"
         />
         {question.suffix && (

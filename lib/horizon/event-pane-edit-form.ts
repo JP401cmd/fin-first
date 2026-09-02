@@ -45,6 +45,12 @@ export function applyStory(
   const story = LIFE_EVENT_STORIES[type]
   if (!story) return { ...state, storyAnswers: answers }
   const impact = story.computeImpact(answers, baseAge)
+  // Leeftijd: één waarde, twee vensters (veld bovenaan + story-vraag). Bewust
+  // GEEN klem hier: een klem in de state-pijplijn springt via de tekst-sync van
+  // het invoerveld terug in het veld en maakt tussenwaarden ontypbaar (de
+  // gemelde bug). De validatie (ageValid in de editor) beslist of er opgeslagen
+  // mag worden; een ongeldige default vangt initFormState af.
+  const sharedAge = impact.suggestedAge ?? state.shared_age
   return {
     ...state,
     ...(impact.oneTimeAmount != null && { oneTimeAmount: impact.oneTimeAmount }),
@@ -58,7 +64,7 @@ export function applyStory(
     ...(impact.contAmount != null && { contAmount: impact.contAmount }),
     ...(impact.contDirection != null && { contDirection: impact.contDirection }),
     ...(impact.contIndexed != null && { contIndexed: impact.contIndexed }),
-    shared_age: impact.suggestedAge ?? state.shared_age,
+    shared_age: sharedAge,
     name: impact.suggestedName && (state.name === '' || isCatalogDefaultName(state)) ? impact.suggestedName : state.name,
     storyAnswers: answers,
   }
@@ -66,6 +72,23 @@ export function applyStory(
 
 function isCatalogDefaultName(s: EditFormState): boolean {
   return s.name === LIFE_EVENT_CATALOG[s.event_type]?.label
+}
+
+/** Key van de story-vraag die de leeftijd draagt, of null als het type geen story (met leeftijd) heeft. */
+export function storyAgeKey(type: string): string | null {
+  return LIFE_EVENT_STORIES[type]?.ageKey ?? null
+}
+
+/**
+ * Zet de leeftijd vanuit het veld bovenaan het formulier en spiegel 'm naar de
+ * story-vraag. Bewust ZONDER klem: een tussenwaarde tijdens typen ("4" op weg
+ * naar "45") moet in de state kunnen landen — de validatie (ageValid in de
+ * editor) beslist of er opgeslagen mag worden, niet de invoer.
+ */
+export function setSharedAge(state: EditFormState, age: number): EditFormState {
+  const key = storyAgeKey(state.event_type)
+  if (!key || !state.storyAnswers) return { ...state, shared_age: age }
+  return { ...state, shared_age: age, storyAnswers: { ...state.storyAnswers, [key]: age } }
 }
 
 /** Map een form-state naar een LifeEvent (zonder id/sort_order). */
@@ -125,10 +148,19 @@ export function initFormState(
   currentAge: number,
 ): EditFormState {
   if (existing) {
-    const savedStoryAnswers =
+    const rawStoryAnswers =
       (existing.metadata as Record<string, unknown> | undefined)?.story_answers as
         | Record<string, StoryAnswerValue>
         | undefined
+    // Reconcilieer de twee leeftijd-vensters: vóór de sync (sep 2026) kon het
+    // veld bovenaan afwijken van de story-vraag. target_age is wat de motor
+    // gebruikte, dus die wint — anders springt de leeftijd bij de eerste
+    // story-wijziging stil terug naar het oude story-antwoord.
+    const ageKey = storyAgeKey(existing.event_type)
+    const savedStoryAnswers =
+      rawStoryAnswers && ageKey && existing.target_age != null && rawStoryAnswers[ageKey] !== existing.target_age
+        ? { ...rawStoryAnswers, [ageKey]: existing.target_age }
+        : rawStoryAnswers
     return {
       name: existing.name,
       event_type: existing.event_type,
@@ -204,6 +236,16 @@ export function initFormState(
   // gebaseerd op de aanbevolen antwoorden i.p.v. ruwe catalog-defaults.
   if (hasStory(type)) {
     const answers = defaultStoryAnswers(type)
+    // Story-leeftijd-default (bv. wereldreis: 35) kan onder de huidige leeftijd
+    // liggen → neem dan dezelfde startleeftijd als een type zonder story zou
+    // krijgen (catalog-defaultAge of nu+5), anders is het formulier meteen ongeldig.
+    const ageKey = storyAgeKey(type)
+    if (ageKey) {
+      const proposed = Number(answers[ageKey])
+      if (!Number.isFinite(proposed) || proposed < currentAge) {
+        answers[ageKey] = Math.max(currentAge, baseState.shared_age)
+      }
+    }
     return applyStory(baseState, type, answers, currentAge)
   }
   return baseState
