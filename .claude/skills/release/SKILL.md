@@ -58,25 +58,28 @@ Per CLAUDE.md verplicht: rekenmotor geraakt ⇒ `lib/architecture/calculations.t
 ### 7. UAT-definitiesynchronisatie — `uat-docs-keeper` (indien gedrag/oppervlak wijzigt)
 Draai `npm run uat:stale` met de scope uit stap 1: welke acceptatiecriteria wijzen (via `assertion.source`) naar gewijzigde bestanden, en welke nieuwe pagina's/routes hebben nog geen scenario. **Geen treffers én geen nieuw gebruikersoppervlak ⇒ één regel "geen UAT-impact", klaar** — de detector is de lichtheidsgarantie: hij draait altijd goedkoop, maar escaleert alleen bij echte impact. Anders dispatcht `uat-docs-keeper` de precieze lijst: werk `given/when/then` + `assertion` in `lib/uat/acceptance/<zone>.ts` bij, voeg voor een nieuw oppervlak een scenario toe aan `catalog.ts` + een `AcceptanceCriterion` + een node in `flows/<zone>.ts`, en houd de geraakte `*.engine.test.ts` + `test/uat-<zone>-suite-check.test.ts` groen. **Definities bijwerken en aanvullen, de live-run NIET uitvoeren — dat is `/uat`, wanneer de zone weer getest wordt.** Herdraai-regel: dit editte testbestanden ⇒ draai de geraakte `*.engine.test.ts` opnieuw.
 
-### 8. Build & echte verificatie
+### 8. Info-knoppen — `npm run page-info:check` (indien een pagina/route is toegevoegd of verplaatst)
+Draai de detector: nieuwe routes zonder `PAGE_INFO`-entry, verweesde entries, of resterende inline-literal beschrijvingen die `getPageInfo()` omzeilen. **Geen treffers ⇒ één regel "info-knoppen actueel, geen wijziging nodig", klaar** — dezelfde lichtheidsgarantie als stap 7. Anders werkt de `info-knoppen-actueel`-skill de content direct bij (INZICHT-dan-GRIP, kort, module-kleur, via `ShellOverlay kind="sheet"` in `PageInfoButton`) — geen aparte goedkeuring nodig voor deze copy-only wijziging. Een gemelde "orphaned"-entry eerst met de hand controleren vóór verwijderen: een key die alleen via een dynamische `pathname`-fallback wordt bereikt (zie het voorbeeld in de detector zelf) meldt onterecht als wees. Herdraai-regel: raakt een latere fix in deze release alsnog een route/pagina, draai de detector opnieuw vóór stap 11 (Ship).
+
+### 9. Build & echte verificatie
 `npm run build` — Next 16 production-build vangt wat tsc mist. Nieuwe/gewijzigde UI **daadwerkelijk bekijken** (dev-server of playwright/chrome-devtools): rendert het, juiste gating, vrijheidstijd-framing, design tokens, mobiel. Nieuwe API-route end-to-end aanroepen: 401 zonder sessie, validatie werkt, RLS houdt vreemde data tegen — én **minstens één INGELOGDE aanroep met het testaccount tegen een echte PostgREST** (lokale prod-build of preview): unit-mocks en het 401-pad bewijzen niets over de query-vorm die supabase-js/PostgREST werkelijk uitvoert (les 17 jul 2026: `update().or().select()` gaf productie-breed 42703 terwijl mocks én 401-smoke groen waren). Een component dat alleen tsc passeert is niet geverifieerd.
 
-### 9. Review — gericht via domein-specialisten (licht houden)
-Geen brede review-pass over alles: stappen 2–8 hebben statics, tests, security, UAT-sync en build al afgehandeld. Deze stap is uitsluitend een **diff-review op correctheid en single-source-of-truth** (lezen álle surfaces het nieuwe getal uit dezelfde bron?) — herhaal geen tsc/lint/tests en geen security (stap 5).
+### 10. Review — gericht via domein-specialisten (licht houden)
+Geen brede review-pass over alles: stappen 2–9 hebben statics, tests, security, UAT-sync en build al afgehandeld. Deze stap is uitsluitend een **diff-review op correctheid en single-source-of-truth** (lezen álle surfaces het nieuwe getal uit dezelfde bron?) — herhaal geen tsc/lint/tests en geen security (stap 5).
 - **Routeer naar de specialist van het geraakte domein** in plaats van één generieke zware review: rekenmotor → `calc-engine-specialist`, DB/RLS → `supabase-db-specialist` (niet herhalen als stap 4 al draaide), AI-plumbing → `ai-specialist-general`, prompts → `ai-specialist-prompt-dna`, UI → `ux-review-expert`. Raakt de diff meerdere domeinen wezenlijk: maximaal twee parallelle specialist-reviews; anders volstaat één.
 - **Scope strak**: geef de reviewer alleen de diff (`git diff master...HEAD`) en de direct geraakte bestanden mee — geen vrije veldtocht door de codebase. Vraag een compact rapport (alleen bevindingen, gesorteerd op ernst).
 - Alleen bij een **architectuur-brede of risicovolle wijziging** (nieuwe datastroom, cross-domein refactor, rekenmotor-aanname) zet je de volledige `code-review`-agent of `senior-developer` op de complete diff — dat is de uitzondering, niet de standaard.
 
-### 10. Ship
+### 11. Ship
 Expliciete `git add` van de bedoelde bestanden (geen `add -A`), commit met heldere message, hooks laten draaien (geen `--no-verify`). **Na de commit, vóór de push: hercontroleer `git status`.** Verschijnen bestanden opnieuw als gewijzigd (een editor/IDE die buffered edits laat flushen, of een lint-/format-hook die de tree herschreef), dan ving de commit een verouderde of half-geschreven versie — inspecteer die diff, valideer (tsc + de geraakte test) en amendeer vóór de push. Push nooit in de aanname dat de commit de bedoelde tree ving; een schone tree ná de commit is het bewijs. Feature-branch: push + PR naar master met wat het is, de migratie-status (al remote toegepast) en de bijgewerkte architectuur- én UAT-definities. Master: de push zelf is de deploy — extra reden dat álle poorten hiervóór gehaald zijn.
 
-### 11. Deploy-verificatie & rollback-pad
+### 12. Deploy-verificatie & rollback-pad
 Een groene lokale build is geen groene Vercel-build (andere env, NFT-excludes, regio, lambda-limieten — hier eerder misgegaan). Na de push:
 1. **Deploy bevestigen**: controleer dat de Vercel-deploy slaagt (`npx vercel ls`/dashboard, of na enkele minuten de productie-URL met een verse response). Rapporteer pas "geshipt" als de deploy live staat — niet bij de push.
 2. **Smoke op productie**: de nieuwe/geraakte flow één keer echt doorlopen en `mcp__supabase__get_logs` checken op nieuwe errors.
 3. **Rollback-pad bij een kapotte deploy**: `git revert` van de commit(s) + push (geen force-push, geen reset op gedeelde history). Het schema blijft staan — migraties zijn forward-only; idempotente, additieve migraties (stap 4) zijn er precies zodat de oude code naast het nieuwe schema blijft werken. Meld de gebruiker wat er terugrolde en waarom.
 
-### 12. Slotstap — wat merkt de gebruiker hiervan?
+### 13. Slotstap — wat merkt de gebruiker hiervan?
 Schrijf in **drie regels mensentaal** op wat deze release voor een gebruiker betekent — geen commit-taal, geen bestandsnamen. Bewaar ze bij de release; ze zijn het ruwe materiaal voor de vrijgavenotities zodra het testerspanel opengaat.
 
 - Wat kan iemand nu wat eerst niet kon, of wat werkt er nu wél goed?
@@ -95,7 +98,7 @@ Toon volgt `merkstem`, die de canonieke bron aanwijst — schrijf hier geen eige
 | "Migratie is idempotent, gewoon toepassen" | Remote drift is hier de norm; eerst schema-effect vergelijken (stap 4.1). |
 | "Security n.v.t., het is alleen UI" | UI lekt ook: masking, partner-privacy, client-side data. Bij twijfel draaien. |
 | "Push maar vast, dan staat het veilig" | Push naar master ís de deploy. Veiligstellen doe je op een branch. |
-| "De deploy zal wel goed gaan, lokaal bouwde het" | Vercel-build ≠ lokale build (env/NFT/regio) — stap 11 bestaat omdat dit hier eerder misging. |
+| "De deploy zal wel goed gaan, lokaal bouwde het" | Vercel-build ≠ lokale build (env/NFT/regio) — stap 12 bestaat omdat dit hier eerder misging. |
 
 ## Afronding
 Rapporteer per poort het bewijs (commando + uitkomst), de security-bevindingen en hun status, en wat er bewust is overgeslagen met reden. "Alles groen" zonder output is geen afronding. De zelfverbeterings-slotstap draait alleen onder de opt-in-condities uit de gedeelde conventies.
