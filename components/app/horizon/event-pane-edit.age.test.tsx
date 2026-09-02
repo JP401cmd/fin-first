@@ -120,6 +120,6 @@ describe('EventPaneEdit — leeftijd is typbaar en loopt gelijk met de story-vra
     fireEvent.change(veld, { target: { value: '30' } })
     expect(veld.value).toBe('30')
     expect(veld.getAttribute('aria-invalid')).toBe('true')
-    expect(screen.getByText(/Kies een leeftijd tussen 40 en 90/)).toBeTruthy()
+    expect(screen.getByText(/Kies een hele leeftijd tussen 40 en 90/)).toBeTruthy()
   })
 })

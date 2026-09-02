@@ -156,11 +156,14 @@ export function initFormState(
     // veld bovenaan afwijken van de story-vraag. target_age is wat de motor
     // gebruikte, dus die wint — anders springt de leeftijd bij de eerste
     // story-wijziging stil terug naar het oude story-antwoord.
+    // Story-rijen zónder bewaarde antwoorden (bv. uit de scenario-bibliotheek)
+    // krijgen de defaults, zodat de spiegeling ook daar werkt.
     const ageKey = storyAgeKey(existing.event_type)
+    const baseAnswers = rawStoryAnswers ?? (hasStory(existing.event_type) ? defaultStoryAnswers(existing.event_type) : undefined)
     const savedStoryAnswers =
-      rawStoryAnswers && ageKey && existing.target_age != null && rawStoryAnswers[ageKey] !== existing.target_age
-        ? { ...rawStoryAnswers, [ageKey]: existing.target_age }
-        : rawStoryAnswers
+      baseAnswers && ageKey && existing.target_age != null && baseAnswers[ageKey] !== existing.target_age
+        ? { ...baseAnswers, [ageKey]: existing.target_age }
+        : baseAnswers
     return {
       name: existing.name,
       event_type: existing.event_type,

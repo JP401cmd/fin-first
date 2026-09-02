@@ -61,6 +61,17 @@ describe('event-pane-edit-form — leeftijd is één bron met twee vensters', ()
     expect(next.shared_age).toBe(52)
   })
 
+  it('initFormState(existing): een story-rij zonder bewaarde antwoorden krijgt defaults met target_age als leeftijd', () => {
+    const existing = {
+      id: 'y', name: 'Wereldreis', event_type: 'world_trip', target_age: 47, target_date: null,
+      one_time_cost: 20000, monthly_cost_change: 0, monthly_income_change: 0, duration_months: 0,
+      icon: 'Globe', is_active: true, sort_order: 0, is_indexed: false, metadata: {},
+    }
+    const s = initFormState('world_trip', existing, 40)
+    expect(s.storyAnswers?.startAge).toBe(47)
+    expect(setSharedAge(s, 50).storyAnswers?.startAge).toBe(50)
+  })
+
   it('setSharedAge spiegelt het bovenste veld naar de story-vraag', () => {
     const base = initFormState('world_trip', null, 40)
     const next = setSharedAge(base, 55)

@@ -246,7 +246,7 @@ export function EventPaneEdit({
           />
           {!ageValid && (
             <p className="mt-1 text-[11px] text-red-700">
-              Kies een leeftijd tussen {currentAge} en {maxAge}.
+              Kies een hele leeftijd tussen {currentAge} en {maxAge}.
             </p>
           )}
         </div>
