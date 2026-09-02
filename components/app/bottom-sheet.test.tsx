@@ -232,3 +232,52 @@ describe('BottomSheet — history-entry per sluitroute', () => {
     expect(getOverlayHistoryDepth()).toBe(0)
   })
 })
+
+// ── Geneste overlay: de ouder mag het gebaar niet afpakken ───────────
+//
+// React-events propageren door de REACT-boom, niet door de DOM-boom. Een
+// geneste BottomSheet leeft als React-kind ín zijn ouder, maar portalt zijn DOM
+// naar `document.body` — dus een `touchstart` in de KIND-sheet bereikt alsnog de
+// `onTouchStart` van de OUDER-sheet. Die zag het doelwit niet in zijn eigen
+// scroll-content zitten en concludeerde "greep" → drag meteen actief → elke
+// `touchmove` kreeg `preventDefault()`.
+//
+// Gevolg op het scherm: de geneste sheet ("Gevonden patronen" boven de
+// rekeningdetail) liet zich niet scrollen — de browser mocht het gebaar nooit
+// als scroll uitvoeren. Given een sheet ín een sheet, When de gebruiker in de
+// kind-sheet veegt, Then houdt de ouder zich stil en blijft het gebaar native.
+describe('BottomSheet — geneste sheet houdt zijn eigen gebaar', () => {
+  it('start GEEN ouder-drag bij een touch die in een geneste sheet begint', () => {
+    const ouderSluit = vi.fn()
+    render(
+      <BottomSheet open onClose={ouderSluit} title="Ouder">
+        <p>ouder-inhoud</p>
+        <BottomSheet open onClose={() => {}} title="Kind">
+          <p>kind-inhoud</p>
+        </BottomSheet>
+      </BottomSheet>,
+    )
+
+    // De scroll-content van de KIND-sheet: precies waar een gebruiker veegt om
+    // door de lijst te scrollen.
+    const kindContent = screen.getByText('kind-inhoud').parentElement as HTMLElement
+    expect(kindContent.className).toContain('overflow-y-auto')
+
+    // Omhoog vegen = onmiskenbaar scrollen, nooit een dismiss. De kind-sheet
+    // beslist dat zelf ('scroll') en laat het gebaar met rust.
+    fireEvent.touchStart(kindContent, { touches: [{ clientX: 0, clientY: 400 }] })
+    const beweging = new TouchEvent('touchmove', {
+      bubbles: true,
+      cancelable: true,
+      // @ts-expect-error — jsdom TouchEvent accepteert plain objects als touches.
+      touches: [{ clientX: 0, clientY: 300 }],
+    })
+    document.dispatchEvent(beweging)
+
+    // De ouder mag het gebaar niet claimen: bleef het event annuleerbaar, dan
+    // heeft niemand `preventDefault()` gedaan en kan de browser gewoon scrollen.
+    expect(beweging.defaultPrevented).toBe(false)
+    fireEvent.touchEnd(document)
+    expect(ouderSluit).not.toHaveBeenCalled()
+  })
+})

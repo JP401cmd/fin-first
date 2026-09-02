@@ -305,12 +305,23 @@ export function useSwipeToDismiss({
    * Eén touchstart voor het hele paneel; routeert op basis van het doelwit.
    * Alles buiten de scroll-content (greepje, header, footer, tussenruimte) is
    * greep — dat maakt "de modal in zijn geheel wegslepen" waar.
+   *
+   * GENESTE OVERLAYS EERST UITSLUITEN. React-events propageren door de REACT-
+   * boom, niet door de DOM-boom: een geneste sheet leeft als React-kind ín dit
+   * paneel maar portalt zijn DOM naar `document.body`. Zonder deze guard zag de
+   * ouder een `touchstart` uit dat kind, vond het doelwit niet in zijn eigen
+   * scroll-content, concludeerde "greep" en zette meteen een drag op — waarna
+   * élke `touchmove` `preventDefault()` kreeg en de kind-sheet zich niet meer
+   * liet scrollen ("Gevonden patronen" boven de rekeningdetail). Een gebaar dat
+   * buiten ONS paneel begint is per definitie niet van ons.
    */
   const handleSheetTouchStart = useCallback((e: React.TouchEvent) => {
+    const sheetEl = sheetRef.current
+    if (sheetEl && !sheetEl.contains(e.target as Node)) return
     const scrollEl = contentRef?.current ?? null
     if (scrollEl && scrollEl.contains(e.target as Node)) handleContentTouchStart(e)
     else handleTouchStart(e)
-  }, [contentRef, handleContentTouchStart, handleTouchStart])
+  }, [sheetRef, contentRef, handleContentTouchStart, handleTouchStart])
 
   const handleTouchMove = useCallback((e: TouchEvent) => {
     if (!enabled) return

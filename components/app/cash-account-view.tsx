@@ -212,6 +212,7 @@ export function CashAccountView({
   const [detectingPatterns, setDetectingPatterns] = useState(false)
   const [detectedPatterns, setDetectedPatterns] = useState<DetectedPattern[]>([])
   const [showDetectModal, setShowDetectModal] = useState(false)
+  const [acceptingAllPatterns, setAcceptingAllPatterns] = useState(false)
 
   // Bank Connect state
   const [gcEnabled, setGcEnabled] = useState(false)
@@ -1527,12 +1528,13 @@ export function CashAccountView({
     }
   }
 
-  async function acceptPattern(pattern: DetectedPattern) {
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    await supabase.from('recurring_transactions').insert({
-      user_id: user.id,
+  /** Eén gevonden patroon → één rij in `recurring_transactions`. Gedeeld door de
+   *  losse "Toevoegen"-knop per regel én door "Alles toevoegen", zodat er maar
+   *  één plek is waar de rijvorm wordt bepaald. `sortOffset` houdt de volgorde
+   *  oplopend wanneer er meerdere in dezelfde ronde worden weggeschreven. */
+  function patternToRecurringRow(pattern: DetectedPattern, userId: string, sortOffset = 0) {
+    return {
+      user_id: userId,
       account_id: accountId,
       name: pattern.counterpartyName,
       amount: pattern.averageAmount,
@@ -1542,10 +1544,54 @@ export function CashAccountView({
       start_date: new Date().toISOString().split('T')[0],
       budget_id: pattern.matchedBudgetId,
       is_active: true,
-      sort_order: recurrings.length,
-    })
+      sort_order: recurrings.length + sortOffset,
+    }
+  }
+
+  async function acceptPattern(pattern: DetectedPattern) {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    await supabase
+      .from('recurring_transactions')
+      .insert(patternToRecurringRow(pattern, user.id))
     setDetectedPatterns((prev) => prev.filter((p) => p.key !== pattern.key))
     loadRecurrings()
+  }
+
+  /** Alle nog openstaande patronen in één keer overnemen — de lijst kan tientallen
+   *  regels lang zijn en één-voor-één tikken is dan het echte werk. Bewust één
+   *  bulk-insert: alles-of-niets, zodat een half doorgevoerde lijst niet ontstaat.
+   *  De lijst wordt pas geleegd als de schrijfactie slaagde. */
+  async function acceptAllPatterns() {
+    if (detectedPatterns.length === 0 || acceptingAllPatterns) return
+    setAcceptingAllPatterns(true)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const aantal = detectedPatterns.length
+      const { error: insertError } = await supabase
+        .from('recurring_transactions')
+        .insert(detectedPatterns.map((p, i) => patternToRecurringRow(p, user.id, i)))
+      if (insertError) {
+        addToast({
+          type: 'error',
+          title: 'Toevoegen is niet gelukt',
+          message: 'Probeer het opnieuw, of voeg de regels één voor één toe.',
+        })
+        return
+      }
+      setDetectedPatterns([])
+      setShowDetectModal(false)
+      loadRecurrings()
+      addToast({
+        type: 'success',
+        title: `${aantal} terugkerende ${aantal === 1 ? 'regel' : 'regels'} toegevoegd`,
+      })
+    } finally {
+      setAcceptingAllPatterns(false)
+    }
   }
 
   if (loading) {
@@ -3309,7 +3355,36 @@ export function CashAccountView({
       )}
 
       {/* Detect patronen modal */}
-      <BottomSheet open={showDetectModal} onClose={() => setShowDetectModal(false)} title="Gevonden patronen" size="lg">
+      {/* De acties leven in de `footerSlot` — niet onderaan de scroll-content:
+          de patronenlijst kan tientallen regels lang zijn, en dan verdwijnt een
+          meescrollende knop onder de vouw (modal-conventie, CLAUDE.md). */}
+      <BottomSheet
+        open={showDetectModal}
+        onClose={() => setShowDetectModal(false)}
+        title="Gevonden patronen"
+        size="lg"
+        footerSlot={
+          <div className="flex items-center justify-end gap-2">
+            <button
+              onClick={() => setShowDetectModal(false)}
+              className="rounded-[var(--r)] border border-[var(--border-md)] px-4 py-2 text-sm text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+            >
+              Sluiten
+            </button>
+            {detectedPatterns.length > 0 && (
+              <button
+                onClick={() => void acceptAllPatterns()}
+                disabled={acceptingAllPatterns}
+                className="rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-60"
+              >
+                {acceptingAllPatterns
+                  ? 'Bezig…'
+                  : `Alles toevoegen (${detectedPatterns.length})`}
+              </button>
+            )}
+          </div>
+        }
+      >
         <div className="p-5">
           <p className="mb-4 font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">Automatisch detecteren</p>
 
@@ -3341,14 +3416,6 @@ export function CashAccountView({
             </div>
           )}
 
-          <div className="mt-4 text-right">
-            <button
-              onClick={() => setShowDetectModal(false)}
-              className="rounded-[var(--r)] border border-[var(--border-md)] px-4 py-2 text-sm text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-            >
-              Sluiten
-            </button>
-          </div>
         </div>
       </BottomSheet>
     </div>
