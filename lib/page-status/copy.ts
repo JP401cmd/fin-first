@@ -299,7 +299,7 @@ export interface FreedomBannerCopy {
   will: PageStatusWill
 }
 
-export const FREEDOM_BANNER_COPY: Record<'free' | 'pensioen', FreedomBannerCopy> = {
+export const FREEDOM_BANNER_COPY: Record<'free' | 'pensioen' | 'nu-stoppen', FreedomBannerCopy> = {
   free: {
     title: 'Financieel vrij',
     reason: 'Je bent financieel vrij — je hoeft niet meer te werken voor geld.',
@@ -318,6 +318,23 @@ export const FREEDOM_BANNER_COPY: Record<'free' | 'pensioen', FreedomBannerCopy>
     will: {
       onderwerp: 'Mijn pensioen-onttrekking',
       detail: 'Ik wil weten hoe lang mijn vermogen meegaat en hoe ik verstandig onttrek.',
+    },
+  },
+  // ADR 0127 D6 — eindstrategie 'Nu stoppen'. BESCHRIJVEND, nooit "je bent vrij":
+  // die kop zou onder dit anker ook boven een plan staan dat twee jaar reikt.
+  // Deze banner verschijnt uitsluitend in de GEDEKTE substaat — `isFinanciallyFree`
+  // laat 'm alleen door bij een tijdsdekking van 100% (D5), dus "reikt tot je
+  // eindleeftijd" is hier een feit en geen belofte. De andere substaat ("reikt
+  // tot leeftijd X") draagt de Vrijheid-strip, die de runway wél in handen heeft.
+  'nu-stoppen': {
+    title: 'Je rekent alsof je nu stopt',
+    reason:
+      'Je plan gaat ervan uit dat je vandaag stopt met werken — je vermogen reikt tot je ingestelde eindleeftijd.',
+    remedy:
+      'Dit overzicht toont je onttrekking vanaf vandaag, niet meer je opbouw.',
+    will: {
+      onderwerp: 'Hoe ver mijn vermogen reikt nu ik gestopt ben',
+      detail: 'Ik wil weten tot welke leeftijd mijn vermogen reikt en hoe ik verstandig onttrek.',
     },
   },
 }

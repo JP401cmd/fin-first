@@ -1,6 +1,7 @@
 'use client'
 
 import { type FireEndStrategy, STRATEGY_LABELS } from '@/lib/fire-strategy'
+import { EINDSTRATEGIE_VOLGORDE, toontEindleeftijd } from '@/lib/horizon/eindstrategie-volgorde'
 
 export interface FireEndStrategyPanelValue {
   strategy: FireEndStrategy
@@ -23,7 +24,10 @@ export function FireEndStrategyPanel({ value, onChange }: FireEndStrategyPanelPr
         Wat wil je doen met je vermogen op het einde van de rit?
       </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {(Object.entries(STRATEGY_LABELS) as [FireEndStrategy, typeof STRATEGY_LABELS[keyof typeof STRATEGY_LABELS]][]).map(([key, info]) => {
+        {/* Volgorde uit één bron (ADR 0127) — `Object.entries` gaf de
+            declaratievolgorde van de map, wat toevallig klopte maar niets vastlegde. */}
+        {EINDSTRATEGIE_VOLGORDE.map((key) => {
+          const info = STRATEGY_LABELS[key]
           const isSelected = strategy === key
           return (
             <button
@@ -43,7 +47,10 @@ export function FireEndStrategyPanel({ value, onChange }: FireEndStrategyPanelPr
         })}
       </div>
 
-      {(strategy === 'deplete' || strategy === 'legacy' || strategy === 'pensioen') && (
+      {/* ADR 0127 — onder 'Nu stoppen' is de eindleeftijd juist BETÉKENISVOL: hij is
+          de lat waar het vermogen tot moet reiken. De handmatige drieledige
+          conditie liet 'm daar weg; `toontEindleeftijd` sluit alleen 'perpetual' uit. */}
+      {toontEindleeftijd(strategy) && (
         <div className="mt-4">
           <label className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">
             {strategy === 'pensioen' ? 'Eindleeftijd simulatie' : 'Eindleeftijd'}
@@ -61,6 +68,11 @@ export function FireEndStrategyPanel({ value, onChange }: FireEndStrategyPanelPr
           {strategy === 'pensioen' && (
             <p className="mt-1.5 font-sans text-[11px] text-[var(--ink-3)]">
               Tot welke leeftijd de simulatie doorloopt. Het resterende vermogen wordt als nalatenschap getoond.
+            </p>
+          )}
+          {strategy === 'nu-stoppen' && (
+            <p className="mt-1.5 font-sans text-[11px] text-[var(--ink-3)]">
+              Tot deze leeftijd moet je vermogen reiken als je nu stopt.
             </p>
           )}
         </div>

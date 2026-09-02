@@ -43,6 +43,7 @@ import { useIsLgUp, useMediaQuery } from '@/lib/hooks/use-media-query'
 import { formatMaskedCurrency } from '@/lib/format'
 import { acquireOverlay } from '@/lib/overlay-signal'
 import { buildVrijheidsleeftijdZin } from '@/lib/horizon/vrijheidsleeftijd-zin'
+import type { NuStoppenReach } from '@/lib/horizon/nu-stoppen-copy'
 
 /** Welke grafiekfase een ballon accentueert bij openen. */
 type OverlayEmphasis = 'accumulation' | 'withdrawal' | 'fire' | null
@@ -126,6 +127,8 @@ export interface ToekomstOverlaySummary {
   masked: boolean
   /** Pensioenmodus → frame de leeftijd als "pensioenleeftijd" i.p.v. een keuze. */
   isPensioen?: boolean
+  /** ADR 0127 — 'Nu stoppen': de samenvattingsregel gaat over bereik, niet over een moment. */
+  nuStoppenReach?: NuStoppenReach | null
 }
 
 export interface ToekomstOverlayProps {
@@ -549,11 +552,11 @@ export function ToekomstOverlay({
  * — alle getallen komen kant-en-klaar uit de parent (single-source).
  */
 function SummaryLine({ summary }: { summary: ToekomstOverlaySummary }) {
-  const { netWorth, freedomAge, masked, isPensioen } = summary
+  const { netWorth, freedomAge, masked, isPensioen, nuStoppenReach } = summary
   // Woorden + afronding komen uit de gedeelde bron (S15) — dezelfde als de
   // welkomstkaart en de duidingsregel op de pagina zelf. Hele jaren, want
   // "rond je 65e" leest natuurlijker dan "65.0"; alleen de ópmaak is hier lokaal.
-  const zin = buildVrijheidsleeftijdZin({ freedomAge, isPensioen, variant: 'inline' })
+  const zin = buildVrijheidsleeftijdZin({ freedomAge, isPensioen, nuStoppenReach, variant: 'inline' })
   const ageLabel =
     zin.ageLabel != null ? (
       <>

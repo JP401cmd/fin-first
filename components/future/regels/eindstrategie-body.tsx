@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { STRATEGY_LABELS, type FireEndStrategy } from '@/lib/fire-strategy'
+import { EINDSTRATEGIE_VOLGORDE, toontEindleeftijd } from '@/lib/horizon/eindstrategie-volgorde'
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
 import { runRegelProjection, type RegelProjection } from '@/lib/future/regel-sim'
 import { SubsectionLabel } from '@/components/editorial'
@@ -15,16 +16,18 @@ import {
 import type { RegelBodyProps } from './types'
 
 const EMPTY_PROJ: RegelProjection = { rows: [], fireAgeFractional: null }
-const STRATEGY_ORDER: FireEndStrategy[] = ['deplete', 'legacy', 'perpetual', 'pensioen']
+/**
+ * De strategie-lijst is AFGELEID, niet handmatig (ADR 0127). Hier stond
+ * `['deplete', 'legacy', 'perpetual', 'pensioen']` met de hand, en dus miste
+ * dit scherm 'nu-stoppen' terwijl drie andere oppervlakken hem al toonden —
+ * half zichtbaar is slechter dan onzichtbaar. De bewuste volgorde (eind-vormen
+ * eerst, stop-ankers erachter) + de motivering wonen in
+ * `lib/horizon/eindstrategie-volgorde.ts`; een zesde strategie verschijnt hier
+ * vanzelf.
+ */
+const STRATEGY_ORDER: readonly FireEndStrategy[] = EINDSTRATEGIE_VOLGORDE
 /** Strategieën die een instelbare eindleeftijd tonen (perpetual = enkel weergave-horizon). */
-const SHOWS_END_AGE: Record<FireEndStrategy, boolean> = {
-  deplete: true,
-  legacy: true,
-  perpetual: false,
-  pensioen: true,
-  // ADR 0127: het geld moet tot de eigen eindleeftijd (B51) reiken — instelbaar.
-  'nu-stoppen': true,
-}
+const SHOWS_END_AGE = toontEindleeftijd
 
 interface Draft {
   strategy: FireEndStrategy
@@ -182,9 +185,9 @@ export function EindstrategieBody({
       </div>
 
       {/* Eindleeftijd + nalatenschap (de teruggebrachte diepgang) */}
-      {(SHOWS_END_AGE[draft.strategy] || draft.strategy === 'legacy') && (
+      {(SHOWS_END_AGE(draft.strategy) || draft.strategy === 'legacy') && (
         <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {SHOWS_END_AGE[draft.strategy] && (
+          {SHOWS_END_AGE(draft.strategy) && (
             <label className="block">
               <span className="block text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] mb-1">
                 Eindleeftijd
@@ -205,7 +208,11 @@ export function EindstrategieBody({
                   ? 'Op deze leeftijd is je vermogen volledig opgemaakt.'
                   : draft.strategy === 'legacy'
                     ? 'Op deze leeftijd resteert het nalatenschapsbedrag.'
-                    : 'Tot deze leeftijd reken je het pensioen-restant door.'}
+                    : draft.strategy === 'nu-stoppen'
+                      ? // ADR 0127 D2: onder 'Nu stoppen' is dit de lat waar het vermogen
+                        // tot moet reiken — beschrijvend, geen belofte dat het lukt.
+                        'Tot deze leeftijd moet je vermogen reiken als je nu stopt.'
+                      : 'Tot deze leeftijd reken je het pensioen-restant door.'}
               </p>
             </label>
           )}

@@ -102,6 +102,10 @@ export function margeKort(m: RendementMarge): string {
  * AOW-leeftijd een TERUGVAL is (er is dan geen eigen stopkeuze).
  */
 export function margeAnkerZin(m: RendementMarge): string {
+  // ADR 0127 — anker 'nu': de eindstrategie 'Nu stoppen' toetst op de
+  // startleeftijd. Zonder eigen tak stond hier "als je doorwerkt tot je AOW",
+  // terwijl de hoofdlijn ernaast een plan toont dat vandaag al gestopt is.
+  if (m.anker === 'nu') return `als je nu stopt (je ${leeftijd(m)}e)`
   return m.anker === 'stopkeuze'
     ? `als je stopt op je ${leeftijd(m)}e`
     : `als je doorwerkt tot je AOW (${leeftijd(m)})`
@@ -109,6 +113,7 @@ export function margeAnkerZin(m: RendementMarge): string {
 
 /** Idem, maar als korte bijzin voor de legenda: `bij stoppen op je 55e`. */
 export function margeAnkerKort(m: RendementMarge): string {
+  if (m.anker === 'nu') return 'bij nu stoppen'
   return m.anker === 'stopkeuze'
     ? `bij stoppen op je ${leeftijd(m)}e`
     : `bij doorwerken tot je AOW (${leeftijd(m)})`
@@ -133,9 +138,14 @@ export function margeLegenda(m: RendementMarge): string {
  * Dezelfde uitspraak als de motor: gap-toets op de anker-leeftijd.
  */
 export function margeZin(m: RendementMarge): string {
-  const aanhef = m.anker === 'stopkeuze'
-    ? `Stop je op je ${leeftijd(m)}e`
-    : `Werk je door tot je AOW (${leeftijd(m)})`
+  const aanhef =
+    m.anker === 'nu'
+      // ADR 0127: het stopmoment is hier geen keuze meer maar de aanname van het
+      // plan — beschrijvend geformuleerd, geen "stop je".
+      ? `Stop je nu (je ${leeftijd(m)}e)`
+      : m.anker === 'stopkeuze'
+        ? `Stop je op je ${leeftijd(m)}e`
+        : `Werk je door tot je AOW (${leeftijd(m)})`
   if (m.begrensd === 'boven') {
     return `${aanhef}, dan houdt je plan stand tot je rendement méér dan ${pct(RENDEMENT_MARGE_GRENS)}% per jaar tegenvalt.`
   }

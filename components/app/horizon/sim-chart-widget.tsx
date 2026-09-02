@@ -23,6 +23,12 @@ import type { SimResult, SimCashflow } from '@/lib/fire-simulation'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import { type FireEndStrategy, STRATEGY_LABELS } from '@/lib/fire-strategy'
 import {
+  NU_STOPPEN_KPI_LABEL,
+  nuStoppenReachFromSim,
+  nuStoppenReachYear,
+  nuStoppenZin,
+} from '@/lib/horizon/nu-stoppen-copy'
+import {
   guardFireTarget,
   guardFreedomAge,
   HORIZON_MISSENDE_GEGEVENS_LABEL,
@@ -128,6 +134,12 @@ export const SimChartModal = memo(function SimChartModal({
   const strategy: FireEndStrategy = simResult?.strategy ?? 'deplete'
   const displayEndAge = simResult?.displayEndAge ?? 90
   const targetEndPortfolio = simResult?.targetEndPortfolio ?? 0
+  // ADR 0127 — het bereik onder 'Nu stoppen' voor de onderbouwing hieronder.
+  const nuStoppenReach = nuStoppenReachFromSim({
+    startAge: simResult?.fireAge ?? currentAge ?? null,
+    kernelDepletionMonth: simResult?.kernelDepletionMonth,
+    endAge: simResult?.displayEndAge,
+  })
   const [tableExpanded, setTableExpanded] = useState(false)
   // "Onder de motorkap" — technische onderbouwing, default ingeklapt (verhaal voorop).
   const [motorkapExpanded, setMotorkapExpanded] = useState(false)
@@ -256,6 +268,9 @@ export const SimChartModal = memo(function SimChartModal({
                 ? targetEndPortfolio > 0
                   ? `nalatenschap ${fmt(targetEndPortfolio)} op leeftijd ${displayEndAge}`
                   : `vaste onttrekking \u00b7 einddatum leeftijd ${displayEndAge}`
+                // ADR 0127 — 'Nu stoppen': geen einddoel maar een bereik.
+                : strategy === 'nu-stoppen'
+                ? `stoppen op vandaag \u00b7 plan tot leeftijd ${displayEndAge}`
                 : `einddatum leeftijd ${displayEndAge}`}
             </p>
             {euroView === 'real' && (
@@ -366,19 +381,31 @@ export const SimChartModal = memo(function SimChartModal({
           )}
 
           {/* Totaalregel */}
+          {/* ADR 0127 — onder 'Nu stoppen' is `fireAgeFractional` de startleeftijd:
+              de totaalregel toont dan het BEREIK, niet een vrijheidsmoment. */}
           <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
-            <span className="text-[var(--ink)]">Vrijheidsleeftijd</span>
+            <span className="text-[var(--ink)]">
+              {strategy === 'nu-stoppen' ? NU_STOPPEN_KPI_LABEL : 'Vrijheidsleeftijd'}
+            </span>
             <span className="tabular-nums text-[var(--ink)]">
-              {fireAgeFractional !== null
-                ? `${fireAgeFractional.toFixed(1)} jaar`
-                : 'Niet bereikbaar'}
+              {strategy === 'nu-stoppen'
+                ? (nuStoppenReachYear(nuStoppenReach) !== null
+                    ? `${nuStoppenReachYear(nuStoppenReach)} jaar`
+                    : 'Nog niet te bepalen')
+                : fireAgeFractional !== null
+                  ? `${fireAgeFractional.toFixed(1)} jaar`
+                  : 'Niet bereikbaar'}
             </span>
           </div>
-          {fireAgeFractional !== null && (
+          {strategy === 'nu-stoppen' ? (
+            <p className="mt-1 text-center font-sans text-[11px] text-[var(--ink-3)]">
+              {nuStoppenZin(nuStoppenReach)}
+            </p>
+          ) : fireAgeFractional !== null ? (
             <p className="mt-1 text-center font-sans text-[11px] text-[var(--ink-3)]">
               {formatFireAge(fireAgeFractional)}
             </p>
-          )}
+          ) : null}
 
           {/* Formule */}
           <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
@@ -394,6 +421,10 @@ export const SimChartModal = memo(function SimChartModal({
                 ? `Portfolio sluit op ${fmt(targetEndPortfolio)} (geïndexeerd) op leeftijd ${displayEndAge}.`
                 : strategy === 'pensioen'
                 ? `Vaste onttrekking op basis van je ingestelde jaarbudget. Restant op leeftijd ${displayEndAge}: ${fmt(targetEndPortfolio)}.`
+                // ADR 0127 — onder 'Nu stoppen' sluit het portfolio niet per se op €0:
+                // de vraag is of het tót de eindleeftijd reikt.
+                : strategy === 'nu-stoppen'
+                ? nuStoppenZin(nuStoppenReach)
                 : `Portfolio sluit op €0 op leeftijd ${displayEndAge}.`}
             </p>
             <p className="mt-1">
@@ -613,6 +644,13 @@ export const SimChartWidget = memo(function SimChartWidget({
   const resolvedCurrentAge = currentAge ?? 30
   // Zie de M6-noot bij het kopgetal hieronder.
   const toonbareFireAge = guardFreedomAge(fireAgeFractional).ok ? fireAgeFractional : null
+  // ADR 0127 — het bereik onder 'Nu stoppen'; consume-only uit dezelfde run.
+  const widgetReach = nuStoppenReachFromSim({
+    startAge: fireAge ?? resolvedCurrentAge,
+    kernelDepletionMonth: simResult.kernelDepletionMonth,
+    endAge: simResult.displayEndAge,
+  })
+  const widgetReachYear = nuStoppenReachYear(widgetReach)
 
   return (
     <>
@@ -635,7 +673,7 @@ export const SimChartWidget = memo(function SimChartWidget({
           </div>
 
           {/* FIRE niet bereikbaar waarschuwing */}
-          {!fireReachable && (
+          {!fireReachable && simResult.strategy !== 'nu-stoppen' && (
             <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-orange-300 bg-orange-50/60 px-3 py-2.5">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
               <p className="font-sans text-[12px] text-orange-700">
@@ -652,21 +690,29 @@ export const SimChartWidget = memo(function SimChartWidget({
           <div className="mb-5 flex items-end gap-6">
             <div>
               <span className="font-sans text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--ink-3)]">
-                Vrijheidsleeftijd
+                {/* ADR 0127 — "FIRE: 47 jr" zegt onder deze strategie niets: 47 is
+                    de huidige leeftijd. Hier hoort de reikwijdte. */}
+                {simResult.strategy === 'nu-stoppen' ? NU_STOPPEN_KPI_LABEL : 'Vrijheidsleeftijd'}
               </span>
               {/* M6-vangrail: een leeftijd op/voorbij het horizonplafond is de
                   parkeerstand van de bisectie — nooit als "100,0" tonen. */}
               <div className="font-display text-[40px] sm:text-[48px] font-bold leading-none tracking-tight text-[var(--ink)]">
-                {toonbareFireAge !== null ? toonbareFireAge.toFixed(1) : '—'}
+                {simResult.strategy === 'nu-stoppen'
+                  ? (widgetReachYear !== null ? String(widgetReachYear) : '—')
+                  : toonbareFireAge !== null ? toonbareFireAge.toFixed(1) : '—'}
               </div>
               <span className="font-sans text-[11px] text-[var(--ink-3)]">
-                {toonbareFireAge !== null
-                  ? formatFireAge(toonbareFireAge) + ' oud'
-                  : `niet bereikbaar vóór leeftijd ${simResult.displayEndAge}`}
+                {simResult.strategy === 'nu-stoppen'
+                  ? nuStoppenZin(widgetReach)
+                  : toonbareFireAge !== null
+                    ? formatFireAge(toonbareFireAge) + ' oud'
+                    : `niet bereikbaar vóór leeftijd ${simResult.displayEndAge}`}
               </span>
             </div>
 
-            {fireReachable && (
+            {/* ADR 0127 D4 — onder 'Nu stoppen' is `requiredFirePortfolio` het HUIDIGE
+                vermogen, geen doel: die twee cijfers zouden hier liegen. */}
+            {fireReachable && simResult.strategy !== 'nu-stoppen' && (
               <div className="mb-1 flex flex-col gap-1 text-right">
                 <div>
                   <span className="font-sans text-[10px] text-[var(--ink-4)]">Benodigd vermogen</span>

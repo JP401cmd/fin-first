@@ -27,9 +27,17 @@ import type { PageStatusInfo } from '@/lib/page-status/types'
 export function resolveFreedomBanner(input: FreedomStateInput): PageStatusInfo | null {
   if (!isFinanciallyFree(input)) return null
 
-  // Vrij → framing is 'free' of 'pensioen' (nooit 'building' hier).
+  // Vrij → framing is 'free', 'pensioen' of 'nu-stoppen' (nooit 'building' hier).
+  // ADR 0127: de 'nu-stoppen'-tak is verplicht — zonder eigen entry viel deze
+  // strategie op de 'free'-kopij ("Je bent vrij"), en dat is onder dit anker een
+  // uitspraak over de gebruiker in plaats van over zijn geld.
   const framing = resolveFreedomFraming(input)
-  const copy = framing === 'pensioen' ? FREEDOM_BANNER_COPY.pensioen : FREEDOM_BANNER_COPY.free
+  const copy =
+    framing === 'pensioen'
+      ? FREEDOM_BANNER_COPY.pensioen
+      : framing === 'nu-stoppen'
+        ? FREEDOM_BANNER_COPY['nu-stoppen']
+        : FREEDOM_BANNER_COPY.free
 
   return {
     route: '/overzicht',

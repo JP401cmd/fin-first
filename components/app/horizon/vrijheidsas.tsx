@@ -219,6 +219,20 @@ export interface VrijheidsasProps {
   margeJaren: number | null
   /** Er is een doel vastgelegd — toont de doel-i-zin onder de kop. */
   doelActief?: boolean
+  /**
+   * ADR 0127 — eindstrategie 'Nu stoppen': het stopmoment is dan een INSTELLING
+   * (vandaag), geen schuif. De rechterhelft ("Hoe stevig is dat?" — stop-slider,
+   * marge-band, koppel-checkbox) verdwijnt dan, net als de cijferrij die drie
+   * FIRE-leeftijden toont die onder dit anker alle drie de huidige leeftijd zijn.
+   * Twee schuiven die hetzelfde besturen is een bug in de maak; twee getallen die
+   * hetzelfde zeggen ook.
+   *
+   * De draaiknoppen (wat-als) blijven staan — die veranderen het plan, niet het
+   * stopmoment.
+   */
+  stopKeuzeVerborgen?: boolean
+  /** Vervangende duiding op de plek van de stopkeuze (alleen bij `stopKeuzeVerborgen`). */
+  stopKeuzeNotitie?: ReactNode
   /** Linker-vlak-inhoud (draaiknoppen + rendement-per-groep) uit horizon-client. */
   draaiknoppen?: ReactNode
 }
@@ -248,6 +262,8 @@ export function Vrijheidsas({
   zone,
   margeJaren,
   doelActief = false,
+  stopKeuzeVerborgen = false,
+  stopKeuzeNotitie,
   draaiknoppen,
 }: VrijheidsasProps) {
   // ── As-schaal (jaren, lineair, min-span 20 jr) — enkel voor de marge-band-posities ──
@@ -324,8 +340,17 @@ export function Vrijheidsas({
       {/* i-uitleg (patroon LevensinkomenStrook/Dekkingsradar) */}
       <InlineInfoDisclosure label="Uitleg vrijheidsas">
         <div className="mb-1.5 font-semibold text-[var(--ink)]" style={{ fontFamily: PLAYFAIR }}>
-          Zo lees je deze twee vragen
+          {stopKeuzeVerborgen ? 'Zo lees je deze sectie' : 'Zo lees je deze twee vragen'}
         </div>
+        {stopKeuzeVerborgen ? (
+          <p className="m-0">
+            Je eindstrategie staat op <b className="text-[var(--ink)]">Nu stoppen</b>: het stopmoment
+            is vastgezet op vandaag. Er is hier dus geen stopkeuze en geen marge tot een streep —
+            de vraag is hoe ver je vermogen reikt. Aan de knoppen hieronder verander je je aannames
+            (inkomen, sparen, rendement) en zie je dat bereik meebewegen.
+          </p>
+        ) : (
+        <>
         <p className="m-0">
           <b className="text-[var(--ink)]">Links</b> bepaal je wanneer je vrij kúnt zijn — de{' '}
           <b className="text-[var(--ink)]">streep</b>, een uitkomst van je aannames en gedrag.{' '}
@@ -344,7 +369,9 @@ export function Vrijheidsas({
           jouw ambitie; de <b className="text-[var(--ink)]">marge</b> is de overspanning tussen verwacht
           en stop.
         </p>
-        {doelActief && (
+        </>
+        )}
+        {doelActief && !stopKeuzeVerborgen && (
           <p className="m-0 mt-2">
             Dit is je <b className="text-[var(--ink)]">vastgelegde doel</b>.
           </p>
@@ -353,21 +380,43 @@ export function Vrijheidsas({
 
       {/* Intro — de twee vragen, netjes gescheiden */}
       <p className="mt-3 font-sans text-[12px] leading-snug text-[var(--ink-3)]">
-        Links bepaal je <b className="font-semibold text-[var(--ink-2)]">wanneer je vrij kúnt zijn</b> —
-        de streep. Rechts kies je <b className="font-semibold text-[var(--ink-2)]">wanneer je stopt</b>;
-        het verschil is je marge.
+        {stopKeuzeVerborgen ? (
+          <>
+            Je stopmoment ligt vast op <b className="font-semibold text-[var(--ink-2)]">vandaag</b> — dat
+            volgt uit je eindstrategie, niet uit een schuif. Hieronder draai je aan je aannames.
+          </>
+        ) : (
+          <>
+            Links bepaal je <b className="font-semibold text-[var(--ink-2)]">wanneer je vrij kúnt zijn</b> —
+            de streep. Rechts kies je <b className="font-semibold text-[var(--ink-2)]">wanneer je stopt</b>;
+            het verschil is je marge.
+          </>
+        )}
       </p>
 
       {/* ── Twee vlakken naast elkaar (mobiel gestapeld) ── */}
-      <div className="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-5">
+      <div
+        className={`mt-4 grid grid-cols-1 gap-6 sm:gap-5 ${stopKeuzeVerborgen ? '' : 'sm:grid-cols-2'}`}
+      >
         {/* LINKS — Wanneer kun je stoppen? (de streep) */}
-        <section className="min-w-0 sm:border-r sm:border-[var(--border-ed)] sm:pr-5">
-          <PanelHeader num="1" title="Wanneer kun je stoppen?" tag="de streep" />
+        <section
+          className={`min-w-0 ${stopKeuzeVerborgen ? '' : 'sm:border-r sm:border-[var(--border-ed)] sm:pr-5'}`}
+        >
+          {stopKeuzeVerborgen ? (
+            <PanelHeader num="1" title="Waar draai je aan?" tag="je aannames" />
+          ) : (
+            <PanelHeader num="1" title="Wanneer kun je stoppen?" tag="de streep" />
+          )}
+          {stopKeuzeVerborgen && stopKeuzeNotitie && (
+            <div className="mt-3">{stopKeuzeNotitie}</div>
+          )}
 
           {draaiknoppen && <div className="mt-4 space-y-5">{draaiknoppen}</div>}
         </section>
 
-        {/* RECHTS — Hoe stevig is dat? (de marge) */}
+        {/* RECHTS — Hoe stevig is dat? (de marge). Verborgen onder 'Nu stoppen'
+            (ADR 0127): het stopmoment is daar een instelling, geen schuif. */}
+        {!stopKeuzeVerborgen && (
         <section className="min-w-0">
           <PanelHeader num="2" title="Hoe stevig is dat?" tag="de marge" />
 
@@ -564,9 +613,13 @@ export function Vrijheidsas({
             </span>
           </label>
         </section>
+        )}
       </div>
 
-      {/* ── Cijferrij (volle breedte, onder de twee vlakken) — de drieslag ── */}
+      {/* ── Cijferrij (volle breedte, onder de twee vlakken) — de drieslag ──
+          Weggelaten onder 'Nu stoppen': basis, verwacht én geambieerd vallen daar
+          per constructie samen met je huidige leeftijd (ADR 0127 D1). */}
+      {!stopKeuzeVerborgen && (
       <div className="mt-6 grid grid-cols-3 gap-3 border-t border-[var(--border-ed)] pt-4">
         <Figure kicker="Basis-vrijheid" value={formatAge(baseFireAge)} unit="jr" />
         {/* Geen delta-sub meer: de "X mnd eerder/later vrij"-duiding staat één keer, op de
@@ -588,6 +641,7 @@ export function Vrijheidsas({
           subClass={zone ? ZONE_TEXT[zone] : 'text-[var(--ink-3)]'}
         />
       </div>
+      )}
     </div>
   )
 }

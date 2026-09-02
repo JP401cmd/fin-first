@@ -11,6 +11,12 @@
 
 import type { SimResult, SimRow, SimCashflow } from '@/lib/fire-simulation'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
+import {
+  nuStoppenGrafiekZin,
+  nuStoppenReachFromSim,
+  nuStoppenZin,
+  type NuStoppenReach,
+} from '@/lib/horizon/nu-stoppen-copy'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 
 /**
@@ -210,7 +216,11 @@ function mean(values: number[]): number {
  * Eerlijke, strategie-bewuste tekst wanneer FIRE niet bereikbaar is.
  * Spiegelt de bestaande copy in sim-chart-widget.tsx (regel ~506-517).
  */
-export function unreachableMessageFor(strategy: FireEndStrategy, displayEndAge: number): string {
+export function unreachableMessageFor(
+  strategy: FireEndStrategy,
+  displayEndAge: number,
+  reach?: NuStoppenReach,
+): string {
   switch (strategy) {
     case 'legacy':
       return `Je haalt je nalatenschapsdoel niet binnen je projectie (tot leeftijd ${displayEndAge}). Verlaag het nalatenschapsbedrag, verhoog je spaarquote of verlaag je uitgaven.`
@@ -218,6 +228,13 @@ export function unreachableMessageFor(strategy: FireEndStrategy, displayEndAge: 
       return `Je vermogen is niet groot genoeg om er blijvend van te leven binnen je projectie (tot leeftijd ${displayEndAge}). Verhoog je spaarquote of verlaag je uitgaven.`
     case 'pensioen':
       return `Je haalt je doel niet binnen je projectie (tot leeftijd ${displayEndAge}). Verhoog je spaarquote of verlaag je uitgaven.`
+    // ADR 0127 — 'Nu stoppen': er valt hier niets "niet te halen". Het stopmoment
+    // ligt vast op vandaag; de enige uitspraak is hoe ver het vermogen reikt.
+    // Zonder deze case viel de strategie via `default` op de FIRE-kopij terug.
+    case 'nu-stoppen':
+      return reach != null
+        ? nuStoppenZin(reach)
+        : `Je vermogen reikt niet tot je ${displayEndAge}e als je nu stopt.`
     case 'deplete':
     default:
       return `Vrijheid niet haalbaar binnen je projectie (tot leeftijd ${displayEndAge}). Verhoog je spaarquote of verlaag je uitgaven.`
@@ -236,6 +253,10 @@ export function leadSentenceForWithdrawal(strategy: FireEndStrategy): string {
   switch (strategy) {
     case 'perpetual':
       return 'Je vermogen blijft op peil — het rendement draagt je uitgaven, je teert niet in. Inkomsten als AOW of pensioen verlichten dat verder.'
+    // ADR 0127 — 'Nu stoppen': de onttrekking begint niet "daarna" maar vandaag.
+    // De default-tak beloofde hier een toekomstig omslagpunt dat er niet is.
+    case 'nu-stoppen':
+      return 'Je onttrekt vanaf vandaag: je inkomen uit werk valt weg en je uitgaven komen uit je vermogen. Inkomsten als AOW of pensioen verlagen die opname later.'
     case 'deplete':
     case 'legacy':
     case 'pensioen':
@@ -249,6 +270,7 @@ export function closingSentenceFor(
   strategy: FireEndStrategy,
   displayEndAge: number,
   targetEndPortfolio: number,
+  reach?: NuStoppenReach,
 ): string {
   switch (strategy) {
     case 'perpetual':
@@ -259,6 +281,13 @@ export function closingSentenceFor(
       return targetEndPortfolio > 0
         ? `Je onttrekt een vast bedrag; wat overblijft (zo'n ${Math.round(targetEndPortfolio).toLocaleString('nl-NL')} euro op leeftijd ${displayEndAge}) is je nalatenschap.`
         : `Je onttrekt een vast bedrag op basis van je ingestelde jaarbudget tot leeftijd ${displayEndAge}.`
+    // ADR 0127 — 'Nu stoppen': de default beloofde "rustig af naar nul rond X",
+    // maar onder dit anker kan het geld ook vóór de eindleeftijd op zijn. De zin
+    // volgt daarom de runway, niet de eindleeftijd.
+    case 'nu-stoppen':
+      return reach != null
+        ? nuStoppenGrafiekZin(reach)
+        : nuStoppenGrafiekZin({ kind: 'onbekend' })
     case 'deplete':
     default:
       return `Je bouwt je vermogen rustig af naar nul rond leeftijd ${displayEndAge} — precies genoeg voor de rest van je leven.`
@@ -480,6 +509,19 @@ export function deriveChapterData(
 
   const endPortfolio = rows[rows.length - 1]?.endPortfolio ?? 0
 
+  // ADR 0127 — het bereik onder 'Nu stoppen', uit DEZELFDE run (geconsumeerd,
+  // niet herrekend). Alleen deze strategie leest 'm; voor de overige vier blijft
+  // hij `undefined` en veranderen de zinnen niet.
+  const nuStoppenReach: NuStoppenReach | undefined =
+    strategy === 'nu-stoppen'
+      ? nuStoppenReachFromSim({
+          // Onder dit anker is `fireAge` per constructie de startleeftijd (D1).
+          startAge: simResult.fireAge ?? rows[0]?.age ?? null,
+          kernelDepletionMonth: simResult.kernelDepletionMonth,
+          endAge: displayEndAge,
+        })
+      : undefined
+
   // unifiedRows-only onttrekking-detail.
   const withdrawalOrder = (() => {
     if (!hasUnified) return undefined
@@ -519,7 +561,7 @@ export function deriveChapterData(
       implicitWithdrawalRate,
       unreachableMessage: fireReachable
         ? null
-        : unreachableMessageFor(strategy, displayEndAge),
+        : unreachableMessageFor(strategy, displayEndAge, nuStoppenReach),
       currentAge,
       yearsFromNow,
     },
@@ -529,7 +571,7 @@ export function deriveChapterData(
       displayEndAge,
       targetEndPortfolio,
       impacts,
-      closingSentence: closingSentenceFor(strategy, displayEndAge, targetEndPortfolio),
+      closingSentence: closingSentenceFor(strategy, displayEndAge, targetEndPortfolio, nuStoppenReach),
       firstYearWithdrawal,
       endPortfolio,
       withdrawalOrder,

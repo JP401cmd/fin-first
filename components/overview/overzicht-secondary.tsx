@@ -17,6 +17,7 @@ import {
 } from './overzicht-hero/voortgang-doelen-card'
 import { VrijheidStrip } from './overzicht-hero/vrijheid-strip'
 import type { FreedomFraming } from '@/lib/fire-strategy'
+import type { NuStoppenReach } from '@/lib/horizon/nu-stoppen-copy'
 import { PageStatusDot } from '@/components/app/page-status-dot'
 import { WelcomeGuideDot } from './welcome-guide-dot'
 import {
@@ -68,6 +69,12 @@ export type OverzichtSecondaryProps = {
    * aftelling. Consume-only — afgeleid in `resolveFreedomAgeView`.
    */
   freedomDataIssue?: boolean
+  /**
+   * ADR 0127 — het bereik onder eindstrategie 'Nu stoppen', afgeleid uit de
+   * stop-nu-runway van dit request. Stuurt de eigen strip-variant (gedekt vs.
+   * reikt tot leeftijd X). `null` bij elke andere strategie.
+   */
+  nuStoppenReach?: NuStoppenReach | null
   /** Briefing-entries onder de hero (max 6, 3-koloms grid). */
   briefingEntries?: BriefingEntry[]
   /** ISO-tijdstip waarop de briefing voor vandaag is vastgezet ("Bijgewerkt …"). */
@@ -125,6 +132,7 @@ export function OverzichtSecondary({
   fireAge,
   freedomFraming = 'building',
   freedomDataIssue = false,
+  nuStoppenReach = null,
   briefingEntries,
   briefingRefreshedAt,
   briefingDataChanged,
@@ -233,6 +241,7 @@ export function OverzichtSecondary({
                   fireAge={fireAge ?? null}
                   framing={freedomFraming}
                   dataIssue={freedomDataIssue}
+                  nuStoppenReach={nuStoppenReach}
                 />
               </>
             }
@@ -250,6 +259,7 @@ export function OverzichtSecondary({
               fireAge={fireAge ?? null}
               framing={freedomFraming}
               dataIssue={freedomDataIssue}
+              nuStoppenReach={nuStoppenReach}
             />
           </>
         )}

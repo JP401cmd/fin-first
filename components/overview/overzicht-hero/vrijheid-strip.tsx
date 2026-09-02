@@ -1,10 +1,15 @@
 'use client'
 
 import Link from 'next/link'
-import { Compass, Sparkles } from 'lucide-react'
+import { Compass, Hourglass, Sparkles } from 'lucide-react'
 import { ProgressMilestones } from '@/components/editorial/progress-milestones'
 import { useFlashChange } from '@/lib/hooks/use-flash-change'
 import type { FreedomFraming } from '@/lib/fire-strategy'
+import {
+  NU_STOPPEN_TITEL,
+  nuStoppenZin,
+  type NuStoppenReach,
+} from '@/lib/horizon/nu-stoppen-copy'
 import {
   HORIZON_MISSENDE_GEGEVENS_HINTS,
   HORIZON_MISSENDE_GEGEVENS_LABEL,
@@ -43,6 +48,7 @@ export function VrijheidStrip({
   fireAge,
   framing = 'building',
   dataIssue = false,
+  nuStoppenReach = null,
 }: {
   freedomPct: number | null
   /** Huidige leeftijd (gerond). Voor aftelling — optioneel. */
@@ -60,6 +66,15 @@ export function VrijheidStrip({
    * de gegevensmelding — een onmogelijke uitkomst is geen resultaat.
    */
   dataIssue?: boolean
+  /**
+   * ADR 0127 — eindstrategie 'Nu stoppen'. Gezet zodra die strategie actief is,
+   * ONGEACHT de tijdsdekking: `framing` schakelt pas naar 'nu-stoppen' bij 100%
+   * dekking, dus zonder deze prop zou de niet-gedekte substaat terugvallen op
+   * "X% op weg naar het moment dat je niet meer hoeft te werken" — terwijl de
+   * gebruiker per aanname al gestopt is. Consume-only: afgeleid uit de
+   * stop-nu-runway van dezelfde request (`nuStoppenReachFromRunway`).
+   */
+  nuStoppenReach?: NuStoppenReach | null
 }) {
   // Flash-puls op het hoofdpercentage bij waardeverandering (flash-up/flash-down,
   // respecteert prefers-reduced-motion). Hook vóór de early returns — rules-of-hooks.
@@ -118,6 +133,41 @@ export function VrijheidStrip({
         </div>
         <span className="shrink-0 text-xs font-semibold text-horizon-700 group-hover:underline">
           Vul profiel aan →
+        </span>
+      </Link>
+    )
+  }
+
+  // 'Nu stoppen' (ADR 0127): het stopmoment ligt al vast, dus "% op weg naar
+  // vrijheid" is hier geen vraag meer. Twee substaten, allebei beschrijvend:
+  // GEDEKT (het geld reikt tot de eindleeftijd) en REIKT TOT leeftijd X. Nooit
+  // "Je bent vrij" — dat is misleidend zodra het geld twee jaar reikt.
+  if (nuStoppenReach != null && nuStoppenReach.kind !== 'onbekend') {
+    const gedekt = nuStoppenReach.kind === 'gedekt'
+    return (
+      <Link
+        href="/toekomst"
+        className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-[var(--border-ed)] bg-gradient-to-r from-horizon-50 to-stone-50 p-3 sm:p-4 hover:border-horizon-300 hover:shadow-sm transition-all group"
+      >
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="w-9 h-9 rounded-lg bg-horizon-100 flex items-center justify-center shrink-0">
+            {gedekt ? (
+              <Sparkles className="w-5 h-5 text-horizon-700" aria-hidden="true" />
+            ) : (
+              <Hourglass className="w-5 h-5 text-horizon-700" aria-hidden="true" />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-horizon-700">
+              {NU_STOPPEN_TITEL}
+            </div>
+            <div className="mt-0.5 text-sm sm:text-base text-[var(--ink)]">
+              {nuStoppenZin(nuStoppenReach)}
+            </div>
+          </div>
+        </div>
+        <span className="shrink-0 text-xs font-semibold text-horizon-700 group-hover:underline">
+          Bekijk →
         </span>
       </Link>
     )

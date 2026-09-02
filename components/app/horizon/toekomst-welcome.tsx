@@ -35,6 +35,7 @@ import { EditorialHeadline } from '@/components/editorial'
 import { useFocusTrap } from '@/lib/hooks/use-focus-trap'
 import { acquireOverlay } from '@/lib/overlay-signal'
 import { buildVrijheidsleeftijdZin } from '@/lib/horizon/vrijheidsleeftijd-zin'
+import type { NuStoppenReach } from '@/lib/horizon/nu-stoppen-copy'
 
 export interface ToekomstWelcomeProps {
   /** Of de overlay zichtbaar is (first-visit-only, door parent bepaald). */
@@ -50,6 +51,12 @@ export interface ToekomstWelcomeProps {
   freedomAge: number | null
   /** Of de vrijheidsleeftijd de pensioen-/AOW-leeftijd is (framing-nuance). */
   isPensioen?: boolean
+  /**
+   * ADR 0127 — eindstrategie 'Nu stoppen': de belofte-zin gaat dan over BEREIK
+   * ("tot welke leeftijd reikt je vermogen"), niet over een toekomstig moment.
+   * Doorgegeven aan `buildVrijheidsleeftijdZin`, die de woorden bepaalt.
+   */
+  nuStoppenReach?: NuStoppenReach | null
   /** Of bedragen gemaskeerd zijn (privacy-modus). */
   masked: boolean
   /**
@@ -71,6 +78,7 @@ export function ToekomstWelcome({
   dailyExpenseRate,
   freedomAge,
   isPensioen = false,
+  nuStoppenReach = null,
   masked,
   onDismiss,
   onViewChart,
@@ -143,6 +151,7 @@ export function ToekomstWelcome({
   const choiceSentence = buildVrijheidsleeftijdZin({
     freedomAge,
     isPensioen,
+    nuStoppenReach,
     variant: 'kaart',
   })
   const hasFreedomAge = choiceSentence.kind === 'leeftijd'

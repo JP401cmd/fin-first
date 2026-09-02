@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client'
 import { getDefaultBudgets } from '@/lib/budget-data'
 import { BudgetAmountEditor } from '@/components/onboarding/budget-amount-editor'
 import { STRATEGY_LABELS, type FireEndStrategy } from '@/lib/fire-strategy'
+import { EINDSTRATEGIE_VOLGORDE, toontEindleeftijd } from '@/lib/horizon/eindstrategie-volgorde'
 import type { RetirementExpenseMethod } from '@/lib/budget-utils'
 import {
   BarChart3,
@@ -1240,8 +1241,10 @@ function HorizonStep({
       <div className="space-y-3">
         <p className="text-xs font-medium text-[var(--ink-2)]">A. Eindstrategie</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {(Object.entries(STRATEGY_LABELS) as [FireEndStrategy, { name: string; subtitle: string }][]).map(
-            ([key, meta]) => {
+          {/* Volgorde uit één bron (ADR 0127) — zie lib/horizon/eindstrategie-volgorde.ts. */}
+          {EINDSTRATEGIE_VOLGORDE.map(
+            (key) => {
+              const meta = STRATEGY_LABELS[key]
               const isSelected = horizon.fire_end_strategy === key
               return (
                 <button
@@ -1272,9 +1275,9 @@ function HorizonStep({
 
         {/* Conditional fields based on strategy */}
         <div className="flex gap-3">
-          {(horizon.fire_end_strategy === 'deplete' ||
-            horizon.fire_end_strategy === 'legacy' ||
-            horizon.fire_end_strategy === 'pensioen') && (
+          {/* ADR 0127 — onder 'Nu stoppen' is de eindleeftijd de lat waar het vermogen
+              tot moet reiken; de handmatige drieledige conditie liet 'm daar weg. */}
+          {toontEindleeftijd(horizon.fire_end_strategy) && (
             <FormField label="Eindleeftijd" className="flex-1">
               <input
                 type="number"

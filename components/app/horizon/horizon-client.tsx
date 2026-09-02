@@ -135,6 +135,15 @@ import {
   isHeroAnswerInvalid,
 } from '@/lib/horizon/hero-fire-age'
 import {
+  NU_STOPPEN_KPI_LABEL,
+  NU_STOPPEN_KPI_LABEL_KORT,
+  nuStoppenKpiCaption,
+  nuStoppenReachFromSim,
+  nuStoppenZin,
+  nuStoppenZinKort,
+  type NuStoppenReach,
+} from '@/lib/horizon/nu-stoppen-copy'
+import {
   guardFireTarget,
   guardFreedomMoment,
   guardRetirementExpense,
@@ -338,14 +347,29 @@ function ReceiptCue() {
  * `compact` = de mobiele 2×2-strip (kleinere typografie, krappere marges).
  * Tekst komt uitsluitend uit `lib/horizon/outcome-guard.ts` — nooit hier.
  */
-function HeroKpiNotice({ guard, compact = false }: { guard: HorizonOutcomeGuard; compact?: boolean }) {
+function HeroKpiNotice({
+  guard,
+  compact = false,
+  label,
+}: {
+  guard: HorizonOutcomeGuard
+  compact?: boolean
+  /**
+   * ADR 0127 — kop-override. De guard geeft app-breed één kop (zie
+   * HORIZON_MISSENDE_GEGEVENS_LABEL), en die klopt voor elk gegevensprobleem.
+   * Onder 'Nu stoppen' is `geen-doelvermogen` echter geen ontbrekend gegeven
+   * maar een EIGENSCHAP van de strategie: er ís geen doelbedrag. De hint van
+   * de guard blijft leidend.
+   */
+  label?: string
+}) {
   return (
     <>
       <div
         className={`${compact ? 'text-[13px]' : 'text-[16px] sm:text-[18px]'} font-black leading-tight tracking-[-0.01em]`}
         style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
       >
-        {guard.label}
+        {label ?? guard.label}
       </div>
       <div
         className={`italic text-[var(--ink-3)] ${compact ? 'text-[10px] mt-1' : 'text-[11px] mt-1.5'}`}
@@ -2372,6 +2396,62 @@ export default function HorizonPage({
   // ── Pensioen-modus afgeleid ──────────────────────────────────────────────
   const isPensioenMode = simResult?.strategy === 'pensioen'
 
+  // ── 'Nu stoppen'-modus afgeleid (ADR 0127) ───────────────────────────────
+  // SPIEGEL van `isPensioenMode`, geen kopie: beide zijn STOP-ANKERS (D1), maar
+  // ze ankeren op een andere datum en beantwoorden een andere vraag. Waar
+  // pensioen-modus "wat heb ik op mijn AOW-leeftijd" toont, toont deze modus
+  // "hoe ver reikt mijn vermogen als ik vandaag stop". Elke `isPensioenMode`-
+  // gebruik hieronder is daarom afzonderlijk gewogen — sommige krijgen een eigen
+  // tak, sommige horen zich als 'fire' te gedragen (overgangsfase, fasebalk,
+  // doel-lijn), en de AOW-specifieke afleidingen blijven onaangeraakt.
+  //
+  // `planningMode` blijft bewust TWEEWAARDIG: dit is een vijfde eindstrategie
+  // binnen de bestaande modi, geen derde planningsmodus (D6).
+  const isNuStoppenMode = simResult?.strategy === 'nu-stoppen'
+
+  // Het kernantwoord onder dit anker: tot welke leeftijd reikt het vermogen.
+  // Consume-only uit DEZELFDE run — onder 'nu-stoppen' ís de hoofdrun de
+  // stop-nu-run (FIRE op maand 0), dus `kernelDepletionMonth` is de runway.
+  // `kernelDepletionMonth` bewust RAUW doorgegeven (geen `?? null`): undefined =
+  // geen kernel-antwoord, null = geen uitputting binnen de horizon.
+  const nuStoppenReach: NuStoppenReach | null = useMemo(
+    () =>
+      simResult != null && simResult.strategy === 'nu-stoppen'
+        ? nuStoppenReachFromSim({
+            // Onder dit anker is `fireAge` per constructie de startleeftijd (D1).
+            startAge: simResult.fireAge ?? currentAge,
+            kernelDepletionMonth: simResult.kernelDepletionMonth,
+            endAge: simResult.displayEndAge,
+          })
+        : null,
+    [simResult, currentAge],
+  )
+
+  /**
+   * Dezelfde uitkomst in de vorm die `resolveHeroFireAge` verwacht.
+   * `depletionAgeFractional: null` betekent daar "reikt tot de eindleeftijd", dus
+   * 'onbekend' mag NOOIT die vorm aannemen — anders leest een ontbrekend antwoord
+   * op het scherm als volledige dekking. Die tak levert `null` (→ 'berekenen'
+   * zolang de kernel draait, anders 'onbekend'). Bij 'nu-op' is de uitputting nú,
+   * dus de startleeftijd.
+   */
+  const nuStoppenRunway = useMemo(() => {
+    if (!isNuStoppenMode || simResult == null || nuStoppenReach == null) return null
+    switch (nuStoppenReach.kind) {
+      case 'gedekt':
+        return { depletionAgeFractional: null, endAge: simResult.displayEndAge }
+      case 'reikt-tot':
+        return { depletionAgeFractional: nuStoppenReach.age, endAge: simResult.displayEndAge }
+      case 'nu-op':
+        return {
+          depletionAgeFractional: simResult.fireAge ?? currentAge ?? 0,
+          endAge: simResult.displayEndAge,
+        }
+      case 'onbekend':
+        return null
+    }
+  }, [isNuStoppenMode, simResult, nuStoppenReach, currentAge])
+
   // ── Dubbele FIRE-grondslag (incl./excl. eigen woning) ────────────────────
   // Bij downsize/opeethypotheek/uitsluiten (showDualHousingBasis) toont /toekomst
   // BEIDE doelen: incl. woning (requiredFireNetWorth = totaal netto vermogen bij
@@ -2383,6 +2463,9 @@ export default function HorizonPage({
   const showDualFireTarget =
     initialData.showDualHousingBasis &&
     !isPensioenMode &&
+    // ADR 0127 D4 — onder 'nu-stoppen' is er geen doelbedrag (het "benodigde"
+    // bedrag ís het huidige vermogen), dus ook geen incl./excl.-woning-paar.
+    !isNuStoppenMode &&
     fireTargetInclHome != null && fireTargetInclHome > 0 &&
     fireTargetExclHome != null && fireTargetExclHome > 0
 
@@ -2414,11 +2497,20 @@ export default function HorizonPage({
   // het GEPROJECTEERDE vermogen op AOW, wat een uitkomst is en geen doel.
   const fireTargetGuard = guardFireTarget(balkVrijheidDoel, {
     isEndOfHorizonFallback: simResult?.requiredFireIsEndOfHorizonFallback === true,
+    // ADR 0127 D4 — 'nu-stoppen': de guard geeft dan 'geen-doelvermogen' terug en
+    // de tegel toont die duiding i.p.v. een bedrag dat toevallig het huidige
+    // vermogen is.
+    isStartPortfolio: simResult?.requiredFireIsStartPortfolio === true,
   })
   const showFireTargetNotice = !isPensioenMode && !fireTargetGuard.ok
 
   // ── AOW-stop shortfall detectie ────────────────────────────────────────
+  // ADR 0127 — 'nu-stoppen' uitgesloten: `fireAge` is daar de HUIDIGE leeftijd,
+  // dus bij iemand die ná zijn AOW nog werkt zou `fireAge > AOW` waar zijn en
+  // verscheen de AOW-stop-toggle — een tweede stopmoment naast een stopmoment
+  // dat al vastligt.
   const isShortfallScenario = !isPensioenMode
+    && !isNuStoppenMode
     && !isHouseholdView && !isPartnerView
     && simResult?.fireReachable === true
     && simResult?.fireAge != null
@@ -2447,6 +2539,10 @@ export default function HorizonPage({
     kernelFireAgeFractional: simResult?.fireAgeFractional ?? null,
     kernelFireAge: simResult?.fireAge ?? null,
     isPensioenMode,
+    // ADR 0127 D6 — eigen tak: het kopgetal is dan de leeftijd tot waar het
+    // vermogen reikt, niet de kernel-`fireAge` (die is de startleeftijd).
+    isNuStoppenMode,
+    nuStoppenRunway: nuStoppenRunway,
     aowAgeFractional: userAowAge.fractional,
     // De wettelijke tabel is server-voorgeladen; is hij leeg, dan staat
     // `userAowAge` nog op de 67-terugval en is het getal dus voorlopig.
@@ -3329,13 +3425,25 @@ export default function HorizonPage({
         : 'Draai aan je aannames — je basislijn blijft staan'
     }
     const delen: string[] = []
+    // ADR 0127 — onder 'Nu stoppen' zijn "vrij op X", "stop X" en "marge" alle drie
+    // uitspraken over een stopKEUZE die er niet is (het stopmoment ligt vast op
+    // vandaag). De ingeklapte kop noemt dan het bereik, uit dezelfde bron als de
+    // hero-KPI — geen tweede weergave van hetzelfde getal.
+    if (isNuStoppenMode) {
+      const reikwijdte = nuStoppenReach != null ? nuStoppenZinKort(nuStoppenReach) : 'je bereik'
+      return doelActief
+        ? `Vastgelegd doel — ${reikwijdte}`
+        : hasScenario
+          ? `Wat-als actief — ${reikwijdte}`
+          : `Verken je pad — ${reikwijdte}`
+    }
     if (scenarioVerwachtFireAge !== null) delen.push(`vrij op ${formatAge(scenarioVerwachtFireAge)} jr`)
     delen.push(`stop ${effectiveStopAge}`)
     if (stopMarge.margeJaren !== null) delen.push(`marge ${formatMargeShort(stopMarge.margeJaren)}`)
     const cijfers = delen.join(' · ')
     if (doelActief) return `Vastgelegd doel — ${cijfers}`
     return hasScenario ? `Wat-als actief — ${cijfers}` : `Verken je pad — ${cijfers}`
-  }, [currentAge, doelActief, hasScenario, scenarioVerwachtFireAge, effectiveStopAge, stopMarge])
+  }, [currentAge, doelActief, hasScenario, scenarioVerwachtFireAge, effectiveStopAge, stopMarge, isNuStoppenMode, nuStoppenReach])
 
   // Slepen aan de stop-slider legt (bij koppel aan) een nieuwe vast te houden marge vast.
   // Vergrendelen alléén tegen de bezonken verwacht-waarde (nooit de basis-fallback).
@@ -4598,9 +4706,33 @@ export default function HorizonPage({
     strategy: fireStrategy?.strategy,
     aowAge: userAowAge.fractional,
   })
-  const showFreeHero = !hasPerspectiveHero && heroFreedomFraming !== 'building'
+  // ADR 0127 — 'nu-stoppen' uitgezonderd: bij volledige tijdsdekking geeft
+  // `resolveFreedomFraming` daar 'nu-stoppen' terug, maar de zin "Je bent vrij"
+  // in de plaats van het getal is dan juist mis. Onder dit anker ís het getal het
+  // antwoord (tot welke leeftijd het reikt) — alleen het LABEL verandert.
+  const showFreeHero =
+    !hasPerspectiveHero && heroFreedomFraming !== 'building' && heroFreedomFraming !== 'nu-stoppen'
   const freeHeroPhrase = heroFreedomFraming === 'pensioen' ? 'Je bent met pensioen' : 'Je bent vrij'
   const freeHeroLabel = heroFreedomFraming === 'pensioen' ? 'Pensioen' : 'Vrijheid'
+
+  // ── KPI-koppen van de leeftijds-tegel (ADR 0127) ───────────────────────
+  // Één plek voor de drie varianten, zodat desktop- en mobiele tegel (en hun
+  // kassabon) niet uiteen kunnen lopen.
+  const heroAgeLabel = isNuStoppenMode
+    ? NU_STOPPEN_KPI_LABEL
+    : isPensioenMode
+      ? 'Pensioenleeftijd'
+      : 'Vrijheidsleeftijd'
+  const heroAgeLabelKort = isNuStoppenMode
+    ? NU_STOPPEN_KPI_LABEL_KORT
+    : isPensioenMode
+      ? 'Pensioenlft'
+      : 'Vrijheidslft'
+  const heroAgeCaptionBase = isNuStoppenMode
+    ? (nuStoppenReach != null ? nuStoppenKpiCaption(nuStoppenReach) : 'jaar')
+    : isPensioenMode
+      ? 'AOW-leeftijd'
+      : 'jaar'
 
   // ── Gelijke behandeling van ontbrekende brondata op de hele KPI-rij (UR2-05) ─
   // De Doelbedrag-tegel had als enige een gegevensmelding (`showFireTargetNotice`,
@@ -4620,9 +4752,16 @@ export default function HorizonPage({
     ageIsInvalid: isHeroAnswerInvalid(heroFireAge),
     fireTarget: fireTargetGuard,
   })
+  //
+  // ADR 0127 D4 — 'nu-stoppen' is uitgezonderd: de doelbedrag-guard is daar
+  // bewust NIET ok ('geen-doelvermogen'). Dat is geen ontbrekend gegeven maar
+  // een eigenschap van de strategie; het moment (tot waar het vermogen reikt)
+  // is er wél en hoort te blijven staan. Zonder die uitzondering zou de tegel
+  // op elke nu-stoppen-run de gegevensmelding tonen.
   const showFireAgeNotice =
     !hasPerspectiveHero &&
     !isPensioenMode &&
+    !isNuStoppenMode &&
     heroFireAge.status !== 'berekenen' &&
     !fireAgeNoticeGuard.ok
   // De uitgave ná pensioen toetst zijn eigen grondslag: de methode-uitkomst uit
@@ -4782,7 +4921,7 @@ export default function HorizonPage({
                   <span className="ml-3 font-serif italic text-lg text-[var(--ink-3)]">
                     {hasPerspectiveHero
                       ? (isPensioenMode ? 'pensioenleeftijd' : 'vrijheidsleeftijd')
-                      : heroFireAgeCaption(heroFireAge, isPensioenMode ? 'pensioenleeftijd' : 'vrijheidsleeftijd')}
+                      : heroFireAgeCaption(heroFireAge, heroAgeLabel.toLowerCase())}
                   </span>
                   {/* M5 — hetzelfde bonnetje-spoor als op de figures-strip: dit
                       grote getal is óók een knop naar zijn eigen aannames. */}
@@ -4809,7 +4948,7 @@ export default function HorizonPage({
             >
               <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1.5">
                 <Hourglass className="h-3 w-3 shrink-0" aria-hidden />
-                <span>{showFireAgeNotice ? 'Vrijheidsleeftijd' : showFreeHero ? freeHeroLabel : isPensioenMode ? 'Pensioenleeftijd' : 'Vrijheidsleeftijd'}</span>
+                <span>{showFireAgeNotice ? 'Vrijheidsleeftijd' : showFreeHero ? freeHeroLabel : heroAgeLabel}</span>
                 <ReceiptCue />
               </div>
               {showFireAgeNotice ? (
@@ -4844,7 +4983,7 @@ export default function HorizonPage({
                   ? ''
                   : hasPerspectiveHero
                     ? (isPartnerView ? `jaar (${perspectiveHero!.householdName})` : 'jaar (huishouden)')
-                    : heroFireAgeCaption(heroFireAge, isPensioenMode ? 'AOW-leeftijd' : 'jaar')}
+                    : heroFireAgeCaption(heroFireAge, heroAgeCaptionBase)}
               </div>
                 </>
               )}
@@ -4865,7 +5004,7 @@ export default function HorizonPage({
               </div>
               {!hasPerspectiveHero && showFireTargetNotice ? (
                 /* M6: onmogelijk/niet-berekenbaar doelbedrag — melding i.p.v. getal. */
-                <HeroKpiNotice guard={fireTargetGuard} />
+                <HeroKpiNotice guard={fireTargetGuard} label={isNuStoppenMode ? 'Geen doelbedrag' : undefined} />
               ) : !hasPerspectiveHero && showDualFireTarget ? (
                 <>
                   {/* Doel MET je huis — het grote doel; kwalificatie inline zodat de kaart even hoog blijft als de buur-KPI's */}
@@ -5029,6 +5168,10 @@ export default function HorizonPage({
               freedomAge: hasPerspectiveHero ? perspectiveHero!.fireAge : heroFireAge.age,
               framing: heroFreedomFraming,
               isPensioen: isPensioenMode,
+              // ADR 0127 — onder 'Nu stoppen' gaat deze zin over BEREIK, niet over
+              // een moment: `heroFireAge.age` is daar de runway-leeftijd, en
+              // "werken wordt een keuze rond je 78e" zou daar een belofte van maken.
+              nuStoppenReach: hasPerspectiveHero ? null : nuStoppenReach,
               // Nog geen antwoord (kernel rekent) of een gegevensprobleem (M6 /
               // UR2-05): dan draagt de KPI zelf al een melding. Een duidingszin
               // eronder zou daar tegenin praten — `showFireAgeNotice` dekt óók
@@ -5090,7 +5233,14 @@ export default function HorizonPage({
                   ? `${formatMaskedApproxCurrency(perspectiveHero!.fireTarget, masked)} — ${isPartnerView ? `${perspectiveHero!.householdName}'s vrijheid` : 'gezamenlijke vrijheid'}`
                   : isPensioenMode
                     ? `${formatMaskedApproxCurrency(viewPortfolioAtAow ?? 0, masked)} — vermogen op AOW`
-                    : `${formatMaskedApproxCurrency(viewBalkVrijheidDoel, masked)} — volledige vrijheid`}
+                    // ADR 0127 D5 — de balk meet hier TIJDSDEKKING, geen kapitaal:
+                    // een doelbedrag noemen zou een noemer suggereren die niet
+                    // bestaat (D4). Het label noemt daarom de eindleeftijd.
+                    : isNuStoppenMode
+                      ? (simResult != null
+                          ? `tot je ${Math.round(simResult.displayEndAge)}e — einde van je plan`
+                          : 'einde van je plan')
+                      : `${formatMaskedApproxCurrency(viewBalkVrijheidDoel, masked)} — volledige vrijheid`}
               </span>
               <span>100%</span>
             </div>
@@ -5109,7 +5259,7 @@ export default function HorizonPage({
             >
               <div className="flex items-center gap-1.5 text-[9px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1">
                 <Hourglass className="h-3 w-3 shrink-0" aria-hidden />
-                <span>{showFireAgeNotice ? 'Vrijheidslft' : showFreeHero ? freeHeroLabel : isPensioenMode ? 'Pensioenlft' : 'Vrijheidslft'}</span>
+                <span>{showFireAgeNotice ? 'Vrijheidslft' : showFreeHero ? freeHeroLabel : heroAgeLabelKort}</span>
                 <ReceiptCue />
               </div>
               {showFireAgeNotice ? (
@@ -5158,7 +5308,7 @@ export default function HorizonPage({
               </div>
               {!hasPerspectiveHero && showFireTargetNotice ? (
                 /* M6: onmogelijk/niet-berekenbaar doelbedrag — melding i.p.v. getal. */
-                <HeroKpiNotice guard={fireTargetGuard} compact />
+                <HeroKpiNotice guard={fireTargetGuard} compact label={isNuStoppenMode ? 'Geen doelbedrag' : undefined} />
               ) : !hasPerspectiveHero && showDualFireTarget ? (
                 <>
                   {/* Doel MET je huis — het grote doel; kwalificatie inline zodat de kaart even hoog blijft als de buur-KPI's */}
@@ -5318,7 +5468,7 @@ export default function HorizonPage({
             <>
               <div className="my-2 border-b border-dashed border-[var(--border-ed)]" />
 
-              {!simResult.fireReachable && !isPensioenMode && (
+              {!simResult.fireReachable && !isPensioenMode && !isNuStoppenMode && (
                 <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-orange-300 bg-orange-50/60 px-3 py-2.5">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
                   <p className="font-sans text-[12px] text-orange-700">
@@ -5349,6 +5499,22 @@ export default function HorizonPage({
                 </div>
               )}
 
+              {/* ADR 0127 D2 — kernel stop-nu-tekort. EIGEN status naast
+                  `pension_shortfall`, en dus een eigen blok: dat blok noemt de
+                  AOW-leeftijd, terwijl een tekort onder 'Nu stoppen' ook NÁ de AOW
+                  kan vallen — een andere boodschap voor een andere oorzaak. De zin
+                  is beschrijvend (hoe ver reikt het) en spoort nergens toe aan;
+                  woorden uit één bron (lib/horizon/nu-stoppen-copy.ts), zodat de
+                  hero-KPI, deze melding en de grafiek-uitleg hetzelfde zeggen. */}
+              {kernelStatus === 'stop_now_shortfall' && nuStoppenReach != null && (
+                <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-orange-300 bg-orange-50/60 px-3 py-2.5">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
+                  <p className="font-sans text-[12px] text-orange-700">
+                    {nuStoppenZin(nuStoppenReach)}
+                  </p>
+                </div>
+              )}
+
               {/* V12 — kernel reached_now: nu al genoeg. Stoplicht-"goed"-status
                   (emerald, volgt de accentkeuze bewust NIET — CLAUDE.md-kleurconventie).
                   B93-doel=0-quirk: bij deplete is de status ALTIJD `reached_now`, óók bij
@@ -5359,7 +5525,15 @@ export default function HorizonPage({
                 <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-positive/30 bg-positive-bg px-3 py-2.5">
                   <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-positive" />
                   <p className="font-sans text-[12px] text-[var(--ink-2)]">
-                    Volgens je huidige cijfers kun je nu al stoppen met werken.
+                    {/* ADR 0127 — onder 'Nu stoppen' is "je kunt nu al stoppen" een
+                        tautologie: je hébt gezegd dat je stopt. De informatieve
+                        uitspraak is dan hoe ver het vermogen reikt — en die reikt
+                        in deze tak per D7-invariant tot de eindleeftijd. */}
+                    {isNuStoppenMode
+                      ? (nuStoppenReach != null
+                          ? nuStoppenZin(nuStoppenReach)
+                          : 'Als je nu stopt, reikt je vermogen tot het einde van je plan.')
+                      : 'Volgens je huidige cijfers kun je nu al stoppen met werken.'}
                   </p>
                 </div>
               )}
@@ -5945,6 +6119,7 @@ export default function HorizonPage({
                 dailyExpenseRate={canonicalDailyRate}
                 freedomAge={hasPerspectiveHero ? perspectiveHero!.fireAge : heroFireAge.age}
                 isPensioen={isPensioenMode}
+                nuStoppenReach={hasPerspectiveHero ? null : nuStoppenReach}
                 masked={masked}
                 // Stil sluiten (✕/Escape/achtergrond): alleen wegklikken, de
                 // tip-overlay NIET openen.
@@ -6021,6 +6196,7 @@ export default function HorizonPage({
                           freedomAge: hasPerspectiveHero ? perspectiveHero!.fireAge : heroFireAge.age,
                           masked,
                           isPensioen: isPensioenMode,
+                          nuStoppenReach: hasPerspectiveHero ? null : nuStoppenReach,
                         }}
                         onClose={handleOverlayExit}
                       >
@@ -6361,9 +6537,11 @@ export default function HorizonPage({
                 className="mt-1 block font-sans text-[10px] text-[var(--ink-4)] transition-colors hover:text-horizon-600"
                 style={{ minHeight: 44, display: 'flex', alignItems: 'center' }}
               >
-                {isPensioenMode
-                  ? <>Pensioen-modus actief &middot; <span className="ml-0.5 underline underline-offset-2">Instellingen &rarr;</span></>
-                  : <>Berekend als FIRE-pad &middot; <span className="ml-0.5 underline underline-offset-2">Pensioen-modus beschikbaar &rarr;</span></>}
+                {isNuStoppenMode
+                  ? <>Nu-stoppen-modus actief &middot; <span className="ml-0.5 underline underline-offset-2">Instellingen &rarr;</span></>
+                  : isPensioenMode
+                    ? <>Pensioen-modus actief &middot; <span className="ml-0.5 underline underline-offset-2">Instellingen &rarr;</span></>
+                    : <>Berekend als FIRE-pad &middot; <span className="ml-0.5 underline underline-offset-2">Pensioen-modus beschikbaar &rarr;</span></>}
               </button>
 
               {/* De wat-als-slider-lab is verplaatst naar de eigen sectie
@@ -6566,7 +6744,11 @@ export default function HorizonPage({
               <div>
                 <div className="mb-3">
                   <Kicker className="mb-1">Vrijheidsas</Kicker>
-                  <h2 className="font-display text-[14px] font-semibold leading-snug text-[var(--ink)]">Wanneer ben je vrij?</h2>
+                  {/* ADR 0127 — onder 'Nu stoppen' is "wanneer ben je vrij?" al beantwoord
+                      (vandaag); de open vraag is hoe ver je vermogen reikt. */}
+                  <h2 className="font-display text-[14px] font-semibold leading-snug text-[var(--ink)]">
+                    {isNuStoppenMode ? 'Hoe ver reikt je vermogen?' : 'Wanneer ben je vrij?'}
+                  </h2>
                 </div>
                 <Vrijheidsas
                   currentAge={currentAge}
@@ -6582,6 +6764,17 @@ export default function HorizonPage({
                   zone={stopMarge.zone}
                   margeJaren={stopMarge.margeJaren}
                   doelActief={doelActief}
+                  // ADR 0127 — stop-slider + koppel-checkbox weg: het stopmoment is
+                  // hier een INSTELLING (eindstrategie), geen schuif. Twee schuiven
+                  // die hetzelfde besturen is een bug in de maak.
+                  stopKeuzeVerborgen={isNuStoppenMode}
+                  stopKeuzeNotitie={
+                    nuStoppenReach != null ? (
+                      <p className="font-sans text-[12px] leading-snug text-[var(--ink-2)]">
+                        {nuStoppenZin(nuStoppenReach)}
+                      </p>
+                    ) : null
+                  }
                   draaiknoppen={
                     <>
                       {/* De vier bestaande sliders (platgeslagen via `bare`) */}
@@ -6638,7 +6831,9 @@ export default function HorizonPage({
                     een rekenuitkomst; bewust géén "je moet", geen "verhoog je spaarquote",
                     geen belofte dat het doel dan gehaald wordt. Sluitregel volgt de
                     bestaande app-conventie ("Indicatie, geen advies — …"). */}
-                {stopPadTekortHint !== null && (
+                {/* ADR 0127 — een "om op X te stoppen"-hint hoort niet bij een plan
+                    waarin het stopmoment al vastligt op vandaag. */}
+                {stopPadTekortHint !== null && !isNuStoppenMode && (
                   <div className="mt-4 border border-[var(--ink-2)] border-l-4 border-l-horizon-500 bg-[var(--paper)] px-3 py-2.5">
                     <p className="mb-1 label-editorial text-[var(--ink-3)]">Wat hoort daarbij?</p>
                     <p className="font-sans text-[12px] leading-snug text-[var(--ink-2)]">
@@ -9178,7 +9373,7 @@ export default function HorizonPage({
       )}
 
       {/* === KPI Kassabon Modals === */}
-      <BottomSheet open={showFireAgeReceipt} onClose={() => setShowFireAgeReceipt(false)} title={isPensioenMode ? 'Pensioenleeftijd' : 'Vrijheidsleeftijd'}>
+      <BottomSheet open={showFireAgeReceipt} onClose={() => setShowFireAgeReceipt(false)} title={heroAgeLabel}>
         <div className="p-5">
           <KassabonShell>
             {/* M6: de motor gaf een leeftijd op/voorbij het horizonplafond — dat is
@@ -9190,16 +9385,20 @@ export default function HorizonPage({
               </div>
             )}
             <div className="mb-3 text-center">
-              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">{isPensioenMode ? 'PENSIOENLEEFTIJD' : 'VRIJHEIDSLEEFTIJD'}</p>
+              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">{heroAgeLabel.toUpperCase()}</p>
               <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">
-                {isPensioenMode ? 'AOW-leeftijd op basis van geboortedatum' : simResult?.fireAgeFractional != null ? 'Simulatie-engine berekening' : 'Statische projectie'}
+                {isNuStoppenMode
+                  ? 'Runway uit de simulatie-engine — stoppen op vandaag'
+                  : isPensioenMode ? 'AOW-leeftijd op basis van geboortedatum' : simResult?.fireAgeFractional != null ? 'Simulatie-engine berekening' : 'Statische projectie'}
               </p>
             </div>
 
             <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
-              {isPensioenMode
-                ? 'Je AOW-leeftijd bepaalt wanneer je staatspensioen ingaat. De simulatie berekent je vermogen op dat moment.'
-                : 'De leeftijd waarop je vermogen voldoende is om je uitgaven te dekken zonder te werken.'}
+              {isNuStoppenMode
+                ? 'De leeftijd tot waar je vermogen je uitgaven dekt als je vandaag stopt met werken.'
+                : isPensioenMode
+                  ? 'Je AOW-leeftijd bepaalt wanneer je staatspensioen ingaat. De simulatie berekent je vermogen op dat moment.'
+                  : 'De leeftijd waarop je vermogen voldoende is om je uitgaven te dekken zonder te werken.'}
             </div>
 
             <div className="mb-2 mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
@@ -9276,11 +9475,13 @@ export default function HorizonPage({
             </div>
 
             <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
-              <span className="text-[var(--ink)]">{isPensioenMode ? 'Pensioenleeftijd' : 'Vrijheidsleeftijd'}</span>
+              <span className="text-[var(--ink)]">{heroAgeLabel}</span>
               <span className="tabular-nums text-[var(--ink)]">{heroFireAgeReceiptText}</span>
             </div>
 
-            {!isPensioenMode && range && range.optimistic.fireAge !== null && range.pessimistic.fireAge !== null && (
+            {/* Optimistisch/pessimistisch zijn FIRE-leeftijden uit de scenarioband —
+                onder 'Nu stoppen' bestaat er geen FIRE-moment om te spreiden (D1). */}
+            {!isPensioenMode && !isNuStoppenMode && range && range.optimistic.fireAge !== null && range.pessimistic.fireAge !== null && (
               <div className="mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
                 <div className="flex justify-between py-0.5">
                   <span className="font-sans text-sm text-[var(--ink-2)]">Optimistisch</span>
@@ -9295,17 +9496,19 @@ export default function HorizonPage({
 
 
             <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
-              <p><strong className="font-semibold text-[var(--ink-3)]">Formule:</strong> {isPensioenMode
-                ? 'AOW-leeftijd is wettelijk bepaald op basis van je geboortedatum. Vermogen op AOW = simulatie-projectie op die leeftijd.'
-                : 'Portfolio groeit met rendement + jaarlijkse besparing. FIRE is bereikt wanneer portfolio ≥ doelbedrag.'}</p>
+              <p><strong className="font-semibold text-[var(--ink-3)]">Formule:</strong> {isNuStoppenMode
+                ? 'Onttrekking start op maand 0. Het bereik is de eerste maand waarin je liquide vermogen aanhoudend op nul staat — omgerekend naar een leeftijd.'
+                : isPensioenMode
+                  ? 'AOW-leeftijd is wettelijk bepaald op basis van je geboortedatum. Vermogen op AOW = simulatie-projectie op die leeftijd.'
+                  : 'Portfolio groeit met rendement + jaarlijkse besparing. FIRE is bereikt wanneer portfolio ≥ doelbedrag.'}</p>
             </div>
 
-            <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">{isPensioenMode ? 'Pensioen-modus — gebaseerd op AOW-leeftijd' : 'Berekend op basis van huidig vermogen, spaargedrag en verwacht rendement'}</p>
+            <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">{isNuStoppenMode ? 'Nu-stoppen-modus — gerekend vanaf vandaag' : isPensioenMode ? 'Pensioen-modus — gebaseerd op AOW-leeftijd' : 'Berekend op basis van huidig vermogen, spaargedrag en verwacht rendement'}</p>
           </KassabonShell>
         </div>
       </BottomSheet>
 
-      <BottomSheet open={showCountdownReceipt} onClose={() => setShowCountdownReceipt(false)} title={isPensioenMode ? 'Aftellen naar pensioen' : 'Aftellen naar vrijheid'}>
+      <BottomSheet open={showCountdownReceipt} onClose={() => setShowCountdownReceipt(false)} title={isNuStoppenMode ? 'Je stopt vandaag' : isPensioenMode ? 'Aftellen naar pensioen' : 'Aftellen naar vrijheid'}>
         <div className="p-5">
           <KassabonShell>
             <div className="mb-3 text-center">
@@ -9356,19 +9559,19 @@ export default function HorizonPage({
         </div>
       </BottomSheet>
 
-      <BottomSheet open={showFireTargetReceipt} onClose={() => setShowFireTargetReceipt(false)} title={isPensioenMode ? 'Verwacht vermogen op AOW' : 'FIRE Doelbedrag'}>
+      <BottomSheet open={showFireTargetReceipt} onClose={() => setShowFireTargetReceipt(false)} title={isNuStoppenMode ? 'Geen doelbedrag' : isPensioenMode ? 'Verwacht vermogen op AOW' : 'FIRE Doelbedrag'}>
         <div className="p-5">
           <KassabonShell>
             {/* M6: dezelfde vangrail als op de KPI-tegel — de bon mag nooit een
                 bedrag onderbouwen dat de tegel als "we missen gegevens" toont. */}
             {showFireTargetNotice && (
               <div className="mb-3 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)] p-2.5 font-sans text-[11px] leading-relaxed text-[var(--ink-2)]">
-                <strong className="font-semibold text-[var(--ink)]">{HORIZON_MISSENDE_GEGEVENS_LABEL}.</strong>{' '}
+                <strong className="font-semibold text-[var(--ink)]">{isNuStoppenMode ? 'Geen doelbedrag' : HORIZON_MISSENDE_GEGEVENS_LABEL}.</strong>{' '}
                 {fireTargetGuard.hint}
               </div>
             )}
             <div className="mb-3 text-center">
-              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">{isPensioenMode ? 'VERWACHT VERMOGEN OP AOW' : 'FIRE DOELBEDRAG'}</p>
+              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">{isNuStoppenMode ? 'GEEN DOELBEDRAG' : isPensioenMode ? 'VERWACHT VERMOGEN OP AOW' : 'FIRE DOELBEDRAG'}</p>
               <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">
                 {isPensioenMode
                   ? 'Geprojecteerd vermogen op AOW-leeftijd'

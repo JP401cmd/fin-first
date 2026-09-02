@@ -19,6 +19,7 @@ import { loadTopMarketBriefing } from '@/lib/briefing/news-market'
 import { collectAandachtspunten } from '@/lib/aandachtspunten-loader'
 import type { Aandachtspunt } from '@/lib/aandachtspunten'
 import { resolveFreedomAgeView, fireAgeForDisplay } from '@/lib/fire-strategy'
+import { nuStoppenReachFromRunway, type NuStoppenReach } from '@/lib/horizon/nu-stoppen-copy'
 import { PageStatusSeed } from '@/components/app/page-status-provider'
 import { computePageStatusInfo, readMinimizedLevel } from '@/lib/page-status/compute'
 import type { BriefingWeekHistoryItem } from '@/components/overview/briefing-panel'
@@ -376,6 +377,16 @@ export async function OverzichtSecondaryLoader({
     strategy: horizonData?.fireStrategy?.strategy,
   })
 
+  // ADR 0127 — eindstrategie 'Nu stoppen': de strip toont dan geen "% op weg"
+  // maar het BEREIK. Geconsumeerd uit de stop-nu-`runway` die dit request toch al
+  // draait (dezelfde die de kop-zin voedt) — geen tweede kernel-run, geen eigen
+  // maand→leeftijd-som in de component. `null` bij elke andere strategie, dan
+  // blijft de strip zich exact gedragen zoals voorheen.
+  const nuStoppenReach: NuStoppenReach | null =
+    horizonData?.fireStrategy?.strategy === 'nu-stoppen'
+      ? nuStoppenReachFromRunway(runway)
+      : null
+
   // Vieringsprop voor de client-host: kant-en-klare strings (plat/serialiseerbaar),
   // zodat de host geen lib/milestones hoeft te bundelen. De once-guard is
   // server-side (`acknowledged_at`), dus de prop is alleen gevuld bij een échte
@@ -407,6 +418,7 @@ export async function OverzichtSecondaryLoader({
         fireAge={fireAgeDisplay}
         freedomFraming={freedomFraming}
         freedomDataIssue={freedomDataIssue}
+        nuStoppenReach={nuStoppenReach}
         briefingEntries={briefingEntries}
         freshMilestone={freshMilestone}
         briefingRefreshedAt={briefingRefreshedAt}

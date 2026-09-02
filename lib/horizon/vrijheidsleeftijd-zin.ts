@@ -25,6 +25,11 @@
 // als het kopgetal in de hero-KPI. Zie de noot bij `VrijheidsleeftijdZinInput`.
 
 import { heroFireAgeYear } from './hero-fire-age'
+import {
+  nuStoppenZin,
+  nuStoppenZinKort,
+  type NuStoppenReach,
+} from './nu-stoppen-copy'
 import type { FreedomFraming } from '@/lib/fire-strategy'
 
 /**
@@ -68,6 +73,17 @@ export interface VrijheidsleeftijdZinInput {
   framing?: FreedomFraming
   /** Toont de pagina de AOW-/pensioenleeftijd i.p.v. een FIRE-leeftijd? */
   isPensioen?: boolean
+  /**
+   * ADR 0127 — eindstrategie 'Nu stoppen'. Dan gaat deze zin NIET over een
+   * moment ("werken wordt een keuze rond je 53e") maar over BEREIK: het
+   * stopmoment ligt al vast op vandaag, dus de enige uitspraak is tot welke
+   * leeftijd het vermogen reikt. Zonder deze invoer zou de leeftijd-tak de
+   * runway-leeftijd als vrijheidsmoment aankondigen — een belofte die het
+   * getal niet draagt.
+   *
+   * Consume-only: afgeleid met `nuStoppenReachFromSim` uit dezelfde kernel-run.
+   */
+  nuStoppenReach?: NuStoppenReach | null
   /**
    * Rekent de kernel nog? Dan `kind: 'berekenen'` en rendert het oppervlak niets.
    */
@@ -131,6 +147,20 @@ export function buildVrijheidsleeftijdZin(
   const naam = input.subjectName?.trim() || null
 
   if (input.pending) return LEEG
+
+  // ── 'Nu stoppen' (ADR 0127) ───────────────────────────────────────
+  // Wint van elke andere tak: onder dit anker is er geen vrijheidsMOMENT om aan
+  // te kondigen (`fireAge` í́s de startleeftijd), alleen een bereik. Alleen in de
+  // eigen weergave — een perspectiefweergave gaat over iemand anders' plan.
+  if (input.nuStoppenReach != null && !naam) {
+    const reach = input.nuStoppenReach
+    return samenstellen(
+      'nu-al',
+      variant === 'inline' ? nuStoppenZinKort(reach) : nuStoppenZin(reach),
+      null,
+      '',
+    )
+  }
 
   // ── Al vrij / al met pensioen ────────────────────────────────────────────
   // Dan is de leeftijd geen vooruitzicht meer. Alleen relevant voor de eigen

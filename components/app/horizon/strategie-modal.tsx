@@ -50,7 +50,15 @@ import {
   type HousingStrategyConfig,
 } from '@/lib/housing-strategy'
 import { type FireEndStrategy, STRATEGY_LABELS } from '@/lib/fire-strategy'
-import { ArrowLeft, Shield, TrendingUp, TrendingDown, Activity, Landmark, Settings, Info, Loader2, Banknote, Heart, Infinity as InfinityIcon } from 'lucide-react'
+import { EINDSTRATEGIE_VOLGORDE } from '@/lib/horizon/eindstrategie-volgorde'
+import {
+  NU_STOPPEN_KPI_LABEL,
+  nuStoppenKort,
+  nuStoppenReachFromSim,
+  nuStoppenReachYear,
+  type NuStoppenReach,
+} from '@/lib/horizon/nu-stoppen-copy'
+import { ArrowLeft, Shield, TrendingUp, TrendingDown, Activity, Landmark, Settings, Info, Loader2, Banknote, Heart, Hourglass, Infinity as InfinityIcon } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Onttrekkingsprofiel-metadata (Dutch) ────────────────────────────────────
@@ -653,6 +661,21 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
   const selectedInfo = PROFIEL_INFO[selectedProfiel]
   const fireAge = selectedSim?.fireAge ?? null
 
+  /**
+   * ADR 0127 — het bereik onder 'Nu stoppen' voor één doorgerekend profiel.
+   * Consume-only: leest `kernelDepletionMonth`/`displayEndAge` uit de run die er
+   * al staat; `fireAge` ís onder dit anker de startleeftijd (D1).
+   */
+  const reachVoor = useCallback(
+    (sim: SimResult): NuStoppenReach =>
+      nuStoppenReachFromSim({
+        startAge: sim.fireAge ?? currentAge,
+        kernelDepletionMonth: sim.kernelDepletionMonth,
+        endAge: sim.displayEndAge,
+      }),
+    [currentAge],
+  )
+
   return (
     <ShellOverlay open={open} onClose={onClose} kind="pane" mobileBackCloses title="Strategieën">
       {/* Outer padding wordt geleverd door SlideInPane (driewegregel — ui-ux skill). */}
@@ -739,8 +762,11 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
               </p>
 
               {/* 4 end strategy cards */}
-              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-                {(Object.entries(STRATEGY_LABELS) as [FireEndStrategy, typeof STRATEGY_LABELS[FireEndStrategy]][]).map(([key, info]) => {
+              {/* Vijf strategieën (ADR 0127) — volgorde uit één bron. Bij vijf kaarten
+                  wordt de 4-koloms rij een 2×3-raster op sm+; op mobiel blijft het 2 kolommen. */}
+              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+                {EINDSTRATEGIE_VOLGORDE.map((key) => {
+                  const info = STRATEGY_LABELS[key]
                   const isSelected = localEndStrategy === key
                   const icon = key === 'deplete'
                     ? <Banknote className="h-4 w-4" />
@@ -748,7 +774,12 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
                       ? <Heart className="h-4 w-4" />
                       : key === 'pensioen'
                         ? <Landmark className="h-4 w-4" />
-                        : <InfinityIcon className="h-4 w-4" />
+                        // ADR 0127 — eigen icoon: 'Nu stoppen' viel via de else-tak op het
+                        // ∞-teken, dat in deze app juist "passief inkomen dekt je uitgaven
+                        // voorgoed" betekent. De zandloper zegt duur, niet eeuwigheid.
+                        : key === 'nu-stoppen'
+                          ? <Hourglass className="h-4 w-4" />
+                          : <InfinityIcon className="h-4 w-4" />
 
                   return (
                     <button
@@ -784,7 +815,9 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
               </div>
 
               {/* Conditional inputs */}
-              {(localEndStrategy === 'deplete' || localEndStrategy === 'legacy') && (
+              {/* ADR 0127 — 'Nu stoppen' erbij: de eindleeftijd is daar de lat waar het
+                  vermogen tot moet reiken, dus juist wél instelbaar. */}
+              {(localEndStrategy === 'deplete' || localEndStrategy === 'legacy' || localEndStrategy === 'nu-stoppen') && (
                 <div className="mt-3 flex flex-wrap items-end gap-4">
                   <div>
                     <label className="font-sans text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">
@@ -913,7 +946,13 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
                 </p>
                 {sim && sim.fireReachable && (
                   <p className="mt-2 font-mono text-xs tabular-nums text-[var(--ink-2)]">
-                    {localEndStrategy === 'pensioen' ? `AOW: ${NL_AOW_AGE} jr` : `FIRE: ${sim.fireAge} jr`}
+                    {/* ADR 0127 — onder 'Nu stoppen' is `sim.fireAge` de startleeftijd en
+                        zegt "FIRE: 47 jr" niets. De vraag is hoe ver het vermogen reikt. */}
+                    {localEndStrategy === 'nu-stoppen'
+                      ? nuStoppenKort(reachVoor(sim))
+                      : localEndStrategy === 'pensioen'
+                        ? `AOW: ${NL_AOW_AGE} jr`
+                        : `FIRE: ${sim.fireAge} jr`}
                   </p>
                 )}
               </button>
@@ -1060,8 +1099,25 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
                   Samenvatting ({selectedInfo.label})
                 </p>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                  <SummaryRow label={localEndStrategy === 'pensioen' ? 'AOW-leeftijd' : 'FIRE leeftijd'} value={localEndStrategy === 'pensioen' ? `${NL_AOW_AGE} jaar` : fireAge !== null ? `${fireAge} jaar` : 'Niet bereikbaar'} />
-                  <SummaryRow label="Doelbedrag" value={<MaskedAmount value={selectedSim.requiredFirePortfolio} tone="horizon" />} />
+                  {/* ADR 0127 — 'Nu stoppen': geen FIRE-leeftijd (die is vandaag) en per D4
+                      geen doelbedrag (`requiredFirePortfolio` í́s het huidige vermogen). */}
+                  <SummaryRow
+                    label={localEndStrategy === 'nu-stoppen' ? NU_STOPPEN_KPI_LABEL : localEndStrategy === 'pensioen' ? 'AOW-leeftijd' : 'FIRE leeftijd'}
+                    value={
+                      localEndStrategy === 'nu-stoppen'
+                        ? (nuStoppenReachYear(reachVoor(selectedSim)) != null
+                            ? `${nuStoppenReachYear(reachVoor(selectedSim))} jaar`
+                            : 'Nog niet te bepalen')
+                        : localEndStrategy === 'pensioen'
+                          ? `${NL_AOW_AGE} jaar`
+                          : fireAge !== null ? `${fireAge} jaar` : 'Niet bereikbaar'
+                    }
+                  />
+                  {localEndStrategy === 'nu-stoppen' ? (
+                    <SummaryRow label="Doelbedrag" value="Geen — je stopt vandaag" />
+                  ) : (
+                    <SummaryRow label="Doelbedrag" value={<MaskedAmount value={selectedSim.requiredFirePortfolio} tone="horizon" />} />
+                  )}
                   <SummaryRow label="Onttrekkingspercentage" value={`${(selectedSim.implicitWithdrawalRate * 100).toFixed(1)}%`} />
                   <SummaryRow label="Eindvermogen" value={
                     selectedSim.rows.length > 0
