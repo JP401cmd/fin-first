@@ -14,8 +14,12 @@ export type {
   KernelProjectionOptions,
   KernelRunSummary,
 } from './engine'
-export { solveFire } from './solver'
+export { solveFire, evaluateFireAt } from './solver'
 export type { SolveFireResult, SolverStatus } from './solver'
+
+// Runway-lezer: eerste AANHOUDENDE maand met Prognose!J ≤ 0 (ADR 0126, PR B).
+export { depletionMonth, MAX_TRANSIENT_SPAN_MONTHS, MAX_TRANSIENT_SPAN_YEARS } from './runway'
+export type { RunwayProjectionView } from './runway'
 
 // Gedeeld doelblok (P!B35–B38) — ook voor beheer-weergaven.
 export {

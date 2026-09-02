@@ -47,7 +47,10 @@ lib/horizon-kernel/
 ├─ engine.ts              Integrale forward-recursie: voedt de DepViews uit
 │                         eigen toestand (vervangt de teacher-forcing).
 ├─ solver.ts / gap.ts     VBA-getrouwe BepaalFIRE-bisectie + P!B93-B100-statusblok
-│                         en pensioengat-/tekort-detectie.
+│                         en pensioengat-/tekort-detectie; `evaluateFireAt` (geforceerd
+│                         FIRE-moment; bij FIRE-maand 0 ankert de engine guardrails op T0).
+├─ runway.ts              Runway-lezer (ADR 0126): eerste AANHOUDENDE maand met
+│                         Prognose!J ≤ 0 (bruggetjes ≤ MAX_TRANSIENT_SPAN_MONTHS tellen niet).
 ├─ wrappers/              band.ts (RunScenarioBand), mc.ts (Monte-Carlo, sin-hash),
 │                         hist.ts (backtest, inert), noise.ts.
 ├─ adapter/               Domein → KernelInput: events, household, params, potten,

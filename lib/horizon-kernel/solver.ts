@@ -258,10 +258,12 @@ export function solveFire(input: KernelInput): SolveFireResult {
  * Evalueer het volledige FIRE-statusblok bij een GEFORCEERDE FIRE-leeftijd — één
  * `runKernelProjection`, GÉÉN bisectie. Voor de secundaire wat-als-lijnen die een
  * vast FIRE-moment forceren i.p.v. te solven (bv. de AOW-stop-sim op /toekomst:
- * FIRE = AOW-leeftijd met een deplete-eindstrategie). Hergebruikt hetzelfde
- * (module-private) `computeStatusBlok` als `solveFire`, dus het statusblok is
- * identiek aan de stand die de solver op diezelfde leeftijd zou opleveren — alleen
- * de bisectie-stappen vervallen (`engineRuns` = 1).
+ * FIRE = AOW-leeftijd met een deplete-eindstrategie; de "stop nu"-runway met
+ * `fireAge = input.startLeeftijd`, ADR 0126). Hergebruikt hetzelfde (module-private)
+ * `computeStatusBlok` als `solveFire`, dus het statusblok is identiek aan de stand
+ * die de solver op diezelfde leeftijd zou opleveren — alleen de bisectie-stappen
+ * vervallen (`engineRuns` = 1). Bij FIRE-maand 0 regelt de ENGINE het guardrails-
+ * anker zelf (zie `runKernelProjection`); deze functie heeft daar geen knop voor.
  */
 export function evaluateFireAt(input: KernelInput, fireAge: number): SolveFireResult {
   const proj = runKernelProjection(input, { fireAge })

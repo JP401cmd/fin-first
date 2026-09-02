@@ -35,7 +35,8 @@ import {
   type ConvergentieRawProfileRow,
 } from '@/lib/horizon-kernel/convergentie-router'
 import { buildKernelInputFromApp, deriveEigenHuisIds, type KernelAdapterInput } from '@/lib/horizon-kernel/adapter'
-import { evaluateFireAt } from '@/lib/horizon-kernel/solver'
+import { evaluateFireAt, type SolveFireResult } from '@/lib/horizon-kernel/solver'
+import type { KernelInput } from '@/lib/horizon-kernel/types'
 import { kernelToUnifiedResult, buildKernelSlotMeta, type KernelHousingSale } from '@/lib/horizon-kernel/bridge'
 import { DEFAULT_FIRE_STRATEGY } from '@/lib/fire-strategy'
 import { DEFAULT_DOWNSIZE_CONFIG } from '@/lib/housing-strategy'
@@ -187,14 +188,113 @@ export interface ForcedStopPathResult {
    * grondslag als de bestaande hoofdrun-hint, geen weergave-deflatie.
    */
   maandHint: number
+  /**
+   * Eerste AANHOUDENDE maand waarin het liquide vermogen (Prognose!J) van DIT pad op
+   * is, of `null` (ADR 0126) — het bridge-veld `KernelUnifiedResult.kernelDepletionMonth`,
+   * doorgegeven en niet herrekend. Maandindex vanaf NU (maand 0 = startleeftijd), niet
+   * vanaf de stopmaand: leeftijd = `startLeeftijd + depletionMonth / 12`. Op een
+   * `stopAge: 'nu'`-run ís dit de runway; op een stop-kaart de uitputting van dát pad.
+   */
+  depletionMonth: number | null
+}
+
+/**
+ * Invoer voor `buildForcedStopSolve`: als `ForcedStopPathInput`, met `stopAge: 'nu'`
+ * als extra vorm. Elke `ForcedStopPathInput` is er één (een numerieke stopAge).
+ */
+export interface ForcedStopSolveInput extends Omit<ForcedStopPathInput, 'stopAge'> {
+  /**
+   * Geforceerde stopleeftijd (fractioneel), of `'nu'`: de startleeftijd van de
+   * kernel-tijdas (FIRE-maand 0) — de "stop nu"-runway (ADR 0126). Bestaat omdat de
+   * startleeftijd pas ná de adapter bekend is (tijdas uit geboortedatum + peildatum).
+   */
+  stopAge: number | 'nu'
+}
+
+/** De motor-helft van het geforceerde-stop-recept: kernel-invoer + statusblok/projectie. */
+export interface ForcedStopSolve {
+  readonly kernelInput: KernelInput
+  readonly solve: SolveFireResult
+  /** De feitelijk geforceerde stopleeftijd (bij `'nu'`: `kernelInput.startLeeftijd`). */
+  readonly stopAge: number
+}
+
+/**
+ * MOTOR-HELFT van het geforceerde-stop-recept — adapter → `evaluateFireAt` — zónder
+ * de bridge. Eén home voor de drie afnemers: de stop-kaarten en de AOW-stop-sim
+ * (`runForcedStopPath`, die hier de bridge-stap achter zet) én de "stop nu"-runway
+ * (lib/horizon/runway.ts, die `solve.projection` rechtstreeks leest — de bridge gooit
+ * die weg en laat alleen `maandHint` door). Vóór deze split stonden adapter +
+ * `evaluateFireAt` in één functie mét bridge; de runway zou de derde kopie van die
+ * orkestratie zijn geworden.
+ *
+ * GOOIT bij een kern-fout (bv. ontbrekende geboortedatum): de aanroeper kiest zijn
+ * degradatie (`runForcedStopPath` → `null`; de runway → `unavailable/kern-fout`).
+ *
+ * `stopAge: 'nu'` = FIRE-maand 0 (salaris weg vanaf maand 0, onttrekking vanaf maand
+ * 0). Het guardrails-anker regelt de ENGINE zelf: `runKernelProjection` initialiseert
+ * het bij FIRE-maand 0 op de T0-liquide-stand (zie lib/horizon-kernel/engine.ts), dus
+ * een numerieke stop op exact de startleeftijd gedraagt zich identiek aan `'nu'`.
+ */
+export function buildForcedStopSolve(input: ForcedStopSolveInput): ForcedStopSolve {
+  const endStrategy = input.endStrategy ?? 'deplete'
+  const endAge = Math.max(input.fireEndAge ?? DEFAULT_FIRE_STRATEGY.endAge, 90)
+  const basisProfiel = buildConvergentieAdapterProfile(input.profile)
+  const adapterInput: KernelAdapterInput = {
+    profile:
+      endStrategy === 'inherit'
+        ? basisProfiel
+        : { ...basisProfiel, fire_end_strategy: 'deplete', fire_end_age: endAge },
+    assets: input.assets,
+    debts: input.debts,
+    lifeEvents: input.lifeEvents,
+    aowRows: input.aowRows,
+  }
+  const kernelInput = buildKernelInputFromApp(adapterInput)
+  const stopAge = input.stopAge === 'nu' ? kernelInput.startLeeftijd : input.stopAge
+  return { kernelInput, solve: evaluateFireAt(kernelInput, stopAge), stopAge }
+}
+
+/**
+ * BRIDGE-HELFT van het geforceerde-stop-recept: kernel-uitkomst → app-vorm (SimResult,
+ * unified rows en de doorgegeven kernel-velden). Apart benoemd zodat de runway
+ * (lib/horizon/runway.ts) dezelfde bridge draait als de stop-kaarten en de AOW-stop-sim
+ * — en `depletionMonth` dus uit hetzelfde bridge-veld leest — zonder de orkestratie
+ * te kopiëren. Puur doorgeven: er wordt hier niets herrekend.
+ */
+export function bridgeForcedStop(
+  run: ForcedStopSolve,
+  ctx: Pick<ForcedStopSolveInput, 'assets' | 'debts' | 'yearlyExpenses'>,
+): ForcedStopPathResult {
+  const { assetSlotMeta, debtSlotMeta } = buildKernelSlotMeta(
+    ctx.assets,
+    ctx.debts,
+    deriveEigenHuisIds(ctx.assets),
+  )
+  const kernelUnified = kernelToUnifiedResult(run.solve, {
+    input: run.kernelInput,
+    yearlyExpenses: ctx.yearlyExpenses,
+    assetSlotMeta,
+    debtSlotMeta,
+  })
+  return {
+    result: toSimResult(kernelUnified),
+    unifiedRows: kernelUnified.rows,
+    kernelHousingSale: kernelUnified.kernelHousingSale ?? null,
+    // Doorgeven, niet herberekenen — `solve` IS de stand die de rijen hierboven voedt.
+    maandHint: run.solve.maandHint,
+    depletionMonth: kernelUnified.kernelDepletionMonth,
+  }
 }
 
 /**
  * Het GEFORCEERDE-run-recept: forceert een FIRE-moment op `stopAge` — `evaluateFireAt`,
- * één kernel-run, geen bisectie. Dit is exact het recept van de AOW-stop-sim
- * (`horizon-client.tsx`), hier single-sourced zodat de hook-stopPad én de scenario-stop-
- * kaarten dezelfde ene motor-orkestratie delen. Een kern-fout → `null` (zichtbare
- * degradatie, geen tweede motor).
+ * één kernel-run, geen bisectie — en brengt de uitkomst via de bridge naar de app-vorm.
+ * Dit is exact het recept van de AOW-stop-sim (`horizon-client.tsx`), hier
+ * single-sourced zodat de hook-stopPad én de scenario-stop-kaarten dezelfde ene
+ * motor-orkestratie delen. De motor-helft is `buildForcedStopSolve` (gedeeld met de
+ * runway); deze functie voegt alleen de bridge toe. Een kern-fout → `null`
+ * (zichtbare degradatie, geen tweede motor).
  *
  * De EINDSTRATEGIE volgt `input.endStrategy` (default `'deplete'` = ongewijzigd gedrag):
  *  - `'deplete'` — forceert `fire_end_strategy:'deplete'` + `fire_end_age:max(fireEndAge,90)`:
@@ -204,40 +304,8 @@ export interface ForcedStopPathResult {
  *    eindstrategie én eigen `fire_end_age` (zie `ForcedStopPathInput.endStrategy`).
  */
 export function runForcedStopPath(input: ForcedStopPathInput): ForcedStopPathResult | null {
-  const endStrategy = input.endStrategy ?? 'deplete'
-  const endAge = Math.max(input.fireEndAge ?? DEFAULT_FIRE_STRATEGY.endAge, 90)
   try {
-    const basisProfiel = buildConvergentieAdapterProfile(input.profile)
-    const adapterInput: KernelAdapterInput = {
-      profile:
-        endStrategy === 'inherit'
-          ? basisProfiel
-          : { ...basisProfiel, fire_end_strategy: 'deplete', fire_end_age: endAge },
-      assets: input.assets,
-      debts: input.debts,
-      lifeEvents: input.lifeEvents,
-      aowRows: input.aowRows,
-    }
-    const kernelInput = buildKernelInputFromApp(adapterInput)
-    const solve = evaluateFireAt(kernelInput, input.stopAge)
-    const { assetSlotMeta, debtSlotMeta } = buildKernelSlotMeta(
-      input.assets,
-      input.debts,
-      deriveEigenHuisIds(input.assets),
-    )
-    const kernelUnified = kernelToUnifiedResult(solve, {
-      input: kernelInput,
-      yearlyExpenses: input.yearlyExpenses,
-      assetSlotMeta,
-      debtSlotMeta,
-    })
-    return {
-      result: toSimResult(kernelUnified),
-      unifiedRows: kernelUnified.rows,
-      kernelHousingSale: kernelUnified.kernelHousingSale ?? null,
-      // Doorgeven, niet herberekenen — `solve` IS de stand die de rijen hierboven voedt.
-      maandHint: solve.maandHint,
-    }
+    return bridgeForcedStop(buildForcedStopSolve(input), input)
   } catch {
     return null
   }

@@ -77,6 +77,7 @@ import {
 import { computeEs, type EindstrategieCode } from './tables/es'
 import type { GebPostHelpers } from './tables/geb'
 import { inflationIndex } from './scaffold'
+import { depletionMonth } from './runway'
 import type { AssetCategorie, KernelInput } from './types'
 import { assignAssetSlots, assignDebtSlots } from './adapter/potten'
 
@@ -196,6 +197,17 @@ export interface KernelUnifiedResult extends UnifiedProjectionResult {
   readonly kernelHousingSale: KernelHousingSale | null
   /** Pensioenpot-weergave per actieve pot (weergaveveld; leeg = geen potten). */
   readonly kernelPensionPots: readonly KernelPensionPotView[]
+  /**
+   * Eerste AANHOUDENDE maand (maandindex vanaf nu, maand 0 = startleeftijd) waarin het
+   * liquide vermogen Prognose!J op is, of `null` (ADR 0126). Gelezen door
+   * `depletionMonth` (runway.ts) op DEZE projectie: `round(J) ≤ 0`, waarbij een dip
+   * die binnen `MAX_TRANSIENT_SPAN_MONTHS` bewezen herstelt (huisverkoop-bruggetje)
+   * niet telt. Op een geforceerde stop-nu-run (`evaluateFireAt` op de startleeftijd)
+   * ís dit de runway; op de hoofdrun of een stop-kaart de uitputtingsmaand van dát
+   * pad. Doorgeven, niet herrekenen: de kop op /overzicht, de stop-nu-scenariokaart
+   * en de eindstrategie lezen alle drie dit ene veld uit dezelfde run.
+   */
+  readonly kernelDepletionMonth: number | null
 }
 
 // ── m-accessors (guard voorbij-horizon / lege cellen → 0) ────────────────────
@@ -880,6 +892,8 @@ export function kernelToUnifiedResult(
     kernelMaandHint: solve.maandHint,
     kernelHousingSale,
     kernelPensionPots,
+    // Runway-lezer op dezelfde projectie (ADR 0126) — doorgeven, niet herrekenen.
+    kernelDepletionMonth: depletionMonth(proj),
   }
 }
 

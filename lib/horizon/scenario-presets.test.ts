@@ -4,10 +4,19 @@ import {
   buildCompleetKernelProfileBase,
 } from '@/lib/regression-tests/horizon-strategie/persona-fixture'
 import {
+  buildConvergentieAdapterProfile,
   computeConvergentieProjection,
   type ConvergentieRawProfileRow,
 } from '@/lib/horizon-kernel/convergentie-router'
+import { buildKernelInputFromApp, deriveEigenHuisIds } from '@/lib/horizon-kernel/adapter'
+import { evaluateFireAt } from '@/lib/horizon-kernel/solver'
+import { buildKernelSlotMeta, kernelToUnifiedResult } from '@/lib/horizon-kernel/bridge'
+import { startNettoLiquide } from '@/lib/horizon-kernel/jaarrand'
+import { depletionMonth } from '@/lib/horizon-kernel/runway'
+import { toSimResult } from '@/lib/unified-projection'
 import {
+  bridgeForcedStop,
+  buildForcedStopSolve,
   runScenarioPresets,
   runScenarioPreset,
   resolveScenarioPresets,
@@ -234,5 +243,86 @@ describe('runForcedStopPath — endStrategy', () => {
     const geerfd = run({ profile: depleteProfiel, fireEndAge: 93, endStrategy: 'inherit' })
     expect(geerfd).not.toBeNull()
     expect(geerfd).toEqual(geforceerd)
+  })
+})
+
+// ── buildForcedStopSolve: de motor-helft (ADR 0126, PR B) ────────────────────
+//
+// `runForcedStopPath` is gesplitst in `buildForcedStopSolve` (adapter → evaluateFireAt)
+// en de bridge-stap. De stop-kaarten, de AOW-stop-sim én de "stop nu"-runway hangen
+// aan dat ene recept. Het bestaande gedrag van `runForcedStopPath` moet byte-identiek
+// blijven — hier vastgepind tegen het VROEGERE recept (adapter + evaluateFireAt +
+// bridge, letterlijk zoals het vóór de split in de functie stond).
+
+describe('buildForcedStopSolve — motor-helft van het geforceerde-stop-recept', () => {
+  const STOP_AGE = Math.round(VERWACHT_FIRE) + 1
+  const base = {
+    profile,
+    assets: fx.assets,
+    debts: fx.debts,
+    lifeEvents: fx.lifeEvents,
+    aowRows: [] as const,
+    yearlyExpenses: 30_000,
+    fireEndAge: 90,
+  }
+
+  it('REGRESSIE-ANKER: runForcedStopPath ≡ het vroegere recept (adapter + evaluateFireAt + bridge) — byte-identiek', () => {
+    // Het OUDE recept, letterlijk (deplete-default: geforceerde eindstrategie + eindleeftijd ≥ 90).
+    const basisProfiel = buildConvergentieAdapterProfile(profile)
+    const kernelInput = buildKernelInputFromApp({
+      profile: { ...basisProfiel, fire_end_strategy: 'deplete', fire_end_age: 90 },
+      assets: fx.assets,
+      debts: fx.debts,
+      lifeEvents: fx.lifeEvents,
+      aowRows: [],
+    })
+    const solve = evaluateFireAt(kernelInput, STOP_AGE)
+    const { assetSlotMeta, debtSlotMeta } = buildKernelSlotMeta(fx.assets, fx.debts, deriveEigenHuisIds(fx.assets))
+    const unified = kernelToUnifiedResult(solve, { input: kernelInput, yearlyExpenses: 30_000, assetSlotMeta, debtSlotMeta })
+    const oud = {
+      result: toSimResult(unified),
+      unifiedRows: unified.rows,
+      kernelHousingSale: unified.kernelHousingSale ?? null,
+      maandHint: solve.maandHint,
+    }
+
+    const nieuw = runForcedStopPath({ ...base, stopAge: STOP_AGE })
+    // De vier bestaande velden byte-identiek; `depletionMonth` is het additieve
+    // bridge-veld (ADR 0126) — óók dat komt uit dezelfde bridge, niet uit een eigen lezing.
+    expect(nieuw).toEqual({ ...oud, depletionMonth: unified.kernelDepletionMonth })
+    expect(nieuw!.depletionMonth).toBe(depletionMonth(solve.projection))
+  })
+
+  it('numerieke stopAge: solve ≡ evaluateFireAt (geen verborgen opties; anker via self-capture)', () => {
+    const { kernelInput, solve, stopAge } = buildForcedStopSolve({ ...base, stopAge: STOP_AGE })
+    expect(stopAge).toBe(STOP_AGE)
+    expect(solve).toEqual(evaluateFireAt(kernelInput, STOP_AGE))
+    expect(solve.projection.summary.guardrailsAnker).toBeGreaterThan(0) // self-capture op fireMaand − 1
+  })
+
+  it("stopAge 'nu': FIRE-maand 0, eigen eindstrategie geërfd, engine ankert guardrails op max(0, T0-liquide)", () => {
+    const { kernelInput, solve, stopAge } = buildForcedStopSolve({ ...base, stopAge: 'nu', endStrategy: 'inherit' })
+    expect(stopAge).toBe(kernelInput.startLeeftijd)
+    expect(solve.fireAge).toBe(kernelInput.startLeeftijd)
+    expect(solve.projection.summary.fireMonth).toBe(0)
+    expect(solve.projection.summary.guardrailsAnker).toBe(Math.max(0, startNettoLiquide(kernelInput)))
+    expect(solve.engineRuns).toBe(1)
+    // 'inherit' op het perpetual-fixture-profiel: eindleeftijd = horizon (100).
+    expect(solve.eindleeftijd).toBe(100)
+    // Een numerieke stop op exact de startleeftijd is hetzelfde pad (de engine ankert, niet het recept).
+    expect(buildForcedStopSolve({ ...base, stopAge: kernelInput.startLeeftijd, endStrategy: 'inherit' }).solve).toEqual(solve)
+  })
+
+  it('bridgeForcedStop geeft het bridge-veld door: depletionMonth ≡ depletionMonth(solve.projection)', () => {
+    const run = buildForcedStopSolve({ ...base, stopAge: 'nu', endStrategy: 'inherit' })
+    const bridged = bridgeForcedStop(run, base)
+    expect(bridged.depletionMonth).toBe(depletionMonth(run.solve.projection))
+    expect(bridged.maandHint).toBe(run.solve.maandHint)
+  })
+
+  it('gooit bij een kern-fout — de aanroeper kiest de degradatie (runForcedStopPath → null)', () => {
+    const kapot = { ...base, profile: { ...profile, date_of_birth: null }, stopAge: STOP_AGE }
+    expect(() => buildForcedStopSolve(kapot)).toThrow()
+    expect(runForcedStopPath(kapot)).toBeNull()
   })
 })

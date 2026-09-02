@@ -38,6 +38,7 @@ import type { SimResult } from '@/lib/fire-simulation'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import type { FactorRow } from '@/lib/euro-display'
+import { computeRunwayFromRawContext, type RunwayResult } from '@/lib/horizon/runway'
 
 /**
  * Beide FIRE-doel-grondslagen uit ÉÉN kernel-run (ADR 0034).
@@ -276,6 +277,35 @@ export function computeHorizonFireSim(
   perspective: Perspective = 'personal',
 ): Promise<HorizonFireSim | null> {
   return computeHorizonFireSimCached(supabase, perspective)
+}
+
+/**
+ * De "stop nu"-runway (ADR 0126, PR B) op de PERSPECTIEF-CORRECTE rauwe context van
+ * de gedeelde FIRE-run: één extra `evaluateFireAt` op FIRE-maand 0, gelezen door
+ * `depletionMonth` en geduid in lib/horizon/runway.ts.
+ *
+ * Bewust een EIGEN `cache()`-naad náást `computeHorizonFireSim` en NIET een veld op
+ * `HorizonFireSim`: dan zou élke consument van de gedeelde run (AI-context,
+ * freedomPct, gezondheidsscore) een extra engine-run betalen die alleen de kop nodig
+ * heeft. De rauwe context wordt wél gedeeld — dezelfde rijen, hetzelfde perspectief,
+ * dus kop en vrijheidsleeftijd komen uit één model. Geen basisrun (geen
+ * geboortedatum, onvolledige perspectief-rijen, kern-fout) ⇒ `unavailable/geen-basisrun`.
+ */
+const computeHorizonRunwayCached = cache(async function computeHorizonRunwayInner(
+  supabase: SupabaseClient,
+  perspective: Perspective,
+): Promise<RunwayResult> {
+  const run = await computeHorizonFireSim(supabase, perspective)
+  if (!run) return { kind: 'unavailable', reason: 'geen-basisrun' }
+  return computeRunwayFromRawContext(run.rawContext)
+})
+
+/** Perspectief-normalisatie buiten de cache — zie `computeHorizonFireSim`. */
+export function computeHorizonRunway(
+  supabase: SupabaseClient,
+  perspective: Perspective = 'personal',
+): Promise<RunwayResult> {
+  return computeHorizonRunwayCached(supabase, perspective)
 }
 
 /**

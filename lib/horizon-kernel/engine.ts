@@ -15,7 +15,9 @@
  * solver-output; deze engine neemt de FIRE-leeftijd als `opts.fireAge` en zoekt 'm
  * NIET zelf (dat is een latere solver-stap). Het guardrails-anker P!B82 =
  * Prognose!J(fireMaand−1) wordt standaard tijdens de loop zelf vastgelegd (self-
- * capture), en is voor tests overridebaar via `opts.guardrailsAnker`.
+ * capture), en is voor tests overridebaar via `opts.guardrailsAnker`. Bij FIRE-maand
+ * 0 (stop-nu-run, ADR 0126 — buiten oracle-domein) bestaat maand −1 niet en
+ * initialiseert de engine het anker op de T0-liquide-stand (`startNettoLiquide`).
  *
  * ## Intra-maand-volgorde (afgeleid uit `docs/horizon-oracle/rekenflow.md` + de
  * per-tabel Dep-interfaces; verifieerbaar tegen de fixtures)
@@ -43,6 +45,8 @@
  *   Ont!H/I (Ont!D=0 vóór FIRE, dus geen terugkoppeling in het model). Het wordt
  *   tijdens de loop op maand fireMaand−1 vastgelegd; ná de loop worden de Ont-rijen
  *   met het definitieve anker herrekend voor uitvoer-correctheid (post-FIRE identiek).
+ *   Uitzondering FIRE-maand 0: dan is er geen "vóór FIRE", het anker staat vanaf de
+ *   start op de T0-liquide-stand en Ont!D rekent vanaf maand 0 (zie de anker-init).
  *
  * Pure module: geen fs/Supabase/Date.now/Math.random.
  */
@@ -76,6 +80,9 @@ import {
 } from './tables/bez'
 import { computeS, S_EXTRA_CATEGORIEEN, debtSlotCount, type SDep, type SRow } from './tables/s'
 import { computePrognose, type PrognoseDep, type PrognoseRow } from './tables/prognose'
+// Alleen `startNettoLiquide` (T0-stand voor het guardrails-anker bij FIRE-maand 0);
+// jaarrand.ts importeert van deze module uitsluitend typen, dus geen runtime-cycle.
+import { startNettoLiquide } from './jaarrand'
 import { computeWerkStrategie, type WerkStrategieRow } from './tables/werk-strategie'
 import { computePT, type PTRow, computePartnerHead, type PartnerHead } from './tables/pt'
 import { computeEs, type EsRow } from './tables/es'
@@ -131,7 +138,9 @@ export interface KernelProjectionOptions {
   readonly fireAge: number
   /**
    * Guardrails-anker P!B82. Standaard (`undefined`) legt de engine het zelf vast als
-   * de eigen Prognose!J(fireMaand−1) tijdens de loop. Overridebaar voor tests.
+   * de eigen Prognose!J(fireMaand−1) tijdens de loop — of, bij FIRE-maand 0 (maand −1
+   * bestaat niet), op de T0-liquide-stand `max(0, startNettoLiquide(input))`.
+   * Overridebaar voor tests.
    */
   readonly guardrailsAnker?: number
   /**
@@ -487,8 +496,24 @@ export function runKernelProjection(
   let overwaardeBijOpeetStart = 0
 
   // Guardrails-anker: override of self-capture op maand fireMaand−1.
+  //
+  // FIRE-MAAND 0 (ADR 0126; buiten oracle-domein — geen fixture forceert FIRE op de
+  // startleeftijd, dus parity blijft byte-identiek): maand −1 bestaat niet, de
+  // self-capture in de maandloop vuurt nooit en het anker zou 0 blijven voor álle
+  // 1200 maanden. `guardrailsFactorInHorizon` (tables/ont.ts) maakt van anker 0 een
+  // ratio 0, en 0 < onderdrempel ⇒ MAX(floor, 1 − stap): een PERMANENTE cut op de
+  // uitgave-term voor elk 'Guardrails'-profiel — een stop-nu-run (runway, status,
+  // Monte-Carlo, rendement-marge: dezelfde projectie) rekent dan systematisch te
+  // rooskleurig. Daarom initialiseert de engine het anker hier zélf op de
+  // T0-liquide-stand — dezelfde afleiding (`startNettoLiquide`, jaarrand.ts) die de
+  // bridge voor rij 0 hanteert. T0-stand ≤ 0 ⇒ anker 0: er is geen positieve
+  // referentie en zo'n run is een deficit. BEWUSTE GRENS: Ont!G(0) is de oracle-cel
+  // "" → 0 (m−1-lag), dus maand 0 zélf houdt één maand de floor-factor — één van
+  // 1200 maanden (aandachtspunt horizon-kernel-bekende-afwijkingen).
+  // Regressieslot: guardrails-anker-fire-maand-0.test.ts.
   const selfCaptureAnker = opts.guardrailsAnker === undefined
-  let anker = opts.guardrailsAnker ?? 0
+  let anker =
+    opts.guardrailsAnker ?? (fireMonth < 1 ? Math.max(0, startNettoLiquide(input)) : 0)
 
   // Uitvoer-arrays.
   const cf: CFRow[] = []

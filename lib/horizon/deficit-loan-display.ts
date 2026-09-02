@@ -29,6 +29,7 @@
  */
 
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
+import { MAX_TRANSIENT_SPAN_YEARS } from '@/lib/horizon-kernel/runway'
 
 export interface DeficitLoanNotice {
   /** Eerste leeftijd (rij-as) waarop het tekort-lening-saldo > 0 is. */
@@ -65,8 +66,13 @@ export interface DeficitLoanDetectOptions {
  * brug (er kwam binnen een jaar genoeg liquide binnen om het af te lossen), of het nu
  * €3k of €150k was — dat is geen staande schuld. Een tekort dat lánger aanhoudt (span
  * > 1) of aan het venster-einde nog openstaat (niet bewezen afgelost) blijft wél melden.
+ *
+ * DE CONSTANTE ZELF woont sinds ADR 0126 in de kernel (`lib/horizon-kernel/runway.ts`,
+ * `MAX_TRANSIENT_SPAN_YEARS`, hierboven geïmporteerd): de runway-lezer `depletionMonth`
+ * hanteert exact dezelfde grens in maanden, zodat "geen tekort-melding" en "geen einde
+ * van de runway" nooit over een andere drempel gaan. De kalibratie-motivering staat
+ * hier, bij de tekort-melding waar hij is ontstaan.
  */
-const MAX_TRANSIENT_SPAN_YEARS = 1
 
 /**
  * Detecteer of en wanneer de tekort-lening wordt aangesproken.
