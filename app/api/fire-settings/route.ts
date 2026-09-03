@@ -1,7 +1,7 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { serverError, unauthorized } from '@/lib/api/respond'
-import { isFireEndStrategy } from '@/lib/fire-strategy'
+import { isFireEndStrategy, isStopAnchorKind, type StopAnchorKind } from '@/lib/fire-strategy'
 
 /**
  * ── VOLGORDE-EIS (ADR 0127), afgehandeld ───────────────────────────────────
@@ -34,6 +34,70 @@ const VALID_RETIREMENT_METHODS = ['essential_budgets', 'custom_amount', 'current
  */
 const FP_KEY = 'fire_strategy_override'
 const LEGACY_SHADOW_STRATEGY = 'pensioen'
+
+/**
+ * ── Stop-anker (ADR 0129, fase F1) ─────────────────────────────────────────
+ *
+ * `fire_stop_anchor`/`fire_stop_age` leven in een APARTE lees- en schrijfstap,
+ * precies zoals `monthly_savings_override` hieronder. Reden: de kolommen komen uit
+ * migratie 20260903140000, en die is bewust nog niet uitgerold. Zou de hoofdquery
+ * ze meenemen, dan geeft élke profielload een 42703 tot het moment van uitrol —
+ * de volgordefout die het migratiebestand zelf als eerste waarschuwing draagt.
+ *
+ * Het VERSCHIL met `monthly_savings_override`: dat veld mag stil falen (een
+ * ontbrekende kolom kost daar hooguit een spaar-override). Een stop-anker níet.
+ * Wie "ik stop op mijn 58e" kiest en een geslaagde opslag ziet terwijl de waarde
+ * nergens landt, ziet bij de volgende load zijn oude plan terug — exact de stille
+ * verliesbug die het schaduwpad hierboven veroorzaakte en die in de ADR 0127-review
+ * is dichtgezet. Daarom: bij een ontbrekende kolom een eerlijke 409, geen success.
+ */
+const STOP_ANCHOR_COLUMNS = 'fire_stop_anchor, fire_stop_age'
+
+/** Postgres 42703 = undefined_column — de migratie is nog niet uitgerold. */
+function isMissingColumn(err: { code?: string } | null): boolean {
+  return err?.code === '42703'
+}
+
+interface StopAnchorInput {
+  anchor: StopAnchorKind
+  stopAge: number | null
+}
+
+/**
+ * Valideer anker + stopleeftijd uit de request-body.
+ *
+ * Halve jaren (ADR 0129 B6): de stop-slider staat op `step={0.5}`. Een waarde
+ * daartussenin wordt NIET stil afgerond — dat zou een keuze van de gebruiker
+ * vervalsen — maar afgewezen, zodat de client zijn eigen resolutie corrigeert.
+ * De consistentie-eis (`age` ⟺ leeftijd aanwezig) spiegelt de DB-CHECK, zodat een
+ * ongeldige combinatie een leesbare 400 geeft in plaats van een 23514.
+ */
+function parseStopAnchorInput(body: Record<string, unknown>): StopAnchorInput | { error: string } {
+  const rawAnchor = body.fire_stop_anchor ?? 'solved'
+  if (!isStopAnchorKind(rawAnchor)) {
+    return { error: `Ongeldig stop-anker: ${String(rawAnchor)}` }
+  }
+
+  const rawAge = body.fire_stop_age
+  if (rawAnchor !== 'age') {
+    if (rawAge != null) {
+      return { error: 'Een stopleeftijd hoort alleen bij het anker "age".' }
+    }
+    return { anchor: rawAnchor, stopAge: null }
+  }
+
+  const age = Number(rawAge)
+  if (!Number.isFinite(age)) {
+    return { error: 'Kies een stopleeftijd bij het anker "age".' }
+  }
+  if (age * 2 !== Math.floor(age * 2)) {
+    return { error: 'Een stopleeftijd loopt in stappen van een half jaar.' }
+  }
+  if (age < 18 || age > 100) {
+    return { error: 'Stopleeftijd moet tussen 18 en 100 liggen.' }
+  }
+  return { anchor: rawAnchor, stopAge: age }
+}
 
 /**
  * Terugleespad van de override — GENERIEK: elke waarde op de canonieke allowlist
@@ -85,7 +149,32 @@ export async function GET() {
     monthlySavingsOverride = raw == null ? null : Number(raw)
   }
 
+  // Stop-anker — aparte query zolang migratie 20260903140000 niet is uitgerold
+  // (zie STOP_ANCHOR_COLUMNS hierboven). Ontbreekt de kolom, dan LEIDT het anker
+  // zich af uit de legacy-strategie, exact zoals `parseFirePlan` dat doet: dan
+  // geven route en loader hetzelfde plan terug en spreekt geen rij zichzelf tegen.
+  let stopAnchor: string = strategy === 'pensioen' ? 'aow' : strategy === 'nu-stoppen' ? 'now' : 'solved'
+  let stopAge: number | null = null
+  const { data: anchorData, error: anchorError } = await supabase
+    .from('profiles')
+    .select(STOP_ANCHOR_COLUMNS)
+    .eq('id', claims.sub)
+    .maybeSingle()
+  if (!anchorError && anchorData) {
+    const row = anchorData as { fire_stop_anchor?: string | null; fire_stop_age?: number | string | null }
+    // De legacy-strategie WINT voor het anker (ADR 0129 D2) — een half-gebackfillde
+    // rij mag niet halverwege van plan wisselen.
+    if (strategy !== 'pensioen' && strategy !== 'nu-stoppen' && isStopAnchorKind(row.fire_stop_anchor)) {
+      stopAnchor = row.fire_stop_anchor
+      stopAge = row.fire_stop_age == null ? null : Number(row.fire_stop_age)
+    }
+  } else if (anchorError && !isMissingColumn(anchorError)) {
+    console.warn('[fire-settings] stop-anker lezen mislukt:', anchorError.message)
+  }
+
   return NextResponse.json({
+    fire_stop_anchor: stopAnchor,
+    fire_stop_age: stopAge,
     retirement_expense_method: data?.retirement_expense_method ?? 'essential_budgets',
     retirement_expense_custom_amount: data?.retirement_expense_custom_amount ?? null,
     fire_end_strategy: strategy,
@@ -121,6 +210,18 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Eindleeftijd moet tussen 50 en 120 liggen' }, { status: 400 })
   }
   const legacyAmount = body.fire_legacy_amount != null ? Number(body.fire_legacy_amount) : null
+
+  // Stop-anker — alleen meenemen als de client het expliciet stuurt, zodat een
+  // oudere client (die het veld niet kent) het anker niet stil op 'solved' zet.
+  const anchorInBody = 'fire_stop_anchor' in body || 'fire_stop_age' in body
+  let stopAnchorInput: StopAnchorInput | null = null
+  if (anchorInBody) {
+    const parsed = parseStopAnchorInput(body)
+    if ('error' in parsed) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 })
+    }
+    stopAnchorInput = parsed
+  }
 
   // V7 — tekort-lening-jaarrente (optioneel). null = wis (adapter → Excel-default 0,05).
   // Alleen meenemen wanneer expliciet in de body; gevalideerd op 0..1 (= DB-CHECK).
@@ -186,7 +287,41 @@ export async function PUT(request: NextRequest) {
         console.warn('[fire-settings] monthly_savings_override update failed (column may be missing):', overrideError.message)
       }
     }
-    return NextResponse.json({ success: true, ...updatePayload, monthly_savings_override: overrideValue })
+    // Stop-anker — aparte update, maar met een HARDE fout bij een ontbrekende
+    // kolom. Anders zou de gebruiker "opgeslagen" zien terwijl zijn stopmoment
+    // nergens landt en de volgende load zijn oude plan toont: precies de stille
+    // verliesbug die het schaduwpad hieronder ooit veroorzaakte. Liever een 409
+    // die zegt dat de database nog niet zover is.
+    if (stopAnchorInput) {
+      const { error: anchorError } = await supabase
+        .from('profiles')
+        .update({
+          fire_stop_anchor: stopAnchorInput.anchor,
+          fire_stop_age: stopAnchorInput.stopAge,
+        })
+        .eq('id', user.id)
+      if (anchorError) {
+        if (isMissingColumn(anchorError)) {
+          console.error('[fire-settings] stop-anker: kolom ontbreekt — migratie 20260903140000 nog niet uitgerold')
+          return NextResponse.json(
+            {
+              error: 'Je stopmoment kan nog niet worden opgeslagen; de database is nog niet bijgewerkt. Je overige instellingen zijn wél bewaard.',
+              code: 'stop_anchor_not_supported',
+            },
+            { status: 409 },
+          )
+        }
+        return serverError(anchorError, 'fire-settings:PUT:stop-anker', 'Stopmoment opslaan mislukt')
+      }
+    }
+    return NextResponse.json({
+      success: true,
+      ...updatePayload,
+      monthly_savings_override: overrideValue,
+      ...(stopAnchorInput
+        ? { fire_stop_anchor: stopAnchorInput.anchor, fire_stop_age: stopAnchorInput.stopAge }
+        : {}),
+    })
   }
 
   // CHECK-constraint-violation (23514) op de strategiekolom: de database kent deze
