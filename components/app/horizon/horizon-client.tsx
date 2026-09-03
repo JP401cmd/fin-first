@@ -2015,7 +2015,10 @@ export default function HorizonPage({
       hasEigenHuis: initialData.housingContext.hasEigenHuis,
       downsizeStrategyActief: downsizeActief,
     })
-      .then((results) => { if (!cancelled) { setScenarioPresets(results); setScenarioPresetsLoading(false) } })
+      // ADR 0129 D7 — de batch draagt naast de kaarten ook `solvedFireAge` ("vrij
+      // mogelijk vanaf", de tweede run onder een vast anker). F3b toont dat getal in de
+      // hero-drieslag; hier wordt alleen de kaartenlijst uitgepakt.
+      .then((batch) => { if (!cancelled) { setScenarioPresets(batch.presets as ScenarioPresetResult[]); setScenarioPresetsLoading(false) } })
       .catch((err) => {
         console.warn('[horizon-worker] preset-run faalde', err)
         if (!cancelled) setScenarioPresetsLoading(false)

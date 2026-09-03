@@ -19,7 +19,12 @@
 import { ageAtDate } from '@/lib/horizon-data'
 import { BOX3_PARAMS, type TaxYear } from '@/lib/box3-data'
 import { resolveFireParams } from '@/lib/fire-params'
-import { resolveFireStrategyWithOverride, type FireEndStrategy } from '@/lib/fire-strategy'
+import {
+  parseFirePlan,
+  resolveFireStrategyWithOverride,
+  type FireEndForm,
+  type FirePlan,
+} from '@/lib/fire-strategy'
 import {
   resolveWithdrawalStrategy,
   parseWithdrawalProfileConfig,
@@ -36,6 +41,7 @@ import type {
   EindstrategieParams,
   GebeurtenisRij,
   InkomenUitgavenParams,
+  KernelStopAnker,
   OnttrekkingsprofielParams,
   Onttrekkingsprofiel,
   OnzekerheidParams,
@@ -75,6 +81,10 @@ export interface KernelAdapterProfile {
   fire_end_strategy?: string | null
   fire_end_age?: number | null
   fire_legacy_amount?: number | string | null
+  /** ADR 0129 D1 — stop-anker (`solved`/`aow`/`now`/`age`); NULL → `solved`. */
+  fire_stop_anchor?: string | null
+  /** ADR 0129 D1 — zelfgekozen stopleeftijd (halve jaren); alleen bij anker `age`. */
+  fire_stop_age?: number | string | null
   feature_preferences?: Record<string, unknown> | null
   withdrawal_strategy?: string | null
   guardrail_floor?: number | null
@@ -222,28 +232,74 @@ export function buildStrategieSelectors(): StrategieSelectors {
   return { toename: 'Eigen indeling', afname: 'Eigen indeling', onttrekking: 'Eigen indeling' }
 }
 
-const FIRE_END_TO_SELECTOR: Record<FireEndStrategy, Eindstrategie> = {
+/** De drie EIND-VORMEN → de Excel-selector P!B48 (ADR 0129: de twee ankers zitten
+ *  niet meer in deze map — die reizen als `KernelInput.stopAnker`). */
+const END_FORM_TO_SELECTOR: Record<FireEndForm, Eindstrategie> = {
   deplete: 'Vermogen opeten',
   legacy: 'Nalatenschap',
   perpetual: 'Eeuwigdurend',
-  pensioen: 'Pensioenleeftijd',
-  'nu-stoppen': 'Nu stoppen',
 }
 
 /**
- * Eindstrategie (P!B48-B54). Uit `resolveFireStrategyWithOverride` (incl. de
- * feature_preferences-fallback voor 'pensioen'). `nietLiquideMeetellen = 'Nee'`
- * (geen app-veld — open punt); de app kent geen aparte eind-leeftijden per modus,
- * dus B51/B52 delen `endAge` en B53 = `legacyAmount`.
+ * Het PLAN (stop-anker × eind-vorm) van dit profiel — één home voor beide assen
+ * (ADR 0129 D2/D3), zodat `buildEindstrategie` en `buildStopAnker` per definitie
+ * dezelfde lezing van de profielrij hebben.
+ *
+ * Het schaduwpad `feature_preferences.fire_strategy_override` (dat 'pensioen' parkeert
+ * zolang de DB-CHECK die waarde niet toestaat) wordt EERST opgelost en dan pas door
+ * `parseFirePlan` gelezen: anders zou een geparkeerd pensioen-plan zijn anker
+ * verliezen en als gewone deplete-run doorgerekend worden.
+ */
+function resolveFirePlan(profile: KernelAdapterProfile): FirePlan {
+  const cfg = resolveFireStrategyWithOverride(profile)
+  return parseFirePlan({ ...profile, fire_end_strategy: cfg.strategy })
+}
+
+/**
+ * Eindstrategie (P!B48-B54) — vanaf ADR 0129 uitsluitend de EIND-VORM.
+ *
+ * Vóór dit besluit droeg de selector ook het stopmoment ('Pensioenleeftijd' /
+ * 'Nu stoppen'); dat reist nu als `KernelInput.stopAnker` (zie `buildStopAnker`),
+ * zodat anker en eind-vorm vrij combineren — bv. "stop op je AOW én laat €100k na op
+ * je 90e", een combinatie die in de oude enum niet uit te drukken was.
+ *
+ * GEVOLG voor bestaande pensioen-rijen: de eindleeftijd komt niet langer uit het
+ * Excel-artefact 100 maar uit de eigen `fire_end_age` (D6/D9). Migratie M1 zet die
+ * kolom op 100 voor precies die rijen, zodat de kernel identiek blijft rekenen —
+ * F2 hoort dus niet live te gaan vóór M1 gedraaid is.
+ *
+ * `nietLiquideMeetellen = 'Nee'` (geen app-veld — open punt); de app kent geen aparte
+ * eind-leeftijden per eind-vorm, dus B51/B52 delen `endAge` en B53 = `legacyAmount`.
  */
 export function buildEindstrategie(profile: KernelAdapterProfile): EindstrategieParams {
-  const cfg = resolveFireStrategyWithOverride(profile)
+  const plan = resolveFirePlan(profile)
   return {
-    selector: FIRE_END_TO_SELECTOR[cfg.strategy],
-    eindleeftijdOpeten: cfg.endAge,
-    eindleeftijdNalatenschap: cfg.endAge,
-    nalatenschapBedrag: cfg.legacyAmount,
+    selector: END_FORM_TO_SELECTOR[plan.endForm],
+    eindleeftijdOpeten: plan.endAge,
+    eindleeftijdNalatenschap: plan.endAge,
+    nalatenschapBedrag: plan.legacyAmount,
     nietLiquideMeetellen: 'Nee',
+  }
+}
+
+/**
+ * Het STOP-ANKER (ADR 0129 D3) — `undefined` onder `solved`, zodat de kernel dan
+ * letterlijk het oude bisectie-pad volgt. De enige plek waar het app-plan een vast
+ * stopmoment de kernel in stuurt; `solver.ts#resolveVastAnker` zet het aan de andere
+ * kant om naar een leeftijd (de AOW-leeftijd komt daar uit `persoon.aowLeeftijd` en
+ * niet uit een hardcoded 67).
+ */
+export function buildStopAnker(profile: KernelAdapterProfile): KernelStopAnker | undefined {
+  const { anchor } = resolveFirePlan(profile)
+  switch (anchor.kind) {
+    case 'solved':
+      return undefined
+    case 'aow':
+      return { soort: 'aow' }
+    case 'now':
+      return { soort: 'nu' }
+    case 'age':
+      return { soort: 'leeftijd', leeftijd: anchor.age }
   }
 }
 

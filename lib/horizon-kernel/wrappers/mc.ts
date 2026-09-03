@@ -181,7 +181,23 @@ function buildBand(startAge: number, paden: readonly number[][]): MonteCarloBand
 
 /**
  * MC!B8 — 1/0-slaagcriterium van een doorgerekende (verstoorde) stand op de live
- * FIRE-leeftijd. Niet-pensioen: `gap ≥ 0`; pensioen: `ROUND(B16,2) ≥ AOW`.
+ * FIRE-leeftijd.
+ *
+ * **Generiek over elk stop-anker (ADR 0129 D3):** `gap ≥ 0` — model ≥ doel op de
+ * eindleeftijd. Dat is de inhoudelijke vraag ("houdt dit plan het?") en hij geldt
+ * even goed wanneer het stopmoment vastligt als wanneer de solver 'm zoekt.
+ *
+ * De **pensioen-oracle-tak** (`ROUND(P!B16,2) ≥ ES!C15`) blijft staan voor de
+ * fixtures — maar alléén op het oracle-pad (geen `stopAnker`-blok). Die toets is
+ * per constructie 1: de solver kortsluit B16 juist naar de AOW-leeftijd, dus MC!B8
+ * vergelijkt een getal met zichzelf. Byte-exact Excel, maar als *slaagkans*
+ * betekenisloos — het is precies waarom de marktcheck voor pensioen-gebruikers
+ * altijd 100% meldde (bevinding 2 van het onderzoek van 3 sep 2026). Zodra het
+ * anker als blok binnenkomt draait ook pensioen een échte simulatie; vastgelegd
+ * als de D9-oracle-afwijking (klasse ADR 0033).
+ *
+ * `outcomes`/`successProbability` blijven daarmee byte-identiek op het fixture-pad:
+ * geen fixture draagt `stopAnker` (`input-from-fixture` zet 'm nooit).
  */
 function successCriterion(
   input: KernelInput,
@@ -189,7 +205,7 @@ function successCriterion(
   proj: ReturnType<typeof runKernelProjection>,
   liveFireAge: number,
 ): number {
-  if (es.interneCode === 'pensioen') {
+  if (es.interneCode === 'pensioen' && input.stopAnker === undefined) {
     // ROUND(P!B16, 2) ≥ ES!C15 (AOW). Live B16 sluit kort naar AOW → altijd 1.
     return Math.round(liveFireAge * 100) / 100 >= es.pensioenleeftijd ? 1 : 0
   }

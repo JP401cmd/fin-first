@@ -64,7 +64,7 @@ import type {
   UnifiedProjectionResult,
   UnifiedProjectionRow,
 } from '@/lib/unified-projection'
-import type { SolveFireResult, SolverStatus } from './solver'
+import { resolveVastAnker, type SolveFireResult, type SolverStatus } from './solver'
 import type { KernelProjection } from './engine'
 import {
   jaarBlokEindMaand,
@@ -78,7 +78,7 @@ import { computeEs, type EindstrategieCode } from './tables/es'
 import type { GebPostHelpers } from './tables/geb'
 import { inflationIndex } from './scaffold'
 import { depletionMonth } from './runway'
-import type { AssetCategorie, KernelInput } from './types'
+import type { AssetCategorie, KernelInput, KernelStopAnker } from './types'
 import { assignAssetSlots, assignDebtSlots } from './adapter/potten'
 
 // ── Bez-categorie-volgorde (identiek aan engine.ts `ASSET_ORDER` + Verdeling) ────
@@ -117,13 +117,41 @@ const CATEGORIE_REP_TYPE: Record<AssetCategorie, AssetType> = {
   Overig: 'other',
 }
 
-/** ES-eindstrategie-code → app-`FireEndStrategy` (1-op-1; 'pensioen' bestaat in beide, 'nu' ↔ 'nu-stoppen'). */
+/**
+ * ES-eindstrategie-code → app-`FireEndStrategy`.
+ *
+ * De drie EIND-VORMEN mappen 1-op-1. `pensioen`/`nu` zijn geen eind-vormen maar de
+ * twee oude, in de enum ingebakken ANKERS (ADR 0129): ze bestaan hier nog omdat het
+ * oracle-pad en de legacy-selector ze nog kunnen leveren. F4 verwijdert beide.
+ */
 const CODE_TO_STRATEGY: Record<EindstrategieCode, FireEndStrategy> = {
   deplete: 'deplete',
   legacy: 'legacy',
   perpetual: 'perpetual',
   pensioen: 'pensioen',
   nu: 'nu-stoppen',
+}
+
+/**
+ * `SimResult.strategy` — de LEGACY-label die ~60 oppervlakken op /toekomst nog als
+ * ANKER lezen (`isPensioenMode`/`isNuStoppenMode`).
+ *
+ * Sinds F2 stuurt de adapter de EIND-VORM als selector plus een los `stopAnker`-blok,
+ * dus `CODE_TO_STRATEGY[code]` alleen zou voor een pensioen-plan ineens `'deplete'`
+ * teruggeven en die zestig takken in één klap stil uitzetten. Tot F3a die takken op
+ * `stopAnker`/`isFixedAnchor(plan)` overzet, projecteert de bridge het anker daarom
+ * terug op de oude label. Het `age`-anker heeft geen legacy-label (en geen UI vóór
+ * F3b) en valt op de eind-vorm terug.
+ *
+ * Dit is een BEWUSTE compat-projectie, geen tweede waarheid: de canonieke feiten zijn
+ * `stopAnker` (welk anker) en `displayEndAge`/`targetEndPortfolio` (welke eind-vorm).
+ * F3a maakt de lezers anker-bewust, F4 verwijdert deze functie.
+ */
+function resolveLegacyStrategy(input: KernelInput, code: EindstrategieCode): FireEndStrategy {
+  const soort = input.stopAnker?.soort
+  if (soort === 'aow') return 'pensioen'
+  if (soort === 'nu') return 'nu-stoppen'
+  return CODE_TO_STRATEGY[code]
 }
 
 /** Per-slot app-koppeling (asset): fysiek kern-slot → app-`AssetType` + app-id. */
@@ -209,6 +237,41 @@ export interface KernelUnifiedResult extends UnifiedProjectionResult {
    * en de eindstrategie lezen alle drie dit ene veld uit dezelfde run.
    */
   readonly kernelDepletionMonth: number | null
+  /**
+   * Echo van `KernelInput.stopAnker` (ADR 0129 D3) — het stop-anker waarmee DEZE run
+   * gerekend heeft, of `null` wanneer de solver het stopmoment zelf heeft gezocht.
+   *
+   * DOORGEVEN, niet afleiden: elk oppervlak dat wil weten of het stopmoment vastligt
+   * leest dit veld (F3a vervangt er `isPensioenMode`/`isNuStoppenMode` mee), zodat er
+   * niet opnieuw twee predicaten voor één feit ontstaan.
+   */
+  readonly stopAnker: KernelStopAnker | null
+  /**
+   * De maandindex van het stopmoment (maand 0 = vandaag) — `round((ankerLeeftijd −
+   * startLeeftijd)·12)` — of `null` zonder vast anker.
+   *
+   * Voedt de dekking (`computeRunwayCoveragePct`, D5): die meet hoe ver het geld
+   * reikt NÁ het stopmoment, niet vanaf vandaag. Onder het `nu`-anker is dit 0 en
+   * valt de formule samen met de ADR 0126/0127-vorm.
+   *
+   * Kan NEGATIEF zijn: een AOW-anker bij iemand die de AOW al voorbij is. De dekking
+   * behandelt dat als "stopmoment is gepasseerd" (noemer krimpt niet verder).
+   */
+  readonly ankerMaand: number | null
+  /**
+   * `true` ⇒ het stopmoment ligt VAST, dus `requiredFirePortfolio`/
+   * `requiredFireNetWorth` zijn de GEPROJECTEERDE stand op het anker en géén
+   * "benodigd vermogen" (ADR 0129 D4). De kernel bisecteert onder een vast anker op
+   * TIJD, niet op kapitaal — het doelvermogen is dan betekenisloos, ongeacht wélk
+   * anker het is.
+   *
+   * Generalisatie van `requiredFireIsStartPortfolio` (ADR 0127 D4, alleen geldig op
+   * FIRE-maand 0). Beide velden staan er tijdens de overgang naast elkaar: de oude
+   * blijft exact zijn huidige waarde houden zodat F2 gedragsbehoudend is; F3a zet de
+   * lezers over op dit veld en F4 verwijdert de oude. De grep op de oude naam is de
+   * voortgangsmeter van F3a.
+   */
+  readonly requiredFireIsAnchorPortfolio: boolean
 }
 
 // ── m-accessors (guard voorbij-horizon / lege cellen → 0) ────────────────────
@@ -821,6 +884,10 @@ export function kernelToUnifiedResult(
   // `simRequiredPortfolio`/`simRequiredNetWorth` op null). Spiegel van de
   // eind-horizon-vlag hierboven: markeren, niet stil corrigeren.
   const requiredFireIsStartPortfolio = fireMonth === 0
+  // ADR 0129 D4 — hetzelfde feit, generiek over elk VAST anker: J op het anker is een
+  // geprojecteerde pot, geen benodigd vermogen. Staat naast (niet in plaats van) de
+  // ADR 0127-vlag hierboven, zodat F2 gedragsbehoudend blijft; F3a zet de lezers over.
+  const requiredFireIsAnchorPortfolio = input.stopAnker !== undefined
   const requiredFirePortfolio = summary.nettoLiquideBijFire ?? summary.eindNettoLiquide
   const firePortfolioAtFire = requiredFirePortfolio
 
@@ -842,7 +909,16 @@ export function kernelToUnifiedResult(
       ? yearlyExpensesNominal / requiredFirePortfolio
       : 0
 
-  const strategy = CODE_TO_STRATEGY[computeEs(input).interneCode]
+  const es = computeEs(input)
+  const strategy = resolveLegacyStrategy(input, es.interneCode)
+  // Het stopmoment als maandindex (ADR 0129 D5). BEWUST uit `resolveVastAnker` en
+  // niet uit `solve.fireAge`: op een GEFORCEERDE run (`evaluateFireAt`, bv. een
+  // stop-scenariokaart) is `fireAge` de geforceerde leeftijd van díe kaart, terwijl
+  // het anker van het plan onveranderd blijft. Eén home voor de anker-resolutie.
+  const stopAnker = input.stopAnker ?? null
+  const ankerLeeftijd = resolveVastAnker(input, es)
+  const ankerMaand =
+    ankerLeeftijd === null ? null : Math.round((ankerLeeftijd - input.startLeeftijd) * 12)
 
   // ── Verkoopmoment eigen woning (marker-contract) ───────────────────────────
   // Eerste in-horizon-maand met Bez!AZ-opbrengst > 0; leeftijd op dezelfde as als
@@ -893,6 +969,9 @@ export function kernelToUnifiedResult(
     requiredFireNetWorth,
     requiredFireIsEndOfHorizonFallback,
     requiredFireIsStartPortfolio,
+    requiredFireIsAnchorPortfolio,
+    stopAnker,
+    ankerMaand,
     implicitWithdrawalRate,
     strategy,
     targetEndPortfolio: solve.doelbedrag,

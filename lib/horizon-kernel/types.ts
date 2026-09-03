@@ -840,4 +840,46 @@ export interface KernelInput {
    * gedocumenteerde conventie (ADR 0020-inverse) en geen onderdeel van dit besluit.
    */
   readonly echteAnnuiteitAflossing?: boolean
+
+  /**
+   * **Buiten oracle-domein (ADR 0129 D3, fase F2).** Het STOP-ANKER van het plan:
+   * ligt het stopmoment vast, en zo ja waarop?
+   *
+   * Tot dit besluit droeg de eindstrategie-selector twee vragen tegelijk: *wat moet
+   * er aan het eind gelden* (opeten/nalatenschap/eeuwigdurend) én *wanneer stop ik*
+   * ('Pensioenleeftijd' = AOW, 'Nu stoppen' = vandaag). Beide ankers hadden een
+   * eigen kortsluiting in `solveFire`, elk met een eigen eindleeftijd-regel, eigen
+   * statusnaam, eigen Monte-Carlo-tak en eigen marge-anker — zeven van de twaalf
+   * combinaties (bv. "stop op je AOW én laat €100k na op je 90e") waren daardoor
+   * onuitdrukbaar.
+   *
+   * Dit blok is de ENIGE plek waar een vast stopmoment de kernel binnenkomt;
+   * `solver.ts#resolveVastAnker` is de enige plek die het naar een leeftijd omzet.
+   * De eind-vorm blijft volledig in `eindstrategie.selector` zitten (die daarmee
+   * terug is bij de vier Excel-waarden), zodat anker en eind-vorm vrij combineren.
+   *
+   * Weggelaten ⇒ **letterlijk het oude gedrag**: `interneCode === 'pensioen'`
+   * kortsluit nog op de AOW-leeftijd (het oracle-pad), alles anders bisecteert.
+   * `input-from-fixture` zet dit veld nooit, dus de 736 parity-fixtures blijven
+   * byte-identiek (patroon `tekortAflossingUitLiquide`). De app-adapter
+   * (`adapter/params.ts#buildStopAnker`) zet 'm zodra het plan een vast anker draagt.
+   */
+  readonly stopAnker?: KernelStopAnker
 }
+
+/**
+ * Het vaste stopmoment van een plan (ADR 0129 D3). Drie vormen; het vierde
+ * app-anker (`solved` — "laat de app het uitrekenen") is de AFWEZIGHEID van dit
+ * blok, niet een variant erin: zo blijft "geen anker" letterlijk het oude,
+ * oracle-getrouwe bisectie-pad.
+ *
+ *  - `aow`      — het AOW-moment uit `persoon.aowLeeftijd` (ES!C15).
+ *  - `nu`       — de startleeftijd (P!B7, FIRE-maand 0).
+ *  - `leeftijd` — een zelfgekozen stopleeftijd (halve jaren toegestaan; de kernel
+ *                 rekent fractioneel). Wordt door `resolveVastAnker` geklemd op
+ *                 `[startLeeftijd, eindleeftijd − 1/12]`.
+ */
+export type KernelStopAnker =
+  | { readonly soort: 'aow' }
+  | { readonly soort: 'nu' }
+  | { readonly soort: 'leeftijd'; readonly leeftijd: number }

@@ -37,11 +37,11 @@ import {
 import type { MarktcheckOutcome } from '@/lib/horizon-kernel/marktcheck'
 import {
   runForcedStopPath,
-  runScenarioPresets,
+  runScenarioPresetBatch,
   type ForcedStopPathInput,
   type ForcedStopPathResult,
+  type ScenarioPresetBatch,
   type ScenarioPresetContext,
-  type ScenarioPresetResult,
 } from '@/lib/horizon/scenario-presets'
 import {
   runMonteCarlo,
@@ -110,7 +110,7 @@ export type KernelWorkerRequest =
 export type KernelWorkerResponse =
   | { readonly id: number; readonly ok: true; readonly kind: 'projection'; readonly result: ConvergentieProjectionOutcome }
   | { readonly id: number; readonly ok: true; readonly kind: 'stoppad'; readonly result: ForcedStopPathResult | null }
-  | { readonly id: number; readonly ok: true; readonly kind: 'presets'; readonly result: ScenarioPresetResult[] }
+  | { readonly id: number; readonly ok: true; readonly kind: 'presets'; readonly result: ScenarioPresetBatch }
   | { readonly id: number; readonly ok: true; readonly kind: 'taxvarianten'; readonly result: VariantenSweepResultaat }
   | { readonly id: number; readonly ok: true; readonly kind: 'mc'; readonly result: MonteCarloResult }
   | { readonly id: number; readonly ok: true; readonly kind: 'marktcheck'; readonly result: MarktcheckOutcome }
@@ -138,7 +138,9 @@ export function executeKernelRequest(req: KernelWorkerRequest): KernelWorkerResp
       case 'stoppad':
         return { id: req.id, ok: true, kind: 'stoppad', result: runForcedStopPath(req.input) }
       case 'presets':
-        return { id: req.id, ok: true, kind: 'presets', result: runScenarioPresets(req.ctx) }
+        // ADR 0129 D7 — de zes kaarten + de tweede run ("vrij mogelijk vanaf") in ÉÉN
+        // oversteek; zie `runScenarioPresetBatch`.
+        return { id: req.id, ok: true, kind: 'presets', result: runScenarioPresetBatch(req.ctx) }
       case 'taxvarianten':
         return {
           id: req.id,

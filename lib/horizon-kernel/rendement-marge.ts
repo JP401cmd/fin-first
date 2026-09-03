@@ -24,6 +24,9 @@
  * −0,06…+0,10 op de afgeronde. Het anker is daarom een VASTE, voor de gebruiker
  * betekenisvolle leeftijd:
  *
+ *  0. **het VASTE stopmoment van het plan** (`KernelInput.stopAnker`, ADR 0129 D3) —
+ *     staat het stopmoment vast (AOW · nu · zelfgekozen leeftijd), dan is dát het
+ *     anker en wint een sliderwaarde er niet van.
  *  1. **de gekozen stopleeftijd** (`stopAge`, de stop-slider van /toekomst — ook
  *     de bron van de stop-marge-band en de doel-lijn). Dan meet de marge precies
  *     het plan dat de gebruiker maakt, en beweegt hij mee met de slider.
@@ -62,6 +65,7 @@ import { RENDEMENT_MARGE_GRENS } from '@/lib/constants'
 import { runKernelProjection } from './engine'
 import { computeEs, type EsRow } from './tables/es'
 import { computeGap, eindleeftijdVan } from './gap'
+import { resolveVastAnker } from './solver'
 import { potRisicoFactor } from './wrappers/risico'
 import type { KernelInput } from './types'
 
@@ -80,11 +84,19 @@ import type { KernelInput } from './types'
 export const RENDEMENT_MARGE_ITERATIES = 12
 
 /**
- * Waar de vaste toets-leeftijd vandaan komt. `'nu'` (ADR 0127): eindstrategie
- * 'Nu stoppen' ankert op de startleeftijd — zonder deze tak zou de marge terugvallen
- * op AOW en een ánder plan doorrekenen dan de hoofdlijn.
+ * Waar de vaste toets-leeftijd vandaan komt.
+ *
+ *  - `'nu'`/`'aow'`/`'anker'` — het plan heeft een VAST stopmoment (ADR 0129 D3):
+ *    respectievelijk het `nu`-anker, het AOW-anker en een zelfgekozen stopleeftijd.
+ *    Een meegegeven sliderwaarde wint daar NIET van; zie `resolveMargeAnker`.
+ *  - `'stopkeuze'` — geen vast anker, maar de gebruiker verkent een stopmoment met
+ *    de slider.
+ *  - `'aow'` is óók de TERUGVAL zonder anker en zonder sliderwaarde (altijd bekend,
+ *    komt niet uit de solver). Anker en terugval delen bewust één lid: de copy zegt
+ *    in beide gevallen hetzelfde ("op je AOW-leeftijd"), en het onderscheid is voor
+ *    de lezer betekenisloos.
  */
-export type MargeAnker = 'stopkeuze' | 'aow' | 'nu'
+export type MargeAnker = 'stopkeuze' | 'aow' | 'nu' | 'anker'
 
 /** De uitkomst van één marge-bepaling. */
 export interface RendementMarge {
@@ -116,8 +128,22 @@ export function resolveMargeAnker(
   es: EsRow = computeEs(input),
 ): { readonly leeftijd: number; readonly anker: MargeAnker } | null {
   const eindleeftijd = eindleeftijdVan(es)
-  // 'Nu stoppen' (ADR 0127 D6): het plan stopt vandaag, dus de marge toetst op de
-  // startleeftijd — een meegegeven stopkeuze zou een ander plan doorrekenen.
+
+  // ── Ligt het stopmoment VAST? Dan is dát het anker (ADR 0129 D3) ─────────────
+  // Een meegegeven sliderwaarde wint hier NIET van: de slider is een verkenning,
+  // het anker is het plan. Vóór dit besluit overschreef de stop-slider het anker
+  // van een pensioen-plan, waardoor de marge een ánder plan doorrekende dan de
+  // hoofdlijn ernaast (bevinding 5 van het onderzoek van 3 sep 2026). Voor het
+  // `nu`-anker bestond die bescherming al (ADR 0127 D6); nu geldt ze voor alle drie.
+  const vastAnker = resolveVastAnker(input, es)
+  if (vastAnker !== null) {
+    if (vastAnker < input.startLeeftijd) return null
+    if (vastAnker >= eindleeftijd) return null
+    const soort = input.stopAnker?.soort
+    return { leeftijd: vastAnker, anker: soort === 'nu' ? 'nu' : soort === 'aow' ? 'aow' : 'anker' }
+  }
+
+  // Legacy-staart (ADR 0127-selector 'Nu stoppen' zónder anker-blok); F4 verwijdert 'm.
   if (es.interneCode === 'nu') {
     const leeftijd = input.startLeeftijd
     if (leeftijd >= eindleeftijd) return null

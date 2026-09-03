@@ -21,6 +21,8 @@ import {
   runScenarioPreset,
   resolveScenarioPresets,
   runForcedStopPath,
+  runScenarioPresetBatch,
+  solveFireAgeWithoutAnchor,
   SCENARIO_PRESET_SPECS,
   type ScenarioPresetContext,
 } from './scenario-presets'
@@ -401,5 +403,44 @@ describe('stop-nu-kaart — geforceerde stop op de kernel-startleeftijd', () => 
     const run = runForcedStopPath({ ...base, stopAge: 'nu', endStrategy: 'inherit' })!
     expect(run.result.strategy).toBe('perpetual')
     expect(run.result.displayEndAge).toBe(100)
+  })
+})
+
+/**
+ * ADR 0129 D7/B9 — **de tweede run.** Onder een vast stopmoment beantwoordt de hoofdrun
+ * "kan ik op X stoppen?"; "vrij mogelijk vanaf …" is dan een APARTE, gesolvede run
+ * zonder anker. Die draait in dezelfde worker-batch als de zes kaarten, niet per widget.
+ */
+describe('solveFireAgeWithoutAnchor — "vrij mogelijk vanaf" (D7/B9)', () => {
+  const ankerProfiel: ConvergentieRawProfileRow = { ...profile, fire_stop_anchor: 'age', fire_stop_age: 62 }
+
+  it('onder `solved` is er geen tweede run: null (de hoofdrun ÍS de opgeloste run)', () => {
+    expect(solveFireAgeWithoutAnchor(makeCtx())).toBeNull()
+    expect(runScenarioPresetBatch(makeCtx()).solvedFireAge).toBeNull()
+  })
+
+  it('onder een vast anker levert hij de leeftijd die de bisectie ZONDER anker vindt', () => {
+    const solved = solveFireAgeWithoutAnchor(makeCtx({ profile: ankerProfiel }))
+    // Exact de leeftijd van de ankerloze basislijn — geen benadering, dezelfde motor
+    // op dezelfde invoer met alleen het anker weg.
+    expect(solved).toBe(VERWACHT_FIRE)
+    expect(solved).not.toBe(62)
+  })
+
+  it('de hoofdrun blijft ondertussen op het ANKER staan (twee vragen, twee antwoorden)', () => {
+    const batch = runScenarioPresetBatch(makeCtx({ profile: ankerProfiel }))
+    const basis = batch.presets.find((p) => p.id === 'basis')
+    expect(basis?.fireAgeFractional).toBe(62)
+    expect(batch.solvedFireAge).toBe(VERWACHT_FIRE)
+  })
+
+  it('AOW-anker: hetzelfde patroon (de opgeloste leeftijd ligt vóór de AOW)', () => {
+    const solved = solveFireAgeWithoutAnchor(makeCtx({ profile: { ...profile, fire_stop_anchor: 'aow' } }))
+    expect(solved).toBe(VERWACHT_FIRE)
+  })
+
+  it('een onbruikbaar profiel degradeert zichtbaar naar null (geen throw, geen verzonnen leeftijd)', () => {
+    const kapot = makeCtx({ profile: { ...ankerProfiel, date_of_birth: null } })
+    expect(solveFireAgeWithoutAnchor(kapot)).toBeNull()
   })
 })

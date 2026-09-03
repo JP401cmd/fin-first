@@ -4,7 +4,7 @@
  *
  *  - `runKernelAsync(rawContext)`   → hoofd- én scenario-projectie
  *  - `runForcedStopPathAsync(input)`→ het gekozen-stop-pad
- *  - `runScenarioPresetsAsync(ctx)` → de vijf preset-kaarten (~5 solves)
+ *  - `runScenarioPresetsAsync(ctx)` → de zes preset-kaarten + de tweede run (ADR 0129 D7)
  *  - `runMarktcheckAsync(ctx)`      → kernel-marktcheck (percentielband /toekomst)
  *  - `runMonteCarloAsync(...)`      → losstaande legacy-MC (fase-modals/radar)
  *
@@ -37,8 +37,8 @@ import type { MarktcheckOutcome } from '@/lib/horizon-kernel/marktcheck'
 import type {
   ForcedStopPathInput,
   ForcedStopPathResult,
+  ScenarioPresetBatch,
   ScenarioPresetContext,
-  ScenarioPresetResult,
 } from '@/lib/horizon/scenario-presets'
 import type { FinancialInput, FutureCashflow, MonteCarloResult } from '@/lib/horizon-data'
 import type {
@@ -188,13 +188,17 @@ export async function runForcedStopPathAsync(
   return null
 }
 
-/** Vijf scenario-preset-kaarten via de worker (of synchrone fallback). */
+/**
+ * De scenario-batch via de worker (of synchrone fallback): de zes preset-kaarten PLUS
+ * de tweede run ("vrij mogelijk vanaf", ADR 0129 D7). Bewust één oversteek — zie
+ * `runScenarioPresetBatch`. Bij een worker-fout: lege kaarten, geen opgeloste leeftijd.
+ */
 export async function runScenarioPresetsAsync(
   ctx: ScenarioPresetContext,
-): Promise<ScenarioPresetResult[]> {
+): Promise<ScenarioPresetBatch> {
   const res = await dispatch({ id: claimId(), kind: 'presets', ctx })
   if (res.ok && res.kind === 'presets') return res.result
-  return []
+  return { presets: [], solvedFireAge: null }
 }
 
 /**

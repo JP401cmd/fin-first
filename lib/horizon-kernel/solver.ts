@@ -4,8 +4,11 @@
  * B93-B100 (formules in `docs/horizon-oracle/structuur.md`).
  *
  * Algoritme (VBA-getrouw, geen "slimmer" zoeken):
- *  1. Eindstrategie "pensioen" (ES!C7): kortsluiting — B16 = ES!C15
- *     (AOW-/pensioenleeftijd), géén bisectie.
+ *  0. `KernelInput.stopAnker` aanwezig (ADR 0129 D3, buiten oracle-domein): het
+ *     stopmoment ligt vast — B16 = `resolveVastAnker(...)`, géén bisectie. Geen
+ *     fixture draagt dit blok, dus de parity blijft byte-identiek.
+ *  1. Eindstrategie "pensioen" (ES!C7) zónder anker-blok: kortsluiting — B16 =
+ *     ES!C15 (AOW-/pensioenleeftijd), géén bisectie. Dit is het oracle-pad.
  *  2. Anders: hiM = CLng((100 − leeftijd)·12); evalueer de gap op de horizon.
  *     Gap < 0 → NIET haalbaar: B16 blijft op de horizon geparkeerd
  *     (`unreachable_within_horizon`, met €/mnd-hint).
@@ -41,8 +44,8 @@
  */
 
 import { runKernelProjection, type KernelProjection } from './engine'
-import { clng, computeDoelblok, computeGap, prognoseJ } from './gap'
-import { computeEs } from './tables/es'
+import { clng, computeDoelblok, computeGap, eindleeftijdVan, prognoseJ } from './gap'
+import { computeEs, type EsRow } from './tables/es'
 import type { KernelInput } from './types'
 
 // NB (calc-review): de bisectie- en horizon-toetsen op de gap zijn bewust STRIKT
@@ -54,11 +57,17 @@ import type { KernelInput } from './types'
 // wrappers/band.ts (identieke bisectie).
 
 /**
- * P!B93/B100 — de vier solver-statussen (exacte Excel-teksten) plus
- * `stop_now_shortfall` (ADR 0127, buiten oracle-domein): bij eindstrategie 'Nu
- * stoppen' springt de tekort-lening aan vóór de eigen eindleeftijd. BEWUST geen
- * hergebruik van `pension_shortfall` — dat draagt AOW-kopij, terwijl dit tekort
- * ook vóór de AOW kan vallen.
+ * P!B93/B100 — de vier solver-statussen (exacte Excel-teksten) plus twee
+ * anker-statussen buiten het oracle-domein:
+ *
+ *  - `anchor_shortfall` (ADR 0129 D3) — onder een VAST stopmoment springt de
+ *    tekort-lening aan vóór de eindleeftijd van het plan. Generiek over de drie
+ *    vaste ankers; BEWUST geen hergebruik van `pension_shortfall`, want dat draagt
+ *    AOW-kopij terwijl dit tekort ook vóór óf ná de AOW kan vallen.
+ *  - `stop_now_shortfall` (ADR 0127) — dezelfde uitkomst onder het `nu`-anker.
+ *    Blijft in F2 bestaan omdat de /toekomst-statusblokken deze naam nog lezen
+ *    (F3b generaliseert ze naar `anchor_shortfall`, F4 verwijdert dit lid); hij
+ *    wordt niet meer gezet voor de NIEUWE ankers (`aow`/`leeftijd`).
  */
 export type SolverStatus =
   | 'reached_now'
@@ -66,6 +75,43 @@ export type SolverStatus =
   | 'unreachable_within_horizon'
   | 'pension_shortfall'
   | 'stop_now_shortfall'
+  | 'anchor_shortfall'
+
+/**
+ * **De enige plek die een vast stopmoment naar een leeftijd omzet** (ADR 0129 D3).
+ *
+ * Vervangt de twee kortsluitingen die hier stonden ('Pensioenleeftijd' → AOW,
+ * 'Nu stoppen' → startleeftijd): allebei hetzelfde patroon, allebei apart
+ * geschreven, allebei met hun eigen status/eindleeftijd/MC-tak eromheen.
+ *
+ *  - `aow`      → `persoon.aowLeeftijd` (ES!C15). BEWUST ONgeklemd: precies zoals de
+ *                 oude pensioen-kortsluiting. Ligt de AOW-leeftijd vóór de huidige
+ *                 leeftijd (iemand die al mét pensioen is), dan geeft dat een
+ *                 NEGATIEVE FIRE-maand — de engine draait die run als "vanaf maand 0
+ *                 volledig in onttrekking" en `nettoLiquideBijFire` valt op `null`
+ *                 (bridge-terugval op de eind-horizonstand). Vastgepind in
+ *                 `anker.test.ts` ("negatieve FIRE-maand").
+ *  - `nu`       → `startLeeftijd` (P!B7, hele jaren — NOOIT de fractionele leeftijd:
+ *                 47,6 zou FIRE-maand 7 geven en is dan niet "nu").
+ *  - `leeftijd` → geklemd op `[startLeeftijd, eindleeftijd − 1/12]` (besluit B7: een
+ *                 stopleeftijd in het verleden gedraagt zich als "nu"; op of voorbij
+ *                 de eindleeftijd bestaat er geen onttrekkingsfase meer om te toetsen,
+ *                 dus de kernel schuift 'm één maand naar binnen — de app weigert die
+ *                 invoer al aan de rand met een 400).
+ *
+ * `null` = geen vast anker ⇒ de aanroeper volgt het oude pad (oracle-kortsluiting bij
+ * `interneCode === 'pensioen'`, anders bisectie).
+ */
+export function resolveVastAnker(input: KernelInput, es: EsRow): number | null {
+  const anker = input.stopAnker
+  if (anker === undefined) return null
+  if (anker.soort === 'aow') return es.pensioenleeftijd
+  if (anker.soort === 'nu') return input.startLeeftijd
+  const ondergrens = input.startLeeftijd
+  const bovengrens = eindleeftijdVan(es) - 1 / 12
+  if (!Number.isFinite(anker.leeftijd)) return ondergrens
+  return Math.min(Math.max(anker.leeftijd, ondergrens), Math.max(ondergrens, bovengrens))
+}
 
 export interface SolveFireResult {
   /** P!B16 — gevonden FIRE-leeftijd (bij unreachable: geparkeerd op de horizon). */
@@ -168,11 +214,22 @@ function computeStatusBlok(
   let status: SolverStatus
   if (code === 'pensioen' && tekortLening > 0) {
     status = 'pension_shortfall'
+  } else if (input.stopAnker !== undefined && tekortLening > 0) {
+    // ADR 0129 D3 — VAST ANKER: het geld reikt niet tot de eindleeftijd van het plan.
+    // Bij doel €0 mét `tekortAflossingUitLiquide` kan `gap < 0` niet zonder
+    // tekort-lening > 0, dus de M6-schijnbereik-tak hieronder is voor élk vast anker
+    // met een deplete-eindvorm onbereikbaar (vastgepind in anker.test.ts): de status
+    // is óf deze, óf `reached_now`.
+    //
+    // F2-COMPAT-STAART (F4 verwijdert deze regel): het `nu`-anker houdt zijn ADR
+    // 0127-naam, omdat de statusblokken op /toekomst nog letterlijk op
+    // `stop_now_shortfall` matchen. Zou het nu-anker meteen `anchor_shortfall`
+    // gaan heten, dan viel dát blok stil weg zonder dat er iets voor in de plaats komt.
+    status = input.stopAnker.soort === 'nu' ? 'stop_now_shortfall' : 'anchor_shortfall'
   } else if (code === 'nu' && tekortLening > 0) {
-    // ADR 0127 D2 — stop-nu: het geld reikt niet tot de eigen eindleeftijd. Bij doel
-    // €0 mét `tekortAflossingUitLiquide` kan `gap < 0` niet zonder tekort-lening > 0,
-    // dus de M6-schijnbereik-tak hieronder wordt voor 'nu' nooit bereikt (vastgepind
-    // in nu-stoppen.test.ts): de status is óf dit, óf `reached_now`.
+    // Legacy-staart (ADR 0127): de eindstrategie-selector 'Nu stoppen' zónder
+    // `stopAnker`-blok. De app-adapter stuurt die selector sinds F2 niet meer
+    // (het anker reist als blok); F4 verwijdert de selector én deze tak.
     status = 'stop_now_shortfall'
   } else if (schijnbereik) {
     status = 'unreachable_within_horizon'
@@ -230,20 +287,22 @@ export function solveFire(input: KernelInput): SolveFireResult {
     }
   }
 
-  // ── Pensioenleeftijd: FIRE = AOW-leeftijd, geen bisectie ────────────────────
-  if (es.interneCode === 'pensioen') {
-    const fireAge = es.pensioenleeftijd
-    return afronden(fireAge, run(fireAge))
+  // ── VAST STOPMOMENT: FIRE = het anker, geen bisectie (ADR 0129 D3) ──────────
+  //    Eén resolutie voor alle drie de vaste ankers (AOW · nu · zelfgekozen
+  //    leeftijd), i.p.v. een kortsluiting per anker. Zo erft élke solveFire-consument
+  //    (convergentie-, household-, whatif-, scalar-router, Monte-Carlo, marktcheck,
+  //    kernel-report, gouden matrix) het anker zonder eigen tak. Bij FIRE-maand 0
+  //    regelt de engine het guardrails-anker zelf (T0-stand).
+  const vastAnker = resolveVastAnker(input, es)
+  if (vastAnker !== null) {
+    return afronden(vastAnker, run(vastAnker))
   }
 
-  // ── Nu stoppen (ADR 0127 D1): FIRE = startleeftijd P!B7 (hele jaren, maand 0), ──
-  //    geen bisectie — precies het pensioen-patroon, maar op vandaag. NOOIT de
-  //    fractionele leeftijd: 47,6 zou FIRE-maand 7 geven en is dan niet "nu". Zo erft
-  //    élke solveFire-consument (convergentie-, household-, whatif-, scalar-router,
-  //    Monte-Carlo, marktcheck, kernel-report, gouden matrix) het anker zonder eigen
-  //    tak. Het guardrails-anker regelt de engine zelf op FIRE-maand 0 (T0-stand).
-  if (es.interneCode === 'nu') {
-    const fireAge = leeftijd
+  // ── Pensioenleeftijd zónder anker-blok: het ORACLE-pad, ongewijzigd ─────────
+  //    De Excel-macro kortsluit B16 op ES!C15. Dit pad draagt de 736 fixtures; de
+  //    app stuurt sinds F2 `stopAnker: {soort:'aow'}` en komt hier niet meer langs.
+  if (es.interneCode === 'pensioen') {
+    const fireAge = es.pensioenleeftijd
     return afronden(fireAge, run(fireAge))
   }
 

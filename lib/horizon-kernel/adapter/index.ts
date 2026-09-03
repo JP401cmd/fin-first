@@ -47,6 +47,7 @@ import {
   buildOnttrekkingsprofiel,
   buildOnzekerheid,
   buildPersoonTijdas,
+  buildStopAnker,
   buildStrategieSelectors,
   buildWoning,
   resolveDeficitLoanRate,
@@ -226,6 +227,10 @@ export function buildKernelInputFromAppWithNotices(input: KernelAdapterInput): K
     // fixture-pad zet deze vlag NIET én vult geen `annuiteitMaandlast`
     // (input-from-fixture) → Excel v5-oracle byte-identiek.
     echteAnnuiteitAflossing: true,
+    // ADR 0129 D3 — het STOP-ANKER van het plan (`aow`/`nu`/gekozen leeftijd), of
+    // weggelaten onder `solved`. Weglaten ⇒ letterlijk het oude gedrag; het
+    // fixture-pad (input-from-fixture) zet 'm nooit → 736 fixtures byte-identiek.
+    stopAnker: buildStopAnker(profile),
   }
 
   return {
@@ -264,6 +269,7 @@ export {
   buildInkomenUitgaven,
   buildOnttrekkingsprofiel,
   buildPersoonTijdas,
+  buildStopAnker,
   buildWoning,
   resolveDeficitLoanRate,
 } from './params'

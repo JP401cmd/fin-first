@@ -26,6 +26,7 @@ import {
   type WithdrawalStrategyConfig,
 } from '@/lib/withdrawal-strategy'
 import type { Box3Method } from '@/lib/bucket-projection'
+import type { KernelStopAnker } from '@/lib/horizon-kernel/types'
 
 // ── Per-asset-type bucket detail ────────────────────────────────────────────
 
@@ -584,6 +585,23 @@ export interface UnifiedProjectionResult {
    */
   requiredFireIsStartPortfolio?: boolean
   /**
+   * `true` ⇒ het stopmoment ligt VAST (ADR 0129 D4) — `requiredFirePortfolio`/
+   * `requiredFireNetWorth` zijn dan de GEPROJECTEERDE stand op het anker, geen
+   * benodigd vermogen. Generalisatie van `requiredFireIsStartPortfolio`; die twee
+   * staan tijdens de overgang naast elkaar (F3a zet de lezers over, F4 ruimt op).
+   */
+  requiredFireIsAnchorPortfolio?: boolean
+  /**
+   * Het stop-anker waarmee deze run gerekend heeft, of `null`/afwezig wanneer de
+   * solver het stopmoment zelf zocht (ADR 0129 D3). Doorgeven, niet afleiden.
+   */
+  stopAnker?: KernelStopAnker | null
+  /**
+   * Maandindex van het stopmoment (maand 0 = nu), of `null` zonder vast anker.
+   * Noemer-verschuiver van de dekking (`computeRunwayCoveragePct`, D5).
+   */
+  ankerMaand?: number | null
+  /**
    * Eerste AANHOUDENDE maand (maand 0 = nu) waarin Prognose!J op is, of `null`
    * (ADR 0126, `depletionMonth`). Alleen het kernel-pad zet dit; onder 'nu-stoppen'
    * voedt het de tijdsdekking-vrijheidsvoortgang (`computeRunwayCoveragePct`).
@@ -702,6 +720,9 @@ export function toSimResult(result: UnifiedProjectionResult): SimResult {
     requiredFireNetWorth: result.requiredFireNetWorth,
     requiredFireIsEndOfHorizonFallback: result.requiredFireIsEndOfHorizonFallback,
     requiredFireIsStartPortfolio: result.requiredFireIsStartPortfolio,
+    requiredFireIsAnchorPortfolio: result.requiredFireIsAnchorPortfolio,
+    stopAnker: result.stopAnker,
+    ankerMaand: result.ankerMaand,
     kernelDepletionMonth: result.kernelDepletionMonth,
     fireReachable: result.fireReachable,
     implicitWithdrawalRate: result.implicitWithdrawalRate,

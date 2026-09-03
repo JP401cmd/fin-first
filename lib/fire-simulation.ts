@@ -25,6 +25,7 @@ import {
   type WerkMetadata,
 } from '@/lib/horizon-data'
 import { type FireEndStrategy } from '@/lib/fire-strategy'
+import type { KernelStopAnker } from '@/lib/horizon-kernel/types'
 import { werkMetadataToCashflows } from '@/lib/werk-strategie'
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -116,6 +117,21 @@ export interface SimResult {
    * additief (stub-/mock-`SimResult`s blijven geldig).
    */
   requiredFireIsStartPortfolio?: boolean
+  /**
+   * `true` ⇒ het stopmoment ligt VAST (ADR 0129 D4, elk vast anker): het "benodigde"
+   * bedrag is de geprojecteerde stand op het anker, geen doelbedrag. Generalisatie
+   * van `requiredFireIsStartPortfolio`; beide staan er tijdens de overgang naast
+   * elkaar (F3a zet de lezers over, F4 verwijdert de oude).
+   */
+  requiredFireIsAnchorPortfolio?: boolean
+  /**
+   * Het stop-anker van deze run (ADR 0129 D3), of `null` wanneer de solver het
+   * stopmoment zelf zocht. DE toets op "ligt het stopmoment vast" — geen tweede
+   * predicaat via de strategienaam.
+   */
+  stopAnker?: KernelStopAnker | null
+  /** Maandindex van het stopmoment (maand 0 = nu); `null` zonder vast anker. */
+  ankerMaand?: number | null
   /**
    * Eerste aanhoudende uitputtingsmaand van Prognose!J (maand 0 = nu) of `null`
    * (ADR 0126). Kernel-pad only; voedt onder 'nu-stoppen' de tijdsdekking.

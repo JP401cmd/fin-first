@@ -111,6 +111,10 @@ export interface WhatifRawProfileRow {
   fire_end_strategy?: string | null
   fire_end_age?: number | null
   fire_legacy_amount?: number | string | null
+  /** ADR 0129 D1 — stop-anker (`solved`/`aow`/`now`/`age`). */
+  fire_stop_anchor?: string | null
+  /** ADR 0129 D1 — zelfgekozen stopleeftijd (halve jaren). */
+  fire_stop_age?: number | string | null
   feature_preferences?: Record<string, unknown> | null
   withdrawal_strategy?: string | null
   guardrail_floor?: number | null
@@ -164,6 +168,11 @@ export function buildWhatifKernelAdapterInput(
     fire_end_strategy: p.fire_end_strategy ?? null,
     fire_end_age: p.fire_end_age ?? null,
     fire_legacy_amount: p.fire_legacy_amount ?? null,
+    // ADR 0129 D3 — het stop-anker moet ook op het what-if-pad meereizen; zonder deze
+    // twee regels zou een vast stopmoment in een what-if-run stil terugvallen op de
+    // bisectie en een ánder plan tonen dan de hoofdlijn.
+    fire_stop_anchor: p.fire_stop_anchor ?? null,
+    fire_stop_age: p.fire_stop_age ?? null,
     feature_preferences: p.feature_preferences ?? null,
     withdrawal_strategy: p.withdrawal_strategy ?? null,
     guardrail_floor: p.guardrail_floor ?? null,

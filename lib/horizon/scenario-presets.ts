@@ -39,7 +39,7 @@ import {
   type ConvergentieRawProfileRow,
 } from '@/lib/horizon-kernel/convergentie-router'
 import { buildKernelInputFromApp, deriveEigenHuisIds, type KernelAdapterInput } from '@/lib/horizon-kernel/adapter'
-import { evaluateFireAt, type SolveFireResult } from '@/lib/horizon-kernel/solver'
+import { evaluateFireAt, solveFire, type SolveFireResult } from '@/lib/horizon-kernel/solver'
 import type { KernelInput } from '@/lib/horizon-kernel/types'
 import { kernelToUnifiedResult, buildKernelSlotMeta, type KernelHousingSale } from '@/lib/horizon-kernel/bridge'
 import { DEFAULT_FIRE_STRATEGY } from '@/lib/fire-strategy'
@@ -553,4 +553,69 @@ export function runScenarioPresets(ctx: ScenarioPresetContext): ScenarioPresetRe
   return specs.map((spec) =>
     spec.id === 'basis' ? basis : runScenarioPreset(spec, ctx, { basisBuffer }),
   )
+}
+
+// ── De tweede run: "vrij mogelijk vanaf" onder een vast anker (ADR 0129 D7/B9) ──
+
+/**
+ * De OPGELOSTE vrijheidsleeftijd — de leeftijd die de kernel zou vinden als het
+ * stopmoment níet vastlag — of `null`.
+ *
+ * "Vrijheid is het moment dat je zóu kunnen" (B9). Onder een vast anker beantwoordt de
+ * hoofdrun een ándere vraag ("kan ik op 62 stoppen?"), en de opgeloste leeftijd blijft
+ * daarnaast staan als inzicht ("vrij mogelijk vanaf 58"). Dat is per definitie een
+ * TWEEDE run: dezelfde bisectie die `solved` altijd al deed, nu ook uitgevoerd wanneer
+ * het anker vaststaat.
+ *
+ * De seam is bewust letterlijk `solveFire` op DEZELFDE `KernelInput`, alleen zónder
+ * `stopAnker` — geen tweede profiel-assemblage, geen gespiegelde profielrij (die zou
+ * langs `feature_preferences.fire_strategy_override` en de D2-tegenspraakregel moeten,
+ * en dat is precies waar een tweede waarheid ontstaat). Alleen de FIRE-leeftijd wordt
+ * teruggegeven; de rijen van deze run worden nergens getekend.
+ *
+ * `null` wanneer er geen vast anker is (dan ís de hoofdrun de opgeloste run), wanneer de
+ * kern-invoer niet te bouwen is, of wanneer de bisectie binnen de horizon geen
+ * toereikende maand vindt — dezelfde `unreachable_within_horizon`-lezing als de bridge,
+ * zodat de horizon-parkeerstand (leeftijd 100) nooit als antwoord passeert (M6).
+ *
+ * KOSTEN: één extra bisectie (~12 engine-runs) per batch, en alléén onder een vast
+ * anker. Draait in dezelfde worker-batch als de zes scenariokaarten (die samen ~6
+ * volledige solves doen), dus het is een fractie van wat er toch al loopt.
+ */
+export function solveFireAgeWithoutAnchor(ctx: ScenarioPresetContext): number | null {
+  try {
+    const input = buildKernelInputFromApp({
+      profile: buildConvergentieAdapterProfile(ctx.profile),
+      assets: ctx.assets,
+      debts: ctx.debts,
+      lifeEvents: ctx.lifeEvents,
+      aowRows: ctx.aowRows,
+    })
+    if (input.stopAnker === undefined) return null
+    const solve = solveFire({ ...input, stopAnker: undefined })
+    return solve.status === 'unreachable_within_horizon' ? null : solve.fireAge
+  } catch {
+    return null
+  }
+}
+
+/** De preset-kaarten + de tweede run, als één worker-antwoord (ADR 0129 D7). */
+export interface ScenarioPresetBatch {
+  readonly presets: readonly ScenarioPresetResult[]
+  /**
+   * "Vrij mogelijk vanaf" — de opgeloste vrijheidsleeftijd zónder anker (B9), of `null`
+   * onder `solved`/onbereikbaar. Zie `solveFireAgeWithoutAnchor`.
+   */
+  readonly solvedFireAge: number | null
+}
+
+/**
+ * De volledige scenario-batch in ÉÉN worker-oversteek: de zes kaarten + de tweede run.
+ *
+ * Bewust samen, niet per widget (ADR 0129 D7): elk oppervlak dat "vrij mogelijk vanaf"
+ * wil tonen zou anders zijn eigen bisectie starten, en dan betaal je die extra solve
+ * drie of vier keer per pagina-load in plaats van één keer.
+ */
+export function runScenarioPresetBatch(ctx: ScenarioPresetContext): ScenarioPresetBatch {
+  return { presets: runScenarioPresets(ctx), solvedFireAge: solveFireAgeWithoutAnchor(ctx) }
 }

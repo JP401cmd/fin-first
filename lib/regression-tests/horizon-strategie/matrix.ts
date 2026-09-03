@@ -122,6 +122,13 @@ export interface ComboConfig {
   withdrawalCurve?: Record<string, number>
   /** Werk-strategie-life-event dat bovenop de baseline wordt geïnjecteerd. */
   werk?: ComboWerk
+  /**
+   * Het STOP-ANKER van het plan (ADR 0129 D1) — de tweede as naast `end` (de
+   * eind-vorm). Afwezig ⇒ kolom `fire_stop_anchor` blijft leeg ⇒ `solved` (of, voor
+   * een legacy-rij, het anker dat nog in `fire_end_strategy` zit — de tegenspraak-
+   * regel D2). Voedt de profielkolommen `fire_stop_anchor`/`fire_stop_age`.
+   */
+  stopAnchor?: { kind: 'aow' | 'now' } | { kind: 'age'; age: number }
 }
 
 export interface ComboDef {
@@ -149,9 +156,24 @@ export const COMBOS: ComboDef[] = [
   { id: 'B-deplete', label: 'Opmaken (deplete)', group: 'end', config: { housing: STD_HOUSING, end: { strategy: 'deplete', endAge: 90, legacyAmount: 0 }, withdrawal: STD_WITHDRAWAL } },
   { id: 'B-legacy', label: `Nalaten €${LEGACY_AMOUNT.toLocaleString('nl-NL')} (legacy)`, group: 'end', config: { housing: STD_HOUSING, end: { strategy: 'legacy', endAge: 90, legacyAmount: LEGACY_AMOUNT }, withdrawal: STD_WITHDRAWAL } },
   { id: 'B-perpetual', label: 'Eeuwigdurend (perpetual)', group: 'end', config: { housing: STD_HOUSING, end: { strategy: 'perpetual', endAge: 90, legacyAmount: 0 }, withdrawal: STD_WITHDRAWAL } },
-  { id: 'B-pensioen', label: 'Pensioen (opbouw tot AOW)', group: 'end', config: { housing: STD_HOUSING, end: { strategy: 'pensioen', endAge: 90, legacyAmount: 0 }, withdrawal: STD_WITHDRAWAL } },
+  // ADR 0129 D6/B2 — `endAge: 100` SPIEGELT MIGRATIE M1. Vóór dat besluit las de
+  // kernel de eindleeftijd van een pensioen-plan uit het Excel-artefact 100 (de
+  // selector 'Pensioenleeftijd' negeerde `fire_end_age`); sinds F2 stuurt de adapter
+  // de EIND-VORM als selector plus een los stop-anker, dus de eindleeftijd komt uit
+  // de kolom. M1 zet die kolom op 100 voor precies deze rijen, en deze combinatie
+  // doet hetzelfde — zo blijven de rijen én `displayEndAge` van `B-pensioen`
+  // byte-identiek aan vóór ADR 0129, en toetst de rij nog steeds wat ze toetste.
+  { id: 'B-pensioen', label: 'Pensioen (opbouw tot AOW)', group: 'end', config: { housing: STD_HOUSING, end: { strategy: 'pensioen', endAge: 100, legacyAmount: 0 }, withdrawal: STD_WITHDRAWAL } },
   // ADR 0127: FIRE op de startleeftijd (maand 0), doel €0 op de eigen eindleeftijd.
   { id: 'B-nu-stoppen', label: 'Nu stoppen (FIRE = vandaag)', group: 'end', config: { housing: STD_HOUSING, end: { strategy: 'nu-stoppen', endAge: 90, legacyAmount: 0 }, withdrawal: STD_WITHDRAWAL } },
+
+  // ── ADR 0129 — de twee assen los: stop-anker × eind-vorm ──
+  // Drie combinaties die vóór dit besluit ONUITDRUKBAAR waren omdat één enum beide
+  // vragen droeg. Ze bewaken dat het anker de STOPLEEFTIJD stuurt en de eind-vorm de
+  // EINDLEEFTIJD/het doelbedrag — precies de scheiding die D3 introduceert.
+  { id: 'B-aow-legacy', label: `Stop op AOW + nalaten €${LEGACY_AMOUNT.toLocaleString('nl-NL')} op 90`, group: 'end', config: { housing: STD_HOUSING, end: { strategy: 'legacy', endAge: 90, legacyAmount: LEGACY_AMOUNT }, withdrawal: STD_WITHDRAWAL, stopAnchor: { kind: 'aow' } } },
+  { id: 'B-age-deplete', label: 'Stop op 58 + vermogen opeten tot 90', group: 'end', config: { housing: STD_HOUSING, end: { strategy: 'deplete', endAge: 90, legacyAmount: 0 }, withdrawal: STD_WITHDRAWAL, stopAnchor: { kind: 'age', age: 58 } } },
+  { id: 'B-age-perpetual', label: 'Stop op 58 + eeuwigdurend', group: 'end', config: { housing: STD_HOUSING, end: { strategy: 'perpetual', endAge: 90, legacyAmount: 0 }, withdrawal: STD_WITHDRAWAL, stopAnchor: { kind: 'age', age: 58 } } },
 
   // ── Groep C — onttrekkingsprofiel varieert (F4: profielen, niet de oude v2-enum) ──
   //    Op de PERPETUAL-baseline (PERP_END), niet deplete — zie PERP_END-doc.
@@ -335,6 +357,18 @@ export const EXPECTED: Record<string, ComboExpectation> = {
   // persona, géén benodigd vermogen (D4; de bridge markeert requiredFireIsStartPortfolio).
   // Gouden rij gegenereerd 2026-09-02 uit de kernel (eerste run: €1.096.980).
   'B-nu-stoppen': { fireAgeFractional: 42.0, doelbedrag: 1096980 },
+  // ADR 0129 — de twee assen los (gegenereerd 2026-09-03 uit de kernel).
+  //  * `B-aow-legacy`: het ANKER zet de stopleeftijd op de AOW (67) → identiek
+  //    fireAge/doelbedrag als `B-pensioen` (beide meten J op maand (67−42)·12), terwijl
+  //    de EIND-VORM een nalatenschapsdoel van €258.707 op de 90e oplevert waar
+  //    `B-pensioen` €0 heeft. Dat verschil ÍS het besluit: vóór ADR 0129 was deze
+  //    combinatie niet uit te drukken.
+  //  * `B-age-*`: het anker kort de solver op 58 (geen bisectie), dus beide rijen delen
+  //    fireAge 58 en J@58 = €3.529.646; alleen het eind-doel verschilt (deplete €0 vs.
+  //    perpetual het geïndexeerde J@58 op leeftijd 100).
+  'B-aow-legacy': { fireAgeFractional: 67.0, doelbedrag: 5846016 },
+  'B-age-deplete': { fireAgeFractional: 58.0, doelbedrag: 3529646 },
+  'B-age-perpetual': { fireAgeFractional: 58.0, doelbedrag: 3529646 },
   // Groep C/D op de PERPETUAL-baseline (PERP_END) — hier discrimineren de profielen/
   // werk-varianten wél (op deplete vielen ze samen op 42,083).
   'C-vast': { fireAgeFractional: 45.083, doelbedrag: 1469348 },
@@ -475,6 +509,11 @@ export function runComboKernel(combo: ComboDef, pinnedAge?: number): ComboActual
     fire_end_strategy: combo.config.end.strategy,
     fire_end_age: combo.config.end.endAge,
     fire_legacy_amount: combo.config.end.legacyAmount,
+    // ADR 0129 D1 — de tweede as. Afwezig ⇒ kolom leeg ⇒ `solved` (of het legacy-anker
+    // uit `fire_end_strategy`, tegenspraak-regel D2).
+    fire_stop_anchor: combo.config.stopAnchor?.kind ?? null,
+    fire_stop_age:
+      combo.config.stopAnchor?.kind === 'age' ? combo.config.stopAnchor.age : null,
     withdrawal_strategy: combo.config.withdrawal.strategy,
     housing_strategy_config: combo.config.housing,
     withdrawal_profile_config: combo.config.withdrawalProfiel

@@ -701,13 +701,16 @@ const tests: TestCase[] = [
     description: 'runSimulation met pensioen strategie produceert geldig resultaat',
     priority: 'critical', estimatedDurationMs: 100,
     fn() {
-      const pensioenStrat: FireStrategyConfig = { strategy: 'pensioen', endAge: 90, legacyAmount: 0 }
+      // ADR 0129 D6/B2 — `endAge: 100` SPIEGELT MIGRATIE M1. Tot F2 negeerde de
+      // pensioen-selector `fire_end_age` en las de kernel het Excel-artefact 100; sinds
+      // F2 draagt de EIND-VORM de eindleeftijd en het losse stop-anker het stopmoment,
+      // dus de eindleeftijd komt uit de kolom. M1 zet die kolom op 100 voor bestaande
+      // pensioen-rijen — deze fixture doet hetzelfde, zodat de assertie hieronder
+      // ongewijzigd blijft en dus nog steeds bewijst dat de kernel identiek rekent.
+      const pensioenStrat: FireStrategyConfig = { strategy: 'pensioen', endAge: 100, legacyAmount: 0 }
       const r = runStd({}, [], pensioenStrat)
       assert(r.rows.length > 0, 'pensioen heeft rows')
-      // HERIJKT: net als perpetual heeft pensioen geen eindig P!B51/52-doel, dus
-      // displayEndAge valt terug op de fysieke horizon-cap (MAX_AGE=100) i.p.v. het
-      // meegegeven strategy.endAge (90). Zie fire-sim-perpetual voor dezelfde reden.
-      assertEqual(r.displayEndAge, 100, 'displayEndAge = MAX_AGE (pensioen heeft geen eindig doel)')
+      assertEqual(r.displayEndAge, 100, 'displayEndAge = de eindleeftijd van het plan (M1: 100)')
       for (const row of r.rows) {
         assertFinite(row.endPortfolio, `pensioen row ${row.age} endPortfolio finite`)
         assertFinite(row.grossIncome, `pensioen row ${row.age} grossIncome finite`)

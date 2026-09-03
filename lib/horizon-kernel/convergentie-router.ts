@@ -84,6 +84,11 @@ export function buildConvergentieAdapterProfile(
     fire_end_strategy: p.fire_end_strategy ?? null,
     fire_end_age: p.fire_end_age ?? null,
     fire_legacy_amount: p.fire_legacy_amount ?? null,
+    // ADR 0129 D1/D3 — het stop-anker reist mee naar de adapter, die het naar
+    // `KernelInput.stopAnker` vertaalt. Ontbreekt de kolom (oude rij), dan leest
+    // `parseFirePlan` het anker nog uit `fire_end_strategy` (de tegenspraak-regel D2).
+    fire_stop_anchor: p.fire_stop_anchor ?? null,
+    fire_stop_age: p.fire_stop_age ?? null,
     feature_preferences: p.feature_preferences ?? null,
     withdrawal_strategy: p.withdrawal_strategy ?? null,
     guardrail_floor: p.guardrail_floor ?? null,

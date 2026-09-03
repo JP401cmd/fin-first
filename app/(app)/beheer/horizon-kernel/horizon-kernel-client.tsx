@@ -37,6 +37,7 @@ const STATUS_LABEL: Record<SolverResult['status'], string> = {
   unreachable_within_horizon: 'Niet binnen horizon',
   pension_shortfall: 'Pensioen-tekort',
   stop_now_shortfall: 'Stop-nu-tekort',
+  anchor_shortfall: 'Tekort op stopmoment',
 }
 
 function SolverStrip({ solver, nettoLiquideBijFire, tekortPiek, startLeeftijd, eindstrategieSelector }: {

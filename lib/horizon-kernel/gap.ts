@@ -50,17 +50,29 @@ export function prognoseI(proj: KernelProjection, m: number): number | null {
 
 /**
  * P!B35 — eindleeftijd per eindstrategie (IFS): deplete→B51, legacy→B52,
- * perpetual/pensioen→100. 'nu' (ADR 0127 D2) → B51, BEWUST niet 100 zoals
- * pensioen: die 100 is een Excel-artefact, en de stop-nu-run wordt (net als de
- * geforceerde stops van `runForcedStopPath`) getoetst tegen de eigen
- * `fire_end_age`. Zo is `reached_now ⇔ runway reikt tot de eindleeftijd` exact.
+ * perpetual/pensioen→100. De **EIND-VORM** bepaalt dit getal, nooit het stop-anker
+ * (ADR 0129 D3): terug bij de exacte oracle-vorm, zonder de anker-uitzondering die
+ * ADR 0127 hier had ('nu' → B51).
+ *
+ * Wat dat voor app-pensioen betekent (D6/D9): de app stuurt sinds F2 de EIND-VORM
+ * als selector plus een los `stopAnker`-blok, dus een "stop op AOW"-plan komt hier
+ * binnen als `deplete`/`legacy`/`perpetual` en gebruikt voortaan de eigen
+ * `fire_end_age` in plaats van het Excel-artefact 100. Migratie M1 zet daarvoor
+ * `fire_end_age := 100` op de bestaande pensioen-rijen, zodat de kernel voor die
+ * gebruikers identiek blijft rekenen; daarna is de eindleeftijd vrij instelbaar en
+ * wordt `aow × legacy` ("stop op je AOW, laat €X na op je 90e") uitdrukbaar.
+ *
+ * De code `'nu'` (ADR 0127-selector 'Nu stoppen') valt hier nu op de 100-tak. Dat
+ * is de dode legacy-staart: de adapter stuurt die selector sinds F2 niet meer, en
+ * F4 verwijdert 'm. Een `nu`-anker loopt via `deplete` en dus via B51 — precies
+ * dezelfde uitkomst als vóór dit besluit.
  */
 export function eindleeftijdVan(es: EsRow): number {
-  return es.interneCode === 'deplete' || es.interneCode === 'nu'
+  return es.interneCode === 'deplete'
     ? es.eindleeftijdOpeten
     : es.interneCode === 'legacy'
       ? es.eindleeftijdNalatenschap
-      : 100 // perpetual én pensioen
+      : 100 // perpetual, pensioen én de dode 'nu'-staart
 }
 
 /**

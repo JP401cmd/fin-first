@@ -176,12 +176,26 @@ export function computeFreedomProgress({
  * AANHOUDENDE maand met Prognose!J ≤ 0, maand 0 = nu) en `eindMaand` =
  * `eindMaandVan(fire_end_age, startLeeftijd)` (lib/horizon-kernel/gap.ts).
  *
+ * ## Het stopmoment als NULPUNT (ADR 0129 D5)
+ * Onder een vast anker dat níet vandaag ligt (AOW, of een zelfgekozen leeftijd) meet
+ * de dekking de periode NÁ het stopmoment — niet vanaf vandaag. Daarom verschuift
+ * `ankerMaand` teller én noemer:
+ *
+ *   pct = (m − ankerMaand) ÷ (eindMaand − ankerMaand)
+ *
+ * Onder het `nu`-anker is `ankerMaand = 0` en valt dit exact samen met de ADR
+ * 0127-formule. Ligt de uitputting VÓÓR het stopmoment (`m < ankerMaand`), dan is de
+ * uitkomst 0: het plan faalt al vóór je stopt — dat is geen gedeeltelijke dekking.
+ * `ankerMaand` mag negatief zijn (een AOW-anker dat al gepasseerd is); de formule
+ * behandelt het stopmoment dan gewoon als "vandaag of eerder" en clampt op 0.
+ *
  * Semantiek (vastgepind in core-metrics.runway-coverage.test.ts):
- *  - eindMaand niet-finite of ≤ 0                         ⇒ 0
+ *  - eindMaand ≤ ankerMaand of niet-finite                ⇒ 0
  *  - kernelDepletionMonth === 0 (deficit)                 ⇒ 0
  *  - kernelDepletionMonth === null (reikt tot horizon)    ⇒ 100
  *  - kernelDepletionMonth > eindMaand (reikt tot eind)    ⇒ 100
- *  - anders                                               ⇒ (m / eindMaand) × 100
+ *  - kernelDepletionMonth < ankerMaand (faalt vóór stop)  ⇒ 0
+ *  - anders                    ⇒ (m − ankerMaand) / (eindMaand − ankerMaand) × 100
  *
  * Eén home naast `computeFreedomProgress`; de loaders kiezen strategie-bewust welke
  * van de twee ze aanroepen — nooit beide mengen.
@@ -189,15 +203,25 @@ export function computeFreedomProgress({
 export function computeRunwayCoveragePct({
   kernelDepletionMonth,
   eindMaand,
+  ankerMaand = 0,
 }: {
   kernelDepletionMonth: number | null
   eindMaand: number
+  /**
+   * Maandindex van het stopmoment (`SimResult.ankerMaand`); maand 0 = vandaag.
+   * Weggelaten ⇒ 0 — het `nu`-anker, en daarmee letterlijk de ADR 0127-formule.
+   */
+  ankerMaand?: number | null
 }): number {
-  if (!Number.isFinite(eindMaand) || eindMaand <= 0) return 0
+  // Een gepasseerd of ontbrekend anker telt als "vandaag": de dekking begint dan bij
+  // maand 0, precies zoals vóór dit besluit.
+  const start = ankerMaand != null && Number.isFinite(ankerMaand) ? Math.max(0, ankerMaand) : 0
+  if (!Number.isFinite(eindMaand) || eindMaand <= start) return 0
   if (kernelDepletionMonth === null) return 100
   if (!Number.isFinite(kernelDepletionMonth) || kernelDepletionMonth <= 0) return 0
   if (kernelDepletionMonth > eindMaand) return 100
-  return Math.min(100, (kernelDepletionMonth / eindMaand) * 100)
+  if (kernelDepletionMonth < start) return 0
+  return Math.min(100, ((kernelDepletionMonth - start) / (eindMaand - start)) * 100)
 }
 
 // ── Vrijheidsvoortgang-grondslag: incl./excl. eigen woning (ADR 0009 herzien) ──

@@ -5,7 +5,7 @@ import {
   type ConvergentieRawContext,
   type ConvergentieRawProfileRow,
 } from '@/lib/horizon-kernel/convergentie-router'
-import { runForcedStopPath, runScenarioPresets, type ScenarioPresetContext } from '@/lib/horizon/scenario-presets'
+import { runForcedStopPath, runScenarioPresetBatch, type ScenarioPresetContext } from '@/lib/horizon/scenario-presets'
 import { runMonteCarlo, type FinancialInput } from '@/lib/horizon-data'
 import { executeKernelRequest } from '@/lib/horizon-kernel/worker/kernel-protocol'
 import {
@@ -124,10 +124,12 @@ describe('run-in-worker — synchrone fallback in jsdom', () => {
     expect(got).toEqual(expected)
   })
 
-  it('runScenarioPresetsAsync === directe runScenarioPresets', async () => {
-    const expected = runScenarioPresets(PRESET_CTX)
+  it('runScenarioPresetsAsync === directe runScenarioPresetBatch (kaarten + tweede run)', async () => {
+    const expected = runScenarioPresetBatch(PRESET_CTX)
     const got = await runScenarioPresetsAsync(PRESET_CTX)
     expect(got).toEqual(expected)
+    // ADR 0129 D7 — de batch draagt het veld altijd; op een `solved`-plan is het null.
+    expect(got).toHaveProperty('solvedFireAge')
   })
 
   it('runMonteCarloAsync === directe runMonteCarlo (deterministisch seed)', async () => {
