@@ -15,6 +15,14 @@ interface Props {
 
 type ExpField = 'wonen' | 'vasteLasten' | 'vrijBesteedbaar'
 
+/**
+ * Bovengrens voor de totale maanduitgaven in de publieke Vrijheidscheck.
+ * Eén bron voor zowel de foutmelding als de navigatie-gate: die twee waren uit
+ * elkaar gelopen (melding wél, gate niet), waardoor een absurd totaal doorliep
+ * naar de pensioen-prefill. Sanity-grens op invoer, geen financiële constante.
+ */
+const MAX_TOTAAL_MAAND = 500000
+
 const FIELDS: { key: ExpField; label: string; hint: string; placeholder: string }[] = [
   {
     key: 'wonen',
@@ -100,13 +108,15 @@ export function StepUitgaven({ intake, onChange, onNext, onBack }: Props) {
   const totaalError =
     (submitted || touched.totaal) && totaalVal <= 0
       ? 'Vul je maandelijkse totaaluitgaven in'
-      : (submitted || touched.totaal) && totaalVal > 500000
+      : (submitted || touched.totaal) && totaalVal > MAX_TOTAAL_MAAND
         ? 'Voer een realistisch bedrag in'
         : null
 
   function handleNext() {
     setSubmitted(true)
-    if (totaalVal <= 0) return
+    // Zelfde grens als totaalError hierboven — anders blokkeert "Verder" niet
+    // terwijl de melding wél zichtbaar is (analoog aan step-inkomen.tsx).
+    if (totaalVal <= 0 || totaalVal > MAX_TOTAAL_MAAND) return
     onChange({
       expenses: {
         wonen: deelValues.wonen,

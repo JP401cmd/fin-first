@@ -1,6 +1,6 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { unauthorized } from '@/lib/api/respond'
+import { serverError, unauthorized } from '@/lib/api/respond'
 import { isFireEndStrategy } from '@/lib/fire-strategy'
 
 /**
@@ -213,8 +213,7 @@ export async function PUT(request: NextRequest) {
     const safePayload = { ...updatePayload, fire_end_strategy: 'deplete' }
     const { error: safeError } = await supabase.from('profiles').update(safePayload).eq('id', user.id)
     if (safeError) {
-      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
-      return NextResponse.json({ error: 'Opslaan mislukt', details: safeError.message }, { status: 500 })
+      return serverError(safeError, 'fire-settings:PUT:shadow', 'Opslaan mislukt')
     }
 
     // Store the actual strategy in feature_preferences (user-writable JSON on profiles)
@@ -223,16 +222,15 @@ export async function PUT(request: NextRequest) {
     fp[FP_KEY] = strategy
     const { error: fpError } = await supabase.from('profiles').update({ feature_preferences: fp }).eq('id', user.id)
     if (fpError) {
-      console.error('[fire-settings] feature_preferences update failed:', fpError.message)
-      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
-      return NextResponse.json({ error: 'Override opslaan mislukt', details: fpError.message }, { status: 500 })
+      return serverError(fpError, 'fire-settings:PUT:override', 'Override opslaan mislukt')
     }
 
     console.log('[fire-settings] Saved pensioen via feature_preferences fallback')
     return NextResponse.json({ success: true, fallback: true, ...updatePayload })
   }
 
-  // Other errors
-  // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
-  return NextResponse.json({ error: 'Opslaan mislukt', details: error.message }, { status: 500 })
+  // Overige DB-fouten: server-side gelogd onder tag, generieke tekst naar de
+  // client (ADR 0044) — het vroegere `details: error.message` lekte de
+  // Postgres-melding (relatie-/constraint-/pooler-namen) aan ingelogden.
+  return serverError(error, 'fire-settings:PUT', 'Opslaan mislukt')
 }

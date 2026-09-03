@@ -10,6 +10,15 @@ import { ReportActions } from './report-actions'
  * via `isSuperAdmin(supabase)`. Hier dus géén extra redirect — alleen
  * de page-render.
  *
+ * Dat die check slaagt geeft nog geen LEESRECHT: de query hieronder draait
+ * op de anon RLS-client met de sessie van de beheerder. De lijst hangt dus
+ * aan de policy `calculator_reports select own or superadmin`
+ * (migratie `20260903110000`). Vóór die migratie bestond alleen een
+ * eigen-rij SELECT en zag de beheerder uitsluitend zijn eigen meldingen —
+ * een lege inbox die als "geen openstaande meldingen" werd gerenderd.
+ * Vervang `createClient()` hier dus niet door een service-role-client, en
+ * verwijder de policy niet: dan is de inbox weer stil leeg.
+ *
  * Lijst: alle `calculator_reports` met status='open', oudste eerst is
  * niet logisch voor moderatie — we sorteren `created_at DESC` zodat
  * nieuwe meldingen bovenaan staan. De `idx_calculator_reports_open`

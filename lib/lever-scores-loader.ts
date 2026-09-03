@@ -36,6 +36,7 @@ import { resolveEffectiveIncomeExpenses } from '@/lib/effective-financials'
 import { loadBudgetBasis } from '@/lib/household/budget-share'
 import type { BudgetBasisRow } from '@/lib/budget-basis'
 import { resolveFireParams } from '@/lib/fire-params'
+import { SAVINGS_RATE_WINDOW_MONTHS } from '@/lib/constants'
 import {
   computeSavingsRate6m,
   computeDebtAflossingMonthly,
@@ -417,7 +418,7 @@ export const loadLeverScores = cache(async function loadLeverScores(
   const income6m = aggSumPositief(tx6mAgg, { realOnly: true })
   const expenses6m = aggSumNegatiefAbs(tx6mAgg, { realOnly: true })
   const savingsBudgetSpent6m = aggSumNegatiefAbs(tx6mAgg, { realOnly: true, budgetIds: savingsBudgetIds })
-  const debtAflossing6m = computeDebtAflossingMonthly(debtRows as unknown as Debt[]) * 6
+  const debtAflossing6m = computeDebtAflossingMonthly(debtRows as unknown as Debt[]) * SAVINGS_RATE_WINDOW_MONTHS
 
   // Vroegste inkomens-datum: all-time via de gedeelde `getEarliestIncomeDate`
   // (order(date asc).limit(1)) i.p.v. een reduce over een gecapte 12-maands-slice —

@@ -36,13 +36,15 @@ const BYPASS_ACCESS: FeatureAccessData = {
 // ("Double") die in parallel werk aan het type wordt toegevoegd. Sleutels als
 // `string` zodat dit compileert ongeacht of 'xl' al in het union zit; onbekende
 // maten vallen terug op een 1×1-cel. De spans spiegelen de echte dashboard-grid
-// (`grid-cols-2 lg:grid-cols-4`) uit components/widgets/draggable-widget-grid.
+// (`grid-cols-2 sm:grid-cols-4`) uit components/widgets/draggable-widget-grid —
+// kolomsprong bij sm, synchroon met de rijhoogte-sprong. Wijkt dit af, dan toont
+// de galerij een andere indeling dan /overzicht.
 const SIZE_SPAN: Partial<Record<string, string>> = {
   mini: 'col-span-1 row-span-1',
   quarter: 'col-span-1 row-span-1',
-  half: 'col-span-1 row-span-2 lg:col-span-2 lg:row-span-1',
+  half: 'col-span-1 row-span-2 sm:col-span-2 sm:row-span-1',
   full: 'col-span-2 row-span-2',
-  xl: 'col-span-2 lg:col-span-4 row-span-2',
+  xl: 'col-span-2 sm:col-span-4 row-span-2',
 }
 const SIZE_LABEL: Partial<Record<string, string>> = {
   mini: 'XS',
@@ -110,7 +112,7 @@ export function WidgetGalerijClient({ data }: { data: DashboardData }) {
               </div>
 
               {/* Elke toegestane size in de echte dashboard-grid */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 auto-rows-[64px] sm:auto-rows-[160px] gap-3 sm:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 auto-rows-[64px] sm:auto-rows-[160px] gap-3 sm:gap-4">
                 {def.sizes.map((size) => (
                   <div key={size} className={`flex min-h-0 flex-col ${SIZE_SPAN[size] ?? 'col-span-1 row-span-1'}`}>
                     <span className="mb-1 shrink-0 font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">

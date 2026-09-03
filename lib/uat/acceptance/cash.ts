@@ -959,6 +959,42 @@ const cardR7Criteria: AcceptanceCriterion[] = [
         'lib/spend-limits/engine.ts#computeSpendLimitPace + lib/spend-limits/status-display.ts#describeSpendLimitPace (échte productiefuncties, synthetische invoer, geen mirror) — zie cash-checks.ts',
     },
   },
+  {
+    workflow: 'WF-CASH-65',
+    scenarioId: 'UAT-CASH-65',
+    titel: 'Gedeelde boeking markeren als "Te bespreken" met je partner (ADR 0128, partner-samenwerkingslaag fase 1)',
+    kriticiteit: 'BELANGRIJK',
+    persona: 'daan',
+    given:
+      'Een huishouden met twee testaccounts (daan + partner): een gedeelde rekening op `partner_visibility=\'full\'` met een gedeelde boeking, en een tweede gedeelde rekening op `\'balance\'`. Tabel `transaction_flags` (migratie 20260903120000) herhaalt de zichtbaarheidsregel NIET — elke policy vraagt via de SECURITY INVOKER-helper `transaction_flag_transaction_visible()` of de aanroeper de boeking zélf mag zien (dezelfde SELECT-policy als `transactions`, incl. `partner_visibility`); schrijven is strenger (`transaction_flaggable()`: gedeeld + eigen huishouden + rekening op `full`).',
+    when:
+      'De gebruiker opent op /overzicht/cashflow/transacties een gedeelde boeking (bewerkformulier) en kiest "Bespreken met {partner}", optioneel met een notitie (max 500 tekens) → `POST /api/transaction-flags`. Later: "Besproken" (`PATCH` status=resolved), "Intrekken" (`DELETE`), opnieuw markeren van een afgeronde boeking, en de rekeninghouder zet `full` terug naar `balance`.',
+    then:
+      'De boeking verschijnt bij BEIDE partners in de server-geladen sectie "Te bespreken met {partner}" (`loadTransactionFlags`, ADR 0058) met melder ("jij"/partnernaam via `flaggedByLabel`) en notitie; de teller in het sectielabel = aantal open vlaggen. "Besproken" haalt hem uit de open-lijst en telt mee in `resolvedCount` ("n eerder besproken"). "Intrekken" (DELETE) staat alleen op de eigen vlag (`eq(flagged_by, user.id)`, 404 bij andermans vlag). Opnieuw markeren van een afgeronde boeking heropent dezelfde rij (unique constraint op `transaction_id` → 23505 → server zet `status=\'open\'` terug op dezelfde rij, geen nieuwe). Op de \'balance\'-rekening (of een persoonlijke boeking) weigert de INSERT-policy (42501/23503) en de route antwoordt 403 met de leesbare tekst "Deze boeking kun je niet met je partner bespreken: alleen gedeelde boekingen op een rekening waarvan ook de boekingen zichtbaar zijn." Zet de rekeninghouder \'full\' terug naar \'balance\', dan verdwijnt de vlag voor de partner op hetzelfde leesmoment als de boeking zelf (RLS erft van transactions, geen backfill) — de melder blijft zijn eigen vlag zien (eigen data, geen lek). Solo-gebruiker (`ctx.hasHousehold=false`): `loadTransactionFlags` geeft `null`, sectie en knop verschijnen niet. Vlaggen/notities worden door geen enkele context-builder geconsumeerd en bereiken dus nooit briefing/chat (K3).',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'DB-mutatiegedrag over meerdere Supabase-rondes zonder eigen pure rekenfunctie (RLS-geërfde zichtbaarheid + route-foutvertaling), zoals WF-CASH-45/47/58: lib/household/transaction-flags.ts#loadTransactionFlags/composeFlagItems/flaggedByLabel (server-loader) + app/api/transaction-flags/route.ts (POST/PATCH/DELETE) + supabase/migrations/20260903120000_transaction_flags.sql (transaction_flag_transaction_visible/transaction_flaggable, transaction_flags_guard, RLS-policies) + docs/adr/0128-partner-review-vlag-volgt-de-zichtbaarheid-van-de-boeking.md',
+    },
+  },
+  {
+    workflow: 'WF-CASH-66',
+    scenarioId: 'UAT-CASH-66',
+    titel: 'TrueLayer-sync stempelt ownership van de dragende rekening en ontdubbelt tegen de partner op een en/of-rekening',
+    kriticiteit: 'KERN',
+    persona: 'daan',
+    given:
+      'Een en/of-rekening (`bank_accounts.ownership=\'shared\'`), gekoppeld door beide partners: dat levert TWEE dragende `bank_accounts`-rijen op (één per koppelende partner) met hetzelfde `iban_hash`. `transactions.ownership` heeft kolomdefault `\'personal\'`; de SELECT-policy toont een partnerrij alléén bij `ownership=\'shared\'`.',
+    when:
+      'De gebruiker synchroniseert een en/of-rekening waarop de partner dezelfde boekingen al eerder zelf heeft gesynchroniseerd of geïmporteerd op zijn EIGEN dragende rij (ander `account_id`, zelfde `iban_hash`).',
+    then:
+      'Elke nieuw ingevoegde rij draagt `ownership: \'shared\'` wanneer de dragende rekening `bank_accounts.ownership=\'shared\'` is (conservatieve terugval op `\'personal\'` als die rij niet leesbaar is — nooit geraden gedeeld). Vóór het invoegen zoekt de sync via `loadHouseholdSiblingAccountIds` (zelfde `iban_hash`, andere `user_id`, actief) de en/of-broertjes van de dragende rekening op, en haalt via `loadHouseholdSharedHashes` de `import_hash`-set van de partner op die rekeningen op (`ownership=\'shared\'`, `neq user_id`, binnen het datumvenster van deze sync). Een boeking die daarin voorkomt wordt NIET nogmaals ingevoegd en telt apart mee als `duplicates_household_partner` (niet in de generieke `duplicates`-teller, zodat "niets nieuws" en "de partner had het al" onderscheidbaar blijven). Op een persoonlijke rekening (`ownership=\'personal\'`) is dit pad een no-op: de siblings-lookup levert een lege set en niets verandert.',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'app/api/bank-connect/sync/route.ts (accountOwnership-afleiding uit de dragende `bank_accounts`-rij + `ownership` op elke insert + laag-1b-filter met `duplicates_household_partner`) + lib/truelayer/existing-hashes.ts#loadHouseholdSiblingAccountIds/loadHouseholdSharedHashes — DB-mutatie + RLS-afhankelijke zichtbaarheid, geen pure functie; spiegelt dezelfde laag-1b-aanpak als `/api/transactions/import` (WF-CASH-63).',
+    },
+  },
 ]
 
 criteria.push(...cardR7Criteria)

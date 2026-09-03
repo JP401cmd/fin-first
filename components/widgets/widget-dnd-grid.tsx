@@ -327,7 +327,9 @@ export function WidgetDndGrid({
         }}
       >
         <SortableContext items={ids} strategy={noTransformStrategy}>
-          <div className="grid grid-cols-2 lg:grid-cols-4 auto-rows-[64px] sm:auto-rows-[160px] gap-3 sm:gap-4">
+          {/* Zelfde kolom-/rijsprong als de kijk-grid (draggable-widget-grid):
+              beide bij sm, anders staat edit-modus anders ingedeeld dan kijk-modus. */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 auto-rows-[64px] sm:auto-rows-[160px] gap-3 sm:gap-4">
             {widgets.map(pref => (
               <SortableWidgetItem
                 key={pref.id}

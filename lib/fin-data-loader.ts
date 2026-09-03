@@ -12,6 +12,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getCachedUser } from '@/lib/supabase/cached-user'
 import type { Recommendation, Action } from '@/lib/recommendation-data'
+import { applyActionPriorityOrder } from '@/lib/action-sort'
 import { computeGoalProgress, type Goal, type GoalProgress } from '@/lib/goal-data'
 import { resolveEffectiveIncomeExpenses, type IncomeExpenseSources } from '@/lib/effective-financials'
 import { localMonthBounds } from '@/lib/month-range'
@@ -114,6 +115,18 @@ export interface FinPageData {
    * "volgt automatisch"-belofte doen.
    */
   vrijheidsgetalLive: boolean
+  /**
+   * Grondslag van dat live vrijheidsgetal-doelbedrag: telt de eigen woning mee
+   * (`false`) of niet (`true`)? `null` wanneer het doel niet live draait of de
+   * snapshot de vlag niet droeg — dan toont de kaart géén kwalificatie.
+   *
+   * Puur DOORGEGEVEN uit `VrijheidsgetalSnapshot.homeExcludedFromFire`, die op
+   * zijn beurt de `isHomeExcludedFromFire`-keuze van de horizon-loader spiegelt.
+   * Nergens opnieuw afgeleid — dit veld bestaat alleen om de doelkaart dezelfde
+   * kwalificatie te laten tonen als de KPI op /toekomst ("met/zonder je huis",
+   * bevinding UR2-17).
+   */
+  vrijheidsgetalHomeExcluded: boolean | null
   /**
    * Grondslag van de LIVE schuldenvrij-datum (`debt_free_date`-doel). `user_set`
    * = hard feit; bij `default_term`/`no_end_date` moet de kaart een aanname-regel
@@ -228,13 +241,16 @@ export async function loadFinData(
     //     JS-cap). Echte afkap-vrijheid voor tellingen bij >1000 acties zou — net als
     //     T2.2 voor transacties (ADR 0050) — een SECURITY-INVOKER aggregaat-RPC vergen
     //     (buiten scope T2.5, geen migratie).
-    supabase
-      .from('actions')
-      .select('*, recommendation:recommendations(title, recommendation_type)')
-      .order('status', { ascending: true })
-      .order('priority_score', { ascending: false })
-      .order('sort_order', { ascending: true })
-      .limit(1000),
+    //     Canonieke prioriteitsvolgorde (lib/action-sort.ts): priority_score desc,
+    //     sort_order asc, created_at desc — één-op-één met het actiebord en de modal,
+    //     zodat een 3-weg gelijkspel (niemand schrijft sort_order) niet aan Postgres'
+    //     onbepaalde volgorde wordt overgelaten (WF-OVZ-20-bug1).
+    applyActionPriorityOrder(
+      supabase
+        .from('actions')
+        .select('*, recommendation:recommendations(title, recommendation_type)')
+        .order('status', { ascending: true }),
+    ).limit(1000),
     // [1] All pending/postponed recommendations with full fields (covers KPI + list)
     supabase
       .from('recommendations')
@@ -413,6 +429,13 @@ export async function loadFinData(
     completedGoalCount,
     totalGoalCount,
     vrijheidsgetalLive: vrijheidsgetalSynced > 0,
+    // Alleen betekenisvol zolang de sync daadwerkelijk sloeg — anders staan de
+    // opgeslagen waarden op de kaart en zou een grondslag-label bij een bedrag
+    // staan dat niet uit die grondslag komt.
+    vrijheidsgetalHomeExcluded:
+      vrijheidsgetalSynced > 0 && typeof fireSnapshot?.homeExcludedFromFire === 'boolean'
+        ? fireSnapshot.homeExcludedFromFire
+        : null,
     debtFreeBasis,
     linkedGoalIds: [...linkedIds],
     autoCompletedGoals,

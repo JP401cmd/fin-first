@@ -10,6 +10,7 @@ import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { buildFactorByAge, deflateRowsByAge } from '@/lib/euro-display'
+import { widgetSimRowsToChartPoints } from '@/lib/horizon/sim-chart-geometry'
 
 interface Props {
   size: WidgetSize
@@ -93,21 +94,24 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
     const qW = 120
     const qH = 40
     const qPad = 2
-    const qMaxVal = Math.max(...viewSimRows.map(r => r.endPortfolio), 1)
-    const qMinAge = viewSimRows[0].age
-    const qMaxAge = viewSimRows[viewSimRows.length - 1].age
+    // Tijdstip-conventie (lib/horizon/sim-chart-geometry.ts): seed + eindstand
+    // van rij `age` op `age + 1`; opbouw = de eerste nAcc+1 punten (D, nazorg R2+R3).
+    const qAllPts = widgetSimRowsToChartPoints(viewSimRows)
+    const qMaxVal = Math.max(...qAllPts.map(([, v]) => v), 1)
+    const qMinAge = qAllPts[0][0]
+    const qMaxAge = qAllPts[qAllPts.length - 1][0]
     const qAgeSpan = qMaxAge - qMinAge || 1
     const qToX = (age: number) => qPad + ((age - qMinAge) / qAgeSpan) * (qW - qPad * 2)
     const qToY = (val: number) => qH - qPad - (Math.max(val, 0) / qMaxVal) * (qH - qPad * 2)
 
-    const accRows = viewSimRows.filter(r => r.phase === 'accumulation')
-    const qPath = accRows.length > 1
-      ? accRows.map((r, i) => `${i === 0 ? 'M' : 'L'}${qToX(r.age).toFixed(1)},${qToY(r.endPortfolio).toFixed(1)}`).join(' ')
+    const qAccPts = qAllPts.slice(0, viewSimRows.filter(r => r.phase === 'accumulation').length + 1)
+    const qPath = qAccPts.length > 1
+      ? qAccPts.map(([a, v], i) => `${i === 0 ? 'M' : 'L'}${qToX(a).toFixed(1)},${qToY(v).toFixed(1)}`).join(' ')
       : ''
 
     const qFireX = fireAgeFractional != null ? qToX(fireAgeFractional) : null
-    const qFireY = fireAgeFractional != null && accRows.length > 0
-      ? qToY(accRows[accRows.length - 1].endPortfolio)
+    const qFireY = fireAgeFractional != null && qAccPts.length > 1
+      ? qToY(qAccPts[qAccPts.length - 1][1])
       : null
 
     return (
@@ -165,30 +169,39 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
   const W = 240
   const H = size === 'full' ? 80 : 72 // max 80px for full-size SVG constraint
   const pad = 4
-  const maxVal = Math.max(...viewSimRows.map(r => r.endPortfolio), 1)
-  const minAge = viewSimRows[0].age
-  const maxAge = viewSimRows[viewSimRows.length - 1].age
+  // Tijdstip-conventie (lib/horizon/sim-chart-geometry.ts, één huis): seed op de
+  // startleeftijd + de eindstand van rij `age` op `age + 1`. De eigen
+  // `[r.age, r.endPortfolio]`-plot zette lijn, piek- en eindlabel een jaar naar
+  // links t.o.v. SimChart (D, nazorg R2+R3). De fase-splitsing gebeurt op INDEX
+  // in dezelfde reeks, zodat de onttrekkingslijn begint op het (al
+  // gedeflateerde) eindpunt van de opbouw — geen knik in 'huidige euro's'.
+  const allPts = widgetSimRowsToChartPoints(viewSimRows)
+  const nAcc = viewSimRows.filter(r => r.phase === 'accumulation').length
+  const accPts = allPts.slice(0, nAcc + 1)
+  const retPts = allPts.slice(nAcc)
+  const maxVal = Math.max(...allPts.map(([, v]) => v), 1)
+  const minAge = allPts[0][0]
+  const maxAge = allPts[allPts.length - 1][0]
   const ageSpan = maxAge - minAge || 1
   // Eind-aslabel = kernel-eindleeftijd (SimResult.displayEndAge, wat /horizon toont),
-  // niet de hardcoded 90. Fallback op de laatste (reeds geclipte) simRow-leeftijd voor
-  // oudere/mock-bundels zonder displayEndAge. Consume-don't-recompute: geen eigen aanname.
+  // niet de hardcoded 90. Fallback op de laatste punt-leeftijd (= laatste geclipte
+  // simRow + 1) voor oudere/mock-bundels zonder displayEndAge. Consume-don't-recompute.
   const endAgeLabel = Math.round(displayEndAge ?? maxAge)
 
   const toX = (age: number) => pad + ((age - minAge) / ageSpan) * (W - pad * 2)
   const toY = (val: number) => H - pad - (Math.max(val, 0) / maxVal) * (H - pad * 2)
 
-  const accumulationRows = viewSimRows.filter(r => r.phase === 'accumulation')
-  const retirementRows = viewSimRows.filter(r => r.phase === 'retirement')
-
-  const buildPath = (rows: NonNullable<typeof viewSimRows>) => {
-    if (rows.length === 0) return ''
-    return rows.map((r, i) => `${i === 0 ? 'M' : 'L'}${toX(r.age).toFixed(1)},${toY(r.endPortfolio).toFixed(1)}`).join(' ')
+  const buildPath = (pts: [number, number][]) => {
+    if (pts.length === 0) return ''
+    return pts.map(([a, v], i) => `${i === 0 ? 'M' : 'L'}${toX(a).toFixed(1)},${toY(v).toFixed(1)}`).join(' ')
   }
 
   const fireX = fireAgeFractional != null ? toX(fireAgeFractional) : null
 
-  /* ── full-size enrichments: peak, end labels, age axis markers ── */
-  const allRows = [...accumulationRows, ...retirementRows]
+  /* ── full-size enrichments: peak, end labels, age axis markers ──
+     `peakRow`/`endRow` dragen de WAARDE (endPortfolio); hun x-positie is het
+     eind van dat leeftijdsjaar (`age + 1`), net als de lijn. */
+  const allRows = viewSimRows
   const peakRow = allRows.reduce((best, r) => r.endPortfolio > best.endPortfolio ? r : best, allRows[0])
   const endRow = allRows[allRows.length - 1]
   const ageMarkers = size === 'full'
@@ -203,7 +216,7 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
           <div className="flex-1 min-w-0 flex flex-col justify-center">
             {fireAgeFractional != null && (
               <p className="text-[10px] text-horizon-600 font-mono font-semibold mb-0.5">
-                FIRE {fireAgeFractional.toFixed(1)}j
+                FIRE {Math.round(fireAgeFractional)}j
               </p>
             )}
             <p className="text-[var(--ink)]">
@@ -219,9 +232,9 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
               className="overflow-visible"
               aria-label="Gesimuleerd vermogenspad"
             >
-              {accumulationRows.length > 1 && (
+              {accPts.length > 1 && (
                 <path
-                  d={buildPath(accumulationRows)}
+                  d={buildPath(accPts)}
                   fill="none"
                   stroke="var(--color-horizon-500)"
                   strokeWidth="1.8"
@@ -235,9 +248,9 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
                   }}
                 />
               )}
-              {retirementRows.length > 1 && (
+              {retPts.length > 1 && (
                 <path
-                  d={buildPath(retirementRows)}
+                  d={buildPath(retPts)}
                   fill="none"
                   stroke="var(--ink-4)"
                   strokeWidth="1.2"
@@ -249,7 +262,7 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
               {fireX != null && (
                 <circle
                   cx={fireX}
-                  cy={toY(accumulationRows.at(-1)?.endPortfolio ?? 0)}
+                  cy={toY(accPts[accPts.length - 1]?.[1] ?? 0)}
                   r="3"
                   fill="var(--color-horizon-600)"
                   style={{ opacity: hasEntered ? 1 : 0, transition: 'opacity 300ms ease 650ms' }}
@@ -313,9 +326,9 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
           ))}
 
           {/* Opbouw pad (horizon-kleur) */}
-          {accumulationRows.length > 1 && (
+          {accPts.length > 1 && (
             <path
-              d={buildPath(accumulationRows)}
+              d={buildPath(accPts)}
               fill="none"
               stroke="var(--color-horizon-500)"
               strokeWidth="1.8"
@@ -333,9 +346,9 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
           )}
 
           {/* Pensioen pad (gedempte kleur) */}
-          {retirementRows.length > 1 && (
+          {retPts.length > 1 && (
             <path
-              d={buildPath(retirementRows)}
+              d={buildPath(retPts)}
               fill="none"
               stroke="var(--ink-4)"
               strokeWidth="1.2"
@@ -363,7 +376,7 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
               />
               <circle
                 cx={fireX}
-                cy={toY(accumulationRows.at(-1)?.endPortfolio ?? 0)}
+                cy={toY(accPts[accPts.length - 1]?.[1] ?? 0)}
                 r="3"
                 fill="var(--color-horizon-600)"
                 style={{ opacity: hasEntered ? 1 : 0, transition: 'opacity 300ms ease 650ms' }}
@@ -374,7 +387,7 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
           {/* Piekwaarde label (full-size only) */}
           {size === 'full' && peakRow && (
             <text
-              x={Math.min(toX(peakRow.age) + 4, W - 40)}
+              x={Math.min(toX(peakRow.age + 1) + 4, W - 40)}
               y={Math.max(toY(peakRow.endPortfolio) - 4, 10)}
               fontSize="5"
               fill="var(--color-horizon-600)"
@@ -389,7 +402,7 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
           {/* Eindsaldo label (full-size only) */}
           {size === 'full' && endRow && endRow !== peakRow && (
             <text
-              x={Math.max(toX(endRow.age) - 4, 40)}
+              x={Math.max(toX(endRow.age + 1) - 4, 40)}
               y={Math.max(toY(endRow.endPortfolio) - 4, 10)}
               fontSize="5"
               fill="var(--ink-3)"
@@ -406,7 +419,7 @@ export const SimVermogenspadWidget = memo(function SimVermogenspadWidget({ size,
           <p className="text-[10px] text-[var(--ink-4)] font-mono">{minAge}j</p>
           {fireAgeFractional != null && (
             <p className="text-[10px] text-horizon-600 font-mono font-semibold">
-              FIRE {fireAgeFractional.toFixed(1)}j
+              FIRE {Math.round(fireAgeFractional)}j
             </p>
           )}
           <p className="text-[10px] text-[var(--ink-4)] font-mono">{endAgeLabel}j</p>

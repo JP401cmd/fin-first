@@ -9,6 +9,7 @@ import { amsterdamWeekKey } from '@/lib/briefing/snapshot'
 import { localMonthBounds } from '@/lib/month-range'
 import { resolveFireParams } from '@/lib/fire-params'
 import { calculateFreedomTime } from '@/lib/format'
+import { getRecentDailyExpenseRate } from '@/lib/expense-rate'
 import { decryptIbanForLabel } from '@/lib/truelayer/cash-asset-backfill'
 import { buildBankSignalNotification } from '@/lib/notifications/bank-signalen'
 import {
@@ -546,9 +547,20 @@ export async function GET(request: NextRequest) {
     // Eén melding per ISO-week (Amsterdam): nudge naar /overzicht waar de
     // verse weekbriefing + vrijheidswinst klaarstaat. Gegate via een
     // app_settings-key, exact zoals de woz/pension-reminders hierboven.
-    // De voorkeur-check zit hier (niet pas in het eind-filter) zodat een
-    // uitgezette melding de week-key niet "opbrandt".
-    if (computeSlow && prefs.briefing !== false) try {
+    //
+    // TWEE DINGEN DIE UIT ELKAAR MOETEN BLIJVEN (WF-WILL-13 bug1):
+    //  · GENEREREN + IN `slow` DUWEN — altijd bij `computeSlow`, ongeacht de
+    //    voorkeur. De voorkeur is een presentatie-filter (r1207/r1269), geen
+    //    generatie-voorwaarde. Zat hij hier, dan onthield de 15-min-cache een
+    //    "geen briefing"-snapshot: zette de gebruiker het type binnen dat
+    //    venster weer aan, dan bleef de widget/badge tot 15 min stale terwijl
+    //    /berichten (die uit `history` leest) de melding wél al toonde.
+    //  · DE WEEK-KEY OPBRANDEN — alléén wanneer de voorkeur AAN staat. Zou de
+    //    key ook branden terwijl het type uit staat, dan is de melding voor
+    //    die week "verbruikt" en verschijnt hij pas de week erna: een gat van
+    //    dagen in plaats van 15 minuten. Niet gebrand ⇒ de push herhaalt zich
+    //    elke recompute, met hetzelfde (stabiele) id — idempotent.
+    if (computeSlow) try {
       const briefingWeekKey = `briefing_notified_week_${user.id}`
       const { data: lastBriefingWeekRow } = await supabase
         .from('app_settings')
@@ -557,9 +569,11 @@ export async function GET(request: NextRequest) {
         .maybeSingle()
       const currentWeek = amsterdamWeekKey(new Date())
       if (lastBriefingWeekRow?.value !== currentWeek) {
-        await supabase
-          .from('app_settings')
-          .upsert({ key: briefingWeekKey, value: currentWeek }, { onConflict: 'key' })
+        if (prefs.briefing !== false) {
+          await supabase
+            .from('app_settings')
+            .upsert({ key: briefingWeekKey, value: currentWeek }, { onConflict: 'key' })
+        }
         const id = `briefing_${currentWeek}`
         slow.push({
           id,
@@ -593,10 +607,16 @@ export async function GET(request: NextRequest) {
     // is hier niet alleen goedkoper, het is de enige variant die de "één som"-regel
     // intact laat. (Een cron zou bovendien een omgevingswijziging zijn.)
     //
-    // De voorkeur-check staat hier — vóór de voorcheck en vóór het zetten van de
-    // dedupe-gate — zodat een uitgezette melding de gate niet "opbrandt": zet de
-    // gebruiker het type later aan, dan ziet hij de melding alsnog.
-    if (computeSlow && prefs.spend_limit !== false) try {
+    // Zelfde splitsing als bij de briefing hierboven (WF-WILL-13 bug1): de
+    // events worden ALTIJD berekend en in `slow` geduwd — de voorkeur filtert
+    // pas op r1207/r1269 — maar de dedupe-gate wordt alleen WEGGESCHREVEN
+    // wanneer de voorkeur aanstaat. Dat is hier extra van belang omdat
+    // `recovered` en `streak_milestone` eenmalige overgangen zijn: brandt de
+    // gate terwijl het type uit staat, dan is die overgang definitief weg.
+    // Niet gebrand ⇒ `decideSpendLimitEvents` levert ze bij elke recompute
+    // opnieuw (`markOnce` werkt op de niet-gepersisteerde gate), dus zodra de
+    // gebruiker het type aanzet ziet hij ze alsnog.
+    if (computeSlow) try {
       // Goedkope, indexed voorcheck: de overgrote meerderheid heeft geen pot en
       // betaalt dan precies deze ene query in plaats van de volle loader. De GET
       // is al zwaar (~22 queries per verse poll); dit is een voorwaarde, geen
@@ -637,10 +657,13 @@ export async function GET(request: NextRequest) {
           limits: spendLimitSection.limits,
           alias: (aliasRow.data as { spend_limit_alias?: string | null } | null)?.spend_limit_alias ?? null,
           gate: parseSpendLimitEventGate(spendLimitGateRow.data?.value ?? null),
+          // Bewust altijd `true`: de voorkeur bepaalt niet MEER of er events
+          // ontstaan, alleen of ze getoond worden (r1207/r1269) en of de gate
+          // hieronder wordt weggeschreven.
           enabled: true,
         })
 
-        if (spendLimitDecision.gateChanged) {
+        if (spendLimitDecision.gateChanged && prefs.spend_limit !== false) {
           await supabase
             .from('app_settings')
             .upsert(
@@ -680,7 +703,14 @@ export async function GET(request: NextRequest) {
     // Geen eigen gate in app_settings: de dedupe zit al in de melding-id
     // (`milestone_<key>`, stabiel per mijlpaal) plus de read-state, en de
     // acknowledge-route haalt de rij vanzelf uit de niet-bevestigde tak.
-    if (computeSlow && prefs.milestone !== false) try {
+    //
+    // Juist daarom is hier geen splitsing nodig zoals bij briefing/spend_limit
+    // (WF-WILL-13 bug1): er valt niets op te branden, dus de voorkeur-check kan
+    // volledig weg uit de generatie en doet zijn werk in het eindfilter
+    // (r1207/r1269). Zonder die verplaatsing schreef een recompute met het type
+    // UIT een mijlpaalloze snapshot in de 15-min-cache, waardoor de
+    // dashboard-widget en de badge na heraanzetten stale bleven.
+    if (computeSlow) try {
       const milestoneCutoff = new Date(Date.now() - MILESTONE_FRESH_WINDOW_MS).toISOString()
       const { data: milestoneRows } = await supabase
         .from('achieved_milestones')
@@ -797,16 +827,12 @@ export async function GET(request: NextRequest) {
               }
             }
 
-            // Compute daily expenses for freedom time calculation (exclude transfers).
-            // Canonieke dagbasis = jaaruitgaven / 365 (zie lib/format.ts
-            // calculateFreedomTime), niet maand/dagenInMaand. De maanduitgaven
-            // extrapoleren we naar een jaar (×12).
-            const totalMonthExpenses = (txRes.data ?? [])
-              .filter(t =>
-                (t as { transaction_type?: string | null }).transaction_type !== 'transfer' &&
-                (t as { transaction_type?: string | null }).transaction_type !== 'joint_transfer')
-              .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
-            const dailyExpenses = totalMonthExpenses > 0 ? (totalMonthExpenses * 12) / 365 : 0
+            // Canoniek dagtarief (lib/expense-rate.ts): 12-mnd rolling consumptie —
+            // dezelfde wisselkoers als élk scherm, zodat een partner-melding
+            // dezelfde vrijheidstijd noemt als de transactie zelf. Hier stond een
+            // eigen som over de LOSSE lopende maand × 12 / 365 (1d, nazorg R2+R3).
+            // Deelt binnen dit request de cache()-entry van het 12-mnd aggregaat.
+            const { dailyRate: dailyExpenses } = await getRecentDailyExpenseRate(supabase)
 
             for (const tx of uniquePartnerTxs) {
               const amount = Math.abs(Number(tx.amount))

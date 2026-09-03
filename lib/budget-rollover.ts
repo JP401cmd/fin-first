@@ -54,6 +54,101 @@ export function computeRollover(
 }
 
 /**
+ * Eén rij zoals de auto-berekening 'm in `budget_rollovers` wegschrijft.
+ *
+ * `user_id` staat hier BEWUST als verplicht veld in het type, niet als optie.
+ * De INSERT-policy op de tabel is `with check ((select auth.uid()) = user_id)`
+ * (`supabase/migrations/20260717120000_sync_remote_baseline.sql:181`), dus een
+ * rij zonder eigenaar wordt door RLS met 42501 geweigerd. Dat gebeurde ook:
+ * de auto-berekening liet `user_id` weg en elke insert werd stil afgewezen,
+ * waardoor de sectie "Overgedragen saldo" nooit verscheen (WF-BUDGET-14-bug1).
+ * Door het veld in het type verplicht te maken breekt een toekomstige weglating
+ * op `tsc`, niet pas live op de RLS-poort.
+ */
+export interface AutoRolloverInsert {
+  user_id: string
+  budget_id: string
+  period: string // 'YYYY-MM'
+  carried_amount: number
+  rollover_type: string
+}
+
+/**
+ * Bouwt de rollover-rijen die aan het begin van een nieuwe periode voor de
+ * INGELOGDE gebruiker weggeschreven moeten worden — de pure kern van de
+ * auto-berekening in `budgets-client`, los van Supabase zodat de payload-vorm
+ * (inclusief `user_id`) testbaar is zonder een echte RLS-ronde.
+ *
+ * Twee poorten, en ze zijn allebei nodig:
+ *  · Zonder `userId` valt er niets te schrijven — een rij zonder eigenaar wordt
+ *    door RLS toch geweigerd, dus we sturen 'm niet eens.
+ *  · Creator-gate: alleen rijen voor budgetten die deze gebruiker bezit. De RLS
+ *    staat schrijven door beide partners toe, maar `UNIQUE(budget_id, period)`
+ *    zou botsen zodra ze allebei voor hetzelfde gedeelde budget wegschrijven.
+ */
+export function buildAutoRolloverInserts(params: {
+  /** `auth.uid()` van de ingelogde gebruiker; ontbreekt die, dan geen rijen. */
+  userId: string | null | undefined
+  /** Deelbudgetten (met `parent_id`) die voor rollover in aanmerking komen. */
+  childBudgets: Array<{
+    id: string
+    default_limit: number | string | null
+    rollover_type: string | null
+    user_id: string | null
+  }>
+  /** Besteding per budget-id in de VORIGE periode. */
+  prevSpending: Record<string, number>
+  /** Rollover-rijen van de vorige periode, ongeïndexeerd zoals uit de DB. */
+  prevRollovers: BudgetRollover[]
+  prevPeriod: string // 'YYYY-MM'
+  currentPeriod: string // 'YYYY-MM'
+}): AutoRolloverInsert[] {
+  const { userId, childBudgets, prevSpending, prevRollovers, prevPeriod, currentPeriod } = params
+
+  if (!userId) return []
+
+  // Vorige-periode-carry PER BUDGET opzoeken. `prevRollovers` bevat de rijen van
+  // ALLE budgetten van die periode; een ongeïndexeerde `getCarriedAmount` pakt
+  // daaruit de eerste rij die op periode matcht — dus de carry van een ánder
+  // budget. Dat is dezelfde indexering als `createEffectiveLimitLookup` al doet,
+  // en ze is hier extra zwaar: de uitkomst gaat als `carried_amount` de tabel in
+  // en die rij wordt per periode maar één keer aangemaakt (UNIQUE op
+  // budget_id+period), dus een verkeerde carry blijft permanent staan.
+  const prevByBudget = new Map<string, BudgetRollover[]>()
+  for (const r of prevRollovers) {
+    const list = prevByBudget.get(r.budget_id)
+    if (list) list.push(r)
+    else prevByBudget.set(r.budget_id, [r])
+  }
+
+  const rows: AutoRolloverInsert[] = []
+  for (const budget of childBudgets) {
+    if (budget.rollover_type === 'reset') continue
+    if (budget.user_id && budget.user_id !== userId) continue
+
+    const prevCarry = getCarriedAmount(prevByBudget.get(budget.id) ?? [], prevPeriod)
+    // De klem op een negatieve besteding zit IN computeRollover, niet hier
+    // — zie de toelichting bij die functie. Deze aanroep geeft de rauwe som door.
+    const { carry } = computeRollover(
+      Number(budget.default_limit),
+      prevSpending[budget.id] ?? 0,
+      prevCarry,
+      budget.rollover_type ?? 'reset',
+    )
+    if (carry > 0) {
+      rows.push({
+        user_id: userId,
+        budget_id: budget.id,
+        period: currentPeriod,
+        carried_amount: carry,
+        rollover_type: budget.rollover_type ?? 'reset',
+      })
+    }
+  }
+  return rows
+}
+
+/**
  * Get the effective budget limit for a given period (base + carry-over).
  */
 export function getEffectiveLimit(

@@ -332,10 +332,15 @@ function CryptoHoldingsEmpty() {
 //    portfolio-startwaarde zodat de gebruiker direct ziet of het portfolio
 //    het beter of slechter doet dan de twee marktreferenties.
 // 4. **CRUD-actiebalk (toevoegen / verwijderen / bewerken)** — crypto-
-//    holdings worden bij voorkeur via bron-koppelingen ingelezen
-//    (Bitvavo/wallet-sync). Handmatige toevoeging blijft via de
-//    asset-detail-flow op de items-tab; het Holdings-app dashboard heeft
-//    geen eigen CRUD nodig.
+//    holdings worden UITSLUITEND via bron-koppelingen ingelezen
+//    (Bitvavo/wallet-sync). Er is bewust GEEN handmatig toevoegpad, ook niet
+//    via de asset-detail-flow op de items-tab: `POST /api/holdings` weigert
+//    `asset_type === 'crypto'` met een 400, omdat een handmatige coin anders
+//    in `investment_holdings` belandt — onzichtbaar op de crypto-pagina, en
+//    de asset-rollup (die `crypto_holdings` bevraagt) nulde vervolgens de
+//    bestaande assetwaarde. Dit doc-comment claimde eerder wél zo'n
+//    asset-detail-flow; die bestaat niet (WF-BEZIT-21-bug4, eigenaar-besluit
+//    3 sep 2026: de guard blijft, de tekst past zich aan).
 // 5. **Volledige fiscale module** — de KPI-strip toont nu een **indicatieve**
 //    Box 3-heffing (forfait 2026 × 36% × bruto crypto-waarde), maar de echte
 //    aangifte vereist peildatum-snapshots, partner-grondslag en alle Box 3-

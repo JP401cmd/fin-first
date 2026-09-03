@@ -214,4 +214,95 @@ describe('buildMilestoneTimeline', () => {
   it('levert een lege lijst bij een lege log', () => {
     expect(buildMilestoneTimeline([], [], USER, null)).toEqual([])
   })
+
+  /**
+   * WF-MIJN-32 — de "Zonder datum"-bak brak een jaargroep doormidden.
+   *
+   * Live waargenomen op /mijn/mijlpalen (UAT 3 sep 2026), jaarkoppen van boven
+   * naar beneden: `2026` → `ZONDER DATUM` → `2026` → `2025`. Twee losse
+   * 2026-koppen dus, met de jaarloze bak ertussen in plaats van onderaan.
+   *
+   * Oorzaak: de comparator sorteerde op de rauwe `achieved_at`. Voor een
+   * 'onbekend'-rij ís dat het seed-moment (vandaag) — een geldige datum, dus de
+   * NaN-tak ving 'm niet af en hij landde tussen de echte 2026-rijen. De
+   * groepering voegt alleen AANEENGESLOTEN gelijke jaren samen, dus het jaar
+   * viel in tweeën uiteen.
+   */
+  it('houdt de "Zonder datum"-bak onderaan en laat een jaar niet in tweeën vallen (WF-MIJN-32)', () => {
+    const SEED_RUN = '2026-09-01T08:00:00.000Z'
+    /** Seed-rij zonder betrouwbare datering: achieved_at ≈ created_at (< 48u). */
+    const onbekend = (key: string) =>
+      row({
+        milestone_key: key,
+        kind: 'schuldenvrij',
+        threshold_value: 0,
+        observed_value: 0,
+        source: 'seed',
+        achieved_at: SEED_RUN,
+        created_at: '2026-09-01T08:00:01.000Z',
+      })
+    /** Seed-rij mét historische datering: achieved_at ligt ver vóór de seed-run. */
+    const omstreeks = (key: string, achievedAt: string) =>
+      row({ milestone_key: key, source: 'seed', achieved_at: achievedAt, created_at: SEED_RUN })
+
+    const jaren = buildMilestoneTimeline(
+      [
+        // Exact gedateerd, ná het seed-moment.
+        row({ milestone_key: 'vermogen-100k', achieved_at: '2026-09-02T12:00:00.000Z' }),
+        // Deze twee sorteerden vóór de fix tussen de twee 2026-rijen in: hun
+        // achieved_at (het seed-moment) ligt chronologisch precies daartussen.
+        onbekend('schuldenvrij'),
+        onbekend('noodfonds-gevuld'),
+        // Zelfde jaar, maar chronologisch vóór het seed-moment.
+        omstreeks('vermogen-50k', '2026-01-01T12:00:00.000Z'),
+        omstreeks('vermogen-25k', '2025-01-01T12:00:00.000Z'),
+      ],
+      [],
+      USER,
+      null,
+    )
+
+    // Eén kop per jaar, aflopend, en de jaarloze bak als laatste groep.
+    expect(jaren.map((j) => j.year)).toEqual([2026, 2025, null])
+
+    // Beide 2026-rijen zitten in dezelfde groep — het jaar is niet gesplitst.
+    expect(jaren[0].entries.map((e) => e.row.milestone_key)).toEqual([
+      'vermogen-100k',
+      'vermogen-50k',
+    ])
+
+    // De jaarloze bak is één aaneengesloten groep met precies de onbekend-rijen.
+    expect(jaren[2].entries.map((e) => e.row.milestone_key)).toEqual([
+      'noodfonds-gevuld',
+      'schuldenvrij',
+    ])
+    expect(jaren[2].entries.every((e) => e.dateKind === 'onbekend')).toBe(true)
+  })
+
+  it('bundelt een onleesbare datum en een seed-zonder-datering in dezelfde bak', () => {
+    // Twee verschillende routes naar "geen jaar" (onleesbare achieved_at op een
+    // detect-rij, en een seed-rij op het seed-moment) mogen niet twee losse
+    // jaarloze groepen opleveren.
+    const jaren = buildMilestoneTimeline(
+      [
+        row({ milestone_key: 'kapot', achieved_at: 'geen-datum' }),
+        row({ milestone_key: 'vermogen-100k', achieved_at: '2026-03-12T12:00:00.000Z' }),
+        row({
+          milestone_key: 'schuldenvrij',
+          kind: 'schuldenvrij',
+          threshold_value: 0,
+          observed_value: 0,
+          source: 'seed',
+          achieved_at: '2026-09-01T08:00:00.000Z',
+          created_at: '2026-09-01T08:00:01.000Z',
+        }),
+      ],
+      [],
+      USER,
+      null,
+    )
+
+    expect(jaren.map((j) => j.year)).toEqual([2026, null])
+    expect(jaren[1].entries.map((e) => e.row.milestone_key)).toEqual(['kapot', 'schuldenvrij'])
+  })
 })

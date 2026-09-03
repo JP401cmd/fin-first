@@ -37,6 +37,7 @@ import {
   formatFireAgeDelta,
 } from '@/lib/horizon-data'
 import { resolveFireParams } from '@/lib/fire-params'
+import { SAVINGS_RATE_WINDOW_MONTHS } from '@/lib/constants'
 import { lookupAowAge, type AowLeeftijdRow, type AowAge } from '@/lib/aow-leeftijd'
 import {
   type SimResult,
@@ -66,8 +67,14 @@ import { WhatIfHeader } from '@/components/app/horizon/whatif-header'
 import { WhatIfSlidersCollapsible, type WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
 import { WhatIfBeslishulp } from '@/components/app/horizon/whatif-beslishulp'
 import { WhatIfDevelopmentNotice } from '@/components/app/horizon/whatif-development-notice'
-import { applyWhatIfOverrides, buildBaselineOverrides } from '@/lib/whatif-overrides'
-import { computeDebtAflossingMonthly, computeSavingsRate6m, resolveSavingsSource } from '@/lib/savings-source'
+import { applyWhatIfOverrides, applyWhatIfOverridesToUnified, buildBaselineOverrides } from '@/lib/whatif-overrides'
+import {
+  computeDebtAflossingMonthly,
+  computeSavingsRate6m,
+  resolveSavingsSource,
+  savingsRateDataMonths,
+  savingsRateWindow,
+} from '@/lib/savings-source'
 import { resolveEffectiveIncomeExpenses } from '@/lib/effective-financials'
 import { withResolvedKernelBedragen } from '@/lib/horizon/kernel-profile-basis'
 import type { CashflowSettingsData } from '@/lib/cashflow-settings-data'
@@ -98,6 +105,7 @@ import { WealthCompositionChart } from '@/components/app/horizon/wealth-composit
 import { type StackedRow } from '@/lib/wealth-composition'
 import { buildBreakdownFromSimRows } from '@/lib/income-expense-breakdown'
 import { resolveUnlinkedCashShare, unlinkedCashTotal } from '@/lib/unlinked-cash'
+import { isTransferType } from '@/lib/transactions/transfer-marking'
 
 // WhatIfChat trekt de zware `ai` + `@ai-sdk/react` bundels (~30–40kB gz) mee. Die horen niet
 // in de First-Load JS van deze route: de chat staat onderaan een lange pagina en wordt lang
@@ -123,7 +131,23 @@ const WhatIfChatDynamic = dynamic(
 
 // ── Page ────────────────────────────────────────────────────────────────────
 
-export default function WhatIfPage() {
+/** Props van de what-if-pagina — geleverd door de server-page (`app/(app)/toekomst/whatif/page.tsx`). */
+export interface WhatIfPageProps {
+  /**
+   * ADR 0117 — de beheerde jaarlaag `fire_assumptions.volatility` (decimaal),
+   * server-side geresolveerd door de pagina en hier alléén doorgegeven aan de
+   * kernel-context (MC!B3). Weglaten → de kernel-default (`DEFAULT_VOLATILITY`).
+   *
+   * Dit is dezelfde waarde die /toekomst via `HorizonRawData.marktVolatiliteit`
+   * krijgt. Tot 3 sep 2026 ontbrak hij hier op alle zes kernel-context-
+   * constructies, zodat de "Onzekerheid"-band een ándere breedte toonde dan de
+   * "Marktcheck"-band op /toekomst zodra beheer de jaarlaag wijzigde. Géén eigen
+   * client-read (ADR 0058) — de pagina resolvet, de client consumeert.
+   */
+  marktVolatiliteit?: number
+}
+
+export default function WhatIfPage({ marktVolatiliteit }: WhatIfPageProps) {
   const fc = useFc()
   // ── Dream gate detection ──────────────────────────────────
   const searchParams = useSearchParams()
@@ -216,7 +240,14 @@ export default function WhatIfPage() {
       const monthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString().split('T')[0]
       const monthEnd = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 1)).toISOString().split('T')[0]
       const twelveMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 11, 1)).toISOString().split('T')[0]
-      const sixMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 5, 1)).toISOString().split('T')[0]
+      // 6-maands spaarquote-venster uit de CANONIEKE bron (lib/savings-source.ts):
+      // zes VOLTOOIDE kalendermaanden, de lopende maand EXCLUSIEF (bevinding C6).
+      // Stond hier als `getMonth() - 5` t/m `monthEnd` — zes maanden INCLUSIEF de
+      // halfvolle lopende maand, exact het pre-C6-patroon — terwijl de motor
+      // eronder (computeSavingsRate6m) wél canoniek was: de juiste engine, gevoed
+      // met het verkeerde venster. De slider-baseline week daardoor af van /toekomst
+      // zodra de lopende maand veel data droeg.
+      const window6m = savingsRateWindow(now)
 
       const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, childBudgetsResult, earliestIncomeResult, fullAssetsResult, fullDebtsResult, bankAccountsResult, income6mResult, expense6mResult, allBudgetsTypeResult, cashflowSettings] = await Promise.all([
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
@@ -236,8 +267,8 @@ export default function WhatIfPage() {
         // `ownership` erbij: de policy is huishoud-verbreed, dus een gedeelde
         // rekening komt hier ook binnen en telt op het eigen aandeel.
         supabase.from('bank_accounts').select('id, balance, ownership').eq('is_active', true).is('linked_asset_id', null),
-        supabase.from('transactions').select('amount, transaction_type').eq('is_income', true).gte('date', sixMonthsAgo).lt('date', monthEnd),
-        supabase.from('transactions').select('amount, transaction_type, budget_id').eq('is_income', false).gte('date', sixMonthsAgo).lt('date', monthEnd),
+        supabase.from('transactions').select('amount, transaction_type').eq('is_income', true).gte('date', window6m.fromDate).lt('date', window6m.toDate),
+        supabase.from('transactions').select('amount, transaction_type, budget_id').eq('is_income', false).gte('date', window6m.fromDate).lt('date', window6m.toDate),
         // Budget-type-map-bron (parent + kind) → spaarbudget-IDs voor de
         // spaarbudget-correctie in computeSavingsRate6m (WF-REKEN-13).
         supabase.from('budgets').select('id, budget_type, parent_id'),
@@ -365,8 +396,9 @@ export default function WhatIfPage() {
       // spaarbudget-correctie mee (stortingen op savings-budgetten tellen als
       // sparen, niet als uitgave), de <6m-extrapolatie én de profiel-fallback —
       // waardoor de spaarquote-slider hetzelfde percentage toont als /toekomst.
-      const isRealTx = (t: { transaction_type?: string | null }) =>
-        t.transaction_type !== 'transfer' && t.transaction_type !== 'joint_transfer'
+      // Transfer-filter uit de gedeelde typelijst (TRANSFER_TYPES) — geen eigen
+      // kopie van 'transfer'/'joint_transfer'.
+      const isRealTx = (t: { transaction_type?: string | null }) => !isTransferType(t.transaction_type)
       const income6m = (income6mResult.data ?? []).filter(isRealTx)
         .reduce((s: number, t: { amount: number | string | null }) => s + Math.abs(Number(t.amount) || 0), 0)
       const expenses6m = (expense6mResult.data ?? []).filter(isRealTx)
@@ -392,18 +424,12 @@ export default function WhatIfPage() {
           return bid && savingsBudgetIds.has(bid) ? s + Math.abs(Number(t.amount) || 0) : s
         }, 0)
 
-      const aflossing6m = computeDebtAflossingMonthly((fullDebtsResult.data ?? []) as Debt[]) * 6
+      const aflossing6m = computeDebtAflossingMonthly((fullDebtsResult.data ?? []) as Debt[]) * SAVINGS_RATE_WINDOW_MONTHS
 
-      // Aantal maanden werkelijke data (1–6) voor de <6m-extrapolatie — zelfde
-      // vroegste-inkomens-datum als de income-extrapolatie hierboven.
-      let dataMonths6 = 6
-      if (earliestIncomeDate) {
-        const earliest = new Date(earliestIncomeDate)
-        dataMonths6 = Math.max(1, Math.min(6,
-          (now.getFullYear() - earliest.getFullYear()) * 12 +
-          (now.getMonth() - earliest.getMonth())
-        ))
-      }
+      // Aantal maanden werkelijke data (1–6) voor de <6m-extrapolatie — uit
+      // dezelfde canonieke bron als het venster (savingsRateDataMonths telt exact
+      // de maanden die savingsRateWindow afbakent), i.p.v. een lokale herimplementatie.
+      const dataMonths6 = savingsRateDataMonths(now, earliestIncomeDate)
 
       const { savingsRate6m: computedSavingsRate6m, extSavingsBudget6 } = computeSavingsRate6m({
         income6m,
@@ -430,8 +456,8 @@ export default function WhatIfPage() {
         estimatedMonthlyExpenses: profileMonthlyExpenses,
         savingsRate6m: computedSavingsRate6m,
         // Handmatig pad volgt dezelfde definitie als het transactie-pad.
-        monthlyDebtAflossing: aflossing6m / 6,
-        monthlySavingsContribution: extSavingsBudget6 / 6,
+        monthlyDebtAflossing: aflossing6m / SAVINGS_RATE_WINDOW_MONTHS,
+        monthlySavingsContribution: extSavingsBudget6 / SAVINGS_RATE_WINDOW_MONTHS,
       })
       setBaseAnnualSavingsFromCashflow(baseAnnualSavings)
 
@@ -710,10 +736,13 @@ export default function WhatIfPage() {
     [rawProfile, fullAssets, aowRows, returnDeltas],
   )
 
-  // ── Legacy what-if FinancialInput (for dailyExpenses display only) ──────
-  const { adjustedInput: whatIfInput, annualSavings: whatIfAnnualSavings_sim } = useMemo(() => {
-    if (!input || !overrides || !baseline) return { adjustedInput: null as FinancialInput | null, annualSavings: 0 }
-    return applyWhatIfOverrides(input, overrides, baseline)
+  // ── Legacy what-if FinancialInput — UITSLUITEND voor de dailyExpenses-weergave. ──
+  // De `annualSavings` van deze deprecated helper wordt bewust NIET meer
+  // geconsumeerd: die rekent op Σ assets.monthly_contribution × 12, een derde
+  // grondslag naast de canonieke (zie whatIfAnnualSavings, WF-REKEN-13-bug3).
+  const whatIfInput = useMemo<FinancialInput | null>(() => {
+    if (!input || !overrides || !baseline) return null
+    return applyWhatIfOverrides(input, overrides, baseline).adjustedInput
   }, [input, overrides, baseline])
 
   // ── Run baseline simulation (DB events only) — IDENTIEK aan /toekomst ──────
@@ -733,11 +762,12 @@ export default function WhatIfPage() {
         aowRows,
         // Baseline: geen rendement-delta.
         yearlyExpenses: baseBuilt.input.yearlyExpenses,
+        marktVolatiliteit,
       },
     })
     if (!outcome.ok) return null
     return { result: toSimResult(outcome.result), cashflows: baseBuilt.input.cashflows }
-  }, [baseBuilt, rawProfile, fullAssets, fullDebts, baselineDbEvents, aowRows])
+  }, [baseBuilt, rawProfile, fullAssets, fullDebts, baselineDbEvents, aowRows, marktVolatiliteit])
 
   // ── Run what-if simulation (DB + scenario events; return override applied) ──
   // Slider-defer (alléén scheduling; geen formule/parameter-wijziging). Bundel de sim-inputs
@@ -756,7 +786,8 @@ export default function WhatIfPage() {
     scenarioActiveEvents,
     returnDeltas,
     aowRows,
-  }), [whatIfBuilt, whatIfUnifiedInput, rawProfile, fullAssets, fullDebts, scenarioActiveEvents, returnDeltas, aowRows])
+    marktVolatiliteit,
+  }), [whatIfBuilt, whatIfUnifiedInput, rawProfile, fullAssets, fullDebts, scenarioActiveEvents, returnDeltas, aowRows, marktVolatiliteit])
 
   const deferredWhatIfSimInput = useDeferredValue(whatIfSimInput)
 
@@ -773,6 +804,7 @@ export default function WhatIfPage() {
         aowRows: p.aowRows,
         returnDeltaByAssetType: p.returnDeltas,
         yearlyExpenses: p.whatIfBuilt.input.yearlyExpenses,
+        marktVolatiliteit: p.marktVolatiliteit,
       },
     })
     if (!outcome.ok) return null
@@ -826,6 +858,7 @@ export default function WhatIfPage() {
           aowRows,
           uniformReturnDelta: pinReturnDelta,
           yearlyExpenses: pinBuilt.input.yearlyExpenses,
+          marktVolatiliteit,
         },
       })
       if (!outcome.ok) continue
@@ -844,7 +877,7 @@ export default function WhatIfPage() {
       })
     }
     return result
-  }, [pinnedScenarioIds, savedScenariosMirror, input, buildInputForEvents, baseline, rawProfile, fullAssets, fullDebts, aowRows])
+  }, [pinnedScenarioIds, savedScenariosMirror, input, buildInputForEvents, baseline, rawProfile, fullAssets, fullDebts, aowRows, marktVolatiliteit])
 
   // ── Marktcheck-band ("Onzekerheid"-pil) ───────────────────────────────────
   // Draait `computeWhatifMarktcheck` in de web worker: n VOLLEDIGE kernel-runs op
@@ -866,6 +899,9 @@ export default function WhatIfPage() {
       aowRows: p.aowRows,
       returnDeltaByAssetType: p.returnDeltas,
       yearlyExpenses: p.whatIfBuilt.input.yearlyExpenses,
+      // ADR 0117 — de beheerde jaarlaag voedt MC!B3; dít is de constructie die
+      // de bandbreedte van de "Onzekerheid"-pil bepaalt.
+      marktVolatiliteit: p.marktVolatiliteit,
     }
   }, [mcEnabled, deferredWhatIfSimInput])
 
@@ -938,6 +974,7 @@ export default function WhatIfPage() {
         lifeEvents: eventsWithThis, aowRows,
         returnDeltaByAssetType: returnDeltas,
         yearlyExpenses: builtWith.input.yearlyExpenses,
+        marktVolatiliteit,
       },
     })
     if (!outcomeWith.ok) return null
@@ -953,6 +990,7 @@ export default function WhatIfPage() {
         lifeEvents: eventsWithout, aowRows,
         returnDeltaByAssetType: returnDeltas,
         yearlyExpenses: builtWithout.input.yearlyExpenses,
+        marktVolatiliteit,
       },
     })
     if (!outcomeWithout.ok) return null
@@ -974,7 +1012,7 @@ export default function WhatIfPage() {
     }
 
     return { event, fireAgeWith, fireAgeWithout, deltaMonths, totalCost }
-  }, [input, buildInputForEvents, events, scenarioActiveEvents, returnDeltas, rawProfile, fullAssets, fullDebts, aowRows])
+  }, [input, buildInputForEvents, events, scenarioActiveEvents, returnDeltas, rawProfile, fullAssets, fullDebts, aowRows, marktVolatiliteit])
 
   // ── Derived values for display ───────────────────────────
   // (currentAge declared earlier at line ~288 for use in handleLoadScenario.)
@@ -984,9 +1022,22 @@ export default function WhatIfPage() {
     ? whatIfFireAge - baselineFireAge
     : null
 
-  // Annual savings for scenario summary — derived overrides feed the legacy helper.
-  const whatIfAnnualSavings = whatIfAnnualSavings_sim || (input?.monthlyContributions ?? 0) * 12
+  // Jaarlijks sparen voor de vergelijking (KPI-strip, verschil-tabel, beslishulp,
+  // AI-samenvatting) — BEIDE kanten op DEZELFDE canonieke grondslag:
+  // `baseUnifiedInput.annualSavings` (buildHorizonInput → override → cashflow-
+  // spaarquote → asset-aggregaat, ADR 0073). De what-if-kant is die grondslag
+  // plus de slider-delta's (inkomen/werkdagen/spaarquote/extra inleg) via
+  // applyWhatIfOverridesToUnified; zonder scenario-wijziging zijn de delta's 0
+  // en is het verschil exact €0. Bewust NIET `whatIfUnifiedInput.annualSavings`:
+  // buildHorizonInput laat annualSavings onafhankelijk van lifeEvents, dus dat
+  // veld is áltijd gelijk aan de baseline en zou elke slider-delta verbergen.
+  // Tot 3 sep 2026 kwam de what-if-kant uit het legacy applyWhatIfOverrides
+  // (Σ assets.monthly_contribution × 12) → "€ 42.000 vs € 20.400" bij een
+  // ongewijzigd scenario (WF-REKEN-13-bug3).
   const baselineAnnualSavings = baseUnifiedInput?.annualSavings ?? (input?.monthlyContributions ?? 0) * 12
+  const whatIfAnnualSavings = baseUnifiedInput && overrides && baseline
+    ? applyWhatIfOverridesToUnified(baseUnifiedInput, overrides, baseline).annualSavings
+    : baselineAnnualSavings
 
   // ── Preset active flag (drives ChartOverlayExplainer + baseline emphasis) ──
   const presetActive = activePresetId !== null

@@ -138,6 +138,15 @@ describe('bank_accounts-kolomprojectie (repo-brede gate)', () => {
     // eigen IBAN); beide lezers scopen strikt op `.eq('user_id', …)`.
     join('lib', 'truelayer', 'target-account.ts'),
     join('app', 'api', 'bank-connect', 'accounts', 'route.ts'),
+    // `loadHouseholdSiblingAccountIds` leest de `iban_hash` van de EIGEN
+    // doelrekening om de en/of-broertjes van de partner te vinden. Die ene
+    // projectie is strikt eigen-rij gescoped (`.eq('id', …).eq('user_id', …)`)
+    // en de waarde verlaat de servermodule niet: de vervolgquery gebruikt hem
+    // als FILTER en projecteert alleen `id`. Server-only bestand, nooit vanuit
+    // clientcode aangeroepen, en de functie-docstring verbiedt expliciet een
+    // service-role-client — zonder RLS wordt `iban_hash` juist een
+    // correlatiesleutel over alle gebruikers heen.
+    join('lib', 'truelayer', 'existing-hashes.ts'),
   ]
 
   function walk(dir: string, out: string[] = []): string[] {

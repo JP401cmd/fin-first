@@ -27,7 +27,7 @@ function makeOverview(overrides: Partial<LocalChatOverview> = {}): LocalChatOver
     dagtarief: 82,
     swrPct: 3.5,
     noodbuffer: null,
-    jaarruimte: { onbenut: 8000, besparing: 2400, vrijheidsdagen: 29 },
+    jaarruimte: { onbenut: 8000, besparing: 2400, vrijheidsdagen: 29, factorAKnown: true },
     kansen: [
       { titel: 'Bespaar op boodschappen', besparingPerJaar: 1200, vrijheidsdagen: 15 },
       { titel: 'Verlaag je energiekosten', besparingPerJaar: 600, vrijheidsdagen: 7 },

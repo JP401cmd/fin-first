@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { Box2DividendSimulator } from './box2-dividend-simulator'
@@ -7,6 +6,7 @@ import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
 import { BOX2_PARAMS, calculateBox2 } from '@/lib/box2-data'
 import { BOX2_SIMULATOR_SCHAAL_FACTOR } from '@/lib/constants'
 import { formatCurrency } from '@/lib/format'
+import { readSourceLF } from '@/lib/test-utils/read-source'
 
 /**
  * Bevinding H26 — "Box 2 toont €0 én €16.867 tegelijk".
@@ -45,9 +45,10 @@ function slider(): HTMLInputElement {
 
 /** De broncode van het component zónder commentaar — invoer voor de grendels. */
 function simulatorCode(): string {
-  const src = readFileSync(
+  // CRLF-veilig (zie lib/test-utils/read-source.ts): de /gm-strip hieronder
+  // slaat stil terug op een verse Windows-checkout zonder normalisatie.
+  const src = readSourceLF(
     join(process.cwd(), 'components/overview/belasting/box2-dividend-simulator.tsx'),
-    'utf8',
   )
   return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 }
@@ -171,6 +172,34 @@ describe('Box2DividendSimulator — één motor (H26)', () => {
     expect(simulatorCode()).not.toContain('(31%)')
     // De motor wordt daadwerkelijk aangeroepen.
     expect(simulatorCode()).toContain('calculateBox2(')
+  })
+})
+
+/**
+ * Zelfde mechanisme als WF-BELAST-10-bug1 (jaarruimte-slider): een native
+ * numerieke `step` saneert de berekende startstand naar een veelvoud, buiten
+ * React om. Het werkelijke dividend is zelden een 1000-voud, dus de thumb week
+ * in de browser af van de kop die hij per constructie hoort te spiegelen
+ * (€45.678 → DOM 46.000). jsdom saneert niet; vastgelegd wordt de invariant.
+ */
+describe('Box2DividendSimulator — startstand exact, stapraster alleen bij interactie', () => {
+  it('draagt géén numerieke step en start exact op een niet-1000-voud dividend', () => {
+    const werkelijk = 45_678
+    const { container } = renderSim({ defaultDividend: werkelijk })
+    expect(werkelijk % 1000).not.toBe(0)
+    expect(slider().step).toBe('any')
+    expect(slider().value).toBe(String(werkelijk))
+    expect(container.textContent).toContain(formatCurrency(motor(werkelijk).totalTaxInclDga))
+  })
+
+  it('slepen en pijltjes snappen op het 1000-raster, vanaf de startstand naar het eerstvolgende', () => {
+    renderSim({ defaultDividend: 45_678 })
+    fireEvent.keyDown(slider(), { key: 'ArrowRight' })
+    expect(slider().value).toBe('46000')
+    fireEvent.change(slider(), { target: { value: '52400' } })
+    expect(slider().value).toBe('52000')
+    fireEvent.keyDown(slider(), { key: 'ArrowLeft' })
+    expect(slider().value).toBe('51000')
   })
 })
 

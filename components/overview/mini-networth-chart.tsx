@@ -234,6 +234,12 @@ function MiniNetWorthChartComponent({
     // vermogen-as. NIET simRequiredPortfolio: dat is het LIQUIDE vrijheidsdoel en
     // hoort niet op de netto-vermogen-as (zou de marker laten zweven t.o.v. de
     // lijn). Het doelbedrag tonen we apart als los label (zie freedomTargetLabel).
+    // Zonder projectierijen in het venster is er GEEN eindstand: de reeks
+    // bestaat dan alleen uit het Vandaag-punt (gerealiseerd vermogen), en dat
+    // onder "Vermogen bij vrijheid → ca. …" zetten is een projectieclaim op een
+    // gerealiseerd getal (5f, nazorg R2+R3). `endValue` blijft numeriek voor de
+    // schaal; label en eindmarker hangen aan `hasProjection`.
+    const hasProjection = projRowsInRange.length > 0
     const endValue =
       dedupedProjection[dedupedProjection.length - 1]?.value ?? currentNetWorth
     const endLabel = isPensioenMode ? 'Pensioen' : 'Vrijheid'
@@ -444,6 +450,7 @@ function MiniNetWorthChartComponent({
       startAge,
       finalAge,
       endValue,
+      hasProjection,
       endLabel,
       finalAgeLabel,
       endMarkerText,
@@ -500,6 +507,7 @@ function MiniNetWorthChartComponent({
     startAge,
     finalAge,
     endValue,
+    hasProjection,
     endLabel,
     finalAgeLabel,
     endMarkerText,
@@ -574,7 +582,9 @@ function MiniNetWorthChartComponent({
             ? simple
               ? `${endLabel} bereikt`
               : `${endLabel} bereikt — verloop tot ${finalAgeLabel}`
-            : `Vermogen bij ${endLabel.toLowerCase()} → ${formatMaskedApproxCurrency(endValue, masked)}`}
+            : hasProjection
+              ? `Vermogen bij ${endLabel.toLowerCase()} → ${formatMaskedApproxCurrency(endValue, masked)}`
+              : 'Nog geen projectie'}
         </span>
       </header>
       <div className="font-serif text-xl font-semibold text-[var(--ink)] tabular-nums">
@@ -731,27 +741,31 @@ function MiniNetWorthChartComponent({
             </g>
           ))}
           {/* Eindmarker rechts: vrijheidsmoment, of eindleeftijd wanneer
-              vrijheid al bereikt is */}
-          <line
-            x1={ageToX(finalAge)}
-            y1={PAD_TOP}
-            x2={ageToX(finalAge)}
-            y2={valueToY(endValue)}
-            stroke="var(--color-horizon-500)"
-            strokeWidth="1"
-            strokeDasharray="2 3"
-            opacity="0.6"
-          />
-          <circle cx={ageToX(finalAge)} cy={valueToY(endValue)} r="4" fill="var(--color-horizon-500)" />
-          <text
-            x={ageToX(finalAge)}
-            y={PAD_TOP - 4}
-            textAnchor="end"
-            className="fill-[var(--color-horizon-800)] font-mono"
-            fontSize="9"
-          >
-            {endMarkerText}
-          </text>
+              vrijheid al bereikt is — alleen mét projectierijen (5f). */}
+          {hasProjection && (
+            <>
+              <line
+                x1={ageToX(finalAge)}
+                y1={PAD_TOP}
+                x2={ageToX(finalAge)}
+                y2={valueToY(endValue)}
+                stroke="var(--color-horizon-500)"
+                strokeWidth="1"
+                strokeDasharray="2 3"
+                opacity="0.6"
+              />
+              <circle cx={ageToX(finalAge)} cy={valueToY(endValue)} r="4" fill="var(--color-horizon-500)" />
+              <text
+                x={ageToX(finalAge)}
+                y={PAD_TOP - 4}
+                textAnchor="end"
+                className="fill-[var(--color-horizon-800)] font-mono"
+                fontSize="9"
+              >
+                {endMarkerText}
+              </text>
+            </>
+          )}
           {/* Vandaag-label — links uitgelijnd wanneer de as dicht bij de
               linkerrand staat (weinig historie), anders gecentreerd. */}
           <text

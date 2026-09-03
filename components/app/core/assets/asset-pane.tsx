@@ -28,6 +28,8 @@ import { ShellOverlay, type PaneAction } from '@/components/app/shell/shell-over
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/app/toast-provider'
 import { ASSET_CLIENT_COLUMNS, type Asset } from '@/lib/asset-data'
+import { computeYearlyMustExpenses, type BudgetRow, type ChildBudgetRow } from '@/lib/budget-utils'
+import { dailyExpenseRate } from '@/lib/format'
 import {
   loadConnectionForAsset,
   type AssetConnectionSummary,
@@ -201,7 +203,7 @@ export function AssetPane({ asset, currentUserId, onClose, onChanged }: AssetPan
         .single(),
       supabase
         .from('budgets')
-        .select('id, default_limit, interval')
+        .select('id, name, default_limit, interval, budget_type')
         .eq('is_essential', true)
         .eq('budget_type', 'expense')
         .is('parent_id', null),
@@ -237,38 +239,23 @@ export function AssetPane({ asset, currentUserId, onClose, onChanged }: AssetPan
     const profile = profileRes.data
     setBudgetingActive(profile?.budgeting_active !== false)
 
-    // Daily-expense schatting voor freedom-time badge (jaarlijkse essentiële
-    // budgetten / 365).
-    const essentialBudgets = essentialBudgetsRes.data ?? []
-    const childBudgets = (childBudgetsRes.data ?? []) as Array<{
-      parent_id: string | null
-      default_limit: number
-      is_essential: boolean
-      interval: string
-      budget_type: string
-    }>
-    let yearlyEssential = 0
-    for (const parent of essentialBudgets) {
-      const kids = childBudgets.filter((c) => c.parent_id === parent.id)
-      const limit =
-        kids.length > 0
-          ? kids.reduce((s, c) => s + Number(c.default_limit), 0)
-          : Number(parent.default_limit)
-      const annual =
-        parent.interval === 'monthly'
-          ? limit * 12
-          : parent.interval === 'quarterly'
-            ? limit * 4
-            : limit
-      yearlyEssential += annual
-    }
-    if (yearlyEssential > 0) {
-      setDailyExpenses(yearlyEssential / 365)
-    } else if (profile?.estimated_monthly_expenses) {
-      setDailyExpenses((Number(profile.estimated_monthly_expenses) * 12) / 365)
-    } else {
-      setDailyExpenses(0)
-    }
+    // Dagtarief voor de vrijheidstijd-badge: ESSENTIËLE-uitgaven-grondslag
+    // (de must-basis van de FIRE-doelberekening, net als portfolio-value-chart)
+    // via de canonieke oprol `computeYearlyMustExpenses` (lib/budget-utils.ts).
+    // Hier stond een eigen kopie die álle kinderen met het PARENT-interval
+    // normaliseerde (de interval-mismatch uit aandachtspunt
+    // budget-kind-oprol-interval-mismatch) en de essential-kind-regel miste.
+    // Terugval: de profielschatting via de canonieke conversie (×12/365);
+    // 0 = geen eerlijke dagbasis.
+    const { yearlyMustExpenses } = computeYearlyMustExpenses(
+      (essentialBudgetsRes.data ?? []) as BudgetRow[],
+      (childBudgetsRes.data ?? []) as ChildBudgetRow[],
+    )
+    setDailyExpenses(
+      yearlyMustExpenses > 0
+        ? yearlyMustExpenses / 365
+        : dailyExpenseRate(Number(profile?.estimated_monthly_expenses ?? 0)),
+    )
   }, [])
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { captureRequestError, isNextControlFlowError } from './request-error'
 
@@ -8,8 +8,16 @@ function makeMockClient() {
   return { client: { from } as unknown as SupabaseClient, from, insert }
 }
 
+beforeEach(() => {
+  // Vitest draait zonder VERCEL_ENV en met NODE_ENV='test' — voor de
+  // dev/prod-guard is dat "aantoonbaar lokaal". Wie een insert verwacht, moet
+  // dus expliciet een deploy-omgeving stellen.
+  vi.stubEnv('VERCEL_ENV', 'production')
+})
+
 afterEach(() => {
   delete process.env.NEXT_RUNTIME
+  vi.unstubAllEnvs()
   vi.restoreAllMocks()
 })
 
@@ -62,6 +70,28 @@ describe('captureRequestError', () => {
       getClient: () => client,
     })
     expect(insert).not.toHaveBeenCalled()
+  })
+
+  it('doet niets vanuit een lokale ontwikkelomgeving (dev/prod-guard)', async () => {
+    // Regressie: een `next dev` tegen de productie-Supabase zette Turbopack/HMR-
+    // ruis in error_logs en ondermijnde /beheer/errors als productiesignaal.
+    vi.stubEnv('VERCEL_ENV', '')
+    vi.stubEnv('NODE_ENV', 'development')
+    const { client, from, insert } = makeMockClient()
+    await captureRequestError(new Error('boom'), { path: '/x' }, { routeType: 'route' }, {
+      getClient: () => client,
+    })
+    expect(from).not.toHaveBeenCalled()
+    expect(insert).not.toHaveBeenCalled()
+  })
+
+  it('een preview-deploy logt wél — de guard mag de inbox niet blind maken', async () => {
+    vi.stubEnv('VERCEL_ENV', 'preview')
+    const { client, insert } = makeMockClient()
+    await captureRequestError(new Error('boom'), { path: '/x' }, { routeType: 'route' }, {
+      getClient: () => client,
+    })
+    expect(insert).toHaveBeenCalledTimes(1)
   })
 
   it('slikt fouten in de client stil in (nooit throwen)', async () => {

@@ -203,7 +203,8 @@ export async function POST(req: Request) {
   }
   const sourceDef = parsed.data
 
-  // 2. AI pre-screen. Faalt gracieus (returns ok=true op AI-fout).
+  // 2. AI pre-screen. Faalt CLOSED: kon de screening niet draaien, dan komt
+  //    `ok=false` met `reason: 'unavailable'` terug (zie die module).
   const screen = await screenPublishMetadata(supabase, {
     name: source.name ?? sourceDef.name,
     description: source.description ?? sourceDef.description ?? null,
@@ -217,10 +218,20 @@ export async function POST(req: Request) {
   await recordAiUsage(supabase, user.id, 'report')
 
   if (!screen.ok) {
+    // Eén responsvorm, twee eerlijke boodschappen. De curatie-sheet toont
+    // uitsluitend `error` (`issue`/`suggestion` reizen mee). Bij 'unavailable'
+    // heeft de screening níets over de inhoud gezegd — dan is "niet geschikt
+    // om publiek te delen" een onterecht verwijt en hoort de gebruiker de
+    // fail-closed-tekst zelf te zien (UAT WF-REKEN-04-bug2). Fail-closed blijft:
+    // in beide gevallen 422 en geen publieke rij.
+    const error =
+      screen.reason === 'unavailable'
+        ? screen.issue
+        : 'De naam of beschrijving is niet geschikt om publiek te delen.'
     return Response.json(
       {
         ok: false,
-        error: 'De naam of beschrijving is niet geschikt om publiek te delen.',
+        error,
         issue: screen.issue,
         suggestion: screen.suggestion,
       },

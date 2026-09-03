@@ -28,7 +28,7 @@ import {
   debtProjection,
   computeRenteAflossingsSplit,
 } from '@/lib/debt-data'
-import type { Asset } from '@/lib/asset-data'
+import { linkedAssetLabel, type Asset } from '@/lib/asset-data'
 import { deriveMarginaalTarief } from '@/lib/box1-tax'
 import { INFLATION } from '@/lib/constants'
 import { computeSharePct, SPLIT_MODE_LABELS, type SplitMode } from '@/lib/household-data'
@@ -385,7 +385,10 @@ export function DebtDetailModal({
             const details: { label: string; value: string }[] = []
             if (debt.fixed_rate_end_date) details.push({ label: 'Rentevast tot', value: new Date(debt.fixed_rate_end_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' }) })
             if (debt.credit_limit) details.push({ label: 'Kredietlimiet', value: formatCurrency(Number(debt.credit_limit)) })
-            if (linkedAsset) details.push({ label: debt.debt_type === 'dga_schuld' ? 'Gekoppelde deelneming' : 'Gekoppelde woning', value: linkedAsset.name })
+            // Label volgt het WERKELIJKE bezittype, niet het schuldtype: een
+            // autolening met een gekoppelde `vehicle` toonde anders
+            // "Gekoppelde woning" (UAT WF-SCHULD-05).
+            if (linkedAsset) details.push({ label: linkedAssetLabel(linkedAsset.asset_type), value: linkedAsset.name })
             if (debt.draagkrachtmeting_date) details.push({ label: 'Draagkrachtmeting', value: new Date(debt.draagkrachtmeting_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' }) })
             if (details.length === 0) return null
             return (

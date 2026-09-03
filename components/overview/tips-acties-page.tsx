@@ -7,7 +7,7 @@ import { ActionBoard } from '@/components/app/action-board'
 import { FreedomDaysAnimationProvider } from '@/components/app/freedom-days-animation'
 import { OpzegModal } from '@/components/app/opzeg-modal'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
-import type { PageInfoContent } from '@/lib/page-info-content'
+import { hasPageInfo, type PageInfoContent } from '@/lib/page-info-content'
 import { PageOpening } from '@/components/editorial'
 import { TipsLijst } from './tips-lijst'
 import type { Action, Recommendation } from '@/lib/recommendation-data'
@@ -59,7 +59,7 @@ export function TipsActiesPage({
   return (
     <FreedomDaysAnimationProvider>
       <section className="relative mx-auto max-w-3xl px-4 sm:px-6 py-6">
-        {(infoContent.insight || infoContent.grip) && (
+        {hasPageInfo(infoContent) && (
           <PageInfoButton
             content={infoContent}
             className="absolute right-4 top-6 sm:right-6"

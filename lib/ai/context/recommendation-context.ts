@@ -5,6 +5,7 @@ import { getNibudHouseholdType, getNibudReferences, calculateBenchmarks } from '
 import { detectRecurringTransactions } from '@/lib/recurring-detection'
 import { buildBudgetSpendingMap, type SpendingTxRow } from '@/lib/budget-spending'
 import { buildAiBudgetTypeMap, loadSplitRows } from './budget-spending-source'
+import { getRecentDailyExpenseRate } from '@/lib/expense-rate'
 
 const TEMPORAL_LABELS: Record<number, string> = {
   1: 'De Levensgenieter (level 1) — Comfort > Snelheid. Wil niet inleveren op comfort. FIRE is een leuke bonus, geen obsessie.',
@@ -49,6 +50,18 @@ export async function buildRecommendationContext(supabase: SupabaseClient, budge
     }
   }
 
+  // Canoniek dagtarief (lib/expense-rate.ts): 12-mnd rolling consumptie met de
+  // profielschatting als terugval — dezelfde wisselkoers als de widgets. Dit
+  // bestand droeg TWEE eigen `(maand × 12) / 365`-sommen (3-mnd budgetsom voor
+  // de NIBUD-vergelijking; 3-mnd transactiesom met een verzonnen €30/dag voor
+  // de abonnementen), waardoor Fin andere vrijheidsdagen citeerde dan het
+  // scherm (1d, nazorg R2+R3). 0 = geen eerlijke dagbasis → geen dagen.
+  const { dailyRate: canonicalDailyExpense } = await getRecentDailyExpenseRate(
+    supabase,
+    new Date(),
+    profileEstimatedMonthlyExpenses,
+  )
+
   // Shared financial overview (net worth, FIRE, freedom %)
   const shared = await buildSharedContext(supabase)
   parts.push(shared)
@@ -71,10 +84,6 @@ export async function buildRecommendationContext(supabase: SupabaseClient, budge
     .select('id, date, amount, description, counterparty_name, is_income, budget_id, transaction_type')
     .gte('date', getMonthsAgoDate(12))
     .order('date', { ascending: true })
-
-  // Filter out own-account transfers
-  const isRealTx = (t: { transaction_type?: string | null }) =>
-    t.transaction_type !== 'transfer' && t.transaction_type !== 'joint_transfer'
 
   if (budgets && transactions && budgetingActive) {
     // Besteding per budget over de laatste 3 maanden — canoniek. Was: inkomsten
@@ -149,15 +158,8 @@ export async function buildRecommendationContext(supabase: SupabaseClient, budge
             }
           }
 
-          // Calculate daily expense for freedom-day conversion
-          const totalMonthlySpending = Object.values(spendingBySlug).reduce((s, v) => s + v, 0)
-          // Fallback to profile estimate instead of hardcoded 1
-          const profileEstExpenses = Number(profile?.estimated_monthly_expenses ?? 0)
-          const dailyExpense = totalMonthlySpending > 0
-            ? (totalMonthlySpending * 12) / 365
-            : (profileEstExpenses > 0 ? (profileEstExpenses * 12) / 365 : 0)
-
-          const benchmarks = calculateBenchmarks(references, spendingBySlug, dailyExpense)
+          // Canoniek dagtarief (zie boven) i.p.v. een eigen som op de 3-mnd budgetsom.
+          const benchmarks = calculateBenchmarks(references, spendingBySlug, canonicalDailyExpense)
           const householdLabel: Record<string, string> = {
             alleenstaand: 'alleenstaand',
             paar: 'paar zonder kinderen',
@@ -233,21 +235,14 @@ export async function buildRecommendationContext(supabase: SupabaseClient, budge
 
       const totalMonthly = detectedSubs.reduce((s, sub) => s + toMonthly(sub), 0)
 
-      // Calculate daily expense from 3-month transaction data for freedom-day conversion
-      let dailyExpense = profileEstimatedMonthlyExpenses > 0 ? (profileEstimatedMonthlyExpenses * 12) / 365 : 30
-      if (transactions) {
-        const totalSpent = transactions
-          .filter(t => !t.is_income && isRealTx(t))
-          .reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
-        const monthlyAvg = totalSpent / 3
-        if (monthlyAvg > 0) dailyExpense = (monthlyAvg * 12) / 365
-      }
-
-      const freedomDaysPerYear = Math.round((totalMonthly * 12) / dailyExpense)
+      // Canoniek dagtarief (zie boven) i.p.v. een eigen 3-mnd som met €30/dag-terugval.
+      const freedomDaysPerYear =
+        canonicalDailyExpense > 0 ? Math.round((totalMonthly * 12) / canonicalDailyExpense) : 0
+      const dagenHint = freedomDaysPerYear > 0 ? ` (~${freedomDaysPerYear} dagen als ze essentieel zouden zijn)` : ''
 
       // Abonnementen zijn niet-essentieel → besparingspotentieel, geen "vrijheidsdagen per jaar" claim
       const subLines: string[] = [
-        `Totaal: ${formatCurrency(Math.round(totalMonthly))}/maand — ${formatCurrency(Math.round(totalMonthly * 12))}/jaar besparingspotentieel richting FIRE-doel (~${freedomDaysPerYear} dagen als ze essentieel zouden zijn)`,
+        `Totaal: ${formatCurrency(Math.round(totalMonthly))}/maand — ${formatCurrency(Math.round(totalMonthly * 12))}/jaar besparingspotentieel richting FIRE-doel${dagenHint}`,
         '',
       ]
 

@@ -483,3 +483,49 @@ describe('DoelBewerkenSheet — completed_at bij de 100%-overgang', () => {
     expect(onCompleted).not.toHaveBeenCalled()
   })
 })
+
+// ── Zelf afsluiten / heropenen (los van de waarde) ─────────────────────────
+// De waarde-gedreven route hierboven dekt "ik vul iets in dat het doel haalt".
+// Een gebruiker wil een doel ook kunnen afronden zonder dat het getal er is —
+// en bij een meelopend doel is er niet eens een invoerveld om het mee te doen.
+describe('DoelBewerkenSheet — zelf afsluiten', () => {
+  it('markeert een doel als behaald zonder dat de waarde het doel haalt', async () => {
+    const onCompleted = vi.fn()
+    renderSheet(() => {}, { onCompleted })
+    // Fixture staat op 20.000 van 50.000 — ruim onder het doel.
+    fireEvent.click(screen.getByTestId('doel-afsluiten'))
+    await new Promise((r) => setTimeout(r, 10))
+
+    const payload = laatstePayload()
+    expect(payload.is_completed).toBe(true)
+    expect(typeof payload.completed_at).toBe('string')
+    // De waarde blijft wat hij was: afsluiten is geen verkapte invoer.
+    expect('current_value' in payload).toBe(false)
+    expect(onCompleted).toHaveBeenCalledTimes(1)
+  })
+
+  it('biedt afsluiten óók aan bij een meelopend doel (geen invoerveld)', () => {
+    renderSheet(() => {}, {
+      goal: { metadata: { sync: 'auto' }, goal_type: 'savings_rate' as GoalType },
+    })
+    expect(screen.queryByRole('spinbutton')).toBeNull()
+    expect(screen.getByTestId('doel-afsluiten')).toBeTruthy()
+  })
+
+  it('heropent een afgesloten doel en wist completed_at', async () => {
+    const onCompleted = vi.fn()
+    renderSheet(() => {}, {
+      goal: { is_completed: true, completed_at: '2026-01-05T10:00:00.000Z' },
+      onCompleted,
+    })
+    expect(screen.queryByTestId('doel-afsluiten')).toBeNull()
+    fireEvent.click(screen.getByTestId('doel-heropenen'))
+    await new Promise((r) => setTimeout(r, 10))
+
+    const payload = laatstePayload()
+    expect(payload.is_completed).toBe(false)
+    expect(payload.completed_at).toBeNull()
+    // Heropenen is geen mijlpaal.
+    expect(onCompleted).not.toHaveBeenCalled()
+  })
+})

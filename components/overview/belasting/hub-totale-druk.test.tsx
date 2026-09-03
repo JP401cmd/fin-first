@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import type { ReactElement } from 'react'
-import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
 import { HubTotaleDruk } from './hub-totale-druk'
 import { buildTaxOverview } from '@/lib/tax-overview'
 import { computeBox1Tax } from '@/lib/box1-tax'
 import { formatCurrency } from '@/lib/format'
+import { readSourceLF } from '@/lib/test-utils/read-source'
 
 /**
  * Bevinding M4 (+ C9): de druk-kaart toonde "MARGINAAL 35,8%" terwijl de Box
@@ -306,9 +306,10 @@ describe('HubTotaleDruk — consume, don\'t recompute (bron-assertie)', () => {
   // Alleen de CODE toetsen: de docblocks van dit component benoemen de
   // verboden bronnen expliciet ("roep hier nooit deriveMarginaalTarief aan"),
   // en die uitleg moet blijven staan zonder de gate te laten afgaan.
-  const bron = readFileSync(
+  // CRLF-veilig (zie lib/test-utils/read-source.ts): de /gm-strip hieronder
+  // slaat stil terug op een verse Windows-checkout zonder normalisatie.
+  const bron = readSourceLF(
     join(process.cwd(), 'components', 'overview', 'belasting', 'hub-totale-druk.tsx'),
-    'utf8',
   )
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/^\s*\/\/.*$/gm, '')

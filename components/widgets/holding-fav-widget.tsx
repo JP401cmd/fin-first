@@ -2,7 +2,9 @@
 
 import { memo, type ReactNode } from 'react'
 import { WidgetShell } from './widget-shell'
-import { MaskedAmount } from '@/components/app/masked-amount'
+import { MaskedAmount, MaskedPercent, useDirectionClass } from '@/components/app/masked-amount'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { MASKED_PERCENT_PLACEHOLDER } from '@/lib/format'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import type { WidgetSize } from '@/lib/widget-catalog'
@@ -49,14 +51,22 @@ function ReturnRing({
   strokeWidth?: number
   fontSize?: number
 }) {
+  // WF-NAV-11: bij maskering mag de ring niets meer prijsgeven. Niet alleen de
+  // tekst lekt — de booglengte verraadt de orde van grootte en de ring-kleur de
+  // richting. Gemaskeerd tekenen we daarom alleen het neutrale spoor (geen
+  // boog), met bullets in het midden.
+  const { masked } = useMaskedAmounts()
+
   const r = (diameter - strokeWidth) / 2
   const c = diameter / 2
   const circumference = 2 * Math.PI * r
   const clampedPct = Math.min(100, Math.max(-100, Math.abs(pct)))
-  const dashOffset = circumference - (clampedPct / 100) * circumference
+  const dashOffset = masked ? circumference : circumference - (clampedPct / 100) * circumference
   const isPositive = pct >= 0
-  const ringColor = isPositive ? 'var(--positive)' : 'var(--negative)'
-  const ariaLabel = `Rendement ${isPositive ? '+' : ''}${pct.toFixed(1)}%`
+  const ringColor = masked ? 'var(--ink-3)' : isPositive ? 'var(--positive)' : 'var(--negative)'
+  const ariaLabel = masked
+    ? 'Rendement verborgen'
+    : `Rendement ${isPositive ? '+' : ''}${pct.toFixed(1)}%`
 
   return (
     <svg
@@ -93,7 +103,7 @@ function ReturnRing({
         className="font-mono tabular-nums"
         style={{ fontSize: `${fontSize}px`, fontWeight: 600, fill: ringColor }}
       >
-        {isPositive ? '+' : ''}{pct.toFixed(1)}%
+        {masked ? MASKED_PERCENT_PLACEHOLDER : `${isPositive ? '+' : ''}${pct.toFixed(1)}%`}
       </text>
     </svg>
   )
@@ -123,8 +133,13 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({
 }) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 400 })
   const isPositive = holding.dailyChangePct >= 0
-  const changeSign = isPositive ? '+' : ''
   const returnPositive = holding.returnPct >= 0
+  // Richtingskleuren van dagmutatie en rendement worden neutraal zodra de
+  // gebruiker maskeert — anders leest winst/verlies gewoon van het scherm af
+  // terwijl de bedragen verborgen zijn (WF-NAV-11). Hooks staan bewust vóór de
+  // size-specifieke early returns.
+  const dayChangeClass = useDirectionClass(isPositive)
+  const returnClass = useDirectionClass(returnPositive)
   const returnAmount = holding.totalValue - holding.totalCost
   const dailyChangeAmount = holding.totalValue * (holding.dailyChangePct / 100)
 
@@ -171,12 +186,9 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({
                   <MaskedAmount value={holding.currentPrice} tone="kern" className="text-xl font-semibold" />
                 </span>
               </div>
-              <span
-                className={`font-mono text-sm tabular-nums shrink-0 ${
-                  isPositive ? 'text-positive' : 'text-negative'
-                }`}
-              >
-                {RETURN_BASIS_LABELS.dayChange.compact.toLowerCase()} {changeSign}{holding.dailyChangePct.toFixed(2)}%
+              <span className={`font-mono text-sm tabular-nums shrink-0 ${dayChangeClass}`}>
+                {RETURN_BASIS_LABELS.dayChange.compact.toLowerCase()}{' '}
+                <MaskedPercent value={holding.dailyChangePct} decimals={2} tone="kern" />
               </span>
             </div>
 
@@ -203,7 +215,7 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({
                     ? <MaskedAmount value={returnAmount} signPrefix="+" tone="kern" />
                     : <MaskedAmount value={returnAmount} tone="kern" />
                 }
-                color={returnPositive ? 'text-positive' : 'text-negative'}
+                color={returnClass}
               />
               <KpiCell
                 label={RETURN_BASIS_LABELS.dayChange.label}
@@ -212,13 +224,13 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({
                     ? <MaskedAmount value={dailyChangeAmount} signPrefix="+" tone="kern" />
                     : <MaskedAmount value={dailyChangeAmount} tone="kern" />
                 }
-                color={isPositive ? 'text-positive' : 'text-negative'}
+                color={dayChangeClass}
               />
               <KpiCell label="Eenheden" value={holding.units.toLocaleString('nl-NL', { maximumFractionDigits: 4 })} />
               <KpiCell
                 label={RETURN_BASIS_LABELS.positionSincePurchase.label}
-                value={`${returnPositive ? '+' : ''}${holding.returnPct.toFixed(1)}%`}
-                color={returnPositive ? 'text-positive' : 'text-negative'}
+                value={<MaskedPercent value={holding.returnPct} tone="kern" />}
+                color={returnClass}
               />
               {priceDate && (
                 <KpiCell
@@ -262,12 +274,8 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({
                 <MaskedAmount value={holding.currentPrice} tone="kern" className="text-lg font-semibold" />
               </span>
             </div>
-            <span
-              className={`font-mono text-xs tabular-nums ${
-                isPositive ? 'text-positive' : 'text-negative'
-              }`}
-            >
-              {changeSign}{holding.dailyChangePct.toFixed(2)}%
+            <span className={`font-mono text-xs tabular-nums ${dayChangeClass}`}>
+              <MaskedPercent value={holding.dailyChangePct} decimals={2} tone="kern" />
             </span>
           </div>
 
@@ -290,7 +298,7 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({
                   ? <MaskedAmount value={returnAmount} signPrefix="+" tone="kern" />
                   : <MaskedAmount value={returnAmount} tone="kern" />
               }
-              color={returnPositive ? 'text-positive' : 'text-negative'}
+              color={returnClass}
             />
             <KpiCell
               label={RETURN_BASIS_LABELS.dayChange.label}
@@ -299,13 +307,13 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({
                   ? <MaskedAmount value={dailyChangeAmount} signPrefix="+" tone="kern" />
                   : <MaskedAmount value={dailyChangeAmount} tone="kern" />
               }
-              color={isPositive ? 'text-positive' : 'text-negative'}
+              color={dayChangeClass}
             />
             <KpiCell label="Eenheden" value={holding.units.toLocaleString('nl-NL', { maximumFractionDigits: 4 })} />
             <KpiCell
               label={RETURN_BASIS_LABELS.positionSincePurchase.label}
-              value={`${returnPositive ? '+' : ''}${holding.returnPct.toFixed(1)}%`}
-              color={returnPositive ? 'text-positive' : 'text-negative'}
+              value={<MaskedPercent value={holding.returnPct} tone="kern" />}
+              color={returnClass}
             />
           </div>
 
@@ -355,18 +363,15 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({
               Kosten <MaskedAmount value={holding.totalCost} tone="kern" className="text-[11px]" />
             </p>
             <div className="flex items-center gap-2">
-              <span className={`leading-none ${returnPositive ? 'text-positive' : 'text-negative'}`}>
+              <span className={`leading-none ${returnClass}`}>
                 {returnPositive
                   ? <MaskedAmount value={returnAmount} signPrefix="+" tone="kern" className="text-[11px]" />
                   : <MaskedAmount value={returnAmount} tone="kern" className="text-[11px]" />
                 }
               </span>
-              <span
-                className={`font-mono text-[11px] tabular-nums leading-none ${
-                  isPositive ? 'text-positive' : 'text-negative'
-                }`}
-              >
-                {RETURN_BASIS_LABELS.dayChange.compact.toLowerCase()} {changeSign}{holding.dailyChangePct.toFixed(1)}%
+              <span className={`font-mono text-[11px] tabular-nums leading-none ${dayChangeClass}`}>
+                {RETURN_BASIS_LABELS.dayChange.compact.toLowerCase()}{' '}
+                <MaskedPercent value={holding.dailyChangePct} tone="kern" />
               </span>
             </div>
           </div>
@@ -414,12 +419,8 @@ export const HoldingFavWidget = memo(function HoldingFavWidget({
         <p className="leading-none text-[var(--ink)] truncate">
           <MaskedAmount value={holding.currentPrice} tone="kern" className="text-[15px] font-semibold" />
         </p>
-        <span
-          className={`font-mono text-xs tabular-nums leading-none whitespace-nowrap ${
-            isPositive ? 'text-positive' : 'text-negative'
-          }`}
-        >
-          {changeSign}{holding.dailyChangePct.toFixed(1)}%
+        <span className={`font-mono text-xs tabular-nums leading-none whitespace-nowrap ${dayChangeClass}`}>
+          <MaskedPercent value={holding.dailyChangePct} tone="kern" />
         </span>
       </div>
     </WidgetShell>

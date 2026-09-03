@@ -32,7 +32,7 @@ import {
   REPAYMENT_TYPE_LABELS,
   computeExpectedBalance,
 } from '@/lib/debt-data'
-import type { Asset } from '@/lib/asset-data'
+import { linkableAssetTypesForDebt, linkedAssetFieldLabel, type Asset } from '@/lib/asset-data'
 import { OwnershipToggle, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { VALUATIONS_CONFLICT_KEY } from '@/lib/valuations'
@@ -48,6 +48,44 @@ export type DebtEditActionsState = {
   isEditing: boolean
   /** Roept de meest recente save-handler aan (via ref). */
   save: () => void
+}
+
+/**
+ * Negatief-validatie van de bedrag-/rentevelden als pure functie, zodat
+ * `handleSave` (blokkeert de DB-write) en de afgeleide save-state (blokkeert de
+ * Opslaan/Toevoegen-knop) gegarandeerd dezelfde regels hanteren. Vóór deze
+ * splitsing zaten de checks alleen ín `handleSave`, waardoor de knop klikbaar
+ * bleef bij bv. rente `-1` en de gebruiker de fout pas ná een klik zag — een
+ * reactieve variant van wat de QuickAdd-wizard (`step-details.tsx`,
+ * `currentErrors` → `canSubmit`) al proactief doet.
+ *
+ * Lege velden zijn geldig: die worden bij het opslaan op 0 gezet. Niet-numerieke
+ * invoer levert `NaN` en dus geen fout — dat gedrag is bewust ongewijzigd
+ * gelaten t.o.v. de oorspronkelijke checks.
+ */
+export function findNegativeDebtValueError(values: {
+  currentBalance: string
+  originalAmount: string
+  interestRate: string
+  minimumPayment: string
+  monthlyPayment: string
+}): string | null {
+  if (values.currentBalance && Number(values.currentBalance) < 0) {
+    return 'Huidig saldo mag niet negatief zijn. Voer een positief bedrag in.'
+  }
+  if (values.originalAmount && Number(values.originalAmount) < 0) {
+    return 'Oorspronkelijk bedrag mag niet negatief zijn. Voer een positief bedrag in.'
+  }
+  if (values.interestRate && Number(values.interestRate) < 0) {
+    return 'Rentepercentage mag niet negatief zijn. Voer een positief percentage in.'
+  }
+  if (values.minimumPayment && Number(values.minimumPayment) < 0) {
+    return 'Minimale betaling mag niet negatief zijn.'
+  }
+  if (values.monthlyPayment && Number(values.monthlyPayment) < 0) {
+    return 'Werkelijke betaling mag niet negatief zijn.'
+  }
+  return null
 }
 
 export function DebtForm({
@@ -237,35 +275,27 @@ export function DebtForm({
     }
   }
 
+  // Per render herberekend, zodat zowel de knop-state als de save-handler op
+  // dezelfde uitkomst leunen (mirror van `currentErrors` in de QuickAdd-wizard).
+  const negativeValueError = useMemo(
+    () => findNegativeDebtValueError({
+      currentBalance,
+      originalAmount,
+      interestRate,
+      minimumPayment,
+      monthlyPayment,
+    }),
+    [currentBalance, originalAmount, interestRate, minimumPayment, monthlyPayment],
+  )
+
   async function handleSave() {
     if (!name || !currentBalance) return
     setValidationError(null)
 
-    // Validate no negative monetary values or rates
-    const numCurrentBalance = Number(currentBalance)
-    const numOriginalAmount = Number(originalAmount)
-    const numInterestRate = Number(interestRate)
-    const numMinimumPayment = Number(minimumPayment)
-    const numMonthlyPayment = Number(monthlyPayment)
-
-    if (numCurrentBalance < 0) {
-      setValidationError('Huidig saldo mag niet negatief zijn. Voer een positief bedrag in.')
-      return
-    }
-    if (originalAmount && numOriginalAmount < 0) {
-      setValidationError('Oorspronkelijk bedrag mag niet negatief zijn. Voer een positief bedrag in.')
-      return
-    }
-    if (interestRate && numInterestRate < 0) {
-      setValidationError('Rentepercentage mag niet negatief zijn. Voer een positief percentage in.')
-      return
-    }
-    if (minimumPayment && numMinimumPayment < 0) {
-      setValidationError('Minimale betaling mag niet negatief zijn.')
-      return
-    }
-    if (monthlyPayment && numMonthlyPayment < 0) {
-      setValidationError('Werkelijke betaling mag niet negatief zijn.')
+    // Vangnet: de knop is al disabled bij een negatieve waarde, maar de
+    // pane-wrapper roept `save()` via een ref aan — blokkeer de write ook hier.
+    if (negativeValueError) {
+      setValidationError(negativeValueError)
       return
     }
 
@@ -370,7 +400,9 @@ export function DebtForm({
   useEffect(() => {
     saveHandlerRef.current = () => { void handleSave() }
   })
-  const canSave = !saving && Boolean(name) && Boolean(currentBalance)
+  // `negativeValueError` telt mee zodat de CTA proactief blokkeert — in de
+  // standalone-knop hieronder én in de pane-footer (debt-pane.tsx leest canSave).
+  const canSave = !saving && Boolean(name) && Boolean(currentBalance) && !negativeValueError
   useEffect(() => {
     if (!onActionsChange) return
     onActionsChange({
@@ -538,6 +570,7 @@ export function DebtForm({
               ) : (
                 <input
                   type="number"
+                  data-testid="debt-current-balance"
                   value={currentBalance}
                   onChange={(e) => setCurrentBalance(e.target.value)}
                   className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
@@ -553,6 +586,7 @@ export function DebtForm({
                 type="number"
                 step="0.1"
                 min="0"
+                data-testid="debt-interest-rate"
                 value={interestRate}
                 onChange={(e) => setInterestRate(e.target.value)}
                 className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
@@ -698,8 +732,13 @@ export function DebtForm({
                 )}
                 {visibleFields.includes('linked_asset_id') && (
                   <div>
+                    {/* Label én filter komen uit LINKED_DEBT_SUGGESTIONS i.p.v.
+                        uit een debt_type-ternary: die labelde elk niet-DGA-type
+                        als "Gekoppelde woning" (UAT WF-SCHULD-05) en zou een
+                        toekomstig koppelpaar (bv. car_loan↔vehicle) op zowel
+                        label als opties fout zetten. */}
                     <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">
-                      {debtType === 'dga_schuld' ? 'Gekoppelde deelneming' : 'Gekoppelde woning'}
+                      {linkedAssetFieldLabel(debtType)}
                       {debtType === 'dga_schuld' && <span className="text-red-500 ml-0.5">*</span>}
                     </label>
                     <select
@@ -709,11 +748,7 @@ export function DebtForm({
                     >
                       <option value="">{debtType === 'dga_schuld' ? 'Selecteer deelneming...' : '-'}</option>
                       {userAssets
-                        .filter((a) =>
-                          debtType === 'dga_schuld'
-                            ? a.asset_type === 'deelneming'
-                            : a.asset_type === 'eigen_huis' || a.asset_type === 'real_estate'
-                        )
+                        .filter((a) => linkableAssetTypesForDebt(debtType).includes(a.asset_type))
                         .map((a) => (
                           <option key={a.id} value={a.id}>{a.name}</option>
                         ))}
@@ -985,9 +1020,11 @@ export function DebtForm({
           </div>
         </div>
 
-        {validationError && (
+        {/* De negatief-fout wint: die is live (verschijnt tijdens typen) en
+            beschrijft precies waarom de CTA geblokkeerd is. */}
+        {(negativeValueError ?? validationError) && (
           <div className="mt-3 rounded-[var(--r)] border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700" data-testid="debt-validation-error">
-            {validationError}
+            {negativeValueError ?? validationError}
           </div>
         )}
 
@@ -1004,7 +1041,8 @@ export function DebtForm({
             </button>
             <button
               onClick={handleSave}
-              disabled={saving || !name || !currentBalance}
+              disabled={!canSave}
+              data-testid="debt-save"
               className="rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
             >
               {saving ? 'Opslaan...' : isEdit ? 'Opslaan' : 'Toevoegen'}

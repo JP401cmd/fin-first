@@ -43,7 +43,7 @@ function makeGoal(overrides: Partial<Goal>): Goal {
 describe('computeGoalProgress — bestaande up-types (regressie)', () => {
   it('savings: 3000/5000 = 60%, zonder datum onTrack=true, eta=null', () => {
     const p = computeGoalProgress(makeGoal({ goal_type: 'savings', current_value: 3000, target_value: 5000 }))
-    expect(p).toEqual({ current: 3000, target: 5000, pct: 60, onTrack: true, measured: true, requiredMonthly: null, eta: null })
+    expect(p).toEqual({ current: 3000, target: 5000, pct: 60, onTrack: true, measured: true, requiredMonthly: null, eta: null, paceSkipped: false })
   })
 
   it('savings: current > target → pct geclampt op 100', () => {
@@ -53,7 +53,7 @@ describe('computeGoalProgress — bestaande up-types (regressie)', () => {
 
   it('target <= 0 → pct 0, onTrack false, eta null', () => {
     const p = computeGoalProgress(makeGoal({ current_value: 100, target_value: 0 }))
-    expect(p).toEqual({ current: 100, target: 0, pct: 0, onTrack: false, measured: false, requiredMonthly: null, eta: null })
+    expect(p).toEqual({ current: 100, target: 0, pct: 0, onTrack: false, measured: false, requiredMonthly: null, eta: null, paceSkipped: false })
   })
 
   it('debt_payoff: 4000 afgelost van 10000 = 40%', () => {
@@ -258,6 +258,77 @@ describe('computeGoalProgress — genadeperiode voor een vers doel (M31)', () =>
   })
 })
 
+// ── UR2-17: geen tempo-oordeel op een live-getrackt STAND-doel ─────────────
+//
+// De pace-toets deelt `current_value` door de maanden sinds aanmaak. Bij een
+// handmatig spaardoel klopt dat (het begon op 0), bij een live stand-doel niet:
+// `current_value` is dan het hele netto vermogen. Het gevolg was "OP KOERS" op
+// het vrijheidsgetal-doel terwijl er €0 werd ingelegd — de meting kán daar
+// niet anders uitvallen, hoe oud het doel ook is.
+describe('computeGoalProgress — live-getrackt stand-doel slaat de tempo-toets over (UR2-17)', () => {
+  const now = Date.now()
+  /** Tessa-repro: €960.000 stand, doel €1.650.000, streefdatum jun 2039. */
+  const standDoel = {
+    current_value: 960_000,
+    target_value: 1_650_000,
+    goal_type: 'net_worth' as GoalType,
+    created_at: new Date(now - 10 * DAY_MS).toISOString(),
+    target_date: new Date(now + 13 * 365 * DAY_MS).toISOString(),
+  }
+
+  it('repro: zonder marker meet de pace-toets een absurd tempo en zegt "op koers"', () => {
+    const p = computeGoalProgress(makeGoal(standDoel))
+    // Dit is het defect zoals het was: 960.000 gedeeld door de minimale
+    // meetperiode ligt honderden malen boven de vereiste maandinleg.
+    expect(p.paceSkipped).toBe(false)
+    expect(p.onTrack).toBe(true)
+    expect(p.requiredMonthly).toBeGreaterThan(0)
+  })
+
+  it('vrijheidsgetal-doel: tempo-toets overgeslagen, geen vals "op koers"-oordeel', () => {
+    const p = computeGoalProgress(makeGoal({
+      ...standDoel,
+      metadata: { standaardDoel: 'vrijheidsgetal' },
+    }))
+    expect(p.paceSkipped).toBe(true)
+    // Geen alarm (dat zou net zo onterecht zijn), maar het scherm mag hier geen
+    // stoplicht op baseren — dát is wat `paceSkipped` afdwingt.
+    expect(p.onTrack).toBe(true)
+    // De STAND is wél gemeten: "Net begonnen" zou hier onwaar zijn.
+    expect(p.measured).toBe(true)
+    // De lat blijft een eerlijke uitspraak en verdwijnt niet van de kaart.
+    expect(p.requiredMonthly).toBeGreaterThan(0)
+    expect(p.pct).toBe(58)
+  })
+
+  it('doelbasis-doel (metadata.sync === "auto") krijgt dezelfde behandeling', () => {
+    const p = computeGoalProgress(makeGoal({ ...standDoel, metadata: { sync: 'auto' } }))
+    expect(p.paceSkipped).toBe(true)
+  })
+
+  it('handmatig doel met dezelfde cijfers behoudt zijn tempo-oordeel (regressie)', () => {
+    const achter = computeGoalProgress(makeGoal({
+      current_value: 100,
+      target_value: 50_000,
+      created_at: new Date(now - 400 * DAY_MS).toISOString(),
+      target_date: new Date(now + 60 * DAY_MS).toISOString(),
+      metadata: { bron: 'parameter' }, // andere marker: géén stand-doel
+    }))
+    expect(achter.paceSkipped).toBe(false)
+    expect(achter.onTrack).toBe(false)
+  })
+
+  it('stand-doel ZONDER streefdatum: niets overgeslagen (er was al geen toets)', () => {
+    const p = computeGoalProgress(makeGoal({
+      current_value: 960_000,
+      target_value: 1_650_000,
+      metadata: { standaardDoel: 'vrijheidsgetal' },
+    }))
+    expect(p.paceSkipped).toBe(false)
+    expect(p.onTrack).toBe(true)
+  })
+})
+
 // ── 2. Nieuwe richting: 'down' (fire_age, lager-is-beter) ──────────────────
 
 describe('computeGoalProgress — down-richting (fire_age)', () => {
@@ -277,7 +348,7 @@ describe('computeGoalProgress — down-richting (fire_age)', () => {
 
   it('current 0 (of null → 0): 0% en niet onTrack', () => {
     const p = computeGoalProgress(makeGoal({ goal_type: 'fire_age', current_value: 0, target_value: 58 }))
-    expect(p).toEqual({ current: 0, target: 58, pct: 0, onTrack: false, measured: false, requiredMonthly: null, eta: null })
+    expect(p).toEqual({ current: 0, target: 58, pct: 0, onTrack: false, measured: false, requiredMonthly: null, eta: null, paceSkipped: false })
   })
 
   it('doel bereikt met overshoot (current < target) → pct geclampt op 100 + onTrack', () => {
@@ -299,7 +370,7 @@ describe('computeGoalProgress — down-richting (fire_age)', () => {
 
   it('target <= 0 (ongeldig) → 0% en niet onTrack', () => {
     const p = computeGoalProgress(makeGoal({ goal_type: 'fire_age', current_value: 60, target_value: 0 }))
-    expect(p).toEqual({ current: 60, target: 0, pct: 0, onTrack: false, measured: false, requiredMonthly: null, eta: null })
+    expect(p).toEqual({ current: 60, target: 0, pct: 0, onTrack: false, measured: false, requiredMonthly: null, eta: null, paceSkipped: false })
   })
 
   it('down-tak negeert target_date (geen eta, geen tijdlijn-onTrack)', () => {

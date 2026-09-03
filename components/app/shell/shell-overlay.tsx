@@ -33,6 +33,19 @@ type SheetSize = 'sm' | 'md' | 'lg' | 'xl' | 'full'
 type ShellOverlayProps = {
   open: boolean
   onClose: () => void
+  /**
+   * Sluit-poort voor de programmatische sluitroutes (X / Escape / backdrop /
+   * terug-knop): geef `false` terug en de overlay blijft staan. Bedoeld voor een
+   * paneel met een eigen bevestiging — een bewerkscherm met onopgeslagen
+   * wijzigingen opent hierin zijn "weet je het zeker?" en sluit pas ná de keuze.
+   *
+   * Wordt doorgegeven aan de BottomSheet-tak (kind="sheet", kind="confirm" en de
+   * mobiele fallback van kind="pane"). De desktop-`SlideInPane` kent de poort
+   * niet en heeft 'm ook niet nodig: die start géén eigen exit-animatie naast
+   * `onClose`, dus een consumer die daar zijn confirm toont houdt de pane vanzelf
+   * open (WF-BUDGET-10 was daarom BottomSheet-specifiek).
+   */
+  onRequestClose?: () => boolean | Promise<boolean>
   kind: ShellOverlayKind
   title?: string
   /** Alleen voor kind="sheet". Default `md`. */
@@ -112,6 +125,7 @@ export type { PaneAction }
 export function ShellOverlay({
   open,
   onClose,
+  onRequestClose,
   kind,
   title,
   size = 'md',
@@ -209,6 +223,7 @@ export function ShellOverlay({
         <BottomSheet
           open={open && !isLgUp}
           onClose={onClose}
+          onRequestClose={onRequestClose}
           title={title}
           size="full"
           footerSlot={mobileFooterSlot}
@@ -234,7 +249,7 @@ export function ShellOverlay({
     // bv. pijl-navigatie of share-icons binnen een sheet.
     return (
       <ModalFooterToneProvider tone={destructive ? 'destructive' : 'default'}>
-        <BottomSheet open={open} onClose={onClose} title={title} size={size} actions={actions} footerSlot={footer} suspended={suspended}>
+        <BottomSheet open={open} onClose={onClose} onRequestClose={onRequestClose} title={title} size={size} actions={actions} footerSlot={footer} suspended={suspended}>
           {children}
         </BottomSheet>
       </ModalFooterToneProvider>
@@ -258,7 +273,7 @@ export function ShellOverlay({
   // hun eigen knop renderen (bv. `event-pane`).
   return (
     <ModalFooterToneProvider tone={destructive ? 'destructive' : 'default'}>
-      <BottomSheet open={open} onClose={onClose} title={title} size="sm" footerSlot={footer}>
+      <BottomSheet open={open} onClose={onClose} onRequestClose={onRequestClose} title={title} size="sm" footerSlot={footer}>
         <div data-destructive={destructive ? 'true' : undefined}>{children}</div>
       </BottomSheet>
     </ModalFooterToneProvider>

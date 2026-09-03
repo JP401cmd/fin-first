@@ -28,12 +28,19 @@ export function sizeLabel(size: WidgetSize): string {
 
 /**
  * Responsive grid-span-classes op basis van de opgeslagen widget-grootte.
- * On mobile (<640px): quarter→mini(1col×1row), half→quarter(1col×2row),
- * full→half(2col×2row), xl→full(2col×2row). On desktop (sm+): quarter
- * (1col×1row), half(2col×1row), full(2col×2row), xl(4col×2row op lg).
+ * On mobile (<640px, 2 kolommen): quarter→mini(1col×1row), half→quarter
+ * (1col×2row), full→half(2col×2row), xl→full(2col×2row). Vanaf sm (4 kolommen):
+ * quarter(1col×1row), half(2col×1row), full(2col×2row), xl(4col×2row).
+ *
+ * De kolomsprong 2→4 zit in de grid-container en gebeurt bij `sm` — gelijk met
+ * de rijhoogte-sprong (64px→160px). Liep die kolomsprong pas bij `lg`, dan
+ * kreeg de rail op sm wél de hoge rijen maar niet de extra kolommen: hetzelfde
+ * widgetprofiel werd dan 1040px hoog op sm tegen 512px op lg, waardoor de
+ * briefing onder de vouw verdween. Houd `sm:` hier dus synchroon met de
+ * `sm:grid-cols-4` van de containers (draggable-widget-grid + widget-dnd-grid).
  */
 export function widgetSpanClass(size: WidgetSize): string {
-  return size === 'xl'      ? 'col-span-2 lg:col-span-4 row-span-2'
+  return size === 'xl'      ? 'col-span-2 sm:col-span-4 row-span-2'
     : size === 'full'       ? 'col-span-2 row-span-2'
     : size === 'half'       ? 'row-span-2 sm:row-span-1 col-span-1 sm:col-span-2'
     : size === 'quarter'    ? 'row-span-1'

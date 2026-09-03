@@ -1184,24 +1184,24 @@ Dit deelgebied heeft geen eigen pagina's: het beschrijft de app-brede bediening 
 
 ---
 
-#### WF-NAV-06 — Mobiele utility-cluster: kompas, privacy, nieuws, meldingen, account
-- **Doel:** Als mobiele gebruiker wil ik op elke tab-root direct bij de globale functies kunnen: status-kompas, bedragen maskeren, nieuws, meldingen en account-acties.
+#### WF-NAV-06 — Mobiele utility-cluster: kompas, nieuws, meldingen, account
+- **Doel:** Als mobiele gebruiker wil ik op elke tab-root direct bij de globale functies kunnen: status-kompas, nieuws, meldingen en account-acties.
 - **Trigger/startpunt:** Mobiel, op een tab-root (Overzicht/Toekomst/Mijn); rechtsboven in de TopBar staat het icoon-cluster.
 - **Eindresultaat:** De gekozen functie is geopend/uitgevoerd zonder de huidige pagina te verlaten (behalve navigatie-items).
 - **Stappen:**
   1. Tik op het 4-dots-kompas; een paneel "Kompas" klapt uit met per hefboom (Bezittingen/Schulden/Cashflow/Belasting) status + detail; tik ernaast of Escape om te sluiten.
-  2. Tik op het oog-icoon om bedragen te maskeren/tonen (zie WF-NAV-09).
-  3. Tik op het kranten-icoon → /nieuws.
-  4. Tik op de bel; het meldingen-venster opent (zie WF-NAV-18); een rode badge toont het aantal ongelezen (cap "9+").
-  5. Tik op de avatar (initiaal); een dropdown toont "Ingelogd als <e-mail>", links naar Beheer (alleen superadmin), Identiteit (→ /mijn), Rapportages, het blok "Sync nu"/"Rapport" en Uitloggen.
-  6. Huishouden-leden zien vooraan het cluster ook de perspectief-badge (zie WF-NAV-19).
-- **Schermen/componenten:** `components/app/shell/top-bar.tsx` (TopBarUtilities), `components/app/shell/lever-compass.tsx` (LeverCompassMobile), `components/app/privacy-toggle.tsx`, `components/app/notifications/*`, `components/sync/global-sync-button.tsx`.
+  2. Tik op het kranten-icoon → /nieuws.
+  3. Tik op de bel; het meldingen-venster opent (zie WF-NAV-18); een rode badge toont het aantal ongelezen (cap "9+").
+  4. Tik op de avatar (initiaal); een dropdown toont "Ingelogd als <e-mail>", links naar Beheer (alleen superadmin), Identiteit (→ /mijn), Rapportages, het blok "Sync nu"/"Rapport" en Uitloggen.
+  5. Huishouden-leden zien vooraan het cluster ook de perspectief-badge (zie WF-NAV-19).
+- **Schermen/componenten:** `components/app/shell/top-bar.tsx` (TopBarUtilities), `components/app/shell/lever-compass.tsx` (LeverCompassMobile), `components/app/notifications/*`, `components/sync/global-sync-button.tsx`.
 - **Kriticiteit:** BELANGRIJK
 - **Rekenend:** nee (het kompas toont statussen + details zoals "4 typen · € 834k" — bron `loadLeverScores`; toetsbaar via de Overzicht-kaarten)
 - **Varianten & randgevallen:**
   - Op subpagina's ('simple' TopBar) is het cluster afwezig — daar alleen ← + titel.
   - Dropdown sluit op klik-buiten en Escape.
   - Solo-gebruiker: geen perspectief-badge (self-gating).
+  - **Geen oog-icoon in het cluster — dat is geen defect.** De weergave-schakelaars (bedragen verbergen, euro-weergave) zijn 29-08-2026 op eigenaarsbesluit uit de TopBar en Sidebar gehaald (B-011, commit `0aa3aa331`): ⌘K is de enige plek om van weergave te wisselen. Maskeren toets je in WF-NAV-11 via die ⌘K-actie. Niet terugmelden als bevinding zonder een nieuw besluit dat B-011 overschrijft.
 - **Cross-module effecten:** Sync-acties verversen koersen/saldi die overal doorwerken (WF-NAV-17).
 
 ---
@@ -1292,15 +1292,15 @@ Dit deelgebied heeft geen eigen pagina's: het beschrijft de app-brede bediening 
 
 #### WF-NAV-11 — Bedragen maskeren (privacy-toggle) en doorwerking
 - **Doel:** Als gebruiker wil ik met één tik alle saldi vervangen door bullets (bv. in de trein), per apparaat onthouden.
-- **Trigger/startpunt:** Oog-icoon in de mobiele TopBar (tab-roots) of de ⌘K-actie "Bedragen verbergen" (desktop heeft geen vast oog-icoon in de sidebar).
-- **Eindresultaat:** Alle bedragen die via de masking-componenten lopen tonen "••••••" (module-accentkleur); het oog-icoon toont de actieve staat; de keuze overleeft herladen op hetzelfde apparaat (localStorage).
+- **Trigger/startpunt:** De ⌘K-actie "Bedragen verbergen" / "Bedragen tonen" (mobiel: via de zoek-pill). Dit is sinds B-011 de ENIGE plek om te wisselen — er staat bewust géén los oog-icoon meer in de mobiele TopBar of de desktop-Sidebar.
+- **Eindresultaat:** Alle bedragen die via de masking-componenten lopen tonen "••••••" (module-accentkleur); de ⌘K-actie wisselt van label en icoon mee met de actieve staat; de keuze overleeft herladen op hetzelfde apparaat (localStorage).
 - **Stappen:**
-  1. Tik op het oog-icoon in de mobiele TopBar (of voer de ⌘K-actie uit).
+  1. Open ⌘K (of de zoek-pill op mobiel) en voer de actie "Bedragen verbergen" uit.
   2. Controleer dat het netto vermogen in de sidebar, hero-bedragen en gemaskeerde kaarten bullets tonen.
-  3. Controleer dat het icoon van staat wisselt (oog ↔ doorgestreept oog, accentkleur bij actief).
+  3. Open ⌘K opnieuw en controleer dat de actie nu "Bedragen tonen" heet (icoon wisselt oog ↔ doorgestreept oog).
   4. Herlaad de pagina en controleer dat de maskering aan blijft.
-  5. Tik nogmaals om bedragen weer te tonen.
-- **Schermen/componenten:** `components/app/privacy-toggle.tsx`, `lib/hooks/use-privacy.tsx` (localStorage-sleutel `trifinity.privacy.masked`), consumenten o.a. `components/app/masked-amount.tsx` en `formatNetWorthShort` in de sidebar.
+  5. Voer "Bedragen tonen" uit om bedragen weer zichtbaar te maken.
+- **Schermen/componenten:** `lib/command-palette/actions.ts` (`action:toggle-privacy`), `lib/hooks/use-privacy.tsx` (localStorage-sleutel `trifinity.privacy.masked`), consumenten o.a. `components/app/masked-amount.tsx` en `formatNetWorthShort` in de sidebar.
 - **Kriticiteit:** BELANGRIJK
 - **Rekenend:** nee
 - **Varianten & randgevallen:**
@@ -6004,14 +6004,14 @@ Alle workflows zijn gebaseerd op de daadwerkelijke code onder `app/(app)/mijn/**
 
 #### WF-MIJN-17 — Bedragen maskeren (privacy-toggle, app-breed)
 - **Doel:** De gebruiker verbergt alle saldi/bedragen in de app (bijv. in het openbaar vervoer) en toont ze later weer.
-- **Trigger/startpunt:** Het oog-icoon in de TopBar (mobiel) of Sidebar (desktop) — op elk ingelogd scherm bereikbaar. Alternatief: command-palette-actie "Bedragen verbergen"/"Bedragen tonen".
+- **Trigger/startpunt:** De command-palette-actie "Bedragen verbergen"/"Bedragen tonen" (⌘K, mobiel via de zoek-pill) — op elk ingelogd scherm bereikbaar. Sinds B-011 is dit de enige ingang; er staat geen los oog-icoon meer in de TopBar of Sidebar.
 - **Eindresultaat:** Alle bedragen die via `formatMaskedCurrency`/`MaskedAmount` lopen tonen bullet-placeholders; de voorkeur overleeft herladen op hetzelfde apparaat.
 - **Stappen:**
-  1. Klik het oog-icoon; het icoon wisselt naar doorgestreept oog en kleurt in module-accent.
+  1. Voer via ⌘K de actie "Bedragen verbergen" uit; het actie-icoon wisselt naar een doorgestreept oog.
   2. Controleer op een cijferrijke pagina (bv. check-in of koppelingen) dat bedragen gemaskeerd zijn.
   3. Herlaad de pagina en controleer dat de maskering aan blijft (localStorage `trifinity.privacy.masked`).
-  4. Klik opnieuw om de bedragen te tonen.
-- **Schermen/componenten:** `components/app/privacy-toggle.tsx`, `lib/hooks/use-privacy.tsx` (device-lokaal, localStorage; bewust niet server-synced), `lib/format.ts#formatMaskedCurrency`.
+  4. Voer "Bedragen tonen" uit om de bedragen weer te tonen.
+- **Schermen/componenten:** `lib/command-palette/actions.ts` (`action:toggle-privacy`), `lib/hooks/use-privacy.tsx` (device-lokaal, localStorage; bewust niet server-synced), `lib/format.ts#formatMaskedCurrency`.
 - **Kriticiteit:** BELANGRIJK
 - **Rekenend:** nee (verandert weergave, niet de cijfers; let op: plain `formatCurrency`-plekken negeren de toggle — bekend aandachtspunt)
 - **Varianten & randgevallen:**
@@ -9092,11 +9092,10 @@ Dit deelgebied heeft geen eigen pagina's — het toetst de app-brede bediening d
 - **a. Happy path:**
   1. Tik het 4-dots-kompas rechtsboven. → *verwacht:* paneel "Kompas" klapt uit met per hefboom status + detail (bv. "4 typen · € 834k" voor Bezittingen).
   2. Tik ernaast (buiten het paneel). → *verwacht:* paneel sluit.
-  3. Tik het oog-icoon. → *verwacht:* bedragen app-breed maskeren/tonen (zie UAT-NAV-11).
-  4. Tik het kranten-icoon. → *verwacht:* /nieuws laadt.
-  5. Tik de bel. → *verwacht:* meldingen-venster opent; badge (indien >0) toont het aantal.
-  6. Tik de avatar. → *verwacht:* dropdown met "Ingelogd als <e-mail>", Identiteit, Rapportages, Sync nu/Rapport, (alleen superadmin: Beheer), Uitloggen.
-  **Eindresultaat:** elk cluster-icoon opent zijn eigen functie zonder de pagina te verlaten (behalve echte navigatie-items).
+  3. Tik het kranten-icoon. → *verwacht:* /nieuws laadt.
+  4. Tik de bel. → *verwacht:* meldingen-venster opent; badge (indien >0) toont het aantal.
+  5. Tik de avatar. → *verwacht:* dropdown met "Ingelogd als <e-mail>", Identiteit, Rapportages, Sync nu/Rapport, (alleen superadmin: Beheer), Uitloggen.
+  **Eindresultaat:** elk cluster-icoon opent zijn eigen functie zonder de pagina te verlaten (behalve echte navigatie-items). Het cluster telt vijf controls (perspectief-badge alleen bij een huishouden) — **géén oog-icoon**: bedragen maskeren loopt sinds B-011 uitsluitend via ⌘K en wordt in UAT-NAV-11 getoetst. Meld de afwezigheid dus niet als bevinding.
 - **c. Foutpad/randgeval (compact):** Tik in het kompas-paneel op de rij "Bezittingen" of "Schulden". → *verwacht:* je landt op de legacy-pagina /core/assets resp. /core/debts (NIET op /overzicht/bezittingen of /overzicht/schulden) — functioneel werkend maar via het oude pad (bekend technisch schuld-punt, `lever-compass.tsx`). Tik op "Cashflow" → je landt via een redirect (/will → /overzicht) op /overzicht; het bedoelde #cashflow-anker gaat daarbij verloren. Navigeer daarna naar een subpagina ('simple'-TopBar) → het hele utility-cluster is afwezig, alleen ← + titel.
 
 ---
@@ -9165,12 +9164,12 @@ WF-NAV-13 (Uitloggen) → **géén eigen scenario** in dit document; gedekt door
 ---
 
 #### UAT-NAV-11 — Bedragen maskeren (privacy-toggle) (dekt WF-NAV-11)
-- **Kriticiteit:** BELANGRIJK (leidend; RAPP heeft eigen toepassing) · **Platform:** mobiel (+ ⌘K op webapp) · **Rooktest:** nee · **Duur:** ~6 min
+- **Kriticiteit:** BELANGRIJK (leidend; RAPP heeft eigen toepassing) · **Platform:** webapp+mobiel (⌘K, mobiel via de zoek-pill) · **Rooktest:** nee · **Duur:** ~6 min
 - **Preconditie:** Ingelogd, persona met zichtbare bedragen (bv. "compleet").
 - **a. Happy path:**
-  1. Tik het oog-icoon in de mobiele TopBar (of voer ⌘K "Bedragen verbergen" uit op desktop). → *verwacht:* netto vermogen in sidebar/hero en alle gemaskeerde bedragen tonen "••••••" in module-accentkleur; icoon wisselt naar doorgestreept oog.
+  1. Voer via ⌘K (mobiel: de zoek-pill) de actie "Bedragen verbergen" uit. → *verwacht:* netto vermogen in sidebar/hero en alle gemaskeerde bedragen tonen "••••••" in module-accentkleur. Er is bewust géén los oog-icoon in TopBar/Sidebar (B-011) — dat is geen defect.
   2. Herlaad de pagina. → *verwacht:* maskering blijft aan (localStorage `trifinity.privacy.masked`).
-  3. Tik nogmaals om te herstellen. → *verwacht:* bedragen weer zichtbaar.
+  3. Open ⌘K opnieuw en voer "Bedragen tonen" uit. → *verwacht:* het actielabel is meegewisseld (icoon doorgestreept oog) en de bedragen zijn weer zichtbaar.
   **Eindresultaat:** maskering werkt app-breed consistent en overleeft een herlaad op hetzelfde apparaat.
 - **c. Foutpad (compact):** Open de app op een tweede apparaat/browser (of incognito). → *verwacht:* maskering staat daar standaard UIT (apparaat-lokaal, geen account-instelling) — dit is verwacht gedrag, geen defect. Controleer of plus/min-tekens vóór gemaskeerde delta's mee-verborgen worden (richting mag niet lekken).
 
@@ -11837,7 +11836,7 @@ Drie workflows zijn hier bewust géén volledig scenario maar een verwijsregel, 
 ---
 
 #### UAT-MIJN-17 — Bedragen maskeren (privacy-toggle, app-breed)
-- **Dekt WF-MIJN-17.** → **Gedekt door UAT-NAV-11.** Test hier niet apart; het oog-icoon in TopBar/Sidebar, de device-lokale opslag (localStorage) en de doorwerking op `formatMaskedCurrency`/`MaskedAmount` app-breed zijn daar leidend uitgewerkt.
+- **Dekt WF-MIJN-17.** → **Gedekt door UAT-NAV-11.** Test hier niet apart; de ⌘K-actie "Bedragen verbergen"/"Bedragen tonen" (sinds B-011 de enige ingang, geen los oog-icoon in TopBar/Sidebar), de device-lokale opslag (localStorage) en de doorwerking op `formatMaskedCurrency`/`MaskedAmount` app-breed zijn daar leidend uitgewerkt.
 
 ---
 
@@ -11965,7 +11964,7 @@ Drie workflows zijn hier bewust géén volledig scenario maar een verwijsregel, 
   **Berekening verwachting (exact, met de synthetische + 1.200-herwaardering uit stap 3):** dagelijkse-uitgaven-tarief = (maandelijkse uitgaven × 12) ÷ 365. Voorbeeld met het genoteerde maandbedrag € 2.400: dagtarief = (2.400 × 12) ÷ 365 = **€ 78,90/dag**. De vrijheidstijd-toename door de + € 1.200-herwaardering = 1.200 ÷ 78,90 ≈ **15,2 dagen** (ca. 2 weken). Controleer dat de regel "Sinds vorige check-in" (indien een eerdere check-in bestaat) of de reflectie-samenvatting een vergelijkbare orde van grootte toont — herbereken met het dan geldende maandbedrag als dat afwijkt van € 2.400.
 - **b. Randgeval — lege staten & "geen wijzigingen":** test elke stap op een account zonder bezittingen/schulden/doelen/budgetten/geplande posten → *verwacht:* respectievelijk "Voeg bezittingen toe", "goed bezig!", link naar Toekomst, link naar budgetten, en een lege vooruitblik-sectie. Doorloop een stap zonder wijzigingen te maken → *verwacht:* de opslaan-knop is disabled; na een eerdere succesvolle opslag toont de knop groen "Opgeslagen".
 - **c. Randgeval — geblokkeerde/afwijkende invoer:** probeer bij een holdings-gekoppelde bezitting de waarde handmatig te wijzigen → *verwacht:* het veld is vergrendeld met een "Holdings"-label. Zet een schuld op € 0 of lager → *verwacht:* deze schuld wordt automatisch gedeactiveerd en verdwijnt uit de lijst. Typ letters in een bedragveld → *verwacht:* geweigerd (alleen cijfers/punt; de budgetstap accepteert ook komma).
-- **d. Randgeval — halverwege afbreken & privacy-maskering:** sla de Bezittingen-stap op en navigeer weg zonder "Afronden" te klikken → *verwacht:* de herwaardering blijft bewaard, maar het maand-snapshot en de maand-voltooiing ontbreken nog (banner blijft actief tot een volledige afronding). Zet de privacy-maskering aan (oog-icoon) tijdens de check-in → *verwacht:* alle bedragen in de check-in tonen bullet-placeholders, conform UAT-NAV-11.
+- **d. Randgeval — halverwege afbreken & privacy-maskering:** sla de Bezittingen-stap op en navigeer weg zonder "Afronden" te klikken → *verwacht:* de herwaardering blijft bewaard, maar het maand-snapshot en de maand-voltooiing ontbreken nog (banner blijft actief tot een volledige afronding). Zet de privacy-maskering aan (⌘K → "Bedragen verbergen") tijdens de check-in → *verwacht:* alle bedragen in de check-in tonen bullet-placeholders, conform UAT-NAV-11.
 
 ---
 

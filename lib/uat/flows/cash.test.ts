@@ -93,7 +93,12 @@ describe('CASH_FLOW — curatie-integriteit', () => {
     // WF-CASH-64 (grenzenpot-tempo, ADR 0119) zijn als flow-knoop toegevoegd.
     // WF-CASH-62 heeft (nog) geen eigen flow-knoop — bestaande, hier ongewijzigde
     // dekkingsleemte, geen regressie van deze wijziging.
-    expect(covered.size).toBe(63)
+    // 63 → 64: WF-CASH-65 (partner-samenwerkingslaag fase 1, "Te bespreken",
+    // ADR 0128) is als flow-knoop toegevoegd, naast 'rekeningzichtbaarheid'.
+    // 64 → 65: WF-CASH-66 (TrueLayer-sync stempelt ownership op de en/of-rekening
+    // en ontdubbelt tegen de dragende rij van de partner) is als flow-knoop
+    // toegevoegd.
+    expect(covered.size).toBe(65)
   })
 
   it('de domeinoverschrijdende cross-knopen dekken BUDGET/OVZ/TOEK/WILL/BEZIT/MIJN', () => {

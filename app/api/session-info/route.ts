@@ -1,14 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { notFound } from '@/lib/api/respond'
 
 /**
  * GET /api/session-info — Returns session token metadata for testing.
  * Shows JWT expiry, token type, and refresh token presence.
- * Only available in development mode.
+ * Only available in development mode: buiten `next dev` 404 (geen 403), met
+ * de proxy-404 via DEV_ONLY_PATHS (lib/supabase/proxy.ts) als eerste laag.
  */
 export async function GET() {
   if (process.env.NODE_ENV !== 'development') {
-    return NextResponse.json({ error: 'Not available in production' }, { status: 403 })
+    return notFound()
   }
 
   const supabase = await createClient()

@@ -1,18 +1,23 @@
 'use client'
 
-import { useState } from 'react'
-import { Info } from 'lucide-react'
+import { Fragment, useState, type ReactNode } from 'react'
+import Link from 'next/link'
+import { ArrowRight, Info } from 'lucide-react'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
-import type { PageInfoContent } from '@/lib/page-info-content'
+import { GlossaryTerm } from '@/components/editorial/glossary-term'
+import { GLOSSARY_ENTRIES } from '@/lib/glossary-data'
+import type { PageInfoContent, PageInfoRelated, PageInfoWerking } from '@/lib/page-info-content'
 
 /**
  * PageInfoButton — "Wat zie ik hier?" info-knop voor hoofdpagina's.
  *
  * Toont een klein i-icoon; bij klik/tap opent een ShellOverlay-sheet met
- * twee gelabelde secties: INZICHT (waarom deze pagina ertoe doet) en GRIP
+ * gelabelde secties. Vast: INZICHT (waarom deze pagina ertoe doet) en GRIP
  * (wat je hier concreet kunt doen) — de twee kernwoorden uit de belofte
  * "de vrijheid om met inzicht en grip keuzes te maken voor nu en de
- * toekomst".
+ * toekomst". Optioneel daaronder: WERKING (hoe de functies werken en
+ * wanneer je ze inzet), BEGRIPPEN (jargon-popovers uit de glossary) en
+ * VERDER (verwante pagina's).
  *
  * Positie: absoluut t.o.v. parent (parent moet `relative` zijn).
  * Consistent rechts-boven geplaatst op alle hoofdpagina's.
@@ -21,10 +26,12 @@ import type { PageInfoContent } from '@/lib/page-info-content'
  * popover — dat geeft focus-trap, scroll-lock, safe-area-padding en het
  * automatisch verbergen van de FloatingNavButton gratis mee, en de
  * sheet-titel rendert al als `<h3>` (ADR 0110-conform, `bottom-sheet.tsx`).
+ * De sectielabels hieronder zijn bewust kickers (`<span>`), geen koppen: dat
+ * houdt de koppenvolgorde binnen de overlay intact.
  */
 
 interface PageInfoButtonProps {
-  /** INZICHT + GRIP — zie lib/page-info-content.ts. */
+  /** INZICHT + GRIP (+ optioneel WERKING/BEGRIPPEN/VERDER) — zie lib/page-info-content.ts. */
   content: PageInfoContent
   /** Optionele titel boven de secties (default: "Wat zie ik hier?"). */
   label?: string
@@ -38,9 +45,32 @@ export function PageInfoButton({
   className = '',
 }: PageInfoButtonProps) {
   const [open, setOpen] = useState(false)
+  const close = () => setOpen(false)
 
-  const hasInsight = Boolean(content.insight)
-  const hasGrip = Boolean(content.grip)
+  const werking = content.werking ?? []
+  const terms = (content.terms ?? []).filter((term) => Boolean(GLOSSARY_ENTRIES[term]))
+  const related = content.related ?? []
+
+  const sections: { key: string; node: ReactNode }[] = []
+  if (content.insight) {
+    sections.push({ key: 'insight', node: <InfoSection kicker="INZICHT" text={content.insight} /> })
+  }
+  if (content.grip) {
+    sections.push({ key: 'grip', node: <InfoSection kicker="GRIP" text={content.grip} /> })
+  }
+  if (werking.length > 0) {
+    sections.push({ key: 'werking', node: <WerkingSection items={werking} /> })
+  }
+  if (terms.length > 0) {
+    sections.push({ key: 'terms', node: <BegrippenSection terms={terms} /> })
+  }
+  if (related.length > 0) {
+    sections.push({ key: 'related', node: <VerderSection items={related} onNavigate={close} /> })
+  }
+
+  // Alleen een gevulde WERKING-lijst rechtvaardigt de bredere sheet; korte
+  // entries houden exact de compacte sheet die ze hadden.
+  const size = werking.length > 0 ? 'md' : 'sm'
 
   return (
     <div className={className}>
@@ -54,13 +84,33 @@ export function PageInfoButton({
         <Info className="h-3.5 w-3.5" />
       </button>
 
-      <ShellOverlay open={open} onClose={() => setOpen(false)} kind="sheet" size="sm" title={label}>
+      <ShellOverlay open={open} onClose={close} kind="sheet" size={size} title={label}>
         <div className="space-y-5">
-          {hasInsight && <InfoSection kicker="INZICHT" text={content.insight} />}
-          {hasInsight && hasGrip && <div className="border-t border-[var(--border-ed)]" />}
-          {hasGrip && <InfoSection kicker="GRIP" text={content.grip} />}
+          {sections.map((section, i) => (
+            <Fragment key={section.key}>
+              {i > 0 && <div className="border-t border-[var(--border-ed)]" />}
+              {section.node}
+            </Fragment>
+          ))}
         </div>
       </ShellOverlay>
+    </div>
+  )
+}
+
+const SERIF = { fontFamily: 'var(--font-source-serif, Georgia, serif)' } as const
+
+function Kicker({ children }: { children: ReactNode }) {
+  return (
+    <div className="mb-1.5 flex items-center gap-2">
+      <span
+        aria-hidden
+        className="inline-block h-px w-4"
+        style={{ background: 'var(--module-active-500)' }}
+      />
+      <span className="text-[9px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)]">
+        {children}
+      </span>
     </div>
   )
 }
@@ -68,22 +118,82 @@ export function PageInfoButton({
 function InfoSection({ kicker, text }: { kicker: string; text: string }) {
   return (
     <div>
-      <div className="mb-1.5 flex items-center gap-2">
-        <span
-          aria-hidden
-          className="inline-block h-px w-4"
-          style={{ background: 'var(--module-active-500)' }}
-        />
-        <span className="text-[9px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)]">
-          {kicker}
-        </span>
-      </div>
-      <p
-        className="text-[13px] leading-relaxed text-[var(--ink-2)]"
-        style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-      >
+      <Kicker>{kicker}</Kicker>
+      <p className="text-[13px] leading-relaxed text-[var(--ink-2)]" style={SERIF}>
         {text}
       </p>
+    </div>
+  )
+}
+
+/** WERKING — definitielijst: functienaam + wat 'ie doet en wanneer je 'm inzet. */
+function WerkingSection({ items }: { items: PageInfoWerking[] }) {
+  return (
+    <div>
+      <Kicker>WERKING</Kicker>
+      <dl className="space-y-3">
+        {items.map((item) => (
+          <div key={item.title}>
+            <dt className="text-[12px] font-semibold leading-snug text-[var(--ink)]">
+              {item.title}
+            </dt>
+            <dd className="mt-0.5 text-[13px] leading-relaxed text-[var(--ink-2)]" style={SERIF}>
+              {item.text}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  )
+}
+
+/** BEGRIPPEN — jargon uit deze pagina, uitgelegd via de bestaande popovers. */
+function BegrippenSection({ terms }: { terms: string[] }) {
+  return (
+    <div>
+      <Kicker>BEGRIPPEN</Kicker>
+      <ul className="flex flex-wrap gap-x-3 gap-y-2">
+        {terms.map((term) => (
+          <li
+            key={term}
+            className="rounded-full border border-[var(--border-ed)] bg-[var(--paper)] px-2.5 py-1 text-[12px] text-[var(--ink-2)]"
+          >
+            <GlossaryTerm term={term} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/** VERDER — verwante pagina's; navigeren sluit de sheet. */
+function VerderSection({
+  items,
+  onNavigate,
+}: {
+  items: PageInfoRelated[]
+  onNavigate: () => void
+}) {
+  return (
+    <div>
+      <Kicker>VERDER</Kicker>
+      <ul className="space-y-1">
+        {items.map((item) => (
+          <li key={item.href}>
+            <Link
+              href={item.href}
+              onClick={onNavigate}
+              className="group flex min-h-[36px] items-center gap-2 text-[13px] text-[var(--ink-2)] transition-colors hover:text-[var(--module-active-700)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+            >
+              <ArrowRight
+                aria-hidden
+                className="h-3.5 w-3.5 shrink-0 text-[var(--module-active-500)]"
+              />
+              <span style={SERIF}>{item.label}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

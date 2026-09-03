@@ -116,7 +116,13 @@ export function GeavanceerdSettings() {
                 setShowResetDialog(false)
                 setResetting(true)
                 try {
-                  const res = await fetch('/api/onboarding/reset', { method: 'POST' })
+                  // De API eist een expliciete bevestiging in de body; zonder
+                  // `{ confirm: true }` wist hij niets (400).
+                  const res = await fetch('/api/onboarding/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ confirm: true }),
+                  })
                   if (!res.ok) throw new Error('Reset failed')
                   router.push('/onboarding')
                 } catch {

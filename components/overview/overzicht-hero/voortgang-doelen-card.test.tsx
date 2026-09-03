@@ -33,6 +33,7 @@ function makeProgress(pct: number, onTrack: boolean, measured = true): GoalProgr
     measured,
     requiredMonthly: null,
     eta: null,
+    paceSkipped: false,
   }
 }
 

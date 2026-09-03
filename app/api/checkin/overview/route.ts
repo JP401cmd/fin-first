@@ -4,6 +4,8 @@ import { computeFireAge } from '@/lib/checkin/fire-age'
 import { resolveFireParams } from '@/lib/fire-params'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 import { savingsRateDataMonths, savingsRateWindow } from '@/lib/savings-source'
+import { deriveRealMonthTotals } from '@/lib/cashflow-month-totals'
+import { isTransferType } from '@/lib/transactions/transfer-marking'
 import {
   resolveUnlinkedCashShare,
   selectUnlinkedBankAccounts,
@@ -40,7 +42,7 @@ export async function GET() {
   const prevMonthIdx = currentMonth === 0 ? 11 : currentMonth - 1
 
   // Fetch data in parallel
-  const [assetsRes, debtsRes, bankRes, curIncomeRes, curExpenseRes, prevExpenseRes, income6mRes, expense6mRes, snapshotsRes, actionsRes, profileRes] = await Promise.all([
+  const [assetsRes, debtsRes, bankRes, curMonthRes, prevMonthRes, income6mRes, expense6mRes, snapshotsRes, actionsRes, profileRes] = await Promise.all([
     // Total assets (actief, met net-worth-weging — zelfde als dashboard)
     supabase
       .from('assets')
@@ -58,28 +60,21 @@ export async function GET() {
     // gedeeld binnen het huishouden) en RLS scoopt hier al — zie
     // lib/unlinked-cash.ts.
     selectUnlinkedBankAccounts(supabase),
-    // Current month income
+    // Lopende maand en vorige maand: ALLE rijen (beide tekens) mét
+    // transaction_type, zodat de canonieke maandmotor
+    // (lib/cashflow-month-totals.ts) op het teken van `amount` classificeert
+    // én de transfer-filter toepast — dezelfde grondslag als currentMonth* op
+    // de dashboard-bundel (ADR 0073).
     supabase
       .from('transactions')
-      .select('amount')
+      .select('amount, transaction_type')
       .eq('user_id', claims.sub)
-      .eq('is_income', true)
       .gte('date', monthStart)
       .lt('date', monthEnd),
-    // Current month expenses
     supabase
       .from('transactions')
-      .select('amount')
+      .select('amount, transaction_type')
       .eq('user_id', claims.sub)
-      .eq('is_income', false)
-      .gte('date', monthStart)
-      .lt('date', monthEnd),
-    // Previous month expenses
-    supabase
-      .from('transactions')
-      .select('amount')
-      .eq('user_id', claims.sub)
-      .eq('is_income', false)
       .gte('date', prevMonthStart)
       .lt('date', prevMonthEnd),
     // 6-maands inkomen/uitgaven voor een stabiele FIRE-leeftijd
@@ -136,14 +131,22 @@ export async function GET() {
   )
   const netWorth = totalAssets - totalDebts
 
-  const monthlyIncome = (curIncomeRes.data || []).reduce((s, t) => s + Math.abs(t.amount || 0), 0)
-  const monthlyExpenses = (curExpenseRes.data || []).reduce((s, t) => s + Math.abs(t.amount || 0), 0)
-  const prevMonthExpenses = (prevExpenseRes.data || []).reduce((s, t) => s + Math.abs(t.amount || 0), 0)
+  // Kalendermaand-totalen via de canonieke maandmotor: teken van `amount` +
+  // transfer-filter (transfer én joint_transfer). Hier stonden drie eigen
+  // sommen op `is_income` ZONDER transfer-filter, terwijl de 6-maands-
+  // gemiddelden eronder wél filterden — een eigen-rekening-overboeking telde
+  // dus als inkomen én uitgave in het maandcijfer maar niet in het
+  // halfjaarcijfer (2a, nazorg R2+R3; aandachtspunt
+  // maand-cashflow-grondslag-duplicaten, nu opgelost).
+  const curMonth = deriveRealMonthTotals(curMonthRes.data ?? [])
+  const prevMonth = deriveRealMonthTotals(prevMonthRes.data ?? [])
+  const monthlyIncome = curMonth.income
+  const monthlyExpenses = curMonth.expenses
+  const prevMonthExpenses = prevMonth.expenses
 
   // 6-maands gemiddelden (excl. eigen-rekening-transfers, zoals de loaders);
   // bij minder dan 6 maanden data middelen we over de beschikbare maanden.
-  const isRealTx = (t: { transaction_type?: string | null }) =>
-    t.transaction_type !== 'transfer' && t.transaction_type !== 'joint_transfer'
+  const isRealTx = (t: { transaction_type?: string | null }) => !isTransferType(t.transaction_type)
   const income6mRows = (income6mRes.data || []).filter(isRealTx)
   const expense6mRows = (expense6mRes.data || []).filter(isRealTx)
   const income6m = income6mRows.reduce((s, t) => s + Math.abs(t.amount || 0), 0)

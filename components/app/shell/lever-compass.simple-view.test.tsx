@@ -74,7 +74,7 @@ describe('LeverCompassMobile — NAV-6 statuspunt-reductie', () => {
   })
 
   // Bug: de trigger staat als tweede icoon in de TopBar-rij (na
-  // PerspectiveSwitcher, vóór PrivacyToggle — zie top-bar.tsx), dus niet aan
+  // PerspectiveSwitcher, vóór het nieuws-icoon — zie top-bar.tsx), dus niet aan
   // de rechterrand. Een `right-0`-geankerd 256px-paneel groeide dan naar
   // links tot voorbij de viewport-rand (zichtbaar afgesneden op 390px breed).
   // Given het paneel open is, when het rendert, then hangt het gecentreerd

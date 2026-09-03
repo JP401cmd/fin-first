@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
+import { serverError } from '@/lib/api/respond'
 
 /**
  * Privacy categories and valid visibility levels.
@@ -233,8 +234,9 @@ export async function PATCH(request: NextRequest) {
       }, { onConflict: 'key' })
 
     if (settingsError) {
-      // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
-      return NextResponse.json({ error: settingsError.message }, { status: 500 })
+      // Server-side gelogd, generieke tekst naar de client (ADR 0044): de rauwe
+      // upsert-fout droeg RLS-/kolomdetails van app_settings.
+      return serverError(settingsError, 'household-privacy:PATCH', 'Opslaan mislukt')
     }
   }
 

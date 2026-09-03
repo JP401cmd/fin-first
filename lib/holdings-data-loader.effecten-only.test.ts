@@ -25,9 +25,9 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { readSourceLF } from '@/lib/test-utils/read-source'
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const LOADER_PATH = join(REPO_ROOT, 'lib', 'holdings-data-loader.ts')
@@ -35,9 +35,10 @@ const ROUTE_PATH = join(REPO_ROOT, 'app', 'api', 'holdings', 'route.ts')
 const CRYPTO_LOADER_PATH = join(REPO_ROOT, 'lib', 'crypto-holdings-data.ts')
 
 /** Strip commentaar: de toelichtingen NOEMEN crypto_holdings nog wel — terecht,
- *  ze leggen uit waaróm het er niet meer is. Het anker matcht op CODE. */
+ *  ze leggen uit waaróm het er niet meer is. Het anker matcht op CODE.
+ *  CRLF-veilig via readSourceLF (zie lib/test-utils/read-source.ts). */
 function codeOf(path: string): string {
-  return readFileSync(path, 'utf8')
+  return readSourceLF(path)
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/^[ \t]*\/\/.*$/gm, '')
     .replace(/\s+/g, ' ')

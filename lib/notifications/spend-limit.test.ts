@@ -501,6 +501,37 @@ describe('decideSpendLimitEvents — voorkeur en dedupe', () => {
     expect(naAanzetten.events.map((e) => e.kind)).toEqual(['recovered'])
   })
 
+  it('levert een eenmalig event opnieuw zolang de gate niet is weggeschreven (WF-WILL-13 bug1)', () => {
+    // De meldingen-route berekent de events sinds WF-WILL-13 bug1 ALTIJD
+    // (`enabled: true`), maar schrijft de gate alleen weg wanneer de voorkeur
+    // aanstaat — anders zou een uitgezet type de overgang "opbranden". Deze test
+    // pint de eigenschap waarop dat leunt: dezelfde ONGEWIJZIGDE gate levert het
+    // once-event bij een volgende run gewoon opnieuw, zodat de melding er nog
+    // staat op het moment dat de gebruiker het type weer aanzet.
+    const potMetHerstel = () =>
+      pot({
+        current: OPEN_WITHIN,
+        closed: [
+          period({ periodKey: '2026-06', matched: 260, limit: 200, status: 'exceeded' }),
+          period({ periodKey: '2026-07', matched: 150, limit: 200, status: 'within' }),
+        ],
+      })
+
+    const eerste = decide([potMetHerstel()])
+    expect(eerste.events.map((e) => e.kind)).toEqual(['recovered'])
+    expect(eerste.gateChanged).toBe(true)
+
+    // Route schreef de gate NIET weg (voorkeur stond uit) → volgende recompute
+    // krijgt exact dezelfde lege gate mee.
+    const tweede = decide([potMetHerstel()])
+    expect(tweede.events.map((e) => e.kind)).toEqual(['recovered'])
+    expect(tweede.events[0].notification.id).toBe(eerste.events[0].notification.id)
+
+    // Wél weggeschreven ⇒ de overgang is verbruikt en komt niet terug.
+    const naPersist = decide([potMetHerstel()], eerste.gate)
+    expect(naPersist.events).toEqual([])
+  })
+
   it('geeft een nieuw id over een periodegrens heen (AC-B6-09)', () => {
     const augustus = decide([
       pot({

@@ -47,15 +47,17 @@ describe('RAPP_FLOW — curatie-integriteit', () => {
     }
   })
 
-  it('dekt alle 14 WF-RAPP-scenario\'s (01..14, aaneengesloten)', () => {
+  it('dekt alle 15 WF-RAPP-scenario\'s (01..15, aaneengesloten)', () => {
     const covered = new Set(
       RAPP_FLOW.nodes.map((n) => n.scenarioId).filter((id): id is string => Boolean(id)),
     )
-    const expected = Array.from({ length: 14 }, (_, i) => `UAT-RAPP-${String(i + 1).padStart(2, '0')}`)
+    const expected = Array.from({ length: 15 }, (_, i) => `UAT-RAPP-${String(i + 1).padStart(2, '0')}`)
     for (const id of expected) {
       expect(covered.has(id), `${id} moet als flow-knoop voorkomen`).toBe(true)
     }
-    expect(covered.size).toBe(14)
+    // 14 → 15: WF-RAPP-15 (totaalplan-rapport consumeert dezelfde gedeelde
+    // buildConvergentieAdapterInput incl. marktVolatiliteit als /toekomst).
+    expect(covered.size).toBe(15)
   })
 
   it('de domeinoverschrijdende cross-knopen dekken BEZIT/SCHULD/OVZ/TOEK', () => {

@@ -197,6 +197,13 @@ const SURFACES: { label: string; path: string }[] = [
     label: 'Box 1-subpagina',
     path: join(process.cwd(), 'app', '(app)', 'overzicht', 'belasting', 'box1', 'page.tsx'),
   },
+  {
+    // C8-vervolg (3-9-2026): het DERDE oppervlak. Fin kreeg zijn Box 1-heffing
+    // uit een eigen invoer (bruto uit `estimateGrossYearly`, géén eigen woning)
+    // en noemde daardoor een ander bedrag dan de twee schermen hierboven.
+    label: 'Fin-context (buildTaxContext)',
+    path: join(process.cwd(), 'lib', 'ai', 'context', 'tax-context.ts'),
+  },
 ]
 
 /**
@@ -233,6 +240,17 @@ describe('bron-grendel — geen enkel oppervlak stelt de Box 1-invoer nog zelf s
 
       it('consumeert de gedeelde eigen-woning-resolutie', () => {
         expect(source).toContain('resolveEigenWoningBox1Input')
+      })
+
+      it('consumeert de gedeelde bruto-resolutie (de ándere helft van de invoer)', () => {
+        // Bruto en eigen woning zijn samen de volledige Box 1-invoer; een
+        // oppervlak dat er één van zelf afleidt levert opnieuw een eigen
+        // heffing op. Fin zat vóór het C8-vervolg op `estimateGrossYearly`.
+        expect(source).toContain('resolveBox1GrossIncome')
+        // De AANROEP, niet de naam: een oppervlak mag in commentaar best
+        // uitleggen waar het vandaan komt — het mag hem alleen niet gebruiken.
+        expect(source).not.toContain('estimateGrossYearly(')
+        expect(source).not.toMatch(/import .*estimateGrossYearly/)
       })
 
       it('geeft WOZ én hypotheekrente mee aan élke computeBox1Tax-aanroep', () => {

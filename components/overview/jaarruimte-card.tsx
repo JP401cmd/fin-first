@@ -19,10 +19,22 @@ import {
 import { TaxGauge } from '@/components/overview/belasting/tax-gauge'
 import { Kicker, SectionLabel } from '@/components/editorial'
 import { AandachtspuntActieButton } from '@/components/overview/belasting/aandachtspunt-actie-button'
+import {
+  RANGE_STEP_ANY,
+  nextRangeValueForKey,
+  snapToStep,
+} from '@/components/overview/belasting/range-slider-snap'
 
 const BOX1_COLOR = 'var(--color-box1-700)'
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
+
+/** Stapgranulariteit van de inleg-slider: ~1% van de ruimte, minimaal €50.
+ *  Puur een bedieningsdetail (geen fiscaal getal) — en NIET als native `step`
+ *  op de input: de browser zou de berekende startstand (ondergrens) dan naar
+ *  een veelvoud saneren (WF-BELAST-10-bug1). Zie `range-slider-snap.ts`. */
+const INLEG_SLIDER_STEPS = 100
+const INLEG_SLIDER_MIN_STEP = 50
 
 /**
  * JaarruimteCard — toont onbenutte pensioen-aftrekruimte (Box 1) plus een
@@ -135,6 +147,17 @@ export function JaarruimteCard({
   const [inleg, setInleg] = useState<number>(rangeLow ?? result.jaarruimte)
   // Houd de inleg geclampt wanneer de jaarruimte verandert (aangroei-input).
   const clampedInleg = Math.min(Math.max(inleg, 0), result.jaarruimte)
+
+  // Stapraster voor GEBRUIKERSinteractie (slepen/toetsen). De startstand zelf
+  // (ondergrens óf volle ruimte) is meestal géén veelvoud van dit raster en
+  // moet exact blijven staan — daarom draagt de input `step="any"` en snapt
+  // alleen de interactie hier (WF-BELAST-10-bug1: native step saneerde
+  // 18.955 → 18.868 in de DOM, los van label, besparing en gauge).
+  const inlegBounds = {
+    step: Math.max(INLEG_SLIDER_MIN_STEP, Math.round(result.jaarruimte / INLEG_SLIDER_STEPS)),
+    min: 0,
+    max: result.jaarruimte,
+  }
 
   // Marginaal-correcte besparing: het echte Box 1-belastingverschil van de inleg
   // (schijfovergangen + heffingskorting-afbouw), niet de vlakke inleg × marginaal.
@@ -296,11 +319,18 @@ export function JaarruimteCard({
               type="range"
               min={0}
               max={result.jaarruimte}
-              step={Math.max(50, Math.round(result.jaarruimte / 100))}
+              step={RANGE_STEP_ANY}
               value={clampedInleg}
-              onChange={(e) => setInleg(Number(e.target.value) || 0)}
+              onChange={(e) => setInleg(snapToStep(Number(e.target.value), inlegBounds))}
+              onKeyDown={(e) => {
+                const next = nextRangeValueForKey(e.key, clampedInleg, inlegBounds)
+                if (next == null) return
+                e.preventDefault()
+                setInleg(next)
+              }}
               className="w-full accent-[var(--color-box1-500)]"
               aria-label="Lijfrente-inleg dit jaar"
+              aria-valuetext={formatCurrency(clampedInleg)}
             />
             {besparing != null && (
               <div className="mt-3 text-sm text-[var(--ink-2)] leading-snug">

@@ -1,6 +1,7 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import {
+  ensureOpeningTransaction,
   syncAssetValueFromHoldings,
   syncHoldingAggregatesFromTransactions,
 } from '@/lib/holdings-sync'
@@ -265,6 +266,24 @@ export async function POST(
     const numPrice = type === 'split' ? 0 : Number(price_per_unit)
     const totalAmount = type === 'split' ? 0 : numUnits * numPrice
 
+    // WF-BEZIT-15-bug1 — red de statische positie vóórdat de sync hem opeet.
+    // Een holding die via quick-add is aangemaakt draagt zijn eenheden als
+    // kolom, zonder transactierij. `syncHoldingAggregatesFromTransactions`
+    // hieronder herleidt de positie UITSLUITEND uit de transactietabel en
+    // overschrijft die kolom — dus zonder deze stap verdampt bij de eerste
+    // transactie-log stilzwijgend het oorspronkelijke bezit (100 @ €10 werd
+    // 50 eenheden na een koop van 50). We zetten die bestaande positie daarom
+    // eerst om in een echte openings-koop. Bewust hier en niet bij quick-add:
+    // zo worden ook de holdings gerepareerd die vandaag al zonder historie in
+    // de database staan — geen aparte backfill nodig.
+    const opening = await ensureOpeningTransaction(
+      supabase,
+      resolved.tables,
+      holdingId,
+      user.id,
+      typeof date === 'string' ? date : null,
+    )
+
     const { data: transaction, error } = await supabase
       .from(resolved.tables.transactions)
       .insert({
@@ -304,6 +323,7 @@ export async function POST(
         source,
         warning: 'Transactie opgeslagen, maar de holding-aggregatie kon niet worden bijgewerkt.',
         holding_updated: false,
+        opening_transaction_created: opening.created,
       }, { status: 201 })
     }
 
@@ -314,6 +334,10 @@ export async function POST(
       holding_updated: true,
       new_units: sync.units,
       new_avg_price: sync.avgPurchasePrice,
+      // Zichtbare terugkoppeling: de client kan melden dat de bestaande positie
+      // als openingstransactie is vastgelegd, zodat de extra rij in de
+      // transactielijst niet als een onverklaarde boeking overkomt.
+      opening_transaction_created: opening.created,
     }, { status: 201 })
   } catch (err) {
     return serverError(err, 'holdings-transactions:POST')

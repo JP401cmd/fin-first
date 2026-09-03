@@ -29,7 +29,7 @@ const OVERVIEW: LocalChatOverview = {
   dagtarief: 85,
   swrPct: 3.4,
   noodbuffer: { bedrag: 7500, maanden: 2.9 },
-  jaarruimte: { onbenut: 22155, besparing: 12409, vrijheidsdagen: 108 },
+  jaarruimte: { onbenut: 22155, besparing: 12409, vrijheidsdagen: 108, factorAKnown: true },
   kansen: [],
   openstaandeActies: [],
   budgetten: null,

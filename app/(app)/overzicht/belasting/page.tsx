@@ -377,6 +377,7 @@ export default async function OverzichtBelastingPage() {
             <HubKansen
               opportunities={kansen.taxOpportunities}
               dailyExpenses={kansen.dailyExpenses}
+              dailyExpensesSource={kansen.dailyExpensesSource}
             />
           </Reveal>
         )}

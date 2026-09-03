@@ -57,7 +57,12 @@ export function VoortgangDoelenCard({
           // meetbaar tempo. Dezelfde grondslag als de statuspil op
           // /toekomst/doelen ("Net begonnen") — hier als neutraal icoon, zodat
           // deze kaart geen groen vinkje zet op iets dat niet gemeten is.
-          const status = !progress.measured
+          // Bevinding UR2-17: bij een live-getrackt STAND-doel is de tempo-toets
+          // overgeslagen (`paceSkipped`) — dan is er net zo min iets te
+          // beoordelen als bij een vers doel, dus dezelfde neutrale toestand.
+          // Een groen vinkje zou hier "je haalt je tempo" beweren terwijl er
+          // geen tempo gemeten is.
+          const status = !progress.measured || progress.paceSkipped
             ? 'nieuw'
             : progress.onTrack
               ? 'ontrack'

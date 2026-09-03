@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
@@ -146,5 +146,157 @@ describe('PerspectiveProvider — de async ronde blijft corrigeren', () => {
 
     await waitFor(() => expect(screen.getByTestId('loading').textContent).toBe('nee'))
     expect(screen.getByTestId('perspective').textContent).toBe('household')
+  })
+})
+
+/**
+ * WF-NAV-19/c, bug2 — "de cookie was al gezet vóór de mislukte PATCH, dus het
+ * perspectief hoort te blijven staan na herlaad".
+ *
+ * Repro (UAT-sweep 2 sep 2026): met een falende PATCH sprong de badge na een
+ * herlaad terug van "Partner" naar "Huishouden". De PATCH was fire-and-forget,
+ * dus de server hoorde de wissel nooit; de mount-effect laat bewust de
+ * SERVERWAARDE winnen en draaide de keuze daarmee stilzwijgend terug.
+ *
+ * Eigenaarsbesluit 3 sep 2026: optie A — de PATCH retryen. De mount-effect
+ * blijft ongewijzigd (die draagt de C1/C7-correctie hierboven), dus deze suite
+ * bewijst de fix via de SERVERKANT: na een netwerkfout moet de server alsnog
+ * bijgetrokken zijn tegen de tijd dat de pagina opnieuw laadt.
+ */
+
+/** Server-dubbel: houdt de opgeslagen waarde bij en laat PATCH-falen scripten. */
+function makeServer(initial: string, patchOutcomes: Array<'network' | 'server-500' | 'client-400' | 'ok'>) {
+  const state = { perspective: initial, patchCalls: 0 }
+  const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+    if (init?.method !== 'PATCH') {
+      return {
+        ok: true,
+        json: async () => ({
+          selectedPerspective: state.perspective,
+          availablePerspectives: HOUSEHOLD_OPTIONS,
+          isHousehold: true,
+          partnerName: 'JP',
+        }),
+      } as unknown as Response
+    }
+
+    // Een afgebroken poging moet zich als abort gedragen, niet als netwerkfout:
+    // anders zou de retry-lus 'm alsnog willen herhalen.
+    if (init.signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+
+    const outcome = patchOutcomes[state.patchCalls] ?? 'ok'
+    state.patchCalls += 1
+    if (outcome === 'network') throw new TypeError('Failed to fetch')
+    if (outcome === 'server-500') return { ok: false, status: 503 } as unknown as Response
+
+    if (outcome === 'client-400') return { ok: false, status: 400 } as unknown as Response
+    state.perspective = JSON.parse(String(init.body)).perspective
+    return { ok: true, status: 200 } as unknown as Response
+  })
+  return { state, fetchMock }
+}
+
+function SwitchProbe() {
+  const { perspective, setPerspective } = usePerspective()
+  return (
+    <>
+      <span data-testid="perspective">{perspective}</span>
+      <button onClick={() => setPerspective('partner')}>naar partner</button>
+      <button onClick={() => setPerspective('household')}>naar huishouden</button>
+    </>
+  )
+}
+
+describe('PerspectiveProvider — een mislukte sync draait de wissel niet meer terug (WF-NAV-19/c)', () => {
+  it('herhaalt de PATCH na een netwerkfout, zodat de server de wissel alsnog krijgt', async () => {
+    const { state, fetchMock } = makeServer('household', ['network'])
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(
+      <PerspectiveProvider initialPerspective="household">
+        <SwitchProbe />
+      </PerspectiveProvider>,
+    )
+
+    fireEvent.click(screen.getByText('naar partner'))
+    expect(screen.getByTestId('perspective').textContent).toBe('partner')
+
+    // Poging 1 faalde; poging 2 hoort na de backoff alsnog te landen.
+    await waitFor(() => expect(state.perspective).toBe('partner'), { timeout: 3000 })
+    expect(state.patchCalls).toBe(2)
+  })
+
+  it('na herlaad staat het perspectief er nog — het gedrag dat de bug brak', async () => {
+    const { state, fetchMock } = makeServer('household', ['network'])
+    vi.stubGlobal('fetch', fetchMock)
+
+    const first = render(
+      <PerspectiveProvider initialPerspective="household">
+        <SwitchProbe />
+      </PerspectiveProvider>,
+    )
+    fireEvent.click(screen.getByText('naar partner'))
+    await waitFor(() => expect(state.perspective).toBe('partner'), { timeout: 3000 })
+    first.unmount()
+
+    // Herlaad: de mount-effect haalt opnieuw op en laat de server winnen. Dát mag
+    // ook — mits de retry de server inmiddels heeft bijgetrokken.
+    render(
+      <PerspectiveProvider initialPerspective="partner">
+        <SwitchProbe />
+      </PerspectiveProvider>,
+    )
+    await waitFor(() => expect(screen.getByTestId('perspective').textContent).toBe('partner'))
+  })
+
+  it('herhaalt ook een 5xx, want die betekent dat de server de keuze niet heeft', async () => {
+    const { state, fetchMock } = makeServer('household', ['server-500'])
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(
+      <PerspectiveProvider initialPerspective="household">
+        <SwitchProbe />
+      </PerspectiveProvider>,
+    )
+    fireEvent.click(screen.getByText('naar partner'))
+
+    await waitFor(() => expect(state.perspective).toBe('partner'), { timeout: 3000 })
+  })
+
+  it('herhaalt een 4xx juist NIET — dat antwoord verandert niet door het opnieuw te vragen', async () => {
+    const { state, fetchMock } = makeServer('household', ['client-400'])
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(
+      <PerspectiveProvider initialPerspective="household">
+        <SwitchProbe />
+      </PerspectiveProvider>,
+    )
+    fireEvent.click(screen.getByText('naar partner'))
+
+    // Ruim langer dan de eerste backoff (300ms): er komt geen tweede poging.
+    await new Promise(r => setTimeout(r, 600))
+    expect(state.patchCalls).toBe(1)
+    expect(state.perspective).toBe('household')
+  })
+
+  it('een nieuwere wissel wint: de retry van de oude keuze schrijft niets terug', async () => {
+    // Eerste wissel faalt en gaat de backoff in; de tweede wissel breekt 'm af.
+    const { state, fetchMock } = makeServer('personal', ['network', 'ok'])
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(
+      <PerspectiveProvider initialPerspective="personal">
+        <SwitchProbe />
+      </PerspectiveProvider>,
+    )
+
+    fireEvent.click(screen.getByText('naar partner'))
+    fireEvent.click(screen.getByText('naar huishouden'))
+
+    await waitFor(() => expect(state.perspective).toBe('household'), { timeout: 3000 })
+    // En blijft daar: de afgebroken partner-retry mag niet alsnog landen.
+    await new Promise(r => setTimeout(r, 700))
+    expect(state.perspective).toBe('household')
   })
 })

@@ -93,11 +93,15 @@ describe('SimVermogenspadWidget — eind-aslabel consumeert kernel-displayEndAge
     expect(screen.queryByText('90j')).not.toBeInTheDocument()
   })
 
-  it('fallback: zonder displayEndAge valt het label terug op de laatste simRow-leeftijd', () => {
+  it('fallback: zonder displayEndAge valt het label terug op de laatste punt-leeftijd (laatste simRow + 1)', () => {
+    // Tijdstip-conventie (sim-chart-geometry): de eindstand van rij 88 staat op
+    // leeftijd 89 — het laatste punt van de lijn. Het aslabel hoort daarbij; "88j"
+    // was de oude `[age, endPortfolio]`-plot die alles een jaar naar links zette.
     const data = makeData({ simRows: makeSimRows(46, 88, 60), displayEndAge: null, fireAgeFractional: 59.5 })
     render(<SimVermogenspadWidget size="full" data={data} />)
 
-    expect(screen.getByText('88j')).toBeInTheDocument()
+    expect(screen.getByText('89j')).toBeInTheDocument()
+    expect(screen.queryByText('88j')).not.toBeInTheDocument()
     expect(screen.queryByText('90j')).not.toBeInTheDocument()
   })
 })

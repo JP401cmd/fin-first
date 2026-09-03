@@ -440,7 +440,7 @@ export const BEZIT_ENGINE_CHECKS: BezitEngineCheck[] = [
   {
     workflow: 'WF-BEZIT-21',
     scenarioId: 'UAT-BEZIT-21',
-    label: 'Crypto KPI-strip (BTC/ETH handmatig toegevoegd op persona compleet)',
+    label: 'Crypto KPI-strip (BTC/ETH uit de persona-seed in crypto_holdings)',
     run: () => {
       criterion('WF-BEZIT-21')
       const btc = { units: 0.5, avgCost: 25000, price: 58000 }

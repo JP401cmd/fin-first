@@ -86,6 +86,7 @@ export function TransactionForm({
   onClose,
   onSaved,
   disableAnalysis,
+  secondaryAction,
 }: {
   transaction?: Transaction
   accountId: string
@@ -95,6 +96,12 @@ export function TransactionForm({
   onClose: () => void
   onSaved: () => void
   disableAnalysis?: boolean
+  /**
+   * Optionele extra actie onder het formulier, náást "Analyseer tegenpartij"
+   * (bv. "Bespreken met partner", ADR 0128). De aanroeper bepaalt of hij er
+   * hoort; het formulier rendert 'm alleen in bewerk-modus.
+   */
+  secondaryAction?: React.ReactNode
 }) {
   const isEdit = !!transaction
   const { hasHousehold } = useHouseholdStatus()
@@ -1080,6 +1087,8 @@ export function TransactionForm({
               </button>
             </div>
           )}
+
+          {isEdit && secondaryAction}
 
           {/* Actions */}
           <div className="mt-4 flex items-center justify-between border-t border-[var(--border-ed)] pt-4">

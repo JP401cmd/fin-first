@@ -24,7 +24,7 @@
 // de doc-volgorde hieronder per generator is dus de bron-volgorde, niet
 // per se de getoonde volgorde.
 
-import { credibleDailyExpense, credibleMonthlyBasis, formatCurrency } from '@/lib/format'
+import { credibleDailyExpense, credibleMonthlyBasis, dailyExpenseRate, formatCurrency } from '@/lib/format'
 import { formatGoalValue, isGoalReached, type GoalType } from '@/lib/goal-data'
 import type { HealthScore } from '@/lib/financial-health'
 import type { LifeEvent } from '@/lib/horizon-data'
@@ -522,7 +522,7 @@ function buildFinanceEntries(finance: BriefingFinanceInput, now: Date): Briefing
   // de zin blijft staan, de onmogelijke claim verdwijnt.
   const dailyExp =
     credibleDailyExpense(finance.dailyExpenseRate) ||
-    (credibleMonthlyBasis(finance.monthlyExpenses) * 12) / 365
+    dailyExpenseRate(credibleMonthlyBasis(finance.monthlyExpenses))
 
   // Maandgrondslagen waarop de briefjes hun percentages en bedragen baseren —
   // gefloord op dezelfde vloer, zodat een restwaarde van een paar euro geen

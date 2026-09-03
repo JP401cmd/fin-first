@@ -56,6 +56,7 @@ import {
 import { deriveRealMonthTotals, type MonthTxRow } from '@/lib/cashflow-month-totals'
 import { consumptionExpenseRows, recentDailyExpenseRateFromRows } from '@/lib/expense-rate'
 import { resolveEffectiveIncomeExpenses, type IncomeExpenseSources } from '@/lib/effective-financials'
+import { SAVINGS_RATE_WINDOW_MONTHS } from '@/lib/constants'
 import { buildBudgetTypeMap } from '@/lib/budget-utils'
 import {
   buildBudgetSpendingMap,
@@ -826,7 +827,7 @@ export const loadForecastSectionData = cache(async (supabase: SupabaseClient): P
 
   const { savingsRate6m, isEstimate: savingsRateIsEstimate } = resolveSavingsRate6m({
     ...window6m,
-    debtAflossing6m: computeDebtAflossingMonthly(debts) * 6,
+    debtAflossing6m: computeDebtAflossingMonthly(debts) * SAVINGS_RATE_WINDOW_MONTHS,
     dataMonths: deriveDataMonths6(now, earliestIncomeDate),
     effectiveMonthlyIncome: monthlyIncome,
     effectiveMonthlyExpenses: monthlyExpenses,
@@ -856,7 +857,7 @@ export const loadForecastSectionData = cache(async (supabase: SupabaseClient): P
   const forecastSavingsExpenses = resolveAmountWithBasis(
     forecastProfile.expenses_source,
     Number(forecastProfile.estimated_monthly_expenses ?? 0),
-    window6m.expenses6m / 6,
+    window6m.expenses6m / SAVINGS_RATE_WINDOW_MONTHS,
     forecastBudgetBasis.expenses.monthlyTotal,
   )
   const { effectiveSavingsRatePct } = resolveSavingsSource({

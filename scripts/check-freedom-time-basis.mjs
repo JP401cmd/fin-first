@@ -108,6 +108,34 @@ const MONTH_DIVISION = /(?<![A-Za-z0-9_$])([A-Za-z0-9_$.]*(?:xpense|itgave|osten
 const WINDOW_AVERAGE = /(?<![A-Za-z0-9_$.])avgDailyExpense(?![A-Za-z0-9_$])/
 
 /**
+ * REGEL 4 (nazorg R2+R3, bevinding 1d) — de conversie zelf, inline herschreven.
+ *
+ * Blinde vlek (a) had nog een derde gedaante: niet ÷30 en niet een venster-
+ * gemiddelde, maar de CORRECTE formule `(maandbedrag * 12) / 365` met de hand
+ * uitgeschreven. Grammaticaal onberispelijk — en juist daardoor onzichtbaar
+ * voor regel 1 t/m 3. Zo stonden er ~11 eigen noemers in de app, waaronder
+ * VIER AI-contextbouwers: die bepalen welke vrijheidsdagen Fin citeert, en
+ * elk had een eigen teller (losse kalendermaand, 3-mnd budgetsom, 12-mnd
+ * budgetbakken, budget-LIMIETEN…) onder een formule die er canoniek uitzag.
+ *
+ * Wat we vangen: `* 12) / 365` en `* 12 / 365` op één regel. De fix is nooit
+ * "de formule ergens anders neerzetten": consumeer het bundelveld
+ * `dailyExpenseRate`, roep server-side `getRecentDailyExpenseRate(supabase)`
+ * aan, of — bij een gedocumenteerde ANDERE grondslag — `dailyExpenseRate(x)`
+ * uit lib/format.ts (dan geldt regel 1 met zijn allowlist). Alleen de
+ * definitie zelf en een regressie-assertie die het canonieke tarief tegen de
+ * letterlijke formule houdt, mogen hem uitschrijven.
+ */
+const INLINE_CONVERSION = /\*\s*12\s*\)?\s*\/\s*365(?![\d.])/
+const INLINE_CONVERSION_ALLOWED = new Map([
+  ['lib/format.ts', 'DEFINITIE van dailyExpenseRate zelf (×12/365).'],
+  [
+    'lib/regression-tests/suites/identiteit-household.ts',
+    'Regressie-assertie die het canonieke tarief tegen de letterlijke formule houdt — dat ís de test.',
+  ],
+])
+
+/**
  * Verwijder string-literals uit een regel vóór de match-test. De naam
  * `dailyExpenseRate(3000)` komt namelijk óók voor in PROZA — UAT-verwachtingen
  * ("vrijheidsdagen = calculateFreedomTime(…, dailyExpenseRate(2200))") en de
@@ -161,6 +189,13 @@ const ALLOWED_FILES = new Map([
     'components/core/holdings/portfolio-value-chart.tsx',
     'ESSENTIELE-uitgaven-grondslag (yearlyEssentialExpenses): bewust de must-basis ' +
       'van de FIRE-doelberekening, niet het totale levensstijl-tarief.',
+  ],
+  [
+    'components/app/core/assets/asset-pane.tsx',
+    'ESSENTIELE-uitgaven-grondslag voor de vrijheidstijd-badge van één bezitting: ' +
+      'computeYearlyMustExpenses/365 (dezelfde must-basis als portfolio-value-chart.tsx); ' +
+      'de profielschatting als terugval loopt door de canonieke conversie. Verving een ' +
+      'inline ×12/365 (regel 4).',
   ],
   [
     'lib/dashboard-data-loader.ts',
@@ -225,6 +260,27 @@ const ALLOWED_FILES = new Map([
     'WHAT-IF-grondslag: het scenariobedrag dat de gebruiker in de schuifjes zet is ' +
       'hier de hele vraag ("wat als ik €X/mnd uitgeef"), net als bij de AI-tool ' +
       'hierboven. De CONVERSIE is wél canoniek — dit verving een ÷30 (M22).',
+  ],
+  [
+    'lib/briefing/engine.ts',
+    'TERUGVAL achter het canonieke bundelveld via de geloofwaardigheidsvloer ' +
+      '(`credibleDailyExpense(finance.dailyExpenseRate) || dailyExpenseRate(…)`, UR2-03): ' +
+      'het rollende tarief wint; de conversie op de effectieve maandbasis is er alleen ' +
+      'voor fixtures zonder bundel of een tarief onder de vloer. Verving een inline ' +
+      '×12/365 (regel 4).',
+  ],
+  [
+    'lib/spending-patterns.ts',
+    'PATROON-grondslag: `derivePatternExpenseBasis` meet seizoens-/trend-/anomalie-impact ' +
+      'tegen het gemiddelde van de GEANALYSEERDE maanden zelf (gedocumenteerd in de ' +
+      'docstring; cloud-context en route delen exact deze ene functie). De conversie ' +
+      'is canoniek; verving een inline ×12/365 (regel 4).',
+  ],
+  [
+    'lib/horizon/fire-scalar.ts',
+    'FIRE-SCALAR-motor: must-grondslag (yearlyMustExpenses/365) met de maand-terugval ' +
+      'via de canonieke conversie — dezelfde regel als lib/dashboard-data-loader.ts ' +
+      'hierboven. Verving een inline ×12/365 (regel 4).',
   ],
 
   // ── Vaste testgetallen (geen gebruikersdata) ─────────────────────────────
@@ -298,6 +354,27 @@ for (const file of files) {
     })
   }
 
+  // ── Regel 4: inline (maand × 12) / 365 (nazorg R2+R3, 1d) ───────────────
+  // Alleen de definitie en een regressie-assertie mogen de formule uitschrijven;
+  // elke andere plek consumeert het bundelveld of roept de helper aan.
+  if (INLINE_CONVERSION.test(src)) {
+    const inlineReason = INLINE_CONVERSION_ALLOWED.get(rel)
+    src.split(/\r?\n/).forEach((rawLine, i) => {
+      if (COMMENT_LINE.test(rawLine)) return
+      if (!INLINE_CONVERSION.test(stripStrings(rawLine))) return
+      if (inlineReason) {
+        allowed.push({ rel, line: i + 1, text: rawLine.trim(), why: 'inline-conversie toegestaan: ' + inlineReason })
+        return
+      }
+      violations.push({
+        rel,
+        line: i + 1,
+        text: rawLine.trim(),
+        rule: 'inline (maand × 12) / 365 i.p.v. het bundelveld / getRecentDailyExpenseRate / dailyExpenseRate()',
+      })
+    })
+  }
+
   if (!CALL.test(src)) continue
   const lines = src.split(/\r?\n/)
   lines.forEach((rawLine, i) => {
@@ -363,7 +440,11 @@ if (violations.length > 0) {
       '\nSTAAT ER [venster-gemiddeld] bij? Ook dan niet: een tarief dat uit de op dat\n' +
       'moment zichtbare/gefilterde lijst komt, verandert zodra de gebruiker van\n' +
       'periode wisselt — dat is een tweede wisselkoers, geen tweede grondslag.\n' +
-      'Client-side lees je het tarief uit `useDailyExpenseRate()`.\n',
+      'Client-side lees je het tarief uit `useDailyExpenseRate()`.\n' +
+      '\nSTAAT ER [inline (maand × 12) / 365] bij? De formule klopt, maar hij hoort\n' +
+      'maar op ÉÉN plek te staan (lib/format.ts). Server-side: `getRecentDailyExpenseRate(supabase)`;\n' +
+      'in een bundel-consument: het veld `dailyExpenseRate`; bij een gedocumenteerde\n' +
+      'andere grondslag: `dailyExpenseRate(maandbedrag)` — en dan geldt regel 1.\n',
   )
   process.exit(1)
 }

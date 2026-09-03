@@ -1,6 +1,7 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { ageAtDate } from '@/lib/horizon-data'
 import { calculateFreedomTime } from '@/lib/format'
+import { getRecentDailyExpenseRate } from '@/lib/expense-rate'
 import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
 import { resolveFireParams } from '@/lib/fire-params'
 import { resolveSavingsSource, savingsRateFromAggregates } from '@/lib/savings-source'
@@ -130,7 +131,6 @@ export async function GET() {
 
     const txRows = txResult.data ?? []
     const expenses = txRows.filter((tx) => Number(tx.amount) < 0)
-    let dailyExpenseRate = 0
     let monthlyExpenses = 0
     let monthlyIncome = 0
 
@@ -154,13 +154,20 @@ export async function GET() {
         )
       )
       monthlyExpenses = totalExpenses / dataMonths
-      dailyExpenseRate = (monthlyExpenses * 12) / 365
 
       const totalIncome = txRows
         .filter((tx) => Number(tx.amount) > 0)
         .reduce((sum, tx) => sum + Number(tx.amount), 0)
       monthlyIncome = totalIncome / dataMonths
     }
+
+    // Canoniek dagtarief (lib/expense-rate.ts): 12-mnd rolling consumptie —
+    // dezelfde wisselkoers als elk scherm. Hier stond een eigen
+    // `(monthlyExpenses * 12) / 365` op de rauwe 12-maands som (zonder
+    // transfer-/consumptie-filter) — een tweede koers, terwijl deze route
+    // "vrijheidsdagen" citeert (1d, nazorg R2+R3). `monthlyExpenses`/
+    // `monthlyIncome` hierboven blijven de FIRE-/spaarbron van deze route.
+    const { dailyRate: dailyExpenseRate } = await getRecentDailyExpenseRate(supabase, now)
 
     // Freedom days
     const freedomDays =

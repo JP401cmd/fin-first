@@ -191,3 +191,71 @@ describe('Rapportage-hub — archief komt uit de server-loader', () => {
     expect(screen.getByText('Je archief is leeg.')).toBeInTheDocument()
   })
 })
+
+/**
+ * Regressie bij WF-RAPP-05-bug1 — "1 AUG – DI 02:00".
+ *
+ * De subtitel rende `date_from`/`date_to` door `formatTimestamp`, een
+ * recency-formatter voor échte tijdstippen: viel de grens binnen 7 dagen van
+ * nu, dan toonde hij `weekdag HH:MM`. Omdat een date-only string als
+ * UTC-middernacht parseert (= 01:00/02:00 in Europe/Amsterdam) leverde dat
+ * "DI 02:00" op voor wat gewoon 1 september is.
+ *
+ * Bijt-proef gedraaid: `formatPeriodeGrens` teruggezet op `formatTimestamp` →
+ * de eerste test rood met exact de gemelde tekst ("1 aug – di 02:00"). De
+ * tweede test bleef groen en is dan ook de controle: buiten het 7-daagse
+ * venster deed `formatTimestamp` het toevallig al goed, wat verklaart waarom
+ * alleen recent afgesloten periodes opvielen.
+ */
+describe('Rapportage-hub — periodegrens is een kalenderdatum, geen tijdstip (WF-RAPP-05-bug1)', () => {
+  /**
+   * Leest de subtitel van het archief-item met deze naam. De openen-knop draagt
+   * geen aria-label; zijn toegankelijke naam begint met de rapportnaam en
+   * eindigt met de periode-subtitel (de eye-knop heet "Bekijk <naam>" en matcht
+   * daardoor niet op `^naam`).
+   */
+  function subtitelVan(naam: string): string {
+    const knop = screen.getByRole('button', { name: new RegExp(`^${naam}`) })
+    return knop.textContent ?? ''
+  }
+
+  const AUGUSTUS_RAPPORT = {
+    id: 'cfg-recent',
+    name: 'Augustus 2026',
+    period_type: 'month' as const,
+    date_from: '2026-08-01',
+    // Exclusieve periodegrens: valt binnen 7 dagen van de gefixeerde 'nu'.
+    date_to: '2026-09-01',
+    use_ai: false,
+  }
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('toont een grens binnen 7 dagen van nu als datum, niet als weekdag + kloktijd', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-02T09:00:00Z'))
+
+    renderHub('full', { archive: [AUGUSTUS_RAPPORT] })
+
+    const subtitel = subtitelVan('Augustus 2026')
+    expect(subtitel).toContain('1 aug – 1 sep')
+    // Geen kloktijd en geen weekdag-afkorting meer in de subtitel.
+    expect(subtitel).not.toMatch(/\d{1,2}:\d{2}/)
+    expect(subtitel).not.toMatch(/\b(ma|di|wo|do|vr|za|zo)\b/i)
+  })
+
+  it('toont een oudere periode ongewijzigd als datumbereik', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-02T09:00:00Z'))
+
+    renderHub('full', {
+      archive: [
+        { ...AUGUSTUS_RAPPORT, id: 'cfg-oud', name: 'Q2 2026', period_type: 'quarter' as const, date_from: '2026-04-01', date_to: '2026-07-01' },
+      ],
+    })
+
+    expect(subtitelVan('Q2 2026')).toContain('1 apr – 1 jul')
+  })
+})

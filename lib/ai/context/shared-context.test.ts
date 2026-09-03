@@ -1,10 +1,10 @@
-import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { CorePageData } from '@/lib/core-data-loader'
 import { computeFreedomProgress } from '@/lib/core-metrics'
 import { deflate, factorAtAge, type FactorRow } from '@/lib/euro-display'
 import type { HorizonFireSim } from '@/lib/fire-target-shared'
+import { readSourceLF } from '@/lib/test-utils/read-source'
 import { formatCurrency } from './formatter'
 
 // ── Mock loadCoreData ──────────────────────────────────────────
@@ -367,7 +367,9 @@ describe('buildSharedContext — euro_view gaat niet naar het model (D14)', () =
 
   it('leest euro_view in geen van beide context-bouwers uit de bron', () => {
     for (const file of ['shared-context.ts', 'horizon-context.ts']) {
-      const src = readFileSync(join(__dirname, file), 'utf8')
+      // CRLF-veilig (zie lib/test-utils/read-source.ts): een verse Windows-
+      // checkout zou de /gm-comment-strip hieronder anders stil laten falen.
+      const src = readSourceLF(join(__dirname, file))
       // Alleen echte code-verwijzingen tellen; de toelichting in de kopcommentaren
       // mág het veld benoemen (dat is juist waar het besluit wordt uitgelegd).
       const codeOnly = src.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')

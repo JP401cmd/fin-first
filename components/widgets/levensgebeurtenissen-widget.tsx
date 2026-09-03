@@ -5,6 +5,7 @@ import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData, TopLifeEvent } from './widget-renderer'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
+import { widgetSimRowsToChartPoints } from '@/lib/horizon/sim-chart-geometry'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { Calendar, TrendingUp, Heart, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 
@@ -19,21 +20,22 @@ const COLOR_OPBOUW = 'var(--color-horizon-700)'
 const COLOR_POS = 'var(--positive)'
 const COLOR_NEG = 'var(--negative)'
 
-/** Linearly interpolate portfolio value at a fractional age. */
-function interpAt(
-  simRows: { age: number; endPortfolio: number }[],
-  targetAge: number,
-): number | null {
-  if (simRows.length === 0) return null
-  if (targetAge <= simRows[0].age) return simRows[0].endPortfolio
-  if (targetAge >= simRows[simRows.length - 1].age)
-    return simRows[simRows.length - 1].endPortfolio
-  for (let i = 1; i < simRows.length; i++) {
-    if (simRows[i].age >= targetAge) {
-      const prev = simRows[i - 1]
-      const curr = simRows[i]
-      const t = (targetAge - prev.age) / (curr.age - prev.age)
-      return prev.endPortfolio + t * (curr.endPortfolio - prev.endPortfolio)
+/**
+ * Linearly interpolate portfolio value at a fractional age — op de CHART-PUNTEN
+ * uit `widgetSimRowsToChartPoints` (seed op de startleeftijd, eindstand van rij `age`
+ * op `age + 1`), niet op de rauwe rijen: die lezen elke leeftijd een jaar te
+ * vroeg (D, nazorg R2+R3).
+ */
+function interpAt(pts: [number, number][], targetAge: number): number | null {
+  if (pts.length === 0) return null
+  if (targetAge <= pts[0][0]) return pts[0][1]
+  if (targetAge >= pts[pts.length - 1][0]) return pts[pts.length - 1][1]
+  for (let i = 1; i < pts.length; i++) {
+    if (pts[i][0] >= targetAge) {
+      const [a0, v0] = pts[i - 1]
+      const [a1, v1] = pts[i]
+      const t = (targetAge - a0) / ((a1 - a0) || 1)
+      return v0 + t * (v1 - v0)
     }
   }
   return null
@@ -61,27 +63,14 @@ function pointsToPath(
     .join(' ')
 }
 
-/** Filter events to those with a targetAge inside simRows range. */
-function chartableEvents(
-  events: TopLifeEvent[],
-  simRows: { age: number }[],
-): TopLifeEvent[] {
-  if (simRows.length === 0) return []
-  const minAge = simRows[0].age
-  const maxAge = simRows[simRows.length - 1].age
+/** Filter events to those with a targetAge inside the chart-point range. */
+function chartableEvents(events: TopLifeEvent[], pts: [number, number][]): TopLifeEvent[] {
+  if (pts.length === 0) return []
+  const minAge = pts[0][0]
+  const maxAge = pts[pts.length - 1][0]
   return events.filter(
     e => e.targetAge != null && e.targetAge >= minAge && e.targetAge <= maxAge,
   )
-}
-
-/** Build [age, portfolio] tuples from simRows (matching SimChart pattern). */
-function buildPts(simRows: { age: number; endPortfolio: number; phase: string }[]): [number, number][] {
-  if (simRows.length === 0) return []
-  const pts: [number, number][] = [[simRows[0].age, simRows[0].endPortfolio]]
-  for (const r of simRows.slice(1)) {
-    pts.push([r.age, r.endPortfolio])
-  }
-  return pts
 }
 
 export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidget({ size, data, href }: Props) {
@@ -105,10 +94,14 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
     return <TextFallback size={size} lifeEvents={lifeEvents} topLifeEvents={topLifeEvents} href={href} />
   }
 
-  const events = chartableEvents(topLifeEvents, simRows)
-  const allPts = buildPts(simRows)
-  const minAge = simRows[0].age
-  const maxAge = simRows[simRows.length - 1].age
+  // Tijdstip-conventie (lib/horizon/sim-chart-geometry.ts, één huis): seed op
+  // de startleeftijd + de eindstand van rij `age` op `age + 1`. De eigen
+  // `[r.age, r.endPortfolio]`-plot die hier stond ("matching SimChart pattern")
+  // volgde dat patroon juist NIET en zette lijn én markers een jaar naar links.
+  const allPts = widgetSimRowsToChartPoints(simRows)
+  const events = chartableEvents(topLifeEvents, allPts)
+  const minAge = allPts[0][0]
+  const maxAge = allPts[allPts.length - 1][0]
   const ageSpan = maxAge - minAge || 1
 
   // ── Quarter: mini sparkline ─────────────────────────────
@@ -154,7 +147,7 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
             )}
             {/* Event dots on path */}
             {events.map((evt, i) => {
-              const portfolio = interpAt(simRows, evt.targetAge!)
+              const portfolio = interpAt(allPts, evt.targetAge!)
               if (portfolio == null) return null
               return (
                 <circle
@@ -176,7 +169,7 @@ export const LevensgebeurtenissenWidget = memo(function LevensgebeurtenissenWidg
             {fireAgeFractional != null && fireAgeFractional >= minAge && fireAgeFractional <= maxAge && (
               <circle
                 cx={toX(fireAgeFractional)}
-                cy={toY(interpAt(simRows, fireAgeFractional) ?? 0)}
+                cy={toY(interpAt(allPts, fireAgeFractional) ?? 0)}
                 r="3"
                 fill={COLOR_OPBOUW}
                 stroke="var(--paper)"

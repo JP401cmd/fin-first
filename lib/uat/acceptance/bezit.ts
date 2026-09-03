@@ -213,7 +213,7 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'willem',
     given: 'Persona Willem Jansen geladen (portefeuille €570.016).',
     when: 'De gebruiker voegt "Vanguard S&P 500 UCITS" (VUSA) toe: 50 eenheden @ €95,00, TER 0,07%.',
-    then: 'Nieuwe kaart-waarde €4.750 (50×95); jaarkosten-preview €3,33 (0,0007×4.750); nieuw portfoliototaal €574.766 (570.016+4.750). Regressie (POST /api/holdings, WF-BEZIT-14-bug2): het doel-asset wordt server-side gevalideerd — een meegestuurd `asset_id` moet van de gebruiker zelf en actief zijn (400 "Onbekend vermogensobject" resp. "gearchiveerd" anders), en een crypto-asset wordt geweigerd (400, crypto loopt via de exchange-sync naar `crypto_holdings`, nooit via dit endpoint naar `investment_holdings`); zonder `asset_id` valt de route terug op het eerste actieve, holdings-trackende asset van de gebruiker (nooit een soft-deleted asset).',
+    then: 'Nieuwe kaart-waarde €4.750 (50×95); jaarkosten-preview €3,33 (0,0007×4.750); nieuw portfoliototaal €574.766 (570.016+4.750). Regressie (POST /api/holdings, WF-BEZIT-14-bug2): het doel-asset wordt server-side gevalideerd — een meegestuurd `asset_id` moet van de gebruiker zelf en actief zijn (400 "Onbekend vermogensobject" resp. "gearchiveerd" anders), en een crypto-asset wordt geweigerd (400, crypto loopt via de exchange-sync naar `crypto_holdings`, nooit via dit endpoint naar `investment_holdings`); zonder `asset_id` valt de route terug op het eerste actieve, holdings-trackende asset van de gebruiker (nooit een soft-deleted asset). Sub-scenario "lege ticker" (regressie WF-BEZIT-14-bug4): het veld "Ticker / ISIN" is in de dialoog "Nieuwe holding" gemarkeerd als verplicht (`*`) en leeg indienen levert een inline melding i.p.v. een mislukte POST; wie de route rechtstreeks aanroept zónder ticker krijgt géén 500 meer maar een 201 met een uit de naam afgeleide ticker (`lib/holdings-ticker.ts#deriveHoldingTicker` — dezelfde afleiding als de backfill `COALESCE(h.ticker, h.name)` in migratie 20260502000003 en als de CSV-import), zodat de NOT NULL-kolom `investment_holdings.ticker` nooit een `null` te verwerken krijgt. Hetzelfde geldt bij PATCH wanneer de gebruiker het tickerveld leegmaakt.',
     assertion: {
       kind: 'exact',
       expected: 'waarde=4750; jaarkosten=3.33; nieuwTotaal=574766',
@@ -312,13 +312,13 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Crypto-holdings-app gebruiken (analyse per coin)',
     kriticiteit: 'KERN',
     persona: 'compleet',
-    given: 'Persona Tessa Compleet geladen; "Holdings bijhouden" gezet op de crypto-asset; 2 coins handmatig toegevoegd: BTC 0,5@ gem. €25.000/huidig €58.000; ETH 3@ gem. €2.000/huidig €3.200.',
+    given: 'Persona Tessa Compleet geladen; "Holdings bijhouden" gezet op de crypto-asset; 2 coins staan klaar in `crypto_holdings`: BTC 0,5@ gem. €25.000/huidig €58.000; ETH 3@ gem. €2.000/huidig €3.200. Klaarzetten kan uitsluitend via de persona-seed of een echte exchange-/wallet-koppeling — de app kent geen invoerscherm voor losse coins.',
     when: 'De gebruiker bekijkt de KPI-strip en het verdelings-paneel "Per coin".',
     then: 'Totale waarde €38.600 (BTC €29.000 + ETH €9.600); indicatieve Box 3-heffing €833,76 (38.600×6%×36%); ongerealiseerd P&L totaal €20.100 (BTC €16.500 + ETH €3.600); verdeling BTC 75,13% / ETH 24,87%. Regressie: deze tab crashte eerder in productie met React #300 (error-boundary "Je gegevens zijn veilig") zodra de setup-gate een sectie-interne state-update kreeg; secties in AppSetupGate worden nu als echte componenten gemount, geen crash meer.',
     assertion: {
       kind: 'exact',
       expected: 'totaal=38600; box3Indicatief=833.76; unrealizedTotal=20100; btcPct=75.13; ethPct=24.87',
-      source: 'som units×current_price + (current_price−avg_purchase_price)×units op de 2 handmatig toegevoegde BTC/ETH-posities; Box3-indicatie = totaal×0,06×0,36 (2026-forfait, geen vrijstelling verrekend — crypto-kpi-strip.tsx)',
+      source: 'som units×current_price + (current_price−avg_purchase_price)×units op de 2 geseede BTC/ETH-posities in crypto_holdings; Box3-indicatie = totaal×0,06×0,36 (2026-forfait, geen vrijstelling verrekend — crypto-kpi-strip.tsx)',
     },
   },
   {

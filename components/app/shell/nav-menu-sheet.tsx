@@ -1,7 +1,9 @@
 'use client'
 
+import { useTransition } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { RotateCw } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import {
   mainNav,
@@ -78,6 +80,13 @@ type NavMenuSheetProps = {
  */
 export function NavMenuSheet({ open, onClose, onAction }: NavMenuSheetProps) {
   const pathname = usePathname() ?? '/'
+  const router = useRouter()
+  // Toetsenbord-/schermlezer-tegenhanger van het pull-to-refresh-gebaar. In de
+  // PWA (`display: standalone`) is er geen browser-chrome, dus zónder deze knop
+  // zou verversen alleen met een veeg kunnen — en dat is voor een deel van de
+  // gebruikers geen weg. Zelfde actie, zelfde transition-semantiek als de
+  // indicator in de shell.
+  const [refreshPending, startRefresh] = useTransition()
   const leverScores = useLeverScores()
   const activeAppKeys = useActiveAppKeys()
   const { mode: displayMode } = useDisplayMode()
@@ -285,6 +294,22 @@ export function NavMenuSheet({ open, onClose, onAction }: NavMenuSheetProps) {
               )
             })}
           </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              startRefresh(() => {
+                router.refresh()
+              })
+            }}
+            disabled={refreshPending}
+            className="mt-1.5 flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-[var(--subtle)]/60 disabled:opacity-60"
+          >
+            <RotateCw size={16} className="text-[var(--ink-2)]" />
+            <span className="text-[13px] font-medium">
+              {refreshPending ? 'Bijwerken…' : 'Ververs pagina'}
+            </span>
+          </button>
         </section>
       </div>
     </BottomSheet>

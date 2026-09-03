@@ -8,6 +8,10 @@ elements: [as-planning, as-vermogen, do-budget, do-transactie]
 
 # 0127 — 'Nu stoppen' als vijfde eindstrategie, kernel-native op het startleeftijd-anker
 
+(ADR 0129 splitst stop-anker en eind-vorm in twee assen en contracteert dit
+besluit in fase F4 tot het `now`-anker binnen dat model. Status blijft
+`aanvaard` tot die fase.)
+
 ## Context
 
 Wie ná zijn FIRE-leeftijd doorwerkt heeft niets aan een plan dat FIRE-relatief

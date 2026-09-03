@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { ArrowRight, Clock } from 'lucide-react'
-import { formatMaskedCurrency, formatFreedomRateFootnote } from '@/lib/format'
+import { formatMaskedCurrency, formatFreedomRateFootnote, type FreedomRateSource } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type { TaxOpportunity } from '@/lib/tax-optimizer'
 import { Kicker, ScenarioCallout } from '@/components/editorial'
@@ -48,6 +48,7 @@ const BOX_BADGE: Record<1 | 2 | 3, { label: string; color: string }> = {
 export function HubKansen({
   opportunities,
   dailyExpenses = 0,
+  dailyExpensesSource,
 }: {
   opportunities: TaxOpportunity[]
   /**
@@ -57,10 +58,20 @@ export function HubKansen({
    * 0 → geen voetnoot (en dan staan er ook geen dagen).
    */
   dailyExpenses?: number
+  /**
+   * Herkomst van dat tarief (`FiscaleKansen.dailyExpensesSource`). Een
+   * profielschatting benoemt zichzelf in de voetnoot als schatting; zonder
+   * bron valt de voetnoot terug op "gemeten" bij een tarief > 0 (1b).
+   */
+  dailyExpensesSource?: FreedomRateSource
 }) {
   const { masked } = useMaskedAmounts()
   const fc = (v: number) => formatMaskedCurrency(v, masked)
-  const rateFootnote = formatFreedomRateFootnote(dailyExpenses, 'transactions', masked)
+  const rateFootnote = formatFreedomRateFootnote(
+    dailyExpenses,
+    dailyExpensesSource ?? (dailyExpenses > 0 ? 'transactions' : 'none'),
+    masked,
+  )
 
   if (opportunities.length === 0) return null
 

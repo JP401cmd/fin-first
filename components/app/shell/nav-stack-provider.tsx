@@ -198,8 +198,13 @@ const STACK_CHANGE_EVENT = 'fintwo:nav-stacks:change'
  */
 const NAV_STACK_META_EVENT = 'fintwo:nav-stack-meta'
 
-/** Detail-shape van het meta-event. Moet matchen met `NavStackMetaDetail` in nav-stack-meta.tsx. */
-type NavStackMetaDetail = {
+/**
+ * Detail-shape van het meta-event. Moet matchen met `NavStackMetaDetail` in
+ * nav-stack-meta.tsx. `pathname` = de route van de afzender; ontbreekt hij
+ * (legacy-afzender), dan geldt het oude top-entry-gedrag.
+ */
+export type NavStackMetaDetail = {
+  pathname?: string
   title: string
   bottomBar: BottomBarConfig
   topBar: TopBarConfig
@@ -317,6 +322,73 @@ function setState(next: StoreState, persistStacks: boolean): void {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event(STACK_CHANGE_EVENT))
   }
+}
+
+// ── NavStackMeta ↔ pathname-watcher coördinatie ─────────────────
+//
+// `<NavStackMeta>` is een kind van de pagina en dus een descendant van deze
+// provider; React draait kind-effects VÓÓR ouder-effects in dezelfde commit.
+// Rendert een nieuwe pagina haar NavStackMeta in dezelfde commit als de
+// pathname-wissel (bv. /toekomst/bibliotheek/[id], server-gerenderd zonder
+// Suspense-grens), dan vuurt het meta-event vóórdat de watcher hieronder de
+// nieuwe entry heeft gepusht — en landde de titel van de detailpagina op de
+// nog-actieve entry van de vórige pagina, gepersisteerd in sessionStorage
+// (UAT WF-REKEN-08-bug1: <h1> "Aflossen vs. beleggen" op /toekomst/bibliotheek).
+// Daarom draagt het event de pathname van de afzender: matcht die de
+// top-entry, dan werken we die bij; zo niet, dan parkeren we de meta per
+// pathname en past de watcher 'm toe zodra hij de entry aanmaakt/activeert.
+// Volgorde-onafhankelijk: meta-vóór-push en push-vóór-meta geven hetzelfde.
+
+/** Geparkeerde meta per pathname — geconsumeerd door de pathname-watcher. */
+const deferredNavStackMeta = new Map<string, NavStackMetaDetail>()
+
+export type NavStackMetaOutcome =
+  | { kind: 'noop' }
+  | { kind: 'update'; stack: StackEntry[] }
+  | { kind: 'defer' }
+
+/** Entry + meta uit een event → bijgewerkte entry (pathname/scrollY blijven). */
+export function withNavStackMeta(entry: StackEntry, detail: NavStackMetaDetail): StackEntry {
+  return { ...entry, title: detail.title, bottomBar: detail.bottomBar, topBar: detail.topBar }
+}
+
+function hasSameNavStackMeta(entry: StackEntry, detail: NavStackMetaDetail): boolean {
+  return (
+    entry.title === detail.title &&
+    JSON.stringify(entry.bottomBar) === JSON.stringify(detail.bottomBar) &&
+    JSON.stringify(entry.topBar) === JSON.stringify(detail.topBar)
+  )
+}
+
+/**
+ * Pure kern van de meta-listener (getest in nav-stack-meta-race.test.ts).
+ *  - `update`: de top-entry is de afzender (of het event draagt geen pathname —
+ *    legacy-gedrag) en de meta verschilt → nieuwe stack.
+ *  - `noop`: identieke meta — niets schrijven (geen re-render/sessionStorage).
+ *  - `defer`: de afzender is (nog) niet de top-entry → parkeren voor de watcher.
+ */
+export function applyNavStackMetaToStack(
+  tabStack: readonly StackEntry[],
+  detail: NavStackMetaDetail,
+): NavStackMetaOutcome {
+  const top = tabStack[tabStack.length - 1]
+  if (!top) return detail.pathname != null ? { kind: 'defer' } : { kind: 'noop' }
+  if (detail.pathname != null && detail.pathname !== top.pathname) return { kind: 'defer' }
+  if (hasSameNavStackMeta(top, detail)) return { kind: 'noop' }
+  return { kind: 'update', stack: [...tabStack.slice(0, -1), withNavStackMeta(top, detail)] }
+}
+
+/** Parkeer meta voor een pathname die nog geen (top-)entry heeft. */
+export function deferNavStackMeta(detail: NavStackMetaDetail): void {
+  if (detail.pathname == null) return
+  deferredNavStackMeta.set(detail.pathname, detail)
+}
+
+/** Haal (en verwijder) geparkeerde meta voor een pathname — één keer toepasbaar. */
+export function takeDeferredNavStackMeta(pathname: string): NavStackMetaDetail | undefined {
+  const detail = deferredNavStackMeta.get(pathname)
+  if (detail) deferredNavStackMeta.delete(pathname)
+  return detail
 }
 
 /**
@@ -629,16 +701,19 @@ export function NavStackProvider({
 
     // ── Scenario 1: tab-root bezoek ──────────────────────────────
     if (isRoot) {
+      const rootEntry: StackEntry = {
+        pathname,
+        title: '',
+        scrollY: 0,
+        topBar: defaultTopBar,
+        bottomBar: defaultBottomBar,
+      }
+      // Meta die de root-pagina al vóór deze reset stuurde (kind-effect eerst).
+      const deferredRoot = takeDeferredNavStackMeta(pathname)
       setState({
         stacks: {
           ...runtimeState.stacks,
-          [activeTab]: [{
-            pathname,
-            title: '',
-            scrollY: 0,
-            topBar: defaultTopBar,
-            bottomBar: defaultBottomBar,
-          }],
+          [activeTab]: [deferredRoot ? withNavStackMeta(rootEntry, deferredRoot) : rootEntry],
         },
         transition: IDLE_TRANSITION,
       }, true)
@@ -649,6 +724,11 @@ export function NavStackProvider({
     const existingIdx = tabStack.findIndex(e => e.pathname === pathname)
     if (existingIdx >= 0 && existingIdx < tabStack.length - 1) {
       const popped = tabStack.slice(0, existingIdx + 1)
+      // De terugkerende pagina kan haar meta al gestuurd hebben terwijl de
+      // vorige top nog actief was → geparkeerd; hier op de doel-entry zetten.
+      const deferredPop = takeDeferredNavStackMeta(pathname)
+      const popTarget = popped[popped.length - 1]
+      if (deferredPop && popTarget) popped[popped.length - 1] = withNavStackMeta(popTarget, deferredPop)
       const outgoing = top
       const incoming = popped[popped.length - 1] ?? null
 
@@ -685,13 +765,18 @@ export function NavStackProvider({
 
     // ── Scenario 3: PUSH — nieuwe sub-page ───────────────────────
     const scrollY = typeof window !== 'undefined' ? window.scrollY : 0
-    const newEntry: StackEntry = {
+    const freshEntry: StackEntry = {
       pathname,
       title: '',
       scrollY,
       topBar: defaultTopBar,
       bottomBar: defaultBottomBar,
     }
+    // Vuurde de nieuwe pagina haar NavStackMeta vóór deze push (kind-effect
+    // eerst), dan staat die geparkeerd — hier op de NIEUWE entry zetten i.p.v.
+    // op de vorige top (WF-REKEN-08-bug1).
+    const deferredPush = takeDeferredNavStackMeta(pathname)
+    const newEntry: StackEntry = deferredPush ? withNavStackMeta(freshEntry, deferredPush) : freshEntry
     const next: StackEntry[] = [...tabStack, newEntry]
     const trimmed = next.length > MAX_STACK_DEPTH
       ? next.slice(next.length - MAX_STACK_DEPTH)
@@ -727,12 +812,14 @@ export function NavStackProvider({
     }
   }, [pathname, activeTab, overrideActiveTab])
 
-  // ── NavStackMeta listener: top-entry meta-update ──────────────
+  // ── NavStackMeta listener: meta-update op de entry van de afzender ──
   // Pagina-componenten kunnen `<NavStackMeta title=... bottomBar=...>`
   // renderen om hun TopBar-titel + BottomBar-config te bevestigen na een
   // pathname-driven auto-push (waar de meta nog leeg was). We werken dan
-  // alleen de TOP-entry van de active tab-stack bij — geen nieuwe push, geen
-  // pop. De event-bron staat in nav-stack-meta.tsx.
+  // alleen de entry van de AFZENDER bij (= top zodra de watcher 'm gepusht
+  // heeft) — geen nieuwe push, geen pop. Komt het event vóór de push binnen,
+  // dan parkeren we het en zet de watcher het op de nieuwe entry (zie
+  // `applyNavStackMetaToStack`). De event-bron staat in nav-stack-meta.tsx.
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -741,31 +828,23 @@ export function NavStackProvider({
       const detail = (e as CustomEvent<NavStackMetaDetail>).detail
       if (!detail) return
 
+      // Sandbox (handmatige push/pop met fictieve entry-pathnames): daar zou
+      // de afzender-check alles parkeren — houd het oude top-entry-gedrag.
+      const scoped: NavStackMetaDetail = overrideActiveTab ? { ...detail, pathname: undefined } : detail
+
       const tabStack = runtimeState.stacks[activeTab]
-      if (tabStack.length === 0) return
-
-      const top = tabStack[tabStack.length - 1]
-      // Defensief: als top om wat voor reden niet bestaat, niets doen.
-      if (!top) return
-
-      // No-op-detectie: als de meta al gelijk is, niet opnieuw schrijven.
-      // Voorkomt onnodige re-renders + sessionStorage-writes bij idempotente
-      // re-renders van NavStackMeta met dezelfde props.
-      const sameTitle = top.title === detail.title
-      const sameBottomBar = JSON.stringify(top.bottomBar) === JSON.stringify(detail.bottomBar)
-      const sameTopBar = JSON.stringify(top.topBar) === JSON.stringify(detail.topBar)
-      if (sameTitle && sameBottomBar && sameTopBar) return
-
-      const updated: StackEntry = {
-        ...top,
-        title: detail.title,
-        bottomBar: detail.bottomBar,
-        topBar: detail.topBar,
+      const outcome = applyNavStackMetaToStack(tabStack, scoped)
+      // No-op-detectie: identieke meta niet opnieuw schrijven (geen
+      // re-render/sessionStorage-write bij idempotente re-renders).
+      if (outcome.kind === 'noop') return
+      if (outcome.kind === 'defer') {
+        deferNavStackMeta(scoped)
+        return
       }
       setState({
         stacks: {
           ...runtimeState.stacks,
-          [activeTab]: [...tabStack.slice(0, -1), updated],
+          [activeTab]: outcome.stack,
         },
         transition: runtimeState.transition,
       }, true)
@@ -773,7 +852,7 @@ export function NavStackProvider({
 
     window.addEventListener(NAV_STACK_META_EVENT, handler)
     return () => window.removeEventListener(NAV_STACK_META_EVENT, handler)
-  }, [activeTab])
+  }, [activeTab, overrideActiveTab])
 
   // ── Memoized context value ─────────────────────────────────────
   const value = useMemo<NavStackContextValue>(() => ({

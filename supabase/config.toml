@@ -155,11 +155,16 @@ enabled = true
 # kapot zijn. De app zelf geeft bij signup/reset altijd een expliciete emailRedirectTo op basis van
 # window.location.origin door (app/signup + app/forgot-password → /auth/callback), dus lokaal blijft
 # de redirect naar localhost werken zolang die origin in de allow-list hieronder staat.
+# Dit is de EINDSTAAT (na de domein-cutover). Zolang productie op fin-first.vercel.app draait,
+# overschrijft [remotes.production.auth] onderaan dit bestand de site_url — zie daar.
 site_url = "https://trifinity.app"
 # A list of URLs (wildcards toegestaan met * en **) die auth-providers na authenticatie als redirect
-# mogen gebruiken. Bevat zowel het productie-domein als de lokale dev-origins zodat dezelfde
-# config.toml voor `supabase config push` (remote) én lokaal `supabase start` klopt.
+# mogen gebruiken. Bevat het huidige productie-domein (fin-first.vercel.app), het eind-domein
+# (trifinity.app) én de lokale dev-origins, zodat dezelfde config.toml voor `supabase config push`
+# (remote) én lokaal `supabase start` klopt en bevestigings-/resetlinks vóór én na de cutover
+# blijven werken. De vercel.app-regel mag pas weg als dat domein niet meer bediend wordt.
 additional_redirect_urls = [
+  "https://fin-first.vercel.app/**",
   "https://trifinity.app/**",
   "https://www.trifinity.app/**",
   "http://127.0.0.1:3000/**",
@@ -236,26 +241,14 @@ otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# Productie-SMTP voor auth-mails (bevestiging + wachtwoordreset). BEWUST UITGECOMMENTARIEERD:
-# zolang dit blok uit staat gebruikt lokaal `supabase start` de inbucket-testmailbox (geen echte
-# mail). Activeren voor de beta:
-#   1. Maak een Resend-account, verifieer het domein trifinity.app (SPF + DKIM DNS-records) en maak
-#      een API-key aan. (Alternatief: Postmark host=smtp.postmarkapp.com / SendGrid host=smtp.sendgrid.net.)
-#   2. Zet de key als secret in de omgeving die `supabase config push` draait: RESEND_SMTP_PASS=...
-#      (NOOIT de key in dit bestand of in git — env()-substitutie houdt 'm buiten de repo).
-#   3. Verwijder de '#' voor de zes regels hieronder en draai `supabase config push`.
-#   -- OF doe stap 1-3 direct in het Supabase-dashboard (Authentication → Emails → SMTP). Dat is de
-#      snelste 'secret only'-route; laat dit blok dan uit zodat een latere config push het niet
-#      overschrijft naar leeg.
-# Na koppeling: test één echte signup end-to-end vanaf een extern mailadres voordat je testers uitnodigt.
-# [auth.email.smtp]
-# enabled = true
-# host = "smtp.resend.com"
-# port = 587
-# user = "resend"
-# pass = "env(RESEND_SMTP_PASS)"
-# admin_email = "support@trifinity.nl"
-# sender_name = "TriFinity"
+# Productie-SMTP voor auth-mails (bevestiging + wachtwoordreset) staat BEWUST NIET in dit
+# basisblok: het basisblok geldt óók voor lokaal `supabase start`, en dat moet de inbucket-
+# testmailbox blijven gebruiken (geen echte mail vanaf een dev-machine). De productie-SMTP staat
+# als override in [remotes.production.auth.email.smtp] onderaan dit bestand; de beheerstappen
+# (Resend-account, DNS, dashboard-klikpad, secret) staan in docs/beheerders-runbook.md → "E-mail".
+# Alternatieve providers (Postmark host=smtp.postmarkapp.com / SendGrid host=smtp.sendgrid.net)
+# zijn bewust niet gekozen: Resend is al de app-mailprovider (lib/email.ts) en staat als
+# verwerker geregistreerd — een tweede provider is een tweede verwerker-traject.
 
 # Uncomment to customize email template
 # [auth.email.template.invite]
@@ -435,3 +428,36 @@ s3_region = "env(S3_REGION)"
 s3_access_key = "env(S3_ACCESS_KEY)"
 # Configures AWS_SECRET_ACCESS_KEY for S3 bucket
 s3_secret_key = "env(S3_SECRET_KEY)"
+
+# ── Productie-overrides (Supabase "remotes": config-as-code per project-ref) ──────────────────
+# Alles hierboven is de basis (lokaal `supabase start` + eindstaat). Dit blok overschrijft alleen
+# wat op het hosted productieproject (ref = het subdomein van NEXT_PUBLIC_SUPABASE_URL; geen
+# secret) NU anders moet zijn dan de basis/eindstaat:
+#   • site_url op fin-first.vercel.app zolang trifinity.app geen DNS heeft (besluit eigenaar
+#     2 sep 2026: SMTP eerst op het huidige domein, cutover later). Bij de cutover: deze ene
+#     site_url-regel verwijderen — de basis (trifinity.app) neemt het dan over.
+#   • Custom SMTP via Resend (host/user zijn vast; de API-key is het wachtwoord en komt via
+#     env(RESEND_SMTP_PASS) uit de omgeving die de push draait — NOOIT in dit bestand).
+#     Afzender = noreply@trifinity.app, dus het domein trifinity.app moet bij Resend geverifieerd
+#     zijn (alleen mail-DNS: SPF/DKIM/DMARC — de site hoeft daarvoor niet te verhuizen).
+#   • De rate-limit email_sent=30/uur uit [auth.rate_limit] hierboven wordt pas effectief zodra
+#     custom SMTP aanstaat.
+# LET OP — `supabase config push` NIET draaien zolang ADR 0047 het `before_user_created`-hook-blok
+# bewust ongetrackt houdt: een push zet de hele auth-config en zou de dashboard-geactiveerde
+# registratie-allowlist-hook uitschakelen. Tot die tijd is het Supabase-dashboard de bron
+# (Authentication → SMTP Settings / URL Configuration) en is dit blok de spiegel die ná elke
+# dashboard-wijziging gelijk gehouden wordt. Klikpad + volgorde: docs/beheerders-runbook.md.
+[remotes.production]
+project_id = "pnnuqwdcgoympgddrvze"
+
+[remotes.production.auth]
+site_url = "https://fin-first.vercel.app"
+
+[remotes.production.auth.email.smtp]
+enabled = true
+host = "smtp.resend.com"
+port = 587
+user = "resend"
+pass = "env(RESEND_SMTP_PASS)"
+admin_email = "noreply@trifinity.app"
+sender_name = "TriFinity"

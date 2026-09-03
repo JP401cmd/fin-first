@@ -1,6 +1,6 @@
-import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, it, expect } from 'vitest'
+import { readSourceLF } from '@/lib/test-utils/read-source'
 
 /**
  * Borgt UR2-02: een afgebroken of overgeslagen bezittingen-stap laat GEEN
@@ -29,10 +29,11 @@ import { describe, it, expect } from 'vitest'
  */
 describe('onboarding save-own-data — geen placeholder-bezittingen (UR2-02)', () => {
   const routePath = path.resolve(__dirname, 'route.ts')
-  // Normaliseer CRLF: op een checkout met autocrlf=true eindigt elke regel op
-  // `\r`, en `.` matcht in JS geen `\r` — waardoor `/\/\/.*$/` zonder deze
-  // normalisatie niets stript en de scan vals-positief aanslaat op commentaar.
-  const source = readFileSync(routePath, 'utf8').replace(/\r\n/g, '\n')
+  // CRLF-veilig via de gedeelde helper (zie lib/test-utils/read-source.ts):
+  // op een checkout met autocrlf=true eindigt elke regel op `\r`, en `.`
+  // matcht in JS geen `\r` — waardoor `/\/\/.*$/` zonder normalisatie niets
+  // stript en de scan vals-positief aanslaat op commentaar.
+  const source = readSourceLF(routePath)
 
   // Strip line- en block-commentaar: de comments noemen de verwijderde namen
   // bewust nog, als waarschuwing tegen herintroductie.

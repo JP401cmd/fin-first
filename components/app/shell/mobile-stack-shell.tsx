@@ -54,7 +54,7 @@
  * (Keyframes leven in app/globals.css onder `.tray-{in,out}going-{push,pop}`.)
  */
 
-import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react'
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { usePathname } from 'next/navigation'
 import { isImmersiveRoute } from '@/lib/shell/immersive-routes'
 import { useNavStack, type StackEntry, type BottomBarConfig, type TopBarKind } from './nav-stack-provider'
@@ -62,6 +62,7 @@ import { resolveRouteTitle } from '@/lib/nav-config'
 import { useIsLgUp } from '@/lib/hooks/use-media-query'
 import { TopBar } from './top-bar'
 import { MobileBottomBar } from './mobile-bottom-bar'
+import { PullRefreshIndicator } from './pull-refresh-indicator'
 
 type MobileStackShellProps = {
   /** Optionele custom actions in de TopBar (rechts). Default = utility-cluster
@@ -129,8 +130,15 @@ type TrayProps = {
   ariaHidden?: boolean
   email?: string
   role?: string
-  /** Ref naar het scroll-`<main>` (alleen de persistente tray gebruikt dit). */
-  mainRef?: Ref<HTMLElement>
+  /**
+   * Ref naar het scroll-`<main>` (alleen de persistente tray gebruikt dit).
+   * Bewust een `RefObject` en geen brede `Ref`: het pull-to-refresh-gebaar leest
+   * `.current` van dit element, en dat kan een callback-ref niet leveren. De
+   * aanwezigheid van deze ref is tegelijk het signaal dat dit de persistente
+   * tray is — de outgoing-overlay is `aria-hidden` en mag geen tweede
+   * ververs-gebaar meebrengen.
+   */
+  mainRef?: RefObject<HTMLElement | null>
   /**
    * De paginanaam die als de ENIGE `<h1>` van de route wordt gerenderd
    * (sr-only). Alleen de persistente tray geeft dit door — de outgoing-tray is
@@ -208,9 +216,14 @@ function Tray({
           de Sidebar. `pb-[var(--mobile-nav-clearance)]` reserveert onderaan
           ruimte voor de zwevende FloatingNavButton; die var is 0 boven 1024px,
           dus op desktop is de padding automatisch 0. */}
+      {/* `overscroll-y-contain`: zonder dit chaint een drag-down bovenaan de
+          tray-scroller door naar de root en vuurt Android's NATIVE
+          pull-to-refresh naast de onze — twee verversingen op één gebaar. De
+          contain hoort daarom onlosmakelijk bij de eigen indicator hieronder;
+          los geshipt zou Android tijdelijk helemaal geen refresh hebben. */}
       <main
         ref={mainRef}
-        className={`flex-1 overflow-y-auto${mainClearance}${mainDesktop}`}
+        className={`flex-1 overflow-y-auto overscroll-y-contain${mainClearance}${mainDesktop}`}
         // `--fin-melding-clearance` is 0px behalve zolang de gedokte
         // Fin-meldingstrook onderin staat (UR2-08; gezet in app/globals.css,
         // hoogte gemeten door components/app/fin/fin-home.tsx). Bewust een
@@ -224,6 +237,11 @@ function Tray({
         // extra scrollruimte aan het eind, onzichtbaar en zonder sprong.
         style={{ marginBottom: 'var(--fin-melding-clearance, 0px)' }}
       >
+        {/* Pull-to-refresh — alleen op de persistente tray (mainRef). `sticky`
+            met `h-0`, dus het kost geen layout-ruimte en duwt `children` niet
+            omlaag. Op ≥lg verbergt het component zichzelf; het gebaar is daar
+            sowieso een no-op omdat deze `<main>` dan geen scroll-container is. */}
+        {mainRef && <PullRefreshIndicator scrollRef={mainRef} />}
         {children}
       </main>
 

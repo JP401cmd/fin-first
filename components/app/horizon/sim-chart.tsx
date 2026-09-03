@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, memo } from 'react'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import type { SimRow, SimCashflow } from '@/lib/fire-simulation'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
-import { NL_SWR, type ScenarioPath, type ProjectionMonth } from '@/lib/horizon-data'
+import { NL_SWR, formatFireAgeDelta, type ScenarioPath, type ProjectionMonth } from '@/lib/horizon-data'
 import type { ChartEventOverlay, ChartEventKind } from '@/lib/chart-event-overlay'
 import {
   buildSimChartGeometry,
@@ -223,7 +223,7 @@ const ChartForeground = memo(function ChartForeground({
       {!isPensioenMode && xFire !== null && fireAgeFractional !== null && fireAgeFractional > minAge && fireAgeFractional < maxAge && (
         <text x={xFire + 4} y={Math.max(PAD.top + 24, labelSafeTopY + 18)} fontSize={8}
           fill={COLOR_OPBOUW} fontFamily="var(--font-inter, sans-serif)" fontWeight={600}>
-          FIRE {fireAgeFractional.toFixed(1)}
+          FIRE {Math.round(fireAgeFractional)}
         </text>
       )}
 
@@ -240,8 +240,7 @@ const ChartForeground = memo(function ChartForeground({
           fontFamily="var(--font-dm-mono, monospace)"
           fill={fireAgeFractional < baselineFireAge ? COLOR_OPBOUW : COLOR_AFBOUW}
         >
-          {fireAgeFractional < baselineFireAge ? '' : '+'}
-          {(fireAgeFractional - baselineFireAge).toFixed(1)} jr
+          {formatFireAgeDelta(fireAgeFractional - baselineFireAge)}
         </text>
       )}
     </>

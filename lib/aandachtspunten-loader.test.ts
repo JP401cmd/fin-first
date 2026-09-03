@@ -9,8 +9,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  * bovengrens onbetrouwbaar en de "benut je jaarruimte"-tip dus misleidend. We
  * dempen 'm dan: het jaarruimte-aandachtspunt wordt NIET gepushed.
  *
- * Bedrijfspensioen-signaal: een actief life_event met `event_type === 'pension'`
- * én `metadata.pensioenType === 'bedrijf'` in de loader-bundel (`horizonData.events`).
+ * Werkgeverspensioen-signaal (`hasWerkgeverspensioen`, lib/jaarruimte.ts): een
+ * actief life_event met `event_type === 'pension'` én `metadata.pensioenType ===
+ * 'bedrijf'` in de loader-bundel (`horizonData.events`), OF — sinds 3-9-2026 —
+ * een EIGEN `assets`-rij met `asset_type 'retirement'` en subtype
+ * uitkeringsregeling/premieregeling in `horizonData.assets` (lijfrente dempt
+ * nooit; partner-rijen tellen niet — de assets-SELECT is huishoud-gedeeld).
  *
  * De DB-randen worden gemockt (`loadHorizonData`, `loadPerspectiveBox3`,
  * `resolveBox1GrossIncome`) plus `computeBox1Tax` als goedkope, monotone
@@ -23,6 +27,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { LifeEvent } from './horizon-data'
 import type { HorizonRawData } from './horizon-data-loader'
 import type { Aandachtspunt } from './aandachtspunten'
+import type { Asset } from './asset-data'
 import { calculateBox3 } from './box3-data'
 
 const loadHorizonRawMock = vi.fn()
@@ -168,6 +173,24 @@ function pensionEvent(pensioenType: string): LifeEvent {
   } as LifeEvent
 }
 
+/**
+ * Minimale actieve `assets.retirement`-rij zoals `getActiveAssets` 'm in de
+ * horizon-bundel legt. `userId` default = de ingelogde testgebruiker ('u1', zie
+ * `makeSupabase`); geef 'partner' mee voor de scoping-regressie.
+ */
+function retirementAsset(subtype: string | null, userId = 'u1', assetType = 'retirement'): Asset {
+  return {
+    id: `ra-${assetType}-${subtype}-${userId}`,
+    user_id: userId,
+    name: 'Pensioenpot',
+    asset_type: assetType,
+    subtype,
+    current_value: 50_000,
+    is_active: true,
+    ownership: 'shared',
+  } as unknown as Asset
+}
+
 /** Bruto-jaarinkomen dat de (gemockte) canonieke Box 1-bron teruggeeft. */
 const GROSS_YEARLY = 120_000
 
@@ -181,6 +204,8 @@ function makeHorizonData(opts: {
   pensioenFactorAKnown: boolean
   pensioenFactorA?: number
   events: LifeEvent[]
+  /** Actieve assets in de bundel (huishoud-gedeeld, dus mét evt. partner-rijen). */
+  assets?: Asset[]
 }): HorizonRawData {
   return {
     effectiveInput: {
@@ -189,9 +214,22 @@ function makeHorizonData(opts: {
     },
     fireParams: { marginaalTarief: 0.495 },
     healthScoreInput: { taxData: { box3Tax: 0 } },
+    // Canoniek 12-mnd rolling dagtarief + herkomst-object. `loadFiscaleKansen`
+    // leest sinds 4441a214e (27-08-2026) `dailyExpenseRateDetail.source` voor
+    // de kansen-bundel; zonder dit veld gooide de hele belasting-producent en
+    // slikte `safe()` dat stil in (alle "WÉL aanwezig"-cases rood sinds die
+    // commit — hersteld 3-9-2026 bij de assets.retirement-kaart).
+    dailyExpenseRate: 100,
+    dailyExpenseRateDetail: {
+      dailyRate: 100,
+      monthlyExpenses: 3000,
+      dataMonths: 12,
+      source: 'transactions',
+    },
     pensioenFactorA: opts.pensioenFactorA ?? 0,
     pensioenFactorAKnown: opts.pensioenFactorAKnown,
     events: opts.events,
+    assets: opts.assets ?? [],
   } as unknown as HorizonRawData
 }
 
@@ -274,6 +312,132 @@ describe('collectTaxAandachtspunten — jaarruimte-demping', () => {
     )
     const result = await collectAandachtspunten(makeSupabase())
     expect(jaarruimtePunt(result)).toBeDefined()
+  })
+})
+
+/**
+ * Werkgeverspensioen via `assets.retirement` (Notion P3, eigenaarsbesluit
+ * 2-9-2026): wie zijn pensioenpot als bezitting invoerde maar de pensioen-wizard
+ * nooit doorliep (geen life_event), moet de bovengrens-tip óók gedempt zien —
+ * maar alleen voor werkgevers-subtypes, en alleen voor EIGEN rijen.
+ */
+describe('collectTaxAandachtspunten — werkgeverspensioen via assets.retirement', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    computeBox1TaxMock.mockImplementation((input: { grossYearlyIncome: number }) => ({
+      tax: Math.round(input.grossYearlyIncome * 0.3697),
+    }))
+    loadPerspectiveBox3Mock.mockResolvedValue(emptyBox3())
+    resolveBox1GrossIncomeMock.mockResolvedValue({ grossYearly: GROSS_YEARLY })
+  })
+
+  it('(1a) eigen retirement-asset subtype uitkeringsregeling + ONBEKENDE factor A, géén event → gedempt', async () => {
+    loadHorizonRawMock.mockResolvedValue(
+      makeHorizonData({
+        pensioenFactorAKnown: false,
+        events: [],
+        assets: [retirementAsset('uitkeringsregeling')],
+      }),
+    )
+    const result = await collectAandachtspunten(makeSupabase())
+    expect(jaarruimtePunt(result)).toBeUndefined()
+  })
+
+  it('(1b) eigen retirement-asset subtype premieregeling + ONBEKENDE factor A → gedempt', async () => {
+    loadHorizonRawMock.mockResolvedValue(
+      makeHorizonData({
+        pensioenFactorAKnown: false,
+        events: [],
+        assets: [retirementAsset('premieregeling')],
+      }),
+    )
+    const result = await collectAandachtspunten(makeSupabase())
+    expect(jaarruimtePunt(result)).toBeUndefined()
+  })
+
+  it('(2) eigen retirement-asset subtype lijfrente (privé-pendant) + ONBEKENDE factor A → NIET gedempt', async () => {
+    loadHorizonRawMock.mockResolvedValue(
+      makeHorizonData({
+        pensioenFactorAKnown: false,
+        events: [],
+        assets: [retirementAsset('lijfrente')],
+      }),
+    )
+    const result = await collectAandachtspunten(makeSupabase())
+    expect(jaarruimtePunt(result)).toBeDefined()
+  })
+
+  it('(2b) retirement-asset zónder subtype (null) → NIET gedempt (fail-closed)', async () => {
+    loadHorizonRawMock.mockResolvedValue(
+      makeHorizonData({
+        pensioenFactorAKnown: false,
+        events: [],
+        assets: [retirementAsset(null)],
+      }),
+    )
+    const result = await collectAandachtspunten(makeSupabase())
+    expect(jaarruimtePunt(result)).toBeDefined()
+  })
+
+  it('(3) PARTNER heeft een werkgeverspensioen-asset (huishoud-gedeelde rij), gebruiker zelf niet → NIET gedempt', async () => {
+    loadHorizonRawMock.mockResolvedValue(
+      makeHorizonData({
+        pensioenFactorAKnown: false,
+        events: [],
+        assets: [retirementAsset('uitkeringsregeling', 'partner')],
+      }),
+    )
+    const result = await collectAandachtspunten(makeSupabase())
+    expect(jaarruimtePunt(result)).toBeDefined()
+  })
+
+  it('(3b) eigen werkgevers-asset náást een partner-rij → gedempt (eigen rij telt, partner-rij niet)', async () => {
+    loadHorizonRawMock.mockResolvedValue(
+      makeHorizonData({
+        pensioenFactorAKnown: false,
+        events: [],
+        assets: [retirementAsset('lijfrente', 'partner'), retirementAsset('premieregeling')],
+      }),
+    )
+    const result = await collectAandachtspunten(makeSupabase())
+    expect(jaarruimtePunt(result)).toBeUndefined()
+  })
+
+  it('(4) eigen werkgevers-asset + BEKENDE factor A → NIET gedempt (bekende factor A wint)', async () => {
+    loadHorizonRawMock.mockResolvedValue(
+      makeHorizonData({
+        pensioenFactorAKnown: true,
+        pensioenFactorA: 1200,
+        events: [],
+        assets: [retirementAsset('uitkeringsregeling')],
+      }),
+    )
+    const result = await collectAandachtspunten(makeSupabase())
+    expect(jaarruimtePunt(result)).toBeDefined()
+  })
+
+  it('(5) niet-retirement asset met een werkgevers-subtype-string → NIET gedempt', async () => {
+    loadHorizonRawMock.mockResolvedValue(
+      makeHorizonData({
+        pensioenFactorAKnown: false,
+        events: [],
+        assets: [retirementAsset('premieregeling', 'u1', 'investment')],
+      }),
+    )
+    const result = await collectAandachtspunten(makeSupabase())
+    expect(jaarruimtePunt(result)).toBeDefined()
+  })
+
+  it('(6) bestaand life_event-pad blijft werken naast een lege assets-bundel → gedempt', async () => {
+    loadHorizonRawMock.mockResolvedValue(
+      makeHorizonData({
+        pensioenFactorAKnown: false,
+        events: [pensionEvent('bedrijf')],
+        assets: [],
+      }),
+    )
+    const result = await collectAandachtspunten(makeSupabase())
+    expect(jaarruimtePunt(result)).toBeUndefined()
   })
 })
 

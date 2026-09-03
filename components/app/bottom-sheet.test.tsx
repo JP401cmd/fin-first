@@ -233,6 +233,120 @@ describe('BottomSheet — history-entry per sluitroute', () => {
   })
 })
 
+/**
+ * WF-BUDGET-10 — de sluit-poort (`onRequestClose`).
+ *
+ * Repro: in het bewerk-paneel met onopgeslagen wijzigingen toonde een klik op X
+ * wél de "Onopgeslagen wijzigingen"-bevestiging, maar `handleProgrammaticClose`
+ * startte `animateExit()` ONVOORWAARDELIJK náást `onClose()` — de sheet (en dus
+ * de zojuist getoonde waarschuwing) was binnen ~300ms weg. De gebruiker kreeg
+ * zijn keuze nooit te zien.
+ *
+ * Deze suite pint beide helften: een poort die weigert houdt de sheet op alle
+ * drie de programmatische routes staan, en zónder poort verandert er niets.
+ */
+describe('BottomSheet — sluit-poort onRequestClose', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    __resetOverlayHistory()
+  })
+
+  function renderSheet(onRequestClose?: () => boolean | Promise<boolean>) {
+    const onClose = vi.fn()
+    render(
+      <BottomSheet open onClose={onClose} onRequestClose={onRequestClose} title="Bewerken" closeOnBackdropClick>
+        <p>formulier</p>
+      </BottomSheet>,
+    )
+    const dialog = screen.getByRole('dialog')
+    return { onClose, dialog, backdrop: dialog.parentElement as HTMLElement }
+  }
+
+  it('houdt de sheet staan bij een X-klik wanneer de poort weigert', async () => {
+    const { onClose } = renderSheet(() => false)
+    fireEvent.click(screen.getByLabelText('Sluiten'))
+
+    expect(onClose).not.toHaveBeenCalled()
+    // Ruim voorbij de 300ms-fallback van de exit-animatie: de sheet mag ook
+    // dán niet alsnog verdwijnen — precies het defect.
+    await new Promise((r) => setTimeout(r, 350))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByText('formulier')).toBeInTheDocument()
+  })
+
+  it('houdt de sheet staan bij Escape wanneer de poort weigert', () => {
+    const { onClose } = renderSheet(() => false)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('houdt de sheet staan bij een backdrop-klik wanneer de poort weigert', () => {
+    const { onClose, backdrop } = renderSheet(() => false)
+    fireEvent.click(backdrop)
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('sluit gewoon wanneer de poort toestemming geeft', () => {
+    const { onClose } = renderSheet(() => true)
+    fireEvent.click(screen.getByLabelText('Sluiten'))
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('wacht op een asynchrone poort en sluit pas bij een positief antwoord', async () => {
+    const { onClose } = renderSheet(() => Promise.resolve(true))
+    fireEvent.click(screen.getByLabelText('Sluiten'))
+    // Nog niets: het antwoord is er pas in een volgende microtask.
+    expect(onClose).not.toHaveBeenCalled()
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
+  })
+
+  it('sluit niet bij een asynchrone poort die weigert', async () => {
+    const { onClose } = renderSheet(() => Promise.resolve(false))
+    fireEvent.click(screen.getByLabelText('Sluiten'))
+    await new Promise((r) => setTimeout(r, 350))
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('laat het swipe-gebaar ongemoeid — dat is een expliciete dismiss', async () => {
+    const poort = vi.fn(() => false)
+    const { dialog, onClose } = renderSheet(poort)
+    fireEvent.touchStart(dialog, { touches: [{ clientX: 0, clientY: 0 }] })
+    fireEvent.touchMove(document, { touches: [{ clientX: 0, clientY: 160 }] })
+    fireEvent.touchEnd(document)
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
+    expect(poort).not.toHaveBeenCalled()
+  })
+
+  it('sluit ongewijzigd meteen zonder poort (harde eis: bestaande callers)', () => {
+    const { onClose } = renderSheet(undefined)
+    fireEvent.click(screen.getByLabelText('Sluiten'))
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('geeft de history-entry terug wanneer de poort de terug-knop weigert', () => {
+    __resetOverlayHistory()
+    window.history.replaceState(null, '')
+    const pushSpy = vi.spyOn(window.history, 'pushState')
+    vi.spyOn(window.history, 'back').mockImplementation(() => {})
+
+    const { onClose } = renderSheet(() => false)
+    expect(pushSpy).toHaveBeenCalledTimes(1)
+
+    window.dispatchEvent(new PopStateEvent('popstate'))
+
+    // De sheet blijft open, dus hij hoort ook zijn entry terug te krijgen —
+    // anders verlaat de VOLGENDE terug-druk de pagina met het paneel nog open.
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(pushSpy).toHaveBeenCalledTimes(2)
+    expect(getOverlayHistoryDepth()).toBe(1)
+  })
+})
+
 // ── Geneste overlay: de ouder mag het gebaar niet afpakken ───────────
 //
 // React-events propageren door de REACT-boom, niet door de DOM-boom. Een

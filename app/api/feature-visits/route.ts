@@ -1,6 +1,9 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { unauthorized, serverError } from '@/lib/api/respond'
+import { parseBody } from '@/lib/api/parse-body'
+import { CLIENT_WRITABLE_FEATURE_SLUGS } from '@/lib/feature-visit-slugs'
 
 /**
  * GET /api/feature-visits — Get user's feature visit records.
@@ -48,13 +51,36 @@ export async function GET() {
 }
 
 /**
+ * Body-contract van POST — een gesloten enum, geen vrije string.
+ *
+ * `user_feature_visits` is een gedeeld markeringsregister met meerdere
+ * slug-families in één tabel, en niet elke familie is even onschuldig. De
+ * `*_setup_completed`-markers zijn POORTEN: `lib/app-setup-status.ts` en
+ * `lib/account-status.ts` lezen ze om te bepalen of een setup-gate nog
+ * verschijnt. Met de oude `typeof x === 'string'`-check kon een client
+ * zichzelf met één fetch een `budgetteren_setup_completed` toekennen en die
+ * gate overslaan — een marker die uitsluitend door de server-routes onder
+ * `app/api/<app>/setup` gezet hoort te worden. De enum sluit dat af; welke slugs
+ * er wél in mogen staat met motivering in `lib/feature-visit-slugs.ts`, met
+ * een drift-test ernaast.
+ *
+ * `.strict()` omdat het register een unieke sleutel op (user_id, feature_slug)
+ * heeft en verder niets van de client overneemt: een onbekende sleutel in de
+ * body betekent dat de call-site iets anders bedoelt dan deze route doet.
+ */
+const FeatureVisitSchema = z
+  .object({
+    feature_slug: z.enum(CLIENT_WRITABLE_FEATURE_SLUGS),
+  })
+  .strict()
+
+/**
  * POST /api/feature-visits — Record a feature visit.
  *
- * Body: { "feature_slug": "vermogensverloop" }
+ * Body: { "feature_slug": "guide_nieuws" }
  *
  * If the feature has been visited before, increments visit_count.
  * If this is the first visit, creates a new record with visit_count=1.
- * Uses UPSERT with ON CONFLICT to handle both cases atomically.
  *
  * Falls back gracefully if the user_feature_visits table doesn't exist yet.
  */
@@ -66,17 +92,13 @@ export async function POST(req: Request) {
     return unauthorized()
   }
 
+  // Zod + de gedeelde 400-envelope (ADR 0044) — vervangt de handgeschreven
+  // `NextResponse.json({ error }, { status: 400 })` die hier stond.
+  const parsed = await parseBody(FeatureVisitSchema, req)
+  if (!parsed.ok) return parsed.response
+  const featureSlug = parsed.data.feature_slug
+
   try {
-    const body = await req.json()
-    const featureSlug = body.feature_slug
-
-    if (!featureSlug || typeof featureSlug !== 'string') {
-      return NextResponse.json(
-        { error: 'feature_slug is verplicht' },
-        { status: 400 }
-      )
-    }
-
     // First, try to get existing visit record
     const { data: existing, error: selectError } = await supabase
       .from('user_feature_visits')

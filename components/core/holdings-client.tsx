@@ -1536,6 +1536,14 @@ function HoldingForm({
 
   async function handleSave(forceDuplicate = false) {
     if (!name || submitted) return
+    // Client-validatie op het nu verplichte tickerveld (WF-BEZIT-14-bug4). De
+    // server leidt een ontbrekende ticker weliswaar af uit de naam, maar op dit
+    // formulier is een echte ticker de bedoeling: hij voedt de koersvernieuwing
+    // en de duplicaatcontrole.
+    if (!ticker.trim()) {
+      setError('Ticker / ISIN is verplicht — vul de ticker in of zoek het fonds op via ISIN.')
+      return
+    }
     setSaving(true)
     setError(null)
     if (!forceDuplicate) setDuplicateWarning(null)
@@ -1549,7 +1557,7 @@ function HoldingForm({
         },
         body: JSON.stringify({
           name,
-          ticker: ticker || null,
+          ticker: ticker.trim() || null,
           isin: isin || null,
           units: units ? Number(units) : 0,
           avg_purchase_price: Number(avgPrice) || 0,
@@ -1674,7 +1682,10 @@ function HoldingForm({
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Ticker / ISIN</label>
+              {/* Verplicht gemarkeerd (WF-BEZIT-14-bug4): de kolom is NOT NULL en
+                  de ticker drijft koersvernieuwing én duplicaatdetectie. Het veld
+                  oogde optioneel naast "Naam *", waarna indienen op een 500 liep. */}
+              <label className="mb-1 block text-xs font-medium text-[var(--ink-2)]">Ticker / ISIN *</label>
               <input
                 value={ticker}
                 onChange={(e) => {

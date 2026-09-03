@@ -128,7 +128,37 @@ export const DebtQuickInputSchema = z.object({
 /** Debt payload inside `asset_with_debt` — no `linked_asset_id` (server-set). */
 const DebtQuickInputWithoutLink = DebtQuickInputSchema.omit({ linked_asset_id: true })
 
-export const QuickAddInputSchema = z.discriminatedUnion('kind', [
+/**
+ * Foutmelding wanneer een DGA-schuld zonder deelneming wordt opgeslagen.
+ *
+ * Eén bron voor de wizard (client, `step-details.tsx`) én de Server Action
+ * (`app/actions/quick-add.ts`), en bewust letterlijk dezelfde tekst als het
+ * volledige bewerkformulier (`components/app/core/debts/debt-form.tsx`) — twee
+ * aanmaakpaden voor hetzelfde schuldtype horen dezelfde melding te geven.
+ */
+export const DGA_LINKED_ASSET_REQUIRED_ERROR =
+  'Selecteer de deelneming waaraan deze DGA-schuld gekoppeld is.'
+
+/**
+ * Draagt deze schuld-invoer de app-invariant "een `dga_schuld` hangt altijd aan
+ * een deelneming"? (WF-SCHULD-20 sub c.)
+ *
+ * De koppeling kan op twee manieren rond zijn: met een echt `linked_asset_id`
+ * (bestaande deelneming) of — tijdens onboarding, waar de deelneming zelf nog
+ * geen DB-id heeft — met het opaak koppel-token `linked_client_ref`, dat de
+ * server ná de batch-insert naar het echte id vertaalt
+ * (`linkOnboardingAssetDebtPairs`). Beide tellen dus als "gekoppeld".
+ */
+export function hasRequiredDeelnemingLink(debt: {
+  debt_type: string
+  linked_asset_id?: string | null
+  linked_client_ref?: string | null
+}): boolean {
+  if (debt.debt_type !== 'dga_schuld') return true
+  return Boolean(debt.linked_asset_id) || Boolean(debt.linked_client_ref)
+}
+
+const QuickAddInputUnion = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('asset'), asset: AssetQuickInputSchema }),
   z.object({ kind: z.literal('debt'), debt: DebtQuickInputSchema }),
   z.object({
@@ -137,6 +167,28 @@ export const QuickAddInputSchema = z.discriminatedUnion('kind', [
     debt: DebtQuickInputWithoutLink,
   }),
 ])
+
+/**
+ * De invariant hangt aan de UNIE, niet aan `DebtQuickInputSchema` zelf, en dat
+ * is bewust:
+ *   - `kind:'asset_with_debt'` draagt géén `linked_asset_id` (de server zet 'm
+ *     na de asset-insert), dus daar is "leeg" juist correct;
+ *   - `DebtQuickInputSchema` wordt óók door de onboarding-batch
+ *     (`/api/onboarding/save-own-data`) gebruikt, waar de koppeling pas ná de
+ *     insert wordt gelegd — een refine op dát schema zou de hele
+ *     onboarding-submit afkeuren.
+ * Blijft over: het zelfstandige `kind:'debt'`-pad van de quick-add-wizard, en
+ * dat is precies het pad waar een niet-gekoppelde DGA-schuld ontstond.
+ */
+export const QuickAddInputSchema = QuickAddInputUnion.superRefine((value, ctx) => {
+  if (value.kind !== 'debt') return
+  if (hasRequiredDeelnemingLink(value.debt)) return
+  ctx.addIssue({
+    code: 'custom',
+    message: DGA_LINKED_ASSET_REQUIRED_ERROR,
+    path: ['debt', 'linked_asset_id'],
+  })
+})
 
 // Re-export inferred TS types so callers can stay DRY.
 export type AssetQuickInputValidated = z.infer<typeof AssetQuickInputSchema>

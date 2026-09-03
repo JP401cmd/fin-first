@@ -13,9 +13,9 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ASSET_CLIENT_COLUMN_LIST } from '@/lib/asset-data'
+import { readSourceLF } from '@/lib/test-utils/read-source'
 
 /**
  * Wijst naar de LAATSTE definitie van de functie, niet naar de eerste. De
@@ -34,7 +34,9 @@ const MIGRATION = join(
   '20260827123000_household_partner_items_box3_vrijgesteld.sql',
 )
 
-const raw = readFileSync(MIGRATION, 'utf8')
+// CRLF-veilig: readFileSync + handmatige regeleinde-strip gaat stil kapot op
+// een verse Windows-checkout (zie lib/test-utils/read-source.ts).
+const raw = readSourceLF(MIGRATION)
 
 /** SQL zonder `--`-commentaar: het motivatieblok noemt de verboden kolomnamen. */
 const sql = raw

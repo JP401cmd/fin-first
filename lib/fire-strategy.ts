@@ -90,6 +90,120 @@ export function parseFireStrategy(profile: {
   }
 }
 
+// ── Het PLAN: stop-anker × eind-vorm (ADR 0129, fase F1) ───────────────────
+//
+// `FireEndStrategy` hierboven mengt twee vragen die los van elkaar staan:
+//   • WANNEER stop ik  — `pensioen` (AOW) en `nu-stoppen` (vandaag) zijn ankers
+//   • WAT geldt aan het EIND — `deplete` · `legacy` · `perpetual` zijn eind-vormen
+// Ze zitten in één enum omdat ze zo gegroeid zijn. Gevolg: zeven van de twaalf
+// combinaties zijn onuitdrukbaar (`aow × legacy` — "stop op AOW en houd €X over"),
+// terwijl de stop-slider ze allang doorrekent; en de twee ankers dragen elk een
+// IMPLICIETE eind-vorm die de gebruiker niet kan zien of kiezen.
+//
+// Dit blok is de expand-fase: het plan-type bestaat naast de enum, `parseFirePlan`
+// leest BEIDE rijvormen, en niets gedraagt zich anders. F2 brengt het anker naar de
+// kernel, F3 naar de oppervlakken, F4 contraheert de enum tot de drie eind-vormen.
+
+/** Wanneer stopt het werken? De vierde (`age`) is de zelfgekozen stopleeftijd. */
+export type StopAnchor =
+  | { kind: 'solved' }
+  | { kind: 'aow' }
+  | { kind: 'now' }
+  | { kind: 'age'; age: number }
+
+/** Wat moet er aan het eind gelden? De enum zonder de twee ankers. */
+export type FireEndForm = 'deplete' | 'legacy' | 'perpetual'
+
+export interface FirePlan {
+  anchor: StopAnchor
+  endForm: FireEndForm
+  /** Tot welke leeftijd moet het vermogen reiken (B51). */
+  endAge: number
+  /** Alleen betekenisvol bij `endForm: 'legacy'`. */
+  legacyAmount: number
+}
+
+/** De vier ankers als allowlist — bron voor de DB-CHECK én de API-validatie. */
+export const STOP_ANCHOR_KINDS = ['solved', 'aow', 'now', 'age'] as const
+export type StopAnchorKind = (typeof STOP_ANCHOR_KINDS)[number]
+
+/** De drie eind-vormen; `FireEndStrategy` minus de twee ankers. */
+export const FIRE_END_FORMS: readonly FireEndForm[] = ['deplete', 'legacy', 'perpetual']
+
+export function isStopAnchorKind(value: unknown): value is StopAnchorKind {
+  return typeof value === 'string' && (STOP_ANCHOR_KINDS as readonly string[]).includes(value)
+}
+
+export function isFireEndForm(value: unknown): value is FireEndForm {
+  return typeof value === 'string' && (FIRE_END_FORMS as readonly string[]).includes(value)
+}
+
+/**
+ * Ligt het stopmoment vast, of zoekt de app het?
+ *
+ * DE ENIGE TOETS op "vast anker" — vervangt in F3 elke `isPensioenMode`,
+ * `isNuStoppenMode` en `requiredFireIsStartPortfolio`-als-strategieproxy. Twee
+ * predicaten voor één feit is precies hoe de twee ankers uit elkaar zijn gegroeid.
+ */
+export function isFixedAnchor(plan: FirePlan): boolean {
+  return plan.anchor.kind !== 'solved'
+}
+
+/** Halve jaren: de stop-slider staat op `step={0.5}` en de kernel neemt fractionele
+ *  leeftijden aan. Stil afronden naar hele jaren vervalst een keuze (ADR 0129 B6). */
+function normalizeStopAge(raw: unknown): number | null {
+  const n = Number(raw)
+  if (!Number.isFinite(n)) return null
+  const halved = Math.round(n * 2) / 2
+  if (halved < 18 || halved > 100) return null
+  return halved
+}
+
+/**
+ * Lees het plan uit een profielrij — deterministisch over BEIDE rijvormen.
+ *
+ * DE TEGENSPRAAK-REGEL (ADR 0129 D2): tijdens de expand-fase dragen sommige rijen
+ * het anker nog in `fire_end_strategy` ('pensioen'/'nu-stoppen') en andere al in
+ * `fire_stop_anchor`. Een legacy-waarde in de OUDE kolom WINT altijd voor het anker.
+ * Daarmee kan geen enkele rij zichzelf tegenspreken, en is er nooit een moment met
+ * twee waarheden — ook niet halverwege de backfill.
+ *
+ * De eind-vorm valt terug op 'deplete' wanneer de oude kolom een anker draagt: dat
+ * is precies wat de kernel onder beide ankers vandaag al doet (doel €0).
+ */
+export function parseFirePlan(profile: {
+  fire_end_strategy?: string | null
+  fire_end_age?: number | null
+  fire_legacy_amount?: number | string | null
+  fire_stop_anchor?: string | null
+  fire_stop_age?: number | string | null
+}): FirePlan {
+  const legacyStrategy = profile.fire_end_strategy
+
+  const anchor: StopAnchor =
+    legacyStrategy === 'pensioen' ? { kind: 'aow' }
+    : legacyStrategy === 'nu-stoppen' ? { kind: 'now' }
+    : resolveStoredAnchor(profile.fire_stop_anchor, profile.fire_stop_age)
+
+  const endForm: FireEndForm = isFireEndForm(legacyStrategy) ? legacyStrategy : 'deplete'
+
+  return {
+    anchor,
+    endForm,
+    endAge: profile.fire_end_age ?? 90,
+    legacyAmount: Number(profile.fire_legacy_amount ?? 0),
+  }
+}
+
+/** `age` zonder geldige leeftijd is geen anker — dan valt het plan terug op `solved`
+ *  (de DB-CHECK verbiedt die combinatie, maar de parser mag er niet op vertrouwen). */
+function resolveStoredAnchor(rawKind: unknown, rawAge: unknown): StopAnchor {
+  if (!isStopAnchorKind(rawKind)) return { kind: 'solved' }
+  if (rawKind !== 'age') return { kind: rawKind }
+  const age = normalizeStopAge(rawAge)
+  return age === null ? { kind: 'solved' } : { kind: 'age', age }
+}
+
 // ── Afgeleide vrijheids-/pensioentoestand (consume-only, ADR 0009) ──────────
 //
 // Eén canonieke, GEDEELDE bron die hero, status-banner én AI consumeren, zodat

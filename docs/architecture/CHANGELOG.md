@@ -919,3 +919,10 @@
 ## 2026-09-02
 
 - Geen wijzigingen.
+
+## 2026-09-03
+
+- **Schermen** toegevoegd: /beheer/testtools/force-error
+- **API-routes** toegevoegd: /api/assets/linkable, /api/recurring/bulk, /api/transaction-flags
+- **Tabellen** toegevoegd: transaction_flags
+- **Componenten (aantal)** toegevoegd: +14

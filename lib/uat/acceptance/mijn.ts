@@ -83,10 +83,10 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     given: 'Ingelogd, /mijn/profiel, sectie "Persoonlijke Gegevens".',
     when: 'De gebruiker wijzigt naam, bibliotheek-weergavenaam (max 40), geboortedatum, land en huishoudtype en klikt "Opslaan" (boven- of onderknop).',
-    then: 'Groene melding "Opgeslagen!" (verdwijnt na ~3s); na herladen zijn alle waarden intact (upsert op `profiles`); beide "Opslaan"-knoppen bewaren het volledige formulier (persoonlijk + huishoudprofiel) in één keer; lege bibliotheeknaam → later "Anoniem".',
+    then: 'Groene melding "Opgeslagen!" (verdwijnt na ~3s); na herladen zijn alle waarden intact (upsert op `profiles`); beide "Opslaan"-knoppen bewaren het volledige formulier (persoonlijk + huishoudprofiel) in één keer; lege bibliotheeknaam → later "Anoniem". Sub c (netwerkonderbreking tijdens opslaan): rode melding "Opslaan is mislukt. Probeer het opnieuw." — NIET de niet-ingelogd-tekst, want de sessie blijft geldig; alleen een écht ontbrekende sessie geeft "Je bent niet ingelogd…".',
     assertion: {
       kind: 'ui-only',
-      source: 'app/(app)/mijn/profiel/page.tsx#saveProfile (Supabase upsert profiles), geen cijfermatige uitkomst',
+      source: 'app/(app)/mijn/profiel/page.tsx#saveProfile (Supabase upsert profiles), geen cijfermatige uitkomst; sub c gepind door app/(app)/mijn/profiel/page.test.tsx',
     },
   },
   {

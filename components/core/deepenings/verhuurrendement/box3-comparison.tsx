@@ -88,7 +88,7 @@ export function Box3Comparison({ calc }: Box3ComparisonProps) {
         <Box3Panel
           title="Werkelijk"
           subtitle="Vanaf 2027"
-          tooltip="Belasting op werkelijk behaald rendement: huurinkomsten + waardestijging × 36% tarief. Verlies wordt afgetopt op nul."
+          tooltip={`Belasting op werkelijk behaald rendement: huurinkomsten + waardestijging × ${TARIEF_PCT}% tarief. Verlies wordt afgetopt op nul.`}
           basis="Werkelijk rendement"
           basisAmount={calc.werkelijkRendement}
           taxAmount={calc.werkelijkBelasting}

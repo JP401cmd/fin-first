@@ -12,11 +12,46 @@
  * insight/grip-onderscheid.
  */
 
+/**
+ * Eén WERKING-item: wat een functie op deze pagina dóet en wanneer je 'm inzet.
+ *
+ * Uitleggend, nooit normatief (Wft): "hier stel je een limiet in", niet "los
+ * eerst je duurste schuld af".
+ */
+export interface PageInfoWerking {
+  /** Korte functienaam, zoals de gebruiker 'm op het scherm terugziet. */
+  title: string
+  /** Wat het doet en wanneer je het gebruikt — 1-2 platte zinnen. */
+  text: string
+}
+
+/** Eén VERDER-item: een verwante route binnen de app. */
+export interface PageInfoRelated {
+  /** Bestaande app-route, bv. '/toekomst/doelen'. */
+  href: string
+  /** Zichtbaar label, zonder "ga naar". */
+  label: string
+}
+
 export interface PageInfoContent {
   /** INZICHT — waarom deze pagina/dit blok ertoe doet, 1-2 zinnen. */
   insight: string
   /** GRIP — wat je hier concreet kunt doen, 1-2 zinnen. */
   grip: string
+  /**
+   * WERKING — hoe de functies op deze pagina werken en wanneer je ze inzet.
+   * Max 4 items; blijft leeg voor entries die geen bediening dragen.
+   *
+   * HARDE VORMEIS: array-van-objecten, **nooit** een object-map met string-keys.
+   * `scripts/page-info/check-coverage.mjs` haalt PAGE_INFO-keys op met
+   * `^\s*'([^']+)':\s*\{` op élke inspringing — geneste quoted keys zouden
+   * daardoor als valse wees gemeld worden. Dat geldt ook voor `related`.
+   */
+  werking?: PageInfoWerking[]
+  /** BEGRIPPEN — keys uit `lib/glossary-data.ts`; renderen als popover-chips. */
+  terms?: string[]
+  /** VERDER — verwante pagina's; de sheet sluit bij navigatie. */
+  related?: PageInfoRelated[]
 }
 
 export const PAGE_INFO: Record<string, PageInfoContent> = {
@@ -26,38 +61,201 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
       'Hoe je ervoor staat in één blik: vier hefbomen — bezittingen, schulden, cashflow, belasting — naast je financiële gezondheidsscore en de voortgang op je doelen. De vermogensgrafiek loopt van je verleden tot je vrijheidsmoment (of, als je dat al haalde, tot je eindleeftijd), met een band eromheen die de bandbreedte toont: de marge waarbinnen je vermogen zich waarschijnlijk beweegt.',
     grip:
       'Klik op een hefboom voor verdieping — het stipje erop is een stoplicht: groen is op koers, oranje vraagt aandacht, rood vraagt actie. Lees de wekelijkse briefing van Fin voor duiding bij de cijfers.',
+    werking: [
+      {
+        title: 'De vier hefbomen',
+        text: 'Bezittingen, schulden, cashflow en belasting zijn de vier plekken waar je iets kunt veranderen. Elke tegel opent de pagina waar je die hefboom beheert.',
+      },
+      {
+        title: 'Het stoplicht op een tegel',
+        text: 'Het stipje kleurt op basis van je eigen cijfers, niet op basis van een norm van buiten. Klik erop om te lezen waar de kleur vandaan komt.',
+      },
+      {
+        title: 'De vermogensgrafiek',
+        text: 'Links staat je vastgelegde historie, rechts de projectie. De band eromheen is geen ruis maar bandbreedte: de marge waarbinnen je vermogen zich waarschijnlijk beweegt.',
+      },
+      {
+        title: 'De wekelijkse briefing',
+        text: 'Fin leest je cijfers van de afgelopen week en zet ze in gewone taal onder elkaar. Hij verschijnt vanzelf; je hoeft niets te starten.',
+      },
+    ],
+    terms: ['netto_vermogen', 'vrijheidstijd', 'spaarquote'],
+    related: [
+      { href: '/overzicht/cashflow', label: 'Cashflow — wat er in- en uitgaat' },
+      { href: '/toekomst', label: 'Toekomst — je pad naar vrijheid' },
+      { href: '/mijn/mijlpalen', label: 'Mijlpalen die je al passeerde' },
+    ],
   },
   '/overzicht/bezittingen': {
     insight:
       'Wat er voor je groeit: cash, beleggingen, eigen huis en pensioen, elk met hun eigen waardeontwikkeling en rendement.',
     grip: 'Klik op een bezitting voor het detail, of voeg er een nieuwe toe.',
+    werking: [
+      {
+        title: 'Bezitting toevoegen',
+        text: 'Kies een type — spaargeld, beleggingen, vastgoed, pensioen, crypto — en leg de waarde vast. Vanaf dat moment telt hij mee in je vermogen én in je projectie.',
+      },
+      {
+        title: 'Herwaarderen',
+        text: 'Werk de actuele waarde bij zodra die verandert. De oude waarde blijft bewaard, zodat verloop en rendement zichtbaar blijven in plaats van te verspringen.',
+      },
+      {
+        title: 'Detail per bezitting',
+        text: 'Klik een bezitting open voor de waardeontwikkeling, het rendement en — bij beleggingen — de losse posities eronder.',
+      },
+      {
+        title: 'Niet alles is even opneembaar',
+        text: 'Je eigen huis en je pensioenpotten kun je niet zomaar aanspreken. In Toekomst leg je vast hoe ze meetellen in je vrijheidsberekening.',
+      },
+    ],
+    terms: ['netto_vermogen', 'per_asset_rendement', 'asset_allocatie', 'liquiditeit'],
+    related: [
+      { href: '/overzicht/schulden', label: 'Schulden — de andere kant van de balans' },
+      { href: '/rapportages/vermogen', label: 'Je vermogen tot in detail' },
+      { href: '/toekomst/voorkeuren', label: 'Aannames achter de projectie' },
+    ],
   },
   '/overzicht/schulden': {
     insight:
       'Wat je nog terugbetaalt — hypotheek, leningen, studieschuld. Schuld verkort je vrijheid; elke aflossing verlengt hem weer.',
     grip: 'Bekijk je aflossingsplan en heroverweeg het waar het sneller of slimmer kan.',
+    werking: [
+      {
+        title: 'Schuld toevoegen',
+        text: 'Leg restschuld, rente en maandlast vast. De app leidt daar zelf uit af wanneer de schuld bij dit tempo op nul staat.',
+      },
+      {
+        title: 'Aflosplan',
+        text: 'Per schuld zie je het verloop tot nul, en wat een extra aflossing met die einddatum doet — vóór je hem overmaakt.',
+      },
+      {
+        title: 'Strategieën naast elkaar',
+        text: 'Twee bekende volgordes — hoogste rente eerst, of kleinste schuld eerst — worden op jouw schulden doorgerekend. Je ziet het verschil in plaats van erover te lezen; de keuze blijft van jou.',
+      },
+      {
+        title: 'Wat een aflossing teruggeeft',
+        text: 'Elke afgeloste euro verlaagt je maandlasten en verkort daarmee de tijd tot je vrijheidsmoment. Dat effect staat naast het bedrag.',
+      },
+    ],
+    terms: ['schuldgraad', 'annuiteit', 'avalanche', 'hypotheek', 'LTV'],
+    related: [
+      { href: '/overzicht/bezittingen', label: 'Bezittingen — de andere kant van de balans' },
+      { href: '/rapportages/balans', label: 'Balans op één peildatum' },
+    ],
   },
   '/overzicht/cashflow': {
     insight:
       'Wat er binnenkomt en wat eruit gaat. Het deel van je inkomen dat je opzij zet, bepaalt hoe snel je bij je vrijheidsmoment komt.',
     grip: 'Beheer hier je budgetten, je vaste lasten en je transacties.',
+    werking: [
+      {
+        title: 'Budgetten',
+        text: 'Een maandlimiet per categorie die meeloopt met je boekingen, zodat je halverwege de maand ziet hoeveel ruimte er nog is.',
+      },
+      {
+        title: 'Vaste lasten',
+        text: 'Je terugkerende kosten los van je losse uitgaven. Handig omdat juist dit deel van je maand al vastligt voordat hij begint.',
+      },
+      {
+        title: 'Transacties',
+        text: 'De losse boekingen achter de totalen. Hier corrigeer je een categorie of zoek je een bedrag terug.',
+      },
+      {
+        title: 'Vooruitblik',
+        text: 'Een rechttoe-rechtaan doortrekking van je huidige patroon over zes maanden — bedoeld als peiling, niet als scenario. Voor scenario’s ga je naar Toekomst.',
+      },
+    ],
+    terms: ['spaarquote', 'vrijheidstijd'],
+    related: [
+      { href: '/overzicht/cashflow/forecast', label: 'Vooruitblik van zes maanden' },
+      { href: '/rapportages/budget', label: 'Budgetrapport om af te drukken' },
+    ],
   },
   '/overzicht/cashflow/budget': {
     insight:
       'Je maandbudgetten in beeld: hoe je inkomen is verdeeld over categorieën en waar nog ruimte zit.',
     grip:
       'Stel per categorie een limiet in en volg gedurende de maand hoeveel ruimte je nog hebt — wat je overhoudt, is vrijheid die je opbouwt.',
+    werking: [
+      {
+        title: 'Limiet per categorie',
+        text: 'Je stelt zelf een maandbedrag in. De balk vult zich met wat er tot nu toe geboekt is, zodat de resterende ruimte zichtbaar blijft in plaats van pas achteraf.',
+      },
+      {
+        title: 'Automatische indeling',
+        text: 'Nieuwe transacties krijgen zelf een categorie toegewezen. Klopt er een niet, dan pas je die aan bij de transactie; het budget rekent direct opnieuw.',
+      },
+      {
+        title: 'Vier weergaven',
+        text: 'Dezelfde cijfers in verschillende vormen — lijst, verdeling en verloop — voor wie liever ziet dan leest. De onderliggende bedragen veranderen niet mee.',
+      },
+      {
+        title: 'Vrijheidsdagen per post',
+        text: 'Achter elk budget staat wat het aan vrijheidstijd kost: het maandbedrag afgezet tegen je eigen dagelijkse uitgaven.',
+      },
+    ],
+    terms: ['spaarquote', 'vrijheidstijd'],
+    related: [
+      { href: '/overzicht/cashflow/transacties', label: 'Transacties achter deze budgetten' },
+      { href: '/rapportages/budget', label: 'Budget versus voornemen' },
+    ],
   },
   '/overzicht/cashflow/transacties': {
     insight:
       'Alles wat er deze maand in en uit gaat, met je geldstroom per categorie en je spaarquote van de maand.',
-    grip: 'Filter en doorzoek je boekingen, of koppel een rekening zodat nieuwe transacties automatisch binnenkomen.',
+    grip: 'Filter en doorzoek je boekingen, of koppel een rekening zodat nieuwe transacties automatisch binnenkomen. Deel je een huishouden, dan zet je een gedeelde boeking met één klik op jullie lijst "Te bespreken" — alleen boekingen die je partner ook ziet.',
+    werking: [
+      {
+        title: 'Filteren en zoeken',
+        text: 'Zoek op tekst, bedrag of periode, en beperk de lijst tot één categorie of rekening.',
+      },
+      {
+        title: 'Categorie corrigeren',
+        text: 'Open een boeking en kies een andere categorie. Je budgetten en je spaarquote rekenen meteen mee — je hoeft niets opnieuw te laden.',
+      },
+      {
+        title: 'Rekening koppelen',
+        text: 'Koppel je bank en nieuwe transacties komen vanzelf binnen. Handmatig invoeren blijft altijd mogelijk; een koppeling is nooit verplicht.',
+      },
+      {
+        title: 'Bestand importeren',
+        text: 'Een export van je bank (CSV, MT940 of OFX) lees je hier in. Boekingen die je al had worden herkend, ook als ze via een andere bron binnenkwamen.',
+      },
+    ],
+    terms: ['spaarquote', 'psd2'],
+    related: [
+      { href: '/overzicht/cashflow/budget', label: 'Budgetten die hierop meelopen' },
+      { href: '/mijn/koppelingen', label: 'Je koppelingen beheren' },
+    ],
   },
   '/overzicht/cashflow/vaste-lasten': {
     insight:
       'Je abonnementen en terugkerende kosten op één plek, uitgedrukt in hoeveel vrijheidstijd ze je kosten. Elke euro minder vaste last is vrijheid die je terugkoopt.',
     grip:
       'In Volledig zie je je vaste-lastenquote — het aandeel van je inkomen, met Nibud-duiding — plus abonnementen-sluipverbruik ten opzichte van het gemiddelde, de samenstelling per categorie en wat opzeggen concreet oplevert.',
+    werking: [
+      {
+        title: 'Herkende abonnementen',
+        text: 'Terugkerende afschrijvingen worden uit je transacties gehaald en als vaste last gegroepeerd. Mist er een, of hoort er een niet thuis, dan pas je dat hier aan.',
+      },
+      {
+        title: 'Vaste-lastenquote',
+        text: 'Het deel van je inkomen dat elke maand al vastligt voordat je iets uitgeeft. De Nibud-duiding ernaast is een spiegel, geen norm waar je aan moet voldoen.',
+      },
+      {
+        title: 'Sluipverbruik',
+        text: 'Abonnementen waarvan het bedrag ongemerkt is opgelopen, of die boven het gemiddelde uitkomen, worden apart gezet.',
+      },
+      {
+        title: 'Opzeghulp',
+        text: 'Per post zie je wat stoppen oplevert in euro’s en in vrijheidstijd, met de gegevens die je voor de opzegging nodig hebt bij elkaar.',
+      },
+    ],
+    terms: ['vrijheidstijd', 'spaarquote'],
+    related: [
+      { href: '/overzicht/cashflow/transacties', label: 'Transacties achter deze posten' },
+      { href: '/overzicht/cashflow/budget', label: 'Budgetten per categorie' },
+    ],
   },
   '/overzicht/cashflow/forecast': {
     insight:
@@ -69,6 +267,25 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     insight:
       'Wat je betaalt over inkomen (Box 1), aanmerkelijk belang (Box 2) en vermogen (Box 3) — en waar slim verdelen over de bakjes je geld per jaar kan schelen.',
     grip: 'Klik een box aan voor de berekening en de besparingskansen die daarbij horen.',
+    werking: [
+      {
+        title: 'Drie boxen, apart gerekend',
+        text: 'Box 1 (werk en woning), Box 2 (aanmerkelijk belang) en Box 3 (vermogen) hebben elk hun eigen regels. Klik een box open voor de opbouw op jouw gegevens.',
+      },
+      {
+        title: 'Kassabon achter elk bedrag',
+        text: 'Elk belastingbedrag is uit te klappen tot de stappen waaruit het is opgebouwd, met de tarieven en grenzen van het lopende belastingjaar erbij.',
+      },
+      {
+        title: 'Kansen',
+        text: 'De optimizer zet fiscale keuzes die op jouw situatie van toepassing zijn onder elkaar, doorgerekend in euro’s. Een indicatie om mee te denken, geen advies.',
+      },
+    ],
+    terms: ['box_3', 'vermogensbelasting', 'heffingsvrij_vermogen', 'forfaitair_rendement'],
+    related: [
+      { href: '/overzicht/belasting/box3', label: 'Box 3 in detail' },
+      { href: '/overzicht/belasting/optimizer', label: 'Fiscale kansen doorgerekend' },
+    ],
   },
   '/overzicht/belasting/box1': {
     insight:
@@ -86,12 +303,58 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
       'Box 3 belast je vermogen — sparen en beleggen — via een forfaitair (fictief) rendement boven je heffingsvrije vermogen.',
     grip:
       'Zie in één oogopslag hoe vrijstelling, partner-verdeling en je mix spaargeld/beleggingen samen je jaarlijkse heffing bepalen.',
+    werking: [
+      {
+        title: 'Heffingsvrij vermogen',
+        text: 'Een deel van je vermogen blijft buiten de heffing. Alleen wat daarboven uitkomt, telt mee in de berekening.',
+      },
+      {
+        title: 'Forfaitair rendement',
+        text: 'De Belastingdienst rekent met een verondersteld rendement per soort bezitting — voor spaargeld anders dan voor beleggingen — niet met wat jij werkelijk hebt verdiend.',
+      },
+      {
+        title: 'Verdeling met een fiscaal partner',
+        text: 'Samen mag je de gezamenlijke grondslag verdelen. De pagina laat zien wat een andere verdeling met de heffing doet; de aangifte doe je zelf.',
+      },
+      {
+        title: 'Tegenbewijs',
+        text: 'Was je werkelijke rendement lager dan het forfait, dan kun je dat onder voorwaarden aantonen. De pagina zet beide bedragen naast elkaar zodat je ziet of het scheelt.',
+      },
+    ],
+    terms: ['box_3', 'heffingsvrij_vermogen', 'forfaitair_rendement', 'tegenbewijs'],
+    related: [
+      { href: '/overzicht/belasting/optimizer', label: 'Fiscale kansen doorgerekend' },
+      { href: '/overzicht/bezittingen', label: 'De bezittingen waar dit op rust' },
+    ],
   },
   '/overzicht/belasting/optimizer': {
     insight:
       'Al je fiscale doelen onder elkaar, doorgerekend op je eigen gegevens: Box 3-scenario’s (de mix sparen/beleggen en, met een fiscaal partner, de optimale verdeling) en je Box 1-jaarruimte.',
     grip:
       'Vergelijk de scenario’s naast elkaar in euro’s en vrijheidsdagen om te kiezen waarop je stuurt — het blijft een indicatie, geen advies.',
+    werking: [
+      {
+        title: 'Doorgerekend op je eigen cijfers',
+        text: 'Elke kans rekent met jouw bezittingen, schulden en inkomen — niet met een voorbeeldhuishouden. Verandert er iets in je gegevens, dan schuift de uitkomst mee.',
+      },
+      {
+        title: 'Euro’s én vrijheidstijd',
+        text: 'Naast het jaarbedrag staat wat de keuze aan vrijheidstijd scheelt. Daardoor worden kansen van heel verschillende omvang toch vergelijkbaar.',
+      },
+      {
+        title: 'Onbenutte jaarruimte',
+        text: 'De aftrekruimte voor pensioenopbouw die je dit jaar nog niet hebt gebruikt, afgeleid uit je inkomen en je bestaande opbouw.',
+      },
+      {
+        title: 'Waar de app ophoudt',
+        text: 'TriFinity rekent voor en legt uit; de keuze en de aangifte blijven van jou. Voor persoonlijk advies is een adviseur met vergunning nodig.',
+      },
+    ],
+    terms: ['box_3', 'heffingsvrij_vermogen', 'pensioen'],
+    related: [
+      { href: '/overzicht/belasting/box3', label: 'Box 3 in detail' },
+      { href: '/overzicht/belasting/box1', label: 'Box 1 en je jaarruimte' },
+    ],
   },
   '/overzicht/tips': {
     insight:
@@ -105,12 +368,59 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
       'Deze tijdas laat zien waar je financieel heen gaat: de opbouwjaren (groen) en de afbouwjaren (oranje) tot je gekozen eindleeftijd, met doelen, levensgebeurtenissen en voorkeuren die samen je route bepalen.',
     grip:
       'Sleep een gebeurtenis naar een ander jaar en zie meteen hoe je vrijheidsmoment verschuift; van hieruit open je doelen, gebeurtenissen en voorkeuren om de projectie bij te stellen.',
+    werking: [
+      {
+        title: 'De tijdas lezen',
+        text: 'Groen zijn de jaren waarin je opbouwt, oranje de jaren waarin je afbouwt. Het omslagpunt is het moment waarop je vermogen je uitgaven kan dragen.',
+      },
+      {
+        title: 'Gebeurtenissen slepen',
+        text: 'Sleep pensioen, een verhuizing of een erfenis naar een ander jaar; de projectie rekent direct opnieuw. Je verandert alleen het plan, niet je vastgelegde gegevens.',
+      },
+      {
+        title: 'Doelen op de as',
+        text: 'Elk doel verschijnt op het jaar waarin het valt, zodat zichtbaar wordt of doelen elkaar in de weg zitten of juist versterken.',
+      },
+      {
+        title: 'Aannames erachter',
+        text: 'Rendement, inflatie, je uitgaven na pensioen en je eindleeftijd bepalen samen de uitkomst. Je stelt ze zelf in bij Voorkeuren — een kleine bijstelling kan jaren schelen.',
+      },
+    ],
+    terms: ['fire', 'vrijheidstijd', 'swr', 'inflatie'],
+    related: [
+      { href: '/toekomst/doelen', label: 'Je doelen beheren' },
+      { href: '/toekomst/gebeurtenissen', label: 'Levensgebeurtenissen op je tijdas' },
+      { href: '/toekomst/voorkeuren', label: 'Aannames achter de projectie' },
+    ],
   },
   '/toekomst/whatif': {
     insight:
       'Voordat je een knoop doorhakt, wil je weten wat hij oplevert — dit is de plek om dat zonder risico uit te proberen.',
     grip:
       'Verander je sparen, rendement of pensioenleeftijd en zie direct hoeveel jaar of maanden vrijheid dat scheelt. Niets hiervan is een toezegging, je verkent alleen.',
+    werking: [
+      {
+        title: 'Schuifjes',
+        text: 'Verander je spaarbedrag, je verwachte rendement, je uitgaven of je pensioenleeftijd; de uitkomst beweegt onder je hand mee.',
+      },
+      {
+        title: 'Naast je huidige pad',
+        text: 'Het scenario wordt getekend náást je bestaande projectie. Je ziet daardoor het verschil, in plaats van twee losse getallen die je zelf moet aftrekken.',
+      },
+      {
+        title: 'Bewaren en vergelijken',
+        text: 'Bewaar een verkenning en leg hem als extra lijn over je pad. Je echte plan verandert er niet door — dat blijft staan tot je het zelf aanpast.',
+      },
+      {
+        title: 'Wat het niet is',
+        text: 'Een verkenning, geen voorspelling en geen toezegging. Markten bewegen anders dan een schuifje; de waarde zit in de richting, niet in de decimaal.',
+      },
+    ],
+    terms: ['rendement', 'inflatie', 'fire'],
+    related: [
+      { href: '/toekomst/bibliotheek', label: 'Je bewaarde scenario’s' },
+      { href: '/toekomst/voorkeuren', label: 'Aannames achter de projectie' },
+    ],
   },
 
   // NB: /toekomst/strategie en /toekomst/uitgaven-na-pensioen hadden hier een
@@ -135,6 +445,29 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
       'Elk doel hier is een stuk vrijheid dat je opbouwt — zie in één oogopslag hoeveel je al hebt, wat er nog te gaan is en of je op koers ligt, loopt achter of aandacht nodig hebt.',
     grip:
       'Voeg een doel toe als bedrag, of koppel het aan één of meer bezittingen en schulden zodat het netto meerekent met wat je opbouwt en aflost — of zet het op een kengetal dat de app al bijhoudt (spaarquote, netto vermogen, vrijheidsleeftijd, noodfonds, passief inkomen, belastingdruk, schuldenvrij-moment, eindkapitaal), dan werkt het vanzelf mee. Doelen van twee jaar of verder krijgen automatisch een seintje bij 25%, 50% en 75%; is een doel behaald, dan wordt dat gevierd en verhuist het naar het archief onderaan, met meteen een suggestie voor de volgende stap. Je eigen doelen staan bovenaan; doelen uit je doelsituatie pas je aan in het Toekomst-lab.',
+    werking: [
+      {
+        title: 'Doel als bedrag',
+        text: 'Leg een streefbedrag en een datum vast. De voortgang loopt daarna mee met wat je opbouwt, zonder dat je hem bijhoudt.',
+      },
+      {
+        title: 'Doel gekoppeld aan bezittingen',
+        text: 'Koppel bezittingen en schulden aan een doel, dan telt de voortgang nétto mee: wat je opbouwt minus wat er nog openstaat.',
+      },
+      {
+        title: 'Doel op een kengetal',
+        text: 'Kies een getal dat de app al bijhoudt — spaarquote, netto vermogen, vrijheidsleeftijd, noodfonds, passief inkomen, belastingdruk, schuldenvrij-moment of eindkapitaal — dan werkt het doel vanzelf mee.',
+      },
+      {
+        title: 'Seintjes en archief',
+        text: 'Doelen van twee jaar of verder geven een seintje bij 25, 50 en 75 procent. Behaalde doelen worden gevierd en verhuizen naar het archief onderaan.',
+      },
+    ],
+    terms: ['spaarquote', 'netto_vermogen', 'noodreserve', 'passief_inkomen'],
+    related: [
+      { href: '/toekomst', label: 'Je doelen op de tijdas' },
+      { href: '/mijn/mijlpalen', label: 'Mijlpalen die je al passeerde' },
+    ],
   },
   '/toekomst/gebeurtenissen': {
     insight:
@@ -221,6 +554,29 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     insight:
       'Hoe minder je handmatig hoeft in te voeren, hoe actueler en betrouwbaarder je cijfers — automatische koppelingen schelen telkens een import.',
     grip: 'Koppel of ontkoppel per dienst: PSD2-bank, UPO-pensioenoverzicht en crypto-brokerage.',
+    werking: [
+      {
+        title: 'Bankkoppeling',
+        text: 'Via de wettelijk geregelde PSD2-route haalt de app je transacties op. Je geeft per bank toestemming, en die toestemming verloopt na verloop van tijd — verlengen doe je hier.',
+      },
+      {
+        title: 'Pensioenoverzicht',
+        text: 'Lees je UPO in, dan rekent de projectie met je werkelijke opbouw in plaats van met een schatting.',
+      },
+      {
+        title: 'Beleggingen en crypto',
+        text: 'Koppel een beleggingsrekening of wallet zodat posities en koersen meelopen zonder dat je ze handmatig bijwerkt.',
+      },
+      {
+        title: 'Altijd terug te draaien',
+        text: 'Ontkoppelen kan hier op elk moment, per dienst. Een koppeling is nooit verplicht: alles in de app werkt ook met handmatige invoer.',
+      },
+    ],
+    terms: ['psd2', 'upo'],
+    related: [
+      { href: '/mijn/privacy', label: 'Wat we bewaren, en waarom' },
+      { href: '/overzicht/cashflow/transacties', label: 'De transacties die binnenkomen' },
+    ],
   },
   '/mijn/jaaroverzicht': {
     insight:
@@ -352,4 +708,19 @@ export function getPageInfo(key: string | null | undefined, fallbackKey?: string
   if (key && PAGE_INFO[key]) return PAGE_INFO[key]
   if (fallbackKey && PAGE_INFO[fallbackKey]) return PAGE_INFO[fallbackKey]
   return EMPTY_PAGE_INFO
+}
+
+/**
+ * Heeft deze entry íets te tonen? Gebruik dit als render-guard rond een
+ * `PageInfoButton` — nooit een handmatige `insight || grip`-check: die laat een
+ * entry die alléén WERKING/BEGRIPPEN/VERDER draagt stilletjes zonder knop.
+ */
+export function hasPageInfo(content: PageInfoContent): boolean {
+  return Boolean(
+    content.insight ||
+      content.grip ||
+      content.werking?.length ||
+      content.terms?.length ||
+      content.related?.length,
+  )
 }

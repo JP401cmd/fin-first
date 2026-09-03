@@ -30,22 +30,23 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolveFireParams, resolveFireParamsWithAssumptions } from '@/lib/fire-params'
 import { resolveFireAssumptions, type FireAssumptionRow } from '@/lib/fire-assumptions'
 import { CURRENT_TAX_YEAR } from '@/lib/box3-data'
 import { NL_SWR } from '@/lib/constants'
+import { readSourceLF } from '@/lib/test-utils/read-source'
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const LOADER_PATH = join(REPO_ROOT, 'lib', 'holdings-data-loader.ts')
 const HERO_PATH = join(REPO_ROOT, 'components', 'core', 'holdings', 'portfolio-summary.tsx')
 
 /** Strip commentaar en normaliseer witruimte: het anker matcht op CODE, niet op
- *  proza (de toelichtingen in beide bestanden nóemen NL_SWR nog wél). */
+ *  proza (de toelichtingen in beide bestanden nóemen NL_SWR nog wél).
+ *  CRLF-veilig via readSourceLF (zie lib/test-utils/read-source.ts). */
 function codeOf(path: string): string {
-  return readFileSync(path, 'utf8')
+  return readSourceLF(path)
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/^[ \t]*\/\/.*$/gm, '')
     .replace(/\s+/g, ' ')

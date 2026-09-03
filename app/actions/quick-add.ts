@@ -25,8 +25,10 @@
  *     we defensively verify ownership of `linked_asset_id` before the debt
  *     insert to guarantee a user cannot link a debt to someone else's
  *     asset by injecting an arbitrary UUID through the `kind:'debt'` path.
- *   - Zod (in `lib/quick-add/validation.ts`) validates format only; it
- *     cannot enforce ownership — that check lives here.
+ *   - Zod (in `lib/quick-add/validation.ts`) validates format plus één
+ *     inhoudelijke invariant (een `dga_schuld` moet een deelneming dragen —
+ *     `hasRequiredDeelnemingLink`); het kan géén eigenaarschap afdwingen — die
+ *     check leeft hier.
  *
  * Cache invalidation: `/core` is the Mission Control page that reads the
  * aggregated totals; `/core/assets` and `/core/debts` are the detail lists.
@@ -223,6 +225,12 @@ export async function quickAdd(raw: unknown): Promise<QuickAddResult> {
 
   try {
     // 3. Debt-only path.
+    //
+    // De invariant "een `dga_schuld` hangt altijd aan een deelneming" is hier al
+    // afgedwongen: `QuickAddInputSchema` (stap 1) keurt dit pad af zonder
+    // `linked_asset_id` en die tekst komt als `code:'VALIDATION'` terug. Dat is
+    // de server-side afdwinging naast de blokkerende wizard-validatie — de
+    // client-check alleen was omzeilbaar met een directe Server-Action-call.
     if (input.kind === 'debt') {
       // Defensive: the wizard never sets `linked_asset_id` via this kind
       // (it uses `kind:'asset_with_debt'` so the server can set it after

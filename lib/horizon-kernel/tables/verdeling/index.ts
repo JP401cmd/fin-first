@@ -38,6 +38,8 @@ import type { KernelInput, MonthIndex } from '../../types'
 import { isBeyondHorizon, leeftijdJaren, maandInJaar } from '../../scaffold'
 import {
   aflossingWeightsCombined,
+  bezitInstroomDoelMask,
+  bezitInstroomFallbackWeights,
   halveningWeights,
   halveningWeightsZonderGevuld,
   reserveMask,
@@ -175,6 +177,20 @@ export interface VerdelingWeights {
   readonly wOnttrekking: readonly number[]
   /** Bezit-toename-gewichten (HC:HH-overloop-verdeling). */
   readonly wBezitToename: readonly number[]
+  /**
+   * `wBezitToename` is all-zero (Σ = 0): géén bezit-categorie kwalificeert regulier
+   * voor toename — het geval `surplus_group = 'schuld_aflossen'` (alle bezit op
+   * reserve-prio 5) of een surplus-doel dat ongevuld is. Poort voor de overloop-
+   * fallback (gap-besluit V24); op het oracle-pad altijd `false`.
+   */
+  readonly bezitToenameDegeneraat: boolean
+  /**
+   * Instroom-fallback-gewichten voor de HC:HH-overloop wanneer `bezitToenameDegeneraat`
+   * (`bezitInstroomFallbackWeights`, gedeeld met de toename-degeneratie V17): ladder
+   * prio 1..4 zonder gevuld-eis → prio-5-reserve → all-nul, beperkt tot categorieën
+   * met ≥ 1 niet-woning-pot (anders verdampt het bedrag alsnog in Bez). Input-constant.
+   */
+  readonly wBezitToenameFallback: readonly number[]
   /** Schuld-aflossing-gewichten (gecombineerde toename-noemer). */
   readonly wAflossing: readonly number[]
   /** Reserve-masker afname (prio 5). */
@@ -198,17 +214,21 @@ export function computeVerdelingWeights(input: KernelInput): VerdelingWeights {
   const bezitPrioOnttrekking = bezit.map((c) => c.prioOnttrekking)
   const bezitGevuld = bezit.map((c) => c.gevuld)
   const bezitNietLiquide = bezit.map((c) => c.nietLiquide)
+  const bezitPrioToename = bezit.map((c) => c.prioToename)
+  const wBezitToename = halveningWeights(bezitPrioToename, bezitGevuld, bezitNietLiquide)
+  const bezitToenameDegeneraat = wBezitToename.every((w) => w === 0)
   return {
     bezitPrioAfname,
     bezitPrioOnttrekking,
     bezitNietLiquide,
     wAfname: halveningWeights(bezitPrioAfname, bezitGevuld, bezitNietLiquide),
     wOnttrekking: halveningWeights(bezitPrioOnttrekking, bezitGevuld, bezitNietLiquide),
-    wBezitToename: halveningWeights(
-      bezit.map((c) => c.prioToename),
-      bezitGevuld,
-      bezitNietLiquide,
-    ),
+    wBezitToename,
+    bezitToenameDegeneraat,
+    // Alleen zinvol op het degenerate pad; anders all-nul (nooit gelezen).
+    wBezitToenameFallback: bezitToenameDegeneraat
+      ? bezitInstroomFallbackWeights(bezitPrioToename, bezitNietLiquide, bezitInstroomDoelMask(input))
+      : new Array<number>(bezit.length).fill(0),
     wAflossing: aflossingWeightsCombined(
       bezit.map((c) => c.prioToename),
       bezitGevuld,
@@ -368,9 +388,25 @@ export function computeVerdeling(
   // aflos-budget over is (EQ > 0, geen tekort), herverdeelt dat zich als toename
   // over de bezittingen. Zodra het tekort het budget absorbeert (EQ 0, m≥699) is de
   // overloop weer 0. In de 18 fixtures zonder prio-aflossing is het budget 0 → 0.
+  //
+  // DEGENERATE-FALLBACK (kernel-extensie, gap-besluit V24 — buiten het Excel-oracle,
+  // inert-by-construction op het fixture-pad): bij `surplus_group = 'schuld_aflossen'`
+  // zet de adapter ÁLLE bezit-categorieën op reserve-prio 5, dus `wBezitToename` is
+  // all-zero. De schuld-categorieën zijn bovendien STATISCH (t=0) gevuld/gewogen: zodra
+  // de aanwijsbare schuld is afgelost (caps 0) lekt het volledige aflos-budget als
+  // `onbenut` — en `onbenut · 0` liet het voor de rest van de horizon VERDAMPEN (in geen
+  // enkele pot; eigenaar-observatie: vrijheidsleeftijd 42 → 53 door enkel deze keuze).
+  // Dezelfde bugklasse als V17 (toename) en de afname-/onttrekking-degeneratie. Alleen
+  // een POSITIEF lek (`onbenut > DEGEN_EPS`) valt terug op de gedeelde instroom-ladder
+  // (`wBezitToenameFallback`); nul/negatief én het niet-degenerate pad blijven
+  // byte-identiek (`onbenut · wBezitToename`).
+  const wOverflow =
+    weights.bezitToenameDegeneraat && aflossing.onbenut > DEGEN_EPS
+      ? weights.wBezitToenameFallback
+      : weights.wBezitToename
   const overflow =
     aflossing.onbenut !== 0
-      ? weights.wBezitToename.map((w) => aflossing.onbenut * w)
+      ? wOverflow.map((w) => aflossing.onbenut * w)
       : ZERO_OVERFLOW
 
   return {

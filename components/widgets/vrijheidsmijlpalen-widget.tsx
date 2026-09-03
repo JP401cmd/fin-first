@@ -9,6 +9,7 @@ import { usePerspective } from '@/components/app/perspective-provider'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { buildFactorByAge, deflateRowsByAge } from '@/lib/euro-display'
+import { widgetSimRowsToChartPoints } from '@/lib/horizon/sim-chart-geometry'
 
 // Zuivere weergave-formattering van een door de motor geleverd aantal maanden
 // (FreedomMilestone.monthsAway) → vrijheidstijd. Geen financiële herberekening:
@@ -170,33 +171,43 @@ export const VrijheidsMijlpalenWidget = memo(function VrijheidsMijlpalenWidget({
     let endAgeLabel = 0
 
     if (rows && showSparkline) {
-      const maxVal = Math.max(...rows.map(r => r.endPortfolio), 1)
-      minAge = rows[0].age
-      const maxAge = rows[rows.length - 1].age
+      // Tijdstip-conventie (lib/horizon/sim-chart-geometry.ts): rij `age` is het
+      // leeftijdsJAAR; `endPortfolio` is de stand op `age + 1`. Eén gedeelde
+      // puntreeks (seed op de startleeftijd + één punt per jaargrens) i.p.v. de
+      // eigen `[r.age, r.endPortfolio]`-plot die de lijn een jaar naar links
+      // zette en `interpAt` elke mijlpaal een jaar te vroeg liet lezen (D,
+      // nazorg R2+R3). De fase-splitsing gebeurt op INDEX in diezelfde reeks:
+      // de onttrekkingslijn begint op het (al gedeflateerde) eindpunt van de
+      // opbouw — geen tweede, nominale seed, dus geen knik in 'huidige euro's'.
+      const allPts = widgetSimRowsToChartPoints(rows)
+      const maxVal = Math.max(...allPts.map(([, v]) => v), 1)
+      minAge = allPts[0][0]
+      const maxAge = allPts[allPts.length - 1][0]
       endAgeLabel = Math.round(data.displayEndAge ?? maxAge)
       const ageSpan = maxAge - minAge || 1
       const currentAge = rows[0].age
       const toX = (age: number) => padX + ((clamp(age, minAge, maxAge) - minAge) / ageSpan) * (W - padX * 2)
       const toY = (val: number) => (SPARK_H - padBottom) - (Math.max(val, 0) / maxVal) * (SPARK_H - padTop - padBottom)
       const interpAt = (age: number): number => {
-        if (age <= rows[0].age) return rows[0].endPortfolio
-        if (age >= rows[rows.length - 1].age) return rows[rows.length - 1].endPortfolio
-        for (let i = 1; i < rows.length; i++) {
-          if (rows[i].age >= age) {
-            const a0 = rows[i - 1]
-            const a1 = rows[i]
-            const t = (age - a0.age) / ((a1.age - a0.age) || 1)
-            return a0.endPortfolio + t * (a1.endPortfolio - a0.endPortfolio)
+        if (age <= allPts[0][0]) return allPts[0][1]
+        if (age >= allPts[allPts.length - 1][0]) return allPts[allPts.length - 1][1]
+        for (let i = 1; i < allPts.length; i++) {
+          if (allPts[i][0] >= age) {
+            const [a0, v0] = allPts[i - 1]
+            const [a1, v1] = allPts[i]
+            const t = (age - a0) / ((a1 - a0) || 1)
+            return v0 + t * (v1 - v0)
           }
         }
-        return rows[rows.length - 1].endPortfolio
+        return allPts[allPts.length - 1][1]
       }
-      const buildPath = (rs: NonNullable<typeof rows>) =>
-        rs.length === 0
+      const buildPath = (pts: [number, number][]) =>
+        pts.length === 0
           ? ''
-          : rs.map((r, i) => `${i === 0 ? 'M' : 'L'}${toX(r.age).toFixed(1)},${toY(r.endPortfolio).toFixed(1)}`).join(' ')
-      sparkPathAcc = buildPath(rows.filter(r => r.phase === 'accumulation'))
-      sparkPathRet = buildPath(rows.filter(r => r.phase === 'retirement'))
+          : pts.map(([a, v], i) => `${i === 0 ? 'M' : 'L'}${toX(a).toFixed(1)},${toY(v).toFixed(1)}`).join(' ')
+      const nAcc = rows.filter(r => r.phase === 'accumulation').length
+      sparkPathAcc = buildPath(allPts.slice(0, nAcc + 1))
+      sparkPathRet = buildPath(allPts.slice(nAcc))
       if (!isShared && data.freedomMilestones) {
         markers = data.freedomMilestones.milestones.map(m => {
           const state: 'reached' | 'upcoming' | 'unreachable' =

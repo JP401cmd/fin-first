@@ -35,7 +35,7 @@ import type { BudgetsPageData, BudgetGoal } from '@/lib/budgets-data-loader'
 import { BudgetIcon, formatCurrency, getTypeColors, isOverPositive, computeBarSegments, iconMap, iconOptions, type BudgetType } from '@/components/app/budget-shared'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { buildSegments, typeColors, childTypeColors } from '@/components/app/budget-donut'
-import { type BudgetRollover, formatPeriod, getCarriedAmount, getPreviousPeriod, computeRollover, computeEffectiveLimit } from '@/lib/budget-rollover'
+import { type BudgetRollover, formatPeriod, getCarriedAmount, getPreviousPeriod, buildAutoRolloverInserts, computeEffectiveLimit } from '@/lib/budget-rollover'
 import { computeBudgetPeriod, localDateStr } from '@/lib/budget-period'
 import { budgetLimitStatus } from '@/lib/budget-alerts'
 import { BudgetTree } from '@/components/app/budget-tree'
@@ -1547,34 +1547,29 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
 
       // Only compute rollovers if there was spending data in the previous month
       if (prevTx.length > 0) {
-        const newRollovers: { budget_id: string; period: string; carried_amount: number; rollover_type: string }[] = []
-
-        for (const budget of childBudgets) {
-          if (budget.rollover_type === 'reset') continue
-          // Creator-gate: schrijf alleen rollover-rijen voor budgetten die de
-          // huidige gebruiker bezit (eigen of door mij aangemaakt gedeeld).
-          if (rolloverUser && budget.user_id && budget.user_id !== rolloverUser.id) continue
-          const prevCarry = getCarriedAmount(prevRollovers, prevPeriod)
-          // De klem op een negatieve besteding zit IN computeRollover, niet hier
-          // — zie lib/budget-rollover.ts. Deze aanroep geeft de rauwe som door.
-          const { carry } = computeRollover(
-            Number(budget.default_limit),
-            prevSpending[budget.id] ?? 0,
-            prevCarry,
-            budget.rollover_type ?? 'reset',
-          )
-          if (carry > 0) {
-            newRollovers.push({
-              budget_id: budget.id,
-              period: currentPeriod,
-              carried_amount: carry,
-              rollover_type: budget.rollover_type ?? 'reset',
-            })
-          }
-        }
+        // Payload-opbouw (incl. de door RLS vereiste `user_id` en de creator-gate)
+        // zit in de pure `buildAutoRolloverInserts` — zie lib/budget-rollover.ts.
+        const newRollovers = buildAutoRolloverInserts({
+          userId: rolloverUser?.id,
+          childBudgets,
+          prevSpending,
+          prevRollovers,
+          prevPeriod,
+          currentPeriod,
+        })
 
         if (newRollovers.length > 0) {
-          await supabase.from('budget_rollovers').insert(newRollovers)
+          const { error: rolloverInsertError } = await supabase
+            .from('budget_rollovers')
+            .insert(newRollovers)
+          if (rolloverInsertError) {
+            // NIET stil laten falen. Precies dat maskeerde WF-BUDGET-14-bug1:
+            // RLS wees elke insert af met 42501 en de enige sporen waren twee
+            // 403's in het netwerkpaneel. Een grep-bare tag maakt een volgende
+            // regressie zichtbaar zonder de gebruiker met een melding op te
+            // zadelen voor een achtergrondberekening die hij niet aanvroeg.
+            console.error('budgets:rollover-autocompute-insert', rolloverInsertError)
+          }
           const { data: freshRollovers } = await supabase
             .from('budget_rollovers')
             .select('*')
@@ -4678,6 +4673,22 @@ function BudgetEditModal({
     }
   }
 
+  /**
+   * Sluit-poort van de overlay (X / Escape / backdrop). Bij onopgeslagen
+   * wijzigingen WEIGEREN we de sluiting en tonen we de inline bevestiging; pas
+   * "Wijzigingen verwijderen" sluit echt (`confirmClose`).
+   *
+   * Zonder deze poort startte de mobiele BottomSheet zijn exit-animatie
+   * onvoorwaardelijk náást `onClose`, waardoor de zojuist getoonde waarschuwing
+   * binnen ~300ms mee van het scherm verdween (UAT WF-BUDGET-10). De
+   * desktop-SlideInPane had dat probleem niet.
+   */
+  function requestClose(): boolean {
+    if (!isDirty) return true
+    setShowCloseConfirm(true)
+    return false
+  }
+
   function confirmClose() {
     setShowCloseConfirm(false)
     onClose()
@@ -4801,7 +4812,7 @@ function BudgetEditModal({
         andere content. URL-state: `?budget=<id>&edit=true`. `handleClose`
         opent eventueel eerst een unsaved-changes-bevestiging; bij confirm
         wordt `onClose` aangeroepen die teruggaat naar `?budget=<id>` (detail). */}
-    <ShellOverlay open={true} onClose={handleClose} kind="pane" title="Budget bewerken">
+    <ShellOverlay open={true} onClose={handleClose} onRequestClose={requestClose} kind="pane" title="Budget bewerken">
         <div className="flex justify-end px-6 pt-3">
           <button type="button" onClick={() => setIsFavorite(!isFavorite)}
             className={`p-1.5 transition-colors ${

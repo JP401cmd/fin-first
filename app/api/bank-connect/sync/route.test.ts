@@ -78,6 +78,8 @@ type TxRow = {
   counterparty_name?: string | null
   budget_id?: string | null
   category_source?: string | null
+  /** Laag-1b-veld: alleen `'shared'`-rijen van de partner zijn zichtbaar. */
+  ownership?: string | null
 }
 
 /** Eén TrueLayer-boeking; de mapper hasht date|amount|description. */
@@ -126,6 +128,16 @@ type SupabaseOpts = {
   ownIbanRules?: { match_type: string; match_value: string }[]
   /** Wat `.from('budgets').select('*')` oplevert (own or shared). */
   budgets?: { id: string; slug: string | null; user_id: string }[]
+  /** `bank_accounts.ownership` van de DRAGENDE rekening (laag 1b + de stempel). */
+  carrierOwnership?: 'personal' | 'shared'
+  /** `bank_accounts.iban_hash` van de dragende rekening; null = geen identiteit. */
+  carrierIbanHash?: string | null
+  /**
+   * De dragende rijen van de PARTNER die dezelfde IBAN-hash dragen — de
+   * en/of-rekening die beide partners koppelden. Wat de huishoud-verbrede
+   * SELECT-policy op `bank_accounts` doorlaat.
+   */
+  siblingAccounts?: { id: string }[]
 }
 
 function makeSupabase(existing: TxRow[], opts: SupabaseOpts = {}) {
@@ -138,7 +150,13 @@ function makeSupabase(existing: TxRow[], opts: SupabaseOpts = {}) {
   /** Elke niet-insert-mutatie op `transactions`. Moet altijd leeg blijven:
    *  dedup verhindert INSERTs en doet nooit een update, merge of delete. */
   const transactionMutations: string[] = []
-  /** Onthoudt of er ooit zelf op `user_id` versmald is bij `bank_accounts`. */
+  /** De laag-1b-leesronden, met hun volledige filterset. */
+  const householdQueries: (DedupQuery & { neqs: Record<string, unknown>; ins: Record<string, unknown> })[] = []
+  /**
+   * Onthoudt of de IDENTIFIER-SET-query (`select('… iban_encrypted …')`) ooit
+   * zelf op `user_id` versmald is. Bewust alleen díe query: de laag-1b-loader
+   * leest dezelfde tabel met een eigen, expliciet gescopede vraag.
+   */
   let bankAccountsUserIdFilter = false
 
   function builder(table: string) {
@@ -146,6 +164,8 @@ function makeSupabase(existing: TxRow[], opts: SupabaseOpts = {}) {
     let payload: unknown = null
     let cols = ''
     const eqs: Record<string, unknown> = {}
+    const neqs: Record<string, unknown> = {}
+    const ins: Record<string, unknown> = {}
     let gte: string | null = null
     let lte: string | null = null
     let range: [number, number] | null = null
@@ -156,7 +176,8 @@ function makeSupabase(existing: TxRow[], opts: SupabaseOpts = {}) {
     b.order = self
     b.limit = self
     b.not = self
-    b.in = self
+    b.in = (col: string, vals: unknown) => { ins[col] = vals; return b }
+    b.neq = (col: string, val: unknown) => { neqs[col] = val; return b }
     b.eq = (col: string, val: unknown) => { eqs[col] = val; return b }
     b.gte = (_col: string, val: string) => { gte = val; return b }
     b.lte = (_col: string, val: string) => { lte = val; return b }
@@ -191,7 +212,19 @@ function makeSupabase(existing: TxRow[], opts: SupabaseOpts = {}) {
     function resolve(): { data: unknown; error: null } {
       if (op !== 'select') return { data: payload, error: null }
       if (table === 'bank_accounts') {
-        // De route/helper mag hier GEEN eigen `user_id`-filter zetten: de
+        // Laag 1b, stap 1a: het eigenaarschap van de dragende rekening.
+        if (cols === 'ownership') {
+          return { data: { ownership: opts.carrierOwnership ?? 'personal' }, error: null }
+        }
+        // Laag 1b, stap 1b: de identiteit van de dragende rekening.
+        if (cols === 'iban_hash') {
+          return { data: { iban_hash: opts.carrierIbanHash ?? null }, error: null }
+        }
+        // Laag 1b, stap 2: de dragende rijen van de partner op dezelfde IBAN.
+        if (cols === 'id') {
+          return { data: opts.siblingAccounts ?? [], error: null }
+        }
+        // De IDENTIFIER-SET-query mag hier GEEN eigen `user_id`-filter zetten: de
         // SELECT-policy is huishoud-verbreed en een eigenaarsfilter zou de
         // gezamenlijke rekening uit de identifier-set laten vallen.
         if (eqs['user_id'] !== undefined) bankAccountsUserIdFilter = true
@@ -257,6 +290,22 @@ function makeSupabase(existing: TxRow[], opts: SupabaseOpts = {}) {
           }
         }
 
+        // Laag 1b: de partnerrijen. Herkenbaar aan de OMGEKEERDE eigenaarsfilter
+        // — die bestaat nergens anders op dit pad.
+        if (neqs['user_id'] !== undefined) {
+          householdQueries.push({ eqs: { ...eqs }, neqs: { ...neqs }, ins: { ...ins }, gte, lte, range })
+          const accountIds = (ins['account_id'] ?? []) as string[]
+          let rows = existing.filter((r) =>
+            r.user_id !== neqs['user_id'] &&
+            accountIds.includes(r.account_id) &&
+            (eqs['ownership'] === undefined || r.ownership === eqs['ownership']) &&
+            inWindow(r) &&
+            r.import_hash !== null
+          )
+          if (range) rows = rows.slice(range[0], range[1] + 1)
+          return { data: rows.map((r) => ({ import_hash: r.import_hash })), error: null }
+        }
+
         dedupQueries.push({ eqs: { ...eqs }, gte, lte, range })
         let rows = existing.filter((r) =>
           (eqs['user_id'] === undefined || r.user_id === eqs['user_id']) &&
@@ -295,6 +344,7 @@ function makeSupabase(existing: TxRow[], opts: SupabaseOpts = {}) {
     rpcCalls,
     dedupQueries,
     crossSourceQueries,
+    householdQueries,
     syncLogs,
     connAccountUpdates,
     transactionMutations,
@@ -986,7 +1036,12 @@ describe('POST /api/bank-connect/sync — eigen-rekening-verschuiving', () => {
     const body = await res.json()
 
     const tables = client.from.mock.calls.map((c) => String(c[0]))
-    expect(tables.filter((t) => t === 'bank_accounts')).toHaveLength(1)
+    // Drie leesronden op `bank_accounts`, alle drie PER RUN en niet per
+    // transactie — dat is wat deze test bewaakt. De identifier-set, plus de twee
+    // vragen van laag 1b (`ownership` van de drager, `iban_hash` voor de
+    // zusterlookup). De zusterquery zelf blijft hier uit: zonder `iban_hash` is
+    // er geen identiteit om op te zoeken.
+    expect(tables.filter((t) => t === 'bank_accounts')).toHaveLength(3)
     expect(tables.filter((t) => t === 'user_own_ibans')).toHaveLength(1)
     // En de teller is herleid uit de weggeschreven rijen, niet opgehoogd naast
     // de insert: drie nieuw, waarvan twee verschuiving.
@@ -1164,5 +1219,158 @@ describe('POST /api/bank-connect/sync — atomaire dagteller (SC-26)', () => {
     expect(res.status).toBe(500)
     expect(mockGetAccountTransactions).not.toHaveBeenCalled()
     consoleError.mockRestore()
+  })
+})
+
+/**
+ * Laag 1b — de en/of-rekening die BEIDE partners koppelen.
+ *
+ * Het scenario dat dit dekt is in Nederland de norm: één echte
+ * betaalrekening, twee TrueLayer-koppelingen, twee dragende
+ * `bank_accounts`-rijen (de callback zoekt haar drager met
+ * `.eq('user_id', …)` en maakt er anders een nieuwe aan). De unieke index
+ * `(account_id, import_hash, coalesce(bank_seq,''))` botst dan NIET — hij
+ * draagt geen `user_id`, maar de twee rijen hebben een ander `account_id`.
+ * Zonder deze laag telt élke gezamenlijke boeking dubbel in uitgaven,
+ * spaarquote en budgetten.
+ */
+describe('POST /api/bank-connect/sync — huishoud-partnerlaag (laag 1b)', () => {
+  /** De dragende rij van de partner voor dezelfde échte rekening. */
+  const SIBLING = 'acct-partner'
+  const PARTNER = 'user-2'
+  const IBAN_HASH = 'hash-nl00rabo0123456789'
+
+  /** De sync draait op ACCOUNT_B; de partner draagt SIBLING. */
+  const jointOpts = {
+    carrierOwnership: 'shared' as const,
+    carrierIbanHash: IBAN_HASH,
+    siblingAccounts: [{ id: SIBLING }],
+  }
+
+  /** Dezelfde boeking als TL_TX, maar al weggeschreven door de partner. */
+  async function partnerRow(overrides: Partial<TxRow> = {}): Promise<TxRow> {
+    return {
+      id: 'tx-partner',
+      user_id: PARTNER,
+      account_id: SIBLING,
+      date: '2026-07-01',
+      import_hash: await computeHash('2026-07-01', -1.7, 'Kosten betaalrekening'),
+      bank_seq: null,
+      ownership: 'shared',
+      ...overrides,
+    }
+  }
+
+  it('slaat een boeking over die de partner al op de zusterrekening heeft staan', async () => {
+    const { client, inserted } = makeSupabase([await partnerRow()], jointOpts)
+    mockCreateClient.mockResolvedValue(client)
+
+    const res = await POST(request())
+    const body = await res.json()
+
+    expect(inserted.flat()).toHaveLength(0)
+    expect(body).toMatchObject({
+      new: 0,
+      duplicates: 0,
+      duplicates_household_partner: 1,
+    })
+  })
+
+  it('is idempotent: dezelfde koppeling twee keer synchroniseren verandert niets', async () => {
+    // De echte idempotentietest van deze kaart. Ronde 1 schrijft weg omdat de
+    // partner nog niets heeft; ronde 2 draait op de tabel ZOALS DIE DAN IS —
+    // met zowel de eigen rij als de partnerrij — en mag niets toevoegen.
+    const rows: TxRow[] = []
+    const first = makeSupabase(rows, jointOpts)
+    mockCreateClient.mockResolvedValue(first.client)
+
+    const res1 = await POST(request())
+    const body1 = await res1.json()
+    expect(body1).toMatchObject({ new: 1, duplicates_household_partner: 0 })
+
+    // De weggeschreven rij landt in de tabel, plus de partnerkopie die via de
+    // koppeling van de ander binnenkwam.
+    const hash = await computeHash('2026-07-01', -1.7, 'Kosten betaalrekening')
+    rows.push({ id: 'tx-eigen', user_id: USER_ID, account_id: ACCOUNT_B, date: '2026-07-01', import_hash: hash, bank_seq: null, ownership: 'shared' })
+    rows.push(await partnerRow())
+
+    const second = makeSupabase(rows, jointOpts)
+    mockCreateClient.mockResolvedValue(second.client)
+
+    const res2 = await POST(request())
+    const body2 = await res2.json()
+
+    expect(second.inserted.flat()).toHaveLength(0)
+    // Laag 1 wint: de rij staat óók al op de eigen rekening, dus dát is de
+    // directere reden. Hij mag niet twee keer geteld worden.
+    expect(body2).toMatchObject({ new: 0, duplicates: 1, duplicates_household_partner: 0 })
+    expect(second.transactionMutations).toEqual([])
+  })
+
+  it('laat een PERSOONLIJKE partnerrij met rust — die telt niet in het gedeelde beeld', async () => {
+    // Een persoonlijke rij van de partner is via de SELECT-policy sowieso
+    // onzichtbaar. De expliciete `ownership`-filter is de tweede gordel: hij mag
+    // nooit stil persoonlijke boekingen van een ander gaan afvangen.
+    const { client, inserted } = makeSupabase(
+      [await partnerRow({ ownership: 'personal' })],
+      jointOpts,
+    )
+    mockCreateClient.mockResolvedValue(client)
+
+    const res = await POST(request())
+    const body = await res.json()
+
+    expect(inserted.flat()).toHaveLength(1)
+    expect(body).toMatchObject({ new: 1, duplicates_household_partner: 0 })
+  })
+
+  it('doet niets zonder IBAN-identiteit op de dragende rekening', async () => {
+    // Geen `iban_hash` = geen betrouwbare "dit is dezelfde rekening"-uitspraak.
+    // Dan liever invoegen dan gokken: de zusterlookup wordt overgeslagen.
+    const { client, inserted, householdQueries } = makeSupabase(
+      [await partnerRow()],
+      { ...jointOpts, carrierIbanHash: null },
+    )
+    mockCreateClient.mockResolvedValue(client)
+
+    const res = await POST(request())
+    const body = await res.json()
+
+    expect(inserted.flat()).toHaveLength(1)
+    expect(body).toMatchObject({ duplicates_household_partner: 0 })
+    // De eigen rekening blijft wél in de vraag zitten (het bestandspad-geval).
+    expect(householdQueries[0].ins['account_id']).toEqual([ACCOUNT_B])
+  })
+
+  it('vraagt de partnerrijen op met de omgekeerde eigenaarsfilter, gedeeld en binnen het venster', async () => {
+    const { client, householdQueries } = makeSupabase([], jointOpts)
+    mockCreateClient.mockResolvedValue(client)
+
+    await POST(request())
+
+    expect(householdQueries).toHaveLength(1)
+    expect(householdQueries[0]).toMatchObject({
+      neqs: { user_id: USER_ID },
+      ins: { account_id: [ACCOUNT_B, SIBLING] },
+      eqs: { ownership: 'shared' },
+      gte: '2026-07-01',
+      lte: '2026-07-01',
+      range: [0, 999],
+    })
+  })
+
+  it('stempelt nieuwe rijen met het eigenaarschap van de dragende rekening', async () => {
+    // Zonder deze stempel viel élke gesynchroniseerde boeking op de kolomdefault
+    // `'personal'` terug, bleef ze onzichtbaar voor de partner, en kon laag 1b
+    // per definitie niets vinden — de laag zou dood zijn opgeleverd.
+    const shared = makeSupabase([], jointOpts)
+    mockCreateClient.mockResolvedValue(shared.client)
+    await POST(request())
+    expect(shared.inserted.flat()[0]).toMatchObject({ ownership: 'shared' })
+
+    const personal = makeSupabase([], { carrierOwnership: 'personal' })
+    mockCreateClient.mockResolvedValue(personal.client)
+    await POST(request())
+    expect(personal.inserted.flat()[0]).toMatchObject({ ownership: 'personal' })
   })
 })

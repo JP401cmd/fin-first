@@ -119,3 +119,31 @@ export const OVERLAY_TRIGGER_KEYS = [...PANE_QUERY_KEYS, 'planEditor', 'newBudge
 export const OVERLAY_TRIGGER_PARAMS: readonly string[] = OVERLAY_TRIGGER_KEYS.map(
   (key) => OVERLAY_QUERY_KEYS[key],
 )
+
+/**
+ * Het CANONIEKE pad van de budgetpagina — de enige route die `BudgetsClient`
+ * rendert en dus de `?budget=` / `?newBudget=`-params leest.
+ *
+ * Het legacy-pad `/core/budgets` is géén alternatief: `next.config.ts` redirect
+ * dat exacte pad naar de cashflow-HUB (`/overzicht/cashflow`), die geen
+ * BudgetsClient rendert. Next matcht een statische redirect op de pathname —
+ * de query telt niet mee voor de match en wordt ongebruikt doorgeplakt. Een
+ * tussenstap via `/core/budgets?budget=<id>` landde daardoor één niveau te hoog
+ * mét een dode `?budget=`-param in de adresbalk (UAT WF-BUDGET-23).
+ */
+export const BUDGET_PAGE_PATH = '/overzicht/cashflow/budget'
+
+/** Deeplink naar de budgetpagina met het detailpaneel van dit budget open. */
+export function budgetDetailUrl(id: string): string {
+  return `${BUDGET_PAGE_PATH}?${OVERLAY_QUERY_KEYS.budget}=${encodeURIComponent(id)}`
+}
+
+/** Deeplink naar de budgetpagina met het bewerk-paneel van dit budget open. */
+export function budgetEditUrl(id: string): string {
+  return `${budgetDetailUrl(id)}&${OVERLAY_QUERY_KEYS.edit}=true`
+}
+
+/** Deeplink naar de budgetpagina met de "Nieuw budget"-pane open. */
+export function newBudgetUrl(): string {
+  return `${BUDGET_PAGE_PATH}?${OVERLAY_QUERY_KEYS.newBudget}=true`
+}

@@ -1,11 +1,13 @@
 'use client'
 
 import { useEffect, useId, useState } from 'react'
+import Link from 'next/link'
 import {
   ASSET_DEFAULT_NAMES,
   ASSET_QUICK_ADD_FIELD3,
   ASSET_QUICK_ADD_LABELS,
   TYPICAL_RETURNS,
+  linkedAssetFieldLabel,
   type AssetField3Kind,
   type AssetType,
 } from '@/lib/asset-data'
@@ -28,6 +30,7 @@ import {
 } from '@/lib/quick-add/name-suggestions'
 import {
   AssetQuickInputSchema,
+  DGA_LINKED_ASSET_REQUIRED_ERROR,
   DebtQuickInputSchema,
   MAX_TERM_YEARS,
 } from '@/lib/quick-add/validation'
@@ -71,6 +74,20 @@ type DebtProps = {
   onOpenFullForm?: () => void
   isSaving?: boolean
   submitLabel?: string
+  /**
+   * Toont én EIST de bezit-koppeling voor schuldtypes die niet los kunnen
+   * bestaan — vandaag alleen `dga_schuld` (WF-SCHULD-20 sub c: een DGA-schuld
+   * hoort altijd aan een deelneming te hangen; het volledige bewerkformulier
+   * dwong dat al af, dit aanmaakpad niet).
+   *
+   * Alleen `true` op het ZELFSTANDIGE schuld-pad in commit-mode:
+   *   - in het asset→schuld-pad is de bezitting de zojuist ingevoerde
+   *     deelneming en zet de wizard/server de koppeling zelf;
+   *   - in collect-mode (onboarding) bestaat er nog geen bezitting-rij om naar
+   *     te wijzen — daar loopt de koppeling via `linked_client_ref` ná de
+   *     batch-insert, en zou een blokkerend veld de gebruiker klemzetten.
+   */
+  requireLinkedAsset?: boolean
 }
 
 export type StepDetailsProps = AssetProps | DebtProps
@@ -92,6 +109,14 @@ type FieldErrors = {
   field3?: string
   monthlyPayment?: string
   termYears?: string
+  linkedAsset?: string
+}
+
+/** Eén bezitting zoals `GET /api/assets/linkable` 'm teruggeeft. */
+type LinkableAsset = {
+  id: string
+  name: string
+  asset_type: AssetType
 }
 
 function getCurrentYear(): number {
@@ -283,6 +308,16 @@ export function StepDetails(props: StepDetailsProps) {
       }
     }
 
+    // Gekoppelde deelneming (DGA-schuld): blokkerend, spiegel van de check in
+    // het volledige bewerkformulier (`debt-form.tsx`). Zelfde tekst, zelfde
+    // moment — anders levert hetzelfde schuldtype via twee aanmaakpaden een
+    // ander datamodel op.
+    if (!isAsset && (props as DebtProps).requireLinkedAsset && typeKey === 'dga_schuld') {
+      if (!(props.draft as DebtDraftState).linked_asset_id) {
+        next.linkedAsset = DGA_LINKED_ASSET_REQUIRED_ERROR
+      }
+    }
+
     // Resterende looptijd (hypotheek): zelfde reden als hierboven — het
     // formulier is noValidate, dus min/max op de input blokkeert niets.
     if (!isAsset && typeKey === 'mortgage') {
@@ -348,6 +383,7 @@ export function StepDetails(props: StepDetailsProps) {
       field3: true,
       monthlyPayment: true,
       termYears: true,
+      linkedAsset: true,
     })
     const nextErrors = validateAll()
     if (Object.keys(nextErrors).length === 0) {
@@ -360,6 +396,7 @@ export function StepDetails(props: StepDetailsProps) {
   const showField3Error = touched.field3 && currentErrors.field3
   const showMonthlyPaymentError = touched.monthlyPayment && currentErrors.monthlyPayment
   const showTermYearsError = touched.termYears && currentErrors.termYears
+  const showLinkedAssetError = touched.linkedAsset && currentErrors.linkedAsset
 
   const submitLabel = props.submitLabel ?? 'Toevoegen'
 
@@ -500,6 +537,24 @@ export function StepDetails(props: StepDetailsProps) {
         />
       )}
 
+      {/* DGA-schuld: verplichte koppeling aan de deelneming. Zat alleen in het
+          volledige bewerkformulier, waardoor elke via deze wizard aangemaakte
+          DGA-schuld structureel ongekoppeld bleef (WF-SCHULD-20 sub c). */}
+      {!isAsset && (props as DebtProps).requireLinkedAsset && typeKey === 'dga_schuld' && (
+        <LinkedAssetField
+          id={`${nameListId}-linked-asset`}
+          debtType={typeKey as DebtType}
+          value={(props.draft as DebtDraftState).linked_asset_id ?? ''}
+          onChange={(assetId) => {
+            setTouched((t) => ({ ...t, linkedAsset: true }))
+            ;(props as DebtProps).onChange({ linked_asset_id: assetId || null })
+          }}
+          onBlur={() => setTouched((t) => ({ ...t, linkedAsset: true }))}
+          error={showLinkedAssetError ? currentErrors.linkedAsset : undefined}
+          palette={palette}
+        />
+      )}
+
       {/* Hint */}
       <p className="text-center text-[11px] text-[var(--ink-4)] leading-relaxed">
         Alleen het minimum — je kunt de rest later aanvullen.
@@ -526,6 +581,125 @@ export function StepDetails(props: StepDetailsProps) {
         )}
       </div>
     </form>
+  )
+}
+
+// ── Gekoppelde bezitting (DGA-schuld) ─────────────────────────────
+
+interface LinkedAssetFieldProps {
+  id: string
+  debtType: DebtType
+  value: string
+  onChange: (assetId: string) => void
+  onBlur: () => void
+  error: string | undefined
+  palette: (typeof PALETTE)['asset'] | (typeof PALETTE)['debt']
+}
+
+/**
+ * Keuzelijst met de eigen bezittingen waaraan dit schuldtype gekoppeld mag
+ * worden. Label en filter komen uit dezelfde bron als het volledige
+ * bewerkformulier (`linkedAssetFieldLabel` / `linkableAssetTypesForDebt` uit
+ * `lib/asset-data.ts`), zodat een toekomstig koppelpaar niet op twee plekken
+ * hoeft te landen.
+ *
+ * De lijst wordt hier opgehaald en niet als prop doorgegeven: de wizard hangt
+ * onder een handvol uiteenlopende client-oppervlakken die lang niet allemaal een
+ * bezittingen-lijst bij de hand hebben. Lezen gaat daarom via de API-route
+ * (`GET /api/assets/linkable`, ADR 0058) — nooit client-direct uit Supabase.
+ *
+ * Faalt die call, dan blijft de lijst leeg: de gebruiker kan niet doorklikken
+ * met een half ingevulde koppeling, en ziet waarom.
+ */
+function LinkedAssetField({
+  id,
+  debtType,
+  value,
+  onChange,
+  onBlur,
+  error,
+  palette,
+}: LinkedAssetFieldProps) {
+  const [options, setOptions] = useState<LinkableAsset[] | null>(null)
+  const [loadFailed, setLoadFailed] = useState(false)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    setOptions(null)
+    setLoadFailed(false)
+
+    async function load() {
+      try {
+        const res = await fetch(
+          `/api/assets/linkable?debtType=${encodeURIComponent(debtType)}`,
+          { signal: controller.signal },
+        )
+        if (!res.ok) throw new Error('laden mislukt')
+        const data = (await res.json()) as { assets?: LinkableAsset[] }
+        if (controller.signal.aborted) return
+        setOptions(data.assets ?? [])
+      } catch {
+        if (controller.signal.aborted) return
+        setOptions([])
+        setLoadFailed(true)
+      }
+    }
+
+    void load()
+    return () => controller.abort()
+  }, [debtType])
+
+  const isLoading = options === null
+  const isEmpty = options !== null && options.length === 0 && !loadFailed
+  const borderClass = error
+    ? 'border-[var(--negative)] focus:border-[var(--negative)] focus:ring-1 focus:ring-[var(--negative)]'
+    : `border-[var(--border-ed)] focus:ring-1 ${palette.focusBorder}`
+
+  return (
+    <div>
+      <label htmlFor={id} className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]">
+        {linkedAssetFieldLabel(debtType)}
+        <span aria-hidden="true" className="ml-0.5 text-[var(--negative)]">
+          *
+        </span>
+      </label>
+      <select
+        id={id}
+        value={value}
+        disabled={isLoading}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? `${id}-error` : undefined}
+        className={`min-h-[44px] w-full border bg-[var(--paper)] px-3 py-2.5 text-base text-[var(--ink)] outline-none transition-colors disabled:opacity-60 ${borderClass}`}
+      >
+        <option value="">{isLoading ? 'Laden…' : 'Selecteer deelneming…'}</option>
+        {(options ?? []).map((asset) => (
+          <option key={asset.id} value={asset.id}>
+            {asset.name}
+          </option>
+        ))}
+      </select>
+      {isEmpty && (
+        <p className="mt-1 text-[11px] text-[var(--ink-3)]">
+          Nog geen deelneming gevonden. Voeg die eerst toe bij{' '}
+          <Link href="/core/assets" className="underline underline-offset-2">
+            Bezittingen
+          </Link>
+          .
+        </p>
+      )}
+      {loadFailed && (
+        <p className="mt-1 text-[11px] text-[var(--ink-3)]">
+          De lijst met deelnemingen kon niet geladen worden — probeer het zo opnieuw.
+        </p>
+      )}
+      {error && (
+        <p id={`${id}-error`} role="alert" className="mt-1 text-[11px] text-[var(--negative)]">
+          {error}
+        </p>
+      )}
+    </div>
   )
 }
 

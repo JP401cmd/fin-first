@@ -8,6 +8,7 @@ import { ActionListModal } from '@/components/app/action-list-modal'
 import { useFreedomDaysAnimation } from '@/components/app/freedom-days-animation'
 import { useToast } from '@/components/app/toast-provider'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
+import { compareActionsByPriority } from '@/lib/action-sort'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
 import { Kicker } from '@/components/editorial'
 
@@ -80,9 +81,11 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
   const ownActions = actions.filter((a) => !isPartnerAssigned(a))
   const partnerAssignedActions = actions.filter((a) => isPartnerAssigned(a))
 
+  // Canonieke volgorde (lib/action-sort.ts): priority_score desc, sort_order asc,
+  // created_at desc — dezelfde drie sleutels als de modal-default en de server-query.
   const openActions = ownActions
     .filter((a) => a.status === 'open')
-    .sort((a, b) => (b.priority_score || 0) - (a.priority_score || 0) || a.sort_order - b.sort_order)
+    .sort(compareActionsByPriority)
 
   const postponedActions = ownActions.filter((a) => a.status === 'postponed')
   const completedActions = ownActions.filter((a) => a.status === 'completed')
@@ -90,7 +93,7 @@ export function ActionBoard({ initialActions, onCancellationOpen, partnerInfo, c
 
   const partnerOpenActions = partnerAssignedActions
     .filter((a) => a.status === 'open')
-    .sort((a, b) => (b.priority_score || 0) - (a.priority_score || 0) || a.sort_order - b.sort_order)
+    .sort(compareActionsByPriority)
 
   // Block view: open + postponed own actions, max 5
   const activeActions = [...openActions, ...postponedActions]

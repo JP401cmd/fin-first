@@ -34,10 +34,10 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { readSourceLF } from '@/lib/test-utils/read-source'
 import { loadSpendLimitsSection } from '@/lib/spend-limits/loader'
 import { toSpendLimitWidgetData, type SpendLimitWidgetData } from '@/lib/spend-limits/widget-data'
 import { mergeWidgetPrefs, type WidgetPref, type WidgetPrefs } from '@/lib/widget-catalog'
@@ -57,7 +57,9 @@ const NOW = new Date(2026, 7, 8)
 /** Strip block- en regelcommentaar en normaliseer witruimte, zodat het anker
  *  op CODE matcht en niet op proza, en niet omvalt bij een herformattering. */
 function loaderCode(): string {
-  return readFileSync(LOADER_PATH, 'utf8')
+  // CRLF-veilig (zie lib/test-utils/read-source.ts) — anders slaat de /gm-strip
+  // hieronder stil terug op een verse Windows-checkout.
+  return readSourceLF(LOADER_PATH)
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/^[ \t]*\/\/.*$/gm, '')
     .replace(/\s+/g, ' ')

@@ -88,10 +88,11 @@ describe('JaarruimteCard — lijfrente-simulator', () => {
       <JaarruimteCard grossYearlyIncome={50_000} />,
     )
     const slider = screen.getByLabelText(/Lijfrente-inleg dit jaar/i)
-    fireEvent.change(slider, { target: { value: '2000' } })
-    // Marginaal-correct via jaarruimteBesparing(50000, 2000, 2026) =
-    // computeBox1Tax(50000).tax − computeBox1Tax(48000).tax = €1.009
-    expect(screen.getByText(/€\s*1\.009/)).toBeTruthy()
+    // Slepen snapt op het stapraster (9.248/100 → stap 92); 2.024 = 22 × 92.
+    fireEvent.change(slider, { target: { value: '2024' } })
+    // Marginaal-correct via jaarruimteBesparing(50000, 2024, 2026) =
+    // computeBox1Tax(50000).tax − computeBox1Tax(47976).tax = €1.021
+    expect(screen.getByText(/€\s*1\.021/)).toBeTruthy()
   })
 
   it('toont géén slider wanneer er geen jaarruimte is', () => {
@@ -230,6 +231,78 @@ describe('JaarruimteCard — onbekende factor A = bovengrens (H23)', () => {
     expect(screen.getByText(/niet-aftrekbare inleg/i)).toBeTruthy()
     fireEvent.change(slider, { target: { value: '3000' } })
     expect(screen.queryByText(/niet-aftrekbare inleg/i)).toBeNull()
+  })
+})
+
+/**
+ * WF-BELAST-10-bug1 (UAT 2 sep 2026) — "slider-thumb staat op 18.868, label op
+ * 18.955". Oorzaak: de native `<input type="range">` saneert élke gezette value
+ * naar een veelvoud van `step` (stapbasis min=0), buiten React om. jsdom doet
+ * dat NIET, dus de DOM-quirk zelf is hier niet te toetsen — wat wél vast te
+ * leggen is, is de component-invariant die 'm uitsluit: géén numerieke `step`
+ * op de input (step="any"), de exacte ondergrens als value, en het stapraster
+ * alleen op gebruikersinteractie.
+ *
+ * IJKGETALLEN (Tessa, bruto €160.658, 2026, factor A onbekend):
+ *  - bovengrens 35.588 → stap round(35588/100) = 356
+ *  - ondergrens 18.955 (geen 356-voud: 53 × 356 = 18.868 = de waargenomen drift)
+ */
+describe('JaarruimteCard — startstand exact, stapraster alleen bij interactie (WF-BELAST-10-bug1)', () => {
+  const TESSA_GROSS = 160_658
+  const ONDERGRENS = 18_955
+  const BOVENGRENS = 35_588
+  const STAP = 356
+
+  function renderTessa() {
+    render(<JaarruimteCard grossYearlyIncome={TESSA_GROSS} pensioenAangroei={0} factorAKnown={false} />)
+    return screen.getByLabelText(/Lijfrente-inleg dit jaar/i) as HTMLInputElement
+  }
+
+  it('premisse: de ondergrens is géén veelvoud van de stap (anders bestond de bug niet)', () => {
+    expect(computeJaarruimte(TESSA_GROSS, 0, 2026).jaarruimte).toBe(BOVENGRENS)
+    expect(Math.max(50, Math.round(BOVENGRENS / 100))).toBe(STAP)
+    expect(ONDERGRENS % STAP).not.toBe(0)
+    expect(Math.round(ONDERGRENS / STAP) * STAP).toBe(18_868)
+  })
+
+  it('draagt géén numerieke step (step="any") en start exact op de ondergrens', () => {
+    const slider = renderTessa()
+    expect(slider.step).toBe('any')
+    expect(slider.value).toBe(String(ONDERGRENS))
+    expect(slider.max).toBe(String(BOVENGRENS))
+    // Label, besparing en input dragen hetzelfde getal.
+    expect(slider.getAttribute('aria-valuetext')).toMatch(/18\.955/)
+    expect(screen.getAllByText(/€\s*18\.955/).length).toBeGreaterThan(0)
+    expect(screen.getByText(/€\s*9\.383/)).toBeTruthy()
+  })
+
+  it('slepen snapt op het 356-raster; de bovengrens blijft exact bereikbaar', () => {
+    const slider = renderTessa()
+    fireEvent.change(slider, { target: { value: '19100' } })
+    expect(slider.value).toBe('19224') // 53,65 → 54 × 356
+    // 35.588 / 356 rondt naar 100 × 356 = 35.600 > max → max zelf (niet 35.244).
+    fireEvent.change(slider, { target: { value: String(BOVENGRENS) } })
+    expect(slider.value).toBe(String(BOVENGRENS))
+  })
+
+  it('pijltjestoetsen stappen vanaf de ondergrens naar het eerstvolgende rasterpunt', () => {
+    const slider = renderTessa()
+    fireEvent.keyDown(slider, { key: 'ArrowRight' })
+    expect(slider.value).toBe('19224') // 54 × 356, niet 18.955 + 356
+    fireEvent.keyDown(slider, { key: 'ArrowLeft' })
+    expect(slider.value).toBe('18868')
+    fireEvent.keyDown(slider, { key: 'End' })
+    expect(slider.value).toBe(String(BOVENGRENS))
+    fireEvent.keyDown(slider, { key: 'Home' })
+    expect(slider.value).toBe('0')
+  })
+
+  it('start bij bekende factor A exact op de volle ruimte (die evenmin een stap-voud is)', () => {
+    render(<JaarruimteCard grossYearlyIncome={TESSA_GROSS} pensioenAangroei={0} factorAKnown />)
+    const slider = screen.getByLabelText(/Lijfrente-inleg dit jaar/i) as HTMLInputElement
+    expect(BOVENGRENS % STAP).not.toBe(0)
+    expect(slider.step).toBe('any')
+    expect(slider.value).toBe(String(BOVENGRENS))
   })
 })
 

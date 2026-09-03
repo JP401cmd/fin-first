@@ -151,6 +151,15 @@ function statusFor(progress: GoalDisplay['progress'], goalType?: GoalType): {
   if (!progress.measured) {
     return { label: 'Net begonnen', color: 'text-[var(--ink-3)]', bg: 'bg-[var(--subtle)]' }
   }
+  // Bevinding UR2-17: bij een live-getrackt STAND-doel (vrijheidsgetal, doelbasis)
+  // is er geen tempo gemeten — de motor zegt dat zelf via `paceSkipped`, dit
+  // scherm leidt het niet af uit het doeltype. "Op koers" zou daar een oordeel
+  // claimen dat niet bestaat: de stand is het hele vermogen, niet de inleg sinds
+  // aanmaak, dus de toets zou zelfs bij €0 inleg groen staan. Neutrale duiding in
+  // dezelfde familie als "Net begonnen" — geen stoplichtkleur.
+  if (progress.paceSkipped) {
+    return { label: 'Loopt mee', color: 'text-[var(--ink-3)]', bg: 'bg-[var(--subtle)]' }
+  }
   if (progress.onTrack) {
     return { label: 'Op koers', color: 'text-positive', bg: 'bg-positive/10' }
   }
@@ -286,7 +295,19 @@ function ManualGoalCard({
   onEdit,
   live = false,
   linked = false,
-}: GoalDisplay & { onEdit: () => void; live?: boolean; linked?: boolean }) {
+  homeExcluded = null,
+}: GoalDisplay & {
+  onEdit: () => void
+  live?: boolean
+  linked?: boolean
+  /**
+   * Grondslag van het live vrijheidsgetal-doel: `true` = het doelbedrag telt de
+   * eigen woning NIET mee (liquide portefeuille), `false` = wél. `null` =
+   * onbekend (geen snapshot/geen live doel) ⇒ geen kwalificatie tonen, want een
+   * verkeerd label is erger dan geen label. Zie UR2-17.
+   */
+  homeExcluded?: boolean | null
+}) {
   // Houdt de app dit doel zelf bij? Dan is er geen waarde om in te typen — dat
   // hoort op de kaart te staan, in dezelfde ingetogen meta-regel-familie als de
   // parameter-doelen ("bekijk live in het lab"). `linked` komt van de loader
@@ -385,8 +406,19 @@ function ManualGoalCard({
           werken terwijl invoer genegeerd wordt. Eén regel, meest specifieke
           eerst — het vrijheidsgetal noemt zijn bron bij naam. */}
       {live ? (
+        /* UR2-17: dit doelbedrag en het doelbedrag op /toekomst kunnen honderd-
+           duizenden euro's schelen zonder dat er iets fout is — het ene telt de
+           eigen woning mee, het andere niet. Zonder die kwalificatie leest het
+           als een tegenspraak. Zelfde woordkeuze als de KPI op /toekomst
+           ("met je huis" / "zonder je huis"), zodat de twee schermen elkaars
+           taal spreken. Onbekend (null) ⇒ geen kwalificatie. */
         <p className="mt-1.5 text-[11px] italic text-[var(--ink-3)]">
           Volgt automatisch je vrijheidsgetal
+          {homeExcluded === true
+            ? ' — zonder je huis'
+            : homeExcluded === false
+              ? ' — met je huis'
+              : ''}
         </p>
       ) : autoTracked ? (
         <p data-testid="doel-loopt-mee" className="mt-1.5 text-[11px] italic text-[var(--ink-3)]">
@@ -406,8 +438,10 @@ function ManualGoalCard({
  *
  * Bewust géén voortgangsbalken of status-pills: die vertellen hier niets meer.
  * Naam, doelbedrag en de datum waarop het rond was — meer is het niet. Klikken
- * opent dezelfde bewerken-sheet als in de actieve lijst (daar kan een doel ook
- * weer heropend worden door de waarde te verlagen).
+ * opent dezelfde bewerken-sheet als in de actieve lijst; daar zit de knop "Doel
+ * weer openen" waarmee een doel het archief verlaat. (Verlagen van de waarde
+ * doet dat ook, maar dat werkt alleen bij een doel dat je zelf bijhoudt — een
+ * meelopend doel heeft geen invoerveld.)
  */
 function BereiktArchief({
   items,
@@ -474,6 +508,7 @@ export function DoelenView({
   monthlyIncome = 0,
   monthlyExpenses = 0,
   vrijheidsgetalLive = false,
+  vrijheidsgetalHomeExcluded = null,
   linkedGoalIds,
   autoCompletedGoals,
 }: {
@@ -492,6 +527,13 @@ export function DoelenView({
   monthlyExpenses?: number
   /** Draait het vrijheidsgetal-doel live op de FIRE-motor? (`FinPageData.vrijheidsgetalLive`) */
   vrijheidsgetalLive?: boolean
+  /**
+   * Grondslag van dat live doelbedrag (`FinPageData.vrijheidsgetalHomeExcluded`):
+   * `true` = eigen woning telt NIET mee, `false` = wél, `null` = onbekend. Voedt
+   * de kwalificatie "met/zonder je huis" op de doelkaart — zonder die regel
+   * leest het verschil met /toekomst als een rekenfout (UR2-17).
+   */
+  vrijheidsgetalHomeExcluded?: boolean | null
   /**
    * Doelen met ≥1 koppeling in `goal_links` (`FinPageData.linkedGoalIds`). De
    * doel-rijen zelf dragen die koppelingen niet — ze leven in een aparte tabel —
@@ -754,6 +796,7 @@ export function DoelenView({
                 progress={d.progress}
                 onEdit={() => setEditingGoal(d.goal)}
                 live={vrijheidsgetalLive && isVrijheidsgetalGoal(d.goal)}
+                homeExcluded={vrijheidsgetalHomeExcluded}
                 linked={linkedIds.has(d.goal.id)}
               />
             ),
@@ -774,6 +817,7 @@ export function DoelenView({
               progress={d.progress}
               onEdit={() => setEditingGoal(d.goal)}
               live={vrijheidsgetalLive && isVrijheidsgetalGoal(d.goal)}
+              homeExcluded={vrijheidsgetalHomeExcluded}
               linked={linkedIds.has(d.goal.id)}
             />
           ))}

@@ -60,6 +60,31 @@ function mockHealth(overrides: Partial<HealthScore> = {}): HealthScore {
   }
 }
 
+/**
+ * Volledige leverScores-fixture voor tests die naast schulden/cashflow (via
+ * pillar-scores) ook een écht belasting-oordeel nodig hebben.
+ *
+ * Sinds "restpunt B2" (release-review 31 aug, hefbomen-nav.tsx:232) heeft de
+ * belasting-tegel GEEN proxy-fallback meer op `health.total` — zonder een
+ * echte pijler (pillarKey=null) en zonder leverScores is haar status altijd
+ * 'neutral'. Een niet-neutraal belasting-verdict in een test vereist dus
+ * leverScores — en die prop overschrijft (bewust) de status van ALLE VIER
+ * tegels tegelijk, niet alleen belasting. `debts`/`cashflow` staan hier op de
+ * statussen die de oude health.pillars-fixture (debt_ratio 60 → warn,
+ * savings_rate 30 → bad) al gaf, zodat de bestaande assertions op die twee
+ * tegels ongewijzigd blijven kloppen.
+ */
+function mockLeverScores(overrides: Partial<LeverScores> = {}): LeverScores {
+  const neutral = { score: null, status: 'neutral' as const, detail: '' }
+  return {
+    assets: neutral,
+    debts: { score: 60, status: 'amber', detail: '' },
+    cashflow: { score: 30, status: 'red', detail: '' },
+    tax: { score: 90, status: 'green', detail: '' },
+    ...overrides,
+  }
+}
+
 describe('HefbomenNav', () => {
   it('rendert 4 hefbomen-tegels', () => {
     render(<HefbomenNav health={mockHealth()} />)
@@ -126,12 +151,18 @@ describe('HefbomenNav', () => {
   })
 
   it('belasting-oordeel volgt de status i.p.v. één vaste waarschuwing (UR2-04)', () => {
-    // v2 (ADR 0010): belasting heeft pillarKey=null → zonder leverScores valt de
-    // tegel terug op health.total als proxy. Tot UR2-04 gaf HEFBOOM_VERDICT voor
-    // good/warn/bad dezelfde alarmerende zin, waardoor een GROENE belasting-
-    // hefboom op /overzicht "Mogelijk betaal je meer dan nodig" droeg terwijl
-    // het kompas ernaast "Goed op koers" zei.
-    render(<HefbomenNav health={mockHealth({ total: 85 })} />)
+    // v2 (ADR 0010): belasting heeft pillarKey=null en (sinds restpunt B2) ook
+    // geen health.total-proxy meer — een niet-neutraal belasting-oordeel komt
+    // dus uit leverScores. Tot UR2-04 gaf HEFBOOM_VERDICT voor good/warn/bad
+    // dezelfde alarmerende zin, waardoor een GROENE belasting-hefboom op
+    // /overzicht "Mogelijk betaal je meer dan nodig" droeg terwijl het kompas
+    // ernaast "Goed op koers" zei.
+    render(
+      <HefbomenNav
+        health={mockHealth()}
+        leverScores={mockLeverScores({ tax: { score: 90, status: 'green', detail: '' } })}
+      />,
+    )
     expect(screen.getByText('Belastingdruk beperkt')).toBeTruthy()
     expect(screen.queryByText('Mogelijk betaal je meer dan nodig')).toBeNull()
     // Het oude jargon mag nergens meer opduiken op de tegel.
@@ -139,9 +170,24 @@ describe('HefbomenNav', () => {
   })
 
   it('belasting-tegel houdt de BEL-3-hedge bij een warn-status', () => {
-    // total 55 → pillarStatus → 'warn' (proxy-tak, geen leverScores).
-    render(<HefbomenNav health={mockHealth({ total: 55 })} />)
+    render(
+      <HefbomenNav
+        health={mockHealth()}
+        leverScores={mockLeverScores({ tax: { score: 55, status: 'amber', detail: '' } })}
+      />,
+    )
     expect(screen.getByText('Mogelijk betaal je meer dan nodig')).toBeTruthy()
+  })
+
+  it('restpunt B2 — belasting-tegel valt NIET meer terug op health.total als proxy (geen leverScores)', () => {
+    // health.total is hoog (85) maar draagt geen Box 3-specifiek signaal.
+    // Zonder leverScores en zonder eigen pillar (pillarKey=null) moet de
+    // status 'neutral' blijven i.p.v. een geleend oordeel van een algemene
+    // gezondheidsproxy (components/overview/overzicht-hero/hefbomen-nav.tsx:232).
+    render(<HefbomenNav health={mockHealth({ total: 85 })} />)
+    expect(screen.queryByText('Belastingdruk beperkt')).toBeNull()
+    expect(screen.queryByText('Mogelijk betaal je meer dan nodig')).toBeNull()
+    expect(screen.queryByText('Hoge belastingdruk')).toBeNull()
   })
 
   it('rendert geen status-substext bij ontbrekende health (neutral)', () => {
@@ -526,7 +572,12 @@ describe('HefbomenNav — eenvoudige weergave (S1: oordeel primair)', () => {
   const housingSplit = { eigenHuisValue: 50_000, mortgageBalance: 20_000 }
 
   it('toont het oordeel in gewone taal op elke tegel', () => {
-    render(<HefbomenNav health={mockHealth()} totals={totals} simple />)
+    // Belasting heeft sinds restpunt B2 alleen via leverScores een niet-neutraal
+    // oordeel (geen health.total-proxy meer); die prop draagt hier ook de
+    // schulden/cashflow-statussen die de oude pillar-fixture al gaf.
+    render(
+      <HefbomenNav health={mockHealth()} totals={totals} leverScores={mockLeverScores()} simple />,
+    )
     expect(screen.getByText('Belastingdruk beperkt')).toBeTruthy()
     expect(screen.getByText('Schuldenlast vraagt aandacht')).toBeTruthy()
     expect(screen.getByText('Tekort op rekening')).toBeTruthy()
@@ -577,7 +628,12 @@ describe('HefbomenNav — eenvoudige weergave (S1: oordeel primair)', () => {
     window.localStorage.setItem(PRIVACY_MASKED_STORAGE_KEY, 'true')
     const { container } = render(
       <PrivacyProvider>
-        <HefbomenNav health={mockHealth()} totals={totals} simple />
+        <HefbomenNav
+          health={mockHealth()}
+          totals={totals}
+          leverScores={mockLeverScores()}
+          simple
+        />
       </PrivacyProvider>,
     )
     expect(container.textContent).toContain(MASKED_AMOUNT_PLACEHOLDER)
@@ -598,7 +654,12 @@ describe('HefbomenNav — eenvoudige weergave (S1: oordeel primair)', () => {
 
   it('laat de volledige weergave ongemoeid (oordeel + excl.-regel + chevron blijven)', () => {
     render(
-      <HefbomenNav health={mockHealth()} totals={totals} housingSplit={housingSplit} />,
+      <HefbomenNav
+        health={mockHealth()}
+        totals={totals}
+        housingSplit={housingSplit}
+        leverScores={mockLeverScores()}
+      />,
     )
     expect(screen.getByText('Belastingdruk beperkt')).toBeTruthy()
     expect(screen.getAllByText(/excl\. eigen woning/i).length).toBe(2)

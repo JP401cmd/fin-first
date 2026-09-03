@@ -7,12 +7,31 @@ import { useScrollLock } from '@/lib/hooks/use-scroll-lock'
 import { useFocusTrap } from '@/lib/hooks/use-focus-trap'
 import { useSwipeToDismiss, SPRING_CURVE } from '@/lib/hooks/use-swipe-to-dismiss'
 import { acquireOverlay } from '@/lib/overlay-signal'
-import { pushOverlayHistory } from '@/lib/overlay-history'
+import { pushOverlayHistory, type OverlayCloseResult } from '@/lib/overlay-history'
 import { scrimColor } from '@/lib/overlay-scrim'
 
 type BottomSheetProps = {
   open: boolean
   onClose: () => void
+  /**
+   * SLUIT-POORT voor de programmatische sluitroutes (X-knop, Escape,
+   * backdrop-klik, terug-knop): "mag ik sluiten?". Geef `false` terug — of een
+   * Promise die op `false` uitkomt — en de sheet blijft staan: geen
+   * exit-animatie, geen `onClose()`. Bedoeld voor een consumer met een eigen
+   * bevestiging (bewerk-paneel met dirty-check), die in deze callback zijn
+   * confirm-UI opent en pas ná de keuze van de gebruiker echt sluit.
+   *
+   * Waarom een aparte prop en niet gewoon `onClose`: `handleProgrammaticClose`
+   * startte `animateExit()` ALTIJD, náást `onClose()`. Een consumer die in zijn
+   * `onClose` alleen een waarschuwing toonde (in plaats van te sluiten) zag die
+   * waarschuwing binnen ~250-300ms mét de sheet verdwijnen — de vangrail vuurde
+   * dus wel, maar was onzichtbaar (UAT WF-BUDGET-10).
+   *
+   * Weglaten = ongewijzigd gedrag: zonder poort sluit elke route meteen, precies
+   * zoals voorheen. Het SWIPE-gebaar loopt bewust NIET langs de poort — dat is
+   * een expliciet, fysiek dismiss-gebaar met zijn eigen animatie-boekhouding.
+   */
+  onRequestClose?: () => boolean | Promise<boolean>
   title?: string
   children: ReactNode
   /** Desktop max-width: 'sm' (448px) | 'md' (512px, default) | 'lg' (640px) | 'xl' (768px) | 'full' (1024px) */
@@ -107,7 +126,7 @@ const sizeClasses = {
   full: 'md:max-w-5xl',
 } as const
 
-export function BottomSheet({ open, onClose, title, children, size = 'md', initialMobileHeight, footerSlot, actions, belowFloatingNav = false, closeOnBackdropClick = false, manageHistory = true, suspended = false }: BottomSheetProps) {
+export function BottomSheet({ open, onClose, onRequestClose, title, children, size = 'md', initialMobileHeight, footerSlot, actions, belowFloatingNav = false, closeOnBackdropClick = false, manageHistory = true, suspended = false }: BottomSheetProps) {
   const [visible, setVisible] = useState(false)
   const [expandedToFull, setExpandedToFull] = useState(false)
   const sheetRef = useRef<HTMLDivElement>(null)
@@ -126,6 +145,12 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
   // Zie `handleProgrammaticClose`: de suspend-guard moet op event-tijd gelden.
   const suspendedRef = useRef(suspended)
   suspendedRef.current = suspended
+  // Ook de sluit-poort leest op event-tijd: de consumer bepaalt zijn antwoord op
+  // basis van state die tussen twee renders veranderd kan zijn (dirty of niet).
+  const onRequestCloseRef = useRef(onRequestClose)
+  onRequestCloseRef.current = onRequestClose
+  /** Loopt er een asynchrone sluit-vraag? Voorkomt een tweede vraag per gebaar. */
+  const closeRequestPendingRef = useRef(false)
 
   // Reduced-motion preference
   const prefersReducedMotion = useRef(false)
@@ -229,7 +254,19 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
 
   // ── Programmatic close (X / Escape / backdrop click) ───────
 
-  const handleProgrammaticClose = useCallback(() => {
+  /** De echte sluiting: exit-animatie én de consumer op de hoogte stellen. */
+  const voerSluitingUit = useCallback(() => {
+    animateExit()
+    onCloseRef.current()
+  }, [animateExit])
+
+  /**
+   * Geeft `false` terug wanneer de sheet NIET sluit — de sluit-poort weigerde,
+   * of hij denkt er nog over na. `pushOverlayHistory` leest die waarde en geeft
+   * de history-entry dan terug, zodat een open sheet nooit zonder entry
+   * achterblijft (de volgende terug-druk zou anders de pagina verlaten).
+   */
+  const handleProgrammaticClose = useCallback((): OverlayCloseResult => {
     // Een teruggetreden sheet sluit NOOIT zichzelf: het venster erbovenop
     // bezit de interactie. De guard leest een ref, zodat hij geldt op het
     // moment van de gebeurtenis en niet op het moment dat de listener werd
@@ -238,9 +275,42 @@ export function BottomSheet({ open, onClose, title, children, size = 'md', initi
     // gebruiker alleen het bovenste venster wilde verlaten.
     if (suspendedRef.current) return
     if (phaseRef.current === 'closing') return
-    animateExit()
-    onCloseRef.current()
-  }, [animateExit])
+
+    const magIkSluiten = onRequestCloseRef.current
+    // Zonder poort: exact het oude pad — meteen sluiten.
+    if (!magIkSluiten) {
+      voerSluitingUit()
+      return
+    }
+    // Er loopt al een vraag; een tweede klik mag 'm niet opnieuw stellen.
+    if (closeRequestPendingRef.current) return false
+
+    const antwoord = magIkSluiten()
+    if (antwoord === true) {
+      voerSluitingUit()
+      return
+    }
+    if (antwoord === false) return false
+
+    // Asynchrone poort: niets doen tot het antwoord binnen is. De sheet blijft
+    // ondertussen gewoon staan — de consumer toont zijn eigen bevestiging.
+    closeRequestPendingRef.current = true
+    Promise.resolve(antwoord).then(
+      (toegestaan) => {
+        closeRequestPendingRef.current = false
+        if (!toegestaan) return
+        // De wereld kan tijdens het wachten veranderd zijn: dezelfde guards.
+        if (suspendedRef.current || phaseRef.current === 'closing') return
+        voerSluitingUit()
+      },
+      () => {
+        // Een afgewezen belofte lezen we als "niet sluiten": bij een poort die
+        // dataverlies moet voorkomen is openblijven de veilige uitkomst.
+        closeRequestPendingRef.current = false
+      },
+    )
+    return false
+  }, [voerSluitingUit])
 
   // Via een ref, zodat het history-effect alleen op `open` hangt: zou het op de
   // callback-identiteit hangen, dan pushte elke re-render een nieuwe entry.

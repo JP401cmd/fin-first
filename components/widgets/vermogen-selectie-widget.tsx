@@ -32,7 +32,7 @@ import { memo, useMemo, useState } from 'react'
 import { Pencil, Wallet } from 'lucide-react'
 import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
-import { MaskedAmount } from '@/components/app/masked-amount'
+import { MaskedAmount, MaskedPercent, MaskedDirection, useDirectionClass } from '@/components/app/masked-amount'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import {
   formatMaskedCurrency,
@@ -117,6 +117,10 @@ export const VermogenSelectieWidget = memo(function VermogenSelectieWidget({
     if (!str) return null
     return ft.isDeficit ? `${str} vrijheid terug te kopen` : `${str} vrijheid`
   }, [selection, data.dailyExpenseRate])
+
+  // Zelfde richting-lek als in de netto-vermogen-tegel: bij maskering wordt de
+  // kleur neutraal (WF-NAV-11). Hook vóór de size-specifieke early returns.
+  const deltaClass = useDirectionClass((delta?.diff ?? 0) >= 0)
 
   const countLabel = selection
     ? `${selection.count.assets} ${selection.count.assets === 1 ? 'bezitting' : 'bezittingen'} · ${selection.count.debts} ${selection.count.debts === 1 ? 'schuld' : 'schulden'}`
@@ -216,12 +220,9 @@ export const VermogenSelectieWidget = memo(function VermogenSelectieWidget({
           <p className="flex items-baseline gap-1.5 truncate leading-none text-[var(--ink)]">
             <MaskedAmount value={selection.total} tone="kern" className="text-[15px] font-semibold" />
             {delta && (
-              <span
-                className={`font-mono text-[10px] tabular-nums ${delta.diff >= 0 ? 'text-positive' : 'text-negative'}`}
-              >
-                <span aria-hidden="true">{delta.diff >= 0 ? '▲' : '▼'}</span>
-                {delta.diff >= 0 ? '+' : ''}
-                {delta.pct.toFixed(0)}%
+              <span className={`font-mono text-[10px] tabular-nums ${deltaClass}`}>
+                <MaskedDirection isPositive={delta.diff >= 0} />
+                <MaskedPercent value={delta.pct} decimals={0} tone="kern" />
               </span>
             )}
           </p>
@@ -400,7 +401,7 @@ export const VermogenSelectieWidget = memo(function VermogenSelectieWidget({
                 <MaskedAmount value={selection.total} tone="kern" className="text-2xl font-semibold" />
               </p>
               {delta && (
-                <span className={delta.diff >= 0 ? 'text-positive' : 'text-negative'}>
+                <span className={deltaClass}>
                   <MaskedAmount
                     value={delta.diff}
                     signPrefix={delta.diff >= 0 ? '+' : ''}

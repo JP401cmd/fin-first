@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import type { NibudBenchmark } from '@/lib/nibud/types'
 import { BarChart3, ArrowRight, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { MaskedAmount } from '@/components/app/masked-amount'
 
 type BenchmarkResponse = {
   household_type: string
@@ -142,7 +143,7 @@ function MiniBar({ benchmark: b }: { benchmark: NibudBenchmark }) {
         <div className="absolute top-0 h-full w-0.5 bg-zinc-400" style={{ left: `${Math.min(refPct, 100)}%` }} />
       </div>
       <span className="w-14 shrink-0 text-right text-[10px] font-medium text-[var(--ink-3)]">
-        +&euro;{Math.abs(Math.round(b.delta))}
+        <MaskedAmount value={Math.abs(Math.round(b.delta))} tone="wil" signPrefix="+" />
       </span>
     </div>
   )
@@ -286,7 +287,12 @@ function DetailRow({
         <div className="flex items-center gap-3">
           {b.delta !== 0 && (
             <span className={`text-xs font-semibold ${textColor}`}>
-              {b.delta > 0 ? '+' : ''}&euro;{Math.abs(Math.round(b.delta))}/mnd
+              <MaskedAmount
+                value={Math.abs(Math.round(b.delta))}
+                tone="wil"
+                signPrefix={b.delta > 0 ? '+' : ''}
+                monoWhenVisible={false}
+              />/mnd
             </span>
           )}
           {b.freedom_days_potential > 0 && (
@@ -310,8 +316,8 @@ function DetailRow({
           />
         </div>
         <div className="flex justify-between text-[10px] text-[var(--ink-3)]">
-          <span>Budget: &euro;{Math.round(b.user_spending)}/mnd</span>
-          <span>NIBUD: &euro;{Math.round(referenceAmount)}/mnd</span>
+          <span>Budget: <MaskedAmount value={Math.round(b.user_spending)} tone="wil" monoWhenVisible={false} />/mnd</span>
+          <span>NIBUD: <MaskedAmount value={Math.round(referenceAmount)} tone="wil" monoWhenVisible={false} />/mnd</span>
         </div>
       </div>
 

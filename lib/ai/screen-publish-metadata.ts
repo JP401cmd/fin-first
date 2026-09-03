@@ -26,9 +26,24 @@ export interface ScreenPublishInput {
   assumptions?: string[]
 }
 
+/**
+ * Waaróm een `ok: false` viel — de route vertaalt dit naar een eerlijke
+ * gebruikersboodschap:
+ *  - `content`: de tekst zelf is afgekeurd (het LLM-oordeel);
+ *  - `unavailable`: de screening kon niet draaien (fail-closed). Over de
+ *    inhoud is dan níets gezegd — "niet geschikt om publiek te delen" zou een
+ *    onterecht verwijt zijn (UAT WF-REKEN-04-bug2). Zonder discriminator kon
+ *    de route de twee alleen op de issue-tekst uit elkaar houden.
+ */
+export type ScreenPublishRejectReason = 'content' | 'unavailable'
+
 export type ScreenPublishResult =
   | { ok: true }
-  | { ok: false; issue: string; suggestion?: string }
+  | { ok: false; reason: ScreenPublishRejectReason; issue: string; suggestion?: string }
+
+/** Fail-closed-melding wanneer de screening zelf niet kon draaien. */
+export const SCREEN_UNAVAILABLE_ISSUE =
+  'De publicatie-controle kon niet automatisch worden uitgevoerd. Probeer het later opnieuw.'
 
 const ScreenResultSchema = z.object({
   ok: z
@@ -118,6 +133,7 @@ export async function screenPublishMetadata(
     }
     return {
       ok: false,
+      reason: 'content',
       issue: object.issue ?? 'Onbekend probleem in naam/beschrijving.',
       suggestion: object.suggestion,
     }
@@ -127,8 +143,8 @@ export async function screenPublishMetadata(
     console.error('[screen-publish-metadata] LLM-call mislukt — fail-closed:', err)
     return {
       ok: false,
-      issue:
-        'De publicatie-controle kon niet automatisch worden uitgevoerd. Probeer het later opnieuw.',
+      reason: 'unavailable',
+      issue: SCREEN_UNAVAILABLE_ISSUE,
     }
   }
 }

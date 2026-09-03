@@ -69,11 +69,11 @@ const criteria: AcceptanceCriterion[] = [
     when:
       'De beheerder opent /beheer, bekijkt de vier groepen (Technisch beheer / Functioneel beheer / Test & ontwikkeling / Ter info), klikt een tegel en keert via de kop "Beheer" terug; een niet-admin probeert /beheer/gebruikers en /beheer/kpi rechtstreeks.',
     then:
-      'De hub toont vier secties met tegels (label/icoon/omschrijving) uit lib/beheer-sections.ts; elke tegel opent de juiste beheerpagina met dezelfde groepsnav; de niet-admin belandt zonder foutmelding op /overzicht.',
+      'De hub toont vier secties met tegels (label/icoon/omschrijving) uit lib/beheer-sections.ts; elke tegel opent de juiste beheerpagina met dezelfde groepsnav; de niet-admin belandt zonder foutmelding op /overzicht. De drie inbak-tegels (Foutmeldingen, Rekenhulp-meldingen, Feedback) dragen een teller met de open werkvoorraad zodra die groter dan 0 is — het getal op Foutmeldingen is gelijk aan "open foutsoorten" op /beheer/errors; is een bron onbereikbaar, dan ontbreekt de teller (geen nep-nul).',
     assertion: {
       kind: 'ui-only',
       source:
-        'app/(app)/beheer/layout.tsx (superadmin-redirect) + lib/beheer-sections.ts (BEHEER_GROUPS) — navigatie/toegangscontrole, geen cijfermatige uitkomst',
+        'app/(app)/beheer/layout.tsx (superadmin-redirect) + lib/beheer-sections.ts (BEHEER_GROUPS, inboxKey) + lib/beheer-inbox-counts.ts (tellers, null = ontbreekt) — navigatie/toegangscontrole; de teller op Foutmeldingen consumeert hetzelfde leesvenster als /beheer/errors (lib/error-groups-loader.ts)',
     },
   },
   {
@@ -284,11 +284,11 @@ const criteria: AcceptanceCriterion[] = [
     when:
       'De beheerder voegt cohortrijen toe / bewerkt / verwijdert (geboortedatum-grenzen, AOW-jaren/-maanden, definitief-vinkje, bron).',
     then:
-      'De getoonde/geserveerde AOW-leeftijd per cohort ("67 jaar + 3 mnd") moet gelijk zijn aan de aow_leeftijden-rijen én toetsbaar tegen de officiële SVB-tabel; deze tabel voedt lookupAowAge → de horizon-kernel (AOW-instroommoment) en pensioenanalyses — een A=B-consistentietoets tussen tabel, weergave en kernel-consumptie (de lookupAowAge-functie zelf is exact gedekt in WF-RAPP-09).',
+      'De getoonde/geserveerde AOW-leeftijd per cohort ("67 jaar + 3 mnd") moet gelijk zijn aan de aow_leeftijden-rijen én toetsbaar tegen de officiële SVB-tabel; deze tabel voedt lookupAowAge → de horizon-kernel (AOW-instroommoment) en pensioenanalyses — een A=B-consistentietoets tussen tabel, weergave en kernel-consumptie (de lookupAowAge-functie zelf is exact gedekt in WF-RAPP-09). Alle schrijfroutes (POST/PUT/DELETE) gaan achter een dubbele poort: `gateSuperAdmin()` (401 niet-ingelogd, 403 geen superadmin) en pas dan de mutatie via `getServiceClient()` (RLS-bypass — de tabel heeft bewust alléén een SELECT-policy voor authenticated, dus de sessie-client kan zelf niets schrijven). Twee overlappende cohorten zouden `lookupAowAge` afhankelijk maken van sorteervolgorde: POST en PUT weigeren daarom een geboortedatumbereik dat een ander bestaand cohort overlapt met 409 (`code: "overlap"`, PUT sluit de eigen rij uit); elke mutatie wordt gelogd via `logAdminAction`.',
     assertion: {
       kind: 'consistency',
       source:
-        'app/(app)/beheer/aow-leeftijd/page.tsx (formatAowAge) + lib/aow-leeftijd.ts#lookupAowAge; API /api/admin/aow-leeftijd — weergave/serving = tabelrijen = SVB-bron (A=B), consistentietoets',
+        'app/(app)/beheer/aow-leeftijd/page.tsx (formatAowAge) + lib/aow-leeftijd.ts#lookupAowAge; app/api/admin/aow-leeftijd/route.ts (GET/POST/PUT/DELETE — superadmin-gate + getServiceClient + findOverlap/409 + logAdminAction) — weergave/serving = tabelrijen = SVB-bron (A=B), consistentietoets',
     },
   },
   {

@@ -41,6 +41,7 @@ import { computeBox1Tax } from '@/lib/box1-tax'
 import { computeJaarruimte, jaarruimteBesparing, type JaarruimteResult } from '@/lib/jaarruimte'
 import { DEFAULT_RETURN } from '@/lib/constants'
 import type { TaxYear } from '@/lib/box3-data'
+import type { FreedomRateSource } from '@/lib/format'
 import {
   generateBox3Strategies,
   DEFAULT_GOAL_ID,
@@ -105,6 +106,12 @@ export interface FiscaleKansen {
   box3PerspectiveTax: number | null
   /** Canonieke dag-uitgaven bij deze grondslag (€→vrijheidstijd). */
   dailyExpenses: number
+  /**
+   * Herkomst van dat tarief (uit `HorizonRawData.dailyExpenseRateDetail`), voor
+   * de voetnoot onder de vrijheidsdagen. Voorheen hardcodede de hub
+   * 'transactions' (1b, nazorg R2+R3). Optioneel voor bestaande fixtures.
+   */
+  dailyExpensesSource?: FreedomRateSource
   /**
    * Het verwachte bruto beleggingsrendement waarmee de scenario's hierboven
    * ZIJN doorgerekend (fractie, bv. 0.055). Komt uit `resolveFireParams` via
@@ -395,6 +402,7 @@ async function loadFiscaleKansenInner(
     box3PerspectiveTax:
       perspective === 'household' ? box3.combined?.tax ?? null : box3.personal.tax,
     dailyExpenses: canonicalDaily,
+    dailyExpensesSource: horizonData.dailyExpenseRateDetail.source,
     expectedReturn,
     expectedReturnIsPersonal,
     grossYearly,

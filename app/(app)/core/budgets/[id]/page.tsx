@@ -3,13 +3,21 @@
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
+import { budgetDetailUrl } from '@/lib/navigation'
 
+/**
+ * Legacy-deeplink `/core/budgets/<id>` → het detailpaneel op de canonieke
+ * budgetpagina. Bewust in één hop naar `budgetDetailUrl(id)`: de tussenstap via
+ * `/core/budgets?budget=<id>` liep tegen de statische redirect in
+ * `next.config.ts` aan en landde op de cashflow-hub — één niveau te hoog, zonder
+ * paneel en met een dode `?budget=`-param (UAT WF-BUDGET-23).
+ */
 export default function BudgetDetailRedirect() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
 
   useEffect(() => {
-    router.replace(`/core/budgets?budget=${id}`)
+    router.replace(budgetDetailUrl(id))
   }, [id, router])
 
   return (

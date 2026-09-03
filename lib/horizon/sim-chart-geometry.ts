@@ -300,6 +300,27 @@ export function simRowsToChartPoints(
   return pts
 }
 
+/**
+ * Bundel-variant voor de dashboard-widgets (`DashboardData.simRows`, waar
+ * `startPortfolio` OPTIONEEL is: hand-gebouwde mock-/fixture-bundels dragen
+ * hem niet, de loader vult hem altijd). Zelfde conventie, zelfde functie —
+ * alleen de seed valt bij een ontbrekende startstand terug op de eerste
+ * eindstand, zodat een fixture zonder seed nog steeds op de canonieke as
+ * (`age + 1`) tekent i.p.v. terug te vallen op een eigen `[age, endPortfolio]`-
+ * plot (nazorg R2+R3, D: levensgebeurtenissen-/mijlpalen-/vermogenspad-/
+ * fire-prognose-widget deden dat elk apart).
+ */
+export function widgetSimRowsToChartPoints(
+  rows: readonly { age: number; startPortfolio?: number; endPortfolio: number }[],
+): [number, number][] {
+  if (rows.length === 0) return []
+  const first = rows[0]
+  return simRowsToChartPoints([
+    { age: first.age, startPortfolio: first.startPortfolio ?? first.endPortfolio, endPortfolio: first.endPortfolio },
+    ...rows.slice(1).map(r => ({ age: r.age, startPortfolio: r.startPortfolio ?? r.endPortfolio, endPortfolio: r.endPortfolio })),
+  ])
+}
+
 export function buildSimChartGeometry(input: SimChartGeometryInput): SimChartGeometry {
   const {
     rows,

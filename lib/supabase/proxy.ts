@@ -25,7 +25,36 @@ export const CRON_PUBLIC_PATHS: readonly string[] = [
   '/api/cron/alerts-sweep',
 ]
 
+/**
+ * Dev-harness-routes die in `next dev` uitgelogd bereikbaar moeten zijn (ze
+ * staan daarom óók in `publicPaths`), maar buiten dev niet mogen BESTAAN.
+ * Twee lagen, conform de security-checklist "Prod surface": deze proxy-404
+ * vóór de handler, plus de route-eigen `NODE_ENV`-guard. Eén laag was de
+ * S4-les; tot de sweep van 3 sep 2026 had `/api/schema-check` er zelfs nul
+ * en onthulde het ongeauthenticeerd welke tabellen/kolommen bestaan.
+ */
+export const DEV_ONLY_PATHS: readonly string[] = [
+  '/api/schema-check',
+  '/api/dev-login',
+  '/api/session-info',
+]
+
+/** Waar: dit pad bestaat buiten `next dev` niet — de proxy antwoordt 404. */
+export function isDevOnlyPathBlocked(
+  pathname: string,
+  nodeEnv: string | undefined = process.env.NODE_ENV,
+): boolean {
+  return DEV_ONLY_PATHS.includes(pathname) && nodeEnv !== 'development'
+}
+
 export async function updateSession(request: NextRequest) {
+  // Dev-harness buiten `next dev`: 404 vóór er een Supabase-client of sessie
+  // aan te pas komt (zie DEV_ONLY_PATHS). Bewust een kale 404, geen envelope:
+  // niets verraadt dat het pad in een andere omgeving wél bestaat.
+  if (isDevOnlyPathBlocked(request.nextUrl.pathname)) {
+    return new NextResponse(null, { status: 404 })
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   })
@@ -72,6 +101,8 @@ export async function updateSession(request: NextRequest) {
     '/reset-password',
     // --- Publieke API's / infra ---
     '/api/health',
+    // Dev-harness (DEV_ONLY_PATHS hierboven): uitgelogd bereikbaar in `next dev`,
+    // buiten dev al bovenaan updateSession ge-404't én door de route zelf.
     '/api/schema-check',
     '/api/dev-login',
     '/api/session-info',
@@ -121,7 +152,8 @@ export async function updateSession(request: NextRequest) {
   // runtime prod-404-check hier is daarmee overbodig: de routes bestaan niet
   // meer, dus Next geeft zelf 404. Voeg zulke routes nooit opnieuw toe onder
   // `app/` — het in-app regressieframework (lib/regression-tests) test tegen
-  // echte productie-routes.
+  // echte productie-routes. De drie overgebleven dev-harness-routes staan in
+  // DEV_ONLY_PATHS en krijgen bovenaan updateSession een 404 buiten `next dev`.
 
   const isPublicPath =
     publicPaths.includes(pathname) || pathname.startsWith('/auth/')

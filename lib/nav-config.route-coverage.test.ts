@@ -89,6 +89,14 @@ const LEGACY_BACKING_ROUTES: readonly string[] = [
   '/core/cash/import',
   '/core/checkin',
   '/core/checkin/historie',
+  // `/mijn/checkins` is een letterlijke re-export van
+  // `/core/checkin/historie` hierboven, en dat component registreert zelf
+  // `<NavStackMeta title="Check-in historie" />`. Hij hoort dus in deze lijst
+  // om dezelfde reden als zijn bron: de titel komt client-side van de pagina,
+  // niet uit de nav-config-kaart. Een entry in EXTRA_ROUTE_TITLES zou dode
+  // configuratie zijn — een expliciete paginatitel wint van de fallback, dus
+  // die tekst zou nooit gelezen worden (WF-NAV-05).
+  '/mijn/checkins',
   '/core/debts',
   // Legacy /horizon/** — canonieke equivalenten leven onder /toekomst/**
   '/horizon',

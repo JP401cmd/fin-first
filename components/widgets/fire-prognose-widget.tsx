@@ -13,6 +13,7 @@ import { RETURN_BASIS_LABELS } from '@/lib/asset-return'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { buildFactorByAge, deflateRowsByAge } from '@/lib/euro-display'
+import { widgetSimRowsToChartPoints } from '@/lib/horizon/sim-chart-geometry'
 
 interface Props {
   size: WidgetSize
@@ -276,21 +277,27 @@ export const FirePrognoseWidget = memo(function FirePrognoseWidget({ size, data,
       {/* Mini vermogenspad for full-size — per-user simulation path only */}
       {size === 'full' && !isShared && viewSimRows && viewSimRows.length > 1 && (() => {
         const rows = viewSimRows
-        const accRows = rows.filter(r => r.phase === 'accumulation')
-        if (accRows.length < 2) return null
+        // Tijdstip-conventie (lib/horizon/sim-chart-geometry.ts): seed op de
+        // startleeftijd + de eindstand van rij `age` op `age + 1`; de opbouw-
+        // fase is de eerste nAcc+1 punten van die gedeelde reeks. De eigen
+        // `[r.age, r.endPortfolio]`-plot zette de lijn een jaar naar links
+        // t.o.v. SimChart (D, nazorg R2+R3).
+        const nAcc = rows.filter(r => r.phase === 'accumulation').length
+        const accPts = widgetSimRowsToChartPoints(rows).slice(0, nAcc + 1)
+        if (accPts.length < 2) return null
         const W = 240
         const H = 48 // compact: max 80px when rendered
         const pad = 4
-        const maxVal = Math.max(...accRows.map(r => r.endPortfolio), 1)
-        const minAge = accRows[0].age
-        const maxAge = accRows[accRows.length - 1].age
+        const maxVal = Math.max(...accPts.map(([, v]) => v), 1)
+        const minAge = accPts[0][0]
+        const maxAge = accPts[accPts.length - 1][0]
         const ageSpan = maxAge - minAge || 1
         const toX = (age: number) => pad + ((age - minAge) / ageSpan) * (W - pad * 2)
         const toY = (val: number) => H - pad - (Math.max(val, 0) / maxVal) * (H - pad * 2)
-        const pathD = accRows.map((r, i) => `${i === 0 ? 'M' : 'L'}${toX(r.age).toFixed(1)},${toY(r.endPortfolio).toFixed(1)}`).join(' ')
+        const pathD = accPts.map(([a, v], i) => `${i === 0 ? 'M' : 'L'}${toX(a).toFixed(1)},${toY(v).toFixed(1)}`).join(' ')
         const areaD = pathD + ` L${toX(maxAge).toFixed(1)},${(H - pad).toFixed(1)} L${toX(minAge).toFixed(1)},${(H - pad).toFixed(1)} Z`
         const fireX = fireAgeFractional != null ? toX(fireAgeFractional) : null
-        const fireY = fireAgeFractional != null ? toY(accRows.at(-1)?.endPortfolio ?? 0) : null
+        const fireY = fireAgeFractional != null ? toY(accPts[accPts.length - 1][1]) : null
 
         return (
           <div className="mt-4">

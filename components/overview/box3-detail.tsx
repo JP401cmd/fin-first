@@ -388,7 +388,10 @@ export function Box3Detail({
             >
               per jaar
             </span>
-            {result.freedomDays > 0 && (
+            {/* Onder maskering ook de vrijheidsdagen weg: dagen × (het elders
+                zichtbare) tarief = de gemaskeerde heffing (ADR 0091 laag 4,
+                M22-restpunt). Zelfde gate als de voetnoot eronder. */}
+            {!masked && result.freedomDays > 0 && (
               <span className="inline-flex items-center gap-1 font-mono text-[11px] tabular-nums text-[var(--ink-3)]">
                 <Clock className="h-3 w-3" aria-hidden="true" />
                 {result.freedomDays} vrijheidsdagen

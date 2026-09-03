@@ -33,7 +33,9 @@ import {
 import { computeHealthScoreFromInputs, type HealthScore, type HealthScoreInput } from '@/lib/financial-health'
 import { computeEffectiveExpenses, computeFireTarget, computeFreedomProgressWithBasis, inclHomeTargetFromScalar } from '@/lib/core-metrics'
 import { computeEmergencyFundMonths } from '@/lib/health-score-input'
-import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND, STARTERSVRIJSTELLING_MAX } from '@/lib/constants'
+import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND, SAVINGS_RATE_WINDOW_MONTHS, STARTERSVRIJSTELLING_MAX } from '@/lib/constants'
+import { savingsRateWindow } from '@/lib/savings-source'
+import { isTransferType } from '@/lib/transactions/transfer-marking'
 import { computeKostenKoper } from '@/lib/kosten-koper'
 import { lookupAowAge, type AowLeeftijdRow, type AowAge } from '@/lib/aow-leeftijd'
 import { shouldSkipKernelContextFetch, keepRefIfEqual } from '@/lib/horizon/kernel-context-sync'
@@ -838,6 +840,19 @@ export default function HorizonPage({
     candidates: { autoShared: number; sumPartners: number; custom: number | null }
     method: HouseholdRetirementMethod
   } | null>(null)
+  // Klik op de "Na pensioen"-KPI (desktop + mobiel delen deze ene handler).
+  // De huishoud-variant bestaat alleen als `householdRetireInfo` gevuld is — dat
+  // gebeurt uitsluitend wanneer buildHouseholdProjectionInput() hasHousehold=true
+  // teruggeeft (>= 2 geaccepteerde leden). De perspectief-switcher biedt
+  // 'Huishouden' al eerder aan (app/api/perspective/route.ts: profielveld
+  // 'samen'/'gezin' óf >= 1 lid), dus `isHouseholdView` alleen is geen bewijs
+  // dat de pane kán renderen: bij die kloof opende de klik voorheen niets
+  // (WF-REKEN-23-bug4). Zonder huishoud-info valt de klik terug op het eigen
+  // uitgavenpaneel, dat altijd gerenderd wordt.
+  const openRetirementExpensePane = useCallback(() => {
+    if (isHouseholdView && householdRetireInfo) setHouseholdRetireOpen(true)
+    else setUitgavenPaneOpen(true)
+  }, [isHouseholdView, householdRetireInfo])
   const [eventPaneOpen, setEventPaneOpen] = useState(false)
   const [eventPaneEditingId, setEventPaneEditingId] = useState<string | null>(null)
   const [eventPaneMode, setEventPaneMode] = useState<'catalog' | 'view' | 'edit'>('catalog')
@@ -1324,7 +1339,14 @@ export default function HorizonPage({
       const oneYearFromNow = new Date(Date.UTC(now.getFullYear() + 1, now.getMonth(), now.getDate())).toISOString().split('T')[0]
       const today = now.toISOString().split('T')[0]
       const twelveMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 11, 1)).toISOString().split('T')[0]
-      const sixMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 5, 1)).toISOString().split('T')[0]
+      // 6-maands venster uit de CANONIEKE bron (lib/savings-source.ts): zes
+      // VOLTOOIDE kalendermaanden, de lopende maand EXCLUSIEF — dezelfde grenzen
+      // als de SSR-loader (lib/horizon/raw-data-loader.ts) waar
+      // `initialData.avgIncome6m`/`avgExpenses6m` vandaan komen. Stond hier als
+      // `getMonth() - 5` t/m `monthEnd` (lopende maand INCLUSIEF, het pre-C6-
+      // patroon), waardoor de gezondheidsscore-ankers na een client-herlading
+      // (event-CRUD) konden verspringen t.o.v. de eerste render.
+      const window6m = savingsRateWindow(now)
 
       const [txResult, assetsResult, debtsResult, profileResult, essentialBudgetsResult, eventsResult, actionsResult, childBudgetsResult, fullDebtsResult, snapshotsResult, income12Result, earliestIncomeResult, tx6mResult, bankAccountsResult, cashflowSettings] = await Promise.all([
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
@@ -1354,8 +1376,9 @@ export default function HorizonPage({
         // (SSR-loader / API-route); een gecapt venster gaf een te recente datum →
         // afwijkend jaarbedrag (WF-TOEK-02-bug2).
         supabase.from('transactions').select('date').gt('amount', 0).order('date', { ascending: true }).limit(1),
-        // 6-month transactions for stable resilience calculation
-        supabase.from('transactions').select('amount').gte('date', sixMonthsAgo).lt('date', monthEnd),
+        // 6-month transactions for stable resilience calculation — canoniek
+        // venster; `transaction_type` erbij voor de transfer-filter (zoals SSR).
+        supabase.from('transactions').select('amount, transaction_type').gte('date', window6m.fromDate).lt('date', window6m.toDate),
         // `ownership` erbij: de SELECT-policy is huishoud-verbreed, dus een
         // gedeelde rekening komt hier ook binnen en telt op het eigen aandeel.
         supabase.from('bank_accounts').select('id, name, balance, ownership').eq('is_active', true).is('linked_asset_id', null),
@@ -1406,16 +1429,19 @@ export default function HorizonPage({
             : undefined,
         )
 
-      // 6-month average income/expenses for stable resilience calculation
+      // 6-month average income/expenses for stable resilience calculation —
+      // TRANSFER-EXCLUSIEF, zoals de SSR-loader (realOnly:true): eigen-rekening-
+      // overboekingen tellen nergens mee in de health-grondslag.
       let totalIncome6m = 0
       let totalExpenses6m = 0
       for (const tx of tx6mResult.data ?? []) {
+        if (isTransferType(tx.transaction_type)) continue
         const amt = Number(tx.amount)
         if (amt > 0) totalIncome6m += amt
         else totalExpenses6m += Math.abs(amt)
       }
-      const avgInc6 = totalIncome6m > 0 ? totalIncome6m / 6 : effectiveMonthlyIncome
-      const avgExp6 = totalExpenses6m > 0 ? totalExpenses6m / 6 : effectiveMonthlyExpenses
+      const avgInc6 = totalIncome6m > 0 ? totalIncome6m / SAVINGS_RATE_WINDOW_MONTHS : effectiveMonthlyIncome
+      const avgExp6 = totalExpenses6m > 0 ? totalExpenses6m / SAVINGS_RATE_WINDOW_MONTHS : effectiveMonthlyExpenses
       setAvgIncome6m(avgInc6)
       setAvgExpenses6m(avgExp6)
 
@@ -3061,9 +3087,13 @@ export default function HorizonPage({
     })
   }, [deficitLoanNotice, deficitNoticeVisible, canonicalDailyRate, masked, userAowAge.fractional, displayEndAge, isPensioenMode, homeExcludedFromProgress])
   const aowAgeIntForDepletion = Math.ceil(userAowAge.fractional)
-  const depletionAge = isAowStopActive && aowStopSimResult
-    ? aowStopSimResult.rows.find(r => r.age >= aowAgeIntForDepletion && r.endPortfolio <= 0)?.age ?? null
+  // Tijdstip-conventie: rij `age` is het leeftijdsJAAR; `endPortfolio <= 0`
+  // betekent "op aan het EIND van dat jaar" = op leeftijd `age + 1`. Het jaar
+  // zelf melden las de uitputting een jaar te vroeg (D, nazorg R2+R3).
+  const depletionRow = isAowStopActive && aowStopSimResult
+    ? aowStopSimResult.rows.find(r => r.age >= aowAgeIntForDepletion && r.endPortfolio <= 0) ?? null
     : null
+  const depletionAge = depletionRow ? depletionRow.age + 1 : null
 
   // ── Erfgenamen (heirs) derivation for End-of-Life analysis ───────────────
   const erfgenamen = useMemo(() => {
@@ -4670,6 +4700,38 @@ export default function HorizonPage({
     [scenarioPresets, displayUnifiedRows, euroView],
   )
 
+  // ── Huishoud-/partner-doel (5a, nazorg R2+R3) ─────────────────────────────
+  // `householdHero`/`partnerHero` dragen `fireTarget` als puntbedrag op hun
+  // FIRE-leeftijd, uitgedrukt op de leeftijd-as van de ingelogde gebruiker
+  // (dezelfde as als de hero-KPI's die `Math.round(fireAge)` tonen). De
+  // deflator hangt alleen af van het aantal jaren tot dat moment, dus dezelfde
+  // genormaliseerde lookup als het solo-doel (`fireAgeForDisplay`, KRUIS-27).
+  // Tot 3 sep 2026 gingen deze bedragen NOMINAAL de approx-naad in, onder
+  // hetzelfde "ca."-voorbehoud als het (wél gedeflateerde) solo-doel — één
+  // voorbehoud dat twee conventies verborg.
+  const viewHouseholdHeroFireTarget = useMemo(
+    () =>
+      householdHero == null
+        ? null
+        : deflate(
+            householdHero.fireTarget,
+            factorAtAge(displayUnifiedRows, fireAgeForDisplay(householdHero.fireAge)),
+            euroView,
+          ),
+    [householdHero, displayUnifiedRows, euroView],
+  )
+  const viewPartnerHeroFireTarget = useMemo(
+    () =>
+      partnerHero == null
+        ? null
+        : deflate(
+            partnerHero.fireTarget,
+            factorAtAge(displayUnifiedRows, fireAgeForDisplay(partnerHero.fireAge)),
+            euroView,
+          ),
+    [partnerHero, displayUnifiedRows, euroView],
+  )
+
   // ── EINDE EURO-WEERGAVE ────────────────────────────────────────────────────
 
   // De foutstaat-guard staat bewust ONDER het render-grensblok: alle hooks van
@@ -4690,6 +4752,33 @@ export default function HorizonPage({
   // Unified perspective hero: household or partner override
   const perspectiveHero = isHouseholdView ? householdHero : isPartnerView ? partnerHero : null
   const hasPerspectiveHero = perspectiveHero != null
+  // Het bijbehorende doelbedrag in de gekozen euro-weergave (omzetting in het
+  // render-grensblok hierboven; hier alleen de perspectief-keuze).
+  const viewPerspectiveHeroFireTarget = isHouseholdView
+    ? viewHouseholdHeroFireTarget
+    : isPartnerView
+      ? viewPartnerHeroFireTarget
+      : null
+
+  // ── Onderschrift bij het ENKELVOUDIGE doelbedrag (UR2-17) ─────────────────
+  // De dual-tak (showDualFireTarget) noemt zijn grondslag al bij naam ("met je
+  // huis" / "zonder je huis"); de single-tak — de standaardstrategie, en dus de
+  // meeste gebruikers — zei alleen "benodigd". Daardoor leest hetzelfde
+  // kerngetal op /toekomst en op /toekomst/doelen als een tegenspraak van
+  // honderdduizenden euro's, terwijl het twee bewuste grondslagen zijn.
+  // Consume-only: `homeExcludedFromProgress` is dezelfde vlag die
+  // `balkVrijheidDoel` hierboven al koos — hier wordt niets herbepaald.
+  // Geen kwalificatie waar ze niet klopt of niets betekent: in pensioen-modus is
+  // het getal een projectie (geen doel), onder 'nu stoppen' bestaat er geen
+  // doelbedrag (ADR 0127 D4) en bij een huishoud-/partnerweergave komt het
+  // bedrag uit een andere bron dan deze vlag.
+  const fireTargetCaption = isPensioenMode
+    ? 'geprojecteerd'
+    : hasPerspectiveHero || isNuStoppenMode
+      ? 'benodigd'
+      : homeExcludedFromProgress
+        ? 'benodigd — zonder je huis'
+        : 'benodigd — met je huis'
 
   // ── Reeds-vrij / met-pensioen framing voor de hero-leeftijdsstat ───────────
   // Consume-only (ADR 0009): leest de reeds-berekende vrijheidsvoortgang +
@@ -5045,14 +5134,14 @@ export default function HorizonPage({
                     style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
                   >
                     {hasPerspectiveHero
-                      ? <MaskedAmount value={perspectiveHero!.fireTarget} tone="horizon" monoWhenVisible={false} approx />
+                      ? <MaskedAmount value={viewPerspectiveHeroFireTarget ?? perspectiveHero!.fireTarget} tone="horizon" monoWhenVisible={false} approx />
                       : <MaskedAmount value={isPensioenMode ? (viewPortfolioAtAow ?? 0) : viewBalkVrijheidDoel} tone="horizon" monoWhenVisible={false} approx />}
                   </div>
                   <div
                     className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
                     style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
                   >
-                    {isPensioenMode ? 'geprojecteerd' : 'benodigd'}
+                    {fireTargetCaption}
                   </div>
                 </>
               )}
@@ -5096,10 +5185,7 @@ export default function HorizonPage({
             {/* KPI 4: Uitgave na pensioen — linkt naar verdiepingspagina */}
             <button
               type="button"
-              onClick={() => {
-                if (isHouseholdView) setHouseholdRetireOpen(true)
-                else setUitgavenPaneOpen(true)
-              }}
+              onClick={openRetirementExpensePane}
               className="p-4 border-r border-[var(--rule-soft)] last:border-r-0 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
               data-testid="hero-stat-retirement-expense"
               title={
@@ -5230,7 +5316,7 @@ export default function HorizonPage({
               <span>0%</span>
               <span className="font-mono">
                 {hasPerspectiveHero
-                  ? `${formatMaskedApproxCurrency(perspectiveHero!.fireTarget, masked)} — ${isPartnerView ? `${perspectiveHero!.householdName}'s vrijheid` : 'gezamenlijke vrijheid'}`
+                  ? `${formatMaskedApproxCurrency(viewPerspectiveHeroFireTarget ?? perspectiveHero!.fireTarget, masked)} — ${isPartnerView ? `${perspectiveHero!.householdName}'s vrijheid` : 'gezamenlijke vrijheid'}`
                   : isPensioenMode
                     ? `${formatMaskedApproxCurrency(viewPortfolioAtAow ?? 0, masked)} — vermogen op AOW`
                     // ADR 0127 D5 — de balk meet hier TIJDSDEKKING, geen kapitaal:
@@ -5349,14 +5435,14 @@ export default function HorizonPage({
                     style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
                   >
                     {hasPerspectiveHero
-                      ? <MaskedAmount value={perspectiveHero!.fireTarget} tone="horizon" monoWhenVisible={false} approx />
+                      ? <MaskedAmount value={viewPerspectiveHeroFireTarget ?? perspectiveHero!.fireTarget} tone="horizon" monoWhenVisible={false} approx />
                       : <MaskedAmount value={isPensioenMode ? (viewPortfolioAtAow ?? 0) : viewBalkVrijheidDoel} tone="horizon" monoWhenVisible={false} approx />}
                   </div>
                   <div
                     className="italic text-[10px] text-[var(--ink-3)] mt-1"
                     style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
                   >
-                    {isPensioenMode ? 'geprojecteerd' : 'benodigd'}
+                    {fireTargetCaption}
                   </div>
                 </>
               )}
@@ -5398,10 +5484,7 @@ export default function HorizonPage({
             {/* KPI 4: Uitgave na pensioen — linkt naar verdiepingspagina */}
             <button
               type="button"
-              onClick={() => {
-                if (isHouseholdView) setHouseholdRetireOpen(true)
-                else setUitgavenPaneOpen(true)
-              }}
+              onClick={openRetirementExpensePane}
               className="p-3 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
               data-testid="hero-stat-retirement-expense"
             >
@@ -5469,9 +5552,9 @@ export default function HorizonPage({
               <div className="my-2 border-b border-dashed border-[var(--border-ed)]" />
 
               {!simResult.fireReachable && !isPensioenMode && !isNuStoppenMode && (
-                <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-orange-300 bg-orange-50/60 px-3 py-2.5">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
-                  <p className="font-sans text-[12px] text-orange-700">
+                <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-amber-200 bg-amber-50/60 px-3 py-2.5">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                  <p className="font-sans text-[12px] text-amber-800">
                     {simResult.strategy === 'legacy' ? (
                       <>Je haalt je nalatenschapsdoel{fireStrategy?.legacyAmount ? ` van ${formatMaskedCurrency(fireStrategy.legacyAmount, masked)}` : ''} niet binnen je projectie (tot leeftijd {simResult.displayEndAge}). Verlaag het nalatenschapsbedrag, verhoog je <GlossaryTerm term="spaarquote">spaarquote</GlossaryTerm> of verlaag je uitgaven.</>
                     ) : simResult.strategy === 'perpetual' ? (
@@ -5491,9 +5574,9 @@ export default function HorizonPage({
                   dekt het inkomen het wél. Beschrijvend (Wft-veilig); eigen oranje regel
                   omdat de banner hierboven pensioen-modus overslaat. */}
               {kernelStatus === 'pension_shortfall' && (
-                <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-orange-300 bg-orange-50/60 px-3 py-2.5">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
-                  <p className="font-sans text-[12px] text-orange-700">
+                <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-amber-200 bg-amber-50/60 px-3 py-2.5">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                  <p className="font-sans text-[12px] text-amber-800">
                     Tot je AOW-leeftijd komt je vermogen tekort — in die periode teer je in op een tekort-lening. Vanaf je AOW-leeftijd dekt je inkomen je uitgaven wél.
                   </p>
                 </div>
@@ -5507,9 +5590,9 @@ export default function HorizonPage({
                   woorden uit één bron (lib/horizon/nu-stoppen-copy.ts), zodat de
                   hero-KPI, deze melding en de grafiek-uitleg hetzelfde zeggen. */}
               {kernelStatus === 'stop_now_shortfall' && nuStoppenReach != null && (
-                <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-orange-300 bg-orange-50/60 px-3 py-2.5">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
-                  <p className="font-sans text-[12px] text-orange-700">
+                <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-amber-200 bg-amber-50/60 px-3 py-2.5">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                  <p className="font-sans text-[12px] text-amber-800">
                     {nuStoppenZin(nuStoppenReach)}
                   </p>
                 </div>

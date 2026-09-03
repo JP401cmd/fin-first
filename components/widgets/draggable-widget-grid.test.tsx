@@ -303,8 +303,9 @@ describe('DraggableWidgetGrid', () => {
     )
     expect(await screen.findByTestId('widget-item-netto_vermogen')).toBeInTheDocument()
     expect(screen.getByTestId('drag-handle-fire_prognose')).toBeInTheDocument()
-    // Double (xl) behoudt zijn volle-breedte span in de herschikbare grid.
-    expect(screen.getByTestId('widget-item-maandoverzicht').className).toContain('lg:col-span-4')
+    // Double (xl) behoudt zijn volle-breedte span in de herschikbare grid
+    // (4 kolommen vanaf sm, synchroon met de kolomsprong van de container).
+    expect(screen.getByTestId('widget-item-maandoverzicht').className).toContain('sm:col-span-4')
   })
 
   it('Auto dashboard button is visible in edit mode', () => {
@@ -445,13 +446,15 @@ describe('DraggableWidgetGrid — favoriet ⇄ widget reverse-sync', () => {
 
 // ── Double (xl) — opt-in bouwblok voor stats-heavy widgets ──────────────────
 describe('DraggableWidgetGrid — Double (xl) size', () => {
-  it('past xl span-classes toe (col-span-2 lg:col-span-4 row-span-2)', () => {
+  it('past xl span-classes toe (col-span-2 sm:col-span-4 row-span-2)', () => {
     const prefs = makePrefs(['maandoverzicht'], ['xl'])
     render(
       <DraggableWidgetGrid initialPrefs={prefs} allPrefs={prefs} data={mockData} />
     )
     const item = screen.getByTestId('widget-item-maandoverzicht')
-    expect(item.className).toContain('lg:col-span-4')
+    // sm, niet lg: de container schakelt vanaf sm naar 4 kolommen, dus een
+    // xl-widget moet daar al de volle vier pakken (anders halve breedte).
+    expect(item.className).toContain('sm:col-span-4')
     expect(item.className).toContain('row-span-2')
   })
 

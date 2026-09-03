@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { readSourceLF } from '@/lib/test-utils/read-source'
 import {
   deriveAssetClass,
   deriveGeography,
@@ -266,8 +266,10 @@ describe('buildClassificationUpdate — geen koersvelden', () => {
  * die zijn eigen afleiding terugbouwt, valt hier om.
  */
 describe('bronanker — geen tweede implementatie', () => {
+  // CRLF-veilig (zie lib/test-utils/read-source.ts): de /gm-strip hieronder
+  // slaat stil terug op een verse Windows-checkout zonder normalisatie.
   const strip = (p: string) =>
-    readFileSync(join(REPO_ROOT, p), 'utf8')
+    readSourceLF(join(REPO_ROOT, p))
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/^[ \t]*\/\/.*$/gm, '')
 

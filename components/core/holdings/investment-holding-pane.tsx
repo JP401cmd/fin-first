@@ -16,11 +16,12 @@
  *     UPPERCASE, optionele bron-banner bij broker-imports en transacties-
  *     tabel. **Geen prijs-chart**: investment-detail toont die niet
  *     (full-page detail rendert ook geen chart). Footer: Bewerken / Sluiten.
- *   - **edit** — form: units, gem. inkoopprijs en notes. Bij broker-imports
- *     (`externalSource !== null`) staat het units-veld read-only met een
- *     uitleg-banner; gem. inkoopprijs en notes blijven altijd bewerkbaar
- *     (broker-import levert vaak geen avg-price terug, dus dat is een
- *     gebruiker-eigen veld). Footer: Opslaan / Annuleren.
+ *   - **edit** — form: units, gem. inkoopprijs, TER en notes. Bij broker-
+ *     imports (`externalSource !== null`) staat het units-veld read-only met
+ *     een uitleg-banner; gem. inkoopprijs, TER en notes blijven altijd
+ *     bewerkbaar (broker-import levert vaak geen avg-price en nooit een TER
+ *     terug, dus dat zijn gebruiker-eigen velden). Footer: Opslaan /
+ *     Annuleren.
  *
  * Data-flow:
  *   - Holding-row komt van de parent (`holdings-client.tsx`) via prop —
@@ -976,6 +977,9 @@ function InvestmentHoldingPaneEdit({
   // op rerenders van dezelfde prop-waarden.
   const initialUnits = holding.units
   const initialAvgPrice = holding.avgPurchasePrice ?? 0
+  // TER-baseline in procent-eenheid (null = geen TER bekend), zodat de
+  // canSave-diff in dezelfde eenheid rekent als het invoerveld.
+  const initialTerPercent = holding.ter != null ? holding.ter * 100 : null
   // Notes-baseline: server-fresh als de detail-fetch klaar is, anders de
   // prop-waarde (`holding.notes`). Empty-string als beide null zijn. We
   // berekenen dit dynamisch zodat een laat-arriverende detail-fetch (bv.
@@ -988,6 +992,11 @@ function InvestmentHoldingPaneEdit({
     initialAvgPrice > 0 ? avgPriceToInput(initialAvgPrice) : '',
   )
   const [notesInput, setNotesInput] = useState(serverNotes)
+  // TER staat in de DB als decimaal (0.0022) maar wordt — net als in het
+  // aanmaakformulier (holdings-client.tsx) — als PERCENTAGE ingevoerd
+  // ("0.22"). Eén invoereenheid over beide formulieren voorkomt dat dezelfde
+  // gebruiker bij creatie 0,22 en bij bewerken 0,0022 moet typen.
+  const [terInput, setTerInput] = useState(terToPercentInput(holding.ter))
   // We dirty-flag de notes zodat een laat-arriverende detail-fetch de
   // gebruiker-invoer niet overschrijft. Onbewerkt veld → herladen bij detail.
   const [notesDirty, setNotesDirty] = useState(false)
@@ -1048,14 +1057,24 @@ function InvestmentHoldingPaneEdit({
       !unitsReadOnly &&
       unitsParsed != null &&
       Math.abs(unitsParsed - initialUnits) > 1e-9
-    return notesChanged || unitsChanged || avgChanged
+    // TER: leeg↔gevuld telt als wijziging (wissen is een legitieme actie), en
+    // gevuld↔gevuld pas bij een echte waarde-verschuiving.
+    const terParsed = parseNumericInput(terInput)
+    const terChanged =
+      terParsed == null
+        ? initialTerPercent != null
+        : initialTerPercent == null ||
+          Math.abs(terParsed - initialTerPercent) > 1e-9
+    return notesChanged || unitsChanged || avgChanged || terChanged
   }, [
     saving,
     unitsInput,
     avgPriceInput,
     notesInput,
+    terInput,
     initialUnits,
     initialAvgPrice,
+    initialTerPercent,
     serverNotes,
     avgPriceReadOnly,
     unitsReadOnly,
@@ -1089,6 +1108,35 @@ function InvestmentHoldingPaneEdit({
         return
       }
       body.units = unitsParsed
+    }
+    // TER is altijd bewerkbaar — ook bij transactie-afgeleide of broker-
+    // gesynchroniseerde posities. Het is een fondseigenschap die de gebruiker
+    // zelf opzoekt (factsheet/Morningstar); geen enkele bron levert 'm mee.
+    // Alleen meesturen wanneer hij daadwerkelijk wijzigde, zodat een save van
+    // uitsluitend de notitie de bestaande `ter_source` niet op 'manual' zet.
+    const terParsed = parseNumericInput(terInput)
+    if (terParsed == null) {
+      if (initialTerPercent != null) {
+        // Veld leeggemaakt = TER wissen. Bron mee wissen: een lege TER met
+        // achtergebleven bron zou de detailpagina "Handmatig ingevoerd" laten
+        // beweren over een waarde die er niet meer is.
+        body.ter = null
+        body.ter_source = null
+      }
+    } else {
+      // Serverrange is 0–0.10 decimaal; hier in dezelfde procent-eenheid als
+      // het invoerveld, zodat de melding matcht met wat de gebruiker typte.
+      if (terParsed < 0 || terParsed > 10) {
+        setValidationError('TER moet tussen 0% en 10% liggen.')
+        return
+      }
+      if (
+        initialTerPercent == null ||
+        Math.abs(terParsed - initialTerPercent) > 1e-9
+      ) {
+        body.ter = terParsed / 100
+        body.ter_source = 'manual'
+      }
     }
 
     setSaving(true)
@@ -1140,6 +1188,8 @@ function InvestmentHoldingPaneEdit({
     unitsInput,
     avgPriceInput,
     notesInput,
+    terInput,
+    initialTerPercent,
     addToast,
     onSaved,
     tickerDisplay,
@@ -1296,7 +1346,27 @@ function InvestmentHoldingPaneEdit({
           }
         />
 
-        {/* Veld 3 — Notities (altijd bewerkbaar, ook bij auto-sync) */}
+        {/* Veld 3 — TER. ALTIJD bewerkbaar, ook bij transactie-afgeleide of
+            broker-gesynchroniseerde posities: de TER is een eigenschap van het
+            fonds, niet van de positie, en wordt door geen enkele bron
+            meegeleverd. Zonder dit veld was de TER alleen bij creatie te zetten
+            en was de "Voeg de TER toe via Bewerken"-hint op de typed
+            detailpagina een dode belofte (WF-BEZIT-16-bug2). Invoereenheid =
+            procent, gelijk aan het aanmaakformulier. */}
+        <FormFieldNumeric
+          id="investment-edit-ter"
+          label="TER — lopende kosten (%)"
+          value={terInput}
+          onChange={setTerInput}
+          step="0.01"
+          min={0}
+          max={10}
+          placeholder="0.22"
+          testId="investment-edit-ter-input"
+          help="Percentage per jaar; vind de TER op de factsheet van het fonds of op Morningstar. Leeg laten = onbekend."
+        />
+
+        {/* Veld 4 — Notities (altijd bewerkbaar, ook bij auto-sync) */}
         <div>
           <label
             htmlFor="investment-edit-notes"
@@ -1344,6 +1414,10 @@ interface FormFieldNumericProps {
   disabled?: boolean
   step?: string
   min?: number
+  max?: number
+  placeholder?: string
+  /** Optionele `data-testid` — alleen gezet waar een test het veld adresseert. */
+  testId?: string
   help?: string
 }
 
@@ -1356,6 +1430,9 @@ function FormFieldNumeric({
   disabled = false,
   step = 'any',
   min,
+  max,
+  placeholder,
+  testId,
   help,
 }: FormFieldNumericProps) {
   // Read-only stijl: grijze achtergrond, ink-3 tekst, cursor-not-allowed.
@@ -1378,6 +1455,9 @@ function FormFieldNumeric({
         disabled={disabled}
         step={step}
         min={min}
+        max={max}
+        placeholder={placeholder}
+        data-testid={testId}
         inputMode="decimal"
         className={
           lockedStyle
@@ -1413,6 +1493,19 @@ function formatUnitsInput(units: number): string {
   // Volle precisie tot 8 decimalen; trailing zeros eraf zodat het veld
   // er niet uit ziet als "1.00000000".
   const fixed = units.toFixed(8)
+  return fixed.replace(/\.?0+$/, '')
+}
+
+/**
+ * Render de opgeslagen TER (decimaal, 0.0022) als procent-invoerstring
+ * ("0.22"). `null` → lege string, zodat "geen TER bekend" een leeg veld is en
+ * niet een misleidende 0. Vier decimalen op procent-schaal = 1e-6 op de
+ * decimale schaal, ruim onder de precisie die een factsheet publiceert.
+ */
+function terToPercentInput(ter: number | null): string {
+  if (ter == null || !Number.isFinite(ter)) return ''
+  const fixed = (ter * 100).toFixed(4)
+  // Trailing zeros eraf, en de punt zelf bij een rond getal ("1.0000" → "1").
   return fixed.replace(/\.?0+$/, '')
 }
 

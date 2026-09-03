@@ -7,6 +7,7 @@ import { resolveHolding } from '@/lib/holdings-table-resolver'
 import { loadHoldingsPnL, attachPnLToHoldings } from '@/lib/holdings-pnl-enrichment'
 import { sumHoldingTotals, type HoldingTotalsRow } from '@/lib/holdings-totals'
 import { PURCHASE_DATE_FUTURE_ERROR, isPurchaseDateInFuture } from '@/lib/asset-parameter-bands'
+import { deriveHoldingTicker } from '@/lib/holdings-ticker'
 
 /**
  * GET /api/holdings — List user's investment holdings.
@@ -331,7 +332,11 @@ export async function POST(request: NextRequest) {
       user_id: user.id,
       asset_id: assetId,
       name,
-      ticker: ticker || null,
+      // `ticker` is NOT NULL in investment_holdings (WF-BEZIT-14-bug4): een leeg
+      // formulierveld werd hier `null` en de insert faalde met een generieke 500.
+      // Val terug op de naam, precies zoals de backfill in migratie
+      // 20260502000003 (`COALESCE(h.ticker, h.name)`) en de CSV-import doen.
+      ticker: deriveHoldingTicker(ticker, name),
       isin: isin || null,
       // `|| 1` vangt nu alléén nog `units === undefined` (= veld niet ingevuld):
       // 0 en negatief zijn hierboven al met een 400 afgewezen. Dat die default
@@ -489,7 +494,13 @@ export async function PATCH(request: NextRequest) {
     if (body.units !== undefined) updates.units = Number(body.units)
     if (body.avg_purchase_price !== undefined) updates.avg_purchase_price = Number(body.avg_purchase_price)
     if (body.name !== undefined) updates.name = body.name
-    if (body.ticker !== undefined) updates.ticker = body.ticker || null
+    // Zelfde NOT NULL-val als bij POST (WF-BEZIT-14-bug4): wie het tickerveld
+    // leegmaakt in een bewerkformulier mag geen 500 krijgen. Val terug op de
+    // meegestuurde naam, en anders op de naam die al op de rij staat.
+    if (body.ticker !== undefined) {
+      const currentName = (resolved.holding as Record<string, unknown>).name
+      updates.ticker = deriveHoldingTicker(body.ticker, body.name ?? currentName)
+    }
     if (body.isin !== undefined) updates.isin = body.isin || null
     if (body.notes !== undefined) updates.notes = body.notes || null
     if (body.currency !== undefined && typeof body.currency === 'string') updates.currency = body.currency.trim().toUpperCase() || 'EUR'

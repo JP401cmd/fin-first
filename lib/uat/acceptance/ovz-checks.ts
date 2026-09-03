@@ -149,9 +149,16 @@ function postponeWeeks(nowMs: number, weeks: number): number {
   return nowMs + weeks * 7 * 24 * 60 * 60 * 1000
 }
 
-/** Mirror van de cap-op-5-sortering (priority_score desc, dan sort_order asc). */
-function sortActions<T extends { priority_score: number; sort_order: number }>(actions: T[]): T[] {
-  return [...actions].sort((a, b) => b.priority_score - a.priority_score || a.sort_order - b.sort_order)
+/** Mirror van de canonieke actie-volgorde (lib/action-sort.ts#compareActionsByPriority):
+ *  priority_score desc, dan sort_order asc, dan created_at desc (nieuwste eerst —
+ *  de derde sleutel sinds WF-OVZ-20-bug1; zonder `created_at` telt die als leeg). */
+function sortActions<T extends { priority_score: number; sort_order: number; created_at?: string }>(actions: T[]): T[] {
+  return [...actions].sort(
+    (a, b) =>
+      b.priority_score - a.priority_score ||
+      a.sort_order - b.sort_order ||
+      (b.created_at ?? '').localeCompare(a.created_at ?? ''),
+  )
 }
 
 // ── Checks — één per 'exact'-workflow in OVZ_ACCEPTANCE ────────────────────
@@ -393,23 +400,30 @@ export const OVZ_ENGINE_CHECKS: OvzEngineCheck[] = [
   {
     workflow: 'WF-OVZ-20',
     scenarioId: 'UAT-OVZ-20',
-    label: 'Totaal open vrijheidsdagen (mirror-som): 55 → 75 na +20',
+    label: 'Totaal open vrijheidsdagen (mirror-som): 55 → 75 na +20; nieuwe actie bovenaan bij 3-weg gelijkspel',
     run: () => {
       criterion('WF-OVZ-20')
-      const acties = [{ freedom_days_impact: 45 }, { freedom_days_impact: 10 }]
+      // Alle drie priority_score 3 en sort_order 0 (geen aanmaakpad schrijft sort_order):
+      // zonder derde sleutel een onbepaald gelijkspel — WF-OVZ-20-bug1.
+      const acties = [
+        { id: 'seed1', freedom_days_impact: 45, priority_score: 3, sort_order: 0, created_at: '2026-08-01T10:00:00Z' },
+        { id: 'seed2', freedom_days_impact: 10, priority_score: 3, sort_order: 0, created_at: '2026-08-15T10:00:00Z' },
+      ]
       const totaalVoor = acties.reduce((s, a) => s + a.freedom_days_impact, 0)
-      const nieuweActie = { freedom_days_impact: 20 }
-      const totaalNa = [...acties, nieuweActie].reduce((s, a) => s + a.freedom_days_impact, 0)
+      const nieuweActie = { id: 'nieuw', freedom_days_impact: 20, priority_score: 3, sort_order: 0, created_at: '2026-09-02T10:00:00Z' }
+      const na = [...acties, nieuweActie]
+      const totaalNa = na.reduce((s, a) => s + a.freedom_days_impact, 0)
+      const volgorde = sortActions(na).map((a) => a.id)
       return {
-        expected: 'totaalVoor=55; totaalNa=75; delta=20',
-        actual: `totaalVoor=${totaalVoor}; totaalNa=${totaalNa}; delta=${totaalNa - totaalVoor}`,
+        expected: 'totaalVoor=55; totaalNa=75; delta=20; volgorde=[nieuw,seed2,seed1]',
+        actual: `totaalVoor=${totaalVoor}; totaalNa=${totaalNa}; delta=${totaalNa - totaalVoor}; volgorde=[${volgorde.join(',')}]`,
       }
     },
   },
   {
     workflow: 'WF-OVZ-21',
     scenarioId: 'UAT-OVZ-21',
-    label: 'Uitstel-datum (mirror, 2 weken) + cap-op-5-sortering (priority_score/sort_order) op 7 acties',
+    label: 'Uitstel-datum (mirror, 2 weken) + cap-op-5-sortering (priority_score/sort_order/created_at) op 7 acties',
     run: () => {
       criterion('WF-OVZ-21')
       const now = Date.UTC(2026, 6, 5) // 5 juli 2026

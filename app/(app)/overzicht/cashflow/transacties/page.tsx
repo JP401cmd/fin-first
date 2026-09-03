@@ -7,6 +7,8 @@ import { KoppelRekeningBanner } from '@/components/overview/koppel-rekening-bann
 import { TransactiesAnalyse } from '@/components/overview/transacties/transacties-analyse'
 import { SpendLimitsSection } from '@/components/overview/transacties/spend-limits-section'
 import { loadSpendLimitsSection } from '@/lib/spend-limits/loader'
+import { getCachedPerspectiveContext } from '@/lib/household/perspective-loader-server'
+import { loadTransactionFlags } from '@/lib/household/transaction-flags'
 import type { WidgetPrefs } from '@/lib/widget-catalog'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
@@ -55,6 +57,12 @@ export default async function OverzichtCashflowTransactiesPage({
   // de sectie herrekent zelf niets. De loader is goedkoop voor wie geen pot heeft:
   // één geïndexeerde query op spend_limits, en pas daarna de aggregaat-RPC's.
   const spendLimits = await loadSpendLimitsSection(supabase)
+  // "Te bespreken" (ADR 0128): server-geladen op de request-gecachte
+  // huishoud-context; `null` voor solo-gebruikers → de sectie rendert niet.
+  const teBespreken = await loadTransactionFlags(
+    supabase,
+    await getCachedPerspectiveContext(supabase),
+  )
 
   // Widget-prefs voor de schakelaar "Widget op dashboard" in het bewerkformulier.
   // Server-side gelezen en als prop doorgegeven (ADR 0058) — de sectie leidt de
@@ -99,6 +107,7 @@ export default async function OverzichtCashflowTransactiesPage({
             zet. Server-geladen (ADR 0058) en als slot doorgegeven, omdat de
             analyse zelf een client-component is. */}
         <TransactiesAnalyse
+          teBespreken={teBespreken}
           naGeldstroom={
             <SpendLimitsSection
               data={spendLimits}

@@ -9,6 +9,8 @@ import { mapTransactions } from '@/lib/truelayer/mapper'
 import {
   loadCrossSourceCandidates,
   loadExistingImportHashes,
+  loadHouseholdSharedHashes,
+  loadHouseholdSiblingAccountIds,
   loadNewestTransactionDate,
 } from '@/lib/truelayer/existing-hashes'
 import {
@@ -344,6 +346,8 @@ export async function POST(req: Request) {
       crossSourceCandidates,
       freqMap,
       ownAccounts,
+      { data: carrierAccount },
+      householdPartnerHashes,
     ] = await Promise.all([
       supabase
         .from('budgets')
@@ -375,6 +379,34 @@ export async function POST(req: Request) {
       // Eigen-rekening-identifiers: ÉÉN keer per sync-run, vóór de rijlus. Twee
       // queries voor de hele run in plaats van twee per transactie.
       loadOwnAccountIdentifiers(supabase, user.id),
+      // Het eigenaarschap van de DRAGENDE rekening. Expliciete kolomlijst, nooit
+      // `*`: deze tabel draagt `*_encrypted` en `*_hash` (CLAUDE.md-kolomregel).
+      // Zie de stempel-noot bij de rijopbouw hieronder voor waaróm dit meekomt.
+      supabase
+        .from('bank_accounts')
+        .select('ownership')
+        .eq('id', connAccount.bank_account_id)
+        .eq('user_id', user.id)
+        .maybeSingle(),
+      // ── Laag 1b: wat de PARTNER al op deze rekening heeft staan ─────────────
+      // Twee stappen, bewust achter elkaar: eerst welke dragende rijen dezelfde
+      // échte rekening beschrijven (de en/of-rekening die beide partners
+      // koppelen levert er twee, met verschillende `account_id`), dán hun hashes.
+      // De eigen doelrekening zit er altijd bij — dat dekt het geval waarin de
+      // partner via het BESTANDSPAD op dezelfde dragende rij heeft geschreven.
+      dates.length === 0
+        ? Promise.resolve(new Set<string>())
+        : loadHouseholdSiblingAccountIds(supabase, {
+            userId: user.id,
+            accountId: connAccount.bank_account_id,
+          }).then((siblingIds) =>
+            loadHouseholdSharedHashes(supabase, {
+              userId: user.id,
+              accountIds: [connAccount.bank_account_id, ...siblingIds],
+              minDate: dates[0],
+              maxDate: dates[dates.length - 1],
+            }),
+          ),
     ])
 
     // Vergelijking op `import_hash` alléén — niet op de volledige indexsleutel
@@ -395,12 +427,27 @@ export async function POST(req: Request) {
     // maar dezelfde hash. Twee gelijke rijen in één insert botsen op de unieke
     // index en nemen de hele batch mee.
     const batchHashes = new Set<string>()
+    /**
+     * Laag 1b: de partner heeft deze boeking al weggeschreven op dezelfde échte
+     * rekening. Apart geteld van laag 1, want het is een andere reden en een
+     * andere schrijver — en zonder eigen teller is "we hebben niets ingevoegd"
+     * niet te onderscheiden van "er was niets nieuws".
+     */
+    let householdPartnerCount = 0
     const afterLayer1 = parsed.filter((p) => {
       if (existingHashSet.has(p.import_hash) || batchHashes.has(p.import_hash)) return false
+      // Ná de eigen-rij-controle, zodat een rij die óók zelf al bestaat de
+      // directere laag-1-reden houdt en niet twee keer geteld wordt. Zonder
+      // partner (of zonder gedeelde rekening) is deze set leeg en is dit een
+      // no-op. Spiegelt laag 1b op `/api/transactions/import`.
+      if (householdPartnerHashes.has(p.import_hash)) {
+        householdPartnerCount++
+        return false
+      }
       batchHashes.add(p.import_hash)
       return true
     })
-    const duplicateCount = parsed.length - afterLayer1.length
+    const duplicateCount = parsed.length - afterLayer1.length - householdPartnerCount
 
     // ── Laag 2: dezelfde boeking uit een andere bron ──────────────────────────
     // Laag 1 hasht de omschrijving mee, en TrueLayer levert een andere
@@ -452,6 +499,30 @@ export async function POST(req: Request) {
      */
     const insertedRows: { category_source: string }[] = []
     let failedCount = 0
+
+    /**
+     * Het eigenaarschap van een gesynchroniseerde boeking VOLGT dat van de
+     * dragende rekening. Hier stond niets, en `transactions.ownership` heeft
+     * kolomdefault `'personal'` — dus élke boeking op een en/of-rekening werd
+     * als persoonlijk weggeschreven.
+     *
+     * Dat was geen cosmetisch verschil maar de reden dat laag 1b structureel
+     * blind was: de SELECT-policy toont een partnerrij alléén bij
+     * `ownership = 'shared'`, dus de partner kon de reeks niet zien en niet
+     * ontdubbelen — terwijl beide reeksen wél in het huishoudbeeld meetellen.
+     * Een dedup-laag die alleen rijen kan zien die per default onzichtbaar zijn,
+     * is geen laag.
+     *
+     * De rekeninghouder houdt de regie: `partner_visibility` (ADR 0118) gaat
+     * over de LEES-poort en wordt in de RLS-policy afgedwongen, niet hier. Op
+     * een persoonlijke rekening blijft dit letterlijk het oude gedrag.
+     * `null`-terugval op `'personal'`: kan de dragende rij niet gelezen worden,
+     * dan raden we niet gedeeld — de conservatieve kant is de persoonlijke.
+     */
+    const accountOwnership =
+      (carrierAccount as { ownership?: string | null } | null)?.ownership === 'shared'
+        ? 'shared'
+        : 'personal'
 
     for (let i = 0; i < newTransactions.length; i += BATCH_SIZE) {
       const batch = newTransactions.slice(i, i + BATCH_SIZE)
@@ -515,6 +586,9 @@ export async function POST(req: Request) {
           // transactie vandaan komt. Bestaande rijen blijven bewust NULL
           // ("onbekend"); die worden niet met een gok gevuld.
           source: 'bank',
+          // Volgt het eigenaarschap van de dragende rekening — zie de noot bij
+          // `accountOwnership` hierboven.
+          ownership: accountOwnership,
         }
       })
 
@@ -651,6 +725,13 @@ export async function POST(req: Request) {
       // plaats van erin — anders verandert stil wat "al bekend" betekent.
       duplicates: duplicateCount,
       duplicates_cross_source: crossSourceCounts.total,
+      // Laag 1b, additief naast `duplicates`: de partner had deze boeking al op
+      // dezelfde échte rekening staan. Bewust NIET in `bank_sync_log` — daar zou
+      // een kolom (en dus een migratie) voor nodig zijn, en dat is dezelfde
+      // afweging die `own_account_transfers` hieronder al maakte. De
+      // terugkoppeling hoort in eerste instantie bij de gebruiker die net op
+      // "Synchroniseer" drukte.
+      duplicates_household_partner: householdPartnerCount,
       // Additief: hoeveel van de nieuwe rijen zijn als eigen-rekening-verschuiving
       // geboekt in plaats van als uitgave/inkomst. Zonder deze teller is "het is
       // gelukt" niet te onderscheiden van "er is niets herkend", terwijl juist

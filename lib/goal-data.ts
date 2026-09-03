@@ -401,7 +401,42 @@ export function goalReachedFromProgress(
 export type GoalProgressInput = Pick<
   Goal,
   'goal_type' | 'current_value' | 'target_value' | 'target_date'
-> & { created_at?: string }
+> & { created_at?: string; metadata?: Record<string, unknown> | null }
+
+/**
+ * STAND-DOEL of INLEG-DOEL? Een doel waarvan `current_value` LIVE uit een
+ * canonieke motor komt (het vrijheidsgetal-doel, en elk doelbasis-doel met
+ * `metadata.sync === 'auto'`) draagt een STAND: het hele netto vermogen, de
+ * huidige spaarquote, het aantal noodfondsmaanden. Een handmatig spaardoel
+ * daarentegen draagt een INLEGSTROOM die bij aanmaak op 0 stond.
+ *
+ * Dat onderscheid is precies de aanname onder de pace-toets in
+ * `computeGoalProgress` ("alles wat er nu in zit, is er sindsdien in gekomen").
+ * Voor een stand-doel is die aanname vals: `current / maanden-sinds-aanmaak`
+ * deelt een reeds bestaand vermogen door een handvol maanden en komt dan altijd
+ * boven elk vereist maandbedrag uit — "OP KOERS" terwijl er €0 wordt ingelegd
+ * (bevinding UR2-17). De tempo-toets wordt daar dus overgeslagen; zie
+ * `GoalProgress.paceApplicable`.
+ *
+ * MIRROR-NOOT: dit leest exact dezelfde twee tags als
+ * `lib/goals/vrijheidsgetal-goal.ts#isVrijheidsgetalGoal` (`standaardDoel`) en
+ * `lib/goal-current-value.ts#isAutoSyncMetricGoal` (`sync`). De check staat hier
+ * bewust ZELFSTANDIG en niet als import: beide bronmodules trekken de
+ * server-loader-graaf mee (horizon-loader resp. `loadForecastSectionData`),
+ * terwijl `lib/goal-data.ts` client-veilig moet blijven — dezelfde afweging die
+ * `components/future/doelen-view.tsx` al drie keer expliciet maakt. Houd de tags
+ * identiek aan die bronnen.
+ *
+ * Defensief: `metadata` mag ontbreken (oude rijen, lichte projecties), `null` of
+ * `{}` zijn — alle drie leveren `false`, dus handmatige doelen blijven volledig
+ * ongemoeid.
+ */
+export function isLiveTrackedStandGoal(goal: { metadata?: Record<string, unknown> | null }): boolean {
+  const m = goal.metadata
+  if (typeof m !== 'object' || m === null) return false
+  const tags = m as Record<string, unknown>
+  return tags.standaardDoel === 'vrijheidsgetal' || tags.sync === 'auto'
+}
 
 export type GoalProgressOptions = {
   /**
@@ -456,6 +491,27 @@ export type GoalProgress = {
    */
   requiredMonthly: number | null
   eta: string | null
+  /**
+   * Is de TEMPO-toets bewust overgeslagen? `true` uitsluitend bij een
+   * live-getrackt STAND-doel met streefdatum (`isLiveTrackedStandGoal`): daar
+   * deelt de pace-toets een reeds bestaand vermogen door de maanden sinds
+   * aanmaak, waardoor de uitkomst niets zegt over de werkelijke inleg —
+   * "OP KOERS" bij €0 inleg (bevinding UR2-17; eigenaarsbesluit 2 sep 2026,
+   * optie A: tempo-toets overslaan i.p.v. een tweede trend-toets bouwen).
+   *
+   * `onTrack` blijft dan `true` — dezelfde "geen probleem gesignaleerd"-lezing
+   * als bij een doel zonder streefdatum, zodat geen enkel oppervlak vals alarm
+   * slaat. Maar een oppervlak dat een STOPLICHT toont hoort hierop te schakelen
+   * naar een neutrale duiding: "Op koers" zou een tempo-oordeel claimen dat niet
+   * gemeten is. `measured` blijft bewust `true` — de STAND is wél echt gemeten;
+   * dat veld betekent "vers doel, nog niets binnen" en die lezing geldt hier
+   * niet.
+   *
+   * `false` voor elk ander doel, inclusief alle bestaande handmatige doelen en
+   * de 'down'-richting (daar rust het oordeel op richting/tolerantie, wat een
+   * geldig oordeel is en geen weggelaten meting).
+   */
+  paceSkipped: boolean
 }
 
 /**
@@ -487,18 +543,19 @@ export function computeGoalProgress(goal: GoalProgressInput, options?: GoalProgr
     // markeert die tweede tak als "nog geen meting" — exact de lezing die
     // ParameterGoalCard al hanteerde; `onTrack` blijft bewust ongewijzigd.
     if (target <= 0 || !Number.isFinite(current) || current <= 0) {
-      return { current, target, pct: 0, onTrack: false, measured: false, requiredMonthly: null, eta: null }
+      return { current, target, pct: 0, onTrack: false, measured: false, requiredMonthly: null, eta: null, paceSkipped: false }
     }
     const pct = Math.max(0, Math.min(Math.round((target / current) * 100), 100))
     const onTrack = current <= target + DOWN_GOAL_ONTRACK_TOLERANCE
     // target_date-tijdlijnlogica (en dus ook `etaOverride`) is alleen zinvol voor
     // 'up'-doelen; een `down`-doel is zelf al een leeftijd, geen datum — en dus
-    // ook geen benodigde maandinleg.
-    return { current, target, pct, onTrack, measured: true, requiredMonthly: null, eta: null }
+    // ook geen benodigde maandinleg. Het richting-/tolerantie-oordeel blijft een
+    // geldig oordeel, dus `paceSkipped` blijft false (er wordt niets weggelaten).
+    return { current, target, pct, onTrack, measured: true, requiredMonthly: null, eta: null, paceSkipped: false }
   }
 
   if (target <= 0) {
-    return { current, target, pct: 0, onTrack: false, measured: false, requiredMonthly: null, eta: etaOverride }
+    return { current, target, pct: 0, onTrack: false, measured: false, requiredMonthly: null, eta: etaOverride, paceSkipped: false }
   }
 
   // Ondergrens op 0 — `current` zelf blijft ongemoeid en mag negatief zijn.
@@ -515,6 +572,7 @@ export function computeGoalProgress(goal: GoalProgressInput, options?: GoalProgr
   // berekenen. Dat is een geldig oordeel, dus `measured` blijft true.
   let onTrack = true
   let measured = true
+  let paceSkipped = false
   let requiredMonthly: number | null = null
   // Een canonieke projectie wint van de opgeslagen streefdatum: dát is het
   // antwoord op "wanneer haal ik dit", terwijl `target_date` de ambitie is.
@@ -538,7 +596,18 @@ export function computeGoalProgress(goal: GoalProgressInput, options?: GoalProgr
       // bij aanmaken op 0 staat — alles wat er nu in zit, is er sindsdien in
       // gekomen. Zonder `created_at` (lichte projecties zoals TopGoal) is er
       // geen meetperiode: dan geen pace-oordeel, en `onTrack` blijft true.
-      if (Number.isFinite(elapsedDays)) {
+      //
+      // UITZONDERING (UR2-17, eigenaarsbesluit 2 sep 2026 — optie A): bij een
+      // LIVE-GETRACKT STAND-doel is die aanname vals. `current_value` is daar
+      // geen sinds-aanmaak opgebouwde inleg maar een canonieke stand (het hele
+      // netto vermogen, de huidige spaarquote), dus `current / maanden` komt
+      // altijd boven elk vereist maandbedrag uit — "OP KOERS" bij €0 inleg,
+      // ongeacht hoe oud het doel is. De tempo-toets wordt hier overgeslagen;
+      // `requiredMonthly` blijft wél staan (dat is een eerlijke uitspraak) en
+      // `paceSkipped` vertelt het scherm dat het géén tempo-oordeel mag tonen.
+      if (isLiveTrackedStandGoal(goal)) {
+        paceSkipped = true
+      } else if (Number.isFinite(elapsedDays)) {
         measured = current > 0 || elapsedDays >= GOAL_PACE_GRACE_DAYS
         if (measured) {
           const monthsElapsed = Math.max(
@@ -560,7 +629,7 @@ export function computeGoalProgress(goal: GoalProgressInput, options?: GoalProgr
     }
   }
 
-  return { current, target, pct, onTrack, measured, requiredMonthly, eta }
+  return { current, target, pct, onTrack, measured, requiredMonthly, eta, paceSkipped }
 }
 
 /**

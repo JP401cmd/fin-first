@@ -71,7 +71,7 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Cash — acceptatiecriteria dekking', () => {
-  it('heeft precies één criterium per catalogus-CASH-scenario (01..61, geen gaten)', () => {
+  it('heeft precies één criterium per catalogus-CASH-scenario (01..66, geen gaten)', () => {
     const workflows = CASH_ACCEPTANCE.criteria.map((c) => c.workflow).sort()
     expect(workflows).toEqual(catalogCashWorkflows)
     expect(new Set(workflows).size).toBe(catalogCashWorkflows.length)
@@ -130,7 +130,15 @@ describe('UAT Cash — acceptatiecriteria dekking', () => {
     // ownership/partner_visibility-koppeling + de import-gate, 'exact') en
     // WF-CASH-64 (grenzenpot-tempo, ADR 0119 — computeSpendLimitPace op
     // synthetische periodes, 'exact').
-    expect(workflows.length).toBe(64)
+    // 64 → 65: WF-CASH-65 (partner-samenwerkingslaag fase 1, ADR 0128 — een
+    // gedeelde boeking markeren als "Te bespreken"; RLS-geërfde zichtbaarheid
+    // + route-foutvertaling over meerdere Supabase-rondes, geen eigen pure
+    // rekenfunctie, dus 'ui-only' zoals WF-CASH-45/47/58).
+    // 65 → 66: WF-CASH-66 (TrueLayer-sync stempelt `transactions.ownership`
+    // van de dragende en/of-rekening en ontdubbelt tegen de partner via
+    // loadHouseholdSiblingAccountIds/loadHouseholdSharedHashes — DB-mutatie +
+    // RLS-afhankelijke zichtbaarheid, geen pure functie, dus 'ui-only').
+    expect(workflows.length).toBe(66)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {

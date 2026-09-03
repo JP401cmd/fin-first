@@ -43,6 +43,7 @@
 // zonder die route, en her-baseline daarna het parity-manifest.
 
 import type { LocalChatOverview } from './local-chat-context'
+import { JAARRUIMTE_BOVENGRENS_SUFFIX } from '@/lib/jaarruimte-facts'
 import type { LocalNewsSource } from './local-news-source'
 
 /**
@@ -146,8 +147,11 @@ export function renderLocalNewsOverview(overview: LocalChatOverview): string {
   // Jaarruimte is hier geen tip maar een RELEVANTIESIGNAAL: het maakt pensioen-
   // en fiscaal nieuws voor deze gebruiker aantoonbaar wél of niet interessant.
   if (overview.jaarruimte) {
+    // H23: zonder bekende factor A is dit een bovengrens — ook een
+    // relevantiesignaal mag niet als hard bedrag doorreizen naar de tekst.
+    const grens = overview.jaarruimte.factorAKnown ? '' : JAARRUIMTE_BOVENGRENS_SUFFIX
     lines.push(
-      `- Onbenutte jaarruimte (pensioen/lijfrente): ${euro(overview.jaarruimte.onbenut)} → geschatte belastingbesparing ${euro(overview.jaarruimte.besparing)}`,
+      `- Onbenutte jaarruimte (pensioen/lijfrente): ${euro(overview.jaarruimte.onbenut)} → geschatte belastingbesparing ${euro(overview.jaarruimte.besparing)}${grens}`,
     )
   }
 

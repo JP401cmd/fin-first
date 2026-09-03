@@ -6,13 +6,12 @@ import { createClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/admin'
 import { logAdminAction } from '@/lib/admin-audit'
 import { ERROR_SIGNATURE_RE } from '@/lib/alerts/error-signature'
+import { summarizeErrorGroups } from '@/lib/error-groups'
 import {
-  buildErrorGroups,
-  summarizeErrorGroups,
-  type ErrorGroup,
-  type ErrorLogRow,
-  type ErrorResolutionRow,
-} from '@/lib/error-groups'
+  ERROR_GROUPS_MAX_ROWS,
+  ERROR_LOG_COLUMNS_LEAN,
+  loadErrorGroups,
+} from '@/lib/error-groups-loader'
 
 /**
  * GET/POST/DELETE /api/admin/error-groups — de werkvoorraad achter
@@ -39,30 +38,8 @@ export const dynamic = 'force-dynamic'
 // Node-runtime: de signature-digest gebruikt `node:crypto`.
 export const runtime = 'nodejs'
 
-/**
- * Leesvenster. Groeperen heeft alleen betekenis over een ruime stapel, maar een
- * onbegrensde query zou met de jaren stilletjes traag worden.
- *
- * 1000 is GEEN vrije keuze: het is de PostgREST-cap uit `supabase/config.toml`
- * (`max_rows = 1000`). Een client-`.limit()` bóven die grens is een **no-op** —
- * zet je hier 2000, dan krijg je nog steeds 1000 rijen terug en zou een
- * afgeleide `rows.length >= MAX_ROWS` structureel `false` blijven. Precies de
- * stille leugen die `truncated` hoort te voorkomen. Zie het gelijkluidende
- * commentaar in `lib/budgets-data-loader.ts` — en de geleden schade in
- * `lib/architecture/calculations.ts`, waar een stille afkap op deze cap ooit
- * twee verschillende spaarquotes op twee schermen opleverde.
- *
- * Bewuste afwijking van de `truncationSuspected`-kanarie elders in de repo: die
- * leidt "afgekapt" af uit `rows.length >= cap` en meldt dus een vals alarm bij
- * exact `cap` rijen. Hier kost een `head: true`-count niets extra's aan
- * dataverkeer en geeft hij het antwoord zéker in plaats van vermoedelijk.
- */
-const MAX_ROWS = 1000
-
-const LOG_COLUMNS = 'id, context, message, level, url, stack, created_at'
-/** POST heeft alleen telling + laatst-gezien nodig — `stack` is tot 8 kB/rij. */
-const LOG_COLUMNS_LEAN = 'id, context, message, level, url, created_at'
-const RESOLUTION_COLUMNS = 'signature, resolved_at, resolved_by, note, resolved_count, last_seen_at'
+// Leesvenster + groepering wonen in `lib/error-groups-loader.ts`, gedeeld met
+// de inbak-teller op de /beheer-hub — één venster, één "open"-getal.
 
 const SignatureSchema = z.object({
   signature: z
@@ -93,51 +70,19 @@ async function requireSuperAdmin(): Promise<AdminContext | NextResponse> {
   return { supabase, userId: user.id, email: user.email ?? null }
 }
 
-/**
- * Haalt het leesvenster op en groepeert het. Gedeeld door GET en POST.
- *
- * `truncated` komt uit een APARTE head-count, niet uit `rows.length >= MAX_ROWS`:
- * die vergelijking kan de PostgREST-cap niet overschrijden en zou dus nooit
- * kunnen zeggen dat er meer ís. `stack` blijft buiten de POST-lezing — die
- * gebruikt alleen `count` en `lastSeenAt`, en een stacktrace is tot 8 kB per rij.
- */
-async function loadGroups(
-  supabase: AdminContext['supabase'],
-  columns: string = LOG_COLUMNS,
-): Promise<{ groups: ErrorGroup[]; truncated: boolean } | { error: unknown }> {
-  const [logs, resolutions, total] = await Promise.all([
-    supabase
-      .from('error_logs')
-      .select(columns)
-      .order('created_at', { ascending: false })
-      .limit(MAX_ROWS),
-    supabase.from('error_log_resolutions').select(RESOLUTION_COLUMNS),
-    supabase.from('error_logs').select('id', { count: 'exact', head: true }),
-  ])
-
-  if (logs.error) return { error: logs.error }
-  if (resolutions.error) return { error: resolutions.error }
-
-  const rows = (logs.data ?? []) as unknown as ErrorLogRow[]
-  return {
-    groups: buildErrorGroups(rows, (resolutions.data ?? []) as ErrorResolutionRow[]),
-    truncated: (total.count ?? rows.length) > rows.length,
-  }
-}
-
 export async function GET() {
   const ctx = await requireSuperAdmin()
   if (ctx instanceof NextResponse) return ctx
 
   try {
-    const loaded = await loadGroups(ctx.supabase)
+    const loaded = await loadErrorGroups(ctx.supabase)
     if ('error' in loaded) return serverError(loaded.error, 'admin-error-groups:GET')
     return NextResponse.json(
       {
         groups: loaded.groups,
         summary: summarizeErrorGroups(loaded.groups),
         truncated: loaded.truncated,
-        windowSize: MAX_ROWS,
+        windowSize: ERROR_GROUPS_MAX_ROWS,
       },
       // De body draagt vrije-tekst foutmeldingen en stacktraces (deels
       // client-aangeleverd, dus mogelijk met PII erin). Die horen niet in een
@@ -157,7 +102,8 @@ export async function POST(req: Request) {
   if (!parsed.ok) return parsed.response
 
   try {
-    const loaded = await loadGroups(ctx.supabase, LOG_COLUMNS_LEAN)
+    // Lean kolomset: POST gebruikt alleen `count` en `lastSeenAt`, geen stacktraces.
+    const loaded = await loadErrorGroups(ctx.supabase, ERROR_LOG_COLUMNS_LEAN)
     if ('error' in loaded) return serverError(loaded.error, 'admin-error-groups:POST')
 
     const group = loaded.groups.find((g) => g.signature === parsed.data.signature)

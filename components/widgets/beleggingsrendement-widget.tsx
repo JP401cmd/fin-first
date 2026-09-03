@@ -3,8 +3,14 @@ import { WidgetShell } from './widget-shell'
 import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
-import { MaskedAmount } from '@/components/app/masked-amount'
-import { calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
+import { MaskedAmount, useDirectionClass } from '@/components/app/masked-amount'
+import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import {
+  calculateFreedomTime,
+  formatFreedomTimeString,
+  dailyExpenseRate,
+  MASKED_PERCENT_PLACEHOLDER,
+} from '@/lib/format'
 import { DEFAULT_RETURN } from '@/lib/constants'
 import { weightedExpectedReturn, INVESTMENT_ASSET_TYPES } from '@/lib/dashboard-wealth-weighting'
 import { RETURN_BASIS_LABELS, formatGainPct } from '@/lib/asset-return'
@@ -51,6 +57,11 @@ export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget
   const portfolioReturn = weightedExpectedReturn(data.assetsByType, INVESTMENT_ASSET_TYPES)
   // Fallback via de canonieke constante (lib/constants.ts) — geen magic number;
   // data.grossReturn komt normaliter per gebruiker uit resolveFireParams.
+  //
+  // Dit percentage wordt bewust NIET meegemaskeerd (WF-NAV-11): het is een
+  // AANNAME over de markt, geen uitkomst van dit portefeuille. Het staat los van
+  // elk bedrag op het scherm en verraadt dus geen richting van het vermogen —
+  // net zomin als een inflatie- of SWR-percentage dat doet.
   const expectedReturnPct = (portfolioReturn > 0 ? portfolioReturn : (data.grossReturn || DEFAULT_RETURN)) * 100
 
   // Vrijheidstijd-framing van de absolute winst/verlies ("Geld is opgeslagen tijd").
@@ -61,15 +72,23 @@ export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget
   const gainFtStr = gainFt ? formatFreedomTimeString(gainFt, 'short') : null
   const gainFtVerb = sinceInceptionAbsolute >= 0 ? 'gewonnen' : 'verloren'
 
-  // Color based on positive/negative return (semantiek blijft semantisch)
-  const returnColor = !hasCostBasis
-    ? 'text-[var(--ink-3)]'
-    : sinceInceptionReturn >= 0
-      ? 'text-positive'
-      : 'text-negative'
+  // WF-NAV-11: zolang bedragen gemaskeerd zijn mag het rendement geen richting
+  // prijsgeven — niet als percentage en niet als kleur. Deze widget zet het
+  // rendementspercentage pal boven een `MaskedAmount`; "+32,7%" laten staan
+  // vertelt de meekijker precies wat het verborgen bedrag verzweeg.
+  const { masked } = useMaskedAmounts()
+
+  // Color based on positive/negative return (semantiek blijft semantisch).
+  // Zonder kostprijs én bij maskering vallen we terug op dezelfde neutrale tint.
+  const gainColor = useDirectionClass(sinceInceptionReturn >= 0)
+  const returnColor = hasCostBasis ? gainColor : 'text-[var(--ink-3)]'
   // Eén formatter voor élk rendementspercentage (lib/asset-return.ts): zelfde
   // afronding en nl-NL-komma als de KPI en de rekenmodal.
-  const returnLabel = hasCostBasis ? (formatGainPct(portfolio.pct) ?? 'onbekend') : 'onbekend'
+  const returnLabel = !hasCostBasis
+    ? 'onbekend'
+    : masked
+      ? MASKED_PERCENT_PLACEHOLDER
+      : (formatGainPct(portfolio.pct) ?? 'onbekend')
   // Grondslag in het label — gedeelde bron, geen eigen tekst per oppervlak.
   const basisLabel = RETURN_BASIS_LABELS.portfolioSincePurchase
   const expectedLabel = RETURN_BASIS_LABELS.expectedAnnual
@@ -131,11 +150,15 @@ export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget
   const renderTypeRow = (row: (typeof typeRows)[number]) => {
     const rowHasCost = row.cost > 0
     const pct = row.pct
+    // Geen hook hier: deze renderer draait in een `.map()`. `masked` komt uit
+    // de outer scope, de neutrale tint spiegelt `useDirectionClass`.
     const rowColor = !rowHasCost
       ? 'text-[var(--ink-4)]'
-      : row.gain >= 0
-        ? 'text-positive'
-        : 'text-negative'
+      : masked
+        ? 'text-[var(--ink-3)]'
+        : row.gain >= 0
+          ? 'text-positive'
+          : 'text-negative'
     const label = ASSET_LABELS[row.type] || row.type
     return (
       <div key={row.type} className="flex items-center justify-between text-xs">
@@ -149,7 +172,7 @@ export const BeleggingsrendementWidget = memo(function BeleggingsrendementWidget
               <MaskedAmount value={row.gain} tone="kern" />
             </span>
             <span className={`font-mono tabular-nums w-16 shrink-0 text-right ${rowColor}`}>
-              {formatGainPct(pct)}
+              {masked ? MASKED_PERCENT_PLACEHOLDER : formatGainPct(pct)}
             </span>
           </>
         ) : (

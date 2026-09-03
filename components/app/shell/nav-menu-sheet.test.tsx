@@ -10,6 +10,9 @@ import { DisplayModeProvider, type DisplayMode } from '@/lib/hooks/use-display-m
 // mocken. Geen echte router nodig.
 vi.mock('next/navigation', () => ({
   usePathname: () => '/toekomst',
+  // De sheet draagt de toetsenbord-tegenhanger van pull-to-refresh
+  // ("Ververs pagina") en leest daarvoor de router.
+  useRouter: () => ({ refresh: vi.fn() }),
 }))
 
 function renderSheet(mode: DisplayMode, activeAppKeys: string[] = []) {

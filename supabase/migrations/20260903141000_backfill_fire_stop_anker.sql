@@ -1,0 +1,194 @@
+-- ADR 0129 (D6, besluit M1) — fase F1, stap 2 van 2: bestaande rijen krijgen
+-- hun stop-anker.
+--
+-- AFHANKELIJKHEID: draai 20260903140000_fire_stop_anker_kolommen.sql EERST.
+-- DDL en datacorrectie staan bewust in twee bestanden, zodat een mislukte
+-- backfill het schema niet meesleept en apart opnieuw gedraaid kan worden.
+--
+-- ── WAT DEZE MIGRATIE DOET ──────────────────────────────────────────────────
+-- Drie takken, precies zoals ADR 0129 D6 ze vastlegt:
+--
+--   1. fire_end_strategy = 'pensioen'    -> fire_stop_anchor = 'aow'
+--                                           EN fire_end_age    = 100
+--   2. fire_end_strategy = 'nu-stoppen'  -> fire_stop_anchor = 'now'
+--   3. al het overige (deplete/legacy/perpetual/NULL) -> 'solved'
+--
+-- Tak 3 is een BEWUSTE NO-OP en staat hieronder expliciet als (uitgevoerde,
+-- 0-rijen) UPDATE opgeschreven in plaats van weggelaten. De kolomdefault is
+-- 'solved', dus die rijen staan er al goed; maar "er gebeurt niets" moet een
+-- zichtbare keuze zijn en geen vergeten geval. De UPDATE is zo geschreven dat
+-- hij per definitie nul rijen raakt en dat dus ook meetbaar aantoont.
+--
+-- WAAROM fire_end_age := 100 BIJ TAK 1 (besluit M1 / B2)
+-- De kernel rekende onder 'pensioen' altijd al tot leeftijd 100 en negeerde de
+-- opgeslagen fire_end_age volledig — een dood veld met een UI-belofte
+-- eromheen. Door die 100 in de DATA waar te maken, rekent de kernel ná deze
+-- migratie identiek aan ervoor, terwijl fire_end_age vanaf F2 een echt,
+-- instelbaar veld wordt (dat maakt combinaties als aow x legacy voor het eerst
+-- uitdrukbaar). Zonder M1 zou de omkering van eindleeftijdVan in F2 het
+-- gedrag van bestaande pensioen-rijen stil veranderen.
+--
+-- fire_end_strategy WORDT HIER NIET AANGERAAKT. Dit is de expand-fase: de oude
+-- kolom blijft naast de nieuwe staan en wint in parseFirePlan voor het anker
+-- (ADR 0129 D2), zodat geen enkele rij zichzelf kan tegenspreken. Het
+-- herschrijven van de legacy-waarden is F4.
+--
+-- ── LIVE GEMETEN VOORAF (public.profiles, 03-09-2026, alleen leesqueries) ───
+--   rijen totaal                                       : 27
+--   tak 1  fire_end_strategy = 'pensioen'              :  2
+--     waarvan fire_end_age nu <> 100 (dus door M1 geraakt):  2
+--     hun huidige fire_end_age                         : 90 voor beide
+--       (= de kolomdefault; er gaat dus geen door de gebruiker gezette
+--        waarde verloren — relevant voor de terugweg hieronder)
+--   tak 2  fire_end_strategy = 'nu-stoppen'            :  0
+--   tak 3  overig (deplete/legacy/perpetual)           : 25
+--   fire_end_strategy IS NULL                          :  0
+--   waarden buiten het CHECK-domein                    :  0
+--
+-- Zou een rij de nieuwe CHECKs schenden? NEE, nul rijen — geverifieerd:
+--   * min(fire_end_age) = 85, max = 93, dus alles binnen de bestaande
+--     profiles_fire_end_age_check (60..120); de M1-waarde 100 valt daar ook in.
+--   * fire_stop_anchor krijgt de default 'solved' en fire_stop_age blijft NULL,
+--     dus profiles_fire_stop_anchor_age_consistent is voor elke bestaande rij
+--     waar (false = false).
+-- Alle bovenstaande feiten zijn gemeten tegen de LIVE database (pg_constraint,
+-- information_schema, tellingen op public.profiles), niet gelezen uit
+-- migratiebestanden (ADR 0045).
+--
+-- ── TELQUERY VOOR EN NA (draai identiek, vergelijk) ─────────────────────────
+--
+--   SELECT
+--     count(*)                                                   AS rijen_totaal,
+--     count(*) FILTER (WHERE fire_stop_anchor = 'solved')         AS anker_solved,
+--     count(*) FILTER (WHERE fire_stop_anchor = 'aow')            AS anker_aow,
+--     count(*) FILTER (WHERE fire_stop_anchor = 'now')            AS anker_now,
+--     count(*) FILTER (WHERE fire_stop_anchor = 'age')            AS anker_age,
+--     count(*) FILTER (WHERE fire_end_strategy = 'pensioen')      AS strategie_pensioen,
+--     count(*) FILTER (WHERE fire_end_strategy = 'pensioen'
+--                        AND fire_end_age = 100)                  AS pensioen_endage_100,
+--     count(*) FILTER (WHERE fire_end_strategy = 'nu-stoppen')    AS strategie_nu_stoppen,
+--     count(*) FILTER (WHERE fire_stop_age IS NOT NULL)           AS met_stopleeftijd
+--   FROM public.profiles;
+--
+--   VOOR (gemeten 03-09-2026):
+--     27 | solved 27 | aow 0 | now 0 | age 0 | pensioen 2 | endage100 0 |
+--     nu-stoppen 0 | stopleeftijd 0
+--   NA (verwacht):
+--     27 | solved 25 | aow 2 | now 0 | age 0 | pensioen 2 | endage100 2 |
+--     nu-stoppen 0 | stopleeftijd 0
+--
+-- Aanvullende toets NA afloop — er mag geen rij zijn die zichzelf tegenspreekt:
+--
+--   SELECT count(*) AS moet_nul_zijn FROM public.profiles
+--   WHERE (fire_end_strategy = 'pensioen'   AND fire_stop_anchor <> 'aow')
+--      OR (fire_end_strategy = 'nu-stoppen' AND fire_stop_anchor <> 'now')
+--      OR (fire_end_strategy = 'pensioen'   AND fire_end_age <> 100);
+--
+-- ── IDEMPOTENTIE ────────────────────────────────────────────────────────────
+-- Elke UPDATE draagt de guard `fire_stop_anchor = 'solved'`: rijen die de
+-- migratie al heeft omgezet, matchen bij een tweede run niet meer en worden
+-- dus niet nog eens geschreven. Opnieuw draaien is daarmee zonder tweede
+-- effect. Let op de resterende grens: deze migratie is ONE-SHOT bedoeld,
+-- direct na de DDL en vóór F3 (waarin de gebruiker het anker zelf kan zetten).
+-- Een run maanden later zou een pensioen-rij die de gebruiker bewust op
+-- 'solved' heeft gezet terugzetten naar 'aow'. Registreer de versie dus meteen
+-- na uitrol, zodat niemand hem per ongeluk herhaalt.
+--
+-- ── TOEGANGSMODEL ───────────────────────────────────────────────────────────
+-- Geen RLS-wijziging. Deze migratie schrijft als migratierol (RLS-bypass) en
+-- raakt uitsluitend eigen-rij planvoorkeuren. Het bedoelde schrijfpad voor deze
+-- kolommen in de app blijft own-row read-modify-write via de anon RLS-client
+-- (app/api/fire-settings), nooit service-role — zie de dekkingscheck in
+-- 20260903140000_fire_stop_anker_kolommen.sql.
+--
+-- ── UITROLLEN — PROJECTVALKUIL ──────────────────────────────────────────────
+-- Rol NIET uit met apply_migration: die verzint een eigen tijdstempel, waardoor
+-- het register uit de pas loopt met de bestandsnaam. Rol uit via execute_sql en
+-- registreer de versie daarna expliciet:
+--   INSERT INTO supabase_migrations.schema_migrations (version, name)
+--   VALUES ('20260903141000', 'backfill_fire_stop_anker');
+-- Beide UPDATEs horen in één transactie te landen; execute_sql draait de
+-- statements in dit bestand als één unit.
+--
+-- ── DE TERUGWEG (wat herstelt dit, en waaraan zie je dat het misging) ───────
+-- Waaraan je ziet dat het misging:
+--   (a) de NA-telling wijkt af van de verwachting hierboven — bijvoorbeeld
+--       anker_aow <> aantal pensioen-rijen, of pensioen_endage_100 <
+--       strategie_pensioen;
+--   (b) de tegenspraak-toets hierboven geeft > 0;
+--   (c) een pensioen-gebruiker ziet ná uitrol een andere FIRE-uitkomst dan
+--       ervoor (F1 hoort gedragsbehoudend te zijn: de gouden matrix moet
+--       byte-identiek blijven). Dat is het scherpste signaal, want het betekent
+--       dat de M1-aanname "de kernel rekende toch al tot 100" niet klopt.
+--
+-- Herstelmigratie (nieuw bestand, NIET dit bestand aanpassen; geen drop column
+-- — dat is F4):
+--
+--   -- 2026xxxxxxxxxx_terugdraaien_backfill_fire_stop_anker.sql
+--   UPDATE public.profiles
+--      SET fire_end_age = 90          -- gemeten pre-waarde van beide
+--                                     -- pensioen-rijen op 03-09-2026; dat is
+--                                     -- tevens de kolomdefault, er ging dus
+--                                     -- geen gebruikerskeuze verloren
+--    WHERE fire_end_strategy = 'pensioen'
+--      AND fire_stop_anchor = 'aow'
+--      AND fire_end_age = 100;
+--   UPDATE public.profiles
+--      SET fire_stop_anchor = 'solved', fire_stop_age = NULL
+--    WHERE fire_stop_anchor IN ('aow', 'now');
+--
+-- Voorbehoud bij die herstelmigratie: hij is exact zolang niemand tussen
+-- uitrol en terugdraaien zelf fire_end_age of het anker heeft gewijzigd. Meet
+-- daarom vóór het terugdraaien opnieuw hoeveel rijen aan de WHERE voldoen; wijkt
+-- dat af van 2 respectievelijk 2, dan is er handmatig werk bij en moet je per
+-- rij beslissen in plaats van blind terugdraaien.
+
+-- ── Tak 1: 'pensioen' -> anker 'aow' + M1 (fire_end_age := 100) ─────────────
+
+UPDATE public.profiles
+   SET fire_stop_anchor = 'aow',
+       fire_end_age     = 100
+ WHERE fire_end_strategy = 'pensioen'
+   AND fire_stop_anchor  = 'solved';
+
+-- ── Tak 2: 'nu-stoppen' -> anker 'now' ──────────────────────────────────────
+-- (0 rijen op 03-09-2026; de tak staat er omdat de waarde sinds 20260902120000
+--  wel geschreven kán worden.)
+
+UPDATE public.profiles
+   SET fire_stop_anchor = 'now'
+ WHERE fire_end_strategy = 'nu-stoppen'
+   AND fire_stop_anchor  = 'solved';
+
+-- ── Tak 3: al het overige blijft 'solved' — BEWUST GEEN UPDATE ─────────────
+-- deplete / legacy / perpetual dragen geen stop-anker: de app rekent de vroegste
+-- haalbare stopleeftijd uit. Dat is de kolomdefault ('solved'), dus er is niets
+-- te doen. Deze tak is daarom een AANTEKENING, geen statement.
+--
+-- WAAROM HIER GEEN UPDATE STAAT (belangrijk — dit was bijna een val).
+-- De voor de hand liggende schrijfwijze is:
+--
+--   UPDATE public.profiles SET fire_stop_anchor = 'solved', fire_stop_age = NULL
+--    WHERE fire_end_strategy IN ('deplete','legacy','perpetual')
+--      AND fire_stop_anchor <> 'solved';
+--
+-- Vandaag raakt die nul rijen — de kolom is net aangemaakt, alles staat op de
+-- default. Maar hij is niet idempotent in de TIJD, alleen in dit moment. Vanaf
+-- fase F3 kiest een gebruiker anker en eind-vorm los van elkaar, en dan is
+-- `deplete` + `age 58` ("ik stop op mijn 58e en eet mijn vermogen op") precies
+-- de combinatie waarvoor dit hele besluit bestaat. Een herdraai van de backfill
+-- — na een herstel, bij het opzetten van een tweede omgeving, of door iemand die
+-- de map van boven naar beneden afloopt — zou dan élke zelfgekozen stopleeftijd
+-- wissen. Stil, want het is een UPDATE die "niets" heet te doen.
+--
+-- De regel erachter: een backfill mag alleen rijen aanraken die hij zelf herkent
+-- aan een VERTREKtoestand, nooit aan een BESTEMMING die later legitiem wordt.
+-- Tak 1 en 2 hierboven voldoen daaraan (`fire_stop_anchor = 'solved'` als
+-- voorwaarde: die toestand verdwijnt zodra de rij gemigreerd is en komt niet
+-- vanzelf terug). Tak 3 heeft geen zo'n vertrektoestand — dus geen statement.
+--
+-- Verificatie dat de default zijn werk deed (verwacht op 03-09-2026: 25):
+--   SELECT count(*) FROM public.profiles
+--    WHERE fire_stop_anchor = 'solved' AND fire_stop_age IS NULL
+--      AND (fire_end_strategy IS NULL
+--           OR fire_end_strategy IN ('deplete','legacy','perpetual'));

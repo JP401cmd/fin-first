@@ -17,45 +17,23 @@
  *  vervolgens `<NavStackMeta>` om die default te corrigeren met de echte
  *  waarden — ZONDER een nieuwe stack-entry te pushen.
  *
- * Coördinatie met agent A (nav-stack-provider.tsx eigenaar):
+ * Coördinatie met nav-stack-provider.tsx:
  *  Deze component dispatcht een browser-CustomEvent `fintwo:nav-stack-meta` met
- *  `{ title, bottomBar }` als detail. Agent A's NavStackProvider moet één
- *  useEffect toevoegen die het event opvangt en de top-entry van de active
- *  tab-stack bijwerkt zonder push/pop.
+ *  `{ pathname, title, bottomBar, topBar }` als detail. De NavStackProvider
+ *  luistert (zie `applyNavStackMetaToStack` + de pathname-watcher aldaar) en
+ *  werkt de entry van de AFZENDER bij zonder push/pop.
  *
- *  Concrete one-liner-uitbreiding voor nav-stack-provider.tsx:
- *
- *    useEffect(() => {
- *      if (typeof window === 'undefined') return
- *      const handler = (e: Event) => {
- *        const { detail } = e as CustomEvent<NavStackMetaDetail>
- *        const tabStack = runtimeState.stacks[activeTab]
- *        if (tabStack.length === 0) return
- *        const top = tabStack[tabStack.length - 1]
- *        const updated: StackEntry = {
- *          ...top,
- *          title: detail.title,
- *          bottomBar: detail.bottomBar,
- *        }
- *        setState({
- *          stacks: {
- *            ...runtimeState.stacks,
- *            [activeTab]: [...tabStack.slice(0, -1), updated],
- *          },
- *          transition: runtimeState.transition,
- *        }, true)
- *      }
- *      window.addEventListener(NAV_STACK_META_EVENT, handler)
- *      return () => window.removeEventListener(NAV_STACK_META_EVENT, handler)
- *    }, [activeTab])
- *
- *  Tot agent A dit toevoegt: NavStackMeta is een no-op in productie (event
- *  vuurt, niemand luistert) — geen crash, geen regressie. De sandbox loading-
- *  demo werkt alvast: het event vuurt en de StackDemo's `pushCounter`-debug-
- *  rendering laat zien dat de meta is gearriveerd.
+ *  Waarom de pathname meereist: dit component is een descendant van de
+ *  provider en React draait kind-effects vóór ouder-effects in dezelfde
+ *  commit. Rendert een nieuwe pagina haar NavStackMeta in dezelfde commit als
+ *  de pathname-wissel, dan vuurt dit event vóórdat de provider de nieuwe
+ *  entry heeft gepusht — en landde de titel op de entry van de vórige pagina
+ *  (gepersisteerd in sessionStorage; UAT WF-REKEN-08-bug1). Met de pathname
+ *  erbij kan de provider het event parkeren tot de entry bestaat.
  */
 
 import { useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 import type { BottomBarConfig, TopBarConfig } from './nav-stack-provider'
 
 // ── Re-export voor consumer-convenience ─────────────────────────────
@@ -70,12 +48,17 @@ export type { BottomBarConfig, TopBarConfig, TopBarKind } from './nav-stack-prov
 export const NAV_STACK_META_EVENT = 'fintwo:nav-stack-meta'
 
 /**
- * CustomEvent-detail-shape. Provider parsed dit en update de top-entry van de
- * huidige active tab-stack. Alle velden zijn altijd aanwezig — `bottomBar` en
- * `topBar` krijgen een default in `NavStackMeta` zelf, dus de listener-kant
- * blijft simpel.
+ * CustomEvent-detail-shape. Provider parsed dit en update de entry van de
+ * afzender in de huidige active tab-stack. `bottomBar` en `topBar` krijgen
+ * een default in `NavStackMeta` zelf, dus de listener-kant blijft simpel.
+ *
+ * `pathname` = de route van de pagina die het event stuurt (`usePathname()`).
+ * De provider werkt alleen een entry met déze pathname bij en parkeert het
+ * event anders tot de entry bestaat. Optioneel voor legacy-afzenders zonder
+ * pathname: die houden het oude "top-entry"-gedrag.
  */
 export type NavStackMetaDetail = {
+  pathname?: string
   title: string
   bottomBar: BottomBarConfig
   topBar: TopBarConfig
@@ -135,6 +118,9 @@ type NavStackMetaProps = {
  * gelijk voor onze sync-doel.
  */
 export function NavStackMeta({ title, bottomBar, topBar }: NavStackMetaProps): null {
+  // De afzender-route: de provider matcht hierop i.p.v. blind de top-entry
+  // te nemen (zie header-comment — effect-volgorde kind → ouder).
+  const pathname = usePathname()
   // Resolve defaults hier zodat het event ALTIJD een complete config draagt.
   // Dat houdt de listener-kant simpel (geen extra null-check daar).
   const resolvedBottom: BottomBarConfig = bottomBar ?? DEFAULT_BOTTOM_BAR
@@ -154,6 +140,7 @@ export function NavStackMeta({ title, bottomBar, topBar }: NavStackMetaProps): n
     if (typeof window === 'undefined') return
 
     const detail: NavStackMetaDetail = {
+      pathname: pathname ?? undefined,
       title,
       bottomBar: resolvedBottom,
       topBar: resolvedTop,
@@ -163,13 +150,13 @@ export function NavStackMeta({ title, bottomBar, topBar }: NavStackMetaProps): n
     )
     // Geen cleanup — dit is een fire-and-forget sync. Volgende render
     // (met andere title of config) dispatcht opnieuw; de listener werkt
-    // simpelweg de top-entry bij. Idempotent.
+    // simpelweg de entry van deze route bij. Idempotent.
     //
     // `resolvedBottom` en `resolvedTop` zijn gederiveerd uit `configKey`
     // (zelfde JSON = gelijke semantiek), dus we kunnen ze veilig in de
     // effect referentielen.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, configKey])
+  }, [title, configKey, pathname])
 
   return null
 }

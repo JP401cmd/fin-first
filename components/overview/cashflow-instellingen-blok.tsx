@@ -497,7 +497,13 @@ export function CashflowInstellingenBlok({
   // vrijheidstijd weg; `showRate` is de ene gate voor beide.
   const dailyRate = data.dailyExpenseRate ?? 0
   const showRate = !masked && dailyRate > 0
-  const rateFootnote = formatFreedomRateFootnote(dailyRate, 'transactions', masked)
+  // Herkomst uit de bundel (1b): een profielschatting noemt zich in de
+  // voetnoot een schatting. Terugval voor fixtures zonder bron-veld.
+  const rateFootnote = formatFreedomRateFootnote(
+    dailyRate,
+    data.dailyExpenseRateSource ?? (dailyRate > 0 ? 'transactions' : 'none'),
+    masked,
+  )
 
   // ── De drie cellen van de samenvatting ────────────────────────────────────
   // De grondslag staat als eigen subregel op ELKE cel (ADR 0103: een grondslag

@@ -229,10 +229,15 @@ export function HefbomenNav({
         // Status-bron: leverScores (gedeelde SSoT, == sidebar-dot). Fallback op
         // de pijler-/proxy-status alleen wanneer leverScores (nog) ontbreekt.
         const leverEntry = leverScores ? leverScores[LEVER_KEY_MAP[key]] : null
-        const proxyScore = !pillarKey && health ? health.total : null
+        // Geen `health.total`-proxy meer als fallback: dat is een algemene
+        // gezondheidsscore, geen Box 3-specifiek signaal, en `hefboomVerdict`
+        // deed er hieronder wél een Box 3-specifieke uitspraak mee (kaart
+        // "restpunt B2", release-review 31 aug). Ontbreekt de echte pijler
+        // (alleen de belasting-tegel heeft `pillarKey: null`), dan is de
+        // status 'neutral' — precies zoals `pillarStatus(null)` al levert.
         const status = leverEntry
           ? leverToLeverageStatus(leverEntry.status)
-          : pillarStatus(pillar?.score ?? proxyScore)
+          : pillarStatus(pillar?.score)
 
         const totalValue = totals?.[key]
         const showTotal = typeof totalValue === 'number' && totalValue > 0

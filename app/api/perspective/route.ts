@@ -46,8 +46,6 @@ export async function GET() {
     }
   }
 
-  const isHousehold = householdType === 'samen' || householdType === 'gezin'
-
   // Check if household tables exist and if user has a household
   let hasHousehold = false
   let partnerName: string | null = null
@@ -80,7 +78,12 @@ export async function GET() {
     },
   ]
 
-  if (isHousehold || hasHousehold) {
+  // WF-NAV-19: Huishouden/Partner mogen UITSLUITEND op een echt geaccepteerd
+  // huishoudlid gegate worden. Het zelf-gerapporteerde NIBUD-veld
+  // `profiles.household_type` ('samen'/'gezin') zegt niets over een gekoppeld
+  // tweede account en mag deze perspectieven dus niet openzetten — anders krijgt
+  // een solo-gebruiker een niet-functionele "Partner"-optie te zien.
+  if (hasHousehold) {
     availablePerspectives.push({
       id: 'household',
       label: 'Huishouden',
@@ -101,8 +104,10 @@ export async function GET() {
   return NextResponse.json({
     selectedPerspective,
     availablePerspectives,
+    // householdType blijft ongewijzigd in de response voor de NIBUD-budgetcheck;
+    // alleen de perspectief-gating (isHousehold) volgt hasHousehold.
     householdType,
-    isHousehold: isHousehold || hasHousehold,
+    isHousehold: hasHousehold,
     hasHousehold,
     partnerName,
   })

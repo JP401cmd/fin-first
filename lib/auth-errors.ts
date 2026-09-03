@@ -72,22 +72,42 @@ export function isUserAlreadyRegisteredError(error: unknown): boolean {
   return haystack.includes('user already registered') || code === 'user_already_exists'
 }
 
-export function translateAuthError(error: unknown): string {
+/**
+ * Herkent een authfout die door een NETWERKSTORING is veroorzaakt, niet door een
+ * ongeldige of ontbrekende sessie.
+ *
+ * Waarom dit een eigen predicate is (WF-MIJN-02c): `supabase.auth.getUser()` is
+ * zelf een netwerkcall. Valt de verbinding weg, dan gooit auth-js NIET — het
+ * retourneert `{ data: { user: null }, error: AuthRetryableFetchError }`. Code
+ * die alleen `user` uitleest ziet dus `null` en concludeert ten onrechte
+ * "uitgelogd", terwijl de sessie gewoon intact is. Een oppervlak dat een
+ * auth-fout anders wil behandelen dan een netwerkfout, poort hierop.
+ *
+ * De match staat bewust op `name` én op message/code-substrings: bij een
+ * gegooide fetch-fout (TypeError) is er geen auth-js-klasse om op te herkennen.
+ */
+export function isAuthNetworkError(error: unknown): boolean {
   const { message, code, name } = extractAuthErrorFields(error)
-  // Case-insensitief matchen op zowel de message als de code, zodat we niet
-  // afhankelijk zijn van exacte Supabase-formulering of -versie.
   const haystack = `${code} ${message}`.toLowerCase()
-
-  // Netwerk/offline eerst: Supabase geeft dit terug als AuthRetryableFetchError,
-  // of de onderliggende fetch gooit een TypeError("Failed to fetch").
-  if (
+  return (
     name === 'AuthRetryableFetchError' ||
     haystack.includes('failed to fetch') ||
     haystack.includes('fetch failed') ||
     haystack.includes('networkerror') ||
     haystack.includes('network error') ||
     haystack.includes('network request failed')
-  ) {
+  )
+}
+
+export function translateAuthError(error: unknown): string {
+  const { message, code } = extractAuthErrorFields(error)
+  // Case-insensitief matchen op zowel de message als de code, zodat we niet
+  // afhankelijk zijn van exacte Supabase-formulering of -versie.
+  const haystack = `${code} ${message}`.toLowerCase()
+
+  // Netwerk/offline eerst: Supabase geeft dit terug als AuthRetryableFetchError,
+  // of de onderliggende fetch gooit een TypeError("Failed to fetch").
+  if (isAuthNetworkError(error)) {
     return AUTH_NETWORK_MESSAGE
   }
 

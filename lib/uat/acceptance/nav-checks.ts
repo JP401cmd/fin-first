@@ -119,12 +119,16 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
     label: 'Titel-fallback (resolveRouteTitle) + tab-root-detectie (isTabRoot)',
     run: () => {
       criterion('WF-NAV-05')
-      const titelCheckins = resolveRouteTitle('/mijn/checkins')
+      // /mijn/feedback valt écht op de titelkaart terug (geen <NavStackMeta> in
+      // de pagina). /mijn/checkins juist niet: die re-export zet zelf
+      // "Check-in historie", dus daar hoort de fallback leeg te zijn.
+      const titelFeedback = resolveRouteTitle('/mijn/feedback')
+      const titelCheckinsFallback = resolveRouteTitle('/mijn/checkins')
       const overzichtIsTabRoot = isTabRoot('/overzicht', 'kern')
       const toekomstIsTabRootVoorHorizon = isTabRoot('/toekomst', 'horizon')
       return {
-        expected: 'titelCheckins=Check-ins; overzichtIsTabRoot=true; toekomstIsTabRootVoorHorizon=true',
-        actual: `titelCheckins=${titelCheckins}; overzichtIsTabRoot=${overzichtIsTabRoot}; toekomstIsTabRootVoorHorizon=${toekomstIsTabRootVoorHorizon}`,
+        expected: 'titelFeedback=Melden; titelCheckinsFallback=null; overzichtIsTabRoot=true; toekomstIsTabRootVoorHorizon=true',
+        actual: `titelFeedback=${titelFeedback}; titelCheckinsFallback=${titelCheckinsFallback}; overzichtIsTabRoot=${overzichtIsTabRoot}; toekomstIsTabRootVoorHorizon=${toekomstIsTabRootVoorHorizon}`,
       }
     },
   },

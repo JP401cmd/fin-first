@@ -114,6 +114,170 @@ export async function syncHoldingAggregatesFromTransactions(
 }
 
 /**
+ * Notitietekst op de synthetische openingstransactie. Bewust herkenbaar in de
+ * UI-transactielijst: de gebruiker moet kunnen zien dat deze rij is afgeleid en
+ * niet door hemzelf is gelogd (en hem desgewenst kunnen corrigeren/verwijderen).
+ */
+export const OPENING_TRANSACTION_NOTE =
+  'Openingspositie — automatisch afgeleid uit het aantal en de gemiddelde aankoopprijs die bij het aanmaken van deze positie zijn ingevoerd.'
+
+export interface OpeningTransactionResult {
+  /** True als er daadwerkelijk een openingsrij is weggeschreven. */
+  created: boolean
+  /**
+   * Waarom er wel/niet is aangemaakt:
+   *   - `created`      — openingsrij weggeschreven
+   *   - `has_history`  — er stonden al transacties; niets te herstellen
+   *   - `no_position`  — holding heeft geen positief aantal eenheden
+   *   - `read_failed`  — bestaande historie/holding niet leesbaar (bewust NIET
+   *                      aanmaken: een niet-verifieerbare staat mag geen
+   *                      dubbele openingspositie opleveren)
+   *   - `insert_failed`— insert geweigerd door DB
+   */
+  reason:
+    | 'created'
+    | 'has_history'
+    | 'no_position'
+    | 'read_failed'
+    | 'insert_failed'
+  /** Aantal eenheden op de aangemaakte openingsrij (0 wanneer niets is gemaakt). */
+  units: number
+  /** Prijs per eenheid op de aangemaakte openingsrij. */
+  pricePerUnit: number
+  /** ISO-datum van de aangemaakte openingsrij, of null. */
+  date: string | null
+}
+
+/** `YYYY-MM-DD` uit een ISO-timestamp of date-string; null bij onbruikbare invoer. */
+function isoDatePart(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length < 10) return null
+  const head = value.slice(0, 10)
+  return /^\d{4}-\d{2}-\d{2}$/.test(head) ? head : null
+}
+
+/**
+ * Herstel de ontbrekende openingspositie van een holding die via quick-add is
+ * aangemaakt (WF-BEZIT-15-bug1).
+ *
+ * Het probleem: `POST /api/holdings` schrijft `units`/`avg_purchase_price` als
+ * statische kolommen ZONDER bijbehorende transactierij. Zodra de gebruiker
+ * daarna zijn eerste transactie logt, herleidt
+ * `syncHoldingAggregatesFromTransactions` de positie uitsluitend uit
+ * `*_transactions` en overschrijft die statische velden — de oorspronkelijke
+ * stukken verdampen stil (100 @ €10 + koop 50 @ €14 gaf 50 eenheden i.p.v.
+ * 150). De aggregatie-engine is niet fout: hij is per ontwerp de single source
+ * of truth. De quick-add-route brak die invariant door bezit vast te leggen
+ * zonder onderliggende transactie.
+ *
+ * Deze helper dicht dat gat op het moment dat het ertoe doet: vlak vóór de
+ * eerste transactie-log wordt de bestaande statische positie omgezet in een
+ * echte `buy`-rij. Dat is bewust de gekozen richting (optie B) en niet "altijd
+ * een openingsrij schrijven bij quick-add" (optie A), omdat B óók de holdings
+ * repareert die vandaag al zonder historie in de database staan — zonder
+ * aparte backfill.
+ *
+ * Idempotent op de enige manier die telt: er wordt alleen geschreven wanneer de
+ * transactietabel voor deze holding aantoonbaar leeg is. Kan dat niet gelezen
+ * worden, dan doen we niets (`read_failed`) — liever de bestaande bug dan een
+ * verdubbelde positie.
+ *
+ * @param notLaterThan Datum van de transactie die de gebruiker nu logt. De
+ *   openingsrij wordt hierop geklemd zodat hij nooit ná de nieuwe transactie
+ *   sorteert. Dat is essentieel bij een eerste log van type `sell`: een verkoop
+ *   die vóór zijn eigen aankoop valt levert een negatieve tussenstand op, en
+ *   `syncHoldingAggregatesFromTransactions` klemt zo'n historie op 0 eenheden.
+ */
+export async function ensureOpeningTransaction(
+  supabase: SupabaseLike,
+  tables: { holdings: string; transactions: string },
+  holdingId: string,
+  userId: string,
+  notLaterThan?: string | null,
+): Promise<OpeningTransactionResult> {
+  const none: OpeningTransactionResult = {
+    created: false,
+    reason: 'has_history',
+    units: 0,
+    pricePerUnit: 0,
+    date: null,
+  }
+
+  // 1. Bestaat er al historie? Eén rij is genoeg om te weten dat de holding
+  //    transactie-gedreven is en er niets te herstellen valt.
+  const { data: existing, error: existingError } = await supabase
+    .from(tables.transactions)
+    .select('id')
+    .eq('holding_id', holdingId)
+    .eq('user_id', userId)
+    .limit(1)
+
+  if (existingError) return { ...none, reason: 'read_failed' }
+  if (existing && existing.length > 0) return none
+
+  // 2. Lees de statische positie. Kolomlijst is bucket-afhankelijk:
+  //    `crypto_holdings` heeft geen `purchase_date`, en een select op een
+  //    niet-bestaande kolom laat de hele query falen.
+  const columns =
+    tables.holdings === 'investment_holdings'
+      ? 'units, avg_purchase_price, purchase_date, created_at'
+      : 'units, avg_purchase_price, created_at'
+
+  const { data: holdingRow, error: holdingError } = await supabase
+    .from(tables.holdings)
+    .select(columns)
+    .eq('id', holdingId)
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (holdingError || !holdingRow) return { ...none, reason: 'read_failed' }
+
+  const row = holdingRow as unknown as {
+    units: number | string | null
+    avg_purchase_price: number | string | null
+    purchase_date?: string | null
+    created_at?: string | null
+  }
+
+  const units = Number(row.units)
+  if (!Number.isFinite(units) || units <= 0) {
+    return { ...none, reason: 'no_position' }
+  }
+
+  // Een ontbrekende aankoopprijs wordt €0: de EENHEDEN zijn wat verloren gaat,
+  // en die redden we hoe dan ook. De kostenbasis is dan even onvolledig als de
+  // invoer was, en de gebruiker kan de openingsrij zelf bijstellen.
+  const rawPrice = Number(row.avg_purchase_price)
+  const pricePerUnit = Number.isFinite(rawPrice) && rawPrice > 0 ? rawPrice : 0
+
+  // Datum: aankoopdatum → aanmaakdatum van de holding → vandaag; daarna
+  // geklemd op de datum van de transactie die nu gelogd wordt.
+  const today = new Date().toISOString().slice(0, 10)
+  let date =
+    isoDatePart(row.purchase_date) ?? isoDatePart(row.created_at) ?? today
+  const clamp = isoDatePart(notLaterThan)
+  if (clamp && date > clamp) date = clamp
+
+  const { error: insertError } = await supabase
+    .from(tables.transactions)
+    .insert({
+      holding_id: holdingId,
+      user_id: userId,
+      type: 'buy',
+      units,
+      price_per_unit: pricePerUnit,
+      total_amount: units * pricePerUnit,
+      date,
+      notes: OPENING_TRANSACTION_NOTE,
+    })
+
+  if (insertError) {
+    return { ...none, reason: 'insert_failed' }
+  }
+
+  return { created: true, reason: 'created', units, pricePerUnit, date }
+}
+
+/**
  * Aggregate all active investment_holdings for a given asset and write the
  * EUR-converted total back onto `assets.current_value`. Foreign-currency
  * positions are converted via cached/fallback FX rates. Errors are swallowed:

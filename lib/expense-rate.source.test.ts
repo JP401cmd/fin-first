@@ -31,8 +31,8 @@
  * alleen groeien met nieuwe dagtarief-oppervlakken.
  */
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { readSourceLF } from '@/lib/test-utils/read-source'
 
 const REPO_ROOT = join(__dirname, '..')
 
@@ -66,13 +66,15 @@ function stripComments(src: string): string {
 describe('dagtarief-databron (L10)', () => {
   for (const relPath of DAGTARIEF_BRONNEN) {
     it(`${relPath} fetcht geen rauwe uitgaven-rijen voor het dagtarief`, () => {
-      const src = stripComments(readFileSync(join(REPO_ROOT, relPath), 'utf8'))
+      // CRLF-veilig (zie lib/test-utils/read-source.ts): stripComments()
+      // vertrouwt op /gm-anchors die op een verse Windows-checkout stil falen.
+      const src = stripComments(readSourceLF(join(REPO_ROOT, relPath)))
       expect(src).not.toMatch(RAUWE_RIJ_FETCH)
     })
   }
 
   it('lib/expense-rate.ts haalt zijn rijen uit het maandaggregaat, gezuiverd tot consumptie', () => {
-    const src = stripComments(readFileSync(join(REPO_ROOT, 'lib/expense-rate.ts'), 'utf8'))
+    const src = stripComments(readSourceLF(join(REPO_ROOT, 'lib/expense-rate.ts')))
     expect(src).toContain('aggToExpenseRows')
     // De consumptie-grondslag (ADR 0126 D2) woont in `consumptionExpenseRows`:
     // transfers eruit (`realOnly: true`) en archief-/inkomsten-/spaarbudgetten
@@ -99,7 +101,7 @@ describe('dagtarief-databron (L10)', () => {
   ]
   for (const relPath of AGGREGAAT_CONSUMENTEN) {
     it(`${relPath} voedt het dagtarief via consumptionExpenseRows, niet via een eigen aggToExpenseRows-optieset`, () => {
-      const src = stripComments(readFileSync(join(REPO_ROOT, relPath), 'utf8'))
+      const src = stripComments(readSourceLF(join(REPO_ROOT, relPath)))
       expect(src).toContain('consumptionExpenseRows(')
       expect(src).not.toMatch(/aggToExpenseRows\s*\(/)
     })
@@ -107,7 +109,7 @@ describe('dagtarief-databron (L10)', () => {
 
   it('de drie route-oppervlakken consumeren de gedeelde fetcher', () => {
     for (const relPath of DAGTARIEF_BRONNEN.filter((p) => p.startsWith('app/'))) {
-      const src = readFileSync(join(REPO_ROOT, relPath), 'utf8')
+      const src = readSourceLF(join(REPO_ROOT, relPath))
       expect(src, relPath).toContain('fetchExpenseRowsForRate')
     }
   })

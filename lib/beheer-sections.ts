@@ -47,11 +47,21 @@ import {
 
 export type BeheerGroupId = 'technisch' | 'functioneel' | 'test' | 'info'
 
+/**
+ * Inbakken met een werkvoorraad-notie (iets dat je kunt afhandelen). Alleen
+ * die krijgen een teller op de hub; de tellers zelf komen uit de server-loader
+ * `lib/beheer-inbox-counts.ts`. Bronnen zonder afvink-notie (nieuws-feedback,
+ * job_runs, vragenlijsten) horen hier bewust niet — geen nep-nul.
+ */
+export type BeheerInboxKey = 'errors' | 'feedback' | 'calculator_reports'
+
 export interface BeheerTool {
   label: string
   href: string
   description: string
   icon: LucideIcon
+  /** Koppelt de tegel aan een teller uit `BeheerInboxCounts`. */
+  inboxKey?: BeheerInboxKey
 }
 
 export interface BeheerGroup {
@@ -120,6 +130,7 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
         href: '/beheer/errors',
         description: 'Foutsoorten uit client en server — afvinkbaar; komt er één terug, dan heropent hij zichzelf.',
         icon: AlertOctagon,
+        inboxKey: 'errors',
       },
       {
         label: 'E-mail',
@@ -208,6 +219,7 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
         href: '/beheer/calculator-reports',
         description: 'Moderatie-inbox voor feedback op rekenhulpen.',
         icon: Inbox,
+        inboxKey: 'calculator_reports',
       },
       {
         label: 'Feedback (archief)',
@@ -217,6 +229,7 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
         // (tabel user_reports → Notion-werkqueue).
         description: 'Historisch archief van het oude feedbackformulier — nieuwe meldingen komen via de chat binnen.',
         icon: MessageSquare,
+        inboxKey: 'feedback',
       },
     ],
   },

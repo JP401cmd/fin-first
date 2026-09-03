@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { getNibudHouseholdType, getNibudReferences, calculateBenchmarks } from '@/lib/nibud/reference-data'
 import { fetchNibudApi } from '@/lib/nibud/api-client'
+import { getRecentDailyExpenseRate } from '@/lib/expense-rate'
 
 export async function GET() {
   const supabase = await createClient()
@@ -73,8 +74,12 @@ export async function GET() {
     if (budget.slug) slugToId[budget.slug] = budget.id
   }
 
-  const totalMonthly = Object.values(budgetBySlug).reduce((s, v) => s + v, 0)
-  const dailyExpense = totalMonthly > 0 ? (totalMonthly * 12) / 365 : 1
+  // Canoniek dagtarief (lib/expense-rate.ts): 12-mnd rolling GEREALISEERDE
+  // consumptie. Hier stond de som van budget-LIMIETEN × 12 / 365 met een
+  // verzonnen €1/dag als terugval — een andere teller én een andere noemer dan
+  // elk ander scherm (1d, nazorg R2+R3). 0 = geen eerlijke dagbasis →
+  // calculateBenchmarks laat de vrijheidsdagen dan op 0.
+  const { dailyRate: dailyExpense } = await getRecentDailyExpenseRate(supabase)
 
   const benchmarks = calculateBenchmarks(references, budgetBySlug, dailyExpense, slugToId)
 

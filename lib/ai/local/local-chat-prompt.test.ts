@@ -9,6 +9,7 @@ import {
 } from './local-chat-prompt'
 import type { LocalChatOverview } from './local-chat-context'
 import type { LocalKnowledgeItem } from './knowledge-context'
+import { JAARRUIMTE_BOVENGRENS_SUFFIX } from '@/lib/jaarruimte-facts'
 
 const OVERVIEW: LocalChatOverview = {
   hasData: true,
@@ -22,7 +23,7 @@ const OVERVIEW: LocalChatOverview = {
   dagtarief: 85,
   swrPct: 3.4,
   noodbuffer: { bedrag: 7500, maanden: 2.9 },
-  jaarruimte: { onbenut: 22155, besparing: 12409, vrijheidsdagen: 108 },
+  jaarruimte: { onbenut: 22155, besparing: 12409, vrijheidsdagen: 108, factorAKnown: true },
   kansen: [
     { titel: 'Bespaar op boodschappen', besparingPerJaar: 600, vrijheidsdagen: 5, deadline: '31 dec' },
   ],
@@ -110,6 +111,26 @@ describe('buildLocalChatSystemPrompt — verrijking (jaarruimte, kansen, acties)
     expect(prompt).toContain('€22.155')
     expect(prompt).toContain('€12.409')
     expect(prompt).toContain('108 dagen vrijheid')
+    // Factor A is hier BEKEND → geen bovengrens-kwalificatie.
+    expect(prompt).not.toContain('bovengrens')
+  })
+
+  it('kwalificeert de jaarruimte als bovengrens zodra factor A niet is ingevuld (H23)', () => {
+    // Zonder ingevulde factor A rekent de motor zonder pensioenaftrek: het
+    // bedrag is de bovengrens. De jaarruimte-kaart toont dat al met een badge +
+    // bereik; de lokale chatprompt herhaalde het als hard feit.
+    const onbekend: LocalChatOverview = {
+      ...OVERVIEW,
+      jaarruimte: { ...OVERVIEW.jaarruimte!, factorAKnown: false },
+    }
+    const prompt = buildLocalChatSystemPrompt({
+      overview: onbekend,
+      question: 'geef een tip',
+      knowledgeItems: [],
+    })
+    expect(prompt).toContain(JAARRUIMTE_BOVENGRENS_SUFFIX.trim())
+    // De bedragen zelf veranderen NIET — dit is weergave, geen motor.
+    expect(prompt).toContain('€22.155')
   })
 
   it('rendert concrete kansen en openstaande acties', () => {

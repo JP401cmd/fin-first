@@ -1,15 +1,19 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { forbidden } from '@/lib/api/respond'
+import { notFound } from '@/lib/api/respond'
 
 /**
  * Dev-only login endpoint for automated testing.
  * POST /api/dev-login with { email, password }
  * Returns session cookies so browser can access protected pages.
+ *
+ * Buiten `next dev` bestaat deze route niet: 404 (geen 403 — een 403 bevestigt
+ * dat het pad er is). Tweede laag is de proxy-404 via DEV_ONLY_PATHS in
+ * lib/supabase/proxy.ts.
  */
 export async function POST(request: Request) {
   if (process.env.NODE_ENV !== 'development') {
-    return forbidden('Not available in production')
+    return notFound()
   }
 
   const { email, password } = await request.json()
@@ -34,7 +38,7 @@ export async function POST(request: Request) {
 
 export async function GET() {
   if (process.env.NODE_ENV !== 'development') {
-    return forbidden('Not available in production')
+    return notFound()
   }
 
   return NextResponse.json({

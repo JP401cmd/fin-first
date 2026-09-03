@@ -281,13 +281,13 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-OVZ-20',
     titel: 'Handmatig een actie toevoegen',
     kriticiteit: 'KERN',
-    given: 'Twee bestaande seed-acties met freedom_days_impact 45 en 10 (totaal open vrijheidsdagen = 55); nieuwe handmatige actie met freedom_days_impact 20.',
-    when: 'De gebruiker slaat de nieuwe actie op.',
-    then: 'De totale "open vrijheidsdagen"-teller stijgt met exact 20 (van 55 naar 75); de nieuwe actie komt bovenaan de lijst met bron-label "handmatig".',
+    given: 'Twee bestaande seed-acties met freedom_days_impact 45 en 10 (totaal open vrijheidsdagen = 55), beide priority_score 3 en sort_order 0; nieuwe handmatige actie met freedom_days_impact 20 en dezelfde priority_score 3 (geen aanmaakpad schrijft sort_order → DB-default 0).',
+    when: 'De gebruiker slaat de nieuwe actie op en herlaadt de pagina.',
+    then: 'De totale "open vrijheidsdagen"-teller stijgt met exact 20 (van 55 naar 75); de nieuwe actie komt bovenaan de compacte "Open acties"-lijst met bron-label "handmatig" — óók bij een 3-weg gelijkspel op priority_score/sort_order, want `created_at` (nieuwste eerst) is de derde sorteersleutel (`lib/action-sort.ts`, server én client). De "Alle acties"-modal opent in dezelfde volgorde (default "Prioriteit"; "Impact" blijft een expliciete keuze).',
     assertion: {
       kind: 'exact',
-      expected: 'totaalVoor=55; totaalNa=75; delta=20',
-      source: 'lib/dashboard-data-loader.ts (totalFreedomDaysOpen, directe som-mirror op synthetische actielijst) — zie ovz-checks.ts',
+      expected: 'totaalVoor=55; totaalNa=75; delta=20; volgorde=[nieuw,seed2,seed1]',
+      source: 'lib/dashboard-data-loader.ts (totalFreedomDaysOpen, directe som-mirror op synthetische actielijst) + lib/action-sort.ts#compareActionsByPriority (mirror: priority_score desc, sort_order asc, created_at desc) — zie ovz-checks.ts',
     },
   },
   {
@@ -297,11 +297,11 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     given: 'Seed-actie "Mail HR over vergoedingen" wordt 2 weken uitgesteld op 5 juli 2026; 7 open/uitgestelde acties (cap = 5 zichtbaar).',
     when: 'De uitstel-datum wordt berekend en de cap-op-5-sortering wordt toegepast.',
-    then: 'Uitgesteld-tot = 5 juli + 2×7 dagen = 19 juli 2026 (`action-board.tsx` r114-119). Met 7 acties: slechts de top 5 (gesorteerd op `priority_score`, dan `sort_order`) zijn zichtbaar in het blok; de knop "Bekijk alle N" toont N=7.',
+    then: 'Uitgesteld-tot = 5 juli + 2×7 dagen = 19 juli 2026 (`action-board.tsx` r114-119). Met 7 acties: slechts de top 5 (gesorteerd op `priority_score`, dan `sort_order`, dan `created_at` nieuwste eerst — `lib/action-sort.ts`) zijn zichtbaar in het blok; de knop "Bekijk alle N" toont N=7.',
     assertion: {
       kind: 'exact',
       expected: 'uitgesteldTot=2026-07-19; zichtbaarAantal=5; totaalN=7',
-      source: 'components/app/action-board.tsx r114-119 (uitstel-datum-mirror, identiek patroon aan WILL/CASH) + priority_score/sort_order-sortering — zie ovz-checks.ts',
+      source: 'components/app/action-board.tsx r114-119 (uitstel-datum-mirror, identiek patroon aan WILL/CASH) + lib/action-sort.ts#compareActionsByPriority (priority_score/sort_order/created_at) — zie ovz-checks.ts',
     },
   },
   {

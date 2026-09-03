@@ -116,6 +116,13 @@ export async function GET() {
       lifeEvents: horizonData.events ?? [],
       aowRows,
       yearlyExpenses: built ? built.input.yearlyExpenses : yearlyExpensesFallback,
+      // ADR 0117 — de beheerde jaarlaag `fire_assumptions.volatility`, server-side
+      // geresolveerd in DEZELFDE `loadHorizonRaw`-bundel die /toekomst voedt (het
+      // importpad `@/lib/horizon-data-loader` is een doorgeef-luik naar
+      // `lib/horizon/raw-data-loader.ts`). Zonder dit veld rekende de slagingskans
+      // van het rapport op de default-σ terwijl de marktcheck op /toekomst de
+      // jaarlaag al droeg: zelfde input, andere bandbreedte.
+      marktVolatiliteit: horizonData.marktVolatiliteit,
     }
 
     // ── Vrijheidstijd-framing: canonieke daguitgaven ──

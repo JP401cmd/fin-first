@@ -43,7 +43,13 @@ function makeSupabase(profile: unknown, actions: unknown[]) {
       if (table === 'actions') {
         return {
           select: () => ({
-            eq: () => ({ in: () => ({ order: () => ({ limit: async () => ({ data: actions }) }) }) }),
+            // `.order()` is chainable (drie sleutels via applyActionPriorityOrder) en eindigt op `.limit()`.
+            eq: () => ({
+              in: () => {
+                const chain = { order: () => chain, limit: async () => ({ data: actions }) }
+                return chain
+              },
+            }),
           }),
         }
       }
@@ -72,6 +78,7 @@ beforeEach(() => {
     onbenut: 22155,
     besparing: 12409,
     grossYearly: 60000,
+    factorAKnown: true,
   })
   vi.mocked(getCachedUser).mockResolvedValue({ id: 'user-1' } as never)
 })
@@ -83,7 +90,22 @@ describe('buildLocalChatOverview — jaarruimte', () => {
       onbenut: 22155,
       besparing: 12409,
       vrijheidsdagen: Math.round(12409 / 114), // = 109
+      factorAKnown: true,
     })
+  })
+
+  it('draagt de "factor A onbekend"-kwalificatie door naar het overzicht (H23)', async () => {
+    // De vlag hoort bij de FEITEN: `buildLocalChatOverview` mag 'm niet laten
+    // vallen, anders herhaalt de prompt een bovengrens als hard bedrag.
+    vi.mocked(computeJaarruimteFacts).mockReturnValue({
+      hasData: true,
+      onbenut: 22155,
+      besparing: 12409,
+      grossYearly: 60000,
+      factorAKnown: false,
+    })
+    const overview = await buildLocalChatOverview(makeSupabase({ net_monthly_income: 3400 }, []))
+    expect(overview.jaarruimte?.factorAKnown).toBe(false)
   })
 
   it('geeft jaarruimte=null wanneer de motor geen ruimte vindt', async () => {
@@ -92,6 +114,7 @@ describe('buildLocalChatOverview — jaarruimte', () => {
       onbenut: 0,
       besparing: 0,
       grossYearly: 0,
+      factorAKnown: true,
     })
     const overview = await buildLocalChatOverview(makeSupabase({ net_monthly_income: 0 }, []))
     expect(overview.jaarruimte).toBeNull()

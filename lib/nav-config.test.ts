@@ -30,10 +30,21 @@ describe('resolveRouteTitle', () => {
   })
 
   it('resolveert EXTRA_ROUTE_TITLES (buiten de nav-structuur)', () => {
-    expect(resolveRouteTitle('/mijn/checkins')).toBe('Check-ins')
     expect(resolveRouteTitle('/mijn/feedback')).toBe('Melden')
+    expect(resolveRouteTitle('/mijn/jaaroverzicht')).toBe('Jaaroverzicht')
     expect(resolveRouteTitle('/toekomst/bibliotheek')).toBe('Rekenhulp-bibliotheek')
     expect(resolveRouteTitle('/toekomst/inflatie-koopkracht')).toBe('Inflatie & koopkracht')
+  })
+
+  /**
+   * WF-NAV-05: deze kaart mag alleen routes dragen die de fallback ECHT
+   * bereiken. `/mijn/checkins` deed dat niet — het is een re-export van de
+   * check-in-historie, en dat component zet zelf `<NavStackMeta title="Check-in
+   * historie" />`, wat terecht wint. De entry beloofde dus een titel die geen
+   * gebruiker ooit zag. Deze assertie houdt hem weg.
+   */
+  it('draagt géén fallback voor /mijn/checkins — de pagina registreert zelf een titel', () => {
+    expect(resolveRouteTitle('/mijn/checkins')).toBeNull()
   })
 
   it('resolveert deep-app-tools met gestripte querystring (OVERVIEW_APP_SUBROUTES)', () => {

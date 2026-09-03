@@ -33,6 +33,8 @@ import { loadActionedAandachtspuntIds } from './aandachtspunten-actions'
 import { loadFiscaleKansen } from './tax-opportunities-loader'
 import { CURRENT_TAX_YEAR } from './box3-data'
 import { loadHorizonRaw } from './horizon-data-loader'
+import { hasWerkgeverspensioen } from './jaarruimte'
+import { getCachedUser } from './supabase/cached-user'
 import {
   getNibudHouseholdType,
   getNibudReferences,
@@ -74,40 +76,50 @@ import type { Asset } from './asset-data'
 // Box 3-tak in de loader (`standing` wordt dan optioneel), wat door de
 // optimizer-keten rimpelt — bewust apart gehouden van deze plak.
 async function collectTaxAandachtspunten(supabase: SupabaseClient): Promise<Aandachtspunt[]> {
-  const [horizonData, kansen] = await Promise.all([
+  const [horizonData, kansen, user] = await Promise.all([
     loadHorizonRaw(supabase),
     loadFiscaleKansen(supabase, 'personal', CURRENT_TAX_YEAR),
+    // Request-gecachete auth-read (al gedaan door de kansen-loader) — géén extra
+    // round-trip. Nodig om het huishoud-gedeelde assets-pad op EIGEN rijen te
+    // scopen, zie hieronder.
+    getCachedUser(supabase),
   ])
 
-  // Demping: werknemer mét bedrijfspensioen + ONBEKENDE factor A.
+  // Demping: werknemer mét werkgeverspensioen + ONBEKENDE factor A.
   // Bij onbekende factor A rekent de loader met 0 → de jaarruimte komt op de
   // bovengrens (te hoog), wat een misleidende "benut je jaarruimte"-tip geeft
-  // voor iemand die al pensioen opbouwt. Bedrijfspensioen-signaal: een actief
-  // life_event met event_type 'pension' én metadata.pensioenType 'bedrijf'
-  // (de events-bundel is al op is_active=true gefilterd in de loader). Bij een
-  // EXPLICIETE factor A (incl. 0 voor zzp → isKnown=true) of geen
-  // bedrijfspensioen blijft de tip ongewijzigd. De box1-hub toont de kans wél
-  // (daar beheert de gebruiker 'm); deze demping zit bewust alléén hier.
+  // voor iemand die al pensioen opbouwt. Bij een EXPLICIETE factor A (incl. 0
+  // voor zzp → isKnown=true) of geen werkgeverspensioen blijft de tip
+  // ongewijzigd.
   //
-  // AANNAME BIJGESTELD 26-08-2026 (bevinding H23): "daar beheert de gebruiker
-  // 'm" klopte niet — de jaarruimtekaart toonde het bovengrens-bedrag zónder
-  // enige onzekerheids-markering en zei zelfs "berekend met je opgeslagen factor
-  // A". Dat is nu opgelost aan de KAART-kant (badge + bereik + eerlijke footer,
-  // via de prop `factorAKnown`), niet hier: deze demping blijft een filter op de
-  // TIPS-lijst, waar geen ruimte is voor een bereik of een badge.
+  // Het SIGNAAL "bouwt zelf werkgeverspensioen op" heeft één definitie:
+  // `hasWerkgeverspensioen` (lib/jaarruimte.ts, naast resolvePensionFactorA).
+  // Twee bronnen, OR-verknoopt: het pensioen-life_event van de wizard
+  // (pensioenType 'bedrijf') én — sinds 3-9-2026 — een eigen `assets`-rij met
+  // asset_type 'retirement' en een werkgevers-subtype (uitkerings-/
+  // premieregeling; lijfrente is het privé-pendant en dempt NOOIT). Beide
+  // komen uit de al-geladen horizon-bundel (events én assets zijn daar op
+  // is_active=true gefilterd) — geen tweede fetch.
   //
-  // BEKENDE GRENS van dit signaal (aparte kaart): een `assets`-rij met
-  // asset_type='retirement' telt NIET mee — alleen de pensioen-strategie-wizard
-  // zet het life_event. Wie zijn pensioenbezit invoerde maar de wizard nooit
-  // doorliep, krijgt de tip dus ongedempt.
+  // SCOPING: `horizonData.assets` komt uit `getActiveAssets`, en de
+  // SELECT-policy op `assets` is huishoud-gedeeld — die rijen bevatten dus óók
+  // het pensioenbezit van de partner. Pensioenopbouw is persoonlijk, daarom
+  // gaat de eigen user-id mee en telt alleen `user_id === eigen id`; zonder id
+  // slaat het signaal het assets-pad over (nooit "iedereen").
+  //
+  // AANNAME BIJGESTELD 26-08-2026 (bevinding H23): de jaarruimtekaart toonde
+  // het bovengrens-bedrag zónder onzekerheids-markering. Dat is opgelost aan de
+  // KAART-kant (badge + bereik + eerlijke footer, via de prop `factorAKnown`),
+  // niet hier: deze demping blijft een filter op de TIPS-lijst, waar geen
+  // ruimte is voor een bereik of een badge.
   //
   // Het is met opzet een FILTER en geen herberekening: we onderdrukken de
   // geleverde kans, we bouwen 'm niet met andere aannames opnieuw op.
-  const hasBedrijfspensioen = horizonData.events.some(
-    (ev) =>
-      ev.event_type === 'pension' &&
-      (ev.metadata as { pensioenType?: unknown } | undefined)?.pensioenType === 'bedrijf',
-  )
+  const hasBedrijfspensioen = hasWerkgeverspensioen({
+    ownUserId: user?.id ?? null,
+    events: horizonData.events,
+    assets: horizonData.assets,
+  })
   const dampenJaarruimte = !horizonData.pensioenFactorAKnown && hasBedrijfspensioen
 
   // Filter ná de conversie: de `tax:`-namespacing woont in

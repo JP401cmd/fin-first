@@ -24,6 +24,13 @@ type SyncResult = {
    * geteld, want `duplicates` behoudt haar oorspronkelijke betekenis.
    */
   duplicates_cross_source: number
+  /**
+   * Dedup-laag 1b: je partner had deze boeking al op dezelfde échte rekening
+   * staan (de en/of-rekening die jullie allebei koppelden). Apart geteld, want
+   * het is een andere schrijver dan jijzelf — en zonder eigen regel lijkt "0
+   * nieuw" op een verse koppeling onverklaarbaar.
+   */
+  duplicates_household_partner: number
   new: number
   /**
    * Hoeveel van de nieuwe rijen als eigen-rekening-verschuiving zijn geboekt
@@ -136,6 +143,7 @@ export default function ConnectSuccessPage() {
             new: data.new,
             duplicates: data.duplicates,
             duplicates_cross_source: data.duplicates_cross_source ?? 0,
+            duplicates_household_partner: data.duplicates_household_partner ?? 0,
             own_account_transfers: data.own_account_transfers ?? 0,
             fetched_from: data.fetched_from ?? null,
             truncated: Boolean(data.truncated),
@@ -249,7 +257,7 @@ export default function ConnectSuccessPage() {
                       {/* "Al bekend" is één begrip voor de gebruiker: of een
                           boeking nu op de hash of cross-bron is herkend, ze stond
                           er al. De splitsing is techniek en staat hieronder. */}
-                      {result.new} nieuw, {result.duplicates + result.duplicates_cross_source} al bekend
+                      {result.new} nieuw, {result.duplicates + result.duplicates_cross_source + result.duplicates_household_partner} al bekend
                     </span>
                   ) : (
                     <button
@@ -406,6 +414,18 @@ export default function ConnectSuccessPage() {
                         {result.duplicates_cross_source === 1
                           ? 'Eén transactie stond hier al vanuit een eerdere import en is niet nog eens toegevoegd.'
                           : `${result.duplicates_cross_source} transacties stonden hier al vanuit een eerdere import en zijn niet nog eens toegevoegd.`}
+                      </p>
+                    )}
+
+                    {/* Laag 1b — je partner koppelde dezelfde en/of-rekening en
+                        had deze boekingen al opgehaald. Zonder deze regel is
+                        "0 nieuw" op een verse koppeling niet te onderscheiden
+                        van "er ging iets mis". */}
+                    {result.duplicates_household_partner > 0 && (
+                      <p className="text-xs text-[var(--ink-2)]">
+                        {result.duplicates_household_partner === 1
+                          ? 'Eén transactie stond hier al via de koppeling van je partner op dezelfde rekening en is niet nog eens toegevoegd.'
+                          : `${result.duplicates_household_partner} transacties stonden hier al via de koppeling van je partner op dezelfde rekening en zijn niet nog eens toegevoegd.`}
                       </p>
                     )}
 

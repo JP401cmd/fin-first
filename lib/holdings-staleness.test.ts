@@ -16,7 +16,8 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync, readdirSync } from 'node:fs'
+import { readdirSync } from 'node:fs'
+import { readSourceLF } from '@/lib/test-utils/read-source'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -220,7 +221,8 @@ describe('bronanker — één definitie, repo-breed', () => {
     const overtreders: string[] = []
     for (const rel of [...sourceFiles('app'), ...sourceFiles('components'), ...sourceFiles('lib')]) {
       if (ALLOWLIST.has(rel)) continue
-      const code = readFileSync(join(REPO_ROOT, rel), 'utf8')
+      // CRLF-veilig (zie lib/test-utils/read-source.ts).
+      const code = readSourceLF(join(REPO_ROOT, rel))
         .replace(/\/\*[\s\S]*?\*\//g, '')
         .replace(/^[ \t]*\/\/.*$/gm, '')
 
@@ -236,7 +238,7 @@ describe('bronanker — één definitie, repo-breed', () => {
   })
 
   it('de drie oppervlakken die het defect vormden consumeren de gedeelde regel', () => {
-    const uses = (p: string) => readFileSync(join(REPO_ROOT, p), 'utf8')
+    const uses = (p: string) => readSourceLF(join(REPO_ROOT, p))
     expect(uses('app/(app)/layout.tsx')).toContain('countStalePrices')
     expect(uses('components/core/holdings-client.tsx')).toContain('countStalePrices')
     expect(uses('components/app/holdings-heatmap.tsx')).toContain('isPriceStale')

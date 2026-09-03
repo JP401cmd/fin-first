@@ -15,6 +15,7 @@ import {
   computeSavingsRate,
 } from '../core-metrics'
 import { DEFAULT_RETURN, INFLATION, NL_SWR } from '../constants'
+import { dailyExpenseRate } from '../format'
 import { ageAtDate } from './fire-format'
 import type { LifeEvent, LifeEventImpact } from './life-events-catalog'
 
@@ -227,9 +228,11 @@ export function computeLifeEventImpact(
   const adjustedFire = adjustedProjection.countdownDays
 
   const fireDelayMonths = Math.round((adjustedFire - baseFire) / 30.44)
+  // Must-grondslag (yearlyMustExpenses/365) met de maand-terugval via de
+  // canonieke conversie — dezelfde regel als lib/dashboard-data-loader.ts.
   const dailyExpense = input.yearlyMustExpenses > 0
     ? input.yearlyMustExpenses / 365
-    : (input.monthlyExpenses > 0 ? (input.monthlyExpenses * 12) / 365 : 0)
+    : dailyExpenseRate(input.monthlyExpenses)
   const freedomDaysLost = dailyExpense > 0 ? Math.round(totalCost / dailyExpense) : 0
 
   return {

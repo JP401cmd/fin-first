@@ -43,6 +43,9 @@ import { PeriodeTrend } from './periode-trend'
 import { UitgavenHeatmap } from './uitgaven-heatmap'
 import { TransactieDetailSheet } from './transactie-detail-sheet'
 import { BulkBewerkenOverlay } from './bulk/bulk-bewerken-overlay'
+import { TeBesprekenSection } from './te-bespreken-section'
+import { BespreekMetPartnerKnop } from './bespreek-met-partner-knop'
+import type { TransactionFlagsData } from '@/lib/household/transaction-flags'
 
 /**
  * TransactiesAnalyse — periode-gestuurde transactie-analyse op
@@ -149,6 +152,7 @@ function formatDayTitle(iso: string): string {
 
 export function TransactiesAnalyse({
   naGeldstroom,
+  teBespreken = null,
 }: {
   /**
    * Server-gerenderde sectie die direct ónder de geldstroom-/spaarquote-kaart
@@ -157,6 +161,14 @@ export function TransactiesAnalyse({
    * plek in de leesvolgorde hoort bij de analyse, niet bij de page-wrapper.
    */
   naGeldstroom?: React.ReactNode
+  /**
+   * "Te bespreken"-lijst van het huishouden (ADR 0128), server-geladen via
+   * `loadTransactionFlags`. `null` = solo of geen partner → de sectie én de
+   * markeer-knop in het bewerkformulier verschijnen niet. Als DATA doorgegeven
+   * (niet als slot) omdat een rij in de lijst het bewerkformulier van déze
+   * component moet kunnen openen.
+   */
+  teBespreken?: TransactionFlagsData | null
 } = {}) {
   const { perspective } = usePerspective()
   const searchParams = useSearchParams()
@@ -567,6 +579,17 @@ export function TransactiesAnalyse({
     [openEditById],
   )
 
+  // De "te bespreken"-lijst hoort in de leesvolgorde direct achter de
+  // grenzenpotten: eerst je grenzen, dan wat jullie samen nog moeten bekijken.
+  const naGeldstroomMetLijst = (
+    <>
+      {naGeldstroom}
+      {teBespreken && (
+        <TeBesprekenSection data={teBespreken} onOpenTransaction={openEditById} />
+      )}
+    </>
+  )
+
   const refetch = useCallback(() => {
     setEditTx(null)
     setAddAccountId(null)
@@ -690,7 +713,7 @@ export function TransactiesAnalyse({
           <Card>
             <p className="text-sm text-red-700">{error}</p>
           </Card>
-          {naGeldstroom}
+          {naGeldstroomMetLijst}
         </>
       ) : initialLoading ? (
         <>
@@ -699,7 +722,7 @@ export function TransactiesAnalyse({
               <div className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--ink-3)] border-t-transparent" />
             </div>
           </Card>
-          {naGeldstroom}
+          {naGeldstroomMetLijst}
         </>
       ) : (
         <>
@@ -748,7 +771,7 @@ export function TransactiesAnalyse({
             </HideInSimple>
           </div>
 
-          {naGeldstroom}
+          {naGeldstroomMetLijst}
 
           <div className="grid gap-5 sm:grid-cols-2">
             <HideInSimple>
@@ -813,6 +836,16 @@ export function TransactiesAnalyse({
           budgetGroups={budgetGroups}
           onClose={() => setEditTx(null)}
           onSaved={refetch}
+          // Alleen bij een partner én een gedeelde boeking; of de rekening ook
+          // op 'full' staat beslist de database (ADR 0128).
+          secondaryAction={
+            teBespreken && editTx.ownership === 'shared' ? (
+              <BespreekMetPartnerKnop
+                transactionId={editTx.id}
+                partnerName={teBespreken.partnerName}
+              />
+            ) : undefined
+          }
         />
       )}
 

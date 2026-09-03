@@ -1,12 +1,11 @@
 -- RLS-leaktest voor public.achieved_milestones
 -- Hoort bij migratie 20260831160000_add_achieved_milestones.sql en ADR 0123.
 --
--- ── STATUS: UIT TE VOEREN BIJ APPLY ─────────────────────────────────────────
--- Dit script is GESCHREVEN, NIET GEDRAAID. In de taak waarin de migratie is
--- geschreven was geen live database beschikbaar (en uitrollen was expliciet
--- verboden), dus élke uitspraak hieronder over "wat de database doet" is een
--- VERWACHTING, geen meting. Draai dit script direct ná het toepassen van de
--- migratie en neem de uitkomst op in de release-aantekening, met datum.
+-- ── STATUS: GEDRAAID, 12/12 GESLAAGD (31 aug 2026) ──────────────────────────
+-- Live uitgevoerd ná het toepassen van de migratie: alle twaalf gevallen
+-- eindigden op RAISE NOTICE (geslaagd), geen enkele op RAISE EXCEPTION. De
+-- uitspraken hieronder over "wat de database doet" zijn dus een GEMETEN
+-- uitkomst, niet langer een verwachting.
 --
 -- ── VORM (patroon uit deze repo) ────────────────────────────────────────────
 -- Rol-gesimuleerde verificatie: `set local role` + `request.jwt.claims`, in één

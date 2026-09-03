@@ -8,8 +8,17 @@ const MAX_REASON_LENGTH = 1000
  *
  * Meld een publieke rekenhulp als misleidend, ongepast, of in strijd
  * met de spelregels. We slaan een rij op in `calculator_reports` met
- * status='open'. Admins beheren de inbox via service-role (geen public
- * SELECT-policy).
+ * status='open'.
+ *
+ * NB: de vorige regel hier ("Admins beheren de inbox via service-role (geen
+ * public SELECT-policy)") was op geen enkel moment waar en is verwijderd.
+ * `/beheer/calculator-reports` leest met de gewone RLS-client, en er ís een
+ * SELECT-policy — hij was alleen eigen-rij, waardoor de beheerder een lege
+ * inbox zag. Sinds migratie `20260903110000` luidt de policy
+ * "calculator_reports select own or superadmin" en doet beheer zijn triage
+ * via een expliciete superadmin-UPDATE-policy (gemeten tegen `pg_policies`,
+ * 03-09-2026). Wie hier een service-role-pad verwacht, zoekt iets dat niet
+ * bestaat.
  *
  * Body: { reason: string }   // max 1000 tekens
  * Resp: 200 { ok: true } | 401 | 404 | 422

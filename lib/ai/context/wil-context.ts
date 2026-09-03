@@ -2,6 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { section, formatCurrency, bulletList } from './formatter'
 import { getNibudHouseholdType, getNibudReferences, calculateBenchmarks } from '@/lib/nibud/reference-data'
 import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
+import { getRecentDailyExpenseRate } from '@/lib/expense-rate'
+import { applyActionPriorityOrder } from '@/lib/action-sort'
 import type { ModuleId } from '@/lib/module-registry'
 import { buildBudgetSpendingMap, type SpendingTxRow } from '@/lib/budget-spending'
 import { buildAiBudgetTypeMap, loadSplitRows } from './budget-spending-source'
@@ -30,9 +32,10 @@ export async function buildWilContext(supabase: SupabaseClient, budgetingActive 
       .select('id, name, slug, budget_type, default_limit, is_essential, parent_id')
       .order('sort_order', { ascending: true }),
     supabase
-      // Bewust ZONDER budget_id-filter: `totalMonthlyExpenses` hieronder telt
-      // ook ongecategoriseerde uitgaven mee. `is_split`/`id` zijn erbij gekomen
-      // zodat de split-regels op hun eigen budget kunnen landen.
+      // Rijen van de lopende maand voor de bestedingsmap per budget.
+      // `is_split`/`id` zijn erbij gekomen zodat de split-regels op hun eigen
+      // budget kunnen landen. (Het dagtarief komt NIET meer uit deze rijen —
+      // zie getRecentDailyExpenseRate hieronder.)
       .from('transactions')
       .select('id, budget_id, amount, is_income, transaction_type, is_split')
       .gte('date', monthStart)
@@ -54,13 +57,15 @@ export async function buildWilContext(supabase: SupabaseClient, budgetingActive 
           .order('created_at', { ascending: false })
           .limit(10)
       : noData,
+    // Canonieke prioriteitsvolgorde (lib/action-sort.ts) — dezelfde top-10 als het
+    // actiebord toont, ook bij gelijke priority_score.
     inzichtActiesActive
-      ? supabase
-          .from('actions')
-          .select('title, freedom_days_impact, status, source')
-          .in('status', ['open', 'postponed'])
-          .order('priority_score', { ascending: false })
-          .limit(10)
+      ? applyActionPriorityOrder(
+          supabase
+            .from('actions')
+            .select('title, freedom_days_impact, status, source')
+            .in('status', ['open', 'postponed']),
+        ).limit(10)
       : noData,
     // Fetch completed/rejected actions from the past year to prevent duplicate suggestions
     inzichtActiesActive
@@ -96,10 +101,6 @@ export async function buildWilContext(supabase: SupabaseClient, budgetingActive 
   const pastActions = pastActionsRes.data ?? []
   const pastRecommendations = pastRecsRes.data ?? []
 
-  // Overboekingen tussen eigen rekeningen zijn geen uitgave.
-  const isRealTx = (t: { transaction_type?: string | null }) =>
-    t.transaction_type !== 'transfer' && t.transaction_type !== 'joint_transfer'
-
   // Besteed per budget — canoniek (getekend, richting per budget, split-regels
   // op hun eigen budget). Was: `Math.abs()` over elke rij, zonder richting en
   // zonder splits, waardoor een inkomst op een uitgaven-budget de besteding
@@ -107,13 +108,6 @@ export async function buildWilContext(supabase: SupabaseClient, budgetingActive 
   const budgetTypes = buildAiBudgetTypeMap(budgets)
   const splits = await loadSplitRows(supabase, transactions)
   const spendingByBudget = buildBudgetSpendingMap(transactions as SpendingTxRow[], splits, budgetTypes)
-
-  // Get monthly expenses for freedom-day conversion. Bewust over ALLE rijen van
-  // de maand (ook zonder budget_id) — dit is het uitgavenniveau, niet de
-  // budgetsom. Split-ouders dragen hier hun eigen (negatieve) bedrag.
-  const totalMonthlyExpenses = transactions
-    .filter(t => Number(t.amount) < 0 && isRealTx(t))
-    .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0)
 
   const parts: string[] = []
 
@@ -130,9 +124,11 @@ export async function buildWilContext(supabase: SupabaseClient, budgetingActive 
     profileEstExpenses = Number(profile?.estimated_monthly_expenses ?? 0)
 
     if (budgetingActive) {
-      const dailyExpense = totalMonthlyExpenses > 0
-        ? (totalMonthlyExpenses * 12) / 365
-        : (profileEstExpenses > 0 ? (profileEstExpenses * 12) / 365 : 0)
+      // Canoniek dagtarief (lib/expense-rate.ts): 12-mnd rolling consumptie,
+      // profielschatting als terugval. Hier stond een eigen `(maand × 12) / 365`
+      // op de LOSSE lopende maand — een tweede wisselkoers, en die bepaalde
+      // welke vrijheidsdagen Fin citeert (1d, nazorg R2+R3).
+      const { dailyRate: dailyExpense } = await getRecentDailyExpenseRate(supabase, now, profileEstExpenses)
 
       // Identify optimization opportunities (non-essential child budgets with spending)
       const opportunities = selectOptimizationOpportunities(budgets, spendingByBudget).map(

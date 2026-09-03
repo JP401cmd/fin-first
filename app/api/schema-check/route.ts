@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { serverError } from '@/lib/api/respond'
+import { notFound, serverError } from '@/lib/api/respond'
 
 // ============================================================
 // Comprehensive Database Schema Verification
@@ -158,6 +158,12 @@ async function verifyRLSEnabled(supabase: SupabaseClient): Promise<Record<string
 }
 
 export async function GET() {
+  // Dev-harness: buiten `next dev` bestaat deze route niet (404 — spiegel van
+  // DEV_ONLY_PATHS in lib/supabase/proxy.ts, dat als eerste laag al 404't).
+  // Zonder deze guard onthulde het endpoint ongeauthenticeerd (publicPaths)
+  // welke tabellen en kolommen bestaan (security-sweep 3 sep 2026).
+  if (process.env.NODE_ENV !== 'development') return notFound()
+
   try {
     const supabase = await createClient()
 

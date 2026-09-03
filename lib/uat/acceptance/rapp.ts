@@ -1,10 +1,11 @@
 /**
- * Acceptatiecriteria — domein Rapportages (WF-RAPP-01..14 / UAT-RAPP-01..14).
+ * Acceptatiecriteria — domein Rapportages (WF-RAPP-01..15 / UAT-RAPP-01..15).
  *
  * Spiegelt exact de aanpak van `budget.ts`/`start.ts`/`will.ts`/`cash.ts`/`ovz.ts`/`nav.ts`.
  * Bron: `docs/uat/uat-plan.md` Deel 1 (workflow-definities WF-RAPP-01..13) +
- * Deel 2 §2.8 (UAT-RAPP-01..13), plus WF-RAPP-14 (nieuw, 11 aug 2026 — zie
- * onder). RAPP is aaneengesloten 01..14 (14 catalogus-scenario's, geen
+ * Deel 2 §2.8 (UAT-RAPP-01..13), plus WF-RAPP-14 (nieuw, 11 aug 2026) en
+ * WF-RAPP-15 (nieuw, 3 sep 2026 — gedeelde `buildConvergentieAdapterInput`,
+ * zie onder). RAPP is aaneengesloten 01..15 (15 catalogus-scenario's, geen
  * verwijsregel-gaten) — WF-RAPP-07 en WF-RAPP-13 dragen een
  * annotatie in hun `wf`-veld ("...LEIDEND voor BUDGET" / "...; app-brede
  * maskinggedrag zelf = UAT-NAV-11"), genormaliseerd naar het kale WF-nummer
@@ -232,6 +233,23 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'consistency',
       source: 'app/api/report/benchmark/route.ts + app/api/report/totaalplan/route.ts consumeren beide `dailyExpenseRate` uit de dashboard-/horizon-bundel (lib/expense-rate.ts#getRecentDailyExpenseRate, via lib/dashboard-data-loader.ts / lib/horizon-data-loader.ts) i.p.v. een eigen herberekening — consume-don\'t-recompute, geen los hand-narekenbaar cijfer op routeniveau (DB-afhankelijk).',
+    },
+  },
+  {
+    workflow: 'WF-RAPP-15',
+    scenarioId: 'UAT-RAPP-15',
+    titel: 'Totaalplan-slagingskans gebruikt dezelfde jaargelaagde marktvolatiliteit als /toekomst (ADR 0117)',
+    kriticiteit: 'KERN',
+    given:
+      'Een gebruiker met een jaargelaagde `fire_assumptions.volatility`-instelling die van de kernel-default afwijkt (ADR 0117), en een gegenereerd totaalplan-rapport (WF-RAPP-09).',
+    when:
+      'De gebruiker leest de plan-brede slagingskans (`SlagingskansData.successProbability`) op het totaalplan en vergelijkt die met de marktcheck-band/-marge op /toekomst voor hetzelfde plan.',
+    then:
+      'De hoofdprojectie (`computeConvergentieProjection`), de /toekomst-marktcheck (`computeMarktcheck`) en de totaalplan-slagingskans (`buildTotaalplanKernelInput` in lib/totaalplan-data.ts) bouwen hun kernel-invoer alle drie via dezelfde `buildConvergentieAdapterInput`-mapping — inclusief `marktVolatiliteit`. Vóór deze samenvoeging (3 sep 2026) stond die mapping drie keer los uitgeschreven en liet het totaalplan-exemplaar `marktVolatiliteit` vallen, waardoor de slagingskans van het rapport op de kernel-default-σ bleef staan terwijl /toekomst al met de jaargelaagde instelling rekende — twee cijfers over "dezelfde" kans die uit elkaar konden lopen zonder dat de gebruiker een reden zag. Met één gedeelde adapter-functie is een veld dat erbij komt (of hier verkeerd gaat) per constructie overal gelijk: een consistentietoets, geen los narekenbaar getal (DB-/kernel-afhankelijk).',
+    assertion: {
+      kind: 'consistency',
+      source:
+        'lib/horizon-kernel/convergentie-router.ts#buildConvergentieAdapterInput (de ENE plek waar `ConvergentieRawContext` → `KernelAdapterInput` mapt, incl. `marktVolatiliteit`) — geconsumeerd door computeConvergentieProjection, computeMarktcheck ÉN lib/totaalplan-data.ts#buildTotaalplanKernelInput/buildSlagingskans. A=B tussen de drie aanroepers is de toets; geen apart exact-cijfer (de kans zelf is stochastisch, MC-run-afhankelijk).',
     },
   },
 ]

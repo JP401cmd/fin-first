@@ -7,6 +7,7 @@ import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { Kicker, ScenarioCallout, FiguresStrip } from '@/components/editorial'
 import { BOX2_PARAMS, calculateBox2, type TaxYear } from '@/lib/box2-data'
 import { BOX2_SIMULATOR_SCHAAL_FACTOR } from '@/lib/constants'
+import { RANGE_STEP_ANY, nextRangeValueForKey, snapToStep } from './range-slider-snap'
 
 /**
  * Box2DividendSimulator — interactieve "hoeveel dividend in welke schijf"-tool.
@@ -44,7 +45,11 @@ const PLAYFAIR = 'var(--font-display, var(--font-playfair, Georgia, serif))'
 const BOX2_COLOR = 'var(--module-active-600)'
 const BOX2_HOOG_COLOR = 'var(--module-active-400)'
 
-/** Slider-stap in euro's — puur een bedieningsdetail, geen fiscaal getal. */
+/** Slider-stap in euro's — puur een bedieningsdetail, geen fiscaal getal.
+ *  Bewust NIET als native `step` op de input: de startstand is het WERKELIJKE
+ *  dividend (zelden een 1000-voud) en de browser zou die anders stil naar een
+ *  veelvoud saneren — dan wijkt de thumb af van de kop die hij hoort te spiegelen
+ *  (zelfde mechanisme als WF-BELAST-10-bug1). Zie `range-slider-snap.ts`. */
 const SLIDER_STEP = 1000
 
 function pct(value: number): string {
@@ -84,6 +89,8 @@ export function Box2DividendSimulator({
     Math.ceil(Math.max(0, defaultDividend) / SLIDER_STEP) * SLIDER_STEP,
   )
   const [dividend, setDividend] = useState(Math.max(0, defaultDividend))
+  // Stapraster voor slepen/toetsen; de startstand blijft er bewust buiten.
+  const dividendBounds = { step: SLIDER_STEP, min: 0, max: sliderMax }
   // Entree-reveal — de gestapelde schijf-balk tekent in via width-transition.
   const { ref: revealRef, hasEntered } = useInViewAnimation({ duration: 600 })
 
@@ -140,9 +147,15 @@ export function Box2DividendSimulator({
           type="range"
           min={0}
           max={sliderMax}
-          step={SLIDER_STEP}
+          step={RANGE_STEP_ANY}
           value={dividend}
-          onChange={(e) => setDividend(Number(e.target.value))}
+          onChange={(e) => setDividend(snapToStep(Number(e.target.value), dividendBounds))}
+          onKeyDown={(e) => {
+            const next = nextRangeValueForKey(e.key, dividend, dividendBounds)
+            if (next == null) return
+            e.preventDefault()
+            setDividend(next)
+          }}
           className="h-11 w-full cursor-pointer accent-[var(--module-active-500)]"
           aria-valuetext={formatCurrency(dividend)}
         />

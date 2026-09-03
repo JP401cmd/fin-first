@@ -1,12 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { section, formatCurrency, bulletList } from './formatter'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
+import { getRecentDailyExpenseRate } from '@/lib/expense-rate'
 import {
   buildBudgetSpendingMap,
   spendingContribution,
   splitContribution,
   budgetBarPct,
-  isExpenseDirectionBudget,
   type SpendingTxRow,
 } from '@/lib/budget-spending'
 import {
@@ -136,18 +136,12 @@ export async function buildBudgetInsightsContext(supabase: SupabaseClient): Prom
     nibudBySlug[n.mapped_budget_slug] = Number(n.basis_amount)
   }
 
-  // Dagtarief uit 12 maanden. Canoniek getekend: alleen de UITGAVEN-richting
-  // telt mee (op een inkomsten-budget is de positieve rij de realisatie, geen
-  // uitgave), en een inkomst op een uitgaven-budget verlaagt het tarief in
-  // plaats van het te verhogen. Onderaan op 0 geklemd: een negatief dagtarief
-  // zou elke vrijheidsdag-omrekening omkeren.
-  const totalExpenses = Object.entries(monthlyByBudget).reduce((sum, [budgetId, monthMap]) => {
-    if (!isExpenseDirectionBudget(budgetTypes.get(budgetId))) return sum
-    return sum + Object.values(monthMap).reduce((s, v) => s + v, 0)
-  }, 0)
-  const distinctMonths = new Set(historicalTx.map(t => t.date.slice(0, 7))).size
-  const avgMonthlyExpenses = distinctMonths > 0 ? Math.max(0, totalExpenses) / distinctMonths : 0
-  const dailyExpenseRate = (avgMonthlyExpenses * 12) / 365
+  // Canoniek dagtarief (lib/expense-rate.ts): 12-mnd rolling consumptie —
+  // dezelfde wisselkoers als de widgets, zodat Fin dezelfde vrijheidsdagen
+  // noemt als het scherm. Hier stond een eigen 12-maands som over de
+  // budget-gerichte maandbakken × 12 / 365 (1d, nazorg R2+R3). Deelt binnen
+  // één request de cache()-entry van het 12-mnd aggregaat.
+  const { dailyRate: dailyExpenseRate } = await getRecentDailyExpenseRate(supabase, now)
 
   // Only child budgets (subbudgets) for detailed analysis. De richting komt uit
   // de type-map (child erft parent) i.p.v. uit de eigen `budget_type`-kolom van
@@ -236,7 +230,7 @@ export async function buildBudgetInsightsContext(supabase: SupabaseClient): Prom
   if (freedomLines.length > 0 && dailyExpenseRate > 0) {
     parts.push(section(
       'ESSENTIËLE BUDGETTEN — VRIJHEIDSDAGEN PER JAAR',
-      `Dagelijkse must-uitgaven: ${formatCurrency(dailyExpenseRate)}/dag\n` + bulletList(freedomLines)
+      `Dagtarief (12-mnd uitgaven): ${formatCurrency(dailyExpenseRate)}/dag\n` + bulletList(freedomLines)
     ))
   }
   if (fireLines.length > 0) {

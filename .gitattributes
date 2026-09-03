@@ -1,1 +1,12 @@
-*.mjs text eol=lf
+# Forceer LF op elke checkout, ongeacht core.autocrlf. Bron-scan-tests
+# (o.a. de euro-view- en heading-gates, en de suites in lib/test-utils/
+# read-source.ts) matchen de LETTERLIJKE inhoud van bronbestanden met
+# regex-idiomen die op `\r` stil terugslaan (JS `.`/`$` matchen geen `\r`).
+# core.autocrlf=true maakt op een verse Windows-checkout élke regel CRLF —
+# deze regel maakt de checkout zelf LF, ongeacht die instelling.
+* text=auto eol=lf
+
+# MT940/OFX zijn CRLF-formaten zoals de bank/broker ze aanlevert. Deze
+# fixtures blijven byte-voor-byte zoals aangeleverd, niet door de
+# checkout-regel hierboven herschreven.
+lib/parsers/__fixtures__/* -text

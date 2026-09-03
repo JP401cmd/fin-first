@@ -691,7 +691,10 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
           zo blijft de ~18kB sleep-code buiten de first-load JS van /overzicht.
           EDIT-modus: WidgetDndGrid laadt de sleep-machinerie uit een aparte
           chunk (dynamic, ssr:false) en herbergt DndContext + de live reorder-
-          on-over + de DragOverlay-portal. De volgorde/save-flow blijft hier. */}
+          on-over + de DragOverlay-portal. De volgorde/save-flow blijft hier.
+          De kolomsprong (2→4) loopt synchroon met de rijhoogte-sprong
+          (64→160px) bij sm; liep hij pas bij lg, dan werd de rail op sm hoger
+          dan op lg (zie widgetSpanClass() in widget-grid-helpers.tsx). */}
       {isEditMode ? (
         <WidgetDndGrid
           widgets={activeWidgets}
@@ -706,7 +709,7 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
           onDragCancel={dragCancel}
         />
       ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-4 auto-rows-[64px] sm:auto-rows-[160px] gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 auto-rows-[64px] sm:auto-rows-[160px] gap-3 sm:gap-4">
           {activeWidgets.map(pref => (
             <StaticWidgetItem key={pref.id} pref={pref} data={data} features={features} />
           ))}

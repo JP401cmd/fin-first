@@ -1,6 +1,7 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { type Debt } from '@/lib/debt-data'
+import { SAVINGS_RATE_WINDOW_MONTHS } from '@/lib/constants'
 import { loadPerspectiveContext } from '@/lib/household/perspective-loader'
 import { computeFireAge } from '@/lib/checkin/fire-age'
 import { resolveFireParams } from '@/lib/fire-params'
@@ -123,7 +124,7 @@ export async function GET() {
   const dataMonths6 = savingsRateDataMonths(now, earliest6m)
   const income6mAvg = income6m / dataMonths6
   const expenses6mAvg = expenses6m / dataMonths6
-  const debtAflossing6m = computeDebtAflossingMonthly(activeDebts) * 6
+  const debtAflossing6m = computeDebtAflossingMonthly(activeDebts) * SAVINGS_RATE_WINDOW_MONTHS
 
   // Spaarquote via de CANONIEKE `computeSavingsRate6m` i.p.v. de kale
   // `savingsRateFromAggregates`. Die trekt éérst de spaarbudget-stortingen van

@@ -11,17 +11,28 @@ import {
   RECOMMENDATION_TYPE_SHORT_LABELS,
 } from '@/lib/recommendation-data'
 import { getWeekBucket } from '@/lib/week-utils'
+import { compareActionsByPriority } from '@/lib/action-sort'
 import type { CancellationMetadata } from '@/lib/cancellation-types'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type SubjectFilter = RecommendationType | 'manual' | 'all'
 type PlanningFilter = 'all' | 'this_week' | 'next_week' | 'later' | 'unplanned'
-type SortBy = 'impact' | 'priority' | 'week'
+type SortBy = 'priority' | 'impact' | 'week'
 
+/**
+ * Default = 'priority': de modal opent in DEZELFDE volgorde als de compacte lijst
+ * (priority_score desc, sort_order asc, created_at desc — `lib/action-sort.ts`).
+ * 'Impact' blijft een expliciete keuze, maar niet langer de default: met impact als
+ * default toonde de modal voor dezelfde actie-set een andere volgorde dan het bord
+ * (eigenaarsbesluit WF-OVZ-20-bug1, optie A, 3 sep 2026).
+ */
+const DEFAULT_SORT: SortBy = 'priority'
+
+// Volgorde van dit object = volgorde in het sorteermenu (default bovenaan).
 const SORT_LABELS: Record<SortBy, string> = {
-  impact: 'Impact',
   priority: 'Prioriteit',
+  impact: 'Impact',
   week: 'Week',
 }
 
@@ -87,7 +98,7 @@ export function ActionListModal({
   const [statusFilter, setStatusFilter] = useState<ActionStatus | 'all'>('open')
   const [subjectFilter, setSubjectFilter] = useState<SubjectFilter>('all')
   const [planningFilter, setPlanningFilter] = useState<PlanningFilter>('all')
-  const [sortBy, setSortBy] = useState<SortBy>('impact')
+  const [sortBy, setSortBy] = useState<SortBy>(DEFAULT_SORT)
   const [showSortMenu, setShowSortMenu] = useState(false)
   const [showForm, setShowForm] = useState(false)
 
@@ -97,7 +108,7 @@ export function ActionListModal({
       setStatusFilter('open')
       setSubjectFilter('all')
       setPlanningFilter('all')
-      setSortBy('impact')
+      setSortBy(DEFAULT_SORT)
       setShowSortMenu(false)
       setShowForm(false)
     }
@@ -124,24 +135,23 @@ export function ActionListModal({
 
   const sortedActions = useMemo(() => {
     const sorted = [...filteredActions]
+    // Elke variant eindigt op de canonieke prioriteitsvolgorde als tiebreaker, zodat
+    // ook 'Impact' en 'Week' deterministisch zijn bij gelijke impact/week.
     switch (sortBy) {
+      case 'priority':
+        sorted.sort(compareActionsByPriority)
+        break
       case 'impact':
         sorted.sort((a, b) =>
           (b.freedom_days_impact || 0) - (a.freedom_days_impact || 0) ||
-          (b.priority_score || 0) - (a.priority_score || 0)
-        )
-        break
-      case 'priority':
-        sorted.sort((a, b) =>
-          (b.priority_score || 0) - (a.priority_score || 0) ||
-          a.sort_order - b.sort_order
+          compareActionsByPriority(a, b)
         )
         break
       case 'week':
         sorted.sort((a, b) => {
           const wA = a.scheduled_week || 'zzzz'
           const wB = b.scheduled_week || 'zzzz'
-          return wA.localeCompare(wB) || (b.priority_score || 0) - (a.priority_score || 0)
+          return wA.localeCompare(wB) || compareActionsByPriority(a, b)
         })
         break
     }

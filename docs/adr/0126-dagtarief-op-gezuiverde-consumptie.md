@@ -115,6 +115,9 @@ dat de marginale grondslag (D1) alsnog in de totale grootheid zou lekken en
 de scheiding van D1 weer ongedaan zou maken op precies het scherm waarvoor ze
 bedoeld is.
 
+(ADR 0129: onder een vast stop-anker volgt de kop op /overzicht voortaan het
+plan-anker in plaats van uitsluitend het `nu`-anker.)
+
 ### Fasering
 
 - **PR A (dit besluit)** — D1/D2: de consumptie-grondslag, in

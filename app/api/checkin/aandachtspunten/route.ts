@@ -1,6 +1,7 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
+import { getRecentDailyExpenseRate } from '@/lib/expense-rate'
 import {
   computeGoalProgress,
   formatGoalValue,
@@ -49,7 +50,7 @@ export async function GET() {
   const prevMonthStart = localMonthStart(new Date(currentYear, currentMonth - 1, 1))
 
   // Fetch data in parallel
-  const [budgetsRes, curExpenseRes, prevExpenseRes, goalsRes, transactionsRes] = await Promise.all([
+  const [budgetsRes, curExpenseRes, prevExpenseRes, goalsRes, expenseRate] = await Promise.all([
     // Budgets with limits
     supabase
       .from('budgets')
@@ -81,14 +82,13 @@ export async function GET() {
       .select('id, name, goal_type, current_value, target_value, target_date, is_completed, icon')
       .eq('user_id', claims.sub)
       .eq('is_completed', false),
-    // All current month expenses (for daily expense calculation)
-    supabase
-      .from('transactions')
-      .select('amount')
-      .eq('user_id', claims.sub)
-      .eq('is_income', false)
-      .gte('date', monthStart)
-      .lt('date', monthEnd),
+    // Canoniek dagtarief (€/dag) — 12-mnd rolling consumptie, gedeeld met de
+    // rest van de app (lib/expense-rate.ts; zelfde aanroep als de zuster-route
+    // checkin/gespreksstarters). Hier stond een eigen som over de LOSSE lopende
+    // maand zonder transfer-filter × 12 / 365 — een tweede wisselkoers op
+    // dezelfde check-in (1d, nazorg R2+R3). Geen user-filter nodig:
+    // transactions-RLS is own-only.
+    getRecentDailyExpenseRate(supabase, now),
   ])
 
   const budgets = budgetsRes.data || []
@@ -96,11 +96,9 @@ export async function GET() {
   const prevExpenses = prevExpenseRes.data || []
   const goals = goalsRes.data || []
 
-  // Daily expenses for freedom days calculation.
-  // Canonieke dagbasis = jaaruitgaven / 365 (zie lib/format.ts calculateFreedomTime),
-  // niet maand/30 (=jaar/360). De maandcijfers extrapoleren we naar een jaar (×12).
-  const totalMonthlyExpenses = (transactionsRes.data || []).reduce((s, t) => s + Math.abs(t.amount || 0), 0)
-  const dailyExpenses = totalMonthlyExpenses > 0 ? (totalMonthlyExpenses * 12) / 365 : 0
+  // Canoniek dagtarief uit lib/expense-rate.ts — zie de toelichting bij de
+  // aanroep hierboven. 0 = geen eerlijke dagbasis → geen vrijheidsdagen.
+  const dailyExpenses = expenseRate.dailyRate
 
   const aandachtspunten: Aandachtspunt[] = []
 

@@ -6,6 +6,7 @@
 import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getCachedUser } from '@/lib/supabase/cached-user'
+import { compareActionsByPriority, type ActionSortKeys } from '@/lib/action-sort'
 import type {
   DashboardData,
   TopAction,
@@ -82,7 +83,7 @@ import {
   type BudgetAmountOverride,
 } from '@/lib/budget-rollover'
 import { calculateBox3, CURRENT_TAX_YEAR, type TaxYear } from '@/lib/box3-data'
-import { NL_AOW_AGE, WEERBAARHEID_DISPLAY_MAX } from '@/lib/constants'
+import { NL_AOW_AGE, SAVINGS_RATE_WINDOW_MONTHS, WEERBAARHEID_DISPLAY_MAX } from '@/lib/constants'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { buildPensionProjection } from '@/lib/pension/pension-projection'
 import { resolveFireAssumptions, type FireAssumptionRow } from '@/lib/fire-assumptions'
@@ -362,7 +363,10 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     // T2.2 voor transacties (ADR 0050) — een SECURITY-INVOKER aggregaat-RPC vergen
     // (buiten scope T2.5, geen migratie).
     supabase.from('actions')
-      .select('id, title, status, freedom_days_impact, priority_score, due_date, source, completed_at, recommendation:recommendations(recommendation_type)')
+      // sort_order + created_at: de tiebreak-sleutels van de canonieke actie-volgorde
+      // (lib/action-sort.ts) — zonder die kolommen zou de top-5 hieronder bij gelijke
+      // prioriteit in DB-volgorde (onbepaald) staan, anders dan het actiebord.
+      .select('id, title, status, freedom_days_impact, priority_score, sort_order, created_at, due_date, source, completed_at, recommendation:recommendations(recommendation_type)')
       .in('status', ['open', 'postponed', 'completed'])
       .limit(1000),
     supabase.from('life_events').select('id, name, event_type, target_age, target_date, one_time_cost, monthly_cost_change, monthly_income_change, duration_months, icon, is_active, sort_order, is_indexed, linked_asset_id, metadata').eq('is_active', true).order('sort_order', { ascending: true }).limit(50),
@@ -1109,8 +1113,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // Het 6-maands sub-venster op het maandaggregaat (transfer-gefilterd, mét de
   // spaarbudget-correctie) woont als pure helper in lib/cashflow-kpis.ts, zodat de
   // forecast-laag EXACT dit venster consumeert i.p.v. het na te bouwen (ADR 0083).
-  // 6 kalendermaanden incl. de huidige = 5 maanden terug (getMonth()-6 telde er 7 —
-  // off-by-one), en de grens is TZ-veilig via localMonthStartMonthsAgo.
+  // Grenzen uit `savingsRateWindow` (lib/savings-source.ts): SAVINGS_RATE_WINDOW_MONTHS
+  // VOLTOOIDE kalendermaanden, de lopende maand EXCLUSIEF (bevinding C6) — TZ-veilig
+  // via localMonthStartMonthsAgo.
   const { income6m, expenses6m, savingsBudgetSpent6m } =
     deriveSavingsRate6mWindow(now, txAgg12, savingsBudgetIds)
 
@@ -1120,7 +1125,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // Compute debt aflossing total (only active debts with include_aflossing_in_savings,
   // weighted by net_worth_inclusion_pct) — gedeelde canonieke helper.
   const debtAflossingMonthly = computeDebtAflossingMonthly((debtsResult.data ?? []) as unknown as Debt[])
-  const debtAflossing6m = debtAflossingMonthly * 6
+  const debtAflossing6m = debtAflossingMonthly * SAVINGS_RATE_WINDOW_MONTHS
 
   // Canonieke 6-maands spaarquote MÉT haar twee fallbacks (profiel-schatting en
   // net-vermogen-delta) — gedeelde helper `resolveSavingsRate6m` in
@@ -1198,7 +1203,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const dashboardSavingsExpenses = resolveAmountWithBasis(
     (profileResult.data as { expenses_source?: string | null } | null)?.expenses_source,
     profileMonthlyExpenses,
-    expenses6m / 6,
+    expenses6m / SAVINGS_RATE_WINDOW_MONTHS,
     dashboardBudgetExpenses.monthlyTotal,
   )
   const dashboardSavingsOverrideRaw = (profileResult.data as { monthly_savings_override?: number | string | null } | null)?.monthly_savings_override
@@ -1601,9 +1606,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       }
     })
 
-  // Top 5 open acties gesorteerd op prioriteit
+  // Top 5 open acties in de canonieke prioriteitsvolgorde (lib/action-sort.ts:
+  // priority_score desc, sort_order asc, created_at desc) — dezelfde volgorde als
+  // het actiebord en de modal, dus geen eigen (tie-onbepaalde) sortering hier.
   const topOpenActions: TopAction[] = openActions
-    .sort((a, b) => (Number((b as { priority_score?: number | null }).priority_score) || 0) - (Number((a as { priority_score?: number | null }).priority_score) || 0))
+    .sort((a, b) => compareActionsByPriority(a as ActionSortKeys, b as ActionSortKeys))
     .slice(0, 5)
     .map(a => {
       const act = a as { id: string; title: string; freedom_days_impact?: number | null; priority_score?: number | null; due_date?: string | null; source?: string }
@@ -1725,7 +1732,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // DSTI-noemer: DEZELFDE canonieke inkomensbron die savingsRate6m voedt
   // (extIncome6/6 = het 6-maands-gemiddelde inkomen; profiel-fallback wanneer er
   // geen transactie-inkomen is) — geen nieuwe/afwijkende bron (ADR 0010 / FR-2).
-  const healthNetMonthlyIncome = income6m > 0 ? extIncome6 / 6 : effectiveMonthlyIncome
+  const healthNetMonthlyIncome = income6m > 0 ? extIncome6 / SAVINGS_RATE_WINDOW_MONTHS : effectiveMonthlyIncome
   // DSTI-teller: Σ maandlasten over de al geladen actieve schulden.
   const healthDebtMonthlyPayments = (debtsResult.data ?? []).reduce(
     (s, d) => s + Number((d as { monthly_payment?: number | string | null }).monthly_payment ?? 0),

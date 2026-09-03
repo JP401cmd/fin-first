@@ -20,6 +20,8 @@
  * Pure functie; geen fs/Supabase/Date.now/Math.random.
  */
 
+import type { KernelInput } from '../../types'
+
 /** Aantal prioriteiten dat gelijktijdig gewogen meedoet (1–4); prio ≥ 5 = 0. */
 const MAX_WEIGHTED_PRIO = 4
 
@@ -70,6 +72,77 @@ export function halveningWeightsZonderGevuld(
     sum += base[c]
   }
   return sum > 0 ? base.map((b) => b / sum) : base
+}
+
+/**
+ * Per bezit-categorie: kan positief geld hier daadwerkelijk LANDEN? (kernel-extensie,
+ * buiten het Excel-oracle — voedt uitsluitend de instroom-fallback-ladder hieronder.)
+ *
+ * Een categorie is instroom-doel als ze ≥ 1 pot heeft die géén eigen woning is:
+ *  - **≥ 1 pot**: Bez verdeelt de categorie-toename "per stuk" (`(toename€ + overloop)
+ *    / aantal`, 0 bij aantal 0 — `tables/bez.ts`). Gewicht naar een pot-loze categorie
+ *    verdampt dus alsnog, alleen één tabel later. Een €0-pot telt WEL (voor instroom is
+ *    een lege pot een geldige bestemming — het V17-principe).
+ *  - **geen eigen woning** (`rol === 'eigenHuis'`): bij "Meerekenen" is die categorie
+ *    liquide in de TS-zin (telt mee als FIRE-kapitaal, laatste-redmiddel-buffer voor
+ *    UITstroom), maar een woning is geen spaarpot voor een kasoverschot.
+ *
+ * Indexering = `input.ts.bezitCategorien` (de vaste bezit-volgorde).
+ */
+export function bezitInstroomDoelMask(input: KernelInput): boolean[] {
+  return input.ts.bezitCategorien.map((cat) =>
+    input.assetPotten.some((p) => p.categorie === cat.categorie && p.rol !== 'eigenHuis'),
+  )
+}
+
+/**
+ * Instroom-fallback-gewichten voor bezit — de ENE ladder voor "positief geld dat volgens
+ * de reguliere ½^(prio−1)-toename-gewichten nergens heen kan" (Σw = 0). Kernel-extensie,
+ * buiten het Excel-oracle; inert-by-construction op het oracle-pad (de fixtures hebben
+ * altijd een gevulde prio-1..4-bestemming, dus de reguliere Σw > 0 en de ladder wordt
+ * nooit aangeroepen). Gedeeld door precies twee consumenten — één formule, één plek:
+ *  - `toenameGewichten` (tables/toename-afname.ts): de degenerate toename-verdeling
+ *    (gap-besluit V17 — lege surplus-doelpot);
+ *  - `computeVerdeling` (verdeling/index.ts): de schuld→bezit-overloop HC:HH wanneer
+ *    `wBezitToename` all-zero is (gap-besluit V24 — surplus "Schulden aflossen" nadat de
+ *    aanwijsbare schuld is afgelost).
+ *
+ * Ladder (eerste tree met Σ > 0 wint; genormaliseerd tot Σ = 1):
+ *  A) prio 1..4 + liquide + instroom-doel — de `gevuld`-eis losgelaten, de ½^(prio−1)-
+ *     ordening intact (de lege surplus-doelpot vult zich, conform de gebruikersintentie);
+ *  B) prio 5 (reserve) + liquide + instroom-doel — gelijk gewogen (alle reserve-prio's zijn
+ *     5, dus ½^(prio−1) is daar per definitie uniform);
+ *  C) géén liquide instroom-doel — all-nul (het geld heeft werkelijk geen bestemming;
+ *     byte-identiek aan het gedrag vóór de extensie).
+ *
+ * @param prio         Per bezit-categorie: TS-prioToename (1..5).
+ * @param nietLiquide  Per bezit-categorie: TS!H.
+ * @param instroomDoel Per bezit-categorie: `bezitInstroomDoelMask` (≥ 1 niet-woning-pot).
+ */
+export function bezitInstroomFallbackWeights(
+  prio: readonly (number | null)[],
+  nietLiquide: readonly boolean[],
+  instroomDoel: readonly boolean[],
+): number[] {
+  const n = prio.length
+  // A) prio 1..4, liquide, instroom-doel — gevuld-eis losgelaten.
+  const a = new Array<number>(n).fill(0)
+  let somA = 0
+  for (let c = 0; c < n; c++) {
+    a[c] = instroomDoel[c] ? baseWeightZonderGevuld(prio[c], nietLiquide[c]) : 0
+    somA += a[c]
+  }
+  if (somA > 0) return a.map((w) => w / somA)
+  // B) prio-5-reserve, liquide, instroom-doel — gelijk gewogen.
+  const b = new Array<number>(n).fill(0)
+  let somB = 0
+  for (let c = 0; c < n; c++) {
+    b[c] = instroomDoel[c] && !nietLiquide[c] && prio[c] === 5 ? 1 : 0
+    somB += b[c]
+  }
+  if (somB > 0) return b.map((w) => w / somB)
+  // C) geen liquide instroom-doel — all-nul.
+  return b
 }
 
 /**

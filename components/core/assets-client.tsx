@@ -2060,10 +2060,16 @@ function TypedHoldingsSection({
         <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--ink-3)]">
           Geen {assetType === 'crypto' ? 'coins' : 'posities'} gekoppeld
         </p>
+        {/* Voor crypto noemt deze tekst bewust GEEN handmatige invoer:
+            `POST /api/holdings` weigert `asset_type === 'crypto'` met een 400,
+            omdat zo'n coin anders in `investment_holdings` belandt — onzichtbaar
+            op de crypto-pagina, waarna de asset-rollup (die `crypto_holdings`
+            leest) de assetwaarde nulde. De empty-state mag dus alleen de route
+            noemen die bestaat: de exchange-/wallet-koppeling (WF-BEZIT-21-bug4). */}
         <p className="mt-1 font-serif italic text-sm leading-relaxed text-[var(--ink-2)]">
-          Voeg holdings toe via een exchange-koppeling, wallet-adres of
-          {assetType === 'investment' ? ' een CSV-import' : ' handmatige invoer'} om hier
-          de detailsamenstelling te zien.
+          {assetType === 'investment'
+            ? 'Voeg holdings toe via een exchange-koppeling, wallet-adres of een CSV-import om hier de detailsamenstelling te zien.'
+            : 'Voeg coins toe via een exchange-koppeling of wallet-adres om hier de detailsamenstelling te zien. Handmatig invoeren kan niet: crypto-saldi lopen altijd via de koppeling.'}
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <button
@@ -2071,7 +2077,10 @@ function TypedHoldingsSection({
             onClick={() =>
               router.push(
                 assetType === 'crypto'
-                  ? '/identity/koppelingen'
+                  ? // Canonieke route; `/identity/koppelingen` is legacy en haalt
+                    // dezelfde pagina alleen via een extra redirect (zie de
+                    // zusje-empty-state in crypto-holdings-page.tsx).
+                    '/mijn/koppelingen'
                   : '/core/assets/holdings/import',
               )
             }

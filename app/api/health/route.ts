@@ -1,92 +1,60 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
-export async function GET(request: Request) {
+/**
+ * GET /api/health — publiek bereikbaar (publicPaths in lib/supabase/proxy.ts).
+ *
+ * Juist dáárom mag hier nooit een rauwe `error.message` de body in (ADR 0044):
+ * dit was de enige route die ZONDER sessie DB-/driver-tekst lekte
+ * (security-sweep 3 sep 2026). De echte fout gaat server-side het log in met
+ * een grep-bare tag; de client krijgt een vaste tekst. De body-vorm
+ * (`status`/`database`/`supabase`/`timestamp`) blijft, want de dev-scripts
+ * (scripts/check-health.js e.a.) en de navigatie-regressiesuite lezen 'm.
+ *
+ * De vroegere `?persistence_test=`-schrijfproef op `app_settings` is weg: een
+ * publieke route hoort geen schrijfpad naar een instellingentabel te dragen —
+ * ook niet één dat RLS toch weigert, want precies die weigering lekte als
+ * DB-tekst naar een anonieme aanroeper.
+ */
+
+function unhealthy(err: unknown): NextResponse {
+  // PostgrestError is geen Error-instantie maar een plat object met `message`.
+  const message =
+    err instanceof Error
+      ? err.message
+      : ((err as { message?: unknown } | null)?.message as string | undefined) ?? String(err)
+  console.error('[health:GET] databasecheck mislukt:', message)
+  return NextResponse.json(
+    {
+      status: 'error',
+      database: 'disconnected',
+      supabase: 'error',
+      error: 'Database niet bereikbaar',
+      timestamp: new Date().toISOString(),
+    },
+    { status: 503 },
+  )
+}
+
+export async function GET() {
   try {
     const supabase = await createClient()
-    const url = new URL(request.url)
-    const persistenceTest = url.searchParams.get('persistence_test')
 
-    // Test the database connection with a simple query
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id')
-      .limit(1)
-
-    if (error) {
-      return NextResponse.json(
-        {
-          status: 'error',
-          database: 'disconnected',
-          supabase: 'error',
-          // eslint-disable-next-line no-restricted-syntax -- rauwe error.message: zie [Arch F4] API-error-envelope
-          error: error.message,
-          timestamp: new Date().toISOString(),
-        },
-        { status: 503 }
-      )
-    }
-
-    // If persistence_test is requested, verify app_settings table persistence
-    let persistence = undefined
-    if (persistenceTest) {
-      // Write a test setting and read it back to verify DB persistence
-      const testKey = `_health_check_${persistenceTest}`
-
-      // Try to read an existing test value
-      const { data: existing } = await supabase
-        .from('app_settings')
-        .select('value')
-        .eq('key', testKey)
-        .maybeSingle()
-
-      if (existing) {
-        persistence = {
-          status: 'verified',
-          key: testKey,
-          value: existing.value,
-          message: 'Data persists from previous write',
-        }
-      } else {
-        // Write a new test value
-        const testValue = { written_at: new Date().toISOString(), server_pid: process.pid }
-        const { error: writeError } = await supabase
-          .from('app_settings')
-          .upsert({ key: testKey, value: testValue })
-
-        persistence = {
-          status: writeError ? 'write_failed' : 'written',
-          key: testKey,
-          value: testValue,
-          error: writeError?.message,
-          message: writeError
-            ? `Write failed: ${writeError.message}`
-            : 'Test value written. Restart server and query again to verify persistence.',
-        }
-      }
-    }
+    // Verbindingscheck met de goedkoopst mogelijke query (RLS-gescoped, dus
+    // zonder sessie gewoon een lege set — het gaat om het bereiken van de DB).
+    const { error } = await supabase.from('profiles').select('id').limit(1)
+    if (error) return unhealthy(error)
 
     return NextResponse.json(
       {
         status: 'healthy',
         database: 'connected',
         supabase: 'connected',
-        persistence,
         timestamp: new Date().toISOString(),
       },
-      { status: 200 }
+      { status: 200 },
     )
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error'
-    return NextResponse.json(
-      {
-        status: 'error',
-        database: 'disconnected',
-        supabase: 'error',
-        error: message,
-        timestamp: new Date().toISOString(),
-      },
-      { status: 503 }
-    )
+    return unhealthy(err)
   }
 }

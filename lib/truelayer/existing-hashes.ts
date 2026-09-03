@@ -277,6 +277,163 @@ export async function loadHouseholdSharedDedupKeys(
 }
 
 /**
+ * De `bank_accounts`-rijen van de PARTNER die dezelfde échte bankrekening
+ * beschrijven als `scope.accountId` — de en/of-rekening die beide partners
+ * hebben gekoppeld.
+ *
+ * ## Waarom dit bestaat naast `loadHouseholdSharedDedupKeys`
+ *
+ * Die loader dekt het BESTANDSPAD: daar kiezen beide partners dezelfde
+ * `bank_accounts`-rij als doel, dus botsen ze op één `account_id`. Op het
+ * SYNC-pad kan dat niet. De callback zoekt haar dragende rekening met
+ * `.eq('user_id', user.id)` (schakel 3, `bank-connect/callback/route.ts`) en
+ * maakt er anders een nieuwe aan — bewust, want een `bank_accounts`-rij heeft
+ * precies één eigenaar en de UPDATE-policy is strikt eigen-rij. Koppelen beide
+ * partners hun en/of-rekening, dan zijn er dus TWEE dragende rijen voor ÉÉN
+ * echte rekening, met twee verschillende `account_id`'s.
+ *
+ * Gevolg zonder deze functie: de unieke index
+ * `(account_id, import_hash, coalesce(bank_seq,''))` botst niet (ander
+ * `account_id`), laag 1 leest `(user_id, account_id)`-gescoped en ziet niets, en
+ * élke gezamenlijke boeking staat twee keer in het huishoudbeeld — in uitgaven,
+ * spaarquote én budgetten. In Nederland is de en/of-rekening de norm, niet de
+ * uitzondering; dit is dus geen randgeval.
+ *
+ * ## Hoe "dezelfde rekening" wordt vastgesteld
+ *
+ * Op `iban_hash` — de blinde index onder een server-only sleutel. Niet op de
+ * plaintext `iban` (die kolom verdwijnt), niet op naam of `external_account_id`
+ * (die verschilt per consent). Draagt de doelrekening geen `iban_hash`, dan is
+ * er geen betrouwbare identiteit en levert deze functie een lege lijst — de
+ * sync valt dan terug op de lagen die er wél zijn, in plaats van op een gok.
+ *
+ * ## Waarom dit geen inferentiekanaal is
+ *
+ * De query draait onder RLS met de ANON-client. De SELECT-policy op
+ * `bank_accounts` ("Users view own or shared bank_accounts") levert eigen rijen
+ * plus huishoud-GEDEELDE rijen. Een PERSOONLIJKE rekening van de partner is dus
+ * onzichtbaar en komt hier nooit uit — precies goed: op een persoonlijke
+ * rekening van een ander valt niets te ontdubbelen, want die boekingen tellen
+ * ook niet in het gedeelde beeld mee. `.neq('user_id', …)` houdt de set zuiver
+ * op partnerrijen, zodat de teller apart telbaar blijft.
+ *
+ * **Deze functie mag daarom NOOIT met een service-role-client worden
+ * aangeroepen.** Zonder RLS wordt `iban_hash` een correlatiesleutel over álle
+ * gebruikers heen. Wie hier ooit een cron/service-role-pad op aansluit, moet
+ * eerst de eigendomsregel expliciet in de query zetten.
+ */
+export async function loadHouseholdSiblingAccountIds(
+  supabase: SupabaseClient,
+  scope: { userId: string; accountId: string },
+): Promise<string[]> {
+  // Expliciete kolomlijst, nooit `*`: `bank_accounts` draagt `*_encrypted` en
+  // `*_hash`, en die horen deze route niet te passeren (CLAUDE.md-kolomregel).
+  const { data: own, error: ownError } = await supabase
+    .from('bank_accounts')
+    .select('iban_hash')
+    .eq('id', scope.accountId)
+    .eq('user_id', scope.userId)
+    .maybeSingle()
+
+  if (ownError) {
+    console.error('[bankconnect-sync:household-siblings] doelrekening lezen mislukt:', ownError)
+    throw new Error('Rekeninggegevens voor duplicaatcontrole ophalen mislukt')
+  }
+
+  const ibanHash = (own as { iban_hash?: string | null } | null)?.iban_hash ?? null
+  if (!ibanHash) return []
+
+  const { data, error } = await supabase
+    .from('bank_accounts')
+    .select('id')
+    .eq('iban_hash', ibanHash)
+    .neq('user_id', scope.userId)
+    .eq('is_active', true)
+    .order('id', { ascending: true })
+
+  if (error) {
+    console.error('[bankconnect-sync:household-siblings] query mislukt:', error)
+    throw new Error('Rekeninggegevens voor duplicaatcontrole ophalen mislukt')
+  }
+
+  return ((data ?? []) as { id: string }[]).map((r) => r.id)
+}
+
+/**
+ * Laag 1b voor het SYNC-pad: de `import_hash`-en die de PARTNER al heeft
+ * weggeschreven op de rekeningen uit `accountIds` — de eigen doelrekening én de
+ * broertjes die `loadHouseholdSiblingAccountIds` vond.
+ *
+ * ## Waarom hash-only en niet `import_hash|bank_seq`
+ *
+ * Zelfde reden als laag 1 op dit pad (zie `loadExistingImportHashes`): de
+ * mapper zet `bank_seq` altijd op `null`, dus de volledige indexsleutel is hier
+ * per definitie gelijk aan de hash. Tegenover een CSV-rij van de partner mét
+ * volgnummer is hash-only bewust conservatief: dat is dezelfde boeking uit een
+ * andere bron, en die willen we juist niet nóg eens wegschrijven.
+ *
+ * ## De twee filters zijn samen de privacy-control
+ *
+ * Identiek aan `loadHouseholdSharedDedupKeys` — haal er nooit één weg:
+ *  - `.eq('ownership', 'shared')` sluit PERSOONLIJKE partnerrijen expliciet uit;
+ *    gedeelde rijen zijn voor deze gebruiker toch al zichtbaar in zijn eigen
+ *    transactielijst (de SELECT-policy is huishoud-verbreed, mét de
+ *    `partner_visibility`-poort uit ADR 0118), dus hier wordt niets blootgelegd
+ *    wat hij niet al mocht zien.
+ *  - `.neq('user_id', …)` houdt de set zuiver op partnerrijen, zodat
+ *    `duplicates_household_partner` apart telbaar blijft en niet stil met de
+ *    eigen laag-1-treffers vermengt.
+ *
+ * ## De cap is expliciet
+ *
+ * `.in('account_id', accountIds)` is hier veilig waar een `.in()` op hashes dat
+ * niet is: de lijst is het aantal dragende rijen voor één IBAN binnen één
+ * huishouden — in de praktijk één of twee, nooit een batchgrootte. Verder
+ * dezelfde `range()`-paginatie met stabiele `order` als elders in dit bestand
+ * (1000 × 100 = 100k rijen binnen dit venster), en fouten worden gegooid in
+ * plaats van als "niets bestaat al" gelezen — dat laatste zou juist de dubbele
+ * reeks opleveren die deze laag hoort te voorkomen.
+ */
+export async function loadHouseholdSharedHashes(
+  supabase: SupabaseClient,
+  scope: { userId: string; accountIds: string[]; minDate: string; maxDate: string },
+): Promise<Set<string>> {
+  const hashes = new Set<string>()
+  if (scope.accountIds.length === 0) return hashes
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const from = page * EXISTING_HASH_PAGE_SIZE
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('import_hash')
+      .neq('user_id', scope.userId)
+      .in('account_id', scope.accountIds)
+      .eq('ownership', 'shared')
+      .not('import_hash', 'is', null)
+      .gte('date', scope.minDate)
+      .lte('date', scope.maxDate)
+      .order('id', { ascending: true })
+      .range(from, from + EXISTING_HASH_PAGE_SIZE - 1)
+
+    if (error) {
+      // Rauwe PostgREST-melding blijft server-side (AVG): de route schrijft een
+      // genormaliseerde tekst naar bank_sync_log, dat in de data-export zit.
+      console.error('[bankconnect-sync:household-shared-hashes] query mislukt:', error)
+      throw new Error('Bestaande transacties voor duplicaatcontrole ophalen mislukt')
+    }
+
+    const rows = (data ?? []) as { import_hash: string | null }[]
+    for (const row of rows) {
+      if (row.import_hash) hashes.add(row.import_hash)
+    }
+
+    if (rows.length < EXISTING_HASH_PAGE_SIZE) break
+  }
+
+  return hashes
+}
+
+/**
  * Haal de KANDIDAAT-RIJEN op voor dedup-laag 2 (cross-bron): de vier velden
  * waarop `lib/parsers/cross-source-dedup.ts` matcht, van transacties die al op
  * DEZE rekening staan rond het datumvenster van de binnenkomende batch.

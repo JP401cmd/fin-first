@@ -41,10 +41,10 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { buildTaxOverview } from './tax-overview'
 import { computeBox1Tax, deriveMarginaalTarief, BOX1_PARAMS } from './box1-tax'
+import { readSourceLF } from '@/lib/test-utils/read-source'
 
 const YEAR = 2026 as const
 
@@ -224,7 +224,7 @@ function callArgs(source: string, fnName: string): string[] {
 }
 
 describe('bron-grendel — de hub leidt geen tarief meer zelf af', () => {
-  const source = readFileSync(HUB_PAGE, 'utf8')
+  const source = readSourceLF(HUB_PAGE)
 
   it('gebruikt de FIRE-vuistregel niet meer als user-facing tarief', () => {
     expect(source).not.toContain('deriveMarginaalTarief')
@@ -252,7 +252,7 @@ describe('bron-grendel — de hub leidt geen tarief meer zelf af', () => {
 })
 
 describe('bron-grendel — de kansen-loader levert heffing én tarieven uit ÉÉN motoraanroep', () => {
-  const source = readFileSync(KANSEN_LOADER, 'utf8')
+  const source = readSourceLF(KANSEN_LOADER)
 
   it('roept computeBox1Tax exact één keer aan', () => {
     expect(callArgs(source, 'computeBox1Tax').length).toBe(1)

@@ -25,6 +25,19 @@ describe('BEHEER_GROUPS', () => {
     }
   })
 
+  it('koppelt precies de drie inbakken met werkvoorraad-notie aan een teller', () => {
+    const keyed = allTools.filter((t) => t.inboxKey != null)
+    expect(new Map(keyed.map((t) => [t.href, t.inboxKey]))).toEqual(
+      new Map([
+        ['/beheer/errors', 'errors'],
+        ['/beheer/calculator-reports', 'calculator_reports'],
+        ['/beheer/feedback', 'feedback'],
+      ]),
+    )
+    // Elke sleutel hoort bij precies één tegel — anders telt de hub dubbel.
+    expect(new Set(keyed.map((t) => t.inboxKey)).size).toBe(keyed.length)
+  })
+
   it('heeft geen lege groepen', () => {
     for (const group of BEHEER_GROUPS) {
       expect(group.tools.length).toBeGreaterThan(0)

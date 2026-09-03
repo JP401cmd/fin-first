@@ -36,8 +36,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { loadCoreData } from '@/lib/core-data-loader'
 import { buildWillFinancialFacts } from '@/lib/ai/context/fin-financial-facts'
-import { computeJaarruimteFacts } from '@/lib/jaarruimte-facts'
-import { resolvePensionFactorA } from '@/lib/jaarruimte'
+import { computeJaarruimteFacts, JAARRUIMTE_BOVENGRENS_SUFFIX } from '@/lib/jaarruimte-facts'
 import { collectAandachtspunten } from '@/lib/aandachtspunten-loader'
 import { type Aandachtspunt, JAARRUIMTE_AANDACHTSPUNT_ID } from '@/lib/aandachtspunten'
 import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
@@ -392,17 +391,17 @@ export async function buildLocalTipCandidates(
   // dus we voegen 'm alleen toe wanneer hij daar nog in stond.
   const jaarruimteNogRelevant = aandachtspunten.some((a) => a.id === JAARRUIMTE_AANDACHTSPUNT_ID)
   if (jaarruimteNogRelevant) {
-    const factorA = resolvePensionFactorA({
-      pension_factor_a: profile?.pension_factor_a,
-      pension_factor_a_source: profile?.pension_factor_a_source,
-    }).factorA
-    const jf = computeJaarruimteFacts(Number(profile?.net_monthly_income ?? 0), factorA, TAX_YEAR)
+    // Het PROFIEL gaat mee, niet een losgetrokken `factorA`-getal: zo reist de
+    // "factor A onbekend"-kwalificatie (H23) mee tot in de tip-toelichting —
+    // die stroomt via `LocalTipCandidate.toelichting` door naar
+    // `local-recommendations-prompt.ts`.
+    const jf = computeJaarruimteFacts(Number(profile?.net_monthly_income ?? 0), profile, TAX_YEAR)
     if (jf.hasData && jf.besparing > 0) {
       raw.push({
         id: JAARRUIMTE_AANDACHTSPUNT_ID,
         bron: 'jaarruimte',
         titel: 'Benut je jaarruimte',
-        toelichting: `je hebt €${Math.round(jf.onbenut).toLocaleString('nl-NL')} onbenutte aftrekruimte voor lijfrente- of pensioeninleg`,
+        toelichting: `je hebt €${Math.round(jf.onbenut).toLocaleString('nl-NL')} onbenutte aftrekruimte voor lijfrente- of pensioeninleg${jf.factorAKnown ? '' : JAARRUIMTE_BOVENGRENS_SUFFIX}`,
         besparingPerJaar: Math.round(jf.besparing),
         euroImpactMonthly: null,
         budgetSlug: null,

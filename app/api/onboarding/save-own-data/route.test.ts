@@ -1,6 +1,6 @@
-import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, it, expect } from 'vitest'
+import { readSourceLF } from '@/lib/test-utils/read-source'
 
 /**
  * Borgt de standaardinstellingen voor nieuwe gebruikers (Notion-kaart "new user
@@ -34,7 +34,9 @@ import { describe, it, expect } from 'vitest'
  */
 describe('onboarding save-own-data — standaardinstellingen nieuwe gebruiker', () => {
   const routePath = path.resolve(__dirname, 'route.ts')
-  const source = readFileSync(routePath, 'utf8')
+  // CRLF-veilig: op een verse Windows-checkout gaat de regelgebaseerde strip
+  // hieronder stil kapot zonder normalisatie (zie lib/test-utils/read-source.ts).
+  const source = readSourceLF(routePath)
 
   // Strip line- en block-commentaar zodat we alleen écht uitgevoerde code zien.
   // (De comments noemen bewust óók de oude/fallback-waarden voor de uitleg.)
@@ -94,7 +96,7 @@ describe('onboarding save-own-data — standaardinstellingen nieuwe gebruiker', 
  */
 describe('onboarding save-own-data — eindstrategie-keuze (FIRE vs. pensioen)', () => {
   const routePath = path.resolve(__dirname, 'route.ts')
-  const source = readFileSync(routePath, 'utf8')
+  const source = readSourceLF(routePath)
   const codeOnly = source
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .split('\n')
@@ -134,7 +136,7 @@ describe('onboarding save-own-data — eindstrategie-keuze (FIRE vs. pensioen)',
  */
 describe('onboarding save-own-data — holdings-tracking standaard uit', () => {
   const routePath = path.resolve(__dirname, 'route.ts')
-  const source = readFileSync(routePath, 'utf8')
+  const source = readSourceLF(routePath)
   const codeOnly = source
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .split('\n')

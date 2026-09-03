@@ -78,7 +78,7 @@ import {
   aggExpenseByMonthAbs,
   aggSpendingByBudgetMonth,
 } from '@/lib/server-data/tx-aggregates'
-import { consumptionExpenseRows, recentDailyExpenseRateFromRows } from './expense-rate'
+import { consumptionExpenseRows, recentDailyExpenseRateFromRows, type RecentDailyExpenseRate } from './expense-rate'
 
 // ── Result type ────────────────────────────────────────────────
 
@@ -239,6 +239,14 @@ export interface CorePageData {
    * bestaande mock-bundels blijven compileren; 0 = geen eerlijke dagbasis.
    */
   dailyExpenseRate?: number
+  /**
+   * Herkomst van dat tarief ('transactions' | 'estimate' | 'none') — voor de
+   * voetnoot onder een vrijheidsdagen-getal. Voorheen gooide deze loader de
+   * `source` uit `recentDailyExpenseRateFromRows` weg en hardcodeden de
+   * consumenten 'transactions' (1b, nazorg R2+R3). Optioneel/additief, net als
+   * `dailyExpenseRate`.
+   */
+  dailyExpenseRateSource?: RecentDailyExpenseRate['source']
   fullAssets: Asset[]
   fullDebts: Debt[]
 
@@ -737,7 +745,7 @@ export const loadCoreData = cache(async function loadCoreData(
   const savingsExpenseResolution = resolveAmountWithBasis(
     profileResult.data?.expenses_source,
     profileMonthlyExpenses,
-    extHalfYearExpenses / 6,
+    extHalfYearExpenses / SAVINGS_RATE_WINDOW_MONTHS,
     budgetExpenses.monthlyTotal,
   )
 
@@ -924,7 +932,7 @@ export const loadCoreData = cache(async function loadCoreData(
   // en horizon-bundel, op het al opgehaalde 12-mnd aggregaat en de gezuiverde
   // consumptie-grondslag (`consumptionExpenseRows`, ADR 0126 D2). De effective
   // maandwaarde dient alleen nog als terugval voor wie geen transacties heeft.
-  const { dailyRate: canonicalDailyExpenseRate } = recentDailyExpenseRateFromRows(
+  const { dailyRate: canonicalDailyExpenseRate, source: canonicalDailyExpenseRateSource } = recentDailyExpenseRateFromRows(
     consumptionExpenseRows(txAgg12, budgetTypeMap),
     now,
     effectiveMonthlyExpenses,
@@ -1200,11 +1208,11 @@ export const loadCoreData = cache(async function loadCoreData(
             items.push({
               name: d.name,
               icon: DEBT_TYPE_ICONS[d.debt_type] ?? 'CircleDot',
-              amount6m: adjusted * 6,
+              amount6m: adjusted * SAVINGS_RATE_WINDOW_MONTHS,
             })
           }
         }
-        debtAflossingTotal6m = monthlyAflossing * 6
+        debtAflossingTotal6m = monthlyAflossing * SAVINGS_RATE_WINDOW_MONTHS
         debtAflossingItems = items.sort((a, b) => b.amount6m - a.amount6m)
       }
 
@@ -1394,7 +1402,7 @@ export const loadCoreData = cache(async function loadCoreData(
       // onrechte "niet in zicht" meldt (review C1, ADR 0124).
       fireAgeFractional: coreSnapshotFireAge,
       avgMonthlyExpenses: effectiveMonthlyExpenses,
-      netMonthlyIncome: extHalfYearIncome > 0 ? extHalfYearIncome / 6 : effectiveMonthlyIncome,
+      netMonthlyIncome: extHalfYearIncome > 0 ? extHalfYearIncome / SAVINGS_RATE_WINDOW_MONTHS : effectiveMonthlyIncome,
       // Noodbuffer-norm: 3 × netto maandsalaris (lib/emergency-fund.ts).
       netMonthlySalary: effectiveMonthlyIncome,
     },
@@ -1622,6 +1630,7 @@ export const loadCoreData = cache(async function loadCoreData(
 
     rawFinancials,
     dailyExpenseRate: canonicalDailyExpenseRate,
+    dailyExpenseRateSource: canonicalDailyExpenseRateSource,
     fullAssets: assetsResult.data as unknown as Asset[],
     fullDebts: debtsResult.data as unknown as Debt[],
     healthScoreInput,

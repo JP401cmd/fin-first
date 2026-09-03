@@ -206,6 +206,15 @@ export interface Box3AssetClassificationResult {
 const PHYSICAL_BELEGGING_SUBTYPES: ReadonlySet<string> = new Set(['kunst', 'verzameling'])
 
 /**
+ * Typen waarvan de box uit het type zelf volgt (box 1 via `eigen_huis`, box 2
+ * via `deelneming`) en die `box3_vrijgesteld = false` dus NIET naar Box 3 mag
+ * trekken (ADR 0108). `retirement` staat hier bewust niet: een als pensioen
+ * geregistreerde pot die in werkelijkheid gewoon sparen is, mág de gebruiker
+ * terugzetten in Box 3.
+ */
+const BOX3_NIET_OVERRULEBAAR_TYPES: ReadonlySet<string> = new Set(['eigen_huis', 'deelneming'])
+
+/**
  * Type-/subtype-afleiding van de Box 3-indeling. Bewust een EXHAUSTIEVE switch
  * over `AssetType`: de oude `if`-keten eindigde op een fall-through
  * ("alles overige is een belegging"), waardoor roerende zaken voor eigen gebruik
@@ -349,6 +358,12 @@ export function classifyAsset(asset: Asset): Box3AssetClassificationResult {
     // blijft gelden voor spaar-/cash-typen; al het andere valt onder het
     // beleggingsforfait.
     const derived = classifyAssetByType(asset)
+    // ADR 0108: box 1 (eigen woning) en box 2 (aanmerkelijk belang) VOLGEN uit
+    // het type en zijn niet naar Box 3 te overrulen — de overschrijving bestaat
+    // om een vrijstelling te bevestigen of te ontkennen (boot, pensioenpot die
+    // eigenlijk sparen is), niet om een woning of deelneming in Box 3 te
+    // trekken. Tot 3 sep 2026 dwong deze tak élk type naar 'beleggingen' (4a).
+    if (BOX3_NIET_OVERRULEBAAR_TYPES.has(asset.asset_type)) return derived
     return {
       category: derived.category === 'spaargeld' ? 'spaargeld' : 'beleggingen',
       exclusionReason: null,
@@ -432,52 +447,17 @@ export function calculateBox3(input: Box3Input): Box3Result {
     else totaalUitgeslotenSchulden += balance
   }
 
-  // Step 4: Schuldendrempel
-  const schuldendrempel = input.hasPartner
-    ? params.schuldendrempelPartner
-    : params.schuldendrempelSingle
-
-  // Step 5: Aftrekbare schulden
-  const aftrekbareSchulden = Math.max(0, totaalBox3Schulden - schuldendrempel)
-
-  // Step 6: Forfaitair rendement spaargeld
-  const forfaitairSpaargeld = totaalSpaargeld * params.forfaitSpaargeld
-
-  // Step 7: Forfaitair rendement beleggingen
-  const forfaitairBeleggingen = totaalBeleggingen * params.forfaitBeleggingen
-
-  // Step 8: Forfaitair rendement schulden
-  const forfaitairSchulden = aftrekbareSchulden * params.forfaitSchulden
-
-  // Step 9: Voordeel uit sparen en beleggen
-  const voordeelUitSparen = forfaitairSpaargeld + forfaitairBeleggingen - forfaitairSchulden
-
-  // Step 10: Rendementsgrondslag
-  const totaalBox3Bezittingen = totaalSpaargeld + totaalBeleggingen
-  const rendementsgrondslag = totaalBox3Bezittingen - aftrekbareSchulden
-
-  // Step 11: Heffingsvrij vermogen
-  const heffingsvrijVermogen = input.hasPartner
-    ? params.heffingsvrijPartner
-    : params.heffingsvrijSingle
-
-  // Step 12: Grondslag sparen en beleggen
-  const grondslagSparen = Math.max(0, rendementsgrondslag - heffingsvrijVermogen)
-
-  // Step 13: Effectief rendement
-  const effectiefRendement = rendementsgrondslag > 0
-    ? voordeelUitSparen / rendementsgrondslag
-    : 0
-
-  // Step 14: Box 3 income
-  const box3Income = grondslagSparen * effectiefRendement
-
-  // Step 15: Tax
-  const tax = box3Income * params.tarief
+  // Step 4-15: de forfait-keten — ÉÉN implementatie, gedeeld met de
+  // partnerverdeling (`computeBox3Heffing` hieronder).
+  const heffing = computeBox3Heffing(
+    { spaargeld: totaalSpaargeld, beleggingen: totaalBeleggingen, box3Schulden: totaalBox3Schulden },
+    input.hasPartner,
+    params,
+  )
 
   // Freedom metric
   const freedomDays = input.dailyExpenses > 0
-    ? Math.round(tax / input.dailyExpenses)
+    ? Math.round(heffing.tax / input.dailyExpenses)
     : 0
 
   return {
@@ -491,6 +471,76 @@ export function calculateBox3(input: Box3Input): Box3Result {
     totaalUitgesloten,
     totaalBox3Schulden,
     totaalUitgeslotenSchulden,
+    ...heffing,
+    freedomDays,
+    dailyExpenses: input.dailyExpenses,
+  }
+}
+
+// ── De forfait-keten (stappen 4-15), gedeeld ─────────────────────────────
+
+/** De drie gesommeerde componenten waarop de Box 3-heffing rekent. */
+export interface Box3HeffingComponents {
+  spaargeld: number
+  beleggingen: number
+  /** Box 3-schulden VÓÓR de schuldendrempel. */
+  box3Schulden: number
+}
+
+/** Alle tussenstappen van de forfait-keten — de velden die `Box3Result` ook draagt. */
+export interface Box3Heffing {
+  schuldendrempel: number
+  aftrekbareSchulden: number
+  forfaitairSpaargeld: number
+  forfaitairBeleggingen: number
+  forfaitairSchulden: number
+  voordeelUitSparen: number
+  rendementsgrondslag: number
+  heffingsvrijVermogen: number
+  grondslagSparen: number
+  effectiefRendement: number
+  box3Income: number
+  tax: number
+}
+
+/**
+ * Stappen 4-15 van de Box 3-heffing als pure functie over de drie gesommeerde
+ * componenten. `calculateBox3` én de partnerverdeling
+ * (`calculateSinglePartnerBox3` → `optimizePartnerAllocation`) rekenen hierdoor.
+ * Tot 3 sep 2026 droeg de partnerverdeling een eigen kopie van exact deze keten
+ * (4g, nazorg R2+R3): bij een wijziging van de forfait-regels zou de "optimale
+ * verdeling" dan stil van de hoofdheffing zijn gaan afwijken. Byte-identiek aan
+ * de vroegere inline-stappen (zelfde operaties, zelfde volgorde).
+ */
+export function computeBox3Heffing(
+  c: Box3HeffingComponents,
+  hasPartner: boolean,
+  params: Box3Params,
+): Box3Heffing {
+  // Step 4: Schuldendrempel
+  const schuldendrempel = hasPartner ? params.schuldendrempelPartner : params.schuldendrempelSingle
+  // Step 5: Aftrekbare schulden
+  const aftrekbareSchulden = Math.max(0, c.box3Schulden - schuldendrempel)
+  // Step 6-8: Forfaitair rendement spaargeld / beleggingen / schulden
+  const forfaitairSpaargeld = c.spaargeld * params.forfaitSpaargeld
+  const forfaitairBeleggingen = c.beleggingen * params.forfaitBeleggingen
+  const forfaitairSchulden = aftrekbareSchulden * params.forfaitSchulden
+  // Step 9: Voordeel uit sparen en beleggen
+  const voordeelUitSparen = forfaitairSpaargeld + forfaitairBeleggingen - forfaitairSchulden
+  // Step 10: Rendementsgrondslag
+  const rendementsgrondslag = c.spaargeld + c.beleggingen - aftrekbareSchulden
+  // Step 11: Heffingsvrij vermogen
+  const heffingsvrijVermogen = hasPartner ? params.heffingsvrijPartner : params.heffingsvrijSingle
+  // Step 12: Grondslag sparen en beleggen
+  const grondslagSparen = Math.max(0, rendementsgrondslag - heffingsvrijVermogen)
+  // Step 13: Effectief rendement
+  const effectiefRendement = rendementsgrondslag > 0 ? voordeelUitSparen / rendementsgrondslag : 0
+  // Step 14: Box 3 income
+  const box3Income = grondslagSparen * effectiefRendement
+  // Step 15: Tax
+  const tax = box3Income * params.tarief
+
+  return {
     schuldendrempel,
     aftrekbareSchulden,
     forfaitairSpaargeld,
@@ -503,8 +553,6 @@ export function calculateBox3(input: Box3Input): Box3Result {
     effectiefRendement,
     box3Income,
     tax,
-    freedomDays,
-    dailyExpenses: input.dailyExpenses,
   }
 }
 
@@ -618,23 +666,18 @@ export function generateBox3Optimizations(
 
 // ── Partner Allocation Optimization ──────────────────────────
 
+/**
+ * Heffing van één fiscale partner op zijn aandeel — dezelfde forfait-keten als
+ * `calculateBox3` (via `computeBox3Heffing`), met de single-drempels. Was een
+ * interne kopie van die keten (4g).
+ */
 function calculateSinglePartnerBox3(
   spaargeld: number,
   beleggingen: number,
   schulden: number,
   params: Box3Params,
 ): number {
-  const aftrekbareSchulden = Math.max(0, schulden - params.schuldendrempelSingle)
-  const forfaitS = spaargeld * params.forfaitSpaargeld
-  const forfaitB = beleggingen * params.forfaitBeleggingen
-  const forfaitSch = aftrekbareSchulden * params.forfaitSchulden
-  const voordeel = forfaitS + forfaitB - forfaitSch
-  const bezittingen = spaargeld + beleggingen
-  const grondslag = bezittingen - aftrekbareSchulden
-  const grondslagSparen = Math.max(0, grondslag - params.heffingsvrijSingle)
-  const effectief = grondslag > 0 ? voordeel / grondslag : 0
-  const inkomen = grondslagSparen * effectief
-  return inkomen * params.tarief
+  return computeBox3Heffing({ spaargeld, beleggingen, box3Schulden: schulden }, false, params).tax
 }
 
 export function optimizePartnerAllocation(

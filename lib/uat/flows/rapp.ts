@@ -49,6 +49,7 @@ export const RAPP_FLOW: UatFlow = {
     { id: 'benchmark', scenarioId: 'UAT-RAPP-10', label: 'WF-RAPP-10 · Benchmark-spiegel openen', kind: 'screen', stage: 4, lane: 'benchmark' },
     { id: 'benchmarkdetail', scenarioId: 'UAT-RAPP-11', label: 'WF-RAPP-11 · Benchmark-cijfer aanklikken (detail-sheet)', kind: 'action', stage: 4, lane: 'benchmark', subOf: 'benchmark' },
     { id: 'vrijheidstijdrapport', scenarioId: 'UAT-RAPP-14', label: 'WF-RAPP-14 · Vrijheidstijd op benchmark + totaalplan (canoniek dagtarief)', kind: 'screen', stage: 4, lane: 'benchmark', subOf: 'benchmark' },
+    { id: 'totaalplanslagingskans', scenarioId: 'UAT-RAPP-15', label: 'WF-RAPP-15 · Totaalplan-slagingskans volgt jaargelaagde marktvolatiliteit (ADR 0117)', kind: 'screen', stage: 3, lane: 'rapporttypen', subOf: 'persoonlijkplan' },
 
     // ── 5 · randvoorwaarden ───────────────────────────────────────────────
     { id: 'print', scenarioId: 'UAT-RAPP-12', label: 'WF-RAPP-12 · Rapport afdrukken als PDF', kind: 'action', stage: 5, lane: 'randvoorwaarden' },

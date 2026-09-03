@@ -31,10 +31,10 @@ import type { Aandachtspunt } from '@/lib/aandachtspunten'
 import { toSimResult } from '@/lib/unified-projection'
 import {
   computeConvergentieProjection,
-  buildConvergentieAdapterProfile,
+  buildConvergentieAdapterInput,
   type ConvergentieRawContext,
 } from '@/lib/horizon-kernel/convergentie-router'
-import { buildKernelInputFromApp, type KernelAdapterInput } from '@/lib/horizon-kernel/adapter'
+import { buildKernelInputFromApp } from '@/lib/horizon-kernel/adapter'
 import { runMonteCarlo } from '@/lib/horizon-kernel/wrappers/mc'
 import type { KernelInput } from '@/lib/horizon-kernel/types'
 import {
@@ -145,18 +145,17 @@ export interface TotaalplanData extends PersoonlijkPlanSections {
  * projectie — zodat MC en projectie één grondslag delen (geen drift). Cap de
  * MC-runs op `TOTAALPLAN_MC_RUNS`. Returnt `null` bij een kern-fout (bv. geen
  * geboortedatum), zodat de aanroeper een nette lege slagingskans kan tonen.
+ *
+ * De adapter-mapping komt uit `buildConvergentieAdapterInput` — dezelfde als de
+ * projectie en de marktcheck op /toekomst. De handgeschreven kopie die hier tot
+ * 3 sep 2026 stond liet `marktVolatiliteit` (ADR 0117) vallen, waardoor de
+ * slagingskans van het rapport op de default-σ bleef staan terwijl /toekomst met
+ * de beheerde jaarlaag rekende: drie bandbreedtes zodra beheer de volatiliteit
+ * wijzigde. Eén home, geen kopie meer.
  */
 export function buildTotaalplanKernelInput(rawContext: ConvergentieRawContext): KernelInput | null {
   try {
-    const adapterInput: KernelAdapterInput = {
-      profile: buildConvergentieAdapterProfile(rawContext.profile),
-      assets: rawContext.assets,
-      debts: rawContext.debts,
-      lifeEvents: rawContext.lifeEvents,
-      aowRows: rawContext.aowRows,
-      taxYear: rawContext.taxYear,
-    }
-    const input = buildKernelInputFromApp(adapterInput)
+    const input = buildKernelInputFromApp(buildConvergentieAdapterInput(rawContext))
     const cappedRuns = Math.min(input.onzekerheid.mc.aantalRuns, TOTAALPLAN_MC_RUNS)
     return {
       ...input,

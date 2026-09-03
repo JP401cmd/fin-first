@@ -49,6 +49,7 @@
  */
 
 import type { LeverageStatus } from '@/lib/leverage-status'
+import type { RetirementSubtype } from '@/lib/asset-data'
 import { computeBox1Tax, type Box1TaxYear } from '@/lib/box1-tax'
 
 /**
@@ -356,6 +357,93 @@ export function resolvePensionFactorA(
   const source: 'upo' | 'estimated' | null =
     rawSource === 'upo' || rawSource === 'estimated' ? rawSource : null
   return { factorA, source, isKnown: true }
+}
+
+// ── Werkgeverspensioen-signaal ────────────────────────────────────────────────
+
+/**
+ * De `assets.retirement`-subtypes die WERKGEVERSopbouw zijn. Bewust een
+ * expliciete lijst en geen "alles behalve lijfrente": `subtype` is in de DB een
+ * vrije string, dus een onbekende/nieuwe waarde valt hiermee buiten het signaal
+ * (fail-closed: liever de tip laten staan dan 'm op een gok dempen).
+ *
+ * `lijfrente` staat er NIET in: dat is het PRIVÉ-pendant — precies het product
+ * waar de jaarruimte-tip over gaat — en mag die tip dus nooit dempen.
+ * `retirement_provider_type` ('verzekeraar'/'ppi') is géén bruikbaar
+ * alternatief: die aanbieders voeren zowel werkgever- als privéproducten.
+ * Eigenaarsbesluit 2-9-2026 (Notion-kaart "Bedrijfspensioen-signaal ziet
+ * assets.retirement niet").
+ */
+export const WERKGEVERSPENSIOEN_SUBTYPES = [
+  'uitkeringsregeling',
+  'premieregeling',
+] as const satisfies readonly RetirementSubtype[]
+
+/** Structurele asset-rij zoals het signaal 'm leest (subset van `Asset`). */
+export interface WerkgeverspensioenAssetRow {
+  user_id: string
+  asset_type: string
+  subtype: string | null
+}
+
+/** Structurele life_event-rij zoals het signaal 'm leest (subset van `LifeEvent`). */
+export interface WerkgeverspensioenEventRow {
+  event_type: string
+  metadata?: unknown
+}
+
+export interface WerkgeverspensioenSignaalInput {
+  /**
+   * Eigen user-id. VERPLICHT voor het assets-pad: de SELECT-policy op `assets`
+   * is huishoud-gedeeld, dus de bundel-rijen bevatten óók partnerbezit. Zonder
+   * id (null/undefined) wordt het assets-pad overgeslagen — nooit "iedereen".
+   */
+  ownUserId: string | null | undefined
+  /** Actieve life_events (de horizon-bundel is al op is_active=true gefilterd). */
+  events: ReadonlyArray<WerkgeverspensioenEventRow>
+  /** Actieve assets uit de horizon-bundel (huishoud-gedeeld, zie `ownUserId`). */
+  assets: ReadonlyArray<WerkgeverspensioenAssetRow>
+}
+
+/** Is deze bezitting een werkgeverspensioen-opbouw (zie {@link WERKGEVERSPENSIOEN_SUBTYPES})? */
+export function isWerkgeverspensioenAsset(asset: Pick<WerkgeverspensioenAssetRow, 'asset_type' | 'subtype'>): boolean {
+  return (
+    asset.asset_type === 'retirement' &&
+    asset.subtype !== null &&
+    (WERKGEVERSPENSIOEN_SUBTYPES as readonly string[]).includes(asset.subtype)
+  )
+}
+
+/**
+ * ÉÉN definitie van "bouwt de gebruiker zélf werkgeverspensioen op" — de
+ * grondslag waarop de aandachtspunten-laag de jaarruimte-tip dempt bij een
+ * ONBEKENDE factor A (de bovengrens is dan misleidend voor iemand die al
+ * opbouwt; zie `pensioenFactorAKnown` en {@link resolvePensionFactorA}).
+ *
+ * Twee bronnen, OR-verknoopt:
+ *  1. een actief `life_event` met `event_type='pension'` én
+ *     `metadata.pensioenType === 'bedrijf'` (gezet door de pensioen-strategie-
+ *     wizard / UPO-upload). Bewust de RAUWE waarde en niet
+ *     `normalizePensionType`: die normaliseert een ONTBREKEND type naar
+ *     'bedrijf', wat het signaal stil zou verbreden;
+ *  2. een `assets`-rij met `asset_type='retirement'` en een werkgevers-subtype,
+ *     UITSLUITEND van de gebruiker zelf (`user_id === ownUserId`). Wie zijn
+ *     pensioenpot invoerde maar de wizard nooit doorliep, telt zo óók mee.
+ *
+ * Dit is een SIGNAAL (boolean), geen rekenmotor: het stuurt alleen een filter
+ * op de tips-lijst, nooit `computeJaarruimte`.
+ */
+export function hasWerkgeverspensioen(input: WerkgeverspensioenSignaalInput): boolean {
+  const viaEvent = input.events.some(
+    (ev) =>
+      ev.event_type === 'pension' &&
+      (ev.metadata as { pensioenType?: unknown } | null | undefined)?.pensioenType === 'bedrijf',
+  )
+  if (viaEvent) return true
+
+  const ownId = input.ownUserId
+  if (!ownId) return false
+  return input.assets.some((a) => a.user_id === ownId && isWerkgeverspensioenAsset(a))
 }
 
 /**

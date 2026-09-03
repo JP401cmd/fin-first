@@ -50,6 +50,7 @@ import type {
   TsSchuldCategorie,
 } from '../types'
 import { isBeyondHorizon, leeftijdJaren, maandInJaar } from '../scaffold'
+import { bezitInstroomDoelMask, bezitInstroomFallbackWeights } from './verdeling/weights'
 
 /**
  * De vijf schuld-categorieën die in deze tabel voorkomen (TS-rij 16-20). De
@@ -130,17 +131,6 @@ function normaliseer(ruw: readonly number[], som: number): number[] {
 }
 
 /**
- * Instroom-gewicht `½^(prio−1)` voor een lege-pot-vulling: prio in 1..4 én LIQUIDE.
- * De `gevuld`-eis is bewust LOSGELATEN — voor INstroom (toename) is een nog lege pot
- * een geldige bestemming (anders dan voor uitstroom). Alleen gebruikt in de
- * degenerate-fallback (`toenameGewichten`), nooit op het reguliere pad.
- */
-function ruwGewichtInstroom(prio: number | null, nietLiquide: boolean): number {
-  if (nietLiquide || prio === null || prio < 1 || prio > 4) return 0
-  return Math.pow(0.5, prio - 1)
-}
-
-/**
  * Toename-gewichten met **degenerate-fallback** (kernel-extensie, buiten het
  * Excel-oracle — snede-2b-stijl). Normaal: de genormaliseerde `ruwGewicht`-vectoren
  * (gevuld + liquide + prio 1..4). Maar als GEEN enkele categorie kwalificeert
@@ -148,19 +138,20 @@ function ruwGewichtInstroom(prio: number | null, nietLiquide: boolean): number {
  * de hele begroting laten verdampen. Dat raakt de oracle-fixtures NIET (die hebben
  * altijd een gevulde prio-1..4-bestemming → `somToename > 0` → deze tak inert), maar
  * wél echte profielen waarvan de `surplus_group`-doelpot nog leeg is (bv. een €0-
- * beleggingspot met Spaargeld op reserve-prio 5). Fallback-ladder:
- *   A) laat de `gevuld`-eis vallen (prio-ordening intact) → de lege surplus-doelpot
- *      (bv. Beleggingen prio 1) vult zich, conform de gebruikersintentie;
- *   B) geen prio-1..4-bestemming → val terug op de prio-5-reserve (liquide bezit,
- *      bv. Spaargeld);
- *   C) ook geen liquide reserve → laat de all-nul-vector staan (er is werkelijk geen
- *      liquide bestemming; extreem zeldzaam, byte-identiek aan het oude gedrag).
- * De schuld-aflossing houdt de `gevuld`-eis: een €0-schuld aflossen is zinloos, en
- * als er een gevulde schuld-aflos-categorie bestond zou `somToename > 0` zijn (dan
- * geen fallback). Voor `D ≤ 0` (deficit) verandert er NIETS — dat loopt via de
- * onttrekking-orde, niet via de toename-waterval.
+ * beleggingspot met Spaargeld op reserve-prio 5) — gap-besluit V17.
+ *
+ * De fallback-ladder zelf (A: prio 1..4 zonder gevuld-eis → B: prio-5-reserve → C:
+ * all-nul) woont in `bezitInstroomFallbackWeights` (verdeling/weights.ts) en wordt
+ * gedeeld met de schuld→bezit-overloop van `computeVerdeling` (gap-besluit V24). Die
+ * ladder is pot-bewust: alleen categorieën met ≥ 1 niet-woning-pot zijn instroom-doel,
+ * anders verdampt het gewicht alsnog in Bez (`per stuk = totaal€ / aantal`, 0 bij
+ * aantal 0). De schuld-aflossing houdt de `gevuld`-eis: een €0-schuld aflossen is
+ * zinloos, en als er een gevulde schuld-aflos-categorie bestond zou `somToename > 0`
+ * zijn (dan geen fallback). Voor `D ≤ 0` (deficit) verandert er NIETS — dat loopt via
+ * de onttrekking-orde, niet via de toename-waterval.
  */
 function toenameGewichten(
+  input: KernelInput,
   bezitCats: readonly TsBezitCategorie[],
   schuldCats: readonly TsSchuldCategorie[],
   ruwBezit: readonly number[],
@@ -175,19 +166,17 @@ function toenameGewichten(
       wSchuld: normaliseer(ruwSchuld, somToename),
     }
   }
-  // A) `gevuld`-eis losgelaten voor bezit (schuld houdt 'm → hier per definitie 0).
-  const aBezit = bezitCats.map((c) => ruwGewichtInstroom(c.prioToename, c.nietLiquide))
-  const somA = aBezit.reduce((a, x) => a + x, 0)
-  if (somA > 0) {
-    return { wBezit: normaliseer(aBezit, somA), wSchuld: schuldCats.map(() => 0) }
+  // Gedeelde instroom-ladder (A → B → C); alleen op het degenerate pad geëvalueerd.
+  const wFallback = bezitInstroomFallbackWeights(
+    bezitCats.map((c) => c.prioToename),
+    bezitCats.map((c) => c.nietLiquide),
+    bezitInstroomDoelMask(input),
+  )
+  const somFallback = wFallback.reduce((a, x) => a + x, 0)
+  if (somFallback > 0) {
+    return { wBezit: wFallback, wSchuld: schuldCats.map(() => 0) }
   }
-  // B) prio-5-reserve (liquide bezit).
-  const bBezit: number[] = bezitCats.map((c) => (!c.nietLiquide && c.prioToename === 5 ? 1 : 0))
-  const somB = bBezit.reduce((a, x) => a + x, 0)
-  if (somB > 0) {
-    return { wBezit: normaliseer(bBezit, somB), wSchuld: schuldCats.map(() => 0) }
-  }
-  // C) geen liquide bestemming — all-nul (byte-identiek aan vóór de extensie).
+  // C) geen liquide instroom-doel — all-nul (byte-identiek aan vóór de extensie).
   return {
     wBezit: normaliseer(ruwBezit, somToename),
     wSchuld: normaliseer(ruwSchuld, somToename),
@@ -241,6 +230,7 @@ export function computeToenameAfname(
   // enige toename-prio-1 naar een nog LEGE pot wijst (somToename==0 & D>0). Inert op
   // het oracle-pad (somToename>0). Zie `toenameGewichten`.
   const { wBezit: wToenameBezit, wSchuld: wToenameSchuld } = toenameGewichten(
+    input,
     bezitCats,
     schuldCats,
     ruwToenameBezit,

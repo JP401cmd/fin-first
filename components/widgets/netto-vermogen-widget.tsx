@@ -6,7 +6,7 @@ import { WidgetEmpty } from './widget-empty'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { formatMaskedCurrency, formatFreedomTimeString, calculateFreedomTime, dailyExpenseRate } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
-import { MaskedAmount } from '@/components/app/masked-amount'
+import { MaskedAmount, MaskedPercent, MaskedDirection, useDirectionClass } from '@/components/app/masked-amount'
 import type { DashboardData } from './widget-renderer'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { Wallet, Users, UserCheck } from 'lucide-react'
@@ -173,6 +173,12 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
     return { assetPct, debtPct }
   }, [totalAssets, totalDebts])
 
+  // Richtingskleur van de MoM-delta. Hook, dus onvoorwaardelijk vóór de
+  // size-specifieke early returns — hij wordt in drie van die takken gebruikt.
+  // Bij maskering levert hij een neutrale ink-tint (WF-NAV-11: kleur lekt
+  // richting net zo goed als het cijfer).
+  const momDeltaClass = useDirectionClass((momDelta?.delta ?? 0) >= 0)
+
   const kickerLabel = isHouseholdView
     ? 'Netto Vermogen — Huishouden'
     : isPartnerView
@@ -217,10 +223,9 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
             </p>
           )}
           {momDelta && !isHouseholdView && !isPartnerView && (
-            <p className={`mt-1 ${
-              momDelta.delta >= 0 ? 'text-positive' : 'text-negative'
-            }`}>
-              <span className="font-mono" aria-hidden="true">{momDelta.delta >= 0 ? '▲' : '▼'}{' '}</span>
+            <p className={`mt-1 ${momDeltaClass}`}>
+              <MaskedDirection isPositive={momDelta.delta >= 0} />
+              {' '}
               <MaskedAmount
                 value={momDelta.delta}
                 signPrefix={momDelta.delta >= 0 ? '+' : ''}
@@ -255,8 +260,9 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
               </p>
             )}
             {momDelta && !isHouseholdView && !isPartnerView && (
-              <p className={`mt-1 ${momDelta.delta >= 0 ? 'text-positive' : 'text-negative'}`}>
-                <span className="font-mono" aria-hidden="true">{momDelta.delta >= 0 ? '▲' : '▼'}{' '}</span>
+              <p className={`mt-1 ${momDeltaClass}`}>
+                <MaskedDirection isPositive={momDelta.delta >= 0} />
+                {' '}
                 <MaskedAmount
                   value={momDelta.delta}
                   signPrefix={momDelta.delta >= 0 ? '+' : ''}
@@ -264,7 +270,7 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
                   className="text-[11px] font-semibold"
                 />{' '}
                 <span className="font-mono tabular-nums text-[11px]">
-                  ({momDelta.delta >= 0 ? '+' : ''}{momDelta.pct.toFixed(1)}%)
+                  (<MaskedPercent value={momDelta.pct} tone="kern" />)
                 </span>
               </p>
             )}
@@ -324,7 +330,7 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
             <MaskedAmount value={netWorth} tone="kern" className="text-2xl font-semibold" />
           </p>
           {momDelta && !isHouseholdView && !isPartnerView && (
-            <span className={momDelta.delta >= 0 ? 'text-positive' : 'text-negative'}>
+            <span className={momDeltaClass}>
               <MaskedAmount
                 value={momDelta.delta}
                 signPrefix={momDelta.delta >= 0 ? '+' : ''}
@@ -495,7 +501,7 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
             {momDelta && (
               <div className="flex items-center justify-between rounded-[var(--r-sm)] bg-[var(--subtle)] px-2 py-1">
                 <span className="text-[11px] text-[var(--ink-3)]">Δ deze maand</span>
-                <span className={momDelta.delta >= 0 ? 'text-positive' : 'text-negative'}>
+                <span className={momDeltaClass}>
                   <MaskedAmount
                     value={momDelta.delta}
                     signPrefix={momDelta.delta >= 0 ? '+' : ''}
@@ -504,8 +510,7 @@ export const NettoVermogenWidget = memo(function NettoVermogenWidget({ size, dat
                   />
                   {' '}
                   <span className="font-mono tabular-nums text-[11px] font-semibold">
-                    ({momDelta.delta >= 0 ? '+' : ''}
-                    {momDelta.pct.toFixed(1)}%)
+                    (<MaskedPercent value={momDelta.pct} tone="kern" />)
                   </span>
                 </span>
               </div>

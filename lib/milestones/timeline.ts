@@ -148,27 +148,47 @@ export function buildMilestoneTimeline(
   userId: string | null,
   dagtarief: number | null,
 ): MilestoneTimelineYear[] {
-  // Nieuwste eerst. Onleesbare datums sorteren naar achteren (NaN-vergelijking
-  // is onbetrouwbaar, dus expliciet afvangen).
-  const sorted = [...rows].sort((a, b) => {
-    const ta = Date.parse(a.achieved_at)
-    const tb = Date.parse(b.achieved_at)
-    if (Number.isNaN(ta) && Number.isNaN(tb)) return 0
-    if (Number.isNaN(ta)) return 1
-    if (Number.isNaN(tb)) return -1
+  // Decoreer-sorteer-groepeer: het jaar dat een rij claimt wordt ÉÉN keer
+  // bepaald en daarna zowel gesorteerd als gegroepeerd.
+  //
+  // Die koppeling is de fix voor WF-MIJN-32. Eerder sorteerde de comparator op
+  // de RAUWE `achieved_at` terwijl de groepering het jaar op `null` zette voor
+  // 'onbekend'-rijen. Voor zo'n rij is `achieved_at` het seed-moment (vandaag)
+  // — een volstrekt geldige datum, dus de NaN-tak ving 'm niet af en hij
+  // sorteerde gewoon tussen de echte rijen van dit jaar in. Omdat de groepering
+  // alleen AANEENGESLOTEN gelijke jaren samenvoegt, brak zo'n rij het jaar in
+  // tweeën: "2026" → "Zonder datum" → "2026". Nu volgt de volgorde per
+  // definitie de groepering: geen jaar ⇒ achteraan, dus de "Zonder datum"-bak
+  // is altijd precies één aaneengesloten groep aan het eind.
+  const decorated = rows.map((row) => {
+    const dateKind = dateKindOf(row)
+    // 'onbekend' claimt geen jaar: achieved_at is daar het seed-moment, niet de
+    // gebeurtenis. Een onleesbare datum levert via `yearOf` óók null op.
+    return { row, dateKind, year: dateKind === 'onbekend' ? null : yearOf(row.achieved_at) }
+  })
+
+  decorated.sort((a, b) => {
+    // Jaarloze rijen ("Zonder datum") altijd achteraan, ongeacht hun timestamp.
+    if (a.year === null || b.year === null) {
+      if (a.year === b.year) return a.row.milestone_key.localeCompare(b.row.milestone_key)
+      return a.year === null ? 1 : -1
+    }
+    // Hier is een jaar bekend, dus `achieved_at` is per definitie parsebaar
+    // (`yearOf` geeft null zodra Date.parse NaN oplevert) — geen NaN-tak nodig.
+    const ta = Date.parse(a.row.achieved_at)
+    const tb = Date.parse(b.row.achieved_at)
     // Deterministische tiebreaker: het detect-pad schrijft alle rijen van één
     // run met dezelfde nowIso, en PostgreSQL geeft binnen gelijke ORDER-BY-
     // sleutels geen vaste volgorde — zonder tweede sleutel kan de tijdlijn
     // tussen twee bezoeken wisselen.
-    return tb - ta || a.milestone_key.localeCompare(b.milestone_key)
+    return tb - ta || a.row.milestone_key.localeCompare(b.row.milestone_key)
   })
 
   const years: MilestoneTimelineYear[] = []
 
-  for (const row of sorted) {
+  for (const { row, dateKind, year } of decorated) {
     const goalName = resolveMilestoneGoalName(row.milestone_key, goals, userId)
     const { titel, betekenis } = buildMilestoneCopy(row, dagtarief, { goalName })
-    const dateKind = dateKindOf(row)
 
     const entry: MilestoneTimelineEntry = {
       row,
@@ -183,9 +203,8 @@ export function buildMilestoneTimeline(
         row.kind === 'vermogen' ? (row.threshold_value ?? row.observed_value ?? 0) : null,
     }
 
-    // 'onbekend' claimt geen jaar: achieved_at is daar het seed-moment, niet de
-    // gebeurtenis. Die rijen horen in de "Zonder datum"-bak achteraan.
-    const year = dateKind === 'onbekend' ? null : yearOf(row.achieved_at)
+    // `year` komt uit de decoratie hierboven — dezelfde waarde waarop gesorteerd
+    // is, zodat een jaargroep nooit door een jaarloze rij doorbroken kan worden.
     const last = years[years.length - 1]
     if (last && last.year === year) last.entries.push(entry)
     else years.push({ year, entries: [entry] })

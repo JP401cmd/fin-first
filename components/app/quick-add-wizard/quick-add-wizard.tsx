@@ -620,6 +620,7 @@ export function QuickAddWizard({
             hasTypePrefill={hasTypePrefill}
             showStepCount={!isCollectMode}
             isSaving={isSaving}
+            requireLinkedAsset={!isCollectMode}
             onBack={handleBack}
             onSelectIntent={selectIntent}
             onSelectType={selectType}
@@ -742,6 +743,14 @@ interface WizardContentProps {
    */
   showStepCount: boolean
   isSaving: boolean
+  /**
+   * Eist het zelfstandige schuld-pad een bezit-koppeling voor types die niet
+   * los kunnen bestaan (`dga_schuld` → deelneming)? Alleen in commit-mode:
+   * daar bestaan de bezittingen als DB-rij. In collect-mode (onboarding) is nog
+   * niets gepersisteerd en loopt de koppeling ná de batch-insert via
+   * `linked_client_ref`. Zie `StepDetails.requireLinkedAsset`.
+   */
+  requireLinkedAsset: boolean
   onBack: () => void
   onSelectIntent: (intent: QuickAddIntent) => void
   onSelectType: (type: AssetType | DebtType) => void
@@ -766,6 +775,7 @@ function WizardContent(props: WizardContentProps) {
     hasTypePrefill,
     showStepCount,
     isSaving,
+    requireLinkedAsset,
     onBack,
     onSelectIntent,
     onSelectType,
@@ -920,6 +930,7 @@ function WizardContent(props: WizardContentProps) {
             onChange={onUpdateDebt}
             onSubmit={onProceedDebtDetails}
             isSaving={isSaving}
+            requireLinkedAsset={requireLinkedAsset}
           />
         </>
       )

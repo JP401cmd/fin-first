@@ -261,6 +261,13 @@ export async function OverzichtSecondaryLoader({
             // datering — en het gevierde getal is het getal dat de hero toont.
             netWorth: currentNetWorth,
             freedomPct: dashboardData.freedomPct ?? null,
+            // BEWUST dashboardData.totalDebts (RLS-breed, huishoud-som) en NIET
+            // een persoonlijke schuldsom naast currentNetWorth hierboven — anders
+            // dan bij netWorth is dit hier een defensieve keuze, geen pariteits-
+            // fout: een "schuldenvrij"-mijlpaal viert pas wanneer het HELE
+            // huishouden op € 0 schuld staat, niet zodra het eigen aandeel dat
+            // doet terwijl een partner nog schuld draagt (restpunt B3,
+            // release-review 31 aug).
             totalDebts: dashboardData.totalDebts,
             emergencyFundMonthsCovered: dashboardData.emergencyFund?.monthsCovered ?? null,
             emergencyFundTargetMonths: dashboardData.emergencyFund?.targetMonths ?? null,

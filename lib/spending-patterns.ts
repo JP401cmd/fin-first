@@ -5,6 +5,7 @@
  */
 
 import { spendingContribution } from '@/lib/budget-spending'
+import { dailyExpenseRate } from '@/lib/format'
 
 export interface MonthlySpending {
   month: string       // YYYY-MM
@@ -112,7 +113,9 @@ export function derivePatternExpenseBasis(
     0,
   )
   const avgMonthlyExpenses = Math.max(0, totalExpenses) / dataMonths
-  return { dataMonths, avgMonthlyExpenses, dailyExpenses: (avgMonthlyExpenses * 12) / 365 }
+  // Conversie via de canonieke helper (×12/365) — de GRONDSLAG (gemiddelde van
+  // de geanalyseerde maanden) is hier bewust patroon-eigen, de conversie niet.
+  return { dataMonths, avgMonthlyExpenses, dailyExpenses: dailyExpenseRate(avgMonthlyExpenses) }
 }
 
 /**

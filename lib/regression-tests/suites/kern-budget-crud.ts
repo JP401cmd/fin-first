@@ -3,7 +3,8 @@
  *
  * Tests for budget creation, editing, deletion and form validation flows:
  * - New budget creation via /core/budgets/new
- * - Budget editing via /core/budgets/[id]/edit redirect
+ * - Budget editing via the /core/budgets/[id]/edit redirect (naar het canonieke
+ *   /overzicht/cashflow/budget, niet het legacy-pad — zie WF-BUDGET-23)
  * - Budget deletion via DELETE /api/budgets/[id]
  * - Budget category (parent) linking
  * - Budget limit validation (no negative values)
@@ -23,6 +24,7 @@ import type { TestCase } from '../test-types'
 import type { Budget, BudgetSelectGroup } from '@/lib/budget-data'
 import { BUDGET_SLUGS, budgetOptionLabel, buildBudgetSelectEntries } from '@/lib/budget-data'
 import { categorizeTransaction, type CategoryCorrection } from '@/lib/parsers/categorize'
+import { BUDGET_PAGE_PATH, budgetDetailUrl, budgetEditUrl, newBudgetUrl } from '@/lib/navigation'
 import { unauthenticatedFetch } from '../server-runner'
 
 const CAT = 'kern.budget-crud'
@@ -223,19 +225,31 @@ const tests: TestCase[] = [
   // ── B: Budget editing ─────────────────────────────────────────────────────
   {
     id: 'budget-crud-edit-redirect',
-    name: 'Budget bewerken: edit URL redirects naar budgets pagina',
-    description: '/core/budgets/[id]/edit redirects to /core/budgets?budget=[id]&edit=true',
+    name: 'Budget bewerken: legacy edit-URL redirect naar de canonieke budgetpagina',
+    description: '/core/budgets/[id]/edit redirect naar /overzicht/cashflow/budget?budget=[id]&edit=true',
     category: CAT,
     priority: 'high',
     estimatedDurationMs: 20,
     fn() {
-      // The edit page component redirects: router.replace(`/core/budgets?budget=${id}&edit=true`)
+      // De redirect-pagina's roepen deze builders aan (één bron van waarheid),
+      // dus deze toets leest het echte doel i.p.v. een overgetypte string.
       const id = '550e8400-e29b-41d4-a716-446655440000'
-      const expectedUrl = `/core/budgets?budget=${id}&edit=true`
+      const editUrl = budgetEditUrl(id)
+      const detailUrl = budgetDetailUrl(id)
 
-      assert(expectedUrl.includes('budget='), 'URL has budget param')
-      assert(expectedUrl.includes('edit=true'), 'URL has edit=true param')
-      assert(expectedUrl.startsWith('/core/budgets?'), 'URL starts with /core/budgets')
+      assert(editUrl.includes(`budget=${id}`), 'URL has budget param')
+      assert(editUrl.includes('edit=true'), 'URL has edit=true param')
+      assert(editUrl.startsWith(`${BUDGET_PAGE_PATH}?`), 'URL starts with the canonical budget path')
+      assert(detailUrl.startsWith(`${BUDGET_PAGE_PATH}?`), 'detail deeplink uses the same canonical path')
+      assert(newBudgetUrl().startsWith(`${BUDGET_PAGE_PATH}?`), 'new-budget deeplink uses the same canonical path')
+
+      // WF-BUDGET-23: het legacy-pad wordt door de statische redirect in
+      // next.config.ts naar de cashflow-HUB getrokken (query telt niet mee voor
+      // de match, maar wordt wél doorgeplakt). Belandt een deeplink daar weer,
+      // dan opent er geen paneel en blijft een dode ?budget= in de adresbalk.
+      assert(!editUrl.startsWith('/core/budgets'), 'edit deeplink avoids the legacy redirect path')
+      assert(!detailUrl.startsWith('/core/budgets'), 'detail deeplink avoids the legacy redirect path')
+      assert(!newBudgetUrl().startsWith('/core/budgets'), 'new deeplink avoids the legacy redirect path')
     },
   },
   {

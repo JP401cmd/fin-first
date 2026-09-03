@@ -167,6 +167,21 @@ export function formatApproxCurrency(value: number, digits = 2): string {
 export const MASKED_AMOUNT_PLACEHOLDER = '\u2022\u2022\u2022\u2022\u2022\u2022'
 
 /**
+ * Placeholder voor een gemaskeerd PERCENTAGE (delta's, rendement).
+ *
+ * Vier bullets in plaats van zes: een percentage-cel is smaller dan een
+ * bedrag-cel, dus zes zou de kolom laten uitzetten precies d\u00e1\u00e1r waar de
+ * widgets het krapst zijn. Zelfde regel als bij het bedrag: render met
+ * `font-mono tabular-nums`.
+ *
+ * Waarom een percentage \u00fcberhaupt gemaskeerd hoort te worden: naast een
+ * gemaskeerd bedrag verraadt "-4.2%" nog steeds de RICHTING en de ORDE van de
+ * verandering. WF-NAV-11 eist dat richting niet lekt \u2014 het bedrag verbergen en
+ * het percentage laten staan voldoet daar niet aan.
+ */
+export const MASKED_PERCENT_PLACEHOLDER = '\u2022\u2022\u2022\u2022'
+
+/**
  * Privacy-aware currency formatter.
  *
  * Returns the masked bullet-placeholder when `masked === true`, otherwise

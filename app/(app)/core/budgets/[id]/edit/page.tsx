@@ -3,13 +3,21 @@
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
+import { budgetEditUrl } from '@/lib/navigation'
 
+/**
+ * Legacy-deeplink `/core/budgets/<id>/edit` → het bewerk-paneel op de canonieke
+ * budgetpagina. Eén hop, om dezelfde reden als de detail-redirect hiernaast: de
+ * tussenstap `/core/budgets?…` werd door de statische redirect in
+ * `next.config.ts` naar de cashflow-hub getrokken, waar zowel `budget` als
+ * `edit=true` verloren gingen (UAT WF-BUDGET-23).
+ */
 export default function BudgetEditRedirect() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
 
   useEffect(() => {
-    router.replace(`/core/budgets?budget=${id}&edit=true`)
+    router.replace(budgetEditUrl(id))
   }, [id, router])
 
   return (

@@ -1,15 +1,39 @@
+import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { getServiceClient } from '@/lib/supabase/service'
 import { deleteAllUserData } from '@/lib/seed-persona'
+import { parseBody } from '@/lib/api/parse-body'
 import { unauthorized, serverError } from '@/lib/api/respond'
 
-export async function POST() {
+/**
+ * POST /api/onboarding/reset — wist ALLE eigen financiële data (±47 tabellen
+ * via deleteAllUserData) en zet het profiel terug naar de onboarding-startstaat.
+ * Onomkeerbaar; logt niet uit.
+ *
+ * Bevestiging op API-niveau is verplicht: de body moet `{ confirm: true }`
+ * dragen. Aanleiding is het dataverlies op het jochen-testaccount van 31 aug
+ * 2026 — één kale POST onder een levende sessie (test-/reviewverkeer vanaf de
+ * eigenaarsmachine) wiste het account zonder dat de API iets terugvroeg. De
+ * UI-dialogen bevestigen al; dit veld maakt een misplaatste fetch, replay of
+ * geautomatiseerde test zonder expliciete intentie onschadelijk (400 i.p.v.
+ * totaalverlies). Vergelijk `/api/account/delete` mode=delete, dat een getypte
+ * e-mailbevestiging eist.
+ */
+const ResetBodySchema = z.object({
+  confirm: z.literal(true),
+})
+
+export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
     return unauthorized()
   }
+
+  // Ná de auth-check (401 wint van 400), vóór elke destructieve stap.
+  const parsed = await parseBody(ResetBodySchema, request)
+  if (!parsed.ok) return parsed.response
 
   // Service-role client voor de RLS-afgeschermde persoonlijke tabellen
   // (net_worth_history/feedback) die de sessie-client bij een reset niet kan

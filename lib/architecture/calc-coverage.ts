@@ -65,7 +65,6 @@ export const CALC_COVERAGE_IGNORE: CalcCoverageIgnoreEntry[] = [
   { file: 'lib/compute-module-access.ts', reason: 'Module-gating-logica, geen financiële berekening.' },
   { file: 'lib/confidence-band.ts', reason: 'Presentatiehulp voor bandbreedte-visualisatie rond bestaande cijfers, geen eigen rekenkern.' },
   { file: 'lib/connections-data.ts', reason: 'computeFreshness is sync-statusmetadata (technische verbindingsstatus), geen financiële berekening.' },
-  { file: 'lib/counterparty-analysis.ts', reason: 'Kleine helper binnen de transactie-inzichten (zie calc "Transactie-inzichten"), niet zelfstandig gecatalogiseerd.' },
   { file: 'lib/crypto-holdings-data.ts', reason: 'Portefeuille-presentatiehelpers (concentratie/spread); de Box 3-impact-tak leunt op de al-gecatalogiseerde box3-forfaitair-motor, de rest is weergave.' },
   { file: 'lib/debt-kpi.ts', reason: 'KPI-aggregatie voor schuldenkaarten — presentatielaag op de schuld-aflossingsmotor (zie calc "Schuld-aflossingsmotor").' },
   { file: 'lib/freedom-milestones.ts', reason: 'Presentatie-mijlpalen afgeleid uit reeds-gecatalogiseerde vrijheidscijfers, geen eigen rekenkern.' },

@@ -19,6 +19,7 @@
  */
 
 import { formatCurrency } from '@/lib/format'
+import { formatFireAge } from '@/lib/horizon/fire-format'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { InlineInfoDisclosure } from '@/components/editorial'
 import { SCENARIO_PRESET_SPECS } from '@/lib/horizon/scenario-presets'
@@ -34,10 +35,14 @@ const FLAG: Record<ScenarioPresetStatus, { label: string; className: string }> =
   rood: { label: 'ROOD', className: 'border-red-200 bg-red-50 text-red-700' },
 }
 
-/** Leeftijd met 1 decimaal in NL-notatie (komma), of "—" bij null. */
+/**
+ * Leeftijd als hele jaren + maanden via de canonieke `formatFireAge`
+ * (lib/horizon/fire-format.ts), of "—" bij null. Was een eigen "62,3 jr" —
+ * de enige decimale leeftijd op /toekomst naast KPI's die hele jaren tonen
+ * (5d, nazorg R2+R3).
+ */
 function formatLeeftijd(age: number | null): string {
-  if (age == null) return '—'
-  return `${age.toFixed(1).replace('.', ',')} jr`
+  return formatFireAge(age)
 }
 
 /** Delta met expliciet teken (+€250 / €-300). */

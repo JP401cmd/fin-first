@@ -77,9 +77,16 @@ ingedeeld in vier groepen: **Technisch beheer**, **Functioneel beheer**, **Test 
 - **"Test verbinding" bewijst in sandbox-modus de credentials níet** (haalt alleen de kale
   providerlijst op, die slaagt ook met fout client-id). De echte proef is een koppelpoging.
 - Registreer per omgeving de redirect-URI `…/api/bank-connect/callback` in de TrueLayer-console
-  (Settings → Redirect URIs). Let op: op de **Live**-app staat nu alleen
-  `https://fin-first.vercel.app/callback` — het juiste pad
-  `https://fin-first.vercel.app/api/bank-connect/callback` moet daar nog bij vóór livegang.
+  (Settings → Redirect URIs). **Stand 2026-09-02: dit staat goed op de Live-app** voor het huidige
+  domein. Bewijs is niet de console maar de data: TrueLayer valideert `redirect_uri` bij de
+  token-exchange, en er staan geslaagde `xs2a-rabobank`-koppelingen plus 1.312 banktransacties.
+  De eerdere notitie "op de Live-app staat alleen `…/callback`" was daarmee achterhaald.
+- **Het openstaande risico is de domeinmigratie, niet de registratie.** Gaat productie ooit van
+  `fin-first.vercel.app` naar `trifinity.app`/`.nl`, dan moeten `NEXT_PUBLIC_APP_URL` (Vercel) én
+  de Live-app-redirect in de TrueLayer-console **in dezelfde handeling** meebewegen — anders
+  breekt de koppeling stil (callback naar het oude domein, of "Unknown client"). Doe direct erna
+  één koppel-smoke. Let op: dezelfde env-var voedt óók push-meldingen, briefing-unsubscribe en
+  huishouden-invites — één waarde, vijf gevolgen.
 
 ### Consent-tekst op het bankkoppelscherm (Data use description)
 De zin die de gebruiker leest vlak vóór hij zijn bank autoriseert, staat **niet in deze repo maar
@@ -313,6 +320,82 @@ mailbox.
   bij Resend is geverifieerd. Zonder key worden pogingen als *overgeslagen* gelogd en blijven
   huishouden-uitnodigingen via de deelbare link werken.
 
+### Twee mailpaden, één provider
+Er zijn twee losse paden die allebei via Resend lopen, maar elk hun eigen sleutel en configuratieplek hebben:
+
+| Pad | Wat | Waar geconfigureerd | Sleutel | Zichtbaar in |
+| --- | --- | --- | --- | --- |
+| App-mail | briefing, huishouden-uitnodiging, cron-alert (`lib/email.ts`, Resend REST-API) | Vercel → env-vars | `RESEND_API_KEY` + `EMAIL_FROM` | `/beheer/email` (`mail_log`) |
+| Auth-mail | registratiebevestiging, wachtwoordreset, e-mailwijziging (Supabase Auth/GoTrue) | Supabase-dashboard → Authentication (custom SMTP) | Resend-API-key als SMTP-wachtwoord | Supabase → Logs → Auth; **niet** in `mail_log` |
+
+Zonder custom SMTP verstuurt Supabase auth-mail via zijn ingebouwde dienst: ~2 mails/uur, niet bedoeld
+voor productie — één testcohort van 12–20 aanmeldingen loopt daar al op vast. Dat is launch-audit
+NO-GO 2/4 (`docs/launch-audit-2026-07.md`, rij E).
+
+### Auth-mail productieklaar maken (Resend-SMTP) — klikpad
+Besluit eigenaar 2 sep 2026: eerst inrichten op het **huidige** productiedomein `fin-first.vercel.app`,
+niet wachten op DNS voor `trifinity.app`. Het afzenderdomein moet wél een eigen domein zijn (vanaf
+`vercel.app` kan niemand mail versturen), dus stap 1 blijft nodig — maar alleen de mail-records; de site
+zelf hoeft niet te verhuizen. Bij de latere cutover is er bewust een tweede, kleiner configuratiemoment
+(geaccepteerd). Volgorde is hard: 1 → 2 → 3 → 4, want het SMTP-wachtwoord bestaat pas na 1 en de
+afzender wordt door Resend geweigerd zolang 1 niet groen is.
+
+1. **Resend — domein verifiëren.** [resend.com](https://resend.com) → *Domains* → *Add domain* →
+   `trifinity.app` (regio EU). Resend toont drie soorten DNS-records: **SPF** (TXT op `send.trifinity.app`
+   of het aangegeven subdomein), **DKIM** (TXT `resend._domainkey…`) en de bijbehorende **MX** voor
+   bounces; zet daarnaast een **DMARC**-record (`_dmarc.trifinity.app` TXT `v=DMARC1; p=none;
+   rua=mailto:ops@trifinity.nl`) — start op `p=none`, aanscherpen kan later. Zet de records bij de
+   registrar van `trifinity.app` (domein eerst registreren als dat nog niet gebeurd is; nslookup gaf op
+   2 sep 2026 NXDOMAIN). Wacht tot Resend het domein op *Verified* zet (minuten tot een uur).
+   *Terugval als trifinity.app niet snel beschikbaar is:* verifieer een domein dat al bestaat
+   (bv. `trifinity.nl`) en gebruik `noreply@` op dát domein als afzender — pas dan óók `EMAIL_FROM`
+   (Vercel) en `admin_email` in `supabase/config.toml` aan zodat beide paden dezelfde afzender dragen.
+2. **Resend — API-key.** *API Keys* → *Create API key*, naam `supabase-auth-smtp`, permissie
+   *Sending access*, domein beperkt tot het geverifieerde domein. De key wordt één keer getoond:
+   direct in de wachtwoordmanager. Maak voor het app-mailpad een **aparte** key (`vercel-app-mail`),
+   zodat je ze los kunt roteren; zet die als `RESEND_API_KEY` in Vercel → *Settings → Environment
+   Variables* (Production) samen met `EMAIL_FROM=TriFinity <noreply@trifinity.app>`, en redeploy.
+3. **Supabase — custom SMTP.** Dashboard → project → *Authentication → Emails → SMTP Settings*
+   (in oudere dashboards *Project Settings → Authentication → SMTP Settings*) → *Enable Custom SMTP*
+   aan en invullen:
+   - Sender email: `noreply@trifinity.app` · Sender name: `TriFinity`
+   - Host: `smtp.resend.com` · Port: `587` (STARTTLS; 465 werkt ook als 587 geblokkeerd is)
+   - Username: `resend` · Password: de Resend-API-key uit stap 2 (de key ís het wachtwoord)
+   - Minimum interval between emails: `1` seconde (spiegelt `max_frequency` in `config.toml`)
+   Sla op. Daarna *Authentication → Rate Limits*: "Rate limit for sending emails" van 2 → **30 per uur**
+   (pas instelbaar zodra custom SMTP aanstaat; spiegelt `[auth.rate_limit] email_sent = 30`).
+4. **Supabase — URL-configuratie.** *Authentication → URL Configuration*: Site URL =
+   `https://fin-first.vercel.app`; Redirect URLs bevatten minimaal `https://fin-first.vercel.app/**`,
+   `https://trifinity.app/**`, `https://www.trifinity.app/**`, `http://localhost:3000/**`,
+   `http://127.0.0.1:3000/**` — exact de lijst uit `supabase/config.toml` (basis + `[remotes.production]`).
+   De app geeft bij signup/reset altijd een expliciete `emailRedirectTo` op basis van de eigen origin mee,
+   dus de Site URL is alleen de terugval; de redirect-lijst is wat de links daadwerkelijk toelaat.
+5. **Leaked-password-protection** (*Authentication → Attack Protection* / *Password security*): aanzetten
+   **als het project op het Pro-plan staat**. Op Free bestaat de toggle niet — dan bewust overslaan; de
+   eigen HaveIBeenPwned-check in `/signup` (ADR 0057) dekt het UI-grade. Niet upgraden alleen hiervoor.
+6. **Bewijs.** Registreer met een gecontroleerd extern adres (Gmail én Outlook) via
+   `https://fin-first.vercel.app/signup`, klik de bevestigingslink, doe daarna *Wachtwoord vergeten* en
+   volg de resetlink. Controleer in de ontvangen mail de headers: `spf=pass`, `dkim=pass`, afzender
+   `noreply@trifinity.app`. Supabase → *Logs → Auth* toont de verzendpogingen; Resend → *Emails* toont
+   aflevering/bounce. Vink daarna rij E in `docs/launch-audit-2026-07.md` af en sluit de Notion-kaart.
+7. **Spiegel in de repo.** `supabase/config.toml` draagt de bedoelde eindtoestand al
+   (`[remotes.production.auth]` + `[remotes.production.auth.email.smtp]`, wachtwoord via
+   `env(RESEND_SMTP_PASS)`). **Draai `supabase config push` niet** zolang ADR 0047 het
+   `before_user_created`-hook-blok bewust ongetrackt houdt: een push zet de hele auth-config en zou de
+   registratie-allowlist-hook uitschakelen. Het dashboard is dus de bron; wijzig je daar iets, werk het
+   blok in `config.toml` handmatig mee.
+
+**Terugdraaien** (elke stap los): SMTP → *Enable Custom SMTP* uit (Supabase valt terug op de ingebouwde
+dienst, 2/uur — en zet de rate-limit dan ook terug naar 2, anders weigert het dashboard op te slaan);
+Vercel-env → variabele verwijderen + redeploy (app-mail wordt weer *overgeslagen*, uitnodigingen via link);
+Resend → API-key intrekken (*API Keys → Revoke*) en/of domein verwijderen; DNS → records verwijderen.
+Niets hiervan raakt gebruikersdata.
+
+**Wat je ziet als het misgaat:** een tester meldt "geen bevestigingsmail" → Supabase *Logs → Auth* filter
+`error` (SMTP-auth-fout = verkeerde key of onverified domein; `rate limit exceeded` = stap 3 niet gedaan)
+en Resend *Emails* (bounce/spam-classificatie). App-mail: `/beheer/email` toont *mislukt* met de
+Resend-foutmelding.
+
 ---
 
 ## Inhoud & teksten
@@ -338,7 +421,14 @@ mailprovider, bankprovider), en elke handmatige actie op productie. Die horen hi
 
 | Datum | Wat | Waarom | Hoe terug |
 | --- | --- | --- | --- |
-| *(nog leeg — eerste aantekening bij de eerstvolgende wijziging)* | | | |
+| ☐ *(uitvoerdatum invullen)* — voorbereid 2026-09-03 | **Resend**: domein `trifinity.app` geverifieerd (SPF/DKIM/DMARC-records bij de registrar) + twee API-keys (`supabase-auth-smtp`, `vercel-app-mail`). | Auth-mail en app-mail hebben een eigen afzenderdomein nodig; vanaf `vercel.app` kan niet verstuurd worden. Launch-audit NO-GO 2/4. | Keys intrekken in Resend → *API Keys*; domein verwijderen; DNS-records weghalen. |
+| ☐ *(uitvoerdatum invullen)* — voorbereid 2026-09-03 | **Supabase Auth**: custom SMTP aan (`smtp.resend.com:587`, user `resend`, wachtwoord = auth-key), afzender `noreply@trifinity.app`, e-mail-rate-limit 2 → 30/uur, Site URL `https://fin-first.vercel.app`, redirect-lijst = `config.toml`. | Ingebouwde Supabase-mail cap ~2/uur maakt de beta-signup onbruikbaar; besluit eigenaar 2 sep: eerst op het huidige domein, cutover later. Gespiegeld in `supabase/config.toml` → `[remotes.production]`. | *Enable Custom SMTP* uit + rate-limit terug naar 2; Site URL/redirects terugzetten. Geen datamutatie. |
+| ☐ *(uitvoerdatum invullen)* — voorbereid 2026-09-03 | **Vercel**: env-vars `RESEND_API_KEY` (app-mail-key) + `EMAIL_FROM=TriFinity <noreply@trifinity.app>` op Production, redeploy. | Activeert briefing-/uitnodigings-/cron-alert-mail (`lib/email.ts`); `mail_log` was tot nu leeg. | Variabelen verwijderen + redeploy → pogingen worden weer *overgeslagen* gelogd, uitnodigingen via link. |
+| ☐ *(alleen op Pro-plan)* | **Supabase Auth**: leaked-password-protection aan. | Harde serverpoort naast de UI-check (ADR 0057). Op Free niet beschikbaar — dan bewust overgeslagen. | Toggle uit. |
+| ☑ 2026-07-29 · **terugwerkend vastgelegd 2026-09-03** | **TrueLayer**: Live-app aangemaakt in de console (client-id `finfirst-297e8f`, eigen secret) + redirect-URI `https://fin-first.vercel.app/api/bank-connect/callback` geregistreerd. | De koppeling moest tegen een échte NL-bank kunnen; `xs2a-rabobank` bestaat niet in sandbox. | Live-app uitzetten in de TrueLayer-console; bestaande consents vervallen dan. Zie ook de rij hieronder. |
+| ☑ 2026-07-31 → 2026-08-04 · **terugwerkend vastgelegd 2026-09-03** | **`app_settings`**: `truelayer_enabled=true` (31-7), `truelayer_client_id`/`_secret` = de live-waarden (29-7), `truelayer_environment=production` (4-8). | Productie-instroom activeren. Destijds gedaan zónder aantekening; deze rij herstelt dat gat. | `/beheer/bank-connect` → TrueLayer uit, of `truelayer_environment` terug op `sandbox` **mét** het sandbox-client-id én -secret (aparte app — zie "TrueLayer-omgeving wisselen"). |
+| ☐ *(openstaand)* | **`truelayer_environment` per omgeving scheiden.** Nu één gedeelde waarde in `app_settings` voor lokaal én productie. | Op 2026-07-31 zette de in-app regressiesuite hem op `sandbox` zonder herstel; pas op 4-8 ontdekt. Gemitigeerd met `putSettingAndRestore`, maar de gedeelde instelling staat er nog. | n.v.t. — dit is een te maken wijziging, geen gedane. |
+| ☐ *(openstaand — vóór externe gebruikers)* | **Verwerkersregister**: TrueLayer-regel afmaken met DPA-vindplaats (ja/nee + link/locatie). | TrueLayer verwerkt rekening- en transactiegegevens namens ons; het register is nu onvolledig. Route: skill `verwerkersregister`. Hoeft niet vóór het technisch werkt, wél vóór het aan externe gebruikers wordt aangeboden. | n.v.t. |
 
 Twee gevallen reiken verder dan de aantekening: raakt de wijziging de **back-upinrichting of de sleutels**
 (`ENCRYPTION_KEY_V1`, `IBAN_INDEX_KEY_V1`), dan is de herstelproef opnieuw nodig — zie hieronder. Raakt hij

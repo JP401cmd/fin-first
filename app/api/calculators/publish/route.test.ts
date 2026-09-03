@@ -149,3 +149,102 @@ describe('POST /api/calculators/publish — poorten vóór de screening', () => 
     expect(mockCheckCreditBudget).toHaveBeenCalledWith(expect.anything(), 'user-1', 'report')
   })
 })
+
+/**
+ * Screening-uitkomst → eerlijke fouttekst (UAT WF-REKEN-04-bug2).
+ *
+ * De screener geeft bij een AI-uitval fail-closed `ok: false` terug — net als
+ * bij een inhoudelijke afkeuring. De route stuurde in beide gevallen de tekst
+ * "niet geschikt om publiek te delen", terwijl bij een uitval over de inhoud
+ * niets gezegd is. De sheet (components/future/publish-curation-sheet.tsx)
+ * toont alleen `data.error`, dus die tekst moet zelf eerlijk zijn.
+ */
+const DEFINITIE = {
+  name: 'Spaarbuffer opbouwen',
+  inputs: [{ key: 'bedrag', label: 'Bedrag', kind: 'euro', default: 100 }],
+  scenarios: [{ key: 'basis', label: 'Basis' }],
+  outputs: [{ key: 'resultaat', label: 'Resultaat', formula: 'bedrag * 12', format: 'euro' }],
+}
+
+/** Bron-rij aanwezig; een publieke insert mag op een afgekeurd pad nooit vallen. */
+function supabaseMetBron() {
+  const chain = {
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    maybeSingle: vi.fn().mockResolvedValue({
+      data: {
+        id: 'calc-1',
+        user_id: 'user-1',
+        name: 'Spaarbuffer opbouwen',
+        description: 'Hoeveel maanden buffer bouw je op?',
+        definition: DEFINITIE,
+      },
+      error: null,
+    }),
+    insert: vi.fn(() => {
+      throw new Error('insert mag niet geraakt worden bij een afgekeurde screening')
+    }),
+  }
+  return {
+    auth: { getUser: vi.fn().mockResolvedValue({ data: { user: USER } }) },
+    from: vi.fn(() => chain),
+  }
+}
+
+describe('POST /api/calculators/publish — screening-uitkomst → fouttekst (WF-REKEN-04-bug2)', () => {
+  beforeEach(() => {
+    mockCreateClient.mockResolvedValue(supabaseMetBron())
+    mockRecordAiUsage.mockResolvedValue(undefined)
+  })
+
+  it('AI-uitval (fail-closed, reason unavailable): de fail-closed-tekst is de error, niet "niet geschikt"', async () => {
+    const ISSUE =
+      'De publicatie-controle kon niet automatisch worden uitgevoerd. Probeer het later opnieuw.'
+    mockScreenPublishMetadata.mockResolvedValue({ ok: false, reason: 'unavailable', issue: ISSUE })
+
+    const res = await POST(request())
+    const body = await res.json()
+
+    expect(res.status).toBe(422)
+    expect(body.ok).toBe(false)
+    expect(body.error).toBe(ISSUE)
+    expect(body.error).not.toContain('niet geschikt')
+    // Fail-closed blijft: het model is wel gekost, maar er komt geen publieke rij.
+    expect(mockRecordAiUsage).toHaveBeenCalledWith(expect.anything(), 'user-1', 'report')
+  })
+
+  it('echte content-afkeuring (reason content): "niet geschikt" blijft, issue/suggestion reizen mee', async () => {
+    mockScreenPublishMetadata.mockResolvedValue({
+      ok: false,
+      reason: 'content',
+      issue: 'De beschrijving noemt een concrete bank.',
+      suggestion: 'Vervang de banknaam door "een online broker".',
+    })
+
+    const res = await POST(request())
+    const body = await res.json()
+
+    expect(res.status).toBe(422)
+    expect(body.ok).toBe(false)
+    expect(body.error).toBe('De naam of beschrijving is niet geschikt om publiek te delen.')
+    expect(body.issue).toBe('De beschrijving noemt een concrete bank.')
+    expect(body.suggestion).toBe('Vervang de banknaam door "een online broker".')
+  })
+
+  it('de reden zit op de uitkomst zelf, niet op de issue-tekst: content met de fail-closed-zin blijft "niet geschikt"', async () => {
+    // Zou de route de twee takken op de tekst uit elkaar houden, dan zou een
+    // LLM-issue die toevallig zo klinkt de framing verliezen. De discriminator
+    // maakt dat onmogelijk.
+    mockScreenPublishMetadata.mockResolvedValue({
+      ok: false,
+      reason: 'content',
+      issue: 'De publicatie-controle kon niet automatisch worden uitgevoerd. Probeer het later opnieuw.',
+    })
+
+    const res = await POST(request())
+    const body = await res.json()
+
+    expect(res.status).toBe(422)
+    expect(body.error).toBe('De naam of beschrijving is niet geschikt om publiek te delen.')
+  })
+})

@@ -123,6 +123,31 @@ export interface ConvergentieRawContext {
 }
 
 /**
+ * Rauwe context → `KernelAdapterInput` — de ENIGE plek waar die mapping leeft.
+ *
+ * De hoofdprojectie (`computeConvergentieProjection`), de marktcheck
+ * (`computeMarktcheck`) én het totaalplan-rapport (`lib/totaalplan-data.ts#
+ * buildTotaalplanKernelInput`) bouwen hun kernel-invoer hiermee. Tot 3 sep 2026
+ * stond deze mapping drie keer uitgeschreven; het totaalplan-exemplaar miste
+ * `marktVolatiliteit`, waardoor de jaarlaag `fire_assumptions.volatility` de
+ * slagingskans van het rapport nooit bereikte terwijl /toekomst er wél mee
+ * rekende. Eén home sluit die klasse uit: een veld dat hier bijkomt, komt overal bij.
+ */
+export function buildConvergentieAdapterInput(
+  rawContext: ConvergentieRawContext,
+): KernelAdapterInput {
+  return {
+    profile: buildConvergentieAdapterProfile(rawContext.profile),
+    assets: rawContext.assets,
+    debts: rawContext.debts,
+    lifeEvents: rawContext.lifeEvents,
+    aowRows: rawContext.aowRows,
+    taxYear: rawContext.taxYear,
+    marktVolatiliteit: rawContext.marktVolatiliteit,
+  }
+}
+
+/**
  * Uitkomst van één convergentie-run: het kernel-resultaat óf een expliciete fout.
  * Bij succes zijn de solver-doorvoer-velden (V12) + het verkoopmoment (marker-
  * contract) aanwezig; bij een kern-fout draagt `reason` de nette Nederlandse toelichting.
@@ -158,15 +183,7 @@ export function computeConvergentieProjection(
 ): ConvergentieProjectionOutcome {
   const { rawContext } = params
   try {
-    const adapterInput: KernelAdapterInput = {
-      profile: buildConvergentieAdapterProfile(rawContext.profile),
-      assets: rawContext.assets,
-      debts: rawContext.debts,
-      lifeEvents: rawContext.lifeEvents,
-      aowRows: rawContext.aowRows,
-      taxYear: rawContext.taxYear,
-      marktVolatiliteit: rawContext.marktVolatiliteit,
-    }
+    const adapterInput = buildConvergentieAdapterInput(rawContext)
     const { result } = runKernelUnified({
       adapterInput,
       yearlyExpenses: rawContext.yearlyExpenses,
@@ -212,15 +229,7 @@ export function computeMarktcheck(params: {
 }): MarktcheckOutcome {
   const { rawContext } = params
   try {
-    const adapterInput: KernelAdapterInput = {
-      profile: buildConvergentieAdapterProfile(rawContext.profile),
-      assets: rawContext.assets,
-      debts: rawContext.debts,
-      lifeEvents: rawContext.lifeEvents,
-      aowRows: rawContext.aowRows,
-      taxYear: rawContext.taxYear,
-      marktVolatiliteit: rawContext.marktVolatiliteit,
-    }
+    const adapterInput = buildConvergentieAdapterInput(rawContext)
     const { input } = buildKernelInputFromAppWithNotices(adapterInput)
     return runMarktcheckOnKernelInput(input, {
       maxRuns: params.maxRuns,

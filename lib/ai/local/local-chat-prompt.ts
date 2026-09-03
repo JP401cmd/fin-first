@@ -26,6 +26,7 @@
 // overschrijven.
 
 import type { LocalChatOverview } from './local-chat-context'
+import { JAARRUIMTE_BOVENGRENS_SUFFIX } from '@/lib/jaarruimte-facts'
 import {
   selectKnowledgeForQuestion,
   LOCAL_KNOWLEDGE_TOKEN_BUDGET,
@@ -128,8 +129,11 @@ function renderOverview(overview: LocalChatOverview): string {
   if (overview.jaarruimte) {
     const jr = overview.jaarruimte
     const dagen = jr.vrijheidsdagen > 0 ? ` (≈ ${jr.vrijheidsdagen} dagen vrijheid)` : ''
+    // H23: zonder bekende factor A is dit de BOVENGRENS, geen vast bedrag.
+    // Zelfde kwalificatie als de cloud tax-context en de tips-toelichting.
+    const grens = jr.factorAKnown ? '' : JAARRUIMTE_BOVENGRENS_SUFFIX
     lines.push(
-      `- Jaarruimte (aftrekbare lijfrente-/pensioeninleg): onbenut ${euro(jr.onbenut)} → geschatte belastingbesparing ${euro(jr.besparing)}${dagen} bij volledige benutting`,
+      `- Jaarruimte (aftrekbare lijfrente-/pensioeninleg): onbenut ${euro(jr.onbenut)} → geschatte belastingbesparing ${euro(jr.besparing)}${dagen} bij volledige benutting${grens}`,
     )
   }
 

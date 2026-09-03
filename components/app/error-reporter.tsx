@@ -6,9 +6,19 @@ import { useEffect } from 'react'
  * ErrorReporter — vangt ongevangen client-fouten (window.onerror +
  * unhandledrejection) en rapporteert ze naar /api/log-error, zodat een
  * superadmin ze terugziet op /beheer/errors. Gecapt per sessie tegen floods.
+ *
+ * In een dev-build melden we niets: een lokale `next dev` praat vaak tegen de
+ * productie-Supabase, en Turbopack/HMR-artefacten zouden /beheer/errors dan als
+ * productiesignaal ondermijnen. Next toont die fouten lokaal al in zijn eigen
+ * overlay + console. `NODE_ENV` is hier een BUILD-time constante die Next in de
+ * clientbundel inlinet; een preview-deploy draait een productie-build en meldt
+ * dus gewoon. De autoriteit blijft de server-side guard in /api/log-error —
+ * deze check bespaart alleen de zinloze roundtrip.
  */
 export function ErrorReporter() {
   useEffect(() => {
+    if (process.env.NODE_ENV !== 'production') return
+
     let sent = 0
     const MAX = 8
 

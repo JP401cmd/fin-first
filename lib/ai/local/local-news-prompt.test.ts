@@ -10,6 +10,7 @@ import { parseLocalNewsProse, parseLocalNewsScore } from './local-news-parse'
 import { guardPersonalImpact } from './local-news-guard'
 import type { LocalChatOverview } from './local-chat-context'
 import type { LocalNewsSource } from './local-news-source'
+import { JAARRUIMTE_BOVENGRENS_SUFFIX } from '@/lib/jaarruimte-facts'
 
 /** Meetmethode van scripts/ai-parity/scan.mjs: tekens ÷ 4. */
 function estimateTokens(text: string): number {
@@ -28,7 +29,7 @@ const OVERVIEW: LocalChatOverview = {
   dagtarief: 85,
   swrPct: 3.4,
   noodbuffer: { bedrag: 7500, maanden: 2.9 },
-  jaarruimte: { onbenut: 22155, besparing: 12409, vrijheidsdagen: 108 },
+  jaarruimte: { onbenut: 22155, besparing: 12409, vrijheidsdagen: 108, factorAKnown: true },
   kansen: [],
   openstaandeActies: [],
   budgetten: null,
@@ -117,6 +118,18 @@ describe('renderLocalNewsOverview — dubbele rol: promptcontext én grondslag',
     const text = renderLocalNewsOverview({ ...OVERVIEW, hasData: false })
     expect(text).toMatch(/Nog geen financiële gegevens/)
     expect(text).not.toContain('€85.000')
+  })
+
+  it('kwalificeert de jaarruimte als bovengrens zodra factor A niet is ingevuld (H23)', () => {
+    // Ook als relevantiesignaal mag een bovengrens niet als hard bedrag de
+    // briefingtekst in reizen.
+    expect(renderLocalNewsOverview(OVERVIEW)).not.toContain('bovengrens')
+    const text = renderLocalNewsOverview({
+      ...OVERVIEW,
+      jaarruimte: { ...OVERVIEW.jaarruimte!, factorAKnown: false },
+    })
+    expect(text).toContain(JAARRUIMTE_BOVENGRENS_SUFFIX.trim())
+    expect(text).toContain('€22.155')
   })
 })
 

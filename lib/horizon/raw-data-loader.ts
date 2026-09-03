@@ -70,7 +70,7 @@ import { type HousingTriggerSimBasis } from '@/lib/housing-trigger'
 import { lifeEventsToCashflows } from '@/lib/fire-simulation'
 import { type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { resolveFireAssumptions, type FireAssumptionRow } from '@/lib/fire-assumptions'
-import { NL_AOW_AGE } from '@/lib/constants'
+import { NL_AOW_AGE, SAVINGS_RATE_WINDOW_MONTHS } from '@/lib/constants'
 import { hasPartner } from '@/lib/household-type'
 import { calculateBox3, CURRENT_TAX_YEAR } from '@/lib/box3-data'
 import { dailyExpenseRate } from '@/lib/format'
@@ -726,8 +726,8 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
     sinceMonth: sixMonthsAgoMonth,
     beforeMonth: currentMonthExcl,
   })
-  const avgIncome6m = totalIncome6m > 0 ? totalIncome6m / 6 : effectiveMonthlyIncome
-  const avgExpenses6m = totalExpenses6m > 0 ? totalExpenses6m / 6 : effectiveMonthlyExpenses
+  const avgIncome6m = totalIncome6m > 0 ? totalIncome6m / SAVINGS_RATE_WINDOW_MONTHS : effectiveMonthlyIncome
+  const avgExpenses6m = totalExpenses6m > 0 ? totalExpenses6m / SAVINGS_RATE_WINDOW_MONTHS : effectiveMonthlyExpenses
 
   // Asset totals with inclusion percentages
   const totalAssetsOnly = (assetsResult.data ?? []).reduce((s, a) =>
@@ -925,7 +925,7 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
 
   // Debt aflossing add-back (principal repayments count as saving) — gedeelde helper.
   const debtAflossingMonthly = computeDebtAflossingMonthly((fullDebtsResult.data ?? []) as unknown as Debt[])
-  const debtAflossing6m = debtAflossingMonthly * 6
+  const debtAflossing6m = debtAflossingMonthly * SAVINGS_RATE_WINDOW_MONTHS
 
   // Canonieke 6-maands spaarquote — gedeelde helper (extrapolatie <6m data +
   // savingsRateFromAggregates + profiel-fallback). Spaarbudgetten tellen als sparen
@@ -955,7 +955,7 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
   const horizonSavingsExpenses = resolveAmountWithBasis(
     sources.expenses_source,
     profileMonthlyExpenses,
-    expenses6m / 6,
+    expenses6m / SAVINGS_RATE_WINDOW_MONTHS,
     horizonBudgetExpenses.monthlyTotal,
   )
   const {

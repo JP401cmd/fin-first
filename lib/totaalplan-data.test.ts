@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { Asset } from '@/lib/asset-data'
 import type { Aandachtspunt } from '@/lib/aandachtspunten'
+import { DEFAULT_VOLATILITY } from '@/lib/constants'
 import { toSimResult } from '@/lib/unified-projection'
 import { computeConvergentieProjection, type ConvergentieRawContext } from '@/lib/horizon-kernel/convergentie-router'
 import { runMonteCarlo } from '@/lib/horizon-kernel/wrappers/mc'
@@ -176,6 +177,18 @@ describe('assembleTotaalplan — slagingskans-parity (single source)', () => {
 
     const input = buildTotaalplanKernelInput(raw.kernelContext)
     expect(input!.onzekerheid.mc.aantalRuns).toBeLessThanOrEqual(TOTAALPLAN_MC_RUNS)
+  })
+})
+
+describe('buildTotaalplanKernelInput — marktVolatiliteit (ADR 0117) bereikt MC!B3', () => {
+  it('jaarlaag op de context → σ in de kernel-invoer (dit exemplaar liet het veld tot 3 sep 2026 vallen)', () => {
+    const input = buildTotaalplanKernelInput(makeKernelContext({ marktVolatiliteit: 0.22 }))
+    expect(input).not.toBeNull()
+    expect(input!.onzekerheid.mc.sigma).toBe(0.22)
+  })
+
+  it('zonder jaarlaag → DEFAULT_VOLATILITY (geen tweede hardcode)', () => {
+    expect(buildTotaalplanKernelInput(makeKernelContext())!.onzekerheid.mc.sigma).toBe(DEFAULT_VOLATILITY)
   })
 })
 

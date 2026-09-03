@@ -137,12 +137,15 @@ describe('ScenarioKaarten', () => {
     expect(within(card).getAllByText('—')).toHaveLength(3)
   })
 
-  it('rendert de stopleeftijd met één decimaal in NL-notatie', () => {
+  it('rendert de stopleeftijd als hele jaren + maanden (canonieke formatFireAge, geen decimalen)', () => {
     render(<ScenarioKaarten kaarten={VIJF} />)
-    expect(screen.getAllByText('62,3 jr').length).toBeGreaterThan(0)
+    // 62,3 jaar → 62 jaar en round(0,3 × 12) = 4 mnd — dezelfde notatie als de
+    // hero-KPI's; "62,3 jr" was de enige decimale leeftijd op /toekomst (5d).
+    expect(screen.getAllByText('62 jaar en 4 mnd').length).toBeGreaterThan(0)
+    expect(screen.queryByText('62,3 jr')).toBeNull()
     // en de unieke stop-varianten tonen hun eigen leeftijd
-    expect(screen.getByText('63,3 jr')).toBeTruthy()
-    expect(screen.getByText('60,3 jr')).toBeTruthy()
+    expect(screen.getByText('63 jaar en 4 mnd')).toBeTruthy()
+    expect(screen.getByText('60 jaar en 4 mnd')).toBeTruthy()
   })
 
   // Het skeleton telt NIET uit de props: het rendert juist vóórdat de kaarten

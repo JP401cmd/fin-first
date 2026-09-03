@@ -10,8 +10,17 @@ import { PageOpening, Button, PageInfoButton } from '@/components/editorial'
 import { FormError, formErrorId } from '@/components/app/form-error'
 import { useToast } from '@/components/app/toast-provider'
 import { getPageInfo } from '@/lib/page-info-content'
+import { isAuthNetworkError } from '@/lib/auth-errors'
 
 type HouseholdType = 'solo' | 'samen' | 'gezin'
+
+/**
+ * Eén opslag-fouttekst voor deze pagina — zowel wanneer de upsert faalt als
+ * wanneer de voorafgaande sessiecheck op een netwerkstoring stukloopt. Beide
+ * zijn voor de gebruiker hetzelfde geval: "het opslaan lukte niet, probeer
+ * opnieuw". Gedocumenteerd in lib/uat/acceptance/mijn.ts (WF-MIJN-02c).
+ */
+const SAVE_FAILED_MESSAGE = 'Opslaan is mislukt. Probeer het opnieuw.'
 
 export default function ProfielPage() {
   const supabase = createClient()
@@ -77,9 +86,19 @@ export default function ProfielPage() {
     setSaving(true)
     setSaveError(null)
 
-    const { data: { user } } = await supabase.auth.getUser()
+    // WF-MIJN-02c: `getUser()` is zelf een netwerkcall. Bij netwerkuitval geeft
+    // auth-js `{ user: null, error: AuthRetryableFetchError }` terug zónder te
+    // gooien — de sessie is dan intact, alleen even onbereikbaar. Die tak mag
+    // dus NIET de "je bent uitgelogd"-tekst tonen (misleidend: de gebruiker
+    // gaat onnodig opnieuw inloggen), maar dezelfde opslag-fouttekst als de
+    // upsert-catch hieronder.
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (!user) {
-      setSaveError('Je bent niet ingelogd. Log opnieuw in en probeer het nog eens.')
+      setSaveError(
+        isAuthNetworkError(authError)
+          ? SAVE_FAILED_MESSAGE
+          : 'Je bent niet ingelogd. Log opnieuw in en probeer het nog eens.',
+      )
       setSaving(false)
       return
     }
@@ -101,7 +120,7 @@ export default function ProfielPage() {
       })
 
     if (error) {
-      setSaveError('Opslaan is mislukt. Probeer het opnieuw.')
+      setSaveError(SAVE_FAILED_MESSAGE)
     } else {
       setSaveError(null)
       addToast({ type: 'success', title: 'Je profiel is opgeslagen.' })

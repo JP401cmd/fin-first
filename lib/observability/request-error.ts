@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getServiceClient } from '@/lib/supabase/service'
 import { logError } from '@/lib/log-error'
+import { shouldPersistErrorLog } from '@/lib/observability/runtime-environment'
 
 /**
  * Server-side error-capture achter de Next.js `onRequestError`-hook
@@ -50,6 +51,11 @@ export async function captureRequestError(
     // instrumentation.ts guardt hier al op, maar dubbel is defensief.
     if (process.env.NEXT_RUNTIME && process.env.NEXT_RUNTIME !== 'nodejs') return
     if (isNextControlFlowError(err)) return
+    // Dev/prod-guard, laag 1 van 2: een lokale `next dev` tegen de productie-DB
+    // mag /beheer/errors niet vervuilen. Bewust vóór getServiceClient(), zodat
+    // lokaal ook geen service-role-client wordt opgetuigd. Laag 2 is de sink
+    // zelf (lib/log-error.ts) — dezelfde twee-lagen-houding als DEV_ONLY_PATHS.
+    if (!shouldPersistErrorLog()) return
 
     const client = (deps?.getClient ?? getServiceClient)()
     const message = err instanceof Error ? err.message : String(err)

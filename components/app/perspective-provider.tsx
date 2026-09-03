@@ -95,6 +95,89 @@ function storePerspective(p: Perspective) {
   }
 }
 
+/* ────────────────────────────────────────────────────────────────────────────
+ * Server-sync van een perspectiefwissel (WF-NAV-19, bug2)
+ *
+ * `setPerspective` werkt optimistisch: state, localStorage en cookie gaan meteen
+ * om, de PATCH volgt. Was die PATCH fire-and-forget, dan liep een netwerkfout
+ * stil dood — en omdat de mount-effect bij de vólgende paginalading bewust de
+ * SERVERWAARDE laat winnen, draaide die de wissel dan alsnog terug. De gebruiker
+ * zag zijn keuze zonder melding verdampen.
+ *
+ * Gekozen richting (eigenaarsbesluit 3 sep 2026, optie A): de PATCH herhalen in
+ * plaats van stil falen, zodat de server bijtrekt vóór de volgende lading. De
+ * mount-effect blijft ongemoeid — juist omdat die de C1/C7-garantie draagt dat
+ * de server een inmiddels ONGELDIGE keuze mag corrigeren (partner ontkoppeld).
+ * Optie B (cookie laat winnen bij mount) zou dat onderscheid moeten raden.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/** Aantal pogingen inclusief de eerste; daarna geeft de sync op. */
+const PERSPECTIVE_SYNC_MAX_ATTEMPTS = 4
+/** Wachttijd vóór poging 2; verdubbelt daarna (300 → 600 → 1200 ms). */
+const PERSPECTIVE_SYNC_BASE_DELAY_MS = 300
+
+/**
+ * `setTimeout` als promise, die meteen afbreekt zodra `signal` afgaat.
+ *
+ * Zonder de abort-koppeling zou een nieuwe wissel tijdens de backoff-pauze pas
+ * ná die pauze opgemerkt worden — en dan alsnog een verouderde waarde posten.
+ */
+function waitWithAbort(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'))
+      return
+    }
+    const onAbort = () => {
+      clearTimeout(timer)
+      reject(new DOMException('Aborted', 'AbortError'))
+    }
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort)
+      resolve()
+    }, ms)
+    signal.addEventListener('abort', onAbort, { once: true })
+  })
+}
+
+/**
+ * Schrijf het gekozen perspectief naar de server, met herhaling bij netwerkfout.
+ *
+ * Stopt bewust in drie gevallen:
+ * - `res.ok` — klaar.
+ * - een 4xx — de server wijst dit verzoek principieel af (niet ingelogd,
+ *   ongeldig perspectief). Herhalen verandert dat antwoord niet.
+ * - `signal.aborted` — er is een NIEUWERE wissel; die heeft zijn eigen sync en
+ *   moet winnen. Doorgaan zou een verouderde waarde terugschrijven.
+ *
+ * Alleen een netwerkfout of een 5xx wordt herhaald: precies de gevallen waarin
+ * de server de keuze nog niet gezien heeft.
+ */
+async function syncPerspectiveToServer(p: Perspective, signal: AbortSignal): Promise<void> {
+  for (let attempt = 1; attempt <= PERSPECTIVE_SYNC_MAX_ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch('/api/perspective', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ perspective: p }),
+        signal,
+      })
+      if (res.ok || res.status < 500) return
+    } catch {
+      // AbortError én netwerkfout landen hier; alleen de eerste is definitief.
+      if (signal.aborted) return
+    }
+
+    if (attempt === PERSPECTIVE_SYNC_MAX_ATTEMPTS) return
+
+    try {
+      await waitWithAbort(PERSPECTIVE_SYNC_BASE_DELAY_MS * 2 ** (attempt - 1), signal)
+    } catch {
+      return // afgebroken tijdens de backoff-pauze
+    }
+  }
+}
+
 /**
  * Custom hook for perspective-dependent data fetching with automatic cancellation.
  *
@@ -229,18 +312,17 @@ export function PerspectiveProvider({
     const controller = new AbortController()
     patchControllerRef.current = controller
 
-    // Persist to server (fire-and-forget with cancellation)
-    try {
-      await fetch('/api/perspective', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ perspective: newPerspective }),
-        signal: controller.signal,
-      })
-    } catch {
-      // AbortError or network error — local storage is the fallback
-    }
+    // Persist to server, met herhaling bij netwerkfout — zie
+    // `syncPerspectiveToServer`. Een stille mislukking zou de wissel bij de
+    // volgende paginalading laten terugdraaien (WF-NAV-19/c).
+    await syncPerspectiveToServer(newPerspective, controller.signal)
   }, [router])
+
+  // Laat geen backoff-timer of retry-lus achter na unmount (bv. uitloggen):
+  // de wissel die erbij hoorde is dan niet meer aan de orde.
+  useEffect(() => {
+    return () => patchControllerRef.current?.abort()
+  }, [])
 
   // Verversen zonder perspectief-wissel — bump alleen de versie-teller zodat
   // perspectief-afhankelijke effecten (hero/grafiek + huishoud-FIRE-sectie)

@@ -734,6 +734,57 @@ export const LINKED_DEBT_SUGGESTIONS: Partial<Record<AssetType, DebtType>> = {
 }
 
 /**
+ * Label voor het "gekoppeld bezit"-veld, per bezittype. Eén bron voor alle
+ * oppervlakken die een `linked_asset_id` tonen (schuld-detailpane, bewerk-
+ * formulier), zodat het label het WERKELIJKE bezittype volgt.
+ *
+ * Aanleiding (UAT WF-SCHULD-05): de detailpane leidde het label af van
+ * `debt_type` via een binaire ternary — alles behalve `dga_schuld` kreeg
+ * "Gekoppelde woning", ook een autolening die tijdens onboarding automatisch
+ * aan een `vehicle`-bezit wordt gekoppeld ("Gekoppelde woning: Auto
+ * (elektrisch)").
+ *
+ * Types die hier niet in staan vallen terug op het generieke label — beter een
+ * neutrale term dan een stellig verkeerde.
+ */
+export const LINKED_ASSET_LABELS: Partial<Record<AssetType, string>> = {
+  eigen_huis: 'Gekoppelde woning',
+  real_estate: 'Gekoppelde woning',
+  vehicle: 'Gekoppeld voertuig',
+  deelneming: 'Gekoppelde deelneming',
+}
+
+/** Generieke terugval wanneer het bezittype geen eigen label heeft. */
+export const LINKED_ASSET_LABEL_FALLBACK = 'Gekoppeld bezit'
+
+/** Label voor één concreet gekoppeld bezit (detail-weergave). */
+export function linkedAssetLabel(assetType: AssetType | null | undefined): string {
+  return (assetType && LINKED_ASSET_LABELS[assetType]) || LINKED_ASSET_LABEL_FALLBACK
+}
+
+/**
+ * Welke bezittypes mogen aan dit schuldtype gekoppeld worden? Afgeleid uit
+ * `LINKED_DEBT_SUGGESTIONS`, zodat een nieuw koppelpaar op één plek landt en
+ * niet opnieuw als losse ternary in een formulier-filter opduikt.
+ */
+export function linkableAssetTypesForDebt(debtType: DebtType): AssetType[] {
+  return (Object.keys(LINKED_DEBT_SUGGESTIONS) as AssetType[])
+    .filter((assetType) => LINKED_DEBT_SUGGESTIONS[assetType] === debtType)
+}
+
+/**
+ * Veldlabel voor de bezit-keuze in het schuldformulier. Daar is nog geen bezit
+ * gekozen, dus komt het label uit de koppelbare types: dragen die allemaal
+ * hetzelfde label (eigen_huis + real_estate → "Gekoppelde woning"), dan dat;
+ * anders het generieke label.
+ */
+export function linkedAssetFieldLabel(debtType: DebtType): string {
+  const labels = new Set(linkableAssetTypesForDebt(debtType).map((t) => LINKED_ASSET_LABELS[t]))
+  const only = labels.size === 1 ? [...labels][0] : undefined
+  return only ?? LINKED_ASSET_LABEL_FALLBACK
+}
+
+/**
  * Volgorde waarin asset-types in de quick-add type-grid worden getoond.
  * Meest voorkomende eerst zodat gebruikers in <30 sec kunnen kiezen.
  */

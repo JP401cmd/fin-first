@@ -7,6 +7,7 @@ import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { maskPIIInObject } from '@/lib/ai/pii-output-filter'
 import { unauthorized, serverError } from '@/lib/api/respond'
+import { getRecentDailyExpenseRate } from '@/lib/expense-rate'
 
 const TEMPORAL_HINTS: Record<number, string> = {
   1: 'De gebruiker is een Levensgenieter (level 1). Wees zacht — adviseer alleen eliminatie bij echte overlappen, niet bij comfortdiensten.',
@@ -109,17 +110,13 @@ export async function POST(req: Request) {
   const temporalBalance = profile?.temporal_balance ?? 3
   const temporalHint = TEMPORAL_HINTS[temporalBalance] ?? TEMPORAL_HINTS[3]
 
-  // Fetch 3-month spending to compute daily expense for freedom-day conversion
-  const startDate = new Date()
-  startDate.setMonth(startDate.getMonth() - 3)
-  const { data: txs } = await supabase
-    .from('transactions')
-    .select('amount')
-    .gte('date', startDate.toISOString().split('T')[0])
-    .eq('is_income', false)
-
-  const totalSpent3m = (txs ?? []).reduce((s, t) => s + Math.abs(Number(t.amount)), 0)
-  const dailyExpense = totalSpent3m > 0 ? (totalSpent3m / 3 * 12) / 365 : 30
+  // Canoniek dagtarief (lib/expense-rate.ts): 12-mnd rolling consumptie — de
+  // wisselkoers die élk scherm gebruikt, zodat het advies dezelfde
+  // vrijheidsdagen noemt als de abonnementen-pagina. Hier stond een eigen
+  // 3-maands som zonder transfer-filter × 12 / 365, met een verzonnen €30/dag
+  // als terugval (1d, nazorg R2+R3). 0 = geen eerlijke dagbasis → het advies
+  // noemt dan geen vrijheidsdagen.
+  const { dailyRate: dailyExpense } = await getRecentDailyExpenseRate(supabase)
 
   let model
   try {
@@ -148,9 +145,12 @@ Je taak: geef abonnementen-advies. Beoordeel elk abonnement als:
 ${temporalHint}
 
 Rekenregels:
-- Dagelijkse uitgaven van gebruiker: €${dailyExpense.toFixed(2)}/dag
+${dailyExpense > 0
+    ? `- Dagelijkse uitgaven van gebruiker: €${dailyExpense.toFixed(2)}/dag
 - Vrijheidsdagen per jaar = (maandelijkse besparing × 12) / dagelijkse uitgaven
-- Vermeld altijd zowel het euro-bedrag als de vrijheidsdagen bij besparingen
+- Vermeld altijd zowel het euro-bedrag als de vrijheidsdagen bij besparingen`
+    : `- Dagelijkse uitgaven van gebruiker: onbekend (nog geen eerlijke dagbasis)
+- Noem GEEN vrijheidsdagen; vermeld alleen euro-bedragen bij besparingen (vrijheidsdagen = 0)`}
 
 Toon: direct, empowerend, nooit veroordelend. Spreek de gebruiker aan als "je/jij".
 Schrijf maximaal 2 zinnen per abonnement-toelichting.

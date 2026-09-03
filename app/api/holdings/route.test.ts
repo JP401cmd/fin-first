@@ -119,3 +119,64 @@ describe('POST /api/holdings — crypto-asset_id routing (WF-BEZIT-21)', () => {
     expect(insertSpy).toHaveBeenCalledTimes(1)
   })
 })
+
+/**
+ * Regressietest WF-BEZIT-14-bug4 (S1): `investment_holdings.ticker` is NOT NULL
+ * (migratie 20260502000003), maar de route bouwde `ticker: ticker || null`. Wie
+ * het optioneel ogende veld "Ticker / ISIN" leeg liet, kreeg daardoor een
+ * constraint-schending en dus een generieke 500 — er werd géén rij aangemaakt.
+ *
+ * De fix leidt de ticker af uit de naam, precies zoals de backfill in diezelfde
+ * migratie (`COALESCE(h.ticker, h.name)`) en de CSV-import doen. De insert-rij
+ * mag dus nooit meer een lege of null-ticker dragen.
+ */
+describe('POST /api/holdings — lege ticker valt terug op de naam (WF-BEZIT-14-bug4)', () => {
+  it('insert zonder ticker-veld draagt de naam als ticker (nooit null)', async () => {
+    setupFrom('investment')
+
+    const res = await POST(
+      postRequest({
+        asset_id: ASSET_ID,
+        name: 'Vanguard S&P 500 UCITS',
+        units: 50,
+        avg_purchase_price: 95,
+      }),
+    )
+
+    expect(res.status).toBe(201)
+    expect(insertSpy).toHaveBeenCalledTimes(1)
+    expect(insertSpy.mock.calls[0][0].ticker).toBe('Vanguard S&P 500 UCITS')
+  })
+
+  it('insert met een lege/whitespace ticker valt eveneens terug op de naam', async () => {
+    setupFrom('investment')
+
+    await POST(
+      postRequest({
+        asset_id: ASSET_ID,
+        name: '  Meesman Aandelen Wereldwijd  ',
+        ticker: '   ',
+        units: 10,
+        avg_purchase_price: 100,
+      }),
+    )
+
+    expect(insertSpy.mock.calls[0][0].ticker).toBe('Meesman Aandelen Wereldwijd')
+  })
+
+  it('laat een ingevulde ticker ongemoeid (alleen getrimd)', async () => {
+    setupFrom('investment')
+
+    await POST(
+      postRequest({
+        asset_id: ASSET_ID,
+        name: 'Vanguard FTSE All-World',
+        ticker: ' VWRL ',
+        units: 10,
+        avg_purchase_price: 100,
+      }),
+    )
+
+    expect(insertSpy.mock.calls[0][0].ticker).toBe('VWRL')
+  })
+})

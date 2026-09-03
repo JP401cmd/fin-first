@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Trash2, TrendingUp, TrendingDown, Minus, Sparkles, ArrowRight, Settings2 } from 'lucide-react'
+import { Trash2, TrendingUp, TrendingDown, Minus, Sparkles, ArrowRight, Settings2, CheckCircle2, RotateCcw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/format'
 import { getGoalSuggestions } from '@/lib/goal-suggestions'
@@ -214,6 +214,52 @@ export function DoelBewerkenSheet({
     // voltooid doel). De parent viert 'm ingetogen; de once-guard per doel-id
     // voorkomt herhaling.
     if (justCompleted) {
+      onCompleted?.({ id: goalId, name: goalName, goalType: goalType ?? null })
+    }
+    onClose()
+    router.refresh()
+  }
+
+  /**
+   * Het doel zelf afsluiten of weer openen — LOSGEKOPPELD van de waarde.
+   *
+   * `handleSubmit` leidt "behaald" af uit de ingevulde waarde, en dat dekt lang
+   * niet alles: je kunt een doel loslaten omdat het niet meer speelt, of het als
+   * gehaald beschouwen om een reden die niet in het getal zit (de auto in
+   * gedeeltelijke ruil, een schuld die is kwijtgescholden). Bij een meelopend
+   * doel is er zelfs helemaal geen invoerveld om het mee over de streep te
+   * duwen — dat wachtte tot de server het oppikte bij een bezoek aan /overzicht.
+   *
+   * Omkeerbaar in beide richtingen, dus geen bevestigingsstap: heropenen zet
+   * `completed_at` weer op null, waarmee het doel het Bereikt-archief verlaat.
+   * Client-direct schrijven volgt bewust het bestaande patroon van deze sheet
+   * (zie `handleSubmit`/`handleDelete`) — één schrijfpad per component.
+   */
+  async function handleToggleCompleted(completed: boolean) {
+    setSaving(true)
+    setError(null)
+    const supabase = createClient()
+    const { error: toggleError } = await supabase
+      .from('goals')
+      .update({
+        is_completed: completed,
+        completed_at: completed ? new Date().toISOString() : null,
+      })
+      .eq('id', goalId)
+    if (toggleError) {
+      setError(
+        completed
+          ? `Afsluiten mislukt: ${toggleError.message}`
+          : `Heropenen mislukt: ${toggleError.message}`,
+      )
+      setSaving(false)
+      return
+    }
+    setSaving(false)
+    // Alleen de échte overgang viert (zelfde regel als in handleSubmit); de
+    // once-guard per doel-id voorkomt dat heropenen-en-opnieuw-sluiten er een
+    // tweede viering van maakt.
+    if (completed && !goal.is_completed) {
       onCompleted?.({ id: goalId, name: goalName, goalType: goalType ?? null })
     }
     onClose()
@@ -483,6 +529,35 @@ export function DoelBewerkenSheet({
             </div>
           </div>
         ) : null}
+
+        {/* Zelf afsluiten of heropenen — de gebruiker beslist, niet de waarde.
+            Staat bewust vóór de bewerk-link en boven "Verwijder doel": dit is
+            de afronding van een doel, geen destructieve actie. Ook zichtbaar
+            bij een meelopend doel, want juist daar is er geen invoerveld om het
+            mee af te ronden. */}
+        {goal.is_completed ? (
+          <button
+            type="button"
+            data-testid="doel-heropenen"
+            onClick={() => handleToggleCompleted(false)}
+            disabled={saving}
+            className="mb-3 inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-ed)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-2)] transition-colors hover:bg-[var(--subtle)] disabled:opacity-50"
+          >
+            <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+            {saving ? 'Bezig…' : 'Doel weer openen'}
+          </button>
+        ) : (
+          <button
+            type="button"
+            data-testid="doel-afsluiten"
+            onClick={() => handleToggleCompleted(true)}
+            disabled={saving}
+            className="mb-3 inline-flex items-center gap-1.5 rounded-lg border border-positive/40 bg-positive/10 px-3 py-1.5 text-xs font-semibold text-positive transition-colors hover:bg-positive/20 disabled:opacity-50"
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
+            {saving ? 'Bezig…' : 'Markeer als behaald'}
+          </button>
+        )}
 
         {/* Volledig-bewerken-link — opent GoalForm met alle velden +
             asset/debt-koppeling + alle goal_types (netto vermogen,

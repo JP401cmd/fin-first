@@ -40,9 +40,9 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { loadCoreData } from '@/lib/core-data-loader'
+import { applyActionPriorityOrder } from '@/lib/action-sort'
 import { buildWillFinancialFacts } from '@/lib/ai/context/fin-financial-facts'
 import { computeJaarruimteFacts } from '@/lib/jaarruimte-facts'
-import { resolvePensionFactorA } from '@/lib/jaarruimte'
 import { collectAandachtspunten } from '@/lib/aandachtspunten-loader'
 import { type Aandachtspunt, JAARRUIMTE_AANDACHTSPUNT_ID } from '@/lib/aandachtspunten'
 import { loadActionedAandachtspuntIds } from '@/lib/aandachtspunten-actions'
@@ -82,6 +82,13 @@ export interface LocalChatJaarruimte {
   besparing: number
   /** Besparing omgerekend naar vrijheidsdagen (besparing ÷ dagtarief). */
   vrijheidsdagen: number
+  /**
+   * Of factor A bekend is (`JaarruimteFacts.factorAKnown`, H23). False → beide
+   * bedragen zijn een BOVENGRENS omdat er zonder pensioenaftrek is gerekend;
+   * de prompt-renderers zetten er dan `JAARRUIMTE_BOVENGRENS_SUFFIX` achter.
+   * Stuurt uitsluitend de weergave, nooit de motor.
+   */
+  factorAKnown: boolean
 }
 
 /** Eén concrete kans (aandachtspunt) uit de canonieke aandachtspunten-bus. */
@@ -240,7 +247,11 @@ async function loadOpenActions(supabase: SupabaseClient): Promise<OpenActionRow[
       .select('title, freedom_days_impact, status')
       .eq('user_id', user.id)
       .in('status', ['open', 'postponed'])
+      // Canonieke prioriteitsvolgorde (lib/action-sort.ts): priority_score desc,
+      // sort_order asc, created_at desc — dezelfde top-N als het actiebord.
       .order('priority_score', { ascending: false })
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: false })
       .limit(MAX_ITEMS)
     return (data ?? []) as OpenActionRow[]
   } catch {
@@ -402,11 +413,13 @@ export async function buildLocalChatOverview(supabase: SupabaseClient): Promise<
   // NB: in de no-data-tak (geen bezit/schuld/transacties) laten we jaarruimte
   // hieronder BEWUST weg om de "nog geen data"-boodschap niet tegen te spreken;
   // dáár wijkt het af van de cloud tax-context (die jaarruimte ook income-only toont).
-  const factorA = resolvePensionFactorA({
-    pension_factor_a: profileResult.data?.pension_factor_a,
-    pension_factor_a_source: profileResult.data?.pension_factor_a_source,
-  }).factorA
-  const jf = computeJaarruimteFacts(Number(profileResult.data?.net_monthly_income ?? 0), factorA, TAX_YEAR)
+  // Het PROFIEL gaat mee, niet een losgetrokken `factorA`-getal: zo reist de
+  // "factor A onbekend"-kwalificatie (H23) mee tot in de prompttekst.
+  const jf = computeJaarruimteFacts(
+    Number(profileResult.data?.net_monthly_income ?? 0),
+    profileResult.data,
+    TAX_YEAR,
+  )
   // ONDERDRUKKING: heeft de gebruiker de jaarruimte-kans al als actie (open of
   // recent afgerond ≤9 mnd), laat het blok dan weg — anders blijft de lokale Fin
   // "benut je jaarruimte" tippen terwijl de actie al genomen is. Faal-open: bij
@@ -419,6 +432,7 @@ export async function buildLocalChatOverview(supabase: SupabaseClient): Promise<
           besparing: jf.besparing,
           // Vrijheidsdagen via het canonieke dagtarief (uitgaven per dag); 0 bij geen uitgaven.
           vrijheidsdagen: facts.dagtarief > 0 ? Math.round(jf.besparing / facts.dagtarief) : 0,
+          factorAKnown: jf.factorAKnown,
         }
       : null
 

@@ -227,7 +227,14 @@ export const EXTRA_ROUTE_TITLES: Record<string, string> = {
   '/toekomst/bibliotheek': 'Rekenhulp-bibliotheek',
   '/toekomst/inflatie-koopkracht': 'Inflatie & koopkracht',
   '/toekomst/samengestelde-interest': 'Samengestelde interest',
-  '/mijn/checkins': 'Check-ins',
+  // '/mijn/checkins' hoort hier BEWUST NIET (WF-NAV-05): die route is een
+  // letterlijke re-export van app/(app)/core/checkin/historie/page.tsx, en dat
+  // component registreert zelf `<NavStackMeta title="Check-in historie" />`.
+  // Een expliciete paginatitel wint terecht van deze fallbackkaart, dus een
+  // entry hier zou nooit gelezen worden — dode configuratie die suggereert dat
+  // de TopBar "Check-ins" toont terwijl er "Check-in historie" staat. Voeg 'm
+  // niet opnieuw toe; wil je de titel wijzigen, doe dat in de historie-pagina.
+  //
   // Jaaroverzicht zit — net als Check-ins — wél in het kaartengrid op /mijn
   // (`components/mijn/mijn-overview.tsx`) maar niet in `navGroups`. Eén ingang
   // per functie; de TopBar-titel komt dus hiervandaan.

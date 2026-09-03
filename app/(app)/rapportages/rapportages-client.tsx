@@ -21,6 +21,7 @@ import { SectionDivider } from '@/components/app/section-divider'
 import { DepthSection } from '@/components/app/depth-section'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { formatTimestamp } from '@/lib/format'
+import { formatAmsterdamDayMonth } from '@/lib/tz'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
 type PeriodType = 'month' | 'quarter' | 'year'
@@ -30,6 +31,20 @@ const PERIOD_OPTIONS: { value: PeriodType; label: string }[] = [
   { value: 'quarter', label: 'Kwartaal' },
   { value: 'year', label: 'Jaar' },
 ]
+
+/**
+ * Toont een periodegrens (`report_configs.date_from` / `date_to`, kolomtype
+ * `date`) als kalenderdatum.
+ *
+ * Bewust NIET `formatTimestamp`: die is een recency-formatter voor échte
+ * tijdstippen en toont binnen 7 dagen `weekdag HH:MM`. Een date-only string
+ * parseert naar UTC-middernacht, wat in Europe/Amsterdam 01:00/02:00 wordt —
+ * een grens van 1 sep verscheen daardoor als "DI 02:00". `formatAmsterdamDayMonth`
+ * heeft geen tijd-branch (`formatAmsterdamShortDate` wél, vandaar niet die).
+ */
+function formatPeriodeGrens(dateOnly: string): string {
+  return formatAmsterdamDayMonth(new Date(dateOnly))
+}
 
 // Romeinse cijfers — bestaande report_configs query is gecapt op 20.
 const ROMAN = [
@@ -780,7 +795,7 @@ export function RapportagesClient({ data }: { data: RapportagesData }) {
                       )}
                     </div>
                     <span className="mt-0.5 block font-mono text-[10px] uppercase tracking-[0.10em] text-[var(--ink-3)]">
-                      {formatTimestamp(config.date_from)} – {formatTimestamp(config.date_to)}
+                      {formatPeriodeGrens(config.date_from)} – {formatPeriodeGrens(config.date_to)}
                     </span>
                   </button>
                   <div className="flex shrink-0 items-center gap-1">

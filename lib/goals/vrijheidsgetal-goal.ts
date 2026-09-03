@@ -73,6 +73,22 @@ export interface VrijheidsgetalSnapshot {
   /** Fractionele FIRE-leeftijd waar de `eta` uit volgt (diagnostiek/tests). */
   fireAgeFractional: number | null
   /**
+   * GRONDSLAG van `currentValue`/`targetValue`: telt de eigen woning mee (`false`)
+   * of niet (`true`)? Dit is de `homeExcludedFromFire`-keuze die
+   * `selectFreedomProgressBasis` hierboven al maakte — hier alleen DOORGEGEVEN,
+   * niet opnieuw bepaald.
+   *
+   * Waarom op de snapshot: het doelbedrag op /toekomst/doelen en dat op
+   * /toekomst kunnen honderdduizenden euro's schelen zonder dat er iets fout is
+   * (incl. vs. excl. woning). Zonder deze vlag kan de doelkaart die kwalificatie
+   * niet tonen en leest het verschil als een rekenfout (bevinding UR2-17).
+   *
+   * OPTIONEEL/ADDITIEF (zelfde patroon als `endBalanceAtEndAge`): stub-/mock-
+   * snapshots die het veld niet zetten blijven geldig; `undefined` betekent
+   * "onbekend" ⇒ de UI toont dan géén kwalificatie i.p.v. een gegokte.
+   */
+  homeExcludedFromFire?: boolean
+  /**
    * Eindsaldo op de LEVENSVERWACHTING-proxy (`profiles.fire_end_age`, default 90
    * — zie lib/persoonlijk-plan-assembly.ts:147-158): de stand in de laatste
    * projectierij op `SimResult.displayEndAge`. Voedt het `end_balance`-doel.
@@ -198,6 +214,7 @@ export function buildVrijheidsgetalSnapshot(
         : null,
     eta,
     fireAgeFractional: fireAge,
+    homeExcludedFromFire: input.homeExcludedFromFire,
     endBalanceAtEndAge:
       input.endBalanceAtEndAge != null && Number.isFinite(input.endBalanceAtEndAge)
         ? input.endBalanceAtEndAge

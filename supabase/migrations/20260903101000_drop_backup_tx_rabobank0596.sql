@@ -1,0 +1,44 @@
+-- AVG-dataminimalisatie: de restant-backuptabel van de Rabobank-importreparatie
+-- van 4 augustus 2026 opruimen.
+--
+-- Kaart: "Nazorg R2+R3 · security-restpunten (H9 WITH CHECK voorop)" (P1),
+-- punt "backup_tx_rabobank0596_20260804 — LAAG (AVG-relevant)".
+--
+-- ⚠️ BEWUST EEN APART BESTAND — dit is de enige DESTRUCTIEVE stap van die kaart.
+-- De policy-migratie `20260903100000_assets_household_write_guard.sql` is
+-- additief en veilig; deze verwijdert data. Ze staan daarom los, zodat de
+-- release-/apply-stap de eerste kan uitrollen en deze desgewenst kan
+-- tegenhouden. Toepassen vraagt een expliciet akkoord van de eigenaar.
+--
+-- ── Wat er staat (gemeten tegen de live database, 03-09-2026) ────────────────
+--   * 355 rijen, exact 1 `user_id` (b177271d-…), transactiedata van
+--     08-05-2026 t/m 04-08-2026 — echte bedragen, omschrijvingen,
+--     tegenpartijnamen en IBAN's.
+--   * RLS staat AAN met 0 policies: dicht voor `anon` en `authenticated`, maar
+--     leesbaar voor elk service-role-pad en voor iedereen met dashboard-toegang.
+--     Niet lek, wél persoonsgegevens die geen doel meer dienen.
+--
+-- ── Waarom dit veilig weg kan (nagetrokken, niet aangenomen) ─────────────────
+-- Twee metingen, allebei read-only uitgevoerd op 03-09-2026:
+--
+--   1. Op `id` matcht GEEN enkele backup-rij nog een rij in `public.transactions`
+--      (0 van 355). Op zichzelf zou dat betekenen: dit is de laatste kopie.
+--   2. Op INHOUD matchen alle 355 rijen wél — een join op
+--      (date, amount, description) tegen `public.transactions` van diezelfde
+--      gebruiker geeft 355 van 355.
+--
+-- Samen: de transacties zijn na de reparatie opnieuw ingelezen en dragen nu
+-- nieuwe id's. De inhoud leeft dus gewoon in `transactions`; de backuptabel is
+-- een duplicaat onder oude sleutels, geen unieke bron. Alleen meting 1 doen zou
+-- tot de tegenovergestelde — en verkeerde — conclusie hebben geleid.
+--
+-- ── Waarom geen archivering ─────────────────────────────────────────────────
+-- Een backup zonder bewaartermijn en zonder eigenaar is precies wat de AVG
+-- dataminimalisatie noemt. De rijen bestaan al ergens anders; een tweede kopie
+-- bewaren vergroot alleen het oppervlak. Wil de eigenaar tóch een kopie vóór het
+-- droppen, dan hoort die buiten de database (export) en met een termijn — niet
+-- als naamloze tabel in `public`.
+--
+-- Idempotent: `if exists`, dus een tweede uitvoering is een no-op.
+
+drop table if exists public.backup_tx_rabobank0596_20260804;

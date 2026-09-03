@@ -5,6 +5,9 @@ import {
   estimateAccruedPensionMonthly,
   estimateFactorAFromSalary,
   resolvePensionFactorA,
+  hasWerkgeverspensioen,
+  isWerkgeverspensioenAsset,
+  WERKGEVERSPENSIOEN_SUBTYPES,
   JAARRUIMTE_OPBOUW_PCT,
   JAARRUIMTE_FACTOR_A,
   JAARRUIMTE_FACTOR_A_IMPUTATIE,
@@ -15,6 +18,81 @@ import {
   JAARRUIMTE_MAX_2026,
 } from './jaarruimte'
 import { computeBox1Tax } from './box1-tax'
+
+// ── WERKGEVERSPENSIOEN-SIGNAAL (Notion P3, 3 sep 2026) ────────────────────────
+// Eén definitie van "bouwt zelf werkgeverspensioen op": life_event OF eigen
+// assets.retirement-rij met werkgevers-subtype. Lijfrente dempt nooit; het
+// assets-pad is op eigen user_id gescoped (assets-SELECT is huishoud-gedeeld).
+describe('hasWerkgeverspensioen — werkgeverspensioen-signaal', () => {
+  const bedrijfEvent = { event_type: 'pension', metadata: { pensioenType: 'bedrijf' } }
+  const lijfrenteEvent = { event_type: 'pension', metadata: { pensioenType: 'lijfrente_levenslang' } }
+  const asset = (subtype: string | null, user_id = 'me', asset_type = 'retirement') => ({
+    user_id,
+    asset_type,
+    subtype,
+  })
+
+  it('WERKGEVERSPENSIOEN_SUBTYPES = uitkerings- + premieregeling, zónder lijfrente', () => {
+    expect([...WERKGEVERSPENSIOEN_SUBTYPES].sort()).toEqual(['premieregeling', 'uitkeringsregeling'])
+    expect(WERKGEVERSPENSIOEN_SUBTYPES).not.toContain('lijfrente')
+  })
+
+  it('isWerkgeverspensioenAsset: retirement + werkgevers-subtype → true; lijfrente/null/ander type → false', () => {
+    expect(isWerkgeverspensioenAsset(asset('uitkeringsregeling'))).toBe(true)
+    expect(isWerkgeverspensioenAsset(asset('premieregeling'))).toBe(true)
+    expect(isWerkgeverspensioenAsset(asset('lijfrente'))).toBe(false)
+    expect(isWerkgeverspensioenAsset(asset(null))).toBe(false)
+    expect(isWerkgeverspensioenAsset(asset('onbekend_nieuw_subtype'))).toBe(false)
+    expect(isWerkgeverspensioenAsset(asset('premieregeling', 'me', 'investment'))).toBe(false)
+  })
+
+  it('event-pad: pensioenType "bedrijf" → true; lijfrente-event → false; ontbrekend type → false (rauwe waarde, niet genormaliseerd)', () => {
+    expect(hasWerkgeverspensioen({ ownUserId: 'me', events: [bedrijfEvent], assets: [] })).toBe(true)
+    expect(hasWerkgeverspensioen({ ownUserId: 'me', events: [lijfrenteEvent], assets: [] })).toBe(false)
+    expect(
+      hasWerkgeverspensioen({ ownUserId: 'me', events: [{ event_type: 'pension', metadata: {} }], assets: [] }),
+    ).toBe(false)
+    expect(
+      hasWerkgeverspensioen({ ownUserId: 'me', events: [{ event_type: 'pension', metadata: null }], assets: [] }),
+    ).toBe(false)
+    expect(
+      hasWerkgeverspensioen({
+        ownUserId: 'me',
+        events: [{ event_type: 'inheritance', metadata: { pensioenType: 'bedrijf' } }],
+        assets: [],
+      }),
+    ).toBe(false)
+  })
+
+  it('assets-pad: eigen werkgevers-rij → true; lijfrente → false; partner-rij → false', () => {
+    expect(hasWerkgeverspensioen({ ownUserId: 'me', events: [], assets: [asset('uitkeringsregeling')] })).toBe(true)
+    expect(hasWerkgeverspensioen({ ownUserId: 'me', events: [], assets: [asset('premieregeling')] })).toBe(true)
+    expect(hasWerkgeverspensioen({ ownUserId: 'me', events: [], assets: [asset('lijfrente')] })).toBe(false)
+    expect(
+      hasWerkgeverspensioen({ ownUserId: 'me', events: [], assets: [asset('uitkeringsregeling', 'partner')] }),
+    ).toBe(false)
+    // Mix: partner-rij telt niet, eigen rij wél.
+    expect(
+      hasWerkgeverspensioen({
+        ownUserId: 'me',
+        events: [],
+        assets: [asset('uitkeringsregeling', 'partner'), asset('premieregeling', 'me')],
+      }),
+    ).toBe(true)
+  })
+
+  it('zonder eigen user-id wordt het assets-pad overgeslagen (nooit "iedereen"); het event-pad blijft werken', () => {
+    expect(hasWerkgeverspensioen({ ownUserId: null, events: [], assets: [asset('uitkeringsregeling')] })).toBe(false)
+    expect(
+      hasWerkgeverspensioen({ ownUserId: undefined, events: [], assets: [asset('uitkeringsregeling')] }),
+    ).toBe(false)
+    expect(hasWerkgeverspensioen({ ownUserId: null, events: [bedrijfEvent], assets: [] })).toBe(true)
+  })
+
+  it('lege invoer → false', () => {
+    expect(hasWerkgeverspensioen({ ownUserId: 'me', events: [], assets: [] })).toBe(false)
+  })
+})
 
 // ── FISCALE-CORRECTIE REGRESSIECASES (ADR 0023, jun 2026) ──────────────────────
 // Pinnen de specifieke getallen die gewijzigd zijn bij de WTP-correctie

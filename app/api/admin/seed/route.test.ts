@@ -1,6 +1,6 @@
-import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, it, expect } from 'vitest'
+import { readSourceLF } from '@/lib/test-utils/read-source'
 
 /**
  * Borgt de demo-vlag-levenscyclus op het admin-seed-pad (bug 13 jul 2026):
@@ -13,7 +13,9 @@ import { describe, it, expect } from 'vitest'
  */
 describe('admin seed — persona-seed markeert account als demo', () => {
   const routePath = path.resolve(__dirname, 'route.ts')
-  const source = readFileSync(routePath, 'utf8')
+  // CRLF-veilig: op een verse Windows-checkout gaat de regelgebaseerde strip
+  // hieronder stil kapot zonder normalisatie (zie lib/test-utils/read-source.ts).
+  const source = readSourceLF(routePath)
   const codeOnly = source
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .split('\n')
@@ -41,7 +43,7 @@ describe('admin seed — persona-seed markeert account als demo', () => {
  */
 describe('admin seed — schema-drift preflight slaat de wipe over', () => {
   const routePath = path.resolve(__dirname, 'route.ts')
-  const source = readFileSync(routePath, 'utf8')
+  const source = readSourceLF(routePath)
   const codeOnly = source
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .split('\n')

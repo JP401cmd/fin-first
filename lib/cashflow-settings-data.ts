@@ -5,6 +5,7 @@ import type { FinancialInput, SavingsRateMethod } from '@/lib/core-metrics'
 import type { RetirementExpenseMethod } from '@/lib/budget-utils'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
 import type { BasisSource, BudgetBasisResult, ResolvedBasis } from '@/lib/budget-basis'
+import type { RecentDailyExpenseRate } from '@/lib/expense-rate'
 
 export interface CashflowSettingsData {
   /** TRANSACTIE-grondslag: het 12-maands geëxtrapoleerde inkomen ("berekend"). */
@@ -104,6 +105,12 @@ export interface CashflowSettingsData {
    * vinkje meebeweegt.
    */
   dailyExpenseRate: number
+  /**
+   * Herkomst van dat tarief (`CorePageData.dailyExpenseRateSource`): de
+   * voetnoot onder de vrijheidstijd noemt een profielschatting dan ook zo,
+   * i.p.v. een hardcoded "gemeten" (1b, nazorg R2+R3). Optioneel voor fixtures.
+   */
+  dailyExpenseRateSource?: RecentDailyExpenseRate['source']
   /** 6-maands spaarbudget-stortingen (correctie-component van savingsRate6m). */
   savingsBudgetTotal6m: number
   /** 6-maands schuldaflossing (correctie-component van savingsRate6m). */
@@ -248,6 +255,7 @@ export async function loadCashflowSettingsData(
     // Doorgeef-veld, GEEN eigen som: `loadCoreData` heeft het canonieke tarief
     // al langs `recentDailyExpenseRateFromRows` gehaald (M22).
     dailyExpenseRate: core.dailyExpenseRate ?? 0,
+    dailyExpenseRateSource: core.dailyExpenseRateSource ?? (core.dailyExpenseRate ? 'transactions' : 'none'),
     // Per-maand reeks (12 slots, oudste → nieuwste) uit dezelfde core-load —
     // serializable en zonder extra DB-round-trip.
     monthlyBreakdown: core.monthlyIncomeExpenseSeries,

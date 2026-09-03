@@ -153,8 +153,10 @@ export const MonteCarloWidget = memo(function MonteCarloWidget({ size, data, hre
           <path d="M0,50 C40,48 80,40 120,30 160,20 200,15 200,15 L200,55 C160,52 120,50 80,50 40,52 0,55 0,55 Z" fill="var(--color-horizon-500)" fillOpacity="0.12" />
           {/* P25-P75 band */}
           <path d="M0,48 C40,44 80,36 120,28 160,22 200,18 200,18 L200,50 C160,48 120,46 80,46 40,48 0,52 0,52 Z" fill="var(--color-horizon-500)" fillOpacity="0.15" />
-          {/* P50 median line */}
-          <path d="M0,48 C40,44 80,38 120,30 160,24 200,20" fill="none" stroke="var(--color-horizon-600)" strokeWidth="1.5" strokeLinecap="round" />
+          {/* P50 median line — `C` neemt 3 punten per segment; het tweede segment
+              herhaalt het eindpunt als stuurpunt, net als de banden hierboven.
+              Een half segment gaf "Unexpected end of attribute" (WF-BEHEER-29-bug5). */}
+          <path d="M0,48 C40,44 80,38 120,30 160,24 200,20 200,20" fill="none" stroke="var(--color-horizon-600)" strokeWidth="1.5" strokeLinecap="round" />
         </svg>
         <div className="flex justify-between text-[10px] text-[var(--ink-4)] font-mono tabular-nums -mt-0.5">
           <span>P10</span>

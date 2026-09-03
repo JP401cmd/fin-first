@@ -88,6 +88,30 @@ function renderBoard(actions: Action[]) {
   )
 }
 
+describe('ActionBoard — volgorde van open acties (WF-OVZ-20-bug1)', () => {
+  it('3-weg gelijkspel op priority_score/sort_order: de nieuwste actie staat bovenaan, ongeacht de laadvolgorde', () => {
+    // Geen aanmaakpad schrijft sort_order (DB-default 0) — zonder derde sleutel was dit
+    // een onbepaald gelijkspel en stond de zojuist toegevoegde actie niet bovenaan.
+    const seed1 = baseAction({ id: 's1', title: 'Seed 1', priority_score: 3, sort_order: 0, created_at: '2026-08-01T10:00:00Z' })
+    const seed2 = baseAction({ id: 's2', title: 'Seed 2', priority_score: 3, sort_order: 0, created_at: '2026-08-15T10:00:00Z' })
+    const nieuw = baseAction({ id: 'n1', title: 'Nieuwe handmatige actie', priority_score: 3, sort_order: 0, created_at: '2026-09-02T10:00:00Z' })
+
+    // Bewust in DB-achtige "verkeerde" volgorde aangeleverd.
+    renderBoard([seed1, nieuw, seed2])
+
+    const titels = screen.getAllByText(/Seed|Nieuwe handmatige/).map((el) => el.textContent)
+    expect(titels).toEqual(['Nieuwe handmatige actie', 'Seed 2', 'Seed 1'])
+  })
+
+  it('priority_score blijft de eerste sleutel; created_at breekt alleen het gelijkspel', () => {
+    const oudMaarHoog = baseAction({ id: 'h', title: 'Oud maar prio 5', priority_score: 5, sort_order: 0, created_at: '2020-01-01T00:00:00Z' })
+    const nieuwMaarLaag = baseAction({ id: 'l', title: 'Nieuw maar prio 1', priority_score: 1, sort_order: 0, created_at: '2026-09-02T00:00:00Z' })
+    renderBoard([nieuwMaarLaag, oudMaarHoog])
+    const titels = screen.getAllByText(/prio/).map((el) => el.textContent)
+    expect(titels).toEqual(['Oud maar prio 5', 'Nieuw maar prio 1'])
+  })
+})
+
 describe('ActionBoard — faalpaden tonen een foutmelding (E-01)', () => {
   it('toont een foutmelding als het bijwerken van de status faalt (!res.ok)', async () => {
     fetchMock.mockResolvedValue({ ok: false, status: 500, text: () => Promise.resolve('boom') })
