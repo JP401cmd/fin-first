@@ -155,7 +155,7 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'compleet',
     given: 'Vaste teller/noemer (FIRE-eligible vermogen, benodigde portfolio) — géén persona-seed; de consistentie is de formule + de clamp.',
     when: 'De gebruiker vergelijkt het vrijheids-% in de hero, de vrijheidsvoortgang-/mijlpalen-widgets, "Jouw Pad" en de deel-kaart.',
-    then: 'Overal hetzelfde percentage uit één bron: vrijheids-% = FIRE-eligible vermogen ÷ benodigde portfolio × 100, geplafonneerd op [0,100] (`computeFreedomProgress`). EXACT: 300.000/500.000 → 60; ≥ doel → 100 (cap); negatief vermogen → 0; geen doel (null) → 0. Huiseigenaar: teller = FIRE-eligible (huis gefilterd), nooit stiekem het volle vermogen (ADR 0009).',
+    then: 'Overal hetzelfde percentage uit één bron: vrijheids-% = FIRE-eligible vermogen ÷ benodigde portfolio × 100, geplafonneerd op [0,100] (`computeFreedomProgress`). EXACT: 300.000/500.000 → 60; ≥ doel → 100 (cap); negatief vermogen → 0; geen doel (null) → 0. Huiseigenaar: teller = FIRE-eligible (huis gefilterd), nooit stiekem het volle vermogen (ADR 0009). Deze kapitaalratio blijft vandaag (F1, ADR 0129) de grondslag voor alle vijf `fire_end_strategy`-waarden; vanaf F3a neemt de DEKKING (`computeRunwayCoveragePct`) het over onder elk vast stopanker (`aow`/`now`/`age`) — zie register-getal 3 (canonical-registry.ts) voor de volledige clausule.',
     assertion: {
       kind: 'exact',
       expected: 'pct60=60; cap100=100; negatief=0; geenDoel=0',
@@ -418,6 +418,25 @@ const criteria: AcceptanceCriterion[] = [
     },
   },
   {
+    workflow: 'WF-KRUIS-28',
+    scenarioId: 'UAT-KRUIS-28',
+    titel: 'Stop-anker: tegenspraak-regel wint altijd + eerlijke 409 bij ontbrekende kolom (ADR 0129 F1)',
+    kriticiteit: 'BELANGRIJK',
+    given:
+      'ADR 0129 fase F1 (gedragsbehoudend): `profiles` draagt naast de oude `fire_end_strategy`-kolom nu ook `fire_stop_anchor`/`fire_stop_age`. Vaste rijfixtures — géén persona-seed, want dit is een parser-/route-identiteit, geen kernel-uitkomst. GEEN LIVE UI-OPPERVLAK schrijft deze kolommen nog (geen picker, geen slider) — dit criterium toetst de parser-/routelaag rechtstreeks (`parseFirePlan`, de PUT-handler van `/api/fire-settings`), niet een browserklik. Het wordt pas via de app zichtbaar/klikbaar zodra F3b de stopmoment-vraag bouwt.',
+    when:
+      '`parseFirePlan` leest een halverwege-gebackfillde rij (oude kolom "pensioen", nieuwe kolom nog op de default "solved") en een rij waar de oude kolom een eind-vorm draagt ("legacy") naast een reeds gezette nieuwe ankerkolom ("aow"); de PUT-route ontvangt een anker-wijziging terwijl de twee kolommen nog niet zijn uitgerold (Postgres 42703) resp. een stopleeftijd van 58,3 jaar (geen halve stap).',
+    then:
+      'DE TEGENSPRAAK-REGEL (D2): een legacy-anker in de OUDE kolom wint altijd — de halverwege-gebackfillde rij levert anker {kind:"aow"}, nooit "solved"; "nu-stoppen" levert {kind:"now"}. Draagt de oude kolom een eind-vorm (geen anker-waarde), dan leidt de NIEUWE ankerkolom — hier {kind:"aow"}. Zo kan geen rij, hoe hij ook ontstond, twee ankers tegelijk beweren. DE ROUTE-INVARIANT (geërfd van ADR 0127): ontbreken de kolommen nog (42703), dan antwoordt PUT 409 met code "stop_anchor_not_supported" en NOOIT `success:true` — een keuze die nergens landt mag nooit als succes terugkomen; de overige velden (bv. `fire_end_strategy`) worden wél opgeslagen, alleen het anker niet. DE HALVE-JAREN-RESOLUTIE (B6): een stopleeftijd van 58,3 wordt in de PARSER naar de dichtstbijzijnde halve jaar afgerond (58,5) — de PUT-ROUTE wijst diezelfde 58,3 daarentegen met 400 af (geen halve stap), want daar is het een expliciete gebruikerskeuze die niet stil mag verschuiven; de twee lagen hebben bewust een verschillend antwoord op dezelfde ruwe waarde (parser = tolerant lezen van reeds bestaande rijen, route = streng bij een nieuwe schrijfactie). De route-invarianten (409/400) zijn bewezen door de dedicated suite `app/api/fire-settings/route.stop-anker.test.ts` — niet herhaald als kruis-checks.ts-fixture (NextRequest/server-mocks zijn niet client-veilig); het engine-check hier dekt uitsluitend de pure parser-tegenspraak-regel (`lib/fire-strategy.plan.test.ts`).',
+    assertion: {
+      kind: 'exact',
+      expected:
+        'halverwege=aow; nuStoppenLegacy=now; nieuweKolomLeidtBijEindVorm=aow; halveJarenNietAfgerond=age58.5',
+      source:
+        'lib/fire-strategy.ts#parseFirePlan (D2 tegenspraak-regel + B6 halve-jaren-afronding) — lib/fire-strategy.plan.test.ts. Route-invarianten (409 "stop_anchor_not_supported"; 400 bij niet-halve leeftijd, geen stille afronding) bewezen door app/api/fire-settings/route.stop-anker.test.ts, niet in dit engine-check (server-only).',
+    },
+  },
+  {
     workflow: 'WF-KRUIS-27',
     scenarioId: 'UAT-KRUIS-27',
     titel: "Consistentie: hetzelfde FIRE-doel identiek gedeflateerd op /toekomst-hero, /overzicht-widget en mini-chart-label",
@@ -440,8 +459,10 @@ export const KRUIS_ACCEPTANCE: AcceptanceSet = {
 
 /**
  * De KRUIS-scenario-nummers die een acceptatiecriterium HOREN te hebben — de
- * catalogus dekt UAT-KRUIS-01..27 (25 = AI-tier-gate; 26 = nieuwe volledige
+ * catalogus dekt UAT-KRUIS-01..28 (25 = AI-tier-gate; 26 = nieuwe volledige
  * gebruikersreis, catalog `wf: null`, hier als synthetisch WF-KRUIS-26; 27 =
- * euro-weergave-consistentie, wave 2/3). Gebruikt door de dekkings-meta-test.
+ * euro-weergave-consistentie, wave 2/3; 28 = stop-anker-tegenspraak-regel + de
+ * eerlijke-409-invariant, ADR 0129 fase F1 — engine-only, nog geen live UI-pad).
+ * Gebruikt door de dekkings-meta-test.
  */
-export const KRUIS_EXPECTED_WORKFLOW_NUMBERS: number[] = Array.from({ length: 27 }, (_, i) => i + 1)
+export const KRUIS_EXPECTED_WORKFLOW_NUMBERS: number[] = Array.from({ length: 28 }, (_, i) => i + 1)

@@ -18,6 +18,8 @@
  *   - WF-KRUIS-09 grondslag   → `getFireEligibleNetWorth`
  *   - WF-KRUIS-14 SWR         → `computeEffectiveSwr`
  *   - WF-KRUIS-20 dagtarief   → `dailyExpenseRate` + `calculateFreedomTime`
+ *   - WF-KRUIS-28 stop-anker  → `parseFirePlan` (ADR 0129 D2, F1 — engine-only,
+ *     nog geen UI-oppervlak; zie het criterium voor de kanttekening)
  *
  * Deze checks gebruiken bewust VASTE fixture-getallen i.p.v. persona-brondata:
  * de KRUIS-consistentie is een algebraïsche identiteit (delta = 0 of delta = het
@@ -35,6 +37,7 @@ import { computeFreedomProgress } from '@/lib/core-metrics'
 import { getFireEligibleNetWorth, type HousingContext } from '@/lib/housing-strategy'
 import { computeEffectiveSwr } from '@/lib/fire-params'
 import { dailyExpenseRate, calculateFreedomTime } from '@/lib/format'
+import { parseFirePlan } from '@/lib/fire-strategy'
 import { KRUIS_ACCEPTANCE } from './kruis'
 import type { AcceptanceCriterion } from './types'
 
@@ -182,6 +185,42 @@ export const KRUIS_ENGINE_CHECKS: KruisEngineCheck[] = [
           (dagenOudeNoemer === dagenCanoniek
             ? ''
             : ` (contrast: maand÷30 gaf ${dagenOudeNoemer} i.p.v. ${dagenCanoniek})`),
+      }
+    },
+  },
+  {
+    workflow: 'WF-KRUIS-28',
+    scenarioId: 'UAT-KRUIS-28',
+    label: 'Stop-anker-tegenspraak-regel (parseFirePlan, ADR 0129 D2): de oude kolom wint',
+    run: () => {
+      criterion('WF-KRUIS-28')
+      // De gevaarlijkste rij die tijdens de F1-backfill kan bestaan: de oude kolom
+      // draagt nog een anker ('pensioen'/'nu-stoppen'), de nieuwe kolom staat al op
+      // de default 'solved' (nog niet gebackfilld). Zou de nieuwe kolom winnen, dan
+      // wisselt een AOW-plan halverwege de migratie stil naar een gesolvede bisectie.
+      const halverwege = parseFirePlan({
+        fire_end_strategy: 'pensioen',
+        fire_stop_anchor: 'solved',
+        fire_end_age: 100,
+      }).anchor.kind
+      const nuStoppenLegacy = parseFirePlan({
+        fire_end_strategy: 'nu-stoppen',
+        fire_stop_anchor: 'solved',
+      }).anchor.kind
+      const nieuweKolomLeidtBijEindVorm = parseFirePlan({
+        fire_end_strategy: 'legacy',
+        fire_stop_anchor: 'aow',
+      }).anchor.kind
+      const halveJarenNietAfgerond = parseFirePlan({
+        fire_stop_anchor: 'age',
+        fire_stop_age: 58.3,
+      }).anchor
+      return {
+        expected: 'halverwege=aow; nuStoppenLegacy=now; nieuweKolomLeidtBijEindVorm=aow; halveJarenNietAfgerond=age58.5',
+        actual:
+          `halverwege=${halverwege}; nuStoppenLegacy=${nuStoppenLegacy}; ` +
+          `nieuweKolomLeidtBijEindVorm=${nieuweKolomLeidtBijEindVorm}; ` +
+          `halveJarenNietAfgerond=${halveJarenNietAfgerond.kind === 'age' ? `age${halveJarenNietAfgerond.age}` : halveJarenNietAfgerond.kind}`,
       }
     },
   },

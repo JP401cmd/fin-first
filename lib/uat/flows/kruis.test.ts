@@ -47,16 +47,16 @@ describe('KRUIS_FLOW — curatie-integriteit', () => {
     }
   })
 
-  it('dekt alle 27 statusdragende UAT-KRUIS-scenario\'s (01..27) als flow-knoop', () => {
+  it('dekt alle 28 statusdragende UAT-KRUIS-scenario\'s (01..28) als flow-knoop', () => {
     const covered = new Set(
       KRUIS_FLOW.nodes.map((n) => n.scenarioId).filter((id): id is string => Boolean(id)),
     )
-    const expected = Array.from({ length: 27 }, (_, i) => `UAT-KRUIS-${String(i + 1).padStart(2, '0')}`)
+    const expected = Array.from({ length: 28 }, (_, i) => `UAT-KRUIS-${String(i + 1).padStart(2, '0')}`)
     for (const id of expected) {
       expect(covered.has(id), `${id} moet als flow-knoop voorkomen`).toBe(true)
     }
-    // Precies deze 27, geen dubbele scenario-knopen.
-    expect(covered.size).toBe(27)
+    // Precies deze 28, geen dubbele scenario-knopen.
+    expect(covered.size).toBe(28)
   })
 
   it('bevat cross-knopen naar de belangrijkste kruisZones', () => {

@@ -137,6 +137,15 @@ export const CANONICAL_REGISTRY: CanonicalEntry[] = [
     id: 'vrijheids-pct',
     nr: 3,
     label: 'Vrijheids-% (voortgang naar vrijheid)',
+    // ADR 0129 (B3/D8, F1 vandaag — de strategie-clausule geldt VANAF F3a, niet nu):
+    // de teller-noemer-formule hieronder is de grondslag onder `solved` (geen vast
+    // stopmoment). Zodra `isFixedAnchor(plan)` waar is (anker aow/now/age) neemt F3a
+    // de DEKKING onder dat anker over als vrijheids-% (`computeRunwayCoveragePct`,
+    // D5 — tijdsdekking i.p.v. kapitaalratio); `isFinanciallyFree` wordt dan de gate
+    // "anker bereikt ∧ dekking ≥ 100", niet dekking/kapitaalratio alleen. Vandaag (F1,
+    // gedragsbehoudend) rekent de app nog per de oude `fire_end_strategy`-enum en is
+    // dit register-getal voor `pensioen`/`nu-stoppen` nog een kapitaalratio via
+    // dezelfde formule — de fixture hieronder blijft tot F3a byte-identiek.
     sourceFn: 'computeFreedomProgress',
     sourceFiles: ['lib/core-metrics.ts'],
     consumers: [
@@ -149,7 +158,13 @@ export const CANONICAL_REGISTRY: CanonicalEntry[] = [
       '/api/report',
     ],
     toetsbaar: 'exact',
-    exactFixture: '{300000,500000}=60; {600000,500000}=100 (cap); {-5000,500000}=0; {…,null}=0',
+    exactFixture: '{300000,500000}=60; {600000,500000}=100 (cap); {-5000,500000}=0; {…,null}=0 (grondslag onder `solved`; F1 vandaag ongewijzigd)',
+    expectedDifferences: [
+      {
+        label: 'strategie-clausule (ADR 0129 B3/D8) — pas VANAF F3a, nog niet gebouwd',
+        reason: 'Onder `solved` blijft dit register-getal de kapitaalratio (FIRE-eligible ÷ benodigde portfolio, deze fixture). Onder élk vast anker (`aow`/`now`/`age`, `isFixedAnchor(plan)`) neemt F3a de DEKKING over (`computeRunwayCoveragePct`, D5) en wordt `isFinanciallyFree` de gate "anker bereikt ∧ dekking ≥ 100" — niet alleen dekking of alleen kapitaalratio. F1 (dit is de huidige fase) is gedragsbehoudend: er is nog geen consument die op `plan.anchor` splitst, dus dit is nog geen bug, alleen een aangekondigd verschil.',
+      },
+    ],
     kruisWorkflow: 'WF-KRUIS-08',
     canonWorkflow: 'WF-CANON-03',
   },

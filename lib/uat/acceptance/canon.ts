@@ -69,7 +69,7 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'compleet',
     given: 'Vaste teller/noemer (FIRE-eligible vermogen, benodigde portfolio) — géén persona-seed; de bron is de formule + clamp.',
     when: 'De gebruiker vergelijkt het vrijheids-% op hero, vrijheidsvoortgang-/mijlpalen-widgets, Jouw Pad, deel-kaart en /api/report.',
-    then: 'Overal hetzelfde percentage uit `computeFreedomProgress`. EXACT: 300.000/500.000 → 60; ≥ doel → 100 (cap); negatief vermogen → 0; geen doel (null) → 0. Teller = FIRE-eligible (nr 4), nooit stiekem het volle vermogen (ADR 0009).',
+    then: 'Overal hetzelfde percentage uit `computeFreedomProgress`. EXACT: 300.000/500.000 → 60; ≥ doel → 100 (cap); negatief vermogen → 0; geen doel (null) → 0. Teller = FIRE-eligible (nr 4), nooit stiekem het volle vermogen (ADR 0009). STRATEGIE-CLAUSULE (ADR 0129 B3/D8) — nog NIET gebouwd, geldt vanaf F3a: deze kapitaalratio blijft de grondslag onder `solved` (geen vast stopmoment). Onder élk vast anker (`aow`/`now`/`age` — `isFixedAnchor(plan)`) neemt F3a de DEKKING over (`computeRunwayCoveragePct`, tijdsdekking i.p.v. kapitaalratio, D5) en wordt `isFinanciallyFree` de gate "anker bereikt ∧ dekking ≥ 100" — geen los cijfer meer. Vandaag (F1, gedragsbehoudend) rekent elke consument nog met deze ene formule voor alle vijf `fire_end_strategy`-waarden; dat is geen bug, F1 verandert bewust niets aan gedrag.',
     assertion: {
       kind: 'exact',
       expected: 'pct60=60; cap100=100; negatief=0; geenDoel=0',

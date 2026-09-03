@@ -57,6 +57,7 @@ export const KRUIS_FLOW: UatFlow = {
     { id: 'k18', scenarioId: 'UAT-KRUIS-18', label: 'WF-KRUIS-18 · Status-semantiek: sidebar==kaart==banner==box', kind: 'screen', stage: 2, lane: 'consistentie' },
     { id: 'k20', scenarioId: 'UAT-KRUIS-20', label: 'WF-KRUIS-20 · Vrijheidstijd: één dagtarief overal', kind: 'screen', stage: 2, lane: 'consistentie' },
     { id: 'k27', scenarioId: 'UAT-KRUIS-27', label: 'WF-KRUIS-27 · Euro-weergave: FIRE-doel identiek gedeflateerd', kind: 'screen', stage: 2, lane: 'consistentie' },
+    { id: 'k28', scenarioId: 'UAT-KRUIS-28', label: 'WF-KRUIS-28 · Stop-anker: tegenspraak-regel + eerlijke 409 (ADR 0129 F1, engine-only)', kind: 'screen', stage: 2, lane: 'consistentie' },
     { id: 'x-belast', label: 'Belasting (Box 1/2/3)', kind: 'cross', stage: 2, lane: 'consistentie', crossZone: 'BELAST' },
     { id: 'x-toek', label: 'Toekomst & tijdas', kind: 'cross', stage: 2, lane: 'consistentie', crossZone: 'TOEK' },
 
@@ -102,6 +103,7 @@ export const KRUIS_FLOW: UatFlow = {
     { from: 'ssot', to: 'k20' },
     { from: 'ssot', to: 'k18' },
     { from: 'ssot', to: 'k27' },
+    { from: 'ssot', to: 'k28' },
 
     // mutaties ← hun bron-domein (cross)
     { from: 'x-bezit', to: 'k02', kind: 'cross' },
@@ -133,6 +135,7 @@ export const KRUIS_FLOW: UatFlow = {
     { from: 'k27', to: 'x-toek', kind: 'cross' },
     { from: 'k27', to: 'x-ovz', kind: 'cross' },
     { from: 'k27', to: 'x-nav', kind: 'cross' },
+    { from: 'k28', to: 'x-toek', kind: 'cross' },
 
     // consistentie-toetsen → oppervlakken/doorwerking
     { from: 'k01', to: 'k22' },
@@ -177,5 +180,6 @@ export const KRUIS_FLOW: UatFlow = {
     { from: 'k25', to: 'consistent' },
     { from: 'k26', to: 'consistent' },
     { from: 'k27', to: 'consistent' },
+    { from: 'k28', to: 'consistent' },
   ],
 }
