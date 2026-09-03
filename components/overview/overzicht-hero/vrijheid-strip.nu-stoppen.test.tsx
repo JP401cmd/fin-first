@@ -24,7 +24,10 @@ describe('VrijheidStrip — eindstrategie Nu stoppen', () => {
         nuStoppenReach={{ kind: 'gedekt', endAge: 90 }}
       />,
     )
-    expect(screen.getByText(/reikt je vermogen tot je 90e/i)).toBeTruthy()
+    // 'liquide' is hier geen stijl maar de grondslag: de runway rekent op
+    // Prognose!J (netto vermogen MINUS niet-liquide bezit), terwijl op datzelfde
+    // scherm het netto vermogen mét woning staat. Laat het woord staan.
+    expect(screen.getByText(/reikt je liquide vermogen tot je 90e/i)).toBeTruthy()
     expect(screen.queryByText(/Je bent vrij/i)).toBeNull()
   })
 
@@ -40,7 +43,7 @@ describe('VrijheidStrip — eindstrategie Nu stoppen', () => {
         nuStoppenReach={{ kind: 'reikt-tot', age: 57.5, endAge: 90 }}
       />,
     )
-    expect(screen.getByText(/reikt je vermogen tot je 58e/i)).toBeTruthy()
+    expect(screen.getByText(/reikt je liquide vermogen tot je 58e/i)).toBeTruthy()
     expect(screen.queryByText('38%')).toBeNull()
     expect(screen.queryByText(/op weg naar het moment/i)).toBeNull()
   })

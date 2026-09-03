@@ -1,8 +1,23 @@
 // lib/horizon/nu-stoppen-copy.ts
 //
 // ÉÉN bron voor het antwoord dat de eindstrategie 'Nu stoppen' (ADR 0127) op
-// elk oppervlak geeft: *tot welke leeftijd reikt je vermogen als je vandaag
-// stopt?* — plus de woorden eromheen.
+// elk oppervlak geeft: *tot welke leeftijd reikt je LIQUIDE vermogen als je
+// vandaag stopt?* — plus de woorden eromheen.
+//
+// "LIQUIDE" IS GEEN VERSIERING, HET IS DE GRONDSLAG. De runway leest
+// `Prognose!J` = `nettoVermogen − (niet-liquide bezit − niet-liquide leningen)`:
+// je eigen woning zit er niet in (en de hypotheek die eraan hangt evenmin),
+// tenzij je woonstrategie hem liquide maakt — verkopen of opeethypotheek. Dat
+// is de juiste grondslag, want van een woning kun je je boodschappen niet
+// betalen. Maar op /overzicht staat het netto vermogen ERBOVEN, mét woning, en
+// dat verschil kan een veelvoud zijn. Een zin die daar "je vermogen" zegt laat
+// de lezer twee ongelijke grootheden op elkaar leggen — precies wat CLAUDE.md
+// verbiedt voor netto vermogen versus de liquide portefeuille. Vandaar dat élke
+// zin hier het woord draagt; schrijf het niet weg om de tekst te "verkorten".
+//
+// De term is `liquide vermogen` omdat de app die al ~90× gebruikt. Niet
+// "vrij besteedbaar": dat is hier bezet voor het deel van je INKOMEN dat
+// overblijft na vaste lasten en sparen — een ander begrip.
 //
 // WAAROM EEN EIGEN MODULE. Onder deze strategie is de kernel-`fireAge` per
 // constructie de STARTleeftijd (D1): elk oppervlak dat "vrijheidsleeftijd 47"
@@ -161,18 +176,18 @@ export function nuStoppenZin(reach: NuStoppenReach): string {
   switch (reach.kind) {
     case 'gedekt':
       return reach.endAge != null
-        ? `Als je nu stopt, reikt je vermogen tot je ${heroFireAgeYear(reach.endAge)}e — het einde van je plan.`
-        : 'Als je nu stopt, reikt je vermogen tot het einde van je plan.'
+        ? `Als je nu stopt, reikt je liquide vermogen tot je ${heroFireAgeYear(reach.endAge)}e — het einde van je plan.`
+        : 'Als je nu stopt, reikt je liquide vermogen tot het einde van je plan.'
     case 'reikt-tot': {
       const jaar = heroFireAgeYear(reach.age)
       return reach.endAge != null
-        ? `Als je nu stopt, reikt je vermogen tot je ${jaar}e. Je plan loopt tot je ${heroFireAgeYear(reach.endAge)}e.`
-        : `Als je nu stopt, reikt je vermogen tot je ${jaar}e.`
+        ? `Als je nu stopt, reikt je liquide vermogen tot je ${jaar}e. Je plan loopt tot je ${heroFireAgeYear(reach.endAge)}e.`
+        : `Als je nu stopt, reikt je liquide vermogen tot je ${jaar}e.`
     }
     case 'nu-op':
-      return 'Als je nu stopt, dekt je vermogen je uitgaven vanaf vandaag niet.'
+      return 'Als je nu stopt, dekt je liquide vermogen je uitgaven vanaf vandaag niet.'
     case 'onbekend':
-      return 'We kunnen nog niet bepalen tot welke leeftijd je vermogen reikt.'
+      return 'We kunnen nog niet bepalen tot welke leeftijd je liquide vermogen reikt.'
   }
 }
 
@@ -184,14 +199,14 @@ export function nuStoppenZinKort(reach: NuStoppenReach): string {
   switch (reach.kind) {
     case 'gedekt':
       return reach.endAge != null
-        ? `je vermogen reikt tot je ${heroFireAgeYear(reach.endAge)}e`
-        : 'je vermogen reikt tot het einde van je plan'
+        ? `je liquide vermogen reikt tot je ${heroFireAgeYear(reach.endAge)}e`
+        : 'je liquide vermogen reikt tot het einde van je plan'
     case 'reikt-tot':
-      return `je vermogen reikt tot je ${heroFireAgeYear(reach.age)}e`
+      return `je liquide vermogen reikt tot je ${heroFireAgeYear(reach.age)}e`
     case 'nu-op':
-      return 'je vermogen dekt je uitgaven vanaf vandaag niet'
+      return 'je liquide vermogen dekt je uitgaven vanaf vandaag niet'
     case 'onbekend':
-      return 'we kunnen nog niet bepalen tot welke leeftijd je vermogen reikt'
+      return 'we kunnen nog niet bepalen tot welke leeftijd je liquide vermogen reikt'
   }
 }
 
@@ -204,13 +219,13 @@ export function nuStoppenGrafiekZin(reach: NuStoppenReach): string {
   switch (reach.kind) {
     case 'gedekt':
       return reach.endAge != null
-        ? `Je werkt in dit beeld niet meer: je onttrekt vanaf vandaag, en je vermogen reikt tot je ${heroFireAgeYear(reach.endAge)}e — het einde van je plan.`
-        : 'Je werkt in dit beeld niet meer: je onttrekt vanaf vandaag, en je vermogen reikt tot het einde van je plan.'
+        ? `Je werkt in dit beeld niet meer: je onttrekt vanaf vandaag, en je liquide vermogen reikt tot je ${heroFireAgeYear(reach.endAge)}e — het einde van je plan.`
+        : 'Je werkt in dit beeld niet meer: je onttrekt vanaf vandaag, en je liquide vermogen reikt tot het einde van je plan.'
     case 'reikt-tot':
-      return `Je werkt in dit beeld niet meer: je onttrekt vanaf vandaag, en je vermogen reikt tot je ${heroFireAgeYear(reach.age)}e.`
+      return `Je werkt in dit beeld niet meer: je onttrekt vanaf vandaag, en je liquide vermogen reikt tot je ${heroFireAgeYear(reach.age)}e.`
     case 'nu-op':
-      return 'Je werkt in dit beeld niet meer: je onttrekt vanaf vandaag, en je vermogen dekt die uitgaven niet.'
+      return 'Je werkt in dit beeld niet meer: je onttrekt vanaf vandaag, en je liquide vermogen dekt die uitgaven niet.'
     case 'onbekend':
-      return 'Je werkt in dit beeld niet meer: je onttrekt vanaf vandaag. Tot welke leeftijd je vermogen reikt kunnen we nog niet bepalen.'
+      return 'Je werkt in dit beeld niet meer: je onttrekt vanaf vandaag. Tot welke leeftijd je liquide vermogen reikt kunnen we nog niet bepalen.'
   }
 }

@@ -159,6 +159,18 @@ describe('toon — de harde randvoorwaarden van het besluit', () => {
         expect(zin).not.toMatch(/oneindig|eeuwig|voorgoed|voor altijd/i)
         // Geen AOW: dit tekort kan ook ná de AOW vallen (D2).
         expect(zin).not.toMatch(/\bAOW\b/i)
+
+        // GRONDSLAG IN DE ZIN. De runway rekent op Prognose!J — netto vermogen
+        // MINUS niet-liquide bezit, dus zonder je eigen woning tenzij je
+        // woonstrategie hem liquide maakt. Op /overzicht staat het netto
+        // vermogen mét woning er direct boven, en dat verschil kan een veelvoud
+        // zijn. Noemt een zin "je vermogen" zonder "liquide", dan legt de lezer
+        // twee ongelijke grootheden op elkaar — precies wat CLAUDE.md verbiedt
+        // voor netto vermogen versus de liquide portefeuille. Een latere
+        // "verkorting" van de copy mag dat woord dus niet wegnemen.
+        if (/vermogen/i.test(zin)) {
+          expect(zin, `grondslag ontbreekt: "${zin}"`).toMatch(/liquide vermogen/i)
+        }
       }
     },
   )
