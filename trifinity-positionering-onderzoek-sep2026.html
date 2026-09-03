@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Waar zij ophouden</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* ============ tokens: volledige lichte set op bare :root ============ */
+:root{
+  color-scheme: light;
+  --ground:#f1f3f1;
+  --paper:#ffffff;
+  --paper-2:#f7f9f8;
+  --ink:#14181a;
+  --ink-2:#454e52;
+  --ink-3:#6f797e;
+  --ink-4:#98a2a7;
+  --line:#dfe4e3;
+  --line-2:#c9d1cf;
+  --accent:#0f5f5a;
+  --accent-2:#e6f0ee;
+  --accent-ink:#0c4a46;
+
+  --houdt:#0a7d18;
+  --deels:#9a6410;
+  --valt:#b3302c;
+  --houdt-bg:#e8f5e9;
+  --deels-bg:#fdf3e2;
+  --valt-bg:#fbeceb;
+
+  /* dataviz: ordinale blauwe ramp (ja → nee) + series */
+  --o-ja:#184f95;
+  --o-deels:#3987e5;
+  --o-nee:#86b6ef;
+  --o-onb:#b6bdc0;
+  --s1:#2a78d6;
+  --s1-mut:#b7d3f6;
+  --grid:#e4e8e7;
+
+  --shadow:0 1px 2px rgba(12,26,24,.05), 0 2px 10px rgba(12,26,24,.05);
+  --r:10px;
+  --maxw:70ch;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --ground:#101413;
+    --paper:#181d1c;
+    --paper-2:#1e2423;
+    --ink:#f0f3f2;
+    --ink-2:#c2cac8;
+    --ink-3:#98a3a0;
+    --ink-4:#75807d;
+    --line:#2b3332;
+    --line-2:#3b4544;
+    --accent:#5fb8b0;
+    --accent-2:#16302e;
+    --accent-ink:#8fd3cc;
+
+    --houdt:#4cc45c;
+    --deels:#e0a542;
+    --valt:#f0736d;
+    --houdt-bg:#132a17;
+    --deels-bg:#2c2213;
+    --valt-bg:#2e1715;
+
+    --o-ja:#9ec5f4;
+    --o-deels:#3987e5;
+    --o-nee:#184f95;
+    --o-onb:#4a5457;
+    --s1:#3987e5;
+    --s1-mut:#22405f;
+    --grid:#2a3231;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 2px 12px rgba(0,0,0,.25);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --ground:#101413;
+  --paper:#181d1c;
+  --paper-2:#1e2423;
+  --ink:#f0f3f2;
+  --ink-2:#c2cac8;
+  --ink-3:#98a3a0;
+  --ink-4:#75807d;
+  --line:#2b3332;
+  --line-2:#3b4544;
+  --accent:#5fb8b0;
+  --accent-2:#16302e;
+  --accent-ink:#8fd3cc;
+
+  --houdt:#4cc45c;
+  --deels:#e0a542;
+  --valt:#f0736d;
+  --houdt-bg:#132a17;
+  --deels-bg:#2c2213;
+  --valt-bg:#2e1715;
+
+  --o-ja:#9ec5f4;
+  --o-deels:#3987e5;
+  --o-nee:#184f95;
+  --o-onb:#4a5457;
+  --s1:#3987e5;
+  --s1-mut:#22405f;
+  --grid:#2a3231;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 2px 12px rgba(0,0,0,.25);
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--ground);
+  color:var(--ink);
+  font-family:"Source Serif 4", Georgia, "Times New Roman", serif;
+  font-size:17px;
+  line-height:1.62;
+  font-optical-sizing:auto;
+}
+h1,h2,h3,h4,.mono,.eyebrow,th,.num{font-family:"Archivo","Helvetica Neue",Arial,sans-serif}
+.mono,.eyebrow,.tag,.st span,.cnt,.axis,.leg,.src{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+
+.wrap{max-width:1140px;margin:0 auto;padding:0 24px}
+.col{max-width:var(--maxw);margin-left:auto;margin-right:auto}
+p{margin:0 0 1.05em}
+a{color:var(--accent-ink);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:.06em}
+a:hover{text-decoration-thickness:.14em}
+:focus-visible{outline:2.5px solid var(--accent);outline-offset:2px;border-radius:3px}
+strong{font-weight:600}
+.tabnum{font-variant-numeric:tabular-nums}
+
+/* ---------------- kop ---------------- */
+header.top{background:var(--paper);border-bottom:1px solid var(--line)}
+header.top .wrap{padding-top:52px;padding-bottom:44px}
+.dateline{display:flex;flex-wrap:wrap;gap:10px 20px;align-items:baseline;
+  font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink-3);margin-bottom:26px}
+.dateline .mark{color:var(--accent);font-weight:600}
+h1{font-size:clamp(2.1rem,5.4vw,3.35rem);line-height:1.04;letter-spacing:-.025em;
+  font-weight:800;margin:0 0 .45em;text-wrap:balance;max-width:17ch}
+.standfirst{font-size:clamp(1.05rem,2.1vw,1.24rem);line-height:1.5;color:var(--ink-2);
+  max-width:62ch;margin:0}
+.meta{display:grid;gap:18px;margin-top:34px;padding-top:26px;border-top:1px solid var(--line);
+  grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.meta div{font-size:.9rem;line-height:1.5;color:var(--ink-2)}
+.meta dt{font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.11em;
+  text-transform:uppercase;color:var(--ink-3);margin-bottom:5px}
+
+/* ---------------- secties ---------------- */
+section{padding:56px 0 12px}
+section + section{border-top:1px solid var(--line)}
+.eyebrow{display:block;font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--accent);font-weight:600;margin-bottom:12px}
+.eyebrow .n{color:var(--ink-4);margin-right:.65em}
+h2{font-size:clamp(1.5rem,3.2vw,2.05rem);line-height:1.12;letter-spacing:-.02em;
+  font-weight:700;margin:0 0 .5em;text-wrap:balance;max-width:24ch}
+h3{font-size:1.14rem;line-height:1.28;font-weight:700;letter-spacing:-.01em;margin:2em 0 .55em}
+h4{font-size:.95rem;font-weight:600;margin:1.5em 0 .4em}
+.lede{font-size:1.1rem;color:var(--ink-2);max-width:62ch}
+
+/* ---------------- oordeelkaarten ---------------- */
+.verdicts{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));margin:30px 0 8px}
+.v{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);
+  padding:20px 20px 18px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:10px}
+.v .hd{display:flex;align-items:center;gap:10px}
+.v .code{font-family:"IBM Plex Mono",monospace;font-size:.74rem;font-weight:600;
+  letter-spacing:.08em;color:var(--ink-3)}
+.v .state{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:.68rem;font-weight:600;
+  letter-spacing:.1em;text-transform:uppercase;padding:3px 9px;border-radius:999px;border:1px solid}
+.v.is-deels .state{color:var(--deels);background:var(--deels-bg);border-color:color-mix(in srgb,var(--deels) 35%,transparent)}
+.v.is-valt .state{color:var(--valt);background:var(--valt-bg);border-color:color-mix(in srgb,var(--valt) 35%,transparent)}
+.v.is-houdt .state{color:var(--houdt);background:var(--houdt-bg);border-color:color-mix(in srgb,var(--houdt) 35%,transparent)}
+.v .claim{font-weight:600;font-size:1.02rem;line-height:1.32;margin:0}
+.v .body{font-size:.92rem;color:var(--ink-2);line-height:1.5;margin:0}
+.v .foot{margin-top:auto;padding-top:10px;border-top:1px dashed var(--line-2);
+  font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--ink-3);line-height:1.45}
+
+/* ---------------- highlight blok ---------------- */
+.pull{background:var(--accent-2);border-left:3px solid var(--accent);
+  padding:22px 24px;border-radius:0 var(--r) var(--r) 0;margin:30px 0}
+.pull p{margin:0;font-size:1.1rem;line-height:1.45;color:var(--ink)}
+.pull p + p{margin-top:.7em;font-size:.94rem;color:var(--ink-2)}
+
+.zin{background:var(--paper);border:2px solid var(--accent);border-radius:var(--r);
+  padding:26px 26px 22px;margin:26px 0}
+.zin .lbl{font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--accent);font-weight:600;display:block;margin-bottom:12px}
+.zin q{font-size:clamp(1.12rem,2.3vw,1.32rem);line-height:1.42;font-weight:400;quotes:"“" "”"}
+.zin .after{margin:16px 0 0;font-size:.9rem;color:var(--ink-2)}
+
+/* ---------------- figuren ---------------- */
+figure{margin:34px 0;background:var(--paper);border:1px solid var(--line);
+  border-radius:var(--r);padding:22px 22px 16px;box-shadow:var(--shadow)}
+figure.wide{max-width:none}
+figcaption{font-size:.85rem;color:var(--ink-3);line-height:1.5;margin-top:14px;
+  padding-top:12px;border-top:1px solid var(--line)}
+figcaption b{color:var(--ink-2);font-weight:600}
+.fig-t{font-family:"Archivo",sans-serif;font-weight:700;font-size:1.02rem;margin:0 0 3px}
+.fig-s{font-size:.87rem;color:var(--ink-3);margin:0 0 16px}
+.svgbox{overflow-x:auto}
+svg{display:block;max-width:100%;height:auto}
+svg text{font-family:"IBM Plex Mono",monospace}
+.leg{display:flex;flex-wrap:wrap;gap:8px 18px;margin:14px 0 0;font-size:.74rem;color:var(--ink-2)}
+.leg span{display:inline-flex;align-items:center;gap:6px}
+.leg i{width:11px;height:11px;border-radius:2px;display:inline-block}
+
+/* ---------------- tabellen ---------------- */
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--paper)}
+table{border-collapse:collapse;width:100%;font-size:.86rem}
+caption{text-align:left;font-family:"Archivo",sans-serif;font-weight:700;font-size:1.02rem;
+  padding:0 0 4px}
+thead th{position:sticky;top:0;background:var(--paper-2);z-index:2;
+  font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--ink-3);font-weight:600;text-align:left;padding:11px 12px;border-bottom:1px solid var(--line-2);white-space:nowrap}
+tbody th,tbody td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top;text-align:left}
+tbody th{font-weight:600;font-family:"Source Serif 4",serif;min-width:210px}
+tr.grp th{background:var(--paper-2);font-family:"IBM Plex Mono",monospace;font-size:.68rem;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:600;padding:9px 12px}
+tr.grp .cnt{color:var(--ink-4);margin-left:.5em}
+.nm{display:block}
+.op{display:block;font-family:"Source Serif 4",serif;font-weight:400;font-size:.78rem;
+  color:var(--ink-3);line-height:1.4;margin-top:3px;max-width:46ch}
+.pr{font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--ink-3);max-width:22ch}
+td.st{text-align:center;white-space:nowrap}
+td.st span{display:inline-block;font-size:.64rem;letter-spacing:.06em;text-transform:uppercase;
+  font-weight:600;padding:3px 8px;border-radius:4px;min-width:52px}
+.s-ja span{background:var(--o-ja);color:#fff}
+.s-deels span{background:var(--o-deels);color:#fff}
+.s-nee span{background:var(--o-nee);color:#0d2c52}
+.s-onbekend span{background:var(--o-onb);color:#fff}
+:root[data-theme="dark"] .s-ja span,
+:root[data-theme="dark"] .s-nee span{color:#0d1620}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) .s-ja span,
+  :root:not([data-theme="light"]) .s-nee span{color:#0d1620}
+}
+
+table.data td.n{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
+  text-align:right;white-space:nowrap}
+table.data tbody th{min-width:0}
+table.data tr.hi th,table.data tr.hi td{background:var(--accent-2)}
+
+/* ---------------- lijsten ---------------- */
+ul.clean{margin:1em 0;padding-left:1.15em}
+ul.clean li{margin-bottom:.6em}
+ol.steps{margin:1em 0;padding-left:1.3em}
+ol.steps li{margin-bottom:.75em}
+.tag{display:inline-block;font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;
+  font-weight:600;padding:2px 7px;border-radius:4px;background:var(--paper-2);
+  border:1px solid var(--line-2);color:var(--ink-3);vertical-align:2px;margin-left:.4em}
+.tag.ok{color:var(--houdt);background:var(--houdt-bg);border-color:color-mix(in srgb,var(--houdt) 30%,transparent)}
+.tag.mid{color:var(--deels);background:var(--deels-bg);border-color:color-mix(in srgb,var(--deels) 30%,transparent)}
+.tag.no{color:var(--valt);background:var(--valt-bg);border-color:color-mix(in srgb,var(--valt) 30%,transparent)}
+
+.src{font-size:.76rem;color:var(--ink-3);line-height:1.55}
+.src a{color:var(--ink-3)}
+
+.grid2{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));margin:26px 0}
+.box{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px}
+.box h4{margin-top:0}
+.box p:last-child{margin-bottom:0}
+.box.warn{border-color:color-mix(in srgb,var(--deels) 40%,var(--line))}
+.box.bad{border-color:color-mix(in srgb,var(--valt) 40%,var(--line))}
+
+footer{background:var(--paper);border-top:1px solid var(--line);margin-top:50px;padding:38px 0 60px}
+footer .wrap{font-size:.84rem;color:var(--ink-3);line-height:1.6}
+
+@media (max-width:640px){
+  body{font-size:16px}
+  section{padding:40px 0 10px}
+  header.top .wrap{padding-top:36px;padding-bottom:32px}
+  figure{padding:16px 14px 12px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="dateline">
+      <span class="mark">TriFinity · positioneringsonderzoek</span>
+      <span>3 september 2026</span>
+      <span>deskresearch</span>
+      <span>intern</span>
+    </div>
+    <h1>Waar zij ophouden</h1>
+    <p class="standfirst">De helft van onze vaste positioneringsvondst is achterhaald. Decumulatie doorrekenen is
+      geen onderscheid meer — zes aanbieders doen het, twee ervan gratis en in het Nederlands. De vertaling van geld
+      naar tijd doet nog steeds niemand.</p>
+
+    <dl class="meta">
+      <div>
+        <dt>Vraag</dt>
+        Waar staat TriFinity in september 2026 op markt, doelgroep, concurrenten en USP — en houdt de conclusie
+        van een half jaar geleden nog stand?
+      </div>
+      <div>
+        <dt>Methode</dt>
+        Deep-research-harnas: 152 agents, 34 aanbieders bevraagd, 7 marktsporen, 5 doelgroepsporen, 3 community-sporen,
+        9 eigen claims tegen de codebase geverifieerd. 291 ruwe claims → top-20 adversarieel getoetst met 3
+        onafhankelijke lenzen per claim. 18 aanbieders die decumulatie of tijdvertaling claimden, kregen een
+        aparte scepticus.
+      </div>
+      <div>
+        <dt>Relatie tot eerder werk</dt>
+        Hertoetst de gap-analyse van maart 2026 (30+ apps), de propositiebrainstorm van april 2026 en de
+        marktcijfers uit de pitch van mei 2026. Het functionaliteitenonderzoek van juli 2026 blijft naast dit
+        stuk staan: dat ging over features, dit over positie.
+      </div>
+    </dl>
+  </div>
+</header>
+
+<!-- =================== 1. SAMENVATTING =================== -->
+<section id="samenvatting">
+  <div class="wrap">
+    <span class="eyebrow"><span class="n">01</span>Managementsamenvatting</span>
+    <h2>Drie stellingen, drie keer "deels" — maar niet om dezelfde reden</h2>
+
+    <div class="verdicts">
+      <article class="v is-deels">
+        <div class="hd"><span class="code">H-A</span><span class="state">deels</span></div>
+        <p class="claim">Ruimte voor een Nederlandse FIRE- &amp; pensioen-app</p>
+        <p class="body">De combinatie FIRE + tweede pijler + Box 3 biedt nog altijd niemand integraal aan. Maar de
+          rekenkern is inmiddels gratis te krijgen, en de betalende markt is klein: naar schatting 20.000 tot 40.000
+          huishoudens in de kern.</p>
+        <p class="foot">Valt zodra ProjectionLab AOW en tweede pijler toevoegt. Dat precedent staat in hun eigen
+          changelog: Canada Pension Plan, april 2026.</p>
+      </article>
+
+      <article class="v is-valt">
+        <div class="hd"><span class="code">H-B</span><span class="state">valt op de afbakening</span></div>
+        <p class="claim">Financiële ruimte voor de vermogende 35-45'er</p>
+        <p class="body">De onderbediende groep bestaat, maar de afbakening klopt niet. Huishoudens met een
+          hoofdkostwinner van 35 tot 45 zitten <em>onder</em> de landelijke mediaan. "Vermogend" selecteert niet
+          op deze leeftijd maar ertegen.</p>
+        <p class="foot">"Financiële ruimte" is in Nederland bovendien een leenwoord: kredietaanbieders voeren het als
+          eigen leendoel-categorie.</p>
+      </article>
+
+      <article class="v is-deels">
+        <div class="hd"><span class="code">T</span><span class="state">splitst</span></div>
+        <p class="claim">Niemand rekent decumulatie door; niemand vertaalt naar tijd</p>
+        <p class="body">De eerste helft is gevallen op haar eigen drempel: zes aanbieders rekenen de fase ná stoppen
+          door. De tweede helft staat onaangetast overeind — van 34 aanbieders vertaalt er nul bedragen naar
+          vrijheidstijd.</p>
+        <p class="foot">Dit is de belangrijkste uitkomst van de ronde: de vaste vondst in de competitive-brief-skill
+          is voor de helft verlopen.</p>
+      </article>
+    </div>
+
+    <div class="col">
+      <h3>Wat er sinds maart is veranderd</h3>
+      <ol class="steps">
+        <li><strong>Het thuisvoordeel is smaller geworden.</strong> ProjectionLab onderhoudt een Nederlandse
+          landingspagina met Box 3-presets en rekent decumulatie door. Early Retirement Calc doet Box 3 in
+          beide stelsels — het huidige forfait én het aangekondigde werkelijk rendement — gratis, en is de enige
+          tool die de r/DutchFIRE-wiki als Nederlandse aanrader noemt.</li>
+        <li><strong>De banken schoven op in de breedte, niet in de diepte.</strong> ING zette in augustus 2026
+          voor het eerst bezittingen en verplichtingen op één scherm. Alle zes onderzochte banken houden nog altijd
+          op bij ongeveer een maand vooruit en bij de grens van de eigen bank.</li>
+        <li><strong>De grootste Nederlandse speler loopt weg van planning.</strong> Dyme is na de overname door
+          verzekeraar RISK doorgeschoven naar polisbeheer en verzekeringsadvies.</li>
+        <li><strong>Er kwam een substituut bij dat er in maart niet was.</strong> Algemene AI-assistenten worden
+          nu breed geraadpleegd bij geldvragen.</li>
+      </ol>
+
+      <div class="pull">
+        <p>De vraag is niet meer of wij de fase ná stoppen doorrekenen. Dat doen er nu meer. De vraag is of wij de
+          enige zijn die die fase in <em>tijd</em> uitdrukt, op Nederlandse potten.</p>
+        <p>Op beide punten is het antwoord ja — en op beide punten is dat aanwijsbaar in de code, niet alleen in de copy.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =================== 2. KERNVONDST =================== -->
+<section id="kernvondst">
+  <div class="wrap">
+    <span class="eyebrow"><span class="n">02</span>De kernvondst</span>
+    <h2>De vaste vondst valt uiteen in een verlopen helft en een intacte helft</h2>
+    <p class="lede col">De competitive-brief-skill draagt één vaste vondst: <em>bijna niemand rekent de
+      decumulatiekant door, en bijna niemand vertaalt bedragen naar tijd.</em> De skill schrijft voor dat een
+      vondst die niet meer klopt, zélf de belangrijkste uitkomst van de ronde is. Dat is hier het geval — voor
+      precies de helft.</p>
+
+    <figure class="wide">
+      <p class="fig-t">Dekking over 34 aanbieders</p>
+      <p class="fig-s">Na hertoetsing. Elke aanbieder die decumulatie of tijdvertaling claimde, kreeg een aparte
+        scepticus met opdracht de claim te weerleggen.</p>
+      <div class="svgbox">
+        <svg viewBox="0 0 800 258" role="img" aria-label="Staafdiagram: van 34 aanbieders rekenen er 6 decumulatie volledig door en 13 gedeeltelijk; nul vertalen bedragen volledig naar tijd en 2 gedeeltelijk; 6 dekken de Nederlandse fiscaliteit volledig en 18 gedeeltelijk; 8 lezen tweede-pijlerpensioen volledig mee en 10 gedeeltelijk.">
+          <!-- rijlabels -->
+          <text x="0" y="63" font-size="12.5" fill="var(--ink-2)">Decumulatie</text>
+          <text x="0" y="113" font-size="12.5" fill="var(--ink-2)">Vertaling naar tijd</text>
+          <text x="0" y="163" font-size="12.5" fill="var(--ink-2)">NL-fiscaliteit</text>
+          <text x="0" y="213" font-size="12.5" fill="var(--ink-2)">Tweede pijler</text>
+
+          <!-- rij 1: decumulatie 6 / 13 / 15 -->
+          <rect x="160" y="46" width="107.4" height="26" rx="2" fill="var(--o-ja)"/>
+          <rect x="269.4" y="46" width="235.1" height="26" rx="2" fill="var(--o-deels)"/>
+          <rect x="506.5" y="46" width="271.5" height="26" rx="2" fill="var(--o-nee)"/>
+          <text x="213" y="63.5" font-size="12" font-weight="600" fill="#ffffff" text-anchor="middle">6</text>
+          <text x="387" y="63.5" font-size="12" font-weight="600" fill="#ffffff" text-anchor="middle">13</text>
+          <text x="642" y="63.5" font-size="12" font-weight="600" fill="#0d2c52" text-anchor="middle">15</text>
+
+          <!-- rij 2: tijd 0 / 2 / 32 -->
+          <rect x="160" y="96" width="34.5" height="26" rx="2" fill="var(--o-deels)"/>
+          <rect x="196.5" y="96" width="581.5" height="26" rx="2" fill="var(--o-nee)"/>
+          <text x="177" y="113.5" font-size="12" font-weight="600" fill="#ffffff" text-anchor="middle">2</text>
+          <text x="487" y="113.5" font-size="12" font-weight="600" fill="#0d2c52" text-anchor="middle">32</text>
+
+          <!-- rij 3: fiscaliteit 6 / 18 / 10 -->
+          <rect x="160" y="146" width="107.4" height="26" rx="2" fill="var(--o-ja)"/>
+          <rect x="269.4" y="146" width="326.2" height="26" rx="2" fill="var(--o-deels)"/>
+          <rect x="597.6" y="146" width="180.4" height="26" rx="2" fill="var(--o-nee)"/>
+          <text x="213" y="163.5" font-size="12" font-weight="600" fill="#ffffff" text-anchor="middle">6</text>
+          <text x="432" y="163.5" font-size="12" font-weight="600" fill="#ffffff" text-anchor="middle">18</text>
+          <text x="687" y="163.5" font-size="12" font-weight="600" fill="#0d2c52" text-anchor="middle">10</text>
+
+          <!-- rij 4: 2e pijler 8 / 10 / 15 / 1 -->
+          <rect x="160" y="196" width="143.9" height="26" rx="2" fill="var(--o-ja)"/>
+          <rect x="305.9" y="196" width="180.4" height="26" rx="2" fill="var(--o-deels)"/>
+          <rect x="488.3" y="196" width="271.5" height="26" rx="2" fill="var(--o-nee)"/>
+          <rect x="761.8" y="196" width="16.2" height="26" rx="2" fill="var(--o-onb)"/>
+          <text x="231" y="213.5" font-size="12" font-weight="600" fill="#ffffff" text-anchor="middle">8</text>
+          <text x="396" y="213.5" font-size="12" font-weight="600" fill="#ffffff" text-anchor="middle">10</text>
+          <text x="624" y="213.5" font-size="12" font-weight="600" fill="#0d2c52" text-anchor="middle">15</text>
+
+          <text x="160" y="245" font-size="11" fill="var(--ink-3)">0</text>
+          <text x="778" y="245" font-size="11" fill="var(--ink-3)" text-anchor="end">34 aanbieders</text>
+          <text x="0" y="24" font-size="11" fill="var(--ink-3)">aantal aanbieders</text>
+        </svg>
+      </div>
+      <div class="leg">
+        <span><i style="background:var(--o-ja)"></i>volledig</span>
+        <span><i style="background:var(--o-deels)"></i>gedeeltelijk</span>
+        <span><i style="background:var(--o-nee)"></i>niet</span>
+        <span><i style="background:var(--o-onb)"></i>onbekend</span>
+      </div>
+      <figcaption><b>Lezing.</b> De eerste, derde en vierde rij laten een druk bezet veld zien. De tweede rij is leeg:
+        geen enkele aanbieder drukt bedragen volledig in vrijheidstijd uit. De twee gedeeltelijke gevallen zijn
+        Grassfeld, dat een bufferkaart in maanden toont, en YNAB, met zijn "age of money" in dagen — beide een
+        losse weergave, geen rekeneenheid door de hele app. Alle andere tijd-claims uit de eerste ronde zijn door
+        de sceptici teruggezet naar "niet".</figcaption>
+    </figure>
+
+    <div class="col">
+      <h3>De gevallen helft: decumulatie</h3>
+      <p>Stelling T viel op haar eigen drempel — die lag bij twee aanbieders in het Nederlandse bereik. Het werden er zes.</p>
+    </div>
+
+    <div class="tablewrap" style="margin:22px 0">
+        <table class="data">
+          <thead><tr><th scope="col">Rekent de fase ná stoppen door</th><th scope="col">Bereik</th><th scope="col">Prijs</th><th scope="col">Waar het dun is</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Early Retirement Calc</th><td>NL</td><td class="n">gratis</td><td>Onttrekkingsstrategie kent twee smaken, constant of variabel. Geen AOW als gemodelleerde rekenpost, geen Box 1 over uitkeringen.</td></tr>
+            <tr><th scope="row">MijnGeldzaken</th><td>NL</td><td class="n">v.a. €2,45/mnd</td><td>Geen gedocumenteerde opnamevolgorde van potten.</td></tr>
+            <tr><th scope="row">ProjectionLab</th><td>NL-pagina</td><td class="n">$129/jr</td><td>Box 3 wel, maar geen Nederlandse potten en geen AOW.</td></tr>
+            <tr><th scope="row">Boldin</th><td>VS</td><td class="n">$144/jr</td><td>Amerikaanse potten en fiscaliteit.</td></tr>
+            <tr><th scope="row">Monarch Money</th><td>VS</td><td class="n">$199/jr</td><td>Alleen in Plus; potten zijn IRA en 401k.</td></tr>
+            <tr><th scope="row">Geldnerd FIRE Calculator</th><td>NL</td><td class="n">gratis</td><td>Spreadsheet, door de maker in 2022 fiscaal verouderd verklaard en sindsdien onbeheerd.</td></tr>
+          </tbody>
+        </table>
+    </div>
+
+    <div class="col">
+      <p>Twee daarvan zijn gratis en Nederlands. Dat is het scherpst voor onze positionering: het rekenhart waarop
+        het maart-argument rustte, is geen betaalde functie meer maar een vrij beschikbare voorziening.</p>
+
+      <h3>De intacte helft: tijd</h3>
+      <p>Van de achttien aanbieders die in de eerste ronde iets tijdachtigs leken te doen, hield er na hertoetsing
+        geen enkele stand op "volledig". De sceptici vonden telkens hetzelfde: wat op tijd lijkt, is een
+        <em>leeftijd</em> — "stop op je 58e" — of een <em>horizon</em> — "35 dagen vooruit". Dat is iets anders dan
+        een bedrag omrekenen naar de hoeveelheid leven die het vertegenwoordigt.</p>
+      <p>Boldin, de sterkste decumulatiemotor in het veld, drukt uitkomsten uit in procenten, dollars en leeftijden;
+        de enige tijdmaat is het moment waarop het geld op is. ProjectionLab kent geen euro-naar-tijd-conversie.
+        De Nederlandse pensioenplanners rekenen in maandbedragen. De banken rekenen in dagen tot de volgende
+        salarisbijschrijving.</p>
+    </div>
+  </div>
+</section>
+
+<!-- =================== 3. MARKT =================== -->
+<section id="markt">
+  <div class="wrap">
+    <span class="eyebrow"><span class="n">03</span>Markt</span>
+    <h2>Het vermogen zit tien tot twintig jaar later dan de propositie aanneemt</h2>
+    <p class="lede col">De doelgroepkeuze van april 2026 rust op één getal: 1,2 tot 1,4 miljoen huishoudens van
+      35 tot 45 met een mediaan vermogen van ongeveer € 120.000. Dat getal klopt. De gevolgtrekking niet.</p>
+
+    <figure class="wide">
+      <p class="fig-t">Mediaan vermogen per leeftijdsgroep van de hoofdkostwinner</p>
+      <p class="fig-s">Nederland, 1 januari 2024 (voorlopig). Bedragen in duizenden euro's, inclusief eigen woning.</p>
+      <div class="svgbox">
+        <svg viewBox="0 0 740 320" role="img" aria-label="Staafdiagram van het mediane vermogen per leeftijdsgroep: 25 tot 35 jaar 13.500 euro, 35 tot 45 jaar 120.100 euro, 45 tot 55 jaar 187.400 euro, 55 tot 65 jaar 250.200 euro, 65 tot 75 jaar 276.900 euro. De landelijke mediaan is 135.500 euro.">
+          <!-- gridlijnen -->
+          <line x1="70" y1="250" x2="716" y2="250" stroke="var(--line-2)" stroke-width="1"/>
+          <line x1="70" y1="176.7" x2="716" y2="176.7" stroke="var(--grid)" stroke-width="1"/>
+          <line x1="70" y1="103.3" x2="716" y2="103.3" stroke="var(--grid)" stroke-width="1"/>
+          <line x1="70" y1="30" x2="716" y2="30" stroke="var(--grid)" stroke-width="1"/>
+          <text x="62" y="254" font-size="11" fill="var(--ink-3)" text-anchor="end">0</text>
+          <text x="62" y="181" font-size="11" fill="var(--ink-3)" text-anchor="end">100</text>
+          <text x="62" y="107" font-size="11" fill="var(--ink-3)" text-anchor="end">200</text>
+          <text x="62" y="34" font-size="11" fill="var(--ink-3)" text-anchor="end">300</text>
+
+          <!-- staven -->
+          <rect x="101" y="240.1" width="64" height="9.9" rx="2" fill="var(--s1-mut)"/>
+          <rect x="227" y="161.9" width="64" height="88.1" rx="2" fill="var(--s1)"/>
+          <rect x="353" y="112.6" width="64" height="137.4" rx="2" fill="var(--s1-mut)"/>
+          <rect x="479" y="66.5" width="64" height="183.5" rx="2" fill="var(--s1-mut)"/>
+          <rect x="605" y="46.9" width="64" height="203.1" rx="2" fill="var(--s1-mut)"/>
+
+          <!-- waardelabels -->
+          <text x="133" y="234" font-size="12" font-weight="600" fill="var(--ink-2)" text-anchor="middle">13,5</text>
+          <text x="259" y="182" font-size="12.5" font-weight="700" fill="#ffffff" text-anchor="middle">120,1</text>
+          <text x="385" y="106" font-size="12" font-weight="600" fill="var(--ink-2)" text-anchor="middle">187,4</text>
+          <text x="511" y="60" font-size="12" font-weight="600" fill="var(--ink-2)" text-anchor="middle">250,2</text>
+          <text x="637" y="40" font-size="12" font-weight="600" fill="var(--ink-2)" text-anchor="middle">276,9</text>
+
+          <!-- referentielijn landelijke mediaan -->
+          <line x1="70" y1="150.6" x2="716" y2="150.6" stroke="var(--valt)" stroke-width="1.5"/>
+          <text x="716" y="145" font-size="11" font-weight="600" fill="var(--valt)" text-anchor="end">landelijke mediaan 135,5</text>
+
+          <!-- x-as -->
+          <text x="133" y="271" font-size="11.5" fill="var(--ink-3)" text-anchor="middle">25-35</text>
+          <text x="259" y="271" font-size="11.5" font-weight="600" fill="var(--ink)" text-anchor="middle">35-45</text>
+          <text x="385" y="271" font-size="11.5" fill="var(--ink-3)" text-anchor="middle">45-55</text>
+          <text x="511" y="271" font-size="11.5" fill="var(--ink-3)" text-anchor="middle">55-65</text>
+          <text x="637" y="271" font-size="11.5" fill="var(--ink-3)" text-anchor="middle">65-75</text>
+          <text x="393" y="292" font-size="11" fill="var(--ink-4)" text-anchor="middle">leeftijd hoofdkostwinner</text>
+          <text x="20" y="20" font-size="11" fill="var(--ink-3)">× € 1.000</text>
+        </svg>
+      </div>
+      <figcaption><b>De doelgroep van april zit onder de landelijke mediaan.</b> Huishoudens met een hoofdkostwinner
+        van 35 tot 45 hebben een mediaan vermogen van € 120.100; over alle 8.258.900 Nederlandse huishoudens is dat
+        € 135.500. "Vermogend" selecteert dus niet op deze leeftijdsgroep, maar ertegen. Bron: CBS StatLine 83834NED,
+        rechtstreeks opgehaald via de open-data-API op 3 september 2026; peildatum 1 januari 2024, voorlopige cijfers.</figcaption>
+    </figure>
+
+    <div class="col">
+      <h3>Waarom de mediaan misleidt bij 35 tot 45</h3>
+      <p>Het vermogen van deze groep is grotendeels vastgezet in een huis. Van de 1.296.800 huishoudens bezitten er
+        774.800 een eigen woning met een mediaanwaarde van € 418.400, waar een hypotheekschuld met een mediaan van
+        € 224.200 tegenover staat. Het vrij besteedbare deel is aanzienlijk dunner: de mediaan van bank- en
+        spaartegoeden is € 15.200, en effecten bezit maar 18,7 procent van de groep — 242.500 huishoudens, met een
+        mediaan effectenbezit van € 8.200.</p>
+      <p>Het echte vermogen zit later. Bij 45 tot 55 is de mediaan € 187.400, bij 55 tot 65 € 250.200 en bij 65 tot
+        75 € 276.900. En dat zijn geen kleine groepen: 1,4 miljoen, 1,5 miljoen en 1,2 miljoen huishoudens.</p>
+
+      <div class="grid2">
+        <div class="box">
+          <h4>Wat de pitch-SAM betreft</h4>
+          <p>De aanname van 1,4 miljoen huishoudens van 25 tot 55 met meer dan € 25.000 vermogen is op
+            <em>totaal</em> vermogen eerder te voorzichtig dan te ruim: die drie cohorten tellen samen bijna
+            4 miljoen huishoudens. Op <em>liquide</em> vermogen is ze te ruim. Welke van de twee telt, hangt af van
+            wat de app moet doen — en voor het doorrekenen van de fase ná stoppen telt liquide.</p>
+        </div>
+        <div class="box">
+          <h4>Twee wetten bewegen de markt</h4>
+          <p>Het wetsvoorstel Wet werkelijk rendement box 3 is op 12 februari 2026 door de Tweede Kamer aangenomen;
+            de Eerste Kamer stelde de stemming uit in afwachting van een novelle. Tegelijk zijn per juli 2026
+            42 pensioenfondsen overgestapt naar het nieuwe stelsel, met 1 januari 2028 als uiterste datum. Beide
+            maken de vraag "wat betekent dit voor mij" concreter — en beide maken elke tool die op één stelsel
+            gebouwd is, tijdelijk.</p>
+        </div>
+      </div>
+
+      <div class="box warn" style="margin:24px 0">
+        <h4>Eén marktverwachting is verschoven en moet uit onze planning</h4>
+        <p>Het opnemen van maximaal 10 procent van het ouderdomspensioen ineens is nog niet in werking getreden.
+          De beoogde invoering is verschoven naar 1 januari 2029. Wie daar in een projectie of in copy op vooruitloopt,
+          belooft iets wat er nog niet is. <span class="tag ok">3-0 bevestigd</span></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =================== 4. DOELGROEP =================== -->
+<section id="doelgroep">
+  <div class="wrap">
+    <span class="eyebrow"><span class="n">04</span>Doelgroep</span>
+    <h2>De onderbediende groep bestaat wél — alleen niet zoals hij was afgebakend</h2>
+
+    <div class="grid2">
+      <div class="box bad">
+        <h4>Wat er niet klopt aan H-B</h4>
+        <ul class="clean">
+          <li><strong>De leeftijd selecteert tegen vermogen in.</strong> 35-45 zit onder de landelijke mediaan.</li>
+          <li><strong>Het woord is bezet.</strong> "Financiële ruimte" is in Nederland een leendoel-categorie bij
+            kredietaanbieders. Wie het zonder contrast gebruikt, concurreert met hypotheek-SEO.</li>
+          <li><strong>De taal heeft geen eigen zoekvraag.</strong> "Financiële rust" levert vooral bedrijfsnamen op;
+            "grip" en "overzicht" zijn aanbiederstaal die Dyme en de banken al voeren.</li>
+        </ul>
+      </div>
+      <div class="box">
+        <h4>Wat er wél klopt aan H-B</h4>
+        <ul class="clean">
+          <li><strong>De onderbediende groep is gemeten.</strong> De AFM telt ongeveer 800.000 huishoudens van 35
+            tot 67 die niet beleggen terwijl ze daarvoor wel de middelen hebben. <span class="tag ok">2-1</span></li>
+          <li><strong>De banken vullen het gat niet.</strong> Alle zes onderzochte banken stoppen bij ongeveer een
+            maand vooruit en bij de eigen bank.</li>
+          <li><strong>De Dyme-opvolger evenmin.</strong> Na de overname door RISK ligt de koers op verzekeren,
+            niet op plannen.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="col">
+      <h3>De twee segmenten spreken verschillende talen — en één ervan zoekt actief</h3>
+      <p>De FIRE-kant heeft levende zoektaal. De eerste automatische aanvulling op "hoeveel geld heb ik nodig om"
+        is "om te stoppen met werken". Het jargon bestaat daarnaast: FIRE, FO, SWR, dividendlekkage, TER. De
+        gezinskant heeft die taal niet: in het volledige community-corpus komt "grip" precies één keer voor, en dan
+        nog als onderdeel van "begrip".</p>
+      <p>Maar het label knelt aan beide kanten. De drukst besproken draad van het jaar in de Nederlandse
+        FIRE-gemeenschap heet "Fire voor normale mensen?" en opent met de vaststelling dat veel mensen meelezen maar
+        uit schaamte niet meeschrijven. De best gewaardeerde reactie splitst het begrip: financiële onafhankelijkheid
+        is fantastisch, eerder stoppen is een optie. Waar men het doel zelf omschrijft, valt het jargon weg en
+        verschijnt precies onze taal: vrijheid, keuze, minder werken, zinvoller werk.</p>
+
+      <h3>Hoe groot is de FIRE-kant werkelijk</h3>
+      <p>De Nederlandse FIRE-gemeenschap op Reddit telt 110.025 leden, gemeten op 3 september 2026 — bijna drie keer
+        het getal van 40.000 waar de april-notitie mee rekende. Als schatting van het aantal huishoudens dat
+        daadwerkelijk zelf doorrekent, blijft die orde van 20.000 tot 40.000 wél overeind; de rest leest mee.
+        Op 8,4 miljoen Nederlandse huishoudens is dat een niche, en die niche betaalt weinig: de officiële
+        toolwiki van die gemeenschap noemt twee tools, allebei gratis.</p>
+      <p>Daar staat een breder signaal tegenover dat wél over onze functie gaat. Twaalf procent van de Nederlandse
+        huishoudens noemt "eerder kunnen stoppen met werken" als spaardoel en zeventien procent "na pensionering
+        extra geld hebben" — samen ruwweg een miljoen huishoudens. <span class="tag ok">6-0 bevestigd</span></p>
+
+      <div class="pull">
+        <p>De doelgroep is niet "de vermogende 35-45'er". Het is wie geld heeft staan en de vraag stelt hoe lang
+          dat meegaat — en die vraag wordt gesteld door mensen die tien tot twintig jaar ouder zijn dan de
+          propositie aannam.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =================== 5. CONCURRENTEN =================== -->
+<section id="concurrenten">
+  <div class="wrap">
+    <span class="eyebrow"><span class="n">05</span>Concurrenten</span>
+    <h2>Vierendertig aanbieders, en waar elk van hen ophoudt</h2>
+    <p class="lede col">Per aanbieder is gevraagd wat hij belooft in zijn eigen kopregel, voor wie hij zegt het te
+      doen, wat hij bewust niet doet, en waarheen hij de gebruiker doorverwijst. Dat laatste is telkens de rand van
+      zijn model.</p>
+
+    <figure class="wide">
+      <div class="tablewrap" style="max-height:640px;overflow-y:auto">
+        <table>
+          <caption class="src" style="padding:12px 12px 8px">Dekkingsmatrix, na hertoetsing. Onder elke naam staat waar dat model ophoudt.</caption>
+          <thead>
+            <tr>
+              <th scope="col">Aanbieder</th>
+              <th scope="col">Decu&shy;mulatie</th>
+              <th scope="col">Tijd</th>
+              <th scope="col">NL-fiscaal</th>
+              <th scope="col">2e pijler</th>
+              <th scope="col">Prijs</th>
+            </tr>
+          </thead>
+          <tbody>
+<tr class="grp"><th colspan="6">Bank <span class="cnt">6</span></th></tr>
+<tr><th scope="row"><span class="nm">bunq</span><span class="op">bunq houdt op bij het einde van de maand.</span></th><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="pr">Freemium-abonnementen </td></tr>
+<tr><th scope="row"><span class="nm">SNS / ASN</span><span class="op">ASN/SNS houdt op bij de rand van de betaalrekening en bij een horizon van 30 dagen.</span></th><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-deels"><span>deels</span></td><td class="st s-nee"><span>nee</span></td><td class="pr">Gratis voor rekeninghouders: &quot;Het kost niets extra en </td></tr>
+<tr><th scope="row"><span class="nm">Knab</span><span class="op">Knab houdt op bij de maandgrens en bij de eigen rekening.</span></th><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-deels"><span>deels</span></td><td class="st s-nee"><span>nee</span></td><td class="pr">Inzicht in je geld&quot; is gratis voor klanten met een Kna</td></tr>
+<tr><th scope="row"><span class="nm">Rabobank</span><span class="op">Rabobank houdt op bij &quot;haalbaarheid van doelen binnen het klantschap&quot;, en dat is een andere vraag dan &quot;wanneer ben ik .</span></th><td class="st s-deels"><span>deels</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-ja"><span>ja</span></td><td class="st s-ja"><span>ja</span></td><td class="pr">Gratis binnen het klantschap</td></tr>
+<tr><th scope="row"><span class="nm">ABN AMRO</span><span class="op">ABN AMRO Inzicht is het scherpste bewijs dat de bank de maand bezit en de toekomst uitbesteedt.</span></th><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="pr">Inzicht zelf is gratis: het is een functie ín de ABN A</td></tr>
+<tr><th scope="row"><span class="nm">ING</span><span class="op">ING houdt op bij de rand van de maand en de rand van de bank.</span></th><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-deels"><span>deels</span></td><td class="st s-onbekend"><span>onbekend</span></td><td class="pr">Gratis voor ING-klanten</td></tr>
+<tr class="grp"><th colspan="6">NL geld-app <span class="cnt">6</span></th></tr>
+<tr><th scope="row"><span class="nm">Flow</span><span class="op">Flow houdt op bij de maandgrens.</span></th><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-deels"><span>deels</span></td><td class="st s-nee"><span>nee</span></td><td class="pr">Freemium, drie tiers </td></tr>
+<tr><th scope="row"><span class="nm">Peaks</span><span class="op">Peaks houdt op precies daar waar TriFinity begint.</span></th><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-deels"><span>deels</span></td><td class="st s-nee"><span>nee</span></td><td class="pr">Sinds 2026 één model: vaste kosten € 1,59 per maand </td></tr>
+<tr><th scope="row"><span class="nm">Dyme</span><span class="op">Dyme houdt op bij de maand.</span></th><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="pr">Basisversie gratis</td></tr>
+<tr><th scope="row"><span class="nm">Financieel Fit</span><span class="op">Financieel Fit houdt op waar het gesprek eindigt.</span></th><td class="st s-deels"><span>deels</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-deels"><span>deels</span></td><td class="st s-ja"><span>ja</span></td><td class="pr">Geen abonnement in de app-zin</td></tr>
+<tr><th scope="row"><span class="nm">Grassfeld</span><span class="op">Grassfeld houdt op bij het einde van de maand.</span></th><td class="st s-nee"><span>nee</span></td><td class="st s-deels"><span>deels</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="pr">Abonnement, laag geprijsd</td></tr>
+<tr><th scope="row"><span class="nm">MijnGeldzaken</span><span class="op">MijnGeldzaken houdt op bij het STOPLICHT.</span></th><td class="st s-ja"><span>ja</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-deels"><span>deels</span></td><td class="st s-ja"><span>ja</span></td><td class="pr">Huishoudboekje: Gratis </td></tr>
+<tr class="grp"><th colspan="6">FIRE / pensioen NL <span class="cnt">10</span></th></tr>
+<tr><th scope="row"><span class="nm">Geldnerd FIRE Calculator</span><span class="op">Het model van Geldnerd is inhoudelijk het dichtst bij TriFinity van alles in cluster c: hij is een van de weinigen die.</span></th><td class="st s-ja"><span>ja</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-deels"><span>deels</span></td><td class="st s-deels"><span>deels</span></td><td class="pr">Gratis</td></tr>
+<tr><th scope="row"><span class="nm">Early Retirement Calc</span><span class="op">Hij houdt op bij de portefeuille.</span></th><td class="st s-ja"><span>ja</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-deels"><span>deels</span></td><td class="st s-deels"><span>deels</span></td><td class="pr">Gratis — geen prijs, betaalmuur, abonnement, account, </td></tr>
+<tr><th scope="row"><span class="nm">ABP</span><span class="op">ABP is binnen zijn eigen kader verrassend sterk op precies het punt waar de meeste apps stoppen: het rekent de fase ná.</span></th><td class="st s-deels"><span>deels</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-deels"><span>deels</span></td><td class="st s-ja"><span>ja</span></td><td class="pr">Gratis, maar niet koopbaar: alleen toegankelijk voor A</td></tr>
+<tr><th scope="row"><span class="nm">PFZW</span><span class="op">PFZW's pensioenplanner is binnen zijn eigen grens sterk en juist dáárom een scherpe illustratie van het gat: hij reken.</span></th><td class="st s-deels"><span>deels</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-deels"><span>deels</span></td><td class="st s-ja"><span>ja</span></td><td class="pr">Gratis, maar niet openbaar: alleen toegankelijk voor P</td></tr>
+<tr><th scope="row"><span class="nm">Mijnpensioenoverzicht.nl</span><span class="op">Mijnpensioenoverzicht.</span></th><td class="st s-deels"><span>deels</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-deels"><span>deels</span></td><td class="st s-ja"><span>ja</span></td><td class="pr">Gratis</td></tr>
+<tr><th scope="row"><span class="nm">a.s.r. / Aegon</span><span class="op">a.</span></th><td class="st s-deels"><span>deels</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-ja"><span>ja</span></td><td class="st s-deels"><span>deels</span></td><td class="pr">Rekentools </td></tr>
+<tr><th scope="row"><span class="nm">Brand New Day</span><span class="op">Brand New Day houdt op bij zijn eigen potje.</span></th><td class="st s-deels"><span>deels</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-ja"><span>ja</span></td><td class="st s-ja"><span>ja</span></td><td class="pr">Geen abonnement op inzicht — de verdiensten zitten in </td></tr>
+<tr><th scope="row"><span class="nm">Nibud</span><span class="op">Nibud houdt op bij de maand.</span></th><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-deels"><span>deels</span></td><td class="st s-deels"><span>deels</span></td><td class="pr">Gratis voor consumenten: alle twaalf tools en tests op</td></tr>
+<tr><th scope="row"><span class="nm">Nationale-Nederlanden</span><span class="op">NN houdt op bij de rand van de eigen polisadministratie.</span></th><td class="st s-deels"><span>deels</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-deels"><span>deels</span></td><td class="st s-ja"><span>ja</span></td><td class="pr">De tools zijn gratis </td></tr>
+<tr><th scope="row"><span class="nm">Wijzer in geldzaken</span><span class="op">Wijzer in geldzaken houdt op bij de momentopname en het doorverwijzen.</span></th><td class="st s-deels"><span>deels</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-ja"><span>ja</span></td><td class="st s-deels"><span>deels</span></td><td class="pr">Gratis</td></tr>
+<tr class="grp"><th colspan="6">Vergelijker / advies <span class="cnt">3</span></th></tr>
+<tr><th scope="row"><span class="nm">Finner</span><span class="op">Finner houdt op bij de keuze van een aanbieder.</span></th><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-deels"><span>deels</span></td><td class="st s-deels"><span>deels</span></td><td class="pr">Vergelijken en de eerste kennismaking met een vermogen</td></tr>
+<tr><th scope="row"><span class="nm">Onafhankelijk financieel planner</span><span class="op">Dit model houdt op bij de mens en bij het moment.</span></th><td class="st s-deels"><span>deels</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-ja"><span>ja</span></td><td class="st s-deels"><span>deels</span></td><td class="pr">Geen bedragen gepubliceerd</td></tr>
+<tr><th scope="row"><span class="nm">Independer</span><span class="op">Independer houdt op bij het transactiemoment.</span></th><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-deels"><span>deels</span></td><td class="st s-nee"><span>nee</span></td><td class="pr">Vergelijken en afsluiten: gratis voor de gebruiker, pr</td></tr>
+<tr class="grp"><th colspan="6">Internationaal <span class="cnt">7</span></th></tr>
+<tr><th scope="row"><span class="nm">Boldin</span><span class="op">Boldin is de sterkste decumulatie-motor in de hele lijst: hij rekent de fase ná stoppen expliciet door — onttrekkingss.</span></th><td class="st s-ja"><span>ja</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="pr">Drieledig: Basic gratis </td></tr>
+<tr><th scope="row"><span class="nm">Monarch Money</span><span class="op">Monarch houdt op precies waar de Nederlandse werkelijkheid begint.</span></th><td class="st s-ja"><span>ja</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="pr">Abonnement, twee lagen </td></tr>
+<tr><th scope="row"><span class="nm">ProjectionLab</span><span class="op">ProjectionLab is van de drie toetsvelden de sterkste tegenspeler op decumulatie: hij rekent de fase ná stoppen wél doo.</span></th><td class="st s-ja"><span>ja</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-deels"><span>deels</span></td><td class="st s-deels"><span>deels</span></td><td class="pr">Freemium, in USD </td></tr>
+<tr><th scope="row"><span class="nm">YNAB</span><span class="op">YNAB houdt op bij het einde van de maand.</span></th><td class="st s-nee"><span>nee</span></td><td class="st s-deels"><span>deels</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="pr">Abonnement, in dollars, ook voor Europese klanten: &quot;Mo</td></tr>
+<tr><th scope="row"><span class="nm">Portfolio Performance / Portfolio Dividend Tracker / Delta</span><span class="op">Dit model houdt op bij de rand van de effectenrekening, en het kijkt achteruit.</span></th><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="pr">Portfolio Performance: gratis, open source </td></tr>
+<tr><th scope="row"><span class="nm">Kubera</span><span class="op">Kubera houdt op bij het getal van vandaag.</span></th><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="pr">Abonnement</td></tr>
+<tr><th scope="row"><span class="nm">Finary</span><span class="op">Finary houdt op bij het HEDEN van het vermogen.</span></th><td class="st s-deels"><span>deels</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-nee"><span>nee</span></td><td class="pr">Freemium, jaarabonnementen </td></tr>
+<tr class="grp"><th colspan="6">Substituut <span class="cnt">2</span></th></tr>
+<tr><th scope="row"><span class="nm">Spreadsheets</span><span class="op">Dit cluster houdt op waar het onderhoud begint.</span></th><td class="st s-deels"><span>deels</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-ja"><span>ja</span></td><td class="st s-deels"><span>deels</span></td><td class="pr">Gratis</td></tr>
+<tr><th scope="row"><span class="nm">ChatGPT / Claude / Gemini als financieel planner</span><span class="op">Dit model houdt op bij het heden.</span></th><td class="st s-deels"><span>deels</span></td><td class="st s-nee"><span>nee</span></td><td class="st s-deels"><span>deels</span></td><td class="st s-deels"><span>deels</span></td><td class="pr">Abonnement</td></tr>
+
+          </tbody>
+        </table>
+      </div>
+      <figcaption><b>Lezing.</b> De kolom "Tijd" is de enige die nergens "volledig" bereikt. De kolom
+        "Decumulatie" is dat sinds maart wél op zes plaatsen. Geen enkele aanbieder heeft alle vier de kolommen op
+        volledig staan.</figcaption>
+    </figure>
+
+    <div class="col">
+      <h3>De drie bewegingen die ertoe doen</h3>
+      <p><strong>ProjectionLab is de scherpste dreiging, en het precedent staat in hun eigen changelog.</strong>
+        Ze onderhouden een Nederlandse landingspagina met Box 3-presets en rekenen decumulatie door met aanpasbare
+        opnamevolgorde. Wat ontbreekt is het Nederlandse pensioenstelsel: AOW als gemodelleerde inkomensstroom en
+        tweede-pijleraanspraken. Dat ze zoiets kunnen toevoegen, blijkt uit versie 4.6.0 van april 2026, waarin ze
+        het Canadese stelsel inbouwden. Eén release volstaat.</p>
+      <p><strong>Early Retirement Calc is de scherpste Nederlandse concurrent, en gratis.</strong> Box 3 in beide
+        stelsels, meerdere onttrekkingsstromen, pensioeninkomen vanaf een datum, backtesting en Monte Carlo. Waar hij
+        dun is: de onttrekkingsstrategie kent twee smaken, AOW moet je met de hand benaderen, en Box 1 over
+        uitkeringen ontbreekt.</p>
+      <p><strong>Rabobank is de stille staartrisico.</strong> Fiscaliteit ja, tweede pijler ja, decumulatie
+        gedeeltelijk — en het Rabo Financieel Plan is gratis voor alle particuliere klanten. Een bank die
+        decumulatie gratis in de app zet, verandert het veld in één keer.</p>
+    </div>
+  </div>
+</section>
+
+<!-- =================== 6. USP =================== -->
+<section id="usp">
+  <div class="wrap">
+    <span class="eyebrow"><span class="n">06</span>Onze eigen claims</span>
+    <h2>Wat wij zeggen, en wat de code ervan waarmaakt</h2>
+    <p class="lede col">Elke belofte op onze landingspagina is tegen de codebase gehouden, met één regel: een claim
+      telt alleen als de functie in een rekenpad of datapad zit — niet als hij alleen in een interfacetekst,
+      een info-knop of een besluitdocument staat.</p>
+
+    <div class="tablewrap" style="margin:26px 0">
+      <table class="data">
+        <thead><tr><th scope="col">Claim</th><th scope="col">Oordeel</th><th scope="col">Positie in de markt</th></tr></thead>
+        <tbody>
+          <tr class="hi"><th scope="row">Geld vertaald naar vrijheidstijd</th><td><span class="tag ok">houdt</span></td><td><strong>Exclusief.</strong> Nul van 34 aanbieders doet dit volledig. Eén dagtarief uit de kernel, niet uit de copy.</td></tr>
+          <tr class="hi"><th scope="row">Fase ná stoppen doorgerekend</th><td><span class="tag ok">houdt</span></td><td><strong>Niet langer exclusief.</strong> Zes aanbieders doen het. Onze diepte — potten met eigen ingangsleeftijd, opnamevolgorde, AOW-brug, guardrails — is dat wel.</td></tr>
+          <tr class="hi"><th scope="row">Nederlandse fiscaliteit in de kern</th><td><span class="tag ok">houdt</span></td><td><strong>Erodeert.</strong> Box 3 per maand in de projectie, beide stelsels. Early Retirement Calc en ProjectionLab hebben Box 3 inmiddels ook; Box 1 over uitkeringen hebben zij niet.</td></tr>
+          <tr class="hi"><th scope="row">Pensioenoverzicht inlezen (2e pijler)</th><td><span class="tag ok">houdt</span></td><td><strong>Exclusief in combinatie.</strong> XML en JSON worden op het eigen apparaat uitgelezen. Geen enkele planner leest mijnpensioenoverzicht.nl in én rekent ermee door.</td></tr>
+          <tr><th scope="row">AI-chat op het eigen apparaat</th><td><span class="tag ok">houdt</span></td><td>Alleen exact zo te formuleren: de chat in privacymodus, niet de app als geheel.</td></tr>
+          <tr><th scope="row">Geen bankkoppeling nodig</th><td><span class="tag ok">houdt</span></td><td>Import via CSV, MT940 en OFX met kolompresets. Onderscheidend tegenover elke PSD2-afhankelijke aanbieder.</td></tr>
+          <tr><th scope="row">Huishouden- en partnerperspectief</th><td><span class="tag ok">houdt</span></td><td>Schakelen tussen eigen, huishoud- en partnerbeeld met zichtbaar eigenaarschap. Zeldzaam in het veld.</td></tr>
+          <tr><th scope="row">Toekomst met bandbreedte</th><td><span class="tag mid">deels</span></td><td>De band bestaat, tot 200 doorrekeningen, maar staat niet standaard aan. In de FIRE-gemeenschap is slagingskans bovendien een bekend concept, geen onderscheid.</td></tr>
+          <tr><th scope="row">Geen advies in de zin van de Wft</th><td><span class="tag mid">deels</span></td><td>Het Wft-blok zit in het prompt-DNA, cloud én op het apparaat. Maar iedereen zegt dit; het is hygiëne, geen positionering. De pagina /wft draagt bovendien nog de aanduiding conceptttekst.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="col">
+      <div class="box bad">
+        <h4>Eén claim op de landingspagina is aantoonbaar te ruim</h4>
+        <p>De landingstekst belooft vrijheid "in jaren, maanden en dagen". De code toont dagen uitsluitend wanneer
+          jaren én maanden allebei nul zijn: <code>formatFreedomTimeString</code> in <code>lib/format.ts</code>
+          bouwt de lange notatie op uit jaren en maanden, en voegt dagen alleen toe als enige eenheid bij een
+          bedrag onder een maand. De juiste formulering is <strong>"in jaren en maanden"</strong>. Dit staat op
+          twee plaatsen: de heldere kop en de pijlertekst.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =================== 7. POSITIONERING =================== -->
+<section id="positionering">
+  <div class="wrap">
+    <span class="eyebrow"><span class="n">07</span>Positionering</span>
+    <h2>Eén zin, op het enige lege vakje in de matrix</h2>
+    <p class="lede col">Vijf kandidaatzinnen zijn vanuit vijf verschillende hoeken geschreven en door drie
+      onafhankelijke jury's gescoord op onderscheidend vermogen, hardmaakbaarheid in de code, Wft-veiligheid en
+      merkstem. Twee jury's kozen de Nederlandse combinatie, één koos de tijdvertaling. Alle drie adviseerden
+      hetzelfde: ent ze op elkaar.</p>
+
+    <div class="zin col">
+      <span class="lbl">Voorstel</span>
+      <q>Je haalt je pensioenoverzicht van mijnpensioenoverzicht.nl binnen als bestand. Vanaf dan rekenen je
+        Box 3-heffing, je pensioenpotten en de jaren tot je AOW mee in één projectie die doorloopt tot ná je
+        stopdatum — en zie je wat dat scheelt in jaren en maanden vrijheid.</q>
+      <p class="after">Elk onderdeel is in de code aanwijsbaar, de zin doet geen belofte over het aangehouden
+        Box 3-stelsel van 2028, en hij eindigt in de eenheid waar de app om draait in plaats van in een rekenmodel.</p>
+    </div>
+
+    <div class="col">
+      <h3>Waarom deze zin en niet de andere vier</h3>
+      <ul class="clean">
+        <li><strong>Alleen tijd</strong> scoorde het hoogst op merkstem maar verloor op reikwijdte: Grassfeld doet
+          al een euro-naar-tijd-weergave op één kaart, en de formulering "jaren, maanden en dagen" is feitelijk
+          onjuist.</li>
+        <li><strong>Alleen decumulatie</strong> staat in het drukst bezette veld van de vijf — precies het veld waar
+          deze ronde de oude stelling zag vallen.</li>
+        <li><strong>Financiële ruimte</strong> huurt een woord van de hypotheekmarkt en betaalt daar de halve zin aan.</li>
+        <li><strong>Geen Wft-advies</strong> zegt iedereen al. Dat hoort in de vertrouwensregel onder de kop, niet
+          in de kop.</li>
+      </ul>
+
+      <h3>Wat hieruit volgt</h3>
+      <ol class="steps">
+        <li><strong>De vaste vondst in de competitive-brief-skill wordt gehalveerd.</strong> "Bijna niemand rekent
+          decumulatie door" gaat eruit, met datum en bewijs. "Bijna niemand vertaalt naar tijd" blijft staan, nu
+          met een meting: nul van 34.</li>
+        <li><strong>De doelgroepafbakening op de landingspagina verschuift.</strong> Niet weg van 30-50, maar erbij:
+          wie geld heeft staan en wil weten hoe lang het meegaat, is gemiddeld ouder. De regel "30-50-jarigen met
+          hypotheek, partner en kinderwens" beschrijft het cohort met het minste liquide vermogen.</li>
+        <li><strong>Twee tekstcorrecties zijn onafhankelijk van de positioneringskeuze.</strong> "Jaren, maanden en
+          dagen" wordt "jaren en maanden"; waar over vermogen in de stopvraag wordt gesproken, hoort er
+          <em>liquide</em> vermogen te staan.</li>
+        <li><strong>ProjectionLab verdient een kwartaalcontrole.</strong> Eén release met AOW en tweede pijler
+          verandert de Nederlandse positie. Leg de beginstand vast: versie 4.6.0, 20 april 2026.</li>
+      </ol>
+
+      <div class="box warn">
+        <h4>Wat er niet in deze zin staat, en waarom niet</h4>
+        <p>Geen bankkoppeling, geen jaarruimte, geen belofte over het stelsel van 2028, geen superlatief en geen
+          getal. De zin is beschrijvend en daarmee Wft-veilig. Vóór hij ergens naar buiten gaat, moet hij langs de
+          compliance-poort — dit rapport is intern en die poort is niet gepasseerd.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =================== 8. VERANTWOORDING =================== -->
+<section id="verantwoording">
+  <div class="wrap">
+    <span class="eyebrow"><span class="n">08</span>Verantwoording</span>
+    <h2>Wat sneuvelde, wat open bleef en wat dit onderzoek niet kan</h2>
+
+    <div class="col">
+      <h3>Weerlegd — niet hergebruiken</h3>
+      <p>Van de twintig zwaarst wegende claims overleefden er zes de drievoudige adversariële toets. De veertien
+        andere sneuvelden vrijwel allemaal op <em>framing</em>, niet op het cijfer: een te sterke gevolgtrekking,
+        een verkeerde noemer, of een vendor-cijfer dat als onafhankelijke meting werd gepresenteerd. Concreet niet
+        meer gebruiken:</p>
+      <ul class="clean">
+        <li><strong>"Mediaan vermogen exclusief eigen woning is € 15.800 bij 35-45."</strong> Met 0 tegen 3
+          verworpen; niet reproduceerbaar uit de gepubliceerde CBS-tabel. Gebruik in plaats daarvan de wél
+          geverifieerde cijfers: mediaan bank- en spaartegoeden € 15.200 en effectenbezit bij 18,7 procent van de groep.</li>
+        <li><strong>"De FIRE-doelgroep is twee ordes kleiner."</strong> Verworpen als te precies; de verdedigbare
+          formulering is anderhalf tot twee ordes, en van de FIRE-doelgroep bestaat geen gemeten omvang.</li>
+        <li><strong>Het bunq-onderzoek over AI-gebruik.</strong> Zelf opdracht gegeven, zonder onderzoeksbureau of
+          veldwerkperiode; bruikbaar als signaal, niet als meting.</li>
+        <li><strong>"Nibud: 35 procent is onzeker."</strong> Het cijfer klopt, maar geldt alleen voor wie nog niet
+          met pensioen is — noem die noemer erbij.</li>
+      </ul>
+
+      <h3>Open vragen</h3>
+      <p>De volledigheidscriticus vond zeventien gaten, waarvan dertien een stelling kunnen omkeren. De vier die
+        het eerst gedicht moeten worden:</p>
+      <ol class="steps">
+        <li><strong>Geen enkele concurrent is daadwerkelijk gebruikt.</strong> Alle 34 dossiers zijn opgebouwd uit
+          publieke website- en marketingtekst. Eén maand MijnGeldzaken en één maand ProjectionLab afnemen zou de
+          decumulatie-uitspraak van bewering naar waarneming tillen.</li>
+        <li><strong>De aanbiederslijst is vooraf opgegeven, niet ontdekt.</strong> Er is geen zoektocht gedaan in de
+          Nederlandse App Store of Play Store. Minstens één Nederlandse aanbieder — Mijn VermogensPlanner — ontbreekt
+          en raakt beide valbepalingen.</li>
+        <li><strong>Er is geen zoekvolumedata.</strong> De taalkeuze steunt op automatische aanvullingen, niet op
+          gemeten volumes.</li>
+        <li><strong>De cohorten 45-65 zijn niet als doelgroep onderzocht,</strong> terwijl het eigen bewijs ze
+          aanwijst als groter en rijker. Dat is de logische volgende ronde.</li>
+      </ol>
+
+      <h3>Beperkingen</h3>
+      <p>Dit is deskresearch: geen interviews, geen enquête, geen test op de landingspagina. Elke uitspraak over
+        herkenning en taal is afgeleid uit publieke bronnen, niet uit onze eigen gebruikers. Vendorcijfers zijn als
+        vendorcijfers gemarkeerd. De CBS-cijfers in sectie 3 zijn door mij rechtstreeks bij de open-data-API
+        opgehaald en niet alleen door een agent overgenomen; de uitsplitsing van vermogensklassen binnen de
+        leeftijdsgroep 35-45 is dat niet. De foto is van 3 september 2026 en veroudert in maanden — ProjectionLab
+        alleen al bracht sinds oktober 2025 drie relevante releases uit.</p>
+
+      <h3>Herkomst</h3>
+      <p class="src">Workflow-run <code>wf_6ea170b4-533</code>, 152 agents, drie sessies (de eerste twee liepen tegen
+        een gebruikslimiet aan en zijn hervat vanuit de cache). Het script is bewaard en herbruikbaar voor een
+        volgende ronde. Kernbronnen: CBS StatLine 83834NED (open-data-API, 3 sep 2026) · Nibud, Geldzaken in de
+        praktijk 2026 · AFM, Onbenut vermogen (mei 2026) · Deloitte, Financiële gezondheid van Nederlandse
+        huishoudens, vijfde meting · Rijksoverheid en Pensioenfederatie over de Wet toekomst pensioenen en het
+        wetsvoorstel Wet werkelijk rendement box 3 · r/DutchFIRE (110.025 leden, 3 sep 2026), de toolwiki en negen
+        best scorende draden · het Tweakers-draad Financiële onafhankelijkheid deel 5 · en de publieke pagina's en
+        changelogs van 34 aanbieders.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    TriFinity · positionerings- en concurrentieonderzoek · 3 september 2026 · intern document.
+    Volgt de competitive-brief-methode: per aanbieder wie hij is, wat hij belooft, waar hij ophoudt, en of dat gat
+    van ons is. Positioneringsbesluiten horen in Notion, niet in een ADR.
+  </div>
+</footer>
+
+</body>
+</html>
