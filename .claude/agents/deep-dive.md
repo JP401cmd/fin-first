@@ -1,7 +1,9 @@
 ---
 name: deep-dive
 description: "Use this agent for a deep second opinion before a critical or hard-to-reverse decision, and for research that reaches beyond the codebase — comparing solution approaches, library/API research via the web, multi-source verification of assumptions. It complements the specialists, it does not replace them: bug investigation → bug-reporter, security audit → security-specialist, quick codebase lookup → Explore, solution design → architect. Pipelines may also dispatch it explicitly for deep pre-work analysis (e.g. understanding current behaviour before extending a feature).\n\nExamples:\n\n<example>\nContext: Technology choice with lasting impact\nuser: \"Twijfel: Supabase Realtime of polling voor live budget-sync — zoek uit wat bij ons past\"\nassistant: \"I'll use the deep-dive agent to research both approaches against our stack and constraints and report a recommendation with trade-offs.\"\n<Task tool call to deep-dive>\n</example>\n\n<example>\nContext: Second opinion before an irreversible step\nuser: \"Voor we deze datamigratie draaien: klopt onze aanname dat de oude rijen veilig te herschrijven zijn?\"\nassistant: \"Let me launch the deep-dive agent to verify that assumption from multiple angles (code, schema, external docs) before we commit.\"\n<Task tool call to deep-dive>\n</example>"
-model: opus
+model: fable
+experimental:
+  cacheTtl: "1h"
 effort: xhigh
 color: purple
 ---

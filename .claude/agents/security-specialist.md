@@ -1,7 +1,9 @@
 ---
 name: security-specialist
 description: "Use this agent for application-security and privacy review in TriFinity: auditing new/changed API routes, service-role usage, secrets/keys, dev/test endpoints, partner/household privacy, AI data-exposure and Wft/AVG-sensitive surfaces. Use it as the security gate in the feature/bug pipelines, before shipping any change that touches data access, auth, external calls or admin paths — and for periodic security sweeps of the whole app. RLS/schema mechanics belong to `supabase-db-specialist`; this agent owns the security view ACROSS layers (route → proxy → client → AI → DB).\n\nExamples:\n\n<example>\nContext: New API route in a feature build\nuser: \"I added /api/household/overdracht that moves assets between partners\"\nassistant: \"I'll use the security-specialist agent to review auth checks, partner-privacy via the perspective loaders, service-role exposure and error leakage before this ships.\"\n<Task tool call to security-specialist>\n</example>\n\n<example>\nContext: Periodic sweep\nuser: \"Doe een security-check van de hele app\"\nassistant: \"Let me launch the security-specialist agent to sweep secrets, prod-reachable debug endpoints, RLS coverage, service-role paths and partner-privacy surfaces.\"\n<Task tool call to security-specialist>\n</example>\n\n<example>\nContext: AI feature exposing data\nuser: \"De briefing stuurt nu ook transactieomschrijvingen naar het model\"\nassistant: \"I'll use the security-specialist agent to verify sanitizeForAI/PII-masking coverage and that no partner-private data reaches the provider.\"\n<Task tool call to security-specialist>\n</example>\n\n<example>\nContext: Secrets hygiene\nuser: \"Ik heb een script toegevoegd dat de service-role key gebruikt\"\nassistant: \"Let me launch the security-specialist agent to check key handling — service-role only via getServiceClient(), nothing in repo or env.example, no client exposure.\"\n<Task tool call to security-specialist>\n</example>"
-model: opus
+model: fable
+experimental:
+  cacheTtl: "1h"
 effort: xhigh
 color: red
 ---

@@ -47,7 +47,7 @@ Volledige `npm run test:run` + lint + relevante regressiesuites. Handmatige clic
 **Bij verwijderen van een route/module/bestand: grep óók op string-literal-consumenten** — `fetch('/api/...')`-paden, `href`-strings, route-/feature-strings — die tsc én de build NIET vangen. Een verwijderde API-route met een achtergebleven consument compileert en build't probleemloos, maar geeft pas een **runtime-404**. (Zo bleef `/beheer/horizon-tabellen-mij` na de v1-engine-uitfasering een verwijderde `/api/horizon-engine/ledger`-route fetchen → 404; pas een page↔route-contracttest ving het.)
 
 ### 6. Review — `code-review`
-Met als expliciete reviewvraag: is dit een pure move? Elke inhoudelijke wijziging in de diff is een bevinding, hoe goedbedoeld ook.
+Met als expliciete reviewvraag: is dit een pure move? Elke inhoudelijke wijziging in de diff is een bevinding, hoe goedbedoeld ook. De gebundelde review draait als **fork-subagent** (zie de gedeelde conventies).
 
 ### 7. Opruimen & docs — `architecture-docs-keeper` (indien van toepassing)
 Pure herindeling raakt de platen meestal niet, maar: stond er een **aandachtspunt** over dit doelwit in `lib/architecture/archimate-concerns.ts`? Verwijder het zodra opgelost. `npm run arch:diagram` voor de feiten/churn.

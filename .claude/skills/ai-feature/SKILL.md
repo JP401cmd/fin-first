@@ -56,7 +56,7 @@ Heeft de functionaliteit een (nieuw of aangepast) system-/taakprompt nodig? Dan 
 Unit-tests voor de pure delen (schema's, context-builders, tools) en regressiecases waar passend (denk aan de `ai-beveiliging`- en `beheer-ai`-suites). Test expliciet de guardrails: PII gaat er niet in en komt er niet uit, kill-switch en tier-gate blokkeren echt, foutpaden geven nette meldingen. `tsc`/lint/tests groen met echte output.
 
 ### 7. Review — `code-review` + `security-specialist`
-`code-review` extra scherp op: geen provider-SDK buiten `getModel` om, token-logging aanwezig, nette foutafhandeling. De `security-specialist` draait altijd mee bij AI-functionaliteit: geen API-keys/secrets richting client, sanitize/PII-mask aantoonbaar in het pad, context respecteert het perspectief van de vrager (geen partner-privé data), kill-switch/tier-gate houden stand. Een 🔴-bevinding blokkeert tot opgelost.
+`code-review` extra scherp op: geen provider-SDK buiten `getModel` om, token-logging aanwezig, nette foutafhandeling. De `security-specialist` draait altijd mee bij AI-functionaliteit: geen API-keys/secrets richting client, sanitize/PII-mask aantoonbaar in het pad, context respecteert het perspectief van de vrager (geen partner-privé data), kill-switch/tier-gate houden stand. Een 🔴-bevinding blokkeert tot opgelost. De `code-review`-run draait als **fork-subagent** (zie de gedeelde conventies); de `security-specialist` blijft een aparte spawn met schone context.
 
 ### 8. Platen — `architecture-docs-keeper` (indien stap 3 van toepassing was)
 Nieuwe service/integratie/datastroom op de ArchiMate-plaat, capability in de HLD, en facts regenereren. `architect` bevestigt de fit.

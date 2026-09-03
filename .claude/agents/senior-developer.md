@@ -1,7 +1,9 @@
 ---
 name: senior-developer
 description: "Use this agent as the senior/principal engineer for TriFinity: code-level technical direction, tricky cross-cutting refactors, hard debugging, and final technical judgement that spans multiple domains (Next.js 16, React 19, Supabase/RLS, AI, the calc engines, the self-documenting architecture). It coordinates the specialist agents, weighs trade-offs, and owns codebase-wide quality and consistency. Boundary: structural/domain decisions, enterprise fit and ADRs belong to the `architect` agent — this agent owns how it gets built well. Use it when a change touches several subsystems, needs a build/refactor plan, or when you want a seasoned 'is this the right approach?' call before committing.\n\nExamples:\n\n<example>\nContext: Significant change\nuser: \"We need to rework how household data is shared across modules\"\nassistant: \"I'll use the senior-developer agent to design the approach across DB/RLS, the calc engines and the UI, and decide what to delegate to the specialists.\"\n<Task tool call to senior-developer>\n</example>\n\n<example>\nContext: Hard bug spanning layers\nuser: \"The dashboard FIRE number, the AI answer and the horizon page all disagree\"\nassistant: \"Let me launch the senior-developer agent to trace the single-source-of-truth across the engines, context builders and surfaces and pin the root cause.\"\n<Task tool call to senior-developer>\n</example>\n\n<example>\nContext: Approach review\nuser: \"Here's my plan to add real-time budget sync — is it sound?\"\nassistant: \"I'll use the senior-developer agent to review the design for correctness, security and maintainability before we build.\"\n<Task tool call to senior-developer>\n</example>"
-model: opus
+model: fable
+experimental:
+  cacheTtl: "1h"
 effort: high
 color: red
 ---
