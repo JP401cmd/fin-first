@@ -29,7 +29,15 @@ Het Nederlandse veld is bezet: vergelijkers, bankeigen inzicht-tools, budget-app
 
 Per ronde, kort: **wie · wat belooft hij · waar houdt hij op · is dat gat van ons (ja/nee + waarom)**. Sluit af met één zin positionering — die zin is het hele doel van de brief.
 
-**Vaste vondst tot nu toe:** bijna niemand rekent de **decumulatiekant** door (wat gebeurt er ná stoppen), en bijna niemand vertaalt bedragen naar **tijd**. Dat is de positionering. Blijkt die vondst bij een volgende ronde niet meer te kloppen, dan is dát de belangrijkste uitkomst van de ronde — meld het terug.
+**Vaste vondst — herzien 3 september 2026.** De oude vondst luidde: *bijna niemand rekent de decumulatiekant door, en bijna niemand vertaalt bedragen naar tijd.* De ronde van 3 sep 2026 (34 aanbieders, elke decumulatie- of tijdclaim door een aparte scepticus hertoetst) splitst die vondst:
+
+- **Decumulatie is géén onderscheid meer.** Zes aanbieders rekenen de fase ná stoppen door, waarvan twee gratis en Nederlands: Early Retirement Calc (Box 3 in beide stelsels) en de Geldnerd-spreadsheet (onbeheerd), plus MijnGeldzaken (v.a. €2,45/mnd), ProjectionLab, Boldin en Monarch Plus. Gebruik dit niet meer als het gat.
+- **Tijd staat onaangetast.** Nul van de 34 vertaalt bedragen volledig naar vrijheidstijd; twee doen iets wat erop lijkt (Grassfeld bufferkaart in maanden, YNAB "age of money" in dagen). Wat elders op tijd lijkt, is een lééftijd ("stop op je 58e") of een horizon ("35 dagen vooruit").
+- **Het gat zit nu in de combinatie:** de fase ná stoppen doorgerekend op *Nederlandse* potten (mijnpensioenoverzicht-import, AOW-brug, Box 3) én uitgedrukt in tijd. Geen enkele aanbieder heeft die vier tegelijk.
+
+Onderbouwing: `trifinity-positionering-onderzoek-sep2026.html` (repo-root). Blijkt ook deze vondst bij een volgende ronde niet meer te kloppen, dan is dát weer de belangrijkste uitkomst — meld het terug en herzie deze regel opnieuw, met datum.
+
+**Bewaak ProjectionLab per kwartaal.** Eén release met AOW en tweede pijler dicht het Nederlandse gat; het precedent is hun Canada Pension Plan-module (v4.6.0, 20 apr 2026). Beginstand vastgelegd op v4.6.0.
 
 ## Verwijzing
 
