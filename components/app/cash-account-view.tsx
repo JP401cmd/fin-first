@@ -1564,21 +1564,39 @@ export function CashAccountView({
    *  bulk-insert: alles-of-niets, zodat een half doorgevoerde lijst niet ontstaat.
    *  De lijst wordt pas geleegd als de schrijfactie slaagde. */
   async function acceptAllPatterns() {
-    if (detectedPatterns.length === 0 || acceptingAllPatterns) return
+    // `accountId` ontbreekt in de gecombineerde weergave; `detectPatterns` opent de
+    // modal daar niet, maar de guard staat hier zodat de aanname zichtbaar is en
+    // niet stilzwijgend als `undefined` de route in gaat.
+    if (!accountId || detectedPatterns.length === 0 || acceptingAllPatterns) return
     setAcceptingAllPatterns(true)
     try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
       const aantal = detectedPatterns.length
-      const { error: insertError } = await supabase
-        .from('recurring_transactions')
-        .insert(detectedPatterns.map((p, i) => patternToRecurringRow(p, user.id, i)))
-      if (insertError) {
+      // Via een API-route, niet client-direct (ADR 0058). RLS dekt alleen dat je
+      // namens jezelf schrijft; dat `account_id` en `budget_id` óók van jou zijn
+      // toetst de route — die sleutels zijn hier client-invoer.
+      const res = await fetch('/api/recurring/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          account_id: accountId,
+          patterns: detectedPatterns.map((p) => ({
+            name: p.counterpartyName,
+            amount: p.averageAmount,
+            frequency: p.frequency,
+            day_of_month: p.dayOfMonth ?? null,
+            day_of_week: p.dayOfWeek ?? null,
+            budget_id: p.matchedBudgetId ?? null,
+          })),
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
         addToast({
           type: 'error',
           title: 'Toevoegen is niet gelukt',
-          message: 'Probeer het opnieuw, of voeg de regels één voor één toe.',
+          message: typeof data.error === 'string'
+            ? data.error
+            : 'Probeer het opnieuw, of voeg de regels één voor één toe.',
         })
         return
       }

@@ -596,6 +596,28 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
       .filter(e => e.age >= chartBounds.minAge && e.age <= chartBounds.maxAge)
   }, [lifeEventsRaw, chartBounds])
 
+  /**
+   * ADR 0127 — het bereik onder 'Nu stoppen' voor één doorgerekend profiel.
+   * Consume-only: leest `kernelDepletionMonth`/`displayEndAge` uit de run die er
+   * al staat; `fireAge` ís onder dit anker de startleeftijd (D1).
+   *
+   * STAAT BOVEN DE EARLY RETURNS, en dat is geen stijlkeuze: hieronder verlaat
+   * het component vroegtijdig bij `loading` en bij `error || !input`. Een hook
+   * ná die returns wordt op de laadrender niet aangeroepen en op de render
+   * daarna wél — dan wijkt de hook-volgorde af en gooit React "Rendered more
+   * hooks than during the previous render". Deze modal heeft een laadtoestand,
+   * dus dat raakt elke opening. Zet nieuwe hooks hier, niet verderop.
+   */
+  const reachVoor = useCallback(
+    (sim: SimResult): NuStoppenReach =>
+      nuStoppenReachFromSim({
+        startAge: sim.fireAge ?? currentAge,
+        kernelDepletionMonth: sim.kernelDepletionMonth,
+        endAge: sim.displayEndAge,
+      }),
+    [currentAge],
+  )
+
   // ── Loading state ──────────────────────────────────────────────────────
 
   if (loading) {
@@ -660,21 +682,6 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
   const selectedSim = simulations[selectedProfiel]
   const selectedInfo = PROFIEL_INFO[selectedProfiel]
   const fireAge = selectedSim?.fireAge ?? null
-
-  /**
-   * ADR 0127 — het bereik onder 'Nu stoppen' voor één doorgerekend profiel.
-   * Consume-only: leest `kernelDepletionMonth`/`displayEndAge` uit de run die er
-   * al staat; `fireAge` ís onder dit anker de startleeftijd (D1).
-   */
-  const reachVoor = useCallback(
-    (sim: SimResult): NuStoppenReach =>
-      nuStoppenReachFromSim({
-        startAge: sim.fireAge ?? currentAge,
-        kernelDepletionMonth: sim.kernelDepletionMonth,
-        endAge: sim.displayEndAge,
-      }),
-    [currentAge],
-  )
 
   return (
     <ShellOverlay open={open} onClose={onClose} kind="pane" mobileBackCloses title="Strategieën">

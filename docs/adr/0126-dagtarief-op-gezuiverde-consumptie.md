@@ -15,10 +15,12 @@ conversie via `dailyExpenseRate`) rekende op **álle** negatieve transacties in
 het 12-maands rolling venster — geen transfer-filter, geen budgettype-filter.
 Op een productie-account bestond ~60% van het 12-maandstotaal uit één
 hypotheekaflossing (`transaction_type` NULL, op een `archive`-budget "Eigen
-rekening") plus één terugbetaald voorschot (type `transfer`, ook archief). De
-grondslag zakte daardoor van ~€19.700 naar ~€7.500/mnd zodra die twee posten
-buiten beschouwing bleven; de vrijheidstijd-kop op /overzicht verschoof van
-3 jaar 3 maanden naar ~8 jaar 3 maanden.
+rekening") plus één terugbetaald voorschot (type `transfer`, ook archief).
+Zodra die twee posten buiten beschouwing bleven meer dan halveerde de
+grondslag, en de vrijheidstijd-kop op /overzicht ruim verdubbelde.
+
+(Bewust zonder de gemeten bedragen: dit is een publieke repo en de aanleiding
+was één echt account. Het argument is de verhouding, niet het bedrag.)
 
 De budgetgebaseerde sommen sloten archief al uit — `computeYearlyMustExpenses`
 en `budget-spending.ts` filteren op budgettype. De transactiegebaseerde
