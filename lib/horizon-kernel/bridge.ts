@@ -154,6 +154,28 @@ function resolveLegacyStrategy(input: KernelInput, code: EindstrategieCode): Fir
   return CODE_TO_STRATEGY[code]
 }
 
+/**
+ * F2-compat voor de STATUS, spiegel van `resolveLegacyStrategy` hierboven.
+ *
+ * DE REGRESSIE (live 3–5 sep 2026). F2 stuurt voor een pensioen-rij de eind-vorm
+ * als selector, dus de solver komt niet meer op interne code 'pensioen' uit en
+ * zet bij een tekort `anchor_shortfall` in plaats van `pension_shortfall`. Het
+ * statusblok op /toekomst matcht letterlijk op `kernelStatus === 'pension_shortfall'`
+ * en er bestond geen blok voor `anchor_shortfall`. Een pensioen-gebruiker met een
+ * tekort-lening zag de grafiek die wél tekenen, maar las er niets over.
+ *
+ * Wat pijnlijk was: dezelfde commit hield `stop_now_shortfall` juist WÉL in stand
+ * met precies deze motivering — en paste die gedachte niet toe op het aow-anker.
+ * Deze functie herstelt het gedrag van vóór F2 exact; het leeftijd-anker blijft
+ * `anchor_shortfall`, want daar wachtte nog geen oud blok op. F3b bouwt het
+ * generieke blok, F4 verwijdert deze vertaling samen met `resolveLegacyStrategy`.
+ * Bewaakt door `bridge.status-compat.test.ts`.
+ */
+function resolveLegacyStatus(input: KernelInput, status: SolverStatus): SolverStatus {
+  if (status === 'anchor_shortfall' && input.stopAnker?.soort === 'aow') return 'pension_shortfall'
+  return status
+}
+
 /** Per-slot app-koppeling (asset): fysiek kern-slot → app-`AssetType` + app-id. */
 export interface AssetSlotMeta {
   readonly slot: number
@@ -861,7 +883,10 @@ export function kernelToUnifiedResult(
   }
 
   // ── FIRE-uitkomsten ────────────────────────────────────────────────────────
-  const status = solve.status
+  // F2-compat: het aow-anker spreekt tegen de UI nog de pensioen-taal (zie
+  // `resolveLegacyStatus`); `fireReachable` leest de kernel-status ervóór, want
+  // die vertaling raakt bereikbaarheid niet.
+  const status = resolveLegacyStatus(ctx.input, solve.status)
   const fireReachable = status !== 'unreachable_within_horizon'
   const fireAgeFractional = fireReachable ? solve.fireAge : null
   const fireAge = fireAgeFractional !== null ? Math.ceil(fireAgeFractional) : null
