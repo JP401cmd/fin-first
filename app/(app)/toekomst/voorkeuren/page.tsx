@@ -57,6 +57,7 @@ export default async function ToekomstVoorkeurenPage() {
       <VoorkeurenView
         fireParams={horizonData.fireParams}
         fireStrategy={horizonData.fireStrategy}
+        firePlan={horizonData.firePlan}
         withdrawalStrategy={horizonData.withdrawalStrategy}
         fireAge={fireAge}
         simRows={simRows}

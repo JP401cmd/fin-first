@@ -1,50 +1,66 @@
 // lib/page-status/freedom.ts
 //
-// PURE builder (géén IO): bouwt de informatieve "je bent vrij / met pensioen"-
-// duiding voor /overzicht uit de gedeelde, consume-only vrijheidsvlag
-// (lib/fire-strategy). Geen rekenmotor, geen DB, geen hardcoded leeftijden —
-// alleen reeds-berekende waarden (freedomPct, currentAge, fireAge, strategy)
-// koppelen aan gecureerde copy (copy.ts).
+// De informatieve vrijheids-/pensioenbanner op /overzicht. Consume-only: leest
+// `isFinanciallyFree` (ADR 0129 D8: anker bereikt ∧ dekking ≥ 100) en het
+// plan-anker; rekent niets zelf.
 //
-// Dit is bewust dezelfde banner-keten (PageStatusBanner/PageStatusDot,
-// minimaliseerbaar) als de stoplicht-duidingen — géén tweede variant — maar met
-// kind 'freedom' (informatief, status semantisch 'neutral', escaleert niet).
+// ADR 0129 F3b — onder een VAST stopmoment (aow/now/age) dat nog niet 'free' is,
+// volgt de banner de Vrijheid-strip: kop "Je rekent met stoppen op {stop}" en de
+// bereik-zin uit anker-copy (gedekt ⇒ neutraal, tekort ⇒ aandacht). Het bereik komt
+// uit de plan-runway van hetzelfde request (`computeHorizonRunway`), aangeleverd
+// door `computePageStatusInfo` — geen tweede kernel-run hier.
 
 import {
+  isAtOrPastAow,
   isFinanciallyFree,
-  resolveFreedomFraming,
+  isFixedAnchor,
+  resolveFreedomAnchor,
   type FreedomStateInput,
 } from '@/lib/fire-strategy'
-import { FREEDOM_BANNER_COPY } from '@/lib/page-status/copy'
+import type { AnkerReach, AnkerStop } from '@/lib/horizon/anker-copy'
+import { FREEDOM_BANNER_COPY, anchoredBannerCopy } from '@/lib/page-status/copy'
 import type { PageStatusInfo } from '@/lib/page-status/types'
 
-/**
- * Geeft de vrijheids-/pensioenbanner voor /overzicht, of `null` wanneer de
- * gebruiker nog niet financieel vrij is (dan toont /overzicht geen banner).
- *
- * @returns PageStatusInfo met kind 'freedom' (status 'neutral'), of null.
- */
-export function resolveFreedomBanner(input: FreedomStateInput): PageStatusInfo | null {
-  if (!isFinanciallyFree(input)) return null
+/** Het bereik + stopmoment onder een vast anker (uit de plan-runway). */
+export interface FreedomBannerAnker {
+  reach: AnkerReach
+  stop: AnkerStop
+}
 
-  // Vrij → framing is 'free', 'pensioen' of 'nu-stoppen' (nooit 'building' hier).
-  // ADR 0127: de 'nu-stoppen'-tak is verplicht — zonder eigen entry viel deze
-  // strategie op de 'free'-kopij ("Je bent vrij"), en dat is onder dit anker een
-  // uitspraak over de gebruiker in plaats van over zijn geld.
-  const framing = resolveFreedomFraming(input)
+export function resolveFreedomBanner(
+  input: FreedomStateInput,
+  anker?: FreedomBannerAnker | null,
+): PageStatusInfo | null {
+  if (!isFinanciallyFree(input)) {
+    // Vast anker, nog niet vrij: de banner volgt de strip (ADR 0129, bijlage /overzicht).
+    const planAnchor = resolveFreedomAnchor(input)
+    if (anker && isFixedAnchor({ anchor: planAnchor })) {
+      const copy = anchoredBannerCopy(anker.reach, anker.stop)
+      if (!copy) return null
+      return {
+        route: '/overzicht',
+        kind: 'freedom',
+        status: anker.reach.kind === 'gedekt' ? 'neutral' : 'warn',
+        title: copy.title,
+        reason: copy.reason,
+        remedy: copy.remedy,
+        will: copy.will,
+      }
+    }
+    return null
+  }
+
+  const anchor = resolveFreedomAnchor(input)
   const copy =
-    framing === 'pensioen'
-      ? FREEDOM_BANNER_COPY.pensioen
-      : framing === 'nu-stoppen'
-        ? FREEDOM_BANNER_COPY['nu-stoppen']
+    anchor.kind === 'now'
+      ? FREEDOM_BANNER_COPY['nu-stoppen']
+      : isAtOrPastAow(input)
+        ? FREEDOM_BANNER_COPY.pensioen
         : FREEDOM_BANNER_COPY.free
 
   return {
     route: '/overzicht',
     kind: 'freedom',
-    // Semantisch neutraal: de freedom-banner is informatief, geen stoplicht. De
-    // styling/dot-kleur wordt in de UI op `kind` gekozen (horizon-accent), niet
-    // op deze status — zo blijven stoplichtkleuren stoplicht (CLAUDE.md).
     status: 'neutral',
     title: copy.title,
     reason: copy.reason,

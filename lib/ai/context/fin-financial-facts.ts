@@ -34,6 +34,7 @@
 
 import type { CorePageData } from '@/lib/core-data-loader'
 import { computeCoreData, computeFreedomProgressWithBasis, inclHomeTargetFromScalar, type FinancialInput } from '@/lib/core-metrics'
+import { isFixedAnchor } from '@/lib/fire-strategy'
 import type { Asset } from '@/lib/asset-data'
 import type { Debt } from '@/lib/debt-data'
 import {
@@ -156,18 +157,30 @@ export function buildWillFinancialFacts(coreData: CorePageData, profile: FinFact
   const requiredNetWorthInclHome =
     coreData.fireNetWorthTargetFromHorizon ??
     inclHomeTargetFromScalar(requiredPortfolio, core.netWorth, fireEligibleNetWorth)
-  const vrijheidsPct = computeFreedomProgressWithBasis({
-    homeExcludedFromFire,
-    netWorthInclHome: core.netWorth,
-    fireEligibleNetWorth,
-    requiredNetWorthInclHome,
-    requiredPortfolioExclHome: requiredPortfolio,
-  })
+  // ADR 0129 B3 — onder een VAST stop-anker (aow/now/age) is er geen doelvermogen (D4:
+  // `fireTargetFromHorizon` is daar al null) en is het vrijheids-% de DEKKING. Die
+  // staat al kant-en-klaar in de Kern-bundel (`healthScoreInput.freedomPct` =
+  // `computeFreedomPctForPlan` in core-data-loader). Hier opnieuw een kapitaalratio
+  // rekenen zou Fin op het 25×-terugvaldoel laten vallen — een ander getal dan het
+  // scherm. Consume, don't recompute. `firePlan` optioneel gelezen (mocks).
+  const anchorFixed = coreData.firePlan != null && isFixedAnchor(coreData.firePlan)
+  const vrijheidsPct = anchorFixed
+    ? coreData.healthScoreInput.freedomPct
+    : computeFreedomProgressWithBasis({
+        homeExcludedFromFire,
+        netWorthInclHome: core.netWorth,
+        fireEligibleNetWorth,
+        requiredNetWorthInclHome,
+        requiredPortfolioExclHome: requiredPortfolio,
+      })
   // FIRE-doel op DEZELFDE grondslag als het vrijheids-% (incl. woning tenzij
-  // uitgesloten), met fallback op het simpele fireTarget.
-  const displayFireGoal = homeExcludedFromFire
-    ? requiredPortfolio
-    : (requiredNetWorthInclHome ?? requiredPortfolio)
+  // uitgesloten), met fallback op het simpele fireTarget. Onder een vast anker is er
+  // géén doel (D4) — de geprojecteerde stand op het anker is geen streefbedrag.
+  const displayFireGoal = anchorFixed
+    ? null
+    : homeExcludedFromFire
+      ? requiredPortfolio
+      : (requiredNetWorthInclHome ?? requiredPortfolio)
 
   // ── Herkomst van het getoonde doel (euro-weergave D14) ─────────────────────
   // Alleen een doel dat de KERNEL op de FIRE-maand projecteerde staat in

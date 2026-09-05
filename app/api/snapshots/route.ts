@@ -11,6 +11,10 @@ import {
 } from '@/lib/health-score-input'
 import { BUDGET_SPENDING_TX_COLUMNS, fetchSpendingSplits } from '@/lib/budget-spending-fetch'
 import { resolveFireParams } from '@/lib/fire-params'
+import { FIRE_PLAN_COLUMNS, isFixedAnchor, resolveFirePlanWithOverride } from '@/lib/fire-strategy'
+import { computeHorizonFireSim } from '@/lib/fire-target-shared'
+import { computeRunwayCoveragePct } from '@/lib/core-metrics'
+import { eindMaandVan } from '@/lib/horizon-kernel/gap'
 import { yearlyMustExpensesFromBudgets } from '@/lib/budget-utils'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
@@ -179,7 +183,9 @@ export async function POST() {
       // net_monthly_income/estimated_monthly_expenses + de bron-vlaggen: nodig
       // voor de EFFECTIEVE spaarquote (handmatig wint) en de noodbuffer-norm
       // (3 × netto maandsalaris) — dezelfde grondslag als de live loader.
-      .select('date_of_birth, expected_return, inflation_rate, household_type, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source')
+      // + het PLAN (ADR 0129 F3a): onder een vast stop-anker wordt `fire_age` niet
+      // geschreven en reist het anker (+ de dekking) mee in `params`.
+      .select(`date_of_birth, expected_return, inflation_rate, household_type, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, feature_preferences, ${FIRE_PLAN_COLUMNS}`)
       .eq('id', user.id)
       .single(),
     // Alle budgetten (alle types, parents + children) — must-expenses + health.
@@ -288,6 +294,29 @@ export async function POST() {
     dateOfBirth,
   }
   const fireProjection = computeFireProjection(horizonInput, fireParams.grossReturn, fireSwr)
+
+  // ADR 0129 F3a — het PLAN. Onder een VAST stop-anker (aow/now/age) is er geen
+  // vrijheidsmoment: `fire_age` blijft `null` (anders leest de trend "bereikt" zodra
+  // de scalar-lus toevallig op of onder het anker uitkomt) en het anker gaat mee in
+  // `params`, samen met de DEKKING uit de canonieke kernel-run (React-cache()'d;
+  // draait alleen onder een vast anker — onder `solved` blijft deze route
+  // kernel-vrij, exact zoals voorheen).
+  const firePlan = resolveFirePlanWithOverride(profileResult.data ?? {})
+  const anchorFixed = isFixedAnchor(firePlan)
+  let coveragePct: number | null = null
+  if (anchorFixed && dateOfBirth) {
+    const run = await computeHorizonFireSim(supabase).catch(() => null)
+    if (run && run.sim.requiredFireIsAnchorPortfolio === true) {
+      coveragePct = computeRunwayCoveragePct({
+        kernelDepletionMonth: run.sim.kernelDepletionMonth ?? null,
+        eindMaand: eindMaandVan(run.sim.displayEndAge, ageAtDate(dateOfBirth)),
+        ankerMaand: run.sim.ankerMaand ?? null,
+      })
+    }
+  }
+  const snapshotFireAge = anchorFixed || fireProjection.fireAge === null
+    ? null
+    : Math.round(fireProjection.fireAge * 10) / 10
 
   // Compute sovereignty level
   const consumerDebtTypes = ['personal_loan', 'credit_card', 'revolving_credit', 'payment_plan', 'car_loan']
@@ -415,7 +444,8 @@ export async function POST() {
   // We try to include them; if the upsert fails due to missing columns, retry without
   const extendedFields: Record<string, unknown> = {
     freedom_percentage: Math.round(freedomPercentage * 10) / 10,
-    fire_age: fireProjection.fireAge !== null ? Math.round(fireProjection.fireAge * 10) / 10 : null,
+    // Onder een vast anker bewust null (ADR 0129 F3a) — zie `snapshotFireAge`.
+    fire_age: snapshotFireAge,
     sovereignty_level: sovereigntyLevel,
     // Canonieke spaarquote (savingsRate6m), NIET fireProjection.savingsRate:
     // deze kolom voedt de spaarquote-widget-ontwikkeling (savingsHistory).
@@ -431,7 +461,9 @@ export async function POST() {
     // inflatie/Box 3-drag/belastingjaar/grondslag) die deze afgeleiden
     // produceerden. Engine-onafhankelijk — de basic-fallback-upsert hieronder
     // laat 'm bewust weg (kolom nullable) als de kolom nog niet bestaat.
-    params: buildSnapshotParams(fireParams),
+    // Met het plan-anker + de dekking (ADR 0129 F3a), zodat een rij met
+    // `fire_age = null` onder een vast anker leesbaar blijft.
+    params: buildSnapshotParams(fireParams, { stopAnchor: firePlan.anchor.kind, coveragePct }),
   }
 
   // Try upsert with extended fields first
@@ -488,7 +520,9 @@ export async function POST() {
       ...snapshot,
       // Always include computed values in response even if not saved to DB
       freedom_percentage: Math.round(freedomPercentage * 10) / 10,
-      fire_age: fireProjection.fireAge !== null ? Math.round(fireProjection.fireAge * 10) / 10 : null,
+      fire_age: snapshotFireAge,
+      stop_anchor: firePlan.anchor.kind,
+      coverage_pct: coveragePct,
       sovereignty_level: sovereigntyLevel,
       savings_rate: Math.round(savingsRate6m * 10) / 10,
       resilience_score: healthScore.total,
@@ -504,7 +538,8 @@ export async function POST() {
       freedom_percentage: Math.round(freedomPercentage * 10) / 10,
       fire_target: fireTarget,
       swr: fireSwr,
-      fire_age: fireProjection.fireAge,
+      fire_age: anchorFixed ? null : fireProjection.fireAge,
+      stop_anchor: firePlan.anchor.kind,
       sovereignty_level: sovereigntyLevel,
       savings_rate: Math.round(savingsRate6m * 10) / 10,
       resilience_score: healthScore.total,

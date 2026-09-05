@@ -290,6 +290,49 @@ export function computeFreedomProgressWithBasis(input: FreedomProgressBasisInput
   return computeFreedomProgress({ fireEligibleNetWorth: currentNetWorth, requiredPortfolio })
 }
 
+// ── Vrijheids-% per PLAN: kapitaalratio onder `solved`, dekking onder een vast anker ──
+
+/**
+ * De dekkings-invoer uit de canonieke kernel-run (bridge-velden, doorgegeven — niet
+ * herrekend): `kernelDepletionMonth` + `ankerMaand` uit `SimResult`, `eindMaand` =
+ * `eindMaandVan(displayEndAge, startLeeftijd)`. `null` = de run kon niet draaien.
+ */
+export interface FreedomCoverageInput {
+  kernelDepletionMonth: number | null
+  eindMaand: number
+  ankerMaand: number | null
+}
+
+/**
+ * DE keuze tussen de twee definities van register-getal 3 (ADR 0129 B3/D5/D8) —
+ * één home, drie loaders (dashboard/horizon/core) die 'm aanroepen.
+ *
+ *  - `anchorFixed === false` (`solved`) — de KAPITAALRATIO `computeFreedomProgressWithBasis`
+ *    (incl./excl. eigen woning, ADR 0034): hoe vol is de pot t.o.v. het FIRE-doel.
+ *  - `anchorFixed === true` (`aow`/`now`/`age`) — de DEKKING `computeRunwayCoveragePct`:
+ *    hoe ver reikt het liquide vermogen ná het stopmoment t.o.v. de eindleeftijd. Het
+ *    "doel" is onder een vast anker de geprojecteerde stand op het anker (bridge-vlag
+ *    `requiredFireIsAnchorPortfolio`), dus een kapitaalratio zou daar ~100 zijn voor
+ *    iedereen — betekenisloos. Zonder kernel-run (`coverage === null`) is de dekking
+ *    onbekend ⇒ 0: liever "0% — geen run" dan een kapitaalratio die iets anders meet.
+ *
+ * `anchorFixed` komt uit `SimResult.requiredFireIsAnchorPortfolio` (de run) of
+ * `isFixedAnchor(plan)` (het profiel, wanneer er geen run is) — allebei hetzelfde
+ * feit, nooit de legacy-strategienaam.
+ *
+ * GEVOLG (bewust, B3): gebruikers op het aow-anker ("Pensioenleeftijd") zagen tot F3a
+ * een kapitaalratio; hun percentage wordt nu de dekking van hun plan ná AOW.
+ */
+export function computeFreedomPctForPlan(input: {
+  anchorFixed: boolean
+  coverage: FreedomCoverageInput | null
+  basis: FreedomProgressBasisInput
+}): number {
+  if (!input.anchorFixed) return computeFreedomProgressWithBasis(input.basis)
+  if (input.coverage === null) return 0
+  return computeRunwayCoveragePct(input.coverage)
+}
+
 /**
  * Scalar-fallback voor de INCL.-woning noemer wanneer er GEEN unified projection
  * beschikbaar is (loaders/routes die alleen een strategie-loos `fireTarget` op de

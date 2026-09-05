@@ -4,7 +4,7 @@
  */
 import type { ReactNode } from 'react'
 import type { RegelSimSnapshot } from '@/lib/future/regel-sim'
-import type { FireStrategyConfig } from '@/lib/fire-strategy'
+import type { FirePlan, FireStrategyConfig } from '@/lib/fire-strategy'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import type { PotRulesConfig } from '@/lib/pot-rules'
 import type { WealthGroup } from '@/lib/wealth-composition'
@@ -36,6 +36,12 @@ export interface RegelBodyProps {
   // ── live-sim (regel 1 & 2) ──
   simSnapshot?: RegelSimSnapshot | null
   fireStrategy?: FireStrategyConfig
+  /**
+   * ADR 0129 — het volledige plan (anker + eind-vorm) uit de bundel. De
+   * eindstrategie-body leest hier het anker; `fireStrategy` is de legacy-echo (F4
+   * verwijdert 'm). Optioneel zodat de illustratieve bodies er niet van weten.
+   */
+  firePlan?: FirePlan | null
   withdrawalStrategy?: WithdrawalStrategyConfig
 
   // ── illustratief (regel 3/4/5) ──

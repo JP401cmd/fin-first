@@ -31,6 +31,7 @@ import type { LifeEvent } from '@/lib/horizon-data'
 import type { Recommendation } from '@/lib/recommendation-data'
 import type { Aandachtspunt, AandachtspuntDomain } from '@/lib/aandachtspunten'
 import type { BriefingEntry, HefboomTag } from '@/lib/types/briefing'
+import { formatStopAge } from '@/lib/horizon/anker-copy'
 
 /**
  * Health-pillar id → hefboom-tag. Plan T-3: tips visueel gekoppeld aan
@@ -152,6 +153,17 @@ export interface BriefingFinanceInput {
   currentAge?: number | null
   /** Vrijheidsleeftijd — context voor FIRE-voortgang. */
   fireAge?: number | null
+  /**
+   * ADR 0129 F3b — het stopmoment ligt VAST (aow/now/age). Dan is `fireAge` het anker
+   * en geen vrijheidsmoment: de FIRE-observatie zegt "Je rekent met stoppen op {stop};
+   * je liquide vermogen reikt tot je {reikt}e" i.p.v. "naar vrijheid rond je 47e"
+   * (bevinding 1).
+   */
+  stopAnchorFixed?: boolean
+  /** Het stopmoment (fractioneel) onder een vast anker; `null` = het nu-anker. */
+  stopAge?: number | null
+  /** Tot welke leeftijd het liquide vermogen reikt (uit de plan-runway); `null` = onbekend/gedekt zonder eind. */
+  reachesAge?: number | null
   /** Aantal openstaande acties — voor de acties-tip. */
   openActions?: number
   /** Som vrijheidsdagen te winnen uit open acties — voor de acties-tip. */
@@ -632,7 +644,24 @@ function buildFinanceEntries(finance: BriefingFinanceInput, now: Date): Briefing
   // 4. FIRE-voortgang — percentage naar volledige vrijheid (cross-hefboom).
   //    Met huidige + vrijheidsleeftijd wordt het een tijd-frame ("van je Xe
   //    nu naar vrijheid rond je Ye") — past bij "Geld is opgeslagen tijd".
-  if (finance.freedomPct != null && finance.freedomPct > 0) {
+  if (finance.stopAnchorFixed) {
+    // ADR 0129 — onder een vast anker is er geen "naar vrijheid rond je Xe": het
+    // stopmoment is een instelling; de uitspraak is hoe ver het liquide vermogen reikt.
+    const stopDeel =
+      finance.stopAge != null && Number.isFinite(finance.stopAge)
+        ? `Je rekent met stoppen op ${formatStopAge(finance.stopAge)}`
+        : 'Je rekent alsof je nu stopt'
+    const reiktDeel =
+      finance.reachesAge != null && Number.isFinite(finance.reachesAge)
+        ? `; je liquide vermogen reikt tot je ${Math.round(finance.reachesAge)}e.`
+        : '.'
+    out.push({
+      id: 'finance:fire',
+      category: 'observation',
+      text: `${stopDeel}${reiktDeel}`,
+      href: '/toekomst',
+    })
+  } else if (finance.freedomPct != null && finance.freedomPct > 0) {
     const pct = Math.round(finance.freedomPct)
     const ageSuffix =
       finance.currentAge && finance.fireAge

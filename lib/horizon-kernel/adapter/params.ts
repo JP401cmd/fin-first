@@ -20,8 +20,7 @@ import { ageAtDate } from '@/lib/horizon-data'
 import { BOX3_PARAMS, type TaxYear } from '@/lib/box3-data'
 import { resolveFireParams } from '@/lib/fire-params'
 import {
-  parseFirePlan,
-  resolveFireStrategyWithOverride,
+  resolveFirePlanWithOverride,
   type FireEndForm,
   type FirePlan,
 } from '@/lib/fire-strategy'
@@ -251,8 +250,9 @@ const END_FORM_TO_SELECTOR: Record<FireEndForm, Eindstrategie> = {
  * verliezen en als gewone deplete-run doorgerekend worden.
  */
 function resolveFirePlan(profile: KernelAdapterProfile): FirePlan {
-  const cfg = resolveFireStrategyWithOverride(profile)
-  return parseFirePlan({ ...profile, fire_end_strategy: cfg.strategy })
+  // Eén home (lib/fire-strategy.ts): de loaders geven hetzelfde plan naast hun
+  // bundel door, dus adapter en bundel kunnen niet van elkaar wegdrijven.
+  return resolveFirePlanWithOverride(profile)
 }
 
 /**

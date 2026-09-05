@@ -835,3 +835,49 @@ describe('DoelenView — brug naar het volgende doel (3b)', () => {
     expect(screen.getByRole('button', { name: /Kies je volgende doel/ })).toBeTruthy()
   })
 })
+
+/**
+ * ADR 0129 F3b (bijlage "Doelen") — een fire_age-doel onder een VAST stopmoment
+ * toont de n.v.t.-notitie uit de goal-loader (consume-only), geen "nu X → doel Y".
+ */
+describe('DoelenView — fire_age-doel onder een vast anker', () => {
+  const reden =
+    'Je stopmoment ligt vast op 62, dus dit doel heeft geen uitkomst om naar te kijken. Wat telt, is of je plan tot je 90e reikt.'
+
+  it('toont de notitie en geen meting', () => {
+    render(
+      <DoelenView
+        goals={[
+          mockGoal({
+            id: 'fire1',
+            name: 'Vrij op 58',
+            goal_type: 'fire_age',
+            target_value: 58,
+            current_value: 0,
+            notApplicableReason: reden,
+            metadata: { bron: 'parameter' },
+          } as Partial<GoalWithBudget>)
+        ]}
+        goalProgresses={[
+          { current: 0, target: 58, pct: 0, onTrack: false, measured: false, requiredMonthly: null, eta: null, paceSkipped: false, notApplicableReason: reden },
+        ]}
+      />,
+    )
+    expect(screen.getByTestId('fire-age-doel-nvt')).toHaveTextContent(reden)
+    expect(screen.queryByText(/^nu /)).toBeNull()
+    expect(screen.queryByText(/bekijk live in het lab/)).toBeNull()
+  })
+
+  it('zonder notitie (solved) blijft de bestaande kaart', () => {
+    render(
+      <DoelenView
+        goals={[mockGoal({ id: 'fire2', name: 'Vrij op 58', goal_type: 'fire_age', target_value: 58, current_value: 0, metadata: { bron: 'parameter' } } as Partial<GoalWithBudget>)]}
+        goalProgresses={[
+          { current: 0, target: 58, pct: 0, onTrack: false, measured: false, requiredMonthly: null, eta: null, paceSkipped: false },
+        ]}
+      />,
+    )
+    expect(screen.queryByTestId('fire-age-doel-nvt')).toBeNull()
+    expect(screen.getByText(/nog geen meting — bekijk live in het lab/)).toBeTruthy()
+  })
+})

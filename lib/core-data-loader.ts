@@ -15,8 +15,7 @@ import type { FireParams } from '@/lib/fire-params'
 import {
   type SavingsRateMethod,
   computeSavingsRateFromNetWorthDelta,
-  computeFreedomProgressWithBasis,
-  computeRunwayCoveragePct,
+  computeFreedomPctForPlan,
   inclHomeTargetFromScalar,
 } from '@/lib/core-metrics'
 import type { HealthScoreInput } from '@/lib/financial-health'
@@ -40,7 +39,14 @@ import { buildBudgetTypeMap, computeYearlyMustExpenses, computeRetirementExpense
 import { resolveFireParams } from '@/lib/fire-params'
 import { DEFAULT_RETURN, INFLATION, SAVINGS_RATE_WINDOW_MONTHS } from '@/lib/constants'
 import { ALL_MODULES } from '@/lib/module-registry'
-import { FIRE_PLAN_COLUMNS, parseFireStrategy, type FireStrategyConfig } from '@/lib/fire-strategy'
+import {
+  FIRE_PLAN_COLUMNS,
+  isFixedAnchor,
+  parseFireStrategy,
+  resolveFirePlanWithOverride,
+  type FirePlan,
+  type FireStrategyConfig,
+} from '@/lib/fire-strategy'
 import { ageAtDate } from '@/lib/horizon-data'
 import { loadCombinedCashStats, type CashAssetStats } from '@/lib/kpi-context'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
@@ -153,6 +159,12 @@ export interface CorePageData {
    * exact hetzelfde doelbedrag toont als de Horizon-pagina.
    */
   fireStrategy: FireStrategyConfig
+  /**
+   * Het plan als twee assen (ADR 0129): `anchor` (wanneer stop ik) × `endForm` (wat
+   * geldt aan het eind). `isFixedAnchor(firePlan)` is DE toets op een vast stopmoment;
+   * `fireStrategy.strategy === 'pensioen'` is een legacy-echo die F4 verwijdert.
+   */
+  firePlan: FirePlan
   /**
    * Huidige leeftijd in hele jaren of `null` als geboortedatum onbekend is.
    * Nodig om `yearsInRetirement` voor de deplete-strategie af te leiden;
@@ -793,6 +805,9 @@ export const loadCoreData = cache(async function loadCoreData(
   // Strategie + leeftijd: identiek aan Horizon's loaders zodat de FIRE-strip
   // op /core exact hetzelfde doelbedrag berekent als de Horizon-pagina.
   const fireStrategy = parseFireStrategy(profileResult.data ?? {})
+  // Het PLAN (stop-anker × eind-vorm, ADR 0129) naast de legacy-config — dezelfde
+  // rij-lezing als de kernel-adapter (`resolveFirePlanWithOverride`).
+  const firePlan: FirePlan = resolveFirePlanWithOverride(profileResult.data ?? {})
   const dobIso = profileResult.data?.date_of_birth ?? null
   const currentAge = dobIso ? ageAtDate(dobIso) : null
 
@@ -1333,29 +1348,38 @@ export const loadCoreData = cache(async function loadCoreData(
   const coreHomeExcludedFromFire = housingContext.hasEigenHuis && isHomeExcludedFromFire(housingStrategyCfg)
   const coreRequiredPortfolioExcl =
     fireTargetFromHorizon != null && fireTargetFromHorizon > 0 ? fireTargetFromHorizon : null
-  // ADR 0127 D5 — 'nu-stoppen': vrijheids-% = TIJDSDEKKING uit de gedeelde kernel-run
-  // (`computeHorizonFireSim`, React-cache() → dezelfde run die `fireTargetFromHorizon`
-  // al leverde; geen extra solve). `computeHorizonFireTarget` gaf hier al null-doelen
-  // (D4), dus zonder deze tak zou de score op 0 vallen.
+  // ADR 0129 B3/D5 — vast anker (aow/now/age): vrijheids-% = DEKKING uit de gedeelde
+  // kernel-run (`computeHorizonFireSim`, React-cache() → dezelfde run die
+  // `fireTargetFromHorizon` al leverde; geen extra solve). `computeHorizonFireTarget`
+  // gaf hier al null-doelen (D4), dus zonder deze tak zou de score op 0 vallen. Eén
+  // home (`computeFreedomPctForPlan`); de vlag uit de run, zonder run uit het plan.
   const coreSharedRun = await computeHorizonFireSim(supabase).catch(() => null)
   const coreStartAge = coreSharedRun?.rawContext?.profile?.date_of_birth
     ? ageAtDate(coreSharedRun.rawContext.profile.date_of_birth)
     : null
-  const coreFreedomPct =
-    coreSharedRun?.sim.requiredFireIsStartPortfolio === true && coreStartAge != null
-      ? computeRunwayCoveragePct({
-          kernelDepletionMonth: coreSharedRun.sim.kernelDepletionMonth ?? null,
-          eindMaand: eindMaandVan(coreSharedRun.sim.displayEndAge, coreStartAge),
-        })
-      : computeFreedomProgressWithBasis({
-          homeExcludedFromFire: coreHomeExcludedFromFire,
-          netWorthInclHome: netWorth,
-          fireEligibleNetWorth: coreFireEligibleNetWorth,
-          requiredNetWorthInclHome:
-            fireNetWorthTargetFromHorizon ??
-            inclHomeTargetFromScalar(coreRequiredPortfolioExcl, netWorth, coreFireEligibleNetWorth),
-          requiredPortfolioExclHome: coreRequiredPortfolioExcl,
-        })
+  const coreAnchorFixed = coreSharedRun
+    ? coreSharedRun.sim.requiredFireIsAnchorPortfolio === true
+    : isFixedAnchor(firePlan)
+  const coreFreedomPct = computeFreedomPctForPlan({
+    anchorFixed: coreAnchorFixed,
+    coverage:
+      coreSharedRun && coreStartAge != null
+        ? {
+            kernelDepletionMonth: coreSharedRun.sim.kernelDepletionMonth ?? null,
+            eindMaand: eindMaandVan(coreSharedRun.sim.displayEndAge, coreStartAge),
+            ankerMaand: coreSharedRun.sim.ankerMaand ?? null,
+          }
+        : null,
+    basis: {
+      homeExcludedFromFire: coreHomeExcludedFromFire,
+      netWorthInclHome: netWorth,
+      fireEligibleNetWorth: coreFireEligibleNetWorth,
+      requiredNetWorthInclHome:
+        fireNetWorthTargetFromHorizon ??
+        inclHomeTargetFromScalar(coreRequiredPortfolioExcl, netWorth, coreFireEligibleNetWorth),
+      requiredPortfolioExclHome: coreRequiredPortfolioExcl,
+    },
+  })
   const coreDebtMonthlyPayments = (debtsResult.data ?? []).reduce(
     (s, d) => s + Number((d as { monthly_payment?: number | string | null }).monthly_payment ?? 0),
     0,
@@ -1395,6 +1419,9 @@ export const loadCoreData = cache(async function loadCoreData(
       totalAssets: effectiveTotalAssets,
       totalDebts: effectiveTotalDebts,
       freedomPct: coreFreedomPct,
+      // Het anker waarop `coreFreedomPct` is bepaald (dekking vs. kapitaalratio) —
+      // de fire_progress-pijler oordeelt op dezelfde grondslag (ADR 0129 B3).
+      fireStopAnchor: firePlan.anchor.kind,
       currentAge,
       // Geen kernel-run op dit pad → zelfde snapshot-terugval als de
       // dashboard-loader (simFireAgeFractional ?? snapshotFireAge), zodat de
@@ -1618,6 +1645,7 @@ export const loadCoreData = cache(async function loadCoreData(
     retirementMethodUsed: activeRetirementMethod,
     fireParams,
     fireStrategy,
+    firePlan,
     currentAge,
     aowAge,
 

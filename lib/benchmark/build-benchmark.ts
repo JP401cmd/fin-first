@@ -43,6 +43,13 @@ const SOURCE_MODELLED_PEER: BenchmarkSource = {
 export interface BenchmarkUserMetrics {
   healthScoreTotal: number | null
   fireAgeFractional: number | null
+  /**
+   * Het stop-anker van het plan (ADR 0129 F3a). Onder een vast anker (`aow`/`now`/
+   * `age`) is `fireAgeFractional` het anker en geen vrijheidsleeftijd — de peer-
+   * vergelijking op vrijheidsleeftijd is dan n.v.t. (met reden). Optioneel/additief:
+   * weggelaten ⇒ `solved` (bestaand gedrag).
+   */
+  fireStopAnchor?: 'solved' | 'aow' | 'now' | 'age'
   savingsRate6m: number | null
   netWorth: number | null
   /** Geschat jaarinkomen — canoniek effectief inkomen (dashboardData.monthlyIncome×12), bruto jaarinkomen als fallback. */
@@ -96,8 +103,10 @@ export function buildBenchmarkReport(args: BuildBenchmarkArgs): BenchmarkReportD
     metrics.push(buildHealthMetric(user.healthScoreTotal, peer.healthScoreTotal))
     addSource(SOURCE_MODELLED_PEER)
 
-    // 2. Vrijheidsleeftijd (gemodelleerde peer; lager = eerder vrij = beter)
-    metrics.push(buildFireAgeMetric(user.fireAgeFractional, peer.fireAge))
+    // 2. Vrijheidsleeftijd (gemodelleerde peer; lager = eerder vrij = beter). Onder een
+    //    vast stop-anker (ADR 0129) is er geen vrijheidsleeftijd om te vergelijken.
+    const anchorFixed = user.fireStopAnchor != null && user.fireStopAnchor !== 'solved'
+    metrics.push(buildFireAgeMetric(anchorFixed ? null : user.fireAgeFractional, peer.fireAge, anchorFixed))
 
     // 3. Spaarquote (indicatieve referentie)
     metrics.push(buildSavingsMetric(user.savingsRate6m, ref.savingsRatePct))
@@ -160,9 +169,12 @@ function buildHealthMetric(userValue: number | null, ref: number): BenchmarkMetr
   }
 }
 
-function buildFireAgeMetric(userValue: number | null, ref: number | null): BenchmarkMetric {
+function buildFireAgeMetric(userValue: number | null, ref: number | null, anchorFixed = false): BenchmarkMetric {
   let caption = 'Je vrijheidsleeftijd is nog niet in zicht.'
-  if (userValue != null && ref != null) {
+  if (anchorFixed) {
+    // ADR 0129 F3a — n.v.t. mét reden: het stopmoment is een instelling, geen uitkomst.
+    caption = 'Niet van toepassing: je stopmoment ligt vast, dus er is geen vrijheidsleeftijd om met een peer te vergelijken.'
+  } else if (userValue != null && ref != null) {
     const d = userValue - ref // negatief = eerder vrij = beter
     const yrs = Math.abs(d)
     const label = yrs < 0.5 ? 'rond dezelfde leeftijd' :

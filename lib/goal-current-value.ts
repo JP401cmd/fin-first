@@ -52,6 +52,7 @@ import {
   isVrijheidsgetalGoal,
   type VrijheidsgetalSnapshot,
 } from '@/lib/goals/vrijheidsgetal-goal'
+import { fireAgeGoalNotApplicableReason } from '@/lib/horizon/anker-copy'
 
 /**
  * Minimale velden die de doel-`current_value`-sync leest/muteert. Zowel het
@@ -73,6 +74,8 @@ export type SyncableGoal = {
   metadata?: Record<string, unknown> | null
   linked_asset_id?: string | null
   linked_debt_id?: string | null
+  /** Leespad-override, zie `Goal.notApplicableReason` (lib/goal-data.ts). */
+  notApplicableReason?: string | null
 }
 
 /**
@@ -750,6 +753,25 @@ export async function syncActiveGoalValues<T extends SyncableGoal>(
   if (kernelFireAge != null && Number.isFinite(kernelFireAge) && kernelFireAge > 0) {
     for (const gl of injectionSet) {
       if (gl.goal_type === 'fire_age') gl.current_value = kernelFireAge
+    }
+  }
+
+  // ADR 0129 F3a — onder een VAST stopmoment (aow/now/age) heeft een fire_age-doel
+  // geen uitkomst: de kernel-"vrijheidsleeftijd" ís het anker, dus het doel las
+  // meteen "behaald" (onder `now`: fireAge = de huidige leeftijd ≤ elk streefgetal).
+  // Geen waarde (0 ⇒ "nog geen meting" in computeGoalProgress) + de reden voor de
+  // doelkaart. Ook de snapshotkolom-terugval hierboven wordt zo overschreven: die
+  // draagt een scalar-leeftijd die onder een vast anker evenmin iets betekent.
+  if (fireSnapshot?.stopAnchor != null && fireSnapshot.stopAnchor !== 'solved') {
+    const reden = fireAgeGoalNotApplicableReason(
+      fireSnapshot.stopAnchor,
+      fireSnapshot.stopAge ?? null,
+      fireSnapshot.endAge ?? null,
+    )
+    for (const gl of injectionSet) {
+      if (gl.goal_type !== 'fire_age') continue
+      gl.current_value = 0
+      gl.notApplicableReason = reden
     }
   }
 

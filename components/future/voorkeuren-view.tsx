@@ -5,9 +5,10 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { SlidersHorizontal, ArrowRight, TrendingUp, Wallet, Pencil } from 'lucide-react'
 import type { FireParams } from '@/lib/fire-params'
-import type { FireStrategyConfig } from '@/lib/fire-strategy'
+import type { FirePlan, FireStrategyConfig } from '@/lib/fire-strategy'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { STRATEGY_LABELS } from '@/lib/fire-strategy'
+import { STOP_ANCHOR_OPTIONS, formatPlanAge } from '@/lib/horizon/plan-draft'
 import { GlossaryTerm } from '@/components/editorial/glossary-term'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { DepthSection } from '@/components/app/depth-section'
@@ -120,6 +121,7 @@ function surplusLabel(s: SurplusGroup): string {
 export function VoorkeurenView({
   fireParams,
   fireStrategy,
+  firePlan = null,
   withdrawalStrategy,
   fireAge,
   simRows,
@@ -129,6 +131,8 @@ export function VoorkeurenView({
 }: {
   fireParams: FireParams
   fireStrategy: FireStrategyConfig
+  /** ADR 0129 — het volledige plan (stop-anker + eind-vorm); voedt de plan-regel. */
+  firePlan?: FirePlan | null
   withdrawalStrategy: WithdrawalStrategyConfig
   /** Vrijheidsleeftijd (gerond) voor AfbouwOverzichtCard. */
   fireAge?: number | null
@@ -180,7 +184,16 @@ export function VoorkeurenView({
     }
   }
 
-  const endStrategy = STRATEGY_LABELS[fireStrategy.strategy]
+  // ADR 0129 — de plan-kaart toont de EIND-VORM als naam en het STOP-ANKER als
+  // ondertitel: twee assen, twee regels. Zonder plan (oude bundel) de legacy-label.
+  const endStrategy = firePlan ? STRATEGY_LABELS[firePlan.endForm] : STRATEGY_LABELS[fireStrategy.strategy]
+  const ankerLabel = (() => {
+    if (!firePlan) return null
+    const a = firePlan.anchor
+    if (a.kind === 'age') return `Stopmoment: op ${formatPlanAge(a.age)}`
+    const opt = STOP_ANCHOR_OPTIONS.find((o) => o.kind === a.kind)
+    return opt ? `Stopmoment: ${opt.name.charAt(0).toLowerCase()}${opt.name.slice(1)}` : null
+  })()
   const wsLabel = WITHDRAWAL_LABELS[withdrawalStrategy.strategy] ?? {
     name: withdrawalStrategy.strategy,
     subtitle: 'Onbekende strategie',
@@ -324,6 +337,7 @@ export function VoorkeurenView({
             label="Eindstrategie"
             value={endStrategy?.name ?? fireStrategy.strategy}
             subtitle={
+              ankerLabel ??
               endStrategy?.subtitle ??
               `Eindleeftijd ${fireStrategy.endAge}, doel ${
                 fireStrategy.legacyAmount > 0 ? `€${fireStrategy.legacyAmount}` : '€0'
@@ -427,6 +441,7 @@ export function VoorkeurenView({
         onSaved={() => router.refresh()}
         simSnapshot={simSnapshot}
         fireStrategy={fireStrategy}
+        firePlan={firePlan}
         withdrawalStrategy={withdrawalStrategy}
         potRules={regelVoorkeuren}
         potBalances={potBalances}

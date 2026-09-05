@@ -291,6 +291,14 @@ export interface KernelUnifiedResult extends UnifiedProjectionResult {
    */
   readonly ankerMaand: number | null
   /**
+   * Het stopmoment van DEZE RUN als LEEFTIJD (fractioneel) — `solve.vastStopLeeftijd`,
+   * doorgegeven zonder afronding. Bewust náást `fireAge` (= `ceil(fireAgeFractional)`):
+   * een gekozen 58,5 werd als "jouw stopmoment" 59 zodra een oppervlak `fireAge` las
+   * (bevinding 11, Fable-review). Onder een vast anker is dít het getal voor "jij stopt
+   * op …"; `null` wanneer de bisectie het stopmoment zocht (ADR 0129 F3a).
+   */
+  readonly vastStopLeeftijd: number | null
+  /**
    * `true` ⇒ het stopmoment ligt VAST, dus `requiredFirePortfolio`/
    * `requiredFireNetWorth` zijn de GEPROJECTEERDE stand op het anker en géén
    * "benodigd vermogen" (ADR 0129 D4). De kernel bisecteert onder een vast anker op
@@ -1014,6 +1022,7 @@ export function kernelToUnifiedResult(
     requiredFireIsAnchorPortfolio,
     stopAnker,
     ankerMaand,
+    vastStopLeeftijd: solve.vastStopLeeftijd,
     implicitWithdrawalRate,
     strategy,
     targetEndPortfolio: solve.doelbedrag,

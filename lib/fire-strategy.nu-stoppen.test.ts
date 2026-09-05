@@ -6,6 +6,7 @@ import {
   isFinanciallyFree,
   parseFireStrategy,
   resolveFireStrategyWithOverride,
+  resolveFreedomAnchor,
   resolveFreedomFraming,
 } from './fire-strategy'
 
@@ -97,18 +98,20 @@ describe("isFinanciallyFree onder 'nu-stoppen' (D5)", () => {
 })
 
 describe("resolveFreedomFraming — 'nu-stoppen'", () => {
-  it("nog niet gedekt → 'building'", () => {
-    expect(resolveFreedomFraming({ freedomPct: 60, currentAge: 42, fireAge: 42, strategy: 'nu-stoppen' })).toBe('building')
+
+  it("gedekt → 'free' (ADR 0129 D8: de gate staat open — het nu-anker is per definitie bereikt); het anker reist apart mee", () => {
+    const input = { freedomPct: 100, currentAge: 42, fireAge: 42, strategy: 'nu-stoppen' as const, aowAge: 67 }
+    expect(resolveFreedomFraming(input)).toBe('free')
+    expect(resolveFreedomAnchor(input)).toEqual({ kind: 'now' })
   })
 
-  it("gedekt → 'nu-stoppen' (eigen framing, geen 'free'/'pensioen'-claim)", () => {
-    expect(
-      resolveFreedomFraming({ freedomPct: 100, currentAge: 42, fireAge: 42, strategy: 'nu-stoppen', aowAge: 67 }),
-    ).toBe('nu-stoppen')
+  it("nog niet gedekt → 'anchored' (vast anker, geen '% op weg')", () => {
+    expect(resolveFreedomFraming({ freedomPct: 60, currentAge: 42, fireAge: 42, strategy: 'nu-stoppen' })).toBe('anchored')
   })
 
   it('de bestaande framings zijn ongewijzigd', () => {
     expect(resolveFreedomFraming({ freedomPct: 100, currentAge: 50, fireAge: 50, strategy: 'deplete', aowAge: 67 })).toBe('free')
-    expect(resolveFreedomFraming({ freedomPct: 100, currentAge: 68, fireAge: 67, strategy: 'pensioen', aowAge: 67 })).toBe('pensioen')
+    // legacy 'pensioen' ⇒ aow-anker; bereikt (68 ≥ 67) ∧ gedekt ⇒ 'free' (woordkeuze "pensioen" via isAtOrPastAow).
+    expect(resolveFreedomFraming({ freedomPct: 100, currentAge: 68, fireAge: 67, strategy: 'pensioen', aowAge: 67 })).toBe('free')
   })
 })

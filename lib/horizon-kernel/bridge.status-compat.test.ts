@@ -139,20 +139,14 @@ describe('bron-grendel — elke TEKORT-status die de bridge voor een live anker 
   )
   const isTekort = (s: SolverStatus) => s.endsWith('_shortfall')
 
-  // F3b — het `age`-anker (contract-ronde, eigenaar-besluit 5 sep 2026). Bewust NIET
-  // geweigerd in PUT: geen UI schrijft het nog (exposure nul) en F3a's D8-gate sluit
-  // het structureel — weigeren nu is churn bij F3b. Zodra F3b het generieke
-  // `anchor_shortfall`-blok bouwt, gaat deze rij de `it.each` hierboven in. Tot dan
-  // zegt /overzicht bij een stopleeftijd in het verleden "je bent vrij" bij 40%
-  // dekking (`isFinanciallyFree` kent het anker niet, ADR 0129 D8).
-  it.todo(
-    "age (F3b): { fire_stop_anchor: 'age', fire_stop_age: 65 } trekt een tekort én `anchor_shortfall` heeft een blok in horizon-client — zie ADR 0129 F3b/D8",
-  )
-
+  // F3b — het `age`-anker: sinds het generieke `anchor_shortfall`-blok in horizon-client
+  // (ADR 0129 D3) is dit een gewone rij in de matrix; de UI schrijft het anker nu ook
+  // (Voorkeuren, strategie-modal, "Maak dit mijn plan").
   it.each([
     ['aow (pensioen-gebruiker)', { fire_stop_anchor: 'aow' } as const],
     ['aow via legacy-kolom', { fire_end_strategy: 'pensioen' } as const],
     ['nu', { fire_stop_anchor: 'now' } as const],
+    ['age (F3b)', { fire_stop_anchor: 'age', fire_stop_age: 65 } as const],
   ])('%s: het scenario trekt een tekort én dat tekort heeft een blok in horizon-client', (_naam, rij) => {
     const { bridge } = bridgedStatus(rij)
     // Eerst bewijzen dat het scenario überhaupt een tekort is — anders toetst de

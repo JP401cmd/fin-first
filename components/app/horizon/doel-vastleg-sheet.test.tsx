@@ -196,3 +196,43 @@ describe('DoelVastlegSheet (rendert alleen afwijkende parameters)', () => {
     expect(screen.getByRole('button', { name: 'Doel bijwerken' })).toBeInTheDocument()
   })
 })
+
+/**
+ * ADR 0129 F3b (bijlage "Doelen") — onder een VAST stopmoment schrijft het lab geen
+ * fire_age-doel: de vrijheidsleeftijd-preview verdwijnt uit de lijst én uit de
+ * submit-set, en de reden staat als notitie in de sheet.
+ */
+describe('DoelVastlegSheet — vast anker: geen fire_age-doel', () => {
+  const previews: DoelParameterPreview[] = [
+    { parameter: 'spaarquote', label: 'Spaarquote', waarde: '45%' },
+    { parameter: 'fire', label: 'Vrijheidsleeftijd', waarde: 'Vrij op 58,5 jr · ≥ 2,0 jr marge' },
+  ]
+  const reden =
+    'Je stopmoment ligt vast op 62, dus dit doel heeft geen uitkomst om naar te kijken. Wat telt, is of je plan tot je 90e reikt.'
+
+  it('filtert de fire-preview weg en toont de notitie', () => {
+    render(
+      <DoelVastlegSheet open onClose={vi.fn()} previews={previews} onSubmit={vi.fn()} fireAgeNietVanToepassing={reden} />,
+    )
+    expect(screen.getByText('Spaarquote')).toBeInTheDocument()
+    expect(screen.queryByText('Vrijheidsleeftijd')).not.toBeInTheDocument()
+    expect(screen.getByTestId('doel-fire-age-nvt')).toHaveTextContent(reden)
+  })
+
+  it('fire komt ook niet in de submit-set terecht', () => {
+    const onSubmit = vi.fn()
+    render(
+      <DoelVastlegSheet open onClose={vi.fn()} previews={previews} onSubmit={onSubmit} fireAgeNietVanToepassing={reden} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Leg vast als mijn doel' }))
+    expect(onSubmit).toHaveBeenCalledWith({ spaarquote: true })
+  })
+
+  it('zonder de prop verandert er niets (solved)', () => {
+    const onSubmit = vi.fn()
+    render(<DoelVastlegSheet open onClose={vi.fn()} previews={previews} onSubmit={onSubmit} />)
+    expect(screen.queryByTestId('doel-fire-age-nvt')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Leg vast als mijn doel' }))
+    expect(onSubmit).toHaveBeenCalledWith({ spaarquote: true, fire: true })
+  })
+})

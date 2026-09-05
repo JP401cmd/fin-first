@@ -1176,3 +1176,58 @@ describe('buildBriefingEntries — check-in-reflectie', () => {
     expect(result.find((e) => e.id.startsWith('checkin:'))).toBeUndefined()
   })
 })
+
+/**
+ * ADR 0129 F3b (bevinding 1) — onder een VAST stopmoment noemt de FIRE-observatie
+ * het stopmoment en het bereik, nooit "naar vrijheid rond je Xe".
+ */
+describe('buildBriefingEntries — FIRE-observatie onder een vast anker', () => {
+  it('age 58,5 met bereik 83: "Je rekent met stoppen op 58,5; je liquide vermogen reikt tot je 83e."', () => {
+    const out = buildBriefingEntries(
+      emptyInput({
+        finance: {
+          netWorthHistory: [],
+          monthlyExpenses: 2000,
+          monthlyIncome: 3000,
+          freedomPct: 62,
+          currentAge: 45,
+          fireAge: 59,
+          stopAnchorFixed: true,
+          stopAge: 58.5,
+          reachesAge: 83.4,
+        },
+      }),
+    )
+    const fire = out.find((e) => e.id === 'finance:fire')
+    expect(fire?.text).toBe('Je rekent met stoppen op 58,5; je liquide vermogen reikt tot je 83e.')
+    expect(fire?.text).not.toMatch(/vrijheid rond je/)
+  })
+
+  it('nu-anker zonder bereik: alleen het stopmoment', () => {
+    const out = buildBriefingEntries(
+      emptyInput({
+        finance: {
+          netWorthHistory: [],
+          monthlyExpenses: 2000,
+          monthlyIncome: 3000,
+          freedomPct: 40,
+          currentAge: 47,
+          fireAge: 47,
+          stopAnchorFixed: true,
+          stopAge: null,
+          reachesAge: null,
+        },
+      }),
+    )
+    expect(out.find((e) => e.id === 'finance:fire')?.text).toBe('Je rekent alsof je nu stopt.')
+  })
+
+  it('solved: de bestaande zin blijft', () => {
+    const out = buildBriefingEntries(
+      emptyInput({
+        finance: { netWorthHistory: [], monthlyExpenses: 2000, monthlyIncome: 3000, freedomPct: 62, currentAge: 45, fireAge: 58 },
+      }),
+    )
+    expect(out.find((e) => e.id === 'finance:fire')?.text).toContain('naar vrijheid rond je 58e')
+  })
+})

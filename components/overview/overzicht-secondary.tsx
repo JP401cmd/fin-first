@@ -18,6 +18,7 @@ import {
 import { VrijheidStrip } from './overzicht-hero/vrijheid-strip'
 import type { FreedomFraming } from '@/lib/fire-strategy'
 import type { NuStoppenReach } from '@/lib/horizon/nu-stoppen-copy'
+import type { AnkerReach, AnkerStop } from '@/lib/horizon/anker-copy'
 import { PageStatusDot } from '@/components/app/page-status-dot'
 import { WelcomeGuideDot } from './welcome-guide-dot'
 import {
@@ -63,6 +64,8 @@ export type OverzichtSecondaryProps = {
    * (`resolveFreedomFraming`). Stuurt de Vrijheid-strip. Default 'building'.
    */
   freedomFraming?: FreedomFraming
+  /** ADR 0129 — onder 'free': "met pensioen" i.p.v. "vrij" (`isAtOrPastAow`). */
+  freedomFreeAsPensioen?: boolean
   /**
    * M6: de motor gaf een vrijheidsleeftijd die niet kán kloppen (parkeerstand op
    * het horizonplafond). De strip toont dan een gegevensmelding i.p.v. een
@@ -75,6 +78,14 @@ export type OverzichtSecondaryProps = {
    * reikt tot leeftijd X). `null` bij elke andere strategie.
    */
   nuStoppenReach?: NuStoppenReach | null
+  /** ADR 0129 F3b — het bereik onder ÉLK vast anker (aow/now/age), uit de plan-runway. */
+  ankerReach?: AnkerReach | null
+  /** Het stopmoment bij `ankerReach` ("nu" / "op 58,5"). */
+  ankerStop?: AnkerStop | null
+  /** "Vrij mogelijk vanaf" (D7, tweede run); `null` = onbekend/onbereikbaar. */
+  solvedFireAge?: number | null
+  /** Eindleeftijd van het plan — voor "plan loopt tot {eind}". */
+  planEndAge?: number | null
   /** Briefing-entries onder de hero (max 6, 3-koloms grid). */
   briefingEntries?: BriefingEntry[]
   /** ISO-tijdstip waarop de briefing voor vandaag is vastgezet ("Bijgewerkt …"). */
@@ -131,8 +142,13 @@ export function OverzichtSecondary({
   currentAge,
   fireAge,
   freedomFraming = 'building',
+  freedomFreeAsPensioen = false,
   freedomDataIssue = false,
   nuStoppenReach = null,
+  ankerReach = null,
+  ankerStop = null,
+  solvedFireAge = null,
+  planEndAge = null,
   briefingEntries,
   briefingRefreshedAt,
   briefingDataChanged,
@@ -240,8 +256,13 @@ export function OverzichtSecondary({
                   currentAge={currentAge ?? null}
                   fireAge={fireAge ?? null}
                   framing={freedomFraming}
+                  freeAsPensioen={freedomFreeAsPensioen}
                   dataIssue={freedomDataIssue}
                   nuStoppenReach={nuStoppenReach}
+                  ankerReach={ankerReach}
+                  ankerStop={ankerStop}
+                  solvedFireAge={solvedFireAge}
+                  planEndAge={planEndAge}
                 />
               </>
             }
@@ -258,8 +279,13 @@ export function OverzichtSecondary({
               currentAge={currentAge ?? null}
               fireAge={fireAge ?? null}
               framing={freedomFraming}
+              freeAsPensioen={freedomFreeAsPensioen}
               dataIssue={freedomDataIssue}
               nuStoppenReach={nuStoppenReach}
+              ankerReach={ankerReach}
+              ankerStop={ankerStop}
+              solvedFireAge={solvedFireAge}
+              planEndAge={planEndAge}
             />
           </>
         )}

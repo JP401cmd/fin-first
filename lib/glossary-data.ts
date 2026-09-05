@@ -403,17 +403,54 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
     explanation:
       'Je neemt alleen op wat je vermogen bovenop de inflatie oplevert, zodat de koopkracht van je vermogen intact blijft. De voorzichtigste variant, en dus de traagste weg naar vrijheid.',
   },
+  // Overgangsvormen (F4 verwijdert ze): 'pensioen' en 'nu-stoppen' zijn sinds ADR 0129
+  // geen eind-vormen meer maar STOP-ANKERS (zie `stopanker_aow` / `stopanker_now`).
   eindstrategie_pensioen: {
     name: 'Pensioenleeftijd',
-    alternative: 'Opbouwen tot je pensioen',
+    alternative: 'Stoppen op je AOW-leeftijd',
     explanation:
-      'Je bouwt op tot je AOW-leeftijd en gaat pas daarna onttrekken; wat overblijft is je nalatenschap. Handig als je niet eerder wilt stoppen met werken.',
+      'Oude naam voor het stopmoment "op mijn AOW-leeftijd": je werkt door tot je AOW ingaat en de app laat zien of je vermogen dan tot het einde van je plan reikt.',
   },
   'eindstrategie_nu-stoppen': {
     name: 'Nu stoppen',
     alternative: 'Werken stopt vandaag',
     explanation:
-      'Het model rekent alsof je vandaag stopt met werken en laat zien tot welke leeftijd je vermogen dan reikt. Er is geen doelbedrag: de vraag is hoe lang het geld strekt, niet hoeveel je nog moet opbouwen.',
+      'Oude naam voor het stopmoment "nu": het model rekent alsof je vandaag stopt met werken en laat zien tot welke leeftijd je liquide vermogen dan reikt.',
+  },
+
+  // ── Stopmoment en de vier ankers (ADR 0129) ─────────────────────────────
+  // De plan-regel stelt twee vragen: WANNEER stop je (het stopmoment, vier
+  // ankers) en WAT moet er aan het eind gelden (de eind-vorm hierboven).
+  // Keys volgen `stopanker_<StopAnchorKind>`.
+  stopmoment: {
+    name: 'Stopmoment',
+    alternative: 'Wanneer je stopt met werken',
+    explanation:
+      'Het moment waarop je in je plan stopt met werken en gaat leven van je vermogen. Je kiest het zelf (een leeftijd, je AOW-leeftijd of nu), of je laat de app uitrekenen wanneer het kan. Los daarvan kies je wat er aan het eind van je plan moet gelden.',
+  },
+  stopanker_solved: {
+    name: 'Laat de app het uitrekenen',
+    alternative: 'De app zoekt je vroegste stopmoment',
+    explanation:
+      'De app zoekt de vroegste leeftijd waarop je vermogen je plan draagt. Dat is je vrijheidsleeftijd: het moment waarop werken een keuze wordt.',
+  },
+  stopanker_aow: {
+    name: 'Op mijn AOW-leeftijd',
+    alternative: 'Doorwerken tot je AOW ingaat',
+    explanation:
+      'Je werkt door tot je AOW ingaat. De app laat zien of je vermogen dan tot het einde van je plan reikt, en vanaf welke leeftijd vrij al mogelijk was geweest.',
+  },
+  stopanker_age: {
+    name: 'Op een leeftijd die ik kies',
+    alternative: 'Zelf een stopleeftijd kiezen',
+    explanation:
+      'Jij kiest het moment, in halve jaren. De app laat zien hoe het dan loopt: tot welke leeftijd je liquide vermogen reikt en vanaf wanneer vrij al mogelijk was.',
+  },
+  stopanker_now: {
+    name: 'Nu',
+    alternative: 'Rekenen alsof je vandaag stopt',
+    explanation:
+      'Je rekent alsof je vandaag stopt. Er is dan geen doelbedrag: de vraag is tot welke leeftijd je liquide vermogen reikt, niet hoeveel je nog moet opbouwen.',
   },
 }
 

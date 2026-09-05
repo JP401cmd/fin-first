@@ -110,15 +110,17 @@ export function guardFreedomAge(age: number | null | undefined): HorizonOutcomeG
  * is het bedrag de geprojecteerde EINDSTAND op de horizon, niet "benodigd bij
  * FIRE" — een andere grootheid, die we niet als doelbedrag presenteren.
  *
- * `isStartPortfolio` = `SimResult.requiredFireIsStartPortfolio` (ADR 0127 D4): FIRE
- * op maand 0 ('nu-stoppen'), het bedrag is het huidige vermogen — geen doel. Wint
- * van elke bedragtoets: ook een positief getal is hier geen doelbedrag.
+ * `isAnchorPortfolio` = `SimResult.requiredFireIsAnchorPortfolio` (ADR 0129 D4): het
+ * stopmoment ligt VAST (aow/now/age), het bedrag is de geprojecteerde stand op het
+ * anker — geen doel. Wint van elke bedragtoets: ook een positief getal is hier geen
+ * doelbedrag. `isStartPortfolio` (ADR 0127 D4, alleen FIRE-maand 0) is de oude,
+ * smallere vlag en blijft geaccepteerd tot F4 — elk nieuw pad geeft de anker-vlag.
  */
 export function guardFireTarget(
   amount: number | null | undefined,
-  opts: { isEndOfHorizonFallback?: boolean; isStartPortfolio?: boolean } = {},
+  opts: { isEndOfHorizonFallback?: boolean; isStartPortfolio?: boolean; isAnchorPortfolio?: boolean } = {},
 ): HorizonOutcomeGuard {
-  if (opts.isStartPortfolio === true) return issue('geen-doelvermogen')
+  if (opts.isAnchorPortfolio === true || opts.isStartPortfolio === true) return issue('geen-doelvermogen')
   if (amount == null || !Number.isFinite(amount)) return issue('geen-gegevens')
   if (amount <= 0) return issue('onmogelijk-bedrag')
   if (opts.isEndOfHorizonFallback === true) return issue('geen-fire-moment')

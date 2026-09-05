@@ -8,8 +8,12 @@ import { MODULE_CATALOG, getModuleLabel, type ModuleId } from '@/lib/module-regi
 import { createClient } from '@/lib/supabase/client'
 import { getDefaultBudgets } from '@/lib/budget-data'
 import { BudgetAmountEditor } from '@/components/onboarding/budget-amount-editor'
-import { STRATEGY_LABELS, type FireEndStrategy } from '@/lib/fire-strategy'
-import { EINDSTRATEGIE_VOLGORDE, toontEindleeftijd } from '@/lib/horizon/eindstrategie-volgorde'
+import { StopPlanVragen } from '@/components/horizon/stop-plan-vragen'
+import {
+  planDraftToFireSettingsBody,
+  validatePlanDraft,
+  type PlanDraft,
+} from '@/lib/horizon/plan-draft'
 import type { RetirementExpenseMethod } from '@/lib/budget-utils'
 import {
   BarChart3,
@@ -204,9 +208,8 @@ interface LifeEventForm {
 }
 
 interface HorizonForm {
-  fire_end_strategy: FireEndStrategy
-  fire_end_age: string
-  fire_legacy_amount: string
+  /** ADR 0129 — het plan als twee vragen (stop-anker + eind-vorm). */
+  plan: PlanDraft
   retirement_expense_method: RetirementExpenseMethod
   retirement_custom_amount: string
   temporal_balance: number
@@ -262,9 +265,7 @@ function createLifeEvent(): LifeEventForm {
 
 function createHorizonDefaults(): HorizonForm {
   return {
-    fire_end_strategy: 'deplete',
-    fire_end_age: '90',
-    fire_legacy_amount: '',
+    plan: { anchor: 'solved', stopAge: null, endForm: 'deplete', endAge: 90, legacyAmount: 0 },
     retirement_expense_method: 'essential_budgets',
     retirement_custom_amount: '',
     temporal_balance: 3,
@@ -690,17 +691,16 @@ function StepForms({
 
       // ── Save horizon settings ──
       if (hasHorizon) {
-        // Save FIRE strategy + expense method via API
+        // ADR 0129 — het volledige plan (anker + eind-vorm) via dezelfde helper als
+        // Voorkeuren; een ongeldig plan komt niet bij de route (leesbare fout hier).
+        if (!validatePlanDraft(horizon.plan).ok) {
+          throw new Error('Controleer je stopmoment en eindleeftijd.')
+        }
         const res = await fetch('/api/fire-settings', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            fire_end_strategy: horizon.fire_end_strategy,
-            fire_end_age: parseInt(horizon.fire_end_age) || 90,
-            fire_legacy_amount:
-              horizon.fire_end_strategy === 'legacy'
-                ? parseFloat(horizon.fire_legacy_amount) || null
-                : null,
+            ...planDraftToFireSettingsBody(horizon.plan),
             retirement_expense_method: horizon.retirement_expense_method,
             retirement_expense_custom_amount:
               horizon.retirement_expense_method === 'custom_amount'
@@ -1237,72 +1237,19 @@ function HorizonStep({
     <section className="space-y-6">
       <h4 className="text-sm font-semibold text-[var(--ink)]">Toekomstplanning instellen</h4>
 
-      {/* Section A: Eindstrategie */}
+      {/* Section A: het plan als twee vragen (ADR 0129 B13) — gespiegeld uit
+          Voorkeuren via hetzelfde component. Zonder geboortedatum in deze modal is de
+          AOW-leeftijd onbekend; de AOW-toets op de eindleeftijd blijft dan stil en de
+          route + Voorkeuren vangen 'm later op. */}
       <div className="space-y-3">
-        <p className="text-xs font-medium text-[var(--ink-2)]">A. Eindstrategie</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {/* Volgorde uit één bron (ADR 0127) — zie lib/horizon/eindstrategie-volgorde.ts. */}
-          {EINDSTRATEGIE_VOLGORDE.map(
-            (key) => {
-              const meta = STRATEGY_LABELS[key]
-              const isSelected = horizon.fire_end_strategy === key
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => updateField('fire_end_strategy', key)}
-                  className={`flex flex-col items-start gap-1 border p-3 text-left transition-all min-h-[44px] ${
-                    isSelected
-                      ? 'border-horizon-400 bg-horizon-50 ring-1 ring-horizon-400'
-                      : 'border-[var(--border-ed)] hover:border-[var(--border-md)] hover:bg-[var(--subtle)]/50'
-                  }`}
-                >
-                  <span
-                    className={`text-sm font-medium ${
-                      isSelected ? 'text-horizon-700' : 'text-[var(--ink)]'
-                    }`}
-                  >
-                    {meta.name}
-                  </span>
-                  <span className="text-[11px] text-[var(--ink-3)] leading-snug">
-                    {meta.subtitle}
-                  </span>
-                </button>
-              )
-            },
-          )}
-        </div>
-
-        {/* Conditional fields based on strategy */}
-        <div className="flex gap-3">
-          {/* ADR 0127 — onder 'Nu stoppen' is de eindleeftijd de lat waar het vermogen
-              tot moet reiken; de handmatige drieledige conditie liet 'm daar weg. */}
-          {toontEindleeftijd(horizon.fire_end_strategy) && (
-            <FormField label="Eindleeftijd" className="flex-1">
-              <input
-                type="number"
-                min={50}
-                max={120}
-                value={horizon.fire_end_age}
-                onChange={(e) => updateField('fire_end_age', e.target.value)}
-                className="w-full min-h-[44px] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-horizon-400"
-              />
-            </FormField>
-          )}
-          {horizon.fire_end_strategy === 'legacy' && (
-            <FormField label="Erfenisbedrag" className="flex-1">
-              <input
-                type="number"
-                min={0}
-                step={1000}
-                placeholder="0"
-                value={horizon.fire_legacy_amount}
-                onChange={(e) => updateField('fire_legacy_amount', e.target.value)}
-                className="w-full min-h-[44px] border border-[var(--border-ed)] bg-[var(--paper)] px-3 py-2 text-sm text-[var(--ink)] font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-horizon-400"
-              />
-            </FormField>
-          )}
-        </div>
+        <p className="text-xs font-medium text-[var(--ink-2)]">A. Stopmoment en eindstrategie</p>
+        <StopPlanVragen
+          compact
+          value={horizon.plan}
+          onChange={(plan) => updateField('plan', plan)}
+          errors={validatePlanDraft(horizon.plan).errors}
+          aowAge={null}
+        />
       </div>
 
       {/* Section B: Pensioenuitgaven — verwijderd uit UI.

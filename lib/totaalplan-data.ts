@@ -26,8 +26,10 @@
  * Pure module: geen Supabase/fs/Math.random (de MC-ruis is deterministisch;
  * `runMonteCarlo` is sin-hash-gebaseerd). Server- én test-bruikbaar.
  */
-import type { FireEndStrategy } from '@/lib/fire-strategy'
+import { stopAnchorFromKernel, type FireEndStrategy } from '@/lib/fire-strategy'
 import type { Aandachtspunt } from '@/lib/aandachtspunten'
+import { ankerReachFromSim, ankerReachesAge } from '@/lib/horizon/anker-copy'
+import { solveFireAgeWithoutAnchor } from '@/lib/horizon/scenario-presets'
 import { toSimResult } from '@/lib/unified-projection'
 import {
   computeConvergentieProjection,
@@ -99,6 +101,18 @@ export interface ProjectieData {
   displayEndAge: number
   /** Gebruikte eindstrategie. */
   strategy: FireEndStrategy
+  /**
+   * Het stop-anker van het plan (ADR 0129 F3a). Onder een vast anker (`aow`/`now`/`age`)
+   * is `fireAge` het anker en geen vrijheidsleeftijd; het rapport toont dan de drie
+   * velden hieronder i.p.v. "Vrijheidsleeftijd (FIRE)" (labels: F3b).
+   */
+  stopAnchor?: 'solved' | 'aow' | 'now' | 'age'
+  /** GEKOZEN STOPMOMENT — `SimResult.vastStopLeeftijd` (fractioneel; 58,5 blijft 58,5). `null` onder `solved`. */
+  gekozenStopmoment?: number | null
+  /** VRIJ MOGELIJK VANAF — de opgeloste leeftijd zónder anker (tweede run, D7). `null` onder `solved` of onbereikbaar. */
+  vrijMogelijkVanaf?: number | null
+  /** REIKT TOT — tot welke leeftijd het liquide vermogen reikt (uitputting, eindleeftijd bij dekking). `null` onder `solved`/onbekend. */
+  reiktTot?: number | null
   /** Volledig vermogenspad (nettoVermogen-grondslag). */
   vermogenspad: ProjectieVermogenspadPunt[]
   /** Eindwaarde netto vermogen (laatste projectierij). */
@@ -211,6 +225,10 @@ function buildProjectie(
       fireLiquidePot: 0,
       displayEndAge: 0,
       strategy: 'perpetual',
+      stopAnchor: 'solved',
+      gekozenStopmoment: null,
+      vrijMogelijkVanaf: null,
+      reiktTot: null,
       vermogenspad: [],
       eindwaardeNettoVermogen: 0,
     }
@@ -218,6 +236,22 @@ function buildProjectie(
 
   const result = outcome.result
   const sim = toSimResult(result)
+
+  // ADR 0129 F3a — onder een vast anker: stopmoment uit de run (nooit `fireAge`, die is
+  // `ceil`), "vrij mogelijk vanaf" uit de tweede run (één bisectie, alleen hier), en
+  // het bereik uit dezelfde run als de rijen. `stopAnchor` uit de kernel-echo.
+  const stopAnchor = stopAnchorFromKernel(sim.stopAnker).kind
+  const anchorFixed = stopAnchor !== 'solved'
+  const reiktTot = anchorFixed
+    ? ankerReachesAge(
+        ankerReachFromSim({
+          startAge: currentAge,
+          kernelDepletionMonth: sim.kernelDepletionMonth,
+          endAge: sim.displayEndAge,
+        }),
+      )
+    : null
+  const vrijMogelijkVanaf = anchorFixed ? solveFireAgeWithoutAnchor(rawContext) : null
 
   const vermogenspad: ProjectieVermogenspadPunt[] = result.rows.map((r) => ({
     year: r.year,
@@ -247,6 +281,10 @@ function buildProjectie(
     fireLiquidePot: Math.round(sim.requiredFirePortfolio),
     displayEndAge: sim.displayEndAge,
     strategy: sim.strategy,
+    stopAnchor,
+    gekozenStopmoment: anchorFixed ? (sim.vastStopLeeftijd ?? null) : null,
+    vrijMogelijkVanaf,
+    reiktTot,
     vermogenspad,
     eindwaardeNettoVermogen,
   }

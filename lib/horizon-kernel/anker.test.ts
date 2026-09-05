@@ -344,7 +344,7 @@ describe('convergentie-router — erft het anker zonder eigen tak', () => {
  * `requiredFireIsEndOfHorizonFallback`, zodat de weergavelaag geen doelbedrag toont
  * (M6-vangrail) in plaats van de eindstand op leeftijd 100 als "benodigd vermogen".
  */
-describe('negatieve FIRE-maand — vastgepind, niet gerepareerd', () => {
+describe('negatieve FIRE-maand — de projectie is maand-0-identiek; de "stand bij FIRE" leest sinds F3a óók maand 0', () => {
   const OUDE_LEEFTIJD = 70
   const oudFx = buildCompleetHorizonFixture(OUDE_LEEFTIJD)
   const oudProfiel: ConvergentieRawProfileRow = {
@@ -371,9 +371,17 @@ describe('negatieve FIRE-maand — vastgepind, niet gerepareerd', () => {
     expect(solve.projection.summary.fireMonth).toBeLessThan(0)
   })
 
-  it('(a) `nettoLiquideBijFire` is null ⇒ de bridge valt terug op de eind-horizonstand én markeert dat', () => {
+  it('(a) F3a-K: `nettoLiquideBijFire` is J(0) — de bridge valt NIET terug op de eind-horizonstand en markeert dat óók niet', () => {
+    // Vóór F3a las de samenvatting `prognose[fireMonth]` met fireMonth < 0 ⇒ undefined ⇒
+    // de bridge nam de EIND-horizonstand als "requiredFirePortfolio" én zette
+    // `requiredFireIsEndOfHorizonFallback`. Onder een vast anker wordt dat getal vanaf
+    // F3a zichtbaar ("vermogen op je stopmoment"), dus de leesindex klemt nu op maand 0 —
+    // exact zoals de maandloop de stop al rekende (Notion-kaart 3d0f9e8d).
     const solve = solveFire(oudInput)
-    expect(solve.projection.summary.nettoLiquideBijFire).toBeNull()
+    expect(solve.projection.summary.fireMonth).toBeLessThan(0)
+    expect(solve.projection.summary.nettoLiquideBijFire).toBe(prognoseJ(solve.projection, 0))
+    expect(solve.projection.summary.nettoLiquideBijFire).not.toBeNull()
+    expect(solve.projection.summary.nettoVermogenBijFire).not.toBeNull()
     const { assetSlotMeta, debtSlotMeta } = buildKernelSlotMeta(
       oudFx.assets,
       oudFx.debts,
@@ -385,12 +393,16 @@ describe('negatieve FIRE-maand — vastgepind, niet gerepareerd', () => {
       assetSlotMeta,
       debtSlotMeta,
     })
-    expect(unified.requiredFireIsEndOfHorizonFallback).toBe(true)
+    expect(unified.requiredFireIsEndOfHorizonFallback).toBe(false)
+    expect(unified.requiredFirePortfolio).toBe(prognoseJ(solve.projection, 0))
+    expect(unified.requiredFirePortfolio).not.toBe(solve.projection.summary.eindNettoLiquide)
     // De maand-0-vlag staat bewust UIT (de FIRE-maand is niet 0 maar negatief); de
     // anker-vlag staat WEL aan — het stopmoment ligt vast, dus er is geen doelvermogen.
     expect(unified.requiredFireIsStartPortfolio).toBe(false)
     expect(unified.requiredFireIsAnchorPortfolio).toBe(true)
     expect(unified.ankerMaand).toBeLessThan(0)
+    // Het stopmoment van de run reist als LEEFTIJD mee (bevinding 11): de AOW, niet `ceil(fireAge)`.
+    expect(unified.vastStopLeeftijd).toBe(AOW_FALLBACK)
   })
 
   it('(b) een geforceerde stop VÓÓR de startleeftijd is PROJECTIE-IDENTIEK aan FIRE-maand 0', () => {
@@ -411,11 +423,25 @@ describe('negatieve FIRE-maand — vastgepind, niet gerepareerd', () => {
     }
     expect(eerder.projection.summary.eindNettoLiquide).toBe(opStart.projection.summary.eindNettoLiquide)
 
-    // HET ENIGE VERSCHIL zit in de samenvatting: maand −24 bestaat niet, dus de
-    // "stand bij FIRE" is null waar hij bij maand 0 een echt getal is. Dát is wat de
-    // bridge naar de eind-horizon-terugval duwt.
-    expect(eerder.projection.summary.nettoLiquideBijFire).toBeNull()
-    expect(opStart.projection.summary.nettoLiquideBijFire).not.toBeNull()
+    // F3a-K: óók de samenvatting leest de effectieve stopmaand (maand 0) — de "stand bij
+    // FIRE" is voor een stop in het verleden dus hetzelfde echte getal als bij een stop
+    // op de startleeftijd, en de bridge markeert geen eind-horizon-terugval meer.
+    expect(eerder.projection.summary.nettoLiquideBijFire).toBe(opStart.projection.summary.nettoLiquideBijFire)
+    expect(eerder.projection.summary.nettoLiquideBijFire).not.toBeNull()
+    expect(unifiedVan(input, eerder).requiredFireIsEndOfHorizonFallback).toBe(false)
+    expect(unifiedVan(input, eerder).requiredFirePortfolio).toBe(unifiedVan(input, opStart).requiredFirePortfolio)
+    // De samenvatting blijft de NEGATIEVE FIRE-maand rapporteren (geen stille correctie).
+    expect(eerder.projection.summary.fireMonth).toBe(-24)
+  })
+
+  it('(c) binnen het oracle-domein (FIRE-maand ≥ 0) is de klem de identiteit', () => {
+    const input = makeInput()
+    for (const age of [PINNED_AGE, 50, 58]) {
+      const solve = evaluateFireAt(input, age)
+      const m = solve.projection.summary.fireMonth
+      expect(m).toBeGreaterThanOrEqual(0)
+      expect(solve.projection.summary.nettoLiquideBijFire).toBe(prognoseJ(solve.projection, m))
+    }
   })
 })
 

@@ -124,16 +124,28 @@ export interface DoelVastlegSheetProps {
   saving?: boolean
   /** Geeft de aangevinkte parameters terug; de parent doet de PUT. */
   onSubmit: (gekozen: Partial<Record<DoelParameter, true>>) => void
+  /**
+   * ADR 0129 (bijlage "Doelen") — onder een VAST stopmoment schrijft het lab géén
+   * `fire_age`-doel: de `fire`-preview wordt uit de lijst gehouden en deze reden
+   * (uit `fireAgeGoalNotApplicableReason`) staat er als notitie. `null` = solved.
+   */
+  fireAgeNietVanToepassing?: string | null
 }
 
 export function DoelVastlegSheet({
   open,
   onClose,
-  previews,
+  previews: allePreviews,
   bijwerken = false,
   saving = false,
   onSubmit,
+  fireAgeNietVanToepassing = null,
 }: DoelVastlegSheetProps) {
+  // Onder een vast anker valt de vrijheidsleeftijd-parameter weg (zie prop-doc); ook
+  // `submit()` leest deze gefilterde lijst, zodat `fire` nooit alsnog meegaat.
+  const previews = fireAgeNietVanToepassing
+    ? allePreviews.filter((p) => p.parameter !== 'fire')
+    : allePreviews
   // Vinkjes: default alles aan. Reset zodra de sheet (her)opent of de afwijkende set wijzigt.
   const [checked, setChecked] = useState<Partial<Record<DoelParameter, boolean>>>({})
   const previewKey = previews.map((p) => p.parameter).join(',')
@@ -194,6 +206,14 @@ export function DoelVastlegSheet({
           aannames je vastlegt — ze verschijnen als doel in je toekomst en je voortgang wordt bijgehouden.
           De gestippelde lijn heet daarna <em className="font-normal not-italic text-[var(--ink)]">Jouw doel</em>.
         </p>
+        {fireAgeNietVanToepassing && (
+          <p
+            data-testid="doel-fire-age-nvt"
+            className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)] bg-[var(--subtle)]/40 px-3 py-2 font-sans text-[12px] leading-snug text-[var(--ink-2)]"
+          >
+            {fireAgeNietVanToepassing}
+          </p>
+        )}
 
         <ul className="space-y-0 border-t border-[var(--border-ed)]">
           {previews.map((p) => (

@@ -25,12 +25,8 @@
 // als het kopgetal in de hero-KPI. Zie de noot bij `VrijheidsleeftijdZinInput`.
 
 import { heroFireAgeYear } from './hero-fire-age'
-import {
-  nuStoppenZin,
-  nuStoppenZinKort,
-  type NuStoppenReach,
-} from './nu-stoppen-copy'
-import type { FreedomFraming } from '@/lib/fire-strategy'
+import { ankerZin, ankerZinKort, type AnkerReach, type AnkerStop } from './anker-copy'
+import type { FreedomFraming, StopAnchor } from '@/lib/fire-strategy'
 
 /**
  * Welke boodschap de zin draagt.
@@ -66,24 +62,36 @@ export interface VrijheidsleeftijdZinInput {
    */
   freedomAge: number | null
   /**
-   * Uitkomst van `resolveFreedomFraming()` (lib/fire-strategy.ts). Bij `'free'`
-   * of `'pensioen'` is de leeftijd geen belofte meer maar een feit, en zegt de
-   * zin dat ook. Default `'building'`.
+   * Uitkomst van `resolveFreedomFraming()` (lib/fire-strategy.ts). Bij `'free'` is
+   * de leeftijd geen belofte meer maar een feit, en zegt de zin dat ook. Default
+   * `'building'`. ('anchored' — een vast anker, nog niet vrij — wordt hier gedragen
+   * door `ankerReach`: die zin gaat over bereik, niet over een moment.)
    */
   framing?: FreedomFraming
-  /** Toont de pagina de AOW-/pensioenleeftijd i.p.v. een FIRE-leeftijd? */
+  /**
+   * Het anker waarop `framing` is beoordeeld (`FreedomAgeView.anchor`); bepaalt onder
+   * 'free' de woordkeuze "pensioen" (aow-anker) vs. "keuze" (de rest). Optioneel:
+   * weggelaten ⇒ `isPensioen` (legacy) beslist.
+   */
+  anchor?: StopAnchor | null
+  /** Toont de pagina de AOW-/pensioenleeftijd i.p.v. een FIRE-leeftijd? (legacy; zie `anchor`). */
   isPensioen?: boolean
   /**
-   * ADR 0127 — eindstrategie 'Nu stoppen'. Dan gaat deze zin NIET over een
-   * moment ("werken wordt een keuze rond je 53e") maar over BEREIK: het
-   * stopmoment ligt al vast op vandaag, dus de enige uitspraak is tot welke
-   * leeftijd het vermogen reikt. Zonder deze invoer zou de leeftijd-tak de
-   * runway-leeftijd als vrijheidsmoment aankondigen — een belofte die het
-   * getal niet draagt.
+   * ADR 0129 — een VAST stop-anker (aow/now/age). Dan gaat deze zin NIET over een
+   * moment ("werken wordt een keuze rond je 53e") maar over BEREIK: het stopmoment
+   * ligt al vast, dus de enige uitspraak is tot welke leeftijd het vermogen reikt.
+   * Zonder deze invoer zou de leeftijd-tak de bereik-leeftijd als vrijheidsmoment
+   * aankondigen — een belofte die het getal niet draagt.
    *
-   * Consume-only: afgeleid met `nuStoppenReachFromSim` uit dezelfde kernel-run.
+   * Consume-only: afgeleid met `ankerReachFromSim` uit dezelfde kernel-run. Het
+   * stopmoment (`ankerStop`) geeft de zin haar aanhef ("nu" / "op 62"); weggelaten
+   * ⇒ het nu-anker (het gedrag van vóór F3a onder 'nu-stoppen').
    */
-  nuStoppenReach?: NuStoppenReach | null
+  ankerReach?: AnkerReach | null
+  /** Het stopmoment bij `ankerReach` (`ankerStopFromSim`); weggelaten ⇒ `{ kind: 'now' }`. */
+  ankerStop?: AnkerStop | null
+  /** @deprecated F4 — alias van `ankerReach` voor lezers van vóór F3a. */
+  nuStoppenReach?: AnkerReach | null
   /**
    * Rekent de kernel nog? Dan `kind: 'berekenen'` en rendert het oppervlak niets.
    */
@@ -113,9 +121,8 @@ export interface VrijheidsleeftijdZin {
 const LEEG: VrijheidsleeftijdZin = { kind: 'berekenen', lead: '', ageLabel: null, tail: '', text: '' }
 
 /**
- * Is dit een leeftijd waar we een zin op mogen bouwen? Dezelfde drempel als
- * `toekomst-welcome.tsx` hanteerde: eindig én positief, zodat er nooit "rond je
- * undefined" of "rond je -3e" op het scherm komt.
+ * Is dit een leeftijd waar we een zin op mogen bouwen? Eindig én positief,
+ * zodat er nooit "rond je undefined" of "rond je -3e" op het scherm komt.
  */
 function heeftLeeftijd(age: number | null | undefined): age is number {
   return age != null && Number.isFinite(age) && age > 0
@@ -143,20 +150,21 @@ export function buildVrijheidsleeftijdZin(
 ): VrijheidsleeftijdZin {
   const variant = input.variant ?? 'duiding'
   const framing = input.framing ?? 'building'
-  const isPensioen = input.isPensioen === true
+  const isPensioen = input.anchor ? input.anchor.kind === 'aow' : input.isPensioen === true
   const naam = input.subjectName?.trim() || null
 
   if (input.pending) return LEEG
 
-  // ── 'Nu stoppen' (ADR 0127) ───────────────────────────────────────
-  // Wint van elke andere tak: onder dit anker is er geen vrijheidsMOMENT om aan
-  // te kondigen (`fireAge` í́s de startleeftijd), alleen een bereik. Alleen in de
-  // eigen weergave — een perspectiefweergave gaat over iemand anders' plan.
-  if (input.nuStoppenReach != null && !naam) {
-    const reach = input.nuStoppenReach
+  // ── Vast stop-anker (ADR 0129; vóór F3a alleen 'Nu stoppen', ADR 0127) ────
+  // Wint van elke andere tak: onder een vast anker is er geen vrijheidsMOMENT om aan
+  // te kondigen (`fireAge` ís het anker), alleen een bereik. Alleen in de eigen
+  // weergave — een perspectiefweergave gaat over iemand anders' plan.
+  const reach = input.ankerReach ?? input.nuStoppenReach
+  if (reach != null && !naam) {
+    const stop: AnkerStop = input.ankerStop ?? { kind: 'now' }
     return samenstellen(
       'nu-al',
-      variant === 'inline' ? nuStoppenZinKort(reach) : nuStoppenZin(reach),
+      variant === 'inline' ? ankerZinKort(reach, stop) : ankerZin(reach, stop),
       null,
       '',
     )
@@ -166,22 +174,26 @@ export function buildVrijheidsleeftijdZin(
   // Dan is de leeftijd geen vooruitzicht meer. Alleen relevant voor de eigen
   // weergave; in een perspectiefweergave gaat de zin over iemand anders en valt
   // de eigen framing weg (precies zoals `showFreeHero` in horizon-client).
-  if (framing !== 'building' && !naam) {
-    // 'nu-stoppen' (ADR 0127): geen belofte over een moment maar over bereik —
-    // beschrijvend, nooit "je kunt nu stoppen".
-    const zin =
-      framing === 'pensioen'
-        ? 'Je pensioen is ingegaan — werken is nu een keuze.'
-        : framing === 'nu-stoppen'
-          ? 'Als je nu stopt, reikt je vermogen tot je eindleeftijd.'
-          : 'Werken is voor jou nu al een keuze.'
+  // 'anchored' (vast anker, nog niet vrij) zonder bereik-invoer valt hieronder
+  // NIET — dan is er (nog) geen uitspraak en volgt de gewone leeftijd-tak.
+  if (framing === 'free' && !naam) {
+    // Het nu-anker (ADR 0127/0129): 'free' betekent daar GEDEKT — een uitspraak over
+    // bereik, geen "werken is een keuze" (het plan ís al stoppen). Zonder bereik-invoer
+    // is de enige eerlijke zin de plan-eind-vorm; de grondslag heet liquide vermogen.
+    if (input.anchor?.kind === 'now') {
+      const gedekt = { kind: 'gedekt' as const, endAge: null }
+      return samenstellen(
+        'nu-al',
+        variant === 'inline' ? ankerZinKort(gedekt, { kind: 'now' }) : ankerZin(gedekt, { kind: 'now' }),
+        null,
+        '',
+      )
+    }
+    const zin = isPensioen
+      ? 'Je pensioen is ingegaan — werken is nu een keuze.'
+      : 'Werken is voor jou nu al een keuze.'
     if (variant === 'inline') {
-      const inline =
-        framing === 'pensioen'
-          ? 'je pensioen is ingegaan'
-          : framing === 'nu-stoppen'
-            ? 'je vermogen reikt tot je eindleeftijd als je nu stopt'
-            : 'werken is nu al een keuze'
+      const inline = isPensioen ? 'je pensioen is ingegaan' : 'werken is nu al een keuze'
       return samenstellen('nu-al', inline, null, '')
     }
     return samenstellen('nu-al', zin, null, '')

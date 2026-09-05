@@ -25,7 +25,7 @@ import { BOX3_PARAMS, CURRENT_TAX_YEAR, classifyAsset } from '@/lib/box3-data'
 import type { Asset } from '@/lib/asset-data'
 import { emergencyTargetBasis, resolveEmergencyFundFromRows } from '@/lib/emergency-fund'
 import { buildBudgetTypeMap } from '@/lib/budget-utils'
-import type { FireEndStrategy } from '@/lib/fire-strategy'
+import type { FireEndStrategy, StopAnchorKind } from '@/lib/fire-strategy'
 import {
   buildBudgetSpendingMap,
   spentForBudget,
@@ -368,10 +368,16 @@ export interface HealthScoreScalars {
    */
   fireAgeFractional: number | null
   /**
-   * Eindstrategie van het plan (ADR 0127 D5) — onder 'nu-stoppen' oordeelt de
-   * fire_progress-pijler op tijdsdekking i.p.v. peer-relatief. Optioneel/additief.
+   * @deprecated F4 (ADR 0129) — legacy-label; alleen nog de terugval wanneer
+   * `fireStopAnchor` ontbreekt ('nu-stoppen' ⇒ now, 'pensioen' ⇒ aow).
    */
   fireEndStrategy?: FireEndStrategy
+  /**
+   * Het stop-anker van het plan (ADR 0129 B3) — onder een VAST anker (aow/now/age) is
+   * `freedomPct` de DEKKING en oordeelt de fire_progress-pijler daar rechtstreeks op,
+   * niet peer-relatief. Optioneel/additief (oude snapshots, mocks ⇒ `solved`).
+   */
+  fireStopAnchor?: StopAnchorKind
   /** 6-maands gemiddelde maanduitgaven — terugval-noemer van de noodbuffer. */
   avgMonthlyExpenses: number
   /**
@@ -455,6 +461,7 @@ export function buildHealthScoreInput(
     currentAge: scalars.currentAge,
     fireAgeFractional: scalars.fireAgeFractional,
     fireEndStrategy: scalars.fireEndStrategy,
+    fireStopAnchor: scalars.fireStopAnchor,
     netMonthlyIncome: scalars.netMonthlyIncome,
     debtMonthlyPayments: rows.debtMonthlyPayments,
     emergencyFundMonths: computeEmergencyFundMonths(

@@ -11,8 +11,19 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/format'
 import { type FinancialInput, type LifeEvent, ageAtDate } from '@/lib/horizon-data'
-import { NL_AOW_AGE } from '@/lib/constants'
-import { FIRE_PLAN_COLUMNS, parseFireStrategy, type FireStrategyConfig } from '@/lib/fire-strategy'
+import { FIRE_PLAN_COLUMNS, type FireStrategyConfig } from '@/lib/fire-strategy'
+import { lookupAowAge } from '@/lib/aow-leeftijd'
+import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
+import { StopPlanVragen } from '@/components/horizon/stop-plan-vragen'
+import {
+  planDraftEquals,
+  planDraftFromSettings,
+  planDraftToFireSettingsBody,
+  validatePlanDraft,
+  formatPlanAge,
+  STOP_ANCHOR_OPTIONS,
+  type PlanDraft,
+} from '@/lib/horizon/plan-draft'
 import {
   type WithdrawalStrategyConfig,
   type WithdrawalProfiel,
@@ -49,16 +60,15 @@ import {
   HOUSING_STRATEGY_LABELS,
   type HousingStrategyConfig,
 } from '@/lib/housing-strategy'
-import { type FireEndStrategy, STRATEGY_LABELS } from '@/lib/fire-strategy'
-import { EINDSTRATEGIE_VOLGORDE } from '@/lib/horizon/eindstrategie-volgorde'
+import { STRATEGY_LABELS } from '@/lib/fire-strategy'
 import {
-  NU_STOPPEN_KPI_LABEL,
-  nuStoppenKort,
-  nuStoppenReachFromSim,
-  nuStoppenReachYear,
-  type NuStoppenReach,
-} from '@/lib/horizon/nu-stoppen-copy'
-import { ArrowLeft, Shield, TrendingUp, TrendingDown, Activity, Landmark, Settings, Info, Loader2, Banknote, Heart, Hourglass, Infinity as InfinityIcon } from 'lucide-react'
+  ANKER_KPI_LABEL,
+  ankerKort,
+  ankerReachFromSim,
+  ankerReachYear,
+  type AnkerReach,
+} from '@/lib/horizon/anker-copy'
+import { ArrowLeft, Shield, TrendingUp, TrendingDown, Activity, Settings, Info, Loader2 } from 'lucide-react'
 import { MaskedAmount } from '@/components/app/masked-amount'
 
 // ── Onttrekkingsprofiel-metadata (Dutch) ────────────────────────────────────
@@ -174,10 +184,12 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
   // Warning when withdrawal columns couldn't be loaded
   const [strategyWarning, setStrategyWarning] = useState<string | null>(null)
 
-  // End strategy editing state
-  const [localEndStrategy, setLocalEndStrategy] = useState<FireEndStrategy>('deplete')
-  const [localEndAge, setLocalEndAge] = useState<string>('90')
-  const [localLegacyAmount, setLocalLegacyAmount] = useState<string>('')
+  // Plan-regel (ADR 0129 B13): de modal spiegelt de twee vragen van Voorkeuren via
+  // hetzelfde `StopPlanVragen`-component en bewaart per (geldige) wijziging — het
+  // opgeslagen plan reist mee zodat "gewijzigd" en "ongeldig" uit elkaar blijven.
+  const [planDraft, setPlanDraft] = useState<PlanDraft>({ anchor: 'solved', stopAge: null, endForm: 'deplete', endAge: 90, legacyAmount: 0 })
+  const [savedPlan, setSavedPlan] = useState<PlanDraft | null>(null)
+  const debouncedPlan = useDebouncedValue(planDraft, 600)
   const [endStrategySaving, setEndStrategySaving] = useState(false)
   const [endStrategyMessage, setEndStrategyMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
@@ -295,21 +307,18 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
 
       const dob = profileResult.data?.date_of_birth ?? null
 
-      // Use fire-settings API for pensioen fallback support
-      let parsedFireStrategy = parseFireStrategy(profileResult.data ?? {})
+      // Het plan (anker + eind-vorm) uit /api/fire-settings — die route lost de
+      // override-schaduwkolom al op; de profielrij is de terugval. Geen handmatige
+      // strategie-allowlist meer (ADR 0129, ontwerpprincipe 5): `planDraftFromSettings`
+      // leest beide rijvormen.
+      let plan = planDraftFromSettings(profileResult.data ?? {})
       try {
         const fsRes = await fetch('/api/fire-settings')
-        if (fsRes.ok) {
-          const fsData = await fsRes.json()
-          if (['perpetual', 'legacy', 'deplete', 'pensioen'].includes(fsData.fire_end_strategy)) {
-            parsedFireStrategy = { strategy: fsData.fire_end_strategy, endAge: fsData.fire_end_age ?? 90, legacyAmount: Number(fsData.fire_legacy_amount ?? 0) }
-          }
-        }
+        if (fsRes.ok) plan = planDraftFromSettings(await fsRes.json())
       } catch { /* fallback to profile data */ }
-      setFireStrategy(parsedFireStrategy)
-      setLocalEndStrategy(parsedFireStrategy.strategy)
-      setLocalEndAge(String(parsedFireStrategy.endAge))
-      setLocalLegacyAmount(parsedFireStrategy.legacyAmount > 0 ? String(parsedFireStrategy.legacyAmount) : '')
+      setFireStrategy({ strategy: plan.endForm, endAge: plan.endAge, legacyAmount: plan.legacyAmount })
+      setPlanDraft(plan)
+      setSavedPlan(plan)
 
       // Resolve withdrawal strategy from separate wsData (defensive) — levert de
       // guardrail floor/ceiling voor de bandbreedte-kaart. Het gekozen PROFIEL
@@ -343,36 +352,24 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
 
   // ── Save end strategy changes ────────────────────────────────────────────
 
-  const saveEndStrategy = useCallback(async (
-    strategy: FireEndStrategy,
-    endAge: string,
-    legacyAmount: string,
-  ) => {
+  const savePlan = useCallback(async (plan: PlanDraft) => {
     setEndStrategySaving(true)
     setEndStrategyMessage(null)
 
     try {
-      // Use fire-settings API which handles CHECK constraint fallback for pensioen
+      // Altijd het volledige plan (route-contract R3): eind-vorm + anker, nooit een
+      // legacy-label als 'pensioen'.
       const res = await fetch('/api/fire-settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fire_end_strategy: strategy,
-          fire_end_age: Number(endAge) || 90,
-          fire_legacy_amount: legacyAmount ? Number(legacyAmount) : null,
-        }),
+        body: JSON.stringify(planDraftToFireSettingsBody(plan)),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Opslaan mislukt')
 
-      // Update simulation state
-      const newConfig: FireStrategyConfig = {
-        strategy,
-        endAge: Number(endAge) || 90,
-        legacyAmount: Number(legacyAmount) || 0,
-      }
-      setFireStrategy(newConfig)
-      setEndStrategyMessage({ type: 'success', text: 'Eindstrategie opgeslagen!' })
+      setFireStrategy({ strategy: plan.endForm, endAge: plan.endAge, legacyAmount: plan.legacyAmount })
+      setSavedPlan(plan)
+      setEndStrategyMessage({ type: 'success', text: 'Plan opgeslagen.' })
       setTimeout(() => setEndStrategyMessage(null), 3000)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Opslaan mislukt'
@@ -382,29 +379,24 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
     }
   }, [])
 
-  // Handler for end strategy card click — saves immediately
-  const handleEndStrategyChange = useCallback((strategy: FireEndStrategy) => {
-    setLocalEndStrategy(strategy)
-    // When switching to pensioen, ensure endAge is at least 90 so the chart
-    // shows the full timeline beyond AOW. Previous implementation may have
-    // stored endAge=67 (equal to AOW age).
-    const age = strategy === 'pensioen' ? String(Math.max(Number(localEndAge) || 90, 90)) : localEndAge
-    if (strategy === 'pensioen' && age !== localEndAge) setLocalEndAge(age)
-    saveEndStrategy(strategy, age, localLegacyAmount)
-  }, [saveEndStrategy, localEndAge, localLegacyAmount])
-
-  // Handler for end age / legacy amount changes — saves on blur
-  const handleEndAgeBlur = useCallback(() => {
-    saveEndStrategy(localEndStrategy, localEndAge, localLegacyAmount)
-  }, [saveEndStrategy, localEndStrategy, localEndAge, localLegacyAmount])
-
-  const handleLegacyAmountBlur = useCallback(() => {
-    saveEndStrategy(localEndStrategy, localEndAge, localLegacyAmount)
-  }, [saveEndStrategy, localEndStrategy, localEndAge, localLegacyAmount])
-
   // ── Derived values ──────────────────────────────────────────────────────
 
   const currentAge = input?.dateOfBirth ? ageAtDate(input.dateOfBirth) : null
+  // AOW uit de gebruikerstabel (dezelfde lookup als de kernel-tijdas) — niet de
+  // wettelijke terugval hardcoden. Voedt de AOW-toets op de eindleeftijd (M2).
+  const aowAgeFractional = input?.dateOfBirth ? lookupAowAge(kernelAowRows ?? [], input.dateOfBirth).fractional : null
+  const planValidatie = validatePlanDraft(planDraft, { aowAge: aowAgeFractional })
+
+  // Autosave (600 ms rust) zodra het concept geldig én gewijzigd is. De modal
+  // bewaarde vóór F3b per klik/blur; met een leeftijd-invoer erbij is "bewaar als
+  // het klopt" de enige vorm die geen half plan wegschrijft.
+  useEffect(() => {
+    if (loading || savedPlan === null) return
+    if (planDraftEquals(debouncedPlan, savedPlan)) return
+    if (!validatePlanDraft(debouncedPlan, { aowAge: aowAgeFractional }).ok) return
+    void savePlan(debouncedPlan)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedPlan, savedPlan, loading])
   const yearlyExpenses = input?.yearlyMustExpenses ?? 0
   const strategyForSim = useMemo<FireStrategyConfig>(
     () => fireStrategy ?? { strategy: 'deplete' as const, endAge: 90, legacyAmount: 0 },
@@ -609,9 +601,11 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
    * dus dat raakt elke opening. Zet nieuwe hooks hier, niet verderop.
    */
   const reachVoor = useCallback(
-    (sim: SimResult): NuStoppenReach =>
-      nuStoppenReachFromSim({
-        startAge: sim.fireAge ?? currentAge,
+    (sim: SimResult): AnkerReach =>
+      ankerReachFromSim({
+        // De kernel-tijdas begint op de huidige leeftijd — onder een aow-/age-anker is
+        // `fireAge` het anker zelf, dus nooit als startleeftijd gebruiken (F3a).
+        startAge: currentAge,
         kernelDepletionMonth: sim.kernelDepletionMonth,
         endAge: sim.displayEndAge,
       }),
@@ -695,9 +689,17 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <div className="inline-flex items-center gap-1.5 rounded-full border border-horizon-300 bg-horizon-50 px-3 py-1.5">
+              <span className="font-sans text-[10px] font-medium uppercase tracking-wider text-horizon-500">Stop</span>
+              <span className="font-sans text-xs font-semibold text-horizon-700">
+                {planDraft.anchor === 'age' && planDraft.stopAge != null
+                  ? `Op ${formatPlanAge(planDraft.stopAge)}`
+                  : STOP_ANCHOR_OPTIONS.find((o) => o.kind === planDraft.anchor)?.name ?? '—'}
+              </span>
+            </div>
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-horizon-300 bg-horizon-50 px-3 py-1.5">
               <span className="font-sans text-[10px] font-medium uppercase tracking-wider text-horizon-500">Eind</span>
               <span className="font-sans text-xs font-semibold text-horizon-700">
-                {STRATEGY_LABELS[localEndStrategy].name}
+                {STRATEGY_LABELS[planDraft.endForm].name}
               </span>
             </div>
             <div className="inline-flex items-center gap-1.5 rounded-full border border-horizon-300 bg-horizon-50 px-3 py-1.5">
@@ -761,108 +763,26 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
           <div className="card-editorial overflow-hidden">
             <div className="h-[3px] bg-horizon-500" />
             <div className="px-4 py-3">
-              <p className="mb-1 font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
-                Eindstrategie
-              </p>
               <p className="mb-3 font-sans text-xs text-[var(--ink-3)]">
-                Wat wil je doen met je vermogen op het einde van de rit?
+                Twee vragen bepalen je plan: wanneer je stopt, en wat er aan het eind moet gelden.
+                Wijzigingen worden bewaard zodra ze kloppen. Dezelfde vragen staan bij{' '}
+                <Link href="/toekomst/voorkeuren?regel=eindstrategie" className="font-medium text-horizon-700 underline hover:text-[var(--ink)]">Voorkeuren</Link>.
               </p>
 
-              {/* 4 end strategy cards */}
-              {/* Vijf strategieën (ADR 0127) — volgorde uit één bron. Bij vijf kaarten
-                  wordt de 4-koloms rij een 2×3-raster op sm+; op mobiel blijft het 2 kolommen. */}
-              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-                {EINDSTRATEGIE_VOLGORDE.map((key) => {
-                  const info = STRATEGY_LABELS[key]
-                  const isSelected = localEndStrategy === key
-                  const icon = key === 'deplete'
-                    ? <Banknote className="h-4 w-4" />
-                    : key === 'legacy'
-                      ? <Heart className="h-4 w-4" />
-                      : key === 'pensioen'
-                        ? <Landmark className="h-4 w-4" />
-                        // ADR 0127 — eigen icoon: 'Nu stoppen' viel via de else-tak op het
-                        // ∞-teken, dat in deze app juist "passief inkomen dekt je uitgaven
-                        // voorgoed" betekent. De zandloper zegt duur, niet eeuwigheid.
-                        : key === 'nu-stoppen'
-                          ? <Hourglass className="h-4 w-4" />
-                          : <InfinityIcon className="h-4 w-4" />
-
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => handleEndStrategyChange(key)}
-                      disabled={endStrategySaving}
-                      className={`relative min-h-[44px] rounded-[var(--r)] border-2 p-3 text-left transition-all ${
-                        isSelected
-                          ? 'border-horizon-500 bg-horizon-50 shadow-sm'
-                          : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--border-md)]'
-                      } disabled:opacity-60`}
-                    >
-                      <div className="mb-1 flex items-center gap-1.5">
-                        <span className={isSelected ? 'text-horizon-600' : 'text-[var(--ink-3)]'}>
-                          {icon}
-                        </span>
-                        <span className={`font-sans text-sm font-semibold ${isSelected ? 'text-[var(--ink)]' : 'text-[var(--ink-2)]'}`}>
-                          {info.name}
-                        </span>
-                      </div>
-                      <p className="font-sans text-[11px] leading-snug text-[var(--ink-3)]">
-                        {info.subtitle}
-                      </p>
-                      {isSelected && (
-                        <span className="absolute -top-2 right-2 rounded-full bg-horizon-600 px-1.5 py-0.5 font-sans text-[9px] font-bold uppercase tracking-wider text-white">
-                          Actief
-                        </span>
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-
-              {/* Conditional inputs */}
-              {/* ADR 0127 — 'Nu stoppen' erbij: de eindleeftijd is daar de lat waar het
-                  vermogen tot moet reiken, dus juist wél instelbaar. */}
-              {(localEndStrategy === 'deplete' || localEndStrategy === 'legacy' || localEndStrategy === 'nu-stoppen') && (
-                <div className="mt-3 flex flex-wrap items-end gap-4">
-                  <div>
-                    <label className="font-sans text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">
-                      Eindleeftijd
-                    </label>
-                    <div className="mt-1 flex items-center gap-1.5">
-                      <input
-                        type="number"
-                        min={50}
-                        max={120}
-                        step={1}
-                        value={localEndAge}
-                        onChange={e => setLocalEndAge(e.target.value)}
-                        onBlur={handleEndAgeBlur}
-                        className="w-20 rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-2.5 py-1.5 font-mono text-sm tabular-nums text-[var(--ink)] outline-none focus:border-horizon-400"
-                      />
-                      <span className="font-sans text-xs text-[var(--ink-3)]">jaar</span>
-                    </div>
-                  </div>
-                  {localEndStrategy === 'legacy' && (
-                    <div>
-                      <label className="font-sans text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">
-                        Na te laten bedrag (€)
-                      </label>
-                      <input
-                        type="number"
-                        min={0}
-                        step={10000}
-                        value={localLegacyAmount}
-                        onChange={e => setLocalLegacyAmount(e.target.value)}
-                        onBlur={handleLegacyAmountBlur}
-                        placeholder="bv. 100.000"
-                        className="mt-1 w-36 rounded-lg border border-[var(--border-md)] bg-[var(--subtle)] px-2.5 py-1.5 font-mono text-sm tabular-nums text-[var(--ink)] outline-none focus:border-horizon-400"
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* ADR 0129 B13 — de twee vragen, gespiegeld uit Voorkeuren via hetzelfde
+                  component. Het eindleeftijd-veld is onder élk anker zichtbaar; de
+                  AOW-toets komt uit de gebruikerstabel (`aowAgeFractional`), niet uit
+                  een hardcoded 67 (bevinding 3). */}
+              <StopPlanVragen
+                compact
+                value={planDraft}
+                onChange={setPlanDraft}
+                errors={planValidatie.errors}
+                aowAge={aowAgeFractional}
+                currentAge={currentAge}
+                solvedFireAge={simulations.vast?.stopAnker == null ? (simulations.vast?.fireAgeFractional ?? null) : null}
+                disabled={endStrategySaving}
+              />
 
               {/* Save indicator */}
               {endStrategySaving && (
@@ -953,13 +873,12 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
                 </p>
                 {sim && sim.fireReachable && (
                   <p className="mt-2 font-mono text-xs tabular-nums text-[var(--ink-2)]">
-                    {/* ADR 0127 — onder 'Nu stoppen' is `sim.fireAge` de startleeftijd en
-                        zegt "FIRE: 47 jr" niets. De vraag is hoe ver het vermogen reikt. */}
-                    {localEndStrategy === 'nu-stoppen'
-                      ? nuStoppenKort(reachVoor(sim))
-                      : localEndStrategy === 'pensioen'
-                        ? `AOW: ${NL_AOW_AGE} jr`
-                        : `FIRE: ${sim.fireAge} jr`}
+                    {/* ADR 0129 — onder een VAST anker (aow/now/age) is `sim.fireAge` het
+                        anker zelf en zegt "FIRE: 47 jr" niets. De vraag is hoe ver het
+                        vermogen reikt; de sleutel is de kernel-echo `stopAnker`. */}
+                    {sim.stopAnker != null
+                      ? ankerKort(reachVoor(sim))
+                      : `FIRE: ${sim.fireAge} jr`}
                   </p>
                 )}
               </button>
@@ -1106,26 +1025,28 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
                   Samenvatting ({selectedInfo.label})
                 </p>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                  {/* ADR 0127 — 'Nu stoppen': geen FIRE-leeftijd (die is vandaag) en per D4
-                      geen doelbedrag (`requiredFirePortfolio` í́s het huidige vermogen). */}
-                  <SummaryRow
-                    label={localEndStrategy === 'nu-stoppen' ? NU_STOPPEN_KPI_LABEL : localEndStrategy === 'pensioen' ? 'AOW-leeftijd' : 'FIRE leeftijd'}
-                    value={
-                      localEndStrategy === 'nu-stoppen'
-                        ? (nuStoppenReachYear(reachVoor(selectedSim)) != null
-                            ? `${nuStoppenReachYear(reachVoor(selectedSim))} jaar`
-                            : 'Nog niet te bepalen')
-                        : localEndStrategy === 'pensioen'
-                          ? `${NL_AOW_AGE} jaar`
-                          : fireAge !== null ? `${fireAge} jaar` : 'Niet bereikbaar'
-                    }
-                  />
-                  {localEndStrategy === 'nu-stoppen' ? (
-                    <SummaryRow label="Doelbedrag" value="Geen — je stopt vandaag" />
+                  {/* ADR 0129 D4 — onder een VAST anker: geen FIRE-leeftijd (die is het anker)
+                      en geen doelbedrag (de kernel bisecteert op tijd, niet op kapitaal); wél
+                      het bereik en het geprojecteerde vermogen op het stopmoment. */}
+                  {selectedSim.stopAnker != null ? (
+                    <>
+                      <SummaryRow
+                        label="Stopmoment"
+                        value={selectedSim.stopAnker.soort === 'nu' ? 'Nu' : selectedSim.vastStopLeeftijd != null ? `${formatPlanAge(selectedSim.vastStopLeeftijd)} jaar` : '—'}
+                      />
+                      <SummaryRow
+                        label={ANKER_KPI_LABEL}
+                        value={ankerReachYear(reachVoor(selectedSim)) != null ? `${ankerReachYear(reachVoor(selectedSim))} jaar` : 'Nog niet te bepalen'}
+                      />
+                      <SummaryRow label="Vermogen op je stopmoment" value={<MaskedAmount value={selectedSim.firePortfolioAtFire} tone="horizon" />} />
+                    </>
                   ) : (
-                    <SummaryRow label="Doelbedrag" value={<MaskedAmount value={selectedSim.requiredFirePortfolio} tone="horizon" />} />
+                    <>
+                      <SummaryRow label="FIRE leeftijd" value={fireAge !== null ? `${fireAge} jaar` : 'Niet bereikbaar'} />
+                      <SummaryRow label="Doelbedrag" value={<MaskedAmount value={selectedSim.requiredFirePortfolio} tone="horizon" />} />
+                      <SummaryRow label="Onttrekkingspercentage" value={`${(selectedSim.implicitWithdrawalRate * 100).toFixed(1)}%`} />
+                    </>
                   )}
-                  <SummaryRow label="Onttrekkingspercentage" value={`${(selectedSim.implicitWithdrawalRate * 100).toFixed(1)}%`} />
                   <SummaryRow label="Eindvermogen" value={
                     selectedSim.rows.length > 0
                       ? formatCurrency(selectedSim.rows[selectedSim.rows.length - 1].endPortfolio)

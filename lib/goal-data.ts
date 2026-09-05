@@ -70,6 +70,15 @@ export type Goal = {
    */
   metadata?: Record<string, unknown> | null
   /**
+   * LEESPAD-override (ADR 0129 F3a, nooit een DB-kolom): dit doel heeft onder het
+   * huidige plan geen uitkomst om naar te kijken — bv. een `fire_age`-doel terwijl het
+   * stopmoment vastligt (aow/now/age): de kernel-"vrijheidsleeftijd" ís dan het anker
+   * en het doel zou meteen "behaald" lezen. `syncActiveGoalValues` zet de reden;
+   * `computeGoalProgress` geeft dan geen voortgang (pct 0, niet gemeten) en de
+   * doelkaart toont de notitie (F3b). `undefined`/`null` = gewoon doel.
+   */
+  notApplicableReason?: string | null
+  /**
    * Koppelingen naar bezittingen én schulden (tabel `goal_links`). Optioneel:
    * niet elke lezing haalt ze op, en `undefined` betekent "niet geladen" —
    * iets anders dan `[]` ("geladen, geen koppelingen"). Alleen `[]`/gevuld mag
@@ -400,7 +409,7 @@ export function goalReachedFromProgress(
  */
 export type GoalProgressInput = Pick<
   Goal,
-  'goal_type' | 'current_value' | 'target_value' | 'target_date'
+  'goal_type' | 'current_value' | 'target_value' | 'target_date' | 'notApplicableReason'
 > & { created_at?: string; metadata?: Record<string, unknown> | null }
 
 /**
@@ -512,6 +521,12 @@ export type GoalProgress = {
    * geldig oordeel is en geen weggelaten meting).
    */
   paceSkipped: boolean
+  /**
+   * Gezet wanneer het doel onder het huidige plan geen uitkomst heeft (ADR 0129 F3a,
+   * zie `Goal.notApplicableReason`); dan is `pct` 0 en `measured` false. Afwezig bij
+   * elk gewoon doel.
+   */
+  notApplicableReason?: string | null
 }
 
 /**
@@ -533,6 +548,23 @@ export type GoalProgress = {
 export function computeGoalProgress(goal: GoalProgressInput, options?: GoalProgressOptions): GoalProgress {
   const current = Number(goal.current_value)
   const target = Number(goal.target_value)
+
+  // ADR 0129 F3a — geen uitkomst om naar te kijken (bv. `fire_age` onder een vast
+  // stopmoment): geen voortgang, geen oordeel, geen datum. `measured: false` is de
+  // bestaande "nog geen meting"-lezing; de reden reist mee voor de doelkaart.
+  if (goal.notApplicableReason) {
+    return {
+      current,
+      target,
+      pct: 0,
+      onTrack: false,
+      measured: false,
+      requiredMonthly: null,
+      eta: null,
+      paceSkipped: false,
+      notApplicableReason: goal.notApplicableReason,
+    }
+  }
 
   const direction = GOAL_TYPE_META[goal.goal_type]?.direction ?? 'up'
   const etaOverride = options?.etaOverride ?? null

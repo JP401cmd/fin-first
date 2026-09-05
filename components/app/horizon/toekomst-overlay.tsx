@@ -44,6 +44,8 @@ import { formatMaskedCurrency } from '@/lib/format'
 import { acquireOverlay } from '@/lib/overlay-signal'
 import { buildVrijheidsleeftijdZin } from '@/lib/horizon/vrijheidsleeftijd-zin'
 import type { NuStoppenReach } from '@/lib/horizon/nu-stoppen-copy'
+import type { AnkerReach, AnkerStop } from '@/lib/horizon/anker-copy'
+import type { StopAnchor } from '@/lib/fire-strategy'
 
 /** Welke grafiekfase een ballon accentueert bij openen. */
 type OverlayEmphasis = 'accumulation' | 'withdrawal' | 'fire' | null
@@ -129,6 +131,12 @@ export interface ToekomstOverlaySummary {
   isPensioen?: boolean
   /** ADR 0127 — 'Nu stoppen': de samenvattingsregel gaat over bereik, niet over een moment. */
   nuStoppenReach?: NuStoppenReach | null
+  /** ADR 0129 F3b — het plan-anker (bepaalt "pensioen"- vs "keuze"-woordkeuze onder 'free'). */
+  anchor?: StopAnchor | null
+  /** ADR 0129 F3b — het bereik onder een vast anker (alias van `nuStoppenReach`, anker-generiek). */
+  ankerReach?: AnkerReach | null
+  /** ADR 0129 F3b — het stopmoment bij `ankerReach` ("nu" / "op 58,5"). */
+  ankerStop?: AnkerStop | null
 }
 
 export interface ToekomstOverlayProps {
@@ -286,9 +294,8 @@ export function ToekomstOverlay({
   }, [visible, close, clearCloseTimer])
 
   // Meld je aan als open overlay zolang de tips-tour zichtbaar is (M15).
-  // Spiegelt `toekomst-welcome.tsx`; deze tour was de enige in zijn familie die
-  // het signaal niet claimde, waardoor de zwevende Fin-hulplagen dwars door de
-  // tourtekst heen bleven staan. Bewust GEEN scroll-lock: de tour is
+  // Zonder dit signaal bleven de zwevende Fin-hulplagen dwars door de tourtekst
+  // heen staan. Bewust GEEN scroll-lock: de tour is
   // pagina-inhoud waar je doorheen scrollt, geen modale sheet — alleen het
   // pill-/FAB-signaal wordt gedeeld. Zie lib/overlay-signal.ts.
   useEffect(() => {
@@ -552,11 +559,18 @@ export function ToekomstOverlay({
  * — alle getallen komen kant-en-klaar uit de parent (single-source).
  */
 function SummaryLine({ summary }: { summary: ToekomstOverlaySummary }) {
-  const { netWorth, freedomAge, masked, isPensioen, nuStoppenReach } = summary
+  const { netWorth, freedomAge, masked, isPensioen, nuStoppenReach, anchor, ankerReach, ankerStop } = summary
   // Woorden + afronding komen uit de gedeelde bron (S15) — dezelfde als de
   // welkomstkaart en de duidingsregel op de pagina zelf. Hele jaren, want
   // "rond je 65e" leest natuurlijker dan "65.0"; alleen de ópmaak is hier lokaal.
-  const zin = buildVrijheidsleeftijdZin({ freedomAge, isPensioen, nuStoppenReach, variant: 'inline' })
+  const zin = buildVrijheidsleeftijdZin({
+    freedomAge,
+    isPensioen,
+    anchor,
+    ankerReach: ankerReach ?? nuStoppenReach,
+    ankerStop,
+    variant: 'inline',
+  })
   const ageLabel =
     zin.ageLabel != null ? (
       <>

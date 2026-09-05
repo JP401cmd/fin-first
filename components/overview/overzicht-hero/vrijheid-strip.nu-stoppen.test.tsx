@@ -20,7 +20,7 @@ describe('VrijheidStrip — eindstrategie Nu stoppen', () => {
         freedomPct={100}
         currentAge={47}
         fireAge={47}
-        framing="nu-stoppen"
+        framing="free"
         nuStoppenReach={{ kind: 'gedekt', endAge: 90 }}
       />,
     )

@@ -165,7 +165,11 @@ describe('horizon-client.tsx — euro-weergave-render-grens (T4)', () => {
     // Het label leest de view*-waarden — dezelfde variabelen als de KPI, dus
     // per constructie hetzelfde bedrag.
     expect(src).toMatch(/formatMaskedApproxCurrency\(viewBalkVrijheidDoel, masked\)\} — volledige vrijheid/)
-    expect(src).toMatch(/formatMaskedApproxCurrency\(viewPortfolioAtAow \?\? 0, masked\)\} — vermogen op AOW/)
+    // ADR 0129 D5/D8 — onder een VAST anker meet de balk dekking (tijd), geen kapitaal:
+    // het label noemt het einde van het plan en draagt géén bedrag meer (dus ook geen
+    // nominale terugval). De vroegere "— vermogen op AOW"-variant is daarmee weg.
+    expect(src).toMatch(/isFixedAnchorMode\s*\?\s*\(simResult != null\s*\?\s*`tot je \$\{Math\.round\(simResult\.displayEndAge\)\}e — einde van je plan`/)
+    expect(src).not.toMatch(/— vermogen op AOW/)
     // …en de nominale variant is wég. Een terugval hierop is onzichtbaar: het
     // bedrag blijft plausibel, alleen te hoog.
     expect(src).not.toMatch(/formatMaskedCurrency\(balkVrijheidDoel, masked\)/)
@@ -175,7 +179,9 @@ describe('horizon-client.tsx — euro-weergave-render-grens (T4)', () => {
     expect(src).not.toMatch(/euro-view: exempt — hoort bij de nominale freedomPct-noemer/)
     // De KPI-tegel "benodigd" deflateerde al en blijft ongewijzigd — dit is de
     // waarde waaraan het label is gelijkgetrokken.
-    expect(src).toMatch(/isPensioenMode \? \(viewPortfolioAtAow \?\? 0\) : viewBalkVrijheidDoel/)
+    // ADR 0129 F3b: de tegel toont onder ÉLK vast anker het geprojecteerde (gedeflateerde)
+    // vermogen op het stopmoment — de sleutel is het anker, niet de pensioen-label.
+    expect(src).toMatch(/isFixedAnchorMode \? \(viewPortfolioAtAow \?\? 0\) : viewBalkVrijheidDoel/)
   })
 
   it('deflateert het balk-doelbedrag via de canonieke route — € 200.032 nominaal wordt ca. € 180.000', () => {

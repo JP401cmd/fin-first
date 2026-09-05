@@ -12,6 +12,7 @@ import {
 } from '@/lib/health-score-input'
 import { BUDGET_SPENDING_TX_COLUMNS, fetchSpendingSplits } from '@/lib/budget-spending-fetch'
 import { resolveFireParams } from '@/lib/fire-params'
+import { FIRE_PLAN_COLUMNS, isFixedAnchor, resolveFirePlanWithOverride } from '@/lib/fire-strategy'
 import { yearlyMustExpensesFromBudgets } from '@/lib/budget-utils'
 import { computeSovereigntyLevel, levelToPhaseId } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
@@ -165,7 +166,8 @@ export async function GET(request: Request) {
       .from('profiles')
       // Zie snapshots/route.ts: de bron-vlaggen + handmatige bedragen voeden de
       // EFFECTIEVE spaarquote en de noodbuffer-norm (3 × netto maandsalaris).
-      .select('date_of_birth, expected_return, inflation_rate, household_type, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source')
+      // + het PLAN (ADR 0129 F3a): onder een vast stop-anker geen `fire_age`.
+      .select(`date_of_birth, expected_return, inflation_rate, household_type, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, feature_preferences, ${FIRE_PLAN_COLUMNS}`)
       .eq('id', user.id)
       .single(),
     // Alle budgetten (alle types, parents + children) — must-expenses + health.
@@ -368,9 +370,17 @@ export async function GET(request: Request) {
     net_worth: netWorth,
   }
 
+  // ADR 0129 F3a — onder een VAST stop-anker (aow/now/age) is er geen vrijheidsmoment:
+  // `fire_age` blijft null (de scalar-lus zou anders een leeftijd schrijven die de
+  // trend als "bereikt" leest) en het anker reist mee in `params`. Zelfde regel als
+  // POST /api/snapshots; de dekking schrijft alleen de handmatige route (kernel-run).
+  const firePlan = resolveFirePlanWithOverride(profileResult.data ?? {})
+  const snapshotFireAge = isFixedAnchor(firePlan) || fireProjection.fireAge === null
+    ? null
+    : Math.round(fireProjection.fireAge * 10) / 10
   const extendedFields: Record<string, unknown> = {
     freedom_percentage: Math.round(freedomPercentage * 10) / 10,
-    fire_age: fireProjection.fireAge !== null ? Math.round(fireProjection.fireAge * 10) / 10 : null,
+    fire_age: snapshotFireAge,
     sovereignty_level: sovereigntyLevel,
     // Canonieke spaarquote (savingsRate6m), NIET fireProjection.savingsRate:
     // deze kolom voedt de spaarquote-widget-ontwikkeling (savingsHistory).
@@ -381,7 +391,7 @@ export async function GET(request: Request) {
     score_version: 2,
     // Provenance-parameterset ([Arch F6] #27) — zie POST /api/snapshots. De
     // basic-fallback-upsert hieronder laat 'm bewust weg (kolom nullable).
-    params: buildSnapshotParams(fireParams),
+    params: buildSnapshotParams(fireParams, { stopAnchor: firePlan.anchor.kind }),
   }
 
   // Try upsert with extended fields; fall back to basic if columns don't exist
@@ -493,7 +503,8 @@ export async function GET(request: Request) {
     snapshot: {
       ...snapshot,
       freedom_percentage: Math.round(freedomPercentage * 10) / 10,
-      fire_age: fireProjection.fireAge !== null ? Math.round(fireProjection.fireAge * 10) / 10 : null,
+      fire_age: snapshotFireAge,
+      stop_anchor: firePlan.anchor.kind,
       sovereignty_level: sovereigntyLevel,
       savings_rate: Math.round(savingsRate6m * 10) / 10,
       resilience_score: healthScore.total,

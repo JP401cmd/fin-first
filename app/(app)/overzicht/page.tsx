@@ -21,6 +21,8 @@ import { CheckinBanner } from '@/components/overview/checkin-banner'
 import { WelcomeGuideBanner } from '@/components/overview/welcome-guide-banner'
 import { WelcomeGuideProvider } from '@/components/overview/welcome-guide-provider'
 import { ageAtDate } from '@/lib/horizon-data'
+import { isFixedAnchor, resolveFreedomAgeView } from '@/lib/fire-strategy'
+import { lookupAowAge } from '@/lib/aow-leeftijd'
 import { loadLeverScores } from '@/lib/lever-scores-loader'
 import { loadCheckinBannerSeed, loadWelcomeGuideSeed } from '@/lib/overview/banner-seeds'
 
@@ -97,7 +99,29 @@ export default async function OverzichtPage() {
   const dob = horizonData?.effectiveInput?.dateOfBirth ?? null
   const currentAge = dob ? Math.round(ageAtDate(dob)) : null
   const endAge = horizonData?.fireStrategy?.endAge ?? null
-  const isPensioenMode = horizonData?.fireStrategy?.strategy === 'pensioen'
+  // ADR 0129 — het STOP-ANKER van het plan is de sleutel, niet de strategienaam:
+  // `aow` → pensioen-weergave (marker op AOW); elk vast anker → de minigrafiek knipt op
+  // het stopmoment ("Vermogen bij stop") en zegt nooit "bereikt" tenzij framing 'free'.
+  const planAnchor = horizonData?.firePlan?.anchor ?? null
+  const isPensioenMode = planAnchor?.kind === 'aow'
+  const stopAnchorFixed = planAnchor != null && isFixedAnchor({ anchor: planAnchor })
+  // AOW uit de gebruikerstabel (dezelfde lookup als de kernel-tijdas), niet hardcoded.
+  const aowAgeFractional = lookupAowAge(horizonData?.aowRows ?? [], dob).fractional
+  const stopAge: number | null =
+    planAnchor?.kind === 'age'
+      ? planAnchor.age
+      : planAnchor?.kind === 'aow'
+        ? aowAgeFractional
+        : planAnchor?.kind === 'now'
+          ? currentAge
+          : null
+  const freedomFraming = resolveFreedomAgeView({
+    fireAgeFractional: horizonData?.fireAgeFractional ?? null,
+    freedomPct,
+    currentAge,
+    anchor: planAnchor,
+    aowAge: aowAgeFractional,
+  }).framing
 
   // Liquide cash = niet-gekoppelde bank-accounts + cash/savings-typed assets.
   // Basis voor de CompoundInsightCard (in blok 2).
@@ -215,6 +239,9 @@ export default async function OverzichtPage() {
               currentAge={currentAge}
               endAge={endAge}
               isPensioenMode={isPensioenMode}
+              stopAnchorFixed={stopAnchorFixed}
+              stopAge={stopAge}
+              framing={freedomFraming}
               netWorthExclHome={netWorthExclHome}
               housingSplit={housingSplit}
             />

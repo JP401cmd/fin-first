@@ -122,8 +122,8 @@ describe('VrijheidStrip — vrij/pensioen-framing', () => {
     expect(document.querySelector('[role="progressbar"]')).toBeNull()
   })
 
-  it("framing 'pensioen' toont 'Je bent met pensioen.'", () => {
-    render(<VrijheidStrip freedomPct={100} framing="pensioen" />)
+  it("framing 'free' + freeAsPensioen toont 'Je bent met pensioen.'", () => {
+    render(<VrijheidStrip freedomPct={100} framing="free" freeAsPensioen />)
     expect(screen.getByText('Je bent met pensioen.')).toBeTruthy()
     expect(screen.getByText('Met pensioen')).toBeTruthy()
   })

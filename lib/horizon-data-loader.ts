@@ -39,7 +39,8 @@ import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Perspective } from '@/lib/household-data'
 import { computeHealthScoreFromInputs, type HealthScore, type HealthScoreInput } from '@/lib/financial-health'
-import { computeFreedomProgressWithBasis, computeRunwayCoveragePct, inclHomeTargetFromScalar } from '@/lib/core-metrics'
+import { computeFreedomPctForPlan, inclHomeTargetFromScalar } from '@/lib/core-metrics'
+import { isFixedAnchor } from '@/lib/fire-strategy'
 import { eindMaandVan } from '@/lib/horizon-kernel/gap'
 import { ageAtDate } from '@/lib/horizon-data'
 import { computeHorizonFireSim } from '@/lib/fire-target-shared'
@@ -119,39 +120,51 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   // Zelfde gate/vorm als `dashboard-data-loader.ts` (simRequiredPortfolio /
   // simRequiredNetWorth) zodat /overzicht-hero, widget-rail, /toekomst en de
   // Fin-chat letterlijk hetzelfde paar cijfers consumeren.
-  // ADR 0127 D4 — 'nu-stoppen': FIRE op maand 0, "benodigd" = huidig vermogen ⇒ geen
-  // doel. Beide noemers op null (de grafiekgeometrie laat de doellijn dan al weg).
-  const isNuStoppen = run?.sim.requiredFireIsStartPortfolio === true
+  // ADR 0129 D4 — vast anker (aow/now/age): het stopmoment ligt vast, "benodigd" = de
+  // geprojecteerde stand op het anker ⇒ geen doel. Beide noemers op null (de
+  // grafiekgeometrie laat de doellijn dan al weg). Bridge-vlag uit de run; zonder run
+  // het plan uit de rauwe laag — nooit de strategienaam.
+  // `firePlan` optioneel gelezen: een gedegradeerde/gemockte rauwe laag zonder plan
+  // gedraagt zich als `solved` (zelfde tolerantie als `effectiveInput` hieronder).
+  const planAnchorKind = raw.firePlan?.anchor.kind ?? 'solved'
+  const anchorFixed = run
+    ? run.sim.requiredFireIsAnchorPortfolio === true
+    : isFixedAnchor({ anchor: raw.firePlan?.anchor ?? { kind: 'solved' } })
   const kernelPortfolio =
-    run && !isNuStoppen && run.sim.requiredFirePortfolio > 0 ? run.sim.requiredFirePortfolio : null
+    run && !anchorFixed && run.sim.requiredFirePortfolio > 0 ? run.sim.requiredFirePortfolio : null
   const kernelNetWorth =
-    run && !isNuStoppen && (run.sim.requiredFireNetWorth ?? 0) > 0 ? run.sim.requiredFireNetWorth! : null
-  const requiredPortfolioExclHome = isNuStoppen ? null : (kernelPortfolio ?? scalarRequiredPortfolioExclHome)
-  const requiredNetWorthInclHome = isNuStoppen
+    run && !anchorFixed && (run.sim.requiredFireNetWorth ?? 0) > 0 ? run.sim.requiredFireNetWorth! : null
+  const requiredPortfolioExclHome = anchorFixed ? null : (kernelPortfolio ?? scalarRequiredPortfolioExclHome)
+  const requiredNetWorthInclHome = anchorFixed
     ? null
     : (kernelNetWorth ??
       inclHomeTargetFromScalar(requiredPortfolioExclHome, netWorthInclHome, fireEligibleNetWorth))
 
-  // ADR 0127 D5 — vrijheids-%: onder 'nu-stoppen' TIJDSDEKKING (uitputtingsmaand ÷
-  // eindmaand) uit het bridge-veld `kernelDepletionMonth`; anders de vulling-van-het-
-  // doel. Eén home per definitie (lib/core-metrics.ts), strategie-bewust gekozen.
-  // Alleen nodig onder 'nu-stoppen'; optioneel gelezen zodat een gedegradeerde/gemockte
-  // rauwe laag zonder `effectiveInput` het gewone pad niet laat struikelen.
+  // ADR 0129 B3/D5 — vrijheids-%: onder een vast anker de DEKKING ((uitputtingsmaand −
+  // ankerMaand) ÷ (eindmaand − ankerMaand)) uit de bridge-velden; onder `solved` de
+  // vulling-van-het-doel. Eén home (`computeFreedomPctForPlan`, lib/core-metrics.ts).
+  // De startleeftijd is alleen nodig onder een vast anker; optioneel gelezen zodat een
+  // gedegradeerde/gemockte rauwe laag zonder `effectiveInput` niet struikelt.
   const startAge =
-    isNuStoppen && raw.effectiveInput?.dateOfBirth ? ageAtDate(raw.effectiveInput.dateOfBirth) : null
-  const freedomPct =
-    isNuStoppen && run && startAge != null
-      ? computeRunwayCoveragePct({
-          kernelDepletionMonth: run.sim.kernelDepletionMonth ?? null,
-          eindMaand: eindMaandVan(run.sim.displayEndAge, startAge),
-        })
-      : computeFreedomProgressWithBasis({
-          homeExcludedFromFire,
-          netWorthInclHome,
-          fireEligibleNetWorth,
-          requiredNetWorthInclHome,
-          requiredPortfolioExclHome,
-        })
+    anchorFixed && raw.effectiveInput?.dateOfBirth ? ageAtDate(raw.effectiveInput.dateOfBirth) : null
+  const freedomPct = computeFreedomPctForPlan({
+    anchorFixed,
+    coverage:
+      run && startAge != null
+        ? {
+            kernelDepletionMonth: run.sim.kernelDepletionMonth ?? null,
+            eindMaand: eindMaandVan(run.sim.displayEndAge, startAge),
+            ankerMaand: run.sim.ankerMaand ?? null,
+          }
+        : null,
+    basis: {
+      homeExcludedFromFire,
+      netWorthInclHome,
+      fireEligibleNetWorth,
+      requiredNetWorthInclHome,
+      requiredPortfolioExclHome,
+    },
+  })
 
   // De vrijheids-pijler van de gezondheidsscore erft dezelfde noemer; zonder
   // deze stap zou de score op een ándere FIRE-grondslag draaien dan de hero
@@ -159,6 +172,9 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
   const healthScoreInput: HealthScoreInput = {
     ...raw.healthScoreInputBase,
     freedomPct,
+    // Het anker waarop `freedomPct` is bepaald (dekking vs. kapitaalratio) reist mee,
+    // zodat de fire_progress-pijler dezelfde grondslag leest (ADR 0129 B3).
+    fireStopAnchor: planAnchorKind,
     // Kernel-koers voor de peer-relatieve fire_progress-pijler — zelfde bron
     // als het `fireAgeFractional`-veld dat deze bundel hieronder exposeert.
     fireAgeFractional: run?.sim.fireAgeFractional ?? null,

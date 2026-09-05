@@ -30,6 +30,9 @@ import { buildCashflowCards } from '@/lib/cashflow-cards'
 import { loadBox2Materiality } from '@/lib/box2-relevance'
 import { resolvePageStatusMap } from '@/lib/page-status/resolve'
 import { resolveFreedomBanner } from '@/lib/page-status/freedom'
+import { computeHorizonRunway } from '@/lib/fire-target-shared'
+import { isFixedAnchor } from '@/lib/fire-strategy'
+import { ankerReachFromRunway, ankerStopFromSim } from '@/lib/horizon/anker-copy'
 import type { PageStatusInfo } from '@/lib/page-status/types'
 import type { MinimizedLevel } from '@/lib/page-status/display'
 import { readMinimizedMap } from '@/lib/page-status/minimized-prefs'
@@ -162,15 +165,37 @@ export async function computePageStatusInfo(
     ])
     const horizonData = await loadHorizonData(supabase, freedomPerspective).catch(() => null)
     const dashboardData = withCanonicalOverviewFigures(rawBundle, horizonData)
-    return resolveFreedomBanner({
-      freedomPct: dashboardData.freedomPct ?? null,
-      currentAge: dashboardData.currentAge ?? null,
-      // FRACTIONEEL, niet afgerond: `isFinanciallyFree` gebruikt dit als DREMPEL
-      // (`currentAge >= fireAge`). Afronden trok 44,92 omhoog naar 45 en liet de
-      // "financieel vrij"-banner tot 6 maanden te vroeg verschijnen (WF-CANON-03).
-      fireAge: dashboardData.fireAgeFractional ?? null,
-      strategy: dashboardData.fireEndStrategy,
-    })
+    const planAnchor = dashboardData.fireStopAnchor ?? null
+    // ADR 0129 F3b — onder een vast anker volgt de banner de strip: het bereik komt
+    // uit de plan-runway (React-cache()'d, dezelfde run als de kop en de strip).
+    const anker = await (async () => {
+      if (planAnchor == null || !isFixedAnchor({ anchor: planAnchor })) return null
+      const runway = await computeHorizonRunway(supabase, freedomPerspective).catch(() => null)
+      if (!runway) return null
+      const reach = ankerReachFromRunway(runway)
+      const stop =
+        runway.kind !== 'unavailable'
+          ? ankerStopFromSim({ stopAnker: runway.planAnker ?? null, vastStopLeeftijd: runway.stopAge ?? null })
+          : planAnchor.kind === 'now'
+            ? { kind: 'now' as const }
+            : null
+      return stop ? { reach, stop } : null
+    })()
+    return resolveFreedomBanner(
+      {
+        freedomPct: dashboardData.freedomPct ?? null,
+        currentAge: dashboardData.currentAge ?? null,
+        // FRACTIONEEL, niet afgerond: `isFinanciallyFree` gebruikt dit als DREMPEL
+        // (`currentAge >= fireAge`). Afronden trok 44,92 omhoog naar 45 en liet de
+        // "financieel vrij"-banner tot 6 maanden te vroeg verschijnen (WF-CANON-03).
+        fireAge: dashboardData.fireAgeFractional ?? null,
+        strategy: dashboardData.fireEndStrategy,
+        // ADR 0129 D8 — het anker is de sleutel voor de gate (anker bereikt ∧ dekking ≥
+        // 100); de legacy-label hierboven blijft alleen als terugval voor oude bundels.
+        anchor: planAnchor,
+      },
+      anker,
+    )
   }
 
   if (family === 'lever') {

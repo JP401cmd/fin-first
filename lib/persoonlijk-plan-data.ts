@@ -162,6 +162,14 @@ export interface PersoonlijkPlanEindstrategie {
   endAge: number
   /** Alleen relevant bij `legacy`-strategie. */
   legacyAmount: number
+  /**
+   * Het stop-anker van het plan (ADR 0129 F3a): `solved` = de app zoekt het moment;
+   * `aow`/`now`/`age` = een vast stopmoment. Het rapport toont onder een vast anker
+   * "Gekozen stopmoment" i.p.v. een vrijheidsleeftijd (labels: F3b).
+   */
+  stopAnchor: 'solved' | 'aow' | 'now' | 'age'
+  /** De gekozen stopleeftijd (halve jaren) — alleen bij `stopAnchor: 'age'`, anders `null`. */
+  stopAge: number | null
 }
 
 // ── Onttrekkingsstrategie ─────────────────────────────────────────────

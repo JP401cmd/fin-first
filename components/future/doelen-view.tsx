@@ -215,7 +215,21 @@ function ParameterGoalCard({ goal, progress }: GoalDisplay) {
         )}
       </header>
 
-      {isFire ? (
+      {isFire && goal.notApplicableReason ? (
+        /* ADR 0129 (bijlage "Doelen") — onder een VAST stopmoment heeft een
+           vrijheidsleeftijd-doel geen uitkomst; de notitie komt uit
+           `fireAgeGoalNotApplicableReason` via de goal-loader (consume-only). */
+        <>
+          <div className="flex items-baseline gap-1.5 mb-1">
+            <span className="font-serif text-lg font-semibold text-[var(--ink)] tabular-nums">
+              {`Doel: ${formatGoalValue(progress.target, 'fire_age')}`}
+            </span>
+          </div>
+          <p data-testid="fire-age-doel-nvt" className="text-[11px] italic text-[var(--ink-3)] leading-snug">
+            {goal.notApplicableReason}
+          </p>
+        </>
+      ) : isFire ? (
         <>
           <div className="flex items-baseline gap-1.5 mb-1">
             <span className="font-serif text-lg font-semibold text-[var(--ink)] tabular-nums">

@@ -45,10 +45,8 @@ import {
   berekenWerkloosheidImpact,
   werkloosheidNaFireWaarschuwing,
 } from '@/lib/horizon/risico-event-regels'
-import { isKernelReachedNowDisplay, kernelToUnifiedResult, buildKernelSlotMeta } from '@/lib/horizon-kernel/bridge'
-import { buildConvergentieAdapterProfile, computeConvergentieProjection, type ConvergentieRawContext, type ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
-import { buildKernelInputFromApp, deriveEigenHuisIds, type KernelAdapterInput } from '@/lib/horizon-kernel/adapter'
-import { evaluateFireAt } from '@/lib/horizon-kernel/solver'
+import { isKernelReachedNowDisplay } from '@/lib/horizon-kernel/bridge'
+import { computeConvergentieProjection, type ConvergentieRawContext, type ConvergentieRawProfileRow } from '@/lib/horizon-kernel/convergentie-router'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
 import { deriveMarginaalTarief } from '@/lib/box1-tax'
 import { type WithdrawalStrategyType, type WithdrawalStrategyConfig, WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
@@ -135,16 +133,25 @@ import {
   heroFireAgeCaption,
   isHeroAnswerPending,
   isHeroAnswerInvalid,
+  heroFireAgeYear,
 } from '@/lib/horizon/hero-fire-age'
 import {
-  NU_STOPPEN_KPI_LABEL,
-  NU_STOPPEN_KPI_LABEL_KORT,
-  nuStoppenKpiCaption,
-  nuStoppenReachFromSim,
-  nuStoppenZin,
-  nuStoppenZinKort,
-  type NuStoppenReach,
-} from '@/lib/horizon/nu-stoppen-copy'
+  ANKER_KPI_LABEL,
+  ANKER_KPI_LABEL_KORT,
+  ankerKpiCaption,
+  ankerReachFromSim,
+  ankerStopFromSim,
+  ankerTitel,
+  ankerVraag,
+  ankerZin,
+  ankerZinKort,
+  fireAgeGoalNotApplicableReason,
+  formatStopAge,
+  type AnkerReach,
+  type AnkerStop,
+} from '@/lib/horizon/anker-copy'
+import { AnkerDrieslag } from '@/components/app/horizon/anker-drieslag'
+import { planDraftToFireSettingsBody } from '@/lib/horizon/plan-draft'
 import {
   guardFireTarget,
   guardFreedomMoment,
@@ -271,7 +278,7 @@ import {
 } from '@/lib/euro-display'
 import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { PillRow } from '@/components/app/pill-row'
-import { FIRE_PLAN_COLUMNS, parseFireStrategy, DEFAULT_FIRE_STRATEGY, type FireStrategyConfig, STRATEGY_LABELS, resolveFreedomFraming, fireAgeForDisplay } from '@/lib/fire-strategy'
+import { FIRE_PLAN_COLUMNS, parseFireStrategy, DEFAULT_FIRE_STRATEGY, type FireStrategyConfig, type StopAnchor, STRATEGY_LABELS, resolveFreedomFraming, fireAgeForDisplay, isAtOrPastAow, isFixedAnchor, stopAnchorFromKernel } from '@/lib/fire-strategy'
 import { toSimResult } from '@/lib/unified-projection'
 import { buildHorizonInput } from '@/lib/horizon/build-input'
 import { buildDeeplinkCleanupUrl } from '@/lib/horizon/deeplink-cleanup'
@@ -667,8 +674,10 @@ export default function HorizonPage({
   const [simModalOpen, setSimModalOpen] = useState(false)
   const [activeFaseModal, setActiveFaseModal] = useState<'opbouw' | 'overgang' | 'onttrekking' | null>(null)
 
-  // AOW-stop toggle state (local, non-persistent)
-  const [aowStopToggle, setAowStopToggle] = useState<'doorgaan' | 'stoppen'>('doorgaan')
+  // ADR 0129 D7 — de tweede kernel-run onder een vast anker ("vrij mogelijk vanaf"),
+  // uitgepakt uit dezelfde worker-batch als de scenariokaarten. `null` = nog niet
+  // gedraaid of `solved` (dan ís de hoofdrun de opgeloste run).
+  const [solvedRun, setSolvedRun] = useState<{ fireAge: number | null; endAge: number | null } | null>(null)
 
   // Scenario overlay state
   const [scenariosExpanded, setScenariosExpanded] = useState(false)
@@ -858,7 +867,6 @@ export default function HorizonPage({
   const [eventPaneMode, setEventPaneMode] = useState<'catalog' | 'view' | 'edit'>('catalog')
   const [clusterSheet, setClusterSheet] = useState<{ events: LifeEvent[]; centerAge: number } | null>(null)
   const [showFireAgeReceipt, setShowFireAgeReceipt] = useState(false)
-  const [showCountdownReceipt, setShowCountdownReceipt] = useState(false)
   const [showFireTargetReceipt, setShowFireTargetReceipt] = useState(false)
   const [showResilienceReceipt, setShowResilienceReceipt] = useState(false)
   const [showSwrReceipt, setShowSwrReceipt] = useState(false)
@@ -2018,7 +2026,12 @@ export default function HorizonPage({
       // ADR 0129 D7 — de batch draagt naast de kaarten ook `solvedFireAge` ("vrij
       // mogelijk vanaf", de tweede run onder een vast anker). F3b toont dat getal in de
       // hero-drieslag; hier wordt alleen de kaartenlijst uitgepakt.
-      .then((batch) => { if (!cancelled) { setScenarioPresets(batch.presets as ScenarioPresetResult[]); setScenarioPresetsLoading(false) } })
+      .then((batch) => {
+        if (cancelled) return
+        setScenarioPresets(batch.presets as ScenarioPresetResult[])
+        setSolvedRun({ fireAge: batch.solvedFireAge ?? null, endAge: batch.solvedFireEndAge ?? null })
+        setScenarioPresetsLoading(false)
+      })
       .catch((err) => {
         console.warn('[horizon-worker] preset-run faalde', err)
         if (!cancelled) setScenarioPresetsLoading(false)
@@ -2422,64 +2435,53 @@ export default function HorizonPage({
       })
     : (firstPaintFreedomPct ?? fire?.freedomPercentage ?? 0)
 
-  // ── Pensioen-modus afgeleid ──────────────────────────────────────────────
-  const isPensioenMode = simResult?.strategy === 'pensioen'
+  // ── Het STOP-ANKER van het plan — de énige sleutel (ADR 0129, ontwerpprincipe 1) ──
+  // Uit de kernel-echo van de run (`simResult.stopAnker`); vóór de run het plan-anker
+  // uit de bundel. `isFixedAnchor` is DE toets op "het stopmoment ligt vast"; nooit
+  // meer een string-vergelijking op de strategienaam ('pensioen'/'nu-stoppen').
+  const planAnchor: StopAnchor = simResult
+    ? stopAnchorFromKernel(simResult.stopAnker)
+    : (initialData.firePlan?.anchor ?? { kind: 'solved' })
+  const isFixedAnchorMode = isFixedAnchor({ anchor: planAnchor })
+  // Pensioen-WEERGAVE: alleen het aow-anker splitst de grafiek en de fasebalk op de
+  // AOW-leeftijd (`planningMode: 'pensioen'`); `now`/`age` splitsen op het anker via
+  // de gewone FIRE-weergave. Het is een grafiek-keuze, geen modus-label.
+  const isPensioenMode = planAnchor.kind === 'aow'
+  // Het nu-anker: het stopmoment is vandaag — dan is er geen stopkeuze (slider) en geen
+  // "om op X te stoppen"-hint.
+  const isNuStoppenMode = planAnchor.kind === 'now'
 
-  // ── 'Nu stoppen'-modus afgeleid (ADR 0127) ───────────────────────────────
-  // SPIEGEL van `isPensioenMode`, geen kopie: beide zijn STOP-ANKERS (D1), maar
-  // ze ankeren op een andere datum en beantwoorden een andere vraag. Waar
-  // pensioen-modus "wat heb ik op mijn AOW-leeftijd" toont, toont deze modus
-  // "hoe ver reikt mijn vermogen als ik vandaag stop". Elke `isPensioenMode`-
-  // gebruik hieronder is daarom afzonderlijk gewogen — sommige krijgen een eigen
-  // tak, sommige horen zich als 'fire' te gedragen (overgangsfase, fasebalk,
-  // doel-lijn), en de AOW-specifieke afleidingen blijven onaangeraakt.
-  //
-  // `planningMode` blijft bewust TWEEWAARDIG: dit is een vijfde eindstrategie
-  // binnen de bestaande modi, geen derde planningsmodus (D6).
-  const isNuStoppenMode = simResult?.strategy === 'nu-stoppen'
-
-  // Het kernantwoord onder dit anker: tot welke leeftijd reikt het vermogen.
-  // Consume-only uit DEZELFDE run — onder 'nu-stoppen' ís de hoofdrun de
-  // stop-nu-run (FIRE op maand 0), dus `kernelDepletionMonth` is de runway.
-  // `kernelDepletionMonth` bewust RAUW doorgegeven (geen `?? null`): undefined =
-  // geen kernel-antwoord, null = geen uitputting binnen de horizon.
-  const nuStoppenReach: NuStoppenReach | null = useMemo(
+  // Het kernantwoord onder een vast anker: tot welke leeftijd reikt het LIQUIDE
+  // vermogen. Consume-only uit DEZELFDE run. `kernelDepletionMonth` bewust RAUW
+  // doorgegeven (geen `?? null`): undefined = geen kernel-antwoord, null = geen
+  // uitputting binnen de horizon. De startleeftijd is de kernel-tijdas (`currentAge`),
+  // niet `fireAge`: onder een aow-/age-anker is `fireAge` het anker zelf.
+  const ankerReach: AnkerReach | null = useMemo(
     () =>
-      simResult != null && simResult.strategy === 'nu-stoppen'
-        ? nuStoppenReachFromSim({
-            // Onder dit anker is `fireAge` per constructie de startleeftijd (D1).
-            startAge: simResult.fireAge ?? currentAge,
+      simResult != null && simResult.stopAnker != null
+        ? ankerReachFromSim({
+            startAge: currentAge,
             kernelDepletionMonth: simResult.kernelDepletionMonth,
             endAge: simResult.displayEndAge,
           })
         : null,
     [simResult, currentAge],
   )
-
-  /**
-   * Dezelfde uitkomst in de vorm die `resolveHeroFireAge` verwacht.
-   * `depletionAgeFractional: null` betekent daar "reikt tot de eindleeftijd", dus
-   * 'onbekend' mag NOOIT die vorm aannemen — anders leest een ontbrekend antwoord
-   * op het scherm als volledige dekking. Die tak levert `null` (→ 'berekenen'
-   * zolang de kernel draait, anders 'onbekend'). Bij 'nu-op' is de uitputting nú,
-   * dus de startleeftijd.
-   */
-  const nuStoppenRunway = useMemo(() => {
-    if (!isNuStoppenMode || simResult == null || nuStoppenReach == null) return null
-    switch (nuStoppenReach.kind) {
-      case 'gedekt':
-        return { depletionAgeFractional: null, endAge: simResult.displayEndAge }
-      case 'reikt-tot':
-        return { depletionAgeFractional: nuStoppenReach.age, endAge: simResult.displayEndAge }
-      case 'nu-op':
-        return {
-          depletionAgeFractional: simResult.fireAge ?? currentAge ?? 0,
-          endAge: simResult.displayEndAge,
-        }
-      case 'onbekend':
-        return null
-    }
-  }, [isNuStoppenMode, simResult, nuStoppenReach, currentAge])
+  // Het stopmoment van de run als zin-onderwerp ("nu" / "op 58,5") — uit
+  // `vastStopLeeftijd`, nooit `fireAge` (bevinding 11).
+  const ankerStop: AnkerStop | null = useMemo(
+    () =>
+      simResult != null
+        ? ankerStopFromSim({ stopAnker: simResult.stopAnker, vastStopLeeftijd: simResult.vastStopLeeftijd })
+        : planAnchor.kind === 'now'
+          ? { kind: 'now' }
+          : planAnchor.kind === 'age'
+            ? { kind: 'age', stopAge: planAnchor.age }
+            : null,
+    [simResult, planAnchor],
+  )
+  // De vraag die de modus draagt (B10): kop van de hero én van de vrijheidsas.
+  const heroVraag = ankerVraag(isFixedAnchorMode ? ankerStop : null)
 
   // ── Dubbele FIRE-grondslag (incl./excl. eigen woning) ────────────────────
   // Bij downsize/opeethypotheek/uitsluiten (showDualHousingBasis) toont /toekomst
@@ -2491,10 +2493,9 @@ export default function HorizonPage({
   const fireTargetExclHome = simResult?.requiredFirePortfolio ?? null
   const showDualFireTarget =
     initialData.showDualHousingBasis &&
-    !isPensioenMode &&
-    // ADR 0127 D4 — onder 'nu-stoppen' is er geen doelbedrag (het "benodigde"
-    // bedrag ís het huidige vermogen), dus ook geen incl./excl.-woning-paar.
-    !isNuStoppenMode &&
+    // ADR 0129 D4 — onder een vast anker is er geen doelbedrag (de kernel bisecteert
+    // op tijd, niet op kapitaal), dus ook geen incl./excl.-woning-paar.
+    !isFixedAnchorMode &&
     fireTargetInclHome != null && fireTargetInclHome > 0 &&
     fireTargetExclHome != null && fireTargetExclHome > 0
 
@@ -2526,29 +2527,21 @@ export default function HorizonPage({
   // het GEPROJECTEERDE vermogen op AOW, wat een uitkomst is en geen doel.
   const fireTargetGuard = guardFireTarget(balkVrijheidDoel, {
     isEndOfHorizonFallback: simResult?.requiredFireIsEndOfHorizonFallback === true,
-    // ADR 0127 D4 — 'nu-stoppen': de guard geeft dan 'geen-doelvermogen' terug en
-    // de tegel toont die duiding i.p.v. een bedrag dat toevallig het huidige
-    // vermogen is.
-    isStartPortfolio: simResult?.requiredFireIsStartPortfolio === true,
+    // ADR 0129 D4 — vast anker (aow/now/age): de guard geeft dan 'geen-doelvermogen'
+    // terug en de tegel toont die duiding i.p.v. een bedrag dat de geprojecteerde
+    // stand op het anker is.
+    isAnchorPortfolio: simResult?.requiredFireIsAnchorPortfolio === true,
   })
-  const showFireTargetNotice = !isPensioenMode && !fireTargetGuard.ok
+  // Onder een vast anker toont de tegel het GEPROJECTEERDE vermogen op het stopmoment
+  // (een uitkomst, geen doel) — de 'geen-doelvermogen'-guard is daar dus geen melding.
+  const showFireTargetNotice = !isFixedAnchorMode && !fireTargetGuard.ok
 
-  // ── AOW-stop shortfall detectie ────────────────────────────────────────
-  // ADR 0127 — 'nu-stoppen' uitgesloten: `fireAge` is daar de HUIDIGE leeftijd,
-  // dus bij iemand die ná zijn AOW nog werkt zou `fireAge > AOW` waar zijn en
-  // verscheen de AOW-stop-toggle — een tweede stopmoment naast een stopmoment
-  // dat al vastligt.
-  const isShortfallScenario = !isPensioenMode
-    && !isNuStoppenMode
-    && !isHouseholdView && !isPartnerView
-    && simResult?.fireReachable === true
-    && simResult?.fireAge != null
-    && simResult.fireAge > Math.round(userAowAge.fractional)
-  const isAowStopActive = isShortfallScenario && aowStopToggle === 'stoppen'
-  const planningMode: 'fire' | 'pensioen' = isPensioenMode || isAowStopActive ? 'pensioen' : 'fire'
-
-  // Reset AOW-stop toggle when strategy changes
-  useEffect(() => { setAowStopToggle('doorgaan') }, [fireStrategy?.strategy])
+  // Grafiek-weergave afgeleid van het ANKER (ADR 0129 B11): `aow` → pensioen-weergave
+  // (split op AOW), `solved`/`now`/`age` → FIRE-weergave (split op het stopmoment).
+  // De vroegere AOW-stop-toggle — een eigen `evaluateFireAt`-run met deplete-override
+  // in `useState` — is weg; de snelkoppeling "Op AOW-leeftijd" zet nu alleen de
+  // stop-slider van de vrijheidsas.
+  const planningMode: 'fire' | 'pensioen' = isPensioenMode ? 'pensioen' : 'fire'
 
   // Pensioen-specific computed values
   const aowAgeFormatted = userAowAge.months > 0
@@ -2567,11 +2560,15 @@ export default function HorizonPage({
     hasKernelResult: simResult != null,
     kernelFireAgeFractional: simResult?.fireAgeFractional ?? null,
     kernelFireAge: simResult?.fireAge ?? null,
-    isPensioenMode,
-    // ADR 0127 D6 — eigen tak: het kopgetal is dan de leeftijd tot waar het
-    // vermogen reikt, niet de kernel-`fireAge` (die is de startleeftijd).
-    isNuStoppenMode,
-    nuStoppenRunway: nuStoppenRunway,
+    // ADR 0129 F3a — één anker-tak: onder elk vast anker is het kopgetal de leeftijd
+    // tot waar het vermogen reikt; stopmoment en tweede run reizen mee als drieslag
+    // (F3b tekent de tegels). `stopAnker` uit de run, nooit de strategienaam.
+    stopAnker: simResult?.stopAnker ?? null,
+    ankerReach,
+    vastStopLeeftijd: simResult?.vastStopLeeftijd ?? null,
+    // D7 — "vrij mogelijk vanaf": de tweede run uit de scenario-batch.
+    solvedFireAgeFractional: solvedRun?.fireAge ?? null,
+    currentAge,
     aowAgeFractional: userAowAge.fractional,
     // De wettelijke tabel is server-voorgeladen; is hij leeg, dan staat
     // `userAowAge` nog op de 67-terugval en is het getal dus voorlopig.
@@ -2599,7 +2596,10 @@ export default function HorizonPage({
     ? simResult.rows.find(r => r.age === aowAgeInt && r.phase === 'retirement')
       ?? simResult.rows.find(r => r.age === aowAgeInt)
     : null
-  const portfolioAtAow = isPensioenMode && simResult
+  // ADR 0129 — onder ÉLK vast anker: het GEPROJECTEERDE vermogen op het stopmoment
+  // (`firePortfolioAtFire` = de stand op de ankermaand). Onder het aow-anker blijft de
+  // rij-lookup op de AOW-leeftijd de eerste bron (bestaand gedrag, #473).
+  const portfolioAtAow = isFixedAnchorMode && simResult
     ? (aowRow?.startPortfolio ?? simResult.firePortfolioAtFire)
     : null
   // Use actual withdrawal from the sim engine (guardrails-aware) instead of simple SWR calc (#473)
@@ -2803,12 +2803,12 @@ export default function HorizonPage({
     const faseId = (simResult != null
       ? faseAtAge({
           currentAge: currentAge ?? rows[0].age,
-          fireAge: isAowStopActive ? Math.ceil(userAowAge.fractional) : simResult.fireAge,
-          fireAgeFractional: isAowStopActive ? userAowAge.fractional : simResult.fireAgeFractional,
+          fireAge: simResult.fireAge,
+          fireAgeFractional: simResult.fireAgeFractional,
           aowAge: userAowAge.fractional,
           endAge: displayEndAge ?? rows[rows.length - 1].age + 1,
           fireReachable: simResult.fireReachable,
-          isPensioenMode: isAowStopActive || isPensioenMode,
+          isPensioenMode,
         }, row.age)?.id
       : null) ?? (isAcc ? 'opbouw' : 'onttrekking')
     const phaseLabel = faseId === 'opbouw' ? 'Opbouw' : faseId === 'overgang' ? 'Overgang' : 'Onttrekking'
@@ -2835,7 +2835,7 @@ export default function HorizonPage({
         ? Math.max(0, row.savings) / 12
         : (row.withdrawalNeed?.totaalNeed ?? (effectiveInput?.monthlyExpenses ?? 0) * 12) / 12,
     }
-  }, [displayUnifiedRows, lifelineAge, currentAge, effectiveInput, simResult, isAowStopActive, userAowAge.fractional, displayEndAge, isPensioenMode])
+  }, [displayUnifiedRows, lifelineAge, currentAge, effectiveInput, simResult, userAowAge.fractional, displayEndAge, isPensioenMode])
 
   // "Speel af": animeer de actieve leeftijd van de eerste naar de laatste rij.
   useEffect(() => {
@@ -2944,70 +2944,9 @@ export default function HorizonPage({
     }
   }, [initialData.housingStrategy, kernelHousingSale, unifiedRows, fireStrategy, simResult])
 
-  // ── AOW-stop simulatie (lokale wat-als bij shortfall) ───────────────────
-  // Kernel-only. Deze wat-als forceert een FIRE-moment op de AOW-leeftijd met een
-  // deplete-eindstrategie. De convergentie-router SOLVET de FIRE-leeftijd zelf en kan
-  // geen forced-fireAge-deplete-run uitdrukken; `evaluateFireAt(input, fireAge)`
-  // (solver.ts) draait daarom ÉÉN geforceerde kernel-run via de bestaande lib-helpers
-  // (adapter → solver → bridge, geen bisectie) met de deplete-op-AOW-vorm. Zonder
-  // rauwe kernel-context of bij een kern-fout: `null` → de AOW-stop-wat-als degradeert
-  // zichtbaar (de toggle valt terug op de gewone grafiek, zie `effectiveSimRows`).
-  const aowStopSimResult = useMemo(() => {
-    if (!isShortfallScenario || !effectiveInput || currentAge == null) return null
-    if (!kernelRawProfile) return null
-    const aowAgeInt = Math.ceil(userAowAge.fractional)
-    const yearlyExp = effectiveInput.yearlyMustExpenses > 0 ? effectiveInput.yearlyMustExpenses : 0
-    if (yearlyExp <= 0) return null
-    const strat = fireStrategy ?? DEFAULT_FIRE_STRATEGY
-    const pensioenEndAge = Math.max(strat.endAge, 90)
-
-    // Gedeelde pensioen-post-wrap: forceer FIRE = AOW (weergave-integer), pensioen-modus.
-    const wrapPensioen = (result: SimResult) => ({
-      ...result,
-      strategy: 'pensioen' as const,
-      fireAge: aowAgeInt,
-      fireAgeFractional: userAowAge.fractional,
-      fireReachable: true,
-      requiredFirePortfolio: result.firePortfolioAtFire,
-    })
-
-    // Bouw de adapter-invoer zoals de convergentie-router (rauwe context van de
-    // pagina) MET de deplete-op-AOW-overrides, en forceer FIRE op de fractionele
-    // AOW-leeftijd (maandnauwkeurig — de kernel rekent op maanden). De weergave-
-    // velden (fireAge = ceil) worden via `wrapPensioen` gezet. Een kern-fout → null.
-    try {
-      const adapterInput: KernelAdapterInput = {
-        profile: {
-          ...buildConvergentieAdapterProfile(kernelRawProfile),
-          fire_end_strategy: 'deplete',
-          fire_end_age: pensioenEndAge,
-        },
-        assets: initialData.assets ?? [],
-        debts,
-        lifeEvents: events,
-        aowRows,
-      }
-      const kernelInput = buildKernelInputFromApp(adapterInput)
-      const solve = evaluateFireAt(kernelInput, userAowAge.fractional)
-      const { assetSlotMeta, debtSlotMeta } = buildKernelSlotMeta(
-        initialData.assets ?? [],
-        debts,
-        deriveEigenHuisIds(initialData.assets ?? []),
-      )
-      const kernelUnified = kernelToUnifiedResult(solve, {
-        input: kernelInput,
-        yearlyExpenses: yearlyExp,
-        assetSlotMeta,
-        debtSlotMeta,
-      })
-      return wrapPensioen(toSimResult(kernelUnified))
-    } catch {
-      // Kern-fout → geen AOW-stop-wat-als (zichtbare degradatie, geen tweede motor).
-      return null
-    }
-  }, [isShortfallScenario, effectiveInput, currentAge, userAowAge.fractional, fireStrategy, debts, events, aowRows, initialData.assets, kernelRawProfile])
-
-  const effectiveSimRows = isAowStopActive && aowStopSimResult ? aowStopSimResult.rows : (simResult?.rows ?? [])
+  // De AOW-stop-wat-als (eigen `evaluateFireAt`-run met deplete-override) is weg —
+  // ADR 0129 B11: de snelkoppeling zet alleen de stop-slider; de hoofdrun is de bron.
+  const effectiveSimRows = simResult?.rows ?? []
 
   // Weergave-clip voor de SimRow-oppervlakken (Pad-grafiek + Inkomen&Uitgaven-
   // strip): t/m eindleeftijd − 1, spiegelbeeld van `displayUnifiedRows`. De
@@ -3018,11 +2957,8 @@ export default function HorizonPage({
   )
   const displayEffectiveSimRows = useMemo(
     () =>
-      clipRowsToPlanEnd(
-        effectiveSimRows,
-        isAowStopActive && aowStopSimResult ? aowStopSimResult.displayEndAge : displayEndAge,
-      ),
-    [effectiveSimRows, isAowStopActive, aowStopSimResult, displayEndAge],
+      clipRowsToPlanEnd(effectiveSimRows, displayEndAge),
+    [effectiveSimRows, displayEndAge],
   )
   // Partner-view: vervang de hoofdlijn door het PARTNER-pad (eigen as + FIRE-
   // markers op de partner). Alleen wanneer er een precies partner-pad is
@@ -3046,7 +2982,7 @@ export default function HorizonPage({
   // (partner/huishouden/AOW-stop, die andere rijen tekenen waar deze punten niet
   // bij horen) ⇒ één lijn op de totaal-grondslag, en dus ook geen pill.
   const dualBasisAvailable =
-    liquidWealthPoints != null && !usePartnerMainLine && !useHouseholdMainLine && !isAowStopActive
+    liquidWealthPoints != null && !usePartnerMainLine && !useHouseholdMainLine
   // De grondslag die de grafiek daadwerkelijk tekent: 'liquid' alleen als de
   // woonstrategie erom vraagt ÉN de J-reeks er ook echt is.
   const effectiveChartPrimaryBasis: 'total' | 'liquid' =
@@ -3089,14 +3025,6 @@ export default function HorizonPage({
       freedomText,
     })
   }, [deficitLoanNotice, deficitNoticeVisible, canonicalDailyRate, masked, userAowAge.fractional, displayEndAge, isPensioenMode, homeExcludedFromProgress])
-  const aowAgeIntForDepletion = Math.ceil(userAowAge.fractional)
-  // Tijdstip-conventie: rij `age` is het leeftijdsJAAR; `endPortfolio <= 0`
-  // betekent "op aan het EIND van dat jaar" = op leeftijd `age + 1`. Het jaar
-  // zelf melden las de uitputting een jaar te vroeg (D, nazorg R2+R3).
-  const depletionRow = isAowStopActive && aowStopSimResult
-    ? aowStopSimResult.rows.find(r => r.age >= aowAgeIntForDepletion && r.endPortfolio <= 0) ?? null
-    : null
-  const depletionAge = depletionRow ? depletionRow.age + 1 : null
 
   // ── Erfgenamen (heirs) derivation for End-of-Life analysis ───────────────
   const erfgenamen = useMemo(() => {
@@ -3427,13 +3355,21 @@ export default function HorizonPage({
 
   // Effectieve stopleeftijd — de slider werkt controlled op dit getal; is er nog niets
   // gekozen dan default naar de (afgeronde) verwacht-FIRE, anders currentAge+1.
+  // ADR 0129 F3b — onder een vast anker is de default het STOPMOMENT VAN HET PLAN
+  // (halve jaren): de slider is dan een verkenning tegen het plan, niet tegen de
+  // gesolvede FIRE-leeftijd.
+  const planStopAgeDefault: number | null =
+    simResult?.vastStopLeeftijd ??
+    (planAnchor.kind === 'age' ? planAnchor.age : planAnchor.kind === 'aow' ? userAowAge.fractional : null)
   const effectiveStopAge =
     scenarioStopAge ??
-    (scenarioVerwachtFireAge !== null
-      ? Math.round(scenarioVerwachtFireAge)
-      : currentAge !== null
-        ? Math.round(currentAge) + 1
-        : 60)
+    (isFixedAnchorMode && planStopAgeDefault != null && Number.isFinite(planStopAgeDefault)
+      ? Math.round(planStopAgeDefault * 2) / 2
+      : scenarioVerwachtFireAge !== null
+        ? Math.round(scenarioVerwachtFireAge)
+        : currentAge !== null
+          ? Math.round(currentAge) + 1
+          : 60)
 
   const stopMarge = useMemo(
     () =>
@@ -3458,12 +3394,13 @@ export default function HorizonPage({
         : 'Draai aan je aannames — je basislijn blijft staan'
     }
     const delen: string[] = []
-    // ADR 0127 — onder 'Nu stoppen' zijn "vrij op X", "stop X" en "marge" alle drie
-    // uitspraken over een stopKEUZE die er niet is (het stopmoment ligt vast op
-    // vandaag). De ingeklapte kop noemt dan het bereik, uit dezelfde bron als de
-    // hero-KPI — geen tweede weergave van hetzelfde getal.
-    if (isNuStoppenMode) {
-      const reikwijdte = nuStoppenReach != null ? nuStoppenZinKort(nuStoppenReach) : 'je bereik'
+    // ADR 0129 — onder een VAST anker zijn "vrij op X", "stop X" en "marge" uitspraken
+    // over een stopKEUZE die het plan al heeft gemaakt. De ingeklapte kop noemt dan
+    // het bereik, uit dezelfde bron als de hero-KPI — geen tweede weergave van
+    // hetzelfde getal.
+    if (isFixedAnchorMode) {
+      const reikwijdte =
+        ankerReach != null ? ankerZinKort(ankerReach, ankerStop ?? { kind: 'now' }) : 'je bereik'
       return doelActief
         ? `Vastgelegd doel — ${reikwijdte}`
         : hasScenario
@@ -3476,10 +3413,60 @@ export default function HorizonPage({
     const cijfers = delen.join(' · ')
     if (doelActief) return `Vastgelegd doel — ${cijfers}`
     return hasScenario ? `Wat-als actief — ${cijfers}` : `Verken je pad — ${cijfers}`
-  }, [currentAge, doelActief, hasScenario, scenarioVerwachtFireAge, effectiveStopAge, stopMarge, isNuStoppenMode, nuStoppenReach])
+  }, [currentAge, doelActief, hasScenario, scenarioVerwachtFireAge, effectiveStopAge, stopMarge, isFixedAnchorMode, ankerReach, ankerStop])
 
   // Slepen aan de stop-slider legt (bij koppel aan) een nieuwe vast te houden marge vast.
   // Vergrendelen alléén tegen de bezonken verwacht-waarde (nooit de basis-fallback).
+  // ── "Maak dit mijn plan" (ADR 0129 F3b, vrijheidsas) ───────────────────────
+  // De slider is verkenning; pas deze CTA zet het gekozen stopmoment als plan: PUT van
+  // het VOLLEDIGE plan (route-contract R3) met anker `age` + de sliderwaarde; de
+  // eind-vorm, eindleeftijd en nalatenschap blijven wat ze waren.
+  const [maakPlanBusy, setMaakPlanBusy] = useState(false)
+  const handleMaakDitMijnPlan = useCallback(
+    async (stopAge: number) => {
+      const plan = initialData.firePlan
+      const strat = fireStrategy ?? DEFAULT_FIRE_STRATEGY
+      const endForm =
+        plan?.endForm ??
+        (strat.strategy === 'legacy' || strat.strategy === 'perpetual' ? strat.strategy : 'deplete')
+      const endAge = plan?.endAge ?? strat.endAge
+      const halved = Math.round(stopAge * 2) / 2
+      if (halved >= endAge) {
+        addToast({ type: 'warning', title: 'Kies een stopmoment vóór de eindleeftijd van je plan.' })
+        return
+      }
+      setMaakPlanBusy(true)
+      try {
+        const res = await fetch('/api/fire-settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(
+            planDraftToFireSettingsBody({
+              anchor: 'age',
+              stopAge: halved,
+              endForm,
+              endAge,
+              legacyAmount: plan?.legacyAmount ?? strat.legacyAmount,
+            }),
+          ),
+        })
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          addToast({ type: 'error', title: 'Opslaan mislukt', message: typeof data?.error === 'string' ? data.error : undefined })
+          return
+        }
+        addToast({ type: 'success', title: `Je plan rekent nu met stoppen op ${formatStopAge(halved)}.` })
+        loadData()
+        router.refresh()
+      } catch {
+        addToast({ type: 'error', title: 'Opslaan mislukt — netwerkfout' })
+      } finally {
+        setMaakPlanBusy(false)
+      }
+    },
+    [initialData.firePlan, fireStrategy, addToast, loadData, router],
+  )
+
   const handleStopAgeChange = useCallback(
     (v: number) => {
       setScenarioStopAge(v)
@@ -4775,9 +4762,9 @@ export default function HorizonPage({
   // het getal een projectie (geen doel), onder 'nu stoppen' bestaat er geen
   // doelbedrag (ADR 0127 D4) en bij een huishoud-/partnerweergave komt het
   // bedrag uit een andere bron dan deze vlag.
-  const fireTargetCaption = isPensioenMode
-    ? 'geprojecteerd'
-    : hasPerspectiveHero || isNuStoppenMode
+  const fireTargetCaption = isFixedAnchorMode
+    ? 'geprojecteerd op je stopmoment'
+    : hasPerspectiveHero
       ? 'benodigd'
       : homeExcludedFromProgress
         ? 'benodigd — zonder je huis'
@@ -4789,42 +4776,40 @@ export default function HorizonPage({
   // de "vrijheidsleeftijd"-stat anders het feitelijk huidige (FIRE≈huidige)
   // leeftijd-getal — verwarrend. Dan tonen we i.p.v. een getal "Je bent vrij" /
   // "Je bent met pensioen". Alleen voor de eigen view (niet huishouden/partner).
-  const heroFreedomFraming = resolveFreedomFraming({
+  const heroFreedomState = {
     freedomPct: effectiveFreedomPct,
     currentAge,
     // Consume-only: exact hetzelfde kernantwoord als de KPI eronder — nooit
     // een eigen precedentieketen (dat was juist de drift-bron van C1).
     fireAge: heroFireAge.age,
     strategy: fireStrategy?.strategy,
+    // ADR 0129 D8 — het anker van de run is de sleutel voor de gate (anker bereikt ∧
+    // dekking ≥ 100); vóór de run het plan-anker uit de bundel.
+    anchor: simResult ? stopAnchorFromKernel(simResult.stopAnker) : (initialData.firePlan?.anchor ?? null),
     aowAge: userAowAge.fractional,
-  })
-  // ADR 0127 — 'nu-stoppen' uitgezonderd: bij volledige tijdsdekking geeft
-  // `resolveFreedomFraming` daar 'nu-stoppen' terug, maar de zin "Je bent vrij"
-  // in de plaats van het getal is dan juist mis. Onder dit anker ís het getal het
-  // antwoord (tot welke leeftijd het reikt) — alleen het LABEL verandert.
+  }
+  const heroFreedomFraming = resolveFreedomFraming(heroFreedomState)
+  // ADR 0129 — het nu-anker uitgezonderd: bij volledige dekking staat de gate open,
+  // maar de zin "Je bent vrij" in de plaats van het getal is dan juist mis. Onder dat
+  // anker ís het getal het antwoord (tot welke leeftijd het reikt) — alleen het LABEL
+  // verandert. 'anchored' (vast anker, nog niet vrij) toont evenmin de vrij-hero.
   const showFreeHero =
-    !hasPerspectiveHero && heroFreedomFraming !== 'building' && heroFreedomFraming !== 'nu-stoppen'
-  const freeHeroPhrase = heroFreedomFraming === 'pensioen' ? 'Je bent met pensioen' : 'Je bent vrij'
-  const freeHeroLabel = heroFreedomFraming === 'pensioen' ? 'Pensioen' : 'Vrijheid'
+    !hasPerspectiveHero && heroFreedomFraming === 'free' && simResult?.stopAnker?.soort !== 'nu'
+  const heroFreeAsPensioen = heroFreedomFraming === 'free' && isAtOrPastAow(heroFreedomState)
+  const freeHeroPhrase = heroFreeAsPensioen ? 'Je bent met pensioen' : 'Je bent vrij'
+  const freeHeroLabel = heroFreeAsPensioen ? 'Pensioen' : 'Vrijheid'
 
   // ── KPI-koppen van de leeftijds-tegel (ADR 0127) ───────────────────────
   // Één plek voor de drie varianten, zodat desktop- en mobiele tegel (en hun
   // kassabon) niet uiteen kunnen lopen.
-  const heroAgeLabel = isNuStoppenMode
-    ? NU_STOPPEN_KPI_LABEL
-    : isPensioenMode
-      ? 'Pensioenleeftijd'
-      : 'Vrijheidsleeftijd'
-  const heroAgeLabelKort = isNuStoppenMode
-    ? NU_STOPPEN_KPI_LABEL_KORT
-    : isPensioenMode
-      ? 'Pensioenlft'
-      : 'Vrijheidslft'
-  const heroAgeCaptionBase = isNuStoppenMode
-    ? (nuStoppenReach != null ? nuStoppenKpiCaption(nuStoppenReach) : 'jaar')
-    : isPensioenMode
-      ? 'AOW-leeftijd'
-      : 'jaar'
+  // ADR 0129 — onder ÉLK vast anker (aow/now/age) is het kopgetal de leeftijd tot waar
+  // het liquide vermogen reikt; de drieslag eronder draagt stopmoment en "vrij mogelijk
+  // vanaf". Geen "Pensioenleeftijd" meer als kop: de AOW is een stopmoment, geen antwoord.
+  const heroAgeLabel = isFixedAnchorMode ? ANKER_KPI_LABEL : 'Vrijheidsleeftijd'
+  const heroAgeLabelKort = isFixedAnchorMode ? ANKER_KPI_LABEL_KORT : 'Vrijheidslft'
+  const heroAgeCaptionBase = isFixedAnchorMode
+    ? (ankerReach != null ? ankerKpiCaption(ankerReach) : 'jaar')
+    : 'jaar'
 
   // ── Gelijke behandeling van ontbrekende brondata op de hele KPI-rij (UR2-05) ─
   // De Doelbedrag-tegel had als enige een gegevensmelding (`showFireTargetNotice`,
@@ -4845,15 +4830,14 @@ export default function HorizonPage({
     fireTarget: fireTargetGuard,
   })
   //
-  // ADR 0127 D4 — 'nu-stoppen' is uitgezonderd: de doelbedrag-guard is daar
+  // ADR 0129 D4 — een VAST anker is uitgezonderd: de doelbedrag-guard is daar
   // bewust NIET ok ('geen-doelvermogen'). Dat is geen ontbrekend gegeven maar
-  // een eigenschap van de strategie; het moment (tot waar het vermogen reikt)
-  // is er wél en hoort te blijven staan. Zonder die uitzondering zou de tegel
-  // op elke nu-stoppen-run de gegevensmelding tonen.
+  // een eigenschap van het plan; het bereik (tot waar het vermogen reikt) is er
+  // wél en hoort te blijven staan. Zonder die uitzondering zou de tegel op elke
+  // run onder een vast anker de gegevensmelding tonen.
   const showFireAgeNotice =
     !hasPerspectiveHero &&
-    !isPensioenMode &&
-    !isNuStoppenMode &&
+    !isFixedAnchorMode &&
     heroFireAge.status !== 'berekenen' &&
     !fireAgeNoticeGuard.ok
   // De uitgave ná pensioen toetst zijn eigen grondslag: de methode-uitkomst uit
@@ -4927,12 +4911,15 @@ export default function HorizonPage({
             className="font-bold leading-tight tracking-[-0.02em] text-[28px] sm:text-[36px]"
             style={{ fontFamily: 'var(--font-playfair, serif)' }}
           >
-            Wanneer ben je{' '}
+            {/* ADR 0129 B10 — de vraag draagt de modus: `solved` "Wanneer kun je
+                stoppen?" · vast anker "Kun je op {stop} stoppen?" · nu "Hoe ver reikt
+                je vermogen?". Het accentwoord is het laatste woord van de vraag. */}
+            {heroVraag.replace(/\s\S+\?$/, '')}{' '}
             <em
               className="font-normal italic"
               style={{ color: 'var(--module-active-700)' }}
             >
-              vrij
+              {heroVraag.match(/(\S+)\?$/)?.[1] ?? ''}
             </em>
             ?
           </h1>
@@ -5024,8 +5011,10 @@ export default function HorizonPage({
             </button>
           </div>
 
-          {/* Desktop: 4-col figures-strip — editorial blueprint */}
-          <div className="hidden sm:grid sm:grid-cols-4 items-start border-t border-b border-[var(--ink)] mb-5">
+          {/* Desktop: 4-col figures-strip — editorial blueprint. Onder een vast anker
+              valt de Opnamerate-tegel weg (uitgaven ÷ huidig vermogen is daar
+              betekenisloos — bevinding 6) en wordt het een 3-koloms strip. */}
+          <div className={`hidden sm:grid ${isFixedAnchorMode && !hasPerspectiveHero ? 'sm:grid-cols-3' : 'sm:grid-cols-4'} items-start border-t border-b border-[var(--ink)] mb-5`}>
             {/* KPI 1: Vrijheidsleeftijd / Pensioenleeftijd — winner met highlight-marker */}
             <button
               type="button"
@@ -5036,7 +5025,7 @@ export default function HorizonPage({
               // UAT-controle "3-5x herladen geeft hetzelfde antwoord".
               data-fire-age-status={hasPerspectiveHero ? 'perspectief' : heroFireAge.status}
               aria-busy={!hasPerspectiveHero && heroFireAgePending}
-              title={hasPerspectiveHero ? (isPartnerView ? `FIRE-leeftijd van ${perspectiveHero!.householdName}` : 'Gezamenlijke FIRE-leeftijd op basis van gecombineerd vermogen en gedeelde uitgaven') : isPensioenMode ? 'AOW-leeftijd op basis van je geboortedatum' : undefined}
+              title={hasPerspectiveHero ? (isPartnerView ? `FIRE-leeftijd van ${perspectiveHero!.householdName}` : 'Gezamenlijke FIRE-leeftijd op basis van gecombineerd vermogen en gedeelde uitgaven') : isFixedAnchorMode ? 'Tot welke leeftijd je liquide vermogen reikt als je op je stopmoment stopt' : undefined}
             >
               <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1.5">
                 <Hourglass className="h-3 w-3 shrink-0" aria-hidden />
@@ -5087,11 +5076,11 @@ export default function HorizonPage({
               onClick={() => setShowFireTargetReceipt(true)}
               className="p-4 border-r border-[var(--rule-soft)] last:border-r-0 text-left transition-colors hover:bg-[var(--subtle)]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
               data-testid="hero-stat-fire-target"
-              title={hasPerspectiveHero ? (isPartnerView ? `FIRE-doelbedrag van ${perspectiveHero!.householdName}` : 'Gezamenlijk FIRE-doelbedrag op basis van gedeelde uitgaven') : isPensioenMode ? 'Geprojecteerd vermogen op je AOW-leeftijd' : undefined}
+              title={hasPerspectiveHero ? (isPartnerView ? `FIRE-doelbedrag van ${perspectiveHero!.householdName}` : 'Gezamenlijk FIRE-doelbedrag op basis van gedeelde uitgaven') : isFixedAnchorMode ? 'Geprojecteerd liquide vermogen op je stopmoment' : undefined}
             >
               <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1.5">
                 <Target className="h-3 w-3 shrink-0" aria-hidden />
-                <span>{isPensioenMode ? 'Vermogen op AOW' : 'Doelbedrag'}</span>
+                <span>{isFixedAnchorMode ? 'Vermogen op je stopmoment' : 'Doelbedrag'}</span>
                 <ReceiptCue />
               </div>
               {!hasPerspectiveHero && showFireTargetNotice ? (
@@ -5138,7 +5127,7 @@ export default function HorizonPage({
                   >
                     {hasPerspectiveHero
                       ? <MaskedAmount value={viewPerspectiveHeroFireTarget ?? perspectiveHero!.fireTarget} tone="horizon" monoWhenVisible={false} approx />
-                      : <MaskedAmount value={isPensioenMode ? (viewPortfolioAtAow ?? 0) : viewBalkVrijheidDoel} tone="horizon" monoWhenVisible={false} approx />}
+                      : <MaskedAmount value={isFixedAnchorMode ? (viewPortfolioAtAow ?? 0) : viewBalkVrijheidDoel} tone="horizon" monoWhenVisible={false} approx />}
                   </div>
                   <div
                     className="italic text-[11px] text-[var(--ink-3)] mt-1.5"
@@ -5151,7 +5140,9 @@ export default function HorizonPage({
             </button>
 
             {/* KPI 3: Opnamerate / Maandelijkse onttrekking — secundaire diepte,
-                verborgen in Eenvoudig-modus (hard-hide). */}
+                verborgen in Eenvoudig-modus (hard-hide) én onder een vast anker
+                (ADR 0129 F3b, bevinding 6: uitgaven ÷ huidig vermogen zegt daar niets). */}
+            {!(isFixedAnchorMode && !hasPerspectiveHero) && (
             <HideInSimple>
             <button
               type="button"
@@ -5184,6 +5175,7 @@ export default function HorizonPage({
               </div>
             </button>
             </HideInSimple>
+            )}
 
             {/* KPI 4: Uitgave na pensioen — linkt naar verdiepingspagina */}
             <button
@@ -5252,15 +5244,28 @@ export default function HorizonPage({
               afrondingsregel als het kopgetal hierboven. Consume-only: geen
               eigen leeftijdsafleiding, geen bedrag (dus buiten de deflator- en
               maskeringsregels). */}
+          {/* ADR 0129 D7/B9 — de DRIESLAG onder een vast anker: VRIJ MOGELIJK VANAF
+              (tweede run) · JOUW STOPMOMENT (instelling) · REIKT TOT (bereik). Alleen
+              in de eigen weergave; consume-only uit `heroFireAge.anker`. */}
+          {!hasPerspectiveHero && heroFireAge.anker && (
+            <AnkerDrieslag
+              anker={heroFireAge.anker}
+              currentAge={currentAge}
+              solvedFireEndAge={solvedRun?.endAge ?? null}
+              planEndAge={simResult?.displayEndAge ?? null}
+            />
+          )}
+
           {(() => {
             const zin = buildVrijheidsleeftijdZin({
               freedomAge: hasPerspectiveHero ? perspectiveHero!.fireAge : heroFireAge.age,
               framing: heroFreedomFraming,
-              isPensioen: isPensioenMode,
-              // ADR 0127 — onder 'Nu stoppen' gaat deze zin over BEREIK, niet over
-              // een moment: `heroFireAge.age` is daar de runway-leeftijd, en
+              anchor: planAnchor,
+              // ADR 0129 — onder een VAST anker gaat deze zin over BEREIK, niet over
+              // een moment: `heroFireAge.age` is daar de bereik-leeftijd, en
               // "werken wordt een keuze rond je 78e" zou daar een belofte van maken.
-              nuStoppenReach: hasPerspectiveHero ? null : nuStoppenReach,
+              ankerReach: hasPerspectiveHero ? null : ankerReach,
+              ankerStop: hasPerspectiveHero ? null : ankerStop,
               // Nog geen antwoord (kernel rekent) of een gegevensprobleem (M6 /
               // UR2-05): dan draagt de KPI zelf al een melding. Een duidingszin
               // eronder zou daar tegenin praten — `showFireAgeNotice` dekt óók
@@ -5320,16 +5325,14 @@ export default function HorizonPage({
               <span className="font-mono">
                 {hasPerspectiveHero
                   ? `${formatMaskedApproxCurrency(viewPerspectiveHeroFireTarget ?? perspectiveHero!.fireTarget, masked)} — ${isPartnerView ? `${perspectiveHero!.householdName}'s vrijheid` : 'gezamenlijke vrijheid'}`
-                  : isPensioenMode
-                    ? `${formatMaskedApproxCurrency(viewPortfolioAtAow ?? 0, masked)} — vermogen op AOW`
-                    // ADR 0127 D5 — de balk meet hier TIJDSDEKKING, geen kapitaal:
-                    // een doelbedrag noemen zou een noemer suggereren die niet
-                    // bestaat (D4). Het label noemt daarom de eindleeftijd.
-                    : isNuStoppenMode
-                      ? (simResult != null
-                          ? `tot je ${Math.round(simResult.displayEndAge)}e — einde van je plan`
-                          : 'einde van je plan')
-                      : `${formatMaskedApproxCurrency(viewBalkVrijheidDoel, masked)} — volledige vrijheid`}
+                  // ADR 0129 D5/D8 — onder ÉLK vast anker meet de balk DEKKING (tijd),
+                  // geen kapitaal: een doelbedrag noemen zou een noemer suggereren die
+                  // niet bestaat (D4). Het label noemt daarom het einde van het plan.
+                  : isFixedAnchorMode
+                    ? (simResult != null
+                        ? `tot je ${Math.round(simResult.displayEndAge)}e — einde van je plan`
+                        : 'einde van je plan')
+                    : `${formatMaskedApproxCurrency(viewBalkVrijheidDoel, masked)} — volledige vrijheid`}
               </span>
               <span>100%</span>
             </div>
@@ -5392,7 +5395,7 @@ export default function HorizonPage({
             >
               <div className="flex items-center gap-1.5 text-[9px] uppercase tracking-[0.18em] font-mono text-[var(--module-active-700)] mb-1">
                 <Target className="h-3 w-3 shrink-0" aria-hidden />
-                <span>{isPensioenMode ? 'Vermogen' : 'Doelbedrag'}</span>
+                <span>{isFixedAnchorMode ? 'Vermogen bij stop' : 'Doelbedrag'}</span>
                 <ReceiptCue />
               </div>
               {!hasPerspectiveHero && showFireTargetNotice ? (
@@ -5439,7 +5442,7 @@ export default function HorizonPage({
                   >
                     {hasPerspectiveHero
                       ? <MaskedAmount value={viewPerspectiveHeroFireTarget ?? perspectiveHero!.fireTarget} tone="horizon" monoWhenVisible={false} approx />
-                      : <MaskedAmount value={isPensioenMode ? (viewPortfolioAtAow ?? 0) : viewBalkVrijheidDoel} tone="horizon" monoWhenVisible={false} approx />}
+                      : <MaskedAmount value={isFixedAnchorMode ? (viewPortfolioAtAow ?? 0) : viewBalkVrijheidDoel} tone="horizon" monoWhenVisible={false} approx />}
                   </div>
                   <div
                     className="italic text-[10px] text-[var(--ink-3)] mt-1"
@@ -5451,7 +5454,9 @@ export default function HorizonPage({
               )}
             </button>
 
-            {/* KPI 3: Opnamerate — verborgen in Eenvoudig-modus (hard-hide). */}
+            {/* KPI 3: Opnamerate — verborgen in Eenvoudig-modus (hard-hide) én onder een
+                vast anker (ADR 0129 F3b, bevinding 6). */}
+            {!(isFixedAnchorMode && !hasPerspectiveHero) && (
             <HideInSimple>
             <button
               type="button"
@@ -5483,6 +5488,7 @@ export default function HorizonPage({
               </div>
             </button>
             </HideInSimple>
+            )}
 
             {/* KPI 4: Uitgave na pensioen — linkt naar verdiepingspagina */}
             <button
@@ -5554,7 +5560,7 @@ export default function HorizonPage({
             <>
               <div className="my-2 border-b border-dashed border-[var(--border-ed)]" />
 
-              {!simResult.fireReachable && !isPensioenMode && !isNuStoppenMode && (
+              {!simResult.fireReachable && !isFixedAnchorMode && (
                 <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-amber-200 bg-amber-50/60 px-3 py-2.5">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                   <p className="font-sans text-[12px] text-amber-800">
@@ -5573,30 +5579,17 @@ export default function HorizonPage({
                 </div>
               )}
 
-              {/* V12 — kernel pensioen-tekort: vóór AOW komt het vermogen tekort, ná AOW
-                  dekt het inkomen het wél. Beschrijvend (Wft-veilig); eigen oranje regel
-                  omdat de banner hierboven pensioen-modus overslaat. */}
-              {kernelStatus === 'pension_shortfall' && (
-                <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-amber-200 bg-amber-50/60 px-3 py-2.5">
+              {/* ADR 0129 D3 — ÉÉN tekort-blok voor elk vast anker (`anchor_shortfall`).
+                  `pension_shortfall` en `stop_now_shortfall` blijven tot F4 als aliassen op
+                  hetzelfde blok. De zin komt uit anker-copy en noemt de AOW bewust NIET:
+                  een tekort kan ook ná de AOW vallen — de oude pensioen-kopij ("vanaf je
+                  AOW-leeftijd dekt je inkomen je uitgaven wél") beloofde iets dat de run
+                  niet draagt. Beschrijvend (hoe ver reikt het), nergens aansporend. */}
+              {(kernelStatus === 'anchor_shortfall' || kernelStatus === 'pension_shortfall' || kernelStatus === 'stop_now_shortfall') && ankerReach != null && (
+                <div data-testid="anchor-shortfall-blok" className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-amber-200 bg-amber-50/60 px-3 py-2.5">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                   <p className="font-sans text-[12px] text-amber-800">
-                    Tot je AOW-leeftijd komt je vermogen tekort — in die periode teer je in op een tekort-lening. Vanaf je AOW-leeftijd dekt je inkomen je uitgaven wél.
-                  </p>
-                </div>
-              )}
-
-              {/* ADR 0127 D2 — kernel stop-nu-tekort. EIGEN status naast
-                  `pension_shortfall`, en dus een eigen blok: dat blok noemt de
-                  AOW-leeftijd, terwijl een tekort onder 'Nu stoppen' ook NÁ de AOW
-                  kan vallen — een andere boodschap voor een andere oorzaak. De zin
-                  is beschrijvend (hoe ver reikt het) en spoort nergens toe aan;
-                  woorden uit één bron (lib/horizon/nu-stoppen-copy.ts), zodat de
-                  hero-KPI, deze melding en de grafiek-uitleg hetzelfde zeggen. */}
-              {kernelStatus === 'stop_now_shortfall' && nuStoppenReach != null && (
-                <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-dashed border-amber-200 bg-amber-50/60 px-3 py-2.5">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-                  <p className="font-sans text-[12px] text-amber-800">
-                    {nuStoppenZin(nuStoppenReach)}
+                    {ankerZin(ankerReach, ankerStop ?? { kind: 'now' })}
                   </p>
                 </div>
               )}
@@ -5611,14 +5604,14 @@ export default function HorizonPage({
                 <div className="mb-4 flex items-start gap-2.5 rounded-[var(--r)] border border-positive/30 bg-positive-bg px-3 py-2.5">
                   <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-positive" />
                   <p className="font-sans text-[12px] text-[var(--ink-2)]">
-                    {/* ADR 0127 — onder 'Nu stoppen' is "je kunt nu al stoppen" een
-                        tautologie: je hébt gezegd dat je stopt. De informatieve
-                        uitspraak is dan hoe ver het vermogen reikt — en die reikt
-                        in deze tak per D7-invariant tot de eindleeftijd. */}
-                    {isNuStoppenMode
-                      ? (nuStoppenReach != null
-                          ? nuStoppenZin(nuStoppenReach)
-                          : 'Als je nu stopt, reikt je vermogen tot het einde van je plan.')
+                    {/* ADR 0129 — onder een VAST anker is "je kunt nu al stoppen" een
+                        tautologie: het stopmoment ligt al vast. De informatieve
+                        uitspraak is dan hoe ver het liquide vermogen reikt — de
+                        bereik-zin uit anker-copy (statusblok gedekt). */}
+                    {isFixedAnchorMode
+                      ? (ankerReach != null
+                          ? ankerZin(ankerReach, ankerStop ?? { kind: 'now' })
+                          : 'Als je op je stopmoment stopt, reikt je liquide vermogen tot het einde van je plan.')
                       : 'Volgens je huidige cijfers kun je nu al stoppen met werken.'}
                   </p>
                 </div>
@@ -5753,42 +5746,8 @@ export default function HorizonPage({
                   de status, één voor de knop, in plaats van een badge per
                   grafiek. */}
               <PillRow className="mb-2" ariaLabel="Grafiek-opties">
-                {/* AOW-stop toggle — alleen bij shortfall scenario (FIRE > AOW) */}
-                {isShortfallScenario && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setAowStopToggle('doorgaan')}
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                        aowStopToggle === 'doorgaan'
-                          ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
-                          : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
-                      }`}
-                      aria-pressed={aowStopToggle === 'doorgaan'}
-                      aria-label="Doorgaan met FIRE-pad"
-                      title="Doorgaan"
-                    >
-                      <TrendingUp className="h-3 w-3" />
-                      <span data-pill-label className="hidden sm:inline">Doorgaan</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAowStopToggle('stoppen')}
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                        aowStopToggle === 'stoppen'
-                          ? 'border-amber-300 bg-amber-50 text-amber-700'
-                          : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-amber-200 hover:text-[var(--ink-2)]'
-                      }`}
-                      aria-pressed={aowStopToggle === 'stoppen'}
-                      aria-label="Stop op AOW-leeftijd"
-                      title="Stop op AOW"
-                    >
-                      <Landmark className="h-3 w-3" />
-                      <span data-pill-label className="hidden sm:inline">Stop op AOW</span>
-                    </button>
-                    <span aria-hidden className="mx-0.5 h-4 w-px bg-[var(--border-ed)]" />
-                  </>
-                )}
+                {/* De AOW-stop-toggle stond hier (ADR 0129 B11): die is een
+                    snelkoppeling op de stop-slider van de vrijheidsas geworden. */}
                 {/* Scenario- en Monte-Carlo-toggles zijn line-chart-overlays —
                     niet zinvol op de vermogensopbouw-stack. Verbergen in
                     barchart-mode i.p.v. uitgrijzen: minder visuele ruis,
@@ -6090,6 +6049,10 @@ export default function HorizonPage({
                           hasScenario: scenarioOverlayDataList.length > 0,
                           hasBaseline: false,
                           planningMode,
+                          // ADR 0129 — onder een vast anker noemt de spotlight het
+                          // stopmoment, niet "op 47 bereik je vrijheid" (bevinding 6).
+                          stopAnchorFixed: isFixedAnchorMode,
+                          stopAge: simResult.vastStopLeeftijd ?? null,
                         })
                       : getWealthCompositionTips({
                           fireAge: simResult.fireAge,
@@ -6102,12 +6065,6 @@ export default function HorizonPage({
               </PillRow>
 
               {/* ── Editorial quote-explainers per actieve overlay/optie ── */}
-              <ChartOverlayExplainer active={isAowStopActive}>
-                <em>Stop op AOW</em> simuleert wat er gebeurt als je tot je
-                AOW-leeftijd doorwerkt en daarna pas onttrekt — zo zie je of
-                je geplande pensioenleeftijd haalbaar is zónder voortijdig <GlossaryTerm term="fire">FIRE</GlossaryTerm> te bereiken.
-              </ChartOverlayExplainer>
-
               <ChartOverlayExplainer active={scenariosExpanded && !!scenarioData}>
                 De <em>scenario-lijnen</em> tonen je vermogenspad onder een
                 voorzichtiger en optimistischer <GlossaryTerm term="rendement">rendement</GlossaryTerm> (±2 procentpunt).
@@ -6179,25 +6136,6 @@ export default function HorizonPage({
                 groei vandaan komt.
               </ChartOverlayExplainer>
 
-              {/* ── AOW-stop waarschuwingsbanner ── */}
-              {isAowStopActive && (
-                <div className={`mb-3 flex items-start gap-2.5 border px-3 py-2.5 ${depletionAge != null ? 'border-amber-200 bg-amber-50/60' : 'border-[var(--border-ed)] bg-[var(--subtle)]/40'}`}>
-                  <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${depletionAge != null ? 'text-amber-500' : 'text-[var(--ink-3)]'}`} />
-                  <div>
-                    <p className={`font-sans text-[12px] font-medium ${depletionAge != null ? 'text-amber-800' : 'text-[var(--ink-2)]'}`}>
-                      {depletionAge != null
-                        ? 'Vermogen raakt op voor eindleeftijd'
-                        : 'Simulatie: stoppen op AOW-leeftijd'}
-                    </p>
-                    <p className={`mt-0.5 font-sans text-[11px] ${depletionAge != null ? 'text-amber-700' : 'text-[var(--ink-3)]'}`}>
-                      {depletionAge != null
-                        ? `Bij stoppen op AOW-leeftijd (${aowAgeFormatted}) is je vermogen rond leeftijd ${depletionAge} op — je haalt de ingestelde eindleeftijd van ${aowStopSimResult?.displayEndAge ?? (fireStrategy?.endAge ?? 90)} niet.`
-                        : `De grafiek toont wat er gebeurt als je stopt met werken op je AOW-leeftijd (${aowAgeFormatted}) en gaat onttrekken uit je opgebouwde vermogen.`}
-                    </p>
-                  </div>
-                </div>
-              )}
-
               {/* STEP 3a: eenmalige welkomsttekst — staat LOS van de overlay. */}
               <ToekomstWelcome
                 visible={!welcomeDismissed}
@@ -6205,7 +6143,7 @@ export default function HorizonPage({
                 dailyExpenseRate={canonicalDailyRate}
                 freedomAge={hasPerspectiveHero ? perspectiveHero!.fireAge : heroFireAge.age}
                 isPensioen={isPensioenMode}
-                nuStoppenReach={hasPerspectiveHero ? null : nuStoppenReach}
+                nuStoppenReach={hasPerspectiveHero || planAnchor?.kind !== 'now' ? null : ankerReach}
                 masked={masked}
                 // Stil sluiten (✕/Escape/achtergrond): alleen wegklikken, de
                 // tip-overlay NIET openen.
@@ -6257,9 +6195,7 @@ export default function HorizonPage({
                             ? householdMainLine!.fireAgeFractional
                             : usePartnerMainLine
                               ? partnerLine!.fireAgeFractional
-                              : isAowStopActive
-                                ? userAowAge.fractional
-                                : simResult.fireAgeFractional
+                              : simResult.fireAgeFractional
                           const lo = visibleMin
                           const span = visibleMax - lo
                           const fraction =
@@ -6275,14 +6211,16 @@ export default function HorizonPage({
                           }
                         })()}
                         summary={{
-                          // Netto vermogen: zelfde canonieke afleiding als ToekomstWelcome.
+                          // Netto vermogen: canonieke afleiding uit de effectieve input
+                          // (totalAssets − totalDebts), niet lokaal herberekend.
                           netWorth: effectiveNetWorth,
                           // Vrijheidsleeftijd: EXACT dezelfde bron + precedentie als de
                           // hero-KPI "vrijheidsleeftijd" (single-source, niet herberekend).
                           freedomAge: hasPerspectiveHero ? perspectiveHero!.fireAge : heroFireAge.age,
                           masked,
-                          isPensioen: isPensioenMode,
-                          nuStoppenReach: hasPerspectiveHero ? null : nuStoppenReach,
+                          anchor: planAnchor,
+                          ankerReach: hasPerspectiveHero ? null : ankerReach,
+                          ankerStop: hasPerspectiveHero ? null : ankerStop,
                         }}
                         onClose={handleOverlayExit}
                       >
@@ -6306,9 +6244,9 @@ export default function HorizonPage({
                             hoverAge={lifelineAge}
                             onHoverAge={setLifelineAge}
                             hideValueTooltip={displayMode === 'full'}
-                            rows={useHouseholdMainLine ? viewHouseholdMainLineRows! : usePartnerMainLine ? viewPartnerLineRows! : (isAowStopActive ? viewDisplayEffectiveSimRows : viewDisplaySimRows)}
-                            fireAge={useHouseholdMainLine ? householdMainLine!.fireAge : usePartnerMainLine ? partnerLine!.fireAge : (isAowStopActive ? Math.ceil(userAowAge.fractional) : simResult.fireAge)}
-                            fireAgeFractional={useHouseholdMainLine ? householdMainLine!.fireAgeFractional : usePartnerMainLine ? partnerLine!.fireAgeFractional : (isAowStopActive ? userAowAge.fractional : simResult.fireAgeFractional)}
+                            rows={useHouseholdMainLine ? viewHouseholdMainLineRows! : usePartnerMainLine ? viewPartnerLineRows! : (viewDisplaySimRows)}
+                            fireAge={useHouseholdMainLine ? householdMainLine!.fireAge : usePartnerMainLine ? partnerLine!.fireAge : (simResult.fireAge)}
+                            fireAgeFractional={useHouseholdMainLine ? householdMainLine!.fireAgeFractional : usePartnerMainLine ? partnerLine!.fireAgeFractional : (simResult.fireAgeFractional)}
                             currentAge={useHouseholdMainLine ? (householdMainLine!.currentAge ?? currentAge ?? 30) : usePartnerMainLine ? (partnerLine!.currentAge ?? currentAge ?? 30) : (currentAge ?? 30)}
                             endAge={chartEndAge!}
                             // euro-view: exempt — `cashflows` levert géén zichtbaar bedrag in
@@ -6321,12 +6259,12 @@ export default function HorizonPage({
                             // net als targetInflationFactors — niet op partner-/huishoud-/
                             // AOW-stop-lijnen. Bij de dubbele-woning-grondslag (downsize/
                             // opeethypotheek/uitsluiten); anders undefined → één doellijn.
-                            fireTargetInclHome={(usePartnerMainLine || useHouseholdMainLine || isAowStopActive) ? undefined : (showDualFireTarget ? viewFireTargetInclHome! : undefined)}
+                            fireTargetInclHome={(usePartnerMainLine || useHouseholdMainLine) ? undefined : (showDualFireTarget ? viewFireTargetInclHome! : undefined)}
                             strategy={simResult.strategy}
                             targetEndPortfolio={viewTargetEndPortfolio}
                             // Meegroeiende doellijn alleen op de basis-projectie (niet op
                             // partner-/huishoud-/AOW-stop-lijnen — die hebben eigen rijen).
-                            targetInflationFactors={(usePartnerMainLine || useHouseholdMainLine || isAowStopActive) ? undefined : viewTargetInflationFactors}
+                            targetInflationFactors={(usePartnerMainLine || useHouseholdMainLine) ? undefined : viewTargetInflationFactors}
                             // Besteedbaar-reeks alleen op de basis-projectie: partner-/
                             // huishoud-/AOW-stop-lijnen tekenen andere rijen, waar deze
                             // punten niet bij horen (`dualBasisAvailable`).
@@ -6347,9 +6285,9 @@ export default function HorizonPage({
                             // partner-event-markers, zodat de lijn + de partner-gebeurtenissen
                             // visueel bij elkaar horen. FIRE-annotaties blijven goud (COLOR_OPBOUW).
                             mainLineColor={(usePartnerMainLine || useHouseholdMainLine) ? COLOR_PARTNER_EVENT : undefined}
-                            scenarioOverlays={(isAowStopActive || usePartnerMainLine || useHouseholdMainLine) ? undefined : viewCombinedScenarioOverlays}
+                            scenarioOverlays={(usePartnerMainLine || useHouseholdMainLine) ? undefined : viewCombinedScenarioOverlays}
                             scenarioPending={scenarioPending || stopPadPending}
-                            monteCarloOverlay={(isAowStopActive || usePartnerMainLine || useHouseholdMainLine) ? undefined : viewMonteCarloOverlay}
+                            monteCarloOverlay={(usePartnerMainLine || useHouseholdMainLine) ? undefined : viewMonteCarloOverlay}
                             // euro-view: exempt — het dagtarief (€→vrijheidstijd) is per
                             // definitie een grootheid van VANDAAG en deflateert nooit (D15).
                             // Deflateert het bedrag wél, dan volgt de vrijheidstijd
@@ -6361,7 +6299,8 @@ export default function HorizonPage({
                             visibleMaxAge={visibleMax}
                             aowAgeFractional={userAowAge.fractional}
                             planningMode={planningMode}
-                            showDepletionWarning={isAowStopActive && !usePartnerMainLine && !useHouseholdMainLine}
+                            stopAnchorFixed={isFixedAnchorMode}
+                            showDepletionWarning={false}
                             eventOverlay={chartEventOverlay}
                             onEventClick={handleChartEventClick}
                             onEventDragEnd={handleChartEventDragEnd}
@@ -6460,12 +6399,12 @@ export default function HorizonPage({
                         }}
                       >
                         <IncomeExpenseChart
-                          rows={isAowStopActive ? viewDisplayEffectiveSimRows : viewDisplaySimRows}
+                          rows={viewDisplaySimRows}
                           currentAge={currentAge ?? 30}
                           endAge={chartEndAge!}
                           visibleMinAge={visibleMin}
                           visibleMaxAge={visibleMax}
-                          fireAge={isAowStopActive ? Math.ceil(userAowAge.fractional) : simResult.fireAge}
+                          fireAge={simResult.fireAge}
                           planningMode={planningMode}
                           aowAgeFractional={userAowAge.fractional}
                           viewMode={ieViewMode}
@@ -6520,12 +6459,12 @@ export default function HorizonPage({
                         <div className="mt-2" style={{ marginLeft: CHART_PAD.left, marginRight: CHART_PAD.right }}>
                           <PhaseBar
                             currentAge={currentAge}
-                            fireAge={isAowStopActive ? Math.ceil(userAowAge.fractional) : simResult.fireAge}
-                            fireAgeFractional={isAowStopActive ? userAowAge.fractional : simResult.fireAgeFractional}
+                            fireAge={simResult.fireAge}
+                            fireAgeFractional={simResult.fireAgeFractional}
                             aowAge={userAowAge.fractional}
                             endAge={chartEndAge!}
                             fireReachable={simResult.fireReachable}
-                            isPensioenMode={isAowStopActive || isPensioenMode}
+                            isPensioenMode={isPensioenMode}
                             onSegmentClick={(fase) => setActiveFaseModal(fase)}
                             visibleMinAge={visibleMin}
                             visibleMaxAge={visibleMax}
@@ -6623,11 +6562,10 @@ export default function HorizonPage({
                 className="mt-1 block font-sans text-[10px] text-[var(--ink-4)] transition-colors hover:text-horizon-600"
                 style={{ minHeight: 44, display: 'flex', alignItems: 'center' }}
               >
-                {isNuStoppenMode
-                  ? <>Nu-stoppen-modus actief &middot; <span className="ml-0.5 underline underline-offset-2">Instellingen &rarr;</span></>
-                  : isPensioenMode
-                    ? <>Pensioen-modus actief &middot; <span className="ml-0.5 underline underline-offset-2">Instellingen &rarr;</span></>
-                    : <>Berekend als FIRE-pad &middot; <span className="ml-0.5 underline underline-offset-2">Pensioen-modus beschikbaar &rarr;</span></>}
+                {/* ADR 0129 B10 — geen modus-label maar het plan in gewone taal. */}
+                {isFixedAnchorMode && ankerStop != null
+                  ? <>{ankerTitel(ankerStop)} &middot; <span className="ml-0.5 underline underline-offset-2">Stopmoment wijzigen &rarr;</span></>
+                  : <>De app rekent je stopmoment uit &middot; <span className="ml-0.5 underline underline-offset-2">Zelf een stopmoment kiezen &rarr;</span></>}
               </button>
 
               {/* De wat-als-slider-lab is verplaatst naar de eigen sectie
@@ -6832,8 +6770,9 @@ export default function HorizonPage({
                   <Kicker className="mb-1">Vrijheidsas</Kicker>
                   {/* ADR 0127 — onder 'Nu stoppen' is "wanneer ben je vrij?" al beantwoord
                       (vandaag); de open vraag is hoe ver je vermogen reikt. */}
+                  {/* ADR 0129 B10 — de sectiekop volgt de hero-kop: de vraag draagt de modus. */}
                   <h2 className="font-display text-[14px] font-semibold leading-snug text-[var(--ink)]">
-                    {isNuStoppenMode ? 'Hoe ver reikt je vermogen?' : 'Wanneer ben je vrij?'}
+                    {heroVraag}
                   </h2>
                 </div>
                 <Vrijheidsas
@@ -6850,17 +6789,22 @@ export default function HorizonPage({
                   zone={stopMarge.zone}
                   margeJaren={stopMarge.margeJaren}
                   doelActief={doelActief}
-                  // ADR 0127 — stop-slider + koppel-checkbox weg: het stopmoment is
-                  // hier een INSTELLING (eindstrategie), geen schuif. Twee schuiven
-                  // die hetzelfde besturen is een bug in de maak.
+                  // ADR 0129 — onder het NU-anker is het stopmoment vandaag: geen schuif.
+                  // Onder aow/age blijft de slider als VERKENNING tegen het plan (default =
+                  // het stopmoment van het plan), met de CTA "Maak dit mijn plan".
                   stopKeuzeVerborgen={isNuStoppenMode}
                   stopKeuzeNotitie={
-                    nuStoppenReach != null ? (
+                    ankerReach != null ? (
                       <p className="font-sans text-[12px] leading-snug text-[var(--ink-2)]">
-                        {nuStoppenZin(nuStoppenReach)}
+                        {ankerZin(ankerReach, ankerStop ?? { kind: 'now' })}
                       </p>
                     ) : null
                   }
+                  ankerVast={isFixedAnchorMode}
+                  planStopAge={simResult?.vastStopLeeftijd ?? (planAnchor.kind === 'age' ? planAnchor.age : null)}
+                  aowAge={userAowAge.fractional}
+                  onMaakPlan={handleMaakDitMijnPlan}
+                  maakPlanBusy={maakPlanBusy}
                   draaiknoppen={
                     <>
                       {/* De vier bestaande sliders (platgeslagen via `bare`) */}
@@ -6968,6 +6912,16 @@ export default function HorizonPage({
           bijwerken={doelActief}
           saving={doelSaving}
           onSubmit={handleDoelVastleggen}
+          // ADR 0129 — onder een vast stopmoment schrijft het lab geen fire_age-doel.
+          fireAgeNietVanToepassing={
+            isFixedAnchorMode && planAnchor.kind !== 'solved'
+              ? fireAgeGoalNotApplicableReason(
+                  planAnchor.kind,
+                  ankerStop != null && ankerStop.kind !== 'now' ? ankerStop.stopAge : null,
+                  simResult?.displayEndAge ?? initialData.firePlan?.endAge ?? null,
+                )
+              : null
+          }
         />
 
         {/* Gedeelde "Doel loslaten"-bevestiging — zelfde ShellOverlay-confirm
@@ -9473,18 +9427,18 @@ export default function HorizonPage({
             <div className="mb-3 text-center">
               <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">{heroAgeLabel.toUpperCase()}</p>
               <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">
-                {isNuStoppenMode
-                  ? 'Runway uit de simulatie-engine — stoppen op vandaag'
-                  : isPensioenMode ? 'AOW-leeftijd op basis van geboortedatum' : simResult?.fireAgeFractional != null ? 'Simulatie-engine berekening' : 'Statische projectie'}
+                {isFixedAnchorMode
+                  ? 'Bereik uit de simulatie-engine — onttrekking vanaf je stopmoment'
+                  : simResult?.fireAgeFractional != null ? 'Simulatie-engine berekening' : 'Statische projectie'}
               </p>
             </div>
 
             <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
-              {isNuStoppenMode
-                ? 'De leeftijd tot waar je vermogen je uitgaven dekt als je vandaag stopt met werken.'
-                : isPensioenMode
-                  ? 'Je AOW-leeftijd bepaalt wanneer je staatspensioen ingaat. De simulatie berekent je vermogen op dat moment.'
-                  : 'De leeftijd waarop je vermogen voldoende is om je uitgaven te dekken zonder te werken.'}
+              {isFixedAnchorMode
+                ? (ankerReach != null
+                    ? ankerZin(ankerReach, ankerStop ?? { kind: 'now' })
+                    : 'De leeftijd tot waar je liquide vermogen je uitgaven dekt als je op je stopmoment stopt.')
+                : 'De leeftijd waarop je vermogen voldoende is om je uitgaven te dekken zonder te werken.'}
             </div>
 
             <div className="mb-2 mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
@@ -9531,6 +9485,19 @@ export default function HorizonPage({
                 <span className="font-sans text-sm text-[var(--ink-2)]">Pensioenuitgaven/jr</span>
                 <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={effectiveInput?.yearlyMustExpenses ?? 0} tone="horizon" />}</span>
               </div>
+              {/* ADR 0129 — het stopmoment als aanname in de bon (uit `vastStopLeeftijd`, nooit `fireAge`). */}
+              {isFixedAnchorMode && ankerStop != null && (
+                <div className="flex justify-between py-0.5">
+                  <span className="font-sans text-sm text-[var(--ink-2)]">Stopmoment</span>
+                  <span className="tabular-nums text-[var(--ink)]">{ankerStop.kind === 'now' ? 'nu' : `${formatStopAge(ankerStop.stopAge)} jaar`}</span>
+                </div>
+              )}
+              {isFixedAnchorMode && heroFireAge.anker?.solvedFireAge != null && (
+                <div className="flex justify-between py-0.5">
+                  <span className="font-sans text-sm text-[var(--ink-2)]">Vrij mogelijk vanaf</span>
+                  <span className="tabular-nums text-[var(--ink)]">{heroFireAgeYear(heroFireAge.anker.solvedFireAge)} jaar</span>
+                </div>
+              )}
               {isPensioenMode && (
                 <div className="flex justify-between py-0.5">
                   <span className="font-sans text-sm text-[var(--ink-2)]">AOW-leeftijd</span>
@@ -9567,7 +9534,7 @@ export default function HorizonPage({
 
             {/* Optimistisch/pessimistisch zijn FIRE-leeftijden uit de scenarioband —
                 onder 'Nu stoppen' bestaat er geen FIRE-moment om te spreiden (D1). */}
-            {!isPensioenMode && !isNuStoppenMode && range && range.optimistic.fireAge !== null && range.pessimistic.fireAge !== null && (
+            {!isFixedAnchorMode && range && range.optimistic.fireAge !== null && range.pessimistic.fireAge !== null && (
               <div className="mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
                 <div className="flex justify-between py-0.5">
                   <span className="font-sans text-sm text-[var(--ink-2)]">Optimistisch</span>
@@ -9582,92 +9549,44 @@ export default function HorizonPage({
 
 
             <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
-              <p><strong className="font-semibold text-[var(--ink-3)]">Formule:</strong> {isNuStoppenMode
-                ? 'Onttrekking start op maand 0. Het bereik is de eerste maand waarin je liquide vermogen aanhoudend op nul staat — omgerekend naar een leeftijd.'
-                : isPensioenMode
-                  ? 'AOW-leeftijd is wettelijk bepaald op basis van je geboortedatum. Vermogen op AOW = simulatie-projectie op die leeftijd.'
-                  : 'Portfolio groeit met rendement + jaarlijkse besparing. FIRE is bereikt wanneer portfolio ≥ doelbedrag.'}</p>
+              <p><strong className="font-semibold text-[var(--ink-3)]">Formule:</strong> {isFixedAnchorMode
+                ? 'Onttrekking start op je stopmoment. Het bereik is de eerste maand waarin je liquide vermogen aanhoudend op nul staat — omgerekend naar een leeftijd.'
+                : 'Portfolio groeit met rendement + jaarlijkse besparing. FIRE is bereikt wanneer portfolio ≥ doelbedrag.'}</p>
             </div>
 
-            <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">{isNuStoppenMode ? 'Nu-stoppen-modus — gerekend vanaf vandaag' : isPensioenMode ? 'Pensioen-modus — gebaseerd op AOW-leeftijd' : 'Berekend op basis van huidig vermogen, spaargedrag en verwacht rendement'}</p>
+            <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">{isFixedAnchorMode && ankerStop != null ? `${ankerTitel(ankerStop)} — gerekend vanaf dat moment` : 'Berekend op basis van huidig vermogen, spaargedrag en verwacht rendement'}</p>
           </KassabonShell>
         </div>
       </BottomSheet>
 
-      <BottomSheet open={showCountdownReceipt} onClose={() => setShowCountdownReceipt(false)} title={isNuStoppenMode ? 'Je stopt vandaag' : isPensioenMode ? 'Aftellen naar pensioen' : 'Aftellen naar vrijheid'}>
-        <div className="p-5">
-          <KassabonShell>
-            <div className="mb-3 text-center">
-              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">{isPensioenMode ? 'AFTELLEN NAAR PENSIOEN' : 'AFTELLEN NAAR VRIJHEID'}</p>
-              <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">{isPensioenMode ? 'resterende tijd tot AOW-leeftijd' : 'resterende tijd tot volledige vrijheid'}</p>
-            </div>
-
-            <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
-              {isPensioenMode
-                ? 'Het aantal dagen tot je AOW-leeftijd, het moment waarop je staatspensioen ingaat.'
-                : 'Het aantal dagen tot je verwachte moment van volledige financiële vrijheid.'}
-            </div>
-
-            <div className="mb-2 mt-2 border-b border-dashed border-[var(--border-ed)] pb-2">
-              {currentAge != null && (
-                <div className="flex justify-between py-0.5">
-                  <span className="font-sans text-sm text-[var(--ink-2)]">Huidige leeftijd</span>
-                  <span className="tabular-nums text-[var(--ink)]">{currentAge} jaar</span>
-                </div>
-              )}
-              <div className="flex justify-between py-0.5">
-                <span className="font-sans text-sm text-[var(--ink-2)]">{isPensioenMode ? 'Pensioenleeftijd' : 'Vrijheidsleeftijd'}</span>
-                <span className="tabular-nums text-[var(--ink)]">{heroFireAgeReceiptText}</span>
-              </div>
-              <div className="flex justify-between py-0.5">
-                <span className="font-sans text-sm text-[var(--ink-2)]">{isPensioenMode ? 'Jaren tot pensioen' : 'Jaren tot vrijheid'}</span>
-                <span className="tabular-nums text-[var(--ink)]">
-                  {`${effectiveCountdown.countdownYears} jaar en ${effectiveCountdown.countdownMonths} maanden`}
-                </span>
-              </div>
-              {effectiveCountdown.fireDate && effectiveCountdown.countdownDays > 0 && (
-                <div className="flex justify-between py-0.5">
-                  <span className="font-sans text-sm text-[var(--ink-2)]">Verwachte datum</span>
-                  <span className="tabular-nums capitalize text-[var(--ink)]">{effectiveCountdown.fireDate}</span>
-                </div>
-              )}
-            </div>
-
-            <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
-              <span className="text-[var(--ink)]">Nog</span>
-              <span className="tabular-nums text-[var(--ink)]">
-                {effectiveCountdown.countdownDays > 0 ? `${effectiveCountdown.countdownDays.toLocaleString('nl-NL')} dagen` : '0 dagen'}
-              </span>
-            </div>
-
-            <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">{isPensioenMode ? 'Berekend vanuit je geboortedatum en AOW-leeftijd' : 'Berekend vanuit je geboortedatum en verwachte vrijheidsleeftijd'}</p>
-          </KassabonShell>
-        </div>
-      </BottomSheet>
-
-      <BottomSheet open={showFireTargetReceipt} onClose={() => setShowFireTargetReceipt(false)} title={isNuStoppenMode ? 'Geen doelbedrag' : isPensioenMode ? 'Verwacht vermogen op AOW' : 'FIRE Doelbedrag'}>
+      {/* De aftel-kassabon ("Aftellen naar vrijheid") is verwijderd: er was geen enkele
+          aanroeper van `setShowCountdownReceipt(true)` meer (dode code sinds de
+          figures-strip), en onder een vast anker is er niets om naar af te tellen. */}
+      <BottomSheet open={showFireTargetReceipt} onClose={() => setShowFireTargetReceipt(false)} title={isFixedAnchorMode ? 'Vermogen op je stopmoment' : 'FIRE Doelbedrag'}>
         <div className="p-5">
           <KassabonShell>
             {/* M6: dezelfde vangrail als op de KPI-tegel — de bon mag nooit een
                 bedrag onderbouwen dat de tegel als "we missen gegevens" toont. */}
             {showFireTargetNotice && (
               <div className="mb-3 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)] p-2.5 font-sans text-[11px] leading-relaxed text-[var(--ink-2)]">
-                <strong className="font-semibold text-[var(--ink)]">{isNuStoppenMode ? 'Geen doelbedrag' : HORIZON_MISSENDE_GEGEVENS_LABEL}.</strong>{' '}
+                <strong className="font-semibold text-[var(--ink)]">{HORIZON_MISSENDE_GEGEVENS_LABEL}.</strong>{' '}
                 {fireTargetGuard.hint}
               </div>
             )}
             <div className="mb-3 text-center">
-              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">{isNuStoppenMode ? 'GEEN DOELBEDRAG' : isPensioenMode ? 'VERWACHT VERMOGEN OP AOW' : 'FIRE DOELBEDRAG'}</p>
+              <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">{isFixedAnchorMode ? 'VERMOGEN OP JE STOPMOMENT' : 'FIRE DOELBEDRAG'}</p>
               <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">
-                {isPensioenMode
-                  ? 'Geprojecteerd vermogen op AOW-leeftijd'
+                {isFixedAnchorMode
+                  ? 'Geprojecteerd — een uitkomst, geen doel'
                   : simResult?.requiredFirePortfolio != null ? 'Simulatie-engine berekening (incl. AOW & kasstromen)' : `Klassieke FIRE-berekening (${(fireSwr * 100).toFixed(2)}% SWR)`}
               </p>
             </div>
 
             <div className="mb-2 border-b border-dashed border-[var(--border-ed)] pb-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
-              {isPensioenMode
-                ? 'Het verwachte vermogen op het moment dat je AOW ingaat, op basis van je huidige situatie en spaargedrag.'
+              {/* ADR 0129 D4 — onder een vast anker bestaat er geen doelbedrag (de kernel
+                  bisecteert op tijd, niet op kapitaal); de bon onderbouwt de PROJECTIE. */}
+              {isFixedAnchorMode
+                ? 'Het geprojecteerde liquide vermogen op je stopmoment. Onder een vast stopmoment is er geen doelbedrag: de vraag is niet hoeveel je nodig hebt, maar tot welke leeftijd dit vermogen reikt.'
                 : 'Het minimale vermogen waarmee je jaarlijkse pensioenuitgaven volledig kunt dekken.'}
             </div>
 
@@ -9682,10 +9601,14 @@ export default function HorizonPage({
                   <span className="tabular-nums text-[var(--ink)]">{aowAgeFormatted}</span>
                 </div>
               )}
-              <div className="flex justify-between py-0.5">
-                <span className="font-sans text-sm text-[var(--ink-2)]">Opnamerate (SWR)</span>
-                <span className="tabular-nums text-[var(--ink)]">{(fireSwr * 100).toFixed(2)}%</span>
-              </div>
+              {/* Onder een vast anker geen opnamerate-regel: uitgaven ÷ huidig vermogen
+                  is daar betekenisloos (bevinding 6). */}
+              {!isFixedAnchorMode && (
+                <div className="flex justify-between py-0.5">
+                  <span className="font-sans text-sm text-[var(--ink-2)]">Opnamerate (SWR)</span>
+                  <span className="tabular-nums text-[var(--ink)]">{(fireSwr * 100).toFixed(2)}%</span>
+                </div>
+              )}
               {/* M5 — de twee aannames waaruit die SWR volgt (rendement − Box 3-
                   druk − inflatie). Zonder deze regels is het doelbedrag een kaal
                   getal en de opnamerate een onverklaarde constante. Beide uit
@@ -9712,21 +9635,23 @@ export default function HorizonPage({
             </div>
 
             <div className="mt-2 flex justify-between border-t-2 border-[var(--ink)] pt-2 font-bold">
-              <span className="text-[var(--ink)]">{isPensioenMode ? 'Verwacht vermogen' : 'Benodigd'}</span>
-              <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={isPensioenMode ? (viewPortfolioAtAow ?? 0) : viewEffectiveFireTarget} tone="horizon" />}</span>
+              {/* ADR 0129 — geen "Benodigd"-totaalregel onder een vast anker: het bedrag is
+                  de geprojecteerde stand op het stopmoment, geen doel. */}
+              <span className="text-[var(--ink)]">{isFixedAnchorMode ? 'Vermogen op je stopmoment (geprojecteerd)' : 'Benodigd'}</span>
+              <span className="tabular-nums text-[var(--ink)]">{<MaskedAmount value={isFixedAnchorMode ? (viewPortfolioAtAow ?? 0) : viewEffectiveFireTarget} tone="horizon" />}</span>
             </div>
 
             <div className="mt-3 flex justify-center">
               {/* De vrijheidstijd volgt automatisch het (eventueel gedeflateerde)
                   bedrag — het dagtarief zelf blijft een grootheid van vandaag (D15). */}
-              <FreedomTimeBadge amount={isPensioenMode ? (viewPortfolioAtAow ?? 0) : viewEffectiveFireTarget} />
+              <FreedomTimeBadge amount={isFixedAnchorMode ? (viewPortfolioAtAow ?? 0) : viewEffectiveFireTarget} />
             </div>
 
             <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
               <p>
                 <strong className="font-semibold text-[var(--ink-3)]">Formule:</strong>{' '}
-                {isPensioenMode
-                  ? 'Vermogensprojectie op AOW-leeftijd via simulatie-engine (incl. Box 3, inflatie en levensgebeurtenissen)'
+                {isFixedAnchorMode
+                  ? 'Vermogensprojectie op je stopmoment via de simulatie-engine (incl. Box 3, inflatie en levensgebeurtenissen)'
                   : simResult?.requiredFirePortfolio != null
                     ? 'Levenslange simulatie (opbouw + verbruik tot leeftijd 90, incl. Box 3 en inflatie)'
                     : fireStrategy?.strategy === 'deplete'
@@ -9738,7 +9663,7 @@ export default function HorizonPage({
             </div>
 
             <p className="mt-3 text-center font-sans text-[10px] text-[var(--ink-4)]">
-              {isPensioenMode ? 'Pensioen-modus — geprojecteerd op AOW-leeftijd' : simResult?.requiredFirePortfolio != null ? 'Simulatie-engine berekening (incl. AOW & kasstromen)' : fireStrategy?.strategy === 'deplete' ? 'Deplete strategie — PV-annuïteitsformule' : fireStrategy?.strategy === 'legacy' ? 'Legacy strategie — erfenis-gebaseerd doelbedrag' : 'Klassieke FIRE-berekening'}
+              {isFixedAnchorMode ? 'Geprojecteerd op je stopmoment — een uitkomst, geen doel' : simResult?.requiredFirePortfolio != null ? 'Simulatie-engine berekening (incl. AOW & kasstromen)' : fireStrategy?.strategy === 'deplete' ? 'Deplete strategie — PV-annuïteitsformule' : fireStrategy?.strategy === 'legacy' ? 'Legacy strategie — erfenis-gebaseerd doelbedrag' : 'Klassieke FIRE-berekening'}
             </p>
           </KassabonShell>
         </div>

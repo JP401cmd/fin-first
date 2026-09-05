@@ -36,7 +36,7 @@ import type { RetirementExpenseMethod } from '@/lib/budget-utils'
 import type { ConvergentieRawContext } from '@/lib/horizon-kernel/convergentie-router'
 import { eindMaandVan } from '@/lib/horizon-kernel/gap'
 import type { SolveFireResult, SolverStatus } from '@/lib/horizon-kernel/solver'
-import type { Eindstrategie, KernelInput } from '@/lib/horizon-kernel/types'
+import type { Eindstrategie, KernelInput, KernelStopAnker } from '@/lib/horizon-kernel/types'
 import { guardRetirementExpense } from '@/lib/horizon/outcome-guard'
 import { bridgeForcedStop, buildForcedStopSolve } from '@/lib/horizon/scenario-presets'
 
@@ -78,6 +78,21 @@ interface RunwayComputed {
    * posities op nul uitkomen. ADR 0093: een duur, geen euro — geen deflator.
    */
   readonly startAge: number
+  /**
+   * Het STOPMOMENT van deze run als leeftijd (ADR 0129 F3a): `startAge` voor de
+   * stop-nu-runway, de ankerleeftijd voor een run op het plan-anker (`stop: 'plan'`
+   * in `computeRunwayFromRawContext`). Voedt de kop "Als je op {stop} stopt, …".
+   * Optioneel/additief: weggelaten (fixtures, oudere aanroepers) ⇒ `startAge`.
+   */
+  readonly stopAge?: number
+  /**
+   * Het PLAN-anker waarmee de kernel-invoer gebouwd is (`KernelInput.stopAnker`), of
+   * `null` onder `solved`. Bepaalt de zinsvorm: geen anker → "Als je nu zou stoppen"
+   * (hypothetisch), nu-anker → "Je liquide vermogen reikt tot …" (het plan ís stoppen),
+   * aow/leeftijd → "Als je op {stop} stopt, …". Echo, geen afleiding. Optioneel/
+   * additief: weggelaten ⇒ `null` (geen anker).
+   */
+  readonly planAnker?: KernelStopAnker | null
 }
 
 export type RunwayResult =
@@ -126,6 +141,8 @@ export function computeRunwayFromSolve(
   solve: SolveFireResult,
   kernelDepletionMonth: number | null,
   method: RetirementExpenseMethod,
+  /** Het stopmoment van de run; weggelaten = de startleeftijd (stop nu). */
+  stopAge: number = kernelInput.startLeeftijd,
 ): RunwayResult {
   const yearly = kernelInput.inkomenUitgaven.uitgaveNaPensioenPerJaar
   if (!guardRetirementExpense(yearly).ok) {
@@ -136,6 +153,8 @@ export function computeRunwayFromSolve(
     strategy: kernelInput.eindstrategie.selector,
     solverStatus: solve.status,
     startAge: kernelInput.startLeeftijd,
+    stopAge,
+    planAnker: kernelInput.stopAnker ?? null,
   }
   const endAge = solve.eindleeftijd
 
@@ -163,8 +182,19 @@ export function computeRunwayFromSolve(
  * zodat `endAge` en de D7-invariant over het eigen plan gaan. Eén engine-run
  * (`buildForcedStopSolve`) + de gedeelde bridge (`bridgeForcedStop`) — het
  * uitputtingsveld komt uit die bridge, niet uit een eigen lezing.
+ *
+ * `opts.stop` (ADR 0129 F3a, kruisverwijzing ADR 0126):
+ *  - `'nu'` (default) — de stop-nu-runway: "als ik vandaag stop" — het bestaande gedrag.
+ *  - `'plan'` — het STOPMOMENT VAN HET PLAN: onder een vast anker (aow/leeftijd) de
+ *    ankerleeftijd via DE resolver (`resolveVastAnker` in `buildForcedStopSolve`), onder
+ *    `solved` of het nu-anker valt dit samen met `'nu'`. De kop op /overzicht leest zo
+ *    "Als je op 62 stopt, reikt je liquide vermogen tot je 83e" i.p.v. een stop-nu-zin
+ *    boven een plan dat op 62 ankert.
  */
-export function computeRunwayFromRawContext(rawContext: ConvergentieRawContext): RunwayResult {
+export function computeRunwayFromRawContext(
+  rawContext: ConvergentieRawContext,
+  opts: { stop?: 'nu' | 'plan' } = {},
+): RunwayResult {
   if (!rawContext.profile.date_of_birth) {
     return { kind: 'unavailable', reason: 'geen-geboortedatum' }
   }
@@ -178,7 +208,7 @@ export function computeRunwayFromRawContext(rawContext: ConvergentieRawContext):
       lifeEvents: rawContext.lifeEvents,
       aowRows: rawContext.aowRows,
       yearlyExpenses: rawContext.yearlyExpenses,
-      stopAge: 'nu',
+      stopAge: opts.stop ?? 'nu',
       endStrategy: 'inherit',
     })
     bridged = bridgeForcedStop(run, rawContext)
@@ -190,5 +220,6 @@ export function computeRunwayFromRawContext(rawContext: ConvergentieRawContext):
     run.solve,
     bridged.depletionMonth,
     resolveRetirementExpenseMethod(rawContext.profile.retirement_expense_method),
+    run.stopAge,
   )
 }

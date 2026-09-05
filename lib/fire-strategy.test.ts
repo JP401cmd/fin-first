@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  isAtOrPastAow,
   isFinanciallyFree,
   isRetiredView,
   resolveFreedomFraming,
@@ -109,22 +110,24 @@ describe('resolveFreedomFraming', () => {
     ).toBe('free')
   })
 
-  it("'pensioen' bij expliciete pensioen-strategie", () => {
-    expect(
-      resolveFreedomFraming({ freedomPct: 100, currentAge: 67, fireAge: 67, strategy: 'pensioen' }),
-    ).toBe('pensioen')
+  // ADR 0129 D8 — 'pensioen' is geen framing meer maar een ANKER (aow) en een
+  // woordkeuze (`isAtOrPastAow`). De gate levert 'free'; de woordkeuze ernaast.
+  it("legacy 'pensioen' op/voorbij AOW met dekking 100 → 'free' + pensioen-woordkeuze", () => {
+    const input = { freedomPct: 100, currentAge: 67, fireAge: 67, strategy: 'pensioen' as const }
+    expect(resolveFreedomFraming(input)).toBe('free')
+    expect(isAtOrPastAow(input)).toBe(true)
   })
 
-  it("'pensioen' wanneer huidige leeftijd op/voorbij AOW", () => {
-    expect(
-      resolveFreedomFraming({ freedomPct: 20, currentAge: 68, fireAge: 60, strategy: 'deplete', aowAge: 67 }),
-    ).toBe('pensioen')
+  it("'free' + pensioen-woordkeuze wanneer huidige leeftijd op/voorbij AOW (solved, leeftijd voorbij FIRE)", () => {
+    const input = { freedomPct: 20, currentAge: 68, fireAge: 60, strategy: 'deplete' as const, aowAge: 67 }
+    expect(resolveFreedomFraming(input)).toBe('free')
+    expect(isAtOrPastAow(input)).toBe(true)
   })
 
-  it("'pensioen' wanneer vrijheidsleeftijd op/voorbij AOW", () => {
-    expect(
-      resolveFreedomFraming({ freedomPct: 100, currentAge: 70, fireAge: 67, strategy: 'deplete', aowAge: 67 }),
-    ).toBe('pensioen')
+  it("'free' + pensioen-woordkeuze wanneer vrijheidsleeftijd op/voorbij AOW", () => {
+    const input = { freedomPct: 100, currentAge: 70, fireAge: 67, strategy: 'deplete' as const, aowAge: 67 }
+    expect(resolveFreedomFraming(input)).toBe('free')
+    expect(isAtOrPastAow(input)).toBe(true)
   })
 
   it("'free' wanneer vrij maar vóór AOW zonder pensioen-strategie", () => {
@@ -188,7 +191,7 @@ describe('resolveFreedomAgeView (seam: drempel vs. weergave)', () => {
     expect(view.fireAgeDisplay).toBe(45)
   })
 
-  it("geeft strategie en AOW door aan de framing ('pensioen')", () => {
+  it("geeft strategie en AOW door aan de framing (legacy 'pensioen' ⇒ anker aow, 'free')", () => {
     const view = resolveFreedomAgeView({
       fireAgeFractional: 67.2,
       freedomPct: 100,
@@ -196,7 +199,8 @@ describe('resolveFreedomAgeView (seam: drempel vs. weergave)', () => {
       strategy: 'pensioen',
       aowAge: 67,
     })
-    expect(view.framing).toBe('pensioen')
+    expect(view.framing).toBe('free')
+    expect(view.anchor).toEqual({ kind: 'aow' })
     expect(view.fireAgeDisplay).toBe(67)
   })
 

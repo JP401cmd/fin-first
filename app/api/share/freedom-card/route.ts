@@ -5,6 +5,8 @@ import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { withCanonicalOverviewFigures } from '@/lib/overview/canonical-health'
 import { summarizeRunway, runwayYearsMonths } from '@/lib/briefing/overview-briefing'
 import { computeHorizonRunway } from '@/lib/fire-target-shared'
+import { isFixedAnchor } from '@/lib/fire-strategy'
+import { ankerReachFromRunway, ankerReachYear } from '@/lib/horizon/anker-copy'
 import { credibleDailyExpense, credibleMonthlyBasis } from '@/lib/format'
 
 /**
@@ -95,14 +97,26 @@ export async function GET(request: Request) {
     //    scalar-kernel-projectie als fallback. Exact hetzelfde ?? -patroon als de
     //    hub-widgets (nooit meer de legacy computeFireProjection). `fireDate` draagt
     //    de status-tekst ('Bereikt!' / 'Niet haalbaar' / 'mrt 2038').
-    const fireCountdownLabel =
-      simFireCountdown?.fireDate ||
-      fireProjResult.fireDate ||
-      (canCalculateFire ? 'Niet haalbaar' : 'Nog geen data')
+    // ADR 0129 F3b (bevinding 1) — onder een VAST stopmoment (aow/now/age) is de
+    // kernel-`fireAge` het anker en "Bereikt!" een valse claim. De kaart zegt dan
+    // "Reikt tot je {reikt}e" uit de plan-runway (dezelfde run als de kop op /overzicht);
+    // de aftelvelden staan op nul zodat de kaart geen countdown naar het anker toont.
+    const stopAnchorFixed = horizonData?.firePlan != null && isFixedAnchor(horizonData.firePlan)
+    const ankerReach = stopAnchorFixed ? ankerReachFromRunway(runway) : null
+    const ankerJaar = ankerReach ? ankerReachYear(ankerReach) : null
+    const fireCountdownLabel = stopAnchorFixed
+      ? ankerJaar != null
+        ? `Reikt tot je ${ankerJaar}e`
+        : ankerReach?.kind === 'nu-op'
+          ? 'Vandaag niet gedekt'
+          : 'Nog geen data'
+      : simFireCountdown?.fireDate ||
+        fireProjResult.fireDate ||
+        (canCalculateFire ? 'Niet haalbaar' : 'Nog geen data')
     const fireCountdown = {
-      years: simFireCountdown?.countdownYears ?? fireProjResult.countdownYears,
-      months: simFireCountdown?.countdownMonths ?? fireProjResult.countdownMonths,
-      days: simFireCountdown?.countdownDays ?? fireProjResult.countdownDays,
+      years: stopAnchorFixed ? 0 : (simFireCountdown?.countdownYears ?? fireProjResult.countdownYears),
+      months: stopAnchorFixed ? 0 : (simFireCountdown?.countdownMonths ?? fireProjResult.countdownMonths),
+      days: stopAnchorFixed ? 0 : (simFireCountdown?.countdownDays ?? fireProjResult.countdownDays),
       label: fireCountdownLabel,
     }
 
@@ -150,6 +164,7 @@ export async function GET(request: Request) {
       freedomDaysWon: Math.round(totalFreedomDaysWon),
       freedomDaysWonThisMonth: Math.round(freedomDaysWonThisMonth),
       fireCountdown,
+      stopAnchorFixed,
       freedomTime,
       savingsRate: canCalculateFire ? Math.round(savingsRatePct * 10) / 10 : null,
       generatedAt: new Date().toISOString(),

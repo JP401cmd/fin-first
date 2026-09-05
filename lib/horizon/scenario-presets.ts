@@ -17,14 +17,16 @@
  *     geërfd (stop; ADR 0126 PR B4). Het naast-beeld "en als ik vandaag stop?" — ook
  *     zinvol voor wie ná zijn FIRE-leeftijd doorwerkt, waar de FIRE-relatieve
  *     kaarten op een gepasseerde datum ankeren.
- *  2. `een-jaar-langer` — stop op verwacht-FIRE + 1 (stop).
+ *  2. `een-jaar-langer` — stop op het plan-stopmoment + 1 (stop; ADR 0129 F3a: onder
+ *     `solved` de verwachte FIRE-leeftijd, onder een vast anker de ankerleeftijd).
  *  3. `minder-uitgeven` — structureel −€300/mnd (input; verlaagt uitgaven → lager doel én
  *     meer sparen).
  *  4. `downsize` — forceer een verkoop-woonstrategie (input) — ALLEEN wanneer de gebruiker
  *     een eigen huis heeft én er nog géén downsize/verkoop-strategie actief is; ANDERS
  *     vervangen door `extra-inleg` (+€250/mnd extra inleg). De wissel leeft in
  *     `resolveScenarioPresets`.
- *  5. `eerder-stoppen` — stop op verwacht-FIRE − 2 (stop; de "rood"-kaart).
+ *  5. `eerder-stoppen` — stop op het plan-stopmoment − 2 (stop; de "rood"-kaart).
+ *  Onder het `now`-anker valt `stop-nu` weg: het basisplan ís dan al "vandaag stoppen".
  */
 
 import type { Asset } from '@/lib/asset-data'
@@ -38,9 +40,15 @@ import {
   computeConvergentieProjection,
   type ConvergentieRawProfileRow,
 } from '@/lib/horizon-kernel/convergentie-router'
-import { buildKernelInputFromApp, deriveEigenHuisIds, type KernelAdapterInput } from '@/lib/horizon-kernel/adapter'
-import { evaluateFireAt, solveFire, type SolveFireResult } from '@/lib/horizon-kernel/solver'
-import type { KernelInput } from '@/lib/horizon-kernel/types'
+import {
+  buildKernelInputFromApp,
+  buildStopAnker,
+  deriveEigenHuisIds,
+  type KernelAdapterInput,
+} from '@/lib/horizon-kernel/adapter'
+import { evaluateFireAt, resolveVastAnker, solveFire, type SolveFireResult } from '@/lib/horizon-kernel/solver'
+import { computeEs } from '@/lib/horizon-kernel/tables/es'
+import type { KernelInput, KernelStopAnker } from '@/lib/horizon-kernel/types'
 import { kernelToUnifiedResult, buildKernelSlotMeta, type KernelHousingSale } from '@/lib/horizon-kernel/bridge'
 import { DEFAULT_FIRE_STRATEGY } from '@/lib/fire-strategy'
 import { DEFAULT_DOWNSIZE_CONFIG } from '@/lib/housing-strategy'
@@ -76,15 +84,19 @@ export type ScenarioPresetStatus = 'basis' | 'groen' | 'amber' | 'rood'
 /**
  * Waar een stop-variant zijn stopmoment aan ANKERT. Twee ankers, expliciet in het type
  * i.p.v. een magische offset:
- *  - `'verwacht-fire'` — relatief aan de verwachte FIRE-leeftijd (+1 / −2 jaar). Zinloos
- *    voor wie ná zijn FIRE-leeftijd doorwerkt: de offset staat dan op een gepasseerde datum.
+ *  - `'plan-stop'` — relatief aan het STOPMOMENT VAN HET PLAN (+1 / −2 jaar, ADR 0129
+ *    F3a): onder `solved` de verwachte FIRE-leeftijd, onder een vast anker de
+ *    ankerleeftijd (aow → AOW-leeftijd, age → de gekozen leeftijd, now → vandaag) via
+ *    DE anker-resolver (`resolveVastAnker`). Vóór F3a heette dit `'verwacht-fire'` en
+ *    ankerde het altijd op de gesolvede leeftijd — voor een aow-/age-plan was "een jaar
+ *    langer" daarmee een jaar langer dan iets wat het plan niet zegt.
  *  - `'nu'` — de startleeftijd van de kernel-tijdas (hele jaren, P!B7 = FIRE-maand 0;
  *    NOOIT de fractionele leeftijd: 47,6 zou FIRE-maand 7 geven en is dan niet "nu").
  *    De run erft de eigen eindstrategie/eindleeftijd (`endStrategy: 'inherit'`) — een
  *    naast-beeld, geen profielwijziging (ADR 0126, PR B4).
  */
 export type StopAnker =
-  | { readonly soort: 'verwacht-fire'; readonly offsetJaren: number }
+  | { readonly soort: 'plan-stop'; readonly offsetJaren: number }
   | { readonly soort: 'nu' }
 
 /** Statische definitie van één preset-kaart. */
@@ -109,7 +121,7 @@ export const SCENARIO_PRESET_SPECS: Record<ScenarioPresetId, ScenarioPresetSpec>
     id: 'een-jaar-langer',
     label: 'Een jaar langer',
     kind: 'stop',
-    stopAnker: { soort: 'verwacht-fire', offsetJaren: SCENARIO_EEN_JAAR_LANGER_OFFSET },
+    stopAnker: { soort: 'plan-stop', offsetJaren: SCENARIO_EEN_JAAR_LANGER_OFFSET },
   },
   'minder-uitgeven': {
     id: 'minder-uitgeven',
@@ -128,7 +140,7 @@ export const SCENARIO_PRESET_SPECS: Record<ScenarioPresetId, ScenarioPresetSpec>
     id: 'eerder-stoppen',
     label: 'Eerder stoppen',
     kind: 'stop',
-    stopAnker: { soort: 'verwacht-fire', offsetJaren: SCENARIO_EERDER_STOPPEN_OFFSET },
+    stopAnker: { soort: 'plan-stop', offsetJaren: SCENARIO_EERDER_STOPPEN_OFFSET },
   },
 }
 
@@ -230,11 +242,16 @@ export interface ForcedStopPathResult {
  */
 export interface ForcedStopSolveInput extends Omit<ForcedStopPathInput, 'stopAge'> {
   /**
-   * Geforceerde stopleeftijd (fractioneel), of `'nu'`: de startleeftijd van de
-   * kernel-tijdas (FIRE-maand 0) — de "stop nu"-runway (ADR 0126). Bestaat omdat de
-   * startleeftijd pas ná de adapter bekend is (tijdas uit geboortedatum + peildatum).
+   * Geforceerde stopleeftijd (fractioneel), `'nu'` of `'plan'`.
+   *  - `'nu'`   — de startleeftijd van de kernel-tijdas (FIRE-maand 0), de "stop nu"-
+   *               runway (ADR 0126). Bestaat omdat de startleeftijd pas ná de adapter
+   *               bekend is (tijdas uit geboortedatum + peildatum).
+   *  - `'plan'` — het STOPMOMENT VAN HET PLAN (ADR 0129 F3a): het `stopAnker` dat de
+   *               adapter uit het profiel bouwt, omgezet door DE anker-resolver
+   *               (`resolveVastAnker`: aow → AOW-leeftijd, leeftijd → geklemd, nu →
+   *               start). Zonder vast anker (`solved`) valt dit terug op `'nu'`.
    */
-  stopAge: number | 'nu'
+  stopAge: number | 'nu' | 'plan'
 }
 
 /** De motor-helft van het geforceerde-stop-recept: kernel-invoer + statusblok/projectie. */
@@ -277,8 +294,44 @@ export function buildForcedStopSolve(input: ForcedStopSolveInput): ForcedStopSol
     aowRows: input.aowRows,
   }
   const kernelInput = buildKernelInputFromApp(adapterInput)
-  const stopAge = input.stopAge === 'nu' ? kernelInput.startLeeftijd : input.stopAge
+  const stopAge =
+    input.stopAge === 'nu'
+      ? kernelInput.startLeeftijd
+      : input.stopAge === 'plan'
+        ? (resolveVastAnker(kernelInput, computeEs(kernelInput)) ?? kernelInput.startLeeftijd)
+        : input.stopAge
   return { kernelInput, solve: evaluateFireAt(kernelInput, stopAge), stopAge }
+}
+
+/**
+ * Het STOPMOMENT VAN HET PLAN als leeftijd (ADR 0129 F3a) — het anker waar de
+ * `plan-stop`-kaarten (+1 / −2 jaar) omheen draaien.
+ *  - vast anker (aow/now/age) → de ankerleeftijd via DE resolver (`resolveVastAnker`,
+ *    dus aow uit `persoon.aowLeeftijd`, age geklemd op de tijdas — B7);
+ *  - `solved` → de verwachte FIRE-leeftijd van de basisrun (`ctx.verwachtFireAge`).
+ * `null` wanneer er niets te ankeren valt (geen FIRE binnen de horizon, kern-fout).
+ * Eén adapter-assemblage, geen engine-run.
+ */
+export function resolvePlanStopAge(ctx: ScenarioPresetContext): number | null {
+  const anker = planStopAnker(ctx)
+  if (anker === undefined) return ctx.verwachtFireAge
+  try {
+    const input = buildKernelInputFromApp({
+      profile: buildConvergentieAdapterProfile(ctx.profile),
+      assets: ctx.assets,
+      debts: ctx.debts,
+      lifeEvents: ctx.lifeEvents,
+      aowRows: ctx.aowRows,
+    })
+    return resolveVastAnker(input, computeEs(input))
+  } catch {
+    return null
+  }
+}
+
+/** Het plan-anker van de context zoals de adapter 'm leest (`undefined` = `solved`). */
+function planStopAnker(ctx: Pick<ScenarioPresetContext, 'profile'>): KernelStopAnker | undefined {
+  return buildStopAnker(buildConvergentieAdapterProfile(ctx.profile))
 }
 
 /**
@@ -358,19 +411,21 @@ export interface ScenarioPresetResult {
 }
 
 /**
- * Selecteert de zes van toepassing zijnde presets in kaart-volgorde. `stop-nu` staat direct
- * náást het basisplan (het naast-beeld "en als ik vandaag stop?"). Slot 5 is de wissel:
- * `downsize` wanneer de gebruiker een eigen huis heeft én er nog géén verkoop-woonstrategie
- * actief is; anders `extra-inleg`.
+ * Selecteert de van toepassing zijnde presets in kaart-volgorde. `stop-nu` staat direct
+ * náást het basisplan (het naast-beeld "en als ik vandaag stop?") — behalve onder het
+ * `now`-anker (ADR 0129 F3a): dan ÍS het basisplan al "vandaag stoppen" en zou de kaart
+ * een dubbele basis zijn. Slot 5 is de wissel: `downsize` wanneer de gebruiker een eigen
+ * huis heeft én er nog géén verkoop-woonstrategie actief is; anders `extra-inleg`.
  */
 export function resolveScenarioPresets(ctx: ScenarioPresetContext): ScenarioPresetSpec[] {
   const slot5: ScenarioPresetSpec =
     ctx.hasEigenHuis && !ctx.downsizeStrategyActief
       ? SCENARIO_PRESET_SPECS.downsize
       : SCENARIO_PRESET_SPECS['extra-inleg']
+  const planIsNu = planStopAnker(ctx)?.soort === 'nu'
   return [
     SCENARIO_PRESET_SPECS.basis,
-    SCENARIO_PRESET_SPECS['stop-nu'],
+    ...(planIsNu ? [] : [SCENARIO_PRESET_SPECS['stop-nu']]),
     SCENARIO_PRESET_SPECS['een-jaar-langer'],
     SCENARIO_PRESET_SPECS['minder-uitgeven'],
     slot5,
@@ -465,7 +520,14 @@ function deriveScenarioStatus(
 export function runScenarioPreset(
   spec: ScenarioPresetSpec,
   ctx: ScenarioPresetContext,
-  opts?: { basisBuffer?: LaagsteBuffer | null },
+  opts?: {
+    basisBuffer?: LaagsteBuffer | null
+    /**
+     * Het plan-stopmoment (`resolvePlanStopAge`), één keer bepaald door
+     * `runScenarioPresets` en hier doorgegeven; weggelaten ⇒ zelf bepalen (losse aanroep).
+     */
+    planStopAge?: number | null
+  },
 ): ScenarioPresetResult {
   const base = (
     stopLeeftijd: number | null,
@@ -484,7 +546,7 @@ export function runScenarioPreset(
   })
 
   if (spec.kind === 'stop') {
-    const anker: StopAnker = spec.stopAnker ?? { soort: 'verwacht-fire', offsetJaren: 0 }
+    const anker: StopAnker = spec.stopAnker ?? { soort: 'plan-stop', offsetJaren: 0 }
     const basisInput = {
       profile: ctx.profile,
       assets: ctx.assets,
@@ -503,11 +565,14 @@ export function runScenarioPreset(
       return base(run.stopAge, run.result.fireAgeFractional, computeLaagsteBuffer(run.unifiedRows), null)
     }
 
-    if (ctx.verwachtFireAge === null) {
-      // Geen FIRE-anker → geen FIRE-relatieve stop-run mogelijk (zichtbare degradatie).
+    // Het stopmoment van het PLAN: de ankerleeftijd onder een vast anker, anders de
+    // verwachte FIRE-leeftijd (ADR 0129 F3a). `undefined` in opts = losse aanroep.
+    const planStopAge = opts && 'planStopAge' in opts ? (opts.planStopAge ?? null) : resolvePlanStopAge(ctx)
+    if (planStopAge === null) {
+      // Geen stopmoment om aan te ankeren → geen relatieve stop-run mogelijk (zichtbare degradatie).
       return base(null, null, null, null)
     }
-    const stopAge = ctx.verwachtFireAge + anker.offsetJaren
+    const stopAge = planStopAge + anker.offsetJaren
     const run = runForcedStopPath({ ...basisInput, stopAge, fireEndAge: ctx.fireEndAge })
     if (run === null) return base(stopAge, null, null, null)
     return base(stopAge, run.result.fireAgeFractional, computeLaagsteBuffer(run.unifiedRows), null)
@@ -550,8 +615,10 @@ export function runScenarioPresets(ctx: ScenarioPresetContext): ScenarioPresetRe
   const specs = resolveScenarioPresets(ctx)
   const basis = runScenarioPreset(SCENARIO_PRESET_SPECS.basis, ctx)
   const basisBuffer = basis.laagsteBuffer
+  // Eén keer het plan-stopmoment bepalen voor alle relatieve stop-kaarten.
+  const planStopAge = resolvePlanStopAge(ctx)
   return specs.map((spec) =>
-    spec.id === 'basis' ? basis : runScenarioPreset(spec, ctx, { basisBuffer }),
+    spec.id === 'basis' ? basis : runScenarioPreset(spec, ctx, { basisBuffer, planStopAge }),
   )
 }
 
@@ -582,7 +649,30 @@ export function runScenarioPresets(ctx: ScenarioPresetContext): ScenarioPresetRe
  * anker. Draait in dezelfde worker-batch als de zes scenariokaarten (die samen ~6
  * volledige solves doen), dus het is een fractie van wat er toch al loopt.
  */
-export function solveFireAgeWithoutAnchor(ctx: ScenarioPresetContext): number | null {
+export function solveFireAgeWithoutAnchor(
+  ctx: Pick<ScenarioPresetContext, 'profile' | 'assets' | 'debts' | 'lifeEvents' | 'aowRows'>,
+): number | null {
+  return solveWithoutAnchor(ctx)?.fireAge ?? null
+}
+
+/** De tweede run in het geheel: de opgeloste leeftijd én de eindleeftijd waartegen ze gevonden is. */
+export interface SolvedWithoutAnchor {
+  /** "Vrij mogelijk vanaf" (fractioneel), of `null` wanneer de bisectie binnen de horizon niets vindt. */
+  readonly fireAge: number | null
+  /**
+   * De EINDLEEFTIJD waartegen de tweede run solvet (`solve.eindleeftijd` = de eind-vorm
+   * van het plan). Bevinding 6 (Fable-review): voor gemigreerde pensioen-rijen is dat
+   * de M1-waarde 100 — de opgeloste leeftijd is dan "vrij mogelijk vanaf, als je tot
+   * 100 rekent" en zegt iets anders dan bij een plan tot 90. Bewust NIET gerepareerd
+   * (de eind-vorm is de gebruikerskeuze), wél doorgegeven zodat F3b het kan duiden.
+   */
+  readonly eindleeftijd: number
+}
+
+/** Als `solveFireAgeWithoutAnchor`, maar met de eindleeftijd van de run erbij (bevinding 6). */
+export function solveWithoutAnchor(
+  ctx: Pick<ScenarioPresetContext, 'profile' | 'assets' | 'debts' | 'lifeEvents' | 'aowRows'>,
+): SolvedWithoutAnchor | null {
   try {
     const input = buildKernelInputFromApp({
       profile: buildConvergentieAdapterProfile(ctx.profile),
@@ -593,7 +683,10 @@ export function solveFireAgeWithoutAnchor(ctx: ScenarioPresetContext): number | 
     })
     if (input.stopAnker === undefined) return null
     const solve = solveFire({ ...input, stopAnker: undefined })
-    return solve.status === 'unreachable_within_horizon' ? null : solve.fireAge
+    return {
+      fireAge: solve.status === 'unreachable_within_horizon' ? null : solve.fireAge,
+      eindleeftijd: solve.eindleeftijd,
+    }
   } catch {
     return null
   }
@@ -607,6 +700,11 @@ export interface ScenarioPresetBatch {
    * onder `solved`/onbereikbaar. Zie `solveFireAgeWithoutAnchor`.
    */
   readonly solvedFireAge: number | null
+  /**
+   * De eindleeftijd waartegen `solvedFireAge` gevonden is (bevinding 6), of `null` onder
+   * `solved`/kern-fout. Zie `SolvedWithoutAnchor.eindleeftijd`.
+   */
+  readonly solvedFireEndAge: number | null
 }
 
 /**
@@ -617,5 +715,10 @@ export interface ScenarioPresetBatch {
  * drie of vier keer per pagina-load in plaats van één keer.
  */
 export function runScenarioPresetBatch(ctx: ScenarioPresetContext): ScenarioPresetBatch {
-  return { presets: runScenarioPresets(ctx), solvedFireAge: solveFireAgeWithoutAnchor(ctx) }
+  const solved = solveWithoutAnchor(ctx)
+  return {
+    presets: runScenarioPresets(ctx),
+    solvedFireAge: solved?.fireAge ?? null,
+    solvedFireEndAge: solved?.eindleeftijd ?? null,
+  }
 }

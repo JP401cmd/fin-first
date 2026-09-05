@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { REGEL_META, type RegelId } from '@/lib/future/regel-registry'
 import type { RegelSimSnapshot } from '@/lib/future/regel-sim'
-import type { FireStrategyConfig } from '@/lib/fire-strategy'
+import type { FirePlan, FireStrategyConfig } from '@/lib/fire-strategy'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import type { PotRulesConfig } from '@/lib/pot-rules'
 import type { WealthGroup } from '@/lib/wealth-composition'
@@ -25,6 +25,7 @@ export function RegelBewerkenPane({
   onSaved,
   simSnapshot,
   fireStrategy,
+  firePlan,
   withdrawalStrategy,
   potRules,
   potBalances,
@@ -36,6 +37,8 @@ export function RegelBewerkenPane({
   onSaved: () => void
   simSnapshot: RegelSimSnapshot | null
   fireStrategy: FireStrategyConfig
+  /** ADR 0129 — het volledige plan (anker + eind-vorm); voedt de eindstrategie-body. */
+  firePlan?: FirePlan | null
   withdrawalStrategy: WithdrawalStrategyConfig
   potRules: PotRulesConfig
   potBalances: Record<WealthGroup, number>
@@ -93,6 +96,7 @@ export function RegelBewerkenPane({
           onSaved={onSaved}
           simSnapshot={simSnapshot}
           fireStrategy={fireStrategy}
+          firePlan={firePlan}
           withdrawalStrategy={withdrawalStrategy}
           potRules={potRules}
           potBalances={potBalances}

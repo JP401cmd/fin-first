@@ -116,10 +116,12 @@ const ChartForeground = memo(function ChartForeground({
   geometry,
   emphasis,
   baselineFireAge,
+  stopAnchorFixed = false,
 }: {
   geometry: SimChartGeometry
   emphasis: 'accumulation' | 'withdrawal' | 'fire' | null
   baselineFireAge?: number | null
+  stopAnchorFixed?: boolean
 }) {
   const {
     isPensioenMode,
@@ -223,7 +225,9 @@ const ChartForeground = memo(function ChartForeground({
       {!isPensioenMode && xFire !== null && fireAgeFractional !== null && fireAgeFractional > minAge && fireAgeFractional < maxAge && (
         <text x={xFire + 4} y={Math.max(PAD.top + 24, labelSafeTopY + 18)} fontSize={8}
           fill={COLOR_OPBOUW} fontFamily="var(--font-inter, sans-serif)" fontWeight={600}>
-          FIRE {Math.round(fireAgeFractional)}
+          {stopAnchorFixed
+            ? `STOP ${Number.isInteger(fireAgeFractional) ? fireAgeFractional : fireAgeFractional.toFixed(1).replace('.', ',')}`
+            : `FIRE ${Math.round(fireAgeFractional)}`}
         </text>
       )}
 
@@ -274,6 +278,7 @@ export const SimChart = memo(function SimChart({
   visibleMaxAge,
   aowAgeFractional,
   planningMode = 'fire',
+  stopAnchorFixed = false,
   showDepletionWarning,
   baselineEmphasis = 'ghost',
   eventOverlay,
@@ -330,6 +335,13 @@ export const SimChart = memo(function SimChart({
   aowAgeFractional?: number
   /** Planning mode: 'fire' (default) uses FIRE age as split point, 'pensioen' uses AOW age */
   planningMode?: 'fire' | 'pensioen'
+  /**
+   * ADR 0129 F3b — het stopmoment ligt VAST (aow/now/age). De stip op het splitpunt
+   * blijft, maar het label zegt "STOP {leeftijd}" i.p.v. "FIRE {leeftijd}": onder een
+   * vast anker is dat punt het gekozen stopmoment, geen vrijheidsmoment. Vóór F3b
+   * werd de FIRE-marker onder `now` alleen bij toeval onderdrukt (`> minAge`).
+   */
+  stopAnchorFixed?: boolean
   /** Show red depletion zone when portfolio hits zero (AOW-stop mode) */
   showDepletionWarning?: boolean
   /** Baseline rendering: 'ghost' (default, faint gray reference) or 'compare' (solid horizon-700, side-by-side feel) */
@@ -591,6 +603,7 @@ export const SimChart = memo(function SimChart({
           geometry={geometry}
           emphasis={emphasis}
           baselineFireAge={baselineFireAge}
+          stopAnchorFixed={stopAnchorFixed}
         />
       </svg>
 

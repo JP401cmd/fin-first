@@ -863,8 +863,16 @@ function buildSummary(
   const eindNettoVermogen = eindRow.beyondHorizon ? 0 : eindRow.nettoVermogen
   const eindNettoLiquide = eindRow.beyondHorizon ? 0 : eindRow.nettoLiquide
 
-  const fireRow =
-    fireMonth >= 0 && fireMonth < prognose.length ? prognose[fireMonth] : undefined
+  // ADR 0129 (contract-ronde F3a-K) — een FIRE-maand VÓÓR de start bestaat niet in
+  // de projectie, maar de maandloop rekent zo'n stop al als maand 0 (de gate is
+  // `m ≥ fireMaand`, waar vanaf maand 0 voor élke fireMaand ≤ 0; vastgepind in
+  // anker.test.ts "negatieve FIRE-maand"). De "stand bij FIRE" leest daarom
+  // dezelfde effectieve stopmaand: J(0)/I(0) — niet `undefined`, want dan viel de
+  // bridge terug op de EIND-horizonstand en markeerde ze een echte stand als
+  // `requiredFireIsEndOfHorizonFallback`. Oracle-domein onaangeroerd: daar is de
+  // FIRE-maand ≥ 0 (bisectie vanaf maand 0), dus `max` is de identiteit.
+  const fireIdx = Math.max(0, fireMonth)
+  const fireRow = fireIdx < prognose.length ? prognose[fireIdx] : undefined
   const nettoVermogenBijFire =
     fireRow === undefined || fireRow.beyondHorizon ? null : fireRow.nettoVermogen
   const nettoLiquideBijFire =

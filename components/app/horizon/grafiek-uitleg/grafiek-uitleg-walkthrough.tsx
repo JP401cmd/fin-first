@@ -269,7 +269,9 @@ export const GrafiekUitlegWalkthrough = memo(function GrafiekUitlegWalkthrough({
   const snijpuntFigures: JouwGetal[] = data.snijpunt.reachable
     ? [
         {
-          label: 'Vrijheidsleeftijd',
+          // ADR 0129 — onder een vast anker is dit punt het gekozen STOPMOMENT, geen
+          // vrijheidsleeftijd (`fireAge` ís het anker).
+          label: data.snijpunt.ankerVast ? 'Stopmoment' : 'Vrijheidsleeftijd',
           value:
             data.snijpunt.fireAgeFractional !== null
               ? data.snijpunt.fireAgeFractional.toFixed(1)
@@ -286,9 +288,10 @@ export const GrafiekUitlegWalkthrough = memo(function GrafiekUitlegWalkthrough({
           value: formatCurrency(data.snijpunt.firePortfolioAtFire),
           sub: freedomNote(data.snijpunt.firePortfolioAtFire, dailyRate) ?? undefined,
         },
-        // #5: bij pensioen is FIRE exogeen (= AOW), dus de impliciete opnamerate
-        // is daar niet betekenisvol — die rij alleen voor de overige strategieën.
-        ...(simResult.strategy !== 'pensioen'
+        // ADR 0129 (bevinding 6): onder ÉLK vast anker (aow/now/age) is het stopmoment
+        // exogeen, dus "uitgaven ÷ vermogen op dat moment" is geen opnamerate maar een
+        // artefact — die rij alleen onder `solved`. Sleutel: het anker, niet de label.
+        ...(!data.snijpunt.ankerVast
           ? [
               {
                 label: 'Opnamepercentage',

@@ -112,6 +112,19 @@ export interface VrijheidsgetalSnapshot {
    * doelwaarde blijft staan.
    */
   endBalanceAtEndAge?: number | null
+  /**
+   * Het stop-anker van het plan (ADR 0129 F3a). Onder een VAST anker (`aow`/`now`/
+   * `age`) is `fireAgeFractional` hier `null` (de kernel-leeftijd ís het anker, geen
+   * vrijheidsmoment) en zijn `targetValue`/`eta` `null` (geen doelvermogen: bridge-
+   * vlag `requiredFireIsAnchorPortfolio`), zodat het vrijheidsgetal-doel NIET wordt
+   * gesynchroniseerd en het `fire_age`-doel "n.v.t." wordt. Optioneel/additief:
+   * stub-/mock-snapshots zonder het veld gedragen zich als `solved`.
+   */
+  stopAnchor?: 'solved' | 'aow' | 'now' | 'age'
+  /** Het stopmoment als leeftijd (`SimResult.vastStopLeeftijd`); alleen onder een vast anker. */
+  stopAge?: number | null
+  /** Eindleeftijd van het plan (`SimResult.displayEndAge`) — voor de n.v.t.-notitie. */
+  endAge?: number | null
 }
 
 /** Minimale rij-/resultaatvorm die `pickEndBalanceAtEndAge` leest. */
@@ -168,6 +181,15 @@ export interface VrijheidsgetalSnapshotInput {
    * te synchroniseren); bestaande aanroepers blijven daarmee ongewijzigd geldig.
    */
   endBalanceAtEndAge?: number | null
+  /**
+   * Het plan-anker van de run (ADR 0129 F3a); weggelaten ⇒ `solved` (bestaand gedrag).
+   * Onder een vast anker levert de bouwer geen FIRE-leeftijd/eta en geen doelwaarde.
+   */
+  stopAnchor?: 'solved' | 'aow' | 'now' | 'age'
+  /** `SimResult.vastStopLeeftijd` — het stopmoment van de run als leeftijd. */
+  stopAge?: number | null
+  /** `SimResult.displayEndAge` — de eindleeftijd van het plan. */
+  endAge?: number | null
 }
 
 /**
@@ -195,8 +217,13 @@ export function buildVrijheidsgetalSnapshot(
     requiredPortfolioExclHome: input.requiredPortfolioExclHome,
   })
 
+  // ADR 0129 F3a — onder een vast anker is de kernel-`fireAge` het anker zelf (geen
+  // vrijheidsmoment) en is `requiredPortfolio` de geprojecteerde stand op het anker
+  // (geen doel). Beide op null: het vrijheidsgetal-doel houdt zijn opgeslagen waarden
+  // (alles-of-niets in `applyVrijheidsgetalSync`), het fire_age-doel wordt n.v.t.
+  const anchorFixed = input.stopAnchor != null && input.stopAnchor !== 'solved'
   const fireAge =
-    input.fireAgeFractional != null && Number.isFinite(input.fireAgeFractional)
+    !anchorFixed && input.fireAgeFractional != null && Number.isFinite(input.fireAgeFractional)
       ? input.fireAgeFractional
       : null
   const age = input.currentAge != null && Number.isFinite(input.currentAge) ? input.currentAge : null
@@ -209,11 +236,14 @@ export function buildVrijheidsgetalSnapshot(
   return {
     currentValue: Number.isFinite(currentNetWorth) ? currentNetWorth : 0,
     targetValue:
-      requiredPortfolio != null && Number.isFinite(requiredPortfolio) && requiredPortfolio > 0
+      !anchorFixed && requiredPortfolio != null && Number.isFinite(requiredPortfolio) && requiredPortfolio > 0
         ? requiredPortfolio
         : null,
     eta,
     fireAgeFractional: fireAge,
+    stopAnchor: input.stopAnchor ?? 'solved',
+    stopAge: anchorFixed && input.stopAge != null && Number.isFinite(input.stopAge) ? input.stopAge : null,
+    endAge: input.endAge != null && Number.isFinite(input.endAge) ? input.endAge : null,
     homeExcludedFromFire: input.homeExcludedFromFire,
     endBalanceAtEndAge:
       input.endBalanceAtEndAge != null && Number.isFinite(input.endBalanceAtEndAge)

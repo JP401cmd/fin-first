@@ -18,7 +18,7 @@
 import { BOX3_DRAG, DEFAULT_RETURN, INFLATION } from '@/lib/constants'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { resolveFireParams } from '@/lib/fire-params'
-import { parseFireStrategy, STRATEGY_LABELS } from '@/lib/fire-strategy'
+import { parseFireStrategy, resolveFirePlanWithOverride, STRATEGY_LABELS } from '@/lib/fire-strategy'
 import {
   resolveWithdrawalStrategy,
   WITHDRAWAL_DEFAULTS,
@@ -59,6 +59,9 @@ export interface PersoonlijkPlanProfileRow {
   fire_end_strategy: string | null
   fire_end_age: number | null
   fire_legacy_amount: number | null
+  /** Het stop-anker (ADR 0129) — in de select via `FIRE_PLAN_COLUMNS`; optioneel voor oudere fixtures. */
+  fire_stop_anchor?: string | null
+  fire_stop_age?: number | string | null
   retirement_expense_method: string | null
   retirement_expense_custom_amount: number | null
   withdrawal_strategy: string | null
@@ -261,12 +264,17 @@ export function buildPersoonlijkPlanSections(
 
   // ── Eindstrategie ──
   const strategyCfg = parseFireStrategy(profile)
+  // Het PLAN (stop-anker × eind-vorm, ADR 0129) — dezelfde rij-lezing als de kernel-
+  // adapter, incl. het schaduwpad `feature_preferences.fire_strategy_override`.
+  const plan = resolveFirePlanWithOverride(profile)
   const eindstrategie: PersoonlijkPlanEindstrategie = {
     strategy: strategyCfg.strategy,
     strategyName: STRATEGY_LABELS[strategyCfg.strategy].name,
     strategySubtitle: STRATEGY_LABELS[strategyCfg.strategy].subtitle,
     endAge: strategyCfg.endAge,
     legacyAmount: Math.round(strategyCfg.legacyAmount),
+    stopAnchor: plan.anchor.kind,
+    stopAge: plan.anchor.kind === 'age' ? plan.anchor.age : null,
   }
 
   // ── Onttrekkingsstrategie ──

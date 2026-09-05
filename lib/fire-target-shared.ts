@@ -35,7 +35,8 @@ import {
   type ConvergentieRawContext,
 } from '@/lib/horizon-kernel/convergentie-router'
 import type { SimResult } from '@/lib/fire-simulation'
-import type { FireStrategyConfig } from '@/lib/fire-strategy'
+import type { FirePlan, FireStrategyConfig } from '@/lib/fire-strategy'
+import { solveFireAgeWithoutAnchor } from '@/lib/horizon/scenario-presets'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import type { FactorRow } from '@/lib/euro-display'
 import { computeRunwayFromRawContext, type RunwayResult } from '@/lib/horizon/runway'
@@ -92,6 +93,11 @@ export interface HorizonFireSim {
   rawContext: ConvergentieRawContext
   /** Huidige eindstrategie (weergave + editor-baseline). */
   fireStrategy: FireStrategyConfig
+  /**
+   * Het plan (stop-anker × eind-vorm, ADR 0129) waarmee DEZE run gedraaid heeft —
+   * dezelfde lezing als de kernel-adapter. `sim.stopAnker` is de kernel-echo ervan.
+   */
+  firePlan: FirePlan
   /** Huidige onttrekkingsstrategie (weergave + editor-baseline). */
   withdrawalStrategy: WithdrawalStrategyConfig
   /** AOW-leeftijd afgerond omhoog (weergave). */
@@ -257,6 +263,7 @@ const computeHorizonFireSimCached = cache(async function computeHorizonFireSimIn
     sim: toSimResult(outcome.result),
     rawContext,
     fireStrategy: data.fireStrategy,
+    firePlan: data.firePlan,
     withdrawalStrategy: data.withdrawalStrategy,
     aowAgeInt: built.aowAgeInt,
     aowAgeFractional,
@@ -297,8 +304,45 @@ const computeHorizonRunwayCached = cache(async function computeHorizonRunwayInne
 ): Promise<RunwayResult> {
   const run = await computeHorizonFireSim(supabase, perspective)
   if (!run) return { kind: 'unavailable', reason: 'geen-basisrun' }
-  return computeRunwayFromRawContext(run.rawContext)
+  // ADR 0129 F3a (kruisverwijzing ADR 0126): de kop volgt het PLAN-anker. Onder `solved`
+  // resolvet 'plan' naar het nu-anker (de bestaande stop-nu-runway); onder aow/age is
+  // het de geforceerde stop op het gekozen moment — "Als je op {stop} stopt, reikt …".
+  return computeRunwayFromRawContext(run.rawContext, { stop: 'plan' })
 })
+
+/**
+ * "Vrij mogelijk vanaf" (ADR 0129 D7/B9) — de OPGELOSTE vrijheidsleeftijd zónder anker,
+ * server-side. `null` onder `solved` (dan ís de hoofdrun de opgeloste run), zonder
+ * basisrun, of wanneer de bisectie binnen de horizon niets vindt.
+ *
+ * Eén extra bisectie per request, alléén onder een vast anker, en React-`cache()`'d
+ * zodat de Fin-context en /overzicht (F3b) binnen één request dezelfde run delen.
+ * Bewust een EIGEN naad naast `computeHorizonFireSim` (patroon `computeHorizonRunway`):
+ * consumenten die alleen het plan-antwoord nodig hebben betalen deze run niet.
+ */
+const computeHorizonSolvedFireAgeCached = cache(async function computeHorizonSolvedFireAgeInner(
+  supabase: SupabaseClient,
+  perspective: Perspective,
+): Promise<number | null> {
+  const run = await computeHorizonFireSim(supabase, perspective)
+  if (!run) return null
+  const { rawContext } = run
+  return solveFireAgeWithoutAnchor({
+    profile: rawContext.profile,
+    assets: rawContext.assets,
+    debts: rawContext.debts,
+    lifeEvents: rawContext.lifeEvents,
+    aowRows: rawContext.aowRows,
+  })
+})
+
+/** Perspectief-normalisatie buiten de cache — zie `computeHorizonFireSim`. */
+export function computeHorizonSolvedFireAge(
+  supabase: SupabaseClient,
+  perspective: Perspective = 'personal',
+): Promise<number | null> {
+  return computeHorizonSolvedFireAgeCached(supabase, perspective)
+}
 
 /** Perspectief-normalisatie buiten de cache — zie `computeHorizonFireSim`. */
 export function computeHorizonRunway(
@@ -323,9 +367,10 @@ const computeHorizonFireTargetCached = cache(async function computeHorizonFireTa
   const run = await computeHorizonFireSim(supabase, perspective)
   if (!run) return EMPTY_HORIZON_FIRE_TARGETS
   const { sim } = run
-  // ADR 0127 D4 — 'nu-stoppen': FIRE op maand 0, het "benodigde" bedrag is het huidige
-  // vermogen en geen doel. Zelfde gate als de loaders (`simRequiredPortfolio` → null).
-  if (sim.requiredFireIsStartPortfolio) return EMPTY_HORIZON_FIRE_TARGETS
+  // ADR 0129 D4 — vast anker (aow/now/age): het stopmoment ligt vast, het "benodigde"
+  // bedrag is de geprojecteerde stand op het anker en geen doel. Zelfde gate als de
+  // loaders (`simRequiredPortfolio` → null); de bridge-vlag, nooit de strategienaam.
+  if (sim.requiredFireIsAnchorPortfolio) return EMPTY_HORIZON_FIRE_TARGETS
   // Beide grondslagen uit DEZELFDE run doorgeven (ADR 0034). Zelfde gate/vorm als
   // `dashboard-data-loader` (simRequiredPortfolio/simRequiredNetWorth) zodat de Kern,
   // de AI-context en /overzicht letterlijk hetzelfde paar cijfers consumeren.

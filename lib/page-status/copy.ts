@@ -26,6 +26,7 @@
 
 import type { LeverageStatus } from '@/lib/leverage-status'
 import type { PageStatusAction, PageStatusWill } from '@/lib/page-status/types'
+import { ankerTitel, ankerZin, type AnkerReach, type AnkerStop } from '@/lib/horizon/anker-copy'
 
 /** Per status (warn/bad) een reason + remedy; {figure} = live cijfer. */
 export interface StatusCopy {
@@ -337,6 +338,30 @@ export const FREEDOM_BANNER_COPY: Record<'free' | 'pensioen' | 'nu-stoppen', Fre
       detail: 'Ik wil weten tot welke leeftijd mijn vermogen reikt en hoe ik verstandig onttrek.',
     },
   },
+}
+
+/**
+ * ADR 0129 F3b — de banner onder een VAST stopmoment dat nog niet 'free' is (de strip
+ * volgend): kop = "Je rekent met stoppen op {stop}" / "Je rekent alsof je nu stopt",
+ * reden = de bereik-zin uit anker-copy. Beschrijvend; geen AOW in een tekortzin,
+ * geen "je kunt stoppen". `reach.kind === 'onbekend'` ⇒ null (geen banner).
+ */
+export function anchoredBannerCopy(reach: AnkerReach, stop: AnkerStop): FreedomBannerCopy | null {
+  if (reach.kind === 'onbekend') return null
+  const gedekt = reach.kind === 'gedekt'
+  return {
+    title: ankerTitel(stop),
+    reason: ankerZin(reach, stop),
+    remedy: gedekt
+      ? 'Dit overzicht toont je opbouw tot je stopmoment en je onttrekking daarna. Vrij mogelijk vanaf een eerdere leeftijd zie je op Toekomst.'
+      : 'Op Toekomst zie je wat er per maand bij hoort om je plan wél te laten reiken, en verken je een ander stopmoment.',
+    will: {
+      onderwerp: gedekt ? 'Of mijn plan tot het einde reikt' : 'Mijn plan laten reiken tot het einde',
+      detail: gedekt
+        ? 'Ik wil weten hoe stevig mijn plan is als ik op mijn stopmoment stop.'
+        : 'Ik wil weten waar de ruimte zit om mijn liquide vermogen verder te laten reiken.',
+    },
+  }
 }
 
 /** Helper: copy voor een route + status (warn/bad). null als route onbekend. */

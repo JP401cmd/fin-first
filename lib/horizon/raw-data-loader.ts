@@ -51,7 +51,12 @@ import { deriveRetirementExpenseBasis, extrapolateAnnualIncome } from '@/lib/ret
 import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import type { Asset } from '@/lib/asset-data'
 import { type Debt } from '@/lib/debt-data'
-import { resolveFireStrategyWithOverride, type FireStrategyConfig } from '@/lib/fire-strategy'
+import {
+  resolveFirePlanWithOverride,
+  resolveFireStrategyWithOverride,
+  type FirePlan,
+  type FireStrategyConfig,
+} from '@/lib/fire-strategy'
 import { resolveFireParams, type FireParams } from '@/lib/fire-params'
 import { resolveWithdrawalStrategy, type WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 import { type HealthScoreInput } from '@/lib/financial-health'
@@ -188,6 +193,12 @@ export interface HorizonRawData {
   actions: Action[]
   debts: Debt[]
   fireStrategy: FireStrategyConfig
+  /**
+   * Het plan als twee assen (ADR 0129): `anchor` (wanneer stop ik) × `endForm` (wat
+   * geldt aan het eind). `isFixedAnchor(firePlan)` is DE toets op een vast stopmoment;
+   * de legacy-label in `fireStrategy.strategy` is een F2-echo die F4 verwijdert.
+   */
+  firePlan: FirePlan
   withdrawalStrategy: WithdrawalStrategyConfig
   fireParams: FireParams
   resilienceSnapshots: SnapshotForTrend[]
@@ -807,6 +818,9 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
 
   // FIRE strategy from profile — use override-aware resolver for pensioen fallback
   const fireStrategy = resolveFireStrategyWithOverride(profile)
+  // Het PLAN (stop-anker × eind-vorm, ADR 0129) — dezelfde rij-lezing als de
+  // kernel-adapter, zodat bundel en run nooit een ander anker dragen.
+  const firePlan = resolveFirePlanWithOverride(profile)
 
   // Withdrawal strategy from profile (static/guardrails/vpw/bucket)
   const withdrawalStrategy = resolveWithdrawalStrategy(profile)
@@ -1092,6 +1106,9 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
       // ADR 0127 D5: onder 'nu-stoppen' oordeelt de fire_progress-pijler op
       // tijdsdekking, niet peer-relatief — de afgeleide laag injecteert de freedomPct.
       fireEndStrategy: fireStrategy.strategy,
+      // ADR 0129 B3: het anker is de sleutel; de afgeleide laag injecteert de
+      // bijbehorende freedomPct (dekking onder een vast anker).
+      fireStopAnchor: firePlan.anchor.kind,
       avgMonthlyExpenses: emergencyExpenseBase,
       netMonthlyIncome: avgIncome6m,
       // Noodbuffer-norm: 3 × netto maandsalaris (lib/emergency-fund.ts).
@@ -1363,6 +1380,7 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
     actions,
     debts,
     fireStrategy,
+    firePlan,
     withdrawalStrategy,
     fireParams,
     resilienceSnapshots: allSnapshots,

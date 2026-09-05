@@ -8,7 +8,7 @@ import type { ResolvedBasis } from '@/lib/budget-basis'
 import type { FireProjection, FireRange, FireCountdown } from '@/lib/horizon-data'
 import type { FreedomMilestoneResult } from '@/lib/freedom-milestones'
 import type { FeeAnalysis } from '@/lib/fee-analysis'
-import type { FireEndStrategy } from '@/lib/fire-strategy'
+import type { FireEndStrategy, StopAnchor } from '@/lib/fire-strategy'
 import type { HealthScore } from '@/lib/financial-health'
 import type { NewsPreview } from '@/lib/news-preview'
 import type { SpendLimitWidgetData } from '@/lib/spend-limits/widget-data'
@@ -445,6 +445,13 @@ export interface DashboardData {
   // FIRE end strategy
   fireEndStrategy: FireEndStrategy
   fireEndAge: number
+  /**
+   * Het stop-anker van het plan (ADR 0129 D8) — DE sleutel voor "ligt het stopmoment
+   * vast" (`isFixedAnchor({ anchor })`). Consumeer dit, niet `fireEndStrategy ===
+   * 'pensioen'`: die label is een F2-compat-echo die F4 verwijdert. Optioneel/additief
+   * zodat mock-/regressie-bundels zonder het veld geldig blijven (⇒ `solved`).
+   */
+  fireStopAnchor?: StopAnchor
   // DAIshboard enrichment: previous month income/expenses + net worth delta
   prevMonthIncome: number
   prevMonthExpenses: number

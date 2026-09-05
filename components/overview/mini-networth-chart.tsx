@@ -7,7 +7,7 @@ import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { deflate, factorAtAge } from '@/lib/euro-display'
-import { fireAgeForDisplay } from '@/lib/fire-strategy'
+import { fireAgeForDisplay, type FreedomFraming } from '@/lib/fire-strategy'
 import { computeConfidenceBand } from '@/lib/confidence-band'
 import { SubtotalLine } from '@/components/editorial/subtotal-line'
 import { NetWorthHistorySheet, type HistoryPoint } from './networth-history-sheet'
@@ -65,6 +65,9 @@ function MiniNetWorthChartComponent({
   fireAge,
   endAge,
   isPensioenMode,
+  stopAnchorFixed = false,
+  stopAge = null,
+  framing,
   simNetWorthRows,
   simRequiredPortfolio,
   monthlySavings,
@@ -78,6 +81,16 @@ function MiniNetWorthChartComponent({
   fireAge: number | null
   endAge: number | null
   isPensioenMode?: boolean
+  /**
+   * ADR 0129 F3b — het stopmoment ligt VAST (aow/now/age). De knip ligt dan op het
+   * STOPMOMENT (`stopAge`), het label heet "Vermogen bij stop", en "bereikt" staat er
+   * alleen als `framing === 'free'` (anker bereikt ∧ dekking ≥ 100, D8) — nooit
+   * omdat de kernel-`fireAge` (= het anker) toevallig ≤ de huidige leeftijd is
+   * (bevinding 1: "Vrijheid bereikt" onder nu-stoppen).
+   */
+  stopAnchorFixed?: boolean
+  stopAge?: number | null
+  framing?: FreedomFraming
   /**
    * Per-jaar geprojecteerd VOLLEDIG netto vermogen (FIRE-pot + meegroeiende
    * niet-liquide assets) uit de loader (`DashboardData.simNetWorthRows`).
@@ -157,8 +170,13 @@ function MiniNetWorthChartComponent({
     // afbouw-fase leeft op /toekomst. Is vrijheid al bereikt (fireAge ≤
     // currentAge), dan loopt de weergave dóór tot de eindleeftijd: er is
     // dan geen opbouw-verhaal meer, wel een "hoe loopt het verder"-verhaal.
-    const fireReached =
-      fireAge != null && currentAge != null && fireAge <= currentAge
+    // ADR 0129 — onder een vast anker knipt de weergave op het STOPMOMENT en is
+    // "bereikt" een gate (framing 'free'), geen leeftijdsvergelijking.
+    const knipAge =
+      stopAnchorFixed && stopAge != null && Number.isFinite(stopAge) ? stopAge : fireAge
+    const fireReached = stopAnchorFixed
+      ? framing === 'free'
+      : knipAge != null && currentAge != null && knipAge <= currentAge
     // De projectie stopt op de WEERGAVE-leeftijd, door dezelfde seam als
     // /toekomst en als de doelbedrag-deflator verderop in dit bestand:
     // `fireAgeForDisplay` (= Math.round). De kernelrijen staan op hele
@@ -166,7 +184,7 @@ function MiniNetWorthChartComponent({
     // de deflator-lookup naar boven afrondt — twee leeftijd-afkappingen op één
     // getal, binnen één component. `fireReached` blijft bewust op de rauwe
     // waarde: dat is een DREMPEL, en die hoort fractioneel (zie fire-strategy.ts).
-    const fireAgeCutoff = fireAgeForDisplay(fireAge)
+    const fireAgeCutoff = fireAgeForDisplay(knipAge)
     const projectionEndAge =
       fireAgeCutoff != null && currentAge != null && fireAgeCutoff > currentAge
         ? fireAgeCutoff
@@ -242,7 +260,7 @@ function MiniNetWorthChartComponent({
     const hasProjection = projRowsInRange.length > 0
     const endValue =
       dedupedProjection[dedupedProjection.length - 1]?.value ?? currentNetWorth
-    const endLabel = isPensioenMode ? 'Pensioen' : 'Vrijheid'
+    const endLabel = stopAnchorFixed ? 'Stop' : isPensioenMode ? 'Pensioen' : 'Vrijheid'
 
     // ── Historie: minimaal 3 maanden ─────────────────────────────────
     // euro-view: exempt — alles links van Vandaag is GEREALISEERD vermogen en
@@ -477,6 +495,9 @@ function MiniNetWorthChartComponent({
     fireAge,
     endAge,
     isPensioenMode,
+    stopAnchorFixed,
+    stopAge,
+    framing,
     simNetWorthRows,
     monthlySavings,
     euroView,
@@ -579,9 +600,13 @@ function MiniNetWorthChartComponent({
             leeftijd de grafiek loopt staat in de pagina-'i' van /overzicht. */}
         <span className="text-xs font-mono tabular-nums text-[var(--ink-3)]">
           {fireReached
-            ? simple
-              ? `${endLabel} bereikt`
-              : `${endLabel} bereikt — verloop tot ${finalAgeLabel}`
+            ? stopAnchorFixed
+              ? simple
+                ? 'Plan gedekt'
+                : `Plan gedekt — verloop tot ${finalAgeLabel}`
+              : simple
+                ? `${endLabel} bereikt`
+                : `${endLabel} bereikt — verloop tot ${finalAgeLabel}`
             : hasProjection
               ? `Vermogen bij ${endLabel.toLowerCase()} → ${formatMaskedApproxCurrency(endValue, masked)}`
               : 'Nog geen projectie'}
@@ -860,8 +885,12 @@ function MiniNetWorthChartComponent({
             className="inline-flex items-center gap-1.5"
             title={
               fireReached
-                ? `Toekomst-projectie tot eindleeftijd — ${endLabel.toLowerCase()} is bereikt`
-                : 'Toekomst-projectie tot vrijheidsmoment'
+                ? stopAnchorFixed
+                  ? 'Toekomst-projectie tot eindleeftijd — je plan is gedekt'
+                  : `Toekomst-projectie tot eindleeftijd — ${endLabel.toLowerCase()} is bereikt`
+                : stopAnchorFixed
+                  ? 'Toekomst-projectie tot je stopmoment'
+                  : 'Toekomst-projectie tot vrijheidsmoment'
             }
           >
             <svg width="16" height="2" aria-hidden="true">
@@ -932,7 +961,7 @@ function MiniNetWorthChartComponent({
                   legenda; die uitleg staat in de pagina-'i'. De marker houdt
                   wél zijn legenda-regel, anders zweeft er een gekleurde streep
                   in de grafiek zonder betekenis. */}
-              {simple ? (fireReached ? 'Tot je eindleeftijd' : 'Vrijheidsmoment') : endMarkerText}
+              {simple ? (fireReached ? 'Tot je eindleeftijd' : stopAnchorFixed ? 'Stopmoment' : 'Vrijheidsmoment') : endMarkerText}
             </span>
           )}
         </div>

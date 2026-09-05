@@ -17,6 +17,7 @@ import {
 } from '@/lib/horizon-kernel/convergentie-router'
 import type { SimRow } from '@/lib/fire-simulation'
 import type { FireStrategyConfig } from '@/lib/fire-strategy'
+import type { PlanDraft } from '@/lib/horizon/plan-draft'
 import type { WithdrawalStrategyConfig } from '@/lib/withdrawal-strategy'
 
 /**
@@ -55,6 +56,14 @@ export interface RegelProjection {
  */
 export interface RegelSimOverride {
   fireStrategy?: FireStrategyConfig
+  /**
+   * ADR 0129 F3b — het volledige plan-concept (anker + eind-vorm) uit de twee vragen.
+   * Wint van `fireStrategy` wanneer beide meegegeven zijn: de eind-vorm gaat in
+   * `fire_end_strategy`, het anker in `fire_stop_anchor`/`fire_stop_age` — exact de
+   * kolommen die `buildConvergentieAdapterProfile` leest, zodat de live-sim onder een
+   * gekozen stopleeftijd hetzelfde rekent als de kernel na de save.
+   */
+  firePlan?: PlanDraft
   withdrawalStrategy?: WithdrawalStrategyConfig
   withdrawalProfileConfig?: Record<string, unknown> | null
 }
@@ -90,13 +99,21 @@ function applyDraftToRawContext(
 ): ConvergentieRawContext {
   if (
     !override?.fireStrategy &&
+    !override?.firePlan &&
     !override?.withdrawalStrategy &&
     override?.withdrawalProfileConfig === undefined
   ) {
     return base
   }
   const profile = { ...base.profile }
-  if (override.fireStrategy) {
+  if (override.firePlan) {
+    const p = override.firePlan
+    profile.fire_end_strategy = p.endForm
+    profile.fire_end_age = p.endAge
+    profile.fire_legacy_amount = p.endForm === 'legacy' ? p.legacyAmount : 0
+    profile.fire_stop_anchor = p.anchor
+    profile.fire_stop_age = p.anchor === 'age' ? p.stopAge : null
+  } else if (override.fireStrategy) {
     profile.fire_end_strategy = override.fireStrategy.strategy
     profile.fire_end_age = override.fireStrategy.endAge
     profile.fire_legacy_amount = override.fireStrategy.legacyAmount

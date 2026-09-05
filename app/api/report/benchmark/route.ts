@@ -63,6 +63,8 @@ export async function GET() {
       // Gelijk aan /overzicht (horizonData); valt terug op de dashboard-loader.
       healthScoreTotal: horizonData?.healthScore?.total ?? dashboardData.healthScore?.total ?? null,
       fireAgeFractional: dashboardData.fireAgeFractional ?? null,
+      // ADR 0129 F3a — onder een vast stop-anker is de vergelijking op vrijheidsleeftijd n.v.t.
+      fireStopAnchor: dashboardData.fireStopAnchor?.kind,
       // HET spaarquote-getal (effectief, grondslag-geresolveerd) — hetzelfde
       // percentage dat de gebruiker op /overzicht en in het instellingenblok
       // ziet. Het benchmark-rapport zet 'm naast een peer-mediaan; op de rauwe

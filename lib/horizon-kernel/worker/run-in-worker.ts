@@ -198,7 +198,7 @@ export async function runScenarioPresetsAsync(
 ): Promise<ScenarioPresetBatch> {
   const res = await dispatch({ id: claimId(), kind: 'presets', ctx })
   if (res.ok && res.kind === 'presets') return res.result
-  return { presets: [], solvedFireAge: null }
+  return { presets: [], solvedFireAge: null, solvedFireEndAge: null }
 }
 
 /**

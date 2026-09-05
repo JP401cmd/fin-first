@@ -28,7 +28,7 @@ import { TARGET_EMERGENCY_SALARY_MONTHS, emergencyScoreTargetMonths } from '@/li
 import { budgetLimitStatus } from '@/lib/budget-alerts'
 import { DEFAULT_RETURN } from '@/lib/constants'
 import { firePeerAgeForAge, FIRE_PEER_CURVE_START_AGE } from '@/lib/benchmark/fire-peer-lat'
-import type { FireEndStrategy } from '@/lib/fire-strategy'
+import { legacyAnchorOf, type FireEndStrategy, type StopAnchorKind } from '@/lib/fire-strategy'
 
 // ── Lightweight input for server-side / snapshot usage ───────
 // Allows computing the health score without a full DashboardData bundle.
@@ -66,13 +66,19 @@ export interface HealthScoreInput {
    */
   fireAgeFractional: number | null
   /**
-   * Eindstrategie van het plan (ADR 0127 D5). Onder 'nu-stoppen' is `freedomPct`
-   * geen vulling-van-een-doel maar TIJDSDEKKING (uitputtingsmaand ÷ eindmaand), en
-   * oordeelt de fire_progress-pijler daar rechtstreeks op — niet peer-relatief (de
-   * peer-lat meet opbouw naar een FIRE-moment dat hier per definitie "nu" is).
-   * Optioneel/additief: oude snapshots en mocks zonder het veld blijven geldig.
+   * @deprecated F4 (ADR 0129) — legacy-label; alleen nog de terugval wanneer
+   * `fireStopAnchor` ontbreekt ('nu-stoppen' ⇒ now, 'pensioen' ⇒ aow).
    */
   fireEndStrategy?: FireEndStrategy
+  /**
+   * Het stop-anker van het plan (ADR 0129 B3). Onder een VAST anker (aow/now/age) is
+   * `freedomPct` geen vulling-van-een-doel maar de DEKKING ((uitputtingsmaand −
+   * ankerMaand) ÷ (eindmaand − ankerMaand)), en oordeelt de fire_progress-pijler daar
+   * rechtstreeks op — niet peer-relatief (de peer-lat meet opbouw naar een FIRE-moment
+   * dat hier vastligt). Optioneel/additief: oude snapshots en mocks zonder het veld
+   * blijven geldig (⇒ `solved`, tenzij de legacy-label een anker draagt).
+   */
+  fireStopAnchor?: StopAnchorKind
   /**
    * Netto maandinkomen — dezelfde canonieke inkomensbron die `savingsRate6m`
    * voedt (income6m/6 resp. effectiveMonthlyIncome). Noemer van de DSTI-pijler.
@@ -313,13 +319,15 @@ function scoreFireProgress(freedomPct: number): number {
  * is de pot" maar "gaat je koers de lat van je leeftijdsgenoten halen".
  */
 export function scoreFireProgressVsPeers(
-  input: Pick<HealthScoreInput, 'freedomPct' | 'currentAge' | 'fireAgeFractional' | 'fireEndStrategy'>,
+  input: Pick<HealthScoreInput, 'freedomPct' | 'currentAge' | 'fireAgeFractional' | 'fireEndStrategy' | 'fireStopAnchor'>,
 ): number {
   const { freedomPct } = input
-  // ADR 0127 D5 — 'nu-stoppen': freedomPct is tijdsdekking (hoe ver reikt het geld
-  // t.o.v. de eigen eindleeftijd). De peer-lat meet opbouw naar een FIRE-moment en
-  // is hier betekenisloos (fireAge = startleeftijd) → direct op de dekking oordelen.
-  if (input.fireEndStrategy === 'nu-stoppen') return scoreFireProgress(freedomPct)
+  // ADR 0129 B3 — onder een VAST anker (aow/now/age) is freedomPct de DEKKING (hoe ver
+  // reikt het geld ná het stopmoment t.o.v. de eigen eindleeftijd). De peer-lat meet
+  // opbouw naar een FIRE-moment en is hier betekenisloos (fireAge = het anker) → direct
+  // op de dekking oordelen. Anker uit het veld; legacy-label alleen als terugval.
+  const anchorKind = input.fireStopAnchor ?? legacyAnchorOf(input.fireEndStrategy)?.kind ?? 'solved'
+  if (anchorKind !== 'solved') return scoreFireProgress(freedomPct)
   const age = input.currentAge
   if (age == null || !Number.isFinite(age)) return scoreFireProgress(freedomPct)
   if (freedomPct >= 100) return 100
@@ -357,9 +365,27 @@ export function scoreFireProgressVsPeers(
 export function scoreAssetConcentration(sharePercent: number): number {
   if (sharePercent <= 40) return 100
   if (sharePercent >= 90) return 0
-  if (sharePercent <= 70) return Math.round(100 - ((sharePercent - 40) / 30) * 60) // 100 → 40
-  return Math.round(40 - ((sharePercent - 70) / 20) * 40)                          // 40 → 0
+  if (sharePercent <= ASSET_CONCENTRATION_HIGH_PCT) {
+    return Math.round(100 - ((sharePercent - 40) / 30) * 60)                       // 100 → 40
+  }
+  return Math.round(40 - ((sharePercent - ASSET_CONCENTRATION_HIGH_PCT) / 20) * 40) // 40 → 0
 }
+
+/**
+ * Het omslagpunt in de curve hierboven: het aandeel (in PROCENTEN) van het
+ * grootste `asset_type` waarboven de spreiding van "beperkt" naar "sterk
+ * geconcentreerd" kantelt.
+ *
+ * Geëxporteerd omdat copy-oppervlakken hetzelfde omslagpunt moeten lezen als de
+ * score. De rondleiding op /overzicht (`lib/rondleiding/steps.ts`) zegt
+ * "vooral in één soort" precies vanaf deze grens; met een eigen 0,7 daar zouden
+ * de zin en de pijler ongemerkt uit elkaar kunnen lopen.
+ *
+ * Let op de eenheid: `HealthScoreInput.largestAssetTypeShare` is een FRACTIE
+ * (0–1), deze constante een percentage — vermenigvuldig dus met 100 vóór de
+ * vergelijking, net als `computeHealthScoreFromInputs` doet.
+ */
+export const ASSET_CONCENTRATION_HIGH_PCT = 70
 
 /**
  * @deprecated Voedt sinds v2 geen pijler meer (ADR 0010). Blijft als helper voor

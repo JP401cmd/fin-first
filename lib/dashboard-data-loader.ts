@@ -37,7 +37,7 @@ import type { FireProjection, FireCountdown } from '@/lib/horizon-data'
 import { loadNewsPreview } from '@/lib/news-preview'
 import { computeNextSteps } from '@/lib/next-steps/engine'
 
-import { computeEffectiveExpenses, computeFireTarget, computeFreedomProgressWithBasis, computeRunwayCoveragePct, inclHomeTargetFromScalar } from '@/lib/core-metrics'
+import { computeEffectiveExpenses, computeFireTarget, computeFreedomPctForPlan, inclHomeTargetFromScalar } from '@/lib/core-metrics'
 import { eindMaandVan } from '@/lib/horizon-kernel/gap'
 import { localMonthStart } from '@/lib/month-range'
 import {
@@ -66,7 +66,7 @@ import {
 } from '@/lib/horizon-data'
 import { resolveFireParams } from '@/lib/fire-params'
 import { lifeEventsToCashflows } from '@/lib/fire-simulation'
-import { parseFireStrategy, resolveFireStrategyWithOverride } from '@/lib/fire-strategy'
+import { isFixedAnchor, parseFireStrategy, resolveFirePlanWithOverride, resolveFireStrategyWithOverride } from '@/lib/fire-strategy'
 import { WITHDRAWAL_DEFAULTS } from '@/lib/withdrawal-strategy'
 import { computeScalarFireProjection, computeScalarFireRange, computeScalarFreedomMilestones, type ScalarFireParams } from '@/lib/horizon-kernel/scalar-router'
 import { computeHorizonFireSim } from '@/lib/fire-target-shared'
@@ -1259,6 +1259,9 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const savingsRateIncomeBasis = dashboardAnnualIncome.basis
   const savingsRateExpensesBasis = dashboardSavingsExpenses.basis
   const fireStrategy = resolveFireStrategyWithOverride(profileResult.data ?? {})
+  // Het PLAN (stop-anker × eind-vorm, ADR 0129) naast de legacy-config: dezelfde
+  // rij, dezelfde schaduwpad-resolutie als de kernel-adapter — één lezing.
+  const firePlan = resolveFirePlanWithOverride(profileResult.data ?? {})
   const dob = profileResult.data?.date_of_birth ?? null
   const currentAge = dob ? ageAtDate(dob) : null
   const yearsInRetirement = (fireStrategy.strategy === 'deplete' && currentAge != null)
@@ -1364,9 +1367,12 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // Prognose!J@FIRE). Puur uit de sim (requiredFireNetWorth via de kernel-bridge), geen eigen som.
   let simRequiredNetWorth: number | null = null
   let simFireAgeFractional: number | null = null
-  // ADR 0127: FIRE op maand 0 ('nu-stoppen') + de runway-maand voor de tijdsdekking.
-  let simIsStartPortfolio = false
+  // ADR 0129 D4/D5: ligt het stopmoment VAST (elk anker: aow/now/age)? Dan is
+  // `requiredFirePortfolio` geen doel en is vrijheids-% de DEKKING — met de
+  // uitputtingsmaand en het stopmoment (`ankerMaand`) uit dezelfde run.
+  let simIsAnchorPortfolio = false
   let simKernelDepletionMonth: number | null = null
+  let simAnkerMaand: number | null = null
   // Kernel-eindleeftijd (SimResult.displayEndAge = solve.eindleeftijd): bij deplete/legacy
   // = plan-eindleeftijd (fire_end_age), bij perpetual/pensioen = horizon-cap 100. Dit is de
   // leeftijd die /horizon als aslabel toont; widgets consumeren 'm i.p.v. een hardcoded 90.
@@ -1443,16 +1449,18 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
         // levert per constructie firePortfolioAtFire === requiredFirePortfolio (bisectie stopt
         // op de eerste toereikende maand). Lees requiredFirePortfolio + fireAgeFractional
         // direct uit simResult (óók correct voor niet-pensioen).
-        // ADR 0127 D4 — 'nu-stoppen' (FIRE op maand 0): "benodigd" = huidig vermogen, geen
-        // doel → beide op null; de grafiekgeometrie laat de doellijn dan al weg.
-        simIsStartPortfolio = simResult.requiredFireIsStartPortfolio === true
+        // ADR 0129 D4 — vast anker (aow/now/age): "benodigd" = de geprojecteerde stand op
+        // het anker, geen doel → beide op null; de grafiekgeometrie laat de doellijn dan
+        // al weg. De bridge-vlag is de ENE toets — nooit de strategienaam.
+        simIsAnchorPortfolio = simResult.requiredFireIsAnchorPortfolio === true
         simRequiredPortfolio =
-          !simIsStartPortfolio && simResult.requiredFirePortfolio > 0 ? simResult.requiredFirePortfolio : null
+          !simIsAnchorPortfolio && simResult.requiredFirePortfolio > 0 ? simResult.requiredFirePortfolio : null
         // Incl.-woning FIRE-doel (Prognose!I@FIRE) — zelfde bron/gate als simRequiredPortfolio.
         simRequiredNetWorth =
-          !simIsStartPortfolio && (simResult.requiredFireNetWorth ?? 0) > 0 ? simResult.requiredFireNetWorth! : null
+          !simIsAnchorPortfolio && (simResult.requiredFireNetWorth ?? 0) > 0 ? simResult.requiredFireNetWorth! : null
         simFireAgeFractional = simResult.fireAgeFractional
         simKernelDepletionMonth = simResult.kernelDepletionMonth ?? null
+        simAnkerMaand = simResult.ankerMaand ?? null
       }
     } catch (err) {
       console.error('[dashboard-data-loader] FIRE-projectie faalde:', err)
@@ -1486,23 +1494,29 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const homeExcludedFromFire = housingContext.hasEigenHuis && isHomeExcludedFromFire(housingStrategyCfg)
   const requiredNetWorthForProgress =
     simRequiredNetWorth ?? inclHomeTargetFromScalar(requiredPortfolioForProgress, netWorth, fireEligibleNetWorth)
-  // ADR 0127 D5 — onder 'nu-stoppen' is vrijheids-% TIJDSDEKKING (uitputtingsmaand ÷
-  // eindmaand, bridge-veld `kernelDepletionMonth`), niet vulling-van-het-doel: bij
-  // FIRE-maand 0 is het "doel" ≈ het huidige vermogen en zou de ratio voor iedereen
-  // ~100 zijn. Eén home (lib/core-metrics.ts), hier strategie-bewust gekozen.
-  const freedomPct =
-    simIsStartPortfolio && simDisplayEndAge != null && currentAge != null
-      ? computeRunwayCoveragePct({
-          kernelDepletionMonth: simKernelDepletionMonth,
-          eindMaand: eindMaandVan(simDisplayEndAge, currentAge),
-        })
-      : computeFreedomProgressWithBasis({
-          homeExcludedFromFire,
-          netWorthInclHome: netWorth,
-          fireEligibleNetWorth,
-          requiredNetWorthInclHome: requiredNetWorthForProgress,
-          requiredPortfolioExclHome: requiredPortfolioForProgress,
-        })
+  // ADR 0129 B3/D5 — onder een VAST anker (aow/now/age) is vrijheids-% de DEKKING
+  // ((uitputtingsmaand − ankerMaand) ÷ (eindmaand − ankerMaand), bridge-velden
+  // `kernelDepletionMonth`/`ankerMaand`), niet vulling-van-het-doel: op het anker is
+  // het "doel" de geprojecteerde stand zelf. Eén home (`computeFreedomPctForPlan`);
+  // de vlag komt uit de run, en zonder run uit het plan — nooit de strategienaam.
+  const freedomPct = computeFreedomPctForPlan({
+    anchorFixed: simIsAnchorPortfolio || (simDisplayEndAge == null && isFixedAnchor(firePlan)),
+    coverage:
+      simIsAnchorPortfolio && simDisplayEndAge != null && currentAge != null
+        ? {
+            kernelDepletionMonth: simKernelDepletionMonth,
+            eindMaand: eindMaandVan(simDisplayEndAge, currentAge),
+            ankerMaand: simAnkerMaand,
+          }
+        : null,
+    basis: {
+      homeExcludedFromFire,
+      netWorthInclHome: netWorth,
+      fireEligibleNetWorth,
+      requiredNetWorthInclHome: requiredNetWorthForProgress,
+      requiredPortfolioExclHome: requiredPortfolioForProgress,
+    },
+  })
 
   // Countdown afgeleid uit simulatie-engine (consistent met fireAgeFractional)
   const simCurrentAge = dob ? ageAtDate(dob) : null
@@ -2936,6 +2950,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     simFireCountdown,
     fireEndStrategy: fireStrategy.strategy,
     fireEndAge: fireStrategy.endAge,
+    fireStopAnchor: firePlan.anchor,
     prevMonthIncome,
     prevMonthExpenses,
     netWorthDelta: netWorthDeltaComputed,

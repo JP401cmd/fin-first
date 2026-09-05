@@ -22,6 +22,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { computeHorizonFireSim } from '@/lib/fire-target-shared'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { inclHomeTargetFromScalar } from '@/lib/core-metrics'
+import { isFixedAnchor } from '@/lib/fire-strategy'
 import { isHomeExcludedFromFire } from '@/lib/housing-strategy'
 import { ageAtDate } from '@/lib/horizon-data'
 import {
@@ -58,16 +59,22 @@ export const loadVrijheidsgetalSnapshot = cache(async function loadVrijheidsgeta
   // tweede optelling over assets/debts.
   const netWorthInclHome = horizon.effectiveInput.totalAssets - horizon.effectiveInput.totalDebts
 
-  const requiredPortfolioExclHome =
-    (run && run.sim.requiredFirePortfolio > 0 ? run.sim.requiredFirePortfolio : null) ??
-    horizon.requiredPortfolioExclHome
-  const requiredNetWorthInclHome =
-    (run && (run.sim.requiredFireNetWorth ?? 0) > 0 ? run.sim.requiredFireNetWorth! : null) ??
-    inclHomeTargetFromScalar(
-      requiredPortfolioExclHome,
-      netWorthInclHome,
-      horizon.fireEligibleNetWorth,
-    )
+  // ADR 0129 D4 — onder een VAST anker is `requiredFirePortfolio` de geprojecteerde
+  // stand op het anker, geen doel: de bridge-vlag is de ENE gate (zelfde als de
+  // loaders). Zonder run valt de gate terug op het plan uit de horizon-bundel.
+  const anchorFixed = run ? run.sim.requiredFireIsAnchorPortfolio === true : isFixedAnchor(horizon.firePlan)
+  const requiredPortfolioExclHome = anchorFixed
+    ? null
+    : ((run && run.sim.requiredFirePortfolio > 0 ? run.sim.requiredFirePortfolio : null) ??
+      horizon.requiredPortfolioExclHome)
+  const requiredNetWorthInclHome = anchorFixed
+    ? null
+    : ((run && (run.sim.requiredFireNetWorth ?? 0) > 0 ? run.sim.requiredFireNetWorth! : null) ??
+      inclHomeTargetFromScalar(
+        requiredPortfolioExclHome,
+        netWorthInclHome,
+        horizon.fireEligibleNetWorth,
+      ))
 
   const dob = horizon.effectiveInput.dateOfBirth
 
@@ -83,5 +90,10 @@ export const loadVrijheidsgetalSnapshot = cache(async function loadVrijheidsgeta
     // Eindsaldo op de levensverwachting-proxy uit DEZELFDE run — geen tweede
     // kernel-solve. `displayEndAge` volgt uit `profiles.fire_end_age` (default 90).
     endBalanceAtEndAge: pickEndBalanceAtEndAge(run?.sim ?? null),
+    // Het plan-anker (ADR 0129): onder een vast anker levert de bouwer geen
+    // FIRE-leeftijd/doelwaarde en krijgt het fire_age-doel de n.v.t.-notitie.
+    stopAnchor: horizon.firePlan.anchor.kind,
+    stopAge: run?.sim.vastStopLeeftijd ?? (horizon.firePlan.anchor.kind === 'age' ? horizon.firePlan.anchor.age : null),
+    endAge: run?.sim.displayEndAge ?? horizon.firePlan.endAge,
   })
 })

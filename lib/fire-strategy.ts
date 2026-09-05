@@ -11,6 +11,8 @@
  */
 
 import { guardFreedomAge } from '@/lib/horizon/outcome-guard'
+// Alleen het TYPE (geen module-cyclus: de kernel-bridge importeert dit bestand).
+import type { KernelStopAnker } from '@/lib/horizon-kernel/types'
 
 /**
  * De vijf eindstrategieën. 'nu-stoppen' (ADR 0127): werken stopt vandaag — de kernel
@@ -157,7 +159,7 @@ export function isFireEndForm(value: unknown): value is FireEndForm {
  * `isNuStoppenMode` en `requiredFireIsStartPortfolio`-als-strategieproxy. Twee
  * predicaten voor één feit is precies hoe de twee ankers uit elkaar zijn gegroeid.
  */
-export function isFixedAnchor(plan: FirePlan): boolean {
+export function isFixedAnchor(plan: Pick<FirePlan, 'anchor'>): boolean {
   return plan.anchor.kind !== 'solved'
 }
 
@@ -209,9 +211,8 @@ export function parseFirePlan(profile: {
   const legacyStrategy = profile.fire_end_strategy
 
   const anchor: StopAnchor =
-    legacyStrategy === 'pensioen' ? { kind: 'aow' }
-    : legacyStrategy === 'nu-stoppen' ? { kind: 'now' }
-    : resolveStoredAnchor(profile.fire_stop_anchor, profile.fire_stop_age)
+    legacyAnchorOf(legacyStrategy) ??
+    resolveStoredAnchor(profile.fire_stop_anchor, profile.fire_stop_age)
 
   const endForm: FireEndForm = isFireEndForm(legacyStrategy) ? legacyStrategy : 'deplete'
 
@@ -221,6 +222,52 @@ export function parseFirePlan(profile: {
     endAge: profile.fire_end_age ?? 90,
     legacyAmount: Number(profile.fire_legacy_amount ?? 0),
   }
+}
+
+/**
+ * De D2-vertaling van de twee LEGACY-labels naar een anker — de ENIGE plek waar
+ * `'pensioen'`/`'nu-stoppen'` een anker worden. `parseFirePlan` leest hier, en
+ * `resolveFreedomAnchor` valt hierop terug voor lezers die alleen nog de oude
+ * `strategy`-string aanreiken (F4 verwijdert die terugval samen met de labels).
+ *
+ * `null` = geen anker-label (een eind-vorm of onbekend): de aanroeper kiest dan
+ * zijn eigen terugval (de nieuwe kolom, of `solved`).
+ */
+export function legacyAnchorOf(strategy: string | null | undefined): StopAnchor | null {
+  if (strategy === 'pensioen') return { kind: 'aow' }
+  if (strategy === 'nu-stoppen') return { kind: 'now' }
+  return null
+}
+
+/**
+ * De kernel-echo van het anker (`SimResult.stopAnker`, Nederlands: aow/nu/leeftijd)
+ * terug naar het app-plan-anker (aow/now/age). Eén mapping-home; `null`/`undefined`
+ * (de solver zocht het stopmoment) is `solved`.
+ */
+export function stopAnchorFromKernel(anker: KernelStopAnker | null | undefined): StopAnchor {
+  if (anker == null) return { kind: 'solved' }
+  if (anker.soort === 'aow') return { kind: 'aow' }
+  if (anker.soort === 'nu') return { kind: 'now' }
+  return { kind: 'age', age: anker.leeftijd }
+}
+
+/**
+ * Het plan van een profielrij MÉT het schaduwpad `feature_preferences.
+ * fire_strategy_override` opgelost (ADR 0129 D2 + het pensioen-parkeerpad).
+ *
+ * Eén home voor de kernel-adapter (`adapter/params.ts`) én de loaders die het plan
+ * naast hun `FireStrategyConfig` doorgeven: zou een loader kaal `parseFirePlan`
+ * lezen terwijl de adapter het schaduwpad wél oplost, dan rekent de kernel een
+ * aow-anker en toont de bundel `solved` — twee waarheden op één rij.
+ */
+export function resolveFirePlanWithOverride(
+  profile: Parameters<typeof resolveFireStrategyWithOverride>[0] & {
+    fire_stop_anchor?: string | null
+    fire_stop_age?: number | string | null
+  },
+): FirePlan {
+  const cfg = resolveFireStrategyWithOverride(profile)
+  return parseFirePlan({ ...profile, fire_end_strategy: cfg.strategy })
 }
 
 /** `age` zonder geldige leeftijd is geen anker — dan valt het plan terug op `solved`
@@ -256,74 +303,123 @@ export interface FreedomStateInput {
    * vrijheidsleeftijd wordt getoond.
    */
   fireAge: number | null
-  /** Gekozen eindstrategie — onderscheidt 'regulier pensioen' van 'vervroegde vrijheid'. */
+  /**
+   * @deprecated F4 (ADR 0129) — de LEGACY-label. Wordt alleen nog gelezen wanneer
+   * `anchor` ontbreekt: `'pensioen'`/`'nu-stoppen'` vertalen dan via
+   * `legacyAnchorOf` naar `aow`/`now`. Geef bij voorkeur `anchor` mee; staan beide
+   * er, dan WINT `anchor` — het is het canonieke feit, de label een echo ervan.
+   */
   strategy?: FireEndStrategy
+  /**
+   * Het stop-anker van het plan (ADR 0129 D8) — de canonieke sleutel sinds F3a.
+   * `null`/weggelaten = terugval op `strategy` en anders `solved`.
+   */
+  anchor?: StopAnchor | null
   /**
    * AOW-leeftijd in jaren (uit lib/aow-leeftijd.ts) — optioneel. Alleen gebruikt
    * voor precieze 'voorbij AOW'-detectie; ontbreekt 'ie, dan valt de logica terug
-   * op `fireAge` (in pensioen-modus is `fireAge` ≡ de AOW-leeftijd).
+   * op `fireAge` (onder het aow-anker is `fireAge` ≡ de AOW-leeftijd).
    */
   aowAge?: number | null
 }
 
 /**
- * Reeds financieel vrij: de vrijheidsvoortgang staat op 100% OF de huidige
- * leeftijd is voorbij de vrijheidsleeftijd. Vanaf dit punt is "% op weg naar
- * vrijheid" niet meer de juiste framing — het beeld toont onttrekking, geen opbouw.
+ * HET anker waarop de vrijheidstoestand wordt beoordeeld: het expliciete `anchor`,
+ * anders de D2-vertaling van de legacy-label, anders `solved`. Eén resolutie voor
+ * `isFinanciallyFree`, `isRetiredView` en `resolveFreedomFraming` — géén tweede
+ * `strategy === 'pensioen'`-toets ernaast.
+ */
+export function resolveFreedomAnchor(input: Pick<FreedomStateInput, 'anchor' | 'strategy'>): StopAnchor {
+  return input.anchor ?? legacyAnchorOf(input.strategy) ?? { kind: 'solved' }
+}
+
+/**
+ * Is het gekozen stopmoment al gepasseerd? Alleen zinvol onder een vast anker.
+ *  - `now`  — per definitie waar (het anker ís vandaag).
+ *  - `aow`  — `currentAge ≥ aowAge`; zonder AOW-leeftijd valt de drempel terug op
+ *             `fireAge` (onder dit anker ≡ de AOW-leeftijd).
+ *  - `age`  — `currentAge ≥ anchor.age` (fractioneel; 58,5 blijft 58,5).
+ * Onbekende leeftijd ⇒ `false`: zonder leeftijd kun je niets "bereikt" noemen.
+ */
+export function isAnchorReached(input: FreedomStateInput, anchor: StopAnchor): boolean {
+  if (anchor.kind === 'solved') return false
+  if (anchor.kind === 'now') return true
+  const { currentAge } = input
+  if (currentAge == null || !Number.isFinite(currentAge)) return false
+  const threshold = anchor.kind === 'age' ? anchor.age : (input.aowAge ?? input.fireAge)
+  return threshold != null && Number.isFinite(threshold) && currentAge >= threshold
+}
+
+/**
+ * Reeds financieel vrij — DE GATE (ADR 0129 D8/B3), geen los cijfer.
+ *
+ *  - `solved` — de vrijheidsvoortgang staat op 100% OF de huidige leeftijd is voorbij
+ *    de vrijheidsleeftijd (het bestaande gedrag).
+ *  - vast anker (`aow`/`now`/`age`) — **anker bereikt ∧ dekking ≥ 100**. Beide
+ *    voorwaarden. Zonder de eerste zou een dertigjarige op een AOW-anker met een
+ *    100%-gedekt plan "met pensioen" heten terwijl de AOW decennia weg ligt; zonder
+ *    de tweede zou een `age`-anker in het verleden (`currentAge ≥ fireAge` is dan
+ *    triviaal waar) iemand vrij verklaren bij 40% dekking. Onder een vast anker is
+ *    `freedomPct` de DEKKING (`computeRunwayCoveragePct`), nooit een kapitaalratio.
+ *
+ * Vanaf dit punt is "% op weg naar vrijheid" niet meer de juiste framing — het beeld
+ * toont onttrekking, geen opbouw.
  */
 export function isFinanciallyFree(input: FreedomStateInput): boolean {
   const { freedomPct, currentAge, fireAge } = input
-  if (freedomPct != null && Number.isFinite(freedomPct) && freedomPct >= 100) return true
-  // ADR 0127 D5 — onder 'nu-stoppen' is `fireAge` per constructie de startleeftijd,
-  // dus `currentAge >= fireAge` is triviaal waar en zegt niets over het geld. Alleen de
-  // tijdsdekking (freedomPct = uitputtingsmaand ÷ eindmaand) mag hier "vrij" verklaren.
-  if (input.strategy === 'nu-stoppen') return false
+  const gedekt = freedomPct != null && Number.isFinite(freedomPct) && freedomPct >= 100
+  const anchor = resolveFreedomAnchor(input)
+  if (isFixedAnchor({ anchor })) return gedekt && isAnchorReached(input, anchor)
+  if (gedekt) return true
   if (currentAge != null && fireAge != null && currentAge >= fireAge) return true
   return false
 }
 
 /**
  * Onttrekkings-/pensioenbeeld van toepassing: de gebruiker is al financieel vrij,
- * OF heeft de pensioen-strategie gekozen en is voorbij de AOW-leeftijd (in
- * pensioen-modus is `fireAge` ≡ AOW). Dit is de trigger voor de "dit beeld toont
+ * OF het plan ankert op de AOW en die is gepasseerd (ook bij een tekort toont het
+ * beeld dan onttrekking, geen opbouw). Dit is de trigger voor de "dit beeld toont
  * je onttrekking tot einde leven"-duiding.
  */
 export function isRetiredView(input: FreedomStateInput): boolean {
   if (isFinanciallyFree(input)) return true
-  if (input.strategy === 'pensioen') {
-    const threshold = input.aowAge ?? input.fireAge
-    if (input.currentAge != null && threshold != null && input.currentAge >= threshold) {
-      return true
-    }
-  }
-  return false
+  const anchor = resolveFreedomAnchor(input)
+  return anchor.kind === 'aow' && isAnchorReached(input, anchor)
 }
 
-export type FreedomFraming = 'building' | 'free' | 'pensioen' | 'nu-stoppen'
-
 /**
- * Hero-/banner-woordkeuze in één afgeleide waarde:
- *  - 'building'   — nog op weg ("X% op weg naar vrijheid"); de bestaande framing.
- *  - 'pensioen'   — vrij rond de AOW-leeftijd: 'regulier pensioen' (strategy
- *    'pensioen', óf leeftijd/vrijheidsleeftijd op of voorbij AOW).
- *  - 'free'       — vrij vóór de AOW-leeftijd: 'vervroegde vrijheid'.
- *  - 'nu-stoppen' — eindstrategie 'Nu stoppen' én het geld reikt tot de eindleeftijd
- *    (tijdsdekking 100%, ADR 0127 D5/D6): geen belofte over een moment maar een
- *    uitspraak over bereik ("als je nu stopt, reikt je vermogen tot je eindleeftijd").
- *
- * Zonder `aowAge` (niet altijd geplumbd) leunt het pensioen-onderscheid op de
- * expliciete 'pensioen'-strategie — het canonieke "ik stop rond AOW"-signaal dat
- * ook de fasebalk al aanstuurt.
+ * Staat de gebruiker op of voorbij de AOW-leeftijd, of valt zijn vrijheidsmoment
+ * daar? De WOORDKEUZE-hulp ("met pensioen" vs. "vrij") voor oppervlakken die dat
+ * onderscheid nog maken; geen onderdeel van de gate zelf.
  */
-export function resolveFreedomFraming(input: FreedomStateInput): FreedomFraming {
-  if (!isFinanciallyFree(input)) return 'building'
-  if (input.strategy === 'nu-stoppen') return 'nu-stoppen'
+export function isAtOrPastAow(input: FreedomStateInput): boolean {
+  const anchor = resolveFreedomAnchor(input)
+  if (anchor.kind === 'aow') return isAnchorReached(input, anchor)
   const atOrPastAow =
     input.aowAge != null && input.currentAge != null && input.currentAge >= input.aowAge
   const fireAtOrPastAow =
     input.aowAge != null && input.fireAge != null && input.fireAge >= input.aowAge
-  if (input.strategy === 'pensioen' || atOrPastAow || fireAtOrPastAow) return 'pensioen'
-  return 'free'
+  return atOrPastAow || fireAtOrPastAow
+}
+
+/**
+ * De drie framings (ADR 0129 D8):
+ *  - 'building'  — `solved` en nog op weg ("X% op weg naar vrijheid").
+ *  - 'anchored'  — een vast anker (`aow`/`now`/`age`) en (nog) niet vrij: het
+ *    oppervlak toont dan geen voortgang-naar-een-moment maar het BEREIK van het plan
+ *    ("als je op {stop} stopt, reikt je liquide vermogen tot …"), gedekt of tekort.
+ *  - 'free'      — de gate `isFinanciallyFree` staat open (onder `solved`: 100% of
+ *    leeftijd voorbij FIRE; onder een vast anker: anker bereikt ∧ dekking ≥ 100).
+ *
+ * De vroegere labels 'pensioen'/'nu-stoppen' waren ankers vermomd als framing; het
+ * anker reist nu apart mee (`resolveFreedomAnchor` / `FreedomAgeView.anchor`), en
+ * de woordkeuze "met pensioen" leest `isAtOrPastAow`.
+ */
+export type FreedomFraming = 'building' | 'free' | 'anchored'
+
+export function resolveFreedomFraming(input: FreedomStateInput): FreedomFraming {
+  if (isFinanciallyFree(input)) return 'free'
+  return isFixedAnchor({ anchor: resolveFreedomAnchor(input) }) ? 'anchored' : 'building'
 }
 
 // ── Seam: DREMPEL vs. WEERGAVE van de vrijheidsleeftijd ────────────────────
@@ -369,6 +465,12 @@ export interface FreedomAgeView {
   /** Framing, bepaald op de fractionele drempel. */
   framing: FreedomFraming
   /**
+   * Het anker waarop `framing` is beoordeeld (ADR 0129) — zodat een oppervlak dat
+   * onder 'free' nog "met pensioen" van "vrij" onderscheidt, of onder 'anchored'
+   * het stopmoment wil noemen, niet zelf de legacy-label hoeft te herlezen.
+   */
+  anchor: StopAnchor
+  /**
    * `true` ⇒ de motor gaf een leeftijd die niet kán kloppen (op/voorbij het
    * horizonplafond, bevinding M6). Het oppervlak toont dan een gegevensmelding
    * i.p.v. een aftelling — niet gewoon "geen aftelling", want dan verdwijnt het
@@ -395,6 +497,7 @@ export function resolveFreedomAgeView({
   return {
     fireAgeDisplay: fireAgeForDisplay(bruikbaar),
     framing: resolveFreedomFraming(state),
+    anchor: resolveFreedomAnchor(state),
     dataIssue: !guard.ok,
   }
 }

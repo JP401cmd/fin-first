@@ -24,13 +24,29 @@ export interface FireProjectionTipContext {
   hasScenario: boolean
   hasBaseline: boolean
   planningMode: 'fire' | 'pensioen'
+  /**
+   * Het stopmoment ligt VAST (ADR 0129: aow/now/age — `isFixedAnchor(plan)`). Dan is
+   * `fireAge` het anker en geen vrijheidsmoment: de spotlight zegt niet "op 47 bereik
+   * je financiële vrijheid" (bevinding 6) maar noemt het gekozen stopmoment. Optioneel/
+   * additief: weggelaten ⇒ het bestaande gedrag.
+   */
+  stopAnchorFixed?: boolean
+  /** Het stopmoment als leeftijd (bv. 58,5), voor de spotlight onder een vast anker. */
+  stopAge?: number | null
 }
 
 export function getFireProjectionTips(ctx: FireProjectionTipContext): string[] {
   const tips: string[] = []
 
   // Spotlight (eerste tip = preview bij ingeklapt)
-  if (ctx.fireAge != null && ctx.fireAge >= ctx.currentAge) {
+  if (ctx.stopAnchorFixed) {
+    const stop = ctx.stopAge ?? ctx.fireAge
+    tips.push(
+      stop != null
+        ? `Je stopmoment ligt vast op ${Number.isInteger(stop) ? stop : stop.toFixed(1).replace('.', ',')} — vanaf daar onttrek je uit je vermogen`
+        : 'Je stopmoment ligt vast — vanaf daar onttrek je uit je vermogen',
+    )
+  } else if (ctx.fireAge != null && ctx.fireAge >= ctx.currentAge) {
     tips.push(
       `Op leeftijd ${ctx.fireAge} bereik je financiële vrijheid — vanaf hier ga je onttrekken uit je vermogen`,
     )
@@ -61,8 +77,8 @@ export function getFireProjectionTips(ctx: FireProjectionTipContext): string[] {
     )
   }
 
-  // Markers
-  if (ctx.fireAge != null && ctx.planningMode === 'fire') {
+  // Markers — onder een vast anker is de stippellijn je stopmoment, geen FIRE-leeftijd.
+  if (ctx.fireAge != null && ctx.planningMode === 'fire' && !ctx.stopAnchorFixed) {
     tips.push(`Verticale stippellijn op leeftijd ${ctx.fireAge} = je FIRE-leeftijd`)
   }
   if (ctx.planningMode === 'pensioen') {

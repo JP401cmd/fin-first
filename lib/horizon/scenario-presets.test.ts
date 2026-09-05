@@ -22,6 +22,7 @@ import {
   resolveScenarioPresets,
   runForcedStopPath,
   runScenarioPresetBatch,
+  resolvePlanStopAge,
   solveFireAgeWithoutAnchor,
   SCENARIO_PRESET_SPECS,
   type ScenarioPresetContext,
@@ -85,11 +86,60 @@ describe('resolveScenarioPresets — slot-4-wissel', () => {
     expect(ids[4]).toBe('extra-inleg')
   })
 
-  it('de stop-ankers staan expliciet in het type: FIRE-relatief met offset vs. "nu"', () => {
-    expect(SCENARIO_PRESET_SPECS['een-jaar-langer'].stopAnker).toEqual({ soort: 'verwacht-fire', offsetJaren: 1 })
-    expect(SCENARIO_PRESET_SPECS['eerder-stoppen'].stopAnker).toEqual({ soort: 'verwacht-fire', offsetJaren: -2 })
+  it('de stop-ankers staan expliciet in het type: plan-stop-relatief met offset vs. "nu"', () => {
+    expect(SCENARIO_PRESET_SPECS['een-jaar-langer'].stopAnker).toEqual({ soort: 'plan-stop', offsetJaren: 1 })
+    expect(SCENARIO_PRESET_SPECS['eerder-stoppen'].stopAnker).toEqual({ soort: 'plan-stop', offsetJaren: -2 })
     expect(SCENARIO_PRESET_SPECS['stop-nu'].stopAnker).toEqual({ soort: 'nu' })
     expect(SCENARIO_PRESET_SPECS['stop-nu'].kind).toBe('stop')
+  })
+
+  // ADR 0129 F3a — onder het `now`-anker ís het basisplan al "vandaag stoppen".
+  it('onder het now-anker valt de stop-nu-kaart weg (geen dubbele basis)', () => {
+    const ids = resolveScenarioPresets(makeCtx({ profile: { ...profile, fire_stop_anchor: 'now' } })).map((s) => s.id)
+    expect(ids).toEqual(['basis', 'een-jaar-langer', 'minder-uitgeven', 'downsize', 'eerder-stoppen'])
+    // Onder aow/age blijft de kaart (vandaag stoppen is daar een écht naast-beeld).
+    expect(resolveScenarioPresets(makeCtx({ profile: { ...profile, fire_stop_anchor: 'aow' } })).map((s) => s.id)).toContain('stop-nu')
+  })
+})
+
+describe('plan-stop-anker — "een jaar langer" betekent iets onder élk plan (ADR 0129 F3a)', () => {
+  it('solved: het plan-stopmoment is de verwachte FIRE-leeftijd (ongewijzigd gedrag)', () => {
+    expect(resolvePlanStopAge(makeCtx())).toBe(VERWACHT_FIRE)
+    const cards = runScenarioPresets(makeCtx())
+    expect(cards.find((c) => c.id === 'een-jaar-langer')!.stopLeeftijd).toBeCloseTo(VERWACHT_FIRE + 1, 9)
+    expect(cards.find((c) => c.id === 'eerder-stoppen')!.stopLeeftijd).toBeCloseTo(VERWACHT_FIRE - 2, 9)
+  })
+
+  it('age 58: de kaarten ankeren op 58 (59 / 56), niet op de gesolvede leeftijd', () => {
+    const ctx = makeCtx({ profile: { ...profile, fire_stop_anchor: 'age', fire_stop_age: 58 } })
+    expect(resolvePlanStopAge(ctx)).toBe(58)
+    const cards = runScenarioPresets(ctx)
+    expect(cards.find((c) => c.id === 'een-jaar-langer')!.stopLeeftijd).toBe(59)
+    expect(cards.find((c) => c.id === 'eerder-stoppen')!.stopLeeftijd).toBe(56)
+  })
+
+  it('aow: de kaarten ankeren op de AOW-leeftijd uit de resolver (geen hardcoded 67 in deze module)', () => {
+    const ctx = makeCtx({ profile: { ...profile, fire_stop_anchor: 'aow' } })
+    const planStop = resolvePlanStopAge(ctx)
+    expect(planStop).not.toBeNull()
+    // Dezelfde leeftijd die de kernel-resolver geeft (aowRows: [] ⇒ de lookupAowAge-terugval).
+    const input = buildKernelInputFromApp({
+      profile: buildConvergentieAdapterProfile(ctx.profile),
+      assets: ctx.assets, debts: ctx.debts, lifeEvents: ctx.lifeEvents, aowRows: ctx.aowRows,
+    })
+    expect(planStop).toBe(input.persoon.aowLeeftijd)
+    const cards = runScenarioPresets(ctx)
+    expect(cards.find((c) => c.id === 'een-jaar-langer')!.stopLeeftijd).toBeCloseTo(planStop! + 1, 9)
+  })
+
+  it("buildForcedStopSolve('plan') onder solved ≡ 'nu' (geen anker ⇒ de startleeftijd)", () => {
+    const basis = { profile, assets: fx.assets, debts: fx.debts, lifeEvents: fx.lifeEvents, aowRows: [], yearlyExpenses: 30_000, endStrategy: 'inherit' as const }
+    expect(buildForcedStopSolve({ ...basis, stopAge: 'plan' }).stopAge).toBe(buildForcedStopSolve({ ...basis, stopAge: 'nu' }).stopAge)
+  })
+
+  it("buildForcedStopSolve('plan') onder age 58 ⇒ 58 (de resolver klemt op de tijdas)", () => {
+    const basis = { profile: { ...profile, fire_stop_anchor: 'age', fire_stop_age: 58 }, assets: fx.assets, debts: fx.debts, lifeEvents: fx.lifeEvents, aowRows: [], yearlyExpenses: 30_000, endStrategy: 'inherit' as const }
+    expect(buildForcedStopSolve({ ...basis, stopAge: 'plan' }).stopAge).toBe(58)
   })
 })
 
@@ -468,5 +518,20 @@ describe('solveFireAgeWithoutAnchor — "vrij mogelijk vanaf" (D7/B9)', () => {
   it('een onbruikbaar profiel degradeert zichtbaar naar null (geen throw, geen verzonnen leeftijd)', () => {
     const kapot = makeCtx({ profile: { ...ankerProfiel, date_of_birth: null } })
     expect(solveFireAgeWithoutAnchor(kapot)).toBeNull()
+    expect(runScenarioPresetBatch(kapot).solvedFireEndAge).toBeNull()
+  })
+
+  it('bevinding 6: de eindleeftijd van de tweede run reist mee — een gemigreerde pensioen-rij (fire_end_age 100) solvet tegen 100', () => {
+    // Niet gerepareerd (de eind-vorm is de gebruikerskeuze), wél als veld doorgegeven zodat
+    // F3b "vrij mogelijk vanaf" kan duiden als "…als je tot 100 rekent".
+    const pensioenM1 = makeCtx({ profile: { ...profile, fire_end_strategy: 'deplete', fire_stop_anchor: 'aow', fire_end_age: 100 } })
+    expect(runScenarioPresetBatch(pensioenM1).solvedFireEndAge).toBe(100)
+    // Hetzelfde plan tot 90 solvet tegen 90; onder `solved` is er geen tweede run.
+    // Let op: de basis-fixture is `perpetual`, en onder perpetual is de eindleeftijd
+    // per definitie 100 (geen eindig doel — de oracle-vorm). De eind-vorm moet dus
+    // expliciet `deplete` zijn, anders toetst deze regel de perpetual-regel i.p.v.
+    // dat de eindleeftijd meereist.
+    expect(runScenarioPresetBatch(makeCtx({ profile: { ...profile, fire_end_strategy: 'deplete', fire_stop_anchor: 'aow', fire_end_age: 90 } })).solvedFireEndAge).toBe(90)
+    expect(runScenarioPresetBatch(makeCtx()).solvedFireEndAge).toBeNull()
   })
 })

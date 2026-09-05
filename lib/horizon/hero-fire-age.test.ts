@@ -85,36 +85,44 @@ describe('resolveHeroFireAge — welk getal wint', () => {
   })
 })
 
-describe('resolveHeroFireAge — pensioen-modus (de "exact 67"-tak)', () => {
-  it('markeert de AOW-leeftijd als voorlopig zolang de wettelijke tabel niet geladen is', () => {
-    // `lookupAowAge` valt zonder tabel terug op NL_AOW_AGE = 67. Dat is precies
-    // het getal dat in de bevinding op één laadbeurt verscheen. Het mag getoond
-    // worden, maar niet als eindantwoord.
+describe('resolveHeroFireAge — aow-anker (de "exact 67"-tak, sinds ADR 0129 F3a één anker-tak)', () => {
+  const gedekt = { kind: 'gedekt' as const, endAge: 90 }
+
+  it('markeert het antwoord als voorlopig zolang de wettelijke tabel niet geladen is', () => {
+    // `lookupAowAge` valt zonder tabel terug op NL_AOW_AGE = 67, dus de run rekende
+    // met een terugval-AOW. Dat mag getoond worden, maar niet als eindantwoord.
     const state = resolveHeroFireAge({
       hasKernelResult: true,
-      isPensioenMode: true,
-      aowAgeFractional: 67,
+      stopAnker: { soort: 'aow' },
+      ankerReach: gedekt,
+      vastStopLeeftijd: 67,
       aowTableLoaded: false,
     })
-    expect(state).toEqual({ status: 'voorlopig', age: 67, bron: 'aow-tabel' })
+    expect(state.status).toBe('voorlopig')
+    expect(state.bron).toBe('kernel-runway')
+    // Het kopgetal is het BEREIK (hoe ver reikt het geld), het stopmoment reist mee.
+    expect(state.age).toBe(90)
+    expect(state.anker?.stopAge).toBe(67)
   })
 
   it('is definitief zodra de wettelijke tabel geladen is', () => {
     const state = resolveHeroFireAge({
       hasKernelResult: true,
-      isPensioenMode: true,
-      aowAgeFractional: 67.25,
+      stopAnker: { soort: 'aow' },
+      ankerReach: gedekt,
+      vastStopLeeftijd: 67.25,
       aowTableLoaded: true,
     })
-    expect(state).toEqual({ status: 'definitief', age: 67.25, bron: 'aow-tabel' })
+    expect(state.status).toBe('definitief')
+    expect(state.anker?.stopAge).toBe(67.25)
   })
 
-  it('pensioen-modus zonder AOW-leeftijd = berekenen (nooit een FIRE-getal in de plaats)', () => {
+  it('aow-anker zonder bereik = berekenen zolang de kernel draait (nooit een FIRE-getal in de plaats)', () => {
     const state = resolveHeroFireAge({
-      hasKernelResult: true,
-      isPensioenMode: true,
-      aowAgeFractional: null,
+      hasKernelResult: false,
+      stopAnker: { soort: 'aow' },
       kernelFireAgeFractional: 52.9,
+      isRefining: true,
     })
     expect(state.status).toBe('berekenen')
     expect(state.age).toBeNull()

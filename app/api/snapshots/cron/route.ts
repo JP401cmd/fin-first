@@ -11,6 +11,7 @@ import {
 } from '@/lib/health-score-input'
 import { BUDGET_SPENDING_TX_COLUMNS, fetchSpendingSplits } from '@/lib/budget-spending-fetch'
 import { resolveFireParams } from '@/lib/fire-params'
+import { FIRE_PLAN_COLUMNS, isFixedAnchor, resolveFirePlanWithOverride } from '@/lib/fire-strategy'
 import { yearlyMustExpensesFromBudgets } from '@/lib/budget-utils'
 import { computeSovereigntyLevel } from '@/lib/feature-phases'
 import { captureBalanceSnapshots } from '@/lib/balance-snapshot'
@@ -133,7 +134,8 @@ export async function GET(request: Request) {
     .from('profiles')
     // Zie snapshots/route.ts: de bron-vlaggen + handmatige bedragen voeden de
     // EFFECTIEVE spaarquote en de noodbuffer-norm (3 × netto maandsalaris).
-    .select('id, date_of_birth, expected_return, inflation_rate, household_type, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source')
+    // + het PLAN (ADR 0129 F3a): onder een vast stop-anker geen `fire_age`.
+    .select(`id, date_of_birth, expected_return, inflation_rate, household_type, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, feature_preferences, ${FIRE_PLAN_COLUMNS}`)
     .eq('onboarding_completed', true)
 
   if (profilesError) {
@@ -323,6 +325,8 @@ export async function GET(request: Request) {
 
       const fireParams = resolveFireParams(profile)
       const fireSwr = fireParams.effectiveSwr
+      // Het plan (ADR 0129) — bepaalt of `fire_age` op de rij mag (alleen onder `solved`).
+      const firePlan = resolveFirePlanWithOverride(profile)
       const fireTarget = yearlyMustExpenses > 0 ? yearlyMustExpenses / fireSwr : 0
       const freedomPercentage = computeSnapshotFreedomPct(netWorth, fireTarget)
 
@@ -504,7 +508,12 @@ export async function GET(request: Request) {
         total_debts: totalDebts,
         net_worth: netWorth,
         freedom_percentage: Math.round(freedomPercentage * 10) / 10,
-        fire_age: fireProjection.fireAge !== null ? Math.round(fireProjection.fireAge * 10) / 10 : null,
+        // ADR 0129 F3a — onder een VAST stop-anker (aow/now/age) bewust null: er is
+        // geen vrijheidsmoment, en de scalar-leeftijd zou de trend "bereikt" laten
+        // lezen. Het anker reist mee in `params` (zelfde regel als POST/auto).
+        fire_age: isFixedAnchor(firePlan) || fireProjection.fireAge === null
+          ? null
+          : Math.round(fireProjection.fireAge * 10) / 10,
         sovereignty_level: sovereigntyLevel,
         // Canonieke spaarquote (savingsRate6m), NIET fireProjection.savingsRate:
         // deze kolom voedt de spaarquote-widget-ontwikkeling (savingsHistory).
@@ -516,7 +525,7 @@ export async function GET(request: Request) {
         score_version: 2,
         // Provenance-parameterset ([Arch F6] #27) — zie POST /api/snapshots. De
         // basic-fallback-upsert hieronder laat 'm bewust weg (kolom nullable).
-        params: buildSnapshotParams(fireParams),
+        params: buildSnapshotParams(fireParams, { stopAnchor: firePlan.anchor.kind }),
       }
 
       const { error: upsertError } = await supabase

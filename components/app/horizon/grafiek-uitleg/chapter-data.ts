@@ -12,11 +12,13 @@
 import type { SimResult, SimRow, SimCashflow } from '@/lib/fire-simulation'
 import type { FireEndStrategy } from '@/lib/fire-strategy'
 import {
-  nuStoppenGrafiekZin,
-  nuStoppenReachFromSim,
-  nuStoppenZin,
-  type NuStoppenReach,
-} from '@/lib/horizon/nu-stoppen-copy'
+  ankerGrafiekZin,
+  ankerReachFromSim,
+  ankerStopFromSim,
+  ankerZin,
+  type AnkerReach,
+  type AnkerStop,
+} from '@/lib/horizon/anker-copy'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 
 /**
@@ -141,6 +143,17 @@ export interface SnijpuntData {
   /** Huidige leeftijd (rows[0].age), voor "over X jaar"-framing. 0 bij lege rows. */
   currentAge: number
   /**
+   * ADR 0129 — het stopmoment ligt VAST (aow/now/age, `SimResult.stopAnker`). Dan is
+   * `fireAgeFractional` het gekozen stopmoment en geen vrijheidsleeftijd, en is de
+   * impliciete opnamerate op dat punt betekenisloos (bevinding 6) — de walkthrough
+   * laat die rij dan weg en noemt het punt "Stopmoment".
+   */
+  ankerVast: boolean
+  /** Het bereik onder een vast anker (uit dezelfde run); `undefined` onder `solved`. */
+  ankerReach?: AnkerReach
+  /** Het stopmoment bij `ankerReach` ("nu" / "op 58,5"); `undefined` onder `solved`. */
+  ankerStop?: AnkerStop
+  /**
    * Aantal jaren vanaf nu tot vrijheid: round(fireAgeFractional − currentAge). `undefined`
    * als FIRE niet bereikbaar is.
    */
@@ -219,8 +232,13 @@ function mean(values: number[]): number {
 export function unreachableMessageFor(
   strategy: FireEndStrategy,
   displayEndAge: number,
-  reach?: NuStoppenReach,
+  reach?: AnkerReach,
+  stop?: AnkerStop,
 ): string {
+  // ADR 0129 — onder ÉLK vast anker (aow/now/age) valt er niets "niet te halen": het
+  // stopmoment ligt vast; de enige uitspraak is hoe ver het liquide vermogen reikt.
+  // Geen aansporing ("verhoog je spaarquote"), geen AOW in de zin.
+  if (reach != null) return ankerZin(reach, stop ?? { kind: 'now' })
   switch (strategy) {
     case 'legacy':
       return `Je haalt je nalatenschapsdoel niet binnen je projectie (tot leeftijd ${displayEndAge}). Verlaag het nalatenschapsbedrag, verhoog je spaarquote of verlaag je uitgaven.`
@@ -228,13 +246,9 @@ export function unreachableMessageFor(
       return `Je vermogen is niet groot genoeg om er blijvend van te leven binnen je projectie (tot leeftijd ${displayEndAge}). Verhoog je spaarquote of verlaag je uitgaven.`
     case 'pensioen':
       return `Je haalt je doel niet binnen je projectie (tot leeftijd ${displayEndAge}). Verhoog je spaarquote of verlaag je uitgaven.`
-    // ADR 0127 — 'Nu stoppen': er valt hier niets "niet te halen". Het stopmoment
-    // ligt vast op vandaag; de enige uitspraak is hoe ver het vermogen reikt.
-    // Zonder deze case viel de strategie via `default` op de FIRE-kopij terug.
+    // Legacy-label (F4 verwijdert 'm): zonder bereik-invoer de kale beschrijving.
     case 'nu-stoppen':
-      return reach != null
-        ? nuStoppenZin(reach)
-        : `Je vermogen reikt niet tot je ${displayEndAge}e als je nu stopt.`
+      return `Je liquide vermogen reikt niet tot je ${displayEndAge}e als je nu stopt.`
     case 'deplete':
     default:
       return `Vrijheid niet haalbaar binnen je projectie (tot leeftijd ${displayEndAge}). Verhoog je spaarquote of verlaag je uitgaven.`
@@ -270,8 +284,12 @@ export function closingSentenceFor(
   strategy: FireEndStrategy,
   displayEndAge: number,
   targetEndPortfolio: number,
-  reach?: NuStoppenReach,
+  reach?: AnkerReach,
+  stop?: AnkerStop,
 ): string {
+  // ADR 0129 — onder een vast anker volgt de afsluiting het BEREIK (uit de run), niet
+  // de eind-vorm-belofte: het geld kan ook vóór de eindleeftijd op zijn.
+  if (reach != null) return ankerGrafiekZin(reach, stop ?? { kind: 'now' })
   switch (strategy) {
     case 'perpetual':
       return 'Je leeft alleen van het rendement, zodat je koopkracht behouden blijft — je vermogen raakt nooit op.'
@@ -281,13 +299,9 @@ export function closingSentenceFor(
       return targetEndPortfolio > 0
         ? `Je onttrekt een vast bedrag; wat overblijft (zo'n ${Math.round(targetEndPortfolio).toLocaleString('nl-NL')} euro op leeftijd ${displayEndAge}) is je nalatenschap.`
         : `Je onttrekt een vast bedrag op basis van je ingestelde jaarbudget tot leeftijd ${displayEndAge}.`
-    // ADR 0127 — 'Nu stoppen': de default beloofde "rustig af naar nul rond X",
-    // maar onder dit anker kan het geld ook vóór de eindleeftijd op zijn. De zin
-    // volgt daarom de runway, niet de eindleeftijd.
+    // Legacy-label (F4 verwijdert 'm): zonder bereik-invoer de 'onbekend'-zin.
     case 'nu-stoppen':
-      return reach != null
-        ? nuStoppenGrafiekZin(reach)
-        : nuStoppenGrafiekZin({ kind: 'onbekend' })
+      return ankerGrafiekZin({ kind: 'onbekend' }, { kind: 'now' })
     case 'deplete':
     default:
       return `Je bouwt je vermogen rustig af naar nul rond leeftijd ${displayEndAge} — precies genoeg voor de rest van je leven.`
@@ -509,18 +523,22 @@ export function deriveChapterData(
 
   const endPortfolio = rows[rows.length - 1]?.endPortfolio ?? 0
 
-  // ADR 0127 — het bereik onder 'Nu stoppen', uit DEZELFDE run (geconsumeerd,
-  // niet herrekend). Alleen deze strategie leest 'm; voor de overige vier blijft
-  // hij `undefined` en veranderen de zinnen niet.
-  const nuStoppenReach: NuStoppenReach | undefined =
-    strategy === 'nu-stoppen'
-      ? nuStoppenReachFromSim({
-          // Onder dit anker is `fireAge` per constructie de startleeftijd (D1).
-          startAge: simResult.fireAge ?? rows[0]?.age ?? null,
-          kernelDepletionMonth: simResult.kernelDepletionMonth,
-          endAge: displayEndAge,
-        })
-      : undefined
+  // ADR 0129 — het bereik onder ÉLK vast anker (aow/now/age), uit DEZELFDE run
+  // (geconsumeerd, niet herrekend). De sleutel is de kernel-echo `stopAnker`, niet de
+  // strategienaam; onder `solved` blijft alles `undefined` en veranderen de zinnen niet.
+  // De startleeftijd is de kernel-tijdas (rows[0].age) — nooit `fireAge`, dat is onder
+  // een aow-/age-anker het anker zelf.
+  const ankerVast = simResult.stopAnker != null
+  const ankerReach: AnkerReach | undefined = ankerVast
+    ? ankerReachFromSim({
+        startAge: rows[0]?.age ?? null,
+        kernelDepletionMonth: simResult.kernelDepletionMonth,
+        endAge: displayEndAge,
+      })
+    : undefined
+  const ankerStop: AnkerStop | undefined = ankerVast
+    ? (ankerStopFromSim({ stopAnker: simResult.stopAnker, vastStopLeeftijd: simResult.vastStopLeeftijd }) ?? undefined)
+    : undefined
 
   // unifiedRows-only onttrekking-detail.
   const withdrawalOrder = (() => {
@@ -561,9 +579,12 @@ export function deriveChapterData(
       implicitWithdrawalRate,
       unreachableMessage: fireReachable
         ? null
-        : unreachableMessageFor(strategy, displayEndAge, nuStoppenReach),
+        : unreachableMessageFor(strategy, displayEndAge, ankerReach, ankerStop),
       currentAge,
       yearsFromNow,
+      ankerVast,
+      ankerReach,
+      ankerStop,
     },
     onttrekking: {
       strategy,
@@ -571,7 +592,7 @@ export function deriveChapterData(
       displayEndAge,
       targetEndPortfolio,
       impacts,
-      closingSentence: closingSentenceFor(strategy, displayEndAge, targetEndPortfolio, nuStoppenReach),
+      closingSentence: closingSentenceFor(strategy, displayEndAge, targetEndPortfolio, ankerReach, ankerStop),
       firstYearWithdrawal,
       endPortfolio,
       withdrawalOrder,

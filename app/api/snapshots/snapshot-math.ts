@@ -108,6 +108,21 @@ export interface SnapshotParams {
   grondslag: 'full-networth'
   /** Bron van de spaarquote-invoer: snapshots leiden 'm af uit transacties (income/expenses). */
   savingsSource: 'transactions'
+  /**
+   * Het stop-anker van het plan op het moment van de snapshot (ADR 0129 F3a).
+   * Onder een vast anker (`aow`/`now`/`age`) is `fire_age` op de rij bewust `null`
+   * (geen vrijheidsmoment) — zonder dit veld zou een trendlijn die nul-rij niet van
+   * "FIRE onhaalbaar" kunnen onderscheiden. Optioneel/additief (v1 blijft v1: oude
+   * rijen zonder het veld lezen als `solved`).
+   */
+  stopAnchor?: 'solved' | 'aow' | 'now' | 'age'
+  /**
+   * De DEKKING (0–100, `computeRunwayCoveragePct`) onder een vast anker op het moment
+   * van de snapshot — het getal dat onder zo'n plan het vrijheids-% ís (B3/D5), zodat
+   * de trend niet "bereikt" leest. `null`/afwezig wanneer er geen kernel-run was of het
+   * anker `solved` is (dan draagt `freedom_percentage` de kapitaalratio).
+   */
+  coveragePct?: number | null
 }
 
 /** Trimt float-ruis af op 5 decimalen (basispunt-precisie) zonder betekenisverlies. */
@@ -122,11 +137,19 @@ function round5(x: number): number {
  * getallen. Aangeroepen door alle drie de schrijfpaden (POST/auto/cron) zodat de
  * parameterset identiek en op één plek gevormd wordt.
  */
-export function buildSnapshotParams(fire: {
-  grossReturn: number
-  inflationRate: number
-  effectiveSwr: number
-}): SnapshotParams {
+export function buildSnapshotParams(
+  fire: {
+    grossReturn: number
+    inflationRate: number
+    effectiveSwr: number
+  },
+  plan?: {
+    /** Het stop-anker van het plan (ADR 0129 F3a). */
+    stopAnchor: 'solved' | 'aow' | 'now' | 'age'
+    /** De dekking onder een vast anker, of `null` (geen run / `solved`). */
+    coveragePct?: number | null
+  },
+): SnapshotParams {
   return {
     v: 1,
     swr: round5(fire.effectiveSwr),
@@ -136,5 +159,14 @@ export function buildSnapshotParams(fire: {
     taxYear: CURRENT_TAX_YEAR,
     grondslag: 'full-networth',
     savingsSource: 'transactions',
+    ...(plan
+      ? {
+          stopAnchor: plan.stopAnchor,
+          coveragePct:
+            plan.coveragePct != null && Number.isFinite(plan.coveragePct)
+              ? Math.round(plan.coveragePct * 10) / 10
+              : null,
+        }
+      : {}),
   }
 }

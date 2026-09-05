@@ -18,8 +18,9 @@ import { BRIEFING_ROTATION_COOKIE, parseRotationOffset } from '@/lib/briefing/ro
 import { loadTopMarketBriefing } from '@/lib/briefing/news-market'
 import { collectAandachtspunten } from '@/lib/aandachtspunten-loader'
 import type { Aandachtspunt } from '@/lib/aandachtspunten'
-import { resolveFreedomAgeView, fireAgeForDisplay } from '@/lib/fire-strategy'
-import { nuStoppenReachFromRunway, type NuStoppenReach } from '@/lib/horizon/nu-stoppen-copy'
+import { resolveFreedomAgeView, fireAgeForDisplay, isAtOrPastAow, isFixedAnchor, type FreedomFraming } from '@/lib/fire-strategy'
+import { ankerReachFromRunway, ankerStopFromSim, type AnkerReach, type AnkerStop } from '@/lib/horizon/anker-copy'
+import { computeHorizonSolvedFireAge } from '@/lib/fire-target-shared'
 import { PageStatusSeed } from '@/components/app/page-status-provider'
 import { computePageStatusInfo, readMinimizedLevel } from '@/lib/page-status/compute'
 import type { BriefingWeekHistoryItem } from '@/components/overview/briefing-panel'
@@ -178,6 +179,8 @@ export async function OverzichtSecondaryLoader({
     marketEntry ?? undefined,
     aandachtspunten,
     checkinForBriefing,
+    // ADR 0129 F3b — onder een vast anker noemt de FIRE-observatie het bereik.
+    runway,
   )
   // Het week-MEETPUNT is sinds ADR 0126 PR C de RUNWAY, niet meer de platte
   // deling (netto vermogen ÷ dagtarief). Eén duiding van de live kernel-run van
@@ -377,22 +380,46 @@ export async function OverzichtSecondaryLoader({
   // M6: `dataIssue` is waar zodra de motor een leeftijd gaf die niet kán kloppen
   // (op/voorbij het horizonplafond). Dan toont de strip een gegevensmelding i.p.v.
   // een aftelling — het probleem verdwijnt niet stilletjes uit beeld.
-  const { fireAgeDisplay, framing: freedomFraming, dataIssue: freedomDataIssue } = resolveFreedomAgeView({
+  // ADR 0129 D8 — het plan-ANKER is de sleutel voor de gate (anker bereikt ∧ dekking
+  // ≥ 100); `strategy` blijft alleen als legacy-terugval voor een bundel zonder plan.
+  const freedomState = {
     fireAgeFractional: dashboardData.fireAgeFractional ?? null,
     freedomPct,
     currentAge,
     strategy: horizonData?.fireStrategy?.strategy,
-  })
+    anchor: horizonData?.firePlan?.anchor ?? null,
+  }
+  const { fireAgeDisplay, framing: freedomFraming, dataIssue: freedomDataIssue } =
+    resolveFreedomAgeView(freedomState)
+  // Woordkeuze onder 'free': "met pensioen" op/voorbij de AOW (het vroegere
+  // framing-label 'pensioen'), anders "vrij". Zelfde helper als de /toekomst-hero.
+  const freedomFreeAsPensioen =
+    freedomFraming === 'free' &&
+    isAtOrPastAow({ ...freedomState, fireAge: freedomState.fireAgeFractional })
 
-  // ADR 0127 — eindstrategie 'Nu stoppen': de strip toont dan geen "% op weg"
-  // maar het BEREIK. Geconsumeerd uit de stop-nu-`runway` die dit request toch al
-  // draait (dezelfde die de kop-zin voedt) — geen tweede kernel-run, geen eigen
-  // maand→leeftijd-som in de component. `null` bij elke andere strategie, dan
-  // blijft de strip zich exact gedragen zoals voorheen.
-  const nuStoppenReach: NuStoppenReach | null =
-    horizonData?.fireStrategy?.strategy === 'nu-stoppen'
-      ? nuStoppenReachFromRunway(runway)
+  // ADR 0129 F3b — onder ÉLK vast anker (aow/now/age) toont de strip geen "% op weg"
+  // maar het BEREIK, geconsumeerd uit de `runway` die dit request toch al draait
+  // (dezelfde plan-runway die de kop-zin voedt) — geen tweede kernel-run, geen eigen
+  // maand→leeftijd-som in de component. Sleutel: het plan-anker, niet de label.
+  const planAnchor = horizonData?.firePlan?.anchor ?? null
+  const ankerVast = planAnchor != null && isFixedAnchor({ anchor: planAnchor })
+  const ankerReach: AnkerReach | null = ankerVast ? ankerReachFromRunway(runway) : null
+  const ankerStop: AnkerStop | null = ankerVast
+    ? runway.kind !== 'unavailable'
+      ? ankerStopFromSim({ stopAnker: runway.planAnker ?? null, vastStopLeeftijd: runway.stopAge ?? null })
+      : planAnchor.kind === 'now'
+        ? { kind: 'now' }
+        : null
+    : null
+  // "Vrij mogelijk vanaf" (D7) — de React-cache()'de tweede run, alléén onder een vast
+  // anker dat nog niet 'free' is; onder `solved` ís de hoofdrun de opgeloste run.
+  const solvedFireAge: number | null =
+    ankerVast && freedomFraming !== 'free'
+      ? await computeHorizonSolvedFireAge(supabase, perspective).catch(() => null)
       : null
+  const planEndAge = horizonData?.firePlan?.endAge ?? null
+  // Compat voor de legacy `nuStoppenReach`-prop (ADR 0127): alleen het nu-anker.
+  const nuStoppenReach: AnkerReach | null = planAnchor?.kind === 'now' ? ankerReach : null
 
   // Vieringsprop voor de client-host: kant-en-klare strings (plat/serialiseerbaar),
   // zodat de host geen lib/milestones hoeft te bundelen. De once-guard is
@@ -424,8 +451,12 @@ export async function OverzichtSecondaryLoader({
         currentAge={currentAge}
         fireAge={fireAgeDisplay}
         freedomFraming={freedomFraming}
+        freedomFreeAsPensioen={freedomFreeAsPensioen}
         freedomDataIssue={freedomDataIssue}
-        nuStoppenReach={nuStoppenReach}
+        ankerReach={ankerReach}
+        ankerStop={ankerStop}
+        solvedFireAge={solvedFireAge}
+        planEndAge={planEndAge}
         briefingEntries={briefingEntries}
         freshMilestone={freshMilestone}
         briefingRefreshedAt={briefingRefreshedAt}
@@ -471,6 +502,9 @@ export async function OverzichtNetWorthChartLoader({
   currentAge,
   endAge,
   isPensioenMode,
+  stopAnchorFixed = false,
+  stopAge = null,
+  framing,
   netWorthExclHome,
   housingSplit,
 }: {
@@ -479,6 +513,11 @@ export async function OverzichtNetWorthChartLoader({
   currentAge: number | null
   endAge: number | null
   isPensioenMode: boolean
+  /** ADR 0129 — vast stopmoment: de minigrafiek knipt op het stopmoment ("Vermogen bij stop"). */
+  stopAnchorFixed?: boolean
+  stopAge?: number | null
+  /** `resolveFreedomAgeView(...).framing` — "bereikt" alleen bij 'free'. */
+  framing?: FreedomFraming
   netWorthExclHome: number | null
   housingSplit: HefbomenHousingSplit | null
 }) {
@@ -504,6 +543,9 @@ export async function OverzichtNetWorthChartLoader({
       fireAge={fireAge}
       endAge={endAge}
       isPensioenMode={isPensioenMode}
+      stopAnchorFixed={stopAnchorFixed}
+      stopAge={stopAge}
+      framing={framing}
       simNetWorthRows={dashboardData.simNetWorthRows ?? null}
       simRequiredPortfolio={dashboardData.simRequiredPortfolio ?? null}
       monthlySavings={monthlySavings}

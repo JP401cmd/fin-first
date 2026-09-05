@@ -42,7 +42,7 @@ describe('buildVrijheidsleeftijdZin — de duidingsregel op /toekomst', () => {
   })
 
   it('zegt bij een ingegaan pensioen dat het pensioen loopt', () => {
-    const zin = buildVrijheidsleeftijdZin({ freedomAge: 68, framing: 'pensioen' })
+    const zin = buildVrijheidsleeftijdZin({ freedomAge: 68, framing: 'free', anchor: { kind: 'aow' } })
     expect(zin.kind).toBe('nu-al')
     expect(zin.text).toBe('Je pensioen is ingegaan — werken is nu een keuze.')
   })

@@ -235,6 +235,22 @@ export interface VrijheidsasProps {
   stopKeuzeNotitie?: ReactNode
   /** Linker-vlak-inhoud (draaiknoppen + rendement-per-groep) uit horizon-client. */
   draaiknoppen?: ReactNode
+  /**
+   * ADR 0129 F3b — het plan heeft een VAST stopmoment (aow/age). De slider is dan een
+   * VERKENNING tegen het plan (default = `planStopAge`); pas de CTA "Maak dit mijn
+   * plan" schrijft de sliderwaarde als anker `age`. Verkennen is nooit destructief.
+   */
+  ankerVast?: boolean
+  /** Het stopmoment van het plan (fractioneel) — de referentie voor "verandert pas als je het vastzet". */
+  planStopAge?: number | null
+  /**
+   * AOW-leeftijd (fractioneel) uit de gebruikerstabel — voedt de snelkoppeling
+   * "Op AOW-leeftijd" (B11): die zet alleen de slider, geen eigen kernel-run meer.
+   */
+  aowAge?: number | null
+  /** CTA "Maak dit mijn plan" — ontvangt de sliderwaarde (halve jaren). */
+  onMaakPlan?: (stopAge: number) => void
+  maakPlanBusy?: boolean
 }
 
 /**
@@ -265,10 +281,15 @@ export function Vrijheidsas({
   stopKeuzeVerborgen = false,
   stopKeuzeNotitie,
   draaiknoppen,
+  ankerVast = false,
+  planStopAge = null,
+  aowAge = null,
+  onMaakPlan,
+  maakPlanBusy = false,
 }: VrijheidsasProps) {
   // ── As-schaal (jaren, lineair, min-span 20 jr) — enkel voor de marge-band-posities ──
   const minAge = Math.floor(currentAge)
-  const candidates = [baseFireAge, verwachtFireAge, laatstFireAge, stopAge].filter(
+  const candidates = [baseFireAge, verwachtFireAge, laatstFireAge, stopAge, aowAge].filter(
     (v): v is number => v != null && Number.isFinite(v),
   )
   const rawMax = (candidates.length ? Math.max(...candidates) : minAge + 20) + 3
@@ -335,6 +356,18 @@ export function Vrijheidsas({
       : null
   const onzekerheidDegenereert = onzekerheid !== null && onzekerheid.vroegst === onzekerheid.laatst
 
+  // ADR 0129 F3b — snelkoppeling "Op AOW-leeftijd" (B11): zet alleen de slider, op
+  // halve jaren binnen de as. Geen eigen kernel-run, geen deplete-override.
+  const aowSliderAge =
+    aowAge != null && Number.isFinite(aowAge)
+      ? Math.max(minAge, Math.min(maxAge, Math.round(aowAge * 2) / 2))
+      : null
+  const aowActief = aowSliderAge !== null && Math.abs(stopAge - aowSliderAge) < 0.25
+  // "Maak dit mijn plan": alleen zinvol als de slider van het plan-stopmoment afwijkt.
+  const planStopHalf = planStopAge != null && Number.isFinite(planStopAge) ? Math.round(planStopAge * 2) / 2 : null
+  const sliderIsPlan = planStopHalf !== null && Math.abs(stopAge - planStopHalf) < 0.25
+  const toonMaakPlan = onMaakPlan != null && !stopKeuzeVerborgen
+
   return (
     <div>
       {/* i-uitleg (patroon LevensinkomenStrook/Dekkingsradar) */}
@@ -344,10 +377,10 @@ export function Vrijheidsas({
         </div>
         {stopKeuzeVerborgen ? (
           <p className="m-0">
-            Je eindstrategie staat op <b className="text-[var(--ink)]">Nu stoppen</b>: het stopmoment
+            Je plan rekent alsof je <b className="text-[var(--ink)]">nu</b> stopt: het stopmoment
             is vastgezet op vandaag. Er is hier dus geen stopkeuze en geen marge tot een streep —
-            de vraag is hoe ver je vermogen reikt. Aan de knoppen hieronder verander je je aannames
-            (inkomen, sparen, rendement) en zie je dat bereik meebewegen.
+            de vraag is hoe ver je liquide vermogen reikt. Aan de knoppen hieronder verander je je
+            aannames (inkomen, sparen, rendement) en zie je dat bereik meebewegen.
           </p>
         ) : (
         <>
@@ -383,7 +416,16 @@ export function Vrijheidsas({
         {stopKeuzeVerborgen ? (
           <>
             Je stopmoment ligt vast op <b className="font-semibold text-[var(--ink-2)]">vandaag</b> — dat
-            volgt uit je eindstrategie, niet uit een schuif. Hieronder draai je aan je aannames.
+            volgt uit je plan, niet uit een schuif. Hieronder draai je aan je aannames.
+          </>
+        ) : ankerVast ? (
+          // ADR 0129 — vast anker: de slider verkent, het plan blijft staan tot de CTA.
+          <>
+            Verken een ander stopmoment. Je plan verandert pas als je het vastzet
+            {planStopHalf !== null && (
+              <> — nu rekent het met stoppen op <b className="font-semibold text-[var(--ink-2)]">{formatAge(planStopHalf)}</b></>
+            )}
+            .
           </>
         ) : (
           <>
@@ -402,7 +444,7 @@ export function Vrijheidsas({
         <section
           className={`min-w-0 ${stopKeuzeVerborgen ? '' : 'sm:border-r sm:border-[var(--border-ed)] sm:pr-5'}`}
         >
-          {stopKeuzeVerborgen ? (
+          {stopKeuzeVerborgen || ankerVast ? (
             <PanelHeader num="1" title="Waar draai je aan?" tag="je aannames" />
           ) : (
             <PanelHeader num="1" title="Wanneer kun je stoppen?" tag="de streep" />
@@ -418,7 +460,7 @@ export function Vrijheidsas({
             (ADR 0127): het stopmoment is daar een instelling, geen schuif. */}
         {!stopKeuzeVerborgen && (
         <section className="min-w-0">
-          <PanelHeader num="2" title="Hoe stevig is dat?" tag="de marge" />
+          <PanelHeader num="2" title={ankerVast ? 'Kun je dan stoppen?' : 'Hoe stevig is dat?'} tag="de marge" />
 
           {/* Gewenste stopleeftijd · berekende (verwacht-)leeftijd · afwijking t.o.v. de
               basislijn — alle drie op ÉÉN regel, zodat je je ambitie, de uitkomst en het
@@ -473,6 +515,45 @@ export function Vrijheidsas({
                 : ''
             }`}
           />
+
+          {/* Snelkoppeling + CTA (ADR 0129 B11/F3b). De AOW-knop zet alleen de slider —
+              de vroegere toggle met eigen kernel-run en deplete-override is weg. De CTA
+              maakt het VERKENDE stopmoment het plan (anker `age`); verkennen zelf is
+              nooit destructief. */}
+          {(aowSliderAge !== null || toonMaakPlan) && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {aowSliderAge !== null && (
+                <button
+                  type="button"
+                  onClick={() => onStopAgeChange(aowSliderAge)}
+                  aria-pressed={aowActief}
+                  className={`inline-flex min-h-[32px] items-center rounded-full border px-2.5 py-1 font-sans text-[11px] font-medium transition-colors ${
+                    aowActief
+                      ? 'border-horizon-300 bg-horizon-50 text-horizon-700'
+                      : 'border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:border-horizon-200 hover:text-[var(--ink-2)]'
+                  }`}
+                  title={`Zet de stopleeftijd op je AOW-leeftijd (${formatAge(aowSliderAge)})`}
+                >
+                  Op AOW-leeftijd
+                </button>
+              )}
+              {toonMaakPlan && (
+                <button
+                  type="button"
+                  onClick={() => onMaakPlan?.(Math.round(stopAge * 2) / 2)}
+                  disabled={maakPlanBusy || sliderIsPlan}
+                  className="inline-flex min-h-[32px] items-center rounded-full border border-horizon-600 bg-horizon-600 px-3 py-1 font-sans text-[11px] font-semibold text-[var(--paper)] transition-colors hover:bg-horizon-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  title={
+                    sliderIsPlan
+                      ? 'Dit is al het stopmoment van je plan'
+                      : `Zet stoppen op ${formatAge(stopAge)} vast als je plan`
+                  }
+                >
+                  {maakPlanBusy ? 'Vastzetten…' : 'Maak dit mijn plan'}
+                </button>
+              )}
+            </div>
+          )}
 
           {/* driezone-band (stoplicht) met basis/verwacht/laatst-markers, stop-marker
               (ambitie) en de marge als overspanning. */}
@@ -634,7 +715,7 @@ export function Vrijheidsas({
           highlight={hasScenario}
         />
         <Figure
-          kicker="Geambieerde vrijheid"
+          kicker={ankerVast ? 'Verkend stopmoment' : 'Geambieerde vrijheid'}
           value={formatAge(stopAge)}
           unit="jr"
           sub={margeText}

@@ -26,6 +26,11 @@ import type { DashboardData } from '@/lib/types/dashboard'
 // Alleen het TYPE: de runway-motor zelf (kernel) hoort niet in deze briefing-module
 // te worden meegebundeld; de loader levert het resultaat aan.
 import type { RunwayResult } from '@/lib/horizon/runway'
+import type { KernelStopAnker } from '@/lib/horizon-kernel/types'
+// Alleen de woordvorm van het stopmoment (pure string-helper, geen kernel).
+import { formatStopAge } from '@/lib/horizon/anker-copy'
+import { isFixedAnchor } from '@/lib/fire-strategy'
+import { lookupAowAge } from '@/lib/aow-leeftijd'
 import { HORIZON_PLAFOND_LEEFTIJD } from '@/lib/constants'
 
 type FinData = Awaited<ReturnType<typeof loadFinData>>
@@ -95,6 +100,12 @@ export function buildOverviewBriefingInput(
   marketEntry?: BriefingEntry,
   aandachtspunten?: Aandachtspunt[],
   checkin?: { monthKey: string; reflection: string },
+  /**
+   * ADR 0129 F3b — de plan-runway van dit request (optioneel). Onder een vast anker
+   * voedt hij `finance.reachesAge` ("je liquide vermogen reikt tot je {reikt}e");
+   * zonder runway noemt de FIRE-observatie alleen het stopmoment.
+   */
+  runway?: RunwayResult | null,
 ): BriefingEngineInput {
   const dob = horizonData?.effectiveInput?.dateOfBirth ?? null
   const currentAge = dob ? Math.round(ageAtDate(dob)) : null
@@ -102,6 +113,18 @@ export function buildOverviewBriefingInput(
     dashboardData.fireAgeFractional != null
       ? Math.round(dashboardData.fireAgeFractional)
       : null
+  // ADR 0129 — het plan-anker (niet de strategienaam) beslist of de FIRE-observatie
+  // een vrijheidsmoment of een stopmoment noemt. AOW uit de gebruikerstabel.
+  const planAnchor = horizonData?.firePlan?.anchor ?? null
+  const stopAnchorFixed = planAnchor != null && isFixedAnchor({ anchor: planAnchor })
+  const stopAge: number | null =
+    planAnchor?.kind === 'age'
+      ? planAnchor.age
+      : planAnchor?.kind === 'aow'
+        ? lookupAowAge(horizonData?.aowRows ?? [], dob).fractional
+        : null
+  const runwayPoint = runway ? summarizeRunway(runway) : null
+  const reachesAge = runwayPoint?.reachesAge ?? null
   const freedomPct =
     horizonData?.healthScoreInput?.freedomPct ?? dashboardData.freedomPct ?? undefined
 
@@ -133,6 +156,9 @@ export function buildOverviewBriefingInput(
       freedomPct,
       currentAge,
       fireAge,
+      stopAnchorFixed,
+      stopAge,
+      reachesAge,
       openActions: dashboardData.openActions,
       totalFreedomDaysOpen: dashboardData.totalFreedomDaysOpen,
       backtestSuccessRate: dashboardData.backtestSuccessRate,
@@ -178,9 +204,10 @@ export function composeOverviewBriefing(
   marketEntry?: BriefingEntry,
   aandachtspunten?: Aandachtspunt[],
   checkin?: { monthKey: string; reflection: string },
+  runway?: RunwayResult | null,
 ): BriefingEntry[] {
   const entries = buildBriefingEntries(
-    buildOverviewBriefingInput(dashboardData, finData, horizonData, now, marketEntry, aandachtspunten, checkin),
+    buildOverviewBriefingInput(dashboardData, finData, horizonData, now, marketEntry, aandachtspunten, checkin, runway),
   )
   return entries.slice(0, OVERVIEW_BRIEFING_MAX)
 }
@@ -286,6 +313,33 @@ export interface RunwayPoint {
   /** De leeftijd waartoe het vermogen reikt: uitputtingsleeftijd (`months`,
    *  fractioneel), de eigen eindleeftijd, of het horizonplafond. */
   reachesAge: number
+  /**
+   * Het STOPMOMENT waar dit meetpunt over gaat (ADR 0129 F3a). Weggelaten (oude
+   * snapshots) ⇒ `'nu'`: de hypothetische stop-nu-runway, exact het gedrag vóór F3a.
+   *  - `nu`  — geen vast anker: "als je nu zóu stoppen" (het plan zoekt het moment).
+   *  - `now` — het nu-anker: het plan ÍS vandaag stoppen; geen "zou".
+   *  - `aow`/`age` — een vast stopmoment in de toekomst, met de leeftijd als getal.
+   */
+  stop?: RunwayPointStop
+}
+
+/** Zie `RunwayPoint.stop`. `stopAge` fractioneel (58,5 blijft 58,5). */
+export type RunwayPointStop =
+  | { kind: 'nu' }
+  | { kind: 'now' }
+  | { kind: 'aow' | 'age'; stopAge: number }
+
+/** Het stopmoment van een `RunwayResult` als bevriesbaar meetpunt-veld. */
+function runwayStopOf(runway: Exclude<RunwayResult, { kind: 'unavailable' }>): RunwayPointStop {
+  const anker: KernelStopAnker | null = runway.planAnker ?? null
+  if (anker == null) return { kind: 'nu' }
+  if (anker.soort === 'nu') return { kind: 'now' }
+  // Een run op het plan-anker (`stop: 'plan'`) draagt de ankerleeftijd als `stopAge`;
+  // een stop-nu-run onder een aow-/age-plan (stopAge === startAge, of weggelaten) is
+  // nog steeds de hypothetische stop-nu-vraag en houdt de 'nu'-zin.
+  const stopAge = runway.stopAge ?? runway.startAge
+  if (stopAge <= runway.startAge) return { kind: 'nu' }
+  return { kind: anker.soort === 'aow' ? 'aow' : 'age', stopAge }
 }
 
 /**
@@ -305,8 +359,12 @@ export interface RunwayPoint {
 export function summarizeRunway(runway: RunwayResult): RunwayPoint | null {
   if (runway.kind === 'unavailable' || runway.kind === 'deficit') return null
 
+  // `stop` alleen meegeven als het NIET het nu-anker is: weggelaten ⇒ 'nu', zodat
+  // bevroren meetpunten van vóór F3a en de stop-nu-kop byte-identiek blijven.
+  const stopKind = runwayStopOf(runway)
+  const stop = stopKind.kind === 'nu' ? {} : { stop: stopKind }
   if (runway.kind === 'months') {
-    return { kind: 'months', months: runway.months, reachesAge: runway.depletionAge }
+    return { kind: 'months', months: runway.months, reachesAge: runway.depletionAge, ...stop }
   }
 
   // De twee OPEN uitkomsten: het vermogen raakt binnen de horizon niet op.
@@ -320,6 +378,7 @@ export function summarizeRunway(runway: RunwayResult): RunwayPoint | null {
     // Ondergrens, niet herrekend: beide leeftijden komen uit dezelfde run.
     months: Math.max(0, Math.round((reachesAge - runway.startAge) * 12)),
     reachesAge,
+    ...stop,
   }
 }
 
@@ -367,6 +426,8 @@ export function runwayDurationLabel(
  *                          HORIZON_PLAFOND_LEEFTIJD en claimt daar niets voorbij.
  */
 export function runwaySentence(point: RunwayPoint): string {
+  const stop = point.stop ?? { kind: 'nu' }
+  if (stop.kind !== 'nu') return ankerRunwaySentence(point, stop)
   if (point.kind === 'beyond-horizon') {
     return `Als je nu zou stoppen, reikt je vermogen zover het model rekent: tot je ${leeftijdOrdinaal(HORIZON_PLAFOND_LEEFTIJD)}.`
   }
@@ -378,6 +439,31 @@ export function runwaySentence(point: RunwayPoint): string {
     return `Als je nu zou stoppen, reikt je vermogen nog ${n} ${n === 1 ? 'maand' : 'maanden'}.`
   }
   return `Als je nu zou stoppen, reikt je vermogen tot je ${leeftijdOrdinaal(point.reachesAge)}.`
+}
+
+/**
+ * De anker-variant van de kop (ADR 0129, bijlage "/overzicht — Kop"):
+ *  - `now`      → "Je liquide vermogen reikt tot je {reikt}e." — het plan ís stoppen,
+ *                 dus geen hypothetisch "zou".
+ *  - `aow`/`age` → "Als je op {stop} stopt, reikt je liquide vermogen tot je {reikt}e."
+ *                 (gedekt: "… tot voorbij je {eind}e."). Het stopmoment als getal, ook
+ *                 onder het aow-anker — geen woord AOW in een zin die een tekort kan
+ *                 dragen (toon-invariant uit lib/horizon/anker-copy.ts).
+ * Beschrijvend, nooit aansporend, nooit "oneindig"; de grondslag heet "liquide vermogen".
+ */
+function ankerRunwaySentence(point: RunwayPoint, stop: Exclude<RunwayPointStop, { kind: 'nu' }>): string {
+  const aanhef = stop.kind === 'now' ? 'Je liquide vermogen reikt' : `Als je op ${formatStopAge(stop.stopAge)} stopt, reikt je liquide vermogen`
+  if (point.kind === 'beyond-horizon') {
+    return `${aanhef} zover het model rekent: tot je ${leeftijdOrdinaal(HORIZON_PLAFOND_LEEFTIJD)}.`
+  }
+  if (point.kind === 'reaches-end-age') {
+    return `${aanhef} tot voorbij je ${leeftijdOrdinaal(point.reachesAge)}.`
+  }
+  if (stop.kind === 'now' && point.months < 12) {
+    const n = point.months
+    return `${aanhef} nog ${n} ${n === 1 ? 'maand' : 'maanden'}.`
+  }
+  return `${aanhef} tot je ${leeftijdOrdinaal(point.reachesAge)}.`
 }
 
 

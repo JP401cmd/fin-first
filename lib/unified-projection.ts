@@ -602,6 +602,12 @@ export interface UnifiedProjectionResult {
    */
   ankerMaand?: number | null
   /**
+   * Het stopmoment van deze run als fractionele LEEFTIJD (`solve.vastStopLeeftijd`),
+   * of `null` zonder vast stopmoment. Onder een vast anker de bron voor "jij stopt
+   * op …" — nooit `fireAge` (die is `ceil` en maakt van 58,5 een 59; bevinding 11).
+   */
+  vastStopLeeftijd?: number | null
+  /**
    * Eerste AANHOUDENDE maand (maand 0 = nu) waarin Prognose!J op is, of `null`
    * (ADR 0126, `depletionMonth`). Alleen het kernel-pad zet dit; onder 'nu-stoppen'
    * voedt het de tijdsdekking-vrijheidsvoortgang (`computeRunwayCoveragePct`).
@@ -723,6 +729,7 @@ export function toSimResult(result: UnifiedProjectionResult): SimResult {
     requiredFireIsAnchorPortfolio: result.requiredFireIsAnchorPortfolio,
     stopAnker: result.stopAnker,
     ankerMaand: result.ankerMaand,
+    vastStopLeeftijd: result.vastStopLeeftijd,
     kernelDepletionMonth: result.kernelDepletionMonth,
     fireReachable: result.fireReachable,
     implicitWithdrawalRate: result.implicitWithdrawalRate,

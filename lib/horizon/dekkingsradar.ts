@@ -26,7 +26,7 @@
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
 import type { HousingStrategyConfig, HousingStrategyTrigger } from '@/lib/housing-strategy'
 import type { KernelHousingSale } from '@/lib/horizon-kernel/bridge'
-import type { FireEndStrategy } from '@/lib/fire-strategy'
+import { isFireEndForm, type FireEndForm, type FireEndStrategy } from '@/lib/fire-strategy'
 import { spendablePortfolio, coveragePctForRow } from '@/lib/horizon/coverage-strip'
 
 // ── Presentatiedrempels (GEEN financiële aannames) ──────────────────────────
@@ -76,7 +76,17 @@ export interface DekkingsradarInput {
   aowAgeFractional: number
   requiredFirePortfolio: number
   targetEndPortfolio: number | null
+  /**
+   * @deprecated F4 (ADR 0129) — de legacy-label uit `SimResult.strategy`. De as leest
+   * bij voorkeur `endForm`; ontbreekt die, dan vertaalt de label via D2 (de twee
+   * anker-labels 'pensioen'/'nu-stoppen' zijn eind-vorm `deplete`).
+   */
   endStrategy: FireEndStrategy
+  /**
+   * De EIND-VORM van het plan (`FirePlan.endForm`, ADR 0129) — wat aan het eind moet
+   * gelden. Optioneel/additief; weggelaten ⇒ afgeleid uit `endStrategy`.
+   */
+  endForm?: FireEndForm
   housingStrategy: HousingStrategyConfig
   hasEigenHuis: boolean
   kernelHousingSale: KernelHousingSale | null
@@ -254,9 +264,12 @@ function axisEindstrategie(input: DekkingsradarInput): RadarAs {
   }
   const eind = input.rows[input.rows.length - 1].netWorth
 
-  // 'nu-stoppen' (ADR 0127) deelt de deplete-semantiek: doel €0 op de eigen
-  // eindleeftijd, dus eindvermogen ≥ 0 = gehaald. Alleen de duiding verschilt.
-  if (input.endStrategy === 'deplete' || input.endStrategy === 'nu-stoppen') {
+  // De EIND-VORM beslist (ADR 0129): `endForm` als die er is, anders de legacy-label
+  // via D2 — de twee anker-labels ('nu-stoppen'/'pensioen') dragen eind-vorm deplete
+  // (doel €0 op de eigen eindleeftijd, dus eindvermogen ≥ 0 = gehaald). Alleen de
+  // duiding verschilt per anker.
+  const endForm: FireEndForm = input.endForm ?? (isFireEndForm(input.endStrategy) ? input.endStrategy : 'deplete')
+  if (endForm === 'deplete') {
     const naam = input.endStrategy === 'nu-stoppen' ? 'Nu-stoppen' : 'Opeten-strategie'
     const base = Math.max(input.jaarBesteding, 1)
     const jarenOver = eind / base

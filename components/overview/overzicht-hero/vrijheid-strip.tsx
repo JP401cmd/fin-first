@@ -5,11 +5,16 @@ import { Compass, Hourglass, Sparkles } from 'lucide-react'
 import { ProgressMilestones } from '@/components/editorial/progress-milestones'
 import { useFlashChange } from '@/lib/hooks/use-flash-change'
 import type { FreedomFraming } from '@/lib/fire-strategy'
+import type { NuStoppenReach } from '@/lib/horizon/nu-stoppen-copy'
 import {
-  NU_STOPPEN_TITEL,
-  nuStoppenZin,
-  type NuStoppenReach,
-} from '@/lib/horizon/nu-stoppen-copy'
+  ankerReachYear,
+  ankerTitel,
+  ankerZin,
+  formatStopAge,
+  type AnkerReach,
+  type AnkerStop,
+} from '@/lib/horizon/anker-copy'
+import { heroFireAgeYear } from '@/lib/horizon/hero-fire-age'
 import {
   HORIZON_MISSENDE_GEGEVENS_HINTS,
   HORIZON_MISSENDE_GEGEVENS_LABEL,
@@ -47,8 +52,13 @@ export function VrijheidStrip({
   currentAge,
   fireAge,
   framing = 'building',
+  freeAsPensioen = false,
   dataIssue = false,
   nuStoppenReach = null,
+  ankerReach = null,
+  ankerStop = null,
+  solvedFireAge = null,
+  planEndAge = null,
 }: {
   freedomPct: number | null
   /** Huidige leeftijd (gerond). Voor aftelling — optioneel. */
@@ -57,9 +67,16 @@ export function VrijheidStrip({
   fireAge?: number | null
   /**
    * Afgeleide framing uit de gedeelde vlag (resolveFreedomFraming). Default
-   * 'building' (% op weg). 'free'/'pensioen' tonen de onttrekkings-staat.
+   * 'building' (% op weg). 'free' toont de onttrekkings-staat; 'anchored' (ADR 0129:
+   * vast anker, nog niet vrij) volgt in F3b — tot dan rendert het als 'building'.
    */
   framing?: FreedomFraming
+  /**
+   * ADR 0129 — onder 'free': "Je bent met pensioen" (op/voorbij de AOW) i.p.v. "Je
+   * bent vrij". Consume-only, afgeleid met `isAtOrPastAow` op de pagina; het
+   * vroegere framing-label 'pensioen' droeg dit onderscheid, nu een aparte vlag.
+   */
+  freeAsPensioen?: boolean
   /**
    * M6-vangrail (consume-only, uit `resolveFreedomAgeView`): de motor gaf een
    * vrijheidsleeftijd die niet kán kloppen. Dan geen percentage/aftelling maar
@@ -75,10 +92,27 @@ export function VrijheidStrip({
    * stop-nu-runway van dezelfde request (`nuStoppenReachFromRunway`).
    */
   nuStoppenReach?: NuStoppenReach | null
+  /**
+   * ADR 0129 F3b — het bereik onder ÉLK vast anker (aow/now/age), uit de plan-runway
+   * van hetzelfde request. Stuurt de anker-strip: gedekt "Plan gedekt tot je {eind}e ·
+   * stopmoment {stop} · vrij mogelijk vanaf {vrij}" of tekort "Reikt tot je {reikt}e ·
+   * stopmoment {stop} · plan loopt tot {eind}". `null` onder `solved`; `nuStoppenReach`
+   * is de F3a-alias voor het nu-anker.
+   */
+  ankerReach?: AnkerReach | null
+  /** Het stopmoment bij `ankerReach`; weggelaten ⇒ het nu-anker. */
+  ankerStop?: AnkerStop | null
+  /** "Vrij mogelijk vanaf" (D7, tweede run) — `null` = niet beschikbaar (dan valt dat deel weg). */
+  solvedFireAge?: number | null
+  /** Eindleeftijd van het plan (voor "plan loopt tot {eind}" wanneer het bereik hem niet draagt). */
+  planEndAge?: number | null
 }) {
   // Flash-puls op het hoofdpercentage bij waardeverandering (flash-up/flash-down,
   // respecteert prefers-reduced-motion). Hook vóór de early returns — rules-of-hooks.
   const { flashClass } = useFlashChange(freedomPct)
+  // Anker-generiek: de oude nu-stoppen-prop is een alias van het bereik onder het nu-anker.
+  const reach: AnkerReach | null = ankerReach ?? nuStoppenReach
+  const stop: AnkerStop = ankerStop ?? { kind: 'now' }
 
   // M6: onmogelijke uitkomst → gegevensmelding i.p.v. een getal. Vóór de
   // freedomPct-tak: een percentage naast een onberekenbaar vrijheidsmoment leest
@@ -138,15 +172,43 @@ export function VrijheidStrip({
     )
   }
 
-  // 'Nu stoppen' (ADR 0127): het stopmoment ligt al vast, dus "% op weg naar
-  // vrijheid" is hier geen vraag meer. Twee substaten, allebei beschrijvend:
-  // GEDEKT (het geld reikt tot de eindleeftijd) en REIKT TOT leeftijd X. Nooit
-  // "Je bent vrij" — dat is misleidend zodra het geld twee jaar reikt.
-  if (nuStoppenReach != null && nuStoppenReach.kind !== 'onbekend') {
-    const gedekt = nuStoppenReach.kind === 'gedekt'
+  // Vast anker (ADR 0129 F3b — aow/now/age), nog niet 'free': het stopmoment ligt al
+  // vast, dus "% op weg naar vrijheid" is hier geen vraag meer. De strip toont het
+  // BEREIK in de drieslag uit de ADR-bijlage: gedekt "Plan gedekt tot je {eind}e ·
+  // stopmoment {stop} · vrij mogelijk vanaf {vrij}" of tekort "Reikt tot je {reikt}e ·
+  // stopmoment {stop} · plan loopt tot {eind}". Onder `now` valt "stopmoment" weg (het
+  // is vandaag); zonder tweede run valt "vrij mogelijk vanaf" weg (D7). "Je bent vrij"
+  // staat alleen bij framing 'free' (anker bereikt ∧ dekking ≥ 100, D8) — de tak
+  // hieronder — en nooit omdat het geld toevallig twee jaar reikt.
+  // Het nu-anker is de uitzondering op 'free' (ADR 0127 D6, gehandhaafd in 0129): bij
+  // volledige dekking staat de D8-gate open, maar "Je bent vrij" is dan juist mis —
+  // het plan ís al stoppen; de informatieve uitspraak blijft het bereik. Zelfde
+  // uitzondering als `showFreeHero` op /toekomst.
+  if (reach != null && reach.kind !== 'onbekend' && (framing !== 'free' || stop.kind === 'now')) {
+    const gedekt = reach.kind === 'gedekt'
+    const eind =
+      reach.kind === 'gedekt' || reach.kind === 'reikt-tot' ? (reach.endAge ?? planEndAge) : planEndAge
+    const reikt = ankerReachYear(reach)
+    const delen: string[] = []
+    if (gedekt) {
+      delen.push(eind != null ? `Plan gedekt tot je ${heroFireAgeYear(eind)}e` : 'Plan gedekt tot het einde')
+    } else if (reach.kind === 'reikt-tot' && reikt != null) {
+      delen.push(`Reikt tot je ${reikt}e`)
+    } else {
+      delen.push('Vandaag al niet gedekt')
+    }
+    if (stop.kind !== 'now') delen.push(`stopmoment ${formatStopAge(stop.stopAge)}`)
+    if (gedekt) {
+      if (solvedFireAge != null && Number.isFinite(solvedFireAge)) {
+        delen.push(`vrij mogelijk vanaf ${heroFireAgeYear(solvedFireAge)}`)
+      }
+    } else if (eind != null) {
+      delen.push(`plan loopt tot ${heroFireAgeYear(eind)}`)
+    }
     return (
       <Link
         href="/toekomst"
+        data-testid="vrijheid-strip-anker"
         className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-[var(--border-ed)] bg-gradient-to-r from-horizon-50 to-stone-50 p-3 sm:p-4 hover:border-horizon-300 hover:shadow-sm transition-all group"
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -159,11 +221,12 @@ export function VrijheidStrip({
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-horizon-700">
-              {NU_STOPPEN_TITEL}
+              {ankerTitel(stop)}
             </div>
             <div className="mt-0.5 text-sm sm:text-base text-[var(--ink)]">
-              {nuStoppenZin(nuStoppenReach)}
+              <strong className="font-semibold">{delen.join(' · ')}</strong>
             </div>
+            <div className="mt-0.5 text-xs text-[var(--ink-2)]">{ankerZin(reach, stop)}</div>
           </div>
         </div>
         <span className="shrink-0 text-xs font-semibold text-horizon-700 group-hover:underline">
@@ -176,8 +239,8 @@ export function VrijheidStrip({
   // Reeds vrij / met pensioen: "% op weg" is niet meer relevant. Toon de
   // onttrekkings-framing in plaats van de voortgangsbalk. Filosofie blijft:
   // het opgebouwde vermogen is opgeslagen tijd die nu voor je werkt.
-  if (framing === 'free' || framing === 'pensioen') {
-    const isPensioen = framing === 'pensioen'
+  if (framing === 'free') {
+    const isPensioen = freeAsPensioen
     const kicker = isPensioen ? 'Met pensioen' : 'Financieel vrij'
     const heading = isPensioen ? 'Je bent met pensioen.' : 'Je bent vrij.'
     const body = isPensioen

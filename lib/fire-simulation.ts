@@ -133,6 +133,12 @@ export interface SimResult {
   /** Maandindex van het stopmoment (maand 0 = nu); `null` zonder vast anker. */
   ankerMaand?: number | null
   /**
+   * Het stopmoment van deze run als fractionele LEEFTIJD (`solve.vastStopLeeftijd`),
+   * of `null` zonder vast stopmoment (ADR 0129 F3a). Lees dit voor "jij stopt op …",
+   * nooit `fireAge`: die is `ceil` en maakt van een gekozen 58,5 een 59.
+   */
+  vastStopLeeftijd?: number | null
+  /**
    * Eerste aanhoudende uitputtingsmaand van Prognose!J (maand 0 = nu) of `null`
    * (ADR 0126). Kernel-pad only; voedt onder 'nu-stoppen' de tijdsdekking.
    */

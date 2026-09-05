@@ -23,6 +23,12 @@ export interface FreedomCardData {
   }
   savingsRate: number | null
   generatedAt: string
+  /**
+   * ADR 0129 F3b — het stopmoment ligt VAST (aow/now/age). De aftel-cel heet dan
+   * "Je liquide vermogen" en `fireCountdown.label` draagt "Reikt tot je {reikt}e"
+   * i.p.v. "Bereikt!" (bevinding 1).
+   */
+  stopAnchorFixed?: boolean
   displayName?: string
   netWorth?: number | null
   fireTarget?: number | null
@@ -101,6 +107,8 @@ export function deriveCardStats(data: FreedomCardData) {
 
   const cl = data.fireCountdown?.label || ''
   const countdownText = cl === 'Bereikt!' ? 'Bereikt'
+    // ADR 0129 — onder een vast anker is de label zelf de uitspraak ("Reikt tot je 83e").
+    : data.stopAnchorFixed && cl !== '' ? cl
     : cl === 'Niet haalbaar' ? 'Niet haalbaar'
     : cl === 'Nog geen data' ? 'N.t.b.'
     : (data.fireCountdown?.years ?? 0) > 0 ? `${data.fireCountdown.years}j ${data.fireCountdown.months}m`
@@ -432,7 +440,7 @@ export async function renderFreedomCardToCanvas(data: FreedomCardData): Promise<
   const cellCells: { kicker: string; value: string }[] = [
     { kicker: 'VRIJHEIDSTIJD', value: stats.freedomTimeShort },
     { kicker: 'ACTIES DEZE MAAND', value: stats.daysWonText },
-    { kicker: 'TOT VOLLEDIGE VRIJHEID', value: stats.countdownText },
+    { kicker: data.stopAnchorFixed ? 'JE LIQUIDE VERMOGEN' : 'TOT VOLLEDIGE VRIJHEID', value: stats.countdownText },
     { kicker: 'SPAARQUOTE', value: stats.savingsText },
   ]
   const colW = contentW / 2
@@ -484,7 +492,7 @@ function FreedomCardVisual({ data }: { data: FreedomCardData }) {
   const cells: { kicker: string; value: string }[] = [
     { kicker: 'Vrijheidstijd', value: stats.freedomTimeShort },
     { kicker: 'Acties deze maand', value: stats.daysWonText },
-    { kicker: 'Tot volledige vrijheid', value: stats.countdownText },
+    { kicker: data.stopAnchorFixed ? 'Je liquide vermogen' : 'Tot volledige vrijheid', value: stats.countdownText },
     { kicker: 'Spaarquote', value: stats.savingsText },
   ]
 

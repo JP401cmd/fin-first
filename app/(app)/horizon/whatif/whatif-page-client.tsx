@@ -59,6 +59,7 @@ import type { Debt } from '@/lib/debt-data'
 import type { Box3Method } from '@/lib/bucket-projection'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
 import { FIRE_PLAN_COLUMNS, parseFireStrategy, type FireStrategyConfig, STRATEGY_LABELS } from '@/lib/fire-strategy'
+import { planDraftFromSettings } from '@/lib/horizon/plan-draft'
 import { SimChart, type ScenarioOverlay, type MonteCarloOverlay } from '@/components/app/horizon/sim-chart'
 import { type SavedScenario, WHATIF_SCENARIO_COLORS } from '@/lib/scenario-types'
 import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-container'
@@ -344,15 +345,18 @@ export default function WhatIfPage({ marktVolatiliteit }: WhatIfPageProps) {
 
       const dob = profileResult.data?.date_of_birth ?? null
 
-      // Use fire-settings API which handles app_settings fallback for pensioen
+      // ADR 0129 F3b (bevinding 7) — geen handmatige strategie-allowlist meer: het plan
+      // wordt via het plan-type gelezen (`planDraftFromSettings` kent beide rijvormen).
+      // De EIND-VORM voedt de legacy `FireStrategyConfig`; het anker leest de kernel
+      // zelf uit de profielrij.
       try {
         const fsRes = await fetch('/api/fire-settings')
         if (fsRes.ok) {
-          const fsData = await fsRes.json()
+          const plan = planDraftFromSettings(await fsRes.json())
           setFireStrategy({
-            strategy: (['perpetual', 'legacy', 'deplete', 'pensioen'].includes(fsData.fire_end_strategy) ? fsData.fire_end_strategy : 'deplete') as FireStrategyConfig['strategy'],
-            endAge: fsData.fire_end_age ?? 90,
-            legacyAmount: Number(fsData.fire_legacy_amount ?? 0),
+            strategy: plan.endForm,
+            endAge: plan.endAge,
+            legacyAmount: plan.legacyAmount,
           })
         } else {
           setFireStrategy(parseFireStrategy(profileResult.data ?? {}))

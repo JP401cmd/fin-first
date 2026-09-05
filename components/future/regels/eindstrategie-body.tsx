@@ -1,14 +1,20 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { STRATEGY_LABELS, type FireEndStrategy } from '@/lib/fire-strategy'
-import { EINDSTRATEGIE_VOLGORDE, toontEindleeftijd } from '@/lib/horizon/eindstrategie-volgorde'
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value'
 import { runRegelProjection, type RegelProjection } from '@/lib/future/regel-sim'
+import { StopPlanVragen } from '@/components/horizon/stop-plan-vragen'
+import {
+  planDraftEquals,
+  planDraftFromPlan,
+  planDraftFromSettings,
+  planDraftToFireSettingsBody,
+  validatePlanDraft,
+  type PlanDraft,
+} from '@/lib/horizon/plan-draft'
 import { SubsectionLabel } from '@/components/editorial'
 import {
   RegelIntro,
-  RegelOptionCard,
   LiveSimImpact,
   FireDeltaFooter,
   fireDeltaMonths,
@@ -16,56 +22,52 @@ import {
 import type { RegelBodyProps } from './types'
 
 const EMPTY_PROJ: RegelProjection = { rows: [], fireAgeFractional: null }
-/**
- * De strategie-lijst is AFGELEID, niet handmatig (ADR 0127). Hier stond
- * `['deplete', 'legacy', 'perpetual', 'pensioen']` met de hand, en dus miste
- * dit scherm 'nu-stoppen' terwijl drie andere oppervlakken hem al toonden —
- * half zichtbaar is slechter dan onzichtbaar. De bewuste volgorde (eind-vormen
- * eerst, stop-ankers erachter) + de motivering wonen in
- * `lib/horizon/eindstrategie-volgorde.ts`; een zesde strategie verschijnt hier
- * vanzelf.
- */
-const STRATEGY_ORDER: readonly FireEndStrategy[] = EINDSTRATEGIE_VOLGORDE
-/** Strategieën die een instelbare eindleeftijd tonen (perpetual = enkel weergave-horizon). */
-const SHOWS_END_AGE = toontEindleeftijd
-
-interface Draft {
-  strategy: FireEndStrategy
-  endAge: number
-  legacyAmount: number
-}
 
 /** V7 — Excel-default tekort-lening-rente (P!B25 = 0,05 → 5%). */
 const DEFAULT_DEFICIT_PCT = 5
 
 /**
- * Regel 1 — Eindstrategie. Diepe instelling (strategie + eindleeftijd + nalatenschap)
- * met live impact-grafiek (baseline vs. kandidaat via runRegelProjection).
+ * Regel 1 — de plan-regel als TWEE VRAGEN (ADR 0129 B13: Voorkeuren is de bron;
+ * de strategie-modal op /toekomst spiegelt dezelfde twee vragen via hetzelfde
+ * `StopPlanVragen`-component). Vraag 1 = het stop-anker, vraag 2 = de eind-vorm met
+ * eindleeftijd en nalatenschap. Live impact-grafiek (baseline vs. kandidaat via
+ * `runRegelProjection`, met het volledige plan-concept als override zodat de kernel
+ * het anker meerekent).
+ *
+ * Vóór F3b stond hier een handmatige strategie-lijst van vijf waarden waarin
+ * 'pensioen' en 'nu-stoppen' als eind-vormen meeliepen — de conflatie die dit besluit
+ * opheft.
  */
 export function EindstrategieBody({
   simSnapshot,
   fireStrategy,
+  firePlan,
   onActionsChange,
   onClose,
   onSaved,
 }: RegelBodyProps) {
-  const fs = fireStrategy ?? { strategy: 'deplete' as FireEndStrategy, endAge: 90, legacyAmount: 0 }
-  const [draft, setDraft] = useState<Draft>({
-    strategy: fs.strategy,
-    endAge: fs.endAge,
-    legacyAmount: fs.legacyAmount,
-  })
+  // Bron: het plan uit de bundel; zonder plan (oude bundel) de legacy-label.
+  const opgeslagen = useMemo<PlanDraft>(
+    () =>
+      firePlan
+        ? planDraftFromPlan(firePlan)
+        : planDraftFromSettings({
+            fire_end_strategy: fireStrategy?.strategy ?? 'deplete',
+            fire_end_age: fireStrategy?.endAge ?? 90,
+            fire_legacy_amount: fireStrategy?.legacyAmount ?? 0,
+          }),
+    [firePlan, fireStrategy],
+  )
+  const [draft, setDraft] = useState<PlanDraft>(opgeslagen)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const debounced = useDebouncedValue(draft, 200)
 
   // V7 — tekort-lening-rente (percentage). De pane levert dit veld niet mee, dus
   // lezen we het zelf uit /api/fire-settings; NULL = Excel-default (5%). Opslaan
-  // gaat via dezelfde PUT als de eindstrategie (deficit_loan_rate als fractie 0..1).
+  // gaat via dezelfde PUT als het plan (deficit_loan_rate als fractie 0..1).
   const [deficitPct, setDeficitPct] = useState(DEFAULT_DEFICIT_PCT)
   const [savedDeficitPct, setSavedDeficitPct] = useState(DEFAULT_DEFICIT_PCT)
-  // False tot de zelf-GET klaar is: de rente-sectie fade't dan in i.p.v. dat de
-  // waarde van de default naar de opgeslagen rente springt.
   const [deficitLoaded, setDeficitLoaded] = useState(false)
   useEffect(() => {
     let cancelled = false
@@ -93,24 +95,16 @@ export function EindstrategieBody({
   const { baseline, draftProj } = useMemo(() => {
     if (!simSnapshot) return { baseline: EMPTY_PROJ, draftProj: EMPTY_PROJ }
     const baseline = runRegelProjection(simSnapshot)
-    const draftProj = runRegelProjection(simSnapshot, {
-      fireStrategy: {
-        strategy: debounced.strategy,
-        endAge: debounced.endAge,
-        legacyAmount: debounced.legacyAmount,
-      },
-    })
+    const draftProj = runRegelProjection(simSnapshot, { firePlan: debounced })
     return { baseline, draftProj }
   }, [simSnapshot, debounced])
 
-  const endAgeValid = Number.isFinite(draft.endAge) && draft.endAge >= 50 && draft.endAge <= 120
-  const legacyValid = draft.strategy !== 'legacy' || (Number.isFinite(draft.legacyAmount) && draft.legacyAmount >= 0)
-  const changed =
-    draft.strategy !== fs.strategy ||
-    draft.endAge !== fs.endAge ||
-    draft.legacyAmount !== fs.legacyAmount ||
-    deficitPct !== savedDeficitPct
-  const canSave = !saving && endAgeValid && legacyValid && deficitValid && changed
+  // De AOW-toets kan alleen hier (de route kent de AOW niet): uit de snapshot, die
+  // dezelfde tabel-lookup draagt als de Tijdas.
+  const aowAge = simSnapshot?.aowFractional ?? null
+  const validatie = validatePlanDraft(draft, { aowAge })
+  const changed = !planDraftEquals(draft, opgeslagen) || deficitPct !== savedDeficitPct
+  const canSave = !saving && validatie.ok && deficitValid && changed
 
   // Save-handler via ref tegen stale closures (zelfde patroon als event-pane-edit).
   const saveRef = useRef(async () => {})
@@ -123,9 +117,8 @@ export function EindstrategieBody({
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            fire_end_strategy: draft.strategy,
-            fire_end_age: draft.endAge,
-            fire_legacy_amount: draft.strategy === 'legacy' ? draft.legacyAmount : null,
+            // Altijd het volledige plan (route-contract R3): eind-vorm + anker.
+            ...planDraftToFireSettingsBody(draft),
             // V7 — tekort-lening-rente als fractie 0..1.
             deficit_loan_rate: deficitPct / 100,
           }),
@@ -168,79 +161,19 @@ export function EindstrategieBody({
         </div>
       )}
 
-      <SubsectionLabel>Kies je eindstrategie</SubsectionLabel>
-      <div className="space-y-2">
-        {STRATEGY_ORDER.map((key) => {
-          const meta = STRATEGY_LABELS[key]
-          return (
-            <RegelOptionCard
-              key={key}
-              active={draft.strategy === key}
-              title={meta.name}
-              description={meta.subtitle}
-              onSelect={() => setDraft((d) => ({ ...d, strategy: key }))}
-            />
-          )
-        })}
-      </div>
-
-      {/* Eindleeftijd + nalatenschap (de teruggebrachte diepgang) */}
-      {(SHOWS_END_AGE(draft.strategy) || draft.strategy === 'legacy') && (
-        <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {SHOWS_END_AGE(draft.strategy) && (
-            <label className="block">
-              <span className="block text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] mb-1">
-                Eindleeftijd
-              </span>
-              <input
-                type="number"
-                min={50}
-                max={120}
-                value={draft.endAge}
-                onChange={(e) => setDraft((d) => ({ ...d, endAge: Number(e.target.value) || 0 }))}
-                className="w-28 px-3 py-2 border border-[var(--border-md)] rounded-lg bg-[var(--paper)] font-mono tabular-nums focus:border-[var(--module-active-700)] focus:outline-none"
-              />
-              {!endAgeValid && (
-                <p className="mt-1 text-[11px] text-amber-700">Tussen 50 en 120 jaar.</p>
-              )}
-              <p className="mt-1 text-[11px] text-[var(--ink-3)] italic leading-snug">
-                {draft.strategy === 'deplete'
-                  ? 'Op deze leeftijd is je vermogen volledig opgemaakt.'
-                  : draft.strategy === 'legacy'
-                    ? 'Op deze leeftijd resteert het nalatenschapsbedrag.'
-                    : draft.strategy === 'nu-stoppen'
-                      ? // ADR 0127 D2: onder 'Nu stoppen' is dit de lat waar het vermogen
-                        // tot moet reiken — beschrijvend, geen belofte dat het lukt.
-                        'Tot deze leeftijd moet je vermogen reiken als je nu stopt.'
-                      : 'Tot deze leeftijd reken je het pensioen-restant door.'}
-              </p>
-            </label>
-          )}
-          {draft.strategy === 'legacy' && (
-            <label className="block">
-              <span className="block text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] mb-1">
-                Nalatenschap (€)
-              </span>
-              <input
-                type="number"
-                min={0}
-                step={1000}
-                value={draft.legacyAmount}
-                onChange={(e) => setDraft((d) => ({ ...d, legacyAmount: Number(e.target.value) || 0 }))}
-                className="w-40 px-3 py-2 border border-[var(--border-md)] rounded-lg bg-[var(--paper)] font-mono tabular-nums focus:border-[var(--module-active-700)] focus:outline-none"
-              />
-              <p className="mt-1 text-[11px] text-[var(--ink-3)] italic leading-snug">
-                Dit bedrag (in huidige euro&apos;s) laat je na — de rest mag opraken.
-              </p>
-            </label>
-          )}
-        </div>
-      )}
+      <StopPlanVragen
+        value={draft}
+        onChange={setDraft}
+        errors={validatie.errors}
+        aowAge={aowAge}
+        currentAge={null}
+        solvedFireAge={simSnapshot ? baseline.fireAgeFractional : null}
+      />
 
       {/* V7 — tekort-lening-rente (FIRE-instelling, opgeslagen via dezelfde PUT). */}
       <div
         aria-busy={!deficitLoaded}
-        className={`mt-5 transition-opacity duration-300 ${deficitLoaded ? 'opacity-100' : 'opacity-60'}`}
+        className={`mt-6 transition-opacity duration-300 ${deficitLoaded ? 'opacity-100' : 'opacity-60'}`}
       >
         <SubsectionLabel>Rente tekort-lening</SubsectionLabel>
         <label className="block">

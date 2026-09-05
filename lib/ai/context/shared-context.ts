@@ -1,8 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { computeCoreData, type FinancialInput } from '@/lib/core-metrics'
 import { loadCoreData } from '@/lib/core-data-loader'
-import { isFinanciallyFree } from '@/lib/fire-strategy'
-import { computeHorizonFireSim, type HorizonFireSim } from '@/lib/fire-target-shared'
+import { isFinanciallyFree, isFixedAnchor, type StopAnchor } from '@/lib/fire-strategy'
+import { computeHorizonFireSim, computeHorizonSolvedFireAge, type HorizonFireSim } from '@/lib/fire-target-shared'
+import { ankerReachFromSim, ankerReachesAge, formatStopAge } from '@/lib/horizon/anker-copy'
+import { leeftijdJaar } from '@/lib/horizon/leeftijd-jaar'
 import { deflate, factorAtAge } from '@/lib/euro-display'
 import { buildWillFinancialFacts } from './fin-financial-facts'
 import { section, formatCurrency, formatFreedomTime, formatPercentage } from './formatter'
@@ -60,6 +62,36 @@ function formatFireGoalLine(nominalGoal: number, run: HorizonFireSim | null, goa
   if (inTodaysMoney === nominal) return `FIRE-doel: ${nominal}`
 
   return `FIRE-doel: ${nominal} (toekomstige euro's; ≈ ${inTodaysMoney} in geld van vandaag)`
+}
+
+/**
+ * De ENE contextregel over een vast stop-anker (ADR 0129, bijlage "Fin —
+ * contextregel"): stopmoment · vrij mogelijk vanaf · reikt tot · plan-eind · dekking,
+ * plus de coach-instructie. Beschrijvend: Fin zegt nooit dat de gebruiker "kan
+ * stoppen" — ze beschrijft hoe ver het reikt. Alle getallen komen kant-en-klaar uit
+ * de canonieke run; hier wordt niets gerekend behalve afronden voor de zin.
+ */
+function buildAnkerContextLine(input: {
+  anchor: StopAnchor
+  stopAge: number | null
+  solvedFireAge: number | null
+  reachesAge: number | null
+  endAge: number | null
+  coveragePct: number
+}): string {
+  const ankerLabel =
+    input.anchor.kind === 'aow' ? 'AOW-leeftijd' : input.anchor.kind === 'now' ? 'vandaag' : 'zelfgekozen leeftijd'
+  const stop =
+    input.anchor.kind === 'now' ? 'nu' : input.stopAge != null ? formatStopAge(input.stopAge) : 'onbekend'
+  const vrij = input.solvedFireAge != null ? `${leeftijdJaar(input.solvedFireAge)}` : 'niet binnen de horizon'
+  const reikt = input.reachesAge != null ? `${leeftijdJaar(input.reachesAge)}` : 'onbekend'
+  const eind = input.endAge != null ? `${leeftijdJaar(input.endAge)}` : 'onbekend'
+  return (
+    `Stopmoment: vast op ${stop} (${ankerLabel}). Vrij mogelijk vanaf ${vrij}. ` +
+    `Liquide vermogen reikt tot ${reikt}; plan tot ${eind}; dekking ${formatPercentage(input.coveragePct)}. ` +
+    'Coach op de houdbaarheid van uitgaven en onttrekking, niet op eerder stoppen. ' +
+    'Zeg nooit dat de gebruiker "kan stoppen" — beschrijf hoe ver het reikt.'
+  )
 }
 
 /**
@@ -145,6 +177,34 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
   const freedomPercentage = facts.vrijheidsPct
   const displayFireGoal = facts.displayFireGoal
 
+  // ── Het stop-anker (ADR 0129 F3a, bijlage "Fin — contextregel") ──────────────
+  // Onder een VAST anker (aow/now/age) is er geen FIRE-moment om naartoe te coachen:
+  // Fin krijgt één regel met het gekozen stopmoment, "vrij mogelijk vanaf" (de tweede
+  // run, D7 — één extra bisectie, React-cache()'d, alléén onder een vast anker), tot
+  // waar het liquide vermogen reikt, de eindleeftijd en de dekking. `firePlan` is
+  // optioneel gelezen zodat een gemockte Kern-bundel zonder het veld `solved` blijft.
+  const anchor: StopAnchor = coreData.firePlan?.anchor ?? { kind: 'solved' }
+  const anchorFixed = isFixedAnchor({ anchor })
+  const solvedFireAge = anchorFixed ? await computeHorizonSolvedFireAge(supabase).catch(() => null) : null
+  const ankerRegel = anchorFixed
+    ? buildAnkerContextLine({
+        anchor,
+        stopAge: horizonRun?.sim.vastStopLeeftijd ?? (anchor.kind === 'age' ? anchor.age : null),
+        solvedFireAge,
+        reachesAge: horizonRun
+          ? ankerReachesAge(
+              ankerReachFromSim({
+                startAge: coreData.currentAge ?? null,
+                kernelDepletionMonth: horizonRun.sim.kernelDepletionMonth,
+                endAge: horizonRun.sim.displayEndAge,
+              }),
+            )
+          : null,
+        endAge: horizonRun?.sim.displayEndAge ?? coreData.firePlan?.endAge ?? null,
+        coveragePct: freedomPercentage,
+      })
+    : null
+
   const lines = [
     `Netto vermogen: ${formatCurrency(facts.nettoVermogen)}`,
     `Vrijgekochte tijd: ${formatFreedomTime(facts.freedomYears, facts.freedomMonths)}`,
@@ -154,8 +214,10 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     // kernel, dan is het bedrag nominaal (toekomstige euro's) en staat de
     // omrekening naar geld van vandaag er letterlijk bij; op een terugvalpad blijft
     // het bij het kale bedrag — zie `formatFireGoalLine`.
-    formatFireGoalLine(displayFireGoal ?? core.fireTarget, horizonRun, facts.fireDoelUitKernel),
-    `Verwachte FIRE-datum: ${core.expectedFireDate || 'onbekend'}`,
+    // Onder een vast anker is er géén doelvermogen (ADR 0129 D4) en geen FIRE-datum
+    // om naartoe te rekenen: de anker-regel hieronder draagt dan het hele verhaal.
+    anchorFixed ? null : formatFireGoalLine(displayFireGoal ?? core.fireTarget, horizonRun, facts.fireDoelUitKernel),
+    anchorFixed ? null : `Verwachte FIRE-datum: ${core.expectedFireDate || 'onbekend'}`,
     `Maandinkomen: ${formatCurrency(rawFinancials.monthlyIncome)} | Maanduitgaven: ${formatCurrency(rawFinancials.monthlyExpenses)}`,
     monthlyMustExpenses > 0 ? `Must-uitgaven (essentieel): ${formatCurrency(monthlyMustExpenses)}/mnd` : null,
     monthlyRetirementExpenses > 0 ? `Jaarlijkse uitgave na retirement: ${formatCurrency(monthlyRetirementExpenses)}/mnd (methode: ${coreData.retirementMethodUsed}) — basis voor FIRE & vrijheidsdagen` : null,
@@ -165,12 +227,21 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     `Autonomiescore: ${core.autonomyScore}`,
     `Dagelijkse uitgaven: ${formatCurrency(Math.round(core.yearlyExpenses / 365))}`,
     `Budgettering: ${coreData.budgetingActive !== false ? 'actief' : 'NIET actief — gebruiker budgetteert niet. Doe GEEN budget-gerelateerde voorstellen.'}`,
-    // Levensfase-signaal (consume-only, ADR 0009): wanneer de gebruiker AL
-    // financieel vrij is (vrijheids-% ≥ 100 of leeftijd voorbij vrijheidsleeftijd)
-    // moet Fin coachen op behoud/onttrekking i.p.v. "eerder vrij worden". Afgeleid
-    // via de canonieke `isFinanciallyFree`-vlag uit reeds-in-context getallen
-    // (freedomPercentage + currentAge); geen nieuwe data naar het model.
-    isFinanciallyFree({ freedomPct: freedomPercentage, currentAge: coreData.currentAge ?? null, fireAge: null })
+    // Het stop-anker (ADR 0129) — alleen onder een vast anker; zie hierboven.
+    ankerRegel,
+    // Levensfase-signaal (consume-only, ADR 0009/0129 D8): wanneer de gebruiker AL
+    // financieel vrij is — onder `solved`: vrijheids-% ≥ 100 of leeftijd voorbij de
+    // vrijheidsleeftijd; onder een vast anker: anker bereikt ∧ dekking ≥ 100 — moet
+    // Fin coachen op behoud/onttrekking i.p.v. "eerder vrij worden". Afgeleid via de
+    // canonieke `isFinanciallyFree`-gate uit reeds-in-context getallen; geen nieuwe
+    // data naar het model.
+    isFinanciallyFree({
+      freedomPct: freedomPercentage,
+      currentAge: coreData.currentAge ?? null,
+      fireAge: null,
+      anchor,
+      aowAge: horizonRun?.aowAgeFractional ?? null,
+    })
       ? 'Levensfase: gebruiker is AL financieel vrij / met pensioen — coach op behoud en onttrekking (hoe lang gaat het vermogen mee, kosten laag houden), NIET op "eerder vrij worden" of sneller sparen. De FIRE-datum en het vrijheids-% zijn bereikt.'
       : null,
   ]

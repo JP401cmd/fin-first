@@ -29,6 +29,9 @@
 // altijd bij hoe hard het is. Kan de kernel het niet, dan is "we weten het nog
 // niet" het antwoord — geen tweede antwoord.
 
+import type { KernelStopAnker } from '@/lib/horizon-kernel/types'
+import { ankerReachesAge, type AnkerReach } from './anker-copy'
+import { leeftijdJaar } from './leeftijd-jaar'
 import { HORIZON_MISSENDE_GEGEVENS_LABEL, guardFreedomAge } from './outcome-guard'
 
 /** Hoe hard is het getoonde getal? */
@@ -52,17 +55,57 @@ export type HeroAnswerStatus =
 
 /**
  * Waar het getoonde getal vandaan komt. `null` als er geen getal is.
- * `'kernel-runway'` (ADR 0127): onder 'nu-stoppen' is het getal geen FIRE-leeftijd
- * maar de leeftijd tot waar het vermogen reikt (`kernelDepletionMonth` → leeftijd,
- * of de eigen eindleeftijd wanneer het geld daar reikt).
+ * `'kernel-runway'` (ADR 0127/0129): onder een VAST anker is het getal geen
+ * FIRE-leeftijd maar de leeftijd tot waar het vermogen reikt (`kernelDepletionMonth`
+ * → leeftijd, of de eigen eindleeftijd wanneer het geld daar reikt).
+ * `'aow-tabel'` is sinds F3a niet meer de bron van het kopgetal (het aow-anker toont
+ * óók het bereik); de waarde blijft in het type voor de wachtende weergavelaag.
  */
 export type HeroAnswerBron = 'kernel' | 'server-kernel' | 'aow-tabel' | 'kernel-runway'
 
+/**
+ * De D7-DRIESLAG onder een vast anker (ADR 0129 B9/D7) — de data-seam voor de drie
+ * tegels die F3b tekent: VRIJ MOGELIJK VANAF · JOUW STOPMOMENT · REIKT TOT. Alleen
+ * aanwezig op `HeroFireAge` wanneer het stopmoment vastligt; onder `solved` ontbreekt
+ * het veld en is `age` de gesolvede vrijheidsleeftijd, exact zoals vóór F3a.
+ */
+export interface HeroAnkerView {
+  /** Het anker van de run (`SimResult.stopAnker`). */
+  soort: KernelStopAnker['soort']
+  /**
+   * JOUW STOPMOMENT — uit het anker (`SimResult.vastStopLeeftijd`, fractioneel), NOOIT
+   * uit `fireAge`: die is `ceil(fireAgeFractional)` en maakte van een gekozen 58,5 een
+   * 59 (bevinding 11). `null` alleen wanneer de run 'm niet leverde.
+   */
+  stopAge: number | null
+  /**
+   * VRIJ MOGELIJK VANAF — de opgeloste vrijheidsleeftijd zónder anker (de tweede run,
+   * `solveFireAgeWithoutAnchor`); `null` = onbereikbaar binnen de horizon of nog niet
+   * gedraaid. Fractioneel.
+   */
+  solvedFireAge: number | null
+  /**
+   * REIKT TOT — de uitputtingsleeftijd, de eindleeftijd bij dekking, of het
+   * horizonplafond zonder plan-einde; `null` bij 'nu-op'/'onbekend'. Fractioneel.
+   */
+  reachesAge: number | null
+  /** Het volledige bereik, voor de zinnen (`ankerZin` c.s.). */
+  reach: AnkerReach
+  /** Reikt het geld tot het einde van het plan? */
+  gedekt: boolean
+}
+
 export interface HeroFireAge {
   status: HeroAnswerStatus
-  /** Leeftijd in jaren (fractioneel). `null` bij 'berekenen' en 'onbekend'. */
+  /**
+   * Leeftijd in jaren (fractioneel). `null` bij 'berekenen' en 'onbekend'. Onder
+   * `solved` de vrijheidsleeftijd; onder een vast anker de leeftijd tot waar het
+   * vermogen REIKT (`anker.reachesAge`) — het antwoord op "kun je op {stop} stoppen?".
+   */
   age: number | null
   bron: HeroAnswerBron | null
+  /** De drieslag — alleen onder een vast anker (zie `HeroAnkerView`). */
+  anker?: HeroAnkerView
 }
 
 export interface HeroFireAgeInput {
@@ -72,23 +115,31 @@ export interface HeroFireAgeInput {
   kernelFireAgeFractional?: number | null
   /** `simResult.fireAge` — hele jaren, alleen als de fractionele ontbreekt. */
   kernelFireAge?: number | null
-  /** `simResult.strategy === 'pensioen'`: de hero toont dan de AOW-leeftijd. */
-  isPensioenMode?: boolean
   /**
-   * `simResult.strategy === 'nu-stoppen'` (ADR 0127 D6): de hero toont dan NIET de
-   * kernel-`fireAge` (die is per constructie de startleeftijd) maar de leeftijd tot
-   * waar het vermogen reikt — spiegel van `isPensioenMode`. `planningMode` blijft
-   * tweewaardig; dit is een eigen tak, geen derde mode.
+   * Het stop-anker van de run (`simResult.stopAnker`, ADR 0129 D3) — DE sleutel voor
+   * de anker-tak. `null`/weggelaten = `solved`: de hero toont de gesolvede leeftijd.
+   * Vervangt `isPensioenMode`/`isNuStoppenMode` (twee predicaten voor één feit).
    */
-  isNuStoppenMode?: boolean
+  stopAnker?: KernelStopAnker | null
   /**
-   * De runway van de stop-nu-run, uit dezelfde kernel-run als `simResult`:
-   * `depletionAgeFractional` = `startLeeftijd + kernelDepletionMonth / 12` (of `null`
-   * wanneer het geld — op bruggetjes na — tot de eindleeftijd/horizon reikt) en
-   * `endAge` = de eigen eindleeftijd (`simResult.displayEndAge`). `null`/weggelaten
-   * = nog geen run → 'berekenen' (zolang de kernel rekent) of 'onbekend'.
+   * Onder een vast anker: het bereik uit DEZELFDE run (`ankerReachFromSim` op
+   * `kernelDepletionMonth`/`displayEndAge`). `null`/weggelaten = nog geen run →
+   * 'berekenen' (zolang de kernel rekent) of 'onbekend'.
    */
-  nuStoppenRunway?: { depletionAgeFractional: number | null; endAge: number } | null
+  ankerReach?: AnkerReach | null
+  /**
+   * Het stopmoment van de run als LEEFTIJD (`simResult.vastStopLeeftijd`, fractioneel).
+   * Voedt `anker.stopAge`; nooit `fireAge` doorgeven (bevinding 11).
+   */
+  vastStopLeeftijd?: number | null
+  /**
+   * "Vrij mogelijk vanaf" (D7/B9): de opgeloste leeftijd van de tweede run
+   * (`ScenarioPresetBatch.solvedFireAge` / `computeHorizonSolvedFireAge`). `null` =
+   * onbereikbaar; weggelaten = nog niet gedraaid.
+   */
+  solvedFireAgeFractional?: number | null
+  /** Huidige leeftijd — alleen gelezen voor het getal bij 'nu-op' (het geld is vandaag op). */
+  currentAge?: number | null
   /** `userAowAge.fractional`. */
   aowAgeFractional?: number | null
   /**
@@ -120,30 +171,40 @@ const ONGELDIG: HeroFireAge = { status: 'ongeldig', age: null, bron: null }
  * deze keten niet voor — dat is de tweede motor die de bevinding veroorzaakte.
  */
 export function resolveHeroFireAge(input: HeroFireAgeInput): HeroFireAge {
-  // Nu-stoppen-modus (ADR 0127 D6): de kernel-`fireAge` ís de startleeftijd en zegt
-  // niets; het kernantwoord is tot welke leeftijd het vermogen reikt. Geen
-  // M6-vangrail hier: een runway die tot de eindleeftijd (bv. 100) reikt is een
-  // antwoord, geen parkeerstand.
-  if (input.isNuStoppenMode) {
-    const runway = input.nuStoppenRunway
-    if (runway == null) return input.isRefining ? BEREKENEN : ONBEKEND
-    const age = runway.depletionAgeFractional ?? runway.endAge
-    if (!Number.isFinite(age)) return ONBEKEND
-    return { status: 'definitief', age, bron: 'kernel-runway' }
-  }
-
-  // Pensioen-modus: de hero toont de wettelijke AOW-leeftijd, niet een
-  // FIRE-leeftijd. `isPensioenMode` volgt uit `simResult.strategy`, dus de
-  // kernel heeft hier per definitie al geantwoord; de onzekerheid zit
-  // uitsluitend in de AOW-tabel.
-  if (input.isPensioenMode) {
-    const aow = input.aowAgeFractional
-    if (aow == null || !Number.isFinite(aow)) return BEREKENEN
-    return {
-      status: input.aowTableLoaded ? 'definitief' : 'voorlopig',
-      age: aow,
-      bron: 'aow-tabel',
+  // ÉÉN anker-tak (ADR 0129 F3a) voor aow/nu/leeftijd — vóór F3a twee gespiegelde
+  // takken (`isNuStoppenMode` toonde het bereik, `isPensioenMode` de AOW-leeftijd).
+  // Onder elk vast anker ís de kernel-`fireAge` het anker zelf en zegt niets; het
+  // kernantwoord is tot welke leeftijd het vermogen REIKT, en de drieslag eromheen
+  // (stopmoment · vrij mogelijk vanaf · reikt tot) reist mee als `anker`. Geen
+  // M6-vangrail hier: een bereik tot de eindleeftijd (bv. 100) is een antwoord, geen
+  // parkeerstand.
+  if (input.stopAnker != null) {
+    const reach = input.ankerReach
+    if (reach == null) return input.isRefining ? BEREKENEN : ONBEKEND
+    const reachesAge = ankerReachesAge(reach)
+    const stopAge =
+      input.vastStopLeeftijd != null && Number.isFinite(input.vastStopLeeftijd)
+        ? input.vastStopLeeftijd
+        : input.stopAnker.soort === 'leeftijd' && Number.isFinite(input.stopAnker.leeftijd)
+          ? input.stopAnker.leeftijd
+          : null
+    const solved = input.solvedFireAgeFractional
+    const anker: HeroAnkerView = {
+      soort: input.stopAnker.soort,
+      stopAge,
+      solvedFireAge: solved != null && Number.isFinite(solved) ? solved : null,
+      reachesAge,
+      reach,
+      gedekt: reach.kind === 'gedekt',
     }
+    if (reach.kind === 'onbekend') return { ...ONBEKEND, anker }
+    // 'nu-op': het geld is vandaag al op — het getal is de huidige leeftijd (als bekend);
+    // het onderschrift (`ankerKpiCaption`) draagt de woorden.
+    const age = reach.kind === 'nu-op' ? (input.currentAge ?? null) : reachesAge
+    // Onder het aow-anker rekende de kernel met de wettelijke tabel; is die client-side
+    // nog niet geladen, dan draaide de run op de 67-terugval en is het getal voorlopig.
+    const voorlopig = input.stopAnker.soort === 'aow' && input.aowTableLoaded === false
+    return { status: voorlopig ? 'voorlopig' : 'definitief', age, bron: 'kernel-runway', anker }
   }
 
   if (input.hasKernelResult) {
@@ -183,7 +244,7 @@ export function resolveHeroFireAge(input: HeroFireAgeInput): HeroFireAge {
  * naar `floor` wil verzetten, verzet het hier — voor alle drie tegelijk.
  */
 export function heroFireAgeYear(age: number): number {
-  return Math.round(age)
+  return leeftijdJaar(age)
 }
 
 export interface FormatHeroFireAgeOptions {
@@ -214,6 +275,8 @@ export function formatHeroFireAge(state: HeroFireAge, opts: FormatHeroFireAgeOpt
     if (opts.aowText) return opts.aowText
     return state.age != null ? `${heroFireAgeYear(state.age)} jaar` : dash
   }
+  // Onder een vast anker zonder getal (het geld is vandaag al op, leeftijd onbekend)
+  // draagt het onderschrift de woorden; het kopgetal blijft het streepje.
   if (state.age != null) return String(heroFireAgeYear(state.age))
   if (state.status === 'berekenen') return opts.pendingText ?? 'berekenen…'
   return dash

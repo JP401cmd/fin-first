@@ -339,3 +339,41 @@ describe('Vrijheidsas rendering', () => {
     expect(info).toHaveAttribute('aria-expanded', 'true')
   })
 })
+
+/**
+ * ADR 0129 F3b — vast anker: de slider is verkenning, de CTA maakt het plan; de
+ * AOW-knop (B11) zet alléén de slider (geen eigen kernel-run meer).
+ */
+describe('Vrijheidsas — vast anker (ADR 0129 F3b)', () => {
+  it('toont de verken-intro met het plan-stopmoment en de CTA "Maak dit mijn plan"', () => {
+    const onMaakPlan = vi.fn()
+    render(<Vrijheidsas {...baseProps} ankerVast planStopAge={58.5} stopAge={62} onMaakPlan={onMaakPlan} />)
+    expect(screen.getByText(/Verken een ander stopmoment\. Je plan verandert pas als je het vastzet/)).toBeTruthy()
+    expect(screen.getByText('58,5')).toBeTruthy()
+    const cta = screen.getByRole('button', { name: 'Maak dit mijn plan' })
+    expect(cta).not.toBeDisabled()
+    fireEvent.click(cta)
+    expect(onMaakPlan).toHaveBeenCalledWith(62)
+  })
+
+  it('de CTA is uitgeschakeld zolang de slider op het plan-stopmoment staat', () => {
+    render(<Vrijheidsas {...baseProps} ankerVast planStopAge={60} stopAge={60} onMaakPlan={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'Maak dit mijn plan' })).toBeDisabled()
+  })
+
+  it('"Op AOW-leeftijd" zet alleen de slider op de AOW-leeftijd (halve jaren), geen andere callback', () => {
+    const onStopAgeChange = vi.fn()
+    const onMaakPlan = vi.fn()
+    render(<Vrijheidsas {...baseProps} aowAge={67.25} onStopAgeChange={onStopAgeChange} onMaakPlan={onMaakPlan} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Op AOW-leeftijd' }))
+    expect(onStopAgeChange).toHaveBeenCalledWith(67.5)
+    expect(onMaakPlan).not.toHaveBeenCalled()
+  })
+
+  it('onder het nu-anker (stopKeuzeVerborgen) is er geen slider, geen AOW-knop en geen CTA', () => {
+    render(<Vrijheidsas {...baseProps} stopKeuzeVerborgen aowAge={67} onMaakPlan={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: 'Op AOW-leeftijd' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Maak dit mijn plan' })).toBeNull()
+    expect(screen.queryByLabelText('Gewenste stopleeftijd')).toBeNull()
+  })
+})
