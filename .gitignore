@@ -86,6 +86,20 @@ signin2.yaml
 # root screenshot- / regressietest-artefacten (alleen root; public/ + docs/ blijven getrackt)
 /*.png
 /claude-progress.txt
+
+# eenmalige gegenereerde rapporten/presentaties in de projectroot (alleen root;
+# public/ + docs/ blijven getrackt). Deze glipten er eerder in via `git add -A`:
+# het UX-onderzoek stond met 8,2 MB in de historie -- 9,3 MB daarvan base64-
+# schermafbeeldingen -- terwijl niets ernaar verwees. Wil je zo'n rapport
+# bewaren, zet 'm dan in docs/ of publiceer 'm als artifact; de root is een
+# werkplek, geen archief.
+/*.html
+# uitzondering: hier wordt wel naar verwezen (competitive-brief-skill + docs/zoekvragen.md)
+!/trifinity-positionering-onderzoek-sep2026.html
+
+# ad-hoc importfixtures/probes in de projectroot (echte fixtures horen in test/)
+/test-*.csv
+/test-*.txt
 # curl cookie-jars
 cookies*.txt
 

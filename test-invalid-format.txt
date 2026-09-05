@@ -1,5 +1,0 @@
-This is just a random text file with no financial data.
-It has multiple lines but none of them contain
-any bank transaction data in MT940, CSV, or OFX format.
-Just plain text that should be rejected by the import system.
-Random numbers: 42, 7, 99, 1234

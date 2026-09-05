@@ -1,8 +1,0 @@
-Datum;Naam / Omschrijving;Rekening;Tegenrekening;Code;Af Bij;Bedrag (EUR);Mutatiesoort;Mededelingen
-20260201;Albert Heijn;NL91INGB0001234567;NL20INGB0009876543;GT;Af;45,50;Betaalautomaat;Betaling Albert Heijn 1234
-20260203;Salaris Werkgever BV;NL91INGB0001234567;NL55RABO0123456789;OV;Bij;3250,00;Overschrijving;Salaris februari 2026
-20260205;Vattenfall Energie;NL91INGB0001234567;NL44ABNA0567890123;IC;Af;185,00;Incasso;Maandtermijn energie feb 2026
-20260207;Shell Tankstation;NL91INGB0001234567;NL33INGB0007654321;GT;Af;72,30;Betaalautomaat;Tankbeurt Shell A12
-20260210;Jumbo Supermarkt;NL91INGB0001234567;NL88RABO0998877665;GT;Af;38,90;Betaalautomaat;TEST_IMPORT_84 Jumbo boodschappen
-20260212;Etos Drogisterij;NL91INGB0001234567;NL77ABNA0112233445;GT;Af;23,45;Betaalautomaat;Huishoudelijke artikelen
-20260215;NS Reizen;NL91INGB0001234567;NL66INGB0005544332;IC;Af;156,80;Incasso;NS Flex maandabonnement feb 2026
