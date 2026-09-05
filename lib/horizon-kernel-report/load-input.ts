@@ -20,6 +20,7 @@ import type { LifeEvent } from '@/lib/horizon-data'
 import type { AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { getAowLeeftijden } from '@/lib/reference-cache'
 import { resolveFireParams } from '@/lib/fire-params'
+import { FIRE_PLAN_COLUMNS } from '@/lib/fire-strategy'
 import { parseHousingStrategy } from '@/lib/housing-strategy'
 import { computeYearlyMustExpenses } from '@/lib/budget-utils'
 import { formatCurrency } from '@/lib/format'
@@ -91,7 +92,7 @@ export async function loadKernelReportInput(supabase: SupabaseClient): Promise<K
       supabase
         .from('profiles')
         .select(
-          'date_of_birth, household_type, number_of_children, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, expected_return, inflation_rate, marginaal_tarief, box3_method, fire_end_strategy, fire_end_age, fire_legacy_amount, retirement_expense_method, retirement_expense_custom_amount, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, housing_strategy_config, pot_rules, feature_preferences',
+          `date_of_birth, household_type, number_of_children, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, expected_return, inflation_rate, marginaal_tarief, box3_method, ${FIRE_PLAN_COLUMNS}, retirement_expense_method, retirement_expense_custom_amount, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, housing_strategy_config, pot_rules, feature_preferences`,
         )
         .single(),
       supabase.from('assets').select('*').eq('is_active', true).limit(500),
@@ -158,6 +159,10 @@ export async function loadKernelReportInput(supabase: SupabaseClient): Promise<K
     fire_end_strategy: profileRaw.fire_end_strategy as string | null,
     fire_end_age: profileRaw.fire_end_age as number | null,
     fire_legacy_amount: profileRaw.fire_legacy_amount as number | string | null,
+    // ADR 0129 L1 — het anker reist mee; zonder deze twee rekende het kernel-rapport
+    // een aow-/age-plan als `solved` (bisectie) terwijl /toekomst het anker wél kent.
+    fire_stop_anchor: profileRaw.fire_stop_anchor as string | null,
+    fire_stop_age: profileRaw.fire_stop_age as number | string | null,
     feature_preferences: profileRaw.feature_preferences as Record<string, unknown> | null,
     withdrawal_strategy: profileRaw.withdrawal_strategy as string | null,
     guardrail_floor: profileRaw.guardrail_floor as number | null,

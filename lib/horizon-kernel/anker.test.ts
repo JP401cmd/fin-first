@@ -34,6 +34,10 @@ import { depletionMonth } from './runway'
  *  D4  Bridge markeert `requiredFireIsAnchorPortfolio` en echoot `stopAnker`/`ankerMaand`.
  *  D7  Onder het `nu`-anker geldt nog steeds exact: `reached_now ⇔ runway reikt tot de
  *      eindleeftijd`.
+ *  K1–K3 (contract-ronde 5 sep 2026, onderaan): onder een vast anker is elke "nee" een
+ *      tekort (nooit `unreachable`, alle 9 vaste-anker-combinaties); het perpetual-doel
+ *      bij een negatieve FIRE-maand wordt op max(0, FIRE-maand) gelezen; `ankerMaand` is
+ *      het stopmoment van de RUN (`solve.vastStopLeeftijd`), niet van het plan.
  *
  * Buiten oracle-domein: geen fixture draagt `stopAnker`, dus de 736 parity-fixtures
  * blijven byte-identiek (aparte suite, `test/horizon-oracle`).
@@ -412,5 +416,219 @@ describe('negatieve FIRE-maand — vastgepind, niet gerepareerd', () => {
     // bridge naar de eind-horizon-terugval duwt.
     expect(eerder.projection.summary.nettoLiquideBijFire).toBeNull()
     expect(opStart.projection.summary.nettoLiquideBijFire).not.toBeNull()
+  })
+})
+
+// ── CONTRACT-RONDE 5 sep 2026 (K1/K2/K3) — repareert wat twee reviews op de
+//    F2-fundamenten vonden, vóórdat F3a/F3b erop bouwen. ─────────────────────
+
+function unifiedVan(input: ReturnType<typeof makeInput>, solve: ReturnType<typeof solveFire>, assets: readonly Asset[] = fx.assets) {
+  const { assetSlotMeta, debtSlotMeta } = buildKernelSlotMeta(assets, fx.debts, deriveEigenHuisIds(assets))
+  return kernelToUnifiedResult(solve, { input, yearlyExpenses: 30_000, assetSlotMeta, debtSlotMeta })
+}
+
+/**
+ * K1 — onder een VAST anker is elke "nee" een TEKORT. `unreachable_within_horizon` is
+ * bisectie-taal ("geen maand gevonden") en heeft geen betekenis voor een plan waarvan
+ * het stopmoment vastligt. Vóór K1 zette `computeStatusBlok` `anchor_shortfall` alleen
+ * bij `tekortLening > 0`; met een doel > 0 (legacy) of het perpetual-doel viel `gap < 0`
+ * zónder tekort-lening via de M6-schijnbereik-tak op `unreachable` → bridge
+ * `fireReachable = false` → hero zonder stopleeftijd, "FIRE niet haalbaar"-kopij en vijf
+ * van zes scenariokaarten leeg. Gemeten: `aow × legacy` (€50M) en `age 58 × perpetual`
+ * (×0,05). B5: alle 12 combinaties toegestaan, dus alle 9 vaste-anker-combinaties gepind.
+ */
+describe('K1 — onder een vast anker is elke "nee" een tekort, nooit unreachable (B5: 3 ankers × 3 eind-vormen)', () => {
+  const EINDVORMEN: Record<string, Partial<ConvergentieRawProfileRow>> = {
+    deplete: { fire_end_strategy: 'deplete' },
+    legacy: { fire_end_strategy: 'legacy', fire_legacy_amount: 100_000 },
+    perpetual: { fire_end_strategy: 'perpetual' },
+  }
+  const ANKERS = { nu: ANKER_RIJEN.nu, aow: ANKER_RIJEN.aow, leeftijd58: ANKER_RIJEN.leeftijd58 }
+  const gevallen = Object.entries(ANKERS).flatMap(([a, anker]) =>
+    Object.entries(EINDVORMEN).flatMap(([e, eind]) =>
+      [0.05, 1, 20].map((factor) => [`${a} × ${e}`, factor, { ...anker, ...eind }, a] as const),
+    ),
+  )
+
+  it.each(gevallen)('%s, bezittingen ×%s → tekort-status of gedekt, nooit unreachable/pension_shortfall', (_label, factor, over, ankerSoort) => {
+    const solve = solveFire(makeInput(over, scaleAssets(factor)))
+    expect(solve.status).not.toBe('unreachable_within_horizon')
+    expect(solve.status).not.toBe('pension_shortfall')
+    // Het nu-anker houdt in F2 zijn eigen naam; de andere ankers erven 'm niet.
+    if (ankerSoort === 'nu') expect(solve.status).not.toBe('anchor_shortfall')
+    else expect(solve.status).not.toBe('stop_now_shortfall')
+    // Elke "nee" is aanwijsbaar: een tekort-status impliceert minstens één van de drie signalen.
+    if (solve.status.endsWith('_shortfall')) {
+      expect(solve.tekortLeningTotEindleeftijd > 0 || solve.gap < 0 || solve.doelbedrag < 0).toBe(true)
+    } else {
+      expect(solve.gap).toBeGreaterThanOrEqual(0)
+      expect(solve.doelbedrag).toBeGreaterThanOrEqual(0)
+    }
+  })
+
+  it('GEMETEN (review): aow × legacy €50M → anchor_shortfall op gap < 0, zonder tekort-lening', () => {
+    const input = makeInput({ ...ANKER_RIJEN.aow, fire_end_strategy: 'legacy', fire_legacy_amount: 50_000_000 })
+    const solve = solveFire(input)
+    expect(solve.status).toBe('anchor_shortfall')
+    expect(solve.gap).toBeLessThan(0)
+    // Precies de tak die vóór K1 op `unreachable` viel: J blijft ≥ 0, dus geen tekort-lening.
+    expect(solve.tekortLeningTotEindleeftijd).toBe(0)
+    // De bridge houdt het stopmoment tonbaar (hero met stopleeftijd, kaarten gevuld).
+    const unified = unifiedVan(input, solve)
+    expect(unified.fireReachable).toBe(true)
+    expect(unified.fireAgeFractional).toBe(AOW_FALLBACK)
+    expect(unified.kernelStatus).toBe('pension_shortfall') // F2-compat-vertaling voor het aow-blok
+  })
+
+  it('GEMETEN (review): age 58 × perpetual (×0,05) → anchor_shortfall', () => {
+    const input = makeInput({ ...ANKER_RIJEN.leeftijd58, fire_end_strategy: 'perpetual' }, scaleAssets(0.05))
+    const solve = solveFire(input)
+    expect(solve.status).toBe('anchor_shortfall')
+    const unified = unifiedVan(input, solve, scaleAssets(0.05))
+    expect(unified.fireReachable).toBe(true)
+    expect(unified.fireAgeFractional).toBe(58)
+    expect(unified.kernelStatus).toBe('anchor_shortfall')
+  })
+
+  it('nu × legacy €50M → stop_now_shortfall (het nu-anker houdt zijn F2-compat-naam, óók voor een doel-tekort)', () => {
+    const solve = solveFire(makeInput({ ...ANKER_RIJEN.nu, fire_end_strategy: 'legacy', fire_legacy_amount: 50_000_000 }))
+    expect(solve.status).toBe('stop_now_shortfall')
+    expect(solve.gap).toBeLessThan(0)
+  })
+
+  it('een gedekt aow × legacy-plan (klein bedrag, rijk) is géén tekort', () => {
+    const solve = solveFire(makeInput({ ...ANKER_RIJEN.aow, fire_end_strategy: 'legacy', fire_legacy_amount: 1_000 }, scaleAssets(20)))
+    expect(['reached_now', 'reached_at']).toContain(solve.status)
+    expect(solve.gap).toBeGreaterThanOrEqual(0)
+  })
+
+  it('zonder anker blijft `unreachable_within_horizon` bestaan (bisectie-pad ongewijzigd)', () => {
+    const solve = solveFire(makeInput({ fire_end_strategy: 'legacy', fire_legacy_amount: 50_000_000 }))
+    expect(solve.status).toBe('unreachable_within_horizon')
+  })
+})
+
+/**
+ * K2 — het perpetual-doel bij een NEGATIEVE FIRE-maand. `computeDoelblok` las J op
+ * `round((fireAge − start)·12)`; bij een AOW-anker voorbij de AOW is dat negatief →
+ * `prognoseJ` null → `?? 0` → doel €0 → het plan degradeerde stil tot deplete en een
+ * 70-jarige kreeg `reached_now` "je vermogen houdt zijn koopkracht" zonder toets.
+ * Regel: het doel wordt gelezen op de effectieve stopmaand max(0, FIRE-maand) en over de
+ * effectieve span geïndexeerd — consistent met hoe de engine zo'n stop rekent (als nu).
+ */
+describe('K2 — perpetual-doel bij een stopmoment vóór de startleeftijd (70 jaar, AOW 67)', () => {
+  const OUDE_LEEFTIJD = 70
+  const oudFx = buildCompleetHorizonFixture(OUDE_LEEFTIJD)
+  const perpetualOud = buildKernelInputFromApp({
+    profile: buildConvergentieAdapterProfile({
+      ...buildCompleetKernelProfileBase(OUDE_LEEFTIJD),
+      fire_end_strategy: 'perpetual',
+      fire_end_age: 90,
+      fire_legacy_amount: 0,
+      housing_strategy_config: { mode: 'include_full' },
+      fire_stop_anchor: 'aow',
+    }),
+    assets: oudFx.assets,
+    debts: oudFx.debts,
+    lifeEvents: oudFx.lifeEvents,
+    aowRows: [],
+  })
+
+  it('het doel is J(0) geïndexeerd over de effectieve span (eind − 70), niet €0', () => {
+    const solve = solveFire(perpetualOud)
+    expect(solve.projection.summary.fireMonth).toBeLessThan(0)
+    const j0 = prognoseJ(solve.projection, 0)
+    expect(j0).not.toBeNull()
+    expect(j0!).toBeGreaterThan(0)
+    expect(solve.doelbedrag).toBeGreaterThan(0)
+    expect(solve.doelbedrag).toBeCloseTo(j0! * (1 + perpetualOud.inflatie) ** (solve.eindleeftijd - OUDE_LEEFTIJD), 6)
+    // Vóór K2: doel 0 ⇒ `J(0) ≥ 0` ⇒ vals `reached_now`. Nu ligt het doel boven J(0).
+    expect(solve.status).not.toBe('reached_now')
+    expect(['reached_at', 'anchor_shortfall']).toContain(solve.status)
+  })
+
+  it('…en is identiek aan de "stop nu"-toets op dezelfde projectie (een stop in het verleden gedraagt zich als nu)', () => {
+    const anker = solveFire(perpetualOud)
+    const nu = evaluateFireAt(perpetualOud, OUDE_LEEFTIJD)
+    expect(anker.doelbedrag).toBeCloseTo(nu.doelbedrag, 6)
+    expect(anker.gap).toBeCloseTo(nu.gap, 6)
+    expect(anker.status).toBe(nu.status)
+  })
+
+  it('binnen het oracle-domein (FIRE-maand ≥ 0) verandert er niets: perpetual-doel = J@FIRE·(1+i)^(eind−FIRE)', () => {
+    const input = makeInput({ fire_end_strategy: 'perpetual' })
+    const solve = solveFire(input)
+    const fireMonth = Math.round((solve.fireAge - input.startLeeftijd) * 12)
+    expect(fireMonth).toBeGreaterThanOrEqual(0)
+    const jBijFire = prognoseJ(solve.projection, fireMonth)!
+    expect(solve.doelbedrag).toBeCloseTo(jBijFire * (1 + input.inflatie) ** (solve.eindleeftijd - solve.fireAge), 6)
+  })
+})
+
+/**
+ * K3 — `ankerMaand` is het stopmoment van de RUN, niet van het plan (D5). De bridge las
+ * 'm uit `resolveVastAnker(input)`: correct voor de plan-run, fout voor een geforceerde
+ * run (`evaluateFireAt` via `bridgeForcedStop`: de stop-nu-runway, de scenariokaarten) —
+ * een aow-gebruiker van 47 kreeg op de /overzicht-runway (stop nu) `ankerMaand` 240, en
+ * `computeRunwayCoveragePct` zou een runway van 20 jaar als 0% dekking lezen. Besluit:
+ * de solver draagt `vastStopLeeftijd` (anker · oracle-pensioen-kortsluiting · geforceerd;
+ * null bij bisectie/parkeerstand) en de bridge leidt `ankerMaand` daaruit af. `stopAnker`
+ * blijft de echo van het PLAN. Spiegel-test op `bridgeForcedStop`: scenario-presets.test.ts.
+ */
+describe('K3 — ankerMaand is het stopmoment van de RUN (solve.vastStopLeeftijd)', () => {
+  it('solveFire: anker ⇒ de ankerleeftijd; bisectie ⇒ null; parkeerstand ⇒ null', () => {
+    expect(solveFire(makeInput(ANKER_RIJEN.aow)).vastStopLeeftijd).toBe(AOW_FALLBACK)
+    expect(solveFire(makeInput(ANKER_RIJEN.leeftijd58)).vastStopLeeftijd).toBe(58)
+    expect(solveFire(makeInput(ANKER_RIJEN.nu)).vastStopLeeftijd).toBe(PINNED_AGE)
+    expect(solveFire(makeInput()).vastStopLeeftijd).toBeNull()
+    const geparkeerd = solveFire(makeInput({ fire_end_strategy: 'legacy', fire_legacy_amount: 50_000_000 }))
+    expect(geparkeerd.status).toBe('unreachable_within_horizon')
+    expect(geparkeerd.vastStopLeeftijd).toBeNull()
+  })
+
+  it('evaluateFireAt: geforceerd = vast ⇒ vastStopLeeftijd = de geforceerde leeftijd', () => {
+    const input = makeInput()
+    expect(evaluateFireAt(input, 50).vastStopLeeftijd).toBe(50)
+    expect(evaluateFireAt(input, PINNED_AGE).vastStopLeeftijd).toBe(PINNED_AGE)
+  })
+
+  it('plan-run onder een vast anker: ankerMaand = het plan-anker (ongewijzigd t.o.v. F2)', () => {
+    const input = makeInput(ANKER_RIJEN.aow)
+    expect(unifiedVan(input, solveFire(input)).ankerMaand).toBe((AOW_FALLBACK - PINNED_AGE) * 12)
+  })
+
+  it('GEMETEN (review): geforceerde run onder een aow-plan → de GEFORCEERDE maand; stopAnker echoot het plan', () => {
+    const input = makeInput(ANKER_RIJEN.aow)
+    // De stop-nu-runway (/overzicht): maand 0 — niet 300.
+    const runway = unifiedVan(input, evaluateFireAt(input, PINNED_AGE))
+    expect(runway.ankerMaand).toBe(0)
+    expect(runway.stopAnker).toEqual({ soort: 'aow' })
+    // Een scenariokaart "stop op 58" onder hetzelfde plan.
+    const kaart = unifiedVan(input, evaluateFireAt(input, 58))
+    expect(kaart.ankerMaand).toBe((58 - PINNED_AGE) * 12)
+    expect(kaart.stopAnker).toEqual({ soort: 'aow' })
+  })
+
+  it('geforceerde run onder `solved`: óók een vast stopmoment (ankerMaand gezet, stopAnker null)', () => {
+    const input = makeInput()
+    const kaart = unifiedVan(input, evaluateFireAt(input, 50))
+    expect(kaart.ankerMaand).toBe((50 - PINNED_AGE) * 12)
+    expect(kaart.stopAnker).toBeNull()
+    // De bisectie-run zelf blijft null (bestaand gedrag).
+    expect(unifiedVan(input, solveFire(input)).ankerMaand).toBeNull()
+  })
+
+  it('oracle-pensioenpad (selector Pensioenleeftijd, geen blok): FIRE = AOW ligt vast ⇒ ankerMaand gezet, stopAnker null', () => {
+    const input = makeInput()
+    const oracleInput = {
+      ...input,
+      stopAnker: undefined,
+      eindstrategie: { ...input.eindstrategie, selector: 'Pensioenleeftijd' as const },
+    }
+    const solve = solveFire(oracleInput)
+    expect(solve.vastStopLeeftijd).toBe(oracleInput.persoon.aowLeeftijd)
+    const unified = unifiedVan(oracleInput, solve)
+    expect(unified.ankerMaand).toBe((AOW_FALLBACK - PINNED_AGE) * 12)
+    expect(unified.stopAnker).toBeNull()
   })
 })

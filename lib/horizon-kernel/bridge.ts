@@ -49,7 +49,9 @@
  * `fireAge = ceil(fireAgeFractional)` — exact de v2-relatie (v2: `fireAge − 1 ≤
  * fireAgeFractional ≤ fireAge`), en gelijk aan `fireAgeFractional` wanneer FIRE op een
  * heel jaar landt. `fireReachable = status !== 'unreachable_within_horizon'`
- * (`pension_shortfall` blijft reachable — AOW-verankerd); bij onbereikbaar zijn beide
+ * (`pension_shortfall`/`anchor_shortfall`/`stop_now_shortfall` blijven reachable — het
+ * stopmoment ligt vast, alleen de dekking ontbreekt; ADR 0129 K1 garandeert dat
+ * `unreachable` onder een vast anker nooit valt); bij onbereikbaar zijn beide
  * fireAge-velden `null` (contract: "null als niet bereikbaar", spiegel v2).
  *
  * Pure functie, geen fs/Supabase/Date.now/Math.random.
@@ -64,7 +66,7 @@ import type {
   UnifiedProjectionResult,
   UnifiedProjectionRow,
 } from '@/lib/unified-projection'
-import { resolveVastAnker, type SolveFireResult, type SolverStatus } from './solver'
+import type { SolveFireResult, SolverStatus } from './solver'
 import type { KernelProjection } from './engine'
 import {
   jaarBlokEindMaand,
@@ -269,8 +271,16 @@ export interface KernelUnifiedResult extends UnifiedProjectionResult {
    */
   readonly stopAnker: KernelStopAnker | null
   /**
-   * De maandindex van het stopmoment (maand 0 = vandaag) — `round((ankerLeeftijd −
-   * startLeeftijd)·12)` — of `null` zonder vast anker.
+   * De maandindex van het stopmoment van DEZE RUN (maand 0 = vandaag) —
+   * `round((solve.vastStopLeeftijd − startLeeftijd)·12)` — of `null` wanneer de
+   * bisectie het stopmoment zocht (incl. de horizon-parkeerstand).
+   *
+   * Contract-ronde K3 (ADR 0129 D5): voor de plan-run is dit het plan-anker; voor
+   * een geforceerde run (`evaluateFireAt` via `bridgeForcedStop`) de geforceerde
+   * maand — de stop-nu-runway heeft 0, een scenariokaart "stop op 58" heeft
+   * (58 − start)·12, óók als het plan zelf op `aow` staat. `stopAnker` echoot
+   * daarnaast onveranderd het PLAN-anker; de twee velden beantwoorden dus
+   * verschillende vragen ("waarmee is deze run gerekend" vs. "wat is het plan").
    *
    * Voedt de dekking (`computeRunwayCoveragePct`, D5): die meet hoe ver het geld
    * reikt NÁ het stopmoment, niet vanaf vandaag. Onder het `nu`-anker is dit 0 en
@@ -884,8 +894,9 @@ export function kernelToUnifiedResult(
 
   // ── FIRE-uitkomsten ────────────────────────────────────────────────────────
   // F2-compat: het aow-anker spreekt tegen de UI nog de pensioen-taal (zie
-  // `resolveLegacyStatus`); `fireReachable` leest de kernel-status ervóór, want
-  // die vertaling raakt bereikbaarheid niet.
+  // `resolveLegacyStatus`). `fireReachable` leest de VERTAALDE status; dat is
+  // equivalent aan de kernel-status, want de vertaling raakt alleen
+  // `anchor_shortfall` → `pension_shortfall` en nooit `unreachable_within_horizon`.
   const status = resolveLegacyStatus(ctx.input, solve.status)
   const fireReachable = status !== 'unreachable_within_horizon'
   const fireAgeFractional = fireReachable ? solve.fireAge : null
@@ -936,14 +947,20 @@ export function kernelToUnifiedResult(
 
   const es = computeEs(input)
   const strategy = resolveLegacyStrategy(input, es.interneCode)
-  // Het stopmoment als maandindex (ADR 0129 D5). BEWUST uit `resolveVastAnker` en
-  // niet uit `solve.fireAge`: op een GEFORCEERDE run (`evaluateFireAt`, bv. een
-  // stop-scenariokaart) is `fireAge` de geforceerde leeftijd van díe kaart, terwijl
-  // het anker van het plan onveranderd blijft. Eén home voor de anker-resolutie.
+  // Het stopmoment van DEZE RUN als maandindex (ADR 0129 D5, contract-ronde K3) — uit
+  // `solve.vastStopLeeftijd`, niet uit het plan-anker. Vóór K3 kwam dit uit
+  // `resolveVastAnker(input)`: correct voor de plan-run, maar op een GEFORCEERDE run
+  // (`evaluateFireAt` via `bridgeForcedStop`: de stop-nu-runway, de scenariokaarten)
+  // het verkeerde getal — een aow-gebruiker van 47 kreeg op de /overzicht-runway
+  // (stop nu, maand 0) een `ankerMaand` van 240, waarmee `computeRunwayCoveragePct`
+  // een runway van 20 jaar als 0% dekking zou lezen ("uitputting vóór het
+  // stopmoment"). De solver weet als enige of het stopmoment vastlag (anker,
+  // oracle-pensioen-kortsluiting of geforceerd) of gezocht werd (bisectie → null).
   const stopAnker = input.stopAnker ?? null
-  const ankerLeeftijd = resolveVastAnker(input, es)
   const ankerMaand =
-    ankerLeeftijd === null ? null : Math.round((ankerLeeftijd - input.startLeeftijd) * 12)
+    solve.vastStopLeeftijd === null
+      ? null
+      : Math.round((solve.vastStopLeeftijd - input.startLeeftijd) * 12)
 
   // ── Verkoopmoment eigen woning (marker-contract) ───────────────────────────
   // Eerste in-horizon-maand met Bez!AZ-opbrengst > 0; leeftijd op dezelfde as als

@@ -57,7 +57,7 @@ export const KRUIS_FLOW: UatFlow = {
     { id: 'k18', scenarioId: 'UAT-KRUIS-18', label: 'WF-KRUIS-18 · Status-semantiek: sidebar==kaart==banner==box', kind: 'screen', stage: 2, lane: 'consistentie' },
     { id: 'k20', scenarioId: 'UAT-KRUIS-20', label: 'WF-KRUIS-20 · Vrijheidstijd: één dagtarief overal', kind: 'screen', stage: 2, lane: 'consistentie' },
     { id: 'k27', scenarioId: 'UAT-KRUIS-27', label: 'WF-KRUIS-27 · Euro-weergave: FIRE-doel identiek gedeflateerd', kind: 'screen', stage: 2, lane: 'consistentie' },
-    { id: 'k28', scenarioId: 'UAT-KRUIS-28', label: 'WF-KRUIS-28 · Stop-anker: tegenspraak-regel + eerlijke 409 (ADR 0129 F1, engine-only)', kind: 'screen', stage: 2, lane: 'consistentie' },
+    { id: 'k28', scenarioId: 'UAT-KRUIS-28', label: 'WF-KRUIS-28 · Stop-anker: tegenspraak-regel + atomair plan-contract (ADR 0129 F1, engine-only)', kind: 'screen', stage: 2, lane: 'consistentie' },
     { id: 'x-belast', label: 'Belasting (Box 1/2/3)', kind: 'cross', stage: 2, lane: 'consistentie', crossZone: 'BELAST' },
     { id: 'x-toek', label: 'Toekomst & tijdas', kind: 'cross', stage: 2, lane: 'consistentie', crossZone: 'TOEK' },
 

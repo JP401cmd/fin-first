@@ -1,7 +1,13 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { serverError, unauthorized } from '@/lib/api/respond'
-import { isFireEndStrategy, isStopAnchorKind, type StopAnchorKind } from '@/lib/fire-strategy'
+import {
+  FIRE_PLAN_COLUMNS,
+  isFireEndStrategy,
+  isStopAnchorKind,
+  parseFirePlan,
+  type StopAnchorKind,
+} from '@/lib/fire-strategy'
 
 /**
  * ── VOLGORDE-EIS (ADR 0127), afgehandeld ───────────────────────────────────
@@ -36,31 +42,70 @@ const FP_KEY = 'fire_strategy_override'
 const LEGACY_SHADOW_STRATEGY = 'pensioen'
 
 /**
- * ── Stop-anker (ADR 0129, fase F1) ─────────────────────────────────────────
+ * ── Het PLAN: stop-anker × eind-vorm (ADR 0129) ────────────────────────────
  *
- * `fire_stop_anchor`/`fire_stop_age` leven in een APARTE lees- en schrijfstap,
- * precies zoals `monthly_savings_override` hieronder. Reden: de kolommen komen uit
- * migratie 20260903140000, en die is bewust nog niet uitgerold. Zou de hoofdquery
- * ze meenemen, dan geeft élke profielload een 42703 tot het moment van uitrol —
- * de volgordefout die het migratiebestand zelf als eerste waarschuwing draagt.
+ * De vijf plan-kolommen (`fire_end_strategy`, `fire_end_age`, `fire_legacy_amount`,
+ * `fire_stop_anchor`, `fire_stop_age`) zijn ÉÉN blok en gaan in ÉÉN UPDATE
+ * (contract-ronde R1). Tot 5 sep 2026 gingen eind-vorm en anker in twee statements,
+ * met een 42703-vangnet omdat migratie 20260903140000 nog niet was uitgerold. Beide
+ * migraties (kolommen + backfill 20260903141000) zijn live en geregistreerd, dus dat
+ * pad is dood; wat overbleef was een schrijfvolgorde waarin een falend tweede
+ * statement een half plan achterliet (statement 1 schrijft 'legacy' → het D2-anker
+ * valt weg terwijl de kolom nog 'aow' draagt; statement 2 faalt → `aow × legacy`
+ * waar `solved × legacy` gevraagd was).
  *
- * Het VERSCHIL met `monthly_savings_override`: dat veld mag stil falen (een
- * ontbrekende kolom kost daar hooguit een spaar-override). Een stop-anker níet.
- * Wie "ik stop op mijn 58e" kiest en een geslaagde opslag ziet terwijl de waarde
- * nergens landt, ziet bij de volgende load zijn oude plan terug — exact de stille
- * verliesbug die het schaduwpad hierboven veroorzaakte en die in de ADR 0127-review
- * is dichtgezet. Daarom: bij een ontbrekende kolom een eerlijke 409, geen success.
+ * HET CONTRACT (R3 — symmetrisch, geen geladen defaults). Twee complete vormen:
+ *  - VOLLEDIG (F3b-client): alle plan-velden — `fire_end_strategy` + `fire_end_age`
+ *    (+ `fire_legacy_amount`, afwezig ⇒ null) + `fire_stop_anchor` (+ `fire_stop_age`
+ *    uitsluitend bij anker `age`). Dit is de vorm die het anker mag raken.
+ *  - EIND-VORM-ALLEEN (pre-F3b-client — strategie-modal, module-activatie,
+ *    eindstrategie-body, uitgaven-na-pensioen): `fire_end_strategy` + `fire_end_age`
+ *    zónder ankervelden. Het anker blijft dan ONAANGERAAKT (een oudere client mag een
+ *    zelfgekozen stopmoment niet stil op 'solved' zetten), behalve wanneer de
+ *    legacy-label zélf een anker draagt ('pensioen' → aow, 'nu-stoppen' → now): dan
+ *    schrijft dezelfde UPDATE ook de ankerkolom, zodat geen rij zichzelf tegenspreekt
+ *    (D2 blijft de leesregel, maar hoeft niets meer recht te zetten).
+ *  - Elke andere combinatie is een DEEL-PLAN en krijgt een 400: alleen een anker,
+ *    alleen een eindleeftijd, een strategie zonder eindleeftijd. Vóór deze ronde
+ *    vulde de route `'deplete'`/`90` in voor wat ontbrak — sinds M1 is `fire_end_age
+ *    = 100` voor de live pensioen-gebruikers dragend, dus een client die alleen
+ *    `{fire_stop_anchor:'aow'}` stuurde zette stil `deplete × aow × 90`.
+ *  - Géén plan-veld in de body ⇒ het plan wordt niet geraakt en alleen de losse
+ *    velden (`deficit_loan_rate`, `retirement_*`, `monthly_savings_override`) gaan
+ *    mee. Een lege body is een client-fout → 400.
+ *
+ * Waarom niet "alle vijf altijd verplicht" (de eerste optie uit de review): dat had
+ * élke live client vandaag een 400 gegeven — geen daarvan kent het anker vóór F3b.
+ * Waarom niet "geen enkel plan-veld raken als er één ontbreekt" (de tweede): dan
+ * had diezelfde client zijn strategiewissel stil verloren zien gaan — precies de
+ * verliesklasse die deze route hoort uit te sluiten. F4 laat de eind-vorm-alleen-vorm
+ * vervallen zodra elke client het volledige plan stuurt.
+ *
+ * KRUISTOETS (R2): stuurt de client een expliciet anker, dan moet
+ * `fire_end_strategy` een eind-vorm zijn (`deplete`/`legacy`/`perpetual`).
+ * `pensioen`/`nu-stoppen` dragen zelf al een anker; `{pensioen, age 58}` gaf een
+ * 200 met echo 58 terwijl lezen (D2, legacy wint) altijd `aow` gaf.
+ *
+ * B7 (R4): `fire_stop_age ≥ fire_end_age` → 400. De kernel klemt zo'n waarde stil op
+ * `eind − 1/12`; "stil afronden vervalst een keuze" geldt hier onverkort. De
+ * AOW-variant (`fire_end_age ≤ AOW` onder anker `aow`) toetst de route NIET: ze kent
+ * de AOW-leeftijd van de gebruiker niet zonder extra query; F3b heeft die in de UI.
  */
-const STOP_ANCHOR_COLUMNS = 'fire_stop_anchor, fire_stop_age'
-
-/** Postgres 42703 = undefined_column — de migratie is nog niet uitgerold. */
-function isMissingColumn(err: { code?: string } | null): boolean {
-  return err?.code === '42703'
-}
+const EINDVORM_KEYS = ['fire_end_strategy', 'fire_end_age', 'fire_legacy_amount'] as const
+const ANCHOR_KEYS = ['fire_stop_anchor', 'fire_stop_age'] as const
 
 interface StopAnchorInput {
   anchor: StopAnchorKind
   stopAge: number | null
+}
+
+/** Het gevalideerde plan-blok, klaar voor de ene UPDATE. */
+interface PlanInput {
+  strategy: string
+  endAge: number
+  legacyAmount: number | null
+  /** `null` ⇒ de ankerkolommen worden niet geraakt (eind-vorm-alleen-vorm). */
+  anchor: StopAnchorInput | null
 }
 
 /**
@@ -69,8 +114,10 @@ interface StopAnchorInput {
  * Halve jaren (ADR 0129 B6): de stop-slider staat op `step={0.5}`. Een waarde
  * daartussenin wordt NIET stil afgerond — dat zou een keuze van de gebruiker
  * vervalsen — maar afgewezen, zodat de client zijn eigen resolutie corrigeert.
- * De consistentie-eis (`age` ⟺ leeftijd aanwezig) spiegelt de DB-CHECK, zodat een
- * ongeldige combinatie een leesbare 400 geeft in plaats van een 23514.
+ * (De parser `parseFirePlan` leest een bestaande rij wél tolerant; zie de docstring
+ * bij `normalizeStopAge` in lib/fire-strategy.ts voor waarom lezen en schrijven
+ * verschillen.) De consistentie-eis (`age` ⟺ leeftijd aanwezig) spiegelt de
+ * DB-CHECK, zodat een ongeldige combinatie een leesbare 400 geeft i.p.v. een 23514.
  */
 function parseStopAnchorInput(body: Record<string, unknown>): StopAnchorInput | { error: string } {
   const rawAnchor = body.fire_stop_anchor ?? 'solved'
@@ -100,6 +147,64 @@ function parseStopAnchorInput(body: Record<string, unknown>): StopAnchorInput | 
 }
 
 /**
+ * Het plan uit de body — `null` als de body geen enkel plan-veld draagt (dan raakt
+ * de PUT het plan niet), anders het gevalideerde blok of een leesbare 400-tekst.
+ */
+function parsePlanInput(body: Record<string, unknown>): PlanInput | null | { error: string } {
+  const eindvormInBody = EINDVORM_KEYS.some((k) => k in body)
+  const anchorInBody = ANCHOR_KEYS.some((k) => k in body)
+  if (!eindvormInBody && !anchorInBody) return null
+
+  // R3 — geen geladen defaults: wat ontbreekt wordt niet ingevuld maar afgewezen.
+  if (!('fire_end_strategy' in body) || !('fire_end_age' in body)) {
+    return {
+      error: anchorInBody && !eindvormInBody
+        ? 'Een stopmoment reist alleen mee met het volledige plan: stuur ook fire_end_strategy en fire_end_age.'
+        : 'fire_end_strategy en fire_end_age horen samen in één verzoek.',
+    }
+  }
+
+  const strategy = String(body.fire_end_strategy)
+  if (!isFireEndStrategy(strategy)) {
+    return { error: `Ongeldige strategie: ${strategy}` }
+  }
+  const endAge = Number(body.fire_end_age)
+  if (!Number.isFinite(endAge) || endAge < 50 || endAge > 120) {
+    return { error: 'Eindleeftijd moet tussen 50 en 120 liggen' }
+  }
+  const legacyAmount = body.fire_legacy_amount != null ? Number(body.fire_legacy_amount) : null
+
+  const legacyAnchor: StopAnchorKind | null =
+    strategy === 'pensioen' ? 'aow' : strategy === 'nu-stoppen' ? 'now' : null
+
+  if (!anchorInBody) {
+    // Eind-vorm-alleen: het anker blijft staan, tenzij de legacy-label er zelf één draagt.
+    return {
+      strategy,
+      endAge,
+      legacyAmount,
+      anchor: legacyAnchor === null ? null : { anchor: legacyAnchor, stopAge: null },
+    }
+  }
+
+  // R2 — kruistoets: een expliciet anker vraagt om een eind-vorm, geen legacy-label.
+  if (legacyAnchor !== null) {
+    return {
+      error: `Kies een eind-vorm (deplete, legacy of perpetual) wanneer je een stopmoment meestuurt; "${strategy}" draagt zelf al een anker.`,
+    }
+  }
+  const parsed = parseStopAnchorInput(body)
+  if ('error' in parsed) return parsed
+
+  // R4 (B7) — een stopleeftijd op of voorbij de eindleeftijd laat geen plan over om te toetsen.
+  if (parsed.anchor === 'age' && parsed.stopAge !== null && parsed.stopAge >= endAge) {
+    return { error: 'Een stopleeftijd moet vóór de eindleeftijd van je plan liggen.' }
+  }
+
+  return { strategy, endAge, legacyAmount, anchor: parsed }
+}
+
+/**
  * Terugleespad van de override — GENERIEK: elke waarde op de canonieke allowlist
  * telt, zodat een derde of vierde strategie nooit over dezelfde kabel struikelt als
  * 'nu-stoppen' deed. De kolom wint zodra ze iets anders draagt dan de
@@ -125,15 +230,34 @@ export async function GET() {
   const claims = await getAuthClaims(supabase)
   if (!claims) return unauthorized()
 
+  // Eén select voor het hele plan (FIRE_PLAN_COLUMNS, L1) — de ankerkolommen zijn
+  // live (migratie 20260903140000 + backfill 20260903141000), dus geen aparte query
+  // en geen 42703-vangnet meer.
   const { data, error } = await supabase
     .from('profiles')
-    .select('retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, feature_preferences, deficit_loan_rate')
+    .select(`retirement_expense_method, retirement_expense_custom_amount, ${FIRE_PLAN_COLUMNS}, feature_preferences, deficit_loan_rate`)
     .eq('id', claims.sub)
     .single()
 
   if (error) return NextResponse.json({ error: 'Fout bij laden' }, { status: 500 })
 
-  const strategy = resolveStoredStrategy(data?.fire_end_strategy, data?.feature_preferences)
+  const row = (data ?? {}) as {
+    retirement_expense_method?: string | null
+    retirement_expense_custom_amount?: number | null
+    fire_end_strategy?: string | null
+    fire_end_age?: number | null
+    fire_legacy_amount?: number | string | null
+    fire_stop_anchor?: string | null
+    fire_stop_age?: number | string | null
+    feature_preferences?: unknown
+    deficit_loan_rate?: number | null
+  }
+  const strategy = resolveStoredStrategy(row.fire_end_strategy, row.feature_preferences)
+
+  // Het anker via de ENE parser (D2: een legacy-label in de oude kolom wint), met de
+  // override al opgelost — spiegel van `resolveFirePlan` in de kernel-adapter, zodat
+  // route en kernel nooit twee lezingen van dezelfde rij hebben.
+  const plan = parseFirePlan({ ...row, fire_end_strategy: strategy })
 
   // monthly_savings_override — aparte maybeSingle() zodat ontbrekende kolom
   // op legacy DBs (migratie 20260513000001 nog niet gerund) graceful null
@@ -149,40 +273,17 @@ export async function GET() {
     monthlySavingsOverride = raw == null ? null : Number(raw)
   }
 
-  // Stop-anker — aparte query zolang migratie 20260903140000 niet is uitgerold
-  // (zie STOP_ANCHOR_COLUMNS hierboven). Ontbreekt de kolom, dan LEIDT het anker
-  // zich af uit de legacy-strategie, exact zoals `parseFirePlan` dat doet: dan
-  // geven route en loader hetzelfde plan terug en spreekt geen rij zichzelf tegen.
-  let stopAnchor: string = strategy === 'pensioen' ? 'aow' : strategy === 'nu-stoppen' ? 'now' : 'solved'
-  let stopAge: number | null = null
-  const { data: anchorData, error: anchorError } = await supabase
-    .from('profiles')
-    .select(STOP_ANCHOR_COLUMNS)
-    .eq('id', claims.sub)
-    .maybeSingle()
-  if (!anchorError && anchorData) {
-    const row = anchorData as { fire_stop_anchor?: string | null; fire_stop_age?: number | string | null }
-    // De legacy-strategie WINT voor het anker (ADR 0129 D2) — een half-gebackfillde
-    // rij mag niet halverwege van plan wisselen.
-    if (strategy !== 'pensioen' && strategy !== 'nu-stoppen' && isStopAnchorKind(row.fire_stop_anchor)) {
-      stopAnchor = row.fire_stop_anchor
-      stopAge = row.fire_stop_age == null ? null : Number(row.fire_stop_age)
-    }
-  } else if (anchorError && !isMissingColumn(anchorError)) {
-    console.warn('[fire-settings] stop-anker lezen mislukt:', anchorError.message)
-  }
-
   return NextResponse.json({
-    fire_stop_anchor: stopAnchor,
-    fire_stop_age: stopAge,
-    retirement_expense_method: data?.retirement_expense_method ?? 'essential_budgets',
-    retirement_expense_custom_amount: data?.retirement_expense_custom_amount ?? null,
+    fire_stop_anchor: plan.anchor.kind,
+    fire_stop_age: plan.anchor.kind === 'age' ? plan.anchor.age : null,
+    retirement_expense_method: row.retirement_expense_method ?? 'essential_budgets',
+    retirement_expense_custom_amount: row.retirement_expense_custom_amount ?? null,
     fire_end_strategy: strategy,
-    fire_end_age: data?.fire_end_age ?? 90,
-    fire_legacy_amount: data?.fire_legacy_amount ?? null,
+    fire_end_age: row.fire_end_age ?? 90,
+    fire_legacy_amount: row.fire_legacy_amount ?? null,
     monthly_savings_override: monthlySavingsOverride,
     // V7 — tekort-lening-jaarrente (0..1). NULL = adapter gebruikt Excel-default 0,05.
-    deficit_loan_rate: data?.deficit_loan_rate ?? null,
+    deficit_loan_rate: row.deficit_loan_rate ?? null,
   })
 }
 
@@ -200,28 +301,12 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Ongeldig verzoek' }, { status: 400 })
   }
 
-  // Validate
-  const strategy = String(body.fire_end_strategy ?? 'deplete')
-  if (!isFireEndStrategy(strategy)) {
-    return NextResponse.json({ error: `Ongeldige strategie: ${strategy}` }, { status: 400 })
+  // ── Het plan: één gevalideerd blok of niets ────────────────────────────────
+  const planParsed = parsePlanInput(body)
+  if (planParsed !== null && 'error' in planParsed) {
+    return NextResponse.json({ error: planParsed.error }, { status: 400 })
   }
-  const endAge = Number(body.fire_end_age) || 90
-  if (endAge < 50 || endAge > 120) {
-    return NextResponse.json({ error: 'Eindleeftijd moet tussen 50 en 120 liggen' }, { status: 400 })
-  }
-  const legacyAmount = body.fire_legacy_amount != null ? Number(body.fire_legacy_amount) : null
-
-  // Stop-anker — alleen meenemen als de client het expliciet stuurt, zodat een
-  // oudere client (die het veld niet kent) het anker niet stil op 'solved' zet.
-  const anchorInBody = 'fire_stop_anchor' in body || 'fire_stop_age' in body
-  let stopAnchorInput: StopAnchorInput | null = null
-  if (anchorInBody) {
-    const parsed = parseStopAnchorInput(body)
-    if ('error' in parsed) {
-      return NextResponse.json({ error: parsed.error }, { status: 400 })
-    }
-    stopAnchorInput = parsed
-  }
+  const plan: PlanInput | null = planParsed
 
   // V7 — tekort-lening-jaarrente (optioneel). null = wis (adapter → Excel-default 0,05).
   // Alleen meenemen wanneer expliciet in de body; gevalideerd op 0..1 (= DB-CHECK).
@@ -238,12 +323,19 @@ export async function PUT(request: NextRequest) {
     }
   }
 
-  // Build update payload — only include retirement fields when explicitly provided
+  // Build update payload — het plan als één blok (R1), losse velden alleen wanneer
+  // expliciet aanwezig.
   const updatePayload: Record<string, unknown> = {
-    fire_end_strategy: strategy,
-    fire_end_age: endAge,
-    fire_legacy_amount: legacyAmount,
     updated_at: new Date().toISOString(),
+  }
+  if (plan) {
+    updatePayload.fire_end_strategy = plan.strategy
+    updatePayload.fire_end_age = plan.endAge
+    updatePayload.fire_legacy_amount = plan.legacyAmount
+    if (plan.anchor) {
+      updatePayload.fire_stop_anchor = plan.anchor.anchor
+      updatePayload.fire_stop_age = plan.anchor.stopAge
+    }
   }
   if (deficitLoanRate !== undefined) updatePayload.deficit_loan_rate = deficitLoanRate
 
@@ -258,22 +350,30 @@ export async function PUT(request: NextRequest) {
 
   // monthly_savings_override — alleen meenemen als expliciet aanwezig in body.
   // Apart bijgewerkt na de hoofd-update zodat een ontbrekende kolom (legacy DBs
-  // zonder migratie 20260513000001) niet de hele save laat falen.
+  // zonder migratie 20260513000001) niet de hele save laat falen. Dit is de ENIGE
+  // kolom die nog een eigen statement heeft — die is écht optioneel op legacy-DB's.
   const overrideInBody = 'monthly_savings_override' in body
   const overrideValue = overrideInBody
     ? (body.monthly_savings_override == null ? null : Number(body.monthly_savings_override))
     : undefined
 
-  // First attempt — try saving directly to profiles
+  // Niets te schrijven (alleen updated_at) en geen override → client-fout, geen stille no-op.
+  if (Object.keys(updatePayload).length === 1 && !overrideInBody) {
+    return NextResponse.json({ error: 'Geen instellingen om op te slaan' }, { status: 400 })
+  }
+
+  // De ene UPDATE — plan + losse velden atomair.
   const { error } = await supabase.from('profiles').update(updatePayload).eq('id', user.id)
 
   if (!error) {
     // Success — de kolom draagt de keuze zelf; een eventuele (stale) override weg.
-    const { data: current } = await supabase.from('profiles').select('feature_preferences').eq('id', user.id).single()
-    const fp = (current?.feature_preferences ?? {}) as Record<string, unknown>
-    if (fp[FP_KEY]) {
-      delete fp[FP_KEY]
-      await supabase.from('profiles').update({ feature_preferences: fp }).eq('id', user.id)
+    if (plan) {
+      const { data: current } = await supabase.from('profiles').select('feature_preferences').eq('id', user.id).single()
+      const fp = (current?.feature_preferences ?? {}) as Record<string, unknown>
+      if (fp[FP_KEY]) {
+        delete fp[FP_KEY]
+        await supabase.from('profiles').update({ feature_preferences: fp }).eq('id', user.id)
+      }
     }
     // monthly_savings_override — defensieve aparte update zodat een ontbrekende
     // kolom op legacy DBs niet de hele save laat falen. Bij missing-column-error
@@ -287,51 +387,21 @@ export async function PUT(request: NextRequest) {
         console.warn('[fire-settings] monthly_savings_override update failed (column may be missing):', overrideError.message)
       }
     }
-    // Stop-anker — aparte update, maar met een HARDE fout bij een ontbrekende
-    // kolom. Anders zou de gebruiker "opgeslagen" zien terwijl zijn stopmoment
-    // nergens landt en de volgende load zijn oude plan toont: precies de stille
-    // verliesbug die het schaduwpad hieronder ooit veroorzaakte. Liever een 409
-    // die zegt dat de database nog niet zover is.
-    if (stopAnchorInput) {
-      const { error: anchorError } = await supabase
-        .from('profiles')
-        .update({
-          fire_stop_anchor: stopAnchorInput.anchor,
-          fire_stop_age: stopAnchorInput.stopAge,
-        })
-        .eq('id', user.id)
-      if (anchorError) {
-        if (isMissingColumn(anchorError)) {
-          console.error('[fire-settings] stop-anker: kolom ontbreekt — migratie 20260903140000 nog niet uitgerold')
-          return NextResponse.json(
-            {
-              error: 'Je stopmoment kan nog niet worden opgeslagen; de database is nog niet bijgewerkt. Je overige instellingen zijn wél bewaard.',
-              code: 'stop_anchor_not_supported',
-            },
-            { status: 409 },
-          )
-        }
-        return serverError(anchorError, 'fire-settings:PUT:stop-anker', 'Stopmoment opslaan mislukt')
-      }
-    }
     return NextResponse.json({
       success: true,
       ...updatePayload,
       monthly_savings_override: overrideValue,
-      ...(stopAnchorInput
-        ? { fire_stop_anchor: stopAnchorInput.anchor, fire_stop_age: stopAnchorInput.stopAge }
-        : {}),
     })
   }
 
   // CHECK-constraint-violation (23514) op de strategiekolom: de database kent deze
   // waarde (nog) niet.
-  if (error.code === '23514' && error.message?.includes('fire_end_strategy')) {
-    if (strategy !== LEGACY_SHADOW_STRATEGY) {
+  if (plan && error.code === '23514' && error.message?.includes('fire_end_strategy')) {
+    if (plan.strategy !== LEGACY_SHADOW_STRATEGY) {
       // EERLIJKE FOUT, GEEN SCHIJN-OPSLAG (ADR 0127-review): niets schrijven — geen
       // 'deplete'-parkeerwaarde, geen override — zodat een GET erna precies teruggeeft
       // wat er wél is opgeslagen (de vorige keuze) en de gebruiker ziet dat het niet lukte.
-      console.error('[fire-settings] CHECK-violation op fire_end_strategy — waarde nog niet ondersteund door de database:', strategy)
+      console.error('[fire-settings] CHECK-violation op fire_end_strategy — waarde nog niet ondersteund door de database:', plan.strategy)
       return NextResponse.json(
         {
           error: 'Deze eindstrategie wordt door de database nog niet ondersteund. Je vorige instelling is ongewijzigd.',
@@ -354,7 +424,7 @@ export async function PUT(request: NextRequest) {
     // Store the actual strategy in feature_preferences (user-writable JSON on profiles)
     const { data: current } = await supabase.from('profiles').select('feature_preferences').eq('id', user.id).single()
     const fp = (current?.feature_preferences ?? {}) as Record<string, unknown>
-    fp[FP_KEY] = strategy
+    fp[FP_KEY] = plan.strategy
     const { error: fpError } = await supabase.from('profiles').update({ feature_preferences: fp }).eq('id', user.id)
     if (fpError) {
       return serverError(fpError, 'fire-settings:PUT:override', 'Override opslaan mislukt')

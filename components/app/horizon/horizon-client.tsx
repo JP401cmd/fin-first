@@ -271,7 +271,7 @@ import {
 } from '@/lib/euro-display'
 import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { PillRow } from '@/components/app/pill-row'
-import { parseFireStrategy, DEFAULT_FIRE_STRATEGY, type FireStrategyConfig, STRATEGY_LABELS, resolveFreedomFraming, fireAgeForDisplay } from '@/lib/fire-strategy'
+import { FIRE_PLAN_COLUMNS, parseFireStrategy, DEFAULT_FIRE_STRATEGY, type FireStrategyConfig, STRATEGY_LABELS, resolveFreedomFraming, fireAgeForDisplay } from '@/lib/fire-strategy'
 import { toSimResult } from '@/lib/unified-projection'
 import { buildHorizonInput } from '@/lib/horizon/build-input'
 import { buildDeeplinkCleanupUrl } from '@/lib/horizon/deeplink-cleanup'
@@ -1293,7 +1293,7 @@ export default function HorizonPage({
           // de bijbehorende bronsignalen, terwijl de `loadData`-select ze al
           // meenam. Zonder die twee kan de rekenlaag hier niet zien welke
           // grondslag geldt en leest ze een profielbedrag alsof het de waarheid is.
-          .select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, box3_method, marginaal_tarief, feature_preferences, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, withdrawal_profile_config, deficit_loan_rate, housing_strategy_config, pot_rules')
+          .select(`date_of_birth, retirement_expense_method, retirement_expense_custom_amount, ${FIRE_PLAN_COLUMNS}, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, box3_method, marginaal_tarief, feature_preferences, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, withdrawal_profile_config, deficit_loan_rate, housing_strategy_config, pot_rules`)
           .single()
         if (cancelled || !profileData) return
         // Jaarlijkse essentiële uitgaven — zelfde grondslag (echte essentiële
@@ -1352,7 +1352,7 @@ export default function HorizonPage({
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct').eq('is_active', true),
         supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-        supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, box3_method, marginaal_tarief, feature_preferences, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, withdrawal_profile_config, deficit_loan_rate, housing_strategy_config, pot_rules').single(),
+        supabase.from('profiles').select(`date_of_birth, retirement_expense_method, retirement_expense_custom_amount, ${FIRE_PLAN_COLUMNS}, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source, box3_method, marginaal_tarief, feature_preferences, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, withdrawal_profile_config, deficit_loan_rate, housing_strategy_config, pot_rules`).single(),
         supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
         supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
         supabase

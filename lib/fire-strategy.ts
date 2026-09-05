@@ -123,6 +123,18 @@ export interface FirePlan {
   legacyAmount: number
 }
 
+/**
+ * De vijf plan-kolommen op `profiles` als ÉÉN select-fragment (ADR 0129, contract-
+ * ronde L1). Elke profiel-select die het plan leest gebruikt dit fragment — nooit een
+ * losse opsomming van drie van de vijf. De aanleiding: zestien selects lazen
+ * `fire_end_strategy, fire_end_age, fire_legacy_amount` zónder het anker, waardoor
+ * bv. `horizon-client#loadData` de server-seed (mét anker) overschreef met een rij
+ * zónder — de hero sprong van AOW naar een gesolvede leeftijd. Wie een zesde
+ * plan-kolom toevoegt, doet dat hier en nergens anders.
+ */
+export const FIRE_PLAN_COLUMNS =
+  'fire_end_strategy, fire_end_age, fire_legacy_amount, fire_stop_anchor, fire_stop_age' as const
+
 /** De vier ankers als allowlist — bron voor de DB-CHECK én de API-validatie. */
 export const STOP_ANCHOR_KINDS = ['solved', 'aow', 'now', 'age'] as const
 export type StopAnchorKind = (typeof STOP_ANCHOR_KINDS)[number]
@@ -149,8 +161,24 @@ export function isFixedAnchor(plan: FirePlan): boolean {
   return plan.anchor.kind !== 'solved'
 }
 
-/** Halve jaren: de stop-slider staat op `step={0.5}` en de kernel neemt fractionele
- *  leeftijden aan. Stil afronden naar hele jaren vervalst een keuze (ADR 0129 B6). */
+/**
+ * Halve jaren (ADR 0129 B6) — TOLERANT LEZEN, STRENG SCHRIJVEN.
+ *
+ * Deze functie leest een reeds opgeslagen `fire_stop_age` en rondt 'm naar de
+ * dichtstbijzijnde halve jaar (58,3 → 58,5). Dat is bewust ánders dan de PUT-route
+ * (`app/api/fire-settings`), die dezelfde 58,3 met een 400 afwijst. De twee lagen
+ * beantwoorden verschillende vragen:
+ *  - SCHRIJVEN is een keuze van de gebruiker: stil afronden zou die keuze vervalsen,
+ *    dus de route weigert en laat de client zijn resolutie corrigeren.
+ *  - LEZEN gaat over een rij die er al is: de DB-CHECK
+ *    (`fire_stop_age * 2 = floor(fire_stop_age * 2)`, migratie 20260903140000)
+ *    garandeert halve jaren, dus in de praktijk is deze afronding de identiteit. Ze
+ *    staat er als vangnet voor een rij die buiten de route om is ontstaan (seed,
+ *    handmatige SQL, een toekomstige kolomwijziging): liever een leesbaar plan op
+ *    58,5 dan een crash of een stil naar `solved` gevallen anker.
+ * Buiten [18, 100] is geen leeftijd → `null` → het anker valt terug op `solved`.
+ * Gepind in `fire-strategy.plan.test.ts` en WF-KRUIS-28 (`tolerantGelezen58.3`).
+ */
 function normalizeStopAge(raw: unknown): number | null {
   const n = Number(raw)
   if (!Number.isFinite(n)) return null

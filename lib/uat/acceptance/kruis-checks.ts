@@ -211,16 +211,22 @@ export const KRUIS_ENGINE_CHECKS: KruisEngineCheck[] = [
         fire_end_strategy: 'legacy',
         fire_stop_anchor: 'aow',
       }).anchor.kind
-      const halveJarenNietAfgerond = parseFirePlan({
+      // TOLERANT LEZEN (B6): een reeds opgeslagen 58,3 wordt bij het LEZEN naar de
+      // dichtstbijzijnde halve jaar gebracht (58,5) — dat ís afronden, en heet hier ook
+      // zo. De DB-CHECK garandeert halve jaren, dus dit is een vangnet voor rijen die
+      // buiten de route om zijn ontstaan. SCHRIJVEN is streng: de PUT-route wijst
+      // dezelfde 58,3 met 400 af (route.stop-anker.test.ts) — een keuze mag niet stil
+      // verschuiven. Zie de docstring bij `normalizeStopAge` in lib/fire-strategy.ts.
+      const tolerantGelezen = parseFirePlan({
         fire_stop_anchor: 'age',
         fire_stop_age: 58.3,
       }).anchor
       return {
-        expected: 'halverwege=aow; nuStoppenLegacy=now; nieuweKolomLeidtBijEindVorm=aow; halveJarenNietAfgerond=age58.5',
+        expected: 'halverwege=aow; nuStoppenLegacy=now; nieuweKolomLeidtBijEindVorm=aow; tolerantGelezen58.3=age58.5',
         actual:
           `halverwege=${halverwege}; nuStoppenLegacy=${nuStoppenLegacy}; ` +
           `nieuweKolomLeidtBijEindVorm=${nieuweKolomLeidtBijEindVorm}; ` +
-          `halveJarenNietAfgerond=${halveJarenNietAfgerond.kind === 'age' ? `age${halveJarenNietAfgerond.age}` : halveJarenNietAfgerond.kind}`,
+          `tolerantGelezen58.3=${tolerantGelezen.kind === 'age' ? `age${tolerantGelezen.age}` : tolerantGelezen.kind}`,
       }
     },
   },

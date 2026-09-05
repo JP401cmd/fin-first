@@ -2,6 +2,7 @@ import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { computeFireAge } from '@/lib/checkin/fire-age'
 import { resolveFireParams } from '@/lib/fire-params'
+import { FIRE_PLAN_COLUMNS } from '@/lib/fire-strategy'
 import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 import { savingsRateDataMonths, savingsRateWindow } from '@/lib/savings-source'
 import { deriveRealMonthTotals } from '@/lib/cashflow-month-totals'
@@ -110,7 +111,7 @@ export async function GET() {
     // Profile for FIRE age
     supabase
       .from('profiles')
-      .select('date_of_birth, expected_return, inflation_rate, fire_end_strategy, fire_end_age')
+      .select(`date_of_birth, expected_return, inflation_rate, ${FIRE_PLAN_COLUMNS}`)
       .eq('id', claims.sub)
       .maybeSingle(),
   ])

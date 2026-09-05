@@ -6,7 +6,7 @@ import { annualAmount } from '@/lib/budget-utils'
 import { localMonthBounds } from '@/lib/month-range'
 import { computeScalarFireRange, type ScalarFireParams } from '@/lib/horizon-kernel/scalar-router'
 import { resolveFireParamsWithAssumptions } from '@/lib/fire-params'
-import { resolveFireStrategyWithOverride } from '@/lib/fire-strategy'
+import { FIRE_PLAN_COLUMNS, resolveFireStrategyWithOverride } from '@/lib/fire-strategy'
 import type { FireAssumptionRow } from '@/lib/fire-assumptions'
 
 /**
@@ -167,7 +167,7 @@ export async function GET() {
     supabase
       .from('profiles')
       .select(
-        'id, full_name, date_of_birth, expected_return, inflation_rate, box3_method, fire_end_strategy, fire_end_age, fire_legacy_amount, feature_preferences',
+        `id, full_name, date_of_birth, expected_return, inflation_rate, box3_method, ${FIRE_PLAN_COLUMNS}, feature_preferences`,
       )
       .in('id', memberIds),
     // Current month transactions for all members
@@ -228,6 +228,9 @@ export async function GET() {
     fire_end_strategy?: string | null
     fire_end_age?: number | null
     fire_legacy_amount?: number | string | null
+    /** ADR 0129 L1 — plan-anker; het scalar-pad leest 'm nog niet (F3a), de select draagt 'm wel. */
+    fire_stop_anchor?: string | null
+    fire_stop_age?: number | string | null
     feature_preferences?: Record<string, unknown> | null
   }
   const scalarParamsFor = (

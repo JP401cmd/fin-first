@@ -236,6 +236,16 @@ export function buildScalarAdapterInput(params: ScalarFireParams): KernelAdapter
     fire_end_strategy: strategyOptions?.strategy ?? 'perpetual',
     fire_end_age: strategyOptions?.endAge ?? null,
     fire_legacy_amount: strategyOptions?.legacyAmount ?? 0,
+    // ADR 0129 L1 — het plan is vijf kolommen; dit synthetische profiel draagt ze
+    // EXPLICIET. Het scalar-pad kent alleen de legacy-strategielabel
+    // (`FireStrategyConfig`, een F3a-luik), dus het anker komt hier uitsluitend via
+    // de tegenspraak-regel D2 uit die label ('pensioen' → aow, 'nu-stoppen' → now);
+    // een `age`-/`aow`-anker naast een eind-vorm is op dit pad nog niet uitdrukbaar
+    // en valt op `solved`. Bewust `null` (= solved) i.p.v. weggelaten, zodat een lezer
+    // niet aanneemt dat het anker hier per ongeluk verloren gaat: het is een bekende
+    // grens van dit pad tot F3a `ScalarStrategyOptions` op `FirePlan` zet.
+    fire_stop_anchor: null,
+    fire_stop_age: null,
     feature_preferences: null,
   }
   return {

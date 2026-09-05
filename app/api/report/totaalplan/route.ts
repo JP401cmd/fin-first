@@ -23,6 +23,7 @@
 import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
 import { NL_AOW_AGE } from '@/lib/constants'
+import { FIRE_PLAN_COLUMNS } from '@/lib/fire-strategy'
 import { loadHorizonRaw } from '@/lib/horizon-data-loader'
 import { buildHorizonInput } from '@/lib/horizon/build-input'
 import { collectAandachtspunten } from '@/lib/aandachtspunten-loader'
@@ -59,7 +60,7 @@ export async function GET() {
       supabase
         .from('profiles')
         .select(
-          'full_name, date_of_birth, household_type, number_of_children, net_monthly_income, estimated_monthly_expenses, expected_return, inflation_rate, marginaal_tarief, fire_end_strategy, fire_end_age, fire_legacy_amount, retirement_expense_method, retirement_expense_custom_amount, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, feature_preferences',
+          `full_name, date_of_birth, household_type, number_of_children, net_monthly_income, estimated_monthly_expenses, expected_return, inflation_rate, marginaal_tarief, ${FIRE_PLAN_COLUMNS}, retirement_expense_method, retirement_expense_custom_amount, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, feature_preferences`,
         )
         .single(),
       supabase.from('aow_leeftijd').select('*'),

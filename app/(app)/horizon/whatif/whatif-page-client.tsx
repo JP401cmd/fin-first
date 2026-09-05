@@ -58,7 +58,7 @@ import { type Asset, ASSET_CLIENT_COLUMNS, ASSET_TYPE_LABELS } from '@/lib/asset
 import type { Debt } from '@/lib/debt-data'
 import type { Box3Method } from '@/lib/bucket-projection'
 import { computeYearlyMustExpenses, computeRetirementExpenses, type RetirementExpenseMethod } from '@/lib/budget-utils'
-import { parseFireStrategy, type FireStrategyConfig, STRATEGY_LABELS } from '@/lib/fire-strategy'
+import { FIRE_PLAN_COLUMNS, parseFireStrategy, type FireStrategyConfig, STRATEGY_LABELS } from '@/lib/fire-strategy'
 import { SimChart, type ScenarioOverlay, type MonteCarloOverlay } from '@/components/app/horizon/sim-chart'
 import { type SavedScenario, WHATIF_SCENARIO_COLORS } from '@/lib/scenario-types'
 import { ZoomableChartContainer } from '@/components/app/horizon/zoomable-chart-container'
@@ -253,7 +253,7 @@ export default function WhatIfPage({ marktVolatiliteit }: WhatIfPageProps) {
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct').eq('is_active', true),
         supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-        supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, estimated_monthly_expenses, household_type, box3_method, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, net_monthly_income, income_source, expenses_source, monthly_savings_override, housing_strategy_config, feature_preferences').single(),
+        supabase.from('profiles').select(`date_of_birth, retirement_expense_method, retirement_expense_custom_amount, ${FIRE_PLAN_COLUMNS}, expected_return, inflation_rate, estimated_monthly_expenses, household_type, box3_method, withdrawal_strategy, guardrail_floor, guardrail_ceiling, guardrail_cut_step, guardrail_raise_step, net_monthly_income, income_source, expenses_source, monthly_savings_override, housing_strategy_config, feature_preferences`).single(),
         supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
         supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
         supabase.from('budgets').select('id, name, parent_id, default_limit, is_essential, interval, budget_type').not('parent_id', 'is', null).not('budget_type', 'in', '("archive","income","savings")'),

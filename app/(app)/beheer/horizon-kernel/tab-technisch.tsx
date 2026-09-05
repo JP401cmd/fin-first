@@ -35,6 +35,7 @@ const STATUSSEN: ReadonlyArray<{ code: string; titel: string; tekst: string }> =
   { code: 'unreachable_within_horizon', titel: 'Niet haalbaar binnen horizon', tekst: 'Zelfs op leeftijd 100 blijft de gap negatief. Het model parkeert FIRE op de horizon en geeft een €/maand-extra-sparen-hint.' },
   { code: 'pension_shortfall', titel: 'Pensioen-tekort', tekst: 'Bij de eindstrategie "Pensioenleeftijd" springt de tekort-lening aan vóór de eindleeftijd — het plan komt niet rond zonder bijsturen.' },
   { code: 'stop_now_shortfall', titel: 'Stop-nu-tekort', tekst: 'Bij de eindstrategie "Nu stoppen" (FIRE op maand 0, ADR 0127) springt de tekort-lening aan vóór de eigen eindleeftijd — het vermogen reikt niet tot daar. Buiten het Excel-oracle.' },
+  { code: 'anchor_shortfall', titel: 'Tekort onder een vast stopmoment', tekst: 'Onder een vast stop-anker (AOW of zelfgekozen leeftijd, ADR 0129 D3) reikt het plan niet tot zijn eindleeftijd: de tekort-lening springt aan (opeten), het doel op de eindleeftijd wordt niet gehaald (nalatenschap/eeuwigdurend) of er is geen koopkracht om te behouden. Onder een vast anker valt nooit "niet haalbaar binnen horizon" — dat is bisectie-taal. Het nu-anker houdt tot F4 zijn eigen naam (stop_now_shortfall). Buiten het Excel-oracle.' },
 ]
 
 const AFWIJKINGEN: ReadonlyArray<{ titel: string; tekst: string; akkoord: string }> = [

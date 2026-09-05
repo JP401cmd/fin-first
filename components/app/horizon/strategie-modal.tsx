@@ -12,7 +12,7 @@ import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/format'
 import { type FinancialInput, type LifeEvent, ageAtDate } from '@/lib/horizon-data'
 import { NL_AOW_AGE } from '@/lib/constants'
-import { parseFireStrategy, type FireStrategyConfig } from '@/lib/fire-strategy'
+import { FIRE_PLAN_COLUMNS, parseFireStrategy, type FireStrategyConfig } from '@/lib/fire-strategy'
 import {
   type WithdrawalStrategyConfig,
   type WithdrawalProfiel,
@@ -194,7 +194,7 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
         supabase.from('transactions').select('amount').gte('date', monthStart).lt('date', monthEnd),
         supabase.from('assets').select('current_value, monthly_contribution, net_worth_inclusion_pct').eq('is_active', true),
         supabase.from('debts').select('current_balance, net_worth_inclusion_pct').eq('is_active', true),
-        supabase.from('profiles').select('date_of_birth, retirement_expense_method, retirement_expense_custom_amount, fire_end_strategy, fire_end_age, fire_legacy_amount, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source').single(),
+        supabase.from('profiles').select(`date_of_birth, retirement_expense_method, retirement_expense_custom_amount, ${FIRE_PLAN_COLUMNS}, expected_return, inflation_rate, net_monthly_income, estimated_monthly_expenses, income_source, expenses_source`).single(),
         supabase.from('budgets').select('id, name, default_limit, interval, budget_type, is_essential').eq('is_essential', true).in('budget_type', ['expense']).is('parent_id', null),
         supabase.from('life_events').select('*').eq('is_active', true).order('sort_order', { ascending: true }),
         supabase.from('budgets').select('id, name, parent_id, default_limit, is_essential, interval, budget_type').not('parent_id', 'is', null).not('budget_type', 'in', '("archive","income","savings")'),

@@ -335,6 +335,32 @@ describe('buildForcedStopSolve — motor-helft van het geforceerde-stop-recept',
     expect(bridged.maandHint).toBe(run.solve.maandHint)
   })
 
+  it('K3 (ADR 0129 D5) — ankerMaand op een geforceerde run is de GEFORCEERDE maand, niet het plan-anker', () => {
+    // Het defect uit de review: een aow-gebruiker van 47 kreeg op de /overzicht-runway
+    // (stop nu, maand 0) een `ankerMaand` van (67−47)·12 = 240 — het anker van het PLAN.
+    // Zodra `computeRunwayCoveragePct({depletionMonth, ankerMaand})` daarop rekent,
+    // geeft een runway van 20 jaar 0% dekking ("uitputting vóór het stopmoment").
+    const aowPlan = { ...base, profile: { ...profile, fire_stop_anchor: 'aow' as const } }
+
+    // Stop-nu-runway: geforceerd op de startleeftijd ⇒ maand 0, ook onder een aow-plan.
+    const runway = buildForcedStopSolve({ ...aowPlan, stopAge: 'nu', endStrategy: 'inherit' })
+    expect(runway.kernelInput.stopAnker).toEqual({ soort: 'aow' })
+    expect(bridgeForcedStop(runway, aowPlan).result.ankerMaand).toBe(0)
+
+    // Scenariokaart "stop op STOP_AGE": de geforceerde maand, het plan-anker (aow) staat ernaast.
+    const kaart = buildForcedStopSolve({ ...aowPlan, stopAge: STOP_AGE })
+    const kaartBridged = bridgeForcedStop(kaart, aowPlan)
+    expect(kaartBridged.result.ankerMaand).toBe(Math.round((STOP_AGE - kaart.kernelInput.startLeeftijd) * 12))
+    expect(kaartBridged.result.stopAnker).toEqual({ soort: 'aow' })
+
+    // Onder `solved` (geen plan-anker) is een geforceerde run óók een vast stopmoment.
+    const solvedKaart = buildForcedStopSolve({ ...base, stopAge: STOP_AGE })
+    expect(solvedKaart.kernelInput.stopAnker).toBeUndefined()
+    expect(bridgeForcedStop(solvedKaart, base).result.ankerMaand).toBe(
+      Math.round((STOP_AGE - solvedKaart.kernelInput.startLeeftijd) * 12),
+    )
+  })
+
   it('gooit bij een kern-fout — de aanroeper kiest de degradatie (runForcedStopPath → null)', () => {
     const kapot = { ...base, profile: { ...profile, date_of_birth: null }, stopAge: STOP_AGE }
     expect(() => buildForcedStopSolve(kapot)).toThrow()

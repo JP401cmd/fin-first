@@ -6,7 +6,9 @@
  *  - **B35 eindleeftijd** = IFS per eindstrategie (deplete→B51, legacy→B52,
  *    perpetual/pensioen→100);
  *  - **B36 doelbedrag**   = legacy: B53·(1+B14)^(B35−B7); perpetual:
- *    Prognose!J@FIRE·(1+B14)^(B35−B16); anders 0;
+ *    Prognose!J@FIRE·(1+B14)^(B35−B16); anders 0. Buiten oracle-domein (ADR 0129
+ *    K2): bij een FIRE-moment vóór de startleeftijd leest perpetual J op
+ *    max(0, FIRE-maand) en indexeert over de effectieve span;
  *  - **B37 modelwaarde**  = INDEX(legacy ∧ B54="Ja" ? Prognose!I : Prognose!J,
  *    (B35−B7)·12+1) — Excel-INDEX trunceert de rij-index;
  *  - **B38 gap**          = B37 − B36.
@@ -115,9 +117,22 @@ export function computeDoelblok(
   if (code === 'legacy') {
     doelbedrag = es.nalatenschapBedrag * (1 + inflatie) ** (eindleeftijd - start)
   } else if (code === 'perpetual') {
-    const fireMonth = Math.round((fireAge - start) * 12)
+    // ADR 0129 (contract-ronde K2) — het perpetual-doel hangt aan Prognose!J op de
+    // FIRE-maand van déze run. Ligt het stopmoment VÓÓR de startleeftijd (een
+    // AOW-anker bij iemand die de AOW al voorbij is; een geforceerde stop in het
+    // verleden), dan bestaat die maand niet in de projectie: `prognoseJ` gaf `null`,
+    // `?? 0` maakte er doel €0 van en het plan degradeerde stil tot deplete —
+    // "je vermogen houdt zijn koopkracht" werd nergens getoetst. De engine rekent
+    // zo'n stop als maand 0 (de hele run is onttrekking; vastgepind in anker.test.ts
+    // "negatieve FIRE-maand"), dus het doel wordt op diezelfde EFFECTIEVE stopmaand
+    // gelezen én over diezelfde effectieve span geïndexeerd — J(0) 33 jaar indexeren
+    // terwijl er 30 verstrijken zou het doel kunstmatig verhogen. Oracle-domein
+    // onaangeroerd: daar is fireAge ≥ startleeftijd (bisectie vanaf maand 0), dus
+    // `max` is de identiteit en de 736 fixtures blijven byte-identiek.
+    const effectieveFireAge = Math.max(fireAge, start)
+    const fireMonth = Math.round((effectieveFireAge - start) * 12)
     const jBijFire = prognoseJ(proj, fireMonth) ?? 0
-    doelbedrag = jBijFire * (1 + inflatie) ** (eindleeftijd - fireAge)
+    doelbedrag = jBijFire * (1 + inflatie) ** (eindleeftijd - effectieveFireAge)
   }
 
   const useI = code === 'legacy' && es.nietLiquideMeetellen === 'Ja'

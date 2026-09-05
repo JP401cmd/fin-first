@@ -60,9 +60,12 @@ import type { KernelInput } from './types'
  * P!B93/B100 — de vier solver-statussen (exacte Excel-teksten) plus twee
  * anker-statussen buiten het oracle-domein:
  *
- *  - `anchor_shortfall` (ADR 0129 D3) — onder een VAST stopmoment springt de
- *    tekort-lening aan vóór de eindleeftijd van het plan. Generiek over de drie
- *    vaste ankers; BEWUST geen hergebruik van `pension_shortfall`, want dat draagt
+ *  - `anchor_shortfall` (ADR 0129 D3) — onder een VAST stopmoment reikt het plan
+ *    niet tot zijn eindleeftijd: de tekort-lening springt aan (deplete), het doel op
+ *    de eindleeftijd wordt niet gehaald (legacy/perpetual, `gap < 0`) of er is geen
+ *    koopkracht om te behouden (perpetual, `doelbedrag < 0`). Onder een vast anker
+ *    valt NOOIT `unreachable_within_horizon` — dat is bisectie-taal. Generiek over de
+ *    drie vaste ankers; BEWUST geen hergebruik van `pension_shortfall`, want dat draagt
  *    AOW-kopij terwijl dit tekort ook vóór óf ná de AOW kan vallen.
  *  - `stop_now_shortfall` (ADR 0127) — dezelfde uitkomst onder het `nu`-anker.
  *    Blijft in F2 bestaan omdat de /toekomst-statusblokken deze naam nog lezen
@@ -132,6 +135,20 @@ export interface SolveFireResult {
   readonly tekortLeningTotEindleeftijd: number
   /** Aantal engine-runs (bisectie-stappen + eind-run) — voor rapportage. */
   readonly engineRuns: number
+  /**
+   * Het VASTE stopmoment van déze run (leeftijd, fractioneel), of `null` wanneer de
+   * bisectie het stopmoment zocht — incl. de horizon-parkeerstand, want dat is geen
+   * gekozen moment. Gezet door de anker-kortsluiting (`resolveVastAnker`), de
+   * oracle-pensioen-kortsluiting (FIRE = AOW) én `evaluateFireAt` (geforceerd = vast).
+   *
+   * Voedt `ankerMaand` in de bridge (ADR 0129 D5, contract-ronde K3): de dekking
+   * meet vanaf het stopmoment van de RUN. Voor de plan-run is dat het plan-anker; voor
+   * een geforceerde run (de stop-nu-runway op /overzicht, de scenariokaarten) de
+   * geforceerde maand — níet het plan-anker, anders geeft een runway van 20 jaar bij
+   * een aow-gebruiker van 47 0% dekking ("uitputting vóór het stopmoment").
+   * Buiten oracle-domein (het Excel kent geen geforceerde runs); additief veld.
+   */
+  readonly vastStopLeeftijd: number | null
   /** De projectie van de eindstand (basis voor wrappers/beheer). */
   readonly projection: KernelProjection
 }
@@ -211,16 +228,27 @@ function computeStatusBlok(
   const schijnbereik =
     input.reachedNowVereistBereikbaarDoel === true && (doelbedrag < 0 || gap < 0)
   const jMaand0 = prognoseJ(proj, 0) ?? 0
+  // ADR 0129 D3 (contract-ronde K1) — VAST ANKER: elke "nee" is een TEKORT, nooit
+  // `unreachable_within_horizon`. Die status is bisectie-taal ("geen maand gevonden
+  // waarop het doel haalbaar is") en heeft geen betekenis voor een plan waarvan het
+  // stopmoment vastligt: daar is de vraag niet wánneer, maar óf het geld tot de
+  // eindleeftijd reikt. Drie tekort-signalen, elk voor een andere eind-vorm:
+  //  - `tekortLening > 0`  — deplete: het liquide vermogen is vóór de eindleeftijd op
+  //                          (bij doel €0 mét `tekortAflossingUitLiquide` impliceert
+  //                          `gap < 0` altijd dit signaal, dus deplete is ongewijzigd);
+  //  - `gap < 0`           — legacy/perpetual: het doel op de eindleeftijd wordt niet
+  //                          gehaald terwijl J wél ≥ 0 kan blijven (géén tekort-lening,
+  //                          wel een tekort op het nalatenschaps-/koopkrachtdoel);
+  //  - `doelbedrag < 0`    — perpetual met J@stop < 0: er is geen koopkracht om te
+  //                          behouden, dus ook een `gap ≥ 0` is hier geen dekking.
+  // Gemeten vóór deze regel: `aow × legacy` (€50M) en `age 58 × perpetual` (×0,05)
+  // vielen via de schijnbereik-tak op `unreachable` → bridge `fireReachable = false`
+  // → hero zonder stopleeftijd, "FIRE niet haalbaar"-kopij en lege scenariokaarten.
+  const vastAnkerTekort = tekortLening > 0 || gap < 0 || doelbedrag < 0
   let status: SolverStatus
   if (code === 'pensioen' && tekortLening > 0) {
     status = 'pension_shortfall'
-  } else if (input.stopAnker !== undefined && tekortLening > 0) {
-    // ADR 0129 D3 — VAST ANKER: het geld reikt niet tot de eindleeftijd van het plan.
-    // Bij doel €0 mét `tekortAflossingUitLiquide` kan `gap < 0` niet zonder
-    // tekort-lening > 0, dus de M6-schijnbereik-tak hieronder is voor élk vast anker
-    // met een deplete-eindvorm onbereikbaar (vastgepind in anker.test.ts): de status
-    // is óf deze, óf `reached_now`.
-    //
+  } else if (input.stopAnker !== undefined && vastAnkerTekort) {
     // F2-COMPAT-STAART (F4 verwijdert deze regel): het `nu`-anker houdt zijn ADR
     // 0127-naam, omdat de statusblokken op /toekomst nog letterlijk op
     // `stop_now_shortfall` matchen. Zou het nu-anker meteen `anchor_shortfall`
@@ -271,6 +299,7 @@ export function solveFire(input: KernelInput): SolveFireResult {
   const afronden = (
     fireAge: number,
     proj: KernelProjection,
+    vastStopLeeftijd: number | null,
   ): SolveFireResult => {
     const blok = computeStatusBlok(input, proj, fireAge)
     return {
@@ -283,6 +312,7 @@ export function solveFire(input: KernelInput): SolveFireResult {
       maandHint: blok.maandHint,
       tekortLeningTotEindleeftijd: blok.tekortLening,
       engineRuns,
+      vastStopLeeftijd,
       projection: proj,
     }
   }
@@ -295,15 +325,17 @@ export function solveFire(input: KernelInput): SolveFireResult {
   //    regelt de engine het guardrails-anker zelf (T0-stand).
   const vastAnker = resolveVastAnker(input, es)
   if (vastAnker !== null) {
-    return afronden(vastAnker, run(vastAnker))
+    return afronden(vastAnker, run(vastAnker), vastAnker)
   }
 
   // ── Pensioenleeftijd zónder anker-blok: het ORACLE-pad, ongewijzigd ─────────
   //    De Excel-macro kortsluit B16 op ES!C15. Dit pad draagt de 736 fixtures; de
   //    app stuurt sinds F2 `stopAnker: {soort:'aow'}` en komt hier niet meer langs.
+  //    Het stopmoment ligt hier óók vast (FIRE = AOW) → `vastStopLeeftijd` gezet;
+  //    dat veld zit niet in de parity-vergelijking (statusblok/tabellen ongewijzigd).
   if (es.interneCode === 'pensioen') {
     const fireAge = es.pensioenleeftijd
-    return afronden(fireAge, run(fireAge))
+    return afronden(fireAge, run(fireAge), fireAge)
   }
 
   // ── Horizon-check: gap < 0 op leeftijd 100 → parkeerstand ───────────────────
@@ -317,7 +349,8 @@ export function solveFire(input: KernelInput): SolveFireResult {
   // (byte-identiek: beide leiden B38 uit computeDoelblok(input, es, proj, fireAge)).
   let proj = run(leeftijd + hi / 12)
   if (computeGap(input, es, proj, leeftijd + hi / 12) < 0) {
-    return afronden(leeftijd + hi / 12, proj)
+    // Parkeerstand: geen gekozen stopmoment → `vastStopLeeftijd` null.
+    return afronden(leeftijd + hi / 12, proj, null)
   }
 
   // ── Maand-bisectie op de gap (VBA: `\` = integer-deling, floor) ─────────────
@@ -334,7 +367,7 @@ export function solveFire(input: KernelInput): SolveFireResult {
   }
 
   const fireAge = leeftijd + hi / 12
-  return afronden(fireAge, run(fireAge))
+  return afronden(fireAge, run(fireAge), null)
 }
 
 /**
@@ -361,6 +394,8 @@ export function evaluateFireAt(input: KernelInput, fireAge: number): SolveFireRe
     maandHint: blok.maandHint,
     tekortLeningTotEindleeftijd: blok.tekortLening,
     engineRuns: 1,
+    // Geforceerd = vast: de dekking van deze run meet vanaf `fireAge` (K3).
+    vastStopLeeftijd: fireAge,
     projection: proj,
   }
 }

@@ -111,6 +111,19 @@ describe('bridge — het aow-anker spreekt tijdens F2 de taal die de UI verstaat
     const { bridge } = bridgedStatus({ fire_stop_anchor: 'age', fire_stop_age: 65 })
     expect(bridge).toBe('anchor_shortfall')
   })
+
+  it('K1 — een aow-plan dat zijn LEGACY-doel niet haalt is een tekort, geen onbereikbaarheid', () => {
+    // Geen tekort-lening (J blijft ≥ 0), wel gap < 0 op de eindleeftijd. Vóór K1 viel
+    // dit via de M6-schijnbereik-tak op `unreachable_within_horizon` → bridge
+    // `fireReachable = false` → hero zonder stopleeftijd en lege scenariokaarten.
+    const { solver, bridge } = bridgedStatus({
+      fire_stop_anchor: 'aow',
+      fire_end_strategy: 'legacy',
+      fire_legacy_amount: 50_000_000,
+    })
+    expect(solver).toBe('anchor_shortfall')
+    expect(bridge).toBe('pension_shortfall')
+  })
 })
 
 describe('bron-grendel — elke TEKORT-status die de bridge voor een live anker uitzendt heeft een UI-blok', () => {
@@ -125,6 +138,16 @@ describe('bron-grendel — elke TEKORT-status die de bridge voor een live anker 
     [...src.matchAll(/kernelStatus\s*===\s*'([a-z_]+)'/g)].map((m) => m[1]),
   )
   const isTekort = (s: SolverStatus) => s.endsWith('_shortfall')
+
+  // F3b — het `age`-anker (contract-ronde, eigenaar-besluit 5 sep 2026). Bewust NIET
+  // geweigerd in PUT: geen UI schrijft het nog (exposure nul) en F3a's D8-gate sluit
+  // het structureel — weigeren nu is churn bij F3b. Zodra F3b het generieke
+  // `anchor_shortfall`-blok bouwt, gaat deze rij de `it.each` hierboven in. Tot dan
+  // zegt /overzicht bij een stopleeftijd in het verleden "je bent vrij" bij 40%
+  // dekking (`isFinanciallyFree` kent het anker niet, ADR 0129 D8).
+  it.todo(
+    "age (F3b): { fire_stop_anchor: 'age', fire_stop_age: 65 } trekt een tekort én `anchor_shortfall` heeft een blok in horizon-client — zie ADR 0129 F3b/D8",
+  )
 
   it.each([
     ['aow (pensioen-gebruiker)', { fire_stop_anchor: 'aow' } as const],

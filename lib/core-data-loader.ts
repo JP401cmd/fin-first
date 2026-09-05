@@ -40,7 +40,7 @@ import { buildBudgetTypeMap, computeYearlyMustExpenses, computeRetirementExpense
 import { resolveFireParams } from '@/lib/fire-params'
 import { DEFAULT_RETURN, INFLATION, SAVINGS_RATE_WINDOW_MONTHS } from '@/lib/constants'
 import { ALL_MODULES } from '@/lib/module-registry'
-import { parseFireStrategy, type FireStrategyConfig } from '@/lib/fire-strategy'
+import { FIRE_PLAN_COLUMNS, parseFireStrategy, type FireStrategyConfig } from '@/lib/fire-strategy'
 import { ageAtDate } from '@/lib/horizon-data'
 import { loadCombinedCashStats, type CashAssetStats } from '@/lib/kpi-context'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
@@ -540,7 +540,7 @@ export const loadCoreData = cache(async function loadCoreData(
       .limit(1),
     supabase
       .from('profiles')
-      .select('full_name, retirement_expense_method, retirement_expense_custom_amount, expected_return, inflation_rate, box3_method, net_monthly_income, estimated_monthly_expenses, budgeting_active, active_modules, fire_end_strategy, fire_end_age, fire_legacy_amount, date_of_birth, income_source, expenses_source, household_type, housing_strategy_config')
+      .select(`full_name, retirement_expense_method, retirement_expense_custom_amount, expected_return, inflation_rate, box3_method, net_monthly_income, estimated_monthly_expenses, budgeting_active, active_modules, ${FIRE_PLAN_COLUMNS}, date_of_birth, income_source, expenses_source, household_type, housing_strategy_config`)
       .single(),
     // Losse bankrekeningen via de gedeelde query-definitie: het
     // `is_active`/`linked_asset_id IS NULL`-predicaat is de GRONDSLAG (welk geld
