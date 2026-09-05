@@ -27,7 +27,12 @@ De reactienorm (2× 15 min per week, geen dagritme), de inbakken-tabel en de vij
 
 ## Wat je niet doorzet, ben je kwijt
 
-Drie van de inbakken hebben **geen status**: `error_logs` is append-only (geen `resolved`-kolom), nieuwsfeedback heeft geen beheerscherm, en de support-mail bestaat feitelijk niet — `lib/legal-contact.ts` zet beide adressen op `null` zolang er geen domein is, dus daar komt vandaag **geen post binnen, ook geen AVG-verzoek en geen lekmelding.** Voor die drie geldt: lezen, en wat telt meteen doorzetten naar een kaart. Er is geen tweede kans, want er is niets dat onthoudt dat je het al zag.
+Twee inbakken **onthouden niets van jouw ronde**, elk om een eigen reden:
+
+- **Nieuwsfeedback** is bewust een *venster*, geen werkvoorraad (ADR 0113). Er ís een scherm (`/beheer/nieuws`, sectie *Feedback op nieuwsitems*), maar het is alleen-lezen: een voorkeurssignaal kent geen `nieuw → gelezen`. Wat je eruit meeneemt, neem je mee als kaart — of het is weg. Verschijnt daar ooit wél een afvinkknop, dan is dát een bevinding.
+- **Support-mail** bestaat feitelijk niet: `lib/legal-contact.ts` zet beide adressen op `null` zolang er geen domein is, dus daar komt vandaag **geen post binnen, ook geen AVG-verzoek en geen lekmelding.**
+
+**Foutmeldingen zijn hier sinds ADR 0113 de uitzondering geworden** — `/beheer/errors` is wél afvinkbaar, maar **per foutSOORT, niet per regel**: het scherm groepeert dezelfde fout met andere ids of bedragen tot één. `error_logs` zelf blijft append-only; het vinkje leeft in `error_log_resolutions` (migratie `20260828140000`). Komt een afgevinkte soort terug, dan **heropent hij zichzelf** met de aantekening "teruggekomen" — dat is een regressie en hoort een kaart te worden, geen tweede vinkje.
 
 ## In-app meldingen lopen anders — controleer, verwerk niet opnieuw
 

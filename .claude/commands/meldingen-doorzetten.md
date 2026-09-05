@@ -57,7 +57,8 @@ Gebruik `mcp__notion__notion-create-pages` op data source `d87e54c5-fb52-4607-a7
 **Pagina-body** (hier hoort de vólledige tekst, want properties kappen af):
 - kop "Wat ging er mis?" / "De vraag" / "De wens" + de volledige `description`
 - bij bug met `expected`: kop "Wat had de melder verwacht?" + de volledige tekst
-- callout 🔎: `Toestemming inzage: JA/NEE · Melder: <email>. Informatief — dit geeft geen technische toegang tot het account; neem contact op met de melder als je meer nodig hebt.`
+- callout 🔎: `Toestemming inzage: JA/NEE · <melder-regel> Informatief — dit geeft geen technische toegang tot het account; neem contact op met de melder als je meer nodig hebt.`
+  **Het e-mailadres volgt de toestemming.** Bij `consent_inzage = true` is de melder-regel `Melder: <email>.`; bij `false` is het `Melder: e-mailadres op verzoek (melder gaf geen toestemming voor contact).` — het adres gaat dan *niet* mee. De formuliervraag luidt "Mogen we contact met je opnemen…?", en bij een wens wordt hij niet eens gesteld (consent is dan hard `false`); het adres tóch naar een verwerker buiten de EU sturen is een belofte die het datapad niet nakomt. Operationeel verlies je niets: `report-id` staat in het technische blok en leidt via `user_reports.user_id` terug naar de melder zodra daar grond voor is.
 - kop "Technische context" + codeblok met `route`, `page_title`, `user_agent`, `viewport`, `app_version`, `id`, `created_at` — open de fence als ` ```text `, anders raadt Notion een taal (het werd `javascript`) waar de automatische route `plain text` zet
 - is er een `screenshot_url`: een image-block met die URL, gevolgd door één regel "Signed link, geldig 48 uur — bron blijft Supabase (`<screenshot_path>`)."
 
