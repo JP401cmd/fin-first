@@ -161,8 +161,8 @@ export interface SavingsSourceInput {
    * `manual` versus "berekend" kent).
    *
    * De server-oppervlakken geven 'm inmiddels allemaal mee: de drie loaders, de
-   * twee cashflow-KPI-loaders, de drie snapshot-routes, `/api/report` en
-   * `/api/guide-progress`. Wat bewust ZONDER blijft: `lib/check/build-report.ts`
+   * twee cashflow-KPI-loaders, de drie snapshot-routes en `/api/report`. Wat
+   * bewust ZONDER blijft: `lib/check/build-report.ts`
    * (zet expliciet manual/manual — in de check-funnel vult de gebruiker zelf in)
    * en de what-if-pagina, die op een eigen, door de gebruiker gestuurde baseline
    * rekent. De optionaliteit blijft daarom bestaan; ze is geen restschuld.

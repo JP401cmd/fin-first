@@ -158,3 +158,47 @@ describe('onboarding save-own-data — holdings-tracking standaard uit', () => {
     )
   })
 })
+
+/**
+ * Borgt het startsignaal van de rondleiding (ADR 0130): de vlag
+ * `module_guide_state['rondleiding:pending']` wordt in DEZELFDE update
+ * geschreven als `onboarding_completed = true`, en niet in een losse call die
+ * apart kan mislukken.
+ *
+ * Even belangrijk: die kolom wordt eerst GELEZEN en dan gemerged. De map draagt
+ * ook de welkomstgids, de coachmarks en de coach-staat; een blinde
+ * `module_guide_state: { 'rondleiding:pending': … }` zou die wissen. De merge
+ * zelf zit in `withRondleidingPending` en heeft z'n eigen unit-test
+ * (lib/rondleiding/seed.test.ts) — hier bewaken we dat de route 'm gebruikt
+ * i.p.v. zelf een object samen te stellen.
+ *
+ * Bronscan i.p.v. handler-import: deze route trekt de AI-extractielaag mee (zie
+ * de suites hierboven).
+ */
+describe('onboarding save-own-data — rondleiding-startsignaal (ADR 0130)', () => {
+  const routePath = path.resolve(__dirname, 'route.ts')
+  const source = readSourceLF(routePath)
+  const codeOnly = source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .map((line) => line.replace(/\/\/.*$/, ''))
+    .join('\n')
+
+  it('schrijft de pending-vlag in dezelfde update als onboarding_completed = true', () => {
+    // De vlag zit in hetzelfde update-object, achter de leesfout-guard: is de
+    // kolom niet leesbaar, dan wordt hij niet aangeraakt (geen merge op een lege basis).
+    expect(codeOnly).toMatch(
+      /onboarding_completed:\s*true,\s*\.\.\.\(guideStateReadErr\s*\?\s*\{\}\s*:\s*\{\s*module_guide_state:\s*withRondleidingPending\(/,
+    )
+  })
+
+  it('leest module_guide_state eerst en merget (geen blinde overschrijving)', () => {
+    expect(codeOnly).toContain("import { withRondleidingPending } from '@/lib/rondleiding/seed'")
+    expect(codeOnly).toContain("select('module_guide_state')")
+    expect(codeOnly).toContain('withRondleidingPending(guideStateRow?.module_guide_state)')
+    // De leesfout wordt niet genegeerd: hij wordt gedestructureerd en stuurt de patch.
+    expect(codeOnly).toContain('error: guideStateReadErr')
+    // Nergens een letterlijk object met de sleutel — dat zou de merge omzeilen.
+    expect(codeOnly).not.toContain("'rondleiding:pending'")
+  })
+})

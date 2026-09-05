@@ -151,6 +151,8 @@ export function buildHldModel(): HldModel {
           { title: 'Een coach die je cijfers uitlegt', desc: 'Fin vertaalt data naar wat het voor jóu betekent.' },
           { title: 'Een korte wekelijkse update', desc: 'De briefing: wat veranderde, waar je op kunt letten — desgewenst ook wekelijks in je mailbox (zelf aan te zetten).' },
           { title: 'Tips op het juiste moment', desc: 'Aandachtspunten die je met één tik tot actie maakt.' },
+          { title: 'Een korte rondleiding bij je eerste bezoek', desc: 'Na het onboarden loopt Fin in een paar minuten met je door je Overzicht — je vier hefbomen, je gezondheidsscore, de vermogensgrafiek, zoeken en het menu — met jouw eigen cijfers. Later opnieuw te starten vanuit Fin of de i op je Overzicht.' },
+          { title: 'Een gids die met je meeloopt', desc: 'Je welkomstgids woont bij Fin: de volgende stappen op een rij, en Fin wijst je er op het juiste scherm op — hooguit één keer per dag.' },
           { title: 'Je vragen beantwoorden', desc: 'Vraag Fin alles over je eigen situatie.' },
           { title: 'Je dagelijkse gesprek met Fin, ook privé', desc: 'Zet je privacy-modus aan, dan beantwoordt Fin je vragen met een AI die lokaal op je toestel draait — dezelfde chat, maar je vraag en je cijfers verlaten het toestel niet. Experimenteel en alleen op desktop.' },
           { title: 'Iets melden vanuit je gesprek met Fin', desc: 'Een bug, een vraag of een idee — meteen vanuit de chat, desgewenst met een screenshot. Komt direct bij ons team terecht.' },

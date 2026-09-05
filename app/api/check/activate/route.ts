@@ -17,6 +17,7 @@ import { getServiceClient } from '@/lib/supabase/service'
 import { decryptField, blindIndex } from '@/lib/crypto/field-encryption'
 import { seedPersonaData } from '@/lib/seed-persona'
 import { intakeToPersona } from '@/lib/check/intake-to-persona'
+import { withRondleidingPending } from '@/lib/rondleiding/seed'
 import type { CheckIntake } from '@/lib/check/types'
 
 export const runtime = 'nodejs'
@@ -108,6 +109,22 @@ export async function POST(request: Request) {
   // Velden die niet in PersonaProfile zitten (zie intake-to-persona): handmatige
   // bronnen + jaarinkomen + onboarding markeren als klaar zodat het account
   // direct gevuld is.
+  //
+  // In dezelfde update gaat de rondleiding-vlag mee (ADR 0130): een via de
+  // Vrijheidscheck geconverteerd account is net zo goed een verse gebruiker en
+  // landt via /dashboard op zijn homescherm. `module_guide_state` wordt eerst
+  // gelezen en gemerged — de map draagt ook `welcome:guide`, de coachmarks en
+  // de coach-staat, en blind overschrijven zou die wissen. Faalt de lees, dan
+  // blijft de kolom onaangeraakt (geen merge op een lege basis).
+  const { data: guideStateRow, error: guideStateReadErr } = await supabase
+    .from('profiles')
+    .select('module_guide_state')
+    .eq('id', user.id)
+    .maybeSingle()
+  if (guideStateReadErr) {
+    console.warn('[check/activate] module_guide_state niet leesbaar — rondleiding-vlag overgeslagen', guideStateReadErr.code)
+  }
+
   await supabase
     .from('profiles')
     .update({
@@ -115,6 +132,9 @@ export async function POST(request: Request) {
       expenses_source: 'manual',
       estimated_yearly_income: intake.yearlyIncomeGross ?? null,
       onboarding_completed: true,
+      ...(guideStateReadErr
+        ? {}
+        : { module_guide_state: withRondleidingPending(guideStateRow?.module_guide_state) }),
     })
     .eq('id', user.id)
 

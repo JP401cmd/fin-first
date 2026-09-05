@@ -16,11 +16,14 @@ import { isImmersiveRoute } from '@/lib/shell/immersive-routes'
 import { useFinSlot } from '@/lib/shell/fin-slot'
 import { useCoachSuggestion } from '@/lib/hooks/use-coach-suggestion'
 import { useTypewriter } from '@/lib/hooks/use-typewriter'
+import { useRondleidingActive } from '@/lib/rondleiding/signal'
 import { CoachMelding } from './coach-melding'
 import {
   DEFAULT_COACH_TIMING, DEFAULT_COACH_HEADER,
   type CoachDataGaps, type DeferredField, type CoachOverrides,
+  type GuideSuggestionInput,
 } from '@/lib/coach-suggestions'
+import { GUIDE_SUGGESTION_KEY_PREFIX, type CoachState } from '@/lib/coach-state'
 import type { ModuleId } from '@/lib/module-registry'
 import { inflight } from '@/lib/inflight'
 
@@ -29,6 +32,18 @@ const POSTPONED_PROMPT =
   'Ik wil opnieuw kijken naar tips die ik eerder heb uitgesteld en waarvan de wachttijd voorbij is. Begin met de belangrijkste.'
 
 export type FinHomeProps = {
+  /**
+   * Server-seed van de meldingstaat (`profiles.module_guide_state['coach:state']`).
+   * Zonder deze prop valt de hook terug op de lege staat en zou elke al
+   * weggeklikte tip opnieuw verschijnen — zie `lib/coach-state.ts`. Bewust
+   * VERPLICHT: een vergeten prop zou stil de cross-device-belofte breken.
+   */
+  coachState: CoachState
+  /**
+   * Open stappen uit de welkomstgids (ADR 0130, fase 2). Ontbreekt de prop, dan
+   * bestaat de gids-laag simpelweg niet en gedraagt de coach zich als voorheen.
+   */
+  guide?: GuideSuggestionInput
   dataGaps?: CoachDataGaps
   deferredFields?: DeferredField[]
   overrides?: CoachOverrides
@@ -39,12 +54,14 @@ export type FinHomeProps = {
 }
 
 export function FinHome({
+  coachState,
+  guide,
   dataGaps, deferredFields, overrides, activeModules,
   delayMs = DEFAULT_COACH_TIMING.delayMs,
   autoDismissMs = DEFAULT_COACH_TIMING.autoDismissMs,
   headerLabel = DEFAULT_COACH_HEADER,
 }: FinHomeProps) {
-  const { isOpen, toggle, open, openWithMessage } = useChatContext()
+  const { isOpen, toggle, open, openWithMessage, openGids } = useChatContext()
   // Zwevende bottom-FAB: verberg de Fin-bubbel én de melding zolang er een
   // modal/overlay open is. Anders bloedt de halftransparante z-[70]-backdrop
   // door en lijkt de FAB bovenop de primaire actieknop onderin de sheet te
@@ -82,9 +99,35 @@ export function FinHome({
   const pathname = usePathname()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { suggestion, dismiss } = useCoachSuggestion({ dataGaps, deferredFields, overrides, activeModules, delayMs })
 
-  const mode: 'bubble' | 'melding' = suggestion ? 'melding' : 'bubble'
+  // ── Zwijgen zolang Fin toch niet te zien is (M15 / ADR 0130) ──────────────
+  //
+  // Dezelfde unie als `hideFloating` verderop (overlay open, of een immersieve
+  // taakflow), plús de rondleiding. `hideFloating` verbergt alleen de WEERGAVE;
+  // `paused` houdt óók de hook stil, zodat een tip achter een open modal niet
+  // stilletjes als "gezien" wordt gestempeld en dus ongezien verdwijnt.
+  //
+  // De rondleiding zit hier wél in maar in `hideFloating` bewust NIET: de tour
+  // licht Fins eigen knop uit als laatste stap, dus die knop moet zichtbaar
+  // blijven — alleen zijn mond gaat dicht (`lib/rondleiding/signal.ts`).
+  //
+  // `isOpen` hoort er óók bij: met de chat open rendert dit component `null`
+  // (zie `if (isOpen) return null` verderop), en een GEPINDE chat claimt bewust
+  // géén overlay-signaal (chat-panel.tsx) — zonder deze term koos de hook dan
+  // een tip, typte 'm uit en schreef 'm na acht seconden als gezien weg terwijl
+  // niemand hem te zien kreeg. Voor een gidsstap verbruikte dat bovendien de dag.
+  const rondleidingActive = useRondleidingActive()
+  const paused = overlayOpen || isOpen || isImmersiveRoute(pathname) || rondleidingActive
+
+  const { suggestion, dismiss } = useCoachSuggestion({
+    coachState, dataGaps, deferredFields, overrides, activeModules, delayMs, paused, guide,
+  })
+
+  // Tijdens de rondleiding gaat ook een melding die al openstond dicht — niet
+  // weggeschreven (de hook is gepauzeerd, dus hij komt na afloop gewoon terug),
+  // alleen niet gerenderd. Anders stond hij bevroren onder de scrim en lichtte
+  // de slotstap "hier vind je mij" de meldkaart uit in plaats van Fins knop.
+  const mode: 'bubble' | 'melding' = suggestion && !rondleidingActive ? 'melding' : 'bubble'
 
   // thinking: true for THINK_MS after a new suggestion appears (skipped when reduced-motion)
   const [thinking, setThinking] = useState(false)
@@ -115,7 +158,7 @@ export function FinHome({
   // typemachine en is `done` meteen waar; de timer start dan direct.
   useEffect(() => {
     if (mode !== 'melding' || !done) return
-    const t = setTimeout(() => dismiss(), autoDismissMs)
+    const t = setTimeout(() => dismiss('auto'), autoDismissMs)
     return () => clearTimeout(t)
   }, [mode, done, suggestion?.key, autoDismissMs, dismiss])
 
@@ -145,17 +188,34 @@ export function FinHome({
   }, [postponedReady, openWithMessage, toggle])
 
   const handleCta = useCallback(() => {
-    dismiss()
+    // Een gids-bubbel ZONDER bestemming wijst naar de pagina waar je al staat
+    // (de route-match is exact). De zinvolle vervolgstap is dan de gidsweergave
+    // in Fin, waar de stap staat die de bubbel noemde — vandaar `openGids()`
+    // i.p.v. een navigatie. Mét bestemming (een deeplink die een paneel opent)
+    // heeft CoachMelding al een <Link> gerenderd en hoeven we alleen op te ruimen.
+    const key = suggestion?.key ?? ''
+    const naarDeGids =
+      key.startsWith(GUIDE_SUGGESTION_KEY_PREFIX) && !suggestion?.ctaHref
+    dismiss('user')
+    if (naarDeGids) {
+      openGids()
+      return
+    }
     const params = new URLSearchParams(searchParams.toString())
     params.delete('welcome')
     const qs = params.toString()
     router.replace(pathname + (qs ? `?${qs}` : ''), { scroll: false })
-  }, [dismiss, searchParams, router, pathname])
+  }, [dismiss, openGids, suggestion?.key, suggestion?.ctaHref, searchParams, router, pathname])
 
   const handleOpenChatFromMelding = useCallback(() => {
-    dismiss()
+    dismiss('user')
     open()
   }, [dismiss, open])
+
+  // Eigen wrapper i.p.v. `onClose={dismiss}`: `dismiss` neemt sinds ADR 0130 een
+  // reden, en een rechtstreeks doorgegeven handler zou het klik-event als reden
+  // meegeven — dan is geen enkele tak meer voorspelbaar.
+  const handleCloseMelding = useCallback(() => { dismiss('user') }, [dismiss])
 
   // ── De meldingstrook eist op mobiel haar eigen band op (UR2-08) ────────────
   //
@@ -275,6 +335,7 @@ export function FinHome({
 
       {!hideFloating && (
         <div
+          data-tour="fin"
           className={`willhome willhome--${mode}${mode === 'bubble' ? ' hidden lg:block' : ''}`}
         >
           {mode === 'melding' && suggestion ? (
@@ -287,7 +348,7 @@ export function FinHome({
                   done={done}
                   cta={suggestion.cta}
                   ctaHref={suggestion.ctaHref}
-                  onClose={dismiss}
+                  onClose={handleCloseMelding}
                   onCtaActivate={handleCta}
                   onOpenChat={handleOpenChatFromMelding}
                 />

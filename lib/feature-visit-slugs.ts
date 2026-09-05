@@ -53,12 +53,10 @@ const GUIDE_SLUGS = [
 
 /**
  * Eenmalige UI-meldingen die de client zelf uitzet (cross-device, daarom niet
- * in localStorage). Call-sites: `components/app/horizon/toekomst-welcome.tsx`,
- * `components/app/horizon/horizon-client.tsx` (dismissExitNoticeForever) en
- * `components/app/budget-koppel-nudge.tsx`.
+ * in localStorage). Call-sites: `components/app/horizon/horizon-client.tsx`
+ * (dismissExitNoticeForever) en `components/app/budget-koppel-nudge.tsx`.
  */
 const DISMISSAL_SLUGS = [
-  'horizon_welcome_shown',
   'horizon_exit_notice_dismissed',
   'budget_koppel_nudge_shown',
 ] as const

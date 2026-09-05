@@ -158,13 +158,13 @@ export async function resolveBudgetShare(
  * DE ingang voor server-loaders: profielrij + budgetrijen → de budgetgrondslag
  * per kant, gewogen op het huishoud-aandeel.
  *
- * Eén functie zodat de DERTIEN aanroepers (core-, dashboard-, horizon-loader,
+ * Eén functie zodat de TWAALF aanroepers (core-, dashboard-, horizon-loader,
  * beide cashflow-KPI-loaders, lever-scores, de doelen-loader, goal-current-value,
- * spend-limits, /api/report, /api/guide-progress en de twee sessie-snapshot-
- * routes) de weging niet elk apart kunnen vergeten — precies het defect dat bij
- * de losse bankrekeningen al één keer is gemaakt.
+ * spend-limits, /api/report en de twee sessie-snapshot-routes) de weging niet
+ * elk apart kunnen vergeten — precies het defect dat bij de losse
+ * bankrekeningen al één keer is gemaakt.
  *
- * De snapshot-cron is de veertiende grondslag-aanroeper en loopt bewust langs
+ * De snapshot-cron is de dertiende grondslag-aanroeper en loopt bewust langs
  * deze functie heen, maar sinds migratie 20260811180000 op dezelfde GRONDSLAG.
  * Twee redenen om daar niet in te trekken: `resolveBudgetShare` leest het
  * huishoud-aandeel uit de SESSIE (`auth.getUser()`) en zou op een

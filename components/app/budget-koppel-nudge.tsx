@@ -16,8 +16,7 @@
  * First-time-only: de parent geeft `visible` (server-afgeleid: marker afwezig
  * ÉN 0 bank_accounts ÉN 0 transacties). Bij eerste render POST'en we de slug
  * `budget_koppel_nudge_shown` naar /api/feature-visits — server-side + RLS
- * user-scoped, dus cross-device (géén localStorage). Zelfde patroon als
- * ToekomstWelcome.
+ * user-scoped, dus cross-device (géén localStorage).
  *
  * Rendert via de gedeelde <BottomSheet> (z-[70], boven de nav-pill, met
  * focus-trap/scroll-lock/drag-dismiss). Module-accent volgt de route: op
@@ -31,7 +30,8 @@ import { BottomSheet } from '@/components/app/bottom-sheet'
 import { EditorialHeadline } from '@/components/editorial'
 
 /** Feature-slug in user_feature_visits die bijhoudt of deze nudge al is
- *  getoond. Eenmalig cross-device — gespiegeld aan HORIZON_WELCOME_SHOWN_SLUG. */
+ *  getoond. Eenmalig cross-device — zelfde patroon als
+ *  HORIZON_EXIT_NOTICE_DISMISSED_SLUG. */
 export const BUDGET_KOPPEL_NUDGE_SHOWN_SLUG = 'budget_koppel_nudge_shown'
 
 export function BudgetKoppelNudge({ visible }: { visible: boolean }) {

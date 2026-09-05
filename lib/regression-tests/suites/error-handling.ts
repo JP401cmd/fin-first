@@ -385,20 +385,6 @@ const tests: TestCase[] = [
   },
 
   {
-    id: 'err-empty-state-guide-progress',
-    name: 'GET /api/guide-progress: geen crash bij nieuwe gebruiker',
-    category: CAT,
-    description: 'Guide progress API handles new user (no progress) gracefully',
-    priority: 'medium',
-    estimatedDurationMs: 500,
-    async fn() {
-      const { status, body } = await fetchAPI('/api/guide-progress')
-      assert(status === 401, `Expected 401, got ${status}`)
-      assertNotNull(body, 'Response body should be valid JSON')
-    },
-  },
-
-  {
     id: 'err-empty-state-fire-simulation-edge',
     name: 'FIRE simulatie: edge case met 0 spaargeld',
     category: CAT,
@@ -544,7 +530,6 @@ const tests: TestCase[] = [
         '/api/budget-trends',
         '/api/cashflow-forecast',
         '/api/snapshots',
-        '/api/guide-progress',
         '/api/checkin/overview',
       ]
       const requests = endpoints.map((ep) => fetchAPI(ep))

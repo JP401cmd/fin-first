@@ -1727,7 +1727,13 @@ export default function OnboardingPage() {
                 // soft-navigation kan de server-layout de nét-geschreven row missen en
                 // redirecten naar /onboarding, wat de Suspense-fallback laat knipperen
                 // tot een browser-refresh de sessie opnieuw aligneert.
-                window.location.assign('/toekomst')
+                //
+                // Bestemming is /dashboard, niet een concrete pagina (ADR 0130): de
+                // middleware (lib/supabase/proxy.ts) vertaalt /dashboard naar het
+                // gekozen homescherm (`profiles.home_screen`, standaard /overzicht).
+                // Zo landt iedereen na de onboarding op zijn eigen hoofdscherm — dáár
+                // start ook de rondleiding.
+                window.location.assign('/dashboard')
               }}
             />
           )}

@@ -298,7 +298,6 @@ import {
 } from '@/lib/chart-tips'
 import { ToekomstOverlay, type OverlayBalloonDef, type ToekomstOverlayGeometry } from '@/components/app/horizon/toekomst-overlay'
 import { TOEKOMST_OVERLAY_BALLOONS } from '@/components/app/horizon/toekomst-overlay-balloons'
-import { ToekomstWelcome } from '@/components/app/horizon/toekomst-welcome'
 import { WidgetEmpty } from '@/components/widgets/widget-empty'
 import { resolveUnlinkedCashShare, unlinkedCashTotal } from '@/lib/unlinked-cash'
 
@@ -949,17 +948,14 @@ export default function HorizonPage({
     setSelectedScenarioIds(new Set())
   }, [])
 
-  // ── Toekomst-overlay (ballonnen) + welkomsttekst ─────────────────
+  // ── Toekomst-overlay (ballonnen) ─────────────────────────────────
   // De grafiek wordt sinds juni 2026 altijd getoond (de oude setup-pane is
-  // verwijderd). In plaats daarvan: (a) een eenmalige welkomsttekst en (b) een
-  // toggle-bare ballonnen-overlay die wijst naar de inline-editors.
+  // verwijderd). In plaats daarvan een toggle-bare ballonnen-overlay die wijst
+  // naar de inline-editors. De eenmalige welkomstkaart is per ADR 0130
+  // verdwenen: het welkom woont nu in de rondleiding op /overzicht.
   //
-  // welcomeDismissed: lokale "weg"-state voor de welkomstbanner. Initieel
-  // afgeleid uit de server-marker (hasSeenWelcome) — al gezien → meteen weg.
-  const [welcomeDismissed, setWelcomeDismissed] = useState<boolean>(initialData.hasSeenWelcome)
   // overlayVisible: zichtbaarheid van de ballonnen-laag. Default AAN de eerste
-  // keer (geen localStorage-key), daarna gepersisteerd. Onafhankelijk van de
-  // welkomsttekst-state.
+  // keer (geen localStorage-key), daarna gepersisteerd.
   const [overlayVisible, setOverlayVisible] = useState(true)
   // overlayEmphasis: welke grafiekfase een gehoverde/gefocuste ballon accentueert.
   const [overlayEmphasis, setOverlayEmphasis] = useState<'accumulation' | 'withdrawal' | 'fire' | null>(null)
@@ -6135,23 +6131,6 @@ export default function HorizonPage({
                 schulden je <GlossaryTerm term="netto_vermogen">netto vermogen</GlossaryTerm> drukken. Geeft inzicht in waar je
                 groei vandaan komt.
               </ChartOverlayExplainer>
-
-              {/* STEP 3a: eenmalige welkomsttekst — staat LOS van de overlay. */}
-              <ToekomstWelcome
-                visible={!welcomeDismissed}
-                netWorth={effectiveNetWorth}
-                dailyExpenseRate={canonicalDailyRate}
-                freedomAge={hasPerspectiveHero ? perspectiveHero!.fireAge : heroFireAge.age}
-                isPensioen={isPensioenMode}
-                nuStoppenReach={hasPerspectiveHero || planAnchor?.kind !== 'now' ? null : ankerReach}
-                masked={masked}
-                // Stil sluiten (✕/Escape/achtergrond): alleen wegklikken, de
-                // tip-overlay NIET openen.
-                onDismiss={() => setWelcomeDismissed(true)}
-                // Primaire CTA "Bekijk je grafiek": wegklikken én de uitgelichte
-                // grafiek met tip-bubbels tonen.
-                onViewChart={() => { setWelcomeDismissed(true); persistOverlayVisible(true) }}
-              />
 
               {/* Cijferbar boven de grafiek — beweegt mee met hover/playback en
                   vervangt de zwevende tooltip. Alleen volledige weergave + pad-modus. */}

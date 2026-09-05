@@ -9,9 +9,13 @@ import {
   PATH_SUGGESTIONS,
   DATA_GAP_SUGGESTIONS,
   isEstablishedAccount,
+  GUIDE_RULE_KEY,
+  GUIDE_SUGGESTION_KEY_PREFIX,
   type CoachDataGaps,
   type CoachOverrides,
+  type GuideSuggestionInput,
 } from './coach-suggestions'
+import type { GuideNextStep } from './welcome-guide'
 import type { ModuleId } from './module-registry'
 
 const full = (): CoachDataGaps => ({
@@ -302,6 +306,144 @@ describe('H15 — first-use-copy hoort bij first use', () => {
     // Bezit + transacties (of budgetten) wel.
     expect(isEstablishedAccount({ ...empty(), hasAssets: true, hasTransactions: true })).toBe(true)
     expect(isEstablishedAccount({ ...empty(), hasAssets: true, hasBudgets: true })).toBe(true)
+  })
+})
+
+// ── ADR 0130 fase 2: de gids-laag ──────────────────────────────────────────
+//
+// Fin noemt de eerstvolgende open gidsstap op de bijpassende route. Zolang de
+// gids loopt VERVANGT die laag de data-gaten — ook wanneer er op deze route
+// niets te noemen valt (één stem). Afgesloten gids → oud gedrag, ongewijzigd.
+describe('gids-laag (ADR 0130)', () => {
+  const stap = (over: Partial<GuideNextStep> = {}): GuideNextStep => ({
+    id: 's1-bezittingen',
+    title: 'Zijn al je bezittingen geregistreerd?',
+    description: 'Zoals eigen huis, cash rekeningen en aandelen.',
+    href: '/overzicht/bezittingen',
+    ...over,
+  })
+  const actief = (steps: GuideNextStep[]): GuideSuggestionInput => ({ status: 'active', steps })
+
+  it('wint van de data-gap-laag op de bijpassende route', () => {
+    // Leeg account: zonder gids zou `gap_bank` winnen.
+    expect(getFirstUndismissedSuggestion(empty(), '/overzicht/bezittingen', none, [])?.key).toBe(
+      'gap_bank',
+    )
+    const s = getFirstUndismissedSuggestion(
+      empty(), '/overzicht/bezittingen', none, [], undefined, ALL_MODULES, actief([stap()]),
+    )
+    expect(s?.key).toBe(`${GUIDE_SUGGESTION_KEY_PREFIX}s1-bezittingen`)
+    expect(s?.message).toBe(
+      'Zijn al je bezittingen geregistreerd? Zoals eigen huis, cash rekeningen en aandelen.',
+    )
+    expect(s?.cta).toBe('Bekijk in de gids')
+    // Kale route = de pagina waar je al staat → geen bestemming, de CTA opent de gids.
+    expect(s?.ctaHref).toBeUndefined()
+  })
+
+  it('laat de toelichting weg als de stap er geen heeft', () => {
+    const s = getFirstUndismissedSuggestion(
+      empty(), '/overzicht/bezittingen', none, [], undefined, ALL_MODULES,
+      actief([stap({ description: undefined })]),
+    )
+    expect(s?.message).toBe('Zijn al je bezittingen geregistreerd?')
+  })
+
+  it('geeft een deeplink-stap wél een ctaHref', () => {
+    const s = getFirstUndismissedSuggestion(
+      empty(), '/overzicht/cashflow/budget', none, [], undefined, ALL_MODULES,
+      actief([stap({ id: 's1-budget', href: '/overzicht/cashflow/budget?newBudget=true' })]),
+    )
+    expect(s?.key).toBe(`${GUIDE_SUGGESTION_KEY_PREFIX}s1-budget`)
+    expect(s?.ctaHref).toBe('/overzicht/cashflow/budget?newBudget=true')
+  })
+
+  it('kiest de eerste stap die bij DEZE route hoort, niet simpelweg de eerste', () => {
+    const s = getFirstUndismissedSuggestion(
+      empty(), '/overzicht/schulden', none, [], undefined, ALL_MODULES,
+      actief([stap(), stap({ id: 's1-schulden', href: '/overzicht/schulden', description: undefined })]),
+    )
+    expect(s?.key).toBe(`${GUIDE_SUGGESTION_KEY_PREFIX}s1-schulden`)
+  })
+
+  it('actieve gids zonder route-match: GEEN data-gap, wél de pad-laag', () => {
+    // De kern van "één stem": op een route waar de gids niets te melden heeft,
+    // zwijgt óók de data-gap-laag — anders hoort de gebruiker dezelfde boodschap
+    // uit twee monden met twee verschillende afvinkmechanismen.
+    const s = getFirstUndismissedSuggestion(
+      empty(), '/overzicht/tips', none, [], undefined, ALL_MODULES, actief([stap()]),
+    )
+    expect(s?.key).toBe('path_will')
+  })
+
+  it('valt zonder pad-regel door naar de default-laag', () => {
+    const s = getFirstUndismissedSuggestion(
+      empty(), '/onbekende-route', none, [], undefined, ALL_MODULES, actief([stap()]),
+    )
+    expect(s?.key).toBe('default')
+  })
+
+  it('slaat een weggeklikte stap over en noemt de volgende op dezelfde route', () => {
+    const weg = new Set([`${GUIDE_SUGGESTION_KEY_PREFIX}s1-bezittingen`])
+    const s = getFirstUndismissedSuggestion(
+      empty(), '/overzicht/bezittingen', weg, [], undefined, ALL_MODULES,
+      actief([stap(), stap({ id: 's1-extra', description: undefined })]),
+    )
+    expect(s?.key).toBe(`${GUIDE_SUGGESTION_KEY_PREFIX}s1-extra`)
+  })
+
+  it('noemt niets op /toekomst (daar staan de uitleg-ballonnen)', () => {
+    const toekomstStap = actief([stap({ id: 's2-voorkeuren', href: '/toekomst', description: undefined })])
+    expect(
+      getFirstUndismissedSuggestion(empty(), '/toekomst', none, [], undefined, ALL_MODULES, toekomstStap)?.key,
+    ).toBe('path_horizon')
+    // Ook de subroutes (prefix-match, zoals de bestaande overlay-de-dup).
+    expect(
+      getFirstUndismissedSuggestion(
+        empty(), '/toekomst/gebeurtenissen', none, [], undefined, ALL_MODULES,
+        actief([stap({ id: 's2-gebeurtenissen', href: '/toekomst/gebeurtenissen', description: undefined })]),
+      )?.key,
+    ).toBe('path_horizon')
+  })
+
+  it('afgesloten gids: exact het oude gedrag', () => {
+    const weg: GuideSuggestionInput = { status: 'dismissed', steps: [stap()] }
+    expect(
+      getFirstUndismissedSuggestion(empty(), '/overzicht/bezittingen', none, [], undefined, ALL_MODULES, weg)?.key,
+    ).toBe('gap_bank')
+    // En ook zónder gids-argument (achterwaarts compatibel).
+    expect(
+      getFirstUndismissedSuggestion(empty(), '/overzicht/bezittingen', none, [], undefined, ALL_MODULES)?.key,
+    ).toBe('gap_bank')
+  })
+
+  it('een uitgestelde onboarding-tip blijft boven de gids staan', () => {
+    const s = getFirstUndismissedSuggestion(
+      empty(), '/overzicht/bezittingen', none, ['assets'], undefined, ALL_MODULES, actief([stap()]),
+    )
+    expect(s?.key).toBe('deferred_assets')
+  })
+
+  it('beheer kan de laag uitzetten — inclusief de vervanging van de data-gaten', () => {
+    const ov: CoachOverrides = { [GUIDE_RULE_KEY]: { enabled: false } }
+    const s = getFirstUndismissedSuggestion(
+      empty(), '/overzicht/bezittingen', none, [], ov, ALL_MODULES, actief([stap()]),
+    )
+    expect(s?.key).toBe('gap_bank')
+  })
+
+  it('staat als één rij in de beheer-catalogus, zonder tekstvelden', () => {
+    const rows = buildCoachCatalogForAdmin()
+    const guideRows = rows.filter((r) => r.layer === 'guide')
+    expect(guideRows.map((r) => r.key)).toEqual([GUIDE_RULE_KEY])
+    expect(guideRows[0].textEditable).toBe(false)
+    expect(guideRows[0].message).toBe('')
+    expect(guideRows[0].cta).toBe('')
+    expect(guideRows[0].enabled).toBe(true)
+    // Elke andere regel houdt zijn bewerkbare tekst.
+    for (const r of rows.filter((x) => x.layer !== 'guide')) {
+      expect(r.textEditable, r.key).toBe(true)
+    }
   })
 })
 

@@ -102,7 +102,6 @@ const ALLOWLIST_ENTRIES = [
   'components/app/horizon/horizon-client.tsx',
   'components/app/horizon/household-retirement-pane.tsx',
   'components/app/horizon/toekomst-exit-notice.tsx',
-  'components/app/horizon/toekomst-welcome.tsx',
   'components/app/horizon/whatif-actions.tsx',
   'components/app/horizon/whatif-events.tsx',
   'components/app/household-section.tsx',
@@ -142,6 +141,15 @@ const ALLOWLIST_ENTRIES = [
   'components/onboarding/welcome-popup.tsx',
   'components/overview/belasting/box1-gross-income-editor.tsx',
   'components/overview/overzicht-hero.tsx',
+  // ADR 0130 — de rondleiding op /overzicht is een SPOTLIGHT: vier scrim-panelen
+  // rond een gat waarin het uitgelichte element zichtbaar én tikbaar blijft. Een
+  // ShellOverlay legt per definitie één vlak over de hele viewport en vangt dus
+  // elke klik — dan zou de slotstap naar een nav-pill/Fin-knop wijzen die niet
+  // meer werkt, en zou de nav-pill zichzelf bovendien verbergen op het
+  // overlay-signaal. Claimt daarom bewust géén `acquireOverlay()` en geen
+  // scroll-lock; de scrim gebruikt wél `var(--scrim)` (regel 3, niet
+  // allowlistbaar). Zie de kop van rondleiding-overlay.tsx.
+  'components/overview/rondleiding/rondleiding-overlay.tsx',
   'components/overview/transacties/transactie-tijdlijn.tsx',
   'components/overview/transacties/transacties-analyse.tsx',
   'components/sync/sync-report-modal.tsx',

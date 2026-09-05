@@ -1006,7 +1006,7 @@ const lisaData: PersonaData = {
     // 'bucket' is verwijderd (DB genormaliseerd → static, migratie 20260703115225).
     withdrawal_strategy: 'static',
     marginaal_tarief: null, // modaal inkomen → auto (laagste schijf, jaar-afgeleid uit BOX1_PARAMS)
-    feature_preferences: { _welcome_seen: true },
+    feature_preferences: {},
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', 'cash_flow', { id: 'fire_prognose', size: 'full' }, 'doelen',
       'assets', 'holdings', 'budgetten', { id: 'uitgaven_heatmap', size: 'half' },
@@ -1383,7 +1383,7 @@ const willemData: PersonaData = {
     // 'vpw' is verwijderd (DB genormaliseerd → static, migratie 20260703115225).
     withdrawal_strategy: 'guardrails',
     rebalance_threshold: 10, // agressief — hoge tolerantie, minder herbalanceren
-    feature_preferences: { _welcome_seen: true },
+    feature_preferences: {},
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', { id: 'fire_prognose', size: 'full' }, 'monte_carlo',
       'holdings', 'backtesting_score', 'vrijheidsmijlpalen', 'box3_drag', 'acties', 'gezondheids_score',
@@ -1721,7 +1721,7 @@ const marijkeData: PersonaData = {
     marginaal_tarief: 0.4950, // hoog inkomen — hoogste schijf
     net_monthly_income: 3400,
     estimated_monthly_expenses: 2800,
-    feature_preferences: { _welcome_seen: true },
+    feature_preferences: {},
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', { id: 'fire_prognose', size: 'full' }, 'box3_drag',
       'holdings', 'vrijheidsmijlpalen', 'acties', 'gezondheids_score',
@@ -2000,7 +2000,7 @@ const tessaData: PersonaData = {
     net_monthly_income: 7600,
     estimated_monthly_expenses: 4100,
     marginaal_tarief: 0.4950,
-    feature_preferences: { _welcome_seen: true },
+    feature_preferences: {},
     widget_prefs: makeWidgetPrefs([
       'netto_vermogen', 'cash_flow', { id: 'fire_prognose', size: 'full' }, 'doelen',
       'assets', 'holdings', 'budgetten', { id: 'uitgaven_heatmap', size: 'half' },

@@ -53,7 +53,6 @@ import { loadHorizonRaw, type HorizonRawData } from '@/lib/horizon/raw-data-load
 export {
   loadHorizonRaw,
   HORIZON_SETUP_COMPLETED_SLUG,
-  HORIZON_WELCOME_SHOWN_SLUG,
   HORIZON_EXIT_NOTICE_DISMISSED_SLUG,
   HORIZON_TIPS_FIRST_CLOSE_NAVIGATED_SLUG,
 } from '@/lib/horizon/raw-data-loader'

@@ -47,7 +47,7 @@ describe('WILL_FLOW — curatie-integriteit', () => {
     }
   })
 
-  it('dekt alle 23 WF-WILL-scenario\'s (01..20 + 23 + 24 + 25 — WF-WILL-21/22 bestaan niet in de catalogus)', () => {
+  it('dekt alle 24 WF-WILL-scenario\'s (01..20 + 23 t/m 26 — WF-WILL-21/22 bestaan niet in de catalogus)', () => {
     const covered = new Set(
       WILL_FLOW.nodes.map((n) => n.scenarioId).filter((id): id is string => Boolean(id)),
     )
@@ -56,11 +56,12 @@ describe('WILL_FLOW — curatie-integriteit', () => {
       'UAT-WILL-23',
       'UAT-WILL-24',
       'UAT-WILL-25',
+      'UAT-WILL-26',
     ]
     for (const id of expected) {
       expect(covered.has(id), `${id} moet als flow-knoop voorkomen`).toBe(true)
     }
-    expect(covered.size).toBe(23)
+    expect(covered.size).toBe(24)
   })
 
   it('de domeinoverschrijdende cross-knopen dekken OVZ/MIJN/BEZIT/TOEK', () => {

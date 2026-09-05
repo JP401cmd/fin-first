@@ -17,7 +17,6 @@ const CAT = 'performance.api-response'
  * Performance regression tests for API response times.
  *
  * Measures and validates response times of critical API endpoints:
- *   - /api/guide-progress (target: <500ms) — loaded on every gids page
  *   - /api/daily-expense-rate (target: <300ms) — used in dashboard
  *   - /api/snapshots (target: <500ms) — netto vermogen graph data
  *   - /api/budget-trends (target: <500ms) — budget overview
@@ -134,50 +133,7 @@ function checkRegression(endpoint: string, currentMs: number): string | null {
 }
 
 const tests: TestCase[] = [
-  // ── 1. /api/guide-progress (target: <500ms) ─────────────────────────
-  {
-    id: 'perf-guide-progress-response',
-    name: '/api/guide-progress response tijd <500ms',
-    category: CAT,
-    description: 'Wordt op elke gids-pagina geladen — moet snel antwoorden',
-    priority: 'high',
-    estimatedDurationMs: 2000,
-    async fn() {
-      const endpoint = '/api/guide-progress'
-      const { status, durationMs } = await timedFetch(endpoint)
-      // We accept 401 (not logged in) — we're measuring response speed, not auth
-      assert(
-        status === 200 || status === 401 || status === 307,
-        `${endpoint} returned unexpected status ${status}`,
-      )
-      saveBaseline(endpoint, durationMs)
-      assertLessThanOrEqual(
-        durationMs,
-        500,
-        `${endpoint} moet <500ms antwoorden (was ${Math.round(durationMs)}ms)`,
-      )
-    },
-  },
-  {
-    id: 'perf-guide-progress-shape',
-    name: '/api/guide-progress response structuur',
-    category: CAT,
-    description: 'Valideert dat response JSON de verwachte velden bevat',
-    priority: 'medium',
-    estimatedDurationMs: 1000,
-    async fn() {
-      const { status, body } = await timedFetch('/api/guide-progress')
-      if (status === 200) {
-        // Should have progress-related fields
-        assertType(body, 'object', 'response is object')
-      } else {
-        // 401 is acceptable — auth guard works
-        assert(status === 401 || status === 307, `Expected 200 or 401, got ${status}`)
-      }
-    },
-  },
-
-  // ── 2. /api/daily-expense-rate (target: <300ms) ─────────────────────
+  // ── 1. /api/daily-expense-rate (target: <300ms) ─────────────────────
   {
     id: 'perf-daily-expense-rate-response',
     name: '/api/daily-expense-rate response tijd <300ms',
@@ -218,7 +174,7 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── 3. /api/snapshots (target: <500ms) ──────────────────────────────
+  // ── 2. /api/snapshots (target: <500ms) ──────────────────────────────
   {
     id: 'perf-snapshots-response',
     name: '/api/snapshots response tijd <500ms',
@@ -258,7 +214,7 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── 4. /api/budget-trends (target: <500ms) ─────────────────────────
+  // ── 3. /api/budget-trends (target: <500ms) ─────────────────────────
   {
     id: 'perf-budget-trends-response',
     name: '/api/budget-trends response tijd <500ms',
@@ -298,7 +254,7 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── 5. Dashboard data loader (target: <1000ms) ─────────────────────
+  // ── 4. Dashboard data loader (target: <1000ms) ─────────────────────
   // We approximate by measuring the dashboard page load (which triggers the server data loader)
   {
     id: 'perf-dashboard-page-response',
@@ -366,7 +322,7 @@ const tests: TestCase[] = [
     },
   },
 
-  // ── 6. Baseline storage and regression detection ────────────────────
+  // ── 5. Baseline storage and regression detection ────────────────────
   {
     id: 'perf-baseline-storage',
     name: 'Baseline meetingen opslaan in localStorage',

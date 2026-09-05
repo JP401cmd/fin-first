@@ -69,12 +69,20 @@ const tests: TestCase[] = [
       for (const r of rows) {
         assert(typeof r.key === 'string' && r.key.length > 0, `key non-empty: ${r.key}`)
         assert(
-          ['deferred', 'data_gap', 'path', 'default'].includes(r.layer),
+          ['deferred', 'guide', 'data_gap', 'path', 'default'].includes(r.layer),
           `layer geldig: ${r.key}`,
         )
         assert(typeof r.condition === 'string' && r.condition.length > 0, `condition non-empty: ${r.key}`)
-        assert(typeof r.message === 'string' && r.message.length > 0, `message non-empty: ${r.key}`)
-        assert(typeof r.cta === 'string' && r.cta.length > 0, `cta non-empty: ${r.key}`)
+        // De gids-laag (textEditable=false) leent zijn tekst uit de gidsconfig en
+        // draagt hier bewust lege tekstvelden — zie ADR 0130.
+        assert(typeof r.textEditable === 'boolean', `textEditable boolean: ${r.key}`)
+        if (r.textEditable) {
+          assert(typeof r.message === 'string' && r.message.length > 0, `message non-empty: ${r.key}`)
+          assert(typeof r.cta === 'string' && r.cta.length > 0, `cta non-empty: ${r.key}`)
+        } else {
+          assertEqual(r.message, '', `lege tekst zonder tekstvelden: ${r.key}`)
+          assertEqual(r.cta, '', `lege knoptekst zonder tekstvelden: ${r.key}`)
+        }
         assert(typeof r.enabled === 'boolean', `enabled boolean: ${r.key}`)
         assert(typeof r.hasOverride === 'boolean', `hasOverride boolean: ${r.key}`)
         // Zonder overrides moeten waarden gelijk zijn aan de defaults

@@ -7,9 +7,18 @@
  *
  * Lagen (hoog → laag):
  *   1. deferred  — onboarding-velden die de gebruiker oversloeg ("Later invullen")
- *   2. data_gap  — ontbrekende kerngegevens (bank → vermogen → budget → doelen)
- *   3. path      — één tip per route, als fallback
- *   4. default   — welkomstbericht, laatste terugval
+ *   2. guide     — de volgende stap uit de welkomstgids, op de bijpassende route
+ *   3. data_gap  — ontbrekende kerngegevens (bank → vermogen → budget → doelen)
+ *   4. path      — één tip per route, als fallback
+ *   5. default   — welkomstbericht, laatste terugval
+ *
+ * ÉÉN STEM (ADR 0130). Zolang de welkomstgids loopt VERVANGT de gids-laag de
+ * data-gap-laag volledig — ook wanneer er op deze route geen gidsstap te noemen
+ * valt. Zes van de tien gap-regels zeggen letterlijk hetzelfde als een gidsstap
+ * ("voeg je bezittingen toe", "stel een budget in"); zonder die vervanging
+ * hoorde de gebruiker dezelfde boodschap uit twee monden, met twee verschillende
+ * afvinkmechanismen. Is de gids afgesloten of af, dan komt het oude gedrag
+ * ongewijzigd terug.
  *
  * HARDE REGEL — FIRST-USE-COPY HOORT BIJ FIRST USE (kaart H15, 27-08-2026).
  * De lagen 3 en 4 worden per constructie pas bereikt als élke data-gap dicht
@@ -34,6 +43,19 @@
  */
 
 import type { ModuleId } from '@/lib/module-registry'
+import { GUIDE_SUGGESTION_KEY_PREFIX } from '@/lib/coach-state'
+import { guideStepMatchesRoute, type GuideNextStep } from '@/lib/welcome-guide'
+
+/**
+ * Het voorvoegsel van de gids-meldingsleutels (`guide_<stap-id>`).
+ *
+ * De DEFINITIE staat in `lib/coach-state.ts` — dat bestand is de enige die zowel
+ * de dismiss-vertakking in de hook als deze laag mag voeden zonder
+ * afhankelijkheidsknoop. Hier alleen doorgegeven, zodat een consument van de
+ * coach-catalogus 'm niet uit een ogenschijnlijk ongerelateerde module hoeft te
+ * halen.
+ */
+export { GUIDE_SUGGESTION_KEY_PREFIX }
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -90,8 +112,34 @@ export type CoachDataGaps = {
  */
 export type DeferredField = 'income' | 'assets' | 'spaardoel'
 
-/** De vier prioriteitslagen waarin coach-regels zijn ingedeeld. */
-export type CoachLayer = 'deferred' | 'data_gap' | 'path' | 'default'
+/** De vijf prioriteitslagen waarin coach-regels zijn ingedeeld. */
+export type CoachLayer = 'deferred' | 'guide' | 'data_gap' | 'path' | 'default'
+
+/**
+ * De sleutel waaronder de gids-laag als geheel in beheer staat. Eén rij, want
+ * de teksten komen uit de gidsconfig (`app_settings.welcome_guide_config`) en
+ * niet uit de coach-catalogus — beheer kan de laag alleen aan- of uitzetten.
+ */
+export const GUIDE_RULE_KEY = 'guide'
+
+/**
+ * Routes waarop Fin GEEN gidsstap noemt (prefix-match, net als `onToekomst`).
+ *
+ * `/toekomst` draagt zijn eigen uitleg-ballonnen rond de grafiek; een gids-bubbel
+ * erbovenop zou een tweede hulplaag op hetzelfde scherm zijn.
+ */
+export const GUIDE_BUBBLE_EXCLUDED_ROUTES: readonly string[] = ['/toekomst']
+
+/**
+ * Wat de shell-layout over de welkomstgids meegeeft. `steps` is de VOLLEDIGE
+ * lijst open stappen (server-side afgeleid, zie `openGuideSteps`); het filteren
+ * op route gebeurt hier, omdat de pathname pas client-side bekend is.
+ */
+export interface GuideSuggestionInput {
+  /** 'active' = de gids loopt nog · 'dismissed' = afgesloten óf helemaal af. */
+  status: 'active' | 'dismissed'
+  steps: GuideNextStep[]
+}
 
 // ── Override / config types ──────────────────────────────────────────────
 
@@ -155,23 +203,29 @@ export const COACH_LAYER_META: Record<
       'Velden die de gebruiker met "Later invullen" oversloeg. Hoogste prioriteit — verwijst naar een concrete actie van de gebruiker.',
     order: 1,
   },
+  guide: {
+    label: 'Welkomstgids — volgende stap',
+    description:
+      'De eerstvolgende open stap uit de welkomstgids, alleen op de pagina waar die stap thuishoort. Hoogstens één per dag, nooit op /toekomst (daar staan de uitleg-ballonnen). Zolang de gids loopt VERVANGT deze laag de data-gaten; na afsluiten of afronden komt die laag terug. De teksten komen uit de gidsconfig (/beheer/welkom), niet uit deze catalogus.',
+    order: 2,
+  },
   data_gap: {
     label: 'Data-gaten',
     description:
-      'Ontbrekende kerngegevens. Vaste volgorde: bank → vermogen → budget → doelen. De eerste niet-weggeklikte gap wint.',
-    order: 2,
+      'Ontbrekende kerngegevens. Vaste volgorde: bank → vermogen → budget → doelen. De eerste niet-weggeklikte gap wint. Wordt overgeslagen zolang de welkomstgids actief is.',
+    order: 3,
   },
   path: {
     label: 'Pad-gebaseerd',
     description:
       'Eén tip per pagina/route, als fallback wanneer er geen data-gap of uitgesteld veld speelt. Deze laag wordt pas bereikt als élke data-gap dicht is — een regel hier moet dus voor een gevuld account kloppen, of een eigen check dragen.',
-    order: 3,
+    order: 4,
   },
   default: {
     label: 'Standaard welkomstbericht',
     description:
       'Laatste terugval als geen enkele andere regel van toepassing is. Twee varianten: gevuld account eerst, daarna het onvoorwaardelijke welkomstbericht.',
-    order: 4,
+    order: 5,
   },
 }
 
@@ -592,9 +646,10 @@ function applyOverride(
 /**
  * Vind de eerste niet-weggeklikte, ingeschakelde suggestie. Prioriteit:
  *  0. Uitgestelde onboarding-velden — specifieke feedback
- *  1. Data-gap suggesties (bank > assets > budget > goals)
- *  2. Pad-gebaseerde suggestie (exacte + prefix match, specifiek → breed)
- *  3. Default welkomstbericht
+ *  1. Welkomstgids — de open stap die bij deze route hoort (ADR 0130)
+ *  2. Data-gap suggesties (bank > assets > budget > goals)
+ *  3. Pad-gebaseerde suggestie (exacte + prefix match, specifiek → breed)
+ *  4. Default welkomstbericht
  *
  * Admin-overrides bepalen de getoonde tekst/CTA en kunnen een regel
  * uitschakelen (overrides[key].enabled === false → overgeslagen).
@@ -603,6 +658,9 @@ function applyOverride(
  * `moduleId` wordt overgeslagen wanneer die module niet actief is (spiegelt de
  * module-gating van de nudges). Is `activeModules` undefined, dan vindt geen
  * gating plaats (achterwaarts compatibel).
+ *
+ * `guide` is de LAATSTE positionele parameter en optioneel: zonder gids-invoer
+ * (of met een afgesloten gids) gedraagt de selectie zich exact als vóór ADR 0130.
  *
  * Retourneert null als alle toepasselijke regels al gezien of uitgeschakeld zijn.
  */
@@ -613,6 +671,7 @@ export function getFirstUndismissedSuggestion(
   deferredFields?: DeferredField[],
   overrides?: CoachOverrides,
   activeModules?: ModuleId[],
+  guide?: GuideSuggestionInput,
 ): CoachSuggestion | null {
   const isEnabled = (key: string) => overrides?.[key]?.enabled !== false
 
@@ -637,8 +696,38 @@ export function getFirstUndismissedSuggestion(
   const onToekomst = pathname === '/toekomst' || pathname.startsWith('/toekomst/')
   const TOEKOMST_OVERLAY_KEYS = new Set(['gap_fire_params', 'gap_life_events'])
 
-  // 1. Data-gap suggesties — module-gated wanneer activeModules is meegegeven
-  if (dataGaps) {
+  // 1. Welkomstgids — de open stap die bij DEZE route hoort (ADR 0130)
+  //
+  // De laag is actief zolang de gids loopt én beheer 'm aan heeft staan. Actief
+  // betekent óók: de data-gap-laag hieronder wordt overgeslagen, ook wanneer er
+  // op deze route geen stap te noemen valt (één stem — zie de module-kop). Zet
+  // beheer de laag uit, dan is er geen gids-laag én geen onderdrukking: het
+  // gedrag van vóór ADR 0130 komt in één klik terug.
+  const guideActive = guide?.status === 'active' && isEnabled(GUIDE_RULE_KEY)
+  if (guideActive) {
+    const excluded = GUIDE_BUBBLE_EXCLUDED_ROUTES.some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+    )
+    if (!excluded) {
+      for (const step of guide!.steps) {
+        if (!guideStepMatchesRoute(step, pathname)) continue
+        const key = `${GUIDE_SUGGESTION_KEY_PREFIX}${step.id}`
+        if (dismissed.has(key)) continue
+        return {
+          key,
+          message: step.description ? `${step.title} ${step.description}` : step.title,
+          cta: 'Bekijk in de gids',
+          // Alleen een DEEPLINK is een zinvolle bestemming: de route-match is
+          // exact, dus een kale href wijst naar de pagina waar je al staat. Zonder
+          // href opent de CTA de gidsweergave in Fin (fin-home.tsx#handleCta).
+          ctaHref: step.href.includes('?') ? step.href : undefined,
+        }
+      }
+    }
+  }
+
+  // 2. Data-gap suggesties — module-gated wanneer activeModules is meegegeven
+  if (dataGaps && !guideActive) {
     for (const entry of DATA_GAP_SUGGESTIONS) {
       // Module-gating: sla over wanneer de regel aan een module hangt die niet
       // actief is. Alleen toegepast als activeModules expliciet is meegegeven.
@@ -655,7 +744,7 @@ export function getFirstUndismissedSuggestion(
     }
   }
 
-  // 2. Pad-gebaseerde suggestie — specifiek → breed (catalogus is al geordend)
+  // 3. Pad-gebaseerde suggestie — specifiek → breed (catalogus is al geordend)
   for (const entry of PATH_SUGGESTIONS) {
     const matches =
       pathname === entry.pathPrefix || pathname.startsWith(entry.pathPrefix + '/')
@@ -669,7 +758,7 @@ export function getFirstUndismissedSuggestion(
     }
   }
 
-  // 3. Default welkomstbericht — gevulde variant vóór het first-use-welkom
+  // 4. Default welkomstbericht — gevulde variant vóór het first-use-welkom
   for (const entry of DEFAULT_SUGGESTIONS) {
     if (entry.check && !(dataGaps && entry.check(dataGaps))) continue
     if (!dismissed.has(entry.key) && isEnabled(entry.key)) {
@@ -696,6 +785,13 @@ export interface CoachAdminRow {
   ctaHref: string
   enabled: boolean
   hasOverride: boolean
+  /**
+   * Hebben de tekstvelden betekenis voor deze regel? `false` voor de gids-laag:
+   * die leent zijn tekst uit de gidsconfig (/beheer/welkom), dus een override
+   * hier zou een veld bewerken dat nooit gelezen wordt. Het beheerscherm toont
+   * dan alleen de aan/uit-schakelaar.
+   */
+  textEditable: boolean
 }
 
 /**
@@ -712,6 +808,7 @@ export function buildCoachCatalogForAdmin(overrides: CoachOverrides = {}): Coach
     condition: string,
     order: number,
     base: SuggestionContent,
+    textEditable = true,
   ) => {
     const ov = overrides[key]
     rows.push({
@@ -727,10 +824,21 @@ export function buildCoachCatalogForAdmin(overrides: CoachOverrides = {}): Coach
       ctaHref: ov?.ctaHref ?? base.ctaHref ?? '',
       enabled: ov?.enabled !== false,
       hasOverride: !!ov,
+      textEditable,
     })
   }
 
   DEFERRED_FIELD_SUGGESTIONS.forEach((e, i) => push('deferred', e.key, e.condition, i + 1, e.suggestion))
+  // Eén rij voor de hele gids-laag: alleen aan/uit. De teksten staan per stap in
+  // de gidsconfig (/beheer/welkom) — daarom lege tekstvelden en textEditable=false.
+  push(
+    'guide',
+    GUIDE_RULE_KEY,
+    'De welkomstgids loopt nog én er staat een open gidsstap open die bij de huidige pagina hoort (exacte route-match; bezoekstappen en /toekomst uitgezonderd). Hoogstens één per dag; wegklikken houdt díe stap stil. Zolang de gids loopt vervangt deze laag de data-gaten. Uit = die vervanging vervalt ook.',
+    1,
+    { message: '', cta: '' },
+    false,
+  )
   DATA_GAP_SUGGESTIONS.forEach((e, i) => push('data_gap', e.key, e.condition, i + 1, e.suggestion))
   PATH_SUGGESTIONS.forEach((e, i) => push('path', e.key, e.condition, i + 1, e.suggestion))
   // Beide default-varianten als eigen rij: een gesplitste regel MOET in beheer
@@ -741,9 +849,10 @@ export function buildCoachCatalogForAdmin(overrides: CoachOverrides = {}): Coach
   return rows
 }
 
-/** Totaal aantal coach-regels in de catalogus. */
+/** Totaal aantal coach-regels in de catalogus (+1 = de gids-laag, ADR 0130). */
 export const COACH_RULE_COUNT =
   DEFERRED_FIELD_SUGGESTIONS.length +
+  1 +
   DATA_GAP_SUGGESTIONS.length +
   PATH_SUGGESTIONS.length +
   DEFAULT_SUGGESTIONS.length

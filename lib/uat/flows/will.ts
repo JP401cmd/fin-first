@@ -13,7 +13,10 @@
 // hebben wél een eigen knoop hieronder — geen verwijsregel-gaten BINNEN de
 // 20 die deze zone daadwerkelijk bezit. WF-WILL-23 (lokaal actievoorstel,
 // backlog #886 C2c) is een latere toevoeging naast de 20, genest onder
-// dezelfde 'vraag'-knoop als het cloud-pad WF-WILL-03.
+// dezelfde 'vraag'-knoop als het cloud-pad WF-WILL-03. WF-WILL-26 (de
+// gids-bubbel, ADR 0130 fase 2) hangt onder de coach-melding: het is dezelfde
+// meldingsvorm, maar met de welkomstgids als bron — en zolang die gids loopt
+// vervangt hij de data-gap-tip van WF-WILL-05.
 //
 // Het proces leest links→rechts: instap (bubbel/bel/krant overal zichtbaar) →
 // chat-kern (vrije vraag, tip/actie-beslissing, pin, badge-heropak, contextuele
@@ -39,6 +42,7 @@ export const WILL_FLOW: UatFlow = {
     { id: 'nav', label: 'Fin-bubbel/bel/krant-icoon zichtbaar op elke pagina', kind: 'entry', stage: 0 },
     { id: 'chatbeslis', label: 'Vrije vraag, tip/badge, of vanuit context elders?', kind: 'decision', stage: 0 },
     { id: 'coachmelding', scenarioId: 'UAT-WILL-05', label: 'WF-WILL-05 · Coach-melding ontvangen en opvolgen', kind: 'screen', stage: 0, lane: 'chat' },
+    { id: 'gidsstap', scenarioId: 'UAT-WILL-26', label: 'WF-WILL-26 · Fin herinnert aan de volgende gidsstap', kind: 'action', stage: 0, lane: 'chat', subOf: 'coachmelding' },
 
     // ── 1 · chat-kern ─────────────────────────────────────────────────────
     { id: 'vraag', scenarioId: 'UAT-WILL-01', label: 'WF-WILL-01 · Vrije vraag stellen aan Fin', kind: 'screen', stage: 1, lane: 'chat' },
@@ -84,6 +88,8 @@ export const WILL_FLOW: UatFlow = {
     { from: 'nav', to: 'krant' },
     { from: 'nav', to: 'coachmelding' },
     { from: 'coachmelding', to: 'vraag', label: 'klik op de meldingstekst opent de chat' },
+    { from: 'coachmelding', to: 'gidsstap', label: 'gids loopt nog → gidsstap i.p.v. data-gap-tip' },
+    { from: 'gidsstap', to: 'uitkomst', label: '"Bekijk in de gids" opent de gidsweergave in Fin' },
     { from: 'nav', to: 'melding', label: 'megafoon-toggle, buiten alle AI-gates' },
 
     // chat-kern (beslispunt: hoe de chat wordt geopend)

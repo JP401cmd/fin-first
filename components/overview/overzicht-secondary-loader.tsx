@@ -22,6 +22,7 @@ import { resolveFreedomAgeView, fireAgeForDisplay, isAtOrPastAow, isFixedAnchor,
 import { ankerReachFromRunway, ankerStopFromSim, type AnkerReach, type AnkerStop } from '@/lib/horizon/anker-copy'
 import { computeHorizonSolvedFireAge } from '@/lib/fire-target-shared'
 import { PageStatusSeed } from '@/components/app/page-status-provider'
+import { RondleidingDataSeed } from '@/components/overview/rondleiding/rondleiding-provider'
 import { computePageStatusInfo, readMinimizedLevel } from '@/lib/page-status/compute'
 import type { BriefingWeekHistoryItem } from '@/components/overview/briefing-panel'
 import type { BriefingRefreshState } from '@/lib/types/briefing'
@@ -418,7 +419,7 @@ export async function OverzichtSecondaryLoader({
       ? await computeHorizonSolvedFireAge(supabase, perspective).catch(() => null)
       : null
   const planEndAge = horizonData?.firePlan?.endAge ?? null
-  // Compat voor de legacy `nuStoppenReach`-prop (ADR 0127): alleen het nu-anker.
+  // Compat voor de rondleiding-seed (ADR 0130, zusterwerk): alleen het nu-anker.
   const nuStoppenReach: AnkerReach | null = planAnchor?.kind === 'now' ? ankerReach : null
 
   // Vieringsprop voor de client-host: kant-en-klare strings (plat/serialiseerbaar),
@@ -443,6 +444,19 @@ export async function OverzichtSecondaryLoader({
         route="/overzicht"
         info={pageStatusInfo}
         minimized={pageStatusMinimized}
+      />
+      {/* Seedt de rondleiding met de vrijheidsleeftijd (ADR 0130). Zelfde
+          patroon en zelfde reden als de status-seed hierboven: de zin komt uit
+          `resolveFreedomAgeView`, dat achter `loadDashboardData` zit, terwijl de
+          rondleiding zelf om blok 1 hangt. Rendert niets; komt de seed niet op
+          tijd, dan laat de grafiekstap de duidingszin gewoon weg. */}
+      <RondleidingDataSeed
+        vrijheid={{
+          fireAgeDisplay,
+          framing: freedomFraming,
+          dataIssue: freedomDataIssue,
+          nuStoppenReach,
+        }}
       />
       <OverzichtSecondary
         goals={finData.goals}

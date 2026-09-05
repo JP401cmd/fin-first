@@ -63,7 +63,7 @@ export async function PUT(req: Request) {
 
   // De kolom draagt náást feature-vlaggen ook niet-feature-sleutels
   // (wealth_widget_selection — ADR 0120, retirement_aspirations,
-  // _welcome_seen, deferred_onboarding_fields). Die overleven élke schrijf:
+  // deferred_onboarding_fields). Die overleven élke schrijf:
   // feature-vlaggen zijn vervang-semantiek (de body is de complete set, zodat
   // "reset naar standaard" met een lege body blijft werken), al het andere
   // wordt onvoorwaardelijk uit de huidige waarde meegenomen. Vóór deze merge

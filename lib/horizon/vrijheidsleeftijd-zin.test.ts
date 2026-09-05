@@ -7,10 +7,10 @@
  *    (leeftijd · al vrij · onbekend/onhaalbaar · nog aan het rekenen), plus de
  *    pensioen- en perspectiefvariant.
  * 2. **De ontdubbeling.** De varianten `kaart` en `inline` moeten byte-voor-byte
- *    reproduceren wat vóór S15 hardgecodeerd in `toekomst-welcome.tsx` en
- *    `toekomst-overlay.tsx` stond. Die twee suites draaien ongewijzigd door en
- *    zijn het echte bewijs; deze tests pinnen de strings hier vast zodat een
- *    latere wijziging niet stilzwijgend één oppervlak laat weglopen.
+ *    reproduceren wat vóór S15 hardgecodeerd in de welkomstkaart en
+ *    `toekomst-overlay.tsx` stond. De welkomstkaart is per ADR 0130 verdwenen,
+ *    dus voor `kaart` zijn dit sindsdien de énige tests die de strings vastpinnen
+ *    — zodat een latere wijziging niet stilzwijgend één oppervlak laat weglopen.
  *
  * De afronding komt uit `heroFireAgeYear` — dezelfde functie als het kopgetal
  * van de hero-KPI. Dat is geen detail: zou de zin anders afronden, dan stond er

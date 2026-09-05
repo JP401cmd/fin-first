@@ -31,7 +31,7 @@ export const TOEK_FLOW: UatFlow = {
     // ── 0 · instap ────────────────────────────────────────────────────────
     { id: 'nav', label: 'Navigatie naar Toekomst (/toekomst)', kind: 'entry', stage: 0 },
     { id: 'eerste', label: 'Eerste keer?', kind: 'decision', stage: 0 },
-    { id: 'welkom', scenarioId: 'UAT-TOEK-07', label: 'WF-TOEK-07 · Welkomst & Tips-modus', kind: 'screen', stage: 0, lane: 'instap' },
+    { id: 'welkom', scenarioId: 'UAT-TOEK-07', label: 'WF-TOEK-07 · Tips-modus', kind: 'screen', stage: 0, lane: 'instap' },
 
     // ── 0 · grondslag (kernel-inputs uit andere domeinen) ─────────────────
     { id: 'x-bezit', label: 'Liquide / FIRE-eligible portefeuille (grondslag)', kind: 'cross', stage: 0, lane: 'grondslag', crossZone: 'BEZIT' },

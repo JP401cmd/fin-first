@@ -93,7 +93,7 @@ export function CheckinBanner({
   const monthLabel = MONTH_NAMES[new Date().getMonth()]
 
   return (
-    // H20: zie WelcomeGuideBanner — deze banner rendert nu IN de hero-sectie
+    // H20: deze banner rendert IN de hero-sectie
     // van /overzicht (slot `banners`, ná de begroeting) en erft daar breedte en
     // horizontale padding.
     <section aria-label="Maandelijkse check-in" className="mb-6">

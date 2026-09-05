@@ -59,7 +59,7 @@ export async function seedTestData(
     withdrawal_strategy: 'static',
     guardrail_floor: 0.80,
     guardrail_ceiling: 1.20,
-    feature_preferences: { _welcome_seen: true },
+    feature_preferences: {},
     updated_at: new Date().toISOString(),
   })
 

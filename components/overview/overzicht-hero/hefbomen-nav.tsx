@@ -303,6 +303,10 @@ export function HefbomenNav({
         return (
           <LeverageCard
             key={key}
+            // Target-contract van de rondleiding (ADR 0130): vier stappen
+            // lichten deze tegels één voor één uit. Zie de `dataTour`-noot in
+            // leverage-card.tsx voor waarom dit een attribuut is.
+            dataTour={`hefboom-${key}`}
             Icon={Icon}
             tint={accent}
             label={label}

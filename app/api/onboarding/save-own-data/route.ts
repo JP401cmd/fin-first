@@ -21,6 +21,7 @@ import type { DebtType } from '@/lib/debt-data'
 import type { GoalSlug } from '@/lib/goals/types'
 import { GOAL_MODULE_PRESETS } from '@/lib/goals/catalog'
 import { deleteEmptyOnboardingBankAccounts } from '@/lib/onboarding-bank-cleanup'
+import { withRondleidingPending } from '@/lib/rondleiding/seed'
 
 /**
  * Best-effort mapping van een nieuwe goal-slug naar de oude `IntentId` zodat
@@ -1328,9 +1329,38 @@ export async function POST(req: Request) {
 
     // 7. Mark onboarding as completed LAST — only after all data is saved successfully
     // This ensures the idempotency guard doesn't block retries after partial failures
+    //
+    // In DEZELFDE update gaat de vlag "deze gebruiker heeft de rondleiding nog
+    // tegoed" mee (ADR 0130). Bewust hier en niet in een aparte call: het
+    // startsignaal van de rondleiding hoort exact zo vers te zijn als
+    // `onboarding_completed` zelf — een tweede, mislukbare write zou een deel
+    // van de nieuwe gebruikers zonder rondleiding laten landen.
+    //
+    // De kolom wordt eerst GELEZEN en dan gemerged: `module_guide_state` draagt
+    // ook `welcome:guide`, de coachmarks en de coach-staat. Blind overschrijven
+    // zou die wissen. Faalt de LEES, dan laten we de kolom met rust: mergen op
+    // een lege basis zou bij een her-onboarding of retry alsnog de bestaande
+    // sleutels wissen. De gebruiker mist dan hooguit de automatische rondleiding
+    // (hij kan 'm zelf starten); het afronden van de onboarding mag hier nooit
+    // op stuklopen.
+    const { data: guideStateRow, error: guideStateReadErr } = await supabase
+      .from('profiles')
+      .select('module_guide_state')
+      .eq('id', user.id)
+      .maybeSingle()
+    if (guideStateReadErr) {
+      console.warn('[save-own-data] module_guide_state niet leesbaar — rondleiding-vlag overgeslagen', guideStateReadErr.code)
+    }
+
     const { error: completeErr } = await supabase
       .from('profiles')
-      .update({ onboarding_completed: true, updated_at: new Date().toISOString() })
+      .update({
+        onboarding_completed: true,
+        ...(guideStateReadErr
+          ? {}
+          : { module_guide_state: withRondleidingPending(guideStateRow?.module_guide_state) }),
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', user.id)
     if (completeErr) throw new Error(`Onboarding afronden mislukt: ${completeErr.message}`)
 

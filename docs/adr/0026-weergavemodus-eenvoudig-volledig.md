@@ -154,6 +154,12 @@ eronder exact herhaalt — is het in **beide** modi gerepareerd. De modus is een
 opbergplek voor UI die er sowieso niet hoorde te staan.
 ## Aanvulling — 28 augustus 2026 (positie van de welkomstgids + waar APP-2 landt)
 
+> **Deels vervangen door ADR 0130 (5 sep 2026).** Besluit 1 t/m 3 hieronder — de gids in het
+> `banners`-slot ná de begroeting, minimaliseren tot een punt naast de pagina-`i`, en APP-2 in de
+> gids óp /overzicht — gelden niet meer: de welkomstgids woont sinds ADR 0130 in de Fin-chat en is
+> van /overzicht verdwenen. De APP-2-regel zelf ("de gids is de enige plek waar de app over de
+> weergavekeuze praat") blijft; de zin is met de gids meeverhuisd.
+
 Fase 1 gaf de welkomstgids de rol van **enige plek waar de app zélf over de weergavekeuze praat**
 (APP-2, de regel hierboven). Wat daarbij nooit is vastgelegd: **wáár die gids op de pagina staat en
 hoe je hem wegkrijgt.** Twee bevindingen uit de schermronde van 25 aug 2026 raakten precies dat gat —

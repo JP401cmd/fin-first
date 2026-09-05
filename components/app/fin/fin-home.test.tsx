@@ -2,17 +2,23 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { FinHome, type FinHomeProps } from './fin-home'
 import { FinSlotProvider } from '@/lib/shell/fin-slot'
-import type { CoachDataGaps } from '@/lib/coach-suggestions'
+import type { CoachDataGaps, GuideSuggestionInput } from '@/lib/coach-suggestions'
+import type { GuideNextStep } from '@/lib/welcome-guide'
 import { __resetInflight } from '@/lib/inflight'
 import { acquireOverlay, __resetOverlayCount } from '@/lib/overlay-signal'
+import { setRondleidingActive, __resetRondleidingSignal } from '@/lib/rondleiding/signal'
+import { EMPTY_COACH_STATE, type CoachState } from '@/lib/coach-state'
 
 const open = vi.fn()
 const toggle = vi.fn()
 const openWithMessage = vi.fn()
+const openGids = vi.fn()
 let isOpenValue = false
 
 vi.mock('@/components/app/chat/chat-provider', () => ({
-  useChatContext: () => ({ isOpen: isOpenValue, open, toggle, openWithMessage, close: vi.fn() }),
+  useChatContext: () => ({
+    isOpen: isOpenValue, open, toggle, openWithMessage, openGids, close: vi.fn(),
+  }),
 }))
 vi.mock('next/navigation', () => ({
   usePathname: () => '/overzicht',
@@ -23,8 +29,18 @@ vi.mock('next/navigation', () => ({
 // FinHome leest het nav-pill-slot via context; zonder provider gooit de hook.
 // Er is hier geen FloatingNavButton, dus het slot blijft leeg → alleen de
 // zwevende instantie rendert (precies wat deze tests asserten).
-const renderFin = (props: FinHomeProps) =>
-  render(<FinSlotProvider><FinHome {...props} /></FinSlotProvider>)
+// `coachState` is verplicht (server-seed uit de app-layout). De helper vult de
+// lege staat in zodat elke bestaande case leest als vroeger; cases die de seed
+// zélf toetsen geven 'm expliciet mee.
+const renderFin = (props: Omit<FinHomeProps, 'coachState'> & { coachState?: CoachState }) =>
+  render(
+    <FinSlotProvider>
+      <FinHome coachState={EMPTY_COACH_STATE} {...props} />
+    </FinSlotProvider>,
+  )
+
+/** Alle bodies die naar /api/coach-state gingen. */
+let coachStatePuts: Record<string, unknown>[] = []
 
 const gaps = (over: Partial<CoachDataGaps> = {}): CoachDataGaps => ({
   hasBank: true, hasAssets: true, hasBudgets: true, hasGoals: true, hasDebts: true,
@@ -34,10 +50,19 @@ const gaps = (over: Partial<CoachDataGaps> = {}): CoachDataGaps => ({
 
 beforeEach(() => {
   vi.useFakeTimers(); localStorage.clear(); isOpenValue = false
-  open.mockReset(); toggle.mockReset(); openWithMessage.mockReset()
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ count: 0 }) }))
+  open.mockReset(); toggle.mockReset(); openWithMessage.mockReset(); openGids.mockReset()
+  coachStatePuts = []
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+    if (url === '/api/coach-state' && init?.body) {
+      coachStatePuts.push(JSON.parse(init.body as string) as Record<string, unknown>)
+    }
+    return { ok: true, json: async () => ({ count: 0 }) }
+  }))
 })
-afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); __resetInflight(); __resetOverlayCount() })
+afterEach(() => {
+  vi.useRealTimers(); vi.restoreAllMocks(); __resetInflight()
+  __resetOverlayCount(); __resetRondleidingSignal()
+})
 
 describe('FinHome', () => {
   it('toont de bubbel-launcher en opent de chat bij klik', () => {
@@ -172,7 +197,138 @@ describe('FinHome', () => {
     renderFin({ dataGaps: gaps({ hasBank: false }), delayMs: 0, autoDismissMs: 999999 })
     act(() => { vi.advanceTimersByTime(400) })
     expect(screen.queryByText(/Koppel je bank/i)).not.toBeInTheDocument()
+    // Sinds ADR 0130 kiest de hook pas ná het vrijgeven — de melding is dus niet
+    // stilletjes achter de overlay al "gebeurd". Vandaar de vertraging opnieuw.
     act(() => { release() })
+    act(() => { vi.advanceTimersByTime(400) })
     expect(screen.getByText(/Koppel je bank/i)).toBeInTheDocument()
+  })
+
+  // ── Server-seed + pauze (ADR 0130) ───────────────────────────────────────
+  it('toont een melding niet meer die volgens de server-seed al is weggeklikt', () => {
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as unknown as MediaQueryList)
+    renderFin({
+      coachState: { ...EMPTY_COACH_STATE, dismissed: ['gap_bank'] },
+      dataGaps: gaps({ hasBank: false }),
+      delayMs: 0,
+      autoDismissMs: 999999,
+    })
+    act(() => { vi.advanceTimersByTime(400) })
+    expect(screen.queryByText(/Koppel je bank/i)).not.toBeInTheDocument()
+  })
+
+  it('stempelt geen enkele melding zolang er een overlay openstaat (M15)', () => {
+    // De latente fout die ADR 0130 dicht: achter een open overlay liep de
+    // auto-dismiss gewoon door en werd de tip als "gezien" weggeschreven,
+    // terwijl niemand hem ooit te zien kreeg.
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as unknown as MediaQueryList)
+    const release = acquireOverlay()
+    try {
+      renderFin({ dataGaps: gaps({ hasBank: false }), delayMs: 0, autoDismissMs: 1000 })
+      act(() => { vi.advanceTimersByTime(60_000) })
+      expect(coachStatePuts).toHaveLength(0)
+    } finally {
+      release()
+    }
+  })
+
+  it('verbergt zijn mond tijdens de rondleiding, maar blijft zélf zichtbaar', () => {
+    // De rondleiding licht in haar laatste stap Fins eigen knop uit — die moet
+    // dus staan blijven. Alleen de proactieve melding zwijgt.
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as unknown as MediaQueryList)
+    act(() => { setRondleidingActive(true) })
+    renderFin({ dataGaps: gaps({ hasBank: false }), delayMs: 0, autoDismissMs: 999999 })
+    act(() => { vi.advanceTimersByTime(60_000) })
+    expect(screen.queryByText(/Koppel je bank/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Open chat met Fin/i })).toBeInTheDocument()
+    expect(coachStatePuts).toHaveLength(0)
+  })
+
+  it('sluit een al openstaande melding tijdens de rondleiding en toont hem daarna weer', () => {
+    // Een herstart van de rondleiding (bestaande gebruiker) kan een melding
+    // aantreffen die al openstaat. Die hoort niet bevroren onder de scrim te
+    // blijven hangen — en al helemaal niet als "gezien" te worden weggeschreven.
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as unknown as MediaQueryList)
+    renderFin({ dataGaps: gaps({ hasBank: false }), delayMs: 0, autoDismissMs: 999999 })
+    act(() => { vi.advanceTimersByTime(400) })
+    expect(screen.getByText(/Koppel je bank/i)).toBeInTheDocument()
+
+    act(() => { setRondleidingActive(true) })
+    expect(screen.queryByText(/Koppel je bank/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Open chat met Fin/i })).toBeInTheDocument()
+
+    act(() => { setRondleidingActive(false) })
+    act(() => { vi.advanceTimersByTime(400) })
+    expect(screen.getByText(/Koppel je bank/i)).toBeInTheDocument()
+    expect(coachStatePuts).toHaveLength(0)
+  })
+
+  it('stempelt niets zolang de chat openstaat — ook gepind, zonder overlay-signaal', () => {
+    // Met de chat open rendert FinHome `null`. Een gepinde chat claimt bewust
+    // geen overlay-signaal, dus zonder `isOpen` in `paused` koos de hook een
+    // tip, typte 'm uit en schreef 'm na de auto-dismiss als gezien weg — voor
+    // een scherm dat niemand zag.
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as unknown as MediaQueryList)
+    isOpenValue = true
+    renderFin({ dataGaps: gaps({ hasBank: false }), delayMs: 0, autoDismissMs: 1000 })
+    act(() => { vi.advanceTimersByTime(60_000) })
+    expect(coachStatePuts).toHaveLength(0)
+  })
+
+  // ── Gids-bubbel (ADR 0130, fase 2) ───────────────────────────────────────
+  //
+  // De route-mock staat op /overzicht; de gidsstappen hieronder wijzen daarheen.
+  describe('gids-bubbel', () => {
+    const guideStap = (over: Partial<GuideNextStep> = {}): GuideNextStep => ({
+      id: 's1-bezittingen',
+      title: 'Zijn al je bezittingen geregistreerd?',
+      href: '/overzicht',
+      ...over,
+    })
+    const guide = (over: Partial<GuideNextStep> = {}): GuideSuggestionInput => ({
+      status: 'active',
+      steps: [guideStap(over)],
+    })
+
+    it('toont de gidsstap in plaats van de data-gap-tip', () => {
+      vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as unknown as MediaQueryList)
+      renderFin({ dataGaps: gaps({ hasBank: false }), delayMs: 0, autoDismissMs: 999999, guide: guide() })
+      act(() => { vi.advanceTimersByTime(400) })
+      expect(screen.getByText(/Zijn al je bezittingen geregistreerd/i)).toBeInTheDocument()
+      expect(screen.queryByText(/Koppel je bank/i)).not.toBeInTheDocument()
+    })
+
+    it('de CTA zonder bestemming opent de gidsweergave in Fin', () => {
+      vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as unknown as MediaQueryList)
+      renderFin({ dataGaps: gaps({ hasBank: false }), delayMs: 0, autoDismissMs: 999999, guide: guide() })
+      act(() => { vi.advanceTimersByTime(400) })
+      act(() => { fireEvent.click(screen.getByRole('button', { name: /Bekijk in de gids/i })) })
+      expect(openGids).toHaveBeenCalledTimes(1)
+      // De chat zelf gaat niet in gespreksmodus open — alleen de gidsweergave.
+      expect(open).not.toHaveBeenCalled()
+      expect(screen.queryByText(/Zijn al je bezittingen geregistreerd/i)).not.toBeInTheDocument()
+    })
+
+    it('een deeplink-stap houdt zijn link en opent de gids NIET', () => {
+      vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as unknown as MediaQueryList)
+      renderFin({
+        dataGaps: gaps({ hasBank: false }), delayMs: 0, autoDismissMs: 999999,
+        guide: guide({ id: 's1-budget', href: '/overzicht?uitgaven=open' }),
+      })
+      act(() => { vi.advanceTimersByTime(400) })
+      const link = screen.getByRole('link', { name: /Bekijk in de gids/i })
+      expect(link).toHaveAttribute('href', '/overzicht?uitgaven=open')
+      act(() => { fireEvent.click(link) })
+      expect(openGids).not.toHaveBeenCalled()
+    })
+  })
+
+  it('schrijft het kruisje weg naar de server (cross-device)', async () => {
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as unknown as MediaQueryList)
+    renderFin({ dataGaps: gaps({ hasBank: false }), delayMs: 0, autoDismissMs: 999999 })
+    await act(async () => {})
+    act(() => { vi.advanceTimersByTime(400) })
+    act(() => { fireEvent.click(screen.getByRole('button', { name: /Sluiten/i })) })
+    expect(coachStatePuts).toEqual([{ action: 'dismiss', key: 'gap_bank' }])
   })
 })

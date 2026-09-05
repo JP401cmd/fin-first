@@ -17,10 +17,13 @@ type Overrides = Record<
   { message?: string; cta?: string; ctaHref?: string; enabled?: boolean }
 >
 
-const LAYER_ORDER: CoachLayer[] = ['deferred', 'data_gap', 'path', 'default']
+const LAYER_ORDER: CoachLayer[] = ['deferred', 'guide', 'data_gap', 'path', 'default']
 
 const LAYER_ACCENT: Record<CoachLayer, { dot: string; text: string }> = {
   deferred: { dot: 'bg-wil-500', text: 'text-wil-700' },
+  // De gids woont bij Fin, dus binnen dezelfde module-familie als 'deferred' —
+  // maar een stop donkerder, zodat de twee lagen uit elkaar te houden zijn.
+  guide: { dot: 'bg-wil-700', text: 'text-wil-800' },
   data_gap: { dot: 'bg-kern-500', text: 'text-kern-700' },
   path: { dot: 'bg-horizon-500', text: 'text-horizon-700' },
   default: { dot: 'bg-[var(--ink-3)]', text: 'text-[var(--ink-2)]' },
@@ -324,45 +327,61 @@ export default function BeheerCoachPage() {
                             </p>
                           </div>
 
-                          {/* Bericht */}
-                          <div>
-                            <span className="mb-0.5 block px-2 text-[10px] font-medium text-[var(--ink-4)]">
-                              Bericht
-                            </span>
-                            <textarea
-                              value={row.message}
-                              rows={2}
-                              onChange={(e) => updateRow(row.key, 'message', e.target.value)}
-                              className="w-full resize-y rounded-lg border border-transparent bg-transparent px-2 py-1 text-sm text-[var(--ink)] transition-colors hover:border-[var(--border-md)] focus:border-[var(--border-md)] focus:bg-[var(--paper)] focus:outline-none"
-                            />
-                          </div>
+                          {/* Tekstvelden — alleen voor regels die hun tekst uit
+                              DEZE catalogus halen. De gids-laag leent 'm uit de
+                              gidsconfig, dus daar zou een invoerveld een waarde
+                              bewerken die nooit gelezen wordt (row.textEditable). */}
+                          {row.textEditable ? (
+                            <>
+                              {/* Bericht */}
+                              <div>
+                                <span className="mb-0.5 block px-2 text-[10px] font-medium text-[var(--ink-4)]">
+                                  Bericht
+                                </span>
+                                <textarea
+                                  value={row.message}
+                                  rows={2}
+                                  onChange={(e) => updateRow(row.key, 'message', e.target.value)}
+                                  className="w-full resize-y rounded-lg border border-transparent bg-transparent px-2 py-1 text-sm text-[var(--ink)] transition-colors hover:border-[var(--border-md)] focus:border-[var(--border-md)] focus:bg-[var(--paper)] focus:outline-none"
+                                />
+                              </div>
 
-                          {/* CTA-label + link */}
-                          <div className="grid gap-2 sm:grid-cols-2">
-                            <div>
-                              <span className="mb-0.5 block px-2 text-[10px] font-medium text-[var(--ink-4)]">
-                                Knop-tekst
-                              </span>
-                              <input
-                                type="text"
-                                value={row.cta}
-                                onChange={(e) => updateRow(row.key, 'cta', e.target.value)}
-                                className="w-full rounded-lg border border-transparent bg-transparent px-2 py-1 text-xs text-[var(--ink-2)] transition-colors hover:border-[var(--border-md)] focus:border-[var(--border-md)] focus:bg-[var(--paper)] focus:outline-none"
-                              />
-                            </div>
-                            <div>
-                              <span className="mb-0.5 block px-2 text-[10px] font-medium text-[var(--ink-4)]">
-                                Knop-link (leeg = alleen sluiten)
-                              </span>
-                              <input
-                                type="text"
-                                value={row.ctaHref}
-                                placeholder="/core/budgets"
-                                onChange={(e) => updateRow(row.key, 'ctaHref', e.target.value)}
-                                className="w-full rounded-lg border border-transparent bg-transparent px-2 py-1 font-mono text-xs text-[var(--ink-2)] transition-colors hover:border-[var(--border-md)] focus:border-[var(--border-md)] focus:bg-[var(--paper)] focus:outline-none"
-                              />
-                            </div>
-                          </div>
+                              {/* CTA-label + link */}
+                              <div className="grid gap-2 sm:grid-cols-2">
+                                <div>
+                                  <span className="mb-0.5 block px-2 text-[10px] font-medium text-[var(--ink-4)]">
+                                    Knop-tekst
+                                  </span>
+                                  <input
+                                    type="text"
+                                    value={row.cta}
+                                    onChange={(e) => updateRow(row.key, 'cta', e.target.value)}
+                                    className="w-full rounded-lg border border-transparent bg-transparent px-2 py-1 text-xs text-[var(--ink-2)] transition-colors hover:border-[var(--border-md)] focus:border-[var(--border-md)] focus:bg-[var(--paper)] focus:outline-none"
+                                  />
+                                </div>
+                                <div>
+                                  <span className="mb-0.5 block px-2 text-[10px] font-medium text-[var(--ink-4)]">
+                                    Knop-link (leeg = alleen sluiten)
+                                  </span>
+                                  <input
+                                    type="text"
+                                    value={row.ctaHref}
+                                    placeholder="/core/budgets"
+                                    onChange={(e) => updateRow(row.key, 'ctaHref', e.target.value)}
+                                    className="w-full rounded-lg border border-transparent bg-transparent px-2 py-1 font-mono text-xs text-[var(--ink-2)] transition-colors hover:border-[var(--border-md)] focus:border-[var(--border-md)] focus:bg-[var(--paper)] focus:outline-none"
+                                  />
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <p className="px-2 text-xs italic leading-relaxed text-[var(--ink-4)]">
+                              Tekst en bestemming komen uit de welkomstgids zelf — pas ze aan op{' '}
+                              <a href="/beheer/welkom" className="underline underline-offset-2">
+                                /beheer/welkom
+                              </a>
+                              . Hier kun je de laag alleen aan- of uitzetten.
+                            </p>
+                          )}
                         </div>
 
                         <div className="flex shrink-0 flex-col items-end gap-2">

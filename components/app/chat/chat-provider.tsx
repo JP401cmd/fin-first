@@ -41,6 +41,19 @@ type ChatContextType = {
   /** True zolang ChatPanel de meldmodus-intent nog moet oppakken. */
   meldingRequested: boolean
   clearMeldingRequest: () => void
+  /**
+   * Open de chat rechtstreeks in de GIDSWEERGAVE (het lijstje-icoon) — het
+   * enige thuis van de welkomstgids sinds ADR 0130. Gebruikt door de proactieve
+   * gids-bubbel van Fin en door de rondleiding ("Begin met je eerste stap").
+   *
+   * Zelfde drieslag als `openMelding`: de modus is state van ChatPanel (het
+   * gesprek moet blijven staan terwijl je de gids leest), dus dit is een
+   * intent-vlag die ChatPanel oppikt en direct wist.
+   */
+  openGids: () => void
+  /** True zolang ChatPanel de gidsmodus-intent nog moet oppakken. */
+  gidsRequested: boolean
+  clearGidsRequest: () => void
 }
 
 const ChatContext = createContext<ChatContextType | null>(null)
@@ -68,6 +81,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [isPinned, setIsPinnedState] = useState(false)
   const [autoOpenMessage, setAutoOpenMessageState] = useState<string | null>(null)
   const [meldingRequested, setMeldingRequested] = useState(false)
+  const [gidsRequested, setGidsRequested] = useState(false)
 
   // Restore pin state from localStorage on mount
   useEffect(() => {
@@ -100,6 +114,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     // dan blijft de vlag anders de hele sessie staan en landt de gebruiker
     // later ongevraagd in de meldmodus bij een gewone chat-opening.
     setMeldingRequested(false)
+    // Idem voor de gidsmodus-intent: een niet-opgepikte vlag zou de volgende
+    // gewone chat-opening ongevraagd in de welkomstgids laten landen.
+    setGidsRequested(false)
     // Unpin when closing
     setIsPinnedState(false)
     try { localStorage.setItem(PIN_STORAGE_KEY, 'false') } catch {}
@@ -161,6 +178,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setMeldingRequested(false)
   }, [])
 
+  const openGids = useCallback(() => {
+    setGidsRequested(true)
+    setIsOpen(true)
+  }, [])
+
+  const clearGidsRequest = useCallback(() => {
+    setGidsRequested(false)
+  }, [])
+
   return (
     <ChatContext.Provider value={{
       isOpen, open, close, toggle, openWithMessage,
@@ -169,6 +195,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       isPinned, togglePin, setIsPinned,
       autoOpenMessage, setAutoOpenMessage,
       openMelding, meldingRequested, clearMeldingRequest,
+      openGids, gidsRequested, clearGidsRequest,
     }}>
       {children}
     </ChatContext.Provider>

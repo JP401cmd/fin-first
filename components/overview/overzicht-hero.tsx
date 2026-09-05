@@ -170,8 +170,13 @@ export function OverzichtHeroPrimary({
           beide even hoog via items-stretch + h-full op de cards. De Health-card
           rendert DIRECT uit de blok-1-`health` (los van de widget-databundel);
           de grafiek stroomt in de rechter cel achter een eigen `<Suspense>`. */}
+      {/* De twee `data-tour`-ankers zitten op de GRID-CELLEN, niet op de kaarten
+          erin: de linkercel wisselt tussen `HealthScoreCard` en een empty state,
+          de rechter tussen een Suspense-fallback en de echte grafiek. Op de cel
+          overleeft het anker beide wissels, dus de rondleiding wijst nooit naar
+          een element dat net vervangen is (ADR 0130). */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-4 items-stretch">
-        <div className="lg:col-span-1">
+        <div data-tour="gezondheid" className="lg:col-span-1">
           {health ? (
             <HealthScoreCard
               health={health}
@@ -182,7 +187,7 @@ export function OverzichtHeroPrimary({
             <HealthScoreEmptyState />
           )}
         </div>
-        <div className="lg:col-span-3">
+        <div data-tour="grafiek" className="lg:col-span-3">
           <div className="h-full">{heroChart}</div>
         </div>
       </div>

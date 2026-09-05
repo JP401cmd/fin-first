@@ -11,7 +11,13 @@
  * `lib/uat/catalog.ts` bevat dan ook geen UAT-WILL-21/22 (het volgnummer na 20
  * is UAT-WILL-23, zie hieronder) — dit domein is dus, net als SCHULD/TOEK, NIET
  * volledig aaneengesloten op WF-nummer, maar WEL 1-op-1 met de catalogus-
- * scenario's die daadwerkelijk bestaan (20 + UAT-WILL-23 + UAT-WILL-24 = 22).
+ * scenario's die daadwerkelijk bestaan (20 + UAT-WILL-23 t/m 26 = 24).
+ *
+ * UAT-WILL-26 (Fin herinnert aan de volgende gidsstap, ADR 0130 fase 2): de
+ * welkomstgids verhuisde van een banner op /overzicht naar Fin; de proactieve
+ * bubbel is de tweede helft van dat besluit. Route-gebonden, max één per dag,
+ * en zolang de gids loopt vervangt hij de data-gap-laag — vandaar een eigen
+ * workflow naast de coach-regelselectie van WF-WILL-05.
  *
  * UAT-WILL-23 (lokaal actievoorstel toevoegen, backlog #886 C2c): het on-device
  * pad hergebruikt de bestaande `ActionSuggestionCard`/`POST /api/ai/actions` van
@@ -380,6 +386,23 @@ const criteria: AcceptanceCriterion[] = [
       kind: 'ui-only',
       source:
         'lib/ai/local/use-execution-mode.ts (kill-switch-check gehoist vóór de cloud-tak, `reason: "ai_uit"`, `AI_DISABLED_MESSAGE`) + components/app/chat/chat-panel.tsx#LocalBlockedNotice (kop "AI staat uit" bij `reason === "ai_uit"`) + app/api/ai/chat/route.ts (assertCloudAllowed, server-laatste-linie, ongewijzigd) + lib/ai/privacy-gate.ts#assertAiEnabled (nieuwe, groepsloze poort) + app/api/briefing/refresh/route.ts + app/api/calculators/publish/route.ts (dezelfde poort, twee andere routes) — gedekt door lib/ai/local/use-execution-mode.test.ts + lib/ai/privacy-gate.test.ts; procestoets/randvoorwaarden, geen AI-inhoud',
+    },
+  },
+  {
+    workflow: 'WF-WILL-26',
+    scenarioId: 'UAT-WILL-26',
+    titel: 'Fin herinnert aan de volgende gidsstap',
+    kriticiteit: 'BELANGRIJK',
+    given:
+      'ADR 0130 fase 2. De welkomstgids loopt nog (status "active", minstens één open stap) en woont sinds datzelfde besluit in Fin — niet meer als banner op /overzicht. De gebruiker heeft vandaag nog geen gids-bubbel gezien (`profiles.module_guide_state["coach:state"].guideLastShownAt` leeg of van gisteren). Testaccount met een open stap "Zijn al je bezittingen geregistreerd?" (bestemming /overzicht/bezittingen).',
+    when:
+      'De gebruiker navigeert naar /overzicht/bezittingen, daarna naar /overzicht/bezittingen/investment, daarna naar /toekomst, en opent tussendoor een sheet. Vervolgens klikt hij op de melding het kruisje (of de knop "Bekijk in de gids"), en bezoekt de pagina later op dezelfde dag nog eens.',
+    then:
+      'ROUTE-GEBONDEN: de bubbel verschijnt uitsluitend op /overzicht/bezittingen — de match is EXACT op pathname (query gestript), dus de subroute /overzicht/bezittingen/investment toont hem niet. Op /toekomst verschijnt hij nooit (daar staan de uitleg-ballonnen). Zolang de gids loopt VERVANGT de gidsstap de data-gap-tip: op een route zonder gidsstap komt er dus géén data-gap-melding, maar valt de selectie door naar de pad-/default-tip. Bezoekstappen ("bekijk je nieuws") worden nooit proactief genoemd — die vinken zichzelf af zodra je er bent. MAX ÉÉN PER DAG: na de eerste verschijning stempelt de app `guideLastShownAt` en zwijgt Fin over de gids tot de volgende lokale kalenderdag; herhaald bezoek diezelfde dag levert hoogstens de gewone pad-tip. Stempelen gebeurt pas bij het ECHT verschijnen — tijdens de rondleiding of achter een open overlay/immersieve route zwijgt Fin en verbruikt de stap zijn dag niet. KRUISJE = DIE STAP STIL: het kruisje schrijft `guide_<stap-id>` naar de weggeklikte sleutels (server-side, dus cross-device) en Fin noemt morgen de vólgende open stap; vanzelf wegglijden (auto-dismiss) doet dat NIET — dan blijft de stap op de lijst en gaat alleen de dag om. CTA: een stap zonder deeplink opent de gidsweergave in Fin ("Bekijk in de gids"), een stap mét query behoudt zijn deeplink. Beheer kan de laag in één klik uitzetten (/beheer/coach, regel "guide"); dan vervalt óók de vervanging van de data-gaten en keert het gedrag van vóór ADR 0130 terug.',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'lib/welcome-guide.ts#openGuideSteps/guideStepMatchesRoute/isProactiveGuideStep + lib/coach-suggestions.ts#getFirstUndismissedSuggestion (gids-laag, order 2, GUIDE_BUBBLE_EXCLUDED_ROUTES) + lib/hooks/use-coach-suggestion.ts (dagregel via isSameLocalDay, stempel bij verschijnen, kruisje vs. auto) + components/app/fin/fin-home.tsx#handleCta (openGids bij een stap zonder deeplink) + app/api/coach-state (PUT guideShown/dismiss) — gedekt door lib/welcome-guide.test.ts, lib/coach-suggestions.test.ts, lib/hooks/use-coach-suggestion.test.ts en components/app/fin/fin-home.test.tsx; in de live-run een PROCEStoets (verschijnt hij op de juiste pagina, en precies één keer), geen cijfermatige uitkomst',
     },
   },
 ]

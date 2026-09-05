@@ -5,7 +5,6 @@
 // app, met onderling afwijkende definities:
 //
 //   · `app/(app)/layout.tsx`      → CoachDataGaps (live, coach-bubble)
-//   · `app/api/guide-progress`    → eigen telling (nul productieconsumenten)
 //   · `app/api/next-steps`        → eigen telling (nul consumenten)
 //   · `lib/next-steps/engine.ts`  → live, consume-don't-recompute
 //

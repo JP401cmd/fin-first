@@ -18,13 +18,16 @@ import { SindsVorigBezoekLoader } from '@/components/overview/sinds-vorig-bezoek
 import { MiniNetWorthChartAnchor } from '@/components/overview/mini-networth-chart-anchor'
 import { resolveOverviewGreeting } from '@/lib/overview/greeting'
 import { CheckinBanner } from '@/components/overview/checkin-banner'
-import { WelcomeGuideBanner } from '@/components/overview/welcome-guide-banner'
-import { WelcomeGuideProvider } from '@/components/overview/welcome-guide-provider'
 import { ageAtDate } from '@/lib/horizon-data'
 import { isFixedAnchor, resolveFreedomAgeView } from '@/lib/fire-strategy'
 import { lookupAowAge } from '@/lib/aow-leeftijd'
 import { loadLeverScores } from '@/lib/lever-scores-loader'
-import { loadCheckinBannerSeed, loadWelcomeGuideSeed } from '@/lib/overview/banner-seeds'
+import { loadCheckinBannerSeed } from '@/lib/overview/banner-seeds'
+import { loadRondleidingSeed } from '@/lib/rondleiding/seed'
+import { RondleidingProvider } from '@/components/overview/rondleiding/rondleiding-provider'
+import { leverToLeverageStatus } from '@/components/app/shell/lever-scores'
+import type { LeverageStatus } from '@/lib/leverage-status'
+import type { Hefboom } from '@/lib/hefboom-config'
 
 export const metadata: Metadata = {
   title: 'Overzicht — TriFinity',
@@ -38,8 +41,8 @@ export const metadata: Metadata = {
  *  Blok 1 (direct): de begroeting + het vier-hefbomen-kompas ÉN de
  *  Health-Score-card (`OverzichtHeroPrimary`). Hangt UITSLUITEND van de lichte,
  *  `cache()`-gedeelde blok-1-loaders af — `loadLeverScores` + `loadHorizonData`
- *  (health/vrijheid%/housing/leeftijd) + het profiel (naam) + de twee
- *  banner-seeds. Paint dus zónder op de zware `loadDashboardData` te wachten;
+ *  (health/vrijheid%/housing/leeftijd) + het profiel (naam) + de check-in-seed.
+ *  Paint dus zónder op de zware `loadDashboardData` te wachten;
  *  gezondheid komt daardoor meteen in beeld, los van de widget-databundel.
  *
  *  `heroChart` (gestreamd, eigen `<Suspense>`): de mini-vermogen-grafiek
@@ -63,22 +66,21 @@ export default async function OverzichtPage() {
   const perspective = await getServerPerspective()
 
   // Eén auth-round-trip vooraf (React cache()): de loaders roepen intern
-  // getCachedUser(supabase) aan; dit hoist die call. Met de user-id vooraf kunnen
-  // de banner-seeds meteen in dezelfde parallelle blok-1-batch.
+  // getCachedUser(supabase) aan; dit hoist die call. Met de user-id vooraf kan
+  // de check-in-seed meteen in dezelfde parallelle blok-1-batch.
   const authUser = await getCachedUser(supabase)
   const userId = authUser?.id ?? null
 
   // ── BLOK 1: lichte, cache()-gedeelde loaders (geen loadDashboardData) ──
   // `getOwnProfile` is `cache()`-wrapped en wordt óók door de twee loaders
-  // aangeroepen → hier "gratis" (voor de gebruikersnaam). De banner-seeds hangen
+  // aangeroepen → hier "gratis" (voor de gebruikersnaam). De check-in-seed hangt
   // enkel van de user-id af.
-  const [leverScoresResult, horizonData, ownProfileRes, checkinBannerSeed, welcomeGuideSeed, txAgg12Res] =
+  const [leverScoresResult, horizonData, ownProfileRes, checkinBannerSeed, txAgg12Res] =
     await Promise.all([
       loadLeverScores(supabase, perspective),
       loadHorizonData(supabase, perspective),
       getOwnProfile(supabase),
       userId ? loadCheckinBannerSeed(supabase, userId) : Promise.resolve(undefined),
-      userId ? loadWelcomeGuideSeed(supabase, userId) : Promise.resolve(null),
       // VERSHEID (UR2-13): de jongste maand mét boekingen, voor de melding
       // "gegevens verouderd" in de banner-slot hieronder. `getTxAgg12m` is
       // React-`cache()`-gewrapt en wordt in blok 2 door `loadDashboardData`
@@ -164,105 +166,155 @@ export default async function OverzichtPage() {
   // waarheid voor de tijd zodat SSR en de eerste client-render identiek zijn.
   const { greeting, dateLabel } = resolveOverviewGreeting()
 
+  // ── Rondleiding (ADR 0130) ────────────────────────────────────────────────
+  //
+  // Seed én data komen UITSLUITEND uit wat hierboven al geladen is: het profiel
+  // (dat de kolom `module_guide_state` toch al meeneemt) en `horizonData`. Geen
+  // extra query, geen tweede berekening — de rondleiding vertelt precies de
+  // cijfers die de pagina zelf toont. De vrijheidsleeftijd hoort bij het
+  // gestreamde blok 2 en meldt zich daar aan via `<RondleidingDataSeed>`.
+  const rondleidingSeed = loadRondleidingSeed(
+    (ownProfileRes.data as { module_guide_state?: unknown } | null)?.module_guide_state,
+  )
+  const leverStatus: Record<Hefboom, LeverageStatus> = {
+    bezittingen: leverToLeverageStatus(leverScoresResult.scores.assets.status),
+    schulden: leverToLeverageStatus(leverScoresResult.scores.debts.status),
+    cashflow: leverToLeverageStatus(leverScoresResult.scores.cashflow.status),
+    belasting: leverToLeverageStatus(leverScoresResult.scores.tax.status),
+  }
+
   return (
     <>
       {/* Tab-root → 'rich' TopBar + tab-titel in de mobiele bovenbalk. */}
       <NavStackMeta title="Overzicht" topBar={{ kind: 'rich' }} bottomBar={{ kind: 'tabs' }} />
-      {/* S13 — één bron voor de welkomstgids, gedeeld door de uitgeklapte
-          banner (blok 1, `banners`-slot) en het geminimaliseerde punt naast de
-          pagina-'i' (blok 2, utility-cluster). De provider staat híer omdat hij
-          beide blokken moet omvatten; de server-seed gaat er nu doorheen i.p.v.
-          rechtstreeks naar de banner. */}
-      <WelcomeGuideProvider seed={welcomeGuideSeed}>
-      <OverzichtHeroPrimary
-        userName={userName ?? undefined}
-        greeting={greeting}
-        dateLabel={dateLabel}
-        greetingNote={
-          // H11 — "sinds je vorige bezoek". Eigen `<Suspense>` met `null`-fallback:
-          // de cel deelt de al lopende `loadDashboardData` (React-cache()) en mag
-          // blok 1 dus niet ophouden. Geen skeleton — een reservering voor een
-          // regel die er meestal NIET is, zou zelf de ruis worden.
-          <Suspense fallback={null}>
-            <SindsVorigBezoekLoader
-              supabase={supabase}
-              perspective={perspective}
-              userId={userId}
-              currentNetWorth={currentNetWorth}
-            />
-          </Suspense>
-        }
-        banners={
-          // H20 — de welkomstgids en de check-in stonden hiervóór bóven de
-          // begroeting: op een vers account was het eerste scherm een checklist,
-          // vóór je naam en vóór elk bedrag. Ze verhuizen naar ná de begroeting
-          // (besluit eigenaar 26-08-2026, optie B). Het blokkenaantal in de
-          // Volledige weergave blijft bewust ongewijzigd (besluit 9 aug 2026).
-          <>
-            <WelcomeGuideBanner />
-            <CheckinBanner seed={checkinBannerSeed} />
-            {/* UR2-13 — staat de administratie stil, dan rusten de hefboom-tegels
-                hieronder (o.a. "Cashflow 38 %") op maandenoude transacties zonder
-                dat iets dat verraadt. Rendert zichzelf weg bij verse data.
-
-                ALLEEN IN HET EIGEN PERSPECTIEF: `getTxAgg12m` is RLS-breed (eigen
-                + gedeeld huishouden) en kent geen partner-variant, terwijl de
-                tegels hieronder in Huishouden/Partner wél perspectief-correct
-                zijn. Een melding over "jouw laatste boeking" naast partnercijfers
-                zou een bewering doen die deze bron niet kan onderbouwen. */}
-            {perspective === 'personal' && (
-              <StaleTransactionsBanner latestTransactionMonth={latestTransactionMonth} />
-            )}
-          </>
-        }
-        health={health}
-        leverScores={leverScoresResult.scores}
-        totals={totals}
-        housingSplit={housingSplit}
-        heroChart={
-          // Twee-traps-render (kaart "Weergave grafiek op het overzicht", optie B):
-          // trap 1 = het Vandaag-anker met het ECHTE netto vermogen uit blok 1
-          // (geen kale skeleton); trap 2 = de volle projectie/historie stroomt in
-          // zodra `OverzichtNetWorthChartLoader` klaar is.
-          <Suspense
-            fallback={
-              <MiniNetWorthChartAnchor
+      {/* De welkomstgids stond hier tot ADR 0130 als banner (plus een
+          geminimaliseerd punt in de utility-cluster van blok 2). Hij woont nu
+          in Fin — vierde icoon in de chat-kop — en de provider hangt in
+          `app/(app)/layout.tsx`. /overzicht opent daarmee weer met de
+          begroeting en de cijfers, niet met een takenlijst. */}
+      {/* De rondleiding hangt om blok 1 (waar de gids-provider stond): daar
+          leven de vier hefboomtegels, de gezondheidskaart en de grafiekcel die
+          zij één voor één uitlicht. Hij rendert zelf niets in de stroom — de
+          spotlight gaat via een portal naar `document.body`. */}
+      <RondleidingProvider
+        seed={rondleidingSeed}
+        data={{
+          userName,
+          totals: totals
+            ? {
+                bezittingen: totals.bezittingen,
+                schulden: totals.schulden,
+                cashflow: totals.cashflow,
+                belasting: totals.belasting,
+              }
+            : null,
+          housingSplit,
+          leverStatus,
+          // Spreiding alleen in het eigen perspectief: de samenstelling komt uit de
+          // RLS-brede assetset (eigen + huishoud-gedeeld), niet uit de
+          // perspectief-rijen. In huishoud-/partnerperspectief zwijgt de stap erover.
+          assetTypeCount:
+            perspective === 'personal' ? (horizonData?.healthScoreInput?.assetTypeCount ?? null) : null,
+          largestAssetTypeShare:
+            perspective === 'personal'
+              ? (horizonData?.healthScoreInput?.largestAssetTypeShare ?? null)
+              : null,
+          health: health ? { total: health.total, label: health.label } : null,
+          currentNetWorth,
+          dailyExpenseRate: horizonData?.dailyExpenseRate ?? 0,
+          isPensioen: isPensioenMode,
+        }}
+      >
+        <OverzichtHeroPrimary
+          userName={userName ?? undefined}
+          greeting={greeting}
+          dateLabel={dateLabel}
+          greetingNote={
+            // H11 — "sinds je vorige bezoek". Eigen `<Suspense>` met `null`-fallback:
+            // de cel deelt de al lopende `loadDashboardData` (React-cache()) en mag
+            // blok 1 dus niet ophouden. Geen skeleton — een reservering voor een
+            // regel die er meestal NIET is, zou zelf de ruis worden.
+            <Suspense fallback={null}>
+              <SindsVorigBezoekLoader
+                supabase={supabase}
+                perspective={perspective}
+                userId={userId}
                 currentNetWorth={currentNetWorth}
-                netWorthExclHome={netWorthExclHome}
-                showExclHome={housingSplit != null}
               />
-            }
-          >
-            <OverzichtNetWorthChartLoader
-              supabase={supabase}
-              currentNetWorth={currentNetWorth}
-              currentAge={currentAge}
-              endAge={endAge}
-              isPensioenMode={isPensioenMode}
-              stopAnchorFixed={stopAnchorFixed}
-              stopAge={stopAge}
-              framing={freedomFraming}
-              netWorthExclHome={netWorthExclHome}
-              housingSplit={housingSplit}
-            />
-          </Suspense>
-        }
-        secondary={
-          <Suspense fallback={<OverzichtSecondaryFallback />}>
-            <OverzichtSecondaryLoader
-              supabase={supabase}
-              perspective={perspective}
-              userId={userId}
-              horizonData={horizonData}
-              freedomPct={freedomPct}
-              currentAge={currentAge}
-              currentNetWorth={currentNetWorth}
-              liquidCash={liquidCash}
-            />
-          </Suspense>
-        }
-      />
-      </WelcomeGuideProvider>
+            </Suspense>
+          }
+          banners={
+            // H20 — de check-in stond hiervóór bóven de begroeting: op een vers
+            // account was het eerste scherm een lijstje,
+            // vóór je naam en vóór elk bedrag. Hij staat sindsdien ná de
+            // begroeting (besluit eigenaar 26-08-2026, optie B). Het blokkenaantal
+            // in de Volledige weergave blijft bewust ongewijzigd (besluit 9 aug
+            // 2026). De welkomstgids stond hier ook — die woont sinds ADR 0130
+            // in Fin.
+            <>
+              <CheckinBanner seed={checkinBannerSeed} />
+              {/* UR2-13 — staat de administratie stil, dan rusten de hefboom-tegels
+                  hieronder (o.a. "Cashflow 38 %") op maandenoude transacties zonder
+                  dat iets dat verraadt. Rendert zichzelf weg bij verse data.
+
+                  ALLEEN IN HET EIGEN PERSPECTIEF: `getTxAgg12m` is RLS-breed (eigen
+                  + gedeeld huishouden) en kent geen partner-variant, terwijl de
+                  tegels hieronder in Huishouden/Partner wél perspectief-correct
+                  zijn. Een melding over "jouw laatste boeking" naast partnercijfers
+                  zou een bewering doen die deze bron niet kan onderbouwen. */}
+              {perspective === 'personal' && (
+                <StaleTransactionsBanner latestTransactionMonth={latestTransactionMonth} />
+              )}
+            </>
+          }
+          health={health}
+          leverScores={leverScoresResult.scores}
+          totals={totals}
+          housingSplit={housingSplit}
+          heroChart={
+            // Twee-traps-render (kaart "Weergave grafiek op het overzicht", optie B):
+            // trap 1 = het Vandaag-anker met het ECHTE netto vermogen uit blok 1
+            // (geen kale skeleton); trap 2 = de volle projectie/historie stroomt in
+            // zodra `OverzichtNetWorthChartLoader` klaar is.
+            <Suspense
+              fallback={
+                <MiniNetWorthChartAnchor
+                  currentNetWorth={currentNetWorth}
+                  netWorthExclHome={netWorthExclHome}
+                  showExclHome={housingSplit != null}
+                />
+              }
+            >
+              <OverzichtNetWorthChartLoader
+                supabase={supabase}
+                currentNetWorth={currentNetWorth}
+                currentAge={currentAge}
+                endAge={endAge}
+                isPensioenMode={isPensioenMode}
+                stopAnchorFixed={stopAnchorFixed}
+                stopAge={stopAge}
+                framing={freedomFraming}
+                netWorthExclHome={netWorthExclHome}
+                housingSplit={housingSplit}
+              />
+            </Suspense>
+          }
+          secondary={
+            <Suspense fallback={<OverzichtSecondaryFallback />}>
+              <OverzichtSecondaryLoader
+                supabase={supabase}
+                perspective={perspective}
+                userId={userId}
+                horizonData={horizonData}
+                freedomPct={freedomPct}
+                currentAge={currentAge}
+                currentNetWorth={currentNetWorth}
+                liquidCash={liquidCash}
+              />
+            </Suspense>
+          }
+        />
+      </RondleidingProvider>
     </>
   )
 }

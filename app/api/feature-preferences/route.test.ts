@@ -116,7 +116,7 @@ describe('PUT /api/feature-preferences — niet-feature-sleutels overleven (conc
   /**
    * Given een profiel waarvan feature_preferences náást feature-vlaggen ook
    *   niet-feature-sleutels draagt (wealth_widget_selection uit ADR 0120,
-   *   retirement_aspirations, _welcome_seen),
+   *   retirement_aspirations, deferred_onboarding_fields),
    * When een feature-toggle de route aanroept,
    * Then blijven die niet-feature-sleutels onvoorwaardelijk staan in de
    *   geschreven kolomwaarde — de route mag alleen de feature-vlaggen
@@ -125,7 +125,7 @@ describe('PUT /api/feature-preferences — niet-feature-sleutels overleven (conc
   const NIET_FEATURE = {
     wealth_widget_selection: { assetIds: ['11111111-1111-4111-8111-111111111111'], debtIds: [] },
     retirement_aspirations: { a: 1 },
-    _welcome_seen: true,
+    deferred_onboarding_fields: ['income'],
   }
 
   it('een feature-toggle behoudt wealth_widget_selection en andere niet-feature-sleutels', async () => {
@@ -140,7 +140,7 @@ describe('PUT /api/feature-preferences — niet-feature-sleutels overleven (conc
     expect(written['feat-free']).toBe(true)
     expect(written.wealth_widget_selection).toEqual(NIET_FEATURE.wealth_widget_selection)
     expect(written.retirement_aspirations).toEqual(NIET_FEATURE.retirement_aspirations)
-    expect(written._welcome_seen).toBe(true)
+    expect(written.deferred_onboarding_fields).toEqual(NIET_FEATURE.deferred_onboarding_fields)
   })
 
   it('reset naar standaard (lege preferences) wist de feature-vlaggen maar behoudt niet-feature-sleutels', async () => {
@@ -154,6 +154,6 @@ describe('PUT /api/feature-preferences — niet-feature-sleutels overleven (conc
     const written = updatePayloads[0].feature_preferences as Record<string, unknown>
     expect(written).not.toHaveProperty('feat-free')
     expect(written.wealth_widget_selection).toEqual(NIET_FEATURE.wealth_widget_selection)
-    expect(written._welcome_seen).toBe(true)
+    expect(written.deferred_onboarding_fields).toEqual(NIET_FEATURE.deferred_onboarding_fields)
   })
 })

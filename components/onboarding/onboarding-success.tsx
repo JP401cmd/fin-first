@@ -103,13 +103,17 @@ export function OnboardingSuccess({
         <div className="h-0.5 flex-1 bg-horizon-300" />
       </div>
 
-      {/* CTA — opent de Toekomst-grafiek (pre-configured door onboarding) */}
+      {/* CTA — naar het eigen homescherm (ADR 0130).
+          `onDashboard` navigeert HARD naar /dashboard; de middleware vertaalt dat
+          naar `profiles.home_screen` (standaard /overzicht), waar de rondleiding
+          klaarstaat. Bewust geen vaste route in de tekst: wie zijn homescherm
+          heeft omgezet, komt op zíjn scherm uit en niet op het onze. */}
       <Button
         variant="moment"
         onClick={onDashboard}
         className="mt-6 w-full max-w-xs sm:w-auto sm:min-w-[200px]"
       >
-        Ga naar je toekomst
+        Naar je overzicht
       </Button>
     </div>
   )

@@ -6,6 +6,8 @@ import { LocalChatTransport } from '@/lib/ai/local/local-chat-transport'
 import { LOCAL_READINESS_FLAP_HINT } from '@/lib/ai/local/local-readiness'
 import { resolveAllExecutionModes } from '@/lib/ai/execution-groups'
 import { getOverlayCount, __resetOverlayCount } from '@/lib/overlay-signal'
+import { WelcomeGuideProvider } from './gids/welcome-guide-provider'
+import { DEFAULT_WELCOME_GUIDE, DEFAULT_WELCOME_GUIDE_STATE } from '@/lib/welcome-guide'
 import { getOverlayHistoryDepth, __resetOverlayHistory } from '@/lib/overlay-history'
 
 /**
@@ -127,6 +129,9 @@ function makeCtx(overrides: Record<string, unknown> = {}) {
     // deze aan vanuit zijn effecten; hier alleen als spy aanwezig.
     resolvePendingAnswer: vi.fn(),
     dropPendingAnswer: vi.fn(),
+    // ADR 0130 — de gids-intent-drieslag, spiegel van de meldmodus.
+    gidsRequested: false,
+    clearGidsRequest: vi.fn(),
     ...overrides,
   }
 }
@@ -187,6 +192,15 @@ function stubExecutionFetch(overrides: {
     }
     if (url === '/api/local-knowledge') {
       return Promise.resolve({ ok: knowledgeOk, json: () => Promise.resolve({ items: knowledgeItems }) })
+    }
+    // De gidsweergave doet bij openen één verse GET (ADR 0130). Zonder deze tak
+    // valt de test op een afgewezen promise i.p.v. op wat hij wil toetsen.
+    if (url === '/api/welcome-guide') {
+      return Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({ config: DEFAULT_WELCOME_GUIDE, state: DEFAULT_WELCOME_GUIDE_STATE }),
+      })
     }
     return Promise.reject(new Error(`onverwachte fetch in test: ${url}`))
   })
@@ -1023,5 +1037,167 @@ describe('ChatPanel — getypte vraag komt terug bij een fout (L7)', () => {
 
     await waitFor(() => expect(screen.getByTestId('chat-error-banner')).toBeTruthy())
     expect((container.querySelector('textarea') as HTMLTextAreaElement).value).toBe('')
+  })
+})
+
+/**
+ * ADR 0130 — de WELKOMSTGIDS woont in Fin.
+ *
+ * De gids was een banner op /overzicht met een geminimaliseerd punt naast de
+ * pagina-'i'. Hij heeft nu één thuis: een vierde icoon in deze kop, vóór de
+ * megafoon, met een eigen weergave die — net als de meldmodus — BUITEN alle
+ * AI-gates valt. Wat hier vastligt is de wiring: het icoon verschijnt alleen als
+ * er iets te tonen is, schakelt heen en terug, staat op slot tijdens een
+ * lopende melding-verzending, is bereikbaar via `openGids()` en valt terug op
+ * het gesprek zodra het paneel sluit.
+ */
+describe('ChatPanel — welkomstgids in de chat-kop (ADR 0130)', () => {
+  const SEED = { config: DEFAULT_WELCOME_GUIDE, state: DEFAULT_WELCOME_GUIDE_STATE }
+
+  function renderMetGids(ctxOverrides: Record<string, unknown> = {}) {
+    ctx = makeCtx(ctxOverrides)
+    return render(
+      <WelcomeGuideProvider seed={SEED}>
+        <ChatPanel />
+      </WelcomeGuideProvider>,
+    )
+  }
+
+  it('toont het gids-icoon met aria-pressed, en schakelt heen en terug', async () => {
+    localStorage.setItem(WFT_KEY, 'true')
+    stubExecutionFetch({ privacyMode: false })
+    renderMetGids()
+
+    const knop = await screen.findByRole('button', { name: 'Welkomstgids openen' })
+    expect(knop.getAttribute('aria-pressed')).toBe('false')
+
+    fireEvent.click(knop)
+
+    await waitFor(() => expect(screen.getByTestId('gids-view')).toBeInTheDocument())
+    const terug = screen.getByRole('button', { name: 'Terug naar de chat' })
+    expect(terug.getAttribute('aria-pressed')).toBe('true')
+
+    fireEvent.click(terug)
+    expect(screen.queryByTestId('gids-view')).not.toBeInTheDocument()
+  })
+
+  it('toont "Welkomstgids · N open" in de kop-subtitel', async () => {
+    localStorage.setItem(WFT_KEY, 'true')
+    stubExecutionFetch({ privacyMode: false })
+    renderMetGids()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Welkomstgids openen' }))
+
+    // Verse gids, niets afgevinkt: het aantal open stappen op de zichtbare
+    // (= verplichte) schermen. Bewust berekend uit de config i.p.v.
+    // hardgecodeerd — anders breekt deze test op elke redactionele wijziging.
+    const open = DEFAULT_WELCOME_GUIDE.screens
+      .filter((sc) => sc.enabled && sc.required)
+      .reduce((n, sc) => n + sc.steps.filter((st) => st.enabled).length, 0)
+    expect(await screen.findByText('Welkomstgids · ' + open + ' open')).toBeInTheDocument()
+  })
+
+  it('werkt ZONDER AI-abonnement — de gids staat buiten de AI-gates', async () => {
+    // Geen Wft-akkoord in localStorage: het akkoordscherm zou de chat blokkeren.
+    // De gids hoort daar bovenuit te komen, precies zoals de meldmodus.
+    stubExecutionFetch({ privacyMode: false, hasAiSubscription: false })
+    renderMetGids()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Welkomstgids openen' }))
+
+    await waitFor(() => expect(screen.getByTestId('gids-view')).toBeInTheDocument())
+    expect(screen.queryByText('Belangrijke mededeling')).not.toBeInTheDocument()
+  })
+
+  it('staat op slot tijdens een lopende melding-verzending', async () => {
+    localStorage.setItem(WFT_KEY, 'true')
+    stubExecutionFetch({ privacyMode: false })
+    renderMetGids({ meldingRequested: true, clearMeldingRequest: vi.fn() })
+
+    await waitFor(() => expect(screen.getByText('melding-formulier')).toBeTruthy())
+    // Megafoon én gids dragen tijdens een verzending hetzelfde label; beide
+    // horen uitgeschakeld te zijn.
+    const opSlot = screen.getAllByRole('button', { name: 'Je melding wordt verstuurd' })
+    expect(opSlot.length).toBeGreaterThanOrEqual(2)
+    for (const knop of opSlot) expect(knop).toBeDisabled()
+  })
+
+  it('opent direct in de gidsmodus via openGids() en wist die intent', async () => {
+    localStorage.setItem(WFT_KEY, 'true')
+    stubExecutionFetch({ privacyMode: false })
+    const clearGidsRequest = vi.fn()
+    renderMetGids({ gidsRequested: true, clearGidsRequest })
+
+    await waitFor(() => expect(screen.getByTestId('gids-view')).toBeInTheDocument())
+    expect(clearGidsRequest).toHaveBeenCalled()
+  })
+
+  it('valt bij sluiten terug op het gesprek', async () => {
+    localStorage.setItem(WFT_KEY, 'true')
+    stubExecutionFetch({ privacyMode: false })
+    ctx = makeCtx({ gidsRequested: true, clearGidsRequest: vi.fn() })
+    const { rerender } = render(
+      <WelcomeGuideProvider seed={SEED}>
+        <ChatPanel />
+      </WelcomeGuideProvider>,
+    )
+    await waitFor(() => expect(screen.getByTestId('gids-view')).toBeInTheDocument())
+
+    ctx = makeCtx({ isOpen: false })
+    rerender(
+      <WelcomeGuideProvider seed={SEED}>
+        <ChatPanel />
+      </WelcomeGuideProvider>,
+    )
+    ctx = makeCtx()
+    rerender(
+      <WelcomeGuideProvider seed={SEED}>
+        <ChatPanel />
+      </WelcomeGuideProvider>,
+    )
+
+    await waitFor(() => expect(screen.getByText('Fin')).toBeInTheDocument())
+    expect(screen.queryByTestId('gids-view')).not.toBeInTheDocument()
+  })
+
+  it('zegt "afgesloten" in de kop-subtitel bij een afgesloten gids — niet "0 open"', async () => {
+    localStorage.setItem(WFT_KEY, 'true')
+    stubExecutionFetch({ privacyMode: false })
+    ctx = makeCtx()
+    render(
+      <WelcomeGuideProvider seed={null} dismissed>
+        <ChatPanel />
+      </WelcomeGuideProvider>,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Welkomstgids openen' }))
+
+    // Synchroon ná de klik: de gidsweergave doet bij openen één verse GET, en
+    // de stub hierboven antwoordt daarop met een ACTIEVE gids (niet met de
+    // afgesloten staat die de echte route zou teruggeven) — daarna klapt de
+    // lege staat dus om. Wat hier vastligt is de subtitel op het moment dat de
+    // lege staat op het scherm staat.
+    expect(screen.getByText('Welkomstgids · afgesloten')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Gids opnieuw tonen' })).toBeInTheDocument()
+    expect(screen.queryByText(/0 open/)).not.toBeInTheDocument()
+  })
+
+  it('rendert geen gids-icoon wanneer er niets te tonen is', async () => {
+    localStorage.setItem(WFT_KEY, 'true')
+    stubExecutionFetch({ privacyMode: false })
+    ctx = makeCtx()
+    render(
+      <WelcomeGuideProvider
+        seed={{
+          config: { ...DEFAULT_WELCOME_GUIDE, enabled: false },
+          state: DEFAULT_WELCOME_GUIDE_STATE,
+        }}
+      >
+        <ChatPanel />
+      </WelcomeGuideProvider>,
+    )
+
+    await waitFor(() => expect(screen.getByText('Fin')).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: 'Welkomstgids openen' })).not.toBeInTheDocument()
   })
 })

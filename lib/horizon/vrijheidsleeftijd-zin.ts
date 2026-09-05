@@ -4,8 +4,9 @@
 // voor jou een keuze rond je 53e".
 //
 // AANLEIDING (bevinding S15). Die zin bestond al op drie plekken — de
-// tips-/spotlight-overlay (`toekomst-overlay.tsx`), de eenmalige welkomstkaart
-// (`toekomst-welcome.tsx`) en de vrijheidsas — maar nergens op de pagina zelf.
+// tips-/spotlight-overlay (`toekomst-overlay.tsx`), de inmiddels verwijderde
+// eenmalige welkomstkaart op /toekomst en de vrijheidsas — maar nergens op de
+// pagina zelf.
 // In Eenvoudig blijven van de hero-strip drie kale KPI's over en volgt daar
 // direct de voortgangsbalk op: het kerngetal krijgt dan geen enkele duiding.
 // De zin er simpelweg bíj zetten zou de formulering op vier plekken zetten en
@@ -14,7 +15,7 @@
 //
 // GEEN JSX, met opzet: de uitkomst is opgeknipt in `lead` / `ageLabel` / `tail`
 // zodat elk oppervlak de leeftijd eigen opmaak kan geven (de overlay zet 'm in
-// `--module-active-800`, de welkomstkaart in `-700`) zonder dat de woorden
+// `--module-active-800`, een kaartoppervlak in `-700`) zonder dat de woorden
 // uiteenlopen. `text` is dezelfde zin als platte tekst — voor aria-labels en
 // voor tests die de hele regel willen pinnen.
 //
@@ -48,9 +49,10 @@ export type VrijheidsleeftijdZinKind = 'leeftijd' | 'nu-al' | 'onbekend' | 'bere
  *                netto vermogen.
  *
  * `kaart` en `inline` reproduceren de strings die vóór S15 in die twee
- * bestanden hardgecodeerd stonden, byte-voor-byte — hun bestaande suites
- * (`toekomst-welcome.test.tsx`, `toekomst-overlay.test.tsx`) draaien
- * ongewijzigd door en zijn daarmee het bewijs van de ontdubbeling.
+ * bestanden hardgecodeerd stonden, byte-voor-byte. De welkomstkaart op
+ * /toekomst is per ADR 0130 verdwenen; de `kaart`-variant blijft de vorm voor
+ * een kaartoppervlak (de rondleiding op /overzicht neemt 'm over) en is
+ * vastgepind in `vrijheidsleeftijd-zin.test.ts`.
  */
 export type VrijheidsleeftijdZinVariant = 'duiding' | 'kaart' | 'inline'
 
@@ -205,7 +207,7 @@ export function buildVrijheidsleeftijdZin(
       // Byte-identiek aan de string die `SummaryLine` hardgecodeerd had.
       return samenstellen('onbekend', 'vrijheid nog niet in zicht', null, '')
     }
-    // Byte-identiek aan `choiceSentenceFallback` uit toekomst-welcome.tsx.
+    // Byte-identiek aan de `choiceSentenceFallback` van de oude welkomstkaart.
     return samenstellen(
       'onbekend',
       'Werken wordt steeds meer een keuze naarmate je vrijheid opbouwt.',

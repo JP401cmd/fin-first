@@ -26,8 +26,17 @@ import { serverError, unauthorized } from '@/lib/api/respond'
  */
 
 /** Sleutels die als coachmark mogen worden weggeschreven — dichte allowlist. */
-const COACHMARK_IDS = ['euro-view'] as const
+const COACHMARK_IDS = ['euro-view', 'overzicht-rondleiding'] as const
 export type CoachmarkId = (typeof COACHMARK_IDS)[number]
+
+/**
+ * Hoe een coachmark eindigde. Alleen de rondleiding gebruikt dit vandaag: de
+ * gidsweergave in Fin labelt haar knop ernaar ("Rondleiding afmaken" bij
+ * `onderbroken`, anders "Rondleiding opnieuw"). Optioneel, zodat een gewone
+ * eenmalige hint als `euro-view` geen betekenisloze uitkomst hoeft te verzinnen.
+ */
+const COACHMARK_OUTCOMES = ['voltooid', 'overgeslagen', 'onderbroken'] as const
+export type CoachmarkOutcome = (typeof COACHMARK_OUTCOMES)[number]
 
 /** Top-level sleutel in `module_guide_state` voor één coachmark. */
 export function coachmarkStateKey(id: CoachmarkId): string {
@@ -36,12 +45,15 @@ export function coachmarkStateKey(id: CoachmarkId): string {
 
 const DismissSchema = z.object({
   id: z.enum(COACHMARK_IDS),
+  outcome: z.enum(COACHMARK_OUTCOMES).optional(),
 })
 
 // ── GET — welke coachmarks zijn al weggeklikt? ────────────────────────────
 //
 // Retourneert een map id → boolean voor élke bekende coachmark, zodat de
-// client geen aannames hoeft te doen over ontbrekende sleutels.
+// client geen aannames hoeft te doen over ontbrekende sleutels. Daarnaast een
+// map id → uitkomst (`null` als de coachmark niet is weggeklikt of geen
+// uitkomst droeg).
 
 export async function GET() {
   const supabase = await createClient()
@@ -60,8 +72,11 @@ export async function GET() {
   const dismissed = Object.fromEntries(
     COACHMARK_IDS.map((id) => [id, state[coachmarkStateKey(id)] != null]),
   ) as Record<CoachmarkId, boolean>
+  const outcome = Object.fromEntries(
+    COACHMARK_IDS.map((id) => [id, readOutcome(state[coachmarkStateKey(id)])]),
+  ) as Record<CoachmarkId, CoachmarkOutcome | null>
 
-  return NextResponse.json({ dismissed })
+  return NextResponse.json({ dismissed, outcome })
 }
 
 // ── PUT — markeer één coachmark als gezien ────────────────────────────────
@@ -85,9 +100,13 @@ export async function PUT(request: Request) {
   if (readError) return serverError(readError, 'coachmark:PUT:read')
 
   const current = (data?.module_guide_state ?? {}) as Record<string, unknown>
+  const entry: { dismissedAt: string; outcome?: CoachmarkOutcome } = {
+    dismissedAt: new Date().toISOString(),
+  }
+  if (parsed.data.outcome) entry.outcome = parsed.data.outcome
   const next = {
     ...current,
-    [coachmarkStateKey(parsed.data.id)]: { dismissedAt: new Date().toISOString() },
+    [coachmarkStateKey(parsed.data.id)]: entry,
   }
 
   const { error: writeError } = await supabase
@@ -98,4 +117,17 @@ export async function PUT(request: Request) {
   if (writeError) return serverError(writeError, 'coachmark:PUT:write')
 
   return NextResponse.json({ ok: true })
+}
+
+/**
+ * Leest de uitkomst uit één opgeslagen coachmark-waarde. Defensief: oudere
+ * rijen dragen alleen `dismissedAt`, en een corrupte jsonb mag de GET niet
+ * laten omvallen.
+ */
+function readOutcome(value: unknown): CoachmarkOutcome | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const raw = (value as { outcome?: unknown }).outcome
+  return (COACHMARK_OUTCOMES as readonly string[]).includes(raw as string)
+    ? (raw as CoachmarkOutcome)
+    : null
 }

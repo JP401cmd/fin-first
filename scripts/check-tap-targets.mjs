@@ -79,7 +79,6 @@ const ALLOWLIST_ENTRIES = [
   'components/app/horizon/phase-analysis/onttrekken/huis-verkopen.tsx',
   'components/app/horizon/phase-analysis/opbouw/hypotheek-vs-beleggen-opbouw.tsx',
   'components/app/horizon/toekomst-overlay.tsx',
-  'components/app/horizon/toekomst-welcome.tsx',
   'components/app/horizon/whatif-chat.tsx',
   'components/app/horizon/whatif-events.tsx',
   'components/app/horizon/whatif-scenarios.tsx',
@@ -122,7 +121,6 @@ const ALLOWLIST_ENTRIES = [
   'components/overview/transacties/bulk/bulk-uitkomst.tsx',
   'components/overview/transacties/spend-limits-section.tsx',
   'components/overview/transacties/transactie-tijdlijn.tsx',
-  'components/overview/welcome-guide-banner.tsx',
   'components/sync/global-sync-button.tsx',
   'components/widgets/draggable-widget-grid.tsx',
 ]

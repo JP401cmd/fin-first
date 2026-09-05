@@ -100,6 +100,7 @@ export function LeverageCard({
   expandable = false,
   expanded = false,
   onToggleExpand,
+  dataTour,
   children,
 }: {
   Icon: LucideIcon
@@ -164,12 +165,28 @@ export function LeverageCard({
   expandable?: boolean
   expanded?: boolean
   onToggleExpand?: () => void
+  /**
+   * Waarde voor `data-tour` op de kaart-root — het TARGET-CONTRACT van de
+   * rondleiding op /overzicht (ADR 0130). Bewust een attribuut en geen id: de
+   * kaart komt vier keer per rij voor en leeft ook op andere pagina's, en een
+   * spotlight die op een class of DOM-structuur zou mikken breekt bij de
+   * eerstvolgende restyling zonder dat iets rood wordt. Ongezet → geen
+   * attribuut, byte-identiek aan voorheen.
+   *
+   * Staat op ALLE varianten (`full`, `verdict` én `compact`): in de eenvoudige
+   * weergave rendert de tegel als `verdict`, en dáár moet de rondleiding het
+   * even goed kunnen vinden.
+   */
+  dataTour?: string
   /** Uitklap-content — alleen gerenderd wanneer `expanded`. */
   children?: React.ReactNode
 }) {
   if (variant === 'compact') {
     return (
-      <div className="group relative rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-2 sm:p-3 transition-all hover:border-[var(--ink-3)] hover:shadow-sm">
+      <div
+        data-tour={dataTour}
+        className="group relative rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-2 sm:p-3 transition-all hover:border-[var(--ink-3)] hover:shadow-sm"
+      >
         {/* Op mobiel gestapeld (icoon boven label, gecentreerd) zodat drie
             compact-kaarten naast elkaar passen zonder dat "Gebeurtenissen"
             afkapt; vanaf sm de oorspronkelijke one-liner. */}
@@ -224,6 +241,7 @@ export function LeverageCard({
 
   return (
     <div
+      data-tour={dataTour}
       className={[
         'group relative flex flex-col rounded-2xl border bg-[var(--paper)] p-3 sm:p-4 transition-all',
         expanded

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-03T15:24:18.108Z",
-  "generatedDate": "2026-09-03",
+  "generatedAt": "2026-09-05T01:03:14.798Z",
+  "generatedDate": "2026-09-05",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -189,15 +189,15 @@
   "stats": {
     "routes": 140,
     "routesProduction": 97,
-    "api": 310,
+    "api": 309,
     "tables": 94,
-    "migrations": 228,
+    "migrations": 230,
     "integrations": 25,
-    "components": 1025,
-    "providers": 16,
+    "components": 1029,
+    "providers": 17,
     "contextBuilders": 9,
     "briefingTools": 0,
-    "coachLayers": 4,
+    "coachLayers": 5,
     "modules": 6,
     "phases": 4
   },
@@ -2847,6 +2847,14 @@
       ]
     },
     {
+      "url": "/api/coach-state",
+      "file": "app/api/coach-state/route.ts",
+      "domain": "coach-state",
+      "methods": [
+        "PUT"
+      ]
+    },
+    {
       "url": "/api/coachmark",
       "file": "app/api/coachmark/route.ts",
       "domain": "coachmark",
@@ -3071,14 +3079,6 @@
       "methods": [
         "PATCH",
         "DELETE"
-      ]
-    },
-    {
-      "url": "/api/guide-progress",
-      "file": "app/api/guide-progress/route.ts",
-      "domain": "guide-progress",
-      "methods": [
-        "GET"
       ]
     },
     {
@@ -4442,15 +4442,6 @@
       "domain": "web-vitals",
       "methods": [
         "GET"
-      ]
-    },
-    {
-      "url": "/api/welcome",
-      "file": "app/api/welcome/route.ts",
-      "domain": "welcome",
-      "methods": [
-        "GET",
-        "PUT"
       ]
     },
     {
@@ -6879,6 +6870,21 @@
       ]
     },
     {
+      "domain": "coach-state",
+      "label": "coach-state",
+      "count": 1,
+      "routes": [
+        {
+          "url": "/api/coach-state",
+          "file": "app/api/coach-state/route.ts",
+          "domain": "coach-state",
+          "methods": [
+            "PUT"
+          ]
+        }
+      ]
+    },
+    {
       "domain": "coachmark",
       "label": "coachmark",
       "count": 1,
@@ -7119,21 +7125,6 @@
           "methods": [
             "GET",
             "PUT"
-          ]
-        }
-      ]
-    },
-    {
-      "domain": "guide-progress",
-      "label": "guide-progress",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/guide-progress",
-          "file": "app/api/guide-progress/route.ts",
-          "domain": "guide-progress",
-          "methods": [
-            "GET"
           ]
         }
       ]
@@ -7820,22 +7811,6 @@
       ]
     },
     {
-      "domain": "welcome",
-      "label": "welcome",
-      "count": 1,
-      "routes": [
-        {
-          "url": "/api/welcome",
-          "file": "app/api/welcome/route.ts",
-          "domain": "welcome",
-          "methods": [
-            "GET",
-            "PUT"
-          ]
-        }
-      ]
-    },
-    {
       "domain": "welcome-guide",
       "label": "welcome-guide",
       "count": 1,
@@ -8309,7 +8284,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 228
+    "migrationCount": 230
   },
   "tablesByDomain": [
     {
@@ -8808,14 +8783,18 @@
     {
       "name": "ToastProvider",
       "source": "@/components/app/toast-provider"
+    },
+    {
+      "name": "WelcomeGuideProvider",
+      "source": "@/components/app/chat/gids/welcome-guide-provider"
     }
   ],
   "components": {
-    "total": 1025,
+    "total": 1029,
     "groups": [
       {
         "group": "app",
-        "count": 402,
+        "count": 403,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8986,6 +8965,8 @@
           "freshness-label.test",
           "gap-analyse",
           "gekoppeld-bezit-label.test",
+          "gids-view",
+          "gids-view.test",
           "goal-form",
           "goal-form.test",
           "grafiek-uitleg-walkthrough",
@@ -9182,8 +9163,6 @@
           "toekomst-overlay",
           "toekomst-overlay-balloons",
           "toekomst-overlay.test",
-          "toekomst-welcome",
-          "toekomst-welcome.test",
           "top-bar",
           "transacties-feed",
           "transacties-feed.test",
@@ -9204,6 +9183,7 @@
           "wealth-composition-chart.test",
           "web-vitals-reporter",
           "web-vitals-trend",
+          "welcome-guide-provider",
           "whatif-actions",
           "whatif-beslishulp",
           "whatif-chat",
@@ -9223,7 +9203,7 @@
       },
       {
         "group": "overview",
-        "count": 185,
+        "count": 187,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -9359,6 +9339,11 @@
           "periode-trend",
           "print-overzicht-button",
           "print-overzicht-button.test",
+          "rondleiding-kaart",
+          "rondleiding-overlay",
+          "rondleiding-overlay.test",
+          "rondleiding-provider",
+          "rondleiding-provider.test",
           "schulden-filter",
           "schulden-filter.test",
           "schulden-view",
@@ -9375,6 +9360,7 @@
           "spend-limit-transaction-list",
           "spend-limits-section",
           "spend-limits-section.test",
+          "spotlight-scrim",
           "tax-gauge",
           "tax-timeline",
           "te-bespreken-section",
@@ -9405,11 +9391,7 @@
           "vrijheid-strip",
           "vrijheid-strip.nu-stoppen.test",
           "vrijheid-strip.test",
-          "weekdag-patroon",
-          "welcome-guide-banner",
-          "welcome-guide-banner.test",
-          "welcome-guide-dot",
-          "welcome-guide-provider"
+          "weekdag-patroon"
         ]
       },
       {
@@ -9796,7 +9778,7 @@
       },
       {
         "group": "editorial",
-        "count": 20,
+        "count": 21,
         "items": [
           "aanname-hint",
           "button",
@@ -9812,6 +9794,7 @@
           "insight-toggle-button.test",
           "page-blueprints",
           "page-info-button",
+          "page-info-button.test",
           "page-opening",
           "progress-milestones",
           "subtotal-line",
@@ -10143,22 +10126,28 @@
           "order": 1
         },
         {
+          "key": "guide",
+          "label": "Welkomstgids — volgende stap",
+          "description": "De eerstvolgende open stap uit de welkomstgids, alleen op de pagina waar die stap thuishoort. Hoogstens één per dag, nooit op /toekomst (daar staan de uitleg-ballonnen). Zolang de gids loopt VERVANGT deze laag de data-gaten; na afsluiten of afronden komt die laag terug. De teksten komen uit de gidsconfig (/beheer/welkom), niet uit deze catalogus.",
+          "order": 2
+        },
+        {
           "key": "data_gap",
           "label": "Data-gaten",
-          "description": "Ontbrekende kerngegevens. Vaste volgorde: bank → vermogen → budget → doelen. De eerste niet-weggeklikte gap wint.",
-          "order": 2
+          "description": "Ontbrekende kerngegevens. Vaste volgorde: bank → vermogen → budget → doelen. De eerste niet-weggeklikte gap wint. Wordt overgeslagen zolang de welkomstgids actief is.",
+          "order": 3
         },
         {
           "key": "path",
           "label": "Pad-gebaseerd",
           "description": "Eén tip per pagina/route, als fallback wanneer er geen data-gap of uitgesteld veld speelt. Deze laag wordt pas bereikt als élke data-gap dicht is — een regel hier moet dus voor een gevuld account kloppen, of een eigen check dragen.",
-          "order": 3
+          "order": 4
         },
         {
           "key": "default",
           "label": "Standaard welkomstbericht",
           "description": "Laatste terugval als geen enkele andere regel van toepassing is. Twee varianten: gevuld account eerst, daarna het onvoorwaardelijke welkomstbericht.",
-          "order": 4
+          "order": 5
         }
       ],
       "dataGapSignals": [
@@ -10695,6 +10684,12 @@
           "write": false
         }
       ],
+      "coach-state": [
+        {
+          "name": "profiles",
+          "write": true
+        }
+      ],
       "coachmark": [
         {
           "name": "profiles",
@@ -10897,40 +10892,6 @@
         {
           "name": "app_settings",
           "write": true
-        }
-      ],
-      "guide-progress": [
-        {
-          "name": "actions",
-          "write": false
-        },
-        {
-          "name": "assets",
-          "write": false
-        },
-        {
-          "name": "budgets",
-          "write": false
-        },
-        {
-          "name": "debts",
-          "write": false
-        },
-        {
-          "name": "life_events",
-          "write": false
-        },
-        {
-          "name": "profiles",
-          "write": false
-        },
-        {
-          "name": "recommendations",
-          "write": false
-        },
-        {
-          "name": "transactions",
-          "write": false
         }
       ],
       "health": [
@@ -11725,12 +11686,6 @@
           "write": true
         }
       ],
-      "welcome": [
-        {
-          "name": "profiles",
-          "write": true
-        }
-      ],
       "welcome-guide": [
         {
           "name": "app_settings",
@@ -11887,6 +11842,14 @@
           "write": true,
           "routes": [
             "/api/check/activate"
+          ]
+        },
+        {
+          "domain": "coach-state",
+          "label": "coach-state",
+          "write": true,
+          "routes": [
+            "/api/coach-state"
           ]
         },
         {
@@ -12110,14 +12073,6 @@
           ]
         },
         {
-          "domain": "welcome",
-          "label": "welcome",
-          "write": true,
-          "routes": [
-            "/api/welcome"
-          ]
-        },
-        {
           "domain": "welcome-guide",
           "label": "welcome-guide",
           "write": true,
@@ -12185,14 +12140,6 @@
             "/api/checkin/gespreksstarters",
             "/api/checkin/overview",
             "/api/checkin/save"
-          ]
-        },
-        {
-          "domain": "guide-progress",
-          "label": "guide-progress",
-          "write": false,
-          "routes": [
-            "/api/guide-progress"
           ]
         },
         {
@@ -12464,14 +12411,6 @@
           ]
         },
         {
-          "domain": "guide-progress",
-          "label": "guide-progress",
-          "write": false,
-          "routes": [
-            "/api/guide-progress"
-          ]
-        },
-        {
           "domain": "household",
           "label": "Huishouden",
           "write": false,
@@ -12678,14 +12617,6 @@
           ]
         },
         {
-          "domain": "guide-progress",
-          "label": "guide-progress",
-          "write": false,
-          "routes": [
-            "/api/guide-progress"
-          ]
-        },
-        {
           "domain": "household",
           "label": "Huishouden",
           "write": false,
@@ -12858,14 +12789,6 @@
           "write": false,
           "routes": [
             "/api/export"
-          ]
-        },
-        {
-          "domain": "guide-progress",
-          "label": "guide-progress",
-          "write": false,
-          "routes": [
-            "/api/guide-progress"
           ]
         },
         {
@@ -13460,14 +13383,6 @@
           ]
         },
         {
-          "domain": "guide-progress",
-          "label": "guide-progress",
-          "write": false,
-          "routes": [
-            "/api/guide-progress"
-          ]
-        },
-        {
           "domain": "report",
           "label": "Rapportages",
           "write": false,
@@ -13597,14 +13512,6 @@
           "write": false,
           "routes": [
             "/api/export"
-          ]
-        },
-        {
-          "domain": "guide-progress",
-          "label": "guide-progress",
-          "write": false,
-          "routes": [
-            "/api/guide-progress"
           ]
         },
         {
@@ -13751,14 +13658,6 @@
           "write": true,
           "routes": [
             "/api/local-tips"
-          ]
-        },
-        {
-          "domain": "guide-progress",
-          "label": "guide-progress",
-          "write": false,
-          "routes": [
-            "/api/guide-progress"
           ]
         }
       ],
@@ -14403,14 +14302,6 @@
           "write": false,
           "routes": [
             "/api/command-palette/search"
-          ]
-        },
-        {
-          "domain": "guide-progress",
-          "label": "guide-progress",
-          "write": false,
-          "routes": [
-            "/api/guide-progress"
           ]
         },
         {
@@ -17282,7 +17173,7 @@
         "do-budget",
         "do-transactie"
       ],
-      "summary": "Wie ná zijn FIRE-leeftijd doorwerkt heeft niets aan een plan dat FIRE-relatief ankert (`verwachtFireAge + offset`): de offset staat op een datum die al gepasseerd is. Wie werkelijk gestopt is wil zijn beeld vanaf vandaag zien. De horizon-kernel-runway (ADR 0126, PR B — \"als ik nu",
+      "summary": "(ADR 0129 splitst stop-anker en eind-vorm in twee assen en contracteert dit besluit in fase F4 tot het `now`-anker binnen dat model. Status blijft `aanvaard` tot die fase.)",
       "file": "docs/adr/0127-nu-stoppen-als-vijfde-eindstrategie.md"
     },
     {
@@ -17298,6 +17189,34 @@
       ],
       "summary": "Partners kunnen een gedeelde boeking markeren als \"te bespreken\" (tabel `transaction_flags`, fase 1 van de partner-samenwerkingslaag). De vlag krijgt géén eigen zichtbaarheidsregel: elke RLS-policy op `transaction_flags` vraagt via een SECURITY INVOKER-helper of de aanroeper de o",
       "file": "docs/adr/0128-partner-review-vlag-volgt-de-zichtbaarheid-van-de-boeking.md"
+    },
+    {
+      "id": "0129-stop-anker-en-eind-vorm-zijn-twee-assen",
+      "title": "Stop-anker en eind-vorm zijn twee assen",
+      "status": "aanvaard",
+      "date": "2026-09-03",
+      "elements": [
+        "as-planning",
+        "fn-toekomstplannen",
+        "data-cont",
+        "sp-plannen"
+      ],
+      "summary": "`FireEndStrategy` draagt vijf waarden die twee verschillende vragen beantwoorden: *wat moet er aan het eind gelden* (`deplete` · `legacy` · `perpetual`) en *wanneer stop ik* (`pensioen` = AOW, `nu-stoppen` = vandaag). Ze zitten in één enum omdat ze zo gegroeid zijn — `pensioen` b",
+      "file": "docs/adr/0129-stop-anker-en-eind-vorm-zijn-twee-assen.md"
+    },
+    {
+      "id": "0130-de-welkomstgids-woont-bij-fin-en-de-rondleiding-op-overzicht",
+      "title": "De welkomstgids woont bij Fin; het welkom is een rondleiding op /overzicht",
+      "status": "aanvaard",
+      "date": "2026-09-05",
+      "elements": [
+        "as-coach",
+        "sp-registreren",
+        "sp-inzicht",
+        "app-comp"
+      ],
+      "summary": "Na de onboarding landde een nieuwe gebruiker hard op `/toekomst`, kreeg daar een full-page welkomstmodal (`ToekomstWelcome`) die tekstueel naar \"het stappenplan op je Overzicht\" verwees, en daarna drie tips-ballonnen rond de vervaagde grafiek. Op `/overzicht` stond de welkomstgid",
+      "file": "docs/adr/0130-de-welkomstgids-woont-bij-fin-en-de-rondleiding-op-overzicht.md"
     }
   ],
   "churn": {
@@ -17305,11 +17224,11 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 72
+        "commits": 67
       },
       {
         "path": "lib/ai",
-        "commits": 45
+        "commits": 46
       },
       {
         "path": "app/(app)/toekomst",
@@ -17321,22 +17240,22 @@
       },
       {
         "path": "app/api/household",
-        "commits": 15
+        "commits": 17
       },
       {
         "path": "app/api/assets",
-        "commits": 12
+        "commits": 13
       },
       {
         "path": "lib/horizon-data.ts",
         "commits": 8
       },
       {
-        "path": "app/api/budgets",
-        "commits": 6
+        "path": "lib/fire-simulation.ts",
+        "commits": 7
       },
       {
-        "path": "lib/fire-simulation.ts",
+        "path": "app/api/budgets",
         "commits": 6
       },
       {
@@ -17347,28 +17266,28 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 10181,
-        "commits": 79
+        "loc": 10175,
+        "commits": 76
       },
       {
         "file": "components/app/budgets-client.tsx",
         "loc": 5423,
-        "commits": 33
+        "commits": 32
       },
       {
         "file": "components/core/assets-client.tsx",
         "loc": 4945,
-        "commits": 38
+        "commits": 35
       },
       {
         "file": "components/app/cash-account-view.tsx",
         "loc": 3680,
-        "commits": 24
+        "commits": 23
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 3060,
-        "commits": 61
+        "loc": 3075,
+        "commits": 59
       },
       {
         "file": "lib/release-notes.ts",
@@ -18515,36 +18434,23 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-09-02",
+    "previousDate": "2026-09-03",
     "hasChanges": true,
     "sections": [
       {
-        "label": "Schermen",
-        "added": [
-          "/beheer/testtools/force-error"
-        ],
-        "removed": []
-      },
-      {
         "label": "API-routes",
         "added": [
-          "/api/assets/linkable",
-          "/api/recurring/bulk",
-          "/api/transaction-flags"
+          "/api/coach-state"
         ],
-        "removed": []
-      },
-      {
-        "label": "Tabellen",
-        "added": [
-          "transaction_flags"
-        ],
-        "removed": []
+        "removed": [
+          "/api/guide-progress",
+          "/api/welcome"
+        ]
       },
       {
         "label": "Componenten (aantal)",
         "added": [
-          "+14"
+          "+4"
         ],
         "removed": []
       }
@@ -18898,6 +18804,13 @@
       "date": "2026-09-03",
       "api": 310,
       "components": 1025,
+      "tables": 94,
+      "routesProduction": 97
+    },
+    {
+      "date": "2026-09-05",
+      "api": 309,
+      "components": 1029,
       "tables": 94,
       "routesProduction": 97
     }

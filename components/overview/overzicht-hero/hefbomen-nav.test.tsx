@@ -693,3 +693,26 @@ describe('HefbomenNav — elk hefboom/status-paar draagt een oordeel', () => {
     expect(verdicts.length).toBe(4)
   })
 })
+
+/**
+ * TARGET-CONTRACT van de rondleiding (ADR 0130). De vier tegels zijn de eerste
+ * vier spotlight-stappen; verdwijnt het `data-tour`-attribuut bij een
+ * restyling, dan blijft alles compileren en groen, en wijst alleen de
+ * rondleiding in het niets. De bron-toets in `lib/rondleiding/targets.source.test.ts`
+ * bewaakt de LETTERLIJKE regel; deze toets bewijst dat hij ook echt in de DOM
+ * landt — in beide weergaven, want de kaart wisselt daar van variant.
+ */
+describe('HefbomenNav — data-tour-ankers voor de rondleiding', () => {
+  it.each([false, true])('zet vier data-tour-ankers (simple=%s)', (simple) => {
+    const { container } = render(<HefbomenNav health={mockHealth()} simple={simple} />)
+    const ankers = Array.from(container.querySelectorAll('[data-tour]')).map((el) =>
+      el.getAttribute('data-tour'),
+    )
+    expect(ankers).toEqual([
+      'hefboom-bezittingen',
+      'hefboom-schulden',
+      'hefboom-cashflow',
+      'hefboom-belasting',
+    ])
+  })
+})

@@ -137,12 +137,12 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-TOEK-07',
     scenarioId: 'UAT-TOEK-07',
-    titel: 'Eerste gebruik: welkomsttekst en Tips-modus',
+    titel: 'Eerste gebruik: Tips-modus',
     kriticiteit: 'OVERIG',
     persona: 'willem',
-    given: 'Persona Willem, verse laad (welkomst nog niet gezien).',
-    when: 'De gebruiker opent /toekomst voor het eerst, doorloopt de welkomstkaart en de Tips-ballonnen en sluit de tips via het kruisje, Escape of de Tips-toggle.',
-    then: 'Welkomstkaart toont netto vermogen + vrijheidsleeftijd consistent met de hero-KPI (geen eigen som); tips-overlay verschijnt over de vervaagde grafiek. Sluiten sluit DIRECT — geen tussenmodal — en wordt onthouden: na wegnavigeren en terugkomen blijven de tips uit (M38). Er volgt alleen een niet-blokkerende toast "Tips verborgen" met de actie "Niet meer melden" (zet die toast cross-device uit; raakt de tips-zichtbaarheid niet). Sluiten navigeert NIET automatisch naar /overzicht. Pure interactie/weergave.',
+    given: 'Persona Willem, verse laad (tips nog niet uitgezet).',
+    when: 'De gebruiker opent /toekomst voor het eerst, doorloopt de Tips-ballonnen en sluit de tips via het kruisje, Escape of de Tips-toggle.',
+    then: 'Er verschijnt GEEN welkomstkaart meer op /toekomst — die is per ADR 0130 vervangen door de rondleiding op /overzicht. De tips-ballonnen staan bij een eerste bezoek WEL default aan: de tips-overlay verschijnt over de vervaagde grafiek. Sluiten sluit DIRECT — geen tussenmodal — en wordt onthouden: na wegnavigeren en terugkomen blijven de tips uit (M38). Er volgt alleen een niet-blokkerende toast "Tips verborgen" met de actie "Niet meer melden" (zet die toast cross-device uit; raakt de tips-zichtbaarheid niet). Sluiten navigeert NIET automatisch naar /overzicht. Pure interactie/weergave.',
     assertion: {
       kind: 'ui-only',
     },

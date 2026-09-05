@@ -926,3 +926,9 @@
 - **API-routes** toegevoegd: /api/assets/linkable, /api/recurring/bulk, /api/transaction-flags
 - **Tabellen** toegevoegd: transaction_flags
 - **Componenten (aantal)** toegevoegd: +14
+
+## 2026-09-05
+
+- **API-routes** toegevoegd: /api/coach-state
+- **API-routes** verwijderd: /api/guide-progress, /api/welcome
+- **Componenten (aantal)** toegevoegd: +4

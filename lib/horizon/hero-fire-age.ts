@@ -262,10 +262,10 @@ export interface FormatHeroFireAgeOptions {
  *
  * PRECISIE (bevinding M5, 27-08-2026): het kopgetal toont HELE jaren. Een
  * vrijheidsleeftijd van "52,8 jaar" belooft een tiende-van-een-jaar-nauwkeurige
- * projectie vijftien jaar vooruit — schijnzekerheid. De welkomstoverlay op
- * dezelfde pagina (`toekomst-welcome.tsx`) rondde al af op een heel jaar
- * ("rond je 53e"); dat was dus twee weergavestijlen voor één getal, op één
- * scherm. Hele jaren is nu de enige stijl in deze seam. De fractionele waarde
+ * projectie vijftien jaar vooruit — schijnzekerheid. De inmiddels verwijderde
+ * welkomstoverlay op dezelfde pagina rondde al af op een heel jaar ("rond je
+ * 53e"); dat waren dus twee weergavestijlen voor één getal, op één scherm.
+ * Hele jaren is nu de enige stijl in deze seam. De fractionele waarde
  * blijft ongemoeid in `state.age` — de kassabon toont hem exact, want dáár is
  * de onderbouwing juist het punt.
  */

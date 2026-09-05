@@ -13,6 +13,10 @@ import {
   guideVisitSlugsForRoute,
   isGuideComplete,
   isGuideStepDone,
+  isProactiveGuideStep,
+  guideStepMatchesRoute,
+  openGuideSteps,
+  summarizeGuide,
   GUIDE_VISIT_SLUG_BY_STEP_ID,
   type GuideAccountFacts,
   type WelcomeGuideConfig,
@@ -445,5 +449,152 @@ describe('guideVisitSlugsForRoute', () => {
     for (const stepId of Object.keys(GUIDE_VISIT_SLUG_BY_STEP_ID)) {
       expect(stepIds.has(stepId)).toBe(true)
     }
+  })
+})
+
+// ── De proactieve gids-bubbel (ADR 0130, fase 2) ────────────────────────────
+
+describe('isProactiveGuideStep', () => {
+  it('sluit precies de bezoekstappen uit', () => {
+    // Bezoekstappen vinken zichzelf af zodra je de route opent — een bubbel
+    // daarover zou verschijnen op het moment dat de stap al klaar is.
+    for (const stepId of Object.keys(GUIDE_VISIT_SLUG_BY_STEP_ID)) {
+      expect(isProactiveGuideStep(stepId), stepId).toBe(false)
+    }
+    for (const stepId of ['s1-bezittingen', 's1-schulden', 's1-budget', 's4-doelen']) {
+      expect(isProactiveGuideStep(stepId), stepId).toBe(true)
+    }
+  })
+
+  it('behandelt een onbekende (door beheer toegevoegde) stap als proactief', () => {
+    expect(isProactiveGuideStep('door-beheer-verzonnen')).toBe(true)
+  })
+})
+
+describe('guideStepMatchesRoute', () => {
+  it('matcht exact op pathname, met query en hash gestript', () => {
+    expect(guideStepMatchesRoute({ href: '/overzicht/bezittingen' }, '/overzicht/bezittingen')).toBe(true)
+    expect(guideStepMatchesRoute({ href: '/toekomst?uitgaven=open' }, '/toekomst')).toBe(true)
+    expect(guideStepMatchesRoute({ href: '/overzicht/belasting/box1#jaarruimte' }, '/overzicht/belasting/box1')).toBe(true)
+  })
+
+  it('matcht NIET op een diepere route (bewust geen prefix)', () => {
+    // De val uit ADR 0130: met een prefix-match zou de bezittingen-stap ook op
+    // de investment-subroute verschijnen, en `/overzicht` op de halve app.
+    expect(
+      guideStepMatchesRoute({ href: '/overzicht/bezittingen' }, '/overzicht/bezittingen/investment'),
+    ).toBe(false)
+    expect(guideStepMatchesRoute({ href: '/overzicht' }, '/overzicht/schulden')).toBe(false)
+  })
+
+  it('een stap zonder bestemming matcht nooit', () => {
+    expect(guideStepMatchesRoute({}, '/overzicht')).toBe(false)
+    expect(guideStepMatchesRoute({ href: '' }, '/overzicht')).toBe(false)
+  })
+})
+
+describe('openGuideSteps', () => {
+  const state: WelcomeGuideState = { ...DEFAULT_WELCOME_GUIDE_STATE }
+
+  it('levert de open datastappen in configuratievolgorde, zonder bezoekstappen', () => {
+    const derived = deriveGuideStates(DEFAULT_WELCOME_GUIDE, EMPTY_FACTS)
+    const ids = openGuideSteps(DEFAULT_WELCOME_GUIDE, state, derived).map((s) => s.id)
+    // Scherm 1 + 2 zijn volledig data-afgeleid; scherm 3 bestaat uitsluitend uit
+    // bezoekstappen en levert dus niets.
+    expect(ids).toEqual([
+      's1-bezittingen',
+      's1-schulden',
+      's1-budget',
+      's1-rekening',
+      's2-voorkeuren',
+      's2-gebeurtenissen',
+      's2-uitgaven',
+    ])
+    expect(ids.some((id) => id in GUIDE_VISIT_SLUG_BY_STEP_ID)).toBe(false)
+  })
+
+  it('draagt titel, toelichting en bestemming mee', () => {
+    const derived = deriveGuideStates(DEFAULT_WELCOME_GUIDE, EMPTY_FACTS)
+    const first = openGuideSteps(DEFAULT_WELCOME_GUIDE, state, derived)[0]
+    expect(first).toEqual({
+      id: 's1-bezittingen',
+      title: 'Zijn al je bezittingen geregistreerd?',
+      description: 'Zoals eigen huis, cash rekeningen en aandelen.',
+      href: '/overzicht/bezittingen',
+    })
+  })
+
+  it('laat een afgeleid afgevinkte stap weg', () => {
+    const derived = deriveGuideStates(DEFAULT_WELCOME_GUIDE, { ...EMPTY_FACTS, hasAssets: true })
+    const ids = openGuideSteps(DEFAULT_WELCOME_GUIDE, state, derived).map((s) => s.id)
+    expect(ids).not.toContain('s1-bezittingen')
+    expect(ids[0]).toBe('s1-schulden')
+  })
+
+  it('laat een handmatig afgevinkte stap weg', () => {
+    const derived = deriveGuideStates(DEFAULT_WELCOME_GUIDE, EMPTY_FACTS)
+    const metVinkje: WelcomeGuideState = { ...state, completedStepIds: ['s1-schulden'] }
+    const ids = openGuideSteps(DEFAULT_WELCOME_GUIDE, metVinkje, derived).map((s) => s.id)
+    expect(ids).not.toContain('s1-schulden')
+  })
+
+  it('laat een niet-van-toepassing-stap weg', () => {
+    const derived = deriveGuideStates(DEFAULT_WELCOME_GUIDE, {
+      ...EMPTY_FACTS,
+      notApplicableStepIds: ['s1-budget'],
+    })
+    const ids = openGuideSteps(DEFAULT_WELCOME_GUIDE, state, derived).map((s) => s.id)
+    expect(ids).not.toContain('s1-budget')
+  })
+
+  it('kijkt alleen naar zichtbare schermen', () => {
+    const derived = deriveGuideStates(DEFAULT_WELCOME_GUIDE, EMPTY_FACTS)
+    expect(openGuideSteps(DEFAULT_WELCOME_GUIDE, state, derived).map((s) => s.id)).not.toContain(
+      's4-doelen',
+    )
+    const meer: WelcomeGuideState = { ...state, revealedScreens: 4 }
+    expect(openGuideSteps(DEFAULT_WELCOME_GUIDE, meer, derived).map((s) => s.id)).toContain(
+      's4-doelen',
+    )
+  })
+
+  it('levert niets bij een uitgeschakelde gids', () => {
+    const uit: WelcomeGuideConfig = { ...DEFAULT_WELCOME_GUIDE, enabled: false }
+    expect(openGuideSteps(uit, state)).toEqual([])
+  })
+})
+
+describe('summarizeGuide', () => {
+  const state: WelcomeGuideState = { ...DEFAULT_WELCOME_GUIDE_STATE }
+
+  it('leeg account: actief, alles open', () => {
+    const derived = deriveGuideStates(DEFAULT_WELCOME_GUIDE, EMPTY_FACTS)
+    const s = summarizeGuide(DEFAULT_WELCOME_GUIDE, state, derived)
+    expect(s.status).toBe('active')
+    expect(s.totalCount).toBe(12) // 3 zichtbare schermen × 4 stappen
+    expect(s.openCount).toBe(12)
+  })
+
+  it('afgerond account: complete, nul open', () => {
+    const derived = deriveGuideStates(DEFAULT_WELCOME_GUIDE, FULL_FACTS)
+    const s = summarizeGuide(DEFAULT_WELCOME_GUIDE, state, derived)
+    expect(s.status).toBe('complete')
+    expect(s.openCount).toBe(0)
+  })
+
+  it('afgesloten gids blijft dismissed, ook met open stappen', () => {
+    const derived = deriveGuideStates(DEFAULT_WELCOME_GUIDE, EMPTY_FACTS)
+    const weg: WelcomeGuideState = { ...state, status: 'dismissed' }
+    const s = summarizeGuide(DEFAULT_WELCOME_GUIDE, weg, derived)
+    expect(s.status).toBe('dismissed')
+    expect(s.openCount).toBe(12)
+  })
+
+  it('laat n.v.t.-stappen buiten de noemer', () => {
+    const derived = deriveGuideStates(DEFAULT_WELCOME_GUIDE, {
+      ...EMPTY_FACTS,
+      notApplicableStepIds: ['s1-budget'],
+    })
+    expect(summarizeGuide(DEFAULT_WELCOME_GUIDE, state, derived).totalCount).toBe(11)
   })
 })

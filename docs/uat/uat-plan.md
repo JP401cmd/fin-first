@@ -127,7 +127,7 @@ Kriticiteit: **KERN** = raakt financiële uitkomsten of gebruikersdata · **BELA
 | WF-OVZ-11 | Vrijheidsweek delen | Je vrijheidsvoortgang als deelbare kaart genereren en delen met instelbaar privacy-niveau. | OVERIG | ja | 3 |
 | WF-OVZ-12 | Status-/vrijheidsmelding minimaliseren en heropenen | De duidings-banner wegklappen tot een statuspunt naast de 'i' en later heropenen, cross-device onthouden. | BELANGRIJK | nee | 4 |
 | WF-OVZ-13 | Maand-check-in starten vanaf de hub | In de eerste week van de maand herinnerd worden aan de check-in en die direct starten of wegklikken. | BELANGRIJK | nee | 4 |
-| WF-OVZ-14 | Welkomstgids doorlopen (eerste gebruik) | Stap voor stap door de eerste acties geleid worden, voortgang afvinken en de gids sessie- of definitief sluiten. | BELANGRIJK | nee | 4 |
+| WF-OVZ-14 | Welkomstgids doorlopen in Fin (eerste gebruik) | Stap voor stap door de eerste acties geleid worden, voortgang afvinken en de gids afsluiten — sinds ADR 0130 als vierde chat-icoon in Fin, niet meer als banner op /overzicht. | BELANGRIJK | nee | 4 |
 | WF-OVZ-15 | Samengestelde-rente-inzicht verkennen | Met een inleg-slider voelen wat sparen vs. beleggen over 30 jaar met je cash doet. | BELANGRIJK | ja | 3 |
 | WF-OVZ-16 | Overzicht afdrukken of als PDF opslaan | De hub als nette A4-print/PDF bewaren zonder navigatie-elementen. | OVERIG | nee | 1 |
 | WF-OVZ-17 | De hub in huishoud- of partnerweergave bekijken | Dezelfde hub met omgerekende cijfers van huishouden of partner, met duidelijke perspectief-chip. | KERN | ja | 3 |
@@ -135,6 +135,9 @@ Kriticiteit: **KERN** = raakt financiële uitkomsten of gebruikersdata · **BELA
 | WF-OVZ-19 | Tips van Will beoordelen: Doe nu / Later / Negeren | Per tip beslissen: nu doen (wordt actie), 14 dagen uitstellen of negeren — met impact in vrijheidsdagen. | KERN | ja | 5 |
 | WF-OVZ-20 | Handmatig een actie toevoegen | Zelf een werkitem met vrijheidsdagen-impact op de actielijst zetten. | KERN | ja | 2 |
 | WF-OVZ-21 | Open acties beheren | Acties afronden (met vrijheidsdagen-animatie), uitstellen, afwijzen, bewerken, aan partner toewijzen en de volledige lijst in een modal beheren. | KERN | ja | 5 |
+| WF-OVZ-26 | Interactieve rondleiding op /overzicht (autostart, overslaan, herstart) | Een vers geonboarde gebruiker met een spotlight-tour langs de hefboomtegels, gezondheidskaart en grafiek voeren; laten overslaan of later herstarten vanuit Fin of de pagina-'i'. | BELANGRIJK | nee | 8 |
+
+*(WF-OVZ-22 t/m WF-OVZ-25 zijn later toegevoegd — vermogens-widget-selectie en de mijlpaalviering, ADR 0123/0124 — en ontbreken nog in de tabel/detailsecties van dit narratieve document; zie `lib/uat/catalog.ts` voor de actuele, volledige lijst.)*
 
 ### Bezittingen & beleggingen (WF-BEZIT)
 
@@ -294,7 +297,7 @@ Kriticiteit: **KERN** = raakt financiële uitkomsten of gebruikersdata · **BELA
 | WF-TOEK-04 | De grafiek verkennen: modus wisselen, zoomen, Inkomen & Uitgaven | Het vermogen bekijken als pad-lijn, gestapelde opbouw en inkomen/uitgaven-verloop, met zoom op een leeftijdsbereik. | BELANGRIJK | ja | 3 |
 | WF-TOEK-05 | Jaar-detail-kassabon: één projectiejaar uitgesplitst bekijken | Voor één toekomstig jaar exact zien waar het vermogen uit bestaat en wat er in- en uitgaat. | KERN | ja | 3 |
 | WF-TOEK-06 | Details: 'Zo werkt jouw grafiek'-walkthrough en jaar-op-jaar tabel | De volledige rekenroute achter de grafiek begrijpen en het jaar-op-jaar verloop als tabel controleren. | BELANGRIJK | ja | 3 |
-| WF-TOEK-07 | Eerste gebruik: welkomsttekst en Tips-modus (ballonnen-overlay) | Als nieuwe gebruiker eenmalig uitleg krijgen en de wijzende tips-ballonnen over de grafiek aan-/uitzetten. | OVERIG | ja | 4 |
+| WF-TOEK-07 | Eerste gebruik: Tips-modus (ballonnen-overlay) | Als nieuwe gebruiker de wijzende tips-ballonnen over de grafiek aan-/uitzetten (de eenmalige welkomstkaart is per ADR 0130 vervangen door de rondleiding op /overzicht, zie WF-OVZ-26). | OVERIG | ja | 4 |
 | WF-TOEK-08 | Rendement-scenario's en Monte Carlo over de grafiek leggen | Zien hoe gevoelig het pad is voor markten via scenario-lijnen (±2pp) en een Monte Carlo-waaier met slaagkans. | BELANGRIJK | ja | 2 |
 | WF-TOEK-09 | Opgeslagen wat-als-scenario's als spooklijn vergelijken | Eerder opgeslagen scenario's als ghost-lijnen naast het actuele plan leggen. | BELANGRIJK | ja | 2 |
 | WF-TOEK-10 | Wat-als-sliders: inkomen, werkdagen, spaarquote en extra inleg live aanpassen | Direct op de tijdas verkennen wat sliderwijzigingen met de vrijheidsleeftijd doen. | KERN | ja | 3 |
@@ -410,6 +413,9 @@ Kriticiteit: **KERN** = raakt financiële uitkomsten of gebruikersdata · **BELA
 | WF-WILL-20 | Minder hierover-feedback op een nieuwsartikel geven | De gebruiker stuurt de krant bij zodat een onderwerp minder prominent terugkomt. | BELANGRIJK | nee | 2 |
 | WF-WILL-21 | Toptips van Will beslissen op /overzicht/tips | De gebruiker beslist over openstaande tips (Doe nu/Later/Negeren) en ziet geaccepteerde tips als acties verschijnen. | KERN | ja | 4 |
 | WF-WILL-22 | Een open actie afronden of bijstellen op /overzicht/tips | De gebruiker vinkt een actie af (met vrijheidsdagen-animatie), stelt uit, wijst af, wijst toe aan partner of voegt zelf een actie toe. | KERN | ja | 5 |
+| WF-WILL-26 | Fin herinnert aan de volgende gidsstap | Zolang de welkomstgids loopt, herinnert Fin proactief — route-gebonden, max één per dag — aan de eerstvolgende open stap; vervangt zolang de gids loopt de gewone data-gap-tip (ADR 0130 fase 2). | BELANGRIJK | nee | 8 |
+
+*(WF-WILL-23 t/m WF-WILL-25 zijn later toegevoegd — lokaal actievoorstel #886, melden vanuit de chat, AI-uit-blokkade — en ontbreken nog in de tabel/detailsecties van dit narratieve document; zie `lib/uat/catalog.ts` voor de actuele, volledige lijst.)*
 
 ### Rapportages (WF-RAPP)
 
@@ -1911,27 +1917,27 @@ Scope: `/overzicht` (hoofdpagina/hub), `/dashboard` (redirect), `/overzicht/tips
 
 ---
 
-#### WF-OVZ-14 — Welkomstgids doorlopen (eerste gebruik)
+#### WF-OVZ-14 — Welkomstgids doorlopen in Fin (eerste gebruik)
 - **Doel:** Als nieuwe gebruiker stap voor stap door de belangrijkste eerste acties geleid worden, voortgang afvinken en zelf bepalen wanneer de gids weg mag.
-- **Trigger/startpunt:** De welkomstkaart bovenaan /overzicht (verschijnt zolang de gids aan staat, niet is weggeklikt en er zichtbare schermen zijn).
-- **Eindresultaat:** Stappen zijn afgevinkt (groen, blijven staan), de gebruiker is door de schermen genavigeerd (verplichte eerst, optionele zelf ontgrendeld) en heeft de gids gesloten — voor deze sessie of voorgoed.
+- **Trigger/startpunt (ADR 0130 — verhuisd):** de gids woont niet meer als banner op /overzicht, maar als vierde icoon (lijstje, vóór de megafoon) in de kop van de Fin-chat; het icoon verschijnt alleen als er iets te tonen is en werkt zonder AI-abonnement.
+- **Eindresultaat:** Stappen zijn afgevinkt (afgeleid of handmatig), de gebruiker is via stap-links door de app genavigeerd en heeft de gids afgesloten — met een lege staat "Gids opnieuw tonen" in plaats van een definitief-weg-keuze.
 - **Stappen:**
-  1. Lees op de kaart de kicker, "Scherm X van Y" en de afvink-teller.
-  2. Vink een stap af via het rondje → stap kleurt groen (nogmaals klikken = ongedaan maken).
-  3. Klik bij een stap op "Open" → je landt op de betreffende pagina om de stap uit te voeren.
-  4. Klik "Volgende scherm" / "Vorige" om te bladeren (voortgangs-stippen bovenin lopen mee; slotje toont dat er nog vergrendelde schermen zijn).
-  5. Op het laatste zichtbare scherm: klik "Ja, toon meer" om een extra scherm te ontgrendelen, of "Nee, sluit gids".
-  6. Klik op de X (of "Gids sluiten") → keuzedialoog: "Volgende keer verder" (verbergt deze sessie) of "Geen onboarding-schermen meer tonen" (voorgoed); "Annuleren" gaat terug.
-  7. Herlaad na "Volgende keer verder" in een nieuwe sessie → de gids gaat verder waar je was; na "voorgoed" komt hij nooit terug.
-- **Schermen/componenten:** /overzicht — `components/overview/welcome-guide-banner.tsx` (GET/PUT `/api/welcome-guide`, sessie-key `welcome_guide_closed`), `components/overview/guide-screen-view.tsx`, `lib/welcome-guide.ts` (getVisibleScreens/hasMoreScreens/countCompletedOnScreen).
+  1. Open de Fin-chat, tik het lijstje-icoon aan → het inhoudsgebied wisselt naar de gidsweergave (aria-pressed); de kop-subtitel toont "Welkomstgids · N open".
+  2. Bekijk de afvinkregels (compact, geen proceskaarten, paneel 480px breed); afgeleide vinkjes (bezittingen/schulden/budget/koppeling/doelen/grafiek-instellingen) staan al aan zonder handmatige klik.
+  3. Klik op een stap-link → navigeert én sluit de chat (tenzij gepind), tenzij het een stap zonder deeplink is.
+  4. Tik het lijstje-icoon nogmaals aan → terug naar het gesprek; sluiten van de chat zet de modus terug op chat.
+  5. Klik "Ik ben klaar met de gids" → lege staat met "Gids opnieuw tonen" (niet meer eenrichtingsverkeer).
+  6. Onder de gids staat in beide weergavemodi de regel die naar /mijn/uiterlijk linkt (APP-2).
+- **Schermen/componenten:** `components/app/chat/gids/*` (gidsweergave in Fin), `components/app/chat/chat-panel.tsx` (vierde kop-icoon), `lib/welcome-guide.ts` (openGuideSteps/getVisibleScreens/hasMoreScreens/countCompletedOnScreen), `app/api/welcome-guide/route.ts` (actie `reactivate`), configuratiescherm `components/overview/guide-screen-view.tsx` (beheerd op /beheer/welkom).
 - **Kriticiteit:** BELANGRIJK
 - **Rekenend:** nee
 - **Varianten & randgevallen:**
-  - Gids door beheer uitgeschakeld of eerder voorgoed gesloten → kaart rendert niets.
-  - API-fout bij laden → kaart verschijnt niet (stil).
-  - Mutaties zijn optimistisch: bij een mislukte server-sync blijft de lokale staat staan en corrigeert de volgende load.
+  - Gids door beheer uitgeschakeld → geen lijstje-icoon in de chat-kop.
+  - API-fout bij laden → gidsweergave toont geen stappen (stil).
+  - Afgeleide vinkjes zijn nooit klikbaar en worden nooit naar `completedStepIds` geschreven; niet-van-toepassing-stappen vallen buiten de noemer.
   - Schermen/stappen kunnen per beheer-configuratie aan/uit staan (totalen passen mee).
-- **Cross-module effecten:** Stap-links deeplinken door de hele app (bezittingen, import, doelen, enz.); configuratie wordt beheerd op /beheer/welkom (zelfde `GuideScreenView`).
+  - Zie ook WF-OVZ-26 (de interactieve rondleiding op /overzicht) en WF-WILL-26 (Fin herinnert proactief aan de volgende open gidsstap) — beide zijn de andere helft van ADR 0130.
+- **Cross-module effecten:** Stap-links deeplinken door de hele app (bezittingen, import, doelen, enz.); configuratie wordt beheerd op /beheer/welkom (zelfde `GuideScreenView`); `app/api/welcome/route.ts` en `app/api/guide-progress/route.ts` bestaan niet meer.
 
 ---
 
@@ -2077,6 +2083,28 @@ Scope: `/overzicht` (hoofdpagina/hub), `/dashboard` (redirect), `/overzicht/tips
   - Partner-acties tellen mee in het totaal en verschijnen alleen zolang er ruimte is onder de 5.
   - Geen huishouden → geen toewijs-optie.
 - **Cross-module effecten:** Afgeronde acties beïnvloeden briefing/aandachtspunten; de opzegflow (OpzegModal) hoort bij het abonnementen-domein; `router.refresh()` synchroniseert de server-data na elke mutatie.
+
+---
+
+#### WF-OVZ-26 — Interactieve rondleiding op /overzicht (autostart, overslaan, herstart)
+- **Doel:** Een vers geonboarde gebruiker via een spotlight-tour langs de belangrijkste onderdelen van /overzicht leiden (ADR 0130); een bestaande gebruiker kan de tour desgewenst zelf herstarten.
+- **Trigger/startpunt:** Autostart alléén bij `module_guide_state['rondleiding:pending'] === true` én geen `coachmark:overzicht-rondleiding`, ~400ms na de eerste paint en pas zodra de eerste hefboomtegel in de DOM staat. Handmatig herstarten via de gidsweergave in Fin of de sectie RONDLEIDING in de pagina-'i' (`/overzicht?rondleiding=start`).
+- **Eindresultaat:** De gebruiker heeft de tour doorlopen, overgeslagen of onderbroken; de uitkomst is server-side vastgelegd via `PUT /api/coachmark` (id `overzicht-rondleiding`, status `voltooid`/`overgeslagen`/`onderbroken`).
+- **Stappen:**
+  1. Welkomstkaart (eigen netto vermogen + vrijheidstijd) → de vier hefboomtegels → de gezondheidskaart → de grafiek → (breed) zijbalk + Fin, of (smal) de nav-pill.
+  2. Esc, "Sla over" of een klik naast het gat sluit direct zonder tussenvraag → `overgeslagen`.
+  3. Een klik op een hefboomtegel navigeert gewoon en markeert `onderbroken`.
+  4. De laatste kaart markeert `voltooid` en biedt "Begin met je eerste stap" (opent de gidsweergave in Fin) naast "Zelf rondkijken".
+  5. Herstart later vanuit Fin (label volgt de afloop: "Rondleiding afmaken" na onderbroken, anders "Rondleiding opnieuw") of vanuit de pagina-'i'.
+- **Schermen/componenten:** `lib/rondleiding/steps.ts` (stapaantal per platform, 9 breed/8 smal), `components/overview/rondleiding/rondleiding-provider.tsx` + `rondleiding-overlay.tsx`, `app/api/coachmark/route.ts`.
+- **Kriticiteit:** BELANGRIJK
+- **Rekenend:** nee — welkomstkaart consumeert het al-berekende netto vermogen/vrijheidstijd, geen eigen som.
+- **Varianten & randgevallen:**
+  - Ontbreekt een doelwit na 2,5s (bv. Fin-companion terwijl de chat gedokt open staat) → die stap wordt overgeslagen, niet naar een leeg vlak gewezen.
+  - Het uitgelichte element blijft tikbaar (geen overlay-signaal, geen scroll-lock) — de nav-pill en Fins knop verbergen zich dus niet tijdens de tour.
+  - Bij een bestaande gebruiker start de tour nooit vanzelf.
+  - Toegankelijkheid: `role="dialog"` met `aria-modal="false"`, focus-trap, `aria-live="polite"` kondigt "Stap N van M — titel" aan.
+- **Cross-module effecten:** Geen — de tour navigeert binnen /overzicht en linkt hooguit terug naar de gidsweergave in Fin (WF-OVZ-14/WF-WILL-26).
 
 ---
 
@@ -4699,19 +4727,19 @@ Scope: /toekomst (tijdas-landing), /toekomst/doelen, /toekomst/gebeurtenissen, /
   - FIRE niet bereikbaar: totaalregel "Niet bereikbaar".
 - **Cross-module effecten:** geen.
 
-#### WF-TOEK-07 — Eerste gebruik: welkomsttekst en Tips-modus (ballonnen-overlay)
-- **Doel:** Een nieuwe gebruiker krijgt eenmalig een welkomstuitleg en kan de wijzende tips-ballonnen over de grafiek aan- en uitzetten.
-- **Trigger/startpunt:** Eerste bezoek aan /toekomst (welkomst nog niet gezien), of klik op de "Tips"-toggle rechtsboven de pagina.
-- **Eindresultaat:** De welkomstkaart is weggeklikt (server-side gemarkeerd); de tips-overlay met drie fase-ballonnen (Opbouw / Financiële vrijheid / Afbouw) ligt over de vervaagde grafiek, of is gesloten na de exit-melding.
+#### WF-TOEK-07 — Eerste gebruik: Tips-modus (ballonnen-overlay)
+- **Doel:** Een nieuwe gebruiker kan de wijzende tips-ballonnen over de grafiek aan- en uitzetten. (De eenmalige welkomstkaart op /toekomst is per ADR 0130 verwijderd — het welkom zit nu in de interactieve rondleiding op /overzicht, zie WF-OVZ-26. `components/app/horizon/toekomst-welcome.tsx` bestaat niet meer.)
+- **Trigger/startpunt:** Eerste bezoek aan /toekomst (tips staan dan default aan), of klik op de "Tips"-toggle rechtsboven de pagina.
+- **Eindresultaat:** De tips-overlay met drie fase-ballonnen (Opbouw / Financiële vrijheid / Afbouw) ligt over de vervaagde grafiek, of is gesloten na de exit-melding.
 - **Stappen:**
-  1. Bij eerste bezoek: lees de welkomstkaart (netto vermogen + vrijheidsleeftijd in leke-taal); klik "Bekijk je grafiek" → kaart weg én tips-overlay aan; of sluit met ✕ → alleen de kaart weg.
+  1. Bij eerste bezoek staat de tips-overlay al aan (geen aparte welkomstkaart meer om eerst weg te klikken).
   2. Met tips aan: hover/focus een ballon → de bijbehorende grafiekfase licht op (emphasis).
   3. Klik de "Tips"-toggle of de ✕ op de overlay → de exit-melding verschijnt (gecentreerde modal).
   4. Kies "Sluiten" (overlay dicht, melding komt later terug) of "Niet meer weergeven" (permanent, cross-device opgeslagen).
   5. Zet tips later weer aan via de "Tips"-toggle naast de pagina-"i".
-- **Schermen/componenten:** components/app/horizon/toekomst-welcome.tsx; components/app/horizon/toekomst-overlay.tsx + toekomst-overlay-balloons.tsx; components/app/horizon/toekomst-exit-notice.tsx; toggle in horizon-client.tsx (regel 2922).
+- **Schermen/componenten:** components/app/horizon/toekomst-overlay.tsx + toekomst-overlay-balloons.tsx; components/app/horizon/toekomst-exit-notice.tsx; toggle in horizon-client.tsx.
 - **Kriticiteit:** OVERIG
-- **Rekenend:** ja — de overlay-samenvatting toont netto vermogen en vrijheidsleeftijd, consume-only uit exact dezelfde bronnen als de hero-KPI (geen eigen som; ballonnen zelf bevatten geen bedragen).
+- **Rekenend:** nee — pure interactie/weergave; de ballonnen zelf bevatten geen bedragen.
 - **Varianten & randgevallen:**
   - Overlay-voorkeur staat in localStorage (per apparaat); "Niet meer weergeven" van de exit-melding is server-side (user_feature_visits, cross-device).
   - Tips-overlay alleen in Pad-modus (niet op de Opbouw-stack).
@@ -6729,6 +6757,28 @@ Scope: de app-brede Will-chat-overlay (bubbel → coach-melding → chatpaneel),
 
 ---
 
+#### WF-WILL-26 — Fin herinnert aan de volgende gidsstap
+- **Doel:** Zolang de welkomstgids nog loopt (ADR 0130 fase 2), herinnert Fin proactief — route-gebonden en max één per dag — aan de eerstvolgende open gidsstap; deze laag vervangt zolang de gids loopt de gewone data-gap-tip van WF-WILL-05.
+- **Trigger/startpunt:** De gebruiker navigeert naar een route die matcht met een open gidsstap (exacte pathname-match, query gestript) en heeft de bubbel vandaag nog niet gezien (`profiles.module_guide_state["coach:state"].guideLastShownAt`).
+- **Eindresultaat:** De gidsstap-melding is getoond, weggeklikt (die stap stil voor altijd) of weggevallen door tijdsverloop (auto-dismiss, stap blijft open); de dag-teller stempelt pas bij het echt verschijnen.
+- **Stappen:**
+  1. Navigeer naar de exacte route van een open gidsstap (bv. /overzicht/bezittingen) → *verwacht:* Fin-bubbel met de gidsstap-tekst; op een subroute (/overzicht/bezittingen/investment) verschijnt hij niet.
+  2. Op /toekomst verschijnt de gidsbubbel nooit (daar staan de uitleg-ballonnen, WF-TOEK-07).
+  3. Klik het kruisje op de melding → *verwacht:* die stap wordt server-side stilgezet (`guide_<stap-id>`), morgen noemt Fin de vólgende open stap.
+  4. Laat de melding vanzelf wegglijden (auto-dismiss) → *verwacht:* de stap blijft op de lijst, alleen de dag gaat om.
+  5. Bezoek dezelfde route nogmaals dezelfde dag → *verwacht:* geen tweede gidsbubbel, hooguit de gewone pad-tip.
+  6. Klik "Bekijk in de gids" (stap zonder deeplink) → *verwacht:* opent de gidsweergave in Fin.
+- **Schermen/componenten:** `lib/welcome-guide.ts` (openGuideSteps/guideStepMatchesRoute/isProactiveGuideStep), `lib/coach-suggestions.ts` (gids-laag, order 2, GUIDE_BUBBLE_EXCLUDED_ROUTES), `lib/hooks/use-coach-suggestion.ts` (dagregel via isSameLocalDay), `components/app/fin/fin-home.tsx` (handleCta), `app/api/coach-state/route.ts` (PUT guideShown/dismiss).
+- **Kriticiteit:** BELANGRIJK
+- **Rekenend:** nee — procestoets (verschijnt hij op de juiste pagina, precies één keer), geen cijfermatige uitkomst.
+- **Varianten & randgevallen:**
+  - Tijdens de rondleiding (WF-OVZ-26) of achter een open overlay/immersieve route zwijgt Fin en verbruikt de stap zijn dag niet.
+  - Bezoekstappen ("bekijk je nieuws") worden nooit proactief genoemd — die vinken zichzelf af zodra je er bent.
+  - Beheer kan de laag in één klik uitzetten (/beheer/coach, regel "guide") → dan keert het gedrag van vóór ADR 0130 terug (gewone data-gap-tip overal).
+- **Cross-module effecten:** hangt samen met WF-OVZ-14 (de gidsweergave zelf) en WF-OVZ-26 (de rondleiding) — samen de twee helften van ADR 0130.
+
+---
+
 #### Ongedekte UI
 
 - **app/(app)/berichten/layout.tsx en app/(app)/nieuws/layout.tsx** — pure accent-wrappers (zetten alleen de Wil-kleurvariabelen), geen eigen interactie; impliciet gedekt door WF-WILL-11/15.
@@ -7713,7 +7763,7 @@ Alle routes onder /beheer zijn afgeschermd in één centrale layout: `app/(app)/
 - **Cross-module effecten:** Stuurt de Will-coach-bubbel/suggesties in de hele app (WillHome).
 
 #### WF-BEHEER-10 — Welkomstgids samenstellen met live-preview
-- **Doel:** De welkomstgids die nieuwe gebruikers op /overzicht zien volledig samenstellen: schermen en stappen toevoegen, herordenen, teksten/links/iconen bewerken en per onderdeel aan/uit zetten.
+- **Doel:** De welkomstgids die nieuwe gebruikers in Fin zien (ADR 0130 — niet meer als banner op /overzicht) volledig samenstellen: schermen en stappen toevoegen, herordenen, teksten/links/iconen bewerken en per onderdeel aan/uit zetten.
 - **Trigger/startpunt:** Hub → "Welkomstgids" (/beheer/welkom).
 - **Eindresultaat:** De aangepaste gids is opgeslagen (app_settings) en wordt zo aan gebruikers getoond; reset naar standaard is mogelijk.
 - **Stappen:**
@@ -7729,7 +7779,7 @@ Alle routes onder /beheer zijn afgeschermd in één centrale layout: `app/(app)/
   - Niet-opgeslagen wijzigingen (dirty state) — toetsen dat opslaan/annuleren consistent is.
   - Reset naar standaard terwijl er overrides staan.
   - Config laden mislukt → foutmelding.
-- **Cross-module effecten:** Bepaalt de welkomstgids-kaart op /overzicht voor (nieuwe) gebruikers.
+- **Cross-module effecten:** Bepaalt de welkomstgidsweergave in Fin voor (nieuwe) gebruikers (WF-OVZ-14).
 
 #### WF-BEHEER-11 — Briefing-directieven beheren
 - **Doel:** Temporele (maandgebonden) en functionele redactieregels voor de briefing toevoegen, prioriteren, aan/uit zetten en verwijderen.
@@ -9571,20 +9621,33 @@ WF-NAV-13 (Uitloggen) → **géén eigen scenario** in dit document; gedekt door
 
 ---
 
-#### UAT-OVZ-14 — Welkomstgids doorlopen (dekt WF-OVZ-14)
+#### UAT-OVZ-14 — Welkomstgids doorlopen in Fin (dekt WF-OVZ-14)
 - **Kriticiteit:** BELANGRIJK · **Platform:** webapp+mobiel · **Rooktest:** nee · **Duur:** ~7 min
-- **Preconditie:** persona **Daan Bakker** (nieuwe gebruiker, gids nog niet gesloten).
+- **Preconditie:** persona **Daan Bakker** (nieuwe gebruiker, gids nog niet gesloten). ADR 0130 — de gids woont sinds deze release in Fin, niet meer als banner op /overzicht.
 - **a. Happy path:**
-  1. Open /overzicht → *verwacht:* welkomstkaart bovenaan met kicker, "Scherm 1 van N", afvink-teller.
-  2. Vink een stap af → *verwacht:* stap kleurt groen; klik nogmaals → ongedaan gemaakt.
-  3. Klik "Open" bij een stap → *verwacht:* navigatie naar de betreffende pagina om de stap uit te voeren.
-  4. Klik "Volgende scherm"/"Vorige" → *verwacht:* voortgangsstippen lopen mee, slotje toont vergrendelde schermen.
-  5. Op het laatste zichtbare scherm: klik "Ja, toon meer" → extra scherm ontgrendeld.
-  6. Klik de X → keuzedialoog "Volgende keer verder" vs. "Geen onboarding-schermen meer tonen" → kies "Volgende keer verder".
-  7. Herlaad in een nieuwe sessie → *verwacht:* gids gaat verder waar je was.
-  - **Eindresultaat:** afvinken, navigeren en sluiten werken; keuze persisteert correct per gekozen optie.
+  1. Open /overzicht → *verwacht:* GEEN welkomstkaart bovenaan; open de Fin-chat → *verwacht:* een vierde icoon (lijstje) staat vóór de megafoon in de kop.
+  2. Tik het lijstje-icoon aan → *verwacht:* het inhoudsgebied wisselt naar de gidsweergave (aria-pressed), kop-subtitel toont "Welkomstgids · N open".
+  3. Bekijk de afvinkregels (compact, 480px breed) → afgeleide stappen staan al afgevinkt zonder handmatige klik.
+  4. Klik op een stap-link → *verwacht:* navigatie naar de betreffende pagina én de chat sluit (tenzij gepind).
+  5. Open de chat opnieuw, tik het lijstje-icoon nogmaals aan → *verwacht:* terug naar het gesprek.
+  6. Klik "Ik ben klaar met de gids" → *verwacht:* lege staat met "Gids opnieuw tonen".
+  - **Eindresultaat:** afvinken (afgeleid + navigatie) en de gids-toggle in de chat-kop werken; "Gids opnieuw tonen" heropent de gidsweergave.
   - **Rekenend:** nee.
-- **c. Variant — voorgoed sluiten:** herhaal met "Geen onboarding-schermen meer tonen" → *verwacht:* gids komt nooit meer terug, ook niet na uitloggen/inloggen. Test ook: API-fout bij laden → kaart verschijnt stil niet (geen foutmelding).
+- **c. Variant — beheer schakelt de gids uit:** zet de gids uit op /beheer/welkom → *verwacht:* het lijstje-icoon verdwijnt uit de chat-kop. Test ook: API-fout bij laden → gidsweergave toont stil geen stappen (geen foutmelding). Zie WF-OVZ-26 voor de interactieve rondleiding en WF-WILL-26 voor de proactieve gids-bubbel — beide horen bij hetzelfde ADR 0130-besluit maar zijn een apart scenario.
+
+---
+
+#### UAT-OVZ-26 — Interactieve rondleiding op /overzicht (dekt WF-OVZ-26)
+- **Kriticiteit:** BELANGRIJK · **Platform:** webapp+mobiel · **Rooktest:** nee · **Duur:** ~8 min
+- **Preconditie:** een vers geonboarde gebruiker met `module_guide_state['rondleiding:pending']` gezet en zonder `coachmark:overzicht-rondleiding`.
+- **a. Happy path (autostart, breed venster):**
+  1. Open /overzicht → *verwacht:* ~400ms na de eerste paint, zodra de eerste hefboomtegel in de DOM staat, start de tour met de welkomstkaart (eigen netto vermogen + vrijheidstijd).
+  2. Doorloop de vier hefboomtegels, de gezondheidskaart, de grafiek en (breed venster) de zijbalk + Fin → *verwacht:* 9 stappen, elk uitgelicht element blijft tikbaar.
+  3. Bereik de laatste kaart → *verwacht:* "Begin met je eerste stap" (opent de gidsweergave in Fin) naast "Zelf rondkijken"; status wordt `voltooid` (`PUT /api/coachmark`).
+- **b. Variant — smal venster:** herhaal op een smal viewport → *verwacht:* 8 stappen (nav-pill vervangt zijbalk + Fin als aparte stap).
+- **c. Variant — overslaan/onderbreken/herstart:** Esc of "Sla over" → *verwacht:* tour sluit direct, status `overgeslagen`. Klik op een hefboomtegel tijdens de tour → *verwacht:* navigeert gewoon, status `onderbroken`. Herstart via de gidsweergave in Fin (label "Rondleiding afmaken" na onderbroken, anders "Rondleiding opnieuw") en via de pagina-'i' → *verwacht:* `/overzicht?rondleiding=start` start de tour opnieuw en het queryparam verdwijnt daarna uit de adresbalk. Test ook: bij een bestaande gebruiker (geen `pending`) start de tour nooit vanzelf.
+- **Eindresultaat:** de tour start alleen onder de juiste voorwaarde, is altijd verlaatbaar zonder tussenvraag, en de uitkomst is server-side vastgelegd.
+- **Rekenend:** nee — de welkomstkaart consumeert het al-berekende netto vermogen/vrijheidstijd.
 
 ---
 
@@ -13200,8 +13263,8 @@ UAT-BEHEER-07 (gebruikersbeheer) krijgt naast zijn eigen KERN-behandeling drie g
 #### UAT-BEHEER-10 — Welkomstgids samenstellen met live-preview (dekt WF-BEHEER-10)
 - **Kriticiteit:** BELANGRIJK · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~8 min
 - **Preconditie:** default = `DEFAULT_WELCOME_GUIDE` (5 schermen).
-- **a. Happy path (wijzig → controleer → herstel):** open `/beheer/welkom`, voeg een stap toe aan een scherm met een unieke testtekst, bekijk de live-preview (oog-icoon) → *verwacht:* preview toont dezelfde weergavecomponent als productie; sla op. Open `/overzicht` als (nieuwe) testgebruiker → *verwacht:* de testtekst verschijnt in de welkomstgids-kaart. **Herstel (verplicht):** klik "Reset" om terug te vallen op `DEFAULT_WELCOME_GUIDE` (5 schermen) en controleer dat de testtekst weg is.
-- **c. Cross-module effecten:** bepaalt de welkomstgids-kaart op `/overzicht` voor (nieuwe) gebruikers.
+- **a. Happy path (wijzig → controleer → herstel):** open `/beheer/welkom`, voeg een stap toe aan een scherm met een unieke testtekst, bekijk de live-preview (oog-icoon) → *verwacht:* preview toont dezelfde weergavecomponent als productie; sla op. Open Fin als (nieuwe) testgebruiker en tik het lijstje-icoon aan → *verwacht:* de testtekst verschijnt in de gidsweergave (ADR 0130 — niet meer als kaart op `/overzicht`). **Herstel (verplicht):** klik "Reset" om terug te vallen op `DEFAULT_WELCOME_GUIDE` (5 schermen) en controleer dat de testtekst weg is.
+- **c. Cross-module effecten:** bepaalt de welkomstgidsweergave in Fin voor (nieuwe) gebruikers.
 
 #### UAT-BEHEER-11 — Briefing-directieven beheren (dekt WF-BEHEER-11)
 - **Kriticiteit:** BELANGRIJK · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~7 min

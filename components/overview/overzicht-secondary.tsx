@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 import { PageInfoButton } from '@/components/editorial'
 import { getPageInfo } from '@/lib/page-info-content'
+import { requestRondleiding } from '@/lib/rondleiding/signal'
 import type { GoalWithBudget } from '@/lib/fin-data-loader'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
 import type { WidgetPref } from '@/lib/widget-catalog'
@@ -20,7 +21,6 @@ import type { FreedomFraming } from '@/lib/fire-strategy'
 import type { NuStoppenReach } from '@/lib/horizon/nu-stoppen-copy'
 import type { AnkerReach, AnkerStop } from '@/lib/horizon/anker-copy'
 import { PageStatusDot } from '@/components/app/page-status-dot'
-import { WelcomeGuideDot } from './welcome-guide-dot'
 import {
   HeroEditToggle,
   HeroWidgetRail,
@@ -221,15 +221,17 @@ export function OverzichtSecondary({
           />
         )}
         <PrintOverzichtButton />
-        {/* Geminimaliseerde welkomstgids (S13): klein lijstje-knopje dat de
-            gids weer uitklapt. Staat links van het statuspunt — de gids is
-            onboarding, de melding is status; die volgorde houdt de urgentste
-            control het dichtst bij de 'i'. */}
-        <WelcomeGuideDot />
         {/* Geminimaliseerde status-/vrijheidsmelding: gekleurd statuspunt direct
             links van de 'i' (meldingen-conventie). */}
         <PageStatusDot />
-        <PageInfoButton content={getPageInfo('/overzicht')} />
+        {/* De pagina-`i` is óók de herstartknop van de rondleiding (ADR 0130):
+            de sectie RONDLEIDING onderin de sheet vraagt het signaal aan, de
+            provider om blok 1 pikt het op. Geen extra knop in de
+            header-controls-rij voor iets dat je één keer gebruikt. */}
+        <PageInfoButton
+          content={getPageInfo('/overzicht')}
+          onStartTour={requestRondleiding}
+        />
       </div>
 
       {/* Optionele power-user widget-rail OP DEZELFDE PLEK als Voortgang-

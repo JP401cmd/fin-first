@@ -38,7 +38,6 @@ const computeHorizonFireSimMock = vi.fn()
 vi.mock('./horizon/raw-data-loader', () => ({
   loadHorizonRaw: (...args: unknown[]) => loadHorizonRawMock(...args),
   HORIZON_SETUP_COMPLETED_SLUG: 'horizon_setup_completed',
-  HORIZON_WELCOME_SHOWN_SLUG: 'horizon_welcome_shown',
   HORIZON_EXIT_NOTICE_DISMISSED_SLUG: 'horizon_exit_notice_dismissed',
   HORIZON_TIPS_FIRST_CLOSE_NAVIGATED_SLUG: 'horizon_tips_first_close_navigated',
 }))

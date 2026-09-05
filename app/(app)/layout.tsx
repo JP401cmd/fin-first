@@ -46,11 +46,19 @@ import type { Debt } from '@/lib/debt-data'
 import { loadLeverScores } from '@/lib/lever-scores-loader'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { FinHome } from '@/components/app/fin/fin-home'
-import { parseCoachConfig, type CoachDataGaps } from '@/lib/coach-suggestions'
+import {
+  parseCoachConfig,
+  type CoachDataGaps,
+  type GuideSuggestionInput,
+} from '@/lib/coach-suggestions'
+import { COACH_STATE_KEY, parseCoachState } from '@/lib/coach-state'
 import { loadAccountStatusCore, toCoachDataGaps } from '@/lib/account-status'
 import { GuideVisitTracker } from '@/components/app/guide-visit-tracker'
 import { ModuleColorProvider } from '@/components/app/module-color-provider'
 import { FinSlotProvider } from '@/lib/shell/fin-slot'
+import { WelcomeGuideProvider } from '@/components/app/chat/gids/welcome-guide-provider'
+import { loadWelcomeGuideSeed } from '@/lib/welcome-guide-loader'
+import { WELCOME_GUIDE_MODULE_KEY, openGuideSteps, summarizeGuide } from '@/lib/welcome-guide'
 import { AccountStorageGuard } from '@/components/app/account-storage-guard'
 import {
   generateAllColorVars,
@@ -416,6 +424,54 @@ export default async function AppLayout({
     )
   }
 
+  // ── Coach-staat (server-side, ADR 0130) ────────────────
+  // Welke meldingen zijn al weggeklikt, wanneer voor het laatst, en wanneer de
+  // gids-bubbel voor het laatst verscheen. Stond tot ADR 0130 in localStorage
+  // (dus per apparaat); leeft nu op de eigen profielrij. Geen extra round-trip:
+  // `module_guide_state` zit al in de main-batch profile-select.
+  const coachState = parseCoachState(
+    (profile?.module_guide_state as Record<string, unknown> | null)?.[COACH_STATE_KEY],
+  )
+
+  // ── Welkomstgids-seed (ADR 0130) ───────────────────────
+  // De gids woont sinds ADR 0130 in Fin (een vierde icoon in de chat-kop) i.p.v.
+  // als banner op /overzicht — dus wordt hij hier geseed, waar zowel ChatPanel
+  // als FinHome eronder vallen. Is de gids AFGESLOTEN, dan laden we niets: de
+  // lege staat ("Gids opnieuw tonen") heeft geen config nodig, en de status
+  // staat gratis in de al geladen profielrij. Dat scheelt twee queries per
+  // harde shell-render voor iedereen die klaar is met de gids.
+  const welcomeGuideStatus = (
+    (profile?.module_guide_state as Record<string, unknown> | null)?.[
+      WELCOME_GUIDE_MODULE_KEY
+    ] as { status?: string } | undefined
+  )?.status
+  const welcomeGuideDismissed = welcomeGuideStatus === 'dismissed'
+  const welcomeGuideSeed = welcomeGuideDismissed
+    ? null
+    : await loadWelcomeGuideSeed(supabase, user.id)
+
+  // ── Gids-laag voor Fins meldingen (ADR 0130, fase 2) ───────────────────
+  // Fin noemt op de bijpassende route de eerstvolgende open gidsstap. De ROUTE
+  // is client-side kennis, dus we geven de volledige lijst open stappen mee (mét
+  // bestemming) en laten `getFirstUndismissedSuggestion` filteren. Géén extra
+  // query: alles komt uit de seed die hierboven al geladen is. Zonder seed
+  // (afgesloten gids, of een gefaalde load) is de status 'dismissed' — dan
+  // gedraagt de coach zich exact als vóór ADR 0130.
+  const guideSummary = welcomeGuideSeed
+    ? summarizeGuide(welcomeGuideSeed.config, welcomeGuideSeed.state, welcomeGuideSeed.derived)
+    : null
+  const coachGuide: GuideSuggestionInput =
+    welcomeGuideSeed && guideSummary?.status === 'active'
+      ? {
+          status: 'active',
+          steps: openGuideSteps(
+            welcomeGuideSeed.config,
+            welcomeGuideSeed.state,
+            welcomeGuideSeed.derived,
+          ),
+        }
+      : { status: 'dismissed', steps: [] }
+
   // ── Module colors (SSR) ────────────────────────────────
   const mc = profile?.module_colors as Record<string, string> | null
   const moduleColors: ModuleColorConfig = {
@@ -485,6 +541,12 @@ export default async function AppLayout({
                       pill zit in de ResponsiveShell, FinHome hangt er als
                       sibling naast. Zie lib/shell/fin-slot.tsx. */}
                   <FinSlotProvider>
+                  {/* Welkomstgids (ADR 0130): één bron voor de gidsweergave in
+                      de chat-kop én — vanaf fase 2 — de proactieve gids-bubbel
+                      van Fin. Staat hier omdat `ChatPanelLazy` en `FinHome`
+                      allebei kinderen van dit div zijn; de server-seed vervangt
+                      de eerste client-fetch. */}
+                  <WelcomeGuideProvider seed={welcomeGuideSeed} dismissed={welcomeGuideDismissed}>
                     <div className="min-h-screen bg-[var(--bg)]" data-app-root style={allVars as React.CSSProperties}>
                       {/* Skip-link — eerste tab-stop voor keyboard- en
                           screen-reader-gebruikers (WCAG 2.1 Bypass Blocks).
@@ -541,6 +603,8 @@ export default async function AppLayout({
                       </Suspense>
                       <Suspense fallback={null}>
                         <FinHome
+                          coachState={coachState}
+                          guide={coachGuide}
                           dataGaps={coachDataGaps}
                           deferredFields={coachDeferredFields}
                           overrides={coachConfig.rules}
@@ -551,6 +615,7 @@ export default async function AppLayout({
                         />
                       </Suspense>
                     </div>
+                  </WelcomeGuideProvider>
                   </FinSlotProvider>
                 </ModuleColorProvider>
                 <NotificationModal />

@@ -1,5 +1,5 @@
 import { registerTests } from '../test-registry'
-import { assert, assertEqual, assertNotNull, assertGreaterThan, assertGreaterThanOrEqual } from '../assert'
+import { assert, assertEqual, assertNotNull } from '../assert'
 import type { TestCase } from '../test-types'
 import { authenticatedFetch } from '../server-runner'
 
@@ -230,90 +230,9 @@ const tests: TestCase[] = [
   // (Step 5 — /api/dashboard-type — verwijderd jun 2026 samen met de
   //  DAIshboard-keten; de widgets/briefing-toggle bestaat niet meer.)
 
-  // ── Step 6: GET /api/guide-progress — tellingen ────────────────────────────
-  {
-    id: 'profiel-guide-progress-counts',
-    name: 'GET /api/guide-progress retourneert tellingen',
-    category: CAT,
-    description: 'Correcte telling van assets, transacties, acties, life events, budgets, schulden',
-    priority: 'critical',
-    estimatedDurationMs: 1000,
-    async fn() {
-      const { status, body } = await fetchJson('/api/guide-progress')
-      assertEqual(status, 200, 'status 200')
-
-      // Verify counts structure
-      const counts = body.counts as Record<string, number>
-      assertNotNull(counts, 'counts aanwezig')
-      assert(typeof counts.assets === 'number', 'assets count is number')
-      assert(typeof counts.transactions === 'number', 'transactions count is number')
-      assert(typeof counts.completedActions === 'number', 'completedActions count is number')
-      assert(typeof counts.lifeEvents === 'number', 'lifeEvents count is number')
-      assert(typeof counts.budgets === 'number', 'budgets count is number')
-      assert(typeof counts.debts === 'number', 'debts count is number')
-
-      // Counts should be non-negative
-      assertGreaterThanOrEqual(counts.assets, 0, 'assets >= 0')
-      assertGreaterThanOrEqual(counts.transactions, 0, 'transactions >= 0')
-      assertGreaterThanOrEqual(counts.completedActions, 0, 'completedActions >= 0')
-      assertGreaterThanOrEqual(counts.lifeEvents, 0, 'lifeEvents >= 0')
-      assertGreaterThanOrEqual(counts.budgets, 0, 'budgets >= 0')
-      assertGreaterThanOrEqual(counts.debts, 0, 'debts >= 0')
-
-      // Financial data should be present
-      const financial = body.financial as Record<string, unknown>
-      assertNotNull(financial, 'financial aanwezig')
-      assert(typeof financial.netWorth === 'number', 'netWorth is number')
-      assert(typeof financial.sovereigntyLevel === 'number', 'sovereigntyLevel is number')
-    },
-  },
-
-  // ── Step 7: Guide voortgangspercentage ─────────────────────────────────────
-  {
-    id: 'profiel-guide-progress-steps',
-    name: 'Guide voortgang: stappen correct berekend',
-    category: CAT,
-    description: 'Gids voortgangspercentage correct berekend op basis van ingevulde onderdelen',
-    priority: 'critical',
-    estimatedDurationMs: 1000,
-    async fn() {
-      const { status, body } = await fetchJson('/api/guide-progress')
-      assertEqual(status, 200, 'status 200')
-
-      // Steps booleans
-      const steps = body.steps as Record<string, boolean>
-      assertNotNull(steps, 'steps aanwezig')
-      assert(typeof steps.hasAssets === 'boolean', 'hasAssets is boolean')
-      assert(typeof steps.hasTransactions === 'boolean', 'hasTransactions is boolean')
-      assert(typeof steps.hasBudgets === 'boolean', 'hasBudgets is boolean')
-      assert(typeof steps.hasCompletedActions === 'boolean', 'hasCompletedActions is boolean')
-      assert(typeof steps.hasLifeEvents === 'boolean', 'hasLifeEvents is boolean')
-      assert(typeof steps.hasFireData === 'boolean', 'hasFireData is boolean')
-      assert(typeof steps.hasDebts === 'boolean', 'hasDebts is boolean')
-
-      // Verify consistency: if counts.assets > 0 → steps.hasAssets = true
-      const counts = body.counts as Record<string, number>
-      if (counts.assets > 0) {
-        assertEqual(steps.hasAssets, true, 'assets > 0 → hasAssets')
-      }
-      if (counts.transactions > 0) {
-        assertEqual(steps.hasTransactions, true, 'transactions > 0 → hasTransactions')
-      }
-      if (counts.budgets > 0) {
-        assertEqual(steps.hasBudgets, true, 'budgets > 0 → hasBudgets')
-      }
-      if (counts.lifeEvents > 0) {
-        assertEqual(steps.hasLifeEvents, true, 'lifeEvents > 0 → hasLifeEvents')
-      }
-      if (counts.debts > 0) {
-        assertEqual(steps.hasDebts, true, 'debts > 0 → hasDebts')
-      }
-
-      // calculatedAt timestamp should be present
-      assertNotNull(body.calculatedAt, 'calculatedAt aanwezig')
-      assert(typeof body.calculatedAt === 'string', 'calculatedAt is string')
-    },
-  },
+  // (Step 6 en 7 — /api/guide-progress — verwijderd sep 2026 met de route zelf:
+  //  de gids-voortgang leeft in `lib/welcome-guide.ts` en de gidsweergave bij
+  //  Fin, niet meer in een eigen tel-endpoint. Zie ADR 0130.)
 ]
 
 export function register(): void {

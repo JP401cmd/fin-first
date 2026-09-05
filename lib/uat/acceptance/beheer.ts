@@ -214,7 +214,7 @@ const criteria: AcceptanceCriterion[] = [
     when:
       'De beheerder voegt schermen/stappen toe, herordent (pijl-omhoog/omlaag), bewerkt teksten/links/iconen (alleen ALLOWED_ICONS), toggelt verplicht/aan-uit, bekijkt de preview en slaat op (of Reset naar DEFAULT_WELCOME_GUIDE).',
     then:
-      'De opgeslagen gids verschijnt zo op /overzicht voor (nieuwe) gebruikers; de preview gebruikt hetzelfde weergavecomponent als productie. Geen eigen berekening.',
+      'De opgeslagen gids verschijnt zo in de gidsweergave van Fin voor (nieuwe) gebruikers (ADR 0130 — niet meer als banner op /overzicht); de preview gebruikt hetzelfde weergavecomponent als productie. Geen eigen berekening.',
     assertion: {
       kind: 'ui-only',
       source:

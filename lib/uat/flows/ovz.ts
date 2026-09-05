@@ -16,7 +16,8 @@
 // (drill-down, gezondheidsscore, vermogensverloop, toekomstprojectie) →
 // doelen & vrijheid (doelen-kaart, vrijheidsstrip, hero-widgets) → briefing
 // (vrijheidsweek, briefing-kaartjes, delen) → status & onboarding
-// (statusmelding, check-in-banner, welkomstgids) → inzichten & print
+// (statusmelding, check-in-banner, welkomstgids in Fin met de rondleiding
+// eronder) → inzichten & print
 // (samengestelde rente, afdrukken) → tips & acties (Fin-tips beslissen,
 // handmatige actie, actiebeheer) → uitkomst → cross-doorwerking.
 //
@@ -67,7 +68,8 @@ export const OVZ_FLOW: UatFlow = {
     { id: 'mijlpaalviering', scenarioId: 'UAT-OVZ-25', label: 'WF-OVZ-25 · Mijlpaal gepasseerd: eenmalige viering (ADR 0123)', kind: 'action', stage: 3, lane: 'briefing', subOf: 'briefing' },
     { id: 'statusmelding', scenarioId: 'UAT-OVZ-12', label: 'WF-OVZ-12 · Status-/vrijheidsmelding minimaliseren', kind: 'action', stage: 4, lane: 'status' },
     { id: 'checkin', scenarioId: 'UAT-OVZ-13', label: 'WF-OVZ-13 · Maand-check-in starten', kind: 'action', stage: 4, lane: 'status' },
-    { id: 'welkomstgids', scenarioId: 'UAT-OVZ-14', label: 'WF-OVZ-14 · Welkomstgids doorlopen', kind: 'action', stage: 4, lane: 'status' },
+    { id: 'welkomstgids', scenarioId: 'UAT-OVZ-14', label: 'WF-OVZ-14 · Welkomstgids doorlopen in Fin', kind: 'action', stage: 4, lane: 'status' },
+    { id: 'rondleiding', scenarioId: 'UAT-OVZ-26', label: 'WF-OVZ-26 · Interactieve rondleiding (spotlight op /overzicht)', kind: 'action', stage: 4, lane: 'status', subOf: 'welkomstgids' },
 
     // ── 5 · inzichten & print ─────────────────────────────────────────────
     { id: 'samengesteldrente', scenarioId: 'UAT-OVZ-15', label: 'WF-OVZ-15 · Samengestelde-rente-inzicht', kind: 'screen', stage: 5, lane: 'inzichten' },
@@ -118,6 +120,7 @@ export const OVZ_FLOW: UatFlow = {
     { from: 'hefboom', to: 'checkin' },
     { from: 'checkin', to: 'x-mijn', kind: 'cross' },
     { from: 'hefboom', to: 'welkomstgids' },
+    { from: 'welkomstgids', to: 'rondleiding' },
 
     // inzichten & print
     { from: 'hefboom', to: 'samengesteldrente' },
@@ -143,6 +146,7 @@ export const OVZ_FLOW: UatFlow = {
     { from: 'mijlpaalviering', to: 'uitkomst' },
     { from: 'statusmelding', to: 'uitkomst' },
     { from: 'welkomstgids', to: 'uitkomst' },
+    { from: 'rondleiding', to: 'uitkomst' },
     { from: 'print', to: 'uitkomst' },
     { from: 'actietoevoegen', to: 'uitkomst' },
     { from: 'actiesbeheren', to: 'uitkomst' },

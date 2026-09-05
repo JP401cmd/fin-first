@@ -63,12 +63,12 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
       'Klik op een hefboom voor verdieping — het stipje erop is een stoplicht: groen is op koers, oranje vraagt aandacht, rood vraagt actie. Lees de wekelijkse briefing van Fin voor duiding bij de cijfers.',
     werking: [
       {
+        // Samengevoegd met het losse item "Het stoplicht op een tegel" (ADR
+        // 0130): de WERKING-lijst telt maximaal vier items, en de rondleiding
+        // verdient er een. Het stoplicht hoort inhoudelijk bij de tegel waar het
+        // op staat, dus die twee gaan samen; er gaat geen uitleg verloren.
         title: 'De vier hefbomen',
-        text: 'Bezittingen, schulden, cashflow en belasting zijn de vier plekken waar je iets kunt veranderen. Elke tegel opent de pagina waar je die hefboom beheert.',
-      },
-      {
-        title: 'Het stoplicht op een tegel',
-        text: 'Het stipje kleurt op basis van je eigen cijfers, niet op basis van een norm van buiten. Klik erop om te lezen waar de kleur vandaan komt.',
+        text: 'Bezittingen, schulden, cashflow en belasting zijn de vier plekken waar je iets kunt veranderen. Elke tegel opent de pagina waar je die hefboom beheert. Het stipje erop kleurt op basis van je eigen cijfers, niet op basis van een norm van buiten.',
       },
       {
         title: 'De vermogensgrafiek',
@@ -77,6 +77,10 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
       {
         title: 'De wekelijkse briefing',
         text: 'Fin leest je cijfers van de afgelopen week en zet ze in gewone taal onder elkaar. Hij verschijnt vanzelf; je hoeft niets te starten.',
+      },
+      {
+        title: 'De rondleiding',
+        text: 'Bij je eerste bezoek loopt Fin in twee minuten met je langs de blokken op deze pagina en vertelt wat je cijfers betekenen. Je kunt hem hieronder opnieuw starten, of vanuit de gids in Fin.',
       },
     ],
     terms: ['netto_vermogen', 'vrijheidstijd', 'spaarquote'],

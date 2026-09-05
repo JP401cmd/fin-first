@@ -37,15 +37,38 @@ interface PageInfoButtonProps {
   label?: string
   /** Extra CSS-classes op de wrapper (bijv. voor positie-overrides). */
   className?: string
+  /**
+   * Optioneel: herstart een rondleiding op deze pagina. Alleen /overzicht geeft
+   * 'm vandaag mee (ADR 0130). Aanwezig → een extra sectie RONDLEIDING onderaan
+   * de sheet.
+   *
+   * Waarom hier en niet als losse knop op de pagina: de `i` is al de plek waar
+   * "wat zie ik hier?" thuishoort, en een rondleiding is precies dat antwoord in
+   * bewegende vorm. Een tweede permanente knop naast de `i` zou de
+   * header-controls-rij laten groeien voor iets dat je één keer gebruikt.
+   */
+  onStartTour?: () => void
 }
 
 export function PageInfoButton({
   content,
   label = 'Wat zie ik hier?',
   className = '',
+  onStartTour,
 }: PageInfoButtonProps) {
   const [open, setOpen] = useState(false)
   const close = () => setOpen(false)
+
+  /**
+   * Sheet eerst dicht, dán starten. De ShellOverlay houdt zolang hij open staat
+   * de scroll-lock én het overlay-signaal vast, en de rondleiding verbergt
+   * zichzelf precies zolang die teller boven nul staat — meteen starten zou dus
+   * een onzichtbare spotlight geven. De vertraging dekt de sluit-animatie.
+   */
+  const startTour = () => {
+    close()
+    window.setTimeout(() => onStartTour?.(), 350)
+  }
 
   const werking = content.werking ?? []
   const terms = (content.terms ?? []).filter((term) => Boolean(GLOSSARY_ENTRIES[term]))
@@ -66,6 +89,9 @@ export function PageInfoButton({
   }
   if (related.length > 0) {
     sections.push({ key: 'related', node: <VerderSection items={related} onNavigate={close} /> })
+  }
+  if (onStartTour) {
+    sections.push({ key: 'tour', node: <RondleidingSection onStart={startTour} /> })
   }
 
   // Alleen een gevulde WERKING-lijst rechtvaardigt de bredere sheet; korte
@@ -162,6 +188,26 @@ function BegrippenSection({ terms }: { terms: string[] }) {
           </li>
         ))}
       </ul>
+    </div>
+  )
+}
+
+/** RONDLEIDING — herstart de interactieve rondleiding op deze pagina. */
+function RondleidingSection({ onStart }: { onStart: () => void }) {
+  return (
+    <div>
+      <Kicker>RONDLEIDING</Kicker>
+      <p className="text-[13px] leading-relaxed text-[var(--ink-2)]" style={SERIF}>
+        Fin loopt in twee minuten met je langs de blokken op deze pagina en vertelt
+        wat je cijfers betekenen.
+      </p>
+      <button
+        type="button"
+        onClick={onStart}
+        className="mt-2.5 inline-flex min-h-[44px] items-center gap-1.5 border border-[var(--module-active-500)] px-3.5 py-2 text-[13px] font-medium text-[var(--module-active-700)] transition-colors hover:bg-[var(--subtle)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+      >
+        Start de rondleiding opnieuw
+      </button>
     </div>
   )
 }

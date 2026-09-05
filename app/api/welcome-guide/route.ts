@@ -19,7 +19,7 @@ import { loadAccountStatus } from '@/lib/account-status'
 // ── Welkomstgids — per-user API ─────────────────────────────────────────────
 // GET  → merged config (app_settings) + per-user staat (module_guide_state).
 // PUT  → muteer per-user staat via één actie (afvinken/navigeren/minimaliseren/
-//        heropenen/voorgoed sluiten).
+//        heropenen/afsluiten/heractiveren).
 //
 // De config is leesbaar voor élke ingelogde user; alleen superadmin schrijft hem
 // (zie /api/admin/welcome-guide). De per-user staat leeft genest onder de
@@ -110,8 +110,12 @@ const ActionSchema = z.discriminatedUnion('action', [
   // S13 — inklappen tot het punt naast de pagina-'i' (heropenbaar) …
   z.object({ action: z.literal('minimize') }),
   z.object({ action: z.literal('restore') }),
-  // … tegenover `dismiss`: voorgoed weg.
+  // … tegenover `dismiss`: klaar met de gids.
   z.object({ action: z.literal('dismiss') }),
+  // ADR 0130 — en terug. Sinds de gids in Fin woont is "klaar" geen eenrichtings-
+  // uitgang meer: de gidsweergave toont dan een lege staat met één knop die de
+  // gids weer aanzet. De voortgang (completedStepIds/currentScreen) blijft staan.
+  z.object({ action: z.literal('reactivate') }),
 ])
 
 type Action = z.infer<typeof ActionSchema>
@@ -164,6 +168,10 @@ function applyAction(
     }
     case 'dismiss': {
       next.status = 'dismissed'
+      break
+    }
+    case 'reactivate': {
+      next.status = 'active'
       break
     }
   }

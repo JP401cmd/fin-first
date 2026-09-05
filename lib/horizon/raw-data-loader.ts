@@ -354,9 +354,6 @@ export interface HorizonRawData {
    *  Legacy-marker — de grafiek wordt sinds juni 2026 altijd getoond; deze flag
    *  bepaalt dat niet langer. Behouden voor achterwaartse compatibiliteit. */
   hasCompletedHorizonSetup: boolean
-  /** Of de eenmalige welkomsttekst bovenaan de /toekomst-grafiek al is getoond.
-   *  False → toon de welkomstbanner (en markeer 'm bij eerste render). */
-  hasSeenWelcome: boolean
   /** Of de gebruiker "Niet meer melden" koos op de bevestigings-toast van de
    *  tips-overlay. True → toon die toast niet meer. De overlay zelf sluit
    *  sinds M38 altijd direct; deze marker raakt alleen de melding. */
@@ -453,18 +450,11 @@ function computeCumulativeImpacts(
  *  of de grafiek wordt getoond. */
 export const HORIZON_SETUP_COMPLETED_SLUG = 'horizon_setup_completed'
 
-/** Feature slug die bijhoudt of de eenmalige welkomsttekst bovenaan de
- *  /toekomst-grafiek al is getoond. Stored in user_feature_visits, gespiegeld
- *  aan HORIZON_SETUP_COMPLETED_SLUG. Wordt door de client gePOST bij eerste
- *  render zodat de welkomsttekst nooit terugkomt (los van de overlay-toggle). */
-export const HORIZON_WELCOME_SHOWN_SLUG = 'horizon_welcome_shown'
-
 /** Feature slug die bijhoudt of de gebruiker "Niet meer weergeven" heeft gekozen
  *  op de exit-melding die verschijnt bij het verlaten van de tips-overlay op
- *  /toekomst. Stored in user_feature_visits (zelfde patroon als
- *  HORIZON_WELCOME_SHOWN_SLUG → cross-device, niet localStorage). Aanwezig →
- *  de exit-melding verschijnt niet meer bij toekomstige exits; de overlay sluit
- *  dan direct. */
+ *  /toekomst. Stored in user_feature_visits (cross-device, niet localStorage).
+ *  Aanwezig → de exit-melding verschijnt niet meer bij toekomstige exits; de
+ *  overlay sluit dan direct. */
 export const HORIZON_EXIT_NOTICE_DISMISSED_SLUG = 'horizon_exit_notice_dismissed'
 
 /** Feature slug die bijhield of de gebruiker de tips-overlay op /toekomst al
@@ -520,7 +510,6 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
     snapshotsResult,
     bankAccountsResult,
     horizonSetupVisitResult,
-    horizonWelcomeVisitResult,
     exitNoticeDismissedResult,
     aowRowsResult,
     txAgg12Result,
@@ -560,13 +549,6 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
       .from('user_feature_visits')
       .select('feature_slug')
       .eq('feature_slug', HORIZON_SETUP_COMPLETED_SLUG)
-      .maybeSingle(),
-    // Welkomsttekst-marker. Gespiegeld aan de setup-marker hierboven; bepaalt
-    // of de eenmalige welkomstbanner bovenaan de grafiek nog wordt getoond.
-    supabase
-      .from('user_feature_visits')
-      .select('feature_slug')
-      .eq('feature_slug', HORIZON_WELCOME_SHOWN_SLUG)
       .maybeSingle(),
     // Exit-melding-dismiss-marker ("Niet meer weergeven"). Zelfde patroon.
     supabase
@@ -1293,16 +1275,9 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
   const hasCompletedHorizonSetup = !horizonSetupVisitResult.error
     && horizonSetupVisitResult.data?.feature_slug === HORIZON_SETUP_COMPLETED_SLUG
 
-  // hasSeenWelcome: true zodra de welkomsttekst-marker bestaat. Bij een
-  // ontbrekende tabel (error) → behandel als "nog niet gezien" zodat de
-  // welkomsttekst minstens één keer verschijnt (graceful degrade).
-  const hasSeenWelcome = !horizonWelcomeVisitResult.error
-    && horizonWelcomeVisitResult.data?.feature_slug === HORIZON_WELCOME_SHOWN_SLUG
-
   // exitNoticeDismissed: true zodra de "Niet meer weergeven"-marker bestaat. Bij
   // een ontbrekende tabel (error) → behandel als "nog niet weggeklikt" zodat de
-  // exit-melding minstens kan verschijnen (graceful degrade, zelfde keuze als
-  // hasSeenWelcome).
+  // exit-melding minstens kan verschijnen (graceful degrade).
   const exitNoticeDismissed = !exitNoticeDismissedResult.error
     && exitNoticeDismissedResult.data?.feature_slug === HORIZON_EXIT_NOTICE_DISMISSED_SLUG
 
@@ -1410,7 +1385,6 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
     unlinkedCash,
     numberOfChildren,
     hasCompletedHorizonSetup,
-    hasSeenWelcome,
     exitNoticeDismissed,
     monthlySavingsOverride,
     monthlyContributionFromAssets,

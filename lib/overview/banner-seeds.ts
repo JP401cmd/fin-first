@@ -1,27 +1,19 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import {
-  WELCOME_GUIDE_SETTINGS_KEY,
-  WELCOME_GUIDE_MODULE_KEY,
-  parseWelcomeGuideConfig,
-  parseWelcomeGuideState,
-  reconcileCompleted,
-  deriveGuideStates,
-  type GuideDerivedStates,
-  type WelcomeGuideConfig,
-  type WelcomeGuideState,
-} from '@/lib/welcome-guide'
-import { loadAccountStatus } from '@/lib/account-status'
 
 /**
- * Server-side SEEDS voor de /overzicht-banners (perf fase 1).
+ * Server-side SEED voor de check-in-banner op /overzicht (perf fase 1).
  *
- * CheckinBanner en WelcomeGuideBanner fetchten hun eerste payload client-side op
- * mount (`/api/monthly-checkin`, `/api/welcome-guide`). Deze helpers berekenen
- * diezelfde payload al server-side op de /overzicht-pagina, zodat de banner de
- * eerste client-fetch kan overslaan — exact het PageStatusSeed-patroon: de API-
- * routes blijven bestaan voor interacties/her-fetches; de seed is enkel een
- * server-side voorsprong, geen tweede databron. Alle reads zijn defensief: een
- * fout levert een veilige default (of null) → de banner valt terug op fetchen.
+ * CheckinBanner fetchte zijn eerste payload client-side op mount
+ * (`/api/monthly-checkin`). Deze helper berekent diezelfde payload al
+ * server-side op de /overzicht-pagina, zodat de banner de eerste client-fetch
+ * kan overslaan — exact het PageStatusSeed-patroon: de API-route blijft bestaan
+ * voor interacties/her-fetches; de seed is enkel een server-side voorsprong,
+ * geen tweede databron. Alle reads zijn defensief: een fout levert een veilige
+ * default → de banner valt terug op fetchen.
+ *
+ * De welkomstgids-seed stond hier ooit naast. Die is met ADR 0130 verhuisd naar
+ * `lib/welcome-guide-loader.ts`: de gids is geen /overzicht-banner meer maar een
+ * weergave in Fin, en zijn seed wordt in de app-layout geladen.
  */
 
 // ── CheckinBanner ────────────────────────────────────────────────────────────
@@ -68,63 +60,5 @@ export async function loadCheckinBannerSeed(
     // client gate't nog op eerste-week + sessie-dismiss. Bij twijfel liever
     // "completed" (verberg) dan onterecht tonen.
     return { enabled: true, completed: true }
-  }
-}
-
-// ── WelcomeGuideBanner ───────────────────────────────────────────────────────
-
-export type WelcomeGuideSeed = {
-  config: WelcomeGuideConfig
-  state: WelcomeGuideState
-  /**
-   * Afgeleide stap-toestand uit de accountstatus (M1). Bewust NAAST `state`:
-   * `state.completedStepIds` blijft de gebruikersintentie, de afleiding wordt
-   * per render berekend en nooit weggeschreven.
-   */
-  derived: GuideDerivedStates
-}
-
-/**
- * Spiegelt GET /api/welcome-guide: gemergede config (app_settings) + per-user
- * staat (profiles.module_guide_state[welcome:guide]) + de afgeleide stap-
- * toestand. Ontbreekt de kolom (staging zonder migratie) of gaat er iets mis →
- * null, zodat de banner terugvalt op de route-fetch (die kent de
- * feature_preferences-fallback).
- */
-export async function loadWelcomeGuideSeed(
-  supabase: SupabaseClient,
-  userId: string,
-): Promise<WelcomeGuideSeed | null> {
-  try {
-    const [configRes, stateRes, accountStatus] = await Promise.all([
-      supabase
-        .from('app_settings')
-        .select('value')
-        .eq('key', WELCOME_GUIDE_SETTINGS_KEY)
-        .maybeSingle(),
-      supabase
-        .from('profiles')
-        .select('module_guide_state')
-        .eq('id', userId)
-        .single(),
-      // `cache()`-gedeeld met de shell-layout (die de core-variant al draait) —
-      // blok 1 van /overzicht blijft daarmee licht: géén loadDashboardData.
-      loadAccountStatus(supabase, userId),
-    ])
-
-    // Kolom mist (42703 / "does not exist") → geen seed, banner fetcht met fallback.
-    const err = stateRes.error as { code?: string; message?: string } | null
-    if (err && (err.code === '42703' || err.message?.includes('does not exist'))) {
-      return null
-    }
-
-    const config = parseWelcomeGuideConfig(configRes.data?.value)
-    const map = (stateRes.data?.module_guide_state as Record<string, unknown>) ?? {}
-    const state = parseWelcomeGuideState(map[WELCOME_GUIDE_MODULE_KEY], config)
-    state.completedStepIds = reconcileCompleted(config, state.completedStepIds)
-
-    return { config, state, derived: deriveGuideStates(config, accountStatus) }
-  } catch {
-    return null
   }
 }

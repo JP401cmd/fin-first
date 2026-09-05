@@ -22,8 +22,10 @@ import { FinDots } from '@/components/app/fin-dots'
 import { ActionEditModal } from '@/components/app/action-edit-modal'
 import type { Action, ActionStatus } from '@/lib/recommendation-data'
 import { renderMarkdown, findToolInvocation, TOOL_LOADING_STATES, TOOL_OUTPUT_STATES, type MessagePart } from './markdown-helpers'
-import { X, Send, Loader2, Zap, Check, AlertTriangle, RefreshCw, Pin, PinOff, ShieldCheck, Sparkles, Clock, ThumbsDown, Cpu, Megaphone } from 'lucide-react'
+import { X, Send, Loader2, Zap, Check, AlertTriangle, RefreshCw, Pin, PinOff, ShieldCheck, Sparkles, Clock, ThumbsDown, Cpu, Megaphone, ListChecks } from 'lucide-react'
 import { MeldingView } from './melding/melding-view'
+import { GidsView } from './gids/gids-view'
+import { countOpenGuideSteps, useWelcomeGuide } from './gids/welcome-guide-provider'
 import type { SuggestRecommendationResult } from '@/lib/ai/tools/suggest-recommendation'
 import { ChatVisualizationCard } from './chat-visualization-card'
 import '@/components/app/fin/fin-home.css' // wh-melding-in keyframe (corner-grow entree, gedeeld met FinHome)
@@ -478,7 +480,7 @@ function QuickActionChips({
 /* ── Main ChatPanel ────────────────────────────────────────────────── */
 
 export function ChatPanel() {
-  const { isOpen, close, pendingMessage, clearPendingMessage, resolvePendingAnswer, dropPendingAnswer, isPinned, togglePin, autoOpenMessage, setAutoOpenMessage, meldingRequested, clearMeldingRequest } = useChatContext()
+  const { isOpen, close, pendingMessage, clearPendingMessage, resolvePendingAnswer, dropPendingAnswer, isPinned, togglePin, autoOpenMessage, setAutoOpenMessage, meldingRequested, clearMeldingRequest, gidsRequested, clearGidsRequest } = useChatContext()
   const router = useRouter()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -537,9 +539,10 @@ export function ChatPanel() {
   // aan het juiste oppervlak toe te wijzen — zie het Escape-effect verderop.
   const [instellingenOpen, setInstellingenOpen] = useState(false)
 
-  // Chat- of meldmodus. Het gesprek (useChat-state) leeft in dit component en
-  // blijft dus staan terwijl de gebruiker een melding maakt.
-  const [mode, setMode] = useState<'chat' | 'melding'>('chat')
+  // Chat-, meld- of gidsmodus. Het gesprek (useChat-state) leeft in dit
+  // component en blijft dus staan terwijl de gebruiker meldt of de welkomstgids
+  // doorloopt.
+  const [mode, setMode] = useState<'chat' | 'melding' | 'gids'>('chat')
   // Loopt er een verzending in MeldingView? Die state woont dáár, maar de drie
   // knoppen die het component kunnen weghalen (megafoon, sluitkruis, mobiele
   // backdrop) wonen hier — dus spiegelen we 'm en zetten we ze op slot. Zonder
@@ -556,6 +559,31 @@ export function ChatPanel() {
     setMode('melding')
     clearMeldingRequest()
   }, [meldingRequested, clearMeldingRequest])
+
+  // ── Welkomstgids (ADR 0130) ──────────────────────────────────────────────
+  // De gids woont sinds dat besluit hier, niet meer als banner op /overzicht.
+  // De provider hangt in de app-layout (rond ChatPanel én FinHome), dus deze
+  // read is gratis; buiten een provider levert hij `display: 'none'` en
+  // verdwijnt het icoon stilletjes.
+  const { data: guideData, display: guideDisplay } = useWelcomeGuide()
+  const guideOpenCount = useMemo(() => countOpenGuideSteps(guideData), [guideData])
+
+  // Gidsmodus-intent van buiten (de proactieve gids-bubbel van Fin, later ook
+  // de rondleiding) — zelfde drieslag als de meldmodus hierboven.
+  useEffect(() => {
+    if (!gidsRequested) return
+    setMode('gids')
+    clearGidsRequest()
+  }, [gidsRequested, clearGidsRequest])
+
+  // Staat de gidsweergave DAADWERKELIJK aan? De intent (`openGids`) kan
+  // aankomen voordat de payload binnen is, en de gids kan verdwijnen terwijl je
+  // erin staat (voor iedereen uitgezet, geen zichtbaar scherm meer). In beide
+  // gevallen toont het paneel gewoon het gesprek i.p.v. een leeg vlak; zodra de
+  // payload er is springt de weergave alsnog aan. Bewust GEEN reset-effect op
+  // `mode`: dat zou de intent op mount overrulen (de payload landt een tick
+  // later) en de gebruiker in het gesprek laten staan.
+  const gidsActief = mode === 'gids' && guideDisplay !== 'none'
 
   // Dynamic domain: route-aware and gated by active modules
   const pathname = usePathname()
@@ -1287,6 +1315,13 @@ export function ChatPanel() {
       ? 'Terug naar de chat'
       : 'Melding maken'
 
+  // Idem voor het gids-icoon: één knop die heen én terug schakelt.
+  const gidsKnopLabel = meldingBezig
+    ? 'Je melding wordt verstuurd'
+    : mode === 'gids'
+      ? 'Terug naar de chat'
+      : 'Welkomstgids openen'
+
   // De launcher (FAB) leeft nu in FinHome — die toont de bubbel én opent de chat.
   // Wanneer de chat gesloten is, rendert ChatPanel niets.
   if (!isOpen) return null
@@ -1338,15 +1373,43 @@ export function ChatPanel() {
                 )}
               </div>
               <span className="text-xs text-[var(--ink-3)]">
-                {mode === 'melding'
-                  ? 'Melding maken'
-                  : isLocalMode
-                    ? 'Draait op je toestel'
-                    : config.subtitle}
+                {gidsActief
+                  ? guideDisplay === 'dismissed'
+                    // Afgesloten = lege staat met "Gids opnieuw tonen"; "0 open"
+                    // zou daar lezen als "alles af", en dat is het niet.
+                    ? 'Welkomstgids · afgesloten'
+                    : `Welkomstgids · ${guideOpenCount} open`
+                  : mode === 'melding'
+                    ? 'Melding maken'
+                    : isLocalMode
+                      ? 'Draait op je toestel'
+                      : config.subtitle}
               </span>
             </div>
           </div>
           <div className="flex items-center gap-1">
+            {/* Welkomstgids — het enige thuis van de gids sinds ADR 0130. Staat
+                vóór de megafoon: de gids hoort bij "wat kan ik hier doen", de
+                megafoon bij "er klopt iets niet". Verschijnt alleen als er iets
+                te tonen is (`display !== 'none'`) en werkt — net als melden —
+                zonder AI-abonnement. Tijdens een lopende melding-verzending op
+                slot, zodat de weergave niet halverwege onder de gebruiker
+                vandaan wisselt. */}
+            {guideDisplay !== 'none' && (
+              <button
+                type="button"
+                onClick={() => setMode((m) => (m === 'gids' ? 'chat' : 'gids'))}
+                disabled={meldingBezig}
+                aria-label={gidsKnopLabel}
+                aria-pressed={mode === 'gids'}
+                title={gidsKnopLabel}
+                className={`touch-target flex items-center justify-center rounded-lg hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent ${
+                  mode === 'gids' ? 'text-wil-700' : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
+                }`}
+              >
+                <ListChecks className="h-4 w-4" />
+              </button>
+            )}
             {/* Melding maken — bug, vraag of aanbeveling. Bewust náást de
                 instellingen: melden hoort bij het venster waar je toch al zit,
                 en werkt óók zonder AI-abonnement. */}
@@ -1393,11 +1456,14 @@ export function ChatPanel() {
           </div>
         </div>
 
-        {/* Meldmodus vervangt het HELE inhoudsgebied — bewust boven alle
-            AI-gates (upsell, Wft, lokaal-geblokkeerd). Een testgebruiker zonder
-            AI-abonnement moet kunnen melden; het gesprek zelf blijft intact,
-            want de useChat-state hangt aan dit component, niet aan deze tak. */}
-        {mode === 'melding' ? (
+        {/* Gids- en meldmodus vervangen het HELE inhoudsgebied — bewust boven
+            alle AI-gates (upsell, Wft, lokaal-geblokkeerd). Een testgebruiker
+            zonder AI-abonnement moet kunnen melden én zijn welkomstgids kunnen
+            doorlopen; het gesprek zelf blijft intact, want de useChat-state
+            hangt aan dit component, niet aan deze tak. */}
+        {gidsActief ? (
+          <GidsView />
+        ) : mode === 'melding' ? (
           <MeldingView onClose={() => setMode('chat')} onBezigChange={setMeldingBezig} />
         ) : (
         <>

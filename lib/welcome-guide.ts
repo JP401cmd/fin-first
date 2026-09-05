@@ -739,3 +739,125 @@ export function isGuideComplete(
     return progress.total === 0 || progress.done === progress.total
   })
 }
+
+// ── De proactieve gids-bubbel (ADR 0130, fase 2) ────────────────────────────
+//
+// Fin noemt op de bijpassende route de eerstvolgende open gidsstap. Dat vraagt
+// twee dingen die de gids zelf niet nodig had: WELKE stappen zijn nog open
+// (`openGuideSteps`) en HOORT deze stap bij deze route (`guideStepMatchesRoute`).
+// Beide leven hier, puur, zodat de coach-laag (`lib/coach-suggestions.ts`) en de
+// server-layout dezelfde lezing gebruiken en er geen tweede definitie van "open
+// stap" ontstaat.
+
+/** Eén open gidsstap, uitgekleed tot wat een melding nodig heeft. */
+export interface GuideNextStep {
+  id: string
+  title: string
+  description?: string
+  /** Bestemming uit de config; ook de route waarop de bubbel mag verschijnen. */
+  href: string
+}
+
+/**
+ * Mag Fin deze stap uit zichzelf noemen?
+ *
+ * NEE voor de bezoekstappen ("heb je hier al gekeken", zie
+ * `GUIDE_VISIT_SLUG_BY_STEP_ID`): die vinken zichzelf af zodra je de route
+ * opent, dus een bubbel dáárover zou precies verschijnen op het moment dat de
+ * stap al klaar is — en zichzelf tegenspreken. Datastappen ("zijn je schulden
+ * geregistreerd?") blijven open tot je iets doet en zijn dus wél zinvol.
+ */
+export function isProactiveGuideStep(stepId: string): boolean {
+  return !(stepId in GUIDE_VISIT_SLUG_BY_STEP_ID)
+}
+
+/**
+ * Hoort deze stap bij deze route? EXACT op pathname, query en hash gestript.
+ *
+ * Bewust geen prefix-match (afgevallen alternatief in ADR 0130): met een prefix
+ * zou `/overzicht/bezittingen/investment` de bezittingen-stap oppikken en zou
+ * `/overzicht` als prefix van de halve app fungeren — Fin zou dan overal
+ * hetzelfde roepen. Exact betekent: de bubbel verschijnt op de pagina die de
+ * stap zélf aanwijst, en nergens anders.
+ */
+export function guideStepMatchesRoute(
+  step: { href?: string },
+  pathname: string,
+): boolean {
+  if (!step.href) return false
+  const path = step.href.split('?')[0].split('#')[0]
+  return path === pathname
+}
+
+/**
+ * Alle nog OPEN stappen over de zichtbare schermen, in configuratievolgorde.
+ *
+ * Filtert op: ingeschakeld · met bestemming · proactief · niet 'nvt' · niet af
+ * (afgeleid óf handmatig, via `isGuideStepDone`). Een uitgeschakelde gids
+ * levert niets — dan hoort Fin er ook niet over te beginnen.
+ */
+export function openGuideSteps(
+  config: WelcomeGuideConfig,
+  state: WelcomeGuideState,
+  derived?: GuideDerivedStates,
+): GuideNextStep[] {
+  if (!config.enabled) return []
+  const out: GuideNextStep[] = []
+  for (const screen of getVisibleScreens(config, state)) {
+    for (const step of screen.steps) {
+      if (!step.enabled || !step.href) continue
+      if (!isProactiveGuideStep(step.id)) continue
+      // 'nvt' is geen open stap: hij hoort niet bij deze gebruiker.
+      if (derived?.[step.id] === 'nvt') continue
+      if (isGuideStepDone(step.id, state.completedStepIds, derived)) continue
+      out.push({
+        id: step.id,
+        title: step.title,
+        description: step.description,
+        href: step.href,
+      })
+    }
+  }
+  return out
+}
+
+/** 'active' = er valt nog iets te doen · 'complete' = alles af · 'dismissed' = afgesloten. */
+export type GuideSummaryStatus = 'active' | 'complete' | 'dismissed'
+
+export interface GuideSummary {
+  status: GuideSummaryStatus
+  /** Nog open stappen over de zichtbare schermen (inclusief bezoekstappen). */
+  openCount: number
+  /** Noemer: alle meetellende stappen, dus zónder de 'nvt'-stappen. */
+  totalCount: number
+}
+
+/**
+ * Eén oordeel over de gids voor consumenten die niet de hele config willen
+ * kennen: de shell-layout (mag Fin een gidsstap noemen?) en de kop-subtitel
+ * "Welkomstgids · N open".
+ *
+ * `isGuideComplete` krijgt hier zijn consument: een AFGERONDE gids gedraagt zich
+ * voor de meldingen als een afgesloten gids — Fin zwijgt en de gewone
+ * data-gap-laag komt terug.
+ */
+export function summarizeGuide(
+  config: WelcomeGuideConfig,
+  state: WelcomeGuideState,
+  derived?: GuideDerivedStates,
+): GuideSummary {
+  let openCount = 0
+  let totalCount = 0
+  for (const screen of getVisibleScreens(config, state)) {
+    const progress = countScreenProgress(screen, state.completedStepIds, derived)
+    openCount += Math.max(0, progress.total - progress.done)
+    totalCount += progress.total
+  }
+  const status: GuideSummaryStatus =
+    state.status === 'dismissed' || !config.enabled
+      ? 'dismissed'
+      : isGuideComplete(config, state, derived)
+        ? 'complete'
+        : 'active'
+  return { status, openCount, totalCount }
+}

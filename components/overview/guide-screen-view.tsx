@@ -34,9 +34,9 @@ import { tapTargetClass } from '@/components/editorial/tap-target'
 
 /**
  * GuideScreenView — pure presentatie van één welkomstgids-scherm. Gedeeld door
- * de live banner (`welcome-guide-banner.tsx`) én de beheer-preview
- * (`beheer/welkom/page.tsx`), zodat het beheerscherm letterlijk dezelfde
- * schermen toont als de gebruiker ziet.
+ * de gidsweergave in Fin (`components/app/chat/gids/gids-view.tsx`) én de
+ * beheer-preview (`beheer/welkom/page.tsx`), zodat het beheerscherm letterlijk
+ * dezelfde schermen toont als de gebruiker ziet.
  *
  * - layout 'process' → genummerde stapkaarten links→rechts (scherm 1).
  * - layout 'list'    → verticale rijen.
@@ -112,6 +112,13 @@ interface Props {
   onToggle?: (stepId: string) => void
   readOnly?: boolean
   compact?: boolean
+  /**
+   * Een stap-link is aangeklikt. De gidsweergave in Fin gebruikt dit om het
+   * chatpaneel te sluiten (tenzij het gepind is) — zonder dat zou de gebruiker
+   * naar de pagina navigeren en die meteen achter het paneel zien verdwijnen.
+   * Weglaten = de link navigeert gewoon, zonder neveneffect (beheer-preview).
+   */
+  onNavigate?: () => void
 }
 
 export function GuideScreenView({
@@ -121,6 +128,7 @@ export function GuideScreenView({
   onToggle,
   readOnly = false,
   compact = false,
+  onNavigate,
 }: Props) {
   const done = new Set(completedStepIds)
   const stateOf = (stepId: string) => resolveStepState(stepId, done, derived)
@@ -146,7 +154,13 @@ export function GuideScreenView({
       )}
 
       {screen.layout === 'process' && !compact ? (
-        <ProcessSteps steps={steps} stateOf={stateOf} onToggle={onToggle} readOnly={readOnly} />
+        <ProcessSteps
+          steps={steps}
+          stateOf={stateOf}
+          onToggle={onToggle}
+          readOnly={readOnly}
+          onNavigate={onNavigate}
+        />
       ) : (
         <ListSteps
           steps={steps}
@@ -154,6 +168,7 @@ export function GuideScreenView({
           onToggle={onToggle}
           readOnly={readOnly}
           compact={compact}
+          onNavigate={onNavigate}
         />
       )}
     </div>
@@ -167,11 +182,13 @@ function ProcessSteps({
   stateOf,
   onToggle,
   readOnly,
+  onNavigate,
 }: {
   steps: WelcomeGuideStep[]
   stateOf: (stepId: string) => StepVisualState
   onToggle?: (id: string) => void
   readOnly: boolean
+  onNavigate?: () => void
 }) {
   return (
     <ol className="flex flex-col gap-3 lg:flex-row lg:items-stretch lg:gap-2">
@@ -218,7 +235,7 @@ function ProcessSteps({
                 </p>
               )}
               <div className="mt-auto pt-2.5">
-                <StepLink step={step} readOnly={readOnly} />
+                <StepLink step={step} readOnly={readOnly} onNavigate={onNavigate} />
               </div>
             </div>
             {/* Procespijl tussen kaarten (alleen desktop, niet na de laatste) */}
@@ -245,6 +262,7 @@ function ListSteps({
   onToggle,
   readOnly,
   compact = false,
+  onNavigate,
 }: {
   steps: WelcomeGuideStep[]
   stateOf: (stepId: string) => StepVisualState
@@ -252,6 +270,7 @@ function ListSteps({
   readOnly: boolean
   /** Eenvoudige weergave: strakkere rijen, geen stapomschrijving (APP-6). */
   compact?: boolean
+  onNavigate?: () => void
 }) {
   return (
     <ul className="divide-y divide-[var(--border-ed)] rounded-xl border border-[var(--border-ed)] bg-[var(--paper)]">
@@ -282,7 +301,7 @@ function ListSteps({
               )}
             </div>
             <div className="shrink-0 self-center">
-              <StepLink step={step} readOnly={readOnly} compact />
+              <StepLink step={step} readOnly={readOnly} compact onNavigate={onNavigate} />
             </div>
           </li>
         )
@@ -386,10 +405,12 @@ function StepLink({
   step,
   readOnly,
   compact = false,
+  onNavigate,
 }: {
   step: WelcomeGuideStep
   readOnly: boolean
   compact?: boolean
+  onNavigate?: () => void
 }) {
   if (!step.href) return null
   const label = (
@@ -411,7 +432,7 @@ function StepLink({
     )
   }
   return (
-    <Link href={step.href} className={cls}>
+    <Link href={step.href} className={cls} onClick={onNavigate}>
       {compact ? <ArrowRight className="h-4 w-4" aria-hidden /> : label}
     </Link>
   )
