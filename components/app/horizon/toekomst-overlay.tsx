@@ -480,11 +480,17 @@ export function ToekomstOverlay({
             // pointerdown bubbelt daarheen en `setPointerCapture` leidt de click weg
             // (→ ✕ leek dood). Stop de pointerdown vóór de container 'm ziet.
             onPointerDown={(e) => e.stopPropagation()}
-            aria-label="Tips sluiten"
-            className="pointer-events-auto fixed right-3 z-[250] inline-flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-2)] shadow-lg transition-colors hover:text-[var(--ink)]"
+            // ZICHTBAAR LABEL (UR3-10). Als kaal ✕ was dit de enige uitgang uit
+            // een laag die de nav-pill volgens de overlay-conventie verbergt —
+            // en testers vonden 'm niet ("de navigatie is weg"). De regel zelf
+            // klopt; wat ontbrak was een uitgang die zichzélf benoemt. Het woord
+            // draagt nu de toegankelijke naam, dus geen `aria-label` ernaast:
+            // dat zou de zichtbare tekst overschrijven (WCAG 2.5.3).
+            className="pointer-events-auto fixed right-3 z-[250] inline-flex h-11 items-center gap-2 rounded-full border border-[var(--border-ed)] bg-[var(--paper)] px-4 text-sm font-medium text-[var(--ink-2)] shadow-lg transition-colors hover:text-[var(--ink)]"
             style={{ top: 'max(0.75rem, env(safe-area-inset-top))' }}
           >
-            <X className="h-5 w-5" aria-hidden />
+            <X className="h-5 w-5 shrink-0" aria-hidden />
+            Sluit tips
           </button>,
           document.body,
         )}

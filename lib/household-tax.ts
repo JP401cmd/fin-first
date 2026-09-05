@@ -42,6 +42,7 @@ import {
   type RecentDailyExpenseRate,
 } from '@/lib/expense-rate'
 import { type Perspective } from '@/lib/household-data'
+import type { FreedomRateSource } from '@/lib/format'
 
 // ── Partner-totalen per Box 3-categorie ──────────────────────────
 
@@ -151,7 +152,7 @@ export interface PerspectiveBox3Data {
    * zonder die vermelding is een tarief dat kan schuiven een tweede waarheid
    * met vertraging (zelfde regel als ADR 0103).
    */
-  dailyExpensesSource: 'transactions' | 'estimate' | 'none'
+  dailyExpensesSource: FreedomRateSource
   /**
    * Het perspectief waarop `dailyExpenses` staat — vandaag ALTIJD 'personal',
    * ook in huishoud-/partnerweergave.
@@ -245,6 +246,7 @@ async function resolveCanonicalDailyExpenses(
   supabase: SupabaseClient,
 ): Promise<RecentDailyExpenseRate> {
   let fallbackMonthly = 0
+  let fallbackSource: 'profile' | 'cohort' = 'profile'
   try {
     const {
       data: { user },
@@ -252,15 +254,18 @@ async function resolveCanonicalDailyExpenses(
     if (user) {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('estimated_monthly_expenses')
+        .select('estimated_monthly_expenses, expenses_source')
         .eq('id', user.id)
         .maybeSingle()
       fallbackMonthly = Math.max(Number(profile?.estimated_monthly_expenses ?? 0) || 0, 0)
+      // Is dat profielbedrag door de APP geraden ("Schat het voor me")? Dan
+      // heet het tarief 'cohort' i.p.v. 'estimate' (ADR 0131).
+      if (profile?.expenses_source === 'estimate') fallbackSource = 'cohort'
     }
   } catch {
     /* geen profiel-schatting → alleen de transactiebasis (of 0) */
   }
-  return getRecentDailyExpenseRate(supabase, new Date(), fallbackMonthly)
+  return getRecentDailyExpenseRate(supabase, new Date(), fallbackMonthly, fallbackSource)
 }
 
 /**

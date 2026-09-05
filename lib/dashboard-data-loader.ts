@@ -1651,6 +1651,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     consumptionExpenseRows(txAgg12, budgetTypeMap),
     now,
     effectiveMonthlyExpenses,
+    // Rust die terugval op een bedrag dat de APP raadde ("Schat het voor me")?
+    // Dan heet het tarief 'cohort' en benoemt de voetnoot dat (ADR 0131).
+    (profileResult.data as { expenses_source?: string | null } | null)?.expenses_source === 'estimate'
+      ? 'cohort'
+      : 'profile',
   )
   const dailyExpenses = recentExpenseRate.dailyRate
   // Canoniek 12-mnd rolling MAANDbedrag uit exact dezelfde bron/berekening als
@@ -1778,6 +1783,11 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
       netMonthlyIncome: healthNetMonthlyIncome,
       // Noodbuffer-norm: 3 × dit salaris (zie lib/emergency-fund.ts).
       netMonthlySalary: effectiveMonthlyIncome,
+      // Grondslag voor het OORDEEL (ADR 0131): de brede vensters, niet de
+      // lopende maand — een lege maand mag een transactiegebruiker niet
+      // "onbekend" maken. 'unknown' laat de inkomen-/uitgavenpijlers wegvallen.
+      incomeBasis: dashboardAnnualIncome.basis,
+      expensesBasis: dashboardSavingsExpenses.basis,
     },
     {
       assets: (assetsResult.data ?? []) as { asset_type?: string | null; current_value?: number | string | null; net_worth_inclusion_pct?: number | null }[],
@@ -2877,6 +2887,10 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     // zelf dailyExpenseRate(monthlyExpenses) op de losse maand te rekenen, zodat
     // hetzelfde bedrag overal dezelfde vrijheidstijd geeft (KRUIS-20).
     dailyExpenseRate: dailyExpenses,
+    // Herkomst van datzelfde tarief — draagt de wisselkoers-voetnoot onder het
+    // widget-grid (UR3-08). Een profiel-/cohortschatting zegt dan dat het een
+    // schatting is in plaats van als gemeten uitgavenpatroon te lezen.
+    dailyExpenseRateSource: recentExpenseRate.source,
     // Zelfde canonieke rolling-bron, maar in €/mnd — de briefing-hero (maand-
     // gebaseerd) consumeert dit i.p.v. de losse huidige-kalendermaand-som,
     // zodat het weektotaal overeenkomt met sidebar/balans (KRUIS-17).

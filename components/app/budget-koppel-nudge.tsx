@@ -27,6 +27,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Sparkles, Link2, Upload, ArrowRight } from 'lucide-react'
 import { BottomSheet } from '@/components/app/bottom-sheet'
+import { BANK_CONNECT_SAFETY_SHORT } from '@/lib/bank-connect-copy'
 import { EditorialHeadline } from '@/components/editorial'
 
 /** Feature-slug in user_feature_visits die bijhoudt of deze nudge al is
@@ -89,7 +90,7 @@ export function BudgetKoppelNudge({ visible }: { visible: boolean }) {
             <span className="flex-1 min-w-0">
               <span className="block font-sans text-sm font-semibold">Bank koppelen</span>
               <span className="block text-xs text-[var(--paper)]/75">
-                Transacties komen automatisch binnen — veilig en alleen-lezen via TrueLayer
+                Transacties komen automatisch binnen
               </span>
             </span>
             <ArrowRight className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden />
@@ -111,6 +112,12 @@ export function BudgetKoppelNudge({ visible }: { visible: boolean }) {
             </span>
             <ArrowRight className="h-4 w-4 shrink-0 text-[var(--ink-3)] transition-transform group-hover:translate-x-0.5" aria-hidden />
           </Link>
+
+          {/* Eén canonieke veiligheidszin onder de twee CTA's (UR3-15) — stond
+              eerder als eigen halve zin in de knop-onderregel. */}
+          <p className="text-xs leading-snug text-[var(--ink-3)]">
+            {BANK_CONNECT_SAFETY_SHORT}
+          </p>
         </div>
 
         {/* Tertiair: later — sluit de nudge zonder te navigeren. */}

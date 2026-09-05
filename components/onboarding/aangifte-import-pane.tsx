@@ -285,7 +285,8 @@ function ChooseStep({
           </h3>
           <p className="font-serif italic text-sm text-[var(--ink-2)] leading-relaxed">
             Sleep hier het PDF-bestand — downloadbaar via Mijn Belastingdienst onder
-            &ldquo;Kopie van aangifte&rdquo;. Wij lezen lokaal, server zien we alleen tekst.
+            &ldquo;Kopie van aangifte&rdquo;. Wij lezen de PDF in je browser; alleen de
+            tekst — zonder BSN — gaat naar onze server.
           </p>
         </button>
 

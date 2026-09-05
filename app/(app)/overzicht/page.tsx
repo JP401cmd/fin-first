@@ -29,7 +29,7 @@ import { ageAtDate } from '@/lib/horizon-data'
 import { isFixedAnchor, resolveFreedomAgeView } from '@/lib/fire-strategy'
 import { lookupAowAge } from '@/lib/aow-leeftijd'
 import { loadLeverScores } from '@/lib/lever-scores-loader'
-import { loadCheckinBannerSeed } from '@/lib/overview/banner-seeds'
+import { loadCheckinBannerSeed, isCheckinBannerEligible } from '@/lib/overview/banner-seeds'
 import { loadRondleidingSeed } from '@/lib/rondleiding/seed'
 import { RondleidingProvider } from '@/components/overview/rondleiding/rondleiding-provider'
 import { leverToLeverageStatus } from '@/components/app/shell/lever-scores'
@@ -86,7 +86,7 @@ export default async function OverzichtPage() {
     leverScoresResult,
     horizonData,
     ownProfileRes,
-    checkinBannerSeed,
+    checkinBannerBase,
     txAgg12Res,
     minimizedMap,
   ] = await Promise.all([
@@ -110,6 +110,16 @@ export default async function OverzichtPage() {
   ])
 
   const userName = (ownProfileRes.data as { full_name?: string | null } | null)?.full_name ?? null
+  // UR3-10 — de check-in-banner nodigt uit tot een terugblik; op een account dat
+  // deze maand is aangemaakt is er nog niets om op terug te blikken en stond hij
+  // op dag één naast de rondleiding, de coachmark en Fins tip. De gate hangt aan
+  // de accountleeftijd (`profiles.created_at`, hier al geladen — geen extra
+  // query), nooit aan de financiële data (ADR 0001).
+  const profileCreatedAt =
+    (ownProfileRes.data as { created_at?: string | null } | null)?.created_at ?? null
+  const checkinBannerSeed = checkinBannerBase
+    ? { ...checkinBannerBase, eligible: isCheckinBannerEligible(profileCreatedAt) }
+    : undefined
   // `realOnly: false` — voor "heeft deze gebruiker transacties?" telt een maand
   // met alleen transfers ook mee; het gaat om het bestaan van data, niet om een som.
   const latestTransactionMonth = aggLatestMonth((txAgg12Res.data ?? []) as TxMonthAggregateRow[])
@@ -187,6 +197,20 @@ export default async function OverzichtPage() {
       : null
   const netWorthExclHome = horizonData?.netWorthExclHome ?? null
 
+  // Woon-grondslag voor de rondleidingkaarten (UR3-04, besluit K4). Alles komt
+  // uit `horizonData`: `freedomBasis.homeExcludedFromFire` is de al gemaakte
+  // `isHomeExcludedFromFire`-keuze (mét de `hasEigenHuis`-gate erin verwerkt) en
+  // `netWorthExclHome` de canonieke `netWorthExcludingHome`-uitkomst. Géén
+  // tweede query, géén eigen aftrek van de overwaarde. `null` zonder eigen
+  // woning: dan is er niets te markeren.
+  const rondleidingWoning =
+    horizonData?.housingContext.hasEigenHuis
+      ? {
+          uitgesloten: horizonData.freedomBasis.homeExcludedFromFire,
+          netWorthExclHome: horizonData.netWorthExclHome,
+        }
+      : null
+
   // Netto vermogen (live) — basis voor de vrijheidstijd-hero + mini-grafiek in blok 2.
   const currentNetWorth =
     (horizonData?.healthScoreInput?.totalAssets ?? 0) -
@@ -260,9 +284,16 @@ export default async function OverzichtPage() {
             perspective === 'personal'
               ? (horizonData?.healthScoreInput?.largestAssetTypeShare ?? null)
               : null,
-          health: health ? { total: health.total, label: health.label } : null,
+          health: health
+            ? { total: health.total, label: health.label, onbekendHint: health.onbekend?.hint ?? null }
+            : null,
           currentNetWorth,
+          woning: rondleidingWoning,
           dailyExpenseRate: horizonData?.dailyExpenseRate ?? 0,
+          // Herkomst van dat tarief uit dezelfde bundel — de wisselkoers-stap
+          // noemt een profiel-/cohortschatting als schatting i.p.v. 'm als
+          // gemeten uitgavenpatroon te presenteren (UR3-08).
+          dailyExpenseRateSource: horizonData?.dailyExpenseRateDetail?.source,
           isPensioen: isPensioenMode,
         }}
       >

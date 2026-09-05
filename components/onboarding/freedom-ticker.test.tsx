@@ -2,6 +2,10 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { computeFreedomTicker, freedomTickerBasis, ONBOARDING_HOUSING_MODE } from '@/lib/freedom-ticker'
 import { computeOnboardingCompleteness } from '@/lib/onboarding-completeness'
+import {
+  HOUSING_CHOICE_BASIS_SENTENCE,
+  HOUSING_CHOICE_FALLBACK,
+} from '@/lib/housing-choice'
 import { OnboardingFreedomTickerProvider } from './freedom-ticker'
 import { OnboardingShell } from './onboarding-shell'
 import { OnboardingKlaar } from './onboarding-klaar'
@@ -91,9 +95,26 @@ describe('eindscherm — zelfde getal, met grondslag-label', () => {
       <OnboardingKlaar {...klaarProps} freedomLabel={CANONIEK!.label} />,
     )
     expect(screen.getAllByText(new RegExp(`Al vrijgekocht`))[0]).toBeTruthy()
+    // De grondslag-zin volgt sinds ADR 0133 de woning-keuze. Zonder keuze
+    // (geen woning, of de vraag niet gesteld) geldt de terugval — dezelfde
+    // lezing als vóór ADR 0133: de woning telt pas mee bij verkoop.
     expect(
-      screen.getAllByText(/eigen woning en je schulden tellen hier nog niet mee/)[0],
+      screen.getAllByText(HOUSING_CHOICE_BASIS_SENTENCE[HOUSING_CHOICE_FALLBACK])[0],
     ).toBeTruthy()
+  })
+
+  it('laat de grondslag-zin de woning-keuze volgen (ADR 0133)', () => {
+    const { rerender } = render(
+      <OnboardingKlaar {...klaarProps} freedomLabel={CANONIEK!.label} housingChoice="sell" />,
+    )
+    expect(screen.getAllByText(HOUSING_CHOICE_BASIS_SENTENCE.sell)[0]).toBeTruthy()
+    expect(screen.queryByText(HOUSING_CHOICE_BASIS_SENTENCE.exclude)).toBeNull()
+
+    rerender(
+      <OnboardingKlaar {...klaarProps} freedomLabel={CANONIEK!.label} housingChoice="exclude" />,
+    )
+    expect(screen.getAllByText(HOUSING_CHOICE_BASIS_SENTENCE.exclude)[0]).toBeTruthy()
+    expect(screen.queryByText(HOUSING_CHOICE_BASIS_SENTENCE.sell)).toBeNull()
   })
 
   it('valt zonder teller terug op de kwalitatieve zin', () => {

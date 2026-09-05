@@ -8,7 +8,8 @@ import {
 } from '@/lib/coach-suggestions'
 import { EMPTY_COACH_STATE, type CoachState } from '@/lib/coach-state'
 
-vi.mock('next/navigation', () => ({ usePathname: () => '/overzicht' }))
+let currentPath = '/overzicht'
+vi.mock('next/navigation', () => ({ usePathname: () => currentPath }))
 
 /**
  * useCoachSuggestion na de verhuizing naar server-state (ADR 0130).
@@ -46,6 +47,7 @@ function stubFetch() {
 beforeEach(() => {
   vi.useFakeTimers()
   localStorage.clear()
+  currentPath = '/overzicht'
   puts = []
   stubFetch()
 })
@@ -168,6 +170,88 @@ describe('useCoachSuggestion — paused', () => {
     rerender({ paused: false })
     act(() => { vi.advanceTimersByTime(0) })
     expect(result.current.suggestion?.key).toBe('gap_bank')
+  })
+})
+
+// -- UR3-10 - een melding hoort bij een pagina ------------------------------
+//
+// Henk zag "de tip van Fin" op elke pagina terugkomen. Dat was geen herhaling
+// maar een melding die MEEHOPTE: de selectie hangt aan `pathname`, dus elke
+// navigatie verving de openstaande melding door de pad-tip van de nieuwe route,
+// herstartte de typemachine en zette de auto-dismiss-timer terug op nul.
+describe('useCoachSuggestion - sluiten bij navigatie (UR3-10)', () => {
+  it('sluit een openstaande melding zodra de gebruiker wegnavigeert', () => {
+    const { result, rerender } = renderHook(() =>
+      useCoachSuggestion({ coachState: state(), dataGaps: fullGaps(), delayMs: 0 }),
+    )
+    act(() => { vi.advanceTimersByTime(0) })
+    expect(result.current.suggestion?.key).toBe('path_core')
+
+    currentPath = '/toekomst'
+    act(() => { rerender() })
+    expect(result.current.suggestion).toBeNull()
+  })
+
+  it('duwt op de nieuwe pagina geen verse tip omhoog', () => {
+    const { result, rerender } = renderHook(() =>
+      useCoachSuggestion({ coachState: state(), dataGaps: fullGaps(), delayMs: 0 }),
+    )
+    act(() => { vi.advanceTimersByTime(0) })
+    expect(result.current.suggestion?.key).toBe('path_core')
+
+    currentPath = '/toekomst'
+    act(() => { rerender() })
+    // Ook nadat de selectietimer van de nieuwe route zou zijn afgelopen blijft
+    // het stil: de melding is gesloten, niet vervangen.
+    act(() => { vi.advanceTimersByTime(5_000) })
+    expect(result.current.suggestion).toBeNull()
+  })
+
+  it('schrijft de sluiting weg als reden `auto` - geen kruisje van de gebruiker', () => {
+    const { result, rerender } = renderHook(() =>
+      useCoachSuggestion({ coachState: state(), dataGaps: fullGaps(), delayMs: 0 }),
+    )
+    act(() => { vi.advanceTimersByTime(0) })
+    currentPath = '/toekomst'
+    act(() => { rerender() })
+
+    expect(puts).toEqual([{ action: 'dismiss', key: 'path_core' }])
+    expect(result.current.suggestion).toBeNull()
+  })
+
+  it('laat een gidsstap open staan: navigeren verbruikt alleen de dagregel', () => {
+    const guide: GuideSuggestionInput = {
+      status: 'active',
+      steps: [{ id: 's1-bezittingen', title: 'Zijn al je bezittingen geregistreerd?', href: '/overzicht' }],
+    }
+    const { result, rerender } = renderHook(() =>
+      useCoachSuggestion({ coachState: state(), dataGaps: fullGaps(), delayMs: 0, guide }),
+    )
+    act(() => { vi.advanceTimersByTime(0) })
+    expect(result.current.suggestion?.key.startsWith('guide_')).toBe(true)
+
+    currentPath = '/toekomst'
+    act(() => { rerender() })
+
+    expect(result.current.suggestion).toBeNull()
+    // Alleen de dagstempel; geen `dismiss` - de stap blijft open in de gids.
+    expect(puts.some((p) => p.action === 'dismiss')).toBe(false)
+    expect(puts.some((p) => p.action === 'guideShown')).toBe(true)
+  })
+
+  it('doet niets wanneer er geen melding openstond', () => {
+    const { result, rerender } = renderHook(() =>
+      useCoachSuggestion({ coachState: state(), dataGaps: fullGaps(), delayMs: 5_000 }),
+    )
+    expect(result.current.suggestion).toBeNull()
+
+    currentPath = '/toekomst'
+    act(() => { rerender() })
+    expect(puts).toHaveLength(0)
+
+    // En op de nieuwe route mag de tip gewoon nog verschijnen.
+    act(() => { vi.advanceTimersByTime(5_000) })
+    expect(result.current.suggestion).not.toBeNull()
   })
 })
 

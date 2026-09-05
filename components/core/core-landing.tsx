@@ -22,7 +22,8 @@ import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wiza
 import type { QuickAddIntent } from '@/lib/quick-add/types'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
-import { computeHealthScoreFromInputs, type HealthScore, type HealthPillar } from '@/lib/financial-health'
+import { computeHealthScoreFromInputs, healthScoreVerdict, type HealthScore, type HealthPillar } from '@/lib/financial-health'
+import { GRONDSLAG_ONBEKEND_LABEL } from '@/lib/grondslag-guard'
 import { GlossaryTerm, PageInfoButton } from '@/components/editorial'
 import { getPageInfo } from '@/lib/page-info-content'
 import { CoreHero } from './core-hero'
@@ -1041,6 +1042,10 @@ function HealthScoreKassabon({ healthScore }: { healthScore: HealthScore }) {
   const strongCount = healthScore.pillars.filter(p => p.score > 70).length
   const mediumCount = healthScore.pillars.filter(p => p.score >= 40 && p.score <= 70).length
   const weakCount = healthScore.pillars.filter(p => p.score < 40).length
+  // Onbekend is geen nul (ADR 0131): zonder inkomen/uitgaven geen cijfer en
+  // geen oordeel in de kop — dezelfde presenter als /overzicht en /toekomst.
+  const verdict = healthScoreVerdict(healthScore)
+  const onbekend = verdict.kind === 'onbekend' ? verdict.onbekend : null
 
   return (
     <div className="space-y-4 p-5" role="region" aria-label="Financiële gezondheidsscore breakdown">
@@ -1050,19 +1055,32 @@ function HealthScoreKassabon({ healthScore }: { healthScore: HealthScore }) {
           <span className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
             Financiële gezondheid
           </span>
-          <span
-            className={`font-mono text-lg font-bold tabular-nums ${pillarScoreColorClass(healthScore.total)}`}
-            aria-label={`Totaalscore ${healthScore.total} van 100`}
-          >
-            {healthScore.total}/100
-          </span>
+          {onbekend ? (
+            <span className="font-mono text-sm font-bold text-[var(--ink-3)]">{GRONDSLAG_ONBEKEND_LABEL}</span>
+          ) : (
+            <span
+              className={`font-mono text-lg font-bold tabular-nums ${pillarScoreColorClass(healthScore.total)}`}
+              aria-label={`Totaalscore ${healthScore.total} van 100`}
+            >
+              {healthScore.total}/100
+            </span>
+          )}
         </div>
-        <div className="flex items-center justify-between text-xs">
-          <span className="font-sans text-[var(--ink-3)]">Beoordeling</span>
-          <span className={`font-medium ${pillarScoreColorClass(healthScore.total)}`}>
-            {healthScore.label}
-          </span>
-        </div>
+        {onbekend ? (
+          <div className="flex flex-col gap-1 text-xs">
+            <p className="text-[var(--ink-2)]">{onbekend.hint}</p>
+            <Link href={onbekend.actie.href} className="underline decoration-dotted underline-offset-2 text-[var(--ink)]">
+              {onbekend.actie.label}
+            </Link>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-sans text-[var(--ink-3)]">Beoordeling</span>
+            <span className={`font-medium ${pillarScoreColorClass(healthScore.total)}`}>
+              {healthScore.label}
+            </span>
+          </div>
+        )}
         {healthScore.previousMonth !== null && (
           <div className="flex items-center justify-between text-xs mt-1">
             <span className="font-sans text-[var(--ink-3)]">Vorige maand</span>

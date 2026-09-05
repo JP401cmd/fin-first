@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-05T01:03:14.798Z",
+  "generatedAt": "2026-09-05T18:39:01.558Z",
   "generatedDate": "2026-09-05",
   "repo": {
     "name": "fin",
@@ -191,9 +191,9 @@
     "routesProduction": 97,
     "api": 309,
     "tables": 94,
-    "migrations": 230,
+    "migrations": 231,
     "integrations": 25,
-    "components": 1029,
+    "components": 1054,
     "providers": 17,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -8284,7 +8284,7 @@
         "migration": "supabase/migrations/20260720100000_create_web_vitals.sql"
       }
     ],
-    "migrationCount": 230
+    "migrationCount": 231
   },
   "tablesByDomain": [
     {
@@ -8790,11 +8790,11 @@
     }
   ],
   "components": {
-    "total": 1029,
+    "total": 1054,
     "groups": [
       {
         "group": "app",
-        "count": 403,
+        "count": 417,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8813,6 +8813,8 @@
           "ai-categorize-sheet.test",
           "ai-privacy-indicator",
           "ai-privacy-indicator.test",
+          "ai-settings-client",
+          "ai-status-card",
           "ai-subscription-upsell",
           "ai-subscription-upsell.test",
           "ai-vaste-kosten-sheet",
@@ -8820,6 +8822,8 @@
           "amount-input",
           "amount-input.test",
           "analysis-section",
+          "anker-drieslag",
+          "anker-drieslag.test",
           "app-link-gate",
           "app-link-gate.test",
           "app-setup-gate",
@@ -8924,6 +8928,7 @@
           "depth-section",
           "depth-section.test",
           "dividend-tracker",
+          "document-title.test",
           "doel-vastleg-sheet",
           "doel-vastleg-sheet.test",
           "dream-transition-context",
@@ -8973,6 +8978,7 @@
           "guide-visit-tracker",
           "head-scripts",
           "health-score-receipt",
+          "health-score-receipt.onbekend.test",
           "health-score-receipt.test",
           "hide-in-simple",
           "hide-in-simple.test",
@@ -9135,14 +9141,19 @@
           "sorr-analyse",
           "spaarquote-gevoeligheid",
           "spending-confidence-indicator",
+          "stale-notice-provider",
+          "stale-notice-provider.test",
           "stale-transactions-banner",
           "stale-transactions-banner.test",
+          "stale-transactions-notice",
           "step-choice",
           "step-details",
+          "step-details-aflossingsvorm.test",
           "step-details-bedrag.test",
           "step-details-dga-koppeling.test",
           "step-header",
           "step-header-count.test",
+          "step-housing-choice",
           "step-link-debt",
           "step-type",
           "step-type.test",
@@ -9168,6 +9179,7 @@
           "transacties-feed.test",
           "transaction-form",
           "transaction-form.bedrag-plausibiliteit.test",
+          "transaction-form.sheet-footer.test",
           "transaction-form.test",
           "transfer-confirm-sheet",
           "trend-chart",
@@ -9179,6 +9191,8 @@
           "verhuurrendement.config",
           "vrijheidsas",
           "vrijheidsas.test",
+          "vrijheidstijd-voetnoot",
+          "vrijheidstijd-voetnoot.test",
           "wealth-composition-chart",
           "wealth-composition-chart.test",
           "web-vitals-reporter",
@@ -9203,7 +9217,7 @@
       },
       {
         "group": "overview",
-        "count": 187,
+        "count": 190,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -9280,6 +9294,7 @@
           "grootste-uitgaven",
           "guide-screen-view",
           "health-score-card",
+          "health-score-card.onbekend.test",
           "health-score-card.test",
           "hefbomen-nav",
           "hefbomen-nav.lever-parity.test",
@@ -9313,6 +9328,7 @@
           "mini-networth-chart",
           "mini-networth-chart-anchor",
           "mini-networth-chart-anchor.test",
+          "mini-networth-chart.stop-anker.test",
           "mini-networth-chart.test",
           "mini-timeline-strip",
           "mini-timeline-strip.test",
@@ -9389,6 +9405,7 @@
           "voortgang-doelen-card",
           "voortgang-doelen-card.test",
           "vrijheid-strip",
+          "vrijheid-strip.anker.test",
           "vrijheid-strip.nu-stoppen.test",
           "vrijheid-strip.test",
           "weekdag-patroon"
@@ -9651,7 +9668,7 @@
       },
       {
         "group": "mijn",
-        "count": 45,
+        "count": 47,
         "items": [
           "abonnement-section",
           "account-basis-section",
@@ -9663,6 +9680,8 @@
           "ai-execution-groups.eenvoudig.test",
           "ai-privacy-settings",
           "ai-privacy-settings.test",
+          "bedragen-verbergen-blok",
+          "bedragen-verbergen-blok.test",
           "budget-tint-picker",
           "budget-tint-picker.test",
           "category-tint-picker",
@@ -9701,6 +9720,50 @@
         ]
       },
       {
+        "group": "onboarding",
+        "count": 38,
+        "items": [
+          "aangifte-import-pane",
+          "budget-amount-editor",
+          "facts-panel",
+          "freedom-ticker",
+          "freedom-ticker.test",
+          "onboarding-bezittingen",
+          "onboarding-bezittingen.test",
+          "onboarding-eindstrategie",
+          "onboarding-eindstrategie.test",
+          "onboarding-horizon",
+          "onboarding-identity",
+          "onboarding-identity.test",
+          "onboarding-inkomen",
+          "onboarding-inkomen.schatting.test",
+          "onboarding-inkomen.test",
+          "onboarding-klaar",
+          "onboarding-pensioen",
+          "onboarding-pensioen.test",
+          "onboarding-posten",
+          "onboarding-schulden",
+          "onboarding-schulden.test",
+          "onboarding-section-back-navigation.test",
+          "onboarding-shell",
+          "onboarding-spaardoel",
+          "onboarding-success",
+          "onboarding-uitgaven-pensioen",
+          "onboarding-uitgaven-pensioen.test",
+          "onboarding-upo-section",
+          "onboarding-vraag",
+          "onboarding-vraag.test",
+          "onboarding-woning-keuze",
+          "onboarding-woning-keuze.test",
+          "progress-bar",
+          "section-review",
+          "speech-bubble",
+          "step-progress",
+          "strategy-tile",
+          "welcome-popup"
+        ]
+      },
+      {
         "group": "check",
         "count": 32,
         "items": [
@@ -9736,44 +9799,6 @@
           "step-schulden",
           "step-uitgaven",
           "step-uitgaven.test"
-        ]
-      },
-      {
-        "group": "onboarding",
-        "count": 32,
-        "items": [
-          "aangifte-import-pane",
-          "budget-amount-editor",
-          "facts-panel",
-          "freedom-ticker",
-          "freedom-ticker.test",
-          "onboarding-bezittingen",
-          "onboarding-bezittingen.test",
-          "onboarding-eindstrategie",
-          "onboarding-horizon",
-          "onboarding-identity",
-          "onboarding-identity.test",
-          "onboarding-inkomen",
-          "onboarding-inkomen.test",
-          "onboarding-klaar",
-          "onboarding-pensioen",
-          "onboarding-pensioen.test",
-          "onboarding-posten",
-          "onboarding-schulden",
-          "onboarding-schulden.test",
-          "onboarding-section-back-navigation.test",
-          "onboarding-shell",
-          "onboarding-spaardoel",
-          "onboarding-success",
-          "onboarding-uitgaven-pensioen",
-          "onboarding-upo-section",
-          "onboarding-vraag",
-          "onboarding-vraag.test",
-          "progress-bar",
-          "section-review",
-          "speech-bubble",
-          "step-progress",
-          "welcome-popup"
         ]
       },
       {
@@ -9916,9 +9941,9 @@
         "group": "horizon",
         "count": 3,
         "items": [
-          "fire-end-strategy-panel",
           "fire-retirement-expense-panel",
-          "fire-savings-panel"
+          "fire-savings-panel",
+          "stop-plan-vragen"
         ]
       },
       {
@@ -17217,6 +17242,60 @@
       ],
       "summary": "Na de onboarding landde een nieuwe gebruiker hard op `/toekomst`, kreeg daar een full-page welkomstmodal (`ToekomstWelcome`) die tekstueel naar \"het stappenplan op je Overzicht\" verwees, en daarna drie tips-ballonnen rond de vervaagde grafiek. Op `/overzicht` stond de welkomstgid",
       "file": "docs/adr/0130-de-welkomstgids-woont-bij-fin-en-de-rondleiding-op-overzicht.md"
+    },
+    {
+      "id": "0131-onbekend-is-geen-nul-drie-staten-van-een-grondslag",
+      "title": "Onbekend is geen nul: een grondslag is gemeten, geschat of onbekend",
+      "status": "aanvaard",
+      "date": "2026-09-05",
+      "elements": [
+        "as-budget",
+        "as-vermogen",
+        "as-planning",
+        "fn-budgetteren",
+        "sp-inzicht"
+      ],
+      "summary": "Sanne (31) koos in de onboarding bij inkomen en uitgaven voor **\"Later invullen\"** — een knop die de app even prominent aanbiedt als invullen — en vulde wél € 14.000 spaargeld in. Haar eerste oordeel op `/overzicht` was **\"8 van 100 — Kritiek\"**, met in het detail \"Spaarquote 0 %",
+      "file": "docs/adr/0131-onbekend-is-geen-nul-drie-staten-van-een-grondslag.md"
+    },
+    {
+      "id": "0132-een-ai-storing-is-zichtbaar-op-het-beheerscherm",
+      "title": "Een AI-storing registreert zichzelf en is zichtbaar op het beheerscherm",
+      "status": "aanvaard",
+      "date": "2026-09-05",
+      "elements": [
+        "as-coach",
+        "t-aigateway"
+      ],
+      "summary": "Van 24 augustus tot 5 september 2026 stond het providertegoed bij Anthropic op — elke aanroep naar Fin kreeg `HTTP 400 invalid_request_error: \"Your credit balance is too low\"`. Twaalf dagen lang was dit onzichtbaar:",
+      "file": "docs/adr/0132-een-ai-storing-is-zichtbaar-op-het-beheerscherm.md"
+    },
+    {
+      "id": "0133-de-gebruiker-kiest-bij-het-toevoegen-van-zijn-woning",
+      "title": "De gebruiker kiest bij het toevoegen van zijn woning: verkopen of niet meetellen",
+      "status": "aanvaard",
+      "date": "2026-09-05",
+      "elements": [
+        "as-vermogen",
+        "as-planning",
+        "do-bezitting",
+        "sp-registreren"
+      ],
+      "summary": "Henk (54) voegde in de onboarding zijn woning van € 425.000 toe en zag binnen twee minuten drie verschillende vrijheidsgetallen:",
+      "file": "docs/adr/0133-de-gebruiker-kiest-bij-het-toevoegen-van-zijn-woning.md"
+    },
+    {
+      "id": "0134-een-aandachtsvrager-tegelijk",
+      "title": "Eén aandachtsvrager tegelijk",
+      "status": "aanvaard",
+      "date": "2026-09-05",
+      "elements": [
+        "as-coach",
+        "sp-inzicht",
+        "app-comp"
+      ],
+      "summary": "Een nieuwe gebruiker kreeg in zijn eerste minuut op `/overzicht` vier dingen tegelijk: de rondleiding (die vanzelf start), de eenmalige uitleg bij de euro-weergave, de maand-check-in-banner en Fins eerste tip. Uit het UX-onderzoek van 5 september 2026: Sanne kreeg er drie over el",
+      "file": "docs/adr/0134-een-aandachtsvrager-tegelijk.md"
     }
   ],
   "churn": {
@@ -17224,15 +17303,15 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 67
+        "commits": 70
       },
       {
         "path": "lib/ai",
-        "commits": 46
+        "commits": 47
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 32
+        "commits": 33
       },
       {
         "path": "app/api/ai",
@@ -17247,12 +17326,12 @@
         "commits": 13
       },
       {
-        "path": "lib/horizon-data.ts",
+        "path": "lib/fire-simulation.ts",
         "commits": 8
       },
       {
-        "path": "lib/fire-simulation.ts",
-        "commits": 7
+        "path": "lib/horizon-data.ts",
+        "commits": 8
       },
       {
         "path": "app/api/budgets",
@@ -17260,14 +17339,14 @@
       },
       {
         "path": "components/horizon",
-        "commits": 2
+        "commits": 4
       }
     ],
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 10175,
-        "commits": 76
+        "loc": 10111,
+        "commits": 78
       },
       {
         "file": "components/app/budgets-client.tsx",
@@ -17281,13 +17360,13 @@
       },
       {
         "file": "components/app/cash-account-view.tsx",
-        "loc": 3680,
+        "loc": 3698,
         "commits": 23
       },
       {
         "file": "lib/dashboard-data-loader.ts",
-        "loc": 3075,
-        "commits": 59
+        "loc": 3089,
+        "commits": 60
       },
       {
         "file": "lib/release-notes.ts",
@@ -17301,8 +17380,8 @@
       },
       {
         "file": "app/(app)/core/checkin/page.tsx",
-        "loc": 2329,
-        "commits": 11
+        "loc": 2387,
+        "commits": 12
       }
     ]
   },
@@ -18334,6 +18413,13 @@
       "parserFormat": "csv"
     },
     {
+      "file": "lib/parsers/iban.ts",
+      "exists": true,
+      "baseUrl": null,
+      "hasAdapter": false,
+      "parserFormat": null
+    },
+    {
       "file": "lib/parsers/mt940.ts",
       "exists": true,
       "baseUrl": null,
@@ -18434,23 +18520,20 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-09-03",
+    "previousDate": "2026-09-05",
     "hasChanges": true,
     "sections": [
       {
-        "label": "API-routes",
+        "label": "Integratie-clients",
         "added": [
-          "/api/coach-state"
+          "lib/parsers/iban.ts"
         ],
-        "removed": [
-          "/api/guide-progress",
-          "/api/welcome"
-        ]
+        "removed": []
       },
       {
         "label": "Componenten (aantal)",
         "added": [
-          "+4"
+          "+25"
         ],
         "removed": []
       }
@@ -18810,7 +18893,7 @@
     {
       "date": "2026-09-05",
       "api": 309,
-      "components": 1029,
+      "components": 1054,
       "tables": 94,
       "routesProduction": 97
     }

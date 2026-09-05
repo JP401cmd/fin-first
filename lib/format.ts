@@ -554,8 +554,21 @@ export function formatFreedomTimeString(
   return parts.slice(0, -1).join(', ') + ' en ' + parts[parts.length - 1]
 }
 
-/** Herkomst van het dagtarief — spiegelt `RecentDailyExpenseRate.source`. */
-export type FreedomRateSource = 'transactions' | 'estimate' | 'none'
+/**
+ * Herkomst van het dagtarief — spiegelt `RecentDailyExpenseRate.source`.
+ *
+ * TWEE SOORTEN "SCHATTING", bewust uit elkaar gehouden (ADR 0131):
+ *   · `'estimate'` — het tarief rust op het PROFIELBEDRAG i.p.v. op transacties.
+ *     Dat bedrag kan de gebruiker zélf getypt hebben; de schatting zit in het
+ *     ontbreken van boekingen, niet in het bedrag.
+ *   · `'cohort'`   — het profielbedrag is er een dat DE APP heeft geraden
+ *     ("Schat het voor me", CBS-leeftijdsband). Dan is óók het bedrag een gok,
+ *     en de voetnoot hoort dat te zeggen én de weg terug te wijzen.
+ * Vallen die twee samen in één woord, dan blijft "(schatting) uit je profiel"
+ * staan nadat de gebruiker zijn eigen bedrag invulde — terecht voor `estimate`,
+ * onjuist voor de gok.
+ */
+export type FreedomRateSource = 'transactions' | 'estimate' | 'cohort' | 'none'
 
 /**
  * De VOETNOOT bij een vrijheidsdagen-getal: welk dagtarief is gebruikt, en waar
@@ -611,7 +624,11 @@ export function formatFreedomRateFootnote(
 
   const bedrag = formatCurrency(rate)
   if (format === 'short') {
+    if (source === 'cohort') return `bij ${bedrag}/dag (geschat op je leeftijd)`
     return source === 'estimate' ? `bij ${bedrag}/dag (schatting)` : `bij ${bedrag}/dag`
+  }
+  if (source === 'cohort') {
+    return `Tegen je dagtarief van ${bedrag} per dag — een schatting op basis van je leeftijd. Vervang 'm door je eigen bedrag.`
   }
   return source === 'estimate'
     ? `Tegen je dagtarief van ${bedrag} per dag — een schatting uit je profiel, want er zijn nog geen uitgaven geboekt.`

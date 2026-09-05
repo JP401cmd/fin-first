@@ -6,7 +6,7 @@
  * regressiesuite (`lib/regression-tests/suites/uat-beheer.ts`).
  *
  * BEHEER is een admin-tooling-zone ZONDER rekenkern: er zijn **geen 'exact'-
- * criteria** (0). De 36 criteria zijn 13 × `consistency` (een getal komt aantoonbaar
+ * criteria** (0). De 37 criteria zijn 14 × `consistency` (een getal komt aantoonbaar
  * uit een andere bron — bv. de architectuur-plaat-tellingen uit architecture.json,
  * de KPI-counts, de UAT-plaat-aggregatie), 2 × `oracle` (horizon-strategie/-kernel,
  * verifieerbaar via hun eigen transparantie-UI) en 21 × `ui-only`. Geen van die

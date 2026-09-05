@@ -1,10 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { computeCoreData, type FinancialInput } from '@/lib/core-metrics'
 import { loadCoreData } from '@/lib/core-data-loader'
-import { isFinanciallyFree, isFixedAnchor, type StopAnchor } from '@/lib/fire-strategy'
+import { fireAgeForDisplay, isFinanciallyFree, isFixedAnchor, type StopAnchor } from '@/lib/fire-strategy'
 import { computeHorizonFireSim, computeHorizonSolvedFireAge, type HorizonFireSim } from '@/lib/fire-target-shared'
 import { ankerReachFromSim, ankerReachesAge, formatStopAge } from '@/lib/horizon/anker-copy'
 import { leeftijdJaar } from '@/lib/horizon/leeftijd-jaar'
+import { guardFreedomAge } from '@/lib/horizon/outcome-guard'
+import { deriveCountdown } from '@/lib/horizon/fire-scalar'
+import { isKernelReachedNowDisplay } from '@/lib/horizon-kernel/bridge'
 import { deflate, factorAtAge } from '@/lib/euro-display'
 import { buildWillFinancialFacts } from './fin-financial-facts'
 import { section, formatCurrency, formatFreedomTime, formatPercentage } from './formatter'
@@ -62,6 +65,48 @@ function formatFireGoalLine(nominalGoal: number, run: HorizonFireSim | null, goa
   if (inTodaysMoney === nominal) return `FIRE-doel: ${nominal}`
 
   return `FIRE-doel: ${nominal} (toekomstige euro's; ≈ ${inTodaysMoney} in geld van vandaag)`
+}
+
+/**
+ * Het vrijheidsmoment (leeftijd + datum + aftelling) — CONSUME, DON'T RECOMPUTE.
+ *
+ * WAT HIER MIS WAS (UR3-06, kaartgeval 1): deze regel las `core.expectedFireDate`
+ * uit `computeCoreData`. Dat is een EIGEN maand-voor-maand projectie met een vaste
+ * `DEFAULT_RETURN` van 7%, zonder schuldaflossing, inflatie of woonstrategie, en
+ * met het naïeve 25×-`fireTarget` als doel — een ándere motor dan de kernel-bisectie
+ * die /toekomst toont. Op een account waar /toekomst "42 — je kunt nu al stoppen"
+ * zei, adviseerde Fin "juli 2028, over 2,5 jaar".
+ *
+ * WAT HET NU IS: exact de keten die /toekomst en de /overzicht-bundel al draaien —
+ * `sim.fireAgeFractional` uit de canonieke run → `guardFreedomAge` (M6-vangrail op
+ * de horizon-parkeerstand) → `fireAgeForDisplay` (afronden is WEERGAVE, nooit de
+ * drempel) → `deriveCountdown` (dezelfde helper als `dashboard-data-loader.ts`) →
+ * `isKernelReachedNowDisplay` voor de "nu al"-lezing (B93-doel=0-quirk; dezelfde
+ * regel als de banner in `horizon-client.tsx`). Hier wordt niets gerekend.
+ *
+ * GEEN TERUGVAL OP DE OUDE PROJECTIE: draaide de kernel niet, dan is het antwoord
+ * "onbekend" — niet een getal uit een tweede motor. Acceptatiecriterium 4 van de
+ * kaart: liever zeggen dat je het niet hebt dan het schatten.
+ */
+function buildFireMomentLine(
+  fireAgeFractional: number | null,
+  currentAge: number | null,
+): string {
+  if (fireAgeFractional == null || currentAge == null || !guardFreedomAge(fireAgeFractional).ok) {
+    return 'Vrijheidsmoment: onbekend — de projectie kon niet draaien. Zeg dat je het vrijheidsmoment niet hebt; schat of bereken het NIET zelf.'
+  }
+  const leeftijd = fireAgeForDisplay(fireAgeFractional)
+  const countdown = deriveCountdown(fireAgeFractional, currentAge)
+  if (isKernelReachedNowDisplay(fireAgeFractional, currentAge)) {
+    return (
+      `Vrijheidsleeftijd: ${leeftijd} — BEREIKT. Volgens de huidige cijfers kan de gebruiker nu al stoppen met werken ` +
+      '(exact wat /toekomst toont). Noem géén toekomstige FIRE-datum en geen "nog X jaar te gaan".'
+    )
+  }
+  return (
+    `Vrijheidsleeftijd: ${leeftijd} (exact wat /toekomst toont). ` +
+    `Verwachte FIRE-datum: ${countdown.fireDate} — nog ${countdown.countdownYears} jaar en ${countdown.countdownMonths} maanden.`
+  )
 }
 
 /**
@@ -177,6 +222,12 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
   const freedomPercentage = facts.vrijheidsPct
   const displayFireGoal = facts.displayFireGoal
 
+  // DE vrijheidsleeftijd uit de canonieke run — fractioneel, want hij is hier zowel
+  // DREMPEL (`isFinanciallyFree`) als weergave-invoer (`buildFireMomentLine` rondt
+  // pas in de laatste stap af, via `fireAgeForDisplay`). Nooit zelf afronden — zie
+  // de seam-toelichting bij `fireAgeForDisplay` in lib/fire-strategy.ts.
+  const kernelFireAgeFractional = horizonRun?.sim.fireAgeFractional ?? horizonRun?.sim.fireAge ?? null
+
   // ── Het stop-anker (ADR 0129 F3a, bijlage "Fin — contextregel") ──────────────
   // Onder een VAST anker (aow/now/age) is er geen FIRE-moment om naartoe te coachen:
   // Fin krijgt één regel met het gekozen stopmoment, "vrij mogelijk vanaf" (de tweede
@@ -217,7 +268,7 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     // Onder een vast anker is er géén doelvermogen (ADR 0129 D4) en geen FIRE-datum
     // om naartoe te rekenen: de anker-regel hieronder draagt dan het hele verhaal.
     anchorFixed ? null : formatFireGoalLine(displayFireGoal ?? core.fireTarget, horizonRun, facts.fireDoelUitKernel),
-    anchorFixed ? null : `Verwachte FIRE-datum: ${core.expectedFireDate || 'onbekend'}`,
+    anchorFixed ? null : buildFireMomentLine(kernelFireAgeFractional, coreData.currentAge ?? null),
     `Maandinkomen: ${formatCurrency(rawFinancials.monthlyIncome)} | Maanduitgaven: ${formatCurrency(rawFinancials.monthlyExpenses)}`,
     monthlyMustExpenses > 0 ? `Must-uitgaven (essentieel): ${formatCurrency(monthlyMustExpenses)}/mnd` : null,
     monthlyRetirementExpenses > 0 ? `Jaarlijkse uitgave na retirement: ${formatCurrency(monthlyRetirementExpenses)}/mnd (methode: ${coreData.retirementMethodUsed}) — basis voor FIRE & vrijheidsdagen` : null,
@@ -225,7 +276,21 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     `Dagen vrijheid verdiend per maand: ${core.daysWonPerMonth}`,
     `Vrije dagen per jaar (passief inkomen): ${core.freeDaysPerYear}`,
     `Autonomiescore: ${core.autonomyScore}`,
-    `Dagelijkse uitgaven: ${formatCurrency(Math.round(core.yearlyExpenses / 365))}`,
+    // HET dagtarief — de €→vrijheidsdagen-koers. CONSUMEER `facts.dagtarief` (het
+    // canonieke 12-maands rolling `coreData.dailyExpenseRate`), niet
+    // `core.yearlyExpenses / 365` (huidige-maand-uitgaven × 12 ÷ 365, een naïeve
+    // extrapolatie). Dat verschil was UR3-06 geval 3: de cashflowpagina zei "één dag
+    // vrijheid kost je nu €105" terwijl Fin met €135/dag rekende en €3.500 op 26
+    // i.p.v. 33 vrijheidsdagen uitkwam. `facts.dagtarief` bestond al precies hiervoor
+    // maar werd door deze bouwer niet gelezen.
+    `Dagtarief (uitgaven per dag): ${formatCurrency(facts.dagtarief)} — DE €→vrijheidsdagen-koers, hetzelfde tarief als op /overzicht/cashflow ("één dag vrijheid kost je nu ..."). Deel bedragen door dit getal om ze in vrijheidsdagen uit te drukken; leid het NIET af uit maandinkomen/-uitgaven.`,
+    // De marktaannames waar de hele projectie op draait — per gebruiker afgeleid in
+    // `lib/fire-params.ts`, exact de drie die /toekomst/voorkeuren naast elkaar toont
+    // (Inflatie · rendement · SWR). Ze bereikten het model eerder NIET, terwijl de
+    // DNA-basisprompt het model wél vertelt dat ze in dit overzicht staan — het model
+    // vulde dat gat met eigen kennis (7% / ~3%) i.p.v. de profielwaarden (UR3-06
+    // geval 4, eigenaarskeuze optie A: de velden alsnog leveren).
+    `Aannames (uit je profiel, /toekomst/voorkeuren): bruto rendement ${formatPercentage(coreData.fireParams.grossReturn * 100)} | inflatie ${formatPercentage(coreData.fireParams.inflationRate * 100)} | veilig opnamepercentage (SWR) ${formatPercentage(coreData.fireParams.effectiveSwr * 100)}. Noem deze percentages letterlijk; gebruik NOOIT een standaardaanname (geen 7%, geen 4%-regel).`,
     `Budgettering: ${coreData.budgetingActive !== false ? 'actief' : 'NIET actief — gebruiker budgetteert niet. Doe GEEN budget-gerelateerde voorstellen.'}`,
     // Het stop-anker (ADR 0129) — alleen onder een vast anker; zie hierboven.
     ankerRegel,
@@ -238,7 +303,12 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     isFinanciallyFree({
       freedomPct: freedomPercentage,
       currentAge: coreData.currentAge ?? null,
-      fireAge: null,
+      // De ECHTE kernel-vrijheidsleeftijd, fractioneel (drempel — nooit afgerond,
+      // WF-CANON-03). Stond hardgecodeerd op `null`, waardoor het levensfase-vangnet
+      // alleen nog op vrijheids-% ≥ 100 kon vallen en niet op "leeftijd voorbij de
+      // vrijheidsleeftijd" — precies de situatie op het account uit UR3-06.
+      // Guard eerst: de horizon-parkeerstand (leeftijd 100) mag de drempel niet voeden.
+      fireAge: guardFreedomAge(kernelFireAgeFractional).ok ? kernelFireAgeFractional : null,
       anchor,
       aowAge: horizonRun?.aowAgeFractional ?? null,
     })

@@ -43,9 +43,19 @@ export interface TerugblikCijfers {
   expenseChangePct: number | null
   /** Bijschrift bij het percentage, bv. 't.o.v. juli'. `null` als er geen is. */
   changeLabel: string | null
+  /**
+   * Is er iets om op terug te blikken? `false` zodra er over die maand geen
+   * inkomsten én geen uitgaven geboekt zijn — dan zijn `income`/`expenses`/
+   * `savings` geen meting maar een gat, en toont de stap ze niet (ADR 0131:
+   * onbekend is geen nul). Dit draait de eerdere keuze "ontbrekend → 0, kaart
+   * blijft gevuld" bewust terug (eigenaarbesluit UR3-01, optie A): een
+   * terugblik met drie keer "€ 0" is een oordeel over een maand waar we niets
+   * van weten.
+   */
+  heeftCijfers: boolean
 }
 
-/** Bedrag of 0 — een ontbrekend veld is geen reden om de kaart leeg te laten. */
+/** Bedrag of 0 — voor de rekenkant; of het ook getóónd wordt beslist `heeftCijfers`. */
 function bedrag(value: number | null | undefined): number {
   return Number.isFinite(value) ? (value as number) : 0
 }
@@ -64,13 +74,16 @@ export function terugblikCijfers(bron: TerugblikBron): TerugblikCijfers {
   const expenses = bedrag(bron.prevMonthExpenses)
 
   const kanVergelijken = basis > 0 && vergelijkMaand.length > 0
+  const income = bedrag(bron.prevMonthIncome)
+  const heeftCijfers = income > 0 || expenses > 0
 
   return {
     label: bron.prevMonthLabel?.trim() || 'afgelopen maand',
-    income: bedrag(bron.prevMonthIncome),
+    income,
     expenses,
     savings: bedrag(bron.prevMonthSavings),
     expenseChangePct: kanVergelijken ? ((expenses - basis) / basis) * 100 : null,
     changeLabel: kanVergelijken ? `t.o.v. ${vergelijkMaand}` : null,
+    heeftCijfers,
   }
 }

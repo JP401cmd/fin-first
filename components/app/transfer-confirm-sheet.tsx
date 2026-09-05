@@ -15,6 +15,14 @@ type TransferTransaction = {
   counterparty_name: string | null
   counterparty_iban: string | null
   amount: number
+  /**
+   * Het budget waar de transactie NU op staat. Sinds UR3-02 komen ook
+   * al-gecategoriseerde transacties in deze sheet terecht; dan is "nee, echte
+   * uitgave" geen nieuwe keuze maar een bevestiging van de bestaande. Vandaar
+   * de voorselectie hieronder — anders moest de gebruiker een budget dat er al
+   * stond opnieuw opzoeken om de suggestie te kunnen wegwuiven.
+   */
+  budget_id?: string | null
 }
 
 type MatchedAccount = {
@@ -296,7 +304,7 @@ export function TransferConfirmSheet({
               {saving ? 'Opslaan...' : 'Ja, eigen overboeking'}
             </button>
             <button
-              onClick={() => setPhase('budget-select')}
+              onClick={() => { setSelectedBudgetId(tx?.budget_id ?? null); setPhase('budget-select') }}
               disabled={saving}
               className="w-full rounded-[var(--r)] border border-[var(--border-md)] px-4 py-2.5 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)] disabled:opacity-50"
             >

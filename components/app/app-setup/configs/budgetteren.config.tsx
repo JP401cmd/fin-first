@@ -10,6 +10,7 @@ import {
   type BudgetTemplateId,
 } from '@/lib/budget-templates/onboarding-presets'
 import { BUDGET_LEAF_META } from '@/lib/budget-data'
+import { BANK_CONNECT_SAFETY_SHORT } from '@/lib/bank-connect-copy'
 
 // ── State ────────────────────────────────────────────────────
 
@@ -255,9 +256,12 @@ function TransactionLoggingExplainer({
     {
       icon: Banknote,
       title: 'Bankkoppeling',
-      copy: 'Koppel je bank één keer en transacties komen automatisch binnen. Je categoriseert ze daarna in een paar tikken.',
+      // Veiligheidszin uit één bron (UR3-15) — de kaart noemde alleen het gemak.
+      copy: `Koppel je bank één keer en transacties komen automatisch binnen. Je categoriseert ze daarna in een paar tikken. ${BANK_CONNECT_SAFETY_SHORT}`,
       hrefLabel: 'Beheer koppelingen',
-      href: '/identity/koppelingen',
+      // Was '/identity/koppelingen' — die route bestaat niet meer (/identity is
+      // vervangen door /mijn). Bijvangst van UR3-15.
+      href: '/mijn/koppelingen',
     },
     {
       icon: Edit3,

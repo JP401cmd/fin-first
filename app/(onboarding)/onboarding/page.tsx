@@ -37,10 +37,15 @@ import { SPAARDOEL_PRESETS, type SpaardoelPresetKey } from '@/lib/onboarding-pre
 import { computeOnboardingCompleteness } from '@/lib/onboarding-completeness'
 import { computeCurrentAge } from '@/lib/persoonlijk-plan-assembly'
 import {
-  ONBOARDING_HOUSING_MODE,
   computeFreedomTicker,
+  computeMonthlyFreedomBuildup,
   freedomTickerBasis,
 } from '@/lib/freedom-ticker'
+import {
+  HOUSING_CHOICE_FALLBACK,
+  housingChoiceToConfig,
+  type HousingChoice,
+} from '@/lib/housing-choice'
 import { OnboardingFreedomTickerProvider } from '@/components/onboarding/freedom-ticker'
 import { INITIAL_HORIZON_DATA } from '@/components/onboarding/onboarding-horizon'
 import { OnboardingSuccess } from '@/components/onboarding/onboarding-success'
@@ -54,6 +59,7 @@ import {
   firstIncompleteRequiredStep,
   type OnboardingDraft,
   type DeferredFieldKey,
+  type EstimatedFieldKey,
 } from './draft-persistence'
 import {
   fetchDraft,
@@ -381,6 +387,22 @@ interface State {
    * coach-bubble of het next-step-mechanisme.
    */
   deferredFields: DeferredFieldKey[]
+  /**
+   * Velden waarvan de APP het bedrag heeft geraden via "Schat het voor me"
+   * (UR3-05). Parallel aan `deferredFields`, maar de tegenovergestelde
+   * uitkomst: daar staat een leeg veld, hier een gevuld veld met een
+   * voorbehoud. Reist mee naar `save-own-data`, dat er
+   * `income_source`/`expenses_source = 'estimate'` van maakt — een placeholder,
+   * geen keuze (ADR 0131), dus echte data verdringt 'm vanzelf.
+   */
+  estimatedFields: EstimatedFieldKey[]
+  /**
+   * De woning-keuze uit stap iii-a (ADR 0133): telt de eigen woning mee voor de
+   * vrijheid, of niet. `null` zolang de vraag niet gesteld is — en dat blijft zo
+   * voor iedereen zonder eigen woning. De keuze reist mee in het concept en in
+   * de save-body; de terugval bij afwezigheid staat in de save-route, niet hier.
+   */
+  housingChoice: HousingChoice | null
 }
 
 type Action =
@@ -408,6 +430,16 @@ type Action =
    * Idempotent: voegt de key alleen toe als hij er nog niet in zit.
    */
   | { type: 'DEFER_FIELD'; key: DeferredFieldKey }
+  /**
+   * Zet of haal de app-schatting-markering op één veld (UR3-05). `false` komt
+   * van elke toetsaanslag in dat veld: typen is per definitie een eigen bedrag.
+   */
+  | { type: 'SET_FIELD_ESTIMATED'; key: EstimatedFieldKey; value: boolean }
+  /**
+   * Zet of wis de woning-keuze (ADR 0133). `null` = wissen — de bezittingen-
+   * sectie stuurt dat zodra de laatste eigen woning uit de lijst verdwijnt.
+   */
+  | { type: 'SET_HOUSING_CHOICE'; choice: HousingChoice | null }
   | { type: 'RESTORE_STATE'; data: OnboardingDraft }
 
 export const _initialState: State = {
@@ -440,6 +472,8 @@ export const _initialState: State = {
   retirementExpense: INITIAL_RETIREMENT_EXPENSE,
   pension: INITIAL_PENSION_DRAFT,
   deferredFields: [],
+  estimatedFields: [],
+  housingChoice: null,
 }
 
 export function _reducer(state: State, action: Action): State {
@@ -476,6 +510,19 @@ export function _reducer(state: State, action: Action): State {
       if (state.deferredFields.includes(action.key)) return state
       return { ...state, deferredFields: [...state.deferredFields, action.key] }
     }
+    case 'SET_FIELD_ESTIMATED': {
+      const has = state.estimatedFields.includes(action.key)
+      if (action.value === has) return state
+      return {
+        ...state,
+        estimatedFields: action.value
+          ? [...state.estimatedFields, action.key]
+          : state.estimatedFields.filter((k) => k !== action.key),
+      }
+    }
+    case 'SET_HOUSING_CHOICE':
+      if (state.housingChoice === action.choice) return state
+      return { ...state, housingChoice: action.choice }
     case 'RESTORE_STATE': {
       const { step: restoredStep, healed } = _resolveRestoredStep(
         action.data.lastStep,
@@ -534,6 +581,16 @@ export function _reducer(state: State, action: Action): State {
           startAge: action.data.pension.startAge,
         },
         deferredFields: [...action.data.deferredFields],
+        // Zelf-helend voor oude concepten: zonder deze sleutel leest een
+        // hersteld bedrag als een EIGEN bedrag. Dat is de veilige kant — een
+        // ontbrekend voorbehoud op iets dat de gebruiker toch al zelf typte
+        // weegt lichter dan een voorbehoud op een bedrag dat hij wél koos.
+        estimatedFields: [...(action.data.estimatedFields ?? [])],
+        // Woning-keuze (ADR 0133): een concept van vóór deze stap draagt de
+        // sleutel niet en herstelt als `null` — "nog niet beantwoord". Nooit
+        // 'exclude' afleiden uit afwezigheid; `sanitizeStoredDraft` bewaakt dat
+        // aan de leeskant, dit is de spiegel ervan.
+        housingChoice: action.data.housingChoice ?? null,
       }
     }
     default:
@@ -1105,6 +1162,25 @@ export default function OnboardingPage() {
         body.deferredFields = state.deferredFields
       }
 
+      // App-schattingen (UR3-05): de server maakt hier `income_source` /
+      // `expenses_source = 'estimate'` van i.p.v. 'manual'. Alleen melden voor
+      // een veld dat óók daadwerkelijk een bedrag draagt — een schatting op een
+      // leeg veld bestaat niet, en zou 'estimate' op een lege profielrij zetten.
+      const estimatedFields = state.estimatedFields.filter((key) =>
+        key === 'income' ? monthlyIncome > 0 : isFinite(monthlyExpenses) && monthlyExpenses > 0,
+      )
+      if (estimatedFields.length > 0) {
+        body.estimatedFields = estimatedFields
+      }
+
+      // Woning-keuze (ADR 0133) — alleen meesturen wanneer de gebruiker 'm
+      // daadwerkelijk maakte. Ontbreekt hij, dan kiest de server bewust de
+      // terugval (`HOUSING_CHOICE_FALLBACK`); dat hier alvast invullen zou een
+      // niet-gemaakte keuze als een keuze laten lezen.
+      if (state.housingChoice !== null) {
+        body.housingChoice = state.housingChoice
+      }
+
       // Derive budgettering mode from modules
       const budgetteringMode = state.activeModules.includes('budgetteren') ? 'manual' : 'none'
       body.budgetteringMode = budgetteringMode
@@ -1300,9 +1376,15 @@ export default function OnboardingPage() {
   /**
    * Meelopende vrijheidstijd-teller (bevinding H12). Verschijnt zodra inkomen,
    * uitgaven én de eerste bezitting bekend zijn; alle guards zitten in
-   * `computeFreedomTicker`. De grondslag volgt de woonstrategie — de onboarding
-   * vraagt die (nog) niet uit en schrijft `downsize` weg, dus de teller draait
-   * op de FIRE-pot exclusief de eigen woning en kan daardoor niet dalen.
+   * `computeFreedomTicker`.
+   *
+   * De grondslag volgt de woonstrategie, en die vraagt de onboarding sinds ADR
+   * 0131 zélf uit — dus komt de mode uit de KEUZE (via `housingChoiceToConfig`,
+   * dezelfde vertaling die de save-route naar `housing_strategy_config`
+   * schrijft) in plaats van uit een gespiegelde constante. Het GETAL blijft
+   * gelijk: `freedomTickerBasis` geeft bij zowel `downsize` (ja, ik verkoop
+   * hem ooit) als `exclude_from_fire` (nee, hij telt niet mee) dezelfde
+   * `fire_pot_excl_home`-grondslag, dus de teller kan nog steeds niet dalen.
    */
   const freedomTicker = useMemo(
     () =>
@@ -1314,9 +1396,29 @@ export default function OnboardingPage() {
           isHome: a.asset_type === 'eigen_huis',
         })),
         debts: state.quickDebts.reduce((s, d) => s + (Number(d.current_balance) || 0), 0),
-        basis: freedomTickerBasis(ONBOARDING_HOUSING_MODE),
+        basis: freedomTickerBasis(
+          housingChoiceToConfig(state.housingChoice ?? HOUSING_CHOICE_FALLBACK).mode,
+        ),
       }),
-    [netMonthlyIncomeForKlaar, monthlyExpensesParsed, state.quickAssets, state.quickDebts],
+    [
+      netMonthlyIncomeForKlaar,
+      monthlyExpensesParsed,
+      state.quickAssets,
+      state.quickDebts,
+      state.housingChoice,
+    ],
+  )
+
+  /**
+   * Vrijheid-per-maand voor het eindscherm (UR3-05, criterium 4). De teller
+   * hierboven deelt een VERMOGEN en geeft `null` zodra de gebruiker geen
+   * bezittingen invulde — precies de gebruiker die anders zónder één tijdgetal
+   * de onboarding verlaat. Deze uitspraak leunt alleen op inkomen en uitgaven,
+   * en die zijn er (desnoods als schatting). Guards zitten in de helper.
+   */
+  const monthlyFreedomBuildup = useMemo(
+    () => computeMonthlyFreedomBuildup(netMonthlyIncomeForKlaar, monthlyExpensesParsed),
+    [netMonthlyIncomeForKlaar, monthlyExpensesParsed],
   )
 
   /**
@@ -1530,6 +1632,21 @@ export default function OnboardingPage() {
               onNext={goToNext}
               onBack={goToBack}
               field={state.step === 'inkomen' ? 'inkomen' : 'uitgaven'}
+              // "Schat het voor me" (UR3-05): de leeftijd staat twee schermen
+              // eerder en is de enige as waarop de app mag raden (eigenaarbesluit
+              // O1 — huishouden wordt in de onboarding niet gevraagd).
+              age={currentAgeForPlan}
+              estimated={{
+                net_monthly_income: state.estimatedFields.includes('income'),
+                estimated_monthly_expenses: state.estimatedFields.includes('expenses'),
+              }}
+              onEstimateChange={(f, value) =>
+                dispatch({
+                  type: 'SET_FIELD_ESTIMATED',
+                  key: f === 'net_monthly_income' ? 'income' : 'expenses',
+                  value,
+                })
+              }
               onSkipIncome={
                 state.step === 'inkomen'
                   ? () => {
@@ -1546,6 +1663,12 @@ export default function OnboardingPage() {
                           estimated_monthly_expenses: '',
                         },
                       })
+                      // Leeg veld = geen schatting. Zonder deze twee zou een
+                      // eerder geraden bedrag als 'estimate'-bron meereizen
+                      // naar een profiel waar niets meer staat — en dat is
+                      // 'unknown', niet 'geschat' (ADR 0131).
+                      dispatch({ type: 'SET_FIELD_ESTIMATED', key: 'income', value: false })
+                      dispatch({ type: 'SET_FIELD_ESTIMATED', key: 'expenses', value: false })
                       dispatch({ type: 'DEFER_FIELD', key: 'income' })
                       dispatch({ type: 'SET_STEP', step: 'bezittingen' })
                     }
@@ -1603,6 +1726,10 @@ export default function OnboardingPage() {
               phases={state.bezittingenPhases}
               onPhasesChange={(phases) =>
                 dispatch({ type: 'SET_BEZITTINGEN_PHASES', phases })
+              }
+              housingChoice={state.housingChoice}
+              onHousingChoiceChange={(choice) =>
+                dispatch({ type: 'SET_HOUSING_CHOICE', choice })
               }
             />
           )}
@@ -1699,6 +1826,14 @@ export default function OnboardingPage() {
               netMonthlyIncome={netMonthlyIncomeForKlaar}
               netWorth={netWorthForKlaar}
               freedomLabel={freedomTicker?.label ?? null}
+              // Niemand verlaat de onboarding zonder tijdgetal (UR3-05): de
+              // teller hierboven vraagt VERMOGEN, de opbouw hieronder alleen
+              // inkomen en uitgaven — en die zijn er, desnoods geschat.
+              monthlyBuildup={monthlyFreedomBuildup}
+              // Grondslag-zin onder de vrijheidstijd volgt de woning-keuze
+              // (ADR 0133); `null` = geen woning/geen keuze → de route-terugval.
+              housingChoice={state.housingChoice}
+              incomeIsEstimate={state.estimatedFields.includes('income')}
               assets={state.quickAssets}
               debts={state.quickDebts}
               spaardoel={spaardoelRecap}

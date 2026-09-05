@@ -175,7 +175,18 @@ export interface HorizonFireSimResult {
    */
   firstPaintFireAge?: number | null
   firstPaintFreedomPct?: number | null
+  /** Prognose!J — benodigde LIQUIDE portefeuille, zónder de eigen woning. */
   firstPaintRequiredPortfolio?: number | null
+  /**
+   * Prognose!I — benodigd NETTO VERMOGEN, MÉT de eigen woning. De server-tegenhanger
+   * van `SimResult.requiredFireNetWorth`, en daarmee de first-paint-waarde voor élk
+   * oppervlak dat ná de run op die grootheid landt.
+   *
+   * Zonder dit veld had de weergavelaag vóór de run alléén Prognose!J in de hand en
+   * ná de run Prognose!I — een grondslag-wissel in de tijd (UR3-07 defect 3). De twee
+   * velden horen dus altijd samen doorgegeven te worden, nooit één alleen.
+   */
+  firstPaintRequiredNetWorth?: number | null
 }
 
 interface HorizonFireSimInput {
@@ -232,7 +243,10 @@ interface HorizonFireSimInput {
    */
   initialFireAge?: number | null
   initialFreedomPct?: number | null
+  /** `HorizonPageData.requiredPortfolioExclHome` — Prognose!J (liquide, zonder woning). */
   initialRequiredPortfolio?: number | null
+  /** `HorizonPageData.requiredNetWorthInclHome` — Prognose!I (netto vermogen, mét woning). */
+  initialRequiredNetWorth?: number | null
 }
 
 /**
@@ -366,6 +380,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   const initialFireAge = params?.initialFireAge ?? null
   const initialFreedomPct = params?.initialFreedomPct ?? null
   const initialRequiredPortfolio = params?.initialRequiredPortfolio ?? null
+  const initialRequiredNetWorth = params?.initialRequiredNetWorth ?? null
 
   // Drie runtimes, drie takken (constant per omgeving → stabiele hook-volgorde):
   //  • BROWSER (`window` + `Worker`): `useWorker` — de `useMemo`'s leveren `null` (geen
@@ -680,9 +695,29 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     deferredStopPadAge !== stopPadAge ||
     (useWorker && stopPadActive && stopPad == null)
 
+  /**
+   * Is er überhaupt een KERNEL-INVOER te bouwen? Exact dezelfde toets als de hoofd-run
+   * hierboven doet (`buildInputFromBundle` + `kernelProfileWithBasis`), zodat "de worker
+   * gaat draaien" en "de hero wacht op de worker" niet uit elkaar kunnen lopen.
+   *
+   * UR3-07 defect 1: `isRefining` toetste alleen of de RUWE invoer aanwezig was
+   * (`horizonInput`/`kernelRawProfile`), niet of `buildHorizonInput` daar een geldige
+   * kernel-invoer van kan maken. Die geeft `null` zodra de jaaruitgave 0 is
+   * (`lib/horizon/build-input.ts` — geen inkomen én geen essentiële uitgaven), en dán
+   * roept het effect hierboven de worker NOOIT aan: `asyncSimMain` blijft voor altijd
+   * `null`. Gevolg: `resolveHeroFireAge` bleef eindeloos `berekenen` teruggeven en de
+   * hero toonde bij élk bezoek "wordt berekend…" naast tegels die al eerlijk "We missen
+   * gegevens" zeiden. Zonder berekenbare invoer is er niets aan het rekenen — dan hoort
+   * het oppervlak meteen te zeggen wat er ontbreekt.
+   */
+  const canBuildKernelInput = useMemo(
+    () => kernelProfileWithBasis != null && buildInputFromBundle(deferredKernelInput) != null,
+    [deferredKernelInput, kernelProfileWithBasis],
+  )
+
   // Verfijnstaat: de worker heeft de hoofd-run nog niet opgeleverd terwijl er wél een
   // berekenbare invoer is (progressieve first paint). In de synchrone tak nooit true.
-  const isRefining = useWorker && simResult == null && horizonInput != null && kernelRawProfile != null
+  const isRefining = useWorker && simResult == null && canBuildKernelInput
 
   // Snapshot persistentie — debounced upsert naar net_worth_snapshots
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -727,7 +762,7 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
   }, [simResult])
 
   if (!params || !horizonInput) {
-    return { result: null, cashflows: [], isLoading: true, error: profileError ?? null, unifiedRows: null, effectiveLifeEvents: [], kernelStatus: null, kernelMaandHint: null, kernelHousingSale: null, kernelPensionPots: null, scenario: null, stopPad: null, scenarioPending: false, stopPadPending: false, isRefining: false, firstPaintFireAge: null, firstPaintFreedomPct: null, firstPaintRequiredPortfolio: null }
+    return { result: null, cashflows: [], isLoading: true, error: profileError ?? null, unifiedRows: null, effectiveLifeEvents: [], kernelStatus: null, kernelMaandHint: null, kernelHousingSale: null, kernelPensionPots: null, scenario: null, stopPad: null, scenarioPending: false, stopPadPending: false, isRefining: false, firstPaintFireAge: null, firstPaintFreedomPct: null, firstPaintRequiredPortfolio: null, firstPaintRequiredNetWorth: null }
   }
 
   return {
@@ -751,5 +786,6 @@ export function useHorizonFireSim(params: HorizonFireSimInput | null): HorizonFi
     firstPaintFireAge: simResult ? null : initialFireAge,
     firstPaintFreedomPct: simResult ? null : initialFreedomPct,
     firstPaintRequiredPortfolio: simResult ? null : initialRequiredPortfolio,
+    firstPaintRequiredNetWorth: simResult ? null : initialRequiredNetWorth,
   }
 }

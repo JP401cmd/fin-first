@@ -152,6 +152,100 @@ describe('mapTransaction', () => {
 
     expect(result.counterparty_name).toBe('Videoland B.V.')
   })
+
+  // ── UR3-02: tegenrekening afleiden uit de omschrijving ─────────────────────
+  //
+  // Juist bij een overboeking tussen twee EIGEN rekeningen laten de Nederlandse
+  // xs2a-banken `meta.counter_party_iban` leeg. Zonder tegenrekening grijpt
+  // `isOwnAccountTransfer` in de sync-route niet, valt de rij door naar gewone
+  // keyword-categorisatie, en telt een spaarstorting als uitgave.
+
+  function savingsTransfer(description: string): TLTransaction {
+    return {
+      transaction_id: 'tl-ur302',
+      timestamp: '2026-09-01T07:00:00Z',
+      amount: -1700,
+      currency: 'EUR',
+      description,
+      transaction_type: 'DEBIT',
+      transaction_category: 'TRANSFER',
+    }
+  }
+
+  it('leidt de tegenrekening af uit de omschrijving als de provider counter_party_iban leeg laat', async () => {
+    const result = await mapTransaction(
+      savingsTransfer('NL20INGB0001234567 Spaarrekening storting'),
+      { selfIbans: ['NL44RABO0123456789'] },
+    )
+
+    expect(result.counterparty_iban).toBe('NL20INGB0001234567')
+  })
+
+  it('leidt niets af zodra de provider zelf een tegenrekening levert', async () => {
+    const tl = {
+      ...savingsTransfer('NL20INGB0001234567 Spaarrekening storting'),
+      meta: { counter_party_iban: 'NL91ABNA0417164300' },
+    } as unknown as TLTransaction
+
+    const result = await mapTransaction(tl, { selfIbans: ['NL44RABO0123456789'] })
+
+    expect(result.counterparty_iban).toBe('NL91ABNA0417164300')
+  })
+
+  it('maakt van de EIGEN rekening in de omschrijving nooit een tegenrekening', async () => {
+    // Anders zou elke transactie op een rekening waarvan de bank het eigen
+    // nummer in de omschrijving herhaalt als eigen overboeking gestempeld
+    // worden — en die verdwijnt stil uit de uitgaven.
+    const result = await mapTransaction(
+      savingsTransfer('NL44RABO0123456789 pinbetaling Albert Heijn'),
+      { selfIbans: ['NL44RABO0123456789'] },
+    )
+
+    expect(result.counterparty_iban).toBeNull()
+  })
+
+  it('leidt niets af bij twee kandidaten in dezelfde omschrijving', async () => {
+    const result = await mapTransaction(
+      savingsTransfer('Doorbelasting NL20INGB0001234567 en NL02SNSB0900123456'),
+    )
+
+    expect(result.counterparty_iban).toBeNull()
+  })
+
+  it('leidt niets af op een incasso — die omschrijving vult de tegenpartij', async () => {
+    // Anders kan een incassant die één van je eigen IBANs kent zijn eigen
+    // afschrijving als "eigen overboeking" laten wegvallen uit je uitgaven.
+    const incasso = {
+      ...savingsTransfer('Incasso NL20INGB0001234567 abonnement'),
+      transaction_category: 'DIRECT_DEBIT',
+      transaction_type: 'DEBIT',
+    } as TLTransaction
+
+    const result = await mapTransaction(incasso, { selfIbans: ['NL44RABO0123456789'] })
+
+    expect(result.counterparty_iban).toBeNull()
+  })
+
+  it('leidt wél af op een doorlopende opdracht — die omschrijving schrijf je zelf', async () => {
+    const standingOrder = {
+      ...savingsTransfer('NL20INGB0001234567 maandelijkse storting spaarrekening'),
+      transaction_category: 'STANDING_ORDER',
+    } as TLTransaction
+
+    const result = await mapTransaction(standingOrder, { selfIbans: ['NL44RABO0123456789'] })
+
+    expect(result.counterparty_iban).toBe('NL20INGB0001234567')
+  })
+
+  it('laat de dedup-sleutel ongemoeid — de afleiding verrijkt alleen de rij', async () => {
+    const description = 'NL20INGB0001234567 Spaarrekening storting'
+    const zonder = await mapTransaction(savingsTransfer(description))
+    const met = await mapTransaction(savingsTransfer(description), {
+      selfIbans: ['NL20INGB0001234567'],
+    })
+
+    expect(met.import_hash).toBe(zonder.import_hash)
+  })
 })
 
 /**

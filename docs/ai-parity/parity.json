@@ -1,16 +1,16 @@
 {
-  "generatedAt": "2026-08-31T21:34:13.505Z",
-  "manifestGeneratedAt": "2026-08-03T00:00:00.000Z",
+  "generatedAt": "2026-09-05T18:13:35.267Z",
+  "manifestGeneratedAt": "2026-09-05T00:00:00.000Z",
   "inSync": false,
   "budgetsOk": true,
   "dnaSubBudget": 2000,
-  "dnaEstimatedTokens": 844,
+  "dnaEstimatedTokens": 890,
   "dnaTokenSource": "live",
   "sources": [
     {
       "file": "lib/ai/dna/base.ts",
-      "storedSha256": "4089da9e6e0a736479423786bcf653065c7ad9f523e8d0d8c8022ae57a6c639d",
-      "liveSha256": "4089da9e6e0a736479423786bcf653065c7ad9f523e8d0d8c8022ae57a6c639d",
+      "storedSha256": "ef73346d82b0a3f3a97deac0077f5c7f76ae11297eee1b1ba1cd91d9e68a7ddf",
+      "liveSha256": "ef73346d82b0a3f3a97deac0077f5c7f76ae11297eee1b1ba1cd91d9e68a7ddf",
       "inSync": true
     },
     {
@@ -27,15 +27,15 @@
       "constant": "LOCAL_CHAT_DNA",
       "file": "lib/ai/local/local-chat-prompt.ts",
       "subBudget": 2000,
-      "estimatedTokens": 844,
+      "estimatedTokens": 890,
       "tokenSource": "live",
       "withinBudget": true,
       "inSync": false,
       "sources": [
         {
           "file": "lib/ai/dna/base.ts",
-          "storedSha256": "4089da9e6e0a736479423786bcf653065c7ad9f523e8d0d8c8022ae57a6c639d",
-          "liveSha256": "4089da9e6e0a736479423786bcf653065c7ad9f523e8d0d8c8022ae57a6c639d",
+          "storedSha256": "ef73346d82b0a3f3a97deac0077f5c7f76ae11297eee1b1ba1cd91d9e68a7ddf",
+          "liveSha256": "ef73346d82b0a3f3a97deac0077f5c7f76ae11297eee1b1ba1cd91d9e68a7ddf",
           "inSync": true
         },
         {
@@ -66,8 +66,8 @@
         {
           "file": "lib/ai/dna/base.ts",
           "storedSha256": "4089da9e6e0a736479423786bcf653065c7ad9f523e8d0d8c8022ae57a6c639d",
-          "liveSha256": "4089da9e6e0a736479423786bcf653065c7ad9f523e8d0d8c8022ae57a6c639d",
-          "inSync": true
+          "liveSha256": "ef73346d82b0a3f3a97deac0077f5c7f76ae11297eee1b1ba1cd91d9e68a7ddf",
+          "inSync": false
         }
       ]
     },
@@ -80,13 +80,13 @@
       "estimatedTokens": 280,
       "tokenSource": "live",
       "withinBudget": true,
-      "inSync": true,
+      "inSync": false,
       "sources": [
         {
           "file": "lib/ai/dna/base.ts",
           "storedSha256": "4089da9e6e0a736479423786bcf653065c7ad9f523e8d0d8c8022ae57a6c639d",
-          "liveSha256": "4089da9e6e0a736479423786bcf653065c7ad9f523e8d0d8c8022ae57a6c639d",
-          "inSync": true
+          "liveSha256": "ef73346d82b0a3f3a97deac0077f5c7f76ae11297eee1b1ba1cd91d9e68a7ddf",
+          "inSync": false
         }
       ]
     },
@@ -129,8 +129,8 @@
         {
           "file": "lib/ai/dna/base.ts",
           "storedSha256": "4089da9e6e0a736479423786bcf653065c7ad9f523e8d0d8c8022ae57a6c639d",
-          "liveSha256": "4089da9e6e0a736479423786bcf653065c7ad9f523e8d0d8c8022ae57a6c639d",
-          "inSync": true
+          "liveSha256": "ef73346d82b0a3f3a97deac0077f5c7f76ae11297eee1b1ba1cd91d9e68a7ddf",
+          "inSync": false
         }
       ]
     },
@@ -143,7 +143,7 @@
       "estimatedTokens": 445,
       "tokenSource": "live",
       "withinBudget": true,
-      "inSync": true,
+      "inSync": false,
       "sources": [
         {
           "file": "lib/news-system-prompt.ts",
@@ -154,8 +154,8 @@
         {
           "file": "lib/ai/dna/base.ts",
           "storedSha256": "4089da9e6e0a736479423786bcf653065c7ad9f523e8d0d8c8022ae57a6c639d",
-          "liveSha256": "4089da9e6e0a736479423786bcf653065c7ad9f523e8d0d8c8022ae57a6c639d",
-          "inSync": true
+          "liveSha256": "ef73346d82b0a3f3a97deac0077f5c7f76ae11297eee1b1ba1cd91d9e68a7ddf",
+          "inSync": false
         }
       ]
     },

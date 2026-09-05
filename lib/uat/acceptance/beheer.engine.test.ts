@@ -4,11 +4,12 @@
  * BEHEER is een admin-tooling-zone ZONDER rekenkern: er zijn geen 'exact'-
  * criteria, dus `BEHEER_ENGINE_CHECKS` (beheer-checks.ts) is bewust leeg. Deze
  * test borgt daarom vooral de DEKKING en de kind-verdeling: elk BEHEER-scenario
- * uit de catalogus (UAT-BEHEER-01..37 met één gat — 12 is op 8 aug 2026 vervallen
+ * uit de catalogus (UAT-BEHEER-01..38 met één gat — 12 is op 8 aug 2026 vervallen
  * met /beheer/doelen; nummers worden niet hergebruikt omdat scenario-ID's
- * opgeslagen UAT-resultaten in Supabase sleutelen) heeft precies één criterium;
- * de kinds zijn geldig (0 exact, 13 consistency, 2 oracle, 21 ui-only); en er is
- * precies één engine-check per exact-criterium (0 = 0).
+ * opgeslagen UAT-resultaten in Supabase sleutelen; 38 is de AI-gezondheid-
+ * strip/kaart van ADR 0132) heeft precies één criterium; de kinds zijn geldig
+ * (0 exact, 14 consistency, 2 oracle, 21 ui-only); en er is precies één
+ * engine-check per exact-criterium (0 = 0).
  */
 
 import { describe, it, expect } from 'vitest'
@@ -30,9 +31,9 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Beheer — acceptatiecriteria dekking', () => {
-  it('is de BEHEER-zone met precies 36 criteria', () => {
+  it('is de BEHEER-zone met precies 37 criteria', () => {
     expect(BEHEER_ACCEPTANCE.zone).toBe('BEHEER')
-    expect(BEHEER_ACCEPTANCE.criteria.length).toBe(36)
+    expect(BEHEER_ACCEPTANCE.criteria.length).toBe(37)
   })
 
   it('heeft precies één criterium per catalogus-BEHEER-scenario', () => {
@@ -66,11 +67,11 @@ describe('UAT Beheer — acceptatiecriteria dekking', () => {
     expect(checkWorkflows).toEqual(exactWorkflows)
   })
 
-  it('heeft de verwachte kind-verdeling (0 exact, 13 consistency, 2 oracle, 21 ui-only)', () => {
+  it('heeft de verwachte kind-verdeling (0 exact, 14 consistency, 2 oracle, 21 ui-only)', () => {
     const counts = { exact: 0, consistency: 0, 'ui-only': 0, oracle: 0, direction: 0 }
     for (const c of BEHEER_ACCEPTANCE.criteria) counts[c.assertion.kind]++
     expect(counts.exact).toBe(0)
-    expect(counts.consistency).toBe(13)
+    expect(counts.consistency).toBe(14)
     expect(counts.oracle).toBe(2)
     expect(counts['ui-only']).toBe(21)
     expect(counts.direction).toBe(0)

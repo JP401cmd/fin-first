@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import { useEffect, useState, useCallback, useRef, useMemo, useDeferredValue, type RefObject } from 'react'
+import Link from 'next/link'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { useDreamTransition } from '@/components/app/horizon/dream-transition-context'
 import type { HorizonPageData } from '@/lib/horizon-data-loader'
@@ -135,6 +136,10 @@ import {
   isHeroAnswerInvalid,
   heroFireAgeYear,
 } from '@/lib/horizon/hero-fire-age'
+import {
+  resolveFireDoelWeergave,
+  FIRE_DOEL_ONDERSCHRIFT,
+} from '@/lib/horizon/fire-doel-weergave'
 import {
   ANKER_KPI_LABEL,
   ANKER_KPI_LABEL_KORT,
@@ -1136,7 +1141,7 @@ export default function HorizonPage({
   // Fase 2b (#495): gemigreerd naar runUnifiedProjection() met per-asset-type rendement
   // Task 4.2: de kernel-runs draaien in een web worker (met synchrone jsdom/SSR-fallback);
   // `firstPaint*` levert de server-scalars zolang de worker-run nog niet geland is.
-  const { result: simResult, cashflows: simCashflows, error: simError, unifiedRows, effectiveLifeEvents, kernelStatus, kernelMaandHint, kernelHousingSale, scenario, stopPad, scenarioPending, stopPadPending, isRefining: kernelIsRefining, firstPaintFireAge, firstPaintFreedomPct, firstPaintRequiredPortfolio } = useHorizonFireSim(
+  const { result: simResult, cashflows: simCashflows, error: simError, unifiedRows, effectiveLifeEvents, kernelStatus, kernelMaandHint, kernelHousingSale, scenario, stopPad, scenarioPending, stopPadPending, isRefining: kernelIsRefining, firstPaintFireAge, firstPaintFreedomPct, firstPaintRequiredPortfolio, firstPaintRequiredNetWorth } = useHorizonFireSim(
     input
       ? {
           horizonInput: input,
@@ -1164,6 +1169,10 @@ export default function HorizonPage({
           initialFireAge: serverFireAge,
           initialFreedomPct: initialData.freedomPct,
           initialRequiredPortfolio: initialData.requiredPortfolioExclHome,
+          // Prognose!I moet MET Prognose!J meereizen: de tegel kiest per
+          // woonstrategie welke van de twee hij toont, en die keuze mag niet
+          // afhangen van de vraag of de worker al geland is (UR3-07 defect 3).
+          initialRequiredNetWorth: initialData.requiredNetWorthInclHome,
         }
       : null,
   )
@@ -2414,8 +2423,15 @@ export default function HorizonPage({
   // de perspectiveHero én het balk-label erven deze effectieve grondslag.
   const homeExcludedFromProgress =
     initialData.housingContext.hasEigenHuis && isHomeExcludedFromFire(initialData.housingStrategy)
+  // Zelfde precedentie als het getoonde doelbedrag hieronder: client-kernel,
+  // dan de SERVER-kernelrun (die Prognose!I al canoniek in de bundel legt), en
+  // pas dán de scalar-reconstructie. Zonder de middelste stap bouwde de eerste
+  // paint dit getal hier lokaal na uit Prognose!J terwijl de server het al had —
+  // een tweede route naar hetzelfde cijfer, en dus de noemer van de balk-vulling
+  // die kon afwijken van het balk-label ernaast (UR3-07 defect 3).
   const effectiveRequiredNetWorthInclHome =
     simResult?.requiredFireNetWorth ??
+    firstPaintRequiredNetWorth ??
     inclHomeTargetFromScalar(
       effectiveFireTarget > 0 ? effectiveFireTarget : null,
       effectiveNetWorth,
@@ -2483,10 +2499,34 @@ export default function HorizonPage({
   // Bij downsize/opeethypotheek/uitsluiten (showDualHousingBasis) toont /toekomst
   // BEIDE doelen: incl. woning (requiredFireNetWorth = totaal netto vermogen bij
   // FIRE — valt samen met de vermogenslijn) én excl. woning/liquide
-  // (requiredFirePortfolio). Valt de sim weg (requiredFireNetWorth == null) dan
-  // blijft het bestaande enkelvoudige gedrag intact. Puur al-doorgeleide velden.
-  const fireTargetInclHome = simResult?.requiredFireNetWorth ?? null
-  const fireTargetExclHome = simResult?.requiredFirePortfolio ?? null
+  // (requiredFirePortfolio). Levert géén van beide runs het paar, dan blijft het
+  // bestaande enkelvoudige gedrag intact. Puur al-doorgeleide velden.
+  //
+  // BEWUSTE KEUZE (UR3-07 defect 3): het paar komt uit dezelfde samenvoeging als
+  // het enkelvoudige bedrag, dus `showDualFireTarget` slaat óók op de
+  // SERVER-waarden aan. Zonder dat zou de tegel behalve van GETAL ook nog van
+  // VORM verspringen — eerst één bedrag, dan twee — en dat is dezelfde bevinding
+  // in een ander jasje. De dual-tak schrijft zijn grondslagen ("met je huis" /
+  // "zonder je huis") zelf al bij het getal, dus hij is bij de eerste paint net
+  // zo eerlijk als daarna.
+  //
+  // ÉÉN BESLISSER (UR3-07 defect 3): `resolveFireDoelWeergave` voegt per
+  // grootheid de client-kernelrun en de SERVER-kernelrun samen en kiest daarna
+  // pas — op de woonstrategie, niet op de vraag of de worker al geland is —
+  // welke van de twee de tegel toont. Vóór deze stap las de tegel Prognose!J bij
+  // de eerste paint en Prognose!I daarna: dezelfde tegel, twee grootheden
+  // (gemeten € 140.000 → € 620.000 op een huis-zware downsize-fixture). Het
+  // onderschrift komt uit dezelfde uitkomst, zodat label en getal niet uit
+  // elkaar kunnen lopen. Consume-only: hier wordt niets herrekend.
+  const fireDoel = resolveFireDoelWeergave({
+    homeExcludedFromProgress,
+    kernelRequiredNetWorthInclHome: simResult?.requiredFireNetWorth,
+    kernelRequiredPortfolioExclHome: simResult?.requiredFirePortfolio,
+    serverRequiredNetWorthInclHome: firstPaintRequiredNetWorth,
+    serverRequiredPortfolioExclHome: firstPaintRequiredPortfolio,
+  })
+  const fireTargetInclHome = fireDoel.inclHuis
+  const fireTargetExclHome = fireDoel.exclHuis
   const showDualFireTarget =
     initialData.showDualHousingBasis &&
     // ADR 0129 D4 — onder een vast anker is er geen doelbedrag (de kernel bisecteert
@@ -2505,13 +2545,13 @@ export default function HorizonPage({
   )
 
   // Doelbedrag dat bij de voortgangsbalk-grondslag hoort: incl. woning
-  // (fireTargetInclHome = requiredFireNetWorth) tenzij de woning is uitgesloten
-  // (exclude_from_fire) → dan het liquide excl.-doel. Consistent met de noemer
-  // van effectiveFreedomPct, zodat de balk-fill en het balk-label niet botsen.
-  // Zelfde C1-regel als bij `effectiveFireTarget`: alleen kernel-afgeleide bronnen.
-  const balkVrijheidDoel = homeExcludedFromProgress
-    ? (simResult?.requiredFirePortfolio ?? firstPaintRequiredPortfolio ?? 0)
-    : (fireTargetInclHome ?? simResult?.requiredFirePortfolio ?? firstPaintRequiredPortfolio ?? 0)
+  // (Prognose!I) tenzij de woning is uitgesloten (exclude_from_fire) → dan het
+  // liquide excl.-doel (Prognose!J). Consistent met de noemer van
+  // effectiveFreedomPct, zodat de balk-fill en het balk-label niet botsen.
+  // Zelfde C1-regel als bij `effectiveFireTarget`: alleen kernel-afgeleide
+  // bronnen — en sinds UR3-07 defect 3 óók dezelfde grondslag vóór en ná de
+  // worker-run, want beide runs leveren nu allebei de grootheden.
+  const balkVrijheidDoel = fireDoel.bedrag
 
   // ── M6-vangrail op het GETOONDE doelbedrag ────────────────────────────────
   // Tweede verdedigingslinie (de rekenkant is bij de bron gefixt: solver-scoping
@@ -4752,19 +4792,21 @@ export default function HorizonPage({
   // meeste gebruikers — zei alleen "benodigd". Daardoor leest hetzelfde
   // kerngetal op /toekomst en op /toekomst/doelen als een tegenspraak van
   // honderdduizenden euro's, terwijl het twee bewuste grondslagen zijn.
-  // Consume-only: `homeExcludedFromProgress` is dezelfde vlag die
-  // `balkVrijheidDoel` hierboven al koos — hier wordt niets herbepaald.
+  // Consume-only: de kwalificatie komt uit `fireDoel.grondslag` — de uitkomst
+  // die het getoonde bedrag zélf koos, niet uit een tweede afleiding op
+  // `homeExcludedFromProgress`. Dat is het verzwarende deel van UR3-07 defect 3:
+  // bij downsize/opeethypotheek stond het J-bedrag van de eerste paint ónder het
+  // bijschrift "benodigd — met je huis" — het label sprak het getal tegen. Nu
+  // kán dat niet meer: wisselt de grondslag, dan wisselt het onderschrift mee.
   // Geen kwalificatie waar ze niet klopt of niets betekent: in pensioen-modus is
   // het getal een projectie (geen doel), onder 'nu stoppen' bestaat er geen
   // doelbedrag (ADR 0127 D4) en bij een huishoud-/partnerweergave komt het
-  // bedrag uit een andere bron dan deze vlag.
+  // bedrag uit een andere bron dan deze keuze.
   const fireTargetCaption = isFixedAnchorMode
     ? 'geprojecteerd op je stopmoment'
     : hasPerspectiveHero
       ? 'benodigd'
-      : homeExcludedFromProgress
-        ? 'benodigd — zonder je huis'
-        : 'benodigd — met je huis'
+      : FIRE_DOEL_ONDERSCHRIFT[fireDoel.grondslag]
 
   // ── Reeds-vrij / met-pensioen framing voor de hero-leeftijdsstat ───────────
   // Consume-only (ADR 0009): leest de reeds-berekende vrijheidsvoortgang +
@@ -5518,6 +5560,28 @@ export default function HorizonPage({
               )}
             </button>
           </div>
+
+          {/* UR3-07 defect 1B — de gegevensmelding zei WAT er ontbrak, maar nergens hing
+              er een actie aan: de tegel bleef een doodlopende mededeling. Eén knop ONDER
+              de strip, niet één per tegel — de tegels zijn zelf al knoppen (naar hun
+              kassabon), en een link in een knop is geen geldige markup. Staat één keer in
+              de boom (na de mobiele strip) en geldt dus voor beide layouts.
+              Woorden: de duiding komt uit de guards ín de tegels; hier staat alleen de
+              actie, zodat de app-brede formulering in outcome-guard.ts niet kan driften. */}
+          {(showFireAgeNotice || showFireTargetNotice || showRetirementExpenseNotice) && (
+            <Link
+              href="/mijn/profiel"
+              data-testid="hero-missende-gegevens-cta"
+              className="group mb-5 flex items-center justify-between gap-3 rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--paper)] px-3 py-2.5 transition-colors hover:border-[var(--module-active-300)]"
+            >
+              <span className="font-sans text-[12px] text-[var(--ink-2)]">
+                Vul je geboortedatum, inkomen en bestedingen aan — dan rekenen we je vrijheidsmoment uit.
+              </span>
+              <span className="shrink-0 font-sans text-[12px] font-semibold text-[var(--module-active-700)] group-hover:underline">
+                Vul profiel aan →
+              </span>
+            </Link>
+          )}
 
           {/* Profile error warning — shown when profile query failed but page loads with defaults */}
           {simError && (

@@ -1095,6 +1095,10 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
       netMonthlyIncome: avgIncome6m,
       // Noodbuffer-norm: 3 × netto maandsalaris (lib/emergency-fund.ts).
       netMonthlySalary: emergencySalaryBase,
+      // Grondslag voor het OORDEEL (ADR 0131): de 12-/6-maands resoluties
+      // hierboven — dezelfde die de spaarquote dragen. 'unknown' = niets bekend.
+      incomeBasis: horizonAnnualIncome.basis,
+      expensesBasis: horizonSavingsExpenses.basis,
     },
     {
       assets: healthAssetRows,
@@ -1344,6 +1348,9 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
     consumptionExpenseRows(txAgg12, budgetTypeMap),
     now,
     effectiveMonthlyExpenses,
+    // Terugval op een bedrag dat de APP raadde ("Schat het voor me") → het
+    // tarief heet 'cohort' en de voetnoot wijst de weg terug (ADR 0131).
+    sources.expenses_source === 'estimate' ? 'cohort' : 'profile',
   )
 
   return {

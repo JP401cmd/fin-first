@@ -17,6 +17,8 @@ import { useFinSlot } from '@/lib/shell/fin-slot'
 import { useCoachSuggestion } from '@/lib/hooks/use-coach-suggestion'
 import { useTypewriter } from '@/lib/hooks/use-typewriter'
 import { useRondleidingActive } from '@/lib/rondleiding/signal'
+import { claimAttention } from '@/lib/attention-signal'
+import { useAttentionQuiet } from '@/lib/hooks/use-attention-quiet'
 import { CoachMelding } from './coach-melding'
 import {
   DEFAULT_COACH_TIMING, DEFAULT_COACH_HEADER,
@@ -116,8 +118,13 @@ export function FinHome({
   // géén overlay-signaal (chat-panel.tsx) — zonder deze term koos de hook dan
   // een tip, typte 'm uit en schreef 'm na acht seconden als gezien weg terwijl
   // niemand hem te zien kreeg. Voor een gidsstap verbruikte dat bovendien de dag.
+  //
+  // De unie zelf woont sinds UR3-10 in `useAttentionQuiet` (ADR 0134) zodat de
+  // coachmark en elke volgende uitleglaag exact dezelfde regel lezen in plaats
+  // van hun eigen variant te bedenken. `self: 'fin-melding'` slaat onze eigen
+  // claim over — anders zou Fin zichzelf pauzeren zodra zijn kaart openstaat.
   const rondleidingActive = useRondleidingActive()
-  const paused = overlayOpen || isOpen || isImmersiveRoute(pathname) || rondleidingActive
+  const paused = useAttentionQuiet({ self: 'fin-melding' })
 
   const { suggestion, dismiss } = useCoachSuggestion({
     coachState, dataGaps, deferredFields, overrides, activeModules, delayMs, paused, guide,
@@ -128,6 +135,20 @@ export function FinHome({
   // alleen niet gerenderd. Anders stond hij bevroren onder de scrim en lichtte
   // de slotstap "hier vind je mij" de meldkaart uit in plaats van Fins knop.
   const mode: 'bubble' | 'melding' = suggestion && !rondleidingActive ? 'melding' : 'bubble'
+
+  // Zolang de meldkaart in beeld staat is Fin de aandachtsvrager (ADR 0134).
+  // Daarmee houdt hij de euro-coachmark stil — en elke volgende uitleglaag die
+  // zich op het register aansluit — zonder dat die lagen van elkaars bestaan
+  // hoeven te weten.
+  // `!paused` staat er bewust bij: een melding die nog in de staat zit terwijl
+  // er een overlay overheen ligt, wordt niet gerenderd (`hideFloating`) en mag
+  // dus ook geen aandacht claimen — anders houdt een onzichtbare kaart de
+  // coachmark stil (M15: geen effect zonder zichtbaarheid).
+  const meldingZichtbaar = mode === 'melding' && !paused
+  useEffect(() => {
+    if (!meldingZichtbaar) return
+    return claimAttention('fin-melding')
+  }, [meldingZichtbaar])
 
   // thinking: true for THINK_MS after a new suggestion appears (skipped when reduced-motion)
   const [thinking, setThinking] = useState(false)

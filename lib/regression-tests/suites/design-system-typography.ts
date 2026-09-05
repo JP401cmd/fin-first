@@ -192,8 +192,12 @@ const tests: TestCase[] = [
         const lines = src.split('\n')
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i]
-          // Skip comments and imports
-          if (line.trim().startsWith('//') || line.trim().startsWith('*') || line.trim().startsWith('import')) continue
+          // Skip comments and imports. `/*` en `/**` horen er expliciet bij:
+          // een eenregelige JSDoc (`/** … '5 maanden geleden' … */`) begint met
+          // geen van beide andere prefixes en werd anders als schending gelezen —
+          // een toelichting die het patroon beschrijft is geen gebruikerstekst.
+          const t = line.trim()
+          if (t.startsWith('//') || t.startsWith('*') || t.startsWith('/*') || t.startsWith('import')) continue
           // Skip variable names like 'twelveMonthsAgo', 'sixMonthsAgo'
           if (/\w+Ago\b/.test(line) && !line.includes("'") && !line.includes('"') && !line.includes('`')) continue
 

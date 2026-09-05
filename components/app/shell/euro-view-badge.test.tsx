@@ -13,16 +13,38 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
 import { EuroViewBadge, __resetCoachmarkCache } from './euro-view-badge'
+import { claimAttention, __resetAttentionSignal } from '@/lib/attention-signal'
 import type { EuroView } from '@/lib/euro-display'
 
 const toggle = vi.fn()
 let currentView: EuroView = 'nominal'
+let currentPath = '/overzicht'
+let chatOpen = false
 
 vi.mock('@/lib/hooks/use-euro-view', () => ({
   useEuroView: () => ({ view: currentView, setView: vi.fn(), toggle }),
 }))
+// `useAttentionQuiet` (ADR 0134) leest het pad en de chat.
+vi.mock('next/navigation', () => ({ usePathname: () => currentPath }))
+vi.mock('@/components/app/chat/chat-provider', () => ({
+  useChatContextOptional: () => ({ isOpen: chatOpen }),
+}))
+
+/**
+ * De coachmark verschijnt pas na een startvertraging (UR3-10) - zonder die
+ * pauze wint hij de race van de rondleiding die op ~400 ms begint. In de tests
+ * duwen we de klok dus expliciet vooruit; `advanceTimersByTimeAsync` spoelt ook
+ * de microtasks van de fetch door.
+ */
+const COACHMARK_DELAY_MS = 1500
+async function laatDeUitlegVerschijnen() {
+  // Twee stappen: eerst de fetch laten landen (dán pas plant het component zijn
+  // startvertraging), daarna die vertraging uitzitten.
+  await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+  await act(async () => { await vi.advanceTimersByTimeAsync(COACHMARK_DELAY_MS + 50) })
+}
 
 /** Stub /api/coachmark; `dismissed=false` betekent: uitleg nog niet gezien. */
 function mockCoachmarkApi(dismissed: boolean) {
@@ -40,14 +62,20 @@ function mockCoachmarkApi(dismissed: boolean) {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers()
   currentView = 'nominal'
+  currentPath = '/overzicht'
+  chatOpen = false
   toggle.mockClear()
   __resetCoachmarkCache()
+  __resetAttentionSignal()
 })
 
 afterEach(() => {
   cleanup()
+  vi.useRealTimers()
   vi.unstubAllGlobals()
+  __resetAttentionSignal()
 })
 
 describe('EuroViewBadge — zichtbaar label (M13a)', () => {
@@ -108,16 +136,16 @@ describe('EuroViewBadge — eenmalige uitleg (M13b)', () => {
     mockCoachmarkApi(false)
     render(<EuroViewBadge showCoachmark />)
 
-    await waitFor(() => {
-      expect(screen.getByRole('note', { name: 'Uitleg bij de euro-weergave' })).toBeTruthy()
-    })
+    await laatDeUitlegVerschijnen()
+    expect(screen.getByRole('note', { name: 'Uitleg bij de euro-weergave' })).toBeTruthy()
   })
 
   it('toont hem NIET wanneer hij al is weggeklikt', async () => {
     const fetchMock = mockCoachmarkApi(true)
     render(<EuroViewBadge showCoachmark />)
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    await laatDeUitlegVerschijnen()
+    expect(fetchMock).toHaveBeenCalled()
     expect(screen.queryByRole('note')).toBeNull()
   })
 
@@ -132,7 +160,8 @@ describe('EuroViewBadge — eenmalige uitleg (M13b)', () => {
     const fetchMock = mockCoachmarkApi(false)
     render(<EuroViewBadge showCoachmark />)
 
-    const knop = await screen.findByRole('button', { name: 'Duidelijk' })
+    await laatDeUitlegVerschijnen()
+    const knop = screen.getByRole('button', { name: 'Duidelijk' })
     fireEvent.click(knop)
 
     expect(screen.queryByRole('note')).toBeNull()
@@ -153,8 +182,93 @@ describe('EuroViewBadge — eenmalige uitleg (M13b)', () => {
       </>,
     )
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    await laatDeUitlegVerschijnen()
     const gets = fetchMock.mock.calls.filter(([, init]) => (init as RequestInit | undefined)?.method !== 'PUT')
     expect(gets).toHaveLength(1)
+  })
+})
+
+// -- UR3-10 - een ding tegelijk in de eerste minuut -------------------------
+//
+// De uitleg stond bij Bas op alle 55 desktoproutes open, dekte het
+// Overzicht-submenu in de zijbalk af en verdween niet nadat hij de knop had
+// gebruikt. Drie regels lossen dat op: zwijgen zolang een ander spreekt,
+// sluiten op gebruik, en sluiten op de eerste routewissel.
+describe('EuroViewBadge - coachmark wijkt en sluit (UR3-10)', () => {
+  it('verschijnt niet - en fetcht niet - zolang een andere laag de aandacht claimt', async () => {
+    const fetchMock = mockCoachmarkApi(false)
+    claimAttention('rondleiding')
+    render(<EuroViewBadge showCoachmark />)
+
+    await laatDeUitlegVerschijnen()
+    expect(screen.queryByRole('note')).toBeNull()
+    // Geen stempel en geen netwerkverkeer zonder zichtbaarheid (M15).
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('verschijnt alsnog zodra die andere laag klaar is', async () => {
+    let release: (() => void) | null = null
+    act(() => { release = claimAttention('rondleiding') })
+    mockCoachmarkApi(false)
+    render(<EuroViewBadge showCoachmark />)
+    await laatDeUitlegVerschijnen()
+    expect(screen.queryByRole('note')).toBeNull()
+
+    act(() => { release?.() })
+    await laatDeUitlegVerschijnen()
+    expect(screen.getByRole('note', { name: 'Uitleg bij de euro-weergave' })).toBeTruthy()
+  })
+
+  it('sluit wanneer de gebruiker de knop zelf gebruikt (AC 2)', async () => {
+    const fetchMock = mockCoachmarkApi(false)
+    render(<EuroViewBadge showCoachmark />)
+    await laatDeUitlegVerschijnen()
+    expect(screen.getByRole('note')).toBeTruthy()
+
+    fireEvent.click(screen.getByTestId('sidebar-euro-view-badge'))
+
+    expect(screen.queryByRole('note')).toBeNull()
+    // De schakelaar doet nog steeds gewoon zijn werk.
+    expect(toggle).toHaveBeenCalledTimes(1)
+    const put = fetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'PUT')
+    expect(put, 'gebruik van de knop hoort de uitleg weg te schrijven').toBeTruthy()
+  })
+
+  it('stuurt geen PUT wanneer er helemaal geen uitleg openstaat', async () => {
+    const fetchMock = mockCoachmarkApi(true)
+    render(<EuroViewBadge showCoachmark />)
+    await laatDeUitlegVerschijnen()
+
+    fireEvent.click(screen.getByTestId('sidebar-euro-view-badge'))
+
+    const puts = fetchMock.mock.calls.filter(([, init]) => (init as RequestInit | undefined)?.method === 'PUT')
+    expect(puts).toHaveLength(0)
+  })
+
+  it('sluit op de eerste routewissel na het verschijnen (AC 2)', async () => {
+    const fetchMock = mockCoachmarkApi(false)
+    const { rerender } = render(<EuroViewBadge showCoachmark />)
+    await laatDeUitlegVerschijnen()
+    expect(screen.getByRole('note')).toBeTruthy()
+
+    currentPath = '/toekomst'
+    await act(async () => { rerender(<EuroViewBadge showCoachmark />) })
+
+    expect(screen.queryByRole('note')).toBeNull()
+    const put = fetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'PUT')
+    expect(put, 'een pagina verder hoort de uitleg weg te schrijven').toBeTruthy()
+  })
+
+  it('verliest de uitleg NIET wanneer je wegnavigeert voordat hij te zien was (M15)', async () => {
+    const fetchMock = mockCoachmarkApi(false)
+    claimAttention('rondleiding') // stil: de rondleiding loopt
+    const { rerender } = render(<EuroViewBadge showCoachmark />)
+    await laatDeUitlegVerschijnen()
+
+    currentPath = '/toekomst'
+    await act(async () => { rerender(<EuroViewBadge showCoachmark />) })
+
+    const puts = fetchMock.mock.calls.filter(([, init]) => (init as RequestInit | undefined)?.method === 'PUT')
+    expect(puts, 'een nooit getoonde uitleg mag niet als gezien worden weggeschreven').toHaveLength(0)
   })
 })

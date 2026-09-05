@@ -147,8 +147,19 @@ describe('OnboardingPensioen', () => {
       target: { value: '10' },
     })
 
-    expect(screen.getByText(/Onder de AOW-franchise/)).toBeTruthy()
+    expect(screen.getByText(/onder de drempel waar de AOW/)).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Neem over' })).toBeNull()
+  })
+
+  it('inschat-hulp: de uitlegtekst bevat geen onverklaard fiscaal jargon (UR3-12)', () => {
+    render(<Host />)
+    fireEvent.click(screen.getByText('Schat het zelf'))
+    fireEvent.click(screen.getByText(/Help me schatten/))
+
+    const hint = screen.getByText(/Jaren in loondienst waarin je pensioen opbouwde/)
+    expect(hint.textContent).not.toMatch(/middelloon/i)
+    expect(hint.textContent).not.toMatch(/AOW-franchise/i)
+    expect(hint.textContent).not.toMatch(/fiscale maximum/i)
   })
 
   it('leeftijdsveld: placeholder en hint volgen de aangeleverde AOW-leeftijd', () => {

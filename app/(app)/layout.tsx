@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
@@ -68,6 +69,27 @@ import {
 } from '@/lib/color-palette'
 import type { ModuleColorConfig, BudgetColorConfig, PhaseColorConfig } from '@/lib/color-palette'
 import type { FontTheme } from '@/components/app/module-color-provider'
+
+// ── Tabtitel binnen de app-shell ────────────────────────────────────
+// Zonder deze export erven alle (app)-pagina's de root-title uit
+// `app/layout.tsx` — de landingsclaim ("Ken je waarheid. Kies je vrijheid…"),
+// die op een ingelogd scherm nergens op slaat. 78 van de 119 `page.tsx` onder
+// `(app)` hebben geen eigen title, en 41 daarvan zijn `'use client'` en KUNNEN
+// er per definitie geen exporteren. Vandaar één neutrale default hier.
+//
+// De echte paginanaam wordt daarna client-side gezet in
+// `components/app/shell/mobile-stack-shell.tsx`, uit dezelfde bron als de
+// enige <h1> (`resolveRouteTitle()`, ADR 0110) — zo blijft de tabtitel
+// single-sourced met de nav-config en werkt hij óók op de client-pagina's.
+//
+// BEWUST een kale string en GEEN `{ default, template }`: de 41 pagina's die
+// hier wél een eigen `metadata` hebben schrijven de suffix zélf voltuit
+// ('Overzicht — TriFinity', 'Architectuur — Beheer'). Een template zou daar
+// een tweede suffix achteraan plakken. Een kale string erft alleen naar
+// pagina's die zélf geen title zetten en laat de rest ongemoeid.
+export const metadata: Metadata = {
+  title: 'TriFinity',
+}
 
 // ── Sidebar status-dot drempels ─────────────────────────────────────
 // Hypotheek-rentevaste periode loopt binnen dit venster af = "actie" (sidebar dot).
@@ -570,6 +592,7 @@ export default async function AppLayout({
                           <CashflowStatusProvider>
                             <ResponsiveShell
                               email={user.email ?? ''}
+                              fullName={(profile?.full_name as string | null) ?? null}
                               role={profile?.role ?? 'user'}
                               sidebarMetrics={{
                                 netWorth: sidebarNetWorth,

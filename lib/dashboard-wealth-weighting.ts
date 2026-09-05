@@ -198,7 +198,7 @@ export const INVESTED_ASSET_TYPES = new Set(['investment', 'crypto'])
  * "Belegt deze gebruiker al?" — de ene lezing achter de beleggings-CTA's
  * (kaart H15). Een BESTAANSVRAAG, geen bedrag: de drempels die bepalen óf een
  * inspiratiekaart rendert blijven bij de aanroeper, deze bepaalt alleen of de
- * kaart "Start met beleggen" of een gevulde variant toont. Zonder dit stond de
+ * kaart "Bekijk beleggen" of een gevulde variant toont. Zonder dit stond de
  * CTA onvoorwaardelijk aan en las een lopende inleg als "nog niet begonnen".
  */
 export function hasInvestedAssets(

@@ -7,7 +7,9 @@ import { FactsPanel } from './facts-panel'
 import { OnboardingVraag } from './onboarding-vraag'
 import { SectionReview } from './section-review'
 import { AssetRow, LinkedDebtRow, AssetTypePicker } from './onboarding-posten'
+import { OnboardingWoningKeuze } from './onboarding-woning-keuze'
 import { QuickAddWizard } from '@/components/app/quick-add-wizard/quick-add-wizard'
+import type { HousingChoice } from '@/lib/housing-choice'
 import {
   ASSET_QUICK_ADD_LABELS,
   type AssetType,
@@ -18,6 +20,7 @@ import type {
   QuickAddInput,
 } from '@/lib/quick-add/types'
 import { formatCurrency } from '@/lib/format'
+import { dataNoteFor } from '@/lib/onboarding/data-note-copy'
 import {
   phaseKey,
   useSectionPhaseNav,
@@ -71,6 +74,20 @@ export interface OnboardingBezittingenProps {
    */
   phases?: SectionPhase[]
   onPhasesChange?: (phases: SectionPhase[]) => void
+  /**
+   * De woning-keuze uit stap iii-a (ADR 0133), gelift naar de orchestrator zodat
+   * hij het concept in reist en de save-body haalt. `null` = nog niet gevraagd.
+   */
+  housingChoice?: HousingChoice | null
+  /**
+   * Rapporteert de keuze terug. `null` betekent WISSEN — dat gebeurt zodra de
+   * laatste eigen woning uit de lijst verdwijnt: een keuze over een woning die
+   * er niet meer is, mag niet stil in het profiel achterblijven.
+   *
+   * Weggelaten (los renderen in tests) → de sectie houdt de keuze zelf vast,
+   * zelfde controlled/uncontrolled-patroon als de fase-stack hierboven.
+   */
+  onHousingChoiceChange?: (choice: HousingChoice | null) => void
 }
 
 // ── Vragen-volgorde ────────────────────────────────────────────────────
@@ -98,6 +115,13 @@ const ASSET_QUESTIONS: AssetQuestion[] = [
   { type: 'eigen_huis', question: 'Heb je een eigen huis?' },
   { type: 'investment', question: 'Heb je beleggingen?' },
 ]
+
+/**
+ * De vraag waarna de woning-keuze (stap iii-a, ADR 0133) kan volgen. Afgeleid
+ * i.p.v. hardgecodeerd, zodat een herordening van `ASSET_QUESTIONS` de
+ * terugkeer-fase na die keuze niet stil naar de verkeerde vraag stuurt.
+ */
+const HOME_QUESTION_INDEX = ASSET_QUESTIONS.findIndex((q) => q.type === 'eigen_huis')
 
 /**
  * Onboarding-specifieke override voor de kleine-letter labels in de
@@ -128,6 +152,8 @@ export function OnboardingBezittingen({
   bankError = false,
   phases,
   onPhasesChange,
+  housingChoice,
+  onHousingChoiceChange,
 }: OnboardingBezittingenProps) {
   // Fase-stack (controlled door de orchestrator, anders interne useState). Terug
   // popt één scherm; op de stack-bodem valt 'ie terug op de groep-`onBack`.
@@ -135,6 +161,26 @@ export function OnboardingBezittingen({
   // Wanneer gezet: de wizard staat open, voorgeselecteerd op dit asset-type.
   const [wizardType, setWizardType] = useState<AssetType | null>(null)
   const [unlinkNotice, setUnlinkNotice] = useState<string | null>(null)
+
+  // ── Woning-keuze (stap iii-a, ADR 0133) ─────────────────────────────
+  // Controlled zodra de orchestrator een setter levert; anders interne state —
+  // zelfde patroon als `useSectionPhaseNav`, zodat de sectie los te renderen is.
+  const [internalChoice, setInternalChoice] = useState<HousingChoice | null>(null)
+  const choice = onHousingChoiceChange ? (housingChoice ?? null) : internalChoice
+  const setChoice = (next: HousingChoice | null) => {
+    if (onHousingChoiceChange) onHousingChoiceChange(next)
+    else setInternalChoice(next)
+  }
+  /**
+   * De fase waar "Verder" op het woning-keuze-scherm heen gaat: de vervolgfase
+   * die de normale loop zonder dat tussenscherm zou hebben gekozen. `phase: null`
+   * betekent "blijf op de fase eronder" (de collect gebeurde in een
+   * `more`/`other-more`-scherm), en de hele waarde `null` betekent "niet gezet" —
+   * dat laatste kan alleen na een remount midden op dit scherm.
+   */
+  const [afterHousingChoice, setAfterHousingChoice] = useState<{
+    phase: SectionPhase | null
+  } | null>(null)
 
   // Koppel-index: client_ref → gekoppelde schuld (hypotheek onder huis).
   const debtByRef = useMemo(() => {
@@ -177,8 +223,13 @@ export function OnboardingBezittingen({
   // ── Wizard-collect ──────────────────────────────────────────────────
   function handleWizardCollect(item: QuickAddInput) {
     setUnlinkNotice(null)
+    // Was er vóór deze post al een eigen woning? Bepaalt of de woning-keuze nog
+    // gesteld moet worden — hij hoort exact één keer te komen, bij de eerste.
+    const hadHome = quickAssets.some((a) => a.asset_type === 'eigen_huis')
+    let addedHome = false
     if (item.kind === 'asset') {
       onAssetsChange([...quickAssets, item.asset])
+      addedHome = item.asset.asset_type === 'eigen_huis'
     } else if (item.kind === 'asset_with_debt') {
       // Huis + hypotheek als lokaal paar — koppel via opaak client_ref-token
       // (server vertaalt na insert naar het echte debts.linked_asset_id).
@@ -188,21 +239,60 @@ export function OnboardingBezittingen({
         ...quickDebts,
         { ...item.debt, linked_asset_id: null, linked_client_ref: ref },
       ])
+      addedHome = item.asset.asset_type === 'eigen_huis'
     }
     // 'debt' kan in de asset-sectie niet voorkomen (wizard intent = asset).
 
     // Sluit de wizard en ga naar de "nog een?"-fase voor het juiste type.
     setWizardType(null)
-    if (phase.kind === 'ask') push({ kind: 'more', qIndex: phase.qIndex })
-    else if (phase.kind === 'other-ask' || phase.kind === 'other-pick')
-      push({ kind: 'other-more' })
-    // 'more' / 'other-more' → geen push, de "nog een?"-fase blijft staan.
+    const next: SectionPhase | null =
+      phase.kind === 'ask'
+        ? { kind: 'more', qIndex: phase.qIndex }
+        : phase.kind === 'other-ask' || phase.kind === 'other-pick'
+          ? { kind: 'other-more' }
+          : // 'more' / 'other-more' → geen push, de "nog een?"-fase blijft staan.
+            null
+
+    // Eerste eigen woning → de keuze ertussen (ADR 0133). Dit komt ná de
+    // hypotheek-vraag van de wizard, want die zit in dezelfde collect
+    // (`asset_with_debt`). "Verder" op dat scherm hervat `next`.
+    if (addedHome && !hadHome && choice === null) {
+      setAfterHousingChoice({ phase: next })
+      push({ kind: 'woning-keuze' })
+      return
+    }
+
+    if (next) push(next)
+  }
+
+  /** "Verder" op het woning-keuze-scherm: hervat de normale loop. */
+  function finishHousingChoice() {
+    const pending = afterHousingChoice
+    setAfterHousingChoice(null)
+    if (!pending) {
+      // Alleen bereikbaar na een remount midden op dit scherm (de vervolgfase
+      // leeft in component-state, niet in de gelifte stack). De woning-vraag is
+      // dan de eerlijkste terugval: dáár kwam de keuze vandaan.
+      push({ kind: 'more', qIndex: HOME_QUESTION_INDEX })
+      return
+    }
+    if (pending.phase) push(pending.phase)
+    else back()
   }
 
   // ── Verwijderen (transient input — geen confirm) ────────────────────
   function removeAsset(idx: number) {
     const removed = quickAssets[idx]
-    onAssetsChange(quickAssets.filter((_, i) => i !== idx))
+    const remaining = quickAssets.filter((_, i) => i !== idx)
+    onAssetsChange(remaining)
+    // Laatste woning weg → de woning-keuze wissen. Een antwoord op "telt je
+    // woning mee?" mag niet stil in het profiel achterblijven zonder woning;
+    // komt er later toch weer een woning bij, dan wordt de vraag opnieuw
+    // gesteld (dezelfde eerste-woning-regel als hierboven).
+    if (choice !== null && !remaining.some((a) => a.asset_type === 'eigen_huis')) {
+      setChoice(null)
+      setAfterHousingChoice(null)
+    }
     // Huis met gekoppelde hypotheek verwijderd → hypotheek blijft als losse
     // schuld (ontkoppeld), spiegelt het DB-gedrag ON DELETE SET NULL.
     if (removed?.client_ref) {
@@ -363,7 +453,13 @@ export function OnboardingBezittingen({
             isMore
               ? 'Voeg er gerust meer toe — of ga door naar de volgende vraag.'
               : (q.deck ??
-                'Elke post die je toevoegt, toont een stukje opgebouwde vrijheid. Twijfel je? Sla gerust over.')
+                'Elke post die je toevoegt, toont een stukje opgebouwde vrijheid; samen vormen ze je netto vermogen. Twijfel je? Sla gerust over — toevoegen kan later altijd.')
+          }
+          // Gegevensregel alleen bij de INGANG van de sectie: op elke micro-vraag
+          // herhalen maakt van een rustige regel een refrein en botst met
+          // "één ding tegelijk" (UR3-10).
+          dataNote={
+            !isMore && phase.qIndex === 0 ? dataNoteFor('bezittingen') : undefined
           }
           onYes={() => setWizardType(q.type)}
           onNo={() => nextAfterQuestion(phase.qIndex)}
@@ -375,6 +471,20 @@ export function OnboardingBezittingen({
             {runningList}
           </>
         </OnboardingVraag>
+      )
+    }
+
+    // Eenmalige woning-keuze, direct na de eerste eigen woning (ADR 0133).
+    // Alle kopij komt uit `lib/housing-choice.ts`; deze sectie levert alleen de
+    // kop-taxonomie en de voortgang.
+    if (phase.kind === 'woning-keuze') {
+      return (
+        <OnboardingWoningKeuze
+          {...sharedVraagProps}
+          value={choice}
+          onChange={setChoice}
+          onNext={finishHousingChoice}
+        />
       )
     }
 

@@ -12,7 +12,8 @@ import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { Kicker, HighlightMark, FiguresStrip, GlossaryTerm } from '@/components/editorial'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import type { NetWorthSnapshot } from '@/lib/net-worth-data'
-import type { HealthScore } from '@/lib/financial-health'
+import { healthScoreVerdict, type HealthScore } from '@/lib/financial-health'
+import { GRONDSLAG_ONBEKEND_KOP } from '@/lib/grondslag-guard'
 import { ModuleTipStrip } from './module-tip-strip'
 
 interface CoreHeroProps {
@@ -441,6 +442,11 @@ function HealthScoreHero({ healthScore, onClick }: { healthScore: HealthScore; o
         className: 'mt-5 border border-[var(--border-ed)] bg-[var(--subtle)]/30 px-4 py-4 sm:px-5',
       }
 
+  // Onbekend is geen nul (ADR 0131): zonder inkomen/uitgaven geen meter en
+  // geen oordeel — de kop van de horizon-melding plus de ene zin.
+  const verdict = healthScoreVerdict(healthScore)
+  const onbekend = verdict.kind === 'onbekend' ? verdict.onbekend : null
+
   return (
     <Wrapper
       {...wrapperProps}
@@ -448,19 +454,26 @@ function HealthScoreHero({ healthScore, onClick }: { healthScore: HealthScore; o
     >
       <div className="flex items-start gap-4 sm:gap-5">
         {/* Gauge — links */}
-        <div className="shrink-0 flex flex-col items-center">
-          <HeroHealthGauge score={healthScore.total} size={88} />
-          <p
-            className="mt-0 text-[10px] font-semibold uppercase tracking-[0.1em]"
-            style={{ color: healthScoreColor(healthScore.total) }}
-          >
-            {healthScore.label}
-          </p>
-          {/* Trend-indicator: pijl + delta vs vorige maand */}
-          {healthScore.previousMonth !== null && (
-            <HealthTrendIndicator trend={healthScore.trend} />
-          )}
-        </div>
+        {onbekend ? (
+          <div className="shrink-0 flex w-[88px] flex-col items-center text-center">
+            <p className="font-serif text-sm font-bold leading-tight text-[var(--ink)]">{GRONDSLAG_ONBEKEND_KOP}</p>
+            <p className="mt-1 text-[10px] leading-snug text-[var(--ink-3)]">{onbekend.hint}</p>
+          </div>
+        ) : (
+          <div className="shrink-0 flex flex-col items-center">
+            <HeroHealthGauge score={healthScore.total} size={88} />
+            <p
+              className="mt-0 text-[10px] font-semibold uppercase tracking-[0.1em]"
+              style={{ color: healthScoreColor(healthScore.total) }}
+            >
+              {healthScore.label}
+            </p>
+            {/* Trend-indicator: pijl + delta vs vorige maand */}
+            {healthScore.previousMonth !== null && (
+              <HealthTrendIndicator trend={healthScore.trend} />
+            )}
+          </div>
+        )}
 
         {/* Pilaar-bars — rechts */}
         <div className="flex-1 min-w-0 pt-0.5">

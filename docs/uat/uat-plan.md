@@ -1944,12 +1944,12 @@ Scope: `/overzicht` (hoofdpagina/hub), `/dashboard` (redirect), `/overzicht/tips
 #### WF-OVZ-15 — Samengestelde-rente-inzicht verkennen (spaargeld vs. beleggen)
 - **Doel:** Voelen wat samengestelde rente over 30 jaar met je spaargeld doet, en spelen met een extra maandinleg.
 - **Trigger/startpunt:** De kaart "Het effect van samengestelde rente" onder de hero — alleen zichtbaar bij ≥ €10.000 liquide cash én een voldoende dramatisch verschil.
-- **Eindresultaat:** Twee balken (spaarrekening 0,5% vs. belegd 7%) die live meebewegen met de inleg-slider, het verschilbedrag onderaan, en een CTA "Start met beleggen" naar /overzicht/bezittingen.
+- **Eindresultaat:** Twee balken (spaarrekening 0,5% vs. belegd 7%) die live meebewegen met de inleg-slider, het verschilbedrag onderaan, en een CTA "Bekijk beleggen" naar /overzicht/bezittingen.
 - **Stappen:**
   1. Lees de kop "Wat doet je €[cash] over 30 jaar?".
   2. Schuif de slider "Extra €/maand inleggen" (€0–€1.000, stappen van €25) → beide eindbedragen en balkhoogtes bewegen live mee.
   3. Lees "Het verschil" (+€…) en de aannames-disclaimer onderaan.
-  4. Klik "Start met beleggen" → /overzicht/bezittingen opent.
+  4. Klik "Bekijk beleggen" → /overzicht/bezittingen opent.
   5. Of klik op de X ("Inzicht minimaliseren") → kaart verdwijnt.
 - **Schermen/componenten:** /overzicht — `components/overview/compound-insight-card.tsx`, berekening `lib/compound-projection.ts` (`compareCompound`), zichtbaarheid `lib/hooks/use-insight-visibility.ts` (localStorage-key `tf-insight-hidden`); drempel €10k in `components/overview/overzicht-hero.tsx` regel 350.
 - **Kriticiteit:** BELANGRIJK
@@ -9658,7 +9658,7 @@ WF-NAV-13 (Uitloggen) → **géén eigen scenario** in dit document; gedekt door
   1. Bekijk de kop → *verwacht:* "Wat doet je €57.700 over 30 jaar?"
   2. Bekijk de twee balken bij slider=€0 → *verwacht:* spaarrekening-balk ≈ **€67.013**, belegd-balk ≈ **€439.227**, verschil ≈ **€372.214**.
   3. Schuif de slider naar €500/maand → *verwacht:* spaarrekening-balk ≈ **€260.693**, belegd-balk ≈ **€1.005.992**, verschil ≈ **€745.299** (beide balken en het verschil bewegen live mee).
-  4. Klik "Start met beleggen" → *verwacht:* navigatie naar /overzicht/bezittingen.
+  4. Klik "Bekijk beleggen" → *verwacht:* navigatie naar /overzicht/bezittingen.
   - **Eindresultaat:** kaart is zichtbaar (drempel gehaald) en toont plausibele, intern consistente bedragen.
   - **Berekening verwachting (rekenend, `lib/compound-projection.ts`):** conservatief 0,5%/30 jr: FV=57.700×(1,005)^30=57.700×1,1614≈**€67.013**; ambitieus 7%/30 jr: FV=57.700×(1,07)^30=57.700×7,6123≈**€439.227**; verschil/multiplier=439.227/67.013=6,55 ≥1,05 → `hasDramaticDelta=true` (kaart terecht zichtbaar). Bij €500/mnd extra: annuïteit-component erbij (conservatief +€193.680, ambitieus +€566.765) → totalen zoals hierboven.
   - **Rekentool-diepte (slider-precisie, edge cases, disclaimer-tekst):** → **UAT-REKEN-22**.

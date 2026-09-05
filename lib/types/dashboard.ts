@@ -5,6 +5,7 @@
 // Zuiver type-only: geen runtime, geen React-verwijzing.
 
 import type { ResolvedBasis } from '@/lib/budget-basis'
+import type { FreedomRateSource } from '@/lib/format'
 import type { FireProjection, FireRange, FireCountdown } from '@/lib/horizon-data'
 import type { FreedomMilestoneResult } from '@/lib/freedom-milestones'
 import type { FeeAnalysis } from '@/lib/fee-analysis'
@@ -222,6 +223,16 @@ export interface DashboardData {
    * mock-/empty-bundels zonder dit veld vallen terug op de maand-conversie.
    */
   dailyExpenseRate?: number
+  /**
+   * Herkomst van `dailyExpenseRate` — `recentDailyExpenseRateFromRows(...).source`.
+   * Draagt de wisselkoers-voetnoot (`<VrijheidstijdVoetnoot>`, UR3-08): een
+   * profiel- of cohortschatting benoemt zichzelf als schatting in plaats van
+   * als gemeten uitgavenpatroon te lezen. Zonder dit veld valt de voetnoot
+   * terug op `'transactions'` bij een tarief > 0 — spiegel van
+   * `CorePageData.dailyExpenseRateSource` en `FiscaleKansen.dailyExpensesSource`.
+   * Optioneel/additief: mock-/empty-bundels missen 'm zonder gevolg.
+   */
+  dailyExpenseRateSource?: FreedomRateSource
   /**
    * Canoniek 12-mnd rolling MAANDbedrag (€/mnd) — zelfde bron/berekening als
    * `dailyExpenseRate` (recentDailyExpenseRateFromRows), alleen in maand-eenheid.

@@ -63,6 +63,27 @@ describe('safeContextTag', () => {
   })
 
   /**
+   * UR3-09 / ADR 0132: `ai:<feature>`-tags uit `lib/ai/ai-failure-middleware.ts`
+   * horen bij de eigen allowlist, net als de andere machinaal gezette tags.
+   */
+  it('laat onze eigen ai:<feature>-tags ongemoeid', () => {
+    expect(safeContextTag('ai:chat')).toBe('ai:chat')
+    expect(safeContextTag('ai:config')).toBe('ai:config')
+  })
+
+  /**
+   * DE PRECIEZE REGRESSIE die de allowlist moet blijven vangen: een tag die op
+   * onze eigen vorm lijkt (`ai:` + toegestaan alfabet) maar in werkelijkheid
+   * client-aangeleverde tekst bevat, mag NOOIT doorlekken. Een IBAN past qua
+   * tekens niet in `[a-z_]` (cijfers/hoofdletters), dus dit moet 'onbekend'
+   * opleveren — exact de klasse fout die de grote allowlist-comment hierboven
+   * beschrijft (IBAN die intact bleef onder de oude knijpfilter-aanpak).
+   */
+  it("safeContextTag('ai:NL91ABNA0417164300') mag NIET doorlaten (IBAN-leak-klasse)", () => {
+    expect(safeContextTag('ai:NL91ABNA0417164300')).toBe('onbekend')
+  })
+
+  /**
    * ALLOWLIST-gedrag. Een eerdere versie knijpde alleen het alfabet en kapte op
    * 40 tekens; die liet een IBAN volledig intact en maakte van een e-mailadres
    * `jan.smit-trifinity.nl`. Deze gevallen zijn dus geen theorie — het waren de

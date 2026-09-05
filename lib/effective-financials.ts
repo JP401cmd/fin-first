@@ -30,10 +30,21 @@ export interface ResolvedAmount {
  *   • `'transaction'` → de transactiewaarde als die > 0, anders de profielschatting.
  *   • `'auto'` / leeg / onbekend → budget als > 0, anders transactie als > 0,
  *                       anders de profielschatting.
+ *   • `'estimate'`    → als `'auto'` (echte data verdringt de gok vanzelf), maar
+ *                       wint het profiel dan heet de grondslag `'estimate'`
+ *                       (ADR 0131 — de app heeft geraden; het label reist mee).
  *
  * De uitkomst is NOOIT `'auto'`: dat is een strategie ("kies voor mij"), geen
  * grondslag. `'profile'` is de terugval en gebruikt dezelfde profielkolom als
  * `'manual'` — het verschil zit in de uitspraak, niet in het getal.
+ *
+ * ONBEKEND IS GEEN NUL (ADR 0131): valt de keten helemaal door tot het profiel
+ * en staat dáár niets (0/leeg — de DB-default na "Later invullen"), dan is de
+ * grondslag `'unknown'`. Het bedrag blijft numeriek 0 zodat de rekenketen niet
+ * op NaN/null hoeft te toetsen, maar de VLAG draagt de betekenis: consumenten
+ * die een oordeel vellen (score, spaarquote, briefing) toetsen de grondslag en
+ * onthouden zich. Alleen `'manual'` met 0 is een geverifieerde nul — de gebruiker
+ * koos dat, en dat blijft `'manual'`.
  *
  * SCHAALVRIJ: de functie kent geen maand of jaar. De caller kiest de eenheid en
  * levert alle drie de bedragen in DEZELFDE eenheid aan (maandbedragen voor de
@@ -56,7 +67,29 @@ export function resolveAmountWithBasis(
   // afgeduwd (ADR 0103 — dat is precies waarom deze waarde bestaat).
   if (source !== 'transaction' && budgetUsable) return { amount: budget, basis: 'budget' }
   if (txUsable) return { amount: transactionAmount, basis: 'transaction' }
-  return { amount: profileAmount, basis: 'profile' }
+
+  const profileUsable = Number.isFinite(profileAmount) && profileAmount > 0
+  if (!profileUsable) return { amount: 0, basis: 'unknown' }
+  return { amount: profileAmount, basis: source === 'estimate' ? 'estimate' : 'profile' }
+}
+
+/**
+ * Grondslag voor een OORDEEL (score, briefing): een meting over een breder
+ * venster telt als bekend, ook als de lopende maand nog leeg is.
+ *
+ * De effectieve maandgrondslag (`resolveEffectiveIncomeExpenses`) rekent op de
+ * LOPENDE kalendermaand; op de 2e van de maand is die bij een transactie-
+ * gebruiker nog leeg en valt hij door naar het profiel. Zonder deze correctie
+ * zou zo'n gebruiker één dag per maand "inkomen onbekend" te zien krijgen
+ * terwijl er zes maanden aan boekingen liggen. De caller geeft daarom de
+ * bredere meting (6-/12-maands som of gemiddelde) mee; is die > 0, dan is de
+ * kant bekend op de transactiegrondslag.
+ */
+export function judgementBasis(effectiveBasis: ResolvedBasis, measuredWide: number): ResolvedBasis {
+  if (effectiveBasis === 'unknown' && Number.isFinite(measuredWide) && measuredWide > 0) {
+    return 'transaction'
+  }
+  return effectiveBasis
 }
 
 /**

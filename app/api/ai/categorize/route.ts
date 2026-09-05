@@ -13,7 +13,9 @@ import {
   type CategorizeBudgetOption,
 } from '@/lib/ai/categorize-system-prompt'
 import { buildBudgetOptions, resolveSlug, type BudgetRow } from './budget-options'
-import { unauthorized } from '@/lib/api/respond'
+import { unauthorized, errorResponse } from '@/lib/api/respond'
+import { isRefusedProviderError } from '@/lib/ai/provider-error'
+import { AI_ERROR_CODE, describeAiError } from '@/lib/ai/error-copy'
 
 const categorizationSchema = z.object({
   categorizations: z.array(z.object({
@@ -182,6 +184,12 @@ export async function POST(req: Request) {
     // Details alleen server-side loggen — provider-foutmeldingen kunnen
     // modelnamen/interne details bevatten en horen niet bij de client.
     console.error('AI categorization failed:', err)
+    // Structureel (provider weigert) vs. tijdelijk — gedrag bij een tijdelijke
+    // hapering blijft ongewijzigd (UR3-09).
+    if (isRefusedProviderError(err)) {
+      const copy = describeAiError(AI_ERROR_CODE.providerRefused)
+      return errorResponse(copy.text, 422, copy.code)
+    }
     return Response.json(
       { error: 'AI-categorisatie is tijdelijk niet beschikbaar. Probeer het later opnieuw.' },
       { status: 500 },

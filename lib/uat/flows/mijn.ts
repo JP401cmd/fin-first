@@ -60,7 +60,7 @@ export const MIJN_FLOW: UatFlow = {
     // ── 2 · voorkeuren ────────────────────────────────────────────────────
     { id: 'notificaties', scenarioId: 'UAT-MIJN-20', label: 'WF-MIJN-20 · Notificatievoorkeuren (push + maandcheck-in)', kind: 'screen', stage: 2, lane: 'voorkeuren' },
     { id: 'partner-meldingen', scenarioId: 'UAT-MIJN-21', label: 'WF-MIJN-21 · Partner-transactiemeldingen configureren', kind: 'screen', stage: 2, lane: 'voorkeuren' },
-    { id: 'uiterlijk', scenarioId: 'UAT-MIJN-22', label: 'WF-MIJN-22 · Uiterlijk (palet, typografie, geavanceerde kleuren)', kind: 'screen', stage: 2, lane: 'voorkeuren' },
+    { id: 'uiterlijk', scenarioId: 'UAT-MIJN-22', label: 'WF-MIJN-22 · Weergave en uiterlijk (palet, typografie, geavanceerde kleuren)', kind: 'screen', stage: 2, lane: 'voorkeuren' },
     { id: 'privacy-overzicht', scenarioId: 'UAT-MIJN-15', label: 'WF-MIJN-15 · Privacy- en transparantie-overzicht', kind: 'screen', stage: 2, lane: 'voorkeuren' },
 
     // ── 2 · data & koppelingen ────────────────────────────────────────────

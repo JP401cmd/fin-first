@@ -1,9 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import { CalendarClock, Wallet } from 'lucide-react'
 import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { euroViewLabel } from '@/lib/euro-display'
+import { useAttentionQuiet } from '@/lib/hooks/use-attention-quiet'
 
 /**
  * Euro-weergave-status: staat de app in *toekomstige* euro's (nominaal, de
@@ -78,7 +80,18 @@ interface EuroViewBadgeProps {
 
 const COACHMARK_ID = 'euro-view'
 
-type CoachmarkState = 'loading' | 'show' | 'hidden'
+/**
+ * Startvertraging (UR3-10). Spiegelt `DEFAULT_COACH_TIMING.delayMs`: de
+ * rondleiding start op ~400 ms, dus zonder deze pauze flitst de popover kort
+ * op vóórdat de tour zijn stilte-claim legt.
+ */
+const COACHMARK_DELAY_MS = 1500
+
+/**
+ * `loading` — server-antwoord nog onbekend · `pending` — nog niet weggeklikt
+ * (mag verschijnen zodra het stil is) · `done` — weg, en weggeschreven.
+ */
+type CoachmarkState = 'loading' | 'pending' | 'done'
 
 /** Eén gedeelde fetch voor alle badge-exemplaren op de pagina. */
 let dismissedPromise: Promise<boolean> | null = null
@@ -103,20 +116,45 @@ export function __resetCoachmarkCache() {
 
 function useEuroViewCoachmark(enabled: boolean) {
   const [state, setState] = useState<CoachmarkState>('loading')
+  const [ready, setReady] = useState(false)
+  // Eén ding tegelijk (UR3-10, ADR 0134): zolang de rondleiding loopt, Fin een
+  // melding toont, de chat openstaat, er een overlay open is of de route
+  // immersief is, bestaat deze popover niet — en wordt zijn staat ook niet
+  // opgehaald. Dat is dezelfde M15-regel als bij Fin: geen stempel, en geen
+  // netwerkverkeer, zonder zichtbaarheid.
+  const quiet = useAttentionQuiet()
+  const pathname = usePathname()
 
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled || quiet || state !== 'loading') return
     let alive = true
     void fetchDismissed().then((dismissed) => {
-      if (alive) setState(dismissed ? 'hidden' : 'show')
+      if (alive) setState(dismissed ? 'done' : 'pending')
     })
     return () => {
       alive = false
     }
-  }, [enabled])
+  }, [enabled, quiet, state])
+
+  useEffect(() => {
+    if (state !== 'pending') return
+    const t = setTimeout(() => setReady(true), COACHMARK_DELAY_MS)
+    return () => clearTimeout(t)
+  }, [state])
+
+  const visible = state === 'pending' && ready && !quiet
+
+  // `dismiss` hangt in effect-dependencies en moet stabiel blijven; de staat
+  // lezen we daarom via een ref.
+  const stateRef = useRef(state)
+  stateRef.current = state
 
   const dismiss = useCallback(() => {
-    setState('hidden')
+    // Alleen een écht openstaande uitleg wordt weggeschreven. Zonder deze
+    // grens zou elke druk op de weergave-knop een PUT sturen — ook op een
+    // exemplaar dat de uitleg helemaal niet aanvraagt (de compacte badge).
+    if (stateRef.current !== 'pending') return
+    setState('done')
     // Andere exemplaren op dezelfde pagina laten meteen meeschakelen.
     dismissedPromise = Promise.resolve(true)
     void fetch('/api/coachmark', {
@@ -131,7 +169,24 @@ function useEuroViewCoachmark(enabled: boolean) {
     })
   }, [])
 
-  return { visible: state === 'show', dismiss }
+  // ── Sluiten op de eerste routewissel ná het verschijnen (AC 2) ────────────
+  //
+  // De uitleg hoorde bij ÉÉN moment, niet bij de hele sessie: hij stond op alle
+  // 55 desktoproutes open en dekte daar het zijbalk-submenu af. We onthouden het
+  // pad waaróp hij zichtbaar werd — niet het pad waarop hij werd aangevraagd:
+  // wie 'm nooit gezien heeft (stil tijdens de rondleiding) verliest zijn uitleg
+  // niet door één klik weg te navigeren (M15).
+  const shownPathRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (visible && shownPathRef.current === null) shownPathRef.current = pathname
+  }, [visible, pathname])
+  useEffect(() => {
+    const from = shownPathRef.current
+    if (from === null || from === pathname) return
+    dismiss()
+  }, [pathname, dismiss])
+
+  return { visible, dismiss }
 }
 
 export function EuroViewBadge({
@@ -141,6 +196,14 @@ export function EuroViewBadge({
 }: EuroViewBadgeProps) {
   const { view, toggle } = useEuroView()
   const { visible: coachmarkVisible, dismiss } = useEuroViewCoachmark(showCoachmark)
+
+  // De knop gebruiken IS de uitleg begrepen (AC 2). Wie zelf schakelt heeft
+  // gezien wat er verandert; de popover daarna nog laten staan las als "hij
+  // gaat niet weg". De uitleg blijft bereikbaar via de pagina-`i` en ⌘K.
+  const handleToggle = useCallback(() => {
+    dismiss()
+    toggle()
+  }, [dismiss, toggle])
 
   const isReal = view === 'real'
   const Icon = isReal ? Wallet : CalendarClock
@@ -159,7 +222,7 @@ export function EuroViewBadge({
     <div className="relative">
       <button
         type="button"
-        onClick={toggle}
+        onClick={handleToggle}
         aria-pressed={isReal}
         aria-label={`Weergave: ${label}. ${hint}`}
         title={`Weergave: ${label} — ${hint}`}

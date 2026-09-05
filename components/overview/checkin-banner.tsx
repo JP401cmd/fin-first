@@ -10,6 +10,14 @@ import Link from 'next/link'
  *   - enabled (gebruiker heeft check-in niet uitgezet)
  *   - nog niet voltooid deze maand
  *   - we zitten in de eerste week van de maand
+ *   - het account bestond al vóór deze maand (`eligible`, UR3-10)
+ *
+ * DIE LAATSTE GATE. Op dag één van een vers account viel de banner samen met de
+ * rondleiding, de euro-coachmark en Fins eerste tip — vier dingen tegelijk — en
+ * nodigde hij uit tot een terugblik op een maand die er nog niet was. De gate
+ * kijkt naar de LEEFTIJD van het account, nooit naar de financiële data: dat
+ * laatste zou functionaliteit verbergen op grond van iemands situatie
+ * (ADR 0001). Zie `isCheckinBannerEligible` in `lib/overview/banner-seeds.ts`.
  *
  * Buiten die voorwaarden rendert de banner niets (geen ruis). Per sessie
  * dismissbaar. De volledige check-in-flow blijft op /core/checkin.
@@ -42,12 +50,19 @@ const MONTH_NAMES = [
 export function CheckinBanner({
   seed,
 }: {
-  /** Server-seed ({ enabled, completed }); aanwezig → geen eerste client-fetch. */
-  seed?: { enabled: boolean; completed: boolean }
+  /**
+   * Server-seed ({ enabled, completed, eligible }); aanwezig → geen eerste
+   * client-fetch. Zonder seed (of zonder `eligible`) blijft de banner weg: de
+   * accountleeftijd is server-kennis en mag niet stil als "wel oud genoeg"
+   * worden gelezen.
+   */
+  seed?: { enabled: boolean; completed: boolean; eligible?: boolean }
 }) {
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
+    // Nieuw account → nog niets om op terug te blikken (UR3-10).
+    if (!seed?.eligible) return
     // Niet in de eerste week → nooit relevant.
     if (!isFirstWeekOfMonth()) return
     // Deze maand al weggeklikt?
@@ -56,27 +71,9 @@ export function CheckinBanner({
     } catch {
       /* sessionStorage onbeschikbaar — ga door */
     }
-    const apply = (d: { enabled?: boolean; completed?: boolean } | null) => {
-      if (d?.enabled && !d?.completed) setVisible(true)
-    }
-    // Server-seed aanwezig → geen fetch, gebruik direct de reeds bekende status.
-    if (seed) {
-      apply(seed)
-      return
-    }
-    let cancelled = false
-    fetch('/api/monthly-checkin')
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return
-        apply(data)
-      })
-      .catch(() => {
-        /* stil falen — geen banner */
-      })
-    return () => {
-      cancelled = true
-    }
+    // De seed draagt de volledige status (enabled + completed); er is dus geen
+    // client-fetch meer nodig. Zonder seed komen we hier niet eens.
+    if (seed.enabled && !seed.completed) setVisible(true)
   }, [seed])
 
   function dismiss() {
@@ -97,12 +94,15 @@ export function CheckinBanner({
     // van /overzicht (slot `banners`, ná de begroeting) en erft daar breedte en
     // horizontale padding.
     <section aria-label="Maandelijkse check-in" className="mb-6">
-      <div className="flex items-center gap-3 rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-stone-50 p-3 sm:p-4">
-        <span className="inline-flex w-9 h-9 rounded-lg bg-violet-100 text-violet-700 items-center justify-center shrink-0">
+      {/* Kleurconventie: dit is een Overzicht-oppervlak, dus module-identiteit
+          via de `kern-*`-tokens (gebruikersinstelbaar op /mijn/uiterlijk) — geen
+          Tailwind-standaardkleuren. */}
+      <div className="flex items-center gap-3 rounded-2xl border border-kern-200 bg-gradient-to-r from-kern-50 to-[var(--subtle)] p-3 sm:p-4">
+        <span className="inline-flex w-9 h-9 rounded-lg bg-kern-100 text-kern-700 items-center justify-center shrink-0">
           <CalendarCheck className="w-4 h-4" aria-hidden="true" />
         </span>
         <div className="flex-1 min-w-0">
-          <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-violet-700">
+          <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-kern-700">
             Check-in {monthLabel}
           </div>
           <p className="text-sm text-[var(--ink-2)] leading-snug">

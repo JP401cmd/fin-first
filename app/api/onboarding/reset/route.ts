@@ -4,6 +4,7 @@ import { getServiceClient } from '@/lib/supabase/service'
 import { deleteAllUserData } from '@/lib/seed-persona'
 import { parseBody } from '@/lib/api/parse-body'
 import { unauthorized, serverError } from '@/lib/api/respond'
+import { FIRE_RESET_FIELDS } from './reset-profile-fields'
 
 /**
  * POST /api/onboarding/reset — wist ALLE eigen financiële data (±47 tabellen
@@ -71,22 +72,39 @@ export async function POST(request: Request) {
       .eq('id', user.id)
     if (coreErr) throw new Error(`Profiel reset mislukt: ${coreErr.message}`)
 
-    // Reset FIRE + optional fields (may not exist if migrations not applied)
-    await supabase
-      .from('profiles')
-      .update({
-        estimated_monthly_expenses: null,
-        expected_return: null,
-        inflation_rate: null,
-        fire_end_strategy: null,
-        fire_end_age: null,
-        fire_legacy_amount: null,
-        retirement_expense_method: null,
-        retirement_expense_custom_amount: null,
-        widget_prefs: null,
-      })
-      .eq('id', user.id)
-      // Ignore errors — columns may not exist yet
+    // Reset FIRE + optionele velden. De NOT NULL-kolommen gaan naar hun
+    // kolom-default, niet naar null — zie de kop van ./reset-profile-fields.ts
+    // voor de gemeten schemafeiten en waarom de oude "alles op null"-vorm elke
+    // reset stil op een 400 liet stuklopen.
+    //
+    // Foutafhandeling: een kolom die op een pre-migration database ONTBREEKT
+    // wordt gestript en de rest gaat door (dat was de oorspronkelijke, terechte
+    // bedoeling). Elke andere fout — zoals de not-null-schending van hiervoor —
+    // wordt gegooid en landt in de catch, zodat toekomstige schemadrift niet
+    // opnieuw ongemerkt een half-gereset profiel oplevert.
+    const firePayload: Record<string, unknown> = { ...FIRE_RESET_FIELDS }
+    for (let attempt = 0; attempt < Object.keys(FIRE_RESET_FIELDS).length + 1; attempt++) {
+      if (Object.keys(firePayload).length === 0) break
+      const { error } = await supabase
+        .from('profiles')
+        .update(firePayload)
+        .eq('id', user.id)
+      if (!error) break
+      // Strippen mag UITSLUITEND bij een schema-cache-miss (PostgREST PGRST204,
+      // "Could not find the 'x' column"). Matchen op alleen de kolomnaam is hier
+      // fout: een not-null-schending (23502) noemt de kolomnaam óók, en die zou
+      // dan opnieuw stil worden weggestript — exact het defect dat deze route
+      // droeg.
+      const isUnknownColumn =
+        error.code === 'PGRST204' || /schema cache/i.test(error.message ?? '')
+      const missing = isUnknownColumn
+        ? Object.keys(firePayload).find(
+            (col) => error.message?.includes(`'${col}'`) || error.message?.includes(`"${col}"`),
+          )
+        : undefined
+      if (!missing) throw new Error(`Profiel FIRE-reset mislukt: ${error.message}`)
+      delete firePayload[missing]
+    }
 
     // Reset stappenplan- en onboarding-metadata. Deze leven in optionele
     // kolommen die mogelijk ontbreken op pre-migration databases, dus we

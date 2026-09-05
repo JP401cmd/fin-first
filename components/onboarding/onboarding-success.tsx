@@ -94,7 +94,7 @@ export function OnboardingSuccess({
             hier veiliger dan een klikbare route. */}
       <p className="mx-auto mt-4 max-w-md font-sans text-xs leading-relaxed text-[var(--ink-3)]">
         Rustig beginnen of meteen alle detail? Je weergave kies je later bij{' '}
-        <span className="font-semibold text-[var(--ink-2)]">Mijn &rarr; Uiterlijk</span>.
+        <span className="font-semibold text-[var(--ink-2)]">Mijn &rarr; Weergave en uiterlijk</span>.
       </p>
 
       {/* Decorative color bar — twee modules (Overzicht + Toekomst) */}

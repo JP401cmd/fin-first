@@ -302,6 +302,22 @@ mailbox.
 - **Let op de dekking:** `error_logs` bevat client-fouten en ónafgevangen serverfouten. Een
   afgevangen API-500 via `serverError()` gaat alleen naar de Vercel-logs en verschijnt hier
   (en dus in de meldingen) **niet**. Aparte kaart.
+  - **Uitzondering: mislukte cloud-AI-aanroepen.** Sinds UR3-09 (ADR 0132) legt
+    `getModel()` (`lib/ai/config.ts`) een middleware om élk model die elke mislukte
+    aanroep zelf naar `error_logs` schrijft (context `ai:<feature>`) — die dekking geldt
+    dus wél, ook al vangt de route de fout zelf af.
+
+### AI-status (storingen)
+- **Technisch beheer → AI Instellingen** (`/beheer/ai`): statuskaart bovenaan, altijd
+  zichtbaar — "Werkt", "Hapert" of "Storing sinds …". Op de **/beheer-hub** verschijnt
+  dezelfde melding als strip, maar alleen bij `hapering`/`storing`.
+- Afgeleid uit de laatste geslaagde `ai_token_usage`-rij plus de `ai:*`-rijen in
+  `error_logs` sinds dat succes — géén aparte tabel. Drempel: 2 mislukte aanroepen sinds
+  het laatste succes. Een providerweigering (tegoed op, sleutel ongeldig) geeft
+  "Storing"; een tijdelijke hapering (rate limit, 5xx) geeft "Hapert".
+- Dit maakt de storing zichtbaar **op het scherm**. Het duwt 'm niet naar een
+  beheerder — zie "Meldingen naar je telefoon (push)" hierboven voor die stap
+  (CRON_SECRET is daar nog steeds de blokkerende factor, zie de aparte kaart).
 
 ### AI-verbruik en -kosten
 - **Technisch beheer → AI Features** (`/beheer/ai-features`): maandbudgetten (AI-abonnees /

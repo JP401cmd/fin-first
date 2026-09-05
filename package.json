@@ -31,6 +31,7 @@
     "check:self-modification": "node scripts/check-self-modification.mjs",
     "uat:stale": "node scripts/uat/stale-scan.mjs",
     "page-info:check": "node scripts/page-info/check-coverage.mjs",
+    "glossary:check": "node scripts/glossary/check-coverage.mjs",
     "litert:check": "node scripts/litert/release-check.mjs",
     "herstelproef:check": "node --env-file=.env.local scripts/herstelproef-check.mjs",
     "db:pull": "npx supabase db pull",

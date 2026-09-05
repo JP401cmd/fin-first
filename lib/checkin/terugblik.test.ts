@@ -79,14 +79,15 @@ describe('terugblikCijfers — de vergelijking loopt één maand verder terug', 
   })
 })
 
-describe('terugblikCijfers — nul-waarden zijn echte waarden', () => {
-  it('een maand zonder inkomen levert 0, niet null', () => {
+describe('terugblikCijfers — nul-waarden zijn echte waarden zolang er íéts geboekt is', () => {
+  it('een maand zonder inkomen maar mét uitgaven levert 0 inkomen, niet null — en heeft cijfers', () => {
     const cijfers = terugblikCijfers({ ...bron, prevMonthIncome: 0, prevMonthSavings: -3100 })
     expect(cijfers.income).toBe(0)
     expect(cijfers.savings).toBe(-3100)
+    expect(cijfers.heeftCijfers).toBe(true)
   })
 
-  it('ontbrekende bedragen tellen als 0', () => {
+  it('ontbrekende bedragen tellen rekenkundig als 0', () => {
     const cijfers = terugblikCijfers({
       ...bron,
       prevMonthIncome: undefined as unknown as number,
@@ -96,5 +97,42 @@ describe('terugblikCijfers — nul-waarden zijn echte waarden', () => {
     expect(cijfers.income).toBe(0)
     expect(cijfers.expenses).toBe(0)
     expect(cijfers.savings).toBe(0)
+  })
+})
+
+describe('terugblikCijfers — onbekend is geen nul (ADR 0131, UR3-01 optie A)', () => {
+  // Given: een account dat in de onboarding "Later invullen" koos en nog geen
+  //   enkele transactie heeft; de vorige maand kent dus geen inkomsten en geen
+  //   uitgaven.
+  // When: de terugblik-stap wordt opgebouwd.
+  // Then: `heeftCijfers` is false — de stap toont géén "€ 0 · € 0 · € 0" als
+  //   oordeel over een maand waar we niets van weten. Vóór deze kaart was
+  //   "ontbrekend → 0, kaart blijft gevuld" een bewuste keuze; de eigenaar
+  //   draaide die terug zodat alle vijf oppervlakken één gedrag tonen.
+  it('geen inkomsten én geen uitgaven → niets om op terug te blikken', () => {
+    const cijfers = terugblikCijfers({
+      ...bron,
+      prevMonthIncome: 0,
+      prevMonthExpenses: 0,
+      prevMonthSavings: 0,
+      monthBeforePrevExpenses: 0,
+    })
+    expect(cijfers.heeftCijfers).toBe(false)
+    expect(cijfers.expenseChangePct).toBeNull()
+  })
+
+  it('ontbrekende velden (undefined) zijn óók niets om op terug te blikken', () => {
+    const cijfers = terugblikCijfers({
+      ...bron,
+      prevMonthIncome: undefined as unknown as number,
+      prevMonthExpenses: undefined as unknown as number,
+      prevMonthSavings: undefined as unknown as number,
+    })
+    expect(cijfers.heeftCijfers).toBe(false)
+  })
+
+  it('één geboekte kant volstaat: alleen uitgaven → wél cijfers (AC4: bestaand gedrag)', () => {
+    expect(terugblikCijfers({ ...bron, prevMonthIncome: 0 }).heeftCijfers).toBe(true)
+    expect(terugblikCijfers({ ...bron, prevMonthExpenses: 0 }).heeftCijfers).toBe(true)
   })
 })

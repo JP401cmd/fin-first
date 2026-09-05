@@ -4,29 +4,52 @@ import { render, fireEvent, screen } from '@testing-library/react'
 import type { AssetQuickInput, DebtQuickInput } from '@/lib/quick-add/types'
 import { formatCurrency } from '@/lib/format'
 
-// Mock de QuickAddWizard: rendert (wanneer open) één knop die exact één item
-// via `onCollect` teruggeeft — zo kunnen we de begeleide ja/nee-loop testen
-// zonder de hele wizard-stack (BottomSheet-portal, toasts) mee te slepen.
+// Mock de QuickAddWizard: rendert (wanneer open) twee knoppen die exact één
+// item via `onCollect` teruggeven — zo kunnen we de begeleide ja/nee-loop
+// testen zonder de hele wizard-stack (BottomSheet-portal, toasts) mee te
+// slepen. De tweede knop levert een `asset_with_debt`-paar, het echte pad van
+// de woning: de wizard vraagt de hypotheek ZELF in dezelfde collect, dus de
+// woning-keuze hoort daar pas ná te komen.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 vi.mock('@/components/app/quick-add-wizard/quick-add-wizard', () => ({
   QuickAddWizard: ({ open, onCollect, initialAssetType }: any) =>
     open ? (
-      <button
-        type="button"
-        data-testid="wizard-collect"
-        onClick={() =>
-          onCollect({
-            kind: 'asset',
-            asset: { asset_type: initialAssetType, name: `Test ${initialAssetType}`, current_value: 1000 },
-          })
-        }
-      >
-        collect
-      </button>
+      <>
+        <button
+          type="button"
+          data-testid="wizard-collect"
+          onClick={() =>
+            onCollect({
+              kind: 'asset',
+              asset: { asset_type: initialAssetType, name: `Test ${initialAssetType}`, current_value: 1000 },
+            })
+          }
+        >
+          collect
+        </button>
+        <button
+          type="button"
+          data-testid="wizard-collect-met-hypotheek"
+          onClick={() =>
+            onCollect({
+              kind: 'asset_with_debt',
+              asset: {
+                asset_type: initialAssetType,
+                name: `Test ${initialAssetType}`,
+                current_value: 400_000,
+              },
+              debt: { debt_type: 'mortgage', name: 'Test hypotheek', current_balance: 250_000 },
+            })
+          }
+        >
+          collect met hypotheek
+        </button>
+      </>
     ) : null,
 }))
 
 import { OnboardingBezittingen } from './onboarding-bezittingen'
+import { HOUSING_CHOICE_OPTIONS, HOUSING_CHOICE_QUESTION } from '@/lib/housing-choice'
 
 afterEach(() => vi.clearAllMocks())
 
@@ -320,5 +343,94 @@ describe('OnboardingBezittingen — gekoppelde hypotheek', () => {
     const text = container.textContent ?? ''
     expect(text).toContain(`Netto na gekoppelde schuld · ${formatCurrency(200_000)}`)
     expect(text).not.toContain('Persoonlijke lening')
+  })
+})
+
+// ── Woning-keuze (stap iii-a, ADR 0133) ────────────────────────────────────
+
+/**
+ * De keuze "Telt je woning mee voor je vrijheid?" hoort exact één keer te komen,
+ * op één moment: nadat de eerste eigen woning is toegevoegd — dus ná de
+ * hypotheek-vraag van de wizard, want die zit in dezelfde collect. Wie geen
+ * woning heeft ziet 'm nooit; verdwijnt de woning weer, dan verdwijnt ook de
+ * keuze. Dat zijn de vier dingen die deze suite pint.
+ */
+describe('OnboardingBezittingen — woning-keuze', () => {
+  const sellTegel = () =>
+    screen.getByRole('button', {
+      name: new RegExp(HOUSING_CHOICE_OPTIONS[0].name, 'i'),
+    })
+
+  /** Loopt naar de eigen-huis-vraag en zegt "Ja". */
+  function totWoningVraag(container: HTMLElement) {
+    fireEvent.click(footerButton('Nee')) // betaalrekening
+    fireEvent.click(footerButton('Nee')) // spaargeld
+    expect(container.textContent).toContain('Heb je een eigen huis?')
+    fireEvent.click(footerButton('Ja'))
+  }
+
+  it('vraagt de keuze ná het toevoegen van de eerste woning mét hypotheek', () => {
+    const { container } = render(<Host />)
+    totWoningVraag(container)
+    // Het echte woning-pad: huis + hypotheek komen in één collect binnen.
+    fireEvent.click(screen.getByTestId('wizard-collect-met-hypotheek'))
+    expect(container.textContent).toContain(HOUSING_CHOICE_QUESTION)
+    // De hypotheek-vraag van de wizard is dus al geweest — de keuze komt erná.
+    expect(container.textContent).not.toContain('Nog een eigen woning?')
+  })
+
+  it('hervat na "Verder" de normale "nog een?"-loop van de woning-vraag', () => {
+    const { container } = render(<Host />)
+    totWoningVraag(container)
+    fireEvent.click(screen.getByTestId('wizard-collect'))
+    fireEvent.click(sellTegel())
+    fireEvent.click(footerButton('Verder'))
+    expect(container.textContent).not.toContain(HOUSING_CHOICE_QUESTION)
+    expect(container.textContent).toContain('Nog een eigen woning?')
+    // ... en de loop loopt daarna gewoon door naar de volgende vraag.
+    fireEvent.click(footerButton('Nee'))
+    expect(container.textContent).toContain('Heb je beleggingen?')
+  })
+
+  it('vraagt de keuze niet nog een keer bij een tweede woning', () => {
+    const { container } = render(<Host />)
+    totWoningVraag(container)
+    fireEvent.click(screen.getByTestId('wizard-collect'))
+    fireEvent.click(sellTegel())
+    fireEvent.click(footerButton('Verder'))
+    // Tweede woning via de "nog een?"-lus.
+    fireEvent.click(footerButton('Ja'))
+    fireEvent.click(screen.getByTestId('wizard-collect'))
+    expect(container.textContent).not.toContain(HOUSING_CHOICE_QUESTION)
+    expect(container.textContent).toContain('Nog een eigen woning?')
+  })
+
+  it('vraagt niets wanneer er geen woning wordt toegevoegd', () => {
+    const { container } = render(<Host />)
+    // Betaalrekening toevoegen en de rest van de sectie aflopen.
+    fireEvent.click(footerButton('Ja'))
+    fireEvent.click(screen.getByTestId('wizard-collect'))
+    fireEvent.click(footerButton('Nee')) // cash-more → spaargeld
+    fireEvent.click(footerButton('Nee')) // spaargeld → eigen huis
+    fireEvent.click(footerButton('Nee')) // eigen huis → beleggingen
+    fireEvent.click(footerButton('Nee')) // beleggingen → andere bezittingen?
+    expect(container.textContent).toContain('Heb je nog andere bezittingen?')
+    expect(container.textContent).not.toContain(HOUSING_CHOICE_QUESTION)
+  })
+
+  it('wist de keuze zodra de laatste woning uit de lijst verdwijnt', () => {
+    const { container } = render(<Host />)
+    totWoningVraag(container)
+    fireEvent.click(screen.getByTestId('wizard-collect'))
+    fireEvent.click(sellTegel())
+    fireEvent.click(footerButton('Verder'))
+    expect(container.textContent).toContain('Nog een eigen woning?')
+
+    // Woning weg → de keuze hoort niet stil te blijven staan: een nieuwe woning
+    // stelt de vraag opnieuw.
+    fireEvent.click(screen.getByLabelText('Verwijder Test eigen_huis'))
+    fireEvent.click(footerButton('Ja'))
+    fireEvent.click(screen.getByTestId('wizard-collect'))
+    expect(container.textContent).toContain(HOUSING_CHOICE_QUESTION)
   })
 })

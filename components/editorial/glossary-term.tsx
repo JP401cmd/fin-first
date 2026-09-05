@@ -112,9 +112,15 @@ export function GlossaryTerm({ term, explanation, children }: GlossaryTermProps)
   // kind PLATTE TEKST is: een ReactNode-kind (bv. <em>marktcheck</em>) draagt
   // eigen opmaak die we niet mogen weggooien, en zo'n kind is meestal al de
   // begrijpelijke variant.
-  const fallbackChild = children ?? term
+  //
+  // Zonder `children` (bv. een BEGRIPPEN-chip: `<GlossaryTerm term={term} />`)
+  // is de rauwe sleutel ('netto_vermogen', 'Monte_Carlo') geen geldige
+  // weergavetekst — die viel eerder letterlijk zo op het scherm. `displayName`
+  // (de entry-naam, met een underscore-fallback voor onbekende termen) is de
+  // enige tekst die we zonder kind mogen tonen.
+  const fallbackChild = children ?? displayName
   const childIsPlain = children === undefined || typeof children === 'string'
-  const sourceWord = typeof children === 'string' ? children : term
+  const sourceWord = typeof children === 'string' ? children : displayName
   const visible: ReactNode =
     mode === 'simple' && entry?.simpleLabel && childIsPlain
       ? matchLeadingCase(entry.simpleLabel, sourceWord)

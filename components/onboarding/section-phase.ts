@@ -29,6 +29,14 @@ export type SectionPhase =
    * stilzwijgend omkeren.
    */
   | { kind: 'pick-many' }
+  /**
+   * Eenmalig tussenscherm in de bezittingen-sectie: "Telt je woning mee voor je
+   * vrijheid?" (ADR 0133). Wordt gepusht direct nadat de eerste `eigen_huis`-post
+   * is toegevoegd — dus ná de hypotheek-vraag van de wizard — en nooit wanneer er
+   * geen woning is. De schulden-sectie gebruikt 'm niet; additief en dus veilig
+   * gedeeld, net als `pick-many`.
+   */
+  | { kind: 'woning-keuze' }
   | { kind: 'other-pick' }
   | { kind: 'other-more' }
   | { kind: 'review' }

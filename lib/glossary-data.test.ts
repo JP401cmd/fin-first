@@ -21,7 +21,6 @@ import {
   GLOSSARY_ENTRIES,
   GLOSSARY,
   JARGON_VERTAALTABEL,
-  CONCEPT_CARD_KEYS,
   getGlossaryAlternative,
 } from './glossary-data'
 
@@ -163,9 +162,62 @@ describe('afgeleide tabellen blijven in de pas', () => {
   it('dekt GLOSSARY alle sleutels met hun uitleg', () => {
     expect(Object.keys(GLOSSARY).sort()).toEqual(Object.keys(GLOSSARY_ENTRIES).sort())
   })
+})
 
-  it('laat elke CONCEPT_CARD_KEY naar een bestaande entry wijzen', () => {
-    const ontbrekend = CONCEPT_CARD_KEYS.filter((k) => !GLOSSARY_ENTRIES[k])
-    expect(ontbrekend).toEqual([])
+describe('UR3-13 — glossary sluitend (F1)', () => {
+  it('kent noodfonds (hernoemd van noodreserve) en niet meer de oude sleutel', () => {
+    // Het scherm zegt overal "noodfonds"; de oude sleutel "noodreserve" liet
+    // zich vanaf die tekst niet vinden (vier namen voor één pot).
+    expect(GLOSSARY_ENTRIES.noodreserve).toBeUndefined()
+    expect(GLOSSARY_ENTRIES.noodfonds?.explanation.length).toBeGreaterThan(0)
+  })
+
+  it('geeft elke gemeten term uit de heuristische audit een entry', () => {
+    // De 7 gemeten (+3 bijvangst) termen uit UR3-13 §2a — P40–P60 is bewust
+    // geen losse entry (zelfde begrip als bandbreedte, geen duplicaat).
+    for (const key of [
+      'bandbreedte',
+      'jaarruimte',
+      'franchise',
+      'aanmerkelijk_belang',
+      'forecast',
+      'optimizer',
+      'ISIN',
+      'YTD',
+      'middelloon',
+      'omslagpunt',
+    ]) {
+      expect(GLOSSARY_ENTRIES[key]?.explanation.length, key).toBeGreaterThan(0)
+    }
+  })
+
+  it('geeft ISIN bewust geen simpleLabel — het is een code, geen vervangbaar woord', () => {
+    expect(GLOSSARY_ENTRIES.ISIN?.simpleLabel).toBeUndefined()
+  })
+
+  it('geeft franchise en aanmerkelijk belang geen simpleLabel — wettelijke termen (S17)', () => {
+    expect(GLOSSARY_ENTRIES.franchise?.simpleLabel).toBeUndefined()
+    expect(GLOSSARY_ENTRIES.aanmerkelijk_belang?.simpleLabel).toBeUndefined()
+  })
+
+  it('breidt de S17 A-rij simpleLabels uit met de §4-optie-A-lijst', () => {
+    const verwacht: Record<string, string> = {
+      SORR: 'volgorderisico',
+      Monte_Carlo: 'marktcheck',
+      LTV: 'schuld ten opzichte van je woningwaarde',
+      ETF: 'beursgenoteerd beleggingsfonds',
+      ter: 'beheerkosten van een fonds',
+      vpw: 'leeftijd-afhankelijke opname',
+      upo: 'pensioenoverzicht',
+      psd2: 'bankkoppeling',
+      YTD: 'dit jaar',
+      compounding: 'rente op rente',
+      rebalancing: 'herbalanceren',
+      guardrails: 'vangrails-strategie',
+      bucket: 'potjes-strategie',
+    }
+    for (const [key, label] of Object.entries(verwacht)) {
+      expect(GLOSSARY_ENTRIES[key]?.simpleLabel, key).toBe(label)
+    }
   })
 })

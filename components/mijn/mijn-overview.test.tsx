@@ -23,7 +23,7 @@ function renderIn(mode: DisplayMode) {
   )
 }
 
-const PRIMAIR = ['Profiel', 'Privacy', 'Koppelingen', 'Uiterlijk']
+const PRIMAIR = ['Profiel', 'Privacy', 'Koppelingen', 'Weergave en uiterlijk']
 const SECUNDAIR = [
   'Notificaties',
   'Check-ins',
@@ -97,7 +97,7 @@ describe('MijnOverview — render', () => {
     // H19 — NL-eerst zonder afkortingen (was: "PSD2-banken, UPO, brokerage-sync.")
     expect(screen.getByText(/Bank koppelen, pensioenoverzicht/i)).toBeTruthy()
     expect(screen.queryByText(/PSD2|UPO|brokerage/i)).toBeNull()
-    expect(screen.getByText(/Kleurpalet, typografie/i)).toBeTruthy()
+    expect(screen.getByText(/Eenvoudig of volledig, je startscherm/i)).toBeTruthy()
     expect(screen.getByText(/Tijdlijn van al je maandelijkse/i)).toBeTruthy()
   })
 
@@ -132,12 +132,12 @@ describe('MijnOverview — curatie per weergavemodus (S8, optie B)', () => {
     }
   })
 
-  it('vouwt in Eenvoudig de secundaire kaarten weg achter "Alle instellingen"', () => {
+  it('vouwt in Eenvoudig de secundaire kaarten weg achter "Overige instellingen"', () => {
     renderIn('simple')
 
     const depth = screen.getByTestId('depth-section')
     expect(depth).toHaveAttribute('data-collapsed', 'true')
-    expect(screen.getByTestId('depth-section-title').textContent).toBe('Alle instellingen')
+    expect(screen.getByTestId('depth-section-title').textContent).toBe('Overige instellingen')
 
     // De vier primaire kaarten staan BUITEN de dichte sectie...
     for (const label of PRIMAIR) {
@@ -172,9 +172,9 @@ describe('MijnOverview — curatie per weergavemodus (S8, optie B)', () => {
     expect(screen.getByTestId('depth-section')).toHaveAttribute('data-collapsed', 'false')
   })
 
-  it('houdt Uiterlijk vooraan — dat is de vluchtroute terug naar Volledig', () => {
+  it('houdt Weergave en uiterlijk vooraan — dat is de vluchtroute terug naar Volledig', () => {
     renderIn('simple')
     const depth = screen.getByTestId('depth-section')
-    expect(depth.contains(screen.getByText('Uiterlijk'))).toBe(false)
+    expect(depth.contains(screen.getByText('Weergave en uiterlijk'))).toBe(false)
   })
 })

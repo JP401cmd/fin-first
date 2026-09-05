@@ -7,6 +7,7 @@ import type { WidgetSize } from '@/lib/widget-catalog'
 import { calculateFreedomTime, formatFreedomTimeString, dailyExpenseRate } from '@/lib/format'
 import { FIRE_SAVINGS_RATE_BENCHMARK_PCT } from '@/lib/constants'
 import { savingsRateBasisLabel, savingsRateFollowsTransactions } from '@/lib/budget-basis'
+import { GRONDSLAG_ONBEKEND_KOP, grondslagGuard } from '@/lib/grondslag-guard'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import type { DashboardData } from './widget-renderer'
 import { PiggyBank, Users, UserCheck } from 'lucide-react'
@@ -80,6 +81,32 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
     : isPartnerView
       ? `Spaarquote — ${partnerName ?? 'Partner'}`
       : 'Spaarquote'
+
+  // Onbekend is geen nul (ADR 0131): zonder inkomen- of uitgavengrondslag is er
+  // geen quote, dus geen "0 %" en geen budget-advies — één zin en één knop.
+  // Alleen in eigen perspectief: de huishoud-/partner-overrides dragen hun
+  // eigen grondslag niet en tonen daarom het bestaande lege-staat-pad.
+  const guard = overrides ? null : grondslagGuard(data.savingsRateIncomeBasis, data.savingsRateExpensesBasis)
+  if (guard && !guard.ok && guard.hint && guard.actie) {
+    if (size === 'mini') {
+      return (
+        <WidgetShell module="kern" size="mini" kicker={kickerLabel} href={guard.actie.href}>
+          <p className="font-mono text-[15px] font-semibold tabular-nums leading-none text-[var(--ink-3)]">–</p>
+        </WidgetShell>
+      )
+    }
+    return (
+      <WidgetShell module="kern" size={size} kicker={kickerLabel}>
+        <WidgetEmpty
+          variant="first-use"
+          icon={PiggyBank}
+          title={GRONDSLAG_ONBEKEND_KOP}
+          description={guard.hint}
+          action={{ label: guard.actie.label, href: guard.actie.href }}
+        />
+      </WidgetShell>
+    )
+  }
 
   if (monthlyIncome === 0 && rate === 0) {
     return (

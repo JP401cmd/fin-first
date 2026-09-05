@@ -1,7 +1,9 @@
 'use client'
 
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
-import type { HealthScore, HealthPillar, PillarGroup } from '@/lib/financial-health'
+import { healthScoreVerdict, type HealthScore, type HealthPillar, type PillarGroup } from '@/lib/financial-health'
+import { GRONDSLAG_ONBEKEND_KOP } from '@/lib/grondslag-guard'
+import { Button } from '@/components/editorial'
 
 // ── Pillar-group subscores (compacte mini-bars op de kaart) ──
 // De vier gedragspijlers (ADR 0010), in vaste volgorde, met kort label.
@@ -200,6 +202,34 @@ export function HealthScoreCard({
       : trend < 0
       ? `${trend.toFixed(0)} punten t.o.v. vorige maand`
       : 'gelijk aan vorige maand'
+
+  // Onbekend is geen nul (ADR 0131): zonder inkomen/uitgaven geen cijfer en
+  // geen oordeel — één zin en één knop. Géén <button>-wrapper hier: een link
+  // in een knop is ongeldige HTML, en de kassabon heeft zonder score niets
+  // te tonen dat de knop niet al zegt.
+  const verdict = healthScoreVerdict(health)
+  if (verdict.kind === 'onbekend') {
+    const { hint, actie } = verdict.onbekend
+    return (
+      <div
+        data-testid="health-score-onbekend"
+        className="flex flex-col items-center justify-center text-center rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5 w-full h-full"
+      >
+        <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)] mb-3">
+          Financiële gezondheid
+        </div>
+        <div className="font-serif text-lg font-bold text-[var(--ink)] leading-tight">
+          {GRONDSLAG_ONBEKEND_KOP}
+        </div>
+        <p className="mt-2 max-w-[240px] font-serif italic text-[13px] leading-relaxed text-[var(--ink-3)]">
+          {hint}
+        </p>
+        <Button href={actie.href} size="sm" className="mt-4">
+          {actie.label}
+        </Button>
+      </div>
+    )
+  }
 
   return (
     <button

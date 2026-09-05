@@ -43,6 +43,7 @@
  */
 
 import type { ModuleId } from '@/lib/module-registry'
+import { BANK_CONNECT_SAFETY_SHORT } from '@/lib/bank-connect-copy'
 import { GUIDE_SUGGESTION_KEY_PREFIX } from '@/lib/coach-state'
 import { guideStepMatchesRoute, type GuideNextStep } from '@/lib/welcome-guide'
 
@@ -329,8 +330,10 @@ export const DATA_GAP_SUGGESTIONS: DataGapRule[] = [
     condition: 'Geen bankrekening gekoppeld (geen asset van type "cash").',
     check: (g) => !g.hasBank,
     suggestion: {
-      message:
-        'Koppel je bank, dan houd ik je uitgaven automatisch bij — minder typewerk, meer zicht op je vrijheid.',
+      // De uitnodiging noemde alleen het voordeel ("minder typewerk"). Dat is
+      // een voordeel, geen vertrouwen — juist hier moet de veiligheidszin mee
+      // (UR3-15). Eén bron: `lib/bank-connect-copy.ts`.
+      message: `Koppel je bank, dan houd ik je uitgaven automatisch bij — minder typewerk, meer zicht op je vrijheid. ${BANK_CONNECT_SAFETY_SHORT}`,
       cta: 'Bank koppelen',
       ctaHref: '/mijn/koppelingen',
     },

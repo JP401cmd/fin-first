@@ -41,6 +41,8 @@ import { StepChoice } from './steps/step-choice'
 import { StepType } from './steps/step-type'
 import { StepDetails } from './steps/step-details'
 import { StepLinkDebt } from './steps/step-link-debt'
+import { StepHousingChoice } from './steps/step-housing-choice'
+import type { HousingChoice } from '@/lib/housing-choice'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { MilestoneCelebration } from '@/components/app/milestone-celebration'
 
@@ -135,6 +137,25 @@ type LinkDebtContext =
       debtDraft: DebtDraftState
     }
 
+/**
+ * Openstaande woning-vraag (ADR 0133) — de afsluitende stap ná de
+ * hypotheek-vraag, voor wie zijn EERSTE eigen woning toevoegt.
+ *
+ * Draagt het success-scherm mee dat zonder deze stap direct getoond zou zijn:
+ * de bezitting is op dit punt al opgeslagen, dus welke uitweg de gebruiker ook
+ * kiest (bevestigen, overslaan, of een mislukte PUT), we eindigen altijd op
+ * exact dát scherm. De vraag mag het toevoegen nooit alsnog laten mislukken.
+ */
+type HousingAskState = {
+  pendingSuccess: Extract<WizardState, { step: 'success' }>
+  choice: HousingChoice | null
+  isSaving: boolean
+  error: string | null
+}
+
+const HOUSING_SAVE_ERROR =
+  'Je keuze is niet opgeslagen — je woning staat er wel gewoon in. Probeer het opnieuw of stel het later in bij Voorkeuren.'
+
 export function QuickAddWizard({
   open,
   onClose,
@@ -165,6 +186,17 @@ export function QuickAddWizard({
   // toon de viering zodra er in commit-mode een bezitting bijkomt vanaf nul.
   const assetCountAtOpenRef = useRef<number | undefined>(assetCountBefore)
   const [celebrateFirstAsset, setCelebrateFirstAsset] = useState(false)
+  /**
+   * Woning-vraag (ADR 0133): openstaande stap + de lopende relevantie-lezing.
+   *
+   * De lezing start bewust VÓÓR de insert (in `proceedFromAssetDetails`) en
+   * wordt als promise bewaard: ná het opslaan heeft élke gebruiker een eigen
+   * woning, dus dán is niet meer te zien of hij er al één hád. Alleen wie er
+   * nog geen had én de vraag nog niet beantwoordde, krijgt 'm — anders zou een
+   * tweede woning de keuze bij de eerste overschrijven.
+   */
+  const [housingAsk, setHousingAsk] = useState<HousingAskState | null>(null)
+  const housingProbeRef = useRef<Promise<boolean> | null>(null)
   // Optionele toast: wizard wordt ook in onboarding-layout gebruikt waar geen
   // ToastProvider zit. In collect-mode roepen we addToast toch niet aan; in
   // commit-mode is de provider altijd aanwezig (app-shell).
@@ -195,6 +227,11 @@ export function QuickAddWizard({
     // hetzelfde bedrag de wedervraag over.
     setBedragBevestiging(null)
     bedragBevestigdRef.current = null
+    // De woning-vraag hoort net zo goed bij één ingevoerde bezitting: bij
+    // heropenen moet de relevantie opnieuw gelezen worden (er kán inmiddels
+    // een woning bijgekomen zijn, of de vraag kan elders beantwoord zijn).
+    setHousingAsk(null)
+    housingProbeRef.current = null
     if (open) {
       dispatch({
         type: 'OPEN',
@@ -234,6 +271,67 @@ export function QuickAddWizard({
   // bij `initialIntent` (-1), skip ook type bij type-prefill (-1).
   const totalSteps = hasTypePrefill ? 2 : initialIntent ? 3 : 4
 
+  // ── Woning-vraag (ADR 0133) ────────────────────────────────────
+
+  /**
+   * Start de relevantie-lezing voor de woning-vraag. Aangeroepen op het moment
+   * dat de gebruiker zijn woning-details indient — dus vóór de insert, want ná
+   * de insert zegt de route altijd `has_eigen_huis: true` en is niet meer te
+   * zien of dit zijn eerste woning was.
+   *
+   * De vraag is alleen relevant wanneer er nog géén eigen woning was ÉN de
+   * keuze nog niet gemaakt is (`choice === null`, de DB-default `include_full`).
+   * Een leesfout (500/netwerk) telt bewust als "niet vragen": een 500 is géén
+   * bewijs dat er geen woning is, en doorvragen zou de keuze bij een bestaande
+   * woning kunnen overschrijven. De gebruiker houdt dan wat hij had en kan het
+   * in Voorkeuren zetten.
+   */
+  const startHousingProbe = useCallback(() => {
+    if (housingProbeRef.current) return
+    housingProbeRef.current = (async () => {
+      try {
+        const res = await fetch('/api/housing-strategy', {
+          headers: { Accept: 'application/json' },
+        })
+        if (!res.ok) return false
+        const data = (await res.json()) as {
+          has_eigen_huis?: boolean
+          choice?: HousingChoice | null
+        }
+        return data.has_eigen_huis === false && (data.choice ?? null) === null
+      } catch {
+        return false
+      }
+    })()
+  }, [])
+
+  /**
+   * Toon het success-scherm — of eerst de woning-vraag, wanneer die openstaat.
+   * Alle commit-paden die op "toegevoegd" uitkomen lopen hierlangs; zonder
+   * lopende lezing (elk ander type, elke collect-flow) is dit een directe
+   * `SUCCESS`-dispatch.
+   */
+  const showSuccess = useCallback(
+    async (payload: Extract<WizardState, { step: 'success' }>) => {
+      const probe = housingProbeRef.current
+      if (probe) {
+        const shouldAsk = await probe
+        housingProbeRef.current = null
+        if (shouldAsk) {
+          setHousingAsk({
+            pendingSuccess: payload,
+            choice: null,
+            isSaving: false,
+            error: null,
+          })
+          return
+        }
+      }
+      dispatch({ type: 'SUCCESS', payload })
+    },
+    [],
+  )
+
   // ── Submit: asset-only of debt-only ────────────────────────────
 
   const submitQuickAdd = useCallback(
@@ -268,24 +366,21 @@ export function QuickAddWizard({
         if (result.ok) {
           const name = input.kind === 'debt' ? input.debt.name : input.asset.name
 
-          dispatch({
-            type: 'SUCCESS',
-            payload: {
-              step: 'success',
-              kind: input.kind,
-              assetName: input.kind !== 'debt' ? input.asset.name : undefined,
-              debtName:
-                input.kind === 'asset_with_debt' ? input.debt.name : undefined,
-              netAmount:
-                input.kind === 'asset_with_debt'
-                  ? input.asset.current_value - input.debt.current_balance
-                  : undefined,
-            },
-          })
-
           addToast({ type: 'success', title: `${name} toegevoegd.`, duration: 3000 })
           router.refresh()
           onSaved?.({ assetId: result.assetId, debtId: result.debtId })
+
+          await showSuccess({
+            step: 'success',
+            kind: input.kind,
+            assetName: input.kind !== 'debt' ? input.asset.name : undefined,
+            debtName:
+              input.kind === 'asset_with_debt' ? input.debt.name : undefined,
+            netAmount:
+              input.kind === 'asset_with_debt'
+                ? input.asset.current_value - input.debt.current_balance
+                : undefined,
+          })
         } else if (
           result.code === 'DEBT_FAILED' &&
           result.partial?.assetId &&
@@ -297,16 +392,13 @@ export function QuickAddWizard({
             message: result.message,
             duration: 6000,
           })
-          dispatch({
-            type: 'SUCCESS',
-            payload: {
-              step: 'success',
-              kind: 'asset',
-              assetName: input.asset.name,
-            },
-          })
           router.refresh()
           onSaved?.({ assetId: result.partial.assetId })
+          await showSuccess({
+            step: 'success',
+            kind: 'asset',
+            assetName: input.asset.name,
+          })
         } else {
           dispatch({ type: 'ERROR', message: result.message })
         }
@@ -318,7 +410,7 @@ export function QuickAddWizard({
         setIsSaving(false)
       }
     },
-    [isCollectMode, onCollect, addToast, onSaved, router],
+    [isCollectMode, onCollect, addToast, onSaved, router, showSuccess],
   )
 
   // ── Asset-details → linkDebt prompt OR submit ──────────────────
@@ -340,6 +432,19 @@ export function QuickAddWizard({
       ) {
         setBedragBevestiging({ bedrag: draft.current_value, draft })
         return
+      }
+
+      // ── Woning-vraag: lees de relevantie NU, vóór de insert (ADR 0133) ───
+      //
+      // Dit is het laatste moment waarop de app weet of de gebruiker al een
+      // eigen woning hád: één regel verderop wordt die er hoe dan ook één. De
+      // lezing loopt parallel aan het opslaan; het antwoord is pas nodig op het
+      // moment dat het success-scherm zou verschijnen (`showSuccess`).
+      //
+      // Alleen commit-mode: in collect-mode (onboarding) stelt de onboarding
+      // zelf deze vraag en is er nog niets om tegen te lezen.
+      if (draft.asset_type === 'eigen_huis' && !isCollectMode) {
+        startHousingProbe()
       }
 
       const complete: AssetQuickInput = {
@@ -399,7 +504,7 @@ export function QuickAddWizard({
         setIsSaving(false)
       }
     },
-    [isCollectMode, addToast, onSaved, router, submitQuickAdd],
+    [isCollectMode, addToast, onSaved, router, submitQuickAdd, startHousingProbe],
   )
 
   // ── Debt-details (stand-alone of gekoppeld) ────────────────────
@@ -455,17 +560,15 @@ export function QuickAddWizard({
       setLinkDebtCtx(null)
       return
     }
-    // Commit-mode: asset is al opgeslagen vóór de prompt — toon success.
-    dispatch({
-      type: 'SUCCESS',
-      payload: {
-        step: 'success',
-        kind: 'asset',
-        assetName: linkDebtCtx.asset.name,
-      },
+    // Commit-mode: asset is al opgeslagen vóór de prompt — toon success
+    // (of eerst de woning-vraag, wanneer die openstaat).
+    void showSuccess({
+      step: 'success',
+      kind: 'asset',
+      assetName: linkDebtCtx.asset.name,
     })
     setLinkDebtCtx(null)
-  }, [linkDebtCtx, submitQuickAdd])
+  }, [linkDebtCtx, submitQuickAdd, showSuccess])
 
   const handleLinkDebtFormUpdate = useCallback((patch: Partial<DebtQuickInput>) => {
     setLinkDebtCtx((prev) =>
@@ -517,6 +620,9 @@ export function QuickAddWizard({
 
   const handleClose = useCallback(() => {
     setLinkDebtCtx(null)
+    // Sluiten met de woning-vraag open = overslaan. De bezitting staat er al;
+    // de keuze blijft bereikbaar in Voorkeuren.
+    setHousingAsk(null)
     onClose()
   }, [onClose])
 
@@ -539,27 +645,73 @@ export function QuickAddWizard({
       }
       // Commit-mode: asset is al opgeslagen — teruggaan naar details zou
       // verwarrend zijn; we sluiten de koppel-flow en tonen het success-scherm.
-      dispatch({
-        type: 'SUCCESS',
-        payload: {
-          step: 'success',
-          kind: 'asset',
-          assetName: linkDebtCtx.asset.name,
-        },
+      void showSuccess({
+        step: 'success',
+        kind: 'asset',
+        assetName: linkDebtCtx.asset.name,
       })
       setLinkDebtCtx(null)
       return
     }
     dispatch({ type: 'BACK' })
-  }, [linkDebtCtx])
+  }, [linkDebtCtx, showSuccess])
 
   const handleAddAnother = useCallback(() => {
     setLinkDebtCtx(null)
     // Zie het open-effect: de bevestiging geldt per ingevoerde bezitting.
     setBedragBevestiging(null)
     bedragBevestigdRef.current = null
+    // Idem de woning-vraag: een volgende bezitting leest 'm opnieuw (en krijgt
+    // 'm dan niet meer — er is nu een woning).
+    setHousingAsk(null)
+    housingProbeRef.current = null
     dispatch({ type: 'ADD_ANOTHER' })
   }, [])
+
+  // ── Woning-vraag: bevestigen / overslaan ───────────────────────
+
+  const handleHousingChange = useCallback((choice: HousingChoice) => {
+    setHousingAsk((prev) => (prev ? { ...prev, choice } : prev))
+  }, [])
+
+  /**
+   * Sla de keuze op via de route (`PUT /api/housing-strategy`, alleen `choice` —
+   * `lib/housing-choice.ts` maakt er server-side de config van) en rond af.
+   *
+   * Mislukt de PUT, dan blijft de bezitting gewoon bestaan: we tonen de fout in
+   * de stap en laten "Overslaan" open staan. De woning toevoegen mag nooit
+   * mislukken omdat een vervolgvraag misging.
+   */
+  const handleHousingConfirm = useCallback(async () => {
+    const current = housingAsk
+    if (!current || current.choice === null || current.isSaving) return
+    setHousingAsk({ ...current, isSaving: true, error: null })
+    try {
+      const res = await fetch('/api/housing-strategy', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ choice: current.choice }),
+      })
+      if (!res.ok) {
+        setHousingAsk({ ...current, isSaving: false, error: HOUSING_SAVE_ERROR })
+        return
+      }
+      setHousingAsk(null)
+      dispatch({ type: 'SUCCESS', payload: current.pendingSuccess })
+      // De keuze verschuift de vrijheids-grondslag (mét/zonder je huis), dus de
+      // server components eromheen moeten opnieuw lezen.
+      router.refresh()
+    } catch {
+      setHousingAsk({ ...current, isSaving: false, error: HOUSING_SAVE_ERROR })
+    }
+  }, [housingAsk, router])
+
+  const handleHousingSkip = useCallback(() => {
+    if (!housingAsk) return
+    const payload = housingAsk.pendingSuccess
+    setHousingAsk(null)
+    dispatch({ type: 'SUCCESS', payload })
+  }, [housingAsk])
 
   // ── Dispatch wrappers ──────────────────────────────────────────
 
@@ -592,8 +744,12 @@ export function QuickAddWizard({
 
   // ── Render ─────────────────────────────────────────────────────
 
-  const sheetTitle = deriveSheetTitle(state, linkDebtCtx, initialIntent)
-  const sheetHeight = deriveSheetHeight(state, linkDebtCtx)
+  // De woning-vraag is een eigen stap bovenop de state-machine (net als de
+  // koppel-schuld-flow) en overschrijft daarom titel + hoogte van de sheet.
+  const sheetTitle = housingAsk
+    ? 'Je woning'
+    : deriveSheetTitle(state, linkDebtCtx, initialIntent)
+  const sheetHeight = housingAsk ? '70vh' : deriveSheetHeight(state, linkDebtCtx)
 
   return (
     <>
@@ -615,6 +771,7 @@ export function QuickAddWizard({
           <WizardContent
             state={state}
             linkDebtCtx={linkDebtCtx}
+            housingAsk={housingAsk}
             totalSteps={totalSteps}
             initialIntent={initialIntent}
             hasTypePrefill={hasTypePrefill}
@@ -642,6 +799,9 @@ export function QuickAddWizard({
             onLinkDebtNo={handleLinkDebtNo}
             onLinkDebtFormUpdate={handleLinkDebtFormUpdate}
             onLinkDebtFormSubmit={handleLinkDebtFormSubmit}
+            onHousingChange={handleHousingChange}
+            onHousingConfirm={() => void handleHousingConfirm()}
+            onHousingSkip={handleHousingSkip}
             onAddAnother={handleAddAnother}
             onClose={handleClose}
           />
@@ -727,6 +887,8 @@ export function QuickAddWizard({
 interface WizardContentProps {
   state: WizardState
   linkDebtCtx: LinkDebtContext
+  /** Openstaande woning-vraag; heeft voorrang boven élke andere stap. */
+  housingAsk: HousingAskState | null
   totalSteps: number
   initialIntent?: QuickAddIntent
   /**
@@ -762,6 +924,9 @@ interface WizardContentProps {
   onLinkDebtNo: () => void
   onLinkDebtFormUpdate: (patch: Partial<DebtQuickInput>) => void
   onLinkDebtFormSubmit: () => void
+  onHousingChange: (choice: HousingChoice) => void
+  onHousingConfirm: () => void
+  onHousingSkip: () => void
   onAddAnother: () => void
   onClose: () => void
 }
@@ -770,6 +935,7 @@ function WizardContent(props: WizardContentProps) {
   const {
     state,
     linkDebtCtx,
+    housingAsk,
     totalSteps,
     initialIntent,
     hasTypePrefill,
@@ -787,12 +953,42 @@ function WizardContent(props: WizardContentProps) {
     onLinkDebtNo,
     onLinkDebtFormUpdate,
     onLinkDebtFormSubmit,
+    onHousingChange,
+    onHousingConfirm,
+    onHousingSkip,
     onAddAnother,
     onClose,
   } = props
 
   // Stap "linkDebt" — details + 1. Verschuift mee met type-prefill.
   const linkDebtStepNumber = hasTypePrefill ? 2 : initialIntent ? 3 : 4
+
+  // Afsluitende woning-vraag (ADR 0133) — ná de hypotheek-vraag, vóór het
+  // success-scherm. Zonder telling: deze stap komt er conditioneel bij, en
+  // "Stap 5 van 5" ná "Stap 4 van 4" is een slechtere belofte dan geen telling.
+  // Zonder terug-knop: alles ervóór is al opgeslagen (zelfde reden als bij de
+  // koppel-prompt in commit-mode).
+  if (housingAsk) {
+    return (
+      <>
+        <StepHeader
+          step={linkDebtStepNumber}
+          total={totalSteps}
+          showStepCount={false}
+          title="Je woning"
+          kicker="Grondslag"
+        />
+        <StepHousingChoice
+          value={housingAsk.choice}
+          onChange={onHousingChange}
+          onConfirm={onHousingConfirm}
+          onSkip={onHousingSkip}
+          isSaving={housingAsk.isSaving}
+          error={housingAsk.error}
+        />
+      </>
+    )
+  }
 
   // Stap 4b — koppel-schuld form. Heeft voorrang boven reducer-state.
   if (linkDebtCtx?.phase === 'form') {

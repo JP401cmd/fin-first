@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { ExternalLink, FileSpreadsheet, Landmark, Building2, PiggyBank, FileText, Trash2, Link2 } from 'lucide-react'
 import Link from 'next/link'
+import { BANK_CONNECT_SAFETY_LONG } from '@/lib/bank-connect-copy'
 import { ConnectionSection } from '@/components/connections/connection-section'
 import { ConnectionCard } from '@/components/connections/connection-card'
 import { IsinResolverStatus } from '@/components/connections/isin-resolver-status'
@@ -529,9 +530,11 @@ export function KoppelingenClient({ initialData, brokerConnections, aangifteImpo
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-[var(--ink)]">PSD2-koppeling</p>
+                {/* Eén canonieke veiligheidszin voor elke bank-uitnodiging
+                    (UR3-15) — dit blok had een eigen formulering. */}
                 <p className="mt-0.5 text-xs text-[var(--ink-3)]">
-                  Lees-rechten via je bank. Saldi en transacties komen automatisch
-                  binnen; wij plaatsen nooit betalingen.
+                  Saldi en transacties komen automatisch binnen.{' '}
+                  {BANK_CONNECT_SAFETY_LONG}
                 </p>
                 <Link
                   href="/core/cash/connect"

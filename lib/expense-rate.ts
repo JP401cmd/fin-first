@@ -46,7 +46,7 @@
  * is een ánder concept en hoort hier NIET thuis.
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { credibleMonthlyBasis, dailyExpenseRate } from '@/lib/format'
+import { credibleMonthlyBasis, dailyExpenseRate, type FreedomRateSource } from '@/lib/format'
 import { localMonthBounds, localMonthStartMonthsAgo } from '@/lib/month-range'
 import { EXPENSE_RATE_ROLLING_MONTHS } from '@/lib/constants'
 import { buildBudgetTypeMap, EXCLUDED_BUDGET_TYPES, type BudgetTypeRow } from '@/lib/budget-utils'
@@ -70,11 +70,15 @@ export interface RecentDailyExpenseRate {
   /** Aantal maanden met data (1..EXPENSE_RATE_ROLLING_MONTHS); 0 bij schatting/geen data. */
   dataMonths: number
   /**
-   * Herkomst van het tarief: echte transacties, profiel-schatting, of geen.
+   * Herkomst van het tarief: echte transacties, profiel-schatting, de gok van
+   * de app zelf, of geen.
    * 'transactions' impliceert een GELOOFWAARDIGE transactiebasis (≥ vloer);
    * consumenten die hierop toetsen hoeven de vloer dus niet zelf te kennen.
+   * 'cohort' is de terugval-tak mét `fallbackSource: 'cohort'` — het
+   * profielbedrag is dan door "Schat het voor me" ingevuld (ADR 0131); zie
+   * `FreedomRateSource` in lib/format.ts voor waarom dat een eigen woord krijgt.
    */
-  source: 'transactions' | 'estimate' | 'none'
+  source: FreedomRateSource
 }
 
 type ExpenseRow = { amount: number | string; date: string }
@@ -110,6 +114,14 @@ export function recentDailyExpenseRateFromRows(
   rows: ExpenseRow[],
   referenceDate: Date,
   fallbackMonthlyExpenses = 0,
+  /**
+   * WIENS bedrag de terugval is. `'profile'` (default) = de gebruiker gaf het
+   * op; `'cohort'` = de app raadde het ("Schat het voor me",
+   * `profiles.expenses_source === 'estimate'`, ADR 0131). Alleen de
+   * terugval-tak leest dit — met een geloofwaardige transactiebasis is de
+   * herkomst van het profielbedrag betekenisloos.
+   */
+  fallbackSource: 'profile' | 'cohort' = 'profile',
 ): RecentDailyExpenseRate {
   if (rows.length > 0) {
     const totalExpenses = rows.reduce((sum, tx) => sum + Math.abs(Number(tx.amount)), 0)
@@ -142,7 +154,7 @@ export function recentDailyExpenseRateFromRows(
       dailyRate: dailyExpenseRate(estimate),
       monthlyExpenses: estimate,
       dataMonths: 0,
-      source: 'estimate',
+      source: fallbackSource === 'cohort' ? 'cohort' : 'estimate',
     }
   }
   return { dailyRate: 0, monthlyExpenses: 0, dataMonths: 0, source: 'none' }
@@ -293,7 +305,9 @@ export async function getRecentDailyExpenseRate(
   supabase: SupabaseClient,
   referenceDate: Date = new Date(),
   fallbackMonthlyExpenses = 0,
+  /** Zie `recentDailyExpenseRateFromRows`: herkomst van het terugval-bedrag. */
+  fallbackSource: 'profile' | 'cohort' = 'profile',
 ): Promise<RecentDailyExpenseRate> {
   const rows = await fetchExpenseRowsForRate(supabase, referenceDate)
-  return recentDailyExpenseRateFromRows(rows, referenceDate, fallbackMonthlyExpenses)
+  return recentDailyExpenseRateFromRows(rows, referenceDate, fallbackMonthlyExpenses, fallbackSource)
 }

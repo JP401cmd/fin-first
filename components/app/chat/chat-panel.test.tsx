@@ -1041,6 +1041,37 @@ describe('ChatPanel — getypte vraag komt terug bij een fout (L7)', () => {
 })
 
 /**
+ * UR3-09 / ADR 0132: een `ai_provider_refused`-envelope (de provider weigert
+ * zelf — tegoed op, sleutel ongeldig; `affordance: 'geen'` in error-copy.ts)
+ * mag GEEN "Opnieuw proberen"-knop tonen — retry kan dit per definitie niet
+ * oplossen. `describeAiThrown` leest de code uit de JSON-envelope in
+ * `error.message` (spiegelt de andere describeAiThrown-tests in
+ * lib/ai/error-copy.test.ts); chat-panel.tsx zelf is generiek over
+ * `errorCopy.affordance` en is voor deze test niet gewijzigd.
+ */
+describe('ChatPanel — ai_provider_refused geeft geen retry-lus (UR3-09 / ADR 0132)', () => {
+  beforeEach(() => {
+    localStorage.setItem(WFT_KEY, 'true')
+    stubExecutionFetch({ privacyMode: false })
+    mockError = new Error(
+      JSON.stringify({
+        error: 'Fin werkt op dit moment niet. Dat ligt aan ons, niet aan jou — opnieuw proberen helpt nu niet.',
+        code: 'ai_provider_refused',
+      }),
+    )
+  })
+
+  it('toont de foutmelding maar geen "Opnieuw proberen"-knop', async () => {
+    render(<ChatPanel />)
+
+    await waitFor(() => expect(screen.getByTestId('chat-error-banner')).toBeTruthy())
+    expect(screen.getByText(/Fin werkt op dit moment niet/)).toBeTruthy()
+    expect(screen.queryByTestId('chat-retry-button')).toBeNull()
+    expect(screen.queryByTestId('chat-error-link')).toBeNull()
+  })
+})
+
+/**
  * ADR 0130 — de WELKOMSTGIDS woont in Fin.
  *
  * De gids was een banner op /overzicht met een geminimaliseerd punt naast de

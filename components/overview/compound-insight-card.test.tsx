@@ -38,10 +38,12 @@ describe('CompoundInsightCard — render', () => {
   // H15: de CTA keek alleen naar cash en riep "Start met beleggen" ook naast
   // een lopende inleg. De rendergate blijft op liquide cash; alleen de CTA
   // volgt nu de werkelijke staat.
+  // UR3-03/UR3-15: "Start met beleggen" was een aansporing tot een concrete
+  // geldhandeling (Wft-grens) — label is nu beschrijvend ("Bekijk beleggen").
   describe('CTA-variant (kaart H15)', () => {
-    it('toont "Start met beleggen" wanneer er nog niet belegd wordt', () => {
+    it('toont "Bekijk beleggen" wanneer er nog niet belegd wordt', () => {
       const { container } = render(<CompoundInsightCard liquidCash={50_000} />)
-      expect(container.textContent).toMatch(/Start met beleggen/i)
+      expect(container.textContent).toMatch(/Bekijk beleggen/i)
       expect(container.querySelector('a[href="/overzicht/bezittingen"]')).toBeTruthy()
     })
 
@@ -49,7 +51,7 @@ describe('CompoundInsightCard — render', () => {
       const { container } = render(
         <CompoundInsightCard liquidCash={50_000} hasInvestments />,
       )
-      expect(container.textContent).not.toMatch(/Start met beleggen/i)
+      expect(container.textContent).not.toMatch(/Bekijk beleggen/i)
       expect(container.textContent).toMatch(/Bekijk je portefeuille/i)
       // ...en verwijst naar de holdings i.p.v. de pagina waar hij zelf op staat.
       expect(

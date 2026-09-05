@@ -142,7 +142,7 @@ const IDENTITY_PAGES: StaticPage[] = [
   { label: 'Profiel',                   sublabel: 'Persoonlijke gegevens en huishouden', href: '/mijn/profiel',                         icon: User,        module: 'globaal' },
   { label: 'Account',                   sublabel: 'Abonnement en accountbeheer',        href: '/mijn/account',                          icon: Settings,    module: 'globaal' },
   { label: 'Notificaties',              sublabel: 'Meldingsvoorkeuren',                 href: '/mijn/notificaties',                     icon: Bell,        module: 'globaal' },
-  { label: 'Uiterlijk',                 sublabel: 'Kleurpalet, typografie en widgets',  href: '/mijn/uiterlijk',                        icon: Settings,    module: 'globaal' },
+  { label: 'Weergave en uiterlijk',     sublabel: 'Eenvoudig of volledig, je startscherm, kleuren en letters', href: '/mijn/uiterlijk', icon: Settings,    module: 'globaal' },
   { label: 'Privacy',                   sublabel: 'Maskeren en gegevensbeheer',         href: '/mijn/privacy',                          icon: Settings,    module: 'globaal' },
   { label: 'Geavanceerd',               sublabel: 'Gegevens en geavanceerde opties',    href: '/mijn/geavanceerd',                      icon: Cog,         module: 'globaal' },
   { label: 'Koppelingen',               sublabel: 'Banken, brokers, exchanges',         href: '/mijn/koppelingen',                      icon: Plug,        module: 'globaal' },

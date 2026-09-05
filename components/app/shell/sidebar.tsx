@@ -35,6 +35,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { EuroViewBadge } from '@/components/app/shell/euro-view-badge'
+import { useIsLgUp } from '@/lib/hooks/use-media-query'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { SIMPLE_HIDDEN_NAV_HREFS } from '@/lib/nav-config'
@@ -500,6 +501,12 @@ function SearchTrigger() {
 function SidebarWeergaveSection({ collapsed }: { collapsed: boolean }) {
   const { isHousehold, loading } = usePerspective()
   const showPerspective = !loading && isHousehold
+  // De zijbalk is `hidden lg:flex` — onder 1024 px staat dit blok wél in de DOM
+  // maar is het onzichtbaar. Zonder deze breakpoint-gate vroeg de coachmark
+  // daar zijn staat op (een fetch) en hing er een popover in de DOM die op
+  // mobiel nooit te zien en dus nooit te sluiten was (UR3-10). Server-snapshot
+  // is `false`, dus de eerste render is overal gelijk.
+  const isLgUp = useIsLgUp()
 
   if (collapsed) {
     return (
@@ -528,7 +535,7 @@ function SidebarWeergaveSection({ collapsed }: { collapsed: boolean }) {
       </div>
       <div className="flex flex-col items-start gap-1.5">
         {showPerspective && <PerspectiveSwitcher menuAlign="left" />}
-        <EuroViewBadge showCoachmark coachmarkAlign="left" />
+        <EuroViewBadge showCoachmark={isLgUp} coachmarkAlign="left" />
       </div>
     </div>
   )

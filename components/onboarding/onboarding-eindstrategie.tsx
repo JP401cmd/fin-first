@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react'
 import { CalendarClock, Flame, Gift, Hourglass, Infinity as InfinityIcon, Landmark } from 'lucide-react'
 import { OnboardingShell } from './onboarding-shell'
 import { FactsPanel } from './facts-panel'
+import { StrategyTile } from './strategy-tile'
 import { parseBedragInput } from './onboarding-inkomen'
 import type { HorizonData } from './onboarding-horizon'
 import {
@@ -429,51 +430,6 @@ function Veld({
   )
 }
 
-// Gemodelleerd naar de `ModeTile` in onboarding-pensioen.tsx — zelfde
-// editorial A/B-tegel (border-2, module-accent-active, Playfair-label +
-// italic Source Serif sublabel).
-function StrategyTile({
-  icon,
-  label,
-  sublabel,
-  active,
-  onClick,
-}: {
-  icon: ReactNode
-  label: string
-  sublabel: string
-  active: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`group flex min-h-[112px] flex-col items-start gap-2 border-2 p-4 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)] ${
-        active
-          ? 'border-[var(--module-active-500)] bg-[var(--module-active-50)]/50'
-          : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--module-active-400)] hover:bg-[var(--module-active-50)]/30'
-      }`}
-    >
-      <span
-        aria-hidden
-        className="flex h-7 w-7 items-center justify-center text-[var(--module-active-700)]"
-      >
-        {icon}
-      </span>
-      <p
-        className="font-serif text-[15px] leading-tight text-[var(--ink)] sm:text-base"
-        style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
-      >
-        {label}
-      </p>
-      <p
-        className="font-serif text-xs italic leading-snug text-[var(--ink-3)]"
-        style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
-      >
-        {sublabel}
-      </p>
-    </button>
-  )
-}
+// `StrategyTile` is verhuisd naar `./strategy-tile` (ADR 0133): de
+// woning-keuze-stap stelt dezelfde A/B-vraag en hoort dezelfde tegel te
+// gebruiken, niet een kopie ervan.

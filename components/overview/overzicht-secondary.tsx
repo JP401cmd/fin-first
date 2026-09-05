@@ -115,7 +115,7 @@ export type OverzichtSecondaryProps = {
   liquidCash?: number
   /**
    * Belegt de gebruiker al? Stuurt de CTA-variant van de compound-kaart
-   * ("Start met beleggen" vs. "Bekijk je portefeuille") — niet de rendergate,
+   * ("Bekijk beleggen" vs. "Bekijk je portefeuille") — niet de rendergate,
    * die blijft op liquide cash. Zie kaart H15.
    */
   hasInvestments?: boolean

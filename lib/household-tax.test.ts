@@ -31,14 +31,21 @@ vi.mock('./expense-rate', () => ({
 const { loadPerspectiveBox3 } = await import('./household-tax')
 
 /** Minimale supabase-dubbel: alleen wat `resolveCanonicalDailyExpenses` raakt. */
-function makeSupabase(estimatedMonthlyExpenses: number | null = null) {
+function makeSupabase(
+  estimatedMonthlyExpenses: number | null = null,
+  /** `profiles.expenses_source`; 'estimate' = de app raadde het bedrag (UR3-05). */
+  expensesSource: string | null = null,
+) {
   return {
     auth: { getUser: async () => ({ data: { user: { id: 'u1' } } }) },
     from: () => ({
       select: () => ({
         eq: () => ({
           maybeSingle: async () => ({
-            data: { estimated_monthly_expenses: estimatedMonthlyExpenses },
+            data: {
+              estimated_monthly_expenses: estimatedMonthlyExpenses,
+              expenses_source: expensesSource,
+            },
           }),
         }),
       }),
@@ -171,11 +178,35 @@ describe('loadPerspectiveBox3 — canonieke dagtarief-noemer (M22)', () => {
     expect(data.dailyExpensesSource).toBe('estimate')
     expect(data.dailyExpenses).toBeCloseTo((2400 * 12) / 365, 10)
     // De profielschatting wordt als TERUGVAL doorgegeven aan de canonieke bron —
-    // niet zelf omgerekend (dat zou een tweede conversie zijn).
+    // niet zelf omgerekend (dat zou een tweede conversie zijn). Het vierde
+    // argument zegt WIENS bedrag die terugval is: 'profile' = de gebruiker gaf
+    // het op (UR3-05/ADR 0131). Zonder `expenses_source = 'estimate'` blijft dat
+    // de default.
     expect(getRecentDailyExpenseRateMock).toHaveBeenCalledWith(
       expect.anything(),
       expect.any(Date),
       2400,
+      'profile',
+    )
+  })
+
+  it("een profielbedrag dat de APP raadde reist als 'cohort' door (UR3-05)", async () => {
+    getRecentDailyExpenseRateMock.mockResolvedValue({
+      dailyRate: (2800 * 12) / 365,
+      monthlyExpenses: 2800,
+      dataMonths: 0,
+      source: 'cohort',
+    })
+    primeLoader()
+
+    const data = await loadPerspectiveBox3(makeSupabase(2800, 'estimate'), 'personal', 2026)
+
+    expect(data.dailyExpensesSource).toBe('cohort')
+    expect(getRecentDailyExpenseRateMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.any(Date),
+      2800,
+      'cohort',
     )
   })
 

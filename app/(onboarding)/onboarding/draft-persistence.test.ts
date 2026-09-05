@@ -358,3 +358,77 @@ describe('firstIncompleteRequiredStep — finish-guard', () => {
     ).toBeNull()
   })
 })
+
+/**
+ * De app-schattingen ("Schat het voor me", UR3-05) moeten een reload overleven:
+ * verdwijnt de markering maar blijft het bedrag staan, dan gaat een gok als
+ * EIGEN INVOER naar het profiel — en wint hij daarmee voorgoed over elke echte
+ * meting (ADR 0131 zegt precies het omgekeerde).
+ */
+describe('draft-persistence — estimatedFields (UR3-05)', () => {
+  it('neemt de markering mee in het concept en leest hem terug', () => {
+    const draft = serializeDraft({
+      ...makeFullState(),
+      estimatedFields: ['income', 'expenses'],
+    })
+    expect(draft.estimatedFields).toEqual(['income', 'expenses'])
+    expect(sanitizeStoredDraft(draft)?.estimatedFields).toEqual(['income', 'expenses'])
+  })
+
+  it('leest een concept van vóór UR3-05 als "geen schatting" — de veilige kant', () => {
+    const oud = serializeDraft(makeFullState()) as unknown as Record<string, unknown>
+    delete oud.estimatedFields
+    expect(sanitizeStoredDraft(oud)?.estimatedFields).toEqual([])
+  })
+
+  it('filtert onbekende sleutels weg i.p.v. ze door te laten', () => {
+    const draft = serializeDraft(makeFullState()) as unknown as Record<string, unknown>
+    draft.estimatedFields = ['income', 'vermogen', 42, null]
+    expect(sanitizeStoredDraft(draft)?.estimatedFields).toEqual(['income'])
+  })
+
+  it('houdt het concept geldig voor de PUT-route (strict schema)', () => {
+    const draft = serializeDraft({ ...makeFullState(), estimatedFields: ['income'] })
+    expect(OnboardingDraftSchema.safeParse(draft).success).toBe(true)
+  })
+})
+
+/**
+ * De woning-keuze (ADR 0133) moet een reload overleven — maar vooral: hij mag
+ * er niet uit AFWEZIGHEID komen. Leest een concept zonder de sleutel terug als
+ * 'exclude', dan verschuift de FIRE-grondslag van een bestaande gebruiker stil
+ * van "incl. verkoopopbrengst" naar "liquide", zonder dat hij iets koos. De
+ * terugval hoort bij de save-route (`HOUSING_CHOICE_FALLBACK` = 'sell'), niet
+ * hier; het concept zegt eerlijk `null` = "nog niet beantwoord".
+ */
+describe('draft-persistence — woning-keuze (ADR 0133)', () => {
+  it('neemt de keuze mee in het concept en leest hem terug', () => {
+    for (const choice of ['sell', 'exclude'] as const) {
+      const draft = serializeDraft({ ...makeFullState(), housingChoice: choice })
+      expect(draft.housingChoice).toBe(choice)
+      expect(sanitizeStoredDraft(draft)?.housingChoice).toBe(choice)
+    }
+  })
+
+  it('leest een concept van vóór ADR 0133 als "niet beantwoord", nooit als exclude', () => {
+    const oud = serializeDraft(makeFullState()) as unknown as Record<string, unknown>
+    delete oud.housingChoice
+    expect(sanitizeStoredDraft(oud)?.housingChoice).toBeNull()
+  })
+
+  it('weigert een waarde die geen keuze is (bv. een rauwe strategie-mode)', () => {
+    const draft = serializeDraft(makeFullState()) as unknown as Record<string, unknown>
+    for (const bogus of ['downsize', 'exclude_from_fire', '', 42, {}]) {
+      draft.housingChoice = bogus
+      expect(sanitizeStoredDraft(draft)?.housingChoice).toBeNull()
+    }
+  })
+
+  it('houdt het concept geldig voor de PUT-route (strict schema), ook zonder keuze', () => {
+    expect(
+      OnboardingDraftSchema.safeParse(serializeDraft({ ...makeFullState(), housingChoice: 'sell' }))
+        .success,
+    ).toBe(true)
+    expect(OnboardingDraftSchema.safeParse(serializeDraft(makeFullState())).success).toBe(true)
+  })
+})

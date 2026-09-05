@@ -35,6 +35,7 @@ export const BEHEER_FLOW: UatFlow = {
     // ── 3 · Technisch beheer ──────────────────────────────────────────────
     { id: 'ai-config', scenarioId: 'UAT-BEHEER-02', label: 'WF-BEHEER-02 · AI-provider, model en systeemprompt', kind: 'screen', stage: 3, lane: 'technisch', subOf: 'sectie-tech' },
     { id: 'ai-limieten', scenarioId: 'UAT-BEHEER-03', label: 'WF-BEHEER-03 · AI-feature-limieten en creditbudgetten', kind: 'screen', stage: 3, lane: 'technisch', subOf: 'sectie-tech' },
+    { id: 'ai-gezondheid', scenarioId: 'UAT-BEHEER-38', label: 'WF-BEHEER-38 · AI-gezondheid (storing/hapering) op /beheer + /beheer/ai', kind: 'screen', stage: 3, lane: 'technisch', subOf: 'sectie-tech' },
     { id: 'truelayer', scenarioId: 'UAT-BEHEER-05', label: 'WF-BEHEER-05 · TrueLayer-bankkoppeling configureren en testen', kind: 'screen', stage: 3, lane: 'technisch', subOf: 'sectie-tech' },
     { id: 'platform-status', scenarioId: 'UAT-BEHEER-06', label: 'WF-BEHEER-06 · Platform-status: onderhoud/aankondiging/AI-kill-switch', kind: 'action', stage: 3, lane: 'technisch', subOf: 'sectie-tech' },
     { id: 'gebruikers', scenarioId: 'UAT-BEHEER-07', label: 'WF-BEHEER-07 · Gebruiker zoeken + account/blokkade beheren', kind: 'screen', stage: 3, lane: 'technisch', subOf: 'sectie-tech' },

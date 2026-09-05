@@ -1,0 +1,221 @@
+-- ADR 0133 (eigenaar-besluit K2, 05-09-2026) — backfill: huiseigenaren die nog
+-- op de DB-default `include_full` staan gaan naar "verkopen wanneer nodig".
+--
+-- GEEN DDL. Deze migratie raakt uitsluitend bestaande rijen; er komt geen
+-- kolom, geen constraint en geen policy bij. `profiles.housing_strategy_config`
+-- (JSONB, sinds 20260513220522_add_housing_strategy_config) bestaat al en is
+-- live op NAAM geverifieerd in information_schema.columns — niet afgeleid uit
+-- een versienummer (ADR 0045).
+--
+-- ── WAAROM ──────────────────────────────────────────────────────────────────
+-- `include_full` betekent: je eigen woning telt voor 100% mee in je FIRE-pot,
+-- alsof je de overwaarde vandaag kunt uitgeven. Dat is precies wat kaart UR3-04
+-- wil vermijden — je kunt je huis niet opeten zolang je erin woont. Het is
+-- bovendien de KOLOMDEFAULT, dus voor deze vijf rijen is het geen keuze die
+-- iemand ooit gemaakt heeft: er is geen set-at-tijdstempel dat een bewuste
+-- `include_full` van een nooit-beantwoorde vraag onderscheidt.
+--
+-- Vanaf ADR 0133 vraagt de onboarding de keuze zélf uit (verkopen of niet
+-- meetellen) en schrijft nieuwe gebruikers `downsize/on_depletion/market` weg.
+-- Deze backfill trekt de bestaande huiseigenaren daarnaartoe, zodat oud en
+-- nieuw dezelfde grondslag hebben.
+--
+-- ── DIT VERSCHUIFT ZICHTBARE GETALLEN (bewust, eigenaar-besluit) ────────────
+-- Voor deze vijf profielen veranderen na uitrol:
+--   * de FIRE-/vrijheidsleeftijd  (de woning is niet langer dag 1 liquide)
+--   * het vrijheidspercentage     (andere teller EN andere noemer)
+--   * het doelbedrag op /toekomst
+-- De richting is conservatiever: de overwaarde telt pas mee op het moment van
+-- verkoop in plaats van meteen. De eigenaar heeft dit expliciet gekozen bóven
+-- de lichtere variant (5A: een eenmalige melding, DB-waarde ongemoeid) en
+-- overweegt een bericht achteraf. Dat bericht is GEEN onderdeel van deze
+-- migratie — zonder dat bericht is dit een stille getalwijziging voor vijf
+-- mensen. Rol dit dus niet uit zonder die afweging opnieuw te maken.
+--
+-- ── DE DOELWAARDE ───────────────────────────────────────────────────────────
+-- Exact `HOUSING_CHOICE_SELL_CONFIG` uit lib/housing-choice.ts, dat óók de
+-- onboarding-save-route voedt. Één literal in de code, één literal hier — wijkt
+-- er iets af, dan krijgen bestaande en nieuwe gebruikers een andere motor en is
+-- dat per definitie toekomstige drift:
+--
+--   { "mode": "downsize", "trigger": "on_depletion", "triggerAge": 67,
+--     "depletionThresholdYears": 0, "salePricePct": 1.0, "salesCostsPct": 0.04,
+--     "newMonthlyHousingCost": null, "saleValuationBasis": "market" }
+--
+-- `salesCostsPct` 0.04 = DOWNSIZE_DEFAULT_SALES_COSTS_PCT (lib/constants.ts).
+-- `trigger: on_depletion` = "wanneer nodig": de kernel verkoopt pas zodra het
+-- liquide vermogen onder de behoefte-buffer zakt, nooit op een verzonnen vaste
+-- leeftijd. `triggerAge` 67 is daarbij enkel de terugvalleeftijd.
+--
+-- ── LIVE GEMETEN VOORAF (public.profiles, 05-09-2026, alleen leesqueries) ───
+--   rijen totaal                                        : 27
+--   mode = include_full (incl. rijen zonder woning)      : 20
+--   DOELGROEP: include_full MET actieve eigen_huis       :  5
+--     waarvan onboarding afgerond                        :  5
+--     distinct config in die groep                       : {"mode":"include_full"}
+--       -> exact één sleutel, geen enkel extra veld. De terugweg hieronder is
+--          daarmee VERLIESLOOS: er gaat geen door de gebruiker gezette
+--          parameter overheen.
+--   mode = downsize                                      :  5 (3 on_depletion,
+--                                                              2 fixed_age)
+--   mode = exclude_from_fire                             :  2
+--   mode = reverse_mortgage                              :  0
+--   housing_strategy_config IS NULL                      :  0
+-- Alle tellingen gemeten tegen de LIVE database, niet gelezen uit
+-- migratiebestanden (ADR 0045).
+--
+-- LINEAGE: de laatste migratie in supabase/migrations/ EN de laatste in
+-- supabase_migrations.schema_migrations zijn beide 20260903141000
+-- (backfill_fire_stop_anker) — geen ongedraaide voorgangers. Deze migratie
+-- bouwt dus niet op iets dat alleen in de repo bestaat.
+--
+-- ── TELQUERY VOOR EN NA (draai identiek, vergelijk) ─────────────────────────
+--
+--   SELECT
+--     count(*) AS rijen_totaal,
+--     count(*) FILTER (WHERE coalesce(housing_strategy_config->>'mode',
+--                                     'include_full') = 'include_full')
+--       AS include_full,
+--     count(*) FILTER (WHERE housing_strategy_config->>'mode' = 'downsize')
+--       AS downsize,
+--     count(*) FILTER (WHERE housing_strategy_config->>'mode' = 'downsize'
+--                        AND housing_strategy_config->>'trigger' = 'on_depletion')
+--       AS downsize_on_depletion,
+--     count(*) FILTER (WHERE housing_strategy_config->>'mode' = 'exclude_from_fire')
+--       AS exclude_from_fire,
+--     count(*) FILTER (WHERE housing_strategy_config->>'mode' = 'reverse_mortgage')
+--       AS reverse_mortgage
+--   FROM public.profiles;
+--
+--   VOOR (gemeten 05-09-2026):
+--     27 | include_full 20 | downsize 5 | downsize_on_depletion 3 |
+--     exclude_from_fire 2 | reverse_mortgage 0
+--   NA (verwacht):
+--     27 | include_full 15 | downsize 10 | downsize_on_depletion 8 |
+--     exclude_from_fire 2 | reverse_mortgage 0
+--
+--   De 15 rijen die op `include_full` BLIJVEN staan zijn profielen ZONDER
+--   eigen woning. Daar is de modus een no-op (er valt niets in of uit te
+--   sluiten), dus die blijven bewust ongemoeid — zie de tweede aantekening
+--   onderaan.
+--
+-- Aanvullende toets NA afloop — er mag geen huiseigenaar meer op de default
+-- staan, en elke omgezette rij moet de volledige literal dragen:
+--
+--   SELECT count(*) AS moet_nul_zijn
+--   FROM public.profiles p
+--   WHERE coalesce(p.housing_strategy_config->>'mode','include_full') = 'include_full'
+--     AND EXISTS (SELECT 1 FROM public.assets a
+--                  WHERE a.user_id = p.id AND a.asset_type = 'eigen_huis'
+--                    AND coalesce(a.is_active, true));
+--
+--   SELECT count(*) AS moet_tien_zijn FROM public.profiles
+--   WHERE housing_strategy_config ? 'saleValuationBasis'
+--     AND housing_strategy_config->>'mode' = 'downsize';
+--
+-- ── IDEMPOTENTIE, EN WAAR DIE OPHOUDT ───────────────────────────────────────
+-- De UPDATE draagt de VERTREKtoestand als guard (`mode = 'include_full'`):
+-- omgezette rijen matchen bij een tweede run niet meer en worden dus niet nog
+-- eens geschreven. Direct opnieuw draaien is zonder tweede effect.
+--
+-- MAAR — en dit is de scherpe grens, dezelfde die tak 3 van
+-- 20260903141000_backfill_fire_stop_anker.sql beschrijft — `include_full` is
+-- géén toestand die permanent verdwijnt. Het is óók een legitieme BESTEMMING:
+-- de strategie-modal in Voorkeuren biedt "Volledig meetellen" bewust aan als
+-- expert-modus. Iemand die na uitrol zelf voor `include_full` kiest, wordt door
+-- een herhaalde run stil teruggezet naar `downsize`.
+--
+-- Deze migratie is daarom ONE-SHOT. Registreer de versie meteen na uitrol
+-- (zie hieronder), zodat niemand hem per ongeluk herhaalt bij een herstel, bij
+-- het opzetten van een tweede omgeving, of door de map van boven naar beneden
+-- af te lopen. De regel erachter: een backfill mag alleen rijen aanraken die
+-- hij herkent aan een vertrektoestand die niet vanzelf terugkomt — en die
+-- eigenschap heeft `include_full` niet. Dat is hier aanvaard omdat de
+-- doelgroep klein en bekend is (5 rijen, alle gemeten), niet omdat de guard
+-- sterk is.
+--
+-- ── TOEGANGSMODEL ───────────────────────────────────────────────────────────
+-- Geen RLS-wijziging. Deze migratie schrijft als migratierol (RLS-bypass) en
+-- raakt uitsluitend een eigen-rij planvoorkeur op `profiles`. Het bedoelde
+-- schrijfpad in de app blijft ongewijzigd: own-row read-modify-write via
+-- app/api/housing-strategy, nooit service-role.
+--
+-- ── UITROLLEN — PROJECTVALKUIL ──────────────────────────────────────────────
+-- Rol NIET uit met apply_migration: die verzint een eigen tijdstempel, waardoor
+-- het register uit de pas loopt met de bestandsnaam. Rol uit via execute_sql en
+-- registreer de versie daarna expliciet:
+--   INSERT INTO supabase_migrations.schema_migrations (version, name)
+--   VALUES ('20260905160000', 'backfill_woonstrategie_include_full_naar_verkopen');
+--
+-- ── DE TERUGWEG (wat herstelt dit, en waaraan zie je dat het misging) ───────
+-- Waaraan je ziet dat het misging:
+--   (a) de NA-telling wijkt af van de verwachting hierboven — bijvoorbeeld
+--       downsize_on_depletion <> 8, of include_full <> 15;
+--   (b) de "moet_nul_zijn"-toets hierboven geeft > 0;
+--   (c) een van de vijf gebruikers meldt een vrijheidsleeftijd of doelbedrag
+--       dat niet conservatiever maar GUNSTIGER werd. De verwachte richting is
+--       eenduidig: de woning telt later mee, dus het doel wordt zwaarder en
+--       de leeftijd hoger of gelijk. Een gunstiger uitkomst betekent dat de
+--       aanname over `on_depletion` niet klopt;
+--   (d) de gouden matrix (lib/regression-tests/horizon-strategie/matrix.test.ts)
+--       verschuift — die mag NIET bewegen: dit is een datacorrectie, geen
+--       kernelwijziging.
+--
+-- Herstelmigratie (NIEUW bestand, dit bestand NOOIT aanpassen):
+--
+--   -- 2026xxxxxxxxxx_terugdraaien_woonstrategie_backfill.sql
+--   UPDATE public.profiles
+--      SET housing_strategy_config = '{"mode": "include_full"}'::jsonb
+--    WHERE housing_strategy_config = '{"mode": "downsize", "trigger": "on_depletion",
+--            "triggerAge": 67, "depletionThresholdYears": 0, "salePricePct": 1.0,
+--            "salesCostsPct": 0.04, "newMonthlyHousingCost": null,
+--            "saleValuationBasis": "market"}'::jsonb
+--      AND EXISTS (SELECT 1 FROM public.assets a
+--                   WHERE a.user_id = profiles.id AND a.asset_type = 'eigen_huis'
+--                     AND coalesce(a.is_active, true));
+--
+-- Dat herstel is VERLIESLOOS voor de vijf gemeten rijen (hun pre-waarde was
+-- exact `{"mode":"include_full"}`), maar het is BOT: het raakt óók de drie
+-- bestaande on_depletion-gebruikers zodra die toevallig exact deze literal
+-- dragen, en elke gebruiker die ná uitrol zélf "verkopen wanneer nodig" koos.
+-- Meet daarom vóór het terugdraaien opnieuw hoeveel rijen aan de WHERE voldoen;
+-- wijkt dat af van 5, dan is er handmatig werk bij en moet je per rij
+-- beslissen in plaats van blind terugdraaien. Draai het herstel bij voorkeur op
+-- de vijf gemeten id's in plaats van op de literal.
+
+-- ── De backfill ─────────────────────────────────────────────────────────────
+-- Guard 1 (vertrektoestand): mode is de default `include_full`. `coalesce` vangt
+--   een eventuele NULL-config af; live zijn dat er 0, maar de kolom staat NULL
+--   toe en de app leest NULL óók als `include_full` (parseHousingStrategy).
+-- Guard 2 (relevantie): het profiel HEEFT een actieve eigen woning. Zonder
+--   woning verandert de modus geen enkel getal — dan is omzetten ruis in de
+--   data en zou de gebruiker in Voorkeuren een strategie zien voor een huis dat
+--   hij niet heeft.
+
+UPDATE public.profiles p
+   SET housing_strategy_config = jsonb_build_object(
+         'mode',                    'downsize',
+         'trigger',                 'on_depletion',
+         'triggerAge',              67,
+         'depletionThresholdYears', 0,
+         'salePricePct',            1.0,
+         'salesCostsPct',           0.04,
+         'newMonthlyHousingCost',   NULL,
+         'saleValuationBasis',      'market'
+       )
+ WHERE coalesce(p.housing_strategy_config->>'mode', 'include_full') = 'include_full'
+   AND EXISTS (
+         SELECT 1
+           FROM public.assets a
+          WHERE a.user_id = p.id
+            AND a.asset_type = 'eigen_huis'
+            AND coalesce(a.is_active, true)
+       );
+
+-- ── Bewust GEEN tweede tak: include_full ZONDER eigen woning ────────────────
+-- 15 rijen blijven op `include_full` staan omdat ze geen woning hebben. Die
+-- laten we met rust. De modus is daar aantoonbaar een no-op — `filterAssetsForFire`
+-- en `getFireEligibleNetWorth` hebben niets om uit te sluiten — dus omzetten zou
+-- een keuze suggereren die niemand maakte, en de dag dat zo'n gebruiker alsnog
+-- een woning toevoegt stelt de app hem de vraag gewoon (ADR 0133, quick-add-
+-- wizard). Precies dán hoort de keuze te vallen, niet nu preventief.

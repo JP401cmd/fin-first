@@ -30,6 +30,19 @@ afterEach(() => {
 })
 
 /**
+ * De twee uitgangen van de overlay, elk op hun eigen toegankelijke naam.
+ *
+ * De scrim is een icoonloze laag en houdt daarom een `aria-label`. De ✕-knop
+ * draagt sinds UR3-10 een zichtbaar label ("Sluit tips") en dus juist géén
+ * `aria-label` meer: dat zou de zichtbare tekst overschrijven (WCAG 2.5.3).
+ * Eén query op het oude label vindt er nog maar één — vandaar deze helper, die
+ * beide uitgangen ophaalt zonder aan te nemen hoe ze hun naam krijgen.
+ */
+function closersOf(s: typeof screen): HTMLElement[] {
+  return [...s.getAllByLabelText('Tips sluiten'), ...s.getAllByRole('button', { name: 'Sluit tips' })]
+}
+
+/**
  * Bewaakt dat de tips-overlay daadwerkelijk sluit: zowel het ✕ (via portal naar
  * document.body) als de blurred achtergrond roepen `onClose` aan.
  */
@@ -61,7 +74,7 @@ describe('ToekomstOverlay — sluiten', () => {
       </ToekomstOverlay>,
     )
 
-    const closers = screen.getAllByLabelText('Tips sluiten')
+    const closers = closersOf(screen)
     expect(closers.length).toBeGreaterThanOrEqual(2) // achtergrond + ✕
     closers.forEach((el) => fireEvent.click(el))
     expect(onClose).toHaveBeenCalled()
@@ -200,7 +213,7 @@ describe('ToekomstOverlay — sluiten', () => {
         </ToekomstOverlay>
       </div>,
     )
-    const closers = screen.getAllByLabelText('Tips sluiten')
+    const closers = closersOf(screen)
     expect(closers.length).toBeGreaterThanOrEqual(2) // scrim + ✕
     // pointerdown mag de grafiek-container (parent) NIET bereiken (anders kaapt
     // `setPointerCapture` de klik) ...

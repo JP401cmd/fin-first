@@ -2,19 +2,28 @@ import Link from 'next/link'
 import { BEHEER_GROUPS } from '@/lib/beheer-sections'
 import { createClient } from '@/lib/supabase/server'
 import { loadBeheerInboxCounts } from '@/lib/beheer-inbox-counts'
+import { loadAiHealth } from '@/lib/ai/ai-health-loader'
+import { AiHealthStrip } from '@/components/app/beheer/ai-status-card'
 
 /**
  * De /beheer-hub. De tellers per inbak komen uit een server-loader (ADR 0058:
  * lezen via loader, geen client-fetch). Een teller verschijnt alleen als hij
  * echt geteld is (`number`) — bij `null` (bron onbereikbaar) ontbreekt hij
  * eerlijk in plaats van een nep-0 te tonen.
+ *
+ * De AI-storingsstrip (UR3-09 / ADR 0132) toont zichzelf alleen bij een
+ * patroon (`storing`/`hapering`) — zie `AiHealthStrip`.
  */
 export default async function BeheerPage() {
   const supabase = await createClient()
-  const counts = await loadBeheerInboxCounts(supabase)
+  const [counts, aiHealth] = await Promise.all([
+    loadBeheerInboxCounts(supabase),
+    loadAiHealth(supabase),
+  ])
 
   return (
     <div className="space-y-10">
+      <AiHealthStrip health={aiHealth} />
       {BEHEER_GROUPS.map((group) => (
         <section key={group.id} aria-labelledby={`beheer-groep-${group.id}`}>
           <div className="border-b border-[var(--border-ed)] pb-2">

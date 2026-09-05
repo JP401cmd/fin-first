@@ -9,6 +9,7 @@ import {
 } from '@/lib/transaction-display'
 import { useDailyExpenseRate } from '@/components/app/freedom-time-label'
 import { formatCurrencyDecimals, MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
+import { BANK_CONNECT_SAFETY_SHORT } from '@/lib/bank-connect-copy'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import type { AnalysisTransaction } from '@/lib/transaction-insights'
@@ -383,6 +384,11 @@ function FirstUseEmpty() {
       <h3 className="font-serif text-[18px] font-semibold text-[var(--ink)]">Nog geen transacties.</h3>
       <p className="max-w-xs font-serif text-[13px] italic text-[var(--ink-3)]">
         Koppel je bank of importeer een bestand om je geldstroom als opgeslagen tijd te zien.
+      </p>
+      {/* De veiligheidszin reist mee naar het moment van twijfel, uit één bron
+          (UR3-15). De knoppen staan in de banner erboven. */}
+      <p className="max-w-sm text-[12px] leading-snug text-[var(--ink-4)]">
+        {BANK_CONNECT_SAFETY_SHORT}
       </p>
     </div>
   )

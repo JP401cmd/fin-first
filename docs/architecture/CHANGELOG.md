@@ -932,3 +932,8 @@
 - **API-routes** toegevoegd: /api/coach-state
 - **API-routes** verwijderd: /api/guide-progress, /api/welcome
 - **Componenten (aantal)** toegevoegd: +4
+
+## 2026-09-05
+
+- **Integratie-clients** toegevoegd: lib/parsers/iban.ts
+- **Componenten (aantal)** toegevoegd: +25

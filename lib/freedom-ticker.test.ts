@@ -2,11 +2,13 @@ import { describe, it, expect } from 'vitest'
 import {
   ONBOARDING_HOUSING_MODE,
   computeFreedomTicker,
+  computeMonthlyFreedomBuildup,
   freedomTickerBasis,
   intakeDailyExpenseRate,
   type FreedomTickerAsset,
 } from './freedom-ticker'
 import { dailyExpenseRate } from './format'
+import { HOUSING_CHOICE_FALLBACK, housingChoiceToConfig } from './housing-choice'
 
 /**
  * Persona WF-START-18 "Jan de Vries" — dezelfde figuur waarop de UAT-flow van
@@ -44,12 +46,38 @@ describe('freedomTickerBasis — grondslag volgt de woonstrategie', () => {
     expect(freedomTickerBasis('reverse_mortgage')).toBe('fire_pot_excl_home')
   })
 
-  it('de onboarding schrijft "verkopen wanneer nodig" weg en draait dus excl. woning', () => {
-    // Spiegel van app/api/onboarding/save-own-data/route.ts. Wijzigt die
-    // default, dan moet deze constante mee — anders toont de teller tijdens de
-    // flow een andere grondslag dan het profiel dat er straks uit komt.
-    expect(ONBOARDING_HOUSING_MODE).toBe('downsize')
+  /**
+   * Sinds ADR 0133 vraagt de onboarding de woonstrategie zélf uit, dus de
+   * grondslag komt uit de KEUZE (`housingChoiceToConfig(keuze).mode`) en niet
+   * meer uit een gespiegelde constante. Wat deze test vastlegt:
+   *
+   *   1. `ONBOARDING_HOUSING_MODE` is niet langer een tweede literal naast de
+   *      bron, maar de terugval-keuze — voor wie de vraag nooit kreeg.
+   *   2. Het GETAL verandert niet door de nieuwe vraag: beide antwoorden landen
+   *      op dezelfde `fire_pot_excl_home`-grondslag, dus de teller kan tijdens
+   *      de intake nog steeds niet dalen (de monotonie-invariant hieronder).
+   */
+  it('de terugval-mode is afgeleid van de woning-keuze, niet apart gespiegeld', () => {
+    expect(ONBOARDING_HOUSING_MODE).toBe(housingChoiceToConfig(HOUSING_CHOICE_FALLBACK).mode)
     expect(freedomTickerBasis(ONBOARDING_HOUSING_MODE)).toBe('fire_pot_excl_home')
+  })
+
+  it('beide antwoorden op de woning-vraag geven dezelfde tellergrondslag', () => {
+    for (const choice of ['sell', 'exclude'] as const) {
+      expect(freedomTickerBasis(housingChoiceToConfig(choice).mode)).toBe('fire_pot_excl_home')
+    }
+    // Zelfde invoer, ander antwoord → hetzelfde getal. Dit is de belofte van de
+    // nieuwe vraag: hij verandert wát de app straks doorrekent, niet wat de
+    // gebruiker tijdens het invullen ziet.
+    const bezittingen = [BETAALREKENING, SPAARGELD, EIGEN_HUIS]
+    const verkoopt = ticker(bezittingen, 0, freedomTickerBasis(housingChoiceToConfig('sell').mode))
+    const teltNietMee = ticker(
+      bezittingen,
+      0,
+      freedomTickerBasis(housingChoiceToConfig('exclude').mode),
+    )
+    expect(verkoopt?.label).toBe(teltNietMee?.label)
+    expect(verkoopt?.amount).toBe(teltNietMee?.amount)
   })
 })
 
@@ -165,5 +193,49 @@ describe('computeFreedomTicker — guards: liever niets dan een verzonnen getal'
   it('negeert onzinwaarden in plaats van ze door te rekenen', () => {
     const met = ticker([BETAALREKENING, { value: Number.NaN, isHome: false }, { value: -500, isHome: false }])
     expect(met?.amount).toBe(2500)
+  })
+})
+
+/**
+ * De OPBOUW-variant (UR3-05). Bestaat omdat `computeFreedomTicker` een VERMOGEN
+ * deelt en dus null geeft voor wie geen bezittingen invulde — precies de
+ * gebruiker die anders zonder één tijdgetal de onboarding verlaat.
+ */
+describe('computeMonthlyFreedomBuildup', () => {
+  it('vertaalt een maandoverschot naar hele dagen vrijheid op het intake-dagtarief', () => {
+    // Cohort 25-35: €3.075 inkomen, €2.800 uitgaven → €92,05/dag; overschot
+    // €275 = 2,99 dagen. `calculateFreedomTime` levert `totalDays` op één
+    // decimaal (3,0), waarvan we hele dagen nemen → 3 per maand.
+    const uit = computeMonthlyFreedomBuildup(3075, 2800)
+    expect(uit).not.toBeNull()
+    expect(uit!.monthlySurplus).toBe(275)
+    expect(uit!.dailyRate).toBeCloseTo((2800 * 12) / 365, 6)
+    expect(uit!.daysPerMonth).toBe(3)
+  })
+
+  it('werkt ZONDER bezittingen — dat is de hele reden dat hij bestaat', () => {
+    // Geen enkele asset in het spel: de teller zou hier null geven.
+    expect(computeFreedomTicker({
+      monthlyIncome: 3075,
+      monthlyExpenses: 2800,
+      assets: [],
+      basis: 'fire_pot_excl_home',
+    })).toBeNull()
+    expect(computeMonthlyFreedomBuildup(3075, 2800)).not.toBeNull()
+  })
+
+  it('geeft null bij een tekort of precies quitte — je bouwt dan geen vrijheid op', () => {
+    expect(computeMonthlyFreedomBuildup(2000, 2500)).toBeNull()
+    expect(computeMonthlyFreedomBuildup(2500, 2500)).toBeNull()
+  })
+
+  it('geeft null zonder inkomen of zonder uitgaven (het "Later invullen"-pad)', () => {
+    expect(computeMonthlyFreedomBuildup(0, 2500)).toBeNull()
+    expect(computeMonthlyFreedomBuildup(3000, 0)).toBeNull()
+  })
+
+  it('geeft null onder één hele dag per maand — "0 dagen" is geen aanmoediging', () => {
+    // Overschot €10 op €3.000/mnd uitgaven (€98,63/dag) = 0,1 dag.
+    expect(computeMonthlyFreedomBuildup(3010, 3000)).toBeNull()
   })
 })

@@ -82,6 +82,23 @@ export interface HorizonPageData extends HorizonRawData {
    */
   requiredPortfolioExclHome: number | null
   /**
+   * FIRE-doel: benodigd NETTO VERMOGEN inclusief de eigen woning
+   * (Prognose!I@FIRE uit de kernel-run) — dus mét het niet-liquide bezit dat de
+   * woonstrategie buiten de FIRE-portefeuille houdt: `I = J + (niet-liquide
+   * bezit − niet-liquide schuld)`. `null` wanneer er geen doel te berekenen is
+   * (o.a. onder een vast anker, ADR 0129 D4).
+   *
+   * WAAROM DIT VELD ER IS (UR3-07 defect 3): dit getal wérd hier al berekend —
+   * het voedde `computeFreedomPctForPlan` — maar verliet de bundel niet. De
+   * /toekomst-tegel had daardoor bij de eerste paint alléén Prognose!J in de
+   * hand en toonde dat, terwijl de client-kernelrun even later op Prognose!I
+   * landde. Eén tegel, twee grootheden, vijftien seconden ertussen: gemeten
+   * € 140.000 → € 620.000 op een huis-zware `downsize`-fixture. `DashboardData`
+   * droeg dit paar al wél — daarom sprongen /overzicht en /toekomst/doelen niet.
+   * De twee velden horen dus samen te reizen; nooit één zonder de ander.
+   */
+  requiredNetWorthInclHome: number | null
+  /**
    * Fractionele FIRE-/vrijheidsleeftijd uit de kernel-run. `null` wanneer de run
    * niet kon draaien of FIRE binnen de horizon onbereikbaar is.
    *
@@ -191,6 +208,10 @@ const loadHorizonDataCached = cache(async function loadHorizonDataInner(
     healthScoreInput,
     freedomPct,
     requiredPortfolioExclHome,
+    // Het incl.-woning-doel reist mee met zijn excl.-woning-broer: de
+    // /toekomst-tegel kiest per woonstrategie wélke van de twee hij toont, en
+    // moet die keuze al bij de eerste paint kunnen maken (zie het veldcommentaar).
+    requiredNetWorthInclHome,
     fireAgeFractional: run?.sim.fireAgeFractional ?? null,
     fireEngine: kernelPortfolio != null ? 'kernel' : 'scalar',
   }

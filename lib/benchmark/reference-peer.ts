@@ -17,6 +17,7 @@ import type { FinancialInput } from '@/lib/horizon-data'
 import { computeScalarFireProjection } from '@/lib/horizon-kernel/scalar-router'
 import { computeHealthScoreFromInputs, type HealthScoreInput } from '@/lib/financial-health'
 import type { CohortReference } from './nl-reference'
+import { cohortMonthlyFromReference } from './cohort-estimate'
 
 /** Aannames voor de peer die niet uit CBS komen (transparant, indicatief). */
 const PEER_EMERGENCY_FUND_MONTHS = 3 // plausibele NL-buffer; concentratie/budget blijven inactief
@@ -52,9 +53,10 @@ export function computeReferencePeer(
   midAge: number,
   now: Date = new Date(),
 ): ReferencePeerResult {
-  const monthlyIncome = ref.incomeMedian / 12
-  const monthlySavings = monthlyIncome * (ref.savingsRatePct / 100)
-  const monthlyExpenses = Math.max(0, monthlyIncome - monthlySavings)
+  // Gedeelde afleiding (lib/benchmark/cohort-estimate.ts): dezelfde som die de
+  // onboarding-knop "Schat het voor me" invult. Zo noemt de peer op /check niet
+  // een ander bedrag "typisch" dan de app zelf raadt voor hetzelfde cohort.
+  const { monthlyIncome, monthlySavings, monthlyExpenses } = cohortMonthlyFromReference(ref)
 
   // Synthetische geboortedatum zodat de motor currentAge = midAge afleidt.
   const dob = new Date(now.getFullYear() - midAge, now.getMonth(), now.getDate())

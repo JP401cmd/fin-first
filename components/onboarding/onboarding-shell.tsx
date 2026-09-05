@@ -1,6 +1,10 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import {
+  DATA_NOTE_LINK_LABEL,
+  DATA_NOTE_PRIVACY_HREF,
+} from '@/lib/onboarding/data-note-copy'
 import { OnboardingProgressBar } from './progress-bar'
 import {
   OnboardingFreedomTickerRow,
@@ -51,6 +55,14 @@ export interface OnboardingShellProps {
   title: ReactNode
   /** Editorial deck-tekst onder de headline. */
   deck: string
+  /**
+   * Optionele gegevensregel onder het deck: wat er met dit antwoord gebeurt.
+   * Kleiner en rustiger dan de deck, met een vaste link naar de publieke
+   * privacyverklaring erachter. Levert de tekst uit
+   * `lib/onboarding/data-note-copy.ts` — nooit een eigen formulering, anders
+   * ontstaat opnieuw de spreiding die UR3-15 opruimde.
+   */
+  dataNote?: string
   /** Facts-paneel content — meestal `<FactsPanel ... />`. */
   factsPanel: ReactNode
   /** Stap-specifieke form-content. */
@@ -72,6 +84,7 @@ export function OnboardingShell({
   romanNum,
   title,
   deck,
+  dataNote,
   factsPanel,
   children,
   footer,
@@ -167,6 +180,26 @@ export function OnboardingShell({
             >
               {deck}
             </p>
+
+            {/* Gegevensregel: wat er met dit antwoord gebeurt. Bewust een
+                tweede, kleinere regel in plaats van een derde deck-zin — op
+                360 px wordt een deck van drie zinnen een muur, en de uitleg
+                moet juist rustig naast de vraag staan. De link opent de
+                PUBLIEKE privacyverklaring in een nieuw tabblad; /mijn/privacy
+                kaatst tijdens de onboarding terug naar /onboarding. */}
+            {dataNote && (
+              <p className="mt-2.5 pl-4 text-[12px] leading-snug text-[var(--ink-3)] max-w-[60ch]">
+                {dataNote} —{' '}
+                <a
+                  href={DATA_NOTE_PRIVACY_HREF}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-2 transition-colors hover:text-[var(--ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+                >
+                  {DATA_NOTE_LINK_LABEL}
+                </a>
+              </p>
+            )}
 
             {/* Stap-specifieke form-velden — caller bepaalt eigen spacing. */}
             <div className="mt-8">{children}</div>

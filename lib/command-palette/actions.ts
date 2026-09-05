@@ -84,7 +84,7 @@ const ACTIONS: ActionDef[] = [
   {
     id: 'action:toggle-privacy',
     getLabel: (ctx) => (ctx.privacyMasked ? 'Bedragen tonen' : 'Bedragen verbergen'),
-    getSublabel: () => 'Toggle privacy-masking voor saldi',
+    getSublabel: () => 'Verberg je bedragen op dit apparaat',
     getIcon: (ctx) => (ctx.privacyMasked ? Eye : EyeOff),
     module: 'globaal',
     build: (ctx) => () => {

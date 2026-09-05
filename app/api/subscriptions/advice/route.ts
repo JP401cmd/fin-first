@@ -6,8 +6,10 @@ import { checkTierGate } from '@/lib/require-tier'
 import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
 import { maskPIIInObject } from '@/lib/ai/pii-output-filter'
-import { unauthorized, serverError } from '@/lib/api/respond'
+import { unauthorized, serverError, errorResponse } from '@/lib/api/respond'
 import { getRecentDailyExpenseRate } from '@/lib/expense-rate'
+import { isRefusedProviderError } from '@/lib/ai/provider-error'
+import { AI_ERROR_CODE, describeAiError } from '@/lib/ai/error-copy'
 
 const TEMPORAL_HINTS: Record<number, string> = {
   1: 'De gebruiker is een Levensgenieter (level 1). Wees zacht — adviseer alleen eliminatie bij echte overlappen, niet bij comfortdiensten.',
@@ -187,6 +189,12 @@ Stel ook maximaal 3 concrete, direct inplanbare acties voor (suggestedActions):
     // the free AI text before it reaches the user (recommendations does the same).
     return Response.json(maskPIIInObject(normalized))
   } catch (err) {
+    // Structureel (provider weigert) vs. tijdelijk — gedrag bij een tijdelijke
+    // hapering blijft ongewijzigd (UR3-09).
+    if (isRefusedProviderError(err)) {
+      const copy = describeAiError(AI_ERROR_CODE.providerRefused)
+      return errorResponse(copy.text, 422, copy.code)
+    }
     return serverError(err, 'subscriptions-advice:POST')
   }
 }

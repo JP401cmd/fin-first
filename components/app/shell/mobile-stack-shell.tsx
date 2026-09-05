@@ -79,8 +79,11 @@ type MobileStackShellProps = {
    */
   forceVisible?: boolean
   /** Email van de ingelogde user — door TopBar's utility-cluster gebruikt
-   *  voor avatar-initial en account-dropdown-header. */
+   *  voor de account-dropdown-header. */
   email?: string
+  /** Initialen voor het avatar-rondje in de TopBar. Komen uit
+   *  `lib/user-initials.ts` (profielnaam wint van e-mail, UR3-17 #27b). */
+  initials?: string
   /** Role van de user — bepaalt of de Beheer-link in account-dropdown
    *  verschijnt (alleen bij `role === 'superadmin'`). */
   role?: string
@@ -129,6 +132,7 @@ type TrayProps = {
   forceVisible: boolean
   ariaHidden?: boolean
   email?: string
+  initials?: string
   role?: string
   /**
    * Ref naar het scroll-`<main>` (alleen de persistente tray gebruikt dit).
@@ -160,6 +164,7 @@ function Tray({
   forceVisible,
   ariaHidden = false,
   email,
+  initials,
   role,
   mainRef,
   pageName,
@@ -207,6 +212,7 @@ function Tray({
         showBackOverride={showBack}
         kindOverride={topBarKind}
         email={email}
+        initials={initials}
         role={role}
       />
 
@@ -260,6 +266,7 @@ export function MobileStackShell({
   children,
   forceVisible = false,
   email,
+  initials,
   role,
 }: MobileStackShellProps) {
   const { currentStack, transition } = useNavStack()
@@ -320,6 +327,22 @@ export function MobileStackShell({
     resolveRouteTitle(pathname) ||
     ''
 
+  // ── Tabtitel (document.title) ──────────────────────────────────
+  // De (app)-layout kan alleen een statische default zetten ('TriFinity');
+  // per-pagina `metadata` is voor 41 van de 119 (app)-pagina's onmogelijk
+  // omdat ze `'use client'` zijn. De paginanaam komt daarom uit dezelfde
+  // bron als de <h1> hierboven — één naam voor de a11y-boom én het
+  // browsertabblad.
+  //
+  // Bij een LEGE paginanaam doen we niets: `resolveRouteTitle` kent (nog)
+  // geen naam voor o.a. de /beheer-routes, en die hebben juist wél een eigen
+  // `metadata.title` ('Architectuur — Beheer'). Overschrijven met de kale
+  // default zou daar een verslechtering zijn.
+  useEffect(() => {
+    if (!pageName) return
+    document.title = `${pageName} — TriFinity`
+  }, [pageName])
+
   return (
     // Buitenste frame: mobiel een 100vh-flex-column; desktop collabeert
     // (`lg:contents`) zodat alleen de `<main>` in de document-flow overblijft.
@@ -360,6 +383,7 @@ export function MobileStackShell({
             forceVisible={forceVisible}
             ariaHidden
             email={email}
+            initials={initials}
             role={role}
           >
             {previousChildren}
@@ -378,6 +402,7 @@ export function MobileStackShell({
           showBack={stackDepth > 1}
           forceVisible={forceVisible}
           email={email}
+          initials={initials}
           role={role}
           mainRef={mainScrollRef}
           pageName={pageName}

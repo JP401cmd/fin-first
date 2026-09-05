@@ -46,6 +46,7 @@
 
 import { calculateFreedomTime, dailyExpenseRate, formatFreedomTimeString } from '@/lib/format'
 import type { FreedomTimeBreakdown } from '@/lib/format'
+import { HOUSING_CHOICE_FALLBACK, housingChoiceToConfig } from '@/lib/housing-choice'
 import type { HousingStrategyMode } from '@/lib/housing-strategy'
 
 /** Welk vermogen de teller door het dagtarief deelt. */
@@ -66,19 +67,23 @@ export function freedomTickerBasis(mode: HousingStrategyMode): FreedomTickerBasi
 }
 
 /**
- * Woonstrategie die de onboarding voor een NIEUWE gebruiker wegschrijft:
- * "verkopen wanneer nodig, op basis van marktwaarde".
+ * Woonstrategie die geldt wanneer de gebruiker de woning-vraag (nog) niet
+ * beantwoordde: "verkopen wanneer nodig, op basis van marktwaarde".
  *
- * Bewust hier gespiegeld en niet uit de API-route geïmporteerd (die is
- * server-only): de teller draait in de browser en moet dezelfde lezing hebben
- * als wat de flow straks opslaat. De onboarding vraagt de woonstrategie
- * (nog) niet uit, dus dit IS de gekozen strategie op dat moment.
- * Bron: `app/api/onboarding/save-own-data/route.ts`
- * (`housing_strategy_config: { mode: 'downsize', … }`), vergrendeld door de
- * bron-assertie in `route.test.ts`. Gaat de onboarding de strategie ooit zélf
- * uitvragen, dan vervangt die keuze deze constante.
+ * DIT IS NIET MEER DE ONBOARDING-KEUZE. Sinds ADR 0133 vraagt de onboarding de
+ * woonstrategie zélf uit, en dat moment stond hier al aangekondigd ("gaat de
+ * onboarding de strategie ooit zélf uitvragen, dan vervangt die keuze deze
+ * constante"). De teller in `app/(onboarding)/onboarding/page.tsx` haalt z'n
+ * mode daarom uit `housingChoiceToConfig(keuze).mode`; deze constante is
+ * verschraald tot de TERUGVAL — afgeleid uit `HOUSING_CHOICE_FALLBACK`, zodat
+ * er geen tweede literal naast de bron staat die stil uit elkaar kan lopen.
+ *
+ * Blijft bestaan omdat de UAT-controles (`lib/uat/acceptance/start-checks.ts`)
+ * de tellerwaarden op deze terugval pinnen — de grondslag van een intake
+ * zónder gemaakte keuze.
  */
-export const ONBOARDING_HOUSING_MODE: HousingStrategyMode = 'downsize'
+export const ONBOARDING_HOUSING_MODE: HousingStrategyMode =
+  housingChoiceToConfig(HOUSING_CHOICE_FALLBACK).mode
 
 /**
  * Het dagtarief van een INTAKE-flow: de canonieke conversie (×12/365) op de
@@ -171,4 +176,58 @@ export function computeFreedomTicker(input: FreedomTickerInput): FreedomTickerRe
     label: formatFreedomTimeString(breakdown, 'short'),
     basis,
   }
+}
+
+/** Wat één maand sparen aan vrijheid oplevert, plus het tarief waarop dat rust. */
+export interface MonthlyFreedomBuildup {
+  /** Maandelijks overschot (inkomen − uitgaven). */
+  monthlySurplus: number
+  /** Het canonieke intake-dagtarief (×12/365) op de maanduitgaven. */
+  dailyRate: number
+  /** Hele dagen vrijheid die dat overschot per maand oplevert (≥ 1). */
+  daysPerMonth: number
+}
+
+/**
+ * De OPBOUW-variant van de teller: niet "hoeveel vrijheid heb je al", maar
+ * "hoeveel komt er per maand bij".
+ *
+ * Bestaat omdat de teller (`computeFreedomTicker`) een VERMOGEN deelt, en dat
+ * is er aan het eind van de onboarding vaak niet — wie geen bezittingen invulde
+ * kreeg dan alsnog geen enkel vrijheidsgetal te zien, precies het gat dat
+ * UR3-05 dicht. Inkomen en uitgaven zijn op dat moment wél bekend (desnoods
+ * geschat), en daarmee is deze uitspraak wél te doen.
+ *
+ * Dezelfde rem als de teller: `null` liever dan een verzonnen getal.
+ *   · geen inkomen of geen uitgaven ingevuld
+ *   · een tekort of precies quitte — dan bouw je geen vrijheid op
+ *   · dagtarief 0 (voorkomt de "∞"-tak van `calculateFreedomTime`)
+ *   · minder dan één hele dag per maand — "0 dagen" is geen aanmoediging
+ *
+ * GEEN EIGEN SOM: de conversie loopt via `intakeDailyExpenseRate` +
+ * `calculateFreedomTime`, exact zoals de teller (CLAUDE.md, consume-don't-recompute).
+ */
+export function computeMonthlyFreedomBuildup(
+  monthlyIncome: number,
+  monthlyExpenses: number,
+): MonthlyFreedomBuildup | null {
+  if (!(monthlyIncome > 0) || !(monthlyExpenses > 0)) return null
+
+  const monthlySurplus = monthlyIncome - monthlyExpenses
+  if (!(monthlySurplus > 0)) return null
+
+  const dailyRate = intakeDailyExpenseRate(monthlyExpenses)
+  if (!(dailyRate > 0)) return null
+
+  const breakdown = calculateFreedomTime(monthlySurplus, dailyRate)
+  if (breakdown.isDeficit || breakdown.isInfinite) return null
+
+  // Hele dagen: "je bouwt er 2,99 per maand bij" leest niet. `totalDays` staat
+  // al op één decimaal (lib/format.ts), dus dit kan hooguit 0,05 dag naar boven
+  // afwijken van de exacte deling — bewust naar beneden i.p.v. `round`, zodat de
+  // uitspraak nooit méér belooft dan de conversie oplevert.
+  const daysPerMonth = Math.floor(breakdown.totalDays)
+  if (daysPerMonth < 1) return null
+
+  return { monthlySurplus, dailyRate, daysPerMonth }
 }

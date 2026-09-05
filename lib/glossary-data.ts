@@ -10,7 +10,8 @@
  * - `explanation`: uitleg in maximaal 2 zinnen, begrijpelijk voor een leek
  *
  * Naamconventie keys: snake_case, lowercase, geen streepjes.
- * Gebruik dezelfde key als `id` in ConceptFlipCards en als `term` in GlossaryTerm.
+ * Gebruik dezelfde key als `term` in GlossaryTerm en als `terms:`-chip-waarde
+ * in lib/page-info-content.ts.
  *
  * HARDE REGEL (S17): sleutels zijn UNIEK ONGEACHT HOOFDLETTERS. `SWR` naast
  * `swr` en `FIRE` naast `fire` bestonden allebei, met tegenstrijdige uitleg, en
@@ -54,12 +55,13 @@ export interface GlossaryEntry {
 /**
  * Canonical glossary — alle financiële concepten die in de app worden uitgelegd.
  *
- * Sectie 1: Concepten die ook in ConceptFlipCards verschijnen (id ↔ key mapping).
- * Sectie 2: Aanvullende financiële termen (alleen tooltip, geen flip-kaart).
+ * Elke entry wordt bewaakt door `npm run glossary:check`: een `missing`
+ * (verwezen sleutel zonder entry) blokkeert, een `orphaned` entry (nog geen
+ * call site) is een waarschuwing — zie het script voor de volledige uitleg.
  */
 export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
-  // ── Sectie 1: ConceptFlipCards-concepten ──────────────────────
-  // Keys komen overeen met ConceptCard.id in concept-flip-cards.tsx
+  // ── Sectie 1: kernconcepten (voorheen ConceptFlipCards — component is
+  // sindsdien verwijderd; deze entries blijven staan als tooltip-bron) ──────
 
   vrijheidstijd: {
     name: 'Vrijheidstijd',
@@ -176,12 +178,14 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
   Monte_Carlo: {
     name: 'Monte Carlo',
     alternative: 'Marktcheck',
+    simpleLabel: 'marktcheck',
     explanation:
       'Een simulatiemethode die je plan een paar honderd keer opnieuw doorrekent, elke keer met een ander rendement. Geeft een kans van slagen in plaats van één enkel getal. De trekkingen liggen vast, dus dezelfde invoer geeft altijd dezelfde uitkomst.',
   },
   SORR: {
     name: 'SORR',
     alternative: 'Volgorderisico',
+    simpleLabel: 'volgorderisico',
     explanation:
       'Sequence of Returns Risk — het risico dat slechte rendementen vroeg in je pensioen je vermogen sneller uitputten dan gemiddelden suggereren.',
   },
@@ -216,6 +220,7 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
   compounding: {
     name: 'Compounding',
     alternative: 'Rente op rente',
+    simpleLabel: 'rente op rente',
     explanation:
       'Het effect waarbij je rendement ook weer rendement oplevert. Hoe langer je belegd blijft, hoe sterker dit sneeuwbaleffect groeit.',
   },
@@ -234,6 +239,7 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
   ETF: {
     name: 'ETF',
     alternative: 'Beursgenoteerd beleggingsfonds',
+    simpleLabel: 'beursgenoteerd beleggingsfonds',
     explanation:
       'Exchange-Traded Fund — een fonds dat je op de beurs kunt kopen en verkopen, vaak met lage kosten en brede spreiding.',
   },
@@ -258,17 +264,25 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
   LTV: {
     name: 'LTV',
     alternative: 'Schuld ten opzichte van woningwaarde',
+    simpleLabel: 'schuld ten opzichte van je woningwaarde',
     explanation:
       'Loan-to-Value — het percentage van de woningwaarde dat je hebt gefinancierd met een hypotheek. Onder de 100% betekent overwaarde.',
   },
   rebalancing: {
     name: 'Rebalancing',
     alternative: 'Herbalanceren van je beleggingen',
+    simpleLabel: 'herbalanceren',
     explanation:
       'Het periodiek terugbrengen van je beleggingsmix naar de gewenste verdeling, bijvoorbeeld door winnaars te verkopen en achterblijvers bij te kopen.',
   },
-  noodreserve: {
-    name: 'Noodreserve',
+  // Hernoemd van `noodreserve` (S17-vervolg, UR3-13): het scherm zegt overal
+  // "noodfonds" (onboarding-preset, NoodfondsWidget, doelen); de begrippenlijst
+  // gebruikte tot nu toe een ander woord voor dezelfde pot, waardoor de uitleg
+  // vanaf het zichtbare woord niet te vinden was. "Noodbuffer" (budget-
+  // subcategorie) blijft een apart, ongewijzigd data-label — dat is een
+  // categorienaam, geen jargonwoord dat hier wordt uitgelegd.
+  noodfonds: {
+    name: 'Noodfonds',
     alternative: 'Spaarpot voor onverwachte uitgaven',
     explanation:
       'Een buffer van 3-6 maanden levenskosten op een spaarrekening, bedoeld voor onvoorziene situaties zoals baanverlies of een grote reparatie.',
@@ -276,6 +290,7 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
   guardrails: {
     name: 'Guardrails',
     alternative: 'Vangrails-strategie',
+    simpleLabel: 'vangrails-strategie',
     explanation:
       'Een dynamische onttrekkings-strategie die je opname verlaagt na slechte beurs-jaren en verhoogt na goede. Floor en ceiling bepalen de min/max correctie t.o.v. je startopname.',
   },
@@ -296,12 +311,14 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
   vpw: {
     name: 'VPW',
     alternative: 'Leeftijd-afhankelijke opname',
+    simpleLabel: 'leeftijd-afhankelijke opname',
     explanation:
       'Variable Percentage Withdrawal — je onttrekkings-percentage stijgt naarmate je ouder wordt, omdat je horizon korter wordt. Veerkrachtiger dan vast SWR bij lange/onzekere levensduur.',
   },
   bucket: {
     name: 'Bucket-strategie',
     alternative: 'Cash-buffer + lange termijn',
+    simpleLabel: 'potjes-strategie',
     explanation:
       'Je vermogen wordt verdeeld in pots: een cash-bucket voor 2-3 jaar uitgaven en een belegde bucket voor de rest. Bij beursdips put je uit cash, zodat je niet hoeft te verkopen op een laag punt.',
   },
@@ -315,6 +332,7 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
   ter: {
     name: 'TER',
     alternative: 'Beheerkosten van een fonds',
+    simpleLabel: 'beheerkosten van een fonds',
     explanation:
       'Total Expense Ratio — de jaarlijkse kosten van een beleggingsfonds als percentage van het belegd vermogen. Voor een wereldwijde index-ETF is 0.10-0.25% een goede richtwaarde.',
   },
@@ -333,12 +351,14 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
   psd2: {
     name: 'PSD2',
     alternative: 'Bank koppelen',
+    simpleLabel: 'bankkoppeling',
     explanation:
       'De Europese betaalrichtlijn die je het recht geeft je eigen bankgegevens te delen met een app die je zelf kiest. Je koppelt via de inlogpagina van je eigen bank, dus je wachtwoord komt hier nooit langs.',
   },
   upo: {
     name: 'UPO',
     alternative: 'Pensioenoverzicht',
+    simpleLabel: 'pensioenoverzicht',
     explanation:
       'Uniform Pensioenoverzicht — het jaarlijkse overzicht van je pensioenuitvoerder met wat je tot nu toe hebt opgebouwd en wat je op pensioenleeftijd mag verwachten. Je vindt het ook op mijnpensioenoverzicht.nl.',
   },
@@ -453,6 +473,86 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
     explanation:
       'Je rekent alsof je vandaag stopt. Er is dan geen doelbedrag: de vraag is tot welke leeftijd je liquide vermogen reikt, niet hoeveel je nog moet opbouwen.',
   },
+
+  // ── Sectie 5: gemeten jargon zonder begrip (UR3-13, heuristische audit 5 sep 2026) ──
+  // De 7 gemeten termen (bandbreedte, jaarruimte, franchise, aanmerkelijk
+  // belang, forecast, optimizer, ISIN) + 3 bijvangst-termen (YTD, middelloon,
+  // omslagpunt). P40–P60 is bewust GEEN losse entry: dat is de technische naam
+  // voor dezelfde bandbreedte, geen ander begrip (zie mini-networth-chart.tsx).
+  // Fase F1 ("glossary sluitend"): de entry bestaat. De KOPPELING — inline
+  // `<GlossaryTerm>` of een `terms:`-chip op de call-sites uit §2a — is fase F2
+  // en volgt in een latere kaart/pas; tot dan meldt `glossary:check` deze
+  // sleutels als "orphaned" (waarschuwing, geen blocker).
+  bandbreedte: {
+    name: 'Bandbreedte',
+    alternative: 'Marge waarbinnen je vermogen waarschijnlijk uitkomt',
+    explanation:
+      'De marge (P40–P60) waarbinnen je vermogen in de meeste scenario’s uitkomt, gebaseerd op marktvolatiliteit. Een brede bandbreedte betekent meer onzekerheid over de uitkomst.',
+  },
+  jaarruimte: {
+    name: 'Jaarruimte',
+    alternative: 'Onbenutte pensioen-aftrekruimte',
+    explanation:
+      'Het bedrag dat je dit jaar nog fiscaal voordelig in een lijfrente kunt inleggen, boven op je werkgeverspensioen. Wat je niet gebruikt vervalt aan het einde van het jaar.',
+  },
+  // Wettelijke term (S17): blijft staan, geen `simpleLabel`.
+  franchise: {
+    name: 'Franchise',
+    alternative: 'AOW-drempel in de pensioenberekening',
+    explanation:
+      'Het deel van je inkomen tot deze grens telt niet mee voor je pensioenopbouw, omdat je AOW dat al dekt. Pas boven de franchise bouw je werkgeverspensioen en jaarruimte op.',
+  },
+  // Wettelijke term (S17): blijft staan, geen `simpleLabel`. Comment-drift-fix:
+  // glossary-data.ts en glossary-term.tsx noemen "aanmerkelijk belang" al
+  // langer als voorbeeld van zo'n wettelijke term — deze entry maakt dat waar.
+  aanmerkelijk_belang: {
+    name: 'Aanmerkelijk belang',
+    alternative: 'Bezit van 5% of meer in een BV',
+    explanation:
+      'Je hebt een aanmerkelijk belang als je 5% of meer van de aandelen in een BV bezit. Dividend en winst bij verkoop worden dan belast in Box 2, niet in Box 3.',
+  },
+  // Geen `simpleLabel`: het besluit is dit leenwoord in de bron te hernoemen
+  // (Forecast → Vooruitblik, in beide weergaven — ADR 0131, fase F2), niet een
+  // Eenvoudig-only vervanging die bij die hernoeming meteen weer vervalt.
+  forecast: {
+    name: 'Forecast',
+    alternative: 'Vooruitblik van je geldstroom',
+    explanation:
+      'Een doorrekening van je verwachte inkomsten en uitgaven de komende maanden, op basis van je patronen tot nu toe. Geen belofte — een inschatting die met nieuwe gegevens verandert.',
+  },
+  // Zelfde reden als forecast: hernoemen aan de bron (→ Kansen) volgt in F2.
+  optimizer: {
+    name: 'Optimizer',
+    alternative: 'Fiscale kansen op een rij',
+    explanation:
+      'Het overzicht van fiscale besparingskansen, geordend op grootste netto effect eerst. Elke kans is een concrete actie die je zelf kunt overwegen.',
+  },
+  // Geen `simpleLabel`: ISIN is een code, geen vervangbaar woord.
+  ISIN: {
+    name: 'ISIN',
+    alternative: 'Uniek identificatienummer van een belegging',
+    explanation:
+      'International Securities Identification Number — de unieke code waarmee een beursgenoteerd fonds of aandeel wereldwijd wordt herkend, ongeacht de beurs waarop het verhandeld wordt.',
+  },
+  YTD: {
+    name: 'YTD',
+    alternative: 'Sinds 1 januari van dit jaar',
+    simpleLabel: 'dit jaar',
+    explanation:
+      'Year-to-Date — de periode vanaf 1 januari van het lopende jaar tot vandaag. Handig om dit jaar te vergelijken met eerdere jaren.',
+  },
+  middelloon: {
+    name: 'Middelloonregeling',
+    alternative: 'Pensioen op basis van gemiddeld salaris',
+    explanation:
+      'Een pensioenregeling waarbij je pensioen wordt opgebouwd over het gemiddelde salaris van je hele loopbaan, met een fiscaal maximum opbouwpercentage van 1,875% per jaar.',
+  },
+  omslagpunt: {
+    name: 'Omslagpunt',
+    alternative: 'Moment waarop je vermogen je uitgaven kan dragen',
+    explanation:
+      'Het moment in je plan waarop je vermogen groot genoeg is om je uitgaven te dragen. Vóór dat moment bouw je nog op; erna leef je (deels) van je vermogen.',
+  },
 }
 
 /**
@@ -490,19 +590,3 @@ export const GLOSSARY: Record<string, string> = Object.fromEntries(
 export const JARGON_VERTAALTABEL: Record<string, string> = Object.fromEntries(
   Object.entries(GLOSSARY_ENTRIES).map(([key, entry]) => [key, entry.alternative]),
 )
-
-/**
- * Keys van entries die in de ConceptFlipCards verschijnen.
- * Gebruikt door ConceptFlipCards om de GLOSSARY_ENTRIES subset op te halen.
- */
-export const CONCEPT_CARD_KEYS = [
-  'vrijheidstijd',
-  'kassabon',
-  'fire',
-  'soevereiniteit',
-  'will',
-  'per_asset_rendement',
-  'heffingsvrij_vermogen',
-] as const
-
-export type ConceptCardKey = (typeof CONCEPT_CARD_KEYS)[number]

@@ -20,7 +20,8 @@ import {
   MARKET_WEATHER, type MarketWeather, type FinancialInput,
   type ScenarioPath,
 } from '@/lib/horizon-data'
-import { computeHealthScoreFromInputs, type HealthScore, type HealthScoreInput } from '@/lib/financial-health'
+import { computeHealthScoreFromInputs, healthScoreVerdict, type HealthScore, type HealthScoreInput } from '@/lib/financial-health'
+import { GRONDSLAG_ONBEKEND_KOP, GRONDSLAG_ONBEKEND_LABEL } from '@/lib/grondslag-guard'
 import { NL_SWR } from '@/lib/constants'
 import {
   simulatePayoff, payoffSummary,
@@ -117,6 +118,13 @@ export function ScenariosModal({ input, debts = [], open, onClose, simRows, simF
   const optimist = scenarios.find(s => s.name === 'optimist')
   const fireTarget = simFireTarget ?? 0
   const baseReturn = weather === 'normal' ? (grossReturn ?? 0) : MARKET_WEATHER[weather].return
+  // Onbekend is geen nul (ADR 0131): ook deze modal leest cijfer en oordeel
+  // uitsluitend via `healthScoreVerdict`. Zonder inkomen/uitgaven toont ze géén
+  // getal en géén label — anders staat hier "8 — Kritiek" terwijl /toekomst en
+  // /overzicht al zwijgen, en is de drift tussen oppervlakken terug.
+  const healthOnbekend = healthScore
+    ? (healthScoreVerdict(healthScore).kind === 'onbekend' ? healthScore.onbekend ?? null : null)
+    : null
 
   return (
     <ShellOverlay open={true} onClose={onClose} kind="pane" mobileBackCloses title="Toekomstpaden">
@@ -212,26 +220,50 @@ export function ScenariosModal({ input, debts = [], open, onClose, simRows, simF
               </div>
               <div className="rounded-[var(--r-lg)] border border-[var(--border-ed)] bg-[var(--paper)] p-6">
                 <div className="flex flex-col items-center gap-6 sm:flex-row">
-                  <div className="relative flex h-24 w-24 shrink-0 items-center justify-center">
-                    <svg viewBox="0 0 100 100" className="h-full w-full">
-                      <circle cx="50" cy="50" r="42" fill="none" stroke="#e4e4e7" strokeWidth="8" />
-                      <circle
-                        cx="50" cy="50" r="42" fill="none"
-                        stroke="var(--color-horizon-500, #c4a06b)" strokeWidth="8" strokeLinecap="round"
-                        strokeDasharray={`${(healthScore.total / 100) * 264} 264`}
-                        transform="rotate(-90 50 50)"
-                      />
-                    </svg>
-                    <span className="absolute text-2xl font-bold text-[var(--ink)]">{healthScore.total}</span>
-                  </div>
+                  {healthOnbekend ? (
+                    <div className="flex w-24 shrink-0 flex-col items-center text-center">
+                      <p className="font-serif text-sm font-bold leading-tight text-[var(--ink)]">{GRONDSLAG_ONBEKEND_KOP}</p>
+                    </div>
+                  ) : (
+                    <div className="relative flex h-24 w-24 shrink-0 items-center justify-center">
+                      <svg viewBox="0 0 100 100" className="h-full w-full">
+                        <circle cx="50" cy="50" r="42" fill="none" stroke="#e4e4e7" strokeWidth="8" />
+                        <circle
+                          cx="50" cy="50" r="42" fill="none"
+                          stroke="var(--color-horizon-500, #c4a06b)" strokeWidth="8" strokeLinecap="round"
+                          strokeDasharray={`${(healthScore.total / 100) * 264} 264`}
+                          transform="rotate(-90 50 50)"
+                        />
+                      </svg>
+                      <span className="absolute text-2xl font-bold text-[var(--ink)]">{healthScore.total}</span>
+                    </div>
+                  )}
 
                   <div ref={resilienceRef} className="flex-1">
-                    <p className="text-lg font-bold text-[var(--ink)]">{healthScore.label}</p>
+                    {healthOnbekend ? (
+                      <p className="text-sm leading-snug text-[var(--ink-2)]">{healthOnbekend.hint}</p>
+                    ) : (
+                      <p className="text-lg font-bold text-[var(--ink)]">{healthScore.label}</p>
+                    )}
                     <div className="mt-3 space-y-2">
                       {healthScore.pillars.map(pillar => (
                         <ResilienceBar key={pillar.id} label={pillar.name} value={pillar.score} max={100} hasEntered={resilienceEntered} />
                       ))}
+                      {healthOnbekend?.pijlers.map(pijler => (
+                        <div key={pijler.id} className="flex items-baseline justify-between gap-3 text-sm">
+                          <span className="text-[var(--ink-2)]">{pijler.name}</span>
+                          <span className="font-mono text-xs text-[var(--ink-3)]">{GRONDSLAG_ONBEKEND_LABEL}</span>
+                        </div>
+                      ))}
                     </div>
+                    {healthOnbekend && (
+                      <a
+                        href={healthOnbekend.actie.href}
+                        className="mt-3 inline-block text-sm font-semibold text-[var(--color-horizon-600)] underline underline-offset-2"
+                      >
+                        {healthOnbekend.actie.label}
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>

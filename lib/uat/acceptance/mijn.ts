@@ -317,7 +317,7 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-MIJN-22',
     scenarioId: 'UAT-MIJN-22',
-    titel: 'Uiterlijk aanpassen: weergavekeuze, palet, typografie en geavanceerde kleuren',
+    titel: 'Weergave en uiterlijk aanpassen: weergavekeuze, palet, typografie en geavanceerde kleuren',
     kriticiteit: 'BELANGRIJK',
     given: 'Ingelogd, /mijn/uiterlijk. Bovenaan de pagina staat sinds fase 1 van de eenvoudige weergave het weergave-keuzeblok ("Eenvoudig — de kern" / "Volledig — alle detail", APP-1); daaronder palet, typografie en de "Geavanceerd"-disclosure.',
     when: 'De gebruiker kiest een weergave, een palet, een typografie-thema, module-accentkleuren (kern/wil/horizon), budget-tints en categoriekaart-tinten, en reset (randgeval) één accentkaart.',

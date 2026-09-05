@@ -10,8 +10,12 @@ import {
   MoreVertical, ToggleLeft, Save, Check, Trash2,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { isOwnAccountTransfer } from '@/lib/parsers/categorize'
 import { buildOwnAccountIdentifiers } from '@/lib/own-accounts'
+import { BANK_CONNECT_SAFETY_SHORT } from '@/lib/bank-connect-copy'
+import {
+  collectPendingOwnAccountTransfers,
+  isPendingOwnAccountTransfer,
+} from '@/lib/own-accounts-pending'
 import { TransferConfirmSheet } from '@/components/app/transfer-confirm-sheet'
 import { ManualTransferSheet } from '@/components/app/manual-transfer-sheet'
 import { PendingTransferBanner } from '@/components/app/pending-transfer-banner'
@@ -269,6 +273,13 @@ export function CashAccountView({
   const [ownIbans, setOwnIbans] = useState<Set<string>>(new Set())
   const [ownNamePatterns, setOwnNamePatterns] = useState<string[]>([])
   const [reviewTransferTxs, setReviewTransferTxs] = useState<Transaction[]>([])
+  // De twee stukken van de identifier-set weer als één object, zodat het
+  // gedeelde predicaat (`lib/own-accounts-pending.ts`) hier en in de banner
+  // dezelfde vorm ziet als op de server.
+  const ownAccountIds = useMemo(
+    () => ({ ibans: ownIbans, namePatterns: ownNamePatterns }),
+    [ownIbans, ownNamePatterns],
+  )
 
   const { perspective } = usePerspective()
   const perspectiveSignal = usePerspectiveAbort(perspective)
@@ -2001,6 +2012,8 @@ export function CashAccountView({
                   <Link2 className="mx-auto mb-2 h-6 w-6 text-[var(--ink-4)]" />
                   <p className="text-sm font-medium text-[var(--ink-2)]">Nog niet gekoppeld</p>
                   <p className="mt-1 text-xs text-[var(--ink-3)]">Koppel deze rekening via TrueLayer om automatisch transacties te importeren.</p>
+                  {/* Veiligheidszin uit één bron (UR3-15). */}
+                  <p className="mt-1.5 text-[11px] leading-snug text-[var(--ink-4)]">{BANK_CONNECT_SAFETY_SHORT}</p>
                   <Link
                     href="/core/cash/connect"
                     className="mt-3 inline-flex items-center gap-1.5 rounded-[var(--r)] bg-kern-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-kern-700"
@@ -2023,21 +2036,26 @@ export function CashAccountView({
         </section>
       )}
 
-      {/* Pending transfer banner */}
+      {/* Pending transfer banner — óók voor transacties die al een budget
+          hebben: een eenmaal misgegane overboeking moet langs deze route
+          herstelbaar blijven (UR3-02). Het predicaat en de cap staan in
+          lib/own-accounts-pending.ts, gedeeld met de per-rij-markering. */}
       {(() => {
-        const pendingTransfers = transactions.filter(
-          (t) =>
-            t.transaction_type !== 'transfer' &&
-            t.transaction_type !== 'joint_transfer' &&
-            !t.budget_id &&
-            (!!t.counterparty_iban || !!t.counterparty_name) &&
-            isOwnAccountTransfer(t.counterparty_iban, ownIbans, t.counterparty_name, ownNamePatterns)
+        // Zonder bekende kijker geen banner: het eigenaarsfilter zou dan
+        // overgeslagen worden en in huishoudweergave kortstondig een gedeelde
+        // partnerboeking meetellen — een knop die RLS toch weigert.
+        if (!currentUserId) return null
+        const { items: pendingTransfers, total } = collectPendingOwnAccountTransfers(
+          transactions,
+          ownAccountIds,
+          currentUserId,
         )
-        if (pendingTransfers.length === 0) return null
+        if (total === 0) return null
         return (
           <div className="mt-5 sm:mt-8">
             <PendingTransferBanner
-              count={pendingTransfers.length}
+              count={total}
+              reviewCount={pendingTransfers.length}
               onReview={() => setReviewTransferTxs(pendingTransfers)}
             />
           </div>
@@ -2688,7 +2706,7 @@ export function CashAccountView({
                       const amount = Number(tx.amount)
                       const isPositive = amount > 0
                       const isTransfer = tx.transaction_type === 'transfer'
-                      const isPendingTransfer = !isTransfer && tx.transaction_type !== 'joint_transfer' && !tx.budget_id && (!!tx.counterparty_iban || !!tx.counterparty_name) && isOwnAccountTransfer(tx.counterparty_iban, ownIbans, tx.counterparty_name, ownNamePatterns)
+                      const isPendingTransfer = !!currentUserId && isPendingOwnAccountTransfer(tx, ownAccountIds, currentUserId)
                       const isSplitTx = !!tx.is_split
                       const isExpanded = expandedSplitId === tx.id
                       const loadedSplits = splitsByTxId[tx.id]

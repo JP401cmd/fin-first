@@ -9,6 +9,7 @@ import type { DashboardData } from './widget-renderer'
 import { Button } from '@/components/editorial/button'
 import { StaticWidgetItem, sizeLabel } from './widget-grid-helpers'
 import { CategoryAppNavBar } from './category-app-nav-bar'
+import { VrijheidstijdVoetnoot } from '@/components/app/vrijheidstijd-voetnoot'
 import {
   readCategoryNavBarVisible,
   saveCategoryNavBarVisible,
@@ -714,6 +715,21 @@ export function DraggableWidgetGrid({ initialPrefs, allPrefs, data, categoryAppL
             <StaticWidgetItem key={pref.id} pref={pref} data={data} features={features} />
           ))}
         </div>
+      )}
+
+      {/* De wisselkoers, ÉÉN keer onder het hele grid (UR3-08, eigenaarsbesluit A).
+          Bijna elke widget hier vertaalt een bedrag naar vrijheidstijd met exact
+          hetzelfde `data.dailyExpenseRate`; de koers per tegel herhalen zou een
+          rustig raster in veertien voetnoten veranderen. Eén regel onderaan
+          houdt hem "in de buurt" zonder het scherm vol te zetten.
+          Verdwijnt vanzelf in privacymodus, bij een tarief van 0 en bij een
+          onbekende grondslag — dat zit in het component (ADR 0091 / 0131). */}
+      {activeWidgets.length > 0 && (
+        <VrijheidstijdVoetnoot
+          dailyRate={data.dailyExpenseRate}
+          source={data.dailyExpenseRateSource}
+          className="mt-3"
+        />
       )}
 
       {/* Add widget picker + AI dashboard — only in edit mode */}

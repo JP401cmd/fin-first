@@ -82,6 +82,11 @@ function parserFilesOnDisk(): string[] {
   // - cross-source-dedup.ts: pure cross-bron dedup-laag (laag 2), geen
   //   bestandsformaat en geen externe client — gedeeld door de bank-sync en,
   //   vanaf fase 3, het importpad
+  // - iban.ts: IBAN-validatie (mod-97) + éénduidige extractie uit vrije tekst.
+  //   Zuivere tekstlogica zonder bestandsformaat en zonder externe client;
+  //   staat in dezelfde familie als counterparty-normalize.ts. Wordt gedeeld
+  //   door de TrueLayer-mapper (UR3-02) en is bewust géén integratie-entry —
+  //   de integratie is de bankkoppeling, niet de helper die zij aanroept.
   const SKIP = [
     'index.ts',
     'shared.ts',
@@ -89,6 +94,7 @@ function parserFilesOnDisk(): string[] {
     'categorize.ts',
     'counterparty-normalize.ts',
     'cross-source-dedup.ts',
+    'iban.ts',
   ]
   return readdirSync(dir)
     .filter(f => f.endsWith('.ts') && !f.endsWith('.test.ts') && !f.endsWith('.d.ts') && !SKIP.includes(f))

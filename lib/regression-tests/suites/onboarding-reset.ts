@@ -2,6 +2,10 @@ import { registerTests } from '../test-registry'
 import { assert, assertEqual, assertIncludes } from '../assert'
 import { unauthenticatedFetch } from '../server-runner'
 import type { TestCase } from '../test-types'
+import {
+  FIRE_RESET_FIELDS,
+  FIRE_RESET_NOT_NULL_COLUMNS,
+} from '@/app/api/onboarding/reset/reset-profile-fields'
 
 const CAT = 'onboarding.reset'
 
@@ -131,6 +135,44 @@ const tests: TestCase[] = [
       // Verify total number of fields being reset
       const fieldCount = Object.keys(PROFILE_RESET_FIELDS).length
       assertEqual(fieldCount, 9, 'Exact 9 profielvelden worden gereset')
+    },
+  },
+
+  // ── Step 2b: FIRE-veldenreset ───────────────────────────────────────
+  {
+    id: 'ob-reset-fire-fields',
+    name: 'FIRE-reset: NOT NULL-kolommen gaan naar hun default, nooit naar null',
+    category: CAT,
+    description:
+      'De FIRE-payload zette tot 5 sep 2026 negen kolommen op null, waarvan vier NOT NULL — ' +
+      'de hele update liep daardoor stil op 23502/400 en de FIRE-aannames van het vorige leven ' +
+      'bleven staan. Deze test bewaakt de eindwaarden ná reset.',
+    priority: 'critical',
+    estimatedDurationMs: 100,
+    fn() {
+      for (const col of FIRE_RESET_NOT_NULL_COLUMNS) {
+        assert(col in FIRE_RESET_FIELDS, `${col} hoort in de FIRE-resetpayload te zitten`)
+        assert(
+          FIRE_RESET_FIELDS[col] !== null,
+          `${col} is NOT NULL in de DB en mag niet op null gezet worden`,
+        )
+      }
+      assertEqual(FIRE_RESET_FIELDS.fire_end_strategy, 'deplete', 'fire_end_strategy → deplete')
+      assertEqual(FIRE_RESET_FIELDS.fire_end_age, 90, 'fire_end_age → 90')
+      assertEqual(
+        FIRE_RESET_FIELDS.retirement_expense_method,
+        'essential_budgets',
+        'retirement_expense_method → essential_budgets',
+      )
+      assertEqual(FIRE_RESET_FIELDS.fire_stop_anchor, 'solved', 'fire_stop_anchor → solved')
+
+      // CHECK profiles_fire_stop_anchor_age_consistent:
+      // (fire_stop_anchor = 'age') = (fire_stop_age IS NOT NULL).
+      assertEqual(
+        FIRE_RESET_FIELDS.fire_stop_age,
+        null,
+        'fire_stop_age → null (hoort bij anker solved)',
+      )
     },
   },
 

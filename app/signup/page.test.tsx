@@ -116,3 +116,42 @@ describe('SignupPage — leaked-password-poort (ADR 0057)', () => {
     expect(signUp).toHaveBeenCalledTimes(1)
   })
 })
+
+/**
+ * Vertrouwen op het moment zelf (UR3-15, AC3). De registratiepagina moet in
+ * één regel zeggen wát er met je gegevens gebeurt — niet alleen waarmee je
+ * akkoord gaat — met beide links en zónder verplicht vinkje
+ * (eigenaarsbesluit 17). De regel staat bewust BOVEN beide aanmaakknoppen:
+ * de Google-knop is het eerste interactieve element.
+ */
+describe('SignupPage — wat er met je gegevens gebeurt (UR3-15)', () => {
+  it('zegt wat er met de gegevens gebeurt, met beide links en zonder vinkje', () => {
+    const { container } = render(<SignupPage />)
+
+    const regel = screen.getByText(/versleuteld opgeslagen in de EU/i)
+    expect(regel.textContent).toMatch(/nooit verkocht of voor advertenties gebruikt/i)
+    expect(regel.textContent).toMatch(/ga je akkoord met/i)
+
+    // Beide links blijven expliciet vindbaar.
+    expect(
+      screen.getByRole('link', { name: 'voorwaarden' }).getAttribute('href'),
+    ).toBe('/voorwaarden')
+    expect(
+      screen.getByRole('link', { name: 'privacyverklaring' }).getAttribute('href'),
+    ).toBe('/privacy')
+
+    // Geen verplicht vinkje — besluit 17.
+    expect(container.querySelector('input[type="checkbox"]')).toBeNull()
+  })
+
+  it('belooft niets wat de app niet waarmaakt', () => {
+    render(<SignupPage />)
+    const regel = screen.getByText(/versleuteld opgeslagen in de EU/i)
+    // "alleen jij" is onwaar zodra er een huishoud-partner is; een
+    // AI-belofte is onwaar zodra iemand met Fin praat (de chatcontext draagt
+    // inkomen en uitgaven naar de modelaanbieder).
+    expect(regel.textContent?.toLowerCase()).not.toContain('alleen jij')
+    // \b zodat "e-mail" niet meetelt.
+    expect(regel.textContent ?? '').not.toMatch(/\bAI\b/i)
+  })
+})

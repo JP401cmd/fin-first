@@ -330,6 +330,8 @@ describe('D1-pariteit — loader-bundel == health-pijler (inclusion-gewogen)', (
         avgMonthlyExpenses,
         netMonthlyIncome: 4_000,
         netMonthlySalary,
+        incomeBasis: 'manual' as const,
+        expensesBasis: 'manual' as const,
         // Legacy leeftijdsblind pad — de peer-relatieve fire_progress-cases
         // staan in financial-health.test.ts.
         currentAge: null,
@@ -378,6 +380,8 @@ describe('D1-pariteit — loader-bundel == health-pijler (inclusion-gewogen)', (
         avgMonthlyExpenses,
         netMonthlyIncome: 4_000,
         netMonthlySalary,
+        incomeBasis: 'manual' as const,
+        expensesBasis: 'manual' as const,
         // Legacy leeftijdsblind pad — de peer-relatieve fire_progress-cases
         // staan in financial-health.test.ts.
         currentAge: null,

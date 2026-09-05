@@ -249,8 +249,21 @@ export const DEBT_SUBTYPE_LABELS: Partial<Record<DebtType, Record<string, string
 
 export const REPAYMENT_TYPE_LABELS: Record<RepaymentType, string> = {
   aflossingsvrij: 'Aflossingsvrij',
-  annuiteit: 'Annuiteit',
+  annuiteit: 'Annuïteit',
   lineair: 'Lineair',
+}
+
+// Eén zin per aflossingsvorm, in gewone taal (UR3-12) — gebruikt door de
+// keuzetegels in MortgageExtraFields (onboarding én de in-app quick-add-
+// wizard delen dit component). Zelfde strekking als annuiteit.explanation
+// in lib/glossary-data.ts.
+export const REPAYMENT_TYPE_EXPLANATIONS: Record<RepaymentType, string> = {
+  annuiteit:
+    'Elke maand hetzelfde bedrag. Eerst betaal je vooral rente, later vooral aflossing.',
+  lineair:
+    'Elke maand hetzelfde stuk aflossing; je maandbedrag begint hoger en wordt daarna elke maand iets lager.',
+  aflossingsvrij:
+    'Je betaalt alleen rente. De schuld zelf blijft staan tot het einde van de looptijd.',
 }
 
 export const DEBT_SUBTYPE_DEFAULTS: Record<string, Partial<{

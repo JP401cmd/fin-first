@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Building2, ExternalLink, Shield, Clock, AlertTriangle } from 'lucide-react'
+import { BANK_CONNECT_SAFETY_SHORT } from '@/lib/bank-connect-copy'
 import { BankSelector } from '@/components/app/bank-connect/bank-selector'
 import {
   CashflowAccountsExit,
@@ -11,6 +12,8 @@ import {
   type TargetSelection,
 } from '@/components/app/bank-connect/target-account-choice'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
+import { PageInfoButton } from '@/components/editorial/page-info-button'
+import { getPageInfo } from '@/lib/page-info-content'
 import {
   occupiedTargetAccountMessage,
   type TargetAccountOption,
@@ -298,10 +301,17 @@ export default function ConnectBankPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-5 sm:px-6 sm:py-8">
+    <div className="relative mx-auto max-w-2xl px-4 py-5 sm:px-6 sm:py-8">
       <NavStackMeta title="Bank koppelen" />
+      {/* "Wat zie ik hier?" — de koppelpagina had als enige uitnodigings-
+          oppervlak geen info-knop, terwijl juist hier de vertrouwensvraag
+          speelt (UR3-15). Vaste plek: absolute child rechtsboven. */}
+      <PageInfoButton
+        content={getPageInfo('/core/cash/connect')}
+        className="absolute right-4 top-4 sm:right-6"
+      />
       {/* Editorial header — blueprint Type 7 (Wizard) */}
-      <header className="mb-8 space-y-2">
+      <header className="mb-8 space-y-2 pr-10">
         <div className="flex items-center gap-2.5 text-[10px] uppercase tracking-[0.22em] font-mono text-[var(--module-active-700)]">
           <span
             aria-hidden
@@ -330,6 +340,13 @@ export default function ConnectBankPage() {
           }}
         >
           Koppel je bankrekening om transacties automatisch te synchroniseren.
+        </p>
+        {/* Stap 1 (bank kiezen) noemde alleen het gemak; de veiligheidsuitleg
+            stond pas op de bevestigstap. Nu draagt ook het kies-moment de
+            canonieke zin (UR3-15). De drie blokken op stap 2 blijven — dáár
+            wordt beslist, dus daar mag het uitgebreider. */}
+        <p className="mt-2 pl-4 text-[12px] leading-snug text-[var(--ink-3)]">
+          {BANK_CONNECT_SAFETY_SHORT}
         </p>
       </header>
 

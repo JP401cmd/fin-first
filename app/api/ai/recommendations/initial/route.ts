@@ -10,7 +10,9 @@ import { checkTierGate } from '@/lib/require-tier'
 import { checkCreditBudget, creditLimitMessage } from '@/lib/ai/credit-gate'
 import { recordAiUsage } from '@/lib/ai-credits'
 import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
-import { unauthorized, serverError } from '@/lib/api/respond'
+import { unauthorized, serverError, errorResponse } from '@/lib/api/respond'
+import { isRefusedProviderError } from '@/lib/ai/provider-error'
+import { AI_ERROR_CODE, describeAiError } from '@/lib/ai/error-copy'
 
 // ── Schema (same as main recommendations endpoint) ─────────
 
@@ -190,6 +192,12 @@ export async function POST() {
 
     return Response.json({ recommendations })
   } catch (err) {
+    // Structureel (provider weigert) vs. tijdelijk — gedrag bij een tijdelijke
+    // hapering blijft ongewijzigd (UR3-09).
+    if (isRefusedProviderError(err)) {
+      const copy = describeAiError(AI_ERROR_CODE.providerRefused)
+      return errorResponse(copy.text, 422, copy.code)
+    }
     return serverError(err, 'ai-recommendations-initial:POST')
   }
 }

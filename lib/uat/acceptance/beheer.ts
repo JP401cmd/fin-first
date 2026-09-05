@@ -10,7 +10,11 @@
  * tabel, dezelfde superadmin/service-role/consistency-vorm als 04/32. 35
  * (FIRE-marktaannames CRUD) voegde de eerste mutatie-workflow op de fiscale-
  * kerngetallen-pagina toe. 36 (Versie & git-dashboard) is het alleen-lezen
- * git-/deploy-/migratiedashboard op /beheer/versie.
+ * git-/deploy-/migratiedashboard op /beheer/versie. 38 (AI-gezondheid, ADR
+ * 0132) voegde de storings-strip op /beheer + de altijd-zichtbare statuskaart
+ * op /beheer/ai toe, gevoed door deriveAiHealth/loadAiHealth — een nieuw
+ * oppervlak náást het bestaande WF-BEHEER-02 (AI-configuratie) en
+ * WF-BEHEER-04 (AI-verbruik/KPI's).
  *
  * KERN-BEVINDING (bepaalt exact/consistency/oracle/ui-only): BEHEER is
  * admin-tooling achter superadmin-gating — de motoren wonen elders (Kern/
@@ -642,6 +646,23 @@ const criteria: AcceptanceCriterion[] = [
       kind: 'consistency',
       source:
         'app/(app)/beheer/kennisbank/page.tsx#PromptParityBlock (badge=parity.inSync, lege-staat=parity.neverGenerated, tokenPct-formule) + lib/ai/local/parity-facts.ts#selectParityFacts + docs/ai-parity/parity.json + app/(app)/beheer/kennisbank/kennisbank-client.tsx (item-CRUD, PUT-opslaan) — badge/tokenbalk volgen aantoonbaar uit parity.json (A=B), consistentietoets; CRUD-regressie is ui-only binnen hetzelfde criterium',
+    },
+  },
+  {
+    workflow: 'WF-BEHEER-38',
+    scenarioId: 'UAT-BEHEER-38',
+    titel: 'AI-gezondheid (storing/hapering) zichtbaar op /beheer en /beheer/ai',
+    kriticiteit: 'BELANGRIJK',
+    given:
+      '/beheer (hub) toont een AiHealthStrip alleen bij status "hapering"/"storing"; /beheer/ai toont bovenaan altijd een AiStatusCard. Beide voeden uit lib/ai/ai-health-loader.ts#loadAiHealth (service-role, ná isSuperAdmin()) op basis van lib/ai/ai-health.ts#deriveAiHealth: laatste geslaagde ai_token_usage-rij plus de ai:<feature>-rijen in error_logs sinds dat succes, drempel 2 mislukte calls sinds het laatste succes (ADR 0132).',
+    when:
+      'De beheerder opent /beheer wanneer de status ok/idle/attention/unknown is (0 of 1 mislukking sinds laatste succes) en wanneer er ≥2 mislukte AI-aanroepen zijn sinds het laatste succes (status hapering bij transient/unknown-fouten, storing bij een refused-fout); opent daarna in beide situaties /beheer/ai.',
+    then:
+      'De hub-strip verschijnt uitsluitend bij status "hapering" of "storing" (met sinds-wanneer) en blijft weg bij ok/idle/attention/unknown. De statuskaart op /beheer/ai toont in elke status precies één van "Werkt", "Nog niet gebruikt", "Eén mislukte aanroep", "Hapert" of "Storing sinds …"; de getoonde status en het sinds-tijdstip moeten exact overeenkomen met wat deriveAiHealth() uit dezelfde ai_token_usage-/error_logs-rijen aflegt — een A=B-consistentietoets, geen los na te rekenen cijfer.',
+    assertion: {
+      kind: 'consistency',
+      source:
+        'lib/ai/ai-health.ts#deriveAiHealth (drempel 2 mislukte calls sinds laatste succes) + lib/ai/ai-health-loader.ts#loadAiHealth (service-role, isSuperAdmin-gated) + components/app/beheer/ai-status-card.tsx (AiHealthStrip op app/(app)/beheer/page.tsx, AiStatusCard op app/(app)/beheer/ai/page.tsx) — weergegeven status/sinds-tijdstip = afleiding uit ai_token_usage + error_logs (A=B), consistentietoets',
     },
   },
 ]

@@ -19,6 +19,10 @@ vi.mock('@/components/app/chat/chat-provider', () => ({
   useChatContext: () => ({
     isOpen: isOpenValue, open, toggle, openWithMessage, openGids, close: vi.fn(),
   }),
+  // `useAttentionQuiet` (ADR 0134) leest de chat via de niet-throwende variant.
+  useChatContextOptional: () => ({
+    isOpen: isOpenValue, open, toggle, openWithMessage, openGids, close: vi.fn(),
+  }),
 }))
 vi.mock('next/navigation', () => ({
   usePathname: () => '/overzicht',

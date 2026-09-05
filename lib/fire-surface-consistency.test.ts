@@ -155,6 +155,31 @@ describe('H21/F4 — één noemer voor vrijheids-%, uit de kernel', () => {
     expect(data.freedomPct).toBeCloseTo(SCALAR_FREEDOM_PCT, 2)
   })
 
+  it('Given een kernel-run met I ≠ J, When de bundel wordt geladen, Then draagt hij BEIDE doelen (first paint /toekomst)', async () => {
+    // UR3-07 defect 3: de bundel berekende Prognose!I al (als noemer van
+    // `freedomPct`) maar exposeerde 'm niet. /toekomst had bij de eerste paint dus
+    // alléén Prognose!J in de hand en toonde dát, terwijl de client-kernelrun even
+    // later op Prognose!I landde — één tegel, twee grootheden. `DashboardData` droeg
+    // het paar wél; daarom sprongen /overzicht en /toekomst/doelen niet mee.
+    // Fixture met een NIET-liquide deel, zodat I en J meetbaar uiteenlopen.
+    computeHorizonFireSimMock.mockResolvedValue({
+      sim: {
+        requiredFirePortfolio: KERNEL_PORTFOLIO,
+        requiredFireNetWorth: KERNEL_PORTFOLIO + 250_000,
+        fireAgeFractional: KERNEL_FIRE_AGE,
+      },
+    })
+    const data = await loadHorizonData(SUPABASE)
+
+    expect(data.requiredPortfolioExclHome).not.toBeNull()
+    expect(data.requiredNetWorthInclHome).not.toBeNull()
+    expect(Math.abs(data.requiredPortfolioExclHome! - KERNEL_PORTFOLIO)).toBeLessThanOrEqual(EPS_EUR)
+    // Het incl.-woning-doel komt uit de kernel, niet uit de scalar-reconstructie.
+    expect(Math.abs(data.requiredNetWorthInclHome! - (KERNEL_PORTFOLIO + 250_000))).toBeLessThanOrEqual(EPS_EUR)
+    // …en het is aantoonbaar een ándere grootheid dan zijn broer.
+    expect(data.requiredNetWorthInclHome).not.toBe(data.requiredPortfolioExclHome)
+  })
+
   it('Given een doel van 0 uit de kernel, When de bundel wordt geladen, Then telt dat als "geen kernel-doel"', async () => {
     computeHorizonFireSimMock.mockResolvedValue({
       sim: { requiredFirePortfolio: 0, requiredFireNetWorth: 0, fireAgeFractional: null },

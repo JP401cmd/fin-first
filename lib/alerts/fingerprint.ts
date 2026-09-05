@@ -67,6 +67,9 @@ const EIGEN_TAGS = new Set([
 ])
 /** `onRequestError:<routeType>` uit lib/observability/request-error.ts. */
 const ONREQUEST_TAG = /^onrequesterror:[a-z-]{1,20}$/
+/** `ai:<feature>` uit lib/ai/ai-failure-middleware.ts (feature-strings zijn
+ *  lowercase snake_case, zie AiTokenFeature; plus 'config' en 'onbekend'). */
+const AI_FAILURE_TAG = /^ai:[a-z_]{1,32}$/
 
 /**
  * Maakt een `context`-waarde veilig om in een melding te tonen.
@@ -86,5 +89,6 @@ export function safeContextTag(context: string | null | undefined): string {
   const raw = (context ?? '').trim().toLowerCase()
   if (EIGEN_TAGS.has(raw)) return raw
   if (ONREQUEST_TAG.test(raw)) return raw
+  if (AI_FAILURE_TAG.test(raw)) return raw
   return 'onbekend'
 }

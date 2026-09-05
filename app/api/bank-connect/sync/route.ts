@@ -328,8 +328,34 @@ export async function POST(req: Request) {
       }
     }
 
-    // Map to ParsedTransaction
-    const parsed = await mapTransactions(tlTransactions)
+    // Map to ParsedTransaction.
+    //
+    // `selfIbans`: de IBAN van de dragende rekening zelf. De mapper leidt een
+    // ontbrekende tegenrekening af uit de omschrijving (UR3-02) en moet dan
+    // wéten welke IBAN NIET de tegenpartij kan zijn — anders zou een bank die
+    // het eigen rekeningnummer in de omschrijving herhaalt elke transactie op
+    // die rekening als eigen overboeking stempelen, en die verdwijnt stil uit
+    // de uitgaven. Beide kolommen: `iban_encrypted` is het pad na Stage B,
+    // `iban` de plaintext-rest die nog niet gemigreerd is.
+    //
+    // In een try: `decryptField` GOOIT bij een ontbrekende `v1:`-prefix of een
+    // auth-tag-mismatch (sleutelrotatie, één rommelige rij). Die regel staat
+    // ná het reserveren van het dagslot en ná de bankverzoeken, dus zonder deze
+    // vangst kost één onleesbare rij de gebruiker zijn hele synchronisatie-
+    // budget aan een gegarandeerde 500. Dezelfde afweging als in
+    // `lib/own-accounts-server.ts`: overslaan, niet de ronde laten vallen.
+    let carrierIban: string | null = null
+    let carrierIbanReadable = true
+    try {
+      carrierIban = decryptField(connAccount.iban_encrypted ?? null) ?? connAccount.iban ?? null
+    } catch {
+      carrierIbanReadable = false
+      console.warn('[bankconnect-sync] eigen IBAN onleesbaar; tegenrekening-afleiding overgeslagen')
+    }
+    const parsed = await mapTransactions(tlTransactions, {
+      selfIbans: [carrierIban],
+      deriveCounterpartyIban: carrierIbanReadable,
+    })
 
     // Load budgets + corrections (categorization), existing hashes (dedup) and
     // the frequency map (smart matching) — all four are independent reads, so

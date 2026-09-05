@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-08-03T00:00:00.000Z",
+  "generatedAt": "2026-09-05T00:00:00.000Z",
   "dnaSubBudget": 2000,
-  "dnaEstimatedTokens": 708,
+  "dnaEstimatedTokens": 890,
   "sources": [
     {
       "file": "lib/ai/dna/base.ts",
-      "sha256": "4089da9e6e0a736479423786bcf653065c7ad9f523e8d0d8c8022ae57a6c639d"
+      "sha256": "ef73346d82b0a3f3a97deac0077f5c7f76ae11297eee1b1ba1cd91d9e68a7ddf"
     },
     {
       "file": "lib/ai/dna/wil.ts",
@@ -19,11 +19,11 @@
       "constant": "LOCAL_CHAT_DNA",
       "file": "lib/ai/local/local-chat-prompt.ts",
       "subBudget": 2000,
-      "estimatedTokens": 708,
+      "estimatedTokens": 890,
       "sources": [
         {
           "file": "lib/ai/dna/base.ts",
-          "sha256": "4089da9e6e0a736479423786bcf653065c7ad9f523e8d0d8c8022ae57a6c639d"
+          "sha256": "ef73346d82b0a3f3a97deac0077f5c7f76ae11297eee1b1ba1cd91d9e68a7ddf"
         },
         {
           "file": "lib/ai/dna/wil.ts",

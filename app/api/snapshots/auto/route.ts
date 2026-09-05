@@ -348,6 +348,9 @@ export async function GET(request: Request) {
         netMonthlyIncome: monthlyIncome,
         // Noodbuffer-norm: 3 × netto maandsalaris (lib/emergency-fund.ts).
         netMonthlySalary: effectiveMonthlyIncome,
+        // Grondslag voor het OORDEEL (ADR 0131) — dezelfde resoluties als de spaarbron.
+        incomeBasis: snapshotAnnualIncome.basis,
+        expensesBasis: snapshotExpenses.basis,
       },
       {
         assets: assets as HealthScoreAsset[],

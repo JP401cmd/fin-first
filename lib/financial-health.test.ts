@@ -32,6 +32,116 @@ const baseInput: HealthScoreInput = {
   ],
 }
 
+// ── ADR 0131 / UR3-01: onbekend is geen nul ───────────────────────────────
+
+describe('onbekend inkomen/uitgaven — geen score, geen oordeel (ADR 0131, UR3-01)', () => {
+  // Given: Sanne koos "Later invullen" — inkomen én uitgaven onbekend, wél
+  //   €14.000 spaargeld en een studieschuld met maandlast. De rekenkant levert
+  //   dan 0 % spaarquote, 0,0 × salaris, 0 % FIRE-voortgang.
+  // When: de score wordt berekend met beide grondslagen 'unknown'.
+  // Then: de pijlers die inkomen/uitgaven nodig hebben zijn géén 0 maar
+  //   WEGGELATEN, en `onbekend` draagt ze met één zin en één knop.
+  const sanne: HealthScoreInput = {
+    ...baseInput,
+    savingsRate6m: 0,
+    emergencyFundMonths: 0,
+    freedomPct: 0,
+    netMonthlyIncome: 0,
+    debtMonthlyPayments: 120,
+    totalAssets: 14_000,
+    totalDebts: 9_000,
+    incomeBasis: 'unknown',
+    expensesBasis: 'unknown',
+  }
+
+  it('laat spaarquote, noodfonds, schuldenlast en FIRE-voortgang weg uit de pijlers', () => {
+    const score = computeHealthScoreFromInputs(sanne, true)
+    const ids = score.pillars.map(p => p.id)
+    expect(ids).not.toContain('savings_rate')
+    expect(ids).not.toContain('emergency_fund')
+    expect(ids).not.toContain('debt_service_ratio')
+    expect(ids).not.toContain('fire_progress')
+    // Wat overblijft rust niet op inkomen/uitgaven.
+    expect(ids).toEqual(expect.arrayContaining(['budget_discipline', 'debt_ratio', 'asset_concentration']))
+    expect(score.activePillarCount).toBe(3)
+  })
+
+  it('draagt `onbekend` met de weggevallen pijlers, één zin en één knop', () => {
+    const score = computeHealthScoreFromInputs(sanne, true)
+    expect(score.onbekend).not.toBeNull()
+    expect(score.onbekend?.ontbreekt).toBe('inkomen-en-uitgaven')
+    expect(score.onbekend?.pijlers.map(p => p.id)).toEqual([
+      'savings_rate', 'emergency_fund', 'debt_service_ratio', 'fire_progress',
+    ])
+    expect(score.onbekend?.pijlers.every(p => p.groupLabel)).toBe(true)
+    expect(score.onbekend?.hint).toMatch(/inkomen en uitgaven/)
+    expect(score.onbekend?.actie.href).toBe('/overzicht/cashflow')
+  })
+
+  it("nergens 'Spaarquote 0%' of '0,0 × salaris' als rawValue — die pijlers bestaan niet als 0", () => {
+    const score = computeHealthScoreFromInputs(sanne, true)
+    for (const p of score.pillars) {
+      expect(p.rawValue).not.toBe('0%')
+      expect(p.rawValue).not.toMatch(/× salaris/)
+    }
+    // …en de briefing kan daardoor de spaarquote-tip ("begin met 10% van je
+    // inkomen") niet meer als zwakste pijler oppikken.
+    expect(score.pillars.map(p => p.improvementTip).join(' ')).not.toMatch(/10% van je inkomen/)
+  })
+
+  it('alleen inkomen onbekend: noodfonds blijft (uitgaven-norm) en FIRE-voortgang blijft; spaarquote en schuldenlast vallen weg', () => {
+    const score = computeHealthScoreFromInputs(
+      { ...sanne, expensesBasis: 'transaction', freedomPct: 12, emergencyFundMonths: 2 },
+      true,
+    )
+    const ids = score.pillars.map(p => p.id)
+    expect(ids).not.toContain('savings_rate')
+    expect(ids).not.toContain('debt_service_ratio')
+    expect(ids).toContain('emergency_fund')
+    expect(ids).toContain('fire_progress')
+    expect(score.onbekend?.ontbreekt).toBe('inkomen')
+    expect(score.onbekend?.pijlers.map(p => p.id)).toEqual(['savings_rate', 'debt_service_ratio'])
+  })
+
+  it('alleen uitgaven onbekend: spaarquote en FIRE-voortgang vallen weg; noodfonds (salaris-norm) en schuldenlast blijven', () => {
+    const score = computeHealthScoreFromInputs(
+      { ...sanne, incomeBasis: 'manual', netMonthlyIncome: 3_000, emergencyFundMonths: 4 },
+      true,
+    )
+    const ids = score.pillars.map(p => p.id)
+    expect(ids).not.toContain('savings_rate')
+    expect(ids).not.toContain('fire_progress')
+    expect(ids).toContain('emergency_fund')
+    expect(ids).toContain('debt_service_ratio')
+    expect(score.onbekend?.ontbreekt).toBe('uitgaven')
+  })
+
+  it('inkomen onbekend zónder schuldlast: schuldenlast blijft gewoon 100 (geen inkomen nodig)', () => {
+    const score = computeHealthScoreFromInputs(
+      { ...sanne, expensesBasis: 'transaction', debtMonthlyPayments: 0 },
+      true,
+    )
+    const dsti = score.pillars.find(p => p.id === 'debt_service_ratio')
+    expect(dsti?.score).toBe(100)
+    expect(score.onbekend?.pijlers.map(p => p.id)).toEqual(['savings_rate'])
+  })
+
+  it('AC4 — met bekende grondslagen is het gedrag byte-identiek aan een input zónder de velden', () => {
+    const met = computeHealthScoreFromInputs({ ...baseInput, incomeBasis: 'manual', expensesBasis: 'transaction' }, true)
+    const zonder = computeHealthScoreFromInputs(baseInput, true)
+    expect(met.total).toBe(zonder.total)
+    expect(met.pillars).toEqual(zonder.pillars)
+    expect(met.onbekend).toBeNull()
+    expect(zonder.onbekend).toBeNull()
+  })
+
+  it("'estimate' telt als bekend: de score rekent gewoon (label reist mee op de kaart, niet hier)", () => {
+    const score = computeHealthScoreFromInputs({ ...baseInput, incomeBasis: 'estimate', expensesBasis: 'estimate' }, true)
+    expect(score.onbekend).toBeNull()
+    expect(score.pillars.map(p => p.id)).toContain('savings_rate')
+  })
+})
+
 // ── FR-1 / AC-STRUCT: pillar-structuur (7 indicatoren, 4 groepen) ─────────
 
 describe('computeHealthScoreFromInputs — pillarstructuur v2', () => {
@@ -669,6 +779,8 @@ describe('Defect B — buildHealthScoreInput deelt canoniek pad', () => {
     avgMonthlyExpenses,
     netMonthlyIncome: 4_500,
     netMonthlySalary: 4_500,
+    incomeBasis: 'manual' as const,
+    expensesBasis: 'manual' as const,
     // Legacy leeftijdsblind pad — de peer-relatieve fire_progress-cases
     // staan in financial-health.test.ts.
     currentAge: null,

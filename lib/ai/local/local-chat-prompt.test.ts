@@ -356,6 +356,11 @@ describe('LOCAL_CHAT_DNA — fin-actie-fence-instructie', () => {
     expect(LOCAL_CHAT_DNA).toContain('max 120 woorden')
   })
 
+  it('instrueert jargon uit te leggen in dezelfde zin, of te vermijden (parity met base.ts, UR3-11)', () => {
+    expect(LOCAL_CHAT_DNA).toMatch(/vakterm/i)
+    expect(LOCAL_CHAT_DNA).toMatch(/dezelfde zin/i)
+  })
+
   it('blijft binnen het sub-budget van 2000 tokens (chars/4-heuristiek)', () => {
     // Zelfde heuristiek als knowledge-context#estimateTokens en de parity-scanner.
     expect(Math.ceil(LOCAL_CHAT_DNA.length / 4)).toBeLessThanOrEqual(2000)

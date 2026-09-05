@@ -467,7 +467,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
         text: 'Doelen van twee jaar of verder geven een seintje bij 25, 50 en 75 procent. Behaalde doelen worden gevierd en verhuizen naar het archief onderaan.',
       },
     ],
-    terms: ['spaarquote', 'netto_vermogen', 'noodreserve', 'passief_inkomen'],
+    terms: ['spaarquote', 'netto_vermogen', 'noodfonds', 'passief_inkomen'],
     related: [
       { href: '/toekomst', label: 'Je doelen op de tijdas' },
       { href: '/mijn/mijlpalen', label: 'Mijlpalen die je al passeerde' },
@@ -552,7 +552,13 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
   '/mijn/privacy': {
     insight:
       'Grip begint bij inzicht in wat er over je wordt opgeslagen — per data-categorie leggen we hier helder uit wat we bewaren, waar en waarom. Geen juridische verplichting, maar een merkpijler.',
-    grip: 'Vraag direct een export van je data op (JSON) of verwijder je account, rechtstreeks vanaf deze pagina.',
+    grip: 'Verberg je bedragen met de schakelaar bovenaan, of vraag direct een export van je data op (JSON), of verwijder je account, rechtstreeks vanaf deze pagina.',
+    werking: [
+      {
+        title: 'Bedragen verbergen',
+        text: 'Toont overal •••• in plaats van bedragen — handig op een trein of in een openbare ruimte. Geldt voor dit apparaat, niet voor je account; op een ander apparaat zet je hem apart aan. Snel wisselen kan ook met het zoekscherm (⌘K).',
+      },
+    ],
   },
   '/mijn/koppelingen': {
     insight:
@@ -640,6 +646,33 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
   '/core/belasting': {
     insight: 'Je Box 3-belastingdruk op basis van je bezittingen en schulden, volgens de actuele Belastingdienst-systematiek.',
     grip: 'Zie het verschil tussen je werkelijke en het fictieve rendement om te bepalen waar fiscale ruimte zit.',
+  },
+  '/core/cash/connect': {
+    insight:
+      'Een bankkoppeling haalt je transacties zelf op, zodat je cijfers actueel blijven zonder dat je elke maand een bestand hoeft te uploaden. Je logt in bij je eigen bank; je wachtwoord komt hier nooit langs.',
+    grip: 'Kies je bank, bevestig bij je bank zelf, en zie je rekeningen binnenkomen. Ontkoppelen kan altijd via Mijn · Koppelingen.',
+    werking: [
+      {
+        title: 'Alleen meelezen',
+        text: 'De koppeling geeft leesrechten op saldi en transacties. Betalen kan de app niet — die rechten vraagt hij niet aan.',
+      },
+      {
+        title: 'Toestemming verloopt',
+        text: 'Je bank geeft toestemming voor 90 dagen. Daarna vraagt de app je opnieuw; tot die tijd blijft alles wat al binnenkwam gewoon staan.',
+      },
+      {
+        title: 'Handmatig blijft mogelijk',
+        text: 'Wil je niet koppelen, dan werkt alles ook met een bestand uit je bank (CSV, MT940 of OFX) of met handmatige invoer.',
+      },
+    ],
+    terms: ['psd2'],
+    related: [
+      { href: '/mijn/koppelingen', label: 'Je koppelingen beheren' },
+      // Binnen de app het in-app transparantie-overzicht; de publieke /privacy
+      // heeft geen PAGE_INFO-sleutel (en is hier ook niet nodig — wie hier komt
+      // is voorbij de onboarding-redirect van WF-START-11).
+      { href: '/mijn/privacy', label: 'Wat we bewaren, en waarom' },
+    ],
   },
   '/core/checkin': {
     insight: 'Je maandelijkse check-in bouwt een betrouwbare tijdlijn op van je financiële voortgang.',

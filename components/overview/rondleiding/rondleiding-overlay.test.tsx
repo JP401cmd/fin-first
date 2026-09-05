@@ -38,12 +38,27 @@ const DATA: RondleidingData = {
   largestAssetTypeShare: 0.42,
   health: { total: 72, label: 'Sterk' },
   currentNetWorth: 146870,
+  woning: null,
   dailyExpenseRate: 92.4,
   isPensioen: false,
   vrijheid: null,
 }
 
 const STAPPEN = resolveRondleidingStappen('desktop')
+
+/**
+ * De index van een stap op ID, nooit een hardgecodeerd getal. Deze suite draait
+ * op de stappen die een SPOTLIGHT hebben; een nieuwe kaart vóóraan (de
+ * wisselkoers, UR3-08) verschuift die dan wel, maar breekt de toets niet meer.
+ */
+function indexVan(id: string): number {
+  const i = STAPPEN.findIndex((s) => s.id === id)
+  if (i < 0) throw new Error(`stap "${id}" bestaat niet meer`)
+  return i
+}
+
+const BEZITTINGEN = indexVan('hefboom-bezittingen')
+const SCHULDEN = indexVan('hefboom-schulden')
 
 /** Zet een element met het gevraagde `data-tour` in de DOM en geeft 'm terug. */
 function plaatsTarget(tour: string): HTMLElement {
@@ -100,7 +115,7 @@ afterEach(() => {
 describe('RondleidingOverlay — de laag zelf', () => {
   it('rendert op z-[70] als dialoog zonder modale afsluiting', () => {
     plaatsTarget('hefboom-bezittingen')
-    renderOverlay(1)
+    renderOverlay(BEZITTINGEN)
 
     const laag = screen.getByTestId('rondleiding-overlay')
     expect(laag.className).toContain('z-[70]')
@@ -114,25 +129,25 @@ describe('RondleidingOverlay — de laag zelf', () => {
 
   it('claimt GEEN overlay-signaal — de nav-pill blijft dus staan', () => {
     plaatsTarget('hefboom-bezittingen')
-    renderOverlay(1)
+    renderOverlay(BEZITTINGEN)
     expect(getOverlayCount()).toBe(0)
   })
 
   it('kondigt de huidige stap aan in een aria-live-regio', () => {
     plaatsTarget('hefboom-schulden')
-    renderOverlay(2)
+    renderOverlay(SCHULDEN)
 
     const live = screen
       .getByTestId('rondleiding-overlay')
       .querySelector('[aria-live="polite"]')
     expect(live).not.toBeNull()
-    expect(live!.textContent).toContain(`Stap 3 van ${STAPPEN.length}`)
+    expect(live!.textContent).toContain(`Stap ${SCHULDEN + 1} van ${STAPPEN.length}`)
     expect(live!.textContent).toContain('Je schulden')
   })
 
   it('toont de titel als h3 en de body eronder', () => {
     plaatsTarget('hefboom-bezittingen')
-    renderOverlay(1)
+    renderOverlay(BEZITTINGEN)
 
     const kop = screen.getByRole('heading', { level: 3, name: 'Je bezittingen' })
     expect(kop).toBeInTheDocument()
@@ -144,7 +159,7 @@ describe('RondleidingOverlay — toetsenbord', () => {
   it('Esc slaat de rondleiding over — één tik, geen tussenvraag', () => {
     plaatsTarget('hefboom-bezittingen')
     const onOverslaan = vi.fn()
-    renderOverlay(1, { onOverslaan })
+    renderOverlay(BEZITTINGEN, { onOverslaan })
 
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onOverslaan).toHaveBeenCalledTimes(1)
@@ -154,7 +169,7 @@ describe('RondleidingOverlay — toetsenbord', () => {
     plaatsTarget('hefboom-bezittingen')
     const onVolgende = vi.fn()
     const onVorige = vi.fn()
-    renderOverlay(1, { onVolgende, onVorige })
+    renderOverlay(BEZITTINGEN, { onVolgende, onVorige })
 
     fireEvent.keyDown(document, { key: 'ArrowRight' })
     fireEvent.keyDown(document, { key: 'ArrowLeft' })
@@ -171,7 +186,7 @@ describe('RondleidingOverlay — toetsenbord', () => {
     const onVolgende = vi.fn()
     const lock = render(<ScrollLockHouder />)
     try {
-      renderOverlay(1, { onOverslaan, onVolgende })
+      renderOverlay(BEZITTINGEN, { onOverslaan, onVolgende })
       fireEvent.keyDown(document, { key: 'Escape' })
       fireEvent.keyDown(document, { key: 'ArrowRight' })
       expect(onOverslaan).not.toHaveBeenCalled()
@@ -187,7 +202,7 @@ describe('RondleidingOverlay — toetsenbord', () => {
   it('laat toetsaanslagen in een invoerveld met rust', () => {
     plaatsTarget('hefboom-bezittingen')
     const onVolgende = vi.fn()
-    renderOverlay(1, { onVolgende })
+    renderOverlay(BEZITTINGEN, { onVolgende })
 
     const input = document.createElement('input')
     document.body.appendChild(input)
@@ -201,7 +216,7 @@ describe('RondleidingOverlay — ontbrekend doelwit', () => {
     vi.useFakeTimers()
     const onTargetOntbreekt = vi.fn()
     // GEEN plaatsTarget: het element bestaat niet.
-    renderOverlay(1, { onTargetOntbreekt })
+    renderOverlay(BEZITTINGEN, { onTargetOntbreekt })
 
     expect(onTargetOntbreekt).not.toHaveBeenCalled()
     await act(async () => {
@@ -214,7 +229,7 @@ describe('RondleidingOverlay — ontbrekend doelwit', () => {
     vi.useFakeTimers()
     plaatsTarget('hefboom-bezittingen')
     const onTargetOntbreekt = vi.fn()
-    renderOverlay(1, { onTargetOntbreekt })
+    renderOverlay(BEZITTINGEN, { onTargetOntbreekt })
 
     await act(async () => {
       vi.advanceTimersByTime(5000)
@@ -242,7 +257,7 @@ describe('RondleidingOverlay — reduced motion', () => {
     )
 
     plaatsTarget('hefboom-bezittingen')
-    renderOverlay(1)
+    renderOverlay(BEZITTINGEN)
 
     expect(scrollIntoView).toHaveBeenCalled()
     expect(scrollIntoView.mock.calls[0][0]).toMatchObject({ behavior: 'auto', block: 'center' })

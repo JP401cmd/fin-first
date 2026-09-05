@@ -24,6 +24,12 @@ import type { GoalSlug } from '@/lib/goals/types'
 import { GOAL_MODULE_PRESETS } from '@/lib/goals/catalog'
 import { deleteEmptyOnboardingBankAccounts } from '@/lib/onboarding-bank-cleanup'
 import { withRondleidingPending } from '@/lib/rondleiding/seed'
+import { resolveRetirementExpenseDefaults } from '@/lib/onboarding/retirement-expense-defaults'
+import {
+  HOUSING_CHOICE_FALLBACK,
+  housingChoiceToConfig,
+  type HousingChoice,
+} from '@/lib/housing-choice'
 
 /**
  * Best-effort mapping van een nieuwe goal-slug naar de oude `IntentId` zodat
@@ -228,58 +234,6 @@ async function insertOnboardingGoal(
 }
 
 /**
- * Bepaal retirement_expense_method + retirement_expense_custom_amount voor het
- * onboarding-profiel.
- *
- * Product-beslissing: standaard = 80% van huidige jaaruitgaven ("custom_amount").
- * Dit overschrijft de vroegere default ("current_income") zodat de /toekomst-
- * grafiek direct een realistische pensioenuitgave toont.
- *
- * Uitzondering: als de gebruiker in de onboarding-UI expliciet een methode heeft
- * gekozen (horizonData.retirement_expense_method aanwezig), respecteren we die.
- *
- * Guard: als de maanduitgaven onbekend zijn (niet ingevuld / uitgesteld), vallen
- * we terug op "current_income" met null custom_amount — geen 0 of garbage invullen.
- */
-function resolveRetirementExpenseDefaults(
-  explicitMethod: 'essential_budgets' | 'custom_amount' | 'current_income' | undefined,
-  explicitCustomAmount: number | undefined,
-  identityMethod: 'essential_budgets' | 'custom_amount' | 'current_income' | undefined,
-  estimatedMonthlyExpenses: number | undefined,
-): {
-  retirement_expense_method: 'essential_budgets' | 'custom_amount' | 'current_income'
-  retirement_expense_custom_amount: number | null
-} {
-  // Gebruiker koos expliciet een methode via de onboarding-UI → respecteer die keuze
-  if (explicitMethod != null) {
-    return {
-      retirement_expense_method: explicitMethod,
-      retirement_expense_custom_amount: explicitCustomAmount ?? null,
-    }
-  }
-  // Legacy: identity bevat al een keuze (oudere clients)
-  if (identityMethod != null) {
-    return {
-      retirement_expense_method: identityMethod,
-      retirement_expense_custom_amount: explicitCustomAmount ?? null,
-    }
-  }
-  // Default: 80% van huidige jaaruitgaven — maar alleen als expenses bekend zijn
-  if (estimatedMonthlyExpenses != null && estimatedMonthlyExpenses > 0) {
-    return {
-      retirement_expense_method: 'custom_amount',
-      // 80% van huidige jaaruitgaven (maand × 12 × 0.8)
-      retirement_expense_custom_amount: Math.round(estimatedMonthlyExpenses * 12 * 0.8),
-    }
-  }
-  // Expenses onbekend (overgeslagen stap) → generieke fallback zonder garbage-waarde
-  return {
-    retirement_expense_method: 'current_income',
-    retirement_expense_custom_amount: null,
-  }
-}
-
-/**
  * Build the RPC payload for the atomic save_onboarding_data function.
  * Structures all onboarding data into the format expected by the plpgsql function.
  *
@@ -305,6 +259,8 @@ function buildRpcPayload(
   horizonData: z.infer<typeof bodySchema>['horizonData'],
   newsDescription: z.infer<typeof bodySchema>['newsDescription'],
   intent: z.infer<typeof bodySchema>['intent'],
+  /** De woning-keuze van de gebruiker (ADR 0133), al opgelost naar een keuze. */
+  housingChoice: HousingChoice,
   pensionData?: z.infer<typeof bodySchema>['pensionData'],
 ) {
   // LET OP (ADR 0129): dit pad is dood (`void buildRpcPayload` hieronder) en de
@@ -345,12 +301,13 @@ function buildRpcPayload(
       onboarding_intent: intent ?? null,
       // ── Standaardinstellingen nieuwe gebruiker (Notion "new user standaard
       // instellingen") ────────────────────────────────────────────────────
-      // Eigen woning: "verkopen wanneer nodig, op basis van marktwaarde"
-      // (downsize + on_depletion + marktwaarde-basis). parseHousingStrategy vult
-      // de overige velden met DEFAULT_DOWNSIZE_CONFIG. Zonder eigen_huis-asset is
-      // dit een no-op; mét eigen woning wordt die pas gemonetiseerd wanneer het
-      // liquide vermogen krap wordt. Vervangt de eerdere exclude_from_fire-default.
-      housing_strategy_config: { mode: 'downsize', trigger: 'on_depletion', saleValuationBasis: 'market' },
+      // Eigen woning: sinds ADR 0133 de KEUZE van de gebruiker, niet langer een
+      // stille default. 'sell' → downsize + on_depletion + marktwaarde-basis
+      // ("verkopen wanneer nodig"), 'exclude' → exclude_from_fire. Zonder keuze
+      // geldt `HOUSING_CHOICE_FALLBACK` = 'sell', exact het gedrag van vóór ADR
+      // 0131, dus dit verschuift geen enkel bestaand getal. Zonder eigen_huis-
+      // asset is de config een no-op.
+      housing_strategy_config: housingChoiceToConfig(housingChoice),
       // Onttrekkingsprofiel: afnemend (enum-spiegel 'static', zoals de
       // onttrekkings-UI schrijft). Verdeling bij toename: naar beleggen
       // (pot_rules.surplus_group; resolvePotRules vult de orde-regels aan).
@@ -556,6 +513,24 @@ const bodySchema = z.object({
    */
   deferredFields: z.array(z.enum(['income', 'assets', 'spaardoel'])).optional(),
   /**
+   * Velden waarvan de APP het bedrag raadde via "Schat het voor me" (UR3-05).
+   * Vertaalt naar `income_source`/`expenses_source = 'estimate'` i.p.v.
+   * 'manual': een placeholder, geen keuze (ADR 0131). Verschil in gedrag:
+   * 'manual' wint over álles, 'estimate' wordt door budgetten en transacties
+   * vanzelf verdrongen — de gok verdampt zodra er echte data is.
+   */
+  estimatedFields: z.array(z.enum(['income', 'expenses'])).optional(),
+  /**
+   * De woning-keuze uit stap iii-a van de onboarding (ADR 0133): telt de eigen
+   * woning mee voor de vrijheid ('exclude') of verkoopt de gebruiker 'm ooit
+   * ('sell')? Optioneel — een client van vóór deze stap, of een flow zónder
+   * eigen woning, stuurt 'm niet mee; dan geldt `HOUSING_CHOICE_FALLBACK`.
+   *
+   * Enum-spiegel van `HousingChoice`/`isHousingChoice` uit `lib/housing-choice.ts`;
+   * `housingChoiceToConfig` is de enige vertaling naar `housing_strategy_config`.
+   */
+  housingChoice: z.enum(['sell', 'exclude']).optional(),
+  /**
    * Pre-extracted data from client-side review (avoids re-running AI extraction).
    *
    * DE AFGELEIDE VELDEN ZIJN OPTIONEEL, MAAR ZE TELLEN. Deze tak accepteerde
@@ -636,7 +611,16 @@ export async function POST(req: Request) {
     selectedGoalSlugs: rawSelectedGoalSlugs,
     onboardingGoal,
     deferredFields,
+    estimatedFields,
+    housingChoice: rawHousingChoice,
   } = parsed.data
+
+  // Woning-keuze (ADR 0133) — ÉÉN keer opgelost, twee write-plekken consumeren
+  // 'm. Geen keuze meegestuurd (oude client, of geen eigen woning) → de
+  // terugval uit `lib/housing-choice.ts`, die gelijk is aan de stille default
+  // van vóór ADR 0133. De vertaling naar `housing_strategy_config` gebeurt
+  // uitsluitend in `housingChoiceToConfig`; deze route schrijft geen literal.
+  const housingChoice: HousingChoice = rawHousingChoice ?? HOUSING_CHOICE_FALLBACK
 
   // Het plan (ADR 0129): eind-vorm + stop-anker ÉÉN keer oplossen — horizonData
   // wint, identity is de backwards-compat-bron, 'deplete'/90 de laatste terugval.
@@ -942,11 +926,21 @@ export async function POST(req: Request) {
     }
     // Add estimated monthly expenses if provided
     if (identity.estimated_monthly_expenses != null) profileData.estimated_monthly_expenses = identity.estimated_monthly_expenses
-    // Onboarding-schattingen = handmatige bron ("eigen bedrag") — zie het
-    // gelijknamige blok in het RPC-pad hierboven.
-    if (identity.net_monthly_income > 0) profileData.income_source = 'manual'
+    // Onboarding-bedragen = handmatige bron ("eigen bedrag"), TENZIJ de app het
+    // bedrag zelf raadde via "Schat het voor me" (UR3-05). Dan is het
+    // `'estimate'`: het gedraagt zich als 'auto' — budgetten en transacties
+    // verdringen de gok vanzelf — maar wint het profiel, dan heet de grondslag
+    // 'estimate' en dragen de oppervlakken hun voorbehoud (ADR 0131). Een échte
+    // 'manual' wint juist over alles; dát is het verschil tussen een keuze en
+    // een placeholder. Deze waarde is SYSTEM-ONLY: hij staat niet in
+    // `BASIS_SOURCES`, dus `sanitizeCashSettingsInput` weigert 'm van de client.
+    const incomeIsEstimate = estimatedFields?.includes('income') === true
+    const expensesIsEstimate = estimatedFields?.includes('expenses') === true
+    if (identity.net_monthly_income > 0) {
+      profileData.income_source = incomeIsEstimate ? 'estimate' : 'manual'
+    }
     if (identity.estimated_monthly_expenses != null && identity.estimated_monthly_expenses > 0) {
-      profileData.expenses_source = 'manual'
+      profileData.expenses_source = expensesIsEstimate ? 'estimate' : 'manual'
     }
     // Add FIRE parameters — horizonData takes priority, then identity (backwards compat)
     if (identity.expected_return != null) profileData.expected_return = identity.expected_return
@@ -965,16 +959,18 @@ export async function POST(req: Request) {
     //   1. Eindstrategie: vermogen opeten tot leeftijd 90 (fire_end_strategy
     //      'deplete' + fire_end_age 90 — zie de ?? fallbacks hieronder; een
     //      expliciete gebruikerskeuze in de horizon-stap wint).
-    //   2. Eigen woning: verkopen wanneer nodig, op basis van marktwaarde
-    //      (downsize + on_depletion + saleValuationBasis 'market'). Vervangt de
-    //      eerdere exclude_from_fire-default. parseHousingStrategy vult de rest.
+    //   2. Eigen woning: de KEUZE van de gebruiker (ADR 0133) — 'sell' →
+    //      downsize + on_depletion + saleValuationBasis 'market' ("verkopen
+    //      wanneer nodig"), 'exclude' → exclude_from_fire. Zonder keuze geldt
+    //      `HOUSING_CHOICE_FALLBACK` = 'sell': exact de default van vóór ADR
+    //      0131, dus geen enkel bestaand getal verschuift.
     //   3. Onttrekkingsprofiel: afnemend (withdrawal_profile_config.profiel;
     //      enum-spiegel 'static' zoals de onttrekkings-UI schrijft).
     //   4. Verdeling bij toename: naar beleggen (pot_rules.surplus_group;
     //      resolvePotRules vult de orde-regels met de defaults aan).
     // Expliciet zodat elke nieuwe gebruiker deze actieve voorkeuren heeft,
     // onafhankelijk van latere default/fallback-drift.
-    profileData.housing_strategy_config = { mode: 'downsize', trigger: 'on_depletion', saleValuationBasis: 'market' }
+    profileData.housing_strategy_config = housingChoiceToConfig(housingChoice)
     // Het plan (ADR 0129) uit het ene opgeloste blok — zie `planColumns` hierboven.
     profileData.fire_end_strategy = planColumns.fire_end_strategy
     profileData.fire_legacy_amount = horizonData?.fire_legacy_amount ?? identity.fire_legacy_amount ?? null

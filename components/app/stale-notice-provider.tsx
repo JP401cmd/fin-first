@@ -10,6 +10,7 @@ import {
   useState,
 } from 'react'
 import { LEVERAGE_STATUS_DOT, LEVERAGE_STATUS_LABEL } from '@/lib/leverage-status'
+import { tapTargetClass } from '@/components/editorial/tap-target'
 import {
   STALE_TX_NOTICE_MINIMIZE_KEY,
   resolveStaleNoticeDisplay,
@@ -182,7 +183,11 @@ export function StaleNoticeDot({ className = '' }: { className?: string }) {
         onClick={ctx.restore}
         aria-label={label}
         title={label}
-        className="flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border-ed)] bg-[var(--paper)] transition-all hover:border-[var(--module-active-500)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+        // 28×28 is bewust: het punt hoort visueel één familie te vormen met de
+        // pagina-`i` (zie de meldingen-conventie in CLAUDE.md). `extend` rekt
+        // alléén het raakgebied op tot 44×44 via ::after — de layout en de
+        // zichtbare maat blijven gelijk, maar de raakdrempel (M19) wordt gehaald.
+        className={`${tapTargetClass('extend')} flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border-ed)] bg-[var(--paper)] transition-all hover:border-[var(--module-active-500)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]`}
       >
         <span
           className={`h-2.5 w-2.5 rounded-full ${LEVERAGE_STATUS_DOT[STALE_STATUS]}`}

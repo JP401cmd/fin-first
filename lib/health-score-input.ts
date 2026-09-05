@@ -20,6 +20,7 @@
  */
 
 import type { HealthScoreInput } from '@/lib/financial-health'
+import type { ResolvedBasis } from '@/lib/budget-basis'
 import { hasPartner } from '@/lib/household-type'
 import { BOX3_PARAMS, CURRENT_TAX_YEAR, classifyAsset } from '@/lib/box3-data'
 import type { Asset } from '@/lib/asset-data'
@@ -395,6 +396,17 @@ export interface HealthScoreScalars {
    * géén nieuwe/afwijkende inkomensbron introduceren (ADR 0010 / FR-2).
    */
   netMonthlyIncome: number
+  /**
+   * Grondslag van inkomen resp. uitgaven voor het OORDEEL (ADR 0131). Neem de
+   * grondslag van het BREDE venster (de 6-/12-maands resolutie, of
+   * `judgementBasis(effectiveBasis, meting6m)` uit lib/effective-financials.ts)
+   * — een lege lopende maand mag een transactiegebruiker niet "onbekend" maken.
+   * `'unknown'` laat de inkomen-/uitgavenpijlers inactief vallen en zet
+   * `HealthScore.onbekend`. VERPLICHT (geen `?`), net als `currentAge`: een
+   * vergeten grondslag hoort een compile-fout te zijn, geen stille nul-score.
+   */
+  incomeBasis: ResolvedBasis
+  expensesBasis: ResolvedBasis
 }
 
 /**
@@ -463,6 +475,8 @@ export function buildHealthScoreInput(
     fireEndStrategy: scalars.fireEndStrategy,
     fireStopAnchor: scalars.fireStopAnchor,
     netMonthlyIncome: scalars.netMonthlyIncome,
+    incomeBasis: scalars.incomeBasis,
+    expensesBasis: scalars.expensesBasis,
     debtMonthlyPayments: rows.debtMonthlyPayments,
     emergencyFundMonths: computeEmergencyFundMonths(
       rows.assets,

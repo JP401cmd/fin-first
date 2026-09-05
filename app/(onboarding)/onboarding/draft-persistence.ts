@@ -57,9 +57,18 @@ import {
   type StopAnchorKind,
 } from '@/lib/fire-strategy'
 import type { HouseholdType } from '@/lib/household-type'
+import { isHousingChoice, type HousingChoice } from '@/lib/housing-choice'
 
 /** Velden die de gebruiker expliciet oversloeg via "Later invullen" (feature #830). */
 export type DeferredFieldKey = 'income' | 'assets' | 'spaardoel'
+
+/**
+ * Velden waarvan de APP het bedrag raadde via "Schat het voor me" (UR3-05).
+ * Spiegelbeeld van `DeferredFieldKey`: daar staat het veld leeg, hier staat er
+ * een bedrag met een voorbehoud. Wordt bij de eind-save vertaald naar
+ * `income_source`/`expenses_source = 'estimate'` (ADR 0131).
+ */
+export type EstimatedFieldKey = 'income' | 'expenses'
 
 /** Huidige conceptversie. Verhoog bij een breaking shape-wijziging. */
 export const ONBOARDING_DRAFT_VERSION = 2
@@ -98,6 +107,23 @@ export interface OnboardingDraft {
   selectedGoals: GoalSlug[]
   activeModules: ModuleId[]
   deferredFields: DeferredFieldKey[]
+  /**
+   * Velden met een app-schatting (UR3-05). Optioneel op het TYPE zodat een
+   * concept van vóór deze stap geldig blijft; `sanitizeStoredDraft` normaliseert
+   * naar `[]` — een hersteld bedrag zonder deze sleutel leest dus als een eigen
+   * bedrag.
+   */
+  estimatedFields?: EstimatedFieldKey[]
+  /**
+   * De woning-keuze uit stap iii-a (ADR 0133). Optioneel op het TYPE zodat een
+   * concept van vóór die stap geldig blijft; `sanitizeStoredDraft` normaliseert
+   * een ontbrekende of onbekende waarde naar `null` — "nog niet beantwoord",
+   * NOOIT naar 'exclude'. Dat zou de FIRE-grondslag van een hersteld concept
+   * stil verschuiven; de terugval hoort de save-route toe
+   * (`HOUSING_CHOICE_FALLBACK`), die 'm gelijk houdt aan het gedrag van vóór
+   * ADR 0133.
+   */
+  housingChoice?: HousingChoice | null
   budgetAmounts: Record<string, number>
   quickAssets: AssetQuickInput[]
   quickDebts: DebtQuickInput[]
@@ -214,6 +240,14 @@ export const OnboardingDraftSchema = z
     selectedGoals: z.array(draftText).max(20),
     activeModules: z.array(draftText).max(20),
     deferredFields: z.array(draftText).max(10),
+    // Optioneel: een client van vóór UR3-05 stuurt deze sleutel niet, en
+    // `strict()` hierboven zou het concept dan afwijzen als hij verplicht was.
+    estimatedFields: z.array(draftText).max(10).optional(),
+    // Woning-keuze (ADR 0133). Tolerant zoals de rest van dit transport-schema:
+    // de narrowing naar de echte union gebeurt in `sanitizeStoredDraft`.
+    // Optioneel + nullable: een client van vóór deze stap stuurt de sleutel niet,
+    // en `strict()` hierboven zou het concept dan afwijzen.
+    housingChoice: draftText.nullable().optional(),
     // `z.record` kent geen `.max()`, dus de sleuteltelling gaat via een refine.
     // Zonder die cap was dit de ENIGE onbegrensde collectie in het schema —
     // alle zusters hebben er een — en daarmee het pad waarlangs een ingelogde
@@ -282,6 +316,15 @@ export interface DraftStateSource {
   selectedGoals: GoalSlug[]
   activeModules: ModuleId[]
   deferredFields: DeferredFieldKey[]
+  /**
+   * Velden met een app-schatting (UR3-05). Optioneel op het TYPE zodat een
+   * concept van vóór deze stap geldig blijft; `sanitizeStoredDraft` normaliseert
+   * naar `[]` — een hersteld bedrag zonder deze sleutel leest dus als een eigen
+   * bedrag.
+   */
+  estimatedFields?: EstimatedFieldKey[]
+  /** Woning-keuze uit stap iii-a (ADR 0133); `null`/ontbrekend = niet gevraagd. */
+  housingChoice?: HousingChoice | null
   budgetAmounts: Record<string, number>
   quickAssets: AssetQuickInput[]
   quickDebts: DebtQuickInput[]
@@ -306,6 +349,8 @@ export function serializeDraft(state: DraftStateSource): OnboardingDraft {
     selectedGoals: [...state.selectedGoals],
     activeModules: [...state.activeModules],
     deferredFields: [...state.deferredFields],
+    estimatedFields: [...(state.estimatedFields ?? [])],
+    housingChoice: state.housingChoice ?? null,
     budgetAmounts: { ...state.budgetAmounts },
     quickAssets: state.quickAssets.map((a) => ({ ...a })),
     quickDebts: state.quickDebts.map((d) => ({ ...d })),
@@ -486,6 +531,20 @@ export function sanitizeStoredDraft(raw: unknown): OnboardingDraft | null {
       )
     : []
 
+  const estimatedFields: EstimatedFieldKey[] = Array.isArray(p.estimatedFields)
+    ? p.estimatedFields.filter(
+        (k: unknown): k is EstimatedFieldKey => k === 'income' || k === 'expenses',
+      )
+    : []
+
+  // Woning-keuze (ADR 0133). Alleen een letterlijke, geldige keuze overleeft;
+  // een ontbrekende of onbekende waarde wordt `null` = "nog niet beantwoord".
+  // Nooit 'exclude' afleiden uit afwezigheid: dat zou de FIRE-grondslag van een
+  // hersteld concept stil verschuiven (de save-route kent de terugval).
+  const housingChoice: HousingChoice | null = isHousingChoice(p.housingChoice)
+    ? p.housingChoice
+    : null
+
   const rawSp = obj(p.spaardoel)
   const spaardoel: SpaardoelDraft = {
     presetKey:
@@ -556,6 +615,8 @@ export function sanitizeStoredDraft(raw: unknown): OnboardingDraft | null {
     selectedGoals,
     activeModules,
     deferredFields,
+    estimatedFields,
+    housingChoice,
     budgetAmounts: sanitizeBudgetAmounts(p.budgetAmounts),
     quickAssets: sanitizeAssets(p.quickAssets),
     quickDebts: sanitizeDebts(p.quickDebts),

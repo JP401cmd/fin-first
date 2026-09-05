@@ -90,11 +90,18 @@ type TopBarProps = {
    */
   kindOverride?: TopBarKind
   /**
-   * Email van de ingelogde user — gebruikt voor avatar-initial en account-
-   * dropdown-header. Komt uit ResponsiveShell → MobileStackShell. Optioneel
-   * zodat sandbox-renders zonder user-context geen utility-cluster tonen.
+   * Email van de ingelogde user — gebruikt voor de account-dropdown-header.
+   * Komt uit ResponsiveShell → MobileStackShell. Optioneel zodat sandbox-
+   * renders zonder user-context geen utility-cluster tonen.
    */
   email?: string
+  /**
+   * Initialen voor het avatar-rondje, afgeleid in ResponsiveShell via
+   * `lib/user-initials.ts`: de PROFIELNAAM wint van het e-mailadres. Zonder
+   * deze prop valt het avatar terug op de eerste letter van het e-mailadres
+   * (UR3-17 #27b — dat was precies het defect).
+   */
+  initials?: string
   /**
    * Role van de user (default 'user'). Bepaalt of de superadmin Beheer-link
    * in het account-dropdown verschijnt.
@@ -120,7 +127,7 @@ type TopBarProps = {
  * - Weergave-badge (`PerspectiveSwitcher`, compact): eerste item in de cluster,
  *   self-gating — alleen zichtbaar voor leden van een huishouden.
  */
-function TopBarUtilities({ email, role }: { email: string; role?: string }) {
+function TopBarUtilities({ email, initials, role }: { email: string; initials?: string; role?: string }) {
   const { unreadCount, openModal } = useNotifications()
   const leverScores = useLeverScores()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -194,7 +201,7 @@ function TopBarUtilities({ email, role }: { email: string; role?: string }) {
           className={`flex h-9 w-9 items-center justify-center transition-colors hover:bg-[var(--subtle)] ${TAP_TARGET_EXTEND_BLOCK}`}
         >
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--ink)] text-[10px] font-medium text-[var(--paper)]">
-            {email[0]?.toUpperCase() ?? '?'}
+            {initials || email[0]?.toUpperCase() || '?'}
           </span>
         </button>
         {menuOpen && (
@@ -311,6 +318,7 @@ export function TopBar({
   showBackOverride,
   kindOverride,
   email,
+  initials,
   role,
 }: TopBarProps) {
   const { activeTab, currentStack, pop } = useNavStack()
@@ -374,7 +382,7 @@ export function TopBar({
   //    wanneer email beschikbaar is.
   //  - 'simple' kind: geen actions (compact 48px voor sub-pages).
   const renderedActions =
-    actions ?? (kind === 'rich' && email ? <TopBarUtilities email={email} role={role} /> : null)
+    actions ?? (kind === 'rich' && email ? <TopBarUtilities email={email} initials={initials} role={role} /> : null)
 
   return (
     <header

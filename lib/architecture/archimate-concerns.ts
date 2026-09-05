@@ -25,6 +25,15 @@ export interface ArchiConcern {
 
 export const ARCHI_CONCERNS: ArchiConcern[] = [
   {
+    id: 'snapshot-resilience-score-bij-onbekend-inkomen',
+    title: 'De snapshot-routes schrijven bij een onthouden oordeel nog een partiële score weg',
+    detail:
+      'Sinds ADR 0131 onthoudt de gezondheidsscore haar oordeel zodra inkomen/uitgaven een \'unknown\'-grondslag hebben: de inkomen-/uitgavenpijlers vallen inactief en `HealthScore.onbekend` is gezet, en élk gebruikerszichtbaar oppervlak toont dan geen cijfer (presenter `healthScoreVerdict`). `total` blijft echter de gewogen som over de RESTERENDE pijlers, en de drie snapshot-routes (app/api/snapshots, /auto, /cron) schrijven dat getal ongewijzigd weg als `net_worth_snapshots.resilience_score`. Gevolg: de trendlijn op /toekomst kan voor een maand zonder oordeel tóch een score tonen (bv. alleen schuldratio + spreiding), en zodra de gebruiker zijn inkomen invult, een sprong die geen gedragsverandering is. Bewust open gelaten: of zo\'n maand `null` hoort te dragen (gat in de lijn) of de partiële score (met markering) is een productkeuze. Verwijder dit punt zodra de snapshot-routes `onbekend` respecteren én de trend-lezers (dashboard-loader `previousMonth`, /toekomst-historie) daarop zijn aangepast.',
+    severity: 'debt',
+    elementIds: ['as-planning', 'as-vermogen', 'as-budget'],
+    reviewedAt: '2026-09-05',
+  },
+  {
     id: 'besteding-per-budget-meerdere-implementaties',
     title: '"Besteed per budget" heeft nog niet overal één implementatie',
     detail:

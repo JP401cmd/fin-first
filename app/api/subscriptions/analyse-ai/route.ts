@@ -8,9 +8,11 @@ import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import { detectRecurringTransactions, CATEGORY_LABELS } from '@/lib/recurring-detection'
 import { VASTE_KOSTEN_ANALYSE_PROMPT } from '@/lib/ai/dna/wil'
 import { sanitizeForAI, type SanitizeOptions } from '@/lib/ai/sanitize'
-import { unauthorized, badRequest } from '@/lib/api/respond'
+import { unauthorized, badRequest, errorResponse } from '@/lib/api/respond'
 import { localMonthStartMonthsAgo } from '@/lib/month-range'
 import type { VasteKostenCandidate } from '@/lib/ai/local/local-vaste-kosten-resolver'
+import { isRefusedProviderError } from '@/lib/ai/provider-error'
+import { AI_ERROR_CODE, describeAiError } from '@/lib/ai/error-copy'
 
 /** Maximum number of candidates to send to the AI model to avoid token waste. */
 const MAX_AI_CANDIDATES = 50
@@ -311,6 +313,14 @@ export async function POST(req: Request) {
     })
   } catch (err) {
     console.error('[/api/subscriptions/analyse-ai]', err)
+    // Structureel (provider weigert) vs. tijdelijk — gedrag bij een tijdelijke
+    // hapering blijft ongewijzigd (UR3-09). classifyProviderError herkent
+    // alleen echte providerfouten (APICallError/LoadAPIKeyError); elke andere
+    // oorzaak (DB, parsing) blijft op de bestaande generieke tekst.
+    if (isRefusedProviderError(err)) {
+      const copy = describeAiError(AI_ERROR_CODE.providerRefused)
+      return errorResponse(copy.text, 422, copy.code)
+    }
     return NextResponse.json({ error: 'Interne fout' }, { status: 500 })
   }
 }

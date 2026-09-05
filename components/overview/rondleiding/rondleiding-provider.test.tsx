@@ -52,6 +52,7 @@ const DATA: Omit<RondleidingData, 'vrijheid'> = {
   largestAssetTypeShare: 0.42,
   health: { total: 72, label: 'Sterk' },
   currentNetWorth: 146870,
+  woning: null,
   dailyExpenseRate: 92.4,
   isPensioen: false,
 }

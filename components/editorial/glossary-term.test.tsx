@@ -114,6 +114,22 @@ describe('GlossaryTerm — wat NIET verandert', () => {
     expect(container.textContent).toBe('xyz')
   })
 
+  it('toont de leesbare naam, niet de rauwe sleutel, wanneer er geen kind is (BEGRIPPEN-chip)', () => {
+    // Bijvangst-defect: een chip zonder children (`<GlossaryTerm term={term} />`,
+    // zoals page-info-button.tsx's BEGRIPPEN-sectie) toonde de rauwe
+    // snake_case-sleutel ('netto_vermogen', 'Monte_Carlo') i.p.v. de naam.
+    const { container } = renderTerm('full', <GlossaryTerm term="netto_vermogen" />)
+    expect(triggerText(container)).toBe('Netto vermogen')
+
+    const { container: container2 } = renderTerm('full', <GlossaryTerm term="Monte_Carlo" />)
+    expect(triggerText(container2)).toBe('Monte Carlo')
+  })
+
+  it('valt bij een onbekende term zonder kind terug op de sleutel met spaties', () => {
+    const { container } = renderTerm('simple', <GlossaryTerm term="bestaat_ook_niet" />)
+    expect(container.textContent).toBe('bestaat ook niet')
+  })
+
   it('respecteert een expliciete explanation-override', () => {
     renderTerm(
       'simple',

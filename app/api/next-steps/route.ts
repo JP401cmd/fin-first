@@ -6,6 +6,7 @@ import { resolveFireParams } from '@/lib/fire-params'
 import { buildBudgetTypeMap } from '@/lib/budget-utils'
 import { buildBudgetSpendingMap, spentForBudget } from '@/lib/budget-spending'
 import { BUDGET_OR_SPLIT_FILTER, BUDGET_SPENDING_TX_COLUMNS } from '@/lib/budget-spending-fetch'
+import { BANK_CONNECT_SAFETY_SHORT } from '@/lib/bank-connect-copy'
 
 /**
  * GET /api/next-steps — Get user's next recommended steps.
@@ -259,7 +260,8 @@ export async function GET() {
       {
         key: 'connect_bank_psd2',
         title: 'Koppel je bank voor automatisch inzicht',
-        description: 'Verbind je bankrekening via PSD2 en je transacties worden automatisch geïmporteerd en gecategoriseerd.',
+        // Veiligheidszin uit één bron mee in de uitnodiging (UR3-15).
+        description: `Verbind je bankrekening via PSD2 en je transacties worden automatisch geïmporteerd en gecategoriseerd. ${BANK_CONNECT_SAFETY_SHORT}`,
         category: 'onboarding',
         priority: 0,
         href: '/core/cash/connect',

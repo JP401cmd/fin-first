@@ -32,12 +32,31 @@
  *     vrijheidsleeftijd-zin uit `buildVrijheidsleeftijdZin` (variant 'kaart')
  *     en de spreidingsdrempel uit `ASSET_CONCENTRATION_HIGH_PCT`. Deze module
  *     LEEST en FORMATTEERT; ze rekent niets uit.
+ *  6. **Elk vrijheidsgetal draagt zijn GRONDSLAG** (UR3-04, eigenaarsbesluiten
+ *     K3 en K4). Een rondleiding die binnen twee minuten drie verschillende
+ *     "vrijheidsgetallen" toont, leert de gebruiker dat het cijfer niets
+ *     betekent. Twee harde regels:
+ *       • **K3** — een BRUTO bedrag (bezittingen, dus vóór schulden) krijgt
+ *         GEEN tijdvertaling. Ook mét markering blijft "€ 368.270 = 14 jaar
+ *         vrijheid" misleidend: een deel van die euro's is van de bank.
+ *         `formatWithFreedom` staat daarom niet op `totals.bezittingen`.
+ *       • **K4** — het netto vermogen op de welkom- en de grafiekkaart draagt
+ *         zijn woon-grondslag als markering achter het bedrag
+ *         (`HOUSING_BASIS_LABEL` uit lib/housing-choice.ts — één huis voor die
+ *         woorden, ook de onboarding leest daaruit). Sluit de gebruiker zijn
+ *         woning uit van FIRE, dan RÉKENT de kaart bovendien op
+ *         `netWorthExclHome`, dezelfde grondslag die /toekomst dan aanhoudt
+ *         (ADR 0034 + ADR 0114). De keuze én beide bedragen komen kant-en-klaar
+ *         uit de loader via `data.woning`; deze module leidt niets af.
  */
 
 import {
   formatCurrency,
+  formatFreedomRateFootnote,
   formatWithFreedom,
+  type FreedomRateSource,
 } from '@/lib/format'
+import { HOUSING_BASIS_LABEL } from '@/lib/housing-choice'
 import { ASSET_CONCENTRATION_HIGH_PCT } from '@/lib/financial-health'
 import { hefboomVerdict } from '@/lib/hefboom-status-copy'
 import { buildVrijheidsleeftijdZin } from '@/lib/horizon/vrijheidsleeftijd-zin'
@@ -91,6 +110,7 @@ export type RondleidingHoofdstuk = 'hefbomen' | 'stand' | 'gereedschap'
 
 export type RondleidingStapId =
   | 'welkom'
+  | 'wisselkoers'
   | 'hefboom-bezittingen'
   | 'hefboom-schulden'
   | 'hefboom-cashflow'
@@ -108,7 +128,7 @@ export const RONDLEIDING_HOOFDSTUK_LABEL: Record<RondleidingHoofdstuk, string> =
   gereedschap: 'Je gereedschap',
 }
 
-/** Kicker voor een stap zonder hoofdstuk (het welkom). */
+/** Kicker voor een stap zonder hoofdstuk (het welkom en de wisselkoers). */
 export const RONDLEIDING_KICKER_DEFAULT = 'Rondleiding'
 
 /**
@@ -136,12 +156,47 @@ export interface RondleidingData {
   assetTypeCount: number | null
   /** Grootste asset_type als FRACTIE (0–1) van het vermogen excl. eigen woning. */
   largestAssetTypeShare: number | null
-  /** Gezondheidsscore + label ("Sterk"), uit `horizonData.healthScore`. */
-  health: { total: number; label: string } | null
-  /** Netto vermogen nu (bezittingen − schulden), perspectief-correct. */
+  /**
+   * Gezondheidsscore + label ("Sterk"), uit `horizonData.healthScore`.
+   * `onbekendHint` (ADR 0131) = de zin uit `healthScore.onbekend.hint` zodra
+   * inkomen/uitgaven ontbreken: dan noemt de stap géén cijfer en géén oordeel.
+   */
+  health: { total: number; label: string; onbekendHint?: string | null } | null
+  /** Netto vermogen nu (bezittingen − schulden), perspectief-correct. INCL. woning. */
   currentNetWorth: number
+  /**
+   * De eigen woning als GRONDSLAG voor het netto vermogen (K4). `null` = geen
+   * eigen woning, en dan valt er niets te markeren: "mét je huis" achter een
+   * bedrag van iemand die huurt, is onzin.
+   *
+   * De velden komen kant-en-klaar uit `loadHorizonData`
+   * (`freedomBasis.homeExcludedFromFire` en `netWorthExclHome`) — deze module
+   * roept `isHomeExcludedFromFire` of `netWorthExcludingHome` NIET zelf aan en
+   * trekt nooit zelf een overwaarde van een bedrag af.
+   */
+  woning: {
+    /**
+     * Woonstrategie `exclude_from_fire` ("hij telt niet mee"). Dan rekenen de
+     * welkom- en grafiekkaart op `netWorthExclHome`, precies zoals /toekomst.
+     */
+    uitgesloten: boolean
+    /**
+     * Netto vermogen ZONDER de overwaarde — canoniek uit
+     * `netWorthExcludingHome`. Een aparte WEERGAVE-grondslag: níét de
+     * FIRE-pot (`fireEligibleNetWorth`) en níét te mengen met
+     * `currentNetWorth` op één as of marker.
+     */
+    netWorthExclHome: number
+  } | null
   /** Dagtarief uitgaven — de noemer van élke €→vrijheidstijd-vertaling. */
   dailyExpenseRate: number
+  /**
+   * Herkomst van dat dagtarief (`HorizonRawData.dailyExpenseRateDetail.source`).
+   * De wisselkoers-stap noemt een profiel- of cohortschatting als schatting;
+   * ontbreekt de bron, dan is de terugval "gemeten" bij een tarief > 0 —
+   * spiegel van hub-kansen en het cashflow-instellingenblok.
+   */
+  dailyExpenseRateSource?: FreedomRateSource
   /** Toont de pagina een pensioen-/AOW-leeftijd i.p.v. een FIRE-leeftijd? */
   isPensioen: boolean
   /**
@@ -250,6 +305,39 @@ function heeftBedrag(bedrag: number | null | undefined): bedrag is number {
   return bedrag != null && Number.isFinite(bedrag) && bedrag > 0
 }
 
+/**
+ * De grondslag van het netto vermogen voor de welkom- en de grafiekkaart (K4):
+ * wélk bedrag de kaart noemt, en met welke markering erachter.
+ *
+ * Kiest NIET zelf: `data.woning.uitgesloten` is de al door de loader gemaakte
+ * keuze (`isHomeExcludedFromFire`), en beide bedragen komen daar vandaan. Zonder
+ * eigen woning is er geen grondslag om te noemen — dan het kale netto vermogen.
+ */
+function nettoVermogenGrondslag(data: RondleidingData): {
+  bedrag: number
+  markering: string | null
+} {
+  if (!data.woning) return { bedrag: data.currentNetWorth, markering: null }
+  return data.woning.uitgesloten
+    ? { bedrag: data.woning.netWorthExclHome, markering: HOUSING_BASIS_LABEL.exclHome }
+    : { bedrag: data.currentNetWorth, markering: HOUSING_BASIS_LABEL.inclHome }
+}
+
+/** Het bedrag mét zijn grondslag-markering, of kaal wanneer er geen is. */
+function metGrondslag(bedrag: string, markering: string | null): string {
+  return markering ? `${bedrag} ${markering}` : bedrag
+}
+
+/**
+ * De zin voor het geval de grondslag GEEN positief bedrag oplevert terwijl er
+ * wél gegevens zijn — het huis uitgesloten, en wat overblijft staat op of onder
+ * nul (bv. een studieschuld die het spaargeld overtreft). "Je overzicht is nog
+ * leeg" zou dan een leugen zijn, en een negatief bedrag naar vrijheidstijd
+ * vertalen ("2 jaar achter") is precies het soort getal dat deze kaart moet
+ * vermijden. Constatering, geen oordeel.
+ */
+const GEEN_POSITIEVE_GRONDSLAG = 'Zonder je huis staat je vermogen nog niet in de plus.'
+
 // ── De stappen ──────────────────────────────────────────────────────────────
 
 const STAPPEN: readonly RondleidingStap[] = [
@@ -264,16 +352,30 @@ const STAPPEN: readonly RondleidingStap[] = [
     target: null,
     body: (data, ctx) => {
       const aanhef = data.userName ? `Hoi ${data.userName}, ik ben Fin.` : 'Hoi, ik ben Fin.'
-      const bedrag = euro(data.currentNetWorth, ctx)
-      const tijd = vrijheidstijd(data.currentNetWorth, data, ctx)
+      // K4 — grondslag eerst: welk vermogen noemt deze kaart, en hoe heet dat.
+      const { bedrag: netto, markering } = nettoVermogenGrondslag(data)
+      const bedrag = euro(netto, ctx)
+      const tijd = vrijheidstijd(netto, data, ctx)
 
-      if (bedrag && heeftBedrag(data.currentNetWorth)) {
+      if (bedrag && heeftBedrag(netto)) {
+        const basis = metGrondslag(bedrag, markering)
         return {
           tekst: zinnen(
             aanhef,
             tijd
-              ? `Je vermogen staat nu op ${bedrag} — ${tijd} vrijheid.`
-              : `Je vermogen staat nu op ${bedrag}.`,
+              ? `Je vermogen staat nu op ${basis} — ${tijd} vrijheid.`
+              : `Je vermogen staat nu op ${basis}.`,
+            'In twee minuten laat ik je zien waar dat vandaan komt.',
+          ),
+        }
+      }
+      // Wél een woning uitgesloten, maar wat overblijft is niet positief: dat is
+      // een stand, geen lege administratie.
+      if (!ctx.masked && data.woning?.uitgesloten) {
+        return {
+          tekst: zinnen(
+            aanhef,
+            GEEN_POSITIEVE_GRONDSLAG,
             'In twee minuten laat ik je zien waar dat vandaan komt.',
           ),
         }
@@ -296,7 +398,45 @@ const STAPPEN: readonly RondleidingStap[] = [
     },
   },
 
-  // ── 2. Bezittingen ───────────────────────────────────────────────────────
+  // ── 2. De wisselkoers — waarom een bedrag een tijd wordt ─────────────────
+  //
+  // De audit van 5 sep 2026 vond het gat: veertien oppervlakken tonen een
+  // vrijheidstijd, geen enkel legt uit hoe die ontstaat. Geen van de drie
+  // persona's kwam er ooit achter dat het één deling is. De welkomkaart heeft
+  // daar het woordbudget niet voor — vandaar een eigen kaart, direct na het
+  // welkom, vóór het eerste tijdgetal op de hefboomtegels.
+  //
+  // Hij voegt bewust GÉÉN nieuw tijdgetal toe (eigenaarsbesluit 2, 12 jul
+  // 2026): hij noemt alleen de koers. De formulering van die koers komt uit
+  // `formatFreedomRateFootnote`, hetzelfde huis als de voetnoot op de
+  // schermen — twee teksten over één koers zouden na de eerste tekstwijziging
+  // uiteenlopen.
+  {
+    id: 'wisselkoers',
+    titel: 'Je wisselkoers',
+    target: null,
+    body: (data, ctx) => {
+      const mechaniek =
+        'Elk tijdgetal is één deling: het bedrag gedeeld door wat je per dag uitgeeft.'
+      const koers = formatFreedomRateFootnote(
+        data.dailyExpenseRate,
+        data.dailyExpenseRateSource ?? (data.dailyExpenseRate > 0 ? 'transactions' : 'none'),
+        ctx.masked,
+      )
+      if (koers) return { tekst: zinnen(mechaniek, koers) }
+      // Geen koers om te noemen — en dan liegt zwijgen niet. In privacymodus
+      // omdat het bedrag verborgen hoort te blijven (ADR 0091 laag 4), zonder
+      // tarief omdat de grondslag nog onbekend is (ADR 0131). Twee verschillende
+      // redenen, dus twee verschillende zinnen.
+      return {
+        tekst: ctx.masked
+          ? zinnen(mechaniek, 'Je bedragen staan nu verborgen, dus ik noem dat dagtarief hier niet.')
+          : zinnen(mechaniek, 'Zodra ik je uitgaven ken, zet ik dat dagtarief erbij.'),
+      }
+    },
+  },
+
+  // ── 3. Bezittingen ───────────────────────────────────────────────────────
   {
     id: 'hefboom-bezittingen',
     hoofdstuk: 'hefbomen',
@@ -309,8 +449,13 @@ const STAPPEN: readonly RondleidingStap[] = [
           tekst: 'Hier staan nog geen bezittingen. Spaargeld, beleggingen, je huis of je pensioenpot komen op deze tegel te staan.',
         }
       }
+      // K3 — BEWUST GEEN `vrijheidstijd(totaal, …)` hier. `totals.bezittingen`
+      // is een BRUTO bedrag: de hypotheek staat op de schuldentegel ernaast, dus
+      // een deel van deze euro's is van de bank. Dat toch delen door het
+      // dagtarief gaf de hoogste van drie tegenstrijdige vrijheidsgetallen op
+      // hetzelfde scherm (UR3-04) — en een label eronder repareert dat niet, het
+      // legt alleen uit waaróm het getal misleidt. Alleen het bedrag dus.
       const bedrag = euro(totaal, ctx)
-      const tijd = vrijheidstijd(totaal, data, ctx)
       // Spreiding: één zin, met dezelfde drempel als de gezondheidspijler —
       // geen tweede definitie van "geconcentreerd" naast die van de score.
       //
@@ -332,11 +477,7 @@ const STAPPEN: readonly RondleidingStap[] = [
 
       return {
         tekst: zinnen(
-          bedrag
-            ? tijd
-              ? `Je bezittingen staan op ${bedrag} — ${tijd} vrijheid.`
-              : `Je bezittingen staan op ${bedrag}.`
-            : 'Je bezittingen staan op deze tegel.',
+          bedrag ? `Je bezittingen staan op ${bedrag}.` : 'Je bezittingen staan op deze tegel.',
           soorten ? `Ze zitten ${soorten}: ${oordeel('bezittingen', data) ?? 'nog zonder oordeel'}.` : null,
           'Hier werk je waardes bij of laat je ze meelopen met de koersen.',
         ),
@@ -465,6 +606,16 @@ const STAPPEN: readonly RondleidingStap[] = [
           tekst: 'Zodra er genoeg gegevens zijn, staat hier één getal van 0 tot 100: rondkomen, buffer, schuld en vrijheid in één oogopslag.',
         }
       }
+      // Onbekend is geen nul (ADR 0131): zonder inkomen/uitgaven spreekt de
+      // rondleiding geen oordeel uit — dezelfde zin als de kaart zelf.
+      if (data.health.onbekendHint) {
+        return {
+          tekst: zinnen(
+            data.health.onbekendHint,
+            'Zodra dat bekend is, staat hier één getal van 0 tot 100: rondkomen, buffer, schuld en vrijheid in één oogopslag.',
+          ),
+        }
+      }
       return {
         tekst: zinnen(
           `Je financiële gezondheid staat op ${Math.round(data.health.total)} van de 100: ${data.health.label.toLowerCase()}.`,
@@ -488,16 +639,22 @@ const STAPPEN: readonly RondleidingStap[] = [
     titel: 'Je vermogen door de tijd',
     target: { desktop: '[data-tour="grafiek"]', mobiel: '[data-tour="grafiek"]' },
     body: (data, ctx) => {
-      const bedrag = euro(data.currentNetWorth, ctx)
-      const tijd = vrijheidstijd(data.currentNetWorth, data, ctx)
-      const heeftVermogen = heeftBedrag(data.currentNetWorth)
+      // K4 — dezelfde grondslag als de welkomkaart, per constructie. Zonder deze
+      // gedeelde helper toonden beide kaarten hetzelfde label boven een ander
+      // getal; dát was het defect.
+      const { bedrag: netto, markering } = nettoVermogenGrondslag(data)
+      const bedrag = euro(netto, ctx)
+      const tijd = vrijheidstijd(netto, data, ctx)
+      const heeftVermogen = heeftBedrag(netto)
 
       const kop =
         bedrag && heeftVermogen
           ? tijd
-            ? `Je netto vermogen is ${bedrag} — ${tijd} vrijheid.`
-            : `Je netto vermogen is ${bedrag}.`
-          : 'Deze lijn loopt van je verleden naar je vrijheidsmoment.'
+            ? `Je netto vermogen is ${metGrondslag(bedrag, markering)} — ${tijd} vrijheid.`
+            : `Je netto vermogen is ${metGrondslag(bedrag, markering)}.`
+          : !ctx.masked && data.woning?.uitgesloten
+            ? GEEN_POSITIEVE_GRONDSLAG
+            : 'Deze lijn loopt van je verleden naar je vrijheidsmoment.'
 
       const nuStoppen = data.vrijheid?.nuStoppenReach ?? null
       // `dataIssue` of een ontbrekende seed ⇒ geen zin. Een gegevensprobleem
@@ -576,7 +733,7 @@ const STAPPEN: readonly RondleidingStap[] = [
 ]
 
 /**
- * De stappen voor één platform, in volgorde: 9 op desktop, 8 op mobiel. Een
+ * De stappen voor één platform, in volgorde: 10 op desktop, 9 op mobiel. Een
  * stap hoort erbij als hij geen spotlight nodig heeft (het welkom) of een
  * target voor DIT platform kent — zo bundelt mobiel zoeken, menu en Fin in de
  * ene stap die de nav-pill uitlicht, terwijl desktop zijbalk en Fin apart

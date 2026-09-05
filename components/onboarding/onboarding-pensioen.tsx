@@ -397,10 +397,11 @@ function PensionEstimateHelper({
         style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
       >
         Jaren in loondienst waarin je pensioen opbouwde via je werkgever(s).
-        We rekenen met het fiscale maximum voor middelloon (1,875% per jaar
-        boven de AOW-franchise) — veel regelingen bouwen iets langzamer op,
-        zie dit dus eerder als boven- dan als ondergrens. Grof mag, later
-        aanpasbaar.
+        We rekenen met het hoogste percentage dat de wet toestaat, over het
+        deel van je salaris boven een drempel — over dat eerste deel bouw je
+        geen pensioen op, daar is de AOW al voor. Veel regelingen bouwen
+        langzamer op, dus zie het bedrag eerder als bovengrens dan als
+        ondergrens. Grof mag, later aanpasbaar.
       </p>
 
       {estimate !== null && (
@@ -415,7 +416,11 @@ function PensionEstimateHelper({
                 bruto per maand, vanaf je AOW-leeftijd ({aowAgeLabel})
               </>
             ) : (
-              <>Onder de AOW-franchise bouw je (bijna) geen werkgeverspensioen op.</>
+              <>
+                Met dit salaris bouw je (bijna) geen pensioen op via je
+                werkgever: het ligt onder de drempel waar de AOW al voor
+                zorgt.
+              </>
             )}
           </p>
           {estimate > 0 && (

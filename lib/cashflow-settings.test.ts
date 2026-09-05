@@ -257,3 +257,26 @@ describe('recomputeFireFromSettings', () => {
     expect(pricey.fireTarget).toBeGreaterThan(cheap.fireTarget)
   })
 })
+
+/**
+ * `'estimate'` is SYSTEM-ONLY (ADR 0131): alleen de app zet 'm, via de
+ * onboarding-knop "Schat het voor me". Zou de client hem mogen sturen, dan kon
+ * een gebruiker zijn eigen keuze als placeholder wegschrijven — en verdrong de
+ * eerstvolgende transactie stil zijn bewust ingevulde bedrag.
+ */
+describe('sanitizeCashSettingsInput — de schatting is geen klantkeuze', () => {
+  it("weigert income_source/expenses_source = 'estimate' van de client", () => {
+    const uit = sanitizeCashSettingsInput({
+      income_source: 'estimate',
+      expenses_source: 'estimate',
+    })
+    expect(uit.income_source).toBeUndefined()
+    expect(uit.expenses_source).toBeUndefined()
+  })
+
+  it('accepteert de vier bronnen die de gebruiker WEL mag kiezen', () => {
+    for (const bron of ['auto', 'budget', 'transaction', 'manual'] as const) {
+      expect(sanitizeCashSettingsInput({ income_source: bron }).income_source).toBe(bron)
+    }
+  })
+})

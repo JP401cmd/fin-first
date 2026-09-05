@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import { OnboardingShell } from './onboarding-shell'
 import { FactsPanel } from './facts-panel'
+import { dataNoteFor } from '@/lib/onboarding/data-note-copy'
 import {
   computeRetirementPrefill,
   type RetirementPrefillMethod,
@@ -104,9 +105,35 @@ export function OnboardingUitgavenPensioen({
         ? 'We schatten op basis van je inkomen, omdat je je uitgaven nog niet hebt ingevuld. Pas gerust aan, of kies “zelfde als nu”.'
         : 'Je hebt je uitgaven en inkomen nog niet ingevuld. Kies “zelfde als nu” of bepaal het later.'
 
-  // "Verder" mag altijd: bij `current_income` is geen bedrag nodig, bij
-  // `custom_amount` valt een leeg veld terug op de impliciete server-default
-  // (we sturen 'm dan niet als expliciet bedrag mee). Geen harde blokkade.
+  /**
+   * "Verder" met de suggestie zichtbaar-maar-ongewijzigd is een ACCEPTATIE, geen
+   * lege invoer (UR3-07 defect 2).
+   *
+   * Wat er misging: `displayAmount` toonde de ≈80%-suggestie, maar die stond
+   * alleen in de render — `data.customAmount` bleef de lege string tenzij de
+   * gebruiker het veld daadwerkelijk bewerkte. Wie op "Verder" klikte met het
+   * bedrag in beeld (precies wat de copy uitnodigt: "Pas gerust aan"), stuurde
+   * dus `method: 'custom_amount'` zónder bedrag mee. De server nam daardoor de
+   * expliciete-keuze-tak, sloeg zijn eigen 80%-veiligheidsklep over en schreef
+   * `null` weg — waarna `computeRetirementExpenses` terugviel op 100% van de
+   * huidige uitgaven. Structureel ~25% te hoog FIRE-doel, precies voor de
+   * gebruiker die de suggestie vertrouwde.
+   *
+   * Committen bij "Verder" (niet bij mount) houdt de suggestie live zolang het
+   * scherm open staat: wijzigt de gebruiker een eerdere stap en komt hij terug,
+   * dan volgt het veld nog steeds `computeRetirementPrefill`.
+   *
+   * "Verder" mag altijd: bij `current_income` is geen bedrag nodig, en zonder
+   * bekende uitgaven/inkomen is er geen suggestie om te committen — dan valt de
+   * server terug op zijn eigen default.
+   */
+  function handleNext() {
+    if (data.method === 'custom_amount' && data.customAmount === '' && prefill.amount != null) {
+      onChange({ ...data, customAmount: formatYearAmount(prefill.amount), skipped: false })
+    }
+    onNext()
+  }
+
   const headline = (
     <>
       Wat denk je straks{' '}
@@ -146,7 +173,8 @@ export function OnboardingUitgavenPensioen({
       kicker="Inkomen & uitgaven"
       romanNum="ii."
       title={headline}
-      deck="Dit gaat over je uitgaven straks, na je pensioen — niet over je pensioeninkomen. Geef een bedrag in prijspeil van vandaag; inflatie rekenen wij er later overheen."
+      deck="Dit gaat over je uitgaven straks, na je pensioen — niet over je pensioeninkomen. Geef een bedrag in prijspeil van vandaag; inflatie rekenen wij er later overheen. Je past het later altijd aan."
+      dataNote={dataNoteFor('uitgaven-later')}
       factsPanel={
         <FactsPanel
           stat="≈ 80%"
@@ -161,7 +189,7 @@ export function OnboardingUitgavenPensioen({
         <div className="flex w-full flex-col gap-2">
           <button
             type="button"
-            onClick={onNext}
+            onClick={handleNext}
             className="w-full min-h-11 bg-[var(--ink)] px-6 py-3 text-sm font-medium text-[var(--paper)] transition-colors hover:bg-[var(--ink-2)]"
           >
             Verder

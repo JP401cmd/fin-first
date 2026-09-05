@@ -192,7 +192,7 @@ export function GidsView() {
             onClick={handleNavigate}
             className="font-semibold text-[var(--ink-3)] underline-offset-2 hover:text-[var(--ink-2)] hover:underline"
           >
-            Mijn → Uiterlijk
+            Mijn → Weergave en uiterlijk
           </Link>
           .
         </p>

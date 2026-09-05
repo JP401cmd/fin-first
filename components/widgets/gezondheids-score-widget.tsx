@@ -6,7 +6,8 @@ import { WidgetShell } from './widget-shell'
 import type { WidgetSize } from '@/lib/widget-catalog'
 import { Activity, TrendingUp, TrendingDown, Minus, ChevronRight, ExternalLink } from 'lucide-react'
 import type { DashboardData } from './widget-renderer'
-import type { HealthPillar, HealthScore } from '@/lib/financial-health'
+import { healthScoreVerdict, type HealthPillar, type HealthScore } from '@/lib/financial-health'
+import { GRONDSLAG_ONBEKEND_KOP, GRONDSLAG_ONBEKEND_LABEL } from '@/lib/grondslag-guard'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { BesprekMetWillButton } from '@/components/app/chat/bespreek-met-fin-button'
@@ -374,6 +375,45 @@ export const GezondheidScoreWidget = memo(function GezondheidScoreWidget({ size,
           title="Te weinig gegevens"
           description="Voeg je bezittingen, schulden en inkomsten toe voor een betrouwbaar gezondheidscijfer."
           action={{ label: 'Voeg je gegevens toe', href: STARTER_HREF }}
+        />
+      </WidgetShell>
+    )
+  }
+
+  // ── Onbekend is geen nul (ADR 0131) ──────────────────────
+  // Inkomen en/of uitgaven zijn nog niet bekend: de engine heeft de pijlers
+  // die daarop rusten weggelaten en `onbekend` gezet. Dan geen cijfer en geen
+  // oordeel — één zin en één knop, via de ene presenter (geen eigen toets).
+  const verdict = healthScoreVerdict(health)
+  if (verdict.kind === 'onbekend') {
+    const { hint, actie } = verdict.onbekend
+    if (size === 'mini') {
+      return (
+        <WidgetShell module="horizon" size="mini" kicker="Gezondheid" href={actie.href}>
+          <p className="font-mono text-[15px] font-semibold tabular-nums leading-none text-[var(--ink-3)]">–</p>
+        </WidgetShell>
+      )
+    }
+    if (size === 'quarter') {
+      return (
+        <WidgetShell module="horizon" size={size} kicker="Gezondheid" href={actie.href}>
+          <Activity className="h-4 w-4 text-horizon-500" />
+          <div className="mt-1 flex items-baseline gap-0.5">
+            <p className="font-mono text-lg font-semibold tabular-nums leading-none text-[var(--ink-3)]">–</p>
+            <span className="text-sm text-[var(--ink-4)]">/100</span>
+          </div>
+          <p className="mt-1 text-[10px] leading-snug text-[var(--ink-3)]">{GRONDSLAG_ONBEKEND_LABEL}</p>
+        </WidgetShell>
+      )
+    }
+    return (
+      <WidgetShell module="horizon" size={size} kicker="Gezondheid">
+        <WidgetEmpty
+          variant="first-use"
+          icon={Activity}
+          title={GRONDSLAG_ONBEKEND_KOP}
+          description={hint}
+          action={{ label: actie.label, href: actie.href }}
         />
       </WidgetShell>
     )

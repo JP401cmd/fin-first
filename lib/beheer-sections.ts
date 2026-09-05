@@ -86,7 +86,7 @@ export const BEHEER_GROUPS: BeheerGroup[] = [
       {
         label: 'AI Instellingen',
         href: '/beheer/ai',
-        description: 'Provider, model, API-keys en systeemprompt-override.',
+        description: 'Provider, model, API-keys, systeemprompt-override en de AI-statuskaart.',
         icon: Bot,
       },
       {

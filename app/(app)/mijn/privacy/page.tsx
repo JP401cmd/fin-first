@@ -3,6 +3,7 @@ import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 import { PrivacyOverview } from '@/components/mijn/privacy-overview'
 import { AiPrivacySettings } from '@/components/mijn/ai-privacy-settings'
 import { AiExecutionSettings } from '@/components/mijn/local-categorization-settings'
+import { BedragenVerbergenBlok } from '@/components/mijn/bedragen-verbergen-blok'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { getPageInfo } from '@/lib/page-info-content'
 
@@ -27,6 +28,9 @@ export default function MijnPrivacyPage() {
           className="absolute right-4 top-4 sm:right-6"
         />
       </div>
+      {/* UR3-14 deel B: eerste blok op de pagina — de enige vindbare ingang
+          naar "Bedragen verbergen" was tot nu toe ⌘K (onvindbaar op mobiel). */}
+      <BedragenVerbergenBlok />
       <PrivacyOverview />
       <AiPrivacySettings />
       <AiExecutionSettings />

@@ -8,7 +8,9 @@ import {
   budgetSuggestionSchema,
   buildBudgetSuggestionPrompt,
 } from '@/lib/ai/schemas/budget-suggestion-schema'
-import { unauthorized, forbidden, serverError } from '@/lib/api/respond'
+import { unauthorized, forbidden, serverError, errorResponse } from '@/lib/api/respond'
+import { isRefusedProviderError } from '@/lib/ai/provider-error'
+import { AI_ERROR_CODE, describeAiError } from '@/lib/ai/error-copy'
 
 export async function POST(req: Request) {
   const supabase = await createClient()
@@ -101,6 +103,12 @@ export async function POST(req: Request) {
       },
     })
   } catch (err) {
+    // Structureel (provider weigert) vs. tijdelijk — gedrag bij een tijdelijke
+    // hapering blijft ongewijzigd (UR3-09).
+    if (isRefusedProviderError(err)) {
+      const copy = describeAiError(AI_ERROR_CODE.providerRefused)
+      return errorResponse(copy.text, 422, copy.code)
+    }
     return serverError(err, 'suggest-budgets:POST')
   }
 }

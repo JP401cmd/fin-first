@@ -951,6 +951,10 @@ export const loadCoreData = cache(async function loadCoreData(
     consumptionExpenseRows(txAgg12, budgetTypeMap),
     now,
     effectiveMonthlyExpenses,
+    // Rust de terugval op een bedrag dat de APP raadde ("Schat het voor me")?
+    // Dan heet het tarief 'cohort' i.p.v. 'estimate' en wijst de voetnoot de
+    // weg terug (ADR 0131). Verdwijnt vanzelf zodra de gebruiker zelf invult.
+    expensesSource === 'estimate' ? 'cohort' : 'profile',
   )
 
   const netWorth = effectiveTotalAssets - effectiveTotalDebts
@@ -1432,6 +1436,10 @@ export const loadCoreData = cache(async function loadCoreData(
       netMonthlyIncome: extHalfYearIncome > 0 ? extHalfYearIncome / SAVINGS_RATE_WINDOW_MONTHS : effectiveMonthlyIncome,
       // Noodbuffer-norm: 3 × netto maandsalaris (lib/emergency-fund.ts).
       netMonthlySalary: effectiveMonthlyIncome,
+      // Grondslag voor het OORDEEL (ADR 0131): de brede vensters (12-maands
+      // inkomen, 6-maands uitgaven), dezelfde die de spaarbron hierboven kreeg.
+      incomeBasis: annualIncomeResolution.basis,
+      expensesBasis: savingsExpenseResolution.basis,
     },
     {
       assets: (assetsResult.data ?? []) as HealthScoreAsset[],

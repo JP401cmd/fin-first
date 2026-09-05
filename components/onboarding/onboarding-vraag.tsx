@@ -28,6 +28,8 @@ export interface OnboardingVraagProps {
   title: ReactNode
   /** Editorial deck onder de headline. */
   deck: string
+  /** Gegevensregel onder het deck — tekst uit `lib/onboarding/data-note-copy.ts`. */
+  dataNote?: string
   /** Facts-paneel content (optioneel — bv. een lopend overzicht of CBS-feit). */
   factsPanel?: ReactNode
   /** Optionele inhoud boven de knoppen (bv. een lopende lijst van toegevoegde posten). */
@@ -53,6 +55,7 @@ export function OnboardingVraag({
   romanNum,
   title,
   deck,
+  dataNote,
   factsPanel,
   children,
   yesLabel = 'Ja',
@@ -71,6 +74,7 @@ export function OnboardingVraag({
       romanNum={romanNum}
       title={title}
       deck={deck}
+      dataNote={dataNote}
       factsPanel={factsPanel ?? null}
       currentStep={currentStep}
       totalSteps={totalSteps}

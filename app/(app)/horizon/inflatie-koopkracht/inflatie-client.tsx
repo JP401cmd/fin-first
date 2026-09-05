@@ -109,7 +109,7 @@ export function InflatieKoopkrachtClient({
           .
         </p>
         <p>
-          Sparen is essentieel voor je <GlossaryTerm term="noodreserve">noodfonds</GlossaryTerm> &mdash; 3 tot 6 maanden
+          Sparen is essentieel voor je <GlossaryTerm term="noodfonds">noodfonds</GlossaryTerm> &mdash; 3 tot 6 maanden
           uitgaven op een toegankelijke rekening. Maar al het geld daarboven
           verdient het om belegd te worden. Niet om snel rijk te worden, maar
           om je vrijheidstijd te beschermen tegen erosie.

@@ -144,10 +144,19 @@ export default function SignupPage() {
             Google). BOVEN beide knoppen geplaatst: de Google-knop is het eerste
             interactieve element, dus in de leesvolgorde moet consent vóór élke
             aanmaak-actie staan, niet erna. De links maken voorwaarden en
-            privacyverklaring expliciet vindbaar. */}
+            privacyverklaring expliciet vindbaar.
+
+            UR3-15: de regel zei alleen waarmee je akkoord gaat, niet wat er met
+            je gegevens gebeurt. De eerste zin vult dat aan. Claim-grens: opslag
+            in de EU en geen verkoop/advertenties staan zo op /privacy en
+            /mijn/privacy — bewust GEEN "alleen jij" (onwaar bij een
+            huishoud-partner) en geen belofte over AI (de chatcontext draagt
+            inkomen en uitgaven wél naar de modelaanbieder; dat legt /privacy
+            §2 en §4 uit). Geen vinkje: eigenaarsbesluit 17. */}
         <p className="mb-5 text-center text-xs text-zinc-500">
-          Door een account aan te maken &mdash; met e-mail of via Google &mdash; ga
-          je akkoord met de{' '}
+          Je gegevens worden versleuteld opgeslagen in de EU en nooit verkocht of
+          voor advertenties gebruikt. Door een account aan te maken &mdash; met
+          e-mail of via Google &mdash; ga je akkoord met de{' '}
           <Link href="/voorwaarden" className="underline hover:text-zinc-700">
             voorwaarden
           </Link>{' '}

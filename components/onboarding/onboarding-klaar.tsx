@@ -7,6 +7,12 @@ import { DEBT_TYPE_ICONS } from '@/lib/debt-data'
 import type { AssetQuickInput, DebtQuickInput } from '@/lib/quick-add/types'
 import type { SpaardoelPresetKey } from '@/lib/onboarding-presets'
 import { formatCurrency } from '@/lib/format'
+import type { MonthlyFreedomBuildup } from '@/lib/freedom-ticker'
+import {
+  HOUSING_CHOICE_BASIS_SENTENCE,
+  HOUSING_CHOICE_FALLBACK,
+  type HousingChoice,
+} from '@/lib/housing-choice'
 import {
   formatOpenOnderdelen,
   type OnboardingCompleteness,
@@ -68,6 +74,32 @@ export interface OnboardingKlaarProps {
    */
   freedomLabel?: string | null
   /**
+   * Wat één maand sparen aan vrijheid oplevert, plus het dagtarief waarop dat
+   * rust (`computeMonthlyFreedomBuildup`). `null` bij een tekort of ontbrekend
+   * inkomen/uitgaven.
+   *
+   * WAAROM NAAST `freedomLabel`: die teller deelt een VERMOGEN en valt weg
+   * zodra iemand geen bezittingen invulde — precies de gebruiker die anders
+   * zónder één tijdgetal de onboarding verlaat (UR3-05, criterium 4). Deze
+   * uitspraak heeft alleen inkomen en uitgaven nodig.
+   */
+  monthlyBuildup?: MonthlyFreedomBuildup | null
+  /**
+   * De woning-keuze uit stap iii-a (ADR 0133). Bepaalt welke grondslag-zin
+   * onder de vrijheidstijd staat — de gebruiker leest hier terug wat hij zelf
+   * antwoordde. `null` (geen woning, of de vraag nooit gesteld) valt terug op
+   * `HOUSING_CHOICE_FALLBACK`, dezelfde terugval als de save-route: dat is
+   * exact het gedrag van vóór ADR 0133 ("je woning telt pas mee als je 'm
+   * verkoopt"), dus deze zin verschuift geen enkele bestaande lezing.
+   */
+  housingChoice?: HousingChoice | null
+  /**
+   * Is het inkomen door de APP geraden ("Schat het voor me")? Dan draagt de
+   * Netto/mnd-cel een zichtbaar voorbehoud — een schatting die eruitziet als
+   * een meting is erger dan geen getal.
+   */
+  incomeIsEstimate?: boolean
+  /**
    * Spaardoel-recap van stap v. — `null` wanneer de gebruiker geskipt of
    * niets ingevuld heeft. Caller (orchestrator) bepaalt deze gating.
    */
@@ -106,6 +138,9 @@ export function OnboardingKlaar({
   netMonthlyIncome,
   netWorth,
   freedomLabel = null,
+  monthlyBuildup = null,
+  housingChoice = null,
+  incomeIsEstimate = false,
   spaardoel = null,
   completeness,
   assets,
@@ -173,9 +208,9 @@ export function OnboardingKlaar({
     >
       {/* ── Figures-strip — 3 cellen op desktop, gestapeld op mobile ──── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 border-t border-b border-[var(--ink)] my-2">
-        {/* Cel 1: Inkomen (€/mnd) */}
+        {/* Cel 1: Inkomen (€/mnd) — mét voorbehoud wanneer de app het raadde. */}
         <RecapCell
-          kicker="Netto/mnd"
+          kicker={incomeIsEstimate && netMonthlyIncome > 0 ? 'Netto/mnd · geschat' : 'Netto/mnd'}
           mobileBottomBorder
           value={
             netMonthlyIncome > 0 ? (
@@ -239,11 +274,15 @@ export function OnboardingKlaar({
                     <span className="mt-1.5 block font-mono text-[11px] tabular-nums text-[var(--module-active-700)]">
                       Al vrijgekocht &middot; {freedomLabel}
                     </span>
+                    {/* De grondslag-zin volgt sinds ADR 0133 de woning-keuze
+                        van de gebruiker; de kopij komt uit
+                        `HOUSING_CHOICE_BASIS_SENTENCE`, dezelfde bron als het
+                        keuzescherm zelf. */}
                     <span
                       className="mt-1 block text-[11px] italic leading-snug text-[var(--ink-3)]"
                       style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
                     >
-                      Je eigen woning en je schulden tellen hier nog niet mee.
+                      {HOUSING_CHOICE_BASIS_SENTENCE[housingChoice ?? HOUSING_CHOICE_FALLBACK]}
                     </span>
                   </>
                 ) : netWorth > 0 ? (
@@ -315,6 +354,32 @@ export function OnboardingKlaar({
           />
         )}
       </div>
+
+      {/* ── De wisselkoers, onder de strip ────────────────────────────────
+          Het dagtarief is de NOEMER van elke vrijheidstijd in de app; zonder
+          dat getal blijft "geld is opgeslagen tijd" een leus. Het stond tot
+          UR3-05 alleen op het uitgaven-scherm, en dan nog uitsluitend als
+          iemand beide bedragen had ingevuld — wie "Later invullen" koos,
+          verliet de onboarding zonder één tijdgetal.
+
+          BEWUST LOS VAN DE VERMOGENSCEL: die toont "al vrijgekocht" en valt
+          weg zonder bezittingen. Deze regel leunt alleen op inkomen en
+          uitgaven, en is dus ook de eerste (en soms enige) vrijheidsvertaling
+          die een lege startpositie te zien krijgt. Eén bron met de meelopende
+          teller: `lib/freedom-ticker.ts`, geen eigen som. */}
+      {monthlyBuildup && (
+        <p className="mt-4 text-sm leading-relaxed text-[var(--ink-2)] max-w-[60ch]">
+          Elke{' '}
+          <span className="font-mono font-bold tabular-nums text-[var(--module-active-700)]">
+            {formatCurrency(Math.round(monthlyBuildup.dailyRate))}
+          </span>
+          {' '}die je niet uitgeeft is één dag vrijheid. Zo bouw je er nu{' '}
+          <span className="font-mono font-bold tabular-nums text-[var(--module-active-700)]">
+            {monthlyBuildup.daysPerMonth}
+          </span>
+          {' '}per maand bij.
+        </p>
+      )}
 
       {/* Subtiele uitleg onder de strip — krant-italic.
           Volgt de échte compleetheid, niet "einde wizard bereikt": de oude

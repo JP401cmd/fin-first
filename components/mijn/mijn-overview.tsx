@@ -89,8 +89,8 @@ const PRIMARY_ROUTES: SubRoute[] = [
   },
   {
     href: '/mijn/uiterlijk',
-    label: 'Uiterlijk',
-    description: 'Kleurpalet, typografie, module-accentkleuren.',
+    label: 'Weergave en uiterlijk',
+    description: 'Eenvoudig of volledig, je startscherm, kleuren en letters.',
     Icon: Palette,
   },
 ]
@@ -204,7 +204,7 @@ export function MijnOverview() {
 
           <div className="mt-4">
             <DepthSection
-              title="Alle instellingen"
+              title="Overige instellingen"
               // De samenvatting is het duidings-deel: wie de sectie dicht ziet
               // staan, moet zonder klikken weten wát erin zit — anders is dit
               // reductie zonder uitleg.

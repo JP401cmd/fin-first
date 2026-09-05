@@ -510,7 +510,10 @@ export function BottomSheet({ open, onClose, onRequestClose, title, children, si
             `--mobile-nav-clearance` nodig zodat sticky knoppen er niet achter
             verdwijnen. Op lg+ is die var 0 (pill verborgen). */}
         {footerSlot && (
-          <div className={`shrink-0 border-t border-[var(--border-ed)] bg-[var(--paper)] px-5 pt-3 lg:pb-3 ${belowFloatingNav ? 'pb-[var(--mobile-nav-clearance)]' : 'pb-[calc(var(--safe-area-bottom,0px)+0.75rem)]'}`}>
+          <div
+            data-testid="bottom-sheet-footer"
+            className={`shrink-0 border-t border-[var(--border-ed)] bg-[var(--paper)] px-5 pt-3 lg:pb-3 ${belowFloatingNav ? 'pb-[var(--mobile-nav-clearance)]' : 'pb-[calc(var(--safe-area-bottom,0px)+0.75rem)]'}`}
+          >
             {footerSlot}
           </div>
         )}

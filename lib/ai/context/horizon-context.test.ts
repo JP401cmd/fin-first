@@ -97,3 +97,46 @@ describe('buildHorizonContext — grondslag + omreken-verbod (euro-weergave D14)
     expect(ctx.toLowerCase()).not.toContain('euroview')
   })
 })
+
+// ── UR3-06 geval 5 — de schulden-totaalregel ─────────────────────────────────
+//
+// Op het scherm is "Maandlasten" één vooraf-opgetelde KPI. In de context stond
+// alleen een lijst per schuld, dus Fin telde zelf op — en noemde EUR 2.690 waar de
+// schuldenpagina EUR 2.980 toonde. De fix is de som één keer hier doen. Deze suite
+// pint vast dat de totalen er zijn, kloppen, en VOOR de losse regels staan.
+describe('buildHorizonContext — schulden-totaal (UR3-06 geval 5)', () => {
+  const DEBT_2 = {
+    name: 'Autolening',
+    debt_type: 'personal_loan',
+    current_balance: 12_000,
+    interest_rate: 6,
+    monthly_payment: 290,
+    repayment_type: 'annuity',
+    end_date: null,
+  }
+
+  it('telt de maandlasten en saldi op zoals de schuldenpagina dat doet', async () => {
+    const ctx = await buildHorizonContext(makeSupabase([], [DEBT, DEBT_2]))
+    // 1.000 + 290 = 1.290 per maand; 200.000 + 12.000 = 212.000 openstaand.
+    expect(ctx).toContain('maandlasten €1.290/mnd')
+    expect(ctx).toContain('€212.000 openstaand')
+    expect(ctx).toContain('TOTAAL (2 actieve schulden)')
+  })
+
+  it('zet het totaal VOOR de per-schuld-regels', async () => {
+    const ctx = await buildHorizonContext(makeSupabase([], [DEBT, DEBT_2]))
+    expect(ctx.indexOf('TOTAAL (')).toBeLessThan(ctx.indexOf('Hypotheek ('))
+    expect(ctx.indexOf('TOTAAL (')).toBeLessThan(ctx.indexOf('Autolening ('))
+  })
+
+  it('verbiedt het model expliciet om zelf op te tellen', async () => {
+    const ctx = await buildHorizonContext(makeSupabase([], [DEBT]))
+    expect(ctx).toContain('tel de regels hieronder NIET zelf op')
+    expect(ctx).toContain('TOTAAL (1 actieve schuld)')
+  })
+
+  it('draagt geen totaalregel wanneer er geen schulden zijn', async () => {
+    const ctx = await buildHorizonContext(makeSupabase([ASSET], []))
+    expect(ctx).not.toContain('TOTAAL (')
+  })
+})

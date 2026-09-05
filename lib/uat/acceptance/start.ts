@@ -325,6 +325,19 @@ const criteria: AcceptanceCriterion[] = [
     },
   },
   {
+    workflow: 'WF-START-29',
+    scenarioId: 'UAT-START-29',
+    titel: '"Schat het voor me": een geschat bedrag dat zich als schatting bekendmaakt',
+    kriticiteit: 'KERN',
+    given: 'Onboarding met een ingevulde geboortedatum, op de inkomen-stap; het bedrag is niet bekend bij de gebruiker.',
+    when: 'De gebruiker klikt "Schat het voor me" op het inkomen-scherm én op het uitgaven-scherm, rondt de onboarding af, bekijkt /overzicht en /overzicht/belasting, en vervangt daarna het bedrag door een eigen bedrag via /overzicht/cashflow of /mijn/profiel.',
+    then: 'De knop vult het veld ZICHTBAAR met het CBS-cohortbedrag van zijn leeftijdsband (25–35 → €3.075 inkomen, €2.800 uitgaven) met de regel "Geschat op basis van je leeftijd"; de uitgavenschatting volgt een zélf getypt inkomen via de referentie-spaarquote. Het eindscherm toont het dagtarief én "zo bouw je er X per maand bij" — óók zonder bezittingen (criterium 4), met de kicker "Netto/mnd · geschat". Na afronden staat `profiles.income_source`/`expenses_source` op \'estimate\' (NIET \'manual\'), zodat het label meereist (spaarquote-widget, cashflow-instellingenblok, dagtarief-voetnoot "een schatting op basis van je leeftijd") én een bankkoppeling of budget de gok vanzelf verdringt. Vult de gebruiker een eigen bedrag in, dan wordt de bron \'manual\' en verdwijnt het voorbehoud op álle oppervlakken tegelijk (criterium 3). "Later invullen" blijft bestaan en wist ook de schattingsmarkering.',
+    assertion: {
+      kind: 'ui-only',
+      source: 'lib/benchmark/cohort-estimate.ts (estimateCohortIncomeExpenses/cohortExpensesFromIncome — dezelfde afleiding als computeReferencePeer) + app/api/onboarding/save-own-data/route.ts (estimatedFields → income_source/expenses_source = \'estimate\') + lib/expense-rate.ts (fallbackSource \'cohort\') + lib/format.ts#formatFreedomRateFootnote. Cijfers vergrendeld in lib/benchmark/cohort-estimate.test.ts en lib/expense-rate.cohort.test.ts; hier is de toets de doorwerking op het scherm.',
+    },
+  },
+  {
     workflow: 'WF-START-22',
     scenarioId: 'UAT-START-22',
     titel: 'Velden uitstellen met "Later invullen" (defer-pad)',
@@ -383,7 +396,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     given: 'Een vers-geonboarde gebruiker en een reeds-geonboarde gebruiker.',
     when: 'De vers-geonboarde gebruiker klikt "Naar je overzicht"; de reeds-geonboarde gebruiker opent handmatig /onboarding; een niet-geonboarde gebruiker opent direct een app-route.',
-    then: 'Harde navigatie naar /dashboard zonder terug-flits naar /onboarding — de middleware vertaalt /dashboard naar het gekozen homescherm (profiles.home_screen, standaard /overzicht), dus de landing is het EIGEN hoofdscherm en niet een vaste route (ADR 0130); een reeds-geonboarde gebruiker die /onboarding opent → redirect naar /dashboard (de middleware vertaalt naar het gekozen homescherm); een niet-geonboarde gebruiker die een app-route opent → redirect naar /onboarding. Op het successcherm zelf staat sinds APP-2 (nazorg eenvoudige weergave, 11 aug 2026) één regel die de weergavekeuze noemt: "Rustig beginnen of meteen alle detail? Je weergave kies je later bij Mijn → Uiterlijk." Twee eigenschappen daarvan zijn te toetsen en bewust zo: de regel is GEEN link (klikken doet niets — een soft-navigation hiernaast zou de `clearLocalStorage()` + harde navigatie van de CTA omzeilen), en hij is NIET modus-afhankelijk (de `DisplayModeProvider` hangt alleen in de (app)-groep, dus buiten die groep zou elke modus-tekst op de \'simple\'-fallback landen — ADR 0026). De cijfers zelf zijn al gedekt door WF-START-18/19; hier telt alleen de landing/poort-navigatie.',
+    then: 'Harde navigatie naar /dashboard zonder terug-flits naar /onboarding — de middleware vertaalt /dashboard naar het gekozen homescherm (profiles.home_screen, standaard /overzicht), dus de landing is het EIGEN hoofdscherm en niet een vaste route (ADR 0130); een reeds-geonboarde gebruiker die /onboarding opent → redirect naar /dashboard (de middleware vertaalt naar het gekozen homescherm); een niet-geonboarde gebruiker die een app-route opent → redirect naar /onboarding. Op het successcherm zelf staat sinds APP-2 (nazorg eenvoudige weergave, 11 aug 2026) één regel die de weergavekeuze noemt: "Rustig beginnen of meteen alle detail? Je weergave kies je later bij Mijn → Weergave en uiterlijk." Twee eigenschappen daarvan zijn te toetsen en bewust zo: de regel is GEEN link (klikken doet niets — een soft-navigation hiernaast zou de `clearLocalStorage()` + harde navigatie van de CTA omzeilen), en hij is NIET modus-afhankelijk (de `DisplayModeProvider` hangt alleen in de (app)-groep, dus buiten die groep zou elke modus-tekst op de \'simple\'-fallback landen — ADR 0026). De cijfers zelf zijn al gedekt door WF-START-18/19; hier telt alleen de landing/poort-navigatie.',
     assertion: {
       kind: 'ui-only',
       source: 'window.location.assign + onboarding-poort in app/(app)/layout.tsx + components/onboarding/onboarding-success.tsx (statische copy), geen eigen berekening',

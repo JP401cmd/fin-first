@@ -1,6 +1,8 @@
 import path from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { readSourceLF } from '@/lib/test-utils/read-source'
+import { HOUSING_CHOICE_FALLBACK, housingChoiceToConfig } from '@/lib/housing-choice'
+import { parseHousingStrategy } from '@/lib/housing-strategy'
 
 /**
  * Borgt de standaardinstellingen voor nieuwe gebruikers (Notion-kaart "new user
@@ -12,10 +14,15 @@ import { readSourceLF } from '@/lib/test-utils/read-source'
  *   2. het multi-step save-pad (sinds Keuze B het primaire pad).
  *
  * De vier defaults:
- *   - Eigen woning: verkopen wanneer nodig, op basis van marktwaarde
- *     (`{ mode: 'downsize', trigger: 'on_depletion', saleValuationBasis: 'market' }`).
- *     Vervangt de eerdere `exclude_from_fire`-default; `parseHousingStrategy`
- *     vult de overige velden met `DEFAULT_DOWNSIZE_CONFIG`.
+ *   - Eigen woning: sinds ADR 0133 GEEN default meer maar de KEUZE van de
+ *     gebruiker (stap iii-a, "Telt je woning mee voor je vrijheid?"). De route
+ *     vertaalt die keuze via `housingChoiceToConfig` en schrijft zélf geen
+ *     literal meer. Wie de vraag niet kreeg (oude client, of geen eigen woning)
+ *     krijgt `HOUSING_CHOICE_FALLBACK` = 'sell' → exact de oude default
+ *     `{ downsize, on_depletion, market }`, dus geen enkel bestaand getal
+ *     verschuift. Deze suite pint dáárom twee dingen: de bedrading in de bron
+ *     (twee write-plekken, één vertaling, geen literal) én het gedrag van die
+ *     vertaling (default bij ontbrekende keuze + mapping bij keuze).
  *   - Onttrekkingsprofiel: afnemend (`withdrawal_profile_config.profiel`), met
  *     de enum-spiegel `withdrawal_strategy = 'static'` (mapping afnemend→static).
  *   - Verdeling bij toename: naar beleggen (`pot_rules.surplus_group`).
@@ -46,28 +53,56 @@ describe('onboarding save-own-data — standaardinstellingen nieuwe gebruiker', 
     .map((line) => line.replace(/\/\/.*$/, ''))
     .join('\n')
 
-  it('schrijft op beide write-plekken housing = downsize/on_depletion/market', () => {
-    const writes =
-      codeOnly.match(/housing_strategy_config[^=:]*[=:]\s*\{\s*mode:\s*'([a-z_]+)'/g) ?? []
-
+  it('schrijft op beide write-plekken de woning-keuze door één vertaling', () => {
     // Precies twee expliciete writes: de buildRpcPayload-referentie en het
     // multi-step pad. De post-RPC update verviel met de gedeprecate RPC-tak.
+    const writes =
+      codeOnly.match(/housing_strategy_config[^=:]*[=:]\s*housingChoiceToConfig\(housingChoice\)/g) ??
+      []
     expect(writes).toHaveLength(2)
-    for (const write of writes) {
-      expect(write).toContain("mode: 'downsize'")
-    }
-    // Trigger + waarderingsbasis staan naast de mode op dezelfde write-plekken.
-    const onDepletion = codeOnly.match(/housing_strategy_config[^=:]*[=:][^}]*trigger:\s*'on_depletion'/g) ?? []
-    expect(onDepletion).toHaveLength(2)
-    const marketBasis = codeOnly.match(/housing_strategy_config[^=:]*[=:][^}]*saleValuationBasis:\s*'market'/g) ?? []
-    expect(marketBasis).toHaveLength(2)
   })
 
-  it('schrijft nergens (in uitgevoerde code) nog exclude_from_fire of include_full als onboarding-default', () => {
-    expect(codeOnly).not.toContain("housing_strategy_config: { mode: 'exclude_from_fire' }")
-    expect(codeOnly).not.toContain("housing_strategy_config = { mode: 'exclude_from_fire' }")
-    expect(codeOnly).not.toContain("housing_strategy_config: { mode: 'include_full' }")
-    expect(codeOnly).not.toContain("housing_strategy_config = { mode: 'include_full' }")
+  it('lost de keuze één keer op: body-keuze wint, anders de terugval', () => {
+    // De enum-spiegel van `HousingChoice` op de body, en de ene resolutie.
+    expect(codeOnly).toMatch(/housingChoice:\s*z\.enum\(\['sell',\s*'exclude'\]\)\.optional\(\)/)
+    expect(codeOnly).toMatch(
+      /const housingChoice:\s*HousingChoice\s*=\s*rawHousingChoice\s*\?\?\s*HOUSING_CHOICE_FALLBACK/,
+    )
+  })
+
+  /**
+   * Het GEDRAG achter die bedrading — geen bronscan maar de echte mapping, zodat
+   * "de route schrijft `housingChoiceToConfig(...)`" ook betekent dat er het
+   * juiste in de kolom belandt.
+   */
+  it('default bij ontbrekende keuze: verkopen wanneer nodig, op marktwaarde', () => {
+    // Precies wat de route vóór ADR 0133 hard wegschreef — de gebruiker die de
+    // vraag niet kreeg (oude client, geen eigen woning) krijgt exact hetzelfde.
+    expect(housingChoiceToConfig(HOUSING_CHOICE_FALLBACK)).toMatchObject({
+      mode: 'downsize',
+      trigger: 'on_depletion',
+      saleValuationBasis: 'market',
+    })
+    // En dat is identiek aan hoe de oude korte literal terugkwam uit de DB-lezer,
+    // dus er verschuift geen enkel bestaand getal.
+    expect(
+      parseHousingStrategy({
+        mode: 'downsize',
+        trigger: 'on_depletion',
+        saleValuationBasis: 'market',
+      }),
+    ).toEqual(housingChoiceToConfig(HOUSING_CHOICE_FALLBACK))
+  })
+
+  it('mapping bij een gemaakte keuze: ja → verkopen, nee → uitsluiten', () => {
+    expect(housingChoiceToConfig('sell').mode).toBe('downsize')
+    expect(housingChoiceToConfig('exclude')).toEqual({ mode: 'exclude_from_fire' })
+  })
+
+  it('schrijft nergens (in uitgevoerde code) nog een eigen housing-literal', () => {
+    // Elke literal hier zou een tweede bron naast `lib/housing-choice.ts` zijn —
+    // precies de drift die ADR 0133 opheft. Ook de oude defaults blijven weg.
+    expect(codeOnly).not.toMatch(/housing_strategy_config[^=:]*[=:]\s*\{\s*mode:/)
   })
 
   it('schrijft onttrekkingsprofiel = afnemend (met static enum-spiegel)', () => {
@@ -243,5 +278,44 @@ describe('onboarding save-own-data — rondleiding-startsignaal (ADR 0130)', () 
     expect(codeOnly).toContain('error: guideStateReadErr')
     // Nergens een letterlijk object met de sleutel — dat zou de merge omzeilen.
     expect(codeOnly).not.toContain("'rondleiding:pending'")
+  })
+})
+
+/**
+ * "Schat het voor me" op de SCHRIJFKANT (UR3-05 op ADR 0131).
+ *
+ * Een bedrag dat de gebruiker zélf typte is `'manual'` en wint over álles; een
+ * bedrag dat de APP raadde is `'estimate'` en wordt door budgetten en
+ * transacties vanzelf verdrongen. Dát verschil — keuze versus placeholder — is
+ * de hele reden dat de vijfde bronwaarde bestaat. Zou de onboarding een gok als
+ * 'manual' wegschrijven, dan blokkeert die gok voorgoed elke echte meting.
+ */
+describe('onboarding save-own-data — app-schatting is geen eigen invoer', () => {
+  const routePath = path.resolve(__dirname, 'route.ts')
+  const source = readSourceLF(routePath)
+  const codeOnly = source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .map((line) => line.replace(/\/\/.*$/, ''))
+    .join('\n')
+
+  it('accepteert estimatedFields als expliciete, gesloten enum', () => {
+    expect(codeOnly).toMatch(
+      /estimatedFields:\s*z\.array\(z\.enum\(\['income',\s*'expenses'\]\)\)\.optional\(\)/,
+    )
+  })
+
+  it("schrijft 'estimate' bij een app-gok en 'manual' bij een eigen bedrag", () => {
+    expect(codeOnly).toMatch(
+      /profileData\.income_source\s*=\s*incomeIsEstimate\s*\?\s*'estimate'\s*:\s*'manual'/,
+    )
+    expect(codeOnly).toMatch(
+      /profileData\.expenses_source\s*=\s*expensesIsEstimate\s*\?\s*'estimate'\s*:\s*'manual'/,
+    )
+  })
+
+  it('zet de bron alleen bij een bedrag > 0 — een schatting op niets bestaat niet', () => {
+    expect(codeOnly).toMatch(/if\s*\(identity\.net_monthly_income\s*>\s*0\)\s*\{/)
+    expect(codeOnly).toMatch(/identity\.estimated_monthly_expenses\s*>\s*0/)
   })
 })

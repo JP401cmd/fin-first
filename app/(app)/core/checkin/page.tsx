@@ -528,12 +528,14 @@ function CheckinPageContent() {
               />
               <span>Geldcheck-in · Historisch</span>
             </div>
-            <h1
+            {/* Pagina-aanhef is een <h2>: de enige <h1> is de sr-only
+                paginanaam in de shell (ADR 0110). */}
+            <h2
               className="text-[20px] sm:text-[24px] font-black tracking-[-0.02em] leading-tight text-[var(--ink)] capitalize"
               style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
             >
               Check-in {monthLabel}
-            </h1>
+            </h2>
           </div>
           <span className="inline-flex items-center gap-1 rounded-[var(--r-sm)] border border-[var(--border-ed)] bg-[var(--subtle)] px-2 py-1 text-[11px] font-medium text-[var(--ink-3)]">
             <Lock className="h-3 w-3" />
@@ -777,12 +779,14 @@ function CheckinPageContent() {
             />
             <span>Geldcheck-in</span>
           </div>
-          <h1
+          {/* Pagina-aanhef is een <h2>: de enige <h1> is de sr-only
+              paginanaam in de shell (ADR 0110). */}
+          <h2
             className="text-[20px] sm:text-[24px] font-black tracking-[-0.02em] leading-tight text-[var(--ink)]"
             style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
           >
             {overview?.monthLabel ? `Check-in ${overview.monthLabel}` : 'Maandelijkse check-in'}
-          </h1>
+          </h2>
         </div>
         <Link
           href="/core/checkin/historie"
@@ -1041,19 +1045,35 @@ function StepTerugblik({ overview, previous }: { overview: CheckinOverview | nul
             LOPENDE maand van het moment van opslaan. Die twee naast elkaar
             zetten vergelijkt twee verschillende grondslagen (B-016). Het
             vermogen hierboven is wél een standcijfer en dus vergelijkbaar. */}
-        <MetricCard label="Inkomen" value={fc(cijfers.income)} />
-        <MetricCard
-          label="Uitgaven"
-          value={fc(cijfers.expenses)}
-          change={cijfers.expenseChangePct ?? undefined}
-          changeLabel={cijfers.changeLabel ?? undefined}
-          invertColor
-        />
-        <MetricCard
-          label="Gespaard"
-          value={fc(cijfers.savings)}
-          verdict={cijfers.savings}
-        />
+        {cijfers.heeftCijfers ? (
+          <>
+            <MetricCard label="Inkomen" value={fc(cijfers.income)} />
+            <MetricCard
+              label="Uitgaven"
+              value={fc(cijfers.expenses)}
+              change={cijfers.expenseChangePct ?? undefined}
+              changeLabel={cijfers.changeLabel ?? undefined}
+              invertColor
+            />
+            <MetricCard
+              label="Gespaard"
+              value={fc(cijfers.savings)}
+              verdict={cijfers.savings}
+            />
+          </>
+        ) : (
+          /* Onbekend is geen nul (ADR 0131): over een maand zonder boekingen
+             valt niets terug te blikken — drie keer "€ 0" zou een oordeel zijn
+             over een maand waar we niets van weten. */
+          <div className="card-editorial p-4 col-span-2">
+            <p className="text-[10px] font-medium text-[var(--ink-3)] uppercase tracking-wider">
+              Inkomen · Uitgaven · Gespaard
+            </p>
+            <p className="mt-1 text-sm text-[var(--ink-3)] font-serif italic">
+              Over {cijfers.label} zijn nog geen inkomsten of uitgaven geboekt — niets om op terug te blikken.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Delta summary from previous check-in */}

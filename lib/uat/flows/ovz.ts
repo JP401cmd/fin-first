@@ -88,7 +88,7 @@ export const OVZ_FLOW: UatFlow = {
     { id: 'x-toek', label: 'Toekomst · doelbeheer, projectie, FIRE-parameters', kind: 'cross', stage: 8, crossZone: 'TOEK' },
     { id: 'x-mijn', label: 'Mijn · profiel-/huishoudinstellingen, check-in-historie', kind: 'cross', stage: 8, crossZone: 'MIJN' },
     { id: 'x-nav', label: 'Navigatie · perspectiefwissel (WF-OVZ-17) + weergavemodus (WF-OVZ-18)', kind: 'cross', stage: 8, crossZone: 'NAV' },
-    { id: 'x-bezit', label: 'Bezittingen · cash-asset herwaarderen, "Start met beleggen"-CTA', kind: 'cross', stage: 8, crossZone: 'BEZIT' },
+    { id: 'x-bezit', label: 'Bezittingen · cash-asset herwaarderen, "Bekijk beleggen"-CTA', kind: 'cross', stage: 8, crossZone: 'BEZIT' },
   ],
   edges: [
     // instap → verkennen

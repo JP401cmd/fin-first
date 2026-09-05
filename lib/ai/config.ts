@@ -1,9 +1,11 @@
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { createMistral } from '@ai-sdk/mistral'
 import { createOpenAI } from '@ai-sdk/openai'
+import { wrapLanguageModel, type LanguageModelMiddleware } from 'ai'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getServiceClient } from '@/lib/supabase/service'
-import { wrapModelWithTokenLogging, type WrappableModel } from '@/lib/ai/token-usage'
+import { tokenLoggingMiddleware, type WrappableModel } from '@/lib/ai/token-usage'
+import { aiFailureMiddleware, logAiFailure } from '@/lib/ai/ai-failure-middleware'
 import { parsePlatformStatus } from '@/lib/platform-status'
 import { decryptField } from '@/lib/crypto/field-encryption'
 import { AI_ERROR_CODE } from '@/lib/ai/error-copy'
@@ -91,7 +93,9 @@ export async function getModel(supabase: SupabaseClient, feature?: string) {
     case 'openai': {
       const apiKey = readSecret(settings.openai_api_key) || process.env.OPENAI_API_KEY
       if (!apiKey) {
-        throw new AIConfigError('OpenAI API key is niet geconfigureerd. Stel deze in via Admin > API Keys of de OPENAI_API_KEY environment variable.', 'openai')
+        const message = 'OpenAI API key is niet geconfigureerd. Stel deze in via Admin > API Keys of de OPENAI_API_KEY environment variable.'
+        await logAiFailure('ai:config', new Error(message), { supabase })
+        throw new AIConfigError(message, 'openai')
       }
       modelId = settings.ai_model_openai || 'gpt-4o'
       base = createOpenAI({ apiKey })(modelId)
@@ -100,7 +104,9 @@ export async function getModel(supabase: SupabaseClient, feature?: string) {
     case 'mistral': {
       const apiKey = readSecret(settings.mistral_api_key) || process.env.MISTRAL_API_KEY
       if (!apiKey) {
-        throw new AIConfigError('Mistral API key is niet geconfigureerd. Stel deze in via Admin > API Keys of de MISTRAL_API_KEY environment variable.', 'mistral')
+        const message = 'Mistral API key is niet geconfigureerd. Stel deze in via Admin > API Keys of de MISTRAL_API_KEY environment variable.'
+        await logAiFailure('ai:config', new Error(message), { supabase })
+        throw new AIConfigError(message, 'mistral')
       }
       modelId = settings.ai_model_mistral || 'mistral-large-latest'
       base = createMistral({ apiKey })(modelId)
@@ -116,7 +122,9 @@ export async function getModel(supabase: SupabaseClient, feature?: string) {
     default: {
       const apiKey = readSecret(settings.anthropic_api_key) || process.env.ANTHROPIC_API_KEY
       if (!apiKey) {
-        throw new AIConfigError('Anthropic API key is niet geconfigureerd. Stel deze in via Admin > API Keys of de ANTHROPIC_API_KEY environment variable.', 'anthropic')
+        const message = 'Anthropic API key is niet geconfigureerd. Stel deze in via Admin > API Keys of de ANTHROPIC_API_KEY environment variable.'
+        await logAiFailure('ai:config', new Error(message), { supabase })
+        throw new AIConfigError(message, 'anthropic')
       }
       modelId = settings.ai_model_anthropic || 'claude-sonnet-4-5-20250929'
       base = createAnthropic({ apiKey })(modelId)
@@ -124,6 +132,14 @@ export async function getModel(supabase: SupabaseClient, feature?: string) {
     }
   }
 
-  if (!feature) return base
-  return wrapModelWithTokenLogging(base, { supabase, feature, provider, modelId })
+  // Deze middleware legt zich ALTIJD om het model — ook zonder feature-string
+  // ('onbekend') — zodat élke mislukte cloud-AI-call een rij in `error_logs`
+  // krijgt (UR3-09 / ADR 0132), ongeacht of de aanroeper token-logging
+  // aanvraagt. Token-logging (succes-alleen, bestaand gedrag) blijft beperkt
+  // tot callsites die wél een feature meegeven.
+  const middleware: LanguageModelMiddleware[] = [aiFailureMiddleware({ supabase, feature: feature ?? 'onbekend' })]
+  if (feature) {
+    middleware.push(tokenLoggingMiddleware({ supabase, feature, provider, modelId }))
+  }
+  return wrapLanguageModel({ model: base, middleware })
 }

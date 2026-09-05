@@ -72,6 +72,7 @@ export const START_FLOW: UatFlow = {
     { id: 'pensioen', scenarioId: 'UAT-START-20', label: 'WF-START-20 · Pensioen opgeven', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'spaardoel', scenarioId: 'UAT-START-21', label: 'WF-START-21 · Spaardoel kiezen of overslaan', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'plan', scenarioId: 'UAT-START-28', label: 'WF-START-28 · "Jouw plan": stopmoment × eind-vorm (ADR 0129)', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
+    { id: 'schatting', scenarioId: 'UAT-START-29', label: 'WF-START-29 · "Schat het voor me" (cohort-schatting, UR3-05)', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'defer', scenarioId: 'UAT-START-22', label: 'WF-START-22 · "Later invullen" (defer-pad)', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'obhervatten', scenarioId: 'UAT-START-23', label: 'WF-START-23 · Onboarding onderbreken/hervatten', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'obretry', scenarioId: 'UAT-START-24', label: 'WF-START-24 · Fout bij afronden herstellen (retry)', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },

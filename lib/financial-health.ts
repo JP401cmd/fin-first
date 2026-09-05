@@ -29,6 +29,8 @@ import { budgetLimitStatus } from '@/lib/budget-alerts'
 import { DEFAULT_RETURN } from '@/lib/constants'
 import { firePeerAgeForAge, FIRE_PEER_CURVE_START_AGE } from '@/lib/benchmark/fire-peer-lat'
 import { legacyAnchorOf, type FireEndStrategy, type StopAnchorKind } from '@/lib/fire-strategy'
+import type { ResolvedBasis } from '@/lib/budget-basis'
+import { grondslagGuard, type OntbrekendeGrondslag } from '@/lib/grondslag-guard'
 
 // ── Lightweight input for server-side / snapshot usage ───────
 // Allows computing the health score without a full DashboardData bundle.
@@ -96,6 +98,17 @@ export interface HealthScoreInput {
   /** Budget categories with limit/spent; empty array if no budgets */
   budgetCategories: { limit: number; spent: number }[]
   /**
+   * Grondslag van het inkomen resp. de uitgaven waarop `savingsRate6m`,
+   * `emergencyFundMonths`, `netMonthlyIncome` en `freedomPct` rusten (ADR 0131).
+   * `'unknown'` = er is NIETS bekend (geen keuze, geen meting, geen profiel-
+   * bedrag): de pijlers die die kant nodig hebben vallen dan inactief en de
+   * score draagt `onbekend`. Optioneel: ontbreekt het veld (oude snapshot-
+   * inputs, mocks, spread-callers), dan telt de kant als bekend — onbekendheid
+   * is een positieve uitspraak van de resolver, geen afwezig veld.
+   */
+  incomeBasis?: ResolvedBasis
+  expensesBasis?: ResolvedBasis
+  /**
    * @deprecated Voedt sinds v2 geen pijler meer (ADR 0010). Blijft als optioneel
    * backward-compat-veld voor het educatieve Box 3-"kans"-inzicht.
    */
@@ -136,6 +149,27 @@ export interface HealthPillar {
   groupLabel?: string
 }
 
+/**
+ * Onbekend is geen nul (ADR 0131). Gezet zodra inkomen en/of uitgaven een
+ * `'unknown'`-grondslag hebben: de pijlers die die kant nodig hebben zijn dan
+ * uit `pillars` gehaald (gewicht herverdeeld, zoals elk no-data-pad) en staan
+ * hier apart, zodat het detail "nog niet bekend" kan tonen in plaats van 0 %.
+ *
+ * `total`/`label` blijven de gewogen som over de RESTERENDE pijlers — de
+ * snapshot-historie blijft een getal — maar een gebruikerszichtbaar oppervlak
+ * toont bij `onbekend !== null` GEEN cijfer en GEEN oordeel: alleen `hint` en
+ * `actie`. Wie het cijfer tóch toont, presenteert een gat als meting.
+ */
+export interface HealthScoreOnbekend {
+  ontbreekt: OntbrekendeGrondslag
+  /** De weggevallen pijlers — naam + groep, zonder score (die bestaat niet). */
+  pijlers: Pick<HealthPillar, 'id' | 'name' | 'pillarGroup' | 'groupLabel'>[]
+  /** Eén zin die zegt wát er ontbreekt (uit lib/grondslag-guard.ts). */
+  hint: string
+  /** De ene knop. */
+  actie: { href: string; label: string }
+}
+
 export interface HealthScore {
   total: number        // 0–100 weighted average
   label: string        // Uitstekend / Sterk / Redelijk / Kwetsbaar / Kritiek
@@ -146,6 +180,12 @@ export interface HealthScore {
   activePillarCount: number
   /** Whether budget discipline is included in the score */
   budgetingActive: boolean
+  /**
+   * Ontbrekende inkomen-/uitgavengrondslag (ADR 0131), of `null`/afwezig als
+   * alles bekend is. Optioneel zodat bestaande fixtures geldig blijven; de
+   * engine zet 'm altijd. Toets via `health.onbekend ?? null`.
+   */
+  onbekend?: HealthScoreOnbekend | null
 }
 
 // ── Pillar group metadata ────────────────────────────────────
@@ -714,7 +754,27 @@ export function computeHealthScoreFromInputs(
   // ── Indicator scores + data-availability (inactivation) ──
   const inactiveByData = new Set<string>()
 
-  // Spaarquote — always has a value (0 is a real score).
+  // ── Onbekend is geen nul (ADR 0131) ──
+  // Een 'unknown'-grondslag is géén meting van 0: de pijlers die die kant nodig
+  // hebben vallen inactief (gewicht herverdeeld, zelfde mechanisme als elk
+  // no-data-pad) en komen apart terug in `onbekend`, zodat het detail "nog niet
+  // bekend" toont. Welke pijler welke kant nodig heeft:
+  //   spaarquote        (inkomen − uitgaven) ÷ inkomen → BEIDE kanten
+  //   noodfonds         salaris-norm, terugval uitgaven-norm → ÉÉN van beide volstaat
+  //   schuldenlast      maandlasten ÷ inkomen → inkomen (alleen mét schuldlast)
+  //   FIRE-voortgang    doelvermogen rust op de uitgaven → uitgaven
+  const guard = grondslagGuard(input.incomeBasis, input.expensesBasis)
+  const incomeUnknown = input.incomeBasis === 'unknown'
+  const expensesUnknown = input.expensesBasis === 'unknown'
+  const unknownByBasis = new Set<string>()
+  if (incomeUnknown || expensesUnknown) unknownByBasis.add('savings_rate')
+  if (incomeUnknown && expensesUnknown) unknownByBasis.add('emergency_fund')
+  if (incomeUnknown && input.debtMonthlyPayments > 0) unknownByBasis.add('debt_service_ratio')
+  if (expensesUnknown) unknownByBasis.add('fire_progress')
+  for (const id of unknownByBasis) inactiveByData.add(id)
+
+  // Spaarquote — een waarde zodra inkomen én uitgaven bekend zijn (0 is dan een
+  // echte score); zonder grondslag is er geen quote, geen 0.
   const savingsRateScore = scoreSavingsRate(input.savingsRate6m)
 
   // Budgetdiscipline — inactief zonder budgetten (FR-5; geen 70-dummy meer).
@@ -912,6 +972,21 @@ export function computeHealthScoreFromInputs(
     ? 0
     : Math.round(pillars.reduce((sum, p) => sum + p.score * p.weight, 0))
 
+  // De weggevallen pijlers, in de vaste pijlervolgorde en binnen de module-set
+  // (een pijler die om een ándere reden al niet meedeed, hoort hier niet).
+  const moduleSet = resolveActiveSet(activeModules, budgetingActive, new Set())
+  const onbekend: HealthScoreOnbekend | null =
+    guard.ok || guard.ontbreekt == null || guard.hint == null || guard.actie == null
+      ? null
+      : {
+          ontbreekt: guard.ontbreekt,
+          pijlers: allPillars
+            .filter(p => unknownByBasis.has(p.id) && moduleSet.has(p.id))
+            .map(p => ({ id: p.id, name: p.name, pillarGroup: p.pillarGroup, groupLabel: p.groupLabel })),
+          hint: guard.hint,
+          actie: guard.actie,
+        }
+
   return {
     total,
     label: getLabel(total),
@@ -920,6 +995,7 @@ export function computeHealthScoreFromInputs(
     trend: 0,
     activePillarCount: pillars.length,
     budgetingActive: resolvedBudgetingActive,
+    onbekend,
   }
 }
 
@@ -976,4 +1052,21 @@ export function computeHealthScoreWithTrend(
 /** Get health label from a numeric score (for use with snapshot data) */
 export function getHealthLabel(score: number): string {
   return getLabel(score)
+}
+
+/**
+ * Wat een oppervlak van de score mag TONEN (ADR 0131). De ene presenter die
+ * cijfer en oordeel aan `onbekend` koppelt, zodat geen consument het getal los
+ * van de vraag "mag dit als oordeel op het scherm?" kan lezen. `total`/`label`
+ * blijven op `HealthScore` staan voor historie en trend; wie iets aan een
+ * gebruiker laat zien, leest ze via déze functie.
+ */
+export type HealthScoreVerdict =
+  | { kind: 'score'; total: number; label: string }
+  | { kind: 'onbekend'; onbekend: HealthScoreOnbekend }
+
+export function healthScoreVerdict(health: HealthScore): HealthScoreVerdict {
+  const onbekend = health.onbekend ?? null
+  if (onbekend) return { kind: 'onbekend', onbekend }
+  return { kind: 'score', total: health.total, label: health.label }
 }

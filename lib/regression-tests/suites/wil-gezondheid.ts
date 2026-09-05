@@ -874,6 +874,8 @@ const tests: TestCase[] = [
         savingsRate6m: 25, totalAssets: 125_000, totalDebts: 30_000,
         freedomPct: 40, avgMonthlyExpenses: 2_500, netMonthlyIncome: 4_000,
         netMonthlySalary: 4_000,
+        incomeBasis: 'manual' as const,
+        expensesBasis: 'manual' as const,
         // Legacy leeftijdsblind pad — de peer-relatieve fire_progress-cases
         // staan in financial-health.test.ts.
         currentAge: null,

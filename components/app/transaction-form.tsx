@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useId } from 'react'
 import { X, Save, Trash2, Repeat, GitFork, Plus, History, ArrowRight, FileText, BarChart3, Sparkles, Users, ArrowLeftRight } from 'lucide-react'
 import { CounterpartyAnalysisPanel } from '@/components/app/counterparty-analysis-panel'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -104,6 +104,11 @@ export function TransactionForm({
   secondaryAction?: React.ReactNode
 }) {
   const isEdit = !!transaction
+  // Het formulier en zijn Opslaan-knop staan in twee verschillende delen van
+  // de sheet (content vs. sticky footer). Het `form`-attribuut op de knop
+  // koppelt ze weer aan elkaar; `useId` houdt dat uniek als er twee
+  // formulieren tegelijk in de boom staan (analyse-paneel stapelt er één).
+  const formId = useId()
   const { hasHousehold } = useHouseholdStatus()
   const { dailyExpenseRate } = useDailyExpenseRate()
   const { addToast } = useOptionalToast()
@@ -623,6 +628,54 @@ export function TransactionForm({
       // venster tegelijk (ADR 0039), en Escape sluit dan alleen de vraag —
       // niet het formulier mét de ingevulde regel.
       suspended={bedragBevestiging !== null}
+      // Primaire acties horen in de niet-scrollende footer van de sheet, ook
+      // op klein scherm (modal-conventie, CLAUDE.md). Stonden hiervoor
+      // onderaan de scroll-content: op een 844px-viewport landden Annuleren en
+      // Opslaan daardoor op 849-886px — buiten beeld (UR3-17 #20).
+      // De Opslaan-knop blijft een `type="submit"` en hoort via het
+      // `form`-attribuut bij het formulier hierboven, zodat de native
+      // required-validatie op datum/bedrag/omschrijving blijft werken.
+      footerSlot={
+        phase === 'form' ? (
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              {isEdit && (
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors ${
+                    confirmDelete
+                      ? 'bg-red-600 text-white hover:bg-red-700'
+                      : 'text-red-600 hover:bg-red-50'
+                  }`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {confirmDelete ? 'Bevestig verwijderen' : 'Verwijderen'}
+                </button>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+              >
+                Annuleren
+              </button>
+              <button
+                type="submit"
+                form={formId}
+                disabled={saving}
+                className="inline-flex items-center gap-2 bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+              >
+                <Save className="h-4 w-4" />
+                {saving ? 'Opslaan...' : 'Opslaan'}
+              </button>
+            </div>
+          </div>
+        ) : undefined
+      }
     >
       {phase === 'analyse' && transaction && (
         <CounterpartyAnalysisPanel
@@ -671,7 +724,7 @@ export function TransactionForm({
       )}
 
       {phase === 'form' && (
-        <form onSubmit={handleSubmit} className="p-6">
+        <form id={formId} onSubmit={handleSubmit} className="p-6">
           {error && (
             <div className="mb-4 border border-red-200 bg-red-50 p-3 text-sm text-red-700">
               {error}
@@ -1090,43 +1143,6 @@ export function TransactionForm({
 
           {isEdit && secondaryAction}
 
-          {/* Actions */}
-          <div className="mt-4 flex items-center justify-between border-t border-[var(--border-ed)] pt-4">
-            <div>
-              {isEdit && (
-                <button
-                  type="button"
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors ${
-                    confirmDelete
-                      ? 'bg-red-600 text-white hover:bg-red-700'
-                      : 'text-red-600 hover:bg-red-50'
-                  }`}
-                >
-                  <Trash2 className="h-4 w-4" />
-                  {confirmDelete ? 'Bevestig verwijderen' : 'Verwijderen'}
-                </button>
-              )}
-            </div>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-              >
-                Annuleren
-              </button>
-              <button
-                type="submit"
-                disabled={saving}
-                className="inline-flex items-center gap-2 bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
-              >
-                <Save className="h-4 w-4" />
-                {saving ? 'Opslaan...' : 'Opslaan'}
-              </button>
-            </div>
-          </div>
         </form>
       )}
     </BottomSheet>

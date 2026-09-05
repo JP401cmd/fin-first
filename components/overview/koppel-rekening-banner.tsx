@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Link2, Plus } from 'lucide-react'
+import { BANK_CONNECT_SAFETY_LONG } from '@/lib/bank-connect-copy'
 
 /**
  * KoppelRekeningBanner — de uitnodiging om je bank te koppelen, bovenaan
@@ -47,8 +48,12 @@ export function KoppelRekeningBanner({
           </h2>
           <p className="text-xs text-[var(--ink-2)] mt-1 leading-snug">
             Met PSD2 worden transacties automatisch geïmporteerd en
-            gecategoriseerd. Veilig via TrueLayer — geen
-            inloggegevens bij TriFinity.
+            gecategoriseerd.
+          </p>
+          {/* Eén canonieke veiligheidszin voor alle bank-uitnodigingen
+              (UR3-15) — deze banner had een eigen, kortere formulering. */}
+          <p className="text-xs text-[var(--ink-3)] mt-1 leading-snug">
+            {BANK_CONNECT_SAFETY_LONG}
           </p>
         </div>
       </header>

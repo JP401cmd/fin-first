@@ -950,6 +950,10 @@ function buildHealth(ctx: EngineContext, fireAgeFractional: number | null): Chec
       netMonthlyIncome: ctx.netMonthlyIncome,
       // Noodbuffer-norm: 3 × netto maandsalaris (lib/emergency-fund.ts).
       netMonthlySalary: ctx.netMonthlyIncome,
+      // De intake vraagt inkomen én uitgaven verplicht — per constructie
+      // opgegeven, nooit 'unknown' (ADR 0131).
+      incomeBasis: 'manual',
+      expensesBasis: 'manual',
     },
     {
       // Noodfonds zit nu als cash-asset in portfolio.assets (SSoT) — geen losse

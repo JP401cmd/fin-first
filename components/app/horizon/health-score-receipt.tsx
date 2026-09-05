@@ -7,7 +7,9 @@ import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { BottomSheet } from '@/components/app/bottom-sheet'
 import { useChatContext } from '@/components/app/chat/chat-provider'
-import type { HealthScore, HealthPillar, PillarGroup } from '@/lib/financial-health'
+import { healthScoreVerdict, type HealthScore, type HealthPillar, type PillarGroup, type HealthScoreOnbekend } from '@/lib/financial-health'
+import { GRONDSLAG_ONBEKEND_LABEL } from '@/lib/grondslag-guard'
+import { Button } from '@/components/editorial'
 
 // ── Pillar-group presentatie-metadata ────────────────────────
 // Vaste volgorde + leesbaar label voor de vier gedragspijlers (ADR 0010).
@@ -533,6 +535,11 @@ export function HealthScoreReceipt({
   // Always use the live computed total from the weighted average of pillars.
   const displayTotal = health.total
   const displayLabel = health.label
+  // Onbekend is geen nul (ADR 0131): zonder inkomen/uitgaven toont de kop géén
+  // cijfer en géén oordeel; de weggevallen pijlers staan als "nog niet bekend"
+  // in hun eigen sectie, niet als 0 %.
+  const verdict = healthScoreVerdict(health)
+  const onbekend = verdict.kind === 'onbekend' ? verdict.onbekend : null
 
   // Welke pijler staat open in de "maak er een actie van"-popup.
   const [actionPillar, setActionPillar] = useState<HealthPillar | null>(null)
@@ -554,17 +561,30 @@ export function HealthScoreReceipt({
       <KassabonShell>
         <div className="flex items-center justify-between border-b border-dashed border-[var(--border-md)] pb-2 mb-2">
           <span className="text-xs text-[var(--ink-3)]">FINANCI&Euml;LE GEZONDHEID</span>
-          <span
-            className={`font-mono text-lg font-bold tabular-nums ${scoreColorClass(displayTotal)}`}
-            aria-label={`Totaalscore ${displayTotal} van 100`}
-          >
-            {displayTotal}/100
-          </span>
+          {onbekend ? (
+            <span className="font-mono text-sm font-bold text-[var(--ink-3)]">{GRONDSLAG_ONBEKEND_LABEL}</span>
+          ) : (
+            <span
+              className={`font-mono text-lg font-bold tabular-nums ${scoreColorClass(displayTotal)}`}
+              aria-label={`Totaalscore ${displayTotal} van 100`}
+            >
+              {displayTotal}/100
+            </span>
+          )}
         </div>
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-[var(--ink-3)]">Beoordeling</span>
-          <span className={`font-medium ${scoreColorClass(displayTotal)}`}>{displayLabel}</span>
-        </div>
+        {onbekend ? (
+          <div className="flex flex-col gap-2 text-xs">
+            <p className="text-[var(--ink-2)]">{onbekend.hint}</p>
+            <Button href={onbekend.actie.href} size="sm" className="self-start">
+              {onbekend.actie.label}
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-[var(--ink-3)]">Beoordeling</span>
+            <span className={`font-medium ${scoreColorClass(displayTotal)}`}>{displayLabel}</span>
+          </div>
+        )}
         {health.previousMonth !== null && (
           <div className="flex items-center justify-between text-xs mt-1">
             <span className="text-[var(--ink-3)]">Vorige maand</span>
@@ -646,6 +666,8 @@ export function HealthScoreReceipt({
           />
         ))}
 
+        {onbekend && <OnbekendPillarsSection onbekend={onbekend} />}
+
         {/* Overige indicatoren zonder gedragsgroep (backward-compat / fixtures) */}
         {ungrouped.length > 0 && (
           <section aria-label="Overige indicatoren" className="space-y-2">
@@ -675,6 +697,38 @@ export function HealthScoreReceipt({
       {/* Popup: maak een actie van de pijler-suggestie */}
       <PillarActionPopup pillar={actionPillar} onClose={() => setActionPillar(null)} />
     </div>
+  )
+}
+
+// ── Weggevallen pijlers (ADR 0131: onbekend is geen nul) ──
+// De pijlers die inkomen/uitgaven nodig hebben en daarom geen score hebben.
+// Bewust géén balk en géén percentage: "nog niet bekend" is de hele waarde.
+
+function OnbekendPillarsSection({ onbekend }: { onbekend: HealthScoreOnbekend }) {
+  if (onbekend.pijlers.length === 0) return null
+  return (
+    <section
+      aria-label="Pijlers die nog niet bekend zijn"
+      className="rounded-[var(--r-sm)] border border-dashed border-[var(--border-ed)] bg-[var(--paper)] overflow-hidden"
+    >
+      <div className="flex items-center justify-between px-3 py-2 border-b border-dashed border-[var(--border-ed)]">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ink-3)]">
+          {GRONDSLAG_ONBEKEND_LABEL}
+        </span>
+        <span className="text-[10px] text-[var(--ink-4)]">telt niet mee</span>
+      </div>
+      <ul className="divide-y divide-dashed divide-[var(--border-ed)]">
+        {onbekend.pijlers.map(p => (
+          <li key={p.id} className="flex items-center justify-between px-3 py-2 text-xs">
+            <span className="text-[var(--ink)]">
+              {p.name}
+              {p.groupLabel && <span className="ml-1.5 text-[10px] text-[var(--ink-4)]">· {p.groupLabel}</span>}
+            </span>
+            <span className="font-mono text-[var(--ink-3)]">{GRONDSLAG_ONBEKEND_LABEL.toLowerCase()}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 

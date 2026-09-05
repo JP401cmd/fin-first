@@ -20,6 +20,7 @@ import {
 import { LINKED_DEBT_SUGGESTIONS } from '@/lib/asset-data'
 import type { DebtQuickInput, QuickAddInput } from '@/lib/quick-add/types'
 import { formatCurrency } from '@/lib/format'
+import { dataNoteFor } from '@/lib/onboarding/data-note-copy'
 import {
   phaseKey,
   useSectionPhaseNav,
@@ -371,7 +372,12 @@ export function OnboardingSchulden({
           deck={
             isMore
               ? 'Voeg er gerust meer toe — of ga door naar de volgende vraag.'
-              : 'Een schuld is vrijheid die je stap voor stap terugkoopt. Heb je deze niet? Tik op "Nee".'
+              : 'Een schuld is vrijheid die je stap voor stap terugkoopt — met het bedrag en de rente reken ik uit wanneer je vrij bent. Heb je deze niet? Tik op "Nee".'
+          }
+          // Alleen bij de ingang van de sectie; op elke micro-vraag herhalen
+          // maakt er een refrein van (UR3-10, één ding tegelijk).
+          dataNote={
+            !isMore && phase.qIndex === 0 ? dataNoteFor('schulden') : undefined
           }
           onYes={() => setWizardType(q.type)}
           onNo={() => nextAfterQuestion(phase.qIndex)}

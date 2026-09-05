@@ -38,8 +38,13 @@ const CONSERVATIVE_RATE = 0.005 // spaarrente ~0.5%
 const AMBITIOUS_RATE = 0.07 // belegd lange-termijn ~7%
 const HORIZON_YEARS = 30
 
-/** CTA-varianten: first-use vs. gevuld (kaart H15, uiux "Empty states"). */
-const CTA_FIRST_USE = { label: 'Start met beleggen', href: '/overzicht/bezittingen' }
+/**
+ * CTA-varianten: first-use vs. gevuld (kaart H15, uiux "Empty states").
+ * "Start met beleggen" was een aansporing tot een concrete geldhandeling
+ * (Wft-grens, kaart UR3-03/UR3-15) — het label is nu beschrijvend/navigatie,
+ * net als CTA_INVESTED hieronder.
+ */
+const CTA_FIRST_USE = { label: 'Bekijk beleggen', href: '/overzicht/bezittingen' }
 const CTA_INVESTED = {
   label: 'Bekijk je portefeuille',
   href: '/overzicht/bezittingen/investment?tab=aandelen-holdings',

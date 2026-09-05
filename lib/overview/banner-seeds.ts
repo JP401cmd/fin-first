@@ -18,10 +18,47 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 // ── CheckinBanner ────────────────────────────────────────────────────────────
 
-export type CheckinBannerSeed = { enabled: boolean; completed: boolean }
+/** Wat de server over de check-in zelf weet (prefs + voltooiing). */
+export type CheckinBannerBase = { enabled: boolean; completed: boolean }
+
+/** Wat de banner uiteindelijk krijgt: de basis plus de accountleeftijd-gate. */
+export type CheckinBannerSeed = CheckinBannerBase & { eligible: boolean }
 
 function currentMonthKey(now = new Date()): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
+/**
+ * Mag de check-in-banner überhaupt verschijnen? (UR3-10, AC 3)
+ *
+ * De banner nodigt uit tot een TERUGBLIK op de vorige maand. Op dag één van een
+ * vers account is er niets om op terug te blikken, en stond hij toch bovenaan —
+ * naast de rondleiding, de coachmark en Fins tip. De gate is bewust op TIJD, niet
+ * op data: "eerst boekingen hebben" zou functionaliteit verbergen op grond van
+ * iemands financiële situatie, en dat is precies wat ADR 0001 uitsluit.
+ *
+ * De regel (optie C1, besluit eigenaar 5 sep 2026): het account moet zijn
+ * aangemaakt vóór de 1e van de HUIDIGE maand. Een account van september ziet de
+ * banner dus voor het eerst op 1–7 oktober.
+ *
+ * ONBEKEND IS GEEN NUL (ADR 0131): zonder bruikbare `created_at` kunnen we niet
+ * vaststellen dát het account ouder is dan deze maand, dus luidt het antwoord
+ * `false` — niet "dan maar tonen". Dat is een nudge die wegblijft, geen getal
+ * dat verkeerd wordt.
+ *
+ * Tijdzone: de vergelijking draait op de lokale tijd van de server-render
+ * (Europe/Amsterdam in productie). Een uur speling rond middernacht op de 1e
+ * verschuift hooguit de dag waarop de nudge voor het eerst verschijnt.
+ */
+export function isCheckinBannerEligible(
+  createdAt: string | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  if (!createdAt) return false
+  const created = new Date(createdAt)
+  if (Number.isNaN(created.getTime())) return false
+  const firstOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0)
+  return created.getTime() < firstOfThisMonth.getTime()
 }
 
 /**
@@ -32,7 +69,7 @@ function currentMonthKey(now = new Date()): string {
 export async function loadCheckinBannerSeed(
   supabase: SupabaseClient,
   userId: string,
-): Promise<CheckinBannerSeed> {
+): Promise<CheckinBannerBase> {
   try {
     const [checkinRes, prefsRes] = await Promise.all([
       supabase

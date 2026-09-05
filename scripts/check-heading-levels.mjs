@@ -103,7 +103,6 @@ const RESIDUE_ENTRIES = [
   'app/(app)/core/belasting/page.tsx',
   'app/(app)/core/cash/connect/page.tsx',
   'app/(app)/core/cash/connect/success/page.tsx',
-  'app/(app)/core/checkin/page.tsx',
   'app/(app)/core/debts/[type]/page.tsx',
   'app/(app)/core/page.tsx',
   'app/(app)/rapportages/[id]/components/report-masthead.tsx',

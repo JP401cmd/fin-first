@@ -5,7 +5,7 @@
  * compliance-poort en ze moeten kort blijven. Deze suite bewaakt precies de
  * vier dingen die stilletjes kunnen verschuiven zonder dat iets rood wordt:
  *
- *  1. het AANTAL stappen per platform (9 desktop / 8 mobiel);
+ *  1. het AANTAL stappen per platform (10 desktop / 9 mobiel);
  *  2. het WOORDBUDGET — op volle én op lege data, want juist de lege staat
  *     groeit ongemerkt (uitleg vervangt cijfer);
  *  3. de DATA-AFHANKELIJKE takken: welkom noemt een eigen getal, privacymodus
@@ -16,6 +16,8 @@
  */
 
 import { describe, it, expect } from 'vitest'
+import { formatFreedomRateFootnote } from '@/lib/format'
+import { HOUSING_BASIS_LABEL } from '@/lib/housing-choice'
 import {
   RONDLEIDING_MAX_WOORDEN,
   RONDLEIDING_STAPPEN,
@@ -45,6 +47,10 @@ const VOL: RondleidingData = {
   largestAssetTypeShare: 0.42,
   health: { total: 72, label: 'Sterk' },
   currentNetWorth: 146870,
+  // Eigen woning die MEETELT (de 'sell'-keuze): overwaarde € 215.000, dus wat er
+  // zonder huis overblijft is negatief — precies de rand die de kaarten moeten
+  // overleven zonder "je overzicht is nog leeg" te zeggen.
+  woning: { uitgesloten: false, netWorthExclHome: -68130 },
   dailyExpenseRate: 92.4,
   isPensioen: false,
   vrijheid: {
@@ -69,10 +75,23 @@ const LEEG: RondleidingData = {
   largestAssetTypeShare: null,
   health: null,
   currentNetWorth: 0,
+  woning: null,
   dailyExpenseRate: 0,
   isPensioen: false,
   vrijheid: null,
 }
+
+/**
+ * Woning UITGESLOTEN van FIRE ("nee — hij telt niet mee") met een positief
+ * restvermogen: de tak waarin de kaarten op `netWorthExclHome` rekenen.
+ */
+const ZONDER_HUIS: RondleidingData = {
+  ...VOL,
+  woning: { uitgesloten: true, netWorthExclHome: 84200 },
+}
+
+/** Huurder: geen woning, dus geen grondslag om achter het bedrag te zetten. */
+const ZONDER_WONING: RondleidingData = { ...VOL, housingSplit: null, woning: null }
 
 /** Alle bodies van één platform, in één keer. */
 function bodies(data: RondleidingData, platform: 'desktop' | 'mobiel', masked = false) {
@@ -85,9 +104,9 @@ function bodies(data: RondleidingData, platform: 'desktop' | 'mobiel', masked = 
 // ── 1. Aantallen per platform ───────────────────────────────────────────────
 
 describe('rondleiding — stappen per platform', () => {
-  it('telt 9 stappen op desktop en 8 op mobiel', () => {
-    expect(resolveRondleidingStappen('desktop')).toHaveLength(9)
-    expect(resolveRondleidingStappen('mobiel')).toHaveLength(8)
+  it('telt 10 stappen op desktop en 9 op mobiel', () => {
+    expect(resolveRondleidingStappen('desktop')).toHaveLength(10)
+    expect(resolveRondleidingStappen('mobiel')).toHaveLength(9)
   })
 
   it('desktop kent zijbalk én Fin apart; mobiel bundelt ze in de nav-pill', () => {
@@ -109,10 +128,25 @@ describe('rondleiding — stappen per platform', () => {
     expect(resolveRondleidingStappen('mobiel').at(-1)?.id).toBe('pill')
   })
 
-  it('elke stap behalve het welkom hoort bij een hoofdstuk', () => {
+  // Het welkom en de wisselkoers vormen samen de OPENING: geen spotlight, geen
+  // hoofdstuk, kicker "Rondleiding". Pas daarna beginnen de drie hoofdstukken
+  // waar de stippen op lopen; een hoofdstuk-stip vóór het eerste hoofdstuk zou
+  // de voortgang laten terugspringen.
+  it('alleen het welkom en de wisselkoers staan buiten een hoofdstuk', () => {
     for (const stap of RONDLEIDING_STAPPEN) {
-      if (stap.id === 'welkom') expect(stap.hoofdstuk).toBeUndefined()
-      else expect(stap.hoofdstuk).toBeDefined()
+      if (stap.id === 'welkom' || stap.id === 'wisselkoers') {
+        expect(stap.hoofdstuk, `stap "${stap.id}"`).toBeUndefined()
+      } else {
+        expect(stap.hoofdstuk, `stap "${stap.id}"`).toBeDefined()
+      }
+    }
+  })
+
+  it('legt de wisselkoers uit vóór het eerste tijdgetal op de hefboomtegels', () => {
+    for (const platform of ['desktop', 'mobiel'] as const) {
+      const ids = resolveRondleidingStappen(platform).map((s) => s.id)
+      expect(ids[1], platform).toBe('wisselkoers')
+      expect(ids.indexOf('wisselkoers')).toBeLessThan(ids.indexOf('hefboom-bezittingen'))
     }
   })
 })
@@ -153,6 +187,29 @@ describe('rondleiding — woordbudget', () => {
     }
   })
 
+  it('houdt het budget mét de grondslag-markering — ook op de langste variant', () => {
+    // De markering kost drie woorden op twee kaarten (K4). De duurste
+    // combinatie is de grafiekstap in pensioenmodus: daar groeit de canonieke
+    // vrijheidszin óók nog met "(AOW-leeftijd)". Blijft dít binnen het budget,
+    // dan blijven de goedkopere varianten dat per definitie ook.
+    const varianten: RondleidingData[] = [
+      ZONDER_HUIS,
+      ZONDER_WONING,
+      { ...VOL, isPensioen: true },
+      { ...ZONDER_HUIS, isPensioen: true },
+    ]
+    for (const platform of ['desktop', 'mobiel'] as const) {
+      for (const data of varianten) {
+        for (const b of bodies(data, platform)) {
+          expect(
+            telWoorden(b.tekst),
+            `stap "${b.id}" is te lang: ${telWoorden(b.tekst)} woorden — "${b.tekst}"`,
+          ).toBeLessThanOrEqual(RONDLEIDING_MAX_WOORDEN)
+        }
+      }
+    }
+  })
+
   it('geen enkele stap is leeg', () => {
     for (const platform of ['desktop', 'mobiel'] as const) {
       for (const data of [VOL, LEEG]) {
@@ -182,6 +239,38 @@ describe('rondleiding — het welkom toont waarde vóór het om tijd vraagt', ()
     expect(welkom.tekst).not.toContain('€')
     expect(welkom.tekst).toMatch(/nog leeg/)
     expect(welkom.tekst).toMatch(/\bik ben Fin\b/)
+  })
+})
+
+describe('rondleiding — de wisselkoers-stap legt de deling uit', () => {
+  const koers = (data: RondleidingData, masked = false) =>
+    bodies(data, 'desktop', masked).find((b) => b.id === 'wisselkoers')!
+
+  it('noemt de mechaniek én het dagtarief uit de canonieke voetnoot', () => {
+    const b = koers(VOL)
+    expect(b.tekst).toMatch(/gedeeld door wat je per dag uitgeeft/)
+    expect(b.tekst).toContain(formatFreedomRateFootnote(VOL.dailyExpenseRate, 'transactions', false)!)
+  })
+
+  it('benoemt een profielschatting als schatting', () => {
+    const b = koers({ ...VOL, dailyExpenseRateSource: 'estimate' })
+    expect(b.tekst).toMatch(/schatting/i)
+  })
+
+  it('voegt geen nieuw tijdgetal toe (eigenaarsbesluit 2)', () => {
+    expect(koers(VOL).tekst).not.toMatch(/vrijheid/i)
+  })
+
+  it('zwijgt over het tarief zonder grondslag, en zegt waarom', () => {
+    const b = koers(LEEG)
+    expect(b.tekst).not.toContain('€')
+    expect(b.tekst).toMatch(/Zodra ik je uitgaven ken/)
+  })
+
+  it('noemt in privacymodus geen tarief, met een eigen reden', () => {
+    const b = koers(VOL, true)
+    expect(b.tekst).not.toContain('€')
+    expect(b.tekst).toMatch(/verborgen/)
   })
 })
 
@@ -274,6 +363,77 @@ describe('rondleiding — spreiding leest dezelfde drempel als de gezondheidspij
     expect(b.tekst).not.toContain('vooral in één soort')
     expect(b.tekst).toContain('4 soorten')
     expect(b.tekst).toContain('goed gespreid')
+  })
+})
+
+// ── 3b. Grondslag van het vrijheidsgetal (UR3-04, besluiten K3 en K4) ──────
+//
+// Het defect: één gebruiker zag binnen twee minuten drie verschillende
+// "vrijheidsgetallen" — liquide op het onboarding-eindscherm, netto vermogen
+// incl. woning op de welkom- en grafiekkaart, en BRUTO bezittingen op de
+// bezittingenkaart, geen van drieën gelabeld. Deze suite pint beide besluiten.
+
+describe('rondleiding — elk vrijheidsgetal draagt zijn grondslag', () => {
+  const kaart = (id: string, data: RondleidingData) =>
+    bodies(data, 'desktop').find((b) => b.id === id)!
+
+  it('K3 — de bezittingenkaart vertaalt het bruto bedrag NIET naar tijd', () => {
+    const b = kaart('hefboom-bezittingen', VOL)
+    expect(b.tekst).toContain('368.270')
+    // Geen tijdvertaling, in geen enkele vorm: niet het woord, niet de eenheid.
+    expect(b.tekst).not.toMatch(/vrijheid/i)
+    expect(b.tekst).not.toMatch(/\d+\s+(jaar|maanden?|dagen?)\b/)
+  })
+
+  it('K4 — welkom en grafiek noemen hetzelfde bedrag, mét de woon-grondslag', () => {
+    for (const id of ['welkom', 'grafiek']) {
+      const b = kaart(id, VOL)
+      expect(b.tekst, id).toContain('146.870')
+      expect(b.tekst, id).toContain(HOUSING_BASIS_LABEL.inclHome)
+      expect(b.tekst, id).toMatch(/vrijheid/)
+    }
+  })
+
+  it('K4 — sluit de gebruiker zijn woning uit, dan rekenen ze zónder huis', () => {
+    for (const id of ['welkom', 'grafiek']) {
+      const b = kaart(id, ZONDER_HUIS)
+      expect(b.tekst, id).toContain('84.200')
+      // Het incl.-woning-getal mag hier nergens meer opduiken.
+      expect(b.tekst, id).not.toContain('146.870')
+      expect(b.tekst, id).toContain(HOUSING_BASIS_LABEL.exclHome)
+    }
+  })
+
+  it('zwijgt over de grondslag zonder eigen woning — een huurder heeft geen huis', () => {
+    for (const id of ['welkom', 'grafiek']) {
+      const b = kaart(id, ZONDER_WONING)
+      expect(b.tekst, id).toContain('146.870')
+      expect(b.tekst, id).not.toMatch(/je huis/i)
+    }
+  })
+
+  it('belooft geen vrijheid als er zónder huis niets positiefs overblijft', () => {
+    // Overwaarde groter dan het netto vermogen (studieschuld, restschuld): dan
+    // geen "2 jaar achter" en al helemaal geen "je overzicht is nog leeg".
+    const negatief: RondleidingData = {
+      ...VOL,
+      woning: { uitgesloten: true, netWorthExclHome: -68130 },
+    }
+    for (const id of ['welkom', 'grafiek']) {
+      const b = kaart(id, negatief)
+      expect(b.tekst, id).toContain('nog niet in de plus')
+      expect(b.tekst, id).not.toMatch(/nog leeg/)
+      expect(b.tekst, id).not.toMatch(/achter/)
+      expect(b.tekst, id).not.toContain('68.130')
+    }
+  })
+
+  it('noemt in privacymodus geen grondslag — er staat immers geen bedrag', () => {
+    for (const id of ['welkom', 'grafiek']) {
+      const b = bodies(ZONDER_HUIS, 'desktop', true).find((x) => x.id === id)!
+      expect(b.tekst, id).not.toMatch(/je huis/i)
+      expect(b.tekst, id).not.toContain('84.200')
+    }
   })
 })
 

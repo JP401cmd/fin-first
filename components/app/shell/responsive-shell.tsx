@@ -32,6 +32,7 @@ import { FloatingNavButton } from '@/components/app/shell/floating-nav-button'
 import { DailyExpenseProvider } from '@/components/app/freedom-time-label'
 import { Sidebar } from '@/components/app/shell/sidebar'
 import { MobileStackShell } from '@/components/app/shell/mobile-stack-shell'
+import { userInitials, userDisplayName } from '@/lib/user-initials'
 import { NavStackProvider } from '@/components/app/shell/nav-stack-provider'
 import { MobileAppStripProvider } from '@/components/app/shell/mobile-app-strip-state'
 import {
@@ -43,8 +44,14 @@ import {
 } from '@/components/app/shell/shell-contexts'
 
 export type ResponsiveShellProps = {
-  /** Email van de ingelogde user — initials/name worden hieruit afgeleid voor de Sidebar profile-pill. */
+  /** Email van de ingelogde user — terugval voor initialen/naam als het profiel geen `full_name` draagt. */
   email: string
+  /**
+   * `profiles.full_name` van de ingelogde user (own-row, al geladen in
+   * `app/(app)/layout.tsx`). Wint van het e-mailadres voor de profiel-pill in
+   * de Sidebar én het avatar-rondje in de TopBar — zie `lib/user-initials.ts`.
+   */
+  fullName?: string | null
   /** Role van de user (default 'user'). Bepaalt zichtbaarheid van de superadmin-link in de Sidebar en TopBar avatar-dropdown. */
   role?: string
   /**
@@ -57,39 +64,9 @@ export type ResponsiveShellProps = {
   children: ReactNode
 }
 
-/**
- * Leid 1-2 letter initialen af uit een email-adres voor de Sidebar profiel-pill.
- * Pakt de eerste twee tekens van het deel vóór de `@` en zet ze in uppercase.
- *
- * Voorbeelden:
- *   getInitials('jan@example.com')          → 'JA'
- *   getInitials('a@b.com')                  → 'A'
- *   getInitials('jpsmit@jps-holding.nl')    → 'JP'
- *   getInitials('')                         → '?'
- */
-function getInitials(email: string): string {
-  if (!email) return '?'
-  const localPart = email.split('@')[0] ?? ''
-  if (!localPart) return '?'
-  const slice = localPart.slice(0, 2)
-  return slice.toUpperCase()
-}
-
-/**
- * Leid een vriendelijke gebruikersnaam af uit een email-adres voor display
- * in de Sidebar profiel-pill. We pakken het deel vóór de `@` en laten verdere
- * verfraaiing aan latere fases over (bv. echte profile.full_name uit de DB).
- *
- * Voorbeelden:
- *   getUserName('jan@example.com')          → 'jan'
- *   getUserName('jpsmit@jps-holding.nl')    → 'jpsmit'
- *   getUserName('')                         → 'Account'
- */
-function getUserName(email: string): string {
-  if (!email) return 'Account'
-  const localPart = email.split('@')[0] ?? ''
-  return localPart || 'Account'
-}
+// Initialen en weergavenaam komen uit `lib/user-initials.ts` — één regel voor
+// de Sidebar-pill én het TopBar-avatar (UR3-17 #27b). Eerder leidde elk
+// oppervlak zijn eigen letters af uit het e-mailadres.
 
 // ── Portal subscribe-helpers (canonical client-only-detect pattern) ─────────
 //
@@ -121,12 +98,13 @@ function SidebarPortal({ children }: { children: ReactNode }) {
 
 function ShellContent({
   email,
+  fullName,
   role,
   sidebarMetrics,
   children,
 }: ResponsiveShellProps) {
-  const initials = getInitials(email)
-  const userName = getUserName(email)
+  const initials = userInitials(fullName, email)
+  const userName = userDisplayName(fullName, email)
 
   // Sidebar-kerncijfers komen uit `app/(app)/layout.tsx` (server) — netWorth
   // weegt mee via net_worth_inclusion_pct (consistent met dashboard), actionCount
@@ -173,7 +151,7 @@ function ShellContent({
               één keer; de mobiele chrome hangt als CSS-gegate siblings in
               dezelfde boom, dus er is geen tweede breakpoint-tak meer. */}
           <div id="main-content" tabIndex={-1} className="outline-none">
-            <MobileStackShell email={email} role={role}>{children}</MobileStackShell>
+            <MobileStackShell email={email} initials={initials} role={role}>{children}</MobileStackShell>
           </div>
         </DailyExpenseProvider>
       </ChatLayoutWrapper>

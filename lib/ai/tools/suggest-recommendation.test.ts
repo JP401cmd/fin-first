@@ -170,3 +170,51 @@ describe('suggestRecommendation', () => {
     expect(capture.insert!.euro_impact_yearly).toBeNull()
   })
 })
+
+/**
+ * Wft-grendel op het tool-schema (kaart UR3-03, bevinding #3): "Beleg
+ * € 50.000 via je Meesman-portefeuille" glipte door de tipkaart-tool heen
+ * omdat title/description volledig vrije tekst waren. `tool.inputSchema` is
+ * de identity-wrapped zod-schema (ai-sdk's `tool()` retourneert 'm ongewijzigd
+ * — geverifieerd tegen @ai-sdk/provider-utils), dus we toetsen 'm hier direct
+ * met safeParse, zonder de execute-laag/Supabase-mock nodig te hebben.
+ */
+describe('suggestRecommendation — Wft-grendel op tip-tekst', () => {
+  const supabase = makeSupabaseMock({ data: SAMPLE_DB_ROW, error: null }, {})
+  const tool = createSuggestRecommendationTool(supabase, 'user-123')
+
+  function parse(overrides: Partial<typeof SAMPLE_INPUT>) {
+    return (tool.inputSchema as { safeParse: (v: unknown) => { success: boolean } }).safeParse({
+      ...SAMPLE_INPUT,
+      ...overrides,
+    })
+  }
+
+  it('accepteert de normale, beschrijvende voorbeeld-tip', () => {
+    expect(parse({}).success).toBe(true)
+  })
+
+  it('weigert een productnaam in de titel', () => {
+    const result = parse({ title: 'Beleg via je Meesman-portefeuille' })
+    expect(result.success).toBe(false)
+  })
+
+  it('weigert een bedrag als opdracht in de description (de live bevinding)', () => {
+    const result = parse({ description: 'Beleg € 50.000 via je Meesman-portefeuille voor meer rendement.' })
+    expect(result.success).toBe(false)
+  })
+
+  it('weigert dezelfde formulering in een suggested_action', () => {
+    const result = parse({
+      suggested_actions: [
+        {
+          title: 'Stort €12.000 in een lijfrente',
+          description: 'Via DeGiro',
+          freedom_days_impact: 10,
+          euro_impact_monthly: -1000,
+        },
+      ],
+    })
+    expect(result.success).toBe(false)
+  })
+})

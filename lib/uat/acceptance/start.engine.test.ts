@@ -21,7 +21,7 @@ import { UAT_SCENARIOS } from '@/lib/uat/catalog'
 import type { AcceptanceCriterion } from './types'
 
 /** De START-scenario's zoals de catalogus ze kent (bron van waarheid voor
- *  WELKE workflows bestaan). START is aaneengesloten 01..28, geen gaten. */
+ *  WELKE workflows bestaan). START is aaneengesloten 01..29, geen gaten. */
 const catalogStartWorkflows = UAT_SCENARIOS.filter((s) => s.zone === 'START').map((s) => s.wf).sort()
 
 function criterion(workflow: string): AcceptanceCriterion {
@@ -31,11 +31,11 @@ function criterion(workflow: string): AcceptanceCriterion {
 }
 
 describe('UAT Start — acceptatiecriteria dekking', () => {
-  it('heeft precies één criterium per catalogus-START-scenario (01..28, geen gaten)', () => {
+  it('heeft precies één criterium per catalogus-START-scenario (01..29, geen gaten)', () => {
     const workflows = START_ACCEPTANCE.criteria.map((c) => c.workflow).sort()
     expect(workflows).toEqual(catalogStartWorkflows)
     expect(new Set(workflows).size).toBe(catalogStartWorkflows.length)
-    expect(workflows.length).toBe(28)
+    expect(workflows.length).toBe(29)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {

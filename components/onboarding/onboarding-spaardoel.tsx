@@ -18,6 +18,7 @@ import {
   type SpaardoelPresetKey,
 } from '@/lib/onboarding-presets'
 import type { GoalSlug } from '@/lib/goals/types'
+import { dataNoteFor } from '@/lib/onboarding/data-note-copy'
 
 /**
  * Stap v. — Spaardoel.
@@ -320,6 +321,7 @@ export function OnboardingSpaardoel({
       romanNum="vi."
       title={headline}
       deck="Met een spaardoel bepaal je zelf hoeveel vrijheid je opzijzet. Sla over kan altijd — je past het later aan in De Toekomst."
+      dataNote={dataNoteFor('spaardoel')}
       factsPanel={
         <FactsPanel
           stat="76%"

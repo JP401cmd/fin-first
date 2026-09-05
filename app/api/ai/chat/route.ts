@@ -12,6 +12,7 @@ import { checkTierGate } from '@/lib/require-tier'
 import { assertCloudAllowed } from '@/lib/ai/privacy-gate'
 import { checkCreditBudget, creditLimitMessage } from '@/lib/ai/credit-gate'
 import { AI_ERROR_CODE, describeAiError } from '@/lib/ai/error-copy'
+import { classifyProviderError } from '@/lib/ai/provider-error'
 import { unauthorized, errorResponse } from '@/lib/api/respond'
 
 /* AI response timeout in milliseconds (60 seconds) */
@@ -250,7 +251,10 @@ export async function POST(req: Request) {
     const rawStream = result.toUIMessageStream({
       onError: (err: unknown) => {
         console.error('[ai-chat:stream]', err)
-        const copy = describeAiError(AI_ERROR_CODE.streamFailed)
+        // Structureel (provider weigert, retry kan dit nooit oplossen) vs.
+        // tijdelijk (bestaand gedrag: retry-knop, ongewijzigd) — H27/UR3-09.
+        const code = classifyProviderError(err) === 'refused' ? AI_ERROR_CODE.providerRefused : AI_ERROR_CODE.streamFailed
+        const copy = describeAiError(code)
         return JSON.stringify({ error: copy.text, code: copy.code })
       },
     })
@@ -282,6 +286,10 @@ export async function POST(req: Request) {
     // gaat met stack + grep-bare tag naar het serverlog, de client krijgt de
     // curated tekst plus een code waarop hij de affordance kan bepalen.
     console.error('[ai-chat:POST]', err, err instanceof Error ? err.stack : '')
+    if (classifyProviderError(err) === 'refused') {
+      const copy = describeAiError(AI_ERROR_CODE.providerRefused)
+      return errorResponse(copy.text, 422, copy.code)
+    }
     return errorResponse(describeAiError(AI_ERROR_CODE.streamFailed).text, 500, AI_ERROR_CODE.streamFailed)
   } finally {
     clearTimeout(timeoutId)

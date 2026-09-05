@@ -117,7 +117,7 @@ const tests: TestCase[] = [
         assertDefined(REPAYMENT_TYPE_LABELS[t], `label voor ${t}`)
       }
 
-      assertEqual(REPAYMENT_TYPE_LABELS.annuiteit, 'Annuiteit', 'annuiteit label')
+      assertEqual(REPAYMENT_TYPE_LABELS.annuiteit, 'Annuïteit', 'annuiteit label')
       assertEqual(REPAYMENT_TYPE_LABELS.lineair, 'Lineair', 'lineair label')
       assertEqual(REPAYMENT_TYPE_LABELS.aflossingsvrij, 'Aflossingsvrij', 'aflossingsvrij label')
     },

@@ -376,6 +376,8 @@ describe('buildHealthScoreInput — doorgifte v2-velden', () => {
     avgMonthlyExpenses: 2_000,
     netMonthlyIncome: 4_200,
     netMonthlySalary: 4_200,
+    incomeBasis: 'manual' as const,
+    expensesBasis: 'manual' as const,
     // Legacy leeftijdsblind pad — de peer-relatieve fire_progress-cases
     // staan in financial-health.test.ts.
     currentAge: null,

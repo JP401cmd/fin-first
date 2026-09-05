@@ -120,7 +120,7 @@ export const navGroups: NavGroup[] = [
       { label: 'Privacy', href: '/mijn/privacy' },
       { label: 'Koppelingen', href: '/mijn/koppelingen' },
       { label: 'Notificaties', href: '/mijn/notificaties' },
-      { label: 'Uiterlijk', href: '/mijn/uiterlijk' },
+      { label: 'Weergave en uiterlijk', href: '/mijn/uiterlijk' },
       { label: 'Geavanceerd', href: '/mijn/geavanceerd' },
     ],
   },

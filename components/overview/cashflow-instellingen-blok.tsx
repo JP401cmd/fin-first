@@ -19,7 +19,8 @@ import {
   formatFreedomRateFootnote,
   formatFreedomTimeString,
 } from '@/lib/format'
-import { BASIS_LABEL, savingsRateBasisLabel } from '@/lib/budget-basis'
+import { BASIS_LABEL, isUnknownBasis, savingsRateBasisLabel } from '@/lib/budget-basis'
+import { GRONDSLAG_ONBEKEND_LABEL } from '@/lib/grondslag-guard'
 import type {
   BasisSource,
   BudgetBasisEntry,
@@ -63,12 +64,23 @@ type Side = 'income' | 'expenses'
 type BasisOptionId = 'budget' | 'transaction' | 'manual'
 
 /**
- * Welke keuze-optie hoort bij een uitkomst-grondslag. `'profile'` valt samen met
- * "Eigen bedrag": het is dezelfde profielkolom, alleen niet door de gebruiker
- * zelf gezet — dat verschil draagt het label op de kaart, niet de radio.
+ * Welke keuze-optie hoort bij een uitkomst-grondslag. `'profile'`, `'estimate'`
+ * en `'unknown'` vallen samen met "Eigen bedrag": het is dezelfde profielkolom,
+ * alleen niet (of nog niet) door de gebruiker zelf gezet — dat verschil draagt
+ * het label op de kaart, niet de radio. Voor `'unknown'` is dat bovendien
+ * precies het veld waar het bedrag ingevuld hoort te worden (ADR 0131).
  */
 function optionForBasis(basis: ResolvedBasis): BasisOptionId {
-  return basis === 'profile' ? 'manual' : basis
+  switch (basis) {
+    case 'budget':
+    case 'transaction':
+    case 'manual':
+      return basis
+    case 'profile':
+    case 'estimate':
+    case 'unknown':
+      return 'manual'
+  }
 }
 
 const SAVE_ERROR_TEXT =
@@ -511,25 +523,49 @@ export function CashflowInstellingenBlok({
   // verdenking van afkapping, dan draagt die regel dat mee — dit is het
   // oppervlak waar het mogelijk te lage bedrag daadwerkelijk staat, dus de
   // waarschuwing mag niet uitsluitend in het detailvenster leven.
-  const incomeFigure: FigureProps = {
-    kicker: 'Geschat jaarinkomen',
-    amount: <MaskedAmount value={annualIncome} tone="kern" monoWhenVisible={false} />,
-    sub: basisSubLabel(incomeBasis, data.budgetIncome.truncationSuspected),
-    sub2: `€${Math.round(monthlyIncome).toLocaleString('nl-NL')} per maand`,
-  }
-  const expensesFigure: FigureProps = {
-    kicker: 'Geschatte uitgaven',
-    amount: <MaskedAmount value={monthlyExpenses} tone="kern" monoWhenVisible={false} />,
-    sub: basisSubLabel(expensesBasis, data.budgetExpenses.truncationSuspected),
-    sub2: 'per maand',
-  }
-  const savingsFigure: FigureProps = {
-    kicker: 'Spaarquote',
-    amount: `${savingsRate}%`,
-    variant: 'winner',
-    sub: savingsBasisLabel,
-    sub2: savingsSub,
-  }
+  // Onbekend is geen nul (ADR 0131): een kant zonder enige grondslag toont
+  // geen "€ 0 uit je profiel" maar zegt dat ze nog niet bekend is, en wijst naar
+  // het "Eigen bedrag"-veld hieronder — daar wordt het bedrag een echte invoer.
+  const incomeUnknown = isUnknownBasis(incomeBasis)
+  const expensesUnknown = isUnknownBasis(expensesBasis)
+  const incomeFigure: FigureProps = incomeUnknown
+    ? {
+        kicker: 'Geschat jaarinkomen',
+        amount: GRONDSLAG_ONBEKEND_LABEL,
+        sub: 'vul hieronder je eigen bedrag in',
+      }
+    : {
+        kicker: 'Geschat jaarinkomen',
+        amount: <MaskedAmount value={annualIncome} tone="kern" monoWhenVisible={false} />,
+        sub: basisSubLabel(incomeBasis, data.budgetIncome.truncationSuspected),
+        sub2: `€${Math.round(monthlyIncome).toLocaleString('nl-NL')} per maand`,
+      }
+  const expensesFigure: FigureProps = expensesUnknown
+    ? {
+        kicker: 'Geschatte uitgaven',
+        amount: GRONDSLAG_ONBEKEND_LABEL,
+        sub: 'vul hieronder je eigen bedrag in',
+      }
+    : {
+        kicker: 'Geschatte uitgaven',
+        amount: <MaskedAmount value={monthlyExpenses} tone="kern" monoWhenVisible={false} />,
+        sub: basisSubLabel(expensesBasis, data.budgetExpenses.truncationSuspected),
+        sub2: 'per maand',
+      }
+  const savingsFigure: FigureProps =
+    incomeUnknown || expensesUnknown
+      ? {
+          kicker: 'Spaarquote',
+          amount: GRONDSLAG_ONBEKEND_LABEL,
+          sub: savingsBasisLabel,
+        }
+      : {
+          kicker: 'Spaarquote',
+          amount: `${savingsRate}%`,
+          variant: 'winner',
+          sub: savingsBasisLabel,
+          sub2: savingsSub,
+        }
 
   return (
     <section className={hideHeading ? undefined : 'mt-5 sm:mt-8'}>

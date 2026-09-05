@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useMemo } from 'react'
+import { dataNoteFor } from '@/lib/onboarding/data-note-copy'
 import { OnboardingShell } from './onboarding-shell'
 import { FactsPanel } from './facts-panel'
 
@@ -215,7 +216,10 @@ export function OnboardingIdentity({
         // server-zod op /api/onboarding/save-own-data, en de AOW/FIRE-
         // afleidingen die eraan hangen). De verplichting zelf klopt; de tekst
         // noemt nu beide velden, zodat de gebruiker de blokkade ziet aankomen.
-        'Je naam en geboortedatum hebben we nodig — de rest van de vragen mag je overslaan.'
+        // UR3-15: de verplichting blijft staan, maar zegt nu ook waaróm — een
+        // scherm dat alleen "we hebben dit nodig" zegt scoorde 2 van 5 op
+        // "waarom willen ze dat weten".
+        'Je naam gebruik ik om je aan te spreken, je geboortedatum om je geld naar vrijheid in tijd te vertalen. Die twee hebben we nodig — de rest van de vragen mag je overslaan.'
       : field === 'dob'
         ? 'Met je leeftijd vertaal ik je geld naar jouw vrijheid in tijd — op maat van je horizon.'
         : 'Zo vertaal ik je bedragen naar jouw vrijheid in tijd — op maat van je situatie.'
@@ -234,6 +238,7 @@ export function OnboardingIdentity({
       romanNum="i."
       title={headline}
       deck={deck}
+      dataNote={dataNoteFor(field === 'dob' ? 'geboortedatum' : 'naam')}
       factsPanel={
         <FactsPanel stat={factsStat} sub={factsSub} source={factsSource} />
       }

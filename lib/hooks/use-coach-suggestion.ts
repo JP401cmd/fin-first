@@ -35,6 +35,14 @@ import type { ModuleId } from '@/lib/module-registry'
  * een tip als "gezien" terwijl FinHome 'm helemaal niet rendert (auto-dismiss
  * liep gewoon door achter een open modal), waardoor tips ongezien verdwenen.
  *
+ * ÉÉN MELDING HOORT BIJ ÉÉN PAGINA (UR3-10, ADR 0134). Navigeert de gebruiker
+ * terwijl er een melding openstaat, dan sluit die melding — hij hopt niet mee
+ * naar de volgende route om daar opnieuw uit te typen met een verse
+ * auto-dismiss-timer. Dat laatste was geen bedoeld gedrag maar een gevolg van de
+ * selectie op `pathname`: elke navigatie duwde de pad-tip van de nieuwe route
+ * over de openstaande melding heen, waardoor het las als "de tip komt op elke
+ * pagina terug".
+ *
  * DAGREGEL VOOR DE GIDS (`guide`, ADR 0130 fase 2). Fin noemt hoogstens ÉÉN
  * gidsstap per lokale kalenderdag. De stempel (`guideLastShownAt`) valt op het
  * moment dat de bubbel daadwerkelijk verschijnt — niet bij het kiezen, en zeker
@@ -191,44 +199,6 @@ export function useCoachSuggestion({
     putCoachState({ action: 'importLegacy', keys })
   }, [])
 
-  // ── Selectie ──────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (paused) return
-    if (dismissedThisMount.current) return
-    // Dagregel: is er vandaag al een gidsstap genoemd, dan houden we de STAPPEN
-    // leeg — niet de hele gids-invoer. `status: 'active'` blijft dus staan, zodat
-    // de data-gap-laag overgeslagen blijft (één stem) en de selectie doorvalt
-    // naar de pad-/default-laag, precies als op een dag mét bubbel.
-    const guideForSelection: GuideSuggestionInput | undefined =
-      guide && guide.status === 'active' && isSameLocalDay(guideShownAtRef.current, new Date())
-        ? { ...guide, steps: [] }
-        : guide
-    const next = getFirstUndismissedSuggestion(
-      dataGaps, pathname, dismissedKeys as Set<string>, deferredFields, overrides, activeModules,
-      guideForSelection,
-    )
-    if (!next) return
-    // Rustpauze na een gesloten melding: route-tips (`path_*`) staan per
-    // pagina klaar, dus zonder pauze duwt elke navigatie meteen de volgende
-    // omhoog. Data-gap- en uitgestelde-veld-tips blijven ongemoeid — die zijn
-    // niet route-gebonden en herhalen zich dus niet bij het navigeren.
-    if (next.key.startsWith('path_') && lastDismissedAt) {
-      const since = Date.now() - Date.parse(lastDismissedAt)
-      if (Number.isFinite(since) && since >= 0 && since < PATH_SUGGESTION_COOLDOWN_MS) return
-    }
-    const timer = setTimeout(() => {
-      show(next)
-      // Pas hier stempelen: dit is het moment waarop de bubbel écht verschijnt.
-      // Bij een pauze is de timer al opgeruimd, dus een ongeziene gidsstap
-      // verbruikt zijn dag niet.
-      if (next.key.startsWith(GUIDE_SUGGESTION_KEY_PREFIX)) markGuideShown(next.key)
-    }, delayMs)
-    return () => clearTimeout(timer)
-  }, [
-    paused, pathname, dataGaps, deferredFields, overrides, activeModules, delayMs,
-    dismissedKeys, lastDismissedAt, show, guide, markGuideShown,
-  ])
-
   const dismiss = useCallback((reason: CoachDismissReason = 'user') => {
     // Geen enkele stempel zolang de melding niet zichtbaar is (M15 / ADR 0130).
     if (pausedRef.current) return
@@ -256,6 +226,67 @@ export function useCoachSuggestion({
     setLastDismissedAt(new Date().toISOString())
     putCoachState({ action: 'dismiss', key: current.key })
   }, [show, markGuideShown])
+
+  // ── Selectie ──────────────────────────────────────────────────────────────
+  //
+  // De routewissel-sluiting (UR3-10) hangt bewust IN dit effect en niet in een
+  // eigen effect ernaast: de selectie plant zijn timer óók op een
+  // pathname-wissel, en een los effect dat ná deze plaatsing zou draaien laat
+  // die al geplande timer gewoon vuren. Hier sluiten we eerst, waarna de
+  // `dismissedThisMount`-poort direct hieronder de nieuwe selectie tegenhoudt.
+  const lastSelectionPath = useRef<string | null>(null)
+  useEffect(() => {
+    const vorigePad = lastSelectionPath.current
+    lastSelectionPath.current = pathname
+    if (vorigePad !== null && vorigePad !== pathname && suggestionRef.current) {
+      // Reden `'auto'`: de gebruiker heeft de melding niet weggeklikt, hij is
+      // verder gelopen. Voor een gidsbubbel betekent dat (net als de bestaande
+      // auto-dismiss) alleen de dagstempel — de stap blijft open in de gids.
+      dismiss('auto')
+    }
+    if (paused) return
+    if (dismissedThisMount.current) return
+    // Dagregel: is er vandaag al een gidsstap genoemd, dan houden we de STAPPEN
+    // leeg — niet de hele gids-invoer. `status: 'active'` blijft dus staan, zodat
+    // de data-gap-laag overgeslagen blijft (één stem) en de selectie doorvalt
+    // naar de pad-/default-laag, precies als op een dag mét bubbel.
+    const guideForSelection: GuideSuggestionInput | undefined =
+      guide && guide.status === 'active' && isSameLocalDay(guideShownAtRef.current, new Date())
+        ? { ...guide, steps: [] }
+        : guide
+    const next = getFirstUndismissedSuggestion(
+      dataGaps, pathname, dismissedKeys as Set<string>, deferredFields, overrides, activeModules,
+      guideForSelection,
+    )
+    if (!next) return
+    // Rustpauze na een gesloten melding: route-tips (`path_*`) staan per
+    // pagina klaar, dus zonder pauze duwt elke navigatie meteen de volgende
+    // omhoog. Data-gap- en uitgestelde-veld-tips blijven ongemoeid — die zijn
+    // niet route-gebonden en herhalen zich dus niet bij het navigeren (H17).
+    //
+    // UR3-10 stelde voor deze pauze te verbreden naar ELKE niet-gidslaag.
+    // Bewust NIET gedaan: dat keert het H17-besluit om (en de test die het
+    // vastlegt) terwijl de gemelde klacht — de tip die op elke pagina terugkomt
+    // — al volledig wordt verholpen door de routewissel-sluiting hierboven, die
+    // via `dismissedThisMount` sowieso élke laag voor de rest van deze mount
+    // stilzet. Zie de oplevernotitie bij de kaart.
+    if (next.key.startsWith('path_') && lastDismissedAt) {
+      const since = Date.now() - Date.parse(lastDismissedAt)
+      if (Number.isFinite(since) && since >= 0 && since < PATH_SUGGESTION_COOLDOWN_MS) return
+    }
+    const timer = setTimeout(() => {
+      show(next)
+      // Pas hier stempelen: dit is het moment waarop de bubbel écht verschijnt.
+      // Bij een pauze is de timer al opgeruimd, dus een ongeziene gidsstap
+      // verbruikt zijn dag niet.
+      if (next.key.startsWith(GUIDE_SUGGESTION_KEY_PREFIX)) markGuideShown(next.key)
+    }, delayMs)
+    return () => clearTimeout(timer)
+  }, [
+    paused, pathname, dataGaps, deferredFields, overrides, activeModules, delayMs,
+    dismissedKeys, lastDismissedAt, show, guide, markGuideShown, dismiss,
+  ])
+
 
   return { suggestion, dismiss }
 }

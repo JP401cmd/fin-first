@@ -11,8 +11,8 @@ import { DisplayModePicker } from '@/components/mijn/display-mode-picker'
 import { HomeScreenPicker } from '@/components/mijn/home-screen-picker'
 
 export const metadata: Metadata = {
-  title: 'Uiterlijk — TriFinity',
-  description: 'Kies kleurpalet, accentkleur en typografie voor TriFinity.',
+  title: 'Weergave en uiterlijk — TriFinity',
+  description: 'Eenvoudig of volledig, je startscherm, kleuren en letters.',
 }
 
 /**
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
 export default function MijnUiterlijkPage() {
   return (
     <>
-      <NavStackMeta title="Uiterlijk" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Weergave en uiterlijk" bottomBar={{ kind: 'tabs' }} />
       <section className="mx-auto max-w-2xl px-4 sm:px-6 py-6">
         <PageOpening
           className="mb-6"

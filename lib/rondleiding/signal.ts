@@ -20,6 +20,13 @@
  *  - `active` — "de rondleiding loopt". Gezet door de provider, gelezen door
  *    FinHome (`paused`).
  *
+ * SINDS UR3-10 (ADR 0134) leeft `active` niet meer als eigen boolean maar als
+ * de claim `'rondleiding'` in het gedeelde aandachtsregister
+ * (`lib/attention-signal.ts`). De API hieronder is ONGEWIJZIGD — alle bestaande
+ * aanroepers blijven werken — maar de rondleiding sluit zich daarmee aan bij
+ * dezelfde regel als Fins melding en de coachmark: één aandachtsvrager tegelijk.
+ * Het `requested`-signaal blijft lokaal: dat is een verzoek, geen zichtbare laag.
+ *
  * Waarom een module-teller + CustomEvent i.p.v. React-context: net als bij
  * `overlay-signal` staan de lezers en de schrijver in verschillende takken van
  * de boom (de gidsweergave hangt in de chat-portal, de provider op /overzicht),
@@ -27,6 +34,11 @@
  */
 
 import { useSyncExternalStore } from 'react'
+import {
+  claimAttention,
+  hasAttentionClaim,
+  useAttentionClaimedBy,
+} from '@/lib/attention-signal'
 
 /**
  * De kale namen wonen in `./constants` — géén React, dus ook leesbaar vanuit een
@@ -44,10 +56,10 @@ export {
 } from './constants'
 
 const REQUEST_EVENT = 'trifinity:rondleiding-request'
-const ACTIVE_EVENT = 'trifinity:rondleiding-active'
 
 let requested = false
-let active = false
+/** Release-functie van de actieve `'rondleiding'`-claim, of `null`. */
+let rondleidingRelease: (() => void) | null = null
 
 function emit(name: string) {
   if (typeof window === 'undefined') return
@@ -67,24 +79,33 @@ export function clearRondleidingRequest(): void {
   emit(REQUEST_EVENT)
 }
 
-/** Meld of de rondleiding loopt. Alleen de provider roept dit aan. */
+/**
+ * Meld of de rondleiding loopt. Alleen de provider roept dit aan.
+ *
+ * Idempotent gehouden bovenop de ref-counted `claimAttention`: de provider zet
+ * een STAAT ("de tour loopt"), geen telling. Twee keer `true` mag dus nooit
+ * twee claims opleveren die één release niet meer opruimt.
+ */
 export function setRondleidingActive(next: boolean): void {
-  if (active === next) return
-  active = next
-  emit(ACTIVE_EVENT)
+  if (next) {
+    if (hasAttentionClaim('rondleiding')) return
+    rondleidingRelease = claimAttention('rondleiding')
+    return
+  }
+  rondleidingRelease?.()
+  rondleidingRelease = null
 }
 
 /** Huidige actief-staat. Bedoeld voor tests / niet-React-lezers. */
 export function isRondleidingActive(): boolean {
-  return active
+  return hasAttentionClaim('rondleiding')
 }
 
 /** Reset beide signalen. ALLEEN voor tests — voorkomt lekken tussen cases. */
 export function __resetRondleidingSignal(): void {
   requested = false
-  active = false
+  setRondleidingActive(false)
   emit(REQUEST_EVENT)
-  emit(ACTIVE_EVENT)
 }
 
 function subscribeTo(name: string) {
@@ -96,14 +117,9 @@ function subscribeTo(name: string) {
 }
 
 const subscribeRequest = subscribeTo(REQUEST_EVENT)
-const subscribeActive = subscribeTo(ACTIVE_EVENT)
 
 function getRequestedSnapshot(): boolean {
   return requested
-}
-
-function getActiveSnapshot(): boolean {
-  return active
 }
 
 function getServerSnapshot(): boolean {
@@ -117,5 +133,5 @@ export function useRondleidingRequested(): boolean {
 
 /** `true` zolang de rondleiding loopt. SSR-veilig. */
 export function useRondleidingActive(): boolean {
-  return useSyncExternalStore(subscribeActive, getActiveSnapshot, getServerSnapshot)
+  return useAttentionClaimedBy('rondleiding')
 }

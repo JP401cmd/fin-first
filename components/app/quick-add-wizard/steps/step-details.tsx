@@ -18,6 +18,7 @@ import {
   DEBT_QUICK_ADD_FIELD3,
   DEBT_QUICK_ADD_LABELS,
   DEFAULT_TERM_YEARS_PER_TYPE,
+  REPAYMENT_TYPE_EXPLANATIONS,
   REPAYMENT_TYPE_LABELS,
   computeDefaultMonthlyPayment,
   type DebtField3Kind,
@@ -1029,33 +1030,34 @@ function MortgageExtraFields({
   // Toon de aanname die anders stilzwijgend zou gelden, zodat de gebruiker
   // ziet wát hij corrigeert als hij het veld leeg laat.
   const defaultTermYears = DEFAULT_TERM_YEARS_PER_TYPE.mortgage
-  // Toon de default expliciet zodat de user ziet wat er wordt opgeslagen als
-  // hij niets wijzigt (draft blijft leeg → buildDebtDraft vult dezelfde default).
-  const selectValue = repaymentType ?? DEBT_DEFAULT_REPAYMENT_TYPE.mortgage ?? 'annuiteit'
+  // "Weet ik niet" laat repaymentType leeg — buildDebtDraft valt dan terug op
+  // DEBT_DEFAULT_REPAYMENT_TYPE.mortgage ('annuiteit'), zichtbaar gemaakt als
+  // eigen tegel i.p.v. een stille default (UR3-12).
+  const groupLabelId = `${repaymentId}-label`
 
   return (
     <>
       <div>
-        <label
-          htmlFor={repaymentId}
-          className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]"
-        >
-          Aflossingsvorm
-        </label>
-        <select
-          id={repaymentId}
-          value={selectValue}
-          onChange={(e) =>
-            onChange({ repayment_type: e.target.value as RepaymentType })
-          }
-          className={`w-full border bg-[var(--paper)] px-3 py-2.5 text-base text-[var(--ink)] outline-none transition-colors focus:ring-1 border-[var(--border-ed)] ${palette.focusBorder}`}
-        >
+        <p id={groupLabelId} className="mb-1.5 block text-xs font-medium text-[var(--ink-2)]">
+          Hoe los je de hypotheek af?
+        </p>
+        <div role="group" aria-labelledby={groupLabelId} className="grid grid-cols-2 gap-2">
           {MORTGAGE_REPAYMENT_ORDER.map((rt) => (
-            <option key={rt} value={rt}>
-              {REPAYMENT_TYPE_LABELS[rt]}
-            </option>
+            <RepaymentTile
+              key={rt}
+              label={REPAYMENT_TYPE_LABELS[rt]}
+              sublabel={REPAYMENT_TYPE_EXPLANATIONS[rt]}
+              active={repaymentType === rt}
+              onClick={() => onChange({ repayment_type: rt })}
+            />
           ))}
-        </select>
+          <RepaymentTile
+            label="Weet ik niet"
+            sublabel="Dan rekent de app met annuïteit — sinds 2013 de gangbare vorm bij een nieuwe hypotheek. Je vindt je vorm op je hypotheekoverzicht en past het later aan."
+            active={repaymentType == null}
+            onClick={() => onChange({ repayment_type: undefined })}
+          />
+        </div>
       </div>
 
       <div>
@@ -1129,5 +1131,40 @@ function MortgageExtraFields({
         </p>
       </div>
     </>
+  )
+}
+
+/**
+ * Aflossingsvorm-tegel (UR3-12): vervangt een kale `<select>` — die kan geen
+ * uitleg per optie tonen — door een keuzeknop met één zin. `MortgageExtraFields`
+ * verschijnt uitsluitend bij `debt_type='mortgage'`, dus de debt-tint
+ * (`--color-debt-*`) ligt vast; geen module-active-vars, want dit component
+ * draait niet alleen in de onboarding maar ook in de in-app quick-add-wizard.
+ */
+function RepaymentTile({
+  label,
+  sublabel,
+  active,
+  onClick,
+}: {
+  label: string
+  sublabel: string
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`flex min-h-[92px] flex-col items-start gap-1 border-2 p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)] ${
+        active
+          ? 'border-[var(--color-debt-500)] bg-[var(--color-debt-50)]/50'
+          : 'border-[var(--border-ed)] bg-[var(--paper)] hover:border-[var(--color-debt-500)]/60'
+      }`}
+    >
+      <p className="text-sm font-semibold text-[var(--ink)]">{label}</p>
+      <p className="text-[11px] leading-snug text-[var(--ink-3)]">{sublabel}</p>
+    </button>
   )
 }

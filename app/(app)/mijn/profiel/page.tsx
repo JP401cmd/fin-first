@@ -116,6 +116,14 @@ export default function ProfielPage() {
         children_ages: childrenAges,
         housing_type: housingType,
         net_monthly_income: netMonthlyIncome ? Number(netMonthlyIncome) : null,
+        // De BRON hoort bij het bedrag (ADR 0103/0131). Zonder deze regel bleef
+        // een `income_source = 'estimate'` uit de onboarding-knop "Schat het
+        // voor me" staan nadat de gebruiker hier zijn eigen bedrag invulde — en
+        // dan blijft het voorbehoud "geschat op je leeftijd" app-breed hangen op
+        // een getal dat hij zélf koos. Een bedrag hier is per definitie eigen
+        // invoer; leeggehaald laten we de bron met rust (dan bepaalt de resolver
+        // 'unknown' op het lege bedrag, niet dit scherm).
+        ...(netMonthlyIncome ? { income_source: 'manual' } : {}),
         updated_at: new Date().toISOString(),
       })
 

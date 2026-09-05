@@ -231,7 +231,7 @@ describe('GidsView — APP-2: de gids noemt de weergavekeuze', () => {
       await screen.findByText('Welkom bij TriFinity')
 
       expect(screen.getByText(zin, { exact: false })).toBeInTheDocument()
-      const link = screen.getByRole('link', { name: 'Mijn → Uiterlijk' })
+      const link = screen.getByRole('link', { name: 'Mijn → Weergave en uiterlijk' })
       expect(link.getAttribute('href')).toBe('/mijn/uiterlijk')
 
       unmount()
@@ -244,7 +244,7 @@ describe('GidsView — APP-2: de gids noemt de weergavekeuze', () => {
     renderSeeded()
     await screen.findByText('Welkom bij TriFinity')
 
-    fireEvent.click(screen.getByRole('link', { name: 'Mijn → Uiterlijk' }))
+    fireEvent.click(screen.getByRole('link', { name: 'Mijn → Weergave en uiterlijk' }))
 
     expect(chatCtx.close).toHaveBeenCalledTimes(1)
   })

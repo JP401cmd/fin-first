@@ -31,16 +31,35 @@ import {
  * `'auto'` is geen vierde optie in de interface maar de waarde die een rij draagt
  * zolang de gebruiker nooit koos ("kies voor mij") — zie ADR 0103.
  */
-export type BasisSource = 'auto' | 'budget' | 'transaction' | 'manual'
+export type BasisSource = 'auto' | 'budget' | 'transaction' | 'manual' | 'estimate'
 
 /**
  * De UITKOMST van de grondslagbeslissing. Bevat bewust GEEN `'auto'`: dat is een
- * resolutiestrategie, geen grondslag. De resolver geeft altijd één van deze vier
+ * resolutiestrategie, geen grondslag. De resolver geeft altijd één van deze
  * concrete uitspraken terug, zodat elk oppervlak kan benoemen waar zijn getal
  * vandaan komt.
+ *
+ * DRIE STATEN (ADR 0131, eigenaarbesluit 5 sep 2026): een bedrag is
+ *   • GEMETEN/OPGEGEVEN — `budget` | `transaction` | `manual` | `profile`;
+ *   • GESCHAT — `estimate`: de app heeft het zelf geraden ("Schat het voor me",
+ *     CBS-leeftijdsband). Voedt score en briefing wél, maar draagt zijn label
+ *     mee tot de gebruiker het vervangt;
+ *   • ONBEKEND — `unknown`: er is niets — geen keuze, geen meting, geen
+ *     profielbedrag > 0. Het bedrag in de rekenketen is dan 0, maar dat is géén
+ *     meting: oppervlakken geven er geen oordeel over (geen score, geen
+ *     "0 %", geen advies op de nul), maar één zin en één knop.
+ *
+ * Vóór ADR 0131 verdween "nooit ingevuld" stil in de `profile`-terugval met
+ * bedrag 0, en las elke consument dat als een echte nul.
  */
-export type ResolvedBasis = 'budget' | 'transaction' | 'manual' | 'profile'
+export type ResolvedBasis = 'budget' | 'transaction' | 'manual' | 'profile' | 'estimate' | 'unknown'
 
+/**
+ * De bronwaarden die een GEBRUIKER mag kiezen. `'estimate'` staat er bewust
+ * NIET in: die zet alleen de app zelf (onboarding, "Schat het voor me") en
+ * `sanitizeCashSettingsInput` weigert 'm daarom van de client — een schatting
+ * is een placeholder, geen keuze.
+ */
 export const BASIS_SOURCES: readonly BasisSource[] = ['auto', 'budget', 'transaction', 'manual']
 
 /**
@@ -60,6 +79,8 @@ export const BASIS_LABEL: Record<ResolvedBasis, string> = {
   transaction: 'uit je transacties',
   manual: 'eigen invoer',
   profile: 'uit je profiel',
+  estimate: 'geschat op je leeftijd',
+  unknown: 'nog niet bekend',
 }
 
 /**
@@ -82,6 +103,18 @@ export const BASIS_PHRASE: Record<ResolvedBasis, string> = {
   transaction: 'volgens je transacties',
   manual: 'volgens je eigen invoer',
   profile: 'volgens je profiel',
+  estimate: 'volgens een schatting op je leeftijd',
+  // Een zin over een onbekende grondslag hoort niet te bestaan — oppervlakken
+  // toetsen eerst `isUnknownBasis` en tonen dan geen zin. Dit is het vangnet.
+  unknown: 'zonder bekende grondslag',
+}
+
+/**
+ * Is er voor deze kant helemaal niets bekend? De ENE toets (ADR 0131), zodat
+ * geen oppervlak zelf `=== 'unknown'` hoeft te schrijven.
+ */
+export function isUnknownBasis(basis: ResolvedBasis | null | undefined): boolean {
+  return basis === 'unknown'
 }
 
 /** De zinsvorm bij een GEMENGDE grondslag (inkomen en uitgaven verschillen). */
@@ -97,6 +130,9 @@ export function savingsRateBasisLabel(
   incomeBasis: ResolvedBasis,
   expensesBasis: ResolvedBasis,
 ): string {
+  // Ontbreekt één kant, dan is de quote niet te bepalen — "gemengde grondslag"
+  // zou dat gat verstoppen achter een label dat een bestaande meting suggereert.
+  if (isUnknownBasis(incomeBasis) || isUnknownBasis(expensesBasis)) return BASIS_LABEL.unknown
   return incomeBasis === expensesBasis ? BASIS_LABEL[incomeBasis] : 'gemengde grondslag'
 }
 
@@ -109,6 +145,7 @@ export function savingsRateBasisPhrase(
   incomeBasis: ResolvedBasis,
   expensesBasis: ResolvedBasis,
 ): string {
+  if (isUnknownBasis(incomeBasis) || isUnknownBasis(expensesBasis)) return BASIS_PHRASE.unknown
   return incomeBasis === expensesBasis ? BASIS_PHRASE[incomeBasis] : BASIS_PHRASE_MIXED
 }
 

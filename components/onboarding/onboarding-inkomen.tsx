@@ -6,7 +6,12 @@ import { FactsPanel } from './facts-panel'
 import type { IdentityData } from './onboarding-identity'
 import { formatCurrency } from '@/lib/format'
 import { intakeDailyExpenseRate } from '@/lib/freedom-ticker'
+import { dataNoteFor } from '@/lib/onboarding/data-note-copy'
 import { savingsRateFromAggregates } from '@/lib/savings-source'
+import {
+  cohortExpensesFromIncome,
+  estimateCohortIncomeExpenses,
+} from '@/lib/benchmark/cohort-estimate'
 
 /**
  * Stap 3 — Inkomen & uitgaven.
@@ -113,6 +118,25 @@ export interface OnboardingInkomenProps {
    * zijn). Default (undefined) = beide velden op één scherm (backward-compat).
    */
   field?: 'inkomen' | 'uitgaven'
+  /**
+   * Leeftijd van de gebruiker (uit de geboortedatum, twee schermen eerder).
+   * Voedt "Schat het voor me": zonder bruikbare leeftijd verschijnt die knop
+   * niet — liever geen knop dan een verzonnen bedrag.
+   */
+  age?: number | null
+  /**
+   * Welke velden op dít moment een APP-SCHATTING dragen (i.p.v. een eigen
+   * bedrag). Bepaalt de "(schatting)"-markering op de preview en de regel onder
+   * het veld. Bron is de orchestrator, zodat het signaal een terugstap en een
+   * concept-herstel overleeft.
+   */
+  estimated?: Partial<Record<FieldKey, boolean>>
+  /**
+   * Meld dat een veld voortaan een schatting is (`true`, na een klik op "Schat
+   * het voor me") of juist niet meer (`false`, zodra de gebruiker zelf typt).
+   * Zonder deze prop verschijnt de knop niet — het label moet ergens hééngaan.
+   */
+  onEstimateChange?: (field: FieldKey, isEstimate: boolean) => void
   /** 1-indexed stap-nummer voor de voortgangsbalk (default 2). */
   currentStep?: number
   totalSteps?: number
@@ -125,6 +149,9 @@ export function OnboardingInkomen({
   onBack,
   onSkipIncome,
   field,
+  age = null,
+  estimated,
+  onEstimateChange,
   currentStep = 2,
   totalSteps = 7,
 }: OnboardingInkomenProps) {
@@ -155,6 +182,67 @@ export function OnboardingInkomen({
     touched[f] || submitted ? errors[f] : undefined
   const markTouched = (f: FieldKey) =>
     setTouched((prev) => ({ ...prev, [f]: true }))
+
+  /**
+   * De cohort-schatting bij de leeftijd die twee schermen eerder is ingevuld
+   * (`lib/benchmark/cohort-estimate.ts` — dezelfde afleiding als de peer op
+   * /check). `null` = geen bruikbare leeftijd; dan verschijnt de knop niet.
+   */
+  const cohort = useMemo(() => estimateCohortIncomeExpenses(age), [age])
+
+  /**
+   * Typen is altijd een eigen bedrag: elke toetsaanslag haalt de
+   * schatting-markering van dat veld af. Dát is criterium 3 ("vervangt hij het
+   * door een eigen bedrag, dan verdwijnt het schattingslabel overal") —
+   * de markering hangt aan de invoer, niet aan een aparte bevestiging.
+   */
+  const setField = (f: FieldKey, value: string) => {
+    onChange({ ...data, [f]: value })
+    if (estimated?.[f]) onEstimateChange?.(f, false)
+  }
+
+  /**
+   * "Schat het voor me" — vul het veld ZICHTBAAR met het cohort-bedrag en
+   * markeer het als schatting. Bewust invullen en niet stil wegschrijven: de
+   * gebruiker moet het bedrag zien staan en kunnen overtypen.
+   *
+   * Uitgaven volgen het inkomen dat er al staat (eigen of geschat) via de
+   * referentie-spaarquote van de band — typt iemand €5.000 waar zijn cohort
+   * €3.075 zegt, dan zouden losse cohort-uitgaven een tegenspraak zijn.
+   */
+  const applyEstimate = (f: FieldKey) => {
+    if (!cohort) return
+    if (f === 'net_monthly_income') {
+      setTouched((prev) => ({ ...prev, net_monthly_income: true }))
+      onChange({ ...data, net_monthly_income: String(cohort.monthlyIncome) })
+      onEstimateChange?.('net_monthly_income', true)
+      return
+    }
+    const typedIncome = data.net_monthly_income ? parseBedragInput(data.net_monthly_income) : NaN
+    const baseIncome =
+      isFinite(typedIncome) && typedIncome > 0 ? typedIncome : cohort.monthlyIncome
+    const expenses = cohortExpensesFromIncome(baseIncome, cohort.savingsRatePct)
+    if (!(expenses > 0)) return
+    setTouched((prev) => ({ ...prev, estimated_monthly_expenses: true }))
+    onChange({ ...data, estimated_monthly_expenses: String(expenses) })
+    onEstimateChange?.('estimated_monthly_expenses', true)
+  }
+
+  /** Toont dit scherm een schattingsknop, en voor welk veld? */
+  const estimateField: FieldKey | null =
+    !cohort || !onEstimateChange
+      ? null
+      : showIncome && !showExpenses
+        ? 'net_monthly_income'
+        : showExpenses && !showIncome
+          ? 'estimated_monthly_expenses'
+          : null
+
+  /** Draagt een veld dat op dit scherm staat een app-schatting? */
+  const showsEstimateNotice = activeFields.some((f) => estimated?.[f])
+  const previewIsEstimate = Boolean(
+    estimated?.net_monthly_income || estimated?.estimated_monthly_expenses,
+  )
 
   const inputErrorClass = (f: FieldKey) =>
     showError(f)
@@ -247,7 +335,7 @@ export function OnboardingInkomen({
     field === 'inkomen'
       ? 'Je netto maandinkomen is het startpunt — het tempo waarin je vrijheid kunt opbouwen. Schat gerust; je kunt het later aanpassen.'
       : field === 'uitgaven'
-        ? 'Je uitgaven bepalen samen met je inkomen je spaarquote. Zo zie je direct hoe snel je vrijheid groeit.'
+        ? 'Je uitgaven bepalen samen met je inkomen je spaarquote. Zo zie je direct hoe snel je vrijheid groeit. Schat gerust — later aanpassen kan altijd.'
         : 'Je inkomen en uitgaven bepalen samen je spaarquote — het tempo waarin je vrijheid opbouwt. Schat gerust; je past het later aan.'
 
   return (
@@ -258,6 +346,7 @@ export function OnboardingInkomen({
       romanNum="ii."
       title={headline}
       deck={deck}
+      dataNote={dataNoteFor(field === 'uitgaven' ? 'uitgaven' : 'inkomen')}
       factsPanel={
         <FactsPanel
           stat="€3.350"
@@ -317,7 +406,7 @@ export function OnboardingInkomen({
                 // Sta alleen cijfers + scheidingstekens toe. We bewaren
                 // de raw string; validatie parse't bij submit.
                 const val = e.target.value.replace(/[^0-9.,]/g, '')
-                onChange({ ...data, net_monthly_income: val })
+                setField('net_monthly_income', val)
               }}
               onBlur={() => markTouched('net_monthly_income')}
               placeholder="0"
@@ -372,7 +461,7 @@ export function OnboardingInkomen({
               value={data.estimated_monthly_expenses}
               onChange={(e) => {
                 const val = e.target.value.replace(/[^0-9.,]/g, '')
-                onChange({ ...data, estimated_monthly_expenses: val })
+                setField('estimated_monthly_expenses', val)
               }}
               onBlur={() => markTouched('estimated_monthly_expenses')}
               placeholder="0"
@@ -404,6 +493,42 @@ export function OnboardingInkomen({
         </div>
         )}
 
+        {/* "Schat het voor me" — de uitweg voor wie het niet weet.
+
+            Niemand hoort de onboarding te verlaten zonder dagtarief: zonder
+            inkomen én uitgaven kent de app geen enkele vrijheidstijd, en dan
+            komt de kernbelofte nergens aan (UR3-05, persona Sanne). De markt
+            doet dit ook zo — Nibud en YNAB zeggen letterlijk "schat nu,
+            corrigeer later".
+
+            SECUNDAIR, geen primaire actie: zelf invullen blijft beter, en
+            "Later invullen" blijft eronder als tertiaire link staan. De knop
+            verdwijnt zodra het veld gevuld is met een EIGEN bedrag — dan is er
+            niets meer te schatten; bij een schatting blijft hij staan als
+            "opnieuw schatten" nadat de gebruiker het bedrag heeft leeggehaald. */}
+        {estimateField && !data[estimateField] && (
+          <button
+            type="button"
+            onClick={() => applyEstimate(estimateField)}
+            className="min-h-11 w-full border border-[var(--border-ed)] bg-[var(--paper)] px-6 py-3 text-sm font-medium text-[var(--ink)] transition-colors hover:bg-[var(--subtle)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+          >
+            Schat het voor me
+          </button>
+        )}
+
+        {/* De schatting maakt zichzelf bekend. Een schatting die eruitziet als
+            een meting is erger dan geen getal — vandaar de bron erbij én de
+            uitnodiging om 'm te vervangen. */}
+        {showsEstimateNotice && cohort && (
+          <p
+            className="text-xs italic text-[var(--ink-3)]"
+            style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}
+          >
+            Geschat op basis van je leeftijd &mdash; typisch voor
+            {' '}{cohort.ageBandLabel}, &eacute;&eacute;n persoon (CBS). Pas het aan als je het beter weet.
+          </p>
+        )}
+
         {/* Spaarquote-preview — verschijnt zodra beide schattingen er staan.
             "Onthult" op het uitgaven-scherm in de gesplitste flow. */}
         {showPreview && (
@@ -413,6 +538,7 @@ export function OnboardingInkomen({
               <span className="font-mono font-bold tabular-nums text-[var(--module-active-700)]">
                 {previewRate}%
               </span>
+              {previewIsEstimate ? ' (schatting)' : ''}
               {' '}— dit drijft je toekomst-prognose.
             </p>
             {/* Vrijheidstijd-noemer: wat één dag leven jou kost. Vanaf hier
@@ -423,7 +549,8 @@ export function OnboardingInkomen({
                 <span className="font-mono font-bold tabular-nums text-[var(--module-active-700)]">
                   {formatCurrency(Math.round(dailyRate))}
                 </span>
-                {' '}die je niet uitgeeft is één dag vrijheid.
+                {' '}die je niet uitgeeft is één dag vrijheid
+                {estimated?.estimated_monthly_expenses ? ' — op basis van de schatting' : ''}.
               </p>
             )}
           </div>

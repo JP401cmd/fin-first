@@ -47,6 +47,13 @@ export const AI_ERROR_CODE = {
   safetyCheck: 'ai_safety_check',
   /** Providerfout tijdens het streamen. */
   streamFailed: 'ai_stream_failed',
+  /**
+   * De provider weigert het verzoek zelf (tegoed op, sleutel ongeldig,
+   * verzoek geweigerd) — `APICallError.isRetryable === false`. Retry kan dit
+   * NOOIT oplossen (UR3-09 / ADR 0132); geen enkele andere code hier mag deze
+   * betekenis overnemen.
+   */
+  providerRefused: 'ai_provider_refused',
   /** 504 — het antwoord duurde te lang. */
   timeout: 'ai_timeout',
   /** Client-side: geen verbinding met de server. */
@@ -142,6 +149,10 @@ const COPY: Record<AiErrorCode, CopyEntry> = {
   [AI_ERROR_CODE.streamFailed]: {
     text: 'Fin kreeg geen antwoord terug. Probeer het zo nog eens.',
     affordance: 'opnieuw',
+  },
+  [AI_ERROR_CODE.providerRefused]: {
+    text: 'Fin werkt op dit moment niet. Dat ligt aan ons, niet aan jou — opnieuw proberen helpt nu niet.',
+    affordance: 'geen',
   },
   [AI_ERROR_CODE.timeout]: {
     text: 'Het antwoord duurde te lang. Probeer het opnieuw met een kortere vraag.',

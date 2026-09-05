@@ -12,7 +12,7 @@ const NAV_ITEMS = [
   { label: 'Overzicht (Horizon)', href: '/horizon' },
   { label: 'Overzicht (Identiteit)', href: '/identity' },
   { label: 'Profiel', href: '/identity/profiel' },
-  { label: 'Uiterlijk', href: '/mijn/uiterlijk' },
+  { label: 'Weergave en uiterlijk', href: '/mijn/uiterlijk' },
   { label: 'Koppelingen', href: '/identity/koppelingen' },
 ]
 

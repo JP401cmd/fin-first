@@ -96,7 +96,20 @@ export async function buildHorizonContext(supabase: SupabaseClient): Promise<str
         : 'betaling dekt rente niet!'
       return `${d.name} (${DEBT_TYPE_LABELS[d.debt_type]}): ${formatCurrency(Number(d.current_balance))} @ ${d.interest_rate}% | ${formatCurrency(Number(d.monthly_payment))}/mnd | ${payoff}`
     })
-    parts.push(section('SCHULDEN', debtLines.join('\n')))
+    // TOTAALREGEL VÓÓR DE LIJST (UR3-06 geval 5). De schuldenpagina toont
+    // "Maandlasten" als één vooraf-opgetelde KPI (Σ monthly_payment over actieve
+    // schulden, `debts-client.tsx#totalMonthlyPayment`); deze context gaf alleen
+    // per-schuld-regels, zodat Fin zélf moest optellen — een recompute-stap met een
+    // gemiste regel als uitkomst (€2.690 vs. €2.980 op het scherm). Dezelfde rijen,
+    // dezelfde som, hier één keer gedaan. De totalen staan bewust BOVEN de lijst:
+    // het model leest ze dan vóór het eerste losse bedrag.
+    const totalMonthlyPayment = debts.reduce((s, d) => s + (Number(d.monthly_payment) || 0), 0)
+    const totalBalance = debts.reduce((s, d) => s + (Number(d.current_balance) || 0), 0)
+    const debtTotalLine =
+      `TOTAAL (${debts.length} actieve schuld${debts.length === 1 ? '' : 'en'}): ` +
+      `${formatCurrency(totalBalance)} openstaand | maandlasten ${formatCurrency(totalMonthlyPayment)}/mnd — ` +
+      'dezelfde totalen als de schuldenpagina. Gebruik deze getallen letterlijk; tel de regels hieronder NIET zelf op.'
+    parts.push(section('SCHULDEN', [debtTotalLine, ...debtLines].join('\n')))
   }
 
   // 5-year portfolio projection
