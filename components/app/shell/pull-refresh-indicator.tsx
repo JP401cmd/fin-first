@@ -4,11 +4,14 @@
  * PullRefreshIndicator — de zichtbare helft van het eigen pull-to-refresh.
  *
  * Bewust GEEN generieke spinner: een ronddraaiend wieltje hoort bij een
- * material-app, niet bij een krant. In plaats daarvan een liniaal — een
- * hairline die vult met de pull-voortgang, in de accentkleur van de actieve
- * module (`--module-active-*`, dus kern op /overzicht, horizon op /toekomst,
- * wil op /mijn) — met een serif-italic microtekst eronder die de drie standen
- * benoemt.
+ * material-app, niet bij een krant. Tijdens het TREKKEN is de meter een liniaal
+ * — een hairline die vult met de pull-voortgang, in de accentkleur van de
+ * actieve module (`--module-active-*`, dus kern op /overzicht, horizon op
+ * /toekomst, wil op /mijn). Zodra het verversen loopt neemt FIN het over:
+ * dezelfde avatar in zijn wacht-stand (`FinDots state="thinking"`) die ook de
+ * ladende vermogensgrafiek draagt (`mini-networth-chart-anchor.tsx`). Wachten
+ * heeft daarmee app-breed één gezicht in plaats van twee eigen animaties. Onder
+ * beide staat een serif-italic microtekst die de drie standen benoemt.
  *
  * ── Waarom dit een eigen component is en niet inline in de shell ────────
  * Het gebaar zet bij elke `touchmove` state (de pull-afstand). Zat die state in
@@ -35,6 +38,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition, type RefObject } from 'react'
 import { useRouter } from 'next/navigation'
 import { usePullToRefresh, PULL_THRESHOLD_PX } from '@/lib/hooks/use-pull-to-refresh'
+import { FinDots } from '@/components/app/fin-dots'
 
 const LABELS = {
   pulling: 'Trek omlaag om te verversen',
@@ -132,15 +136,16 @@ export function PullRefreshIndicator({ scrollRef }: PullRefreshIndicatorProps) {
         }}
       >
         <div className="flex h-full flex-col items-center justify-end gap-2 px-4 pb-3">
-          {/* De liniaal: hairline-goot met een vullende inkt-streep erin. */}
-          <div className="h-px w-24 overflow-hidden bg-[var(--rule-soft,var(--border-ed))]">
-            {phase === 'refreshing' ? (
-              reduceMotion ? (
-                <div className="h-px w-full bg-[var(--module-active-500)]" />
-              ) : (
-                <div className="ptr-sweep h-px w-1/3 bg-[var(--module-active-500)]" />
-              )
-            ) : (
+          {phase === 'refreshing' ? (
+            // Fin wacht mee. 22px + gap-2 (8) + de microtekst (11) + pb-3 (12)
+            // = 53, dus het past binnen `PULL_REST_PX` (56) — de rusthoogte van
+            // de strip tijdens het verversen. De trek-stand houdt exact dezelfde
+            // maatvoering als voorheen; `fin-dots.css` regelt zijn eigen
+            // reduced-motion, dus hier geen tweede schakelaar.
+            <FinDots size={22} state="thinking" />
+          ) : (
+            /* De liniaal: hairline-goot met een vullende inkt-streep erin. */
+            <div className="h-px w-24 overflow-hidden bg-[var(--rule-soft,var(--border-ed))]">
               <div
                 className="h-px bg-[var(--module-active-500)]"
                 style={{
@@ -148,8 +153,8 @@ export function PullRefreshIndicator({ scrollRef }: PullRefreshIndicatorProps) {
                   transition: dragging ? 'none' : 'width 200ms ease-out',
                 }}
               />
-            )}
-          </div>
+            </div>
+          )}
 
           <p
             className={`font-serif text-[11px] italic leading-none ${

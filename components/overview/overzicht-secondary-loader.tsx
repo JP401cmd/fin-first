@@ -419,8 +419,6 @@ export async function OverzichtSecondaryLoader({
       ? await computeHorizonSolvedFireAge(supabase, perspective).catch(() => null)
       : null
   const planEndAge = horizonData?.firePlan?.endAge ?? null
-  // Compat voor de rondleiding-seed (ADR 0130, zusterwerk): alleen het nu-anker.
-  const nuStoppenReach: AnkerReach | null = planAnchor?.kind === 'now' ? ankerReach : null
 
   // Vieringsprop voor de client-host: kant-en-klare strings (plat/serialiseerbaar),
   // zodat de host geen lib/milestones hoeft te bundelen. De once-guard is
@@ -455,7 +453,12 @@ export async function OverzichtSecondaryLoader({
           fireAgeDisplay,
           framing: freedomFraming,
           dataIssue: freedomDataIssue,
-          nuStoppenReach,
+          // ÉLK vast anker (aow/now/age), niet langer alleen 'now': onder een
+          // vaste eindleeftijd is de leeftijd geen vrijheidsmoment maar het
+          // ingestelde stopmoment, en dan hoort de rondleiding over BEREIK te
+          // spreken — precies dezelfde invoer als de vrijheidsstrip hieronder.
+          ankerReach,
+          ankerStop,
         }}
       />
       <OverzichtSecondary

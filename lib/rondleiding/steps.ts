@@ -50,19 +50,14 @@
  *         uit de loader via `data.woning`; deze module leidt niets af.
  */
 
-import {
-  formatCurrency,
-  formatFreedomRateFootnote,
-  formatWithFreedom,
-  type FreedomRateSource,
-} from '@/lib/format'
+import { formatCurrency, formatWithFreedom } from '@/lib/format'
 import { HOUSING_BASIS_LABEL } from '@/lib/housing-choice'
 import { ASSET_CONCENTRATION_HIGH_PCT } from '@/lib/financial-health'
 import { hefboomVerdict } from '@/lib/hefboom-status-copy'
 import { buildVrijheidsleeftijdZin } from '@/lib/horizon/vrijheidsleeftijd-zin'
 // Bewust `anker-copy` en niet het `@deprecated` `nu-stoppen-copy` (ADR 0129 F4
 // verwijdert dat bestand; de aliassen daar wijzen al hierheen).
-import { ANKER_KPI_LABEL, type AnkerReach } from '@/lib/horizon/anker-copy'
+import { ANKER_KPI_LABEL, type AnkerReach, type AnkerStop } from '@/lib/horizon/anker-copy'
 import type { Hefboom } from '@/lib/hefboom-config'
 import type { LeverageStatus } from '@/lib/leverage-status'
 import type { FreedomFraming } from '@/lib/fire-strategy'
@@ -70,11 +65,17 @@ import type { FreedomFraming } from '@/lib/fire-strategy'
 // ── Budget & drempels ───────────────────────────────────────────────────────
 
 /**
- * Woordbudget per stap-body. Bewust ruim onder wat een alinea zou zijn: drie
- * regels op een kaart van 22rem. `steps.test.ts` toetst 'm op volle én lege
- * data, want juist de lege staat groeit ongemerkt (uitleg vervangt cijfer).
+ * Woordbudget per stap-body. Bewust ruim onder wat een alinea zou zijn: drie à
+ * vier regels op een kaart van 22rem. `steps.test.ts` toetst 'm op volle én
+ * lege data, want juist de lege staat groeit ongemerkt (uitleg vervangt cijfer).
+ *
+ * 35 → 42 (sep 2026): de grafiekkaart draagt sinds deze wijziging óók de twee
+ * klikzones van de grafiek, en die pasten niet naast de grondslag-markering én
+ * de canonieke vrijheidszin — de duurste variant (pensioen + "zonder je huis")
+ * komt op 40. Bewust niet ruimer: 42 laat precies twee woorden speling, geen
+ * ruimte voor een vijfde gedachte.
  */
-export const RONDLEIDING_MAX_WOORDEN = 35
+export const RONDLEIDING_MAX_WOORDEN = 42
 
 /**
  * Vanaf welk bedrag de vrijheidstijd erbij hoort. Spiegelt de
@@ -110,13 +111,13 @@ export type RondleidingHoofdstuk = 'hefbomen' | 'stand' | 'gereedschap'
 
 export type RondleidingStapId =
   | 'welkom'
-  | 'wisselkoers'
   | 'hefboom-bezittingen'
   | 'hefboom-schulden'
   | 'hefboom-cashflow'
   | 'hefboom-belasting'
   | 'gezondheid'
   | 'grafiek'
+  | 'briefing'
   | 'zijbalk'
   | 'fin'
   | 'pill'
@@ -128,7 +129,7 @@ export const RONDLEIDING_HOOFDSTUK_LABEL: Record<RondleidingHoofdstuk, string> =
   gereedschap: 'Je gereedschap',
 }
 
-/** Kicker voor een stap zonder hoofdstuk (het welkom en de wisselkoers). */
+/** Kicker voor een stap zonder hoofdstuk (alleen het welkom). */
 export const RONDLEIDING_KICKER_DEFAULT = 'Rondleiding'
 
 /**
@@ -190,13 +191,6 @@ export interface RondleidingData {
   } | null
   /** Dagtarief uitgaven — de noemer van élke €→vrijheidstijd-vertaling. */
   dailyExpenseRate: number
-  /**
-   * Herkomst van dat dagtarief (`HorizonRawData.dailyExpenseRateDetail.source`).
-   * De wisselkoers-stap noemt een profiel- of cohortschatting als schatting;
-   * ontbreekt de bron, dan is de terugval "gemeten" bij een tarief > 0 —
-   * spiegel van hub-kansen en het cashflow-instellingenblok.
-   */
-  dailyExpenseRateSource?: FreedomRateSource
   /** Toont de pagina een pensioen-/AOW-leeftijd i.p.v. een FIRE-leeftijd? */
   isPensioen: boolean
   /**
@@ -208,7 +202,18 @@ export interface RondleidingData {
     fireAgeDisplay: number | null
     framing: FreedomFraming
     dataIssue: boolean
-    nuStoppenReach: AnkerReach | null
+    /**
+     * ADR 0129 — het BEREIK onder een vast stop-anker (aow/now/age). Niet
+     * langer alleen het nu-anker: wie een vaste eindleeftijd kiest heeft geen
+     * vrijheidsMOMENT om aan te kondigen, want dat moment ligt al vast. "Werken
+     * wordt een keuze rond je 51e" is daar geen duiding maar een belofte die
+     * het getal niet draagt — het vermogen kan vóór die leeftijd op zijn.
+     * Consume-only: `ankerReachFromRunway` uit dezelfde kernel-run als
+     * /toekomst, `null` onder een opbouwpad zonder vast anker.
+     */
+    ankerReach: AnkerReach | null
+    /** Het stopmoment bij dat bereik (`ankerStopFromSim`) — "nu" of "op 62". */
+    ankerStop: AnkerStop | null
   } | null
 }
 
@@ -222,9 +227,9 @@ export interface RondleidingStapBody {
   /** De volledige body als één string. Max `RONDLEIDING_MAX_WOORDEN` woorden. */
   tekst: string
   /**
-   * Optionele kicker BOVEN de hoofdstuk-naam — vandaag alleen "Reikt tot" bij
-   * eindstrategie 'Nu stoppen', waar de grafiek geen vrijheidsMOMENT toont maar
-   * een bereik (ADR 0127).
+   * Optionele kicker BOVEN de hoofdstuk-naam — vandaag alleen "Reikt tot" onder
+   * een vast stop-anker, waar de grafiek geen vrijheidsMOMENT toont maar een
+   * bereik (ADR 0127/0129).
    */
   kicker?: string
 }
@@ -338,6 +343,14 @@ function metGrondslag(bedrag: string, markering: string | null): string {
  */
 const GEEN_POSITIEVE_GRONDSLAG = 'Zonder je huis staat je vermogen nog niet in de plus.'
 
+/**
+ * De staart van de grafiekkaart: de twee klikzones van `mini-networth-chart`.
+ * Constaterend geformuleerd ("tik op X voor Y"), geen aansporing over geld —
+ * hij beschrijft de bediening van het scherm, niet een keuze met je vermogen.
+ */
+const KLIKZONES =
+  'Tik op het verleden om je vermogen bij te werken, op de toekomst voor meer detail.'
+
 // ── De stappen ──────────────────────────────────────────────────────────────
 
 const STAPPEN: readonly RondleidingStap[] = [
@@ -398,45 +411,7 @@ const STAPPEN: readonly RondleidingStap[] = [
     },
   },
 
-  // ── 2. De wisselkoers — waarom een bedrag een tijd wordt ─────────────────
-  //
-  // De audit van 5 sep 2026 vond het gat: veertien oppervlakken tonen een
-  // vrijheidstijd, geen enkel legt uit hoe die ontstaat. Geen van de drie
-  // persona's kwam er ooit achter dat het één deling is. De welkomkaart heeft
-  // daar het woordbudget niet voor — vandaar een eigen kaart, direct na het
-  // welkom, vóór het eerste tijdgetal op de hefboomtegels.
-  //
-  // Hij voegt bewust GÉÉN nieuw tijdgetal toe (eigenaarsbesluit 2, 12 jul
-  // 2026): hij noemt alleen de koers. De formulering van die koers komt uit
-  // `formatFreedomRateFootnote`, hetzelfde huis als de voetnoot op de
-  // schermen — twee teksten over één koers zouden na de eerste tekstwijziging
-  // uiteenlopen.
-  {
-    id: 'wisselkoers',
-    titel: 'Je wisselkoers',
-    target: null,
-    body: (data, ctx) => {
-      const mechaniek =
-        'Elk tijdgetal is één deling: het bedrag gedeeld door wat je per dag uitgeeft.'
-      const koers = formatFreedomRateFootnote(
-        data.dailyExpenseRate,
-        data.dailyExpenseRateSource ?? (data.dailyExpenseRate > 0 ? 'transactions' : 'none'),
-        ctx.masked,
-      )
-      if (koers) return { tekst: zinnen(mechaniek, koers) }
-      // Geen koers om te noemen — en dan liegt zwijgen niet. In privacymodus
-      // omdat het bedrag verborgen hoort te blijven (ADR 0091 laag 4), zonder
-      // tarief omdat de grondslag nog onbekend is (ADR 0131). Twee verschillende
-      // redenen, dus twee verschillende zinnen.
-      return {
-        tekst: ctx.masked
-          ? zinnen(mechaniek, 'Je bedragen staan nu verborgen, dus ik noem dat dagtarief hier niet.')
-          : zinnen(mechaniek, 'Zodra ik je uitgaven ken, zet ik dat dagtarief erbij.'),
-      }
-    },
-  },
-
-  // ── 3. Bezittingen ───────────────────────────────────────────────────────
+  // ── 2. Bezittingen ───────────────────────────────────────────────────────
   {
     id: 'hefboom-bezittingen',
     hoofdstuk: 'hefbomen',
@@ -629,10 +604,18 @@ const STAPPEN: readonly RondleidingStap[] = [
   // ── 7. De grafiek ────────────────────────────────────────────────────────
   //
   // De vrijheidsleeftijd-zin komt CANONIEK uit `buildVrijheidsleeftijdZin`
-  // (variant 'kaart'), dezelfde bron als /toekomst. Onder eindstrategie
-  // 'Nu stoppen' is die zin lang én gaat hij over BEREIK, niet over een
-  // moment — dan valt de band-uitleg weg zodat het budget klopt en de kaart
-  // één boodschap houdt.
+  // (variant 'kaart'), dezelfde bron als /toekomst. Onder ELK VAST STOP-ANKER
+  // (aow/now/age) gaat die zin over BEREIK en niet over een moment: wie een
+  // vaste eindleeftijd kiest krijgt geen "werken wordt een keuze rond je 51e"
+  // te zien, want dat moment ligt al vast en het vermogen kan er vóór op zijn.
+  // Die zin is bovendien lang — dan valt de staart weg zodat het budget klopt
+  // en de kaart één boodschap houdt.
+  //
+  // De STAART wijst de twee klikzones aan die de grafiek zelf niet verraadt
+  // (`mini-networth-chart.tsx`): links van Vandaag opent het vermogensverloop
+  // (waar je bedragen ook bijwerkt), rechts van Vandaag de volle projectie op
+  // /toekomst. Die affordance stond nergens — de band-uitleg die hier stond
+  // beschreef een element dat de legenda ("Bandbreedte") al benoemt.
   {
     id: 'grafiek',
     hoofdstuk: 'stand',
@@ -656,7 +639,7 @@ const STAPPEN: readonly RondleidingStap[] = [
             ? GEEN_POSITIEVE_GRONDSLAG
             : 'Deze lijn loopt van je verleden naar je vrijheidsmoment.'
 
-      const nuStoppen = data.vrijheid?.nuStoppenReach ?? null
+      const reach = data.vrijheid?.ankerReach ?? null
       // `dataIssue` of een ontbrekende seed ⇒ geen zin. Een gegevensprobleem
       // of een nog niet ingestroomd blok 2 mag hier geen leeftijd beloven.
       const zin =
@@ -665,24 +648,49 @@ const STAPPEN: readonly RondleidingStap[] = [
               freedomAge: data.vrijheid.fireAgeDisplay,
               framing: data.vrijheid.framing,
               isPensioen: data.isPensioen,
-              nuStoppenReach: nuStoppen,
+              ankerReach: reach,
+              ankerStop: data.vrijheid.ankerStop,
               pending: false,
               variant: 'kaart',
             }).text
           : null
 
-      const staart = nuStoppen
-        ? null
-        : 'De band eromheen toont de marge waarbinnen je vermogen waarschijnlijk beweegt.'
+      const staart = reach ? null : KLIKZONES
 
       return {
         tekst: zinnen(kop, zin, staart),
-        kicker: nuStoppen ? ANKER_KPI_LABEL : undefined,
+        kicker: reach ? ANKER_KPI_LABEL : undefined,
       }
     },
   },
 
-  // ── 8. De zijbalk (alleen desktop) ───────────────────────────────────────
+  // ── 8. De briefing ───────────────────────────────────────────────────────
+  //
+  // De rondleiding wees wél de vier hefbomen, de gezondheid en de grafiek aan,
+  // maar liep langs het blok dat er wekelijks IETS BIJ zet zonder dat de
+  // gebruiker erom vraagt. Wie niet weet dat daar meldingen verschijnen, leest
+  // ze niet: op /overzicht staat de briefing ónder de vouw.
+  //
+  // De kaart noemt de zes categorieën in gewone taal — dezelfde zes als
+  // `CATEGORY_CONFIG` in `briefing-panel.tsx` (observation, tip, upcoming,
+  // heads_up, milestone, market). Bewust GEEN belofte over de frequentie van
+  // het verversen: dat hangt aan AI-toegang en aan een dagteller die deze
+  // module niet kent, en een toezegging die het scherm niet nakomt is erger
+  // dan geen toezegging.
+  {
+    id: 'briefing',
+    hoofdstuk: 'gereedschap',
+    titel: 'De briefing',
+    target: { desktop: '[data-tour="briefing"]', mobiel: '[data-tour="briefing"]' },
+    body: () => ({
+      tekst: zinnen(
+        'Elke week zet ik hier wat me opvalt, een tip, wat eraan komt, een heads-up, een mijlpaal of nieuws uit de markt.',
+        'Doorklikken brengt je naar het onderdeel zelf.',
+      ),
+    }),
+  },
+
+  // ── 9. De zijbalk (alleen desktop) ───────────────────────────────────────
   {
     id: 'zijbalk',
     hoofdstuk: 'gereedschap',
@@ -697,7 +705,7 @@ const STAPPEN: readonly RondleidingStap[] = [
     }),
   },
 
-  // ── 9. Fin zelf (alleen desktop) ─────────────────────────────────────────
+  // ── 10. Fin zelf (alleen desktop) ────────────────────────────────────────
   //
   // De rondleiding eindigt waar Fin woont. Kan ontbreken (een chat die al open
   // stond verbergt de zwevende companion) — vandaar `optioneel`.
@@ -715,7 +723,7 @@ const STAPPEN: readonly RondleidingStap[] = [
     }),
   },
 
-  // ── 8′. De nav-pill (alleen mobiel; vervangt 8 + 9) ──────────────────
+  // ── 9′. De nav-pill (alleen mobiel; vervangt 9 + 10) ─────────────────
   {
     id: 'pill',
     hoofdstuk: 'gereedschap',

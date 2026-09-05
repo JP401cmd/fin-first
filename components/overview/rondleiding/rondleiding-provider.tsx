@@ -80,10 +80,10 @@ const VrijheidSeedContext = createContext<((seed: VrijheidSeed) => void) | null>
  */
 export function RondleidingDataSeed({ vrijheid }: { vrijheid: VrijheidSeed }) {
   const registreer = useContext(VrijheidSeedContext)
-  const { fireAgeDisplay, framing, dataIssue, nuStoppenReach } = vrijheid
+  const { fireAgeDisplay, framing, dataIssue, ankerReach, ankerStop } = vrijheid
   useEffect(() => {
-    registreer?.({ fireAgeDisplay, framing, dataIssue, nuStoppenReach })
-  }, [registreer, fireAgeDisplay, framing, dataIssue, nuStoppenReach])
+    registreer?.({ fireAgeDisplay, framing, dataIssue, ankerReach, ankerStop })
+  }, [registreer, fireAgeDisplay, framing, dataIssue, ankerReach, ankerStop])
   return null
 }
 

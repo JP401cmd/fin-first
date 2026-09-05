@@ -290,10 +290,6 @@ export default async function OverzichtPage() {
           currentNetWorth,
           woning: rondleidingWoning,
           dailyExpenseRate: horizonData?.dailyExpenseRate ?? 0,
-          // Herkomst van dat tarief uit dezelfde bundel — de wisselkoers-stap
-          // noemt een profiel-/cohortschatting als schatting i.p.v. 'm als
-          // gemeten uitgavenpatroon te presenteren (UR3-08).
-          dailyExpenseRateSource: horizonData?.dailyExpenseRateDetail?.source,
           isPensioen: isPensioenMode,
         }}
       >

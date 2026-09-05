@@ -29,6 +29,7 @@ const BRON = {
   finHome: lees('components', 'app', 'fin', 'fin-home.tsx'),
   sidebar: lees('components', 'app', 'shell', 'sidebar.tsx'),
   pill: lees('components', 'app', 'shell', 'floating-nav-button.tsx'),
+  briefing: lees('components', 'overview', 'briefing-panel.tsx'),
 }
 
 /**
@@ -56,6 +57,7 @@ const HOUDERS: Record<string, { bron: string; eist: string[] }> = {
   },
   '[data-tour="gezondheid"]': { bron: 'overzicht-hero.tsx', eist: ['data-tour="gezondheid"'] },
   '[data-tour="grafiek"]': { bron: 'overzicht-hero.tsx', eist: ['data-tour="grafiek"'] },
+  '[data-tour="briefing"]': { bron: 'briefing-panel.tsx', eist: ['data-tour="briefing"'] },
   '[data-tour="fin"]': { bron: 'fin-home.tsx', eist: ['data-tour="fin"'] },
   '#app-sidebar': { bron: 'sidebar.tsx', eist: ['id="app-sidebar"'] },
   '[data-mobile-floating-nav]': {
@@ -70,6 +72,7 @@ const BRON_PER_NAAM: Record<string, string> = {
   'fin-home.tsx': BRON.finHome,
   'sidebar.tsx': BRON.sidebar,
   'floating-nav-button.tsx': BRON.pill,
+  'briefing-panel.tsx': BRON.briefing,
 }
 
 describe('rondleiding — elke selector heeft een houder in de bron', () => {

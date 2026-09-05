@@ -9,14 +9,13 @@
  *  2. het WOORDBUDGET — op volle én op lege data, want juist de lege staat
  *     groeit ongemerkt (uitleg vervangt cijfer);
  *  3. de DATA-AFHANKELIJKE takken: welkom noemt een eigen getal, privacymodus
- *     noemt geen euro's, 'Nu stoppen' spreekt over bereik, een gegevensprobleem
- *     belooft geen leeftijd;
+ *     noemt geen euro's, ELK VAST STOP-ANKER spreekt over bereik (nooit over
+ *     "werken wordt een keuze"), een gegevensprobleem belooft geen leeftijd;
  *  4. de WFT-GRENS en de STEM — geen imperatief over geld, geen
  *     besparingsbelofte, Fin in de ik-vorm waar hij zich voorstelt.
  */
 
 import { describe, it, expect } from 'vitest'
-import { formatFreedomRateFootnote } from '@/lib/format'
 import { HOUSING_BASIS_LABEL } from '@/lib/housing-choice'
 import {
   RONDLEIDING_MAX_WOORDEN,
@@ -57,7 +56,8 @@ const VOL: RondleidingData = {
     fireAgeDisplay: 53,
     framing: 'building',
     dataIssue: false,
-    nuStoppenReach: null,
+    ankerReach: null,
+    ankerStop: null,
   },
 }
 
@@ -92,6 +92,35 @@ const ZONDER_HUIS: RondleidingData = {
 
 /** Huurder: geen woning, dus geen grondslag om achter het bedrag te zetten. */
 const ZONDER_WONING: RondleidingData = { ...VOL, housingSplit: null, woning: null }
+
+/** Eindstrategie 'Nu stoppen' — het nu-anker (ADR 0127). */
+const NU_STOPPEN: RondleidingData = {
+  ...VOL,
+  vrijheid: {
+    fireAgeDisplay: 47,
+    framing: 'free',
+    dataIssue: false,
+    ankerReach: { kind: 'reikt-tot', age: 86.4, endAge: 90 },
+    ankerStop: { kind: 'now' },
+  },
+}
+
+/**
+ * Een VASTE EINDLEEFTIJD (anker-soort 'age', ADR 0129). Dit was het gat: de
+ * kaart kreeg alleen het nu-anker mee, dus wie "ik stop op mijn 62e" instelt
+ * las "werken wordt voor jou een keuze rond je 51e" — terwijl 51 daar het
+ * ingestelde stopmoment is en het vermogen erna op kan raken.
+ */
+const VASTE_EINDLEEFTIJD: RondleidingData = {
+  ...VOL,
+  vrijheid: {
+    fireAgeDisplay: 62,
+    framing: 'anchored',
+    dataIssue: false,
+    ankerReach: { kind: 'reikt-tot', age: 78.2, endAge: 95 },
+    ankerStop: { kind: 'age', stopAge: 62 },
+  },
+}
 
 /** Alle bodies van één platform, in één keer. */
 function bodies(data: RondleidingData, platform: 'desktop' | 'mobiel', masked = false) {
@@ -128,13 +157,13 @@ describe('rondleiding — stappen per platform', () => {
     expect(resolveRondleidingStappen('mobiel').at(-1)?.id).toBe('pill')
   })
 
-  // Het welkom en de wisselkoers vormen samen de OPENING: geen spotlight, geen
-  // hoofdstuk, kicker "Rondleiding". Pas daarna beginnen de drie hoofdstukken
-  // waar de stippen op lopen; een hoofdstuk-stip vóór het eerste hoofdstuk zou
-  // de voortgang laten terugspringen.
-  it('alleen het welkom en de wisselkoers staan buiten een hoofdstuk', () => {
+  // Het welkom is de OPENING: geen spotlight, geen hoofdstuk, kicker
+  // "Rondleiding". Pas daarna beginnen de drie hoofdstukken waar de stippen op
+  // lopen; een hoofdstuk-stip vóór het eerste hoofdstuk zou de voortgang laten
+  // terugspringen.
+  it('alleen het welkom staat buiten een hoofdstuk', () => {
     for (const stap of RONDLEIDING_STAPPEN) {
-      if (stap.id === 'welkom' || stap.id === 'wisselkoers') {
+      if (stap.id === 'welkom') {
         expect(stap.hoofdstuk, `stap "${stap.id}"`).toBeUndefined()
       } else {
         expect(stap.hoofdstuk, `stap "${stap.id}"`).toBeDefined()
@@ -142,11 +171,14 @@ describe('rondleiding — stappen per platform', () => {
     }
   })
 
-  it('legt de wisselkoers uit vóór het eerste tijdgetal op de hefboomtegels', () => {
+  // De briefing staat ná de grafiek en vóór de shell-stappen: hij hoort bij het
+  // gereedschap, en op /overzicht staat hij ónder de grafiekcel. Een stap die
+  // omhoog springt in de pagina laat de rondleiding terugscrollen.
+  it('wijst de briefing aan ná de grafiek en vóór de shell-stappen', () => {
     for (const platform of ['desktop', 'mobiel'] as const) {
       const ids = resolveRondleidingStappen(platform).map((s) => s.id)
-      expect(ids[1], platform).toBe('wisselkoers')
-      expect(ids.indexOf('wisselkoers')).toBeLessThan(ids.indexOf('hefboom-bezittingen'))
+      expect(ids.indexOf('briefing'), platform).toBeGreaterThan(ids.indexOf('grafiek'))
+      expect(ids.indexOf('briefing'), platform).toBeLessThan(ids.length - 1)
     }
   })
 })
@@ -170,17 +202,20 @@ describe('rondleiding — woordbudget', () => {
     }
   }
 
-  it('houdt het budget ook in privacymodus en onder de eindstrategie Nu stoppen', () => {
-    const nuStoppen: RondleidingData = {
-      ...VOL,
-      vrijheid: {
-        fireAgeDisplay: 47,
-        framing: 'free',
-        dataIssue: false,
-        nuStoppenReach: { kind: 'reikt-tot', age: 86.4, endAge: 90 },
-      },
-    }
-    for (const b of [...bodies(VOL, 'desktop', true), ...bodies(nuStoppen, 'desktop')]) {
+  it('houdt het budget ook in privacymodus en onder elk vast stop-anker', () => {
+    for (const b of [
+      ...bodies(VOL, 'desktop', true),
+      ...bodies(NU_STOPPEN, 'desktop'),
+      ...bodies(VASTE_EINDLEEFTIJD, 'desktop'),
+      ...bodies(VASTE_EINDLEEFTIJD, 'mobiel'),
+      // De kruisingen die de varianten hierboven NIET raken: een vast anker in
+      // privacymodus (geen bedrag, wél de lange bereik-zin), een vast anker op
+      // een leeg account, en een huurder in pensioenmodus (geen grondslag-
+      // markering, wél "(AOW-leeftijd)" én de klikzones).
+      ...bodies(VASTE_EINDLEEFTIJD, 'desktop', true),
+      ...bodies({ ...LEEG, vrijheid: VASTE_EINDLEEFTIJD.vrijheid }, 'desktop'),
+      ...bodies({ ...ZONDER_WONING, isPensioen: true }, 'desktop'),
+    ]) {
       expect(telWoorden(b.tekst), `stap "${b.id}": "${b.tekst}"`).toBeLessThanOrEqual(
         RONDLEIDING_MAX_WOORDEN,
       )
@@ -242,38 +277,6 @@ describe('rondleiding — het welkom toont waarde vóór het om tijd vraagt', ()
   })
 })
 
-describe('rondleiding — de wisselkoers-stap legt de deling uit', () => {
-  const koers = (data: RondleidingData, masked = false) =>
-    bodies(data, 'desktop', masked).find((b) => b.id === 'wisselkoers')!
-
-  it('noemt de mechaniek én het dagtarief uit de canonieke voetnoot', () => {
-    const b = koers(VOL)
-    expect(b.tekst).toMatch(/gedeeld door wat je per dag uitgeeft/)
-    expect(b.tekst).toContain(formatFreedomRateFootnote(VOL.dailyExpenseRate, 'transactions', false)!)
-  })
-
-  it('benoemt een profielschatting als schatting', () => {
-    const b = koers({ ...VOL, dailyExpenseRateSource: 'estimate' })
-    expect(b.tekst).toMatch(/schatting/i)
-  })
-
-  it('voegt geen nieuw tijdgetal toe (eigenaarsbesluit 2)', () => {
-    expect(koers(VOL).tekst).not.toMatch(/vrijheid/i)
-  })
-
-  it('zwijgt over het tarief zonder grondslag, en zegt waarom', () => {
-    const b = koers(LEEG)
-    expect(b.tekst).not.toContain('€')
-    expect(b.tekst).toMatch(/Zodra ik je uitgaven ken/)
-  })
-
-  it('noemt in privacymodus geen tarief, met een eigen reden', () => {
-    const b = koers(VOL, true)
-    expect(b.tekst).not.toContain('€')
-    expect(b.tekst).toMatch(/verborgen/)
-  })
-})
-
 describe('rondleiding — privacymodus', () => {
   it('noemt geen enkel euroteken in welke stap dan ook', () => {
     for (const platform of ['desktop', 'mobiel'] as const) {
@@ -293,30 +296,69 @@ describe('rondleiding — de grafiekstap volgt de canonieke vrijheidszin', () =>
     expect(grafiek(VOL).tekst).toMatch(/keuze/)
   })
 
+  it('wijst de twee klikzones van de grafiek aan zolang er geen vast anker is', () => {
+    expect(grafiek(VOL).tekst).toMatch(/Tik op het verleden/)
+    expect(grafiek(VOL).tekst).toMatch(/op de toekomst/)
+  })
+
   it('spreekt onder Nu stoppen over BEREIK en draagt de kicker "Reikt tot"', () => {
-    const b = grafiek({
-      ...VOL,
-      vrijheid: {
-        fireAgeDisplay: 47,
-        framing: 'free',
-        dataIssue: false,
-        nuStoppenReach: { kind: 'reikt-tot', age: 86.4, endAge: 90 },
-      },
-    })
+    const b = grafiek(NU_STOPPEN)
     expect(b.tekst).toMatch(/reikt/)
+    expect(b.kicker).toBe('Reikt tot')
+  })
+
+  // De kern van de correctie: onder een VASTE EINDLEEFTIJD is de leeftijd het
+  // ingestelde stopmoment, geen vrijheidsmoment. "Werken wordt een keuze rond
+  // je 62e" zou daar een belofte doen die het getal niet draagt — het vermogen
+  // kan ná dat moment op raken, en juist dát zegt de bereik-zin wél.
+  it('belooft geen keuze-moment bij een vaste eindleeftijd, maar noemt het bereik', () => {
+    const b = grafiek(VASTE_EINDLEEFTIJD)
+    expect(b.tekst).not.toMatch(/keuze/)
+    expect(b.tekst).toMatch(/Als je op 62 stopt/)
+    expect(b.tekst).toMatch(/reikt je liquide vermogen tot je 78e/)
     expect(b.kicker).toBe('Reikt tot')
   })
 
   it('belooft geen leeftijd bij een gegevensprobleem of een nog niet geladen seed', () => {
     const metIssue = grafiek({
       ...VOL,
-      vrijheid: { fireAgeDisplay: 53, framing: 'building', dataIssue: true, nuStoppenReach: null },
+      vrijheid: {
+        fireAgeDisplay: 53,
+        framing: 'building',
+        dataIssue: true,
+        ankerReach: null,
+        ankerStop: null,
+      },
     })
     const zonderSeed = grafiek({ ...VOL, vrijheid: null })
     for (const b of [metIssue, zonderSeed]) {
       expect(b.tekst).not.toContain('53e')
       expect(b.tekst).not.toMatch(/keuze rond/)
     }
+  })
+})
+
+describe('rondleiding — de briefingstap noemt wat daar kan verschijnen', () => {
+  const briefing = (platform: 'desktop' | 'mobiel') =>
+    bodies(VOL, platform).find((b) => b.id === 'briefing')!
+
+  it('bestaat op beide platforms en licht het briefing-blok uit', () => {
+    for (const platform of ['desktop', 'mobiel'] as const) {
+      expect(briefing(platform), platform).toBeDefined()
+      const stap = RONDLEIDING_STAPPEN.find((x) => x.id === 'briefing')!
+      expect(stap.target?.[platform]).toBe('[data-tour="briefing"]')
+    }
+  })
+
+  it('noemt de soorten meldingen die de briefing kan brengen', () => {
+    const tekst = briefing('desktop').tekst
+    for (const woord of ['opvalt', 'tip', 'heads-up', 'mijlpaal', 'markt']) {
+      expect(tekst, woord).toContain(woord)
+    }
+  })
+
+  it('belooft niets over verversen — dat hangt aan AI-toegang en een dagteller', () => {
+    expect(briefing('desktop').tekst).not.toMatch(/ververs/i)
   })
 })
 

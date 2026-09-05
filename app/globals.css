@@ -1747,28 +1747,6 @@ body.sleepmodus-dragging * {
   }
 }
 
-/* ── Pull-to-refresh: onbepaalde inkt-sweep ─────────────────────
-   Perpetueel laad-motief (hangt niet aan viewport-intrede of modal-open),
-   dus pure CSS met een eigen reduced-motion-gate. Het component rendert bij
-   reduced motion sowieso een statische, volle streep i.p.v. deze sweep — de
-   media-query hieronder is het vangnet daarop. Alleen `transform`
-   geanimeerd; de goot eromheen clipt. */
-@keyframes ptr-sweep-kf {
-  0%   { transform: translateX(-100%); }
-  100% { transform: translateX(300%); }
-}
-
-.ptr-sweep {
-  animation: ptr-sweep-kf 1100ms cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ptr-sweep {
-    animation: none;
-    transform: none;
-    width: 100%;
-  }
-}
 
 /* ── Globale focus-indicator (WCAG 2.1 Focus Visible) ───────────
    Conservatief: alleen :focus-visible (keyboard/programmatic), niet

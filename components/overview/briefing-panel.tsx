@@ -385,7 +385,7 @@ export function BriefingPanel({
   }
 
   return (
-    <div id="briefing" className="mt-6 scroll-mt-20">
+    <div id="briefing" data-tour="briefing" className="mt-6 scroll-mt-20">
       <BriefingHeader
         refreshedAt={shownRefreshedAt}
         headline={shownHeadline}
