@@ -260,7 +260,11 @@ const tests: TestCase[] = [
         monthlyIncome: 5000,
         monthlyExpenses: 3200,
         monthlySavings: 1800,
+        prevMonthIncome: 4800,
         prevMonthExpenses: 2900,
+        prevMonthSavings: 1900,
+        monthBeforePrevExpenses: 2650,
+        avgMonthlyExpenses6m: 2875,
         completedActionsCount: 2,
         freedomDaysWon: 8,
         fireAge: 52,
@@ -274,6 +278,16 @@ const tests: TestCase[] = [
       assertEqual(typeof response.monthlyExpenses, 'number', 'monthlyExpenses is number')
       assertEqual(response.monthlySavings, response.monthlyIncome - response.monthlyExpenses, 'monthlySavings = income - expenses')
       assertEqual(typeof response.prevMonthExpenses, 'number', 'prevMonthExpenses is number')
+      // De terugblik-stap leest UITSLUITEND deze prevMonth*-velden; ontbreekt er
+      // een, dan valt hij terug op de lopende maand onder een kop die de vorige
+      // maand belooft — precies bug B-016.
+      assertEqual(typeof response.prevMonthIncome, 'number', 'prevMonthIncome is number')
+      assertEqual(typeof response.prevMonthSavings, 'number', 'prevMonthSavings is number')
+      assertEqual(response.prevMonthSavings, response.prevMonthIncome - response.prevMonthExpenses, 'prevMonthSavings = prev income - prev expenses')
+      assertEqual(typeof response.monthBeforePrevExpenses, 'number', 'monthBeforePrevExpenses is number')
+      // Stabiele grondslag voor vrijheidstijd; zonder dit veld valt de check-in
+      // terug op de lopende maand en leest elke groei als eeuwen vrijheid.
+      assertEqual(typeof response.avgMonthlyExpenses6m, 'number', 'avgMonthlyExpenses6m is number')
       assertEqual(typeof response.completedActionsCount, 'number', 'completedActionsCount is number')
       assertEqual(typeof response.freedomDaysWon, 'number', 'freedomDaysWon is number')
     },
@@ -291,6 +305,16 @@ const tests: TestCase[] = [
       assertEqual(MONTH_NAMES.length, 12, '12 month names')
       assertEqual(MONTH_NAMES[0], 'januari', 'January = januari')
       assertEqual(MONTH_NAMES[11], 'december', 'December = december')
+
+      // De terugblik noemt twee maanden terug bij naam (de vergelijkingsbasis).
+      // Die index loopt over de jaargrens heen: in januari is dat november.
+      // Een tweede ternary zou dat stil fout doen, vandaar de modulo in de route.
+      for (let m = 0; m < 12; m++) {
+        const prevIdx = m === 0 ? 11 : m - 1
+        const beforePrevIdx = (m + 10) % 12
+        assertEqual(beforePrevIdx, prevIdx === 0 ? 11 : prevIdx - 1, `${MONTH_NAMES[m]}: maand-voor-vorige is de maand vóór de vorige`)
+        assertIncludes(MONTH_NAMES, MONTH_NAMES[beforePrevIdx], `${MONTH_NAMES[m]}: vergelijkingsmaand is een geldige maandnaam`)
+      }
       // Verify all lowercase
       for (const name of MONTH_NAMES) {
         assertEqual(name, name.toLowerCase(), `${name} is lowercase`)
@@ -967,7 +991,9 @@ const tests: TestCase[] = [
         audience: 'solo', monthIndex: 0,
         netWorth: 559353, totalAssets: 1030000, netWorthTrend: 0, prevNetWorth: 559353,
         monthlyIncome: 4000, monthlyExpenses: 3000, prevMonthIncome: 4000, prevMonthExpenses: 3000,
-        monthlySavings: 1000, prevMonthlySavings: 1000, savingsRate6m: 20, dailyExpenses: 100,
+        monthlySavings: 1000, prevMonthlySavings: 1000,
+        monthBeforePrevExpenses: 3000, monthBeforePrevSavings: 1000,
+        savingsRate6m: 20, dailyExpenses: 100,
         goals: [], totalDebts: 0, debtCount: 0,
         completedActionsThisMonth: 0, completedActionsFreedomDays: 0, pendingActionsCount: 0,
         fireAge: null, prevFireAge: null, expensesByCategory: [], newRecurring: [],
@@ -990,7 +1016,9 @@ const tests: TestCase[] = [
         audience: 'solo', monthIndex: 0,
         netWorth: 100000, totalAssets: 115000, netWorthTrend: 4000, prevNetWorth: 96000,
         monthlyIncome: 4000, monthlyExpenses: 3000, prevMonthIncome: 4000, prevMonthExpenses: 3000,
-        monthlySavings: 1000, prevMonthlySavings: 1000, savingsRate6m: 20, dailyExpenses: 100,
+        monthlySavings: 1000, prevMonthlySavings: 1000,
+        monthBeforePrevExpenses: 3000, monthBeforePrevSavings: 1000,
+        savingsRate6m: 20, dailyExpenses: 100,
         goals: [], totalDebts: 15000, debtCount: 1,
         completedActionsThisMonth: 0, completedActionsFreedomDays: 0, pendingActionsCount: 0,
         fireAge: null, prevFireAge: null, expensesByCategory: [], newRecurring: [], topAsset: null,

@@ -168,6 +168,8 @@ function baseInput(over: Partial<GespreksstartersInput> = {}): GespreksstartersI
     prevMonthExpenses: 3000,
     monthlySavings: 1000,
     prevMonthlySavings: 1000,
+    monthBeforePrevExpenses: 3000,
+    monthBeforePrevSavings: 1000,
     savingsRate6m: 20,
     dailyExpenses: 100,
     goals: [],
@@ -381,5 +383,59 @@ describe('buildGespreksstarters — contracten', () => {
       goals: [{ name: 'Bijna klaar', current: 1800, target: 2000, completed: false, targetDate: soon.toISOString().slice(0, 10) }],
     }))
     expect(out.map(o => o.id)).not.toContain('doel-deadline')
+  })
+})
+
+describe('vergelijkende starters kijken naar afgeronde maanden (B-016)', () => {
+  // Given: het is 4 september. Van de lopende maand staan er een paar dagen aan
+  //   boekingen (uitgaven EUR 97); augustus en juli waren normale maanden.
+  // When: de gebruiker de maandelijkse check-in doet.
+  // Then: er verschijnt GEEN starter die de vier septemberdagen als een daling
+  //   viert. Vóór de fix vergeleek detectUitgaven de lopende maand met de
+  //   vorige: -97% -> "EUR 3.003 minder uitgegeven dan vorige maand, N
+  //   vrijheidsdagen gewonnen!" terwijl er simpelweg nog niets geboekt was.
+  it('viert de nog niet verstreken lopende maand niet als besparing', () => {
+    const out = buildGespreksstarters(baseInput({
+      monthlyIncome: 0,
+      monthlyExpenses: 97,
+      monthlySavings: -97,
+      prevMonthIncome: 4000,
+      prevMonthExpenses: 3100,
+      prevMonthlySavings: 900,
+      monthBeforePrevExpenses: 3000,
+      monthBeforePrevSavings: 1000,
+    }))
+    expect(out.find((s) => s.id === 'uitgaven-daling')).toBeUndefined()
+    expect(out.find((s) => s.id === 'uitgaven-stijging')).toBeUndefined()
+  })
+
+  it('signaleert een ECHTE stijging tussen de twee afgeronde maanden', () => {
+    // Augustus 3.600 t.o.v. juli 3.000 = +20% -> boven de drempel van 15%.
+    const out = buildGespreksstarters(baseInput({
+      monthlyExpenses: 97,
+      prevMonthExpenses: 3600,
+      monthBeforePrevExpenses: 3000,
+    }))
+    const hit = out.find((s) => s.id === 'uitgaven-stijging')
+    expect(hit).toBeDefined()
+    // Het bedrag is het verschil tussen de twee afgeronde maanden, niet iets
+    // waar de lopende maand in meeweegt.
+    expect(`${hit!.vraag} ${hit!.context}`).toContain('20%')
+  })
+
+  it('vergelijkt gespaard bedrag tussen de twee afgeronde maanden', () => {
+    // `monthlyIncome: 0` is het echte begin-van-de-maand-beeld: er is nog geen
+    // salaris geboekt, dus het acute "meer uit dan in"-signaal hoort niet te
+    // vuren (dat vraagt inkomen > 0) en de vergelijking komt aan bod.
+    const out = buildGespreksstarters(baseInput({
+      monthlyIncome: 0,
+      monthlyExpenses: 97,
+      monthlySavings: -97,
+      prevMonthlySavings: 1200,
+      monthBeforePrevSavings: 900,
+    }))
+    const hit = out.find((s) => s.id === 'sparen-stijging')
+    expect(hit).toBeDefined()
+    expect(`${hit!.vraag} ${hit!.context}`).not.toContain('deze maand')
   })
 })

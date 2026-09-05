@@ -34,6 +34,11 @@ export async function GET() {
   const { start: monthStart, end: monthEnd } = localMonthBounds(now)
   const prevMonthStart = localMonthStart(new Date(currentYear, currentMonth - 1, 1))
   const prevMonthEnd = monthStart
+  // De maand vóór de vorige. De vergelijkende starters zetten twee VOLLEDIGE
+  // maanden naast elkaar (afgelopen maand vs. daarvóór) i.p.v. de lopende maand
+  // tegen de vorige — zie de toelichting bij monthBeforePrev* in
+  // lib/checkin/gespreksstarters.ts (B-016).
+  const monthBeforePrevStart = localMonthStart(new Date(currentYear, currentMonth - 2, 1))
   // 6-maands venster uit de CANONIEKE bron (lib/savings-source.ts): zes
   // VOLTOOIDE kalendermaanden, de lopende maand exclusief — zelfde grenzen als
   // de spaarquote op /overzicht. Stond hier als `currentMonth - 6` t/m
@@ -51,7 +56,8 @@ export async function GET() {
     supabase.from('assets').select('name, current_value, net_worth_inclusion_pct').eq('user_id', claims.sub).eq('is_active', true),
     supabase.from('debts').select('current_balance, name, debt_type, interest_rate, monthly_payment, repayment_type, end_date, start_date, net_worth_inclusion_pct, include_aflossing_in_savings, custom_aflossing_amount, is_active').eq('user_id', claims.sub),
     supabase.from('transactions').select('amount').eq('user_id', claims.sub).eq('is_income', true).gte('date', monthStart).lt('date', monthEnd),
-    supabase.from('transactions').select('amount').eq('user_id', claims.sub).eq('is_income', true).gte('date', prevMonthStart).lt('date', prevMonthEnd),
+    // Vorige maand ÉN de maand daarvóór; hieronder gesplitst op de maandgrens.
+    supabase.from('transactions').select('amount, date').eq('user_id', claims.sub).eq('is_income', true).gte('date', monthBeforePrevStart).lt('date', prevMonthEnd),
     supabase.from('goals').select('name, current_value, target_value, is_completed, target_date').eq('user_id', claims.sub),
     // ALLE budgetten, niet alleen de uitgave-budgetten: de spaarquote heeft de
     // spaarbudget-ID's nodig (stortingen op een spaarbudget tellen als sparen,
@@ -68,7 +74,7 @@ export async function GET() {
     // en RLS scoopt hier al (lib/unlinked-cash.ts).
     selectUnlinkedBankAccounts(supabase),
     supabase.from('transactions').select('amount, category').eq('user_id', claims.sub).eq('is_income', false).gte('date', monthStart).lt('date', monthEnd),
-    supabase.from('transactions').select('amount, category').eq('user_id', claims.sub).eq('is_income', false).gte('date', prevMonthStart).lt('date', monthStart),
+    supabase.from('transactions').select('amount, category, date').eq('user_id', claims.sub).eq('is_income', false).gte('date', monthBeforePrevStart).lt('date', monthStart),
     supabase.from('transactions').select('amount, counterparty_name, description, date').eq('user_id', claims.sub).eq('is_income', false).gte('date', threeMonthsAgo).lt('date', monthEnd),
     loadPerspectiveContext(supabase),
     loadPrevFireAge(supabase, claims.sub, currentYear, currentMonth),
@@ -105,10 +111,23 @@ export async function GET() {
 
   const monthlyIncome = (curIncomeRes.data || []).reduce((s, t) => s + Math.abs(t.amount || 0), 0)
   const monthlyExpenses = (curCatRes.data || []).reduce((s, t) => s + Math.abs(t.amount || 0), 0)
-  const prevMonthIncome = (prevIncomeRes.data || []).reduce((s, t) => s + Math.abs(t.amount || 0), 0)
-  const prevMonthExpenses = (prevCatRes.data || []).reduce((s, t) => s + Math.abs(t.amount || 0), 0)
+  // Beide queries hierboven dekken twee maanden; splitsen op de maandgrens.
+  // `date` is een ISO-datum (YYYY-MM-DD), dus een tekstvergelijking volstaat.
+  const prevIncomeRows = (prevIncomeRes.data || []).filter(t => t.date >= prevMonthStart)
+  const beforePrevIncomeRows = (prevIncomeRes.data || []).filter(t => t.date < prevMonthStart)
+  const prevCatRows = (prevCatRes.data || []).filter(t => t.date >= prevMonthStart)
+  const beforePrevCatRows = (prevCatRes.data || []).filter(t => t.date < prevMonthStart)
+
+  const sumAbs = (rows: { amount: number | null }[]) =>
+    rows.reduce((s, t) => s + Math.abs(t.amount || 0), 0)
+
+  const prevMonthIncome = sumAbs(prevIncomeRows)
+  const prevMonthExpenses = sumAbs(prevCatRows)
+  const monthBeforePrevIncome = sumAbs(beforePrevIncomeRows)
+  const monthBeforePrevExpenses = sumAbs(beforePrevCatRows)
   const monthlySavings = monthlyIncome - monthlyExpenses
   const prevMonthlySavings = prevMonthIncome - prevMonthExpenses
+  const monthBeforePrevSavings = monthBeforePrevIncome - monthBeforePrevExpenses
 
   // 6-maands gemiddelden (excl. eigen-rekening-transfers, zoals de loaders);
   // bij minder dan 6 maanden data middelen we over de beschikbare maanden.
@@ -185,7 +204,9 @@ export async function GET() {
     if (b.monthly_limit && b.monthly_limit > 0) budgetLimits[b.name] = b.monthly_limit
   }
   const curByCat = sumByCategory(curCatRes.data || [])
-  const prevByCat = sumByCategory(prevCatRes.data || [])
+  // Bewust de gesplitste rijen: de categorie-vergelijking gaat over de lopende
+  // maand t.o.v. de VORIGE, niet t.o.v. twee maanden samen.
+  const prevByCat = sumByCategory(prevCatRows)
   const categoryNames = new Set([...Object.keys(curByCat), ...Object.keys(prevByCat)])
   const expensesByCategory = [...categoryNames].map(name => ({
     name,
@@ -209,6 +230,7 @@ export async function GET() {
     netWorth, totalAssets, netWorthTrend, prevNetWorth,
     monthlyIncome, monthlyExpenses, prevMonthIncome, prevMonthExpenses,
     monthlySavings, prevMonthlySavings, savingsRate6m, dailyExpenses,
+    monthBeforePrevExpenses, monthBeforePrevSavings,
     goals: (goalsRes.data || []).map(g => ({
       name: g.name, current: g.current_value, target: g.target_value,
       completed: g.is_completed, targetDate: g.target_date ?? null,

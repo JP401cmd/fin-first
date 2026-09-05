@@ -39,6 +39,7 @@ import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { PageInfoButton } from '@/components/editorial'
 import { getPageInfo } from '@/lib/page-info-content'
 import { berekenReeks } from '@/lib/checkin/reeks'
+import { terugblikCijfers } from '@/lib/checkin/terugblik'
 import { CheckinAfsluitViering } from './afsluit-viering'
 
 /**
@@ -85,12 +86,21 @@ type StepKey = (typeof STEPS)[number]['key']
 interface CheckinOverview {
   monthLabel: string
   prevMonthLabel: string
+  /** De maand vóór de vorige — vergelijkingsbasis van de terugblik. */
+  monthBeforePrevLabel: string
   netWorth: number
   netWorthChange: number
+  /** Ongemarkeerd = de LOPENDE maand (ADR 0073) — niet de terugblik-maand. */
   monthlyIncome: number
   monthlyExpenses: number
   monthlySavings: number
+  /** De afgelopen, volledige maand: waar de terugblik-stap over gaat. */
+  prevMonthIncome: number
   prevMonthExpenses: number
+  prevMonthSavings: number
+  monthBeforePrevExpenses: number
+  /** 6-maands gemiddelde uitgaven — de STABIELE grondslag voor vrijheidstijd. */
+  avgMonthlyExpenses6m: number
   completedActionsCount: number
   freedomDaysWon: number
   fireAge: number | null
@@ -425,7 +435,14 @@ function CheckinPageContent() {
           details: {
             netWorthChange: overview?.netWorthChange || 0,
             freedomDaysWon: overview?.freedomDaysWon || 0,
+            // De maand waar de terugblik van deze check-in over ging, mét zijn
+            // eigen vergelijkingsbasis — zo blijft achteraf herleidbaar welke
+            // cijfers de gebruiker toen zag (de `metrics` hierboven dragen de
+            // lopende maand op het moment van opslaan).
+            prevMonthIncome: overview?.prevMonthIncome || 0,
             prevMonthExpenses: overview?.prevMonthExpenses || 0,
+            prevMonthSavings: overview?.prevMonthSavings || 0,
+            monthBeforePrevExpenses: overview?.monthBeforePrevExpenses || 0,
             assets: assets.map(a => ({ name: a.name, type: a.asset_type, value: Number(a.current_value) })),
             debts: debts.map(d => ({ name: d.name, type: d.debt_type, balance: Number(d.current_balance) })),
             goals: goals.map(g => ({ name: g.name, current: g.current_value, target: g.target_value, completed: g.is_completed, icon: g.icon })),
@@ -945,6 +962,22 @@ function CheckinStepProgress({ current }: { current: StepKey }) {
   )
 }
 
+/**
+ * De uitgaven-grondslag waarmee de check-in bedragen naar vrijheidstijd
+ * omrekent. Bewust NIET de lopende maand: begin van de maand staat daar bijna
+ * niets in, waardoor het dagtarief instort en een normale vermogensgroei als
+ * honderden jaren vrijheid op het scherm komt (B-016). Het 6-maands gemiddelde
+ * is dezelfde stabiele grondslag die de route al voor de FIRE-leeftijd gebruikt.
+ *
+ * Zonder historie geeft hij 0 — bewust géén terugval op de lopende maand.
+ * `dailyExpenseRate(0)` is 0 en alle vrijheidsstrings zijn gegate op "> 0", dus
+ * dan tonen we niets. Bij een vers account is dat het eerlijke antwoord: die
+ * deel-maand zou precies dezelfde eeuwen-vervorming opleveren.
+ */
+function stabieleMaanduitgaven(overview: CheckinOverview): number {
+  return overview.avgMonthlyExpenses6m > 0 ? overview.avgMonthlyExpenses6m : 0
+}
+
 /* ── Step 1: Terugblik ───────────────────────────────────────────────── */
 function StepTerugblik({ overview, previous }: { overview: CheckinOverview | null; previous: PreviousSnapshot | null }) {
   const fc = useFc()
@@ -956,14 +989,14 @@ function StepTerugblik({ overview, previous }: { overview: CheckinOverview | nul
     )
   }
 
-  const expenseChange = overview.prevMonthExpenses > 0
-    ? ((overview.monthlyExpenses - overview.prevMonthExpenses) / overview.prevMonthExpenses) * 100
-    : 0
+  // De stap gaat over de AFGELOPEN maand — welke cijfers dat zijn en waartegen
+  // ze afgezet worden, bepaalt lib/checkin/terugblik.ts (B-016).
+  const cijfers = terugblikCijfers(overview)
 
   // Compute deltas from previous check-in
   const prevMetrics = previous?.metrics
   const netWorthDelta = prevMetrics ? overview.netWorth - prevMetrics.netWorth : null
-  const dailyExpenses = dailyExpenseRate(overview.monthlyExpenses)
+  const dailyExpenses = dailyExpenseRate(stabieleMaanduitgaven(overview))
 
   // Freedom time for net worth growth
   const freedomGrowth = netWorthDelta && dailyExpenses > 0
@@ -986,7 +1019,7 @@ function StepTerugblik({ overview, previous }: { overview: CheckinOverview | nul
           className="text-[18px] sm:text-[20px] font-black tracking-[-0.02em] leading-tight text-[var(--ink)]"
           style={{ fontFamily: 'var(--font-playfair, Georgia, serif)' }}
         >
-          Terugblik {overview.prevMonthLabel || 'afgelopen maand'}
+          Terugblik {cijfers.label}
         </h2>
         <p
           className="mt-2 italic text-[13px] text-[var(--ink-3)] leading-snug"
@@ -1003,24 +1036,23 @@ function StepTerugblik({ overview, previous }: { overview: CheckinOverview | nul
           change={overview.netWorthChange}
           delta={netWorthDelta}
         />
-        <MetricCard
-          label="Inkomen"
-          value={fc(overview.monthlyIncome)}
-          delta={prevMetrics ? overview.monthlyIncome - prevMetrics.monthlyIncome : null}
-        />
+        {/* Géén "sinds check-in"-delta op deze drie: het zijn maandtotalen van
+            een afgeronde maand, en de opgeslagen check-in-metrics dragen de
+            LOPENDE maand van het moment van opslaan. Die twee naast elkaar
+            zetten vergelijkt twee verschillende grondslagen (B-016). Het
+            vermogen hierboven is wél een standcijfer en dus vergelijkbaar. */}
+        <MetricCard label="Inkomen" value={fc(cijfers.income)} />
         <MetricCard
           label="Uitgaven"
-          value={fc(overview.monthlyExpenses)}
-          change={expenseChange}
+          value={fc(cijfers.expenses)}
+          change={cijfers.expenseChangePct ?? undefined}
+          changeLabel={cijfers.changeLabel ?? undefined}
           invertColor
-          delta={prevMetrics ? overview.monthlyExpenses - prevMetrics.monthlyExpenses : null}
-          deltaInverted
         />
         <MetricCard
           label="Gespaard"
-          value={fc(overview.monthlySavings)}
-          verdict={overview.monthlySavings}
-          delta={prevMetrics ? overview.monthlySavings - prevMetrics.monthlySavings : null}
+          value={fc(cijfers.savings)}
+          verdict={cijfers.savings}
         />
       </div>
 
@@ -1991,7 +2023,7 @@ function StepReflectie({
   const overBudgetCount = budgets.filter(b => b.budget_type === 'expense' && b.limit > 0 && b.spent > b.limit).length
   const activeGoalCount = goals.filter(g => !g.is_completed).length
   const prevMetrics = previous?.metrics
-  const dailyExpenses = overview ? dailyExpenseRate(overview.monthlyExpenses) : 0
+  const dailyExpenses = overview ? dailyExpenseRate(stabieleMaanduitgaven(overview)) : 0
 
   // Compute freedom time for savings
   const savingsFreedom = overview && dailyExpenses > 0
@@ -2215,14 +2247,21 @@ function MetricCard({
   label,
   value,
   change,
+  changeLabel = 't.o.v. vorige maand',
   invertColor,
   verdict,
   delta,
-  deltaInverted,
 }: {
   label: string
   value: string
   change?: number
+  /**
+   * Waartegen `change` is afgezet. Default is "vorige maand" — dat klopt op een
+   * kaart die de lopende maand toont, maar NIET in de terugblik-stap: die gaat
+   * zelf al over de vorige maand en vergelijkt dus met de maand dáárvoor. Het
+   * bijschrift hoort daarom bij de aanroep, niet vast in de kaart (B-016).
+   */
+  changeLabel?: string
   invertColor?: boolean
   /**
    * Ondertitel-oordeel op basis van het TEKEN van dit bedrag: > 0 "Positief",
@@ -2235,13 +2274,12 @@ function MetricCard({
    */
   verdict?: number
   delta?: number | null
-  deltaInverted?: boolean
 }) {
   const fc = useFc()
   const showChange = typeof change === 'number' && change !== 0
   const isPositiveChange = invertColor ? change! < 0 : change! > 0
   const showDelta = typeof delta === 'number' && delta !== 0
-  const isDeltaPositive = deltaInverted ? delta! < 0 : delta! > 0
+  const isDeltaPositive = delta! > 0
 
   return (
     <div className="card-editorial p-4">
@@ -2249,7 +2287,7 @@ function MetricCard({
       <p className="mt-1 text-lg font-mono tabular-nums font-semibold text-[var(--ink)]">{value}</p>
       {showChange && (
         <p className={`mt-0.5 text-[10px] font-medium ${isPositiveChange ? 'text-positive' : 'text-negative'}`}>
-          {change! > 0 ? '+' : ''}{change!.toFixed(1)}% t.o.v. vorige maand
+          {change! > 0 ? '+' : ''}{change!.toFixed(1)}% {changeLabel}
         </p>
       )}
       {typeof verdict === 'number' && verdict !== 0 && !showDelta && (

@@ -179,6 +179,15 @@ export interface GespreksstartersInput {
   monthlySavings: number
   prevMonthlySavings: number
   /**
+   * De maand vóór de vorige. De starters die twee maanden VERGELIJKEN gebruiken
+   * bewust `prevMonth*` naast deze velden en NOOIT de lopende maand: die is bij
+   * een check-in begin van de maand een paar dagen oud, en dan meldt een
+   * vergelijking "je gaf 97% minder uit dan vorige maand — vrijheidsdagen
+   * gewonnen!" over niets anders dan een nog niet verstreken maand (B-016).
+   */
+  monthBeforePrevExpenses: number
+  monthBeforePrevSavings: number
+  /**
    * De GEMETEN 6-maands transactiequote (`computeSavingsRate6m`), NIET de
    * effectieve spaarquote die de app-oppervlakken tonen (ADR 0103 /
    * eigenaar-besluit 31 aug 2026). Dat is hier bewust: de gespreksstarters zetten
@@ -263,52 +272,13 @@ const detectVermogen: Detector = (i) => {
 }
 
 const detectSparenVergelijking: Detector = (i) => {
-  if (i.monthlySavings > 0 && i.prevMonthlySavings > 0) {
-    const delta = i.monthlySavings - i.prevMonthlySavings
-    if (delta > 50) {
-      const extraDays = freedomDays(delta * 12, i.dailyExpenses)
-      const eur = formatEUR(delta)
-      return [{
-        id: 'sparen-stijging', theme: 'sparen', sentiment: 'positive',
-        score: clamp(delta / 8, 10, 90),
-        variants: [
-          (v) => ({
-            vraag: `${v.subjCap} ${v.hebt} deze maand ${eur} meer gespaard dan vorige maand. Op jaarbasis is dat ${freedomLabel(extraDays)} extra vrijheid. Welke keuze maakte het verschil?`,
-            context: `Spaarquote: ${i.savingsRate6m.toFixed(0)}% (6-maands).`,
-            actie: `Bespreek welke uitgaven ${v.subj} bewust ${v.hebt} verminderd.`,
-            vrijheidstijd: freedomLabel(extraDays),
-          }),
-          (v) => ({
-            vraag: `${eur} meer opzij dan vorige maand — ${freedomLabel(extraDays)} extra vrijheid per jaar. Houdbaar?`,
-            context: `Maandbesparing steeg met ${eur}.`,
-            actie: `Toets ${v.samen} of dit tempo vol te houden is.`,
-            vrijheidstijd: freedomLabel(extraDays),
-          }),
-        ],
-      }]
-    }
-    if (delta < -50) {
-      const eur = formatEUR(i.monthlySavings)
-      const prev = formatEUR(i.prevMonthlySavings)
-      return [{
-        id: 'sparen-daling', theme: 'sparen', sentiment: 'neutral',
-        score: clamp(Math.abs(delta) / 12, 8, 70),
-        variants: [
-          (v) => ({
-            vraag: `De maandelijkse besparing daalde van ${prev} naar ${eur}. Was dat een bewuste keuze, of onverwachte kosten?`,
-            context: `Verschil: ${formatEUR(delta)} minder gespaard.`,
-            actie: `Kijk ${v.samen} of ${v.subj} volgende maand terug ${v.wilt} naar het oude niveau.`,
-          }),
-          (v) => ({
-            vraag: `${prev} → ${eur} gespaard. Wat veranderde er deze maand?`,
-            context: `Maandbesparing daalde met ${formatEUR(Math.abs(delta))}.`,
-            actie: `Benoem ${v.samen} de grootste verschuiving.`,
-          }),
-        ],
-      }]
-    }
-    return []
-  }
+  // ── VOLGORDE: acuut vóór historisch ────────────────────────────────────────
+  // "Deze maand ging er meer uit dan er binnenkwam" is een toestand van NU en
+  // weegt zwaarder dan "je spaarde minder dan de maand daarvoor". Deze tak stond
+  // onderaan en werd toen afgeschermd doordat de vergelijking hierboven al
+  // returnde; dat kon pas gebeuren nadat de vergelijking op afgeronde maanden
+  // overging (B-016) — daarvóór sloot haar guard op `monthlySavings > 0` dit
+  // geval per ongeluk uit. Expliciet vooraan gezet i.p.v. impliciet vrijgelaten.
   if (i.monthlySavings <= 0 && i.monthlyIncome > 0) {
     return [{
       id: 'negatief-sparen', theme: 'sparen', sentiment: 'alert',
@@ -327,48 +297,100 @@ const detectSparenVergelijking: Detector = (i) => {
       ],
     }]
   }
+  // Afgelopen maand t.o.v. de maand daarvóór — twee VOLLEDIGE maanden. Zie de
+  // toelichting bij monthBeforePrev* in GespreksstartersInput.
+  if (i.prevMonthlySavings > 0 && i.monthBeforePrevSavings > 0) {
+    const delta = i.prevMonthlySavings - i.monthBeforePrevSavings
+    if (delta > 50) {
+      const extraDays = freedomDays(delta * 12, i.dailyExpenses)
+      const eur = formatEUR(delta)
+      return [{
+        id: 'sparen-stijging', theme: 'sparen', sentiment: 'positive',
+        score: clamp(delta / 8, 10, 90),
+        variants: [
+          (v) => ({
+            vraag: `${v.subjCap} ${v.hebt} afgelopen maand ${eur} meer gespaard dan de maand daarvoor. Op jaarbasis is dat ${freedomLabel(extraDays)} extra vrijheid. Welke keuze maakte het verschil?`,
+            context: `Spaarquote: ${i.savingsRate6m.toFixed(0)}% (6-maands).`,
+            actie: `Bespreek welke uitgaven ${v.subj} bewust ${v.hebt} verminderd.`,
+            vrijheidstijd: freedomLabel(extraDays),
+          }),
+          (v) => ({
+            vraag: `${eur} meer opzij dan de maand daarvoor — ${freedomLabel(extraDays)} extra vrijheid per jaar. Houdbaar?`,
+            context: `Maandbesparing steeg met ${eur}.`,
+            actie: `Toets ${v.samen} of dit tempo vol te houden is.`,
+            vrijheidstijd: freedomLabel(extraDays),
+          }),
+        ],
+      }]
+    }
+    if (delta < -50) {
+      const eur = formatEUR(i.prevMonthlySavings)
+      const prev = formatEUR(i.monthBeforePrevSavings)
+      return [{
+        id: 'sparen-daling', theme: 'sparen', sentiment: 'neutral',
+        score: clamp(Math.abs(delta) / 12, 8, 70),
+        variants: [
+          (v) => ({
+            vraag: `De maandelijkse besparing daalde van ${prev} naar ${eur}. Was dat een bewuste keuze, of onverwachte kosten?`,
+            context: `Verschil: ${formatEUR(delta)} minder gespaard.`,
+            actie: `Kijk ${v.samen} of ${v.subj} volgende maand terug ${v.wilt} naar het oude niveau.`,
+          }),
+          (v) => ({
+            vraag: `${prev} → ${eur} gespaard. Wat veranderde er afgelopen maand?`,
+            context: `Maandbesparing daalde met ${formatEUR(Math.abs(delta))}.`,
+            actie: `Benoem ${v.samen} de grootste verschuiving.`,
+          }),
+        ],
+      }]
+    }
+    return []
+  }
   return []
 }
 
 const detectUitgaven: Detector = (i) => {
-  if (i.prevMonthExpenses <= 0 || i.monthlyExpenses <= 0) return []
-  const change = ((i.monthlyExpenses - i.prevMonthExpenses) / i.prevMonthExpenses) * 100
+  // Twee VOLLEDIGE maanden tegenover elkaar: afgelopen maand vs. de maand
+  // daarvóór. Stond hier als lopende maand vs. vorige maand, wat bij een
+  // check-in op de 4e van de maand een daling van ~97% "vond" en die vierde als
+  // gewonnen vrijheidsdagen (B-016).
+  if (i.monthBeforePrevExpenses <= 0 || i.prevMonthExpenses <= 0) return []
+  const change = ((i.prevMonthExpenses - i.monthBeforePrevExpenses) / i.monthBeforePrevExpenses) * 100
   if (change > 15) {
-    const extra = i.monthlyExpenses - i.prevMonthExpenses
+    const extra = i.prevMonthExpenses - i.monthBeforePrevExpenses
     const days = freedomDays(extra * 12, i.dailyExpenses)
     return [{
       id: 'uitgaven-stijging', theme: 'uitgaven', sentiment: 'neutral',
       score: clamp(change, 15, 85),
       variants: [
         (v) => ({
-          vraag: `${v.subjCap} ${v.poss} uitgaven zijn ${change.toFixed(0)}% hoger dan vorige maand. Dat verschil (${formatEUR(extra)}) is op jaarbasis ${freedomLabel(days)}. Welke uitgaven voelden waardevol?`,
-          context: `Van ${formatEUR(i.prevMonthExpenses)} naar ${formatEUR(i.monthlyExpenses)}.`,
+          vraag: `${v.subjCap} ${v.poss} uitgaven waren afgelopen maand ${change.toFixed(0)}% hoger dan de maand daarvoor. Dat verschil (${formatEUR(extra)}) is op jaarbasis ${freedomLabel(days)}. Welke uitgaven voelden waardevol?`,
+          context: `Van ${formatEUR(i.monthBeforePrevExpenses)} naar ${formatEUR(i.prevMonthExpenses)}.`,
           actie: `Loop ${v.samen} de grootste categorieën door.`,
         }),
         (v) => ({
-          vraag: `${formatEUR(extra)} meer uitgegeven dan vorige maand (+${change.toFixed(0)}%). Bewust of geslopen?`,
-          context: `Maanduitgaven stegen naar ${formatEUR(i.monthlyExpenses)}.`,
+          vraag: `${formatEUR(extra)} meer uitgegeven dan de maand daarvoor (+${change.toFixed(0)}%). Bewust of geslopen?`,
+          context: `Maanduitgaven stegen naar ${formatEUR(i.prevMonthExpenses)}.`,
           actie: `Markeer ${v.samen} wat de moeite waard was.`,
         }),
       ],
     }]
   }
   if (change < -10) {
-    const saved = i.prevMonthExpenses - i.monthlyExpenses
+    const saved = i.monthBeforePrevExpenses - i.prevMonthExpenses
     const days = freedomDays(saved, i.dailyExpenses)
     return [{
       id: 'uitgaven-daling', theme: 'uitgaven', sentiment: 'positive',
       score: clamp(days * 2, 10, 85),
       variants: [
         (v) => ({
-          vraag: `${v.subjCap} ${v.hebt} ${formatEUR(saved)} minder uitgegeven dan vorige maand — ${days} vrijheidsdagen gewonnen! Wat ${v.heb} ${v.subj} anders gedaan?`,
+          vraag: `${v.subjCap} ${v.hebt} afgelopen maand ${formatEUR(saved)} minder uitgegeven dan de maand daarvoor — ${days} vrijheidsdagen gewonnen! Wat ${v.heb} ${v.subj} anders gedaan?`,
           context: `Uitgaven daalden ${Math.abs(change).toFixed(0)}%.`,
           actie: `Bespreek of ${v.subj} dit patroon ${v.wilt} vasthouden.`,
           vrijheidstijd: `${days} dagen`,
         }),
         (v) => ({
           vraag: `${formatEUR(saved)} minder uitgegeven — ${freedomLabel(days)} vrijheid erbij. Welke gewoonte hielp?`,
-          context: `Uitgaven daalden ${Math.abs(change).toFixed(0)}% t.o.v. vorige maand.`,
+          context: `Uitgaven daalden ${Math.abs(change).toFixed(0)}% t.o.v. de maand daarvoor.`,
           actie: `Leg ${v.samen} vast wat ${v.subj} wilt herhalen.`,
           vrijheidstijd: `${days} dagen`,
         }),

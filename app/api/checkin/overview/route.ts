@@ -32,6 +32,10 @@ export async function GET() {
   const { start: monthStart, end: monthEnd } = localMonthBounds(now)
   const prevMonthStart = localMonthStart(new Date(currentYear, currentMonth - 1, 1))
   const prevMonthEnd = monthStart
+  // De maand vóór de vorige: de vergelijkingsbasis van de terugblik-stap. Die
+  // stap gaat over de VORIGE maand, dus "t.o.v. vorige maand" betekent daar de
+  // maand dáárvoor — niet de lopende (zie lib/checkin/terugblik.ts, B-016).
+  const monthBeforePrevStart = localMonthStart(new Date(currentYear, currentMonth - 2, 1))
   // 6-maands venster uit de CANONIEKE bron (lib/savings-source.ts): zes
   // VOLTOOIDE kalendermaanden, de lopende maand exclusief. Stond hier als
   // `new Date(currentYear, currentMonth - 6, 1)` t/m `monthEnd` — dat telde
@@ -41,9 +45,12 @@ export async function GET() {
   const window6m = savingsRateWindow(now)
 
   const prevMonthIdx = currentMonth === 0 ? 11 : currentMonth - 1
+  // Modulo i.p.v. een tweede ternary: in januari/februari loopt deze index over
+  // de jaargrens heen (jan → november).
+  const monthBeforePrevIdx = (currentMonth + 10) % 12
 
   // Fetch data in parallel
-  const [assetsRes, debtsRes, bankRes, curMonthRes, prevMonthRes, income6mRes, expense6mRes, snapshotsRes, actionsRes, profileRes] = await Promise.all([
+  const [assetsRes, debtsRes, bankRes, curMonthRes, prevTwoMonthsRes, income6mRes, expense6mRes, snapshotsRes, actionsRes, profileRes] = await Promise.all([
     // Total assets (actief, met net-worth-weging — zelfde als dashboard)
     supabase
       .from('assets')
@@ -72,11 +79,16 @@ export async function GET() {
       .eq('user_id', claims.sub)
       .gte('date', monthStart)
       .lt('date', monthEnd),
+    // Vorige maand ÉN de maand daarvóór in één trek: de terugblik-stap toont de
+    // vorige maand en zet die af tegen de maand ervóór. Bewust één query met
+    // `date` erbij (hieronder gesplitst op de maandgrens) i.p.v. twee: het
+    // scheelt een round-trip naar PostgREST, en beide maanden worden toch altijd
+    // samen gebruikt.
     supabase
       .from('transactions')
-      .select('amount, transaction_type')
+      .select('amount, transaction_type, date')
       .eq('user_id', claims.sub)
-      .gte('date', prevMonthStart)
+      .gte('date', monthBeforePrevStart)
       .lt('date', prevMonthEnd),
     // 6-maands inkomen/uitgaven voor een stabiele FIRE-leeftijd
     supabase
@@ -140,7 +152,14 @@ export async function GET() {
   // halfjaarcijfer (2a, nazorg R2+R3; aandachtspunt
   // maand-cashflow-grondslag-duplicaten, nu opgelost).
   const curMonth = deriveRealMonthTotals(curMonthRes.data ?? [])
-  const prevMonth = deriveRealMonthTotals(prevMonthRes.data ?? [])
+  // Eén trek van twee maanden, hier gesplitst op de maandgrens. `date` is een
+  // ISO-datum (YYYY-MM-DD), dus een tekstvergelijking met de grens volstaat —
+  // dezelfde vorm die PostgREST hierboven filtert.
+  const prevTwoMonths = prevTwoMonthsRes.data ?? []
+  const prevMonth = deriveRealMonthTotals(prevTwoMonths.filter((t) => t.date >= prevMonthStart))
+  const monthBeforePrev = deriveRealMonthTotals(
+    prevTwoMonths.filter((t) => t.date < prevMonthStart),
+  )
   const monthlyIncome = curMonth.income
   const monthlyExpenses = curMonth.expenses
   const prevMonthExpenses = prevMonth.expenses
@@ -196,12 +215,24 @@ export async function GET() {
   return NextResponse.json({
     monthLabel: MONTH_NAMES[currentMonth],
     prevMonthLabel: MONTH_NAMES[prevMonthIdx],
+    monthBeforePrevLabel: MONTH_NAMES[monthBeforePrevIdx],
     netWorth,
     netWorthChange,
+    // Ongemarkeerd = de LOPENDE maand (ADR 0073). De terugblik-stap hoort hier
+    // niet aan te komen; die leest de prevMonth*-velden hieronder.
     monthlyIncome,
     monthlyExpenses,
     monthlySavings: monthlyIncome - monthlyExpenses,
+    prevMonthIncome: prevMonth.income,
     prevMonthExpenses,
+    prevMonthSavings: prevMonth.income - prevMonth.expenses,
+    monthBeforePrevExpenses: monthBeforePrev.expenses,
+    // Stabiele uitgaven-grondslag voor het omrekenen naar vrijheidstijd. De
+    // lopende maand deugt daar niet voor: op de 4e van de maand staat er een
+    // handvol euro's, waardoor het dagtarief instort en élk bedrag als eeuwen
+    // vrijheid leest (gemeld: "+161j 7m"). Zelfde 6-maands gemiddelde dat de
+    // FIRE-leeftijd hierboven al gebruikt, om precies dezelfde reden.
+    avgMonthlyExpenses6m: expenses6mAvg,
     completedActionsCount,
     freedomDaysWon,
     fireAge,

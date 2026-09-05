@@ -20,7 +20,13 @@ export interface CheckinSnapshot {
   details?: {
     netWorthChange?: number
     freedomDaysWon?: number
+    /** De maand waar de terugblik van deze check-in over ging, met zijn eigen
+     *  vergelijkingsbasis. `metrics` hierboven draagt de LOPENDE maand op het
+     *  moment van opslaan; deze velden de afgeronde maand ervoor (B-016). */
+    prevMonthIncome?: number
     prevMonthExpenses?: number
+    prevMonthSavings?: number
+    monthBeforePrevExpenses?: number
     assets?: { name: string; type: string; value: number }[]
     debts?: { name: string; type: string; balance: number }[]
     goals?: { name: string; current: number; target: number; completed: boolean; icon?: string | null }[]
