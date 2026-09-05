@@ -18,8 +18,10 @@ import {
   normalizePageStatusRoute,
   normalizeMinimizeKey,
   EXTRA_MINIMIZE_KEYS,
+  NUMERIC_MINIMIZE_NARROWERS,
 } from '@/lib/page-status/compute'
 import { DEFICIT_NOTICE_MINIMIZE_KEY } from '@/lib/horizon/deficit-loan-minimize'
+import { STALE_TX_NOTICE_MINIMIZE_KEY } from '@/lib/transaction-staleness-minimize'
 
 /** Sleutels die via Object.prototype op élk object-literal "bestaan". */
 const PROTOTYPE_SLEUTELS = [
@@ -50,8 +52,9 @@ describe('normalizePageStatusRoute — allowlist is echt een allowlist', () => {
     expect(normalizePageStatusRoute(null)).toBeNull()
   })
 
-  it('laat de pref-only sleutel NIET door (de GET-scope groeit bewust niet mee)', () => {
+  it('laat de pref-only sleutels NIET door (de GET-scope groeit bewust niet mee)', () => {
     expect(normalizePageStatusRoute(DEFICIT_NOTICE_MINIMIZE_KEY)).toBeNull()
+    expect(normalizePageStatusRoute(STALE_TX_NOTICE_MINIMIZE_KEY)).toBeNull()
   })
 })
 
@@ -66,9 +69,39 @@ describe('normalizeMinimizeKey — schrijf-allowlist', () => {
     expect(normalizeMinimizeKey(`${DEFICIT_NOTICE_MINIMIZE_KEY}/`)).toBe(DEFICIT_NOTICE_MINIMIZE_KEY)
   })
 
+  it('laat de "gegevens verouderd"-sleutel door (B-015)', () => {
+    expect(EXTRA_MINIMIZE_KEYS).toContain(STALE_TX_NOTICE_MINIMIZE_KEY)
+    expect(normalizeMinimizeKey(STALE_TX_NOTICE_MINIMIZE_KEY)).toBe(
+      STALE_TX_NOTICE_MINIMIZE_KEY,
+    )
+    expect(normalizeMinimizeKey(`${STALE_TX_NOTICE_MINIMIZE_KEY}/`)).toBe(
+      STALE_TX_NOTICE_MINIMIZE_KEY,
+    )
+  })
+
   it('weigert prototype-sleutels → 400', () => {
     for (const sleutel of PROTOTYPE_SLEUTELS) {
       expect(normalizeMinimizeKey(sleutel), `prototype-sleutel "${sleutel}"`).toBeNull()
+    }
+  })
+
+  it('elke pref-only sleutel heeft een numerieke narrower, en omgekeerd', () => {
+    // De twee lijsten MOETEN elkaar dekken. Een extra sleutel zonder narrower
+    // valt in de PUT stil terug op de stoplicht-enum en accepteert dan
+    // 'warn'/'bad'/'info' waar een getal hoort — geen lek (de lezer verwerpt de
+    // string en toont de melding), wél een stille semantische mismatch die pas
+    // opvalt als iemand zich afvraagt waarom minimaliseren niets doet.
+    expect([...NUMERIC_MINIMIZE_NARROWERS.keys()].sort()).toEqual(
+      [...EXTRA_MINIMIZE_KEYS].sort(),
+    )
+    for (const sleutel of EXTRA_MINIMIZE_KEYS) {
+      const narrower = NUMERIC_MINIMIZE_NARROWERS.get(sleutel)
+      expect(narrower, `narrower voor "${sleutel}"`).toBeDefined()
+      // Elke narrower weigert de stoplicht-strings — dat is het punt van de
+      // scheiding: dezelfde JSONB-map draagt beide soorten waarden.
+      expect(narrower!('warn')).toBeNull()
+      expect(narrower!(Number.NaN)).toBeNull()
+      expect(narrower!(-1)).toBeNull()
     }
   })
 

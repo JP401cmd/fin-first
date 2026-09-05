@@ -9,11 +9,8 @@ import {
   asMinimizedLevel,
   readMinimizedLevel,
   ROUTE_FAMILY,
+  NUMERIC_MINIMIZE_NARROWERS,
 } from '@/lib/page-status/compute'
-import {
-  DEFICIT_NOTICE_MINIMIZE_KEY,
-  asDeficitMinimizedPeak,
-} from '@/lib/horizon/deficit-loan-minimize'
 import {
   statusCacheKey,
   readStatusCache,
@@ -46,7 +43,6 @@ import type { MinimizedLevel } from '@/lib/page-status/display'
  * wordt PARALLEL aan de statusberekening gelezen (Promise.all) — geen extra
  * seriële round-trip.
  */
-
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -143,16 +139,17 @@ export async function PUT(request: NextRequest) {
     }
 
     // Het "niveau" is sleutel-afhankelijk:
-    //  - /overzicht-routes  → stoplicht-niveau 'warn' | 'bad' | 'info'.
-    //  - tekort-lening      → de PIEK (afgerond, nominaal) waarop geminimaliseerd
+    //  - /overzicht-routes    → stoplicht-niveau 'warn' | 'bad' | 'info'.
+    //  - tekort-lening        → de PIEK (afgerond, nominaal) waarop geminimaliseerd
     //    werd; escalatie = een materieel hogere piek (zie deficit-loan-minimize).
-    // Beide mogen null zijn (voorkeur wissen → melding weer tonen).
+    //  - gegevens-verouderd   → het aantal MAANDEN achterstand waarop
+    //    geminimaliseerd werd; escalatie = nog eens `TX_STALE_AFTER_MONTHS` erbij
+    //    (zie transaction-staleness-minimize).
+    // Alle mogen null zijn (voorkeur wissen → melding weer tonen).
     let level: MinimizedLevel | number | null = null
     if (body.level !== null) {
-      level =
-        route === DEFICIT_NOTICE_MINIMIZE_KEY
-          ? asDeficitMinimizedPeak(body.level)
-          : asMinimizedLevel(body.level)
+      const narrowNumeric = NUMERIC_MINIMIZE_NARROWERS.get(route)
+      level = narrowNumeric ? narrowNumeric(body.level) : asMinimizedLevel(body.level)
       if (level === null) {
         return NextResponse.json({ error: 'Ongeldig niveau' }, { status: 400 })
       }
@@ -160,11 +157,21 @@ export async function PUT(request: NextRequest) {
 
     // Read-modify-write op de eigen jsonb-map: lezen, sleutel zetten/wissen,
     // de volledige map terugschrijven naar UITSLUITEND de eigen rij (RLS).
-    const { data: current } = await supabase
+    const { data: current, error: readError } = await supabase
       .from('profiles')
       .select('status_banner_minimized')
       .eq('id', user.id)
       .single()
+
+    // NOOIT schrijven op een mislukte lezing. Zonder deze guard levert een
+    // transiënte leesfout (time-out, RLS-hik) een lege `current`, waarna de
+    // read-modify-write hieronder de map terugschrijft met UITSLUITEND de
+    // zojuist gezette sleutel — en alle andere geminimaliseerde meldingen van
+    // deze gebruiker stil weg zijn. Falen doen we liever zichtbaar.
+    if (readError) {
+      console.error('[/api/overzicht/page-status PUT] lezen mislukt', readError)
+      return NextResponse.json({ error: 'Interne fout' }, { status: 500 })
+    }
 
     const nextMap: Record<string, unknown> = {
       ...((current?.status_banner_minimized as Record<string, unknown>) ?? {}),

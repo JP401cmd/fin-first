@@ -6,6 +6,13 @@ import { buildCashflowCards, cashflowCardStatuses } from '@/lib/cashflow-cards'
 import { CashflowStatusSeed } from '@/components/app/cashflow-status-provider'
 import { StaleTransactionsBanner } from '@/components/app/stale-transactions-banner'
 import { transactionFreshness } from '@/lib/transaction-staleness'
+import { getCachedUser } from '@/lib/supabase/cached-user'
+import { readMinimizedMap } from '@/lib/page-status/minimized-prefs'
+import {
+  STALE_TX_NOTICE_MINIMIZE_KEY,
+  asStaleMinimizedMonths,
+  resolveStaleNoticeDisplay,
+} from '@/lib/transaction-staleness-minimize'
 import {
   CashflowLandingCards,
   CashflowLandingCardsSkeleton,
@@ -47,13 +54,30 @@ export async function CashflowCardsLoader({ perspective }: { perspective: Perspe
   // boven zijn return (zie de kop van page.tsx).
   const supabase = await createClient()
 
-  const [kpis, cashflow, vasteLasten] = await Promise.all([
+  const user = await getCachedUser(supabase)
+
+  const [kpis, cashflow, vasteLasten, minimizedMap] = await Promise.all([
     loadCashflowKpis(supabase),
     loadCashflowData(supabase, perspective),
     loadVasteLastenSummary(supabase),
+    user
+      ? readMinimizedMap(supabase, user.id)
+      : Promise.resolve({} as Record<string, unknown>),
   ])
   const cards = buildCashflowCards(kpis, cashflow, vasteLasten)
   const txFreshness = transactionFreshness(kpis.latestTransactionMonth)
+
+  // ── DE VOORKEUR GELDT OOK HIER ─────────────────────────────────────────────
+  // Het is dezelfde melding als op /overzicht, onder dezelfde pref-sleutel. Wie
+  // haar daar inklapte, hoort haar hier niet opnieuw op volle grootte te zien.
+  // De knoppen zitten er bewust NIET bij: deze hub heeft geen provider en de
+  // melding staat in een gestreamd blok, terwijl het statuspunt bij de pagina-'i'
+  // hoort — die al gerenderd is vóór dit blok aankomt. Terughalen doe je op
+  // /overzicht; van daaruit werkt het weer op beide pagina's.
+  const staleDisplay = resolveStaleNoticeDisplay(
+    txFreshness.state === 'stale' ? txFreshness.monthsBehind : null,
+    asStaleMinimizedMonths(minimizedMap[STALE_TX_NOTICE_MINIMIZE_KEY]),
+  )
 
   return (
     <>
@@ -67,7 +91,7 @@ export async function CashflowCardsLoader({ perspective }: { perspective: Perspe
           transacties, dus als die stilstaan hoort dat te staan vóór de cijfers,
           niet erna. De sectie-wrapper hangt aan hetzelfde canonieke oordeel als
           de banner zelf, zodat er bij verse data geen lege padding overblijft. */}
-      {txFreshness.state === 'stale' && (
+      {staleDisplay === 'expanded' && (
         <section className="mx-auto max-w-6xl px-4 pb-4 sm:px-6">
           <StaleTransactionsBanner latestTransactionMonth={kpis.latestTransactionMonth} />
         </section>

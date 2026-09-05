@@ -36,7 +36,14 @@ import { ankerReachFromRunway, ankerStopFromSim } from '@/lib/horizon/anker-copy
 import type { PageStatusInfo } from '@/lib/page-status/types'
 import type { MinimizedLevel } from '@/lib/page-status/display'
 import { readMinimizedMap } from '@/lib/page-status/minimized-prefs'
-import { DEFICIT_NOTICE_MINIMIZE_KEY } from '@/lib/horizon/deficit-loan-minimize'
+import {
+  DEFICIT_NOTICE_MINIMIZE_KEY,
+  asDeficitMinimizedPeak,
+} from '@/lib/horizon/deficit-loan-minimize'
+import {
+  STALE_TX_NOTICE_MINIMIZE_KEY,
+  asStaleMinimizedMonths,
+} from '@/lib/transaction-staleness-minimize'
 
 /** Welke databron(nen) een in-scope route nodig heeft. */
 export type Family = 'lever' | 'cashflow' | 'box2' | 'freedom'
@@ -88,8 +95,33 @@ export function normalizePageStatusRoute(raw: string | null): string | null {
  * `computePageStatusInfo`. Ze zijn daarom bewust géén ROUTE_FAMILY-entry — de
  * GET blijft er `{ info: null }` voor geven — maar de PUT moet ze wel kunnen
  * opslaan, zodat er één schrijfpad voor minimaliseren blijft bestaan.
+ *
+ * Beide huidige sleutels dragen een GETAL i.p.v. een stoplicht-niveau: de piek
+ * van de tekort-lening resp. het aantal maanden achterstand van de
+ * "Gegevens verouderd"-melding. De PUT kiest per sleutel de bijbehorende
+ * narrowing-helper; zie `app/api/overzicht/page-status/route.ts`.
  */
-export const EXTRA_MINIMIZE_KEYS: readonly string[] = [DEFICIT_NOTICE_MINIMIZE_KEY]
+/**
+ * Sleutels waarvan het opgeslagen "niveau" een GETAL is i.p.v. een
+ * stoplicht-niveau, met de narrowing-helper die erbij hoort. Een `Map` (geen
+ * object-literal) zodat de prototype-keten hier per constructie geen rol speelt
+ * — dezelfde zorg als de `hasOwnProperty`-vorm in `normalizeMinimizeKey`.
+ *
+ * Woont bewust hier, náást `EXTRA_MINIMIZE_KEYS`: die twee MOETEN elkaar dekken
+ * (een sleutel zonder narrower valt stil terug op de stoplicht-enum en
+ * accepteert dan 'warn'/'bad'/'info' waar een getal hoort). Naast elkaar is dat
+ * zichtbaar, en `__tests__/minimize-key-allowlist.test.ts` pint de pariteit vast.
+ */
+export const NUMERIC_MINIMIZE_NARROWERS: ReadonlyMap<string, (value: unknown) => number | null> =
+  new Map([
+    [DEFICIT_NOTICE_MINIMIZE_KEY, asDeficitMinimizedPeak],
+    [STALE_TX_NOTICE_MINIMIZE_KEY, asStaleMinimizedMonths],
+  ])
+
+export const EXTRA_MINIMIZE_KEYS: readonly string[] = [
+  DEFICIT_NOTICE_MINIMIZE_KEY,
+  STALE_TX_NOTICE_MINIMIZE_KEY,
+]
 
 /**
  * Allowlist voor het SCHRIJFPAD (PUT): de /overzicht-routes uit ROUTE_FAMILY

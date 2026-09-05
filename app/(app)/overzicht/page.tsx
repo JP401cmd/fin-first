@@ -7,6 +7,13 @@ import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { getOwnProfile } from '@/lib/server-data/base'
 import { getTxAgg12m, aggLatestMonth, type TxMonthAggregateRow } from '@/lib/server-data/tx-aggregates'
 import { StaleTransactionsBanner } from '@/components/app/stale-transactions-banner'
+import { StaleNoticeProvider } from '@/components/app/stale-notice-provider'
+import { transactionFreshness } from '@/lib/transaction-staleness'
+import { readMinimizedMap } from '@/lib/page-status/minimized-prefs'
+import {
+  STALE_TX_NOTICE_MINIMIZE_KEY,
+  asStaleMinimizedMonths,
+} from '@/lib/transaction-staleness-minimize'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { OverzichtHeroPrimary } from '@/components/overview/overzicht-hero'
 import {
@@ -75,24 +82,47 @@ export default async function OverzichtPage() {
   // `getOwnProfile` is `cache()`-wrapped en wordt óók door de twee loaders
   // aangeroepen → hier "gratis" (voor de gebruikersnaam). De check-in-seed hangt
   // enkel van de user-id af.
-  const [leverScoresResult, horizonData, ownProfileRes, checkinBannerSeed, txAgg12Res] =
-    await Promise.all([
-      loadLeverScores(supabase, perspective),
-      loadHorizonData(supabase, perspective),
-      getOwnProfile(supabase),
-      userId ? loadCheckinBannerSeed(supabase, userId) : Promise.resolve(undefined),
-      // VERSHEID (UR2-13): de jongste maand mét boekingen, voor de melding
-      // "gegevens verouderd" in de banner-slot hieronder. `getTxAgg12m` is
-      // React-`cache()`-gewrapt en wordt in blok 2 door `loadDashboardData`
-      // opnieuw aangeroepen — deze aanroep verschuift die RPC dus naar voren in
-      // plaats van er één toe te voegen, en houdt hem in dezelfde parallelle golf.
-      getTxAgg12m(supabase),
-    ])
+  const [
+    leverScoresResult,
+    horizonData,
+    ownProfileRes,
+    checkinBannerSeed,
+    txAgg12Res,
+    minimizedMap,
+  ] = await Promise.all([
+    loadLeverScores(supabase, perspective),
+    loadHorizonData(supabase, perspective),
+    getOwnProfile(supabase),
+    userId ? loadCheckinBannerSeed(supabase, userId) : Promise.resolve(undefined),
+    // VERSHEID (UR2-13): de jongste maand mét boekingen, voor de melding
+    // "gegevens verouderd" in de banner-slot hieronder. `getTxAgg12m` is
+    // React-`cache()`-gewrapt en wordt in blok 2 door `loadDashboardData`
+    // opnieuw aangeroepen — deze aanroep verschuift die RPC dus naar voren in
+    // plaats van er één toe te voegen, en houdt hem in dezelfde parallelle golf.
+    getTxAgg12m(supabase),
+    // Server-seed van de "geminimaliseerd"-voorkeur voor diezelfde melding
+    // (own-row jsonb-pref, cross-device). Lichte single-row select, parallel aan
+    // de rest van de golf — zo flikkert de banner/het statuspunt niet na
+    // hydration. Zelfde vorm als /toekomst voor de tekort-lening-melding.
+    userId
+      ? readMinimizedMap(supabase, userId)
+      : Promise.resolve({} as Record<string, unknown>),
+  ])
 
   const userName = (ownProfileRes.data as { full_name?: string | null } | null)?.full_name ?? null
   // `realOnly: false` — voor "heeft deze gebruiker transacties?" telt een maand
   // met alleen transfers ook mee; het gaat om het bestaan van data, niet om een som.
   const latestTransactionMonth = aggLatestMonth((txAgg12Res.data ?? []) as TxMonthAggregateRow[])
+
+  // B-015 — de melding is minimaliseerbaar. De provider deelt één toestand met
+  // de banner (blok 1) én het statuspunt naast de pagina-'i' (blok 2). De maat
+  // is het aantal maanden achterstand; het oordeel komt uit hetzelfde canonieke
+  // `transactionFreshness` dat de banner zelf gebruikt (geen tweede drempel).
+  const txFreshness = transactionFreshness(latestTransactionMonth)
+  const staleMonthsBehind = txFreshness.state === 'stale' ? txFreshness.monthsBehind : null
+  const staleMinimizedMonths = asStaleMinimizedMonths(
+    minimizedMap[STALE_TX_NOTICE_MINIMIZE_KEY],
+  )
 
   const health = horizonData?.healthScore ?? null
   const freedomPct = horizonData?.healthScoreInput?.freedomPct ?? null
@@ -196,6 +226,17 @@ export default async function OverzichtPage() {
           leven de vier hefboomtegels, de gezondheidskaart en de grafiekcel die
           zij één voor één uitlicht. Hij rendert zelf niets in de stroom — de
           spotlight gaat via een portal naar `document.body`. */}
+      {/* De "Gegevens verouderd"-melding leeft in de banner-slot van blok 1,
+          maar haar geminimaliseerde vorm is een statuspunt náást de pagina-'i'
+          in de utility-cluster van blok 2. Deze provider omspant daarom béíde:
+          hij deelt de achterstand met het punt en onthoudt minimaliseren
+          server-side (jsonb-pref → PUT /api/overzicht/page-status).
+          Perspectief-gelijk aan de banner hieronder: buiten het eigen
+          perspectief is er geen melding, dus ook geen punt. */}
+      <StaleNoticeProvider
+        monthsBehind={perspective === 'personal' ? staleMonthsBehind : null}
+        initialMinimizedMonths={staleMinimizedMonths}
+      >
       <RondleidingProvider
         seed={rondleidingSeed}
         data={{
@@ -315,6 +356,7 @@ export default async function OverzichtPage() {
           }
         />
       </RondleidingProvider>
+      </StaleNoticeProvider>
     </>
   )
 }

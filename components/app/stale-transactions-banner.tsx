@@ -1,6 +1,5 @@
-import Link from 'next/link'
-import { AlertTriangle } from 'lucide-react'
 import { transactionFreshness, transactionAgeLabel } from '@/lib/transaction-staleness'
+import { StaleNoticeCard } from '@/components/app/stale-transactions-notice'
 
 /**
  * "GEGEVENS VEROUDERD" — de transactie-tegenhanger van de "Prijzen verouderd"-
@@ -19,10 +18,21 @@ import { transactionFreshness, transactionAgeLabel } from '@/lib/transaction-sta
  * drempel en rekent niets uit. Rendert `null` zodra de data vers is of er geen
  * historie bekend is (dan is een lege staat het juiste bericht, geen melding).
  *
- * BEWUST NIET MINIMALISEERBAAR. De minimaliseer-conventie (CLAUDE.md) geldt voor
- * status-DUIDING die de gebruiker niet meteen kan oplossen; deze melding is een
- * feitelijke gegevensconditie mét een directe uitweg (importeren of koppelen) en
- * verdwijnt vanzelf zodra die genomen is — net als de holdings-banner.
+ * ── MINIMALISEERBAAR (B-015) ───────────────────────────────────────────────
+ * Deze melding was bewust NIET minimaliseerbaar, met als redenering: een
+ * gegevensconditie mét een directe uitweg verdwijnt vanzelf zodra je die uitweg
+ * neemt. Die redenering is herzien. De uitweg (importeren of koppelen) kán
+ * maandenlang op zich laten wachten, en zolang staat de melding bovenaan élk
+ * bezoek van /overzicht — bij de eigenaar inmiddels drie maanden. Ze volgt nu de
+ * meldingen-conventie uit CLAUDE.md: inklappen tot een gekleurd punt naast de
+ * pagina-'i', server-side onthouden, en automatisch heropenen zodra de
+ * achterstand materieel groeit. De drempel en de sleutel staan in
+ * `lib/transaction-staleness-minimize.ts`.
+ *
+ * Dit bestand is bewust GEEN client-component: het versheidsoordeel leest de
+ * klok (`new Date()`) en hoort dus één keer, server-side, te draaien. De
+ * zichtbare kaart (met de minimaliseer-knop en de context-consumptie) is
+ * `StaleNoticeCard` — die krijgt alleen nog kant-en-klare strings.
  */
 export function StaleTransactionsBanner({
   latestTransactionMonth,
@@ -36,39 +46,13 @@ export function StaleTransactionsBanner({
   className?: string
 }) {
   const freshness = transactionFreshness(latestTransactionMonth, now)
-  if (freshness.state !== 'stale') return null
-
-  const age = transactionAgeLabel(freshness.monthsBehind)
+  if (freshness.state !== 'stale' || !freshness.latestMonthLabel) return null
 
   return (
-    <div
-      className={`flex items-start gap-3 border border-[var(--module-active-300)] bg-[var(--module-active-50)]/60 px-4 py-3 ${className}`}
-      data-testid="stale-transactions-warning"
-    >
-      <AlertTriangle
-        className="mt-0.5 h-4 w-4 shrink-0 text-[var(--module-active-700)]"
-        aria-hidden="true"
-      />
-      <div className="min-w-0">
-        <p className="text-[10px] uppercase tracking-[0.18em] font-mono font-semibold text-[var(--module-active-700)]">
-          Gegevens verouderd
-        </p>
-        <p className="mt-1 font-serif text-sm italic leading-relaxed text-[var(--ink-2)]">
-          Je laatste boeking is van{' '}
-          <span className="font-mono not-italic font-semibold text-[var(--ink)]">
-            {freshness.latestMonthLabel}
-          </span>
-          {age ? ` (${age})` : ''}. Je cashflow, spaarquote en budgetstand rekenen met die
-          transacties — tot je nieuwe toevoegt beschrijven ze niet je huidige situatie.{' '}
-          <Link
-            href="/core/cash/import"
-            className="not-italic font-medium text-[var(--module-active-700)] underline underline-offset-2"
-          >
-            Transacties importeren
-          </Link>
-          .
-        </p>
-      </div>
-    </div>
+    <StaleNoticeCard
+      latestMonthLabel={freshness.latestMonthLabel}
+      ageLabel={transactionAgeLabel(freshness.monthsBehind)}
+      className={className}
+    />
   )
 }

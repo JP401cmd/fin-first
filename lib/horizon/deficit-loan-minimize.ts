@@ -37,6 +37,9 @@ export const DEFICIT_NOTICE_MINIMIZE_KEY = '/toekomst/tekort-lening'
 /** Heropen-drempel: de melding klapt weer uit boven 110% van de opgeslagen piek. */
 export const DEFICIT_ESCALATION_FACTOR = 1.1
 
+/** Bovengrens voor een opgeslagen piek — duizend miljard euro tekort. */
+export const DEFICIT_MINIMIZED_PEAK_MAX = 1e12
+
 /**
  * Smalt een onbekende jsonb-waarde tot een geldige opgeslagen piek (hele euro's,
  * niet-negatief) of null. Strikt numeriek: de map draagt voor /overzicht-routes
@@ -44,6 +47,9 @@ export const DEFICIT_ESCALATION_FACTOR = 1.1
  */
 export function asDeficitMinimizedPeak(value: unknown): number | null {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return null
+  // Bovengrens, zelfde reden als bij de stale-melding: een absurd hoge piek is
+  // een eindig getal, wordt opgeslagen, en zet escalatie daarna voorgoed uit.
+  if (value > DEFICIT_MINIMIZED_PEAK_MAX) return null
   return Math.round(value)
 }
 

@@ -11,7 +11,14 @@
 //
 // RLS: single-row select op de EIGEN profielrij via de anon-client. Nooit een
 // service-role-client.
+//
+// React-`cache()`: binnen één server-request halen meerdere blokken van
+// /overzicht dezelfde map op (blok 1 voor de "gegevens verouderd"-melding, blok 2
+// via `readMinimizedLevel` voor de status-banner). Zonder wrapper zijn dat twee
+// identieke selects per bezoek; mét is het er één. Het gedrag blijft gelijk — de
+// cache leeft per request, niet per gebruiker.
 
+import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
@@ -22,7 +29,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  *
  * @returns de map, of een leeg object als er geen rij/waarde is.
  */
-export async function readMinimizedMap(
+export const readMinimizedMap = cache(async function readMinimizedMap(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<Record<string, unknown>> {
@@ -40,4 +47,4 @@ export async function readMinimizedMap(
   }
 
   return (data?.status_banner_minimized ?? {}) as Record<string, unknown>
-}
+})

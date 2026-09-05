@@ -21,6 +21,7 @@ import type { FreedomFraming } from '@/lib/fire-strategy'
 import type { NuStoppenReach } from '@/lib/horizon/nu-stoppen-copy'
 import type { AnkerReach, AnkerStop } from '@/lib/horizon/anker-copy'
 import { PageStatusDot } from '@/components/app/page-status-dot'
+import { StaleNoticeDot } from '@/components/app/stale-notice-provider'
 import {
   HeroEditToggle,
   HeroWidgetRail,
@@ -221,6 +222,12 @@ export function OverzichtSecondary({
           />
         )}
         <PrintOverzichtButton />
+        {/* Geminimaliseerde "Gegevens verouderd"-melding (B-015): zelfde
+            h-7 w-7-familie, stoplicht-oranje, links van het status-/vrijheidspunt
+            hieronder. De conventie noemt absolute offsets voor pagina's waar de
+            'i' absoluut staat; deze cluster is een flex-rij, dus DOM-volgorde +
+            gap-2 (8px) geeft exact dezelfde plaatsing. */}
+        <StaleNoticeDot />
         {/* Geminimaliseerde status-/vrijheidsmelding: gekleurd statuspunt direct
             links van de 'i' (meldingen-conventie). */}
         <PageStatusDot />
