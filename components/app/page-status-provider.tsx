@@ -12,6 +12,7 @@ import {
 import { usePathname } from 'next/navigation'
 import { usePageStatus, type PageStatusSeedData } from '@/lib/hooks/use-page-status'
 import {
+  minimizeLevelFor,
   resolveBannerDisplay,
   type BannerDisplay,
   type MinimizedLevel,
@@ -143,14 +144,11 @@ export function PageStatusProvider({ children }: { children: React.ReactNode }) 
 
   const minimize = useCallback(() => {
     if (!info) return
-    // Leverage-banner minimaliseert op z'n stoplicht-niveau (warn/bad, escaleert);
-    // de informatieve vrijheidsbanner op een vast 'info'-niveau (escaleert nooit).
-    const level: MinimizedLevel | null =
-      info.kind === 'freedom'
-        ? 'info'
-        : info.status === 'warn' || info.status === 'bad'
-          ? info.status
-          : null
+    // Je minimaliseert op de ernst die je ziet — de keuze zelf woont als pure
+    // helper naast resolveBannerDisplay, met een test op de keten (zie B-017:
+    // een 'freedom'-banner mét tekort werd hier op 'info' opgeslagen en klapte
+    // daardoor meteen weer uit).
+    const level: MinimizedLevel | null = minimizeLevelFor(info.kind, info.status)
     if (level == null) return
     const prev = minimizedLevel
     // Pure updater + side-effect (persist) ERBUITEN, zodat een dubbele

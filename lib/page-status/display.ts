@@ -14,6 +14,7 @@
 // rechtstreeks kan afdekken.
 
 import type { LeverageStatus } from '@/lib/leverage-status'
+import type { PageStatusKind } from './types'
 
 export type BannerDisplay = 'expanded' | 'minimized'
 
@@ -52,4 +53,37 @@ export function resolveBannerDisplay(
   if (minimizedLevel == null) return 'expanded'
   // Geëscaleerd (huidige status erger dan toen geminimaliseerd) → weer tonen.
   return severity(status) <= severity(minimizedLevel) ? 'minimized' : 'expanded'
+}
+
+/**
+ * Op welk niveau slaat een klik op "Minimaliseren" deze banner op?
+ *
+ * De regel is één zin: **je minimaliseert op de ernst die je op dat moment
+ * ziet.** Alleen iets ergers dan dát heropent de banner — dat is precies de
+ * escalatie-garantie die `resolveBannerDisplay` hierboven afdwingt.
+ *
+ * ── WAAROM DIT EEN EIGEN HELPER IS (B-017) ─────────────────────────────────
+ * Deze keuze zat als losse ternary in `PageStatusProvider` en ging daar mis:
+ * een `freedom`-banner werd altijd op het vaste 'info' (severity 0) opgeslagen.
+ * Dat klopte zolang die banner per definitie 'neutral' was, maar sinds ADR 0129
+ * kan hij 'warn' zijn (het stop-anker met een tekort). `resolveBannerDisplay`
+ * las die eigen 'warn' vervolgens als escalatie t.o.v. 'info' en klapte de
+ * banner in hetzelfde renderpad weer uit: de knop deed zichtbaar niets. De keuze
+ * hoort dus naast de helper die haar interpreteert, met een test op de KETEN —
+ * niet los in een component waar geen test bij kan.
+ *
+ * @param kind Soort melding; bepaalt alleen nog wat er gebeurt zónder alarm.
+ * @param status De status die de gebruiker op dat moment ziet.
+ * @returns Het op te slaan niveau, of `null` als er niets te minimaliseren valt
+ *   (een leverage-banner bestaat alleen bij warn/bad).
+ */
+export function minimizeLevelFor(
+  kind: PageStatusKind,
+  status: LeverageStatus,
+): MinimizedLevel | null {
+  // Alarm-niveaus minimaliseren op zichzelf: alleen verergering heropent.
+  if (status === 'warn' || status === 'bad') return status
+  // Geen alarm: de informatieve vrijheidsbanner klapt in op het vaste
+  // 'info'-niveau (escaleert nooit); een leverage-banner bestaat hier niet.
+  return kind === 'freedom' ? 'info' : null
 }

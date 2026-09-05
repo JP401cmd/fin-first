@@ -32,18 +32,26 @@ export function PageStatusBanner() {
 
   const status = info?.status ?? 'neutral'
   const isFreedom = info?.kind === 'freedom'
-  // Freedom-banner is informatief (geen stoplicht): horizon-accent i.p.v. een
-  // amber/rode stoplichtstreep, en een mijlpaal-kicker uit de titel.
+  const isAlarm = status === 'warn' || status === 'bad'
+  // Kleur volgt de STATUS, niet de soort melding: een freedom-banner is alleen
+  // informatief (horizon-accent) zolang hij niets alarmeert. Sinds ADR 0129
+  // draagt het stop-anker met een tekort status 'warn' — dan hoort de streep
+  // amber te zijn, want stoplicht-status volgt de accentkeuze niet (CLAUDE.md).
+  const isInformational = isFreedom && !isAlarm
+  // De kicker blijft bij een freedom-banner de titel: die benoemt het anker
+  // ("Je rekent met stoppen op 48") en dat draagt meer dan het woord 'Aandacht'.
   const kicker = isFreedom
     ? info?.title ?? 'Mijlpaal'
     : status === 'bad'
       ? 'Actie nodig'
       : 'Aandacht'
-  const bgClass = isFreedom
+  const bgClass = isInformational
     ? 'bg-gradient-to-r from-horizon-50 to-stone-50'
     : leverageStatusBgClass(status)
-  const stripeClass = isFreedom ? 'bg-horizon-500' : LEVERAGE_STATUS_DOT[status]
-  const kickerTextClass = isFreedom ? 'text-horizon-700' : leverageStatusTextClass(status)
+  const stripeClass = isInformational ? 'bg-horizon-500' : LEVERAGE_STATUS_DOT[status]
+  const kickerTextClass = isInformational
+    ? 'text-horizon-700'
+    : leverageStatusTextClass(status)
 
   // De aria-live-regio is ALTIJD gemount (ook op groene pagina's), zodat een
   // screenreader de regio al observeert vóórdat de banner lazy verschijnt. De

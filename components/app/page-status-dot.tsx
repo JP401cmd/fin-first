@@ -28,13 +28,19 @@ export function PageStatusDot({ className = '' }: PageStatusDotProps) {
 
   if (!info || display !== 'minimized') return null
 
-  // Freedom-banner is informatief (geen stoplicht): horizon-accent dot + eigen
-  // label. Leverage-banner houdt de stoplichtkleur + status-label.
+  // Kleur volgt de STATUS, niet de soort melding. Een freedom-banner is
+  // informatief zolang hij niets alarmeert (horizon-accent); draagt hij een
+  // stoplichtstatus — sinds ADR 0129 kan dat: het stop-anker met een tekort —
+  // dan hoort het punt amber/rood te zijn. De kleurconventie in CLAUDE.md is
+  // hier expliciet: stoplicht-status volgt de accentkeuze NIET. Vóór B-017 was
+  // deze combinatie onbereikbaar (zo'n banner liet zich niet minimaliseren),
+  // dus het viel niemand op.
   const isFreedom = info.kind === 'freedom'
-  const label = isFreedom
+  const isAlarm = info.status === 'warn' || info.status === 'bad'
+  const label = isFreedom && !isAlarm
     ? `${info.title} — toon melding`
     : `${LEVERAGE_STATUS_LABEL[info.status]} — toon melding`
-  const dotClass = isFreedom ? 'bg-horizon-500' : LEVERAGE_STATUS_DOT[info.status]
+  const dotClass = isFreedom && !isAlarm ? 'bg-horizon-500' : LEVERAGE_STATUS_DOT[info.status]
 
   return (
     <div className={className}>
