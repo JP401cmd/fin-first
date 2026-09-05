@@ -6,7 +6,7 @@ import { FinDots } from '@/components/app/fin-dots'
 import { SpeechBubble } from './speech-bubble'
 import { StepProgress } from './step-progress'
 import type { RetirementExpenseMethod } from '@/lib/budget-utils'
-import type { FireEndStrategy } from '@/lib/fire-strategy'
+import type { FireEndStrategy, StopAnchorKind } from '@/lib/fire-strategy'
 import type { ModuleId } from '@/lib/module-registry'
 import { NL_AOW_MONTHLY } from '@/lib/constants'
 import { Button } from '@/components/editorial'
@@ -25,9 +25,20 @@ export interface LifeEventEntry {
 }
 
 export interface HorizonData {
+  /**
+   * De EIND-VORM van het plan (ADR 0129). De stap "Jouw plan" schrijft hier
+   * uitsluitend `deplete` · `legacy` · `perpetual`; de legacy-labels
+   * `pensioen`/`nu-stoppen` zijn ankers en komen uit de onboarding niet meer
+   * (de draft-persistentie vertaalt een oud concept naar `fire_stop_anchor`).
+   * Het type blijft de brede enum omdat dit legacy-component 'm nog spelt.
+   */
   fire_end_strategy: FireEndStrategy
-  fire_end_age: number                // 60-120, default 90
+  fire_end_age: number                // 50-120, default 90
   fire_legacy_amount: string
+  /** Het STOP-ANKER (ADR 0129): wanneer stopt het werken. Default `solved`. */
+  fire_stop_anchor: StopAnchorKind
+  /** Alleen bij `fire_stop_anchor === 'age'`; halve jaren, 18–100. Anders `null`. */
+  fire_stop_age: number | null
   retirement_expense_method: RetirementExpenseMethod
   retirement_custom_amount: string
   temporal_balance: number            // 1-5, default 3
@@ -38,6 +49,8 @@ export const INITIAL_HORIZON_DATA: HorizonData = {
   fire_end_strategy: 'deplete',
   fire_end_age: 90,
   fire_legacy_amount: '',
+  fire_stop_anchor: 'solved',
+  fire_stop_age: null,
   retirement_expense_method: 'current_income',
   retirement_custom_amount: '',
   temporal_balance: 3,

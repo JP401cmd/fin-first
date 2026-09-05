@@ -152,6 +152,101 @@ export function isFireEndForm(value: unknown): value is FireEndForm {
   return typeof value === 'string' && (FIRE_END_FORMS as readonly string[]).includes(value)
 }
 
+// ── Schrijfkant: anker + stopleeftijd valideren zoals een CLIENT ze aanreikt ──
+//
+// Gedeeld door `PUT /api/fire-settings` en `POST /api/onboarding/save-own-data`
+// (ADR 0129, onboarding-stap "Jouw plan", 5 sep 2026): twee routes schrijven
+// hetzelfde plan, dus één toets. Een Next-route kan geen losse functie exporteren
+// (de route-typevalidator weigert extra exports), daarom woont de toets hier en
+// delegeren beide routes. STRENG — geen stille afronding; zie `normalizeStopAge`
+// hieronder voor waarom LEZEN wél tolerant is.
+
+export interface StopAnchorWriteInput {
+  anchor: StopAnchorKind
+  stopAge: number | null
+}
+
+/**
+ * De grenzen van het plan — ÉÉN bron voor de schrijftoets hieronder, de zod-schema's
+ * van `/api/fire-settings` en `/api/onboarding/save-own-data`, en de client-validatie
+ * (`lib/horizon/plan-draft.ts` re-exporteert ze; de `<input min/max>` in de plan-vragen
+ * lezen ze). `END_AGE_MIN` is 60 als spiegel van de live DB-CHECK
+ * `profiles_fire_end_age_check` (60..120) — er komt geen migratie; een lagere client-
+ * grens zou een geldige invoer in een 23514 laten eindigen. Gepind in
+ * `lib/onboarding-plan.test.ts`.
+ */
+export const STOP_AGE_MIN = 18
+export const STOP_AGE_MAX = 100
+export const END_AGE_MIN = 60
+export const END_AGE_MAX = 120
+
+/**
+ * De eindleeftijd waarop de backfill 20260903141000 (D6/M1) de bestaande
+ * `pensioen`-rijen zette: een plan dat op de AOW ankert rekent tot 100. Een OUDE
+ * draft of client die het label 'pensioen' nog stuurt, kan de 90-default nooit zelf
+ * hebben gekozen (de oude stap toonde geen eindleeftijd-veld) — dus krijgt zo'n rij
+ * dezelfde 100 als de backfill, niet de meegestuurde default.
+ */
+export const LEGACY_PENSIOEN_END_AGE = 100
+
+/**
+ * De eindleeftijd die de plan-vragen ZETTEN zodra de gebruiker "Mijn vermogen mag
+ * niet slinken" (`perpetual`) kiest (eigenaar-besluit 5 sep 2026). Onder perpetual is
+ * de eindleeftijd geen keuze maar een weergave-horizon: de kernel rekent die vorm tot
+ * 100 (`gap.ts#eindleeftijdVan`), het veld is verborgen, en zonder deze zet zou de
+ * B7-toets (stopleeftijd vóór eindleeftijd) naar een onzichtbare 90 verwijzen.
+ * Dezelfde waarde als `LEGACY_PENSIOEN_END_AGE`, bewust een eigen naam: andere reden.
+ */
+export const PERPETUAL_END_AGE = 100
+
+/**
+ * Halve jaren (ADR 0129 B6): een waarde tussen twee halve jaren wordt NIET stil
+ * afgerond — dat zou een keuze van de gebruiker vervalsen — maar afgewezen, zodat
+ * de client zijn eigen resolutie corrigeert. De consistentie-eis (`age` ⟺ leeftijd
+ * aanwezig) spiegelt de DB-CHECK, zodat een ongeldige combinatie een leesbare 400
+ * geeft i.p.v. een 23514. De aanroeper past zijn eigen default toe op een ontbrekend
+ * anker (`body.fire_stop_anchor ?? 'solved'`).
+ */
+export function validateStopAnchorInput(
+  rawAnchor: unknown,
+  rawAge: unknown,
+): StopAnchorWriteInput | { error: string } {
+  if (!isStopAnchorKind(rawAnchor)) {
+    return { error: `Ongeldig stop-anker: ${String(rawAnchor)}` }
+  }
+
+  if (rawAnchor !== 'age') {
+    if (rawAge != null) {
+      return { error: 'Een stopleeftijd hoort alleen bij het anker "age".' }
+    }
+    return { anchor: rawAnchor, stopAge: null }
+  }
+
+  const age = Number(rawAge)
+  if (!Number.isFinite(age)) {
+    return { error: 'Kies een stopleeftijd bij het anker "age".' }
+  }
+  if (age * 2 !== Math.floor(age * 2)) {
+    return { error: 'Een stopleeftijd loopt in stappen van een half jaar.' }
+  }
+  if (age < STOP_AGE_MIN || age > STOP_AGE_MAX) {
+    return { error: `Stopleeftijd moet tussen ${STOP_AGE_MIN} en ${STOP_AGE_MAX} liggen.` }
+  }
+  return { anchor: rawAnchor, stopAge: age }
+}
+
+/** R4 (B7): de 400-tekst wanneer de stopleeftijd op of voorbij de eindleeftijd ligt. */
+export const STOP_AGE_BEFORE_END_AGE_ERROR = 'Een stopleeftijd moet vóór de eindleeftijd van je plan liggen.'
+
+/**
+ * R4 (B7): een stopleeftijd op of voorbij de eindleeftijd laat geen plan over om te
+ * toetsen — de kernel zou 'm stil op `eind − 1/12` klemmen, en stil afronden
+ * vervalst een keuze.
+ */
+export function stopAgeConflictsWithEndAge(input: StopAnchorWriteInput, endAge: number): boolean {
+  return input.anchor === 'age' && input.stopAge !== null && input.stopAge >= endAge
+}
+
 /**
  * Ligt het stopmoment vast, of zoekt de app het?
  *

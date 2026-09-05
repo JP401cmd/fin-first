@@ -2,13 +2,14 @@
 //
 // Bron: docs/uat/uat-plan.md Deel 1 — "Publiek, registratie & onboarding
 // (WF-START)" (WF-START-01..26, plus WF-START-27 als latere aanvulling — het
-// deelpad van ADR 0067) en de acceptatie in lib/uat/acceptance/start.ts.
+// deelpad van ADR 0067 — en WF-START-28, de onboarding-stap "Jouw plan" van
+// ADR 0129) en de acceptatie in lib/uat/acceptance/start.ts.
 // De knopen met `scenarioId` verwijzen naar de UAT-scenario-ID's uit
 // lib/uat/catalog.ts (UAT-START-NN) en erven daarmee de rondestatus. Het label
 // toont bewust het WF-nummer, spiegelt lib/uat/flows/budget.ts + schuld.ts + toek.ts.
 //
 // START is — net als BUDGET — een AANEENGESLOTEN catalogus: alle
-// WF-START-01..27 hebben een eigen UAT-scenario en dus een eigen knoop
+// WF-START-01..28 hebben een eigen UAT-scenario en dus een eigen knoop
 // hieronder. Geen verwijsregel-gaten (UAT-START-15 wordt WÉL door het
 // NAV-deelgebied naar hier terugverwezen als "leidend scenario" — dat is een
 // verwijzing VAN NAV NAAR START, niet andersom, dus hier gewoon een normale knoop).
@@ -70,6 +71,7 @@ export const START_FLOW: UatFlow = {
     { id: 'bezitschuld', scenarioId: 'UAT-START-19', label: 'WF-START-19 · Bezittingen & schulden (huis+hypotheek)', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'pensioen', scenarioId: 'UAT-START-20', label: 'WF-START-20 · Pensioen opgeven', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'spaardoel', scenarioId: 'UAT-START-21', label: 'WF-START-21 · Spaardoel kiezen of overslaan', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
+    { id: 'plan', scenarioId: 'UAT-START-28', label: 'WF-START-28 · "Jouw plan": stopmoment × eind-vorm (ADR 0129)', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'defer', scenarioId: 'UAT-START-22', label: 'WF-START-22 · "Later invullen" (defer-pad)', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'obhervatten', scenarioId: 'UAT-START-23', label: 'WF-START-23 · Onboarding onderbreken/hervatten', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
     { id: 'obretry', scenarioId: 'UAT-START-24', label: 'WF-START-24 · Fout bij afronden herstellen (retry)', kind: 'action', stage: 5, lane: 'onboarding', subOf: 'onboarding' },
@@ -77,7 +79,7 @@ export const START_FLOW: UatFlow = {
 
     // ── 6 · uitkomst ──────────────────────────────────────────────────────────
     { id: 'overgang', scenarioId: 'UAT-START-26', label: 'WF-START-26 · Overgang onboarding → app', kind: 'screen', stage: 6 },
-    { id: 'uitkomst', label: 'Gebruiker in de app: bezittingen/schulden/doel/pensioen zichtbaar', kind: 'outcome', stage: 6 },
+    { id: 'uitkomst', label: 'Gebruiker in de app: bezittingen/schulden/doel/pensioen/plan zichtbaar', kind: 'outcome', stage: 6 },
 
     // ── 7 · cross-doorwerking (OUTPUT) ───────────────────────────────────────
     { id: 'x-ovz', label: 'Overzicht-hub · netto vermogen & cashflow-instellingen', kind: 'cross', stage: 7, crossZone: 'OVZ' },
@@ -121,6 +123,7 @@ export const START_FLOW: UatFlow = {
     { from: 'onboarding', to: 'bezitschuld' },
     { from: 'onboarding', to: 'pensioen' },
     { from: 'onboarding', to: 'spaardoel' },
+    { from: 'onboarding', to: 'plan' },
     { from: 'onboarding', to: 'defer' },
     { from: 'onboarding', to: 'obhervatten' },
     { from: 'onboarding', to: 'obretry' },
@@ -133,6 +136,7 @@ export const START_FLOW: UatFlow = {
     // uitkomst → cross-doorwerking (OUTPUT)
     { from: 'uitkomst', to: 'x-ovz', kind: 'cross' },
     { from: 'uitkomst', to: 'x-toek', kind: 'cross' },
+    { from: 'plan', to: 'x-toek', kind: 'cross', label: 'stop-anker × eind-vorm → tijdas + Voorkeuren (WF-TOEK-24)' },
     { from: 'defer', to: 'x-will', kind: 'cross', label: 'overgeslagen velden → coach-suggestie' },
     { from: 'routebescherming', to: 'x-nav', kind: 'cross', label: 'auth-grens hergebruikt door NAV' },
   ],

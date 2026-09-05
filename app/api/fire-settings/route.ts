@@ -2,10 +2,14 @@ import { createClient, getAuthClaims } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { serverError, unauthorized } from '@/lib/api/respond'
 import {
+  END_AGE_MAX,
+  END_AGE_MIN,
   FIRE_PLAN_COLUMNS,
+  STOP_AGE_BEFORE_END_AGE_ERROR,
   isFireEndStrategy,
-  isStopAnchorKind,
   parseFirePlan,
+  stopAgeConflictsWithEndAge,
+  validateStopAnchorInput,
   type StopAnchorKind,
 } from '@/lib/fire-strategy'
 
@@ -111,39 +115,15 @@ interface PlanInput {
 /**
  * Valideer anker + stopleeftijd uit de request-body.
  *
- * Halve jaren (ADR 0129 B6): de stop-slider staat op `step={0.5}`. Een waarde
- * daartussenin wordt NIET stil afgerond — dat zou een keuze van de gebruiker
- * vervalsen — maar afgewezen, zodat de client zijn eigen resolutie corrigeert.
- * (De parser `parseFirePlan` leest een bestaande rij wél tolerant; zie de docstring
- * bij `normalizeStopAge` in lib/fire-strategy.ts voor waarom lezen en schrijven
- * verschillen.) De consistentie-eis (`age` ⟺ leeftijd aanwezig) spiegelt de
- * DB-CHECK, zodat een ongeldige combinatie een leesbare 400 geeft i.p.v. een 23514.
+ * De toets zelf woont in `validateStopAnchorInput` (lib/fire-strategy.ts) en wordt
+ * sinds 5 sep 2026 gedeeld met `POST /api/onboarding/save-own-data` — de
+ * onboarding-stap "Jouw plan" schrijft hetzelfde anker. Eén toets, twee routes;
+ * gedrag en fouttexten hier zijn ongewijzigd (halve jaren, 18–100, `age` ⟺
+ * leeftijd aanwezig). Zie de docstring dáár voor waarom lezen tolerant is en
+ * schrijven streng.
  */
 function parseStopAnchorInput(body: Record<string, unknown>): StopAnchorInput | { error: string } {
-  const rawAnchor = body.fire_stop_anchor ?? 'solved'
-  if (!isStopAnchorKind(rawAnchor)) {
-    return { error: `Ongeldig stop-anker: ${String(rawAnchor)}` }
-  }
-
-  const rawAge = body.fire_stop_age
-  if (rawAnchor !== 'age') {
-    if (rawAge != null) {
-      return { error: 'Een stopleeftijd hoort alleen bij het anker "age".' }
-    }
-    return { anchor: rawAnchor, stopAge: null }
-  }
-
-  const age = Number(rawAge)
-  if (!Number.isFinite(age)) {
-    return { error: 'Kies een stopleeftijd bij het anker "age".' }
-  }
-  if (age * 2 !== Math.floor(age * 2)) {
-    return { error: 'Een stopleeftijd loopt in stappen van een half jaar.' }
-  }
-  if (age < 18 || age > 100) {
-    return { error: 'Stopleeftijd moet tussen 18 en 100 liggen.' }
-  }
-  return { anchor: rawAnchor, stopAge: age }
+  return validateStopAnchorInput(body.fire_stop_anchor ?? 'solved', body.fire_stop_age)
 }
 
 /**
@@ -169,8 +149,9 @@ function parsePlanInput(body: Record<string, unknown>): PlanInput | null | { err
     return { error: `Ongeldige strategie: ${strategy}` }
   }
   const endAge = Number(body.fire_end_age)
-  if (!Number.isFinite(endAge) || endAge < 50 || endAge > 120) {
-    return { error: 'Eindleeftijd moet tussen 50 en 120 liggen' }
+  // Zelfde grens als de DB-CHECK en de client-validatie — één bron (lib/fire-strategy).
+  if (!Number.isFinite(endAge) || endAge < END_AGE_MIN || endAge > END_AGE_MAX) {
+    return { error: `Eindleeftijd moet tussen ${END_AGE_MIN} en ${END_AGE_MAX} liggen` }
   }
   const legacyAmount = body.fire_legacy_amount != null ? Number(body.fire_legacy_amount) : null
 
@@ -197,8 +178,8 @@ function parsePlanInput(body: Record<string, unknown>): PlanInput | null | { err
   if ('error' in parsed) return parsed
 
   // R4 (B7) — een stopleeftijd op of voorbij de eindleeftijd laat geen plan over om te toetsen.
-  if (parsed.anchor === 'age' && parsed.stopAge !== null && parsed.stopAge >= endAge) {
-    return { error: 'Een stopleeftijd moet vóór de eindleeftijd van je plan liggen.' }
+  if (stopAgeConflictsWithEndAge(parsed, endAge)) {
+    return { error: STOP_AGE_BEFORE_END_AGE_ERROR }
   }
 
   return { strategy, endAge, legacyAmount, anchor: parsed }

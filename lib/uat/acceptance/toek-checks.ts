@@ -21,6 +21,8 @@
  * Alle gebruikte imports zijn client-veilig (geen `server-only`/`next/headers`/
  * `@/lib/supabase/server` in hun import-graaf):
  *   - `lib/fire-strategy.ts`  — pure types + labels + parser (geen deps).
+ *   - `lib/horizon/plan-draft.ts` — kopij + concept-vorm van de twee plan-vragen
+ *                                (WF-TOEK-24, ADR 0129); importeert alléén fire-strategy.
  *   - `lib/horizon-data.ts`   — importeert alleen core-metrics/msci-data/constants.
  *   - `lib/goal-data.ts`      — pure helpers.
  *   - `lib/horizon-kernel/adapter/defaults.ts` — alleen een `TaxYear`-type-import.
@@ -45,7 +47,14 @@
  */
 
 import { PERSONAS } from '@/lib/test-personas'
-import { STRATEGY_LABELS, parseFireStrategy } from '@/lib/fire-strategy'
+import { STRATEGY_LABELS, parseFireStrategy, parseFirePlan } from '@/lib/fire-strategy'
+import {
+  END_FORM_OPTIONS,
+  STOP_ANCHOR_OPTIONS,
+  endFormShowsEndAge,
+  planDraftFromPlan,
+  planDraftToFireSettingsBody,
+} from '@/lib/horizon/plan-draft'
 import { computeAowMonthly } from '@/lib/horizon-data'
 import { computeGoalProgress, isGoalReached, type Goal } from '@/lib/goal-data'
 import { computeLinkedCurrentValue } from '@/lib/goal-current-value'
@@ -288,17 +297,25 @@ export const TOEK_ENGINE_CHECKS: ToekEngineCheck[] = [
   {
     workflow: 'WF-TOEK-24',
     scenarioId: 'UAT-TOEK-24',
-    label: 'Guardrail-echo (80/120/10) + eindstrategie pensioen/€200.000 (Marijke)',
+    label: 'Guardrail-echo (80/120/10) + plan-echo van Marijkes legacy-rij: pensioen → anker AOW × eind-vorm deplete, bedragveld verborgen',
     run: () => {
       criterion('WF-TOEK-24')
       const p = marijke.profile
       const floorPct = (p.guardrail_floor ?? 0) * 100
       const ceilingPct = (p.guardrail_ceiling ?? 0) * 100
       const cutStepPct = (p.guardrail_cut_step ?? 0) * 100
-      const cfg = parseFireStrategy(p)
+      // Het plan zoals Voorkeuren het leest (EindstrategieBody: parseFirePlan →
+      // planDraftFromPlan) en de labels die StopPlanVragen daarbij toont.
+      const draft = planDraftFromPlan(parseFirePlan(p))
+      const ankerLabel = STOP_ANCHOR_OPTIONS.find((o) => o.kind === draft.anchor)!.name
+      const eindVormLabel = END_FORM_OPTIONS.find((o) => o.form === draft.endForm)!.name
+      const eindleeftijdVeld = endFormShowsEndAge(draft.endForm) ? 'zichtbaar' : 'verborgen'
+      const bedragVeld = draft.endForm === 'legacy' ? 'zichtbaar' : 'verborgen'
+      // Wat een save wegschrijft: het volledige plan; de nalatenschap alleen onder legacy.
+      const put = planDraftToFireSettingsBody(draft)
       return {
-        expected: 'floorPct=80; ceilingPct=120; cutStepPct=10; strategie=pensioen; nalatenschap=200000',
-        actual: `floorPct=${fx(floorPct, 0)}; ceilingPct=${fx(ceilingPct, 0)}; cutStepPct=${fx(cutStepPct, 0)}; strategie=${cfg.strategy}; nalatenschap=${cfg.legacyAmount}`,
+        expected: 'floorPct=80; ceilingPct=120; cutStepPct=10; anker=aow; ankerLabel=Op mijn AOW-leeftijd; eindVorm=deplete; eindVormLabel=Niets, het mag op zijn; eindleeftijd=90; eindleeftijdVeld=zichtbaar; bedragVeld=verborgen; rijNalatenschap=200000; putNalatenschap=null',
+        actual: `floorPct=${fx(floorPct, 0)}; ceilingPct=${fx(ceilingPct, 0)}; cutStepPct=${fx(cutStepPct, 0)}; anker=${draft.anchor}; ankerLabel=${ankerLabel}; eindVorm=${draft.endForm}; eindVormLabel=${eindVormLabel}; eindleeftijd=${draft.endAge}; eindleeftijdVeld=${eindleeftijdVeld}; bedragVeld=${bedragVeld}; rijNalatenschap=${draft.legacyAmount}; putNalatenschap=${put.fire_legacy_amount}`,
       }
     },
   },

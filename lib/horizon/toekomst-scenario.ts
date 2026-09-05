@@ -25,6 +25,9 @@ import { ASSET_TYPE_TO_CATEGORIE } from '@/lib/horizon-kernel/adapter/potten'
 import { isSliderWorkEvent } from '@/lib/horizon-kernel/adapter/guard'
 import type { WhatIfEvent } from '@/lib/types/horizon-whatif'
 import type { AssetGroupReturn } from '@/lib/types/horizon-whatif'
+// Stopleeftijd-clamps (integer, jaren) — ÉÉN bron met de schrijftoets van de routes
+// en de plan-vragen (lib/fire-strategy), geen lokale 18/100 meer.
+import { STOP_AGE_MAX, STOP_AGE_MIN } from '@/lib/fire-strategy'
 
 // ── Ranges / whitelist (spiegelen de bestaande sliders — één bron voor de clamps) ──
 
@@ -44,10 +47,6 @@ const SLIDER_RANGES = {
 /** Rendement-delta-bereik (decimaal) — spiegelt de Marktbias-slider (`whatif-market-assumptions.tsx`, ±0,05 = ±5 pp). */
 const RETURN_DELTA_MIN = -0.05
 const RETURN_DELTA_MAX = 0.05
-
-/** Stopleeftijd-clamps (integer, jaren). */
-const STOP_AGE_MIN = 18
-const STOP_AGE_MAX = 100
 
 /** Vastgehouden koppel-marge-clamps (jaren t.o.v. de verwacht-FIRE). */
 const STOP_MARGE_MIN = -30

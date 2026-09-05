@@ -88,13 +88,20 @@ describe('onboarding save-own-data — standaardinstellingen nieuwe gebruiker', 
 })
 
 /**
- * Borgt de eindstrategie-onboardingvraag (jul 2026): de nieuwe stap zet de
- * keuze via horizonData.fire_end_strategy. Keuze 1 (FIRE) → 'deplete', keuze 2
- * (pensioen) → 'pensioen'. Voor 'pensioen' te laten landen moest de zod-enum op
- * BEIDE fire_end_strategy-velden verbreed worden; de default-fallback blijft
- * 'deplete' (één bron van waarheid = de keuze in horizonData).
+ * Borgt het plan uit de onboarding-stap "Jouw plan" (ADR 0129, 5 sep 2026): de stap
+ * stuurt eind-vorm + stop-anker via horizonData; de route lost beide ÉÉN keer op via
+ * `resolveOnboardingPlanColumns` (lib/onboarding-plan.ts — de gedragstests van de
+ * mapping staan in lib/onboarding-plan.test.ts) en schrijft de plan-kolommen op
+ * beide write-plekken uit dat ene blok. De oude zod-enum blijft de legacy-labels
+ * accepteren (drafts/clients van vóór de stap); de helper vertaalt ze naar een
+ * anker — het label wordt nooit meer als eind-vorm weggeschreven.
+ *
+ * Vóór 5 sep 2026 pinde deze suite `profileData.fire_end_strategy =
+ * horizonData?.fire_end_strategy ?? … ?? 'deplete'`; die ??-keten leeft nu als
+ * `strategy`-invoer van de helper, zodat dezelfde bron-volgorde (horizonData →
+ * identity → 'deplete') blijft gelden.
  */
-describe('onboarding save-own-data — eindstrategie-keuze (FIRE vs. pensioen)', () => {
+describe('onboarding save-own-data — het plan (stop-anker × eind-vorm, ADR 0129)', () => {
   const routePath = path.resolve(__dirname, 'route.ts')
   const source = readSourceLF(routePath)
   const codeOnly = source
@@ -103,7 +110,7 @@ describe('onboarding save-own-data — eindstrategie-keuze (FIRE vs. pensioen)',
     .map((line) => line.replace(/\/\/.*$/, ''))
     .join('\n')
 
-  it('accepteert pensioen op elke fire_end_strategy zod-enum (identity + horizonData)', () => {
+  it('accepteert de legacy-labels nog op elke fire_end_strategy zod-enum (identity + horizonData)', () => {
     const enums = codeOnly.match(/fire_end_strategy:\s*z\.enum\(\[[^\]]*\]\)/g) ?? []
     // Beide schema-velden (identity + horizonData) moeten aanwezig zijn.
     expect(enums).toHaveLength(2)
@@ -111,17 +118,53 @@ describe('onboarding save-own-data — eindstrategie-keuze (FIRE vs. pensioen)',
       expect(e).toContain("'perpetual'")
       expect(e).toContain("'legacy'")
       expect(e).toContain("'deplete'")
-      // De verbreding waardoor keuze 2 (pensioen) door de validatie komt.
+      // Oude drafts/clients sturen 'pensioen' nog; de helper vertaalt het naar anker aow.
       expect(e).toContain("'pensioen'")
     }
   })
 
-  it('laat de eindstrategie via horizonData.fire_end_strategy in profileData landen (default deplete)', () => {
-    // Eén bron van waarheid: de keuze uit horizonData wint, met identity als
-    // secundaire en 'deplete' als laatste fallback wanneer er geen keuze is.
+  it('accepteert het stop-anker in horizonData via de canonieke allowlist', () => {
+    expect(codeOnly).toMatch(/fire_stop_anchor:\s*z\.enum\(STOP_ANCHOR_KINDS\)/)
+    expect(codeOnly).toMatch(/fire_stop_age:\s*z\.number\(\)\.nullable\(\)\.optional\(\)/)
+  })
+
+  it('lost het plan één keer op via resolveOnboardingPlanColumns — horizonData wint, dan identity, dan deplete/90', () => {
     expect(codeOnly).toMatch(
-      /profileData\.fire_end_strategy\s*=\s*horizonData\?\.fire_end_strategy\s*\?\?[^]*?\?\?\s*'deplete'/,
+      /resolveOnboardingPlanColumns\(\{[^}]*strategy:\s*horizonData\?\.fire_end_strategy\s*\?\?\s*identity\.fire_end_strategy\s*\?\?\s*'deplete'/,
     )
+    expect(codeOnly).toMatch(
+      /resolveOnboardingPlanColumns\(\{[^}]*endAge:\s*horizonData\?\.fire_end_age\s*\?\?\s*identity\.fire_end_age\s*\?\?\s*90/,
+    )
+    // Een ongeldig of tegenstrijdig plan is een client-fout via de error-envelope.
+    expect(codeOnly).toMatch(/if\s*\('error' in planColumns\)\s*return badRequest\(planColumns\.error\)/)
+  })
+
+  it('schrijft eind-vorm én ankerkolommen in het multi-step pad uit het opgeloste blok', () => {
+    // Het multi-step pad is de enige levende write-plek. `buildRpcPayload` is dood
+    // (`void buildRpcPayload`) en de DB-RPC leest de ankerkolommen niet — dat pad
+    // wordt hier bewust NIET als write-plek gepind (zie de opmerking bij de functie).
+    expect(codeOnly).toMatch(/profileData\.fire_end_strategy\s*=\s*planColumns\.fire_end_strategy/)
+    expect(codeOnly).toMatch(/profileData\.fire_end_age\s*=\s*planColumns\.fire_end_age/)
+    expect(codeOnly).toMatch(/profileData\.fire_stop_anchor\s*=\s*planColumns\.fire_stop_anchor/)
+    expect(codeOnly).toMatch(/profileData\.fire_stop_age\s*=\s*planColumns\.fire_stop_age/)
+    // In het levende pad nergens meer een rechtstreekse schrijf van het rauwe label.
+    expect(codeOnly).not.toMatch(/profileData\.fire_end_strategy\s*=\s*horizonData\?\.fire_end_strategy/)
+  })
+
+  it('beide fire_end_age-schema-velden lezen de ene grens (END_AGE_MIN/END_AGE_MAX = DB-CHECK 60..120)', () => {
+    const bands = codeOnly.match(/fire_end_age:\s*z\.number\(\)\.int\(\)\.min\(([^)]*)\)\.max\(([^)]*)\)/g) ?? []
+    // identity + horizonData.
+    expect(bands).toHaveLength(2)
+    for (const b of bands) {
+      expect(b).toContain('min(END_AGE_MIN)')
+      expect(b).toContain('max(END_AGE_MAX)')
+    }
+    expect(codeOnly).not.toMatch(/fire_end_age:\s*z\.number\(\)\.int\(\)\.min\(\d/)
+  })
+
+  it('neemt de ankerkolommen op in de optionele-kolommenlijst (schema-cache-miss-recovery)', () => {
+    expect(codeOnly).toContain("'fire_stop_anchor',")
+    expect(codeOnly).toContain("'fire_stop_age',")
   })
 })
 

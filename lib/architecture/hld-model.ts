@@ -69,10 +69,10 @@ export function buildHldModel(): HldModel {
 
     // De reis als korte verhaallijn rond de functionaliteiten.
     journey: [
-      { n: 1, title: 'Beginnen', you: 'Je vertelt waar je naartoe wilt.', app: 'We zetten alleen de onderdelen aan die jij nodig hebt.' },
+      { n: 1, title: 'Beginnen', you: 'Je vertelt waar je naartoe wilt — en wanneer je wilt stoppen met werken.', app: 'We zetten alleen de onderdelen aan die jij nodig hebt en rekenen vanaf dag één met jouw plan.' },
       { n: 2, title: 'Vastleggen', you: 'Je koppelt je bank of importeert je gegevens.', app: 'Inkomsten, uitgaven en bezittingen staan overzichtelijk bij elkaar.' },
       { n: 3, title: 'Begrijpen', you: 'Je ziet in één oogopslag hoe je ervoor staat.', app: 'Fin, je coach, legt uit wat opvalt en wat je nú kunt doen.' },
-      { n: 4, title: 'Vooruitkijken', you: 'Je rekent je toekomst door.', app: 'Je ziet wanneer je financieel vrij bent — en wat keuzes daaraan veranderen.' },
+      { n: 4, title: 'Vooruitkijken', you: 'Je rekent je toekomst door.', app: 'Je ziet wanneer je financieel vrij bent — of, als je je stopmoment al kent, of je geld tot het einde van je plan reikt — en wat keuzes daaraan veranderen.' },
       { n: 5, title: 'Samen groeien', you: 'Je deelt met je partner en bouwt verder.', app: 'Eén beeld voor het hele huishouden; je groeit van herstel naar meesterschap.' },
     ],
 
@@ -112,6 +112,7 @@ export function buildHldModel(): HldModel {
         accent: 'horizon',
         items: [
           { title: 'Uitrekenen wanneer je niet meer hoeft te werken', desc: 'Je FIRE-datum: het moment dat werken een keuze wordt.' },
+          { title: 'Zelf kiezen wanneer je stopt en zien of het reikt', desc: 'Twee vragen, al bij het aanmelden en later bij Voorkeuren: wanneer wil je stoppen met werken — zo vroeg als het kan, op je AOW-leeftijd of op een leeftijd die jij kiest — en tot welke leeftijd moet je geld reiken en wat moet er dan nog over zijn: niets, een bedrag voor later of voor anderen, of je vermogen mag niet slinken. Kies je een vast stopmoment, dan rekent de app niet uit wánneer je vrij bent, maar of je geld tot het einde van je plan reikt — en vanaf welke leeftijd vrij al mogelijk was geweest.' },
           { title: '“Wat als”-scenario\'s doorrekenen', desc: 'Meer sparen, eerder stoppen, anders beleggen — zie het effect direct.' },
           { title: 'Grote gebeurtenissen meenemen', desc: 'Huis kopen, pensioen, kinderen — alles op je tijdlijn.' },
           { title: 'Je doelen terugzien op je tijdlijn', desc: 'Een doel met een streefdatum krijgt een eigen markering op je tijdas, op de leeftijd die bij die datum hoort — zodat het scherm dat over je toekomst gaat laat zien waar je naartoe spaart. Is de streefdatum al voorbij en het doel nog open, dan blijft de markering staan bij vandaag.' },
@@ -121,9 +122,9 @@ export function buildHldModel(): HldModel {
           { title: 'Je vermogen jaren vooruit zien groeien', desc: 'Simulaties en een toets tegen echte beurshistorie.' },
           { title: 'Snappen hoe je vrijheidsgrafiek is opgebouwd', desc: 'In vier stappen met je eigen cijfers: opbouw, benodigd vermogen, het vrijheidsmoment en onttrekking.' },
           { title: 'Je loopbaan en inkomen meenemen', desc: 'Salarisgroei, een plafond of minder werken — zie wat het met je vrijheidsdatum doet.' },
-          { title: 'Zien hoe stevig je plan staat, op elk front', desc: 'Een radar met vier sterktepunten — de brug tot je AOW, je pensioeninkomen, wonen en je eindstrategie — die rekent op de stopleeftijd die jij kiest.' },
+          { title: 'Zien hoe stevig je plan staat, op elk front', desc: 'Een radar met vier sterktepunten — de brug tot je AOW, je pensioeninkomen, wonen en wat er aan het eind van je plan over moet zijn — die rekent op het stopmoment dat jij kiest.' },
           { title: 'Kant-en-klare paden naast elkaar zien', desc: 'Zes voorgerekende scenario\'s naast je basispad — waaronder "nu stoppen" — met een seintje bij het pad dat de minste buffer overhoudt.' },
-          { title: 'Zien tot welke leeftijd je vermogen reikt als je vandaag stopt', desc: 'Een zin die meebeweegt met je cijfers: hoeveel maanden of tot welke leeftijd je toekomt als je nu met werken stopt — inclusief rendement, AOW en belasting. Wil je dat plan echt maken, dan kun je "Nu stoppen" ook als je eindstrategie kiezen; de app rekent dan je hele plan vanaf vandaag door.' },
+          { title: 'Zien tot welke leeftijd je vermogen reikt als je vandaag stopt', desc: 'Een zin die meebeweegt met je cijfers: hoeveel maanden of tot welke leeftijd je toekomt als je nu met werken stopt — inclusief rendement, AOW en belasting. Wil je dat plan echt maken, dan kies je bij Voorkeuren "Nu" als je stopmoment; de app rekent dan je hele plan vanaf vandaag door.' },
           { title: 'Mijn doorgerekende toekomst vastleggen als doel', desc: 'Sta je op een "wat als"-stand die klopt? Maak er met één klik je doelsituatie van — spaarquote, salaris, rendement en vrijheidsleeftijd worden echte doelen die meegroeien met je cijfers, terug te vinden bij je doelen.' },
           { title: 'Je hele plan als één deelbaar document', desc: 'Het totaalplan bundelt je aannames, je vermogensprojectie naar volledige vrijheid, de slagingskans onder marktschommelingen en concrete inzichten in één rapport — deelbaar als PDF met je partner of adviseur, met alle cijfers uit dezelfde rekenmotor als Toekomst en Overzicht.' },
           { title: 'Zien wat een toekomstig bedrag vandaag waard is', desc: 'Zet je grafiek op /overzicht en /toekomst om naar wat de bedragen vandaag waard zijn; wat je al hebt of al hebt uitgegeven verandert niet mee.' },

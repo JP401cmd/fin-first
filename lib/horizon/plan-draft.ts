@@ -1,8 +1,9 @@
 // lib/horizon/plan-draft.ts
 //
 // De PLAN-REGEL als bewerkbaar concept (ADR 0129 B13/F3b): twee vragen — "Wanneer
-// stop je met werken?" (het stop-anker) en "Wat moet er aan het eind gelden?" (de
-// eind-vorm + eindleeftijd + nalatenschap) — met de validatie die de route NIET kan
+// wil je stoppen met werken?" (het stop-anker) en "Tot welke leeftijd moet je geld
+// reiken, en wat moet er dan nog over zijn?" (eindleeftijd + eind-vorm + bedrag dat
+// over moet blijven) — met de validatie die de route NIET kan
 // doen (de AOW-leeftijd kent alleen de client) en de vertaling naar de PUT-body van
 // `/api/fire-settings`.
 //
@@ -18,10 +19,22 @@ import {
   type FireEndForm,
   type FirePlan,
   type StopAnchorKind,
+  DEFAULT_FIRE_STRATEGY,
+  END_AGE_MAX,
+  END_AGE_MIN,
   FIRE_END_FORMS,
+  PERPETUAL_END_AGE,
+  STOP_AGE_MAX,
+  STOP_AGE_MIN,
   STOP_ANCHOR_KINDS,
-  STRATEGY_LABELS,
 } from '@/lib/fire-strategy'
+
+/**
+ * Grenzen — ÉÉN bron in `lib/fire-strategy.ts` (naast de schrijftoets van de routes);
+ * hier alleen doorgegeven zodat de plan-vragen en de onboarding-stap ze via dit
+ * bestand kunnen lezen. `END_AGE_MIN = 60` spiegelt de live DB-CHECK (60..120).
+ */
+export { END_AGE_MAX, END_AGE_MIN, STOP_AGE_MAX, STOP_AGE_MIN }
 
 /** Het bewerkbare plan zoals de twee vragen het dragen. */
 export interface PlanDraft {
@@ -33,7 +46,15 @@ export interface PlanDraft {
   legacyAmount: number
 }
 
-/** Kopij van vraag 1 — letterlijk uit de bijlage van ADR 0129 (merkstem-ronde F0). */
+// ── Kopij van de twee vragen — ÉÉN bron voor onboarding, Voorkeuren en modals ──
+//
+// Eigenaar-besluit 5 sep 2026 (herziening van de ADR 0129-bijlage): de eind-vorm is
+// eigenlijk twee getallen — "tot welke leeftijd moet je geld reiken, en wat moet er
+// dan nog over zijn?" Die formulering is de norm op ALLE oppervlakken, in gewone
+// taal. Beschrijvend, nooit aansporend: geen "je kunt stoppen", geen advies, geen
+// "oneindig". De onboarding-stap "Jouw plan" leest letterlijk dezelfde strings.
+
+/** Kopij van vraag 1 — de vier ankers. De onboarding biedt `now` bewust niet aan. */
 export const STOP_ANCHOR_OPTIONS: ReadonlyArray<{
   kind: StopAnchorKind
   name: string
@@ -41,13 +62,13 @@ export const STOP_ANCHOR_OPTIONS: ReadonlyArray<{
 }> = [
   {
     kind: 'solved',
-    name: 'Laat de app het uitrekenen',
-    subtitle: 'De app zoekt de vroegste leeftijd waarop je vermogen je plan draagt.',
+    name: 'Zo vroeg als het kan',
+    subtitle: 'De app rekent uit vanaf welke leeftijd werken een keuze wordt.',
   },
   {
     kind: 'aow',
     name: 'Op mijn AOW-leeftijd',
-    subtitle: 'Je werkt door tot je AOW ingaat. De app laat zien of je vermogen dan reikt.',
+    subtitle: 'Je werkt door tot je AOW ingaat. De app laat zien of je geld dan reikt.',
   },
   {
     kind: 'age',
@@ -61,27 +82,64 @@ export const STOP_ANCHOR_OPTIONS: ReadonlyArray<{
   },
 ]
 
-export const STOP_ANCHOR_QUESTION = 'Wanneer stop je met werken?'
-export const END_FORM_QUESTION = 'Wat moet er aan het eind gelden?'
-export const END_AGE_QUESTION = 'Tot welke leeftijd moet je vermogen reiken?'
+export const STOP_ANCHOR_QUESTION = 'Wanneer wil je stoppen met werken?'
+/** Vraag 2 als geheel — de kop boven eindleeftijd-veld én keuze. */
+export const END_FORM_QUESTION = 'Tot welke leeftijd moet je geld reiken, en wat moet er dan nog over zijn?'
+/** Het eindleeftijd-veld (eerste helft van vraag 2). */
+export const END_AGE_QUESTION = 'Tot welke leeftijd moet je geld reiken?'
+/** De keuze wat er overblijft (tweede helft van vraag 2). */
+export const END_REMAINDER_QUESTION = 'Wat moet er dan nog over zijn?'
+/** Getoond in plaats van het eindleeftijd-veld onder `perpetual`. */
+export const PERPETUAL_NO_END_AGE_NOTE =
+  'Dan rekent de app zonder eindleeftijd: je leeft van wat je vermogen oplevert.'
 
-/** Kopij van vraag 2 — de drie eind-vormen met de bestaande, canonieke ondertitels. */
-export const END_FORM_OPTIONS: ReadonlyArray<{ form: FireEndForm; name: string; subtitle: string }> =
-  FIRE_END_FORMS.map((form) => ({
-    form,
-    name: STRATEGY_LABELS[form].name,
-    subtitle: STRATEGY_LABELS[form].subtitle,
-  }))
-
-/** Grenzen — spiegel van de route en de DB-CHECK (lees: geen tweede waarheid, wel een vroege). */
-export const STOP_AGE_MIN = 18
-export const STOP_AGE_MAX = 100
-export const END_AGE_MIN = 50
-export const END_AGE_MAX = 120
+/**
+ * Kopij van vraag 2 — de drie eind-vormen in gewone taal. Bewust EXPLICIET en niet
+ * afgeleid uit `STRATEGY_LABELS` (Vermogen opeten · Nalatenschap · Eeuwigdurend):
+ * die vaktermen blijven de canonieke korte labels voor rapporten, grafiek-voetnoten
+ * en tests; hier spreekt de vraag de gebruiker aan in de woorden van het besluit.
+ */
+export const END_FORM_OPTIONS: ReadonlyArray<{ form: FireEndForm; name: string; subtitle: string }> = [
+  {
+    form: 'deplete',
+    name: 'Niets, het mag op zijn',
+    subtitle: 'Je geld mag op de eindleeftijd volledig opgemaakt zijn. Dit is de standaard.',
+  },
+  {
+    form: 'legacy',
+    name: 'Een bedrag voor later of voor anderen',
+    subtitle: 'Op de eindleeftijd blijft een bedrag over dat je bewust apart houdt.',
+  },
+  {
+    form: 'perpetual',
+    name: 'Mijn vermogen mag niet slinken',
+    subtitle: 'Je geld houdt zijn waarde; je leeft van wat het oplevert, zonder eindleeftijd.',
+  },
+]
 
 /** Toont de eind-vorm een instelbare eindleeftijd? (perpetual = alleen weergave-horizon). */
 export function endFormShowsEndAge(endForm: FireEndForm): boolean {
   return endForm !== 'perpetual'
+}
+
+/**
+ * De eind-vorm kiezen — de ENIGE manier waarop de plan-vragen (Voorkeuren, modals,
+ * onboarding) `endForm` zetten. Eigenaar-besluit 5 sep 2026: kiest de gebruiker
+ * `perpetual`, dan gaat de (verborgen) eindleeftijd naar `PERPETUAL_END_AGE` (100),
+ * dezelfde horizon als de kernel — anders zou de B7-toets een stopleeftijd van 92
+ * afwijzen tegen een onzichtbare 90. Wisselt hij daarna terug naar een vorm mét
+ * eindleeftijd en staat die nog op de perpetual-zet, dan keert de standaard (90)
+ * terug; een zelf gekozen andere leeftijd blijft staan.
+ */
+export function withEndForm(draft: PlanDraft, endForm: FireEndForm): PlanDraft {
+  if (endForm === 'perpetual') {
+    return { ...draft, endForm, endAge: PERPETUAL_END_AGE }
+  }
+  const endAge =
+    draft.endForm === 'perpetual' && draft.endAge === PERPETUAL_END_AGE
+      ? DEFAULT_FIRE_STRATEGY.endAge
+      : draft.endAge
+  return { ...draft, endForm, endAge }
 }
 
 /** Een `FirePlan` (gelezen) → concept. */
@@ -172,8 +230,11 @@ export function validatePlanDraft(
     errors.endAge = `Tussen ${END_AGE_MIN} en ${END_AGE_MAX} jaar.`
   }
 
-  if (draft.endForm === 'legacy' && (!Number.isFinite(draft.legacyAmount) || draft.legacyAmount < 0)) {
-    errors.legacyAmount = 'Een bedrag van nul of hoger.'
+  // "Een bedrag dat over moet blijven" is per definitie > 0 — nul is de eind-vorm
+  // `deplete`. Gelijk aan de onboarding-route (`fire_legacy_amount: positive()`), zodat
+  // Voorkeuren en onboarding één regel spreken.
+  if (draft.endForm === 'legacy' && (!Number.isFinite(draft.legacyAmount) || draft.legacyAmount <= 0)) {
+    errors.legacyAmount = 'Een bedrag boven nul.'
   }
 
   if (draft.anchor === 'age') {
@@ -185,7 +246,7 @@ export function validatePlanDraft(
     } else if (s < STOP_AGE_MIN || s > STOP_AGE_MAX) {
       errors.stopAge = `Tussen ${STOP_AGE_MIN} en ${STOP_AGE_MAX} jaar.`
     } else if (!errors.endAge && s >= draft.endAge) {
-      errors.stopAge = `Je stopmoment ligt vóór de eindleeftijd van je plan (${draft.endAge}).`
+      errors.stopAge = `Je stopleeftijd moet vóór de eindleeftijd van je plan (${draft.endAge}) liggen.`
     }
   }
 

@@ -429,10 +429,11 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
       'Het moment waarop je in je plan stopt met werken en gaat leven van je vermogen. Je kiest het zelf (een leeftijd, je AOW-leeftijd of nu), of je laat de app uitrekenen wanneer het kan. Los daarvan kies je wat er aan het eind van je plan moet gelden.',
   },
   stopanker_solved: {
-    name: 'Laat de app het uitrekenen',
-    alternative: 'De app zoekt je vroegste stopmoment',
+    // Zelfde woorden als de plan-vragen (lib/horizon/plan-draft.ts) — één taal op alle oppervlakken.
+    name: 'Zo vroeg als het kan',
+    alternative: 'De app rekent je vroegste stopmoment uit',
     explanation:
-      'De app zoekt de vroegste leeftijd waarop je vermogen je plan draagt. Dat is je vrijheidsleeftijd: het moment waarop werken een keuze wordt.',
+      'De app rekent uit vanaf welke leeftijd werken een keuze wordt: de vroegste leeftijd waarop je vermogen je plan draagt. Dat is je vrijheidsleeftijd.',
   },
   stopanker_aow: {
     name: 'Op mijn AOW-leeftijd',

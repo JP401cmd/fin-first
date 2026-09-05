@@ -27,7 +27,12 @@
  * `lib/health-score-input.ts` (alleen `computeEmergencyFundMonths`),
  * `lib/savings-source.ts`, `lib/onboarding/retirement-prefill.ts`,
  * `lib/onboarding-presets.ts` (alleen `computeNoodfondsTarget`),
- * `lib/subscription-catalog.ts`.
+ * `lib/subscription-catalog.ts`, en voor WF-START-28 (stap "Jouw plan", ADR
+ * 0129): `lib/horizon/plan-draft.ts` (validatie + kopij), `lib/onboarding-plan.ts`
+ * (de route-toets van save-own-data), `app/(onboarding)/onboarding/
+ * draft-persistence.ts` (concept-herstel; zod + pure helpers) en de geëxporteerde
+ * `planDraftFromOnboarding` uit `components/onboarding/onboarding-eindstrategie.tsx`
+ * (een 'use client'-module — de suite draait óók in de browser).
  */
 
 import { dailyExpenseRate, calculateFreedomTime } from '@/lib/format'
@@ -42,6 +47,18 @@ import {
   freedomTickerBasis,
 } from '@/lib/freedom-ticker'
 import { ADDON_PLANS } from '@/lib/subscription-catalog'
+import {
+  defaultStopAge,
+  endFormShowsEndAge,
+  validatePlanDraft,
+} from '@/lib/horizon/plan-draft'
+import { resolveOnboardingPlanColumns, type OnboardingPlanInput } from '@/lib/onboarding-plan'
+import { STOP_AGE_BEFORE_END_AGE_ERROR, type FireEndForm } from '@/lib/fire-strategy'
+import { sanitizeStoredDraft } from '@/app/(onboarding)/onboarding/draft-persistence'
+import {
+  planDraftFromOnboarding,
+  type OnboardingPlanValue,
+} from '@/components/onboarding/onboarding-eindstrategie'
 import { START_ACCEPTANCE } from './start'
 import type { AcceptanceCriterion } from './types'
 
@@ -265,6 +282,60 @@ export const START_ENGINE_CHECKS: StartEngineCheck[] = [
       return {
         expected: 'noodfondsPrefill=11400',
         actual: `noodfondsPrefill=${prefill}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-START-28',
+    scenarioId: 'UAT-START-28',
+    label: 'Stap "Jouw plan" (ADR 0129): standaardpad, AOW, eigen stopleeftijd (geldig/geblokkeerd), bedrag, perpetual en legacy-concept-herstel',
+    run: () => {
+      criterion('WF-START-28')
+      // De route-toets van POST /api/onboarding/save-own-data, één keer opgelost
+      // (resolveOnboardingPlanColumns) → "anker/eind-vorm/eindleeftijd/stopleeftijd".
+      const kolommen = (input: OnboardingPlanInput): string => {
+        const r = resolveOnboardingPlanColumns(input)
+        return 'error' in r
+          ? `route400:${r.error}`
+          : `${r.fire_stop_anchor}/${r.fire_end_strategy}/${r.fire_end_age}/${r.fire_stop_age}`
+      }
+      // De vijf plan-velden zoals INITIAL_HORIZON_DATA ze aanreikt (standaardpad).
+      const basis: OnboardingPlanValue = {
+        fire_end_strategy: 'deplete',
+        fire_end_age: 90,
+        fire_legacy_amount: '',
+        fire_stop_anchor: 'solved',
+        fire_stop_age: null,
+      }
+      // (a) standaardpad + (b) AOW-anker — client-validatie is triviaal, de route schrijft.
+      const standaard = kolommen({ strategy: 'deplete', anchor: 'solved', stopAge: null, endAge: 90 })
+      const aow = kolommen({ strategy: 'deplete', anchor: 'aow', stopAge: null, endAge: 90 })
+      // (c) eigen stopleeftijd: de voorinvulling bij 40 jaar (currentAge + 5, geen
+      // gesolvede vrijheidsleeftijd in de onboarding) en een geldige 62,5.
+      const standaardStop = defaultStopAge({ currentAge: 40, endAge: 90 })
+      const ageDraft = planDraftFromOnboarding({ ...basis, fire_stop_anchor: 'age', fire_stop_age: 62.5 })
+      const ageGeldig = `${validatePlanDraft(ageDraft).ok ? 'ok' : 'fout'}/${kolommen({ strategy: 'deplete', anchor: 'age', stopAge: 62.5, endAge: 90 })}`
+      // (d) geblokkeerd: stop ≥ eind (veld + route), leeg, geen half jaar.
+      const stopNaEind = validatePlanDraft({ ...ageDraft, stopAge: 90 }).errors.stopAge
+      const routeStopNaEind = resolveOnboardingPlanColumns({ strategy: 'deplete', anchor: 'age', stopAge: 90, endAge: 90 })
+      const ageStopNaEind = `${stopNaEind}|${'error' in routeStopNaEind && routeStopNaEind.error === STOP_AGE_BEFORE_END_AGE_ERROR ? 'route400' : 'route-ok'}`
+      const ageLeeg = validatePlanDraft({ ...ageDraft, stopAge: null }).errors.stopAge
+      const ageGeenHalfJaar = validatePlanDraft({ ...ageDraft, stopAge: 62.3 }).errors.stopAge
+      // (e) legacy: leeg bedrag → NaN → blokkade; "250.000" → 250000.
+      const legacyLeeg = validatePlanDraft(planDraftFromOnboarding({ ...basis, fire_end_strategy: 'legacy' })).errors.legacyAmount
+      const legacyDraft = planDraftFromOnboarding({ ...basis, fire_end_strategy: 'legacy', fire_legacy_amount: '250.000' })
+      const legacy = `${validatePlanDraft(legacyDraft).ok ? 'ok' : 'fout'}/${legacyDraft.legacyAmount}`
+      // (f) perpetual verbergt het eindleeftijd-veld; deplete toont het.
+      const veld = (form: FireEndForm) => (endFormShowsEndAge(form) ? 'zichtbaar' : 'verborgen')
+      // (g) concept van vóór 5 sep 2026 (legacy-label 'pensioen') → anker aow × deplete,
+      // client-side (sanitizeStoredDraft) én server-side (route) identiek.
+      const concept = sanitizeStoredDraft({ version: 1, horizon: { fire_end_strategy: 'pensioen', fire_end_age: 90 } })!.horizon
+      const conceptPensioen = `${concept.fire_stop_anchor}/${concept.fire_end_strategy}`
+      const routePensioen = kolommen({ strategy: 'pensioen', endAge: 90 })
+      return {
+        expected:
+          'standaard=solved/deplete/90/null; aow=aow/deplete/90/null; standaardStopleeftijdBij40=45; ageGeldig=ok/age/deplete/90/62.5; ageStopNaEind=Je stopleeftijd moet vóór de eindleeftijd van je plan (90) liggen.|route400; ageLeeg=Kies een stopleeftijd.; ageGeenHalfJaar=In stappen van een half jaar.; legacyLeeg=Een bedrag boven nul.; legacy=ok/250000; perpetualEindleeftijdVeld=verborgen; depleteEindleeftijdVeld=zichtbaar; conceptPensioen=aow/deplete; routePensioen=aow/deplete/100/null',
+        actual: `standaard=${standaard}; aow=${aow}; standaardStopleeftijdBij40=${standaardStop}; ageGeldig=${ageGeldig}; ageStopNaEind=${ageStopNaEind}; ageLeeg=${ageLeeg}; ageGeenHalfJaar=${ageGeenHalfJaar}; legacyLeeg=${legacyLeeg}; legacy=${legacy}; perpetualEindleeftijdVeld=${veld('perpetual')}; depleteEindleeftijdVeld=${veld('deplete')}; conceptPensioen=${conceptPensioen}; routePensioen=${routePensioen}`,
       }
     },
   },

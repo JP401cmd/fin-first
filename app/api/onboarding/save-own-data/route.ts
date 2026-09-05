@@ -1,8 +1,10 @@
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { unauthorized, serverError } from '@/lib/api/respond'
+import { unauthorized, serverError, badRequest } from '@/lib/api/respond'
 import { PARAMETER_BANDS } from '@/lib/parameters-band'
+import { END_AGE_MAX, END_AGE_MIN, STOP_ANCHOR_KINDS } from '@/lib/fire-strategy'
+import { resolveOnboardingPlanColumns } from '@/lib/onboarding-plan'
 import { NL_AOW_AGE, NL_AOW_MONTHLY } from '@/lib/horizon-data'
 import { HORIZON_SETUP_COMPLETED_SLUG } from '@/lib/horizon-data-loader'
 import { lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeftijd'
@@ -305,6 +307,10 @@ function buildRpcPayload(
   intent: z.infer<typeof bodySchema>['intent'],
   pensionData?: z.infer<typeof bodySchema>['pensionData'],
 ) {
+  // LET OP (ADR 0129): dit pad is dood (`void buildRpcPayload` hieronder) en de
+  // DB-RPC leest de ankerkolommen `fire_stop_anchor`/`fire_stop_age` niet. Het anker
+  // ontbreekt hier dus bewust; wordt dit pad ooit gereactiveerd, dan hoort het
+  // `planColumns`-blok van het multi-step pad hier óók in (en in de RPC).
   // Budgetten worden niet meer in onboarding geseed — zie comment hierboven.
   const parentBudgets: Record<string, unknown>[] = []
   const childBudgets: Record<string, unknown>[] = []
@@ -413,7 +419,8 @@ const bodySchema = z.object({
     retirement_custom_amount: z.number().min(0).optional(),
     fire_end_strategy: z.enum(['perpetual', 'legacy', 'deplete', 'pensioen']).optional(),
     fire_legacy_amount: z.number().positive().optional(),
-    fire_end_age: z.number().int().min(60).max(120).optional(),
+    // Grens uit de ene bron (lib/fire-strategy) — spiegel van de DB-CHECK 60..120.
+    fire_end_age: z.number().int().min(END_AGE_MIN).max(END_AGE_MAX).optional(),
     temporal_balance: z.number().int().min(1).max(5).optional(),
   }),
   // budgetAmounts is optioneel sinds de onboarding-redesign (fase 3, mei 2026):
@@ -440,9 +447,19 @@ const bodySchema = z.object({
     'nieuws',
   ])).optional(),
   horizonData: z.object({
+    // De oude labels blijven geaccepteerd (drafts/clients van vóór de stap "Jouw
+    // plan"); `resolveOnboardingPlanColumns` vertaalt ze naar een anker en schrijft
+    // altijd een eind-vorm weg (ADR 0129).
     fire_end_strategy: z.enum(['perpetual', 'legacy', 'deplete', 'pensioen']).optional(),
-    fire_end_age: z.number().int().min(60).max(120).optional(),
+    // Zelfde band als de DB-CHECK, `/api/fire-settings` en de plan-vragen (60–120):
+    // één bron in lib/fire-strategy, geen tweede grens.
+    fire_end_age: z.number().int().min(END_AGE_MIN).max(END_AGE_MAX).optional(),
     fire_legacy_amount: z.number().positive().optional(),
+    // Het stop-anker (ADR 0129): allowlist uit de canonieke bron; de stopleeftijd
+    // wordt in `resolveOnboardingPlanColumns` op halve jaren, 18–100 en
+    // `age` ⟺ aanwezig getoetst (zelfde toets als /api/fire-settings).
+    fire_stop_anchor: z.enum(STOP_ANCHOR_KINDS).optional(),
+    fire_stop_age: z.number().nullable().optional(),
     retirement_expense_method: z.enum(['essential_budgets', 'custom_amount', 'current_income']).optional(),
     retirement_custom_amount: z.number().min(0).optional(),
     temporal_balance: z.number().int().min(1).max(5).optional(),
@@ -620,6 +637,19 @@ export async function POST(req: Request) {
     onboardingGoal,
     deferredFields,
   } = parsed.data
+
+  // Het plan (ADR 0129): eind-vorm + stop-anker ÉÉN keer oplossen — horizonData
+  // wint, identity is de backwards-compat-bron, 'deplete'/90 de laatste terugval.
+  // Een legacy-label ('pensioen'/'nu-stoppen') wordt hier vertaald naar zijn anker;
+  // een tegenstrijdig of ongeldig anker (age zonder leeftijd, stop ≥ eind, geen
+  // halve jaren) is een client-fout → 400 via de error-envelope.
+  const planColumns = resolveOnboardingPlanColumns({
+    strategy: horizonData?.fire_end_strategy ?? identity.fire_end_strategy ?? 'deplete',
+    anchor: horizonData?.fire_stop_anchor,
+    stopAge: horizonData?.fire_stop_age,
+    endAge: horizonData?.fire_end_age ?? identity.fire_end_age ?? 90,
+  })
+  if ('error' in planColumns) return badRequest(planColumns.error)
 
   // Normaliseer de goal-input: de fase-3 client stuurt zowel een array
   // (`selectedGoalSlugs`) als de eerste-entry (`selectedGoalSlug`); oudere
@@ -945,9 +975,12 @@ export async function POST(req: Request) {
     // Expliciet zodat elke nieuwe gebruiker deze actieve voorkeuren heeft,
     // onafhankelijk van latere default/fallback-drift.
     profileData.housing_strategy_config = { mode: 'downsize', trigger: 'on_depletion', saleValuationBasis: 'market' }
-    profileData.fire_end_strategy = horizonData?.fire_end_strategy ?? identity.fire_end_strategy ?? 'deplete'
+    // Het plan (ADR 0129) uit het ene opgeloste blok — zie `planColumns` hierboven.
+    profileData.fire_end_strategy = planColumns.fire_end_strategy
     profileData.fire_legacy_amount = horizonData?.fire_legacy_amount ?? identity.fire_legacy_amount ?? null
-    profileData.fire_end_age = horizonData?.fire_end_age ?? identity.fire_end_age ?? 90
+    profileData.fire_end_age = planColumns.fire_end_age
+    profileData.fire_stop_anchor = planColumns.fire_stop_anchor
+    profileData.fire_stop_age = planColumns.fire_stop_age
     profileData.temporal_balance = horizonData?.temporal_balance ?? identity.temporal_balance ?? 3
     profileData.withdrawal_strategy = 'static'
     profileData.withdrawal_profile_config = { profiel: 'afnemend' }
@@ -1006,6 +1039,8 @@ export async function POST(req: Request) {
       'fire_end_strategy',
       'fire_legacy_amount',
       'fire_end_age',
+      'fire_stop_anchor',
+      'fire_stop_age',
       'temporal_balance',
       'widget_prefs',
       'financial_context',

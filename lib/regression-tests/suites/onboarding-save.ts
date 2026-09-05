@@ -62,6 +62,9 @@ function buildFullBody() {
       fire_end_strategy: 'legacy' as const,
       fire_end_age: 90,
       fire_legacy_amount: 200000,
+      // Het stop-anker (ADR 0129) reist sinds de stap "Jouw plan" mee.
+      fire_stop_anchor: 'solved' as const,
+      fire_stop_age: null,
       retirement_expense_method: 'custom_amount' as const,
       retirement_custom_amount: 2000,
       temporal_balance: 3,
@@ -539,11 +542,14 @@ const tests: TestCase[] = [
         'fire_end_strategy',
         'fire_end_age',
         'fire_legacy_amount',
+        // ADR 0129 — het stop-anker uit de stap "Jouw plan" (5 sep 2026).
+        'fire_stop_anchor',
+        'fire_stop_age',
         'retirement_expense_method',
         'retirement_expense_custom_amount',
         'temporal_balance',
       ]
-      assertEqual(fireFieldsFromHorizon.length, 6, 'Zes FIRE velden worden opgeslagen vanuit horizonData')
+      assertEqual(fireFieldsFromHorizon.length, 8, 'Acht FIRE velden worden opgeslagen vanuit horizonData')
 
       // activeModules are saved in profile
       const activeModulesField = 'active_modules'

@@ -255,19 +255,60 @@ eindleeftijd van het plan · `{pct}` dekking · `{hint}` maandbedrag uit
 
 ### De twee vragen (Voorkeuren; gespiegeld in de strategie-modal)
 
-**Wanneer stop je met werken?**
+**Wanneer wil je stoppen met werken?** (kopij herzien 5 sep 2026, zie onder)
 
 | optie | anker | ondertitel |
 |---|---|---|
-| Laat de app het uitrekenen | `solved` | De app zoekt de vroegste leeftijd waarop je vermogen je plan draagt. |
-| Op mijn AOW-leeftijd | `aow` | Je werkt door tot je AOW ingaat. De app laat zien of je vermogen dan reikt. |
+| Zo vroeg als het kan | `solved` | De app rekent uit vanaf welke leeftijd werken een keuze wordt. |
+| Op mijn AOW-leeftijd | `aow` | Je werkt door tot je AOW ingaat. De app laat zien of je geld dan reikt. |
 | Op een leeftijd die ik kies | `age` | Jij kiest het moment. De app laat zien hoe het dan loopt. |
 | Nu | `now` | Je rekent alsof je vandaag stopt. |
 
 **Wat moet er aan het eind gelden?** — de drie bestaande ondertitels in
 `STRATEGY_LABELS` (Vermogen opeten · Nalatenschap · Eeuwigdurend) blijven
-ongewijzigd; ze zijn al canoniek in code. Het eindleeftijd-veld heet: *"Tot
-welke leeftijd moet je vermogen reiken?"*
+ongewijzigd als vakterm in code (rapporten, voetnoten); de gebruikersvraag
+zelf is per 5 sep 2026 herschreven, zie onder. Het eindleeftijd-veld heet: *"Tot
+welke leeftijd moet je geld reiken?"*
+
+**Herzien 5 sep 2026 (eigenaar-besluit) — gewone taal op alle oppervlakken.**
+De eind-vorm is eigenlijk twee getallen: *tot welke leeftijd moet je geld
+reiken, en wat moet er dan nog over zijn?* Die zin is de kop van vraag 2 in
+Voorkeuren, de strategie-modal, de module-activatie én de nieuwe onboarding-
+stap "Jouw plan" (`components/onboarding/onboarding-eindstrategie.tsx`, vervangt
+de FIRE-vs-pensioen-tegels). Volgorde binnen vraag 2: éérst het eindleeftijd-
+veld, dán de keuze wat er overblijft, dán het bedragveld. Kopij (één bron:
+`lib/horizon/plan-draft.ts`; `STRATEGY_LABELS` blijft de vakterm voor rapporten):
+
+| vraag | optie | waarde | ondertitel |
+|---|---|---|---|
+| 1 · Wanneer wil je stoppen met werken? | Zo vroeg als het kan | `solved` | De app rekent uit vanaf welke leeftijd werken een keuze wordt. |
+| | Op mijn AOW-leeftijd | `aow` | Je werkt door tot je AOW ingaat. De app laat zien of je geld dan reikt. |
+| | Op een leeftijd die ik kies | `age` | Jij kiest het moment. De app laat zien hoe het dan loopt. |
+| | Nu (niet in de onboarding) | `now` | Je rekent alsof je vandaag stopt. |
+| 2 · Wat moet er dan nog over zijn? | Niets, het mag op zijn | `deplete` | Je geld mag op de eindleeftijd volledig opgemaakt zijn. Dit is de standaard. |
+| | Een bedrag voor later of voor anderen | `legacy` | Op de eindleeftijd blijft een bedrag over dat je bewust apart houdt. |
+| | Mijn vermogen mag niet slinken | `perpetual` | Je geld houdt zijn waarde; je leeft van wat het oplevert, zonder eindleeftijd. |
+
+Onder `perpetual` vervalt het eindleeftijd-veld met één zin uitleg: *"Dan
+rekent de app zonder eindleeftijd: je leeft van wat je vermogen oplevert."*
+Kiest de gebruiker `perpetual`, dan zet de plan-vraag de (verborgen) eindleeftijd op
+`PERPETUAL_END_AGE` (100, `lib/fire-strategy.ts`; `withEndForm` in `plan-draft.ts`) —
+dezelfde horizon als de kernel — zodat de B7-toets (stopleeftijd vóór eindleeftijd)
+niet naar een onzichtbare 90 verwijst; terug naar een vorm mét eindleeftijd herstelt
+de standaard 90 (eigenaar-besluit 5 sep 2026).
+De onboarding schrijft alleen eind-vormen in `fire_end_strategy` en het anker in
+`fire_stop_anchor`/`fire_stop_age`; `POST /api/onboarding/save-own-data` lost
+beide op via `lib/onboarding-plan.ts` (legacy-labels van oude drafts → anker,
+dezelfde schrijftoets als `/api/fire-settings` via `validateStopAnchorInput`).
+
+Daarmee vervalt de eerdere aanname dat de onboarding buiten dit besluit bleef en
+haar twee tegels (FIRE / pensioen, alleen `fire_end_strategy`) tot F4 zou
+houden: de onboarding kent het anker sinds 5 sep 2026 zelf en schrijft nooit
+meer een legacy-label. De "wanneer stop ik en reikt het"-keuze staat sinds F3b
+op alle oppervlakken én in de onboarding, en is als functionaliteit opgenomen
+in de praatplaat (`lib/architecture/hld-model.ts`). F4 behoudt alleen nog het
+contractwerk (enum naar drie waarden, legacy-rijen herschrijven, kernel-compat
+weg, concern verwijderen).
 
 ### Hero /toekomst
 

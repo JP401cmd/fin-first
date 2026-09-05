@@ -215,21 +215,12 @@ export const ARCHI_CONCERNS: ArchiConcern[] = [
   },
   {
     id: 'fire-eindstrategie-conflateert-stop-anker-en-eind-vorm',
-    title: "FireEndStrategy vermengt 'wanneer stop ik' met 'wat moet er aan het eind gelden'",
+    title: "FireEndStrategy draagt nog legacy-labels naast de twee echte assen (contract-compat tot F4)",
     detail:
-      "ADR 0127 D1: 'pensioen' was al géén eind-vorm maar een stop-anker op de AOW-leeftijd (solver-kortsluiting, geen bisectie); 'nu-stoppen' voegt hetzelfde patroon toe met het anker op de startleeftijd. Eén enum draagt daarmee twee assen — wanneer de bisectie stopt zoeken, én wat de eind-vorm (perpetual/legacy/deplete/doel-0) betekent. Bewust geaccepteerd voor dit besluit: een derde stop-anker (bv. een persisterende 'stop op leeftijd X') hoort NIET als zesde enum-waarde te landen, maar zou de splitsing in twee aparte kolommen (stop-anker × eind-vorm) moeten afdwingen. Verwijder dit punt zodra die splitsing gemaakt is, of zodra bewust besloten wordt de conflatie te laten staan.",
-    severity: 'info',
-    elementIds: ['as-planning', 'fn-toekomstplannen'],
-    reviewedAt: '2026-09-02',
-  },
-  {
-    id: 'pensioen-freedompct-blijft-kapitaalratio',
-    title: "'pensioen'-eindstrategie deelt de tijdsdekking-definitie van 'nu-stoppen' niet",
-    detail:
-      "ADR 0127 D5 maakte freedomPct onder eindstrategie 'nu-stoppen' TIJDSDEKKING (uitputtingsmaand ÷ eindmaand) omdat de gewone kapitaalratio daar zinloos is (requiredFirePortfolio ≈ huidig vermogen). De 'pensioen'-eindstrategie is qua constructie hetzelfde patroon — een stop-anker (AOW-leeftijd), geen bisectie — maar freedomPct blijft daar de OUDE kapitaalratio (computeFreedomProgress). Niet gecorrigeerd in dit besluit: het risico dat 'pensioen' dezelfde ~100%-vertekening kent (het doel valt dicht bij het geprojecteerde vermogen op de AOW-leeftijd) is niet onderzocht. Verwijder dit punt zodra 'pensioen' is nagelopen en bewust hetzelfde (of een ander) besluit heeft gekregen.",
+      "ADR 0127 D1 signaleerde dat één enum twee assen droeg — wanneer de bisectie stopt zoeken ('pensioen' = AOW-anker, 'nu-stoppen' = startleeftijd) én wat de eind-vorm (perpetual/legacy/deplete) betekent. Die splitsing is sinds ADR 0129 gemaakt: het stop-anker leeft in fire_stop_anchor/fire_stop_age (F1), de kernel leest een los KernelInput.stopAnker-blok en de eindstrategie-selector draagt alleen nog de eind-vorm (F2), lib-consumenten en UI-oppervlakken lezen isFixedAnchor(plan) (F3a/F3b, live 5 sep 2026), en sinds 5 sep 2026 stelt ook de onboarding-stap 'Jouw plan' de twee vragen apart en schrijft anker én eind-vorm via lib/onboarding-plan.ts#resolveOnboardingPlanColumns (een legacy-label uit een oude draft wordt dáár naar anker + deplete vertaald; een label mét afwijkend anker is een fout, spiegel van kruistoets R2 in /api/fire-settings). Wat RESTEERT is het contract: fire_end_strategy accepteert 'pensioen' en 'nu-stoppen' nog als legacy-waarden, bestaande rijen zijn niet herschreven, en de bridge vertaalt anchor_shortfall nog naar pension_shortfall/stop_now_shortfall voor oude UI-blokken. Zolang die compat-laag bestaat kan een client de conflatie opnieuw introduceren door een legacy-label zonder anker te schrijven — de routes vangen dat met een kruistoets, het schema niet. Verwijder dit punt in F4 (ADR 0129 fasering): enum naar drie waarden, legacy-rijen herschreven, kernel-compat weg.",
     severity: 'debt',
-    elementIds: ['as-planning', 'fn-toekomstplannen', 'as-vermogen'],
-    reviewedAt: '2026-09-02',
+    elementIds: ['as-planning', 'fn-toekomstplannen', 'data-cont'],
+    reviewedAt: '2026-09-05',
   },
   {
     id: 'hypotheek-koppeling-bepaalt-j-grondslag',

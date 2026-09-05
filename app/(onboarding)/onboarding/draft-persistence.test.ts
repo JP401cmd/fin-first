@@ -55,6 +55,9 @@ function makeFullState(): DraftStateSource & Record<string, unknown> {
       fire_end_age: 85,
       temporal_balance: 4,
       fire_legacy_amount: '100000',
+      // Het stop-anker (ADR 0129) hoort bij het concept sinds de stap "Jouw plan".
+      fire_stop_anchor: 'age',
+      fire_stop_age: 58.5,
       retirement_expense_method: 'custom_amount',
       retirement_custom_amount: '32000',
       life_events: [
@@ -104,6 +107,87 @@ describe('serializeDraft — het concept draagt alle antwoorden (UR2-01)', () =>
     state.identity.full_name = 'Iemand Anders'
     expect(draft.quickAssets[0].current_value).toBe(1200)
     expect(draft.identity.full_name).toBe('Jan Paul')
+  })
+})
+
+/**
+ * Het plan in het concept (ADR 0129, stap "Jouw plan" — 5 sep 2026): het stop-anker
+ * reist als twee velden mee; een concept van vóór die datum draagt het anker nog als
+ * legacy-label in `fire_end_strategy`. Herstel mag de keuze niet verliezen én mag
+ * nooit een concept opleveren dat zichzelf tegenspreekt.
+ */
+describe('sanitizeStoredDraft — het plan: stop-anker × eind-vorm (ADR 0129)', () => {
+  it('een concept zonder ankervelden (vóór de stap "Jouw plan") herstelt als solved', () => {
+    const restored = sanitizeStoredDraft({
+      lastStep: 'spaardoel',
+      horizon: { fire_end_strategy: 'deplete', fire_end_age: 90, temporal_balance: 3 },
+    })
+    expect(restored!.horizon.fire_stop_anchor).toBe('solved')
+    expect(restored!.horizon.fire_stop_age).toBeNull()
+    expect(restored!.horizon.fire_end_strategy).toBe('deplete')
+  })
+
+  it("legacy 'pensioen' → anker aow + eind-vorm deplete, eindleeftijd 100 (D6/M1-spiegel van de backfill) — niet de 90 uit het oude concept", () => {
+    // De oude stap toonde geen eindleeftijd-veld: die 90 is nooit een keuze geweest.
+    const restored = sanitizeStoredDraft({
+      lastStep: 'eindstrategie',
+      horizon: { fire_end_strategy: 'pensioen', fire_end_age: 90, temporal_balance: 3 },
+    })
+    expect(restored!.horizon).toMatchObject({
+      fire_end_strategy: 'deplete',
+      fire_stop_anchor: 'aow',
+      fire_stop_age: null,
+      fire_end_age: 100,
+    })
+  })
+
+  it('de nieuwe vorm herstelt ongeschonden: age × legacy met halve stopleeftijd', () => {
+    const restored = sanitizeStoredDraft({
+      lastStep: 'klaar',
+      horizon: {
+        fire_end_strategy: 'legacy',
+        fire_end_age: 92,
+        fire_legacy_amount: '50000',
+        fire_stop_anchor: 'age',
+        fire_stop_age: 58.5,
+        temporal_balance: 3,
+      },
+    })
+    expect(restored!.horizon).toMatchObject({
+      fire_end_strategy: 'legacy',
+      fire_stop_anchor: 'age',
+      fire_stop_age: 58.5,
+      fire_legacy_amount: '50000',
+    })
+  })
+
+  it('age zonder stopleeftijd valt terug op solved — geen concept spreekt zichzelf tegen', () => {
+    const restored = sanitizeStoredDraft({
+      horizon: { fire_end_strategy: 'deplete', fire_end_age: 90, fire_stop_anchor: 'age', temporal_balance: 3 },
+    })
+    expect(restored!.horizon.fire_stop_anchor).toBe('solved')
+    expect(restored!.horizon.fire_stop_age).toBeNull()
+  })
+
+  it('een stopleeftijd onder een ander anker dan age wordt genegeerd', () => {
+    const restored = sanitizeStoredDraft({
+      horizon: { fire_end_strategy: 'deplete', fire_end_age: 90, fire_stop_anchor: 'aow', fire_stop_age: 60, temporal_balance: 3 },
+    })
+    expect(restored!.horizon).toMatchObject({ fire_stop_anchor: 'aow', fire_stop_age: null })
+  })
+
+  it('een legacy-label wint van een tegenstrijdig opgeslagen anker (D2, spiegel van parseFirePlan)', () => {
+    const restored = sanitizeStoredDraft({
+      horizon: { fire_end_strategy: 'pensioen', fire_end_age: 90, fire_stop_anchor: 'age', fire_stop_age: 58, temporal_balance: 3 },
+    })
+    expect(restored!.horizon).toMatchObject({ fire_end_strategy: 'deplete', fire_stop_anchor: 'aow', fire_stop_age: null })
+  })
+
+  it('een onbekend anker valt terug op solved', () => {
+    const restored = sanitizeStoredDraft({
+      horizon: { fire_end_strategy: 'deplete', fire_end_age: 90, fire_stop_anchor: 'morgen', temporal_balance: 3 },
+    })
+    expect(restored!.horizon.fire_stop_anchor).toBe('solved')
   })
 })
 

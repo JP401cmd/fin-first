@@ -83,7 +83,7 @@ export const TOEK_FLOW: UatFlow = {
     { id: 'downsizebeslis', label: 'Meetellen / uitsluiten / verkopen?', kind: 'decision', stage: 4, lane: 'strategie', subOf: 'huisstrat' },
 
     // ── 4 · de toekomst configureren · voorkeuren ─────────────────────────
-    { id: 'eindstrat', scenarioId: 'UAT-TOEK-24', label: 'WF-TOEK-24 · Eind-/onttrekkingsstrategie', kind: 'screen', stage: 4, lane: 'voorkeuren' },
+    { id: 'eindstrat', scenarioId: 'UAT-TOEK-24', label: 'WF-TOEK-24 · Plan (stop × eind-vorm) / onttrekkingsstrategie', kind: 'screen', stage: 4, lane: 'voorkeuren' },
     { id: 'potregels', scenarioId: 'UAT-TOEK-25', label: 'WF-TOEK-25 · Pot-regels (volgorde, toe-/afname)', kind: 'screen', stage: 4, lane: 'voorkeuren' },
     { id: 'marktaannames', scenarioId: 'UAT-TOEK-26', label: 'WF-TOEK-26 · Markt-aannames (inflatie, rendement)', kind: 'screen', stage: 4, lane: 'voorkeuren' },
 

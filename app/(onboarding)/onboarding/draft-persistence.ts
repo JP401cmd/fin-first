@@ -49,7 +49,13 @@ import type { IdentityData } from '@/components/onboarding/onboarding-identity'
 import type { AssetQuickInput, DebtQuickInput } from '@/lib/quick-add/types'
 import type { AssetType } from '@/lib/asset-data'
 import type { DebtType, RepaymentType } from '@/lib/debt-data'
-import { FIRE_END_STRATEGIES, type FireEndStrategy } from '@/lib/fire-strategy'
+import {
+  LEGACY_PENSIOEN_END_AGE,
+  isFireEndForm,
+  isStopAnchorKind,
+  legacyAnchorOf,
+  type StopAnchorKind,
+} from '@/lib/fire-strategy'
 import type { HouseholdType } from '@/lib/household-type'
 
 /** Velden die de gebruiker expliciet oversloeg via "Later invullen" (feature #830). */
@@ -119,10 +125,12 @@ const VALID_PRESET_KEYS: readonly SpaardoelPresetKey[] = [
   'custom',
 ]
 
-// De canonieke allowlist (ADR 0127 D9). De onboarding BIEDT 'nu-stoppen' niet aan
-// (een nieuwe gebruiker zonder plan hoort daar niet mee te beginnen), maar een
-// opgeslagen concept mag de waarde niet stil naar 'deplete' vouwen.
-const VALID_FIRE_END_STRATEGIES: readonly FireEndStrategy[] = FIRE_END_STRATEGIES
+// Het plan in het concept (ADR 0129, stap "Jouw plan" sinds 5 sep 2026): de
+// eind-vorm (`deplete`/`legacy`/`perpetual`) en het stop-anker reizen als twee
+// velden. Een concept van vóór die datum draagt het anker nog als legacy-label in
+// `fire_end_strategy` ('pensioen'/'nu-stoppen'); `sanitizeStoredDraft` vertaalt dat
+// via `legacyAnchorOf` naar `fire_stop_anchor` — de keuze gaat niet verloren, maar
+// het label wordt niet meer als eind-vorm doorgegeven. Zie de horizon-narrowing.
 
 const VALID_HOUSEHOLD_TYPES: readonly HouseholdType[] = ['solo', 'samen', 'gezin']
 
@@ -249,6 +257,9 @@ export const OnboardingDraftSchema = z
         fire_end_strategy: draftText,
         fire_end_age: z.number().finite(),
         fire_legacy_amount: draftText,
+        // Optioneel: concepten van vóór de stap "Jouw plan" dragen deze velden niet.
+        fire_stop_anchor: draftText.optional(),
+        fire_stop_age: z.number().finite().nullable().optional(),
         retirement_expense_method: draftText,
         retirement_custom_amount: draftText,
         temporal_balance: z.number().finite(),
@@ -503,14 +514,31 @@ export function sanitizeStoredDraft(raw: unknown): OnboardingDraft | null {
   }
 
   const rawHor = obj(p.horizon)
+  // Het plan (ADR 0129): een LEGACY-label in `fire_end_strategy` wint voor het anker
+  // (D2 — 'pensioen' → aow, 'nu-stoppen' → now; spiegel van `parseFirePlan`), de
+  // eind-vorm valt dan op 'deplete'. Anders het opgeslagen anker, met `age` alleen
+  // wanneer er ook een stopleeftijd staat — een concept dat zichzelf tegenspreekt
+  // herstelt als 'solved'. Concepten zonder de velden (vóór 5 sep 2026): 'solved'.
+  const rawStrategy = typeof rawHor.fire_end_strategy === 'string' ? rawHor.fire_end_strategy : null
+  const legacyAnchor = legacyAnchorOf(rawStrategy)
+  const storedAnchor: StopAnchorKind = isStopAnchorKind(rawHor.fire_stop_anchor)
+    ? rawHor.fire_stop_anchor
+    : 'solved'
+  const anchorKind: StopAnchorKind = legacyAnchor !== null ? legacyAnchor.kind : storedAnchor
+  const rawStopAge =
+    typeof rawHor.fire_stop_age === 'number' && Number.isFinite(rawHor.fire_stop_age)
+      ? rawHor.fire_stop_age
+      : null
+  const stopAge = anchorKind === 'age' ? rawStopAge : null
   const horizon: HorizonData = {
-    fire_end_strategy:
-      typeof rawHor.fire_end_strategy === 'string' &&
-      (VALID_FIRE_END_STRATEGIES as readonly string[]).includes(rawHor.fire_end_strategy)
-        ? (rawHor.fire_end_strategy as FireEndStrategy)
-        : 'deplete',
-    fire_end_age: num(rawHor.fire_end_age, 90),
+    fire_end_strategy: isFireEndForm(rawStrategy) ? rawStrategy : 'deplete',
+    // 'pensioen' → 100 (LEGACY_PENSIOEN_END_AGE, spiegel van de backfill D6/M1): de
+    // oude stap toonde geen eindleeftijd-veld, dus de 90 in zo'n concept is nooit
+    // een keuze geweest. 'nu-stoppen' houdt de meegegeven/default eindleeftijd.
+    fire_end_age: rawStrategy === 'pensioen' ? LEGACY_PENSIOEN_END_AGE : num(rawHor.fire_end_age, 90),
     fire_legacy_amount: str(rawHor.fire_legacy_amount),
+    fire_stop_anchor: anchorKind === 'age' && stopAge === null ? 'solved' : anchorKind,
+    fire_stop_age: stopAge,
     retirement_expense_method:
       rawHor.retirement_expense_method === 'essential_budgets' ||
       rawHor.retirement_expense_method === 'custom_amount'

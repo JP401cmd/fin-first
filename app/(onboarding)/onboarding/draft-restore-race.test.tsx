@@ -107,6 +107,8 @@ function seedDraft(): OnboardingDraft {
       fire_end_strategy: 'deplete',
       fire_end_age: 90,
       fire_legacy_amount: '',
+      fire_stop_anchor: 'solved',
+      fire_stop_age: null,
       retirement_expense_method: 'current_income',
       retirement_custom_amount: '',
       temporal_balance: 3,

@@ -159,6 +159,8 @@ function makeRestoreDraft(overrides: Partial<OnboardingDraft> = {}): OnboardingD
       fire_end_strategy: 'deplete',
       fire_end_age: 90,
       fire_legacy_amount: '',
+      fire_stop_anchor: 'solved',
+      fire_stop_age: null,
       retirement_expense_method: 'current_income',
       retirement_custom_amount: '',
       temporal_balance: 3,
@@ -291,6 +293,8 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
           fire_end_strategy: 'legacy',
           fire_end_age: 85,
           fire_legacy_amount: '100000',
+          fire_stop_anchor: 'age',
+          fire_stop_age: 58.5,
           retirement_expense_method: 'custom_amount',
           retirement_custom_amount: '32000',
           temporal_balance: 4,
@@ -300,6 +304,8 @@ describe('onboarding _reducer — RESTORE_STATE', () => {
       }),
     })
     expect(result.horizon.fire_end_strategy).toBe('legacy')
+    expect(result.horizon.fire_stop_anchor).toBe('age')
+    expect(result.horizon.fire_stop_age).toBe(58.5)
     expect(result.horizon.fire_end_age).toBe(85)
     expect(result.horizon.temporal_balance).toBe(4)
     expect(result.horizon.fire_legacy_amount).toBe('100000')
@@ -494,33 +500,52 @@ describe('onboarding _resolveRestoredStep — spaardoel + klaar', () => {
   })
 })
 
-describe('onboarding _reducer — SET_HORIZON (eindstrategie-keuze)', () => {
-  // De eindstrategie-stap mapt tegel 1 (FIRE) → 'deplete' en tegel 2
-  // (pensioen) → 'pensioen' via SET_HORIZON. Geen nieuwe state-slice; de keuze
-  // rijdt op het bestaande horizon-veld en wordt bij save als
-  // horizonData.fire_end_strategy meegestuurd.
-  it('zet fire_end_strategy op deplete (keuze 1 — FIRE)', () => {
-    const result = _reducer(_initialState, {
-      type: 'SET_HORIZON',
-      data: { ..._initialState.horizon, fire_end_strategy: 'deplete' },
-    })
-    expect(result.horizon.fire_end_strategy).toBe('deplete')
+describe('onboarding _reducer — SET_HORIZON (stap "Jouw plan": stop-anker × eind-vorm)', () => {
+  // Sinds ADR 0129 (5 sep 2026) schrijft de stap "Jouw plan" twee assen via
+  // SET_HORIZON: het stop-anker (`fire_stop_anchor` + `fire_stop_age`) en de
+  // eind-vorm (`fire_end_strategy` ∈ deplete/legacy/perpetual). De vroegere tegel
+  // "Werken tot pensioenleeftijd" zette het legacy-label 'pensioen' in
+  // fire_end_strategy; dat label komt uit de onboarding niet meer — het AOW-anker
+  // is nu een eigen veld, met de eind-vorm ernaast vrij te kiezen.
+  it('begint op solved × deplete zonder stopleeftijd', () => {
+    expect(_initialState.horizon.fire_stop_anchor).toBe('solved')
+    expect(_initialState.horizon.fire_stop_age).toBeNull()
+    expect(_initialState.horizon.fire_end_strategy).toBe('deplete')
   })
 
-  it('zet fire_end_strategy op pensioen (keuze 2 — werken tot pensioen)', () => {
+  it('zet het AOW-anker zonder de eind-vorm aan te raken (aow × deplete, geen "pensioen")', () => {
     const result = _reducer(_initialState, {
       type: 'SET_HORIZON',
-      data: { ..._initialState.horizon, fire_end_strategy: 'pensioen' },
+      data: { ..._initialState.horizon, fire_stop_anchor: 'aow', fire_stop_age: null },
     })
-    expect(result.horizon.fire_end_strategy).toBe('pensioen')
-    // fire_end_age blijft de bestaande default (niet functioneel voor pensioen).
+    expect(result.horizon.fire_stop_anchor).toBe('aow')
+    expect(result.horizon.fire_end_strategy).toBe('deplete')
     expect(result.horizon.fire_end_age).toBe(90)
+  })
+
+  it('zet een zelfgekozen stopleeftijd in halve jaren naast een eigen eind-vorm (age × legacy)', () => {
+    const result = _reducer(_initialState, {
+      type: 'SET_HORIZON',
+      data: {
+        ..._initialState.horizon,
+        fire_stop_anchor: 'age',
+        fire_stop_age: 58.5,
+        fire_end_strategy: 'legacy',
+        fire_legacy_amount: '100000',
+      },
+    })
+    expect(result.horizon).toMatchObject({
+      fire_stop_anchor: 'age',
+      fire_stop_age: 58.5,
+      fire_end_strategy: 'legacy',
+      fire_legacy_amount: '100000',
+    })
   })
 
   it('laat de identiteit + overige velden ongemoeid', () => {
     const result = _reducer(_initialState, {
       type: 'SET_HORIZON',
-      data: { ..._initialState.horizon, fire_end_strategy: 'pensioen' },
+      data: { ..._initialState.horizon, fire_stop_anchor: 'aow' },
     })
     expect(result.identity).toEqual(_initialState.identity)
     expect(result.spaardoel).toEqual(_initialState.spaardoel)

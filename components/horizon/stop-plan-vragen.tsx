@@ -3,9 +3,10 @@
 /**
  * StopPlanVragen — de plan-regel als TWEE VRAGEN (ADR 0129 B10/B13, F3b).
  *
- *   1. Wanneer stop je met werken?      → het stop-anker (solved · aow · age · now)
- *   2. Wat moet er aan het eind gelden? → de eind-vorm (deplete · legacy · perpetual)
- *      + "Tot welke leeftijd moet je vermogen reiken?" + nalatenschapsbedrag
+ *   1. Wanneer wil je stoppen met werken?   → het stop-anker (solved · aow · age · now)
+ *   2. Tot welke leeftijd moet je geld reiken, en wat moet er dan nog over zijn?
+ *      → éérst het eindleeftijd-veld, dán de keuze wat er overblijft
+ *        (deplete · legacy · perpetual), dán het bedragveld bij legacy
  *
  * Eén component voor Voorkeuren (de bron), de strategie-modal op /toekomst en de
  * module-activatie-modal. Gecontroleerd: de aanroeper houdt het `PlanDraft` en doet
@@ -13,9 +14,13 @@
  * uit `validatePlanDraft` — de AOW-toets zit dáár, met de AOW uit de gebruikerstabel
  * die de aanroeper meegeeft (nooit een hardcoded 67).
  *
- * Het eindleeftijd-veld is onder ELK anker zichtbaar (alleen `perpetual` verbergt het,
- * want daar is het een weergave-horizon): vóór F3b verborg de modal het onder pensioen
- * en forceerde ≥ 90 terwijl Voorkeuren het toonde (bevinding 3 / M2).
+ * Volgorde binnen vraag 2 (eigenaar-besluit 5 sep 2026): de eind-vorm is eigenlijk
+ * twee getallen — tot welke leeftijd, en wat blijft er dan over. Daarom staat het
+ * eindleeftijd-veld BOVEN de keuze; alleen `perpetual` verbergt het (daar rekent de
+ * app zonder eindleeftijd) en toont in plaats daarvan één zin uitleg. Vóór F3b
+ * verborg de modal het veld onder pensioen en forceerde ≥ 90 terwijl Voorkeuren het
+ * toonde (bevinding 3 / M2). De kopij komt letterlijk uit `lib/horizon/plan-draft.ts`
+ * — dezelfde strings als de onboarding-stap "Jouw plan".
  */
 
 import { RegelOptionCard } from '@/components/future/regels/shared'
@@ -26,6 +31,8 @@ import {
   END_AGE_QUESTION,
   END_FORM_OPTIONS,
   END_FORM_QUESTION,
+  END_REMAINDER_QUESTION,
+  PERPETUAL_NO_END_AGE_NOTE,
   STOP_AGE_MAX,
   STOP_AGE_MIN,
   STOP_ANCHOR_OPTIONS,
@@ -34,6 +41,7 @@ import {
   endAgeHint,
   endFormShowsEndAge,
   formatPlanAge,
+  withEndForm,
   type PlanDraft,
   type PlanDraftErrors,
 } from '@/lib/horizon/plan-draft'
@@ -57,6 +65,9 @@ export interface StopPlanVragenProps {
 
 const INPUT_CLASS =
   'px-3 py-2 border border-[var(--border-md)] rounded-lg bg-[var(--paper)] font-mono tabular-nums text-sm text-[var(--ink)] focus:border-[var(--module-active-700)] focus:outline-none disabled:opacity-60'
+
+const FIELD_LABEL_CLASS =
+  'block text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] mb-1'
 
 function Kop({ compact, children }: { compact: boolean; children: string }) {
   if (compact) {
@@ -111,7 +122,7 @@ export function StopPlanVragen({
       <section aria-labelledby="stop-plan-vraag-1">
         <span id="stop-plan-vraag-1" className="sr-only">{STOP_ANCHOR_QUESTION}</span>
         <Kop compact={compact}>{STOP_ANCHOR_QUESTION}</Kop>
-        <div className="space-y-2">
+        <div className="space-y-2" role="group" aria-labelledby="stop-plan-vraag-1">
           {STOP_ANCHOR_OPTIONS.map((opt) => (
             <RegelOptionCard
               key={opt.kind}
@@ -126,9 +137,7 @@ export function StopPlanVragen({
 
         {value.anchor === 'age' && (
           <label className="mt-3 block">
-            <span className="block text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] mb-1">
-              Stopleeftijd
-            </span>
+            <span className={FIELD_LABEL_CLASS}>Stopleeftijd</span>
             <span className="flex items-center gap-2">
               <input
                 type="number"
@@ -151,11 +160,45 @@ export function StopPlanVragen({
         )}
       </section>
 
-      {/* ── Vraag 2: de eind-vorm ────────────────────────────────────────── */}
+      {/* ── Vraag 2: tot welke leeftijd, en wat blijft er over ─────────── */}
       <section aria-labelledby="stop-plan-vraag-2">
         <span id="stop-plan-vraag-2" className="sr-only">{END_FORM_QUESTION}</span>
         <Kop compact={compact}>{END_FORM_QUESTION}</Kop>
-        <div className="space-y-2">
+
+        {/* Eerst de eindleeftijd — de eerste helft van de vraag. */}
+        {endFormShowsEndAge(value.endForm) ? (
+          <label className="block">
+            <span className={FIELD_LABEL_CLASS}>{END_AGE_QUESTION}</span>
+            <span className="flex items-center gap-2">
+              <input
+                type="number"
+                min={END_AGE_MIN}
+                max={END_AGE_MAX}
+                step={1}
+                value={value.endAge}
+                disabled={disabled}
+                aria-invalid={errors.endAge ? true : undefined}
+                onChange={(e) => onChange({ ...value, endAge: Number(e.target.value) || 0 })}
+                className={`w-28 ${INPUT_CLASS}`}
+              />
+              <span className="text-sm text-[var(--ink-3)]">jaar</span>
+            </span>
+            <Fout text={errors.endAge} />
+            <p className="mt-1 text-[11px] text-[var(--ink-3)] italic leading-snug">
+              {endAgeHint(value.endForm)}
+            </p>
+          </label>
+        ) : (
+          <p className="text-[11px] text-[var(--ink-3)] italic leading-snug">
+            {PERPETUAL_NO_END_AGE_NOTE}
+          </p>
+        )}
+
+        {/* Dan de keuze wat er overblijft — de tweede helft. */}
+        <p id="stop-plan-vraag-2-rest" className={`${FIELD_LABEL_CLASS} mt-4`}>
+          {END_REMAINDER_QUESTION}
+        </p>
+        <div className="space-y-2" role="group" aria-labelledby="stop-plan-vraag-2-rest">
           {END_FORM_OPTIONS.map((opt) => (
             <RegelOptionCard
               key={opt.form}
@@ -163,57 +206,30 @@ export function StopPlanVragen({
               title={opt.name}
               description={opt.subtitle}
               disabled={disabled}
-              onSelect={() => onChange({ ...value, endForm: opt.form })}
+              onSelect={() => onChange(withEndForm(value, opt.form))}
             />
           ))}
         </div>
 
-        {(endFormShowsEndAge(value.endForm) || value.endForm === 'legacy') && (
-          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {endFormShowsEndAge(value.endForm) && (
-              <label className="block">
-                <span className="block text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] mb-1">
-                  {END_AGE_QUESTION}
-                </span>
-                <input
-                  type="number"
-                  min={END_AGE_MIN}
-                  max={END_AGE_MAX}
-                  step={1}
-                  value={value.endAge}
-                  disabled={disabled}
-                  aria-invalid={errors.endAge ? true : undefined}
-                  onChange={(e) => onChange({ ...value, endAge: Number(e.target.value) || 0 })}
-                  className={`w-28 ${INPUT_CLASS}`}
-                />
-                <Fout text={errors.endAge} />
-                <p className="mt-1 text-[11px] text-[var(--ink-3)] italic leading-snug">
-                  {endAgeHint(value.endForm)}
-                </p>
-              </label>
-            )}
-            {value.endForm === 'legacy' && (
-              <label className="block">
-                <span className="block text-[10px] uppercase tracking-[0.18em] font-mono text-[var(--ink-3)] mb-1">
-                  Nalatenschap (€)
-                </span>
-                <input
-                  type="number"
-                  min={0}
-                  step={1000}
-                  value={value.legacyAmount}
-                  disabled={disabled}
-                  aria-invalid={errors.legacyAmount ? true : undefined}
-                  onChange={(e) => onChange({ ...value, legacyAmount: Number(e.target.value) || 0 })}
-                  className={`w-40 ${INPUT_CLASS}`}
-                />
-                <Fout text={errors.legacyAmount} />
-                <p className="mt-1 text-[11px] text-[var(--ink-3)] italic leading-snug">
-                  Dit bedrag (in huidige euro&apos;s) laat je na — de rest mag opraken.
-                </p>
-              </label>
-            )}
-          </div>
+        {/* Tot slot het bedrag — alleen wanneer er iets over moet blijven. */}
+        {value.endForm === 'legacy' && (
+          <label className="mt-4 block">
+            <span className={FIELD_LABEL_CLASS}>Bedrag dat over moet blijven (€)</span>
+            <input
+              type="number"
+              min={0}
+              step={1000}
+              value={value.legacyAmount}
+              disabled={disabled}
+              aria-invalid={errors.legacyAmount ? true : undefined}
+              onChange={(e) => onChange({ ...value, legacyAmount: Number(e.target.value) || 0 })}
+              className={`w-40 ${INPUT_CLASS}`}
+            />
+            <Fout text={errors.legacyAmount} />
+            <p className="mt-1 text-[11px] text-[var(--ink-3)] italic leading-snug">
+              Dit bedrag (in huidige euro&apos;s) blijft over — de rest mag opraken.
+            </p>
+          </label>
         )}
       </section>
     </div>

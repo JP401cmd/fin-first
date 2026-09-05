@@ -17,9 +17,11 @@
  * (rapportcijfers — netto vermogen + canonieke buffer-maanden), 10
  * (spaarquote-conversie na activatie), 18 (spaarquote-preview + prefills +
  * recap-netto-vermogen), 19 (bezittingen/schulden-optelsom), 20
- * (pensioen-ingangsleeftijd-klem) en 21 (noodfonds-prefill). Geen enkele van
- * deze criteria vereist Supabase/auth — allemaal pure functies op letterlijke
- * getallen uit het UAT-plan.
+ * (pensioen-ingangsleeftijd-klem), 21 (noodfonds-prefill) en 28 (stap "Jouw
+ * plan": validatie/route-toets/concept-herstel van stop-anker × eind-vorm, ADR
+ * 0129 — pure functies uit plan-draft.ts, onboarding-plan.ts en
+ * draft-persistence.ts). Geen enkele van deze criteria vereist Supabase/auth —
+ * allemaal pure functies op letterlijke getallen uit het UAT-plan.
  *
  * TWEE "INLINE CLIENT-CALC"-workflows zonder los-exporteerbare pure functie
  * (spiegelt de figures-strip-mirror in `schuld-checks.ts` en de
@@ -271,7 +273,7 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Onboarding volledig doorlopen en in de app landen',
     kriticiteit: 'KERN',
     given: 'Testpersoon "Jan de Vries": netto maandinkomen €3.000, maanduitgaven €2.100, bezittingen (Betaalrekening €2.500 + Spaargeld €18.000 + Beleggingen €12.000 = €32.500), schulden (Studieschuld €9.000).',
-    when: 'De gebruiker doorloopt de stappen "inkomen"/"uitgaven" (spaarquote-preview), "uitgaven na pensioen" (prefill), "spaardoel" (Noodfonds-preset) en "klaar" (recap).',
+    when: 'De gebruiker doorloopt de stappen "inkomen"/"uitgaven" (spaarquote-preview), "uitgaven na pensioen" (prefill), "spaardoel" (Noodfonds-preset), "Jouw plan" (standaardpad — twee vragen, zie WF-START-28) en "klaar" (recap).',
     then: 'Spaarquote-preview = 30%. Pensioen-uitgaven-prefill = €20.160/jaar (80% × €2.100 × 12). Noodfonds-prefill = €12.600 (6× €2.100, al een veelvoud van €100). Recap netto vermogen = €32.500 − €9.000 = €23.500. De meelopende vrijheidstijd-teller staat na de derde bezitting op 1j 3m over €32.500 en blijft daar staan als de studieschuld erbij komt — de intake-grondslag telt de eigen woning niet mee en trekt schulden er niet af, zodat het getal tijdens het invullen nooit daalt (bevinding H12). Ná activatie moet /overzicht/cashflow exact dezelfde 30% spaarquote tonen (SSoT-eis, zelfde motor als WF-START-10).',
     assertion: {
       kind: 'exact',
@@ -342,7 +344,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     given: 'Enkele stappen ingevuld (incl. naam, geboortedatum, inkomen, een bezitting), tab gesloten of pagina ververst zonder af te ronden.',
     when: 'De gebruiker opent /onboarding opnieuw.',
-    then: 'Herstel-melding "Verder waar je was" (neutraal, geen groen vinkje), terug op de opgeslagen stap MÉT alle eerder gegeven antwoorden — naam, geboortedatum, bedragen, bezittingen en schulden staan er weer (concept op de eigen profielrij, ADR 0122). Alleen een geüpload pensioenoverzicht komt niet terug (ADR 0115: dat blijft op het toestel) en de melding zegt dat met zoveel woorden. De finish-guard stuurt een afrondpoging met een nog lege verplichte naam/geboortedatum terug naar die stap.',
+    then: 'Herstel-melding "Verder waar je was" (neutraal, geen groen vinkje), terug op de opgeslagen stap MÉT alle eerder gegeven antwoorden — naam, geboortedatum, bedragen, bezittingen en schulden staan er weer (concept op de eigen profielrij, ADR 0122). Alleen een geüpload pensioenoverzicht komt niet terug (ADR 0115: dat blijft op het toestel) en de melding zegt dat met zoveel woorden. Een concept van vóór 5 sep 2026 met `fire_end_strategy: "pensioen"` komt terug als anker AOW × eind-vorm deplete in de stap "Jouw plan" (exact getoetst in WF-START-28). De finish-guard stuurt een afrondpoging met een nog lege verplichte naam/geboortedatum terug naar die stap.',
     assertion: {
       kind: 'ui-only',
       source: 'app/(onboarding)/onboarding/draft-persistence.ts (serializeDraft/sanitizeStoredDraft/firstIncompleteRequiredStep) + app/api/onboarding/draft/route.ts + app/(onboarding)/onboarding/page.tsx (restoreChecked-poort: persisteren mag pas ná de restore-poging), geen cijfermatige uitkomst',
@@ -398,6 +400,21 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'consistency',
       source: 'lib/check/share-freedom.ts#selectShareFreedom is de enige functie die het volledige rapport ziet en reduceert het tot {years, months}; buildFreedomShareText/buildFreedomCardCopy/ShareButton.tsx werken uitsluitend op dat object. A=B-toets (gedeelde payload bevat geen ander cijfer dan years/months, en bij deficit/infinite/nul geen deel-knop) i.p.v. een hard cijfer — bewaakt door lib/check/__tests__/share-freedom.test.ts',
+    },
+  },
+  {
+    workflow: 'WF-START-28',
+    scenarioId: 'UAT-START-28',
+    titel: 'Stap "Jouw plan": stopmoment en eind-vorm kiezen tijdens onboarding (ADR 0129)',
+    kriticiteit: 'KERN',
+    given: 'De laatste inhoudelijke onboarding-stap (vii., kicker "Toekomst", kop "Jouw plan"; vóór 5 sep 2026 heette dit de eindstrategie-stap met één FIRE-vs-pensioen-keuze). Twee vragen, letterlijk uit lib/horizon/plan-draft.ts (dezelfde strings als Voorkeuren en de strategie-modal): (1) "Wanneer wil je stoppen met werken?" met drie tegels — "Zo vroeg als het kan" (anker solved, standaard), "Op mijn AOW-leeftijd" (aow) en "Op een leeftijd die ik kies" (age + veld "Stopleeftijd (halve jaren)", 18–100); het anker `now` wordt in de onboarding bewust NIET aangeboden. (2) "Tot welke leeftijd moet je geld reiken, en wat moet er dan nog over zijn?" — éérst het veld "Tot welke leeftijd moet je geld reiken?" (50–120, standaard 90), dán de kop "Wat moet er dan nog over zijn?" met drie tegels — "Niets, het mag op zijn" (deplete, standaard), "Een bedrag voor later of voor anderen" (legacy + veld "Bedrag dat over moet blijven"), "Mijn vermogen mag niet slinken" (perpetual). Feitenpaneel: "90 jaar" als standaard-eindleeftijd.',
+    when: 'De gebruiker (a) klikt direct "Verder" (standaardpad solved × deplete × 90); (b) kiest "Op mijn AOW-leeftijd"; (c) kiest "Op een leeftijd die ik kies" en vult 62,5 in; (d) vult onder dat anker 90 (= eindleeftijd), niets, of 62,3 in en klikt "Verder"; (e) kiest "Een bedrag voor later of voor anderen" met een leeg bedrag resp. "250.000"; (f) kiest "Mijn vermogen mag niet slinken"; (g) hervat een concept van vóór 5 sep 2026 met `fire_end_strategy: "pensioen"`.',
+    then: '(a) Geen veld verplicht; de save (`POST /api/onboarding/save-own-data`) lost het plan één keer op via `resolveOnboardingPlanColumns` en schrijft fire_stop_anchor=solved, fire_end_strategy=deplete, fire_end_age=90, fire_stop_age=null (beide write-plekken, dezelfde vijf kolommen). (b) fire_stop_anchor=aow, eind-vorm blijft deplete — de AOW-toets (eindleeftijd > AOW-leeftijd) draait hier NIET: de onboarding kent de AOW-tabel niet, die toets zit alleen in Voorkeuren (WF-TOEK-24). (c) Bij het aanklikken van "age" vult `defaultStopAge` het veld vooraf met huidige leeftijd + 5 in halve jaren, geklemd vóór de eindleeftijd (bij 40 jaar → 45; zonder geboortedatum 60) — bewust geen vaste 58/65; 62,5 is geldig en wordt als fire_stop_age=62.5 weggeschreven. (d) "Verder" wordt geblokkeerd: rode banner "Controleer de gemarkeerde velden om door te gaan" plus de fout onder het veld — bij stop ≥ eind "Je stopleeftijd moet vóór de eindleeftijd van je plan (90) liggen.", bij leeg "Kies een stopleeftijd.", bij 62,3 "In stappen van een half jaar."; de route weigert stop ≥ eind óók met een 400 (STOP_AGE_BEFORE_END_AGE_ERROR) — nergens een stille klem of afronding. (e) Een leeg bedrag onder legacy blokkeert met "Een bedrag boven nul." (leeg → NaN, géén stille €0); "250.000" wordt als 250000 gelezen en alleen onder legacy meegestuurd als fire_legacy_amount. (f) Het eindleeftijd-veld verdwijnt en er staat één zin: "Dan rekent de app zonder eindleeftijd: je leeft van wat je vermogen oplevert."; onder deplete en legacy blijft het veld zichtbaar. (g) `sanitizeStoredDraft` herstelt het oude label als anker aow + eind-vorm deplete (het label wordt nooit meer als eind-vorm doorgegeven); stuurt een oude client het label alsnog mee, dan vertaalt de route het identiek naar aow/deplete/90/null. De cijfers van de overige stappen veranderen niet (WF-START-18); het plan werkt door in /toekomst en Voorkeuren (WF-TOEK-24).',
+    assertion: {
+      kind: 'exact',
+      expected:
+        'standaard=solved/deplete/90/null; aow=aow/deplete/90/null; standaardStopleeftijdBij40=45; ageGeldig=ok/age/deplete/90/62.5; ageStopNaEind=Je stopleeftijd moet vóór de eindleeftijd van je plan (90) liggen.|route400; ageLeeg=Kies een stopleeftijd.; ageGeenHalfJaar=In stappen van een half jaar.; legacyLeeg=Een bedrag boven nul.; legacy=ok/250000; perpetualEindleeftijdVeld=verborgen; depleteEindleeftijdVeld=zichtbaar; conceptPensioen=aow/deplete; routePensioen=aow/deplete/100/null',
+      source: 'lib/horizon/plan-draft.ts#validatePlanDraft + defaultStopAge + endFormShowsEndAge (kopij STOP_ANCHOR_OPTIONS/END_FORM_OPTIONS) + components/onboarding/onboarding-eindstrategie.tsx#planDraftFromOnboarding (leeg bedrag → NaN) + lib/onboarding-plan.ts#resolveOnboardingPlanColumns (route-toets, legacy-label → anker) + app/(onboarding)/onboarding/draft-persistence.ts#sanitizeStoredDraft (concept-herstel) — zie start-checks.ts',
     },
   },
 ]

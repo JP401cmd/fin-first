@@ -35,6 +35,7 @@ import { formatAowAge, lookupAowAge, type AowLeeftijdRow } from '@/lib/aow-leeft
 import type { PensionParseResult } from '@/app/api/pension/parse/route'
 import { SPAARDOEL_PRESETS, type SpaardoelPresetKey } from '@/lib/onboarding-presets'
 import { computeOnboardingCompleteness } from '@/lib/onboarding-completeness'
+import { computeCurrentAge } from '@/lib/persoonlijk-plan-assembly'
 import {
   ONBOARDING_HOUSING_MODE,
   computeFreedomTicker,
@@ -870,6 +871,15 @@ export default function OnboardingPage() {
     }
   }, [aowRows, state.identity.date_of_birth])
 
+  // Huidige leeftijd (hele jaren) uit de geboortedatum — alleen voor de
+  // standaard-stopleeftijd wanneer de gebruiker in "Jouw plan" een eigen
+  // leeftijd kiest (`defaultStopAge`). Zonder geboortedatum valt die helper
+  // zelf terug; hier geen eigen aanname.
+  const currentAgeForPlan = useMemo(
+    () => computeCurrentAge(state.identity.date_of_birth || null),
+    [state.identity.date_of_birth],
+  )
+
   // Bewaar het concept server-side bij elke wijziging (behalve op de
   // terminal-stappen saving/success). Twee poorten:
   //  · `restoreChecked` — schrijven vóórdat de restore-poging klaar is zou het
@@ -1030,10 +1040,20 @@ export default function OnboardingPage() {
           // 'current_income' ("zelfde als nu") → methode meesturen, geen bedrag.
         }
 
+        // Het plan (ADR 0129) uit de stap "Jouw plan": eind-vorm + anker. De
+        // stopleeftijd reist alleen mee onder anker `age`; het bedrag dat over
+        // moet blijven alleen onder eind-vorm `legacy` — anders zou een eerder
+        // ingetypt bedrag stil meegaan met een plan dat er niets mee doet.
+        const legacyAmountParsed = parseBedragInput(state.horizon.fire_legacy_amount)
         body.horizonData = {
           fire_end_strategy: state.horizon.fire_end_strategy,
           fire_end_age: state.horizon.fire_end_age,
-          fire_legacy_amount: state.horizon.fire_legacy_amount ? Number(state.horizon.fire_legacy_amount) : undefined,
+          fire_legacy_amount:
+            state.horizon.fire_end_strategy === 'legacy' && isFinite(legacyAmountParsed) && legacyAmountParsed > 0
+              ? Math.round(legacyAmountParsed)
+              : undefined,
+          fire_stop_anchor: state.horizon.fire_stop_anchor,
+          fire_stop_age: state.horizon.fire_stop_anchor === 'age' ? state.horizon.fire_stop_age : null,
           retirement_expense_method: retirementMethod,
           retirement_custom_amount: retirementCustom,
           temporal_balance: state.horizon.temporal_balance,
@@ -1656,16 +1676,17 @@ export default function OnboardingPage() {
             />
           )}
 
-          {/* ── Eindstrategie — FIRE vs. pensioen (laatste inhoudelijke vraag) ── */}
+          {/* ── Jouw plan — stop-anker × eind-vorm (laatste inhoudelijke vraag, ADR 0129) ── */}
           {state.step === 'eindstrategie' && (
             <OnboardingEindstrategie
-              strategy={state.horizon.fire_end_strategy}
-              onChange={(strategy) =>
+              value={state.horizon}
+              onChange={(patch) =>
                 dispatch({
                   type: 'SET_HORIZON',
-                  data: { ...state.horizon, fire_end_strategy: strategy },
+                  data: { ...state.horizon, ...patch },
                 })
               }
+              currentAge={currentAgeForPlan}
               onNext={goToNext}
               onBack={goToBack}
               currentStep={currentContentStep}
