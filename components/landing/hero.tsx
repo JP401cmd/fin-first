@@ -27,7 +27,7 @@ function VrijheidsPadKaart() {
           viewBox="0 0 320 200"
           className="w-full"
           role="img"
-          aria-label="Voorbeeldprojectie: je vermogen groeit tot het doelvermogen en je bent vrij vanaf je 51e; met vijf procent extra spaarquote verschuift dat moment naar je 48e."
+          aria-label="Voorbeeldprojectie: je vermogen groeit tot het doelvermogen en je bent vrij vanaf je 51e; zet je vijf procent van je inkomen extra opzij, dan verschuift dat moment naar je 48e."
         >
           {/* Doelvermogen-lijn: hier ben je vrij */}
           <line x1="16" y1="48" x2="304" y2="48" stroke="var(--border-md)" strokeDasharray="2 4" />
@@ -81,7 +81,7 @@ function VrijheidsPadKaart() {
         </p>
         <p className="flex items-center gap-2 font-sans text-[11px] text-[var(--ink-2)]">
           <span aria-hidden="true" className="inline-block w-5 shrink-0 border-t-2 border-dashed border-horizon-600" />
-          Met 5% extra spaarquote — vrij vanaf je <strong className="font-semibold text-horizon-700">48e</strong>
+          Met 5% van je inkomen extra opzij — vrij vanaf je <strong className="font-semibold text-horizon-700">48e</strong>
         </p>
       </div>
 

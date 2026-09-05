@@ -1,5 +1,5 @@
 {
-  "attestedAt": "2026-09-01T10:40:41.691Z",
+  "attestedAt": "2026-09-05T20:40:25.705Z",
   "note": "Attestatie-baseline voor de merkstem (ADR 0112). Per toon-/claimbron en per copy-oppervlak een sha256. Bijwerken betekent: de copy is opnieuw naast de bron gelegd. Zie .claude/skills/merkstem/SKILL.md en scripts/merkstem/scan.mjs.",
   "toneSources": [
     {
@@ -7,7 +7,7 @@
       "label": "Toon (base.ts § TOON)",
       "file": "lib/ai/dna/base.ts",
       "section": "TOON",
-      "sha256": "c3b1ed0d4a5bb41c2379b18e72641b7759823f2a97c5ecf2ea0ad4cefa54b719"
+      "sha256": "7fa836d7b1bf4909c9220bf54e4bb49d4ef85793491387332c19605c8c830b65"
     },
     {
       "id": "dna-framing",
@@ -57,7 +57,7 @@
         },
         {
           "file": "components/landing/hero.tsx",
-          "sha256": "6671ba1bfe6229f1b1469ddbfc2c5e5e2dbab98235cc1e0e3e84123da5ec5ed0",
+          "sha256": "0f4f8b708fd3e0582fe268ab4a78b6193864d9ec8ee200bac1179ff9e95ce77c",
           "copyLines": 18
         },
         {
@@ -114,7 +114,7 @@
         },
         {
           "file": "app/over/page.tsx",
-          "sha256": "bd676195ff4a3822616c58ae6501620c1c6a062e06528960b0aceccafdeccdc4",
+          "sha256": "21a81ddafd5f49fcca0616b112922b7887ed2754f4aa345391b72f80638fa023",
           "copyLines": 14
         },
         {
@@ -175,13 +175,13 @@
       "files": [
         {
           "file": "lib/briefing/directives.ts",
-          "sha256": "869608c7530c5a1292f0614517683241fc97af0694cbed925d41538886edd50b",
+          "sha256": "f6a766fbe7e2b4bb4688c658a8c95fe02452c3d79ac3810b71bfab3063b8cfc1",
           "copyLines": 70
         },
         {
           "file": "lib/briefing/email-template.ts",
-          "sha256": "70fae6968ecd2e9c9d6bd599631374e81b7fd928faa974f7a0737d1d8e8b7445",
-          "copyLines": 12
+          "sha256": "8ab3d3848d2b2af9ee232ac36b6ec94aa54199c9de99a207001ed4bd310f35c1",
+          "copyLines": 13
         }
       ]
     }

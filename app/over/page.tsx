@@ -53,7 +53,8 @@ export default function OverPage() {
       <MarketingSection heading="Gemaakt in Nederland">
         <p>
           TriFinity is gemaakt in Nederland, met de Nederlandse fiscale context
-          (zoals box 3) als vertrekpunt. Je data leeft binnen de EU, en we
+          (zoals box 3, de belasting op je vermogen) als vertrekpunt. Je data
+          leeft binnen de EU, en we
           verdienen aan abonnementen — niet aan jouw gegevens. Dat is geen
           marketingbelofte maar een ontwerpkeuze: de app werkt vóór jou, niet
           tegen je aandacht.

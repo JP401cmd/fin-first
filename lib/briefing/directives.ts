@@ -500,7 +500,8 @@ export function getDefaultFunctionalDirectives(): FunctionalDirective[] {
       title: 'Budget overschreden',
       metric: 'budget',
       condition: 'over',
-      instruction: 'Benoem de budgetoverschrijding prominent. Concrete bespaartips, niet veroordelend.',
+      instruction:
+        'Benoem de budgetoverschrijding prominent. Wijs concreet op bewustere keuzes en wat die aan vrijheidstijd opleveren, niet veroordelend.',
       priority: 'high',
       enabled: true,
     },
@@ -509,7 +510,8 @@ export function getDefaultFunctionalDirectives(): FunctionalDirective[] {
       title: 'Lage spaarquote',
       metric: 'savings_rate',
       condition: 'low',
-      instruction: 'Benadruk kleine verbeteringen. Elke extra euro gespaard = meer vrijheidstijd.',
+      instruction:
+        'Benadruk kleine verbeteringen. Elke extra euro die je opzij zet, koopt vrijheidstijd vrij.',
       priority: 'normal',
       enabled: true,
     },
