@@ -68,8 +68,18 @@ function savingsRateLabel(rate: number): string {
 export function GeldstroomGauge({
   summary,
   windowLabel,
+  onOpenIncome,
+  onOpenExpense,
 }: {
   summary: FlowSummary
+  /**
+   * Kassabon-ingangen (UR3-28 fase 2b). Aanwezig → de Inkomen-/Uitgaven-cel
+   * wordt een knop die de bijbehorende kassabon opent; afwezig → de cel blijft
+   * platte tekst. De meter blijft daarmee presentational: hij weet wél dat een
+   * getal doorklikbaar kán zijn, niet wat er dan gebeurt.
+   */
+  onOpenIncome?: () => void
+  onOpenExpense?: () => void
   /**
    * Het venster waarover deze meter leest — "augustus tot nu toe", "juli 2026".
    * Rendert als onderschrift onder de leeswaarde (S3).
@@ -199,10 +209,10 @@ export function GeldstroomGauge({
       {/* Inkomen/Uitgaven/Saldo als compacte horizontale balk (3-up) — minder
           verticale ruimte dan een stack. */}
       <div className="grid grid-cols-3 border-t border-b border-[var(--border-ed)] text-center">
-        <KpiCell label="Inkomen" tone="positive">
+        <KpiCell label="Inkomen" tone="positive" onClick={onOpenIncome} openLabel="Inkomsten per rekening">
           <MaskedAmount value={income} tone="inherit" decimals />
         </KpiCell>
-        <KpiCell label="Uitgaven" tone="negative">
+        <KpiCell label="Uitgaven" tone="negative" onClick={onOpenExpense} openLabel="Uitgaven per budget">
           <MaskedAmount value={expense} tone="inherit" decimals />
         </KpiCell>
         <KpiCell label="Saldo" tone={net >= 0 ? 'positive' : 'negative'}>
@@ -248,9 +258,14 @@ export function GeldstroomGauge({
 export function GeldstroomZin({
   description,
   summary,
+  onOpenIncome,
+  onOpenExpense,
 }: {
   description: FlowDescription
   summary: FlowSummary
+  /** Zie `GeldstroomGauge` — dezelfde kassabon-ingangen, dezelfde strip. */
+  onOpenIncome?: () => void
+  onOpenExpense?: () => void
 }) {
   const { kind, windowLabel, income, expense, net, savingsRate, prevIncome } = description
 
@@ -309,10 +324,10 @@ export function GeldstroomZin({
       </p>
 
       <div className="grid grid-cols-3 border-t border-b border-[var(--border-ed)] text-center">
-        <KpiCell label="Inkomen" tone="positive">
+        <KpiCell label="Inkomen" tone="positive" onClick={onOpenIncome} openLabel="Inkomsten per rekening">
           <MaskedAmount value={summary.income} tone="inherit" decimals />
         </KpiCell>
-        <KpiCell label="Uitgaven" tone="negative">
+        <KpiCell label="Uitgaven" tone="negative" onClick={onOpenExpense} openLabel="Uitgaven per budget">
           <MaskedAmount value={summary.expense} tone="inherit" decimals />
         </KpiCell>
         <KpiCell label="Saldo" tone={summary.net >= 0 ? 'positive' : 'negative'}>
@@ -328,25 +343,51 @@ export function GeldstroomZin({
   )
 }
 
+/**
+ * Eén cel van de 3-up strip. Zonder `onClick` een stille `<div>`; mét `onClick`
+ * een echte `<button>` die de bijbehorende kassabon opent — "elk getal is
+ * klikbaar", en de affordance zit in de hover/focus, niet in een extra icoon
+ * dat de smalle kolom niet aankan.
+ */
 function KpiCell({
   label,
   tone,
   children,
+  onClick,
+  openLabel,
 }: {
   label: string
   tone: 'positive' | 'negative'
   children: React.ReactNode
+  onClick?: () => void
+  /** Toegankelijke omschrijving van wat de klik opent. */
+  openLabel?: string
 }) {
   const valueColor =
     tone === 'positive' ? 'text-[var(--color-income-700)]' : 'text-[var(--color-expense-600)]'
-  return (
-    <div className="border-r border-[var(--border-ed)] px-1 py-2 last:border-r-0">
+  const body = (
+    <>
       <div className="text-[9px] font-mono uppercase tracking-[0.1em] text-[var(--ink-3)]">
         {label}
       </div>
       <div className={`mt-0.5 font-mono text-[13px] font-semibold tabular-nums ${valueColor}`}>
         {children}
       </div>
-    </div>
+    </>
+  )
+
+  if (!onClick) {
+    return <div className="border-r border-[var(--border-ed)] px-1 py-2 last:border-r-0">{body}</div>
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={openLabel ?? label}
+      className="cursor-pointer border-r border-[var(--border-ed)] px-1 py-2 text-center transition-colors duration-150 last:border-r-0 hover:bg-[var(--subtle)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--ink)]"
+    >
+      {body}
+    </button>
   )
 }

@@ -35,6 +35,8 @@ import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { CounterpartyAnalysisPanel } from '@/components/app/counterparty-analysis-panel'
 import { PeriodeSelector, resolvePeriodForMode } from './periode-selector'
 import { GeldstroomGauge, GeldstroomZin } from './geldstroom-gauge'
+import { GeldstroomKassabonnen, type KassabonKind } from './geldstroom-kassabonnen'
+import { GeldstroomDaggrafiek } from './geldstroom-daggrafiek'
 import { TopTegenpartijen } from './top-tegenpartijen'
 import { GrootsteUitgaven } from './grootste-uitgaven'
 import { NieuweTegenpartijen } from './nieuwe-tegenpartijen'
@@ -246,6 +248,9 @@ export function TransactiesAnalyse({
   // je straks een actie uitvoert op rijen die je niet meer voor je hebt.
   const [bulkOpen, setBulkOpen] = useState(false)
   const [drillCp, setDrillCp] = useState<{ name: string; iban: string | null } | null>(null)
+  // Welke kassabon staat open (UR3-28 fase 2b): de opsomming achter het
+  // Inkomen- of Uitgaven-getal van de geldstroom-kaart. `null` = geen.
+  const [kassabon, setKassabon] = useState<KassabonKind | null>(null)
   const [listDetail, setListDetail] = useState<
     { kind: 'day'; date: string } | { kind: 'weekday'; index: number } | null
   >(null)
@@ -490,6 +495,14 @@ export function TransactiesAnalyse({
   const prevTxns = useMemo(
     () => allMapped.filter((t) => t.date >= periodWindow.prevSince && t.date <= periodWindow.prevUntil),
     [allMapped, periodWindow.prevSince, periodWindow.prevUntil],
+  )
+  // Alles vóór de periode — de 12 maanden historie die `resolveFetchWindow`
+  // sowieso al ophaalt. Voedt het historische dagpatroon onder de forecast-curve
+  // van de daggrafiek; géén extra query, en dezelfde perspectief-lens als de
+  // rest van de pagina.
+  const priorTxns = useMemo(
+    () => allMapped.filter((t) => t.date < periodWindow.since),
+    [allMapped, periodWindow.since],
   )
 
   const currentSummary = useMemo(() => summarizeFlow(currentTxns), [currentTxns])
@@ -747,12 +760,22 @@ export function TransactiesAnalyse({
                   cashflow-hub. `summarizeFlow` is bewust NIET aangeraakt: het
                   ongeclampte leescijfer en de 0%-bij-geen-inkomen zijn C6-terrein
                   en moeten in Volledig reproduceerbaar blijven. */}
+              {/* De Inkomen-/Uitgaven-cel van de strip is in BEIDE modi de
+                  ingang naar zijn kassabon (UR3-28 fase 2b). De cijfers stonden
+                  er al; wat de hub uniek had was de doorklik. */}
               {simple ? (
-                <GeldstroomZin description={flowDescription} summary={currentSummary} />
+                <GeldstroomZin
+                  description={flowDescription}
+                  summary={currentSummary}
+                  onOpenIncome={() => setKassabon('income')}
+                  onOpenExpense={() => setKassabon('expense')}
+                />
               ) : (
                 <GeldstroomGauge
                   summary={currentSummary}
                   windowLabel={flowDescription.windowLabel}
+                  onOpenIncome={() => setKassabon('income')}
+                  onOpenExpense={() => setKassabon('expense')}
                 />
               )}
               {currentSummary.income === 0 && currentSummary.expense === 0 && (
@@ -772,6 +795,27 @@ export function TransactiesAnalyse({
           </div>
 
           {naGeldstroomMetLijst}
+
+          {/* Geldstroom per dag — UITSLUITEND in de maand-stand. De grafiek is
+              maand-vormig (dag-van-de-maand op de x-as, "vandaag"-marker,
+              forecast tot het maandeinde); een rollend 30-dagen-venster, een
+              kwartaal of een jaar heeft geen van die ankers. Voor die perioden
+              dekken de heatmap en het weekdag-patroon dezelfde textuur.
+              In Eenvoudig verborgen, net als op de hub. */}
+          {period === 'month' && (
+            <HideInSimple>
+              <Card>
+                <GeldstroomDaggrafiek
+                  transactions={currentTxns}
+                  priorTransactions={priorTxns}
+                  budgets={budgets}
+                  summary={currentSummary}
+                  monthStart={periodWindow.since}
+                  monthLabel={periodWindow.label}
+                />
+              </Card>
+            </HideInSimple>
+          )}
 
           <div className="grid gap-5 sm:grid-cols-2">
             <HideInSimple>
@@ -936,6 +980,20 @@ export function TransactiesAnalyse({
           onMutated={refetch}
         />
       )}
+
+      {/* Kassabonnen achter het Inkomen-/Uitgaven-getal van de geldstroom-kaart.
+          Lezen dezelfde `currentTxns` + `budgets` + rekeningnamen die de pagina
+          al in geheugen heeft — geen extra query, en dus per definitie hetzelfde
+          venster als de PeriodeSelector. */}
+      <GeldstroomKassabonnen
+        open={kassabon}
+        onClose={() => setKassabon(null)}
+        transactions={currentTxns}
+        budgets={budgets}
+        accountMap={accountMap}
+        summary={currentSummary}
+        windowLabel={flowDescription.windowLabel}
+      />
 
       {/* Tegenpartij-analyse */}
       {drillCp && (
