@@ -36,34 +36,37 @@ const DEBT = {
 
 /**
  * Fake supabase die exact de keten uit `buildHorizonContext` nabootst:
- * `from(tabel).select(...).eq('is_active', true).order('sort_order', …)`.
+ * `from(tabel).select(...).eq('user_id', …).eq('is_active', true).order('sort_order', …)`.
  */
 function makeSupabase(assets: unknown[], debts: unknown[]) {
   return {
-    from: (table: string) => ({
-      select: () => ({
-        eq: () => ({
-          order: async () => ({ data: table === 'assets' ? assets : debts, error: null }),
-        }),
-      }),
-    }),
+    from: (table: string) => {
+      // Keten-fake: `.select().eq('user_id', ...).eq('is_active', true).order(...)`.
+      // `eq` geeft zichzelf terug, zodat het aantal filters niet uitmaakt.
+      const chain = {
+        select: () => chain,
+        eq: () => chain,
+        order: async () => ({ data: table === 'assets' ? assets : debts, error: null }),
+      }
+      return chain
+    },
   } as never
 }
 
 describe('buildHorizonContext — grondslag + omreken-verbod (euro-weergave D14)', () => {
   it('zet de vaste grondslag-zin letterlijk in de context', async () => {
-    const ctx = await buildHorizonContext(makeSupabase([ASSET], [DEBT]))
+    const ctx = await buildHorizonContext(makeSupabase([ASSET], [DEBT]), 'user-1')
     expect(ctx).toContain(GRONDSLAG)
   })
 
   it('zet de zin vóór het eerste bedrag, zodat het model de grondslag eerst leest', async () => {
-    const ctx = await buildHorizonContext(makeSupabase([ASSET], [DEBT]))
+    const ctx = await buildHorizonContext(makeSupabase([ASSET], [DEBT]), 'user-1')
     expect(ctx.indexOf(GRONDSLAG)).toBe(0)
     expect(ctx.indexOf(GRONDSLAG)).toBeLessThan(ctx.indexOf('€'))
   })
 
   it('is statisch: de zin staat er ook zonder schulden en zonder 5-jaarsprojectie', async () => {
-    const ctx = await buildHorizonContext(makeSupabase([], [DEBT]))
+    const ctx = await buildHorizonContext(makeSupabase([], [DEBT]), 'user-1')
     expect(ctx).toContain(GRONDSLAG)
     // Geen assets → geen `projectPortfolio`-blok, maar de schuldprojecties
     // (afbetaaltermijn, totale rente) zijn óók projectiebedragen.
@@ -71,19 +74,19 @@ describe('buildHorizonContext — grondslag + omreken-verbod (euro-weergave D14)
   })
 
   it('draagt de zin NIET in de lege tak — daar staat geen enkel projectiebedrag', async () => {
-    const ctx = await buildHorizonContext(makeSupabase([], []))
+    const ctx = await buildHorizonContext(makeSupabase([], []), 'user-1')
     expect(ctx).not.toContain(GRONDSLAG)
     expect(ctx).toContain('Nog geen assets of schulden geregistreerd.')
   })
 
   it('voegt geen nieuwe sectie/kop toe voor de grondslag (NFR-G1, tokenkosten)', async () => {
-    const ctx = await buildHorizonContext(makeSupabase([ASSET], [DEBT]))
+    const ctx = await buildHorizonContext(makeSupabase([ASSET], [DEBT]), 'user-1')
     const headers = ctx.match(/^== .+ ==$/gm) ?? []
     expect(headers).toEqual(['== ASSETS ==', '== VERMOGENSSAMENSTELLING ==', '== SCHULDEN ==', '== 5-JAAR PROJECTIE =='])
   })
 
   it('houdt de 5-jaarsprojectie nominaal — geen tweede, reële variant', async () => {
-    const ctx = await buildHorizonContext(makeSupabase([ASSET], []))
+    const ctx = await buildHorizonContext(makeSupabase([ASSET], []), 'user-1')
     expect(ctx).toContain('Totale assets over 5 jaar (projectie):')
     // Eén projectiebedrag, geen gepaarde reële waarde: `projectPortfolio` is een
     // eigen motor náást de kernel (D12) en heeft dus geen canonieke deflator.
@@ -92,7 +95,7 @@ describe('buildHorizonContext — grondslag + omreken-verbod (euro-weergave D14)
   })
 
   it('noemt de weergavevoorkeur nergens', async () => {
-    const ctx = await buildHorizonContext(makeSupabase([ASSET], [DEBT]))
+    const ctx = await buildHorizonContext(makeSupabase([ASSET], [DEBT]), 'user-1')
     expect(ctx).not.toContain('euro_view')
     expect(ctx.toLowerCase()).not.toContain('euroview')
   })
@@ -116,7 +119,7 @@ describe('buildHorizonContext — schulden-totaal (UR3-06 geval 5)', () => {
   }
 
   it('telt de maandlasten en saldi op zoals de schuldenpagina dat doet', async () => {
-    const ctx = await buildHorizonContext(makeSupabase([], [DEBT, DEBT_2]))
+    const ctx = await buildHorizonContext(makeSupabase([], [DEBT, DEBT_2]), 'user-1')
     // 1.000 + 290 = 1.290 per maand; 200.000 + 12.000 = 212.000 openstaand.
     expect(ctx).toContain('maandlasten €1.290/mnd')
     expect(ctx).toContain('€212.000 openstaand')
@@ -124,19 +127,19 @@ describe('buildHorizonContext — schulden-totaal (UR3-06 geval 5)', () => {
   })
 
   it('zet het totaal VOOR de per-schuld-regels', async () => {
-    const ctx = await buildHorizonContext(makeSupabase([], [DEBT, DEBT_2]))
+    const ctx = await buildHorizonContext(makeSupabase([], [DEBT, DEBT_2]), 'user-1')
     expect(ctx.indexOf('TOTAAL (')).toBeLessThan(ctx.indexOf('Hypotheek ('))
     expect(ctx.indexOf('TOTAAL (')).toBeLessThan(ctx.indexOf('Autolening ('))
   })
 
   it('verbiedt het model expliciet om zelf op te tellen', async () => {
-    const ctx = await buildHorizonContext(makeSupabase([], [DEBT]))
+    const ctx = await buildHorizonContext(makeSupabase([], [DEBT]), 'user-1')
     expect(ctx).toContain('tel de regels hieronder NIET zelf op')
     expect(ctx).toContain('TOTAAL (1 actieve schuld)')
   })
 
   it('draagt geen totaalregel wanneer er geen schulden zijn', async () => {
-    const ctx = await buildHorizonContext(makeSupabase([ASSET], []))
+    const ctx = await buildHorizonContext(makeSupabase([ASSET], []), 'user-1')
     expect(ctx).not.toContain('TOTAAL (')
   })
 })

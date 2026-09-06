@@ -27,21 +27,43 @@ const GRONDSLAG_PROJECTIEBEDRAGEN =
  * Horizon-specific context: assets, debts, projections.
  * Uses real Supabase data.
  */
-export async function buildHorizonContext(supabase: SupabaseClient): Promise<string> {
+export async function buildHorizonContext(
+  supabase: SupabaseClient,
+  userId: string | null,
+): Promise<string> {
+  // Zonder ingelogde gebruiker halen we niets op: er is dan geen eigenaar om op
+  // te scopen, en een ongescopede lezing is precies wat hieronder voorkomen wordt.
+  if (!userId) {
+    return section('VERMOGEN & PROJECTIES', 'Nog geen assets of schulden geregistreerd.')
+  }
+
   // Egress-trim: alleen de velden die deze context daadwerkelijk gebruikt —
   // breakdown-regels + projectPortfolio (current_value/expected_return/
   // monthly_contribution/depreciation_rate/purchase_value/is_active/asset_type)
   // en debtProjection (current_balance/interest_rate/monthly_payment/
   // repayment_type/end_date).
+  //
+  // `.eq('user_id', userId)` is hier GEEN dubbelop. De SELECT-policy op beide
+  // tabellen is "own or shared" (`auth.uid() = user_id OR (ownership = 'shared'
+  // AND household_id = user_household_id())`), dus RLS scopet níét op de
+  // gebruiker. Zonder dit filter belanden de gedeelde rijen van de partner —
+  // inclusief het vrije-tekstveld `name` — verbatim in de promptcontext, buiten
+  // de privacy-bewuste perspectief-loaders om en zonder dat `privacy_settings`
+  // geraadpleegd is. De TOTAAL-regel eronder telt over exact deze verzameling op
+  // en zegt het model die letterlijk over te nemen: partnerschuld zou dan als
+  // eigen maandlast worden gerapporteerd. Zie de eigen-scoping in
+  // app/api/housing-strategy/route.ts, die dezelfde policy-val afdekt.
   const [assetsResult, debtsResult] = await Promise.all([
     supabase
       .from('assets')
       .select('name, asset_type, current_value, expected_return, monthly_contribution, depreciation_rate, purchase_value, is_active')
+      .eq('user_id', userId)
       .eq('is_active', true)
       .order('sort_order', { ascending: true }),
     supabase
       .from('debts')
       .select('name, debt_type, current_balance, interest_rate, monthly_payment, repayment_type, end_date')
+      .eq('user_id', userId)
       .eq('is_active', true)
       .order('sort_order', { ascending: true }),
   ])

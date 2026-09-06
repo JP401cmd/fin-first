@@ -34,7 +34,7 @@ export async function buildContext(supabase: SupabaseClient): Promise<string> {
     buildSharedContext(supabase),
     budgetingActive ? buildKernContext(supabase) : Promise.resolve(''),
     buildWilContext(supabase, budgetingActive, activeModules),
-    buildHorizonContext(supabase),
+    buildHorizonContext(supabase, user?.id ?? null),
     budgetingActive ? buildSpendingPatternsContext(supabase) : Promise.resolve(''),
     budgetingActive ? buildBudgetInsightsContext(supabase) : Promise.resolve(''),
     buildTaxContext(supabase),
