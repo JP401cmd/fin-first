@@ -2,9 +2,12 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 
 /**
- * De per-rekening detailpagina is opgegaan in de cashflow-landing. We mappen
- * de bank_account-id naar zijn gekoppelde asset en sturen door naar de focus-
- * weergave op /overzicht/cashflow. Zonder mapping: gewoon de landing.
+ * De per-rekening detailpagina is opgegaan in de cash-categoriepagina. We mappen
+ * de bank_account-id naar zijn gekoppelde asset en sturen door naar de
+ * focus-weergave daar. Zonder mapping: gewoon de categoriepagina.
+ *
+ * Stond eerder op /overzicht/cashflow#rekening-<assetId>; die hub is opgeheven
+ * en rekeningen wonen nu bij de bezittingen.
  */
 export default async function CashAccountRedirect({
   params,
@@ -20,7 +23,7 @@ export default async function CashAccountRedirect({
     .maybeSingle()
 
   if (data?.linked_asset_id) {
-    redirect(`/overzicht/cashflow#rekening-${data.linked_asset_id}`)
+    redirect(`/overzicht/bezittingen/cash?asset=${data.linked_asset_id}`)
   }
-  redirect('/overzicht/cashflow')
+  redirect('/overzicht/bezittingen/cash')
 }

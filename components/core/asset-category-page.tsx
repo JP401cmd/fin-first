@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Plus } from 'lucide-react'
+import Link from 'next/link'
+import { Link2, Plus } from 'lucide-react'
 import {
   type Asset,
   type AssetType,
@@ -33,6 +34,9 @@ import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { CashOverview } from '@/components/app/cash-overview'
 import { HideInSimple } from '@/components/app/hide-in-simple'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
+import { bankLinkRowForAccount, type CashBankLink } from '@/lib/bank-connection-status'
+import { detailBankAccountIdForAsset } from '@/lib/cash-detail-target'
 import { AddCategoryCard } from './add-category-card'
 import { VermogenAssetCard } from './vermogen-asset-card'
 import { CategoryTabs, type CategoryTab } from './category-tabs'
@@ -54,6 +58,23 @@ const AssetValuationModal = dynamic(
   () => import('@/components/core/assets-client').then((m) => ({ default: m.ValuationModal })),
   { ssr: false },
 )
+/**
+ * Rekeningdetail — het rijke venster met bankverbinding, herstelpad,
+ * transactie-as en verwijderflow. Alleen relevant voor `type === 'cash'` en
+ * alleen voor een rekening die daadwerkelijk zo'n as heeft; zie
+ * `detailBankAccountIdForAsset`. Lazy: opent pas op user-actie.
+ */
+const DynCashAccountView = dynamic(
+  () => import('@/components/app/cash-account-view').then((m) => ({ default: m.CashAccountView })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center py-20">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-kern-500 border-t-transparent" />
+      </div>
+    ),
+  },
+)
 import {
   findDeepenings,
   getDeepeningComponent,
@@ -71,6 +92,14 @@ import {
  * tip-strip met deeplink naar Instellingen.
  */
 const ITEMS_TAB_KEY = 'items'
+
+/**
+ * Stabiele default voor `bankLinks`. Een inline `[]` in de destructurering zou
+ * elke render een nieuwe array-identiteit opleveren en daarmee elke `useMemo`
+ * die erop leunt nodeloos hérrekenen. Spiegelt `EMPTY_BANK_LINKS` in
+ * `cash-overview.tsx`.
+ */
+const EMPTY_BANK_LINKS: CashBankLink[] = []
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -149,13 +178,24 @@ interface AssetCategoryPageProps {
   initialCoreData?: CorePageData
   /**
    * Mapping van cash-asset-ID → bank-account-ID, alleen relevant voor
-   * `type === 'cash'`. Wanneer een cash-asset `has_budget_tracking=true`
-   * heeft én een bijbehorende rij in `bank_accounts` (1:1 koppeling), dan
-   * navigeren we bij een klik op de asset-card naar de cash-detail-pagina
-   * (`/core/assets/cash/[bankAccountId]`). Zonder koppeling valt de klik
-   * terug op de bestaande `<AssetPane />` detail-flow.
+   * `type === 'cash'`. Dit is de VAL-TERUG-bron van de tweewegkeuze: een
+   * cash-bezit met `has_budget_tracking=true` heeft een transactie-as en dus
+   * een rekeningdetail, ook zonder bankverbinding. Zie `bankLinks` hieronder
+   * voor de eerste bron en `detailBankAccountIdForAsset` voor de regel.
    */
   bankAccountByAssetId?: Record<string, string>
+  /**
+   * Koppelstatus van élke bankrekening (`loadCashBankLinks`), alleen relevant
+   * voor `type === 'cash'`. EERSTE bron van de tweewegkeuze: draagt dit bezit
+   * een echte bankverbinding (`linked` / `linked-broken`), dan is er een
+   * rekeningdetail te openen — met de statusuitleg en het herstelpad — en
+   * staat budgetteren daar los van.
+   *
+   * Deze bundel reist ook als prop dóór naar het rekeningdetail zelf, zodat
+   * dat scherm de koppeltoestand niet nóg een keer uit zijn eigen koppelrijen
+   * hoeft af te leiden.
+   */
+  bankLinks?: CashBankLink[]
   /**
    * Lichtgewicht refs (assets+debts+holdings) voor de KPI-strip onder elke
    * asset-card. Server laadt deze parallel met de hoofdquery; bij `undefined`
@@ -302,6 +342,7 @@ export function AssetCategoryPage({
   initialHoldingsData,
   initialCoreData,
   bankAccountByAssetId,
+  bankLinks = EMPTY_BANK_LINKS,
   initialKpiRefs,
   initialConnectionsByAssetId,
   initialCryptoHoldings,
@@ -507,28 +548,47 @@ export function AssetCategoryPage({
     ? activeModules.includes(activeDeepening.moduleId)
     : false
 
-  // Klik op een asset: voor cash met `has_budget_tracking=true` én een
-  // gekoppelde bank-account-rij navigeren we naar de cashflow-pagina — daar zit
-  // de transactie-historie, herhalingen, import en bewerken bij elkaar. In alle
-  // andere gevallen openen we de lokale BottomSheet (lichte preview met
-  // optionele deep-link naar de bewerk-flow). Zo blijven niet-getrackte
-  // cash-assets en alle andere asset-types netjes binnen het bestaande
-  // BottomSheet-patroon.
+  // Klik op een asset opent altijd dezelfde URL-state (`?asset=<id>`) — ook
+  // voor cash. WELK venster daarbij hoort is een afleiding, geen tweede
+  // navigatie: zie `detailAccountId` hieronder.
   //
-  // Rechtstreeks naar de anker-URL, niet meer via `/core/assets/cash/[accId]`:
-  // die route is opgegaan in de cashflow-landing en is nog slechts een redirect
-  // die het bank-account-id terugvertaalt naar exact dit anker. De extra hop
-  // voegt niets toe — het bezit-id hebben we hier al.
+  // Dit was eerder een `router.push` naar `/overzicht/cashflow#rekening-<id>`,
+  // omdat de rekeningen op die hub woonden. De hub is opgeheven; een rekening
+  // is een bezit als elk ander en wordt hier bewerkt.
   const openAssetDetail = useCallback(
-    (asset: Asset) => {
-      if (asset.has_budget_tracking && bankAccountByAssetId?.[asset.id]) {
-        router.push(`/overzicht/cashflow#rekening-${asset.id}`)
-        return
-      }
-      setSelectedAssetId(asset.id)
-    },
-    [bankAccountByAssetId, router, setSelectedAssetId],
+    (asset: Asset) => setSelectedAssetId(asset.id),
+    [setSelectedAssetId],
   )
+
+  // ── Welk venster hoort bij de geselecteerde rekening? ────────
+  //
+  // Twee mogelijkheden, en de keuze is een AFLEIDING uit de URL-state — niet
+  // een aparte state die ernaast kan gaan lopen. Dat is wat een deeplink
+  // (`?asset=<id>`, ook die van de oude `/core/assets/cash/[accountId]`-route)
+  // op het juiste scherm laat landen zonder eigen routing-hop.
+  //
+  //  1. De rekening doet mee aan budgetteren of draagt een bankverbinding →
+  //     het rekeningdetail (`CashAccountView`): bankverbinding, statusuitleg,
+  //     herstelpad, transactie-as, archief en de verwijderflow.
+  //  2. Geen van beide → het gewone `<AssetPane />`, exact als elk ander bezit.
+  //
+  // De regel zelf staat in `detailBankAccountIdForAsset` en blijft ongewijzigd;
+  // hier verschuift alleen de plek waar hij gemount is.
+  //
+  // Uitzondering: `&edit=1` (de Bewerken-knop op een kaart) wint altijd van het
+  // rekeningdetail. Wie op Bewerken drukt wil het formulier, niet de volledige
+  // transactiepagina — dat was al het gedrag van deze pagina.
+  const editRequested = searchParams.get('edit') === '1'
+  const detailAccountId = useMemo(() => {
+    if (type !== 'cash' || !selectedAsset || editRequested) return undefined
+    return detailBankAccountIdForAsset(bankLinks, bankAccountByAssetId ?? {}, selectedAsset.id)
+  }, [type, selectedAsset, editRequested, bankLinks, bankAccountByAssetId])
+
+  /* M35 — één overlay tegelijk. Opent het rekeningdetail zélf een schermvullend
+     venster ("Rekening bewerken", herwaarderen), dan treedt deze sheet terug in
+     plaats van eronder te blijven staan. Sluiten kán hier niet: dat kind is een
+     child van deze overlay en een gesloten sheet rendert `null`. */
+  const [detailSubOverlayOpen, setDetailSubOverlayOpen] = useState(false)
 
   // Direct revaluation-target — gezet door de "Herwaarderen"-knop op een
   // kaart. Opent uitsluitend de ValuationModal (sheet), zonder eerst de
@@ -592,6 +652,25 @@ export function AssetCategoryPage({
                 onRevalueClick={handleAssetRevalue}
                 onAddClick={() => setQuickAddOpen(true)}
               />
+
+              {/* Bank koppelen — hoorde bij de snelle acties op de opgeheven
+                  cashflow-hub. "Rekening toevoegen" wordt hier al door de
+                  AddCategoryCard in de items-grid gedekt; koppelen niet, en dat
+                  is nu juist de ingang die een rekening zijn transactie-as
+                  geeft. Volledig-materiaal, net als daar. */}
+              {type === 'cash' && (
+                <HideInSimple>
+                  <div className="mt-5 flex flex-wrap items-center gap-2 sm:mt-6">
+                    <Link
+                      href="/core/cash/connect"
+                      className="inline-flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+                    >
+                      <Link2 className="h-4 w-4" />
+                      Bank koppelen
+                    </Link>
+                  </div>
+                </HideInSimple>
+              )}
 
               {type !== 'cash' && historyData && (
                 <HideInSimple>
@@ -690,7 +769,32 @@ export function AssetCategoryPage({
         />
       )}
 
-      {selectedAsset && (
+      {/* Rekeningdetail — pad 1 van de tweewegkeuze (zie `detailAccountId`). */}
+      <ShellOverlay
+        open={Boolean(detailAccountId)}
+        onClose={() => setSelectedAssetId(null)}
+        kind="sheet"
+        size="full"
+        title={selectedAsset?.name ?? 'Rekening'}
+        suspended={detailSubOverlayOpen}
+      >
+        {detailAccountId && (
+          /* De koppeltoestand reist mee als prop: het rekeningdetail leest 'm
+             uit dezelfde loader-bundel als de kaarten, in plaats van 'm nóg een
+             keer uit zijn eigen koppelrijen af te leiden. */
+          <DynCashAccountView
+            accountId={detailAccountId}
+            embedded
+            bankLink={bankLinkRowForAccount(bankLinks, detailAccountId)}
+            onExclusiveOverlayChange={setDetailSubOverlayOpen}
+          />
+        )}
+      </ShellOverlay>
+
+      {/* Bezit-pane — pad 2 van de tweewegkeuze, en het enige pad voor elk
+          niet-cash type. Wijkt zolang het rekeningdetail openstaat, zodat de
+          twee vensters elkaar nooit overlappen. */}
+      {selectedAsset && !detailAccountId && (
         <AssetPane
           asset={selectedAsset}
           currentUserId={currentUserId}

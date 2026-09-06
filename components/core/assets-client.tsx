@@ -586,13 +586,10 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
   // moet vóór dat gebruik staan (voorheen een gehoiste function-declaratie).
   const handleAssetClick = useCallback(
     (asset: Asset) => {
-      // Cash-rekeningen wonen op de cashflow-pagina: open daar met focus op de
-      // gekozen rekening (#rekening-<assetId>). Andere asset-types openen de
-      // detail-pane op hun categoriepagina zoals voorheen.
-      if (asset.asset_type === 'cash') {
-        router.push(`/overzicht/cashflow#rekening-${asset.id}`)
-        return
-      }
+      // Elk bezit — cash inbegrepen — opent de detail-pane op zijn eigen
+      // categoriepagina. Cash had hier een uitzondering naar
+      // /overzicht/cashflow#rekening-<assetId>, omdat de rekeningen op die hub
+      // woonden; die hub is opgeheven.
       router.push(`/core/assets/${asset.asset_type}?asset=${asset.id}`)
     },
     [router],
@@ -1212,7 +1209,7 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
               {/* Group header — gedeelde component (zie debts/page.tsx):
                   icoon + label + chevron = link naar /core/assets/[type]. */}
               <CategoryGroupHeader
-                href={type === 'cash' ? '/overzicht/cashflow' : `/core/assets/${type}`}
+                href={`/core/assets/${type}`}
                 label={ASSET_TYPE_LABELS[type]}
                 iconName={groupIcon}
                 iconColor={groupColor}
@@ -1240,7 +1237,6 @@ export default function AssetsPage({ initialAssetId, initialData, toolbarFilter,
                     provenance={asset._provenance}
                     shareFraction={asset._myShareFraction}
                     aggregated={asset._aggregated}
-                    hideActions={type === 'cash'}
                   />
                 ))}
                 <AddCategoryCard

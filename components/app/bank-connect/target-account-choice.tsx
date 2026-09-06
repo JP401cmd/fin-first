@@ -88,9 +88,9 @@ export function describeAccountHistory(account: TargetAccountOption): string {
  * verbreken is.
  *
  * `/core/assets/cash/{bank_accounts.id}` is een bestaande, stabiele redirect naar
- * `/overzicht/cashflow#rekening-{assetId}` — dezelfde bestemming die de
- * "Open volledig"-link op de cash-kaart al gebruikt. Vandaar dat het `id` van de
- * kandidaat volstaat en de wizard geen tweede route hoeft te kennen.
+ * de rekening op haar categoriepagina (`/overzicht/bezittingen/cash?asset=…`) —
+ * dezelfde bestemming die een klik op de cash-kaart al oplevert. Vandaar dat het
+ * `id` van de kandidaat volstaat en de wizard geen tweede route hoeft te kennen.
  *
  * Geëxporteerd omdat het correctiemoment (`carrier-correction.tsx`) exact dezelfde
  * uitweg aanbiedt; twee formuleringen van dezelfde weg lopen ooit uiteen.
@@ -139,7 +139,7 @@ export function OccupiedAccountExit({ accountId }: { accountId: string }) {
  */
 export function CashflowAccountsExit({ className = '' }: { className?: string }) {
   return (
-    <Link href="/overzicht/cashflow" className={`${EXIT_LINK_CLASS} ${className}`}>
+    <Link href="/overzicht/bezittingen/cash" className={`${EXIT_LINK_CLASS} ${className}`}>
       <ExternalLink aria-hidden className="h-3.5 w-3.5 shrink-0" />
       Ga naar je rekeningen om die koppeling te verbreken
     </Link>

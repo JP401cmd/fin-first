@@ -1,4 +1,4 @@
-import { notFound, redirect } from 'next/navigation'
+import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import {
   ASSET_CLIENT_COLUMNS,
@@ -38,6 +38,8 @@ import {
   type InvestmentHoldingRow,
 } from '@/lib/investment-holdings-data'
 import { loadCoreData, type CorePageData } from '@/lib/core-data-loader'
+import { loadCashBankLinks } from '@/lib/bank-link-loader'
+import type { CashBankLink } from '@/lib/bank-connection-status'
 import { loadKpiContextRefs, type KpiContextRefs } from '@/lib/kpi-context'
 import {
   loadConnectionsByAssetIds,
@@ -85,10 +87,9 @@ export default async function AssetCategoryServerPage({
 }) {
   const { type } = await params
 
-  // Cash heeft nu een eigen landing op de cashflow-route — stuur door vóór
-  // de validatiecheck zodat andere asset-types onveranderd blijven.
-  if (type === 'cash') redirect('/overzicht/cashflow')
-
+  // Cash had hier een redirect naar /overzicht/cashflow: de rekeningen woonden
+  // daar. Die uitzondering is opgeheven — rekeningen zijn een bezitgroep als
+  // elke andere en worden op hun eigen categoriepagina bewerkt.
   if (!isValidAssetType(type)) {
     notFound()
   }
@@ -192,12 +193,17 @@ export default async function AssetCategoryServerPage({
   // koppeling valt de klik terug op de algemene asset-detail-sheet.
   // Niet-cash categorieën hebben deze prop niet nodig — `undefined` is veilig.
   let bankAccountByAssetId: Record<string, string> | undefined
+  // Koppelstatus per bankrekening — de eerste bron van de tweewegkeuze op de
+  // cash-pagina (rekeningdetail versus het gewone bezit-formulier), en tevens
+  // de bundel die het rekeningdetail zélf consumeert. Zie `bankLinks` in
+  // <AssetCategoryPage> en `detailBankAccountIdForAsset`.
+  let bankLinks: CashBankLink[] | undefined
 
   if (type === 'cash') {
     // Voor de cash-categorie laden we ook de Kern-data zodat we de
     // kencijfers (geschat jaarinkomen, must-uitgaven) kunnen tonen
     // bovenaan de pagina.
-    const [budgetsResult, coreResult, bankAccountsResult] = await Promise.allSettled([
+    const [budgetsResult, coreResult, bankAccountsResult, bankLinksResult] = await Promise.allSettled([
       loadBudgetsData(supabase),
       loadCoreData(supabase),
       supabase
@@ -206,9 +212,13 @@ export default async function AssetCategoryServerPage({
         .eq('user_id', user.id)
         .eq('is_active', true)
         .not('linked_asset_id', 'is', null),
+      loadCashBankLinks(supabase),
     ])
     if (budgetsResult.status === 'fulfilled') budgetsData = budgetsResult.value
     if (coreResult.status === 'fulfilled') coreData = coreResult.value
+    // Een gefaalde koppelstatus is geen blokkade: de tweewegkeuze valt dan
+    // terug op de budget-map, precies zoals vóór de bankLinks-bron bestond.
+    if (bankLinksResult.status === 'fulfilled') bankLinks = bankLinksResult.value
     if (bankAccountsResult.status === 'fulfilled' && bankAccountsResult.value.data) {
       const rows = bankAccountsResult.value.data as Array<{ id: string; linked_asset_id: string | null }>
       bankAccountByAssetId = Object.fromEntries(
@@ -325,6 +335,7 @@ export default async function AssetCategoryServerPage({
         initialHoldingsData={holdingsData ?? undefined}
         initialCoreData={coreData ?? undefined}
         bankAccountByAssetId={bankAccountByAssetId}
+        bankLinks={bankLinks}
         initialKpiRefs={kpiRefs ?? undefined}
         initialConnectionsByAssetId={connectionsByAssetId}
         initialCryptoHoldings={cryptoHoldings}

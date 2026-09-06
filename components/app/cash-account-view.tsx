@@ -1508,11 +1508,11 @@ export function CashAccountView({
         message: parts.length > 0 ? `${parts.join(' · ')}.` : undefined,
       })
 
-      // Geen anker meegeven: `/core/assets/cash/[accountId]` leidt door naar
-      // `/overzicht/cashflow#rekening-<assetId>`, en dat anker bestaat na deze
-      // verwijdering niet meer.
+      // Geen rekening meegeven: `/core/assets/cash/[accountId]` leidt door naar
+      // die ene rekening op haar categoriepagina, en die bestaat na deze
+      // verwijdering niet meer. Terug naar de lijst dus.
       if (onNavigateToAccount) onNavigateToAccount(undefined)
-      else router.push('/overzicht/cashflow')
+      else router.push('/overzicht/bezittingen/cash')
       router.refresh()
     } catch {
       setDeleteError('Verwijderen is niet gelukt. Probeer het opnieuw.')

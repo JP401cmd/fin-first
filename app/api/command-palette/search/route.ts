@@ -36,9 +36,6 @@ function escLike(input: string): string {
 }
 
 function assetHref(id: string, type: string | null | undefined): string {
-  // Cash woont op de cashflow-pagina; `id` is hier de assets.id, wat exact de
-  // anker-sleutel is die CashOverview rendert (#rekening-<assetId>).
-  if (type === 'cash') return `/overzicht/cashflow#rekening-${id}`
   if (type === 'investment' || type === 'crypto') return `/core/assets/holdings/${id}`
   return `/core/assets/${type ?? 'cash'}?asset=${id}`
 }

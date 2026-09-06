@@ -1320,6 +1320,18 @@ export function CashOverview({
         </div>
         )}
 
+      </section>
+      )}
+
+      {/* === 1b. Archief === */}
+      {/* Staat BUITEN de rekeningen-sectie, en dus ook buiten
+          `hideAccountsSection`. Reden: waar de rekeningenlijst wordt
+          overgenomen door een ander oppervlak (de items-grid op de
+          cash-categoriepagina), blijft het archief anders onbereikbaar — en
+          dat is precies het ding dat bevestigt dat je bewaarde boekingen er
+          nog zijn. Eén plek per scherm: op de hub staat hij direct ónder de
+          rekeningen, daar direct onder de items. */}
+      <section>
         {/* Archief — alleen zichtbaar zodra er iets in staat.
 
             Bewust een eigen regel en géén rekening-kaart: het archief ÍS geen
@@ -1354,7 +1366,6 @@ export function CashOverview({
           </Link>
         )}
       </section>
-      )}
 
       {/* === 2. Geldstroom — Sankey + banner-style figures-strip === */}
       {/* Verborgen in Eenvoudig: maandselector + figures-strip + dag-grafiek
