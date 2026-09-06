@@ -75,7 +75,7 @@ describe('onbekend inkomen/uitgaven — geen score, geen oordeel (ADR 0131, UR3-
     ])
     expect(score.onbekend?.pijlers.every(p => p.groupLabel)).toBe(true)
     expect(score.onbekend?.hint).toMatch(/inkomen en uitgaven/)
-    expect(score.onbekend?.actie.href).toBe('/overzicht/budget')
+    expect(score.onbekend?.actie.href).toBe('/overzicht/budget/transacties')
   })
 
   it("nergens 'Spaarquote 0%' of '0,0 × salaris' als rawValue — die pijlers bestaan niet als 0", () => {

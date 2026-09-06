@@ -28,7 +28,7 @@ export type LeverId = 'assets' | 'debts' | 'cashflow' | 'tax'
 export const LEVER_LABELS: Record<LeverId, string> = {
   assets: 'Bezittingen',
   debts: 'Schulden',
-  cashflow: 'Cashflow',
+  cashflow: 'Budget',
   tax: 'Belasting',
 }
 

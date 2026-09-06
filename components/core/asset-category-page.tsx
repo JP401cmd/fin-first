@@ -584,14 +584,17 @@ export function AssetCategoryPage({
   // De regel zelf staat in `detailBankAccountIdForAsset` en blijft ongewijzigd;
   // hier verschuift alleen de plek waar hij gemount is.
   //
-  // Uitzondering: `&edit=1` (de Bewerken-knop op een kaart) wint altijd van het
-  // rekeningdetail. Wie op Bewerken drukt wil het formulier, niet de volledige
-  // transactiepagina — dat was al het gedrag van deze pagina.
-  const editRequested = searchParams.get('edit') === '1'
+  // `&edit=1` (de Bewerken-knop op een kaart) wint NIET van het rekeningdetail.
+  // Op het oppervlak dat deze pagina vervangt deed Bewerken exact hetzelfde als
+  // klikken: bij een bankkoppeling opende het rekeningdetail. Dat is ook de
+  // eerlijke uitkomst — het generieke bezitformulier kent de bankverbinding, de
+  // statusuitleg en het herstelpad niet, en "Rekening bewerken" zit ín het
+  // rekeningdetail. Voor elk ander bezittype blijft `edit=1` gewoon het
+  // formulier openen; daar bestaat geen tweede venster.
   const detailAccountId = useMemo(() => {
-    if (type !== 'cash' || !selectedAsset || editRequested) return undefined
+    if (type !== 'cash' || !selectedAsset) return undefined
     return detailBankAccountIdForAsset(bankLinks, bankAccountByAssetId ?? {}, selectedAsset.id)
-  }, [type, selectedAsset, editRequested, bankLinks, bankAccountByAssetId])
+  }, [type, selectedAsset, bankLinks, bankAccountByAssetId])
 
   /* M35 — één overlay tegelijk. Opent het rekeningdetail zélf een schermvullend
      venster ("Rekening bewerken", herwaarderen), dan treedt deze sheet terug in

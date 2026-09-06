@@ -1,10 +1,8 @@
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
-import { createClient } from '@/lib/supabase/server'
-import { loadBudgetsData } from '@/lib/budgets-data-loader'
 import { getServerPerspective } from '@/lib/household/server-perspective'
-import BudgetsClient from '@/components/app/budgets-client'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
+import { BudgetsLoader, BudgetsFallback } from './budgets-loader'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import {
   CashflowCardsLoader,
@@ -23,7 +21,7 @@ export const metadata: Metadata = {
 /**
  * /overzicht/budget — de derde hefboom.
  *
- * WAS /overzicht/budget, één laag dieper, achter de cashflow-hub.
+ * WAS /overzicht/cashflow/budget, één laag dieper, achter de cashflow-hub.
  * Budgetteren is voor het grip-segment de dagelijkse handeling en zat daarmee
  * even diep als de fiscale optimizer, die bijna niemand opent (UR3-28, "de
  * scheve diepte"). De hub is opgeheven; deze pagina neemt zijn plek in de
@@ -36,46 +34,20 @@ export const metadata: Metadata = {
  * bezittingen en schulden. Wie nog niets heeft ingericht krijgt de lege staat
  * van `BudgetsClient` ("voeg je eerste budget toe"); de inrichtflow zelf blijft
  * bestaan en bereikbaar, hij is alleen geen voorwaarde meer.
+ *
+ * GESTREAMD IN BLOKKEN, net als /overzicht en de oude hub. Blok 1 (titel,
+ * opening, header-controls) staat in de eerste byte; de drie kaarten en de
+ * budgetten stromen er elk achteraan in hun eigen `<Suspense>`. De LCP-kandidaat
+ * is de TITEL, en die hangt van niets af.
  */
 export default async function OverzichtBudgetPage() {
-  const supabase = await createClient()
+  // HET ENIGE AWAIT BOVEN DE RETURN, en dat moet zo blijven. Streaming werkt
+  // alleen als er geen zware await boven staat: één `createClient()`/`loadX()`
+  // erbij en de hele pagina wacht weer, terwijl de `<Suspense>`-grenzen er nog
+  // "correct" uitzien. De loaders hieronder halen hun supabase-client daarom
+  // zélf op (`createClient()` is React-`cache()`-gewrapt → dezelfde instantie,
+  // geen dubbele cookie-read). Vergrendeld in page.streaming.test.ts.
   const perspective = await getServerPerspective()
-
-  const data = await loadBudgetsData(supabase)
-
-  // showKoppelNudge: toon ná het doorlopen van de setup éénmalig de koppel-nudge
-  // (BudgetKoppelNudge). Zelf-beperkend: alleen als de eenmalige marker ontbreekt
-  // ÉN de gebruiker nog géén bank_accounts en géén transacties heeft. De 0-data-
-  // guard voorkomt dat bestaande (backfill-)gebruikers de nudge zien. User-scoped
-  // tellen (.eq('user_id', …)), niet via gedeelde huishoud-RLS, zodat partner-data
-  // niet meetelt. Slug-string spiegelt BUDGET_KOPPEL_NUDGE_SHOWN_SLUG uit
-  // components/app/budget-koppel-nudge.tsx.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  let showKoppelNudge = false
-  if (user) {
-    const [markerRes, accountsRes, txRes] = await Promise.all([
-      supabase
-        .from('user_feature_visits')
-        .select('feature_slug')
-        .eq('user_id', user.id)
-        .eq('feature_slug', 'budget_koppel_nudge_shown')
-        .maybeSingle(),
-      supabase
-        .from('bank_accounts')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id),
-      supabase
-        .from('transactions')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id),
-    ])
-    const markerAbsent = !markerRes.data
-    const noAccounts = (accountsRes.count ?? 0) === 0
-    const noTransactions = (txRes.count ?? 0) === 0
-    showKoppelNudge = markerAbsent && noAccounts && noTransactions
-  }
 
   return (
     <>
@@ -111,9 +83,9 @@ export default async function OverzichtBudgetPage() {
         <CashflowCardsLoader perspective={perspective} />
       </Suspense>
 
-      <div className="mx-auto max-w-6xl px-4 pt-6 sm:px-6">
-        <BudgetsClient initialData={data} showKoppelNudge={showKoppelNudge} />
-      </div>
+      <Suspense fallback={<BudgetsFallback />}>
+        <BudgetsLoader />
+      </Suspense>
     </>
   )
 }

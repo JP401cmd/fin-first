@@ -213,7 +213,8 @@ const MODULES: ModuleEntry[] = [
       // buiten het standaardpad houdt. Volledige motivering bij
       // OVERVIEW_APP_SUBROUTES in lib/nav-config.ts; die lijst is de canonieke
       // bron (deze kopie voedt de desktop-sidebar en moet er gelijk aan blijven).
-      { label: 'Budgetteren',       href: '/overzicht/budget',          appKey: 'budgetteren' },
+      // Budgetteren stond hier tot ADR 0135; het is basisfunctionaliteit en staat
+      // nu als 'Budget' bij de hefbomen hierboven, niet nog eens als app.
       { label: 'Aandelen holdings', href: '/overzicht/bezittingen/investment',   appKey: 'aandelen-holdings' },
       { label: 'Crypto holdings',   href: '/overzicht/bezittingen/crypto',       appKey: 'crypto-holdings' },
       { label: 'Hypotheekplanner',  href: '/overzicht/schulden/mortgage',        appKey: 'hypotheekplanner' },

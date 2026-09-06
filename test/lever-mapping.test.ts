@@ -113,7 +113,7 @@ describe('lever-mapping', () => {
     it('labels are in Dutch', () => {
       expect(LEVER_LABELS.assets).toBe('Bezittingen')
       expect(LEVER_LABELS.debts).toBe('Schulden')
-      expect(LEVER_LABELS.cashflow).toBe('Cashflow')
+      expect(LEVER_LABELS.cashflow).toBe('Budget')
       expect(LEVER_LABELS.tax).toBe('Belasting')
     })
   })

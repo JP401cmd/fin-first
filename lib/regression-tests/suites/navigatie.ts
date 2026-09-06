@@ -34,7 +34,6 @@ const KNOWN_ROUTES = [
   '/core/assets',
   '/core/debts',
   '/overzicht/budget',
-  '/overzicht/budget',
   '/overzicht/budget/transacties',
   '/overzicht/budget/vaste-lasten',
   '/overzicht/budget/forecast',

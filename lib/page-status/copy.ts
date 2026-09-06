@@ -113,19 +113,24 @@ export const PAGE_STATUS_COPY: Record<string, RouteCopy> = {
   // en dat is precies de pagina waarop deze melding staat.
   '/overzicht/budget': {
     title: 'Budget',
+    // De hefboomscore is een menging van spaarquote en budgetdiscipline, dus de
+    // melding benoemt beide. Hier stond tot ADR 0135 een tweede, budget-
+    // specifieke entry onder dezelfde route ("Meerdere budgetten zijn over de
+    // limiet"); die kon niet blijven bestaan, maar zijn onderwerp is hier
+    // opgenomen zodat de melding past bij de pagina waar je staat.
     warn: {
-      reason: 'Je houdt deze maand weinig over ({figure}).',
+      reason: 'Je houdt deze maand weinig over ({figure}), en een paar budgetten dreigen uit te lopen.',
       remedy:
-        'Bekijk je budgetten en vaste lasten — kleine besparingen tellen snel op tot meer ruimte.',
+        'Bekijk welke categorieën uitlopen en stel ze bij — kleine besparingen tellen snel op tot meer ruimte.',
     },
     bad: {
       reason: 'Je geeft deze maand meer uit dan er binnenkomt ({figure}).',
       remedy:
-        'Begin bij je grootste posten. Bekijk je budgetten en vaste lasten om de balans te herstellen.',
+        'Begin bij je grootste posten: bekijk de kassabon per categorie en stel de overschreden budgetten bij.',
     },
     will: {
-      onderwerp: 'Mijn maandelijkse cashflow',
-      detail: 'Ik wil zien waar mijn geld heen gaat en hoe ik maandelijks meer kan overhouden.',
+      onderwerp: 'Mijn budgetten op koers krijgen',
+      detail: 'Ik wil weten welke budgetten uitlopen en hoe ik ze realistisch bijstel, zodat ik maandelijks meer overhoud.',
     },
   },
 

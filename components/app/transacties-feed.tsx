@@ -286,7 +286,7 @@ export function TransactiesFeed({
                 transacties hier te zien.
               </p>
               <Link
-                href="/overzicht/budget"
+                href="/overzicht/bezittingen/cash"
                 className="inline-flex min-h-11 items-center justify-center border border-[var(--ink)] bg-[var(--ink)] px-4 py-2.5 text-sm font-medium text-[var(--paper)] transition-opacity hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
               >
                 Koppel een rekening

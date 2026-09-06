@@ -25,7 +25,7 @@ const LEVER_ICON: Record<LeverId, LucideIcon> = {
 const LEVER_TOOLTIP: Record<LeverId, string> = {
   assets: 'Bezittingen',
   debts: 'Schulden',
-  cashflow: 'Cashflow',
+  cashflow: 'Budget',
   tax: 'Belasting',
 }
 

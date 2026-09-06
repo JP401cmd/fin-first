@@ -96,6 +96,12 @@ const TXNS: AnalysisTransaction[] = [
   tx({ id: 't7', amount: -30, account_id: 'acc-1' }), // zonder budget
   tx({ id: 't8', amount: -66, account_id: 'acc-1', budget_id: 'b-weg' }), // budget onbekend
   tx({ id: 't9', amount: -5000, account_id: 'acc-1', transaction_type: 'transfer' }), // telt niet mee
+  // Positief én joint_transfer: precies de twee assen waarop de oude toets
+  // niets bewees. Een negatieve overboeking kan sowieso nooit in de
+  // inkomstenbon staan, dus die toonde de uitsluiting niet aan.
+  tx({ id: 't10', amount: 7000, account_id: 'acc-1', transaction_type: 'transfer' }),
+  tx({ id: 't11', amount: 4000, account_id: 'acc-2', transaction_type: 'joint_transfer' }),
+  tx({ id: 't12', amount: -4000, account_id: 'acc-2', transaction_type: 'joint_transfer' }),
 ]
 
 const ACCOUNT_MAP = new Map([['acc-1', 'Betaalrekening']])
@@ -144,11 +150,19 @@ describe('GeldstroomKassabonnen — inkomsten per rekening', () => {
     expect(shown[shown.length - 1]).toBe(formatCurrencyDecimals(SUMMARY.income))
   })
 
-  it('sluit transfers uit, net als de periode-samenvatting', () => {
+  it('sluit transfers uit — eigen rekening ÉN partner, beide richtingen', () => {
     renderBon('income')
-    const dialog = screen.getByRole('dialog')
-    // De transfer is −5000 en zou als uitgave meetellen; hij mag nergens opduiken.
-    expect(amountsIn(dialog)).not.toContain(formatCurrencyDecimals(5000))
+    const inkomsten = amountsIn(screen.getByRole('dialog'))
+    // Een POSITIEVE overboeking is de enige die de inkomstenbon kan halen als de
+    // uitsluiting ontbreekt; daarom staan die er nu in de fixture.
+    expect(inkomsten).not.toContain(formatCurrencyDecimals(7000))
+    expect(inkomsten).not.toContain(formatCurrencyDecimals(4000))
+
+    cleanup()
+    renderBon('expense')
+    const uitgaven = amountsIn(screen.getByRole('dialog'))
+    expect(uitgaven).not.toContain(formatCurrencyDecimals(5000))
+    expect(uitgaven).not.toContain(formatCurrencyDecimals(4000))
   })
 })
 

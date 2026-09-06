@@ -498,7 +498,7 @@ export const BUDGET_HEATMAP_HREF = '/overzicht/budget?weergave=heatmap'
 
 export const WIDGET_HREFS: Record<string, string> = {
   netto_vermogen:           '/overzicht',
-  cash_flow:                '/overzicht/budget',
+  cash_flow:                '/overzicht/budget/transacties',
   budgetten:                '/overzicht/budget',
   // M17: de heatmap-tegel landt op de budgetten-pagina IN heatmap-weergave.
   // Zonder `?weergave=` valt die pagina terug op de laatst gekozen view uit
@@ -541,8 +541,8 @@ export const WIDGET_HREFS: Record<string, string> = {
   pensioen_aow:             '/toekomst/gebeurtenissen',
   meldingen:                '/berichten',
   volgende_stap:            '/overzicht/tips',
-  maandoverzicht:           '/overzicht/budget',
-  weekoverzicht:            '/overzicht/budget',
+  maandoverzicht:           '/overzicht/budget/transacties',
+  weekoverzicht:            '/overzicht/budget/transacties',
   agenda:                   '/overzicht/budget',
   noodfonds:                '/overzicht/budget',
   huishouden_vergelijking:  '/overzicht',

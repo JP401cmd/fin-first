@@ -490,11 +490,15 @@ const STAPPEN: readonly RondleidingStap[] = [
     },
   },
 
-  // ── 4. Cashflow ──────────────────────────────────────────────────────────
+  // ── 4. Budget ────────────────────────────────────────────────────────────
+  // De step-id en het `data-tour`-attribuut houden bewust de sleutel `cashflow`
+  // (ADR 0135): die staat óók in de scoreberekening en de briefing-tags, en
+  // hernoemen is een aparte verbouwing. Alleen wat de gebruiker leest volgt de
+  // tegel, en die heet sinds die ADR "Budget".
   {
     id: 'hefboom-cashflow',
     hoofdstuk: 'hefbomen',
-    titel: 'Je cashflow',
+    titel: 'Je budget',
     target: { desktop: '[data-tour="hefboom-cashflow"]', mobiel: '[data-tour="hefboom-cashflow"]' },
     body: (data) => {
       const quote = data.totals?.cashflow ?? null

@@ -85,7 +85,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     ],
     terms: ['netto_vermogen', 'vrijheidstijd', 'spaarquote'],
     related: [
-      { href: '/overzicht/budget', label: 'Cashflow — wat er in- en uitgaat' },
+      { href: '/overzicht/budget', label: 'Budget — wat er in- en uitgaat' },
       { href: '/toekomst', label: 'Toekomst — je pad naar vrijheid' },
       { href: '/mijn/mijlpalen', label: 'Mijlpalen die je al passeerde' },
     ],

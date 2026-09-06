@@ -35,8 +35,9 @@
  *    later. Het argument van CF-2 luidde *"Forecast is geen landingsbelofte"*,
  *    maar de werkelijke schade was een KAPOTTE VERWIJSKETEN: op mobiel is deze
  *    kaart de enige contextuele ingang naar /overzicht/budget/forecast (het
- *    `Cashflow`-item in `lib/nav-config.ts` heeft geen `children`, dus de
- *    NavMenuSheet toont de sub-pagina's niet). Sinds FC-1 (9 aug 2026) heeft die
+ *    `Cashflow`-item in `lib/nav-config.ts` had toen geen `children`, dus de
+ *    NavMenuSheet toonde de sub-pagina's niet — sinds ADR 0135 heeft het
+ *    Budget-item ze wél. Sinds FC-1 (9 aug 2026) heeft die
  *    pagina bovendien een eigen Eenvoudig-vorm — een samenvattend blok met
  *    sparkline — dus de reden om er niet naartoe te wijzen verviel. Alle vier de
  *    kaarten staan er nu in béide modi.

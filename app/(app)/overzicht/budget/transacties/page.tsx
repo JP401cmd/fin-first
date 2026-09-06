@@ -1,7 +1,10 @@
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
-import { TransactiesNoticesLoader } from '@/components/overview/transacties/transacties-notices-loader'
+import {
+  TransactiesVersheidBanner,
+  TransactiesKoopkrachtKaart,
+} from '@/components/overview/transacties/transacties-notices-loader'
 import { InsightToggleButton } from '@/components/editorial/insight-toggle-button'
 import { INFLATION_IMPACT_ID } from '@/components/overview/inflation-impact-card'
 import { CashflowInstellingenBlokLazy } from '@/components/overview/cashflow-instellingen-lazy'
@@ -36,6 +39,13 @@ export const metadata: Metadata = {
  * `loadCashflowData` (perspectief-keten, 6 maanden transacties, recurrings, een
  * naam-decoratie per getoonde feed-rij) om er precies één integer uit te lezen;
  * de rest van die bundel wordt op deze route nergens gebruikt.
+ *
+ * NUANCE sinds ADR 0135: `TransactiesNoticesLoader` roept `loadCashflowData`
+ * wél weer aan, voor één scalar — de €500-drempel van de inflatiekaart. Dat is
+ * een bewuste keuze van de eigenaar: het blok staat achter een eigen
+ * `<Suspense>` en houdt de analyse dus niet op, het is serverwerk per verzoek
+ * en geen wachttijd voor de gebruiker. De besparing hierboven geldt nog steeds
+ * voor het KRITIEKE pad; hij is niet stil teruggedraaid.
  *
  * DEEPLINK NAAR ÉÉN GRENZENPOT (D7 / FR-B1-09): `?limit=<uuid>` opent de
  * prestatieweergave van die pot, `&periode=<periodKey>` selecteert er meteen een
@@ -114,11 +124,13 @@ export default async function OverzichtCashflowTransactiesPage({
           deck="Elke transactie is gekochte of verkochte tijd — bekijk waar je uren heen gaan."
         />
         <KoppelRekeningBanner accountCount={accountCount} />
-        {/* Versheidsmelding + inflatie-impact, verhuisd van de cashflow-hub.
-            Eigen <Suspense> zodat hun loaders de analyse niet ophouden; bij
-            verse data en lage uitgaven rendert het blok niets. */}
-        <Suspense fallback={null}>
-          <TransactiesNoticesLoader perspective={perspective} />
+        {/* Versheidsmelding, verhuisd van de cashflow-hub: alles hieronder rust
+            op transacties, dus als die stilstaan hoort dat er vóór te staan.
+            Eigen <Suspense> zodat zijn loader de analyse niet ophoudt; bij verse
+            data rendert hij niets. De fallback reserveert de bannerhoogte zodat
+            de analyse niet omlaag springt zodra hij binnenkomt. */}
+        <Suspense fallback={<div aria-hidden="true" className="h-16 animate-pulse bg-[var(--subtle)]" />}>
+          <TransactiesVersheidBanner />
         </Suspense>
         {/* De grenzenpotten staan direct onder de geldstroom-/spaarquote-kaart:
             eerst wat er binnenkomt en overblijft, dan de grenzen die je daarop
@@ -135,6 +147,14 @@ export default async function OverzichtCashflowTransactiesPage({
             />
           }
         />
+        {/* Koopkracht ONDER de analyse — de pagina vraagt waar je tijd naartoe
+            gaat, dus eerst het antwoord, dan de zijstap over dertig jaar. Geen
+            gereserveerde hoogte: hij verschijnt alleen boven €500
+            baseline-uitgaven én kan weggeklikt zijn, dus een vaste reservering
+            zou voor een deel van de gebruikers een permanent gat zijn. */}
+        <Suspense fallback={null}>
+          <TransactiesKoopkrachtKaart perspective={perspective} />
+        </Suspense>
       </div>
 
       {/* Waar je cijfers op rusten — de grondslagkeuze voor inkomen, uitgaven en

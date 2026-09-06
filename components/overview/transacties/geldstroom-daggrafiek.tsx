@@ -6,6 +6,7 @@ import { MaskedAmount } from '@/components/app/masked-amount'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { formatMaskedCurrency } from '@/lib/format'
 import { summarizeFlow, type AnalysisTransaction, type FlowSummary } from '@/lib/transaction-insights'
+import { isRealAggRow } from '@/lib/server-data/tx-aggregates'
 import type { Budget } from '@/lib/budget-data'
 
 /**
@@ -125,6 +126,15 @@ export function GeldstroomDaggrafiek({
   const historicalDayPattern = useMemo<HistoricalDayPattern | null>(() => {
     const perMonthDay = new Map<string, Map<number, AnalysisTransaction[]>>()
     for (const t of priorTransactions) {
+      // Overboekingen tellen niet mee — en dat moet HIER gebeuren, niet pas in
+      // `summarizeFlow` hieronder. `monthCount` telt de maanden die in
+      // `perMonthDay` staan; laat je transfers meebucketen, dan telt een maand
+      // waarin het enige verkeer een interne of partner-overboeking was mee als
+      // maand met €0. Dat verdunt élk dagelijks gemiddelde en daarmee de hele
+      // prognosecurve. Waren álle voorafgaande maanden zo, dan gaf het oude pad
+      // `null` (→ "op basis van je huidige tempo"); zonder deze regel ontstaat
+      // een nullen-patroon dat zich als "o.b.v. 12 mnd" presenteert.
+      if (!isRealAggRow(t)) continue
       const monthKey = t.date.slice(0, 7)
       const day = Number(t.date.slice(8, 10))
       if (!Number.isFinite(day)) continue

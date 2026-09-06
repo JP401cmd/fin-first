@@ -129,10 +129,10 @@ function OordeelDeck({ insights }: { insights: Insights }) {
         Je vaste lasten zijn in beeld, je maandinkomen nog niet — daarom staat er geen
         aandeel bij.{' '}
         <Link
-          href="/overzicht/budget"
+          href="/overzicht/budget/transacties"
           className="not-italic font-medium text-[var(--module-active-700)] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
         >
-          Vul je inkomen in bij Cashflow
+          Vul je inkomen in bij je transacties
         </Link>{' '}
         om te zien welk deel van je inkomen vastligt.
       </EditorialDeck>

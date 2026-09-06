@@ -138,8 +138,8 @@ export default async function AssetCategoryServerPage({
   // ── Cumulatieve categorie-historie ───────────────────────────
   // Voor niet-cash categorieën laden we 12 maanden snapshot-historie zodat
   // `<CategoryHistoryChart>` direct kan renderen zonder client-roundtrip.
-  // Cash heeft eigen overzicht-componenten (CashOverview + CoreKengetallen)
-  // bovenaan de items-tab, dus we besparen daar de query.
+  // Cash heeft zijn eigen overzicht-sectie (CoreKengetallen) onderaan de
+  // items-tab, dus we besparen daar de query.
   const historyPromise: Promise<CategoryHistoryData | undefined> =
     type === 'cash'
       ? Promise.resolve(undefined)
@@ -219,7 +219,17 @@ export default async function AssetCategoryServerPage({
         .eq('is_active', true)
         .not('linked_asset_id', 'is', null),
       loadCashBankLinks(supabase),
-      supabase.from('bank_accounts').select('id').eq('is_archive_bucket', true).maybeSingle(),
+      // Expliciet op eigen rij, ook al is er vandaag maar één archiefbucket per
+      // gebruiker: de SELECT-policy op bank_accounts is huishoud-VERBREED, en
+      // `maybeSingle()` faalt op twee rijen. De loader hiernaast
+      // (`loadCashBankLinks`) filtert om dezelfde reden expliciet. Zo is het
+      // per constructie waar in plaats van per toeval.
+      supabase
+        .from('bank_accounts')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('is_archive_bucket', true)
+        .maybeSingle(),
     ])
     if (budgetsResult.status === 'fulfilled') budgetsData = budgetsResult.value
     if (coreResult.status === 'fulfilled') coreData = coreResult.value

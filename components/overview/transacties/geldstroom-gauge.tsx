@@ -384,10 +384,14 @@ function KpiCell({
     <button
       type="button"
       onClick={onClick}
-      aria-label={openLabel ?? label}
+      /* Bewust GEEN aria-label: die vervángt de naamberekening, en dan verliest
+         een schermlezer juist het bedrag — de hele reden dat deze cel bestaat.
+         De zichtbare inhoud (label + bedrag) blijft de naam; wat de knop dóét
+         komt er als sr-only staart achteraan. */
       className="cursor-pointer border-r border-[var(--border-ed)] px-1 py-2 text-center transition-colors duration-150 last:border-r-0 hover:bg-[var(--subtle)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--ink)]"
     >
       {body}
+      {openLabel && <span className="sr-only">, {openLabel}</span>}
     </button>
   )
 }
