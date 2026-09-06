@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 }
 
 /**
- * /overzicht/cashflow/forecast — losse Forecast-pagina (was de "Forecast"-tab).
+ * /overzicht/budget/forecast — losse Forecast-pagina (was de "Forecast"-tab).
  * Toont eerst de cashflow-samenvatting (spaarquote 6m, maandelijks netto,
  * uitgaventrend) en daaronder de 6-maands-projectietabel. Gestreamd in blokken
  * (perf Task 2.5, zelfde vorm als de hub en de vaste-lasten-pagina).
@@ -51,7 +51,7 @@ export default async function OverzichtCashflowForecastPage() {
       <div className="relative mx-auto max-w-6xl px-4 pt-4 sm:px-6">
         <PageStatusDot className="absolute right-[52px] top-4 sm:right-[60px]" />
         <PageInfoButton
-          content={getPageInfo('/overzicht/cashflow/forecast')}
+          content={getPageInfo('/overzicht/budget/forecast')}
           className="absolute right-4 top-4 sm:right-6"
         />
       </div>

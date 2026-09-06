@@ -32,7 +32,7 @@ const { loadPerspectiveTransactions, searchParams } = vi.hoisted(() => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn(), replace: vi.fn(), push: vi.fn() }),
   useSearchParams: () => searchParams.value,
-  usePathname: () => '/overzicht/cashflow/transacties',
+  usePathname: () => '/overzicht/budget/transacties',
 }))
 
 vi.mock('@/components/app/perspective-provider', () => ({

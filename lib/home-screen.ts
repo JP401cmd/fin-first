@@ -27,7 +27,7 @@ export const DEFAULT_HOME_SCREEN: HomeScreen = 'overzicht'
  */
 export const HOME_SCREEN_HREFS: Record<HomeScreen, string> = {
   overzicht: '/overzicht',
-  budget: '/overzicht/cashflow/budget',
+  budget: '/overzicht/budget',
 }
 
 export function isHomeScreen(value: unknown): value is HomeScreen {

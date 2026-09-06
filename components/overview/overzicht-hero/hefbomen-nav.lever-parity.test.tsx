@@ -194,7 +194,7 @@ describe('HefbomenNav — status-pariteit: kaart-dot == sidebar-dot', () => {
           weight: 0.25,
           explanation: '',
           improvementTip: '',
-          actionHref: '/overzicht/cashflow',
+          actionHref: '/overzicht/budget',
           actionLabel: 'Bekijk',
           rawValue: '-5%',
         },

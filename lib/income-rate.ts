@@ -26,7 +26,7 @@
  * BEKENDE KOSTEN, bewust aanvaard: `resolveBox1GrossIncome` trekt via
  * `loadCashflowSettingsData` de `loadCoreData`-bundel binnen. Op de belasting-hub
  * is die al warm (de kansen-loader deed 'm) en is deze bron gratis; op
- * /overzicht/cashflow/vaste-lasten is het één extra PARALLELLE golf. Dat is
+ * /overzicht/budget/vaste-lasten is het één extra PARALLELLE golf. Dat is
  * dezelfde koppeling die het aandachtspunt `bruto-box1-grondslag-meervoudig` al
  * registreert (opvolgactie: override-first met lazy estimate) — deze module voegt
  * er geen nieuwe koppeling aan toe, hij hangt aan de bestaande.

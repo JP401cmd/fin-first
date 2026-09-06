@@ -502,7 +502,7 @@ export const loadLeverScores = cache(async function loadLeverScores(
   // Budgetgrondslag (ADR 0103) uit dezelfde gedeelde samenstelling als de
   // loaders. Zonder dit zou de sidebar-statusdot — die op ÉLKE route in het
   // shell-pad hangt — het Box 1-inkomen op de transactiegrondslag blijven
-  // rekenen terwijl /overzicht/cashflow het budgetgetal toont. Geen extra query:
+  // rekenen terwijl /overzicht/budget het budgetgetal toont. Geen extra query:
   // `getBudgets`/`getOwnProfile` staan al in de golf hierboven.
   const leverBudgetBasis = await loadBudgetBasis(
     supabase,

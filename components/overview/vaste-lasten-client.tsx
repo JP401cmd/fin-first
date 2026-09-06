@@ -2,7 +2,7 @@
 
 /**
  * VasteLastenClient — orchestrator voor het Vaste-lasten-scherm
- * (/overzicht/cashflow/vaste-lasten). Twee lagen die meebewegen met de
+ * (/overzicht/budget/vaste-lasten). Twee lagen die meebewegen met de
  * weergavemodus:
  *
  *   Eenvoudig → hoofdcijfer €/mnd + vrijheidstijd-onderschrift + OORDEELREGEL
@@ -129,7 +129,7 @@ function OordeelDeck({ insights }: { insights: Insights }) {
         Je vaste lasten zijn in beeld, je maandinkomen nog niet — daarom staat er geen
         aandeel bij.{' '}
         <Link
-          href="/overzicht/cashflow"
+          href="/overzicht/budget"
           className="not-italic font-medium text-[var(--module-active-700)] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
         >
           Vul je inkomen in bij Cashflow

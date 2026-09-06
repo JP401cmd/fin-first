@@ -370,7 +370,7 @@ export interface HorizonRawData {
   /** Jaarlijks spaarbedrag afgeleid van de cashflow-pagina: inkomen × spaarquote
    *  (berekend óf overschreven, incl. spaarbudgetten + schuldaflossing). Primaire
    *  spaarbron voor de FIRE-prognose wanneer er geen handmatige spaar-override is.
-   *  Zie lib/savings-source.ts — spiegelt het instellingenblok op /overzicht/cashflow. */
+   *  Zie lib/savings-source.ts — spiegelt het instellingenblok op /overzicht/budget. */
   baseAnnualSavingsFromCashflow: number
   /** Retirement-expense methode uit profile (raw, mogelijk null bij nieuwe users). */
   retirementExpenseMethod: RetirementExpenseMethod | null
@@ -688,7 +688,7 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
   // ── De budgetgrondslag (ADR 0103) ────────────────────────────────────────
   // Zelfde motor en dezelfde rijen als de core-/dashboard-loader (`getBudgets`
   // is cache()-gedeeld binnen het request), zodat /toekomst per definitie op
-  // dezelfde grondslag staat als /overzicht/cashflow. Geen extra query.
+  // dezelfde grondslag staat als /overzicht/budget. Geen extra query.
   const { income: horizonBudgetIncome, expenses: horizonBudgetExpenses } = await loadBudgetBasis(
     supabase,
     profile as Record<string, unknown>,
@@ -943,7 +943,7 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
   })
 
   // Canonieke spaarbron voor de FIRE-prognose: inkomen × spaarquote, exact zoals
-  // het instellingenblok onderaan /overzicht/cashflow het toont (berekend óf
+  // het instellingenblok onderaan /overzicht/budget het toont (berekend óf
   // overschreven). `effectiveSavingsRate` is datzelfde percentage en voedt
   // hieronder ook de gezondheidsscore — één getal, één oordeel.
   const sources = profile as { income_source?: string | null; expenses_source?: string | null }
@@ -1074,7 +1074,7 @@ const loadHorizonRawCached = cache(async function loadHorizonRawInner(
   const healthScoreInputWithPlaceholder = buildHealthScoreInput(
     {
       // EFFECTIEVE spaarquote (handmatige invoer wint) — hetzelfde percentage
-      // dat het instellingenblok onderaan /overzicht/cashflow toont en dat de
+      // dat het instellingenblok onderaan /overzicht/budget toont en dat de
       // FIRE-prognose hierboven gebruikt. Niet de rauwe transactiequote.
       savingsRate6m: effectiveSavingsRate,
       totalAssets: perspectiveTotalAssets,

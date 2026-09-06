@@ -387,11 +387,11 @@ export const CashFlowWidget = memo(function CashFlowWidget({ size, data, href }:
   // ADR 0103: manual > budget > transactie > profiel). Bij `income_source='auto'`
   // is dat de 12-maands gerealiseerde budgetsom: een STRUCTURELE maandwaarde die
   // niets met de lopende maand te maken heeft. Eén klik verderop toonde
-  // /overzicht/cashflow de GEREALISEERDE maand. Twee schermen, één label,
+  // /overzicht/budget de GEREALISEERDE maand. Twee schermen, één label,
   // tegengesteld teken (+€3.606 vs −€3.618).
   //
   // Eigen perspectief consumeert daarom `currentMonth*` — hetzelfde bundelveld
-  // dat de Transacties-kaart op /overzicht/cashflow sinds 30 jul 2026 leest
+  // dat de Transacties-kaart op /overzicht/budget sinds 30 jul 2026 leest
   // (lib/cashflow-cards.ts). Consume, don't recompute: geen eigen tel-lus, en het
   // aggregaat achter dit veld kan niet stil op `max_rows` afkappen (ADR 0073).
   //

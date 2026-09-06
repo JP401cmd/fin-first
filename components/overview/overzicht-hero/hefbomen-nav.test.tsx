@@ -90,7 +90,7 @@ describe('HefbomenNav', () => {
     render(<HefbomenNav health={mockHealth()} />)
     expect(screen.getByText('Bezittingen')).toBeTruthy()
     expect(screen.getByText('Schulden')).toBeTruthy()
-    expect(screen.getByText('Cashflow')).toBeTruthy()
+    expect(screen.getByText('Budget')).toBeTruthy()
     expect(screen.getByText('Belasting')).toBeTruthy()
   })
 
@@ -100,7 +100,7 @@ describe('HefbomenNav', () => {
     expect(links.length).toBe(4)
     expect(links[0]?.getAttribute('href')).toBe('/overzicht/bezittingen')
     expect(links[1]?.getAttribute('href')).toBe('/overzicht/schulden')
-    expect(links[2]?.getAttribute('href')).toBe('/overzicht/cashflow')
+    expect(links[2]?.getAttribute('href')).toBe('/overzicht/budget')
     expect(links[3]?.getAttribute('href')).toBe('/overzicht/belasting')
   })
 
@@ -232,7 +232,7 @@ describe('HefbomenNav — Eenvoudige weergave (display_mode simple)', () => {
     render(<HefbomenNav health={mockHealth()} simple />)
     expect(screen.getByText('Bezittingen')).toBeTruthy()
     expect(screen.getByText('Schulden')).toBeTruthy()
-    expect(screen.getByText('Cashflow')).toBeTruthy()
+    expect(screen.getByText('Budget')).toBeTruthy()
     expect(screen.getByText('Belasting')).toBeTruthy()
   })
 })

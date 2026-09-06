@@ -36,7 +36,7 @@ export const SpaarquoteWidget = memo(function SpaarquoteWidget({ size, data, hre
   // getallen op één kaart spreken elkaar niet meer tegen.
   //
   // DE EFFECTIEVE QUOTE, NIET DE 6-MAANDS METING (31 aug 2026). Deze widget las
-  // `savingsRate6m`, terwijl het instellingenblok onderaan /overzicht/cashflow en
+  // `savingsRate6m`, terwijl het instellingenblok onderaan /overzicht/budget en
   // de hefboomkaart op /overzicht de grondslag-geresolveerde quote tonen. Wie op
   // budgetten of eigen bedragen staat, zag daardoor 9,5 % op de widget naast 30 %
   // op /overzicht. `effectiveSavingsRatePct` is HET spaarquote-getal; de meting

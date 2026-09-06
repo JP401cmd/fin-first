@@ -120,14 +120,14 @@ const tests: TestCase[] = [
     estimatedDurationMs: 50,
     fn() {
       // Data-gap aanwezig → gap_bank (eerste in volgorde)
-      const gap = getFirstUndismissedSuggestion(emptyGaps(), '/overzicht/cashflow/budget', NO_DISMISS, [])
+      const gap = getFirstUndismissedSuggestion(emptyGaps(), '/overzicht/budget', NO_DISMISS, [])
       assertEqual(gap?.key, 'gap_bank', 'gap_bank (eerste data-gap) wint')
 
       // Geen gaps → pad-suggestie. Sinds bevinding C7 bestaat er geen
-      // onvoorwaardelijke `path_budgets` meer; /overzicht/cashflow valt door
+      // onvoorwaardelijke `path_budgets` meer; /overzicht/budget valt door
       // naar de brede /overzicht-regel.
-      const path = getFirstUndismissedSuggestion(fullGaps(), '/overzicht/cashflow/budget', NO_DISMISS, [])
-      assertEqual(path?.key, 'path_core', 'path_core bij volledige data op /overzicht/cashflow/budget')
+      const path = getFirstUndismissedSuggestion(fullGaps(), '/overzicht/budget', NO_DISMISS, [])
+      assertEqual(path?.key, 'path_core', 'path_core bij volledige data op /overzicht/budget')
 
       // Geen gaps, onbekend pad → de GEVULDE terugval. Sinds kaart H15 is de
       // default-laag gesplitst: "Welkom." is first-use-copy en hoort niet bij
@@ -165,10 +165,10 @@ const tests: TestCase[] = [
     estimatedDurationMs: 50,
     fn() {
       const onlyBudgetsMissing = { ...fullGaps(), hasBudgets: false }
-      const missing = getFirstUndismissedSuggestion(onlyBudgetsMissing, '/overzicht/cashflow/budget', NO_DISMISS, [])
+      const missing = getFirstUndismissedSuggestion(onlyBudgetsMissing, '/overzicht/budget', NO_DISMISS, [])
       assertEqual(missing?.key, 'gap_budgets', 'gap_budgets vuurt zonder budgetten')
 
-      const withBudgets = getFirstUndismissedSuggestion(fullGaps(), '/overzicht/cashflow/budget', NO_DISMISS, [])
+      const withBudgets = getFirstUndismissedSuggestion(fullGaps(), '/overzicht/budget', NO_DISMISS, [])
       assert(
         withBudgets?.key !== 'gap_budgets' && withBudgets?.key !== 'path_budgets',
         `geen budget-tip voor een gebruiker mét budgetten (kreeg: ${withBudgets?.key})`,

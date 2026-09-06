@@ -1,58 +1,30 @@
 'use client'
 
+/**
+ * cashflow-instellingen-lazy.tsx — het grondslagblok (inkomen, uitgaven,
+ * spaarquote) als client-eiland dat zijn data pas ophaalt wanneer het in beeld
+ * komt. Daarmee blijven ~25 `loadCoreData`-queries buiten het paginarequest van
+ * iedereen die niet naar beneden scrollt.
+ *
+ * Woonde als `cashflow-below-fold.tsx` in de route-map van de cashflow-hub, met
+ * daarin ook het lazy-eiland en de skeleton van `CashOverview`. Die hub is
+ * opgeheven (UR3-28) en `CashOverview` bestaat niet meer; wat overblijft is dit
+ * ene blok, en dat is een component en geen route-bestand. Het staat nu op de
+ * transactiepagina, naast de transacties en budgetten die de grondslag voeden.
+ */
+
 import { useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { DepthSection } from '@/components/app/depth-section'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import type { CashflowSettingsData } from '@/lib/cashflow-settings-data'
-import type { CashBankLink } from '@/lib/bank-connection-status'
 
 /**
- * cashflow-below-fold.tsx — dun client-eiland voor perf Task 3.2.
- *
- * `page.tsx` is een server-component; `next/dynamic(..., { ssr: false })` mag
- * daar niet direct in (Next.js-restrictie voor Server Components). Dit eiland
- * doet de dynamic-imports voor de twee zware below-the-fold-blokken zodat ze
- * uit het first-load JS-chunk van /overzicht/cashflow blijven:
- *
- * - `CashOverview` (components/app/cash-overview.tsx, 1696 r) — fetcht zelf
- *   client-side (self-fetch, bewust ongewijzigd — zie brief) en staat onder de
- *   vouw, dus `ssr:false` verliest geen SSR-content.
- * - `CashflowInstellingenBlok` (components/overview/cashflow-instellingen-blok.tsx,
- *   281 r) — consumeert props, klein, zelfde behandeling.
- *
- * Skeletons benaderen de kaart-hoogte (token-based: --subtle/--border-ed/--paper,
- * animate-pulse) om CLS te vermijden, conform het bestaande loading.tsx-patroon
- * op cashflow-niveau.
- *
- * SINDS TASK 2.2 is `CashflowInstellingenBlokLazy` niet langer een pure drop-in:
- * hij haalt zijn eigen data op bij in-view i.p.v. 'm als prop te krijgen (zie de
- * doc-comment daar voor de ruil). `CashOverviewLazy` blijft props-identiek.
- *
- * `CashOverviewSkeleton` doet dubbel dienst (perf Task 2.2): behalve als
- * `next/dynamic`-loading-state is hij óók de Suspense-fallback van
- * `CashOverviewLoader` (cash-overview-loader.tsx), zodat de overgang
- * server-boundary → chunk-load geen tweede skeleton-vorm oplevert. Hij spiegelt
- * structureel de drie secties die de pagina
- * hier daadwerkelijk laat renderen (embedded, showAllCashAccounts,
- * showMonthLinks — dus VermogenAssetCard-kaarten, geen simple-mode):
- * "Rekeningen" (card-editorial-grid, cash-overview.tsx ~808-905), "Geldstroom"
- * (maand-banner + KPI-strip + dagchart, ~907-1104) en "Snelle acties"
- * (~1130-1157). Zie de per-sectie comments hieronder voor de nagetelde
- * hoogtes/paddings. Noot: `--paper-2` uit de reviewopdracht bestaat niet in
- * app/globals.css (alleen gescopeerd in app/check/rapport/rapport.css) — dit
- * bestand gebruikt daarom `--paper` (kaart-bg) + `--subtle` (skeleton-blok),
- * de tokens die het bestaande `components/app/shell/page-skeleton.tsx` ook
- * gebruikt.
+ * Voorlaad-marge van de IntersectionObserver: begin met ophalen zodra het blok
+ * nog 300px onder de vouw zit, zodat de skeleton in de praktijk zelden in beeld
+ * komt.
  */
-
-const DynCashOverview = dynamic(
-  () => import('@/components/app/cash-overview').then(m => ({ default: m.CashOverview })),
-  {
-    ssr: false,
-    loading: () => <CashOverviewSkeleton />,
-  },
-)
+const SETTINGS_PREFETCH_MARGIN = '300px 0px'
 
 const DynCashflowInstellingenBlok = dynamic(
   () =>
@@ -64,111 +36,6 @@ const DynCashflowInstellingenBlok = dynamic(
     loading: () => <CashflowInstellingenBlokSkeleton />,
   },
 )
-
-/**
- * Eén rekening-kaart-placeholder — spiegelt `VermogenAssetCard`
- * (components/core/vermogen-asset-card.tsx), de kaart die hier écht rendert
- * (showAllCashAccounts=true → cashAssets.map). Nageteld:
- * 3px accentbalk + hoofdregel (p-3 sm:p-4, icon h-7 w-7 + naam/sub-regel +
- * bedrag rechts) + actie-rij (border-t, px-3 py-2 sm:px-4, 2 knop-placeholders)
- * ≈ 95-105px — de kaart heeft GEEN eigen vaste hoogte, laat 'm organisch
- * groeien uit dezelfde spacing-tokens als het origineel.
- */
-function RekeningenCardSkeleton() {
-  return (
-    <div className="card-editorial w-full">
-      <div className="h-[3px] w-full bg-[var(--subtle)]" />
-      <div className="flex items-center gap-3 p-3 sm:p-4">
-        <div className="h-7 w-7 shrink-0 bg-[var(--subtle)]" />
-        <div className="min-w-0 flex-1 space-y-1.5">
-          <div className="h-3.5 w-2/3 bg-[var(--subtle)]" />
-          <div className="h-2.5 w-1/3 bg-[var(--subtle)]" />
-        </div>
-        <div className="h-4 w-14 shrink-0 bg-[var(--subtle)]" />
-      </div>
-      <div className="flex items-center justify-end gap-2 border-t border-[var(--border-ed)] px-3 py-2 sm:px-4">
-        <div className="h-6 w-20 bg-[var(--subtle)]" />
-        <div className="h-6 w-16 bg-[var(--subtle)]" />
-      </div>
-    </div>
-  )
-}
-
-/**
- * `CashOverview`-skeleton — spiegelt de drie secties structureel (zie
- * bestandskop). Buitenste `mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8` is
- * 1:1 overgenomen van de echte container (cash-overview.tsx r806) zodat ook
- * de breedte/uitlijning niet verspringt bij de chunk-swap, niet alleen de
- * hoogte.
- */
-export function CashOverviewSkeleton() {
-  return (
-    <div
-      aria-hidden="true"
-      className="mx-auto max-w-6xl animate-pulse px-4 py-5 sm:px-6 sm:py-8"
-    >
-      {/* === 1. Rekeningen — Kicker-regel + cards-grid (~808-905) === */}
-      <section className="mt-5 sm:mt-8">
-        <div className="mb-4 h-3 w-24 bg-[var(--subtle)]" />
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
-          <RekeningenCardSkeleton />
-          <RekeningenCardSkeleton />
-          <RekeningenCardSkeleton />
-        </div>
-      </section>
-
-      {/* === 2. Geldstroom — banner + KPI-strip + chart-blok (~907-1104) === */}
-      <section className="mt-5 sm:mt-8">
-        {/* Maand-banner: top-rij (py-3, ~44px) + 4-koloms KPI-strip (2x2 op
-            mobiel, nageteld border-r/border-b matcht de echte
-            `[&:nth-child(-n+2)]:border-b` regel op r977-1068). */}
-        <div className="border border-[var(--border-ed)]">
-          <div className="flex items-center justify-between border-b border-[var(--border-ed)] px-4 py-3 sm:px-5">
-            <div className="h-5 w-28 bg-[var(--subtle)]" />
-            <div className="h-3 w-16 bg-[var(--subtle)]" />
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4">
-            {[0, 1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className={[
-                  'p-4',
-                  i < 3 ? 'border-r border-[var(--border-ed)]' : '',
-                  i < 2 ? 'border-b sm:border-b-0 border-[var(--border-ed)]' : '',
-                ].join(' ')}
-              >
-                <div className="h-2.5 w-12 bg-[var(--subtle)]" />
-                <div className="mt-1.5 h-6 w-20 bg-[var(--subtle)]" />
-                <div className="mt-1.5 h-2.5 w-10 bg-[var(--subtle)]" />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Chart-blok: card-editorial (zelfde class als het echte blok,
-            r1072) + header-rij (mb-3) + grafiek-placeholder. De echte
-            `CashflowChart`-SVG is hardcoded `h-[200px]` (r1497) — exacte
-            waarde overgenomen i.p.v. een afgeronde Tailwind-stap. */}
-        <div className="mt-6 card-editorial p-4 sm:p-6">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="h-4 w-24 bg-[var(--subtle)]" />
-            <div className="h-3 w-32 bg-[var(--subtle)]" />
-          </div>
-          <div className="h-[200px] w-full bg-[var(--subtle)]" />
-        </div>
-      </section>
-
-      {/* === 3. Snelle acties — actions-rij (~1130-1157) === */}
-      <section className="mt-5 sm:mt-8">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="h-9 w-48 bg-[var(--subtle)]" />
-          <div className="h-9 w-40 bg-[var(--subtle)]" />
-          <div className="h-9 w-32 bg-[var(--subtle)]" />
-        </div>
-      </section>
-    </div>
-  )
-}
 
 /**
  * `CashflowInstellingenBlok`-skeleton — spiegelt de echte sectie
@@ -201,37 +68,6 @@ function CashflowInstellingenBlokSkeleton() {
     </section>
   )
 }
-
-/**
- * Drop-in vervanger voor de statische `CashOverview`-import op de
- * cashflow-pagina. Géén `onNavigateToAccount` in dit props-type: `page.tsx`
- * is een Server Component en kan nooit een functie-prop doorgeven (RSC-regel),
- * en de enige echte gebruiker van die callback (`components/core/asset-category-page.tsx`)
- * importeert `CashOverview` direct, niet via dit lazy-eiland. Dempt ook de
- * serializable-props-waarschuwing van `next/dynamic`.
- */
-export function CashOverviewLazy(props: {
-  embedded?: boolean
-  hideAccountsSection?: boolean
-  hideQuickActions?: boolean
-  showAllCashAccounts?: boolean
-  showMonthLinks?: boolean
-  /**
-   * Koppelstatus per bankrekening uit `loadCashBankLinks()` op de server-pagina.
-   * Serialiseerbare data (geen functie), dus mag wél door dit `dynamic()`-eiland
-   * heen — anders dan `onNavigateToAccount` hierboven.
-   */
-  bankLinks?: CashBankLink[]
-}) {
-  return <DynCashOverview {...props} />
-}
-
-/**
- * Marge waarbinnen het blok al als "in beeld" telt. 300px onder de viewport, dus
- * de fetch start terwijl de gebruiker er nog naartoe scrollt — niet pas als het
- * blok de rand raakt.
- */
-const SETTINGS_PREFETCH_MARGIN = '300px 0px'
 
 /**
  * Het instellingen-blok, met zijn EIGEN data — opgehaald ná hydratatie en pas
@@ -373,7 +209,7 @@ function CashflowInstellingenDisclosure({ data }: { data: CashflowSettingsData }
       {/* NB: het blok draagt in Volledig sinds de samenvatting-herbouw zijn eigen
           kop "Je instellingen" / "Waar je cijfers op rusten"; "& toekomst" klopt
           niet meer (de FIRE-doorkijk woont op /toekomst). Deze twee regels lopen
-          daar bewust nog niet mee: `cashflow-below-fold.test.tsx` pint de titel
+          daar bewust nog niet mee: `cashflow-instellingen-lazy.test.tsx` pint de titel
           letterlijk, en dat testbestand is niet van deze wijziging. Hernoemen
           hoort in dezelfde change als die assertie. In de praktijk ziet een
           gebruiker nooit beide labels tegelijk — in Eenvoudig onderdrukt

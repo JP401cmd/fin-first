@@ -171,7 +171,7 @@ describe('BudgettenWidget — states', () => {
     // In de empty-state hoort de CTA de ENIGE, intentionele navigatie te zijn.
     const data = makeData([])
     const { container } = render(
-      <BudgettenWidget size="half" data={data} href="/overzicht/cashflow/budget" />,
+      <BudgettenWidget size="half" data={data} href="/overzicht/budget" />,
     )
     expect(container.querySelectorAll('a a').length).toBe(0)
     const anchors = container.querySelectorAll('a')

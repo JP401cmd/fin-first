@@ -124,8 +124,8 @@ interface CashflowSectionProps {
 /**
  * CashflowSection — compacte cashflow-samenvatting (spaarquote 6m,
  * maandelijks netto, uitgaventrend). Leeft bovenaan de forecast-pagina
- * /overzicht/cashflow/forecast. De vaste-lasten-teaser is bewust verwijderd:
- * die data zit al op /overzicht/cashflow/vaste-lasten.
+ * /overzicht/budget/forecast. De vaste-lasten-teaser is bewust verwijderd:
+ * die data zit al op /overzicht/budget/vaste-lasten.
  *
  * ── WEERGAVEMODUS (S5, release R5) ──────────────────────────────────────────
  * Dit was het enige blok op deze route dat niet modus-bewust was: in Eenvoudig

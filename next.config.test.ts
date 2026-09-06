@@ -41,10 +41,12 @@ async function rulesFor(source: string): Promise<RedirectRule[]> {
 }
 
 describe('next.config redirects — legacy routes redirecten op de routing-laag (React #310)', () => {
-  it('/core/cash redirect naar de canonieke cashflow-landing', async () => {
+  it('/core/cash redirect naar de rekeningen bij de bezittingen', async () => {
+    // Wees eerst naar de cashflow-hub; die is opgeheven (UR3-28) en de
+    // rekeningen wonen sindsdien op hun eigen bezitgroep-pagina.
     const rules = await rulesFor('/core/cash')
     expect(rules).toHaveLength(1)
-    expect(rules[0].destination).toBe('/overzicht/cashflow')
+    expect(rules[0].destination).toBe('/overzicht/bezittingen/cash')
     // Bewust tijdelijk (307), niet permanent (308): browsers cachen een 308
     // agressief, en deze migratie moet omkeerbaar blijven.
     expect(rules[0].permanent).toBe(false)

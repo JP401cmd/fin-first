@@ -125,13 +125,13 @@ export const OVERLAY_TRIGGER_PARAMS: readonly string[] = OVERLAY_TRIGGER_KEYS.ma
  * rendert en dus de `?budget=` / `?newBudget=`-params leest.
  *
  * Het legacy-pad `/core/budgets` is géén alternatief: `next.config.ts` redirect
- * dat exacte pad naar de cashflow-HUB (`/overzicht/cashflow`), die geen
+ * dat exacte pad naar de cashflow-HUB (`/overzicht/budget`), die geen
  * BudgetsClient rendert. Next matcht een statische redirect op de pathname —
  * de query telt niet mee voor de match en wordt ongebruikt doorgeplakt. Een
  * tussenstap via `/core/budgets?budget=<id>` landde daardoor één niveau te hoog
  * mét een dode `?budget=`-param in de adresbalk (UAT WF-BUDGET-23).
  */
-export const BUDGET_PAGE_PATH = '/overzicht/cashflow/budget'
+export const BUDGET_PAGE_PATH = '/overzicht/budget'
 
 /** Deeplink naar de budgetpagina met het detailpaneel van dit budget open. */
 export function budgetDetailUrl(id: string): string {

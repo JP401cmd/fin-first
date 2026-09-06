@@ -56,16 +56,16 @@ const KERN_PAGES: StaticPage[] = [
   // Behouden is de canonieke naam ("Koppelingen", = navGroups + de
   // NavStackMeta-titel van de pagina); "bank" blijft vindbaar via het sublabel
   // van dat item, dat de ranker meeneemt.
-  { label: 'Cashflow',                  sublabel: 'Budget, transacties, vaste lasten, forecast', href: '/overzicht/cashflow',              icon: Banknote,    module: 'kern' },
-  { label: 'Transacties',               sublabel: 'Inkomsten en uitgaven deze maand',   href: '/overzicht/cashflow/transacties',        icon: Receipt,     module: 'kern' },
-  { label: 'Vaste lasten',              sublabel: 'Abonnementen en terugkerende kosten', href: '/overzicht/cashflow/vaste-lasten',      icon: RefreshCw,   module: 'kern' },
+  { label: 'Budget',                    sublabel: 'Budgetten, transacties, vaste lasten, forecast', href: '/overzicht/budget',              icon: Banknote,    module: 'kern' },
+  { label: 'Transacties',               sublabel: 'Inkomsten en uitgaven deze maand',   href: '/overzicht/budget/transacties',        icon: Receipt,     module: 'kern' },
+  { label: 'Vaste lasten',              sublabel: 'Abonnementen en terugkerende kosten', href: '/overzicht/budget/vaste-lasten',      icon: RefreshCw,   module: 'kern' },
   // Bankafschrift-import. Spiegelt bewust 'Holdings importeren' hierboven: ook
   // een /core/**-backing-route die alleen hier wordt ontsloten (niet in
   // nav-config — dat zou de legacy-allowlist in nav-config.route-coverage.test.ts
   // doorbreken). Label = de NavStackMeta-titel van de pagina zelf. Geen
   // requiredModule: transacties importeren is niet module-gated.
   { label: 'Transacties importeren',    sublabel: 'Bankafschrift: CSV, MT940, OFX',     href: '/core/cash/import',                      icon: FileText,    module: 'kern' },
-  { label: 'Forecast',                  sublabel: 'Spaarquote, netto, trend + 6-maands-vooruitblik', href: '/overzicht/cashflow/forecast', icon: LineChart,   module: 'kern' },
+  { label: 'Forecast',                  sublabel: 'Spaarquote, netto, trend + 6-maands-vooruitblik', href: '/overzicht/budget/forecast', icon: LineChart,   module: 'kern' },
 ]
 
 // ── Apps (deep-tools) ────────────────────────────────────────────────────────

@@ -371,7 +371,7 @@ describe('UR2-13 — Transacties-kaart bij een leeg maandvenster', () => {
 
 // ── CF-3 — venster-label bij de maandcijfers ───────────────────────────────
 // De Transacties-KPI is de gerealiseerde LOPENDE kalendermaand; op
-// /overzicht/cashflow/transacties staan 30-DAGEN-cijfers. Zonder venster zijn
+// /overzicht/budget/transacties staan 30-DAGEN-cijfers. Zonder venster zijn
 // die twee niet uit elkaar te houden — dezelfde verwarringsklasse als ADR 0073,
 // alleen nu in de copy i.p.v. in de grondslag. Deze suite pint het label vast
 // TEGEN de velden die het beschrijft, zodat een label niet stil kan blijven

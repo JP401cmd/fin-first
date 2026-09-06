@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest'
 import { componentBody, stripComments } from '@/test/helpers/page-source'
 
 /**
- * /overzicht/cashflow/vaste-lasten — broncontrole (perf Task 2.4).
+ * /overzicht/budget/vaste-lasten — broncontrole (perf Task 2.4).
  *
  * Zelfde soort test als op de hub (page.streaming.test.ts daar), en om dezelfde
  * reden: het defect is niet "een verkeerd getal" maar "de eerste byte komt pas
@@ -31,7 +31,7 @@ const CLIENT_SRC = readFileSync(
 
 const PAGE_SIGNATURE = 'export default async function OverzichtCashflowVasteLastenPage'
 
-describe('/overzicht/cashflow/vaste-lasten — geen zware await boven de return', () => {
+describe('/overzicht/budget/vaste-lasten — geen zware await boven de return', () => {
   const body = componentBody(PAGE_SRC, PAGE_SIGNATURE)
 
   it('heeft exact één await in het component-lichaam', () => {
@@ -51,7 +51,7 @@ describe('/overzicht/cashflow/vaste-lasten — geen zware await boven de return'
   })
 })
 
-describe('/overzicht/cashflow/vaste-lasten — de zware loaders staan achter Suspense', () => {
+describe('/overzicht/budget/vaste-lasten — de zware loaders staan achter Suspense', () => {
   const src = stripComments(PAGE_SRC)
 
   for (const loader of ['loadDashboardData', 'loadCashflowKpis', 'loadCashflowData', 'loadVasteLastenSummary']) {
@@ -117,7 +117,7 @@ describe('vaste-lasten-loader — draait op de slanke KPI-laag (ADR 0083)', () =
   })
 })
 
-describe('/overzicht/cashflow/vaste-lasten — precies één pagina-aanhef', () => {
+describe('/overzicht/budget/vaste-lasten — precies één pagina-aanhef', () => {
   it('de client rendert geen tweede PageOpening', () => {
     // De kicker + pagina-aanhef zijn bij T2.4 uit vaste-lasten-client.tsx naar
     // de server-pagina verhuisd (LCP-kandidaat, hangt van geen data af). Zet

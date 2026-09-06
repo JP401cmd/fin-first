@@ -73,8 +73,8 @@ describe('getFirstUndismissedSuggestion priority', () => {
   })
 
   it('falls through data gap -> path -> default', () => {
-    expect(getFirstUndismissedSuggestion(empty(), '/overzicht/cashflow', none, [])?.key).toBe('gap_bank')
-    expect(getFirstUndismissedSuggestion(full(), '/overzicht/cashflow', none, [])?.key).toBe('path_core')
+    expect(getFirstUndismissedSuggestion(empty(), '/overzicht/budget', none, [])?.key).toBe('gap_bank')
+    expect(getFirstUndismissedSuggestion(full(), '/overzicht/budget', none, [])?.key).toBe('path_core')
     // Gevuld account → de gevulde terugval, niet het first-use-welkom (H15).
     expect(getFirstUndismissedSuggestion(full(), '/random', none, [])?.key).toBe('default_gevuld')
   })
@@ -91,10 +91,10 @@ describe('getFirstUndismissedSuggestion priority', () => {
   it('budget-tip vuurt alleen bij ontbrekende budgetten (geen onvoorwaardelijke pad-regel)', () => {
     const onlyBudgetsMissing: CoachDataGaps = { ...full(), hasBudgets: false }
     expect(
-      getFirstUndismissedSuggestion(onlyBudgetsMissing, '/overzicht/cashflow/budget', none, [])?.key,
+      getFirstUndismissedSuggestion(onlyBudgetsMissing, '/overzicht/budget', none, [])?.key,
     ).toBe('gap_budgets')
     // Mét budgetten: geen budget-tip meer, maar de brede /overzicht-fallback.
-    for (const path of ['/overzicht/cashflow', '/overzicht/cashflow/budget', '/core/budgets']) {
+    for (const path of ['/overzicht/budget', '/overzicht/budget', '/core/budgets']) {
       const key = getFirstUndismissedSuggestion(full(), path, none, [])?.key
       expect(key).not.toBe('path_budgets')
       expect(key).not.toBe('gap_budgets')
@@ -215,8 +215,8 @@ describe('H15 — first-use-copy hoort bij first use', () => {
   /** Elke pad-prefix uit de catalogus + de routes zónder pad-regel. */
   const ALLE_ROUTES = [
     ...PATH_SUGGESTIONS.map((r) => r.pathPrefix),
-    '/overzicht/cashflow',
-    '/overzicht/cashflow/budget',
+    '/overzicht/budget',
+    '/overzicht/budget',
     '/overzicht/bezittingen',
     '/mijn',
     '/mijn/profiel',
@@ -237,7 +237,7 @@ describe('H15 — first-use-copy hoort bij first use', () => {
 
   it('houdt de first-use-copy wél voor een leeg account', () => {
     // Leeg account: de data-gap-laag vuurt en die draagt de first-use-teksten.
-    const s = getFirstUndismissedSuggestion(empty(), '/overzicht/cashflow', none, [], undefined, ALL_MODULES)
+    const s = getFirstUndismissedSuggestion(empty(), '/overzicht/budget', none, [], undefined, ALL_MODULES)
     expect(s?.key).toBe('gap_bank')
     // En de onvoorwaardelijke terugval blijft "Welkom." zolang het account
     // niet gevuld is — ook als alle gaps zijn weggeklikt (de val waarin de
@@ -351,11 +351,11 @@ describe('gids-laag (ADR 0130)', () => {
 
   it('geeft een deeplink-stap wél een ctaHref', () => {
     const s = getFirstUndismissedSuggestion(
-      empty(), '/overzicht/cashflow/budget', none, [], undefined, ALL_MODULES,
-      actief([stap({ id: 's1-budget', href: '/overzicht/cashflow/budget?newBudget=true' })]),
+      empty(), '/overzicht/budget', none, [], undefined, ALL_MODULES,
+      actief([stap({ id: 's1-budget', href: '/overzicht/budget?newBudget=true' })]),
     )
     expect(s?.key).toBe(`${GUIDE_SUGGESTION_KEY_PREFIX}s1-budget`)
-    expect(s?.ctaHref).toBe('/overzicht/cashflow/budget?newBudget=true')
+    expect(s?.ctaHref).toBe('/overzicht/budget?newBudget=true')
   })
 
   it('kiest de eerste stap die bij DEZE route hoort, niet simpelweg de eerste', () => {

@@ -10,7 +10,7 @@ elements: [as-budget, fn-budgetteren]
 
 ## Context
 
-`/overzicht/cashflow` heeft een TTFB-p75 van 8,8 s (desktop) en 22,3 s (mobiel).
+`/overzicht/budget` heeft een TTFB-p75 van 8,8 s (desktop) en 22,3 s (mobiel).
 De dominante oorzaak is niet de pagina zelf maar haar databron:
 `buildCashflowCards` (`lib/cashflow-cards.ts`) krijgt de volledige
 `DashboardData` binnen en gebruikt daaruit precies **zeven scalars**:
@@ -114,13 +114,13 @@ wijziging, op beide paden tegelijk.
   besluit legde de fundering; de omzetting volgde in dezelfde reeks. De hub gaat
   via `components/overview/cashflow-cards-loader.tsx` (T2.2), de sidebar-dots via
   `app/api/overzicht/cashflow-status/route.ts` (T2.3), de vaste-lasten-pagina via
-  `app/(app)/overzicht/cashflow/vaste-lasten/vaste-lasten-loader.tsx` (T2.4) en de
+  `app/(app)/overzicht/budget/vaste-lasten/vaste-lasten-loader.tsx` (T2.4) en de
   forecast-pagina via `loadForecastSectionData` (T2.5, zie de uitbreiding
   hieronder). Geen van deze vier raakt `loadDashboardData` nog aan.
 
 ## Uitbreiding — de forecast-pagina (T2.5, 4 aug 2026)
 
-`/overzicht/cashflow/forecast` (TTFB-p75 8,8 s, LCP 10,9 s desktop) was de
+`/overzicht/budget/forecast` (TTFB-p75 8,8 s, LCP 10,9 s desktop) was de
 laatste pagina op de volle bundel. `CashflowSection` leest daaruit **vijf ándere
 velden**: `monthlyIncome`, `monthlyExpenses`, `savingsRate6m`, `savingsHistory`
 en `expenseHistory`.

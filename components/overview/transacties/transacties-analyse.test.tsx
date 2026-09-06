@@ -31,7 +31,7 @@ import { TransactiesAnalyse } from './transacties-analyse'
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn(), replace: vi.fn(), push: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
-  usePathname: () => '/overzicht/cashflow/transacties',
+  usePathname: () => '/overzicht/budget/transacties',
   Link: ({ href, children }: { href: string; children: React.ReactNode }) => (
     <a href={href}>{children}</a>
   ),

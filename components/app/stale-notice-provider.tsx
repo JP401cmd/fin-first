@@ -142,7 +142,7 @@ export function StaleNoticeProvider({
 /**
  * Hook voor de MELDING zelf.
  *
- * Zónder provider (bv. /overzicht/cashflow, waar dezelfde banner boven de
+ * Zónder provider (bv. /overzicht/budget, waar dezelfde banner boven de
  * KPI-kaarten staat maar geen paginakop-cluster is om het punt in te hangen)
  * blijft de melding gewoon uitgeklapt en is `canMinimize` false — de
  * minimaliseer-knop wordt dan niet getoond, zodat er geen knop bestaat die

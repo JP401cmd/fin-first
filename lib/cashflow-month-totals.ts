@@ -8,7 +8,7 @@
 // `deriveRealMonthTotals` woonde in `lib/cashflow-kpis.ts`. Dat is een
 // LOADER-module: hij trekt `lib/server-data/*`, de perspectief-context en de
 // budget-grondslag mee. Prima voor server-code — maar de figures-strip op
-// /overzicht/cashflow is een CLIENT-component die per gekozen maand zijn eigen
+// /overzicht/budget is een CLIENT-component die per gekozen maand zijn eigen
 // rijen ophaalt en dus dezelfde totalen moet kunnen afleiden. Die de hele
 // loader-graaf laten importeren om bij tien regels pure rekenkunde te komen is
 // geen optie; de formule kopiëren nog minder — precies zó ontstond bevinding H6

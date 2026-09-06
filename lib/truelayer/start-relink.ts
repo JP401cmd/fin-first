@@ -2,7 +2,7 @@
  * HET HERSTELPAD, clientkant — één implementatie voor alle oppervlakken.
  *
  * "Verbinding kwijt" is op twee plekken zichtbaar: de rekeningkaart op
- * `/overzicht/cashflow` en de bankverbindings-sectie op de rekeningdetail. Beide
+ * `/overzicht/budget` en de bankverbindings-sectie op de rekeningdetail. Beide
  * doen exact hetzelfde: een herautorisatie starten voor één bestaande koppeling en
  * de gebruiker naar zijn bank sturen. Twee `fetch`-blokken met elk hun eigen
  * foutafhandeling zouden binnen één release uiteenlopen — dat is de driftklasse

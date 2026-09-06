@@ -42,11 +42,11 @@ function makeData(): DashboardData {
 describe('BudgetHeatmapWidget — deeplink per categorie-blok', () => {
   // Het blok moet naar de CANONIEKE categorie-view deeplinken (ShellOverlay-pane
   // via `?budget=`), niet naar de backing-route `/core/budgets/[id]`.
-  const EXPECTED = '/overzicht/cashflow/budget?budget=child-1'
+  const EXPECTED = '/overzicht/budget?budget=child-1'
 
   it('desktop-cel klik opent de categorie-pane via ?budget=<id>', () => {
     const { container } = render(
-      <BudgetHeatmapWidget size="full" data={makeData()} href="/overzicht/cashflow/budget" />,
+      <BudgetHeatmapWidget size="full" data={makeData()} href="/overzicht/budget" />,
     )
     const cell = container.querySelector('g[role="button"]')
     expect(cell).not.toBeNull()
@@ -56,7 +56,7 @@ describe('BudgetHeatmapWidget — deeplink per categorie-blok', () => {
 
   it('mobiele blok-knop opent dezelfde deeplink', () => {
     const { container } = render(
-      <BudgetHeatmapWidget size="full" data={makeData()} href="/overzicht/cashflow/budget" />,
+      <BudgetHeatmapWidget size="full" data={makeData()} href="/overzicht/budget" />,
     )
     // De gestapelde mobiele lijst rendert <button>-blokken (jsdom kent geen
     // media-queries, dus beide render-paden staan in de DOM).

@@ -210,7 +210,7 @@ describe('SpendLimitWidget — deeplink', () => {
     const links = Array.from(container.querySelectorAll('a'))
     // Precies één href per tegel — de link staat op één plek in het component.
     expect(links.length).toBe(1)
-    expect(links[0].getAttribute('href')).toBe('/overzicht/cashflow/transacties?limit=POT-1')
+    expect(links[0].getAttribute('href')).toBe('/overzicht/budget/transacties?limit=POT-1')
   })
 })
 

@@ -1025,7 +1025,7 @@ export default function OnboardingPage() {
       // (`net_monthly_income`). We sturen het maandbedrag naar
       // profiles.net_monthly_income (de server zet dit, mits > 0, als
       // handmatige bron 'eigen bedrag' in het blok "Instellingen & toekomst"
-      // op /overzicht/cashflow → drijft de spaarquote/FIRE-prognose via
+      // op /overzicht/budget → drijft de spaarquote/FIRE-prognose via
       // resolveSavingsSource, ook zonder transacties). Valt terug op een
       // eventueel reeds gevuld canoniek jaarveld (÷12) voor herstelde oude
       // drafts die alleen dat nog hadden.
@@ -1653,7 +1653,7 @@ export default function OnboardingPage() {
                       // "Later invullen" defer-pad (feature #829): wis beide
                       // velden en sla de hele inkomen-groep over (naar
                       // bezittingen). De gebruiker vult dit later aan via
-                      // /overzicht/cashflow.
+                      // /overzicht/budget.
                       dispatch({
                         type: 'SET_IDENTITY',
                         data: {

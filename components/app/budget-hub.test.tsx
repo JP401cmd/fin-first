@@ -5,7 +5,7 @@ import { BudgetHub } from './budgets-client'
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn(), refresh: vi.fn() }),
-  usePathname: () => '/overzicht/cashflow/budget',
+  usePathname: () => '/overzicht/budget',
 }))
 
 afterEach(() => {

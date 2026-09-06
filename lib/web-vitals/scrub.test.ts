@@ -36,8 +36,8 @@ describe('scrubRoute', () => {
   })
 
   it('knipt query-string en hash af', () => {
-    expect(scrubRoute('/overzicht/cashflow/transacties?maand=3#top')).toBe(
-      '/overzicht/cashflow/transacties',
+    expect(scrubRoute('/overzicht/budget/transacties?maand=3#top')).toBe(
+      '/overzicht/budget/transacties',
     )
   })
 
@@ -90,7 +90,7 @@ describe('scrubRoute', () => {
       { path: '/overzicht/bezittingen/9f8e7d6c-5b4a-4321-9876-abcdef012345', leak: '9f8e7d6c-5b4a-4321-9876-abcdef012345' },
       { path: '/overzicht/schulden/1337', leak: '1337' },
       { path: '/toekomst/bibliotheek/scenario-88274611', leak: '88274611' },
-      { path: '/overzicht/cashflow/transacties/deadbeefcafebabe', leak: 'deadbeefcafebabe' },
+      { path: '/overzicht/budget/transacties/deadbeefcafebabe', leak: 'deadbeefcafebabe' },
       { path: '/mijn/huishouden/leden/00000000-0000-4000-8000-000000000001', leak: '00000000-0000-4000-8000-000000000001' },
     ]
 

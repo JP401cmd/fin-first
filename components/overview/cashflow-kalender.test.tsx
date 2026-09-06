@@ -73,7 +73,7 @@ describe('CashflowKalender — render', () => {
     const { container } = render(<CashflowKalender recurrings={[]} />)
     const text = container.textContent ?? ''
     expect(text).not.toMatch(/recurring transactions/i)
-    expect(text).not.toContain('/overzicht/cashflow')
+    expect(text).not.toContain('/overzicht/budget')
   })
 
   it('rendert weekday-header (Ma t/m Zo)', () => {

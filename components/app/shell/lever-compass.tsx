@@ -53,7 +53,7 @@ type LeverConfig = {
 const LEVERS: LeverConfig[] = [
   { key: 'assets', label: 'Bezittingen', Icon: Landmark, href: '/overzicht/bezittingen' },
   { key: 'debts', label: 'Schulden', Icon: CreditCard, href: '/overzicht/schulden' },
-  { key: 'cashflow', label: 'Cashflow', Icon: ArrowUpDown, href: '/overzicht/cashflow' },
+  { key: 'cashflow', label: 'Budget', Icon: ArrowUpDown, href: '/overzicht/budget' },
   { key: 'tax', label: 'Belasting', Icon: Receipt, href: '/overzicht/belasting' },
 ]
 

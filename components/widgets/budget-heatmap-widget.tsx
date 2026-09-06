@@ -95,7 +95,7 @@ export const BudgetHeatmapWidget = memo(function BudgetHeatmapWidget({ size, dat
     // deeplink-param (`?budget=`, single source = searchParams in BudgetsClient) —
     // conform de overzicht-klik-conventie + WIDGET_HREFS. Werkt voor parent- én
     // child-id's. Was `/core/budgets/[id]` (backing-/redirect-route).
-    router.push(`/overzicht/cashflow/budget?budget=${budgetId}`)
+    router.push(`/overzicht/budget?budget=${budgetId}`)
   }, [router])
 
   // M17: uitweg onder de compacte mobiele lijst (quarter/half) — de schermbrede

@@ -85,7 +85,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     ],
     terms: ['netto_vermogen', 'vrijheidstijd', 'spaarquote'],
     related: [
-      { href: '/overzicht/cashflow', label: 'Cashflow — wat er in- en uitgaat' },
+      { href: '/overzicht/budget', label: 'Cashflow — wat er in- en uitgaat' },
       { href: '/toekomst', label: 'Toekomst — je pad naar vrijheid' },
       { href: '/mijn/mijlpalen', label: 'Mijlpalen die je al passeerde' },
     ],
@@ -147,39 +147,15 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
       { href: '/rapportages/balans', label: 'Balans op één peildatum' },
     ],
   },
-  '/overzicht/cashflow': {
+  // Eén entry voor de Budget-hefboom. Hier stonden er twee — de cashflow-hub en
+  // de budgetpagina eronder — die na de verhuizing (UR3-28) dezelfde route
+  // beschreven. Samengevoegd in plaats van er één te laten winnen: de pagina is
+  // nu allebei, de hefboom én de plek waar je je budgetten beheert.
+  '/overzicht/budget': {
     insight:
       'Wat er binnenkomt en wat eruit gaat. Het deel van je inkomen dat je opzij zet, bepaalt hoe snel je bij je vrijheidsmoment komt.',
-    grip: 'Beheer hier je budgetten, je vaste lasten en je transacties.',
-    werking: [
-      {
-        title: 'Budgetten',
-        text: 'Een maandlimiet per categorie die meeloopt met je boekingen, zodat je halverwege de maand ziet hoeveel ruimte er nog is.',
-      },
-      {
-        title: 'Vaste lasten',
-        text: 'Je terugkerende kosten los van je losse uitgaven. Handig omdat juist dit deel van je maand al vastligt voordat hij begint.',
-      },
-      {
-        title: 'Transacties',
-        text: 'De losse boekingen achter de totalen. Hier corrigeer je een categorie of zoek je een bedrag terug.',
-      },
-      {
-        title: 'Vooruitblik',
-        text: 'Een rechttoe-rechtaan doortrekking van je huidige patroon over zes maanden — bedoeld als peiling, niet als scenario. Voor scenario’s ga je naar Toekomst.',
-      },
-    ],
-    terms: ['spaarquote', 'vrijheidstijd'],
-    related: [
-      { href: '/overzicht/cashflow/forecast', label: 'Vooruitblik van zes maanden' },
-      { href: '/rapportages/budget', label: 'Budgetrapport om af te drukken' },
-    ],
-  },
-  '/overzicht/cashflow/budget': {
-    insight:
-      'Je maandbudgetten in beeld: hoe je inkomen is verdeeld over categorieën en waar nog ruimte zit.',
     grip:
-      'Stel per categorie een limiet in en volg gedurende de maand hoeveel ruimte je nog hebt — wat je overhoudt, is vrijheid die je opbouwt.',
+      'Stel per categorie een limiet in en volg gedurende de maand hoeveel ruimte je nog hebt — wat je overhoudt, is vrijheid die je opbouwt. Je transacties, vaste lasten en vooruitblik staan bovenaan.',
     werking: [
       {
         title: 'Limiet per categorie',
@@ -190,21 +166,22 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
         text: 'Nieuwe transacties krijgen zelf een categorie toegewezen. Klopt er een niet, dan pas je die aan bij de transactie; het budget rekent direct opnieuw.',
       },
       {
-        title: 'Vier weergaven',
-        text: 'Dezelfde cijfers in verschillende vormen — lijst, verdeling en verloop — voor wie liever ziet dan leest. De onderliggende bedragen veranderen niet mee.',
+        title: 'Vrijheidsdagen per post',
+        text: 'Achter elk budget staat wat het aan vrijheidstijd kost: het maandbedrag afgezet tegen je eigen dagelijkse uitgaven. Dezelfde cijfers staan in meerdere vormen — lijst, verdeling en verloop — voor wie liever ziet dan leest.',
       },
       {
-        title: 'Vrijheidsdagen per post',
-        text: 'Achter elk budget staat wat het aan vrijheidstijd kost: het maandbedrag afgezet tegen je eigen dagelijkse uitgaven.',
+        title: 'Drie onderdelen bovenaan',
+        text: 'Transacties zijn de losse boekingen achter de totalen, vaste lasten je terugkerende kosten, en de vooruitblik trekt je huidige patroon zes maanden door — als peiling, niet als scenario. Voor scenario’s ga je naar Toekomst.',
       },
     ],
     terms: ['spaarquote', 'vrijheidstijd'],
     related: [
-      { href: '/overzicht/cashflow/transacties', label: 'Transacties achter deze budgetten' },
-      { href: '/rapportages/budget', label: 'Budget versus voornemen' },
+      { href: '/overzicht/budget/transacties', label: 'Transacties achter deze budgetten' },
+      { href: '/overzicht/budget/forecast', label: 'Vooruitblik van zes maanden' },
+      { href: '/rapportages/budget', label: 'Budgetrapport om af te drukken' },
     ],
   },
-  '/overzicht/cashflow/transacties': {
+  '/overzicht/budget/transacties': {
     insight:
       'Alles wat er deze maand in en uit gaat, met je geldstroom per categorie en je spaarquote van de maand.',
     grip: 'Filter en doorzoek je boekingen, of koppel een rekening zodat nieuwe transacties automatisch binnenkomen. Deel je een huishouden, dan zet je een gedeelde boeking met één klik op jullie lijst "Te bespreken" — alleen boekingen die je partner ook ziet.',
@@ -228,11 +205,11 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     ],
     terms: ['spaarquote', 'psd2'],
     related: [
-      { href: '/overzicht/cashflow/budget', label: 'Budgetten die hierop meelopen' },
+      { href: '/overzicht/budget', label: 'Budgetten die hierop meelopen' },
       { href: '/mijn/koppelingen', label: 'Je koppelingen beheren' },
     ],
   },
-  '/overzicht/cashflow/vaste-lasten': {
+  '/overzicht/budget/vaste-lasten': {
     insight:
       'Je abonnementen en terugkerende kosten op één plek, uitgedrukt in hoeveel vrijheidstijd ze je kosten. Elke euro minder vaste last is vrijheid die je terugkoopt.',
     grip:
@@ -257,11 +234,11 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     ],
     terms: ['vrijheidstijd', 'spaarquote'],
     related: [
-      { href: '/overzicht/cashflow/transacties', label: 'Transacties achter deze posten' },
-      { href: '/overzicht/cashflow/budget', label: 'Budgetten per categorie' },
+      { href: '/overzicht/budget/transacties', label: 'Transacties achter deze posten' },
+      { href: '/overzicht/budget', label: 'Budgetten per categorie' },
     ],
   },
-  '/overzicht/cashflow/forecast': {
+  '/overzicht/budget/forecast': {
     insight:
       'Je spaarquote, maandelijks netto en uitgaventrend in één blik, met een vooruitblik van 6 maanden op basis van je baseline en vaste lasten.',
     grip:
@@ -585,7 +562,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     terms: ['psd2', 'upo'],
     related: [
       { href: '/mijn/privacy', label: 'Wat we bewaren, en waarom' },
-      { href: '/overzicht/cashflow/transacties', label: 'De transacties die binnenkomen' },
+      { href: '/overzicht/budget/transacties', label: 'De transacties die binnenkomen' },
     ],
   },
   '/mijn/jaaroverzicht': {

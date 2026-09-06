@@ -110,7 +110,7 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Transactie importeren → budgetrealisatie + cashflow + spaarquote',
     kriticiteit: 'KERN',
     persona: 'compleet',
-    given: 'Persona Tessa geladen; spaarquote genoteerd op /overzicht en onderaan /overzicht/cashflow.',
+    given: 'Persona Tessa geladen; spaarquote genoteerd op /overzicht en onderaan /overzicht/budget.',
     when: 'De gebruiker importeert een MT940/CSV/OFX met één salaris (+) en meerdere uitgaven (−) in de huidige maand en categoriseert ze.',
     then: 'De transacties verschijnen in de lijst; "besteed" per geraakt budget stijgt; maandinkomsten/-uitgaven (excl. eigen-rekening-overboekingen) kloppen; de 6-maands spaarquote is overal herrekend (`savingsRateFromAggregates`, WF-KRUIS-06). Randgeval: een eigen-rekening-overboeking mag géén kerngetal veranderen; een spaarbudget-transactie verhoogt de spaarquote i.p.v. te verlagen. Richtingstoets.',
     assertion: {
@@ -298,7 +298,7 @@ const criteria: AcceptanceCriterion[] = [
     persona: 'compleet',
     given: 'Persona Tessa geladen; sidebar open (desktop), hefboomkaarten zichtbaar.',
     when: 'De gebruiker vergelijkt per domein de sidebar-dot, de hefboomkaart-dot, de status-duiding-banner en (belasting) de Box 1/2/3-kaartstatussen; wijzigt daarna een input die een status omslaat.',
-    then: 'Per domein tonen alle plekken exact dezelfde stoplichtstatus uit één scoringsbron (`loadLeverScores`/`computeLeverScores`, `lib/leverage-status.ts`-semantiek). Een status-omslag beweegt overal tegelijk. Stoplichtkleuren volgen NIET het module-accent (semantiek blijft semantisch). Consistentie: categorische gelijkheid van de status over vier oppervlakken. Sinds 11 aug 2026 leest `loadLeverScores` het Box 1-inkomen op dezelfde budgetgrondslag als /overzicht/cashflow (ADR 0103) en telt hij losse rekeningen via de canonieke huishoud-gewogen optelling — zonder die twee kon de dot een andere status tonen dan de pagina eronder terwijl beide "uit één bron" heetten te komen.',
+    then: 'Per domein tonen alle plekken exact dezelfde stoplichtstatus uit één scoringsbron (`loadLeverScores`/`computeLeverScores`, `lib/leverage-status.ts`-semantiek). Een status-omslag beweegt overal tegelijk. Stoplichtkleuren volgen NIET het module-accent (semantiek blijft semantisch). Consistentie: categorische gelijkheid van de status over vier oppervlakken. Sinds 11 aug 2026 leest `loadLeverScores` het Box 1-inkomen op dezelfde budgetgrondslag als /overzicht/budget (ADR 0103) en telt hij losse rekeningen via de canonieke huishoud-gewogen optelling — zonder die twee kon de dot een andere status tonen dan de pagina eronder terwijl beide "uit één bron" heetten te komen.',
     assertion: {
       kind: 'consistency',
       source: 'consistentie-eis: identieke stoplichtstatus per domein op sidebar/hefboomkaart/banner/boxkaart (lib/lever-scores-loader.ts + lib/leverage-status.ts, één bron).',

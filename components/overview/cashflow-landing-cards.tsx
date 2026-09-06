@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * CashflowLandingCards — de hefboom-stijl kaarten op /overzicht/cashflow.
+ * CashflowLandingCards — de hefboom-stijl kaarten op /overzicht/budget.
  * Zelfde shell als de vier-hefbomen-rij op /overzicht (gedeelde LeverageCard):
  * status-dot + KPI + uitklapbare chevron met een 1-regel inzicht en een
  * deeplink naar de bijbehorende sub-pagina.
@@ -34,7 +34,7 @@
  *  · **CF-2** (Forecast-kaart weg, 4 → 3) — teruggedraaid op kaart S5, één stap
  *    later. Het argument van CF-2 luidde *"Forecast is geen landingsbelofte"*,
  *    maar de werkelijke schade was een KAPOTTE VERWIJSKETEN: op mobiel is deze
- *    kaart de enige contextuele ingang naar /overzicht/cashflow/forecast (het
+ *    kaart de enige contextuele ingang naar /overzicht/budget/forecast (het
  *    `Cashflow`-item in `lib/nav-config.ts` heeft geen `children`, dus de
  *    NavMenuSheet toont de sub-pagina's niet). Sinds FC-1 (9 aug 2026) heeft die
  *    pagina bovendien een eigen Eenvoudig-vorm — een samenvattend blok met

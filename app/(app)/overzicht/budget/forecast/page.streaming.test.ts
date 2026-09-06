@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest'
 import { componentBody, stripComments } from '@/test/helpers/page-source'
 
 /**
- * /overzicht/cashflow/forecast — broncontrole (perf Task 2.5).
+ * /overzicht/budget/forecast — broncontrole (perf Task 2.5).
  *
  * Zelfde soort test als op de hub en de vaste-lasten-pagina, en om dezelfde
  * reden: het defect is niet "een verkeerd getal" maar "de eerste byte komt pas
@@ -36,7 +36,7 @@ const SECTION_SRC = readFileSync(
 
 const PAGE_SIGNATURE = 'export default async function OverzichtCashflowForecastPage'
 
-describe('/overzicht/cashflow/forecast — geen zware await boven de return', () => {
+describe('/overzicht/budget/forecast — geen zware await boven de return', () => {
   const body = componentBody(PAGE_SRC, PAGE_SIGNATURE)
 
   it('heeft exact één await in het component-lichaam', () => {
@@ -56,7 +56,7 @@ describe('/overzicht/cashflow/forecast — geen zware await boven de return', ()
   })
 })
 
-describe('/overzicht/cashflow/forecast — de zware loaders staan achter Suspense', () => {
+describe('/overzicht/budget/forecast — de zware loaders staan achter Suspense', () => {
   const src = stripComments(PAGE_SRC)
 
   for (const loader of ['loadDashboardData', 'loadForecastSectionData', 'loadCashflowData']) {
@@ -117,7 +117,7 @@ describe('forecast-loader — draait op de slanke forecast-laag (ADR 0083)', () 
   })
 })
 
-describe('/overzicht/cashflow/forecast — CashflowSection hangt niet meer aan de bundel', () => {
+describe('/overzicht/budget/forecast — CashflowSection hangt niet meer aan de bundel', () => {
   const src = stripComments(SECTION_SRC)
 
   it('typeert zijn prop op CashflowSectionScalars, niet op DashboardData', () => {

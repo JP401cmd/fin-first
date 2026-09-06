@@ -56,7 +56,7 @@ let currentSearch = new URLSearchParams()
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: routerReplace, refresh: routerRefresh, push: vi.fn() }),
   useSearchParams: () => currentSearch,
-  usePathname: () => '/overzicht/cashflow/transacties',
+  usePathname: () => '/overzicht/budget/transacties',
 }))
 
 // ── Fixtures uit de echte motor ─────────────────────────────────────────────
@@ -292,7 +292,7 @@ describe('SpendLimitsSection — deeplink naar de prestatieweergave', () => {
 
     expect(routerReplace).toHaveBeenCalledTimes(1)
     const [url, opts] = routerReplace.mock.calls[0]
-    expect(url).toBe('/overzicht/cashflow/transacties?periode_analyse=maand')
+    expect(url).toBe('/overzicht/budget/transacties?periode_analyse=maand')
     expect(opts).toEqual({ scroll: false })
     expect(screen.queryByText('Verloop per periode')).toBeNull()
     // Een leeggemaakte live-regio kondigt niets aan; sluiten moet hoorbaar zijn.

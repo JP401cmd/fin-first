@@ -5,7 +5,7 @@
 
 ## 1. Aanleiding
 
-Het zoekveld op `/overzicht/cashflow/transacties` doorzoekt **niet** de volledige
+Het zoekveld op `/overzicht/budget/transacties` doorzoekt **niet** de volledige
 historie. Het is een client-side filter over een al-geladen venster:
 
 - [`transactie-tijdlijn.tsx:191`](../components/overview/transacties/transactie-tijdlijn.tsx) —

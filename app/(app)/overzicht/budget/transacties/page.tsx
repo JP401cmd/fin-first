@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { TransactiesNoticesLoader } from '@/components/overview/transacties/transacties-notices-loader'
 import { InsightToggleButton } from '@/components/editorial/insight-toggle-button'
 import { INFLATION_IMPACT_ID } from '@/components/overview/inflation-impact-card'
-import { CashflowInstellingenBlokLazy } from '../cashflow-below-fold'
+import { CashflowInstellingenBlokLazy } from '@/components/overview/cashflow-instellingen-lazy'
 import { loadAccountCount } from '@/lib/account-count'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
 }
 
 /**
- * /overzicht/cashflow/transacties — periode-gestuurde transactie-analyse.
+ * /overzicht/budget/transacties — periode-gestuurde transactie-analyse.
  * De analyse is een client-component (TransactiesAnalyse) die zélf data ophaalt
  * per gekozen periode; de server levert enkel het accountCount voor de
  * koppel-banner.
@@ -100,7 +100,7 @@ export default async function OverzichtCashflowTransactiesPage({
         />
         <PageStatusDot className="absolute right-[52px] top-4 sm:right-[60px]" />
         <PageInfoButton
-          content={getPageInfo('/overzicht/cashflow/transacties')}
+          content={getPageInfo('/overzicht/budget/transacties')}
           className="absolute right-4 top-4 sm:right-6"
         />
       </div>

@@ -7,7 +7,7 @@
 //     cashflow-pagina, via de Box 1-motor omgerekend naar bruto.
 //
 // De netto-bron is BEWUST exact dezelfde waarde als de "Geschat jaarinkomen"-
-// kaart op /overzicht/cashflow: het EFFECTIEVE jaarinkomen op de gekozen
+// kaart op /overzicht/budget: het EFFECTIEVE jaarinkomen op de gekozen
 // grondslag (`CashflowSettingsData.effectiveAnnualIncome`). Zo zitten Box 1 en
 // cashflow gegarandeerd op hetzelfde getal.
 //

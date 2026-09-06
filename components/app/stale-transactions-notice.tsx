@@ -19,7 +19,7 @@ import { useStaleNotice } from '@/components/app/stale-notice-provider'
  *
  * MINIMALISEERBAAR: de knop verschijnt alleen wanneer er een
  * `StaleNoticeProvider` boven hangt die de keuze server-side kan onthouden.
- * Zónder provider (bv. /overzicht/cashflow) blijft de melding uitgeklapt en is
+ * Zónder provider (bv. /overzicht/budget) blijft de melding uitgeklapt en is
  * er geen knop die niets doet.
  */
 export function StaleNoticeCard({

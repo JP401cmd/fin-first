@@ -88,7 +88,7 @@ export async function GET() {
       // cashflow-landingskaarten via `buildForecast` gebruiken. Deze route had
       // die switch lokaal herhaald — vandaag tekenmatig identiek, maar twee
       // onafhankelijke kopieën van één formule zijn per definitie toekomstige
-      // drift: de prognose op /overzicht/cashflow en die in deze route zouden
+      // drift: de prognose op /overzicht/budget en die in deze route zouden
       // dan uiteenlopen zonder dat er ergens iets rood wordt
       // ("consume, don't recompute", CLAUDE.md).
       //

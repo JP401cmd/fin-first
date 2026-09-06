@@ -48,7 +48,13 @@ describe('resolveRouteTitle', () => {
   })
 
   it('resolveert deep-app-tools met gestripte querystring (OVERVIEW_APP_SUBROUTES)', () => {
-    expect(resolveRouteTitle('/overzicht/cashflow/budget')).toBe('Budgetteren')
+    expect(resolveRouteTitle('/overzicht/bezittingen/investment')).toBe('Aandelen holdings')
+  })
+
+  // Budget was zo'n deep-app-tool tot UR3-28; sinds het de derde hefboom is,
+  // levert navGroups zijn titel — en heet hij 'Budget', niet 'Budgetteren'.
+  it('resolveert de Budget-hefboom uit navGroups', () => {
+    expect(resolveRouteTitle('/overzicht/budget')).toBe('Budget')
   })
 
   it('resolveert globalNav-routes met een echte href', () => {
@@ -58,7 +64,7 @@ describe('resolveRouteTitle', () => {
   })
 
   it('normaliseert querystring, hash en trailing slash', () => {
-    expect(resolveRouteTitle('/overzicht/cashflow/budget?x=1')).toBe('Budgetteren')
+    expect(resolveRouteTitle('/overzicht/budget?x=1')).toBe('Budget')
     expect(resolveRouteTitle('/toekomst/doelen#sectie')).toBe('Doelen')
     expect(resolveRouteTitle('/toekomst/doelen/')).toBe('Doelen')
   })

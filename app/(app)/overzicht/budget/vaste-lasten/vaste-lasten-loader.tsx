@@ -16,7 +16,7 @@ import type { Perspective } from '@/lib/household-data'
 
 /**
  * VasteLastenLoader — async server-child achter de `<Suspense>` op
- * /overzicht/cashflow/vaste-lasten (perf Task 2.4). Spiegelt
+ * /overzicht/budget/vaste-lasten (perf Task 2.4). Spiegelt
  * `CashflowCardsLoader` op de hub: de pagina zelf rendert alleen wat direct kan
  * (kicker, titel, header-controls) en dít blok stroomt er achteraan.
  *

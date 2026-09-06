@@ -6,7 +6,7 @@ date: 2026-08-11
 elements: [as-budget, as-planning, as-belasting, fn-budgetteren, t-supabase]
 ---
 
-"Geschat jaarinkomen" en "Geschatte uitgaven" op `/overzicht/cashflow` kenden tot
+"Geschat jaarinkomen" en "Geschatte uitgaven" op `/overzicht/budget` kenden tot
 nu toe twee grondslagen: de transactiesom, of een handmatig bedrag dat de
 gebruiker zelf invulde (`profiles.income_source` / `expenses_source` =
 `'auto' | 'manual'`). Wie zijn inkomen niet in transacties terugziet — een ZZP'er

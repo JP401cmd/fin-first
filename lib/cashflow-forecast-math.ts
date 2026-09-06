@@ -1,5 +1,5 @@
 // lib/cashflow-forecast-math.ts
-// Pure forecast-rekenkern voor /overzicht/cashflow/forecast. Géén 'use client'
+// Pure forecast-rekenkern voor /overzicht/budget/forecast. Géén 'use client'
 // zodat zowel de client-tabel (CashflowForecast) als server-components (de
 // cashflow-landingskaarten) dezelfde aannames delen en niet uit-sync raken.
 

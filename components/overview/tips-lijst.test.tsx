@@ -330,7 +330,7 @@ describe('TipsLijst', () => {
       />,
     )
     const cta = screen.getByRole('link', { name: /Open budget/i })
-    expect(cta).toHaveAttribute('href', '/overzicht/cashflow?budget=streaming')
+    expect(cta).toHaveAttribute('href', '/overzicht/budget?budget=streaming')
   })
 
   it('valt terug op een type-gebaseerde deep-link CTA zonder related veld', () => {

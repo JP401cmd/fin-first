@@ -7,7 +7,7 @@ import type { CashflowSectionScalars } from '@/lib/cashflow-kpis'
 /**
  * S5 (V2) — `CashflowSection` is modus-bewust geworden.
  *
- * Het was het enige blok op /overzicht/cashflow/forecast dat de weergavemodus
+ * Het was het enige blok op /overzicht/budget/forecast dat de weergavemodus
  * negeerde: in Eenvoudig stonden er drie kale KPI-kaarten met twee losse
  * percentages. Nu zegt Eenvoudig hetzelfde in één kaart en in woorden — het
  * bedrag blijft, de percentages worden zinnen. Volledig verandert niet.

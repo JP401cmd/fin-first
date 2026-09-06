@@ -166,12 +166,34 @@ const nextConfig: NextConfig = {
       // BudgetsClient). Index redirect; de detail-/nieuw-subroutes
       // (/core/budgets/[id], /core/budgets/new) blijven los bestaan
       // (exact-match redirect raakt die niet).
-      { source: '/core/budgets', destination: '/overzicht/cashflow', permanent: false },
+      { source: '/core/budgets', destination: '/overzicht/budget', permanent: false },
 
       // Belasting-dedup (beslissing 3): de volledige Box 3-pagina is nu
       // compact als Box3Detail op /overzicht/belasting (zelfde pure
       // box3-data-engine via /api/household/box3). Index redirect.
       { source: '/core/belasting', destination: '/overzicht/belasting', permanent: false },
+
+      // ── De cashflow-hub is opgeheven (UR3-28, "de scheve diepte") ────────
+      // Budgetteren zat drie lagen diep: /overzicht → /overzicht/cashflow →
+      // /overzicht/cashflow/budget, even diep als de fiscale optimizer. De
+      // tussenlaag is weg: budget is nu zelf de hefboom op laag 2, en zijn drie
+      // onderdelen hangen eronder. De hub-inhoud is verdeeld — rekeningen naar
+      // de bezittingen, de rest naar de transactiepagina.
+      //
+      // Deze regels houden élke oude URL levend, inclusief de deeplinks die in
+      // meldingen, briefing-mails en gedeelde links rondgaan (?budget=,
+      // ?maand=, ?limit=, ?rekening=): Next behoudt de query-string bij een
+      // redirect. Bewust `permanent: false` — zelfde keuze als de andere
+      // route-verhuizingen hierboven, zodat een latere correctie niet in
+      // browsercaches vastzit.
+      { source: '/overzicht/cashflow/budget', destination: '/overzicht/budget', permanent: false },
+      { source: '/overzicht/cashflow/transacties', destination: '/overzicht/budget/transacties', permanent: false },
+      { source: '/overzicht/cashflow/vaste-lasten', destination: '/overzicht/budget/vaste-lasten', permanent: false },
+      { source: '/overzicht/cashflow/forecast', destination: '/overzicht/budget/forecast', permanent: false },
+      // De hub zelf als laatste: hij is de kortste bron en zou de vier
+      // specifiekere paden anders niet raken (Next matcht exact), maar de
+      // volgorde is hier bewust expliciet zodat herordenen opvalt.
+      { source: '/overzicht/cashflow', destination: '/overzicht/budget', permanent: false },
 
       // ── Legacy-routes die géén React-tree meer renderen (React #310) ─────
       // Deze twee waren server-componenten die bij élke render meteen
@@ -189,7 +211,7 @@ const nextConfig: NextConfig = {
       // nul op een echte pagina. Op de routing-laag redirecten haalt de
       // trigger weg: er wordt geen React-boom meer gebouwd om vervolgens weg
       // te gooien, en het scheelt bovendien een RSC-round-trip.
-      { source: '/core/cash', destination: '/overzicht/cashflow', permanent: false },
+      { source: '/core/cash', destination: '/overzicht/bezittingen/cash', permanent: false },
 
       // Volgorde is functioneel: de dreamgate-variant moet vóór de
       // catch-all staan, anders vangt de tweede regel hem af. Spiegelt de

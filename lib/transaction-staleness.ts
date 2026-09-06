@@ -10,7 +10,7 @@
 //     cashflow te zien", terwijl er 407 stonden. De widget toetste op de
 //     GEREALISEERDE huidige + vorige maand; die waren leeg, en "leeg venster"
 //     werd gelezen als "geen transacties";
-//   • /overzicht/cashflow — Transacties-kaart: "Nog geen transacties";
+//   • /overzicht/budget — Transacties-kaart: "Nog geen transacties";
 //   • daarnaast een spaarquote van 38 % zonder één aanduiding dat die op data
 //     van vijf maanden terug rust.
 // Alle drie waren waar binnen hun eigen venster en onwaar als mededeling. De

@@ -18,7 +18,7 @@ import type { CashflowCardStatuses } from '@/lib/cashflow-cards'
  * usePageStatus ↔ PageStatusProvider).
  *
  * ── TWEE ROUTES, TWEE BRONNEN ───────────────────────────────────────────────
- *  · **De hub** (`/overzicht/cashflow`) berekent de vier kaarten toch al
+ *  · **De hub** (`/overzicht/budget`) berekent de vier kaarten toch al
  *    server-side en geeft de statussen mee via `<CashflowStatusSeed>`. Daar
  *    fetcht deze hook dus NOOIT — 0 requests, 0 queries.
  *  · **De sub-pagina's** (`/budget`, `/transacties`, `/vaste-lasten`,
@@ -68,7 +68,7 @@ import type { CashflowCardStatuses } from '@/lib/cashflow-cards'
  */
 
 /** De hub — de enige cashflow-route die zijn eigen statussen server-side levert. */
-export const CASHFLOW_HUB_ROUTE = '/overzicht/cashflow'
+export const CASHFLOW_HUB_ROUTE = '/overzicht/budget'
 
 export const NEUTRAL_CASHFLOW_STATUSES: CashflowCardStatuses = {
   budget: 'neutral',
@@ -99,7 +99,7 @@ export function useCashflowCardStatuses(
 ): CashflowCardStatuses {
   const pathname = usePathname() ?? '/'
   // Trailing slash strippen vóór de routevergelijking (Next normaliseert 'm weg,
-  // maar een `/overzicht/cashflow/` zou anders als sub-pagina tellen).
+  // maar een `/overzicht/budget/` zou anders als sub-pagina tellen).
   const route =
     pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname
   // Begrensde match: alleen de hub zelf en zijn kinderen. Een losse prefixmatch

@@ -63,14 +63,18 @@ export const ROUTE_FAMILY: Record<string, Family> = {
   '/overzicht': 'freedom',
   '/overzicht/bezittingen': 'lever',
   '/overzicht/schulden': 'lever',
-  '/overzicht/cashflow': 'lever',
+  '/overzicht/budget': 'lever',
   '/overzicht/belasting': 'lever',
   '/overzicht/belasting/box1': 'lever',
   '/overzicht/belasting/box3': 'lever',
-  '/overzicht/cashflow/budget': 'cashflow',
-  '/overzicht/cashflow/transacties': 'cashflow',
-  '/overzicht/cashflow/vaste-lasten': 'cashflow',
-  '/overzicht/cashflow/forecast': 'cashflow',
+  // De budgetpagina is sinds UR3-28 zélf een hefboom en hoort dus bij de LICHTE
+  // `lever`-familie: één set queries, gedeeld met de sidebar-dots. Vóór die
+  // verhuizing was hij een sub-pagina en draaide hij op de zware kaart-loaderset
+  // ('cashflow'). Zijn drie onderdelen hieronder blijven wél die familie — die
+  // krijgen hun status uit de kaart waar ze bij horen.
+  '/overzicht/budget/transacties': 'cashflow',
+  '/overzicht/budget/vaste-lasten': 'cashflow',
+  '/overzicht/budget/forecast': 'cashflow',
   '/overzicht/belasting/box2': 'box2',
 }
 

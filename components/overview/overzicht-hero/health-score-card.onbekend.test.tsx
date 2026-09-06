@@ -36,7 +36,7 @@ describe('HealthScoreCard — onbekend inkomen (ADR 0131)', () => {
     expect(screen.getByText(GRONDSLAG_ONBEKEND_KOP)).toBeTruthy()
     expect(screen.getByText(/inkomen en uitgaven nog niet/)).toBeTruthy()
     const knop = screen.getByRole('link', { name: 'Vul je inkomen en uitgaven in' })
-    expect(knop.getAttribute('href')).toBe('/overzicht/cashflow')
+    expect(knop.getAttribute('href')).toBe('/overzicht/budget')
 
     expect(screen.queryByText(/van 100/)).toBeNull()
     expect(screen.queryByText(/kritiek/i)).toBeNull()

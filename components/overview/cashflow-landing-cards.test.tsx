@@ -50,7 +50,7 @@ const CARDS: CashflowCard[] = [
   {
     key: 'budget',
     label: 'Budget',
-    href: '/overzicht/cashflow/budget',
+    href: '/overzicht/budget',
     tooltip: 'Plan en volg je maandbudgetten.',
     kpi: '€ 1.000/mnd',
     status: 'good',
@@ -64,7 +64,7 @@ const CARDS: CashflowCard[] = [
   {
     key: 'transacties',
     label: 'Transacties',
-    href: '/overzicht/cashflow/transacties',
+    href: '/overzicht/budget/transacties',
     tooltip: 'Inkomsten en uitgaven van deze maand.',
     kpi: '+€ 1.100',
     status: 'good',
@@ -75,7 +75,7 @@ const CARDS: CashflowCard[] = [
   {
     key: 'vaste-lasten',
     label: 'Vaste lasten',
-    href: '/overzicht/cashflow/vaste-lasten',
+    href: '/overzicht/budget/vaste-lasten',
     tooltip: 'Abonnementen en terugkerende kosten.',
     kpi: '€ 1.400/mnd',
     status: 'warn',
@@ -86,7 +86,7 @@ const CARDS: CashflowCard[] = [
   {
     key: 'forecast',
     label: 'Forecast',
-    href: '/overzicht/cashflow/forecast',
+    href: '/overzicht/budget/forecast',
     tooltip: 'Verwachte kasstroom 6 maanden vooruit.',
     kpi: '€ 42.000',
     status: 'good',
@@ -127,20 +127,20 @@ describe('CashflowLandingCards — Volledig blijft ongewijzigd', () => {
 
   it('toont KPI + status-substext op de kaart', () => {
     const { container } = renderCards('full')
-    const card = cardByHref(container, '/overzicht/cashflow/transacties')
+    const card = cardByHref(container, '/overzicht/budget/transacties')
     expect(within(card).getByText('+€ 1.100')).toBeTruthy()
     expect(within(card).getByText('Goed gespaard deze maand')).toBeTruthy()
   })
 
   it('CF-3 — toont de venster-regel onder de KPI van de Transacties-kaart', () => {
     const { container } = renderCards('full')
-    const card = cardByHref(container, '/overzicht/cashflow/transacties')
+    const card = cardByHref(container, '/overzicht/budget/transacties')
     expect(within(card).getByText('in augustus tot nu toe')).toBeTruthy()
   })
 
   it('CF-3 — een kaart zonder venster (kpiWindow null) krijgt géén lege regel', () => {
     const { container } = renderCards('full')
-    const card = cardByHref(container, '/overzicht/cashflow/vaste-lasten')
+    const card = cardByHref(container, '/overzicht/budget/vaste-lasten')
     expect(within(card).queryByText(/tot nu toe/)).toBeNull()
   })
 })
@@ -159,16 +159,16 @@ describe('CashflowLandingCards — S5: Forecast-kaart in béide modi', () => {
   it('rendert vier kaarten in Eenvoudig, inclusief Forecast', () => {
     const { container } = renderCards('simple')
     expect(container.querySelectorAll('a').length).toBe(4)
-    expect(cardByHref(container, '/overzicht/cashflow/forecast')).toBeTruthy()
+    expect(cardByHref(container, '/overzicht/budget/forecast')).toBeTruthy()
   })
 
   it('houdt alle vier de sub-pagina\'s navigeerbaar vanaf de hub', () => {
     const { container } = renderCards('simple')
     for (const href of [
-      '/overzicht/cashflow/budget',
-      '/overzicht/cashflow/transacties',
-      '/overzicht/cashflow/vaste-lasten',
-      '/overzicht/cashflow/forecast',
+      '/overzicht/budget',
+      '/overzicht/budget/transacties',
+      '/overzicht/budget/vaste-lasten',
+      '/overzicht/budget/forecast',
     ]) {
       expect(cardByHref(container, href)).toBeTruthy()
     }
@@ -176,7 +176,7 @@ describe('CashflowLandingCards — S5: Forecast-kaart in béide modi', () => {
 
   it('geeft de Forecast-kaart hetzelfde oordeel + cijfer + venster als de rest', () => {
     const { container } = renderCards('simple')
-    const card = cardByHref(container, '/overzicht/cashflow/forecast')
+    const card = cardByHref(container, '/overzicht/budget/forecast')
     expect(within(card).getByText('Saldo groeit')).toBeTruthy()
     expect(card.textContent).toContain('€ 42.000')
     expect(card.textContent).toContain('verwacht over zes maanden')
@@ -197,10 +197,10 @@ describe('CashflowLandingCards — S4: oordeel-kaarten in Eenvoudig', () => {
   it('toont per kaart het oordeel als primaire regel', () => {
     const { container } = renderCards('simple')
     expect(
-      within(cardByHref(container, '/overzicht/cashflow/budget')).getByText('Onder budget'),
+      within(cardByHref(container, '/overzicht/budget')).getByText('Onder budget'),
     ).toBeTruthy()
     expect(
-      within(cardByHref(container, '/overzicht/cashflow/transacties')).getByText(
+      within(cardByHref(container, '/overzicht/budget/transacties')).getByText(
         'Goed gespaard deze maand',
       ),
     ).toBeTruthy()
@@ -212,7 +212,7 @@ describe('CashflowLandingCards — S4: oordeel-kaarten in Eenvoudig', () => {
     // S1-regel verbiedt. Het woord komt uit dezelfde lijst als de
     // vaste-lasten-detailpagina (S2), zodat hub en pagina niet uiteenlopen.
     const { container } = renderCards('simple')
-    const card = cardByHref(container, '/overzicht/cashflow/vaste-lasten')
+    const card = cardByHref(container, '/overzicht/budget/vaste-lasten')
     expect(within(card).getByText(LEVERAGE_STATUS_LABEL.warn)).toBeTruthy()
     expect(card.textContent).toContain('33% van inkomen')
     expect(card.textContent).toContain('€ 1.400/mnd')
@@ -220,20 +220,20 @@ describe('CashflowLandingCards — S4: oordeel-kaarten in Eenvoudig', () => {
 
   it('S4 — élke kaart draagt haar cijfer MÉT venster (kpiWindow verplicht)', () => {
     const { container } = renderCards('simple')
-    const budget = cardByHref(container, '/overzicht/cashflow/budget')
+    const budget = cardByHref(container, '/overzicht/budget')
     expect(budget.textContent).toContain('€ 1.000/mnd')
     expect(budget.textContent).toContain('nog te besteden deze maand')
 
     // Transacties gebruikt het CANONIEKE, datum-gedreven venster uit
     // buildCashflowCards — niet de vaste fallback-copy.
-    const tx = cardByHref(container, '/overzicht/cashflow/transacties')
+    const tx = cardByHref(container, '/overzicht/budget/transacties')
     expect(tx.textContent).toContain('+€ 1.100')
     expect(tx.textContent).toContain('in augustus tot nu toe')
   })
 
   it('toont de status-dot weer, decoratief (S1-regel: één drager)', () => {
     const { container } = renderCards('simple')
-    const card = cardByHref(container, '/overzicht/cashflow/budget')
+    const card = cardByHref(container, '/overzicht/budget')
     const dot = card.querySelector('span[aria-hidden="true"][class*="rounded-full"]')
     expect(dot).toBeTruthy()
     // Zichtbaar oordeel aanwezig → géén tweede, sr-only statusdrager.
@@ -256,7 +256,7 @@ describe('CashflowLandingCards — S4: oordeel-kaarten in Eenvoudig', () => {
         <CashflowLandingCards cards={leeg} />
       </DisplayModeProvider>,
     )
-    const card = cardByHref(container, '/overzicht/cashflow/budget')
+    const card = cardByHref(container, '/overzicht/budget')
     expect(within(card).getByText('Nog geen budget')).toBeTruthy()
     expect(card.textContent).not.toContain('nog te besteden deze maand')
   })
@@ -284,7 +284,7 @@ describe('CashflowLandingCards — privacy-masking', () => {
   it('maskeert de bedragen in Eenvoudig en laat de duiding staan', () => {
     const { container } = renderMasked('simple')
     fireEvent.click(screen.getByTestId('mask-on'))
-    const card = cardByHref(container, '/overzicht/cashflow/transacties')
+    const card = cardByHref(container, '/overzicht/budget/transacties')
     expect(card.textContent).not.toContain('1.100')
     expect(card.textContent).toContain(MASKED_AMOUNT_PLACEHOLDER)
     // Oordeel en venster zijn geen bedrag en blijven leesbaar.
@@ -295,7 +295,7 @@ describe('CashflowLandingCards — privacy-masking', () => {
   it('maskeert óók in Volledig (het gat was niet modus-specifiek)', () => {
     const { container } = renderMasked('full')
     fireEvent.click(screen.getByTestId('mask-on'))
-    const card = cardByHref(container, '/overzicht/cashflow/vaste-lasten')
+    const card = cardByHref(container, '/overzicht/budget/vaste-lasten')
     expect(card.textContent).not.toContain('1.400')
     expect(card.textContent).toContain(MASKED_AMOUNT_PLACEHOLDER)
     // Een percentage is geen bedrag en wordt niet gemaskeerd.

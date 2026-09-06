@@ -101,7 +101,7 @@ describe('FloatingNavButton — long-press waffle', () => {
     expect(waffleButton().getAttribute('data-pressing')).toBeNull()
 
     expect(pushMock).toHaveBeenCalledTimes(1)
-    expect(pushMock).toHaveBeenCalledWith('/overzicht/cashflow/budget')
+    expect(pushMock).toHaveBeenCalledWith('/overzicht/budget')
     expect(sheetOpen()).toBe('false')
 
     // Click vuurt op mobiel automatisch ná touchend — die mag het menu nu

@@ -214,7 +214,7 @@ export function consumptionExpenseRows(
  * (`dataMonths`) schoven mee, en het dagtarief LOOG omhoog. Dat is exact het
  * bugpatroon dat `lib/server-data/tx-aggregates.parity.test.ts` al bewijst voor
  * de spaarquote — en de reden dat /rapportages/balans €165/dag toonde naast
- * €106/dag op /overzicht/cashflow (bevinding L10): cashflow liep al wél via het
+ * €106/dag op /overzicht/budget (bevinding L10): cashflow liep al wél via het
  * aggregaat, de rapport-routes nog niet.
  *
  * Het aggregaat (`public.tx_month_aggregate`) levert per definitie enkele rijen

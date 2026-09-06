@@ -4,7 +4,7 @@
  * Tests for budget creation, editing, deletion and form validation flows:
  * - New budget creation via /core/budgets/new
  * - Budget editing via the /core/budgets/[id]/edit redirect (naar het canonieke
- *   /overzicht/cashflow/budget, niet het legacy-pad — zie WF-BUDGET-23)
+ *   /overzicht/budget, niet het legacy-pad — zie WF-BUDGET-23)
  * - Budget deletion via DELETE /api/budgets/[id]
  * - Budget category (parent) linking
  * - Budget limit validation (no negative values)
@@ -226,7 +226,7 @@ const tests: TestCase[] = [
   {
     id: 'budget-crud-edit-redirect',
     name: 'Budget bewerken: legacy edit-URL redirect naar de canonieke budgetpagina',
-    description: '/core/budgets/[id]/edit redirect naar /overzicht/cashflow/budget?budget=[id]&edit=true',
+    description: '/core/budgets/[id]/edit redirect naar /overzicht/budget?budget=[id]&edit=true',
     category: CAT,
     priority: 'high',
     estimatedDurationMs: 20,

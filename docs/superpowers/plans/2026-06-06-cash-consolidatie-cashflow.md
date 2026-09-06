@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Maak `/overzicht/cashflow` de enige thuisbasis voor cash-rekeningen — overzicht, geldstroom, bewerken én instellingen (jaarinkomen, spaarquote, geschatte uitgaven) met live FIRE-impact — terwijl bezittingen cash blijft tonen als waarde en doorklikt naar cashflow. Ruim de dubbele rekening-verdieping (`/core/assets/cash`) op.
+**Goal:** Maak `/overzicht/budget` de enige thuisbasis voor cash-rekeningen — overzicht, geldstroom, bewerken én instellingen (jaarinkomen, spaarquote, geschatte uitgaven) met live FIRE-impact — terwijl bezittingen cash blijft tonen als waarde en doorklikt naar cashflow. Ruim de dubbele rekening-verdieping (`/core/assets/cash`) op.
 
 **Architecture:** De bestaande cashflow-landing (server component, hub met 4 hefboom-kaarten + inspiratieblok) krijgt onder het inspiratieblok twee nieuwe secties: (1) een verbrede `CashOverview` die álle cash-rekeningen toont met per-rekening anker `#rekening-<assetId>`, en (2) een nieuw client-blok `CashflowInstellingenBlok` met inline-bewerkbaar inkomen/uitgaven + doel-spaarquote + live herberekende FIRE-projectie. Pure data-transformaties komen in losse, geteste lib-modules. `/core/assets/cash` en de per-rekening detailroute redirecten naar de cashflow-landing.
 
@@ -24,7 +24,7 @@
 **Gewijzigd:**
 - `app/api/parameters/route.ts` — GET + PUT uitbreiden met de cash-settings-velden.
 - `components/app/cash-overview.tsx` — `showAllCashAccounts`-prop; verbrede rekeningenlijst; anker + hash-focus; AssetPane voor handmatige cash-assets.
-- `app/(app)/overzicht/cashflow/page.tsx` — twee nieuwe secties onder het inspiratieblok.
+- `app/(app)/overzicht/budget/page.tsx` — twee nieuwe secties onder het inspiratieblok.
 - `components/core/assets-client.tsx` — `handleAssetClick` cash-tak + cash-categorie-header href.
 - `components/core/vermogen-asset-card.tsx` — actie-rij (bewerken/herwaarderen) verbergen voor `asset_type === 'cash'`.
 - `app/(app)/core/assets/[type]/page.tsx` — cash → redirect naar cashflow.
@@ -1041,7 +1041,7 @@ git commit -m "feat(cashflow): instellingen-blok loader + component (info + edit
 ## Task 7: Cashflow-landing — secties onder het inspiratieblok
 
 **Files:**
-- Modify: `app/(app)/overzicht/cashflow/page.tsx`
+- Modify: `app/(app)/overzicht/budget/page.tsx`
 
 > De landing is een server component. We voegen onder het inspiratieblok (regel 80-84) de verbrede `CashOverview` toe en het instellingen-blok (met server-geladen data).
 
@@ -1089,11 +1089,11 @@ Verwacht: geen fouten.
 
 - [ ] **Step 5: Handmatige verificatie**
 
-`npm run dev`, ga naar `/overzicht/cashflow`. Verwacht: onder het inflatie-blok verschijnen Rekeningen (alle cash-rekeningen), de geldstroom-banner + grafiek, en het Instellingen & toekomst-blok. Bewerk het inkomen → de FIRE-zin onderaan herberekent live; herlaad de pagina → de waarde is bewaard.
+`npm run dev`, ga naar `/overzicht/budget`. Verwacht: onder het inflatie-blok verschijnen Rekeningen (alle cash-rekeningen), de geldstroom-banner + grafiek, en het Instellingen & toekomst-blok. Bewerk het inkomen → de FIRE-zin onderaan herberekent live; herlaad de pagina → de waarde is bewaard.
 
 - [ ] **Step 6: Commit**
 ```bash
-git add app/(app)/overzicht/cashflow/page.tsx
+git add app/(app)/overzicht/budget/page.tsx
 git commit -m "feat(cashflow): rekeningen + geldstroom + instellingen op de landing"
 ```
 
@@ -1114,7 +1114,7 @@ function handleAssetClick(asset: Asset) {
   // gekozen rekening (#rekening-<assetId>). Andere asset-types openen de
   // detail-pane op hun categoriepagina zoals voorheen.
   if (asset.asset_type === 'cash') {
-    router.push(`/overzicht/cashflow#rekening-${asset.id}`)
+    router.push(`/overzicht/budget#rekening-${asset.id}`)
     return
   }
   router.push(`/core/assets/${asset.asset_type}?asset=${asset.id}`)
@@ -1136,7 +1136,7 @@ In hetzelfde bestand, in de category-loop (regel ~808), maak de `href` condition
 door:
 ```tsx
 <CategoryGroupHeader
-  href={type === 'cash' ? '/overzicht/cashflow' : `/core/assets/${type}`}
+  href={type === 'cash' ? '/overzicht/budget' : `/core/assets/${type}`}
   label={ASSET_TYPE_LABELS[type]}
   iconName={groupIcon}
   iconColor={groupColor}
@@ -1167,7 +1167,7 @@ Verwacht: geen fouten.
 
 - [ ] **Step 5: Handmatige verificatie**
 
-Ga naar `/overzicht/bezittingen`. Cash-kaarten tonen géén bewerk/herwaardeer-knoppen meer; klik op een cash-kaart → navigeert naar `/overzicht/cashflow` en scrollt/markeert die rekening. Klik op een niet-cash-kaart (bv. beleggingen) → opent zoals voorheen, mét knoppen.
+Ga naar `/overzicht/bezittingen`. Cash-kaarten tonen géén bewerk/herwaardeer-knoppen meer; klik op een cash-kaart → navigeert naar `/overzicht/budget` en scrollt/markeert die rekening. Klik op een niet-cash-kaart (bv. beleggingen) → opent zoals voorheen, mét knoppen.
 
 - [ ] **Step 6: Commit**
 ```bash
@@ -1188,7 +1188,7 @@ git commit -m "feat(bezittingen): cash klikt door naar cashflow, kaarten display
 
 In `app/(app)/core/assets/[type]/page.tsx`, voeg `redirect` toe aan de bestaande `next/navigation`-import (naast `notFound`). Voeg direct ná `const { type } = await params` (regel ~85), vóór de `isValidAssetType`-check, toe:
 ```ts
-if (type === 'cash') redirect('/overzicht/cashflow')
+if (type === 'cash') redirect('/overzicht/budget')
 ```
 
 - [ ] **Step 2: Per-rekening detail → cashflow-focus (server-redirect)**
@@ -1201,7 +1201,7 @@ import { createClient } from '@/lib/supabase/server'
 /**
  * De per-rekening detailpagina is opgegaan in de cashflow-landing. We mappen
  * de bank_account-id naar zijn gekoppelde asset en sturen door naar de focus-
- * weergave op /overzicht/cashflow. Zonder mapping: gewoon de landing.
+ * weergave op /overzicht/budget. Zonder mapping: gewoon de landing.
  */
 export default async function CashAccountRedirect({
   params,
@@ -1217,9 +1217,9 @@ export default async function CashAccountRedirect({
     .maybeSingle()
 
   if (data?.linked_asset_id) {
-    redirect(`/overzicht/cashflow#rekening-${data.linked_asset_id}`)
+    redirect(`/overzicht/budget#rekening-${data.linked_asset_id}`)
   }
-  redirect('/overzicht/cashflow')
+  redirect('/overzicht/budget')
 }
 ```
 
@@ -1227,9 +1227,9 @@ export default async function CashAccountRedirect({
 
 In `app/(app)/core/cash/page.tsx`, vervang `redirect('/core/assets/cash')` door:
 ```ts
-redirect('/overzicht/cashflow')
+redirect('/overzicht/budget')
 ```
-(en werk de doc-comment bij naar "…naar /overzicht/cashflow…").
+(en werk de doc-comment bij naar "…naar /overzicht/budget…").
 
 - [ ] **Step 4: Type-check**
 
@@ -1238,7 +1238,7 @@ Verwacht: geen fouten. (De `[accountId]`-pagina is nu server-side; controleer da
 
 - [ ] **Step 5: Handmatige verificatie**
 
-Bezoek in de browser: `/core/assets/cash` → belandt op `/overzicht/cashflow`. Bezoek `/core/cash` → idem. Bezoek `/core/assets/cash/<een-bestaande-bank_account-id>` → belandt op `/overzicht/cashflow#rekening-<assetId>` met focus.
+Bezoek in de browser: `/core/assets/cash` → belandt op `/overzicht/budget`. Bezoek `/core/cash` → idem. Bezoek `/core/assets/cash/<een-bestaande-bank_account-id>` → belandt op `/overzicht/budget#rekening-<assetId>` met focus.
 
 - [ ] **Step 6: Commit**
 ```bash
@@ -1254,7 +1254,7 @@ git commit -m "feat(cashflow): redirect cash-routes naar de cashflow-landing"
 - Modify: `components/core/category-deepening-registry.ts`
 - Delete: `components/core/deepenings/cash-budgetteren-tab.tsx`
 
-> Budgetbeheer leeft al op `/overzicht/cashflow/budget`. De cash-Budgetteren-tab is de dubbeling.
+> Budgetbeheer leeft al op `/overzicht/budget`. De cash-Budgetteren-tab is de dubbeling.
 
 - [ ] **Step 1: Verwijder de cash-entry uit `CATEGORY_DEEPENINGS`**
 
@@ -1284,7 +1284,7 @@ Verwacht: geen fouten (de tab werd alleen vanuit de registry geïmporteerd — g
 - [ ] **Step 6: Commit**
 ```bash
 git add components/core/category-deepening-registry.ts
-git commit -m "refactor(cash): verwijder dubbele Budgetteren-verdieping (leeft op /overzicht/cashflow/budget)"
+git commit -m "refactor(cash): verwijder dubbele Budgetteren-verdieping (leeft op /overzicht/budget)"
 ```
 
 ---
@@ -1304,20 +1304,20 @@ git commit -m "refactor(cash): verwijder dubbele Budgetteren-verdieping (leeft o
 
 - [ ] **Step 1: Sidebar Budgetteren-link**
 
-In `components/app/shell/sidebar.tsx` (regel ~188), vervang `/core/assets/cash?tab=budgetteren` door `/overzicht/cashflow/budget`.
+In `components/app/shell/sidebar.tsx` (regel ~188), vervang `/core/assets/cash?tab=budgetteren` door `/overzicht/budget`.
 
 - [ ] **Step 2: Koppel-rekening-banner**
 
-In `components/overview/koppel-rekening-banner.tsx` (regel ~87), vervang de "manage accounts"-link `/core/assets/cash` door `/overzicht/cashflow`.
-In `components/overview/koppel-rekening-banner.test.tsx` (regel ~42), werk de verwachte href bij naar `/overzicht/cashflow`.
+In `components/overview/koppel-rekening-banner.tsx` (regel ~87), vervang de "manage accounts"-link `/core/assets/cash` door `/overzicht/budget`.
+In `components/overview/koppel-rekening-banner.test.tsx` (regel ~42), werk de verwachte href bij naar `/overzicht/budget`.
 
 - [ ] **Step 3: Overige `/core/assets/cash`-links**
 
-Vervang `/core/assets/cash` → `/overzicht/cashflow` in:
+Vervang `/core/assets/cash` → `/overzicht/budget` in:
 - `components/dashboard/cards/insight-card.tsx` (regel ~32)
 - `components/widgets/huishouden-activiteit-widget.tsx` (regel ~136)
 
-Vervang `/core/assets/cash?tab=budgetteren` → `/overzicht/cashflow/budget` in:
+Vervang `/core/assets/cash?tab=budgetteren` → `/overzicht/budget` in:
 - `components/app/app-setup/configs/budgetteren.config.tsx` (regel ~94)
 - `components/app/budgets-client.tsx` (regel ~1177 en ~1231)
 
@@ -1360,14 +1360,14 @@ Verwacht: geen nieuwe falende tests t.o.v. baseline.
 - [ ] **Step 4: Handmatige end-to-end checklist**
 
 `npm run dev`, dan controleer:
-1. `/overzicht/bezittingen`: cash-kaarten tonen waarde, géén bewerk-knoppen; klik → `/overzicht/cashflow#rekening-<id>` met scroll + highlight.
-2. `/overzicht/cashflow`: onder het inflatie-blok staan Rekeningen (alle cash, incl. handmatige), geldstroom + grafiek, en Instellingen & toekomst.
+1. `/overzicht/bezittingen`: cash-kaarten tonen waarde, géén bewerk-knoppen; klik → `/overzicht/budget#rekening-<id>` met scroll + highlight.
+2. `/overzicht/budget`: onder het inflatie-blok staan Rekeningen (alle cash, incl. handmatige), geldstroom + grafiek, en Instellingen & toekomst.
 3. Bewerk inkomen/uitgaven → FIRE-zin herberekent live; reload → bewaard.
 4. Stel doel-spaarquote in → bewaard na reload.
 5. Klik handmatige cash-rekening op cashflow → AssetPane opent (bewerken/herwaarderen).
 6. Klik bank-gekoppelde rekening → detail-modal opent.
 7. `/core/assets/cash`, `/core/cash`, `/core/assets/cash/<id>` redirecten correct.
-8. Sidebar "Budgetteren" → `/overzicht/cashflow/budget`.
+8. Sidebar "Budgetteren" → `/overzicht/budget`.
 9. Niet-cash asset-types op bezittingen: onveranderd (klik + knoppen intact).
 
 - [ ] **Step 5: Commit de spec + dit plan**

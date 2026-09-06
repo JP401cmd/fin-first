@@ -1,7 +1,7 @@
 /**
  * B-019 — de voorspelling moet de RICHTING van het budget volgen.
  *
- * Gemeld op /overzicht/cashflow/budget: "Inkomens budgetten worden in de
+ * Gemeld op /overzicht/budget: "Inkomens budgetten worden in de
  * verwachting gezien als uitgaven". `computeBudgetForecast` rekende correct
  * (de reeks die de aanroeper doorgeeft is al richting-gecorrigeerd door
  * `spendingContribution`), maar bénoemde elke uitkomst als uitgave: de kop

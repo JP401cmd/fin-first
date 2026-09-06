@@ -68,7 +68,7 @@ describe('LeverCompassMobile — NAV-6 statuspunt-reductie', () => {
     renderCompass('simple', scoresWith({}))
     fireEvent.click(screen.getByRole('button', { name: /Kompas:/ }))
     const panel = screen.getByRole('dialog', { name: 'Financieel kompas' })
-    for (const label of ['Bezittingen', 'Schulden', 'Cashflow', 'Belasting']) {
+    for (const label of ['Bezittingen', 'Schulden', 'Budget', 'Belasting']) {
       expect(within(panel).getByText(label)).toBeInTheDocument()
     }
   })

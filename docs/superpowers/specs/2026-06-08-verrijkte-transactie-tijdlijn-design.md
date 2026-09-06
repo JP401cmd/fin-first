@@ -1,7 +1,7 @@
 # Verrijkte transactie-tijdlijn — ontwerp
 
 **Datum:** 2026-06-08
-**Route:** `/overzicht/cashflow/transacties`
+**Route:** `/overzicht/budget/transacties`
 **Module:** De Kern (amber/bruin)
 **Status:** ontwerp goedgekeurd via visuele iteratie; klaar voor implementatieplan
 
@@ -9,7 +9,7 @@
 
 ## 1. Doel & context
 
-De transactielijst op `/overzicht/cashflow/transacties` is nu een dag-gegroepeerde lijst
+De transactielijst op `/overzicht/budget/transacties` is nu een dag-gegroepeerde lijst
 (`components/app/transacties-feed.tsx`) met type/zoek/rekening/**budget**-filters. Hij leest als een
 tabel: ruwe banknamen (`BCK*SHELL T KEMPKE`), bedrag, weinig hiërarchie.
 
@@ -287,7 +287,7 @@ meervoud volgen hetzelfde op één decimaal afgeronde getal.
    breid `mapRow` + load-select uit). Graceful degradation eerst — werkt ook op huidige demo-data.
 4. **Filters & zoeken:** quick-chips + Filters-sheet + smart-search + URL-state.
 5. **Polish:** privacy-masking, empty/loading/a11y, optioneel rijk detail.
-6. **Verificatie:** tests + tsc + visuele check op `/overzicht/cashflow/transacties` (én na een echte
+6. **Verificatie:** tests + tsc + visuele check op `/overzicht/budget/transacties` (én na een echte
    Rabobank-import).
 
 ## 13. Risico's & open punten

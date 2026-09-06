@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * Grenzenpotten op /overzicht/cashflow/transacties — beheer + stand.
+ * Grenzenpotten op /overzicht/budget/transacties — beheer + stand.
  *
  * euro-view: exempt (gerealiseerde historie + één geprojecteerd bedrag binnen
  * dezelfde kalenderperiode — ADR 0119; nominaal, dus geen deflator)
@@ -438,7 +438,7 @@ export function SpendLimitsSection({
     params.delete('limit')
     params.delete('periode')
     const qs = params.toString()
-    router.replace(`/overzicht/cashflow/transacties${qs ? `?${qs}` : ''}`, { scroll: false })
+    router.replace(`/overzicht/budget/transacties${qs ? `?${qs}` : ''}`, { scroll: false })
   }, [router, searchParams])
 
   const openNew = useCallback(() => {

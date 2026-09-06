@@ -29,7 +29,7 @@ export function deepLinkForRecommendation(
   // bezit/budget/de schuld waar de tip over gaat.
   if (rec.related_budget_slug) {
     return {
-      href: `/overzicht/cashflow?budget=${encodeURIComponent(rec.related_budget_slug)}`,
+      href: `/overzicht/budget?budget=${encodeURIComponent(rec.related_budget_slug)}`,
       label: 'Open budget',
       isExternal: false,
     }
@@ -54,7 +54,7 @@ export function deepLinkForRecommendation(
   switch (rec.recommendation_type) {
     case 'budget_optimization':
       return {
-        href: '/overzicht/cashflow',
+        href: '/overzicht/budget',
         label: 'Open cashflow',
         isExternal: false,
       }
@@ -73,7 +73,7 @@ export function deepLinkForRecommendation(
     case 'income_increase':
     case 'savings_boost':
       return {
-        href: '/overzicht/cashflow',
+        href: '/overzicht/budget',
         label: 'Open cashflow',
         isExternal: false,
       }

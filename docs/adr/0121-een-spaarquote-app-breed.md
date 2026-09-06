@@ -16,7 +16,7 @@ Op een productie-account van de eigenaar (schermafdrukken 31-08-2026, grondslag
 
 | Oppervlak | Getal | Grondslag |
 |---|---|---|
-| `/overzicht/cashflow` instellingen-blok | 30 % | effectief ("uit je budgetten") |
+| `/overzicht/budget` instellingen-blok | 30 % | effectief ("uit je budgetten") |
 | `/overzicht` hefboomkaart "Op koers met sparen" | 30 % | effectief |
 | forecast-kaart "SPAARQUOTE (6m)" | 9,5 % | rauwe 6-maands transactiemeting |
 | spaarquote-widget | 9,5 % (+ een €-bedrag op die meting) | rauwe meting |

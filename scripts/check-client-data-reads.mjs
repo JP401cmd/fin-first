@@ -110,7 +110,6 @@ const ALLOWLIST = new Set([
   'components/app/budget-form.tsx',
   'components/app/app-setup/configs/budgetteren.config.tsx',
   // — Fase b, slice 3: cash —
-  'components/app/cash-overview.tsx',
   'components/app/cash-account-view.tsx',
   'components/app/transaction-form.tsx',
   'components/app/transfer-confirm-sheet.tsx',

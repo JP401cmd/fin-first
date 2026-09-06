@@ -1441,7 +1441,7 @@ NEWFILEUID:NONE
         { amount: -500.00, transaction_type: 'transfer' }, // telt NIET mee
       ]
 
-      // STRIP (/overzicht/cashflow): de canonieke maandmotor over dezelfde rijen.
+      // STRIP (/overzicht/budget): de canonieke maandmotor over dezelfde rijen.
       const strip = deriveRealMonthTotals(rijen)
       const stripSaldo = strip.income - strip.expenses
       const stripQuote = currentMonthSavingsRate(strip.income, strip.expenses)

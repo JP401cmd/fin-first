@@ -116,9 +116,9 @@ const HEFBOMEN: ReadonlyArray<{
   },
   {
     key: 'cashflow',
-    href: '/overzicht/cashflow',
+    href: '/overzicht/budget',
     pillarKey: 'savings_rate',
-    tooltip: 'In en uit per maand — het deel dat je opzij zet bepaalt je tempo.',
+    tooltip: 'Budgetten, transacties en vaste lasten — het deel dat je opzij zet bepaalt je tempo.',
   },
   {
     key: 'belasting',

@@ -101,9 +101,9 @@ describe('buildBreadcrumbs — grenzen van de type-lookup', () => {
   })
 
   it('laat een gewone route-crumb ongemoeid', () => {
-    expect(buildBreadcrumbs('/overzicht/cashflow/vaste-lasten').map((c) => c.label)).toEqual([
+    expect(buildBreadcrumbs('/overzicht/budget/vaste-lasten').map((c) => c.label)).toEqual([
       'Overzicht',
-      'Cashflow',
+      'Budget',
       'Vaste lasten',
     ])
   })

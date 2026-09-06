@@ -24,7 +24,7 @@ import {
  * waarde, zodat alle downstream (resolveSavingsSource / FIRE-prognose /
  * check-intake) ongewijzigd op een jaarinkomen blijft rekenen. Beide landen
  * als handmatige bron ("eigen bedrag") in het blok "Instellingen & toekomst"
- * op /overzicht/cashflow en voeden via `resolveSavingsSource` de
+ * op /overzicht/budget en voeden via `resolveSavingsSource` de
  * FIRE-prognose — zo heeft een verse gebruiker zonder transacties direct een
  * werkende spaarquote in de toekomst-views.
  *
@@ -71,7 +71,7 @@ function getFieldErrors(data: IncomeData): Partial<Record<FieldKey, string>> {
   const errors: Partial<Record<FieldKey, string>> = {}
 
   // Beide velden zijn optioneel — de gebruiker mag ze later invullen via
-  // /overzicht/cashflow. Wel valideren wanneer er iets is ingevuld.
+  // /overzicht/budget. Wel valideren wanneer er iets is ingevuld.
   // Drempel is een MAANDbedrag (~€170.000/mnd is ruim boven elk realistisch
   // netto maandinkomen) sinds het inkomen per maand wordt uitgevraagd.
   if (data.net_monthly_income) {
@@ -287,7 +287,7 @@ export function OnboardingInkomen({
     // Canonieke quote-formule (lib/savings-source.ts) i.p.v. een handgerolde
     // deling: numeriek identiek zolang de aflossing 0 is — en die is hier per
     // definitie 0, want de schulden-stap komt pas later — maar het houdt deze
-    // preview op dezelfde formule als /overzicht/cashflow. Een eigen som naast
+    // preview op dezelfde formule als /overzicht/budget. Een eigen som naast
     // de canonieke motor is per definitie toekomstige drift (CLAUDE.md,
     // "consume, don't recompute").
     return Math.round(savingsRateFromAggregates(monthlyIncome, monthlyExpenses, 0))
@@ -381,7 +381,7 @@ export function OnboardingInkomen({
         )}
 
         {/* Geschat netto maandinkomen — DM Mono input met EUR-prefix.
-            Optioneel: gebruiker kan later invullen via /overzicht/cashflow.
+            Optioneel: gebruiker kan later invullen via /overzicht/budget.
             De orchestrator converteert dit maandbedrag bij save naar het
             canonieke jaarinkomen (×12). */}
         {showIncome && (
@@ -439,7 +439,7 @@ export function OnboardingInkomen({
         )}
 
         {/* Geschatte maandelijkse uitgaven — zelfde patroon. Samen met het
-            jaarinkomen bepaalt dit de spaarquote op /overzicht/cashflow en
+            jaarinkomen bepaalt dit de spaarquote op /overzicht/budget en
             in de toekomst-prognose. */}
         {showExpenses && (
         <div>

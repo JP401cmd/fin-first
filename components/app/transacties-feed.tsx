@@ -66,7 +66,7 @@ interface Props {
  * prop (bedragen zijn al perspectief-geschaald door de parent).
  *
  * Gerenderd op de transactie-analysepagina
- * (/overzicht/cashflow/transacties). Rijen zijn klikbaar wanneer `onSelect`
+ * (/overzicht/budget/transacties). Rijen zijn klikbaar wanneer `onSelect`
  * is meegegeven.
  */
 export function TransactiesFeed({
@@ -286,7 +286,7 @@ export function TransactiesFeed({
                 transacties hier te zien.
               </p>
               <Link
-                href="/overzicht/cashflow"
+                href="/overzicht/budget"
                 className="inline-flex min-h-11 items-center justify-center border border-[var(--ink)] bg-[var(--ink)] px-4 py-2.5 text-sm font-medium text-[var(--paper)] transition-opacity hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
               >
                 Koppel een rekening

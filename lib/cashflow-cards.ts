@@ -1,6 +1,6 @@
 // lib/cashflow-cards.ts
 // Bouwt de vier hefboom-stijl kaarten voor de cashflow-landingspagina
-// (/overzicht/cashflow): Budget, Transacties, Vaste lasten, Forecast. Elke
+// (/overzicht/budget): Budget, Transacties, Vaste lasten, Forecast. Elke
 // kaart krijgt een status, een KPI en uitklap-detail — afgeleid uit data die de
 // pagina toch al laadt (CashflowCardScalars + CashflowData + de vaste-lasten-
 // samenvatting). Pure module zodat de server-page hem kan aanroepen; de client
@@ -79,7 +79,7 @@ export function cashflowCardStatuses(cards: CashflowCard[]): CashflowCardStatuse
   }
 }
 
-const BASE = '/overzicht/cashflow'
+const BASE = '/overzicht/budget'
 
 function signed(value: number): string {
   return `${value >= 0 ? '+' : ''}${formatCurrency(value)}`
@@ -100,7 +100,7 @@ function signed(value: number): string {
  *
  * Daarom is "tot nu toe" de eerlijke lezing en niet een mooiere formulering van
  * "deze maand": de maand loopt nog, het getal groeit tot de 1e. Precies dat
- * onderscheidt het van de 30-DAGEN-cijfers op /overzicht/cashflow/transacties —
+ * onderscheidt het van de 30-DAGEN-cijfers op /overzicht/budget/transacties —
  * dezelfde verwarring die ADR 0073 vastlegde, hier in de copy afgevangen in
  * plaats van in de grondslag.
  *
@@ -240,7 +240,7 @@ export function transactiesCardStatus(input: {
  * Vaste-lasten-aandeeldrempels (fractie van maandinkomen).
  *
  * Gedeeld tussen `vasteLastenCardStatus` (de statussemantiek) én de
- * vaste-lasten-quote-meter op /overzicht/cashflow/vaste-lasten, zodat de
+ * vaste-lasten-quote-meter op /overzicht/budget/vaste-lasten, zodat de
  * meter-zones EXACT samenvallen met de statusgrenzen — geen losse getallen in
  * de UI, geen drift. Grondslag: Nibud-richtlijn (≤ ~50% van je netto-inkomen
  * aan vaste lasten is gezond; boven ~70% wordt het risicovol).
@@ -351,7 +351,11 @@ export function buildCashflowCards(
   const budget: CashflowCard = {
     key: 'budget',
     label: 'Budget',
-    href: `${BASE}/budget`,
+    // De budgetpagina ÍS sinds UR3-28 de hefboom zelf, dus deze kaart wijst naar
+    // `BASE` en niet naar een subpad. Hij wordt op die pagina niet gerenderd
+    // (`BUDGET_SUBCARD_KEYS` hieronder) — hij bestaat nog omdat zijn STATUS de
+    // hefboomkaart en de sidebar-dot voedt.
+    href: BASE,
     tooltip: 'Plan en volg je maandbudgetten.',
     kpi: budgetActive ? formatCurrency(budgetRemaining) : null,
     status: budgetStatus,
@@ -450,7 +454,7 @@ export function buildCashflowCards(
             : 'Tekort deze maand',
     status: txStatus,
     // DE KAART WAAR CF-3 OM BEGONNEN IS. Dit netto-cijfer staat één klik
-    // verwijderd van de 30-dagen-cijfers op /overzicht/cashflow/transacties en
+    // verwijderd van de 30-dagen-cijfers op /overzicht/budget/transacties en
     // was zonder venster niet van die cijfers te onderscheiden. `subText` doet
     // het oordeel ("Tekort deze maand"), deze regel de meetlat.
     kpiWindow: hasTx ? `in ${monthWindow}` : null,
@@ -553,4 +557,25 @@ export function buildCashflowCards(
   }
 
   return [budget, transacties, vasteLasten, forecast]
+}
+
+/**
+ * De drie kaarten die BOVENAAN de budgetpagina staan.
+ *
+ * `buildCashflowCards` levert er vier; de vierde is Budget zelf, en die pagina
+ * hoeft niet naar zichzelf te linken. Zijn status blijft wél nodig — hij voedt
+ * de hefboomkaart op /overzicht en de sidebar-dot — dus hij wordt hier
+ * gefilterd en niet weggelaten bij het bouwen.
+ */
+export const BUDGET_SUBCARD_KEYS: readonly CashflowCardKey[] = [
+  'transacties',
+  'vaste-lasten',
+  'forecast',
+]
+
+/** De kaarten van `buildCashflowCards` minus Budget zelf, in vaste volgorde. */
+export function budgetSubCards(cards: CashflowCard[]): CashflowCard[] {
+  return BUDGET_SUBCARD_KEYS.map((key) => cards.find((c) => c.key === key)).filter(
+    (c): c is CashflowCard => Boolean(c),
+  )
 }

@@ -8,7 +8,7 @@ import type { PeriodKind } from '@/lib/transaction-insights'
 
 /**
  * PeriodeSelector — periode-keuze + kalender-navigatie voor de
- * transactie-analysepagina (/overzicht/cashflow/transacties).
+ * transactie-analysepagina (/overzicht/budget/transacties).
  *
  * Presentational op één punt na: de weergavemodus leest hij zélf uit
  * `useDisplayMode()` (het enige leespad — geen prop-drilling van de rauwe

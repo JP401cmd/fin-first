@@ -699,7 +699,7 @@ describe('decideSpendLimitEvents — copy', () => {
     ])
     expect(events[0].notification.aiContext.length).toBeGreaterThan(20)
     expect(events[0].notification.actionUrl).toBe(
-      '/overzicht/cashflow/transacties?limit=pot-1&periode=2026-07',
+      '/overzicht/budget/transacties?limit=pot-1&periode=2026-07',
     )
   })
 })

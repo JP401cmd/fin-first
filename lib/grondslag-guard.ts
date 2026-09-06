@@ -57,11 +57,11 @@ export const GRONDSLAG_ONBEKEND_HINT: Record<OntbrekendeGrondslag, string> = {
 }
 
 /**
- * De ene knop. Landt op het instellingenblok van /overzicht/cashflow: daar
+ * De ene knop. Landt op het instellingenblok van /overzicht/budget: daar
  * schrijft "Eigen bedrag" bron én bedrag in één PUT (`income_source: 'manual'`),
  * zodat het bedrag daarna als geverifieerde invoer geldt — ook wanneer het 0 is.
  */
-export const GRONDSLAG_AANVULLEN_HREF = '/overzicht/cashflow'
+export const GRONDSLAG_AANVULLEN_HREF = '/overzicht/budget'
 
 export const GRONDSLAG_AANVULLEN_LABEL: Record<OntbrekendeGrondslag, string> = {
   inkomen: 'Vul je inkomen in',

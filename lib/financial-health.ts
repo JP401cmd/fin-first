@@ -214,8 +214,8 @@ const PILLAR_GROUP: Record<string, PillarGroup> = {
 // daad plaatsvindt. Sluit aan op de vrijheids-loop (zie tips-lijst).
 
 const PILLAR_ACTION: Record<string, { href: string; label: string }> = {
-  savings_rate:       { href: '/overzicht/cashflow',    label: 'Verhoog je spaarquote' },
-  budget_discipline:  { href: '/overzicht/cashflow',    label: 'Stel je budget bij' },
+  savings_rate:       { href: '/overzicht/budget',    label: 'Verhoog je spaarquote' },
+  budget_discipline:  { href: '/overzicht/budget',    label: 'Stel je budget bij' },
   emergency_fund:     { href: '/toekomst/doelen',       label: 'Stel je noodfondsdoel' },
   debt_service_ratio: { href: '/overzicht/schulden',    label: 'Verlaag je maandlasten' },
   debt_ratio:         { href: '/overzicht/schulden',    label: 'Versnel je aflossing' },

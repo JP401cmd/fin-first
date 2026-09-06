@@ -143,7 +143,7 @@ describe('resolveSavingsSource — handmatig pad = wat de cashflow-kaart toont',
       estimatedMonthlyExpenses: 3000, savingsRate6m: 99,
     })
     // (4000−3000)/4000 = 25% — exact het percentage op de kaart onderaan
-    // /overzicht/cashflow.
+    // /overzicht/budget.
     expect(r.effectiveSavingsRatePct).toBeCloseTo(25, 10)
   })
 

@@ -11,7 +11,7 @@
  *
  * WAT ER MIS WAS (productie-account van de eigenaar, schermafdrukken 31-08-2026,
  * grondslag "uit je budgetten") — vier oppervlakken, drie percentages:
- *   · /overzicht/cashflow instellingen-blok  → 30 %  (effectief, correct)
+ *   · /overzicht/budget instellingen-blok  → 30 %  (effectief, correct)
  *   · /overzicht-kaart "Op koers met sparen" → 30 %  (effectief, correct)
  *   · forecast-kaart "SPAARQUOTE (6m)"       →  9,5 % (rauwe transactiequote)
  *     — op DEZELFDE pagina waar het maandelijks netto-overschot wél de effectieve

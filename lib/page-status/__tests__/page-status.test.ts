@@ -65,7 +65,7 @@ function makeCashflowCard(
   return {
     key,
     label: key,
-    href: `/overzicht/cashflow/${key}`,
+    href: `/overzicht/budget/${key}`,
     tooltip: '',
     kpi: null,
     status,
@@ -198,12 +198,12 @@ describe('resolvePageStatusMap — lever/box routes', () => {
     expect(map['/overzicht/schulden'].status).toBe('bad')
   })
 
-  it('amber cashflow lever → /overzicht/cashflow with status warn', () => {
+  it('amber cashflow lever → /overzicht/budget with status warn', () => {
     const map = resolvePageStatusMap({
       levers: makeLeverScores('green', 'green', 'amber', 'green', '', '', 'Spaarquote 8%'),
     })
-    expect(map['/overzicht/cashflow']).toBeDefined()
-    expect(map['/overzicht/cashflow'].status).toBe('warn')
+    expect(map['/overzicht/budget']).toBeDefined()
+    expect(map['/overzicht/budget'].status).toBe('warn')
   })
 
   it('red tax lever → /overzicht/belasting with status bad', () => {
@@ -220,7 +220,7 @@ describe('resolvePageStatusMap — lever/box routes', () => {
     })
     expect(map['/overzicht/bezittingen']).toBeDefined()
     expect(map['/overzicht/schulden']).toBeDefined()
-    expect(map['/overzicht/cashflow']).toBeDefined()
+    expect(map['/overzicht/budget']).toBeDefined()
     expect(map['/overzicht/belasting']).toBeDefined()
   })
 
@@ -280,7 +280,7 @@ describe('resolvePageStatusMap — no-data gate (M2)', () => {
     })
     expect(map['/overzicht/bezittingen']).toBeUndefined()
     expect(map['/overzicht/schulden']).toBeUndefined()
-    expect(map['/overzicht/cashflow']).toBeUndefined()
+    expect(map['/overzicht/budget']).toBeUndefined()
     expect(map['/overzicht/belasting']).toBeUndefined()
   })
 })
@@ -339,13 +339,14 @@ describe('resolvePageStatusMap — optional families', () => {
     const map = resolvePageStatusMap({
       levers: makeLeverScores('amber', 'amber', 'amber', 'amber'),
     })
-    // No cashflow-sub entries
-    expect(map['/overzicht/cashflow/budget']).toBeUndefined()
-    expect(map['/overzicht/cashflow/transacties']).toBeUndefined()
-    expect(map['/overzicht/cashflow/vaste-lasten']).toBeUndefined()
-    expect(map['/overzicht/cashflow/forecast']).toBeUndefined()
-    // Lever routes ARE present
+    // No cashflow-sub entries. /overzicht/budget hoort sinds UR3-28 NIET meer bij
+    // die familie — het is de hefboom zelf en komt dus uit de levers hieronder.
+    expect(map['/overzicht/budget/transacties']).toBeUndefined()
+    expect(map['/overzicht/budget/vaste-lasten']).toBeUndefined()
+    expect(map['/overzicht/budget/forecast']).toBeUndefined()
+    // Lever routes ARE present — de Budget-hefboom inbegrepen.
     expect(map['/overzicht/bezittingen']).toBeDefined()
+    expect(map['/overzicht/budget']).toBeDefined()
   })
 
   it('calling with only cashflowCards skips lever routes — no crash', () => {
@@ -359,12 +360,13 @@ describe('resolvePageStatusMap — optional families', () => {
     // No lever routes
     expect(map['/overzicht/bezittingen']).toBeUndefined()
     expect(map['/overzicht/schulden']).toBeUndefined()
-    // Cashflow warn/bad present
-    expect(map['/overzicht/cashflow/budget']).toBeDefined()
-    expect(map['/overzicht/cashflow/forecast']).toBeDefined()
+    // Cashflow warn/bad present. De BUDGET-kaart levert géén route-entry meer:
+    // die route hangt aan de hefboomscore, niet aan de kaart (UR3-28).
+    expect(map['/overzicht/budget']).toBeUndefined()
+    expect(map['/overzicht/budget/forecast']).toBeDefined()
     // good/neutral absent
-    expect(map['/overzicht/cashflow/transacties']).toBeUndefined()
-    expect(map['/overzicht/cashflow/vaste-lasten']).toBeUndefined()
+    expect(map['/overzicht/budget/transacties']).toBeUndefined()
+    expect(map['/overzicht/budget/vaste-lasten']).toBeUndefined()
   })
 
   it('calling with empty input {} returns empty map — no crash', () => {
@@ -398,26 +400,21 @@ describe('resolvePageStatusMap — optional families', () => {
 // ── resolvePageStatusMap — cashflow card routes ───────────────────────────────
 
 describe('resolvePageStatusMap — cashflow cards', () => {
-  it('warn budget card → /overzicht/cashflow/budget entry; reason is clean (no parenthetical/figure)', () => {
-    // Budget reason is a qualitative situation — the card subText (a label like
-    // "Boven budget") is intentionally NOT woven into a parenthetical.
-    const subText = 'Boven budget'
-    const cards = [makeCashflowCard('budget', 'warn', subText)]
+  it('budget card → GEEN route-entry: die route hangt aan de hefboomscore', () => {
+    // Tot UR3-28 was /overzicht/budget een sub-pagina en leverde de budgetkaart
+    // er de melding voor. Nu is het de hefboom zelf: de melding komt uit
+    // `leverInfo(...scores.cashflow)`. De kaart blijft wél bestaan — zijn status
+    // voedt de hefboomtegel op /overzicht en de sidebar-dot.
+    const cards = [makeCashflowCard('budget', 'warn', 'Boven budget')]
     const map = resolvePageStatusMap({ cashflowCards: cards })
-    const info = map['/overzicht/cashflow/budget']
-    expect(info).toBeDefined()
-    expect(info.status).toBe('warn')
-    expect(info.reason.trim().length).toBeGreaterThan(0)
-    expect(info.reason).not.toContain('{figure}')
-    expect(info.reason).not.toContain('(')
-    expect(info.reason).not.toContain(')')
+    expect(map['/overzicht/budget']).toBeUndefined()
   })
 
-  it('bad transacties card → /overzicht/cashflow/transacties entry; reason is clean (no parenthetical/figure)', () => {
+  it('bad transacties card → /overzicht/budget/transacties entry; reason is clean (no parenthetical/figure)', () => {
     const subText = 'Tekort deze maand'
     const cards = [makeCashflowCard('transacties', 'bad', subText)]
     const map = resolvePageStatusMap({ cashflowCards: cards })
-    const info = map['/overzicht/cashflow/transacties']
+    const info = map['/overzicht/budget/transacties']
     expect(info).toBeDefined()
     expect(info.status).toBe('bad')
     expect(info.reason.trim().length).toBeGreaterThan(0)
@@ -426,21 +423,21 @@ describe('resolvePageStatusMap — cashflow cards', () => {
     expect(info.reason).not.toContain(')')
   })
 
-  it('bad vaste-lasten card → /overzicht/cashflow/vaste-lasten entry; ratio figure appears in reason', () => {
+  it('bad vaste-lasten card → /overzicht/budget/vaste-lasten entry; ratio figure appears in reason', () => {
     // Vaste lasten keeps {figure}: the subText is a real ratio ("X% van inkomen").
     const ratio = '72% van inkomen'
     const cards = [makeCashflowCard('vaste-lasten', 'bad', ratio)]
     const map = resolvePageStatusMap({ cashflowCards: cards })
-    const info = map['/overzicht/cashflow/vaste-lasten']
+    const info = map['/overzicht/budget/vaste-lasten']
     expect(info).toBeDefined()
     expect(info.status).toBe('bad')
     expect(info.reason).toContain(ratio)
   })
 
-  it('warn forecast card → /overzicht/cashflow/forecast entry; reason is clean (no parenthetical/figure)', () => {
+  it('warn forecast card → /overzicht/budget/forecast entry; reason is clean (no parenthetical/figure)', () => {
     const cards = [makeCashflowCard('forecast', 'warn', 'Saldo daalt')]
     const map = resolvePageStatusMap({ cashflowCards: cards })
-    const info = map['/overzicht/cashflow/forecast']
+    const info = map['/overzicht/budget/forecast']
     expect(info).toBeDefined()
     expect(info.status).toBe('warn')
     expect(info.reason.trim().length).toBeGreaterThan(0)
@@ -452,19 +449,19 @@ describe('resolvePageStatusMap — cashflow cards', () => {
   it('good card → no entry', () => {
     const cards = [makeCashflowCard('budget', 'good', 'Op schema')]
     const map = resolvePageStatusMap({ cashflowCards: cards })
-    expect(map['/overzicht/cashflow/budget']).toBeUndefined()
+    expect(map['/overzicht/budget']).toBeUndefined()
   })
 
   it('neutral card → no entry', () => {
     const cards = [makeCashflowCard('transacties', 'neutral', null)]
     const map = resolvePageStatusMap({ cashflowCards: cards })
-    expect(map['/overzicht/cashflow/transacties']).toBeUndefined()
+    expect(map['/overzicht/budget/transacties']).toBeUndefined()
   })
 
   it('cashflow card with null subText: reason has no leftover "()" or {figure}', () => {
-    const cards = [makeCashflowCard('budget', 'warn', null)]
+    const cards = [makeCashflowCard('transacties', 'warn', null)]
     const map = resolvePageStatusMap({ cashflowCards: cards })
-    const info = map['/overzicht/cashflow/budget']
+    const info = map['/overzicht/budget/transacties']
     expect(info).toBeDefined()
     expect(info.reason).not.toContain('{figure}')
     expect(info.reason).not.toContain('()')
@@ -608,15 +605,15 @@ describe('route-family smoke — in-scope routes', () => {
   const KNOWN_IN_SCOPE = [
     '/overzicht/bezittingen',
     '/overzicht/schulden',
-    '/overzicht/cashflow',
+    '/overzicht/budget',
     '/overzicht/belasting',
     '/overzicht/belasting/box1',
     '/overzicht/belasting/box2',
     '/overzicht/belasting/box3',
-    '/overzicht/cashflow/budget',
-    '/overzicht/cashflow/transacties',
-    '/overzicht/cashflow/vaste-lasten',
-    '/overzicht/cashflow/forecast',
+    '/overzicht/budget',
+    '/overzicht/budget/transacties',
+    '/overzicht/budget/vaste-lasten',
+    '/overzicht/budget/forecast',
   ]
 
   it('PAGE_STATUS_COPY covers every known in-scope route', () => {

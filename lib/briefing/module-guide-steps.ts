@@ -28,8 +28,8 @@ export const MODULE_GUIDE_DISPLAY_ORDER: ModuleId[] = [
 
 export const DEFAULT_MODULE_GUIDE_STEPS: Record<ModuleId, ModuleGuideStep[]> = {
   budgetteren: [
-    { key: 'budget_bekijk', label: 'Bekijk je budgetten', href: '/overzicht/cashflow/budget' },
-    { key: 'budget_nibud', label: 'Vergelijk met Nibud-normen', href: '/overzicht/cashflow/budget' },
+    { key: 'budget_bekijk', label: 'Bekijk je budgetten', href: '/overzicht/budget' },
+    { key: 'budget_nibud', label: 'Vergelijk met Nibud-normen', href: '/overzicht/budget' },
     { key: 'budget_spaarquote', label: 'Check je spaarquote', href: '/overzicht' },
     { key: 'budget_noodfonds', label: 'Controleer je noodfonds', href: '/overzicht' },
   ],

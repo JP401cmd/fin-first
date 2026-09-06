@@ -51,7 +51,7 @@ import type { TransactionFlagsData } from '@/lib/household/transaction-flags'
 
 /**
  * TransactiesAnalyse — periode-gestuurde transactie-analyse op
- * /overzicht/cashflow/transacties.
+ * /overzicht/budget/transacties.
  *
  * Client-component (zoals cash-account-view): haalt zélf de transacties op per
  * gekozen periode, zodat door de historie bladeren mogelijk is. Perspectief +
@@ -177,7 +177,7 @@ export function TransactiesAnalyse({
   const { mode } = useDisplayMode()
   const simple = mode === 'simple'
 
-  // Deeplink vanaf de geldstroom-banner (/overzicht/cashflow) opent een
+  // Deeplink vanaf de geldstroom-banner (/overzicht/budget) opent een
   // specifieke kalendermaand via `?maand=YYYY-MM` → periode 'month' + de offset
   // (aantal maanden) t.o.v. de huidige maand. Eénmalig bij mount uitgelezen;
   // daarna stuurt de periode-selector de state. Geen param → huidig gedrag (30d).
@@ -221,7 +221,7 @@ export function TransactiesAnalyse({
   const [accountMap, setAccountMap] = useState<Map<string, string>>(new Map())
   const [accounts, setAccounts] = useState<AccountOption[]>([])
   // Deeplink `?rekening=<id>` — gebruikt door de archief-regel op
-  // /overzicht/cashflow, die anders naar niets kon wijzen. Zelfde vorm als de
+  // /overzicht/budget, die anders naar niets kon wijzen. Zelfde vorm als de
   // `?maand=`-deeplink hierboven: eenmalig bij mount, daarna stuurt de
   // chip-rij de state. Géén validatie op bestaan: is het id onzin, dan filtert
   // de tijdlijn op nul rijen en zet de gebruiker 'm met één klik terug op
@@ -863,7 +863,7 @@ export function TransactiesAnalyse({
           <p className="text-[11px] italic text-[var(--ink-3)]">
             Op zoek naar de vooruitblik?{' '}
             <Link
-              href="/overzicht/cashflow/forecast"
+              href="/overzicht/budget/forecast"
               className="inline-flex items-center gap-0.5 not-italic font-medium text-[var(--ink-2)] underline hover:text-[var(--ink)]"
             >
               Cashflow-prognose <ArrowRight className="h-3 w-3" />

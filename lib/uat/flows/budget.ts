@@ -150,7 +150,7 @@ export const BUDGET_FLOW: UatFlow = {
     { from: 'hub', to: 'rapport' },
     { from: 'rapport', to: 'x-rapp', kind: 'cross' },
     { from: 'hub', to: 'grondslag' },
-    { from: 'grondslag', to: 'x-cash', kind: 'cross', label: 'grondslagkeuze op /overzicht/cashflow' },
+    { from: 'grondslag', to: 'x-cash', kind: 'cross', label: 'grondslagkeuze op /overzicht/budget' },
     { from: 'grondslag', to: 'uitkomst' },
 
     // samenvloeien → uitkomst

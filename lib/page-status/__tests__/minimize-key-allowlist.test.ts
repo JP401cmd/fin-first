@@ -60,7 +60,7 @@ describe('normalizePageStatusRoute — allowlist is echt een allowlist', () => {
 
 describe('normalizeMinimizeKey — schrijf-allowlist', () => {
   it('laat de /overzicht-routes door', () => {
-    expect(normalizeMinimizeKey('/overzicht/cashflow/budget')).toBe('/overzicht/cashflow/budget')
+    expect(normalizeMinimizeKey('/overzicht/budget')).toBe('/overzicht/budget')
   })
 
   it('laat de extra pref-only sleutel door', () => {

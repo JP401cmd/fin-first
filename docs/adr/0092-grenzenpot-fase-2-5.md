@@ -94,7 +94,7 @@ wordt in de route berekend (canoniek periodebedrag minus top-N-som), niet in
 SQL — anders ontstaat een tweede optelling naast de motor.
 
 Bedragmaskering in de grafiek en de heatmap volgt ADR 0091. Deeplink-contract:
-`?limit=<id>[&periode=<periodKey>]` op `/overzicht/cashflow/transacties`.
+`?limit=<id>[&periode=<periodKey>]` op `/overzicht/budget/transacties`.
 
 ## Besluit 6 — Widget als projectie, geen tweede berekening
 

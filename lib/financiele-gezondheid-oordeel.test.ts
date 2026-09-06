@@ -12,7 +12,7 @@
  *
  * 2. SPAARQUOTE. Zet de gebruiker inkomen/uitgaven handmatig, dan IS het
  *    getoonde percentage al de spaarquote — het instellingenblok onderaan
- *    /overzicht/cashflow toont `(inkomen − uitgaven) / inkomen`. De canonieke
+ *    /overzicht/budget toont `(inkomen − uitgaven) / inkomen`. De canonieke
  *    resolver telde daar spaarbudgetten en schuldaflossing NOG EENS bovenop,
  *    waardoor de gezondheidsscore en de FIRE-prognose een hoger percentage
  *    gebruikten dan de gebruiker zelf had ingevoerd.
@@ -181,7 +181,7 @@ describe('resolveSavingsSource — handmatige invoer IS de spaarquote', () => {
       monthlyDebtAflossing: 360.21,    // was: hier bovenop → 37,2 %
       monthlySavingsContribution: 0,
     })
-    // Precies wat het instellingenblok onderaan /overzicht/cashflow toont.
+    // Precies wat het instellingenblok onderaan /overzicht/budget toont.
     expect(r.effectiveSavingsRatePct).toBeCloseTo(30, 6)
     expect(r.baseAnnualSavings).toBeCloseTo(18_000, 4) // 60.000 × 30 %
   })

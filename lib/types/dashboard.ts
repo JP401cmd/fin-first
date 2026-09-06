@@ -255,7 +255,7 @@ export interface DashboardData {
    * bij `profiles.income_source = 'manual'` de handmatige profielinschatting
    * wint — precies wat Horizon/FIRE en de spaarquote nodig hebben. Oppervlakken
    * die "wat is er déze maand echt gebeurd" tonen (de Transacties-kaart op
-   * /overzicht/cashflow) consumeren daarom dit veld en NIET `monthlyIncome`.
+   * /overzicht/budget) consumeren daarom dit veld en NIET `monthlyIncome`.
    * Zuster met hetzelfde venster-in-de-naam-principe: `prevMonthIncome`
    * (zelfde grondslag, vorige maand) en `recentMonthlyExpenses` (12-mnd rolling).
    */

@@ -3,7 +3,7 @@
 /**
  * LeverageCard — gedeelde hefboom-kaart-shell. Geëxtraheerd uit HefbomenNav
  * (components/overview/overzicht-hero/hefbomen-nav.tsx) zodat de vier-hefbomen-
- * rij op /overzicht, de cashflow-landingskaarten op /overzicht/cashflow, de
+ * rij op /overzicht, de cashflow-landingskaarten op /overzicht/budget, de
  * box-kaarten op /overzicht/belasting en de nav-kaarten op /toekomst exact
  * hetzelfde uiterlijk delen en niet uit-sync raken.
  *

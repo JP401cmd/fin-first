@@ -1,7 +1,7 @@
 import { bankLinkRowForAsset, type CashBankLink } from '@/lib/bank-connection-status'
 
 /**
- * WELK PANEEL opent een cash-kaart op `/overzicht/cashflow`: de
+ * WELK PANEEL opent een cash-kaart op `/overzicht/budget`: de
  * rekeningdetail-overlay, of het bewerk-paneel van de bezitting?
  *
  * Die keuze hing tot fase 7 aan één bron: een `asset.id → bank_accounts.id`-map die

@@ -257,7 +257,7 @@ const LIMIET_FIXTURE_DB: FakeDb = {
  *
  * NEGEN sinds UR2-13: `latestTransactionMonth` — het versheidsoordeel achter de
  * melding "gegevens verouderd" en achter de lege-staat-copy. /overzicht leest 'm
- * uit de dashboardbundel en /overzicht/cashflow uit de slanke laag; zouden die
+ * uit de dashboardbundel en /overzicht/budget uit de slanke laag; zouden die
  * uiteenlopen, dan waarschuwt het ene scherm terwijl het andere zwijgt. Beide
  * paden draaien `aggLatestMonth` op hetzelfde aggregaat, en deze suite houdt dat zo.
  */
@@ -317,7 +317,7 @@ describe('loadCashflowKpis ↔ loadDashboardData — parity op alle acht velden'
     // op hetzelfde aggregaat. Drift hier = twee dagtarieven in de app.
     expect(nieuw.dailyExpenseRate).toBe(oud.dailyExpenseRate)
     // Versheid (UR2-13): één oordeel over "hoe oud is deze data", anders
-    // waarschuwt /overzicht/cashflow terwijl /overzicht zwijgt (of omgekeerd).
+    // waarschuwt /overzicht/budget terwijl /overzicht zwijgt (of omgekeerd).
     expect(nieuw.latestTransactionMonth).toBe(oud.latestTransactionMonth)
   })
 
@@ -674,7 +674,7 @@ describe('deriveBudgetTotals — waarde-getuige (de verplaatste oprol)', () => {
   // ── De gemelde productiecase (eigenaar-account, augustus 2026) ─────────────
   //
   // Budgetpagina (na de hotfix, getekende som): "uitgaven € 2.616 / € 7.701".
-  // Budget-kaart op /overzicht/cashflow (oude abs-grondslag): "€ 26 · nog te
+  // Budget-kaart op /overzicht/budget (oude abs-grondslag): "€ 26 · nog te
   // besteden deze maand" — want ±€2.530 aan ruis-rijen op uitgavenbudgetten
   // telde er twee keer absoluut bij op: 2.616 + 2×2.530 = 7.676 ⇒ restant 25.
   //

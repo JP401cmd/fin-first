@@ -424,7 +424,7 @@ const CONTEXT_CHIPS: Array<{
     prompt: 'Geef me één concrete tip om mijn bezittingen beter te laten renderen of risico te verlagen.',
   },
   {
-    prefixes: ['/overzicht/cashflow', '/core/budgets', '/core/cash'],
+    prefixes: ['/overzicht/budget', '/core/budgets', '/core/cash'],
     label: 'Tip voor mijn cashflow',
     prompt: 'Geef me één concrete tip om mijn maandelijkse cashflow te verbeteren.',
   },

@@ -81,7 +81,18 @@ export const navGroups: NavGroup[] = [
       // gefilterd op tracking-flag — zie OVERVIEW_APP_SUBROUTES.
       { label: 'Bezittingen', href: '/overzicht/bezittingen' },
       { label: 'Schulden', href: '/overzicht/schulden' },
-      { label: 'Cashflow', href: '/overzicht/cashflow' },
+      {
+        label: 'Budget',
+        href: '/overzicht/budget',
+        // De drie onderdelen — geneste, contextuele subroutes, net als de
+        // Box-pagina's onder Belasting. Stonden er niet toen budget zelf nog een
+        // laag dieper zat achter de cashflow-hub (UR3-28).
+        children: [
+          { label: 'Transacties', href: '/overzicht/budget/transacties' },
+          { label: 'Vaste lasten', href: '/overzicht/budget/vaste-lasten' },
+          { label: 'Forecast', href: '/overzicht/budget/forecast' },
+        ],
+      },
       {
         label: 'Belasting',
         href: '/overzicht/belasting',
@@ -185,7 +196,6 @@ export type OverviewAppItem = NavItem & {
  * volgen op een expliciete gebruikersvraag over dát onderwerp.
  */
 export const OVERVIEW_APP_SUBROUTES: OverviewAppItem[] = [
-  { label: 'Budgetteren', href: '/overzicht/cashflow/budget', appKey: 'budgetteren' },
   { label: 'Aandelen holdings', href: '/overzicht/bezittingen/investment', tabHref: '/overzicht/bezittingen/investment?tab=aandelen-holdings', appKey: 'aandelen-holdings' },
   { label: 'Crypto holdings', href: '/overzicht/bezittingen/crypto', tabHref: '/overzicht/bezittingen/crypto?tab=crypto-holdings', appKey: 'crypto-holdings' },
   { label: 'Hypotheekplanner', href: '/overzicht/schulden/mortgage', tabHref: '/overzicht/schulden/mortgage?tab=hypotheekplanner', appKey: 'hypotheekplanner' },
@@ -259,14 +269,13 @@ export const EXTRA_ROUTE_TITLES: Record<string, string> = {
   '/rapportages/benchmark': 'Benchmark',
   '/rapportages/persoonlijk-plan': 'Persoonlijk plan',
   '/rapportages/totaalplan': 'Totaalplan',
-  // Cashflow-verdiepingen onder /overzicht/cashflow. /overzicht/cashflow zelf
-  // en .../budget zitten al in de nav (navGroups resp. OVERVIEW_APP_SUBROUTES);
-  // deze drie niet. Titels = de `<NavStackMeta title>` per pagina.
+  // De drie onderdelen van Budget stonden hier zolang ze buiten de nav vielen.
+  // Sinds UR3-28 zijn ze `children` van de Budget-hefboom in `navGroups` en
+  // leveren ze hun titel dus uit de nav-structuur zelf — hier laten staan zou
+  // een tweede bron voor dezelfde titel zijn (`buildRouteTitleMap` neemt de
+  // eerste winnaar, dus dat blijft stil fout gaan).
   // NB: /overzicht/tips stond hier tot ADR 0095 — die route zit nu in
-  // `globalNav` en levert zijn titel dus uit de nav-structuur zelf.
-  '/overzicht/cashflow/forecast': 'Forecast',
-  '/overzicht/cashflow/transacties': 'Transacties',
-  '/overzicht/cashflow/vaste-lasten': 'Vaste lasten',
+  // `globalNav` en levert zijn titel op dezelfde manier.
 }
 
 /**

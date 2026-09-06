@@ -494,12 +494,12 @@ export const DEFAULT_WIDGET_PREFS: WidgetPrefs = {
  * weergave in localStorage; `?weergave=heatmap` overschrijft dat eenmalig zodat
  * elke ingang die de heatmap bedoelt ook op de heatmap uitkomt.
  */
-export const BUDGET_HEATMAP_HREF = '/overzicht/cashflow/budget?weergave=heatmap'
+export const BUDGET_HEATMAP_HREF = '/overzicht/budget?weergave=heatmap'
 
 export const WIDGET_HREFS: Record<string, string> = {
   netto_vermogen:           '/overzicht',
-  cash_flow:                '/overzicht/cashflow',
-  budgetten:                '/overzicht/cashflow/budget',
+  cash_flow:                '/overzicht/budget',
+  budgetten:                '/overzicht/budget',
   // M17: de heatmap-tegel landt op de budgetten-pagina IN heatmap-weergave.
   // Zonder `?weergave=` valt die pagina terug op de laatst gekozen view uit
   // localStorage (meestal de boom) — dan tikt de gebruiker op een heatmap en
@@ -519,9 +519,9 @@ export const WIDGET_HREFS: Record<string, string> = {
   fire_prognose:            '/toekomst',
   monte_carlo:              '/toekomst?modal=simulations',
   levensgebeurtenissen:     '/toekomst/gebeurtenissen',
-  spaarquote:               '/overzicht/cashflow/forecast',
+  spaarquote:               '/overzicht/budget/forecast',
   vrijheidsvoortgang:       '/toekomst',
-  vaste_lasten:             '/overzicht/cashflow/vaste-lasten',
+  vaste_lasten:             '/overzicht/budget/vaste-lasten',
   gezondheids_score:        '/toekomst',
   belasting_box3:           '/overzicht/belasting/box3',
   vrijheidsscenarios:       '/toekomst?modal=scenarios',
@@ -541,20 +541,20 @@ export const WIDGET_HREFS: Record<string, string> = {
   pensioen_aow:             '/toekomst/gebeurtenissen',
   meldingen:                '/berichten',
   volgende_stap:            '/overzicht/tips',
-  maandoverzicht:           '/overzicht/cashflow',
-  weekoverzicht:            '/overzicht/cashflow',
-  agenda:                   '/overzicht/cashflow',
-  noodfonds:                '/overzicht/cashflow/budget',
+  maandoverzicht:           '/overzicht/budget',
+  weekoverzicht:            '/overzicht/budget',
+  agenda:                   '/overzicht/budget',
+  noodfonds:                '/overzicht/budget',
   huishouden_vergelijking:  '/overzicht',
-  huishouden_activiteit:   '/overzicht/cashflow/transacties',
+  huishouden_activiteit:   '/overzicht/budget/transacties',
   beslissingspatronen:     '/overzicht/tips',
   vrijheidsdagen_maand:    '/overzicht/tips',
   wilskracht:              '/overzicht/tips',
   berichten:               '/nieuws',
-  trend_inkomen:           '/overzicht/cashflow/forecast',
-  trend_uitgaven:          '/overzicht/cashflow/forecast',
-  trend_sparen:            '/overzicht/cashflow/forecast',
-  trend_schulden:          '/overzicht/cashflow/forecast',
+  trend_inkomen:           '/overzicht/budget/forecast',
+  trend_uitgaven:          '/overzicht/budget/forecast',
+  trend_sparen:            '/overzicht/budget/forecast',
+  trend_schulden:          '/overzicht/budget/forecast',
   rebalancing:             '/overzicht/bezittingen',
   fee_analyzer:            '/overzicht/bezittingen',
   hypotheek_vs_beleggen:   '/overzicht/schulden/mortgage',

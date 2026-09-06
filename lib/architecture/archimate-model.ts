@@ -241,13 +241,13 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
       id: 'sp-registreren', x: 320, y: row(0), w: 210, h: 66, kind: 'bizproc',
       title: 'Registreren & importeren',
       lead: 'Inkomsten, uitgaven, bezittingen en beleggingen vastleggen — handmatig, via bank-import (MT940/CSV/OFX) of via bank-connect.',
-      items: ['/overzicht/cashflow/transacties', 'bank-import', 'onboarding-extractie'],
+      items: ['/overzicht/budget/transacties', 'bank-import', 'onboarding-extractie'],
     },
     {
       id: 'sp-budget', x: 320, y: row(1), w: 210, h: 66, kind: 'bizproc',
       title: 'Budgetteren',
       lead: "Budgetten opstellen en bewaken; uitgaven getoond als 'dagen deze maand'. Spaarquote en vaste lasten als hefbomen.",
-      items: ['/overzicht/cashflow', '/overzicht/cashflow/budget'],
+      items: ['/overzicht/budget', '/overzicht/budget'],
     },
     {
       id: 'sp-vermogen', x: 320, y: row(2), w: 210, h: 66, kind: 'bizproc',

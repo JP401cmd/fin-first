@@ -1,7 +1,7 @@
 /**
  * AUTH-DEDUPE OP HET CASHFLOW-DATAPAD (T1.2).
  *
- * `/overzicht/cashflow` draait vijf loaders naast elkaar in één `Promise.all`.
+ * `/overzicht/budget` draait vijf loaders naast elkaar in één `Promise.all`.
  * Drie daarvan deden hun eigen rauwe `supabase.auth.getUser()` — elk een volle
  * `/auth/v1/user`-roundtrip, en elk als EERSTE, BLOKKERENDE stap vóór hun eigen
  * queries. Ze lopen nu alle drie via `getCachedUser`, die React `cache()` op de

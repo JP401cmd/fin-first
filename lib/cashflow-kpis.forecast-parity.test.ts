@@ -3,11 +3,11 @@
  * (de slanke forecast-laag) — ADR 0083, taak T2.5.
  *
  * De forecast-laag levert de scalars voor `CashflowSection` op
- * /overzicht/cashflow/forecast: `monthlyIncome`, `monthlyExpenses`, de twee
+ * /overzicht/budget/forecast: `monthlyIncome`, `monthlyExpenses`, de twee
  * spaarquotes (`savingsRate6m` = de METING, `effectiveSavingsRatePct` = het
  * GETOONDE getal met zijn twee grondslagen) plus `savingsHistory` en
  * `expenseHistory`. De spaarquotes zijn de gevaarlijke: ze staan óók op
- * /overzicht, in het instellingenblok onderaan /overzicht/cashflow, op de
+ * /overzicht, in het instellingenblok onderaan /overzicht/budget, op de
  * spaarquote-widget en op het spaarquote-doel. Wijken ze af, dan toont de app
  * twee verschillende spaarquotes — precies wat de "consume, don't recompute"-regel
  * moet voorkomen, en precies wat er op 31 aug 2026 op productie gebeurde.

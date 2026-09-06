@@ -22,7 +22,7 @@
 //
 // GRONDSLAG-REGEL (CLAUDE.md): de rapportcijfers (WF-START-08) en de
 // conversie-spaarquote (WF-START-10) MOETEN identiek zijn aan wat de gebruiker
-// later op /overzicht/cashflow ziet (resolveSavingsSource is de ene bron) —
+// later op /overzicht/budget ziet (resolveSavingsSource is de ene bron) —
 // net zoals de onboarding-spaarquote-preview (WF-START-18) dezelfde motor
 // gebruikt. Het gezondheidsgetal en vrijheids-% in het rapport zijn NIET
 // hand-narekenbaar (horizon-kernel / 7-indicator-samenstelling) — bewust apart

@@ -3,7 +3,7 @@ import type { CashflowSettingsData } from '@/lib/cashflow-settings-data'
 
 /**
  * GET /api/overzicht/cashflow-settings — de lazy data-route van het
- * instellingen-blok onderaan /overzicht/cashflow (perf Task 2.2, stap 5).
+ * instellingen-blok onderaan /overzicht/budget (perf Task 2.2, stap 5).
  *
  * Vier eigenschappen die er echt toe doen, en die geen van alle uit de loader
  * zelf volgen:

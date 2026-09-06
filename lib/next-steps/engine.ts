@@ -174,7 +174,7 @@ export function computeNextSteps(input: NextStepInput): NextStep[] {
       'Budgetten aanmaken',
       'Maak je budgetten aan',
       'Budgetten maken zichtbaar hoeveel levenstijd elke categorie kost.',
-      '/overzicht/cashflow/budget',
+      '/overzicht/budget',
     )
   }
   if (input.goalCount === 0) {
@@ -207,7 +207,7 @@ export function computeNextSteps(input: NextStepInput): NextStep[] {
       'Noodfonds aanvullen',
       'Vul je noodfonds aan',
       'Een gevulde buffer is vrijheid die je vandaag al bezit.',
-      '/overzicht/cashflow/budget',
+      '/overzicht/budget',
       {
         metric: `${nl(input.emergencyMonthsCovered)} van ${nl(input.emergencyTargetMonths)} ${meervoud(input.emergencyTargetMonths, 'maand', 'maanden')} gedekt`,
       },
@@ -223,7 +223,7 @@ export function computeNextSteps(input: NextStepInput): NextStep[] {
       'Spaarquote verhogen',
       'Bouw sneller vrijheid op',
       'Elk procent spaarquote erbij haalt je vrijheidsdatum naar voren.',
-      '/overzicht/cashflow/budget',
+      '/overzicht/budget',
       { metric: `spaarquote ${nl(input.savingsRatePct)}%` },
     )
   }
@@ -233,7 +233,7 @@ export function computeNextSteps(input: NextStepInput): NextStep[] {
       'Budgetten bijsturen',
       'Stuur je budgetten bij',
       'Overschrijdingen kosten stilletjes vrijheidstijd.',
-      '/overzicht/cashflow/budget',
+      '/overzicht/budget',
       {
         metric: `${input.budgetsOverLimit} ${meervoud(input.budgetsOverLimit, 'budget', 'budgetten')} over de limiet`,
       },
@@ -249,7 +249,7 @@ export function computeNextSteps(input: NextStepInput): NextStep[] {
       'Vaste lasten verlagen',
       'Maak je vaste lasten lichter',
       'Hoe minder vastligt, hoe meer keuzevrijheid je elke maand houdt.',
-      '/overzicht/cashflow/vaste-lasten',
+      '/overzicht/budget/vaste-lasten',
       { metric: `${nl(pct, 0)}% van je inkomen ligt vast` },
     )
   }

@@ -267,7 +267,7 @@ const PERIOD_WORDS: Record<SpendLimitPeriodKind, { lopend: string; meervoud: str
 
 /** Deeplink naar de pot; met periode voor events die over een afgesloten periode gaan. */
 function limitUrl(potId: string, periodKey?: string): string {
-  const base = `/overzicht/cashflow/transacties?limit=${encodeURIComponent(potId)}`
+  const base = `/overzicht/budget/transacties?limit=${encodeURIComponent(potId)}`
   return periodKey ? `${base}&periode=${encodeURIComponent(periodKey)}` : base
 }
 

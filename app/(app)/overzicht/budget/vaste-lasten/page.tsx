@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 }
 
 /**
- * /overzicht/cashflow/vaste-lasten — losse Vaste-lasten-pagina (was de
+ * /overzicht/budget/vaste-lasten — losse Vaste-lasten-pagina (was de
  * "Vaste lasten"-tab). Abonnementen-/vaste-kosten-analyse + kalender van
  * terugkerende transacties. Gestreamd in blokken (perf Task 2.4, zelfde vorm als
  * de hub).
@@ -53,7 +53,7 @@ export default async function OverzichtCashflowVasteLastenPage() {
       <div className="relative mx-auto max-w-6xl px-4 pt-4 sm:px-6">
         <PageStatusDot className="absolute right-[52px] top-4 sm:right-[60px]" />
         <PageInfoButton
-          content={getPageInfo('/overzicht/cashflow/vaste-lasten')}
+          content={getPageInfo('/overzicht/budget/vaste-lasten')}
           className="absolute right-4 top-4 sm:right-6"
         />
       </div>

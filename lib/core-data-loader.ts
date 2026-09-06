@@ -128,7 +128,7 @@ export interface CorePageData {
    *
    * DIT is het percentage waar de gezondheidsscore en de FIRE-prognose op
    * draaien, en dus het percentage dat het instellingenblok onderaan
-   * /overzicht/cashflow hoort te tonen. Vóór dit veld toonde dat blok
+   * /overzicht/budget hoort te tonen. Vóór dit veld toonde dat blok
    * `savingsRate6m` onder een kassabon met effectieve bedragen: inkomen €5.000,
    * uitgaven €3.000, gespaard +€2.000 — met daaronder 5 % in plaats van 40 %,
    * terwijl de score en de FIRE-datum wél op 40 % rekenden.
@@ -580,7 +580,7 @@ export const loadCoreData = cache(async function loadCoreData(
     // ALLE budgetten (parents + children, alle types, incl. is_archived/
     // merged_into) via de gedeelde, cache()-gewrapte `getBudgets` — dezelfde rijen
     // die dashboard-/horizon-/lever-scores-loader al ophalen, dus op /overzicht en
-    // /overzicht/cashflow is dit letterlijk dezelfde roundtrip. De bestaande
+    // /overzicht/budget is dit letterlijk dezelfde roundtrip. De bestaande
     // essential/child-queries hierboven zijn VOORGEFILTERD (alleen essentiële
     // uitgave-parents, children zonder archive/income/savings) en dus ongeschikt
     // als grondslag-bron: de inkomstenkant zit er per definitie niet in.
@@ -742,7 +742,7 @@ export const loadCoreData = cache(async function loadCoreData(
   // budgetsom → transactie-extrapolatie → profielschatting × 12, met 'manual' die
   // altijd wint. Loopt DOOR de gedeelde resolver en niet ernáást, zodat het
   // jaarinkomen dat de FIRE-keten, de spaarbron en Box 1 voeden per definitie
-  // dezelfde grondslag draagt als de inkomenskaart op /overzicht/cashflow.
+  // dezelfde grondslag draagt als de inkomenskaart op /overzicht/budget.
   const annualIncomeResolution = resolveAmountWithBasis(
     profileResult.data?.income_source,
     profileMonthlyIncome * 12,
@@ -1390,7 +1390,7 @@ export const loadCoreData = cache(async function loadCoreData(
   )
   // EFFECTIEVE spaarquote: de gekozen grondslag wint over de 6-maands transactie-
   // meting — hetzelfde percentage dat het instellingenblok onderaan
-  // /overzicht/cashflow toont én dat Fin citeert (beide lezen DÉZE loader, dus daar
+  // /overzicht/budget toont én dat Fin citeert (beide lezen DÉZE loader, dus daar
   // is de gelijkheid per constructie). Zelfde helper als de dashboard-/horizon-loader.
   //
   // ONAFGEROND DOORGEVEN (M5, 31 aug 2026). Hier stond

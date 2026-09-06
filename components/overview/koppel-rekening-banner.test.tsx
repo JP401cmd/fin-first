@@ -3,7 +3,7 @@
  *
  * TXN-1 (faseplan "Eenvoudige weergave"): de banner is een UITNODIGING en hoort
  * dus alleen te verschijnen zolang er nog geen rekening is. De bevestigings-
- * strip "X rekeningen gekoppeld" stond permanent bovenaan /overzicht/cashflow/
+ * strip "X rekeningen gekoppeld" stond permanent bovenaan /overzicht/budget/
  * transacties en meldde iedereen mét rekeningen elke keer opnieuw iets wat ze al
  * wisten. Deze suite pint dat de banner bij ≥ 1 rekening niets meer rendert —
  * in BEIDE weergavemodi, want dit is een conditie-fix en geen diepte-reductie.

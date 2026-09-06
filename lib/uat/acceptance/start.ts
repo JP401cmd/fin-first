@@ -168,7 +168,7 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Vanuit het rapport een account maken en de check activeren (conversie)',
     kriticiteit: 'KERN',
     given: 'Sanne\'s geactiveerde account: netMonthlyIncome €3.200 (bron: manual), estimatedMonthlyExpenses €2.200 (bron: manual), geen schulden.',
-    when: 'De gebruiker opent /overzicht/cashflow na activatie.',
+    when: 'De gebruiker opent /overzicht/budget na activatie.',
     then: 'Effectief jaarinkomen = €38.400; effectieve spaarquote = 31,25%; jaarlijks spaarbedrag = €12.000 — moet exact overeenkomen met wat de gebruiker later zelf narekent (SSoT-eis, zelfde motor als WF-START-18). DEZE DRIE GETALLEN ZIJN INVARIANT over de grondslag-tak die `resolveSavingsSource` sinds ADR 0103 draagt: Sanne staat op manual/manual, dus met én zonder het optionele `basis`-blok komt de uniforme (I − E) / I = (3.200 − 2.200) / 3.200 op 31,25% uit. De check-funnel zelf (`lib/check/build-report.ts`) blijft bewust op de legacy-tak — daar vult de gebruiker de bedragen zelf in.',
     assertion: {
       kind: 'exact',
@@ -248,7 +248,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'BELANGRIJK',
     given: 'Afwisselend uitgelogde en ingelogde staat.',
     when: 'De tester opent beveiligde routes uitgelogd, publieke check-routes uitgelogd, en publieke auth-pagina\'s ingelogd; roept een beveiligde API-route uitgelogd rechtstreeks aan.',
-    then: 'Beveiligde routes → login-redirect met `redirectTo` (en terugkeer na inloggen); /check en /check/rapport blijven publiek bereikbaar; ingelogd op /, /login, /signup, /forgot-password of /dashboard → automatische redirect naar het gekozen homescherm (profiles.home_screen; default /overzicht, keuze "budget" → /overzicht/cashflow/budget); een beveiligde API-route geeft uitgelogd JSON 401, geen HTML-redirect.',
+    then: 'Beveiligde routes → login-redirect met `redirectTo` (en terugkeer na inloggen); /check en /check/rapport blijven publiek bereikbaar; ingelogd op /, /login, /signup, /forgot-password of /dashboard → automatische redirect naar het gekozen homescherm (profiles.home_screen; default /overzicht, keuze "budget" → /overzicht/budget); een beveiligde API-route geeft uitgelogd JSON 401, geen HTML-redirect.',
     assertion: {
       kind: 'ui-only',
       source: 'proxy.ts + lib/supabase/proxy.ts publieke/beschermde padenlijst, geen cijfermatige uitkomst',
@@ -274,7 +274,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     given: 'Testpersoon "Jan de Vries": netto maandinkomen €3.000, maanduitgaven €2.100, bezittingen (Betaalrekening €2.500 + Spaargeld €18.000 + Beleggingen €12.000 = €32.500), schulden (Studieschuld €9.000).',
     when: 'De gebruiker doorloopt de stappen "inkomen"/"uitgaven" (spaarquote-preview), "uitgaven na pensioen" (prefill), "spaardoel" (Noodfonds-preset), "Jouw plan" (standaardpad — twee vragen, zie WF-START-28) en "klaar" (recap).',
-    then: 'Spaarquote-preview = 30%. Pensioen-uitgaven-prefill = €20.160/jaar (80% × €2.100 × 12). Noodfonds-prefill = €12.600 (6× €2.100, al een veelvoud van €100). Recap netto vermogen = €32.500 − €9.000 = €23.500. De meelopende vrijheidstijd-teller staat na de derde bezitting op 1j 3m over €32.500 en blijft daar staan als de studieschuld erbij komt — de intake-grondslag telt de eigen woning niet mee en trekt schulden er niet af, zodat het getal tijdens het invullen nooit daalt (bevinding H12). Ná activatie moet /overzicht/cashflow exact dezelfde 30% spaarquote tonen (SSoT-eis, zelfde motor als WF-START-10).',
+    then: 'Spaarquote-preview = 30%. Pensioen-uitgaven-prefill = €20.160/jaar (80% × €2.100 × 12). Noodfonds-prefill = €12.600 (6× €2.100, al een veelvoud van €100). Recap netto vermogen = €32.500 − €9.000 = €23.500. De meelopende vrijheidstijd-teller staat na de derde bezitting op 1j 3m over €32.500 en blijft daar staan als de studieschuld erbij komt — de intake-grondslag telt de eigen woning niet mee en trekt schulden er niet af, zodat het getal tijdens het invullen nooit daalt (bevinding H12). Ná activatie moet /overzicht/budget exact dezelfde 30% spaarquote tonen (SSoT-eis, zelfde motor als WF-START-10).',
     assertion: {
       kind: 'exact',
       expected:
@@ -330,7 +330,7 @@ const criteria: AcceptanceCriterion[] = [
     titel: '"Schat het voor me": een geschat bedrag dat zich als schatting bekendmaakt',
     kriticiteit: 'KERN',
     given: 'Onboarding met een ingevulde geboortedatum, op de inkomen-stap; het bedrag is niet bekend bij de gebruiker.',
-    when: 'De gebruiker klikt "Schat het voor me" op het inkomen-scherm én op het uitgaven-scherm, rondt de onboarding af, bekijkt /overzicht en /overzicht/belasting, en vervangt daarna het bedrag door een eigen bedrag via /overzicht/cashflow of /mijn/profiel.',
+    when: 'De gebruiker klikt "Schat het voor me" op het inkomen-scherm én op het uitgaven-scherm, rondt de onboarding af, bekijkt /overzicht en /overzicht/belasting, en vervangt daarna het bedrag door een eigen bedrag via /overzicht/budget of /mijn/profiel.',
     then: 'De knop vult het veld ZICHTBAAR met het CBS-cohortbedrag van zijn leeftijdsband (25–35 → €3.075 inkomen, €2.800 uitgaven) met de regel "Geschat op basis van je leeftijd"; de uitgavenschatting volgt een zélf getypt inkomen via de referentie-spaarquote. Het eindscherm toont het dagtarief én "zo bouw je er X per maand bij" — óók zonder bezittingen (criterium 4), met de kicker "Netto/mnd · geschat". Na afronden staat `profiles.income_source`/`expenses_source` op \'estimate\' (NIET \'manual\'), zodat het label meereist (spaarquote-widget, cashflow-instellingenblok, dagtarief-voetnoot "een schatting op basis van je leeftijd") én een bankkoppeling of budget de gok vanzelf verdringt. Vult de gebruiker een eigen bedrag in, dan wordt de bron \'manual\' en verdwijnt het voorbehoud op álle oppervlakken tegelijk (criterium 3). "Later invullen" blijft bestaan en wist ook de schattingsmarkering.',
     assertion: {
       kind: 'ui-only',

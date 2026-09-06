@@ -7,7 +7,7 @@ import type { Perspective } from '@/lib/household-data'
 
 /**
  * ForecastLoader — async server-child achter de `<Suspense>` op
- * /overzicht/cashflow/forecast (perf Task 2.5). Spiegelt `CashflowCardsLoader`
+ * /overzicht/budget/forecast (perf Task 2.5). Spiegelt `CashflowCardsLoader`
  * op de hub en `VasteLastenLoader` op de vaste-lasten-pagina: de pagina rendert
  * alleen wat direct kan (kicker, titel, deck, header-controls) en dít blok
  * stroomt er achteraan.

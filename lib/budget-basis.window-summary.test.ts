@@ -2,7 +2,7 @@
  * B-017 — één grondslag-regel onder de budget-kassabon, ook als de posten
  * verschillende meetvensters hebben.
  *
- * Gemeld op /overzicht/cashflow: "bovenaan staat 12 maanden gemiddeld en in de
+ * Gemeld op /overzicht/budget: "bovenaan staat 12 maanden gemiddeld en in de
  * budgetten staat 10 maanden of 2 maanden". De per-post-deler IS bewust
  * per-post (`resolveDenominatorMonths`: de leeftijd van het budget, ADR 0103 /
  * de over-extrapolatiefout van ADR 0050) — dus niet "alles op 12", maar de

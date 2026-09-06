@@ -24,7 +24,7 @@ identiek uitzien maar verschillende dingen betekenen:
 
 De ongemarkeerde naam `monthlyIncome` dekte daarmee stilzwijgend één specifieke
 grondslag, zonder dat de naam dat verraadt. Dat is tweemaal gematerialiseerd als
-defect: de Transacties-kaart op `/overzicht/cashflow` toonde `+€ 2.000`
+defect: de Transacties-kaart op `/overzicht/budget` toonde `+€ 2.000`
 (profiel 5000−3000) terwijl de maand werkelijk €25.227 in en €92.437 uit was, en
 `components/widgets/cash-flow-widget.tsx` zet de effective waarden nog in één
 vergelijking naast de gerealiseerde `prevMonth*`-velden.

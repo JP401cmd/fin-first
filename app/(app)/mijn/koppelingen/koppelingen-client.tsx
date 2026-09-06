@@ -516,7 +516,7 @@ export function KoppelingenClient({ initialData, brokerConnections, aangifteImpo
       {/* ── Bankrekeningen ───────────────────────────────────────────
           Twee wegen naar dezelfde uitkomst: automatisch (PSD2) of een
           bestand. Het beheer van gekoppelde rekeningen zelf leeft op
-          /overzicht/cashflow (ConnectedAccountCard) — hier linken we,
+          /overzicht/budget (ConnectedAccountCard) — hier linken we,
           we dupliceren die UI bewust niet. */}
       <ConnectionSection
         title="Bankrekeningen"

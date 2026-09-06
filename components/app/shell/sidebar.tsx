@@ -176,17 +176,18 @@ const MODULES: ModuleEntry[] = [
       { label: 'Bezittingen', href: '/overzicht/bezittingen', leverKey: 'assets' },
       { label: 'Schulden', href: '/overzicht/schulden', leverKey: 'debts' },
       {
-        label: 'Cashflow',
-        href: '/overzicht/cashflow',
+        label: 'Budget',
+        href: '/overzicht/budget',
         leverKey: 'cashflow',
-        // Cashflow-onderdelen — derde niveau, alleen zichtbaar op een
-        // cashflow-route (zie SubTagStrip). Bron: app/(app)/overzicht/
-        // cashflow/{budget,transacties,vaste-lasten,forecast}/page.tsx.
+        // De drie onderdelen — derde niveau, alleen zichtbaar op een
+        // budget-route (zie SubTagStrip). Bron: app/(app)/overzicht/
+        // budget/{transacties,vaste-lasten,forecast}/page.tsx. "Budget" stond
+        // hier zelf ook nog als kind toen het een sub-pagina was; sinds UR3-28
+        // is het de ouder en zou dat een kind naar zichzelf zijn.
         children: [
-          { label: 'Budget', href: '/overzicht/cashflow/budget' },
-          { label: 'Transacties', href: '/overzicht/cashflow/transacties' },
-          { label: 'Vaste lasten', href: '/overzicht/cashflow/vaste-lasten' },
-          { label: 'Forecast', href: '/overzicht/cashflow/forecast' },
+          { label: 'Transacties', href: '/overzicht/budget/transacties' },
+          { label: 'Vaste lasten', href: '/overzicht/budget/vaste-lasten' },
+          { label: 'Forecast', href: '/overzicht/budget/forecast' },
         ],
       },
       {
@@ -212,7 +213,7 @@ const MODULES: ModuleEntry[] = [
       // buiten het standaardpad houdt. Volledige motivering bij
       // OVERVIEW_APP_SUBROUTES in lib/nav-config.ts; die lijst is de canonieke
       // bron (deze kopie voedt de desktop-sidebar en moet er gelijk aan blijven).
-      { label: 'Budgetteren',       href: '/overzicht/cashflow/budget',          appKey: 'budgetteren' },
+      { label: 'Budgetteren',       href: '/overzicht/budget',          appKey: 'budgetteren' },
       { label: 'Aandelen holdings', href: '/overzicht/bezittingen/investment',   appKey: 'aandelen-holdings' },
       { label: 'Crypto holdings',   href: '/overzicht/bezittingen/crypto',       appKey: 'crypto-holdings' },
       { label: 'Hypotheekplanner',  href: '/overzicht/schulden/mortgage',        appKey: 'hypotheekplanner' },
@@ -878,10 +879,11 @@ type FreshnessLabels = { on: string; off: string }
 // LeverageStatus als de bijbehorende cashflow-landingskaart (Budget/Transacties/
 // Vaste lasten/Forecast) — één bron, geen drift.
 const CASHFLOW_STATUS_BY_HREF: Record<string, keyof CashflowCardStatuses> = {
-  '/overzicht/cashflow/budget': 'budget',
-  '/overzicht/cashflow/transacties': 'transacties',
-  '/overzicht/cashflow/vaste-lasten': 'vasteLasten',
-  '/overzicht/cashflow/forecast': 'forecast',
+  // '/overzicht/budget' staat hier bewust NIET: dat is sinds UR3-28 de ouder,
+  // en die haalt zijn dot uit `leverKey: 'cashflow'` — de hefboomscore.
+  '/overzicht/budget/transacties': 'transacties',
+  '/overzicht/budget/vaste-lasten': 'vasteLasten',
+  '/overzicht/budget/forecast': 'forecast',
 }
 
 // Belasting-children (status-mirror), gemapt op child-href → belasting-key.

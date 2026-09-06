@@ -35,8 +35,11 @@ export const HEFBOOM_CONFIG: Record<Hefboom, HefboomVisual> = {
     tint: 'text-amber-700 bg-amber-50',
     Icon: CreditCard,
   },
+  // Sleutel blijft `cashflow` -- die staat in de scoreberekening, de
+  // briefing-tags en de rondleidingstappen. Alleen wat de gebruiker ziet
+  // verandert: de hefboom heet Budget en leidt naar de budgetpagina (UR3-28).
   cashflow: {
-    label: 'Cashflow',
+    label: 'Budget',
     tint: 'text-sky-700 bg-sky-50',
     Icon: Banknote,
   },

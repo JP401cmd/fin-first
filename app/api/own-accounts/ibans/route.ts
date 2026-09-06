@@ -70,7 +70,7 @@ export async function GET() {
     const supabase = await createClient()
     // Pure read-GET → `getAuthClaims` i.p.v. `auth.getUser()` (ADR 0052): de JWT
     // wordt lokaal geverifieerd, wat de auth-server-roundtrip per request scheelt op
-    // een route die in het client-pad van /overzicht/cashflow zit. RLS blijft de
+    // een route die in het client-pad van /overzicht/budget zit. RLS blijft de
     // echte autorisatiegrens (de query hieronder loopt over de RLS-client), en de
     // identiteit wordt hier verder nergens gebruikt — alleen de aanwezigheid ervan.
     // Geaccepteerd: een server-side ingetrokken sessie kan tot de JWT-expiry (max.

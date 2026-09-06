@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { loadCashflowKpis } from '@/lib/cashflow-kpis'
 import { loadCashflowData } from '@/lib/cashflow-data-loader'
 import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
-import { buildCashflowCards, cashflowCardStatuses } from '@/lib/cashflow-cards'
+import { buildCashflowCards, budgetSubCards, cashflowCardStatuses } from '@/lib/cashflow-cards'
 import { CashflowStatusSeed } from '@/components/app/cashflow-status-provider'
 import {
   CashflowLandingCards,
@@ -12,9 +12,14 @@ import type { Perspective } from '@/lib/household-data'
 
 /**
  * CashflowCardsLoader — async server-child achter de `<Suspense>` op
- * /overzicht/cashflow (perf Task 2.2). Spiegelt `OverzichtSecondaryLoader` op
- * /overzicht: de pagina zelf rendert alleen wat direct kan (titel, opening,
- * header-controls) en dít blok stroomt er achteraan.
+ * /overzicht/budget. Spiegelt `OverzichtSecondaryLoader` op /overzicht: de
+ * pagina zelf rendert alleen wat direct kan (titel, opening, header-controls)
+ * en dít blok stroomt er achteraan.
+ *
+ * DRIE KAARTEN, GEEN VIER. `buildCashflowCards` levert er vier; Budget zelf
+ * wordt eruit gefilterd (`budgetSubCards`) want dit ÍS de budgetpagina. Zijn
+ * status blijft wel meegebouwd — die voedt de hefboomkaart op /overzicht en de
+ * sidebar-dot.
  *
  * DRIE LOADERS, GEEN DASHBOARD-BUNDEL. `buildCashflowCards` leest precies zeven
  * scalars; die komen uit `loadCashflowKpis` (lib/cashflow-kpis.ts, ADR 0083) —
@@ -57,7 +62,7 @@ export async function CashflowCardsLoader({ perspective }: { perspective: Perspe
       <CashflowStatusSeed statuses={cashflowCardStatuses(cards)} />
 
       <section className="mx-auto max-w-6xl px-4 sm:px-6">
-        <CashflowLandingCards cards={cards} />
+        <CashflowLandingCards cards={budgetSubCards(cards)} />
       </section>
     </>
   )

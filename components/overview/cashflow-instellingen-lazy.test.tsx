@@ -2,7 +2,7 @@ import { StrictMode } from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, act, waitFor, fireEvent } from '@testing-library/react'
 import { DisplayModeProvider, type DisplayMode } from '@/lib/hooks/use-display-mode'
-import { CashflowInstellingenBlokLazy } from './cashflow-below-fold'
+import { CashflowInstellingenBlokLazy } from './cashflow-instellingen-lazy'
 
 /**
  * `CashflowInstellingenBlokLazy` — in-view-gedrag (perf Task 2.2, stap 5).

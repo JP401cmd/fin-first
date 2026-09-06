@@ -134,7 +134,7 @@ export interface BriefingFinanceInput {
   /** Maandinkomen — basis voor de maand-observatie (déze-maand-surplus). */
   monthlyIncome?: number
   /** DE spaarquote (%): het grondslag-geresolveerde `effectiveSavingsRatePct`
-   *  uit de bundel (ADR 0103) — exact het getal onderaan /overzicht/cashflow, op
+   *  uit de bundel (ADR 0103) — exact het getal onderaan /overzicht/budget, op
    *  de hefboomkaart en op de spaarquote-widget. Wanneer aanwezig is dít de bron
    *  voor elke spaarquote-presentatie; het 1-maands (inkomen−uitgaven)/inkomen-
    *  cijfer blijft alleen voor de "deze maand meer uitgegeven dan binnenkwam"-
@@ -588,7 +588,7 @@ function buildFinanceEntries(finance: BriefingFinanceInput, now: Date): Briefing
           ratio > 1
             ? `Je zit op ${pct}% van je maandbudget — over je limiet, met nog ${leftLabel} te gaan.`
             : `Je hebt ${pct}% van je maandbudget besteed, met nog ${leftLabel} deze maand.`,
-        href: '/overzicht/cashflow',
+        href: '/overzicht/budget',
         hefboom: 'cashflow',
       })
     }
@@ -619,7 +619,7 @@ function buildFinanceEntries(finance: BriefingFinanceInput, now: Date): Briefing
         id: 'finance:savings',
         category: 'heads_up',
         text: `Je gaf deze maand meer uit dan er binnenkwam${days ? ` — ${days} ingeleverd` : ''}.`,
-        href: '/overzicht/cashflow',
+        href: '/overzicht/budget',
         hefboom: 'cashflow',
       })
     } else if (ratePct >= 10) {
@@ -627,7 +627,7 @@ function buildFinanceEntries(finance: BriefingFinanceInput, now: Date): Briefing
         id: 'finance:savings',
         category: 'observation',
         text: `Je spaart ${ratePct}% van je inkomen${days ? ` — ${days} per maand` : ''}.`,
-        href: '/overzicht/cashflow',
+        href: '/overzicht/budget',
         hefboom: 'cashflow',
       })
     } else {
@@ -635,7 +635,7 @@ function buildFinanceEntries(finance: BriefingFinanceInput, now: Date): Briefing
         id: 'finance:savings',
         category: 'observation',
         text: `Je spaarquote is ${ratePct}% — elke procent extra koopt vrijheid terug.`,
-        href: '/overzicht/cashflow',
+        href: '/overzicht/budget',
         hefboom: 'cashflow',
       })
     }
@@ -689,7 +689,7 @@ function buildFinanceEntries(finance: BriefingFinanceInput, now: Date): Briefing
           dts === 0
             ? 'Salaris komt vandaag binnen — meteen doorzetten naar je doel levert het meeste vrijheid.'
             : `Salaris komt over ${dts} ${dts === 1 ? 'dag' : 'dagen'} (25e).`,
-        href: '/overzicht/cashflow',
+        href: '/overzicht/budget',
         hefboom: 'cashflow',
       })
     }
@@ -737,7 +737,7 @@ function buildFinanceEntries(finance: BriefingFinanceInput, now: Date): Briefing
       id: 'finance:emergency',
       category: 'heads_up',
       text: `Je noodfonds dekt ${covered} van de ${ef.targetMonths} maanden — buffer eerst, die koopt rust én vrijheid.`,
-      href: '/overzicht/cashflow',
+      href: '/overzicht/budget',
       hefboom: 'cashflow',
     })
   }
@@ -757,7 +757,7 @@ function buildFinanceEntries(finance: BriefingFinanceInput, now: Date): Briefing
       id: 'finance:recurring',
       category: 'observation',
       text: `Je vaste lasten zijn ${formatCurrency(finance.totalRecurringAmount)} per maand, ${pct}% van je inkomen${topLabel}.`,
-      href: '/overzicht/cashflow',
+      href: '/overzicht/budget',
       hefboom: 'cashflow',
     })
   }
@@ -978,7 +978,7 @@ const SEASONAL_RULES: SeasonalRule[] = [
       id: 'seasonal:vakantiegeld',
       category: 'upcoming',
       text: 'Vakantiegeld komt eind deze maand. Direct doorstorten naar je doel of beleggen levert het meeste vrijheid.',
-      href: '/overzicht/cashflow',
+      href: '/overzicht/budget',
       hefboom: 'cashflow',
     }),
   },
@@ -992,7 +992,7 @@ const SEASONAL_RULES: SeasonalRule[] = [
       id: 'seasonal:zomer-uitgaven',
       category: 'heads_up',
       text: 'Zomer-uitgaven liggen typisch 15-25% boven gemiddeld. Vergelijk straks je augustus met vorig jaar.',
-      href: '/overzicht/cashflow',
+      href: '/overzicht/budget',
       hefboom: 'cashflow',
     }),
   },

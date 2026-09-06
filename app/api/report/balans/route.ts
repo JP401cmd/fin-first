@@ -150,7 +150,7 @@ export async function GET(request: Request) {
       // Dagtarief-grondslag via het MAANDAGGREGAAT, niet via rauwe transactie-rijen
       // (bevinding L10). Een ongepagineerde `.from('transactions')`-fetch werd door
       // PostgREST stil op max_rows = 1000 afgekapt, waardoor deze balans €165/dag
-      // toonde naast €106/dag op /overzicht/cashflow — dat oppervlak liep al wél via
+      // toonde naast €106/dag op /overzicht/budget — dat oppervlak liep al wél via
       // het aggregaat. Venster + grondslag wonen nu in `fetchExpenseRowsForRate`.
       fetchExpenseRowsForRate(supabase, new Date(date)),
     ])

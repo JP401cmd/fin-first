@@ -276,7 +276,7 @@ export default function WhatIfPage({ marktVolatiliteit }: WhatIfPageProps) {
         // GEDEELDE GRONDSLAG (ADR 0103). De maandbedragen liepen hier al door de
         // resolver, maar het JAARinkomen werd nog lokaal uit transacties
         // geëxtrapoleerd — waardoor what-if een ander FIRE-doel kon tonen dan de
-        // inkomenskaart op /overzicht/cashflow. Dat getal komt nu uit dezelfde
+        // inkomenskaart op /overzicht/budget. Dat getal komt nu uit dezelfde
         // bundel; de eigen 12-maands inkomsten-query is daarmee weg.
         fetch('/api/overzicht/cashflow-settings')
           .then((r) => (r.ok ? (r.json() as Promise<CashflowSettingsData>) : null))
@@ -321,7 +321,7 @@ export default function WhatIfPage({ marktVolatiliteit }: WhatIfPageProps) {
 
       const earliestIncomeDate = earliestIncomeResult.data?.[0]?.date
       // Jaarinkomen op de GEDEELDE grondslag (ADR 0103): `effectiveAnnualIncome`
-      // is hetzelfde getal als op de inkomenskaart van /overzicht/cashflow.
+      // is hetzelfde getal als op de inkomenskaart van /overzicht/budget.
       // Terugval bij een mislukte bundel-fetch: het effectieve maandinkomen × 12
       // — nooit een tweede, afwijkende extrapolatie.
       const extrapolatedIncome = cashflowSettings

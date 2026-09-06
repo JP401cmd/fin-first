@@ -1,7 +1,7 @@
 /**
  * ACCOUNTCOUNT ZONDER DE VOLLE LOADER (T1.7).
  *
- * /overzicht/cashflow/transacties draaide `loadCashflowData` — perspectief-keten,
+ * /overzicht/budget/transacties draaide `loadCashflowData` — perspectief-keten,
  * 6 maanden transactiepaginatie, recurring-detectie en een naam-decoratie per
  * getoonde feed-rij — om er precies één integer uit te lezen: `accountCount`,
  * voor de koppel-banner.
@@ -229,7 +229,7 @@ describe('loadAccountCount — uitkomst', () => {
  * De 0-terugval hierboven is pariteit met de oude loader en blijft, maar 0 is
  * op deze pagina niet neutraal: het toont "koppel je rekening" aan iemand die
  * er wél heeft. Sinds de omzetting is dit het ENIGE serverwerk op
- * /overzicht/cashflow/transacties — er is geen tweede query meer die de storing
+ * /overzicht/budget/transacties — er is geen tweede query meer die de storing
  * zou verraden. Dus moet hij in de logs vindbaar zijn, en nergens anders.
  */
 describe('loadAccountCount — een gefaalde telling is luidruchtig, niet stil', () => {

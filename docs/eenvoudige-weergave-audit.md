@@ -120,19 +120,19 @@ Al goed: strip-reductie + pill-lijst. Rest:
 | BEZ-3 | Schulden-strip in Eenvoudig 3→2 (Totale schuld + Maandlasten; "Rente gewogen" → Volledig) — valt onder APP-7 | B |
 | BEZ-4 | Verdiepings-tabs (`?tab=` aandelen-/crypto-holdings, verhuurrendement, hypotheekplanner) alleen Volledig; in Eenvoudig de gewone categorielijst — consistent met NAV-1. **Nazorg M41 (28 aug 2026):** BEZ-4 (aangenomen) en NAV-1 (afgewezen) botsten in combinatie — het Apps-blok bleef zichtbaar én linkte rechtstreeks naar de `?tab=`-deeplink, dus één klik in Eenvoudig landde alsnog in de verdiepingstab. Opgelost door de nav-hrefs kaal te maken (`OVERVIEW_APP_SUBROUTES.href`); de deeplink leeft nu apart als `tabHref` voor het commandopalet. Beide besluiten blijven overeind. | A |
 
-### /overzicht/cashflow (hub)
+### /overzicht/budget (hub)
 
 Nu (Eenvoudig): 4 landing-cards met KPI + rekening-pills + maandbanner; geldstroomblok en snelle acties al verborgen.
 
 | # | Voorstel | Cat |
 |---|---|---|
 | CF-1 ★ | ~~De 4 kaarten in Eenvoudig compact (one-liner, zoals /toekomst)~~ — **TERUGGEDRAAID 28 aug 2026 (S4).** De one-liner was reductie zónder duiding: de H1 vroeg "Hoeveel vrijheid zet je elke maand opzij?" en Eenvoudig antwoordde met drie kale navigatieknoppen — geen cijfer, geen oordeel, geen status-dot. Onder het R5-richtingsbesluit *duiding boven reductie* dragen de kaarten in Eenvoudig nu de `verdict`-variant van `LeverageCard`: oordeel primair, kerngetal mét venster secundair, status-dot terug. Volledig ongewijzigd | B |
-| CF-2 ★ | ~~**Forecast-kaart in Eenvoudig verbergen** (4→3)~~ — **TERUGGEDRAAID 28 aug 2026 (S5).** Het argument was "Forecast is geen landingsbelofte", maar de schade was een kapotte verwijsketen: op mobiel is deze kaart de énige contextuele ingang naar /overzicht/cashflow/forecast — het `Cashflow`-item in `lib/nav-config.ts` heeft geen `children`, dus de NavMenuSheet toont de sub-pagina's niet. En sinds FC-1 (9 aug 2026) heeft die pagina een eigen Eenvoudig-vorm, dus verviel de reden om er niet naartoe te wijzen. Alle vier de kaarten staan nu in béide modi; de route is nooit verborgen geweest en blijft dat | A |
+| CF-2 ★ | ~~**Forecast-kaart in Eenvoudig verbergen** (4→3)~~ — **TERUGGEDRAAID 28 aug 2026 (S5).** Het argument was "Forecast is geen landingsbelofte", maar de schade was een kapotte verwijsketen: op mobiel is deze kaart de énige contextuele ingang naar /overzicht/budget/forecast — het `Cashflow`-item in `lib/nav-config.ts` heeft geen `children`, dus de NavMenuSheet toont de sub-pagina's niet. En sinds FC-1 (9 aug 2026) heeft die pagina een eigen Eenvoudig-vorm, dus verviel de reden om er niet naartoe te wijzen. Alle vier de kaarten staan nu in béide modi; de route is nooit verborgen geweest en blijft dat | A |
 | CF-3 | Maandcijfers venster-labelen: "€ 0 ontvangen **in augustus tot nu toe**" — voorkomt verwarring naast de 30-dagen-cijfers op transacties (zelfde les als ADR 0073). **HERZIEN 28 aug 2026 (S4): weer in BEIDE modi, en in Eenvoudig verplicht op élke kaart.** De herziening van 10 aug ("alleen in Volledig") hing het venster aan het cijfer — *"in Eenvoudig draagt de compacte kaart sinds CF-1 géén cijfer meer, dus valt met het cijfer ook de reden voor het venster weg"* — en verviel toen S4 het cijfer terugbracht. Waar `card.kpiWindow` leeg is, levert de call-site een vaste venster-copy (budget: "nog te besteden deze maand"; vaste lasten: de quote als meetlat). Gating zit op de call-site (`cashflow-landing-cards.tsx`), niet in de gedeelde `LeverageCard` | E |
 | CF-5 | **Nieuw 28 aug 2026 (S4).** Privacy-masking op het hub-kaartenpad — dat ontbrak volledig: `buildCashflowCards` formatteert de bedragen server-side tot strings, waar `MaskedAmount`/`formatMaskedCurrency` (die een `number` willen) niet bij kunnen. Opgelost met `maskCurrencyInText` (`lib/format.ts`) op KPI, meetlat, substext en drill-down, in béide modi. Zonder dit zouden de teruggezette cijfers zich óók met de privacy-toggle aan laten zien | E |
 | CF-4 | Instellingenblok als disclosure, standaard dicht | C |
 
-### /overzicht/cashflow/budget
+### /overzicht/budget
 
 Al goed: strip 4→2, pill-weergave geforceerd, partner-potten en Nibud verborgen.
 
@@ -142,7 +142,7 @@ Al goed: strip 4→2, pill-weergave geforceerd, partner-potten en Nibud verborge
 | BUD-2 | "Kopieer vorige maand" + "Rapport" alleen Volledig | A |
 | BUD-3 | BudgetHub-samenvatting in Eenvoudig terug tot één regel ("1 bijna vol, € 2.540 te verdelen") + disclosure; overige hub-blokken (alerts, dekkingsgraad, inzichten) op klik | C |
 
-### /overzicht/cashflow/transacties (+ grenzenpotten)
+### /overzicht/budget/transacties (+ grenzenpotten)
 
 Al goed: 6 analyseblokken verborgen. Maar vóór de inhoud staan nog: koppel-banner (ook als alles al gekoppeld is) + 3 actieknoppen + 4 periode-tabs.
 
@@ -154,7 +154,7 @@ Al goed: 6 analyseblokken verborgen. Maar vóór de inhoud staan nog: koppel-ban
 | TXN-4 | Rekening-tabs: lange namen afkappen op korte labels | E |
 | TXN-5 ★ | **Nieuw 28 aug 2026 (S3).** Met de zes analyseblokken verborgen was de `GeldstroomGauge` het enige duidingselement dat in Eenvoudig overbleef — een naald op een −100…+100-schaal, zonder trend of vergelijking eromheen die 'm leesbaar maakt. In Eenvoudig staat daar nu `GeldstroomZin`: dezelfde Inkomen/Uitgaven/Saldo-strip, duiding in woorden, en géén spaarquote zolang het venster loopt. In Volledig blijft de meter, mét een venster-onderschrift ("augustus tot nu toe") — die ontbrak, terwijl de status-melding erboven op een ánder venster draait (kalendermaand vs. het gekozen periodevenster). Bewust NIET meegenomen: het ongeclampte leescijfer en de 0%-bij-geen-inkomen — dat is bevinding C6 en moet in Volledig reproduceerbaar blijven | B |
 
-### /overzicht/cashflow/vaste-lasten & /forecast
+### /overzicht/budget/vaste-lasten & /forecast
 
 **Herzien 28 aug 2026 (S2).** Het oordeel "Vaste lasten al goed (kalender + insights
 verborgen)" is ingetrokken. Verbergen wás hier geen winst: Eenvoudig hield het lángste
@@ -167,7 +167,7 @@ reductie**. Forecast: zie FC-1 (uitgevoerd) en S5.
 |---|---|---|
 | VL-1 ★ | **Nieuw 28 aug 2026 (S2).** Eenvoudig = oordeel vóór lijst: oordeelregel (feit + Nibud-norm, stoplichtwoord uit `LEVERAGE_STATUS_LABEL`) i.p.v. de compacte meter, dan quote-meter + sluipverbruik + top-5 grootste posten; de volle lijst achter DepthSection "Alle {n} posten". Volledig ongewijzigd. Copy-rollen gescheiden: deck = feit, `PageStatusBanner` = handeling | B |
 | FC-1 | Forecast-pagina in Eenvoudig: 6-maands tabel → eindregel ("Over 6 maanden ± € X") + sparkline; tabel in Volledig | B |
-| FC-2 | **Nieuw 28 aug 2026 (S5, V2).** `CashflowSection` (bovenaan /overzicht/cashflow/forecast) was het enige blok op die route dat de modus negeerde: drie kale KPI-kaarten met twee losse percentages. In Eenvoudig nu één kaart — het maandbedrag blijft (dát beantwoordt de pagina-vraag), de spaarquote en de uitgaventrend worden zinnen mét hun venster erin. Percentage en zin staan op één afleiding, zodat ze elkaar niet kunnen tegenspreken. Volledig ongewijzigd; `forecast-fallback.tsx` beweegt mee | B |
+| FC-2 | **Nieuw 28 aug 2026 (S5, V2).** `CashflowSection` (bovenaan /overzicht/budget/forecast) was het enige blok op die route dat de modus negeerde: drie kale KPI-kaarten met twee losse percentages. In Eenvoudig nu één kaart — het maandbedrag blijft (dát beantwoordt de pagina-vraag), de spaarquote en de uitgaventrend worden zinnen mét hun venster erin. Percentage en zin staan op één afleiding, zodat ze elkaar niet kunnen tegenspreken. Volledig ongewijzigd; `forecast-fallback.tsx` beweegt mee | B |
 
 ### /overzicht/belasting (+ boxen + optimizer)
 

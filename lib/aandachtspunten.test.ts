@@ -144,7 +144,7 @@ describe('budgetBenchmarksToAandachtspunten', () => {
       savings: 1200, // 100 × 12
       euroImpactMonthly: 100,
       freedomDays: 4,
-      href: '/overzicht/cashflow',
+      href: '/overzicht/budget',
     })
     expect(result[0].title).toContain('Boodschappen')
   })
@@ -431,7 +431,7 @@ describe('aandachtspuntToActionPayload', () => {
       savings: 1200,
       euroImpactMonthly: 100,
       freedomDays: 4,
-      href: '/overzicht/cashflow',
+      href: '/overzicht/budget',
     }
     const payload = aandachtspuntToActionPayload(a)
     expect(payload.euro_impact_monthly).toBe(100)

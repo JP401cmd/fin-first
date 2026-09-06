@@ -1,5 +1,5 @@
 /**
- * PeriodeSelector — de periode-keuze op /overzicht/cashflow/transacties.
+ * PeriodeSelector — de periode-keuze op /overzicht/budget/transacties.
  *
  * Wat hier bewaakt wordt is TXN-2 (faseplan "Eenvoudige weergave" §8, fase 2,
  * herzien 10 aug 2026): in **Eenvoudig** zijn er drie periodes (30 dagen /

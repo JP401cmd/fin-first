@@ -1,6 +1,6 @@
 // lib/cashflow-kpis.ts
 //
-// SLANKE KPI-LAAG VOOR /overzicht/cashflow (FASE 2 · Task 2.1)
+// SLANKE KPI-LAAG VOOR /overzicht/budget (FASE 2 · Task 2.1)
 // ───────────────────────────────────────────────────────────────────────────
 // `buildCashflowCards` (lib/cashflow-cards.ts) kreeg de volledige
 // `DashboardData` binnen maar gebruikt daaruit precies ZEVEN scalars. Om die
@@ -257,7 +257,7 @@ export { buildBudgetTypeMap }
  * ## Waarom punt 2 is omgedraaid (eigenaar-besluit 30 aug 2026)
  * Hier stond: "de spent-pass heeft GÉÉN transfer-filter … dat is bestaand
  * gedrag van élke budget-surface; het hier logischer maken zou de budgetdekking
- * op /overzicht en op /overzicht/cashflow uit elkaar laten lopen." Dat argument
+ * op /overzicht en op /overzicht/budget uit elkaar laten lopen." Dat argument
  * is inmiddels precies OMGEKEERD: de referentie-schermen (budgetten-pagina,
  * detail-pane, rollover-carry, AI-lookup) staan sinds de hotfix van 30 aug 2026
  * op de canonieke som, dus het ongefilterde `Math.abs` hield deze KPI juist als
@@ -269,7 +269,7 @@ export { buildBudgetTypeMap }
  * op, gaat een inkomst ERAF en draagt een transfer 0 bij; op income/savings is
  * het spiegelbeeld van kracht; een onbekend type telt absoluut. **Het
  * KPI-bedrag verschuift daardoor eenmalig** — gewenst, en zichtbaar op de
- * Budget-KPI van /overzicht en /overzicht/cashflow én in de briefing-weekmail
+ * Budget-KPI van /overzicht en /overzicht/budget én in de briefing-weekmail
  * (`lib/briefing/overview-briefing.ts` → budgetdruk).
  *
  * Er wordt per budget_TYPE geaggregeerd, dus zonder parent-rollup: elke
@@ -388,7 +388,7 @@ export function toSortedMonthHistory(byMonth: Map<string, number>): MonthValue[]
 /**
  * Uitgaven per maand (Σ |negatieve bedragen|, transfer-gefilterd) als oplopende
  * reeks — de bron van `DashboardData.expenseHistory` en van de uitgaventrend-
- * sparkline op /overzicht/cashflow/forecast.
+ * sparkline op /overzicht/budget/forecast.
  *
  * Verplaatst uit `loadDashboardData` (was ~r1409-1412). Uit het MAANDAGGREGAAT,
  * niet uit rauwe rijen: een aggregaat kan niet stil op `max_rows` afkappen.
@@ -737,7 +737,7 @@ export interface CashflowSectionScalars {
 }
 
 /**
- * De vijf velden die `CashflowSection` (/overzicht/cashflow/forecast) nodig heeft,
+ * De vijf velden die `CashflowSection` (/overzicht/budget/forecast) nodig heeft,
  * uit ACHT gedeelde fetches — zonder de rest van `loadDashboardData` (~40 queries
  * in 5-6 seriële golven plus een koude horizon-tak met bisectie-solve).
  *

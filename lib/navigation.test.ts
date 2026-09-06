@@ -55,7 +55,7 @@ describe('OVERLAY_TRIGGER_PARAMS', () => {
  * De drie legacy-routes (`/core/budgets/<id>`, `…/edit`, `/core/budgets/new`)
  * redirectten naar het tussenpad `/core/budgets?…`. Dat exacte pad matcht de
  * statische redirect in `next.config.ts` (`/core/budgets` →
- * `/overzicht/cashflow`); Next matcht op pathname, plakt de ongebruikte query
+ * `/overzicht/budget`); Next matcht op pathname, plakt de ongebruikte query
  * door en zette de gebruiker op de hub — één niveau te hoog, geen paneel, en een
  * dode `?budget=`-param die in de adresbalk bleef staan.
  *

@@ -31,7 +31,7 @@ describe('resolveReturnTarget', () => {
     ['/berichten', 'Terug naar Mijn', '/mijn'],
     ['/nieuws/artikel', 'Terug naar Mijn', '/mijn'],
     ['/rapportages', 'Terug naar Rapportages', '/rapportages'],
-    ['/overzicht/cashflow', 'Naar Overzicht', '/overzicht'],
+    ['/overzicht/budget', 'Naar Overzicht', '/overzicht'],
     ['/core/assets', 'Naar Overzicht', '/overzicht'],
     [null, 'Naar Overzicht', '/overzicht'],
   ])('mapt %s → %s (%s)', (path, label, href) => {

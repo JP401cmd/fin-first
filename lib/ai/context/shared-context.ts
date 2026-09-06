@@ -272,7 +272,7 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     `Maandinkomen: ${formatCurrency(rawFinancials.monthlyIncome)} | Maanduitgaven: ${formatCurrency(rawFinancials.monthlyExpenses)}`,
     monthlyMustExpenses > 0 ? `Must-uitgaven (essentieel): ${formatCurrency(monthlyMustExpenses)}/mnd` : null,
     monthlyRetirementExpenses > 0 ? `Jaarlijkse uitgave na retirement: ${formatCurrency(monthlyRetirementExpenses)}/mnd (methode: ${coreData.retirementMethodUsed}) — basis voor FIRE & vrijheidsdagen` : null,
-    `Spaarquote: ${formatPercentage(coreData.effectiveSavingsRatePct)} — DE spaarquote: grondslag-geresolveerd (budget/transactie/handmatig, ADR 0103). Exact hetzelfde getal als onderaan /overzicht/cashflow — dat instellingenblok leest deze ééne loader, dus daar kan het niet uiteenlopen. De hefboomkaart op /overzicht en de spaarquote-widget draaien op dezelfde formule via hun eigen loader en tonen hetzelfde percentage, op afronding en één bekende grondslagafwijking na (de spaarbudget-correctie telt hier bruto én transfer-inclusief). Gebruik dit getal letterlijk; herbereken het NIET uit inkomen/uitgaven.`,
+    `Spaarquote: ${formatPercentage(coreData.effectiveSavingsRatePct)} — DE spaarquote: grondslag-geresolveerd (budget/transactie/handmatig, ADR 0103). Exact hetzelfde getal als onderaan /overzicht/budget — dat instellingenblok leest deze ééne loader, dus daar kan het niet uiteenlopen. De hefboomkaart op /overzicht en de spaarquote-widget draaien op dezelfde formule via hun eigen loader en tonen hetzelfde percentage, op afronding en één bekende grondslagafwijking na (de spaarbudget-correctie telt hier bruto én transfer-inclusief). Gebruik dit getal letterlijk; herbereken het NIET uit inkomen/uitgaven.`,
     `Dagen vrijheid verdiend per maand: ${core.daysWonPerMonth}`,
     `Vrije dagen per jaar (passief inkomen): ${core.freeDaysPerYear}`,
     `Autonomiescore: ${core.autonomyScore}`,
@@ -283,7 +283,7 @@ export async function buildSharedContext(supabase: SupabaseClient): Promise<stri
     // vrijheid kost je nu €105" terwijl Fin met €135/dag rekende en €3.500 op 26
     // i.p.v. 33 vrijheidsdagen uitkwam. `facts.dagtarief` bestond al precies hiervoor
     // maar werd door deze bouwer niet gelezen.
-    `Dagtarief (uitgaven per dag): ${formatCurrency(facts.dagtarief)} — DE €→vrijheidsdagen-koers, hetzelfde tarief als op /overzicht/cashflow ("één dag vrijheid kost je nu ..."). Deel bedragen door dit getal om ze in vrijheidsdagen uit te drukken; leid het NIET af uit maandinkomen/-uitgaven.`,
+    `Dagtarief (uitgaven per dag): ${formatCurrency(facts.dagtarief)} — DE €→vrijheidsdagen-koers, hetzelfde tarief als op /overzicht/budget ("één dag vrijheid kost je nu ..."). Deel bedragen door dit getal om ze in vrijheidsdagen uit te drukken; leid het NIET af uit maandinkomen/-uitgaven.`,
     // De marktaannames waar de hele projectie op draait — per gebruiker afgeleid in
     // `lib/fire-params.ts`, exact de drie die /toekomst/voorkeuren naast elkaar toont
     // (Inflatie · rendement · SWR). Ze bereikten het model eerder NIET, terwijl de

@@ -131,7 +131,7 @@ export function resolvePageStatusMap(input: ResolvePageStatusInput): PageStatusM
     entries.push(
       leverInfo('/overzicht/bezittingen', scores.assets),
       leverInfo('/overzicht/schulden', scores.debts),
-      leverInfo('/overzicht/cashflow', scores.cashflow),
+      leverInfo('/overzicht/budget', scores.cashflow),
       leverInfo('/overzicht/belasting', scores.tax),
       // Belasting-subpagina's (Box 1/3 AL LeverageStatus). Box 1: geen
       // jaarruimte-cijfer-string → null (copy valt terug op de cijferloze vorm).
@@ -154,21 +154,23 @@ export function resolvePageStatusMap(input: ResolvePageStatusInput): PageStatusM
       return card.subText ?? card.detail?.tip ?? null
     }
 
-    const budget = cardByKey('budget')
-    if (budget) {
-      entries.push(buildInfo('/overzicht/cashflow/budget', budget.status, cardFigure('budget')))
-    }
+    // Hier stond een entry voor '/overzicht/budget' zelf, uit de tijd dat het een
+    // sub-pagina van de cashflow-hub was. De budgetpagina is sinds UR3-28 de
+    // hefboom en krijgt haar melding uit `leverInfo(...scores.cashflow)`
+    // hierboven — twee entries onder dezelfde sleutel zouden elkaar overschrijven.
+    // De budget-KAART blijft wel gebouwd: zijn status voedt de hefboomtegel op
+    // /overzicht en de sidebar-dot.
     const transacties = cardByKey('transacties')
     if (transacties) {
       entries.push(
-        buildInfo('/overzicht/cashflow/transacties', transacties.status, cardFigure('transacties')),
+        buildInfo('/overzicht/budget/transacties', transacties.status, cardFigure('transacties')),
       )
     }
     const vasteLasten = cardByKey('vaste-lasten')
     if (vasteLasten) {
       entries.push(
         buildInfo(
-          '/overzicht/cashflow/vaste-lasten',
+          '/overzicht/budget/vaste-lasten',
           vasteLasten.status,
           cardFigure('vaste-lasten'),
         ),
@@ -177,7 +179,7 @@ export function resolvePageStatusMap(input: ResolvePageStatusInput): PageStatusM
     const forecast = cardByKey('forecast')
     if (forecast) {
       entries.push(
-        buildInfo('/overzicht/cashflow/forecast', forecast.status, cardFigure('forecast')),
+        buildInfo('/overzicht/budget/forecast', forecast.status, cardFigure('forecast')),
       )
     }
   }

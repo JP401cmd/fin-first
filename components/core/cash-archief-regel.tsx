@@ -30,7 +30,7 @@ export function CashArchiefRegel({
 
   return (
     <Link
-      href={`/overzicht/cashflow/transacties?rekening=${accountId}`}
+      href={`/overzicht/budget/transacties?rekening=${accountId}`}
       className={`group flex items-center justify-between gap-3 rounded-[var(--r)] border border-dashed border-[var(--border-md)] bg-[var(--subtle)] px-4 py-3 transition-colors hover:border-[var(--ink-3)] ${className}`}
       data-testid="cashflow-archief"
     >

@@ -1,8 +1,8 @@
 // lib/cashflow-data-loader.ts
-// Server-side data loader voor de cashflow-pagina's onder /overzicht/cashflow.
+// Server-side data loader voor de cashflow-pagina's onder /overzicht/budget.
 //
 // Factort het recurrings/baseline/bank-accounts-blok dat voorheen inline in
-// app/(app)/overzicht/cashflow/page.tsx stond. Wordt gedeeld door de
+// app/(app)/overzicht/budget/page.tsx stond. Wordt gedeeld door de
 // landingspagina (kaart-KPI's), de Vaste-lasten-pagina en de Forecast-pagina.
 // React `cache()` dedupt per request.
 //

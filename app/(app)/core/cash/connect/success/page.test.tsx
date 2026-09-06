@@ -48,7 +48,7 @@ describe('Success-pagina — geblokkeerde rekeningen', () => {
     expect(band.textContent).toMatch(/draagt al een andere bankkoppeling/i)
 
     const exit = screen.getByRole('link', { name: /koppeling te verbreken/i }) as HTMLAnchorElement
-    expect(exit.getAttribute('href')).toBe('/overzicht/cashflow')
+    expect(exit.getAttribute('href')).toBe('/overzicht/bezittingen/cash')
     // Raakteldoel (het was een kale tekstlink); en dezelfde link die de wizard
     // gebruikt zodra hij de bezette rekening niet kan aanwijzen.
     expect(exit.className).toContain('min-h-[44px]')

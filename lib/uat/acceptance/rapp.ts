@@ -134,7 +134,7 @@ const criteria: AcceptanceCriterion[] = [
     kriticiteit: 'KERN',
     given: 'Persona Lisa, 100% deterministische `default_limit`-waarden (geen jitter): Vaste lasten €1.555, Dagelijks €925, Vervoer €265, Leuke dingen €300, Sparen €600, Schulden €50; Inkomen €5.200.',
     when: 'Begroot (totaal), Te verdelen en dekkingsgraad worden berekend.',
-    then: 'Totaal Uitgaven-begroot = 1.555+925+265+300 = €3.045; Begroot (totaal, incl. sparen/schulden) = 3.045+600+50 = €3.695; Te verdelen = 5.200−3.695 = €1.505; dekkingsgraad = 3.695/5.200×100 ≈ 71,1%; Essentieel-begroot (Vaste lasten+Dagelijks+Vervoer) = €2.745, Discretionair-begroot (Leuke dingen) = €300. Besteed/Verschil zelf leunen op gejitterde transacties (kruisverwijs 1-op-1 met /overzicht/cashflow/transacties — elk verschil is een bug).',
+    then: 'Totaal Uitgaven-begroot = 1.555+925+265+300 = €3.045; Begroot (totaal, incl. sparen/schulden) = 3.045+600+50 = €3.695; Te verdelen = 5.200−3.695 = €1.505; dekkingsgraad = 3.695/5.200×100 ≈ 71,1%; Essentieel-begroot (Vaste lasten+Dagelijks+Vervoer) = €2.745, Discretionair-begroot (Leuke dingen) = €300. Besteed/Verschil zelf leunen op gejitterde transacties (kruisverwijs 1-op-1 met /overzicht/budget/transacties — elk verschil is een bug).',
     assertion: {
       kind: 'exact',
       expected: 'begroot=3695; teVerdelen=1505; dekkingsgraad=71.06; essentieelBegroot=2745; discretionairBegroot=300',

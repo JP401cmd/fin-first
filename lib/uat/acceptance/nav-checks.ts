@@ -253,7 +253,7 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
         // edge-middleware (lib/supabase/proxy.ts) naar profiles.home_screen
         // vertaalt — een statische config-regel zou die vertaling
         // onbereikbaar maken (config-redirects draaien vóór de middleware).
-        expected: 'aantalRedirects=24; coreNaarOverzicht=true; dashboardGeenConfigRedirect=true; coreAssetsGeenRedirect=true',
+        expected: 'aantalRedirects=29; coreNaarOverzicht=true; dashboardGeenConfigRedirect=true; coreAssetsGeenRedirect=true',
         actual: `aantalRedirects=${redirects.length}; coreNaarOverzicht=${coreNaarOverzicht}; dashboardGeenConfigRedirect=${dashboardGeenConfigRedirect}; coreAssetsGeenRedirect=${coreAssetsGeenRedirect}`,
       }
     },

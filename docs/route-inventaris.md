@@ -51,7 +51,7 @@ voor leesbaarheid):
 - `/toekomst/uitgaven-na-pensioen` → `/toekomst?uitgaven=open`
 - `/toekomst/strategie` → `/toekomst/gebeurtenissen?strategie=…`
 - `/horizon/whatif`, `/horizon/uitgaven-na-pensioen`, `/horizon/inflatie-koopkracht`, `/horizon/samengestelde-interest`
-- `/dashboard` → `/overzicht`, `/core/cash` → `/overzicht/cashflow`
+- `/dashboard` → `/overzicht`, `/core/cash` → `/overzicht/budget`
 
 `/horizon/page.tsx` rendert nog een echte `HorizonPage` (niet in nav) — kandidaat om te redirecten
 naar `/toekomst` ná controle dat geen interne link er nog op leunt.

@@ -376,7 +376,7 @@ function ActiveChip({ label, onRemove }: { label: string; onRemove: () => void }
 
 function FirstUseEmpty() {
   // Bewust géén eigen CTA-knop: de KoppelRekeningBanner bovenaan de pagina
-  // (/overzicht/cashflow/transacties) toont al de canonieke acties
+  // (/overzicht/budget/transacties) toont al de canonieke acties
   // "Bank koppelen" (/core/cash/connect) en "Importeer" (/core/cash/import).
   // Een tweede knop hier was redundant én linkte naar een omweg-pagina.
   return (
@@ -431,7 +431,7 @@ function AccountButton({ active, label, onClick, state }: { active: boolean; lab
       aria-label={state === undefined ? undefined : `${label} — ${accountSourceSuffix(state)}`}
       className={['inline-flex items-center gap-1.5 min-h-[44px] px-3 py-1 font-mono text-[11px] uppercase tracking-[0.06em] border',
         active ? 'bg-[var(--ink)] text-[var(--paper)] border-[var(--ink)]' : 'bg-[var(--paper)] text-[var(--ink-3)] border-[var(--border-ed)]'].join(' ')}>
-      {/* Herkomst-symbool: gedeeld met de rekening-kaarten op /overzicht/cashflow.
+      {/* Herkomst-symbool: gedeeld met de rekening-kaarten op /overzicht/budget.
           `inheritColor` ALLEEN op de actieve pill: die staat op `--ink` met
           `--paper`-tekst, waar een vaste inkt-toon wegvalt. Onvoorwaardelijk erven
           gooide op élke inactieve pill de tint weg, en dan moet een 12px `Unlink`

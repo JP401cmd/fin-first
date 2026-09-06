@@ -57,7 +57,7 @@ describe('lever-compass deeplinks — canonieke /overzicht/*-routes', () => {
     expect(hrefs).toEqual([
       '/overzicht/bezittingen',
       '/overzicht/schulden',
-      '/overzicht/cashflow',
+      '/overzicht/budget',
       '/overzicht/belasting',
     ])
   })

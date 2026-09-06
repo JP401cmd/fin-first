@@ -1,7 +1,7 @@
 /**
  * Regressietest — bevinding C7: "Budgetpagina laadt niet".
  *
- * Symptoom uit het UX-testpanel: `/overzicht/cashflow/budget` toont eerst de
+ * Symptoom uit het UX-testpanel: `/overzicht/budget` toont eerst de
  * (server-gehydrateerde) budgetten en klapt kort daarna om naar één rood blok
  * "Kon budgetten niet laden"; retry verandert niets, en de rest van de pagina
  * (NIBUD-kaart, doelen, rollovers) verdwijnt mee.
@@ -31,7 +31,7 @@
  * verandert en de effect-hook écht gaat fetchen (zie ook de act-notitie in de
  * empty-state-test).
  *
- * Dekt beide routes tegelijk: `/overzicht/cashflow/budget` en `/core/budgets`
+ * Dekt beide routes tegelijk: `/overzicht/budget` en `/core/budgets`
  * renderen dezelfde `BudgetsClient` met dezelfde `initialData`-vorm.
  */
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
@@ -113,7 +113,7 @@ vi.mock('@/lib/household/perspective-loader', async (importOriginal) => {
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
-  usePathname: () => '/overzicht/cashflow/budget',
+  usePathname: () => '/overzicht/budget',
   useRouter: () => ({
     push: vi.fn(),
     replace: vi.fn(),

@@ -206,7 +206,7 @@ export const CURRENT_MONTH_INCOME_COMPLETE_RATIO = 0.8
  * spreekt van 3–6 maanden; de ondergrens op de salaris-grondslag). Dit is sinds
  * het eigenaar-besluit van 29 jul 2026 de norm waartegen de noodbuffer wordt
  * beoordeeld: het salaris is het getal dat de gebruiker zelf invoert en herkent
- * (instellingenblok onderaan /overzicht/cashflow), terwijl de gemeten
+ * (instellingenblok onderaan /overzicht/budget), terwijl de gemeten
  * maanduitgaven bij transactie-zware of net gestarte accounts wild schommelen.
  *
  * SINGLE SOURCE voor de noodfonds-bundel (`lib/emergency-fund.ts`), de

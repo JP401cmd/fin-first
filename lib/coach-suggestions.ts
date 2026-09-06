@@ -367,7 +367,7 @@ export const DATA_GAP_SUGGESTIONS: DataGapRule[] = [
     suggestion: {
       message: 'Met een budget bepaal je zelf hoeveel vrijheid je elke maand opzijzet. Stel je eerste in.',
       cta: 'Budget instellen',
-      ctaHref: '/overzicht/cashflow',
+      ctaHref: '/overzicht/budget',
     },
   },
   {
@@ -459,12 +459,12 @@ export const PATH_SUGGESTIONS: PathRule[] = [
   // vóór de brede /overzicht-fallback (anders zou /overzicht die afvangen).
   //
   // GEEN `path_budgets`-regel meer (bevinding C7, besluit eigenaar 26-08-2026).
-  // Die vuurde onvoorwaardelijk op `/overzicht/cashflow` met de tekst "Voeg je
+  // Die vuurde onvoorwaardelijk op `/overzicht/budget` met de tekst "Voeg je
   // eerste budget toe" — óók voor iemand met tientallen bestaande budgetten,
   // wat feitelijk onjuist is en het vertrouwen in Fin ondermijnt. De juiste
   // regel bestond al één laag hoger: `gap_budgets` (DATA_GAP_SUGGESTIONS)
   // vuurt hetzelfde advies mét `check: (g) => !g.hasBudgets`. De pad-regel was
-  // dus een ongeconditioneerd duplicaat en is verwijderd; `/overzicht/cashflow`
+  // dus een ongeconditioneerd duplicaat en is verwijderd; `/overzicht/budget`
   // valt nu terug op `path_core`, dat voor élke datastand klopt.
   {
     pathPrefix: '/overzicht/schulden',

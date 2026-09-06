@@ -42,11 +42,11 @@ describe('EmptyStateCard (generic)', () => {
         kicker="K"
         title="T"
         body="B"
-        ctaHref="/overzicht/cashflow"
+        ctaHref="/overzicht/budget"
         ctaLabel="Klik"
       />,
     )
-    const link = container.querySelector('a[href="/overzicht/cashflow"]')
+    const link = container.querySelector('a[href="/overzicht/budget"]')
     expect(link).toBeTruthy()
   })
 

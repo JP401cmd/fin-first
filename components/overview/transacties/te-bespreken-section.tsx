@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * "Te bespreken" op /overzicht/cashflow/transacties — de open vlaggen die jij
+ * "Te bespreken" op /overzicht/budget/transacties — de open vlaggen die jij
  * of je partner op gedeelde boekingen hebt gezet (ADR 0128, fase 1).
  *
  * DATAPAD (ADR 0058): krijgt zijn gegevens als props van de server-page

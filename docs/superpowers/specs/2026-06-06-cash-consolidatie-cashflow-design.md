@@ -13,16 +13,16 @@ Cash-rekeningen worden vandaag op twee plekken "verdiept" beheerd:
 - **`/core/assets/cash`** (asset-categoriepagina) — met een rijk cash-overzicht
   (Rekeningen-lijst, geldstroom-banner, CashflowChart, kengetallen) én een
   **Budgetteren-tab**.
-- **`/overzicht/cashflow`** — een hub met vier hefboom-kaarten (Budget,
+- **`/overzicht/budget`** — een hub met vier hefboom-kaarten (Budget,
   Transacties, Vaste lasten, Forecast) die deeplinken naar sub-routes, waarvan
-  `/overzicht/cashflow/budget` exact dezelfde budget-functionaliteit biedt als
+  `/overzicht/budget` exact dezelfde budget-functionaliteit biedt als
   de Budgetteren-tab hierboven.
 
 Dat is de dubbeling. Cash-rekeningen horen thuis op de cashflow-pagina — dat is
 de plek voor cash, met én zonder budgetteren.
 
 **Doel:** alle inzicht, info en bewerking voor cash-rekeningen consolideren op
-`/overzicht/cashflow`. De bezittingen-pagina blijft cash tonen als *waarde*
+`/overzicht/budget`. De bezittingen-pagina blijft cash tonen als *waarde*
 (onderdeel van het vermogen), maar de verdieping verhuist volledig naar
 cashflow. De cashflow-pagina wordt bovendien uitgebreid met instellingen + info
 voor geschat jaarinkomen, spaarquote en (bij gebrek aan budgetten) geschatte
@@ -35,14 +35,14 @@ uitgaven, inclusief de live impact op de toekomst (FIRE).
 | # | Vraag | Keuze |
 |---|-------|-------|
 | 1 | Informatie-architectuur cashflow-landing | **Rijke landing**: volledig cash-overzicht onder het inspiratieblok; de 4 hefboom-kaarten blijven bovenaan als "ga dieper"-navigatie. Landing = samenvatting, sub-routes = detail. |
-| 2 | Klik-bestemming vanaf bezittingen | **Landing + focus**: klik op cash-rekening → `/overzicht/cashflow#rekening-<assetId>` (scroll + markeer die rekening). Oude routes redirecten hierheen. |
+| 2 | Klik-bestemming vanaf bezittingen | **Landing + focus**: klik op cash-rekening → `/overzicht/budget#rekening-<assetId>` (scroll + markeer die rekening). Oude routes redirecten hierheen. |
 | 3 | Diepte instellingen-blok | **Volledig instelbaar + live FIRE-impact**: jaarinkomen + geschatte uitgaven inline bewerkbaar (schrijven naar `profiles`), spaarquote afgeleid getoond + instelbaar doel, live herberekende FIRE-leeftijd bij wijziging. |
 
 **Aanvullende akkoorden:**
 - §2 — cash-kaarten op bezittingen worden **display-only** (inline bewerk/herwaardeer-knoppen weg).
 - §5 — `CoreKengetallen` wordt **niet apart** getoond op cashflow; het nieuwe instellingen-blok subsumeert inkomen/uitgaven.
 - §6 — de per-rekening detailpagina (`cash-account-view` via `/core/assets/cash/[accountId]`) vervalt; focus-op-landing vervangt 'm.
-- §6 — de **Budgetten-tab** op `/core/assets/cash` vervalt expliciet; budgetbeheer leeft op het bestaande `/overzicht/cashflow/budget`.
+- §6 — de **Budgetten-tab** op `/core/assets/cash` vervalt expliciet; budgetbeheer leeft op het bestaande `/overzicht/budget`.
 
 ---
 
@@ -63,8 +63,8 @@ Bestandsverwijzingen zijn indicatief; regelnummers kunnen verschuiven.
 - Budgetteren-tab: `components/core/deepenings/cash-budgetteren-tab.tsx`, geregistreerd in `components/core/category-deepening-registry.ts`.
 - Per-rekening detail: `app/(app)/core/assets/cash/[accountId]/page.tsx` → `components/app/cash-account-view.tsx`.
 
-### Cashflow-landing `/overzicht/cashflow`
-- Route: `app/(app)/overzicht/cashflow/page.tsx` (server). Laadt `loadDashboardData`, `loadCashflowData(supabase, perspective)`, `loadVasteLastenSummary`; bouwt kaarten via `buildCashflowCards`.
+### Cashflow-landing `/overzicht/budget`
+- Route: `app/(app)/overzicht/budget/page.tsx` (server). Laadt `loadDashboardData`, `loadCashflowData(supabase, perspective)`, `loadVasteLastenSummary`; bouwt kaarten via `buildCashflowCards`.
 - Rendert: titel "Je geldstroom" + `PerspectiveContextLabel`, `CashflowLandingCards`, en — bij `baselineExpenses >= 500` — het inspiratieblok `InflationImpactCard`.
 - Sub-routes: `/budget`, `/transacties`, `/vaste-lasten`, `/forecast`.
 
@@ -84,8 +84,8 @@ Bestandsverwijzingen zijn indicatief; regelnummers kunnen verschuiven.
 
 ### 4.1 Bezittingen-pagina (blijft compleet)
 - Cash-categorie blijft tonen met saldo's; telt mee in totaal vermogen. Geen wijziging aan weergave/telling.
-- Cash-categorie-header: `href` wordt `/overzicht/cashflow` (conditioneel op `type === 'cash'`; overige types ongewijzigd).
-- Kaart-klik: voor `asset_type === 'cash'` → `router.push(`/overzicht/cashflow#rekening-${asset.id}`)`; overige types ongewijzigd.
+- Cash-categorie-header: `href` wordt `/overzicht/budget` (conditioneel op `type === 'cash'`; overige types ongewijzigd).
+- Kaart-klik: voor `asset_type === 'cash'` → `router.push(`/overzicht/budget#rekening-${asset.id}`)`; overige types ongewijzigd.
 - Cash-kaarten **display-only**: `VermogenAssetCard` verbergt inline bewerk- + herwaardeer-knoppen wanneer `asset_type === 'cash'` (via prop of interne conditie). Andere types behouden hun knoppen.
 
 ### 4.2 Cashflow-landing — nieuwe opbouw (boven → onder)
@@ -98,8 +98,8 @@ Bestandsverwijzingen zijn indicatief; regelnummers kunnen verschuiven.
 ### 4.3 Rekening-focus & redirects
 - `CashOverview` rekening-kaarten krijgen `id="rekening-<assetId>"`. Bij laden met matchende `location.hash`: scroll-into-view + tijdelijke highlight.
 - **`CashOverview` verbreden** zodat álle cash-rekeningen verschijnen — ook handmatige cash-assets zonder `bank_account`/budget-tracking. (Vandaag filtert het op `has_budget_tracking === true`.) De geldstroom-aggregaties blijven gebaseerd op rekeningen met transacties; handmatige cash-assets verschijnen als saldo-kaart zonder transactie-stroom.
-- `/core/assets/cash` → `redirect('/overzicht/cashflow')` (alleen wanneer `type === 'cash'`; de generieke `[type]`-route blijft voor alle andere types werken).
-- `/core/assets/cash/[accountId]` → redirect naar `/overzicht/cashflow#rekening-<assetId>` (map `accountId` → gekoppeld `assetId`; valt terug op de landing zonder hash als de mapping ontbreekt).
+- `/core/assets/cash` → `redirect('/overzicht/budget')` (alleen wanneer `type === 'cash'`; de generieke `[type]`-route blijft voor alle andere types werken).
+- `/core/assets/cash/[accountId]` → redirect naar `/overzicht/budget#rekening-<assetId>` (map `accountId` → gekoppeld `assetId`; valt terug op de landing zonder hash als de mapping ontbreekt).
 
 ### 4.4 Instellingen & toekomst-blok (nieuw component)
 Eén blok onderaan de landing dat info én instellingen bundelt:
@@ -111,7 +111,7 @@ Eén blok onderaan de landing dat info én instellingen bundelt:
 - **Geen aparte `CoreKengetallen`** op deze pagina — dit blok is dé plek voor inkomen/uitgaven. (De geldstroom-banner toont "deze maand"; dit blok 6-mnd-gemiddelde + doel + instellingen — verschillende tijdvensters, complementair, geen dubbeling.)
 
 ### 4.5 Opruimen (ontdubbelen)
-- Budgetteren-tab voor cash verwijderd: `cash-budgetteren-tab.tsx` + de cash-entry in `category-deepening-registry.ts`. Budgetbeheer leeft op `/overzicht/cashflow/budget`.
+- Budgetteren-tab voor cash verwijderd: `cash-budgetteren-tab.tsx` + de cash-entry in `category-deepening-registry.ts`. Budgetbeheer leeft op `/overzicht/budget`.
 - Per-rekening detail (`cash-account-view` via `/core/assets/cash/[accountId]`) vervalt; focus-op-landing vervangt 'm. In de plan-fase beslissen: behouden als embedded detail-modal binnen `CashOverview` (bestaande `detailAccountId`-modal) óf verwijderen. Voorkeur: hergebruiken als detail-modal mits dat goedkoop is, anders verwijderen.
 - Dode code (componenten/route-bestanden die nergens meer renderen) expliciet markeren of verwijderen.
 

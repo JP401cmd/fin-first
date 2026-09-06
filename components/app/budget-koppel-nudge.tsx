@@ -2,7 +2,7 @@
 
 /**
  * BudgetKoppelNudge — eenmalige popup direct ná het doorlopen van de
- * budget-setup (AppSetupGate) op /overzicht/cashflow/budget.
+ * budget-setup (AppSetupGate) op /overzicht/budget.
  *
  * Zodra de gebruiker de setup voltooit rendert de server-page BudgetsClient op
  * dezelfde URL. Dat "na het doorlopen"-moment is precies waar deze nudge de

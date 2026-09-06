@@ -72,7 +72,7 @@ describe('NavMenuSheet — NAV-2: alleen de actieve tak klapt uit', () => {
 
 /**
  * Testgebruiker-melding 1bb8a1 — op mobiel stonden de hoofdonderdelen van
- * Overzicht (Bezittingen/Schulden/Cashflow/Belasting) en de actieve apps
+ * Overzicht (Bezittingen/Schulden/Budget/Belasting) en de actieve apps
  * (Crypto holdings e.d.) als één ongemarkeerde lijst onder elkaar. De sheet
  * moet dezelfde scheiding tonen als de desktop-sidebar: een aparte
  * apps-groep met eigen kop, en die kop ALLEEN bij >=1 actieve app.
@@ -86,7 +86,7 @@ describe('NavMenuSheet — apps gescheiden van hoofdonderdelen onder Overzicht',
     expect(screen.queryByText('Crypto holdings')).not.toBeInTheDocument()
     // Hoofdonderdelen blijven ongewijzigd zichtbaar.
     expect(screen.getByText('Bezittingen')).toBeInTheDocument()
-    expect(screen.getByText('Cashflow')).toBeInTheDocument()
+    expect(screen.getByText('Budget')).toBeInTheDocument()
   })
 
   it('groepeert actieve apps onder een eigen kop, los van de hoofdonderdelen', () => {
@@ -98,7 +98,7 @@ describe('NavMenuSheet — apps gescheiden van hoofdonderdelen onder Overzicht',
     // ...en de hoofdonderdelen staan er nadrukkelijk BUITEN.
     expect(within(appsGroup).queryByText('Bezittingen')).not.toBeInTheDocument()
     expect(within(appsGroup).queryByText('Schulden')).not.toBeInTheDocument()
-    expect(within(appsGroup).queryByText('Cashflow')).not.toBeInTheDocument()
+    expect(within(appsGroup).queryByText('Budget')).not.toBeInTheDocument()
     expect(within(appsGroup).queryByText('Belasting')).not.toBeInTheDocument()
     // Niet-geactiveerde apps blijven weg.
     expect(within(appsGroup).queryByText('Aandelen holdings')).not.toBeInTheDocument()
@@ -107,10 +107,19 @@ describe('NavMenuSheet — apps gescheiden van hoofdonderdelen onder Overzicht',
   })
 
   it('toont meerdere actieve apps samen in dezelfde groep', () => {
-    renderSheet('full', ['crypto-holdings', 'budgetteren'])
+    renderSheet('full', ['crypto-holdings', 'aandelen-holdings'])
     const appsGroup = screen.getByRole('group', { name: /apps/i })
     expect(within(appsGroup).getByText('Crypto holdings')).toBeInTheDocument()
-    expect(within(appsGroup).getByText('Budgetteren')).toBeInTheDocument()
+    expect(within(appsGroup).getByText('Aandelen holdings')).toBeInTheDocument()
+  })
+
+  // Budgetteren stond hier als app tot UR3-28. Het is nu basisfunctionaliteit en
+  // een vast hoofdonderdeel ("Budget", de derde hefboom) — dus nadrukkelijk NIET
+  // in de apps-groep, ook niet wanneer de oude app-sleutel nog actief zou zijn.
+  it('rekent Budget tot de hoofdonderdelen, niet tot de apps', () => {
+    renderSheet('full', ['budgetteren'])
+    expect(screen.queryByRole('group', { name: /apps/i })).not.toBeInTheDocument()
+    expect(screen.getByText('Budget')).toBeInTheDocument()
   })
 
   it("verbergt in 'simple' de apps-groep van de niet-actieve Overzicht-tak", () => {

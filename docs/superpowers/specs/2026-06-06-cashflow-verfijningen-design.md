@@ -9,7 +9,7 @@
 
 ## 1. Aanleiding
 
-Vier verfijningen op de nieuwe `/overzicht/cashflow`-landing na ronde 1:
+Vier verfijningen op de nieuwe `/overzicht/budget`-landing na ronde 1:
 1. Het rekeningen-deel is smaller dan de boven-/ondersecties.
 2. De rekening-kaarten zijn eigen markup i.p.v. de echte bezittingen-kaart, en missen bewerk-/herwaardeer-acties.
 3. Een gedeelde ("gezamenlijke") rekening verdwijnt in het persoonlijke perspectief op de cashflow-pagina (klopt wél op bezittingen).
@@ -25,7 +25,7 @@ Vier verfijningen op de nieuwe `/overzicht/cashflow`-landing na ronde 1:
 
 ## 3. Huidige staat (referentie; regelnummers indicatief)
 
-- **Breedte:** `app/(app)/overzicht/cashflow/page.tsx` wrapt `<CashOverview>` in een eigen `<section className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">`; `components/app/cash-overview.tsx` root is óók `mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8` → dubbele horizontale padding.
+- **Breedte:** `app/(app)/overzicht/budget/page.tsx` wrapt `<CashOverview>` in een eigen `<section className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">`; `components/app/cash-overview.tsx` root is óók `mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-8` → dubbele horizontale padding.
 - **Perspectief:** `components/core/assets-client.tsx` laadt via `loadPerspectiveData(supabase, perspective)` uit `lib/household/perspective-loader.ts` (RLS levert eigen + gedeeld; `stamp()` zet `_provenance` + `_myShareFraction`). `loadAllCashRekeningen` in `cash-overview.tsx` filtert daarentegen `.eq('ownership','personal')` → bug.
 - **Kaart:** `components/core/vermogen-asset-card.tsx` — props `perspective/partnerName/provenance/shareFraction/aggregated`; rendert OwnershipBadge + `formatOwnershipSubline` ("Jouw aandeel: € X"). Sinds ronde 1 (T8) verbergt het de actie-rij hard via `asset.asset_type !== 'cash'`.
 - **Rendement:** `assets.expected_return` bestaat; in `AssetForm` (assets-client.tsx) wordt het bij opslaan voor cash geforceerd op 0 (`isCashType ? 0 : …`). `projectPortfolio` (lib/asset-data.ts) gebruikt per-asset `expected_return` voor de lange-termijn/FIRE-projectie. De 6-mnd `buildForecast` (lib/cashflow-forecast-math.ts) gebruikt géén asset-rendement (alleen recurring in/uit).

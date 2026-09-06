@@ -29,7 +29,7 @@ const SAVINGS: GoalSuggestion[] = [
     key: 'savings:auto-transfer',
     text: 'Stel een automatische maandoverboeking in op je doel-rekening — zo loop je niet meer achter op gedrag.',
     impact: '+30% consistentie',
-    href: '/overzicht/cashflow',
+    href: '/overzicht/budget',
     ctaLabel: 'Cashflow openen',
   },
   {

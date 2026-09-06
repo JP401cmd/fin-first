@@ -47,7 +47,7 @@ import { WEALTH_GROUP_LABELS, type WealthGroup } from '@/lib/wealth-composition'
  * adapter/prio-overgang). Vijf verwijzers (coach-suggestie 'Rendement
  * instellen', module-guide, ⌘K-sublabel, de widgets swr_monitor/inflatie_impact
  * en de pagina-`i`) liepen in Eenvoudig dood. Precedent: CF-4 in
- * cashflow-below-fold.tsx.
+ * cashflow-instellingen-lazy.tsx.
  *
  * De leesregels consumeren de bestaande props/formatters (regelVoorkeuren,
  * fireParams → formatGroupOrder/surplusLabel/formatPct) — geen tweede afleiding.

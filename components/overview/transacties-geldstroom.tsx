@@ -10,12 +10,12 @@ import type { TransactionRow } from '@/components/app/transacties-feed'
  * @audit-kpi-actions skip — banner-style stats; actie via parent feed
  *
  * TransactiesGeldstroom — banner-style cashflow-overzicht boven de
- * TransactiesFeed op /overzicht/cashflow?view=transacties. Aggregeert
+ * TransactiesFeed op /overzicht/budget?view=transacties. Aggregeert
  * de transactions uit de HUIDIGE maand (filter op month-match) en toont
  * 4 KPI's: Inkomen / Uitgaven / Saldo / Spaarquote.
  *
  * User-feedback (mei 2026): wil de geldstroom-info uit /core/assets/cash
- * óók terugzien op /overzicht/cashflow/transacties — gecombineerd over
+ * óók terugzien op /overzicht/budget/transacties — gecombineerd over
  * alle rekeningen. Deze component levert dat over de transactions-prop
  * zonder extra Supabase-call.
  *

@@ -2,7 +2,7 @@
  * Regressietest bij WF-BUDGET-02-bug3.
  *
  * Repro (16 aug 2026): met "Bedragen verbergen" aan toonde de NIBUD-sectie —
- * als enige blok op /overzicht/cashflow/budget — gewoon de echte bedragen,
+ * als enige blok op /overzicht/budget — gewoon de echte bedragen,
  * zowel in de preview-regel (MiniBar) als in de detail-modal (DetailRow:
  * delta, "Budget: €X/mnd", "NIBUD: €Y/mnd"). Oorzaak: kale `€{...}`-
  * template-literals i.p.v. het gedeelde masking-bewuste `MaskedAmount`.

@@ -880,7 +880,7 @@ Scope: de publieke marketing-site (landing + subpagina's), de publieke Vrijheids
 - **Schermen/componenten:** `/onboarding` — orchestrator `app/(onboarding)/onboarding/page.tsx`, stappen `components/onboarding/onboarding-identity.tsx`, `onboarding-inkomen.tsx`, `onboarding-uitgaven-pensioen.tsx`, `onboarding-bezittingen.tsx`, `onboarding-schulden.tsx`, `onboarding-pensioen.tsx`, `onboarding-spaardoel.tsx`, `onboarding-klaar.tsx`, `onboarding-success.tsx`, shell `onboarding-shell.tsx`; server `app/api/onboarding/save-own-data/route.ts`; pensioen-write `lib/pension/apply-parse-result.ts`.
 - **Kriticiteit:** KERN
 - **Rekenend:** ja —
-  - Spaarquote-preview: `Math.round(((maandinkomen − maanduitgaven) / maandinkomen) × 100)` in `components/onboarding/onboarding-inkomen.tsx` (previewRate). Het maandinkomen wordt als handmatige bron opgeslagen (`profiles.net_monthly_income`) en drijft daarna de spaarquote/FIRE-prognose via `resolveSavingsSource` (`lib/savings-source.ts`) — de preview moet dus sporen met de spaarquote die later op /overzicht/cashflow verschijnt.
+  - Spaarquote-preview: `Math.round(((maandinkomen − maanduitgaven) / maandinkomen) × 100)` in `components/onboarding/onboarding-inkomen.tsx` (previewRate). Het maandinkomen wordt als handmatige bron opgeslagen (`profiles.net_monthly_income`) en drijft daarna de spaarquote/FIRE-prognose via `resolveSavingsSource` (`lib/savings-source.ts`) — de preview moet dus sporen met de spaarquote die later op /overzicht/budget verschijnt.
   - Uitgaven-na-pensioen-prefill: `computeRetirementPrefill` (`lib/onboarding/retirement-prefill.ts`), 80% van maanduitgaven (jaarbedrag); bij overslaan vult de server dezelfde 80%-default in via `resolveRetirementExpenseDefaults`.
   - Recap netto vermogen op de klaar-stap: som bezittingen − som schulden (`netWorthForKlaar` in `app/(onboarding)/onboarding/page.tsx`); "—" wanneer beide secties zijn overgeslagen.
 - **Varianten & randgevallen:**
@@ -969,7 +969,7 @@ Scope: de publieke marketing-site (landing + subpagina's), de publieke Vrijheids
   3. Rond de onboarding af en controleer in de app dat de coach de overgeslagen onderwerpen als suggestie aanbiedt.
 - **Schermen/componenten:** defer-dispatches in `app/(onboarding)/onboarding/page.tsx` (DEFER_FIELD), doorvoer in `app/api/onboarding/save-own-data/route.ts`, consumptie in `app/(app)/layout.tsx` (coachDeferredFields).
 - **Kriticiteit:** BELANGRIJK
-- **Rekenend:** nee (afwezigheid van data; de spaarquote-bron blijft dan leeg tot de gebruiker het via /overzicht/cashflow aanvult).
+- **Rekenend:** nee (afwezigheid van data; de spaarquote-bron blijft dan leeg tot de gebruiker het via /overzicht/budget aanvult).
 - **Varianten & randgevallen:**
   - "Later invullen" op inkomen wist óók een eerder ingevuld bedrag (bewust).
   - Skips van uitgaven-na-pensioen en pensioen worden niet als deferred field getrackt maar laten de server-default resp. niets achter.
@@ -1139,7 +1139,7 @@ Dit deelgebied heeft geen eigen pagina's: het beschrijft de app-brede bediening 
 - **Rekenend:** nee — er wordt geen bedrag getoond, maar de statussen zijn wél toetsbaar: de cashflow-/belasting-dots moeten exact de status van de bijbehorende landingskaarten spiegelen (bron: `buildCashflowCards` via `/api/overzicht/cashflow-status`, resp. `loadLeverScores`).
 - **Varianten & randgevallen:**
   - Geen signalen beschikbaar (server gaf niets mee) → alle dots grijs/neutraal.
-  - Cashflow-statushook fetcht alleen op /overzicht/cashflow*-routes; elders neutraal.
+  - Cashflow-statushook fetcht alleen op /overzicht/budget*-routes; elders neutraal.
   - Berichten-badge capt op "9+" in de mobiele TopBar.
 - **Cross-module effecten:** dots spiegelen de statussen van Overzicht/cashflow/belasting — drift tussen dot en kaart is een defect.
 
@@ -1403,7 +1403,7 @@ Dit deelgebied heeft geen eigen pagina's: het beschrijft de app-brede bediening 
 - **Eindresultaat:** Je landt op de canonieke tegenhanger; sidebar/TopBar markeren de juiste module.
 - **Stappen (verwachte doelen, exact uit next.config.ts):**
   1. /core → /overzicht; /horizon → /toekomst; /identity → /mijn; /will → /overzicht; /dashboard → /overzicht.
-  2. /core/budgets → /overzicht/cashflow; /core/belasting → /overzicht/belasting; /overzicht/acties → /overzicht/tips.
+  2. /core/budgets → /overzicht/budget; /core/belasting → /overzicht/belasting; /overzicht/acties → /overzicht/tips.
   3. /identity/profiel → /mijn/profiel; /identity/koppelingen → /mijn/koppelingen; /identity/parameters → /toekomst/voorkeuren; /identity/instellingen, /identity/voortgang, /identity/widgets → /mijn.
   4. /horizon/samengestelde-interest → /toekomst/samengestelde-interest; /horizon/inflatie-koopkracht → /toekomst/inflatie-koopkracht.
   5. Diepere legacy-subroutes (bv. /core/assets, /core/cash/import, /core/debts, /core/checkin/historie) hebben GEEN redirect en tonen nog live backing-UI — de nav-stack mapt ze op de juiste tab.
@@ -1634,14 +1634,14 @@ Scope: `/overzicht` (hoofdpagina/hub), `/dashboard` (redirect), `/overzicht/tips
   - Geen gezondheidsscore-data → lege-staat-kaart "Nog geen score" met CTA "Voeg bezitting toe →" naar /overzicht/bezittingen.
   - `leverScores` (nog) niet geladen → status-stip valt terug op pijler-status uit de gezondheidsscore.
   - Begroeting zonder naam wanneer profielnaam ontbreekt.
-- **Cross-module effecten:** De hefboomkaart-statussen zijn per definitie gelijk aan de sidebar-dots en de status-duiding-banner (gedeelde bron); de getallen moeten overeenkomen met /overzicht/bezittingen, /overzicht/schulden, /overzicht/cashflow en /overzicht/belasting.
+- **Cross-module effecten:** De hefboomkaart-statussen zijn per definitie gelijk aan de sidebar-dots en de status-duiding-banner (gedeelde bron); de getallen moeten overeenkomen met /overzicht/bezittingen, /overzicht/schulden, /overzicht/budget en /overzicht/belasting.
 
 ---
 
 #### WF-OVZ-02 — Via een hefboomkaart naar een deelgebied gaan en de drill-down uitklappen
 - **Doel:** Vanuit de hub direct doorklikken naar een van de vier deelgebieden, of eerst extra detail (status-uitleg + verbetertip) uitklappen zonder de pagina te verlaten.
 - **Trigger/startpunt:** De vier hefboomkaarten bovenaan /overzicht.
-- **Eindresultaat:** Klik op de kaart → deelgebied-pagina geopend (/overzicht/bezittingen, /overzicht/schulden, /overzicht/cashflow of /overzicht/belasting). Klik op de chevron → uitklap-paneel met pijler-naam, kerngetal, verbetertip en een actie-link.
+- **Eindresultaat:** Klik op de kaart → deelgebied-pagina geopend (/overzicht/bezittingen, /overzicht/schulden, /overzicht/budget of /overzicht/belasting). Klik op de chevron → uitklap-paneel met pijler-naam, kerngetal, verbetertip en een actie-link.
 - **Stappen:**
   1. Beweeg over een hefboomkaart en lees de tooltip (bv. "Cash, beleggingen, eigen huis en pensioen — wat groeit voor je.").
   2. Klik op het kaartlichaam → je landt op de bijbehorende deelpagina.
@@ -1957,7 +1957,7 @@ Scope: `/overzicht` (hoofdpagina/hub), `/dashboard` (redirect), `/overzicht/tips
 - **Varianten & randgevallen:**
   - Liquide cash < €10.000 of delta < 5% → kaart wordt niet getoond.
   - Privacy-masking aan → alle bedragen (ook slider-label en balk-labels) gemaskeerd.
-  - Na minimaliseren is er op /overzicht zélf geen herstel-knop; terughalen kan via de inzicht-toggle op /overzicht/bezittingen of /overzicht/cashflow (of door localStorage te wissen).
+  - Na minimaliseren is er op /overzicht zélf geen herstel-knop; terughalen kan via de inzicht-toggle op /overzicht/bezittingen of /overzicht/budget (of door localStorage te wissen).
 - **Cross-module effecten:** CTA naar Bezittingen; de keuze "verborgen" is per apparaat (localStorage) en gedeeld met dezelfde kaart op andere pagina's.
 
 ---
@@ -2111,7 +2111,7 @@ Scope: `/overzicht` (hoofdpagina/hub), `/dashboard` (redirect), `/overzicht/tips
 #### Ongedekte UI
 - **/dashboard** — geen live UI: `app/(app)/dashboard/page.tsx` is een pure `redirect('/overzicht')`; daarnaast vangt `next.config.ts` (regel 43) `/dashboard → /overzicht` al op routing-niveau af. Alleen als redirect-doel testen (WF-OVZ-01 startpunt), er is niets anders te bedienen.
 - **`HefbomenLegenda` — bestaat niet meer** (bijgewerkt 11 aug 2026). Het component (uitleg groen/oranje/rood-stippen) is bij OVZ-1 van de eenvoudige-weergave-audit verwijderd; het werd alleen in zijn eigen unit-test gerenderd. De uitleg van de stoplichtkleuren staat nu éénmalig in de pagina-'i' van /overzicht (`PAGE_INFO['/overzicht']` in `lib/page-info-content.ts`) — tóets die, niet het component. De status-dot zelf houdt zijn `title` uit `LEVERAGE_STATUS_LABEL`.
-- **Herstel-knop voor het geminimaliseerde samengestelde-rente-inzicht ontbreekt op /overzicht zelf** — na de X-klik (WF-OVZ-15) is er op de hub geen `InsightToggleButton`; herstellen kan alleen via /overzicht/bezittingen of /overzicht/cashflow (waar de toggle wél naast de 'i' staat) of door localStorage te wissen.
+- **Herstel-knop voor het geminimaliseerde samengestelde-rente-inzicht ontbreekt op /overzicht zelf** — na de X-klik (WF-OVZ-15) is er op de hub geen `InsightToggleButton`; herstellen kan alleen via /overzicht/bezittingen of /overzicht/budget (waar de toggle wél naast de 'i' staat) of door localStorage te wissen.
 - **/core/checkin als banner-doel** — de CheckinBanner linkt naar de legacy backing-route `/core/checkin` (bestaat nog als live pagina); de check-in-flow zelf valt buiten deze scope maar de link is functioneel.
 - **Losse hero-onderdelen zonder eigen flow** — de filosofie-footer "Geld is opgeslagen tijd" en de datum/begroeting zijn puur statisch en zijn meegenomen als leesstappen in WF-OVZ-01.
 
@@ -2134,7 +2134,7 @@ Route-status vooraf (verhouding nieuw vs. legacy):
 - **/overzicht/bezittingen** is de canonieke landing (nav-config linkt hierheen). Deze rendert `BezittingenView` → dezelfde `AssetsPage`-component als legacy **/core/assets**, plus een filter-dropdown en twee inspiratiekaarten.
 - **/overzicht/bezittingen/[type]** is een pure re-export van **/core/assets/[type]** (zelfde server-page, nul duplicatie). Beide URL's tonen identieke UI.
 - **/core/assets** en **/core/assets/[type]** zijn nog volwaardig live (géén redirect) en worden intern nog aangestuurd: kaart-klik vanuit het overzicht navigeert naar `/core/assets/[type]?asset=<id>`, de bewerk-knop zet de URL op `/core/assets?asset=<id>&edit=1`, en de "Terug naar Vermogen"-link op de holdings-pagina wijst naar `/core/assets`.
-- **/core/assets/cash/[accountId]** is een pure redirect naar `/overzicht/cashflow#rekening-<assetId>`.
+- **/core/assets/cash/[accountId]** is een pure redirect naar `/overzicht/budget#rekening-<assetId>`.
 - **/holdings/[id]** (app-root) rendert altijd `notFound()` — een bewuste 404-guard, geen UI.
 - Sidebar-apps linken naar `/overzicht/bezittingen/investment`, `/overzicht/bezittingen/crypto` en `/overzicht/bezittingen/real_estate` — sinds M41 (28 aug 2026) **zonder** `?tab=`-deeplink, zodat een klik in Eenvoudig op de gewone categorielijst landt en niet in de verdiepingstab die BEZ-4 daar buiten het standaardpad houdt (`OVERVIEW_APP_SUBROUTES` in lib/nav-config.ts; de deeplink staat daar apart als `tabHref` en wordt alleen door het commandopalet gebruikt). Die app-entries verschijnen alleen wanneer minstens één asset de bijbehorende tracking-vlag heeft.
 
@@ -2148,7 +2148,7 @@ Route-status vooraf (verhouding nieuw vs. legacy):
   1. Open "Bezittingen" vanuit de navigatie.
   2. Bekijk de figures-strip bovenaan (totale waarde met vrijheidstijd-onderschrift).
   3. Scroll door de categoriegroepen; elke groep heeft een klikbare kop (icoon + label + totaal) en een grid van bezitting-kaarten.
-  4. Controleer dat een groepskop naar de categoriepagina linkt (Cash-groepskop linkt naar /overzicht/cashflow).
+  4. Controleer dat een groepskop naar de categoriepagina linkt (Cash-groepskop linkt naar /overzicht/budget).
 - **Schermen/componenten:** app/(app)/overzicht/bezittingen/page.tsx → components/overview/bezittingen-view.tsx → components/core/assets-client.tsx (AssetsPage), components/core/vermogen-asset-card.tsx, components/core/category-group-header.tsx.
 - **Kriticiteit:** KERN
 - **Rekenend:** ja — Totale waarde = som van `perspectiveAssetValue()` over actieve assets (components/core/assets-client.tsx, `perspectiveAssetValue`/`totalValue`); vrijheidstijd = `calculateFreedomTime`/`formatFreedomTimeString` (lib/format.ts) op basis van `dailyExpenseRate` uit de uitgaven van de lopende maand; "Rendement portefeuille" = `buildAssetReturnBreakdown().portfolio.gain` (lib/asset-return.ts) — uitsluitend de marktportefeuille (investment + crypto), met de kostprijs uit de holdings-motor (`sumHoldingTotals` via `AssetsPageData.holdingsCostByAssetId`) en terugval op `purchase_value`. Woning/deelneming vallen in een aparte waarderings-emmer en cash/spaargeld/pensioen dragen geen rendement; de rekenmodal toont alle drie plus de sluitpost naar Totale waarde. Cash-kaartwaarden worden gesynchroniseerd met `bank_accounts.balance` (actueler dan asset.current_value).
@@ -2248,7 +2248,7 @@ Route-status vooraf (verhouding nieuw vs. legacy):
 - **Kriticiteit:** KERN
 - **Rekenend:** ja — rendement% = (current_value − purchase_value)/purchase_value (AssetDetailModal r1193); vrijheidstijd via `calculateFreedomTime` op dagelijkse uitgaven afgeleid van essentiële budgetten/365 (asset-pane.tsx r224-253); eigen huis: overwaarde = waarde − gekoppelde hypotheeksaldo; deelneming: totaal DGA-leningen getoetst aan de Wet excessief lenen-drempel (`DGA_LENING_DREMPEL`, lib/box2-data.ts).
 - **Varianten & randgevallen:**
-  - Cash-kaart: klik gaat NIET naar een pane maar naar /overzicht/cashflow#rekening-<assetId> (cash woont op de cashflow-landing; actieknoppen op cash-kaarten zijn verborgen).
+  - Cash-kaart: klik gaat NIET naar een pane maar naar /overzicht/budget#rekening-<assetId> (cash woont op de cashflow-landing; actieknoppen op cash-kaarten zijn verborgen).
   - Crypto-/investment-asset: pane toont een compacte typed holdings-lijst (max 12) met deeplink "Open holdings (N)" naar de app-tab; savings/retirement tonen de legacy inklapbare holdings-lijst met eigen toevoeg/bewerk/verwijder-mini-formulier.
   - Asset met actieve holdings: banner "Portfolio tracker actief" en Herwaarderen is geblokkeerd.
   - Deelneming: DGA-schuld koppelen/ontkoppelen rechtstreeks vanuit de pane (dropdown "Koppel schuld").
@@ -2346,7 +2346,7 @@ Route-status vooraf (verhouding nieuw vs. legacy):
 - **Kriticiteit:** BELANGRIJK
 - **Rekenend:** ja — hero-totaal = som `current_value` van de categorie (asset-category-page.tsx r414-417); per-kaart-KPI's via `computeAssetKpi` (lib/asset-kpi.ts) met context uit `buildKpiContext` (lib/kpi-context.ts) — o.a. LTV en overwaarde bij eigen huis; historie-grafiek uit `loadCategoryHistory` (lib/load-category-history.ts) op balance_snapshots.
 - **Varianten & randgevallen:**
-  - /core/assets/cash en /overzicht/bezittingen/cash redirecten naar /overzicht/cashflow (vóór de type-validatie).
+  - /core/assets/cash en /overzicht/bezittingen/cash redirecten naar /overzicht/budget (vóór de type-validatie).
   - Ongeldig type in de URL → 404 (editorial not-found).
   - Lege categorie: krant-stijl empty state met CTA "Voeg <item> toe".
   - App-tab aanwezig maar module uit: tab blijft zichtbaar met teaser + tip-strip naar Instellingen; onbekende `?tab=`-waarde valt terug op de items-tab.
@@ -2600,7 +2600,7 @@ Route-status vooraf (verhouding nieuw vs. legacy):
 #### Ongedekte UI
 
 - **/holdings/[id] (app-root):** rendert onvoorwaardelijk `notFound()` — bewuste 404-guard voor oude/foute links (app/holdings/[id]/page.tsx). Geen UI, geen workflow; testbaar als "elke /holdings/<iets>-URL geeft een nette 404".
-- **/core/assets/cash/[accountId]:** pure redirect naar /overzicht/cashflow#rekening-<assetId> (of de kale cashflow-landing zonder mapping). Geen eigen UI; alleen als redirect-doel testen. De code die er vroeger naartoe navigeerde (asset-category-page.tsx `openAssetDetail` voor budget-getrackte cash-assets) landt dus effectief op de cashflow-landing.
+- **/core/assets/cash/[accountId]:** pure redirect naar /overzicht/budget#rekening-<assetId> (of de kale cashflow-landing zonder mapping). Geen eigen UI; alleen als redirect-doel testen. De code die er vroeger naartoe navigeerde (asset-category-page.tsx `openAssetDetail` voor budget-getrackte cash-assets) landt dus effectief op de cashflow-landing.
 - **/core/assets en /core/assets/[type] (legacy backing):** nog volledig live UI (géén redirect). /core/assets is bereikbaar via interne paden ("Terug naar Vermogen" op de holdings-pagina; de bewerk-URL-state schrijft er hard naartoe, óók vanaf /overzicht/bezittingen). Wordt gedekt door WF-BEZIT-01 t/m 11 (zelfde componenten), maar de dubbele bereikbaarheid zelf is een aandachtspunt.
 - **/core/assets/holdings (legacy centrale holdings-pagina):** live UI, alleen bereikbaar via secundaire links ("Alle holdings" op de holding-detailpagina, "Bekijk holdings" na import, "filter wissen") — niet via de hoofdnavigatie. Zelfde component als de aandelen-holdings-tab; gedekt door WF-BEZIT-12 t/m 16.
 - **Empty-state-links in de crypto-holdings-app naar /identity/koppelingen** (crypto-holdings-page.tsx r261/268): /identity is een legacy-route (IA verhuisde naar /mijn); werkt vermoedelijk alleen via een redirect — verifiëren tijdens de UAT.
@@ -3066,14 +3066,14 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
 
 #### WF-CASH-01 — Cashflow-onderdelen verkennen via de vier hefboom-kaarten
 - **Doel:** In één oogopslag zien hoe Budget, Transacties, Vaste lasten en Forecast ervoor staan en doorklikken naar het juiste onderdeel.
-- **Trigger/startpunt:** Gebruiker opent /overzicht/cashflow (de cashflow-landing).
+- **Trigger/startpunt:** Gebruiker opent /overzicht/budget (de cashflow-landing).
 - **Eindresultaat:** Vier kaarten met status-stip (groen/oranje/rood/grijs), een KPI-cijfer en subtekst; een uitgeklapte kaart toont een secundaire waarde, een 1-regel-inzicht en een deeplink; klik navigeert naar de sub-pagina.
 - **Stappen:**
-  1. Open /overzicht/cashflow en bekijk de vier kaarten (Budget, Transacties, Vaste lasten, Forecast) met hun status-stip en KPI.
+  1. Open /overzicht/budget en bekijk de vier kaarten (Budget, Transacties, Vaste lasten, Forecast) met hun status-stip en KPI.
   2. Klik op de uitklap-chevron van een kaart — het detailpaneel klapt open (accordeon: één kaart open per keer).
   3. Lees de secundaire waarde (bv. "X% spaarquote", "€…/jr") en het inzicht.
   4. Klik op de actielink ("Bekijk transacties" etc.) of op de kaart zelf — je landt op de bijbehorende sub-pagina.
-- **Schermen/componenten:** /overzicht/cashflow — app/(app)/overzicht/cashflow/page.tsx; components/overview/cashflow-landing-cards.tsx; components/overview/leverage-card.tsx; lib/cashflow-cards.ts; lib/leverage-status.ts
+- **Schermen/componenten:** /overzicht/budget — app/(app)/overzicht/budget/page.tsx; components/overview/cashflow-landing-cards.tsx; components/overview/leverage-card.tsx; lib/cashflow-cards.ts; lib/leverage-status.ts
 - **Kriticiteit:** KERN
 - **Rekenend:** ja — Budget-KPI (limiet/mnd + budgetdekking-score), Transacties-KPI (maandnetto + maand-spaarquote %), Vaste-lasten-KPI (€/mnd + % van inkomen), Forecast-KPI (eindsaldo na 6 mnd + netto/mnd). Bron: `buildCashflowCards` in lib/cashflow-cards.ts (statussen via `budgetCardStatus`/`transactiesCardStatus`/`vasteLastenCardStatus`/`forecastCardStatus`, forecast via `buildForecast` in lib/cashflow-forecast-math.ts, vaste-lastentotaal via `loadVasteLastenSummary` in lib/vaste-lasten-summary.ts).
 - **Varianten & randgevallen:**
@@ -3081,19 +3081,19 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
   - Weergavemodus "Eenvoudig": geen uitklap-chevrons — kaarten alleen als navigatie.
   - Statusdrempels: spaarquote ≥20% groen / ≥0% oranje / <0% rood; vaste lasten <50% groen / ≤70% oranje / >70% rood (Nibud-basis).
   - Huishoud-perspectief: perspectief-label in de kicker; bedragen naar aandeel geschaald.
-- **Cross-module effecten:** Budget-kaart deeplinkt naar /overzicht/cashflow/budget (deelgebied Budgetten). Dezelfde statusfuncties voeden de sidebar-status-dots.
+- **Cross-module effecten:** Budget-kaart deeplinkt naar /overzicht/budget (deelgebied Budgetten). Dezelfde statusfuncties voeden de sidebar-status-dots.
 
 #### WF-CASH-02 — Maand-geldstroom bekijken en door maanden bladeren
 - **Doel:** Per kalendermaand zien wat er binnenkwam, uitging en overbleef, inclusief een dagelijkse grafiek met vooruitblik naar het einde van de maand.
-- **Trigger/startpunt:** Op /overzicht/cashflow, onder de kaarten: het geldstroom-blok (maandbanner + figures-strip + grafiek).
+- **Trigger/startpunt:** Op /overzicht/budget, onder de kaarten: het geldstroom-blok (maandbanner + figures-strip + grafiek).
 - **Eindresultaat:** Voor de gekozen maand kloppen Inkomen, Uitgaven, Saldo en Spaarquote in de figures-strip; de grafiek toont dagelijkse balken + cumulatieve saldolijn, en (alleen huidige maand) een gestippelde forecast-curve.
 - **Stappen:**
-  1. Scroll op /overzicht/cashflow naar het blok "Geldstroom".
+  1. Scroll op /overzicht/budget naar het blok "Geldstroom".
   2. Lees de vier totalen: Inkomen, Uitgaven, Saldo (met +/−), Spaarquote met duiding (sterk/gezond/laag).
   3. Klik op ◀ / ▶ naast de maandnaam om een maand terug of vooruit te bladeren — totalen en grafiek laden opnieuw.
   4. Bekijk in de grafiek de groene (in) en rode (uit) dagbalken en de saldolijn; in de huidige maand loopt vanaf vandaag een gestippelde prognose door.
   5. Klik op "Naar budget" of "Naar transacties" — de deeplink neemt de geselecteerde maand mee (?maand=JJJJ-MM).
-- **Schermen/componenten:** /overzicht/cashflow — components/app/cash-overview.tsx (maandselector, figures-strip, `CashflowChart`, forecast-curve op historisch dagpatroon); lib/month-range.ts (`localMonthBounds`)
+- **Schermen/componenten:** /overzicht/budget — components/app/cash-overview.tsx (maandselector, figures-strip, `CashflowChart`, forecast-curve op historisch dagpatroon); lib/month-range.ts (`localMonthBounds`)
 - **Kriticiteit:** KERN
 - **Rekenend:** ja — maandtotalen inkomen/uitgaven/netto en spaarquote (netto/inkomen), transfers uitgesloten; forecast-eindsaldo van de maand. Bron: aggregaties in components/app/cash-overview.tsx (`incomeByAccount`, `expensesByBudget`, `savingsRate`, `forecast` useMemo — historisch dagpatroon over 12 afgesloten maanden, fallback lineair tempo).
 - **Varianten & randgevallen:**
@@ -3106,13 +3106,13 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
 
 #### WF-CASH-03 — Kassabon: inkomsten of uitgaven van de maand uitsplitsen
 - **Doel:** Zien waar het maandinkomen vandaan kwam (per rekening) en waar de uitgaven heen gingen (per budget), inclusief vrijheidstijd-equivalent.
-- **Trigger/startpunt:** Klik op het cijfer "Inkomen" of "Uitgaven" in de figures-strip van het geldstroom-blok op /overzicht/cashflow.
+- **Trigger/startpunt:** Klik op het cijfer "Inkomen" of "Uitgaven" in de figures-strip van het geldstroom-blok op /overzicht/budget.
 - **Eindresultaat:** Een bottom-sheet-kassabon met regels per rekening (inkomsten) of per (hoofd)budget met limiet (uitgaven), totaalregel en vrijheidstijd-badge.
 - **Stappen:**
   1. Klik in de figures-strip op "Inkomen" — de kassabon "Inkomsten deze maand" opent met een regel per rekening en een totaal.
   2. Sluit en klik op "Uitgaven" — de kassabon "Uitgaven deze maand" opent met een regel per budget (bedrag / limiet), inclusief "Ongecategoriseerd" wanneer van toepassing.
   3. Controleer dat de totalen gelijk zijn aan de figures-strip.
-- **Schermen/componenten:** /overzicht/cashflow — components/app/cash-overview.tsx (BottomSheet-kassabons met KassabonShell + FreedomTimeBadge)
+- **Schermen/componenten:** /overzicht/budget — components/app/cash-overview.tsx (BottomSheet-kassabons met KassabonShell + FreedomTimeBadge)
 - **Kriticiteit:** BELANGRIJK
 - **Rekenend:** ja — som per rekening/per budget en totaal moeten optellen tot het strip-totaal; uitgaven van verwijderde/onbekende budgetten landen in "Ongecategoriseerd". Bron: `incomeByAccount`/`expensesByBudget`/`totalIncome`/`totalExpenses` in components/app/cash-overview.tsx.
 - **Varianten & randgevallen:**
@@ -3123,14 +3123,14 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
 
 #### WF-CASH-04 — Rekeningen bekijken en een rekeningdetail openen
 - **Doel:** Alle (bank)rekeningen met saldo, aandeel van totaal en vrijheidstijd zien en doorklikken naar het detail van één rekening.
-- **Trigger/startpunt:** Sectie "Rekeningen" bovenaan het embedded cash-overzicht op /overzicht/cashflow.
+- **Trigger/startpunt:** Sectie "Rekeningen" bovenaan het embedded cash-overzicht op /overzicht/budget.
 - **Eindresultaat:** Kaart (of pill in Eenvoudig) per rekening met saldo, %-van-totaal-balkje en waardeverloop-lijn; klik opent een modal met het volledige rekeningdetail of het bewerk-paneel van een handmatige cash-rekening.
 - **Stappen:**
   1. Bekijk de rekening-kaarten met naam, IBAN/bank, saldo, aandeel-% en (brede modus) sparkline van het waardeverloop.
   2. Klik op een gekoppelde/getrackte rekening — een modal opent met het rekeningdetail (transacties per maand).
   3. Klik in de modal op "Open volledig" om naar de volledige rekeningpagina te gaan, of sluit met X/Escape.
   4. Klik op een handmatige cash-rekening (zonder banktracking) — het bewerk-paneel (AssetPane) opent; via de herwaardeer-actie opent de herwaardeer-modal.
-- **Schermen/componenten:** /overzicht/cashflow — components/app/cash-overview.tsx (VermogenAssetCard / kaart-grid / EenvoudigPillList, nested modal met components/app/cash-account-view.tsx, AssetPane, ValuationModal); volledige detailpagina = /core/assets/cash/[id]
+- **Schermen/componenten:** /overzicht/budget — components/app/cash-overview.tsx (VermogenAssetCard / kaart-grid / EenvoudigPillList, nested modal met components/app/cash-account-view.tsx, AssetPane, ValuationModal); volledige detailpagina = /core/assets/cash/[id]
 - **Kriticiteit:** KERN
 - **Rekenend:** ja — saldo per rekening, aandeel-% van totaalsaldo, sparkline uit balance_snapshots. Bron: components/app/cash-overview.tsx (`accountPillItems`, `totalBalance`), lib/load-entity-sparklines.ts.
 - **Varianten & randgevallen:**
@@ -3142,14 +3142,14 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
 
 #### WF-CASH-05 — Cashflow-instellingen aanpassen (inkomen, spaarquote, uitgaven)
 - **Doel:** De basisaannames voor inkomen, uitgaven en spaarquote controleren en desgewenst een eigen (handmatige) waarde vastleggen.
-- **Trigger/startpunt:** Blok "Instellingen & toekomst" onderaan /overzicht/cashflow — drie klikkaarten: Geschat jaarinkomen, Spaarquote, Geschatte uitgaven.
+- **Trigger/startpunt:** Blok "Instellingen & toekomst" onderaan /overzicht/budget — drie klikkaarten: Geschat jaarinkomen, Spaarquote, Geschatte uitgaven.
 - **Eindresultaat:** De gekozen waarde (berekend of handmatig, met "handmatig"-badge) staat op de kaart en is opgeslagen; afgeleide cijfers elders in de app volgen deze bron.
 - **Stappen:**
   1. Klik op de kaart "Geschat jaarinkomen" — een bottom-sheet opent met een 12-maands-kassabon van je transactie-inkomen.
   2. Kies "Gebruik berekend (€…/mnd)" of vul een eigen bedrag in bij "Eigen bedrag" (opslaan gebeurt bij het verlaten van het veld).
   3. Herhaal voor "Geschatte uitgaven" (6-maands-kassabon) en "Spaarquote" (6-maands-kassabon met sparen-in-budgetten + schuldaflossing als plusregels).
   4. Sluit de sheet — de kaart toont de nieuwe waarde, met "handmatig"-badge bij eigen invoer.
-- **Schermen/componenten:** /overzicht/cashflow — components/overview/cashflow-instellingen-blok.tsx; lib/cashflow-overrides.ts (`recomputeTriple`); persist via PUT /api/parameters; data uit lib/cashflow-settings-data.ts
+- **Schermen/componenten:** /overzicht/budget — components/overview/cashflow-instellingen-blok.tsx; lib/cashflow-overrides.ts (`recomputeTriple`); persist via PUT /api/parameters; data uit lib/cashflow-settings-data.ts
 - **Kriticiteit:** KERN
 - **Rekenend:** ja — de driehoek inkomen/uitgaven/spaarquote wordt consistent herrekend (`recomputeTriple` in lib/cashflow-overrides.ts); de getoonde "berekend"-spaarquote is de canonieke 6-maands `savingsRate6m` (incl. spaarbudgetten en schuldaflossing); kassabon-totalen komen uit `monthlyBreakdown` (lib/cashflow-settings-data.ts).
 - **Varianten & randgevallen:**
@@ -3161,7 +3161,7 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
 
 #### WF-CASH-06 — Inflatie-impact verkennen en het inzicht wegklikken/terughalen
 - **Doel:** Zien wat inflatie over 10/20/30 jaar doet met de maandelijkse uitgaven en de aanname zelf bijstellen.
-- **Trigger/startpunt:** Kaart "Inflatie & koopkracht" op /overzicht/cashflow (alleen zichtbaar bij ≥ €500/mnd baseline-uitgaven, in Volledig-modus).
+- **Trigger/startpunt:** Kaart "Inflatie & koopkracht" op /overzicht/budget (alleen zichtbaar bij ≥ €500/mnd baseline-uitgaven, in Volledig-modus).
 - **Eindresultaat:** Drie tegels met het toekomstige maandbedrag per horizon; de slider herrekent live; de kaart is te minimaliseren en via de inzicht-toggle rechtsboven terug te halen.
 - **Stappen:**
   1. Bekijk de kop ("Je €X/maand wordt over 30 jaar €Y…") en de tegels voor 10/20/30 jaar.
@@ -3169,7 +3169,7 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
   3. Klik op de X rechtsboven op de kaart — het inzicht verdwijnt.
   4. Klik op de inzicht-toggleknop in de paginakop (naast statuspunt/i) om het inzicht weer zichtbaar te maken.
   5. Klik op "Verdiep — koopkracht-analyse" voor de volledige analyse.
-- **Schermen/componenten:** /overzicht/cashflow — components/overview/inflation-impact-card.tsx; components/editorial/insight-toggle-button.tsx; lib/hooks/use-insight-visibility.ts
+- **Schermen/componenten:** /overzicht/budget — components/overview/inflation-impact-card.tsx; components/editorial/insight-toggle-button.tsx; lib/hooks/use-insight-visibility.ts
 - **Kriticiteit:** OVERIG
 - **Rekenend:** ja — toekomstig maandbedrag = samengestelde groei van het huidige maandbedrag tegen de gekozen inflatie. Bron: `projectCompound` in lib/compound-projection.ts, aangeroepen in components/overview/inflation-impact-card.tsx (`futureMonthly`).
 - **Varianten & randgevallen:**
@@ -3180,13 +3180,13 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
 
 #### WF-CASH-07 — Status-melding minimaliseren en heropenen via het statuspunt
 - **Doel:** De status-duiding-banner bovenaan de cashflow-pagina's wegklappen tot een gekleurd punt en later weer openen.
-- **Trigger/startpunt:** Banner boven de paginatitel op /overzicht/cashflow (en sub-pagina's), gerenderd door de overzicht-layout.
+- **Trigger/startpunt:** Banner boven de paginatitel op /overzicht/budget (en sub-pagina's), gerenderd door de overzicht-layout.
 - **Eindresultaat:** Na "Minimaliseren" is alleen het gekleurde statuspunt links naast de i-knop zichtbaar; klik op het punt heropent de banner; bij status-escalatie klapt de banner vanzelf weer uit.
 - **Stappen:**
   1. Bekijk de status-banner (indien aanwezig) bovenaan de pagina en klik op "Minimaliseren".
   2. Controleer dat het gekleurde punt (stoplichtkleur) links naast de i-knop staat.
   3. Klik op het punt — de banner klapt weer uit.
-- **Schermen/componenten:** alle /overzicht/cashflow-routes — app/(app)/overzicht/layout.tsx (PageStatusProvider + PageStatusBanner); components/app/page-status-dot.tsx; components/app/page-status-banner.tsx; lib/page-status/display.ts
+- **Schermen/componenten:** alle /overzicht/budget-routes — app/(app)/overzicht/layout.tsx (PageStatusProvider + PageStatusBanner); components/app/page-status-dot.tsx; components/app/page-status-banner.tsx; lib/page-status/display.ts
 - **Kriticiteit:** OVERIG
 - **Rekenend:** nee
 - **Varianten & randgevallen:**
@@ -3196,14 +3196,14 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
 
 #### WF-CASH-08 — Analyse-periode kiezen en door de historie bladeren
 - **Doel:** De transactie-analyse bekijken over 30 dagen, een maand, kwartaal of jaar en terugbladeren in de tijd.
-- **Trigger/startpunt:** /overzicht/cashflow/transacties — de periode-selector bovenaan de analyse.
+- **Trigger/startpunt:** /overzicht/budget/transacties — de periode-selector bovenaan de analyse.
 - **Eindresultaat:** Alle inzichten (gauge, trend, lijsten, tijdlijn) tonen de gekozen periode; het label (bv. "juni 2026", "Q2 2026") klopt; vooruitbladeren voorbij "nu" kan niet.
 - **Stappen:**
-  1. Open /overzicht/cashflow/transacties — standaard staat "30 dagen" actief.
+  1. Open /overzicht/budget/transacties — standaard staat "30 dagen" actief.
   2. Kies de tab "Maand", "Kwartaal" of "Jaar" — de analyse herlaadt voor de huidige kalenderperiode.
   3. Klik ‹ om een periode terug te gaan; het label verandert mee; › is uitgeschakeld zodra je in het heden bent.
   4. Open de pagina met deeplink ?maand=JJJJ-MM (bv. vanaf de geldstroom-banner) — de periode staat direct op die maand.
-- **Schermen/componenten:** /overzicht/cashflow/transacties — app/(app)/overzicht/cashflow/transacties/page.tsx; components/overview/transacties/transacties-analyse.tsx; components/overview/transacties/periode-selector.tsx; lib/transaction-insights.ts (`resolvePeriodWindow`)
+- **Schermen/componenten:** /overzicht/budget/transacties — app/(app)/overzicht/budget/transacties/page.tsx; components/overview/transacties/transacties-analyse.tsx; components/overview/transacties/periode-selector.tsx; lib/transaction-insights.ts (`resolvePeriodWindow`)
 - **Kriticiteit:** BELANGRIJK
 - **Rekenend:** ja — periodevenster (since/until) en het even-lange vorige venster. Bron: `resolvePeriodWindow` in lib/transaction-insights.ts.
 - **Varianten & randgevallen:**
@@ -3214,7 +3214,7 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
 
 #### WF-CASH-09 — Geldstroom-inzichten bekijken en inzoomen op een dag of weekdag
 - **Doel:** Begrijpen waar het geld in de periode heenging: spaarquote-meter, trend t.o.v. vorige periode, weekdag-patroon, uitgaven-heatmap, top-tegenpartijen, grootste uitgaven en nieuwe tegenpartijen — met doorklik naar de onderliggende transacties.
-- **Trigger/startpunt:** /overzicht/cashflow/transacties na het laden van een periode (Volledig-modus voor de meeste blokken).
+- **Trigger/startpunt:** /overzicht/budget/transacties na het laden van een periode (Volledig-modus voor de meeste blokken).
 - **Eindresultaat:** Klik op een heatmap-cel of weekdag-staaf opent een bottom-sheet met precies de transacties van die dag/weekdag; klik op een grootste-uitgave opent het bewerk-formulier.
 - **Stappen:**
   1. Lees de geldstroom-gauge (naald = spaarquote van de periode, met inkomen/uitgaven/saldo eronder).
@@ -3223,7 +3223,7 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
   4. Klik in het weekdag-patroon op een staaf — een sheet toont alle transacties van die weekdag in de periode.
   5. Klik in "Grootste uitgaven" op een regel — het transactie-bewerkformulier opent.
   6. Klik in "Top-tegenpartijen" of "Nieuwe tegenpartijen" op een naam — de tegenpartij-analyse opent (zie WF-CASH-15).
-- **Schermen/componenten:** /overzicht/cashflow/transacties — components/overview/transacties/{geldstroom-gauge,periode-trend,weekdag-patroon,uitgaven-heatmap,top-tegenpartijen,grootste-uitgaven,nieuwe-tegenpartijen,transactie-detail-sheet}.tsx; lib/transaction-insights.ts
+- **Schermen/componenten:** /overzicht/budget/transacties — components/overview/transacties/{geldstroom-gauge,periode-trend,weekdag-patroon,uitgaven-heatmap,top-tegenpartijen,grootste-uitgaven,nieuwe-tegenpartijen,transactie-detail-sheet}.tsx; lib/transaction-insights.ts
 - **Kriticiteit:** BELANGRIJK
 - **Rekenend:** ja — periodetotalen in/uit/netto + spaarquote (`summarizeFlow`), nieuwe tegenpartijen t.o.v. prior-historie (`newCounterparties`), heatmap-venster (`resolveHeatmapWindow`) — alle in lib/transaction-insights.ts; transfers zijn in álle aggregaten uitgesloten.
 - **Varianten & randgevallen:**
@@ -3235,7 +3235,7 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
 
 #### WF-CASH-10 — Transacties zoeken en filteren in de verrijkte tijdlijn
 - **Doel:** Snel specifieke transacties terugvinden met slimme zoektekst, filter-chips, bedrag-filters, sortering en rekening-filter — met per dag het vrijheidsdagen-equivalent.
-- **Trigger/startpunt:** De tijdlijn onderaan /overzicht/cashflow/transacties.
+- **Trigger/startpunt:** De tijdlijn onderaan /overzicht/budget/transacties.
 - **Eindresultaat:** De lijst toont alleen passende transacties, gegroepeerd per dag met dagtotaal en "≈ x vrijheidsdagen"; actieve filters staan als verwijderbare chips; "Toon meer" laadt volgende 50.
 - **Stappen:**
   1. Kies bovenaan de tijdlijn een rekening-knop ("Alle rekeningen" of één rekening; icoon toont gekoppeld vs import).
@@ -3244,7 +3244,7 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
   4. Open "Filters" (bottom-sheet) voor min/max-bedrag en sortering (datum/bedrag/winkel); het resultaat-aantal telt live mee.
   5. Verwijder een actieve filter-chip of klik "Alles wissen".
   6. Klik "Toon meer · N resterend" om verder te bladeren.
-- **Schermen/componenten:** /overzicht/cashflow/transacties — components/overview/transacties/transactie-tijdlijn.tsx; lib/transaction-display.ts (`parseSmartQuery`, `cleanMerchantName`, `deriveType`, `detectRecurring`, `freedomDays`); het dagtarief komt uit `useDailyExpenseRate` (components/app/freedom-time-label.tsx → /api/daily-expense-rate → lib/expense-rate.ts)
+- **Schermen/componenten:** /overzicht/budget/transacties — components/overview/transacties/transactie-tijdlijn.tsx; lib/transaction-display.ts (`parseSmartQuery`, `cleanMerchantName`, `deriveType`, `detectRecurring`, `freedomDays`); het dagtarief komt uit `useDailyExpenseRate` (components/app/freedom-time-label.tsx → /api/daily-expense-rate → lib/expense-rate.ts)
 - **Kriticiteit:** BELANGRIJK
 - **Rekenend:** ja — dagtotaal (in − uit) per daggroep en het vrijheidsdagen-label (netto dagbedrag ÷ het CANONIEKE 12-mnd rolling dagtarief). Bron: `freedomDays` in lib/transaction-display.ts op het tarief uit `recentDailyExpenseRateFromRows` (lib/expense-rate.ts); saldo- en FX-subregels per rij uit de transactievelden. Sinds M22 rekent de tijdlijn NIET meer met een eigen gemiddelde over het zichtbare venster — het label verandert dus niet als je van periode wisselt of filtert.
 - **Varianten & randgevallen:**
@@ -3257,7 +3257,7 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
 
 #### WF-CASH-11 — Handmatig een transactie toevoegen (eventueel terugkerend)
 - **Doel:** Een uitgave of inkomst vastleggen die niet via import/koppeling binnenkwam en die meteen in alle cijfers zien meetellen.
-- **Trigger/startpunt:** Knop "Nieuwe transactie" bovenaan /overzicht/cashflow/transacties (alleen zichtbaar als er ≥1 rekening is).
+- **Trigger/startpunt:** Knop "Nieuwe transactie" bovenaan /overzicht/budget/transacties (alleen zichtbaar als er ≥1 rekening is).
 - **Eindresultaat:** De transactie staat in de tijdlijn en telt mee in gauge/maandcijfers; optioneel is ook een terugkerende regel (vaste last/inkomst) aangemaakt.
 - **Stappen:**
   1. Klik "Nieuwe transactie"; bij meerdere rekeningen kies je eerst een rekening in de keuze-sheet.
@@ -3266,7 +3266,7 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
   4. (Met huishouden) kies Eigendom persoonlijk/gezamenlijk; bij een gezamenlijk budget verschijnt de suggestie-chip "Zet op gezamenlijk".
   5. Vink desgewenst "Terugkerende transactie" aan en kies frequentie + dag (+ optionele einddatum).
   6. Klik "Opslaan" — de sheet sluit en de lijst ververst.
-- **Schermen/componenten:** /overzicht/cashflow/transacties — components/app/transaction-form.tsx (insert in `transactions`, optioneel `recurring_transactions`); rekening-kiezer-BottomSheet in components/overview/transacties/transacties-analyse.tsx
+- **Schermen/componenten:** /overzicht/budget/transacties — components/app/transaction-form.tsx (insert in `transactions`, optioneel `recurring_transactions`); rekening-kiezer-BottomSheet in components/overview/transacties/transacties-analyse.tsx
 - **Kriticiteit:** KERN
 - **Rekenend:** ja — bedrag krijgt het juiste teken (inkomen +, uitgave −) en telt direct mee in `summarizeFlow`-totalen en de maand-geldstroom; een terugkerende regel voedt kalender/forecast/vaste lasten. Bron: components/app/transaction-form.tsx (`handleSubmit`).
 - **Varianten & randgevallen:**
@@ -3278,14 +3278,14 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
 
 #### WF-CASH-12 — Transactie bewerken en hercategoriseren met reikwijdte-keuze
 - **Doel:** Een bestaande transactie corrigeren (bedrag, datum, omschrijving, budget) en bij een budgetwijziging kiezen of vergelijkbare transacties meegaan.
-- **Trigger/startpunt:** Klik op een transactie in de tijdlijn, in "Grootste uitgaven" of in een detail-sheet op /overzicht/cashflow/transacties.
+- **Trigger/startpunt:** Klik op een transactie in de tijdlijn, in "Grootste uitgaven" of in een detail-sheet op /overzicht/budget/transacties.
 - **Eindresultaat:** De transactie is bijgewerkt; bij budgetwijziging zijn (naar keuze) ook alle/vanaf-datum-transacties van dezelfde tegenpartij omgezet, en het systeem heeft een correctieregel onthouden voor toekomstige imports.
 - **Stappen:**
   1. Klik op een transactieregel — "Transactie bewerken" opent met alle velden voorgevuld.
   2. Wijzig het Budget en klik "Opslaan".
   3. Kies in de reikwijdte-vraag ("Budget gewijzigd — wat wil je aanpassen?"): alle transacties van deze tegenpartij / alleen vanaf deze datum / alleen deze.
   4. Controleer dat de lijst ververst en de categorie overal klopt.
-- **Schermen/componenten:** /overzicht/cashflow/transacties — components/app/transaction-form.tsx (`handleSaveWithScope`; correctieregel naar `category_corrections`)
+- **Schermen/componenten:** /overzicht/budget/transacties — components/app/transaction-form.tsx (`handleSaveWithScope`; correctieregel naar `category_corrections`)
 - **Kriticiteit:** KERN
 - **Rekenend:** ja — bulk-update zet budget_id + category_source='rule' op matchende transacties (match op tegenpartijnaam, anders omschrijving); de correctieregel stuurt toekomstige import-categorisering. Bron: components/app/transaction-form.tsx.
 - **Varianten & randgevallen:**
@@ -3350,16 +3350,16 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
 
 #### WF-CASH-16 — Vaste lasten bekijken: totaal, aandeel van inkomen en vrijheidstijd
 - **Doel:** Zien hoeveel er maandelijks vastligt aan abonnementen en vaste kosten, hoe dat zich verhoudt tot het inkomen (Nibud-zones) en wat het kost in vrijheidstijd.
-- **Trigger/startpunt:** /overzicht/cashflow/vaste-lasten (of via de Vaste-lasten-kaart op de landing).
+- **Trigger/startpunt:** /overzicht/budget/vaste-lasten (of via de Vaste-lasten-kaart op de landing).
 - **Eindresultaat:** Hoofdcijfer €/mnd + €/jr + "± X dagen vrijheid/mnd", aandeel-meter met kleurzones, de lijst per categorie (Abonnementen | Vaste kosten) met subtotalen, en in Volledig de verdiepende blokken (quote-meter, vrijheidsvertaling, sluipverbruik-benchmark, samenstelling).
 - **Stappen:**
-  1. Open /overzicht/cashflow/vaste-lasten en lees het hoofdcijfer en het vrijheids-onderschrift.
+  1. Open /overzicht/budget/vaste-lasten en lees het hoofdcijfer en het vrijheids-onderschrift.
   2. Bekijk de meter "Aandeel van je inkomen" (kleur = status).
   3. Blader door de lijst; op mobiel wissel je met de tabs "Abonnementen"/"Vaste Kosten".
   4. (Volledig) Lees de vaste-lastenquote-meter met zone-grenzen 50%/70%, de vrijheidstijd-vertaling, de abonnementen-benchmark t.o.v. het NL-gemiddelde en de samenstellingsbalk per categorie.
   5. Klik "Bespreek met Will" om het onderwerp met context aan de coach voor te leggen.
   6. Klik "Nu scannen" om de detectie te verversen.
-- **Schermen/componenten:** /overzicht/cashflow/vaste-lasten — app/(app)/overzicht/cashflow/vaste-lasten/page.tsx; components/overview/vaste-lasten-client.tsx; components/will/vaste-kosten-analyse.tsx; components/overview/vaste-lasten-insights.tsx; lib/vaste-lasten-summary.ts; lib/vaste-lasten-insights.ts
+- **Schermen/componenten:** /overzicht/budget/vaste-lasten — app/(app)/overzicht/budget/vaste-lasten/page.tsx; components/overview/vaste-lasten-client.tsx; components/will/vaste-kosten-analyse.tsx; components/overview/vaste-lasten-insights.tsx; lib/vaste-lasten-summary.ts; lib/vaste-lasten-insights.ts
 - **Kriticiteit:** KERN
 - **Rekenend:** ja — totaal €/mnd = confirmed recurring_transactions + auto-detectie over 12 mnd transacties (`loadVasteLastenSummary` in lib/vaste-lasten-summary.ts, frequentie-omrekening `toMonthly`); aandeel-% en status (`buildVasteLastenInsights` in lib/vaste-lasten-insights.ts, drempels `VASTE_LASTEN_GOOD_MAX`/`WARN_MAX` in lib/cashflow-cards.ts); vrijheidsdagen/mnd. Het totaal moet exact gelijk zijn aan de KPI op de landing-kaart.
 - **Varianten & randgevallen:**
@@ -3371,7 +3371,7 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
 
 #### WF-CASH-17 — Terugkerend item classificeren of bevestigen
 - **Doel:** Een (auto-gedetecteerd) terugkerend item de juiste plek geven: abonnement, vaste kosten, of uitsluiten van het overzicht.
-- **Trigger/startpunt:** Klik op een item-rij in de lijst op /overzicht/cashflow/vaste-lasten.
+- **Trigger/startpunt:** Klik op een item-rij in de lijst op /overzicht/budget/vaste-lasten.
 - **Eindresultaat:** Het item staat in de gekozen kolom met (eventueel) een nieuwe naam; een auto-gedetecteerd item is bevestigd als terugkerende transactie; "Niet opnemen" verbergt het item.
 - **Stappen:**
   1. Klik op een item — de sheet "Item classificeren" opent.
@@ -3425,7 +3425,7 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
 
 #### WF-CASH-20 — "Wat als ik opzeg"-schuif: besparing omrekenen naar vrijheid
 - **Doel:** Spelen met een opzeg-bedrag en direct zien wat dat per jaar oplevert in euro's en vrijheidstijd.
-- **Trigger/startpunt:** Blok "Wat als ik opzeg" onderaan /overzicht/cashflow/vaste-lasten (Volledig-modus).
+- **Trigger/startpunt:** Blok "Wat als ik opzeg" onderaan /overzicht/budget/vaste-lasten (Volledig-modus).
 - **Eindresultaat:** Twee tegels (Per jaar / Vrijheid terug) rekenen live mee met de slider.
 - **Stappen:**
   1. Versleep de slider (start = grootste abonnement; bereik 0 t/m totaal vaste lasten).
@@ -3439,7 +3439,7 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
 
 #### WF-CASH-21 — Cashflow-kalender: komende 5 weken vooruitkijken
 - **Doel:** Per dag zien welke vaste afschrijvingen en inkomsten eraan komen.
-- **Trigger/startpunt:** Kalender-grid onderaan /overzicht/cashflow/vaste-lasten (Volledig-modus).
+- **Trigger/startpunt:** Kalender-grid onderaan /overzicht/budget/vaste-lasten (Volledig-modus).
 - **Eindresultaat:** 35-daags grid (ma-start) met per dag rode (−) en groene (+) bedragen uit terugkerende transacties; header toont totaal "Verwacht uit"/"Verwacht in"; vandaag is gemarkeerd.
 - **Stappen:**
   1. Scroll naar "Komende 5 weken".
@@ -3456,14 +3456,14 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
 
 #### WF-CASH-22 — Zes maanden vooruitkijken met de cashflow-forecast
 - **Doel:** Zien hoe het saldo zich de komende 6 maanden ontwikkelt op basis van gemiddelden en vaste lasten/inkomsten.
-- **Trigger/startpunt:** /overzicht/cashflow/forecast (of via de Forecast-kaart op de landing).
+- **Trigger/startpunt:** /overzicht/budget/forecast (of via de Forecast-kaart op de landing).
 - **Eindresultaat:** Bovenaan de samenvatting (Spaarquote 6m met sparkline, Maandelijks netto, Uitgaventrend); daaronder de tabel met per maand Verwacht in / Verwacht uit / Netto / Saldo, plus headertotalen en "Saldo na 6m".
 - **Stappen:**
-  1. Open /overzicht/cashflow/forecast.
+  1. Open /overzicht/budget/forecast.
   2. Lees de drie samenvattingskaarten (spaarquote 6m %, maandelijks netto +/−, uitgaventrend t.o.v. vorige maand).
   3. Loop de 6 maandregels na: netto = in − uit; saldo loopt cumulatief door vanaf het huidige liquide saldo.
   4. Volg desgewenst de voetnoot-link naar /toekomst voor diepere scenario's.
-- **Schermen/componenten:** /overzicht/cashflow/forecast — app/(app)/overzicht/cashflow/forecast/page.tsx; components/will/cashflow-section.tsx; components/overview/cashflow-forecast.tsx; lib/cashflow-forecast-math.ts; lib/cashflow-data-loader.ts
+- **Schermen/componenten:** /overzicht/budget/forecast — app/(app)/overzicht/budget/forecast/page.tsx; components/will/cashflow-section.tsx; components/overview/cashflow-forecast.tsx; lib/cashflow-forecast-math.ts; lib/cashflow-data-loader.ts
 - **Kriticiteit:** KERN
 - **Rekenend:** ja — baseline = 6-maands gemiddeld inkomen/uitgaven uit transacties (`loadCashflowData` in lib/cashflow-data-loader.ts), recurrings frequentie-omgerekend erbovenop, cumulatief vanaf `startingBalance` (som liquide bank-saldi). Bron: `buildForecast` + `recurringPerMonth` in lib/cashflow-forecast-math.ts; spaarquote 6m = `savingsRate6m` uit de DashboardData-bundel. Het "Saldo na 6m" moet gelijk zijn aan de Forecast-kaart-KPI op de landing.
 - **Varianten & randgevallen:**
@@ -3615,7 +3615,7 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
   3. Je wordt doorgestuurd naar de bank om te autoriseren ("Sluit dit venster niet").
   4. Na autorisatie kom je via de callback terug op de succespagina "Bank gekoppeld".
   5. Klik per rekening "Synchroniseer nu" en controleer het resultaat "X nieuw, Y dup".
-  6. Klik "Naar Kas overzicht" — je landt (via redirect) op /overzicht/cashflow.
+  6. Klik "Naar Kas overzicht" — je landt (via redirect) op /overzicht/budget.
 - **Schermen/componenten:** /core/cash/connect — app/(app)/core/cash/connect/page.tsx; components/app/bank-connect/bank-selector.tsx (GET /api/bank-connect/providers); POST /api/bank-connect/auth-link; /core/cash/connect/callback — app/(app)/core/cash/connect/callback/page.tsx (fallback → /api/bank-connect/callback); /core/cash/connect/success — app/(app)/core/cash/connect/success/page.tsx (POST /api/bank-connect/sync)
 - **Kriticiteit:** KERN
 - **Rekenend:** ja — sync-resultaat (aantal nieuwe vs duplicaat-transacties) uit /api/bank-connect/sync; gesyncte transacties tellen mee in alle cashflow-cijfers. Bron: app/(app)/core/cash/connect/success/page.tsx (`handleSync`).
@@ -3629,15 +3629,15 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
 
 #### Ongedekte UI
 
-- **/core/cash** — pure redirect naar /overzicht/cashflow (app/(app)/core/cash/page.tsx); geen eigen UI. Interne links ("Naar Kas overzicht" op de connect-succespagina, "Rekening toevoegen" in de import-lege-staat) lopen bewust via deze redirect.
+- **/core/cash** — pure redirect naar /overzicht/budget (app/(app)/core/cash/page.tsx); geen eigen UI. Interne links ("Naar Kas overzicht" op de connect-succespagina, "Rekening toevoegen" in de import-lege-staat) lopen bewust via deze redirect.
 - **/core/cash/connect/callback** — alleen een fallback-doorstuurpagina (spinner "Verbinding verwerken..."); de echte afhandeling zit in /api/bank-connect/callback. Zelfstandig niet zinvol te testen behalve als onderdeel van WF-CASH-30.
 - **Budget-detail-kassabon in components/app/cash-overview.tsx** (derde BottomSheet, "Kassabon: Budget detail" rond regel 1208): onbereikbaar — `setExpenseReceiptBudgetId` wordt nergens op een waarde gezet (alleen op null bij sluiten). Dode UI; de uitgaven-kassabon heeft geen doorklik per budget.
-- ~~**"Beheer rekeningen"-link in de KoppelRekeningBanner** verwijst naar /overzicht/cashflow — circulair vanaf /overzicht/cashflow/transacties; er is geen aparte rekeningen-beheerpagina in deze scope.~~ **VERVALLEN (Eenvoudige weergave fase 2, TXN-1):** `KoppelRekeningBanner` heeft nu maar één toestand (uitnodiging bij 0 gekoppelde rekeningen, in beide modi) — de "X rekeningen gekoppeld"-strip met de "Beheer rekeningen"/"Extra bank koppelen"-links bestaat niet meer, dus ook de circulaire link niet.
+- ~~**"Beheer rekeningen"-link in de KoppelRekeningBanner** verwijst naar /overzicht/budget — circulair vanaf /overzicht/budget/transacties; er is geen aparte rekeningen-beheerpagina in deze scope.~~ **VERVALLEN (Eenvoudige weergave fase 2, TXN-1):** `KoppelRekeningBanner` heeft nu maar één toestand (uitnodiging bij 0 gekoppelde rekeningen, in beide modi) — de "X rekeningen gekoppeld"-strip met de "Beheer rekeningen"/"Extra bank koppelen"-links bestaat niet meer, dus ook de circulaire link niet.
 - **Lege-staat-CTA van de tijdlijn** ("Koppel of importeer") linkt naar /overzicht/bezittingen/cash — buiten dit deelgebied (Bezittingen); niet dood, maar de dekking van die landingsplek ligt elders.
 
 #### Onbevestigd
 
-- **?maand=-deeplink naar /overzicht/cashflow/budget**: de geldstroom-banner biedt "Naar budget ?maand=JJJJ-MM", maar of de budget-pagina die parameter consumeert is niet geverifieerd (route valt onder het deelgebied Budgetten; grep in app/(app)/overzicht/cashflow/budget vond geen searchParams-gebruik).
+- **?maand=-deeplink naar /overzicht/budget**: de geldstroom-banner biedt "Naar budget ?maand=JJJJ-MM", maar of de budget-pagina die parameter consumeert is niet geverifieerd (route valt onder het deelgebied Budgetten; grep in app/(app)/overzicht/budget vond geen searchParams-gebruik).
 - ~~**Provider-naamgeving open banking**: de koppel-banner spreekt van "GoCardless", de connect-pagina van "TrueLayer".~~ **VERVALLEN**: `koppel-rekening-banner.tsx` noemt sinds fase 2 (TXN-1-herschrijving) alleen nog "TrueLayer" — een grep op "GoCardless" levert nul treffers in `app/**`/`components/**`. Geen copy-inconsistentie meer om te noteren.
 - **Server-gedrag /api/bank-connect/sync**: de succespagina toont "X nieuw, Y dup" uit de API-response; de dedupe-logica server-side is niet regel-voor-regel gecontroleerd.
 - **Inhoud/niveaus van de PageStatusBanner per cashflow-route**: de banner/dot-mechaniek is geverifieerd (layout + provider), maar welke statusniveaus wanneer verschijnen komt uit een aparte status-API die niet is doorgelicht.
@@ -3650,13 +3650,13 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
 
 ### Budgetteren (WF-BUDGET)
 
-**Route-architectuur (verificatie):** de canonieke budgetpagina is `/overzicht/cashflow/budget` (sidebar-item "Budget"/"Budgetteren"). `/core/budgets` rendert exact dezelfde `BudgetsClient` en is een levende legacy-backing-route (geen redirect). `/core/budgets/new`, `/core/budgets/[id]` en `/core/budgets/[id]/edit` zijn pure client-side redirects naar `/core/budgets` met query-params (`?newBudget=true`, `?budget=<id>`, `?budget=<id>&edit=true`). Alle pane-/sheet-state (detail, bewerken, nieuw budget, planeditor) leeft in de URL-query-params.
+**Route-architectuur (verificatie):** de canonieke budgetpagina is `/overzicht/budget` (sidebar-item "Budget"/"Budgetteren"). `/core/budgets` rendert exact dezelfde `BudgetsClient` en is een levende legacy-backing-route (geen redirect). `/core/budgets/new`, `/core/budgets/[id]` en `/core/budgets/[id]/edit` zijn pure client-side redirects naar `/core/budgets` met query-params (`?newBudget=true`, `?budget=<id>`, `?budget=<id>&edit=true`). Alle pane-/sheet-state (detail, bewerken, nieuw budget, planeditor) leeft in de URL-query-params.
 
 ---
 
 #### WF-BUDGET-01 — Budgetteren voor het eerst instellen (setup-gate)
 - **Doel:** als nieuwe gebruiker de Budgetteren-app activeren: kiezen welke rekening gevolgd wordt, met welk budget-template gestart wordt en bevestigen hoe transacties gelogd worden.
-- **Trigger/startpunt:** de gebruiker opent `/overzicht/cashflow/budget` (of `/core/budgets`) zonder dat Budgetteren is ingesteld; in plaats van de budgetpagina verschijnt de eenmalige setup ("Stel Budgetteren in").
+- **Trigger/startpunt:** de gebruiker opent `/overzicht/budget` (of `/core/budgets`) zonder dat Budgetteren is ingesteld; in plaats van de budgetpagina verschijnt de eenmalige setup ("Stel Budgetteren in").
 - **Eindresultaat:** Budgetteren is actief; bij de volgende paginaweergave verschijnt het volledige budgetscherm, eventueel voorgevuld met template-categorieën en richtbedragen.
 - **Stappen:**
   1. Open de pagina Budget via de zijbalk (Overzicht → Cashflow → Budget).
@@ -3664,11 +3664,11 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
   3. Sectie "2. Template": kies een van de budget-templates (met voorbeeldcategorieën) of "Leeg starten".
   4. Sectie "3. Transacties": lees de drie werkwijzen (Bankkoppeling / Handmatig / CSV-import) en vink "Ik snap hoe ik transacties op rekeningen kan loggen" aan.
   5. Bevestig de setup (verstuurt naar `/api/budgetteren/setup`).
-- **Schermen/componenten:** `app/(app)/overzicht/cashflow/budget/page.tsx` en `app/(app)/core/budgets/page.tsx` (gate-check via `lib/app-setup-status.ts#getAppSetupStatus`), `components/app/app-setup/app-setup-gate.tsx`, `components/app/app-setup/configs/budgetteren.config.tsx`, templates uit `lib/budget-templates/onboarding-presets.ts`.
+- **Schermen/componenten:** `app/(app)/overzicht/budget/page.tsx` en `app/(app)/core/budgets/page.tsx` (gate-check via `lib/app-setup-status.ts#getAppSetupStatus`), `components/app/app-setup/app-setup-gate.tsx`, `components/app/app-setup/configs/budgetteren.config.tsx`, templates uit `lib/budget-templates/onboarding-presets.ts`.
 - **Kriticiteit:** KERN
 - **Rekenend:** ja — de template seedt categorieën met richtbedragen afgeleid van het opgegeven inkomen (bron: `lib/budget-templates/onboarding-presets.ts#buildTemplateSeed`).
 - **Varianten & randgevallen:**
-  - Geen cash-rekening aanwezig → lege staat met link naar Kern-bezittingen ("/overzicht/cashflow"); setup kan niet worden afgerond.
+  - Geen cash-rekening aanwezig → lege staat met link naar Kern-bezittingen ("/overzicht/budget"); setup kan niet worden afgerond.
   - Validatie: zonder rekening / zonder template-keuze / zonder bevestigingsvinkje toont de gate een reden en blokkeert afronden.
   - Bestaande gebruiker mét budgetten maar zonder setup-marker: wordt door lazy backfill als voltooid gemarkeerd en ziet de gate niet.
   - Gebruiker mét voltooide setup maar zonder enige budgetrij: de client seedt automatisch de standaardbudgetten (`budgets-client.tsx#seedBudgets`, defaults uit `lib/budget-data.ts#getDefaultBudgets`).
@@ -3678,7 +3678,7 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
 
 #### WF-BUDGET-02 — Budget-vs-realisatie van de maand bekijken
 - **Doel:** in één oogopslag zien hoeveel ruimte er deze maand nog is: gepland vs. werkelijk, per type (Inkomen/Uitgaven/Sparen/Schulden) en per budgetcategorie.
-- **Trigger/startpunt:** de gebruiker opent `/overzicht/cashflow/budget` (of `/core/budgets`) met voltooide setup.
+- **Trigger/startpunt:** de gebruiker opent `/overzicht/budget` (of `/core/budgets`) met voltooide setup.
 - **Eindresultaat:** de pagina toont de editorial header "Hoeveel ruimte heb je nog?" met twee bedragen (Volgens plan / Werkelijk), de KPI-strip met vier kolommen (x/y-formaat) en de budgetboom per type, elk met voortgangsbalken.
 - **Stappen:**
   1. Open de pagina Budget.
@@ -3713,7 +3713,7 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
 - **Kriticiteit:** KERN
 - **Rekenend:** ja — bij meerdere maanden wordt de limiet geschaald: `baseLimit × periodMonthCount` (rollovers gelden alléén in maandmodus) (`budgets-client.tsx#getEffectiveLimit`); YTD/12 mnd hangen aan de huidige datum, niet aan de maandselectie (`lib/budget-period.ts`).
 - **Varianten & randgevallen:**
-  - Deeplink `?maand=YYYY-MM` (o.a. vanaf de geldstroom-banner op `/overzicht/cashflow`, `components/app/cash-overview.tsx`) opent de pagina direct op die maand.
+  - Deeplink `?maand=YYYY-MM` (o.a. vanaf de geldstroom-banner op `/overzicht/budget`, `components/app/cash-overview.tsx`) opent de pagina direct op die maand.
   - Ongeldige `?maand`-waarde → valt terug op de huidige maand.
   - Toekomstige maand zonder transacties → besteed = €0, limieten blijven zichtbaar.
   - "Kopieer vorige maand"-knop is alleen zichtbaar in maandmodus (zie WF-BUDGET-16).
@@ -3820,7 +3820,7 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
 
 #### WF-BUDGET-08 — Nieuw budget aanmaken via het uitgebreide formulier
 - **Doel:** een nieuw (deel)budget aanmaken met alle parameters: categorie, icoon, type, bedrag, interval, overschot-beheer, doeltype, limiet-instellingen, prioriteit en (bij huishouden) eigendom.
-- **Trigger/startpunt:** deeplink `?newBudget=true` op de budgetpagina — bereikbaar via de oude route `/core/budgets/new` (redirect), via de welkomstgids-CTA (`lib/welcome-guide.ts` → `/overzicht/cashflow/budget?newBudget=true`) of een directe link. Het pane heet "Nieuw budget".
+- **Trigger/startpunt:** deeplink `?newBudget=true` op de budgetpagina — bereikbaar via de oude route `/core/budgets/new` (redirect), via de welkomstgids-CTA (`lib/welcome-guide.ts` → `/overzicht/budget?newBudget=true`) of een directe link. Het pane heet "Nieuw budget".
 - **Eindresultaat:** het budget staat in de boom; toast "Je hebt je budget opgezet — Zo bepaal je zelf hoeveel vrijheid je elke maand opzijzet."; data ververst.
 - **Stappen:**
   1. Open het "Nieuw budget"-pane.
@@ -4137,7 +4137,7 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
   1. Open `/core/budgets/new` → korte redirect → budgetpagina met het "Nieuw budget"-pane open.
   2. Open `/core/budgets/<id>` → detailpaneel van dat budget open (spinner tijdens redirect).
   3. Open `/core/budgets/<id>/edit` → bewerk-paneel open.
-  4. Open `/overzicht/cashflow/budget?planEditor=true` → planeditor-sheet open.
+  4. Open `/overzicht/budget?planEditor=true` → planeditor-sheet open.
   5. Druk browser-terug: pane sluit, pagina blijft staan.
 - **Schermen/componenten:** `app/(app)/core/budgets/new/page.tsx`, `app/(app)/core/budgets/[id]/page.tsx`, `app/(app)/core/budgets/[id]/edit/page.tsx` (client-redirects), query-key-register `lib/navigation.ts#OVERLAY_QUERY_KEYS`, URL-cleanup in `components/app/budgets-client.tsx`.
 - **Kriticiteit:** BELANGRIJK
@@ -4146,7 +4146,7 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
   - Ongeldig/verwijderd budget-id → query-params worden na het laden automatisch opgeschoond; geen pane, geen fout.
   - Deeplink van een budget van een ándere gebruiker → zelfde opschoning (budget niet in de eigen set).
   - `?maand=` met ongeldige waarde → huidige maand.
-- **Cross-module effecten:** meerdere instapkanalen linken hierheen: welkomstgids, briefing-gidsstappen, discover-carousel, geldstroom-banner op /overzicht/cashflow.
+- **Cross-module effecten:** meerdere instapkanalen linken hierheen: welkomstgids, briefing-gidsstappen, discover-carousel, geldstroom-banner op /overzicht/budget.
 
 ---
 
@@ -4168,7 +4168,7 @@ Scope: `/overzicht/schulden`, `/overzicht/schulden/[type]`, `/core/debts`, `/cor
 
 #### Ongedekte UI
 
-- **`/core/budgets` (levende legacy-route):** rendert de volledige budget-UI maar komt in geen enkel navigatie-item voor (sidebar/nav-config wijzen uitsluitend naar `/overzicht/cashflow/budget`). Dient als backing-route voor de drie redirect-subroutes en als fallback-redirectdoel. Functioneel identiek aan de canonieke pagina — in de UAT volstaat één steekproef dat beide routes hetzelfde tonen.
+- **`/core/budgets` (levende legacy-route):** rendert de volledige budget-UI maar komt in geen enkel navigatie-item voor (sidebar/nav-config wijzen uitsluitend naar `/overzicht/budget`). Dient als backing-route voor de drie redirect-subroutes en als fallback-redirectdoel. Functioneel identiek aan de canonieke pagina — in de UAT volstaat één steekproef dat beide routes hetzelfde tonen.
 - **`/core/budgets/new`, `/core/budgets/[id]`, `/core/budgets/[id]/edit`:** pure client-side redirects (alleen een spinner); geen eigen UI. Alleen als deeplink-doel relevant (gedekt door WF-BUDGET-23).
 - **`?planEditor=true`-deeplink:** wordt door `BudgetsClient` gelezen en opent de planeditor, maar geen enkel UI-element in de huidige codebase zet deze parameter nog (de code-commentaar verwijst naar een in-app bottom-bar "Plan"-knop die niet meer bestaat). Werkt alleen als handmatige deeplink.
 - **BudgetForm niet-embedded pad:** `components/app/budget-form.tsx` bevat een volledig standalone-pad (eigen header, terug-link, redirect naar `/core/budgets` na opslaan), maar de component wordt in de hele codebase alleen embedded (in het newBudget-pane) gerenderd — het standalone pad is momenteel dode code.
@@ -4315,7 +4315,7 @@ Alle live belasting-UI leeft onder `/overzicht/belasting` (hub + drie box-subpag
   - Weergavemodus "Eenvoudig" → secties I, II en III verborgen; hero + jaarruimte blijven.
   - Inkomen boven €120.000 → geen markering op de curve (buiten bereik).
   - Voetregel "Indicatie, geen advies" altijd aanwezig.
-- **Cross-module effecten:** bruto-schatting is per constructie gelijk aan de "Geschat jaarinkomen"-kaart op /overzicht/cashflow (zelfde bron `loadCashflowSettingsData`).
+- **Cross-module effecten:** bruto-schatting is per constructie gelijk aan de "Geschat jaarinkomen"-kaart op /overzicht/budget (zelfde bron `loadCashflowSettingsData`).
 
 #### WF-BELAST-08 — Bruto-jaarinkomen voor Box 1 aanpassen
 - **Doel:** De gebruiker corrigeert het geschatte bruto-jaarinkomen waarmee de hele Box 1-pagina rekent, of keert terug naar de automatische schatting.
@@ -6786,7 +6786,7 @@ Scope: de app-brede Will-chat-overlay (bubbel → coach-melding → chatpaneel),
 - **actionUrl's in meldingen wijzen naar legacy-routes** (/core/budgets, /core/cash, /core/assets/holdings/…, /horizon — app/api/notifications/route.ts). Of die routes live UI, redirects of dood zijn valt buiten deze scope; de tester van WF-WILL-12 moet elke doorklik verifiëren. Genoteerd als risico: dit deelgebied genereert de links, het doelgedrag hoort bij de legacy-deelgebieden.
 - **Verdict 'more' in /api/news/feedback** — de API accepteert "more", maar geen enkele knop in de UI verstuurt het ("duim omhoog" bestaat niet; alleen "Minder hierover"). Dode API-tak vanuit gebruikersperspectief.
 - **Notificatietype 'recommendation' ("Partner-actie")** — het type bestaat in de typen-lijst, de voorkeuren-sanitizer en de MODULE_MAP van notification-item.tsx, maar de GET van /api/notifications bevat géén generator die dit type aanmaakt. De bijbehorende toggle op /mijn/notificaties stuurt dus momenteel niets aan.
-- **components/will/cashflow-section.tsx en components/will/vaste-kosten-analyse.tsx** — staan in de map "will" maar worden gebruikt door de cashflow-forecast en vaste-lasten-pagina's (/overzicht/cashflow/**); horen functioneel bij het cashflow-deelgebied, niet verweesd.
+- **components/will/cashflow-section.tsx en components/will/vaste-kosten-analyse.tsx** — staan in de map "will" maar worden gebruikt door de cashflow-forecast en vaste-lasten-pagina's (/overzicht/budget/**); horen functioneel bij het cashflow-deelgebied, niet verweesd.
 
 #### Onbevestigd
 
@@ -7088,7 +7088,7 @@ Dit deelgebied toetst niet één pagina, maar de belofte dat **hetzelfde kernget
 | Netto vermogen | `lib/horizon-data-loader.ts` (healthScoreInput.totalAssets − totalDebts) / `lib/dashboard-data-loader.ts` (netWorth) / `lib/lever-scores-loader.ts` (zelfde grondslag, gedocumenteerd) | /overzicht (hero + grafiek), sidebar, /overzicht/bezittingen, /overzicht/schulden, /rapportages/balans, /rapportages/vermogen, netto-vermogen-widget, deel-kaart, Will-context |
 | Vrijheidsvoortgang (%) | `lib/core-metrics.ts#computeFreedomProgress` (FIRE-eligible vermogen ÷ benodigde portfolio uit kernel) | /overzicht-hero, vrijheidsvoortgang-/mijlpalen-widgets, Jouw Pad (sovereignty), deel-kaart, snapshots (trend), gezondheidsscore-pijler, /api/report |
 | Gezondheidsgetal | `lib/health-score-input.ts#buildHealthScoreInput` + `lib/financial-health.ts#computeHealthScoreFromInputs` (ADR 0008) | /overzicht-hero (score + kassabon), /toekomst (score + modal), legacy /core, snapshot-trend (resilience_score) |
-| Spaarquote | `lib/savings-source.ts#savingsRateFromAggregates` ((inkomen − uitgaven + aflossing) ÷ inkomen, 6-maands) | /overzicht-hero (cashflow-tegel), /overzicht/cashflow (instellingenblok + kassabon), forecast, gezondheidsscore-pijler, FIRE-spaarbron, check-in gespreksstarters, deel-kaart, snapshots, Will-context |
+| Spaarquote | `lib/savings-source.ts#savingsRateFromAggregates` ((inkomen − uitgaven + aflossing) ÷ inkomen, 6-maands) | /overzicht-hero (cashflow-tegel), /overzicht/budget (instellingenblok + kassabon), forecast, gezondheidsscore-pijler, FIRE-spaarbron, check-in gespreksstarters, deel-kaart, snapshots, Will-context |
 | Box 3 | `lib/box3-data.ts#calculateBox3` (volledig) en `lib/health-score-input.ts#buildTaxData` (vereenvoudigde schatting) | /overzicht/belasting (hub-KPI), /overzicht/belasting/box3, Box 3-widget, hero-belastingtegel, schulden-belastingsectie, FIRE-projectie (intern) |
 | FIRE-datum/-leeftijd | horizon-kernel via `lib/horizon-kernel/convergentie-router.ts` + gedeelde `lib/horizon/build-input.ts#buildHorizonInput`; scalar-fallback `lib/horizon-kernel/scalar-router.ts` | /toekomst (tijdas), /overzicht (mini-grafiek + FIRE-countdown-widget), snapshot-FIRE-trend, deel-kaart, persoonlijk plan |
 | SWR | `lib/fire-params.ts#computeEffectiveSwr` (bruto rendement − Box 3-drag − inflatie, vloer 0,1%) | SWR-monitor-widget, pensioen/AOW-widget, spaarquote-gevoeligheid (fase-analyse), FIRE-doel |
@@ -7170,9 +7170,9 @@ Dit deelgebied toetst niet één pagina, maar de belofte dat **hetzelfde kernget
   2. Ga naar /overzicht/schulden → "Schuld toevoegen"; voer een persoonlijke lening in: saldo €15.000, maandlast €400.
   3. Terug op /overzicht: netto vermogen −€15.000; open de gezondheidsscore-uitsplitsing — de DSTI-pijler is verslechterd.
   4. Open /overzicht/belasting/box3: de schuld (boven de schuldendrempel) verlaagt de rendementsgrondslag.
-  5. Zet in de schuld-instellingen "aflossing telt mee als sparen" aan (indien beschikbaar) en controleer op /overzicht/cashflow dat de spaarquote-kassabon de aflossingscomponent toont.
+  5. Zet in de schuld-instellingen "aflossing telt mee als sparen" aan (indien beschikbaar) en controleer op /overzicht/budget dat de spaarquote-kassabon de aflossingscomponent toont.
   6. Verlaag daarna het saldo (aflossing simuleren) en controleer dat netto vermogen stijgt en de Box 3-grondslag weer stijgt.
-- **Schermen/componenten:** /overzicht/schulden (`components/overview/schulden-view.tsx`), gezondheids-uitsplitsing op /overzicht (`components/overview/overzicht-hero.tsx` + `lib/financial-health.ts`), /overzicht/belasting/box3 (`components/overview/box3-detail.tsx`), /overzicht/cashflow (`components/overview/cashflow-instellingen-blok.tsx`), schulden-belastingsectie (`components/app/core/debts/belasting-section.tsx`).
+- **Schermen/componenten:** /overzicht/schulden (`components/overview/schulden-view.tsx`), gezondheids-uitsplitsing op /overzicht (`components/overview/overzicht-hero.tsx` + `lib/financial-health.ts`), /overzicht/belasting/box3 (`components/overview/box3-detail.tsx`), /overzicht/budget (`components/overview/cashflow-instellingen-blok.tsx`), schulden-belastingsectie (`components/app/core/debts/belasting-section.tsx`).
 - **Kriticiteit:** KERN
 - **Rekenend:** ja — DSTI-pijler (teller Σ monthly_payment via `lib/dashboard-data-loader.ts` r999, noemer 6-maands inkomen; `lib/health-score-input.ts`), spaarquote-aflossingsterm (`lib/savings-source.ts#computeDebtAflossingMonthly`, alleen schulden met include_aflossing_in_savings), Box 3-grondslag (`lib/box3-data.ts#calculateBox3`), netto vermogen.
 - **Varianten & randgevallen:**
@@ -7184,16 +7184,16 @@ Dit deelgebied toetst niet één pagina, maar de belofte dat **hetzelfde kernget
 
 #### WF-KRUIS-05 — Transactie importeren → budgetrealisatie + cashflow + spaarquote
 - **Doel:** Als gebruiker importeer ik banktransacties en zie ze doorwerken in budgetten, cashflow-cijfers en de spaarquote.
-- **Trigger/startpunt:** /overzicht/cashflow/transacties → link "Importeer transacties" → /core/cash/import; upload een MT940/CSV/OFX-bestand.
-- **Eindresultaat:** De transacties staan in de transactielijst; de budgetrealisatie ("besteed") op /overzicht/cashflow/budget is gestegen; de inkomsten/uitgaven van de maand op /overzicht (cashflow-tegel) en /overzicht/cashflow kloppen; de 6-maands spaarquote is herrekend op alle oppervlakken.
+- **Trigger/startpunt:** /overzicht/budget/transacties → link "Importeer transacties" → /core/cash/import; upload een MT940/CSV/OFX-bestand.
+- **Eindresultaat:** De transacties staan in de transactielijst; de budgetrealisatie ("besteed") op /overzicht/budget is gestegen; de inkomsten/uitgaven van de maand op /overzicht (cashflow-tegel) en /overzicht/budget kloppen; de 6-maands spaarquote is herrekend op alle oppervlakken.
 - **Stappen:**
-  1. Noteer de spaarquote op /overzicht (cashflow-tegel) en onderaan /overzicht/cashflow (instellingenblok, label "laatste 6 maanden").
-  2. Ga naar /overzicht/cashflow/transacties en klik "Importeer transacties"; upload een bestand met o.a. één salaris (+) en meerdere uitgaven (−) in de huidige maand.
+  1. Noteer de spaarquote op /overzicht (cashflow-tegel) en onderaan /overzicht/budget (instellingenblok, label "laatste 6 maanden").
+  2. Ga naar /overzicht/budget/transacties en klik "Importeer transacties"; upload een bestand met o.a. één salaris (+) en meerdere uitgaven (−) in de huidige maand.
   3. Wijs tijdens/na de import categorieën (budgetten) toe aan de transacties.
-  4. Controleer op /overzicht/cashflow/transacties dat de nieuwe transacties zichtbaar zijn in de gekozen maand.
-  5. Open /overzicht/cashflow/budget: de "besteed"-bedragen van de geraakte budgetten zijn gestegen.
-  6. Terug op /overzicht: de cashflow-tegel (spaarquote) en de maandinkomsten/-uitgaven zijn herrekend; open ook de spaarquote-kassabon op /overzicht/cashflow en controleer dat de 6-maands-som de nieuwe maand bevat.
-- **Schermen/componenten:** /core/cash/import (`app/(app)/core/cash/import/page.tsx`), /overzicht/cashflow/transacties (`components/overview/transacties/transacties-analyse.tsx`), /overzicht/cashflow/budget, /overzicht/cashflow (`components/overview/cashflow-instellingen-blok.tsx`), cashflow-tegel op /overzicht.
+  4. Controleer op /overzicht/budget/transacties dat de nieuwe transacties zichtbaar zijn in de gekozen maand.
+  5. Open /overzicht/budget: de "besteed"-bedragen van de geraakte budgetten zijn gestegen.
+  6. Terug op /overzicht: de cashflow-tegel (spaarquote) en de maandinkomsten/-uitgaven zijn herrekend; open ook de spaarquote-kassabon op /overzicht/budget en controleer dat de 6-maands-som de nieuwe maand bevat.
+- **Schermen/componenten:** /core/cash/import (`app/(app)/core/cash/import/page.tsx`), /overzicht/budget/transacties (`components/overview/transacties/transacties-analyse.tsx`), /overzicht/budget, /overzicht/budget (`components/overview/cashflow-instellingen-blok.tsx`), cashflow-tegel op /overzicht.
 - **Kriticiteit:** KERN
 - **Rekenend:** ja — maandinkomsten/-uitgaven (transactiesom excl. eigen-rekening-overboekingen, `lib/dashboard-data-loader.ts` isRealTx), budget-besteed per budget (transacties per budget_id), spaarquote (`lib/savings-source.ts#savingsRateFromAggregates` over 6 maanden incl. spaarbudget-correctie).
 - **Varianten & randgevallen:**
@@ -7207,14 +7207,14 @@ Dit deelgebied toetst niet één pagina, maar de belofte dat **hetzelfde kernget
 #### WF-KRUIS-06 — Spaarquote: één getal op alle oppervlakken
 - **Doel:** Als gebruiker zie ik overal exact dezelfde spaarquote — hetzelfde percentage, uit dezelfde 6-maands-formule.
 - **Trigger/startpunt:** Gebruiker met minimaal 6 maanden transactiehistorie opent /overzicht.
-- **Eindresultaat:** De spaarquote in de cashflow-tegel op /overzicht, in het instellingenblok onderaan /overzicht/cashflow ("berekend, laatste 6 maanden"), in de gezondheidsscore-uitsplitsing (spaarquote-pijler-input), op de forecast-subpagina en in de maand-check-in-gespreksstarters is hetzelfde percentage.
+- **Eindresultaat:** De spaarquote in de cashflow-tegel op /overzicht, in het instellingenblok onderaan /overzicht/budget ("berekend, laatste 6 maanden"), in de gezondheidsscore-uitsplitsing (spaarquote-pijler-input), op de forecast-subpagina en in de maand-check-in-gespreksstarters is hetzelfde percentage.
 - **Stappen:**
   1. Open /overzicht en noteer het percentage in de cashflow-tegel.
-  2. Open /overzicht/cashflow, scroll naar het instellingenblok en noteer de "berekende" spaarquote; open de kassabon en controleer dat de 6-maands inkomsten/uitgaven-uitsplitsing tot dit percentage optelt.
-  3. Open /overzicht/cashflow/forecast en vergelijk de daar getoonde spaarquote.
+  2. Open /overzicht/budget, scroll naar het instellingenblok en noteer de "berekende" spaarquote; open de kassabon en controleer dat de 6-maands inkomsten/uitgaven-uitsplitsing tot dit percentage optelt.
+  3. Open /overzicht/budget/forecast en vergelijk de daar getoonde spaarquote.
   4. Open de gezondheidsscore-uitsplitsing op /overzicht en controleer dat de spaarquote-pijler met hetzelfde percentage rekent.
   5. Start een maand-check-in (/mijn/checkins) en controleer dat een gespreksstarter over sparen hetzelfde percentage noemt.
-- **Schermen/componenten:** /overzicht (`components/overview/overzicht-hero.tsx`), /overzicht/cashflow (`components/overview/cashflow-instellingen-blok.tsx`), /overzicht/cashflow/forecast, gezondheidskassabon (`lib/financial-health.ts`), check-in (`app/api/checkin/gespreksstarters/route.ts`).
+- **Schermen/componenten:** /overzicht (`components/overview/overzicht-hero.tsx`), /overzicht/budget (`components/overview/cashflow-instellingen-blok.tsx`), /overzicht/budget/forecast, gezondheidskassabon (`lib/financial-health.ts`), check-in (`app/api/checkin/gespreksstarters/route.ts`).
 - **Kriticiteit:** KERN
 - **Rekenend:** ja — spaarquote% = (inkomen6m − uitgaven6m(excl. spaarbudget) + schuldaflossing6m) ÷ inkomen6m × 100; bron: `lib/savings-source.ts#savingsRateFromAggregates`, gevoed in `lib/dashboard-data-loader.ts` r554 en identiek in `lib/horizon-data-loader.ts` r582.
 - **Varianten & randgevallen:**
@@ -7226,11 +7226,11 @@ Dit deelgebied toetst niet één pagina, maar de belofte dat **hetzelfde kernget
 
 #### WF-KRUIS-07 — Spaarbron-instellingen wijzigen → FIRE-prognose beweegt overal mee
 - **Doel:** Als gebruiker pas ik in het cashflow-instellingenblok mijn inkomen/uitgaven/spaarquote (of een handmatige spaar-override) aan en zie de FIRE-prognose op /toekomst én /overzicht mee veranderen.
-- **Trigger/startpunt:** /overzicht/cashflow → instellingenblok onderaan → potlood bij "Inkomen", "Uitgaven" of "Spaarquote".
+- **Trigger/startpunt:** /overzicht/budget → instellingenblok onderaan → potlood bij "Inkomen", "Uitgaven" of "Spaarquote".
 - **Eindresultaat:** De opgeslagen bron (handmatig vs berekend) is zichtbaar in het blok; de tijdas op /toekomst en de mini-projectie op /overzicht gebruiken de nieuwe spaarbron; de vrijheidsmijlpalen-widget herrekent zijn datums.
 - **Stappen:**
   1. Noteer de FIRE-leeftijd op /toekomst en het snijpunt in de /overzicht-mini-grafiek.
-  2. Open /overzicht/cashflow → instellingenblok → bewerk "Inkomen" naar een handmatige (hogere) waarde; de driehoek inkomen/uitgaven/spaarquote herrekent live; sla op.
+  2. Open /overzicht/budget → instellingenblok → bewerk "Inkomen" naar een handmatige (hogere) waarde; de driehoek inkomen/uitgaven/spaarquote herrekent live; sla op.
   3. Herlaad /toekomst: de FIRE-leeftijd is eerder (of gelijk bij plafond); herlaad /overzicht: het snijpunt in de mini-grafiek en de FIRE-countdown-widget bewegen identiek mee.
   4. Zet de bron terug op "berekend" en controleer dat beide pagina's terugvallen op het transactie-gebaseerde getal.
 - **Schermen/componenten:** `components/overview/cashflow-instellingen-blok.tsx` (schrijft via PUT /api/parameters), /toekomst (`components/app/horizon/horizon-client.tsx`), /overzicht-hero + widgets (`components/widgets/*`), spaarbron-resolutie `lib/savings-source.ts#resolveSavingsSource`.
@@ -7438,11 +7438,11 @@ Dit deelgebied toetst niet één pagina, maar de belofte dat **hetzelfde kernget
 #### WF-KRUIS-18 — Status-semantiek: sidebar-dot == hefboomkaart == statusbanner == boxkaart
 - **Doel:** Als gebruiker zie ik voor elk domein (Bezittingen/Schulden/Cashflow/Belasting en Box 1/2/3) overal dezelfde stoplichtstatus.
 - **Trigger/startpunt:** /overzicht met zichtbare hefboomkaarten; sidebar open (desktop).
-- **Eindresultaat:** De status-dot in de sidebar naast bv. "Cashflow", de dot op de Cashflow-hefboomkaart op /overzicht, de status-duiding-banner bovenaan /overzicht/cashflow en (voor belasting) de dots op de Box 1/2/3-kaarten op /overzicht/belasting tonen per domein exact dezelfde kleur/status.
+- **Eindresultaat:** De status-dot in de sidebar naast bv. "Cashflow", de dot op de Cashflow-hefboomkaart op /overzicht, de status-duiding-banner bovenaan /overzicht/budget en (voor belasting) de dots op de Box 1/2/3-kaarten op /overzicht/belasting tonen per domein exact dezelfde kleur/status.
 - **Stappen:**
   1. Noteer per domein de sidebar-dot-kleur.
   2. Open /overzicht en vergelijk de dots op de vier hefboomkaarten.
-  3. Open /overzicht/cashflow (of een ander domein met afwijkende status) en vergelijk de status-duiding-banner; minimaliseer de banner en controleer dat het statuspunt naast de pagina-i dezelfde kleur heeft.
+  3. Open /overzicht/budget (of een ander domein met afwijkende status) en vergelijk de status-duiding-banner; minimaliseer de banner en controleer dat het statuspunt naast de pagina-i dezelfde kleur heeft.
   4. Open /overzicht/belasting en vergelijk de Box 1/2/3-kaartstatussen met de sidebar-Box-dots.
   5. Verander een input die een status omslaat (bv. spaarquote fors omlaag via handmatige uitgaven-instelling) en controleer dat ALLE plekken tegelijk omslaan.
 - **Schermen/componenten:** SSoT `lib/lever-scores-loader.ts#loadLeverScores` (+ `components/app/shell/lever-scores.ts#computeLeverScores`, `lib/box3-taxable-input.ts#box3TaxStatus`, `lib/jaarruimte.ts#box1JaarruimteStatus`); consumenten: sidebar (`app/(app)/layout.tsx`), hefboomkaarten (`components/overview/overzicht-hero.tsx` via leverScores-prop), statusbanner (`components/app/page-status-provider.tsx` + `lib/page-status/compute.ts`), belasting-hub (`app/(app)/overzicht/belasting/page.tsx`).
@@ -7532,7 +7532,7 @@ Dit deelgebied toetst niet één pagina, maar de belofte dat **hetzelfde kernget
 - **Trigger/startpunt:** Will-chat openen (bubbel) en vragen: "Wat is mijn spaarquote?" / "Wat is mijn netto vermogen?" / "Ben ik financieel vrij?".
 - **Eindresultaat:** Will noemt de canonieke 6-maands spaarquote (letterlijk hetzelfde percentage als onderaan de cashflow-pagina — de context instrueert de AI dit getal NIET te herberekenen), het netto vermogen zoals op /overzicht en een vrijheidsframing consistent met het vrijheids-% en de FIRE-leeftijd.
 - **Stappen:**
-  1. Noteer spaarquote (/overzicht/cashflow), netto vermogen en vrijheids-% (/overzicht).
+  1. Noteer spaarquote (/overzicht/budget), netto vermogen en vrijheids-% (/overzicht).
   2. Open Will en stel de drie vragen.
   3. Vergelijk de genoemde getallen met de UI (kleine formatteringsverschillen toegestaan; de percentages/bedragen zelf moeten gelijk zijn).
   4. Controleer dat Wills "vrij / nog niet vrij"-framing overeenkomt met de hero-framing (zelfde vlag).
@@ -7554,7 +7554,7 @@ Dit deelgebied toetst niet één pagina, maar de belofte dat **hetzelfde kernget
   2. Open /core: de Kern-landing verschijnt; vergelijk netto vermogen/totalen met /overzicht.
   3. Open /horizon: dezelfde tijdas als /toekomst (zonder navkaarten); FIRE-leeftijd identiek.
   4. Open /toekomst?tab=gebeurtenissen: redirect naar /toekomst/gebeurtenissen.
-  5. Open /core/cash/import via de link op /overzicht/cashflow/transacties: de import-flow werkt (dit is de actieve import-ingang, geen dode route).
+  5. Open /core/cash/import via de link op /overzicht/budget/transacties: de import-flow werkt (dit is de actieve import-ingang, geen dode route).
 - **Schermen/componenten:** /dashboard (`app/(app)/dashboard/page.tsx` — redirect), /core (`app/(app)/core/page.tsx` → `lib/core-data-loader.ts` → `components/core/core-landing.tsx`), /horizon (`app/(app)/horizon/page.tsx` → zelfde `components/app/horizon/horizon-client.tsx` als /toekomst), redirect-guard (`app/(app)/toekomst/page.tsx#resolveTabRedirect`).
 - **Kriticiteit:** KERN
 - **Rekenend:** ja — dezelfde kerngetallen als de canonieke routes (core-data-loader gebruikt dezelfde `computeFreedomProgress`/`buildHealthScoreInput`/`savingsRateFromAggregates`-bouwstenen).
@@ -7571,7 +7571,7 @@ Dit deelgebied toetst niet één pagina, maar de belofte dat **hetzelfde kernget
 - **/core** — géén redirect: live backing-UI (CoreLanding, registratie van bezittingen/schulden). Niet in de hoofdnavigatie; bereikbaar via deeplinks. Gedekt door WF-KRUIS-24; de eigen interactie-flows van deze landing horen bij het Kern-deelgebied.
 - **/horizon** — géén redirect: rendert live dezelfde HorizonPage-component als /toekomst, zonder landing-koppen/navkaarten. Deeplink-doel/legacy-oppervlak; cijfermatig gedekt door WF-KRUIS-24.
 - **/horizon/whatif, /horizon/strategie, /horizon/inflatie-koopkracht, /horizon/samengestelde-interest, /horizon/uitgaven-na-pensioen** — parallelle legacy-varianten van de /toekomst-equivalenten. Bestaan als routes; in dit deelgebied niet individueel gedekt (alleen indirect via de gedeelde motoren). Aanbeveling: in het Toekomst-deelgebied vaststellen of ze redirecten dan wel dubbel-live zijn.
-- **/core/cash/import** — live en actief gelinkt (o.a. vanaf /overzicht/cashflow/transacties, cash-overview, koppel-rekening-banner): dé import-ingang, ondanks het legacy-pad. Gedekt door WF-KRUIS-05.
+- **/core/cash/import** — live en actief gelinkt (o.a. vanaf /overzicht/budget/transacties, cash-overview, koppel-rekening-banner): dé import-ingang, ondanks het legacy-pad. Gedekt door WF-KRUIS-05.
 - **/beheer/** — admin-oppervlakken (o.a. /beheer/horizon-kernel, /beheer/regressietest, /beheer/horizon-strategie) tonen ook kerngetallen maar zijn interne verificatie-tools, geen gebruikers-UAT-scope.
 - **/api/snapshots/cron** — server-side snapshot-pad zonder UI; alleen indirect toetsbaar via de trendreeksen (WF-KRUIS-16).
 
@@ -7978,7 +7978,7 @@ Alle routes onder /beheer zijn afgeschermd in één centrale layout: `app/(app)/
   - Template laden op een account zonder bestaande budgetten (lege beginstaat).
   - Fout halverwege de client-side reeks (deels gewist, deels geüpsert) — de stappen zijn niet transactioneel; toets herstelgedrag.
   - Transacties behouden hun bedrag maar verliezen hun budgetkoppeling — hercategorisatie nodig.
-- **Cross-module effecten:** Budgetten sturen /overzicht/cashflow, budget-alerts en de spaarquote-afleiding.
+- **Cross-module effecten:** Budgetten sturen /overzicht/budget, budget-alerts en de spaarquote-afleiding.
 
 #### WF-BEHEER-22 — Onboarding-flow opnieuw doorlopen (reset eigen account)
 - **Doel:** Het eigen account terugzetten naar de nieuwe-gebruiker-staat om de volledige onboarding te kunnen testen.
@@ -8216,7 +8216,7 @@ De onafhankelijke dekkingscontrole vond vijf gebruikersworkflows die in de eerst
 
 #### WF-BEZIT-24 — Eigendom van een bezitting, rekening of transactie instellen (persoonlijk/gedeeld)
 - **Doel:** Als lid van een huishouden per bezitting, bankrekening of transactie bepalen of die persoonlijk of gedeeld is, zodat de totalen per perspectief (eigen/huishouden/partner) kloppen.
-- **Trigger/startpunt:** Het formulier voor het toevoegen of bewerken van een bezitting (/overzicht/bezittingen), een rekening of een transactie (/overzicht/cashflow, /overzicht/cashflow/transacties) — de eigendom-toggle verschijnt alleen wanneer de gebruiker in een huishouden zit.
+- **Trigger/startpunt:** Het formulier voor het toevoegen of bewerken van een bezitting (/overzicht/bezittingen), een rekening of een transactie (/overzicht/budget, /overzicht/budget/transacties) — de eigendom-toggle verschijnt alleen wanneer de gebruiker in een huishouden zit.
 - **Eindresultaat:** Het item is gemarkeerd als persoonlijk of gedeeld; in het huishoud-perspectief telt een gedeeld item mee voor beide partners, in het eigen perspectief telt alleen het eigen (aandeel van het) bezit mee.
 - **Stappen:**
   1. Open het formulier van een bezitting, rekening of transactie (nieuw of bewerken).
@@ -8235,16 +8235,16 @@ De onafhankelijke dekkingscontrole vond vijf gebruikersworkflows die in de eerst
 
 #### WF-CASH-31 — Terugkerende transactieregels beheren, stopzetten en verwijderen
 - **Doel:** Bestaande terugkerende regels (abonnementen, vaste lasten) inzien, bewerken, tijdelijk stopzetten of verwijderen zodat het verwachte maandtotaal blijft kloppen.
-- **Trigger/startpunt:** Het rekeningdetail-paneel op /overzicht/cashflow: de sectie met terugkerende transacties, inclusief detectievoorstellen ("Wij herkennen een terugkerend patroon") en de lijst met bestaande regels.
+- **Trigger/startpunt:** Het rekeningdetail-paneel op /overzicht/budget: de sectie met terugkerende transacties, inclusief detectievoorstellen ("Wij herkennen een terugkerend patroon") en de lijst met bestaande regels.
 - **Eindresultaat:** De regel is aangepast (bedrag/frequentie/dag), voorzien van een einddatum, op inactief gezet of verwijderd; het getoonde verwachte maandtotaal is direct bijgewerkt.
 - **Stappen:**
-  1. Open op /overzicht/cashflow het detail van een rekening met terugkerende regels.
+  1. Open op /overzicht/budget het detail van een rekening met terugkerende regels.
   2. Bevestig eventueel een detectievoorstel (aangedragen via de detectie-API) zodat er een regel ontstaat.
   3. Open een bestaande regel via de bewerk-sheet (RecurringEditSheet).
   4. Wijzig bedrag, frequentie of dag van de maand en sla op — controleer het nieuwe verwachte maandtotaal.
   5. Zet een einddatum of schakel "actief" uit (stopzetten) en controleer dat de regel niet meer meetelt.
   6. Verwijder een regel en bevestig de bevestigingsvraag.
-- **Schermen/componenten:** /overzicht/cashflow rekeningdetail (components/app/cash-account-view.tsx: detectie via /api/detect-recurring, lijst + verwacht maandtotaal, bewerk-sheet components/app/recurring-edit-sheet.tsx).
+- **Schermen/componenten:** /overzicht/budget rekeningdetail (components/app/cash-account-view.tsx: detectie via /api/detect-recurring, lijst + verwacht maandtotaal, bewerk-sheet components/app/recurring-edit-sheet.tsx).
 - **Kriticiteit:** KERN
 - **Rekenend:** ja — het verwachte maandtotaal van terugkerende regels (som van actieve regels, genormaliseerd naar maandbedrag); bron: cash-account-view.tsx (recurring-sectie).
 - **Varianten & randgevallen:**
@@ -8252,7 +8252,7 @@ De onafhankelijke dekkingscontrole vond vijf gebruikersworkflows die in de eerst
   - Regel stopzetten (is_active uit) versus einddatum in het verleden: beide sluiten de regel uit van het maandtotaal.
   - Verwijderen halverwege annuleren: regel blijft ongewijzigd.
   - Rekening zonder terugkerende regels: lege sectie met detectie-ingang.
-- **Cross-module effecten:** vaste-lasten-overzicht (/overzicht/cashflow/vaste-lasten), cashflow-forecast en de maandelijkse verplichtingen in het gezondheidsgetal.
+- **Cross-module effecten:** vaste-lasten-overzicht (/overzicht/budget/vaste-lasten), cashflow-forecast en de maandelijkse verplichtingen in het gezondheidsgetal.
 
 #### WF-MIJN-29 — Openstaande huishoud-uitnodiging intrekken
 - **Doel:** Een verstuurde maar nog niet geaccepteerde huishoud-uitnodiging annuleren (bijvoorbeeld na een typefout in het e-mailadres), zodat de verkeerde ontvanger geen toegang tot het huishouden kan krijgen.
@@ -8291,7 +8291,7 @@ De onafhankelijke dekkingscontrole vond vijf gebruikersworkflows die in de eerst
 
 #### WF-KRUIS-25 — Tier-gate-ervaring zonder AI-add-on (alle AI-oppervlakken)
 - **Doel:** Als gebruiker zonder AI-add-on op elk AI-oppervlak een nette, consistente blokkade met upgrade-verwijzing zien — in plaats van een kale fout of, erger, tóch AI-functionaliteit.
-- **Trigger/startpunt:** Een account zonder AI-add-on opent achtereenvolgens de AI-oppervlakken: Will-chat, /nieuws (krant), /rapportages (persoonlijk plan/rapport), /toekomst/rekenhulp (AI-calculatorbouw), abonnementen-detectie/analyse op /overzicht/cashflow/vaste-lasten, AI-categorisering en AI-aanbevelingen.
+- **Trigger/startpunt:** Een account zonder AI-add-on opent achtereenvolgens de AI-oppervlakken: Will-chat, /nieuws (krant), /rapportages (persoonlijk plan/rapport), /toekomst/rekenhulp (AI-calculatorbouw), abonnementen-detectie/analyse op /overzicht/budget/vaste-lasten, AI-categorisering en AI-aanbevelingen.
 - **Eindresultaat:** Elk oppervlak toont een duidelijke melding dat dit een betaalde AI-functie is, met verwijzing naar /mijn/account; geen enkel oppervlak levert AI-output.
 - **Stappen:**
   1. Log in met een account zonder AI-add-on.
@@ -8299,7 +8299,7 @@ De onafhankelijke dekkingscontrole vond vijf gebruikersworkflows die in de eerst
   3. Open /nieuws — verwacht de gate in plaats van de krant.
   4. Open /rapportages en probeer een rapport/persoonlijk plan te genereren — verwacht de gate.
   5. Open /toekomst/rekenhulp en probeer een rekenhulp te laten bouwen — verwacht de gate.
-  6. Start op /overzicht/cashflow/vaste-lasten de abonnementen-detectie/analyse — verwacht de gate.
+  6. Start op /overzicht/budget/vaste-lasten de abonnementen-detectie/analyse — verwacht de gate.
   7. Controleer dat elke melding naar /mijn/account (upgrade) verwijst en dat de rest van de pagina bruikbaar blijft.
 - **Schermen/componenten:** gate-afdwinging in lib/require-tier.ts (checkTierGate), gebruikt door 11 API-routes (o.a. app/api/ai/chat, app/api/news, app/api/report, app/api/ai/build-calculator, app/api/subscriptions/advice|analyse-ai|detect-ai, app/api/ai/recommendations(+initial), app/api/ai/categorize, app/api/onboarding/suggest-budgets); upgrade-pagina /mijn/account.
 - **Kriticiteit:** BELANGRIJK
@@ -8338,12 +8338,12 @@ Deze onderdelen bestaan in de code maar worden door geen enkele gebruikersworkfl
 **Overzicht-hub & dashboard:**
 - /dashboard — geen live UI: pure redirect naar /overzicht (page-redirect + next.config-redirect); alleen als redirect-doel testbaar
 - ~~HefbomenLegenda — dode UI-export~~ **opgelost 9 aug 2026 (OVZ-1): component verwijderd**; de stoplicht-uitleg staat nu in de pagina-'i' van /overzicht (`PAGE_INFO['/overzicht']`)
-- Geen herstel-knop op /overzicht voor het geminimaliseerde samengestelde-rente-inzicht — terughalen kan alleen via de InsightToggleButton op /overzicht/bezittingen of /overzicht/cashflow
+- Geen herstel-knop op /overzicht voor het geminimaliseerde samengestelde-rente-inzicht — terughalen kan alleen via de InsightToggleButton op /overzicht/bezittingen of /overzicht/budget
 - CheckinBanner linkt naar legacy backing-route /core/checkin — route bestaat nog als live pagina (check-in-flow zelf buiten deze scope)
 
 **Bezittingen & beleggingen:**
 - /holdings/[id] (app-root): onvoorwaardelijke 404-guard — geen UI, alleen testen dat elke URL netjes 404't
-- /core/assets/cash/[accountId]: pure redirect naar /overzicht/cashflow#rekening-<assetId> — geen eigen UI
+- /core/assets/cash/[accountId]: pure redirect naar /overzicht/budget#rekening-<assetId> — geen eigen UI
 - /core/assets en /core/assets/[type]: legacy backing maar nog volledig live UI (geen redirect); intern nog aangestuurd (kaart-klik en bewerk-URL-state schrijven er hard naartoe, ook vanaf /overzicht/bezittingen)
 - /core/assets/holdings: live legacy-pagina, alleen bereikbaar via secundaire links (Alle holdings / Bekijk holdings na import / filter wissen), niet via hoofdnavigatie
 - Empty-state-links in crypto-holdings-app naar /identity/koppelingen — legacy identity-route, werkt vermoedelijk alleen via redirect
@@ -8358,14 +8358,14 @@ Deze onderdelen bestaan in de code maar worden door geen enkele gebruikersworkfl
 - connection/stekker-indicator op schuld-kaarten: display-pad bestaat maar er zijn geen productie-debt-koppelingen — niet uitoefenbaar
 
 **Cashflow, transacties & bankimport:**
-- /core/cash is een pure redirect naar /overzicht/cashflow — geen eigen UI
+- /core/cash is een pure redirect naar /overzicht/budget — geen eigen UI
 - /core/cash/connect/callback is alleen een fallback-doorstuurpagina (spinner); echte afhandeling in /api/bank-connect/callback
 - Budget-detail-kassabon in components/app/cash-overview.tsx (derde BottomSheet) is onbereikbaar: setExpenseReceiptBudgetId wordt nergens op een waarde gezet — dode UI
-- ~~'Beheer rekeningen'-link in KoppelRekeningBanner verwijst circulair naar /overzicht/cashflow; geen aparte beheerpagina~~ VERVALLEN (fase 2 TXN-1): banner heeft nu één toestand, die link bestaat niet meer
+- ~~'Beheer rekeningen'-link in KoppelRekeningBanner verwijst circulair naar /overzicht/budget; geen aparte beheerpagina~~ VERVALLEN (fase 2 TXN-1): banner heeft nu één toestand, die link bestaat niet meer
 - Lege-staat-CTA van de tijdlijn linkt naar /overzicht/bezittingen/cash (buiten dit deelgebied)
 
 **Budgetteren:**
-- /core/budgets is een levende legacy-route met volledige UI maar staat in geen enkel navigatie-item (sidebar wijst naar /overzicht/cashflow/budget); dient als backing-route en redirect-doel
+- /core/budgets is een levende legacy-route met volledige UI maar staat in geen enkel navigatie-item (sidebar wijst naar /overzicht/budget); dient als backing-route en redirect-doel
 - /core/budgets/new, /core/budgets/[id] en /core/budgets/[id]/edit zijn pure client-side redirects (alleen spinner) — uitsluitend deeplink-doelen
 - ?planEditor=true wordt door BudgetsClient gelezen maar door geen enkel UI-element meer gezet (verwijzing naar verdwenen bottom-bar 'Plan'-knop) — alleen als handmatige deeplink werkend
 - BudgetForm bevat een standalone (niet-embedded) pad met eigen header en redirect naar /core/budgets, maar wordt in de codebase alleen embedded gerenderd — dode code
@@ -8411,7 +8411,7 @@ Deze onderdelen bestaan in de code maar worden door geen enkele gebruikersworkfl
 - actionUrl's in meldingen wijzen naar legacy-routes (/core/budgets, /core/cash, /core/assets/holdings, /horizon) — doelgedrag (live/redirect/dood) valt buiten deze scope en moet bij WF-WILL-12 per doorklik geverifieerd worden
 - Verdict 'more' in /api/news/feedback: API accepteert het, maar geen enkele UI-knop verstuurt het (alleen 'Minder hierover' bestaat; geen duim-omhoog)
 - Notificatietype 'recommendation' (label Partner-actie): bestaat in typen/prefs/MODULE_MAP maar geen enkele generator in de GET van /api/notifications maakt het aan — de bijbehorende toggle op /mijn/notificaties stuurt niets aan
-- components/will/cashflow-section.tsx en vaste-kosten-analyse.tsx: staan in de map will maar horen functioneel bij het cashflow-deelgebied (gebruikt op /overzicht/cashflow/**), niet verweesd
+- components/will/cashflow-section.tsx en vaste-kosten-analyse.tsx: staan in de map will maar horen functioneel bij het cashflow-deelgebied (gebruikt op /overzicht/budget/**), niet verweesd
 
 **Rapportages:**
 - PullQuoteSection 'Redactioneel commentaar' in het periodieke rapport rendert nooit — de API zet aiInsights: [] hard (app/api/report/route.ts) → dode UI
@@ -8424,7 +8424,7 @@ Deze onderdelen bestaan in de code maar worden door geen enkele gebruikersworkfl
 - /core — géén redirect: live backing-UI (CoreLanding); eigen interactieflows horen bij het Kern-deelgebied
 - /horizon — géén redirect: rendert live dezelfde HorizonPage als /toekomst (zonder landing-koppen); deeplink-doel
 - /horizon/whatif, /horizon/strategie, /horizon/inflatie-koopkracht, /horizon/samengestelde-interest, /horizon/uitgaven-na-pensioen — parallelle legacy-varianten van /toekomst-equivalenten, niet individueel gedekt
-- /core/cash/import — live én actief gelinkt vanaf /overzicht/cashflow/transacties: dé import-ingang ondanks legacy-pad (gedekt via WF-KRUIS-05)
+- /core/cash/import — live én actief gelinkt vanaf /overzicht/budget/transacties: dé import-ingang ondanks legacy-pad (gedekt via WF-KRUIS-05)
 - /beheer/** — interne verificatie-tools (horizon-kernel, regressietest) met kerngetallen, buiten gebruikers-UAT-scope
 - /api/snapshots/cron — server-side snapshotpad zonder UI, alleen indirect toetsbaar via trends
 
@@ -8484,7 +8484,7 @@ Vermoedens die niet (volledig) in de code geverifieerd konden worden. Ze zijn be
 - Read-only gedrag van de partner-aggregaat-pill in Eenvoudig-weergave op alle devices (geen onClick in code; aangenomen)
 
 **Cashflow, transacties & bankimport:**
-- Of /overzicht/cashflow/budget de ?maand=-deeplink van de geldstroom-banner consumeert (route valt onder deelgebied Budgetten; geen searchParams-gebruik gevonden)
+- Of /overzicht/budget de ?maand=-deeplink van de geldstroom-banner consumeert (route valt onder deelgebied Budgetten; geen searchParams-gebruik gevonden)
 - Provider-naamgeving: koppel-banner zegt 'GoCardless', connect-pagina 'TrueLayer' — welke provider echt achter /api/bank-connect zit is niet in de API-code geverifieerd (mogelijk verouderde copy)
 - Server-side dedupe-gedrag van /api/bank-connect/sync ('X nieuw, Y dup') niet regel-voor-regel gecontroleerd
 - Welke statusniveaus de PageStatusBanner per cashflow-route toont (status-API niet doorgelicht)
@@ -8583,7 +8583,7 @@ De volgende punten stonden bij een deelgebied als "onbevestigd" maar zijn tijden
 
 - **Maandelijkse snapshots draaien gepland** — `vercel.json` definieert crons: `/api/snapshots/cron` (1e van de maand 02:00), `/api/holdings/refresh-prices/cron` (dagelijks 18:00) en `/api/news-ingest/cron` (dagelijks 05:00).
 - **De open-banking-provider is TrueLayer** — `app/api/bank-connect/auth-link/route.ts` gebruikt `lib/truelayer/client`; de tekst "GoCardless" in de koppel-banner is verouderde copy (tekstdefect, kandidaat voor de bevindingenlijst).
-- **De `?maand=`-deeplink op /overzicht/cashflow/budget werkt** — `components/app/budgets-client.tsx` leest `searchParams.get('maand')`; de deeplink vanaf de geldstroom-banner is toetsbaar.
+- **De `?maand=`-deeplink op /overzicht/budget werkt** — `components/app/budgets-client.tsx` leest `searchParams.get('maand')`; de deeplink vanaf de geldstroom-banner is toetsbaar.
 - **De budget-notificatiedrempel werkt** — `app/api/notifications/route.ts` genereert budgetmeldingen op `alert_threshold` (default 80%); het zijn in-app meldingen (bel + /berichten), géén e-mail of browser-push.
 - **De huishoud-uitnodiging wordt server-side gemaild** — `app/api/household/invite/route.ts` roept `sendEmail(householdInviteEmail(...))` aan; zonder `RESEND_API_KEY` valt dit terug op een kopieerbare link.
 - **Deeplink-verwerking op /toekomst vervangt de URL door `/horizon`** — `components/app/horizon/horizon-client.tsx` doet hardcoded `router.replace('/horizon')`; testwaardig randgeval (URL "springt" naar de legacy-route).
@@ -8907,9 +8907,9 @@ Alle scenario's, per deelgebied in uitvoervolgorde. Formaat en registratie: zie 
   2. Registreer met **exact hetzelfde e-mailadres** als de check (sanne.bakker.uat@example.test) en een wachtwoord → *verwacht:* "Controleer je e-mail".
   3. (Na bevestiging) klik de bevestigingslink → `/auth/callback?next=/check/activeren?token=…` → `/check/activeren` toont een spinner ("Je gegevens gaan mee") → automatische redirect naar `/overzicht`.
   4. Controleer `/overzicht` → *verwacht:* netto vermogen **€ 29.600** (identiek aan "Foto van nu" in het rapport).
-  5. Open `/overzicht/cashflow` (instellingenblok onderaan) → *verwacht:* inkomen/uitgaven-bron staat op "handmatig", spaarquote **≈ 31,25%** (mogelijk afgerond weergegeven als "31%" of "31,3%").
+  5. Open `/overzicht/budget` (instellingenblok onderaan) → *verwacht:* inkomen/uitgaven-bron staat op "handmatig", spaarquote **≈ 31,25%** (mogelijk afgerond weergegeven als "31%" of "31,3%").
   **Eindresultaat:** bezittingen na activatie = Noodfonds € 6.600 (cash), Spaargeld € 15.000 (savings), Beleggingen € 8.000 (investment); schulden = geen; profiel `full_name` = **"Sanne"** (let op: alléén de voornaam — de check vraagt nooit een achternaam, dus dit is bedoeld gedrag, geen bug); `onboarding_completed` = true (de gebruiker ziet de onboarding-flow nooit).
-  **Berekening verwachting:** spaarquote via `resolveSavingsSource`/`savingsRateFromAggregates`: effectief maandinkomen = € 3.200, uitgaven = € 2.200, geen aflossing/spaarbudget-correctie (geen schulden) → `((3200 − 2200 + 0) / 3200) × 100` = `(1000/3200)×100` = **31,25%** — moet EXACT hetzelfde percentage zijn als je later handmatig narekent op `/overzicht/cashflow`; het jaarlijkse spaarbedrag = 38.400 × 0,3125 = **€ 12.000**.
+  **Berekening verwachting:** spaarquote via `resolveSavingsSource`/`savingsRateFromAggregates`: effectief maandinkomen = € 3.200, uitgaven = € 2.200, geen aflossing/spaarbudget-correctie (geen schulden) → `((3200 − 2200 + 0) / 3200) × 100` = `(1000/3200)×100` = **31,25%** — moet EXACT hetzelfde percentage zijn als je later handmatig narekent op `/overzicht/budget`; het jaarlijkse spaarbedrag = 38.400 × 0,3125 = **€ 12.000**.
 - **b. Randgeval — account met al bestaande data:** herhaal de activatie-flow op een account dat al minstens één bezitting heeft (bv. een net gereset "Landing page testaccount" waarop je handmatig al iets hebt toegevoegd) → *verwacht:* seeding wordt overgeslagen (`skipped: 'account_not_empty'`), de gebruiker gaat gewoon door naar `/overzicht` zonder dat de bestaande data wordt aangevuld of overschreven.
 - **c. Foutpad — mismatch en ongeldige tokens:** registreer met een ANDER e-mailadres dan de check → *verwacht:* 403 "Deze check hoort niet bij dit account" → foutscherm "Bijna klaar" met knop "Naar mijn overzicht" (leeg account); open `/check/activeren?token=<verlopen-token>` → *verwacht:* 410; open met een niet-bestaand token → *verwacht:* 404; open `/check/activeren` terwijl uitgelogd → *verwacht:* 401 — alle drie tonen hetzelfde nette foutscherm met doorgang naar `/overzicht`.
 - **d. Persistentie (idempotentie):** open de activatielink van Sanne nogmaals nadat de activatie al is gelukt (a) → *verwacht:* idempotent succes — geen tweede seed, bezittingen blijven exact € 29.600 totaal (geen duplicaten).
@@ -8992,7 +8992,7 @@ Alle scenario's, per deelgebied in uitvoervolgorde. Formaat en registratie: zie 
   - Pensioen-prefill: `computeRetirementPrefill({ monthlyExpenses: 2100 })` = `Math.round(2100 × 12 × 0,8)` = `Math.round(20.160)` = **€ 20.160/jaar** (basis: uitgaven, methode: eigen bedrag) (`lib/onboarding/retirement-prefill.ts`).
   - Noodfonds-prefill: `computeNoodfondsTarget({ monthlyIncome: 3000, monthlyExpenses: 2100 })` = uitgaven > 0 dus basis = 2.100 × 3 = 6.300, afgerond op € 100 = **€ 6.300** (al een veelvoud van 100) (`lib/onboarding-presets.ts`).
   - Netto vermogen recap: bezittingen (2.500 + 18.000 + 12.000 = 32.500) − schulden (9.000) = **€ 23.500** (`netWorthForKlaar`, `app/(onboarding)/onboarding/page.tsx`).
-  - Consistentie-check ná activatie: op `/overzicht/cashflow` moet de spaarquote via `resolveSavingsSource`/`savingsRateFromAggregates` opnieuw exact **30%** geven — `((3000 − 2100 + 0) / 3000) × 100` = **30%** — de preview tijdens onboarding en de cashflow-pagina mogen NOOIT uiteenlopen (SSoT-eis).
+  - Consistentie-check ná activatie: op `/overzicht/budget` moet de spaarquote via `resolveSavingsSource`/`savingsRateFromAggregates` opnieuw exact **30%** geven — `((3000 − 2100 + 0) / 3000) × 100` = **30%** — de preview tijdens onboarding en de cashflow-pagina mogen NOOIT uiteenlopen (SSoT-eis).
 - **b. Randgeval — extreme maar geldige invoer:** verse reset. Vul inkomen **€ 3.000** en uitgaven **€ 999.000** in (beide binnen hun eigen toegestane grenzen, maar samen onrealistisch) → *verwacht:* spaarquote-preview toont **"-33200%"** (`Math.round(((3000 − 999000)/3000)×100)` = `Math.round(-33200)` = **-33200**) zonder dat de pagina crasht of de layout breekt — een negatief drie-cijferig-duizendtallig percentage moet gewoon leesbaar getoond worden.
 - **c. Foutpad:** verse reset. Vul bij naam **"J"** (1 teken) in en probeer verder te gaan → *verwacht:* validatiefout (minimaal 2 tekens); vul een geboortedatum in de TOEKOMST in → *verwacht:* validatiefout; laat naam/geboortedatum leeg en spring (via de knoppen) door naar de klaar-stap → klik "Begin met TriFinity" → *verwacht:* de finish-guard stuurt je terug naar de eerste onvolledige verplichte stap met een duidelijke melding.
 - **d. Persistentie:** rond de happy path (a) af, log uit via het accountmenu en log opnieuw in → *verwacht:* `/overzicht` toont nog steeds netto vermogen € 23.500 en de cashflow-instellingen tonen nog steeds spaarquote 30% op basis van de handmatige bron.
@@ -9071,7 +9071,7 @@ Dit deelgebied heeft geen eigen pagina's — het toetst de app-brede bediening d
 - **a. Happy path:**
   1. Log in en land op /overzicht. → *verwacht:* linker-sidebar (264px) toont "tf."-merk, "Het Overzicht" met gekleurde streep + amber accentkleur, netto vermogen kort geformatteerd rechts van het label (bv. "€ 834k").
   2. Klik "Bezittingen" onder Het Overzicht. → *verwacht:* /overzicht/bezittingen laadt; de rij krijgt de actieve sub-stijl.
-  3. Klik "Cashflow". → *verwacht:* /overzicht/cashflow laadt; direct daaronder klapt het derde niveau uit (Budget/Transacties/Vaste lasten/Forecast).
+  3. Klik "Cashflow". → *verwacht:* /overzicht/budget laadt; direct daaronder klapt het derde niveau uit (Budget/Transacties/Vaste lasten/Forecast).
   4. Bekijk de apps-strip onder de subroutes. → *verwacht:* alleen apps waarvan minstens één bezit/schuld de tracking-vlag aan heeft staan verschijnen (bv. "Budgetteren").
   5. Klik "De Toekomst". → *verwacht:* /toekomst laadt, streep en icoon wisselen naar paars (horizon), subroutes Tijdas/Doelen/Gebeurtenissen/Voorkeuren/Rekenhulp/Wat-Als verschijnen.
   6. Klik in "overige" achtereenvolgens Tips & acties, Berichten, Nieuws, Rapportages. → *verwacht:* elke klik laadt de bijbehorende pagina.
@@ -9096,7 +9096,7 @@ Dit deelgebied heeft geen eigen pagina's — het toetst de app-brede bediening d
 - **Preconditie:** Persona "compleet" (data in meerdere hefbomen zodat dots kleur tonen).
 - **a. Happy path:**
   1. Bekijk in de sidebar (Het Overzicht actief) de vier hefboom-dots naast Bezittingen/Schulden/Cashflow/Belasting. → *verwacht:* elke dot heeft een kleur (groen/amber/rood/grijs) met een hover-title die de status in woorden geeft (Gezond/Aandacht/Zorg/Geen data) + een detail-zin.
-  2. Navigeer naar /overzicht/cashflow/budget. → *verwacht:* Budget/Transacties/Vaste lasten/Forecast tonen elk een status-mirror-dot; de dot bij "Budget" heeft exact dezelfde kleur als de status op de Cashflow-landingskaart "Budget".
+  2. Navigeer naar /overzicht/budget. → *verwacht:* Budget/Transacties/Vaste lasten/Forecast tonen elk een status-mirror-dot; de dot bij "Budget" heeft exact dezelfde kleur als de status op de Cashflow-landingskaart "Budget".
   3. Navigeer naar /overzicht/belasting/box1. → *verwacht:* Box 1/2/3 tonen elk een status-mirror-dot; Box 2 staat standaard neutraal (grijs).
   4. Bekijk de apps-strip: freshness-dots (groen gevuld = actie nodig, grijze ring = niets).
   5. Bekijk "overige": Tips & acties/Berichten/Nieuws tonen een freshness-dot (+ bij Berichten een numeriek badge); Rapportages toont altijd een grijze dot.
@@ -9114,7 +9114,7 @@ Dit deelgebied heeft geen eigen pagina's — het toetst de app-brede bediening d
   2. Tik het raster-icoon. → *verwacht:* bottom-sheet "Navigatie" schuift omhoog (start ~80vh); het raster-icoon wordt een kruisje (✕); de pill blijft zichtbaar bóven de sheet.
   3. Bekijk de lijst: Overzicht (amber)/Toekomst (paars)/Mijn (teal) met beschrijving, elk direct gevolgd door hun subroutes.
   4. Sta je (in een andere sessie) op Belasting of dieper → Box 1/2/3 verschijnen als geneste sub-items.
-  5. Tik op een subroute (bv. "Cashflow"). → *verwacht:* menu sluit, /overzicht/cashflow laadt, raster-icoon terug naar ⊞.
+  5. Tik op een subroute (bv. "Cashflow"). → *verwacht:* menu sluit, /overzicht/budget laadt, raster-icoon terug naar ⊞.
   6. Open het menu opnieuw, scroll naar "Overal beschikbaar", tik "Krant". → *verwacht:* /nieuws laadt, menu sluit.
   7. Open het menu nogmaals en sluit zonder keuze door nogmaals op de pill te tikken. → *verwacht:* menu sluit, geen navigatie.
   **Eindresultaat:** elke navigatiekeuze laadt de juiste pagina en sluit het menu; de pill blijft altijd bereikbaar als sluitknop.
@@ -9268,7 +9268,7 @@ WF-NAV-13 (Uitloggen) → **géén eigen scenario** in dit document; gedekt door
 - **Preconditie:** Ingelogd.
 - **a. Happy path:**
   1. Open achtereenvolgens /core, /horizon, /identity, /will, /dashboard rechtstreeks in de adresbalk. → *verwacht:* elk redirect direct naar respectievelijk /overzicht, /toekomst, /mijn, /overzicht, /overzicht.
-  2. Open /core/budgets, /core/belasting, /overzicht/acties. → *verwacht:* redirect naar /overzicht/cashflow, /overzicht/belasting, /overzicht/tips.
+  2. Open /core/budgets, /core/belasting, /overzicht/acties. → *verwacht:* redirect naar /overzicht/budget, /overzicht/belasting, /overzicht/tips.
   3. Open /identity/profiel en /identity/parameters. → *verwacht:* redirect naar /mijn/profiel resp. /toekomst/voorkeuren.
   4. Open een diepere legacy-subroute zonder redirect-regel, bv. /core/assets. → *verwacht:* GEEN redirect, de legacy-pagina laadt gewoon (nog live backing-UI); de sidebar markeert wél "Het Overzicht" als actieve module.
 
@@ -9442,7 +9442,7 @@ WF-NAV-13 (Uitloggen) → **géén eigen scenario** in dit document; gedekt door
 - **b. Variant — hefboomtotaal 0/onbekend (Schulden-kaart):** Willem heeft `totalDebts = 0` → per de gedocumenteerde variant toont de Schulden-kaart **géén bedrag**, alleen het label "Schulden" + status-stip. *Verwacht:* status-stip **groen** (lever-score schulden: `totalDebts ≤ 0 → score 100`, `statusFromScore ≥60 → green`, `lib/lever-scores-loader.ts` regel ~100-111). Controleer dat de kaart niet "€0" toont maar echt leeg blijft op het bedrag.
 - **c. Cross-check statusstippen:** Bezittingen-stip = groen (5 verschillende asset-types bij Willem: investment/retirement/eigen_huis/real_estate/vehicle → diversificatiescore `min(100,(5/5)×100)=100`). Belasting-stip = **rood** ondanks het grote vermogen: rendementsgrondslag €508.986 valt net boven de €500k-boven-vrijstellingsgrens → score **20** (`statusFromScore <30 → red`). *Dit is een bewust contra-intuïtief maar correct testpunt: grote portefeuille + fiscaal partner ≠ groene belastingstip.* Cashflow-stip: verwacht groen (spaarquote-component ≥30% → 100; budget-component naar verwachting 100 bij 0 categorieën over budget, gezien het comfortabele surplus — niet exact narekenbaar door transactie-jitter, alleen richting toetsen).
 - **d. Privacy-masking:** zet masking aan (`/mijn/profiel` of shell-toggle) → *verwacht:* alle vier euro-bedragen en het netto-vermogen tonen gemaskeerd (`••••` -achtig via `formatMaskedCurrency`); het cashflow-percentage blijft zichtbaar (is geen saldo).
-- **Cross-module effecten:** vergelijk de vier hefboomcijfers met /overzicht/bezittingen, /overzicht/schulden, /overzicht/cashflow en /overzicht/belasting — moeten identiek zijn (zelfde SSoT).
+- **Cross-module effecten:** vergelijk de vier hefboomcijfers met /overzicht/bezittingen, /overzicht/schulden, /overzicht/budget en /overzicht/belasting — moeten identiek zijn (zelfde SSoT).
 
 ---
 
@@ -9605,7 +9605,7 @@ WF-NAV-13 (Uitloggen) → **géén eigen scenario** in dit document; gedekt door
   5. Klik in de banner op "Bespreek met Will" → *verwacht:* chat opent met het bannertopic.
   - **Eindresultaat:** minimaliseren/heropenen werkt en is cross-device consistent; screenreader hoort de aria-live-aankondiging.
   - **Rekenend:** nee — de banner consumeert enkel de bestaande vrijheidsvlag, er wordt niets herberekend.
-- **c. Variant — stoplicht-escalatie (verwijzing, niet hier reproduceerbaar):** de root-banner bij Marijke is altijd niveau **'info'** en heropent per ontwerp NOOIT automatisch (bevestigd in de inventarisatie: escalatie geldt alleen voor stoplicht-niveaus op de deelroutes /overzicht/cashflow, /overzicht/belasting e.d.). Toets de oranje→rood-auto-heropen-regel daarom op een deelroute met een verslechterende status (bv. schuldratio die van 'aandacht' naar 'actie' kantelt op /overzicht/schulden) — dit is dezelfde `resolveBannerDisplay`-machinerie (`lib/page-status/display.ts`) die hier gedocumenteerd staat, zodat CASH/BELAST er niet opnieuw over hoeven te rapporteren, maar de daadwerkelijke escalatie-klik is alleen op die deelroutes waar te nemen.
+- **c. Variant — stoplicht-escalatie (verwijzing, niet hier reproduceerbaar):** de root-banner bij Marijke is altijd niveau **'info'** en heropent per ontwerp NOOIT automatisch (bevestigd in de inventarisatie: escalatie geldt alleen voor stoplicht-niveaus op de deelroutes /overzicht/budget, /overzicht/belasting e.d.). Toets de oranje→rood-auto-heropen-regel daarom op een deelroute met een verslechterende status (bv. schuldratio die van 'aandacht' naar 'actie' kantelt op /overzicht/schulden) — dit is dezelfde `resolveBannerDisplay`-machinerie (`lib/page-status/display.ts`) die hier gedocumenteerd staat, zodat CASH/BELAST er niet opnieuw over hoeven te rapporteren, maar de daadwerkelijke escalatie-klik is alleen op die deelroutes waar te nemen.
 
 ---
 
@@ -9662,7 +9662,7 @@ WF-NAV-13 (Uitloggen) → **géén eigen scenario** in dit document; gedekt door
   - **Eindresultaat:** kaart is zichtbaar (drempel gehaald) en toont plausibele, intern consistente bedragen.
   - **Berekening verwachting (rekenend, `lib/compound-projection.ts`):** conservatief 0,5%/30 jr: FV=57.700×(1,005)^30=57.700×1,1614≈**€67.013**; ambitieus 7%/30 jr: FV=57.700×(1,07)^30=57.700×7,6123≈**€439.227**; verschil/multiplier=439.227/67.013=6,55 ≥1,05 → `hasDramaticDelta=true` (kaart terecht zichtbaar). Bij €500/mnd extra: annuïteit-component erbij (conservatief +€193.680, ambitieus +€566.765) → totalen zoals hierboven.
   - **Rekentool-diepte (slider-precisie, edge cases, disclaimer-tekst):** → **UAT-REKEN-22**.
-- **c. Variant — drempel niet gehaald (Daan):** open /overzicht met persona Daan (liquide cash €2.850) → *verwacht:* kaart wordt **niet getoond** (< €10.000-drempel). Test ook: klik X ("Inzicht minimaliseren") bij Willem → kaart verdwijnt; er is GEEN herstel-knop op /overzicht zelf — terughalen kan alleen via /overzicht/bezittingen of /overzicht/cashflow (of localStorage wissen).
+- **c. Variant — drempel niet gehaald (Daan):** open /overzicht met persona Daan (liquide cash €2.850) → *verwacht:* kaart wordt **niet getoond** (< €10.000-drempel). Test ook: klik X ("Inzicht minimaliseren") bij Willem → kaart verdwijnt; er is GEEN herstel-knop op /overzicht zelf — terughalen kan alleen via /overzicht/bezittingen of /overzicht/budget (of localStorage wissen).
 
 ---
 
@@ -9747,7 +9747,7 @@ Alle bedragen zijn met de hand herleid uit `lib/test-personas.ts` en de rekenmot
   1. Open `/overzicht/bezittingen` → *verwacht:* figures-strip met Totale waarde, vrijheidstijd-onderschrift, Maandelijkse inleg, Rendement portefeuille, Waarde over N jaar.
   2. Lees de figures-strip → *verwacht:* Totale waarde **€1.585.000**, Maandelijkse inleg **€1.700**, Rendement portefeuille **+€84.860** (onderschrift "+36,1% sinds aankoop" · "beleggingen en crypto").
   3. Scroll door de categoriegroepen → *verwacht:* groepen Cash (4 kaarten), Spaargeld (1), Beleggingen (1, holdings-badge), Pensioen (1), Crypto (1), Eigen huis (1), Vastgoed (1), Voertuig (1), Fysiek (1), Deelneming (1), Levensverzekering (1), Vordering (1), Overig (1) = 13 groepen, 16 kaarten.
-  4. Klik de Cash-groepskop → *verwacht:* navigeert naar `/overzicht/cashflow`.
+  4. Klik de Cash-groepskop → *verwacht:* navigeert naar `/overzicht/budget`.
   **Eindresultaat:** bovenstaande 3 cijfers exact; vrijheidstijd-onderschrift in de orde van ~42-43 jaar (zie kanttekening 1).
   **Berekening verwachting:** Totale waarde = Σ `current_value` van alle 16 actieve bezit-rijen (13 gedeclareerd + 3 bank-rekeningen-als-cash): 30.000+45.000+300.000+120.000+20.000+560.000+185.000+28.000+14.000+180.000+28.000+35.000+6.000 (=1.551.000, de 13 gedeclareerde) + 8.200+21.500+4.300 (=34.000, de 3 rekeningen) = **€1.585.000** (`perspectiveAssetValue`/`totalValue`, `components/core/assets-client.tsx:140-146,389`). Maandelijkse inleg = Σ `monthly_contribution` = Spaardeposito €200 + Meesman €1.500 = **€1.700**. Rendement portefeuille = `buildAssetReturnBreakdown().portfolio.gain` (lib/asset-return.ts) over uitsluitend de `investment`- en `crypto`-bezittingen: Meesman Wereldwijd Totaal (holdings-tracking, kostprijs via `sumHoldingTotals` op de rauwe holding-kolommen: 2.215 × €102,0948 = €226.139,98) → 300.000 − 226.139,98 = €73.860,02; Crypto portefeuille (geen holdings, terugval op `purchase_value`) → 20.000 − 9.000 = €11.000. Samen kostprijs €235.139,98 en rendement **€84.860,02** (+36,09%, op de strip afgerond tot **+€84.860**). Woning, vastgoed, voertuig, fysiek, deelneming, levensverzekering, vordering en overig vallen in de waarderings-emmer; cash/spaargeld/pensioen dragen geen kostprijs — geen van beide telt mee in deze KPI. De rekenmodal toont alle drie de emmers plus de sluitpost naar €1.585.000.
 - **b. Randgeval — extreem grote nieuwe bezitting:** voeg via QuickAdd een bezit "Test extreem" (other) toe met waarde **€999.999.999** → *verwacht:* Totale waarde wordt **€1.585.000.000** (afgerond op de gulden, geen decimalen-overflow), leesbaar geformatteerd, geen layout-breuk in de figures-strip.
@@ -9835,7 +9835,7 @@ Alle bedragen zijn met de hand herleid uit `lib/test-personas.ts` en de rekenmot
 - **Kriticiteit:** BELANGRIJK · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~4 min
 - **Preconditie:** persona `compleet` geladen
 - **a. Happy path:** klik de groepskop "Beleggingen" → *verwacht:* mini-hero "1 positie", totaal **€300.000** (hero leest het vaste `current_value`-veld, `asset-category-page.tsx:414-417`); tab "Posities" toont de Meesman-kaart + tab "Aandelen holdings"; 12-maands categorie-historiegrafiek onderaan (`loadCategoryHistory`). Navigeer naar `/overzicht/bezittingen/investment` en `/core/assets/investment` → *verwacht:* identieke UI (pure re-export).
-- **c. Foutpad — ongeldig type:** navigeer naar `/core/assets/foo` → *verwacht:* 404 (editorial not-found). `/core/assets/cash` → *verwacht:* redirect naar `/overzicht/cashflow` vóór de type-validatie.
+- **c. Foutpad — ongeldig type:** navigeer naar `/core/assets/foo` → *verwacht:* 404 (editorial not-found). `/core/assets/cash` → *verwacht:* redirect naar `/overzicht/budget` vóór de type-validatie.
 
 #### UAT-BEZIT-12 — Aandelen-holdings-app openen en portfolio analyseren (dekt WF-BEZIT-12)
 - **Kriticiteit:** KERN · **Platform:** webapp+mobiel · **Rooktest:** nee · **Duur:** ~8 min
@@ -10216,7 +10216,7 @@ WF-SCHULD-19 (eenvoudige weergave op schuldenpagina's) → gedekt door UAT-NAV-1
 
 Daans terugkerende transacties (salaris, huur, verzekeringen, abonnementen etc.) worden 15 maanden terug geseed met voor een deel van de posten een `Math.random()`-jitter (±15–30%) en willekeurige boodschappen-triptijden. Deze bedragen zijn dus **niet exact reproduceerbaar** tussen twee reseeds. Waar een verwachte uitkomst op zulke posten leunt, geven we daarom een vaste, jitter-onafhankelijke kernsom + een consistentie-/richtingscontrole (bv. "spaarquote blijft ruim boven de groendrempel, ongeacht de jitter-uitkomst") in plaats van een enkel exact getal. Voor transacties die de tester zelf invoert of importeert (handmatige invoer, bankbestand-import) zijn de verwachte uitkomsten wél volledig exact, met synthetische testdata (nep-IBAN's zoals NL00TEST0123456789).
 
-Let op: `recurring_transactions` wordt door de testdata-seed **niet** gevuld — alleen losse `transactions`-rijen. Dit betekent dat een vers geseede Daan-account op /overzicht/cashflow/vaste-lasten zijn vaste lasten via **live auto-detectie** getoond krijgt (geen probleem, dat gebeurt automatisch), maar dat de terugkerende-regelbeheer-sectie in het rekeningdetail (WF-CASH-31) **start leeg** met alleen detectievoorstellen — dit is verwerkt in de preconditie van dat scenario.
+Let op: `recurring_transactions` wordt door de testdata-seed **niet** gevuld — alleen losse `transactions`-rijen. Dit betekent dat een vers geseede Daan-account op /overzicht/budget/vaste-lasten zijn vaste lasten via **live auto-detectie** getoond krijgt (geen probleem, dat gebeurt automatisch), maar dat de terugkerende-regelbeheer-sectie in het rekeningdetail (WF-CASH-31) **start leeg** met alleen detectievoorstellen — dit is verwerkt in de preconditie van dat scenario.
 
 **Afbakening in dit document:** WF-CASH-25 (AI-categorisering), WF-CASH-26 (handmatig + bulk + regels) en WF-CASH-28 (sleepmodus) zijn hier **leidend** en krijgen volledige a–d-dekking, ook al is WF-CASH-28 op zichzelf BELANGRIJK. WF-CASH-07 wordt niet apart uitgewerkt — dat gedrag (banner minimaliseren/heropenen via het statuspunt) is generiek en wordt getoetst door **UAT-OVZ-12** (steekproef-oppervlak); hier volgt alleen een verwijsregel. WF-CASH-06 blijft OVERIG (alleen de kaart-weergave); de rekenkern van de inflatie-slider wordt getoetst door **UAT-REKEN-21**.
 
@@ -10225,15 +10225,15 @@ Let op: `recurring_transactions` wordt door de testdata-seed **niet** gevuld —
 #### UAT-CASH-01 — Cashflow-onderdelen verkennen via de vier hefboom-kaarten (dekt WF-CASH-01)
 - **Kriticiteit:** KERN · **Platform:** webapp+mobiel · **Rooktest:** ja (basis-laadtest van de landing) · **Duur:** ~6 min
 - **Preconditie:** Persona Daan Bakker, ingelogd, weergavemodus "Volledig". Bekijk rond kalendermaand juni 2026.
-- **a. Happy path:** 1) Open /overzicht/cashflow. → *verwacht:* vier kaarten (Budget, Transacties, Vaste lasten, Forecast), elk met een status-stip, KPI-cijfer en subtekst. 2) Klik de uitklap-chevron van "Transacties". → *verwacht:* paneel klapt open met secundaire waarde (maand-spaarquote %) en een 1-regel-inzicht. 3) Klik de actielink "Bekijk transacties". → *verwacht:* navigatie naar /overzicht/cashflow/transacties. **Eindresultaat:** alle vier kaarten tonen actuele cijfers; doorklikken werkt. **Berekening verwachting:** Transacties-kaart-status volgt `transactiesCardStatus` (lib/cashflow-cards.ts): rate=(netto/inkomen)×100, ≥20% groen. Voor Daans juni-2026-cijfers (vast inkomen €3.400 salaris + €1.700 bonus = €5.100 exact; uitgaven bestaan uit een vaste kern van €1.756,37 + €18,00 + €52,40 (niet-gejitterd, exact) plus twee gejitterde blokken met basis €585 en €380) is de spaarquote in het **slechtste geval** (alle jitter +30%) nog steeds ≈40% — ruim boven de 20%-grens. **Verwacht dus altijd: groene stip op de Transacties-kaart**, ongeacht de exacte jitter-uitkomst.
+- **a. Happy path:** 1) Open /overzicht/budget. → *verwacht:* vier kaarten (Budget, Transacties, Vaste lasten, Forecast), elk met een status-stip, KPI-cijfer en subtekst. 2) Klik de uitklap-chevron van "Transacties". → *verwacht:* paneel klapt open met secundaire waarde (maand-spaarquote %) en een 1-regel-inzicht. 3) Klik de actielink "Bekijk transacties". → *verwacht:* navigatie naar /overzicht/budget/transacties. **Eindresultaat:** alle vier kaarten tonen actuele cijfers; doorklikken werkt. **Berekening verwachting:** Transacties-kaart-status volgt `transactiesCardStatus` (lib/cashflow-cards.ts): rate=(netto/inkomen)×100, ≥20% groen. Voor Daans juni-2026-cijfers (vast inkomen €3.400 salaris + €1.700 bonus = €5.100 exact; uitgaven bestaan uit een vaste kern van €1.756,37 + €18,00 + €52,40 (niet-gejitterd, exact) plus twee gejitterde blokken met basis €585 en €380) is de spaarquote in het **slechtste geval** (alle jitter +30%) nog steeds ≈40% — ruim boven de 20%-grens. **Verwacht dus altijd: groene stip op de Transacties-kaart**, ongeacht de exacte jitter-uitkomst.
 - **b. Lege staat:** Gebruik een vers, ongebudgetteerd account (of maak tijdelijk een verse testgebruiker) zonder budgetplan en zonder transacties. → *verwacht:* Budget-kaart toont "Nog geen budget" met grijze stip; Transacties-kaart "Nog geen transacties"; Vaste lasten en Forecast tonen neutrale kaarten.
-- **c. Weergavemodus Eenvoudig:** Zet weergavemodus op "Eenvoudig" (/mijn/uiterlijk) en open /overzicht/cashflow opnieuw. → *verwacht:* geen uitklap-chevrons meer; kaarten fungeren alleen als navigatie-tegel.
+- **c. Weergavemodus Eenvoudig:** Zet weergavemodus op "Eenvoudig" (/mijn/uiterlijk) en open /overzicht/budget opnieuw. → *verwacht:* geen uitklap-chevrons meer; kaarten fungeren alleen als navigatie-tegel.
 - **d. Statusdrempel vaste lasten:** Bekijk de Vaste-lasten-kaart-status. → *verwacht:* status "good" (groen) zolang vaste-lasten/inkomen-ratio <50%; "warn" (oranje) bij 50–70%; "bad" (rood) boven 70% (`vasteLastenCardStatus`, lib/cashflow-cards.ts — exacte grens: <0,5 groen, ≤0,7 oranje, >0,7 rood). **Berekening verwachting:** Daans vaste-lasten-kern (huur+gas+verzekering+gemeente+NS-Flex+Swapfiets+Netflix+Spotify+Basic-Fit+PS Plus) ≈ €1.416,37/mnd tegen een basisinkomen van €3.400 → ratio ≈41,7% → verwacht **groen**.
 
 #### UAT-CASH-02 — Maand-geldstroom bekijken en door maanden bladeren (dekt WF-CASH-02)
 - **Kriticiteit:** KERN · **Platform:** webapp+mobiel · **Rooktest:** nee · **Duur:** ~7 min
 - **Preconditie:** Persona Daan Bakker, weergavemodus "Volledig".
-- **a. Happy path:** 1) Scroll naar het blok "Geldstroom" op /overzicht/cashflow (standaard huidige maand = juli 2026). → *verwacht:* Inkomen/Uitgaven/Saldo/Spaarquote-totalen zichtbaar, plus dagelijkse balkjesgrafiek met cumulatieve saldolijn en een gestippelde forecast-curve vanaf vandaag (5 juli). 2) Klik ◀ eenmaal. → *verwacht:* maand springt naar juni 2026, totalen en grafiek verversen, geen gestippelde forecast-curve meer (niet de huidige maand). 3) Klik ▶ terug naar juli. → *verwacht:* ▶ is uitgeschakeld zodra je weer in de huidige maand bent. **Eindresultaat:** navigatie werkt in beide richtingen; huidige maand toont de forecast-curve, historische maanden niet. **Berekening verwachting:** in juni 2026 moet Inkomen minus Uitgaven in de figures-strip exact overeenkomen met Saldo (Saldo = Inkomen − Uitgaven, geen afronding op tussenstappen); Spaarquote-duiding volgt dezelfde 20%/0%-grenzen als WF-CASH-01 → "sterk" bij deze cijfers.
+- **a. Happy path:** 1) Scroll naar het blok "Geldstroom" op /overzicht/budget (standaard huidige maand = juli 2026). → *verwacht:* Inkomen/Uitgaven/Saldo/Spaarquote-totalen zichtbaar, plus dagelijkse balkjesgrafiek met cumulatieve saldolijn en een gestippelde forecast-curve vanaf vandaag (5 juli). 2) Klik ◀ eenmaal. → *verwacht:* maand springt naar juni 2026, totalen en grafiek verversen, geen gestippelde forecast-curve meer (niet de huidige maand). 3) Klik ▶ terug naar juli. → *verwacht:* ▶ is uitgeschakeld zodra je weer in de huidige maand bent. **Eindresultaat:** navigatie werkt in beide richtingen; huidige maand toont de forecast-curve, historische maanden niet. **Berekening verwachting:** in juni 2026 moet Inkomen minus Uitgaven in de figures-strip exact overeenkomen met Saldo (Saldo = Inkomen − Uitgaven, geen afronding op tussenstappen); Spaarquote-duiding volgt dezelfde 20%/0%-grenzen als WF-CASH-01 → "sterk" bij deze cijfers.
 - **b. Deeplink met maand:** Klik "Naar transacties" vanuit de juni-weergave. → *verwacht:* URL bevat `?maand=2026-06` en de transactiepagina opent gefilterd op juni.
 - **c. Maandgrens-randgeval (tijdzone):** Voeg zelf handmatig een transactie toe op 30 juni 2026 23:00 lokale tijd (of via datumveld 30-06-2026) en één op 1 juli 2026 00:30. → *verwacht:* de 30-juni-transactie telt in juni, de 1-juli-transactie in juli — géén dag-shift door UTC-conversie (lokale maandgrenzen, `localMonthBounds` in lib/month-range.ts).
 - **d. Lege periode:** Blader terug naar een maand vóór Daans eerste geseede transactie (>15 maanden terug). → *verwacht:* hint "Er zijn transacties in andere maanden" met knop "Ga naar recentste transactie".
@@ -10248,8 +10248,8 @@ Let op: `recurring_transactions` wordt door de testdata-seed **niet** gevuld —
 - **Kriticiteit:** KERN · **Platform:** webapp+mobiel · **Rooktest:** nee · **Duur:** ~5 min
 - **Preconditie:** Persona Daan Bakker.
 - **a. Happy path:** 1) Bekijk de rekening-kaarten "Betaalrekening ING" en "Spaarrekening ING" bovenaan het cash-overzicht. → *verwacht:* naam, saldo, %-van-totaal-balkje. 2) Klik op "Betaalrekening ING". → *verwacht:* modal met rekeningdetail (transacties per maand). 3) Klik "Open volledig". → *verwacht:* navigatie naar /core/assets/cash/[id]. **Eindresultaat:** modal en volledige pagina tonen hetzelfde saldo. **Berekening verwachting:** %-van-totaal voor elke rekening = eigen saldo ÷ (som van beide saldi) × 100; beide percentages tellen op tot 100% (afgerond).
-- **b. Handmatige cash-rekening:** Voeg via /overzicht/bezittingen een handmatige cash-rekening toe zonder banktracking, dan terug naar /overzicht/cashflow. → *verwacht:* klik op die kaart opent het AssetPane (bewerk-paneel) i.p.v. de transactiedetail-modal.
-- **c. Deeplink met anker:** Open /overzicht/cashflow#rekening-\<id\> (id van Betaalrekening ING). → *verwacht:* de kaart scrollt in beeld met een tijdelijke highlight-ring.
+- **b. Handmatige cash-rekening:** Voeg via /overzicht/bezittingen een handmatige cash-rekening toe zonder banktracking, dan terug naar /overzicht/budget. → *verwacht:* klik op die kaart opent het AssetPane (bewerk-paneel) i.p.v. de transactiedetail-modal.
+- **c. Deeplink met anker:** Open /overzicht/budget#rekening-\<id\> (id van Betaalrekening ING). → *verwacht:* de kaart scrollt in beeld met een tijdelijke highlight-ring.
 - **d. Eenvoudig-modus:** Zet weergavemodus op Eenvoudig. → *verwacht:* rekeningen worden als compacte pills getoond i.p.v. kaarten met sparkline.
 
 #### UAT-CASH-05 — Cashflow-instellingen aanpassen (inkomen, spaarquote, uitgaven) (dekt WF-CASH-05)
@@ -10272,9 +10272,9 @@ Let op: `recurring_transactions` wordt door de testdata-seed **niet** gevuld —
 
 #### UAT-CASH-08 — Analyse-periode kiezen en door de historie bladeren (dekt WF-CASH-08)
 - **Kriticiteit:** BELANGRIJK · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~5 min
-- **Preconditie:** Persona Daan Bakker, /overzicht/cashflow/transacties.
+- **Preconditie:** Persona Daan Bakker, /overzicht/budget/transacties.
 - **a. Happy path:** 1) Open de pagina — standaard "30 dagen" actief. → *verwacht:* label toont het exacte 30-dagenvenster (vandaag t/m 29 dagen terug). 2) Kies tab "Maand". → *verwacht:* venster springt naar kalendermaand juli 2026 (huidige, nog lopende maand). 3) Klik ‹ eenmaal. → *verwacht:* label wordt "juni 2026"; › is weer actief. 4) Klik › tot je bij juli 2026 bent. → *verwacht:* › wordt uitgeschakeld zodra je in de huidige maand bent (kan niet voorbij "nu"). **Berekening verwachting:** `resolvePeriodWindow` (lib/transaction-insights.ts) — het 30-dagenblok is exact `since = vandaag−29, until = vandaag` (30 dagen inclusief); maand/kwartaal/jaar gebruiken exacte kalendergrenzen. Controleer dat het venster van "vorige periode" (voor de trend, WF-CASH-09) exact even lang is als het huidige.
-- **c. Ongeldige deeplink:** Open /overzicht/cashflow/transacties?maand=2026-13 (ongeldige maand). → *verwacht:* valt terug op de 30-dagen-weergave, geen crash.
+- **c. Ongeldige deeplink:** Open /overzicht/budget/transacties?maand=2026-13 (ongeldige maand). → *verwacht:* valt terug op de 30-dagen-weergave, geen crash.
 
 #### UAT-CASH-09 — Geldstroom-inzichten bekijken en inzoomen op een dag of weekdag (dekt WF-CASH-09)
 - **Kriticiteit:** BELANGRIJK · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~6 min
@@ -10290,7 +10290,7 @@ Let op: `recurring_transactions` wordt door de testdata-seed **niet** gevuld —
 
 #### UAT-CASH-11 — Handmatig een transactie toevoegen (eventueel terugkerend) (dekt WF-CASH-11)
 - **Kriticiteit:** KERN · **Platform:** webapp+mobiel · **Rooktest:** ja (transactie toevoegen → maandtotaal beweegt) · **Duur:** ~7 min
-- **Preconditie:** Persona Daan Bakker, /overzicht/cashflow/transacties, huidige maand juli 2026. Noteer vóór de stap het huidige maandtotaal Uitgaven in de figures-strip (variabel door jitter — noteer het exacte getal dat op het scherm staat, bv. "€X,XX").
+- **Preconditie:** Persona Daan Bakker, /overzicht/budget/transacties, huidige maand juli 2026. Noteer vóór de stap het huidige maandtotaal Uitgaven in de figures-strip (variabel door jitter — noteer het exacte getal dat op het scherm staat, bv. "€X,XX").
 - **a. Happy path:** 1) Klik "Nieuwe transactie". 2) Kies Type "Uitgave", Datum 5-7-2026, Bedrag €42,50, Beschrijving "Testaankoop UAT", Tegenpartij "UAT Teststore". 3) Kies budget "Boodschappen". 4) Klik "Opslaan". → *verwacht:* sheet sluit, transactie verschijnt bovenaan de tijdlijn op 5 juli. **Eindresultaat + Berekening verwachting:** het nieuwe maandtotaal Uitgaven = (het genoteerde begintotaal) + €42,50 exact; de nieuwe transactie telt direct mee in de spaarquote-gauge (netto daalt met exact €42,50).
 - **b. Terugkerende transactie meteen aanmaken:** Herhaal met Type "Uitgave", Bedrag €12,99, Beschrijving "Test-abonnement UAT", budget "Vrije tijd, hobby's & sport", vink "Terugkerende transactie" aan, frequentie Maandelijks, dag 5. → *verwacht:* naast de losse transactie ontstaat een `recurring_transactions`-rij; deze verschijnt in Vaste lasten (WF-CASH-16) en de Kalender (WF-CASH-21) op dag 5 van elke maand met €12,99.
 - **c. Validatiefout:** Laat Beschrijving leeg en klik Opslaan. → *verwacht:* foutmelding, niets opgeslagen, sheet blijft open.
@@ -10328,14 +10328,14 @@ Let op: `recurring_transactions` wordt door de testdata-seed **niet** gevuld —
 #### UAT-CASH-16 — Vaste lasten bekijken: totaal, aandeel van inkomen en vrijheidstijd (dekt WF-CASH-16)
 - **Kriticiteit:** KERN · **Platform:** webapp+mobiel · **Rooktest:** nee · **Duur:** ~7 min
 - **Preconditie:** Persona Daan Bakker. Let op: er zijn géén bevestigde `recurring_transactions` in de seed — de pagina moet zelf live auto-detecteren over de 12-maands-transactiehistorie.
-- **a. Happy path:** 1) Open /overzicht/cashflow/vaste-lasten. → *verwacht:* hoofdcijfer €/mnd + €/jr + "± X dagen vrijheid/mnd"; meter "Aandeel van je inkomen" met kleur. 2) Blader tussen tabs "Abonnementen"/"Vaste Kosten". → *verwacht:* Netflix/Spotify/Basic-Fit/PS Plus onder Abonnementen, huur/energie/verzekering/gemeente onder Vaste Kosten. 3) (Volledig) bekijk de quote-meter, vrijheidstijd-vertaling en samenstellingsbalk. **Berekening verwachting:** het hoofdcijfer moet exact overeenkomen met de Vaste-lasten-KPI op de landing-kaart (WF-CASH-01) — interne consistentie-check, ongeacht de exacte absolute waarde. De vaste kern (huur 950+gas 150+verzekering 130+gemeente 20+NS-Flex 60+Swapfiets 19,50+Netflix 15,99+Spotify 10,99+Basic-Fit 44,90+PS Plus 14,99) ≈ €1.416,37/mnd tegen inkomen €3.400 → ratio ≈41,7% → status groen (<50%).
+- **a. Happy path:** 1) Open /overzicht/budget/vaste-lasten. → *verwacht:* hoofdcijfer €/mnd + €/jr + "± X dagen vrijheid/mnd"; meter "Aandeel van je inkomen" met kleur. 2) Blader tussen tabs "Abonnementen"/"Vaste Kosten". → *verwacht:* Netflix/Spotify/Basic-Fit/PS Plus onder Abonnementen, huur/energie/verzekering/gemeente onder Vaste Kosten. 3) (Volledig) bekijk de quote-meter, vrijheidstijd-vertaling en samenstellingsbalk. **Berekening verwachting:** het hoofdcijfer moet exact overeenkomen met de Vaste-lasten-KPI op de landing-kaart (WF-CASH-01) — interne consistentie-check, ongeacht de exacte absolute waarde. De vaste kern (huur 950+gas 150+verzekering 130+gemeente 20+NS-Flex 60+Swapfiets 19,50+Netflix 15,99+Spotify 10,99+Basic-Fit 44,90+PS Plus 14,99) ≈ €1.416,37/mnd tegen inkomen €3.400 → ratio ≈41,7% → status groen (<50%).
 - **b. Vrijheidstijd-vertaling:** Lees "± X dagen vrijheid/mnd" naast het hoofdcijfer. → *verwacht:* X = (hoofdcijfer × 12) ÷ (maanduitgaven × 12 ÷ 365), oftewel hoofdcijfer ÷ dagtarief waarbij dagtarief = maanduitgaven×12/365 (`dailyExpenseRate`, lib/format.ts); resultaat afgerond op 1 decimaal.
 - **c. Nu scannen:** Klik "Nu scannen". → *verwacht:* detectie ververst; totalen blijven gelijk of nemen toe als er nieuwe patronen worden gevonden, nooit een crash.
 - **d. Lege staat:** Test met een verse persona zonder transacties. → *verwacht:* "Nog geen vaste kosten gevonden" met uitleg om eerst te uploaden/koppelen.
 
 #### UAT-CASH-17 — Terugkerend item classificeren of bevestigen (dekt WF-CASH-17)
 - **Kriticiteit:** KERN · **Platform:** webapp+mobiel · **Rooktest:** nee · **Duur:** ~6 min
-- **Preconditie:** Persona Daan Bakker, /overzicht/cashflow/vaste-lasten.
+- **Preconditie:** Persona Daan Bakker, /overzicht/budget/vaste-lasten.
 - **a. Happy path — als Abonnement bevestigen:** 1) Klik op de auto-gedetecteerde regel "Basic-Fit". 2) Kies "Abonnement", pas naam niet aan. 3) Klik Opslaan. → *verwacht:* een `recurring_transactions`-rij ontstaat met `amount = -44,90`, `frequency='monthly'`; regel staat nu onder "Abonnementen" en telt mee in het vaste-lastentotaal.
 - **b. Als Vaste kosten classificeren:** Klik op "Vattenfall" (gas-water-licht), kies "Vaste kosten". → *verwacht:* regel staat onder "Vaste Kosten" met bedrag €150,00 (of de geldende jitter-waarde van de laatst herkende maand).
 - **c. Niet opnemen:** Klik op "Padel City Amsterdam" (onregelmatige leuke-uitgaven-post, mogelijk fout-gedetecteerd als terugkerend), kies "Niet opnemen". → *verwacht:* waarschuwing verschijnt; na opslaan verdwijnt het item volledig uit alle vaste-lasten-cijfers (totaal daalt mee).
@@ -10343,14 +10343,14 @@ Let op: `recurring_transactions` wordt door de testdata-seed **niet** gevuld —
 
 #### UAT-CASH-18 — Abonnement opzeggen via een opzegbrief (dekt WF-CASH-18)
 - **Kriticiteit:** KERN · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~6 min
-- **Preconditie:** Persona Daan Bakker, /overzicht/cashflow/vaste-lasten, item "Netflix" (€15,99/mnd) bevestigd als abonnement (via WF-CASH-17).
+- **Preconditie:** Persona Daan Bakker, /overzicht/budget/vaste-lasten, item "Netflix" (€15,99/mnd) bevestigd als abonnement (via WF-CASH-17).
 - **a. Happy path:** 1) Klik het ban-icoon naast "Netflix". 2) Vul Naam "Daan Bakker" en Woonplaats "Amsterdam" in. → *verwacht:* briefpreview vult live mee. 3) Klik "Opzegbrief bewaren voor later". → *verwacht:* sheet sluit; actie "Afronden van opzeggen Netflix abonnement" staat in de actielijst met `euro_impact_monthly = -15,99` (of de actuele bevestigde waarde). **Berekening verwachting:** euro_impact_monthly van de actie = het exacte maandbedrag van het bevestigde abonnement, geen afronding-verschil.
 - **b. Validatiefout:** Laat Woonplaats leeg en klik opslaan. → *verwacht:* foutmelding, geen actie aangemaakt.
 - **c. Annuleren:** Vul het formulier deels in en klik Annuleren. → *verwacht:* sheet sluit zonder op te slaan, geen actie aangemaakt.
 
 #### UAT-CASH-19 — Vaste kosten laten analyseren door Will (AI) (dekt WF-CASH-19)
 - **Kriticiteit:** BELANGRIJK · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~6 min
-- **Preconditie:** Persona Daan Bakker met AI-add-on actief, /overzicht/cashflow/vaste-lasten.
+- **Preconditie:** Persona Daan Bakker met AI-add-on actief, /overzicht/budget/vaste-lasten.
 - **a. Happy path:** 1) Klik "Laat Will analyseren". → *verwacht:* laad-fase, dan voorstellen per rij met AI-classificatie + reden. 2) Beoordeel/pas aan waar nodig, klik "Opslaan". → *verwacht:* toast met aantal opgeslagen items; lijst en totalen verversen (KPI op WF-CASH-16 stijgt mee als er nieuwe items bevestigd zijn).
 - **c. AI niet geconfigureerd:** Herhaal met een account zonder AI-add-on (of AI-kill-switch aan). → *verwacht:* melding "AI is niet geconfigureerd…" (HTTP 422), geen crash, handmatige weg (WF-CASH-17) blijft beschikbaar.
 
@@ -10362,12 +10362,12 @@ Let op: `recurring_transactions` wordt door de testdata-seed **niet** gevuld —
 #### UAT-CASH-21 — Cashflow-kalender: komende 5 weken vooruitkijken (dekt WF-CASH-21)
 - **Kriticiteit:** BELANGRIJK · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~5 min
 - **Preconditie:** Persona Daan Bakker met ≥1 bevestigde recurring (bv. Netflix maandelijks dag 7, uit WF-CASH-18).
-- **a. Happy path:** 1) Scroll naar "Komende 5 weken" op /overzicht/cashflow/vaste-lasten. → *verwacht:* 35-daags grid (ma-start), vandaag (5 juli) gemarkeerd. 2) Zoek de dag 7 (van de eerstvolgende maand indien 5 juli al voorbij dag 7 is, dus 7 augustus) — Netflix moet daar met -€15,99 staan. **Berekening verwachting:** `getNextOccurrence` voor een monthly recurring met `day_of_month=7`: als vandaag (5 juli) vóór dag 7 valt → eerstvolgende datum is 7 juli; header-totaal "Verwacht uit" moet minimaal dit bedrag bevatten.
+- **a. Happy path:** 1) Scroll naar "Komende 5 weken" op /overzicht/budget/vaste-lasten. → *verwacht:* 35-daags grid (ma-start), vandaag (5 juli) gemarkeerd. 2) Zoek de dag 7 (van de eerstvolgende maand indien 5 juli al voorbij dag 7 is, dus 7 augustus) — Netflix moet daar met -€15,99 staan. **Berekening verwachting:** `getNextOccurrence` voor een monthly recurring met `day_of_month=7`: als vandaag (5 juli) vóór dag 7 valt → eerstvolgende datum is 7 juli; header-totaal "Verwacht uit" moet minimaal dit bedrag bevatten.
 - **c. Meer dan 2 items op een dag:** Bevestig ook Spotify (dag 7) als abonnement zodat dag 7 twee items heeft, en voeg zelf een derde terugkerende post op dag 7 toe (WF-CASH-11b). → *verwacht:* dag 7 toont de eerste 2 regels + "+1 meer".
 
 #### UAT-CASH-22 — Zes maanden vooruitkijken met de cashflow-forecast (dekt WF-CASH-22)
 - **Kriticiteit:** KERN · **Platform:** webapp+mobiel · **Rooktest:** nee · **Duur:** ~7 min
-- **Preconditie:** Persona Daan Bakker, /overzicht/cashflow/forecast, **weergavemodus Volledig** — sinds FC-1 (eenvoudige-weergave-audit) toont Eenvoudig hier geen tabel meer; zie stap e.
+- **Preconditie:** Persona Daan Bakker, /overzicht/budget/forecast, **weergavemodus Volledig** — sinds FC-1 (eenvoudige-weergave-audit) toont Eenvoudig hier geen tabel meer; zie stap e.
 - **a. Happy path (Volledig):** 1) Open de pagina. → *verwacht:* 3 samenvattingskaarten (spaarquote 6m, maandelijks netto, uitgaventrend) + tabel met 6 maandregels (Verwacht in/Verwacht uit/Netto/Saldo). 2) Loop de 6 regels na. → *verwacht:* Netto = Verwacht in − Verwacht uit voor elke regel; Saldo loopt cumulatief door vanaf het huidige liquide saldo (Betaalrekening + Spaarrekening = €850+€2.000 = €2.850, tenzij handmatige transacties dit inmiddels wijzigden). **Berekening verwachting:** `buildForecast` (lib/cashflow-forecast-math.ts) herhaalt dezelfde 6-maands-baseline (`Math.round(6-maands-som/6)`) in elke van de 6 maanden en telt de per-maand omgerekende recurrings (weekly×52/12, quarterly÷3, yearly÷12, monthly ongewijzigd) erbovenop; alle 6 maanden hebben dus identiek "Verwacht in"/"Verwacht uit" tenzij het aantal actieve recurrings verandert. Startsaldo = €2.850 (som bank-rekeningen).
 - **b. Saldo na 6m = landing-KPI:** Vergelijk het laatste "Saldo"-cijfer met de Forecast-KPI op de cashflow-landing (WF-CASH-01). → *verwacht:* exact gelijk (dezelfde bron).
 - **c. Negatieve maand:** Verlaag Daans handmatig ingesteld inkomen (WF-CASH-05) tijdelijk naar €0 en verhoog uitgaven, en herlaad de forecast. → *verwacht:* maanden met negatief netto tonen het saldo/netto-cijfer in rood.
@@ -10538,14 +10538,14 @@ Datum;Naam / Omschrijving;Rekening;Tegenrekening;Code;Af Bij;Bedrag (EUR);Mutati
 #### UAT-CASH-30 — Bank koppelen via open banking en de eerste synchronisatie draaien (dekt WF-CASH-30)
 - **Kriticiteit:** KERN · **Platform:** webapp+mobiel · **Rooktest:** nee · **Duur:** ~8 min (toetsbaar deel; sync/succes vereist sandbox-koppeling)
 - **Preconditie:** Persona Daan Bakker, /core/cash/connect.
-- **a. Toetsbaar tot de bank-redirect:** 1) Zoek een bank in de zoekbalk (bv. "ING"). 2) Klik het bank-logo. → *verwacht:* bevestigingsscherm met tekst over een veilige, alleen-lezen verbinding (90 dagen geldig) en een "Verbind met ING"-knop. 3) Klik "Verbind met ING". → *verwacht:* een auth-link wordt aangevraagd (POST /api/bank-connect/auth-link) en de browser wordt doorgestuurd naar de bank-autorisatiepagina — verifieer alleen dát de doorverwijzing plaatsvindt (naar een externe URL), niet het bank-eigen inlogscherm zelf. ~~**Bevinding om te noteren:** de "Beheer rekeningen"/koppel-banner elders in de app noemt de provider "GoCardless", terwijl deze connect-pagina expliciet "TrueLayer" noemt.~~ **VERVALLEN (fase 2):** de koppel-banner (components/overview/koppel-rekening-banner.tsx) noemt sinds de TXN-1-herschrijving alleen nog "TrueLayer" — geen copy-inconsistentie meer. In **Eenvoudig** ligt de ingang naar deze wizard bovendien niet meer direct in de actie-rij van /overzicht/cashflow/transacties maar achter het "…"-menu (TXN-1); in **Volledig** staat "Bank koppelen" ongewijzigd als eigen knop.
+- **a. Toetsbaar tot de bank-redirect:** 1) Zoek een bank in de zoekbalk (bv. "ING"). 2) Klik het bank-logo. → *verwacht:* bevestigingsscherm met tekst over een veilige, alleen-lezen verbinding (90 dagen geldig) en een "Verbind met ING"-knop. 3) Klik "Verbind met ING". → *verwacht:* een auth-link wordt aangevraagd (POST /api/bank-connect/auth-link) en de browser wordt doorgestuurd naar de bank-autorisatiepagina — verifieer alleen dát de doorverwijzing plaatsvindt (naar een externe URL), niet het bank-eigen inlogscherm zelf. ~~**Bevinding om te noteren:** de "Beheer rekeningen"/koppel-banner elders in de app noemt de provider "GoCardless", terwijl deze connect-pagina expliciet "TrueLayer" noemt.~~ **VERVALLEN (fase 2):** de koppel-banner (components/overview/koppel-rekening-banner.tsx) noemt sinds de TXN-1-herschrijving alleen nog "TrueLayer" — geen copy-inconsistentie meer. In **Eenvoudig** ligt de ingang naar deze wizard bovendien niet meer direct in de actie-rij van /overzicht/budget/transacties maar achter het "…"-menu (TXN-1); in **Volledig** staat "Bank koppelen" ongewijzigd als eigen knop.
 - **b. Callback-foutafhandeling met nepparameters:** Navigeer direct naar /core/cash/connect?error=missing_reference (en herhaal met andere foutcodes als connection_not_found, authorization_incomplete, callback_failed, missing_code). → *verwacht:* elk van deze querystring-foutcodes toont een passende, begrijpelijke Nederlandstalige foutmelding op /core/cash/connect, geen crash, geen halve state.
 - **c. Providers laden mislukt / geen zoekresultaat:** Zoek op een onzinnige banknaam ("xyzxyzbank"). → *verwacht:* "Geen banken gevonden". (Providers-laadfout zelf is alleen te forceren door de API te blokkeren — noteer als "vereist sandbox/dev-toggle" als niet reproduceerbaar.)
 - **Niet toetsbaar zonder sandbox-koppeling:** de daadwerkelijke bank-autorisatie, de callback-succesflow naar /core/cash/connect/success, "Synchroniseer nu" (X nieuw/Y dup) en de 90-dagen-hergeldigheid vereisen een echte of sandbox TrueLayer-koppeling — expliciet buiten bereik van deze UAT-ronde.
 
 #### UAT-CASH-31 — Terugkerende transactieregels beheren, stopzetten en verwijderen (dekt WF-CASH-31)
 - **Kriticiteit:** KERN · **Platform:** webapp+mobiel · **Rooktest:** nee · **Duur:** ~10 min
-- **Preconditie:** Persona Daan Bakker, open het rekeningdetail van Betaalrekening ING (via de modal op /overzicht/cashflow, WF-CASH-04, of rechtstreeks /core/assets/cash/[id]). **Belangrijk:** de testdata-seed vult `recurring_transactions` niet — de sectie "Terugkerende transacties" start dus **leeg** en toont alleen detectievoorstellen (via /api/detect-recurring, `min_confidence=medium`) op basis van Daans 15 maanden transactiehistorie. Verwacht voorstellen met hoge betrouwbaarheid: "Huur studio" (-€950, maandelijks, dag 1, amountCV≈0 → high), "TechFlow BV / Salaris" (+€3.400, maandelijks, dag 25, high), "Vattenfall"/"Zilveren Kruis"/"NS Reizigers"/"Swapfiets" (maandelijks, dag 1, high/medium).
+- **Preconditie:** Persona Daan Bakker, open het rekeningdetail van Betaalrekening ING (via de modal op /overzicht/budget, WF-CASH-04, of rechtstreeks /core/assets/cash/[id]). **Belangrijk:** de testdata-seed vult `recurring_transactions` niet — de sectie "Terugkerende transacties" start dus **leeg** en toont alleen detectievoorstellen (via /api/detect-recurring, `min_confidence=medium`) op basis van Daans 15 maanden transactiehistorie. Verwacht voorstellen met hoge betrouwbaarheid: "Huur studio" (-€950, maandelijks, dag 1, amountCV≈0 → high), "TechFlow BV / Salaris" (+€3.400, maandelijks, dag 25, high), "Vattenfall"/"Zilveren Kruis"/"NS Reizigers"/"Swapfiets" (maandelijks, dag 1, high/medium).
 - **a. Happy path — voorstel bevestigen en bewerken:** 1) Bekijk het voorstel "Huur studio -€950/mnd (dag 1)" met confidence-indicatie. 2) Bevestig het (het wordt een `recurring_transactions`-rij: `is_active=true`, `frequency='monthly'`, `day_of_month=1`). → *verwacht:* verwacht maandtotaal bovenaan de sectie toont **-€950,00**. 3) Open de regel via de bewerk-sheet (RecurringEditSheet), wijzig bedrag naar €975,00 (huurverhoging) en sla op. → *verwacht:* verwacht maandtotaal wordt **-€975,00**. **Berekening verwachting:** `getExpectedMonthlyTotal` (lib/recurring-data.ts) sommeert alle actieve regels genormaliseerd naar maandbedrag (monthly ongewijzigd); met precies 1 actieve regel van -€975 is het totaal exact -€975,00.
 - **b. Einddatum in het verleden, maar nog actief (bekende afwijking):** Zet op dezelfde regel een Einddatum van 1 juni 2026 (in het verleden t.o.v. vandaag 5 juli) maar laat "Actief" aangevinkt staan. Sla op. → *verwacht:* de regel toont in de lijst geen "volgende datum" meer (want `getNextOccurrence` geeft `null` als `end_date` in het verleden ligt) — **maar** het verwachte maandtotaal blijft **-€975,00**, want `getExpectedMonthlyTotal` controleert de einddatum niet, alleen `is_active`. **Noteer dit expliciet als bevinding:** een verlopen-maar-actieve regel telt nog volledig mee in het getoonde maandtotaal, wat een tester kan verrassen.
 - **c. Stopzetten (is_active uit):** Open de regel opnieuw en zet "Actief" uit (of gebruik de losse deactiveer-actie). Sla op. → *verwacht:* de regel verdwijnt volledig uit de lijst (server haalt alleen `is_active=true`-rijen op) en het verwachte maandtotaal wordt **€0,00**.
@@ -10583,11 +10583,11 @@ Rooktest-nominaties: UAT-BUDGET-01a (eerste setup), UAT-BUDGET-02a (realisatie v
 #### UAT-BUDGET-01 — Budgetteren voor het eerst instellen (dekt WF-BUDGET-01)
 - **Kriticiteit:** KERN · **Platform:** webapp+mobiel · **Rooktest:** ja · **Duur:** ~12 min
 - **Precondition:** een NIÉT-Lisa testaccount (Lisa heeft Budgetteren al actief). Reset een "Landing page testaccount" (`/beheer/testdata`, WF-BEHEER-23) of het eigen account via "Onboarding-flow opnieuw doorlopen" (WF-BEHEER-22); doorloop onboarding tot de inkomensstap met netto maandinkomen **€3.000**; zorg voor minstens 1 actieve cash-rekening.
-- **a. Happy path:** Open `/overzicht/cashflow/budget` → *verwacht:* setup-scherm "Stel Budgetteren in" i.p.v. de budgetpagina. Sectie 1: vink de cash-rekening aan. Sectie 2: kies "Nibud-standaard". Sectie 3: lees de 3 kaarten (Bankkoppeling/Handmatig/CSV-import), vink "Ik snap hoe ik transacties op rekeningen kan loggen" aan. Bevestig.
+- **a. Happy path:** Open `/overzicht/budget` → *verwacht:* setup-scherm "Stel Budgetteren in" i.p.v. de budgetpagina. Sectie 1: vink de cash-rekening aan. Sectie 2: kies "Nibud-standaard". Sectie 3: lees de 3 kaarten (Bankkoppeling/Handmatig/CSV-import), vink "Ik snap hoe ik transacties op rekeningen kan loggen" aan. Bevestig.
   **Eindresultaat:** setup-scherm verdwijnt; budgetboom met 6 hoofdbudgetten + 22 deelbudgetten verschijnt.
   **Berekening verwachting:** Nibud-allocatie (`NIBUD_ALLOC`) telt exact op tot 100% van €3.000: Vaste lasten wonen €1.140 (Huur €720 / Gas-water-licht €150 / Verzekeringen €120 / Gemeentelijk €60 / Telefoon-internet-tv €60 / Abonnementen €30), Dagelijkse uitgaven €540 (Boodschappen €360 / Huishouden €60 / Kinderen €60 / Medisch €60), Vervoer €300 (Brandstof €120 / Auto vast €90 / Auto onderhoud €60 / Fiets €30), Leuke dingen €360 (elk van de 4 sub-potjes €90), Sparen & investeren €510 (Noodbuffer €210 / Investeren-FIRE €300), Schulden & aflossingen €150 (Schulden €90 / Extra aflossing €60). Totaal = €3.000 → **Volgens plan: te verdelen €0.**
 - **b. Validatie geblokkeerd:** probeer te bevestigen zonder rekening, zonder templatekeuze en zonder het vinkje → *verwacht:* per ontbrekend onderdeel een blokkerende reden; vul stap voor stap aan en controleer dat elke blokkade verdwijnt zodra dat onderdeel compleet is.
-- **c. Geen cash-rekening:** op een account zonder enige cash-rekening → *verwacht:* sectie 1 toont een lege staat met link "Kern-bezittingen" (→ `/overzicht/cashflow`); setup kan niet worden afgerond.
+- **c. Geen cash-rekening:** op een account zonder enige cash-rekening → *verwacht:* sectie 1 toont een lege staat met link "Kern-bezittingen" (→ `/overzicht/budget`); setup kan niet worden afgerond.
 
 ---
 
@@ -10609,7 +10609,7 @@ Rooktest-nominaties: UAT-BUDGET-01a (eerste setup), UAT-BUDGET-02a (realisatie v
 - **b. YTD-schaling:** klik de periode-pill op "YTD" → *verwacht:* titel "2026 YTD"; maandpijlen verdwijnen/zijn uitgeschakeld.
   **Berekening verwachting:** bij toetsing in juli is dit 7 maanden (jan t/m jul) → Boodschappen-limiet toont €600 × 7 = **€4.200** (rollover telt niet mee buiten maandmodus).
 - **c. 12-maanden-modus:** klik "12 mnd" → *verwacht:* titel "Afgelopen 12 maanden"; Boodschappen-limiet toont €600 × 12 = **€7.200**.
-- **d. Deeplink `?maand=`:** open `/overzicht/cashflow/budget?maand=2026-06` → *verwacht:* pagina opent direct op juni 2026. Open vervolgens `?maand=ongeldig` → *verwacht:* valt terug op de huidige maand (juli 2026), geen foutmelding.
+- **d. Deeplink `?maand=`:** open `/overzicht/budget?maand=2026-06` → *verwacht:* pagina opent direct op juni 2026. Open vervolgens `?maand=ongeldig` → *verwacht:* valt terug op de huidige maand (juli 2026), geen foutmelding.
 
 ---
 
@@ -10791,7 +10791,7 @@ Rooktest-nominaties: UAT-BUDGET-01a (eerste setup), UAT-BUDGET-02a (realisatie v
 #### UAT-BUDGET-23 — Deeplinks en legacy-routes gebruiken (dekt WF-BUDGET-23)
 - **Kriticiteit:** BELANGRIJK · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~8 min
 - **Precondition:** Persona Lisa met minstens één bestaand budget (noteer het budget-id via de URL na het openen van een detailpaneel).
-- **a. Happy path:** open achtereenvolgens `/core/budgets/new` (→ korte redirect, "Nieuw budget"-pane open), `/core/budgets/<id>` (→ detailpaneel van dat budget, spinner tijdens redirect), `/core/budgets/<id>/edit` (→ bewerk-paneel open), en `/overzicht/cashflow/budget?planEditor=true` (→ planeditor-sheet open). Druk na elke stap browser-terug → *verwacht:* pane sluit, pagina (URL zonder query) blijft staan, geen 404's.
+- **a. Happy path:** open achtereenvolgens `/core/budgets/new` (→ korte redirect, "Nieuw budget"-pane open), `/core/budgets/<id>` (→ detailpaneel van dat budget, spinner tijdens redirect), `/core/budgets/<id>/edit` (→ bewerk-paneel open), en `/overzicht/budget?planEditor=true` (→ planeditor-sheet open). Druk na elke stap browser-terug → *verwacht:* pane sluit, pagina (URL zonder query) blijft staan, geen 404's.
 - **c. Randgevallen:** open `/core/budgets/<niet-bestaand-uuid>` → *verwacht:* geen pane, query-params worden automatisch opgeschoond, geen fout. Open (indien beschikbaar) een budget-id van een ánder account → *verwacht:* zelfde opschoon-gedrag (budget hoort niet bij deze gebruiker). Open `?maand=2026-99` (ongeldige maand) → *verwacht:* valt terug op de huidige maand.
 
 ---
@@ -11992,7 +11992,7 @@ Drie workflows zijn hier bewust géén volledig scenario maar een verwijsregel, 
   3. Herhaal voor de overige vijf types → *verwacht:* elke keuze start een eigen download zonder foutmelding.
   **Eindresultaat:** zes bruikbare CSV-bestanden gedownload.
 - **b. Randgeval — geen data:** test met een vers gereset account zonder transacties/budgetten → *verwacht:* de export levert een (vrijwel) leeg bestand op, geen foutmelding in de UI.
-- **c. Inhoud-consistentiecheck:** open het gedownloade "Transacties"-CSV-bestand en tel het aantal rijen (exclusief header) → *verwacht:* dit aantal komt overeen met het aantal transacties dat `/overzicht/cashflow/transacties` toont voor dezelfde periode/scope; steekproefsgewijs één bedrag vergelijken tussen CSV en scherm.
+- **c. Inhoud-consistentiecheck:** open het gedownloade "Transacties"-CSV-bestand en tel het aantal rijen (exclusief header) → *verwacht:* dit aantal komt overeen met het aantal transacties dat `/overzicht/budget/transacties` toont voor dezelfde periode/scope; steekproefsgewijs één bedrag vergelijken tussen CSV en scherm.
 - **d. Bediening — dropdown sluiten:** open de exportdropdown en klik ergens buiten de dropdown → *verwacht:* de dropdown sluit zonder dat er een download start.
 
 ---
@@ -12166,7 +12166,7 @@ Verwijzingen naar andere UAT-documenten (UAT-OVZ-*, UAT-BEZIT-17, UAT-KRUIS-25, 
 #### UAT-WILL-07 — "Bespreek met Will" vanaf een onderwerp elders in de app (dekt WF-WILL-07)
 - **Kriticiteit:** BELANGRIJK · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~6 min
 - **Preconditie:** persona Tessa Compleet (alle in-depth apps actief, dus alle knop-locaties beschikbaar).
-- **a. Happy path:** open /toekomst (fase-analyse) of /overzicht/cashflow (vaste-lasten-analyse), zoek een "Bespreek met Will"-knop bij een specifiek onderwerp en klik erop → *verwacht:* de chat opent en het kick-off-bericht (onderwerp + toelichting + "Wat betekent dit voor mijn situatie…") staat al als eigen bericht in het gesprek; Will antwoordt streamend zonder dat er iets getypt hoefde te worden.
+- **a. Happy path:** open /toekomst (fase-analyse) of /overzicht/budget (vaste-lasten-analyse), zoek een "Bespreek met Will"-knop bij een specifiek onderwerp en klik erop → *verwacht:* de chat opent en het kick-off-bericht (onderwerp + toelichting + "Wat betekent dit voor mijn situatie…") staat al als eigen bericht in het gesprek; Will antwoordt streamend zonder dat er iets getypt hoefde te worden.
 - **c. Compact:** herhaal op minstens één andere locatie (bv. de Box 3 stelsel-2028-kaart óf de status-duiding-banner op /overzicht) om te bevestigen dat het generieke mechanisme overal identiek werkt · klik snel twee keer op dezelfde knop → er wordt niet twee keer hetzelfde kick-off-bericht verstuurd (one-shot-guard).
 
 ---
@@ -12194,7 +12194,7 @@ Verwijzingen naar andere UAT-documenten (UAT-OVZ-*, UAT-BEZIT-17, UAT-KRUIS-25, 
 - **Kriticiteit:** BELANGRIJK · **Platform:** webapp · **Rooktest:** ja · **Duur:** ~10 min (excl. koersalert-subscenario) / +10 min met koersalert-subscenario
 - **Preconditie:** persona met minstens één budget en actuele-maand-transacties (bv. Daan Bakker of Lisa de Groot); voor stap a2 zelf een trigger zetten (zie hieronder).
 - **a. Happy path — budgetmelding (zelf getriggerd):**
-  1. Kies een budgetcategorie met een gekend maandlimiet (bv. Daans "Boodschappen", limiet €380/mnd). Voeg op /overzicht/cashflow/transacties (of via import) een handmatige transactie toe die de reeds bestede maandsom over de 80%-drempel tilt, bv. een extra uitgave van €50 boven op wat er al besteed is (controleer eerst het al-bestede bedrag deze maand op de budgettenpagina).
+  1. Kies een budgetcategorie met een gekend maandlimiet (bv. Daans "Boodschappen", limiet €380/mnd). Voeg op /overzicht/budget/transacties (of via import) een handmatige transactie toe die de reeds bestede maandsom over de 80%-drempel tilt, bv. een extra uitgave van €50 boven op wat er al besteed is (controleer eerst het al-bestede bedrag deze maand op de budgettenpagina).
   2. **Narekenen:** drempel = 80% van €380 = €304 (`shouldAlert`, default `alert_threshold` = 80). Bij bv. €320 totaal besteed (84%): titel "Boodschappen: 84% besteed", omschrijving "€320 van €380 — nog €60 over (drempel: 80%)" (amber). Bij ≥ €380 (100%): "… — over budget" (rood); bij ≥ €456 (120%): "… — flink over budget".
   3. Klik het bel-icoon in de topbalk → *verwacht:* modal opent, haalt verse meldingen op; de budgetmelding staat onder "Dringend" als hij ongelezen is én prioriteit ≤2 (bij ≥100% besteed) of anders gewoon onder "Vandaag".
   4. Klik "Alles gelezen" → *verwacht:* alle ongelezen meldingen worden in één keer gelezen; de rode badge op het bel-icoon verdwijnt.
@@ -12473,7 +12473,7 @@ Verwijzingen naar andere UAT-documenten (UAT-OVZ-*, UAT-BEZIT-17, UAT-KRUIS-25, 
   5. Controleer de kassabon (Inkomen/Uitgaven/Sparen/Schulden met begroot-bedrag als sublabel) en de spaarquote-totaalregel.
   6. Lees de maandvergelijking (vorige maand, 3-maands gemiddelde, huidige maand).
   7. Controleer de vrijheidstijd-eindconclusie.
-  - **Eindresultaat:** Begroot-cijfer klopt exact met de rekensom; Besteed komt overeen met wat `/overzicht/cashflow/transacties` voor juni 2026 toont (zelfde brontransacties).
+  - **Eindresultaat:** Begroot-cijfer klopt exact met de rekensom; Besteed komt overeen met wat `/overzicht/budget/transacties` voor juni 2026 toont (zelfde brontransacties).
   - **Berekening verwachting — "Begroot" (100% deterministisch, geen jitter):**
     - Vaste lasten wonen & energie: 1.100(huur/hyp)+180(gas/water/licht)+210(verzekeringen)+65(gemeentelijk) = **€1.555**
     - Dagelijkse uitgaven: 480(boodschappen)+60(huishouden)+350(kinderen)+35(medisch) = **€925**
@@ -12485,7 +12485,7 @@ Verwijzingen naar andere UAT-documenten (UAT-OVZ-*, UAT-BEZIT-17, UAT-KRUIS-25, 
     - **Begroot (totaal) = 3.045+600+50 = €3.695**; Inkomen-begroot = 4.200+400+0+600 = **€5.200**
     - **Te verdelen** = 5.200−3.695 = **€1.505**; **dekkingsgraad** = 3.695/5.200×100 ≈ **71,1%**
     - Essentieel-begroot (Vaste lasten+Dagelijks+Vervoer) = **€2.745**; Discretionair-begroot (Leuke dingen) = **€300**
-    - **Besteed/Verschil/Vrijheid-impact/burn-rate/YTD/trend**: afhankelijk van echte transacties (jitter) — kruisverwijs 1-op-1 met de bedragen die `/overzicht/cashflow/transacties` voor dezelfde categorie/maand toont; elk verschil ís een bug (route en scherm moeten dezelfde `transactions`-rijen sommeren).
+    - **Besteed/Verschil/Vrijheid-impact/burn-rate/YTD/trend**: afhankelijk van echte transacties (jitter) — kruisverwijs 1-op-1 met de bedragen die `/overzicht/budget/transacties` voor dezelfde categorie/maand toont; elk verschil ís een bug (route en scherm moeten dezelfde `transactions`-rijen sommeren).
 - **b. Lopende maand — burn-rate-variant (juli 2026):**
   1. Genereer voor juli 2026 (huidige maand, dag 5 van 31).
   - → *verwacht:* blok "Uitgavesnelheid" verschijnt (dag 5/31 + `projectedMonthEnd` = besteed-tot-nu ÷ 5 × 31); rollovers alleen zichtbaar als er carried-bedragen zijn (hier: geen, dus verborgen); YTD-sectie verschijnt (maandnummer 7 ≥ 2).
@@ -12770,20 +12770,20 @@ Deze totalen wijken bewust af van het ronde marketing-cijfer in `meta.netWorth` 
 - **Kriticiteit:** KERN · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~12 min
 - **Preconditie:** Persona Tessa/compleet.
 - **a. Happy path:**
-  1. Noteer de spaarquote op /overzicht (cashflow-tegel) en onderaan /overzicht/cashflow (instellingenblok, label "berekend, laatste 6 maanden").
-  2. Ga naar /overzicht/cashflow/transacties → "Importeer transacties" → /core/cash/import → upload een CSV met: één salaris +€1.000 (nieuw, boven op de bestaande salaris-transacties) en twee uitgaven −€150 en −€60 in de huidige maand.
+  1. Noteer de spaarquote op /overzicht (cashflow-tegel) en onderaan /overzicht/budget (instellingenblok, label "berekend, laatste 6 maanden").
+  2. Ga naar /overzicht/budget/transacties → "Importeer transacties" → /core/cash/import → upload een CSV met: één salaris +€1.000 (nieuw, boven op de bestaande salaris-transacties) en twee uitgaven −€150 en −€60 in de huidige maand.
   3. Wijs categorieën toe tijdens/na import (bv. "Overige inkomsten", "Boodschappen", "Vrije tijd").
-  4. Controleer op /overzicht/cashflow/transacties: de drie nieuwe transacties staan in de huidige maand.
-  5. Open /overzicht/cashflow/budget: de "besteed"-bedragen van de geraakte budgetten (Boodschappen, Vrije tijd) zijn met exact €150 resp. €60 gestegen.
-  6. Terug op /overzicht: cashflow-tegel en maandinkomsten/-uitgaven zijn herrekend (inkomsten +€1.000, uitgaven +€210); open de spaarquote-kassabon op /overzicht/cashflow en controleer dat de 6-maands-som de nieuwe maand bevat.
+  4. Controleer op /overzicht/budget/transacties: de drie nieuwe transacties staan in de huidige maand.
+  5. Open /overzicht/budget: de "besteed"-bedragen van de geraakte budgetten (Boodschappen, Vrije tijd) zijn met exact €150 resp. €60 gestegen.
+  6. Terug op /overzicht: cashflow-tegel en maandinkomsten/-uitgaven zijn herrekend (inkomsten +€1.000, uitgaven +€210); open de spaarquote-kassabon op /overzicht/budget en controleer dat de 6-maands-som de nieuwe maand bevat.
   - **Eindresultaat:** budgetrealisatie, maandtotalen en 6-maands-spaarquote zijn alle drie en consistent bijgewerkt.
-  - **Berekening verwachting:** budget "besteed" Boodschappen +€150 exact, Vrije tijd +€60 exact (transactiesom per budget_id, deterministisch). Spaarquote-delta is NIET met de hand te voorspellen (6-maands gemiddelde over reeds-gejitterde transacties) — controleer in plaats daarvan dat de nieuwe 6-maands-spaarquote op /overzicht en op /overzicht/cashflow **exact hetzelfde percentage** tonen (dat is de eigenlijke consistentie-eis, zie UAT-KRUIS-06).
+  - **Berekening verwachting:** budget "besteed" Boodschappen +€150 exact, Vrije tijd +€60 exact (transactiesom per budget_id, deterministisch). Spaarquote-delta is NIET met de hand te voorspellen (6-maands gemiddelde over reeds-gejitterde transacties) — controleer in plaats daarvan dat de nieuwe 6-maands-spaarquote op /overzicht en op /overzicht/budget **exact hetzelfde percentage** tonen (dat is de eigenlijke consistentie-eis, zie UAT-KRUIS-06).
 - **b. Randgeval:**
   - Neem één transactie op als **eigen-rekening-overboeking** (zelfde IBAN als afzender/ontvanger, bv. van "Gezamenlijke rekening ABN" naar "Spaarrekening gezin"): mag NIET meetellen in inkomsten/uitgaven/spaarquote — controleer dat de kerngetallen ongewijzigd blijven na deze ene transactie.
   - Boek een transactie op een **spaarbudget** (bv. "Investeren / FIRE / pensioen"): telt als sparen, niet als uitgave — spaarquote moet stijgen in plaats van dalen.
   - Import met minder dan 6 maanden historie beschikbaar: spaarquote wordt geëxtrapoleerd, herkomstlabel blijft correct benoemd.
 - **c. Foutpad:** importeer hetzelfde bestand een tweede keer — geen dubbeltelling (dedupe) of een duidelijke waarschuwing, in geen geval dubbele bedragen in de budgetrealisatie. Breek een import handmatig af (tabblad sluiten na upload, vóór categorisatie-afronding) — geen half-toegepaste realisatie (transacties staan er óf volledig óf niet in).
-- **d. Persistentie:** herlaad /overzicht/cashflow/transacties, /overzicht/cashflow/budget en /overzicht; alle drie tonen de geïmporteerde data ongewijzigd na een harde refresh.
+- **d. Persistentie:** herlaad /overzicht/budget/transacties, /overzicht/budget en /overzicht; alle drie tonen de geïmporteerde data ongewijzigd na een harde refresh.
 
 ---
 
@@ -12792,8 +12792,8 @@ Deze totalen wijken bewust af van het ronde marketing-cijfer in `meta.netWorth` 
 - **Preconditie:** Persona Tessa/compleet met ≥6 maanden transactiehistorie (standaard bij seeden: 15 maanden).
 - **a. Happy path:**
   1. Open /overzicht en noteer het percentage in de cashflow-tegel.
-  2. Open /overzicht/cashflow → instellingenblok → noteer de "berekende" spaarquote; open de kassabon en controleer dat de 6-maands inkomsten/uitgaven-uitsplitsing tot exact dit percentage optelt.
-  3. Open /overzicht/cashflow/forecast en vergelijk het daar getoonde percentage.
+  2. Open /overzicht/budget → instellingenblok → noteer de "berekende" spaarquote; open de kassabon en controleer dat de 6-maands inkomsten/uitgaven-uitsplitsing tot exact dit percentage optelt.
+  3. Open /overzicht/budget/forecast en vergelijk het daar getoonde percentage.
   4. Open de gezondheidsscore-uitsplitsing op /overzicht: de spaarquote-pijler-input toont hetzelfde percentage.
   5. Start een maand-check-in (/mijn/checkins) en controleer dat een gespreksstarter over sparen hetzelfde percentage noemt.
   - **Eindresultaat:** vijf oppervlakken, één percentage, één formule (`lib/savings-source.ts#savingsRateFromAggregates`).
@@ -12810,7 +12810,7 @@ Deze totalen wijken bewust af van het ronde marketing-cijfer in `meta.netWorth` 
 - **Preconditie:** Persona Tessa/compleet.
 - **a. Happy path:**
   1. Noteer de FIRE-leeftijd op /toekomst en het snijpunt in de /overzicht-mini-grafiek.
-  2. Open /overzicht/cashflow → instellingenblok → potlood bij "Inkomen" → zet handmatig op **€10.000/maand** (hoger dan Tessa's huidige €7.600) → opslaan.
+  2. Open /overzicht/budget → instellingenblok → potlood bij "Inkomen" → zet handmatig op **€10.000/maand** (hoger dan Tessa's huidige €7.600) → opslaan.
   3. Herlaad /toekomst: FIRE-leeftijd is eerder of gelijk (nooit later, want inkomen ↑ zonder uitgaven-wijziging = hogere spaarcapaciteit). Herlaad /overzicht: snijpunt in mini-grafiek en FIRE-countdown-widget bewegen naar **dezelfde** nieuwe leeftijd/datum.
   4. Zet de bron terug op "berekend" en controleer dat beide pagina's terugvallen op het transactie-gebaseerde getal van stap 1.
   - **Eindresultaat:** één spaarbron-resolutie (`lib/savings-source.ts#resolveSavingsSource`), twee oppervlakken, identieke nieuwe FIRE-leeftijd.
@@ -12998,9 +12998,9 @@ Deze totalen wijken bewust af van het ronde marketing-cijfer in `meta.netWorth` 
 - **a. Happy path:**
   1. Noteer per domein (Bezittingen/Schulden/Cashflow/Belasting) de sidebar-dot-kleur.
   2. Open /overzicht en vergelijk de dots op de bijbehorende hefboomkaarten.
-  3. Open /overzicht/cashflow (of een ander domein met een afwijkende status) en vergelijk de status-duiding-banner; minimaliseer de banner en controleer dat het statuspunt naast de pagina-i dezelfde kleur heeft.
+  3. Open /overzicht/budget (of een ander domein met een afwijkende status) en vergelijk de status-duiding-banner; minimaliseer de banner en controleer dat het statuspunt naast de pagina-i dezelfde kleur heeft.
   4. Open /overzicht/belasting en vergelijk de Box 1/2/3-kaartstatussen met de sidebar-Box-dots.
-  5. Verander een input die een status doet omslaan (bv. voer op /overzicht/cashflow een fors lagere handmatige uitgaven-instelling in die de spaarquote-status doet kantelen) en controleer dat ALLE plekken (sidebar, hefboomkaart, banner, statuspunt) tegelijk omslaan.
+  5. Verander een input die een status doet omslaan (bv. voer op /overzicht/budget een fors lagere handmatige uitgaven-instelling in die de spaarquote-status doet kantelen) en controleer dat ALLE plekken (sidebar, hefboomkaart, banner, statuspunt) tegelijk omslaan.
   - **Eindresultaat:** één stoplichtstatus per domein, identiek op vier plekken tegelijk, vóór en ná een statuswijzigende actie.
   - **Berekening verwachting:** categorische gelijkheid (geen euro-bedrag, maar een status uit `{op koers, aandacht, actie}` of vergelijkbaar) — SSoT is `lib/lever-scores-loader.ts#loadLeverScores`; alle vier consumenten moeten letterlijk dezelfde status-string/-kleur tonen, geen "bijna gelijk".
 - **b. Randgeval:** statusescalatie (oranje→rood) terwijl de banner geminimaliseerd is: de banner klapt automatisch weer uit; het statuspunt verkleurt mee (geen "stuck" grijs/oud punt).
@@ -13035,7 +13035,7 @@ Deze totalen wijken bewust af van het ronde marketing-cijfer in `meta.netWorth` 
 - **Kriticiteit:** KERN · **Platform:** webapp · **Rooktest:** nee · **Duur:** ~8 min
 - **Preconditie:** Persona Tessa/compleet.
 - **a. Happy path:**
-  1. Bepaal het dagtarief zelf: noteer de actuele maanduitgaven zoals getoond op /overzicht/cashflow (dit is een transactie-afgeleid bedrag met seed-jitter, dus niet vooraf vast te leggen in dit document) en bereken (maanduitgaven × 12) ÷ 365.
+  1. Bepaal het dagtarief zelf: noteer de actuele maanduitgaven zoals getoond op /overzicht/budget (dit is een transactie-afgeleid bedrag met seed-jitter, dus niet vooraf vast te leggen in dit document) en bereken (maanduitgaven × 12) ÷ 365.
   2. Deel het netto vermogen (uit UAT-KRUIS-01) door dit dagtarief en vergelijk met de hero-vrijheidstijd op /overzicht (afronding in dagen/maanden/jaren toegestaan, geen ander dagtarief).
   3. Open de Box 3-widget of de belastingpagina en controleer dat "kost X vrijheidsdagen" = heffing ÷ hetzelfde dagtarief.
   4. Open /rapportages/vermogen of /rapportages/balans en controleer de vrijheidstijd-finale met dezelfde deling.
@@ -13083,12 +13083,12 @@ Deze totalen wijken bewust af van het ronde marketing-cijfer in `meta.netWorth` 
 - **Kriticiteit:** KERN · **Platform:** webapp + mobiel · **Rooktest:** nee · **Duur:** ~8 min
 - **Preconditie:** Persona Tessa/compleet mét actieve AI-add-on (zonder add-on: zie UAT-KRUIS-25, dan is er geen Will-antwoord om te vergelijken).
 - **a. Happy path:**
-  1. Noteer spaarquote (/overzicht/cashflow), netto vermogen (€1.130.980) en vrijheids-% (/overzicht).
+  1. Noteer spaarquote (/overzicht/budget), netto vermogen (€1.130.980) en vrijheids-% (/overzicht).
   2. Open Will en stel achtereenvolgens: "Wat is mijn spaarquote?", "Wat is mijn netto vermogen?", "Ben ik financieel vrij?".
   3. Vergelijk de genoemde getallen met de UI: spaarquote en netto vermogen moeten letterlijk (op kleine formatteringsverschillen na, bv. "1.130.980" vs "€1,13 miljoen") overeenkomen — de context instrueert de AI expliciet deze getallen NIET zelf te herberekenen.
   4. Controleer dat Wills "vrij / nog niet vrij"-framing overeenkomt met de hero-framing (zelfde vlag: bij Tessa met eigen woning die niet volledig meetelt, moet Will NIET "je bent al vrij" zeggen als de hero "nog X jaar" toont).
   - **Eindresultaat:** Will citeert de canonieke cijfers, herberekent niets zelf.
-  - **Berekening verwachting:** netto vermogen genoemd door Will = exact €1.130.980 (of het actuele bedrag na eerdere scenario's); spaarquote = exact het percentage van /overzicht/cashflow op datzelfde moment. Geen eigen AI-afronding die tot een ander getal leidt dan de UI.
+  - **Berekening verwachting:** netto vermogen genoemd door Will = exact €1.130.980 (of het actuele bedrag na eerdere scenario's); spaarquote = exact het percentage van /overzicht/budget op datzelfde moment. Geen eigen AI-afronding die tot een ander getal leidt dan de UI.
 - **b. Randgeval:** stel een vraag direct ná een datawijziging (bv. na UAT-KRUIS-02's bezit-toevoeging): Will moet het NIEUWE getal noemen, niet een gecachete oude waarde (context wordt per gesprek opnieuw opgebouwd).
 - **c. Foutpad:** AI uitgeschakeld (kill-switch of geen add-on): geen Will-antwoord beschikbaar — dus per definitie geen inconsistentie mogelijk; controleer dat de gate-melding verschijnt (zie UAT-KRUIS-25) in plaats van een kapotte/lege chat.
 - **d. Persistentie:** herlaad de Will-chat (nieuw gesprek starten) en stel dezelfde vragen opnieuw — dezelfde actuele getallen komen terug.
@@ -13101,7 +13101,7 @@ Deze totalen wijken bewust af van het ronde marketing-cijfer in `meta.netWorth` 
 - **a. Happy path:**
   1. Open /core (géén redirect, live backing-UI): vergelijk het getoonde netto vermogen/spaarquote met /overzicht.
   2. Open /horizon (géén redirect, rendert dezelfde tijdas-component als /toekomst): vergelijk de FIRE-leeftijd met /toekomst.
-  3. Open /core/cash/import (actieve import-ingang): bevestig dat een import hier exact hetzelfde resultaat oplevert als via /overzicht/cashflow/transacties (zelfde route, alleen andere ingang).
+  3. Open /core/cash/import (actieve import-ingang): bevestig dat een import hier exact hetzelfde resultaat oplevert als via /overzicht/budget/transacties (zelfde route, alleen andere ingang).
   - **Eindresultaat:** /core toont exact hetzelfde netto vermogen/spaarquote als /overzicht; /horizon toont exact dezelfde FIRE-leeftijd als /toekomst.
   - **Berekening verwachting:** netto vermogen op /core = exact €1.130.980 (of het actuele bedrag), zelfde `computeFreedomProgress`/`buildHealthScoreInput`/`savingsRateFromAggregates`-bouwstenen als /overzicht (`lib/core-data-loader.ts` hergebruikt dezelfde bouwstenen). FIRE-leeftijd op /horizon = exact gelijk aan /toekomst (letterlijk dezelfde component + data).
 - **b./c. Niet van toepassing (gemotiveerd):** dit is een zuivere cross-route cijfer-consistentietoets; interactiegedrag en foutpaden van deze schermen zelf horen bij de module-scenario's (Kern/Horizon-deelgebieden), niet bij KRUIS.
@@ -13117,7 +13117,7 @@ Deze totalen wijken bewust af van het ronde marketing-cijfer in `meta.netWorth` 
   2. /nieuws (krant). → *verwacht: gate i.p.v. de krant-inhoud.*
   3. /rapportages → probeer een persoonlijk plan/rapport te genereren. → *verwacht: gate.*
   4. /toekomst/rekenhulp → probeer een AI-rekenhulp te laten bouwen. → *verwacht: gate.*
-  5. /overzicht/cashflow/vaste-lasten → start de abonnementen-detectie/analyse. → *verwacht: gate.*
+  5. /overzicht/budget/vaste-lasten → start de abonnementen-detectie/analyse. → *verwacht: gate.*
   6. Open een transactie en probeer de AI-categorisatie-suggestie te gebruiken (indien een los aanroepbare actie, bv. "AI-voorstel" bij het toewijzen van een budgetcategorie). → *verwacht: gate of stille fallback naar regel-gebaseerde suggestie, nooit een AI-antwoord.*
   7. Open /will en controleer de AI-aanbevelingen-sectie (initial + volledig). → *verwacht: gate i.p.v. gegenereerde aanbevelingen.*
   8. Doorloop /onboarding (nieuw test-account) tot de budgetsuggestie-stap. → *verwacht: gate i.p.v. AI-voorgestelde budgetten (nette fallback naar standaardbudgetten).*
@@ -13139,9 +13139,9 @@ Deze totalen wijken bewust af van het ronde marketing-cijfer in `meta.netWorth` 
   3. **Onboarding — inkomen/uitgaven:** vul netto maandinkomen **€3.000** en geschatte maanduitgaven **€2.100** in. → *verwacht: de onboarding-stap toont direct een spaarquote-indicatie van **30,0%** ((3.000−2.100)÷3.000×100).* **Checkpoint 1:** dit percentage moet straks (halte 5) ongewijzigd terugkomen als bronlabel "geschat uit profiel".
   4. **Onboarding afronden:** doorloop de resterende stappen (of sla desgewenst optionele stappen over) tot de successcreen; klik door naar /overzicht. → *verwacht: /overzicht laadt zonder crash, toont een lege-staat-achtige hero (netto vermogen €0, want nog geen bezittingen) mét de spaarquote-tegel op **30,0%** (uit de profielschatting van stap 3). * **Checkpoint 2:** spaarquote-tegel = exact 30,0%, identiek aan checkpoint 1.
   5. **Eerste bezitting:** ga naar /overzicht/bezittingen → "Bezitting toevoegen" → type **Spaargeld** → bedrag **€10.000** → opslaan. → *verwacht: terug op /overzicht toont de hero netto vermogen **€10.000** exact (0 + 10.000).* **Checkpoint 3:** €10.000 op de hero, in de sidebar én op /overzicht/bezittingen (drievoudig gelijk, zelfde bedrag als zojuist ingevoerd).
-  6. **Eerste transactie (inkomen):** ga naar /overzicht/cashflow/transacties → voeg handmatig een transactie toe: **+€3.000**, categorie "Salaris & uitkering", datum vandaag. → *verwacht: transactie zichtbaar in de lijst van de huidige maand; het maandinkomen op /overzicht/cashflow toont €3.000.*
-  7. **Eerste transactie (uitgave):** voeg een tweede transactie toe: **−€500**, categorie "Boodschappen", datum vandaag. → *verwacht: maanduitgaven tonen €500.* **Checkpoint 4:** de twee bedragen (€3.000 inkomen, €500 uitgave) van stap 6-7 komen ongewijzigd terug in het instellingenblok van /overzicht/cashflow.
-  8. **Eerste budget:** ga naar /overzicht/cashflow/budget → stel het limiet voor "Boodschappen" in op **€400/maand**. → *verwacht: de budgetkaart toont "besteed €500 van €400" — een zichtbare overschrijding van €100, want de transactie uit stap 7 was al geboekt vóórdat het limiet werd ingesteld.* **Checkpoint 5:** €500 (exact het bedrag uit stap 7) verschijnt hier als "besteed", niet een ander bedrag.
+  6. **Eerste transactie (inkomen):** ga naar /overzicht/budget/transacties → voeg handmatig een transactie toe: **+€3.000**, categorie "Salaris & uitkering", datum vandaag. → *verwacht: transactie zichtbaar in de lijst van de huidige maand; het maandinkomen op /overzicht/budget toont €3.000.*
+  7. **Eerste transactie (uitgave):** voeg een tweede transactie toe: **−€500**, categorie "Boodschappen", datum vandaag. → *verwacht: maanduitgaven tonen €500.* **Checkpoint 4:** de twee bedragen (€3.000 inkomen, €500 uitgave) van stap 6-7 komen ongewijzigd terug in het instellingenblok van /overzicht/budget.
+  8. **Eerste budget:** ga naar /overzicht/budget → stel het limiet voor "Boodschappen" in op **€400/maand**. → *verwacht: de budgetkaart toont "besteed €500 van €400" — een zichtbare overschrijding van €100, want de transactie uit stap 7 was al geboekt vóórdat het limiet werd ingesteld.* **Checkpoint 5:** €500 (exact het bedrag uit stap 7) verschijnt hier als "besteed", niet een ander bedrag.
   9. **Tijdas bekijken:** open /toekomst. → *verwacht: een FIRE-projectie rendert (geen crash ondanks de zeer korte historie); het vermogenspad start bij **€10.000** (checkpoint 3-bedrag) en de spaarcapaciteit is gebaseerd op de 30,0%-schatting (checkpoint 1/2) zolang er nog geen 6 maanden transactiehistorie is.* **Checkpoint 6:** startpunt van de tijdas = €10.000, exact gelijk aan de hero op /overzicht.
   10. **Rapport:** open /rapportages/balans. → *verwacht: balanstotaal = **€10.000** (geen schulden), exact gelijk aan checkpoint 3/6.* Indien een AI-add-on beschikbaar is: genereer een persoonlijk plan en controleer dat het genoemde netto vermogen en spaarquote overeenkomen met checkpoint 3 en checkpoint 1/2; zonder add-on: verwacht de gate-melding (zie UAT-KRUIS-25) in plaats van een rapport, en behandel dat NIET als een gebroken keten.
   - **Eindresultaat:** één bedrag (€10.000 netto vermogen) en één percentage (30,0% spaarquote) reizen ongewijzigd van de onboarding-invoer, via het eerste bezit, de eerste transacties en het eerste budget, tot en met de tijdas en het rapport — de kern van "geld is opgeslagen tijd" van eerste gebruik tot vrijheidsinzicht.
@@ -13365,7 +13365,7 @@ UAT-BEHEER-07 (gebruikersbeheer) krijgt naast zijn eigen KERN-behandeling drie g
 
   Herhaal happy path voor Gezin, ZZP en Pensioen en verifieer telkens de bijpassende rij.
 - **b. Varianten & randgevallen:** annuleren in sheet of bevestigingsdialoog → geen wijziging; template laden op een account zonder bestaande budgetten (lege beginstaat) → werkt identiek, gewoon 0 te ontkoppelen transacties; de stappenreeks (transacties/splits ontkoppelen → rollovers/amounts wissen → budgetten wissen → nieuwe upserten) is **niet transactioneel** — een fout halverwege kan een deels-gewiste, deels-geüpsertte staat achterlaten; test dit alleen op een wegwerp-account.
-- **c. Cross-module effecten:** budgetten sturen `/overzicht/cashflow`, budget-alerts en de spaarquote-afleiding; gekoppelde transacties tonen zich na het laden als "niet-gecategoriseerd" tot handmatige hercategorisatie.
+- **c. Cross-module effecten:** budgetten sturen `/overzicht/budget`, budget-alerts en de spaarquote-afleiding; gekoppelde transacties tonen zich na het laden als "niet-gecategoriseerd" tot handmatige hercategorisatie.
 - **d. Aanvullende verificatie:** controleer na het laden van elk template dat de "Eigen rekening"-categorie (`budget_type='archive'`) **niet** meetelt in de drie kassabon-totalen en dat het aantal in de succesmelding altijd 33 is, ongeacht welk template gekozen is (parent- én child-rijen tellen allebei mee als "budget").
 
 #### UAT-BEHEER-22 — Onboarding-flow opnieuw doorlopen (reset eigen account) (dekt WF-BEHEER-22)

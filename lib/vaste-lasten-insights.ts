@@ -1,7 +1,7 @@
 // lib/vaste-lasten-insights.ts
 //
 // Pure, serialiseerbare inzichten-motor voor het Vaste-lasten-scherm
-// (/overzicht/cashflow/vaste-lasten). Zet de gedeelde vaste-lasten-samenvatting
+// (/overzicht/budget/vaste-lasten). Zet de gedeelde vaste-lasten-samenvatting
 // (`VasteLastenSummary`) + inkomen/uitgaven uit `DashboardData` om naar één
 // model dat de client-componenten renderen.
 //

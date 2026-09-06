@@ -2,7 +2,7 @@
 
 /**
  * VasteLastenInsights — de uitgebreide inzicht-blokken voor het
- * Vaste-lasten-scherm (/overzicht/cashflow/vaste-lasten), getoond in de
+ * Vaste-lasten-scherm (/overzicht/budget/vaste-lasten), getoond in de
  * weergavemodus "Volledig" (de aanroeper wikkelt dit in <HideInSimple>).
  *
  * Pure presentatie: consumeert het serialiseerbare `VasteLastenInsights`-model

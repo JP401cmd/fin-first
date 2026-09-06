@@ -6,7 +6,7 @@ import { savingsRateFromAggregates } from './savings-source'
 
 // ── Bevinding H6 — "Twee schermen, één begrip, tegengesteld teken" ───────────
 //
-// De figures-strip op /overzicht/cashflow draaide een EIGEN tel-lus die op vier
+// De figures-strip op /overzicht/budget draaide een EIGEN tel-lus die op vier
 // assen afweek van de canonieke maandmotor. Deze suite legt per as vast wat de
 // canonieke uitkomst is, met een rijenset die alle vier tegelijk raakt — precies
 // de probe uit de kaart-analyse.

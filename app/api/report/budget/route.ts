@@ -245,7 +245,7 @@ export async function GET(request: Request) {
 
     // Canoniek dagtarief (€/dag) via de gedeelde bron `lib/expense-rate.ts` —
     // `expenseTx` is al het 12-mnd rolling venster uit het maandaggregaat. Zelfde
-    // grondslag EN databron als de andere rapporten, /overzicht/cashflow en de
+    // grondslag EN databron als de andere rapporten, /overzicht/budget en de
     // dashboard-widgets (KRUIS-20 = de formule, L10 = de rijen eronder).
     const dailyExpenseRate = recentDailyExpenseRateFromRows(expenseTx, now).dailyRate
 

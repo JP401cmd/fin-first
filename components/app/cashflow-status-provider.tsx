@@ -21,7 +21,7 @@ import type { CashflowCardStatuses } from '@/lib/cashflow-cards'
  * `null`-renderend `<CashflowStatusSeed>` levert de server-waarde aan, en de
  * consumers zijn puur. Geen tweede mechanisme.
  *
- * SERVER-SEED (dedup): de cashflow-hub (/overzicht/cashflow) berekent de vier
+ * SERVER-SEED (dedup): de cashflow-hub (/overzicht/budget) berekent de vier
  * kaarten toch al server-side (components/overview/cashflow-cards-loader.tsx) en
  * registreert de statussen hier. Daardoor doet de hub NUL status-fetches; de
  * sub-pagina's (die de kaarten niet hebben) fetchen `/api/overzicht/

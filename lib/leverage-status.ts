@@ -1,6 +1,6 @@
 /**
  * Gedeelde status-semantiek voor hefboom-stijl kaarten (HefbomenNav op
- * /overzicht én CashflowLandingCards op /overzicht/cashflow).
+ * /overzicht én CashflowLandingCards op /overzicht/budget).
  *
  * Pure module (géén 'use client') zodat zowel server-components (die de
  * status afleiden uit data) als client-components (die hem renderen) deze

@@ -707,7 +707,7 @@ const tests: TestCase[] = [
       // formule LOKAAL met een eigen switch, in plaats van de al bestaande,
       // gedeelde `recurringPerMonth` uit lib/cashflow-forecast-math.ts te
       // importeren (die functie wordt wél al gebruikt door
-      // lib/cashflow-cards.ts voor /overzicht/cashflow/forecast). Twee
+      // lib/cashflow-cards.ts voor /overzicht/budget/forecast). Twee
       // onafhankelijke implementaties van dezelfde formule zijn vandaag
       // toevallig identiek, maar dat is drift-risico zonder waarschuwing —
       // exact de bugklasse die CLAUDE.md's "consume, don't recompute"-regel

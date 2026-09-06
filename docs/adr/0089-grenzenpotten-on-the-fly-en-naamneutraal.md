@@ -18,7 +18,7 @@ enige norm is de eigen uitgavengrens.
 
 Fase 1 levert: één of meer grenzenpotten per gebruiker, op **budget** of op
 **tegenpartij**, per **kalendermaand**, beheerd vanaf
-`/overzicht/cashflow/transacties`, met de lopende (voorlopige) periode, de laatste
+`/overzicht/budget/transacties`, met de lopende (voorlopige) periode, de laatste
 afgesloten periode en vier reeks-getallen.
 
 Vier besluiten moesten vóór de bouw vastliggen.

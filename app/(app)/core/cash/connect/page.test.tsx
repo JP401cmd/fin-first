@@ -118,7 +118,7 @@ describe('Koppelwizard — drager bezet', () => {
     const exit = (await screen.findByRole('link', {
       name: /Ga naar je rekeningen om die koppeling te verbreken/i,
     })) as HTMLAnchorElement
-    expect(exit.getAttribute('href')).toBe('/overzicht/cashflow')
+    expect(exit.getAttribute('href')).toBe('/overzicht/bezittingen/cash')
   })
 
   it('vertrouwt ?drager= alleen als die rekening ook echt bezet is', async () => {

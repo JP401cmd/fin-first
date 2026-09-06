@@ -317,7 +317,7 @@ export interface SkippedBankSync {
  * drager valt de link terug op de landing zelf.
  */
 export function bankManualHref(bankAccountId: string | null): string {
-  return bankAccountId ? `/core/assets/cash/${bankAccountId}` : '/overzicht/cashflow'
+  return bankAccountId ? `/core/assets/cash/${bankAccountId}` : '/overzicht/budget'
 }
 
 /**

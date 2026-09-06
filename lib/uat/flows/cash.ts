@@ -43,7 +43,7 @@ export const CASH_FLOW: UatFlow = {
   zone: 'CASH',
   nodes: [
     // ── 0 · landing ───────────────────────────────────────────────────────
-    { id: 'nav', label: 'Navigatie naar /overzicht/cashflow', kind: 'entry', stage: 0 },
+    { id: 'nav', label: 'Navigatie naar /overzicht/budget', kind: 'entry', stage: 0 },
     { id: 'hefboom', scenarioId: 'UAT-CASH-01', label: 'WF-CASH-01 · Vier hefboom-kaarten (Budget/Transacties/Vaste lasten/Forecast)', kind: 'screen', stage: 0, lane: 'landing' },
     { id: 'kpiweergave', scenarioId: 'UAT-CASH-51', label: 'WF-CASH-51 · Budget-KPI resterend, Transacties-KPI gerealiseerde maand', kind: 'screen', stage: 0, lane: 'landing', subOf: 'hefboom' },
 

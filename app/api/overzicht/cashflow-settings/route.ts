@@ -7,7 +7,7 @@ import { unauthorized, serverError } from '@/lib/api/respond'
  * GET /api/overzicht/cashflow-settings
  *
  * Levert `CashflowSettingsData` — de props-bundel van het instellingen-blok
- * (inkomen, uitgaven, spaarquote) onderaan /overzicht/cashflow.
+ * (inkomen, uitgaven, spaarquote) onderaan /overzicht/budget.
  *
  * WAAROM DEZE ROUTE BESTAAT (perf Task 2.2, stap 5). Het blok is `ssr:false` en
  * staat onder de vouw, maar zijn data werd wél in het hub-request geladen:

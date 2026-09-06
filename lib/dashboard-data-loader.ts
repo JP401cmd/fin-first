@@ -416,7 +416,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     supabase.from('bank_connections').select('id').eq('status', 'active').limit(1),
     // Heatmap-widget "beschikbaar": rollover-carry (huidige periode) + periode-
     // overrides uit budget_amounts, zodat de widget dezelfde effectieve limiet
-    // consumeert als /overzicht/cashflow/budget (getEffectiveLimit) i.p.v. een
+    // consumeert als /overzicht/budget (getEffectiveLimit) i.p.v. een
     // eigen som op enkel default_limit — één bron van waarheid.
     // Sinds 31 aug 2026 GEDEELDE fetchers (lib/server-data/base.ts): ze voeden
     // behalve de heatmap ook de limiet-kant van `deriveBudgetTotals` hieronder,
@@ -491,7 +491,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   const allHoldingsResult = { data: holdingsSupersetRows }
   const rebalHoldingsResult = { data: holdingsSupersetRows.filter((h) => h.is_active === true) }
 
-  // Vaste lasten: consumeer de canonieke bron (dezelfde die /overzicht/cashflow?view=vaste-lasten
+  // Vaste lasten: consumeer de canonieke bron (dezelfde die /overzicht/budget?view=vaste-lasten
   // voedt) zodat het widgettotaal EXACT gelijk is aan het paginatotaal — filtert amount<0,
   // sluit 'excluded' uit én telt auto-gedetecteerde vaste lasten mee. Start hier zodat de
   // detectie parallel loopt met de FIRE-berekening hieronder; cache() dedupt per request.
@@ -1100,7 +1100,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // JAAR-grondslag (ADR 0103): dezelfde precedentie, op jaarbedragen. Voedt
   // `computeRetirementExpenses` (methode current_income → FIRE-doel) en de
   // spaarbron, zodat /overzicht per definitie op dezelfde grondslag staat als
-  // /overzicht/cashflow en /toekomst.
+  // /overzicht/budget en /toekomst.
   const dashboardAnnualIncome = resolveAmountWithBasis(
     (profileResult.data as { income_source?: string | null } | null)?.income_source,
     Number(profileResult.data?.net_monthly_income ?? 0) * 12,
@@ -1196,7 +1196,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
 
   const yearlyExpenses = effectiveMonthlyExpenses * 12
 
-  // Spaarbron voor de FIRE-prognose — gelijk aan /toekomst en /overzicht/cashflow.
+  // Spaarbron voor de FIRE-prognose — gelijk aan /toekomst en /overzicht/budget.
   // Prioriteit: handmatige override → inkomen × spaarquote → asset-aggregaat.
   // De unified engine indexeert dit jaarbedrag zelf met inflatie.
   // Uitgaven-grondslag voor de spaarquote, op de 6-maands meetbasis.
@@ -1212,7 +1212,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     baseAnnualSavings: dashboardBaseAnnualSavings,
     // De EFFECTIEVE spaarquote: de gekozen grondslag wint over de 6-maands
     // transactiemeting. Dit is exact het percentage dat het instellingenblok
-    // onderaan /overzicht/cashflow toont, het getal waarop de gezondheidsscore
+    // onderaan /overzicht/budget toont, het getal waarop de gezondheidsscore
     // oordeelt (zie healthScoreInput hieronder) — en sinds 31 aug 2026 óók het
     // getal dat de bundel als `effectiveSavingsRatePct` exporteert, zodat de
     // widget, de forecast-kaart en het spaarquote-doel er niet elk een eigen
@@ -2897,7 +2897,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     recentMonthlyExpenses,
     // Gerealiseerde huidige kalendermaand uit transacties (excl. transfers) —
     // NIET de effective/manual-override hierboven. De Transacties-kaart op
-    // /overzicht/cashflow toont "deze maand" en consumeert deze twee.
+    // /overzicht/budget toont "deze maand" en consumeert deze twee.
     currentMonthIncome,
     currentMonthExpenses,
     // Versheid van diezelfde grondslag: een leeg venster is geen bewijs van geen

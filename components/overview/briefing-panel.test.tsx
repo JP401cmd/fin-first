@@ -154,11 +154,11 @@ describe('BriefingPanel — href en span', () => {
     const { container } = render(
       <BriefingPanel
         entries={[
-          makeEntry('tip', 'Klik mij', { href: '/overzicht/cashflow' }),
+          makeEntry('tip', 'Klik mij', { href: '/overzicht/budget' }),
         ]}
       />,
     )
-    expect(container.querySelector('a[href="/overzicht/cashflow"]')).toBeTruthy()
+    expect(container.querySelector('a[href="/overzicht/budget"]')).toBeTruthy()
   })
 
   it('rendert card als article zonder href', () => {
@@ -199,14 +199,14 @@ describe('BriefingPanel — hefboom-tag (plan T-3)', () => {
     // HEFBOOM_CONFIG.cashflow tint = 'text-sky-700 bg-sky-50'
     expect(container.querySelector('.bg-sky-50')).toBeTruthy()
     // aria-label staat op de span
-    expect(container.querySelector('[aria-label*="Cashflow"]')).toBeTruthy()
+    expect(container.querySelector('[aria-label*="Budget"]')).toBeTruthy()
   })
 
   it('rendert GEEN hefboom-icoon zonder hefboom-veld', () => {
     const { container } = render(
       <BriefingPanel entries={[makeEntry('tip', 'Geen tag')]} />,
     )
-    expect(container.querySelector('[aria-label*="Cashflow"]')).toBeNull()
+    expect(container.querySelector('[aria-label*="Budget"]')).toBeNull()
     expect(container.querySelector('[aria-label*="Bezittingen"]')).toBeNull()
   })
 

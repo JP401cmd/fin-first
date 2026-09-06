@@ -73,7 +73,7 @@ describe('OverzichtHeroPrimary — blok 1 rendert zónder loadDashboardData', ()
     // horizonData. Aanwezig ZONDER enige dashboardData-prop.
     expect(screen.getByText('Bezittingen')).toBeTruthy()
     expect(screen.getByText('Schulden')).toBeTruthy()
-    expect(screen.getByText('Cashflow')).toBeTruthy()
+    expect(screen.getByText('Budget')).toBeTruthy()
     expect(screen.getByText('Belasting')).toBeTruthy()
 
     // De Health-Score-card hoort nu bij blok 1 (los van de widget-databundel):

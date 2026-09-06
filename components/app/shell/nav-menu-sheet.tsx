@@ -49,7 +49,7 @@ function statusForHref(
 ): LeverStatus | null {
   if (href.startsWith('/overzicht/bezittingen')) return scores.assets.status
   if (href.startsWith('/overzicht/schulden')) return scores.debts.status
-  if (href.startsWith('/overzicht/cashflow')) return scores.cashflow.status
+  if (href.startsWith('/overzicht/budget')) return scores.cashflow.status
   if (href.startsWith('/overzicht/belasting')) return scores.tax.status
   return null
 }

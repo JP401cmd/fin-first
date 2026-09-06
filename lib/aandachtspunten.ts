@@ -286,7 +286,7 @@ export function budgetBenchmarksToAandachtspunten(
         savings: Math.round(b.delta * 12 * 100) / 100,
         euroImpactMonthly: monthly,
         freedomDays: b.freedom_days_potential,
-        href: '/overzicht/cashflow',
+        href: '/overzicht/budget',
       }
     })
 }

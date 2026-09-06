@@ -18,7 +18,7 @@
 - `supabase/migrations/20260606010000_add_income_expense_source.sql` — lokale spiegel.
 
 **Gewijzigd:**
-- `app/(app)/overzicht/cashflow/page.tsx` — width-fix (geen dubbele wrapper).
+- `app/(app)/overzicht/budget/page.tsx` — width-fix (geen dubbele wrapper).
 - `components/core/vermogen-asset-card.tsx` — `hideActions`-prop i.p.v. harde cash-conditie.
 - `components/core/assets-client.tsx` — geef `hideActions={type === 'cash'}` mee; (un-force cash `expected_return`).
 - `components/app/cash-overview.tsx` — broad mode: `loadPerspectiveData` + `VermogenAssetCard` + ValuationModal; verwijder eigen card-markup.
@@ -34,7 +34,7 @@
 
 ## Task 1: Breedte rekeningen-deel gelijktrekken
 
-**Files:** Modify `app/(app)/overzicht/cashflow/page.tsx`
+**Files:** Modify `app/(app)/overzicht/budget/page.tsx`
 
 > CashOverview's eigen root is al `mx-auto max-w-6xl px-4 sm:px-6`; de extra page-sectie eromheen verdubbelt de padding.
 
@@ -50,11 +50,11 @@ door (geen wrapper-section; CashOverview levert zelf de breedte):
 ```
 Laat de instellingen-sectie eronder ongewijzigd.
 
-- [ ] **Step 2: Verifieer.** Run `npx tsc --noEmit 2>&1 | grep -i "overzicht/cashflow/page"` → leeg. Start `npm run dev`, open `/overzicht/cashflow`: de Rekeningen + geldstroom lijnen nu links/rechts gelijk met de 4 hefboom-kaarten en het instellingen-blok.
+- [ ] **Step 2: Verifieer.** Run `npx tsc --noEmit 2>&1 | grep -i "overzicht/cashflow/page"` → leeg. Start `npm run dev`, open `/overzicht/budget`: de Rekeningen + geldstroom lijnen nu links/rechts gelijk met de 4 hefboom-kaarten en het instellingen-blok.
 
 - [ ] **Step 3: Commit**
 ```bash
-git add "app/(app)/overzicht/cashflow/page.tsx"
+git add "app/(app)/overzicht/budget/page.tsx"
 git commit -m "fix(cashflow): rekeningen-deel zelfde breedte als boven/onder (geen dubbele wrapper)"
 ```
 (Eindig elke commit-body met: `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`)
@@ -717,7 +717,7 @@ function ChoiceRow({ computedLabel, isManual, onUseComputed, manualValue, onManu
 
 - [ ] **Step 2: Type-check.** `npx tsc --noEmit 2>&1 | grep -i "cashflow-instellingen-blok"` → leeg. Bevestig dat `BottomSheet` de props `open`/`onClose`/`title` accepteert (zoals in cash-overview.tsx) en `Kicker`/`MaskedAmount`/`KassabonShell` zoals eerder. Pas import/props aan indien afwijkend.
 
-- [ ] **Step 3: Handmatige check.** `/overzicht/cashflow`: drie kaarten openen elk een kassabon; "gebruik berekend"/"eigen bedrag" wisselt de bron; de "handmatig"-badge verschijnt op de kaart; bewerk uitgaven → spaarquote verandert (en omgekeerd); de FIRE-zin herberekent; herlaad → keuze bewaard; check dat Horizon/dashboard dezelfde override gebruiken.
+- [ ] **Step 3: Handmatige check.** `/overzicht/budget`: drie kaarten openen elk een kassabon; "gebruik berekend"/"eigen bedrag" wisselt de bron; de "handmatig"-badge verschijnt op de kaart; bewerk uitgaven → spaarquote verandert (en omgekeerd); de FIRE-zin herberekent; herlaad → keuze bewaard; check dat Horizon/dashboard dezelfde override gebruiken.
 
 - [ ] **Step 4: Commit**
 ```bash

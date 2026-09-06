@@ -106,7 +106,7 @@ describe('budget-scope voor de grondslag — sessie vs. service-role', () => {
 
   it('sessie-variant zet GEEN user-filter — de policy verbreedt naar gedeelde rijen', () => {
     // Een eigen `.eq('user_id', …)` zou het gedeelde inkomstenbudget van de
-    // partner wegsnijden en de snapshot laten driften met /overzicht/cashflow.
+    // partner wegsnijden en de snapshot laten driften met /overzicht/budget.
     const { supabase, calls } = fakeSupabase()
     selectBudgetsForBasis(supabase)
     expect(calls.table).toBe('budgets')

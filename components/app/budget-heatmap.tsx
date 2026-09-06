@@ -117,7 +117,7 @@ function getHeatmapConstants(size?: WidgetSize): HeatmapConstants {
       // budgetten-pagina (size undefined) zijn hoge, multi-sectie viewBox houdt.
       return { VB_W: 800, VB_H: 340, CELL_GAP: 3, CELL_RADIUS: 6, SECTION_LABEL_H: 18 }
     default:
-      // size === undefined → vrijstaande /overzicht/cashflow/budget-heatmap:
+      // size === undefined → vrijstaande /overzicht/budget-heatmap:
       // natuurlijke hoogte (h-auto), kan meerdere secties stapelen → hoog.
       return { VB_W: 800, VB_H: 500, CELL_GAP: 3, CELL_RADIUS: 6, SECTION_LABEL_H: 18 }
   }

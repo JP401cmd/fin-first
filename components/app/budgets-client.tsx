@@ -192,7 +192,7 @@ export function BudgetEditorialHeader({
    * Som van de effectieve limieten van alle uitgavenbudgetten — dezelfde
    * grondslag als `budgetTotals.expense.limit` op de cashflow-Budget-kaart
    * (pariteit bewaakt in lib/cashflow-kpis.parity.test.ts), zodat het
-   * ankergetal hier en de kaart op /overzicht/cashflow hetzelfde zeggen.
+   * ankergetal hier en de kaart op /overzicht/budget hetzelfde zeggen.
    */
   totalExpenseBudget: number
   /** Getekende besteding op de uitgavenbudgetten deze periode. */
@@ -210,7 +210,7 @@ export function BudgetEditorialHeader({
   // Twee perspectieven op "ruimte", met het bestedingsrestant als anker:
   //  - Nog te besteden: uitgavenlimiet − besteed, via de canonieke klem
   //    `budgetBeschikbaar` — EXACT het getal van de Budget-kaart op
-  //    /overzicht/cashflow, zodat doorklikken geen ander cijfer oplevert.
+  //    /overzicht/budget, zodat doorklikken geen ander cijfer oplevert.
   //  - Nog te verdelen: verwacht inkomen − toegewezen budgetten (`teVerdelen`).
   //    Plan-hygiëne (klopt je opzet?), bewust sober — géén besteedbare ruimte.
   const { masked } = useMaskedAmounts()
@@ -241,7 +241,7 @@ export function BudgetEditorialHeader({
     >
       {/* Twee kolommen: besteden vs. verdelen. "Nog te besteden" draagt de
           highlight-marker en is het anker — hetzelfde getal als de Budget-
-          kaart op /overzicht/cashflow; "Nog te verdelen" is de sobere
+          kaart op /overzicht/budget; "Nog te verdelen" is de sobere
           plan-hygiëne-lezing ernaast. In Eenvoudig-modus verbergen we dit
           cijferblok volledig (kicker + headline blijven). Zonder actief
           uitgavenbudget valt de anker-kolom weg en blijft alleen verdelen. */}
@@ -1186,7 +1186,7 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
   // afkorting "YTD" komt er per definitie niet in beeld.
   const effectivePeriodMode: 'maand' | 'ytd' | '12m' = simple ? 'maand' : periodMode
   const [monthDate, setMonthDate] = useState(() => {
-    // Deeplink vanaf de geldstroom-banner (/overzicht/cashflow) opent deze
+    // Deeplink vanaf de geldstroom-banner (/overzicht/budget) opent deze
     // pagina op de daar geselecteerde maand via `?maand=YYYY-MM`. Eénmalig bij
     // mount uitgelezen; daarna stuurt de maand-selector de state.
     const maand = searchParams.get('maand')
@@ -1793,7 +1793,7 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
   // BudgetPlanEditorSheet — bron-of-truth is `?planEditor=true`, net als de
   // budget-pane. B-020: de sheet ging hiervóór met een losse `useState` open
   // zónder history-entry, dus de Android-terugknop verliet de hele route (je
-  // landde op /overzicht/cashflow i.p.v. terug op de budgetpagina). Door de
+  // landde op /overzicht/budget i.p.v. terug op de budgetpagina). Door de
   // open-staat uit de URL te lezen en het openen/sluiten via een EIGEN
   // `createPaneUrlHistory`-instantie te laten lopen (push bij openen, back bij
   // sluiten) sluit één terugdruk de sheet en blijf je op /…/budget.
@@ -2434,7 +2434,7 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
 
       {/* Editorial header — blueprint stijl (Type App: Budgetteren).
           Toont kicker met streep, headline met italic-em, ankergetal 'Nog te
-          besteden' (= Budget-kaart op /overzicht/cashflow) met halve
+          besteden' (= Budget-kaart op /overzicht/budget) met halve
           transparante streep en sobere 'Nog te verdelen'-kolom ernaast. */}
       <BudgetEditorialHeader
         monthLabel={monthLabel}

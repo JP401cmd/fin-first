@@ -108,19 +108,21 @@ export const PAGE_STATUS_COPY: Record<string, RouteCopy> = {
     },
   },
 
-  '/overzicht/cashflow': {
-    title: 'Cashflow',
+  // Hefboom 3. Was 'Cashflow' met een eigen hub; sinds UR3-28 is de budgetpagina
+  // zelf de hefboom. De actie-knop is vervallen: hij wees naar '/overzicht/budget'
+  // en dat is precies de pagina waarop deze melding staat.
+  '/overzicht/budget': {
+    title: 'Budget',
     warn: {
       reason: 'Je houdt deze maand weinig over ({figure}).',
       remedy:
-        'Bekijk je budget en vaste lasten — kleine besparingen tellen snel op tot meer ruimte.',
+        'Bekijk je budgetten en vaste lasten — kleine besparingen tellen snel op tot meer ruimte.',
     },
     bad: {
       reason: 'Je geeft deze maand meer uit dan er binnenkomt ({figure}).',
       remedy:
-        'Begin bij je grootste posten. Bekijk je budget en vaste lasten om de balans te herstellen.',
+        'Begin bij je grootste posten. Bekijk je budgetten en vaste lasten om de balans te herstellen.',
     },
-    action: { label: 'Naar je budget', href: '/overzicht/cashflow/budget' },
     will: {
       onderwerp: 'Mijn maandelijkse cashflow',
       detail: 'Ik wil zien waar mijn geld heen gaat en hoe ik maandelijks meer kan overhouden.',
@@ -149,25 +151,12 @@ export const PAGE_STATUS_COPY: Record<string, RouteCopy> = {
     },
   },
 
-  // ── Cashflow-subpagina's (de vier kaarten) ────────────────────────────────
-  '/overzicht/cashflow/budget': {
-    title: 'Budget',
-    warn: {
-      reason: 'Een paar budgetten dreigen over de limiet te gaan.',
-      remedy: 'Bekijk welke categorieën uitlopen en stel je budget waar nodig bij.',
-    },
-    bad: {
-      reason: 'Meerdere budgetten zijn over de limiet.',
-      remedy:
-        'Bekijk de kassabon per categorie en stel de overschreden budgetten bij.',
-    },
-    will: {
-      onderwerp: 'Mijn budgetten op koers krijgen',
-      detail: 'Ik wil weten welke budgetten uitlopen en hoe ik ze realistisch bijstel.',
-    },
-  },
+  // ── De drie onderdelen van Budget ─────────────────────────────────────────
+  // Hier stond ook een entry voor '/overzicht/budget' zelf, uit de tijd dat het
+  // een sub-pagina van de cashflow-hub was. Die is verweesd: de budgetpagina is
+  // nu de hefboom en haalt haar melding uit de hefboomscore hierboven.
 
-  '/overzicht/cashflow/transacties': {
+  '/overzicht/budget/transacties': {
     title: 'Transacties',
     warn: {
       reason: 'Je spaarquote is deze maand aan de krappe kant.',
@@ -185,7 +174,7 @@ export const PAGE_STATUS_COPY: Record<string, RouteCopy> = {
     },
   },
 
-  '/overzicht/cashflow/vaste-lasten': {
+  '/overzicht/budget/vaste-lasten': {
     title: 'Vaste lasten',
     warn: {
       reason: 'Je vaste lasten nemen een fors deel van je inkomen in beslag ({figure}).',
@@ -203,7 +192,7 @@ export const PAGE_STATUS_COPY: Record<string, RouteCopy> = {
     },
   },
 
-  '/overzicht/cashflow/forecast': {
+  '/overzicht/budget/forecast': {
     title: 'Forecast',
     warn: {
       reason: 'Je verwachte saldo blijft de komende maanden vlak.',

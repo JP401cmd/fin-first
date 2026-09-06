@@ -1,6 +1,6 @@
 /**
  * Pure rekenfuncties voor de transactie-analysepagina
- * (/overzicht/cashflow/transacties). Geen React- of Supabase-afhankelijkheden —
+ * (/overzicht/budget/transacties). Geen React- of Supabase-afhankelijkheden —
  * server-safe en los te unit-testen (zie transaction-insights.test.ts).
  *
  * Conventies:

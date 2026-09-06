@@ -288,14 +288,14 @@ const tests: TestCase[] = [
 
       // Legacy alias corrected → nieuwe IA
       const alias = validateHref('/core/transactions')
-      assertEqual(alias, '/overzicht/cashflow/transacties', 'Alias /core/transactions should map to /overzicht/cashflow/transacties')
+      assertEqual(alias, '/overzicht/budget/transacties', 'Alias /core/transactions should map to /overzicht/budget/transacties')
 
       const alias2 = validateHref('/core/schulden')
       assertEqual(alias2, '/overzicht/schulden', 'Alias /core/schulden should map to /overzicht/schulden')
 
       // Prefix match
-      const prefix = validateHref('/overzicht/cashflow/budget/123')
-      assertEqual(prefix, '/overzicht/cashflow/budget', 'Prefix match should strip dynamic segment')
+      const prefix = validateHref('/overzicht/budget/123')
+      assertEqual(prefix, '/overzicht/budget', 'Prefix match should strip dynamic segment')
 
       // Invalid route removed
       const invalid = validateHref('/nonexistent/page')
@@ -312,7 +312,7 @@ const tests: TestCase[] = [
       ]
       const validated = validateCardHrefs(cards)
       assert(
-        validated[0].href === '/overzicht/cashflow/transacties',
+        validated[0].href === '/overzicht/budget/transacties',
         'Hallucinated href should be corrected',
       )
       assert(
@@ -335,7 +335,7 @@ const tests: TestCase[] = [
           type: 'checklist',
           title: 'To-do',
           items: [
-            { label: 'Budgetten bekijken', href: '/overzicht/cashflow/budget', done: false },
+            { label: 'Budgetten bekijken', href: '/overzicht/budget', done: false },
             { label: 'Doelen bekijken', href: '/core/goals', done: false },
             { label: 'Geen link', done: true },
           ],
@@ -345,7 +345,7 @@ const tests: TestCase[] = [
       const validated = validateCardHrefs(cards)
       const checklist = validated[0] as { type: 'checklist'; items: { label: string; href?: string; done: boolean }[] }
 
-      assertEqual(checklist.items[0].href, '/overzicht/cashflow/budget', 'Valid checklist href preserved')
+      assertEqual(checklist.items[0].href, '/overzicht/budget', 'Valid checklist href preserved')
       assertEqual(checklist.items[1].href, '/toekomst/doelen', 'Hallucinated /core/goals should map to /toekomst/doelen')
       assertEqual(checklist.items[2].href, undefined, 'Item without href stays undefined')
     },

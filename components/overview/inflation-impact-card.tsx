@@ -16,7 +16,7 @@ export const INFLATION_IMPACT_ID = 'inflation-impact'
  * niet adresseren: wat doet inflatie met je maandelijkse uitgaven over
  * 10/20/30 jaar?
  *
- * Plaatsing: bovenaan /overzicht/cashflow zodat de gebruiker, wanneer
+ * Plaatsing: bovenaan /overzicht/budget zodat de gebruiker, wanneer
  * hij of zij naar uitgaven kijkt, direct zicht heeft op de koopkracht-
  * erosie in de toekomst.
  *

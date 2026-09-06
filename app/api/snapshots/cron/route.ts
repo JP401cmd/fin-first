@@ -369,7 +369,7 @@ export async function GET(request: Request) {
       // (fireProjection.savingsRate).
       const savingsRateFromTx = savingsRateFromAggregates(monthlyIncome, monthlyExpenses, debtAflossing6m)
       // EFFECTIEVE inkomsten en spaarquote — handmatige invoer wint, exact zoals
-      // de live loader en het instellingenblok onderaan /overzicht/cashflow.
+      // de live loader en het instellingenblok onderaan /overzicht/budget.
       // Budgetgrondslag (ADR 0103) — de snapshot legt HISTORIE vast en moet dus
       // op dezelfde grondslag staan als het dashboard. BEWUST NIET via
       // `loadBudgetBasis`: die resolvet het huishoud-aandeel uit de SESSIE

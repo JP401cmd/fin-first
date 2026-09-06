@@ -198,7 +198,7 @@ export async function POST() {
       .eq('user_id', user.id),
     // Budgetrijen voor de GRONDSLAG (ADR 0103) — huishoud-verbreed via RLS,
     // exact zoals `getBudgets` in de live loaders. Zonder deze aparte query zou
-    // een gedeeld inkomstenbudget van de partner wél op /overzicht/cashflow
+    // een gedeeld inkomstenbudget van de partner wél op /overzicht/budget
     // meetellen en NIET in de snapshot van die nacht.
     selectBudgetsForBasis(supabase),
     // Grondslag-selectie (ADR 0103). BEWUST een aparte, tolerante query en geen
@@ -346,7 +346,7 @@ export async function POST() {
   const savingsRateFromTx = savingsRateFromAggregates(monthlyIncome, monthlyExpenses, debtAflossing6m)
   // EFFECTIEVE inkomsten/uitgaven en spaarquote: handmatige invoer wint over de
   // transactiemeting, exact zoals de live loader en het instellingenblok
-  // onderaan /overzicht/cashflow. Zonder dit dreef de opgeslagen historie weg
+  // onderaan /overzicht/budget. Zonder dit dreef de opgeslagen historie weg
   // van het getal dat de gebruiker ziet.
   // Budgetgrondslag (ADR 0103) — de snapshot legt HISTORIE vast, dus hij moet op
   // dezelfde grondslag staan als het dashboard; een tijdreeks corrigeert zich

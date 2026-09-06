@@ -4,7 +4,7 @@ import { BANK_CONNECT_SAFETY_LONG } from '@/lib/bank-connect-copy'
 
 /**
  * KoppelRekeningBanner — de uitnodiging om je bank te koppelen, bovenaan
- * /overzicht/cashflow/transacties.
+ * /overzicht/budget/transacties.
  *
  * ÉÉN toestand, bewust (TXN-1, faseplan "Eenvoudige weergave" §7): de banner
  * verschijnt zolang er GEEN zichtbare bankrekening is. Zodra er één of meer
@@ -16,7 +16,7 @@ import { BANK_CONNECT_SAFETY_LONG } from '@/lib/bank-connect-copy'
  * was — en meldde daarmee elke keer opnieuw iets wat de gebruiker al weet. De
  * twee links zijn niet verdwenen maar leven op hun eigen plek: koppelen via de
  * actie-rij van de transactie-analyse (in Eenvoudig het "…"-menu) en beheren op
- * /overzicht/cashflow zelf.
+ * /overzicht/budget zelf.
  *
  * Geldt in BEIDE weergavemodi: dit is geen diepte-reductie maar een conditie
  * die altijd al zo hoorde te zijn. Vandaar geen `HideInSimple` maar een gewone

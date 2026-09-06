@@ -213,7 +213,7 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
         // GEDEELDE GRONDSLAG (ADR 0103). Deze modal rekende zijn eigen
         // 12-maands jaarinkomen uit een rauwe transactielus — daarmee negeerde
         // hij zowel de handmatige override als (nu) de budget-grondslag, en
-        // toonde hij een ander FIRE-doel dan /overzicht/cashflow. Het
+        // toonde hij een ander FIRE-doel dan /overzicht/budget. Het
         // jaarinkomen komt voortaan uit dezelfde bundel als de kaart die de
         // gebruiker ziet; de twee eigen inkomens-queries zijn daarmee weg.
         fetch('/api/overzicht/cashflow-settings')
@@ -284,7 +284,7 @@ export function StrategieModal({ open, onClose, housingStrategy, initialTab, ker
       const monthlyContributions = (assetsResult.data ?? []).reduce((s, a) => s + Number(a.monthly_contribution), 0)
 
       // Jaarinkomen op de GEDEELDE grondslag: `effectiveAnnualIncome` is precies
-      // het getal op de inkomenskaart van /overzicht/cashflow en dezelfde waarde
+      // het getal op de inkomenskaart van /overzicht/budget en dezelfde waarde
       // die de FIRE-keten voedt. Valt de bundel weg (offline/401), dan het
       // effectieve maandinkomen × 12 — nooit een tweede, eigen extrapolatie.
       const extrapolatedIncome = cashflowSettings

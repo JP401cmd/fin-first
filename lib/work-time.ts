@@ -11,7 +11,7 @@
  * om te betalen", "per jaar opgeofferd aan belasting"). Vrijheidstijd-getallen
  * zijn NIET optelbaar tot een werkjaar: het zijn onafhankelijke aandelen van de
  * uitgaven, niet delen van dezelfde taart. Daardoor claimden /overzicht/belasting
- * ("9 maanden per jaar") en /overzicht/cashflow/vaste-lasten ("9 maanden") samen
+ * ("9 maanden per jaar") en /overzicht/budget/vaste-lasten ("9 maanden") samen
  * ACHTTIEN maanden per jaar — naast een effectief tarief van 36,6% op dezelfde
  * kaart. Bevinding C5 van het UX-testpanel (24-08-2026).
  *

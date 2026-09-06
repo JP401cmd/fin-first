@@ -320,7 +320,7 @@ export const SpendLimitWidget = memo(function SpendLimitWidget({
       : null
 
   // ÉÉN plek voor de deeplink — nooit per rendertak herhaald.
-  const href = `/overzicht/cashflow/transacties?limit=${limit.id}`
+  const href = `/overzicht/budget/transacties?limit=${limit.id}`
 
   const statusRow = (
     <span className={`inline-flex items-center gap-1.5 ${STATUS_TEXT_CLASS[status]}`}>

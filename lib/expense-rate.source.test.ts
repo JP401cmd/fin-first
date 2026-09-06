@@ -11,7 +11,7 @@
  * 1000) — óók zonder expliciete `.limit()`. Boven de 1000 negatieve transacties
  * in het venster kwam er een willekeurige deelverzameling terug: het totaal én de
  * vroegste maand schoven, en het dagtarief LOOG omhoog. Zichtbaar gevolg:
- * /rapportages/balans toonde €165/dag naast €106/dag op /overzicht/cashflow —
+ * /rapportages/balans toonde €165/dag naast €106/dag op /overzicht/budget —
  * dat oppervlak liep al wél via het maandaggregaat.
  *
  * Een gedragstest vangt dit niet: met een fixture van 5 rijen geeft de rauwe route

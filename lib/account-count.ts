@@ -3,7 +3,7 @@
 // Aantal ZICHTBARE actieve bankrekeningen voor het gekozen perspectief — als
 // count-query (`head: true`), dus zonder ook maar één rij op te halen.
 //
-// Waarom apart: /overzicht/cashflow/transacties draaide voor dit ENE getal (de
+// Waarom apart: /overzicht/budget/transacties draaide voor dit ENE getal (de
 // koppel-banner) de volledige `loadCashflowData` — perspectief-keten, 6 maanden
 // transactiepaginatie, recurring-detectie en een 500-rijen join-fetch. Pagina's
 // die alleen het aantal nodig hebben, horen alleen het aantal op te halen.

@@ -7,7 +7,7 @@ import { LEVERAGE_STATUS_LABEL, type LeverageStatus } from '@/lib/leverage-statu
 /**
  * Contracttests voor de gedeelde `LeverageCard`-shell (S1).
  *
- * Dit is de shell die /overzicht, /overzicht/cashflow, /overzicht/belasting en
+ * Dit is de shell die /overzicht, /overzicht/budget, /overzicht/belasting en
  * /toekomst delen, en waarop de kaarten S2, S4 en S17 verder bouwen. De regel
  * die hier hard vastligt:
  *

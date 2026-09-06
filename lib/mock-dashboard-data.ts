@@ -280,7 +280,7 @@ export const MOCK_DASHBOARD_DATA: DashboardData = {
 
   // Next steps
   nextSteps: [
-    { key: 'noodfonds_aanvullen', label: 'Noodfonds aanvullen', title: 'Vul je noodfonds aan', description: 'Een gevulde buffer is vrijheid die je vandaag al bezit.', impact: null, metric: '3 van 6 maanden gedekt', module: 'kern', kind: 'groei', href: '/overzicht/cashflow/budget', dismissed: false },
+    { key: 'noodfonds_aanvullen', label: 'Noodfonds aanvullen', title: 'Vul je noodfonds aan', description: 'Een gevulde buffer is vrijheid die je vandaag al bezit.', impact: null, metric: '3 van 6 maanden gedekt', module: 'kern', kind: 'groei', href: '/overzicht/budget', dismissed: false },
     { key: 'review_actions', label: 'Acties oppakken', title: 'Pak je openstaande acties op', description: 'Deze acties liggen klaar om vrijheidstijd terug te winnen.', impact: 12, metric: '3 acties open', module: 'wil', kind: 'groei', href: '/overzicht/tips', dismissed: false },
   ],
 

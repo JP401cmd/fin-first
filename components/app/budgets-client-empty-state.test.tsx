@@ -11,7 +11,7 @@
  * alleen gezet in de `finally` van `loadBudgets()`. `skipInitialFetch`
  * slaat die fetch echter over zodra `initialData` bestaat
  * — en BEIDE routes (`app/(app)/core/budgets/page.tsx` en
- * `app/(app)/overzicht/cashflow/budget/page.tsx`) geven `initialData` altijd
+ * `app/(app)/overzicht/budget/page.tsx`) geven `initialData` altijd
  * mee. Gevolg: op het pad dat de app daadwerkelijk gebruikt bleef
  * `initialLoadDone` op `false` staan, viel de lege-staat-tak nooit in, en
  * rendert er onder de toolbar niets (alle type-secties zijn

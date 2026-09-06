@@ -4,7 +4,7 @@
  * Homescherm-keuze — Overzicht ⇄ Budgetteren als startscherm.
  *
  * Eén profiel-brede voorkeur die bepaalt waar een "ga naar hoofdscherm"-
- * navigatie landt: /overzicht (default) of /overzicht/cashflow/budget.
+ * navigatie landt: /overzicht (default) of /overzicht/budget.
  * Waarden + routes zijn canoniek in `lib/home-screen.ts`; deze hook levert
  * naast de keuze ook de afgeleide `homeHref` zodat consumers (top-bar ←,
  * long-press op de waffle) nooit zelf een route hoeven te mappen.

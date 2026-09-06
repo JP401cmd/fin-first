@@ -124,7 +124,7 @@ describe('UAT Cash — acceptatiecriteria dekking', () => {
     // volgt, 'exact') en WF-CASH-61 (grenzenpot-reeksscore/prestatiebadge,
     // `computeSpendLimitScore` — pure motor op synthetische periodes, 'exact').
     // 61 → 62: WF-CASH-62 (bevinding H6 — het /overzicht-widget en de
-    // figures-strip op /overzicht/cashflow tonen hetzelfde saldo voor hetzelfde
+    // figures-strip op /overzicht/budget tonen hetzelfde saldo voor hetzelfde
     // venster, 'exact' via deriveRealMonthTotals + currentMonthSavingsRate).
     // 62 → 64: WF-CASH-63 (rekening-zichtbaarheid voor de partner, ADR 0118 —
     // ownership/partner_visibility-koppeling + de import-gate, 'exact') en
@@ -196,7 +196,7 @@ describe('UAT Cash — acceptatiecriteria dekking', () => {
     // 'exact' en krijgt een CASH_ENGINE_CHECKS-rij; de DB-schrijfvolgorde en
     // de success-pagina-melding blijven narratief in hetzelfde criterium.
     // 30 → 31: bugfix-toevoeging (docs/adr/0073-grondslag-in-de-veldnaam.md,
-    // nieuw oppervlak app/(app)/overzicht/cashflow/page.tsx) — WF-CASH-51
+    // nieuw oppervlak app/(app)/overzicht/budget/page.tsx) — WF-CASH-51
     // (buildCashflowCards, échte productiefunctie op literaire invoer) is
     // 'exact' en krijgt een CASH_ENGINE_CHECKS-rij.
     // 31 → 32: grenzenpotten fase 2-5 (ADR 0089/0092) — WF-CASH-53

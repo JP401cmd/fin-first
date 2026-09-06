@@ -44,7 +44,7 @@ import type { CashflowSettingsData } from '@/lib/cashflow-settings-data'
 export { BASIS_LABEL }
 
 /**
- * Instellingenblok onderaan /overzicht/cashflow — inkomen, uitgaven en
+ * Instellingenblok onderaan /overzicht/budget — inkomen, uitgaven en
  * spaarquote.
  *
  * ÉÉN VENSTER, DRIE KAARTEN (ADR 0103). De drie kaarten blijven staan: het zijn
@@ -114,7 +114,7 @@ export function CashflowInstellingenBlok({
   /**
    * Onderdrukt de eigen kop (kicker + h2) én de sectie-marge. Gezet wanneer het
    * blok in een disclosure hangt die de titel al draagt (CF-4, Eenvoudige
-   * weergave — zie cashflow-below-fold.tsx); zonder dit staat de kop er twee keer.
+   * weergave — zie cashflow-instellingen-lazy.tsx); zonder dit staat de kop er twee keer.
    */
   hideHeading?: boolean
 }) {
@@ -122,7 +122,7 @@ export function CashflowInstellingenBlok({
   const radioName = useId()
   const { masked } = useMaskedAmounts()
 
-  // De bundel komt via een lazy fetch binnen (cashflow-below-fold). Na elke
+  // De bundel komt via een lazy fetch binnen (cashflow-instellingen-lazy). Na elke
   // wijziging halen we 'm opnieuw op, zodat de spaarquote en de server-resolutie
   // van de grondslag weer kloppen zonder dat de gebruiker moet verversen.
   const [data, setData] = useState(initialData)

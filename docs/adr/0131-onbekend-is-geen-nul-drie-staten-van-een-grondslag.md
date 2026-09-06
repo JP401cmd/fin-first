@@ -14,7 +14,7 @@ Sanne (31) koos in de onboarding bij inkomen en uitgaven voor **"Later
 invullen"** — een knop die de app even prominent aanbiedt als invullen — en
 vulde wél € 14.000 spaargeld in. Haar eerste oordeel op `/overzicht` was
 **"8 van 100 — Kritiek"**, met in het detail "Spaarquote 0 %" en "Noodfonds
-0,0 × salaris". `/overzicht/cashflow` zei "Geschat jaarinkomen € 0 · uit je
+0,0 × salaris". `/overzicht/budget` zei "Geschat jaarinkomen € 0 · uit je
 profiel", de check-in "Inkomen € 0 · Uitgaven € 0 · Gespaard € 0", en de
 briefing adviseerde "begin met 10 % van je inkomen". Henk, die alles invulde,
 kreeg 78 — het verschil zat in één overslaanbare stap, niet in hun situatie.
@@ -60,7 +60,7 @@ naast elkaar, en die horen in één contract.
 4. **Eén weergave-guard: `lib/grondslag-guard.ts`**, zuster van
    `lib/horizon/outcome-guard.ts` (ADR 0109). Hij rekent niets en corrigeert
    niets; hij beoordeelt een reeds bepaalde grondslag en levert de ene zin en de
-   ene knop (`/overzicht/cashflow`, waar "Eigen bedrag" bron én bedrag in één
+   ene knop (`/overzicht/budget`, waar "Eigen bedrag" bron én bedrag in één
    PUT schrijft). De kop is dezelfde als die van de horizon-melding — geen twee
    "we missen iets"-formuleringen naast elkaar.
 
@@ -91,7 +91,7 @@ naast elkaar, en die horen in één contract.
 
 - Vijf oppervlakken tonen bij ontbrekend inkomen één gedrag: geen cijfer, geen
   oordeel, één zin, één knop — `/overzicht`-hero, gezondheidswidget, kassabon
-  (/toekomst en /core), rondleiding, `/overzicht/cashflow` (instellingenblok en
+  (/toekomst en /core), rondleiding, `/overzicht/budget` (instellingenblok en
   spaarquote-widget), check-in-terugblik. De briefing kiest per constructie geen
   weggevallen pijler meer als "vraagt aandacht".
 - Een account mét inkomen gedraagt zich byte-identiek aan voorheen: de nieuwe

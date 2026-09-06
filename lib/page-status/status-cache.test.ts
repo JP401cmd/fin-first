@@ -14,12 +14,12 @@ describe('page-status status-cache', () => {
   beforeEach(() => __resetStatusCache())
 
   it('miss on empty cache', () => {
-    const key = statusCacheKey('u1', 'personal', '/overzicht/cashflow/budget')
+    const key = statusCacheKey('u1', 'personal', '/overzicht/budget')
     expect(readStatusCache(key, 1000)).toEqual({ hit: false, info: null })
   })
 
   it('hit within TTL, miss after TTL expires', () => {
-    const key = statusCacheKey('u1', 'personal', '/overzicht/cashflow/budget')
+    const key = statusCacheKey('u1', 'personal', '/overzicht/budget')
     writeStatusCache(key, info, 1000)
 
     // Vlak vóór verlopen → hit.
@@ -33,7 +33,7 @@ describe('page-status status-cache', () => {
   })
 
   it('caches a null info (geen banner) net zo goed als een echte status', () => {
-    const key = statusCacheKey('u1', 'personal', '/overzicht/cashflow/forecast')
+    const key = statusCacheKey('u1', 'personal', '/overzicht/budget/forecast')
     writeStatusCache(key, null, 0)
     const read = readStatusCache(key, 10)
     expect(read.hit).toBe(true)
@@ -43,7 +43,7 @@ describe('page-status status-cache', () => {
   it('isoleert per user, per perspectief en per route (geen cross-account-lek)', () => {
     const now = 0
     writeStatusCache(
-      statusCacheKey('u1', 'personal', '/overzicht/cashflow/budget'),
+      statusCacheKey('u1', 'personal', '/overzicht/budget'),
       info,
       now,
     )
@@ -51,28 +51,28 @@ describe('page-status status-cache', () => {
     // Andere gebruiker → miss.
     expect(
       readStatusCache(
-        statusCacheKey('u2', 'personal', '/overzicht/cashflow/budget'),
+        statusCacheKey('u2', 'personal', '/overzicht/budget'),
         now,
       ).hit,
     ).toBe(false)
     // Ander perspectief → miss.
     expect(
       readStatusCache(
-        statusCacheKey('u1', 'household', '/overzicht/cashflow/budget'),
+        statusCacheKey('u1', 'household', '/overzicht/budget'),
         now,
       ).hit,
     ).toBe(false)
     // Andere route → miss.
     expect(
       readStatusCache(
-        statusCacheKey('u1', 'personal', '/overzicht/cashflow/transacties'),
+        statusCacheKey('u1', 'personal', '/overzicht/budget/transacties'),
         now,
       ).hit,
     ).toBe(false)
     // Zelfde sleutel → hit.
     expect(
       readStatusCache(
-        statusCacheKey('u1', 'personal', '/overzicht/cashflow/budget'),
+        statusCacheKey('u1', 'personal', '/overzicht/budget'),
         now,
       ).hit,
     ).toBe(true)

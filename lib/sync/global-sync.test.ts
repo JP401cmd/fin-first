@@ -166,7 +166,7 @@ describe('planBankSyncs — voorrangsvolgorde', () => {
     expect(skipped).toHaveLength(1)
     expect(skipped[0].reason).toBe('link-broken')
     // De uitweg blijft de landingspagina; er is geen rekening om naartoe te linken.
-    expect(skipped[0].manualHref).toBe('/overzicht/cashflow')
+    expect(skipped[0].manualHref).toBe('/overzicht/budget')
   })
 
   it('wint van de uur-rem én van de dagrem: geen drager = altijd overslaan', () => {
@@ -219,7 +219,7 @@ describe('planBankSyncs — job-vorm', () => {
   })
 
   // Deze test legde eerder vast dat een koppeling ZONDER dragende rekening wél
-  // een job werd, met `/overzicht/cashflow` als terugvallink. Dat gedrag is
+  // een job werd, met `/overzicht/budget` als terugvallink. Dat gedrag is
   // bewust weg: de route weigert zo'n koppeling met een 409 die vóór de
   // dagteller valt, dus die job kon alleen maar mislukken en werd door geen
   // enkele rem afgeknepen. De terugvallink zelf is niet verdwenen — hij reist nu
@@ -230,12 +230,12 @@ describe('planBankSyncs — job-vorm', () => {
     const { jobs, skipped } = planBankSyncs([makeBank({ bankAccountId: null })], NOW)
 
     expect(jobs).toEqual([])
-    expect(skipped[0].manualHref).toBe('/overzicht/cashflow')
+    expect(skipped[0].manualHref).toBe('/overzicht/budget')
   })
 
   it('bankManualHref direct getest', () => {
     expect(bankManualHref('abc')).toBe('/core/assets/cash/abc')
-    expect(bankManualHref(null)).toBe('/overzicht/cashflow')
+    expect(bankManualHref(null)).toBe('/overzicht/budget')
   })
 
   it('een overgeslagen koppeling draagt ook een manualHref', () => {

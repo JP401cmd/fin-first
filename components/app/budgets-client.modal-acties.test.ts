@@ -13,7 +13,7 @@
  *         bovendien meescrolde).
  *  B-020  de planeditor ging met een losse `useState` open, zónder
  *         history-entry: de Android-terugknop verliet daardoor de hele route
- *         (je landde op /overzicht/cashflow i.p.v. terug op /…/budget).
+ *         (je landde op /overzicht/budget i.p.v. terug op /…/budget).
  *  B-022  archiveren en de vraag-aan-Fin horen elders in de modal; onderin
  *         blijven herschikken, bewerken en één knop die "Terug" heet zolang er
  *         niets gewijzigd is en "Opslaan" wordt zodra dat wel zo is.

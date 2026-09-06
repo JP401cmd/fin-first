@@ -1,5 +1,5 @@
 /**
- * De uitgaven-heatmap op /overzicht/cashflow/transacties werd tot nu toe apart
+ * De uitgaven-heatmap op /overzicht/budget/transacties werd tot nu toe apart
  * gedownload, terwijl het periode-venster van diezelfde pagina hem vrijwel
  * altijd al omvat. De tweede download is weg; de heatmap wordt uit de gedeelde
  * ruwe set gesneden met `windowPerspectiveItems` — exact de vensterregel die de

@@ -12,7 +12,7 @@ oppervlakken presenteerden dat getal echter met **werktijd-taal** ("die je werkt
 om te betalen", "per jaar opgeofferd aan belasting"). Vrijheidstijd-getallen zijn
 onafhankelijke uitgaven-aandelen en dus niet optelbaar tot een werkjaar, waardoor
 `/overzicht/belasting` ("9 maanden per jaar") en
-`/overzicht/cashflow/vaste-lasten` ("9 maanden") samen **achttien maanden per
+`/overzicht/budget/vaste-lasten` ("9 maanden") samen **achttien maanden per
 jaar** claimden. Besluit: werktijd wordt een aparte, canonieke grootheid die
 deelt op het **bruto dagelijks inkomen** — één noemer voor alle werktijd-claims,
 zodat ze delen van dezelfde taart zijn.
@@ -90,7 +90,7 @@ leverde twee onafhankelijke aandelen.
 - **De belasting-hub betaalt niets extra.** `kansen.grossYearly` *is* al
   `resolveBox1GrossIncome`; de hub gebruikt daarom de pure variant
   `dailyIncomeRateFromGrossYearly` — zelfde grondslag, nul extra queries.
-- **`/overzicht/cashflow/vaste-lasten` krijgt één extra parallelle loader.**
+- **`/overzicht/budget/vaste-lasten` krijgt één extra parallelle loader.**
   `getCanonicalDailyIncomeRate` trekt via `loadCashflowSettingsData` de
   `loadCoreData`-bundel binnen. Dat is dezelfde koppeling die het aandachtspunt
   `bruto-box1-grondslag-meervoudig` al registreert (opvolgactie: override-first

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Vervang de transactielijst op `/overzicht/cashflow/transacties` door een verrijkte, redactionele "Tijdlijn"-lens (budget-onafhankelijk) met rekening-selector, en breid de Rabobank-import uit zodat lopend saldo, type, terugkerend en FX worden bewaard.
+**Goal:** Vervang de transactielijst op `/overzicht/budget/transacties` door een verrijkte, redactionele "Tijdlijn"-lens (budget-onafhankelijk) met rekening-selector, en breid de Rabobank-import uit zodat lopend saldo, type, terugkerend en FX worden bewaard.
 
 **Architecture:** Pure displaylogica in nieuwe `lib/transaction-display.ts` (TDD). Datafundament: migratie + parser/import-uitbreiding. UI: nieuwe `TransactieTijdlijn`-component vervangt `TransactiesFeed` binnen `TransactiesAnalyse`. Geen budget/categorie in deze lens. Graceful degradation: ontbrekende Tier-B-velden (demo/ING-data) renderen niet.
 
@@ -1179,7 +1179,7 @@ Verwijder `budgetOptions` (niet meer gebruikt door de tijdlijn) — laat staan a
 - [ ] **Step 3: Typecheck + visuele check**
 
 Run: `npx tsc --noEmit` → schoon.
-Start de app (`npm run dev`) en open `/overzicht/cashflow/transacties`: de feed toont opgeschoonde namen, dag-koppen met vrijheidstijd, en de rekening-selector. Op demo-data zijn saldo/FX afwezig (graceful).
+Start de app (`npm run dev`) en open `/overzicht/budget/transacties`: de feed toont opgeschoonde namen, dag-koppen met vrijheidstijd, en de rekening-selector. Op demo-data zijn saldo/FX afwezig (graceful).
 
 - [ ] **Step 4: Commit**
 
@@ -1274,7 +1274,7 @@ Dag-koppen als `<h3 className="sr-only">` of `aria`-gelabeld; rijen `<button>` m
 
 Run: `npx vitest run components/overview/transacties/` → PASS.
 Run: `npx tsc --noEmit` → schoon.
-Visuele check op `/overzicht/cashflow/transacties`: lege filter toont wis-CTA; oog-icoon maskeert bedragen én saldo.
+Visuele check op `/overzicht/budget/transacties`: lege filter toont wis-CTA; oog-icoon maskeert bedragen én saldo.
 
 - [ ] **Step 5: Commit**
 
@@ -1300,7 +1300,7 @@ Expected: alle PASS.
 - [ ] **Step 3: Echte-data-rooktest (handmatig)**
 
 Importeer `CSV_A_NL60RABO0330370596_EUR_202601.csv` via `/core/cash/import` op een testrekening. Open
-`/overzicht/cashflow/transacties`: `BCK*SHELL…` → "Shell", lopend saldo zichtbaar, ASR/PayPal `🔁`,
+`/overzicht/budget/transacties`: `BCK*SHELL…` → "Shell", lopend saldo zichtbaar, ASR/PayPal `🔁`,
 CHF-transactie toont FX-badge, rekening-selector schakelt correct. Bevestig dat budget/categorie nergens
 in deze lens verschijnt.
 

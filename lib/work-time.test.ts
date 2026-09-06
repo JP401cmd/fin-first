@@ -9,7 +9,7 @@ import { WORK_YEAR_MONTHS, WORK_TIME_DISPLAY_MAX_MONTHS } from '@/lib/constants'
 
 /**
  * Bevinding C5 (UX-testpanel, 24-08-2026): /overzicht/belasting claimde
- * "9 maanden per jaar" en /overzicht/cashflow/vaste-lasten "9 maanden" — samen
+ * "9 maanden per jaar" en /overzicht/budget/vaste-lasten "9 maanden" — samen
  * ACHTTIEN maanden per jaar. Oorzaak: beide deelden op het UITGAVEN-dagtarief
  * (vrijheidstijd) terwijl de tekst een deel van het WERKJAAR beloofde.
  *

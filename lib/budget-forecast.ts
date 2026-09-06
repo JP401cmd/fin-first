@@ -11,7 +11,7 @@
  * dus op een inkomstenbudget is de reeks het gerealiseerde inkomen en op een
  * uitgavenbudget de besteding. De WOORDEN waren dat niet: elke uitkomst heette
  * "Verwachte uitgaven" en elke zin "geef je volgende maand € X uit aan …",
- * inclusief op "Salaris". Gemeld vanaf /overzicht/cashflow/budget.
+ * inclusief op "Salaris". Gemeld vanaf /overzicht/budget.
  *
  * Daarom draagt de uitkomst nu zijn eigen `label` en zijn eigen zinnen, gekozen
  * op `budget_type`. Het is bewust ÉÉN tabel (`PHRASING`) en geen tweede

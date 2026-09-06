@@ -2,7 +2,7 @@
  * resolveSavingsSource — canonieke spaarbron voor de FIRE-prognose.
  *
  * Spiegelt exact het getal dat het instellingenblok onderaan
- * /overzicht/cashflow toont (`components/overview/cashflow-instellingen-blok.tsx`):
+ * /overzicht/budget toont (`components/overview/cashflow-instellingen-blok.tsx`):
  *
  *   - inkomen     = handmatig ? net_monthly_income × 12 : extrapolated jaarinkomen
  *   - spaarquote  = uitgaven-handmatig
@@ -369,7 +369,7 @@ export function resolveSavingsSource(input: SavingsSourceInput): SavingsSource {
 
   const expensesManual = input.expensesSource === 'manual'
   // HANDMATIG PAD = letterlijk wat het instellingenblok onderaan
-  // /overzicht/cashflow toont: (inkomen − uitgaven) / inkomen. Géén
+  // /overzicht/budget toont: (inkomen − uitgaven) / inkomen. Géén
   // spaarbudget-/aflossing-correctie erbovenop.
   //
   // Waarom niet: die correcties hoorden bij het TRANSACTIE-pad, waar `expenses6m`

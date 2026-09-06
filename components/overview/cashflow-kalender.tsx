@@ -20,7 +20,7 @@ import {
  * cash-overview". Eerste stap richting Sankey (later) — deze kalender
  * geeft het gevoel "wat komt er deze maand" zonder zware visualisatie.
  *
- * Mounting: nieuwe sub-view op /overzicht/cashflow naast Budget /
+ * Mounting: nieuwe sub-view op /overzicht/budget naast Budget /
  * Transacties / Vaste lasten via de CashflowViewSwitcher.
  *
  * TWEE BRONNEN, ÉÉN KALENDER (bevinding M21) — en ze blijven uit elkaar te

@@ -32,9 +32,9 @@ function makeRec(overrides: Partial<Recommendation> = {}): Recommendation {
 }
 
 describe('deepLinkForRecommendation — related fields prioriteit', () => {
-  it('related_budget_slug → /overzicht/cashflow?budget=...', () => {
+  it('related_budget_slug → /overzicht/budget?budget=...', () => {
     const link = deepLinkForRecommendation(makeRec({ related_budget_slug: 'streaming' }))
-    expect(link?.href).toBe('/overzicht/cashflow?budget=streaming')
+    expect(link?.href).toBe('/overzicht/budget?budget=streaming')
     expect(link?.label).toBe('Open budget')
   })
 
@@ -60,10 +60,10 @@ describe('deepLinkForRecommendation — related fields prioriteit', () => {
 })
 
 describe('deepLinkForRecommendation — fallback per type', () => {
-  it('budget_optimization → /overzicht/cashflow', () => {
+  it('budget_optimization → /overzicht/budget', () => {
     expect(
       deepLinkForRecommendation(makeRec({ recommendation_type: 'budget_optimization' })),
-    ).toMatchObject({ href: '/overzicht/cashflow', label: 'Open cashflow' })
+    ).toMatchObject({ href: '/overzicht/budget', label: 'Open cashflow' })
   })
 
   it('asset_reallocation → /overzicht/bezittingen', () => {
@@ -78,15 +78,15 @@ describe('deepLinkForRecommendation — fallback per type', () => {
     ).toMatchObject({ href: '/overzicht/schulden' })
   })
 
-  it('income_increase → /overzicht/cashflow', () => {
+  it('income_increase → /overzicht/budget', () => {
     expect(
       deepLinkForRecommendation(makeRec({ recommendation_type: 'income_increase' })),
-    ).toMatchObject({ href: '/overzicht/cashflow' })
+    ).toMatchObject({ href: '/overzicht/budget' })
   })
 
-  it('savings_boost (default in mock) → /overzicht/cashflow', () => {
+  it('savings_boost (default in mock) → /overzicht/budget', () => {
     expect(deepLinkForRecommendation(makeRec())).toMatchObject({
-      href: '/overzicht/cashflow',
+      href: '/overzicht/budget',
     })
   })
 })

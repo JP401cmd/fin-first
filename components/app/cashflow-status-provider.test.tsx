@@ -9,7 +9,7 @@ import type { CashflowCardStatuses } from '@/lib/cashflow-cards'
  * De winst van T2.3 zit in WIE er fetcht, dus dat is wat hier bewaakt wordt met
  * een fetch-teller (niet: "er kwam een waarde terug"):
  *
- *  1. op de HUB (/overzicht/cashflow) fetcht de provider NUL keer — die pagina
+ *  1. op de HUB (/overzicht/budget) fetcht de provider NUL keer — die pagina
  *     berekent de kaarten server-side en seedt ze;
  *  2. de seed mag LAAT komen (gestreamd blok, mount ná de eerste paint) en
  *     landt dan alsnog, zonder dat er tussendoor een fetch is losgegaan — dat is
@@ -89,7 +89,7 @@ afterEach(() => {
 
 describe('CashflowStatusProvider — de hub fetcht niet', () => {
   beforeEach(() => {
-    mockUsePathname.mockReturnValue('/overzicht/cashflow')
+    mockUsePathname.mockReturnValue('/overzicht/budget')
   })
 
   it('doet nul fetches en toont de geseede statussen', async () => {
@@ -143,7 +143,7 @@ describe('CashflowStatusProvider — de hub fetcht niet', () => {
   })
 
   it('een trailing slash telt nog steeds als de hub', async () => {
-    mockUsePathname.mockReturnValue('/overzicht/cashflow/')
+    mockUsePathname.mockReturnValue('/overzicht/budget/')
     render(
       <CashflowStatusProvider>
         <CashflowStatusSeed statuses={SEEDED} />
@@ -159,10 +159,9 @@ describe('CashflowStatusProvider — de hub fetcht niet', () => {
 
 describe('CashflowStatusProvider — sub-pagina en daarbuiten', () => {
   it.each([
-    '/overzicht/cashflow/budget',
-    '/overzicht/cashflow/transacties',
-    '/overzicht/cashflow/vaste-lasten',
-    '/overzicht/cashflow/forecast',
+    '/overzicht/budget/transacties',
+    '/overzicht/budget/vaste-lasten',
+    '/overzicht/budget/forecast',
   ])('fetcht op %s exact één keer en toont het antwoord', async (pathname) => {
     mockUsePathname.mockReturnValue(pathname)
     render(
@@ -193,7 +192,7 @@ describe('CashflowStatusProvider — sub-pagina en daarbuiten', () => {
   // Begrensde routematch: een zusterroute die toevallig met de hub-prefix begint
   // is GEEN cashflow-sub-pagina en mag het endpoint dus niet raken.
   it('behandelt een zusterroute met dezelfde prefix niet als sub-pagina', async () => {
-    mockUsePathname.mockReturnValue('/overzicht/cashflow-instellingen')
+    mockUsePathname.mockReturnValue('/overzicht/budget-instellingen')
     render(
       <CashflowStatusProvider>
         <StatusProbe />
@@ -206,7 +205,7 @@ describe('CashflowStatusProvider — sub-pagina en daarbuiten', () => {
   })
 
   it('blijft neutraal bij een niet-ok antwoord (progressive enhancement)', async () => {
-    mockUsePathname.mockReturnValue('/overzicht/cashflow/budget')
+    mockUsePathname.mockReturnValue('/overzicht/budget/transacties')
     fetchSpy.mockResolvedValue({ ok: false, json: async () => ({}) } as Response)
     render(
       <CashflowStatusProvider>
@@ -224,7 +223,7 @@ describe('CashflowStatusProvider — perspectiefwissel', () => {
   // overleeft. Zonder het perspectief in de deps zouden de dots op een
   // sub-pagina op het vorige perspectief blijven staan.
   it('haalt op een sub-pagina opnieuw op', async () => {
-    mockUsePathname.mockReturnValue('/overzicht/cashflow/budget')
+    mockUsePathname.mockReturnValue('/overzicht/budget/transacties')
     const { rerender } = render(
       <CashflowStatusProvider>
         <StatusProbe />
@@ -267,7 +266,7 @@ describe('CashflowStatusProvider — perspectiefwissel', () => {
   // gebruiker een weggegooid eerste verzoek opleveren — en beide verzoeken zijn
   // cache-misses, dus twee volle loadersets voor één paginabezoek.
   it('doet geen speculatief verzoek zolang het perspectief nog niet bekend is', async () => {
-    mockUsePathname.mockReturnValue('/overzicht/cashflow/budget')
+    mockUsePathname.mockReturnValue('/overzicht/budget/transacties')
     mockUsePerspective.mockReturnValue({ perspective: 'personal', loading: true })
     const { rerender } = render(
       <CashflowStatusProvider>
@@ -296,7 +295,7 @@ describe('CashflowStatusProvider — perspectiefwissel', () => {
   // De hub blijft ook ná een wissel op nul fetches: daar hertekent de zachte
   // refresh het server-blok, dat een verse seed levert.
   it('laat de hub ook dan niet fetchen — de verse seed doet het werk', async () => {
-    mockUsePathname.mockReturnValue('/overzicht/cashflow')
+    mockUsePathname.mockReturnValue('/overzicht/budget')
     const { rerender } = render(
       <CashflowStatusProvider>
         <CashflowStatusSeed statuses={SEEDED} />
@@ -328,7 +327,7 @@ describe('CashflowStatusProvider — perspectiefwissel', () => {
 
 describe('CashflowStatusProvider — route-overgangen', () => {
   it('sub → hub: geen extra fetch, en de sub-waarden lekken niet naar de hub', async () => {
-    mockUsePathname.mockReturnValue('/overzicht/cashflow/budget')
+    mockUsePathname.mockReturnValue('/overzicht/budget/transacties')
     const { rerender } = render(
       <CashflowStatusProvider>
         <StatusProbe />
@@ -339,7 +338,7 @@ describe('CashflowStatusProvider — route-overgangen', () => {
     expect(probe()).toBe('warn/good/bad/neutral')
 
     // Naar de hub: het gestreamde blok is er nog niet, dus geen seed.
-    mockUsePathname.mockReturnValue('/overzicht/cashflow')
+    mockUsePathname.mockReturnValue('/overzicht/budget')
     rerender(
       <CashflowStatusProvider>
         <StatusProbe />
@@ -352,7 +351,7 @@ describe('CashflowStatusProvider — route-overgangen', () => {
   })
 
   it('hub → sub: de blijvende seed lekt niet in de sub-dots', async () => {
-    mockUsePathname.mockReturnValue('/overzicht/cashflow')
+    mockUsePathname.mockReturnValue('/overzicht/budget')
     const { rerender } = render(
       <CashflowStatusProvider>
         <CashflowStatusSeed statuses={SEEDED} />
@@ -364,7 +363,7 @@ describe('CashflowStatusProvider — route-overgangen', () => {
 
     // Naar een sub-pagina: de seed blijft in de provider staan, maar mag daar
     // niet getoond worden — ook niet in het venster vóór het antwoord.
-    mockUsePathname.mockReturnValue('/overzicht/cashflow/budget')
+    mockUsePathname.mockReturnValue('/overzicht/budget/transacties')
     rerender(
       <CashflowStatusProvider>
         <StatusProbe />
@@ -380,7 +379,7 @@ describe('CashflowStatusProvider — route-overgangen', () => {
 
 describe('useCashflowStatusContext buiten de provider', () => {
   it('valt terug op neutrale statussen i.p.v. te crashen', async () => {
-    mockUsePathname.mockReturnValue('/overzicht/cashflow')
+    mockUsePathname.mockReturnValue('/overzicht/budget/transacties')
     render(<StatusProbe />)
     await act(async () => {})
 

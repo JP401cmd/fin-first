@@ -1397,7 +1397,7 @@ export default function HorizonPage({
         supabase.from('bank_accounts').select('id, name, balance, ownership').eq('is_active', true).is('linked_asset_id', null),
         // GEDEELDE GRONDSLAG (ADR 0103) — het jaarinkomen dat `current_income`
         // als pensioenuitgave (en dus als FIRE-doel) gebruikt, komt uit dezelfde
-        // bundel als de inkomenskaart op /overzicht/cashflow. Zonder dit rekende
+        // bundel als de inkomenskaart op /overzicht/budget. Zonder dit rekende
         // deze refresh nog puur op de transactie-extrapolatie.
         fetch('/api/overzicht/cashflow-settings')
           .then((r) => (r.ok ? (r.json() as Promise<CashflowSettingsData>) : null))
@@ -1484,7 +1484,7 @@ export default function HorizonPage({
       //
       // Het jaarinkomen komt op de GEDEELDE grondslag (ADR 0103): budgetten,
       // transacties, eigen bedrag of profielschatting — hetzelfde getal dat de
-      // inkomenskaart op /overzicht/cashflow toont. Dat is hier de zwaarste
+      // inkomenskaart op /overzicht/budget toont. Dat is hier de zwaarste
       // consequentie van het besluit: bij `retirement_expense_method =
       // 'current_income'` ÍS dit jaarinkomen de pensioenuitgave, en dus het
       // FIRE-doel.
