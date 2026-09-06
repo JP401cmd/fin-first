@@ -227,3 +227,58 @@ describe('GeldstroomKassabonnen — doorklik naar kindbudgetten', () => {
     expect(screen.queryByLabelText('Toon deelbudgetten van Wonen')).toBeNull()
   })
 })
+
+// ── Volgorde van de inkomstenbon ─────────────────────────────────────────────
+//
+// De bon liep na de verhuizing op BEDRAG te sorteren, met de restpost
+// "Overige rekeningen" in die sortering mee. De opgeheven cashflow-hub liep de
+// rekeningen af in hun eigen volgorde (`sort_order`) en zette de restpost
+// altijd onderaan. Dat is ook de leesbare vorm: een bon die zichzelf elke maand
+// hersorteert laat je telkens opnieuw zoeken, en een restpost middenin leest
+// als een gewone rekening.
+describe('GeldstroomKassabonnen — volgorde van de inkomstenbon', () => {
+  // Twee rekeningen in bewuste volgorde, waarbij de EERSTE het kleinste bedrag
+  // heeft: op bedrag gesorteerd zouden ze omdraaien.
+  const MAP = new Map([
+    ['acc-klein', 'Eerst in de lijst'],
+    ['acc-groot', 'Tweede in de lijst'],
+  ])
+  const RIJEN: AnalysisTransaction[] = [
+    tx({ id: 'i1', amount: 100, account_id: 'acc-klein' }),
+    tx({ id: 'i2', amount: 900, account_id: 'acc-groot' }),
+    tx({ id: 'i3', amount: 400, account_id: 'acc-onbekend' }), // → restpost
+  ]
+
+  function renderInkomsten() {
+    return render(
+      <GeldstroomKassabonnen
+        open="income"
+        onClose={() => {}}
+        transactions={RIJEN}
+        budgets={BUDGETS}
+        accountMap={MAP}
+        summary={summarizeFlow(RIJEN)}
+        windowLabel="juni 2026"
+      />,
+    )
+  }
+
+  it('volgt de volgorde van de rekeningenlijst, niet het bedrag', () => {
+    renderInkomsten()
+    const namen = Array.from(
+      screen.getByRole('dialog').querySelectorAll('span'),
+    )
+      .map((el) => el.textContent?.trim() ?? '')
+      .filter((t) => t === 'Eerst in de lijst' || t === 'Tweede in de lijst')
+    expect(namen).toEqual(['Eerst in de lijst', 'Tweede in de lijst'])
+  })
+
+  it('zet de restpost altijd onderaan, ook als hij niet het kleinst is', () => {
+    renderInkomsten()
+    const dialog = screen.getByRole('dialog')
+    const regels = Array.from(dialog.querySelectorAll('span'))
+      .map((el) => el.textContent?.trim() ?? '')
+      .filter((t) => ['Eerst in de lijst', 'Tweede in de lijst', 'Overige rekeningen'].includes(t))
+    expect(regels[regels.length - 1]).toBe('Overige rekeningen')
+  })
+})

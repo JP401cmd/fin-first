@@ -119,18 +119,25 @@ export function GeldstroomKassabonnen({
       if (!id) return OVERIGE_REKENINGEN
       return accountMap.has(id) ? id : OVERIGE_REKENINGEN
     })
+    // VOLGORDE = die van de rekeningenlijst, niet op bedrag. `accountMap` is
+    // gevuld in `sort_order`-volgorde, dus 'm aflopen geeft dezelfde reeks als
+    // de kaarten hierboven — en dezelfde als de opgeheven cashflow-hub, die de
+    // rekeningen ook in die volgorde afliep. Een bon die zichzelf hersorteert op
+    // bedrag laat de lezer elke maand op een andere plek zoeken.
     const lines: Array<{ id: string; name: string; amount: number }> = []
-    for (const [key, flow] of byAccount) {
-      if (flow.income <= 0) continue
-      lines.push({
-        id: key,
-        // Restpost: inkomen zonder rekening of op een rekening die deze pagina
-        // niet kent. Zonder deze regel telt de bon niet op tot zijn eigen totaal.
-        name: key === OVERIGE_REKENINGEN ? 'Overige rekeningen' : accountMap.get(key) ?? 'Overige rekeningen',
-        amount: flow.income,
-      })
+    for (const [id, naam] of accountMap) {
+      const income = byAccount.get(id)?.income ?? 0
+      if (income <= 0) continue
+      lines.push({ id, name: naam, amount: income })
     }
-    lines.sort((a, b) => b.amount - a.amount)
+    // Restpost ALTIJD onderaan: inkomen zonder rekening of op een rekening die
+    // deze pagina niet kent. Zonder deze regel telt de bon niet op tot zijn
+    // eigen totaal — en als hij meesorteerde kon hij middenin belanden, waar
+    // hij als gewone rekening leest.
+    const rest = byAccount.get(OVERIGE_REKENINGEN)?.income ?? 0
+    if (rest > 0) {
+      lines.push({ id: OVERIGE_REKENINGEN, name: 'Overige rekeningen', amount: rest })
+    }
     return lines
   }, [transactions, accountMap])
 
