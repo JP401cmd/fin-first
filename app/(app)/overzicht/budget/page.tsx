@@ -10,7 +10,7 @@ import {
 } from '@/components/overview/cashflow-cards-loader'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
-import { PageOpening } from '@/components/editorial'
+import { Kicker } from '@/components/editorial'
 import { getPageInfo } from '@/lib/page-info-content'
 
 export const metadata: Metadata = {
@@ -60,25 +60,27 @@ export default async function OverzichtBudgetPage() {
         />
       </div>
 
-      <section className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
-        <PageOpening
-          className="mb-4"
-          kicker={
-            <>
-              Je geldstroom
-              <PerspectiveContextLabel />
-            </>
-          }
-          titleBefore="Hoeveel "
-          emphasis="vrijheid"
-          titleAfter=" zet je elke maand opzij?"
-          deck="Het deel van je inkomen dat je opzij zet bepaalt hoe snel je vrijheid bereikt. Kies een onderdeel om dieper te kijken."
-        />
-      </section>
-
       {/* De drie onderdelen als kaarten met hun kerngetal en status —
           overgenomen van de opgeheven cashflow-hub, waar er vier stonden.
-          Budget zelf valt weg: dit ÍS die pagina. */}
+          Budget zelf valt weg: dit ÍS die pagina.
+
+          GEEN EIGEN PAGINA-AANHEF hier. De hub-hero ("Hoeveel vrijheid zet je
+          elke maand opzij?") is bij de verhuizing meegekomen en stond toen
+          bóven de aanhef die `BudgetsClient` zelf al draagt ("Hoeveel ruimte
+          heb je nog?") — twee volwaardige `PageOpening`s, dus twee h2's met
+          een grote vraag op één scherm, met deze kaarten ertussen geklemd.
+          ADR 0135 schreef die afweging al voor ("één wint, de andere vervalt");
+          de budget-aanhef wint, want die draagt cijfers en een maandaanduiding.
+          Alleen zichtbaar bij live doorklikken: los gelezen klopt elk bestand.
+
+          De kicker blijft wél, buiten het gestreamde blok: hij benoemt waar
+          deze drie kaarten over gaan en staat er al vóór ze binnen zijn. */}
+      <section className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
+        <Kicker size="small" className="mb-2">
+          Je geldstroom
+          <PerspectiveContextLabel className="normal-case tracking-normal" />
+        </Kicker>
+      </section>
       <Suspense fallback={<CashflowCardsFallback />}>
         <CashflowCardsLoader perspective={perspective} />
       </Suspense>
