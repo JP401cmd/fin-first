@@ -1,5 +1,10 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
+import { TransactiesNoticesLoader } from '@/components/overview/transacties/transacties-notices-loader'
+import { InsightToggleButton } from '@/components/editorial/insight-toggle-button'
+import { INFLATION_IMPACT_ID } from '@/components/overview/inflation-impact-card'
+import { CashflowInstellingenBlokLazy } from '../cashflow-below-fold'
 import { loadAccountCount } from '@/lib/account-count'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
@@ -86,6 +91,13 @@ export default async function OverzichtCashflowTransactiesPage({
     <>
       <NavStackMeta title="Transacties" bottomBar={{ kind: 'tabs' }} />
       <div className="relative mx-auto max-w-6xl px-4 pt-4 sm:px-6">
+        {/* Verhuisd van de opgeheven cashflow-hub, samen met de inflatiekaart
+            waar hij bij hoort: haalt het weggeklikte inzicht terug. Vaste
+            offsets links van het statuspunt (meldingen-conventie). */}
+        <InsightToggleButton
+          ids={[INFLATION_IMPACT_ID]}
+          className="absolute right-[84px] top-4 sm:right-[92px]"
+        />
         <PageStatusDot className="absolute right-[52px] top-4 sm:right-[60px]" />
         <PageInfoButton
           content={getPageInfo('/overzicht/cashflow/transacties')}
@@ -102,6 +114,12 @@ export default async function OverzichtCashflowTransactiesPage({
           deck="Elke transactie is gekochte of verkochte tijd — bekijk waar je uren heen gaan."
         />
         <KoppelRekeningBanner accountCount={accountCount} />
+        {/* Versheidsmelding + inflatie-impact, verhuisd van de cashflow-hub.
+            Eigen <Suspense> zodat hun loaders de analyse niet ophouden; bij
+            verse data en lage uitgaven rendert het blok niets. */}
+        <Suspense fallback={null}>
+          <TransactiesNoticesLoader perspective={perspective} />
+        </Suspense>
         {/* De grenzenpotten staan direct onder de geldstroom-/spaarquote-kaart:
             eerst wat er binnenkomt en overblijft, dan de grenzen die je daarop
             zet. Server-geladen (ADR 0058) en als slot doorgegeven, omdat de
@@ -118,6 +136,13 @@ export default async function OverzichtCashflowTransactiesPage({
           }
         />
       </div>
+
+      {/* Waar je cijfers op rusten — de grondslagkeuze voor inkomen, uitgaven en
+          spaarquote (ADR 0103). Verhuisd van de cashflow-hub: die keuze wordt
+          gevoed door transacties en budgetten, dus hij hoort naast zijn bron.
+          Draagt zijn eigen <section>-wrapper en laadt pas in beeld; bij een
+          mislukte fetch rendert hij niets, inclusief de padding. */}
+      <CashflowInstellingenBlokLazy />
     </>
   )
 }

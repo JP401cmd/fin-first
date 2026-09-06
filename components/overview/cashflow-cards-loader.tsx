@@ -4,22 +4,10 @@ import { loadCashflowData } from '@/lib/cashflow-data-loader'
 import { loadVasteLastenSummary } from '@/lib/vaste-lasten-summary'
 import { buildCashflowCards, cashflowCardStatuses } from '@/lib/cashflow-cards'
 import { CashflowStatusSeed } from '@/components/app/cashflow-status-provider'
-import { StaleTransactionsBanner } from '@/components/app/stale-transactions-banner'
-import { transactionFreshness } from '@/lib/transaction-staleness'
-import { getCachedUser } from '@/lib/supabase/cached-user'
-import { readMinimizedMap } from '@/lib/page-status/minimized-prefs'
-import {
-  STALE_TX_NOTICE_MINIMIZE_KEY,
-  asStaleMinimizedMonths,
-  resolveStaleNoticeDisplay,
-} from '@/lib/transaction-staleness-minimize'
 import {
   CashflowLandingCards,
   CashflowLandingCardsSkeleton,
 } from '@/components/overview/cashflow-landing-cards'
-import { InflationImpactCard } from '@/components/overview/inflation-impact-card'
-import { HideInSimple } from '@/components/app/hide-in-simple'
-import { Kicker } from '@/components/editorial'
 import type { Perspective } from '@/lib/household-data'
 
 /**
@@ -42,11 +30,11 @@ import type { Perspective } from '@/lib/household-data'
  * server-side hebben. De projectie kaart→status loopt via `cashflowCardStatuses`,
  * gedeeld met die route, zodat dot en kaart per constructie gelijk blijven.
  *
- * DE INFLATIEKAART HOORT HIER (stap 3): hij hangt aan `cashflow.baselineExpenses`
- * uit diezelfde `loadCashflowData`. Hem in een eigen `<Suspense>` zetten zou een
- * tweede wachtpunt op dezelfde load introduceren; `cache()` deelt de load toch al,
- * dus meeliften kost niets. De toon-drempel (>= €500) blijft byte-identiek aan de
- * vroegere in-page-conditie, inclusief `HideInSimple` en de Koopkracht-kicker.
+ * DE VERSHEIDSMELDING EN DE INFLATIEKAART STONDEN HIER, en zijn verhuisd naar
+ * `TransactiesNoticesLoader` op de transactiepagina. Beide gaan over transacties
+ * — de een over transacties die stilstaan, de ander over de gemeten uitgaven —
+ * en horen dus aan die kant van de splitsing die de cashflow-hub opheft. Dit
+ * blok draagt nu nog uitsluitend de kaarten en de statusseed.
  */
 export async function CashflowCardsLoader({ perspective }: { perspective: Perspective }) {
   // `createClient()` is React-`cache()`-gewrapt → dezelfde instantie als elders in
@@ -54,30 +42,12 @@ export async function CashflowCardsLoader({ perspective }: { perspective: Perspe
   // boven zijn return (zie de kop van page.tsx).
   const supabase = await createClient()
 
-  const user = await getCachedUser(supabase)
-
-  const [kpis, cashflow, vasteLasten, minimizedMap] = await Promise.all([
+  const [kpis, cashflow, vasteLasten] = await Promise.all([
     loadCashflowKpis(supabase),
     loadCashflowData(supabase, perspective),
     loadVasteLastenSummary(supabase),
-    user
-      ? readMinimizedMap(supabase, user.id)
-      : Promise.resolve({} as Record<string, unknown>),
   ])
   const cards = buildCashflowCards(kpis, cashflow, vasteLasten)
-  const txFreshness = transactionFreshness(kpis.latestTransactionMonth)
-
-  // ── DE VOORKEUR GELDT OOK HIER ─────────────────────────────────────────────
-  // Het is dezelfde melding als op /overzicht, onder dezelfde pref-sleutel. Wie
-  // haar daar inklapte, hoort haar hier niet opnieuw op volle grootte te zien.
-  // De knoppen zitten er bewust NIET bij: deze hub heeft geen provider en de
-  // melding staat in een gestreamd blok, terwijl het statuspunt bij de pagina-'i'
-  // hoort — die al gerenderd is vóór dit blok aankomt. Terughalen doe je op
-  // /overzicht; van daaruit werkt het weer op beide pagina's.
-  const staleDisplay = resolveStaleNoticeDisplay(
-    txFreshness.state === 'stale' ? txFreshness.monthsBehind : null,
-    asStaleMinimizedMonths(minimizedMap[STALE_TX_NOTICE_MINIMIZE_KEY]),
-  )
 
   return (
     <>
@@ -86,31 +56,9 @@ export async function CashflowCardsLoader({ perspective }: { perspective: Perspe
           cashflow-status` niet. Rendert niets. */}
       <CashflowStatusSeed statuses={cashflowCardStatuses(cards)} />
 
-      {/* Versheidsmelding bóven de kaarten (UR2-13): de vier KPI's hieronder —
-          budgetstand, maandsaldo, vaste lasten, prognose — rusten allemaal op
-          transacties, dus als die stilstaan hoort dat te staan vóór de cijfers,
-          niet erna. De sectie-wrapper hangt aan hetzelfde canonieke oordeel als
-          de banner zelf, zodat er bij verse data geen lege padding overblijft. */}
-      {staleDisplay === 'expanded' && (
-        <section className="mx-auto max-w-6xl px-4 pb-4 sm:px-6">
-          <StaleTransactionsBanner latestTransactionMonth={kpis.latestTransactionMonth} />
-        </section>
-      )}
-
       <section className="mx-auto max-w-6xl px-4 sm:px-6">
         <CashflowLandingCards cards={cards} />
       </section>
-
-      {cashflow.baselineExpenses >= 500 && (
-        <HideInSimple>
-          <section className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
-            <Kicker size="small" className="mb-2">
-              Koopkracht
-            </Kicker>
-            <InflationImpactCard monthlyExpenses={cashflow.baselineExpenses} />
-          </section>
-        </HideInSimple>
-      )}
     </>
   )
 }

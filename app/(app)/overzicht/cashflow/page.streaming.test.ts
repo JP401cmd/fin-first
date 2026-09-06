@@ -99,10 +99,31 @@ describe('cashflow-cards-loader — draait op de slanke KPI-laag (ADR 0083)', ()
     expect(src).not.toContain('loadDashboardData')
   })
 
-  it('rendert de inflatiekaart in hetzelfde gestreamde blok', () => {
-    // Stap 3: de kaart hangt aan `cashflow.baselineExpenses` uit dezelfde
-    // `loadCashflowData` — een eigen Suspense zou een tweede wachtpunt op
-    // dezelfde load zijn.
+  it('draagt de inflatiekaart en de versheidsmelding NIET meer', () => {
+    // Beide zijn verhuisd naar `TransactiesNoticesLoader` op de
+    // transactiepagina (UR3-28): de een gaat over transacties die stilstaan, de
+    // ander over de gemeten uitgaven. Dit blok draagt nog uitsluitend de
+    // kaarten en de statusseed.
+    expect(src).not.toContain('<InflationImpactCard')
+    expect(src).not.toContain('<StaleTransactionsBanner')
+  })
+})
+
+describe('transacties-notices-loader — draagt de twee verhuisde duidingen', () => {
+  const src = stripComments(
+    readFileSync(
+      path.resolve(__dirname, '../../../../components/overview/transacties/transacties-notices-loader.tsx'),
+      'utf-8',
+    ),
+  )
+
+  it('rendert de versheidsmelding onder dezelfde minimaliseer-voorkeur', () => {
+    expect(src).toContain('<StaleTransactionsBanner')
+    expect(src).toContain('STALE_TX_NOTICE_MINIMIZE_KEY')
+    expect(src).toContain("staleDisplay === 'expanded'")
+  })
+
+  it('rendert de inflatiekaart op dezelfde drempel als voorheen', () => {
     expect(src).toContain('<InflationImpactCard')
     expect(src).toContain('cashflow.baselineExpenses >= 500')
   })
