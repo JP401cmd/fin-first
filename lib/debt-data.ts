@@ -506,6 +506,132 @@ export function computeExpectedBalance(debt: Debt): ExpectedBalance | null {
   }
 }
 
+// ── Resterende looptijd ──────────────────────────────────────
+
+/**
+ * Bovengrens voor een zinnige looptijd: 600 maanden (50 jaar). Gelijk aan de
+ * lus-limiet in `amortizationSchedule`, zodat beide aflospaden dezelfde
+ * horizon hanteren. Loopt een schuld daaroverheen, dan is de uitkomst niet
+ * plausibel genoeg om als hard getal te tonen.
+ */
+export const MAX_TERM_MONTHS = 600
+
+/**
+ * Looptijd in maanden die volgt uit saldo, maandbedrag, rente en aflossingsvorm
+ * — of `null` als er geen zinnig einde uit te rekenen is.
+ *
+ * Dit is de canonieke afleiding "hoe lang doet dit maandbedrag erover?". Hij
+ * woonde in `lib/debt-remaining-term.ts` en is hierheen verhuisd omdat
+ * `computeRenteAflossingsSplit` en `debtProjection` hem nu óók nodig hebben:
+ * dat bestand importeert uit dít bestand, dus andersom importeren zou een
+ * cyclus opleveren. `debt-remaining-term.ts` her-exporteert hem, zodat de
+ * bestaande callers (`debtRemainingMonths`, `buildDebtDraft`) ongewijzigd
+ * blijven — één functiebody, geen tweede kopie.
+ *
+ * Volgorde:
+ * 1. Aflossingsvrij kent uit zichzelf geen einde.
+ * 2. Lineair: de aflossing per maand is constant en volgt uit het maandbedrag
+ *    minus de rente over het HUIDIGE saldo (het opgeslagen maandbedrag is de
+ *    huidige, dus hoogste, termijn); de looptijd is saldo / die aflossing.
+ * 3. Annuïteit (default): projectie via `amortizationSchedule` met het
+ *    werkelijke maandbedrag.
+ *
+ * @param balance huidig saldo (positief bedrag)
+ * @param payment maandbedrag: aflossing plus rente over het huidige saldo
+ * @param annualRate rente in procenten per jaar; niet-eindig telt als 0
+ * @param repaymentType aflossingsvorm; `null`/`undefined` ⇒ annuïteit
+ * @param now ankerdatum voor de annuïteitsprojectie
+ */
+/** Klemt een looptijd op de plausibiliteitsgrens; `null` blijft `null`. */
+function clampTerm(months: number | null): number | null {
+  if (months == null || !Number.isFinite(months) || months <= 0) return null
+  return Math.min(MAX_TERM_MONTHS, months)
+}
+
+/** Maanden van nu tot een einddatum, of `null` als die er niet (zinnig) is. */
+function monthsUntil(endDate: string | null | undefined): number | null {
+  if (!endDate) return null
+  const months = Math.round((new Date(endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30.44))
+  return months > 0 ? months : null
+}
+
+/**
+ * Aflossing per maand bij een lineaire schuld: het maandbedrag minus de rente
+ * over het HUIDIGE saldo (het opgeslagen maandbedrag is de huidige, dus
+ * hoogste, termijn). `null` als de betaling de rente niet dekt — dan lost de
+ * schuld nooit af.
+ */
+function linearPrincipalPerMonth(balance: number, payment: number, annualRate: number): number | null {
+  const rate = Number.isFinite(annualRate) ? annualRate : 0
+  const principal = payment - balance * (rate / 100 / 12)
+  return Number.isFinite(principal) && principal > 0 ? principal : null
+}
+
+/**
+ * Looptijd zónder plausibiliteitsgrens. Bestaat apart omdat "de betaling dekt
+ * de rente niet" en "dit duurt langer dan 600 maanden" twee verschillende
+ * dingen zijn: `deriveRemainingMonths` geeft op allebei `null`, en een caller
+ * die dat als één ding leest noemt een schuld ten onrechte onbetaalbaar. Een
+ * lineaire schuld van € 350.000 à 3,5% met € 1.500 p/m houdt € 479 per maand
+ * over voor aflossing, maar doet er 731 maanden over — die hoort "731" te
+ * krijgen, niet "de betaling dekt de rente niet".
+ */
+function uncappedRemainingMonths(
+  balance: number,
+  payment: number,
+  annualRate: number,
+  repaymentType: RepaymentType | null | undefined,
+): number | null {
+  const rate = Number.isFinite(annualRate) ? annualRate : 0
+  if (!(balance > 0) || !(payment > 0)) return null
+  const rt = repaymentType ?? 'annuiteit'
+  if (rt === 'aflossingsvrij') return null
+
+  if (rt === 'lineair') {
+    const principal = linearPrincipalPerMonth(balance, payment, rate)
+    return principal == null ? null : Math.ceil(balance / principal)
+  }
+
+  const monthlyRate = rate / 100 / 12
+  // Rentevrij: geen logaritme (log(1)/log(1) = 0/0 = NaN).
+  if (monthlyRate <= 0) return Math.ceil(balance / payment)
+  const monthlyInterest = balance * monthlyRate
+  if (payment <= monthlyInterest) return null
+  return Math.ceil(Math.log(payment / (payment - monthlyInterest)) / Math.log(1 + monthlyRate))
+}
+
+export function deriveRemainingMonths(
+  balance: number,
+  payment: number,
+  annualRate: number,
+  repaymentType: RepaymentType | null | undefined,
+  now: Date,
+): number | null {
+  // De rentekolom is als `number` getypeerd, maar een DB-rij kan in de
+  // praktijk null/leeg dragen; een NaN-rente zou het hele schema NaN maken.
+  const rate = Number.isFinite(annualRate) ? annualRate : 0
+  if (!Number.isFinite(balance) || !Number.isFinite(payment)) return null
+  if (balance <= 0 || payment <= 0) return null
+
+  const rt = repaymentType ?? 'annuiteit'
+  if (rt === 'aflossingsvrij') return null
+
+  if (rt === 'lineair') {
+    const principalPerMonth = linearPrincipalPerMonth(balance, payment, rate)
+    // Dekt het maandbedrag de rente niet, dan lost de schuld nooit af.
+    if (principalPerMonth == null) return null
+    const months = Math.ceil(balance / principalPerMonth)
+    if (months <= 0 || months > MAX_TERM_MONTHS) return null
+    return months
+  }
+
+  // Annuïteit / default — projectie met het werkelijke maandbedrag.
+  const sched = amortizationSchedule(balance, rate, payment, now)
+  if (sched.length === 0) return null
+  const last = sched[sched.length - 1]
+  return last.balance <= 0.01 ? sched.length : null
+}
+
 // ── Rente / aflossing split ──────────────────────────────────
 
 export interface RenteAflossingsSplit {
@@ -518,8 +644,13 @@ export interface RenteAflossingsSplit {
 
 /**
  * Bereken de maandelijkse rente/aflossing-uitsplitsing voor een schuld.
- * Afleiding op basis van current_balance, interest_rate, repayment_type en dates.
- * Returnt null als onvoldoende data beschikbaar is.
+ *
+ * Bron is `monthly_payment` — wat er werkelijk betaald wordt. `current_balance`
+ * en `interest_rate` bepalen het rentedeel, `repayment_type` de vorm. De
+ * einddatum is uitsluitend TERUGVAL, voor rijen zonder maandbedrag; hij mag het
+ * ingevulde bedrag niet overrulen (zie de kop van deze functie en
+ * `lib/debt-maandbedrag-bron.test.ts`). Returnt null als er te weinig is om
+ * iets zinnigs te zeggen.
  */
 export function computeRenteAflossingsSplit(debt: Debt): RenteAflossingsSplit | null {
   const balance = Number(debt.current_balance)
@@ -531,7 +662,12 @@ export function computeRenteAflossingsSplit(debt: Debt): RenteAflossingsSplit | 
   const monthlyRate = rate / 100 / 12
   const currentRente = balance * monthlyRate
 
-  // Aflossingsvrij: 100% rente, 0% aflossing
+  // Aflossingsvrij: 100% rente, 0% aflossing — per definitie lost dit product
+  // niet af. Bewust NIET meegenomen in de "maandbedrag wint"-regel hieronder:
+  // wat een gebruiker bóven de rente betaalt op een aflossingsvrije rij is een
+  // modelvraag (extra aflossing? premie? kosten?) die de horizon-adapter
+  // vandaag conservatief op 0 zet (`potten.ts`). Die knoop hoort niet in deze
+  // functie doorgehakt te worden.
   if (debt.repayment_type === 'aflossingsvrij') {
     const monthlyPayment = roundCents(currentRente)
     return {
@@ -545,20 +681,71 @@ export function computeRenteAflossingsSplit(debt: Debt): RenteAflossingsSplit | 
     }
   }
 
-  // Bereken resterende maanden uit einddatum
+  // ── Het opgeslagen maandbedrag is de bron ──────────────────────────────
+  //
+  // Betaalt de gebruiker een bedrag, dan is dát het feit: het gaat elke maand
+  // van de rekening af. De einddatum is een plan, en de twee kunnen elkaar
+  // tegenspreken. Deze functie herrekende het maandbedrag vroeger als PMT over
+  // de einddatum zodra die gezet was, waardoor het ingevulde bedrag nooit aan
+  // bod kwam — de tweede helft van bug H2 (aug 2026; de eerste helft, een
+  // wizard die zelf een einddatum verzon, is toen wel gerepareerd).
+  //
+  // Wat dat kostte, gemeten op productie: een hypotheek van € 710k met een
+  // opgeslagen termijn van € 1.742,57 werd hier als € 2.121,84 gelezen. Het
+  // verschil (€ 379/mnd) liep als "aflossing" door in de spaarquote
+  // (`lib/savings-source.ts`, `lib/core-data-loader.ts`) en via
+  // `lib/horizon-kernel/adapter/potten.ts` in de FIRE-datum. Andersom kon ook:
+  // een DUO-lening van € 136 p/m werd als € 54,41 gerekend.
+  //
+  // De einddatum blijft de terugval voor rijen zónder maandbedrag — beter een
+  // plan dan geen getal. Vastgelegd in `debt-maandbedrag-bron.test.ts`.
+  if (payment > 0) {
+    // De uitsplitsing en de looptijd zijn twee losse vragen. De uitsplitsing
+    // volgt altijd rechtstreeks uit het maandbedrag; alleen de looptijd kan
+    // onbepaalbaar zijn. Ze aan elkaar knopen brak juist het geval waarvoor
+    // deze functie het hardst nodig is: een hypotheek waarvan de termijn de
+    // rente maar net dekt (€ 1.100 op € 350.000 à 3,5% → ~900 maanden) valt
+    // buiten de 600-maands plausibiliteitsgrens van `deriveRemainingMonths`,
+    // en zou dan géén split meer opleveren terwijl rente en aflossing prima
+    // te bepalen zijn.
+    const rente = roundCents(currentRente)
+    const aflossing = roundCents(Math.max(0, payment - currentRente))
+    return {
+      monthlyPayment: roundCents(payment),
+      currentRente: rente,
+      currentAflossing: aflossing,
+      // Geklemd op [0,100]: het detailvenster tekent de gestapelde balk als
+      // `width: X%` en `width: (100 − X)%`, en een betaling die de rente niet
+      // dekt gaf daar een negatieve breedte (ongeldige CSS) plus een label
+      // "(111%)".
+      rentePercentage: Math.min(100, Math.max(0, Math.round((currentRente / payment) * 10000) / 100)),
+      // Binnen de grens: de gedeelde afleiding. Daarbuiten een best-effort
+      // getal voor de weergave — deze functie mag geen `null` teruggeven waar
+      // de KPI (`debtRemainingMonths`) bewust wél afhaakt.
+      // Terugvalketen, in deze volgorde: (1) de gedeelde afleiding binnen de
+      // plausibiliteitsgrens, (2) diezelfde afleiding ongecapt maar geklemd —
+      // deze functie mag geen `null` geven waar de KPI bewust wél afhaakt,
+      // (3) de einddatum wanneer de betaling de rente niet dekt en er dus
+      // niets af te leiden valt. Zonder (3) kwam daar `0` uit, en `0` leest
+      // als "afgelost".
+      remainingMonths: deriveRemainingMonths(balance, payment, rate, debt.repayment_type, new Date())
+        ?? clampTerm(uncappedRemainingMonths(balance, payment, rate, debt.repayment_type))
+        ?? monthsUntil(debt.end_date)
+        ?? 0,
+    }
+  }
+
+  // Terugval: geen (bruikbaar) maandbedrag. Leid het af uit de einddatum.
   let remainingMonths: number | null = null
   if (debt.end_date) {
     remainingMonths = Math.max(1, Math.round(
       (new Date(debt.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30.44),
     ))
   }
+  if (!remainingMonths || remainingMonths <= 0) return null
 
-  // Lineair: vaste aflossing per maand
   if (debt.repayment_type === 'lineair') {
-    if (!remainingMonths && payment <= 0) return null
-    const n = remainingMonths ?? (payment > currentRente ? Math.ceil(balance / (payment - currentRente)) : null)
-    if (!n || n <= 0) return null
-    const aflossing = roundCents(balance / n)
+    const aflossing = roundCents(balance / remainingMonths)
     const rente = roundCents(currentRente)
     const monthlyPayment = roundCents(aflossing + rente)
     return {
@@ -566,37 +753,22 @@ export function computeRenteAflossingsSplit(debt: Debt): RenteAflossingsSplit | 
       currentRente: rente,
       currentAflossing: aflossing,
       rentePercentage: monthlyPayment > 0 ? Math.round((rente / monthlyPayment) * 10000) / 100 : 0,
-      remainingMonths: n,
+      remainingMonths,
     }
   }
 
-  // Annuïteit (default): PMT formule of fallback op monthly_payment
-  let monthlyPayment: number
-  if (remainingMonths && rate > 0) {
-    // PMT = P × r(1+r)^n / ((1+r)^n - 1)
-    const factor = Math.pow(1 + monthlyRate, remainingMonths)
-    monthlyPayment = balance * (monthlyRate * factor) / (factor - 1)
-  } else if (remainingMonths && rate === 0) {
-    monthlyPayment = balance / remainingMonths
-  } else if (payment > 0) {
-    // Fallback: gebruik opgeslagen monthly_payment
-    monthlyPayment = payment
-  } else {
-    return null
-  }
-
-  monthlyPayment = roundCents(monthlyPayment)
+  // Annuïteit (default): PMT over de resterende looptijd.
+  const factor = Math.pow(1 + monthlyRate, remainingMonths)
+  const monthlyPayment = roundCents(
+    rate > 0 ? balance * (monthlyRate * factor) / (factor - 1) : balance / remainingMonths,
+  )
   const rente = roundCents(currentRente)
-  const aflossing = roundCents(Math.max(0, monthlyPayment - rente))
-
   return {
     monthlyPayment,
     currentRente: rente,
-    currentAflossing: aflossing,
+    currentAflossing: roundCents(Math.max(0, monthlyPayment - rente)),
     rentePercentage: monthlyPayment > 0 ? Math.round((rente / monthlyPayment) * 10000) / 100 : 0,
-    remainingMonths: remainingMonths ?? (payment > currentRente
-      ? Math.ceil(Math.log(payment / (payment - balance * monthlyRate)) / Math.log(1 + monthlyRate))
-      : 0),
+    remainingMonths,
   }
 }
 
@@ -604,11 +776,25 @@ export function computeRenteAflossingsSplit(debt: Debt): RenteAflossingsSplit | 
  * Calculate months until payoff and total interest for a single debt.
  * Branches on repayment_type for different amortization models.
  */
+export type DebtUnpayableReason =
+  /** Er is (nog) geen maandbedrag ingevuld — los van de rente. */
+  | 'geen-aflossing'
+  /** Er wordt wél betaald, maar minder dan de maandelijkse rente. */
+  | 'betaling-dekt-rente-niet'
+
 export function debtProjection(debt: Debt): {
   monthsToPayoff: number
   totalInterest: number
   payoffDate: string
   isPayable: boolean
+  /**
+   * Waaróm de schuld niet aflosbaar is; alleen gezet als `isPayable` false is.
+   *
+   * Beide oorzaken gaven eerder dezelfde uitkomst, waarna elke consument de
+   * rente-verklaring toonde — ook bij 0% rente, waar er geen rente te dekken
+   * valt. Zie `debt-data.test.ts` > 'reden van onaflosbaarheid'.
+   */
+  unpayableReason?: DebtUnpayableReason
 } {
   const balance = Number(debt.current_balance)
   const rate = Number(debt.interest_rate)
@@ -639,17 +825,28 @@ export function debtProjection(debt: Debt): {
     }
   }
 
-  // Linear: fixed principal, calculate term from payment
+  // Lineair: vaste aflossing, looptijd volgt uit het maandbedrag.
   if (repaymentType === 'lineair') {
-    const monthlyRate = rate / 100 / 12
-    // For linear, first month interest is highest
-    const firstInterest = balance * monthlyRate
-    // Approximate principal per month from monthly_payment - average interest
-    const approxPrincipal = payment - (balance * monthlyRate / 2)
-    if (approxPrincipal <= 0) {
-      return { monthsToPayoff: Infinity, totalInterest: Infinity, payoffDate: '', isPayable: false }
+    // Één afleiding, gedeeld met de "resterend"-KPI en de rente/aflossing-
+    // split. Hier stond een eigen benadering met de HALVE rente
+    // (`payment − balance × maandrente / 2`, een gemiddelde-rente-aanname),
+    // terwijl `deriveRemainingMonths` de volle rente over het huidige saldo
+    // aftrekt. Bij lineair ís het opgeslagen maandbedrag de huidige — dus
+    // hoogste — termijn, dus de volle rente hoort eraf. Dezelfde schuld gaf
+    // daardoor 85 maanden hier en 103 in de KPI. Zie
+    // `debt-maandbedrag-bron.test.ts`.
+    //
+    // Bewust de ONGECAPTE variant: `deriveRemainingMonths` geeft óók `null`
+    // boven de 600-maandsgrens, en die als "onbetaalbaar" lezen zou een schuld
+    // waarvan de betaling de rente ruim dekt een rood alarm geven — en Fin een
+    // aantoonbaar onjuiste uitspraak voeren.
+    const termMonths = uncappedRemainingMonths(balance, payment, rate, 'lineair')
+    if (termMonths == null || termMonths <= 0) {
+      return {
+        monthsToPayoff: Infinity, totalInterest: Infinity, payoffDate: '', isPayable: false,
+        unpayableReason: payment > 0 ? 'betaling-dekt-rente-niet' : 'geen-aflossing',
+      }
     }
-    const termMonths = Math.ceil(balance / approxPrincipal)
     const schedule = linearAmortization(balance, rate, termMonths)
     const totalInterest = schedule.reduce((sum, r) => sum + r.interest, 0)
     const lastRow = schedule[schedule.length - 1]
@@ -665,7 +862,10 @@ export function debtProjection(debt: Debt): {
   // Check if payment covers monthly interest
   const monthlyInterest = balance * (rate / 100 / 12)
   if (payment <= monthlyInterest) {
-    return { monthsToPayoff: Infinity, totalInterest: Infinity, payoffDate: '', isPayable: false }
+    return {
+      monthsToPayoff: Infinity, totalInterest: Infinity, payoffDate: '', isPayable: false,
+      unpayableReason: payment > 0 ? 'betaling-dekt-rente-niet' : 'geen-aflossing',
+    }
   }
 
   const schedule = amortizationSchedule(balance, rate, payment)

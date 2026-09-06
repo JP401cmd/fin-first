@@ -15,7 +15,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import { Edit3, RefreshCw, AlertTriangle, Users, Scale } from 'lucide-react'
+import { Edit3, RefreshCw, AlertTriangle, Info, Users, Scale } from 'lucide-react'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { BudgetIcon, formatCurrency } from '@/components/app/budget-shared'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
@@ -369,8 +369,14 @@ export function DebtDetailModal({
             </div>
             <div className="rounded-[var(--r)] bg-[var(--subtle)] p-3">
               <p className="text-xs text-[var(--ink-3)]">Resterende rente</p>
-              <p className="mt-0.5 text-sm font-medium text-red-600">
-                {proj.isPayable ? formatCurrency(proj.totalInterest) : 'Onbetaalbaar'}
+              <p className={`mt-0.5 text-sm font-medium ${
+                !proj.isPayable && proj.unpayableReason === 'geen-aflossing'
+                  ? 'text-[var(--ink)]'
+                  : 'text-red-600'
+              }`}>
+                {proj.isPayable
+                  ? formatCurrency(proj.totalInterest)
+                  : proj.unpayableReason === 'geen-aflossing' ? 'Onbekend' : 'Onbetaalbaar'}
               </p>
               {dailyExpenses > 0 && proj.isPayable && proj.totalInterest >= 100 && (
                 <p className="mt-0.5 text-[10px] text-red-500/80">
@@ -403,14 +409,28 @@ export function DebtDetailModal({
             )
           })()}
 
-          {!proj.isPayable && debt.repayment_type !== 'aflossingsvrij' && (
-            <div className="flex items-center gap-2 rounded-[var(--r)] border border-red-200 bg-red-50 p-3">
-              <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
-              <p className="text-xs text-red-700">
-                De maandelijkse betaling dekt de rente niet. Verhoog de betaling om deze schuld af te lossen.
-              </p>
-            </div>
-          )}
+          {!proj.isPayable && debt.repayment_type !== 'aflossingsvrij' && (() => {
+            // Een ontbrekend maandbedrag is een gat in de invoer, geen risico:
+            // dat krijgt de neutrale informatie-vorm. Alleen een betaling die de
+            // rente niet dekt is een echte alarmtoestand (de schuld groeit) en
+            // houdt het rood. Zonder dit onderscheid zag de gebruiker met een
+            // 0%-lening zónder aflossing een rood alarm over rente die er niet is.
+            const isAlarm = proj.unpayableReason !== 'geen-aflossing'
+            return (
+              <div className={`flex items-center gap-2 rounded-[var(--r)] border p-3 ${
+                isAlarm ? 'border-red-200 bg-red-50' : 'border-[var(--border-ed)] bg-[var(--subtle)]'
+              }`}>
+                {isAlarm
+                  ? <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
+                  : <Info className="h-4 w-4 shrink-0 text-[var(--ink-3)]" />}
+                <p className={`text-xs ${isAlarm ? 'text-red-700' : 'text-[var(--ink-2)]'}`}>
+                  {isAlarm
+                    ? 'De maandelijkse betaling dekt de rente niet. Verhoog de betaling om deze schuld af te lossen.'
+                    : 'Er is nog geen maandbedrag ingevuld. Vul er een in om te zien wanneer deze schuld is afgelost.'}
+                </p>
+              </div>
+            )
+          })()}
 
           {debt.notes && <p className="text-xs text-[var(--ink-3)]">{debt.notes}</p>}
 

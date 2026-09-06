@@ -32,6 +32,7 @@ import {
   type Debt,
   type DebtType,
 } from '@/lib/debt-data'
+import { debtRemainingMonths } from '@/lib/debt-remaining-term'
 import type {
   VermogenReportData,
   VermogenAssetCategory,
@@ -66,6 +67,20 @@ function remainingMonthsFromEndDate(endDate: string | null, referenceDate: Date)
   // 30.44 = gemiddelde dagen per maand (365.25 / 12); zelfde constant als
   // in computeExpectedBalance / computeRenteAflossingsSplit voor consistentie.
   return Math.max(0, Math.round(diffMs / (1000 * 60 * 60 * 24 * 30.44)))
+}
+
+/**
+ * Resterende looptijd voor het rapport: dezelfde bron als de rest van de app.
+ *
+ * Dit rapport rekende uitsluitend met `end_date`, terwijl de schuldkaart en het
+ * detailvenster sinds het sluitstuk van H2 het maandbedrag volgen. Dezelfde
+ * hypotheek stond daardoor met 213 maanden in het rapport en met 361 op de
+ * kaart. `debtRemainingMonths` doet het maandbedrag eerst; de einddatum blijft
+ * de terugval, inclusief het "0 bij een gepasseerde einddatum"-gedrag hierboven.
+ */
+function remainingMonthsForDebt(debt: Debt, referenceDate: Date): number | null {
+  return debtRemainingMonths(debt, referenceDate)
+    ?? remainingMonthsFromEndDate(debt.end_date, referenceDate)
 }
 
 /**
@@ -163,7 +178,7 @@ function buildDebtItem(d: Debt, referenceDate: Date): VermogenDebtItem {
     subtypeLabel,
     currentBalance,
     interestRatePct: Number(d.interest_rate) || 0,
-    remainingMonths: remainingMonthsFromEndDate(d.end_date, referenceDate),
+    remainingMonths: remainingMonthsForDebt(d, referenceDate),
     monthlyPayment: Math.round((Number(d.monthly_payment) || 0) * 100) / 100,
     repaymentTypeLabel,
     repaymentType: d.repayment_type ?? null,
@@ -576,10 +591,10 @@ function buildHypotheekItem(d: Debt): VermogenHypotheekItem {
   // iets toont.
   let schedule: VermogenHypotheekRow[] = []
   if (rt === 'aflossingsvrij') {
-    const months = remainingMonthsFromEndDate(d.end_date, new Date()) ?? 360
+    const months = remainingMonthsForDebt(d, new Date()) ?? 360
     schedule = interestOnlySchedule(balance, rate, Math.min(months, 360))
   } else if (rt === 'lineair') {
-    const months = remainingMonthsFromEndDate(d.end_date, new Date()) ?? 240
+    const months = remainingMonthsForDebt(d, new Date()) ?? 240
     schedule = linearAmortization(balance, rate, Math.max(1, months))
   } else {
     // annuiteit (default)

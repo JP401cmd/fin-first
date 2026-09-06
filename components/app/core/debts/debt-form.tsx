@@ -31,11 +31,14 @@ import {
   DEBT_TYPE_FIELDS,
   REPAYMENT_TYPE_LABELS,
   computeExpectedBalance,
+  deriveRemainingMonths,
+  type RepaymentType,
 } from '@/lib/debt-data'
 import { linkableAssetTypesForDebt, linkedAssetFieldLabel, type Asset } from '@/lib/asset-data'
 import { OwnershipToggle, useHouseholdStatus, type OwnershipType } from '@/components/app/ownership-toggle'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { VALUATIONS_CONFLICT_KEY } from '@/lib/valuations'
+import { addMonthsIso } from '@/lib/debt-term-basis'
 
 /**
  * Shape die `DebtForm` (in `embedded`-mode) publiceert naar de pane-wrapper.
@@ -153,16 +156,32 @@ export function DebtForm({
     debt?.has_hypotheekplanner_tracking ?? false,
   )
   const [validationError, setValidationError] = useState<string | null>(null)
+  const errorRef = useRef<HTMLDivElement>(null)
   // Household ownership
   const [ownership, setOwnership] = useState<OwnershipType>(debt?.ownership ?? 'personal')
   const { hasHousehold, householdId } = useHouseholdStatus()
   // Per-debt partner split override
   const [useCustomSplit, setUseCustomSplit] = useState(debt?.partner_split_pct != null)
   const [partnerSplitPct, setPartnerSplitPct] = useState(debt?.partner_split_pct ?? 50)
-  // Berekend vs eigen maandbedrag — standaard altijd berekend
-  const [useCalculatedPayment, setUseCalculatedPayment] = useState(true)
-  // Berekend vs eigen saldo
-  const [useCalculatedBalance, setUseCalculatedBalance] = useState(true)
+  // Berekend vs eigen maandbedrag/saldo. Bij een NIEUWE schuld is "berekend"
+  // een nuttige startwaarde. Bij het BEWERKEN van een bestaande schuld is de
+  // opgeslagen waarde de waarheid van de gebruiker, dus start die kant op.
+  //
+  // Deze twee stonden hardcoded op `true` terwijl élk ander veld hierboven uit
+  // `debt?.…` initialiseert, en dat was stil destructief: zodra een schuld een
+  // einddatum had (de voorwaarde waaronder `calculatedBalance`/
+  // `calculatedPayment` een waarde krijgen) verving het formulier bij het
+  // ópenen al het opgeslagen saldo en maandbedrag door een afgeleid getal, en
+  // schreef `handleSave` dát naar de database. Een bewerking die alleen de
+  // rente aanraakte verhoogde zo een schuld van € 9.000/€ 125 p/m ongevraagd
+  // naar € 10.950,92/€ 137,65 p/m — zonder waarschuwing, en zonder rij in
+  // `valuations` (de historie-tak hieronder vergelijkt de getypte state, niet
+  // de weggeschreven waarde, en zag dus geen wijziging). Voor de gebruiker las
+  // dat als "mijn aanpassing wordt niet opgeslagen".
+  //
+  // Vastgelegd in `debt-form.berekend-toggle.test.tsx`.
+  const [useCalculatedPayment, setUseCalculatedPayment] = useState(!debt)
+  const [useCalculatedBalance, setUseCalculatedBalance] = useState(!debt)
   // Stabiele "nu" voor de remaining-months-berekening in `calculatedPayment`.
   // Eenmaal gevangen bij mount zodat render-purity (react-hooks/purity)
   // gerespecteerd wordt; sub-seconde precisie is niet relevant voor een
@@ -234,6 +253,53 @@ export function DebtForm({
     const factor = Math.pow(1 + monthlyRate, months)
     return Math.round(bal * (monthlyRate * factor) / (factor - 1) * 100) / 100
   }, [currentBalance, interestRate, endDate, effectiveRepaymentType, useCalculatedBalance, calculatedBalance, nowMs])
+
+  /**
+   * Maandbedrag en einddatum kunnen elkaar tegenspreken: het ene is wat er
+   * werkelijk betaald wordt, het andere wanneer het klaar zou moeten zijn. De
+   * rekenmotor kiest sinds de H2-opvolging het maandbedrag als bron
+   * (`lib/debt-data.ts#computeRenteAflossingsSplit`), dus een einddatum die er
+   * niet bij past wordt stil genegeerd. Dat is beter dan andersom — het
+   * ingevulde bedrag verdween voorheen in een PMT-herberekening — maar een
+   * gebruiker die twee dingen invult verdient te horen dát ze botsen, in plaats
+   * van dat er één zwijgend afvalt.
+   *
+   * Alleen bij een noemenswaardig verschil: minstens drie maanden én meer dan
+   * 10%, zodat afronding en een paar weken drift geen waarschuwing opleveren.
+   */
+  const einddatumConflict = useMemo(() => {
+    if (!endDate) return null
+    const rt = effectiveRepaymentType || 'annuiteit'
+    if (rt === 'aflossingsvrij') return null
+
+    const bal = useCalculatedBalance && calculatedBalance != null ? calculatedBalance : Number(currentBalance)
+    const pay = useCalculatedPayment && calculatedPayment != null ? calculatedPayment : Number(monthlyPayment)
+    if (!(bal > 0) || !(pay > 0)) return null
+
+    const maandenVolgensBedrag = deriveRemainingMonths(bal, pay, Number(interestRate) || 0, rt as RepaymentType, new Date(nowMs))
+    if (maandenVolgensBedrag == null) return null
+
+    const maandenVolgensDatum = Math.max(
+      1,
+      Math.round((new Date(endDate).getTime() - nowMs) / (1000 * 60 * 60 * 24 * 30.44)),
+    )
+    const verschil = Math.abs(maandenVolgensBedrag - maandenVolgensDatum)
+    if (verschil < 3 || verschil / maandenVolgensDatum <= 0.1) return null
+
+    // `addMonthsIso` i.p.v. `setMonth`: die laatste loopt bij dag 29-31 over
+    // naar de volgende maand, en `toISOString` schuift in CET een dag terug.
+    const afgeleideDatum = addMonthsIso(
+      new Date(nowMs).toISOString().split('T')[0]!,
+      maandenVolgensBedrag,
+    )
+    return {
+      maandenVolgensBedrag,
+      afgeleideDatum,
+      label: new Date(afgeleideDatum).toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' }),
+      eerder: maandenVolgensBedrag < maandenVolgensDatum,
+    }
+  }, [endDate, effectiveRepaymentType, useCalculatedBalance, calculatedBalance, currentBalance,
+      useCalculatedPayment, calculatedPayment, monthlyPayment, interestRate, nowMs])
 
   function handleTypeChange(type: DebtType) {
     setDebtType(type)
@@ -309,14 +375,33 @@ export function DebtForm({
 
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) {
+      // Zonder deze reset bleef `saving` op true staan: spinner voor altijd,
+      // geen melding, en de pane-CTA permanent in laadtoestand.
+      setSaving(false)
+      setValidationError('Je sessie is verlopen. Log opnieuw in en probeer het nog eens.')
+      return
+    }
+
+    // Eén bron voor het saldo dat daadwerkelijk wordt weggeschreven. Stond
+    // eerder drie keer los uitgeschreven — in de row (`calculatedBalance` bij
+    // "Berekend"), in de is_active-tak en in de historie-tak (beide de getypte
+    // `currentBalance`). Bij "Berekend" is dat invoerveld niet eens gerenderd,
+    // dus die twee takken beoordeelden een waarde die nooit is opgeslagen: een
+    // schuld kon op is_active=false gaan met een saldo > 0, en een saldosprong
+    // van bijna € 3.000 belandde in de database zonder één rij in `valuations`
+    // of `balance_snapshots` — precies de historie die de verwijder-route
+    // belooft bij te houden.
+    const balanceToWrite = useCalculatedBalance && calculatedBalance != null
+      ? calculatedBalance
+      : (Number(currentBalance) || 0)
 
     const row = {
       user_id: user.id,
       name,
       debt_type: debtType,
       original_amount: Number(originalAmount) || 0,
-      current_balance: useCalculatedBalance && calculatedBalance != null ? calculatedBalance : (Number(currentBalance) || 0),
+      current_balance: balanceToWrite,
       interest_rate: Number(interestRate) || 0,
       minimum_payment: Number(minimumPayment) || 0,
       monthly_payment: useCalculatedPayment && calculatedPayment != null ? calculatedPayment : (Number(monthlyPayment) || 0),
@@ -353,20 +438,46 @@ export function DebtForm({
     if (isEdit && debt) {
       // When balance reaches 0, mark debt as paid off
       const editRow = { ...row } as Record<string, unknown>
-      if ((Number(currentBalance) || 0) <= 0) {
+      if (balanceToWrite <= 0) {
         editRow.is_active = false
       }
-      await supabase.from('debts').update(editRow).eq('id', debt.id)
+      // `.eq('user_id')` + `.select()` maken een mislukte write zichtbaar.
+      // Zonder die twee gaf een geweigerde of niet-matchende update
+      // `error: null` en 0 geraakte rijen — waarna de code hieronder
+      // vrolijk `onSaved()` aanriep: pane dicht, "opgeslagen", niets gebeurd.
+      // Exact de faalvorm die de docblock van `app/api/debts/[id]/route.ts`
+      // voor de DELETE beschrijft; de UPDATE-policy is net zo strikt eigen-rij
+      // terwijl de SELECT-policy huishoud-gedeeld is, dus een gedeelde schuld
+      // van de partner is wél zichtbaar en níét beschrijfbaar.
+      const { data: updated, error: updateError } = await supabase
+        .from('debts')
+        .update(editRow)
+        .eq('id', debt.id)
+        .eq('user_id', user.id)
+        .select('id')
+        .maybeSingle()
+
+      if (updateError || !updated) {
+        console.error('[debt-form] opslaan mislukt', updateError)
+        setSaving(false)
+        setValidationError('Opslaan is niet gelukt. Probeer het opnieuw.')
+        return
+      }
 
       // Auto-track valuation when current_balance changes
-      const newBalance = Number(currentBalance) || 0
+      const newBalance = balanceToWrite
       const oldBalance = Number(debt.current_balance)
       if (newBalance !== oldBalance) {
         const valuationNotes = newBalance <= 0
           ? `Schuld afgelost! Saldo bijgewerkt van ${oldBalance} naar ${newBalance}`
           : `Saldo bijgewerkt van ${oldBalance} naar ${newBalance}`
         const today = new Date().toISOString().split('T')[0]
-        await supabase.from('valuations').upsert({
+        // Best-effort, net als de opruiming in `app/api/debts/[id]/route.ts`:
+        // de schuld zélf is hierboven al opgeslagen, dus de opdracht van de
+        // gebruiker is uitgevoerd. Een mislukte historie-rij mag daar geen
+        // "Opslaan is niet gelukt" van maken. Wél loggen — stilzwijgend
+        // negeren was hoe deze hele bug onzichtbaar bleef.
+        const { error: valuationError } = await supabase.from('valuations').upsert({
           user_id: user.id,
           entity_type: 'debt',
           entity_id: debt.id,
@@ -374,8 +485,11 @@ export function DebtForm({
           value: newBalance,
           notes: valuationNotes,
         }, { onConflict: VALUATIONS_CONFLICT_KEY })
+        if (valuationError) {
+          console.error('[debt-form] waardehistorie niet bijgewerkt (schuld is wél opgeslagen)', valuationError)
+        }
         // Mirror naar balance_snapshots zodat de categorie-sparkline meebeweegt.
-        await upsertSingleBalanceSnapshot(supabase, user.id, today, {
+        const snapshot = await upsertSingleBalanceSnapshot(supabase, user.id, today, {
           type: 'debt',
           id: debt.id,
           name,
@@ -383,14 +497,33 @@ export function DebtForm({
           balance: newBalance,
           netWorthInclusionPct,
         })
+        if (!snapshot.ok) {
+          console.error('[debt-form] balance_snapshot niet bijgewerkt (schuld is wél opgeslagen)', snapshot.error)
+        }
       }
     } else {
-      await supabase.from('debts').insert(row)
+      const { error: insertError } = await supabase.from('debts').insert(row)
+      if (insertError) {
+        console.error('[debt-form] toevoegen mislukt', insertError)
+        setSaving(false)
+        setValidationError('Opslaan is niet gelukt. Probeer het opnieuw.')
+        return
+      }
     }
 
     setSaving(false)
     onSaved()
   }
+
+  // Een fout die pas ná een klik ontstaat (validatie in `handleSave`, of een
+  // geweigerde write) staat buiten beeld zolang de gebruiker bovenaan het
+  // formulier zit. De live negatief-fout scrollt bewust niet mee: die
+  // verschijnt tijdens het typen, dus staat al in beeld.
+  useEffect(() => {
+    if (validationError) {
+      errorRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' })
+    }
+  }, [validationError])
 
   // Publiceer save-state naar pane-wrapper (zelfde ref-pattern als
   // EventPaneEdit). Save-handler-ref voorkomt stale closures op de form-
@@ -663,6 +796,22 @@ export function DebtForm({
                 className="w-full rounded-[var(--r)] border border-[var(--border-ed)] px-3 py-2 text-sm"
               />
             </div>
+            {einddatumConflict && (
+              <div role="status" aria-live="polite" className="col-span-2 rounded-[var(--r)] border border-amber-200 bg-amber-50 px-3 py-2" data-testid="debt-einddatum-conflict">
+                <p className="text-[11px] leading-snug text-amber-700">
+                  Je maandbedrag past niet bij deze einddatum: bij dit bedrag ben je{' '}
+                  {einddatumConflict.eerder ? 'al' : 'pas'} in {einddatumConflict.label} klaar.
+                  We rekenen met je maandbedrag.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setEndDate(einddatumConflict.afgeleideDatum)}
+                  className="mt-1 text-[11px] font-medium text-amber-800 underline underline-offset-2"
+                >
+                  Einddatum bijstellen naar {einddatumConflict.label}
+                </button>
+              </div>
+            )}
           </div>
 
           <div>
@@ -1023,7 +1172,17 @@ export function DebtForm({
         {/* De negatief-fout wint: die is live (verschijnt tijdens typen) en
             beschrijft precies waarom de CTA geblokkeerd is. */}
         {(negativeValueError ?? validationError) && (
-          <div className="mt-3 rounded-[var(--r)] border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700" data-testid="debt-validation-error">
+          <div
+            // `role="alert"` omdat dit blok onderaan de scroll-content staat
+            // terwijl de Opslaan-CTA in de sticky pane-footer zit: wie bovenaan
+            // het formulier opslaat, ziet anders niets gebeuren. De ref scrollt
+            // 'm in beeld; samen zijn dit de enige terugkoppeling op de
+            // faalpaden in `handleSave`.
+            ref={errorRef}
+            role="alert"
+            className="mt-3 rounded-[var(--r)] border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700"
+            data-testid="debt-validation-error"
+          >
             {negativeValueError ?? validationError}
           </div>
         )}

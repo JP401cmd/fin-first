@@ -115,7 +115,9 @@ export async function buildHorizonContext(
       const proj = debtProjection(d)
       const payoff = proj.isPayable
         ? `afbetaald in ${Math.floor(proj.monthsToPayoff / 12)}j ${proj.monthsToPayoff % 12}m | totale rente: ${formatCurrency(proj.totalInterest)}`
-        : 'betaling dekt rente niet!'
+        : proj.unpayableReason === 'geen-aflossing'
+          ? 'geen maandbedrag ingevuld — aflosdatum onbekend'
+          : 'betaling dekt rente niet!'
       return `${d.name} (${DEBT_TYPE_LABELS[d.debt_type]}): ${formatCurrency(Number(d.current_balance))} @ ${d.interest_rate}% | ${formatCurrency(Number(d.monthly_payment))}/mnd | ${payoff}`
     })
     // TOTAALREGEL VÓÓR DE LIJST (UR3-06 geval 5). De schuldenpagina toont

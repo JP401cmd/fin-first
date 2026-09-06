@@ -115,11 +115,29 @@ describe('debtRemainingMonths — lineair pad (bug H2)', () => {
 })
 
 describe('debtRemainingMonths — overige paden ongewijzigd', () => {
-  it('end_date is leidend boven de projectie', () => {
+  /**
+   * Het maandbedrag gaat vóór de einddatum; die volgorde stond hiervoor
+   * andersom. Deze casus is niet toevallig gekozen — €320 bij €80/mnd is het
+   * voorbeeld uit bug H2 (aug 2026), waar de wizard onvoorwaardelijk een
+   * einddatum van start + standaardlooptijd zette. Zolang die einddatum won,
+   * las de KPI hem terug als 12 maanden, terwijl de schuld er bij €80 per maand
+   * gewoon 4 doet. De einddatum is de terugval, niet de bron.
+   */
+  it('het maandbedrag gaat vóór een einddatum die er niet bij past', () => {
     const debt = makeDebt({
       repayment_type: 'lineair',
       current_balance: 320,
       monthly_payment: 80,
+      end_date: '2027-08-26',
+    })
+    expect(debtRemainingMonths(debt, NOW)).toBe(4)
+  })
+
+  it('zonder bruikbaar maandbedrag blijft de einddatum de bron', () => {
+    const debt = makeDebt({
+      repayment_type: 'lineair',
+      current_balance: 320,
+      monthly_payment: 0,
       end_date: '2027-08-26',
     })
     expect(debtRemainingMonths(debt, NOW)).toBe(12)

@@ -47,6 +47,7 @@ import {
   type RepaymentType as DebtRepaymentType,
   computeRenteAflossingsSplit,
 } from '@/lib/debt-data'
+import { debtRemainingMonths } from '@/lib/debt-remaining-term'
 import type { AssetType } from '@/lib/asset-data'
 import type { RepaymentType as HvBRepaymentType } from '@/lib/hypotheek-vs-beleggen'
 import { deriveMarginaalTarief } from '@/lib/box1-tax'
@@ -95,10 +96,16 @@ const FALLBACK_TERM_MONTHS = 360
  * `FALLBACK_TERM_MONTHS` wanneer geen einddatum beschikbaar.
  */
 function remainingMonths(debt: Debt): number {
-  if (!debt.end_date) return FALLBACK_TERM_MONTHS
-  const end = new Date(debt.end_date).getTime()
-  const now = Date.now()
-  return Math.max(1, Math.round((end - now) / (1000 * 60 * 60 * 24 * 30.44)))
+  // Via de gedeelde bron: het maandbedrag eerst, de einddatum als terugval.
+  // Deze helper las alléén `end_date`, terwijl het aflossingsdeel op hetzelfde
+  // scherm uit `computeRenteAflossingsSplit` komt — dat is sinds het sluitstuk
+  // van H2 maandbedrag-gebaseerd. Op één hypotheek (€ 300.000, 3,1%, € 1.280
+  // p/m, einddatum 2044) tekende de grafiek daardoor 213 maanden met een PMT
+  // van ~€ 1.934, terwijl de balk ernaast "+€ 505 per maand" toonde —
+  // 213 × € 505 ≈ € 108k op een saldo van € 300k. `AmortisationChart` leidt
+  // zijn PMT af uit dít getal, dus met de juiste looptijd komt die vanzelf weer
+  // op het werkelijke maandbedrag uit.
+  return debtRemainingMonths(debt, new Date()) ?? FALLBACK_TERM_MONTHS
 }
 
 // ── Component ────────────────────────────────────────────────

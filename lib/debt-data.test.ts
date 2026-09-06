@@ -13,6 +13,8 @@ import {
   DEBT_GROUP_FOR_TYPE,
   DEBT_GROUP_LABELS,
   getDebtGroup,
+  debtProjection,
+  type Debt,
   type DebtGroup,
   type DebtType,
 } from './debt-data'
@@ -128,5 +130,71 @@ describe('DebtGroup-taxonomie', () => {
       consumptief: 'Consumptief',
       overig: 'Overig',
     })
+  })
+})
+
+/**
+ * Regressie — een schuld zonder maandbedrag is niet "onbetaalbaar door rente".
+ *
+ * Repro (schermafbeelding gebruiker, 6-9-2026): een DGA-schuld met 0% rente en
+ * een leeg maandbedrag toonde "Resterende rente: Onbetaalbaar" plus de melding
+ * "De maandelijkse betaling dekt de rente niet. Verhoog de betaling om deze
+ * schuld af te lossen." Bij 0% rente ís er geen rente om te dekken; het echte
+ * probleem is dat er geen aflossing is ingevuld.
+ *
+ * `debtProjection` kende beide oorzaken dezelfde uitkomst toe (`isPayable:
+ * false`) zonder onderscheid, waardoor elke consument — detailvenster én de
+ * AI-context — de rente-verklaring gaf. `unpayableReason` maakt het verschil
+ * expliciet.
+ */
+describe('debtProjection — reden van onaflosbaarheid', () => {
+  const base: Debt = {
+    id: 'd1', user_id: 'u1', name: 'RC-schuld', debt_type: 'dga_schuld',
+    original_amount: 15000, current_balance: 14875, interest_rate: 0,
+    minimum_payment: 0, monthly_payment: 0,
+    start_date: '2026-08-12', end_date: '2036-08-12',
+    creditor: null, notes: null, is_active: true, sort_order: 0,
+    created_at: '2026-08-12T00:00:00Z', updated_at: '2026-08-12T00:00:00Z',
+    subtype: null, is_tax_deductible: null, fixed_rate_end_date: null, nhg: null,
+    linked_asset_id: null, credit_limit: null, repayment_type: 'lineair',
+    draagkrachtmeting_date: null, tax_year: null, has_payment_plan: false,
+    has_written_agreement: false, ownership: 'personal', household_id: null,
+    partner_split_pct: null, net_worth_inclusion_pct: 100,
+    include_aflossing_in_savings: false, custom_aflossing_amount: null,
+    has_hypotheekplanner_tracking: false,
+  }
+
+  it('0% rente zonder maandbedrag → reden is de ontbrekende aflossing, niet de rente', () => {
+    const proj = debtProjection(base)
+    expect(proj.isPayable).toBe(false)
+    expect(proj.unpayableReason).toBe('geen-aflossing')
+  })
+
+  it('idem voor de annuïteiten-tak', () => {
+    const proj = debtProjection({ ...base, repayment_type: 'annuiteit' })
+    expect(proj.isPayable).toBe(false)
+    expect(proj.unpayableReason).toBe('geen-aflossing')
+  })
+
+  it('rente zonder maandbedrag → nog steeds de ontbrekende aflossing', () => {
+    const proj = debtProjection({ ...base, interest_rate: 5 })
+    expect(proj.isPayable).toBe(false)
+    expect(proj.unpayableReason).toBe('geen-aflossing')
+  })
+
+  it('betaling die de rente écht niet dekt houdt de rente-reden', () => {
+    // 100k @ 12% → € 1.000 rente p/m, betaling € 100 dekt dat niet.
+    const proj = debtProjection({
+      ...base, repayment_type: 'annuiteit',
+      current_balance: 100000, interest_rate: 12, monthly_payment: 100,
+    })
+    expect(proj.isPayable).toBe(false)
+    expect(proj.unpayableReason).toBe('betaling-dekt-rente-niet')
+  })
+
+  it('0% rente mét maandbedrag lost gewoon af', () => {
+    const proj = debtProjection({ ...base, monthly_payment: 125 })
+    expect(proj.isPayable).toBe(true)
+    expect(proj.unpayableReason).toBeUndefined()
   })
 })

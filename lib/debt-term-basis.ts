@@ -1,10 +1,14 @@
 /**
  * Grondslag van de looptijd van een schuld — "waarop is dit getal gebaseerd?".
  *
- * `debts.end_date` is de enige bron voor élk afgeleid looptijd-getal
- * (resterende looptijd, aflostijd, schuldenvrij-jaar, en via
- * `computeDefaultMonthlyPayment` ook de geschatte maandlast). Die datum kan
- * op drie manieren tot stand komen:
+ * Sinds het sluitstuk van H2 (sep 2026) is `debts.monthly_payment` de bron van
+ * élk afgeleid looptijd-getal (resterende looptijd, aflostijd,
+ * schuldenvrij-jaar) en is `debts.end_date` de terugval voor rijen zonder
+ * maandbedrag — zie `lib/debt-maandbedrag-bron.test.ts`. Deze module gaat over
+ * de vraag waaróp een getoond getal rust, en dáárvoor blijft de herkomst van de
+ * einddatum relevant: hij bepaalt nog steeds de terugval, en via
+ * `computeDefaultMonthlyPayment` óók het maandbedrag dat de wizard voorstelt.
+ * Die datum kan op drie manieren tot stand komen:
  *
  *  1. de gebruiker vulde hem zelf in (wizard-veld "Resterende looptijd" of
  *     het einddatum-veld in het volledige schuldformulier), of `buildDebtDraft`
