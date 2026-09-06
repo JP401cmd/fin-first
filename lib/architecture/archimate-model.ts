@@ -246,8 +246,13 @@ export function buildArchimateModel(facts: ArchFacts): ArchimateModel {
     {
       id: 'sp-budget', x: 320, y: row(1), w: 210, h: 66, kind: 'bizproc',
       title: 'Budgetteren',
-      lead: "Budgetten opstellen en bewaken; uitgaven getoond als 'dagen deze maand'. Spaarquote en vaste lasten als hefbomen.",
-      items: ['/overzicht/budget', '/overzicht/budget'],
+      lead: "Budgetten opstellen en bewaken; uitgaven getoond als 'dagen deze maand'. Spaarquote en vaste lasten als hefbomen. Sinds ADR 0135 is Budget zelf de derde hefboom — de cashflow-tussenlaag is opgeheven — met transacties, vaste lasten en forecast eronder.",
+      items: [
+        '/overzicht/budget',
+        '/overzicht/budget/transacties',
+        '/overzicht/budget/vaste-lasten',
+        '/overzicht/budget/forecast',
+      ],
     },
     {
       id: 'sp-vermogen', x: 320, y: row(2), w: 210, h: 66, kind: 'bizproc',

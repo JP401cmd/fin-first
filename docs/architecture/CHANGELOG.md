@@ -937,3 +937,9 @@
 
 - **Integratie-clients** toegevoegd: lib/parsers/iban.ts
 - **Componenten (aantal)** toegevoegd: +25
+
+## 2026-09-06
+
+- **Schermen** toegevoegd: /overzicht/budget, /overzicht/budget/forecast, /overzicht/budget/transacties, /overzicht/budget/vaste-lasten
+- **Schermen** verwijderd: /overzicht/cashflow, /overzicht/cashflow/budget, /overzicht/cashflow/forecast, /overzicht/cashflow/transacties, /overzicht/cashflow/vaste-lasten
+- **Componenten (aantal)** toegevoegd: +6

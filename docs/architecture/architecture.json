@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-05T18:39:01.558Z",
-  "generatedDate": "2026-09-05",
+  "generatedAt": "2026-09-06T12:46:05.689Z",
+  "generatedDate": "2026-09-06",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -187,13 +187,13 @@
     }
   },
   "stats": {
-    "routes": 140,
-    "routesProduction": 97,
+    "routes": 139,
+    "routesProduction": 96,
     "api": 309,
     "tables": 94,
     "migrations": 231,
     "integrations": 25,
-    "components": 1054,
+    "components": 1060,
     "providers": 17,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -839,32 +839,26 @@
       "isTest": false
     },
     {
-      "url": "/overzicht/cashflow",
-      "file": "app/(app)/overzicht/cashflow/page.tsx",
+      "url": "/overzicht/budget",
+      "file": "app/(app)/overzicht/budget/page.tsx",
       "group": "wil",
       "isTest": false
     },
     {
-      "url": "/overzicht/cashflow/budget",
-      "file": "app/(app)/overzicht/cashflow/budget/page.tsx",
+      "url": "/overzicht/budget/forecast",
+      "file": "app/(app)/overzicht/budget/forecast/page.tsx",
       "group": "wil",
       "isTest": false
     },
     {
-      "url": "/overzicht/cashflow/forecast",
-      "file": "app/(app)/overzicht/cashflow/forecast/page.tsx",
+      "url": "/overzicht/budget/transacties",
+      "file": "app/(app)/overzicht/budget/transacties/page.tsx",
       "group": "wil",
       "isTest": false
     },
     {
-      "url": "/overzicht/cashflow/transacties",
-      "file": "app/(app)/overzicht/cashflow/transacties/page.tsx",
-      "group": "wil",
-      "isTest": false
-    },
-    {
-      "url": "/overzicht/cashflow/vaste-lasten",
-      "file": "app/(app)/overzicht/cashflow/vaste-lasten/page.tsx",
+      "url": "/overzicht/budget/vaste-lasten",
+      "file": "app/(app)/overzicht/budget/vaste-lasten/page.tsx",
       "group": "wil",
       "isTest": false
     },
@@ -1852,32 +1846,26 @@
         "isTest": false
       },
       {
-        "url": "/overzicht/cashflow",
-        "file": "app/(app)/overzicht/cashflow/page.tsx",
+        "url": "/overzicht/budget",
+        "file": "app/(app)/overzicht/budget/page.tsx",
         "group": "wil",
         "isTest": false
       },
       {
-        "url": "/overzicht/cashflow/budget",
-        "file": "app/(app)/overzicht/cashflow/budget/page.tsx",
+        "url": "/overzicht/budget/forecast",
+        "file": "app/(app)/overzicht/budget/forecast/page.tsx",
         "group": "wil",
         "isTest": false
       },
       {
-        "url": "/overzicht/cashflow/forecast",
-        "file": "app/(app)/overzicht/cashflow/forecast/page.tsx",
+        "url": "/overzicht/budget/transacties",
+        "file": "app/(app)/overzicht/budget/transacties/page.tsx",
         "group": "wil",
         "isTest": false
       },
       {
-        "url": "/overzicht/cashflow/transacties",
-        "file": "app/(app)/overzicht/cashflow/transacties/page.tsx",
-        "group": "wil",
-        "isTest": false
-      },
-      {
-        "url": "/overzicht/cashflow/vaste-lasten",
-        "file": "app/(app)/overzicht/cashflow/vaste-lasten/page.tsx",
+        "url": "/overzicht/budget/vaste-lasten",
+        "file": "app/(app)/overzicht/budget/vaste-lasten/page.tsx",
         "group": "wil",
         "isTest": false
       },
@@ -8790,7 +8778,7 @@
     }
   ],
   "components": {
-    "total": 1054,
+    "total": 1060,
     "groups": [
       {
         "group": "app",
@@ -8859,6 +8847,7 @@
           "budget-pill-tree",
           "budget-pill-tree.test",
           "budget-plan-editor-sheet",
+          "budget-plan-editor-sheet.sticky-footer.test",
           "budget-shared",
           "budget-sparkline",
           "budget-tree",
@@ -8870,8 +8859,6 @@
           "carrier-correction",
           "cash-account-view",
           "cash-account-view.test",
-          "cash-overview",
-          "cash-overview.leesronden.test",
           "cashflow-forecast-chart",
           "cashflow-status-provider",
           "cashflow-status-provider.test",
@@ -9100,6 +9087,7 @@
           "quick-add-trigger",
           "quick-add-wizard",
           "quick-add-wizard-collect.test",
+          "quick-add-woning-keuze.test",
           "receipt-row",
           "recurring-classify-sheet",
           "recurring-edit-sheet",
@@ -9217,7 +9205,7 @@
       },
       {
         "group": "overview",
-        "count": 190,
+        "count": 195,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -9270,6 +9258,8 @@
           "cashflow-forecast.test",
           "cashflow-instellingen-blok",
           "cashflow-instellingen-blok.test",
+          "cashflow-instellingen-lazy",
+          "cashflow-instellingen-lazy.test",
           "cashflow-kalender",
           "cashflow-kalender.test",
           "cashflow-landing-cards",
@@ -9288,8 +9278,12 @@
           "fee-impact-card.test",
           "filter-dropdown",
           "filter-dropdown.test",
+          "geldstroom-daggrafiek",
+          "geldstroom-daggrafiek.test",
           "geldstroom-gauge",
           "geldstroom-gauge.test",
+          "geldstroom-kassabonnen",
+          "geldstroom-kassabonnen.test",
           "gepaarde-staven",
           "grootste-uitgaven",
           "guide-screen-view",
@@ -9353,8 +9347,6 @@
           "periode-selector",
           "periode-selector.test",
           "periode-trend",
-          "print-overzicht-button",
-          "print-overzicht-button.test",
           "rondleiding-kaart",
           "rondleiding-overlay",
           "rondleiding-overlay.test",
@@ -9394,6 +9386,7 @@
           "transacties-analyse.test",
           "transacties-geldstroom",
           "transacties-geldstroom.test",
+          "transacties-notices-loader",
           "uitgaven-heatmap",
           "vaste-lasten-client",
           "vaste-lasten-client.eenvoudig.test",
@@ -9516,7 +9509,7 @@
       },
       {
         "group": "core",
-        "count": 80,
+        "count": 81,
         "items": [
           "account-source-icon",
           "account-source-icon.test",
@@ -9533,6 +9526,7 @@
           "box3-comparison",
           "card-kpi-strip",
           "card-tint-overlay",
+          "cash-archief-regel",
           "cashflow-chart",
           "cashflow-hero-tile",
           "category-card",
@@ -9602,7 +9596,7 @@
       },
       {
         "group": "future",
-        "count": 60,
+        "count": 59,
         "items": [
           "afbouw-overzicht-card",
           "afbouw-overzicht-card.test",
@@ -9642,7 +9636,6 @@
           "pensioen-strategie-editor",
           "pensioen-strategie-editor.test",
           "pot-flow-diagram",
-          "print-tijdas-button",
           "publish-curation-sheet",
           "rate-limit-badge",
           "regel-bewerken-pane",
@@ -9721,7 +9714,7 @@
       },
       {
         "group": "onboarding",
-        "count": 38,
+        "count": 39,
         "items": [
           "aangifte-import-pane",
           "budget-amount-editor",
@@ -9730,6 +9723,7 @@
           "freedom-ticker.test",
           "onboarding-bezittingen",
           "onboarding-bezittingen.test",
+          "onboarding-data-note.test",
           "onboarding-eindstrategie",
           "onboarding-eindstrategie.test",
           "onboarding-horizon",
@@ -16630,7 +16624,7 @@
         "as-budget",
         "fn-budgetteren"
       ],
-      "summary": "`/overzicht/cashflow` heeft een TTFB-p75 van 8,8 s (desktop) en 22,3 s (mobiel). De dominante oorzaak is niet de pagina zelf maar haar databron: `buildCashflowCards` (`lib/cashflow-cards.ts`) krijgt de volledige `DashboardData` binnen en gebruikt daaruit precies **zeven scalars**",
+      "summary": "`/overzicht/budget` heeft een TTFB-p75 van 8,8 s (desktop) en 22,3 s (mobiel). De dominante oorzaak is niet de pagina zelf maar haar databron: `buildCashflowCards` (`lib/cashflow-cards.ts`) krijgt de volledige `DashboardData` binnen en gebruikt daaruit precies **zeven scalars**:",
       "file": "docs/adr/0083-slanke-cashflow-kpi-laag.md"
     },
     {
@@ -16883,7 +16877,7 @@
         "fn-budgetteren",
         "t-supabase"
       ],
-      "summary": "\"Geschat jaarinkomen\" en \"Geschatte uitgaven\" op `/overzicht/cashflow` kenden tot nu toe twee grondslagen: de transactiesom, of een handmatig bedrag dat de gebruiker zelf invulde (`profiles.income_source` / `expenses_source` = `'auto' | 'manual'`). Wie zijn inkomen niet in transa",
+      "summary": "\"Geschat jaarinkomen\" en \"Geschatte uitgaven\" op `/overzicht/budget` kenden tot nu toe twee grondslagen: de transactiesom, of een handmatig bedrag dat de gebruiker zelf invulde (`profiles.income_source` / `expenses_source` = `'auto' | 'manual'`). Wie zijn inkomen niet in transact",
       "file": "docs/adr/0103-grondslag-van-inkomen-en-uitgaven-is-een-expliciete-keuze.md"
     },
     {
@@ -17296,6 +17290,19 @@
       ],
       "summary": "Een nieuwe gebruiker kreeg in zijn eerste minuut op `/overzicht` vier dingen tegelijk: de rondleiding (die vanzelf start), de eenmalige uitleg bij de euro-weergave, de maand-check-in-banner en Fins eerste tip. Uit het UX-onderzoek van 5 september 2026: Sanne kreeg er drie over el",
       "file": "docs/adr/0134-een-aandachtsvrager-tegelijk.md"
+    },
+    {
+      "id": "0135-budget-is-de-derde-hefboom",
+      "title": "Budget is de derde hefboom; de cashflow-laag vervalt",
+      "status": "aanvaard",
+      "date": "2026-09-06",
+      "elements": [
+        "as-budget",
+        "as-transacties",
+        "sp-budget"
+      ],
+      "summary": "Budgetteren is voor het grip-segment de dagelijkse handeling, maar zat drie lagen diep: `/overzicht` → `/overzicht/cashflow` → `/overzicht/cashflow/budget`. Even diep als de fiscale optimizer, die bijna niemand opent. Uit het beginner-onderzoek van september 2026 (Notion UR3-28, ",
+      "file": "docs/adr/0135-budget-is-de-derde-hefboom.md"
     }
   ],
   "churn": {
@@ -17303,15 +17310,15 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 70
+        "commits": 73
       },
       {
         "path": "lib/ai",
-        "commits": 47
+        "commits": 49
       },
       {
         "path": "app/(app)/toekomst",
-        "commits": 33
+        "commits": 34
       },
       {
         "path": "app/api/ai",
@@ -17345,28 +17352,28 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 10111,
-        "commits": 78
+        "loc": 10152,
+        "commits": 79
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 5423,
-        "commits": 32
+        "loc": 5456,
+        "commits": 34
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4945,
-        "commits": 35
+        "loc": 4941,
+        "commits": 36
       },
       {
         "file": "components/app/cash-account-view.tsx",
         "loc": 3698,
-        "commits": 23
+        "commits": 25
       },
       {
         "file": "lib/dashboard-data-loader.ts",
         "loc": 3089,
-        "commits": 60
+        "commits": 62
       },
       {
         "file": "lib/release-notes.ts",
@@ -17381,7 +17388,7 @@
       {
         "file": "app/(app)/core/checkin/page.tsx",
         "loc": 2387,
-        "commits": 12
+        "commits": 13
       }
     ]
   },
@@ -18524,16 +18531,25 @@
     "hasChanges": true,
     "sections": [
       {
-        "label": "Integratie-clients",
+        "label": "Schermen",
         "added": [
-          "lib/parsers/iban.ts"
+          "/overzicht/budget",
+          "/overzicht/budget/forecast",
+          "/overzicht/budget/transacties",
+          "/overzicht/budget/vaste-lasten"
         ],
-        "removed": []
+        "removed": [
+          "/overzicht/cashflow",
+          "/overzicht/cashflow/budget",
+          "/overzicht/cashflow/forecast",
+          "/overzicht/cashflow/transacties",
+          "/overzicht/cashflow/vaste-lasten"
+        ]
       },
       {
         "label": "Componenten (aantal)",
         "added": [
-          "+25"
+          "+6"
         ],
         "removed": []
       }
@@ -18896,6 +18912,13 @@
       "components": 1054,
       "tables": 94,
       "routesProduction": 97
+    },
+    {
+      "date": "2026-09-06",
+      "api": 309,
+      "components": 1060,
+      "tables": 94,
+      "routesProduction": 96
     }
   ]
 }
