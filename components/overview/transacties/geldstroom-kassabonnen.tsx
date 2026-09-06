@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
-import { BottomSheet } from '@/components/app/bottom-sheet'
+import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { KassabonShell } from '@/components/app/kassabon-shell'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
@@ -203,7 +203,8 @@ export function GeldstroomKassabonnen({
   return (
     <>
       {/* === Kassabon: Inkomsten === */}
-      <BottomSheet
+      <ShellOverlay
+        kind="sheet"
         open={open === 'income'}
         onClose={closeAll}
         title={`Inkomsten · ${windowLabel}`}
@@ -232,10 +233,11 @@ export function GeldstroomKassabonnen({
             </div>
           </div>
         </KassabonShell>
-      </BottomSheet>
+      </ShellOverlay>
 
       {/* === Kassabon: Uitgaven === */}
-      <BottomSheet
+      <ShellOverlay
+        kind="sheet"
         open={open === 'expense' && !drillBudgetId}
         onClose={closeAll}
         title={`Uitgaven · ${windowLabel}`}
@@ -300,10 +302,11 @@ export function GeldstroomKassabonnen({
             </div>
           </div>
         </KassabonShell>
-      </BottomSheet>
+      </ShellOverlay>
 
       {/* === Kassabon: deelbudgetten van één uitgavenpost === */}
-      <BottomSheet
+      <ShellOverlay
+        kind="sheet"
         open={open === 'expense' && !!drillBudgetId}
         // Sluiten brengt je terug op de uitgaven-bon, niet uit de hele reeks:
         // je klikte je één niveau dieper, dus één niveau terug is de stap die
@@ -349,7 +352,7 @@ export function GeldstroomKassabonnen({
             )}
           </div>
         </KassabonShell>
-      </BottomSheet>
+      </ShellOverlay>
     </>
   )
 }

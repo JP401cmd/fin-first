@@ -88,7 +88,6 @@ const ALLOWLIST_ENTRIES = [
   'components/app/budget-merge-wizard.tsx',
   'components/app/budget-plan-editor-sheet.tsx',
   'components/app/cash-account-view.tsx',
-  'components/app/cash-overview.tsx',
   'components/app/category-rules-sheet.tsx',
   'components/app/chat/chat-panel.tsx',
   'components/app/core/box3-partner-modal.tsx',
