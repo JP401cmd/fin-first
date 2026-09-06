@@ -677,19 +677,27 @@ export function AssetCategoryPage({
                   cashflow-hub. "Rekening toevoegen" wordt hier al door de
                   AddCategoryCard in de items-grid gedekt; koppelen niet, en dat
                   is nu juist de ingang die een rekening zijn transactie-as
-                  geeft. Volledig-materiaal, net als daar. */}
+                  geeft.
+
+                  IN BEIDE WEERGAVEN, en dat is een afwijking van de hub. Daar
+                  zat deze knop in de `HideInSimple`-snelle-acties, samen met
+                  import en "betaalrekening toevoegen" — verdedigbaar zolang die
+                  hub één van meerdere ingangen was. Sinds ADR 0135 hebben de
+                  rekeningen hier hun ENIGE thuis, en dan is een beginner in
+                  Eenvoudig precies degene die zijn app nog moet vullen. Dat is
+                  letterlijk de M40-redenering waarmee de transactiepagina zijn
+                  vul-routes uit het "…"-menu naar de zichtbare rij haalde: een
+                  vul-route is geen diepte die je mag wegnemen. */}
               {type === 'cash' && (
-                <HideInSimple>
-                  <div className="mt-5 flex flex-wrap items-center gap-2 sm:mt-6">
-                    <Link
-                      href="/core/cash/connect"
-                      className="inline-flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-                    >
-                      <Link2 className="h-4 w-4" />
-                      Bank koppelen
-                    </Link>
-                  </div>
-                </HideInSimple>
+                <div className="mt-5 flex flex-wrap items-center gap-2 sm:mt-6">
+                  <Link
+                    href="/core/cash/connect"
+                    className="inline-flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+                  >
+                    <Link2 className="h-4 w-4" />
+                    Bank koppelen
+                  </Link>
+                </div>
               )}
 
               {type !== 'cash' && historyData && (

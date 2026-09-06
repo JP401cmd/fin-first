@@ -155,6 +155,7 @@ function formatDayTitle(iso: string): string {
 export function TransactiesAnalyse({
   naGeldstroom,
   teBespreken = null,
+  vulIngangenInBanner = false,
 }: {
   /**
    * Server-gerenderde sectie die direct ónder de geldstroom-/spaarquote-kaart
@@ -171,6 +172,17 @@ export function TransactiesAnalyse({
    * component moet kunnen openen.
    */
   teBespreken?: TransactionFlagsData | null
+  /**
+   * Staat de `KoppelRekeningBanner` bovenaan de pagina (= nul rekeningen)? Dan
+   * laat de actie-rij "Importeer transacties" en "Bank koppelen" wég: die
+   * banner biedt beide al, uitgebreider, twee blokken hoger.
+   *
+   * Dat is geen nieuwe keuze maar de bestaande. De banner dekt bewust ALLEEN de
+   * zuivere 0-rekeningen-stand en verdwijnt zodra er één rekening is; de
+   * actie-rij bestaat voor het vervolg-vullen dáárna (M40). Dat die twee elkaar
+   * bij nul rekeningen overlapten was een omissie, geen ontwerp.
+   */
+  vulIngangenInBanner?: boolean
 } = {}) {
   const { perspective } = usePerspective()
   const searchParams = useSearchParams()
@@ -678,7 +690,10 @@ export function TransactiesAnalyse({
           </button>
         </HideInSimple>
         {/* Vul-routes: in BEIDE modi in de rij (M40). De import zelf verandert
-            niet — dit is puur de vindbaarheid van de ingang. */}
+            niet — dit is puur de vindbaarheid van de ingang. Ze wijken alleen
+            wanneer de koppel-banner er staat, want die biedt ze dan al. */}
+        {!vulIngangenInBanner && (
+          <>
         <Link
           href="/core/cash/import"
           className="inline-flex items-center gap-2 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
@@ -693,6 +708,8 @@ export function TransactiesAnalyse({
           <Link2 className="h-4 w-4" />
           Bank koppelen
         </Link>
+          </>
+        )}
         {simple && (
           <button
             type="button"

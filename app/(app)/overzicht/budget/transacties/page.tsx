@@ -138,6 +138,10 @@ export default async function OverzichtCashflowTransactiesPage({
             analyse zelf een client-component is. */}
         <TransactiesAnalyse
           teBespreken={teBespreken}
+          /* Bij nul rekeningen staat de KoppelRekeningBanner hierboven, en die
+             biedt koppelen én importeren al — dan hoeven ze niet nog eens in de
+             actie-rij. Zelfde conditie als de banner zelf gebruikt. */
+          vulIngangenInBanner={accountCount === 0}
           naGeldstroom={
             <SpendLimitsSection
               data={spendLimits}

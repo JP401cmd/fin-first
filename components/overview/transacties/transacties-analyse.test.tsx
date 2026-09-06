@@ -65,10 +65,10 @@ vi.mock('@/lib/household/perspective-loader', () => ({
   loadPerspectiveTransactions: () => new Promise(() => {}),
 }))
 
-function renderAnalyse(mode: DisplayMode = 'full') {
+function renderAnalyse(mode: DisplayMode = 'full', vulIngangenInBanner = false) {
   return render(
     <DisplayModeProvider initialMode={mode}>
-      <TransactiesAnalyse />
+      <TransactiesAnalyse vulIngangenInBanner={vulIngangenInBanner} />
     </DisplayModeProvider>,
   )
 }
@@ -143,5 +143,32 @@ describe('TransactiesAnalyse — actie-rij (Eenvoudig, TXN-1 herzien via M40)', 
     expect(within(menu).queryAllByRole('link')).toHaveLength(0)
     expect(within(menu).queryByText('Importeer transacties')).not.toBeInTheDocument()
     expect(within(menu).queryByText('Bank koppelen')).not.toBeInTheDocument()
+  })
+})
+
+// ── Ontdubbeling met de koppel-banner ────────────────────────────────────────
+//
+// Bij NUL rekeningen staat de KoppelRekeningBanner twee blokken hoger, en die
+// biedt koppelen én importeren al — uitgebreider, met de PSD2-uitleg erbij.
+// Beide tegelijk tonen gaf twee koppel-ingangen vlak boven elkaar. De banner
+// dekt bewust alleen die 0-stand en verdwijnt zodra er één rekening is; vanaf
+// dán is de actie-rij de plek voor het vervolg-vullen (M40).
+describe('TransactiesAnalyse — vul-routes wijken voor de koppel-banner', () => {
+  it('laat "Importeer transacties" en "Bank koppelen" weg zodra de banner er staat', () => {
+    renderAnalyse('full', true)
+    expect(screen.queryByText('Importeer transacties')).not.toBeInTheDocument()
+    expect(screen.queryByText('Bank koppelen')).not.toBeInTheDocument()
+  })
+
+  it('houdt ze in Eenvoudig evengoed weg — de banner geldt in beide modi', () => {
+    renderAnalyse('simple', true)
+    expect(screen.queryByText('Importeer transacties')).not.toBeInTheDocument()
+    expect(screen.queryByText('Bank koppelen')).not.toBeInTheDocument()
+  })
+
+  it('brengt ze terug zodra er een rekening is (banner weg)', () => {
+    renderAnalyse('full', false)
+    expect(screen.getByText('Importeer transacties')).toBeInTheDocument()
+    expect(screen.getByText('Bank koppelen')).toBeInTheDocument()
   })
 })
