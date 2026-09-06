@@ -75,6 +75,8 @@ interface DataOverrides {
   budgetIncomeEntries?: BudgetBasisEntry[]
   budgetExpenseEntries?: BudgetBasisEntry[]
   budgetIncomeOpts?: { realizedWindowMonths?: number; truncationSuspected?: boolean }
+  /** Maanden historie onder `estimatedAnnualIncome` (12 = geen extrapolatie). */
+  incomeMonths?: number
 }
 
 /**
@@ -118,6 +120,9 @@ function makeData(overrides: DataOverrides = {}): CashflowSettingsData {
   }))
   return {
     estimatedAnnualIncome: 48000,
+    // Volledige historie tenzij een test iets anders zegt: dan is er niets te
+    // extrapoleren en hoort de transactie-kassabon over zijn venster te zwijgen.
+    incomeMonths: overrides.incomeMonths ?? 12,
     // Het EFFECTIEVE jaarinkomen op de gekozen grondslag (ADR 0103); gelijk aan
     // de transactiewaarde zolang de mock op grondslag 'transaction' staat.
     effectiveAnnualIncome: 48000,
@@ -615,8 +620,8 @@ describe('CashflowInstellingenBlok — budget-selectie', () => {
   it('zegt het rustig wanneer op minder dan het volle venster is gemeten', () => {
     // `realizedWindowMonths` staat in productie ALTIJD op 12; het aantal maanden
     // met werkelijke data zit per post in `realizedMonths`. De regel hangt dus
-    // aan de posten (langstlopende wint), niet aan de venster-constante — anders
-    // was hij onbereikbaar.
+    // aan de posten, niet aan de venster-constante — anders was hij onbereikbaar.
+    // Leunt ÉLKE post op een korter venster, dan is de spanne het hele verhaal.
     render(
       <CashflowInstellingenBlok
         data={makeData({
@@ -631,14 +636,64 @@ describe('CashflowInstellingenBlok — budget-selectie', () => {
     )
     const sheet = openVia('Geschat jaarinkomen')
     expect(
+      within(sheet).getByText(/Gemeten over 3–5 maanden en doorgerekend naar een heel jaar/i),
+    ).toBeTruthy()
+  })
+
+  it('B-017: een post met een vol jaar mag een korte post niet wegdrukken', () => {
+    // De regel werd samengevat met `Math.max` over de posten, dus "Salaris" (12
+    // maanden) zette 'm op 12 en liet de melding vallen — terwijl "Bijverdienste"
+    // uit 2 maanden ×6 was doorgerekend. Precies het "bovenaan 12 maanden, in de
+    // budgetten 10 of 2" uit de melding.
+    render(
+      <CashflowInstellingenBlok
+        data={makeData({
+          incomeSource: 'budget',
+          incomeBasis: 'budget',
+          budgetIncomeEntries: [
+            entry({ id: 'inc-1', name: 'Salaris', annualAmount: 60000, realizedMonths: 12 }),
+            entry({ id: 'inc-2', name: 'Bijverdienste', annualAmount: 1200, realizedMonths: 2 }),
+          ],
+        })}
+      />,
+    )
+    const sheet = openVia('Geschat jaarinkomen')
+    expect(
+      within(sheet).getByText(
+        /1 van de 2 posten is gemeten over 2 maanden en doorgerekend naar een heel jaar/i,
+      ),
+    ).toBeTruthy()
+  })
+
+  it('zwijgt over het meetvenster zodra ELKE post het volle jaar dekt', () => {
+    render(
+      <CashflowInstellingenBlok
+        data={makeData({ incomeSource: 'budget', incomeBasis: 'budget' })}
+      />,
+    )
+    const sheet = openVia('Geschat jaarinkomen')
+    expect(within(sheet).queryByText(/doorgerekend naar een heel jaar/i)).toBeNull()
+  })
+
+  it('B-017: de transactie-kassabon meldt zijn eigen extrapolatie', () => {
+    // "Totaal (12 mnd)" met eronder een "≈ €X/mnd" uit het GEËXTRAPOLEERDE jaar:
+    // twee noemers zolang er minder dan twaalf maanden historie is. Dezelfde
+    // zin als onder de budget-kassabon — één formulering voor één feit.
+    render(
+      <CashflowInstellingenBlok
+        data={makeData({ incomeSource: 'transaction', incomeBasis: 'transaction', incomeMonths: 5 })}
+      />,
+    )
+    const sheet = openVia('Geschat jaarinkomen')
+    expect(
       within(sheet).getByText(/Gemeten over 5 maanden en doorgerekend naar een heel jaar/i),
     ).toBeTruthy()
   })
 
-  it('zwijgt over het meetvenster zodra een post het volle jaar dekt', () => {
+  it('de transactie-kassabon zwijgt bij een volle jaarhistorie', () => {
     render(
       <CashflowInstellingenBlok
-        data={makeData({ incomeSource: 'budget', incomeBasis: 'budget' })}
+        data={makeData({ incomeSource: 'transaction', incomeBasis: 'transaction' })}
       />,
     )
     const sheet = openVia('Geschat jaarinkomen')

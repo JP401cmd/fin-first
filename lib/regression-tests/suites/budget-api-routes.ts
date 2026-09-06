@@ -454,7 +454,7 @@ const tests: TestCase[] = [
       // motor die de route bewust spiegelt, niet de route zelf (die is
       // hier niet aanroepbaar zonder vi.mock — zie kop van dit bestand).
       const monthlySpending = [500, 520, 480, 510, 490, 500]
-      const result = computeBudgetForecast(monthlySpending, 0, 'Test')
+      const result = computeBudgetForecast(monthlySpending, 0, 'Test', 'expense')
 
       assertEqual(result.mean, 500, 'Mean of symmetric data')
       assertFinite(result.stdDev, 'StdDev is finite')
@@ -486,28 +486,28 @@ const tests: TestCase[] = [
       }
 
       // High confidence: CV = 0.05 (< 0.15)
-      const high = computeBudgetForecast(spendingForCv(1000, 0.05), 0, 'Test')
+      const high = computeBudgetForecast(spendingForCv(1000, 0.05), 0, 'Test', 'expense')
       assertEqual(high.confidence, 'high', 'CV 0.05 → high')
       assertGreaterThanOrEqual(high.confidencePercent, 80, 'High confidence ≥ 80%')
       assertLessThanOrEqual(high.confidencePercent, 95, 'High confidence ≤ 95%')
 
       // Medium confidence: CV = 0.25 (0.15 ≤ CV < 0.35)
-      const medium = computeBudgetForecast(spendingForCv(1000, 0.25), 0, 'Test')
+      const medium = computeBudgetForecast(spendingForCv(1000, 0.25), 0, 'Test', 'expense')
       assertEqual(medium.confidence, 'medium', 'CV 0.25 → medium')
       assertGreaterThanOrEqual(medium.confidencePercent, 10, 'Medium confidence ≥ 10%')
 
       // Low confidence: CV = 0.5 (≥ 0.35)
-      const low = computeBudgetForecast(spendingForCv(1000, 0.5), 0, 'Test')
+      const low = computeBudgetForecast(spendingForCv(1000, 0.5), 0, 'Test', 'expense')
       assertEqual(low.confidence, 'low', 'CV 0.5 → low')
       assertGreaterThanOrEqual(low.confidencePercent, 10, 'Low confidence ≥ 10%')
       assertLessThanOrEqual(low.confidencePercent, 45, 'Low confidence ≤ 45%')
 
       // Boundary: exactly 0.15
-      const boundary1 = computeBudgetForecast(spendingForCv(1000, 0.15), 0, 'Test')
+      const boundary1 = computeBudgetForecast(spendingForCv(1000, 0.15), 0, 'Test', 'expense')
       assertEqual(boundary1.confidence, 'medium', 'CV 0.15 → medium')
 
       // Boundary: exactly 0.35
-      const boundary2 = computeBudgetForecast(spendingForCv(1000, 0.35), 0, 'Test')
+      const boundary2 = computeBudgetForecast(spendingForCv(1000, 0.35), 0, 'Test', 'expense')
       assertEqual(boundary2.confidence, 'low', 'CV 0.35 → low')
     },
   },
@@ -543,7 +543,7 @@ const tests: TestCase[] = [
       // toetsen wél expliciet wat de echte motor voor hetzelfde
       // te-weinig-data-scenario teruggeeft, zodat de divergentie zichtbaar
       // blijft i.p.v. stilzwijgend.
-      const realMotorResult = computeBudgetForecast([100, 200, 0, 0, 0, 0], 0, 'Test')
+      const realMotorResult = computeBudgetForecast([100, 200, 0, 0, 0, 0], 0, 'Test', 'expense')
       assert(!realMotorResult.hasSufficientData, 'Echte motor: onvoldoende data')
       assertEqual(realMotorResult.confidence, 'low', "Echte motor kent geen 'insufficient' — valt terug op 'low'")
       assertEqual(realMotorResult.predicted, 0, 'Echte motor: geen predictie bij onvoldoende data')

@@ -15,7 +15,6 @@ vi.mock('@/lib/horizon-data-loader', () => ({ loadHorizonData: vi.fn() }))
 vi.mock('@/lib/fin-data-loader', () => ({ loadFinData: vi.fn() }))
 vi.mock('@/components/app/horizon/horizon-client', () => ({ default: () => null }))
 vi.mock('@/components/future/toekomst-nav-cards', () => ({ ToekomstNavCards: () => null }))
-vi.mock('@/components/future/print-tijdas-button', () => ({ PrintTijdasButton: () => null }))
 vi.mock('next/navigation', () => ({ redirect: vi.fn() }))
 
 import { resolveTabRedirect } from './page'

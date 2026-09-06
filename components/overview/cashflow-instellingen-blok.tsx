@@ -19,7 +19,13 @@ import {
   formatFreedomRateFootnote,
   formatFreedomTimeString,
 } from '@/lib/format'
-import { BASIS_LABEL, isUnknownBasis, savingsRateBasisLabel } from '@/lib/budget-basis'
+import {
+  BASIS_LABEL,
+  extrapolationNote,
+  isUnknownBasis,
+  savingsRateBasisLabel,
+  summarizeBasisWindow,
+} from '@/lib/budget-basis'
 import { GRONDSLAG_ONBEKEND_LABEL } from '@/lib/grondslag-guard'
 import type {
   BasisSource,
@@ -231,6 +237,25 @@ export function CashflowInstellingenBlok({
     () => data.monthlyBreakdown.reduce((s, m) => s + m.income, 0),
     [data.monthlyBreakdown],
   )
+
+  // B-017 — de transactie-kassabon extrapoleert net zo hard als de
+  // budget-kassabon ernaast (`extrapolatedIncome`, ADR 0050) en zweeg daar
+  // even hard over. Eén post (de transactiesom als geheel), dus een
+  // één-post-samenvatting; de ZIN komt uit dezelfde helper, zodat de twee
+  // kassabonnen niet twee formuleringen voor hetzelfde feit krijgen. Het
+  // venster is het aantal maandrijen dat er boven staat, niet een losse
+  // constante — anders kan de tekst van de tabel afwijken.
+  const transactieWindowNote = useMemo(() => {
+    const windowMonths = Math.max(1, data.monthlyBreakdown.length)
+    const gemeten = data.incomeMonths
+    return extrapolationNote({
+      windowMonths,
+      countedRealized: gemeten > 0 ? 1 : 0,
+      shortCount: gemeten > 0 && gemeten < windowMonths ? 1 : 0,
+      shortestMonths: gemeten,
+      longestShortMonths: gemeten,
+    })
+  }, [data.monthlyBreakdown.length, data.incomeMonths])
 
   const bothTransaction = incomeBasis === 'transaction' && expensesBasis === 'transaction'
   const showTxReceipt = bothTransaction && data.savingsRateMethod === 'transaction'
@@ -659,7 +684,7 @@ export function CashflowInstellingenBlok({
                 label="Uit je budgetten"
                 hint={
                   data.budgetIncome.hasBudgets
-                    ? 'Wat er de afgelopen 12 maanden per post binnenkwam. Vink aan wat meetelt.'
+                    ? 'Wat er per post binnenkwam over de afgelopen 12 maanden; een post die korter bestaat telt over zijn eigen maanden. Vink aan wat meetelt.'
                     : 'Je hebt nog geen inkomsten-budgetten om uit te rekenen.'
                 }
                 onSelect={() => chooseSource('income', 'budget')}
@@ -696,6 +721,17 @@ export function CashflowInstellingenBlok({
                       <p className="mt-1 text-[10px] text-[var(--ink-meta)]">
                         ≈ €{Math.round(data.estimatedAnnualIncome / 12).toLocaleString('nl-NL')}/mnd
                       </p>
+                      {/* Zelfde eerlijkheidsregel als onder de budget-kassabon
+                          (B-017): de "≈ €X/mnd" hierboven komt uit het
+                          GEËXTRAPOLEERDE jaar, niet uit het totaal erboven
+                          gedeeld door twaalf. Zolang er minder dan twaalf
+                          maanden historie is, zijn dat twee noemers — en dat
+                          hoort de gebruiker te lezen. */}
+                      {transactieWindowNote && (
+                        <p className="mt-1 font-serif text-[10px] italic leading-snug text-[var(--ink-3)]">
+                          {transactieWindowNote}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </KassabonShell>
@@ -749,7 +785,7 @@ export function CashflowInstellingenBlok({
                 label="Uit je budgetten"
                 hint={
                   data.budgetExpenses.hasBudgets
-                    ? 'Wat je de afgelopen 12 maanden per post uitgaf. Vink aan wat meetelt.'
+                    ? 'Wat je per post uitgaf over de afgelopen 12 maanden; een post die korter bestaat telt over zijn eigen maanden. Vink aan wat meetelt.'
                     : 'Je hebt nog geen uitgaven-budgetten om uit te rekenen.'
                 }
                 onSelect={() => chooseSource('expenses', 'budget')}
@@ -1090,13 +1126,16 @@ function BudgetKassabon({ basis, excluded, onToggle, annualTotal, emptyNote }: {
   // `realizedWindowMonths` is de BREEDTE van het venster dat de rekenkant
   // bevraagt en staat altijd op 12 (REALIZED_WINDOW_MONTHS) — daarop toetsen was
   // dode code. Wat de gebruiker wil weten is hoeveel maanden er werkelijk data
-  // ONDER zijn cijfer zit, en dat staat per post in `realizedMonths`. De
-  // langstlopende post bepaalt de bovengrens van het totaal.
+  // ONDER zijn cijfer zit, en dat staat per post in `realizedMonths`.
+  //
+  // B-017: dat werd samengevat met `Math.max`, dus één post met een vol jaar
+  // liet de regel volledig weg terwijl ernaast een post van 2 maanden ×6 was
+  // doorgerekend — precies het "bovenaan 12 maanden, in de budgetten 10 of 2"
+  // uit de melding. De samenvatting woont nu in lib/budget-basis.ts en kijkt
+  // naar de ZWAKSTE posten, met de LIVE selectie: wat niet meetelt in het
+  // totaal, hoort deze regel ook niet te sturen.
   const windowMonths = basis.realizedWindowMonths
-  const measuredMonths = basis.entries.reduce(
-    (max, e) => (e.source === 'realized' ? Math.max(max, e.realizedMonths) : max),
-    0,
-  )
+  const windowNote = extrapolationNote(summarizeBasisWindow(basis, excluded))
   return (
     <>
       <KassabonShell>
@@ -1145,10 +1184,9 @@ function BudgetKassabon({ basis, excluded, onToggle, annualTotal, emptyNote }: {
             <p className="mt-1 text-[10px] text-[var(--ink-3)]">
               ≈ €{Math.round(annualTotal).toLocaleString('nl-NL')} per jaar
             </p>
-            {measuredMonths > 0 && measuredMonths < windowMonths && (
+            {windowNote && (
               <p className="mt-1 font-serif text-[10px] italic leading-snug text-[var(--ink-3)]">
-                Gemeten over {measuredMonths} {measuredMonths === 1 ? 'maand' : 'maanden'} en
-                doorgerekend naar een heel jaar.
+                {windowNote}
               </p>
             )}
           </div>

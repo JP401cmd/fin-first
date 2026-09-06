@@ -250,19 +250,6 @@ const criteria: AcceptanceCriterion[] = [
     },
   },
   {
-    workflow: 'WF-OVZ-16',
-    scenarioId: 'UAT-OVZ-16',
-    titel: 'Overzicht afdrukken of als PDF opslaan',
-    kriticiteit: 'OVERIG',
-    given: 'De hub-pagina met print-CSS (`print:hidden`-classes).',
-    when: 'De gebruiker klikt de printer-knop.',
-    then: 'De browser-printdialoog opent; navigatie/knoppen/chat/"Vorige weken"-disclosure zijn verborgen op de afdruk. Zuiver een presentatie-laag, geen eigen berekening.',
-    assertion: {
-      kind: 'ui-only',
-      source: 'components/overview/print-overzicht-button.tsx (window.print) — geen cijfermatige uitkomst',
-    },
-  },
-  {
     workflow: 'WF-OVZ-19',
     scenarioId: 'UAT-OVZ-19',
     titel: 'Tips van Fin beoordelen: Doe nu / Later / Negeren',

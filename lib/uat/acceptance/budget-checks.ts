@@ -334,7 +334,7 @@ export const BUDGET_ENGINE_CHECKS: BudgetEngineCheck[] = [
     label: 'Voorspelling (computeBudgetForecast): gewogen gemiddelde, betrouwbaarheid, overschrijding',
     run: () => {
       criterion('WF-BUDGET-15')
-      const f = computeBudgetForecast([380, 400, 420, 410, 430, 440], 400, 'Boodschappen')
+      const f = computeBudgetForecast([380, 400, 420, 410, 430, 440], 400, 'Boodschappen', 'expense')
       return {
         expected: 'predicted=422; confidence=high; confidencePercent=85; monthsUsed=6; exceedsLimit=true; exceedAmount=22; stdDev=19.72; mean=413.33',
         actual: `predicted=${f.predicted}; confidence=${f.confidence}; confidencePercent=${f.confidencePercent}; monthsUsed=${f.monthsUsed}; exceedsLimit=${f.exceedsLimit}; exceedAmount=${f.exceedAmount}; stdDev=${fx(f.stdDev, 2)}; mean=${fx(f.mean, 2)}`,

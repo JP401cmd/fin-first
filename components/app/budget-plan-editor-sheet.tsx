@@ -547,13 +547,69 @@ export function BudgetPlanEditorSheet({
     onEditAdvanced(id)
   }
 
+  // ── Footer ────────────────────────────────────────────────────
+  // B-018/B-020: de plan-knoppen stonden in een `sticky`-blok ONDERIN de
+  // scroll-content, met `--mobile-nav-clearance` als bodempadding. Twee
+  // gevolgen op een 384px-viewport: (a) de rij "Te verdelen + Annuleren +
+  // Opslaan — N wijzigingen" paste niet en duwde de knoppen buiten beeld,
+  // (b) de nav-clearance reserveerde ruimte voor de zwevende nav-pill die
+  // een open overlay juist verbergt (lib/overlay-signal.ts). Nu: de gedeelde
+  // `footerSlot` van BottomSheet (niet-scrollend blok met bovenrand +
+  // safe-area-padding) en één knop die "Terug" heet zolang er niets gewijzigd
+  // is en "Opslaan" wordt zodra dat wél zo is (B-022-regel).
+  const treeFooter = view === 'tree' ? (
+    <div className="flex flex-col gap-2">
+      {error && (
+        <div className="flex items-start gap-2 rounded-[var(--r)] border border-red-200 bg-red-50 px-3 py-2" role="alert">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+          <p className="text-xs text-red-700">{error}</p>
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <div
+          className={`min-w-0 flex-1 rounded-[var(--r)] border px-3 py-2 ${
+            teVerdelen >= 0 ? 'border-positive/20 bg-positive/10' : 'border-negative/20 bg-negative/10'
+          }`}
+        >
+          <p className={`text-[10px] font-semibold uppercase tracking-[0.08em] ${teVerdelen >= 0 ? 'text-positive' : 'text-negative'}`}>
+            Te verdelen
+          </p>
+          <p className={`truncate font-mono text-sm font-bold tabular-nums ${teVerdelen >= 0 ? 'text-positive' : 'text-negative'}`}>
+            {teVerdelen >= 0 ? '' : '–'}{<MaskedAmount value={Math.abs(teVerdelen)} tone="wil" />}
+          </p>
+        </div>
+        {changes === 0 ? (
+          <button
+            type="button"
+            onClick={handleClose}
+            className="min-h-[44px] shrink-0 whitespace-nowrap border border-[var(--ink)] bg-[var(--paper)] px-4 py-2 text-sm font-medium text-[var(--ink)] hover:bg-[var(--subtle)]"
+            style={{ fontFamily: 'var(--font-inter, system-ui, sans-serif)' }}
+          >
+            Terug
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 whitespace-nowrap bg-[var(--ink)] px-4 py-2 text-sm font-medium text-[var(--paper)] hover:bg-[var(--ink-2)] disabled:cursor-not-allowed disabled:opacity-50"
+            style={{ fontFamily: 'var(--font-inter, system-ui, sans-serif)' }}
+          >
+            <Save className="h-4 w-4" />
+            {saving ? 'Opslaan…' : `Opslaan — ${changes}`}
+          </button>
+        )}
+      </div>
+    </div>
+  ) : undefined
+
   // ── Render ────────────────────────────────────────────────────
   return (
     <>
     {/* `manageHistory={false}`: deze sheet is URL-gestuurd (`?planEditor=true`)
         en haalt die param bij sluiten zelf met `router.replace` weg. De centrale
         overlay-history zou een tweede claim op dezelfde entry leggen. */}
-    <BottomSheet key={editorEpoch} open={open} onClose={handleClose} title="Plan bewerken" size="full" manageHistory={false}>
+    <BottomSheet key={editorEpoch} open={open} onClose={handleClose} title="Plan bewerken" size="full" manageHistory={false} footerSlot={treeFooter}>
       {/* Editorial intro — kicker-met-streep + deck (italic Source Serif).
           BottomSheet levert al de Playfair-titel in zijn header-bar; deze
           intro geeft context (welke maand, wat je hier doet) zonder dubbele
@@ -600,7 +656,7 @@ export function BudgetPlanEditorSheet({
       )}
 
       {view === 'tree' && (
-        <div className="px-4 pb-40 pt-4 sm:px-6">
+        <div className="px-4 pb-8 pt-4 sm:px-6">
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <TreeSection
               grouped={grouped}
@@ -677,55 +733,6 @@ export function BudgetPlanEditorSheet({
           onBack={() => setView('template-preview')}
           effectiveFrom={effectiveFrom}
         />
-      )}
-
-      {/* Footer: Te verdelen + save */}
-      {view === 'tree' && (
-        <div
-          className="sticky bottom-0 left-0 right-0 border-t border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 shadow-[0_-8px_16px_-8px_rgba(0,0,0,0.08)] sm:px-6"
-          style={{ paddingBottom: 'calc(0.75rem + var(--mobile-nav-clearance))' }}
-        >
-          {error && (
-            <div className="mb-2 flex items-start gap-2 rounded-[var(--r)] border border-red-200 bg-red-50 px-3 py-2" role="alert">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
-              <p className="text-xs text-red-700">{error}</p>
-            </div>
-          )}
-          <div className="flex items-center justify-between gap-3">
-            <div
-              className={`flex-1 rounded-[var(--r)] border px-3 py-2 ${
-                teVerdelen >= 0 ? 'border-positive/20 bg-positive/10' : 'border-negative/20 bg-negative/10'
-              }`}
-            >
-              <p className={`text-[10px] font-semibold uppercase tracking-[0.08em] ${teVerdelen >= 0 ? 'text-positive' : 'text-negative'}`}>
-                Te verdelen
-              </p>
-              <p className={`font-mono text-sm font-bold tabular-nums ${teVerdelen >= 0 ? 'text-positive' : 'text-negative'}`}>
-                {teVerdelen >= 0 ? '' : '–'}{<MaskedAmount value={Math.abs(teVerdelen)} tone="wil" />}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={handleClose}
-                className="border border-[var(--ink)] bg-[var(--paper)] px-3 py-2 text-sm font-medium text-[var(--ink)] hover:bg-[var(--subtle)] min-h-[44px]"
-                style={{ fontFamily: 'var(--font-inter, system-ui, sans-serif)' }}
-              >
-                Annuleren
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving || changes === 0}
-                className="inline-flex items-center gap-1.5 bg-[var(--ink)] px-4 py-2 text-sm font-medium text-[var(--paper)] hover:bg-[var(--ink-2)] disabled:cursor-not-allowed disabled:opacity-50 min-h-[44px]"
-                style={{ fontFamily: 'var(--font-inter, system-ui, sans-serif)' }}
-              >
-                <Save className="h-4 w-4" />
-                {saving ? 'Opslaan…' : changes > 0 ? `Opslaan — ${changes} wijziging${changes === 1 ? '' : 'en'}` : 'Geen wijzigingen'}
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Delete confirmation */}
@@ -1386,7 +1393,10 @@ function TemplatePreview({
 
       <div
         className="sticky bottom-0 left-0 right-0 border-t border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 sm:px-6"
-        style={{ paddingBottom: 'calc(0.75rem + var(--mobile-nav-clearance))' }}
+        // B-020: géén `--mobile-nav-clearance` — een open overlay verbergt de
+        // zwevende nav-pill (lib/overlay-signal.ts), dus die ruimte is dubbelop.
+        // Alleen de iOS-safe-area blijft nodig.
+        style={{ paddingBottom: 'calc(0.75rem + var(--safe-area-bottom, 0px))' }}
       >
         <div className="flex justify-end gap-2">
           <button
@@ -1474,7 +1484,10 @@ function TemplateConfirm({
 
       <div
         className="sticky bottom-0 left-0 right-0 border-t border-[var(--border-ed)] bg-[var(--paper)] px-4 py-3 sm:px-6"
-        style={{ paddingBottom: 'calc(0.75rem + var(--mobile-nav-clearance))' }}
+        // B-020: géén `--mobile-nav-clearance` — een open overlay verbergt de
+        // zwevende nav-pill (lib/overlay-signal.ts), dus die ruimte is dubbelop.
+        // Alleen de iOS-safe-area blijft nodig.
+        style={{ paddingBottom: 'calc(0.75rem + var(--safe-area-bottom, 0px))' }}
       >
         <div className="flex justify-end gap-2">
           <button

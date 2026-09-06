@@ -17,7 +17,7 @@
 // doelen & vrijheid (doelen-kaart, vrijheidsstrip, hero-widgets) → briefing
 // (vrijheidsweek, briefing-kaartjes, delen) → status & onboarding
 // (statusmelding, check-in-banner, welkomstgids in Fin met de rondleiding
-// eronder) → inzichten & print
+// eronder) → inzichten
 // (samengestelde rente, afdrukken) → tips & acties (Fin-tips beslissen,
 // handmatige actie, actiebeheer) → uitkomst → cross-doorwerking.
 //
@@ -71,9 +71,8 @@ export const OVZ_FLOW: UatFlow = {
     { id: 'welkomstgids', scenarioId: 'UAT-OVZ-14', label: 'WF-OVZ-14 · Welkomstgids doorlopen in Fin', kind: 'action', stage: 4, lane: 'status' },
     { id: 'rondleiding', scenarioId: 'UAT-OVZ-26', label: 'WF-OVZ-26 · Interactieve rondleiding (spotlight op /overzicht)', kind: 'action', stage: 4, lane: 'status', subOf: 'welkomstgids' },
 
-    // ── 5 · inzichten & print ─────────────────────────────────────────────
+    // ── 5 · inzichten ─────────────────────────────────────────────
     { id: 'samengesteldrente', scenarioId: 'UAT-OVZ-15', label: 'WF-OVZ-15 · Samengestelde-rente-inzicht', kind: 'screen', stage: 5, lane: 'inzichten' },
-    { id: 'print', scenarioId: 'UAT-OVZ-16', label: 'WF-OVZ-16 · Afdrukken / PDF opslaan', kind: 'action', stage: 5, lane: 'inzichten' },
 
     // ── 6 · tips & acties ─────────────────────────────────────────────────
     { id: 'tipsbeslissen', scenarioId: 'UAT-OVZ-19', label: 'WF-OVZ-19 · Tips van Fin beoordelen (Doe nu/Later/Negeren)', kind: 'screen', stage: 6, lane: 'tips' },
@@ -122,10 +121,9 @@ export const OVZ_FLOW: UatFlow = {
     { from: 'hefboom', to: 'welkomstgids' },
     { from: 'welkomstgids', to: 'rondleiding' },
 
-    // inzichten & print
+    // inzichten
     { from: 'hefboom', to: 'samengesteldrente' },
     { from: 'samengesteldrente', to: 'x-bezit', kind: 'cross' },
-    { from: 'hefboom', to: 'print' },
 
     // tips & acties
     { from: 'hefboom', to: 'tipsbeslissen' },
@@ -147,7 +145,6 @@ export const OVZ_FLOW: UatFlow = {
     { from: 'statusmelding', to: 'uitkomst' },
     { from: 'welkomstgids', to: 'uitkomst' },
     { from: 'rondleiding', to: 'uitkomst' },
-    { from: 'print', to: 'uitkomst' },
     { from: 'actietoevoegen', to: 'uitkomst' },
     { from: 'actiesbeheren', to: 'uitkomst' },
 

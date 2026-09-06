@@ -6,7 +6,6 @@ import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { loadFinData } from '@/lib/fin-data-loader'
 import HorizonPage from '@/components/app/horizon/horizon-client'
 import { ToekomstNavCards } from '@/components/future/toekomst-nav-cards'
-import { PrintTijdasButton } from '@/components/future/print-tijdas-button'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PageOpening, EditorialDeck, OrnamentColophon } from '@/components/editorial'
 import { getPageInfo } from '@/lib/page-info-content'
@@ -66,7 +65,7 @@ export function resolveTabRedirect(
  * /toekomst — tijdas-landing met vier navigatiekaarten (nieuwe architectuur).
  *
  * Render-volgorde:
- *  1. Landing-header (kicker + serif-titel) met de PrintTijdasButton rechts.
+ *  1. Landing-header (kicker + serif-titel) met de info-knop rechts.
  *  2. ToekomstNavCards — vier kaarten (Doelen · Gebeurtenissen · Voorkeuren ·
  *     Rekenhulp), elk met KPI + status-dot, die naar hun subpagina linken.
  *  3. HorizonPage — de tijdas zelf (grafiek + Risk Lab + drag&drop events).
@@ -120,10 +119,6 @@ export default async function ToekomstPage({
     minimizedMap[DEFICIT_NOTICE_MINIMIZE_KEY],
   )
 
-  // Een echte tijdas-projectie vereist een leeftijd (geboortedatum). Zonder die
-  // kan er geen FIRE-pad berekend worden — dan tonen we ook geen print/deel-knop.
-  const hasProjection = horizonData.effectiveInput?.dateOfBirth != null
-
   return (
     <>
       {/* Tab-root → 'rich' TopBar (utility-cluster) + tab-titel in de mobiele
@@ -158,10 +153,6 @@ export default async function ToekomstPage({
                 gap-2 (8px) geeft exact dezelfde plaatsing. */}
             <DeficitNoticeDot />
             <PageInfoButton content={getPageInfo('/toekomst')} />
-            {/* Print/Deel toont op basis van een ECHTE projectie (geboortedatum
-                aanwezig → tijdas berekenbaar), niet langer op de verwijderde
-                setup-flag. Geen data-backfill nodig. */}
-            {hasProjection && <PrintTijdasButton />}
           </div>
         </div>
 
@@ -191,8 +182,9 @@ export default async function ToekomstPage({
           niet langer verzwijgt wat je zojuist hebt ingevoerd. Geen extra query. */}
       <HorizonPage initialData={horizonData} embedded goals={finData.goals} />
 
-      {/* Krant-stijl colophon als landing-footer. print:hidden zodat de
-          tijdas-print (PrintTijdasButton) ongewijzigd blijft. */}
+      {/* Krant-stijl colophon als landing-footer. `print:hidden` blijft staan:
+          de eigen printknop is weg (B-021), maar de browser-print van de
+          gebruiker (Ctrl+P) hoort deze footer nog steeds niet mee te nemen. */}
       <div className="print:hidden">
         <OrnamentColophon text="Geld is opgeslagen tijd" module="De Toekomst" />
       </div>

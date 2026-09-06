@@ -11,6 +11,20 @@ export interface CashflowSettingsData {
   /** TRANSACTIE-grondslag: het 12-maands geëxtrapoleerde inkomen ("berekend"). */
   estimatedAnnualIncome: number
   /**
+   * Over hoeveel maanden `estimatedAnnualIncome` daadwerkelijk is gemeten
+   * (`CorePageData.incomeMonths` = `actualIncomeMonths`, ADR 0050). `12` = geen
+   * extrapolatie; minder betekent dat de som naar een vol jaar is doorgerekend.
+   *
+   * DOORGEEF-VELD, geen eigen som — B-017: de transactie-kassabon zette
+   * "Totaal (12 mnd)" boven een "≈ €X/mnd" die uit het GEËXTRAPOLEERDE jaar
+   * kwam. Bij minder dan twaalf maanden historie is dat een andere noemer dan
+   * de rijen erboven, zonder één woord uitleg — dezelfde stilte die de
+   * budget-kassabon ernaast had. `CoreKengetallen` op de cash-pagina toonde
+   * dit al ("Geëxtrapoleerd vanuit N maanden"); dit blok kón het niet, want het
+   * getal stond niet op de bundel.
+   */
+  incomeMonths: number
+  /**
    * Het EFFECTIEVE jaarinkomen op de gekozen grondslag (ADR 0103) — dít is het
    * getal op de "Geschat jaarinkomen"-kaart, en dezelfde waarde die de FIRE-keten
    * en het bruto Box 1-inkomen voeden. Consumenten beslissen de grondslag NIET
@@ -216,6 +230,9 @@ export async function loadCashflowSettingsData(
 
   return {
     estimatedAnnualIncome: rf.extrapolatedIncome,
+    // Hoort bij het veld erboven: hoeveel maanden er ONDER die extrapolatie
+    // zitten. CONSUME uit de core-bundel, niet opnieuw afleiden.
+    incomeMonths: core.incomeMonths,
     effectiveAnnualIncome: rf.effectiveAnnualIncome,
     netMonthlyIncome: Number(profile?.net_monthly_income ?? 0),
     savingsRate6m: core.savingsRate6m,

@@ -78,7 +78,7 @@ describe('UAT Ovz — acceptatiecriteria dekking', () => {
       expect(criterion(wf).assertion.kind, `${wf} moet oracle zijn`).toBe('oracle')
     }
     expect(criterion('WF-OVZ-04').assertion.kind).toBe('direction')
-    for (const wf of ['WF-OVZ-08', 'WF-OVZ-11', 'WF-OVZ-12', 'WF-OVZ-13', 'WF-OVZ-16', 'WF-OVZ-24']) {
+    for (const wf of ['WF-OVZ-08', 'WF-OVZ-11', 'WF-OVZ-12', 'WF-OVZ-13', 'WF-OVZ-24']) {
       expect(criterion(wf).assertion.kind, `${wf} moet ui-only zijn`).toBe('ui-only')
     }
   })

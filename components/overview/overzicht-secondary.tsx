@@ -28,7 +28,6 @@ import {
   useHeroRailState,
 } from './hero-widget-rail'
 import { CompoundInsightCard } from './compound-insight-card'
-import { PrintOverzichtButton } from './print-overzicht-button'
 import {
   MilestoneCelebrationHost,
   type CelebratableMilestone,
@@ -221,7 +220,6 @@ export function OverzichtSecondary({
             onToggle={() => rail.setIsEditing(!rail.isEditing)}
           />
         )}
-        <PrintOverzichtButton />
         {/* Geminimaliseerde "Gegevens verouderd"-melding (B-015): zelfde
             h-7 w-7-familie, stoplicht-oranje, links van het status-/vrijheidspunt
             hieronder. De conventie noemt absolute offsets voor pagina's waar de

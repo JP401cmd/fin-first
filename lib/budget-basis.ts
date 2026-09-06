@@ -184,6 +184,98 @@ export const BASIS_BUDGET_TYPE: Readonly<Record<'income' | 'expense', string>> =
 export const MAX_BASIS_ENTRIES = 500
 
 /**
+ * Hoe hard leunt de getoonde budgetsom op EXTRAPOLATIE? (B-017)
+ *
+ * De deler is bewust PER POST (`resolveDenominatorMonths`: de leeftijd van het
+ * budget) — een post die twee maanden bestaat heeft geen twaalf maanden
+ * historie, en die per-post-keuze blijft staan. Wat mis was, is dat de
+ * kassabon dat samenvatte met `Math.max` over de posten: één post met een vol
+ * jaar zette de max op 12 en liet de eerlijkheidsregel dus volledig weg,
+ * terwijl ernaast een post van twee maanden ×6 werd doorgerekend. De MAX is de
+ * verkeerde samenvatter: de zwakste post bepaalt hoe hard het totaal op
+ * extrapolatie leunt, niet de sterkste.
+ */
+export interface BasisWindowSummary {
+  /** Breedte van het meetvenster (`realizedWindowMonths`, in productie 12). */
+  windowMonths: number
+  /** Aantal MEETELLENDE posten met een gemeten venster (planned telt niet mee). */
+  countedRealized: number
+  /** Daarvan het aantal met minder dan het volle venster. */
+  shortCount: number
+  /** Kortste venster onder die korte posten (0 als er geen zijn). */
+  shortestMonths: number
+  /** Langste venster onder die korte posten (0 als er geen zijn). */
+  longestShortMonths: number
+}
+
+/**
+ * Vat de meetvensters van de MEETELLENDE posten samen.
+ *
+ * `excludedIds` is de LIVE selectie van de UI (optimistische Set) en wint van
+ * `entry.excluded` uit de bundel: wat niet in het totaal zit, hoort de
+ * eerlijkheidsregel ook niet te sturen. Zonder argument valt de toets terug op
+ * de bundel-vlag.
+ *
+ * `planned`-posten (geen enkele boeking in het venster) dragen géén meting en
+ * tellen hier dus niet mee — die verklaren zichzelf al met "gepland" in hun
+ * eigen regel (`entryMeta` in het instellingenblok).
+ */
+export function summarizeBasisWindow(
+  basis: Pick<BudgetBasisResult, 'entries' | 'realizedWindowMonths'>,
+  excludedIds?: ReadonlySet<string>,
+): BasisWindowSummary {
+  const windowMonths = Math.max(1, basis.realizedWindowMonths)
+  const counted = basis.entries.filter(
+    e =>
+      e.source === 'realized' &&
+      e.realizedMonths > 0 &&
+      !(excludedIds ? excludedIds.has(e.id) : e.excluded),
+  )
+  const short = counted.filter(e => e.realizedMonths < windowMonths)
+  return {
+    windowMonths,
+    countedRealized: counted.length,
+    shortCount: short.length,
+    shortestMonths: short.length > 0 ? Math.min(...short.map(e => e.realizedMonths)) : 0,
+    longestShortMonths: short.length > 0 ? Math.max(...short.map(e => e.realizedMonths)) : 0,
+  }
+}
+
+/** "5 maanden" / "1 maand" / "2–10 maanden" — de spanne in gewone taal. */
+function monthsSpan(from: number, to: number): string {
+  if (from === to) return `${from} ${from === 1 ? 'maand' : 'maanden'}`
+  return `${from}–${to} maanden`
+}
+
+/**
+ * De ENE grondslag-regel onder een kassabon die op extrapolatie leunt: dekt
+ * elke meetellende post het volle venster, dan valt er niets te melden.
+ *
+ * Twee vormen, en het verschil is het antwoord op B-017 ("bovenaan 12 maanden,
+ * in de budgetten 10 of 2"):
+ *  · leunt ALLES op een korter venster → de rustige zin die er al stond;
+ *  · leunt een DEEL erop → benoem hoeveel posten, over welke spanne, en dat de
+ *    rest het volle jaar wél dekt. Zo staan teller en noemer allebei in beeld.
+ *
+ * Ook bruikbaar buiten de budgetgrondslag: de transactie-kassabon extrapoleert
+ * op dezelfde manier (`extrapolatedIncome`, ADR 0050) en leende tot nu toe
+ * dezelfde stilte. Vandaar dat deze functie een `BasisWindowSummary` neemt en
+ * geen `BudgetBasisResult`.
+ */
+export function extrapolationNote(summary: BasisWindowSummary): string | null {
+  if (summary.shortCount === 0 || summary.countedRealized === 0) return null
+  const spanne = monthsSpan(summary.shortestMonths, summary.longestShortMonths)
+  if (summary.shortCount === summary.countedRealized) {
+    return `Gemeten over ${spanne} en doorgerekend naar een heel jaar.`
+  }
+  const werkwoord = summary.shortCount === 1 ? 'is' : 'zijn'
+  return (
+    `${summary.shortCount} van de ${summary.countedRealized} posten ${werkwoord} gemeten ` +
+    `over ${spanne} en doorgerekend naar een heel jaar; de rest dekt het volle jaar.`
+  )
+}
+
+/**
  * Budgetrij zoals de loaders 'm uit `select('*')` (of een expliciete kolomlijst)
  * krijgen. `default_limit` mag string|number|null zijn — PostgREST levert NUMERIC
  * als string.

@@ -38,13 +38,13 @@ describe('computeBudgetForecast — negatieve maanden', () => {
 
   it('ongeklemd met 4 negatieve maanden in het venster: geen prognose', () => {
     const slechtVenster = [-100, 1200, -200, -300, 1250, -400]
-    const r = computeBudgetForecast(slechtVenster, LIMIT, 'Inventaris & apparaten')
+    const r = computeBudgetForecast(slechtVenster, LIMIT, 'Inventaris & apparaten', 'expense')
     expect(r.hasSufficientData).toBe(false)
     expect(r.message).toContain('Nog niet genoeg uitgavenhistorie')
   })
 
   it('GEKLEMD blijft de prognose staan bij 12 maanden waarvan 4 negatief', () => {
-    const r = computeBudgetForecast(CLAMPED_MONTHS, LIMIT, 'Inventaris & apparaten')
+    const r = computeBudgetForecast(CLAMPED_MONTHS, LIMIT, 'Inventaris & apparaten', 'expense')
     expect(r.hasSufficientData).toBe(true)
     expect(r.message).not.toContain('Nog niet genoeg uitgavenhistorie')
     expect(r.predicted).toBeGreaterThan(0)
@@ -52,7 +52,7 @@ describe('computeBudgetForecast — negatieve maanden', () => {
 
   it('geklemd: hetzelfde slechte venster levert nu wél een prognose', () => {
     const slechtVenster = [-100, 1200, -200, -300, 1250, -400].map((v) => Math.max(0, v))
-    const r = computeBudgetForecast(slechtVenster, LIMIT, 'Inventaris & apparaten')
+    const r = computeBudgetForecast(slechtVenster, LIMIT, 'Inventaris & apparaten', 'expense')
     // Twee echte uitgavenmaanden blijven twee; de klem verzint geen data.
     expect(r.monthsUsed).toBe(2)
     expect(r.hasSufficientData).toBe(false)
@@ -60,13 +60,13 @@ describe('computeBudgetForecast — negatieve maanden', () => {
 
   it('de klem verandert niets aan een reeks zonder negatieve maanden', () => {
     const positief = [1200, 1300, 1250, 1180, 1220, 1300]
-    const a = computeBudgetForecast(positief, LIMIT, 'X')
-    const b = computeBudgetForecast(positief.map((v) => Math.max(0, v)), LIMIT, 'X')
+    const a = computeBudgetForecast(positief, LIMIT, 'X', 'expense')
+    const b = computeBudgetForecast(positief.map((v) => Math.max(0, v)), LIMIT, 'X', 'expense')
     expect(b).toEqual(a)
   })
 
   it('de prognose blijft nooit negatief', () => {
-    const r = computeBudgetForecast(CLAMPED_MONTHS, LIMIT, 'Inventaris & apparaten')
+    const r = computeBudgetForecast(CLAMPED_MONTHS, LIMIT, 'Inventaris & apparaten', 'expense')
     expect(r.predicted).toBeGreaterThanOrEqual(0)
   })
 })

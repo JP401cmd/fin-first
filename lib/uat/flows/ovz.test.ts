@@ -47,18 +47,18 @@ describe('OVZ_FLOW — curatie-integriteit', () => {
     }
   })
 
-  it('dekt alle 24 WF-OVZ-scenario\'s (01..16, 19..26 — WF-OVZ-17/18 bestaan niet in de catalogus)', () => {
+  it('dekt alle 23 WF-OVZ-scenario\'s (01..15, 19..26 — WF-OVZ-16/17/18 bestaan niet in de catalogus)', () => {
     const covered = new Set(
       OVZ_FLOW.nodes.map((n) => n.scenarioId).filter((id): id is string => Boolean(id)),
     )
     const expected = [
-      ...Array.from({ length: 16 }, (_, i) => i + 1),
+      ...Array.from({ length: 15 }, (_, i) => i + 1),
       19, 20, 21, 22, 23, 24, 25, 26,
     ].map((n) => `UAT-OVZ-${String(n).padStart(2, '0')}`)
     for (const id of expected) {
       expect(covered.has(id), `${id} moet als flow-knoop voorkomen`).toBe(true)
     }
-    expect(covered.size).toBe(24)
+    expect(covered.size).toBe(23)
   })
 
   it('de domeinoverschrijdende cross-knopen dekken WILL/TOEK/MIJN/NAV/BEZIT', () => {

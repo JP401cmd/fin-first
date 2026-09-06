@@ -250,7 +250,7 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'exact',
       expected: 'predicted=422; confidence=high; confidencePercent=85; monthsUsed=6; exceedsLimit=true; exceedAmount=22; stdDev=19.72; mean=413.33',
-      source: 'lib/budget-forecast.ts#computeBudgetForecast([380,400,420,410,430,440], 400, \'Boodschappen\')',
+      source: 'lib/budget-forecast.ts#computeBudgetForecast([380,400,420,410,430,440], 400, \'Boodschappen\', \'expense\')',
     },
   },
   {

@@ -1207,7 +1207,6 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
   const [transactions, setTransactions] = useState<{ id?: string; account_id?: string; budget_id: string; amount: number; date: string; description: string; counterparty_name: string | null; is_split_row?: boolean }[]>(initialData?.transactions ?? [])
   const [rollovers, setRollovers] = useState<BudgetRollover[]>(initialData?.rollovers ?? [])
   const [budgetAmounts, setBudgetAmounts] = useState<{ id: string; budget_id: string; effective_from: string; amount: number }[]>(initialData?.budgetAmounts ?? [])
-  const [showPlanEditor, setShowPlanEditor] = useState(false)
   // Mount-latch voor de lazy BudgetPlanEditorSheet: false tot de planeditor voor
   // het eerst opent, daarna voorgoed true. Zo wordt de dynamische chunk pas bij
   // de eerste open gefetcht, maar blijft de sheet daarna gemount zodat de
@@ -1791,30 +1790,37 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
     }))
   }, [paneHistory, buildPaneUrl])
 
-  // BudgetPlanEditorSheet — getriggerd door `?planEditor=true` (gezet door de
-  // in-app bottom-bar "Plan"-knop). Bij sluiten halen we alleen die ene param
-  // weg en behouden we de rest van de URL (zoals `?tab=budgetteren` op de
-  // cash-categorie-pagina). Geen vaste path-redirect zoals closeBudgetModal,
-  // want deze sheet kan vanuit meerdere routes geopend zijn.
-  const closePlanEditor = useCallback(() => {
-    setShowPlanEditor(false)
-    const next = new URLSearchParams(searchParams.toString())
-    if (!next.has(OVERLAY_QUERY_KEYS.planEditor)) return
-    next.delete(OVERLAY_QUERY_KEYS.planEditor)
-    const qs = next.toString()
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
-  }, [router, pathname, searchParams])
+  // BudgetPlanEditorSheet — bron-of-truth is `?planEditor=true`, net als de
+  // budget-pane. B-020: de sheet ging hiervóór met een losse `useState` open
+  // zónder history-entry, dus de Android-terugknop verliet de hele route (je
+  // landde op /overzicht/cashflow i.p.v. terug op de budgetpagina). Door de
+  // open-staat uit de URL te lezen en het openen/sluiten via een EIGEN
+  // `createPaneUrlHistory`-instantie te laten lopen (push bij openen, back bij
+  // sluiten) sluit één terugdruk de sheet en blijf je op /…/budget.
+  // Bij sluiten halen we alleen die ene param weg en behouden we de rest van de
+  // URL (zoals `?tab=budgetteren` op de cash-categorie-pagina).
+  const showPlanEditor = searchParams.get(OVERLAY_QUERY_KEYS.planEditor) === 'true'
 
-  // Open de sheet zodra `?planEditor=true` in de URL staat. De effect blijft
-  // idempotent: bij sluiten via `closePlanEditor` wordt de param verwijderd,
-  // dus deze effect heropent niets. Wel zichtbaar wanneer de gebruiker via
-  // de bottom-bar opnieuw op "Plan" tikt — searchParams wisselt en setShow
-  // wordt opnieuw aangeroepen.
+  const planEditorHistory = useMemo(() => createPaneUrlHistory(router), [router])
+
+  // Sloot de terugknop (popstate) de sheet zelf, dan is de entry al
+  // geconsumeerd — een latere programmatische close mag geen extra back doen.
+  const planEditorOpenRef = useRef(showPlanEditor)
   useEffect(() => {
-    if (searchParams.get(OVERLAY_QUERY_KEYS.planEditor) === 'true') {
-      setShowPlanEditor(true)
-    }
-  }, [searchParams])
+    if (!showPlanEditor && planEditorOpenRef.current) planEditorHistory.reset()
+    planEditorOpenRef.current = showPlanEditor
+  }, [showPlanEditor, planEditorHistory])
+
+  const openPlanEditor = useCallback(() => {
+    planEditorHistory.open(
+      buildPaneUrl((p) => { p.set(OVERLAY_QUERY_KEYS.planEditor, 'true') }),
+      showPlanEditor,
+    )
+  }, [planEditorHistory, buildPaneUrl, showPlanEditor])
+
+  const closePlanEditor = useCallback(() => {
+    planEditorHistory.close(buildPaneUrl((p) => { p.delete(OVERLAY_QUERY_KEYS.planEditor) }))
+  }, [planEditorHistory, buildPaneUrl])
 
   // Latch de eerste open: zodra de planeditor ooit opengaat, blijft de sheet
   // gemount (idempotent — nooit teruggezet). Zie de mount-latch-uitleg bij de
@@ -1852,7 +1858,9 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
   // BudgetForm-pad. Sluit de sheet eerst (sheet-over-pane stapelt focus-traps)
   // en opent het bewerkscherm voor dit budget (?budget=<id>&edit=true).
   const openBudgetEditAdvanced = useCallback((budgetId: string) => {
-    setShowPlanEditor(false)
+    // De planeditor sluit doordat `planEditor` uit de query verdwijnt (de
+    // open-staat is URL-gedreven); zijn eigen history-entry wordt door de
+    // reset-effect vrijgegeven zodra de param weg is.
     const next = new URLSearchParams(searchParams.toString())
     next.delete(OVERLAY_QUERY_KEYS.planEditor)
     next.set(OVERLAY_QUERY_KEYS.budget, budgetId)
@@ -2528,7 +2536,7 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
           teVerdelen={teVerdelen}
           periodMode={effectivePeriodMode}
           simple={simple}
-          onOpenPlanEditor={() => setShowPlanEditor(true)}
+          onOpenPlanEditor={openPlanEditor}
           onOpenBudget={(id) => openBudgetModal(id)}
           uncategorizedCount={uncategorizedCount}
           uncategorizedTotal={uncategorizedTotal}
@@ -2592,7 +2600,7 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
           )}
           <button
             type="button"
-            onClick={() => setShowPlanEditor(true)}
+            onClick={openPlanEditor}
             aria-label="Plan bewerken"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--ink-2)] hover:text-[var(--ink)] transition-colors"
           >
@@ -3462,7 +3470,70 @@ function BudgetDetailModal({
         prop wordt straks in een vervolgtaak (§6.1) gebruikt voor transactie-
         detail-binnen-pane. Voor edit-toggle gaan we naar `?…&edit=true` en
         rendert de parent een tweede ShellOverlay (BudgetEditModal). */}
-    <ShellOverlay open={true} onClose={onClose} kind="pane" title={budget.name}>
+    <ShellOverlay
+      open={true}
+      onClose={onClose}
+      kind="pane"
+      title={budget.name}
+      /* B-022: "archiveren" en de vraag-aan-Fin horen niet meer in de rij
+         onderin — die rij liep op 384px breed buiten beeld (B-018). Beide zijn
+         nu compacte header-acties naast de titel; de sticky footer houdt alleen
+         de dagelijkse acties: herschikken, bewerken en terug. */
+      actions={
+        <>
+          <button
+            type="button"
+            onClick={() => openWithMessage(`Analyseer mijn ${budget.name} budget`)}
+            aria-label={`Vraag Fin om tips over ${budget.name}`}
+            title="Vraag Fin om tips over dit budget"
+            className="inline-flex h-9 w-9 items-center justify-center border border-wil-200 bg-wil-50 text-wil-700 transition-colors hover:border-wil-300 hover:bg-wil-100"
+          >
+            <MessageCircle className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowDeleteConfirm(true)}
+            aria-label={`${budget.name} archiveren`}
+            title="Budget archiveren"
+            className="inline-flex h-9 w-9 items-center justify-center border border-orange-200 bg-[var(--paper)] text-orange-600 transition-colors hover:border-orange-300 hover:bg-orange-50"
+            data-testid="budget-delete-btn"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </>
+      }
+      /* De herschik-knoppen staan links van de knoppen in dezelfde sticky
+         footer (op mobiel als eigen regel erboven) — zie ShellOverlay. */
+      footerInfo={siblings.length > 1 ? (
+        <div className="flex gap-1">
+          <button
+            type="button"
+            disabled={!canMoveUp || reordering}
+            onClick={() => moveBudget('up')}
+            aria-label="Verplaats omhoog"
+            title="Omhoog"
+            className="inline-flex h-11 w-11 items-center justify-center border border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] disabled:opacity-30"
+          >
+            <ChevronUp className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            disabled={!canMoveDown || reordering}
+            onClick={() => moveBudget('down')}
+            aria-label="Verplaats omlaag"
+            title="Omlaag"
+            className="inline-flex h-11 w-11 items-center justify-center border border-[var(--border-ed)] bg-[var(--paper)] text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] disabled:opacity-30"
+          >
+            <ChevronDown className="h-4 w-4" />
+          </button>
+        </div>
+      ) : undefined}
+      primaryAction={{ label: 'Bewerken', onClick: onEdit }}
+      /* Deze weergave bewerkt niets: er valt hier nooit iets op te slaan, dus
+         de knop blijft "Terug". Zodra je op Bewerken tikt neemt het
+         bewerkscherm het over — dáár wordt "Terug" wél "Opslaan" (B-022). */
+      secondaryAction={{ label: 'Terug', onClick: onClose }}
+    >
         {/* Header accent */}
         <div className={`flex items-center gap-3 bg-gradient-to-r ${colors.headerGradient} px-6 py-4`}>
           <div className={`flex h-10 w-10 shrink-0 items-center justify-center ${colors.bgDark}`}>
@@ -4154,10 +4225,16 @@ function BudgetDetailModal({
           // geen ontbrekende maand. computeBudgetForecast filtert op `v > 0`, dus
           // zonder deze klem vallen negatieve maanden volledig weg en flipt het
           // paneel bij ≥3 zulke maanden naar "Nog niet genoeg uitgavenhistorie".
+          //
+          // `budgetType` gaat mee (B-019): `history` is al richting-gecorrigeerd
+          // via `spendingContribution`, dus op een inkomstenbudget staat hier het
+          // gerealiseerde INKOMEN. De motor benoemde dat toch als uitgave — kop,
+          // zin, lege staat én limiet-alarm. De woorden komen nu uit de motor mee
+          // (`forecast.label`), zodat dit scherm ze niet opnieuw verzint.
           const monthlySpending = history.slice(0, -1).map(h => Math.max(0, h.spent))
           if (monthlySpending.length < 3) return null
-          const forecast = computeBudgetForecast(monthlySpending, limit, budget.name)
-          const varianceData = calculateSpendingVariance(monthlySpending, budget.name)
+          const forecast = computeBudgetForecast(monthlySpending, limit, budget.name, budgetType)
+          const varianceData = calculateSpendingVariance(monthlySpending, budget.name, budgetType)
 
           if (!forecast.hasSufficientData) {
             return (
@@ -4197,7 +4274,7 @@ function BudgetDetailModal({
                   aria-label="Voorspellingsdetails tonen"
                 >
                   <div>
-                    <p className="text-xs text-[var(--ink-3)] font-medium">Verwachte uitgaven</p>
+                    <p className="text-xs text-[var(--ink-3)] font-medium">{forecast.label}</p>
                     <p className="text-lg font-bold text-[var(--ink)] mt-0.5" data-testid="budget-forecast-amount">
                       {<MaskedAmount value={forecast.predicted} tone="wil" />}
                     </p>
@@ -4292,7 +4369,7 @@ function BudgetDetailModal({
               onClose={() => setShowForecastModal(false)}
               kind="sheet"
               size="md"
-              title="Verwachte uitgaven"
+              title={forecast.label}
             >
               <div className="p-4 sm:p-6">
               <KassabonShell>
@@ -4407,112 +4484,66 @@ function BudgetDetailModal({
           </div>
         )}
 
-        {/* Delete confirmation */}
-        {showDeleteConfirm && (
-          <div className="border-t border-orange-200 bg-orange-50 px-6 py-4" data-testid="budget-delete-confirm">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-600" />
-              <div className="flex-1">
-                <p className="text-xs font-semibold text-orange-800">Budget archiveren?</p>
-                <p className="mt-1 text-xs text-orange-700">
-                  {isParent
-                    ? `Dit archiveert "${budget.name}" en alle ${children.length} subbudgetten. Gekoppelde transacties blijven behouden; het budget verdwijnt uit je actieve lijst.`
-                    : `Dit archiveert "${budget.name}". Gekoppelde transacties blijven behouden; het budget verdwijnt uit je actieve lijst.`
-                  }
-                </p>
-                <FormError id={formErrorId('budget-archiveren')} message={deleteError} />
-                <div className="mt-2 flex gap-2">
-                  <button
-                    type="button"
-                    disabled={deleting}
-                    onClick={async () => {
-                      setDeleting(true)
-                      setDeleteError(null)
-                      try {
-                        const res = await fetch(`/api/budgets/${budget.id}`, { method: 'DELETE' })
-                        if (!res.ok) {
-                          const data = await res.json()
-                          setDeleteError(data.error || 'Archiveren mislukt')
-                          setDeleting(false)
-                          return
-                        }
-                        onDelete()
-                      } catch {
-                        setDeleteError('Netwerk fout bij archiveren')
-                        setDeleting(false)
-                      }
-                    }}
-                    className="bg-orange-600 px-3 py-1 text-xs font-medium text-white hover:bg-orange-700 disabled:opacity-50"
-                    data-testid="budget-delete-confirm-btn"
-                  >
-                    {deleting ? 'Archiveren...' : 'Archiveren'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setShowDeleteConfirm(false); setDeleteError(null) }}
-                    className="border border-orange-300 px-3 py-1 text-xs font-medium text-orange-700 hover:bg-orange-100"
-                    data-testid="budget-delete-cancel-btn"
-                  >
-                    Annuleren
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+    </ShellOverlay>
 
-        {/* Actions */}
-        <div className="flex gap-2 border-t border-[var(--border-ed)] px-6 py-4">
-          {/* Ordering buttons */}
-          {siblings.length > 1 && (
-            <div className="flex gap-1">
-              <button
-                type="button"
-                disabled={!canMoveUp || reordering}
-                onClick={() => moveBudget('up')}
-                title="Omhoog"
-                className="inline-flex items-center justify-center border border-[var(--border-ed)] bg-[var(--paper)] p-2 text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] disabled:opacity-30"
-              >
-                <ChevronUp className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                disabled={!canMoveDown || reordering}
-                onClick={() => moveBudget('down')}
-                title="Omlaag"
-                className="inline-flex items-center justify-center border border-[var(--border-ed)] bg-[var(--paper)] p-2 text-[var(--ink-3)] hover:bg-[var(--subtle)] hover:text-[var(--ink-2)] disabled:opacity-30"
-              >
-                <ChevronDown className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          )}
+    {/* Archiveer-bevestiging — B-022: zat hiervoor als oranje blok ONDERIN de
+        scroll-content, precies daar waar de knoppenrij al buiten beeld liep.
+        Nu de canonieke ShellOverlay-confirm (focus-trap, Esc, sticky footer),
+        als sibling van de pane zodat hij erboven stapelt. */}
+    <ShellOverlay
+      open={showDeleteConfirm}
+      onClose={() => { setShowDeleteConfirm(false); setDeleteError(null) }}
+      kind="confirm"
+      destructive
+      title="Budget archiveren?"
+      footer={
+        <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => openWithMessage(`Analyseer mijn ${budget.name} budget`)}
-            className="inline-flex flex-shrink-0 items-center justify-center gap-1.5 border border-wil-200 bg-wil-50 px-3 py-2 text-xs font-medium text-wil-700 transition-colors hover:bg-wil-100 hover:border-wil-300"
-            title="Vraag Fin om tips over dit budget"
+            disabled={deleting}
+            onClick={async () => {
+              setDeleting(true)
+              setDeleteError(null)
+              try {
+                const res = await fetch(`/api/budgets/${budget.id}`, { method: 'DELETE' })
+                if (!res.ok) {
+                  const data = await res.json()
+                  setDeleteError(data.error || 'Archiveren mislukt')
+                  setDeleting(false)
+                  return
+                }
+                onDelete()
+              } catch {
+                setDeleteError('Netwerk fout bij archiveren')
+                setDeleting(false)
+              }
+            }}
+            className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50"
+            data-testid="budget-delete-confirm-btn"
           >
-            <MessageCircle className="h-3.5 w-3.5" />
-            Vraag Fin
+            <Trash2 className="h-4 w-4" />
+            {deleting ? 'Archiveren…' : 'Archiveren'}
           </button>
           <button
             type="button"
-            onClick={onEdit}
-            className="inline-flex flex-1 items-center justify-center gap-1.5 bg-kern-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-kern-700"
+            onClick={() => { setShowDeleteConfirm(false); setDeleteError(null) }}
+            className="min-h-[44px] flex-1 border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+            data-testid="budget-delete-cancel-btn"
           >
-            <Pencil className="h-3.5 w-3.5" />
-            Bewerken
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowDeleteConfirm(true)}
-            className="inline-flex items-center justify-center gap-1.5 border border-orange-200 bg-[var(--paper)] px-3 py-2 text-xs font-medium text-orange-600 transition-colors hover:bg-orange-50 hover:border-orange-300"
-            data-testid="budget-delete-btn"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            Archiveren
+            Annuleren
           </button>
         </div>
+      }
+    >
+      <div className="px-6 py-4" data-testid="budget-delete-confirm">
+        <p className="text-sm leading-relaxed text-[var(--ink-2)]">
+          {isParent
+            ? `Dit archiveert "${budget.name}" en alle ${children.length} subbudgetten. Gekoppelde transacties blijven behouden; het budget verdwijnt uit je actieve lijst.`
+            : `Dit archiveert "${budget.name}". Gekoppelde transacties blijven behouden; het budget verdwijnt uit je actieve lijst.`
+          }
+        </p>
+        <FormError id={formErrorId('budget-archiveren')} message={deleteError} />
+      </div>
     </ShellOverlay>
     {txToEdit && (
       <TransactionForm
@@ -4812,7 +4843,22 @@ function BudgetEditModal({
         andere content. URL-state: `?budget=<id>&edit=true`. `handleClose`
         opent eventueel eerst een unsaved-changes-bevestiging; bij confirm
         wordt `onClose` aangeroepen die teruggaat naar `?budget=<id>` (detail). */}
-    <ShellOverlay open={true} onClose={handleClose} onRequestClose={requestClose} kind="pane" title="Budget bewerken">
+    <ShellOverlay
+      open={true}
+      onClose={handleClose}
+      onRequestClose={requestClose}
+      kind="pane"
+      title="Budget bewerken"
+      /* B-018/B-022: de knoppen stonden onderaan de SCROLL-content — op een
+         384px-viewport moest je het hele formulier doorscrollen om Opslaan te
+         zien. Nu de sticky pane-footer (desktop én mobiel), met één knop die
+         "Terug" heet zolang er niets gewijzigd is en "Opslaan" wordt zodra dat
+         wel zo is. Weggooien kan via de X/Esc-route, die zijn eigen
+         niet-opgeslagen-wijzigingen-bevestiging opent (requestClose). */
+      primaryAction={isDirty
+        ? { label: 'Opslaan', onClick: handleSave, disabled: !name.trim(), loading: saving }
+        : { label: 'Terug', onClick: handleClose }}
+    >
         <div className="flex justify-end px-6 pt-3">
           <button type="button" onClick={() => setIsFavorite(!isFavorite)}
             className={`p-1.5 transition-colors ${
@@ -5376,19 +5422,6 @@ function BudgetEditModal({
           </CollapsibleSection>
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-[var(--border-ed)] px-6 py-4">
-          <button onClick={handleClose} className="border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]">
-            Annuleren
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving || !name.trim()}
-            className="inline-flex items-center gap-1.5 bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
-          >
-            <Save className="h-4 w-4" />
-            {saving ? 'Opslaan...' : 'Opslaan'}
-          </button>
-        </div>
     </ShellOverlay>
 
     {showCreateGoal && (

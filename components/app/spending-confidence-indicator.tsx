@@ -14,12 +14,21 @@
  */
 
 import { useState } from 'react'
+import { budgetForecastPhrasing } from '@/lib/budget-forecast'
 
 export type ConfidenceLevel = 'high' | 'medium' | 'low' | 'insufficient'
 
 export interface SpendingVarianceData {
   /** Budget category name */
   categoryName: string
+  /**
+   * `budgets.budget_type` van de post waarover deze reeks gaat (B-019). De
+   * reeks is al richting-gecorrigeerd door de aanroeper, dus op een
+   * inkomstenbudget staan hier inkomsten — de teksten noemden ze allemaal
+   * "uitgaven". De woorden komen uit `budgetForecastPhrasing`, dezelfde tabel
+   * die de voorspelling erboven gebruikt; hier staat géén tweede lijst.
+   */
+  budgetType?: string | null
   /** Standard deviation of monthly spending */
   stdDev: number
   /** Mean monthly spending */
@@ -42,6 +51,7 @@ export interface SpendingVarianceData {
 export function calculateSpendingVariance(
   monthlyAmounts: number[],
   categoryName: string,
+  budgetType?: string | null,
 ): SpendingVarianceData {
   // Filter to non-zero months (zero might mean no data, not zero spending)
   const nonZero = monthlyAmounts.filter(v => v > 0)
@@ -49,6 +59,7 @@ export function calculateSpendingVariance(
   if (nonZero.length < 3) {
     return {
       categoryName,
+      budgetType,
       stdDev: 0,
       mean: 0,
       cv: 1,
@@ -81,6 +92,7 @@ export function calculateSpendingVariance(
 
   return {
     categoryName,
+    budgetType,
     stdDev: Math.round(stdDev * 100) / 100,
     mean: Math.round(mean * 100) / 100,
     cv: Math.round(cv * 1000) / 1000,
@@ -107,20 +119,26 @@ export function getVarianceConfidenceLabel(confidence: ConfidenceLevel): string 
  * Get Dutch tooltip description for confidence level.
  */
 export function getVarianceTooltip(data: SpendingVarianceData): string {
+  const woorden = budgetForecastPhrasing(data.budgetType)
   if (!data.hasSufficientData) {
-    return `Nog niet genoeg maanden met uitgaven (${data.monthsOfData}/3). Minimaal 3 maanden nodig voor een betrouwbare voorspelling.`
+    return `Nog niet genoeg maanden met ${woorden.dataNoun} (${data.monthsOfData}/3). Minimaal 3 maanden nodig voor een betrouwbare voorspelling.`
   }
   const formattedStdDev = new Intl.NumberFormat('nl-NL', {
     style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0,
   }).format(data.stdDev)
 
+  const onderwerp = woorden.varianceSubject
+  const zijn = woorden.varianceIsPlural ? 'zijn' : 'is'
+  const varieren = woorden.varianceIsPlural ? 'variëren' : 'varieert'
+  const staart = `Variatie van ${formattedStdDev}/mnd over ${data.monthsOfData} maanden. ${data.confidencePercent}% betrouwbaar.`
+
   switch (data.confidence) {
     case 'high':
-      return `Uitgaven zijn zeer voorspelbaar. Variatie van slechts ${formattedStdDev}/mnd over ${data.monthsOfData} maanden. ${data.confidencePercent}% betrouwbaar.`
+      return `${onderwerp} ${zijn} zeer voorspelbaar. Variatie van slechts ${formattedStdDev}/mnd over ${data.monthsOfData} maanden. ${data.confidencePercent}% betrouwbaar.`
     case 'medium':
-      return `Uitgaven zijn redelijk voorspelbaar. Variatie van ${formattedStdDev}/mnd over ${data.monthsOfData} maanden. ${data.confidencePercent}% betrouwbaar.`
+      return `${onderwerp} ${zijn} redelijk voorspelbaar. ${staart}`
     case 'low':
-      return `Uitgaven variëren sterk. Variatie van ${formattedStdDev}/mnd over ${data.monthsOfData} maanden. ${data.confidencePercent}% betrouwbaar.`
+      return `${onderwerp} ${varieren} sterk. ${staart}`
     default:
       return ''
   }
@@ -385,7 +403,8 @@ export function SpendingVarianceDetailPanel({ data, className = '' }: VarianceDe
             ))}
           </div>
           <p className="text-xs text-[var(--ink-3)]" data-testid="variance-insufficient-message">
-            Onvoldoende data — minimaal 3 maanden met uitgaven nodig ({data.monthsOfData}/3)
+            Onvoldoende data — minimaal 3 maanden met{' '}
+            {budgetForecastPhrasing(data.budgetType).dataNoun} nodig ({data.monthsOfData}/3)
           </p>
         </div>
       </div>

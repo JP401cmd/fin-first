@@ -20,6 +20,7 @@ import {
 import { isRejected, planRuleTarget } from '@/lib/transactions/rule-target'
 import { escapeLikePattern } from '@/lib/transactions/search-query'
 import { FREQUENCY_LABELS } from '@/lib/recurring-data'
+import { tapTargetClass } from '@/components/editorial/tap-target'
 
 type Transaction = {
   id: string
@@ -185,6 +186,34 @@ export function TransactionForm({
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
+
+  /**
+   * B-022: de sheet sluit af met ÉÉN knop — "Terug" zolang er niets gewijzigd
+   * is, "Opslaan" zodra dat wel zo is. Daarvoor vergelijken we het formulier
+   * met een momentopname van de begintoestand. De splits worden asynchroon
+   * nageladen (`splitsLoading`), dus de opname wacht daarop; anders leest een
+   * bewerkte split-transactie meteen als "gewijzigd".
+   */
+  const formSnapshot = useMemo(
+    () => JSON.stringify({
+      form,
+      isSplit,
+      splits: splitRows.map((r) => ({ b: r.budget_id, a: r.amount, d: r.description })),
+    }),
+    [form, isSplit, splitRows],
+  )
+  const [pristineSnapshot, setPristineSnapshot] = useState<string | null>(null)
+  // Eénmalige momentopname zodra de splits binnen zijn. `setState` in een
+  // effect is hier bewust: de baseline hángt af van een asynchroon geladen
+  // waarde, en de guard maakt 'm idempotent (één extra render, niet meer).
+  // Zelfde afweging als de open-reset in budget-plan-editor-sheet.tsx.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (splitsLoading || pristineSnapshot !== null) return
+    setPristineSnapshot(formSnapshot)
+  }, [splitsLoading, pristineSnapshot, formSnapshot])
+  /* eslint-enable react-hooks/set-state-in-effect */
+  const isDirty = pristineSnapshot !== null && pristineSnapshot !== formSnapshot
 
   /**
    * De "Eigen rekening"-posten (archive-emmer): hoofdpost én subpost, want welke
@@ -578,11 +607,6 @@ export function TransactionForm({
 
   async function handleDelete() {
     if (!transaction) return
-    if (!confirmDelete) {
-      setConfirmDelete(true)
-      return
-    }
-
     setDeleting(true)
     const supabase = createClient()
     const { error: deleteError } = await supabase
@@ -627,7 +651,7 @@ export function TransactionForm({
       // Zolang de bedrag-wedervraag openstaat treedt dit formulier terug: één
       // venster tegelijk (ADR 0039), en Escape sluit dan alleen de vraag —
       // niet het formulier mét de ingevulde regel.
-      suspended={bedragBevestiging !== null}
+      suspended={bedragBevestiging !== null || confirmDelete}
       // Primaire acties horen in de niet-scrollende footer van de sheet, ook
       // op klein scherm (modal-conventie, CLAUDE.md). Stonden hiervoor
       // onderaan de scroll-content: op een 844px-viewport landden Annuleren en
@@ -635,45 +659,48 @@ export function TransactionForm({
       // De Opslaan-knop blijft een `type="submit"` en hoort via het
       // `form`-attribuut bij het formulier hierboven, zodat de native
       // required-validatie op datum/bedrag/omschrijving blijft werken.
+      // B-022: "verwijderen" hoort niet meer naast de opslaan-knop maar als
+      // compacte actie in de titelbalk; onderin blijft één knop over die
+      // "Terug" heet zolang er niets gewijzigd is en "Opslaan" wordt zodra dat
+      // wel zo is. Zo passen de knoppen ook op een 384px-viewport (B-018).
+      actions={
+        isEdit ? (
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(true)}
+            disabled={deleting}
+            aria-label="Transactie verwijderen"
+            title="Transactie verwijderen"
+            // 36x36 is de visuele maat die in de titelbalk past; `extend` rekt
+            // alleen het raakgebied op tot 44x44 via ::after, zodat de
+            // raakdrempel (M19) gehaald wordt zonder de balk te verbreden.
+            className={`${tapTargetClass('extend')} inline-flex h-9 w-9 items-center justify-center border border-red-200 bg-[var(--paper)] text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        ) : undefined
+      }
       footerSlot={
         phase === 'form' ? (
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              {isEdit && (
-                <button
-                  type="button"
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors ${
-                    confirmDelete
-                      ? 'bg-red-600 text-white hover:bg-red-700'
-                      : 'text-red-600 hover:bg-red-50'
-                  }`}
-                >
-                  <Trash2 className="h-4 w-4" />
-                  {confirmDelete ? 'Bevestig verwijderen' : 'Verwijderen'}
-                </button>
-              )}
-            </div>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
-              >
-                Annuleren
-              </button>
-              <button
-                type="submit"
-                form={formId}
-                disabled={saving}
-                className="inline-flex items-center gap-2 bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
-              >
-                <Save className="h-4 w-4" />
-                {saving ? 'Opslaan...' : 'Opslaan'}
-              </button>
-            </div>
-          </div>
+          isDirty ? (
+            <button
+              type="submit"
+              form={formId}
+              disabled={saving}
+              className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 bg-kern-600 px-4 py-2 text-sm font-medium text-white hover:bg-kern-700 disabled:opacity-50"
+            >
+              <Save className="h-4 w-4" />
+              {saving ? 'Opslaan...' : 'Opslaan'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onClose}
+              className="min-h-[44px] w-full border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--subtle)]"
+            >
+              Terug
+            </button>
+          )
         ) : undefined
       }
     >
@@ -1146,6 +1173,42 @@ export function TransactionForm({
         </form>
       )}
     </BottomSheet>
+
+    {/* Verwijder-bevestiging (B-022). De actie zit nu in de titelbalk; de
+        tweetraps-bevestiging die eerst in de knop zelf zat is hier een echte
+        confirm-overlay geworden — zelfde patroon als de bedrag-wedervraag
+        hieronder, inclusief het terugtreden van het formulier (`suspended`). */}
+    <ShellOverlay
+      open={confirmDelete}
+      onClose={() => setConfirmDelete(false)}
+      kind="confirm"
+      destructive
+      title="Transactie verwijderen?"
+      footer={
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => { setConfirmDelete(false); void handleDelete() }}
+            disabled={deleting}
+            className="min-h-[44px] flex-1 rounded-[var(--r)] bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+            data-testid="tx-verwijderen-bevestigen"
+          >
+            Verwijderen
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(false)}
+            className="min-h-[44px] flex-1 rounded-[var(--r)] border border-[var(--border-ed)] px-4 py-2 text-sm font-medium text-[var(--ink-2)]"
+          >
+            Annuleren
+          </button>
+        </div>
+      }
+    >
+      <div className="px-6 py-4 text-sm leading-relaxed text-[var(--ink-2)]">
+        <p>Deze transactie wordt verwijderd. Je budgetten en totalen rekenen daarna zonder deze regel.</p>
+      </div>
+    </ShellOverlay>
 
     {/* Plausibiliteitsvraag bij een uitzonderlijk bedrag (UR2-18). Geen
         blokkade: de gebruiker mag doorzetten. De vraag staat bewust óók in
