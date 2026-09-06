@@ -198,12 +198,18 @@ export default async function AssetCategoryServerPage({
   // de bundel die het rekeningdetail zélf consumeert. Zie `bankLinks` in
   // <AssetCategoryPage> en `detailBankAccountIdForAsset`.
   let bankLinks: CashBankLink[] | undefined
+  // Het archief (`bank_accounts.is_archive_bucket`, ADR 0082): de bak met
+  // boekingen van verwijderde rekeningen. Stond op de opgeheven cashflow-hub en
+  // hoort bij rekeningbeheer, dus hier. Geen `is_active`-filter — die rij staat
+  // per definitie op inactief.
+  let archiveAccountId: string | null = null
+  let archiveTxCount: number | null = null
 
   if (type === 'cash') {
     // Voor de cash-categorie laden we ook de Kern-data zodat we de
     // kencijfers (geschat jaarinkomen, must-uitgaven) kunnen tonen
     // bovenaan de pagina.
-    const [budgetsResult, coreResult, bankAccountsResult, bankLinksResult] = await Promise.allSettled([
+    const [budgetsResult, coreResult, bankAccountsResult, bankLinksResult, archiveResult] = await Promise.allSettled([
       loadBudgetsData(supabase),
       loadCoreData(supabase),
       supabase
@@ -213,12 +219,28 @@ export default async function AssetCategoryServerPage({
         .eq('is_active', true)
         .not('linked_asset_id', 'is', null),
       loadCashBankLinks(supabase),
+      supabase.from('bank_accounts').select('id').eq('is_archive_bucket', true).maybeSingle(),
     ])
     if (budgetsResult.status === 'fulfilled') budgetsData = budgetsResult.value
     if (coreResult.status === 'fulfilled') coreData = coreResult.value
     // Een gefaalde koppelstatus is geen blokkade: de tweewegkeuze valt dan
     // terug op de budget-map, precies zoals vóór de bankLinks-bron bestond.
     if (bankLinksResult.status === 'fulfilled') bankLinks = bankLinksResult.value
+
+    // Nooit een archief (nog nooit een rekening verwijderd) → null, en de regel
+    // rendert niet. Alleen tellen als er een archief IS; `head: true` haalt geen
+    // rijen op. Bij twijfel (count null of een fout) tonen we niets: een
+    // archiefregel zonder betrouwbaar aantal voegt geen zekerheid toe.
+    if (archiveResult.status === 'fulfilled') {
+      archiveAccountId = ((archiveResult.value.data as { id?: string } | null)?.id) ?? null
+    }
+    if (archiveAccountId) {
+      const { count, error: countError } = await supabase
+        .from('transactions')
+        .select('id', { count: 'exact', head: true })
+        .eq('account_id', archiveAccountId)
+      archiveTxCount = countError ? null : (count ?? null)
+    }
     if (bankAccountsResult.status === 'fulfilled' && bankAccountsResult.value.data) {
       const rows = bankAccountsResult.value.data as Array<{ id: string; linked_asset_id: string | null }>
       bankAccountByAssetId = Object.fromEntries(
@@ -336,6 +358,8 @@ export default async function AssetCategoryServerPage({
         initialCoreData={coreData ?? undefined}
         bankAccountByAssetId={bankAccountByAssetId}
         bankLinks={bankLinks}
+        archiveAccountId={archiveAccountId}
+        archiveTxCount={archiveTxCount}
         initialKpiRefs={kpiRefs ?? undefined}
         initialConnectionsByAssetId={connectionsByAssetId}
         initialCryptoHoldings={cryptoHoldings}

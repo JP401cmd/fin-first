@@ -32,12 +32,12 @@ import { buildKpiContext, type KpiContextRefs } from '@/lib/kpi-context'
 import { computeAssetKpi, type KpiPair } from '@/lib/asset-kpi'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
-import { CashOverview } from '@/components/app/cash-overview'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { ShellOverlay } from '@/components/app/shell/shell-overlay'
 import { bankLinkRowForAccount, type CashBankLink } from '@/lib/bank-connection-status'
 import { detailBankAccountIdForAsset } from '@/lib/cash-detail-target'
 import { AddCategoryCard } from './add-category-card'
+import { CashArchiefRegel } from './cash-archief-regel'
 import { VermogenAssetCard } from './vermogen-asset-card'
 import { CategoryTabs, type CategoryTab } from './category-tabs'
 import { CategoryHistoryChart } from './category-history-chart'
@@ -197,6 +197,13 @@ interface AssetCategoryPageProps {
    */
   bankLinks?: CashBankLink[]
   /**
+   * Het archief (`bank_accounts.is_archive_bucket`) en het aantal boekingen
+   * erin, alleen relevant voor `type === 'cash'`. `null` = geen archief of geen
+   * betrouwbare telling; de regel rendert dan niet.
+   */
+  archiveAccountId?: string | null
+  archiveTxCount?: number | null
+  /**
    * Lichtgewicht refs (assets+debts+holdings) voor de KPI-strip onder elke
    * asset-card. Server laadt deze parallel met de hoofdquery; bij `undefined`
    * (load-failure of KPI's nog niet relevant voor dit type) vervalt de
@@ -292,8 +299,8 @@ interface AssetCategoryPageProps {
   initialAssetSparklines?: Record<string, number[]>
   /**
    * 12-maands cumulatieve historie voor `<CategoryHistoryChart>`. Server-side
-   * geladen voor niet-cash categorieën; cash heeft eigen overzicht-secties
-   * (`CashOverview` + `CoreKengetallen`) onder de items-tab. `undefined` of
+   * geladen voor niet-cash categorieën; cash heeft zijn eigen overzicht-sectie
+   * (`CoreKengetallen`) onder de items-tab. `undefined` of
    * een lege reeks → chart wordt niet gerenderd.
    */
   historyData?: CategoryHistoryData
@@ -343,6 +350,8 @@ export function AssetCategoryPage({
   initialCoreData,
   bankAccountByAssetId,
   bankLinks = EMPTY_BANK_LINKS,
+  archiveAccountId = null,
+  archiveTxCount = null,
   initialKpiRefs,
   initialConnectionsByAssetId,
   initialCryptoHoldings,
@@ -633,13 +642,11 @@ export function AssetCategoryPage({
           {isItemsTab ? (
             <>
               {/* Volgorde voor cash:
-                  1. ItemsTab — de standaard asset-cards (alle cash-assets,
-                     ook handmatig ingevoerde zonder bank-account-rij).
-                  2. CashOverview embedded — toont alleen hero (totaal
-                     liquiditeit) + geldstroom; rekeningen-sectie en snelle
-                     acties zijn verborgen omdat die overlappen met de
-                     items-grid en de detail-pagina's.
-                  3. CoreKengetallen — financiële kencijfers onderaan.
+                  1. ItemsTab — de rekeningen als asset-cards (ook handmatig
+                     ingevoerde zonder bank-account-rij).
+                  2. De archiefregel — de boekingen van verwijderde rekeningen.
+                  3. Bank koppelen.
+                  4. CoreKengetallen — financiële kencijfers onderaan.
                   Andere types tonen alleen de items-tab. */}
               <ItemsTab
                 type={type}
@@ -652,6 +659,16 @@ export function AssetCategoryPage({
                 onRevalueClick={handleAssetRevalue}
                 onAddClick={() => setQuickAddOpen(true)}
               />
+
+              {/* Archief — verhuisd van de opgeheven cashflow-hub; hij hoort bij
+                  rekeningbeheer. Staat direct onder de rekeningen, net als daar. */}
+              {type === 'cash' && (
+                <CashArchiefRegel
+                  accountId={archiveAccountId}
+                  txCount={archiveTxCount}
+                  className="mt-3 sm:mt-4"
+                />
+              )}
 
               {/* Bank koppelen — hoorde bij de snelle acties op de opgeheven
                   cashflow-hub. "Rekening toevoegen" wordt hier al door de
@@ -684,13 +701,13 @@ export function AssetCategoryPage({
                 </HideInSimple>
               )}
 
-              {type === 'cash' && (
-                <HideInSimple>
-                  <div className="mt-8 -mx-4 sm:-mx-6">
-                    <CashOverview embedded hideAccountsSection hideQuickActions />
-                  </div>
-                </HideInSimple>
-              )}
+              {/* Hier stond het geldstroomblok (`<CashOverview embedded
+                  hideAccountsSection hideQuickActions />`): maandselector,
+                  KPI-strip, daggrafiek. Dat is transactie-materiaal en woont nu
+                  op de transactiepagina, waar het de periodekiezer volgt. Het
+                  hier laten staan zou precies de doublure zijn die het opheffen
+                  van de cashflow-hub moet wegnemen. Deze pagina gaat over de
+                  rekeningen zelf. */}
 
               {type === 'cash' && initialCoreData && (
                 <HideInSimple>
