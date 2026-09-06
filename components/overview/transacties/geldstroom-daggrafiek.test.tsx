@@ -83,8 +83,9 @@ const TXNS: AnalysisTransaction[] = [
   tx('t3', '2026-06-03', -120),
   tx('t4', '2026-06-17', -240),
   tx('t5', '2026-06-28', -60),
-  tx('t6', '2026-06-05', -5000, 'transfer'), // telt in geen enkel cijfer mee
-  tx('t7', '2026-06-09', -4000, 'joint_transfer'), // C6-grens: telt hier WEL mee
+  tx('t8', '2026-06-20', -1320), // duwt het netto negatief — een échte uitgave
+  tx('t6', '2026-06-05', -5000, 'transfer'), // eigen rekening → telt nergens mee
+  tx('t7', '2026-06-09', -4000, 'joint_transfer'), // naar de partner → telt evenmin mee
 ]
 
 // Parent mét kinderen (mag niet dubbeltellen) + één blad.

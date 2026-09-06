@@ -487,3 +487,63 @@ describe('describeFlow — C6-grens: summarizeFlow blijft ongewijzigd', () => {
     expect(halveMaand.savingsRate).toBe(-265)
   })
 })
+
+// ── joint_transfer: een overboeking naar je partner is geen inkomen ─────────
+//
+// Dit bestand filterde tot 6 sep 2026 op alleen `transaction_type === 'transfer'`
+// en liet `joint_transfer` als echt inkomen én echte uitgave meetellen. Elke
+// andere motor in de app sloot beide al uit (dashboard, budgetten, spaarquote,
+// AI-context, abonnementsherkenning); deze was de uitzondering, en juist hij
+// voedt de transactiepagina. Voor een huishouden dat onderling geld overmaakt
+// blies dat in- én uitstroom op — precies de bug die de transfer-uitsluiting
+// ooit moest oplossen.
+describe('overboekingen tellen niet mee — transfer ÉN joint_transfer', () => {
+  const salaris = tx({ amount: 3000 })
+  const boodschappen = tx({ amount: -200 })
+  const naarPartner = tx({ amount: -4000, transaction_type: 'joint_transfer' })
+  const vanPartner = tx({ amount: 4000, transaction_type: 'joint_transfer' })
+
+  it('houdt joint_transfer buiten inkomen, uitgaven, netto en spaarquote', () => {
+    const zonder = summarizeFlow([salaris, boodschappen])
+    const met = summarizeFlow([salaris, boodschappen, naarPartner, vanPartner])
+    expect(met.income).toBe(zonder.income)
+    expect(met.expense).toBe(zonder.expense)
+    expect(met.net).toBe(zonder.net)
+    expect(met.savingsRate).toBe(zonder.savingsRate)
+    // En de telling ziet ze evenmin als echte transacties.
+    expect(met.count).toBe(zonder.count)
+  })
+
+  it('laat een partner-overboeking niet als grootste uitgave bovendrijven', () => {
+    const grootste = largestTransactions([boodschappen, naarPartner], {
+      direction: 'expense',
+      limit: 5,
+    })
+    expect(grootste.map((t) => t.id)).toEqual([boodschappen.id])
+  })
+
+  it('telt een partner-overboeking niet mee bij tegenpartijen', () => {
+    const partnerTx = tx({
+      amount: -4000,
+      counterparty_name: 'Partner',
+      transaction_type: 'joint_transfer',
+    })
+    const namen = topCounterparties([boodschappen, partnerTx], {
+      direction: 'expense',
+      sortBy: 'total',
+      limit: 5,
+    }).map((c) => c.name)
+    expect(namen).not.toContain('Partner')
+  })
+
+  it('telt een partner-overboeking niet mee per weekdag of per dag', () => {
+    const opDatum = tx({
+      amount: -4000,
+      date: '2026-06-15',
+      transaction_type: 'joint_transfer',
+    })
+    const echte = tx({ amount: -50, date: '2026-06-15' })
+    expect(spendByDay([echte, opDatum]).get('2026-06-15')).toBe(50)
+    expect(spendByWeekday([echte, opDatum]).reduce((s, v) => s + v, 0)).toBe(50)
+  })
+})

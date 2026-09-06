@@ -5,14 +5,35 @@
  *
  * Conventies:
  *  - `amount` < 0 = uitgave, > 0 = inkomst (perspectief-geschaald bij weergave).
- *  - `transaction_type === 'transfer'` (eigen-rekening-overboeking) wordt in ALLE
- *    aggregaten uitgesloten — anders blazen transfers in- én uitstroom dubbel op
- *    (de bug in de oude TransactiesGeldstroom). Spiegelt cash-account-view.tsx.
+ *  - OVERBOEKINGEN worden in ALLE aggregaten uitgesloten — anders blazen ze in-
+ *    én uitstroom dubbel op (de bug in de oude TransactiesGeldstroom). Dat geldt
+ *    voor `transfer` (tussen je eigen rekeningen) én `joint_transfer` (tussen
+ *    jou en je partner). Het predicaat is `isRealAggRow`, dezelfde bron die
+ *    dashboard, budgetten, spaarquote, AI-context en abonnementsherkenning
+ *    gebruiken — zie de waarschuwing in lib/cashflow-month-totals.ts.
  *  - Datums zijn ISO 'yyyy-mm-dd' en worden lokaal geparsed (geen UTC-drift).
  */
 
 import { savingsRateFromAggregates } from '@/lib/savings-source'
 import { currentMonthWindowLabel } from '@/lib/cashflow-cards'
+import { isRealAggRow } from '@/lib/server-data/tx-aggregates'
+
+/**
+ * Telt deze rij mee als echt inkomen of een echte uitgave?
+ *
+ * Delegeert naar `isRealAggRow` — het app-brede predicaat — zodat er niet een
+ * tweede definitie van "overboeking" naast komt te staan. Dit bestand filterde
+ * tot 6 sep 2026 op alleen `transaction_type === 'transfer'` en liet daarmee
+ * `joint_transfer` (een overboeking tussen partners) als echt inkomen én als
+ * echte uitgave meetellen. Elke andere motor in de app sloot beide al uit; deze
+ * was de enige uitzondering, en juist hij voedt de transactiepagina.
+ *
+ * `lib/server-data/tx-aggregates.ts` heeft géén eigen imports, dus dit bestand
+ * blijft server-safe en los te unit-testen.
+ */
+function isRealTx(t: { transaction_type?: string | null }): boolean {
+  return isRealAggRow(t)
+}
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -201,7 +222,7 @@ export function summarizeFlow(txns: AnalysisTransaction[]): FlowSummary {
   let expense = 0
   let count = 0
   for (const t of txns) {
-    if (t.transaction_type === 'transfer') continue
+    if (!isRealTx(t)) continue
     count++
     if (t.amount > 0) income += t.amount
     else if (t.amount < 0) expense += Math.abs(t.amount)
@@ -364,7 +385,7 @@ export function topCounterparties(
 ): CounterpartyAgg[] {
   const map = new Map<string, CounterpartyAgg>()
   for (const t of txns) {
-    if (t.transaction_type === 'transfer') continue
+    if (!isRealTx(t)) continue
     if (opts.direction === 'expense' && !(t.amount < 0)) continue
     if (opts.direction === 'income' && !(t.amount > 0)) continue
     const key = counterpartyKey(t.counterparty_name, t.counterparty_iban)
@@ -397,7 +418,7 @@ export function largestTransactions(
 ): AnalysisTransaction[] {
   const filtered = txns.filter(
     (t) =>
-      t.transaction_type !== 'transfer' &&
+      isRealTx(t) &&
       (opts.direction === 'expense' ? t.amount < 0 : t.amount > 0),
   )
   filtered.sort((a, b) => (opts.direction === 'expense' ? a.amount - b.amount : b.amount - a.amount))
@@ -411,7 +432,7 @@ export function newCounterparties(
 ): CounterpartyAgg[] {
   const map = new Map<string, CounterpartyAgg>()
   for (const t of periodTxns) {
-    if (t.transaction_type === 'transfer') continue
+    if (!isRealTx(t)) continue
     const key = counterpartyKey(t.counterparty_name, t.counterparty_iban)
     if (key === '__unknown__') continue
     if (priorKeys.has(key)) continue
@@ -432,7 +453,7 @@ export function newCounterparties(
 export function spendByWeekday(txns: AnalysisTransaction[]): number[] {
   const out = new Array<number>(7).fill(0)
   for (const t of txns) {
-    if (t.transaction_type === 'transfer') continue
+    if (!isRealTx(t)) continue
     if (!(t.amount < 0)) continue
     const d = parseLocalDate(t.date)
     const idx = (d.getDay() + 6) % 7 // maandag-eerst
@@ -513,7 +534,7 @@ export function heatmapWindowCovered(
 export function spendByDay(txns: AnalysisTransaction[]): Map<string, number> {
   const m = new Map<string, number>()
   for (const t of txns) {
-    if (t.transaction_type === 'transfer') continue
+    if (!isRealTx(t)) continue
     if (!(t.amount < 0)) continue
     m.set(t.date, (m.get(t.date) ?? 0) + Math.abs(t.amount))
   }
