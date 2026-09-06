@@ -1,8 +1,11 @@
 import { bankLinkRowForAsset, type CashBankLink } from '@/lib/bank-connection-status'
 
 /**
- * WELK PANEEL opent een cash-kaart op `/overzicht/budget`: de
+ * WELK PANEEL opent een cash-kaart op `/overzicht/bezittingen/cash`: de
  * rekeningdetail-overlay, of het bewerk-paneel van de bezitting?
+ *
+ * (Stond tot ADR 0135 op de cashflow-hub; die is opgeheven en de rekeningen
+ * wonen sindsdien bij de bezittingen. De regel zelf is ongewijzigd.)
  *
  * Die keuze hing tot fase 7 aan één bron: een `asset.id → bank_accounts.id`-map die
  * `cash-overview.tsx` opbouwt uit rekeningen wiens cash-bezit

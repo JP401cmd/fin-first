@@ -10,7 +10,8 @@
 // een AANEENGESLOTEN catalogus: alle WF-BUDGET-01..25 hebben een eigen
 // UAT-scenario en dus een eigen knoop hieronder. Geen verwijsregel-gaten.
 // WF-BUDGET-25 (later toegevoegd) dekt de sleepmodus' +-knop ("Nieuw budget
-// toevoegen") — een escape-hatch die vanuit de Budget Hub, /core/cash en de
+// toevoegen") — een escape-hatch die vanuit de Budget Hub, het rekeningdetail
+// op /overzicht/bezittingen/cash en de
 // import-flow bereikbaar is; hier gemodelleerd als een sub-knoop van 'nieuw'
 // omdat het dezelfde uitkomst (budget aanmaken) via een ander instappunt is.
 //
@@ -59,7 +60,7 @@ export const BUDGET_FLOW: UatFlow = {
     { id: 'templatebeslis', label: 'Template of handmatig?', kind: 'decision', stage: 2, lane: 'toevoegen' },
     { id: 'template', scenarioId: 'UAT-BUDGET-07', label: 'WF-BUDGET-07 · Template toepassen (VERVANG-flow)', kind: 'action', stage: 2, lane: 'toevoegen' },
     { id: 'sleepmodusnieuw', scenarioId: 'UAT-BUDGET-25', label: 'WF-BUDGET-25 · Nieuw budget via sleepmodus (+-knop)', kind: 'action', stage: 2, lane: 'toevoegen', subOf: 'nieuw' },
-    { id: 'x-cash-sleep', label: 'Sleepmodus-instap (/core/cash & import)', kind: 'cross', stage: 2, lane: 'toevoegen', crossZone: 'CASH' },
+    { id: 'x-cash-sleep', label: 'Sleepmodus-instap (rekeningdetail op /overzicht/bezittingen/cash & de import)', kind: 'cross', stage: 2, lane: 'toevoegen', crossZone: 'CASH' },
 
     // ── 2 · beheren (detail-pane rail) ─────────────────────────────────────
     { id: 'detail', scenarioId: 'UAT-BUDGET-09', label: 'WF-BUDGET-09 · Budgetdetail (donut, historie, vrijheidstijd)', kind: 'screen', stage: 2, lane: 'beheren' },
@@ -150,7 +151,7 @@ export const BUDGET_FLOW: UatFlow = {
     { from: 'hub', to: 'rapport' },
     { from: 'rapport', to: 'x-rapp', kind: 'cross' },
     { from: 'hub', to: 'grondslag' },
-    { from: 'grondslag', to: 'x-cash', kind: 'cross', label: 'grondslagkeuze op /overzicht/budget' },
+    { from: 'grondslag', to: 'x-cash', kind: 'cross', label: 'grondslagkeuze op /overzicht/budget/transacties' },
     { from: 'grondslag', to: 'uitkomst' },
 
     // samenvloeien → uitkomst

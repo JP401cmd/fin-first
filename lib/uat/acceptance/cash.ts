@@ -28,9 +28,30 @@
  *
  * TWEE MIRRORS met bronregel-verwijzing (client-inline formules zonder eigen
  * pure export — spiegelt de mirrors in `start-checks.ts`/`will-checks.ts`):
- *  - aandeel-% per rekening (components/app/cash-overview.tsx)
  *  - split-som-validatie (components/app/transaction-form.tsx)
  *  - sibling-matching op genormaliseerde tegenpartijnaam (lib/parsers/categorize.ts-conventie)
+ *
+ * DE DERDE MIRROR IS VERVALLEN (ADR 0135, 6 sep 2026): het aandeel-% per
+ * rekening werd gemirrord uit `components/app/cash-overview.tsx`, en dat bestand
+ * bestaat niet meer. De cashflow-hub is opgeheven; rekeningen wonen sindsdien op
+ * `/overzicht/bezittingen/cash` als gewone bezitgroep, zónder aandeel-pillen.
+ * WF-CASH-04 toetst daarom nu de ÉCHTE `detailBankAccountIdForAsset`
+ * (lib/cash-detail-target.ts) — de tweewegkeuze die bepaalt wélk venster een
+ * rekening opent. Dat is een echte productiefunctie in plaats van een mirror.
+ *
+ * ADR 0135 — WAAR DE OPPERVLAKKEN NU WONEN (6 sep 2026). De cashflow-hub
+ * (`/overzicht/cashflow`) is opgeheven en `/overzicht/budget` is de derde
+ * hefboom geworden. Voor deze zone verschoof daarmee:
+ *  - rekeningen/rekeningdetail/archief/"Bank koppelen" → /overzicht/bezittingen/cash
+ *  - geldstroom, kassabonnen, daggrafiek, versheidsmelding, inflatiekaart en het
+ *    grondslag-instellingenblok → /overzicht/budget/transacties
+ *  - de drie overige kaarten (Transacties/Vaste lasten/Forecast) → bovenaan
+ *    /overzicht/budget; de Budget-kaart wordt daar bewust NIET gerenderd
+ *    (`budgetSubCards`), want dat ÍS die pagina — zijn status voedt nog wel de
+ *    hefboomtegel op /overzicht en de sidebar-dot.
+ * De verhuisde geldstroom volgt sindsdien de PERIODEKIEZER van de
+ * transactiepagina (standaard rollend 30 dagen) in plaats van de kalendermaand-
+ * tot-nu-toe van de hub; de daggrafiek rendert uitsluitend bij periode "maand".
  *
  * WF-CASH-25 (AI-tegenpartijgroepen-volgorde) importeert sinds feature #881
  * de ÉCHTE `orderGroupsLargestFirst`/`buildCombinedGroups` (lib/auto-categorize.ts,
@@ -52,15 +73,15 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-CASH-01',
     scenarioId: 'UAT-CASH-01',
-    titel: 'Cashflow-onderdelen verkennen via de hefboom-kaarten',
+    titel: 'Budget-onderdelen verkennen via de drie kaarten bovenaan /overzicht/budget',
     kriticiteit: 'KERN',
-    given: 'Synthetische kaartinvoer: Transacties-kaart met inkomen/uitgaven-paren op de statusgrenzen; Vaste-lasten-kaart met aandeel-ratio\'s op de statusgrenzen; Forecast-kaart met netto/mnd op de statusgrenzen. De statusfuncties zelf zijn mode-onafhankelijk — `buildCashflowCards` berekent voor alle vier de kaarten (incl. Forecast) altijd, ongeacht weergavemodus (de weergavemodus raakt alleen de PRESENTATIE op de landing, nooit de berekening). WEERGAVEMODUS op de LANDING (/overzicht/budget, CF-1/CF-2): in **Volledig** staan alle vier de kaarten met KPI/venster/substext/chevron zichtbaar. In **Eenvoudig** rendert `CashflowLandingCards` de `verdict`-variant (oordeel primair + kerngetal mét venster + status-dot, géén chevron) — óók voor de vierde kaart. HERZIEN 28-08-2026 (S4 + S5): CF-1 (compacte one-liner zonder cijfer) en CF-2 (Forecast-kaart weg, 4→3) zijn allebei teruggedraaid onder het R5-richtingsbesluit "duiding boven reductie"; CF-2 verborg op mobiel de enige contextuele ingang naar /overzicht/budget/forecast. De landing toont dus in béide modi alle vier de kaarten, de route was en blijft bereikbaar, en de sidebar-statusdot leest nog steeds alle vier de statussen. HALVE-MAAND-UITZONDERING (bevinding C6, 26-08-2026): dit grensgeval-toetsblok roept `transactiesCardStatus` aan ZONDER `expectedMonthlyIncome`/`forecastNetPerMonth` (beide optioneel, default 0/null) — daarmee blijft `isCurrentMonthIncomeIncomplete` per constructie `false` en de grens <0%→bad ongewijzigd. De uitzondering zelf (zie WF-CASH-51) is dus geen sluipende wijziging van DIT grensgeval, maar een derde, optionele voorwaarde die alleen intreedt als de caller ze meegeeft.',
-    when: 'De statusfuncties worden aangeroepen op elk grensgeval.',
-    then: 'Transacties: spaarquote ≥20% → good, ≥0% → warn, <0% → bad (zonder de optionele halve-maand-parameters). Vaste lasten: aandeel <50% → good, ≤70% → warn, >70% → bad. Forecast: netto/mnd >0 → good, <0 → bad, =0 → warn.',
+    given: 'Synthetische kaartinvoer: Transacties-kaart met inkomen/uitgaven-paren op de statusgrenzen; Vaste-lasten-kaart met aandeel-ratio\'s op de statusgrenzen; Forecast-kaart met netto/mnd op de statusgrenzen. De statusfuncties zelf zijn mode-onafhankelijk — `buildCashflowCards` berekent voor alle vier de kaarten (incl. Budget en Forecast) altijd, ongeacht weergavemodus (de weergavemodus raakt alleen de PRESENTATIE, nooit de berekening). VIER GEBOUWD, DRIE GETOOND — HERZIEN 06-09-2026 (ADR 0135): de landing van deze onderdelen is niet langer de cashflow-hub maar `/overzicht/budget` zelf, en die pagina rendert via `budgetSubCards(cards)` uitsluitend Transacties, Vaste lasten en Forecast. De Budget-kaart wordt nog wél gebouwd — hij zou naar zichzelf linken — maar niet getoond; zijn STATUS voedt de hefboomtegel op /overzicht en de sidebar-dot (die dot komt voor `/overzicht/budget` zelf uit de lichte `loadLeverScores`-familie, niet uit deze kaartenset). WEERGAVEMODUS (CF-1/CF-2): in **Volledig** staan de drie kaarten met KPI/venster/substext/chevron zichtbaar. In **Eenvoudig** rendert `CashflowLandingCards` de `verdict`-variant (oordeel primair + kerngetal mét venster + status-dot, géén chevron). HERZIEN 28-08-2026 (S4 + S5): CF-1 (compacte one-liner zonder cijfer) en CF-2 (Forecast-kaart weg) zijn allebei teruggedraaid onder het R5-richtingsbesluit "duiding boven reductie"; CF-2 verborg op mobiel de enige contextuele ingang naar /overzicht/budget/forecast. De landing toont dus in béide modi dezelfde drie kaarten, de routes waren en blijven bereikbaar, en de sidebar leest nog steeds alle vier de statussen. HALVE-MAAND-UITZONDERING (bevinding C6, 26-08-2026): dit grensgeval-toetsblok roept `transactiesCardStatus` aan ZONDER `expectedMonthlyIncome`/`forecastNetPerMonth` (beide optioneel, default 0/null) — daarmee blijft `isCurrentMonthIncomeIncomplete` per constructie `false` en de grens <0%→bad ongewijzigd. De uitzondering zelf (zie WF-CASH-51) is dus geen sluipende wijziging van DIT grensgeval, maar een derde, optionele voorwaarde die alleen intreedt als de caller ze meegeeft.',
+    when: 'De statusfuncties worden aangeroepen op elk grensgeval; daarnaast wordt de kaartenselectie van de budgetpagina bepaald met `budgetSubCards`.',
+    then: 'Transacties: spaarquote ≥20% → good, ≥0% → warn, <0% → bad (zonder de optionele halve-maand-parameters). Vaste lasten: aandeel <50% → good, ≤70% → warn, >70% → bad. Forecast: netto/mnd >0 → good, <0 → bad, =0 → warn. En: `budgetSubCards` levert exact drie kaarten in de vaste volgorde transacties, vaste-lasten, forecast — de Budget-kaart valt eruit, ook al bouwt `buildCashflowCards` hem wél.',
     assertion: {
       kind: 'exact',
-      expected: 'transGood=good; transWarn=warn; transBad=bad; vlGood=good; vlWarn=warn; vlBad=bad; fcGood=good; fcBad=bad; fcWarn=warn',
-      source: 'lib/cashflow-cards.ts#transactiesCardStatus/vasteLastenCardStatus/forecastCardStatus — zie cash-checks.ts',
+      expected: 'transGood=good; transWarn=warn; transBad=bad; vlGood=good; vlWarn=warn; vlBad=bad; fcGood=good; fcBad=bad; fcWarn=warn; subCards=transacties,vaste-lasten,forecast',
+      source: 'lib/cashflow-cards.ts#transactiesCardStatus/vasteLastenCardStatus/forecastCardStatus + #budgetSubCards/BUDGET_SUBCARD_KEYS — zie cash-checks.ts',
     },
   },
   {
@@ -80,28 +101,28 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-CASH-03',
     scenarioId: 'UAT-CASH-03',
-    titel: 'Kassabon: inkomsten of uitgaven van de maand uitsplitsen',
+    titel: 'Kassabon: inkomsten of uitgaven van de gekozen periode uitsplitsen',
     kriticiteit: 'BELANGRIJK',
-    given: 'Persona Daan Bakker, maand juni 2026; de figures-strip-totalen Inkomen/Uitgaven leunen op gejitterde seed-transacties.',
-    when: 'De gebruiker opent de inkomsten- en uitgaven-kassabon.',
-    then: 'De som van de per-rekening-regels (inkomsten) resp. per-budget-regels (uitgaven, incl. "Ongecategoriseerd" voor budget=NULL) is exact gelijk aan het strip-totaal — een A=B-consistentietoets, geen vast cijfer (de onderliggende bedragen zijn jitter-afhankelijk).',
+    given: 'Persona Daan Bakker op /overzicht/budget/transacties; de Inkomen/Uitgaven-cellen van de geldstroom-kaart leunen op gejitterde seed-transacties. VERHUISD 06-09-2026 (ADR 0135): de kassabonnen stonden op de cashflow-hub (`components/app/cash-overview.tsx`, verwijderd) en wonen nu in `components/overview/transacties/geldstroom-kassabonnen.tsx`. GEDRAGSWIJZIGING, expliciet besloten: de bonnen beschrijven de periode van de `PeriodeSelector` (standaard rollend 30 dagen) en niet meer de kalendermaand-tot-nu-toe; het venster staat daarom in de titel van elke sheet. De doorklik zelf is nieuw op deze pagina — de cijfers stonden er al, de ingang ontbrak (`KpiCell` werd een button, in BEIDE weergavemodi: `GeldstroomGauge` in Volledig en `GeldstroomZin` in Eenvoudig dragen dezelfde `onOpenIncome`/`onOpenExpense`).',
+    when: 'De gebruiker opent de inkomsten- en uitgaven-kassabon vanaf de geldstroom-kaart.',
+    then: 'De som van de per-rekening-regels (inkomsten) resp. per-budget-regels (uitgaven, incl. "Ongecategoriseerd" voor een ontbrekend of onbekend budget) is exact gelijk aan het periodetotaal onderaan de bon — een A=B-consistentietoets, geen vast cijfer (de onderliggende bedragen zijn jitter-afhankelijk). Het totaal komt bewust NIET uit de opsomming maar uit dezelfde `summarizeFlow`-samenvatting die de kaart zelf toont: elke regel is een `summarizeFlow` over een deelverzameling van diezelfde rijen, dus met identieke classificatie (teken van `amount`) en hetzelfde overboekingsfilter. Bekende, aanvaarde afwijking: een legacy-rij met zowel een split als een `budget_id` zou onder "Ongecategoriseerd" landen in plaats van op zijn eigen budget — het TOTAAL klopt in beide gevallen.',
     assertion: {
       kind: 'consistency',
-      source: 'components/app/cash-overview.tsx (incomeByAccount/expensesByBudget/totalIncome/totalExpenses) — som-regels moet gelijk zijn aan het strip-totaal',
+      source: 'components/overview/transacties/geldstroom-kassabonnen.tsx (summarizeByKey per rekening/budget) vs. lib/transaction-insights.ts#summarizeFlow over dezelfde periode-rijen — som-regels moet gelijk zijn aan het bon-totaal',
     },
   },
   {
     workflow: 'WF-CASH-04',
     scenarioId: 'UAT-CASH-04',
-    titel: 'Rekeningen bekijken en een rekeningdetail openen',
+    titel: 'Rekeningen bekijken als bezitgroep en een rekeningdetail openen (/overzicht/bezittingen/cash)',
     kriticiteit: 'KERN',
-    given: 'Twee synthetische rekeningen: Betaalrekening €850, Spaarrekening €2.000 (totaal €2.850).',
-    when: 'Het aandeel-% per rekening wordt berekend.',
-    then: 'Betaalrekening = 850/2.850×100 ≈ 29,82%; Spaarrekening = 2.000/2.850×100 ≈ 70,18%; beide percentages tellen (afgerond) op tot 100%.',
+    given: 'HERSCHREVEN 06-09-2026 (ADR 0135). Rekeningen woonden op de cashflow-hub met een aandeel-%-pil per rekening (`components/app/cash-overview.tsx`); dat bestand is verwijderd en die pil bestaat niet meer. Cash gedraagt zich sindsdien als élke andere bezitgroep: `/overzicht/bezittingen/cash` toont de rekeningen als asset-kaarten (`AssetCategoryPage` → `ItemsTab`), met daaronder de archiefregel (`CashArchiefRegel`, alleen bij een archiefrekening met een betrouwbare telling) en de "Bank koppelen"-ingang (Volledig-materiaal, `HideInSimple`). De vier uitzonderingen die cash naar de hub wegduwden — eigen groepskop, verborgen kaartacties, wegnavigerende klik en een harde redirect op deze route — zijn opgeheven; `/core/cash` redirect nu hierhéén (niet naar /overzicht/budget). Synthetische invoer voor de tweewegkeuze: rekening A met een `linked` bankverbinding maar zonder budget-map-rij, rekening B zonder bankverbinding maar mét budgetteren (`has_budget_tracking` → een rij in de bankAccount-map), rekening C met een `manual`-koppelrij (companion-rij van uitgezet budgetteren) en géén map-rij.',
+    when: 'De gebruiker klikt een rekening aan; `detailBankAccountIdForAsset` bepaalt wélk venster daarbij hoort.',
+    then: 'Klikken zet altijd dezelfde URL-state (`?asset=<id>`); het venster is een AFLEIDING, geen tweede navigatie. A (echte verbinding, `linked` of `linked-broken`) → het rijke rekeningdetail (`CashAccountView`: bankverbinding, statusuitleg, herstelpad, transactie-as, verwijderflow) op het bank-account-id van de koppelrij. B (geen verbinding, wel budgetteren) → val terug op de budget-map en dus óók het rekeningdetail. C (`manual`-rij, budgetteren uit) → `undefined`, dus het gewone `<AssetPane />`-bezitformulier: dat scherm zou anders niets te tonen hebben en de rekening onbewerkbaar maken. `&edit=1` (de Bewerken-knop op een kaart) wint altijd van het rekeningdetail. De tweewegkeuze zelf is ONGEWIJZIGD meeverhuisd — alleen de plek waar hij gemount is verschoof.',
     assertion: {
       kind: 'exact',
-      expected: 'betaalPct=29.82; spaarPct=70.18',
-      source: 'components/app/cash-overview.tsx (accountPillItems/totalBalance-aandeelformule, gemirrord) — zie cash-checks.ts',
+      expected: 'metVerbinding=bank-a; alleenBudgetteren=bank-b; manualZonderBudgetteren=undefined',
+      source: 'lib/cash-detail-target.ts#detailBankAccountIdForAsset (+ lib/bank-connection-status.ts#bankLinkRowForAsset) — échte productiefunctie, geen mirror; gemount in components/core/asset-category-page.tsx via app/(app)/overzicht/bezittingen/[type]/page.tsx (re-export van app/(app)/core/assets/[type]/page.tsx), met components/core/cash-archief-regel.tsx voor het archief en app/(app)/core/assets/cash/[accountId]/page.tsx als terugvertaler van de oude deeplink; zie cash-checks.ts',
     },
   },
   {
@@ -123,12 +144,12 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-CASH-06',
     titel: 'Inflatie-impact verkennen en het inzicht wegklikken/terughalen',
     kriticiteit: 'OVERIG',
-    given: 'Kaart "Inflatie & koopkracht" (alleen bij ≥€500/mnd baseline-uitgaven), inflatie-aanname 1–5%.',
+    given: 'Kaart "Inflatie & koopkracht" onder de kicker "Koopkracht" (alleen bij ≥€500/mnd `cashflow.baselineExpenses`, en `HideInSimple` — dus Volledig-materiaal), inflatie-aanname 1–5%. VERHUISD 06-09-2026 (ADR 0135): de kaart stond boven de hefboom-kaarten op de cashflow-hub en wordt nu gerenderd door `TransactiesNoticesLoader` op /overzicht/budget/transacties — de kaart hangt aan de gemeten uitgaven en hoort dus aan de transactiekant van de splitsing. Drempel, `HideInSimple` en kicker zijn byte-identiek meeverhuisd. Diezelfde loader draagt ook de VERSHEIDSMELDING (`StaleTransactionsBanner`): dezelfde melding als op /overzicht, onder dezelfde pref-sleutel (`STALE_TX_NOTICE_MINIMIZE_KEY`), dus wie haar daar inklapte ziet haar hier niet opnieuw op volle grootte — de minimaliseer-/herstelknoppen zitten er bewust niet bij, terughalen doe je op /overzicht.',
     when: 'De gebruiker verandert de slider en minimaliseert/herstelt de kaart via de inzicht-toggle.',
-    then: 'De tegels herrekenen live; de kaart is minimaliseerbaar/herstelbaar (localStorage, per apparaat). De onderliggende samengestelde-groeiformule (`projectCompound`) wordt VOLLEDIG narekenbaar getoetst in UAT-REKEN-21 — hier alleen een oogtoets (30-jaars-tegel > 10-jaars-tegel bij positieve inflatie).',
+    then: 'De tegels herrekenen live; de kaart is minimaliseerbaar/herstelbaar (localStorage, per apparaat). De onderliggende samengestelde-groeiformule (`projectCompound`) wordt VOLLEDIG narekenbaar getoetst in UAT-REKEN-21 — hier alleen een oogtoets (30-jaars-tegel > 10-jaars-tegel bij positieve inflatie). De versheidsmelding verschijnt uitsluitend bij `transactionFreshness(...).state === "stale"` én een niet-onderdrukte pref.',
     assertion: {
       kind: 'ui-only',
-      source: 'components/overview/inflation-impact-card.tsx + lib/hooks/use-insight-visibility.ts — rekenkern gedekt door UAT-REKEN-21, hier geen dubbele exacte toets',
+      source: 'components/overview/transacties/transacties-notices-loader.tsx → components/overview/inflation-impact-card.tsx + components/app/stale-transactions-banner.tsx + lib/hooks/use-insight-visibility.ts — rekenkern gedekt door UAT-REKEN-21, hier geen dubbele exacte toets',
     },
   },
   {
@@ -136,12 +157,12 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-CASH-07',
     titel: 'Status-melding minimaliseren en heropenen via het statuspunt',
     kriticiteit: 'OVERIG',
-    given: 'De PageStatusBanner/-dot-mechaniek is generiek over alle /overzicht-routes.',
-    when: 'De gebruiker minimaliseert/heropent de status-banner op een cashflow-route.',
-    then: 'Verwijsregel: dit generieke patroon wordt grondig getoetst door UAT-OVZ-12 (steekproef-oppervlak) — hier geen aparte uitwerking om duplicatie te voorkomen.',
+    given: 'De PageStatusBanner/-dot-mechaniek is generiek over alle /overzicht-routes. GEWIJZIGDE BRON 06-09-2026 (ADR 0135): `/overzicht/budget` zit in `ROUTE_FAMILY` nu in de familie `lever` — de lichte `loadLeverScores` die ook de sidebar-dots voedt — in plaats van de zware kaart-loaderset `cashflow`; het is immers de hefboom zelf geworden. De drie ONDERDELEN (/transacties, /vaste-lasten, /forecast) blijven wél de cashflow-familie: die krijgen hun status uit de kaart waar ze bij horen. `PAGE_STATUS_COPY` voor `/overzicht/budget` draagt daarom géén actie-knop meer (die wees naar zichzelf), en `resolvePageStatus` levert voor die route geen kaart-entry meer maar `leverInfo(scores.cashflow)`.',
+    when: 'De gebruiker minimaliseert/heropent de status-banner op /overzicht/budget of een van de drie onderdelen.',
+    then: 'Verwijsregel: dit generieke patroon wordt grondig getoetst door UAT-OVZ-12 (steekproef-oppervlak) — hier geen aparte uitwerking om duplicatie te voorkomen. Wel zone-specifiek: de duiding op /overzicht/budget moet dezelfde hefboomstatus tonen als de Budget-tegel op /overzicht en de sidebar-dot bij "Budget" (één bron: `loadLeverScores`), en de drie onderdelen die van hun eigen kaart.',
     assertion: {
       kind: 'ui-only',
-      source: 'app/(app)/overzicht/layout.tsx (PageStatusProvider) — verwijsregel naar UAT-OVZ-12, geen eigen cijfermatige uitkomst hier',
+      source: 'app/(app)/overzicht/layout.tsx (PageStatusProvider) + lib/page-status/compute.ts#ROUTE_FAMILY + lib/page-status/resolve.ts (leverInfo voor /overzicht/budget) — verwijsregel naar UAT-OVZ-12, geen eigen cijfermatige uitkomst hier',
     },
   },
   {
@@ -163,9 +184,9 @@ const criteria: AcceptanceCriterion[] = [
     scenarioId: 'UAT-CASH-09',
     titel: 'Geldstroom-inzichten bekijken en inzoomen op een dag of weekdag',
     kriticiteit: 'BELANGRIJK',
-    given: '"Nu" vastgezet op 15 juli 2026; synthetische transacties: inkomen €3.000, uitgaven €1.800, netto €1.200 (transfers uitgesloten).',
+    given: '"Nu" vastgezet op 15 juli 2026; synthetische transacties: inkomen €3.000, uitgaven €1.800, netto €1.200. OVERBOEKINGEN UITGESLOTEN — HERZIEN 06-09-2026 (bugfix f544f8d5e, ADR 0135): `lib/transaction-insights.ts` filterde op zes plekken op alleen `transaction_type === \'transfer\'` en liet daarmee `joint_transfer` (een overboeking tussen partners) als échte inkomst én als échte uitgave meetellen — precies de bug die de transfer-uitsluiting ooit moest oplossen. Elke andere motor in de app sloot beide al uit; deze was de enige uitzondering, en juist hij voedt de transactiepagina. De zes plekken delegeren nu naar `isRealAggRow`, het app-brede predicaat. Gevolg voor huishoudens die onderling overmaken: meter, trend, tegenpartijen, grootste uitgaven, weekdagpatroon en heatmap tonen LAGERE en juistere bedragen dan vóór 6 sep. De fixture hieronder draagt daarom naast de echte rijen ook een `transfer`- én een `joint_transfer`-rij, die de uitkomst NIET mogen bewegen.',
     when: 'De geldstroom-gauge en het heatmap-venster worden berekend.',
-    then: 'Spaarquote = (1.200/3.000)×100 = 40%. Heatmap-venster bestrijkt exact 12 volledige kalendermaanden t/m de laatste dag van de vórige maand: start=2025-07-01, end=2026-06-30 — de huidige (lopende) maand juli verschijnt NIET. WEERGAVEMODUS (S3, 28-08-2026): het GETAL is mode-onafhankelijk — `summarizeFlow` rekent altijd hetzelfde. Wat ermee getoond wordt verschilt. In **Volledig** staat de `GeldstroomGauge` (naald op een −100…+100-schaal, spaarquote als leeswaarde, kwalitatief etiket) nu mét een venster-onderschrift ("augustus tot nu toe" / "juli 2026"), zodat hij niet meer stilzwijgend een ánder venster leest dan de status-melding erboven. In **Eenvoudig** vervangt `GeldstroomZin` de meter: dezelfde Inkomen/Uitgaven/Saldo-strip, maar de duiding staat in woorden. Die zin toont bewust GÉÉN spaarquote zolang het venster loopt (een quote over een halve maand is het valse oordeel uit bevinding C6) en doet géén voorspelling — "er is nog niets binnengekomen" is een waarneming, geen belofte dat er salaris komt. De takken zitten in `describeFlow` (`lib/transaction-insights.ts`), een tweede LEZING naast `summarizeFlow`; die laatste is bewust ongewijzigd gelaten omdat het ongeclampte leescijfer en de 0%-bij-geen-inkomen eigendom van C6 zijn en in Volledig reproduceerbaar moeten blijven.',
+    then: 'Spaarquote = (1.200/3.000)×100 = 40%. Heatmap-venster bestrijkt exact 12 volledige kalendermaanden t/m de laatste dag van de vórige maand: start=2025-07-01, end=2026-06-30 — de huidige (lopende) maand juli verschijnt NIET. WEERGAVEMODUS (S3, 28-08-2026): het GETAL is mode-onafhankelijk — `summarizeFlow` rekent altijd hetzelfde. Wat ermee getoond wordt verschilt. In **Volledig** staat de `GeldstroomGauge` (naald op een −100…+100-schaal, spaarquote als leeswaarde, kwalitatief etiket) nu mét een venster-onderschrift ("augustus tot nu toe" / "juli 2026"), zodat hij niet meer stilzwijgend een ánder venster leest dan de status-melding erboven. In **Eenvoudig** vervangt `GeldstroomZin` de meter: dezelfde Inkomen/Uitgaven/Saldo-strip, maar de duiding staat in woorden. Die zin toont bewust GÉÉN spaarquote zolang het venster loopt (een quote over een halve maand is het valse oordeel uit bevinding C6) en doet géén voorspelling — "er is nog niets binnengekomen" is een waarneming, geen belofte dat er salaris komt. De takken zitten in `describeFlow` (`lib/transaction-insights.ts`), een tweede LEZING naast `summarizeFlow`; die laatste is bewust ongewijzigd gelaten omdat het ongeclampte leescijfer en de 0%-bij-geen-inkomen eigendom van C6 zijn en in Volledig reproduceerbaar moeten blijven. DAGGRAFIEK (ADR 0135, nieuw op deze pagina): de "geldstroom per dag"-grafiek is van de opgeheven hub meeverhuisd (`components/overview/transacties/geldstroom-daggrafiek.tsx`) en rendert UITSLUITEND bij periode "maand" én in Volledig. Hij is maand-vormig gebouwd (dag-van-de-maand op de x-as, "vandaag"-marker, forecastpad tot maandeinde); een rollend 30-dagen-venster, kwartaal of jaar heeft geen van die ankers, en periode-onafhankelijk maken zou de forecastmotor herschrijven. Voor die perioden dekken de heatmap en het weekdagpatroon dezelfde textuur. Het historische dagpatroon eronder komt uit de rijen vóór het venster die de pagina tóch al ophaalt — geen extra query.',
     assertion: {
       kind: 'exact',
       expected: 'spaarquote=40; heatmapStart=2025-07-01; heatmapEnd=2026-06-30',
@@ -264,7 +285,7 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'exact',
       expected: 'totaalMaand=338.33; aandeelPct=9.95; vrijheidsdagen=4.7',
-      source: 'lib/cashflow-forecast-math.ts#recurringPerMonth (het toMonthly-equivalent, echte productiefunctie) + lib/format.ts#dailyExpenseRate — zie cash-checks.ts',
+      source: 'lib/cashflow-forecast-math.ts#recurringPerMonth (het toMonthly-equivalent, echte productiefunctie) + lib/format.ts#dailyExpenseRate — gerenderd op app/(app)/overzicht/budget/vaste-lasten/page.tsx; zie cash-checks.ts',
     },
   },
   {
@@ -346,7 +367,7 @@ const criteria: AcceptanceCriterion[] = [
     assertion: {
       kind: 'exact',
       expected: 'netto=800; saldoNa6m=7650',
-      source: 'lib/cashflow-forecast-math.ts#buildForecast — echte productiefunctie, geen mirror',
+      source: 'lib/cashflow-forecast-math.ts#buildForecast — echte productiefunctie, geen mirror; gerenderd op app/(app)/overzicht/budget/forecast/page.tsx',
     },
   },
   {
@@ -733,15 +754,15 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-CASH-51',
     scenarioId: 'UAT-CASH-51',
-    titel: 'Cashflow-landingskaarten: Budget toont het resterende bedrag, Transacties de gerealiseerde huidige maand (dekt app/(app)/overzicht/budget/page.tsx)',
+    titel: 'Kaart-KPI\'s: Budget toont het resterende bedrag, Transacties de gerealiseerde huidige maand (dekt app/(app)/overzicht/budget/page.tsx)',
     kriticiteit: 'KERN',
-    given: 'De pagina /overzicht/budget rendert de vier hefboom-kaarten via `buildCashflowCards` (`lib/dashboard-data-loader.ts` + `lib/cashflow-data-loader.ts` + `lib/vaste-lasten-summary.ts` als invoer). ADR 0073 ("grondslag in de veldnaam") legt vast dat elk inkomsten-/uitgavenveld op de bundel zijn venster in de naam draagt. WEERGAVEMODUS — HERZIEN 28-08-2026 (S4): de hieronder getoetste `budgetKpi`/`transKpi`-WAARDEN zijn mode-onafhankelijk (`buildCashflowCards` rekent ze altijd uit, server-side) en zijn sinds S4 in BEIDE modi ZICHTBAAR op de landing. In **Volledig** staat de KPI-tekst als hoofdcijfer op de kaart, met het venster-label (`kpiWindow`) eronder waar dat bestaat — voor Budget draagt `kpiWindow` sinds de budgetpagina-pariteit de Volledig-grondslag ("van € X uitgavenbudget"), zodat kaart en budgetpagina-hero herkenbaar hetzelfde getal tonen. In **Eenvoudig** staat het oordeel bovenaan en het kerngetal daaronder, ALTIJD mét venster: de Transacties-kaart gebruikt het canonieke `kpiWindow` ("in {maand} tot nu toe"), de Budget-kaart wint met de vaste call-site-copy "nog te besteden deze maand" — `meterLine()` (components/overview/cashflow-landing-cards.tsx) laat die vaste tekst bewust over de gevulde `card.kpiWindow` heen winnen, want het cijfer is een restant, geen som-over-venster — en de Vaste-lasten-kaart de quote ("{n}% van inkomen") als meetlat. Dit vervangt CF-1 en de CF-3-herziening van 10-08-2026 ("venster alleen in Volledig"): die hing het venster aan het cijfer, en het cijfer is terug. De "Budgetdekking"-tip in het uitklap-detail noemt hetzelfde vensterlabel in plaats van het vaste "deze maand". PRIVACY (S4): alle bedragen op dit pad lopen sindsdien door `maskCurrencyInText` — met de privacy-toggle aan tonen KPI, meetlat en drill-down het bullet-placeholder; percentages, aantallen en venster-labels blijven leesbaar.',
-    when: 'De gebruiker leest de Budget-kaart en de Transacties-kaart op de landingspagina (Volledig — in Eenvoudig staan de KPI-cijfers zelf niet op de landing, zie hierboven).',
+    given: 'HERZIEN 06-09-2026 (ADR 0135) — WAAR DE BUDGET-KPI NU LANDT. Dit criterium dekte `app/(app)/overzicht/cashflow/page.tsx`; dat bestand bestaat niet meer. De pagina is nu /overzicht/budget en die rendert via `CashflowCardsLoader` → `budgetSubCards` nog maar DRIE kaarten (Transacties, Vaste lasten, Forecast). De BUDGET-kaart wordt nog wel gebouwd maar niet meer op deze pagina getoond — dat zou een kaart naar zichzelf zijn; zijn KPI en status voeden sindsdien de Budget-hefboomtegel op /overzicht en de sidebar-dot. De hieronder getoetste `budgetKpi` is dus de waarde die `buildCashflowCards` produceert en die het HEFBOOM-oppervlak leest, niet meer een kaart op deze landing. De `transKpi` is ongewijzigd zichtbaar op de Transacties-kaart hier. Ook nieuw: de kaartenset komt niet meer uit de volle dashboardbundel maar uit `loadCashflowKpis` + `loadCashflowData` + `loadVasteLastenSummary`, en dezelfde array seedt via `CashflowStatusSeed`/`cashflowCardStatuses` de sidebar-dots. De pagina /overzicht/budget rendert de kaarten via `buildCashflowCards` (`lib/dashboard-data-loader.ts` + `lib/cashflow-data-loader.ts` + `lib/vaste-lasten-summary.ts` als invoer). ADR 0073 ("grondslag in de veldnaam") legt vast dat elk inkomsten-/uitgavenveld op de bundel zijn venster in de naam draagt. WEERGAVEMODUS — HERZIEN 28-08-2026 (S4): de hieronder getoetste `budgetKpi`/`transKpi`-WAARDEN zijn mode-onafhankelijk (`buildCashflowCards` rekent ze altijd uit, server-side) en zijn sinds S4 in BEIDE modi ZICHTBAAR op de landing. In **Volledig** staat de KPI-tekst als hoofdcijfer op de kaart, met het venster-label (`kpiWindow`) eronder waar dat bestaat — voor Budget draagt `kpiWindow` sinds de budgetpagina-pariteit de Volledig-grondslag ("van € X uitgavenbudget"), zodat kaart en budgetpagina-hero herkenbaar hetzelfde getal tonen. In **Eenvoudig** staat het oordeel bovenaan en het kerngetal daaronder, ALTIJD mét venster: de Transacties-kaart gebruikt het canonieke `kpiWindow` ("in {maand} tot nu toe"), de Budget-kaart wint met de vaste call-site-copy "nog te besteden deze maand" — `meterLine()` (components/overview/cashflow-landing-cards.tsx) laat die vaste tekst bewust over de gevulde `card.kpiWindow` heen winnen, want het cijfer is een restant, geen som-over-venster — en de Vaste-lasten-kaart de quote ("{n}% van inkomen") als meetlat. Dit vervangt CF-1 en de CF-3-herziening van 10-08-2026 ("venster alleen in Volledig"): die hing het venster aan het cijfer, en het cijfer is terug. De "Budgetdekking"-tip in het uitklap-detail noemt hetzelfde vensterlabel in plaats van het vaste "deze maand". PRIVACY (S4): alle bedragen op dit pad lopen sindsdien door `maskCurrencyInText` — met de privacy-toggle aan tonen KPI, meetlat en drill-down het bullet-placeholder; percentages, aantallen en venster-labels blijven leesbaar.',
+    when: 'De gebruiker leest de Transacties-kaart op /overzicht/budget en de Budget-hefboomtegel op /overzicht; beide KPI\'s komen uit dezelfde `buildCashflowCards`-aanroep.',
     then: 'De Budget-KPI toont wat er van het maandbudget OVER is (plafond − besteed), niet het plafond zelf, en zonder "/mnd"-suffix — bij overschrijding een negatief bedrag, geduid door `subText` ("Boven budget"); `budgetCardStatus` blijft ongewijzigd op `monthSummary.budgetScore`. De Transacties-KPI, de spaarquote in het uitklap-detail, de tip en de kaartstatus draaien allemaal op de GEREALISEERDE huidige kalendermaand (`DashboardData.currentMonthIncome`/`currentMonthExpenses`, transfer-gefilterd via `aggIncomeByMonth`/`aggExpenseByMonthAbs` met `realOnly: true`) — NIET op het effective `monthlyIncome`/`monthlyExpenses`, dat bij `profiles.income_source = \'manual\'` een profielinschatting is in plaats van wat deze maand werkelijk gebeurde. De Vaste-lasten-kaart is bewust de UITZONDERING: die blijft het effective maandinkomen als noemer gebruiken voor het aandeel, omdat een structureel aandeel tegen een stabiel inkomen hoort te worden gemeten, niet tegen een half-afgelopen kalendermaand. HALVE-MAAND-UITZONDERING (bevinding C6, 26-08-2026) — in DIT literaire voorbeeld ONGEWIJZIGD: `buildCashflowCards` geeft de Transacties-kaart wél het effective maandinkomen (€6.000) als meetlat mee, maar `recurrings: []`/`baselineIncome: 0`/`baselineExpenses: 0` maakt `hasForecast` hier `false`, dus `forecastNetPerMonth` is `null` en de nieuwe voorwaarde (compleetheid ÉN een niet-negatieve prognose) kan niet intreden — de KPI (€ -500) en de status blijven zoals hierboven beschreven. Zie WF-CASH-01 voor de kale statusgrenzen en de nieuwe uitzondering zelf.',
     assertion: {
       kind: 'exact',
       expected: 'budgetKpi=€ -250 (plafond 3.950, besteed 4.200); transKpi=€ -500 (gerealiseerd 3.000/3.500, effective 6.000/2.000 genegeerd)',
-      source: 'app/(app)/overzicht/budget/page.tsx + lib/cashflow-cards.ts#buildCashflowCards — echte productiefunctie, aangeroepen op literaire invoer; zie cash-checks.ts',
+      source: 'lib/cashflow-cards.ts#buildCashflowCards — echte productiefunctie, aangeroepen op literaire invoer; gerenderd via app/(app)/overzicht/budget/page.tsx → components/overview/cashflow-cards-loader.tsx (Transacties) resp. de hefboomtegel op /overzicht (Budget); zie cash-checks.ts',
     },
   },
   {
@@ -864,7 +885,7 @@ const criteria: AcceptanceCriterion[] = [
     titel: 'Grondslag van inkomen en uitgaven kiezen: budgetten, transacties of een eigen bedrag (ADR 0103)',
     kriticiteit: 'KERN',
     given:
-      'Het cashflow-instellingenblok op /overzicht/budget (`components/overview/cashflow-instellingen-blok.tsx`, lazy ingeladen via `cashflow-below-fold.tsx` — óók in Eenvoudig, daar achter een disclosure). Eén synthetische situatie waarin de drie bronnen bewust UITEENLOPEN: profielschatting €2.000/mnd, gemeten transacties €3.000/mnd, budgetsom €3.600/mnd. De keuze staat per kant op `profiles.income_source` / `profiles.expenses_source`; de uitsluitlijst op de eigen, exclusieve kolom `profiles.cashflow_basis_prefs` (NADRUKKELIJK niet `feature_preferences`, die kolom wordt als volledige overwrite geschreven).',
+      'Het grondslag-instellingenblok op /overzicht/budget/transacties (`components/overview/cashflow-instellingen-blok.tsx`, lazy ingeladen via `CashflowInstellingenBlokLazy` — óók in Eenvoudig, daar achter een disclosure). VERHUISD 06-09-2026 (ADR 0135): het blok stond onderaan de opgeheven cashflow-hub; het beschrijft waar de gemeten inkomsten/uitgaven vandaan komen en hoort dus bij de transacties. Gedrag en opslag zijn ongewijzigd meeverhuisd. Eén synthetische situatie waarin de drie bronnen bewust UITEENLOPEN: profielschatting €2.000/mnd, gemeten transacties €3.000/mnd, budgetsom €3.600/mnd. De keuze staat per kant op `profiles.income_source` / `profiles.expenses_source`; de uitsluitlijst op de eigen, exclusieve kolom `profiles.cashflow_basis_prefs` (NADRUKKELIJK niet `feature_preferences`, die kolom wordt als volledige overwrite geschreven).',
     when:
       'De gebruiker zet de grondslag achtereenvolgens op "kies voor mij" (`auto`), "uit je transacties" (`transaction`), "eigen bedrag" (`manual`) en op `auto` zonder bruikbare budget- of transactiesom; `resolveAmountWithBasis` neemt telkens de precedentiebeslissing en `resolveSavingsSource` leidt de spaarquote van diezelfde grondslag af.',
     then:
@@ -899,19 +920,19 @@ const criteria: AcceptanceCriterion[] = [
   {
     workflow: 'WF-CASH-62',
     scenarioId: 'UAT-CASH-62',
-    titel: 'Widget en cashflow-strip tonen hetzelfde saldo voor hetzelfde venster (bevinding H6)',
+    titel: 'Maandaggregaat en rauwe maandpass leveren hetzelfde saldo voor hetzelfde venster (bevinding H6)',
     kriticiteit: 'KERN',
     persona: 'daan',
     given:
-      'Eén kalendermaand transactierijen die alle vier de assen raakt waarop de figures-strip op /overzicht/budget vroeger afweek van de canonieke maandmotor: (a) een POSITIEF bedrag met `is_income = false` (de kolom draagt geen CHECK tegen `sign(amount)` — 20260215000000_create_base_tables.sql r.229), (b) een `joint_transfer`-rij (de strip filterde alleen op `transfer`), (c) een rij zónder `account_id` (de strip scoopte op `.in(\'account_id\', accountIds)`), en (d) gewone in- en uitgaven. Daarnaast een profiel waarin de EFFECTIVE grondslag bewust ANDERE bedragen geeft dan de gerealiseerde maand — precies de situatie uit de bevinding (+€3.606 op /overzicht tegenover −€3.618 op /overzicht/budget).',
+      'HERZIEN 06-09-2026 (ADR 0135): dit criterium sprak over de figures-strip op de cashflow-hub (`components/app/cash-overview.tsx`); die strip én dat bestand bestaan niet meer. Wat blijft is de eigenlijke eis van bevinding H6 — dat de TWEE maandpaden niet uiteenlopen. `deriveRealMonthTotals` (rauwe maandrijen; voedt de effectieve grondslag in `loadCashflowKpis`/`loadDashboardData`, de grenzenpot-loader en `GET /api/checkin/overview`) en `aggIncomeByMonth`/`aggExpenseByMonthAbs` met `realOnly: true` (het maandaggregaat; voedt `DashboardData.currentMonthIncome/currentMonthExpenses`, en daarmee het cashflow-widget op /overzicht én de Transacties-kaart op /overzicht/budget) moeten voor dezelfde maand hetzelfde zeggen. Eén kalendermaand transactierijen die alle vier de assen raakt waarop het rauwe pad vroeger afweek: (a) een POSITIEF bedrag met `is_income = false` (de kolom draagt geen CHECK tegen `sign(amount)` — 20260215000000_create_base_tables.sql r.229), (b) een `joint_transfer`-rij (er werd alleen op `transfer` gefilterd), (c) een rij zónder `account_id` (er werd op `.in(\'account_id\', accountIds)` gescoopt), en (d) gewone in- en uitgaven. Daarnaast een profiel waarin de EFFECTIVE grondslag bewust ANDERE bedragen geeft dan de gerealiseerde maand — precies de situatie uit de bevinding (+€3.606 op /overzicht tegenover −€3.618 op de hub).',
     when:
-      'Het cashflow-widget op /overzicht leidt zijn netto af uit `DashboardData.currentMonthIncome/currentMonthExpenses` (het maandaggregaat) en de figures-strip uit `deriveRealMonthTotals` over dezelfde rijen; beide oppervlakken vragen daarna hun spaarquote op bij `currentMonthSavingsRate`.',
+      'Het cashflow-widget op /overzicht leidt zijn netto af uit `DashboardData.currentMonthIncome/currentMonthExpenses` (het maandaggregaat) en de check-in/KPI-laag uit `deriveRealMonthTotals` over dezelfde rijen; beide vragen daarna hun spaarquote op bij `currentMonthSavingsRate`.',
     then:
-      'De twee oppervlakken leveren HETZELFDE saldo en DEZELFDE spaarquote, omdat ze één classificatie (het teken van `amount`), één transfer-definitie (`isRealAggRow`: transfer én joint_transfer) en één quote-formule (`savingsRateFromAggregates`) delen — en géén van beide op rekening scoopt. Het effective maandcijfer (`monthlyIncome − monthlyExpenses`) is bewust een ANDER getal en mag dat blijven: dat is een structurele maandwaarde, geen "deze maand". Voorwaarde waaronder dat verschil is toegestaan: elk oppervlak BENOEMT zijn venster — de widget-kicker draagt `currentMonthWindowLabel` ("Cashflow — augustus tot nu toe") en de strip draagt "gerealiseerd in … tot nu toe / … volledige maand". Huishouden- en partnerperspectief houden de effective grondslag (de overrides dragen geen `currentMonth*`) en zeggen dat in hun eigen label ("Cashflow per maand — Huishouden").',
+      'De twee paden leveren HETZELFDE saldo en DEZELFDE spaarquote, omdat ze één classificatie (het teken van `amount`), één transfer-definitie (`isRealAggRow`: transfer én joint_transfer) en één quote-formule (`savingsRateFromAggregates`) delen — en géén van beide op rekening scoopt. Het effective maandcijfer (`monthlyIncome − monthlyExpenses`) is bewust een ANDER getal en mag dat blijven: dat is een structurele maandwaarde, geen "deze maand". Voorwaarde waaronder dat verschil is toegestaan: elk oppervlak BENOEMT zijn venster — de widget-kicker draagt `currentMonthWindowLabel` ("Cashflow — augustus tot nu toe") en de Transacties-kaart op /overzicht/budget zijn `kpiWindow` ("in {maand} tot nu toe"). De strip die dit venster vroeger als tekst droeg ("gerealiseerd in … tot nu toe / … volledige maand") is met de cashflow-hub verdwenen; de venster-eis geldt sindsdien voor de twee overgebleven oppervlakken. Huishouden- en partnerperspectief houden de effective grondslag (de overrides dragen geen `currentMonth*`) en zeggen dat in hun eigen label ("Cashflow per maand — Huishouden").',
     assertion: {
       kind: 'exact',
       expected:
-        'stripSaldo=-2446.45; widgetSaldo=-2446.45; gelijk=true; stripQuote=-222.4; widgetQuote=-222.4; effectiefSaldo=1111; effectiefWijktAf=true',
+        'rauwSaldo=-2446.45; widgetSaldo=-2446.45; gelijk=true; rauwQuote=-222.4; widgetQuote=-222.4; effectiefSaldo=1111; effectiefWijktAf=true',
       source:
         'lib/cashflow-month-totals.ts#deriveRealMonthTotals + lib/cashflow-cards.ts#currentMonthSavingsRate — échte productiefuncties, geen mirror; de venster-labels zijn vergrendeld in components/widgets/cash-flow-widget.test.tsx en de vier assen in lib/cashflow-month-totals.test.ts — zie cash-checks.ts',
     },

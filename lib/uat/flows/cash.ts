@@ -19,8 +19,18 @@
 // ADR 0089/0092: kwartaal/jaar-periodes, prestatieweergave, widget,
 // match-preview, alias, meldingen) zijn de nieuwste toevoeging.
 //
-// Het proces leest links→rechts: landing (4 hefboom-kaarten) → verkennen
-// (maand-geldstroom/kassabon/rekeningen/instellingen/inflatie/status) →
+// ADR 0135 (6 sep 2026) — DE CASHFLOW-HUB IS OPGEHEVEN. Er zijn nu TWEE
+// instappen in deze zone: /overzicht/budget (de derde hefboom, met bovenaan de
+// drie onderdeel-kaarten Transacties/Vaste lasten/Forecast) en
+// /overzicht/bezittingen/cash (de rekeningen, als gewone bezitgroep, mét het
+// archief en "Bank koppelen"). De geldstroom, kassabonnen, daggrafiek,
+// versheidsmelding, inflatiekaart en het grondslagblok wonen op
+// /overzicht/budget/transacties en hangen in deze graaf dus onder de
+// Transacties-tak. De verhuisde geldstroom volgt de PERIODEKIEZER (standaard
+// rollend 30 dagen) in plaats van kalendermaand-tot-nu-toe.
+//
+// Het proces leest links→rechts: landing (3 onderdeel-kaarten) → verkennen
+// (geldstroom/kassabon/rekeningen/instellingen/inflatie/status) →
 // analyse (periode/inzichten/zoeken) → transactiebeheer (toevoegen/bewerken/
 // splitsen/verwijderen/tegenpartij) → vaste lasten (bekijken/classificeren/
 // opzeggen/AI/wat-als/kalender/forecast/regelbeheer) → bankimport (MT940-CSV/
@@ -44,14 +54,17 @@ export const CASH_FLOW: UatFlow = {
   nodes: [
     // ── 0 · landing ───────────────────────────────────────────────────────
     { id: 'nav', label: 'Navigatie naar /overzicht/budget', kind: 'entry', stage: 0 },
-    { id: 'hefboom', scenarioId: 'UAT-CASH-01', label: 'WF-CASH-01 · Vier hefboom-kaarten (Budget/Transacties/Vaste lasten/Forecast)', kind: 'screen', stage: 0, lane: 'landing' },
-    { id: 'kpiweergave', scenarioId: 'UAT-CASH-51', label: 'WF-CASH-51 · Budget-KPI resterend, Transacties-KPI gerealiseerde maand', kind: 'screen', stage: 0, lane: 'landing', subOf: 'hefboom' },
+    // Tweede instap sinds ADR 0135: de rekeningen zijn geen hub-sectie meer maar
+    // een gewone bezitgroep, met een eigen route.
+    { id: 'nav-rekeningen', label: 'Navigatie naar /overzicht/bezittingen/cash', kind: 'entry', stage: 0 },
+    { id: 'hefboom', scenarioId: 'UAT-CASH-01', label: 'WF-CASH-01 · Drie onderdeel-kaarten (Transacties/Vaste lasten/Forecast) — Budget wordt gebouwd, niet getoond', kind: 'screen', stage: 0, lane: 'landing' },
+    { id: 'kpiweergave', scenarioId: 'UAT-CASH-51', label: 'WF-CASH-51 · Budget-KPI resterend (hefboomtegel), Transacties-KPI gerealiseerde maand', kind: 'screen', stage: 0, lane: 'landing', subOf: 'hefboom' },
 
     // ── 1 · verkennen ─────────────────────────────────────────────────────
-    { id: 'geldstroom', scenarioId: 'UAT-CASH-02', label: 'WF-CASH-02 · Maand-geldstroom bekijken', kind: 'screen', stage: 1, lane: 'verkennen' },
-    { id: 'kassabon', scenarioId: 'UAT-CASH-03', label: 'WF-CASH-03 · Kassabon inkomsten/uitgaven', kind: 'screen', stage: 1, lane: 'verkennen', subOf: 'geldstroom' },
-    { id: 'rekeningen', scenarioId: 'UAT-CASH-04', label: 'WF-CASH-04 · Rekeningen & rekeningdetail', kind: 'screen', stage: 1, lane: 'verkennen' },
-    { id: 'instellingen', scenarioId: 'UAT-CASH-05', label: 'WF-CASH-05 · Cashflow-instellingen (inkomen/spaarquote/uitgaven)', kind: 'screen', stage: 1, lane: 'verkennen' },
+    { id: 'geldstroom', scenarioId: 'UAT-CASH-02', label: 'WF-CASH-02 · Geldstroom bekijken (periodekiezer) & door maanden bladeren', kind: 'screen', stage: 1, lane: 'verkennen' },
+    { id: 'kassabon', scenarioId: 'UAT-CASH-03', label: 'WF-CASH-03 · Kassabon inkomsten/uitgaven (gekozen periode)', kind: 'screen', stage: 1, lane: 'verkennen', subOf: 'geldstroom' },
+    { id: 'rekeningen', scenarioId: 'UAT-CASH-04', label: 'WF-CASH-04 · Rekeningen als bezitgroep & rekeningdetail (/overzicht/bezittingen/cash)', kind: 'screen', stage: 1, lane: 'verkennen' },
+    { id: 'instellingen', scenarioId: 'UAT-CASH-05', label: 'WF-CASH-05 · Grondslag-instellingen (inkomen/spaarquote/uitgaven, op /overzicht/budget/transacties)', kind: 'screen', stage: 1, lane: 'verkennen' },
     { id: 'grondslagkeuze', scenarioId: 'UAT-CASH-60', label: 'WF-CASH-60 · Grondslag inkomen/uitgaven kiezen: budgetten, transacties of eigen bedrag (ADR 0103)', kind: 'action', stage: 1, lane: 'verkennen', subOf: 'instellingen' },
     { id: 'inflatie', scenarioId: 'UAT-CASH-06', label: 'WF-CASH-06 · Inflatie-impact verkennen', kind: 'screen', stage: 1, lane: 'verkennen' },
     { id: 'statusmelding', scenarioId: 'UAT-CASH-07', label: 'WF-CASH-07 · Status-melding minimaliseren/heropenen', kind: 'screen', stage: 1, lane: 'verkennen' },
@@ -138,7 +151,7 @@ export const CASH_FLOW: UatFlow = {
     { from: 'hefboom', to: 'kpiweergave' },
     { from: 'hefboom', to: 'geldstroom' },
     { from: 'geldstroom', to: 'kassabon' },
-    { from: 'hefboom', to: 'rekeningen' },
+    { from: 'nav-rekeningen', to: 'rekeningen' },
     { from: 'hefboom', to: 'instellingen' },
     { from: 'instellingen', to: 'grondslagkeuze' },
     { from: 'grondslagkeuze', to: 'x-budget', kind: 'cross', label: 'budgetgrondslag' },

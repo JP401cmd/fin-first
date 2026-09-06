@@ -10,10 +10,13 @@
  * De meeste checks roepen ÉCHTE productiefuncties aan (geen mirror) — deze zone
  * heeft ongewoon veel pure, client-veilige rekenkernen. Uitzonderingen (met
  * bronregel-verwijzing, spiegelt de mirrors in `start-checks.ts`/`will-checks.ts`):
- *  - aandeel-% per rekening (components/app/cash-overview.tsx)
  *  - split-som-validatie (components/app/transaction-form.tsx)
  *  - euro_impact_monthly-negatie bij opzeggen (components/app/opzeg-modal.tsx)
  *  - sibling-matching op genormaliseerde tegenpartijnaam (lib/parsers/categorize.ts-conventie)
+ *
+ * De aandeel-%-mirror (components/app/cash-overview.tsx) is met dat bestand
+ * vervallen bij het opheffen van de cashflow-hub (ADR 0135, 6 sep 2026);
+ * WF-CASH-04 toetst nu de échte `detailBankAccountIdForAsset`.
  *
  * WF-CASH-25 roept sinds feature #881 de ÉCHTE `orderGroupsLargestFirst` +
  * `buildCombinedGroups` aan (lib/auto-categorize.ts) — geen mirror meer van de
@@ -33,8 +36,11 @@ import {
   vasteLastenCardStatus,
   forecastCardStatus,
   buildCashflowCards,
+  budgetSubCards,
   currentMonthSavingsRate,
 } from '@/lib/cashflow-cards'
+import { detailBankAccountIdForAsset } from '@/lib/cash-detail-target'
+import type { CashBankLink } from '@/lib/bank-connection-status'
 import { deriveRealMonthTotals } from '@/lib/cashflow-month-totals'
 import type { DashboardData } from '@/lib/types/dashboard'
 import { MOCK_DASHBOARD_DATA } from '@/lib/mock-dashboard-data'
@@ -192,9 +198,19 @@ function makeRecurring(overrides: Partial<RecurringTransaction> & { id: string; 
   }
 }
 
-/** Mirror van de aandeel-%-formule per rekening (components/app/cash-overview.tsx). */
-function aandeelPct(balance: number, total: number): number {
-  return (balance / total) * 100
+/**
+ * Koppelrij-fixture voor WF-CASH-04 (`loadCashBankLinks`-vorm). Spiegelt de
+ * `link()`-helper in lib/cash-detail-target.test.ts.
+ */
+function bankLink(overrides: Partial<CashBankLink> = {}): CashBankLink {
+  return {
+    bankAccountId: 'bank-a',
+    assetId: 'asset-a',
+    state: 'linked',
+    connectionAccountId: 'bca-1',
+    providerName: 'ING',
+    ...overrides,
+  }
 }
 
 /** Mirror van de split-som-validatie (components/app/transaction-form.tsx):
@@ -350,9 +366,28 @@ export const CASH_ENGINE_CHECKS: CashEngineCheck[] = [
       const fcGood = forecastCardStatus({ netPerMonth: 100, hasForecast: true })
       const fcBad = forecastCardStatus({ netPerMonth: -100, hasForecast: true })
       const fcWarn = forecastCardStatus({ netPerMonth: 0, hasForecast: true })
+      // ADR 0135: /overzicht/budget rendert DRIE van de vier gebouwde kaarten.
+      // Échte productiefunctie op een minimale kaart-array — de Budget-kaart
+      // wordt gebouwd (zijn status voedt de hefboomtegel en de sidebar-dot) maar
+      // niet getoond, want die pagina ÍS de budgethefboom.
+      const alleVier = (['budget', 'transacties', 'vaste-lasten', 'forecast'] as const).map(
+        (key) =>
+          ({
+            key,
+            label: key,
+            href: '/overzicht/budget',
+            tooltip: '',
+            kpi: null,
+            status: 'neutral',
+            subText: null,
+            kpiWindow: null,
+            detail: { label: '', value: '', tip: '', actionLabel: '' },
+          }) as ReturnType<typeof buildCashflowCards>[number],
+      )
+      const subCards = budgetSubCards(alleVier).map((c) => c.key).join(',')
       return {
-        expected: 'transGood=good; transWarn=warn; transBad=bad; vlGood=good; vlWarn=warn; vlBad=bad; fcGood=good; fcBad=bad; fcWarn=warn',
-        actual: `transGood=${transGood}; transWarn=${transWarn}; transBad=${transBad}; vlGood=${vlGood}; vlWarn=${vlWarn}; vlBad=${vlBad}; fcGood=${fcGood}; fcBad=${fcBad}; fcWarn=${fcWarn}`,
+        expected: 'transGood=good; transWarn=warn; transBad=bad; vlGood=good; vlWarn=warn; vlBad=bad; fcGood=good; fcBad=bad; fcWarn=warn; subCards=transacties,vaste-lasten,forecast',
+        actual: `transGood=${transGood}; transWarn=${transWarn}; transBad=${transBad}; vlGood=${vlGood}; vlWarn=${vlWarn}; vlBad=${vlBad}; fcGood=${fcGood}; fcBad=${fcBad}; fcWarn=${fcWarn}; subCards=${subCards}`,
       }
     },
   },
@@ -373,15 +408,34 @@ export const CASH_ENGINE_CHECKS: CashEngineCheck[] = [
   {
     workflow: 'WF-CASH-04',
     scenarioId: 'UAT-CASH-04',
-    label: 'Aandeel-% per rekening (mirror): 850/2.850 + 2.000/2.850',
+    label: 'Rekeningdetail-of-bezitformulier (detailBankAccountIdForAsset): verbinding wint, budget-map is de val-terug, manual valt door',
     run: () => {
       criterion('WF-CASH-04')
-      const totaal = 850 + 2000
-      const betaalPct = aandeelPct(850, totaal)
-      const spaarPct = aandeelPct(2000, totaal)
+      // Échte productiefunctie — de mirror van het aandeel-% per rekening is
+      // met `components/app/cash-overview.tsx` vervallen (ADR 0135). Drie
+      // rekeningen, drie takken:
+      //  A — echte verbinding, géén budget-map-rij → rekeningdetail.
+      //  B — geen koppelrij, wél budgetteren → val terug op de budget-map.
+      //  C — `manual`-companion (budgetteren uit), geen map-rij → undefined,
+      //      dus het gewone bezitformulier (een leeg rekeningdetail zou de
+      //      rekening onbewerkbaar maken).
+      const links: CashBankLink[] = [
+        bankLink({ bankAccountId: 'bank-a', assetId: 'asset-a', state: 'linked' }),
+        bankLink({
+          bankAccountId: 'bank-c',
+          assetId: 'asset-c',
+          state: 'manual',
+          connectionAccountId: null,
+          providerName: null,
+        }),
+      ]
+      const budgetMap: Record<string, string> = { 'asset-b': 'bank-b' }
+      const metVerbinding = detailBankAccountIdForAsset(links, budgetMap, 'asset-a')
+      const alleenBudgetteren = detailBankAccountIdForAsset(links, budgetMap, 'asset-b')
+      const manualZonderBudgetteren = detailBankAccountIdForAsset(links, budgetMap, 'asset-c')
       return {
-        expected: 'betaalPct=29.82; spaarPct=70.18',
-        actual: `betaalPct=${fx(betaalPct, 2)}; spaarPct=${fx(spaarPct, 2)}`,
+        expected: 'metVerbinding=bank-a; alleenBudgetteren=bank-b; manualZonderBudgetteren=undefined',
+        actual: `metVerbinding=${metVerbinding}; alleenBudgetteren=${alleenBudgetteren}; manualZonderBudgetteren=${manualZonderBudgetteren}`,
       }
     },
   },
@@ -421,9 +475,17 @@ export const CASH_ENGINE_CHECKS: CashEngineCheck[] = [
     label: 'Spaarquote-gauge (summarizeFlow) + heatmap-venster (resolveHeatmapWindow)',
     run: () => {
       criterion('WF-CASH-09')
+      // De twee overboekingsrijen mogen de uitkomst NIET bewegen. Vóór de
+      // bugfix van 6 sep 2026 filterde `summarizeFlow` op alleen 'transfer' en
+      // telde `joint_transfer` (partner-overboeking) als écht inkomen én als
+      // echte uitgave mee — de spaarquote zou hier dan (1200+0)/(3000+5000) →
+      // een heel ander getal geven. Beide worden nu uitgesloten via
+      // `isRealAggRow`.
       const txns = [
         makeTx({ id: 't1', date: '2026-06-05', amount: 3000 }),
         makeTx({ id: 't2', date: '2026-06-10', amount: -1800 }),
+        makeTx({ id: 't3', date: '2026-06-12', amount: 5000, transaction_type: 'joint_transfer' }),
+        makeTx({ id: 't4', date: '2026-06-13', amount: -5000, transaction_type: 'transfer' }),
       ]
       const flow = summarizeFlow(txns)
       const spaarquote = flow.savingsRate
@@ -1426,7 +1488,7 @@ NEWFILEUID:NONE
     workflow: 'WF-CASH-62',
     scenarioId: 'UAT-CASH-62',
     label:
-      'Widget en cashflow-strip delen één grondslag voor "deze maand" (H6: classificatie op teken, beide transfer-types, geen rekening-scoping, één spaarquote-formule)',
+      'Maandaggregaat en rauwe maandpass delen één grondslag voor "deze maand" (H6: classificatie op teken, beide transfer-types, geen rekening-scoping, één spaarquote-formule)',
     run: () => {
       criterion('WF-CASH-62')
 
@@ -1442,14 +1504,14 @@ NEWFILEUID:NONE
       ]
 
       // STRIP (/overzicht/budget): de canonieke maandmotor over dezelfde rijen.
-      const strip = deriveRealMonthTotals(rijen)
-      const stripSaldo = strip.income - strip.expenses
-      const stripQuote = currentMonthSavingsRate(strip.income, strip.expenses)
+      const rauw = deriveRealMonthTotals(rijen)
+      const rauwSaldo = rauw.income - rauw.expenses
+      const rauwQuote = currentMonthSavingsRate(rauw.income, rauw.expenses)
 
       // WIDGET (/overzicht): consumeert DashboardData.currentMonth*, dat de loader
       // uit HETZELFDE maandaggregaat vult — hier gemodelleerd als de canonieke pass.
-      const currentMonthIncome = strip.income
-      const currentMonthExpenses = strip.expenses
+      const currentMonthIncome = rauw.income
+      const currentMonthExpenses = rauw.expenses
       const widgetSaldo = currentMonthIncome - currentMonthExpenses
       const widgetQuote = currentMonthSavingsRate(currentMonthIncome, currentMonthExpenses)
 
@@ -1459,11 +1521,11 @@ NEWFILEUID:NONE
 
       return {
         expected:
-          'stripSaldo=-2446.45; widgetSaldo=-2446.45; gelijk=true; stripQuote=-222.4; widgetQuote=-222.4; effectiefSaldo=1111; effectiefWijktAf=true',
+          'rauwSaldo=-2446.45; widgetSaldo=-2446.45; gelijk=true; rauwQuote=-222.4; widgetQuote=-222.4; effectiefSaldo=1111; effectiefWijktAf=true',
         actual:
-          `stripSaldo=${fx(stripSaldo, 2)}; widgetSaldo=${fx(widgetSaldo, 2)}; gelijk=${stripSaldo === widgetSaldo}; ` +
-          `stripQuote=${fx(stripQuote ?? 0, 1)}; widgetQuote=${fx(widgetQuote ?? 0, 1)}; ` +
-          `effectiefSaldo=${fx(effectiefSaldo, 0)}; effectiefWijktAf=${effectiefSaldo !== stripSaldo}`,
+          `rauwSaldo=${fx(rauwSaldo, 2)}; widgetSaldo=${fx(widgetSaldo, 2)}; gelijk=${rauwSaldo === widgetSaldo}; ` +
+          `rauwQuote=${fx(rauwQuote ?? 0, 1)}; widgetQuote=${fx(widgetQuote ?? 0, 1)}; ` +
+          `effectiefSaldo=${fx(effectiefSaldo, 0)}; effectiefWijktAf=${effectiefSaldo !== rauwSaldo}`,
       }
     },
   },
