@@ -138,7 +138,10 @@ describe('UAT Cash — acceptatiecriteria dekking', () => {
     // van de dragende en/of-rekening en ontdubbelt tegen de partner via
     // loadHouseholdSiblingAccountIds/loadHouseholdSharedHashes — DB-mutatie +
     // RLS-afhankelijke zichtbaarheid, geen pure functie, dus 'ui-only').
-    expect(workflows.length).toBe(66)
+    // 66 → 67: WF-CASH-67 (ADR 0136 — "Grens bereikt" als vierde WEERGAVE-stand
+    // van een grenzenpot; leest `periodHeadroom` uit de échte motoruitkomst en
+    // toetst tegelijk dat de motor/score/reeks er NIET door bewegen, 'exact').
+    expect(workflows.length).toBe(67)
   })
 
   it('elk criterium heeft een geldige assertion.kind', () => {
@@ -215,7 +218,9 @@ describe('UAT Cash — acceptatiecriteria dekking', () => {
     // 38 → 40: WF-CASH-63 (rekening-zichtbaarheid, ADR 0118) en WF-CASH-64
     // (grenzenpot-tempo, ADR 0119) zijn beide 'exact' en krijgen elk een
     // CASH_ENGINE_CHECKS-rij.
-    expect(exactWorkflows.length).toBe(40)
+    // 40 → 41: WF-CASH-67 (grenzenpot "Grens bereikt", ADR 0136) is 'exact' en
+    // krijgt een CASH_ENGINE_CHECKS-rij.
+    expect(exactWorkflows.length).toBe(41)
   })
 
   it('markeert de jitter-gebonden/AI/gebonden randgevallen met de juiste kind', () => {

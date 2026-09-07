@@ -27,6 +27,36 @@
  * `app/globals.css`. Liever een badge kwijt dan pillen die onbereikbaar
  * voorbij de schermrand staan; de betekenis blijft via `title`/`aria-label`.
  *
+ * ## Invariant: label en badge reizen samen (B-025)
+ *
+ * **Er ontstaat nooit een kaal getal zonder label.** Valt een `data-pill-label`
+ * weg, dan valt de `data-pill-badge` van diezelfde pil mee — in de compacte
+ * stand én onder `sm`, waar de pil zijn label zelf inlevert. Blijft het getal
+ * staan, dan blijft zijn naam staan.
+ *
+ * Dat was eerst een hoopvolle afspraak: de Marktcheck-pil zette bij een waarde
+ * `className="inline"` op haar label. Die klasse weegt (0,1,0) en verloor
+ * altijd van de compact-regel `[data-pill-row][data-compact='true']
+ * [data-pill-label]` (0,3,0) — op 696px stond er dus een naamloos flesje met
+ * een los cijfer, dat als succeskans gelezen werd. De invariant zit nu in CSS
+ * met winnende specificiteit, niet in een class per callsite.
+ *
+ * Is het getál het punt van de pil (een marge, een delta), zet dan
+ * **`data-pill-keep` op de pil-knop** — en alleen zolang de badge daadwerkelijk
+ * rendert, zodat een pil zonder getal gewoon meedoet met de compacte stand:
+ *
+ * ```tsx
+ * <button data-pill-keep={marge ? '' : undefined} …>
+ *   <FlaskConical className="h-3 w-3" />
+ *   <span data-pill-label className="hidden sm:inline">Marktcheck</span>
+ *   {marge && <span data-pill-badge className="font-mono …">{margeKort(marge)}</span>}
+ * </button>
+ * ```
+ *
+ * Een keep-badge hoort een inline element te zijn (span met tekst). In de
+ * `data-tight`-stand levert óók een keep-pil álles in: label én badge, nooit
+ * één van de twee.
+ *
  * ## Waarom de meting eruitziet zoals hij eruitziet
  *
  * **Meten op elke commit, niet op een dependency.** Een eerdere versie triggerde
@@ -53,9 +83,12 @@
  * is zichtbaar overlopen beter dan de popovers slopen.
  *
  * ## Gebruik
- * Geef het label binnen een pil het attribuut `data-pill-label`; de rij verbergt
- * die in compacte stand (regel in `app/globals.css`). Het mobiel-gedrag blijft
- * van de pil zelf (`hidden sm:inline`) — daar zijn labels sowieso al weg.
+ * Geef het label binnen een pil het attribuut `data-pill-label` en een telbadge
+ * of delta `data-pill-badge`; de rij verbergt beide samen in compacte stand
+ * (regels in `app/globals.css`). Het mobiel-gedrag blijft van de pil zelf
+ * (`hidden sm:inline`) — daar zijn labels sowieso al weg, en dus de badges ook.
+ * Draagt de pil een getal dat niet mag verdwijnen, zet er dan `data-pill-keep`
+ * op (zie de invariant hierboven).
  * Elke pil houdt een `title` + `aria-label` zodat de betekenis niet aan de tekst
  * hangt; zonder label ís het icoon de hele knop.
  */

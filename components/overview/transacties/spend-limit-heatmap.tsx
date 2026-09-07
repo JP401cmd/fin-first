@@ -5,34 +5,45 @@
  *
  * euro-view: exempt (gerealiseerde historie)
  *
- * ── DRIE TOESTANDEN, GEEN INTENSITEITSRAMP (D14) ────────────────────────────
- * Een cel is `geen uitgaven`, `binnen` of `boven` — plus de voorlopig-markering
- * op de lopende periode. Bewust GEEN ramp over bedragen (zoals de
- * uitgaven-intensiteit-heatmap wél doet): uit een ramp valt via de kleur een
- * bedrag te reconstrueren, ook wanneer bedragmaskering aan staat. Drie
- * toestanden zijn daarmee maskering-immuun én zijn precies de norm die de
- * gebruiker zelf stelde.
+ * ── VIER TOESTANDEN, GEEN INTENSITEITSRAMP (D14) ────────────────────────────
+ * Een cel is `geen uitgaven`, `binnen`, `grens bereikt` of `boven` — plus de
+ * voorlopig-markering op de lopende periode. Bewust GEEN ramp over bedragen
+ * (zoals de uitgaven-intensiteit-heatmap wél doet): uit een ramp valt via de
+ * kleur een bedrag te reconstrueren, ook wanneer bedragmaskering aan staat. Een
+ * kleine, vaste set toestanden is daarmee maskering-immuun én is precies de norm
+ * die de gebruiker zelf stelde.
  *
  * Niet alleen kleur: `boven` is óók duidelijk donkerder dan `binnen` (solide
- * negative-token vs. lichte tint), en elke cel draagt een tekstueel
- * `aria-label`. Kleurenblindheid mag het beeld niet betekenisloos maken.
+ * negative-token vs. lichte tint), `bereikt` draagt een zichtbaar sterkere rand
+ * dan de andere tinten, en elke cel draagt een tekstueel `aria-label`.
+ * Kleurenblindheid mag het beeld niet betekenisloos maken.
  *
- * CONSUME, DON'T RECOMPUTE: `status` komt uit de motor. Dit component leidt
- * alleen "geen uitgaven" af uit het aantal gematchte transacties — een
- * weergave-onderscheid binnen `within`, geen tweede statusregel.
+ * CONSUME, DON'T RECOMPUTE: `status` komt uit de motor en de bereikt-lezing uit
+ * de gedeelde standen-map (`resolveSpendLimitOutcomeState`, ADR 0136). Dit
+ * component leidt alleen "geen uitgaven" af uit het aantal gematchte
+ * transacties — een weergave-onderscheid binnen `within`, geen tweede
+ * statusregel.
  */
 
 import { useState } from 'react'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { formatMaskedCurrency } from '@/lib/format'
 import type { SpendLimitPeriodOutcome } from '@/lib/spend-limits/engine'
+import {
+  resolveSpendLimitOutcomeState,
+  SPEND_LIMIT_STATUS_LABEL_INLINE,
+} from '@/lib/spend-limits/status-display'
 
-type CellState = 'none' | 'within' | 'over'
+type CellState = 'none' | 'within' | 'reached' | 'over'
 
 function cellState(o: SpendLimitPeriodOutcome): CellState {
-  if (o.status === 'exceeded') return 'over'
+  const state = resolveSpendLimitOutcomeState(o)
+  if (state === 'exceeded') return 'over'
+  if (state === 'reached') return 'reached'
   // Een periode zonder gematchte transactie is niet "goed gegaan" — er is niets
-  // gebeurd. Dat verschil is voor een gedragsinstrument betekenisvol.
+  // gebeurd. Dat verschil is voor een gedragsinstrument betekenisvol. Een
+  // periode die de grens raakte kan hier niet vallen: daar is per definitie
+  // uitgegeven.
   return o.matchedTransactionCount === 0 ? 'none' : 'within'
 }
 
@@ -42,13 +53,20 @@ const STATE_STYLE: Record<CellState, { background: string; boxShadow: string }> 
     background: 'var(--positive-bg)',
     boxShadow: 'inset 0 0 0 1px color-mix(in oklch, var(--positive) 40%, transparent)',
   },
+  // Warning-familie, niet negative: er is niets overschreden. De volle rand
+  // onderscheidt hem van `within` zonder een vijfde kleur te introduceren.
+  reached: {
+    background: 'var(--warning-bg)',
+    boxShadow: 'inset 0 0 0 2px var(--warning)',
+  },
   over: { background: 'var(--negative)', boxShadow: 'inset 0 0 0 1px var(--negative)' },
 }
 
 const STATE_WORD: Record<CellState, string> = {
   none: 'geen uitgaven',
-  within: 'binnen je grens',
-  over: 'boven je grens',
+  within: SPEND_LIMIT_STATUS_LABEL_INLINE.within,
+  reached: SPEND_LIMIT_STATUS_LABEL_INLINE.reached,
+  over: SPEND_LIMIT_STATUS_LABEL_INLINE.exceeded,
 }
 
 export interface SpendLimitHeatmapProps {

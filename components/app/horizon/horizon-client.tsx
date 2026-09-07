@@ -2081,9 +2081,25 @@ export default function HorizonPage({
     [naturalMilestones],
   )
 
+  // Bijvangst B-025: kernel-afgeleide events dragen een FRACTIONELE target_age
+  // (de kernel verkoopt de woning in een maand, niet op een verjaardag). De
+  // tijdlijn zet die rauw onder de marker — "73.16666666666666j" naast
+  // buurlabels als "49j". Gebruikers-events komen uit een integer-kolom, dus
+  // dit raakt alleen de afgeleide markers. We ronden op hele jaren af, precies
+  // zoals `handleEventDragEnd` dat doet vóór het wegschrijven; label én
+  // markerpositie blijven zo bij elkaar.
+  //
+  // Alleen deze weergave-lijst wordt afgerond. `displayEvents` (EventPane,
+  // chart-markers, simulatie-invoer) houdt de exacte kernel-waarde — afronden
+  // dáár zou een rekenwaarde verschuiven, en dat is geen weergavekwestie.
   const eventsForTimeline = useMemo(() => {
     const base = showLifeEvents ? displayEvents : []
-    return showNaturalMilestones ? [...base, ...naturalMilestonesAsEvents] : base
+    const alle = showNaturalMilestones ? [...base, ...naturalMilestonesAsEvents] : base
+    return alle.map(e =>
+      e.target_age != null && !Number.isInteger(e.target_age)
+        ? { ...e, target_age: Math.round(e.target_age) }
+        : e,
+    )
   }, [showLifeEvents, showNaturalMilestones, displayEvents, naturalMilestonesAsEvents])
 
   // ── V7 tekort-lening-zichtbaarheid ──────────────────────────────────────
@@ -5021,7 +5037,8 @@ export default function HorizonPage({
           </div>
 
           {/* Mobile: Primary number */}
-          <div className="sm:hidden mb-3">
+          {/* Zelfde breekpunt als de 2x2-strip hieronder (B-025). */}
+          <div className="md:hidden mb-3">
             <button type="button" onClick={() => setShowFireAgeReceipt(true)} className="text-left">
               {showFreeHero ? (
                 <span className="font-serif text-[28px] font-bold tracking-tight text-[var(--ink)]">{freeHeroPhrase}.</span>
@@ -5051,8 +5068,13 @@ export default function HorizonPage({
 
           {/* Desktop: 4-col figures-strip — editorial blueprint. Onder een vast anker
               valt de Opnamerate-tegel weg (uitgaven ÷ huidig vermogen is daar
-              betekenisloos — bevinding 6) en wordt het een 3-koloms strip. */}
-          <div className={`hidden sm:grid ${isFixedAnchorMode && !hasPerspectiveHero ? 'sm:grid-cols-3' : 'sm:grid-cols-4'} items-start border-t border-b border-[var(--ink)] mb-5`}>
+              betekenisloos — bevinding 6) en wordt het een 3-koloms strip.
+
+              Breekpunt is `md` (768px), niet `sm` (640px) — B-025. Op 640–767px
+              (Surface Duo staand: 696px) gaf vier kolommen ~150px per tegel voor
+              een kicker, een icoon en een 32px Playfair-getal: de cijfers liepen
+              in elkaar. Die band houdt daarom de 2×2-variant hieronder. */}
+          <div className={`hidden md:grid ${isFixedAnchorMode && !hasPerspectiveHero ? 'md:grid-cols-3' : 'md:grid-cols-4'} items-start border-t border-b border-[var(--ink)] mb-5`}>
             {/* KPI 1: Vrijheidsleeftijd / Pensioenleeftijd — winner met highlight-marker */}
             <button
               type="button"
@@ -5376,11 +5398,12 @@ export default function HorizonPage({
             </div>
           </div>
 
-          {/* Mobile: 2x2 figures-strip — editorial blueprint.
-              Cellen stretchen (géén items-start): de rand tussen de cellen moet
-              doorlopen tot de volle rijhoogte, ook als één KPI (dual doelbedrag)
-              hoger uitvalt dan zijn buur. */}
-          <div className="grid grid-cols-2 sm:hidden border-t border-b border-[var(--ink)] mb-5">
+          {/* Mobiel én smalle tablet (< 768px): 2x2 figures-strip — editorial
+              blueprint. Cellen stretchen (géén items-start): de rand tussen de
+              cellen moet doorlopen tot de volle rijhoogte, ook als één KPI (dual
+              doelbedrag) hoger uitvalt dan zijn buur.
+              `md:hidden` i.p.v. `sm:hidden` — zie de noot bij de strip hierboven. */}
+          <div className="grid grid-cols-2 md:hidden border-t border-b border-[var(--ink)] mb-5">
             {/* KPI 1: Vrijheidsleeftijd / Pensioenleeftijd — winner */}
             <button
               type="button"
@@ -5853,17 +5876,18 @@ export default function HorizonPage({
                           ? margeZin(mcMarge)
                           : 'Marktcheck: je plan doorgerekend onder wisselende markten'}
                       aria-busy={mcExpanded && mcPending}
+                      /* Het label mag NIET wegvallen zolang de datawaarde staat
+                         (H21/F2): op smal scherm bleef anders een kaal getal over,
+                         dat naast een "succeskans" als kans gelezen werd. Dat liep
+                         via `className="inline"` op het label (0,1,0) en verloor
+                         altijd van de compact-regel (0,3,0) — B-025. Nu draagt de
+                         PIL het keep-signaal, en garandeert de CSS dat label en
+                         badge samen reizen. Zonder badge geen keep: dan doet de pil
+                         gewoon mee met de compacte stand. */
+                      data-pill-keep={mcExpanded && (mcPending || mcFailed || Boolean(mcMarge)) ? '' : undefined}
                     >
                       <FlaskConical className="h-3 w-3" />
-                      {/* Het label mag NIET wegvallen zolang de datawaarde staat
-                          (H21/F2): op smal scherm bleef anders een kaal getal over,
-                          dat naast een "succeskans" als kans gelezen werd. Zonder
-                          waarde blijft het label op `sm:` verborgen — dan is er ook
-                          niets te misduiden en telt de compacte pillenbalk. */}
-                      <span
-                        data-pill-label
-                        className={mcExpanded && !mcPending && mcMarge ? 'inline' : 'hidden sm:inline'}
-                      >
+                      <span data-pill-label className="hidden sm:inline">
                         Marktcheck
                       </span>
                       {mcExpanded && mcPending && (
@@ -5899,6 +5923,9 @@ export default function HorizonPage({
                       aria-pressed={showScenarioLine}
                       aria-label={`${doelLijnLabel}-lijn tonen`}
                       title={`${doelLijnLabel}-lijn`}
+                      /* De delta is hier het punt van de pil → label en badge
+                         blijven samen staan zolang die delta er is (B-025). */
+                      data-pill-keep={hasScenario && scenarioFireDeltaLabel ? '' : undefined}
                     >
                       {/* Ink-dash-swatch (zelfde SVG als legenda/ScenarioChip) draagt de
                           wat-als-identiteit; de pill volgt verder de horizon-chroom van de rij. */}

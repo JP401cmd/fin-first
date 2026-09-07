@@ -11,9 +11,20 @@
  *
  * ── DIT IS WEERGAVE, GEEN BEREKENING ────────────────────────────────────────
  * `resolveSpendLimitDisplayStatus` leest alleen wat de motor al besliste
- * (`status`, `isNearLimit`) — er wordt hier geen drempel toegepast en geen
- * bedrag vergeleken. De 80%-grens blijft van `SPEND_LIMIT_NEAR_LIMIT_PCT` in de
- * motor.
+ * (`status`, `isNearLimit`, `periodHeadroom`) — er wordt hier geen drempel
+ * toegepast en geen bedrag opnieuw gesommeerd. De 80%-grens blijft van
+ * `SPEND_LIMIT_NEAR_LIMIT_PCT` in de motor, en de rekenkundige grens
+ * (`matched > limit` ⇒ 'exceeded', exact op de grens telt als BINNEN) blijft van
+ * `computePeriodOutcome`. Zie ADR 0136.
+ *
+ * ── DE VIERDE STAND IS WEERGAVE, GEEN AFWIJKING VAN DE MOTOR ────────────────
+ * Exact op de grens levert de motor `status: 'within'` én `periodHeadroom: 0`.
+ * Reken-technisch klopt dat (je bent niet eroverheen), maar de tekst die eraan
+ * hing beloofde ruimte die er niet is: "Er is nog ruimte, maar niet veel" naast
+ * "€ 0 ruimte". Daarom kent de WEERGAVE een vierde stand — `reached` — tussen
+ * `near` en `exceeded`. De motor, de reeksen, de score en de
+ * `exceeded`-telling zien 'm niet: daar blijft dit gewoon een periode binnen de
+ * grens.
  *
  * ── KLEUR VOLGT DE SEMANTIEK, NIET HET ACCENT ───────────────────────────────
  * Binnen/dichtbij/boven is stoplicht-semantiek en volgt de gekozen accentkleur
@@ -23,8 +34,60 @@
 
 import type { SpendLimitPeriodPace, SpendLimitScoreLabel, SpendLimitStatus } from './engine'
 
-/** De drie standen die elk oppervlak toont. */
-export type SpendLimitDisplayStatus = 'within' | 'near' | 'exceeded'
+/** De vier standen die elk oppervlak toont. */
+export type SpendLimitDisplayStatus = 'within' | 'near' | 'reached' | 'exceeded'
+
+/**
+ * De standen die ook over een AFGESLOTEN periode iets zeggen: waar stond je aan
+ * het eind van die periode. `near` hoort hier bewust niet bij — "je nadert je
+ * grens" gaat over een periode die nog loopt, en een afgesloten maand op 85%
+ * bleef gewoon binnen.
+ */
+export type SpendLimitOutcomeState = Extract<
+  SpendLimitDisplayStatus,
+  'within' | 'reached' | 'exceeded'
+>
+
+/**
+ * Cent-tolerantie voor "er is geen ruimte meer".
+ *
+ * `periodHeadroom` is een euro-float: een som van transactiebedragen afgetrokken
+ * van een grensbedrag. Een strikte `=== 0` laat een afrondingsrest van een
+ * duizendste cent door, waarna het scherm "€ 0 ruimte" toont en de tekst ernaast
+ * alsnog ruimte belooft — precies de tegenspraak die deze stand moet opheffen.
+ * Een halve cent is de kleinste eenheid die er in euro's toe doet, en tegelijk
+ * exact de grens waaronder het bedrag naar "€ 0,00" afrondt: de stand zegt
+ * daarmee hetzelfde als het getal ernaast.
+ *
+ * Bewust hetzelfde getal als `CENT_EPSILON` in `lib/budget-alerts.ts`, waar
+ * `budgetLimitStatus` de budget-limiet al in drie toestanden leest
+ * (onder/bereikt/over). Die constante is daar niet geëxporteerd; ze samenvoegen
+ * is een aparte opruiming, geen onderdeel van deze fix.
+ */
+export const SPEND_LIMIT_HEADROOM_EPSILON = 0.005
+
+/**
+ * Waar deze periode eindigde ten opzichte van de grens — zonder de
+ * near-nuance.
+ *
+ * DIT IS GEEN TWEEDE STATUSREGEL: `exceeded` komt onverkort van de motor, en
+ * `reached` is een LEZING van `periodHeadroom` (dat de motor al berekende), niet
+ * een eigen vergelijking van besteed tegen grens. De `limitAmount > 0`-guard
+ * spiegelt die van `isNearLimit`: op een nulgrens is elke uitgave al een
+ * overschrijding, en een lege periode zou anders permanent "grens bereikt"
+ * melden.
+ */
+export function resolveSpendLimitOutcomeState(period: {
+  status: SpendLimitStatus
+  limitAmount: number
+  periodHeadroom: number
+}): SpendLimitOutcomeState {
+  if (period.status === 'exceeded') return 'exceeded'
+  if (period.limitAmount > 0 && period.periodHeadroom < SPEND_LIMIT_HEADROOM_EPSILON) {
+    return 'reached'
+  }
+  return 'within'
+}
 
 /**
  * Leid de weergave-stand af uit een doorgerekende periode.
@@ -32,12 +95,18 @@ export type SpendLimitDisplayStatus = 'within' | 'near' | 'exceeded'
  * Neemt bewust het kleinst mogelijke stukje van de uitkomst aan — zo werkt hij
  * zowel op een `SpendLimitPeriodOutcome` (pane, kaart) als op de smallere
  * widget-projectie, zonder dat die twee vormen naar elkaar toe hoeven groeien.
+ * De widget-projectie noemt de ruimte `currentHeadroom`; die vertaalt zichzelf
+ * op de aanroeproep, zodat hier één veldnaam blijft staan.
  */
 export function resolveSpendLimitDisplayStatus(period: {
   status: SpendLimitStatus
   isNearLimit: boolean
+  limitAmount: number
+  periodHeadroom: number
 }): SpendLimitDisplayStatus {
-  if (period.status === 'exceeded') return 'exceeded'
+  const state = resolveSpendLimitOutcomeState(period)
+  // `reached` gaat vóór `near`: op de grens staan is geen "bijna".
+  if (state !== 'within') return state
   return period.isNearLimit ? 'near' : 'within'
 }
 
@@ -45,6 +114,7 @@ export function resolveSpendLimitDisplayStatus(period: {
 export const SPEND_LIMIT_STATUS_LABEL: Record<SpendLimitDisplayStatus, string> = {
   within: 'Binnen je grens',
   near: 'Dicht bij je grens',
+  reached: 'Grens bereikt',
   exceeded: 'Boven je grens',
 }
 
@@ -52,12 +122,21 @@ export const SPEND_LIMIT_STATUS_LABEL: Record<SpendLimitDisplayStatus, string> =
 export const SPEND_LIMIT_STATUS_LABEL_INLINE: Record<SpendLimitDisplayStatus, string> = {
   within: 'binnen je grens',
   near: 'dicht bij je grens',
+  reached: 'grens bereikt',
   exceeded: 'boven je grens',
 }
 
+/**
+ * `reached` deelt het WARNING-token met `near` en niet het negative-token: er is
+ * niets overschreden, dus rood zou een gebeurtenis beloven die niet plaatsvond —
+ * en groen zou ruimte suggereren die er niet is. Het onderscheid met `near` zit
+ * in het label ("Grens bereikt" tegen "Dicht bij je grens") en, waar er een vlak
+ * getekend wordt, in een sterkere rand (zie `SPEND_LIMIT_STATUS_BAND_CLASS`).
+ */
 export const SPEND_LIMIT_STATUS_TEXT_CLASS: Record<SpendLimitDisplayStatus, string> = {
   within: 'text-positive',
   near: 'text-warning',
+  reached: 'text-warning',
   exceeded: 'text-negative',
 }
 
@@ -65,6 +144,7 @@ export const SPEND_LIMIT_STATUS_TEXT_CLASS: Record<SpendLimitDisplayStatus, stri
 export const SPEND_LIMIT_STATUS_COLOR_VAR: Record<SpendLimitDisplayStatus, string> = {
   within: 'var(--positive)',
   near: 'var(--warning)',
+  reached: 'var(--warning)',
   exceeded: 'var(--negative)',
 }
 
@@ -79,6 +159,9 @@ export const SPEND_LIMIT_STATUS_COLOR_VAR: Record<SpendLimitDisplayStatus, strin
 export const SPEND_LIMIT_STATUS_BAND_CLASS: Record<SpendLimitDisplayStatus, string> = {
   within: 'border-positive/25 bg-positive-bg',
   near: 'border-warning/30 bg-warning-bg',
+  // Zelfde tint als `near`, stevigere rand: dezelfde kleurfamilie (er is niets
+  // overschreden), maar zichtbaar een stap verder.
+  reached: 'border-warning/60 bg-warning-bg',
   exceeded: 'border-negative/30 bg-negative-bg',
 }
 

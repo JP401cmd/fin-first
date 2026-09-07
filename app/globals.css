@@ -433,8 +433,40 @@
    houdt de rij alleen iconen over. De regel staat hier (en niet als Tailwind
    arbitrary-variant op de component) omdat het de garantie hard en zichtbaar
    maakt: één plek, geen kans dat een niet-gegenereerde variant 'm stil sloopt. */
-[data-pill-row][data-compact='true'] [data-pill-label] {
+[data-pill-row][data-compact='true'] [data-pill-label],
+[data-pill-row][data-compact='true'] [data-pill-badge] {
   display: none;
+}
+
+/* INVARIANT (B-025) — label en badge reizen SAMEN. Valt het label weg, dan valt
+   de badge mee. Er blijft dus nooit een kaal getal zonder naam over: op 696px
+   las de rij anders als naamloze iconen met losse cijfers ("3", "−2,1"), en een
+   getal naast een flesje werd als succeskans gelezen.
+
+   Uitzondering: een pil waarvan het GETAL het punt is, draagt `data-pill-keep`
+   op de knop — en alleen zolang de badge daadwerkelijk rendert. Daar blijven
+   label én badge staan, ook onder `sm` (waar de pil zijn label normaal via
+   `hidden sm:inline` inlevert): het getal krijgt zijn naam mee.
+
+   Specificiteit is hier de hele truc. De vorige ontsnappingsklep was een
+   `.inline`-class op het label (0,1,0) en verloor dus altijd van de
+   compact-regel hierboven (0,3,0). Deze regel weegt 0,4,0 en wint wél.
+   Een keep-badge hoort een inline element te zijn (span met tekst). */
+[data-pill-row][data-compact='true'] [data-pill-keep] [data-pill-label],
+[data-pill-row][data-compact='true'] [data-pill-keep] [data-pill-badge],
+[data-pill-row] [data-pill-keep] [data-pill-label],
+[data-pill-row] [data-pill-keep] [data-pill-badge] {
+  display: inline;
+}
+
+/* Onder `sm` verbergt elke pil zijn label zelf (`hidden sm:inline`). Zonder
+   deze regel bleef daar een badge zonder label staan — precies het kale getal
+   dat de invariant verbiedt. Keep-pillen vallen er bewust buiten: hun regel
+   hierboven weegt zwaarder (0,3,0 vs 0,2,0), dus dáár blijven naam én getal. */
+@media (max-width: 639.98px) {
+  [data-pill-row] [data-pill-badge] {
+    display: none;
+  }
 }
 
 /* Pillen mogen NIET krimpen. In een `flex-nowrap`-rij is `flex-shrink: 1` de
@@ -450,10 +482,14 @@
    scherm), dan vallen ook de databadges (delta's, telbadges, `data-pill-badge`)
    weg en worden gap en pill-padding strakker. Liever een badge kwijt dan
    pillen die onbereikbaar voorbij de schermrand staan; betekenis blijft via
-   `title`/`aria-label`. De padding-regel raakt bewust alleen de pillen zelf
+   `title`/`aria-label`. Ook een `data-pill-keep`-pil levert hier álles in
+   (label én badge) — nooit één van de twee, dat zou de invariant breken.
+   De padding-regel raakt bewust alleen de pillen zelf
    (directe kinderen + één niveau diep, voor de rechter `ml-auto`-groep en
    popover-triggers) — de popover-ínhoud (dieper genest) blijft ongemoeid. */
-[data-pill-row][data-tight='true'] [data-pill-badge] {
+[data-pill-row][data-tight='true'] [data-pill-badge],
+[data-pill-row][data-tight='true'] [data-pill-keep] [data-pill-badge],
+[data-pill-row][data-tight='true'] [data-pill-keep] [data-pill-label] {
   display: none;
 }
 [data-pill-row][data-tight='true'] {

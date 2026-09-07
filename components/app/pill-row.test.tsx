@@ -19,6 +19,8 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { render, cleanup } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { PillRow } from './pill-row'
 
 // ── Layout-mock ─────────────────────────────────────────────────────────────
@@ -199,5 +201,59 @@ describe('PillRow', () => {
     const { container } = render(<Pills extra />)
     expect(row(container).hasAttribute('data-pill-row')).toBe(true)
     expect(container.querySelectorAll('[data-pill-label]').length).toBe(3)
+  })
+
+  it('laat data-pill-keep op een pil ongemoeid — de rij bemoeit zich niet met haar kinderen', () => {
+    const { container } = render(
+      <PillRow ariaLabel="Grafiek-opties">
+        <button type="button" title="Marktcheck" data-pill-keep="">
+          <span data-pill-label>Marktcheck</span>
+          <span data-pill-badge>-2,1%</span>
+        </button>
+      </PillRow>,
+    )
+    expect(container.querySelector('[data-pill-keep]')).toBeTruthy()
+  })
+})
+
+// ── De invariant zelf: label en badge reizen samen (B-025) ───────────────────
+//
+// Het verbergen is CSS en jsdom past `app/globals.css` niet toe, dus een
+// render-test kan de invariant niet bewijzen. Wat we WÉL hard kunnen maken is
+// de regelvorm in de bron — en precies dáár ging het mis: de ontsnappingsklep
+// was een `.inline`-class (0,1,0) die het altijd verloor van de compact-regel
+// (0,3,0), waardoor er op 696px naamloze iconen met kale getallen overbleven.
+describe('pillenrij-invariant in app/globals.css', () => {
+  /** Regelblokken met een `data-pill`-selector; @media-wrappers vallen weg. */
+  const blokken = [
+    ...readFileSync(join(process.cwd(), 'app/globals.css'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .matchAll(/([^{}]+)\{([^{}]*)\}/g),
+  ]
+    .map((m) => ({ selector: m[1].trim(), body: m[2].trim() }))
+    .filter((r) => r.selector.includes('data-pill'))
+
+  const verbergt = (fragment: string) =>
+    blokken.filter((r) => r.selector.includes(fragment) && /display:\s*none/.test(r.body))
+  const toont = (fragment: string) =>
+    blokken.filter((r) => r.selector.includes(fragment) && /display:\s*inline/.test(r.body))
+
+  it('verbergt in de compacte stand het label én de badge in dezelfde regel', () => {
+    const compact = verbergt("[data-compact='true'] [data-pill-label]")
+    expect(compact.length).toBeGreaterThan(0)
+    // Dezelfde regel moet de badge meenemen — anders blijft er een kaal getal staan.
+    expect(compact.some((r) => r.selector.includes("[data-compact='true'] [data-pill-badge]"))).toBe(true)
+  })
+
+  it('geeft een keep-pil label én badge terug in de compacte stand', () => {
+    const keep = toont('[data-pill-keep]')
+    expect(keep.some((r) => r.selector.includes('[data-pill-keep] [data-pill-label]'))).toBe(true)
+    expect(keep.some((r) => r.selector.includes('[data-pill-keep] [data-pill-badge]'))).toBe(true)
+  })
+
+  it('laat ook een keep-pil in de tight-stand álles vallen, nooit één van de twee', () => {
+    const tight = verbergt("[data-tight='true']")
+    expect(tight.some((r) => r.selector.includes("[data-tight='true'] [data-pill-keep] [data-pill-label]"))).toBe(true)
+    expect(tight.some((r) => r.selector.includes("[data-tight='true'] [data-pill-keep] [data-pill-badge]"))).toBe(true)
   })
 })

@@ -185,7 +185,12 @@ export const NAV_ENGINE_CHECKS: NavEngineCheck[] = [
       const syncMetModule = itemsMetModule.some((i) => i.id === 'action:sync-prices')
       const syncZonderModule = itemsZonderModule.some((i) => i.id === 'action:sync-prices')
       return {
-        expected: 'perspectiefItems=3; actiefLabel=Persoonlijk · actief; privacyLabel=Bedragen verbergen; syncPricesMetModule=true; syncPricesZonderModule=false',
+        // `syncPricesZonderModule=true` is sinds B-029 het JUISTE antwoord: de
+        // sync-actie draagt geen module-gate meer, omdat haar ronde ook
+        // banktransacties ophaalt en de header-knop die dezelfde ronde draait
+        // nooit een gate had. De check blijft staan om precies dát vast te
+        // pinnen — een teruggekeerde gate hoort hier rood te worden.
+        expected: 'perspectiefItems=3; actiefLabel=Persoonlijk · actief; privacyLabel=Bedragen verbergen; syncPricesMetModule=true; syncPricesZonderModule=true',
         actual: `perspectiefItems=${perspectiefItems.length}; actiefLabel=${actiefItem.sublabel}; privacyLabel=${privacyItem.label}; syncPricesMetModule=${syncMetModule}; syncPricesZonderModule=${syncZonderModule}`,
       }
     },

@@ -10,6 +10,7 @@ import {
 } from '@/components/overview/cashflow-cards-loader'
 import { PageInfoButton } from '@/components/editorial/page-info-button'
 import { PageStatusDot } from '@/components/app/page-status-dot'
+import { BudgetHeaderSlot, BudgetHeaderSlotProvider } from '@/components/app/budgets-client'
 import { Kicker } from '@/components/editorial'
 import { getPageInfo } from '@/lib/page-info-content'
 
@@ -40,6 +41,24 @@ export const metadata: Metadata = {
  * budgetten stromen er elk achteraan in hun eigen `<Suspense>`. De LCP-kandidaat
  * is de TITEL, en die hangt van niets af.
  */
+/*
+ * VOLGORDE: AANHEF → KICKER → KAARTEN → BUDGETTEN.
+ *
+ * De aanhef stond ónder de kaarten. ADR 0135 haalde terecht één van de twee
+ * pagina-aanhefs weg — er stonden er twee, met de kaarten ertussen geklemd —
+ * maar de aanhef die won (`BudgetEditorialHeader`, "Hoeveel ruimte heb je
+ * nog?") woont in `BudgetsClient`, en die stroomt als laatste binnen. Gevolg:
+ * een pagina die met drie kaartjes opende en zijn titel halverwege droeg.
+ *
+ * De aanhef is niet naar deze server-page te tillen: zijn cijfers hangen aan
+ * de maand-selectie en het perspectief in `BudgetsClient`, en hier opnieuw
+ * uitrekenen zou een tweede grondslag maken. In plaats daarvan staat hier de
+ * aanhef-PLEK (`<BudgetHeaderSlot>`) en publiceert `BudgetsClient` zijn
+ * cijfers ernaartoe (`BudgetHeaderSlotProvider` omspant beide). Tot de
+ * budgetten binnen zijn draagt het slot de wachtvorm: kicker + kop staan zo
+ * nog steeds in de eerste byte, precies waar de LCP-redenering hierboven ze
+ * wil hebben, en het cijferblok schuift de kaarten niet omlaag als het invult.
+ */
 export default async function OverzichtBudgetPage() {
   // HET ENIGE AWAIT BOVEN DE RETURN, en dat moet zo blijven. Streaming werkt
   // alleen als er geen zware await boven staat: één `createClient()`/`loadX()`
@@ -52,42 +71,44 @@ export default async function OverzichtBudgetPage() {
   return (
     <>
       <NavStackMeta title="Budget" bottomBar={{ kind: 'tabs' }} />
-      <div className="relative mx-auto max-w-6xl px-4 pt-4 sm:px-6">
-        <PageStatusDot className="absolute right-[52px] top-4 sm:right-[60px]" />
-        <PageInfoButton
-          content={getPageInfo('/overzicht/budget')}
-          className="absolute right-4 top-4 sm:right-6"
-        />
-      </div>
 
-      {/* De drie onderdelen als kaarten met hun kerngetal en status —
-          overgenomen van de opgeheven cashflow-hub, waar er vier stonden.
-          Budget zelf valt weg: dit ÍS die pagina.
+      <BudgetHeaderSlotProvider>
+        {/* De pagina-aanhef — één opening, bovenaan. De header-controls zweven
+            er absoluut overheen (conventie CLAUDE.md: statuspunt links van de
+            'i', zelfde h-7 w-7-familie); `BudgetHeaderSlot` geeft de kicker-rij
+            en de kop daarvoor een rechter-gutter, zodat alleen die twee regels
+            inspringen en het cijferblok de volle breedte houdt. */}
+        <section className="relative mx-auto max-w-6xl px-4 pt-4 sm:px-6">
+          <PageStatusDot className="absolute right-[52px] top-4 sm:right-[60px]" />
+          <PageInfoButton
+            content={getPageInfo('/overzicht/budget')}
+            className="absolute right-4 top-4 sm:right-6"
+          />
+          <BudgetHeaderSlot />
+        </section>
 
-          GEEN EIGEN PAGINA-AANHEF hier. De hub-hero ("Hoeveel vrijheid zet je
-          elke maand opzij?") is bij de verhuizing meegekomen en stond toen
-          bóven de aanhef die `BudgetsClient` zelf al draagt ("Hoeveel ruimte
-          heb je nog?") — twee volwaardige `PageOpening`s, dus twee h2's met
-          een grote vraag op één scherm, met deze kaarten ertussen geklemd.
-          ADR 0135 schreef die afweging al voor ("één wint, de andere vervalt");
-          de budget-aanhef wint, want die draagt cijfers en een maandaanduiding.
-          Alleen zichtbaar bij live doorklikken: los gelezen klopt elk bestand.
+        {/* De drie onderdelen als kaarten met hun kerngetal en status —
+            overgenomen van de opgeheven cashflow-hub, waar er vier stonden.
+            Budget zelf valt weg: dit ÍS die pagina.
 
-          De kicker blijft wél, buiten het gestreamde blok: hij benoemt waar
-          deze drie kaarten over gaan en staat er al vóór ze binnen zijn. */}
-      <section className="mx-auto max-w-6xl px-4 pt-4 sm:px-6">
-        <Kicker size="small" className="mb-2">
-          Je geldstroom
-          <PerspectiveContextLabel className="normal-case tracking-normal" />
-        </Kicker>
-      </section>
-      <Suspense fallback={<CashflowCardsFallback />}>
-        <CashflowCardsLoader perspective={perspective} />
-      </Suspense>
+            De kicker hoort bij de KAARTEN, niet bij de aanhef: hij benoemt waar
+            deze drie over gaan en staat er al vóór ze binnen zijn. Daarom
+            blijft hij hier staan, tussen de aanhef en de kaarten, en niet
+            bovenaan — de aanhef draagt zijn eigen kicker ("Budgetteren · <maand>"). */}
+        <section className="mx-auto max-w-6xl px-4 pt-2 sm:px-6 sm:pt-3">
+          <Kicker size="small" className="mb-2">
+            Je geldstroom
+            <PerspectiveContextLabel className="normal-case tracking-normal" />
+          </Kicker>
+        </section>
+        <Suspense fallback={<CashflowCardsFallback />}>
+          <CashflowCardsLoader perspective={perspective} />
+        </Suspense>
 
-      <Suspense fallback={<BudgetsFallback />}>
-        <BudgetsLoader />
-      </Suspense>
+        <Suspense fallback={<BudgetsFallback />}>
+          <BudgetsLoader />
+        </Suspense>
+      </BudgetHeaderSlotProvider>
     </>
   )
 }

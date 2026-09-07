@@ -6,21 +6,15 @@
 //   - syncing → spin-animation + kleine "3/7" tekst onder het icoon (desktop)
 //   - partial → grijze icoon met rode dot rechtsboven; klik opent het rapport
 //
-// De knop fetcht de connections-lijst zelf bij click — anders zou hij telkens
-// een server-component moeten zijn. Voor wallets/exchanges met veel rijen valt
-// dit binnen <200ms (één Supabase round-trip).
-//
-// Sinds de bankstap komt daar één parallelle leesronde bij
-// (`/api/bank-connect/linked-accounts`). Die mag NIET fataal zijn: kan hij niet
-// geladen worden, dan gaat de sync door zónder bankkoppelingen — prijzen en
-// exchanges verversen is beter dan een knop die helemaal niets doet.
+// De leesronde ("welke doelen mogen nu mee?") en het starten van de ronde staan
+// bewust NIET hier maar in `useGlobalSyncRunner` — het ⌘K-palet start dezelfde
+// ronde en moet dezelfde doelen meekrijgen. Deze knop is alleen nog de drie
+// visuele states plus de klik.
 
-import { useCallback, useState } from 'react'
+import { useCallback } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { useGlobalSync } from './global-sync-provider'
-import { useToast } from '@/components/app/toast-provider'
-import { fetchBankSyncTargets } from './load-bank-sync-targets'
-import type { ConnectionsData } from '@/lib/connections-data'
+import { useGlobalSyncRunner } from './use-global-sync-runner'
 import {
   formatAmsterdamDayMonth,
   formatAmsterdamDayMonthYear,
@@ -51,13 +45,12 @@ function formatRelative(iso: string | null): string {
 }
 
 export function GlobalSyncButton({ onOpenReport }: GlobalSyncButtonProps) {
-  const { state, triggerGlobalSync, getBankAttempts } = useGlobalSync()
-  const { addToast } = useToast()
-  const [loadingConnections, setLoadingConnections] = useState(false)
+  const { state } = useGlobalSync()
+  const { runGlobalSync, loadingTargets } = useGlobalSyncRunner()
 
   const isSyncing = state.phase === 'syncing'
   const isPartial = state.phase === 'partial'
-  const disabled = isSyncing || loadingConnections
+  const disabled = isSyncing || loadingTargets
 
   const handleClick = useCallback(async () => {
     if (isPartial) {
@@ -66,33 +59,8 @@ export function GlobalSyncButton({ onOpenReport }: GlobalSyncButtonProps) {
       return
     }
     if (disabled) return
-
-    setLoadingConnections(true)
-    try {
-      // Parallel: de bank-leesronde mag de exchange-/wallet-ronde niet vertragen.
-      const [res, banks] = await Promise.all([
-        fetch('/api/integrations/connections', { cache: 'no-store' }),
-        fetchBankSyncTargets(getBankAttempts()),
-      ])
-      if (!res.ok) {
-        throw new Error('Kon koppelingen niet laden')
-      }
-      const data = (await res.json()) as ConnectionsData
-      const totalConnections = data.exchanges.length + data.wallets.length + banks.length
-
-      await triggerGlobalSync({
-        exchanges: data.exchanges,
-        wallets: data.wallets,
-        banks,
-        pricesOnly: totalConnections === 0,
-      })
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Onbekende fout'
-      addToast({ type: 'error', title: 'Sync mislukt', message })
-    } finally {
-      setLoadingConnections(false)
-    }
-  }, [isPartial, disabled, onOpenReport, triggerGlobalSync, addToast, getBankAttempts])
+    await runGlobalSync()
+  }, [isPartial, disabled, onOpenReport, runGlobalSync])
 
   // Bronnen, niet koppelingen: de prijzenverversing telt net zo goed mee als een
   // exchange- of bankkoppeling. Zelfde noemer als de eindmelding ("2 van 2

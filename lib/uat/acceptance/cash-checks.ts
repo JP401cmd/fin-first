@@ -84,7 +84,14 @@ import {
   type SpendLimitAggregateRow,
   type SpendLimitPeriodOutcome,
 } from '@/lib/spend-limits/engine'
-import { describeSpendLimitPace } from '@/lib/spend-limits/status-display'
+import {
+  describeSpendLimitPace,
+  resolveSpendLimitDisplayStatus,
+  resolveSpendLimitOutcomeState,
+  SPEND_LIMIT_HEADROOM_EPSILON,
+  SPEND_LIMIT_STATUS_LABEL,
+  SPEND_LIMIT_STATUS_TEXT_CLASS,
+} from '@/lib/spend-limits/status-display'
 import {
   normalizePartnerVisibility,
   ownershipForVisibility,
@@ -1442,7 +1449,15 @@ NEWFILEUID:NONE
       criterion('WF-CASH-61')
 
       const LIMIET = 500
-      /** Eén afgesloten maandperiode met een vast bedrag — geen jitter. */
+      /**
+       * Eén afgesloten maandperiode met een vast bedrag — geen jitter.
+       *
+       * `status` spiegelt hier de MOTOR-regel (`matched > limit` ⇒ 'exceeded',
+       * exact op de grens telt als binnen), niet de weergave-stand. ADR 0136
+       * voegde een vierde WEERGAVE-stand toe (`reached`) zonder de motor te
+       * raken; deze fixture hoort die dus NIET te volgen — de score en de reeks
+       * rekenen op de motorwaarde.
+       */
       const periode = (maand: number, bedrag: number): SpendLimitPeriodOutcome => {
         const mm = String(maand).padStart(2, '0')
         const laatsteDag = new Date(Date.UTC(2026, maand, 0)).getUTCDate()
@@ -1597,7 +1612,12 @@ NEWFILEUID:NONE
       criterion('WF-CASH-64')
 
       const LIMIET = 500
-      /** Eén AFGESLOTEN 30-dagen-periode met een vast bedrag — hand-narekenbaar dagtempo. */
+      /**
+       * Eén AFGESLOTEN 30-dagen-periode met een vast bedrag — hand-narekenbaar
+       * dagtempo. `status` spiegelt de MOTOR-regel, niet de weergave-stand: de
+       * vierde stand uit ADR 0136 (`reached`) is weergave en raakt het tempo,
+       * de reeks en de score niet.
+       */
       const gesloten = (nr: number, bedrag: number): SpendLimitPeriodOutcome => ({
         periodKey: `basis-${nr}`,
         label: `basis-${nr}`,
@@ -1670,6 +1690,95 @@ NEWFILEUID:NONE
           `baselineDailyAmount=${pace.baselineDailyAmount}; basisPeriodCount=${pace.basisPeriodCount}; ` +
           `projectedAmount=${pace.projectedAmount}; projectedExceeds=${pace.projectedExceeds}; zin=${zin}; ` +
           `teWeinigProjected=${teWeinigPace.projectedAmount}; teWeinigBasis=${teWeinigPace.basisPeriodCount}; dagPotHeeftGeenPace=${dagPotHeeftGeenPace}`,
+      }
+    },
+  },
+  {
+    workflow: 'WF-CASH-67',
+    scenarioId: 'UAT-CASH-67',
+    label:
+      'Grenzenpot "Grens bereikt" (ADR 0136): de vierde WEERGAVE-stand op periodHeadroom < 0,005 — wint van `near`, laat de motor/score/reeks ongemoeid',
+    run: () => {
+      criterion('WF-CASH-67')
+
+      const LIMIET = 500
+      const agg = (month: string, sumNegatief: number): SpendLimitAggregateRow => ({
+        bucketStart: `${month}-01`,
+        transactionType: null,
+        sumPositief: 0,
+        sumNegatief,
+        count: 1,
+      })
+      const slice = (key: string) => ({
+        periodKey: key,
+        label: key,
+        since: `${key}-01`,
+        until: `${key}-28`,
+        isOpen: false,
+      })
+
+      // (a) PRECIES OP DE GRENS — de échte motor, geen fixture: €500 besteed op
+      //     een grens van €500. De motorregel (`matched > limit`) laat dit
+      //     BINNEN, en 500/500 = 100% ≥ 80% zet `isNearLimit` aan. Dat is exact
+      //     de tegenspraak uit de melding: "Er is nog ruimte" naast € 0 ruimte.
+      const opDeGrens = computePeriodOutcome(slice('2026-03'), [agg('2026-03', -500)], LIMIET)
+      // (b) NET ERONDER — €499,99 laat een cent ruimte en blijft dus `near`.
+      const netEronder = computePeriodOutcome(slice('2026-04'), [agg('2026-04', -499.99)], LIMIET)
+      // (c) RUIM BINNEN — geen near, geen reached.
+      const ruimBinnen = computePeriodOutcome(slice('2026-05'), [agg('2026-05', -100)], LIMIET)
+      // (d) EROVERHEEN — `exceeded` blijft onverkort van de motor komen.
+      const eroverheen = computePeriodOutcome(slice('2026-06'), [agg('2026-06', -501)], LIMIET)
+      // (e) NULGRENS — dezelfde guard als `isNearLimit` (`limitAmount > 0`): een
+      //     lege periode op een grens van €0 zou anders permanent "grens
+      //     bereikt" melden.
+      const nulGrens = computePeriodOutcome(slice('2026-07'), [], 0)
+
+      // De cent-tolerantie zelf, op de gedeelde lezing: een afrondingsrest onder
+      // een halve cent telt als "geen ruimte meer" (het bedrag ernaast rondt af
+      // naar € 0,00), een halve cent en meer niet.
+      const restOnderEpsilon = resolveSpendLimitOutcomeState({
+        status: 'within',
+        limitAmount: LIMIET,
+        periodHeadroom: SPEND_LIMIT_HEADROOM_EPSILON / 2,
+      })
+      const restOpEpsilon = resolveSpendLimitOutcomeState({
+        status: 'within',
+        limitAmount: LIMIET,
+        periodHeadroom: SPEND_LIMIT_HEADROOM_EPSILON,
+      })
+
+      // DE MOTOR IS ONGEMOEID: zes afgesloten periodes die alle zes precies op
+      // de grens eindigen zijn zes TREFFERS — trefpercentage 100, reeks 6, geen
+      // enkele overschrijding. Zou `reached` in de motor zijn gaan zitten, dan
+      // zakte dit cijfer hier zichtbaar weg.
+      const zesOpDeGrens = ['01', '02', '03', '04', '05', '06'].map((mm) =>
+        computePeriodOutcome(slice(`2026-${mm}`), [agg(`2026-${mm}`, -500)], LIMIET),
+      )
+      const scoreOpDeGrens = computeSpendLimitScore(
+        zesOpDeGrens,
+        computeSpendLimitTrend(zesOpDeGrens),
+        null,
+      )
+      const streaksOpDeGrens = computeStreaks(zesOpDeGrens)
+
+      return {
+        expected:
+          'motorStatusOpDeGrens=within; motorNearOpDeGrens=true; motorHeadroomOpDeGrens=0; ' +
+          'weergaveOpDeGrens=reached; weergaveNetEronder=near; weergaveRuimBinnen=within; weergaveEroverheen=exceeded; weergaveNulGrens=within; ' +
+          'restOnderEpsilon=reached; restOpEpsilon=within; ' +
+          'label=Grens bereikt; kleur=text-warning; ' +
+          'scoreOpDeGrens=100; hitRateOpDeGrens=100; exceededTellingOpDeGrens=0; reeksOpDeGrens=6',
+        actual:
+          `motorStatusOpDeGrens=${opDeGrens.status}; motorNearOpDeGrens=${opDeGrens.isNearLimit}; motorHeadroomOpDeGrens=${fx(opDeGrens.periodHeadroom, 0)}; ` +
+          `weergaveOpDeGrens=${resolveSpendLimitDisplayStatus(opDeGrens)}; ` +
+          `weergaveNetEronder=${resolveSpendLimitDisplayStatus(netEronder)}; ` +
+          `weergaveRuimBinnen=${resolveSpendLimitDisplayStatus(ruimBinnen)}; ` +
+          `weergaveEroverheen=${resolveSpendLimitDisplayStatus(eroverheen)}; ` +
+          `weergaveNulGrens=${resolveSpendLimitDisplayStatus(nulGrens)}; ` +
+          `restOnderEpsilon=${restOnderEpsilon}; restOpEpsilon=${restOpEpsilon}; ` +
+          `label=${SPEND_LIMIT_STATUS_LABEL.reached}; kleur=${SPEND_LIMIT_STATUS_TEXT_CLASS.reached}; ` +
+          `scoreOpDeGrens=${scoreOpDeGrens.score}; hitRateOpDeGrens=${scoreOpDeGrens.hitRatePct}; ` +
+          `exceededTellingOpDeGrens=${streaksOpDeGrens.exceededPeriodCount}; reeksOpDeGrens=${streaksOpDeGrens.currentStreak}`,
       }
     },
   },

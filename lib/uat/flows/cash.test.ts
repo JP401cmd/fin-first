@@ -98,7 +98,9 @@ describe('CASH_FLOW — curatie-integriteit', () => {
     // 64 → 65: WF-CASH-66 (TrueLayer-sync stempelt ownership op de en/of-rekening
     // en ontdubbelt tegen de dragende rij van de partner) is als flow-knoop
     // toegevoegd.
-    expect(covered.size).toBe(65)
+    // 65 → 66: WF-CASH-67 (grenzenpot precies op de grens, ADR 0136) is als
+    // flow-knoop 'grenzenpotbereikt' onder 'grenzenpotberekenen' toegevoegd.
+    expect(covered.size).toBe(66)
   })
 
   it('de domeinoverschrijdende cross-knopen dekken BUDGET/OVZ/TOEK/WILL/BEZIT/MIJN', () => {

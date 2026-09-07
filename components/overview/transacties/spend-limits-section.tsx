@@ -80,6 +80,7 @@ import { budgetAttention, describeLimitShort, describeRule } from '@/lib/spend-l
 import {
   describeSpendLimitPace,
   resolveSpendLimitDisplayStatus,
+  SPEND_LIMIT_HEADROOM_EPSILON,
   SPEND_LIMIT_STATUS_BAND_CLASS,
   SPEND_LIMIT_STATUS_LABEL,
   SPEND_LIMIT_STATUS_TEXT_CLASS,
@@ -294,7 +295,12 @@ function FreedomLine({
   const { masked } = useMaskedAmounts()
   if (masked) return null
   if (dailyExpenseRate === null || !(dailyExpenseRate > 0)) return null
-  if (!(Math.abs(amount) > 0)) return null
+  // Dezelfde halve cent als de `reached`-stand (ADR 0136): een bedrag onder
+  // SPEND_LIMIT_HEADROOM_EPSILON rondt af naar "€ 0,00" en is dus geen ruimte.
+  // Met een kale `> 0`-guard bleef bij een headroom van bv. 0,004 "geen ruimte
+  // meer" staan mét eronder "Die ruimte ≈ 0 dagen vrijheid" — twee zinnen die
+  // elkaar tegenspreken over hetzelfde getal.
+  if (!(Math.abs(amount) >= SPEND_LIMIT_HEADROOM_EPSILON)) return null
   const time = formatFreedomTimeString(calculateFreedomTime(amount, dailyExpenseRate), 'short')
   return (
     <p className={`font-serif text-[11px] italic text-[var(--ink-3)] ${className}`}>
@@ -581,14 +587,18 @@ export function SpendLimitsSection({
   const collapsedSummary = useMemo(() => {
     const n = data.limits.length
     if (n === 0) return `Nog geen ${copy.pluralLower}`
-    const over = data.limits.filter((l) => l.report.currentPeriod.status === 'exceeded').length
-    const near = data.limits.filter(
-      (l) => l.report.currentPeriod.status !== 'exceeded' && l.report.currentPeriod.isNearLimit,
-    ).length
+    // Eén lezing van de stand (dezelfde als de kaart en de tegel), zodat een pot
+    // die precies op zijn grens staat hier niet "dicht bij je grens" heet.
+    const states = data.limits.map((l) => resolveSpendLimitDisplayStatus(l.report.currentPeriod))
+    const count = (s: string) => states.filter((x) => x === s).length
+    const over = count('exceeded')
+    const reached = count('reached')
+    const near = count('near')
     const parts = [`${n} ${n === 1 ? copy.singularLower : copy.pluralLower}`]
     if (over > 0) parts.push(`${over} boven je grens`)
+    if (reached > 0) parts.push(`${reached} op je grens`)
     if (near > 0) parts.push(`${near} dicht bij je grens`)
-    if (over === 0 && near === 0) parts.push('allemaal binnen je grens')
+    if (over === 0 && reached === 0 && near === 0) parts.push('allemaal binnen je grens')
     return parts.join(' · ')
   }, [data.limits, copy])
 
@@ -870,6 +880,9 @@ function SpendLimitCard({
             <MaskedAmount value={current.periodMatchedAmount} tone="kern" /> van{' '}
             <MaskedAmount value={current.limitAmount} tone="kern" />
           </span>
+          {/* Drie takken, want twee logen: precies op de grens toonde hier "nog
+              € 0 ruimte" (ADR 0136). Er is niets overschreden, dus geen
+              waarschuwingsdriehoek — wel de warning-kleur van de stand. */}
           <span className="text-xs text-[var(--ink-2)]">
             {over ? (
               <>
@@ -877,6 +890,8 @@ function SpendLimitCard({
                 <MaskedAmount value={current.periodOverAmount} tone="inherit" className="text-negative" />{' '}
                 eroverheen
               </>
+            ) : displayStatus === 'reached' ? (
+              <span className="text-warning">geen ruimte meer</span>
             ) : (
               <>
                 nog <MaskedAmount value={current.periodHeadroom} tone="inherit" /> ruimte
@@ -909,7 +924,11 @@ function SpendLimitCard({
           </p>
         )}
         {/* Geld is opgeslagen tijd: de ruimte of de overschrijding ook in
-            vrijheidstijd, op het dagtarief uit de loader. */}
+            vrijheidstijd, op het dagtarief uit de loader. Bij `reached` houdt
+            FreedomLine zich stil — "Die ruimte is ≈ 0 dagen vrijheid" zou
+            dezelfde belofte herhalen (ADR 0136). Let op: het bedrag is dáár niet
+            per se nul, maar KLEINER DAN SPEND_LIMIT_HEADROOM_EPSILON; de guard
+            in FreedomLine gebruikt daarom diezelfde drempel. */}
         <FreedomLine
           className="mt-0.5"
           amount={over ? current.periodOverAmount : current.periodHeadroom}

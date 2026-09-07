@@ -29,7 +29,9 @@ vi.mock('@/components/app/chat/chat-provider', () => ({
 }))
 
 vi.mock('@/components/sync/global-sync-provider', () => ({
-  useGlobalSync: () => ({ triggerGlobalSync: vi.fn() }),
+  // `getBankAttempts` hoort erbij sinds de palette-sync via
+  // `useGlobalSyncRunner` dezelfde volledige ronde start als de header-knop.
+  useGlobalSync: () => ({ triggerGlobalSync: vi.fn(), getBankAttempts: () => ({}) }),
 }))
 
 vi.mock('@/components/app/feature-access-provider', () => ({

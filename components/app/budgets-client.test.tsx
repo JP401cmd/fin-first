@@ -20,10 +20,15 @@ import { DisplayModeProvider } from '@/lib/hooks/use-display-mode'
 import {
   BudgetEditorialHeader,
   BudgetFiguresStrip,
+  BudgetHeaderSlot,
+  BudgetHeaderSlotProvider,
   BudgetPeriodToggle,
   BudgetReportActions,
   BudgetViewToggle,
+  useBudgetHeaderSlot,
+  type BudgetHeaderFigures,
 } from './budgets-client'
+import { useEffect } from 'react'
 
 // Optimistische PUT bij de modus is geen echte netwerk-call in de test.
 beforeEach(() => {
@@ -129,6 +134,66 @@ describe('BudgetEditorialHeader — één euroteken (regressie WF-BUDGET-02-bug2
     expect(text).not.toMatch(/€\s*€/)
     // Minteken staat vóór het (enkele) euroteken.
     expect(text).toMatch(/−€/)
+  })
+})
+
+/**
+ * Het aanhef-slot: op /overzicht/budget staat de pagina-opening bóven de drie
+ * geldstroom-kaarten, terwijl haar cijfers uit `BudgetsPage` komen. Wat hier
+ * vastligt is het mechanisme — wachtvorm tot er gepubliceerd is, daarna exact
+ * de gepubliceerde cijfers, zonder tweede som onderweg.
+ */
+describe('BudgetHeaderSlot — aanhef bóven de kaarten', () => {
+  function Publisher({ figures }: { figures: BudgetHeaderFigures }) {
+    const slot = useBudgetHeaderSlot()
+    const publish = slot?.publish
+    useEffect(() => {
+      publish?.(figures)
+    }, [publish, figures])
+    return null
+  }
+
+  it('toont de wachtvorm — kop wél, cijfers nog niet — zolang er niets gepubliceerd is', () => {
+    render(
+      <DisplayModeProvider initialMode="full">
+        <BudgetHeaderSlotProvider>
+          <BudgetHeaderSlot />
+        </BudgetHeaderSlotProvider>
+      </DisplayModeProvider>,
+    )
+    expect(screen.getByText(/heb je nog/i)).toBeTruthy()
+    expect(screen.queryByText('Nog te besteden')).toBeNull()
+  })
+
+  it('toont ná publicatie exact de gepubliceerde cijfers (1800 − 1500 = 300)', () => {
+    const { container } = render(
+      <DisplayModeProvider initialMode="full">
+        <BudgetHeaderSlotProvider>
+          <BudgetHeaderSlot />
+          <Publisher figures={{ ...HEADER_PROPS, simple: false }} />
+        </BudgetHeaderSlotProvider>
+      </DisplayModeProvider>,
+    )
+    expect(screen.getByText('Nog te besteden')).toBeTruthy()
+    expect(screen.getByText('Nog te verdelen')).toBeTruthy()
+    const text = container.textContent ?? ''
+    // Ankergetal (budgetBeschikbaar) én de maand uit de publicatie.
+    expect(text).toContain('300')
+    expect(text).toMatch(/juni 2026/i)
+  })
+
+  it('publiceert `simple` mee: in Eenvoudig blijft het cijferblok weg', () => {
+    render(
+      <DisplayModeProvider initialMode="simple">
+        <BudgetHeaderSlotProvider>
+          <BudgetHeaderSlot />
+          <Publisher figures={{ ...HEADER_PROPS, simple: true }} />
+        </BudgetHeaderSlotProvider>
+      </DisplayModeProvider>,
+    )
+    expect(screen.getByText(/heb je nog/i)).toBeTruthy()
+    expect(screen.queryByText('Nog te besteden')).toBeNull()
+    expect(screen.queryByText('Nog te verdelen')).toBeNull()
   })
 })
 

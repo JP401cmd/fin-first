@@ -56,6 +56,42 @@
  *
  * Volledig blijft verder ongewijzigd: `simple` is daar false, dus de
  * `verdict`-variant, het afwijkende raster en de CF-2-filter doen er niets.
+ *
+ * ── W-003 — KLEINER, MÉT HET OORDEEL (7 sep 2026) ───────────────────────────
+ * Een testgebruiker vroeg de kaartjes in Eenvoudig te "minimaliseren, zoals de
+ * kaartjes op de toekomst pagina". Op /toekomst staat dáár de `compact`-variant
+ * (icoon + label, verder niets). Overschakelen was de voor de hand liggende
+ * lezing en is bewust NIET gedaan: `compact` gooit het oordeel weg, en dat is
+ * precies de reductie die het R5-richtingsbesluit hierboven verbiedt. De
+ * eigenaar heeft die afweging expliciet gemaakt — **kleiner mag, het oordeel
+ * blijft.**
+ *
+ * De wens landt daarom als MAAT en niet als variant: `<LeverageCard dense>`
+ * (zie de prop-docstring daar) zet de verdict-tegel op de maatvoering van
+ * `compact` — p-2 sm:p-3, chip 28/32px, label en oordeel één typetrap lager,
+ * bedrag op 10px — met alle vier de regels intact. De chevron was in Eenvoudig
+ * al weg (`expandable={!simple}`).
+ *
+ * ── W-002 — DE VIERDE TEGEL: INSTELLINGEN (7 sep 2026) ──────────────────────
+ * Naast de drie gestatuste kaarten staat nu een losse INSTELLINGEN-tegel
+ * (`BudgetInstellingenTile`) die naar /overzicht/budget/instellingen wijst: de
+ * grondslagschattingen (inkomen/uitgaven/spaarquote) plus de keuze welke cash-
+ * en spaarrekeningen in budgetteren meelopen.
+ *
+ * Hij is met OPZET géén `CashflowCardKey` en géén `LeverageCard`. Die union
+ * voedt `cashflowCardStatuses()` — het wire-contract van
+ * `GET /api/overzicht/cashflow-status` én van de sidebar-stippen. Een
+ * instellingen-ingang heeft geen status en geen KPI; hem daar inhangen zou een
+ * lege stip door de hele app geven. Vandaar: eigen tegel, geen status-dot, geen
+ * cijfer, neutrale (niet-stoplicht, niet-module) chip-tint.
+ *
+ * HET RASTER BLIJFT ONGEWIJZIGD `grid-cols-2 md:grid-cols-4`. Met de vierde
+ * tegel is de md-rij nu exact vol (er stonden er drie sinds `budgetSubCards`)
+ * en is mobiel een schone 2×2. `grid-cols-3` — de letterlijke /toekomst-vorm —
+ * is overwogen en afgevallen: dat zet de vierde tegel als wees op een eigen
+ * rij, en een verdict-regel ("Goed gespaard deze maand") is op een derde van
+ * een telefoonscherm een muur van tekst. De verkleining zit dus in de tegel,
+ * niet in het raster.
  */
 
 import { useState } from 'react'
@@ -66,6 +102,7 @@ import {
   ArrowLeftRight,
   Repeat,
   LineChart,
+  SlidersHorizontal,
   type LucideIcon,
 } from 'lucide-react'
 import { LeverageCard } from './leverage-card'
@@ -77,7 +114,11 @@ import {
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { maskCurrencyInText } from '@/lib/format'
+import { BUDGET_SUBCARD_KEYS } from '@/lib/cashflow-cards'
 import type { CashflowCard, CashflowCardKey } from '@/lib/cashflow-cards'
+
+/** Waar de instellingen-tegel naartoe wijst. Eén plek, gedeeld met de tests. */
+export const BUDGET_INSTELLINGEN_HREF = '/overzicht/budget/instellingen'
 
 const VISUAL: Record<CashflowCardKey, { Icon: LucideIcon; tint: string }> = {
   budget: { Icon: PiggyBank, tint: 'text-amber-700 bg-amber-50' },
@@ -94,6 +135,12 @@ const VISUAL: Record<CashflowCardKey, { Icon: LucideIcon; tint: string }> = {
  * kaart minder toonde (CF-2) en die kaarten one-liners waren (CF-1) die op
  * mobiel gestapeld werden. Beide redenen zijn vervallen: de kaarten dragen nu in
  * beide modi hun oordeel + cijfer, en het zijn er in beide modi vier.
+ *
+ * ONGEWIJZIGD BIJ W-003 + W-002 (7 sep 2026), en dat is een keuze. Sinds ADR
+ * 0135 rendert deze pagina drie gestatuste kaarten (`budgetSubCards`), dus stond
+ * de md-rij één tegel leeg; de instellingen-tegel vult die precies. Op mobiel is
+ * het daarmee een schone 2×2 in plaats van 2 + 1. Zie de W-002-alinea in de
+ * bestandskop voor waarom `grid-cols-3` (de letterlijke /toekomst-vorm) afviel.
  */
 const CARD_GRID = 'grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3'
 
@@ -194,6 +241,8 @@ export function CashflowLandingCards({ cards }: { cards: CashflowCard[] }) {
             href={card.href}
             tooltip={card.tooltip}
             variant={simple ? 'verdict' : 'full'}
+            /* W-003: kleiner in Eenvoudig, mét behoud van het oordeel. */
+            dense={simple}
             expandable={!simple}
             expanded={expanded}
             onToggleExpand={() => setExpandedKey(expanded ? null : card.key)}
@@ -202,7 +251,59 @@ export function CashflowLandingCards({ cards }: { cards: CashflowCard[] }) {
           </LeverageCard>
         )
       })}
+      <BudgetInstellingenTile dense={simple} />
     </nav>
+  )
+}
+
+/**
+ * De vierde tegel: INSTELLINGEN (W-002).
+ *
+ * Bewust GEEN `LeverageCard` en geen `CashflowCardKey` — zie de W-002-alinea in
+ * de bestandskop. Deze tegel draagt geen status, geen status-dot en geen cijfer;
+ * hij is een ingang, geen meting. De chip-tint is daarom neutraal (`--subtle` /
+ * `--ink-2`) en niet een van de herkenningskleuren van de drie kaarten: die
+ * dragen een onderdeel, deze draagt een handeling.
+ *
+ * De shell (rounded-2xl, paper-bg, ink-border, hover-lift) en de `dense`-maten
+ * zijn 1-op-1 die van `LeverageCard`, zodat de tegel in dezelfde rij niet uit de
+ * toon valt. Hij telt twee tekstregels waar de kaarten er drie hebben; het
+ * raster rekt tegels in een rij toch al gelijk, dus dat geeft geen sprong.
+ */
+function BudgetInstellingenTile({ dense }: { dense: boolean }) {
+  return (
+    <Link
+      href={BUDGET_INSTELLINGEN_HREF}
+      title="Je schattingen en welke rekeningen meelopen in budgetteren."
+      className={`group relative flex flex-col rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] transition-all hover:border-[var(--ink-3)] hover:shadow-sm ${
+        dense ? 'p-2 sm:p-3' : 'p-3 sm:p-4'
+      }`}
+    >
+      <span
+        className={`${
+          dense ? 'w-7 h-7 sm:w-8 sm:h-8' : 'w-8 h-8 sm:w-9 sm:h-9'
+        } rounded-lg flex items-center justify-center bg-[var(--subtle)] text-[var(--ink-2)]`}
+      >
+        <SlidersHorizontal
+          className={dense ? 'w-3.5 h-3.5 sm:w-4 sm:h-4' : 'w-4 h-4 sm:w-5 sm:h-5'}
+          aria-hidden="true"
+        />
+      </span>
+      <span
+        className={`${
+          dense ? 'mt-1.5 text-xs sm:text-sm' : 'mt-2 text-sm sm:text-base'
+        } font-semibold text-[var(--ink)]`}
+      >
+        Instellingen
+      </span>
+      <span
+        className={`mt-0.5 ${
+          dense ? 'text-xs sm:text-sm' : 'text-sm sm:text-base'
+        } font-medium leading-snug text-[var(--ink-2)]`}
+      >
+        Schattingen en rekeningen
+      </span>
+    </Link>
   )
 }
 
@@ -225,8 +326,15 @@ export function CashflowLandingCards({ cards }: { cards: CashflowCard[] }) {
  *   subAmount    text-[11px] leading-tight            → h-3
  *   substext-rij min-h-[16px]                         → h-4
  *
- * plus de kaart-padding (`p-3 sm:p-4` vol, `p-3` compact) en dezelfde
- * `rounded-2xl border`-shell.
+ * plus de kaart-padding (`p-3 sm:p-4` vol, `p-2 sm:p-3` in de `dense`-tak van
+ * Eenvoudig) en dezelfde `rounded-2xl border`-shell.
+ *
+ * HET AANTAL KOMT UIT `BUDGET_SUBCARD_KEYS`, niet uit een hard `[0,1,2,3]`
+ * (W-003, 7 sep 2026). Die literal bleef op vier staan toen ADR 0135 de
+ * kaartenset op deze pagina naar drie bracht, dus reserveerde de fallback in
+ * béide modi één tegel te veel — dezelfde CLS als hierboven beschreven, alleen
+ * de andere kant op. Naast de drie status-tegels staat één instellingen-tegel
+ * (W-002) met een eigen, kortere vorm: chip + twee tekstregels, geen cijfer.
  *
  * De KPI- én venster-regel worden bewust WÉL gereserveerd, terwijl
  * `LeverageCard` ze bij `kpi === null` / `kpiWindow === null` weglaat: dat is de
@@ -240,44 +348,52 @@ export function CashflowLandingCardsSkeleton() {
   const simple = useDisplayMode().mode === 'simple'
 
   if (simple) {
-    /* HERZIEN 28 aug 2026 (S4 + S5). De simple-fallback reserveerde drie tegels
-       met alleen een icoon + label, omdat de kaart toen een one-liner was (CF-1)
-       en de Forecast-kaart ontbrak (CF-2). Beide zijn vervallen: het zijn er
-       vier, en elk rendert de `verdict`-variant — icon-chip, label,
-       oordeel-regel en de bedrag+venster-regel. Zonder deze bijwerking zou élke
-       hub-load in Eenvoudig van drie one-liners naar vier volle tegels
-       springen: gegarandeerde CLS.
-
-       Hoogtes nageteld uit `leverage-card.tsx`, `verdict`-tak:
-         icon-chip  w-8 h-8 / sm:w-9 sm:h-9        → h-8 w-8 / sm:h-9 sm:w-9
-         label      text-sm (20px) / sm:text-base  → h-5 / sm:h-6
-         oordeel    text-sm (20px) / sm:text-base  → h-5 / sm:h-6
-         bedrag     text-[11px] leading-tight      → h-3
-       plus dezelfde `mt-2` / `mt-0.5`-ritmiek. De bedrag-regel wordt bewust
-       gereserveerd hoewel `LeverageCard` 'm bij `kpi === null` weglaat: dat is
-       de lege-account-staat, en reserveren kiest de veelvoorkomende kant. */
+    /* W-003 + W-002 (7 sep 2026). Twee correcties tegelijk:
+       (1) HET AANTAL. Hier stond hard `[0, 1, 2, 3]` — vier gestatuste tegels —
+           terwijl de budgetpagina er sinds ADR 0135 nog maar DRIE rendert
+           (`budgetSubCards`). De fallback reserveerde dus één tegel te veel, in
+           béide modi: precies de layout-sprong die hij hoort te voorkomen, alleen
+           de andere kant op. Het aantal komt nu uit `BUDGET_SUBCARD_KEYS` zelf,
+           zodat het niet opnieuw kan wegdrijven van de kaartenset.
+       (2) DE MATEN. De echte tegels draaien in Eenvoudig sinds W-003 op
+           `dense` (p-2 sm:p-3, chip 28/32px, label + oordeel één typetrap
+           lager, bedrag op 10px). Hoogtes hieronder zijn dáárop nageteld —
+           text-xs (16px) → h-4, sm:text-sm (20px) → h-5, text-[10px]
+           leading-tight → h-3.
+       De instellingen-tegel krijgt zijn eigen, kortere vorm (chip + twee
+       tekstregels, géén cijferregel): hij heeft geen status en geen KPI. */
+    /* HERZIEN 28 aug 2026 (S4 + S5), nog steeds geldend: de tegel is geen
+       one-liner meer maar een verdict-kaart — icon-chip, label, oordeel-regel én
+       de bedrag+venster-regel. De bedrag-regel wordt bewust gereserveerd hoewel
+       `LeverageCard` 'm bij `kpi === null` weglaat: dat is de lege-account-staat,
+       en reserveren kiest de veelvoorkomende kant. */
     return (
       <div className={`${CARD_GRID} animate-pulse`}>
-        {[0, 1, 2, 3].map((i) => (
+        {BUDGET_SUBCARD_KEYS.map((key) => (
           <div
-            key={i}
-            className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-4"
+            key={key}
+            className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-2 sm:p-3"
           >
-            <div className="h-8 w-8 rounded-lg bg-[var(--subtle)] sm:h-9 sm:w-9" />
-            <div className="mt-2 h-5 w-20 bg-[var(--subtle)] sm:h-6" />
-            <div className="mt-0.5 h-5 w-28 bg-[var(--subtle)] sm:h-6" />
-            <div className="mt-0.5 h-3 w-32 bg-[var(--subtle)]" />
+            <div className="h-7 w-7 rounded-lg bg-[var(--subtle)] sm:h-8 sm:w-8" />
+            <div className="mt-1.5 h-4 w-16 bg-[var(--subtle)] sm:h-5" />
+            <div className="mt-0.5 h-4 w-24 bg-[var(--subtle)] sm:h-5" />
+            <div className="mt-0.5 h-3 w-28 bg-[var(--subtle)]" />
           </div>
         ))}
+        <div className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-2 sm:p-3">
+          <div className="h-7 w-7 rounded-lg bg-[var(--subtle)] sm:h-8 sm:w-8" />
+          <div className="mt-1.5 h-4 w-20 bg-[var(--subtle)] sm:h-5" />
+          <div className="mt-0.5 h-4 w-28 bg-[var(--subtle)] sm:h-5" />
+        </div>
       </div>
     )
   }
 
   return (
     <div className={`${CARD_GRID} animate-pulse`}>
-      {[0, 1, 2, 3].map((i) => (
+      {BUDGET_SUBCARD_KEYS.map((key) => (
         <div
-          key={i}
+          key={key}
           className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-4"
         >
           <div className="h-8 w-8 rounded-lg bg-[var(--subtle)] sm:h-9 sm:w-9" />
@@ -287,6 +403,12 @@ export function CashflowLandingCardsSkeleton() {
           <div className="mt-1 h-4 w-16 bg-[var(--subtle)]" />
         </div>
       ))}
+      {/* Instellingen — chip + twee tekstregels, géén cijfer- of oordeelregel. */}
+      <div className="rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-3 sm:p-4">
+        <div className="h-8 w-8 rounded-lg bg-[var(--subtle)] sm:h-9 sm:w-9" />
+        <div className="mt-2 h-5 w-20 bg-[var(--subtle)] sm:h-6" />
+        <div className="mt-0.5 h-5 w-28 bg-[var(--subtle)] sm:h-6" />
+      </div>
     </div>
   )
 }

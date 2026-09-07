@@ -74,7 +74,17 @@ function row(month: string, spend: number): SpendLimitAggregateRow {
   }
 }
 
-function pot(over: Partial<SpendLimitConfig> = {}): SpendLimitWithReport {
+/** De standaardhistorie: drie afgesloten maanden, lopende maand nog leeg. */
+const DEFAULT_ROWS: SpendLimitAggregateRow[] = [
+  row('2026-07', 150),
+  row('2026-06', 240),
+  row('2026-05', 120),
+]
+
+function pot(
+  over: Partial<SpendLimitConfig> = {},
+  rows: SpendLimitAggregateRow[] = DEFAULT_ROWS,
+): SpendLimitWithReport {
   const config: SpendLimitConfig = {
     id: 'pot-1',
     name: 'Boodschappengrens',
@@ -106,7 +116,7 @@ function pot(over: Partial<SpendLimitConfig> = {}): SpendLimitWithReport {
         period: config.period,
         createdAt: config.createdAt,
       },
-      rows: [row('2026-07', 150), row('2026-06', 240), row('2026-05', 120)],
+      rows,
       now: NOW,
       windowPeriods: SPEND_LIMIT_WINDOW_BY_PERIOD[config.period],
     }),
@@ -262,6 +272,29 @@ describe('SpendLimitsSection — de kaart toont wat de motor zegt', () => {
       'short',
     )
     expect(screen.getByText(`Die ruimte is ≈ ${verwacht} vrijheid`)).toBeTruthy()
+  })
+
+  it('precies op de grens: "Grens bereikt", geen ruimte-belofte (ADR 0136)', () => {
+    // Uitgegeven == grens. De motor houdt dit BINNEN de grens (die regel is
+    // ongewijzigd); alleen de weergave kent de vierde stand.
+    const p = pot({}, [row('2026-08', 200)])
+    expect(p.report.currentPeriod.status).toBe('within')
+    expect(p.report.currentPeriod.periodHeadroom).toBe(0)
+    expect(p.report.currentPeriod.isNearLimit).toBe(true)
+
+    render(
+      <PrivacyProvider>
+        <SpendLimitsSection data={sectionData({ limits: [p] })} />
+      </PrivacyProvider>,
+    )
+
+    expect(screen.getByText('Grens bereikt')).toBeTruthy()
+    expect(screen.getByText('geen ruimte meer')).toBeTruthy()
+    expect(screen.queryByText('Dicht bij je grens')).toBeNull()
+    // "Die ruimte is ≈ … vrijheid" hoort weg te blijven bij nul ruimte.
+    expect(screen.queryByText(/Die ruimte is/)).toBeNull()
+    // De ingeklapte samenvatting telt 'm apart, niet als "dicht bij".
+    expect(screen.getByText(/op je grens/)).toBeTruthy()
   })
 })
 

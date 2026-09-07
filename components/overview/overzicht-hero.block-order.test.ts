@@ -20,7 +20,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const pageSource = readFileSync(
@@ -81,11 +81,34 @@ describe('/overzicht — de banners staan ná de begroeting (H20)', () => {
     expect(grafiek, 'de grafiek hoort ná de gezondheidskaart').toBeGreaterThan(gezondheid)
   })
 
-  it('de delta-regel (H11) blijft bij de begroeting staan, in de header', () => {
-    const headline = at(heroSource, '<EditorialHeadline', 'overzicht-hero.tsx')
-    const note = at(heroSource, '{greetingNote}', 'overzicht-hero.tsx')
-    const headerEnd = at(heroSource, '</header>', 'overzicht-hero.tsx')
-    expect(note).toBeGreaterThan(headline)
-    expect(note).toBeLessThan(headerEnd)
+  /**
+   * B-028 — de dagdelta-regel onder de begroeting ("Tegen je huidige uitgaven
+   * kwam er sinds gisteren 9 dagen vrijheid bij") is VERWIJDERD, met de hele
+   * keten eronder: het `greetingNote`-slot, `SindsVorigBezoek(Loader)`,
+   * `lib/overview/sinds-vorig-bezoek.ts` en de bezoekmarker (`touchLastSeen`) in
+   * `profiles.briefing_snapshot`. Eigenaar-besluit: een DAG-delta zegt te weinig
+   * in dit domein — de waarde zit in maandelijks gebruik — en er komt bewust
+   * GEEN vervangende regel.
+   *
+   * De grendel is daarom OMGEKEERD: hij bewaakt niet langer wáár de regel staat,
+   * maar dát hij niet terugsluipt. Zelfde bron-aanpak als de volgorde-checks
+   * hierboven, plus een bestandscheck zodat een halve herintroductie (het
+   * component terug, de render nog niet) óók rood wordt.
+   */
+  it('de dagdelta-regel (H11) is weg en blijft weg (B-028)', () => {
+    expect(heroSource, 'het `greetingNote`-slot rendert weer in de hero').not.toContain(
+      '{greetingNote}',
+    )
+    expect(heroSource, 'de `greetingNote`-prop is weer gedeclareerd').not.toContain(
+      'greetingNote?:',
+    )
+    expect(pageSource, 'page.tsx hangt de delta-cel weer op').not.toContain('SindsVorigBezoek')
+    for (const pad of [
+      ['components', 'overview', 'sinds-vorig-bezoek.tsx'],
+      ['components', 'overview', 'sinds-vorig-bezoek-loader.tsx'],
+      ['lib', 'overview', 'sinds-vorig-bezoek.ts'],
+    ]) {
+      expect(existsSync(join(process.cwd(), ...pad)), `${pad.join('/')} is terug`).toBe(false)
+    }
   })
 })

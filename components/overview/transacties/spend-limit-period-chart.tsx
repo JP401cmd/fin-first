@@ -48,6 +48,12 @@ import {
   formatMaskedCurrency,
 } from '@/lib/format'
 import type { SpendLimitPeriodOutcome, SpendLimitTrend } from '@/lib/spend-limits/engine'
+import {
+  resolveSpendLimitOutcomeState,
+  SPEND_LIMIT_STATUS_LABEL,
+  SPEND_LIMIT_STATUS_LABEL_INLINE,
+  SPEND_LIMIT_STATUS_TEXT_CLASS,
+} from '@/lib/spend-limits/status-display'
 
 // ── Afmetingen (viewBox-eenheden; de SVG schaalt naar 100% breedte) ─────────
 
@@ -399,13 +405,16 @@ export function SpendLimitPeriodChart({
             bereikbaar (NFR-B1-05) — de tooltip mag niet alleen op hover bestaan. */}
         {outcomes.map((o, i) => {
           const pct = pctOfLimit(o.periodMatchedAmount, limitAmount)
-          const statusWord = o.isOpen
-            ? o.status === 'exceeded'
-              ? 'voorlopig boven je grens'
-              : 'voorlopig binnen je grens'
-            : o.status === 'exceeded'
-              ? 'boven je grens'
-              : 'binnen je grens'
+          // Drie woorden uit de gedeelde standen-map: precies op de grens is
+          // "grens bereikt", niet "binnen je grens" (ADR 0136). De near-stand
+          // hoort hier niet — die gaat over een periode die nog loopt.
+          const word = SPEND_LIMIT_STATUS_LABEL_INLINE[resolveSpendLimitOutcomeState(o)]
+          // "voorlopig" ACHTER het woord, niet ervoor. Als bijvoeglijk voorvoegsel
+          // liep het stuk op de enige stand zonder lidwoord: "voorlopig grens
+          // bereikt". Achteraan loopt hij in alle vier de standen ("grens bereikt,
+          // voorlopig"), en het is dezelfde vorm die de heatmap-aria-label al
+          // gebruikt (spend-limit-heatmap.tsx) — één zinsbouw voor één feit.
+          const statusWord = o.isOpen ? `${word}, voorlopig` : word
           return (
             <rect
               key={`hit-${o.periodKey}`}
@@ -459,10 +468,10 @@ export function SpendLimitPeriodChart({
           </div>
           <div
             className={`mt-0.5 text-[11px] ${
-              active.status === 'exceeded' ? 'text-negative' : 'text-positive'
+              SPEND_LIMIT_STATUS_TEXT_CLASS[resolveSpendLimitOutcomeState(active)]
             }`}
           >
-            {active.status === 'exceeded' ? 'Boven je grens' : 'Binnen je grens'}
+            {SPEND_LIMIT_STATUS_LABEL[resolveSpendLimitOutcomeState(active)]}
             {pctOfLimit(active.periodMatchedAmount, limitAmount) !== null && (
               <> · {pctOfLimit(active.periodMatchedAmount, limitAmount)}% van je grens</>
             )}

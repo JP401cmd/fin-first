@@ -37,7 +37,6 @@ import {
   runwaySentence,
   computeRunwayWeekDelta,
 } from '@/lib/briefing/overview-briefing'
-import { buildSindsVorigBezoek } from '@/lib/overview/sinds-vorig-bezoek'
 import { compareCompound } from '@/lib/compound-projection'
 import { buildSimNetWorthRows } from '@/lib/horizon/networth-rows'
 import { DEFAULT_HOUSING_STRATEGY } from '@/lib/housing-strategy'
@@ -245,7 +244,7 @@ export const OVZ_ENGINE_CHECKS: OvzEngineCheck[] = [
     workflow: 'WF-OVZ-09',
     scenarioId: 'UAT-OVZ-09',
     label:
-      'Vrijheidstijd: TOTAAL = runway (summarizeRunway) + week-delta-plausibiliteitsgrens (computeRunwayWeekDelta); MARGINAAL = bezoekdelta (buildSindsVorigBezoek)',
+      'Vrijheidstijd: TOTAAL = runway (summarizeRunway) + week-delta-plausibiliteitsgrens (computeRunwayWeekDelta)',
     run: () => {
       criterion('WF-OVZ-09')
       // ── TOTAAL — de runway. Willem stopt op zijn 45e en zijn vermogen reikt
@@ -275,26 +274,21 @@ export const OVZ_ENGINE_CHECKS: OvzEngineCheck[] = [
         { months: 118 },
       )
 
-      // ── MARGINAAL — de bezoekdelta. Bewust een ANDERE grootheid (ADR 0126 D1):
-      //    €2.500 erbij ÷ €100/dag = 25 vrijheidsdagen. Die dagen mogen nooit bij
-      //    de runway hierboven opgeteld worden.
-      const bezoek = buildSindsVorigBezoek(
-        { netWorth: 122500 },
-        { at: '2026-08-23T09:00:00.000Z', netWorth: 120000 },
-        100,
-        new Date('2026-08-24T09:00:00Z'),
-      )
+      // ── DE MARGINALE BEZOEKDELTA IS VERVALLEN (B-028, sep 2026). Hier stond
+      //    `buildSindsVorigBezoek` als derde meting: Δ vermogen ÷ dagtarief van
+      //    vandaag, de regel onder de begroeting. Die regel én haar keten zijn
+      //    verwijderd — een dag-delta zegt te weinig in dit domein — dus er is op
+      //    /overzicht nog maar ÉÉN vrijheidsgrootheid: de runway hierboven.
 
       return {
         expected:
-          'willemKind=reaches-end-age; willemDuur=minstens 45 jaar; willemZin=Als je nu zou stoppen, reikt je vermogen tot voorbij je 90e.; daanMeetpunt=geen; opgeblazenDelta=onderdrukt; opgeblazenImplausibel=true; normaleDeltaMaanden=2; marginaleBezoekdagen=25',
+          'willemKind=reaches-end-age; willemDuur=minstens 45 jaar; willemZin=Als je nu zou stoppen, reikt je vermogen tot voorbij je 90e.; daanMeetpunt=geen; opgeblazenDelta=onderdrukt; opgeblazenImplausibel=true; normaleDeltaMaanden=2',
         actual:
           `willemKind=${willem?.kind}; willemDuur=${willem ? runwayDurationLabel(willem) : 'geen'}` +
           `; willemZin=${willem ? runwaySentence(willem) : 'geen'}` +
           `; daanMeetpunt=${daan === null ? 'geen' : daan.kind}` +
           `; opgeblazenDelta=${gesprongen.deltaMonths === null ? 'onderdrukt' : gesprongen.deltaMonths}` +
-          `; opgeblazenImplausibel=${gesprongen.isImplausibleDelta}; normaleDeltaMaanden=${normaal.deltaMonths}` +
-          `; marginaleBezoekdagen=${bezoek?.deltaDays}`,
+          `; opgeblazenImplausibel=${gesprongen.isImplausibleDelta}; normaleDeltaMaanden=${normaal.deltaMonths}`,
       }
     },
   },

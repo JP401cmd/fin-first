@@ -2,11 +2,15 @@
 
 // De leesronde die de bankstap van de globale sync voedt.
 //
-// Twee oppervlakken starten diezelfde sync — de header-knop en "Alles
-// synchroniseren" in het sync-rapport — en allebei moeten ze dezelfde vraag
-// beantwoorden: welke bankkoppelingen zijn actief, en mag elk daarvan nu mee?
-// Eén helper, zodat de foutafhandeling (niet-fataal) en de mapping op één plek
-// staan.
+// Meerdere oppervlakken starten diezelfde sync — de header-knop, de ⌘K-actie
+// "Alles synchroniseren" en de knop in het sync-rapport — en allemaal moeten ze
+// dezelfde vraag beantwoorden: welke bankkoppelingen zijn actief, en mag elk
+// daarvan nu mee? Eén helper, zodat de foutafhandeling (niet-fataal) en de
+// mapping op één plek staan.
+//
+// De eerste twee lopen inmiddels via `useGlobalSyncRunner`, dat deze leesronde
+// combineert met de exchange-/wallet-lijst; het sync-rapport heeft de
+// bankkoppelingen al in beeld en mapt ze rechtstreeks met `toBankSyncTargets`.
 
 import { toBankSyncTargets } from '@/lib/sync/bank-sync-targets'
 import type { BankSyncTarget } from '@/lib/sync/global-sync'

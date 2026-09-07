@@ -94,6 +94,9 @@ export const TOEK_FLOW: UatFlow = {
     { id: 'doelkoppelen', scenarioId: 'UAT-TOEK-39', label: 'WF-TOEK-39 · Meervoudig koppelen (bezittingen + schulden, netto)', kind: 'screen', stage: 4, lane: 'doelen', subOf: 'doelen' },
     { id: 'doelbasis', scenarioId: 'UAT-TOEK-40', label: 'WF-TOEK-40 · Doelbasis: live meesyncen & richting-bewust afsluiten', kind: 'screen', stage: 4, lane: 'doelen', subOf: 'doelen' },
 
+    { id: 'pillenrij', scenarioId: 'UAT-TOEK-41', label: 'WF-TOEK-41 · Pillenrij-invariant (label + badge samen) & het md-breekpunt van de cijferstrip', kind: 'screen', stage: 2, lane: 'aflezen', subOf: 'grafiek' },
+    { id: 'strategiekaarten', scenarioId: 'UAT-TOEK-42', label: 'WF-TOEK-42 · Vier levensstrategieën in beide weergavemodi', kind: 'screen', stage: 4, lane: 'strategie', subOf: 'strategiebeslis' },
+
     // ── 5 · uitkomst ──────────────────────────────────────────────────────
     { id: 'fire', label: 'Toekomstbeeld bijgewerkt · vrijheidsleeftijd, FIRE-datum & doelen', kind: 'outcome', stage: 5 },
 
@@ -184,6 +187,10 @@ export const TOEK_FLOW: UatFlow = {
     { from: 'doelpace', to: 'fire' },
     { from: 'doelkoppelen', to: 'fire' },
     { from: 'doelbasis', to: 'fire' },
+    { from: 'grafiek', to: 'pillenrij' },
+    { from: 'strategiebeslis', to: 'strategiekaarten' },
+    { from: 'pillenrij', to: 'fire' },
+    { from: 'strategiekaarten', to: 'fire' },
 
     // uitkomst → cross-doorwerking (OUTPUT)
     { from: 'fire', to: 'x-ovz', kind: 'cross' },

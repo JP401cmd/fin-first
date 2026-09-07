@@ -184,6 +184,60 @@ describe('decideSpendLimitEvents — lopende periode', () => {
     expect(events[0].notification.title).toContain('boven je grens')
   })
 
+  it('meldt `reached` in plaats van `near` zodra de grens exact geraakt is (ADR 0136)', () => {
+    // De gemelde bug: op de grens levert de motor `within` MÉT `isNearLimit`,
+    // en de near-tekst beloofde dan "Er is nog ruimte, maar niet veel" naast
+    // "€ 0 ruimte".
+    const { events, gateChanged } = decide([
+      pot({
+        current: period({
+          periodKey: '2026-08',
+          label: 'augustus 2026',
+          isOpen: true,
+          matched: 5,
+          limit: 5,
+          status: 'within',
+          isNearLimit: true,
+        }),
+      }),
+    ])
+
+    expect(events.map((e) => e.kind)).toEqual(['reached'])
+    const n = events[0].notification
+    expect(n.id).toBe('spend_limit_pot-1_2026-08_reached')
+    // Een eindstand, geen overschrijding: buiten de dringend-bak (priority ≤ 2).
+    expect(n.priority).toBe(3)
+    expect(n.title).toContain('grens bereikt')
+    // Geen enkele belofte van ruimte, in geen enkele vorm.
+    expect(n.description).not.toMatch(/ruimte/i)
+    expect(n.description).toContain('niets meer over')
+    // En dus ook geen "€ 0 ruimte"-regel in de renderer: het veld ontbreekt.
+    expect(n.metadata?.headroom).toBeUndefined()
+    expect(n.metadata?.matched).toBe(5)
+    expect(n.metadata?.limit).toBe(5)
+    // Live status: geen gate, net als `near` en `exceeded`.
+    expect(events[0].once).toBe(false)
+    expect(gateChanged).toBe(false)
+  })
+
+  it('een halve cent ruimte is nog ruimte: dan blijft het gewoon `near`', () => {
+    const { events } = decide([
+      pot({
+        current: period({
+          periodKey: '2026-08',
+          isOpen: true,
+          matched: 199.98,
+          limit: 200,
+          status: 'within',
+          isNearLimit: true,
+        }),
+      }),
+    ])
+
+    expect(events.map((e) => e.kind)).toEqual(['near'])
+    expect(events[0].notification.metadata?.headroom).toBeCloseTo(0.02, 10)
+  })
+
   it('zwijgt bij een pot ruim binnen de grens (AC-B6-10)', () => {
     const { events, gateChanged } = decide([pot({ current: OPEN_WITHIN })])
     expect(events).toEqual([])

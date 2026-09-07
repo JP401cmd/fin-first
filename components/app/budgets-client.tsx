@@ -20,7 +20,16 @@
  *  - §6.4 `/core/budgets/new` als sheet via `?new=true`.
  */
 
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+  type ReactNode,
+} from 'react'
 import dynamic from 'next/dynamic'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import {
@@ -184,6 +193,7 @@ export function BudgetEditorialHeader({
   totalExpenseBudget,
   totalExpenseSpent,
   simple = false,
+  gutterClassName = '',
 }: {
   monthLabel: string
   teVerdelen: number
@@ -202,6 +212,12 @@ export function BudgetEditorialHeader({
    * blijven staan zodat de pagina nog steeds een editorial aanhef houdt.
    */
   simple?: boolean
+  /**
+   * Rechter-gutter voor de kicker-rij en de kop, dáár waar het i-cluster
+   * (PageInfoButton + statuspunt) absoluut boven de aanhef zweeft — op
+   * /overzicht/budget dus. Het cijferblok eronder houdt de volle breedte.
+   */
+  gutterClassName?: string
 }) {
   const periodKicker = monthLabel
     ? monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)
@@ -229,6 +245,7 @@ export function BudgetEditorialHeader({
   return (
     <PageOpening
       className="mb-6"
+      gutterClassName={gutterClassName}
       kicker={
         <>
           Budgetteren {periodKicker && `· ${periodKicker}`}
@@ -295,6 +312,119 @@ export function BudgetEditorialHeader({
           </p>
         </div>
       </div>
+      )}
+    </PageOpening>
+  )
+}
+
+// ─── Aanhef-slot: de pagina-opening staat BOVEN de kaarten ────────
+//
+// Op /overzicht/budget stromen drie blokken los binnen: de aanhef, de drie
+// geldstroom-kaarten en de budgetten. De aanhef hoort bovenaan — dat was de
+// melding: "de titel hoort boven de kaartjes te staan" — maar hij is niet
+// server-side te renderen. Zijn cijfers (nog te besteden / nog te verdelen)
+// komen uit de state van deze client: de maand-selectie, de periode-modus, het
+// perspectief en de share-fracties. Ze daar nóg een keer uitrekenen zou een
+// tweede grondslag maken (CLAUDE.md: consume, don't recompute) én de aanhef
+// bevriezen op de maand waarmee de pagina laadde.
+//
+// Daarom een slot, in dezelfde geest als `FinSlotProvider` (lib/shell/fin-slot):
+// de pagina zet de aanhef-plek bovenaan neer, deze client publiceert er zijn
+// header-cijfers naartoe. Tot dat gebeurt draagt het slot de wachtvorm — kicker
+// en kop staan zo al in de eerste byte, boven de kaarten, en de cijfers vullen
+// zich aan zodra de budgetten binnen zijn. Zonder provider (de legacy-route
+// /core/budgets) rendert de header gewoon op zijn oude plek in deze client.
+
+/** De volledige prop-set van `BudgetEditorialHeader`, zoals gepubliceerd. */
+export type BudgetHeaderFigures = {
+  monthLabel: string
+  teVerdelen: number
+  totalIncome: number
+  totalExpenseBudget: number
+  totalExpenseSpent: number
+  simple: boolean
+}
+
+type BudgetHeaderSlotValue = {
+  figures: BudgetHeaderFigures | null
+  publish: (figures: BudgetHeaderFigures | null) => void
+}
+
+const BudgetHeaderSlotContext = createContext<BudgetHeaderSlotValue | null>(null)
+
+/**
+ * Omspant de aanhef-plek én het budgetblok, zodat de twee elkaar kunnen vinden.
+ * Rendert zelf niets zichtbaars.
+ */
+export function BudgetHeaderSlotProvider({ children }: { children: ReactNode }) {
+  const [figures, setFigures] = useState<BudgetHeaderFigures | null>(null)
+  const publish = useCallback((next: BudgetHeaderFigures | null) => setFigures(next), [])
+  const value = useMemo(() => ({ figures, publish }), [figures, publish])
+  return (
+    <BudgetHeaderSlotContext.Provider value={value}>{children}</BudgetHeaderSlotContext.Provider>
+  )
+}
+
+/**
+ * Toegang tot het slot, of `null` buiten een provider. Bewust géén throw: de
+ * legacy-route /core/budgets mount `BudgetsPage` zonder slot en houdt zijn
+ * aanhef gewoon inline.
+ */
+export function useBudgetHeaderSlot(): BudgetHeaderSlotValue | null {
+  return useContext(BudgetHeaderSlotContext)
+}
+
+/**
+ * De aanhef-plek zelf — de pagina rendert 'm bovenaan, boven de kaarten.
+ * Toont de gepubliceerde aanhef, of de wachtvorm zolang er niets gepubliceerd
+ * is. De wachtvorm heeft dezelfde opbouw (kicker + kop + cijferblok-hoogte),
+ * zodat de kaarten eronder niet verspringen als de cijfers instromen.
+ */
+export function BudgetHeaderSlot() {
+  const slot = useBudgetHeaderSlot()
+  const simple = useDisplayMode().mode === 'simple'
+  const figures = slot?.figures ?? null
+
+  if (figures) {
+    return <BudgetEditorialHeader {...figures} gutterClassName="pr-20 sm:pr-24" />
+  }
+
+  return (
+    <PageOpening
+      className="mb-6"
+      gutterClassName="pr-20 sm:pr-24"
+      kicker="Budgetteren"
+      titleBefore="Hoeveel "
+      emphasis="ruimte"
+      titleAfter=" heb je nog?"
+    >
+      {/* Zelfde raster als het echte cijferblok. In Eenvoudig toont de aanhef
+          geen cijferblok, dus reserveert de wachtvorm daar ook geen hoogte.
+
+          ÉÉN kolom, en dat is een bewuste keuze: `BudgetEditorialHeader` rendert
+          de "Nog te besteden"-kolom alleen bij een actief uitgavenbudget
+          (`totalExpenseBudget > 0`), en de wachtvorm weet vóór publicatie niet
+          of die er komt. "Nog te verdelen" komt er altijd — dus reserveren we
+          precies wat zeker is. Op sm+ verandert dat niets: één of twee kolommen
+          naast elkaar zijn even hoog. Op mobiel stapelen ze, en daar is dit een
+          RUIL: een account zonder uitgavenbudget krijgt nu géén sprong meer (die
+          was er, ~100px omhoog, precies op de leegste pagina), een account mét
+          uitgavenbudget zakt bij instroom één blok. Bewust die kant op — de
+          wachtvorm hoort niet méér te beloven dan hij weet. */}
+      {!simple && (
+        <div
+          aria-hidden="true"
+          className="mt-2 grid grid-cols-1 gap-4 border-t border-[var(--border-ed)] pt-3 sm:grid-cols-2 sm:gap-0 sm:divide-x sm:divide-[var(--border-ed)]"
+        >
+          <div className="sm:pr-6">
+            <div className="h-3.5 w-28 animate-pulse bg-[var(--subtle)]" />
+            <div className="mt-1 h-7 w-40 animate-pulse bg-[var(--subtle)] sm:h-9" />
+            <div className="mt-2 h-4 w-56 max-w-full animate-pulse bg-[var(--subtle)]" />
+            {/* De sub-meta wikkelt op smal scherm naar een tweede regel —
+                meereserveren, anders zakken de kaarten alsnog een stukje. */}
+            <div className="mt-1 h-4 w-32 animate-pulse bg-[var(--subtle)] sm:hidden" />
+          </div>
+        </div>
       )}
     </PageOpening>
   )
@@ -2252,6 +2382,35 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
 
   const monthLabel = monthDate.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' })
 
+  // Aanhef-slot (zie BudgetHeaderSlotProvider hierboven): op /overzicht/budget
+  // staat de pagina-opening bóven de drie kaarten, buiten deze client. De
+  // cijfers erin komen wél hiervandaan, dus publiceren we ze — inclusief elke
+  // maand-, periode- en perspectiefwissel hieronder. Eén grondslag, geen tweede
+  // som. Zonder provider (legacy /core/budgets) gebeurt er niets en rendert de
+  // header verderop gewoon op zijn oude plek.
+  const headerSlot = useBudgetHeaderSlot()
+  const publishHeader = headerSlot?.publish
+  useEffect(() => {
+    if (!publishHeader) return
+    publishHeader({
+      monthLabel,
+      teVerdelen,
+      totalIncome,
+      totalExpenseBudget,
+      totalExpenseSpent,
+      simple,
+    })
+    return () => publishHeader(null)
+  }, [
+    publishHeader,
+    monthLabel,
+    teVerdelen,
+    totalIncome,
+    totalExpenseBudget,
+    totalExpenseSpent,
+    simple,
+  ])
+
   // Household-boom-modus: in huishoud-blik mét budgetModel='household' splitsen we
   // de boom in drie secties (Gezamenlijk / Mijn potjes / Potjes van partner).
   // In 'separate'-modus blijft de bestaande enkele type-gegroepeerde boom staan.
@@ -2435,15 +2594,22 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
       {/* Editorial header — blueprint stijl (Type App: Budgetteren).
           Toont kicker met streep, headline met italic-em, ankergetal 'Nog te
           besteden' (= Budget-kaart op /overzicht/budget) met halve
-          transparante streep en sobere 'Nog te verdelen'-kolom ernaast. */}
-      <BudgetEditorialHeader
-        monthLabel={monthLabel}
-        teVerdelen={teVerdelen}
-        totalIncome={totalIncome}
-        totalExpenseBudget={totalExpenseBudget}
-        totalExpenseSpent={totalExpenseSpent}
-        simple={simple}
-      />
+          transparante streep en sobere 'Nog te verdelen'-kolom ernaast.
+
+          ALLEEN als er geen aanhef-slot is. Op /overzicht/budget staat de
+          aanhef bovenaan de pagina (boven de drie kaarten) en publiceert deze
+          client zijn cijfers daarheen — hem hier óók renderen zou de dubbele
+          aanhef terugbrengen die ADR 0135 juist wegnam. */}
+      {!headerSlot && (
+        <BudgetEditorialHeader
+          monthLabel={monthLabel}
+          teVerdelen={teVerdelen}
+          totalIncome={totalIncome}
+          totalExpenseBudget={totalExpenseBudget}
+          totalExpenseSpent={totalExpenseSpent}
+          simple={simple}
+        />
+      )}
 
       {/* Month selector + KPI-strip — figures-strip-stijl met top+bottom borders.
           Top-rij: maand-nav + periode-toggle + rapport + kopieer-knoppen.

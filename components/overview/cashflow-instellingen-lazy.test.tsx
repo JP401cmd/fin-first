@@ -1,6 +1,6 @@
 import { StrictMode } from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, act, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, act, waitFor } from '@testing-library/react'
 import { DisplayModeProvider, type DisplayMode } from '@/lib/hooks/use-display-mode'
 import { CashflowInstellingenBlokLazy } from './cashflow-instellingen-lazy'
 
@@ -168,15 +168,22 @@ describe('CashflowInstellingenBlokLazy — StrictMode (dubbele mount in dev)', (
   })
 })
 
-// ── CF-4 — het instellingenblok als disclosure, in Eenvoudig standaard dicht ──
+// ── W-002 — GEEN disclosure meer: dit blok woont op het instellingenscherm ──
 //
-// De waarde van CF-4 zit in twee dingen tegelijk: in Eenvoudig staat het blok
-// DICHT (rust op het eerste scherm) en het is er nog WEL (één klik, geen
-// hard-hide — instellingen mag je niet wegnemen). En "Volledig blijft
-// ongewijzigd" is een acceptatiecriterium, dus daar mag er geen disclosure om
-// heen komen te staan.
+// HERZIEN 7 sep 2026. Hier stond CF-4: in Eenvoudig hing het blok in een
+// `DepthSection` met de titel "Instellingen & toekomst", zodat de
+// TRANSACTIEPAGINA rust hield zonder de instellingen weg te nemen. Met de
+// verhuizing naar /overzicht/budget/instellingen vervalt die reden — op een
+// pagina die zélf "Instellingen" heet is de disclosure een tweede kop om
+// hetzelfde blok. De oude assertie pinde bovendien de titelstring letterlijk
+// vast, en die klopte al niet meer ("& toekomst" verhuisde met de FIRE-doorkijk
+// naar /toekomst).
+//
+// Wat de suite nu bewaakt is de andere kant van dezelfde eis: het blok is er in
+// BÉIDE weergaven, ongewijzigd, mét zijn eigen kop — en er komt geen
+// verpakking omheen terug.
 
-describe('CashflowInstellingenBlokLazy — CF-4: disclosure in Eenvoudig', () => {
+describe('CashflowInstellingenBlokLazy — W-002: onverpakt in beide weergaven', () => {
   async function renderReady(mode: DisplayMode) {
     fetchMock.mockResolvedValue(jsonOk({ netMonthlyIncome: 4200 }))
     const result = render(
@@ -189,44 +196,24 @@ describe('CashflowInstellingenBlokLazy — CF-4: disclosure in Eenvoudig', () =>
     return result
   }
 
-  it('Eenvoudig: het blok hangt in een disclosure die standaard DICHT staat', async () => {
-    const { container } = await renderReady('simple')
+  for (const mode of ['simple', 'full'] as const) {
+    it(`${mode}: geen disclosure eromheen — het blok draagt zijn eigen kop`, async () => {
+      const { container } = await renderReady(mode)
 
-    const section = container.querySelector('[data-testid="depth-section"]')
-    expect(section).not.toBeNull()
-    expect(section?.getAttribute('data-collapsed')).toBe('true')
-    expect(screen.getByTestId('depth-section-title')).toHaveTextContent(
-      'Instellingen & toekomst',
-    )
-  })
+      expect(container.querySelector('[data-testid="depth-section"]')).toBeNull()
+      expect(screen.getByTestId('instellingen-blok')).toHaveTextContent('4200')
+      // `hideHeading` ongezet = het blok toont zijn eigen kicker + h2.
+      expect(screen.getByTestId('instellingen-blok').getAttribute('data-hide-heading')).toBe(
+        'false',
+      )
+    })
+  }
 
-  it('Eenvoudig: de inhoud is niet weggegooid — één klik zet de disclosure open', async () => {
-    const { container } = await renderReady('simple')
-
-    // Ingeklapt is het blok al gemount (geen hard-hide): de data staat er.
-    expect(screen.getByTestId('instellingen-blok')).toHaveTextContent('4200')
-
-    fireEvent.click(screen.getByTestId('depth-section-toggle'))
-    expect(
-      container.querySelector('[data-testid="depth-section"]')?.getAttribute('data-collapsed'),
-    ).toBe('false')
-  })
-
-  it('Eenvoudig: de disclosure draagt de kop, dus het blok onderdrukt zijn eigen kicker', async () => {
+  it('de instellingen zijn in Eenvoudig niet hard verborgen', async () => {
+    // Instellingen mag je nooit wegnemen (de oorspronkelijke CF-4-eis, en die
+    // blijft staan): geen HideInSimple, geen weggegooide inhoud.
     await renderReady('simple')
-    expect(screen.getByTestId('instellingen-blok').getAttribute('data-hide-heading')).toBe(
-      'true',
-    )
-  })
-
-  it('Volledig: geen disclosure — het blok rendert onveranderd, mét eigen kop', async () => {
-    const { container } = await renderReady('full')
-
-    expect(container.querySelector('[data-testid="depth-section"]')).toBeNull()
     expect(screen.getByTestId('instellingen-blok')).toHaveTextContent('4200')
-    expect(screen.getByTestId('instellingen-blok').getAttribute('data-hide-heading')).toBe(
-      'false',
-    )
   })
 })
 

@@ -395,9 +395,13 @@ export async function fetchTxMonthAggregate(
  * `tx-aggregates.cache.test.ts` pint die gelijkheid vast als anti-drift-getuige.
  *
  * `ownOnly` blijft weg (default false) = RLS-breed (eigen + gedeeld huishouden),
- * identiek aan alle drie de vervangen callsites. Loaders met een ANDER venster
- * houden bewust hun eigen `fetchTxMonthAggregate`-call: een ander venster is een
- * andere cache-entry (lib/lever-scores-loader.ts draait 6 maanden MÉT `ownOnly`).
+ * identiek aan alle vervangen callsites. Loaders met een ANDER venster houden
+ * bewust hun eigen `fetchTxMonthAggregate`-call: een ander venster is een andere
+ * cache-entry. `lib/lever-scores-loader.ts` is DÁÁRVAN GEEN VOORBEELD MEER (en
+ * draaide ook nooit met `ownOnly`): die deelt sinds B-030 déze entry en sliced
+ * zijn 6-maands spaarquote-venster in JS uit dezelfde rijen — het 6-maands
+ * venster is een strikte subset van dit 12-maands venster, dus dat is
+ * byte-identiek en kost geen extra RPC.
  *
  * DE RIJEN ZIJN GEDEELD — behandel ze als READ-ONLY. Sinds de dedupe krijgt elke
  * consument binnen het request exact hetzelfde array-object terug, waar ze eerder

@@ -41,6 +41,7 @@ import type { SpendLimitTrendDirection } from '@/lib/spend-limits/engine'
 import {
   describeSpendLimitPace,
   resolveSpendLimitDisplayStatus,
+  SPEND_LIMIT_HEADROOM_EPSILON,
   SPEND_LIMIT_SCORE_TEXT_CLASS,
   SPEND_LIMIT_STATUS_COLOR_VAR,
   SPEND_LIMIT_STATUS_LABEL_INLINE,
@@ -50,7 +51,7 @@ import {
 import type { WidgetSize } from '@/lib/widget-catalog'
 
 /**
- * De drie toestanden die de tegel toont. Stand, kleuren en labels komen uit
+ * De vier toestanden die de tegel toont. Stand, kleuren en labels komen uit
  * lib/spend-limits/status-display.ts — dezelfde bron als de pane en de kaart,
  * zodat de tegel niet opnieuw amber kan waarschuwen waar een ander oppervlak
  * groen geruststelt.
@@ -72,8 +73,18 @@ const TREND_LABEL: Record<SpendLimitTrendDirection, string> = {
   unknown: 'nog niet genoeg historie',
 }
 
+/**
+ * De projectie noemt de ruimte `currentHeadroom`; de gedeelde lezing kent één
+ * veldnaam (`periodHeadroom`). Die vertaling staat hier, zodat de motorvorm en
+ * de widgetvorm niet naar elkaar toe hoeven groeien.
+ */
 function resolveStatus(limit: SpendLimitWidgetData): DisplayStatus {
-  return resolveSpendLimitDisplayStatus(limit)
+  return resolveSpendLimitDisplayStatus({
+    status: limit.status,
+    isNearLimit: limit.isNearLimit,
+    limitAmount: limit.limitAmount,
+    periodHeadroom: limit.currentHeadroom,
+  })
 }
 
 function StatusDot({ status }: { status: DisplayStatus }) {
@@ -309,13 +320,20 @@ export const SpendLimitWidget = memo(function SpendLimitWidget({
 
   const status = resolveStatus(limit)
   const isOver = status === 'exceeded'
+  /** Precies op de grens: binnen, maar zonder ruimte (ADR 0136). */
+  const isReached = status === 'reached'
 
   // ── Vrijheidstijd ("Geld is opgeslagen tijd") ──
   // Dagtarief komt uit de bundel; nooit lokaal /30 rekenen.
+  // Bij `reached` verdwijnt de regel: "≈ 0 dagen vrijheid over" is geen
+  // informatie, de statusregel zegt het al. De drempel is DEZELFDE halve cent
+  // waarop `reached` zelf aanslaat (SPEND_LIMIT_HEADROOM_EPSILON, ADR 0136) —
+  // met een kale `> 0` bleef bij een restruimte van bv. 0,004 de vrijheidsregel
+  // staan náást "geen ruimte meer".
   const hasRate = !!dailyExp && dailyExp > 0
   const freedomAmount = isOver ? limit.currentOverAmount : limit.currentHeadroom
   const freedomLabel =
-    hasRate && freedomAmount > 0
+    hasRate && freedomAmount >= SPEND_LIMIT_HEADROOM_EPSILON
       ? formatFreedomTimeString(calculateFreedomTime(freedomAmount, dailyExp as number), 'short')
       : null
 
@@ -349,6 +367,26 @@ export const SpendLimitWidget = memo(function SpendLimitWidget({
         {' '}van <MaskedAmount value={limit.limitAmount} tone="kern" className="text-xs" />
       </span>
     </p>
+  )
+
+  /**
+   * De ruimte-regel, in één vorm voor full én half.
+   *
+   * Drie takken, want twee logen: bij `reached` stond hier "€ 0 ruimte over" in
+   * het positive-token — een groene belofte van ruimte die er niet is (ADR
+   * 0136). Nu zegt hij het in woorden, in de warning-kleur van de stand.
+   */
+  const roomToneClass = isOver ? 'text-negative' : isReached ? 'text-warning' : 'text-positive'
+  const roomContent = isOver ? (
+    <>
+      <MaskedAmount value={limit.currentOverAmount} tone="kern" className="text-xs" /> eroverheen
+    </>
+  ) : isReached ? (
+    <>geen ruimte meer</>
+  ) : (
+    <>
+      <MaskedAmount value={limit.currentHeadroom} tone="kern" className="text-xs" /> ruimte over
+    </>
   )
 
   const metaRow = (
@@ -474,17 +512,7 @@ export const SpendLimitWidget = memo(function SpendLimitWidget({
             hasEntered={hasEntered}
             paceFraction={limit.pace?.elapsedFraction ?? null}
           />
-          <p className={`text-xs ${isOver ? 'text-negative' : 'text-positive'}`}>
-            {isOver ? (
-              <>
-                <MaskedAmount value={limit.currentOverAmount} tone="kern" className="text-xs" /> eroverheen
-              </>
-            ) : (
-              <>
-                <MaskedAmount value={limit.currentHeadroom} tone="kern" className="text-xs" /> ruimte over
-              </>
-            )}
-          </p>
+          <p className={`text-xs ${roomToneClass}`}>{roomContent}</p>
           {freedomLabel && (
             <p className="font-serif italic text-[11px] text-[var(--ink-3)]">
               {isOver ? `≈ ${freedomLabel} vrijheid eroverheen` : `≈ ${freedomLabel} vrijheid over`}
@@ -527,16 +555,8 @@ export const SpendLimitWidget = memo(function SpendLimitWidget({
             hasEntered={hasEntered}
             paceFraction={limit.pace?.elapsedFraction ?? null}
           />
-          <p className={`truncate text-xs ${isOver ? 'text-negative' : 'text-positive'}`}>
-            {isOver ? (
-              <>
-                <MaskedAmount value={limit.currentOverAmount} tone="kern" className="text-xs" /> eroverheen
-              </>
-            ) : (
-              <>
-                <MaskedAmount value={limit.currentHeadroom} tone="kern" className="text-xs" /> ruimte over
-              </>
-            )}
+          <p className={`truncate text-xs ${roomToneClass}`}>
+            {roomContent}
             <span className="text-[var(--ink-4)]"> · </span>
             {/* Reeks = een AANTAL periodes, geen bedrag → maskeert niet. */}
             <span className="font-mono tabular-nums text-[var(--ink)]">{limit.currentStreak}</span>

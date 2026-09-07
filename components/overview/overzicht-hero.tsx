@@ -42,21 +42,17 @@ type OverzichtHeroPrimaryProps = {
   /** NL-datumlabel ("Donderdag 16 juli 2026"), zelfde server-bron als `greeting`. */
   dateLabel: string
   /**
-   * Bijschrift direct ONDER de begroeting, bínnen de `<header>` (H11): de
-   * "sinds je vorige bezoek"-delta-regel, gestreamd achter een eigen
-   * `<Suspense>`. Hoort in de header omdat hij bij de groet leest ("goedemorgen
-   * … sinds gisteren kwam er 3 dagen vrijheid bij") en dezelfde
-   * `pr-12 sm:pr-16`-vrijloop voor de utility-cluster moet respecteren. Rendert
-   * `null` zodra er niets te melden valt.
-   */
-  greetingNote?: ReactNode
-  /**
    * Bannerstrook NÁ de begroeting en vóór het hefbomen-kompas (H20): de
    * welkomstgids en de maand-check-in. Die stonden bóven de begroeting, waardoor
    * je op een vers account eerst een checklist zag en pas daarna wie je bent en
-   * hoe je ervoor staat. Eigen slot (geen deel van `greetingNote`) omdat het
+   * hoe je ervoor staat. Eigen slot (dus niet ín de `<header>`) omdat het
    * volle-breedte kaarten zijn: in de header zouden ze de rechter vrijloop voor
    * de utility-cluster erven en scheef uitlijnen.
+   *
+   * ER IS GEEN BIJSCHRIFT-SLOT MEER ONDER DE BEGROETING. Tot B-028 hing daar de
+   * "sinds je vorige bezoek"-dagdelta (`greetingNote`, H11). Die regel is
+   * vervallen (eigenaar-besluit): een DAG-delta zegt te weinig — de waarde van
+   * dit domein zit in maandelijks gebruik — en er komt bewust geen vervanger.
    */
   banners?: ReactNode
   /** Health Score — voedt de status-fallback op de hefboomtegels. Uit horizonData. */
@@ -106,7 +102,6 @@ export function OverzichtHeroPrimary({
   userName,
   greeting,
   dateLabel,
-  greetingNote,
   banners,
   health,
   leverScores,
@@ -146,7 +141,6 @@ export function OverzichtHeroPrimary({
         >
           {`${greeting}${userName ? `, ${userName}` : ''}`}
         </EditorialHeadline>
-        {greetingNote}
       </header>
 
       {/* H20 — gids/check-in ná de begroeting. Bewust hier en niet ná het

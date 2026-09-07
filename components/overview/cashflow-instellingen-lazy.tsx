@@ -9,14 +9,27 @@
  * Woonde als `cashflow-below-fold.tsx` in de route-map van de cashflow-hub, met
  * daarin ook het lazy-eiland en de skeleton van `CashOverview`. Die hub is
  * opgeheven (UR3-28) en `CashOverview` bestaat niet meer; wat overblijft is dit
- * ene blok, en dat is een component en geen route-bestand. Het staat nu op de
- * transactiepagina, naast de transacties en budgetten die de grondslag voeden.
+ * ene blok, en dat is een component en geen route-bestand.
+ *
+ * ── VERHUISD 7 sep 2026 (W-002) ─────────────────────────────────────────────
+ * Van /overzicht/budget/transacties naar /overzicht/budget/instellingen. Op de
+ * transactiepagina was dit een voetnoot onder de vouw; het is een instelling, en
+ * die hoort op het instellingenscherm. De transactiepagina rendert 'm niet meer
+ * — verhuisd, niet gekopieerd.
+ *
+ * MET DE VERHUIZING VERVIEL DE DISCLOSURE. Hier hing het blok in Eenvoudig in
+ * een `DepthSection` met de titel "Instellingen & toekomst" (CF-4). Die bestond
+ * om rust te scheppen op een pagina die ergens ánders over ging — de transacties
+ * — zonder de instellingen weg te nemen. Op een pagina die zélf "Instellingen"
+ * heet is dat een tweede kop om hetzelfde blok, dus de verpakking is weg: het
+ * blok rendert nu in béide weergaven onveranderd, mét zijn eigen kop
+ * ("Je instellingen" / "Waar je cijfers op rusten"). Dat lost meteen de
+ * verouderde titel op — "& toekomst" klopte al niet meer sinds de
+ * FIRE-doorkijk naar /toekomst verhuisde.
  */
 
 import { useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { DepthSection } from '@/components/app/depth-section'
-import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import type { CashflowSettingsData } from '@/lib/cashflow-settings-data'
 
 /**
@@ -166,60 +179,14 @@ export function CashflowInstellingenBlokLazy() {
 
   return (
     // Instellingen (inkomen, spaarquote, uitgaven) zijn óók in Eenvoudig
-    // zichtbaar — bewust géén HideInSimple. Het blok bevat alleen die drie
-    // kern-instellingen, die de gebruiker in beide modi wil kunnen zien; in
-    // Eenvoudig staan ze alleen achter een disclosure (CF-4, hieronder).
+    // zichtbaar — bewust géén HideInSimple, en sinds de verhuizing (W-002) ook
+    // geen disclosure meer: op het instellingenscherm zíjn dit de instellingen.
     <section ref={anchorRef} className="mx-auto max-w-6xl px-4 pb-8 pt-2 sm:px-6">
       {state.status === 'ready' ? (
-        <CashflowInstellingenDisclosure data={state.data} />
+        <DynCashflowInstellingenBlok data={state.data} />
       ) : (
         <CashflowInstellingenBlokSkeleton />
       )}
     </section>
-  )
-}
-
-/**
- * CF-4 — het instellingenblok als disclosure, in Eenvoudig standaard DICHT.
- *
- * Waarom `DepthSection` en geen `HideInSimple`: instellingen zijn geen diepte
- * die je mag wegnemen, het zijn drie waarden die de gebruiker moet kúnnen
- * bijstellen. Hard verbergen zou de enige ingang naar zijn inkomen/uitgaven op
- * deze pagina dichtzetten. `DepthSection` is precies het inklappen-met-behoud
- * dat ADR 0026 bedoelde en dat volgens §9 van de audit ongebruikt lag: dicht in
- * 'simple', open in 'full', één klik ertussen.
- *
- * Waarom alleen in Eenvoudig gemónt en niet altijd: `DepthSection` zou in
- * Volledig weliswaar open staan, maar dan mét kop-knop en kaartrand om het blok
- * heen. "Volledig blijft ongewijzigd" is een acceptatiecriterium, dus daar
- * rendert exact de bestaande boom — `hideHeading` blijft ongezet, dus ook de
- * eigen kicker en sectie-marge van het blok blijven zoals ze waren.
- *
- * De lazy fetch hierboven blijft ongemoeid: het anker-`<section>` staat er ook
- * ingeklapt, dus in-view laadt de data zoals voorheen en de disclosure opent
- * meteen gevuld.
- */
-function CashflowInstellingenDisclosure({ data }: { data: CashflowSettingsData }) {
-  const simple = useDisplayMode().mode === 'simple'
-
-  if (!simple) return <DynCashflowInstellingenBlok data={data} />
-
-  return (
-    <div className="mt-5 sm:mt-8">
-      {/* NB: het blok draagt in Volledig sinds de samenvatting-herbouw zijn eigen
-          kop "Je instellingen" / "Waar je cijfers op rusten"; "& toekomst" klopt
-          niet meer (de FIRE-doorkijk woont op /toekomst). Deze twee regels lopen
-          daar bewust nog niet mee: `cashflow-instellingen-lazy.test.tsx` pint de titel
-          letterlijk, en dat testbestand is niet van deze wijziging. Hernoemen
-          hoort in dezelfde change als die assertie. In de praktijk ziet een
-          gebruiker nooit beide labels tegelijk — in Eenvoudig onderdrukt
-          `hideHeading` de eigen kop van het blok. */}
-      <DepthSection
-        title="Instellingen & toekomst"
-        summary="Je inkomen, spaarquote en geschatte uitgaven"
-      >
-        <DynCashflowInstellingenBlok data={data} hideHeading />
-      </DepthSection>
-    </div>
   )
 }

@@ -77,12 +77,37 @@ type StatusCode = LeverageStatus
  */
 const BELASTING_BASIS_LABEL = 'Box 3 · sparen en beleggen'
 
+/**
+ * Wát het percentage op de cashflow/budget-tegel is (B-030). De tegel toonde een
+ * KAAL "25%" — het enige getal in de rij zonder eenheid, tussen drie
+ * euro-bedragen. "25% waarvan?" was de letterlijke melding.
+ *
+ * Zelfde behandeling als de belasting-tegel hierboven: het label reist in
+ * Volledig mee als `subAmount` (de grondslagregel onder de KPI) en in Eenvoudig
+ * als `kpiWindow` (achter het gedempte bedrag) — `LeverageCard` rendert
+ * `subAmount` bewust niet in de `verdict`-variant, dus zonder die tweede route
+ * zou het label juist wegvallen bij de gebruiker die het het hardst nodig heeft.
+ *
+ * DE GROOTHEID: de EFFECTIEVE spaarquote (ADR 0121), niet de rauwe 6-maands
+ * transactiemeting — zie `HefbomenTotals.cashflow`. Daarom staat er geen venster
+ * bij: het getal ís geen zes-maands gemiddelde. Dat is dezelfde reden waarom de
+ * forecast-kaart zijn "(6m)"-label verloor.
+ */
+const CASHFLOW_BASIS_LABEL = 'Spaarquote'
+
 export type HefbomenTotals = {
   /** Totale waarde bezittingen, in EUR. */
   bezittingen?: number | null
   /** Totale openstaande schulden, in EUR. */
   schulden?: number | null
-  /** Spaarquote 6-maands gemiddelde (0–100 %). */
+  /**
+   * De EFFECTIEVE spaarquote in procenten (0–100) — `resolveSavingsSource(...)
+   * .effectiveSavingsRatePct`, waar een handmatige of budget-grondslag wint van
+   * de meting (ADR 0121). De aanroeper leest dit uit
+   * `healthScoreInput.savingsRate6m`; die VELDNAAM is een legacy-misnomer — de
+   * horizon-loader vult 'm met `effectiveSavingsRate`, niet met de rauwe
+   * 6-maands quote.
+   */
   cashflow?: number | null
   /**
    * Jaarlijkse Box 3-belasting, in EUR — NIET de totale belastingdruk.
@@ -209,11 +234,13 @@ export function HefbomenNav({
 
   // Toont ten minste één tegel een grondslagregel onder de KPI? Dan krijgen ze
   // alle vier minstens de placeholder (zie de `subAmount`-blok hieronder).
-  // Twee bronnen: de dubbele grondslag (incl./excl. eigen woning) en de
-  // eenheid-regel onder het belastingbedrag.
+  // Drie bronnen: de dubbele grondslag (incl./excl. eigen woning), de
+  // eenheid-regel onder het belastingbedrag en — sinds B-030 — het
+  // "Spaarquote"-label onder het cashflow-percentage.
   const showsBasisRow =
     housingSplit != null ||
-    (typeof totals?.belasting === 'number' && totals.belasting > 0)
+    (typeof totals?.belasting === 'number' && totals.belasting > 0) ||
+    (typeof totals?.cashflow === 'number' && totals.cashflow > 0)
 
   return (
     <nav
@@ -290,6 +317,12 @@ export function HefbomenNav({
             )
           } else if (key === 'belasting' && showTotal) {
             subAmount = BELASTING_BASIS_LABEL
+          } else if (key === 'cashflow' && showTotal) {
+            // B-030: zegt WAT die "25%" is. Alleen bij een getoond getal —
+            // `showTotal` is `totalValue > 0`, dus bij een spaarquote van 0 of
+            // lager toont de tegel geen percentage en hoort er ook geen label
+            // te staan (een kaal "Spaarquote" zonder cijfer is ruis).
+            subAmount = CASHFLOW_BASIS_LABEL
           } else {
             // Deze tegel heeft geen grondslagregel → lege placeholder, zodat alle
             // vier tegels in de desktop-rij (align-items: stretch) gelijke
@@ -312,9 +345,18 @@ export function HefbomenNav({
             label={label}
             kpi={showTotal ? formattedTotal : null}
             // In Eenvoudig rendert `subAmount` bewust niet; de eenheid van het
-            // belastingbedrag mag daar niet mee wegvallen, dus die reist via het
+            // belastingbedrag en het "waarvan?" bij het cashflow-percentage
+            // mogen daar niet mee wegvallen, dus die reizen via het
             // venster-label achter het gedempte bedrag mee.
-            kpiWindow={key === 'belasting' && showTotal ? 'Box 3' : undefined}
+            kpiWindow={
+              showTotal
+                ? key === 'belasting'
+                  ? 'Box 3'
+                  : key === 'cashflow'
+                    ? CASHFLOW_BASIS_LABEL
+                    : undefined
+                : undefined
+            }
             status={status}
             subText={subText}
             subAmount={subAmount}

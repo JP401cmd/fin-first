@@ -31,6 +31,10 @@
  *    `full`: het oordeel neemt de regel over die de KPI had, de KPI zakt naar
  *    de regel die `subAmount` had. De tegel wordt dus niet hoger.
  *
+ *    De `dense`-prop (zie hieronder) verkleint alléén deze variant: kleinere
+ *    icon-chip, kleiner type, strakkere padding. Vier regels blijven vier
+ *    regels — dat is precies het verschil met `compact`.
+ *
  *  · `compact` — one-liner: icon-chip + label (+ `subAmount`). Géén KPI,
  *    oordeel, status-dot of chevron. Voor navigatie-rijen waar de kaart puur
  *    een doorstap is.
@@ -81,6 +85,21 @@ import {
  * heeft (pure doorstap-navigatie) — niet als "rustiger" alternatief voor een
  * kaart die wél iets te zeggen heeft; dat is precies de reductie waar het
  * R5-richtingsbesluit tegenin gaat.
+ *
+ * ── TUSSENSTAND 7 sep 2026 (W-003) — "kleiner, mét het oordeel" ────────────
+ * Een testgebruiker vroeg de budgetkaartjes in Eenvoudig te "minimaliseren,
+ * zoals op de toekomst-pagina". Dáár staat `compact`, en overschakelen was de
+ * voor de hand liggende lezing — maar dat gooit het oordeel weg, en juist dat
+ * verbiedt het R5-richtingsbesluit hierboven. De eigenaar heeft die afweging
+ * expliciet gemaakt: **kleiner mag, het oordeel blijft.**
+ *
+ * Daarom is de wens gehonoreerd als MAAT (`dense`) en niet als variant: de
+ * kaart houdt icon-chip, label, oordeel én cijfer-met-venster, maar krijgt de
+ * maatvoering van de `compact`-tak (p-2 sm:p-3, kleinere chip, één typetrap
+ * lager). `LeverageCardVariant` blijft daarmee ongewijzigd drie waarden — een
+ * vierde variant zou elke `variant`-switch in de app opnieuw laten kiezen
+ * tussen "klein" en "met oordeel", en dat is precies de keuze die hier al
+ * gemaakt ís.
  */
 export type LeverageCardVariant = 'full' | 'verdict' | 'compact'
 
@@ -96,6 +115,7 @@ export function LeverageCard({
   href,
   tooltip,
   variant = 'full',
+  dense = false,
   showSubRow = true,
   expandable = false,
   expanded = false,
@@ -151,6 +171,19 @@ export function LeverageCard({
   tooltip?: string
   /** Zie `LeverageCardVariant`. Default `full` → byte-identiek aan voorheen. */
   variant?: LeverageCardVariant
+  /**
+   * Kleinere maatvoering — ALLEEN van toepassing op `variant="verdict"`
+   * (W-003, 7 sep 2026). Zet de tegel op de maat van de `compact`-tak
+   * (`p-2 sm:p-3`, chip 28/32px, label + oordeel één typetrap lager, bedrag op
+   * 10px) zonder één van de vier regels te laten vallen.
+   *
+   * Bewust een boolean naast `variant` en geen vierde variant: de vraag "hoe
+   * groot" staat los van de vraag "wat toont de kaart", en alleen zo blijven
+   * alle bestaande call-sites byte-identiek. Op `full` en `compact` heeft de
+   * prop géén effect — die maten zijn elders al vastgelegd (de vier-hefbomen-
+   * rij op /overzicht deelt `full` met deze kaarten en mag niet meekrimpen).
+   */
+  dense?: boolean
   /**
    * Rendert de oordeel-rij onder de KPI. Alleen van toepassing op `full` —
    * `verdict` toont het oordeel per definitie, `compact` per definitie niet.
@@ -219,6 +252,8 @@ export function LeverageCard({
   }
 
   const isVerdict = variant === 'verdict'
+  /** `dense` telt uitsluitend binnen de verdict-tak — zie de prop-docstring. */
+  const isDense = isVerdict && dense
 
   /**
    * Het zichtbare oordeel. In `verdict` valt de shell terug op het generieke
@@ -243,7 +278,8 @@ export function LeverageCard({
     <div
       data-tour={dataTour}
       className={[
-        'group relative flex flex-col rounded-2xl border bg-[var(--paper)] p-3 sm:p-4 transition-all',
+        'group relative flex flex-col rounded-2xl border bg-[var(--paper)] transition-all',
+        isDense ? 'p-2 sm:p-3' : 'p-3 sm:p-4',
         expanded
           ? 'border-[var(--ink-3)] shadow-sm row-span-2 sm:row-span-1'
           : 'border-[var(--border-ed)] hover:border-[var(--ink-3)] hover:shadow-sm',
@@ -255,7 +291,7 @@ export function LeverageCard({
             hieronder. `title` blijft staan als hover-affordance op desktop;
             hij bereikt AT niet en telt dus niet als drager. */}
         <span
-          className={`absolute right-2.5 top-2.5 sm:right-3 sm:top-3 w-2 h-2 rounded-full ${LEVERAGE_STATUS_DOT[status]}`}
+          className={`absolute ${isDense ? 'right-2 top-2' : 'right-2.5 top-2.5 sm:right-3 sm:top-3'} w-2 h-2 rounded-full ${LEVERAGE_STATUS_DOT[status]}`}
           aria-hidden="true"
           title={LEVERAGE_STATUS_LABEL[status]}
         />
@@ -263,11 +299,13 @@ export function LeverageCard({
           <span className="sr-only">{LEVERAGE_STATUS_LABEL[status]}</span>
         )}
         <div
-          className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center ${tint}`}
+          className={`${isDense ? 'w-7 h-7 sm:w-8 sm:h-8' : 'w-8 h-8 sm:w-9 sm:h-9'} rounded-lg flex items-center justify-center ${tint}`}
         >
-          <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
+          <Icon className={isDense ? 'w-3.5 h-3.5 sm:w-4 sm:h-4' : 'w-4 h-4 sm:w-5 sm:h-5'} />
         </div>
-        <div className="mt-2 text-sm sm:text-base font-semibold text-[var(--ink)]">
+        <div
+          className={`${isDense ? 'mt-1.5 text-xs sm:text-sm' : 'mt-2 text-sm sm:text-base'} font-semibold text-[var(--ink)]`}
+        >
           {label}
         </div>
 
@@ -277,14 +315,16 @@ export function LeverageCard({
                 Statuskleur is semantiek (stoplicht), geen module-accent; het
                 WOORD draagt de betekenis ook zonder kleur. */}
             <div
-              className={`mt-0.5 text-sm sm:text-base font-medium leading-snug ${leverageStatusTextClass(status)}`}
+              className={`mt-0.5 ${isDense ? 'text-xs sm:text-sm' : 'text-sm sm:text-base'} font-medium leading-snug ${leverageStatusTextClass(status)}`}
             >
               {shownVerdict}
             </div>
             {/* Bedrag secundair — gedempt, met het venster-label op dezelfde
                 regel zodat het cijfer één duidende eenheid blijft. */}
             {(kpi || kpiWindow) && (
-              <div className="mt-0.5 text-[11px] leading-tight text-[var(--ink-3)] tabular-nums">
+              <div
+                className={`mt-0.5 ${isDense ? 'text-[10px]' : 'text-[11px]'} leading-tight text-[var(--ink-3)] tabular-nums`}
+              >
                 {kpi}
                 {kpi && kpiWindow ? ' · ' : null}
                 {kpiWindow}

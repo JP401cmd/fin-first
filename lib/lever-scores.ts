@@ -76,7 +76,7 @@ export type LeverScores = {
   assets: LeverEntry
   /** Schulden: schuld-vermogen-ratio. */
   debts: LeverEntry
-  /** Cashflow: spaarquote (canoniek 6-maands) + budget-health. */
+  /** Cashflow: de EFFECTIEVE spaarquote (ADR 0121) + budget-health. */
   cashflow: LeverEntry
   /** Belasting: box3-exposure. */
   tax: LeverEntry
@@ -123,8 +123,33 @@ export function computeLeverScores(input: {
   /** Aantal actieve schulden. */
   debtCount?: number
   assetTypeCount: number
-  /** Canonieke 6-maands spaarquote (%) uit savingsRateFromAggregates (incl.
-   *  spaarbudget- + aflossing-correctie). null = onvoldoende transactiedata. */
+  /**
+   * De EFFECTIEVE spaarquote (%) — `resolveSavingsSource(...).effectiveSavingsRatePct`
+   * (ADR 0121): de grondslag-geresolveerde quote, waar een handmatige of
+   * budget-grondslag wint van de 6-maands transactiemeting. Hetzelfde getal als
+   * de hefboomKAART op /overzicht toont (via `healthScoreInput.savingsRate6m`,
+   * een legacy-misnomer voor diezelfde effectieve quote) en als het
+   * instellingenblok onderaan /overzicht/budget noemt — met één benoemde
+   * uitzondering, zie hieronder.
+   *
+   * Op een zuivere transactiegrondslag IS dat per definitie de meting
+   * (`computeSavingsRate6m` → `savingsRateFromAggregates`, incl. spaarbudget- +
+   * aflossing-correctie).
+   *
+   * `null` = de hefboom doet geen uitspraak. Dat is NIET alleen "geen grondslag
+   * én geen transactiedata": het gebeurt óók op het zuivere transactiepad zodra
+   * er wel 12-maands maar geen 6-maands transactie-inkomen is. `loadLeverScores`
+   * geeft daar bewust geen profiel-fallback of vermogens-delta-schatting door,
+   * waar de kaart die wél heeft — de volledige motivatie en de grens staan in de
+   * kop van lib/lever-scores-loader.ts. Consumenten die het getal van de kaart
+   * náást dit oordeel zetten (de rondleiding doet dat) moeten dus kunnen omgaan
+   * met "wel een percentage, geen oordeel".
+   *
+   * Voedt zowel de detailregel ("Spaarquote 25%") als de SCORE/stoplichtkleur —
+   * bewust samen: vóór B-030 stond hier de rauwe meting terwijl de kaart ernaast
+   * het effectieve getal toonde, dus droeg één tegel een effectief cijfer met een
+   * rauw afgeleid stipje.
+   */
   savingsRate: number | null
   /** Totaal box3-belast vermogen boven vrijstelling. */
   box3TaxableAboveThreshold: number

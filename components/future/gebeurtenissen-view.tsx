@@ -279,13 +279,6 @@ export function GebeurtenissenView({
   const jaarruimteDeeplink =
     openStrategy === 'pensioen' && searchParams.get('strategie') === 'pensioen'
 
-  // In Eenvoudig blijft alleen de strategie staan waar van buiten naartoe
-  // verwezen wordt (Pensioen — zie de toelichting bij het blok hieronder).
-  const zichtbareStrategieen = useMemo(
-    () => (simpleMode ? LEVENSSTRATEGIEEN.filter((s) => s.key === 'pensioen') : LEVENSSTRATEGIEEN),
-    [simpleMode],
-  )
-
   // ── Feature #876: kernel-run (zelfde run-site als de Tijdas-grafiek) ─────
   // De hook draait pas ná hydration (params null → isLoading, skeleton-rij);
   // een korte mount-flits is acceptabel en consistent met de grafiek. GEEN
@@ -766,57 +759,55 @@ export function GebeurtenissenView({
           was er in Eenvoudig geen zichtbare ingang meer — een opdracht zonder
           bestemming.
 
-          In plaats daarvan het bestaande precedent uit horizon-client.tsx:
-          voorwaardelijk renderen omdat er naartoe gedeeplinkt wordt. In
-          Eenvoudig blijft alléén de Pensioen-strategie staan (mét duiding
-          waaróm), AOW/Huis/Werk blijven Volledig-weergave-diepte. */}
+          B-024: er stond in Eenvoudig vervolgens alléén de Pensioen-kaart. Dat
+          loste de deeplink op, maar nam de gebruiker drie keuzes af (AOW, huis,
+          werk) die hij nergens anders in de app terugvindt — en dat las als een
+          halve pagina, niet als een rustiger pagina. Besluit eigenaar:
+          Eenvoudig reduceert de VÓRM, niet het aantal keuzes — kleiner, niet
+          minder. Alle vier de strategieën staan dus in béíde modi; Eenvoudig
+          krijgt in plaats van een kortere lijst een compacter raster (twee
+          kolommen vanaf de smalste viewport, strakkere padding). */}
       <div>
         <header className="mb-4">
           <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
             Toekomst — levensstrategieën
           </div>
           <h2 className="font-serif text-xl text-[var(--ink)] mt-1">
-            {simpleMode ? 'Je pensioen-strategie' : 'Vier multi-step strategieën'}
+            Vier multi-step strategieën
           </h2>
           <p className="mt-1 text-xs text-[var(--ink-3)]">
-            {simpleMode ? (
-              <>
-                Hier beheer je je pensioenpotten en je factor A — het getal dat
-                bepaalt hoeveel jaarruimte je in Box 1 overhoudt. Zet je de
-                weergave op Volledig, dan staan hier ook de AOW-, huis- en
-                werk-strategie.
-              </>
-            ) : (
-              <>
-                Anders dan losse gebeurtenissen: strategieën hebben eigen
-                parameters en zijn als bandjes zichtbaar op de tijdas.
-              </>
-            )}
+            Anders dan losse gebeurtenissen: strategieën hebben eigen parameters
+            en zijn als bandjes zichtbaar op de tijdas.
           </p>
         </header>
 
+        {/* Eenvoudig = compacter raster, niet minder kaarten (B-024): twee
+            kolommen vanaf de smalste viewport en strakkere padding, zodat de
+            vier strategieën samen ongeveer de hoogte van één Volledig-kaart
+            innemen. */}
         <div
           className={
             simpleMode
-              ? 'grid grid-cols-1 gap-3 sm:max-w-md sm:gap-4'
+              ? 'grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4'
               : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4'
           }
         >
-          {zichtbareStrategieen.map((strat) => {
+          {LEVENSSTRATEGIEEN.map((strat) => {
             const Icon = strat.Icon
-            const cls =
-              'rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] p-4 sm:p-5 flex flex-col text-left'
+            const cls = `rounded-2xl border border-[var(--border-ed)] bg-[var(--paper)] flex flex-col text-left ${
+              simpleMode ? 'p-3' : 'p-4 sm:p-5'
+            }`
             const inner = (
               <>
                 <div
-                  className={`w-9 h-9 rounded-lg ${strat.bg} ${strat.text} flex items-center justify-center mb-3`}
+                  className={`${simpleMode ? 'w-7 h-7 mb-2' : 'w-9 h-9 mb-3'} rounded-lg ${strat.bg} ${strat.text} flex items-center justify-center`}
                 >
-                  <Icon className="w-4 h-4" aria-hidden="true" />
+                  <Icon className={simpleMode ? 'w-3.5 h-3.5' : 'w-4 h-4'} aria-hidden="true" />
                 </div>
                 <h3 className="text-sm font-semibold text-[var(--ink)] mb-1.5">
                   {strat.label}
                 </h3>
-                <p className="text-xs text-[var(--ink-2)] leading-snug flex-1">
+                <p className={`${simpleMode ? 'text-[11px]' : 'text-xs'} text-[var(--ink-2)] leading-snug flex-1`}>
                   {strat.description}
                 </p>
                 <span className="mt-3 text-[11px] font-semibold text-horizon-700 inline-flex items-center gap-1">

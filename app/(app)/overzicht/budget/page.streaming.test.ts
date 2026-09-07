@@ -63,6 +63,39 @@ describe('/overzicht/budget — beide blokken stromen achter een eigen Suspense'
   })
 })
 
+/**
+ * De volgorde-regressie zelf. De aanhef woonde in `BudgetsClient` en stroomde
+ * dus als laatste binnen: de pagina opende met drie kaartjes en droeg zijn
+ * titel halverwege. Hier staat de vorm die dat vastzet — aanhef-plek eerst,
+ * dan de kaarten, dan de budgetten, met de provider om alle drie heen zodat
+ * `BudgetsClient` zijn cijfers naar boven kan publiceren.
+ */
+describe('/overzicht/budget — de aanhef staat bóven de kaarten', () => {
+  const src = stripComments(PAGE_SRC)
+
+  it('rendert de aanhef-plek vóór het kaartenblok en dat vóór de budgetten', () => {
+    const header = src.indexOf('<BudgetHeaderSlot />')
+    const cards = src.indexOf('<CashflowCardsLoader')
+    const budgets = src.indexOf('<BudgetsLoader')
+    expect(header).toBeGreaterThan(-1)
+    expect(cards).toBeGreaterThan(header)
+    expect(budgets).toBeGreaterThan(cards)
+  })
+
+  it('omspant de provider zowel de aanhef-plek als het budgetblok', () => {
+    const open = src.indexOf('<BudgetHeaderSlotProvider>')
+    const close = src.indexOf('</BudgetHeaderSlotProvider>')
+    expect(open).toBeGreaterThan(-1)
+    expect(open).toBeLessThan(src.indexOf('<BudgetHeaderSlot />'))
+    expect(close).toBeGreaterThan(src.indexOf('<BudgetsLoader'))
+  })
+
+  it('schrijft hier géén tweede pagina-aanhef — één opening (ADR 0135)', () => {
+    expect(src).not.toContain('<PageOpening')
+    expect(src).not.toContain('<EditorialHeadline')
+  })
+})
+
 describe('budgets-loader — draagt de zware kant', () => {
   const src = stripComments(LOADER_SRC)
 

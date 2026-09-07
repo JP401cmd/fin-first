@@ -14,13 +14,21 @@
  * melding iets anders zeggen dan het scherm — precies de drift die de motor
  * moet voorkomen.
  *
- * ── VIER EVENTS, TWEE SOORTEN ───────────────────────────────────────────────
- *  - `near` en `exceeded` zijn LIVE STATUSSEN over de lopende periode, zonder
- *    gate: ze verdwijnen vanzelf zodra de toestand of de periode wisselt (exact
- *    het budget-alert-model). Ze sluiten elkaar per definitie uit, want
- *    `isNearLimit` eist zelf al `status === 'within'` — er staat hier bewust geen
- *    tweede check omheen.
+ * ── VIJF EVENTS, TWEE SOORTEN ───────────────────────────────────────────────
+ *  - `near`, `reached` en `exceeded` zijn LIVE STATUSSEN over de lopende
+ *    periode, zonder gate: ze verdwijnen vanzelf zodra de toestand of de periode
+ *    wisselt (exact het budget-alert-model). Ze sluiten elkaar uit: `isNearLimit`
+ *    eist zelf al `status === 'within'`, en `reached` staat er als eigen tak
+ *    vóór — zie hieronder.
  *  - `recovered` en `streak_milestone` zijn EENMALIG en lopen via de gate.
+ *
+ * ── WAAROM `reached` EEN EIGEN TAK IS (ADR 0136) ────────────────────────────
+ * Op de grens staan levert in de motor `status: 'within'` mét `isNearLimit`, en
+ * de near-tekst beloofde dan "Er is nog ruimte, maar niet veel" terwijl de
+ * melding er "€ 0 ruimte" naast zette. De WEERGAVE kent daarom een vierde stand
+ * (`resolveSpendLimitOutcomeState`), en die stand wordt hier geconsumeerd —
+ * niet nagerekend. De motor is ongemoeid: dit blijft een periode binnen de
+ * grens, ook voor de reeks, de score en de `exceeded`-telling.
  *
  * `recovered` is bewust een DATAFEIT (laatst afgesloten periode binnen, de
  * periode daarvóór erboven) en niet "er stond eerder een melding": het eerste is
@@ -48,11 +56,17 @@
 import { formatCurrency } from '@/lib/format'
 import { spendLimitCopy, type SpendLimitAlias } from '@/lib/spend-limits/copy'
 import type { SpendLimitPeriodKind, SpendLimitPeriodOutcome } from '@/lib/spend-limits/engine'
+import { resolveSpendLimitOutcomeState } from '@/lib/spend-limits/status-display'
 import type { SpendLimitWithReport } from '@/lib/spend-limits/types'
 
 // ── Contract ─────────────────────────────────────────────────────────────────
 
-export type SpendLimitEventKind = 'near' | 'exceeded' | 'recovered' | 'streak_milestone'
+export type SpendLimitEventKind =
+  | 'near'
+  | 'reached'
+  | 'exceeded'
+  | 'recovered'
+  | 'streak_milestone'
 
 /**
  * De dedupe-staat voor de EENMALIGE events: `{ [potId]: { [periodKey]: marker[] } }`.
@@ -102,7 +116,13 @@ export interface SpendLimitNotificationAmounts {
   limit: number
   /** Bedrag boven de grens — alleen bij `exceeded`. */
   over?: number
-  /** Resterende ruimte — alleen bij `near`. */
+  /**
+   * Resterende ruimte — alleen bij `near`.
+   *
+   * Bewust NIET bij `reached`: daar is de ruimte nul, en "€ 0 ruimte" naast de
+   * melding was precies de helft van de tegenspraak die ADR 0136 opheft. Die
+   * stand zegt het in woorden, niet in een bedrag dat niets meer voorstelt.
+   */
   headroom?: number
 }
 
@@ -324,7 +344,11 @@ export function decideSpendLimitEvents(input: DecideSpendLimitEventsInput): Spen
     const current = report.currentPeriod
 
     // ── Live statussen over de lopende periode ──────────────────────────────
-    if (current.status === 'exceeded') {
+    // De stand komt uit de gedeelde weergave-lezing, zodat de melding en het
+    // scherm niet uiteen kunnen lopen (ADR 0136).
+    const currentState = resolveSpendLimitOutcomeState(current)
+
+    if (currentState === 'exceeded') {
       events.push({
         kind: 'exceeded',
         potId,
@@ -351,9 +375,45 @@ export function decideSpendLimitEvents(input: DecideSpendLimitEventsInput): Spen
             `${config.name}. Welke uitgaven zitten daarin?`,
         },
       })
+    } else if (currentState === 'reached') {
+      // Precies op de grens: reken-technisch binnen, maar er is niets meer over.
+      // Deze tak staat VÓÓR `near`, want `isNearLimit` is hier ook waar — en de
+      // near-tekst zou dan ruimte beloven die er niet is (de melding uit ADR
+      // 0136). Priority 3, gelijk aan `near` en aan de budget-alert "limiet
+      // bereikt": het is een eindstand, geen overschrijding, en hoort dus niet in
+      // de dringend-bak (priority ≤ 2).
+      events.push({
+        kind: 'reached',
+        potId,
+        periodKey: current.periodKey,
+        once: false,
+        notification: {
+          id: `spend_limit_${potId}_${current.periodKey}_reached`,
+          type: 'spend_limit',
+          priority: 3,
+          title: `${config.name}: grens bereikt`,
+          description:
+            `Je ${copy.singularLower} staat ${words.lopend} precies op de grens die je jezelf ` +
+            'stelde. Er is niets meer over.',
+          icon: 'Gauge',
+          color: 'amber',
+          actionUrl: limitUrl(potId),
+          // Geen `headroom`: die is nul, en een "€ 0 ruimte"-regel naast deze
+          // tekst is exact de tegenspraak die deze stand opheft.
+          metadata: {
+            matched: current.periodMatchedAmount,
+            limit: current.limitAmount,
+          },
+          aiContext:
+            `Mijn ${copy.singularLower} "${config.name}" staat ${words.lopend} precies op mijn grens ` +
+            `van ${formatCurrency(current.limitAmount)}. Waar gaat dat geld heen?`,
+        },
+      })
     } else if (current.isNearLimit) {
       // `isNearLimit` eist zelf al `status === 'within'`; deze `else` is dus geen
-      // extra regel maar de plek waar de uitsluiting zichtbaar is.
+      // extra regel maar de plek waar de uitsluiting zichtbaar is. De
+      // `reached`-tak hierboven vangt bovendien het randgeval af waarin
+      // `isNearLimit` waar is terwijl er geen ruimte meer over is.
       events.push({
         kind: 'near',
         potId,

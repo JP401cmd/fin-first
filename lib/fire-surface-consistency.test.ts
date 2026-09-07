@@ -239,9 +239,17 @@ describe('H21 — bron-grendels tegen terugkeer van de motor-mix', () => {
 
   it('de Marktcheck-pil houdt haar label zolang de datawaarde er staat', () => {
     const src = read('components', 'app', 'horizon', 'horizon-client.tsx')
-    // Een kale `4,1%` naast "99% succeskans" is het defect; het label mag dus
-    // niet onvoorwaardelijk op `hidden sm:inline` staan wanneer er een waarde is.
-    expect(src).not.toMatch(/className="hidden sm:inline">Marktcheck</)
-    expect(src).toMatch(/mcExpanded && !mcPending && mcMarge \? 'inline' : 'hidden sm:inline'/)
+    // Een kale `4,1%` naast "99% succeskans" is het defect. De eerste vangst was
+    // een `'inline'`-class op het label — die weegt (0,1,0) en verloor altijd van
+    // de compact-regel `[data-pill-row][data-compact='true'] [data-pill-label]`
+    // (0,3,0); op 696px stond er dus alsnog een naamloos flesje met een cijfer
+    // (B-025). Sindsdien draagt de PIL het signaal `data-pill-keep` en garandeert
+    // app/globals.css dat label en badge samen reizen. Grendel dus op dat
+    // attribuut, gekoppeld aan exact de conditie waaronder de badge rendert.
+    expect(src).toMatch(
+      /data-pill-keep=\{mcExpanded && \(mcPending \|\| mcFailed \|\| Boolean\(mcMarge\)\) \? '' : undefined\}/,
+    )
+    // En niet terug naar de machteloze class-truc.
+    expect(src).not.toMatch(/mcExpanded && !mcPending && mcMarge \? 'inline' : 'hidden sm:inline'/)
   })
 })

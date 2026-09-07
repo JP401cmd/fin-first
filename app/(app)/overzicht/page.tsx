@@ -21,7 +21,6 @@ import {
   OverzichtNetWorthChartLoader,
 } from '@/components/overview/overzicht-secondary-loader'
 import { OverzichtSecondaryFallback } from '@/components/overview/overzicht-secondary'
-import { SindsVorigBezoekLoader } from '@/components/overview/sinds-vorig-bezoek-loader'
 import { MiniNetWorthChartAnchor } from '@/components/overview/mini-networth-chart-anchor'
 import { resolveOverviewGreeting } from '@/lib/overview/greeting'
 import { CheckinBanner } from '@/components/overview/checkin-banner'
@@ -174,9 +173,22 @@ export default async function OverzichtPage() {
       .reduce((s, a) => s + Number(a.current_value ?? 0), 0)
 
   // Totaalbedragen per hefboom-tegel — uit healthScoreInput (horizonData,
-  // perspectief-correct). Belasting = Box 3-druk per jaar. Cashflow = de
-  // canonieke 6-maands spaarquote (`savingsRate6m`); consume-don't-recompute,
-  // dezelfde grondslag als de cashflow-hefboom-status en de gezondheidsscore.
+  // perspectief-correct). Belasting = Box 3-druk per jaar.
+  //
+  // Cashflow = de EFFECTIEVE spaarquote (ADR 0121) — de grondslag-geresolveerde
+  // `resolveSavingsSource(...).effectiveSavingsRatePct`, waar een handmatige of
+  // budget-grondslag wint van de meting. Het veld op `healthScoreInput` heet
+  // `savingsRate6m`, maar dat is een LEGACY-MISNOMER: de horizon-loader vult het
+  // met `effectiveSavingsRate` (lib/horizon/raw-data-loader.ts). Consume-don't-
+  // recompute; dezelfde grondslag als de gezondheidsscore-pijler Rondkomen én —
+  // sinds B-030 — als de cashflow-hefboom-status en het kompas-detail.
+  //
+  // GELIJKE GRONDSLAG IS NIET OVERAL HETZELFDE GETAL. De hefboom-STATUS komt uit
+  // `loadLeverScores`, en die loader draait bewust zonder de profiel-fallback en
+  // de netto-vermogen-delta-tak die achter dít getal zitten. Op het zuivere
+  // transactiepad zonder 6-maands inkomen staat de tegel daarom grijs terwijl
+  // `totals.cashflow` een percentage draagt. Zie de kop van
+  // lib/lever-scores-loader.ts voor de grens en de motivatie.
   const totals = horizonData?.healthScoreInput
     ? {
         bezittingen: horizonData.healthScoreInput.totalAssets,
@@ -297,20 +309,6 @@ export default async function OverzichtPage() {
           userName={userName ?? undefined}
           greeting={greeting}
           dateLabel={dateLabel}
-          greetingNote={
-            // H11 — "sinds je vorige bezoek". Eigen `<Suspense>` met `null`-fallback:
-            // de cel deelt de al lopende `loadDashboardData` (React-cache()) en mag
-            // blok 1 dus niet ophouden. Geen skeleton — een reservering voor een
-            // regel die er meestal NIET is, zou zelf de ruis worden.
-            <Suspense fallback={null}>
-              <SindsVorigBezoekLoader
-                supabase={supabase}
-                perspective={perspective}
-                userId={userId}
-                currentNetWorth={currentNetWorth}
-              />
-            </Suspense>
-          }
           banners={
             // H20 — de check-in stond hiervóór bóven de begroeting: op een vers
             // account was het eerste scherm een lijstje,

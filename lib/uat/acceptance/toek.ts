@@ -613,6 +613,42 @@ const criteria: AcceptanceCriterion[] = [
         'lib/goal-data.ts#isGoalReached (richting-bewuste toets) + lib/goals/auto-complete.ts#isMachineTrackedGoal/selectReachedAutoGoals (échte productiefuncties, geen kernel-run nodig — pure selectie op een reeds-gesynchroniseerde doel-rij). Viering-venster = AUTO_COMPLETED_NOTICE_WINDOW_DAYS (lib/goals/auto-complete.ts). Check-in-skip = app/(app)/core/checkin/page.tsx#isLiveGoal (spiegelt bewust lokaal, zelfde drie bronnen).',
     },
   },
+  {
+    workflow: 'WF-TOEK-41',
+    scenarioId: 'UAT-TOEK-41',
+    titel: 'Pillenrij-invariant: label en badge reizen samen, en de 640-767px-band houdt de 2×2-cijferstrip',
+    kriticiteit: 'BELANGRIJK',
+    persona: 'tessa',
+    given:
+      'De pillenrij boven de tijdas-grafiek op /toekomst (`components/app/pill-row.tsx`) meet zichzelf en schakelt bij ruimtegebrek naar `data-compact` en daarna `data-tight`. Elke pil draagt haar naam als `data-pill-label` en haar getal als `data-pill-badge`. VOORHEEN hing de uitzondering aan een `className=\'inline\'` op het label van de Marktcheck-pil; die klasse weegt (0,1,0) en verloor altijd van de compact-regel `[data-pill-row][data-compact=\'true\'] [data-pill-label]` (0,3,0). Op 696 px (Surface Duo staand) stond er dus een naamloos flesje met een los cijfer, dat naast de succeskans als kans gelezen werd (melding B-025). Op datzelfde scherm schakelde de hero-cijferstrip al vanaf `sm` (640 px) naar 4 kolommen — ~150 px per tegel voor een kicker, een icoon en een 32 px Playfair-getal.',
+    when:
+      'De tester versmalt /toekomst door de 640-767px-band (bv. 696 px) en verder tot de rij compact en daarna tight wordt, met de Marktcheck aan (marge zichtbaar) en een wat-als-scenario actief (delta-badge op de scenario-pil), en leest daarna de gebeurtenissen-tijdlijn met een kernel-afgeleide marker (woningverkoop).',
+    then:
+      'HARDE INVARIANT: er staat nooit een kaal getal zonder naam. Valt een `data-pill-label` weg, dan valt de `data-pill-badge` van diezelfde pil mee — in de compacte stand én onder `sm`, waar de pil zijn label zelf inlevert (`hidden sm:inline`). Blijft het getal staan, dan blijft de naam staan. De uitzondering draagt de PIL, niet de callsite: `data-pill-keep` op de pil-knop, en alleen zolang de badge daadwerkelijk rendert — een pil zónder getal doet gewoon mee met de compacte stand. De regel staat in `app/globals.css` met winnende specificiteit (0,4,0 resp. 0,3,0), niet als class per callsite. In de `data-tight`-stand levert óók een keep-pil álles in — label én badge, nooit één van de twee: liever een badge kwijt dan pillen voorbij de schermrand, en de betekenis blijft via `title`/`aria-label`. Concreet dragen de Marktcheck-pil (marge) en de scenario-lijn-pil (FIRE-delta) `data-pill-keep`. HERO-CIJFERSTRIP: het breekpunt tussen de 2×2-variant en de 3/4-koloms strip is `md` (768 px), niet `sm` — de band 640-767 px houdt dus 2×2, en het mobiele hoofdcijfer erboven volgt hetzelfde breekpunt (`md:hidden`). TIJDLIJN-LEEFTIJD: kernel-afgeleide events dragen een fractionele `target_age` (de kernel verkoopt een woning in een maand, niet op een verjaardag); de tijdlijn rondt die af op hele jaren, zodat er "73j" staat en niet "73.16666666666666j". Alleen die weergavelijst rondt af — `displayEvents` (EventPane, chart-markers, simulatie-invoer) houdt de exacte kernelwaarde, want daar zou afronden een rekenwaarde verschuiven.',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'components/app/pill-row.tsx (meting + `data-compact`/`data-tight`) + app/globals.css (de vier CSS-regels die label en badge koppelen, incl. de `max-width: 639.98px`-regel en de `data-pill-keep`-uitzondering) + components/app/horizon/horizon-client.tsx (`data-pill-keep` op de Marktcheck- en scenario-pil, het `md`-breekpunt van beide cijferstrips, en `eventsForTimeline` met `Math.round` op een fractionele `target_age`) — responsief weergavegedrag zonder cijfermatige uitkomst; de CSS-specificiteit zelf is niet in een pure module na te rekenen. Bewaakt in `components/app/pill-row.test.tsx`.',
+    },
+  },
+  {
+    workflow: 'WF-TOEK-42',
+    scenarioId: 'UAT-TOEK-42',
+    titel: 'Eenvoudige weergave verkleint de vorm, niet het aantal keuzes: vier levensstrategieën in béíde modi',
+    kriticiteit: 'BELANGRIJK',
+    persona: 'willem',
+    given:
+      'Het blok "levensstrategieën" op /toekomst/gebeurtenissen (`components/future/gebeurtenissen-view.tsx`) toont vier multi-step strategieën: AOW, pensioen, huis en werk. VOORHEEN filterde Eenvoudig drie ervan weg en liet alleen Pensioen staan (met een duiding-alinea die uitlegde dát er één stond en dat Volledig de rest terugbracht) — dat loste de deeplink `/toekomst/strategie` op, maar nam de gebruiker drie keuzes af die hij nergens anders in de app terugvindt (melding B-024).',
+    when:
+      'De gebruiker bekijkt het blok in Volledig én in Eenvoudig (weergavemodus via ⌘K of /mijn), en volgt daarna de deeplinks /toekomst/gebeurtenissen?strategie=aow|pensioen|huis.',
+    then:
+      'In BÉIDE modi staan alle VIER de strategie-kaarten, met dezelfde kop "Vier multi-step strategieën" en dezelfde duiding ("Anders dan losse gebeurtenissen: strategieën hebben eigen parameters en zijn als bandjes zichtbaar op de tijdas"). De alinea die uitlegde dát er één kaart stond, is vervallen — staat hij er nog, dan is dat een regressie. Eenvoudig reduceert alleen de VORM: een compacter raster (2 kolommen vanaf de smalste viewport, 4 op `lg`) met strakkere padding, kleiner icoon en kleinere beschrijvingstekst, zodat de vier kaarten samen ongeveer de hoogte van één Volledig-kaart innemen. Volledig houdt 1 → 2 (`sm`) → 4 (`lg`) kolommen. Alle vier de deeplinks openen in beide modi hun kaart; er is geen strategie meer die alleen in Volledig bereikbaar is. Onderliggend principe (eigenaarsbesluit B-024): Eenvoudig maakt de pagina kleiner, niet armer — keuzes verbergen leest als een halve pagina.',
+    assertion: {
+      kind: 'ui-only',
+      source:
+        'components/future/gebeurtenissen-view.tsx (`LEVENSSTRATEGIEEN` wordt in beide modi volledig gerenderd; `simpleMode` stuurt alleen raster-, padding- en typografieklassen) — weergavemodus-gedrag zonder cijfermatige uitkomst. Bewaakt in `components/future/gebeurtenissen-view.test.tsx`.',
+    },
+  },
 ]
 
 export const TOEK_ACCEPTANCE: AcceptanceSet = {
@@ -627,5 +663,5 @@ export const TOEK_ACCEPTANCE: AcceptanceSet = {
  */
 export const TOEK_EXPECTED_WORKFLOW_NUMBERS: number[] = [
   ...Array.from({ length: 26 }, (_, i) => i + 1), // 1..26
-  28, 29, 30, 32, 33, 34, 35, 36, 37, 38, 39, 40,
+  28, 29, 30, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42,
 ]

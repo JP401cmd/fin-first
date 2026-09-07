@@ -32,7 +32,11 @@ import { buildBudgetSpendingMap, type SpendingSplitRow } from '@/lib/budget-spen
 import { getCurrentMonthSplits } from '@/lib/budget-spending-fetch'
 import { buildBudgetTypeMap } from '@/lib/budget-utils'
 import { box1JaarruimteStatus, resolvePensionFactorA } from '@/lib/jaarruimte'
-import { resolveEffectiveIncomeExpenses } from '@/lib/effective-financials'
+import {
+  resolveAmountWithBasis,
+  resolveEffectiveIncomeExpenses,
+} from '@/lib/effective-financials'
+import { extrapolateAnnualIncome } from '@/lib/retirement-expense-basis'
 import { loadBudgetBasis } from '@/lib/household/budget-share'
 import type { BudgetBasisRow } from '@/lib/budget-basis'
 import { resolveFireParams } from '@/lib/fire-params'
@@ -40,6 +44,7 @@ import { SAVINGS_RATE_WINDOW_MONTHS } from '@/lib/constants'
 import {
   computeSavingsRate6m,
   computeDebtAflossingMonthly,
+  resolveSavingsSource,
   savingsRateWindow,
   savingsRateDataMonths,
 } from '@/lib/savings-source'
@@ -54,7 +59,7 @@ import {
 } from '@/lib/server-data/base'
 import { resolveUnlinkedCashShare, unlinkedCashTotal } from '@/lib/unlinked-cash'
 import {
-  fetchTxMonthAggregate,
+  getTxAgg12m,
   aggSumPositief,
   aggSumNegatiefAbs,
   type TxMonthAggregateRow,
@@ -216,12 +221,36 @@ export function deriveBudgetHealthCounts(
 /**
  * Laad de vier-hefbomen-scores + de Box 1/3-statussen voor de huidige gebruiker.
  *
- * Queries: assets/debts/6m-transacties (canonieke spaarquote)/alle-budgetten/
+ * Queries: assets/debts/12m-maandaggregaat (spaarquote)/alle-budgetten/
  * maand-budget-tx/maand-inkomen + vroegste-inkomen (extrapolatie). De cashflow-
- * hefboom consumeert de canonieke 6-maands spaarquote (`computeSavingsRate6m` →
- * `savingsRateFromAggregates`), identiek aan het cashflow-instellingenblok en de
- * gezondheidsscore; de overige velden gebruiken dezelfde pure helpers
- * (`computeLeverScores`, `box3TaxStatus`, `box1JaarruimteStatus`).
+ * hefboom consumeert sinds B-030 de EFFECTIEVE spaarquote
+ * (`resolveSavingsSource(...).effectiveSavingsRatePct`, ADR 0121) — hetzelfde
+ * getal als de hefboomkaart op /overzicht, het cashflow-instellingenblok en de
+ * gezondheidsscore, in plaats van de rauwe 6-maands transactiemeting. De overige
+ * velden gebruiken dezelfde pure helpers (`computeLeverScores`, `box3TaxStatus`,
+ * `box1JaarruimteStatus`).
+ *
+ * ── DE GRENS VAN DIE PARITEIT (lees dit vóór je "hetzelfde getal" gelooft) ──
+ * Gelijk is de GRONDSLAG en de FORMULE, niet de hele fallback-ladder. Deze
+ * loader voedt `computeSavingsRate6m` BEWUST zonder `fallbackMonthlyIncome`/
+ * `fallbackMonthlyExpenses`, en draait de netto-vermogen-delta-tak niet die
+ * `resolveSavingsRate6m` (lib/cashflow-kpis.ts) er bovenop legt. Dat is de in
+ * lib/savings-source.ts gedocumenteerde keuze voor "de lichte sidebar-loader":
+ * geen uitspraak zonder grondslag, en geen extra snapshot-query op een loader
+ * die op ÉLKE route in het shell-pad draait.
+ *
+ * Praktisch verschil, één venster breed: staan beide grondslagen op
+ * 'transaction' (dan en alleen dan telt de meting mee) én is er wél
+ * 12-maands transactie-inkomen maar GEEN inkomen in het 6-maands venster, dan
+ * blijft de hefboom hier op `null` — "Onvoldoende transactiedata — Start",
+ * grijs — terwijl de kaart ernaast via de profiel-fallback (of de
+ * vermogens-delta) wél een percentage toont. Buiten die combinatie is de
+ * uitkomst gelijk: zodra één van beide grondslagen niet 'transaction' is, wint
+ * `effectiveSavingsRatePct` en speelt de meting geen rol.
+ *
+ * Wil je die grens dichten, dan is dat een eigenaar-besluit in de geest van
+ * B-030 (het verandert de statuskleur van de Budget-hefboom op bestaande
+ * accounts), geen opruimwerk — en het kost `getNetWorthSnapshots12m` erbij.
  *
  * @param supabase    Server-client (RLS-gescoped op de ingelogde gebruiker).
  * @param perspective Stuurt UITSLUITEND `netWorth` (perspectief-correct, via
@@ -300,7 +329,7 @@ export const loadLeverScores = cache(async function loadLeverScores(
     budgetsRes,
     bankAccountsRes,
     currentMonthTxRes,
-    tx6mAggRes,
+    txAgg12Res,
     earliestIncomeRes,
   ] = await Promise.all([
     getOwnProfile(supabase),
@@ -309,12 +338,24 @@ export const loadLeverScores = cache(async function loadLeverScores(
     getBudgets(supabase),
     getUnlinkedBankAccounts(supabase),
     getCurrentMonthTx(supabase),
-    // 6-maands maandaggregaat voor de canonieke spaarquote (transfer-gefilterd via
-    // realOnly; spaarbudget-correctie via budgetIds). SQL-aggregaat i.p.v. een
-    // 6-maands rijen-slice: kan niet stil afkappen op max_rows=1000
-    // (correctheid). RLS-breed (geen ownOnly) — identiek aan getTx12m's vroegere
-    // scope, waar T2.1 de expliciete .eq('user_id') liet vervallen.
-    fetchTxMonthAggregate(supabase, { from: savingsWindow.fromDate, to: savingsWindow.toDate }),
+    // Het ROLLENDE 12-MAANDS maandaggregaat (transfer-gefilterd via realOnly;
+    // spaarbudget-correctie via budgetIds). SQL-aggregaat i.p.v. een rijen-slice:
+    // kan niet stil afkappen op max_rows=1000 (correctheid). RLS-breed (geen
+    // ownOnly) — identiek aan de scope die T2.1 hier achterliet.
+    //
+    // WAAROM 12 EN NIET 6 (B-030): deze loader draaide een EIGEN 6-maands
+    // `fetchTxMonthAggregate`. Sinds de cashflow-hefboom de EFFECTIEVE spaarquote
+    // consumeert (ADR 0121) heeft hij óók het 12-maands transactie-inkomen nodig
+    // voor `extrapolateAnnualIncome` — de jaargrondslag die `resolveSavingsSource`
+    // gebruikt zodra de grondslag níét op 'transaction' staat. Het 6-maands
+    // venster is een strikte SUBSET van het 12-maands venster (beide op
+    // maandgrenzen, hetzelfde aggregaat per maand), dus de sommen hieronder zijn
+    // byte-identiek; ze worden nu in JS gesliced op `savingsWindow.sinceMonth` /
+    // `.beforeMonth` i.p.v. door de RPC-grenzen. Netto GEEN extra query: dit is
+    // dezelfde `cache()`-gedeelde RPC die de dashboard-, core- en horizon-loader
+    // (en blok 1 van /overzicht) al draaien — waar de vorige 6-maands-variant een
+    // eigen cache-entry had, deelt deze aanroep de bestaande.
+    getTxAgg12m(supabase),
     // Vroegste inkomens-datum (all-time, één rij) — afkap-vrij, i.p.v. de vroegere
     // reduce over een gecapte 12-maands-slice (die kon bij >1000 positieve rijen
     // stil afkappen → savingsDataMonths te klein → over-extrapolatie). Zelfde
@@ -404,20 +445,36 @@ export const loadLeverScores = cache(async function loadLeverScores(
   const savingsBudgetIds = new Set<string>()
   for (const [id, type] of budgetTypeById) if (type === 'savings') savingsBudgetIds.add(id)
 
-  // ── Spaarquote (canoniek 6-maands — gedeelde helper) ──
-  // Consume, don't recompute: dezelfde grondslag als het cashflow-instellingenblok
+  // ── De MÉTING: de canonieke 6-maands transactiequote (gedeelde helper) ──
+  // Consume, don't recompute: dezelfde formule als het cashflow-instellingenblok
   // en de gezondheidsscore (savingsRateFromAggregates via computeSavingsRate6m):
   // transfer-gefilterd, spaarbudget-stortingen + schuldaflossing tellen als sparen,
   // <6m data geëxtrapoleerd. GEEN profiel-fallback hier (net als de oude 3-maands
-  // variant): zonder transactie-inkomen blijft de quote `null` zodat de cashflow-
-  // hefboom "onvoldoende data" toont i.p.v. een getal.
-  // 6-maands sommen uit het maandaggregaat (transfer-gefilterd via realOnly,
-  // spaarbudget-correctie via budgetIds) — byte-identiek aan de vroegere rij-
-  // reductie, maar zonder de stille max_rows-afkap.
-  const tx6mAgg = (tx6mAggRes.data ?? []) as TxMonthAggregateRow[]
-  const income6m = aggSumPositief(tx6mAgg, { realOnly: true })
-  const expenses6m = aggSumNegatiefAbs(tx6mAgg, { realOnly: true })
-  const savingsBudgetSpent6m = aggSumNegatiefAbs(tx6mAgg, { realOnly: true, budgetIds: savingsBudgetIds })
+  // variant): zonder transactie-inkomen blijft de meting `null`.
+  //
+  // Dat is de bewuste grens uit de kop van dit bestand, en hij zit precies HIER:
+  // `computeSavingsRate6m` krijgt geen `fallbackMonthlyIncome`/`-Expenses` mee
+  // (zie de optionele velden in lib/savings-source.ts, die deze loader met naam
+  // noemen), en de netto-vermogen-delta-tak van `resolveSavingsRate6m`
+  // (lib/cashflow-kpis.ts) draait hier niet. Op het transactie/transactie-pad
+  // ZONDER 6-maands inkomen wijkt de hefboom daardoor af van de kaart: grijs
+  // "Onvoldoende transactiedata" naast een percentage. Bewust — een profiel-
+  // afgeleide uitspraak op een tegel die "6 maanden transacties" belooft is de
+  // ergere fout, en de delta-tak zou een snapshot-query toevoegen aan een loader
+  // die op élke route meedraait. Wijzig dit niet zonder eigenaar-besluit.
+  // De 6-maands sommen komen als SUB-VENSTER uit het 12-maands maandaggregaat
+  // (`savingsWindow.sinceMonth`/`.beforeMonth`, exclusieve bovengrens = de lopende
+  // maand, bevinding C6) — byte-identiek aan de vroegere eigen 6-maands RPC, maar
+  // op de gedeelde `getTxAgg12m`-entry.
+  const txAgg12 = (txAgg12Res.data ?? []) as TxMonthAggregateRow[]
+  const window6m = { sinceMonth: savingsWindow.sinceMonth, beforeMonth: savingsWindow.beforeMonth }
+  const income6m = aggSumPositief(txAgg12, { realOnly: true, ...window6m })
+  const expenses6m = aggSumNegatiefAbs(txAgg12, { realOnly: true, ...window6m })
+  const savingsBudgetSpent6m = aggSumNegatiefAbs(txAgg12, {
+    realOnly: true,
+    ...window6m,
+    budgetIds: savingsBudgetIds,
+  })
   const debtAflossing6m = computeDebtAflossingMonthly(debtRows as unknown as Debt[]) * SAVINGS_RATE_WINDOW_MONTHS
 
   // Vroegste inkomens-datum: all-time via de gedeelde `getEarliestIncomeDate`
@@ -431,7 +488,7 @@ export const loadLeverScores = cache(async function loadLeverScores(
     (earliestIncomeRes.data as { date?: string | null } | null)?.date ?? undefined
   const savingsDataMonths = savingsRateDataMonths(now, earliestIncomeDate)
 
-  const savingsRate: number | null =
+  const measuredSavingsRate6m: number | null =
     income6m > 0
       ? computeSavingsRate6m({
           income6m,
@@ -441,6 +498,106 @@ export const loadLeverScores = cache(async function loadLeverScores(
           dataMonths: savingsDataMonths,
         }).savingsRate6m
       : null
+
+  // ── Budgetgrondslag (ADR 0103) — gedeelde samenstelling ──
+  // Voedt zowel de EFFECTIEVE spaarquote hieronder als het Box 1-maandinkomen
+  // verderop. `getBudgets`/`getOwnProfile` staan al in de golf hierboven en
+  // `loadBudgetBasis` is intern `cache()`-gedeeld, dus dit is geen extra last;
+  // hij staat hier bewust vóór `computeLeverScores` omdat de cashflow-hefboom
+  // hem nu nodig heeft.
+  const leverBudgetBasis = await loadBudgetBasis(
+    supabase,
+    profile as unknown as Record<string, unknown>,
+    (budgetsRes.data ?? []) as unknown as BudgetBasisRow[],
+  )
+
+  // ── De EFFECTIEVE spaarquote — HET spaarquote-getal (ADR 0121) ──
+  //
+  // WAT HIER MIS WAS (B-030): deze loader gaf de MÉTING hierboven door aan
+  // `computeLeverScores`, die er zowel de kompas-detailregel ("Spaarquote 12%")
+  // als de STATUS-kleur van de Budget-hefboom mee maakte. De hefboomKAART op
+  // /overzicht leest ondertussen `healthScoreInput.savingsRate6m` — en dát veld
+  // draagt (ondanks zijn naam) de EFFECTIEVE quote uit de horizon-loader. Eén
+  // hefboom, één scherm, twee percentages: kaart 25 %, kompas 12 %. Erger nog:
+  // het stipje op die kaart was van de rauwe meting afgeleid terwijl het getal
+  // ernaast effectief was. ADR 0121 kent drie uitzonderingen waar de meting mág
+  // verschijnen (transactie-kassabon, check-in-gespreksstarters, geldstroom-gauge
+  // — élk mét venster-label); een kompas-detailregel zonder venster hoort daar
+  // niet bij.
+  //
+  // GEEN TWEEDE FORMULE: `resolveSavingsSource` blijft de enige plek waar de
+  // grondslagkeuze in een percentage wordt omgezet. Wat hier staat is uitsluitend
+  // dezelfde INVOER samenstellen als `loadForecastSectionData`/`loadDashboardData`
+  // (het parity-gekoppelde paar): jaarinkomen via `extrapolateAnnualIncome` op het
+  // 12-maands transactie-inkomen, uitgaven op de 6-maands MEETBASIS
+  // (`expenses6m / 6` — dezelfde meting waar de quote op staat, bewust niet de
+  // lopende maand), en de budgetgrondslag uit `loadBudgetBasis`.
+  //
+  // GEVOLG, BEWUST (eigenaar-besluit B-030): staat de grondslag NIET op
+  // 'transaction', dan verschuiven de detailregel én de STATUSKLEUR van de
+  // Budget-hefboom (kompas, sidebar-dot én de status-duiding-melding op
+  // /overzicht/budget) mee naar het getal dat de kaart al toonde. Op beide
+  // transactie-grondslagen is de uitkomst per definitie identiek aan voorheen —
+  // `resolveSavingsSource` geeft daar letterlijk `savingsRate6m` terug.
+  // De transactie-extrapolatie apart, want hij heeft TWEE rollen: kandidaat voor
+  // de grondslagkeuze hieronder, én de terugval die `resolveSavingsSource`
+  // gebruikt zodra de gekozen grondslag geen bruikbaar jaarinkomen oplevert.
+  // Die tweede rol is de reden dat hij niet inline mag: gaf je daar
+  // `leverAnnualIncome.amount` mee, dan valt de terugval terug op exact dezelfde
+  // waarde en vangt hij niets op — precies het randgeval (`income_source =
+  // 'manual'` met een leeggemaakt bedrag) waarvoor hij bestaat. Dashboard
+  // (`dashboard-data-loader.ts:1225`) en forecast (`cashflow-kpis.ts:869`) geven
+  // hier om dezelfde reden de extrapolatie mee.
+  const leverExtrapolatedIncome = extrapolateAnnualIncome(
+    aggSumPositief(txAgg12, { realOnly: true }),
+    earliestIncomeDate,
+    now,
+  )
+  const leverAnnualIncome = resolveAmountWithBasis(
+    profile.income_source,
+    Number(profile.net_monthly_income ?? 0) * 12,
+    leverExtrapolatedIncome,
+    leverBudgetBasis.income.annualTotal,
+  )
+  const leverSavingsExpenses = resolveAmountWithBasis(
+    profile.expenses_source,
+    Number(profile.estimated_monthly_expenses ?? 0),
+    expenses6m / SAVINGS_RATE_WINDOW_MONTHS,
+    leverBudgetBasis.expenses.monthlyTotal,
+  )
+  const { effectiveSavingsRatePct } = resolveSavingsSource({
+    incomeSource: profile.income_source,
+    expensesSource: profile.expenses_source,
+    netMonthlyIncome: Number(profile.net_monthly_income ?? 0),
+    estimatedAnnualIncome: leverExtrapolatedIncome,
+    estimatedMonthlyExpenses: Number(profile.estimated_monthly_expenses ?? 0),
+    // Op het transactie/transactie-pad IS dit de uitkomst; `null` betekent daar
+    // "geen meting", en de guard hieronder houdt die `null` in stand.
+    savingsRate6m: measuredSavingsRate6m ?? 0,
+    basis: {
+      income: leverAnnualIncome.basis,
+      expenses: leverSavingsExpenses.basis,
+      annualIncome: leverAnnualIncome.amount,
+      monthlyExpenses: leverSavingsExpenses.amount,
+    },
+  })
+
+  // GEEN UITSPRAAK ZONDER GRONDSLAG — de `null` van vóór B-030 blijft intact:
+  //  · beide grondslagen op 'transaction' → de uitkomst ÍS de meting
+  //    (`resolveSavingsSource` geeft daar letterlijk `savingsRate6m` terug), dus
+  //    geen transactie-inkomen in het venster blijft `null` = "Onvoldoende
+  //    transactiedata — Start". Byte-identiek aan voorheen.
+  //  · anders wint de grondslag-geresolveerde quote, TENZIJ `resolveAmountWithBasis`
+  //    helemaal doorvalt (`'unknown'` — geen budget, geen transacties, geen
+  //    profielbedrag; ADR 0131: onbekend is geen nul). Dan zou de uniforme formule
+  //    op een inkomen van €0 draaien en een verzonnen 0 % opleveren.
+  const bothTransaction =
+    leverAnnualIncome.basis === 'transaction' && leverSavingsExpenses.basis === 'transaction'
+  const savingsRate: number | null = bothTransaction
+    ? measuredSavingsRate6m
+    : leverAnnualIncome.basis === 'unknown'
+      ? null
+      : effectiveSavingsRatePct
 
   // ── Box 3-belast-vermogen-signaal (gedeelde helper) ──
   const householdType = (profile.household_type as string | undefined) ?? undefined
@@ -500,15 +657,11 @@ export const loadLeverScores = cache(async function loadLeverScores(
     else monthTxExpenses += Math.abs(amt)
   }
   // Budgetgrondslag (ADR 0103) uit dezelfde gedeelde samenstelling als de
-  // loaders. Zonder dit zou de sidebar-statusdot — die op ÉLKE route in het
-  // shell-pad hangt — het Box 1-inkomen op de transactiegrondslag blijven
-  // rekenen terwijl /overzicht/budget het budgetgetal toont. Geen extra query:
-  // `getBudgets`/`getOwnProfile` staan al in de golf hierboven.
-  const leverBudgetBasis = await loadBudgetBasis(
-    supabase,
-    profile as unknown as Record<string, unknown>,
-    (budgetsRes.data ?? []) as unknown as BudgetBasisRow[],
-  )
+  // loaders — `leverBudgetBasis` is hierboven al opgehaald (hij voedt sinds B-030
+  // óók de effectieve spaarquote). Zonder deze grondslag zou de sidebar-statusdot
+  // — die op ÉLKE route in het shell-pad hangt — het Box 1-inkomen op de
+  // transactiegrondslag blijven rekenen terwijl /overzicht/budget het budgetgetal
+  // toont.
   const { income: box1MonthlyIncome } = resolveEffectiveIncomeExpenses(
     profile,
     monthTxIncome,

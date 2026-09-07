@@ -142,6 +142,31 @@ describe('SpendLimitWidget — status komt uit de motor, niet uit een eigen drem
     expect(text).not.toContain('dicht bij je grens')
   })
 
+  it('exact op de grens ⇒ "grens bereikt", nooit "€ 0 ruimte over" (ADR 0136)', () => {
+    // De motorstand op de grens: within én near, met nul ruimte. De tegel mag
+    // daar geen groene ruimte-belofte van maken.
+    const { container } = render(
+      <SpendLimitWidget
+        size="half"
+        limit={makeLimit({
+          currentMatchedAmount: 200,
+          currentHeadroom: 0,
+          currentOverAmount: 0,
+          status: 'within',
+          isNearLimit: true,
+        })}
+        dailyExp={50}
+      />,
+    )
+    const text = (container.textContent ?? '').replace(/ /g, ' ')
+    expect(text).toContain('grens bereikt')
+    expect(text).toContain('geen ruimte meer')
+    expect(text).not.toContain('ruimte over')
+    expect(text).not.toContain('dicht bij je grens')
+    // Vrijheidstijd over nul euro zegt niets en verdwijnt.
+    expect(text).not.toContain('vrijheid over')
+  })
+
   it('exceeded ⇒ "boven je grens" met het overschrijdingsbedrag', () => {
     const { container } = render(
       <SpendLimitWidget

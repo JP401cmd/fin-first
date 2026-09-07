@@ -91,6 +91,11 @@ export const navGroups: NavGroup[] = [
           { label: 'Transacties', href: '/overzicht/budget/transacties' },
           { label: 'Vaste lasten', href: '/overzicht/budget/vaste-lasten' },
           { label: 'Forecast', href: '/overzicht/budget/forecast' },
+          // Vierde ingang, géén vierde onderdeel: hier stel je in waar de
+          // cijfers op rusten (inkomen/uitgaven/spaarquote) en welke rekeningen
+          // in budgetteren meelopen. Staat hier óók om de mobiele TopBar-titel
+          // te voeden — `resolveRouteTitle()` leest deze boom (W-002).
+          { label: 'Instellingen', href: '/overzicht/budget/instellingen' },
         ],
       },
       {

@@ -181,6 +181,11 @@ export const NotificationItem = memo(function NotificationItem({ notification, o
                 {' · '}
               </>
             )}
+            {/* "X ruimte" verschijnt alleen bij een melding die ook ruimte
+                belooft: de `near`-stand. Een melding op de grens (`reached`,
+                ADR 0136) draagt bewust géén `headroom`, want "€ 0 ruimte" naast
+                "je grens is bereikt" was precies de tegenspraak die gemeld werd.
+                Blijft dan staan: "€ 5 van € 5" — dat klopt wél. */}
             {notification.metadata.headroom != null && (
               <>
                 <MaskedAmount value={Number(notification.metadata.headroom)} tone="kern" /> ruimte

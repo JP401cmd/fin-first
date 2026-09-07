@@ -16,7 +16,7 @@ import type { CommandItem, CommandModuleContext } from './types'
 /**
  * Cap op het aantal algemene acties dat de palette zonder zoekterm toont.
  * Leeft hier (bij het register) zodat de test kan bewaken dat elke kern-actie
- * — inclusief 'Synchroniseer prijzen' — binnen de cap valt; een nieuwe actie
+ * — inclusief 'Alles synchroniseren' — binnen de cap valt; een nieuwe actie
  * toevoegen zonder de cap te verhogen drukt anders stilzwijgend de onderste
  * actie uit de standaardlijst.
  */
@@ -46,7 +46,19 @@ export type ActionRunContext = {
   toggleHomeScreen: () => void
   /** Huidig homescherm — bepaalt het label van de toggle-actie. */
   homeScreen: HomeScreen
-  /** Trigger een prices-only sync (geen bank-/exchange-koppelingen vereist). */
+  /**
+   * Start de VOLLEDIGE sync-ronde: koersen, bankgegevens, exchanges en wallets —
+   * exact dezelfde ronde als de sync-knop in de header (`useGlobalSyncRunner`).
+   *
+   * Deed tot 7 sep 2026 alleen de prijzen (`pricesOnly: true`), waardoor de
+   * "algemene synchroniseren"-knop in ⌘K aantoonbaar minder deed dan die in de
+   * header — de bankgegevens gingen niet mee. De rem op bankkoppelingen (één
+   * ronde per uur, drie verzoeken reserve op de 10/dag) zit in
+   * `lib/sync/global-sync.ts#planBankSyncs` en is hier niet aan de orde.
+   *
+   * De veldnaam is historisch; hernoemen raakt ook de UAT-spiegel
+   * (`lib/uat/acceptance/nav-checks.ts`) en gaat als aparte opruimstap.
+   */
   triggerPricesSync: () => Promise<void> | void
   /** Huidig actief perspectief (personal/household/partner). */
   currentPerspective: Perspective
@@ -150,12 +162,24 @@ const ACTIONS: ActionDef[] = [
     },
   },
   {
+    // Het id blijft `action:sync-prices` — het is de sleutel waarop de recents
+    // (`lib/command-palette/recents.ts`) en de UAT-spiegel deze actie kennen; de
+    // RONDE is verbreed, niet de actie vervangen.
     id: 'action:sync-prices',
-    getLabel: () => 'Synchroniseer prijzen',
-    getSublabel: () => 'Beleggings- en cryptokoersen verversen',
+    getLabel: () => 'Alles synchroniseren',
+    getSublabel: () => 'Koersen, banktransacties en cryptosaldi ophalen',
     getIcon: () => RefreshCw,
     module: 'globaal',
-    requiredModule: 'vermogensregistratie',
+    // GEEN module-gate — bewust, en dat is een correctie (B-029, 7 sep 2026).
+    // De gate stond op 'vermogensregistratie' toen de ronde alleen koersen
+    // ververste. Nu hij ook banktransacties ophaalt is dat aantoonbaar te smal:
+    // die horen bij 'budgetteren', en beide modules zijn `standalone`, dus een
+    // budgetteren-only gebruiker mét bankkoppeling zag de actie niet.
+    //
+    // Verbreden naar "de één OF de ander" zou een tweede vorm van waarheid
+    // maken, want de knop die exact dezelfde ronde draait — `GlobalSyncButton`
+    // in `sidebar.tsx` en `top-bar.tsx` — is volledig ongegate. Dit spiegelt
+    // die knop; één ronde, één beschikbaarheid.
     build: (ctx) => async () => {
       ctx.closePalette()
       await ctx.triggerPricesSync()

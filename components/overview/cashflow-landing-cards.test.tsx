@@ -15,6 +15,23 @@
  * Elk onderdeel is los te breken zonder dat de ander het merkt — de `variant`
  * kan omvallen terwijl de CF-2-filter blijft, of andersom — dus ze krijgen elk
  * hun eigen assertie i.p.v. één "ziet er eenvoudig uit"-check.
+ *
+ * ── W-003 + W-002 (7 sep 2026) ──────────────────────────────────────────────
+ * Twee dingen erbij, en ze breken los van elkaar:
+ *  · **W-003** — in Eenvoudig draaien de kaarten op `dense`: kleinere padding,
+ *    chip en typetrap, mét het oordeel. De verleiding was `variant="compact"`
+ *    (de /toekomst-vorm), en dát gooit het oordeel weg — de eigenaar besliste
+ *    anders. De suite pint daarom BEIDE kanten: de maten ÉN het oordeel.
+ *  · **W-002** — naast de gestatuste kaarten staat een losse instellingen-tegel.
+ *    Die is met opzet géén `CashflowCardKey` en draagt dus geen status-dot; een
+ *    test die alleen "er staat een vierde tegel" zou zeggen laat precies die
+ *    fout door.
+ *
+ * LET OP bij het lezen van de tel-asserties: de fixture hieronder draagt VIER
+ * kaarten (inclusief Budget), terwijl de echte pagina er via `budgetSubCards`
+ * drie doorgeeft. Het component telt niet zelf — het rendert wat het krijgt,
+ * plus één instellingen-tegel. Vandaar `CARDS.length + 1` i.p.v. een kaal
+ * getal.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, within, fireEvent } from '@testing-library/react'
@@ -25,8 +42,9 @@ import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 import {
   CashflowLandingCards,
   CashflowLandingCardsSkeleton,
+  BUDGET_INSTELLINGEN_HREF,
 } from './cashflow-landing-cards'
-import type { CashflowCard } from '@/lib/cashflow-cards'
+import { BUDGET_SUBCARD_KEYS, type CashflowCard } from '@/lib/cashflow-cards'
 
 /** Zet de privacy-toggle aan binnen een echte `PrivacyProvider`. */
 function MaskToggle() {
@@ -111,12 +129,22 @@ function cardByHref(container: HTMLElement, href: string): HTMLAnchorElement {
   return el as HTMLAnchorElement
 }
 
+/**
+ * De kaart-SHELL (het `<div>` met de rand en de padding). Bij een `LeverageCard`
+ * is dat de ouder van de `<a>`; de instellingen-tegel IS zelf de `<a>`.
+ */
+function shellOf(card: HTMLAnchorElement): HTMLElement {
+  return (card.className.includes('rounded-2xl') ? card : card.parentElement) as HTMLElement
+}
+
 // ── Volledig: ongewijzigd ────────────────────────────────────────────────────
 
 describe('CashflowLandingCards — Volledig blijft ongewijzigd', () => {
   it('rendert alle vier de kaarten, inclusief Forecast', () => {
     const { container } = renderCards('full')
-    expect(container.querySelectorAll('a').length).toBe(4)
+    // +1 = de instellingen-tegel (W-002); het component telt niet zelf, het
+    // rendert wat het krijgt.
+    expect(container.querySelectorAll('a').length).toBe(CARDS.length + 1)
     expect(screen.getByText('Forecast')).toBeTruthy()
   })
 
@@ -158,7 +186,7 @@ describe('CashflowLandingCards — Volledig blijft ongewijzigd', () => {
 describe('CashflowLandingCards — S5: Forecast-kaart in béide modi', () => {
   it('rendert vier kaarten in Eenvoudig, inclusief Forecast', () => {
     const { container } = renderCards('simple')
-    expect(container.querySelectorAll('a').length).toBe(4)
+    expect(container.querySelectorAll('a').length).toBe(CARDS.length + 1)
     expect(cardByHref(container, '/overzicht/budget/forecast')).toBeTruthy()
   })
 
@@ -315,23 +343,44 @@ describe('CashflowLandingCardsSkeleton — volgt de weergavemodus', () => {
     return container.querySelectorAll('.animate-pulse > div')
   }
 
-  it('reserveert vier tegels in Volledig', () => {
-    expect(skeletonTiles('full').length).toBe(4)
-  })
+  // HERZIEN 7 sep 2026 (W-003, bijvangst). Hier stond `toBe(4)` als kaal getal,
+  // in béide modi — geschreven toen de hub vier gestatuste kaarten toonde. ADR
+  // 0135 bracht de budgetpagina op DRIE (`budgetSubCards`) en deze fallback bleef
+  // op vier staan: één tegel te veel reserveren is dezelfde CLS als er één te
+  // weinig reserveren, alleen de andere kant op. De telling komt nu uit
+  // `BUDGET_SUBCARD_KEYS` + de instellingen-tegel, dus hij kan niet opnieuw
+  // wegdrijven van de kaartenset.
+  for (const mode of ['full', 'simple'] as const) {
+    it(`reserveert in ${mode} evenveel tegels als er komen (${BUDGET_SUBCARD_KEYS.length} kaarten + instellingen)`, () => {
+      expect(skeletonTiles(mode).length).toBe(BUDGET_SUBCARD_KEYS.length + 1)
+    })
+  }
 
-  it('reserveert óók in Eenvoudig vier tegels — evenveel als er daadwerkelijk komen', () => {
-    expect(skeletonTiles('simple').length).toBe(4)
-  })
-
-  // Vormpin, niet alleen een telling — HERZIEN 28 aug 2026 (S4 + S5). De tegel
-  // is geen one-liner meer maar een verdict-kaart: icoon-chip + label + oordeel
-  // + bedrag/venster, vier blokken onder elkaar. Reserveert de skeleton er
-  // minder, dan groeit elke tegel zodra de echte kaarten binnenkomen — precies
-  // de CLS die deze fallback moest voorkomen.
-  it('reserveert in Eenvoudig vier blokken per tegel (icoon, label, oordeel, cijfer)', () => {
-    const tiles = skeletonTiles('simple')
-    for (const tile of Array.from(tiles)) {
+  // Vormpin, niet alleen een telling — HERZIEN 28 aug 2026 (S4 + S5), aangevuld
+  // 7 sep 2026 (W-002). De status-tegel is geen one-liner maar een
+  // verdict-kaart: icoon-chip + label + oordeel + bedrag/venster, vier blokken
+  // onder elkaar. De instellingen-tegel heeft er DRIE — geen cijferregel, want
+  // hij draagt geen KPI. Reserveert de skeleton de verkeerde vorm, dan groeit of
+  // krimpt de tegel zodra de echte kaarten binnenkomen.
+  it('reserveert in Eenvoudig vier blokken per status-tegel en drie voor instellingen', () => {
+    const tiles = Array.from(skeletonTiles('simple'))
+    const status = tiles.slice(0, BUDGET_SUBCARD_KEYS.length)
+    const instellingen = tiles[tiles.length - 1]!
+    for (const tile of status) {
       expect(tile.children.length).toBe(4)
+    }
+    expect(instellingen.children.length).toBe(3)
+  })
+
+  // W-003: de skeleton moet de dense-maat van de echte tegel spiegelen. Bleef
+  // hij op `p-3 sm:p-4` staan, dan krimpt elke tegel bij de instroom.
+  it('gebruikt in Eenvoudig de dense-padding, in Volledig de volle', () => {
+    for (const tile of Array.from(skeletonTiles('simple'))) {
+      expect(tile.className).toContain('p-2')
+      expect(tile.className).not.toContain('p-3 sm:p-4')
+    }
+    for (const tile of Array.from(skeletonTiles('full'))) {
+      expect(tile.className).toContain('p-3 sm:p-4')
     }
   })
 
@@ -347,5 +396,78 @@ describe('CashflowLandingCardsSkeleton — volgt de weergavemodus', () => {
       expect(grid?.className).toContain('md:grid-cols-4')
       unmount()
     }
+  })
+})
+
+// ── W-003: kleiner in Eenvoudig, MÉT het oordeel ────────────────────────────
+//
+// De melder vroeg om "minimaliseren, zoals op de toekomst pagina". Daar staat
+// `variant="compact"` — icoon + label, verder niets. De eigenaar besliste
+// anders: kleiner mag, het oordeel blijft. Deze suite pint beide helften, want
+// ze vallen los om: je kunt de maten terugdraaien zonder het oordeel te raken,
+// en je kunt naar `compact` overstappen met dezelfde maten.
+
+describe('CashflowLandingCards — W-003: dense in Eenvoudig', () => {
+  it('geeft de kaart in Eenvoudig de dense-maten (padding, chip, typetrap)', () => {
+    const { container } = renderCards('simple')
+    const card = cardByHref(container, '/overzicht/budget/transacties')
+    const shell = shellOf(card)
+
+    expect(shell.className).toContain('p-2 sm:p-3')
+    expect(shell.className).not.toContain('p-3 sm:p-4')
+    // Chip 28/32px i.p.v. 32/36px.
+    expect(card.querySelector('.w-7')).toBeTruthy()
+    expect(card.querySelector('.w-9')).toBeNull()
+    // Label en oordeel één typetrap lager.
+    expect(within(card).getByText('Transacties').className).toContain('text-xs')
+    expect(within(card).getByText('Goed gespaard deze maand').className).toContain('text-xs')
+  })
+
+  it('houdt Volledig op de volle maat — dense raakt alleen de verdict-tak', () => {
+    const { container } = renderCards('full')
+    const shell = shellOf(cardByHref(container, '/overzicht/budget/transacties'))
+    expect(shell.className).toContain('p-3 sm:p-4')
+    expect(shell.className).not.toContain('p-2 sm:p-3')
+  })
+
+  it('kleiner betekent NIET kaler: oordeel, cijfer, venster en status-dot blijven', () => {
+    // Dit is de hele reden dat W-003 geen `variant="compact"` werd. Valt deze
+    // test om, dan is het R5-richtingsbesluit stilletjes teruggedraaid.
+    const { container } = renderCards('simple')
+    const card = cardByHref(container, '/overzicht/budget/transacties')
+    expect(within(card).getByText('Goed gespaard deze maand')).toBeTruthy()
+    expect(card.textContent).toContain('+€ 1.100')
+    expect(card.textContent).toContain('in augustus tot nu toe')
+    expect(card.querySelector('span[aria-hidden="true"][class*="rounded-full"]')).toBeTruthy()
+  })
+})
+
+// ── W-002: de vierde tegel is een INGANG, geen vierde kaart ─────────────────
+
+describe('CashflowLandingCards — W-002: instellingen-tegel', () => {
+  for (const mode of ['simple', 'full'] as const) {
+    it(`staat er in ${mode} en wijst naar de instellingenpagina`, () => {
+      const { container } = renderCards(mode)
+      const tile = cardByHref(container, BUDGET_INSTELLINGEN_HREF)
+      expect(tile.textContent).toContain('Instellingen')
+      expect(tile.textContent).toContain('Schattingen en rekeningen')
+    })
+  }
+
+  it('draagt GEEN status-dot en GEEN cijfer — hij meet niets', () => {
+    // Zou de tegel als `CashflowCardKey`/LeverageCard zijn ingehangen, dan kreeg
+    // hij een (lege) stip mee door de hele app, tot in de sidebar. Deze assertie
+    // is het enige wat dat hard houdt.
+    const { container } = renderCards('simple')
+    const tile = cardByHref(container, BUDGET_INSTELLINGEN_HREF)
+    expect(tile.querySelector('span[class*="rounded-full"]')).toBeNull()
+    expect(tile.textContent).not.toMatch(/€/)
+  })
+
+  it('krimpt mee in Eenvoudig, net als de kaarten ernaast', () => {
+    const { container: simple } = renderCards('simple')
+    expect(shellOf(cardByHref(simple, BUDGET_INSTELLINGEN_HREF)).className).toContain('p-2 sm:p-3')
+    const { container: full } = renderCards('full')
+    expect(shellOf(cardByHref(full, BUDGET_INSTELLINGEN_HREF)).className).toContain('p-3 sm:p-4')
   })
 })

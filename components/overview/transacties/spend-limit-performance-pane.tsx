@@ -57,8 +57,11 @@ import { budgetAttention, describeRule, describeRules } from '@/lib/spend-limits
 import {
   describeSpendLimitPace,
   resolveSpendLimitDisplayStatus,
+  resolveSpendLimitOutcomeState,
+  SPEND_LIMIT_HEADROOM_EPSILON,
   SPEND_LIMIT_STATUS_BAND_CLASS,
   SPEND_LIMIT_STATUS_LABEL,
+  SPEND_LIMIT_STATUS_LABEL_INLINE,
   SPEND_LIMIT_STATUS_TEXT_CLASS,
 } from '@/lib/spend-limits/status-display'
 import { SpendLimitScoreBadge, SpendLimitScoreExplainer } from './spend-limit-score-badge'
@@ -145,7 +148,10 @@ function visiblePeriods(outcomes: SpendLimitPeriodOutcome[]): SpendLimitPeriodOu
 /** Vrijheidstijd bij een bedrag; `null` zodra het niet eerlijk te tonen is. */
 function freedomFor(amount: number, dailyExpenseRate: number | null): string | null {
   if (dailyExpenseRate === null || !(dailyExpenseRate > 0)) return null
-  if (!(Math.abs(amount) > 0)) return null
+  // Halve cent = dezelfde drempel als de `reached`-stand (ADR 0136). Onder die
+  // grens rondt het bedrag naar "€ 0,00" af, dus is er niets om in vrijheidstijd
+  // uit te drukken — anders staat "geen ruimte meer" bóven "≈ 0 dagen vrijheid".
+  if (!(Math.abs(amount) >= SPEND_LIMIT_HEADROOM_EPSILON)) return null
   return formatFreedomTimeString(calculateFreedomTime(amount, dailyExpenseRate), 'long')
 }
 
@@ -562,6 +568,8 @@ function PaneBody({
             <MaskedAmount value={current.periodMatchedAmount} tone="kern" /> van{' '}
             <MaskedAmount value={current.limitAmount} tone="kern" />
           </p>
+          {/* Drie takken (ADR 0136): precies op de grens is binnen, maar zonder
+              ruimte — "nog € 0 ruimte" beloofde daar iets wat er niet is. */}
           <p className="mt-1 text-xs text-[var(--ink-2)]">
             {over ? (
               <>
@@ -572,12 +580,18 @@ function PaneBody({
                 />{' '}
                 eroverheen
               </>
+            ) : displayStatus === 'reached' ? (
+              <span className="text-warning">geen ruimte meer</span>
             ) : (
               <>
                 nog <MaskedAmount value={current.periodHeadroom} tone="inherit" /> ruimte
               </>
             )}
           </p>
+          {/* Bij `reached` houdt FreedomLine zich stil; de regel hierboven heeft
+              het al gezegd. Niet omdat het bedrag nul ís — het is kleiner dan
+              SPEND_LIMIT_HEADROOM_EPSILON — maar omdat `freedomFor` op diezelfde
+              drempel afkapt. */}
           <FreedomLine
             amount={over ? current.periodOverAmount : current.periodHeadroom}
             dailyExpenseRate={dailyExpenseRate}
@@ -658,7 +672,9 @@ function PaneBody({
             <span className="font-mono tabular-nums">
               {formatMaskedCurrency(last.periodMatchedAmount, masked)}
             </span>{' '}
-            · {last.status === 'exceeded' ? 'boven je grens' : 'binnen je grens'}
+            {/* Dezelfde drie woorden als de grafiek en het rooster; `near` hoort
+                niet bij een afgesloten periode (ADR 0136). */}·{' '}
+            {SPEND_LIMIT_STATUS_LABEL_INLINE[resolveSpendLimitOutcomeState(last)]}
           </p>
         )}
         <SpendLimitScoreExplainer score={report.score} />

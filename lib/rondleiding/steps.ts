@@ -525,9 +525,20 @@ const STAPPEN: readonly RondleidingStap[] = [
           ),
         }
       }
+      // Het PERCENTAGE en het OORDEEL komen uit twee loaders: het getal uit
+      // `healthScoreInput.savingsRate6m` (horizon/dashboard), het oordeel uit
+      // `loadLeverScores`. Die tweede houdt zich op één venster bewust stil —
+      // wel 12-maands, geen 6-maands transactie-inkomen (zie de kop van
+      // lib/lever-scores-loader.ts). Zonder deze tak stond er dan "Je zet 25%
+      // opzij: nog zonder oordeel", een zin die zichzelf tegenspreekt. Geen
+      // oordeel? Dan noemen we het getal en verzinnen we er niets bij.
+      // (`oordeel` geeft bij 'neutral' al `null` — `hefboomVerdict` doet dat.)
+      const cashflowOordeel = oordeel('cashflow', data)
       return {
         tekst: zinnen(
-          `Je zet ${Math.round(quote)}% van je inkomen opzij: ${oordeel('cashflow', data) ?? 'nog zonder oordeel'}.`,
+          cashflowOordeel
+            ? `Je zet ${Math.round(quote)}% van je inkomen opzij: ${cashflowOordeel}.`
+            : `Je zet ${Math.round(quote)}% van je inkomen opzij.`,
           'Dat bepaalt je tempo naar vrijheid.',
           'Hier zie je wat er in en uit gaat, en waar het heen gaat.',
         ),

@@ -273,27 +273,35 @@ describe('GebeurtenissenView — strategieën-sectie', () => {
   })
 })
 
-// ── S6 — de bestemming van de factor-A-verwijzing blijft in Eenvoudig staan ──
+// ── S6 / B-024 — Eenvoudig reduceert de vorm, niet het aantal keuzes ─────────
 //
 // Box 1 draagt in béide weergavemodi de opdracht "vul je factor A in bij je
 // pensioen-strategie" en linkt naar /toekomst/gebeurtenissen?strategie=pensioen.
 // Was het hele strategieblok in Eenvoudig hard verborgen, dan opende de modal
 // wél (de deeplink-useEffect staat buiten de hide) maar was er ná sluiten geen
-// zichtbare ingang meer: een eenrichtingsdeeplink. Deze tests pinnen dat de
-// bestemming blijft bestaan, en dat de rest wél Volledig-diepte blijft.
-describe('GebeurtenissenView — strategieën in Eenvoudig (S6)', () => {
-  it('toont in Eenvoudig alleen de Pensioen-strategie als ingang', () => {
+// zichtbare ingang meer: een eenrichtingsdeeplink.
+//
+// De eerste oplossing liet in Eenvoudig alléén de Pensioen-kaart staan. Dat nam
+// de gebruiker drie keuzes af (AOW, huis, werk) die hij nergens anders
+// terugvindt — gemeld als B-024. Besluit eigenaar: Eenvoudig maakt de vorm
+// kleiner (compacter raster), niet de lijst korter. Deze tests pinnen dat om.
+describe('GebeurtenissenView — strategieën in Eenvoudig (S6/B-024)', () => {
+  it('toont in Eenvoudig alle vier de levensstrategieën', () => {
     renderView({ events: [], mode: 'simple' })
+    expect(screen.getByText('AOW-strategie')).toBeTruthy()
     expect(screen.getByText('Pensioen-strategie')).toBeTruthy()
-    expect(screen.queryByText('AOW-strategie')).toBeNull()
-    expect(screen.queryByText('Huis-strategie')).toBeNull()
-    expect(screen.queryByText('Werk-strategie')).toBeNull()
+    expect(screen.getByText('Huis-strategie')).toBeTruthy()
+    expect(screen.getByText('Werk-strategie')).toBeTruthy()
   })
 
-  it('geeft in Eenvoudig duiding waarom er één strategie staat (duiding boven reductie)', () => {
-    renderView({ events: [], mode: 'simple' })
-    expect(screen.getByText(/hoeveel jaarruimte je in Box 1 overhoudt/i)).toBeTruthy()
-    expect(screen.getByText(/Zet je de weergave op Volledig/i)).toBeTruthy()
+  it('draagt in béide modi dezelfde meervoudskop, zonder duiding over een kortere lijst', () => {
+    const { unmount } = renderView({ events: [], mode: 'simple' })
+    expect(screen.getByText('Vier multi-step strategieën')).toBeTruthy()
+    expect(screen.queryByText(/Zet je de weergave op Volledig/i)).toBeNull()
+    unmount()
+
+    renderView({ events: [] })
+    expect(screen.getByText('Vier multi-step strategieën')).toBeTruthy()
   })
 
   it('de zichtbare ingang staat los van de modal-state (geen eenrichtingsdeeplink)', () => {

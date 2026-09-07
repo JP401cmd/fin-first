@@ -111,7 +111,12 @@ export function PageInfoButton({
       </button>
 
       <ShellOverlay open={open} onClose={close} kind="sheet" size={size} title={label}>
-        <div className="space-y-5">
+        {/* Bij `kind="sheet"` is de horizontale marge eigendom van de consumer:
+            de BottomSheet-scrollcontainer levert er geen (alleen zijn header en
+            footer dragen `px-5`). Zonder deze padding staat alle tekst — en
+            lopen de sectielijnen — strak tegen de schermrand op mobiel. Zelfde
+            maat als de andere sheets in de app. */}
+        <div className="space-y-6 px-5 pb-6 sm:px-6">
           {sections.map((section, i) => (
             <Fragment key={section.key}>
               {i > 0 && <div className="border-t border-[var(--border-ed)]" />}
@@ -157,7 +162,9 @@ function WerkingSection({ items }: { items: PageInfoWerking[] }) {
   return (
     <div>
       <Kicker>WERKING</Kicker>
-      <dl className="space-y-3">
+      {/* De dichtstbedrukte sectie van de sheet (vier items van ~35 woorden):
+          hier telt de tussenruimte het zwaarst voor de leesbaarheid. */}
+      <dl className="space-y-4">
         {items.map((item) => (
           <div key={item.title}>
             <dt className="text-[12px] font-semibold leading-snug text-[var(--ink)]">
@@ -229,7 +236,7 @@ function VerderSection({
             <Link
               href={item.href}
               onClick={onNavigate}
-              className="group flex min-h-[36px] items-center gap-2 text-[13px] text-[var(--ink-2)] transition-colors hover:text-[var(--module-active-700)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+              className="group flex min-h-[44px] items-center gap-2 text-[13px] text-[var(--ink-2)] transition-colors hover:text-[var(--module-active-700)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
             >
               <ArrowRight
                 aria-hidden

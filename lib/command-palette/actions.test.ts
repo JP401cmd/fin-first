@@ -107,22 +107,57 @@ describe('buildActionItems — perspectief-acties', () => {
     expect(ids).toContain('action:logout')
   })
 
-  it('sync-prices blijft module-gated (vermogensregistratie)', () => {
-    const withoutModule = buildActionItems(makeCtx(), [])
-    expect(withoutModule.find((i) => i.id === 'action:sync-prices')).toBeUndefined()
+  // De actie draaide tot 7 sep 2026 alleen de prijzen; sindsdien is het exact
+  // dezelfde ronde als de sync-knop in de header (koersen + bankgegevens +
+  // exchanges/wallets). Label en sublabel moeten dat dekken — "Synchroniseer
+  // prijzen / Beleggings- en cryptokoersen verversen" beloofde minder dan de
+  // actie doet, en dat was precies de melding.
+  it("heet 'Alles synchroniseren' en noemt de bankgegevens in de sublabel", () => {
+    const item = buildActionItems(makeCtx(), ['vermogensregistratie']).find(
+      (i) => i.id === 'action:sync-prices',
+    )
+    if (!item) throw new Error('action:sync-prices ontbreekt in het register')
+    expect(item.label).toBe('Alles synchroniseren')
+    expect(item.sublabel).toMatch(/bank/i)
+    expect(item.label).not.toMatch(/prijzen/i)
+  })
 
-    const withModule = buildActionItems(makeCtx(), ['vermogensregistratie'])
-    expect(withModule.find((i) => i.id === 'action:sync-prices')).toBeDefined()
+  it('sluit het palet en start de ronde via de context-runner', async () => {
+    const triggerPricesSync = vi.fn()
+    const closePalette = vi.fn()
+    const item = buildActionItems(makeCtx({ triggerPricesSync, closePalette }), [
+      'vermogensregistratie',
+    ]).find((i) => i.id === 'action:sync-prices')
+    if (!item) throw new Error('action:sync-prices ontbreekt in het register')
+    await item.run!()
+    expect(closePalette).toHaveBeenCalledTimes(1)
+    expect(triggerPricesSync).toHaveBeenCalledTimes(1)
+  })
+
+  // B-029: de gate stond op 'vermogensregistratie' toen de ronde alleen koersen
+  // ververste. Nu hij ook banktransacties ophaalt — die bij 'budgetteren' horen —
+  // sloot die gate een budgetteren-only gebruiker mét bankkoppeling uit, terwijl
+  // de header-knop die exact dezelfde ronde draait nooit een gate had. Deze test
+  // pint de correctie: geen gate, ongeacht de actieve modules.
+  it('sync-prices is niet module-gated — spiegelt de ongegate header-knop', () => {
+    const zonderModules = buildActionItems(makeCtx(), [])
+    expect(zonderModules.find((i) => i.id === 'action:sync-prices')).toBeDefined()
+
+    const budgetterenOnly = buildActionItems(makeCtx(), ['budgetteren'])
+    expect(budgetterenOnly.find((i) => i.id === 'action:sync-prices')).toBeDefined()
+
+    const metVermogen = buildActionItems(makeCtx(), ['vermogensregistratie'])
+    expect(metVermogen.find((i) => i.id === 'action:sync-prices')).toBeDefined()
   })
 })
 
 describe('buildActionItems — zichtbaarheid binnen de standaard-cap', () => {
   // Given een gebruiker met vermogensregistratie en de euro-toggle in het
   // register, When de palette zonder zoekterm de eerste ACTIONS_LIMIT_VISIBLE
-  // algemene acties toont, Then vallen zowel 'Synchroniseer prijzen' als de
+  // algemene acties toont, Then vallen zowel 'Alles synchroniseren' als de
   // euro-toggle binnen die cap — een nieuwe actie mag de sync-knop niet uit
   // de standaardlijst drukken.
-  it("toont 'Synchroniseer prijzen' én de euro-toggle in de standaardlijst", () => {
+  it("toont 'Alles synchroniseren' én de euro-toggle in de standaardlijst", () => {
     const items = buildActionItems(makeCtx(), ['vermogensregistratie'])
     const general = items.filter((i) => !i.id.startsWith('action:perspective-'))
     const defaultVisible = general.slice(0, ACTIONS_LIMIT_VISIBLE).map((i) => i.id)

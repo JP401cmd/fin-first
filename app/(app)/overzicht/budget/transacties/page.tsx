@@ -7,7 +7,6 @@ import {
 } from '@/components/overview/transacties/transacties-notices-loader'
 import { InsightToggleButton } from '@/components/editorial/insight-toggle-button'
 import { INFLATION_IMPACT_ID } from '@/components/overview/inflation-impact-card'
-import { CashflowInstellingenBlokLazy } from '@/components/overview/cashflow-instellingen-lazy'
 import { loadAccountCount } from '@/lib/account-count'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
@@ -161,12 +160,13 @@ export default async function OverzichtCashflowTransactiesPage({
         </Suspense>
       </div>
 
-      {/* Waar je cijfers op rusten — de grondslagkeuze voor inkomen, uitgaven en
-          spaarquote (ADR 0103). Verhuisd van de cashflow-hub: die keuze wordt
-          gevoed door transacties en budgetten, dus hij hoort naast zijn bron.
-          Draagt zijn eigen <section>-wrapper en laadt pas in beeld; bij een
-          mislukte fetch rendert hij niets, inclusief de padding. */}
-      <CashflowInstellingenBlokLazy />
+      {/* "Waar je cijfers op rusten" — de grondslagkeuze voor inkomen, uitgaven
+          en spaarquote (ADR 0103) — stond hier, onder de vouw, achter een
+          disclosure. VERHUISD 7 sep 2026 (W-002) naar
+          /overzicht/budget/instellingen: het is een instelling, geen voetnoot bij
+          een transactielijst, en op de budgetpagina wijst de vierde tegel er nu
+          rechtstreeks naartoe. Verhuisd, niet gekopieerd — twee schermen die
+          dezelfde grondslag schrijven is precies de drift die dit voorkomt. */}
     </>
   )
 }

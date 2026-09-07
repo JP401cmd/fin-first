@@ -170,15 +170,46 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
         text: 'Achter elk budget staat wat het aan vrijheidstijd kost: het maandbedrag afgezet tegen je eigen dagelijkse uitgaven. Dezelfde cijfers staan in meerdere vormen — lijst, verdeling en verloop — voor wie liever ziet dan leest.',
       },
       {
-        title: 'Drie onderdelen bovenaan',
-        text: 'Transacties zijn de losse boekingen achter de totalen, vaste lasten je terugkerende kosten, en de vooruitblik trekt je huidige patroon zes maanden door — als peiling, niet als scenario. Voor scenario’s ga je naar Toekomst.',
+        title: 'Vier tegels bovenaan',
+        text: 'Transacties zijn de losse boekingen achter de totalen, vaste lasten je terugkerende kosten, en de vooruitblik trekt je huidige patroon zes maanden door — als peiling, niet als scenario. Voor scenario’s ga je naar Toekomst. De vierde tegel is Instellingen: daar staat je schatting van inkomen, uitgaven en spaarquote, en kies je welke rekeningen meelopen.',
       },
     ],
     terms: ['spaarquote', 'vrijheidstijd'],
     related: [
       { href: '/overzicht/budget/transacties', label: 'Transacties achter deze budgetten' },
       { href: '/overzicht/budget/forecast', label: 'Vooruitblik van zes maanden' },
+      { href: '/overzicht/budget/instellingen', label: 'Waar je cijfers op rusten' },
       { href: '/rapportages/budget', label: 'Budgetrapport om af te drukken' },
+    ],
+  },
+  '/overzicht/budget/instellingen': {
+    insight:
+      'Twee knoppen bepalen wat je overal elders ziet: waar je schatting van inkomen en uitgaven op rust, en welke rekeningen meelopen. Klopt dit niet, dan klopt je spaarquote en je vrijheidsmoment ook niet.',
+    grip:
+      'Kies of je cijfers op je transacties rusten of op je eigen schatting, en vink aan welke betaal- en spaarrekeningen meetellen. Beide werken direct door in je budgetten, je geldstroom en je horizon.',
+    werking: [
+      {
+        title: 'Grondslag per post',
+        text: 'Inkomen, uitgaven en spaarquote kunnen elk op iets anders rusten: je gemeten transacties, je budgetten, of een bedrag dat je zelf invult. Bij elke post staat waar het getal vandaan komt, zodat je nooit een cijfer ziet zonder herkomst.',
+      },
+      {
+        title: 'Rekeningen die meelopen',
+        text: 'Alleen transacties van aangevinkte rekeningen tellen mee. Dezelfde vinkjes staan per rekening bij je bezittingen — het is één keuze, dus je kunt ze niet uit elkaar laten lopen. Zet je de laatste rekening uit, dan valt budgetteren stil; daar vragen we eerst om bevestiging.',
+      },
+      {
+        title: 'Onderlinge overboekingen',
+        text: 'Laat je twee eigen rekeningen meelopen, dan verschijnt een overboeking daartussen twee keer: als afboeking én als bijboeking. Boek die op de post "Eigen rekening" — daar verschuift het geld wel, maar telt het niet als uitgave of inkomst. Doe je dat niet, dan lijkt je maand duurder én rijker dan hij was en zakt je spaarquote ten onrechte.',
+      },
+      {
+        title: 'Wat we zelf herkennen',
+        text: 'Een overboeking naar een rekening waarvan we het rekeningnummer kennen, boeken we automatisch op "Eigen rekening". Twee bedragen die alleen toevallig spiegelen — zelfde bedrag, tegengesteld teken, binnen twee dagen — leggen we aan je voor in plaats van ze stil te verplaatsen; een echte uitgave en een toevallige ontvangst zien er namelijk hetzelfde uit.',
+      },
+    ],
+    terms: ['spaarquote', 'vrijheidstijd'],
+    related: [
+      { href: '/overzicht/budget', label: 'Terug naar je budgetten' },
+      { href: '/overzicht/budget/transacties', label: 'Transacties indelen' },
+      { href: '/overzicht/bezittingen', label: 'Je rekeningen bij Bezittingen' },
     ],
   },
   '/overzicht/budget/transacties': {

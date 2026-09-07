@@ -37,7 +37,7 @@ import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { useHomeScreen } from '@/lib/hooks/use-home-screen'
-import { useGlobalSync } from '@/components/sync/global-sync-provider'
+import { useGlobalSyncRunner } from '@/components/sync/use-global-sync-runner'
 import { useModuleAccess } from '@/components/app/feature-access-provider'
 import { usePerspective } from '@/components/app/perspective-provider'
 import {
@@ -119,7 +119,7 @@ export function CommandPalette({ open, onClose, role, userId }: CommandPalettePr
   const { mode: displayMode, toggle: toggleDisplayMode } = useDisplayMode()
   const { view: euroView, toggle: toggleEuroView } = useEuroView()
   const { homeScreen, toggle: toggleHomeScreen } = useHomeScreen()
-  const { triggerGlobalSync } = useGlobalSync()
+  const { runGlobalSync } = useGlobalSyncRunner()
   const {
     perspective: currentPerspective,
     availablePerspectives,
@@ -139,9 +139,11 @@ export function CommandPalette({ open, onClose, role, userId }: CommandPalettePr
       euroView,
       toggleHomeScreen,
       homeScreen,
-      triggerPricesSync: async () => {
-        await triggerGlobalSync({ exchanges: [], wallets: [], pricesOnly: true })
-      },
+      // Exact dezelfde ronde als de header-knop — koersen én bankgegevens én
+      // koppelingen. Stond hier als `pricesOnly: true`, wat de bankstap,
+      // exchanges en wallets stilzwijgend oversloeg; zie de noot bovenaan
+      // `components/sync/use-global-sync-runner.ts`.
+      triggerPricesSync: runGlobalSync,
       currentPerspective,
       availablePerspectives,
       setPerspective,
@@ -157,7 +159,7 @@ export function CommandPalette({ open, onClose, role, userId }: CommandPalettePr
       euroView,
       toggleHomeScreen,
       homeScreen,
-      triggerGlobalSync,
+      runGlobalSync,
       currentPerspective,
       availablePerspectives,
       setPerspective,

@@ -6,7 +6,6 @@ import {
   readBriefingSnapshot,
   getOrCreateWeeklySnapshot,
   applyManualRefresh,
-  touchLastSeen,
   refreshStateToday,
   type BriefingSnapshot,
 } from './snapshot'
@@ -461,141 +460,18 @@ describe('week-historie — afgesloten weken in de snapshot', () => {
   })
 })
 
-// ── Bezoekmarker "sinds je vorige bezoek" (H11) ─────────────────────
+// ── Back-compat op de vormwissel van ADR 0126 PR C ──────────────────
+//
+// In productie staan weekmeetpunten nog in de OUDE vorm (`totalFreedomDays`,
+// uit de inmiddels verwijderde platte deling). Ze mogen niet crashen én niet
+// stilzwijgend als het nieuwe getal gelezen worden: dat is een ándere grootheid
+// dan de runway-maanden. De parser laat ze vallen; de eerstvolgende schrijfbeurt
+// zet de nieuwe vorm.
+//
+// De bezoekmarker (`lastSeen`/`previousLastSeen`) die hier ook getest werd is
+// met B-028 vervallen — zie de toelichting bovenin lib/briefing/snapshot.ts.
 
-describe('touchLastSeen — bezoekmarker op dagcadans', () => {
-  const base = (over: Partial<BriefingSnapshot> = {}): BriefingSnapshot => ({
-    week: '2026-W34',
-    lastManualRefresh: '',
-    refreshedAt: '2026-08-18T08:00:00.000Z',
-    entries: [entry('observation:a')],
-    ...over,
-  })
-
-  it('schrijft niets zonder bestaande snapshot (nooit een halve rij achterlaten)', async () => {
-    const { supabase, writes } = makeSupabase({ snapshot: null })
-    const res = await touchLastSeen(supabase, 'u', { netWorth: 100_000 })
-    expect(res.previous).toBeNull()
-    expect(writes).toHaveLength(0)
-  })
-
-  it('eerste bezoek ooit: zet de marker, maar heeft nog geen basis', async () => {
-    const now = new Date('2026-08-24T09:00:00Z')
-    const { supabase, writes } = makeSupabase({ snapshot: base() })
-    const res = await touchLastSeen(supabase, 'u', { netWorth: 100_000 }, { now })
-    expect(res.previous).toBeNull()
-    expect(writes).toHaveLength(1)
-    const w = writes[0] as { briefing_snapshot: BriefingSnapshot }
-    expect(w.briefing_snapshot.lastSeen?.netWorth).toBe(100_000)
-    expect(w.briefing_snapshot.previousLastSeen).toBeUndefined()
-  })
-
-  it('nieuwe kalenderdag: de vorige marker schuift door naar de basis', async () => {
-    const now = new Date('2026-08-24T09:00:00Z')
-    const snapshot = base({
-      lastSeen: { at: '2026-08-23T20:00:00.000Z', netWorth: 90_000 },
-    })
-    const { supabase, writes } = makeSupabase({ snapshot })
-    const res = await touchLastSeen(supabase, 'u', { netWorth: 100_000 }, { now })
-    expect(res.previous?.netWorth).toBe(90_000)
-    const w = writes[0] as { briefing_snapshot: BriefingSnapshot }
-    expect(w.briefing_snapshot.previousLastSeen?.netWorth).toBe(90_000)
-    expect(w.briefing_snapshot.lastSeen?.netWorth).toBe(100_000)
-    // De briefing zelf blijft ongemoeid — dit raakt alleen de bezoekmarkers.
-    expect(w.briefing_snapshot.week).toBe('2026-W34')
-    expect(w.briefing_snapshot.entries).toHaveLength(1)
-  })
-
-  it('tweede bezoek dezelfde dag: geen write, dezelfde basis (regel flikkert niet weg)', async () => {
-    const now = new Date('2026-08-24T21:00:00Z')
-    const snapshot = base({
-      lastSeen: { at: '2026-08-24T09:00:00.000Z', netWorth: 100_000 },
-      previousLastSeen: { at: '2026-08-23T20:00:00.000Z', netWorth: 90_000 },
-    })
-    const { supabase, writes } = makeSupabase({ snapshot })
-    const res = await touchLastSeen(supabase, 'u', { netWorth: 104_000 }, { now })
-    expect(writes).toHaveLength(0)
-    expect(res.previous?.netWorth).toBe(90_000)
-  })
-
-  it('een week-overgang wist de bezoekmarkers niet (andere cadans)', async () => {
-    const now = new Date('2026-08-24T09:00:00Z') // maandag, W35
-    const snapshot = base({
-      lastSeen: { at: '2026-08-23T20:00:00.000Z', netWorth: 90_000 },
-      previousLastSeen: { at: '2026-08-22T20:00:00.000Z', netWorth: 80_000 },
-    })
-    const { supabase, writes } = makeSupabase({ snapshot })
-    await getOrCreateWeeklySnapshot(supabase, 'u', [entry('observation:vers')], { now })
-    const w = writes[0] as { briefing_snapshot: BriefingSnapshot }
-    expect(w.briefing_snapshot.week).toBe(amsterdamWeekKey(now))
-    expect(w.briefing_snapshot.lastSeen?.netWorth).toBe(90_000)
-    expect(w.briefing_snapshot.previousLastSeen?.netWorth).toBe(80_000)
-  })
-
-  it('parser verdraagt oude snapshots zonder markers', async () => {
-    const { supabase } = makeSupabase({
-      snapshot: {
-        week: '2026-W34',
-        lastManualRefresh: '',
-        refreshedAt: '2026-08-18T08:00:00.000Z',
-        entries: [],
-      },
-    })
-    const snap = await readBriefingSnapshot(supabase, 'u')
-    expect(snap?.lastSeen).toBeUndefined()
-    expect(snap?.previousLastSeen).toBeUndefined()
-  })
-
-  it('parser weigert een onvolledige marker (geen getal → geen basis)', async () => {
-    const { supabase } = makeSupabase({
-      snapshot: {
-        week: '2026-W34',
-        lastManualRefresh: '',
-        refreshedAt: '2026-08-18T08:00:00.000Z',
-        entries: [],
-        lastSeen: { at: '2026-08-23T20:00:00.000Z', netWorth: 'veel' },
-      },
-    })
-    const snap = await readBriefingSnapshot(supabase, 'u')
-    expect(snap?.lastSeen).toBeUndefined()
-  })
-
-  // ── BACK-COMPAT op de vormwissel van ADR 0126 PR C ─────────────────────
-  //
-  // In productie staan markers en meetpunten in de OUDE vorm. Ze mogen niet
-  // crashen én niet stilzwijgend als het nieuwe getal gelezen worden: een
-  // `totalFreedomDays` uit de platte deling is een andere grootheid dan de
-  // runway-maanden. De parser laat ze daarom vallen; de eerstvolgende
-  // schrijfbeurt zet de nieuwe vorm.
-  it('een bezoekmarker in de oude vorm (totalFreedomDays) wordt genegeerd, niet omgerekend', async () => {
-    const { supabase } = makeSupabase({
-      snapshot: {
-        week: '2026-W34',
-        lastManualRefresh: '',
-        refreshedAt: '2026-08-18T08:00:00.000Z',
-        entries: [],
-        lastSeen: { at: '2026-08-23T20:00:00.000Z', totalFreedomDays: 41365 },
-      },
-    })
-    const snap = await readBriefingSnapshot(supabase, 'u')
-    expect(snap?.lastSeen).toBeUndefined()
-  })
-
-  it('een oude marker blokkeert de nieuwe niet: het eerstvolgende bezoek schrijft de nieuwe vorm', async () => {
-    const now = new Date('2026-08-24T09:00:00Z')
-    const { supabase, writes } = makeSupabase({
-      snapshot: base({
-        lastSeen: { at: '2026-08-23T20:00:00.000Z', totalFreedomDays: 41365 } as never,
-      }),
-    })
-    const res = await touchLastSeen(supabase, 'u', { netWorth: 100_000 }, { now })
-    // Geen basis dit bezoek (de oude marker is niet vergelijkbaar) …
-    expect(res.previous).toBeNull()
-    // … maar wel meteen een marker in de nieuwe vorm, dus morgen werkt de regel.
-    const w = writes[0] as { briefing_snapshot: BriefingSnapshot }
-    expect(w.briefing_snapshot.lastSeen?.netWorth).toBe(100_000)
-  })
-
+describe('readBriefingSnapshot — back-compat op oude vormen', () => {
   it('een weekmeetpunt in de oude vorm wordt genegeerd (geen deling als runway lezen)', async () => {
     const { supabase } = makeSupabase({
       snapshot: {

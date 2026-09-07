@@ -60,7 +60,13 @@ function budgetRule(
   }
 }
 
-function budgetPot(over: Partial<SpendLimitConfig>): SpendLimitWithReport {
+/** De standaardhistorie: twee afgesloten maanden, lopende maand nog leeg. */
+const DEFAULT_ROWS: SpendLimitAggregateRow[] = [row('2026-07', 150), row('2026-06', 240)]
+
+function budgetPot(
+  over: Partial<SpendLimitConfig>,
+  rows: SpendLimitAggregateRow[] = DEFAULT_ROWS,
+): SpendLimitWithReport {
   const config: SpendLimitConfig = {
     id: 'pot-1',
     name: 'Boodschappengrens',
@@ -86,7 +92,7 @@ function budgetPot(over: Partial<SpendLimitConfig>): SpendLimitWithReport {
         period: 'month',
         createdAt: config.createdAt,
       },
-      rows: [row('2026-07', 150), row('2026-06', 240)],
+      rows,
       now: NOW,
       windowPeriods: SPEND_LIMIT_WINDOW_BY_PERIOD.month,
     }),
@@ -229,6 +235,39 @@ let transactionsBody: unknown
 function breakdownCalls() {
   return fetchMock.mock.calls.filter((c) => String(c[0]).includes('/breakdown?'))
 }
+
+describe('SpendLimitPerformancePane — de lopende periode op de grens (ADR 0136)', () => {
+  it('toont "Grens bereikt" en belooft geen ruimte meer', () => {
+    // Augustus staat exact op de grens van €200. Motorstand: within (die regel
+    // is ongewijzigd) met nul ruimte — alleen de weergave kent de vierde stand.
+    const p = budgetPot({}, [row('2026-07', 150), row('2026-08', 200)])
+    expect(p.report.currentPeriod.status).toBe('within')
+    expect(p.report.currentPeriod.periodHeadroom).toBe(0)
+
+    renderPane(p)
+
+    expect(screen.getByText('Grens bereikt')).toBeTruthy()
+    expect(screen.getByText('geen ruimte meer')).toBeTruthy()
+    expect(screen.queryByText(/Die ruimte is/)).toBeNull()
+    expect(screen.queryByText('Dicht bij je grens')).toBeNull()
+  })
+
+  it('het rooster en de grafiek noemen die periode óók "grens bereikt"', () => {
+    const p = budgetPot({}, [row('2026-07', 150), row('2026-08', 200)])
+    renderPane(p)
+
+    // Trefvlak (grafiek) én cel (rooster) dragen hetzelfde woord; de lopende
+    // periode krijgt er "voorlopig" bij.
+    const treffers = screen.getAllByRole('button', { name: /augustus 2026/i })
+    expect(treffers.length).toBeGreaterThan(0)
+    expect(treffers.some((el) => /grens bereikt/i.test(el.getAttribute('aria-label') ?? ''))).toBe(
+      true,
+    )
+    expect(
+      treffers.some((el) => /binnen je grens/i.test(el.getAttribute('aria-label') ?? '')),
+    ).toBe(false)
+  })
+})
 
 describe('SpendLimitPerformancePane — uitsplitsing per naam', () => {
   beforeEach(() => {
