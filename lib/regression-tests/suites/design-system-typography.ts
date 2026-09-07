@@ -46,53 +46,15 @@ const tests: TestCase[] = [
   // these monolith string-grep tests were removed during the Kern
   // refactor (cleanup task #10).
   //
-  // CoreHero zelf roept `formatCurrency` niet meer rechtstreeks aan — het
-  // hoofdbedrag gaat via `formatMaskedCurrency` (lib/format.ts, privacy-
-  // masking) en secundaire bedragen via <MaskedAmount> (die formatCurrency
-  // intern gebruikt maar het letterlijke woord niet in core-hero.tsx zet).
-  // De canonieke formatter voor dit component is dus formatMaskedCurrency.
-  {
-    id: 'typo-core-hero-font-mono',
-    name: 'core-hero: bedragen gebruiken font-mono',
-    category: CAT,
-    description: 'Financiële bedragen in CoreHero moeten font-mono class gebruiken',
-    priority: 'high',
-    estimatedDurationMs: 10,
-    fn() {
-      const src = readSourceFile('components/core/core-hero.tsx')
-      assert(src.length > 0, 'core-hero.tsx kon niet gelezen worden')
-
-      const formatCurrencyMatches = src.match(/formatMaskedCurrency/g) || []
-      const fontMonoMatches = src.match(/font-mono/g) || []
-
-      assertGreaterThan(
-        formatCurrencyMatches.length, 0,
-        'core-hero moet formatMaskedCurrency aanroepen',
-      )
-      assertGreaterThan(
-        fontMonoMatches.length, 0,
-        'core-hero moet font-mono class bevatten voor bedragen',
-      )
-    },
-  },
-  {
-    id: 'typo-core-hero-tabular-nums',
-    name: 'core-hero: bedragen gebruiken tabular-nums',
-    category: CAT,
-    description: 'Financiële bedragen in CoreHero moeten tabular-nums gebruiken voor uitgelijnde cijfers',
-    priority: 'high',
-    estimatedDurationMs: 10,
-    fn() {
-      const src = readSourceFile('components/core/core-hero.tsx')
-      assert(src.length > 0, 'core-hero.tsx kon niet gelezen worden')
-
-      const tabularMatches = src.match(/tabular-nums/g) || []
-      assertGreaterThan(
-        tabularMatches.length, 0,
-        'core-hero moet tabular-nums class bevatten',
-      )
-    },
-  },
+  // UR3-26 (7 sep 2026): de twee `typo-core-hero-*`-tests zijn verwijderd
+  // samen met hun onderwerp. `components/core/core-hero.tsx` en
+  // `core-landing.tsx` hingen onder `/core`, een route die al sinds de
+  // nav-migratie op de routing-laag naar /overzicht redirect — de bestanden
+  // hadden geen enkele importeur meer. Een string-grep-test op een verwijderd
+  // bestand faalt met "kon niet gelezen worden" en zegt niets over de
+  // typografie. De canonieke hero leeft nu op /overzicht
+  // (`components/overview/overzicht-hero/**`) en wordt daar op
+  // componentniveau getoetst.
 
   // ── 2. Table/kicker headers use uppercase + --ink-3 ──────────────────
   {

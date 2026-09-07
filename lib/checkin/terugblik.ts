@@ -15,6 +15,15 @@
 // De keuze "welke maand hoort bij deze stap" woont daarom hier, als pure functie
 // met een test eromheen, in plaats van als losse veldverwijzingen verspreid door
 // een component van ruim tweeduizend regels.
+//
+// ── STAP 7 HANGT ER SINDS UR3-23 OOK AAN ───────────────────────────────────
+// Bovenstaande "verderop terecht deze maand"-uitzondering is teruggedraaid. De
+// samenvatting in stap 7 (Reflectie) toonde "je hebt deze maand € -3.529
+// gespaard" onder een terugblik op augustus: twee tegenstrijdige gespaard-
+// bedragen in dezelfde flow. De eigenaar koos consistentie binnen de check-in
+// boven het per stap verdedigbare venster. Deze module is daarmee de énige
+// grondslag van élke terugblik-achtige bewering in de check-in — stap 1 én
+// stap 7. `app/(app)/core/checkin/reflectie-grondslag.test.ts` grendelt dat.
 
 /** De maandvelden uit `/api/checkin/overview` die de terugblik nodig heeft. */
 export interface TerugblikBron {

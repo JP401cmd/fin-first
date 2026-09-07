@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import { Wallet, Compass, User, Newspaper, Bell, MessageCircle, Settings, Zap } from 'lucide-react'
+import { Wallet, Compass, User, Newspaper, Bell, MessageCircle, Settings, Zap, BarChart3 } from 'lucide-react'
 
 /**
  * Unified nav-config — single source of truth voor sidebar (desktop) én
@@ -90,7 +90,11 @@ export const navGroups: NavGroup[] = [
         children: [
           { label: 'Transacties', href: '/overzicht/budget/transacties' },
           { label: 'Vaste lasten', href: '/overzicht/budget/vaste-lasten' },
-          { label: 'Forecast', href: '/overzicht/budget/forecast' },
+          // "Vooruitblik", niet "Forecast" (UR3-13 F2, optie C): een Engels
+          // leenwoord met een gangbaar Nederlands equivalent hernoemen we aan
+          // de bron, in béide weergavemodi — niet via een simpelLabel dat
+          // alleen wérkt waar <GlossaryTerm> staat. De URL blijft ongewijzigd.
+          { label: 'Vooruitblik', href: '/overzicht/budget/forecast' },
           // Vierde ingang, géén vierde onderdeel: hier stel je in waar de
           // cijfers op rusten (inkomen/uitgaven/spaarquote) en welke rekeningen
           // in budgetteren meelopen. Staat hier óók om de mobiele TopBar-titel
@@ -106,7 +110,10 @@ export const navGroups: NavGroup[] = [
           { label: 'Box 1 · Werk + woning', href: '/overzicht/belasting/box1' },
           { label: 'Box 2 · Aanmerkelijk belang', href: '/overzicht/belasting/box2' },
           { label: 'Box 3 · Sparen + beleggen', href: '/overzicht/belasting/box3' },
-          { label: 'Fiscale optimizer', href: '/overzicht/belasting/optimizer' },
+          // "Fiscale kansen" i.p.v. "Fiscale optimizer" — zelfde regel als
+          // Vooruitblik hierboven (UR3-13 F2, optie C). De pagina zelf sprak al
+          // over "kansen"; alleen het menu-label liep nog achter.
+          { label: 'Fiscale kansen', href: '/overzicht/belasting/optimizer' },
         ],
       },
     ],
@@ -197,8 +204,11 @@ export type OverviewAppItem = NavItem & {
  * categoriepagina's ("Beleggingen", "Crypto", "Hypotheek", "Vastgoed").
  *
  * NB: contextuele deeplinks elders (coach-suggesties, widget-catalogus,
- * compound-insight-kaart, not-found-pagina's) blijven bewust ongemoeid — die
- * volgen op een expliciete gebruikersvraag over dát onderwerp.
+ * not-found-pagina's) blijven bewust ongemoeid — die volgen op een expliciete
+ * gebruikersvraag over dát onderwerp. De compound-insight-kaart stond hier ook
+ * in dat rijtje, maar linkt sinds M41 naar /overzicht/bezittingen; ze was
+ * daarmee stilletjes de laatste ingang van /toekomst/samengestelde-interest
+ * kwijt (UR3-26).
  */
 export const OVERVIEW_APP_SUBROUTES: OverviewAppItem[] = [
   { label: 'Aandelen holdings', href: '/overzicht/bezittingen/investment', tabHref: '/overzicht/bezittingen/investment?tab=aandelen-holdings', appKey: 'aandelen-holdings' },
@@ -216,11 +226,19 @@ export const OVERVIEW_APP_SUBROUTES: OverviewAppItem[] = [
  * de mobiele nav-sheet: daar was ze alleen bereikbaar via /overzicht-links,
  * ⌘K, de gezondheidsscore-kassabon of een AI-actionUrl. Bewust géén badge —
  * het numerieke ongelezen-getal blijft exclusief bij Berichten.
+ *
+ * "Rapportages" volgt dezelfde redenering (UR3-26). De pagina stond in de
+ * desktop-sidebar (`OVERIGE_BASE`) en in ⌘K, maar op mobiel alléén in het
+ * account-dropdownmenu van de TopBar — en dat menu rendert uitsluitend bij
+ * `topBar.kind === 'rich'` in een `lg:hidden`-balk. Een account-menu is een
+ * ander mentaal model dan navigatie, dus de route ontbrak feitelijk in de
+ * mobiele nav-sheet. Exact het ADR 0095-patroon, in de andere richting.
  */
 export const globalNav: GlobalNavItem[] = [
   { label: 'Tips & acties', icon: Zap, href: '/overzicht/tips' },
   { label: 'Krant', icon: Newspaper, href: '/nieuws' },
   { label: 'Berichten', icon: Bell, href: '/berichten' },
+  { label: 'Rapportages', icon: BarChart3, href: '/rapportages' },
   { label: 'Vraag Fin', icon: MessageCircle, action: 'open-chat' },
   { label: 'Account', icon: Settings, action: 'open-account' },
 ]
@@ -241,7 +259,11 @@ export const globalNav: GlobalNavItem[] = [
 export const EXTRA_ROUTE_TITLES: Record<string, string> = {
   '/toekomst/bibliotheek': 'Rekenhulp-bibliotheek',
   '/toekomst/inflatie-koopkracht': 'Inflatie & koopkracht',
-  '/toekomst/samengestelde-interest': 'Samengestelde interest',
+  // '/toekomst/samengestelde-interest' stond hier tot UR3-26. Die route had nul
+  // ingangen (geen menu, geen ⌘K, geen enkele in-app link) sinds de
+  // compound-insight-kaart naar /overzicht/bezittingen verhuisde; hij redirect
+  // nu op de routing-laag naar de rekenhulp-bibliotheek en bestaat niet meer
+  // als pagina. Een titel hier zou naar een niet-bestaande pagina wijzen.
   // '/mijn/checkins' hoort hier BEWUST NIET (WF-NAV-05): die route is een
   // letterlijke re-export van app/(app)/core/checkin/historie/page.tsx, en dat
   // component registreert zelf `<NavStackMeta title="Check-in historie" />`.
@@ -267,7 +289,10 @@ export const EXTRA_ROUTE_TITLES: Record<string, string> = {
   // SSoT-fallback en de pagina niet uiteenlopen. De dynamische
   // /rapportages/[id] hoort hier bewust NIET: die levert een runtime-titel
   // via <NavStackMeta>.
-  '/rapportages': 'Rapportages',
+  // NB: de hub '/rapportages' zelf staat sinds UR3-26 in `globalNav` en levert
+  // zijn titel daarvandaan — dezelfde verhuizing als /overzicht/tips bij ADR
+  // 0095. Hem hier laten staan zou dode configuratie zijn (`buildRouteTitleMap`
+  // neemt de eerste winnaar, en globalNav gaat vóór EXTRA_ROUTE_TITLES).
   '/rapportages/balans': 'Balans-rapportage',
   '/rapportages/vermogen': 'Vermogensoverzicht',
   '/rapportages/budget': 'Budget-rapportage',

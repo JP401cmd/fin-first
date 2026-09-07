@@ -10,9 +10,10 @@
  * klopte maar half: `initialLoadDone` stond op `useState(false)` en werd
  * alleen gezet in de `finally` van `loadBudgets()`. `skipInitialFetch`
  * slaat die fetch echter over zodra `initialData` bestaat
- * — en BEIDE routes (`app/(app)/core/budgets/page.tsx` en
- * `app/(app)/overzicht/budget/page.tsx`) geven `initialData` altijd
- * mee. Gevolg: op het pad dat de app daadwerkelijk gebruikt bleef
+ * — en de route die `BudgetsClient` rendert
+ * (`app/(app)/overzicht/budget/page.tsx`) geeft `initialData` altijd
+ * mee. (Tot UR3-26 was er een tweede: `app/(app)/core/budgets/page.tsx`,
+ * verwijderd toen die route al op de routing-laag redirectte.) Gevolg: op het pad dat de app daadwerkelijk gebruikt bleef
  * `initialLoadDone` op `false` staan, viel de lege-staat-tak nooit in, en
  * rendert er onder de toolbar niets (alle type-secties zijn
  * `.length > 0`-gated) — een stille, lege pagina voor een nieuwe gebruiker.

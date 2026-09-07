@@ -158,8 +158,31 @@ const nextConfig: NextConfig = {
       // zodat er per functie één URL overblijft.
       { source: '/identity/profiel', destination: '/mijn/profiel', permanent: false },
       { source: '/identity/koppelingen', destination: '/mijn/koppelingen', permanent: false },
-      { source: '/horizon/samengestelde-interest', destination: '/toekomst/samengestelde-interest', permanent: false },
       { source: '/horizon/inflatie-koopkracht', destination: '/toekomst/inflatie-koopkracht', permanent: false },
+
+      // ── Samengestelde interest opgeheven (UR3-26) ───────────────────────
+      // De losse calculator had NUL ingangen: geen menu-item, geen ⌘K-item en
+      // geen enkele in-app link. De laatste ingang verdween toen de
+      // compound-insight-kaart bij M41 naar /overzicht/bezittingen ging — en
+      // niets merkte dat, want de enige nav-gate bewaakte titel-dekking, niet
+      // bereikbaarheid. Eigenaarsbesluit 6 sep 2026: opruimen, geen ingang
+      // teruggeven. Beide URL's landen op de rekenhulp-bibliotheek, waar de
+      // gebruiker dezelfde vraag met een eigen rekenhulp beantwoordt; de
+      // rente-op-rente-uitleg zelf staat op de compound-insight-kaart bij de
+      // bezittingen. Géén keten: /horizon/* wijst rechtstreeks naar het
+      // einddoel, niet naar de opgeheven /toekomst-variant.
+      { source: '/horizon/samengestelde-interest', destination: '/toekomst/rekenhulp', permanent: false },
+      { source: '/toekomst/samengestelde-interest', destination: '/toekomst/rekenhulp', permanent: false },
+
+      // ── Check-in-historie heeft één canoniek pad (UR3-26) ───────────────
+      // `/core/checkin/historie` en `/mijn/checkins` waren twee live URL's voor
+      // identieke inhoud (de tweede is een letterlijke re-export van de eerste)
+      // — een schending van "één canoniek pad per functie". Canoniek wordt
+      // /mijn/checkins: dat is de /mijn-tak waar het kaartgrid, de briefing en
+      // ⌘K al naar wijzen; de /core-tak is legacy. Het bestand blijft als
+      // backing-module staan (de re-export importeert het build-time), maar de
+      // URL is niet meer bereikbaar.
+      { source: '/core/checkin/historie', destination: '/mijn/checkins', permanent: false },
 
       // Budgetten-dedup (beslissing 1): de budget-OVERZICHT-pagina is
       // identiek aan de Budget-view op /overzicht/cashflow (zelfde

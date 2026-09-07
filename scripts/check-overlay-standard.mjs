@@ -126,7 +126,6 @@ const ALLOWLIST_ENTRIES = [
   'components/core/asset-edit-connection-section.tsx',
   'components/core/assets-client.tsx',
   'components/core/core-kengetallen.tsx',
-  'components/core/core-landing.tsx',
   'components/core/debt-detail-sheet.tsx',
   'components/core/holdings-client.tsx',
   'components/future/doelen-view.tsx',

@@ -56,7 +56,6 @@ const ALLOWLIST_ENTRIES = [
   'app/(app)/beheer/fiscale-kerngetallen/fire-assumptions-editor.tsx',
   'app/(app)/beheer/testdata/page.tsx',
   'app/(app)/beheer/widget-presets/page.tsx',
-  'app/(app)/core/belasting/page.tsx',
   'app/(app)/mijn/notificaties/page.tsx',
   'components/aangifte/manual-wizard.tsx',
   'components/aangifte/review-primitives.tsx',

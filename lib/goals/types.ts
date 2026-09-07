@@ -1,6 +1,9 @@
 // ── Goal Types ──────────────────────────────────────────────────────────
-// Outcome-georiënteerde doelen die de gebruiker tijdens onboarding kiest.
-// Vervangen de oude module-georiënteerde IntentId-keuze.
+// Doelen die de gebruiker tijdens onboarding kón kiezen. Die stap is op
+// 12 juni 2026 verwijderd en komt niet terug (eigenaarsbesluit UR3-28,
+// 6 september 2026); wat rest is de vertaling van een doel-slug uit een
+// oud localStorage-concept naar de modules die het activeert. Zie de
+// toelichting bovenaan `catalog.ts`.
 
 import type { ModuleId } from '@/lib/module-registry'
 
@@ -14,18 +17,6 @@ export type GoalSlug =
 
 export interface GoalCatalogEntry {
   slug: GoalSlug
-  /** Card-titel (bv. "Grip op je uitgaven") */
-  label: string
-  /** Korte tagline onder de label (bv. "Budgetteren en besparen") */
-  tagline: string
-  /** Eerste-persoon beschrijving (bv. "Ik wil weten waar mijn geld naartoe gaat...") */
-  description: string
-  /** Lucide icon naam */
-  icon: string
-  /** Emoji-fallback voor card-grids zonder lucide-render */
-  emoji: string
-  /** Eén doel mag de prominente "aanbevolen" plek krijgen op de keuze-pagina */
-  primary?: boolean
-  /** Modules die geactiveerd worden wanneer dit doel gekozen wordt */
+  /** Modules die geactiveerd worden wanneer dit doel wordt meegestuurd */
   modulesPreset: ModuleId[]
 }

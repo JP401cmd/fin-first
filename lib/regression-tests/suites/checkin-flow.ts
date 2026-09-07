@@ -9,6 +9,7 @@ import type { Aandachtspunt } from '@/lib/checkin-types'
 import type { GesprekStarterData } from '@/lib/checkin-types'
 import { unauthenticatedFetch } from '../server-runner'
 import { STARTER_IDS, buildGespreksstarters, type GespreksstartersInput } from '@/lib/checkin/gespreksstarters'
+import { terugblikCijfers } from '@/lib/checkin/terugblik'
 
 const CAT = 'checkin.flow'
 
@@ -394,6 +395,47 @@ const tests: TestCase[] = [
       const zeroPrev = 0
       const changeFromZero = zeroPrev > 0 ? ((155000 - zeroPrev) / zeroPrev) * 100 : 0
       assertEqual(changeFromZero, 0, 'no change when previous is 0')
+    },
+  },
+
+  {
+    id: 'checkin-terugblik-reflectie-zelfde-maand',
+    name: 'Check-in: terugblik (stap 1) en reflectie (stap 7) delen één maand', category: CAT,
+    description: 'Beide stappen lezen de afgesloten vorige maand via terugblikCijfers, nooit het lopende maandveld',
+    priority: 'high', estimatedDurationMs: 100,
+    fn() {
+      // De gemelde situatie (UR3-23): begin september. Augustus is afgesloten
+      // en positief; september heeft de vaste lasten al geboekt maar het
+      // salaris nog niet. Stap 1 toonde augustus, stap 7 het lopende veld —
+      // twee tegenstrijdige gespaard-bedragen in dezelfde flow.
+      const overview = {
+        prevMonthLabel: 'augustus',
+        monthBeforePrevLabel: 'juli',
+        prevMonthIncome: 6200,
+        prevMonthExpenses: 4100,
+        prevMonthSavings: 2100,
+        monthBeforePrevExpenses: 4000,
+      }
+      // Het lopende-maandveld uit de melding; de gedeelde bron kent het niet.
+      const monthlySavingsLopend = -3529
+
+      const cijfers = terugblikCijfers(overview)
+      assertEqual(cijfers.savings, 2100, 'gespaard = de afgesloten maand')
+      assertEqual(cijfers.label, 'augustus', 'label benoemt diezelfde maand')
+      assert(cijfers.savings !== monthlySavingsLopend, 'nooit het lopende maandveld')
+
+      // Eén bron voor beide stappen: hetzelfde bedrag én hetzelfde label, dus
+      // geen tweede grondslag die los kan gaan lopen.
+      const nogmaals = terugblikCijfers(overview)
+      assertEqual(nogmaals.savings, cijfers.savings, 'stap 1 en stap 7 tonen hetzelfde bedrag')
+      assertEqual(nogmaals.label, cijfers.label, 'stap 1 en stap 7 noemen dezelfde maand')
+
+      // Lege maand: geen van beide stappen toont een hard "€ 0 gespaard"
+      // (ADR 0131 — onbekend is geen nul).
+      const leeg = terugblikCijfers({
+        ...overview, prevMonthIncome: 0, prevMonthExpenses: 0, prevMonthSavings: 0,
+      })
+      assertEqual(leeg.heeftCijfers, false, 'lege maand levert geen bedrag om te tonen')
     },
   },
 

@@ -56,7 +56,7 @@ const KERN_PAGES: StaticPage[] = [
   // Behouden is de canonieke naam ("Koppelingen", = navGroups + de
   // NavStackMeta-titel van de pagina); "bank" blijft vindbaar via het sublabel
   // van dat item, dat de ranker meeneemt.
-  { label: 'Budget',                    sublabel: 'Budgetten, transacties, vaste lasten, forecast', href: '/overzicht/budget',              icon: Banknote,    module: 'kern' },
+  { label: 'Budget',                    sublabel: 'Budgetten, transacties, vaste lasten, vooruitblik', href: '/overzicht/budget',           icon: Banknote,    module: 'kern' },
   { label: 'Transacties',               sublabel: 'Inkomsten en uitgaven deze maand',   href: '/overzicht/budget/transacties',        icon: Receipt,     module: 'kern' },
   { label: 'Vaste lasten',              sublabel: 'Abonnementen en terugkerende kosten', href: '/overzicht/budget/vaste-lasten',      icon: RefreshCw,   module: 'kern' },
   // Bankafschrift-import. Spiegelt bewust 'Holdings importeren' hierboven: ook
@@ -65,7 +65,10 @@ const KERN_PAGES: StaticPage[] = [
   // doorbreken). Label = de NavStackMeta-titel van de pagina zelf. Geen
   // requiredModule: transacties importeren is niet module-gated.
   { label: 'Transacties importeren',    sublabel: 'Bankafschrift: CSV, MT940, OFX',     href: '/core/cash/import',                      icon: FileText,    module: 'kern' },
-  { label: 'Forecast',                  sublabel: 'Spaarquote, netto, trend + 6-maands-vooruitblik', href: '/overzicht/budget/forecast', icon: LineChart,   module: 'kern' },
+  // Label hernoemd naar het Nederlandse woord (UR3-13 F2, optie C). "forecast"
+  // blijft bewust in het sublabel staan — de ranker leest dat mee, zodat wie
+  // het oude woord intikt de pagina nog steeds vindt.
+  { label: 'Vooruitblik',               sublabel: 'Spaarquote, netto, trend + 6 maanden vooruit (forecast)', href: '/overzicht/budget/forecast', icon: LineChart, module: 'kern' },
 ]
 
 // ── Apps (deep-tools) ────────────────────────────────────────────────────────
@@ -162,7 +165,12 @@ const GLOBAL_PAGES: StaticPage[] = [
   // meldmodus in de chat. Sublabel benoemt dat, zodat ⌘K geen inzendformulier
   // meer belooft dat er niet is.
   { label: 'Melden',                    sublabel: 'Melden gaat via je gesprek met Fin', href: '/mijn/feedback',                         icon: MessageSquare, module: 'globaal' },
-  { label: 'FIRE-simulatie',            sublabel: 'Standalone tool met sliders',        href: '/tools/fire-sim',                        icon: Calculator,  module: 'globaal' },
+  // NB: hier stond tot UR3-26 een item "FIRE-simulatie → /tools/fire-sim".
+  // Die route heeft nooit bestaan (geen app/tools, geen rewrite) — ⌘K leverde
+  // dus een 404. Het was de enige dode nav-href app-breed; de nieuwe toets
+  // "elke nav-href bestaat" in lib/nav-config.route-coverage.test.ts vangt een
+  // herhaling. De scenario-tool met sliders die het sublabel beloofde is
+  // /toekomst/whatif, en die staat al in HORIZON_PAGES.
 ]
 
 // ── Beheer (alleen als role === 'admin') ─────────────────────────────────────

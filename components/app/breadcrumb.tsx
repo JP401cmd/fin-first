@@ -31,7 +31,10 @@ const segmentLabels: Record<string, string> = {
   budget: 'Budget',
   transacties: 'Transacties',
   'vaste-lasten': 'Vaste lasten',
-  forecast: 'Forecast',
+  // Slug blijft 'forecast' (de URL wijzigt niet), het label is Nederlands —
+  // UR3-13 F2, optie C.
+  forecast: 'Vooruitblik',
+  optimizer: 'Fiscale kansen',
   cash: 'Cash',
   cashflow: 'Cashflow',
   import: 'Importeren',

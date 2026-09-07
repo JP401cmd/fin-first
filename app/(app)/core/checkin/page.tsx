@@ -788,8 +788,9 @@ function CheckinPageContent() {
             {overview?.monthLabel ? `Check-in ${overview.monthLabel}` : 'Maandelijkse check-in'}
           </h2>
         </div>
+        {/* Canoniek pad sinds UR3-26: /core/checkin/historie redirect hierheen. */}
         <Link
-          href="/core/checkin/historie"
+          href="/mijn/checkins"
           className="ml-auto mr-8 flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-[var(--ink-3)] hover:text-[var(--ink)] hover:bg-[var(--subtle)] transition-colors"
           title="Vorige check-ins bekijken"
         >
@@ -2045,9 +2046,20 @@ function StepReflectie({
   const prevMetrics = previous?.metrics
   const dailyExpenses = overview ? dailyExpenseRate(stabieleMaanduitgaven(overview)) : 0
 
+  // Dezelfde grondslag als stap 1 (Terugblik): de AFGESLOTEN vorige maand.
+  // Deze samenvatting las hier `overview.monthlySavings` — het ongemarkeerde,
+  // dus LOPENDE maandveld (ADR 0073). Binnen één check-in stonden daardoor twee
+  // tegenstrijdige "gespaard"-bedragen: "Terugblik augustus" in stap 1, en
+  // "je hebt deze maand € -3.529 gespaard" in stap 7, met een half-geboekte
+  // september eronder (UR3-23). De eigenaar koos consistentie binnen de flow
+  // boven het eerdere "de reflectie gaat bewust over nu": beide stappen hangen
+  // nu aan `terugblikCijfers()`, zodat een volgende venster-wijziging niet
+  // opnieuw maar één van de twee raakt.
+  const cijfers = overview ? terugblikCijfers(overview) : null
+
   // Compute freedom time for savings
-  const savingsFreedom = overview && dailyExpenses > 0
-    ? calculateFreedomTime(Math.abs(overview.monthlySavings), dailyExpenses)
+  const savingsFreedom = cijfers && dailyExpenses > 0
+    ? calculateFreedomTime(Math.abs(cijfers.savings), dailyExpenses)
     : null
 
   return (
@@ -2075,12 +2087,15 @@ function StepReflectie({
       <div className="card-editorial p-4">
         <p className="text-xs font-medium text-[var(--ink-3)] uppercase tracking-wider mb-2">Samenvatting</p>
         <div className="space-y-1.5 text-sm text-[var(--ink-2)]">
-          {overview && (
+          {/* `heeftCijfers` komt uit dezelfde bron als stap 1: over een maand
+              zonder boekingen valt niets te melden, en "€ 0 gespaard" zou daar
+              een oordeel zijn over een gat (ADR 0131). */}
+          {cijfers?.heeftCijfers && (
             <p>
-              Je hebt deze maand <span className="font-mono tabular-nums font-medium">{fc(overview.monthlySavings)}</span> gespaard
+              Je hebt in {cijfers.label} <span className="font-mono tabular-nums font-medium">{fc(cijfers.savings)}</span> gespaard
               {savingsFreedom && !savingsFreedom.isInfinite && savingsFreedom.totalDays > 0 && (
                 <span className="text-[var(--ink-3)]">
-                  {' '}({overview.monthlySavings >= 0 ? '+' : '-'}{formatFreedomTimeString(savingsFreedom, 'short', true)} vrijheid)
+                  {' '}({cijfers.savings >= 0 ? '+' : '-'}{formatFreedomTimeString(savingsFreedom, 'short', true)} vrijheid)
                 </span>
               )}.
             </p>
