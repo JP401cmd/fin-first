@@ -15,6 +15,7 @@ import {
   formatMaskedApproxCurrency,
   formatFreedomRateFootnote,
   formatCurrency,
+  formatDecimal,
   APPROX_PREFIX,
   MASKED_AMOUNT_PLACEHOLDER,
   maskCurrencyInText,
@@ -573,5 +574,37 @@ describe('maskCurrencyInText (S4)', () => {
   it('geeft null/undefined ongewijzigd terug', () => {
     expect(maskCurrencyInText(null, true)).toBeNull()
     expect(maskCurrencyInText(undefined, true)).toBeUndefined()
+  })
+})
+
+describe('formatDecimal', () => {
+  // UR3-17 - #21d: op balans en wat-als stonden ratio's en percentages via
+  // `toFixed()` op het scherm, dus met een Engelse punt ("34.2%"). Op een
+  // Nederlands rapport leest dat als een ongeformatteerd getal.
+  it('gebruikt de nl-NL komma als decimaalteken', () => {
+    expect(formatDecimal(34.25, 1)).toBe('34,3')
+    expect(formatDecimal(1.5, 2)).toBe('1,50')
+  })
+
+  it('houdt het aantal decimalen vast, ook bij ronde getallen', () => {
+    expect(formatDecimal(7, 1)).toBe('7,0')
+    expect(formatDecimal(7, 0)).toBe('7')
+  })
+
+  it('houdt het minteken bij een negatieve waarde', () => {
+    expect(formatDecimal(-1.15, 1)).toBe('-1,2')
+  })
+
+  it('zet duizendtallen met een punt (nl-NL), niet met een komma', () => {
+    expect(formatDecimal(1234.5, 1)).toBe('1.234,5')
+  })
+
+  it('valt terug op 0 bij een niet-eindige waarde, net als de rest van format.ts', () => {
+    expect(formatDecimal(Number.NaN, 1)).toBe('0,0')
+    expect(formatDecimal(Number.POSITIVE_INFINITY, 1)).toBe('0,0')
+  })
+
+  it('gebruikt een decimaal als er geen digits worden meegegeven', () => {
+    expect(formatDecimal(2.34)).toBe('2,3')
   })
 })

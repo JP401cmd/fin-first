@@ -10,6 +10,7 @@ import { computeWhatifProjection } from '@/lib/horizon-kernel/whatif-router'
 import type { WhatifRawProfileRow } from '@/lib/horizon-kernel/adapter/whatif-varianten'
 import { lifeEventsToCashflows, type SimCashflow, type SimResult } from '@/lib/fire-simulation'
 import { formatFireAge } from '@/lib/horizon-data'
+import { formatDecimal } from '@/lib/format'
 import type { WhatIfEvent } from '@/components/app/horizon/whatif-events'
 import type { Debt } from '@/lib/debt-data'
 import type { Asset } from '@/lib/asset-data'
@@ -242,7 +243,7 @@ export function WhatIfBeslishulp({
         icon: <Landmark className="h-5 w-5" aria-hidden />,
         fireAgeWith: aflossenAge,
         deltaMonths: deltaFrom(aflossenAge),
-        footnote: `Aflossen levert je gegarandeerd je schuldrente op (~${(debtRate * 100).toFixed(1)}%), niet het onzekere marktrendement. Doorgaans dus een kleinere — maar zekere — vrijheidswinst dan beleggen.`,
+        footnote: `Aflossen levert je gegarandeerd je schuldrente op (~${formatDecimal(debtRate * 100, 1)}%), niet het onzekere marktrendement. Doorgaans dus een kleinere — maar zekere — vrijheidswinst dan beleggen.`,
       })
     }
 

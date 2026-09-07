@@ -65,7 +65,7 @@ export function OwnershipToggle({ value, onChange, hasHousehold, compact = false
         {showWarning && (
           <p className="mt-1 flex items-center gap-1 text-[10px] text-amber-600" data-testid="ownership-no-household-warning">
             <AlertTriangle className="h-3 w-3 shrink-0" />
-            Nodig eerst je partner uit via Identiteit
+            Nodig eerst je partner uit via Mijn
           </p>
         )}
       </div>
@@ -120,7 +120,7 @@ export function OwnershipToggle({ value, onChange, hasHousehold, compact = false
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
           <p className="text-xs text-amber-700">
             Je hebt nog geen huishouden. Nodig eerst je partner uit via{' '}
-            <a href="/mijn" className="font-medium underline">Identiteit</a>.
+            <a href="/mijn" className="font-medium underline">Mijn</a>.
           </p>
         </div>
       )}

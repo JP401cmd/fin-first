@@ -193,7 +193,8 @@ const criteria: AcceptanceCriterion[] = [
     then: 'Een BottomSheet opent met "Jouw waarde", een referentie-rij (label afhankelijk van metriek/tier: "Mediaan (doelgroep)" voor vermogen, "Referentie (doelgroep)" voor inkomen, "Typische peer" voor gemodelleerde metrieken), tier-uitleg en bronvermelding — pure presentatie, niets wordt herberekend.',
     assertion: {
       kind: 'ui-only',
-      source: 'app/(app)/rapportages/benchmark/metric-detail-sheet.tsx — presentatielaag, geen eigen berekening',
+      source:
+        'app/(app)/rapportages/benchmark/components/metric-detail-sheet.tsx — presentatielaag, geen eigen berekening',
     },
   },
   {

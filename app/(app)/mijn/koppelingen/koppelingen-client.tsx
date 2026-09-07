@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useTransition } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { ExternalLink, FileSpreadsheet, Landmark, Building2, PiggyBank, FileText, Trash2, Link2 } from 'lucide-react'
 import Link from 'next/link'
 import { BANK_CONNECT_SAFETY_LONG } from '@/lib/bank-connect-copy'
@@ -99,8 +99,9 @@ function linkedAssetHref(linkedAssetType: string): string {
 
 export function KoppelingenClient({ initialData, brokerConnections, aangifteImports, bankConnectEnabled }: KoppelingenClientProps) {
   const router = useRouter()
-  const pathname = usePathname()
-  const moduleContext = pathname?.startsWith('/mijn') ? 'Mijn' : 'Identiteit'
+  // Vaste kicker: dit component leeft onder /mijn/koppelingen, dus de vroegere
+  // pathname-terugval op 'Identiteit' kon alleen nog een niet-bestaand pad tonen.
+  const moduleContext = 'Mijn'
   const { addToast } = useToast()
   const { masked } = useMaskedAmounts()
 

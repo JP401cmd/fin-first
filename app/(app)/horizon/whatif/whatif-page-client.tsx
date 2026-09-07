@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo, useRef, useDeferredValue } f
 import dynamic from 'next/dynamic'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { formatMaskedCurrency, dailyExpenseRate } from '@/lib/format'
+import { formatDecimal, formatMaskedCurrency, dailyExpenseRate } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
@@ -1119,7 +1119,7 @@ export default function WhatIfPage({ marktVolatiliteit }: WhatIfPageProps) {
         `Mijn wat-als scenario: inkomen ${fc(overrides.monthlyIncome)}/mnd, ` +
           `${overrides.workDaysPerWeek} werkdagen/week, ` +
           `spaarquote ${Math.round(overrides.savingsRate)}%, ` +
-          `rendement ${overrides.expectedReturn.toFixed(1)}%` +
+          `rendement ${formatDecimal(overrides.expectedReturn, 1)}%` +
           (overrides.extraContribution > 0 ? `, extra inleg ${fc(overrides.extraContribution)}/mnd` : ''),
         '',
         `Resultaat: FIRE op ${whatIfFireAge !== null ? Math.floor(whatIfFireAge) + ' jaar' : 'onbereikbaar'}` +

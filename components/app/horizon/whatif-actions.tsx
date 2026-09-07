@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { formatMaskedCurrency } from '@/lib/format'
+import { formatDecimal, formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import type { WhatIfOverrides } from '@/components/app/horizon/whatif-sliders'
 import { BottomSheet } from '@/components/app/bottom-sheet'
@@ -137,8 +137,8 @@ export function WhatIfActions({
         id: 'portfolio-review',
         icon: <BarChart3 className="h-4 w-4" />,
         title: 'Portfolio herbalanceren',
-        description: `Je scenario verwacht ${overrides.expectedReturn.toFixed(1)}% rendement i.p.v. ${baseline.expectedReturn.toFixed(1)}%. Overweeg een hoger aandeel aandelen of een goedkoper indexfonds.`,
-        impact: `${overrides.expectedReturn.toFixed(1)}% rendement`,
+        description: `Je scenario verwacht ${formatDecimal(overrides.expectedReturn, 1)}% rendement i.p.v. ${formatDecimal(baseline.expectedReturn, 1)}%. Overweeg een hoger aandeel aandelen of een goedkoper indexfonds.`,
+        impact: `${formatDecimal(overrides.expectedReturn, 1)}% rendement`,
         category: 'beleggen',
       })
     }
@@ -172,7 +172,7 @@ export function WhatIfActions({
       parts.push(`- Spaarquote: ${Math.round(baseline.savingsRate)}% → ${Math.round(overrides.savingsRate)}%`)
     }
     if (deltas.expectedReturn !== 0) {
-      parts.push(`- Verwacht rendement: ${baseline.expectedReturn.toFixed(1)}% → ${overrides.expectedReturn.toFixed(1)}%`)
+      parts.push(`- Verwacht rendement: ${formatDecimal(baseline.expectedReturn, 1)}% → ${formatDecimal(overrides.expectedReturn, 1)}%`)
     }
     if (deltas.extraContribution !== 0) {
       parts.push(`- Extra inleg: +${formatMaskedCurrency(deltas.extraContribution, masked)}/mnd`)
@@ -180,7 +180,7 @@ export function WhatIfActions({
 
     if (fireAgeDelta !== null) {
       parts.push('')
-      parts.push(`Dit verandert mijn FIRE-leeftijd met ${fireAgeDelta > 0 ? '+' : ''}${fireAgeDelta.toFixed(1)} jaar.`)
+      parts.push(`Dit verandert mijn FIRE-leeftijd met ${fireAgeDelta > 0 ? '+' : ''}${formatDecimal(fireAgeDelta, 1)} jaar.`)
     }
 
     parts.push('')
@@ -236,7 +236,7 @@ export function WhatIfActions({
               </div>
               {fireAgeDelta !== null && Math.abs(fireAgeDelta) > 0.1 && (
                 <p className={`mt-0.5 font-mono text-[11px] ${fireAgeDelta < 0 ? 'text-horizon-700' : 'text-kern-700'}`}>
-                  FIRE {fireAgeDelta < 0 ? '' : '+'}{fireAgeDelta.toFixed(1)} jaar
+                  FIRE {fireAgeDelta < 0 ? '' : '+'}{formatDecimal(fireAgeDelta, 1)} jaar
                   {' · '}
                   {<MaskedAmount value={whatIfAnnualSavings - baselineAnnualSavings} tone="horizon" />}/jaar
                 </p>
@@ -385,7 +385,7 @@ function ScenarioSummaryKassabon({
           <div className="flex justify-between py-0.5">
             <span className="font-sans text-sm text-[var(--ink-2)]">Verwacht rendement</span>
             <span className="tabular-nums text-[var(--ink)]">
-              {baseline.expectedReturn.toFixed(1)}% → {overrides.expectedReturn.toFixed(1)}%
+              {formatDecimal(baseline.expectedReturn, 1)}% → {formatDecimal(overrides.expectedReturn, 1)}%
             </span>
           </div>
         )}
@@ -425,7 +425,7 @@ function ScenarioSummaryKassabon({
         <span className="text-[var(--ink)]">FIRE-leeftijd effect</span>
         <span className="tabular-nums text-[var(--ink)]">
           {fireAgeDelta !== null
-            ? `${fireAgeDelta > 0 ? '+' : ''}${fireAgeDelta.toFixed(1)} jaar`
+            ? `${fireAgeDelta > 0 ? '+' : ''}${formatDecimal(fireAgeDelta, 1)} jaar`
             : 'n.v.t.'
           }
         </span>

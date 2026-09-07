@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { ChevronDown, ChevronUp, LineChart } from 'lucide-react'
+import { formatDecimal } from '@/lib/format'
 
 // Datacontract(en) wonen nu in @/lib/types/horizon-whatif (import-richting UI→lib).
 import type { AssetGroupReturn } from '@/lib/types/horizon-whatif'
@@ -24,13 +25,13 @@ const STEP = 0.005
 const EPSILON = 0.0001
 
 function formatPp(v: number): string {
-  return `${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)} pp`
+  return `${v >= 0 ? '+' : ''}${formatDecimal(v * 100, 1)} pp`
 }
 
 /** Randlabel voor de rendement-track (typografische min-teken, pp zonder overbodige decimaal). */
 function formatPpEdge(v: number): string {
   const abs = Math.abs(v * 100)
-  const num = abs % 1 === 0 ? abs.toFixed(0) : abs.toFixed(1)
+  const num = abs % 1 === 0 ? formatDecimal(abs, 0) : formatDecimal(abs, 1)
   return `${v < 0 ? '−' : v > 0 ? '+' : ''}${num} pp`
 }
 
@@ -187,7 +188,7 @@ export function WhatIfMarketAssumptions({ value, onChange, assetGroups = [] }: P
                         <span className={`shrink-0 text-right font-mono text-[10px] tabular-nums ${
                           isDiverged ? 'font-semibold text-horizon-700' : 'text-[var(--ink-3)]'
                         }`}>
-                          {targetPct.toFixed(1)}%
+                          {formatDecimal(targetPct, 1)}%
                         </span>
                       </div>
                     )

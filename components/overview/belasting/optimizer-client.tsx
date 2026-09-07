@@ -310,8 +310,9 @@ export function Box3OptimizerClient({
           met deze uitgangspunten.
         </FooterNote>
         <FooterNote kicker="Methode">
-          Elke heffing komt uit de canonieke Box 3-motor; de jaarruimte-besparing is
-          marginaal-correct via de Box 1-motor. Geen eigen sommen op deze pagina.
+          De belasting per keuze is doorgerekend met dezelfde rekenmotor als de rest van de
+          app: Box 3 over je vermogen, Box 1 over het voordeel van pensioeninleg — tegen het
+          tarief dat voor jouw inkomen geldt. Deze pagina rekent niets apart uit.
         </FooterNote>
         <FooterNote kicker="Geen advies">{OPTIMIZER_DISCLAIMER}</FooterNote>
       </div>

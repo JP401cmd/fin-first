@@ -9,7 +9,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Printer } from 'lucide-react'
-import { formatMaskedCurrency, formatTimestamp } from '@/lib/format'
+import { formatDecimal, formatMaskedCurrency, formatTimestamp } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import {
   FiguresStrip,
@@ -481,7 +481,7 @@ export default function BalansPage() {
         {data.solvabiliteitsratio != null && (
           <KengetalRow
             label="Solvabiliteitsratio"
-            value={`${data.solvabiliteitsratio.toFixed(1)}%`}
+            value={`${formatDecimal(data.solvabiliteitsratio, 1)}%`}
             variant={solvVariant}
             tooltip="Eigen vermogen / Totaal activa"
           />
@@ -490,7 +490,7 @@ export default function BalansPage() {
         {data.schuldgraad != null && (
           <KengetalRow
             label="Schuldgraad"
-            value={`${data.schuldgraad.toFixed(2)}×`}
+            value={`${formatDecimal(data.schuldgraad, 2)}×`}
             variant={data.schuldgraad > 2 ? 'negative' : data.schuldgraad <= 1 ? 'positive' : 'neutral'}
             tooltip="Schulden / Eigen vermogen"
           />
@@ -499,7 +499,7 @@ export default function BalansPage() {
         {data.liquiditeitsratio != null && (
           <KengetalRow
             label="Liquiditeitsratio (current ratio)"
-            value={`${data.liquiditeitsratio.toFixed(2)}×`}
+            value={`${formatDecimal(data.liquiditeitsratio, 2)}×`}
             variant={data.liquiditeitsratio >= 2 ? 'positive' : data.liquiditeitsratio >= 1 ? 'neutral' : 'negative'}
             tooltip="(Vlottende activa + liquide middelen) / Kort vreemd vermogen"
           />

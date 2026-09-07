@@ -14,7 +14,7 @@
  */
 
 import { useCallback } from 'react'
-import { formatMaskedCurrency } from '@/lib/format'
+import { formatDecimal, formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { SectionLabel } from '@/components/editorial'
 import type {
@@ -100,7 +100,7 @@ export function DemografieBlock({ data, aowMonths }: { data: PersoonlijkPlanDemo
         <DefinitionRow
           label="AOW-leeftijd"
           value={aowLabel}
-          sub={'bron: aow_leeftijd-tabel'}
+          sub={'volgens de wettelijke AOW-tabel voor jouw geboortejaar'}
         />
       </div>
     </section>
@@ -120,11 +120,11 @@ export function InkomenBlock({ data }: { data: PersoonlijkPlanInkomen }) {
         <DefinitionRow
           label="Bruto jaarinkomen"
           value={data.estimatedGrossAnnualIncome != null ? fc(data.estimatedGrossAnnualIncome) : null}
-          sub={data.estimatedGrossAnnualIncome != null ? 'ruwe schatting — vul aan in instellingen' : undefined}
+          sub={data.estimatedGrossAnnualIncome != null ? 'ruwe schatting — vul aan bij Mijn → Profiel' : undefined}
         />
         <DefinitionRow
           label="Marginaal IB-tarief"
-          value={`${(data.marginaalTarief * 100).toFixed(2)}%`}
+          value={`${formatDecimal(data.marginaalTarief * 100, 2)}%`}
           sub={data.marginaalTarief >= 0.4 ? 'hoogste schijf — €75.518+ bruto/jr' : 'eerste schijf — t/m €75.518 bruto/jr'}
         />
         <DefinitionRow
@@ -145,7 +145,8 @@ export function CashflowBlock({ cashflows }: { cashflows: PersoonlijkPlanCashflo
         <p
           className="font-source-serif italic text-[13px] text-[var(--ink-3)]"
         >
-          Geen AOW- of pensioen-cashflows geregistreerd. Voeg ze toe in Toekomst onder levensgebeurtenissen.
+          Nog geen AOW of aanvullend pensioen vastgelegd. Je voegt ze toe bij Toekomst →
+          Gebeurtenissen.
         </p>
       ) : (
         <div className="space-y-2">
@@ -196,7 +197,9 @@ export function UitgavenBlock({ data }: { data: PersoonlijkPlanUitgaven }) {
     custom_amount: 'Eigen bedrag',
     current_income: 'Huidig jaarinkomen',
   }
-  const methodLabel = methodLabels[data.retirementExpenseMethod] ?? data.retirementExpenseMethod
+  // Terugval bewust NIET de rauwe sleutel (`essential_budgets`): een onbekende
+  // methode zou anders een snake_case-veldnaam op het scherm zetten.
+  const methodLabel = methodLabels[data.retirementExpenseMethod] ?? 'eigen keuze'
 
   return (
     <section className="report-section mb-6">
@@ -245,11 +248,11 @@ export function FireParamsBlock({ data }: { data: PersoonlijkPlanFireParams }) {
       <div className="grid grid-cols-1 gap-x-6 md:grid-cols-2">
         <DefinitionRow
           label="Bruto rendement"
-          value={`${(data.grossReturn * 100).toFixed(2)}%`}
+          value={`${formatDecimal(data.grossReturn * 100, 2)}%`}
         />
         <DefinitionRow
           label="Inflatie"
-          value={`${(data.inflationRate * 100).toFixed(2)}%`}
+          value={`${formatDecimal(data.inflationRate * 100, 2)}%`}
         />
         <DefinitionRow
           label="Box 3 methode"
@@ -257,8 +260,8 @@ export function FireParamsBlock({ data }: { data: PersoonlijkPlanFireParams }) {
         />
         <DefinitionRow
           label="Effectieve SWR"
-          value={`${(data.effectiveSwr * 100).toFixed(2)}%`}
-          sub={`= bruto rendement − Box 3 drag (${(data.box3Drag * 100).toFixed(2)}%) − inflatie`}
+          value={`${formatDecimal(data.effectiveSwr * 100, 2)}%`}
+          sub={`= bruto rendement − Box 3 drag (${formatDecimal(data.box3Drag * 100, 2)}%) − inflatie`}
         />
       </div>
     </section>
@@ -318,20 +321,20 @@ export function OnttrekkingBlock({ data }: { data: PersoonlijkPlanOnttrekking })
           <div className="mt-4 grid grid-cols-1 gap-x-6 md:grid-cols-2">
             <DefinitionRow
               label="Floor (ondergrens)"
-              value={`${(data.guardrailFloor * 100).toFixed(0)}% van basis`}
+              value={`${formatDecimal(data.guardrailFloor * 100, 0)}% van basis`}
             />
             <DefinitionRow
               label="Ceiling (bovengrens)"
-              value={`${(data.guardrailCeiling * 100).toFixed(0)}% van basis`}
+              value={`${formatDecimal(data.guardrailCeiling * 100, 0)}% van basis`}
             />
             <DefinitionRow
               label="Cut-step"
-              value={`${(data.guardrailCutStep * 100).toFixed(0)}%`}
+              value={`${formatDecimal(data.guardrailCutStep * 100, 0)}%`}
               sub="verlaging bij beurswind tegen"
             />
             <DefinitionRow
               label="Raise-step"
-              value={`${(data.guardrailRaiseStep * 100).toFixed(0)}%`}
+              value={`${formatDecimal(data.guardrailRaiseStep * 100, 0)}%`}
               sub="verhoging bij beurswind mee"
             />
           </div>

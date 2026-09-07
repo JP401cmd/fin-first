@@ -100,6 +100,23 @@ export function formatCurrencyDecimals(value: number): string {
   }).format(safe)
 }
 
+/**
+ * Getal met vaste decimalen in nl-NL — dus een KOMMA als decimaalteken.
+ *
+ * Bestaansreden: `value.toFixed(1)` schrijft altijd de Engelse notatie
+ * ("34.2"), en dat leest op een Nederlands scherm als een ongeformatteerd
+ * getal. Gebruik dit voor percentages, ratio's en jaren-delta's; voor
+ * bedragen blijven `formatCurrency`/`formatCurrencyDecimals` de vorm.
+ * Het teken (%, ×, ' jaar') zet de aanroeper er zelf achter.
+ */
+export function formatDecimal(value: number, digits = 1): string {
+  const d = Number.isFinite(digits) && digits > 0 ? Math.floor(digits) : 0
+  return new Intl.NumberFormat('nl-NL', {
+    minimumFractionDigits: d,
+    maximumFractionDigits: d,
+  }).format(safeNumber(value))
+}
+
 // ── Prognose-weergave: eerlijke precisie op kopgetallen (M5) ──────────────
 //
 // AANLEIDING (bevinding M5, 24-08-2026): de prognosekoppen op /overzicht en

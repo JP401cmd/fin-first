@@ -214,8 +214,9 @@ export function Filosofie() {
               </p>
               <p>
                 Daarom rekent TriFinity je financiën niet alleen om naar
-                euro&apos;s, maar naar vrijheid in jaren, maanden en dagen. Niet
-                om je te laten schrikken, maar om elke keuze betekenis te geven:{' '}
+                euro&apos;s, maar naar vrijheid: je vermogen in jaren en maanden,
+                een losse uitgave in dagen. Niet om je te laten schrikken, maar
+                om elke keuze betekenis te geven:{' '}
                 <em className="italic text-[var(--ink)]">
                   dit kost me drie vrijheidsdagen, dit levert er dertig op.
                 </em>

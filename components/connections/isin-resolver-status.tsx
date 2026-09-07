@@ -4,9 +4,14 @@
 //
 // Polls /api/integrations/market-data/isin-lookup/status once on mount and
 // renders one of three states:
-//   - configured + within-quota   → "Actief" + "X/250 calls vandaag"
-//   - configured + quota-exhausted → "Uitgeput" badge + reset-time
-//   - not configured              → "Niet geconfigureerd" + setup hint
+//   - configured + within-quota   → "Actief" + "X van 250 opzoekacties vandaag"
+//   - configured + quota-exhausted → "Limiet bereikt" badge + reset-time
+//   - not configured              → "Staat uit" + de handmatige terugval
+//
+// De teksten zijn bewust gebruikerstaal: deze kaart staat op /mijn/koppelingen
+// voor eindgebruikers, niet in /beheer. Serverconfiguratie (een ontbrekende
+// API-sleutel) is niets waar de gebruiker iets mee kan — die ziet alleen dat
+// automatisch opzoeken uit staat en dat hij het zelf kan invullen.
 
 import { useEffect, useState } from 'react'
 import { formatAmsterdamDayMonth, formatAmsterdamTime } from '@/lib/tz'
@@ -65,14 +70,14 @@ export function IsinResolverStatus() {
           </p>
           {state.kind === 'ready' && state.status.configured && (
             <p className="mt-1 font-mono text-[11px] tabular-nums text-[var(--ink-3)]">
-              {state.status.callsToday}/{state.status.dailyLimit} calls vandaag · reset om{' '}
-              {formatResetTime(state.status.resetAt)}
+              {state.status.callsToday} van {state.status.dailyLimit} opzoekacties vandaag · weer
+              vrij om {formatResetTime(state.status.resetAt)}
             </p>
           )}
           {state.kind === 'ready' && !state.status.configured && (
             <p className="mt-1 font-serif text-[11px] italic text-[var(--ink-3)]">
-              Voeg <code className="font-mono text-[10px] text-[var(--ink-2)]">FMP_API_KEY</code> toe
-              aan environment om automatische ISIN-lookup te activeren.
+              Automatisch opzoeken staat nu uit. Je kunt ticker en naam gewoon zelf invullen bij
+              een nieuwe holding.
             </p>
           )}
           {state.kind === 'error' && (
@@ -111,7 +116,7 @@ function StatusBadge({ state }: { state: LoadState }) {
     return (
       <span className="inline-flex shrink-0 items-center gap-1.5 border border-[var(--border-ed)] bg-[var(--subtle)] px-2 py-1 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ink-3)]">
         <span className="inline-block h-2 w-2 rounded-full bg-[var(--ink-4)]" aria-hidden="true" />
-        Niet geconfigureerd
+        Staat uit
       </span>
     )
   }
@@ -121,7 +126,7 @@ function StatusBadge({ state }: { state: LoadState }) {
     return (
       <span className="inline-flex shrink-0 items-center gap-1.5 border border-[color-mix(in_oklab,var(--negative)_30%,transparent)] bg-[color-mix(in_oklab,var(--negative)_8%,transparent)] px-2 py-1 text-[10px] font-medium uppercase tracking-[0.08em] text-negative">
         <span className="inline-block h-2 w-2 rounded-full bg-negative" aria-hidden="true" />
-        Uitgeput
+        Limiet bereikt
       </span>
     )
   }

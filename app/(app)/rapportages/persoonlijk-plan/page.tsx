@@ -190,7 +190,8 @@ export default function PersoonlijkPlanPage() {
         <ScenarioCallout title="Wat staat hier in?">
           Dit rapport toont de aannames waarmee TriFinity je FIRE-, horizon- en pensioenberekeningen
           opstelt — geen prognoses, alleen de input-zijde. Lees het door om te controleren of de
-          parameters nog kloppen met je situatie. Wijzig waardes in <em>Identiteit → Instellingen</em>.
+          parameters nog kloppen met je situatie. Je persoonlijke gegevens wijzig je bij{' '}
+          <em>Mijn → Profiel</em>; de reken-aannames bij <em>Toekomst → Voorkeuren</em>.
         </ScenarioCallout>
       </section>
 

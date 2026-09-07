@@ -20,7 +20,7 @@ export default function OverPage() {
           straks vrij kunt besteden. TriFinity is gebouwd rond dat ene idee —{' '}
           <em className="italic text-kern-700">geld is opgeslagen tijd</em> — en
           vertaalt je financiën daarom niet alleen naar euro&apos;s, maar naar
-          vrijheid in jaren, maanden en dagen.
+          vrijheid: je vermogen in jaren en maanden, een losse uitgave in dagen.
         </p>
       </MarketingSection>
 

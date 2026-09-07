@@ -405,7 +405,7 @@ const criteria: AcceptanceCriterion[] = [
     titel: '"Vraag Fin"-wizard: AI-tegenpartijgroepen grootste-eerst met recentste-datum-tiebreak',
     kriticiteit: 'KERN',
     given: 'Drie onbekende-tegenpartijgroepen na stage-1 (regels/overboekingen/spiegelpaar): "Albert Heijn" (3 leden, meest recente datum 2026-06-20), "Bol.com" (3 leden, meest recente datum 2026-06-25), "Uniek Winkeltje" (1 lid, 2026-06-10).',
-    when: 'De wizard (component/app/categorize-wizard.tsx) berekent de presentatievolgorde met dezelfde `buildCombinedGroups` + `orderGroupsLargestFirst` die de AI-motor zelf gebruikt (`groupOrder: \'largest-first\'`) — geen eigen sortering.',
+    when: 'De wizard (components/app/categorize-wizard.tsx) berekent de presentatievolgorde met dezelfde `buildCombinedGroups` + `orderGroupsLargestFirst` die de AI-motor zelf gebruikt (`groupOrder: \'largest-first\'`) — geen eigen sortering.',
     then: 'Groepen met gelijk ledental (Albert Heijn/Bol.com, elk 3) worden getoond op recentste-datum-tiebreak: Bol.com (2026-06-25) vóór Albert Heijn (2026-06-20); de kleinere groep "Uniek Winkeltje" (1 lid) komt als laatste — één AI-groepkaart tegelijk, grootste/meest-actuele eerst.',
     assertion: {
       kind: 'exact',
