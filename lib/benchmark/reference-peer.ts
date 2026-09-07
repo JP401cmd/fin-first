@@ -16,6 +16,7 @@
 import type { FinancialInput } from '@/lib/horizon-data'
 import { computeScalarFireProjection } from '@/lib/horizon-kernel/scalar-router'
 import { computeHealthScoreFromInputs, type HealthScoreInput } from '@/lib/financial-health'
+import { localDateString } from '@/lib/month-range'
 import type { CohortReference } from './nl-reference'
 import { cohortMonthlyFromReference } from './cohort-estimate'
 
@@ -59,8 +60,11 @@ export function computeReferencePeer(
   const { monthlyIncome, monthlySavings, monthlyExpenses } = cohortMonthlyFromReference(ref)
 
   // Synthetische geboortedatum zodat de motor currentAge = midAge afleidt.
-  const dob = new Date(now.getFullYear() - midAge, now.getMonth(), now.getDate())
-  const dateOfBirth = dob.toISOString().split('T')[0]
+  // localDateString i.p.v. toISOString(): die laatste schoof de synthetische
+  // geboortedatum in NL (UTC+) een dag terug.
+  const dateOfBirth = localDateString(
+    new Date(now.getFullYear() - midAge, now.getMonth(), now.getDate()),
+  )
 
   const fin: FinancialInput = {
     totalAssets: ref.netWorthMedian,

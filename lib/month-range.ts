@@ -11,6 +11,17 @@
  * datum-componenten — dat is per definitie tijdzone-onafhankelijk.
  */
 
+/**
+ * Formatteer een lokale Date als `YYYY-MM-DD` uit zijn lokale componenten —
+ * het tijdzone-veilige alternatief voor `d.toISOString().split('T')[0]`, dat in
+ * NL (UTC+) een dag terugschuift zodra `d` lokale middernacht voorstelt.
+ * Gebruik dit waar een VOLLEDIGE kalenderdatum nodig is; voor maandgrenzen zijn
+ * `localMonthStart` / `localMonthBounds` / `localMonthEnd` specifieker.
+ */
+export function localDateString(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 /** Formatteer de jaar/maand van een lokale Date als `YYYY-MM-01`. */
 export function localMonthStart(monthDate: Date): string {
   return `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}-01`
@@ -48,6 +59,5 @@ export function localMonthStartMonthsAgo(refDate: Date, monthsBack: number): str
  */
 export function localMonthEnd(monthDate: Date): string {
   // Dag 0 van de volgende maand = de laatste dag van deze maand.
-  const last = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0)
-  return `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, '0')}-${String(last.getDate()).padStart(2, '0')}`
+  return localDateString(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0))
 }

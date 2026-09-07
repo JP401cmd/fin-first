@@ -1,19 +1,28 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
+import { geenMaandgrensIso } from "./eslint-rules/geen-maandgrens-iso.mjs";
+
+// Lokale plugin. Eén regel, in een eigen module omdat hij scope-resolutie doet
+// (en dus met RuleTester te testen moet zijn — zie
+// eslint-rules/geen-maandgrens-iso.test.mjs).
+const trifinityPlugin = {
+  rules: { "geen-maandgrens-iso": geenMaandgrensIso },
+};
 
 // Gedeelde no-restricted-syntax-selectors. Flat config: een later object dat
 // dezelfde regel zet VERVANGT de eerdere config voor die bestanden — daarom
 // zijn de basis-selectors hier los gedefinieerd en spreiden beide regel-
 // objecten ze opnieuw in, zodat de P&L-vangrails (alleen components/ +
 // app/(app)/) de tijdzone- en household-vangrails niet uitschakelen.
+//
+// LET OP — de tijdzone-/maandgrensvangrail stond hier tot 7 sep 2026 als
+// selector [0] en is VERHUISD naar de eigen regel
+// `trifinity/geen-maandgrens-iso` (UR3-25). Reden: de selector eiste
+// `callee.object.type="NewExpression"` en kende daarmee maar één schrijfvorm;
+// esquery heeft geen scope-resolutie, dus de variabele-vorm was met géén
+// enkele selector te vangen. Niet terugzetten — dat geeft dubbele meldingen.
 const RESTRICTED_SYNTAX_BASE = [
-  {
-    selector:
-      'CallExpression[callee.type="MemberExpression"][callee.property.name="toISOString"][callee.object.type="NewExpression"][callee.object.callee.name="Date"][callee.object.arguments.length>=2]',
-    message:
-      "Gebruik lib/month-range.ts (localMonthBounds / localMonthStart / localMonthStartMonthsAgo) i.p.v. new Date(jaar, maand, …).toISOString() — die schuift de maandgrens in NL een dag terug.",
-  },
   {
     selector:
       'BinaryExpression[operator=/^[!=]==?$/]:has(Literal[value=/^(samenwonend|getrouwd)$/]):has(Identifier[name=/^household_?[Tt]ype$/])',
@@ -133,7 +142,16 @@ const eslintConfig = defineConfig([
     // `react-hooks`-plugin dan niet geregistreerd is → "could not find plugin
     // react-hooks"-crash tijdens een volledige `eslint .`-run.
     files: ["**/*.{js,jsx,mjs,ts,tsx,mts,cts}"],
+    plugins: { trifinity: trifinityPlugin },
     rules: {
+      // Tijdzone-/maandgrensvangrail met scope-resolutie (UR3-25, 7 sep 2026).
+      // Vervangt de oude esquery-selector, die alleen de geketende
+      // `new Date(j,m,d).toISOString()` kende. Deze regel lost de ontvanger op
+      // en vangt óók de variabele-vorm (`const d = new Date(j,m,1);
+      // d.toISOString()`) en de lokale functie-vorm (`at(j,m,d).toISOString()`).
+      // Severity = "error": elke NIEUWE occurrence blokkeert. Wat hij bewust
+      // NIET dekt staat in de regelkop en in docs/gate-dekking.md.
+      "trifinity/geen-maandgrens-iso": "error",
       // React-compiler-prep-regels: advisory (warn) tot de overtredingen
       // gericht zijn weggewerkt — errors blijven gereserveerd voor echte bugs.
       // rules-of-hooks en exhaustive-deps behouden hun default-zwaarte.
@@ -148,18 +166,6 @@ const eslintConfig = defineConfig([
       "@typescript-eslint/no-explicit-any": "warn",
       // Cosmetisch en hinderlijk in Nederlandse UI-teksten (apostrofs/quotes).
       "react/no-unescaped-entities": "off",
-      // Tijdzone-vangrail (eenduidige-gegevens-audit S9): markeer
-      // `new Date(jaar, maand, …).toISOString()` als maandgrens. Een Date uit
-      // lokale componenten via toISOString() schuift de grens in NL (UTC+) een
-      // dag terug — vorige-maand-data lekt in het venster. `new Date()` zonder
-      // argumenten (≤1 arg) blijft toegestaan: dat is een echte timestamp.
-      //
-      // Severity = "error": alle bestaande sites zijn gemigreerd naar
-      // lib/month-range.ts (localMonthBounds / localMonthStart /
-      // localMonthStartMonthsAgo / localMonthEnd). De enige bewuste
-      // uitzondering is een gedragsneutrale demo-fixture met een gerichte
-      // eslint-disable (app/test-freedom-days-monthly-trend/page.tsx). Een
-      // error blokkeert nu elke NIEUWE occurrence van de tijdzone-trap.
       // Huishoudtype-vocabulaire-vangrail (hasPartner-bug, jun 2026): verbied
       // élke (in)gelijkheidsvergelijking van `household_type`/`householdType`
       // met de DODE woordenschat 'samenwonend'/'getrouwd'. De canonieke waarden

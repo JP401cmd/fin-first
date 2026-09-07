@@ -180,7 +180,10 @@ export async function GET() {
     for (let i = 1; i <= 6; i++) {
       const futureDate = new Date(now.getFullYear(), now.getMonth() + i, 1)
       const monthLabel = futureDate.toLocaleDateString('nl-NL', { month: 'short', year: 'numeric' })
-      const monthKey = futureDate.toISOString().split('T')[0]
+      // Zelfde canonieke helper als `currentMonthStart` hierboven: zónder deze
+      // schreef de prognose zijn sleutel in NL (UTC+) op de laatste dag van de
+      // vórige maand — twee sleutelformaten in één forecast-array.
+      const monthKey = localMonthStart(futureDate)
 
       forecast.push({
         month: monthKey,

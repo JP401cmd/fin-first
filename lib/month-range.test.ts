@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { localMonthBounds, localMonthEnd, localMonthStart, localMonthStartMonthsAgo } from './month-range'
+import { localDateString, localMonthBounds, localMonthEnd, localMonthStart, localMonthStartMonthsAgo } from './month-range'
 
 describe('localMonthBounds — tijdzone-veilige maandgrenzen', () => {
   it('augustus 2025 → [2025-08-01, 2025-09-01)', () => {
@@ -110,5 +110,57 @@ describe('localMonthEnd — laatste dag van de maand als string (tijdzone-veilig
     // → "2025-08-30" i.p.v. de bedoelde 2025-08-31. De helper bouwt uit lokale
     // componenten, dus geen dag-verschuiving.
     expect(localMonthEnd(new Date(2025, 7, 1))).toBe('2025-08-31')
+  })
+})
+
+describe('localDateString — volledige kalenderdatum, tijdzone-veilig', () => {
+  it('formatteert uit lokale componenten, met padding', () => {
+    expect(localDateString(new Date(2026, 8, 7))).toBe('2026-09-07')
+    expect(localDateString(new Date(2026, 0, 1))).toBe('2026-01-01')
+  })
+
+  it('REGRESSIE (UR3-25): 1 januari blijft 1 januari, niet 31 december', () => {
+    // `new Date(1991, 0, 1).toISOString()` gaf in NL "1990-12-31" — daardoor
+    // werd een persona met een gepinde geboortedatum een jaar ouder dan bedoeld
+    // (lib/regression-tests/horizon-strategie/persona-fixture.ts).
+    expect(localDateString(new Date(1991, 0, 1))).toBe('1991-01-01')
+  })
+
+  it('REGRESSIE: zomertijd (CEST) schuift de dag evenmin terug', () => {
+    expect(localDateString(new Date(2026, 6, 1))).toBe('2026-07-01')
+  })
+
+  it('houdt het uur buiten beschouwing (kalenderdag, geen moment)', () => {
+    expect(localDateString(new Date(2026, 8, 7, 0, 5))).toBe('2026-09-07')
+    expect(localDateString(new Date(2026, 8, 7, 23, 55))).toBe('2026-09-07')
+  })
+
+  it('schrikkeldag', () => {
+    expect(localDateString(new Date(2028, 1, 29))).toBe('2028-02-29')
+  })
+})
+
+describe('maandgrenzen in CET en CEST — beide kanten van de zomertijdgrens', () => {
+  it('wintermaand (CET): januari 2026', () => {
+    expect(localMonthBounds(new Date(2026, 0, 1))).toEqual({ start: '2026-01-01', end: '2026-02-01' })
+    expect(localMonthEnd(new Date(2026, 0, 1))).toBe('2026-01-31')
+  })
+
+  it('zomermaand (CEST): juli 2026', () => {
+    expect(localMonthBounds(new Date(2026, 6, 1))).toEqual({ start: '2026-07-01', end: '2026-08-01' })
+    expect(localMonthEnd(new Date(2026, 6, 1))).toBe('2026-07-31')
+  })
+
+  it('de maand waarin de klok vooruit gaat (maart 2026)', () => {
+    expect(localMonthBounds(new Date(2026, 2, 1))).toEqual({ start: '2026-03-01', end: '2026-04-01' })
+  })
+
+  it('de maand waarin de klok terug gaat (oktober 2026)', () => {
+    expect(localMonthBounds(new Date(2026, 9, 1))).toEqual({ start: '2026-10-01', end: '2026-11-01' })
+  })
+
+  it('jaargrens december 2026 → januari 2027', () => {
+    expect(localMonthBounds(new Date(2026, 11, 1))).toEqual({ start: '2026-12-01', end: '2027-01-01' })
+    expect(localMonthStartMonthsAgo(new Date(2027, 0, 15), 1)).toBe('2026-12-01')
   })
 })

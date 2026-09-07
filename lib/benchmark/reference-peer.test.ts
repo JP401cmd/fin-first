@@ -28,6 +28,7 @@ import { getCohortReference } from '@/lib/benchmark/nl-reference'
 import type { FinancialInput } from '@/lib/horizon-data'
 import { computeScalarFireProjection } from '@/lib/horizon-kernel/scalar-router'
 import { computeHealthScoreFromInputs, type HealthScoreInput } from '@/lib/financial-health'
+import { localDateString } from '@/lib/month-range'
 
 // Vaste "vandaag" voor alle deterministische tests.
 const NOW = new Date('2026-06-15')
@@ -43,8 +44,11 @@ function buildPeerInputs(
   const monthlySavings = monthlyIncome * (ref.savingsRatePct / 100)
   const monthlyExpenses = Math.max(0, monthlyIncome - monthlySavings)
 
-  const dob = new Date(now.getFullYear() - midAge, now.getMonth(), now.getDate())
-  const dateOfBirth = dob.toISOString().split('T')[0]
+  // Spiegelt computeReferencePeer: dezelfde tijdzone-veilige formattering,
+  // anders wijkt de oracle op elke dag ná 22:00 NL af van de productiecode.
+  const dateOfBirth = localDateString(
+    new Date(now.getFullYear() - midAge, now.getMonth(), now.getDate()),
+  )
 
   const fin: FinancialInput = {
     totalAssets: ref.netWorthMedian,

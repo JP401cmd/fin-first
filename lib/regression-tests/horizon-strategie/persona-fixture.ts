@@ -28,6 +28,7 @@ import {
   type PersonaDebt,
   type PersonaLifeEvent,
 } from '@/lib/test-personas'
+import { localDateString } from '@/lib/month-range'
 
 /** Leeftijd waarop we de persona pinnen voor de projectie (zie determinisme). */
 export const COMPLEET_PINNED_AGE = 42
@@ -70,8 +71,10 @@ function slugId(prefix: string, name: string): string {
 function pinnedDateOfBirth(age: number): string {
   const now = new Date()
   // 1 januari, `age` jaar geleden → ageAtDate() = age (geen verjaardag-flip).
-  const dob = new Date(now.getFullYear() - age, 0, 1)
-  return dob.toISOString().slice(0, 10)
+  // localDateString is hier niet cosmetisch: `toISOString()` gaf in NL (UTC+)
+  // 31 december van het jaar dáárvoor, waardoor de persona één jaar ouder werd
+  // dan de fixture belooft.
+  return localDateString(new Date(now.getFullYear() - age, 0, 1))
 }
 
 function toAsset(p: PersonaAsset): Asset {

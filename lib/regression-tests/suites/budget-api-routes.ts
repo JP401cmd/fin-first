@@ -43,7 +43,7 @@ import {
   assertIncludes,
 } from '../assert'
 import type { TestCase } from '../test-types'
-import { localMonthBounds } from '@/lib/month-range'
+import { localMonthBounds, localMonthStart } from '@/lib/month-range'
 import { computeBudgetForecast } from '@/lib/budget-forecast'
 import { recurringPerMonth } from '@/lib/cashflow-forecast-math'
 
@@ -639,7 +639,9 @@ const tests: TestCase[] = [
       for (let i = 1; i <= 6; i++) {
         const futureDate = new Date(now.getFullYear(), now.getMonth() + i, 1)
         forecast.push({
-          month: futureDate.toISOString().split('T')[0],
+          // Spiegelt app/api/cashflow-forecast/route.ts, dat sinds UR3-25
+          // dezelfde canonieke helper gebruikt als de huidige-maand-sleutel.
+          month: localMonthStart(futureDate),
           label: futureDate.toLocaleDateString('nl-NL', { month: 'short', year: 'numeric' }),
           projectedBalance: 5000 + i * 700,
           income: 3000,

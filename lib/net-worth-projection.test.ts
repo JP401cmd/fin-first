@@ -123,6 +123,7 @@ describe('computeNetWorthProjection — datums en labels', () => {
     // localMonthStart (lokaal). Rond middernacht NL-tijd kan de maand-0-datum
     // daardoor een dag achterlopen. Deze test pint de middag, buiten die rand.
     const r = computeNetWorthProjection(0, 0, 0)
+    // eslint-disable-next-line trifinity/geen-maandgrens-iso -- pint bewust het UTC-gedrag van de productiecode (maand 0 gebruikt toISOString); NOW is een middag-anker (12:00), dus geen verschuiving.
     expect(r.points[0].date).toBe(NOW.toISOString().split('T')[0])
   })
 

@@ -21,6 +21,7 @@ import { SectionDivider } from '@/components/app/section-divider'
 import { DepthSection } from '@/components/app/depth-section'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { formatTimestamp } from '@/lib/format'
+import { localMonthBounds } from '@/lib/month-range'
 import { formatAmsterdamDayMonth } from '@/lib/tz'
 import { NavStackMeta } from '@/components/app/shell/nav-stack-meta'
 
@@ -91,12 +92,23 @@ function getYearOptions(): { value: string; label: string }[] {
   return options
 }
 
-function computeDateRange(periodType: PeriodType, selection: string): { from: string; to: string; name: string } {
+/**
+ * Periodeselectie → `{ from, to }` voor POST /api/report.
+ *
+ * `to` is EXCLUSIEF: de route filtert met `.lt('date', date_to)`. Geëxporteerd
+ * omdat de maandtak een gedragsregressie draagt (UR3-25) die apart getoetst
+ * wordt — zie rapportages-date-range.test.ts.
+ */
+export function computeDateRange(periodType: PeriodType, selection: string): { from: string; to: string; name: string } {
   if (periodType === 'month') {
     const [year, month] = selection.split('-').map(Number)
-    const from = `${year}-${String(month).padStart(2, '0')}-01`
-    const toDate = new Date(year, month, 1)
-    const to = toDate.toISOString().split('T')[0]
+    // `to` is EXCLUSIEF (zie /api/report: `.lt('date', date_to)`), dus de 1e van
+    // de volgende maand — net als de kwartaal- en jaartak hieronder.
+    // localMonthBounds levert beide grenzen tijdzone-veilig; het oude
+    // `new Date(year, month, 1).toISOString()` schoof `to` in NL (UTC+) een dag
+    // terug, waardoor de laatste dag van de maand structureel uit het rapport
+    // én uit elke maand-op-maand-delta viel.
+    const { start: from, end: to } = localMonthBounds(new Date(year, month - 1, 1))
     const months = ['Januari', 'Februari', 'Maart', 'April', 'Mei', 'Juni', 'Juli', 'Augustus', 'September', 'Oktober', 'November', 'December']
     return { from, to, name: `${months[month - 1]} ${year}` }
   }

@@ -96,6 +96,14 @@ describe('appendDismissed', () => {
   })
 })
 
+/**
+ * NB — de `trifinity/geen-maandgrens-iso`-disables hieronder zijn structureel,
+ * niet cosmetisch. Deze suite bouwt bewust lokale MOMENTEN (altijd met uur) en
+ * voert die als ISO-timestamp aan `isSameLocalDay`, precies zoals de opslag dat
+ * doet. Dat de UTC-conversie rond middernacht een andere kalenderdag oplevert,
+ * ís hier het te testen gedrag — de vangrail bewaakt kalendergrenzen, en die
+ * zijn dit niet.
+ */
 describe('isSameLocalDay — rond middernacht in lokale tijd', () => {
   it('is false bij null of een onleesbare datum', () => {
     expect(isSameLocalDay(null, new Date())).toBe(false)
@@ -107,12 +115,14 @@ describe('isSameLocalDay — rond middernacht in lokale tijd', () => {
     // dus we bouwen beide momenten lokaal op.
     const ochtend = new Date(2026, 8, 5, 8, 30)
     const avond = new Date(2026, 8, 5, 23, 59, 59)
+    // eslint-disable-next-line trifinity/geen-maandgrens-iso -- lokaal moment met uur; de UTC-conversie is hier het te testen gedrag, geen kalendergrens.
     expect(isSameLocalDay(ochtend.toISOString(), avond)).toBe(true)
   })
 
   it('is false zodra de lokale middernacht gepasseerd is', () => {
     const netVoor = new Date(2026, 8, 5, 23, 59, 59)
     const netNa = new Date(2026, 8, 6, 0, 0, 1)
+    // eslint-disable-next-line trifinity/geen-maandgrens-iso -- lokaal moment met uur; de UTC-conversie is hier het te testen gedrag, geen kalendergrens.
     expect(isSameLocalDay(netVoor.toISOString(), netNa)).toBe(false)
   })
 
@@ -120,17 +130,20 @@ describe('isSameLocalDay — rond middernacht in lokale tijd', () => {
     // Twee uur uit elkaar, maar over de lokale dagrand heen → andere dag.
     const laat = new Date(2026, 8, 5, 23, 0)
     const vroeg = new Date(2026, 8, 6, 1, 0)
+    // eslint-disable-next-line trifinity/geen-maandgrens-iso -- lokaal moment met uur; de UTC-conversie is hier het te testen gedrag, geen kalendergrens.
     expect(isSameLocalDay(laat.toISOString(), vroeg)).toBe(false)
     // En omgekeerd: 20 uur uit elkaar maar binnen dezelfde dag kan niet, dus
     // de tegenhanger is dezelfde dag met een groot gat.
     const vroegeOchtend = new Date(2026, 8, 6, 0, 5)
     const lateAvond = new Date(2026, 8, 6, 23, 55)
+    // eslint-disable-next-line trifinity/geen-maandgrens-iso -- lokaal moment met uur; de UTC-conversie is hier het te testen gedrag, geen kalendergrens.
     expect(isSameLocalDay(vroegeOchtend.toISOString(), lateAvond)).toBe(true)
   })
 
   it('vergelijkt óók het jaar en de maand (niet alleen de dagnummer)', () => {
     const vorigJaar = new Date(2025, 8, 5, 12, 0)
     const nu = new Date(2026, 8, 5, 12, 0)
+    // eslint-disable-next-line trifinity/geen-maandgrens-iso -- lokaal moment met uur; de UTC-conversie is hier het te testen gedrag, geen kalendergrens.
     expect(isSameLocalDay(vorigJaar.toISOString(), nu)).toBe(false)
   })
 })

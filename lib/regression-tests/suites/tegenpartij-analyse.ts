@@ -2,6 +2,7 @@ import { registerTests } from '../test-registry'
 import { assertEqual, assertGreaterThan, assertGreaterThanOrEqual, assertNotNull, assert } from '../assert'
 import type { TestCase } from '../test-types'
 import { computeCounterpartyStats, computeMonthCategoryBreakdown, type CounterpartyTransaction } from '@/lib/counterparty-analysis'
+import { localDateString } from '@/lib/month-range'
 
 const CAT = 'kern.tegenpartij-analyse'
 
@@ -22,8 +23,7 @@ function monthlyTxs(counterparty: string, months: number, amount: number, budget
   const result: CounterpartyTransaction[] = []
   const now = new Date()
   for (let i = 0; i < months; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 15)
-    const dateStr = d.toISOString().split('T')[0]
+    const dateStr = localDateString(new Date(now.getFullYear(), now.getMonth() - i, 15))
     result.push(tx({
       date: dateStr,
       amount,

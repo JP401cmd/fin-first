@@ -19,6 +19,7 @@ import { type LifeEvent } from '@/lib/horizon-data'
 import { BOX3_PARAMS } from '@/lib/box3-data'
 import type { SimResult } from '@/lib/fire-simulation'
 import type { UnifiedProjectionRow } from '@/lib/unified-projection'
+import { localMonthStart } from '@/lib/month-range'
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -82,8 +83,9 @@ function ageToIsoDate(dob: string | null, age: number): string {
   if (!dob) {
     // No dob: synthesize ISO using current year + age delta. Best-effort.
     const now = new Date()
-    const target = new Date(now.getFullYear() + Math.round(age - 30), now.getMonth(), 1)
-    return target.toISOString().split('T')[0]
+    // localMonthStart i.p.v. toISOString(): die laatste zette de mijlpaal in NL
+    // (UTC+) op de laatste dag van de vórige maand.
+    return localMonthStart(new Date(now.getFullYear() + Math.round(age - 30), now.getMonth(), 1))
   }
   const birth = new Date(dob)
   const yearsFull = Math.floor(age)

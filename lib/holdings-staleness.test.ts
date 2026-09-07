@@ -37,9 +37,19 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
  * Óók de bron voor de `last_price_update`-fixtures hieronder: een kale
  * `new Date(jaar, maand, …).toISOString()` is verboden (lint-vangrail voor de
  * NL-maandgrens). Hier is de lokale wandkloktijd juist de bedoeling — een
- * slotkoers valt op 17:35 Amsterdam — dus loopt de conversie via deze helper.
+ * slotkoers valt op 17:35 Amsterdam — dus loopt de conversie via `atIso`.
  */
 const at = (y: number, m: number, d: number, h = 12, min = 0) => new Date(y, m - 1, d, h, min)
+
+/**
+ * Dezelfde lokale wandkloktijd als `at`, maar meteen als ISO-timestamp voor de
+ * `last_price_update`-fixtures. Eén bewuste uitzondering op de maandgrens-
+ * vangrail, hier gebundeld i.p.v. acht keer bij de call-sites: het uur is altijd
+ * expliciet (default 12:00), dus er is geen middernacht-grens die kan
+ * verschuiven — dit is een echt moment, geen kalendergrens.
+ */
+// eslint-disable-next-line trifinity/geen-maandgrens-iso -- lokaal moment mét expliciet uur (middag-anker), geen maandgrens; zie de docblock hierboven.
+const atIso = (y: number, m: number, d: number, h = 12, min = 0) => at(y, m, d, h, min).toISOString()
 
 function row(over: Partial<StalenessRow> = {}): StalenessRow {
   return { units: 10, ticker: 'MRVL', last_price_update: null, ...over }
@@ -78,19 +88,19 @@ describe('isPriceStale', () => {
   it('DE MAANDAGTEST: een vrijdagkoers is maandagochtend NIET verouderd', () => {
     // Dit was de structurele vals-positief. Vrijdag 7 aug 17:35 (slotkoers
     // Amsterdam) — maandagochtend is er nog geen handelsdag afgesloten.
-    const vrijdagSlot = at(2026, 8, 7, 17, 35).toISOString()
+    const vrijdagSlot = atIso(2026, 8, 7, 17, 35)
     expect(isPriceStale(row({ last_price_update: vrijdagSlot }), maandagOchtend)).toBe(false)
   })
 
   it('maar dinsdag is diezelfde vrijdagkoers wél verouderd', () => {
-    const vrijdagSlot = at(2026, 8, 7, 17, 35).toISOString()
+    const vrijdagSlot = atIso(2026, 8, 7, 17, 35)
     expect(isPriceStale(row({ last_price_update: vrijdagSlot }), at(2026, 8, 11, 9))).toBe(true)
   })
 
   it('een gesloten positie is nooit verouderd', () => {
     // Niet omdat haar prijs vers is, maar omdat refresh-prices haar overslaat:
     // meetellen levert een aantal op dat door vernieuwen niet kán dalen.
-    const oud = at(2020, 1, 1, 0).toISOString()
+    const oud = atIso(2020, 1, 1, 0)
     expect(isPriceStale(row({ units: 0, last_price_update: oud }), maandagOchtend)).toBe(false)
     expect(
       isPriceStale(row({ units: 10, pnl_is_closed: true, last_price_update: oud }), maandagOchtend),
@@ -98,7 +108,7 @@ describe('isPriceStale', () => {
   })
 
   it('de engine-vlag wint van de units-kolom', () => {
-    const oud = at(2020, 1, 1, 0).toISOString()
+    const oud = atIso(2020, 1, 1, 0)
     // Units 0 maar de engine zegt open → telt wél mee.
     expect(
       isPriceStale(row({ units: 0, pnl_is_closed: false, last_price_update: oud }), maandagOchtend),
@@ -106,7 +116,7 @@ describe('isPriceStale', () => {
   })
 
   it('zonder ticker én zonder ISIN is er geen koersbron, dus geen veroudering', () => {
-    const oud = at(2020, 1, 1, 0).toISOString()
+    const oud = atIso(2020, 1, 1, 0)
     expect(
       isPriceStale({ units: 10, ticker: null, isin: null, last_price_update: oud }, maandagOchtend),
     ).toBe(false)
@@ -146,10 +156,10 @@ describe('countStalePrices — het gemelde scenario', () => {
   it('telt 1 waar de oude regel er 96 meldde', () => {
     // 95 verkochte posities met een stokoude prijs, 1 open positie die
     // daadwerkelijk verouderd is, 13 open posities die actueel zijn.
-    const oud = at(2026, 1, 1, 0).toISOString()
+    const oud = atIso(2026, 1, 1, 0)
     // Maandag 18:00 — het moment waarop de dagelijkse cron draait (vercel.json).
     // Op dinsdagochtend ligt dat ná de grens (maandag 09:00) en is de koers vers.
-    const vers = at(2026, 8, 10, 18).toISOString()
+    const vers = atIso(2026, 8, 10, 18)
     const nu = at(2026, 8, 11, 9) // dinsdag
 
     const holdings: StalenessRow[] = [
@@ -254,7 +264,7 @@ describe('fiat-saldi hebben geen koersbron', () => {
     // Alle drie de koerspaden slaan zo'n rij over ("Fiat balance — geen
     // prijsverversing"). Meetellen gaf een stipje dat door verversen niet kón
     // doven — hetzelfde patroon als bij de gesloten posities.
-    const oud = at(2020, 1, 1, 0).toISOString()
+    const oud = atIso(2020, 1, 1, 0)
     expect(
       isPriceStale({ units: 500, ticker: 'EUR', is_fiat_balance: true, last_price_update: oud }),
     ).toBe(false)
