@@ -2,15 +2,17 @@ import React from 'react'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { StaleNoticeProvider, StaleNoticeDot } from './stale-notice-provider'
-import { StaleTransactionsBanner } from './stale-transactions-banner'
-import { transactionFreshness } from '@/lib/transaction-staleness'
+import { StaleNoticeBanner } from './stale-transactions-notice'
+import { transactionFreshness, transactionAgeLabel } from '@/lib/transaction-staleness'
 import {
   STALE_TX_NOTICE_MINIMIZE_KEY,
   STALE_TX_ESCALATION_MONTHS,
 } from '@/lib/transaction-staleness-minimize'
 
 /**
- * Gedrags-tests op het minimaliseren van de "Gegevens verouderd"-melding (B-015).
+ * Gedrags-tests op het minimaliseren van de "Gegevens verouderd"-melding (B-015),
+ * sinds UR3-22 op de gedeelde vorm: `StaleDataGuard` seedt de provider en de twee
+ * plaatsbare vormen (`StaleNoticeBanner` + `StaleNoticeDot`) lezen 'm uit.
  *
  * Wat hier bewezen moet worden (en wat de pure unit-test op
  * `resolveStaleNoticeDisplay` NIET dekt):
@@ -24,9 +26,10 @@ import {
  *  D. een server-geseede waarde maakt de melding meteen geminimaliseerd — al op
  *     de EERSTE render, dus zonder flits;
  *  E. escalatie (+STALE_TX_ESCALATION_MONTHS) heropent, één maand extra niet;
- *  F. zónder provider blijft de melding uitgeklapt en is minimaliseren niet
- *     aangeboden (geen knop die niets onthoudt);
- *  G. een mislukte PUT rolt de optimistische toestand terug.
+ *  F. verse data (geen achterstand) levert géén melding en géén punt;
+ *  G. een mislukte PUT rolt de optimistische toestand terug;
+ *  H. UR3-22 — de melding is niet meer half aan te zetten: zonder guard/provider
+ *     rendert de banner niets, in plaats van een melding zonder terughaalpunt.
  */
 
 // next/link → simpele anchor (geen router-context nodig in jsdom).
@@ -42,19 +45,32 @@ vi.mock('next/link', () => ({
 const NOW = new Date(2026, 7, 31)
 const LATEST_MONTH = '2026-03'
 
-/** De canonieke achterstand voor deze invoer — geen los getal in de test. */
-const MONTHS_BEHIND = transactionFreshness(LATEST_MONTH, NOW).monthsBehind
+/** De canonieke achterstand + teksten voor deze invoer — geen losse getallen/strings. */
+const FRESHNESS = transactionFreshness(LATEST_MONTH, NOW)
+const MONTHS_BEHIND = FRESHNESS.monthsBehind
+const LABEL = FRESHNESS.latestMonthLabel
+const AGE_LABEL = transactionAgeLabel(MONTHS_BEHIND)
 
-function setup(initialMinimizedMonths: number | null = null) {
+/** Wat `StaleDataGuard` server-side aan de provider meegeeft. */
+function renderSeeded(
+  monthsBehind: number | null,
+  initialMinimizedMonths: number | null = null,
+) {
   return render(
     <StaleNoticeProvider
-      monthsBehind={MONTHS_BEHIND}
+      monthsBehind={monthsBehind}
       initialMinimizedMonths={initialMinimizedMonths}
+      latestMonthLabel={monthsBehind == null ? null : LABEL}
+      ageLabel={monthsBehind == null ? null : AGE_LABEL}
     >
       <StaleNoticeDot />
-      <StaleTransactionsBanner latestTransactionMonth={LATEST_MONTH} now={NOW} />
+      <StaleNoticeBanner />
     </StaleNoticeProvider>,
   )
+}
+
+function setup(initialMinimizedMonths: number | null = null) {
+  return renderSeeded(MONTHS_BEHIND, initialMinimizedMonths)
 }
 
 let fetchMock: ReturnType<typeof vi.fn>
@@ -74,6 +90,21 @@ describe('StaleNoticeProvider — uitgeklapt ↔ geminimaliseerd', () => {
     setup()
     expect(screen.getByTestId('stale-transactions-warning')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /toon de melding/i })).toBeNull()
+  })
+
+  it('noemt de canonieke maand en leeftijd uit de server-seed', () => {
+    setup()
+    const melding = screen.getByTestId('stale-transactions-warning')
+    expect(melding.textContent).toContain('Gegevens verouderd')
+    expect(melding.textContent).toContain(LABEL!)
+    expect(melding.textContent).toContain(AGE_LABEL!)
+  })
+
+  it('wijst naar de uitweg — anders is het een melding zonder handeling', () => {
+    setup()
+    expect(
+      screen.getByRole('link', { name: 'Transacties importeren' }).getAttribute('href'),
+    ).toBe('/core/cash/import')
   })
 
   it('klapt na "Minimaliseren" in tot het statuspunt', () => {
@@ -149,37 +180,26 @@ describe('StaleNoticeProvider — server-side onthouden', () => {
 
 describe('StaleNoticeProvider — escalatie heropent', () => {
   it('blijft ingeklapt bij één maand extra (de kalender is geen escalatie)', () => {
-    render(
-      <StaleNoticeProvider
-        monthsBehind={MONTHS_BEHIND! + 1}
-        initialMinimizedMonths={MONTHS_BEHIND}
-      >
-        <StaleNoticeDot />
-        <StaleTransactionsBanner latestTransactionMonth={LATEST_MONTH} now={NOW} />
-      </StaleNoticeProvider>,
-    )
+    renderSeeded(MONTHS_BEHIND! + 1, MONTHS_BEHIND)
     expect(screen.queryByTestId('stale-transactions-warning')).toBeNull()
   })
 
   it(`heropent bij +${STALE_TX_ESCALATION_MONTHS} maanden, ondanks de opgeslagen voorkeur`, () => {
-    render(
-      <StaleNoticeProvider
-        monthsBehind={MONTHS_BEHIND! + STALE_TX_ESCALATION_MONTHS}
-        initialMinimizedMonths={MONTHS_BEHIND}
-      >
-        <StaleNoticeDot />
-        <StaleTransactionsBanner latestTransactionMonth={LATEST_MONTH} now={NOW} />
-      </StaleNoticeProvider>,
-    )
+    renderSeeded(MONTHS_BEHIND! + STALE_TX_ESCALATION_MONTHS, MONTHS_BEHIND)
     expect(screen.getByTestId('stale-transactions-warning')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /toon de melding/i })).toBeNull()
   })
 })
 
-describe('StaleTransactionsBanner — zonder provider', () => {
-  it('blijft uitgeklapt en biedt geen minimaliseer-knop aan', () => {
-    render(<StaleTransactionsBanner latestTransactionMonth={LATEST_MONTH} now={NOW} />)
-    expect(screen.getByTestId('stale-transactions-warning')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Minimaliseren' })).toBeNull()
+describe('StaleNoticeBanner — verse data en ontbrekende guard', () => {
+  it('rendert niets wanneer de guard geen achterstand meldt', () => {
+    renderSeeded(null)
+    expect(screen.queryByTestId('stale-transactions-warning')).toBeNull()
+    expect(screen.queryByRole('button', { name: /toon de melding/i })).toBeNull()
+  })
+
+  it('rendert niets zonder guard/provider — de melding is niet half aan te zetten', () => {
+    render(<StaleNoticeBanner />)
+    expect(screen.queryByTestId('stale-transactions-warning')).toBeNull()
   })
 })

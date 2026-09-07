@@ -63,6 +63,14 @@ interface StaleNoticeContextValue {
   minimize: () => void
   /** Melding weer uitklappen (wist de voorkeur). */
   restore: () => void
+  /**
+   * De jongste transactiemaand in gewone taal ('maart 2026'), of null als er
+   * niets te melden is. SERVER-BEREKEND en via de provider meegegeven — nooit
+   * hier afgeleid, want het oordeel leest de klok (zie `StaleDataGuard`).
+   */
+  latestMonthLabel: string | null
+  /** De leeftijd in gewone taal ('5 maanden geleden'), of null. */
+  ageLabel: string | null
 }
 
 const NOOP = () => {}
@@ -72,6 +80,8 @@ const StaleNoticeContext = createContext<StaleNoticeContextValue | null>(null)
 export function StaleNoticeProvider({
   monthsBehind = null,
   initialMinimizedMonths = null,
+  latestMonthLabel = null,
+  ageLabel = null,
   children,
 }: {
   /**
@@ -82,6 +92,10 @@ export function StaleNoticeProvider({
   monthsBehind?: number | null
   /** Server-side gelezen opgeslagen maandaantal uit `profiles.status_banner_minimized`. */
   initialMinimizedMonths?: number | null
+  /** Jongste transactiemaand in gewone taal ('maart 2026'); server-berekend. */
+  latestMonthLabel?: string | null
+  /** Leeftijd in gewone taal ('5 maanden geleden'); server-berekend. */
+  ageLabel?: string | null
   children: React.ReactNode
 }) {
   const [minimizedMonths, setMinimizedMonths] = useState<number | null>(
@@ -130,8 +144,8 @@ export function StaleNoticeProvider({
   const display = resolveStaleNoticeDisplay(monthsBehind, minimizedMonths)
 
   const value = useMemo<StaleNoticeContextValue>(
-    () => ({ display, canMinimize: true, minimize, restore }),
-    [display, minimize, restore],
+    () => ({ display, canMinimize: true, minimize, restore, latestMonthLabel, ageLabel }),
+    [display, minimize, restore, latestMonthLabel, ageLabel],
   )
 
   return (
@@ -142,16 +156,25 @@ export function StaleNoticeProvider({
 /**
  * Hook voor de MELDING zelf.
  *
- * Zónder provider (bv. /overzicht/budget, waar dezelfde banner boven de
- * KPI-kaarten staat maar geen paginakop-cluster is om het punt in te hangen)
- * blijft de melding gewoon uitgeklapt en is `canMinimize` false — de
- * minimaliseer-knop wordt dan niet getoond, zodat er geen knop bestaat die
- * niets onthoudt.
+ * Zónder provider is er geen server-seed en dus ook geen melding: `canMinimize`
+ * is false (geen knop die niets onthoudt) en de teksten zijn null, waardoor
+ * `StaleNoticeBanner` niets rendert. Sinds UR3-22 loopt élke plaatsing via
+ * `StaleDataGuard`, dus die tak is de vangrail — niet een tweede werkende vorm.
  */
 export function useStaleNotice(): StaleNoticeContextValue {
   const ctx = useContext(StaleNoticeContext)
   if (ctx) return ctx
-  return { display: 'expanded', canMinimize: false, minimize: NOOP, restore: NOOP }
+  return {
+    display: 'expanded',
+    canMinimize: false,
+    minimize: NOOP,
+    restore: NOOP,
+    // Zonder provider zijn er geen server-berekende teksten, en dus ook geen
+    // melding om te tonen: `StaleNoticeBanner` rendert dan niets. Dat is de
+    // bedoeling — de melding hoort uitsluitend via `StaleDataGuard` te komen.
+    latestMonthLabel: null,
+    ageLabel: null,
+  }
 }
 
 /**

@@ -78,6 +78,7 @@ import { getOwnProfile, getBudgets } from '@/lib/server-data/base'
 import { fetchLatestSnapshotsByMonth } from '@/lib/server-data/snapshot-aggregates'
 import {
   getTxAgg12m,
+  aggLatestMonth,
   aggSumPositief,
   aggSumNegatiefAbs,
   aggIncomeByMonth,
@@ -274,6 +275,22 @@ export interface CorePageData {
 
   // Feature state
   hasTransactions: boolean
+  /**
+   * De JONGSTE maand mét boekingen ('YYYY-MM') uit het 12-maands aggregaat, of
+   * null. De grondslag voor "hoe oud zijn deze cijfers?" — `hasTransactions`
+   * zegt alleen DÁT er data is, niet van wanneer.
+   *
+   * Zelfde reducer (`aggLatestMonth`) op hetzelfde `txAgg12` dat deze loader
+   * toch al ophaalt: nul extra queries en per constructie hetzelfde oordeel als
+   * `DashboardData.latestTransactionMonth` en de banner op /overzicht (bewaakt
+   * door `lib/cashflow-kpis.parity.test.ts`).
+   *
+   * TOEGEVOEGD VOOR FIN (UR3-22): de AI-context had nul freshness-signalen, dus
+   * Fin kon stellig "je hebt deze maand …" zeggen op vijf maanden oude cijfers —
+   * en een AI-uitspraak leest als vaststaand feit, waar een banner tenminste nog
+   * een zichtbaar voorbehoud is.
+   */
+  latestTransactionMonth: string | null
   hasGoals: boolean
   fireUnreachable: boolean
 
@@ -962,6 +979,11 @@ export const loadCoreData = cache(async function loadCoreData(
 
   // ── Has transactions ──
   const hasTransactions = (txResult.data?.length ?? 0) > 0
+  // `realOnly` op de default (false): voor "van wanneer is de jongste boeking?"
+  // telt een maand met alleen transfers ook mee — zie `aggLatestMonth`. Zelfde
+  // aanroep als /overzicht en `loadCashflowKpis`, dus per constructie hetzelfde
+  // versheidsoordeel op elk oppervlak (incl. Fin).
+  const latestTransactionMonth = aggLatestMonth(txAgg12)
 
   // ── FIRE reachability for smart prioritization ──
   const fireTarget = yearlyRetirementExpenses > 0
@@ -1672,6 +1694,7 @@ export const loadCoreData = cache(async function loadCoreData(
     healthScoreInput,
 
     hasTransactions,
+    latestTransactionMonth,
     hasGoals,
     fireUnreachable,
 

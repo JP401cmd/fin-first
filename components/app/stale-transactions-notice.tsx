@@ -7,9 +7,9 @@ import { useStaleNotice } from '@/components/app/stale-notice-provider'
 /**
  * StaleNoticeCard — de zichtbare vorm van de "Gegevens verouderd"-melding.
  *
- * Gescheiden van `stale-transactions-banner.tsx` omdat dát bestand het
- * VERSHEIDSOORDEEL doet (en dus `new Date()` server-side moet blijven draaien):
- * een client-component die zelf de klok leest, rekent bij SSR én bij hydration
+ * Gescheiden van `stale-data-guard.tsx` omdat dát bestand het VERSHEIDSOORDEEL
+ * doet (en dus `new Date()` server-side moet blijven draaien): een
+ * client-component die zelf de klok leest, rekent bij SSR én bij hydration
  * opnieuw en kan op een maandwissel een hydration-mismatch geven. Hier komen
  * alleen nog kant-en-klare strings binnen.
  *
@@ -18,9 +18,8 @@ import { useStaleNotice } from '@/components/app/stale-notice-provider'
  * geen blok zijn. Wat overblijft is de kern — wélke maand, en de uitweg.
  *
  * MINIMALISEERBAAR: de knop verschijnt alleen wanneer er een
- * `StaleNoticeProvider` boven hangt die de keuze server-side kan onthouden.
- * Zónder provider (bv. /overzicht/budget) blijft de melding uitgeklapt en is
- * er geen knop die niets doet.
+ * `StaleNoticeProvider` boven hangt die de keuze server-side kan onthouden —
+ * sinds UR3-22 komt die er altijd, want `StaleDataGuard` is de enige ingang.
  */
 export function StaleNoticeCard({
   latestMonthLabel,
@@ -92,5 +91,32 @@ export function StaleNoticeCard({
         </div>
       )}
     </section>
+  )
+}
+
+/**
+ * StaleNoticeBanner — de melding zoals een scherm haar plaatst.
+ *
+ * DE OPT-IN IS WEG (UR3-22). Tot nu toe moest elk scherm zélf het aggregaat
+ * ophalen, `transactionFreshness` draaien, de voorkeur lezen en dan de banner
+ * met de juiste props renderen — zeven stappen die alleen /overzicht compleet
+ * had, waardoor de melding op twee van de dertien betrokken schermen stond. Nu
+ * doet `StaleDataGuard` (server) al dat werk één keer en zet de kant-en-klare
+ * teksten in de context; dit component en `StaleNoticeDot` zijn de twee
+ * plaatsbare vormen ervan. Een scherm heeft dus nog maar één beslissing: wáár
+ * de melding en wáár het punt komt.
+ *
+ * Rendert niets zonder provider of bij verse data — een scherm kan de melding
+ * niet half aanzetten.
+ */
+export function StaleNoticeBanner({ className = '' }: { className?: string }) {
+  const { display, latestMonthLabel, ageLabel } = useStaleNotice()
+  if (display === 'none' || !latestMonthLabel) return null
+  return (
+    <StaleNoticeCard
+      latestMonthLabel={latestMonthLabel}
+      ageLabel={ageLabel}
+      className={className}
+    />
   )
 }
