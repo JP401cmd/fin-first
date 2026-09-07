@@ -29,7 +29,7 @@ interface ImportHolding {
 
 interface ImportTransaction {
   holding_index: number
-  type: 'buy' | 'sell' | 'dividend'
+  type: 'buy' | 'sell' | 'dividend' | 'transfer_in' | 'transfer_out'
   units: number
   price_per_unit: number
   total_amount: number
@@ -110,7 +110,15 @@ const BROKER_TO_FORMAT_ID: Partial<Record<string, FormatId>> = {
 } as const
 
 const VALID_BROKERS = ['degiro', 'saxo', 'ing_beleggen', 'trading212', 'etoro']
-const VALID_TX_TYPES = ['buy', 'sell', 'dividend']
+/**
+ * De transactietypes die een import mag wegschrijven.
+ *
+ * `transfer_in`/`transfer_out` zijn de twee benen van een corporate action die
+ * de parser herkent (DEGIRO-splitsing/conversie). Ze staan al toe in de
+ * CHECK-constraint op `investment_transactions.type` (migratie
+ * 20260502000003) — er is dus geen migratie nodig om ze te accepteren.
+ */
+const VALID_TX_TYPES = ['buy', 'sell', 'dividend', 'transfer_in', 'transfer_out']
 const VALID_MODES: ImportMode[] = ['snapshot', 'append']
 
 // Simple RFC 4122 UUID shape check — targetAssetId must be a uuid.
@@ -193,7 +201,7 @@ function validateTransaction(tx: unknown, index: number, holdingsLength: number)
     return `Transactie ${index}: holding_index (${obj.holding_index}) valt buiten bereik (0-${holdingsLength - 1})`
   }
   if (!obj.type || !VALID_TX_TYPES.includes(obj.type as string)) {
-    return `Transactie ${index}: type moet 'buy', 'sell' of 'dividend' zijn`
+    return `Transactie ${index}: type moet een van ${VALID_TX_TYPES.join(', ')} zijn`
   }
   if (typeof obj.units !== 'number' || isNaN(obj.units) || obj.units < 0) {
     return `Transactie ${index}: units moet een positief getal zijn`

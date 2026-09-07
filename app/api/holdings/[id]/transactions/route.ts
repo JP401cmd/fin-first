@@ -21,11 +21,19 @@ import {
  * Voor de P&L-berekening op de UI behandelen we ze grotendeels gelijk: 'buy'
  * voegt units + cost basis toe, 'sell' realiseert P&L en haalt units weg,
  * 'split' rebalancet, 'dividend' / 'reward' tellen op aan dividend-income
- * zonder de units te raken. 'deposit'/'withdrawal'/'fee'/'transfer_*' worden
- * (voor nu) als no-ops gezien voor running-P&L; ze blijven wel zichtbaar in
- * de log dankzij de `select('*')`.
+ * zonder de units te raken. 'transfer_out'/'transfer_in' zijn de twee benen van
+ * een corporate action: units verplaatsen mét kostbasis, zonder realisatie.
+ * 'deposit'/'withdrawal'/'fee' worden (voor nu) als no-ops gezien voor
+ * running-P&L; ze blijven wel zichtbaar in de log dankzij de `select('*')`.
  */
-type SharedTxType = 'buy' | 'sell' | 'dividend' | 'split' | 'reward'
+type SharedTxType =
+  | 'buy'
+  | 'sell'
+  | 'dividend'
+  | 'split'
+  | 'reward'
+  | 'transfer_in'
+  | 'transfer_out'
 const VALID_INVESTMENT_TYPES = new Set(['buy', 'sell', 'dividend', 'split', 'transfer_in', 'transfer_out'])
 const VALID_CRYPTO_TYPES = new Set(['buy', 'sell', 'deposit', 'withdrawal', 'fee', 'reward'])
 
@@ -86,10 +94,36 @@ function computeRunningPnL(transactions: TransactionRow[]) {
       if (multiplier > 0 && runningUnits > 0) {
         runningUnits *= multiplier
       }
+    } else if (t === 'transfer_out') {
+      // Uit-been van een corporate action: stukken verlaten deze regel zonder
+      // opbrengst. Aantal en kostbasis dalen met de gemiddelde kostprijs; er
+      // wordt NIETS gerealiseerd.
+      //
+      // Dit is een LOGBOEK-replay, geen tweede bron: het gezaghebbende aantal
+      // komt van de canonieke engine (`computePositionFromTransactions`) via
+      // `syncHoldingAggregatesFromTransactions`. De twee lopen bewust op één
+      // punt uiteen: deze lus klemt een negatief tussenresultaat op 0
+      // (`Math.max`) omdat een logboekregel geen negatief aantal mag tonen,
+      // terwijl de engine dat pas op het eindresultaat doet. Bij een
+      // consistente historie geeft dat hetzelfde getal; bij een historie die
+      // méér verkoopt dan er ooit in kwam, kan het logboek hoger uitkomen dan
+      // de engine. Dat verschil is zichtbaar in het logboek en niet in de
+      // opgeslagen positie — die volgt altijd de engine.
+      runningCostBasis -= runningAvgPrice * numUnits
+      runningUnits = Math.max(0, runningUnits - numUnits)
+      if (runningUnits <= 0) {
+        runningCostBasis = 0
+        runningUnits = 0
+      }
+    } else if (t === 'transfer_in') {
+      // In-been: stukken komen binnen MET meegenomen kostbasis, dus
+      // `pricePerUnit` is de kostprijs per eenheid, niet de dagkoers.
+      runningCostBasis += numUnits * pricePerUnit
+      runningUnits += numUnits
     } else if (t === 'dividend' || t === 'reward') {
       cumulativeDividends += totalAmount
     }
-    // deposit/withdrawal/fee/transfer_in/transfer_out: voor nu geen P&L-effect
+    // deposit/withdrawal/fee: voor nu geen P&L-effect
 
     const newRunningAvgPrice = runningUnits > 0 ? runningCostBasis / runningUnits : 0
 

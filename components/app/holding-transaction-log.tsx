@@ -4,8 +4,15 @@ import { memo, useEffect, useState, useCallback, useId } from 'react'
 import {
   ArrowUpRight, ArrowDownRight, DollarSign, Receipt,
   TrendingUp, TrendingDown, Loader2, AlertTriangle,
-  Plus, ChevronDown, ChevronUp, Trash2, Split,
+  Plus, ChevronDown, ChevronUp, Trash2, Split, ArrowLeftRight, HelpCircle,
 } from 'lucide-react'
+import {
+  isHoldingTxType,
+  TX_TYPE_LABEL,
+  TX_TYPE_SIGN,
+  UNKNOWN_TX_LABEL,
+  type HoldingTxType,
+} from '@/lib/holdings-transaction-types'
 import { formatCurrency } from '@/components/app/budget-shared'
 import { FreedomTimeBadge } from '@/components/app/freedom-time-label'
 import { MaskedAmount } from '@/components/app/masked-amount'
@@ -14,7 +21,12 @@ import { DensityToggle, useListDensity, type ListDensity } from '@/components/ap
 type TransactionWithPnL = {
   id: string
   holding_id: string
-  type: 'buy' | 'sell' | 'dividend' | 'split'
+  // De data komt als `any` uit `res.json()`, dus deze annotatie is documentatie
+  // en geen bewijs. Ze moet dáárom compleet zijn: stond hier alleen
+  // buy/sell/dividend/split, dan viel een corporate action stil in de
+  // `|| typeConfig.buy`-terugval en toonde het logboek twee koopregels die
+  // nooit hebben plaatsgevonden.
+  type: HoldingTxType
   units: number
   price_per_unit: number
   total_amount: number
@@ -52,9 +64,25 @@ type HoldingTransactionLogProps = {
 // een pagina toe. Een actieve belegger kan >100 rijen hebben.
 const ROW_PAGE = 100
 
-const typeConfig = {
+/**
+ * Weergave per transactietype. Bewust een `Record<HoldingTxType, …>`: komt er
+ * ooit een type bij, dan is dat hier een COMPILE-fout in plaats van een regel
+ * die stil in de terugval belandt. Labels en tekens komen uit de gedeelde bron
+ * zodat het logboek dezelfde woorden gebruikt als de importvoorbeschouwing.
+ */
+type TxTypeConfig = {
+  label: string
+  icon: typeof ArrowDownRight
+  color: string
+  bg: string
+  border: string
+  badgeBg: string
+  sign: '+' | '-' | ''
+}
+
+const typeConfig: Record<HoldingTxType, TxTypeConfig> = {
   buy: {
-    label: 'Koop',
+    label: TX_TYPE_LABEL.buy,
     icon: ArrowDownRight,
     color: 'text-positive',
     bg: 'bg-positive-bg',
@@ -81,15 +109,55 @@ const typeConfig = {
     sign: '+',
   },
   split: {
-    label: 'Split',
+    label: TX_TYPE_LABEL.split,
     icon: Split,
     color: 'text-violet-600',
     bg: 'bg-violet-50',
     border: 'border-violet-200',
     badgeBg: 'bg-violet-100',
-    sign: '',
+    sign: TX_TYPE_SIGN.split,
+  },
+  // Twee benen van dezelfde gebeurtenis (splitsing, naamswijziging, conversie).
+  // Neutrale inkt en géén teken: er is niets gehandeld, dus winst noch verlies.
+  // Een groene "Koop" met plusteken — waar deze regels vóór de fix in vielen —
+  // is precies de fout die dit type moest wegnemen, en dan óók nog op de plek
+  // waar de gebruiker de splitsing komt controleren.
+  transfer_in: {
+    label: TX_TYPE_LABEL.transfer_in,
+    icon: ArrowLeftRight,
+    color: 'text-[var(--ink-2)]',
+    bg: 'bg-[var(--subtle)]',
+    border: 'border-[var(--border-ed)]',
+    badgeBg: 'bg-[var(--subtle)]',
+    sign: TX_TYPE_SIGN.transfer_in,
+  },
+  transfer_out: {
+    label: TX_TYPE_LABEL.transfer_out,
+    icon: ArrowLeftRight,
+    color: 'text-[var(--ink-2)]',
+    bg: 'bg-[var(--subtle)]',
+    border: 'border-[var(--border-ed)]',
+    badgeBg: 'bg-[var(--subtle)]',
+    sign: TX_TYPE_SIGN.transfer_out,
   },
 }
+
+/**
+ * Weergave voor een type dat wij niet kennen. NOOIT de koop-config: een
+ * onbekend type als "Koop" tonen is de foutvorm zelf.
+ */
+const unknownTypeConfig: TxTypeConfig = {
+  label: UNKNOWN_TX_LABEL,
+  icon: HelpCircle,
+  color: 'text-[var(--ink-3)]',
+  bg: 'bg-[var(--subtle)]',
+  border: 'border-[var(--border-ed)]',
+  badgeBg: 'bg-[var(--subtle)]',
+  sign: '',
+}
+
+const configFor = (type: string): TxTypeConfig =>
+  isHoldingTxType(type) ? typeConfig[type] : unknownTypeConfig
 
 /** Dag-kop-label voor de transactielijst — spiegelt cash-account-view. */
 function formatDayHeader(iso: string): string {
@@ -367,7 +435,7 @@ const TxRow = memo(function TxRow({
   onDeleteConfirm,
   onDeleteCancel,
 }: TxRowProps) {
-  const cfg = typeConfig[tx.type] || typeConfig.buy
+  const cfg = configFor(tx.type)
   const Icon = cfg.icon
   // Compact: kleinere padding + secundaire meta-regels verborgen; bedrag blijft
   // volledig leesbaar. De datum staat sinds M-10 in de dag-kop, niet meer in de rij.

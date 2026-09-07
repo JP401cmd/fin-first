@@ -7,13 +7,31 @@
  *   as decimal separator, comma as thousands separator).
  */
 
+import { applyDegiroCorporateActions } from './degiro-corporate-actions'
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 export type BrokerType = 'degiro' | 'saxo' | 'ing_beleggen' | 'trading212' | 'etoro'
 
-export type HoldingRowType = 'buy' | 'sell' | 'dividend' | 'position'
+/**
+ * Wat een geparseerde regel voorstelt.
+ *
+ * `transfer_in` / `transfer_out` zijn de twee benen van een corporate action
+ * (splitsing, naamswijziging, conversie). Ze bestaan omdat de DEGIRO
+ * transactie-export zo'n gebeurtenis als twee gewone handelsregels aanlevert:
+ * de oude regel MOET sluiten zonder opbrengst en zonder gerealiseerd resultaat,
+ * de nieuwe MOET openen met de meegenomen kostbasis. Zie
+ * `lib/parsers/degiro-corporate-actions.ts`.
+ */
+export type HoldingRowType =
+  | 'buy'
+  | 'sell'
+  | 'dividend'
+  | 'position'
+  | 'transfer_in'
+  | 'transfer_out'
 
 export interface ParsedHoldingRow {
   name: string
@@ -993,6 +1011,23 @@ export function parseBrokerCSV(content: string, broker: BrokerType): BrokerParse
     } else {
       result.skipped++
     }
+  }
+
+  // Splitsingen/conversies zijn een kenmerk van het PAAR, niet van de losse rij
+  // — `parseDegiroRow` kan ze per definitie niet zien. Daarom een pass over alle
+  // gelezen rijen, en alleen op het DEGIRO-transactieformaat waartegen de
+  // heuristiek is gewogen.
+  //
+  // GUARD: alleen met een `Order ID`-kolom. Zonder die kolom is `externalId`
+  // voor ÉLKE rij null, en dan is elke rij een kandidaat — een verkoop van
+  // EUR 70.000 en een aankoop van EUR 70.000 op dezelfde dag zouden binnen de
+  // promille-marge als "corporate action" koppelen en beide hun realisatie
+  // verliezen. Een gemiste splitsing is een zichtbaar verkeerd label; een
+  // valselijk gekoppelde handelsdag is een stil verdwenen resultaat. Bij twijfel
+  // dus niets doen.
+  const hasOrderIdColumn = headersLower.some((h) => h.replace(/\s+/g, '') === 'orderid')
+  if (broker === 'degiro' && isTransaction && hasOrderIdColumn) {
+    result.rows = applyDegiroCorporateActions(result.rows)
   }
 
   result.contentKind = deriveContentKind(result.rows)

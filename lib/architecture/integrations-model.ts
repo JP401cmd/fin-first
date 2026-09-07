@@ -330,7 +330,13 @@ export const INTEGRATIONS: IntegrationEntry[] = [
     authMethod: 'upload',
     apiVersionPinned: null,
     baseUrl: null,
-    sourceFiles: ['lib/parsers/broker-csv.ts'],
+    sourceFiles: [
+      'lib/parsers/broker-csv.ts',
+      // Pass over ALLE gelezen rijen na het parsen: herkent de twee benen van
+      // een DEGIRO-splitsing/conversie (die de export als gewone handelsregels
+      // aanlevert) en zet ze om naar transfer_out/transfer_in.
+      'lib/parsers/degiro-corporate-actions.ts',
+    ],
     apiRoutes: ['/api/holdings/import'],
     dbTable: null,
     docsUrl: '',

@@ -33,6 +33,7 @@
 
 import { localMonthEnd, localMonthStart } from './month-range'
 import { roundCents } from '@/lib/format'
+import type { HoldingTxType } from '@/lib/holdings-transaction-types'
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -540,7 +541,14 @@ export function buildPortfolioHistory(
   }>,
   transactions: Array<{
     holding_id: string
-    type: 'buy' | 'sell' | 'dividend'
+    /**
+     * Het volledige type-domein, niet alleen de drie handelstypes: de
+     * DB-kolom draagt ook `split` en de corporate-action-benen
+     * `transfer_in`/`transfer_out`. Stond hier een te smalle union, dan zag de
+     * replay hieronder ze niet en liep de eigen rendementslijn structureel uit
+     * de pas — zonder dat `tsc` iets kon zeggen.
+     */
+    type: HoldingTxType
     units: number
     price_per_unit: number
     date: string
@@ -682,8 +690,23 @@ export function buildPortfolioHistory(
           costBasis -= costBasis * fraction
           units -= tx.units
           if (inThisMonth) monthFlow -= amount
+        } else if (tx.type === 'transfer_out') {
+          // Uit-been van een splitsing/conversie: stukken en kostbasis gaan
+          // eruit, maar er is GEEN kasstroom — `monthFlow` blijft dus
+          // ongemoeid. Zou dit als verkoop tellen, dan boekt de
+          // rendementsberekening een opbrengst die de gebruiker nooit kreeg.
+          const fraction = tx.units / Math.max(units, tx.units)
+          costBasis -= costBasis * fraction
+          units -= tx.units
+        } else if (tx.type === 'transfer_in') {
+          // In-been: `price_per_unit` is de meegenomen kostbasis per stuk, dus
+          // `amount` is de kostbasis die binnenkomt. Ook hier geen kasstroom —
+          // er is geen euro bijgestort.
+          costBasis += amount
+          units += tx.units
         }
-        // dividends don't affect units
+        // dividend/split raken de units niet in deze replay; zie de bekende
+        // beperking bij `split` (het aantal volgt hier de splitfactor niet).
       }
 
       if (!sawTxUpToMonth) {

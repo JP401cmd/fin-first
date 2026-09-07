@@ -33,7 +33,13 @@ export interface TradeKeyInput {
   ticker?: string | null
   /** ISO-datum (YYYY-MM-DD). */
   date?: string | null
-  /** 'buy' | 'sell' | 'dividend' */
+  /**
+   * Het transactietype: 'buy' | 'sell' | 'dividend' | 'split' | 'transfer_in' |
+   * 'transfer_out' (zie `lib/holdings-transaction-types.ts`). Bewust `string`
+   * en geen union — de sleutel wordt ook over ruwe, nog niet genormaliseerde
+   * invoer afgeleid. Let op: het type zit ÍN de sleutel, dus een rij die
+   * herclassificeert krijgt een andere sleutel.
+   */
   type: string
   units: number
   price_per_unit: number

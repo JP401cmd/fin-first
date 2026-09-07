@@ -413,3 +413,59 @@ describe('buildPortfolioValueHistory', () => {
     })
   })
 })
+
+// ---------------------------------------------------------------------------
+// Corporate actions in de prijsladder
+// ---------------------------------------------------------------------------
+//
+// Trap 2 (laatst bekende transactieprijs) slaat op de stukken zoals ze TOEN
+// waren. Een splitsing verandert die stukken: er komen er meer, elk minder
+// waard. De `split`-tak corrigeerde daar al voor; de `transfer_*`-benen vielen
+// er doorheen, waardoor de waarde van een positie zonder marktkoers bij een
+// 2-voor-1 split uit het niets verdubbelde — en de grafiek dat aan rendement
+// toeschreef.
+// ---------------------------------------------------------------------------
+
+describe('buildPortfolioValueHistory — splitsing zonder marktkoers', () => {
+  it('herschaalt de laatst bekende transactieprijs mee met een 2-voor-1 splitsing', () => {
+    const r = buildPortfolioValueHistory({
+      transactions: [
+        tx('h1', 'buy', 60, 5, '2026-01-10'),
+        // 2-voor-1: 60 eruit, 120 erin met dezelfde meegenomen kostbasis.
+        tx('h1', 'transfer_out', 60, 5, '2026-02-10'),
+        tx('h1', 'transfer_in', 120, 2.5, '2026-02-10'),
+      ],
+      prices: [],
+      today: '2026-03-15',
+    })
+
+    const laatste = r.points[r.points.length - 1]
+    // 120 stuks × €2,50 = €300 — precies de inleg, want er is niets gebeurd
+    // behalve dat de stukken in tweeën zijn geknipt. Vóór de fix bleef de
+    // koers op €5 staan: 120 × €5 = €600.
+    expect(laatste.marketValue).toBeCloseTo(300, 6)
+    expect(laatste.costBasis).toBeCloseTo(300, 6)
+    expect(laatste.openPositions).toBe(1)
+  })
+
+  it('gebruikt de meegenomen kostbasis nooit als kóers voor een conversie naar een andere positie', () => {
+    // Het uit-been sluit `oud`; het in-been opent `nieuw`. Voor `nieuw` is er
+    // geen eerdere koers, dus de ladder hoort op de kostprijs uit te komen —
+    // niet op een koers van een positie die niet meer bestaat.
+    const r = buildPortfolioValueHistory({
+      transactions: [
+        tx('oud', 'buy', 40, 10, '2026-01-10'),
+        tx('oud', 'transfer_out', 40, 10, '2026-02-10'),
+        tx('nieuw', 'transfer_in', 10, 40, '2026-02-10'),
+      ],
+      prices: [],
+      today: '2026-03-15',
+    })
+
+    const laatste = r.points[r.points.length - 1]
+    // 10 × €40 kostbasis = €400 = de oorspronkelijke inleg. De gesloten oude
+    // positie telt niet meer mee.
+    expect(laatste.marketValue).toBeCloseTo(400, 6)
+    expect(laatste.openPositions).toBe(1)
+  })
+})

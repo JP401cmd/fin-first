@@ -154,6 +154,14 @@ function typeLabel(type: ParsedHoldingRow['type']): string {
       return 'Dividend'
     case 'position':
       return 'Positie'
+    // Twee benen van dezelfde gebeurtenis (splitsing, naamswijziging,
+    // conversie). Bewust NIET "Koop"/"Verkoop": er is niets gehandeld, en die
+    // labels zouden de gebruiker een opbrengst en een nieuwe inleg suggereren
+    // die er niet zijn.
+    case 'transfer_out':
+      return 'Splitsing / conversie (uit)'
+    case 'transfer_in':
+      return 'Splitsing / conversie (in)'
   }
 }
 
@@ -168,6 +176,12 @@ function typeColor(type: ParsedHoldingRow['type']): string {
       return 'text-blue-600'
     case 'position':
       return 'text-[var(--ink-3)]'
+    // Bewust neutrale inkt en géén positief/negatief: een corporate action is
+    // winst noch verlies. Een groene of rode regel zou hier precies de fout
+    // suggereren die dit type juist wegneemt.
+    case 'transfer_in':
+    case 'transfer_out':
+      return 'text-[var(--ink-2)]'
   }
 }
 
@@ -589,8 +603,11 @@ export default function HoldingsImportClient({ targets }: HoldingsImportClientPr
       // bestaande rij botst en die stil als duplicaat laat overslaan.
       const transactions = selected
         .filter(
-          (row): row is PreviewRow & { type: 'buy' | 'sell' | 'dividend' } =>
-            row.type !== 'position',
+          (
+            row,
+          ): row is PreviewRow & {
+            type: Exclude<PreviewRow['type'], 'position'>
+          } => row.type !== 'position',
         )
         .map((row) => ({
           holding_index: keyToIndex.get(instrumentKey(row))!,
@@ -695,6 +712,14 @@ export default function HoldingsImportClient({ targets }: HoldingsImportClientPr
   const holdingsCount = countDistinctInstruments(includedRows)
   const transactionsCount = includedRows.filter(
     (r) => r.type !== 'position',
+  ).length
+  // Herkende splitsingen/conversies (twee regels per gebeurtenis). Expliciet
+  // getoond: die regels zien er in het bestand uit als een verkoop en een koop,
+  // dus de gebruiker moet vóór het importeren kunnen zien dát wij ze anders
+  // hebben gelezen — anders is "het is gelukt" niet te onderscheiden van "hij
+  // heeft mijn splitsing als handel geboekt".
+  const corporateActionCount = includedRows.filter(
+    (r) => r.type === 'transfer_out',
   ).length
   const totalValue = includedRows.reduce((sum, r) => sum + r.total_amount, 0)
 
@@ -1190,6 +1215,15 @@ export default function HoldingsImportClient({ targets }: HoldingsImportClientPr
               </span>{' '}
               transacties
             </div>
+            {corporateActionCount > 0 && (
+              <div className="text-sm text-[var(--ink-2)]">
+                <span className="font-mono tabular-nums font-bold text-[var(--ink)]">
+                  {corporateActionCount}
+                </span>{' '}
+                {corporateActionCount === 1 ? 'splitsing' : 'splitsingen'} /
+                conversie{corporateActionCount !== 1 && 's'}
+              </div>
+            )}
             <div className="text-sm text-[var(--ink-2)]">
               Totale waarde:{' '}
               <span className="font-mono tabular-nums font-bold text-[var(--ink)]">

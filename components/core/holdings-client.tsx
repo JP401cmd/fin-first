@@ -1,7 +1,14 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
-import { Plus, X, ArrowLeft, ArrowUpRight, ArrowDownRight, Briefcase, Receipt, DollarSign, PieChart, AlertTriangle, CheckCircle, Upload, LayoutGrid, List } from 'lucide-react'
+import { Plus, X, ArrowLeft, ArrowUpRight, ArrowDownRight, Briefcase, Receipt, DollarSign, PieChart, AlertTriangle, CheckCircle, Upload, LayoutGrid, List, Split, ArrowLeftRight, HelpCircle } from 'lucide-react'
+import {
+  isHoldingTxType,
+  TX_TYPE_LABEL,
+  TX_TYPE_SIGN,
+  UNKNOWN_TX_LABEL,
+  type HoldingTxType,
+} from '@/lib/holdings-transaction-types'
 import { formatTimestamp, formatMaskedCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useAbortableFetch, isAbortError } from '@/lib/hooks/use-abortable-fetch'
@@ -1967,10 +1974,23 @@ function HoldingTransactionForm({
     }
   }
 
-  const typeConfig = {
-    buy: { label: 'Koop', icon: ArrowDownRight, color: 'text-positive', bg: 'bg-positive/10', border: 'border-positive/30', ring: 'ring-positive' },
-    sell: { label: 'Verkoop', icon: ArrowUpRight, color: 'text-negative', bg: 'bg-negative/10', border: 'border-negative/30', ring: 'ring-negative' },
-    dividend: { label: 'Dividend', icon: DollarSign, color: 'text-kern-600', bg: 'bg-kern-50', border: 'border-kern-200', ring: 'ring-kern-500' },
+  // Bewust een `Record<HoldingTxType, …>`: een nieuw transactietype wordt hier
+  // een compile-fout in plaats van een regel die stil in een terugval belandt.
+  // De `transfer_*`-benen krijgen neutrale inkt en geen teken — een corporate
+  // action is winst noch verlies (spiegelt de importvoorbeschouwing).
+  const typeConfig: Record<HoldingTxType, { label: string; icon: typeof ArrowDownRight; color: string; bg: string; border: string; ring: string }> = {
+    buy: { label: TX_TYPE_LABEL.buy, icon: ArrowDownRight, color: 'text-positive', bg: 'bg-positive/10', border: 'border-positive/30', ring: 'ring-positive' },
+    sell: { label: TX_TYPE_LABEL.sell, icon: ArrowUpRight, color: 'text-negative', bg: 'bg-negative/10', border: 'border-negative/30', ring: 'ring-negative' },
+    dividend: { label: TX_TYPE_LABEL.dividend, icon: DollarSign, color: 'text-kern-600', bg: 'bg-kern-50', border: 'border-kern-200', ring: 'ring-kern-500' },
+    split: { label: TX_TYPE_LABEL.split, icon: Split, color: 'text-violet-600', bg: 'bg-violet-50', border: 'border-violet-200', ring: 'ring-violet-500' },
+    transfer_in: { label: TX_TYPE_LABEL.transfer_in, icon: ArrowLeftRight, color: 'text-[var(--ink-2)]', bg: 'bg-[var(--subtle)]', border: 'border-[var(--border-ed)]', ring: 'ring-[var(--border-ed)]' },
+    transfer_out: { label: TX_TYPE_LABEL.transfer_out, icon: ArrowLeftRight, color: 'text-[var(--ink-2)]', bg: 'bg-[var(--subtle)]', border: 'border-[var(--border-ed)]', ring: 'ring-[var(--border-ed)]' },
+  }
+
+  /** Nooit terugvallen op "Koop": een onbekend type als koop tonen is de fout zelf. */
+  const unknownTypeConfig = {
+    label: UNKNOWN_TX_LABEL, icon: HelpCircle, color: 'text-[var(--ink-3)]',
+    bg: 'bg-[var(--subtle)]', border: 'border-[var(--border-ed)]', ring: 'ring-[var(--border-ed)]',
   }
 
   return (
@@ -2203,7 +2223,7 @@ function HoldingTransactionForm({
 
                   <div className="space-y-2">
                     {transactions.map((tx) => {
-                      const cfg = typeConfig[tx.type] || typeConfig.buy
+                      const cfg = isHoldingTxType(tx.type) ? typeConfig[tx.type] : unknownTypeConfig
                       const Icon = cfg.icon
                       return (
                         <div key={tx.id} className="flex items-center gap-3 border border-[var(--border-ed)] p-2.5">
@@ -2220,7 +2240,7 @@ function HoldingTransactionForm({
                             </p>
                           </div>
                           <span className={`shrink-0 text-xs font-semibold ${cfg.color}`}>
-                            {tx.type === 'sell' ? '-' : '+'}{fc(tx.total_amount)}
+                            {isHoldingTxType(tx.type) ? TX_TYPE_SIGN[tx.type] : ''}{fc(tx.total_amount)}
                           </span>
                         </div>
                       )

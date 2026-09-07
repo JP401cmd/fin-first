@@ -562,6 +562,45 @@ describe('buildPortfolioHistory — kasstroom en koersdekking', () => {
     expect(history[1].observedNetFlow).toBe(-1000)
     expect(computeTwrSeries(history)!.returnPct).toBe(0)
   })
+
+  // Given een 2-voor-1 splitsing (transfer_out + transfer_in op één datum);
+  // When de historie wordt opgebouwd;
+  // Then volgt het aantal de splitsing en is er GEEN kasstroom.
+  //
+  // Vóór de fix kende deze replay alleen `buy`/`sell`: het aantal bevroor op
+  // 10 stuks terwijl de koers al de post-split koers was, en de eigen
+  // rendementslijn liep daardoor structureel uit de pas.
+  it('boekt een splitsing als aantalswijziging, niet als kasstroom', () => {
+    const positie = {
+      id: 'h1',
+      units: 20,
+      avg_purchase_price: 50,
+      current_price: 50,
+      purchase_date: '2026-06-10',
+      created_at: '2026-06-01T00:00:00.000Z',
+    }
+    const txs = [
+      { holding_id: 'h1', type: 'buy' as const, units: 10, price_per_unit: 100, date: '2026-06-10' },
+      { holding_id: 'h1', type: 'transfer_out' as const, units: 10, price_per_unit: 100, date: '2026-07-10' },
+      { holding_id: 'h1', type: 'transfer_in' as const, units: 20, price_per_unit: 50, date: '2026-07-10' },
+    ]
+    const dagkoersen = [
+      { holding_id: 'h1', date: '2026-06-30', close_price: 100 },
+      { holding_id: 'h1', date: '2026-07-31', close_price: 50 },
+      { holding_id: 'h1', date: '2026-08-14', close_price: 50 },
+    ]
+    const history = buildPortfolioHistory([positie], [], txs, NOW, dagkoersen)
+
+    // Juni: 10 × €100 = €1.000. Juli: 20 × €50 = €1.000 — de splitsing knipt de
+    // stukken, niet het vermogen. Zonder de transfer-takken bleef het aantal op
+    // 10 staan en halveerde de waarde naar €500.
+    expect(history[0].totalValue).toBeCloseTo(1000, 6)
+    expect(history[1].totalValue).toBeCloseTo(1000, 6)
+    // Er is geen euro in of uit gegaan.
+    expect(history[1].observedNetFlow).toBe(0)
+    // En dus ook geen rendement uit het niets.
+    expect(computeTwrSeries(history)!.returnPct).toBeCloseTo(0, 6)
+  })
 })
 
 describe('benchmarkInterval — dichtheid volgt het venster', () => {

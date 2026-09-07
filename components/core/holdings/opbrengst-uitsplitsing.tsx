@@ -106,6 +106,21 @@ export function OpbrengstUitsplitsing({
           <BreakdownRow label="Kosten" amount={-totalFees} formatAmount={formatAmount} />
         )}
       </dl>
+
+      {/* Positie zonder eigen inleg: het percentage kan niet bestaan. Zeg dat,
+          in plaats van het stil weg te laten. Dit overkomt een positie die via
+          een splitsing of naamswijziging is ontstaan — de inleg staat op de
+          oude regel en is dáár geteld; hier nog eens meetellen zou de inleg
+          verdubbelen en het rendement halveren. Zonder deze regel verdween het
+          percentage zonder uitleg en las de gebruiker een lege plek als een
+          fout. */}
+      {!isClosed && totalInvested === 0 && (
+        <p className="mt-3 border-t border-[var(--rule-soft)] pt-2 text-[11px] leading-snug text-[var(--ink-3)]">
+          Geen eigen inleg op deze regel — de stukken kwamen binnen via een
+          splitsing of conversie, met de kostprijs van de oude regel. Daarom
+          staat er geen rendementspercentage: er is niets om tegen af te zetten.
+        </p>
+      )}
     </div>
   )
 }

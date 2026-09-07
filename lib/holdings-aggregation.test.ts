@@ -161,6 +161,78 @@ describe('computePositionFromTransactions — split (aandelensplitsing)', () => 
   })
 })
 
+describe('computePositionFromTransactions — transfer_out / transfer_in', () => {
+  // De twee benen van een corporate action (DEGIRO-splitsing, naamswijziging,
+  // conversie). De oude regel sluit zonder opbrengst; de nieuwe opent met de
+  // meegenomen kostbasis. De `split`-tak hierboven blijft ongemoeid: die kent
+  // FACTOR-semantiek op één ISIN en past niet op een paar met absolute
+  // aantallen op twee ISIN's.
+
+  it('Given een positie van 200 @ €11, When transfer_out 200, Then sluit hij zonder opbrengst en zonder realisatie', () => {
+    const agg = computePositionFromTransactions([
+      { type: 'buy', units: 200, price_per_unit: 11, date: '2025-01-01' },
+      { type: 'transfer_out', units: 200, price_per_unit: 11, date: '2025-06-01' },
+    ])
+    expect(agg.netUnits).toBe(0)
+    expect(agg.totalSoldUnits).toBe(0)
+    expect(agg.totalProceeds).toBe(0)
+    expect(agg.realizedPnL).toBe(0)
+    expect(agg.isClosed).toBe(true)
+  })
+
+  it('Given een transfer_in van 20 @ €110, When herleid, Then telt de inleg NIET mee in totalInvested', () => {
+    const agg = computePositionFromTransactions([
+      { type: 'transfer_in', units: 20, price_per_unit: 110, date: '2025-06-01' },
+    ])
+    expect(agg.netUnits).toBe(20)
+    expect(agg.avgCost).toBeCloseTo(110, 6)
+    // Anders wordt de inleg over de oude én de nieuwe regel dubbelgeteld.
+    expect(agg.totalBoughtUnits).toBe(0)
+    expect(agg.totalInvested).toBe(0)
+  })
+
+  it('Given een gedeeltelijke transfer_out, When herleid, Then blijft de kostprijs van de rest gelijk', () => {
+    const agg = computePositionFromTransactions([
+      { type: 'buy', units: 100, price_per_unit: 10, date: '2025-01-01' },
+      { type: 'transfer_out', units: 40, price_per_unit: 10, date: '2025-06-01' },
+    ])
+    expect(agg.netUnits).toBe(60)
+    expect(agg.avgCost).toBeCloseTo(10, 6)
+    expect(agg.realizedPnL).toBe(0)
+  })
+
+  it('Given een transfer_in op een bestaande positie, When herleid, Then middelt de kostprijs zoals bij een koop', () => {
+    const agg = computePositionFromTransactions([
+      { type: 'buy', units: 100, price_per_unit: 10, date: '2025-01-01' },
+      { type: 'transfer_in', units: 100, price_per_unit: 20, date: '2025-06-01' },
+    ])
+    expect(agg.netUnits).toBe(200)
+    expect(agg.avgCost).toBeCloseTo(15, 6)
+  })
+
+  it('Given een forward split als paar op dezelfde regel, When herleid, Then blijft de totale kostbasis gelijk', () => {
+    const agg = computePositionFromTransactions([
+      { type: 'buy', units: 60, price_per_unit: 5, date: '2025-01-01' },
+      { type: 'transfer_out', units: 60, price_per_unit: 5, date: '2025-06-01' },
+      { type: 'transfer_in', units: 120, price_per_unit: 2.5, date: '2025-06-01' },
+    ])
+    expect(agg.netUnits).toBe(120)
+    expect(agg.avgCost).toBeCloseTo(2.5, 6)
+    expect(agg.netUnits * agg.avgCost).toBeCloseTo(300, 6)
+    expect(agg.totalProceeds).toBe(0)
+  })
+
+  it('Given een transfer_out zonder voorafgaande aankoop, When herleid, Then wordt de positie negatief (zichtbaar gat, geen stilte)', () => {
+    // Spiegelt het `sell`-gedrag: holdings-sync klemt op 0 en zet
+    // `historyIncomplete`. Een genegeerde transfer_out zou de oude regel juist
+    // op zijn volledige aantal laten staan — dubbeltelling, en stil.
+    const agg = computePositionFromTransactions([
+      { type: 'transfer_out', units: 50, price_per_unit: 4, date: '2025-06-01' },
+    ])
+    expect(agg.netUnits).toBe(-50)
+  })
+})
+
 describe('deriveStoredAggregates — engine-uitvoer als op te slaan holding-aggregaten', () => {
   it('units === netUnits en avgPurchasePrice === avgCost (geen tweede berekening)', () => {
     const txs: PositionTransaction[] = [
@@ -249,5 +321,98 @@ describe('consistente kostenbasis — ingelegd + koerswinst === marktwaarde', ()
     const koerswinst = valued.unrealizedPnL
     const marktwaarde = meesman.units * meesman.current_price
     expect(Math.abs(ingelegd + koerswinst - marktwaarde)).toBeLessThan(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Volgorde binnen één datum
+// ---------------------------------------------------------------------------
+//
+// Beide benen van een forward split op dezelfde ISIN dragen dezelfde datum, en
+// in de database ordent NIETS ze: `id` is een random uuid en `created_at` is
+// voor alle rijen van één upsert gelijk. De drie consumenten vragen bovendien
+// drie verschillende sorteringen (`date ASC, created_at ASC`, geen `order()`,
+// `date DESC`). De garantie hoort dus in de engine, niet in de parser: die
+// levert een lijst af die na de DB-round-trip niet meer bestaat.
+// ---------------------------------------------------------------------------
+
+describe('computePositionFromTransactions — volgorde binnen één datum', () => {
+  // 60 stuks à EUR 5 = EUR 300 inleg, daarna een 2-voor-1 split: 60 eruit,
+  // 120 erin met dezelfde meegenomen kostbasis (EUR 2,50 per stuk).
+  const koop: PositionTransaction = {
+    type: 'buy',
+    units: 60,
+    price_per_unit: 5,
+    total_amount: 300,
+    date: '2025-05-01',
+  }
+  const uitBeen: PositionTransaction = {
+    type: 'transfer_out',
+    units: 60,
+    price_per_unit: 5,
+    total_amount: 300,
+    date: '2025-11-01',
+  }
+  const inBeen: PositionTransaction = {
+    type: 'transfer_in',
+    units: 120,
+    price_per_unit: 2.5,
+    total_amount: 300,
+    date: '2025-11-01',
+  }
+
+  it('Given het in-been vóór het uit-been in de invoer, When afgeleid, Then blijft de inleg EUR 300 en niet EUR 400', () => {
+    // Dit is de volgorde die een `date DESC`-query of een query zonder
+    // `order()` zomaar kan opleveren. Zonder tweede sorteersleutel telde de lus
+    // 60 oude + 120 nieuwe stukken en middelde over 180: EUR 3,3333 per stuk.
+    const agg = computePositionFromTransactions([koop, inBeen, uitBeen])
+    expect(agg.netUnits).toBe(120)
+    expect(agg.avgCost).toBeCloseTo(2.5, 6)
+    expect(agg.netUnits * agg.avgCost).toBeCloseTo(300, 6)
+  })
+
+  it('Given elke denkbare invoervolgorde, When afgeleid, Then is de uitkomst identiek', () => {
+    const permutaties: PositionTransaction[][] = [
+      [koop, uitBeen, inBeen],
+      [koop, inBeen, uitBeen],
+      [uitBeen, inBeen, koop],
+      [inBeen, uitBeen, koop],
+      [uitBeen, koop, inBeen],
+      [inBeen, koop, uitBeen],
+    ]
+    const uitkomsten = permutaties.map((p) => {
+      const agg = computePositionFromTransactions(p)
+      return {
+        netUnits: agg.netUnits,
+        avgCost: Math.round(agg.avgCost * 1e6) / 1e6,
+        totalInvested: agg.totalInvested,
+        totalProceeds: agg.totalProceeds,
+        realizedPnL: agg.realizedPnL,
+      }
+    })
+    for (const uitkomst of uitkomsten) {
+      expect(uitkomst).toEqual(uitkomsten[0])
+    }
+    expect(uitkomsten[0]).toEqual({
+      netUnits: 120,
+      avgCost: 2.5,
+      totalInvested: 300,
+      totalProceeds: 0,
+      realizedPnL: 0,
+    })
+  })
+
+  it('Given een gewone koop en verkoop op dezelfde dag, When afgeleid, Then verandert er niets aan de bestaande volgorde', () => {
+    // De rang raakt alleen transfer_*; al het andere houdt rang 0 en blijft dus
+    // in de volgorde waarin het binnenkwam (stabiele sort).
+    const koopA: PositionTransaction = {
+      type: 'buy', units: 10, price_per_unit: 10, total_amount: 100, date: '2025-03-01',
+    }
+    const verkoopA: PositionTransaction = {
+      type: 'sell', units: 10, price_per_unit: 15, total_amount: 150, date: '2025-03-01',
+    }
+    const agg = computePositionFromTransactions([koopA, verkoopA])
+    expect(agg.netUnits).toBe(0)
+    expect(agg.realizedPnL).toBeCloseTo(50, 6)
   })
 })

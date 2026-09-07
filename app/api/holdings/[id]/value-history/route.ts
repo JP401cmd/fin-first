@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { backfillHoldingPrices } from '@/lib/historical-prices'
 import { resolveHolding, type HoldingTables } from '@/lib/holdings-table-resolver'
 import { roundCents } from '@/lib/format'
+import { isHoldingTxType, TX_TYPE_LABEL } from '@/lib/holdings-transaction-types'
 
 /**
  * GET /api/holdings/[id]/value-history
@@ -168,6 +169,23 @@ async function buildPriceBasedHistory(supabase: any, holding: any, tables: Holdi
             runningCostBasis = 0
             runningUnits = 0
           }
+        } else if (tx.type === 'transfer_out') {
+          // Uit-been van een splitsing/conversie: de stukken verlaten deze
+          // regel zonder opbrengst. Zonder deze tak bevriest het aantal op de
+          // splitsdatum en loopt de hele grafiek daarna op een verkeerd aantal.
+          const avgCost = runningUnits > 0 ? runningCostBasis / runningUnits : 0
+          runningCostBasis -= avgCost * numUnits
+          runningUnits = Math.max(0, runningUnits - numUnits)
+          if (runningUnits <= 0) {
+            runningCostBasis = 0
+            runningUnits = 0
+          }
+        } else if (tx.type === 'transfer_in') {
+          // In-been: de stukken komen binnen MET hun meegenomen kostbasis, dus
+          // `price_per_unit` is hier de kostprijs per eenheid en niet de
+          // dagkoers. Zelfde semantiek als de canonieke engine.
+          runningCostBasis += numUnits * pricePerUnit
+          runningUnits += numUnits
         }
 
         txEvents.push({
@@ -300,15 +318,31 @@ async function buildTransactionBasedHistory(supabase: any, holding: any, tables:
         runningCostBasis = 0
         runningUnits = 0
       }
+    } else if (tx.type === 'transfer_out') {
+      // Zie de eerste replay hierboven: zonder deze tak bevriest het aantal op
+      // de splitsdatum. Geen opbrengst, geen realisatie.
+      const avgCost = runningUnits > 0 ? runningCostBasis / runningUnits : 0
+      runningCostBasis -= avgCost * numUnits
+      runningUnits = Math.max(0, runningUnits - numUnits)
+      if (runningUnits <= 0) {
+        runningCostBasis = 0
+        runningUnits = 0
+      }
+    } else if (tx.type === 'transfer_in') {
+      runningCostBasis += numUnits * pricePerUnit
+      runningUnits += numUnits
     }
 
-    const eventLabel = tx.type === 'buy'
-      ? 'Koop'
-      : tx.type === 'sell'
-        ? 'Verkoop'
-        : tx.type === 'dividend' || tx.type === 'reward'
-          ? 'Dividend'
-          : tx.type
+    // Label uit de gedeelde bron; `reward` is een oude/externe variant van
+    // dividend. Onbekende types tonen hun ruwe waarde — zichtbaar vreemd is
+    // beter dan een verzonnen label, maar de bekende types horen hier nooit
+    // meer als `transfer_out` in een tooltip te belanden.
+    const rawType = String(tx.type ?? '')
+    const eventLabel = isHoldingTxType(rawType)
+      ? TX_TYPE_LABEL[rawType]
+      : rawType === 'reward'
+        ? TX_TYPE_LABEL.dividend
+        : rawType
     const valueAtEvent = runningUnits * pricePerUnit
 
     history.push({

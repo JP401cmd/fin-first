@@ -17,6 +17,11 @@
 // gerealiseerd en ongerealiseerd bij een deels-open positie.
 // ---------------------------------------------------------------------------
 
+// De rang binnen één datum (wat vertrekt gaat vóór wat binnenkomt) staat naast
+// de type-definities, zodat elke consument van een transactietype dezelfde
+// exhaustieve map gebruikt.
+import { sameDayOrder } from './holdings-transaction-types'
+
 /**
  * Bovengrens op de transactie-fetch die de holdings-aggregatie voedt. Ruim
  * boven elke realistische per-positie historie (zelfs jaren dagtrading /
@@ -27,7 +32,10 @@
 export const HOLDINGS_TX_AGG_LIMIT = 5000
 
 export interface PositionTransaction {
-  /** 'buy' | 'sell' | 'dividend' | 'split' (case-insensitief). Onbekend = genegeerd. */
+  /**
+   * 'buy' | 'sell' | 'dividend' | 'split' | 'transfer_in' | 'transfer_out'
+   * (case-insensitief). Onbekend = genegeerd.
+   */
   type: string
   /** Aantal eenheden (absoluut; het teken volgt uit `type`). */
   units: number | string
@@ -82,11 +90,30 @@ const EPSILON = 1e-9
  * Leidt de huidige positie af uit de transactiehistorie via average-cost.
  * Sorteert zelf op datum (oplopend) zodat de aanroeper de volgorde niet hoeft
  * te garanderen.
+ *
+ * BINNEN ÉÉN DATUM beslist niet de invoervolgorde maar `SAME_DAY_ORDER`: wat de
+ * positie verlaat gaat vóór wat er binnenkomt. Zonder die tweede sleutel was de
+ * uitkomst voor een forward split op dezelfde ISIN nondeterministisch — beide
+ * benen dragen dezelfde datum, `investment_transactions.id` is een random uuid,
+ * `created_at` is voor alle rijen van één upsert gelijk, en de drie consumenten
+ * vragen drie verschillende sorteringen (`date ASC, created_at ASC`, géén
+ * `order()`, `date DESC`). Landde het in-been eerst, dan telde deze lus de
+ * stukken even dubbel en middelde de kostprijs over te veel stuks: EUR 400 inleg
+ * op een positie die EUR 300 heeft gekost. De garantie hoort hier en niet bij de
+ * parser, want het gezaghebbende getal wordt ná de DB-round-trip afgeleid en
+ * dáár is geen enkele rijvolgorde vastgelegd.
+ *
+ * Al het andere houdt rang 0; de sort is stabiel, dus onderling blijven die in
+ * de volgorde waarin ze binnenkwamen.
  */
 export function computePositionFromTransactions(
   txs: readonly PositionTransaction[],
 ): PositionAggregate {
-  const ordered = [...txs].sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
+  const ordered = [...txs].sort(
+    (a, b) =>
+      (a.date ?? '').localeCompare(b.date ?? '') ||
+      sameDayOrder(a.type) - sameDayOrder(b.type),
+  )
 
   let units = 0
   let avgCost = 0
@@ -133,6 +160,27 @@ export function computePositionFromTransactions(
         units *= u
         avgCost /= u
       }
+    } else if (type === 'transfer_out') {
+      // Het uit-been van een corporate action (splitsing, naamswijziging,
+      // conversie): de stukken verlaten DEZE regel, maar er is geen koper en
+      // dus geen opbrengst. Het aantal daalt; `sold`/`proceeds`/`realized`
+      // blijven ongemoeid — anders ontstaat precies het verzonnen gerealiseerde
+      // resultaat waarvoor dit type bestaat. `avgCost` blijft ook staan: de
+      // eventueel resterende stukken hebben dezelfde kostprijs als daarvoor.
+      //
+      // EXPLICIET en niet stilzwijgend genegeerd: een genegeerde `transfer_out`
+      // laat de oude regel op zijn oude aantal staan, en dat is een stille fout
+      // (het bezit is dan dubbel geteld over de oude en de nieuwe regel).
+      units -= u
+    } else if (type === 'transfer_in') {
+      // Het in-been: de stukken komen binnen MET hun meegenomen kostbasis, dus
+      // `px` is hier de kostprijs per eenheid en niet de dagkoers. Middelt als
+      // een koop, maar telt bewust NIET mee in `bought`/`invested`: die inleg is
+      // al op de oude regel geteld, en meetellen zou de inleg over de oude en de
+      // nieuwe regel dubbeltellen (en daarmee het rendement halveren).
+      const newUnits = units + u
+      avgCost = newUnits > EPSILON ? (units * avgCost + u * px) / newUnits : 0
+      units = newUnits
     }
   }
 

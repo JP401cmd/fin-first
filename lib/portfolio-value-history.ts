@@ -278,6 +278,12 @@ export function buildPortfolioValueHistory(
   const lastObserved = new Map<string, { close: number; tier: Exclude<PriceTier, 'cost'> }>()
   /** Laatst gebruikte transactieprijs per positie, tot aan de huidige peildatum. */
   const lastTxPrice = new Map<string, number>()
+  /**
+   * Aantal stukken dat een nog niet afgesloten `transfer_out` heeft verlaten,
+   * per positie. Nodig om bij het in-been de verhouding te kennen waarmee een
+   * koers van vóór de corporate action moet worden herschaald.
+   */
+  const pendingTransferOut = new Map<string, number>()
   /** Transacties tot en met de huidige peildatum, per positie. */
   const seenTx = new Map<string, PositionTransaction[]>()
 
@@ -322,6 +328,30 @@ export function buildPortfolioValueHistory(
           const previous = lastTxPrice.get(holdingId)
           if (previous !== undefined && Number.isFinite(factor) && factor > 0) {
             lastTxPrice.set(holdingId, previous / factor)
+          }
+        } else if (type === 'transfer_out') {
+          // Uit-been van een splitsing/conversie. `price_per_unit` is hier de
+          // meegenomen KOSTBASIS per stuk en geen koers, dus die mag nooit in
+          // `lastTxPrice` belanden. We onthouden alleen het aantal, zodat het
+          // in-been de verhouding kent.
+          pendingTransferOut.set(holdingId, Math.abs(Number(row.units)) || 0)
+        } else if (type === 'transfer_in') {
+          // Zelfde probleem als bij `split`, alleen dan uitgedrukt als een paar
+          // regels in plaats van een factor: bij een 2-voor-1 split komt er
+          // dubbel zoveel stuks binnen, dus een koers van vóór de actie slaat op
+          // andere stukken. Zonder herschaling verdubbelt de waarde van een
+          // positie zonder marktkoers uit het niets.
+          const inUnits = Math.abs(Number(row.units)) || 0
+          const outUnits = pendingTransferOut.get(holdingId) ?? 0
+          const previous = lastTxPrice.get(holdingId)
+          pendingTransferOut.delete(holdingId)
+          if (previous !== undefined && inUnits > 0 && outUnits > 0) {
+            lastTxPrice.set(holdingId, previous * (outUnits / inUnits))
+          } else {
+            // Geen verhouding af te leiden (conversie naar een ándere positie,
+            // of geen eerdere koers): liever terugvallen op de kostprijs-ladder
+            // dan een koers van vóór de actie blijven gebruiken.
+            lastTxPrice.delete(holdingId)
           }
         }
         ti++
