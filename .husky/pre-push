@@ -69,6 +69,23 @@ node scripts/check-tap-targets.mjs
 echo "→ Running koppencontract-check (M28)…"
 node scripts/check-heading-levels.mjs
 
+# Info-knoppen (besluit 9, 12 jul 2026): elke inhoudspagina draagt een `i`, en
+# elke `getPageInfo('key')`/`infoKey` wijst naar een bestaande PAGE_INFO-sleutel.
+# Exit 1 op missing / inline literal / ongedekte route / een opgeloste
+# RESIDUE-entry; een wees-sleutel is een waarschuwing (exit 0). Deze scan
+# bestond al als commando maar hing aan NIETS — en juist daardoor groeide het
+# gat naar 17 van de 64 routes vóór iemand 'm handmatig draaide.
+echo "→ Running info-knoppen-check (besluit 9)…"
+node scripts/page-info/check-coverage.mjs
+
+# Begrippenlijst (UR3-13): een `<GlossaryTerm term="…">` of een `terms: […]`-chip
+# die naar een niet-bestaande GLOSSARY_ENTRIES-sleutel wijst, rendert stil niets.
+# Precies de bugklasse van de noodreserve/noodfonds-naammismatch. Exit 1 op
+# missing; een wees-entry is bewust alleen een waarschuwing (nieuw jargon mag
+# eerst landen, de koppeling volgt).
+echo "→ Running begrippenlijst-check (UR3-13)…"
+node scripts/glossary/check-coverage.mjs
+
 # Productiecijfers (ADR 0111): deze repo is PUBLIEK, en migratiecommentaar en ADR's
 # zijn precies waar we ons huiswerk opschrijven — "gemeten op remote, N rijen",
 # "op het eigenaar-account: €N". De sweep vond gegevens op recordniveau, het

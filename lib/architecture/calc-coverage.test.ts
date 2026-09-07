@@ -4,6 +4,7 @@
 
 import { describe, expect, it } from 'vitest'
 import * as fs from 'fs'
+import * as os from 'os'
 import * as path from 'path'
 import {
   CALC_COVERAGE_IGNORE,
@@ -64,7 +65,7 @@ describe('sentinel-bewijs', () => {
   })
 
   it('vindt compute*-export via zowel function- als const-declaratie', () => {
-    const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'calc-coverage-'))
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'calc-coverage-'))
     try {
       fs.writeFileSync(path.join(dir, 'a.ts'), 'export function computeFoo() { return 1 }\n')
       fs.writeFileSync(path.join(dir, 'b.ts'), 'export const computeBar = () => 2\n')

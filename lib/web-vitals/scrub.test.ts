@@ -63,9 +63,9 @@ describe('scrubRoute', () => {
     it('niet-string input valt terug op /', () => {
       // @ts-expect-error — bewust een niet-string doorgeven (defensieve cast-tak)
       expect(scrubRoute(null)).toBe('/')
-      // @ts-expect-error
+      // @ts-expect-error — bewust undefined doorgeven (defensieve cast-tak)
       expect(scrubRoute(undefined)).toBe('/')
-      // @ts-expect-error
+      // @ts-expect-error — bewust een number doorgeven (defensieve cast-tak)
       expect(scrubRoute(42)).toBe('/')
     })
 

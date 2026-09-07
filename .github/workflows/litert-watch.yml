@@ -1,0 +1,99 @@
+name: LiteRT-LM watcher
+
+# Waarom een EIGEN workflow, en niet een stap in ci.yml.
+#
+# `npm run litert:check` is geen kwaliteitspoort maar een UPSTREAM-WACHTER: hij
+# beantwoordt tweemaal per week de vraag "is er een nieuwere `@litert-lm/core`
+# dan onze pin, en noemt de changelog de Adreno-GPU-correctheidsfix?" (L3 staat
+# geparkeerd op een bug in Googles runtime, niet in onze code — zie de docblock
+# van scripts/litert/release-check.mjs).
+#
+# Daaruit volgen drie eigenschappen die hem ONGESCHIKT maken als push-gate:
+#   1. Zijn niet-nul exit is het SIGNAAL, niet een defect. Exit 11 ("nieuwe
+#      release, geen Adreno-signaal") is vandaag de stand; als pre-push- of
+#      CI-gate zou dat élke push in de repo blokkeren tot iemand een
+#      Early-Preview-dependency bumpt. Het diff dat je pusht heeft er niets mee
+#      te maken.
+#   2. Hij heeft NETWERK nodig (npm-registry + GitHub-release-notes). Een gate
+#      die offline rood wordt, leert mensen `--no-verify`.
+#   3. Zijn uitkomst verandert zonder dat de repo verandert. Aan een commit
+#      hangen levert dus ruis bij elke push en stilte in de weken zonder push.
+#
+# Vandaar: een eigen, GEPLANDE, NIET-GATENDE job. Hij hangt daarmee wél ergens
+# aan (de kaart "Drie controle-scripts hangen aan niets"), zonder de push-poort
+# te vervuilen. De uitkomst landt in de job-samenvatting en als annotatie, zodat
+# je 'm ziet zonder logs open te klappen. Handmatig draaien kan altijd via
+# workflow_dispatch of lokaal met `npm run litert:check`.
+#
+# LET OP: GitHub draait `schedule` alleen vanaf de default branch, en zet een
+# cron stil na ~60 dagen zonder repo-activiteit. Blijft de wachter stil terwijl
+# er wél gepusht wordt, controleer dan of deze workflow nog op master staat.
+
+on:
+  schedule:
+    # Maandag en donderdag 07:00 UTC — de "tweemaal per week"-cadans uit de
+    # docblock van het script.
+    - cron: '0 7 * * 1,4'
+  workflow_dispatch:
+
+# Geen `concurrency`-groep nodig: de job duurt seconden en draait hooguit
+# tweemaal per week.
+
+jobs:
+  litert-watch:
+    name: Nieuwere @litert-lm/core dan onze pin?
+    runs-on: ubuntu-latest
+    # Signaleren, nooit blokkeren. De job slaagt ook bij exit 10/11/12.
+    permissions:
+      contents: read
+    env:
+      HUSKY: 0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node (versie uit .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      # Bewust GEEN `npm ci`: scripts/litert/release-check.mjs is zero-dependency
+      # (alleen node:fs/node:url/node:path) en leest de pin uit package.json,
+      # dat na de checkout al op schijf staat.
+      - name: Release-check draaien
+        run: |
+          set +e
+          output=$(node scripts/litert/release-check.mjs 2>&1)
+          code=$?
+          set -e
+
+          echo "$output"
+
+          {
+            echo '## LiteRT-LM release-check'
+            echo ''
+            echo '```'
+            echo "$output"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Exit-codes uit de docblock van het script:
+          #   0 geen actie · 10 Adreno-signaal · 11 nieuwe release zonder signaal
+          #  12 pin-drift app↔spike · 1 fout (netwerk/onleesbare package.json)
+          case "$code" in
+            0)
+              echo "::notice title=LiteRT-LM::Pin is actueel — geen actie."
+              ;;
+            10)
+              echo "::warning title=LiteRT-LM::Nieuwe release MET Adreno-signaal in de notes. Aanleiding tot een on-device hermeting (L3). Zie de job-samenvatting."
+              ;;
+            11)
+              echo "::notice title=LiteRT-LM::Nieuwe release zonder Adreno-signaal. Lagere urgentie, L3 blijft geparkeerd. Zie de job-samenvatting."
+              ;;
+            12)
+              echo "::warning title=LiteRT-LM::Pin-drift tussen package.json en spikes/litert-lm — het meetharnas meet iets anders dan de app draait. Repareer vóór een volgende hermeting."
+              ;;
+            *)
+              echo "::warning title=LiteRT-LM::Release-check kon geen uitspraak doen (exit $code — netwerk of onleesbare package.json). Geen conclusie over de pin."
+              ;;
+          esac
