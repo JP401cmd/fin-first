@@ -779,13 +779,17 @@ export function TransactiesAnalyse({
                   en moeten in Volledig reproduceerbaar blijven. */}
               {/* De Inkomen-/Uitgaven-cel van de strip is in BEIDE modi de
                   ingang naar zijn kassabon (UR3-28 fase 2b). De cijfers stonden
-                  er al; wat de hub uniek had was de doorklik. */}
+                  er al; wat de hub uniek had was de doorklik. Sinds UR3-14
+                  deel D geldt dat óók voor Saldo en — in Volledig — voor de
+                  spaarquote-leeswaarde: die twee waren de laatste getallen in
+                  dezelfde strip zónder doorklik, zonder zichtbaar verschil. */}
               {simple ? (
                 <GeldstroomZin
                   description={flowDescription}
                   summary={currentSummary}
                   onOpenIncome={() => setKassabon('income')}
                   onOpenExpense={() => setKassabon('expense')}
+                  onOpenFlow={() => setKassabon('flow')}
                 />
               ) : (
                 <GeldstroomGauge
@@ -793,6 +797,7 @@ export function TransactiesAnalyse({
                   windowLabel={flowDescription.windowLabel}
                   onOpenIncome={() => setKassabon('income')}
                   onOpenExpense={() => setKassabon('expense')}
+                  onOpenFlow={() => setKassabon('flow')}
                 />
               )}
               {currentSummary.income === 0 && currentSummary.expense === 0 && (

@@ -9,6 +9,8 @@ import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { BOX2_TOOLTIPS, type Box2Result } from '@/lib/box2-data'
 import { usePerspective } from '@/components/app/perspective-provider'
 import { HideInSimple } from '@/components/app/hide-in-simple'
+import { SwapInSimple } from '@/components/app/swap-in-simple'
+import { Box2SchijfZin } from '@/components/overview/belasting/box2-schijf-zin'
 import { PerspectiveContextLabel } from '@/components/app/perspective-context-label'
 import { Kicker, HighlightMark, OrnamentColophon } from '@/components/editorial'
 import { GlossaryTerm } from '@/components/editorial/glossary-term'
@@ -261,6 +263,18 @@ export function Box2Detail({ year = 2026 }: { year?: number }) {
             <GlossaryTerm term="vervreemdingswinst">vervreemdingswinst</GlossaryTerm> uit je
             aanmerkelijk belang (≥ 5%-deelneming).
           </p>
+
+          {/* BEL-9 — één gevolg-zin per box in Eenvoudig (besluit 6 sep 2026).
+              De schijfcellen zelf staan in de uitklap "Berekeningsstappen"
+              hieronder en die zit al in `HideInSimple`; in Volledig zou een
+              tweede weergave van dezelfde staffel dus dubbelop zijn. Vandaar
+              een lege Volledig-tak: `SwapInSimple` houdt Volledig byte-identiek
+              én maakt met één grep zichtbaar dát Eenvoudig hier iets ánders
+              toont. Een call-site-`mode`-ternary is verboden (ADR 0026,
+              aanvulling 28 aug). */}
+          <SwapInSimple simple={<Box2SchijfZin result={result} toonGeenBedrag={toonGeenBedrag} fc={fc} />}>
+            {null}
+          </SwapInSimple>
         </div>
 
         {/* DGA-waarschuwing — signaleert extra verschuldigde heffing → semantisch negatief, scherp kader */}

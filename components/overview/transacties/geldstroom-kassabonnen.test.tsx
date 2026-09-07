@@ -23,7 +23,7 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, within } from '@testing-library/react'
 import { summarizeFlow, type AnalysisTransaction } from '@/lib/transaction-insights'
 import type { Budget } from '@/lib/budget-data'
-import { formatCurrencyDecimals } from '@/lib/format'
+import { formatCurrency, formatCurrencyDecimals } from '@/lib/format'
 import { GeldstroomKassabonnen } from './geldstroom-kassabonnen'
 
 afterEach(cleanup)
@@ -197,8 +197,17 @@ describe('GeldstroomKassabonnen — uitgaven per budget', () => {
   it('toont de limiet als parent + kinderen bij elkaar', () => {
     renderBon('expense')
     const dialog = screen.getByRole('dialog')
-    // 100 (parent) + 250 + 50 (kinderen) = 400.
-    expect(within(dialog).getByText(/400/)).toBeTruthy()
+    // 100 (parent) + 250 + 50 (kinderen) = 400. Pin de GEFORMATTEERDE string:
+    // `getByText(/400/)` slaagde alleen doordat er toevallig precies één
+    // knooppunt matchte, en zou net zo goed aanslaan op een 400 binnen een
+    // ander bedrag. De limiet rendert zonder decimalen (`MaskedAmount` zonder
+    // `decimals`), dus `formatCurrency` is hier de juiste bron. De eigen
+    // normalizer is nodig omdat de standaard-normalizer de harde spatie uit
+    // `Intl` (U+00A0) tot een gewone spatie plet, waardoor de exacte string
+    // nooit meer matcht.
+    expect(
+      within(dialog).getByText(formatCurrency(400), { normalizer: (s) => s.trim() }),
+    ).toBeTruthy()
   })
 })
 

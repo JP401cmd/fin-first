@@ -26,6 +26,8 @@ import { PerspectiveContextLabel } from '@/components/app/perspective-context-la
 import { Kicker, SectionLabel, FiguresStrip, OrnamentColophon, type FigureProps } from '@/components/editorial'
 import { Reveal } from '@/components/landing/reveal'
 import { HideInSimple } from '@/components/app/hide-in-simple'
+import { SwapInSimple } from '@/components/app/swap-in-simple'
+import { Box1KostZin } from '@/components/overview/belasting/box1-kost-zin'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 const SOURCE_SERIF = 'var(--font-source-serif, Georgia, serif)'
@@ -355,14 +357,18 @@ function Box1DrukHero({
         </div>
       )}
 
-      {/* BEL-4 / APP-7: in Eenvoudig blijven de twee cijfers staan die de vraag
-          "wat kost het en wat houd ik over" beantwoorden — effectief tarief +
-          netto besteedbaar. "Geschat bruto" (invoer/bewerkbaar) en het
-          marginale tarief zijn expert-diepte en blijven Volledig. */}
-      <FiguresStrip
-        figures={figures}
-        simpleFigures={[figures[1], figures[3]]}
-      />
+      {/* BEL-9 (besluit 6 sep 2026) — één gevolg-zin per box in Eenvoudig.
+          BEL-4/APP-7 kapte de strip hier af tot twee cellen (effectief tarief +
+          netto besteedbaar); dat blééf expert-notatie — twee losse getallen
+          waarvan de lezer zelf moet zien dat het eerste over het tweede gaat.
+          In Eenvoudig staat er nu één zin met exact diezelfde twee velden erin.
+          Volledig rendert de strip byte-identiek: `SwapInSimple` raakt de
+          `full`-tak niet. `simpleFigures` is daarmee dood en verwijderd — de
+          Eenvoudig-tak van deze strip bestaat niet meer. Een
+          call-site-`mode`-ternary is verboden (ADR 0026, aanvulling 28 aug). */}
+      <SwapInSimple simple={<Box1KostZin result={result} />}>
+        <FiguresStrip figures={figures} />
+      </SwapInSimple>
 
       <p
         className="text-[12px] italic text-[var(--ink-3)] leading-snug max-w-[60ch]"

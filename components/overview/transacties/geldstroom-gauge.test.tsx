@@ -163,7 +163,10 @@ describe('S3 — call-site gating en de C6-grens', () => {
     // volle bestandsinhoud maakt de testoutput onleesbaar.
     const i = analyse.indexOf('<GeldstroomZin')
     expect(i).toBeGreaterThan(-1)
-    const fragment = analyse.slice(Math.max(0, i - 200), i + 400)
+    // Venster ruim genoeg om béíde takken te dekken. Elke kassabon-ingang die
+    // erbij komt (UR3-28: income/expense, UR3-14 deel D: flow) verlengt de
+    // GeldstroomZin-tak met een regel en duwt `<GeldstroomGauge` verderop.
+    const fragment = analyse.slice(Math.max(0, i - 200), i + 600)
     expect(/simple \? \(\s*<GeldstroomZin/.test(fragment)).toBe(true)
     expect(/<GeldstroomGauge[\s\S]{0,160}windowLabel=/.test(fragment)).toBe(true)
   })

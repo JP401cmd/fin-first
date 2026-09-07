@@ -28,6 +28,7 @@ import type { BriefingWeekHistoryItem } from '@/components/overview/briefing-pan
 import type { BriefingRefreshState } from '@/lib/types/briefing'
 import type { HefbomenHousingSplit } from './overzicht-hero/hefbomen-nav'
 import { MiniNetWorthChart } from './mini-networth-chart'
+import type { VermogenOpbouw } from './vermogen-kassabon'
 import { dailyExpenseRate } from '@/lib/format'
 import { runMilestoneDetection } from '@/lib/milestones/run'
 import { isFarHorizonGoal } from '@/lib/milestones/detect'
@@ -524,6 +525,7 @@ export async function OverzichtNetWorthChartLoader({
   framing,
   netWorthExclHome,
   housingSplit,
+  vermogenOpbouw = null,
 }: {
   supabase: SupabaseClient
   currentNetWorth: number
@@ -537,6 +539,15 @@ export async function OverzichtNetWorthChartLoader({
   framing?: FreedomFraming
   netWorthExclHome: number | null
   housingSplit: HefbomenHousingSplit | null
+  /**
+   * De twee termen achter `currentNetWorth` — voedt de kassabon achter het
+   * kopgetal (UR3-14 deel D). Komt van de PAGINA mee, niet uit `dashboardData`:
+   * `currentNetWorth` en `netWorthExclHome` zijn perspectief-correct
+   * (`loadHorizonData(supabase, perspective)`) terwijl `loadDashboardData` geen
+   * perspectief kent. Een bon die zijn termen uit de andere bron haalt zou in
+   * Huishouden/Partner andere getallen tonen dan het totaal erboven.
+   */
+  vermogenOpbouw?: VermogenOpbouw | null
 }) {
   const { dashboardData } = await loadDashboardData(supabase)
 
@@ -568,6 +579,9 @@ export async function OverzichtNetWorthChartLoader({
       monthlySavings={monthlySavings}
       netWorthExclHome={netWorthExclHome}
       showExclHome={housingSplit != null}
+      vermogenOpbouw={vermogenOpbouw}
+      eigenHuisValue={housingSplit?.eigenHuisValue ?? null}
+      mortgageBalance={housingSplit?.mortgageBalance ?? null}
       dailyExpense={dailyExpense}
     />
   )

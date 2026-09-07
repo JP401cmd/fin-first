@@ -6,14 +6,9 @@ import { getCachedUser } from '@/lib/supabase/cached-user'
 import { loadHorizonData } from '@/lib/horizon-data-loader'
 import { getOwnProfile } from '@/lib/server-data/base'
 import { getTxAgg12m, aggLatestMonth, type TxMonthAggregateRow } from '@/lib/server-data/tx-aggregates'
-import { StaleTransactionsBanner } from '@/components/app/stale-transactions-banner'
-import { StaleNoticeProvider } from '@/components/app/stale-notice-provider'
-import { transactionFreshness } from '@/lib/transaction-staleness'
+import { StaleDataGuard } from '@/components/app/stale-data-guard'
+import { StaleNoticeBanner } from '@/components/app/stale-transactions-notice'
 import { readMinimizedMap } from '@/lib/page-status/minimized-prefs'
-import {
-  STALE_TX_NOTICE_MINIMIZE_KEY,
-  asStaleMinimizedMonths,
-} from '@/lib/transaction-staleness-minimize'
 import { getServerPerspective } from '@/lib/household/server-perspective'
 import { OverzichtHeroPrimary } from '@/components/overview/overzicht-hero'
 import {
@@ -123,16 +118,6 @@ export default async function OverzichtPage() {
   // met alleen transfers ook mee; het gaat om het bestaan van data, niet om een som.
   const latestTransactionMonth = aggLatestMonth((txAgg12Res.data ?? []) as TxMonthAggregateRow[])
 
-  // B-015 — de melding is minimaliseerbaar. De provider deelt één toestand met
-  // de banner (blok 1) én het statuspunt naast de pagina-'i' (blok 2). De maat
-  // is het aantal maanden achterstand; het oordeel komt uit hetzelfde canonieke
-  // `transactionFreshness` dat de banner zelf gebruikt (geen tweede drempel).
-  const txFreshness = transactionFreshness(latestTransactionMonth)
-  const staleMonthsBehind = txFreshness.state === 'stale' ? txFreshness.monthsBehind : null
-  const staleMinimizedMonths = asStaleMinimizedMonths(
-    minimizedMap[STALE_TX_NOTICE_MINIMIZE_KEY],
-  )
-
   const health = horizonData?.healthScore ?? null
   const freedomPct = horizonData?.healthScoreInput?.freedomPct ?? null
 
@@ -177,10 +162,11 @@ export default async function OverzichtPage() {
   //
   // Cashflow = de EFFECTIEVE spaarquote (ADR 0121) — de grondslag-geresolveerde
   // `resolveSavingsSource(...).effectiveSavingsRatePct`, waar een handmatige of
-  // budget-grondslag wint van de meting. Het veld op `healthScoreInput` heet
-  // `savingsRate6m`, maar dat is een LEGACY-MISNOMER: de horizon-loader vult het
-  // met `effectiveSavingsRate` (lib/horizon/raw-data-loader.ts). Consume-don't-
-  // recompute; dezelfde grondslag als de gezondheidsscore-pijler Rondkomen én —
+  // budget-grondslag wint van de meting. Het veld op `healthScoreInput` heette
+  // tot R2 (7 sep 2026) `savingsRate6m` — een legacy-misnomer, want de
+  // horizon-loader vult het met `effectiveSavingsRate`
+  // (lib/horizon/raw-data-loader.ts). De naam draagt nu zijn grondslag.
+  // Consume-don't-recompute; dezelfde grondslag als de gezondheidsscore-pijler Rondkomen én —
   // sinds B-030 — als de cashflow-hefboom-status en het kompas-detail.
   //
   // GELIJKE GRONDSLAG IS NIET OVERAL HETZELFDE GETAL. De hefboom-STATUS komt uit
@@ -193,7 +179,7 @@ export default async function OverzichtPage() {
     ? {
         bezittingen: horizonData.healthScoreInput.totalAssets,
         schulden: horizonData.healthScoreInput.totalDebts,
-        cashflow: horizonData.healthScoreInput.savingsRate6m,
+        cashflow: horizonData.healthScoreInput.effectiveSavingsRatePct,
         belasting: horizonData.box3Tax ?? null,
       }
     : undefined
@@ -264,14 +250,20 @@ export default async function OverzichtPage() {
           spotlight gaat via een portal naar `document.body`. */}
       {/* De "Gegevens verouderd"-melding leeft in de banner-slot van blok 1,
           maar haar geminimaliseerde vorm is een statuspunt náást de pagina-'i'
-          in de utility-cluster van blok 2. Deze provider omspant daarom béíde:
-          hij deelt de achterstand met het punt en onthoudt minimaliseren
-          server-side (jsonb-pref → PUT /api/overzicht/page-status).
-          Perspectief-gelijk aan de banner hieronder: buiten het eigen
-          perspectief is er geen melding, dus ook geen punt. */}
-      <StaleNoticeProvider
-        monthsBehind={perspective === 'personal' ? staleMonthsBehind : null}
-        initialMinimizedMonths={staleMinimizedMonths}
+          in de utility-cluster van blok 2. Deze guard omspant daarom béíde: hij
+          velt het versheidsoordeel, deelt de achterstand met banner én punt en
+          onthoudt minimaliseren server-side (jsonb-pref → PUT
+          /api/overzicht/page-status). De bronnen liggen hier al in blok 1, dus
+          ze gaan als `preloaded` mee — geen tweede leesronde.
+
+          ALLEEN IN HET EIGEN PERSPECTIEF: `getTxAgg12m` is RLS-breed (eigen +
+          gedeeld huishouden) en kent geen partner-variant, terwijl de tegels
+          hieronder in Huishouden/Partner wél perspectief-correct zijn. Een
+          melding over "jouw laatste boeking" naast partnercijfers zou een
+          bewering doen die deze bron niet kan onderbouwen. */}
+      <StaleDataGuard
+        active={perspective === 'personal'}
+        preloaded={{ latestTransactionMonth, minimizedMap }}
       >
       <RondleidingProvider
         seed={rondleidingSeed}
@@ -321,16 +313,9 @@ export default async function OverzichtPage() {
               <CheckinBanner seed={checkinBannerSeed} />
               {/* UR2-13 — staat de administratie stil, dan rusten de hefboom-tegels
                   hieronder (o.a. "Cashflow 38 %") op maandenoude transacties zonder
-                  dat iets dat verraadt. Rendert zichzelf weg bij verse data.
-
-                  ALLEEN IN HET EIGEN PERSPECTIEF: `getTxAgg12m` is RLS-breed (eigen
-                  + gedeeld huishouden) en kent geen partner-variant, terwijl de
-                  tegels hieronder in Huishouden/Partner wél perspectief-correct
-                  zijn. Een melding over "jouw laatste boeking" naast partnercijfers
-                  zou een bewering doen die deze bron niet kan onderbouwen. */}
-              {perspective === 'personal' && (
-                <StaleTransactionsBanner latestTransactionMonth={latestTransactionMonth} />
-              )}
+                  dat iets dat verraadt. Rendert zichzelf weg bij verse data en
+                  buiten het eigen perspectief; de gating zit in de guard hierboven. */}
+              <StaleNoticeBanner />
             </>
           }
           health={health}
@@ -362,6 +347,15 @@ export default async function OverzichtPage() {
                 framing={freedomFraming}
                 netWorthExclHome={netWorthExclHome}
                 housingSplit={housingSplit}
+                /* UR3-14 deel D — de twee termen achter het kopgetal, zodat de
+                   kassabon achter het netto vermogen dezelfde perspectief-
+                   correcte grondslag toont als het getal zelf. Geen extra
+                   query: `totals` staat hier al. */
+                vermogenOpbouw={
+                  totals
+                    ? { bezittingen: totals.bezittingen, schulden: totals.schulden }
+                    : null
+                }
               />
             </Suspense>
           }
@@ -381,7 +375,7 @@ export default async function OverzichtPage() {
           }
         />
       </RondleidingProvider>
-      </StaleNoticeProvider>
+      </StaleDataGuard>
     </>
   )
 }

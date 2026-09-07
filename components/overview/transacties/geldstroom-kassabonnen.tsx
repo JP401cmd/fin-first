@@ -10,10 +10,11 @@ import { summarizeFlow, type AnalysisTransaction, type FlowSummary } from '@/lib
 import type { Budget } from '@/lib/budget-data'
 
 /**
- * GeldstroomKassabonnen — de drie kassabon-sheets achter de Inkomen- en
- * Uitgaven-cel van de geldstroom-kaart. Verhuisd van de cashflow-hub
+ * GeldstroomKassabonnen — de kassabon-sheets achter de cellen van de
+ * geldstroom-kaart. Verhuisd van de cashflow-hub
  * (`components/app/cash-overview.tsx`) naar de transactiepagina (UR3-28,
- * fase 2b).
+ * fase 2b); de saldo/spaarquote-bon kwam erbij met UR3-14 deel D, zodat élk
+ * getal in die strip dezelfde affordance heeft.
  *
  * ── ÉÉN GRONDSLAG, GEEN TWEEDE SOM ───────────────────────────────────────────
  * Elke regel is een `summarizeFlow` over een deelverzameling van dezelfde
@@ -49,7 +50,7 @@ const OVERIGE_REKENINGEN = '__overig'
 /** Bucket-sleutel voor uitgaven zonder (bekend) budget. */
 const ONGECATEGORISEERD = '__uncat'
 
-export type KassabonKind = 'income' | 'expense'
+export type KassabonKind = 'income' | 'expense' | 'flow'
 
 type ReceiptLine = {
   id: string
@@ -311,6 +312,16 @@ export function GeldstroomKassabonnen({
         </KassabonShell>
       </ShellOverlay>
 
+      {/* === Kassabon: saldo + spaarquote === */}
+      <ShellOverlay
+        kind="sheet"
+        open={open === 'flow'}
+        onClose={closeAll}
+        title={`Saldo en spaarquote · ${windowLabel}`}
+      >
+        <SaldoSpaarquoteKassabon summary={summary} windowLabel={windowLabel} />
+      </ShellOverlay>
+
       {/* === Kassabon: deelbudgetten van één uitgavenpost === */}
       <ShellOverlay
         kind="sheet"
@@ -361,5 +372,105 @@ export function GeldstroomKassabonnen({
         </KassabonShell>
       </ShellOverlay>
     </>
+  )
+}
+
+/**
+ * SaldoSpaarquoteKassabon — de bon achter de Saldo-cel en de spaarquote-
+ * leeswaarde van de geldstroom-kaart (UR3-14 deel D).
+ *
+ * Vóór deze bon waren Inkomen en Uitgaven doorklikbaar en Saldo en spaarquote
+ * niet: dezelfde strip, dezelfde opmaak, een andere affordance zonder zichtbaar
+ * verschil. Dat was de inconsistentie die de kaart meldde.
+ *
+ * CONSUME, DON'T RECOMPUTE. Alle vier de getallen komen uit één `FlowSummary`
+ * (`summarizeFlow`), waar `savingsRate` al door de canonieke
+ * `savingsRateFromAggregates` is gegaan. Deze bon deelt niets zelf: de
+ * formuleregel benoemt de deling, hij voert 'm niet uit.
+ *
+ * GRONDSLAG STAAT ERBIJ. Dit is de spaarquote van dít periodevenster over de
+ * transacties, niet de EFFECTIEVE spaarquote van de hefboom-tegel op /overzicht
+ * (ADR 0121 — daar wint een handmatige of budget-grondslag van de meting). Dat
+ * zijn twee verschillende grootheden die allebei "spaarquote" heten; de bon
+ * zegt daarom wélke hij toont. Aflossingen tellen in dit periodeaggregaat niet
+ * als sparen mee (de aflossingsterm van `savingsRateFromAggregates` is hier 0)
+ * — ook dat staat er, want anders leest een aflosser zijn quote als te laag.
+ */
+export function SaldoSpaarquoteKassabon({
+  summary,
+  windowLabel,
+}: {
+  summary: FlowSummary
+  windowLabel: string
+}) {
+  const { income, expense, net, savingsRate } = summary
+  const overschot = net >= 0
+
+  return (
+    <KassabonShell>
+      <div className="mb-3 text-center">
+        <p className="font-sans text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ink-3)]">
+          Saldo en spaarquote
+        </p>
+        <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">{windowLabel}</p>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[var(--ink-2)]">Inkomen</span>
+          <span className="font-bold tabular-nums">
+            <MaskedAmount value={income} tone="kern" decimals />
+          </span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-[var(--ink-2)]">Uitgaven</span>
+          <span className="font-bold tabular-nums">
+            <MaskedAmount value={-expense} tone="kern" decimals />
+          </span>
+        </div>
+
+        <div className="mt-2 border-t border-dashed border-[var(--border-md)] pt-2">
+          <div className="flex items-center justify-between font-bold">
+            <span>{overschot ? 'Saldo — overgehouden' : 'Saldo — tekort'}</span>
+            <span className="tabular-nums" data-testid="flow-kassabon-saldo">
+              <MaskedAmount
+                value={net}
+                tone="kern"
+                decimals
+                signPrefix={net > 0 ? '+' : undefined}
+              />
+            </span>
+          </div>
+          {/* Vrijheidstijd hoort bij het bedrag dat je overhoudt — dat is de
+              tijd die je in deze periode hebt opgeslagen. Bij een tekort geen
+              badge: "min zoveel dagen vrijheid" is een oordeel dat deze
+              periode-aggregatie niet kan dragen (een halve maand met de vaste
+              lasten er al af leest anders dan een afgesloten maand). */}
+          {overschot && <FreedomTimeBadge amount={net} className="mt-1" />}
+        </div>
+
+        <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2">
+          <div className="flex items-center justify-between font-bold">
+            <span>Spaarquote</span>
+            <span className="tabular-nums" data-testid="flow-kassabon-spaarquote">
+              {savingsRate}%
+            </span>
+          </div>
+          <p className="mt-1 font-sans text-[11px] leading-relaxed text-[var(--ink-3)]">
+            Saldo gedeeld door inkomen — welk deel van wat er binnenkwam je hebt
+            omgezet in vrijheid.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 border-t border-dashed border-[var(--border-ed)] pt-2 font-sans text-[10px] leading-relaxed text-[var(--ink-4)]">
+        <p>
+          Over {windowLabel.toLowerCase()}, gemeten aan je transacties.
+          Aflossingen tellen hier niet als sparen mee. De spaarquote op je
+          overzicht kan hiervan afwijken: die volgt je vaste grondslag, niet de
+          meting van deze periode.
+        </p>
+      </div>
+    </KassabonShell>
   )
 }

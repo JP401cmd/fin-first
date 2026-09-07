@@ -2,14 +2,14 @@
 
 import { memo, useId, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { formatMaskedApproxCurrency, formatMaskedCurrency } from '@/lib/format'
+import { formatMaskedApproxCurrency } from '@/lib/format'
 import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { useDisplayMode } from '@/lib/hooks/use-display-mode'
 import { deflate, factorAtAge } from '@/lib/euro-display'
 import { fireAgeForDisplay, type FreedomFraming } from '@/lib/fire-strategy'
 import { computeConfidenceBand } from '@/lib/confidence-band'
-import { SubtotalLine } from '@/components/editorial/subtotal-line'
+import { NettoVermogenKopgetal, type VermogenOpbouw } from './vermogen-kassabon'
 import { NetWorthHistorySheet, type HistoryPoint } from './networth-history-sheet'
 
 // SVG-dimensies — module-scope want puur constant, gedeeld door de
@@ -73,6 +73,9 @@ function MiniNetWorthChartComponent({
   monthlySavings,
   netWorthExclHome,
   showExclHome = false,
+  vermogenOpbouw = null,
+  eigenHuisValue = null,
+  mortgageBalance = null,
   dailyExpense,
 }: {
   netWorthHistory: { month: string; value: number }[]
@@ -132,9 +135,21 @@ function MiniNetWorthChartComponent({
    */
   showExclHome?: boolean
   /**
+   * De twee termen achter `currentNetWorth` (`healthScoreInput.totalAssets` /
+   * `.totalDebts`, perspectief-correct uit blok 1) — voedt de kassabon achter
+   * het kopgetal (UR3-14 deel D). CONSUME, DON'T RECOMPUTE: de bon telt niets
+   * op; het totaal blijft `currentNetWorth`. Afwezig → kopgetal blijft plat.
+   */
+  vermogenOpbouw?: VermogenOpbouw | null
+  /** `housingSplit.eigenHuisValue` — regel in de kassabon bij `showExclHome`. */
+  eigenHuisValue?: number | null
+  /** `housingSplit.mortgageBalance` — regel in de kassabon bij `showExclHome`. */
+  mortgageBalance?: number | null
+  /**
    * Canoniek dagtarief (EUR/dag) uit de dashboard-bundel — doorgegeven aan de
-   * NetWorthHistorySheet voor de vrijheidstijd-equivalent van de periode-delta.
-   * Afwezig -> sheet toont alleen het EUR-bedrag. Nooit lokaal herrekenen.
+   * NetWorthHistorySheet voor de vrijheidstijd-equivalent van de periode-delta
+   * én aan de vermogens-kassabon voor de vrijheidstijd van het netto vermogen.
+   * Afwezig -> alleen het EUR-bedrag. Nooit lokaal herrekenen.
    */
   dailyExpense?: number
 }) {
@@ -612,22 +627,22 @@ function MiniNetWorthChartComponent({
               : 'Nog geen projectie'}
         </span>
       </header>
-      <div className="font-serif text-xl font-semibold text-[var(--ink)] tabular-nums">
-        {formatMaskedCurrency(currentNetWorth, masked)}
-      </div>
-      {/* Dubbele grondslag: nettovermogen EXCL. eigen woning als losse
-          subtotaal-regel onder het kopgetal (headline-context → gedeelde
-          SubtotalLine i.p.v. een compacte tegel-regel). Geen tweede grafieklijn:
-          een excl.-lijn op een totaal-vermogen-as voegt niets toe. Bron =
-          horizonData.netWorthExclHome (perspectief-correct). Margin-override
-          omdat de SubtotalLine-default (-mt-3 mb-5) te ruim is voor deze plek. */}
-      {showExclHome && netWorthExclHome != null && (
-        <SubtotalLine
-          label="excl. eigen woning"
-          amount={netWorthExclHome}
-          className="!mt-1 !mb-0"
-        />
-      )}
+      {/* Kopgetal + (dubbele grondslag) de EXCL.-eigen-woning-subregel.
+          Beide wonen sinds UR3-14 deel D in `NettoVermogenKopgetal`: met
+          `vermogenOpbouw` is het kopgetal een knop naar de kassabon met de
+          opbouw, zonder die prop rendert het exact het platte getal dat er
+          altijd stond. Geen tweede grafieklijn voor de excl.-grondslag: een
+          excl.-lijn op een totaal-vermogen-as voegt niets toe. Bron =
+          horizonData.netWorthExclHome (perspectief-correct). */}
+      <NettoVermogenKopgetal
+        currentNetWorth={currentNetWorth}
+        netWorthExclHome={netWorthExclHome}
+        showExclHome={showExclHome}
+        opbouw={vermogenOpbouw ?? null}
+        eigenHuisValue={eigenHuisValue}
+        mortgageBalance={mortgageBalance}
+        dailyExpense={dailyExpense}
+      />
       {/* Grafiek met twee klikzones: verleden (popup) + toekomst (/toekomst).
           De zones liggen als onzichtbare hit-areas óver de SVG, gesplitst op
           de Vandaag-as. Focus-ring + hover-tint maken de zones ontdekbaar. */}

@@ -254,7 +254,7 @@ export function Box3OptimizerClient({
               <div className="mt-4">
                 <BesprekMetWillButton
                   onderwerp="Mijn fiscale situatie"
-                  detail="Er is nu geen doorgerekende kans die per saldo voordeel oplevert in de optimizer."
+                  detail="Er is nu geen doorgerekende kans die per saldo voordeel oplevert bij Fiscale kansen."
                   vraag="Waar liggen voor mij nog fiscale kansen om vrijheid terug te kopen?"
                 />
               </div>

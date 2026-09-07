@@ -11,16 +11,45 @@
  *    kinderen zou dubbeltellen);
  *  · de y-as-labels lopen door de privacy-maskering — op de cashflow-hub stond
  *    daar een kale `formatCurrency` die dwars door de privacy-modus heen las.
+ *
+ * ── DE FORECAST-TAK (UR3, dekkingskaart) ─────────────────────────────────────
+ * De acht oorspronkelijke tests renderden állemaal met `priorTransactions={[]}`
+ * en een `NOW` búiten de getoonde maand. Daardoor was `isCurrentMonth` altijd
+ * `false` en sloeg de vroege `return` in `forecast` het complete forecastblok
+ * over — dagpatroon, forecastpad, `projectedExpenses`, Snelheid, vandaag-marker
+ * en de over/ruimte-regel. Precies dáár zat de rekenfout die de eindreview vond
+ * (transfers verdunden `monthCount` in `historicalDayPattern`; gerepareerd in
+ * 96d26b6c9 met `isRealAggRow`). De suite was groen en dat groen zei niets.
+ *
+ * Het blok "forecast-tak — lopende maand" hieronder loopt daarom met een `NOW`
+ * BINNEN de maand. T2 is de bijtende toets op die rekenfout: haal `isRealAggRow`
+ * uit `historicalDayPattern` weg en de prognose zakt van € 400,00 naar € 300,00.
+ * Waarneempunt is steeds het Prognose-blok in de footer — nooit
+ * `container.textContent`, want de y-as-ticks dragen óók bedragen en maken een
+ * bedrag-assertie stil vals-positief.
  */
 import { describe, it, expect, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import { PrivacyProvider, useMaskedAmounts } from '@/lib/hooks/use-privacy'
+import { PRIVACY_MASKED_STORAGE_KEY } from '@/lib/hooks/use-privacy'
 import { MASKED_AMOUNT_PLACEHOLDER, formatCurrencyDecimals } from '@/lib/format'
 import { summarizeFlow, type AnalysisTransaction } from '@/lib/transaction-insights'
 import type { Budget } from '@/lib/budget-data'
 import { GeldstroomDaggrafiek } from './geldstroom-daggrafiek'
 
-afterEach(cleanup)
+// `PrivacyProvider` bewaart de maskeer-voorkeur in `localStorage`, en die
+// overleeft `cleanup()`. De privacy-test hieronder zet 'm dus aan voor élke test
+// die daarná draait: die rendert dan '••••••' in plaats van bedragen en elke
+// `toContain(formatCurrencyDecimals(...))` wordt stil onhaalbaar. Zonder deze
+// opruiming is de suite volgorde-afhankelijk.
+afterEach(() => {
+  cleanup()
+  try {
+    window.localStorage.removeItem(PRIVACY_MASKED_STORAGE_KEY)
+  } catch {
+    // localStorage kan geweigerd zijn — de in-memory state is dan al schoon.
+  }
+})
 
 function tx(id: string, date: string, amount: number, type: string | null = null): AnalysisTransaction {
   return {
@@ -115,6 +144,35 @@ function renderChart(extra?: React.ReactNode) {
   )
 }
 
+/**
+ * Vrije variant van `renderChart` — elke prop overschrijfbaar, `summary` volgt
+ * standaard uit `summarizeFlow(transactions)` zodat de grafiek en de meegegeven
+ * samenvatting per constructie dezelfde populatie beschrijven.
+ */
+function renderWith(over: {
+  transactions?: AnalysisTransaction[]
+  priorTransactions?: AnalysisTransaction[]
+  budgets?: Budget[]
+  monthStart?: string
+  monthLabel?: string
+  now?: Date
+}) {
+  const transactions = over.transactions ?? TXNS
+  return render(
+    <PrivacyProvider>
+      <GeldstroomDaggrafiek
+        transactions={transactions}
+        priorTransactions={over.priorTransactions ?? []}
+        budgets={over.budgets ?? BUDGETS}
+        summary={summarizeFlow(transactions)}
+        monthStart={over.monthStart ?? MONTH_START}
+        monthLabel={over.monthLabel ?? 'juni 2026'}
+        now={over.now ?? NOW}
+      />
+    </PrivacyProvider>,
+  )
+}
+
 describe('GeldstroomDaggrafiek — footer-KPI\'s', () => {
   it('toont exact summarizeFlow(...).income / .expense / .net', () => {
     const { container } = renderChart()
@@ -137,9 +195,36 @@ describe('GeldstroomDaggrafiek — footer-KPI\'s', () => {
     expect(container.textContent).not.toContain(formatCurrencyDecimals(2199))
   })
 
-  it('sluit `transfer` uit, zoals de periode-samenvatting', () => {
-    const { container } = renderChart()
-    expect(container.textContent).not.toContain(formatCurrencyDecimals(5000))
+  // WAS: `expect(container.textContent).not.toContain(formatCurrencyDecimals(5000))`.
+  // Die toets was VACUÜM: € 5.000,00 wordt nergens als tekst gerenderd — de
+  // KPI's komen uit de `summary`-prop (die de test zélf al transfer-vrij maakt)
+  // en de staven zijn `<rect>`, geen tekst. De y-as gebruikt bovendien
+  // `formatCurrency` zónder decimalen, dus zelfs een tick op −5000 kan de string
+  // "€ 5.000,00" niet bevatten. De assertie kón niet falen. Wat de uitsluiting
+  // werkelijk bewaakt is de staaf-telling — dus toetsen we die, expliciet en
+  // mét controlegroep zodat de assertie aantoonbaar bijt.
+  it('geeft een dag met uitsluitend een overboeking géén staaf', () => {
+    const rows = [
+      tx('n1', '2026-06-03', -100),
+      tx('n2', '2026-06-05', -5000, 'transfer'),
+      tx('n3', '2026-06-09', -4000, 'joint_transfer'),
+    ]
+
+    const { container } = renderWith({ transactions: rows })
+    const negatief = (root: HTMLElement) =>
+      Array.from(root.querySelectorAll('svg rect')).filter(
+        (r) => r.getAttribute('fill') === 'var(--negative)',
+      ).length
+    // Alleen 3 juni draagt een échte uitgave; 5 en 9 juni zijn overboekingen.
+    expect(negatief(container)).toBe(1)
+
+    // Controlegroep: dezelfde drie dagen zónder transfer-type geven wél drie
+    // staven. Zonder deze helft zou een component die überhaupt geen staven
+    // tekent de assertie hierboven ook halen.
+    cleanup()
+    const zonderType = rows.map((r) => ({ ...r, transaction_type: null }))
+    const { container: c2 } = renderWith({ transactions: zonderType })
+    expect(negatief(c2)).toBe(3)
   })
 })
 
@@ -202,5 +287,132 @@ describe('GeldstroomDaggrafiek — privacy', () => {
       .filter((t) => t.trim().length > 0 && !/^\d+$/.test(t.trim()))
     expect(axisAfter.every((t) => t.includes(MASKED_AMOUNT_PLACEHOLDER))).toBe(true)
     expect(container.textContent).not.toContain(formatCurrencyDecimals(SUMMARY.income))
+  })
+})
+
+// ── De forecast-tak: NOW BINNEN de getoonde maand ───────────────────────────
+//
+// Gedeelde fixture: augustus 2026 (31 dagen), `NOW` = 10 augustus, twee rijen
+// (+2000 op 08-01, −100 op 08-05). Daarmee is `dayOfMonth` = 10,
+// `daysRemaining` = 21 en `cumulativeToday` = 1900.
+//
+// Alle verwachte bedragen hieronder zijn met de hand herleid uit de bron:
+//  · historische tak — projectedExpenses = expense + Σ avgExpense over d 11..31
+//  · tempo-tak       — projectedExpenses = expense + (expense / dayOfMonth) × 21
+
+const LOPEND_START = '2026-08-01'
+const NOW_IN_MAAND = new Date(2026, 7, 10) // 10 augustus 2026
+const LOPEND_TXNS: AnalysisTransaction[] = [tx('a1', '2026-08-01', 2000), tx('a2', '2026-08-05', -100)]
+
+/**
+ * Het Prognose-blok uit de footer — NIET `container.textContent`. De y-as-ticks
+ * dragen ook bedragen, dus een bedrag-assertie op de hele container kan
+ * toevallig een tick raken en daarmee stil vals-positief worden.
+ */
+function prognoseBlok(): string {
+  return screen.getByText('Prognose').parentElement?.textContent ?? ''
+}
+
+function renderLopend(over: { priorTransactions?: AnalysisTransaction[]; budgets?: Budget[] } = {}) {
+  return renderWith({
+    transactions: LOPEND_TXNS,
+    priorTransactions: over.priorTransactions ?? [],
+    budgets: over.budgets ?? [],
+    monthStart: LOPEND_START,
+    monthLabel: 'augustus 2026',
+    now: NOW_IN_MAAND,
+  })
+}
+
+describe('GeldstroomDaggrafiek — forecast-tak (lopende maand)', () => {
+  it('T1 · bereikt de tak: prognose-KPI, gestippeld pad tot maandeinde en één vandaag-marker', () => {
+    const { container } = renderLopend()
+
+    // De tak zelf: in een afgesloten maand staat hier 'Netto'.
+    expect(screen.getByText('Prognose')).toBeTruthy()
+    expect(screen.queryByText('Netto')).toBeNull()
+
+    const svg = container.querySelector('svg')!
+
+    // Precies één gestippeld forecastpad, met één segment per resterende dag:
+    // daysInMonth (31) − dayOfMonth (10) = 21.
+    const forecastPaden = Array.from(svg.querySelectorAll('path[stroke-dasharray="3 3"]'))
+    expect(forecastPaden).toHaveLength(1)
+    expect((forecastPaden[0].getAttribute('d') ?? '').match(/L /g) ?? []).toHaveLength(21)
+
+    // Precies één VERTICALE stippellijn (de vandaag-marker). Filteren op
+    // x1 === x2 is essentieel: de y-as-gridlines dragen dezelfde dasharray.
+    const stippelLijnen = Array.from(svg.querySelectorAll('line[stroke-dasharray="2 3"]'))
+    expect(stippelLijnen.length).toBeGreaterThan(1) // gridlines + marker
+    const verticaal = stippelLijnen.filter((l) => l.getAttribute('x1') === l.getAttribute('x2'))
+    expect(verticaal).toHaveLength(1)
+  })
+
+  it('T2 · een maand met alléén een overboeking verdunt de dagpatroon-gemiddelden niet', () => {
+    // Mei draagt uitsluitend een overboeking en mag dus NIET als "maand met €0"
+    // in `monthCount` belanden. Juni en juli dragen elk € 300 op dag 20.
+    //   correct : avgExpense(dag 20) = 600 / 2 = 300 → prognose 100 + 300 = 400
+    //   verdund : avgExpense(dag 20) = 600 / 3 = 200 → prognose 100 + 200 = 300
+    // Dit is de bijtende toets op de rekenfout uit 96d26b6c9: haal
+    // `isRealAggRow` uit `historicalDayPattern` weg en deze test wordt rood.
+    renderLopend({
+      priorTransactions: [
+        tx('p1', '2026-06-20', -300),
+        tx('p2', '2026-07-20', -300),
+        tx('p3', '2026-05-20', -5000, 'transfer'),
+      ],
+    })
+
+    const blok = prognoseBlok()
+    expect(blok).toContain(formatCurrencyDecimals(400))
+    expect(blok).not.toContain(formatCurrencyDecimals(300))
+    expect(blok).toContain('o.b.v. 12 mnd')
+  })
+
+  it('T3 · alleen overboekingen in de historie → terugval op het huidige tempo', () => {
+    // Geen enkele échte rij in de historie → `historicalDayPattern` is null en
+    // de curve valt terug op het tempo: 100 + (100 / 10) × 21 = 310.
+    // Zonder de transfer-uitsluiting ontstaat hier een nullen-patroon dat zich
+    // als "o.b.v. 12 mnd" presenteert en op € 100,00 blijft staan.
+    const { container } = renderLopend({
+      priorTransactions: [
+        tx('p1', '2026-05-04', -400, 'transfer'),
+        tx('p2', '2026-06-04', -400, 'joint_transfer'),
+        tx('p3', '2026-07-04', 400, 'transfer'),
+      ],
+    })
+
+    const blok = prognoseBlok()
+    expect(blok).toContain(formatCurrencyDecimals(310))
+    expect(blok).toContain('o.b.v. tempo')
+    expect(blok).not.toContain('o.b.v. 12 mnd')
+
+    // De curve bestaat wél — de terugval is geen leeg pad.
+    expect(container.querySelectorAll('path[stroke-dasharray="3 3"]')).toHaveLength(1)
+  })
+
+  it('T6 · prognose boven de maandlimiet kleurt het pad rood en toont de over-regel', () => {
+    // Uitsluitend een MAANDELIJKS budget: `totalMonthlyBudget` deelt kwartaal-
+    // en jaarbudgetten niet door 3/12 (bekende afwijking, aparte bugkaart) —
+    // die grondslag mag deze test niet cementeren.
+    const { container } = renderLopend({
+      budgets: [budget({ id: 'b-eten', name: 'Eten', default_limit: 200 })],
+    })
+
+    // Prognose 310 tegen een limiet van 200 → € 110,00 over.
+    const blok = prognoseBlok()
+    expect(blok).toContain(formatCurrencyDecimals(310))
+    expect(blok).toContain(formatCurrencyDecimals(110))
+    expect(blok).toContain('over')
+    expect(blok).not.toContain('ruimte')
+
+    // Snelheid = expense / (limiet × dayOfMonth / daysInMonth)
+    //          = 100 / (200 × 10 / 31) = 155%.
+    const snelheid = screen.getByText('Snelheid').parentElement?.textContent ?? ''
+    expect(snelheid).toContain('155%')
+    expect(snelheid).toContain('te snel')
+
+    const forecastPad = container.querySelector('path[stroke-dasharray="3 3"]')!
+    expect(forecastPad.getAttribute('stroke')).toBe('var(--negative)')
   })
 })

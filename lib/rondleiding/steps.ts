@@ -610,7 +610,11 @@ const STAPPEN: readonly RondleidingStap[] = [
         tekst: zinnen(
           `Je financiële gezondheid staat op ${Math.round(data.health.total)} van de 100: ${data.health.label.toLowerCase()}.`,
           'Eén getal voor rondkomen, buffer, schuld en vrijheid samen.',
-          'Achter de kaart zit de onderverdeling.',
+          // UR3-14 deel D — dit is de ENIGE plek waar de app het kassabon-
+          // patroon uitlegt: tik op een getal en je ziet de som. Bewust een
+          // woordwissel binnen dezelfde stap (geen extra stap), zodat het
+          // 35-woordbudget van de rondleiding niet verschuift.
+          'Tik op het getal, dan zie je de som.',
         ),
       }
     },

@@ -314,7 +314,7 @@ export default async function OverzichtBelastingPage() {
             {/* BEL-2: de "nieuw"-badge is vervallen — de optimizer is geen
                 introductie meer maar een vast onderdeel van de hub. */}
             <span className="flex items-center gap-2">
-              <span className="text-base font-semibold text-[var(--ink)]">Fiscale optimizer</span>
+              <span className="text-base font-semibold text-[var(--ink)]">Fiscale kansen</span>
             </span>
             <span className="mt-0.5 block text-sm leading-snug text-[var(--ink-2)]">
               Kies een fiscaal doel en vergelijk doorgerekende Box 3-scenario’s — in euro’s en vrijheidsdagen.

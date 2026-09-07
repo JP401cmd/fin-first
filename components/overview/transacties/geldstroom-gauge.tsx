@@ -70,6 +70,7 @@ export function GeldstroomGauge({
   windowLabel,
   onOpenIncome,
   onOpenExpense,
+  onOpenFlow,
 }: {
   summary: FlowSummary
   /**
@@ -80,6 +81,12 @@ export function GeldstroomGauge({
    */
   onOpenIncome?: () => void
   onOpenExpense?: () => void
+  /**
+   * Kassabon-ingang voor Saldo én de spaarquote-leeswaarde (UR3-14 deel D).
+   * Beide openen dezelfde bon: het saldo ís de teller van de spaarquote, dus
+   * twee bonnen voor één som zou dezelfde regels twee keer tonen.
+   */
+  onOpenFlow?: () => void
   /**
    * Het venster waarover deze meter leest — "augustus tot nu toe", "juli 2026".
    * Rendert als onderschrift onder de leeswaarde (S3).
@@ -184,20 +191,25 @@ export function GeldstroomGauge({
           </text>
         </svg>
 
-        {/* Leeswaarde: spaarquote */}
+        {/* Leeswaarde: spaarquote. Met een kassabon-ingang (UR3-14 deel D) is
+            de leeswaarde zélf de knop — het percentage was het enige getal op
+            deze kaart dat nergens heen ging. Zonder ingang blijft het exact de
+            platte tekst die er stond. */}
         <div className="-mt-1 text-center">
-          <div
-            className="text-[22px] font-black leading-none tabular-nums text-[var(--ink)]"
-            style={{ fontFamily: PLAYFAIR }}
-          >
-            {savingsRate}%
-          </div>
-          <div
-            className="mt-0.5 text-[11px] italic text-[var(--ink-3)]"
-            style={{ fontFamily: SOURCE_SERIF }}
-          >
-            spaarquote · {savingsRateLabel(savingsRate)}
-          </div>
+          <SpaarquoteLeeswaarde onClick={onOpenFlow}>
+            <div
+              className="text-[22px] font-black leading-none tabular-nums text-[var(--ink)]"
+              style={{ fontFamily: PLAYFAIR }}
+            >
+              {savingsRate}%
+            </div>
+            <div
+              className="mt-0.5 text-[11px] italic text-[var(--ink-3)]"
+              style={{ fontFamily: SOURCE_SERIF }}
+            >
+              spaarquote · {savingsRateLabel(savingsRate)}
+            </div>
+          </SpaarquoteLeeswaarde>
           {windowLabel && (
             <div className="mt-0.5 text-[10px] uppercase tracking-[0.08em] text-[var(--ink-4)]">
               {windowLabel}
@@ -215,11 +227,44 @@ export function GeldstroomGauge({
         <KpiCell label="Uitgaven" tone="negative" onClick={onOpenExpense} openLabel="Uitgaven per budget">
           <MaskedAmount value={expense} tone="inherit" decimals />
         </KpiCell>
-        <KpiCell label="Saldo" tone={net >= 0 ? 'positive' : 'negative'}>
+        <KpiCell
+          label="Saldo"
+          tone={net >= 0 ? 'positive' : 'negative'}
+          onClick={onOpenFlow}
+          openLabel="Saldo en spaarquote"
+        >
           <MaskedAmount value={net} tone="inherit" decimals signPrefix={net > 0 ? '+' : ''} />
         </KpiCell>
       </div>
     </div>
+  )
+}
+
+/**
+ * De spaarquote-leeswaarde onder de meter: zonder `onClick` een stille `<div>`,
+ * mét `onClick` een echte `<button>` naar de saldo/spaarquote-kassabon. Zelfde
+ * driewegkeuze als `KpiCell` — en om dezelfde reden géén `aria-label`: die zou
+ * de naamberekening vervangen en juist het percentage bij de schermlezer
+ * weghalen. De zichtbare inhoud blijft de naam; wat de knop doet komt er als
+ * sr-only staart achteraan.
+ */
+function SpaarquoteLeeswaarde({
+  onClick,
+  children,
+}: {
+  onClick?: () => void
+  children: React.ReactNode
+}) {
+  if (!onClick) return <>{children}</>
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="mx-auto block cursor-pointer rounded px-2 py-0.5 transition-colors duration-150 hover:bg-[var(--subtle)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ink)]"
+    >
+      {children}
+      <span className="sr-only">, toon saldo en spaarquote</span>
+    </button>
   )
 }
 
@@ -260,12 +305,14 @@ export function GeldstroomZin({
   summary,
   onOpenIncome,
   onOpenExpense,
+  onOpenFlow,
 }: {
   description: FlowDescription
   summary: FlowSummary
   /** Zie `GeldstroomGauge` — dezelfde kassabon-ingangen, dezelfde strip. */
   onOpenIncome?: () => void
   onOpenExpense?: () => void
+  onOpenFlow?: () => void
 }) {
   const { kind, windowLabel, income, expense, net, savingsRate, prevIncome } = description
 
@@ -330,7 +377,12 @@ export function GeldstroomZin({
         <KpiCell label="Uitgaven" tone="negative" onClick={onOpenExpense} openLabel="Uitgaven per budget">
           <MaskedAmount value={summary.expense} tone="inherit" decimals />
         </KpiCell>
-        <KpiCell label="Saldo" tone={summary.net >= 0 ? 'positive' : 'negative'}>
+        <KpiCell
+          label="Saldo"
+          tone={summary.net >= 0 ? 'positive' : 'negative'}
+          onClick={onOpenFlow}
+          openLabel="Saldo en spaarquote"
+        >
           <MaskedAmount
             value={summary.net}
             tone="inherit"

@@ -607,10 +607,19 @@ export function Box3Detail({
         {/* 3.1 — Forfaitaire opbouw als gestapelde staaf */}
         <Box3Opbouw result={result} fc={fc} />
 
-        {/* 3.3 — Heffingsvrij-vermogen-gauge */}
-        <HideInSimple>
+        {/* 3.3 — Heffingsvrij-vermogen-gauge.
+
+            BEL-9 (besluit 6 sep 2026). Dit katern stond hard in `HideInSimple`,
+            terwijl 3.1 (de forfaitaire opbouw-staaf — het rekenmodel) er juist
+            búiten staat. De beginner kreeg dus het model en niet het gevolg,
+            terwijl "elke € 1.000 extra kost je ≈ € N" precies de zin is die de
+            gebruikerstest als beste vertaling van de hele app aanwees.
+            In Eenvoudig staat er nu die ene zin (`sentenceOnly`), in Volledig
+            de bestaande gauge + tekst — byte-identiek, want `SwapInSimple`
+            raakt de `full`-tak niet. */}
+        <SwapInSimple simple={<Box3Heffingsvrij result={result} fc={fc} sentenceOnly />}>
           <Box3Heffingsvrij result={result} fc={fc} />
-        </HideInSimple>
+        </SwapInSimple>
 
         {/* 3.4 — Vermogensmix spaargeld vs. beleggingen */}
         <HideInSimple>

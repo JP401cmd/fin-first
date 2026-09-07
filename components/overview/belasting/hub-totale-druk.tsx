@@ -6,6 +6,7 @@ import type { TaxOverviewResult } from '@/lib/tax-overview'
 import { Kicker, HighlightMark } from '@/components/editorial'
 import { SwapInSimple } from '@/components/app/swap-in-simple'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { TotaleDrukKassabonTrigger } from './totale-druk-kassabon'
 
 const PLAYFAIR = 'var(--font-playfair, Georgia, serif)'
 
@@ -124,6 +125,14 @@ export function HubTotaleDruk({
           de gouden "universele uitkomst": HighlightMark zet er de gouden marker
           onder (--module-active-200 is hier de hub-highlight, niet box-codering). */}
       <div className="mt-4 flex items-baseline gap-3 flex-wrap">
+        {/* UR3-14 deel D — het hero-bedrag opent de kassabon met de opbouw over
+            de boxen. De trigger is een client-child (deze kaart blijft een
+            server-component), net als `MaskedAmount` hieronder. */}
+        <TotaleDrukKassabonTrigger
+          overview={overview}
+          dailyExpenses={dailyExpenses}
+          exclBox2={exclBox2}
+        >
         <HighlightMark>
           {/* PRIVACY (ADR 0091). Katern I was het laatste hub-blok dat de
               privacymodus negeerde: het hero-bedrag stond onder het oog-icoon
@@ -143,6 +152,7 @@ export function HubTotaleDruk({
             />
           </span>
         </HighlightMark>
+        </TotaleDrukKassabonTrigger>
         <span
           className="italic text-sm text-[var(--ink-3)]"
           style={{ fontFamily: 'var(--font-source-serif, Georgia, serif)' }}

@@ -3,6 +3,7 @@ import { render as rtlRender, screen } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import { MiniNetWorthChart } from './mini-networth-chart'
 import { DisplayModeProvider, type DisplayMode } from '@/lib/hooks/use-display-mode'
+import { localMonthStart } from '@/lib/month-range'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
@@ -27,8 +28,9 @@ function render(ui: ReactElement, mode: DisplayMode = 'full') {
 
 function buildHistory(values: number[]): { month: string; value: number }[] {
   return values.map((value, i) => {
-    const d = new Date(2025, i, 1)
-    return { month: d.toISOString().slice(0, 7), value }
+    // localMonthStart: `new Date(2025, i, 1).toISOString()` gaf in NL (UTC+) de
+    // vórige maand, dus de fixture liep een maand achter op zijn bedoeling.
+    return { month: localMonthStart(new Date(2025, i, 1)).slice(0, 7), value }
   })
 }
 

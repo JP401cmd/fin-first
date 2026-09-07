@@ -247,7 +247,14 @@ describe('Box3TegenbewijsCard — weergavemodus Eenvoudig (UR2-16d)', () => {
 
   it('blijft op de box3-pagina bereikbaar via DepthSection, niet hard verborgen', () => {
     const detail = readFileSync(join(process.cwd(), 'components/overview/box3-detail.tsx'), 'utf8')
-    const start = detail.indexOf('<SwapInSimple')
+    // Anker op de KAART, niet op "de eerste SwapInSimple in het bestand": sinds
+    // BEL-9 (7 sep 2026) draagt box3-detail.tsx een tweede swap — katern 3.3
+    // (heffingsvrij) staat er in het bestand vóór deze — en dan wees een
+    // eerste-treffer-scan naar het verkeerde katern. Blijft bijten: valt de
+    // tegenbewijs-call-site terug op HideInSimple, dan levert dit de swap van
+    // 3.3 op en bevat die geen <Box3TegenbewijsCard>.
+    const cardIdx = detail.indexOf('<Box3TegenbewijsCard')
+    const start = detail.lastIndexOf('<SwapInSimple', cardIdx)
     expect(start, 'de tegenbewijs-call-site hoort een modus-tak te hebben').toBeGreaterThan(-1)
 
     const callSite = detail.slice(start, detail.indexOf('</SwapInSimple>', start))

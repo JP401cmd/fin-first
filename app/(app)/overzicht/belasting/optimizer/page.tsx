@@ -10,7 +10,7 @@ import { CURRENT_TAX_YEAR } from '@/lib/box3-data'
 import { Box3OptimizerClient } from '@/components/overview/belasting/optimizer-client'
 
 export const metadata: Metadata = {
-  title: 'Fiscale optimizer — TriFinity',
+  title: 'Fiscale kansen — TriFinity',
   description:
     'Al je fiscale doelen doorgerekend — Box 3-scenario’s én je Box 1-jaarruimte — in euro’s en vrijheidsdagen.',
 }
@@ -43,7 +43,7 @@ export default async function BelastingOptimizerPage() {
 
   return (
     <>
-      <NavStackMeta title="Fiscale optimizer" bottomBar={{ kind: 'tabs' }} />
+      <NavStackMeta title="Fiscale kansen" bottomBar={{ kind: 'tabs' }} />
 
       <div className="relative mx-auto max-w-6xl px-4 pt-6 pb-3 sm:px-6 sm:pt-8">
         <PageInfoButton
@@ -52,7 +52,7 @@ export default async function BelastingOptimizerPage() {
         />
         <PageOpening
           className="pr-20 sm:pr-24"
-          kicker="Belasting · Optimizer"
+          kicker="Belasting · Kansen"
           titleBefore="Van belasting berekenen naar "
           emphasis="optimaliseren"
           titleAfter=""

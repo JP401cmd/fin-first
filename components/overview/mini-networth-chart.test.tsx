@@ -8,6 +8,7 @@ import { MASKED_AMOUNT_PLACEHOLDER, formatApproxCurrency, formatCurrency } from 
 import { EuroViewProvider } from '@/lib/hooks/use-euro-view'
 import { deflate, factorAtAge } from '@/lib/euro-display'
 import { buildSimNetWorthRows } from '@/lib/horizon/networth-rows'
+import { localMonthStart } from '@/lib/month-range'
 import { VrijheidsvoortgangWidget } from '@/components/widgets/vrijheidsvoortgang-widget'
 import type { DashboardData } from '@/components/widgets/widget-renderer'
 
@@ -56,8 +57,9 @@ function render(ui: ReactElement, mode: DisplayMode = 'full') {
 
 function buildHistory(values: number[]): { month: string; value: number }[] {
   return values.map((value, i) => {
-    const d = new Date(2025, i, 1)
-    return { month: d.toISOString().slice(0, 7), value }
+    // localMonthStart: `new Date(2025, i, 1).toISOString()` gaf in NL (UTC+) de
+    // vórige maand, dus de fixture liep een maand achter op zijn bedoeling.
+    return { month: localMonthStart(new Date(2025, i, 1)).slice(0, 7), value }
   })
 }
 
