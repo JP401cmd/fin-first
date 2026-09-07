@@ -173,7 +173,9 @@ export const TIME_PERIODS: TimePeriod[] = [
   { id: '3m', label: '3M', months: 3, windowLabel: 'over 3 maanden' },
   { id: '6m', label: '6M', months: 6, windowLabel: 'over 6 maanden' },
   { id: '1y', label: '1J', months: 12, windowLabel: 'over 1 jaar' },
-  { id: 'ytd', label: 'YTD', months: 0, isYtd: true, windowLabel: 'dit jaar' },
+  // Label "Dit jaar", niet "YTD" (UR3-13 F2, optie C): de id blijft 'ytd' — dat
+  // is een data-sleutel die de API-vensters en de opgeslagen keuze aansturen.
+  { id: 'ytd', label: 'Dit jaar', months: 0, isYtd: true, windowLabel: 'dit jaar' },
   { id: 'all', label: 'Alles', months: 0, windowLabel: 'over de volledige historie' },
 ]
 

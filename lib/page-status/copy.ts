@@ -198,7 +198,7 @@ export const PAGE_STATUS_COPY: Record<string, RouteCopy> = {
   },
 
   '/overzicht/budget/forecast': {
-    title: 'Forecast',
+    title: 'Vooruitblik',
     warn: {
       reason: 'Je verwachte saldo blijft de komende maanden vlak.',
       remedy:

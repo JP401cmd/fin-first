@@ -236,7 +236,7 @@ describe('BudgetPeriodToggle — Eenvoudig vs Volledig (BUD-1)', () => {
       </DisplayModeProvider>,
     )
     expect(screen.queryByRole('button', { name: 'Maand' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'YTD' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Dit jaar' })).toBeNull()
     expect(screen.queryByRole('button', { name: '12 mnd' })).toBeNull()
     // Jargonregel: "YTD" komt in Eenvoudig niet in beeld.
     expect(container.textContent ?? '').not.toContain('YTD')
@@ -244,9 +244,9 @@ describe('BudgetPeriodToggle — Eenvoudig vs Volledig (BUD-1)', () => {
   })
 
   it('simple: rendert óók niets wanneer de bewaarde keuze nog YTD is', () => {
-    // Regressie op de terugval: wie in Volledig op YTD stond en terugschakelt
-    // naar Eenvoudig mag geen YTD-schakel (of -label) meer zien. De caller zet
-    // `effectivePeriodMode` op 'maand'; de toggle zelf verdwijnt volledig.
+    // Regressie op de terugval: wie in Volledig op de jaar-periode stond en
+    // terugschakelt naar Eenvoudig mag die schakel niet meer zien. De caller
+    // zet `effectivePeriodMode` op 'maand'; de toggle zelf verdwijnt volledig.
     const { container } = render(
       <DisplayModeProvider initialMode="simple">
         <BudgetPeriodToggle simple periodMode="ytd" onSelect={() => {}} />
@@ -256,7 +256,7 @@ describe('BudgetPeriodToggle — Eenvoudig vs Volledig (BUD-1)', () => {
     expect(container.textContent ?? '').not.toContain('YTD')
   })
 
-  it('full: toont Maand / YTD / 12 mnd en meldt de keuze terug', () => {
+  it('full: toont Maand / Dit jaar / 12 mnd en meldt de keuze terug', () => {
     const onSelect = vi.fn()
     render(
       <DisplayModeProvider initialMode="full">
@@ -264,10 +264,20 @@ describe('BudgetPeriodToggle — Eenvoudig vs Volledig (BUD-1)', () => {
       </DisplayModeProvider>,
     )
     expect(screen.getByRole('button', { name: 'Maand' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'YTD' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Dit jaar' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '12 mnd' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'YTD' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Dit jaar' }))
     expect(onSelect).toHaveBeenCalledWith('ytd')
+  })
+
+  it('full: toont de afkorting "YTD" nergens meer — het leenwoord is aan de bron hernoemd (UR3-13 F2, optie C)', () => {
+    const { container } = render(
+      <DisplayModeProvider initialMode="full">
+        <BudgetPeriodToggle simple={false} periodMode="ytd" onSelect={() => {}} />
+      </DisplayModeProvider>,
+    )
+    expect(container.textContent ?? '').not.toContain('YTD')
+    expect(container.textContent ?? '').toContain('Dit jaar')
   })
 })
 

@@ -83,7 +83,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
         text: 'Bij je eerste bezoek loopt Fin in twee minuten met je langs de blokken op deze pagina en vertelt wat je cijfers betekenen. Je kunt hem hieronder opnieuw starten, of vanuit de gids in Fin.',
       },
     ],
-    terms: ['netto_vermogen', 'vrijheidstijd', 'spaarquote'],
+    terms: ['netto_vermogen', 'vrijheidstijd', 'spaarquote', 'bandbreedte', 'kassabon'],
     related: [
       { href: '/overzicht/budget', label: 'Budget — wat er in- en uitgaat' },
       { href: '/toekomst', label: 'Toekomst — je pad naar vrijheid' },
@@ -112,7 +112,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
         text: 'Je eigen huis en je pensioenpotten kun je niet zomaar aanspreken. In Toekomst leg je vast hoe ze meetellen in je vrijheidsberekening.',
       },
     ],
-    terms: ['netto_vermogen', 'per_asset_rendement', 'asset_allocatie', 'liquiditeit'],
+    terms: ['netto_vermogen', 'per_asset_rendement', 'asset_allocatie', 'liquiditeit', 'inclusiepercentage'],
     related: [
       { href: '/overzicht/schulden', label: 'Schulden — de andere kant van de balans' },
       { href: '/rapportages/vermogen', label: 'Je vermogen tot in detail' },
@@ -139,7 +139,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
         text: 'Het rendement wordt berekend uit je eigen inleg en waardeverloop, niet uit een marktgemiddelde. Daarom kan het afwijken van wat je broker toont.',
       },
     ],
-    terms: ['per_asset_rendement', 'asset_allocatie', 'diversificatie', 'index_etf', 'expense_ratio', 'dividend'],
+    terms: ['per_asset_rendement', 'asset_allocatie', 'diversificatie', 'index_etf', 'expense_ratio', 'dividend', 'ETF', 'ter', 'ISIN', 'rebalancing'],
     related: [{ href: '/overzicht/bezittingen', label: 'Al je bezittingen bij elkaar' }],
   },
   '/overzicht/bezittingen/eigen_huis': {
@@ -184,7 +184,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
         text: 'Bouw je minder op dan fiscaal mag, dan is er jaarruimte. Wat dat voor jou betekent, zie je bij je belastingoverzicht.',
       },
     ],
-    terms: ['pensioen', 'upo', 'jaarruimte', 'franchise', 'middelloon'],
+    terms: ['pensioen', 'upo', 'jaarruimte', 'franchise', 'middelloon', 'AOW'],
     related: [
       { href: '/overzicht/belasting/box1', label: 'Wat pensioen fiscaal doet' },
       { href: '/toekomst', label: 'Je pad tot aan de pensioenleeftijd' },
@@ -377,6 +377,10 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
       'Je spaarquote, maandelijks netto en uitgaventrend in één blik, met een vooruitblik van 6 maanden op basis van je baseline en vaste lasten.',
     grip:
       'Volg hoe je saldo zich naar verwachting ontwikkelt; deze blik is lineair — voor een scenario-diepere projectie ga je naar Toekomst.',
+    // 'forecast' staat hier bewust als begrip, terwijl de pagina zelf
+    // "Vooruitblik" heet (UR3-13 F2, optie C): wie het Engelse woord elders
+    // tegenkomt, vindt hier waar het bij ons over gaat.
+    terms: ['forecast', 'spaarquote', 'vrijheidstijd'],
   },
   '/overzicht/belasting': {
     insight:
@@ -412,6 +416,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     insight:
       'Box 2 belast inkomen uit aanmerkelijk belang: dividend en vervreemdingswinst voor wie 5% of meer van de aandelen in een vennootschap bezit, bijvoorbeeld een eigen bv.',
     grip: 'Heb je een deelneming? Voeg die toe als bezitting, dan rekent TriFinity Box 2 automatisch voor je uit.',
+    terms: ['aanmerkelijk_belang', 'dividend', 'vervreemdingswinst'],
   },
   '/overzicht/belasting/box3': {
     insight:
@@ -465,7 +470,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
         text: 'TriFinity rekent voor en legt uit; de keuze en de aangifte blijven van jou. Voor persoonlijk advies is een adviseur met vergunning nodig.',
       },
     ],
-    terms: ['box_3', 'heffingsvrij_vermogen', 'pensioen'],
+    terms: ['box_3', 'heffingsvrij_vermogen', 'pensioen', 'jaarruimte', 'optimizer'],
     related: [
       { href: '/overzicht/belasting/box3', label: 'Box 3 in detail' },
       { href: '/overzicht/belasting/box1', label: 'Box 1 en je jaarruimte' },
@@ -501,7 +506,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
         text: 'Rendement, inflatie, je uitgaven na pensioen en je eindleeftijd bepalen samen de uitkomst. Je stelt ze zelf in bij Voorkeuren — een kleine bijstelling kan jaren schelen.',
       },
     ],
-    terms: ['fire', 'vrijheidstijd', 'swr', 'inflatie'],
+    terms: ['fire', 'vrijheidstijd', 'swr', 'inflatie', 'omslagpunt', 'stopmoment', 'bandbreedte'],
     related: [
       { href: '/toekomst/doelen', label: 'Je doelen beheren' },
       { href: '/toekomst/gebeurtenissen', label: 'Levensgebeurtenissen op je tijdas' },
@@ -550,11 +555,10 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     grip:
       'Bekijk hoe €100 van vandaag aanvoelt over 10, 20 of 30 jaar en reken je doel om in koopkracht in plaats van kale euro’s.',
   },
-  '/toekomst/samengestelde-interest': {
-    insight:
-      'Rente-op-rente is de stille motor achter elke vrijheid: tijd doet het zware werk, niet alleen je inleg.',
-    grip: 'Speel met inleg, rendement en horizon en zie hoe een euro van vandaag over 30 jaar kan uitgroeien tot tien euro.',
-  },
+  // '/toekomst/samengestelde-interest' stond hier tot UR3-26. De losse
+  // calculator had nul ingangen en redirect nu naar de rekenhulp-bibliotheek;
+  // de rente-op-rente-uitleg zelf staat op de compound-insight-kaart bij de
+  // bezittingen. Een info-tekst voor een dood adres hoort hier niet.
   '/toekomst/doelen': {
     insight:
       'Elk doel hier is een stuk vrijheid dat je opbouwt — zie in één oogopslag hoeveel je al hebt, wat er nog te gaan is en of je op koers ligt, loopt achter of aandacht nodig hebt.',
@@ -593,6 +597,20 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     insight:
       'Achter elke projectie zitten aannames — verwacht rendement, inflatie, je uitgaven na pensioen, je eindleeftijd — en die bepalen samen hoeveel jaar vrijheid je berekening laat zien.',
     grip: 'Draai hier aan die knoppen; een kleine bijstelling kan je uitkomst met jaren verschuiven.',
+    // De plan-regel (ADR 0129) is hier twee vragen: wanneer stop je, en wat moet
+    // er aan het eind gelden. De opties van die twee vragen zijn precies deze
+    // begrippen — als radio-label kunnen ze geen popover dragen, dus staan ze
+    // als chip op de `i` van de pagina waar je ze kiest.
+    terms: [
+      'stopmoment',
+      'stopanker_solved',
+      'stopanker_aow',
+      'stopanker_age',
+      'stopanker_now',
+      'eindstrategie_deplete',
+      'eindstrategie_legacy',
+      'eindstrategie_perpetual',
+    ],
   },
   '/toekomst/bibliotheek': {
     insight:
@@ -669,6 +687,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
       'Eenmaal gestopt draait alles om hoelang je vermogen meegaat en welke risico’s die afbouwfase kunnen ondermijnen.',
     grip:
       'Bekijk de Monte Carlo-slagingskans, het volgorde-risico van de eerste jaren, koopkrachterosie door inflatie, de keuze om je huis te behouden of verkopen, en wat je nalaat aan het einde.',
+    terms: ['SORR', 'Monte_Carlo', 'inflatie'],
   },
   '/toekomst/fase-onttrekking/inkomen': {
     insight: 'Hoe je jaarinkomen in de afbouwfase is samengesteld, bepaalt hoeveel druk er op je vermogen staat.',
@@ -682,6 +701,7 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
       'Alles wat je gegevens en voorkeuren bepaalt staat hier verzameld, gescheiden per onderwerp in plaats van in één lange lijst.',
     grip:
       'Beheer profiel, partner, privacy en koppelingen, stel voorkeuren in voor notificaties, uiterlijk en de personalisatie van je Overzicht, en exporteer rapportages.',
+    terms: ['soevereiniteit'],
   },
   '/mijn/profiel': {
     insight:
@@ -759,19 +779,14 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
       'Alle meldingen die je ontvangt komen hier samen — budgetwaarschuwingen, partner-transacties, mijlpalen, herinneringen en tips — zodat je niets hoeft te missen tussen losse kanalen.',
     grip:
       'Filter op ongelezen en markeer berichten als gelezen. Het financiële nieuws vind je in De Krant, je wekelijkse briefing op het Overzicht.',
+    terms: ['will'],
   },
 
   // ── Kern sub-pagina's (/core/**) ─────────────────────────────────────
-  '/core': {
-    insight:
-      'Je financieel fundament in één overzicht: al je bezittingen en schulden, je netto vermogen, schuldgraad en FIRE-voortgang.',
-    grip: 'Klik op een categorie om items toe te voegen of te beheren.',
-  },
-  '/core/budgets': {
-    insight:
-      'Je maandbudgetten per categorie: wat je hebt uitgegeven tegenover je limiet, en hoeveel vrijheidsdagen elke post kost.',
-    grip: 'Klik op een budget om de bijbehorende transacties en trends te bekijken.',
-  },
+  // '/core', '/core/budgets' en '/core/belasting' stonden hier tot UR3-26.
+  // Die drie pagina's zijn met de dode-broncode-opruiming verdwenen: hun URL
+  // redirect al sinds de nav-migratie naar /overzicht, /overzicht/budget resp.
+  // /overzicht/belasting, en die canonieke routes dragen hun eigen entry.
   '/core/assets': {
     insight:
       'Al je bezittingen gegroepeerd per type — spaargeld, beleggingen, vastgoed, crypto en meer — met de totale waarde en verdeling.',
@@ -781,10 +796,6 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     insight:
       'Al je schulden op een rij: hypotheek, leningen en overige verplichtingen, met resterende schuld, maandlasten en aflossingstempo.',
     grip: 'Voeg schulden toe of bekijk mogelijke aflosstrategieën.',
-  },
-  '/core/belasting': {
-    insight: 'Je Box 3-belastingdruk op basis van je bezittingen en schulden, volgens de actuele Belastingdienst-systematiek.',
-    grip: 'Zie het verschil tussen je werkelijke en het fictieve rendement om te bepalen waar fiscale ruimte zit.',
   },
   '/core/cash/connect': {
     insight:
@@ -844,12 +855,14 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     insight:
       'Hier zie je niet alleen wát je uitgaf, maar of dat klopt met wat je jezelf had voorgenomen — en wat het verschil doet met de vrijheid die je opbouwt.',
     grip: 'Vergelijk per categorie waar je onder of over budget zit en wat dat betekent voor je spaarquote; druk het rapport af als PDF.',
+    terms: ['kassabon', 'spaarquote'],
   },
   '/rapportages/benchmark': {
     insight:
       'Losse cijfers zeggen weinig zonder context; deze pagina zet jouw spaarquote, vermogen en woonlasten naast vergelijkbare huishoudens — als spiegel, niet als rapportcijfer.',
     grip:
       'Bekijk waar je afwijkt van het gemiddelde en gebruik dat als aanknopingspunt om elders in de app iets bij te stellen, niet als score om na te jagen.',
+    terms: ['YTD', 'spaarquote'],
   },
   '/rapportages/persoonlijk-plan': {
     insight:

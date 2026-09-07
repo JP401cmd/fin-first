@@ -518,14 +518,14 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
     name: 'Forecast',
     alternative: 'Vooruitblik van je geldstroom',
     explanation:
-      'Een doorrekening van je verwachte inkomsten en uitgaven de komende maanden, op basis van je patronen tot nu toe. Geen belofte — een inschatting die met nieuwe gegevens verandert.',
+      'Een doorrekening van je verwachte inkomsten en uitgaven de komende maanden, op basis van je patronen tot nu toe. Geen belofte — een inschatting die met nieuwe gegevens verandert. In TriFinity heet deze pagina Vooruitblik; forecast is het Engelse woord dat je elders tegenkomt.',
   },
   // Zelfde reden als forecast: hernoemen aan de bron (→ Kansen) volgt in F2.
   optimizer: {
     name: 'Optimizer',
     alternative: 'Fiscale kansen op een rij',
     explanation:
-      'Het overzicht van fiscale besparingskansen, geordend op grootste netto effect eerst. Elke kans is een concrete actie die je zelf kunt overwegen.',
+      'Het overzicht van fiscale besparingskansen, geordend op grootste netto effect eerst. Elke kans is iets dat je zelf kunt overwegen. In TriFinity heet deze pagina Fiscale kansen; optimizer is het Engelse woord dat je elders tegenkomt.',
   },
   // Geen `simpleLabel`: ISIN is een code, geen vervangbaar woord.
   ISIN: {
@@ -539,7 +539,7 @@ export const GLOSSARY_ENTRIES: Record<string, GlossaryEntry> = {
     alternative: 'Sinds 1 januari van dit jaar',
     simpleLabel: 'dit jaar',
     explanation:
-      'Year-to-Date — de periode vanaf 1 januari van het lopende jaar tot vandaag. Handig om dit jaar te vergelijken met eerdere jaren.',
+      'Year-to-Date — de periode vanaf 1 januari van het lopende jaar tot vandaag. Handig om dit jaar te vergelijken met eerdere jaren. In TriFinity heet deze periode Dit jaar; YTD is de afkorting die je bij banken en brokers tegenkomt.',
   },
   middelloon: {
     name: 'Middelloonregeling',

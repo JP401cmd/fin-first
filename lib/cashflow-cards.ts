@@ -533,12 +533,14 @@ export function buildCashflowCards(
   const fcStatus: LeverageStatus = forecastCardStatus({ netPerMonth, hasForecast })
   const forecast: CashflowCard = {
     key: 'forecast',
-    label: 'Forecast',
+    // Sleutel + route blijven 'forecast' (data-slug); het zichtbare label is
+    // Nederlands — UR3-13 F2, optie C.
+    label: 'Vooruitblik',
     href: `${BASE}/forecast`,
     tooltip: 'Verwachte kasstroom 6 maanden vooruit.',
     kpi: hasForecast ? formatCurrency(endBalance) : null,
     subText: !hasForecast
-      ? 'Nog geen forecast'
+      ? 'Nog geen vooruitblik'
       : netPerMonth > 0
         ? 'Saldo groeit'
         : netPerMonth < 0

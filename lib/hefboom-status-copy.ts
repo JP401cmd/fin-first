@@ -104,6 +104,18 @@ export const HEFBOOM_VERDICT: Record<
 export const HEFBOOM_VERDICT_NEUTRAL = 'Nog geen gegevens'
 
 /**
+ * Wat een tegel toont bij `neutral` terwijl hij WÉL een getal laat zien.
+ *
+ * "Nog geen gegevens" naast "46%" is een tegenspraak: de gegevens zijn er, het
+ * OORDEEL ontbreekt (de lever-score is nog niet te bepalen). Dat verschil is
+ * geen semantische muggenzifterij — de eerste zin nodigt uit om gegevens toe te
+ * voegen die er al zijn, en dat is precies wat de tester op de cashflow-tegel
+ * zag (UR3-17 #8). Kies daarom op de call-site tussen deze twee zinnen op basis
+ * van "staat er een getal in deze tegel".
+ */
+export const HEFBOOM_VERDICT_NEUTRAL_MET_CIJFER = 'Nog geen oordeel'
+
+/**
  * Het oordeel voor één hefboom in gewone taal.
  *
  * @returns de domeinspecifieke zin, of `null` bij `neutral` — dan is er niets

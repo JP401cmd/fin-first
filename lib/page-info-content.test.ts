@@ -125,3 +125,66 @@ describe('categorie-detail: sleutel uit het type, met terugval', () => {
     expect(hasPageInfo(getPageInfo('/toekomst/rekenhulp'))).toBe(true)
   })
 })
+
+
+/**
+ * UR3-13 F2 — "koppelingen": elke begripsentry heeft een consument.
+ *
+ * F1 liet de begrippenlijst sluitend achter (64 entries), maar 26 daarvan
+ * stonden zónder enige call site: de uitleg bestond, maar was vanaf het scherm
+ * niet te bereiken. F2 hangt die entries aan de `i` van de pagina waar het
+ * woord staat.
+ *
+ * Waarom dit hier als test staat en niet alleen in `npm run glossary:check`:
+ * die scan meldt een wees-entry bewust als WAARSCHUWING (exit 0), zodat nieuw
+ * jargon eerst als entry mag landen. Daardoor kan een latere bewerking deze 24
+ * koppelingen stilletjes weer losknippen zonder dat één poort rood wordt. Deze
+ * test pint precies de koppelingen die F2 legde — hij vervangt de scan niet,
+ * hij houdt de uitkomst ervan vast.
+ */
+const F2_GEKOPPELD = [
+  // Leenwoorden die aan de bron hernoemd zijn (optie C) — de entry blijft
+  // bestaan voor wie het Engelse woord elders tegenkomt.
+  'forecast',
+  'optimizer',
+  'YTD',
+  // Grafiek- en tijdas-taal.
+  'bandbreedte',
+  'omslagpunt',
+  'kassabon',
+  // De plan-regel: stop-anker (4) + eind-vorm (3) + het overkoepelende begrip.
+  'stopmoment',
+  'stopanker_solved',
+  'stopanker_aow',
+  'stopanker_age',
+  'stopanker_now',
+  'eindstrategie_deplete',
+  'eindstrategie_legacy',
+  'eindstrategie_perpetual',
+  // Beleggen, pensioen en fiscaal.
+  'ETF',
+  'ter',
+  'ISIN',
+  'rebalancing',
+  'AOW',
+  'SORR',
+  'aanmerkelijk_belang',
+  'inclusiepercentage',
+  // App-eigen begrippen die alleen als dode entry bestonden.
+  'soevereiniteit',
+  'will',
+] as const
+
+describe('PAGE_INFO — UR3-13 F2: de gekoppelde begrippen blijven gekoppeld', () => {
+  const gechipt = new Set(Object.values(PAGE_INFO).flatMap((c) => c.terms ?? []))
+
+  it.each(F2_GEKOPPELD)('%s hangt aan minstens één BEGRIPPEN-chip', (term) => {
+    expect(gechipt.has(term)).toBe(true)
+  })
+
+  it('koppelt alleen bestaande entries — een hernoemde key valt hier om', () => {
+    for (const term of F2_GEKOPPELD) {
+      expect(GLOSSARY_ENTRIES[term], `ontbrekende entry: ${term}`).toBeTruthy()
+    }
+  })
+})

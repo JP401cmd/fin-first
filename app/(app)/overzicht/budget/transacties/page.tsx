@@ -1,10 +1,10 @@
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
-import {
-  TransactiesVersheidBanner,
-  TransactiesKoopkrachtKaart,
-} from '@/components/overview/transacties/transacties-notices-loader'
+import { TransactiesKoopkrachtKaart } from '@/components/overview/transacties/transacties-notices-loader'
+import { StaleDataGuard } from '@/components/app/stale-data-guard'
+import { StaleNoticeBanner } from '@/components/app/stale-transactions-notice'
+import { StaleNoticeDot } from '@/components/app/stale-notice-provider'
 import { InsightToggleButton } from '@/components/editorial/insight-toggle-button'
 import { INFLATION_IMPACT_ID } from '@/components/overview/inflation-impact-card'
 import { loadAccountCount } from '@/lib/account-count'
@@ -99,14 +99,25 @@ export default async function OverzichtCashflowTransactiesPage({
   return (
     <>
       <NavStackMeta title="Transacties" bottomBar={{ kind: 'tabs' }} />
+      {/* UR3-22 — de versheidsmelding kwam op deze pagina wél binnen maar zonder
+          terughaalpunt: wie haar op /overzicht inklapte kon haar hier niet meer
+          openen (de voorkeur is gedeeld, de knop stond er niet). De guard omspant
+          nu de héle pagina, zodat de banner beneden en het punt in de
+          header-cluster hieronder dezelfde toestand delen. */}
+      <StaleDataGuard>
       <div className="relative mx-auto max-w-6xl px-4 pt-4 sm:px-6">
         {/* Verhuisd van de opgeheven cashflow-hub, samen met de inflatiekaart
             waar hij bij hoort: haalt het weggeklikte inzicht terug. Vaste
-            offsets links van het statuspunt (meldingen-conventie). */}
+            offsets links van de punten (meldingen-conventie). */}
         <InsightToggleButton
           ids={[INFLATION_IMPACT_ID]}
-          className="absolute right-[84px] top-4 sm:right-[92px]"
+          className="absolute right-[116px] top-4 sm:right-[124px]"
         />
+        {/* Geminimaliseerde "Gegevens verouderd"-melding, links van het
+            statuspunt — dezelfde volgorde als de utility-cluster van /overzicht
+            (stale · status · 'i'), hier met de absolute offsets die de conventie
+            voor deze paginavorm voorschrijft. */}
+        <StaleNoticeDot className="absolute right-[84px] top-4 sm:right-[92px]" />
         <PageStatusDot className="absolute right-[52px] top-4 sm:right-[60px]" />
         <PageInfoButton
           content={getPageInfo('/overzicht/budget/transacties')}
@@ -123,14 +134,13 @@ export default async function OverzichtCashflowTransactiesPage({
           deck="Elke transactie is gekochte of verkochte tijd — bekijk waar je uren heen gaan."
         />
         <KoppelRekeningBanner accountCount={accountCount} />
-        {/* Versheidsmelding, verhuisd van de cashflow-hub: alles hieronder rust
-            op transacties, dus als die stilstaan hoort dat er vóór te staan.
-            Eigen <Suspense> zodat zijn loader de analyse niet ophoudt; bij verse
-            data rendert hij niets. De fallback reserveert de bannerhoogte zodat
-            de analyse niet omlaag springt zodra hij binnenkomt. */}
-        <Suspense fallback={<div aria-hidden="true" className="h-16 animate-pulse bg-[var(--subtle)]" />}>
-          <TransactiesVersheidBanner />
-        </Suspense>
+        {/* Versheidsmelding: alles hieronder rust op transacties, dus als die
+            stilstaan hoort dat er vóór te staan. Geen eigen <Suspense> meer —
+            de guard hierboven heeft het oordeel al geveld (twee gedeelde,
+            React-cache()'de leesacties i.p.v. de volledige `loadCashflowKpis`
+            die deze melding voorheen alleen hiervoor optrok), dus er valt
+            niets meer in te streamen. Bij verse data rendert hij niets. */}
+        <StaleNoticeBanner />
         {/* De grenzenpotten staan direct onder de geldstroom-/spaarquote-kaart:
             eerst wat er binnenkomt en overblijft, dan de grenzen die je daarop
             zet. Server-geladen (ADR 0058) en als slot doorgegeven, omdat de
@@ -159,6 +169,7 @@ export default async function OverzichtCashflowTransactiesPage({
           <TransactiesKoopkrachtKaart perspective={perspective} />
         </Suspense>
       </div>
+      </StaleDataGuard>
 
       {/* "Waar je cijfers op rusten" — de grondslagkeuze voor inkomen, uitgaven
           en spaarquote (ADR 0103) — stond hier, onder de vouw, achter een

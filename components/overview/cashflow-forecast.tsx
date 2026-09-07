@@ -231,7 +231,7 @@ function ForecastHeading() {
   return (
     <div>
       <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-[var(--ink-3)]">
-        Cashflow — forecast
+        Cashflow — vooruitblik
       </div>
       <h2 className="font-serif text-xl text-[var(--ink)] mt-1">
         {FORECAST_MONTHS} maanden vooruit

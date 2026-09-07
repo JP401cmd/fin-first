@@ -737,12 +737,19 @@ export function BudgetReportActions({
 }
 
 /**
- * De periode-toggle (Maand / YTD / 12 mnd) in de actiebalk. In Eenvoudig-modus
- * (`simple`) is de maand de énige periode → deze group rendert dan niet en de
- * caller forceert `effectivePeriodMode='maand'`. Daarmee blijft de afkorting
- * "YTD" ook volledig uit beeld in Eenvoudig (jargonregel: "dit jaar" i.p.v.
- * "YTD"); in Volledig blijft het label ongewijzigd. Geëxporteerd voor
- * unit-tests. `periodMode` blijft de gebruikers-keuze; in simple irrelevant.
+ * De periode-toggle (Maand / Dit jaar / 12 mnd) in de actiebalk. In
+ * Eenvoudig-modus (`simple`) is de maand de énige periode → deze group rendert
+ * dan niet en de caller forceert `effectivePeriodMode='maand'`.
+ *
+ * Het label was "YTD"; sinds UR3-13 F2 (optie C) staat er in BEIDE weergaven
+ * "Dit jaar". Een Engelse afkorting met een gangbaar Nederlands equivalent
+ * hernoemen we aan de bron — niet via een `simpleLabel`, want dat werkt alleen
+ * waar `<GlossaryTerm>` staat en zou in Eenvoudig twee woorden voor hetzelfde
+ * opleveren. De afkorting zelf blijft uitgelegd in de begrippenlijst (key
+ * `YTD`), want banken en brokers gebruiken 'm wél.
+ *
+ * Geëxporteerd voor unit-tests. `periodMode` blijft de gebruikers-keuze; in
+ * simple irrelevant.
  */
 export function BudgetPeriodToggle({
   simple,
@@ -767,7 +774,7 @@ export function BudgetPeriodToggle({
               : 'text-[var(--ink-3)] hover:text-[var(--ink-2)]'
           }`}
         >
-          {mode === 'maand' ? 'Maand' : mode === 'ytd' ? 'YTD' : '12 mnd'}
+          {mode === 'maand' ? 'Maand' : mode === 'ytd' ? 'Dit jaar' : '12 mnd'}
         </button>
       ))}
     </div>
@@ -2633,9 +2640,10 @@ export default function BudgetsPage({ initialBudgetId, initialData, showKoppelNu
               style={{ fontFamily: 'var(--font-playfair, serif)' }}
             >
               {effectivePeriodMode === 'ytd'
-                ? // Jaar uit de berekende YTD-periode (huidig kalenderjaar), niet uit
+                ? // Jaar uit de berekende periode (huidig kalenderjaar), niet uit
                   // de maand-selectie — periodStart is `${huidigJaar}-01-01`.
-                  `${periodStart.slice(0, 4)} YTD`
+                  // "Dit jaar" i.p.v. "YTD": zie BudgetPeriodToggle hierboven.
+                  `Dit jaar (${periodStart.slice(0, 4)})`
                 : effectivePeriodMode === '12m'
                   ? 'Afgelopen 12 maanden'
                   : monthLabel}

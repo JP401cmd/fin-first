@@ -16,7 +16,7 @@ import { getPageInfo } from '@/lib/page-info-content'
 
 export const metadata: Metadata = {
   title: 'Budget — TriFinity',
-  description: 'Plan en volg je maandbudgetten — transacties, vaste lasten en forecast.',
+  description: 'Plan en volg je maandbudgetten — transacties, vaste lasten en vooruitblik.',
 }
 
 /**

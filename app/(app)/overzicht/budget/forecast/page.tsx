@@ -10,7 +10,7 @@ import { PageStatusDot } from '@/components/app/page-status-dot'
 import { getPageInfo } from '@/lib/page-info-content'
 
 export const metadata: Metadata = {
-  title: 'Forecast — TriFinity',
+  title: 'Vooruitblik — TriFinity',
   description: 'Spaarquote, maandelijks netto, uitgaventrend en 6-maands-vooruitblik.',
 }
 
@@ -47,7 +47,10 @@ export default async function OverzichtCashflowForecastPage() {
 
   return (
     <>
-      <NavStackMeta title="Forecast" bottomBar={{ kind: 'tabs' }} />
+      {/* Titel = "Vooruitblik" (UR3-13 F2, optie C). De map — en dus de URL —
+          blijft /overzicht/budget/forecast; alleen het woord op het scherm is
+          Nederlands. */}
+      <NavStackMeta title="Vooruitblik" bottomBar={{ kind: 'tabs' }} />
       <div className="relative mx-auto max-w-6xl px-4 pt-4 sm:px-6">
         <PageStatusDot className="absolute right-[52px] top-4 sm:right-[60px]" />
         <PageInfoButton
