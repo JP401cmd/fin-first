@@ -943,3 +943,9 @@
 - **Schermen** toegevoegd: /overzicht/budget, /overzicht/budget/forecast, /overzicht/budget/transacties, /overzicht/budget/vaste-lasten
 - **Schermen** verwijderd: /overzicht/cashflow, /overzicht/cashflow/budget, /overzicht/cashflow/forecast, /overzicht/cashflow/transacties, /overzicht/cashflow/vaste-lasten
 - **Componenten (aantal)** toegevoegd: +6
+
+## 2026-09-07
+
+- **Schermen** toegevoegd: /overzicht/budget/instellingen
+- **Integratie-clients** toegevoegd: lib/parsers/degiro-corporate-actions.ts
+- **Componenten (aantal)** toegevoegd: +2

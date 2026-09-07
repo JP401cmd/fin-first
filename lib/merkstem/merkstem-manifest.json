@@ -1,5 +1,5 @@
 {
-  "attestedAt": "2026-09-05T20:40:25.705Z",
+  "attestedAt": "2026-09-07T16:37:20.964Z",
   "note": "Attestatie-baseline voor de merkstem (ADR 0112). Per toon-/claimbron en per copy-oppervlak een sha256. Bijwerken betekent: de copy is opnieuw naast de bron gelegd. Zie .claude/skills/merkstem/SKILL.md en scripts/merkstem/scan.mjs.",
   "toneSources": [
     {
@@ -57,8 +57,8 @@
         },
         {
           "file": "components/landing/hero.tsx",
-          "sha256": "0f4f8b708fd3e0582fe268ab4a78b6193864d9ec8ee200bac1179ff9e95ce77c",
-          "copyLines": 18
+          "sha256": "5c7bac75b1da7cf5d864bfc8c3f4b78983eae58e186aac441e2a942c459164bb",
+          "copyLines": 19
         },
         {
           "file": "components/landing/marketing-page-shell.tsx",
@@ -87,18 +87,18 @@
         },
         {
           "file": "components/landing/sections/home.tsx",
-          "sha256": "3b2a2797e2489bf867211cffaf1cb6465019c30a117f77eb4ae313bc82f3e9b8",
-          "copyLines": 45
+          "sha256": "ddc48cbd9d498eabe89a9da7a1494fd9712c21e3890e826da42d369fc6abd7da",
+          "copyLines": 48
         },
         {
           "file": "components/landing/sections/veiligheid.tsx",
-          "sha256": "c30916a6c559657b8924a0d138fd48b1214b947f9bab63ff00de29076c5d22fc",
-          "copyLines": 24
+          "sha256": "4647a7d87382092cd62cf82b764da0af2e36c43f887717db27b1779fd01fe0f2",
+          "copyLines": 27
         },
         {
           "file": "components/landing/slot-cta.tsx",
-          "sha256": "1becf77198577a7d4d7547e7444692bc2b12505bcf10768b88aeffeec07b700d",
-          "copyLines": 4
+          "sha256": "e15fe12a06e62d7bf03896bfa15b85f4c09b43b2c4a4f96d3ecea15fc458074e",
+          "copyLines": 5
         }
       ]
     },
@@ -114,8 +114,8 @@
         },
         {
           "file": "app/over/page.tsx",
-          "sha256": "21a81ddafd5f49fcca0616b112922b7887ed2754f4aa345391b72f80638fa023",
-          "copyLines": 14
+          "sha256": "2b82fcc45d2e94341ecfa6bae054db93b52d527dc527c1981c98cf359eb654e6",
+          "copyLines": 15
         },
         {
           "file": "app/page.tsx",
@@ -141,18 +141,18 @@
       "files": [
         {
           "file": "app/check/page.tsx",
-          "sha256": "654c3fd95c155e03597af589b1a20c9de3205c9ca828d5fc1926164ae9331620",
-          "copyLines": 7
+          "sha256": "71f366aa4739db6b35489e8200d001e0222727c73988da0ebd2f5e7ee2645eb0",
+          "copyLines": 9
         },
         {
           "file": "app/contact/page.tsx",
-          "sha256": "d7c73714f8d2eba8242912814a56c5c542ade5b7f2bc873f0412a5858ba519c8",
-          "copyLines": 10
+          "sha256": "c70224a724a49e124ef561c01750d52d1ee1553d27692ca7a17a917d3d458ae2",
+          "copyLines": 12
         },
         {
           "file": "app/signup/page.tsx",
-          "sha256": "d413962abbb891ad2c6d352c7d382a50203386d5aa94ccbaf7ccb53c961249f1",
-          "copyLines": 12
+          "sha256": "ad4c5811ec39f898bc38c152bd3fb94d13f4704d1efca070dfe388241e7d2c3d",
+          "copyLines": 15
         }
       ]
     },

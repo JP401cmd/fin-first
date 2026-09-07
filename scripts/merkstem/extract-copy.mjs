@@ -232,9 +232,44 @@ export function extractCopy(source, { jsx = true } = {}) {
   // vergelijkingsoperatoren, en dan levert dit patroon codefragmenten op i.p.v.
   // copy — dat is precies wat het eerste prototype op lib/briefing/directives.ts deed.
   if (jsx) {
+    // Prettier zet een `{' '}` neer zodra een zin een inline `<em>`/`<Link>`
+    // bevat. In het skelet is de string-inhoud al weggeblankt, dus daar staat
+    // `{   }`: een container die niets dan witruimte omsluit. De tekenklasse
+    // hieronder sluit `{`/`}` uit, waardoor zo'n container de tekstknoop niet
+    // half maar HEEL liet wegvallen — en dat is precies de vorm waarin
+    // claim-dragende zinnen geschreven worden (nadruk plus link naar het
+    // beleid). De extractie was dus het blindst waar hij het scherpst moet zijn.
+    //
+    // Blank die containers tot witruimte van GELIJKE LENGTE: de tekstknoop wordt
+    // aaneengesloten zonder dat de indexen verschuiven, zodat de leesvolgorde
+    // (die bewust in de hash meetelt) intact blijft.
+    //
+    // Bewust alleen de witruimte-containers. De tekenklasse verbreden tot
+    // `/[>}]([^<>{}]+)[<{]/` haalt óók echte `{expr}`-containers binnen en
+    // levert dan overwegend codefragmenten op (`export default function Home()`,
+    // `catch (err)`) — de valkuil die ADR 0112 al voor `.ts`-bestanden benoemt.
+    //
+    // De detectie draait op de RAUWE BRON, niet op het skelet. `blank()` blankt
+    // alléén de INHOUD van een literal en laat de aanhalingstekens staan, dus in
+    // het skelet zien `{' '}` en `{'een hele zin'}` er identiek uit
+    // (`{'            '}`). Matchen op het skelet zou die tweede dus óók blanken,
+    // en dat kost twee dingen: een `{}` verliest zijn rol als grens (waardoor
+    // codefragmenten de copy in lekken), en de samengevoegde tekstknoop krijgt de
+    // index van de eerste `>` terwijl de literal een látere index heeft — dan
+    // klopt de leesvolgorde niet meer, en die telt bewust mee in de hash.
+    //
+    // Indexen lopen gelijk op: `blank()` behoudt de lengte, dus een positie in de
+    // bron is dezelfde positie in het skelet.
+    const WHITESPACE_CONTAINER = /\{\s*(['"])\s*\1\s*\}|\{\s+\}/g
+    const jsxChars = [...skeleton]
+    for (const c of source.matchAll(WHITESPACE_CONTAINER)) {
+      for (let k = c.index; k < c.index + c[0].length; k++) jsxChars[k] = ' '
+    }
+    const jsxSkeleton = jsxChars.join('')
+
     const jsxText = />([^<>{}]+)</g
     let m
-    while ((m = jsxText.exec(skeleton)) !== null) {
+    while ((m = jsxText.exec(jsxSkeleton)) !== null) {
       const t = normalize(m[1])
       if (looksLikeProse(t)) found.push({ index: m.index + 1, text: t })
     }

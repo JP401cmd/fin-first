@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-06T12:46:05.689Z",
-  "generatedDate": "2026-09-06",
+  "generatedAt": "2026-09-07T12:49:16.173Z",
+  "generatedDate": "2026-09-07",
   "repo": {
     "name": "fin",
     "version": "0.71.0"
@@ -187,13 +187,13 @@
     }
   },
   "stats": {
-    "routes": 139,
-    "routesProduction": 96,
+    "routes": 140,
+    "routesProduction": 97,
     "api": 309,
     "tables": 94,
     "migrations": 231,
     "integrations": 25,
-    "components": 1060,
+    "components": 1062,
     "providers": 17,
     "contextBuilders": 9,
     "briefingTools": 0,
@@ -847,6 +847,12 @@
     {
       "url": "/overzicht/budget/forecast",
       "file": "app/(app)/overzicht/budget/forecast/page.tsx",
+      "group": "wil",
+      "isTest": false
+    },
+    {
+      "url": "/overzicht/budget/instellingen",
+      "file": "app/(app)/overzicht/budget/instellingen/page.tsx",
       "group": "wil",
       "isTest": false
     },
@@ -1854,6 +1860,12 @@
       {
         "url": "/overzicht/budget/forecast",
         "file": "app/(app)/overzicht/budget/forecast/page.tsx",
+        "group": "wil",
+        "isTest": false
+      },
+      {
+        "url": "/overzicht/budget/instellingen",
+        "file": "app/(app)/overzicht/budget/instellingen/page.tsx",
         "group": "wil",
         "isTest": false
       },
@@ -8778,11 +8790,11 @@
     }
   ],
   "components": {
-    "total": 1060,
+    "total": 1062,
     "groups": [
       {
         "group": "app",
-        "count": 417,
+        "count": 419,
         "items": [
           "aandelen-holdings.config",
           "account-form-modal",
@@ -8898,6 +8910,7 @@
           "debt-comparison-chart",
           "debt-detail-modal",
           "debt-form",
+          "debt-form.berekend-toggle.test",
           "debt-form.negatieve-invoer.test",
           "debt-pane",
           "debt-trajectory-chart",
@@ -9118,6 +9131,7 @@
           "sidebar.naamgeving.test",
           "sim-chart",
           "sim-chart-widget",
+          "sim-chart-widget.canonieke-koers.test",
           "sim-chart-widget.test",
           "sim-chart.test",
           "simulations-modal",
@@ -9205,7 +9219,7 @@
       },
       {
         "group": "overview",
-        "count": 195,
+        "count": 194,
         "items": [
           "aandachtspunt-actie-button",
           "atomic-cards",
@@ -9242,6 +9256,8 @@
           "box3-tegenbewijs-card.test",
           "briefing-panel",
           "briefing-panel.test",
+          "budget-cash-sources",
+          "budget-cash-sources.test",
           "bulk-bevestigingen",
           "bulk-bevestigingen.test",
           "bulk-bewerken-overlay",
@@ -9355,9 +9371,6 @@
           "schulden-filter",
           "schulden-filter.test",
           "schulden-view",
-          "sinds-vorig-bezoek",
-          "sinds-vorig-bezoek-loader",
-          "sinds-vorig-bezoek.test",
           "spend-limit-heatmap",
           "spend-limit-performance-pane",
           "spend-limit-performance-pane.test",
@@ -9914,11 +9927,12 @@
       },
       {
         "group": "command-palette",
-        "count": 4,
+        "count": 5,
         "items": [
           "command-palette",
           "command-palette-provider",
           "command-palette.overlay.test",
+          "command-palette.sync.test",
           "command-palette.touch.test"
         ]
       },
@@ -17303,6 +17317,18 @@
       ],
       "summary": "Budgetteren is voor het grip-segment de dagelijkse handeling, maar zat drie lagen diep: `/overzicht` → `/overzicht/cashflow` → `/overzicht/cashflow/budget`. Even diep als de fiscale optimizer, die bijna niemand opent. Uit het beginner-onderzoek van september 2026 (Notion UR3-28, ",
       "file": "docs/adr/0135-budget-is-de-derde-hefboom.md"
+    },
+    {
+      "id": "0136-grens-bereikt-is-een-weergave-stand",
+      "title": "Grenzenpot: \"grens bereikt\" is een vierde WEERGAVE-stand, geen nieuwe rekenregel",
+      "status": "aanvaard",
+      "date": "2026-09-07",
+      "elements": [
+        "as-budget",
+        "fn-budgetteren"
+      ],
+      "summary": "Een grenzenpot die precies op zijn grens staat, is rekenkundig binnen die grens en heeft tegelijk geen ruimte meer. De motor zei het eerste, elk oppervlak zei alleen dat, en de tekst beloofde daardoor ruimte die er niet was. De motor blijft ongemoeid — exact op de grens telt nog ",
+      "file": "docs/adr/0136-grens-bereikt-is-een-weergave-stand.md"
     }
   ],
   "churn": {
@@ -17310,11 +17336,11 @@
     "areas": [
       {
         "path": "app/(app)/overzicht",
-        "commits": 73
+        "commits": 75
       },
       {
         "path": "lib/ai",
-        "commits": 49
+        "commits": 50
       },
       {
         "path": "app/(app)/toekomst",
@@ -17352,23 +17378,23 @@
     "hotFiles": [
       {
         "file": "components/app/horizon/horizon-client.tsx",
-        "loc": 10152,
+        "loc": 10187,
         "commits": 79
       },
       {
         "file": "components/app/budgets-client.tsx",
-        "loc": 5456,
+        "loc": 5614,
         "commits": 34
       },
       {
         "file": "components/core/assets-client.tsx",
-        "loc": 4941,
+        "loc": 4966,
         "commits": 36
       },
       {
         "file": "components/app/cash-account-view.tsx",
         "loc": 3698,
-        "commits": 25
+        "commits": 24
       },
       {
         "file": "lib/dashboard-data-loader.ts",
@@ -17383,7 +17409,7 @@
       {
         "file": "app/(app)/core/cash/import/page.tsx",
         "loc": 2436,
-        "commits": 25
+        "commits": 20
       },
       {
         "file": "app/(app)/core/checkin/page.tsx",
@@ -18420,6 +18446,13 @@
       "parserFormat": "csv"
     },
     {
+      "file": "lib/parsers/degiro-corporate-actions.ts",
+      "exists": true,
+      "baseUrl": null,
+      "hasAdapter": false,
+      "parserFormat": null
+    },
+    {
       "file": "lib/parsers/iban.ts",
       "exists": true,
       "baseUrl": null,
@@ -18527,29 +18560,27 @@
   ],
   "diff": {
     "baseline": false,
-    "previousDate": "2026-09-05",
+    "previousDate": "2026-09-06",
     "hasChanges": true,
     "sections": [
       {
         "label": "Schermen",
         "added": [
-          "/overzicht/budget",
-          "/overzicht/budget/forecast",
-          "/overzicht/budget/transacties",
-          "/overzicht/budget/vaste-lasten"
+          "/overzicht/budget/instellingen"
         ],
-        "removed": [
-          "/overzicht/cashflow",
-          "/overzicht/cashflow/budget",
-          "/overzicht/cashflow/forecast",
-          "/overzicht/cashflow/transacties",
-          "/overzicht/cashflow/vaste-lasten"
-        ]
+        "removed": []
+      },
+      {
+        "label": "Integratie-clients",
+        "added": [
+          "lib/parsers/degiro-corporate-actions.ts"
+        ],
+        "removed": []
       },
       {
         "label": "Componenten (aantal)",
         "added": [
-          "+6"
+          "+2"
         ],
         "removed": []
       }
@@ -18919,6 +18950,13 @@
       "components": 1060,
       "tables": 94,
       "routesProduction": 96
+    },
+    {
+      "date": "2026-09-07",
+      "api": 309,
+      "components": 1062,
+      "tables": 94,
+      "routesProduction": 97
     }
   ]
 }

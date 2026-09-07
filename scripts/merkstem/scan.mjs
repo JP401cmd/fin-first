@@ -38,7 +38,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
-import { dirname, join, relative, sep } from 'node:path'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import { copyHash, extractCopy, jsxForFile, extractDnaSection, extractMarkdownSection } from './extract-copy.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -455,5 +455,17 @@ function runCheck() {
   console.log(`\nmerkstem:check — toon- en claimbron geattesteerd ✓${copyDrift.length ? '  (copy-drift: waarschuwing, zie boven)' : '  (geen copy-drift)'}\n`)
 }
 
-if (process.argv.includes('--check')) runCheck()
-else runScan()
+// Alleen draaien wanneer dit script zélf de entry point is. Zonder deze guard
+// voert een `import` uit een test `runScan()` uit, en dát herschrijft
+// lib/merkstem/merkstem-manifest.json — de ATTESTATIE zelf — plus
+// docs/merkstem/merkstem.json, tegen de staat van de werkboom. Een testrun zou
+// dus stilzwijgend de Wft- en AVG-claimbaseline her-attesteren, inclusief
+// ongecommit werk van een parallelle sessie. De parity-kant had dezelfde bug;
+// die is op 7 sep 2026 zo misgegaan en hier preventief gedicht.
+const isEntryPoint =
+  typeof process.argv[1] === 'string' && resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+
+if (isEntryPoint) {
+  if (process.argv.includes('--check')) runCheck()
+  else runScan()
+}

@@ -81,8 +81,16 @@ jobs:
       # de FIRE-uitgavenbasis (computeYearlyMustExpenses/
       # computeRetirementExpenses) die tot Arch F2 bevinding #17 alleen via de
       # dev-only in-app regressiesuite draaide — nu ook in deze CI-gate.
+      #
+      # scripts/merkstem + scripts/ai-parity + lib/uat/acceptance-sources
+      # bewaken de POORTEN zelf: de merkstem-extractie (die claim-dragende copy
+      # in zijn geheel liet wegvallen zolang er een {' '} naast stond), de
+      # parity-baseline-classificatie (CRLF-artefact vs. echte drift) en het
+      # bestaan van de bronverwijzingen in de acceptatiecriteria. Zonder deze
+      # regel draaien ze nergens automatisch — en een test die nergens
+      # ingehaakt is, is documentatie, geen poort.
       - name: Rekenmotor- & pariteitstests (vitest)
-        run: npx vitest run lib/horizon-kernel test/horizon-oracle lib/box1-tax lib/box3 lib/fiscale-kerngetallen lib/architecture lib/budget-utils.test.ts test/budget-berekeningen-suite-check.test.ts test/uat-stale-scan.test.ts
+        run: npx vitest run lib/horizon-kernel test/horizon-oracle lib/box1-tax lib/box3 lib/fiscale-kerngetallen lib/architecture lib/budget-utils.test.ts test/budget-berekeningen-suite-check.test.ts test/uat-stale-scan.test.ts scripts/merkstem scripts/ai-parity lib/uat/acceptance-sources.test.ts
 
       # In-app regressiesuites (lib/regression-tests/suites/*.ts, ~80 suites) —
       # draaien normaal alleen via de server-runner (/beheer/regressietest of

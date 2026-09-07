@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-05T20:40:25.729Z",
-  "attestedAt": "2026-09-05T20:40:25.705Z",
+  "generatedAt": "2026-09-07T16:37:21.005Z",
+  "attestedAt": "2026-09-07T16:37:20.964Z",
   "toneStatus": "attested",
   "copyStatus": "attested",
   "toneSources": [
@@ -41,7 +41,7 @@
       "label": "Landingcopy",
       "caveat": "",
       "fileCount": 14,
-      "copyLines": 235,
+      "copyLines": 243,
       "files": [
         {
           "file": "components/landing/demo-mocks.tsx",
@@ -90,10 +90,10 @@
         },
         {
           "file": "components/landing/hero.tsx",
-          "attestedSha256": "0f4f8b708fd3e0582fe268ab4a78b6193864d9ec8ee200bac1179ff9e95ce77c",
-          "liveSha256": "0f4f8b708fd3e0582fe268ab4a78b6193864d9ec8ee200bac1179ff9e95ce77c",
-          "copyLines": 18,
-          "attestedCopyLines": 18,
+          "attestedSha256": "5c7bac75b1da7cf5d864bfc8c3f4b78983eae58e186aac441e2a942c459164bb",
+          "liveSha256": "5c7bac75b1da7cf5d864bfc8c3f4b78983eae58e186aac441e2a942c459164bb",
+          "copyLines": 19,
+          "attestedCopyLines": 19,
           "extractionCollapsed": false,
           "status": "attested"
         },
@@ -144,28 +144,28 @@
         },
         {
           "file": "components/landing/sections/home.tsx",
-          "attestedSha256": "3b2a2797e2489bf867211cffaf1cb6465019c30a117f77eb4ae313bc82f3e9b8",
-          "liveSha256": "3b2a2797e2489bf867211cffaf1cb6465019c30a117f77eb4ae313bc82f3e9b8",
-          "copyLines": 45,
-          "attestedCopyLines": 45,
+          "attestedSha256": "ddc48cbd9d498eabe89a9da7a1494fd9712c21e3890e826da42d369fc6abd7da",
+          "liveSha256": "ddc48cbd9d498eabe89a9da7a1494fd9712c21e3890e826da42d369fc6abd7da",
+          "copyLines": 48,
+          "attestedCopyLines": 48,
           "extractionCollapsed": false,
           "status": "attested"
         },
         {
           "file": "components/landing/sections/veiligheid.tsx",
-          "attestedSha256": "c30916a6c559657b8924a0d138fd48b1214b947f9bab63ff00de29076c5d22fc",
-          "liveSha256": "c30916a6c559657b8924a0d138fd48b1214b947f9bab63ff00de29076c5d22fc",
-          "copyLines": 24,
-          "attestedCopyLines": 24,
+          "attestedSha256": "4647a7d87382092cd62cf82b764da0af2e36c43f887717db27b1779fd01fe0f2",
+          "liveSha256": "4647a7d87382092cd62cf82b764da0af2e36c43f887717db27b1779fd01fe0f2",
+          "copyLines": 27,
+          "attestedCopyLines": 27,
           "extractionCollapsed": false,
           "status": "attested"
         },
         {
           "file": "components/landing/slot-cta.tsx",
-          "attestedSha256": "1becf77198577a7d4d7547e7444692bc2b12505bcf10768b88aeffeec07b700d",
-          "liveSha256": "1becf77198577a7d4d7547e7444692bc2b12505bcf10768b88aeffeec07b700d",
-          "copyLines": 4,
-          "attestedCopyLines": 4,
+          "attestedSha256": "e15fe12a06e62d7bf03896bfa15b85f4c09b43b2c4a4f96d3ecea15fc458074e",
+          "liveSha256": "e15fe12a06e62d7bf03896bfa15b85f4c09b43b2c4a4f96d3ecea15fc458074e",
+          "copyLines": 5,
+          "attestedCopyLines": 5,
           "extractionCollapsed": false,
           "status": "attested"
         }
@@ -176,7 +176,7 @@
       "label": "Publieke routes",
       "caveat": "",
       "fileCount": 5,
-      "copyLines": 37,
+      "copyLines": 38,
       "files": [
         {
           "file": "app/functies/page.tsx",
@@ -189,10 +189,10 @@
         },
         {
           "file": "app/over/page.tsx",
-          "attestedSha256": "21a81ddafd5f49fcca0616b112922b7887ed2754f4aa345391b72f80638fa023",
-          "liveSha256": "21a81ddafd5f49fcca0616b112922b7887ed2754f4aa345391b72f80638fa023",
-          "copyLines": 14,
-          "attestedCopyLines": 14,
+          "attestedSha256": "2b82fcc45d2e94341ecfa6bae054db93b52d527dc527c1981c98cf359eb654e6",
+          "liveSha256": "2b82fcc45d2e94341ecfa6bae054db93b52d527dc527c1981c98cf359eb654e6",
+          "copyLines": 15,
+          "attestedCopyLines": 15,
           "extractionCollapsed": false,
           "status": "attested"
         },
@@ -230,32 +230,32 @@
       "label": "Funnel",
       "caveat": "",
       "fileCount": 3,
-      "copyLines": 29,
+      "copyLines": 36,
       "files": [
         {
           "file": "app/check/page.tsx",
-          "attestedSha256": "654c3fd95c155e03597af589b1a20c9de3205c9ca828d5fc1926164ae9331620",
-          "liveSha256": "654c3fd95c155e03597af589b1a20c9de3205c9ca828d5fc1926164ae9331620",
-          "copyLines": 7,
-          "attestedCopyLines": 7,
+          "attestedSha256": "71f366aa4739db6b35489e8200d001e0222727c73988da0ebd2f5e7ee2645eb0",
+          "liveSha256": "71f366aa4739db6b35489e8200d001e0222727c73988da0ebd2f5e7ee2645eb0",
+          "copyLines": 9,
+          "attestedCopyLines": 9,
           "extractionCollapsed": false,
           "status": "attested"
         },
         {
           "file": "app/contact/page.tsx",
-          "attestedSha256": "d7c73714f8d2eba8242912814a56c5c542ade5b7f2bc873f0412a5858ba519c8",
-          "liveSha256": "d7c73714f8d2eba8242912814a56c5c542ade5b7f2bc873f0412a5858ba519c8",
-          "copyLines": 10,
-          "attestedCopyLines": 10,
+          "attestedSha256": "c70224a724a49e124ef561c01750d52d1ee1553d27692ca7a17a917d3d458ae2",
+          "liveSha256": "c70224a724a49e124ef561c01750d52d1ee1553d27692ca7a17a917d3d458ae2",
+          "copyLines": 12,
+          "attestedCopyLines": 12,
           "extractionCollapsed": false,
           "status": "attested"
         },
         {
           "file": "app/signup/page.tsx",
-          "attestedSha256": "d413962abbb891ad2c6d352c7d382a50203386d5aa94ccbaf7ccb53c961249f1",
-          "liveSha256": "d413962abbb891ad2c6d352c7d382a50203386d5aa94ccbaf7ccb53c961249f1",
-          "copyLines": 12,
-          "attestedCopyLines": 12,
+          "attestedSha256": "ad4c5811ec39f898bc38c152bd3fb94d13f4704d1efca070dfe388241e7d2c3d",
+          "liveSha256": "ad4c5811ec39f898bc38c152bd3fb94d13f4704d1efca070dfe388241e7d2c3d",
+          "copyLines": 15,
+          "attestedCopyLines": 15,
           "extractionCollapsed": false,
           "status": "attested"
         }

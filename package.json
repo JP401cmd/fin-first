@@ -20,6 +20,7 @@
     "arch:check": "node scripts/architecture/generate.mjs --check",
     "parity:scan": "node scripts/ai-parity/scan.mjs",
     "parity:check": "node scripts/ai-parity/scan.mjs --check",
+    "parity:rebaseline": "node scripts/ai-parity/scan.mjs --rebaseline",
     "merkstem:scan": "node scripts/merkstem/scan.mjs",
     "merkstem:check": "node scripts/merkstem/scan.mjs --check",
     "check:client-reads": "node scripts/check-client-data-reads.mjs",

@@ -38,9 +38,10 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
-import { dirname, join, relative, sep } from 'node:path'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
@@ -78,6 +79,31 @@ function warn(msg) {
  */
 function sha256(text) {
   return createHash('sha256').update(text).digest('hex')
+}
+
+/**
+ * Bepaal wat een opgeslagen baseline is ten opzichte van de bron.
+ *
+ * De checker hierboven hasht CRLF→LF genormaliseerd, maar de baselines in
+ * parity-manifest.json zijn met de hand op de RAUWE bytes gegenereerd (de
+ * `lokale-prompt-parity`-skill schreef daar een wegwerp-snippet voor). Op een
+ * Windows-checkout kreeg elk CRLF-bestand daardoor een baseline die de checker
+ * per constructie nooit kan reproduceren — permanente "drift" die niets met de
+ * inhoud te maken heeft. Gemeten op 7 sep 2026: 4 van de 16 baselines.
+ *
+ * Dit onderscheid bestaat zodat `--rebaseline` alléén dát representatieprobleem
+ * mag opruimen. Zou het blind alle hashes herschrijven, dan maakt het opruimen
+ * van de valse positieven de ECHTE drift in dezelfde beweging stil — en juist
+ * die moet zichtbaar blijven tot iemand de hercondensatie-afweging maakt.
+ *
+ * @returns 'in-sync' | 'crlf-artefact' | 'drift'
+ */
+export function classifyBaseline({ stored, headContent }) {
+  if (!stored || typeof headContent !== 'string') return 'drift'
+  const lf = headContent.replace(/\r\n/g, '\n')
+  if (stored === sha256(lf)) return 'in-sync'
+  if (stored === sha256(lf.replace(/\n/g, '\r\n'))) return 'crlf-artefact'
+  return 'drift'
 }
 
 /**
@@ -340,16 +366,165 @@ function checkFresh() {
   if (c.inSync !== f.inSync) console.error(`  • inSync: gecommit ${c.inSync} → nu ${f.inSync}`)
   if (c.dnaEstimatedTokens !== f.dnaEstimatedTokens)
     console.error(`  • dnaEstimatedTokens: gecommit ${c.dnaEstimatedTokens} → nu ${f.dnaEstimatedTokens}`)
-  const fByFile = new Map(f.sources.map((s) => [s.file, s]))
-  for (const cs of c.sources) {
-    const fs2 = fByFile.get(cs.file)
-    if (fs2 && cs.liveSha256 !== fs2.liveSha256) {
-      console.error(`  • ${cs.file}: live-hash gewijzigd (bron is aangepast)`)
+  // Loop óók de artefact-bronnen langs, niet alleen de top-level `sources`.
+  // Stond hier eerder alleen `c.sources`, dan noemde de diagnose uitsluitend de
+  // chat-bronnen en bleef een verschil onder briefing/rapport/aanbevelingen/
+  // nieuws/rekenhulp onzichtbaar — je las "STALE" met één oorzaak terwijl er
+  // meer speelden, en concludeerde ten onrechte dat het niet aan je eigen
+  // wijziging lag. Ook een gewijzigde STORED-hash (een rebaseline) hoort hier
+  // genoemd te worden, niet alleen een gewijzigde live-hash.
+  const paren = [
+    ...c.sources.map((s) => ['(top-level)', s]),
+    ...c.artefacts.flatMap((a) => (a.sources ?? []).map((s) => [a.id, s])),
+  ]
+  const versGeindexeerd = new Map([
+    ...f.sources.map((s) => [`(top-level)|${s.file}`, s]),
+    ...f.artefacts.flatMap((a) => (a.sources ?? []).map((s) => [`${a.id}|${s.file}`, s])),
+  ])
+  for (const [label, cs] of paren) {
+    const vers = versGeindexeerd.get(`${label}|${cs.file}`)
+    if (!vers) continue
+    if (cs.liveSha256 !== vers.liveSha256) {
+      console.error(`  • ${label} · ${cs.file}: live-hash gewijzigd (bron is aangepast)`)
+    }
+    if (cs.storedSha256 !== vers.storedSha256) {
+      console.error(`  • ${label} · ${cs.file}: baseline gewijzigd (manifest is gerebaselined)`)
     }
   }
   console.error('\nDraai `npm run parity:scan` en commit het bijgewerkte docs/ai-parity/parity.json.\n')
   process.exit(1)
 }
 
-if (process.argv.includes('--check')) checkFresh()
-else runScan()
+// ── rebaseline: repareer de representatie, nooit stilzwijgend de inhoud ──────
+// De baselines werden met de hand gegenereerd (skill-stap 3, "wegwerp-snippet")
+// en dus op rauwe bytes; de checker normaliseert CRLF→LF. Deze modus laat
+// generator en checker per constructie dezelfde methode gebruiken.
+//
+// Bewust vanuit HEAD en niet vanaf schijf: de werkboom is gedeeld met parallelle
+// sessies, en een rebaseline vanaf schijf zou hun ONGECOMMITTE wijziging als
+// nieuwe waarheid vastleggen. Een baseline hoort een gecommitte staat te zijn.
+function headContent(file) {
+  try {
+    return execFileSync('git', ['show', `HEAD:${file}`], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      maxBuffer: 1 << 24,
+    })
+  } catch {
+    return null
+  }
+}
+
+function runRebaseline({ acceptDrift = false } = {}) {
+  const manifest = JSON.parse(read(MANIFEST_FILE) || 'null')
+  if (!manifest) {
+    console.error('parity:rebaseline — lib/ai/local/parity-manifest.json ontbreekt of is onleesbaar.')
+    process.exit(1)
+  }
+
+  const groups = [
+    { label: '(top-level)', sources: manifest.sources },
+    ...(manifest.artefacts ?? []).map((a) => ({ label: a.id, sources: a.sources })),
+  ]
+
+  const cache = new Map()
+  const drift = []
+  let genormaliseerd = 0
+  let geaccepteerd = 0
+  let inSync = 0
+
+  for (const group of groups) {
+    for (const s of group.sources ?? []) {
+      if (!s?.file) continue
+      if (!cache.has(s.file)) cache.set(s.file, headContent(s.file))
+      const head = cache.get(s.file)
+      const verdict = classifyBaseline({ stored: s.sha256, headContent: head })
+
+      if (verdict === 'in-sync') {
+        inSync++
+      } else if (verdict === 'crlf-artefact') {
+        s.sha256 = sha256(head.replace(/\r\n/g, '\n'))
+        genormaliseerd++
+        console.log(`  ~ ${group.label} · ${s.file} — regelinde-artefact genormaliseerd`)
+      } else if (acceptDrift && typeof head === 'string') {
+        s.sha256 = sha256(head.replace(/\r\n/g, '\n'))
+        geaccepteerd++
+        console.log(`  + ${group.label} · ${s.file} — ECHTE drift geaccepteerd (--accept-drift)`)
+      } else {
+        drift.push(`${group.label} · ${s.file}`)
+      }
+    }
+  }
+
+  // Herbereken de token-schatting per artefact. Die waarde is de FALLBACK die
+  // `buildArtefact` gebruikt zodra de live-extractie faalt (hernoemde constante,
+  // herstructurering); loopt hij achter, dan rapporteert het script bij zo'n
+  // storing een stille onwaarheid. De skill vraagt hier expliciet om.
+  //
+  // Bewust van SCHIJF en niet uit HEAD — anders dan de bron-hashes hierboven.
+  // Een baseline hoort een gecommitte staat te zijn (daarom HEAD), maar de
+  // token-schatting beschrijft het artefact zoals het nu geschreven is, en dat
+  // is juist de nog-ongecommitte hercondensatie waar deze run over gaat.
+  let hermeten = 0
+  for (const a of manifest.artefacts ?? []) {
+    if (!a?.constant || !a?.file) continue
+    const tekst = extractConstantText(read(join(ROOT, a.file)), a.constant)
+    if (tekst == null) {
+      warn(`token-schatting van '${a.id}' niet hermeten — constante ${a.constant} niet gevonden`)
+      continue
+    }
+    const vers = estimateTokens(tekst)
+    if (vers !== a.estimatedTokens) {
+      console.log(`  # ${a.id} · tokenschatting ${a.estimatedTokens} → ${vers} (budget ${a.subBudget})`)
+      a.estimatedTokens = vers
+      hermeten++
+    }
+  }
+
+  // Alleen schrijven als er daadwerkelijk iets wijzigt: een no-op-run mag geen
+  // mtime-ruis of formatteringsdiff opleveren. `generatedAt` schuift mee, zodat
+  // het manifest zelf vertelt wanneer de baselines voor het laatst bepaald zijn
+  // (de SKILL vraagt daarom, en de rebaseline is nu het enige gereedschap dat ze
+  // mag zetten).
+  const gewijzigd = genormaliseerd + geaccepteerd + hermeten
+  if (gewijzigd > 0) {
+    manifest.generatedAt = new Date().toISOString()
+    writeFileSync(MANIFEST_FILE, JSON.stringify(manifest, null, 2) + '\n')
+  }
+
+  console.log(
+    `\nparity:rebaseline — ${inSync} in sync · ${genormaliseerd} genormaliseerd${
+      acceptDrift ? ` · ${geaccepteerd} drift geaccepteerd` : ''
+    } · ${drift.length} onaangeroerd\n`,
+  )
+  if (drift.length > 0) {
+    console.log('  Echte inhoudelijke drift — NIET aangeraakt:')
+    for (const d of drift) console.log(`    ✗ ${d}`)
+    console.log(
+      '\n  Dit is geen regelinde-kwestie: de bron is inhoudelijk gewijzigd sinds het\n' +
+        '  artefact werd gecondenseerd. Loop de hercondensatie-afweging langs de\n' +
+        '  `lokale-prompt-parity`-skill (met eigenaar-gate) en draai daarna\n' +
+        '  `npm run parity:rebaseline -- --accept-drift`.\n',
+    )
+  }
+  if (gewijzigd > 0) {
+    console.log(`  ✓ ${rel(MANIFEST_FILE)}\n`)
+    console.log('  Draai nu `npm run parity:scan` om het rapport bij te werken.\n')
+  } else {
+    console.log(`  = ${rel(MANIFEST_FILE)} ongewijzigd — niets te normaliseren.\n`)
+  }
+}
+
+// Alleen draaien wanneer dit script zélf de entry point is. Zonder deze guard
+// voert een `import` uit een test runScan() uit en overschrijft die het
+// gecommitte parity.json met de staat van de werkboom — inclusief ongecommit
+// werk van een parallelle sessie. Precies zo misgegaan op 7 sep 2026.
+const isEntryPoint =
+  typeof process.argv[1] === 'string' && resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+
+if (isEntryPoint) {
+  if (process.argv.includes('--check')) checkFresh()
+  else if (process.argv.includes('--rebaseline'))
+    runRebaseline({ acceptDrift: process.argv.includes('--accept-drift') })
+  else runScan()
+}
