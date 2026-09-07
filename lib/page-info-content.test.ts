@@ -83,3 +83,45 @@ describe('hasPageInfo — render-guard', () => {
     expect(hasPageInfo(getPageInfo('/bestaat-niet'))).toBe(false)
   })
 })
+
+/**
+ * De categoriepagina's (`CategoryHero`/`DebtCategoryHero`) bouwen hun sleutel
+ * uit het TYPE — `/overzicht/bezittingen/${type}` — met de categorie-entry als
+ * terugval. Dat is de plek waar besluit 9 stilletjes kan stukgaan: een
+ * hernoemd type of een verwijderde entry laat de knop niet verdwijnen, hij gaat
+ * alleen ineens de algemene tekst tonen. Deze test pint de resolutie zelf.
+ */
+describe('categorie-detail: sleutel uit het type, met terugval', () => {
+  it('geeft een type met eigen entry zijn eigen tekst', () => {
+    const hypotheek = getPageInfo('/overzicht/schulden/mortgage', '/overzicht/schulden')
+    expect(hypotheek).toBe(PAGE_INFO['/overzicht/schulden/mortgage'])
+    expect(hypotheek).not.toBe(PAGE_INFO['/overzicht/schulden'])
+
+    const huis = getPageInfo('/overzicht/bezittingen/eigen_huis', '/overzicht/bezittingen')
+    expect(huis).toBe(PAGE_INFO['/overzicht/bezittingen/eigen_huis'])
+  })
+
+  it('valt voor een type zonder eigen entry terug op de categorie', () => {
+    expect(getPageInfo('/overzicht/schulden/personal_loan', '/overzicht/schulden')).toBe(
+      PAGE_INFO['/overzicht/schulden'],
+    )
+    expect(getPageInfo('/overzicht/bezittingen/vehicle', '/overzicht/bezittingen')).toBe(
+      PAGE_INFO['/overzicht/bezittingen'],
+    )
+  })
+
+  it('levert altijd renderbare inhoud, dus de knop verdwijnt nooit', () => {
+    for (const type of ['mortgage', 'personal_loan', 'student_loan', 'other']) {
+      expect(hasPageInfo(getPageInfo(`/overzicht/schulden/${type}`, '/overzicht/schulden'))).toBe(true)
+    }
+    for (const type of ['cash', 'investment', 'eigen_huis', 'retirement', 'crypto', 'other']) {
+      expect(hasPageInfo(getPageInfo(`/overzicht/bezittingen/${type}`, '/overzicht/bezittingen'))).toBe(
+        true,
+      )
+    }
+  })
+
+  it('geeft de rekenhulp een eigen entry (was de derde route zonder knop)', () => {
+    expect(hasPageInfo(getPageInfo('/toekomst/rekenhulp'))).toBe(true)
+  })
+})

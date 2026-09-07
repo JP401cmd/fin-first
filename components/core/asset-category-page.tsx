@@ -28,6 +28,8 @@ import type {
 import type { InvestmentHoldingRow } from '@/lib/investment-holdings-data'
 import type { CategoryHistoryData } from '@/lib/load-category-history'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { PageInfoButton } from '@/components/editorial'
+import { getPageInfo, hasPageInfo } from '@/lib/page-info-content'
 import { buildKpiContext, type KpiContextRefs } from '@/lib/kpi-context'
 import { computeAssetKpi, type KpiPair } from '@/lib/asset-kpi'
 import { useFeatureAccess } from '@/components/app/feature-access-provider'
@@ -896,13 +898,26 @@ interface CategoryHeroProps {
 function CategoryHero({ type, total, count }: CategoryHeroProps) {
   const accentColor = ASSET_TYPE_COLORS[type]
   const { ref, hasEntered } = useInViewAnimation({ duration: 600 })
+  /**
+   * Info-knop (besluit 9: inhoudspagina's dragen een `i`). De sleutel komt uit
+   * het TYPE, niet uit de pathname: dan krijgt de legacy-route
+   * `/core/assets/[type]` exact dezelfde uitleg als de canonieke
+   * `/overzicht/bezittingen/[type]`. Types met eigen jargon (eigen huis,
+   * beleggingen, pensioen) hebben een eigen entry; de rest valt terug op de
+   * categorie-overzichtstekst.
+   */
+  const pageInfo = getPageInfo(`/overzicht/bezittingen/${type}`, '/overzicht/bezittingen')
 
   return (
-    <section className="border-b border-[var(--border-ed)] bg-[var(--paper)]">
+    <section className="relative border-b border-[var(--border-ed)] bg-[var(--paper)]">
       {/* Module-active accent (Kern-500 op /core/assets/**) */}
       <div className="h-1" style={{ background: 'var(--module-active-500)' }} />
 
-      <div className="px-4 py-5 sm:px-6 sm:py-7">
+      {hasPageInfo(pageInfo) && (
+        <PageInfoButton content={pageInfo} className="absolute right-4 top-4 sm:right-6" />
+      )}
+
+      <div className="py-5 pl-4 pr-12 sm:py-7 sm:pl-6 sm:pr-14">
         {/* Hairline-kicker — canonieke PageOpening-spec (streep + mono-label) */}
         <div className="flex flex-wrap items-center gap-2.5 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--module-active-700)]">
           <span

@@ -54,6 +54,7 @@ export default async function ToekomstRekenhulpPage() {
         emphasis="tijd"
         titleAfter="?"
         deck="Fin-ondersteunde rekenhulpen — vergelijk financiële keuzes en bewaar je eigen berekeningen."
+        infoKey="/toekomst/rekenhulp"
       />
       <RekenhulpView saved={savedCalculators} prefill={prefill} />
     </>

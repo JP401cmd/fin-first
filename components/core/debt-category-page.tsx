@@ -12,6 +12,8 @@ import {
 } from '@/lib/debt-data'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { PageInfoButton } from '@/components/editorial'
+import { getPageInfo, hasPageInfo } from '@/lib/page-info-content'
 import { HideInSimple } from '@/components/app/hide-in-simple'
 import { AddCategoryCard } from './add-category-card'
 import { VermogenDebtCard } from './vermogen-debt-card'
@@ -593,13 +595,25 @@ function DebtCategoryHero({ type, total, count }: DebtCategoryHeroProps) {
   const { ref, hasEntered } = useInViewAnimation({ duration: 600 })
   const [, plural] = debtNoun(type, count === 1 ? 1 : 2)
   const counterLabel = count === 1 ? debtNoun(type, 1)[0] : plural
+  /**
+   * Info-knop (besluit 9). Sleutel komt uit het TYPE, zodat
+   * `mortgage` zijn eigen hypotheek-uitleg krijgt (LTV, annuïteit,
+   * aflossingsvrij, renteherziening) op zowel de canonieke route als de legacy
+   * `/core/debts/[type]`. Andere types vallen terug op de
+   * categorie-overzichtstekst.
+   */
+  const pageInfo = getPageInfo(`/overzicht/schulden/${type}`, '/overzicht/schulden')
 
   return (
-    <section className="border-b border-[var(--border-ed)] bg-[var(--paper)]">
+    <section className="relative border-b border-[var(--border-ed)] bg-[var(--paper)]">
       {/* Module-active accent (Kern-500 op /core/debts/**) */}
       <div className="h-1" style={{ background: 'var(--module-active-500)' }} />
 
-      <div className="px-4 py-5 sm:px-6 sm:py-7">
+      {hasPageInfo(pageInfo) && (
+        <PageInfoButton content={pageInfo} className="absolute right-4 top-4 sm:right-6" />
+      )}
+
+      <div className="py-5 pl-4 pr-12 sm:py-7 sm:pl-6 sm:pr-14">
         {/* Hairline-kicker — canonieke PageOpening-spec in module-active-accent.
             Rood (--negative) blijft uitsluitend voor negatieve semantiek
             (bedragen/status), niet als kop-identiteit. */}

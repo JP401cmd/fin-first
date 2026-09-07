@@ -119,6 +119,77 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
       { href: '/toekomst/voorkeuren', label: 'Aannames achter de projectie' },
     ],
   },
+
+  // Categorie-detail onder /overzicht/bezittingen/[type]. De categoriepagina
+  // zoekt op de volledige pathname en valt terug op '/overzicht/bezittingen';
+  // een type zonder eigen entry krijgt dus automatisch de overzichtstekst.
+  // Alleen de types met eigen jargon staan hier — dat is precies waar de
+  // eerste-run-testers op vastliepen.
+  '/overzicht/bezittingen/investment': {
+    insight:
+      'Je beleggingen: wat je inlegde, wat het nu waard is en wat het verschil je aan vrijheidstijd oplevert.',
+    grip: 'Open een positie voor het verloop, of werk de waarde bij zodat je rendement blijft kloppen.',
+    werking: [
+      {
+        title: 'Positie of totaalbedrag',
+        text: 'Je kunt één bedrag per rekening bijhouden, of de losse posities eronder. Met posities erbij kan de app ook je spreiding en je kosten laten zien.',
+      },
+      {
+        title: 'Rendement per bezitting',
+        text: 'Het rendement wordt berekend uit je eigen inleg en waardeverloop, niet uit een marktgemiddelde. Daarom kan het afwijken van wat je broker toont.',
+      },
+    ],
+    terms: ['per_asset_rendement', 'asset_allocatie', 'diversificatie', 'index_etf', 'expense_ratio', 'dividend'],
+    related: [{ href: '/overzicht/bezittingen', label: 'Al je bezittingen bij elkaar' }],
+  },
+  '/overzicht/bezittingen/eigen_huis': {
+    insight:
+      'Je eigen woning telt mee in je vermogen, maar je kunt hem niet zomaar opeten. Daarom krijgt hij in de projectie een eigen behandeling.',
+    grip: 'Werk de waarde bij, en leg in Toekomst vast of het huis meetelt, wordt verkocht of wordt opgegeten.',
+    werking: [
+      {
+        title: 'Waarde bijwerken',
+        text: 'Zet er de WOZ-waarde of een taxatie in. De oude waarde blijft bewaard, zodat je verloop een lijn blijft in plaats van een sprong.',
+      },
+      {
+        title: 'De hypotheek staat apart',
+        text: 'De woning staat bij je bezittingen, de hypotheek bij je schulden. Je overwaarde is het verschil tussen die twee.',
+      },
+      {
+        title: 'Meetellen of niet',
+        text: 'In Toekomst kies je hoe het huis in je vrijheidsberekening meetelt. Die keuze verandert je vrijheidsmoment, dus hij hoort bewust gemaakt te worden.',
+      },
+    ],
+    terms: ['netto_vermogen', 'liquiditeit', 'LTV', 'hypotheek'],
+    related: [
+      { href: '/overzicht/schulden/mortgage', label: 'De hypotheek ernaast' },
+      { href: '/toekomst/voorkeuren', label: 'Hoe je huis meetelt in de projectie' },
+    ],
+  },
+  '/overzicht/bezittingen/retirement': {
+    insight:
+      'Wat er via je werkgever en de AOW voor je klaarstaat. Dat geld komt later, maar het bepaalt nu al hoeveel je zelf nog opzij moet zetten.',
+    grip: 'Leg per regeling vast wat je verwacht en vanaf welke leeftijd, dan rekent de projectie het mee.',
+    werking: [
+      {
+        title: 'Uit je pensioenoverzicht',
+        text: 'De bedragen op mijnpensioenoverzicht.nl (het UPO) kun je hier overnemen. Verwacht bedrag en ingangsleeftijd zijn de twee die het meeste uitmaken.',
+      },
+      {
+        title: 'Later beschikbaar',
+        text: 'Pensioen kun je niet vervroegd aanspreken. In de projectie telt het daarom pas mee vanaf de leeftijd die je invult — de jaren daarvóór moet je zelf overbruggen.',
+      },
+      {
+        title: 'Ruimte om zelf bij te leggen',
+        text: 'Bouw je minder op dan fiscaal mag, dan is er jaarruimte. Wat dat voor jou betekent, zie je bij je belastingoverzicht.',
+      },
+    ],
+    terms: ['pensioen', 'upo', 'jaarruimte', 'franchise', 'middelloon'],
+    related: [
+      { href: '/overzicht/belasting/box1', label: 'Wat pensioen fiscaal doet' },
+      { href: '/toekomst', label: 'Je pad tot aan de pensioenleeftijd' },
+    ],
+  },
   '/overzicht/schulden': {
     insight:
       'Wat je nog terugbetaalt — hypotheek, leningen, studieschuld. Schuld verkort je vrijheid; elke aflossing verlengt hem weer.',
@@ -145,6 +216,38 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     related: [
       { href: '/overzicht/bezittingen', label: 'Bezittingen — de andere kant van de balans' },
       { href: '/rapportages/balans', label: 'Balans op één peildatum' },
+    ],
+  },
+
+  // Categorie-detail onder /overzicht/schulden/[type] — zelfde
+  // pathname-met-terugval-mechanisme als bij bezittingen. De hypotheek krijgt
+  // een eigen entry omdat juist daar de meeste onbekende woorden staan.
+  '/overzicht/schulden/mortgage': {
+    insight:
+      'Je hypotheek is meestal je grootste schuld én je langste. Elke euro rente is tijd die je aan de bank betaalt in plaats van aan jezelf.',
+    grip: 'Bekijk het verloop tot nul, en zie wat extra aflossen doet vóór je het overmaakt.',
+    werking: [
+      {
+        title: 'Aflosvorm',
+        text: 'Bij een annuïteit blijft je maandbedrag gelijk en verschuift de verhouding rente-aflossing. Bij aflossingsvrij betaal je alleen rente en blijft de schuld staan tot het einde van de looptijd.',
+      },
+      {
+        title: 'Rentevastperiode',
+        text: 'Je rente staat vast tot een afgesproken datum. Daarna wordt hij opnieuw bepaald, en verandert je maandlast mee. Leg die datum vast, dan kan de projectie er rekening mee houden.',
+      },
+      {
+        title: 'Schuld tegenover waarde',
+        text: 'De verhouding tussen je restschuld en de waarde van je woning heet de LTV. Hoe lager die wordt, hoe gunstiger je rente bij een volgende herziening meestal uitvalt.',
+      },
+      {
+        title: 'Wat extra aflossen teruggeeft',
+        text: 'Extra aflossen verlaagt je maandlast en daarmee het bedrag dat je nodig hebt om vrij te zijn. Dat effect staat naast het bedrag, in tijd.',
+      },
+    ],
+    terms: ['hypotheek', 'annuiteit', 'LTV', 'schuldgraad'],
+    related: [
+      { href: '/overzicht/bezittingen/eigen_huis', label: 'De woning ernaast' },
+      { href: '/overzicht/schulden', label: 'Al je schulden bij elkaar' },
     ],
   },
   // Eén entry voor de Budget-hefboom. Hier stonden er twee — de cashflow-hub en
@@ -495,6 +598,34 @@ export const PAGE_INFO: Record<string, PageInfoContent> = {
     insight:
       'Verkenningen die je niet meteen weer kwijt wilt raken horen hier: je wat-als-scenario’s en berekeningen op één plek.',
     grip: 'Open een opgeslagen scenario om verder te bouwen, of leg het naast je huidige plan om te vergelijken.',
+  },
+  '/toekomst/rekenhulp': {
+    insight:
+      'Een keuze kost of levert tijd. Hier reken je er één door — huren of kopen, extra aflossen, een auto vervangen — en zie je wat hij met je vrijheid doet.',
+    grip: 'Vul een rekenhulp met je eigen cijfers, of laat Fin er een maken en bewaar hem voor later.',
+    werking: [
+      {
+        title: 'Vooringevuld met jouw cijfers',
+        text: 'Bedragen die de app al kent — inkomen, uitgaven, vermogen, rente — staan alvast ingevuld. Je overschrijft ze gerust; dat verandert niets aan je echte gegevens.',
+      },
+      {
+        title: 'Zelf een rekenhulp laten maken',
+        text: 'Beschrijf de vraag in gewone taal en Fin bouwt de bijbehorende berekening. Je ziet de formule, dus je kunt hem controleren voor je erop leunt.',
+      },
+      {
+        title: 'Bewaren en delen',
+        text: 'Een rekenhulp die je vaker gebruikt bewaar je onder je eigen naam. Publiceren mag ook; dan kunnen anderen hem kopiëren en aanpassen.',
+      },
+      {
+        title: 'Een verkenning, geen advies',
+        text: 'De uitkomst is een doorrekening van wat jij invult. Wat je met die uitkomst doet, blijft jouw keuze.',
+      },
+    ],
+    terms: ['vrijheidstijd', 'compounding', 'annuiteit'],
+    related: [
+      { href: '/toekomst/whatif', label: 'Wat-als op je hele plan' },
+      { href: '/toekomst/bibliotheek', label: 'Wat je eerder bewaarde' },
+    ],
   },
 
   // ── Horizon-fallbacks (embedded /horizon-varianten) ─────────────────
