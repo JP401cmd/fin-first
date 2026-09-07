@@ -18,6 +18,7 @@ import { DEFAULT_VOLATILITY } from '@/lib/constants'
 import type { SimCashflow } from '@/lib/fire-simulation'
 import type { TransitionScenario } from '@/components/app/horizon/phase-modal-overgang'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { formatAowAge } from '@/lib/aow-leeftijd'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -176,7 +177,7 @@ export const MonteCarloOvergang = memo(function MonteCarloOvergang({
             </p>
             <p className="mt-1 text-xs leading-relaxed text-[var(--ink-3)]">
               {fireAge != null && aowAge != null
-                ? `Je FIRE-leeftijd (${Math.round(fireAge)}) en je AOW-leeftijd (${Math.round(aowAge)}) vallen samen — er is geen periode om te overbruggen, dus de Monte Carlo simulatie voor de overgangsfase is niet relevant.`
+                ? `Je FIRE-leeftijd (${Math.round(fireAge)}) en je AOW-leeftijd (${formatAowAge(aowAge)}) vallen samen — er is geen periode om te overbruggen, dus de Monte Carlo simulatie voor de overgangsfase is niet relevant.`
                 : 'FIRE-leeftijd en AOW-leeftijd vallen samen. Er is geen overgangsfase om te simuleren.'}
             </p>
           </div>

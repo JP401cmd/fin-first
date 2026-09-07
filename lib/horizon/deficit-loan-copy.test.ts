@@ -46,7 +46,7 @@ describe('buildDeficitLoanCopy — leenperiode', () => {
   it('gebruikt de AOW-leeftijd als bovengrens wanneer die ná de eerste tekort-leeftijd ligt', () => {
     const copy = buildDeficitLoanCopy(BASE)
     expect(copy.variant).toBe('tot-aow')
-    expect(copy.periode).toBe('De leenperiode loopt van leeftijd 58 tot je AOW-leeftijd (67).')
+    expect(copy.periode).toBe('De leenperiode loopt van leeftijd 58 tot je AOW-leeftijd (67 jaar en 3 maanden).')
   })
 
   it('valt terug op de plan-eindleeftijd wanneer de AOW-leeftijd al gepasseerd is', () => {
@@ -68,18 +68,21 @@ describe('buildDeficitLoanCopy — leenperiode', () => {
     expect(copy.periode).toBe('De leenperiode begint op leeftijd 58.')
   })
 
-  it('kapt fractionele leeftijden af op hele jaren (geen 67,25 op het scherm)', () => {
+  // UR3-24: de AOW-leeftijd draagt de canonieke schrijfwijze (`formatAowAge`), niet
+  // meer een eigen `Math.floor` — dat schreef "(67)" voor een 67j3m-cohort en was de
+  // achtste van negen vormen. Een decimale weergave ("67,25") blijft verboden.
+  it('schrijft de AOW-leeftijd canoniek en toont nooit een decimale leeftijd', () => {
     const copy = buildDeficitLoanCopy({ ...BASE, firstAge: 58.75, aowAge: 67.25 })
     expect(copy.periode).toContain('leeftijd 58')
-    expect(copy.periode).toContain('(67)')
+    expect(copy.periode).toContain('(67 jaar en 3 maanden)')
     expect(copy.periode).not.toMatch(/58[.,]7|67[.,]2/)
   })
 
   it('onderscheidt een korte van een lange leenperiode via de genoemde grenzen', () => {
     const kort = buildDeficitLoanCopy({ ...BASE, firstAge: 66, aowAge: 67.25 })
     const lang = buildDeficitLoanCopy({ ...BASE, firstAge: 52, aowAge: 67.25 })
-    expect(kort.periode).toContain('van leeftijd 66 tot je AOW-leeftijd (67)')
-    expect(lang.periode).toContain('van leeftijd 52 tot je AOW-leeftijd (67)')
+    expect(kort.periode).toContain('van leeftijd 66 tot je AOW-leeftijd (67 jaar en 3 maanden)')
+    expect(lang.periode).toContain('van leeftijd 52 tot je AOW-leeftijd (67 jaar en 3 maanden)')
     expect(kort.periode).not.toBe(lang.periode)
   })
 })

@@ -96,7 +96,10 @@ describe('validatePlanDraft — de twee toetsen die alleen de client kan doen', 
   it('aow: eindleeftijd op of onder de AOW-leeftijd is fout, de route kent de AOW niet', () => {
     const r = validatePlanDraft({ ...basis, anchor: 'aow', endAge: 67 }, { aowAge: 67.25 })
     expect(r.ok).toBe(false)
-    expect(r.errors.endAge).toContain('67,3')
+    // UR3-24: een AOW-leeftijd schrijf je als AOW-leeftijd (`formatAowAge`), niet in
+    // het komma-formaat van een gekozen stopleeftijd — dat was vorm 2 van de negen.
+    expect(r.errors.endAge).toContain('67 jaar en 3 maanden')
+    expect(r.errors.endAge).not.toContain('67,3')
     expect(validatePlanDraft({ ...basis, anchor: 'aow', endAge: 90 }, { aowAge: 67.25 }).ok).toBe(true)
   })
 

@@ -20,6 +20,7 @@ import { memo } from 'react'
 import { ChartEventMarkers } from './chart-event-markers'
 import type { ChartEventOverlay, ChartEventKind } from '@/lib/chart-event-overlay'
 import type { SimChartGeometry } from '@/lib/horizon/sim-chart-geometry'
+import { formatAowAgeKort } from '@/lib/aow-leeftijd'
 
 export type ChartStaticLayersProps = {
   geometry: SimChartGeometry
@@ -424,9 +425,7 @@ export function ChartStaticLayersInner({
             fill="var(--ink-4, #bbb8b0)"
             fontFamily="var(--font-dm-mono, monospace)"
           >
-            {aowAgeFractional % 1 === 0
-              ? `${aowAgeFractional}`
-              : `${Math.floor(aowAgeFractional)}+${Math.round((aowAgeFractional % 1) * 12)}m`}
+            {formatAowAgeKort(aowAgeFractional)}
           </text>
           {/* AOW dot at junction point (pensioen mode only) */}
           {isPensioenMode && aowFractionalPt !== null && (

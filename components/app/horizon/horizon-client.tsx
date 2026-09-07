@@ -38,7 +38,7 @@ import { NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND, SAVINGS_RATE_WINDOW_MONTHS,
 import { savingsRateWindow } from '@/lib/savings-source'
 import { isTransferType } from '@/lib/transactions/transfer-marking'
 import { computeKostenKoper } from '@/lib/kosten-koper'
-import { lookupAowAge, type AowLeeftijdRow, type AowAge } from '@/lib/aow-leeftijd'
+import { lookupAowAge, formatAowAge, formatAowAgeKort, type AowLeeftijdRow, type AowAge } from '@/lib/aow-leeftijd'
 import { shouldSkipKernelContextFetch, keepRefIfEqual } from '@/lib/horizon/kernel-context-sync'
 import { computeSuggestedEventValues, type SuggestedEventValues } from '@/lib/horizon/event-prefill'
 import {
@@ -2597,9 +2597,10 @@ export default function HorizonPage({
   const planningMode: 'fire' | 'pensioen' = isPensioenMode ? 'pensioen' : 'fire'
 
   // Pensioen-specific computed values
-  const aowAgeFormatted = userAowAge.months > 0
-    ? `${userAowAge.years}j + ${userAowAge.months}m`
-    : `${userAowAge.years} jaar`
+  // UR3-24: hero-KPI en kassabon-waardecellen zijn krappe, tabular-nums-cellen —
+  // dus de VASTGELEGDE korte vorm ("67+9m"), dezelfde die de AOW-stippellijn op de
+  // tijdas-grafiek draagt. Voorheen een eigen negende schrijfwijze ("67j + 9m").
+  const aowAgeFormatted = formatAowAgeKort(userAowAge)
 
   // ── KERNANTWOORD: één bron voor de vrijheids-/pensioenleeftijd (bevinding C1) ─
   // De hero-KPI, de kassabon eronder en de welkomst-/exit-overlay tonen dezelfde
@@ -3920,7 +3921,7 @@ export default function HorizonPage({
 
     // AOW-specific: warn if age deviates significantly from personal AOW age
     if (formType === 'aow' && typeof formAge === 'number' && formAge < 60) {
-      warnings.push(`Let op: je persoonlijke AOW-leeftijd is ${userAowAge.months > 0 ? `${userAowAge.years} jaar en ${userAowAge.months} maanden` : `${userAowAge.years} jaar`}. Een eerdere leeftijd dan 60 is onrealistisch.`)
+      warnings.push(`Let op: je persoonlijke AOW-leeftijd is ${formatAowAge(userAowAge)}. Een eerdere leeftijd dan 60 is onrealistisch.`)
     }
 
     // Children-specific: validate aantalKinderen
@@ -6153,7 +6154,7 @@ export default function HorizonPage({
                     chartMode === 'vermogenspad'
                       ? getFireProjectionTips({
                           fireAge: simResult.fireAge,
-                          aowAge: Math.round(userAowAge.fractional),
+                          aowAge: userAowAge.fractional,
                           currentAge: currentAge ?? 30,
                           hasMonteCarlo: !!monteCarloOverlay,
                           hasScenario: scenarioOverlayDataList.length > 0,
@@ -6166,7 +6167,7 @@ export default function HorizonPage({
                         })
                       : getWealthCompositionTips({
                           fireAge: simResult.fireAge,
-                          aowAge: Math.round(userAowAge.fractional),
+                          aowAge: userAowAge.fractional,
                           currentAge: currentAge ?? 30,
                         })
                   }
@@ -6482,7 +6483,7 @@ export default function HorizonPage({
                               storageKey="income_expense_chart"
                               tips={getIncomeExpenseTips({
                                 fireAge: simResult.fireAge,
-                                aowAge: Math.round(userAowAge.fractional),
+                                aowAge: userAowAge.fractional,
                                 viewMode: ieViewMode,
                               })}
                               align="right"
@@ -7459,9 +7460,7 @@ export default function HorizonPage({
                         <div className="min-w-0">
                           <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-horizon-600">Jouw AOW-leeftijd</p>
                           <p className="text-xs text-[var(--ink-2)]">
-                            {userAowAge.months > 0
-                              ? `${userAowAge.years} jaar en ${userAowAge.months} maanden`
-                              : `${userAowAge.years} jaar`}
+                            {formatAowAge(userAowAge)}
                             <span className={`ml-1.5 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-medium ${
                               userAowAge.isDefinitive
                                 ? 'bg-positive-bg text-positive'

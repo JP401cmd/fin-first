@@ -29,6 +29,8 @@
  *    loopt tot het einde van de projectie (de FIRE-tak, of een tekort dat pas
  *    ná AOW ontstaat).
  */
+import { formatAowAge } from '@/lib/aow-leeftijd'
+
 export type DeficitLoanPeriodVariant = 'tot-aow' | 'tot-einde'
 
 export interface DeficitLoanCopyInput {
@@ -88,9 +90,14 @@ export function buildDeficitLoanCopy(input: DeficitLoanCopyInput): DeficitLoanCo
   const variant: DeficitLoanPeriodVariant =
     aow != null && aow > startAge ? 'tot-aow' : 'tot-einde'
 
+  // UR3-24: de VERGELIJKING mag op hele jaren (`aow`), de WEERGAVE niet — die ging
+  // via `Math.floor` en schreef "(67)" voor een 67j9m-cohort. Canonieke vorm:
+  // `formatAowAge` op de onafgeronde waarde.
+  const aowLabel = input.aowAge != null ? formatAowAge(input.aowAge) : ''
+
   const periode =
     variant === 'tot-aow'
-      ? `De leenperiode loopt van leeftijd ${startAge} tot je AOW-leeftijd (${aow}).`
+      ? `De leenperiode loopt van leeftijd ${startAge} tot je AOW-leeftijd (${aowLabel}).`
       : eind != null
         ? `De leenperiode begint op leeftijd ${startAge} en loopt door tot het einde van je projectie (leeftijd ${eind}).`
         : `De leenperiode begint op leeftijd ${startAge}.`

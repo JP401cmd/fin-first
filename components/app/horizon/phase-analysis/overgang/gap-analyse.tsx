@@ -10,6 +10,7 @@ import type { Debt } from '@/lib/debt-data'
 import type { SimCashflow } from '@/lib/fire-simulation'
 import type { TransitionScenario } from '@/components/app/horizon/phase-modal-overgang'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { formatAowAge } from '@/lib/aow-leeftijd'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -196,7 +197,7 @@ export const GapAnalyse = memo(function GapAnalyse({
             </p>
             <p className="mt-1 text-xs leading-relaxed text-[var(--ink-3)]">
               {fireAge != null && aowAge != null
-                ? `Je FIRE-leeftijd (${Math.round(fireAge)}) en je AOW-leeftijd (${Math.round(aowAge)}) vallen samen. Er is geen overgangsperiode die overbrugd moet worden.`
+                ? `Je FIRE-leeftijd (${Math.round(fireAge)}) en je AOW-leeftijd (${formatAowAge(aowAge)}) vallen samen. Er is geen overgangsperiode die overbrugd moet worden.`
                 : 'FIRE-leeftijd en AOW-leeftijd vallen samen. Een gap-analyse is niet nodig.'}
             </p>
           </div>

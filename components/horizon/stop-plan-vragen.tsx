@@ -40,12 +40,12 @@ import {
   defaultStopAge,
   endAgeHint,
   endFormShowsEndAge,
-  formatPlanAge,
   withEndForm,
   type PlanDraft,
   type PlanDraftErrors,
 } from '@/lib/horizon/plan-draft'
 import type { StopAnchorKind } from '@/lib/fire-strategy'
+import { formatAowAge } from '@/lib/aow-leeftijd'
 
 export interface StopPlanVragenProps {
   value: PlanDraft
@@ -113,7 +113,7 @@ export function StopPlanVragen({
 
   const ankerOndertitel = (kind: StopAnchorKind, subtitle: string) =>
     kind === 'aow' && aowAge != null && Number.isFinite(aowAge)
-      ? `${subtitle} Jouw AOW-leeftijd: ${formatPlanAge(aowAge)}.`
+      ? `${subtitle} Jouw AOW-leeftijd: ${formatAowAge(aowAge)}.`
       : subtitle
 
   return (

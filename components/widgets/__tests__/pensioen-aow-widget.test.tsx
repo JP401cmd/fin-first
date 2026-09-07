@@ -43,13 +43,13 @@ const COHORT_1986: AowLeeftijdRow = {
   is_definitive: false,
   source: 'test',
 }
-const EXPECTED_AOW_AGE = lookupAowAge([COHORT_1986], '1986-05-01').years // = 69
+const EXPECTED_AOW_AGE = lookupAowAge([COHORT_1986], '1986-05-01').fractional // = 69
 
 function makeData(overrides: Partial<DashboardData> = {}): DashboardData {
   return {
     currentAge: 40,
     // Loader zet dit uit lookupAowAge — hier pinnen we op dezelfde engine-uitvoer.
-    aowAge: EXPECTED_AOW_AGE,
+    aowAgeFractional: EXPECTED_AOW_AGE,
     monthlyExpenses: 0, // vroeg-in-de-maand: losse maand ~0 (mag NIET de dekking sturen)
     recentMonthlyExpenses: 3000, // canonieke rolling-maand → stuurt de dekking
     dailyExpenseRate: 100,
@@ -71,6 +71,18 @@ describe('PensioenAowWidget — HIGH-1 cohort-correcte AOW-leeftijd', () => {
     // De oude hardcoded fallback (67 → 27 jaar) mag nergens meer opduiken.
     expect(screen.queryByText('tot AOW (67)')).toBeNull()
     expect(screen.queryByText('27 jaar')).toBeNull()
+  })
+
+  // UR3-24, mechanisme 6: de loader gaf `.years` door, waardoor de maanden
+  // STILZWIJGEND verdwenen — een 67j9m-cohort werd hier "67", geen andere
+  // afronding maar echt informatieverlies. Het bundelveld is nu fractioneel en
+  // de widget schrijft de leeftijd met de canonieke korte vorm.
+  it('houdt de maanden vast: een 67j9m-cohort toont 67+9m, niet 67', () => {
+    render(<PensioenAowWidget size="half" data={makeData({ aowAgeFractional: 67 + 9 / 12 })} />)
+    expect(screen.getByText('tot AOW (67+9m)')).toBeTruthy()
+    expect(screen.queryByText('tot AOW (67)')).toBeNull()
+    // 67,75 − 40 = 27,75 → 27 hele jaren te gaan (nooit een decimaal op het scherm).
+    expect(screen.getByText('27 jaar')).toBeTruthy()
   })
 })
 

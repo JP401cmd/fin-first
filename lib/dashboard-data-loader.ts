@@ -2852,8 +2852,12 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
   // die de widget zelf zette) — pure consumptie van de canonieke aow_leeftijd-tabel,
   // geen eigen leeftijdrekenwerk. Gegate op dob (niet op netWorth), zodat de leeftijd
   // ook klopt voor gebruikers met een nul/negatief vermogen. null → widget empty-state.
+  // UR3-24: FRACTIONEEL (67.75), niet `.years`. Het oude `.years`-pad gooide de
+  // maanden stilzwijgend weg, waardoor de widget "67" toonde voor een 67j9m-cohort —
+  // geen andere afronding maar echt informatieverlies. De widget formatteert zelf met
+  // de canonieke `formatAowAge`/`formatAowAgeKort`.
   const widgetAowAge: number | null = dob
-    ? lookupAowAge((aowResult.data ?? []) as AowLeeftijdRow[], dob).years
+    ? lookupAowAge((aowResult.data ?? []) as AowLeeftijdRow[], dob).fractional
     : null
   // Verwacht aanvullend pensioen (2e pijler): piek-bruto maandbedrag, verbatim uit de
   // canonieke pensioen-projectiemotor (buildPensionProjection consumeert de 'pension'
@@ -3021,7 +3025,7 @@ export const loadDashboardData = cache(async function loadDashboardData(supabase
     inflationRate: fireParams.inflationRate,
     grossReturn: fireParams.grossReturn,
     currentAge: dob ? ageAtDate(dob) : null,
-    aowAge: widgetAowAge,
+    aowAgeFractional: widgetAowAge,
     pensionMonthlyGross: widgetPensionMonthlyGross,
     weekOverview,
     feeAnalysis,

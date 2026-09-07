@@ -12,6 +12,13 @@
  * - Conditionele tips: alleen toevoegen als de chart-feature actief is.
  */
 
+import { formatAowAge } from '@/lib/aow-leeftijd'
+import { formatStopAge } from '@/lib/horizon/anker-copy'
+
+// UR3-24: `aowAge` is de FRACTIONELE AOW-leeftijd (bv. 67.75) en wordt hier met de
+// canonieke `formatAowAge` geschreven. Callers gaven eerder `Math.round(fractional)`
+// mee, waardoor de tooltip "68" zei terwijl de stippellijn ernaast op 67+9m stond.
+
 // ─────────────────────────────────────────────────────────────────
 // FIRE-projectie / Vermogenspad (SimChart)
 // ─────────────────────────────────────────────────────────────────
@@ -43,7 +50,7 @@ export function getFireProjectionTips(ctx: FireProjectionTipContext): string[] {
     const stop = ctx.stopAge ?? ctx.fireAge
     tips.push(
       stop != null
-        ? `Je stopmoment ligt vast op ${Number.isInteger(stop) ? stop : stop.toFixed(1).replace('.', ',')} — vanaf daar onttrek je uit je vermogen`
+        ? `Je stopmoment ligt vast op ${formatStopAge(stop)} — vanaf daar onttrek je uit je vermogen`
         : 'Je stopmoment ligt vast — vanaf daar onttrek je uit je vermogen',
     )
   } else if (ctx.fireAge != null && ctx.fireAge >= ctx.currentAge) {
@@ -52,7 +59,7 @@ export function getFireProjectionTips(ctx: FireProjectionTipContext): string[] {
     )
   } else {
     tips.push(
-      `De spike rond leeftijd ${ctx.aowAge} is je AOW-uitkering die start`,
+      `De spike rond je AOW-leeftijd (${formatAowAge(ctx.aowAge)}) is je AOW-uitkering die start`,
     )
   }
 
@@ -82,7 +89,7 @@ export function getFireProjectionTips(ctx: FireProjectionTipContext): string[] {
     tips.push(`Verticale stippellijn op leeftijd ${ctx.fireAge} = je FIRE-leeftijd`)
   }
   if (ctx.planningMode === 'pensioen') {
-    tips.push(`Verticale stippellijn op leeftijd ${ctx.aowAge} = je AOW-startleeftijd`)
+    tips.push(`Verticale stippellijn op ${formatAowAge(ctx.aowAge)} = je AOW-startleeftijd`)
   }
 
   return tips
@@ -141,14 +148,14 @@ export function getIncomeExpenseTips(ctx: IncomeExpenseTipContext): string[] {
         `Op leeftijd ${ctx.fireAge} valt salaris weg — dan moet je onttrekking het overnemen`,
       )
     }
-    tips.push(`Plotse stijging rond leeftijd ${ctx.aowAge} = AOW-uitkering kicks in`)
+    tips.push(`Plotse stijging rond ${formatAowAge(ctx.aowAge)} = AOW-uitkering kicks in`)
   } else {
     tips.push(
       'Bronnen-modus splitst inkomen op (salaris, AOW, pensioen, onttrekking) en uitgaven (vast, variabel, schulden)',
     )
     tips.push('Hoe hoger een gestapelde balk, hoe groter de stroom in dat jaar')
     tips.push(
-      `Salaris-blok verdwijnt na leeftijd ${ctx.fireAge ?? ctx.aowAge}, AOW-blok verschijnt op leeftijd ${ctx.aowAge}`,
+      `Salaris-blok verdwijnt na leeftijd ${ctx.fireAge ?? formatAowAge(ctx.aowAge)}, AOW-blok verschijnt op ${formatAowAge(ctx.aowAge)}`,
     )
     tips.push('Schulden-balk (rood) krimpt naarmate je aflost')
   }
@@ -238,7 +245,7 @@ export function getSurplusGapTips(ctx: SurplusGapTipContext): string[] {
 
   const phaseLine =
     ctx.planningMode === 'pensioen'
-      ? `Stippellijn op leeftijd ${ctx.aowAge} = AOW-startleeftijd (begin onttrekking)`
+      ? `Stippellijn op ${formatAowAge(ctx.aowAge)} = AOW-startleeftijd (begin onttrekking)`
       : ctx.fireAge != null
       ? `Stippellijn op leeftijd ${ctx.fireAge} = je FIRE-leeftijd (begin onttrekking)`
       : null

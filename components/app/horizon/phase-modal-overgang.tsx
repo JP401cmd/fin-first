@@ -37,6 +37,7 @@ import { formatCurrency, type FreedomRateSource } from '@/lib/format'
 import { useEuroView } from '@/lib/hooks/use-euro-view'
 import { ReceiptRow } from '@/components/app/horizon/phase-analysis/receipt-row'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { formatAowAgeKort } from '@/lib/aow-leeftijd'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -587,7 +588,7 @@ function GapAnalysisKassabon({
           GAP-ANALYSE
         </p>
         <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">
-          FIRE ({Math.round(fireAge)}) tot AOW ({Math.round(aowAge)}) &middot; {durationYears} jaar zonder AOW
+          FIRE ({Math.round(fireAge)}) tot AOW ({formatAowAgeKort(aowAge)}) &middot; {durationYears} jaar zonder AOW
         </p>
         {euroView === 'real' && (
           <p className="mt-1 font-sans text-[10px] italic text-[var(--ink-3)]">
@@ -692,7 +693,7 @@ function ShortfallAnalysis({
           TEKORT-ANALYSE
         </p>
         <p className="mt-0.5 font-sans text-[10px] text-[var(--ink-3)]">
-          AOW ({Math.round(aowAge)}) tot FIRE ({Math.round(fireAge)}) &middot; {durationYears} jaar met AOW
+          AOW ({formatAowAgeKort(aowAge)}) tot FIRE ({Math.round(fireAge)}) &middot; {durationYears} jaar met AOW
         </p>
         {euroView === 'real' && (
           <p className="mt-1 font-sans text-[10px] italic text-[var(--ink-3)]">

@@ -14,6 +14,7 @@ import { deriveMarginaalTarief } from '@/lib/box1-tax'
 import type { Debt } from '@/lib/debt-data'
 import type { SimCashflow } from '@/lib/fire-simulation'
 import { MaskedAmount } from '@/components/app/masked-amount'
+import { GlossaryTerm } from '@/components/editorial/glossary-term'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -344,7 +345,9 @@ export const HypotheekVsBeleggenOpbouw = memo(
           {/* ── Breakeven and conclusion ──────────────────────── */}
           <div className="rounded-[var(--r)] border border-dashed border-[var(--border-ed)] p-2.5">
             <div className="flex items-baseline justify-between">
-              <span className="text-xs text-[var(--ink-3)]">Omslagpunt</span>
+              <span className="text-xs text-[var(--ink-3)]">
+                <GlossaryTerm term="omslagpunt">Omslagpunt</GlossaryTerm>
+              </span>
               <span className="font-mono text-xs tabular-nums text-[var(--ink-2)]">
                 {(result.breakevenRendement * 100).toFixed(1)}% bruto rendement
               </span>

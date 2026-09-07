@@ -30,6 +30,16 @@ import { formatMaskedCurrency } from '@/lib/format'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { Kicker } from '@/components/editorial'
 import { NL_AOW_AGE } from '@/lib/constants'
+import { formatAowAge, formatAowAgeKort } from '@/lib/aow-leeftijd'
+
+/**
+ * De terugval wanneer er geen cohort-leeftijd bekend is. Eén home: zowel de
+ * projectie-lus als de labels eronder lezen 'm, zodat rekenwaarde en weergave
+ * niet uiteen kunnen lopen (UR3-24).
+ */
+function resolveAowAge(aowAge: number): number {
+  return aowAge > 0 ? aowAge : NL_AOW_AGE
+}
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -123,7 +133,7 @@ function computeProjection(
   grossReturn: number,
   inflationRate: number,
 ): ProjectionPoint[] {
-  const effectiveAowAge = aowAge > 0 ? aowAge : NL_AOW_AGE
+  const effectiveAowAge = resolveAowAge(aowAge)
   const startAge = currentAge ?? 30
   const yearsToProject = Math.max(1, Math.ceil(effectiveAowAge - startAge))
 
@@ -530,14 +540,16 @@ export function NetWorthProjectionChart({
   })()
 
   // Summary values
-  const pensionAge = currentAge != null
-    ? Math.round(aowAge > 0 ? aowAge : NL_AOW_AGE)
-    : null
+  // UR3-24: de AOW-leeftijd wordt niet meer zelf afgerond. `pensionAgeLabel` in
+  // lopende tekst, `pensionAgeKort` in krappe chart-/kaart-labels — dezelfde twee
+  // canonieke vormen als elders; `resolveAowAge` is dezelfde terugval als de projectie.
+  const pensionAgeLabel = currentAge != null ? formatAowAge(resolveAowAge(aowAge)) : null
+  const pensionAgeKort = currentAge != null ? formatAowAgeKort(resolveAowAge(aowAge)) : null
 
   const endLabel = isShortTerm
     ? 'Over 5 jaar'
-    : pensionAge != null
-      ? `Bij pensioen (${pensionAge})`
+    : pensionAgeKort != null
+      ? `Bij pensioen (${pensionAgeKort})`
       : 'Bij pensioen'
 
   const chartContent = (
@@ -552,8 +564,8 @@ export function NetWorthProjectionChart({
           ) : (
             <>
               Geschat vermogensverloop tot{' '}
-              {pensionAge != null ? (
-                <>pensioenleeftijd ({pensionAge})</>
+              {pensionAgeLabel != null ? (
+                <>pensioenleeftijd ({pensionAgeLabel})</>
               ) : (
                 <>pensioen (AOW)</>
               )}
@@ -599,7 +611,7 @@ export function NetWorthProjectionChart({
             role="img"
             aria-label={isShortTerm
             ? 'Netto vermogen projectie komende 5 jaar'
-            : `Netto vermogen projectie tot ${pensionAge ?? 'pensioen'}${pensionAge ? ' jaar' : ''}`
+            : `Netto vermogen projectie tot ${pensionAgeLabel ?? 'pensioen'}`
           }
           >
             {/* Y-axis grid lines + labels */}
@@ -763,7 +775,7 @@ export function NetWorthProjectionChart({
                   opacity={hasEntered ? 1 : 0}
                   style={{ transition: 'opacity 400ms ease-out 500ms' }}
                 >
-                  {pensionAge != null ? `AOW ${pensionAge}` : 'AOW'}
+                  {pensionAgeKort != null ? `AOW ${pensionAgeKort}` : 'AOW'}
                 </text>
               </>
             )}

@@ -28,6 +28,8 @@ import {
   STOP_AGE_MIN,
   STOP_ANCHOR_KINDS,
 } from '@/lib/fire-strategy'
+import { formatStopAge } from '@/lib/horizon/anker-copy'
+import { formatAowAge } from '@/lib/aow-leeftijd'
 
 /**
  * Grenzen — ÉÉN bron in `lib/fire-strategy.ts` (naast de schrijftoets van de routes);
@@ -257,17 +259,21 @@ export function validatePlanDraft(
     Number.isFinite(ctx.aowAge) &&
     draft.endAge <= ctx.aowAge
   ) {
-    errors.endAge = `Je plan moet voorbij je AOW-leeftijd (${formatPlanAge(ctx.aowAge)}) reiken.`
+    // Een AOW-leeftijd schrijf je als AOW-leeftijd, niet als stopleeftijd:
+    // `formatAowAge` i.p.v. het komma-formaat hieronder (UR3-24).
+    errors.endAge = `Je plan moet voorbij je AOW-leeftijd (${formatAowAge(ctx.aowAge)}) reiken.`
   }
 
   return { ok: Object.keys(errors).length === 0, errors }
 }
 
-/** "67" of "67,3" — hetzelfde komma-formaat als `formatStopAge` in anker-copy. */
-export function formatPlanAge(age: number): string {
-  if (Number.isInteger(age)) return String(age)
-  return (Math.round(age * 10) / 10).toFixed(1).replace('.', ',')
-}
+/**
+ * "67" of "67,3" — het komma-formaat voor een door de gebruiker gekozen PLAN-/
+ * STOPleeftijd. Eén home: `formatStopAge` in anker-copy (UR3-24 — dit was een
+ * byte-identiek duplicaat). NIET voor een AOW-leeftijd: die gaat via
+ * `formatAowAge` uit `lib/aow-leeftijd.ts`.
+ */
+export const formatPlanAge = formatStopAge
 
 /**
  * De PUT-body voor `/api/fire-settings` — ALTIJD het volledige plan (route-contract R3):

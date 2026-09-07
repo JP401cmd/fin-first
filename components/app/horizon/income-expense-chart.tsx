@@ -6,6 +6,7 @@ import { useMaskedAmounts } from '@/lib/hooks/use-privacy'
 import { MASKED_AMOUNT_PLACEHOLDER } from '@/lib/format'
 import type { SimRow } from '@/lib/fire-simulation'
 import type { BreakdownResult, BreakdownRow, BreakdownLayer } from '@/lib/income-expense-breakdown'
+import { formatAowAgeKort } from '@/lib/aow-leeftijd'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -794,9 +795,7 @@ function RefLines({
           </text>
           <text x={xAowLine - 4} y={PAD.top + 19} textAnchor="end" fontSize={7}
             fill="var(--hor-t, #8a6e42)" fontFamily="var(--font-dm-mono, monospace)" fontWeight={500}>
-            {aowAgeFractional % 1 === 0
-              ? `${aowAgeFractional}`
-              : `${Math.floor(aowAgeFractional)}+${Math.round((aowAgeFractional % 1) * 12)}m`}
+            {formatAowAgeKort(aowAgeFractional)}
           </text>
         </g>
       )}

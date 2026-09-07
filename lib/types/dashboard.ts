@@ -636,10 +636,12 @@ export interface DashboardData {
   grossReturn: number     // e.g. 0.07
   // Current age of user (null if no date_of_birth)
   currentAge: number | null
-  // Pensioen / AOW-widget bron. aowAge = cohort-correcte AOW-leeftijd (hele jaren)
-  // uit de aow_leeftijd-tabel via lookupAowAge — NIET de hardcoded 67-fallback.
-  // null bij ontbrekende geboortedatum (widget toont empty-state).
-  aowAge?: number | null
+  // Pensioen / AOW-widget bron. Cohort-correcte AOW-leeftijd uit de aow_leeftijd-
+  // tabel via lookupAowAge — NIET de hardcoded 67-fallback. FRACTIONEEL (67.75 =
+  // 67 jaar en 9 maanden); de grondslag staat in de naam omdat het veld tot UR3-24
+  // hele jaren droeg en de maanden weggooide. Weergave uitsluitend via
+  // formatAowAge/formatAowAgeKort. null bij ontbrekende geboortedatum (empty-state).
+  aowAgeFractional?: number | null
   // Verwacht aanvullend pensioen (2e pijler) — piek-bruto maandbedrag, verbatim
   // uit de canonieke buildPensionProjection-motor (brutoNominaal = mijnpensioen
   // 'TeBereiken'). null als er geen pensioen-events zijn geïmporteerd.

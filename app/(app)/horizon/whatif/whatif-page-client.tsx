@@ -1528,7 +1528,7 @@ export default function WhatIfPage({ marktVolatiliteit }: WhatIfPageProps) {
                   chartMode === 'vermogenspad'
                     ? getFireProjectionTips({
                         fireAge: simResult.fireAge,
-                        aowAge: Math.round(userAowAge.fractional),
+                        aowAge: userAowAge.fractional,
                         currentAge: currentAge ?? 30,
                         hasMonteCarlo: !!monteCarloOverlay,
                         hasScenario: pinnedOverlays.length > 0,
@@ -1537,7 +1537,7 @@ export default function WhatIfPage({ marktVolatiliteit }: WhatIfPageProps) {
                       })
                     : getWealthCompositionTips({
                         fireAge: simResult.fireAge,
-                        aowAge: Math.round(userAowAge.fractional),
+                        aowAge: userAowAge.fractional,
                         currentAge: currentAge ?? 30,
                       })
                 }

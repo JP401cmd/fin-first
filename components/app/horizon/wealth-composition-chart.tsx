@@ -11,6 +11,7 @@ import {
 } from '@/lib/wealth-composition'
 import { ChartEventMarkers, topPaddingFor, bottomPaddingFor } from './chart-event-markers'
 import type { ChartEventOverlay, ChartEventKind } from '@/lib/chart-event-overlay'
+import { formatAowAgeKort } from '@/lib/aow-leeftijd'
 
 // ── Constants (match SimChart) ──────────────────────────────
 
@@ -271,6 +272,8 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
   const isPensioenMode = planningMode === 'pensioen'
 
   // Determine which age to use as the split/reference line
+  // aow-weergave: geometrie — dit is een fase-SPLITSINGSJAAR (rij-index), geen
+  // weergave van de AOW-leeftijd; afronden hoort hier wel. Zie lib/aow-leeftijd.ts.
   const refAge = isPensioenMode
     ? (aowAgeFractional != null ? Math.ceil(aowAgeFractional) : null)
     : fireAge
@@ -667,9 +670,7 @@ export const WealthCompositionChart = memo(function WealthCompositionChart({
               fontFamily="var(--font-dm-mono, monospace)"
               fontWeight={500}
             >
-              {aowAgeFractional % 1 === 0
-                ? `${aowAgeFractional}`
-                : `${Math.floor(aowAgeFractional)}+${Math.round((aowAgeFractional % 1) * 12)}m`}
+              {formatAowAgeKort(aowAgeFractional)}
             </text>
           </g>
         )}

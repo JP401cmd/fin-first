@@ -6,6 +6,7 @@ import type { WidgetSize } from '@/lib/widget-catalog'
 import type { DashboardData } from './widget-renderer'
 import { MaskedAmount } from '@/components/app/masked-amount'
 import { NL_AOW_AGE, NL_AOW_MONTHLY, NL_AOW_MONTHLY_SAMENWONEND, NL_SWR } from '@/lib/constants'
+import { formatAowAge, formatAowAgeKort } from '@/lib/aow-leeftijd'
 import { computeEffectiveSwr } from '@/lib/fire-params'
 import { calculateFreedomTime, formatFreedomTimeString } from '@/lib/format'
 import { useInViewAnimation } from '@/lib/hooks/use-in-view-animation'
@@ -38,8 +39,14 @@ export const PensioenAowWidget = memo(function PensioenAowWidget({ size, data, h
   // HIGH-1: cohort-correcte AOW-leeftijd uit de bundel (loader → lookupAowAge op de
   // aow_leeftijd-tabel). NL_AOW_AGE alleen als fallback wanneer de bundel geen leeftijd
   // heeft (mock/ontbrekende dob). Nooit meer de hardcoded 67 als het cohort hoger is.
-  const aowAge = data.aowAge ?? NL_AOW_AGE
-  const yearsToAow = currentAge != null ? Math.max(0, aowAge - currentAge) : null
+  // UR3-24: het bundelveld is FRACTIONEEL (67.75). Weergave gaat door de canonieke
+  // formatteerlaag — `aowAgeLabel` in lopende tekst, `formatAowAgeKort` in de krappe
+  // countdown-chip — nooit meer als kaal getal, dat gooide de maanden weg.
+  const aowAge = data.aowAgeFractional ?? NL_AOW_AGE
+  const aowAgeLabel = formatAowAge(aowAge)
+  const aowAgeKort = formatAowAgeKort(aowAge)
+  // Resterende HELE jaren tot de AOW; de maanden tellen nu wél mee in de aftrekking.
+  const yearsToAow = currentAge != null ? Math.max(0, Math.floor(aowAge - currentAge)) : null
   const aowMonthly = NL_AOW_MONTHLY
   const aowYearly = aowMonthly * 12
 
@@ -113,7 +120,7 @@ export const PensioenAowWidget = memo(function PensioenAowWidget({ size, data, h
             <p className="font-mono text-lg font-semibold tabular-nums text-[var(--ink)]">
               {yearsToAow} jaar
             </p>
-            <p className="text-[10px] text-[var(--ink-3)]">tot AOW-leeftijd ({aowAge})</p>
+            <p className="text-[10px] text-[var(--ink-3)]">tot AOW-leeftijd ({aowAgeLabel})</p>
             <p className="mt-1.5 text-[var(--ink)]">
               <MaskedAmount value={aowMonthly} tone="horizon" className="text-sm" />
             </p>
@@ -140,7 +147,7 @@ export const PensioenAowWidget = memo(function PensioenAowWidget({ size, data, h
               <p className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">
                 {yearsToAow} jaar
               </p>
-              <span className="text-xs text-[var(--ink-3)]">tot je AOW-leeftijd ({aowAge})</span>
+              <span className="text-xs text-[var(--ink-3)]">tot je AOW-leeftijd ({aowAgeLabel})</span>
             </div>
             {currentAge != null && (
               <div className="mt-2">
@@ -156,7 +163,7 @@ export const PensioenAowWidget = memo(function PensioenAowWidget({ size, data, h
                 </div>
                 <div className="mt-0.5 flex justify-between text-[10px] text-[var(--ink-4)]">
                   <span>nu ({currentAge})</span>
-                  <span>AOW ({aowAge})</span>
+                  <span>AOW ({aowAgeKort})</span>
                 </div>
               </div>
             )}
@@ -228,7 +235,7 @@ export const PensioenAowWidget = memo(function PensioenAowWidget({ size, data, h
             <p className="font-mono text-2xl font-semibold tabular-nums text-[var(--ink)]">
               {yearsToAow} jaar
             </p>
-            <span className="text-xs text-[var(--ink-3)]">tot AOW ({aowAge})</span>
+            <span className="text-xs text-[var(--ink-3)]">tot AOW ({aowAgeKort})</span>
           </div>
         ) : (
           <p className="text-xs text-[var(--ink-3)]">Voeg je geboortedatum toe in je profiel</p>
@@ -345,7 +352,7 @@ export const PensioenAowWidget = memo(function PensioenAowWidget({ size, data, h
             <p className="font-mono text-xl font-semibold tabular-nums text-[var(--ink)]">
               {yearsToAow} jaar
             </p>
-            <span className="text-[10px] text-[var(--ink-3)]">tot AOW ({aowAge})</span>
+            <span className="text-[10px] text-[var(--ink-3)]">tot AOW ({aowAgeKort})</span>
           </div>
           <p className="mt-1 text-[var(--ink)]">
             <MaskedAmount value={aowMonthly} tone="horizon" className="text-sm" />/mnd
